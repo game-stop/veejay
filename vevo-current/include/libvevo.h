@@ -88,49 +88,49 @@ typedef int vevo_port_type_id_t;					///< port type specifier
 /**
 	Boolean type definition
 */
-typedef enum { FALSE=0, TRUE } vevo_boolean_t;
+
+#define FALSE 0
+#define TRUE 1
+typedef int vevo_boolean_t;
 
 /**
 	Atom type definitions
 */
-typedef enum { 
-	VEVO_INT=1,
-	VEVO_STRING,
-	VEVO_DOUBLE,
-	VEVO_BOOLEAN,
-	VEVO_PTR_VOID,
-	VEVO_PTR_DBL,
-	VEVO_PTR_U8,
-	VEVO_PTR_U16,
-	VEVO_PTR_U32,
-	VEVO_PTR_S8,
-	VEVO_PTR_S16,
-	VEVO_PTR_S32,
-} vevo_atom_type_t;
+#define	VEVO_INT 1
+#define VEVO_STRING 2
+#define VEVO_DOUBLE 3
+#define VEVO_BOOLEAN 4
+#define VEVO_PTR_VOID 5
+#define VEVO_PTR_DBL 6
+#define VEVO_PTR_U8 7
+#define VEVO_PTR_U16 8
+#define VEVO_PTR_U32 9
+#define VEVO_PTR_S8 10
+#define VEVO_PTR_S16 11
+#define VEVO_PTR_S32 12
+typedef int vevo_atom_type_t;
 
-typedef enum
-{
-	VEVO_FRAME_U8 = 1,
-	VEVO_FRAME_U16,
-	VEVO_FRAME_U32,
-	VEVO_FRAME_S8,
-	VEVO_FRAME_S16,
-	VEVO_FRAME_S32,
-	VEVO_FRAME_FLOAT
-} vevo_pixel_info_t;
+#define VEVO_FRAME_U8 1
+#define VEVO_FRAME_U16 2
+#define VEVO_FRAME_U32 3
+#define VEVO_FRAME_S8 4
+#define VEVO_FRAME_S16 5
+#define VEVO_FRAME_S32 6
+#define VEVO_FRAME_FLOAT 7
+typedef int vevo_pixel_info_t;
 
 
 /**
 	Atom storage type definitions
 */
-typedef enum { 
-	VEVOP_ATOM=0,
-	VEVOP_ARRAY 
-} vevo_storage_t;
+#define VEVOP_ATOM 0
+#define VEVOP_ARRAY 1
+typedef int vevo_storage_t;
 
 /**
 	Property types
 */
+#define VEVO_PROPERTY_PARAMETER			0
 #define VEVO_PROPERTY_CHANNEL  			100
 #define VEVO_PROPERTY_INSTANCE 			200
 
@@ -142,74 +142,70 @@ typedef enum {
 #define VEVO_INTERLACE_BOTTOM_TOP		1
 #define VEVO_INTERLACE_NONE				0			///< default choice (whole frames)
 
+/*!
+	Parameter properties */
+#define	VEVOP_MIN		(VEVO_PROPERTY_PARAMETER + 1)	///< (depends) parameter min value
+#define VEVOP_MAX		(VEVO_PROPERTY_PARAMETER + 2)	///< (depends) parameter max value
+#define VEVOP_DEFAULT	(VEVO_PROPERTY_PARAMETER + 3)	///< parameter default value
+#define VEVOP_STEP_SIZE (VEVO_PROPERTY_PARAMETER + 4)	///< (optional) parameter step size
+#define VEVOP_PAGE_SIZE (VEVO_PROPERTY_PARAMETER + 5)	///< (optional) parameter page size
+#define VEVOP_VALUE		(VEVO_PROPERTY_PARAMETER + 6)	///< parameter value
+#define VEVOP_GROUP_ID	(VEVO_PROPERTY_PARAMETER + 7)	///< (optional) parameter belongs to a group
+#define VEVOP_ENABLED	(VEVO_PROPERTY_PARAMETER + 8)	///< (optional) toggleable parameters
 
-typedef enum { 
-/* parameter properties */
-	VEVOP_MIN = 1,									///< (depends) parameter minimum value
-	VEVOP_MAX,										///< (depends) parameter maximum value
-	VEVOP_DEFAULT,									///< parameter default value
-	VEVOP_STEP_SIZE,								///< (optional) parameter step size
-	VEVOP_PAGE_SIZE,								///< (optional) parameter page size
-	VEVOP_VALUE,									///< parameter value
-	VEVOP_GROUP_ID,									///< (optional) parameter belongs to a group 
-	VEVOP_ENABLED,									///< (optional) toggleable parameters
-
-/* channel properties */
-	VEVOC_FLAGS = VEVO_PROPERTY_CHANNEL,			///< channel optional flags
-	VEVOC_WIDTH,									///< imagedata width
-	VEVOC_HEIGHT,									///< imagedata height
-	VEVOC_FPS,										///< video fps
-	VEVOC_INTERLACING,								///< video interlace order 
-	VEVOC_SAME_AS,									///< channel must have same properties as ...
-	VEVOC_ENABLED,									///< channel is enabled
-	VEVOC_FORMAT,									///< pixel format
-	VEVOC_SHIFT_V,									///< vertical shift factor (for planar data)
-	VEVOC_SHIFT_H,									///< horizontal shift factor (for planar data)
-	VEVOC_PIXELDATA,								///< pointer to image data
-	VEVOC_PIXELINFO,								///< description of imagedata
-/*
-	//Audio data
-	VEVOC_AUDIODATA,								///< pointer to audio data
-	VEVOC_AUDIOBITS,								///< bits of audio data
-	VEVOC_AUDIORATE,								///< rate
-	VEVOC_AUDIOCHANS,								///< channels
-	VEVOC_AUDIOBPS,									///< bps
-	VEVOC_AUDIOSAMPLES,								///< number of audio samples
+/*!
+	Channel properties
 */
+#define	VEVOC_FLAGS			(VEVO_PROPERTY_CHANNEL + 1)		///< channel optional flags
+#define VEVOC_WIDTH			(VEVO_PROPERTY_CHANNEL + 2)		///< image data width
+#define VEVOC_HEIGHT		(VEVO_PROPERTY_CHANNEL + 3)		///< image data height
+#define VEVOC_FPS			(VEVO_PROPERTY_CHANNEL + 4)		///< video fps
+#define VEVOC_INTERLACING	(VEVO_PROPERTY_CHANNEL + 5)		///< video interlacing order (!!)
+#define VEVOC_SAME_AS		(VEVO_PROPERTY_CHANNEL + 6)		///< channel must have same properties as ...
+#define VEVOC_ENABLED		(VEVO_PROPERTY_CHANNEL + 7)		///< channel is enabled 
+#define VEVOC_FORMAT		(VEVO_PROPERTY_CHANNEL + 8)		///< pixel format
+#define	VEVOC_SHIFT_V		(VEVO_PROPERTY_CHANNEL + 9)		///< vertical shift value (for YUV planar data)
+#define VEVOC_SHIFT_H		(VEVO_PROPERTY_CHANNEL + 10)	///< horizontal shift value (for YUV planar data)
+#define VEVOC_PIXELDATA		(VEVO_PROPERTY_CHANNEL + 11)	///< pointer to image data
+#define VEVOC_PIXELINFO		(VEVO_PROPERTY_CHANNEL + 12)	///< description of imagedata (byte size)
 
-/* instance properties */
-	VEVOI_SCALE_X = VEVO_PROPERTY_INSTANCE,			///< horizontal scale multiplier
-	VEVOI_SCALE_Y,									///< vertical scale multiplier
-	VEVOI_FPS,										///< (optional) frames per second desired by host
-	VEVOI_VIEWPORT,									///< (optional) viewport (x1,y1,w,h)
-	VEVOI_PRIVATE,									///< (optional) plugin's private data
-	VEVOI_SMP,										///< (optional) plugin's multi threading use
-	VEVOI_FLAGS,									///< plugin flags
-/*
-	ports initialized by vevo_allocate_instance function:
+/*!
+	Instance properties
 */
+#define VEVOI_SCALE_X		(VEVO_PROPERTY_INSTANCE + 1)	///< horizontal scale multiplier
+#define VEVOI_SCALE_Y		(VEVO_PROPERTY_INSTANCE + 2)	///< vertical scale multiplier
+#define VEVOI_FPS			(VEVO_PROPERTY_INSTANCE + 3)	///< (optional) frames per second desired by host
+#define VEVOI_VIEWPORT		(VEVO_PROPERTY_INSTANCE + 4)	///< (optional) viewport (x1,y1,w,h)
+#define VEVOI_PRIVATE		(VEVO_PROPERTY_INSTANCE + 5)	///< (optional) plugin's private data
+#define VEVOI_SMP			(VEVO_PROPERTY_INSTANCE + 6)	///< (optional) plugin's multi threaeding use
+#define VEVOI_FLAGS			(VEVO_PROPERTY_INSTANCE + 7)	///< plugin flags
 
-	VEVOI_N_IN_PARAMETERS,  						///< number of input parameters
-	VEVOI_N_OUT_PARAMETERS, 						///< number of output parameters
-	VEVOI_N_IN_CHANNELS, 							///< number of input channels
-	VEVOI_N_OUT_CHANNELS,							///< number of output channels
+/*! 	
+	Instance properties that are set by vevo_allocate_instance(...) :
+*/
+#define VEVOI_N_IN_PARAMETERS 	(VEVO_PROPERTY_INSTANCE + 8)	///< number of input parameters
+#define	VEVOI_N_OUT_PARAMETERS 	(VEVO_PROPERTY_INSTANCE + 9)	///< number of output parameters
+#define VEVOI_N_IN_CHANNELS		(VEVO_PROPERTY_INSTANCE + 10)	///< number of input channels
+#define VEVOI_N_OUT_CHANNELS	(VEVO_PROPERTY_INSTANCE + 11)	///< number of output channels
 
-} vevo_property_type_t;
 
-/**
+typedef int vevo_property_type_t;
+
+/*!
 	Parameter layout hints
 */
-typedef enum
-{ 
-	VEVOP_HINT_NORMAL,								///< parameter is a single value (numeric or text)
-	VEVOP_HINT_RGBA,								///< parameter is a RGBA color key (numeric or text)
-	VEVOP_HINT_COORD2D,								///< parameter is a 2D coordinate (numeric only)
-	VEVOP_HINT_TRANSITION,							///< parameter is a transitions (numeric only)
-	VEVOP_HINT_GROUP,								///< parameter is a group of values (numeric or text)
-} vevo_param_hint_t;
+#define	VEVOP_HINT_NORMAL		0					///< parameter is a single value (numeric or text)
+#define VEVOP_HINT_RGBA			1					///< parameter is RGBA color key (numeric or text)
+#define VEVOP_HINT_COORD2D		2					///< parameter is 2d coordinate (numeric only)
+#define VEVOP_HINT_TRANSITION	4					///< parameter is a transition (numeric only)
+#define VEVOP_HINT_GROUP		5					///< parameter is a group of values (numeric of text)
 
+typedef int vevo_param_hint_t;
 
-typedef enum { VEVO_PROPERTY_WRITEABLE=0, VEVO_PROPERTY_READONLY } vevo_cntl_flags_t;
+#define	VEVO_PROPERTY_WRITEABLE 	0				///< property is writeable
+#define VEVO_PROPERTY_READONLY		1				///< property is readonly
+
+typedef int vevo_cntl_flags_t;
 
 
 /*!
