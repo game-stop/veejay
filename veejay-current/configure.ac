@@ -47,9 +47,7 @@ AC_ARG_ENABLE(warnings_as_errors,
 AC_ARG_ENABLE(simd-accel,
               AC_HELP_STRING([--enable-simd-accel],
                              [use SIMD multimedia instructions such as MMX, AltiVec, etc.if possible]))
-AC_ARG_ENABLE(playstation2,
-		AC_HELP_STRING([--enable-ps2],
-			       [Disable zlib support]))
+
 AC_ARG_WITH(extra-cflags,
             AC_HELP_STRING([--with-extra-cflags=flags],
                            [Options to be added to CFLAGS (optional)]))
@@ -130,8 +128,6 @@ AC_TYPE_SIGNAL
 
 AC_MSG_NOTICE([The host is $host  $host_cpu  $host_vendor  $host_os .])
 
-LIBM_LIBS="-lm"
-AC_SUBST(LIBM_LIBS)
 
 dnl *********************************************************************
 dnl Test whether we're linux or not. If so, define HAVE_V4L and build the
@@ -148,17 +144,22 @@ case $host in
 		],
 		[AC_MSG_ERROR([version.h not found - please install the linux kernel headers])
 		])
+		LIBM_LIBS="-lm"
 	;;
    *-apple-darwin*)
 		AC_DEFINE(HAVE_DARWIN,,[MAC OS X Darin])
 		dnl OS-X/Darwin needs no-cpp-precomp
 		CFLAGS="$CFLAGS -no-cpp-precomp"
 		have_darwin=true
+		LIBM_LIBS=""
 	;;	
   *)
 	AC_MSG_WARN([Alien platform - Good Luck!])
+	LIBM_LIBS=""
 	;;
 esac
+
+AC_SUBST(LIBM_LIBS)
 
 if test x$with_v4l != xno ; then
   if test x$have_linux != xfalse ; then
@@ -405,6 +406,7 @@ have_x86_64cpu=false
 have_altivec=false
 have_mips=false
 have_ppccpu=false
+have_ps2=false
 
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
@@ -456,6 +458,21 @@ case $host_cpu in
 	AC_DEFINE(ARCH_MIPS,,[Compiling for MIPS CPU])
 	AC_DEFINE(HAVE_MIPS,,[Compiling for MIPS CPU])
 	have_mips=true
+	AC_MSG_CHECKING([if we are compiling on playstation2 hardware])
+	AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[]],
+		[[#include <linux/ps2/dev.h>
+		  #include <linux/ps2/gs.h>
+                ]])],
+		[have_ps2=true],
+		[have_ps2=false])
+
+	if test x$have_ps2 = xtrue ; then
+		AC_MSG_RESULT(yes)
+		AC_DEFINE(HAVE_PS2,,[Compile for playstation2])
+	else
+		AC_MSG_RESULT(no)
+	fi
+
 	;;
   *)
     AC_MSG_RESULT(unknown)
@@ -724,7 +741,7 @@ fi
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
 
-if test "x$playstation2" != "xno" ; then
+if test x$have_ps2 = xtrue ; then
  ac_configure_args="$ac_configure_args --disable-v4l --disable-audio-oss --disable-vhook --disable-ffmpeg --disable-ffserver --disable-zlib --disable-dv1394 --disable-mpeg-audio-hp --disable-network --disable-audio-oss --disable-audiobeos"
 else
 ac_configure_args="$ac_configure_args --disable-ffserver --disable-ffplay --disable-v4l --disable-audio-oss --disable-vhook --disable-dv1394 --disable-mpeg-audio-hp --disable-network --disable-audio-oss --disable-audio-beos"
