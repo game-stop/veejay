@@ -231,15 +231,8 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_CLIP_SET_MARKER_END			=	2012,
 	VJ_EVENT_CLIP_SET_MARKER			=	2026,
 	VJ_EVENT_CLIP_CLEAR_MARKER			=	2013,
-	VJ_EVENT_CLIP_HISTORY_SET_ENTRY			=	2015,
-	VJ_EVENT_CLIP_HISTORY_ENTRY_AS_NEW		=	2016,
-	VJ_EVENT_CLIP_HISTORY_CLEAR_ENTRY		=	2017,
-	VJ_EVENT_CLIP_HISTORY_LOCK_ENTRY		=	2018,
-	VJ_EVENT_CLIP_HISTORY_UNLOCK_ENTRY		=	2019,
-	VJ_EVENT_CLIP_HISTORY_PLAY_ENTRY		=	2020,
 	VJ_EVENT_CLIP_LOAD_CLIPLIST			=	2021,
 	VJ_EVENT_CLIP_SAVE_CLIPLIST			=	2022,
-	VJ_EVENT_CLIP_HISTORY_LIST			=	2023,
 	VJ_EVENT_CLIP_LIST				=	2024,
 	VJ_EVENT_CLIP_DEL				=	2030,
 	VJ_EVENT_CLIP_REC_START				=	2031,
@@ -251,8 +244,6 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_CHAIN_TOGGLE_ALL			=	2037,
 	VJ_EVENT_CLIP_UPDATE				=	2038,
 	VJ_EVENT_CLIP_DEL_ALL				=	2039,
-	VJ_EVENT_CLIP_ADD_WAVE				=	2041,
-	VJ_EVENT_CLIP_DEL_WAVE				=	2042,
 	VJ_EVENT_CLIP_COPY				=	2040,
 	VJ_EVENT_CLIP_SELECT_RENDER			=	2051,
 	VJ_EVENT_CLIP_RENDER_TO				=	2052,
@@ -260,24 +251,25 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_TAG_ACTIVATE				=	2101,
 	VJ_EVENT_TAG_DEACTIVATE				=	2102,
 	VJ_EVENT_TAG_DELETE				=	2103,
+#ifdef HAVE_V4L
 	VJ_EVENT_TAG_NEW_V4L				=	2104,
+#endif
 	VJ_EVENT_TAG_NEW_Y4M				=	2107,
-	VJ_EVENT_TAG_NEW_RAW				=	2108,
 	VJ_EVENT_TAG_OFFLINE_REC_START			=	2109,
 	VJ_EVENT_TAG_OFFLINE_REC_STOP			=	2110,
 	VJ_EVENT_TAG_REC_START				=	2111,
 	VJ_EVENT_TAG_REC_STOP				=	2112,
-	VJ_EVENT_TAG_LOAD_TAGLIST			=	2113,
-	VJ_EVENT_TAG_SAVE_TAGLIST			=	2114,
 	VJ_EVENT_TAG_LIST				=	2115,
 	VJ_EVENT_TAG_DEVICES				=	2116,
 	VJ_EVENT_TAG_CHAIN_DISABLE			=	2117,
 	VJ_EVENT_TAG_CHAIN_ENABLE			=	2118,
         VJ_EVENT_TAG_NEW_AVFORMAT			=	2119,
+#ifdef HAVE_V4L
 	VJ_EVENT_TAG_SET_BRIGHTNESS			=	2301,
 	VJ_EVENT_TAG_SET_CONTRAST			=	2302,
 	VJ_EVENT_TAG_SET_HUE				=	2303,
 	VJ_EVENT_TAG_SET_COLOR				=	2304,
+#endif
 	VJ_EVENT_CHAIN_ENTRY_SET_EFFECT			=	2201,
 	VJ_EVENT_CHAIN_ENTRY_SET_PRESET			=	2202,
 	VJ_EVENT_CHAIN_ENTRY_SET_ARG_VAL		=	2203,
@@ -292,8 +284,6 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_CHAIN_ENTRY_SET_SOURCE_CHANNEL		=	2212,
 	VJ_EVENT_CHAIN_ENTRY_CLEAR			=	2213,
 	VJ_EVENT_CHAIN_MANUAL				=	2222,
-	VJ_EVENT_CHAIN_COPY_TO_BUF			=	2221,
-	VJ_EVENT_CHAIN_PASTE_AS_NEW			=	2220,
 	VJ_EVENT_CHAIN_ENABLE				=	2214,
 	VJ_EVENT_CHAIN_DISABLE				=	2219,
 	VJ_EVENT_CHAIN_CLEAR				=	2205,
@@ -301,18 +291,12 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_CHAIN_FADE_OUT				=	2217,
 	VJ_EVENT_CHAIN_SET_ENTRY			=	2218,
 	VJ_EVENT_CHAIN_LIST				=	2215,
-	VJ_EVENT_CHAIN_ENTRY_SET_AUTOMATIC		=	2230,
-	VJ_EVENT_CHAIN_ENTRY_DEL_AUTOMATIC		=	2231,
-	VJ_EVENT_CHAIN_ENTRY_ENABLE_AUTOMATIC		=	2232,	
-	VJ_EVENT_CHAIN_ENTRY_DISABLE_AUTOMATIC		=	2233,
 	VJ_EVENT_CHAIN_GET_ENTRY			=	2250,
 	VJ_EVENT_EFFECT_LIST				=	2500,
 	VJ_EVENT_EDITLIST_LIST				=	2501,
 	VJ_EVENT_VIDEO_INFORMATION			=	2502,
 	VJ_EVENT_OUTPUT_Y4M_START			=	3001,
 	VJ_EVENT_OUTPUT_Y4M_STOP			=	3002,
-	VJ_EVENT_OUTPUT_RAW_START			=	3003,
-	VJ_EVENT_OUTPUT_RAW_STOP			=	3004,
 	VJ_EVENT_RESIZE_SDL_SCREEN			=	3008,
 	VJ_EVENT_SET_PLAY_MODE				=	3009,
 	VJ_EVENT_SET_MODE_AND_GO			=	3010,
@@ -327,7 +311,6 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_EDITLIST_CUT				=	4007,
 	VJ_EVENT_EDITLIST_ADD				=	4008,
 	VJ_EVENT_EDITLIST_ADD_CLIP			=	4009,
-	VJ_EVENT_EDITLIST_ADD_HIS			=	4010,
 	VJ_EVENT_EDITLIST_SAVE				=	4011,
 	VJ_EVENT_EDITLIST_LOAD				=	4012,
 	/* message bundles are bundles of events, start at 5000 */
@@ -392,15 +375,8 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_CLIP_SET_MARKER_END,			NET_CLIP_SET_MARKER_END		},
 	{ VJ_EVENT_CLIP_SET_MARKER,			NET_CLIP_SET_MARKER			},
 	{ VJ_EVENT_CLIP_CLEAR_MARKER,			NET_CLIP_CLEAR_MARKER			},
-	{ VJ_EVENT_CLIP_HISTORY_SET_ENTRY,		NET_CLIP_HISTORY_SET_ENTRY		},
-	{ VJ_EVENT_CLIP_HISTORY_ENTRY_AS_NEW,		NET_CLIP_HISTORY_ENTRY_AS_NEW		},
-	{ VJ_EVENT_CLIP_HISTORY_CLEAR_ENTRY,		NET_CLIP_HISTORY_CLEAR_ENTRY		},
-	{ VJ_EVENT_CLIP_HISTORY_LOCK_ENTRY,		NET_CLIP_HISTORY_LOCK_ENTRY		},
-	{ VJ_EVENT_CLIP_HISTORY_UNLOCK_ENTRY,		NET_CLIP_HISTORY_UNLOCK_ENTRY		},
-	{ VJ_EVENT_CLIP_HISTORY_PLAY_ENTRY,		NET_CLIP_HISTORY_PLAY_ENTRY		},
 	{ VJ_EVENT_CLIP_LOAD_CLIPLIST,			NET_CLIP_LOAD_CLIPLIST		},
 	{ VJ_EVENT_CLIP_SAVE_CLIPLIST,			NET_CLIP_SAVE_CLIPLIST		},
-	{ VJ_EVENT_CLIP_HISTORY_LIST,			NET_CLIP_HISTORY_LIST			},
 	{ VJ_EVENT_CLIP_LIST,				NET_CLIP_LIST				},
 	{ VJ_EVENT_CLIP_DEL,				NET_CLIP_DEL				},
 	{ VJ_EVENT_CLIP_DEL_ALL,			NET_CLIP_DEL_ALL			},
@@ -415,16 +391,15 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_TAG_ACTIVATE,			NET_TAG_ACTIVATE			},
 	{ VJ_EVENT_TAG_DEACTIVATE,			NET_TAG_DEACTIVATE			},
 	{ VJ_EVENT_TAG_DELETE,				NET_TAG_DELETE				},
+#ifdef HAVE_V4L
 	{ VJ_EVENT_TAG_NEW_V4L,				NET_TAG_NEW_V4L				},
+#endif
 	{ VJ_EVENT_TAG_NEW_Y4M,				NET_TAG_NEW_Y4M				},
-	{ VJ_EVENT_TAG_NEW_RAW,				NET_TAG_NEW_RAW				},
 	{ VJ_EVENT_TAG_NEW_AVFORMAT,			NET_TAG_NEW_AVFORMAT			},
 	{ VJ_EVENT_TAG_OFFLINE_REC_START,		NET_TAG_OFFLINE_REC_START		},
 	{ VJ_EVENT_TAG_OFFLINE_REC_STOP,		NET_TAG_OFFLINE_REC_STOP		},
 	{ VJ_EVENT_TAG_REC_START,			NET_TAG_REC_START			},
 	{ VJ_EVENT_TAG_REC_STOP,			NET_TAG_REC_STOP			},
-	{ VJ_EVENT_TAG_LOAD_TAGLIST,			NET_TAG_LOAD_TAGLIST			},
-	{ VJ_EVENT_TAG_SAVE_TAGLIST,			NET_TAG_SAVE_TAGLIST			},
 	{ VJ_EVENT_TAG_LIST,				NET_TAG_LIST				},
 	{ VJ_EVENT_TAG_DEVICES,				NET_TAG_DEVICES				},
 	{ VJ_EVENT_CHAIN_ENTRY_SET_EFFECT,		NET_CHAIN_ENTRY_SET_EFFECT		},
@@ -440,8 +415,6 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_CHAIN_ENTRY_SET_SOURCE,		NET_CHAIN_ENTRY_SET_SOURCE		},
 	{ VJ_EVENT_CHAIN_ENTRY_SET_SOURCE_CHANNEL,	NET_CHAIN_ENTRY_SET_SOURCE_CHANNEL	},
 	{ VJ_EVENT_CHAIN_ENTRY_CLEAR,			NET_CHAIN_ENTRY_CLEAR			},
-	{ VJ_EVENT_CHAIN_COPY_TO_BUF,			NET_CHAIN_COPY_TO_BUF			},
-	{ VJ_EVENT_CHAIN_PASTE_AS_NEW,			NET_CHAIN_PASTE_AS_NEW			},
 	{ VJ_EVENT_CHAIN_ENABLE,			NET_CHAIN_ENABLE			},
 	{ VJ_EVENT_CHAIN_DISABLE,			NET_CHAIN_DISABLE			},
 	{ VJ_EVENT_CHAIN_CLEAR	,			NET_CHAIN_CLEAR				},
@@ -453,8 +426,6 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_VIDEO_INFORMATION,			NET_VIDEO_INFORMATION			},
 	{ VJ_EVENT_OUTPUT_Y4M_START,			NET_OUTPUT_Y4M_START			},
 	{ VJ_EVENT_OUTPUT_Y4M_STOP,			NET_OUTPUT_Y4M_STOP			},
-	{ VJ_EVENT_OUTPUT_RAW_START,			NET_OUTPUT_RAW_START			},
-	{ VJ_EVENT_OUTPUT_RAW_STOP,			NET_OUTPUT_RAW_STOP			},
 	{ VJ_EVENT_RESIZE_SDL_SCREEN,			NET_RESIZE_SDL_SCREEN			},
 	{ VJ_EVENT_SET_PLAY_MODE,			NET_SET_PLAY_MODE			},
 	{ VJ_EVENT_SET_MODE_AND_GO,			NET_SET_MODE_AND_GO			},
@@ -483,19 +454,17 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_CHAIN_GET_ENTRY,			NET_CHAIN_GET_ENTRY			},
 	{ VJ_EVENT_CHAIN_TOGGLE_ALL,			NET_CHAIN_TOGGLE_ALL			},
 	{ VJ_EVENT_CLIP_UPDATE,				NET_CLIP_UPDATE			},	
+#ifdef HAVE_V4L
 	{ VJ_EVENT_TAG_SET_BRIGHTNESS,			NET_TAG_SET_BRIGHTNESS			},
 	{ VJ_EVENT_TAG_SET_CONTRAST,			NET_TAG_SET_CONTRAST			},
 	{ VJ_EVENT_TAG_SET_HUE,				NET_TAG_SET_HUE				},
-	{ VJ_EVENT_CLIP_ADD_WAVE,			NET_CLIP_ADD_WAVE			},
-	{ VJ_EVENT_CLIP_DEL_WAVE,			NET_CLIP_DEL_WAVE			},
+#endif
 	{ VJ_EVENT_RECORD_DATAFORMAT,			NET_RECORD_DATAFORMAT			},
+#ifdef HAVE_V4L
 	{ VJ_EVENT_TAG_SET_COLOR,			NET_TAG_SET_COLOR			},
+#endif
 	{ VJ_EVENT_QUIT,  				NET_QUIT				},
 	{ VJ_EVENT_INIT_GUI_SCREEN,			NET_INIT_GUI_SCREEN			},
-	{ VJ_EVENT_CHAIN_ENTRY_SET_AUTOMATIC,		NET_CHAIN_ENTRY_SET_AUTOMATIC		},
-	{ VJ_EVENT_CHAIN_ENTRY_DEL_AUTOMATIC,		NET_CHAIN_ENTRY_DEL_AUTOMATIC		},
-	{ VJ_EVENT_CHAIN_ENTRY_ENABLE_AUTOMATIC,	NET_CHAIN_ENTRY_ENABLE_AUTOMATIC	},
-	{ VJ_EVENT_CHAIN_ENTRY_DISABLE_AUTOMATIC,	NET_CHAIN_ENTRY_DISABLE_AUTOMATIC	},
 	{ VJ_EVENT_EFFECT_SET_BG,			NET_EFFECT_SET_BG			},
 	{ VJ_EVENT_SWITCH_CLIP_TAG,			NET_SWITCH_CLIP_TAG	},
 	{ VJ_EVENT_SET_VOLUME,				NET_SET_VOLUME				},
@@ -769,11 +738,6 @@ static struct {
 	{ VJ_EVENT_CLIP_SET_MARKER_END,		"Clip: set marker ending position",	 vj_event_clip_set_marker_end,  2,	"%d %d",	{0,0}	},
 	{ VJ_EVENT_CLIP_SET_MARKER,		"Clip: set marker starting and ending position", vj_event_clip_set_marker,	  3,	"%d %d %d",	{0,0}	},
 	{ VJ_EVENT_CLIP_CLEAR_MARKER,		"Clip: clear marker",			 vj_event_clip_set_marker_clear,1,	"%d",		{0,0}	},
-//	{ VJ_EVENT_CLIP_HISTORY_ENTRY_AS_NEW,	"ClipHistory: move entry to new clip",	 vj_event_clip_his_entry_to_new,2,	"%d %d",	{0,0}	}, 
-//	{ VJ_EVENT_CLIP_HISTORY_CLEAR_ENTRY,	"ClipHistory: clear entry",		 vj_event_clip_his_del_entry,   2,	"%d %d",	{0,0}	},
-//	{ VJ_EVENT_CLIP_HISTORY_LOCK_ENTRY,   	"ClipHistory: lock entry",		 vj_event_clip_his_lock_entry,  2,	"%d %d",	{0,0}	},
-//	{ VJ_EVENT_CLIP_HISTORY_UNLOCK_ENTRY, 	"ClipHistory: unlock entry",		 vj_event_clip_his_unlock_entry,2,	"%d %d",	{0,0}	},
-//	{ VJ_EVENT_CLIP_HISTORY_PLAY_ENTRY,	"ClipHistory: play entry",		 vj_event_clip_his_play_entry,  2,	"%d %d",	{0,0}	},
 #ifdef HAVE_XML2
 	{ VJ_EVENT_CLIP_LOAD_CLIPLIST,		"Clip: load clips from file",			 vj_event_clip_load_list,	  1,	"%s",		{0,0}	},
 	{ VJ_EVENT_CLIP_SAVE_CLIPLIST,		"Clip: save clips to file",			 vj_event_clip_save_list,	  1,	"%s",		{0,0}	},
@@ -796,7 +760,6 @@ static struct {
 	{ VJ_EVENT_TAG_NEW_V4L,			"Stream: open video4linux device (hw)",		 vj_event_tag_new_v4l,		 2,	"%d %d",		{0,1}	},	
 #endif
 	{ VJ_EVENT_TAG_NEW_Y4M,			"Stream: open y4m stream by name (file)",	 vj_event_tag_new_y4m,		 1,	"%s",		{0,0}	}, 
-//	{ VJ_EVENT_TAG_NEW_RAW,			"Stream: open raw stream by name (file)",	 vj_event_tag_new_raw,		 1, 	"%s",		{0,0}	},
 	{ VJ_EVENT_STREAM_NEW_NET,		"Stream: open network stream ",	vj_event_tag_new_net, 2, "%s %d", {0,0}	},
 	{ VJ_EVENT_STREAM_NEW_MCAST,		"Stream: open multicast stream", vj_event_tag_new_mcast, 2, "%s %d", {0,0} },	
 	{ VJ_EVENT_TAG_NEW_AVFORMAT,		"Stream: open file as stream with FFmpeg",	 vj_event_tag_new_avformat,	 1,	"%s",		{0,0}	},
@@ -828,8 +791,6 @@ static struct {
 	{ VJ_EVENT_CHAIN_SET_ENTRY,		"Chain: select entry ",		 vj_event_chain_entry_select,	1,	"%d",		{0,0}	},
 	{ VJ_EVENT_OUTPUT_Y4M_START,		"Output: Yuv4Mpeg start writing to file",	 vj_event_output_y4m_start,	1,	"%s",		{0,0}	},
 	{ VJ_EVENT_OUTPUT_Y4M_STOP,		"Output: Yuv4Mpeg stop writing to file",	 vj_event_output_y4m_stop,	0,	NULL,		{0,0}	},
-//	{ VJ_EVENT_OUTPUT_RAW_START,		"Output: RAW start writing to file",		 vj_event_output_raw_start,	1,	"%s",		{0,0}	},
-//	{ VJ_EVENT_OUTPUT_RAW_STOP,		"Output: RAW stop writing to file",		 vj_event_output_raw_stop,	1,	"%s",		{0,0}	},
 #ifdef HAVE_SDL
 	{ VJ_EVENT_RESIZE_SDL_SCREEN,		"Output: Resize SDL video screen",		 vj_event_set_screen_size,	2,	"%d %d", 	{0,0}	},
 	{ VJ_EVENT_INIT_GUI_SCREEN,		"Output: Initialize GUI screen",		vj_event_init_gui_screen,	2,	"%s %d",	{0,0}	},
@@ -848,7 +809,6 @@ static struct {
 	{ VJ_EVENT_EDITLIST_LOAD,		"EditList: load EditList into veejay",		 vj_event_el_load_editlist,	1,	"%s",		{0,0}	},
 	{ VJ_EVENT_EDITLIST_ADD,		"EditList: add video file to editlist",		 vj_event_el_add_video,		1,	"%s",		{0,0}	},
 	{ VJ_EVENT_EDITLIST_ADD_CLIP,		"EditList: add video file to editlist as clip", vj_event_el_add_video_clip,	1,	"%s",		{0,0}	},
-	{ VJ_EVENT_EDITLIST_ADD_HIS,		"EditList: add video file to history list",	vj_event_el_add_video_his,	4,	"%s %d %d %d",	{0,0}	},
 	{ VJ_EVENT_TAG_LIST,			"Stream: send list of all streams",		vj_event_send_tag_list,		1,	"%d",		{0,0}	},
 	{ VJ_EVENT_CLIP_LIST,			"Clip: send list of Clips",			vj_event_send_clip_list,	1,	"%d",		{0,0}	},
 	{ VJ_EVENT_EDITLIST_LIST,		"EditList: send list of all files",		vj_event_send_editlist,		0,	NULL,		{0,0}   },
@@ -866,7 +826,6 @@ static struct {
 	{ VJ_EVENT_CHAIN_GET_ENTRY,		"Chain: get entry contents",			vj_event_send_chain_entry,	2,	"%d %d",	{0,0}	},		
 	{ VJ_EVENT_EFFECT_LIST,			"EffectList: list all effects",			vj_event_send_effect_list,	0,	NULL,		{0,0}	},
 	{ VJ_EVENT_VIDEO_INFORMATION,		"Video: send properties",			vj_event_send_video_information,0,	NULL,		{0,0}	},
-	{ VJ_EVENT_CLIP_HISTORY_LIST,		"Clip: send history list",			vj_event_send_clip_history_list,1,	"%d",		{0,0}	},
 #ifdef HAVE_SDL
 	{ VJ_EVENT_BUNDLE_ATTACH_KEY,		"Bundle: attach a Key to a bundle",		vj_event_attach_key_to_bundle,	3,	"%d %d %d",	{0,0} 	},
 #endif
@@ -1265,15 +1224,14 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 {
 	int id = net_list[ net_id ].list_id;
 	int  i = 0;
+	int		argument_list[16];
+	memset( argument_list, 0, 16 );
 
+	if(args != NULL)
+		for( i = 0; i < 16; i ++ ) argument_list[i] = args[i];
+	
 	if( arglen <= 0 )
-	{/*
-		veejay_msg(VEEJAY_MSG_DEBUG, 
-			"(VIMS) Network %03d:  '%s' (defaults)",
-			net_id,
-			vj_event_list[id].name
-		);*/
-
+	{
 		vj_event_trigger_function(
 			(void*)v,
 			net_list[net_id].act,
@@ -1282,27 +1240,19 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 			vj_event_list[id].args[0],
 			vj_event_list[id].args[1]
 		);
-
 		return;
 	}	
 
 	if( str_arg != NULL && vj_event_list[id].format[1] == 's' )
 	{
 		char *str = strdup( str_arg);
-		veejay_msg(VEEJAY_MSG_DEBUG, 
-			"(VIMS) Network %03d:   '%s' [%s]",
-			net_id,
-			vj_event_list[id].name,
-			str_arg
-		);
-
-		for(i=0; i < 16; i++)
-		{
-			argument_list[i] = 0;
-		}
 
 		_last_known_num_args = vj_event_list[id].num_params;
-	
+
+	    veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) Network %04d: [%s] [%d][%d][%d][%d] ...",
+			net_id, vj_event_list[id].name, str_arg, argument_list[0],argument_list[1],
+					argument_list[2],argument_list[3]);
+
 		vj_event_trigger_function(
 			(void*) v,
 			net_list[net_id].act,
@@ -1349,24 +1299,14 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 			net_id,
 			vj_event_list[id].name,
 			str_args
-		);
+			);
 	
 
 		}
 
-		for(i=0; i < arglen; i++) 
-		{
-			argument_list[i] = args[i];
-		}
+		_last_known_num_args = vj_event_list[id].num_params;
 
-		for(i=arglen; i < 16; i++)
-		{
-			argument_list[i] = 0;
-		}
-
-			_last_known_num_args = vj_event_list[id].num_params;
-
-			vj_event_trigger_function(
+		vj_event_trigger_function(
 			(void*) v,
 			net_list[net_id].act,
 			vj_event_list[id].num_params,
@@ -3183,201 +3123,6 @@ void vj_event_clip_load_list(void *ptr, const char format[], va_list ap)
 	}
 }
 #endif
-
-void vj_event_clip_his_play_entry(void *ptr, const char format[], va_list ap)
-{
-	int args[2];
-	veejay_t *v = (veejay_t *)ptr;
-	char *str = NULL;
-	P_A(args,str,format,ap);
-	if(args[0] == 0 )
-	{
-		args[0] = v->uc->clip_id;
-	}
-	if(args[0] == -1) args[0] = clip_size()-1;
-
-	if( clip_exists(args[0]))
-	{
-		if( clip_set_render_entry(args[0],args[1]) )	
-		{
-			veejay_set_clip(v, args[0]);
-			veejay_msg(VEEJAY_MSG_INFO, "Playing render entry %d of clip %d", args[1],args[0]);
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot set render entry to %d for clip %d",args[1],args[0]);
-		}
-	}
-	else
-	{
-		p_no_clip(args[0]);
-	}
-}
-
-void vj_event_clip_his_lock_entry(void *ptr, const char format[], va_list ap)
-{
-	int args[2];
-	veejay_t *v=  (veejay_t*)ptr;
-	char *s = NULL;
-	P_A(args,s,format,ap);
-	if(args[0] == 0 )
-	{
-		args[0] = v->uc->clip_id;
-	}
-	if(args[0] == -1) args[0] = clip_size()-1;
-
-	if( clip_exists(args[0]))
-	{
-		if( clip_entry_set_is_rendering( args[0] , args[0] , 1))
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Locking render entry %d of clip %d",
-				args[1],args[0]);
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot lock render entry %d of clip %d",args[1],args[0]);
-		}
-	}	
-	else 
-	{
-		p_no_clip(args[0]);
-	}
-}
-
-void vj_event_clip_his_unlock_entry(void *ptr, const char format[],va_list ap)
-{
-	int args[2];
-	veejay_t *v = (veejay_t*)ptr;
-	char *s = NULL;
-	P_A(args,s,format,ap);
-
-	if(args[0] == 0 )
-	{
-		args[0] = v->uc->clip_id;
-	}
-	if(args[0] == -1) args[0] = clip_size()-1;
-
-	if( clip_exists(args[0])) 
-	{
-		if(clip_entry_set_is_rendering( args[0],args[1],0))
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Unlocking render entry %d of clip %d",
-				args[1],args[0]);
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot unlock render entry %d of clip %d",args[1],args[0]);
-		}
-	}
-	else
-	{
-		p_no_clip(args[0]);
-	}
-}
-
-void vj_event_clip_his_del_entry(void *ptr, const char format[], va_list ap)
-{
-	veejay_t *v = (veejay_t*)ptr;
-	int args[2];
-	char *s = NULL;
-	P_A(args,s,format,ap);
-	if(args[0] == 0 )
-	{
-		args[0] = v->uc->clip_id;
-	}
-	if(args[0] == -1) args[0] = clip_size()-1;
-
-	if(clip_exists(args[0]))
-	{
-		if(args[1] >= 0 && args[1] < CLIP_MAX_RENDER) 
-		{
-			int s,e;
-			int ds = clip_get_startFrame(args[0]);
-			int de = clip_get_endFrame(args[0]);
-			if( clip_set_render_entry(args[0],0) ) 
-			{
-				s = clip_get_startFrame(args[0]);
-				e = clip_get_endFrame(args[0]);
-
-				if( clip_set_render_entry(args[0], args[1]) &&
-				    clip_set_startframe(args[0],s) &&
-				    clip_set_endframe(args[0],e) )
-				{		
-			
-					if( veejay_edit_delete(v, ds,de) )
-					{
-						veejay_msg(VEEJAY_MSG_INFO, "Deleted rendered editlist frames from entry %d of clip %d",args[1],args[0]);
-						v->uc->render_changed = 1;
-					}
-					else
-					{
-						veejay_msg(VEEJAY_MSG_ERROR,"Unable to delete frames %d-%d from EditList",ds,de);
-					}	
-				}
-				else
-				{
-					veejay_msg(VEEJAY_MSG_ERROR, "Cannnot update clip %d 's render history entry %d with %d - %d",
-						args[0],args[1],s,e); 
-				}
-			}
-			else
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Cannot set Clip %d 's render entry to %d", args[0],args[1]);
-			}
-		}	
-	}
-	else 
-	{
-		p_no_clip(args[0]);
-	}
-}
-
-void vj_event_clip_his_entry_to_new(void *ptr, const char format[],va_list ap)
-{
-	veejay_t *v = (veejay_t*)ptr;
-	int args[2];
-	char *s = NULL;
-	P_A(args,s,format,ap);
-	
-	if(args[0] == 0 )
-	{
-		args[0] = v->uc->clip_id;
-	}
-	if(args[0] == -1) args[0] = clip_size()-1;	
-	if(clip_exists(args[0]))
-	{
-		int s,e;
-		clip_info *skel;
-		clip_set_render_entry(args[0], args[1]);
-		
-		s   = clip_get_startFrame( args[0] );
-		e   = clip_get_endFrame(args[0]);
-		if(args[1] == 0)
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "This clip cannot be moved to a new clip");
-				return;
-		}
-
-		/* move to original */
-		clip_set_render_entry(args[0] , 0);
-		skel = clip_skeleton_new( s,e);
-		if( clip_store(skel) == 0)
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Moved rendered entry to new clip %d", clip_size()-1);
-			clip_set_looptype(skel->clip_id, clip_get_looptype(args[0]));
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot store newly created clip !");
-		}
-		v->uc->render_changed = 1;
-	}
-	else
-	{
-		p_no_clip(args[0]);
-	}
-
-}
 
 void 	vj_event_clip_ren_start			( 	void *ptr, 	const char format[], 	va_list ap	)
 {
@@ -5611,45 +5356,6 @@ void vj_event_el_add_video_clip(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_ERROR, "Appended file %s to EditList",str);
 	}
 	
-}
-void vj_event_el_add_video_his(void *ptr, const char format[], va_list ap)
-{
-	veejay_t *v = (veejay_t*)ptr;
-	int start = -1;
-	int destination = v->edit_list->video_frames-1;
-	char str[1024];
-	int args[4];		/* clip_id, len, entry, file */
-	P_A(args,str,format,ap);
-
-	if ( !clip_exists(args[0]))
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Clip %d does not exist",args[0]);
-		return;
-	}
-	if ( args[2] < 0 || args[2] >= CLIP_MAX_RENDER)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid render entry %d given",args[2]);
-		return;
-	}
-	if ( veejay_edit_addmovie(v,str,start,destination,destination))
-	{
-		int start_pos = destination;
-		int end_pos = (args[1]==0 ? v->edit_list->video_frames-1 : destination+args[1]);
-		int cs = clip_get_render_entry( args[0] );
-		clip_set_render_entry( args[0], args[2] );
-		clip_set_startframe( args[0], start_pos );
-		clip_set_endframe( args[0], end_pos);
-		clip_set_render_entry( args[0], cs );
-		veejay_msg(VEEJAY_MSG_INFO, "Clip %d R[%d,%d] added on Entry %d (%ld frames)",
-			args[0],start_pos,end_pos,args[2],v->edit_list->video_frames-1);
-		v->uc->render_changed = 1;
-		clip_entry_set_is_rendering( args[0], args[2], 0);
-	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot add file %s to EditList",str);
-	}
-
 }
 
 void vj_event_tag_del(void *ptr, const char format[] , va_list ap ) 

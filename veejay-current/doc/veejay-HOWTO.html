@@ -15,6 +15,7 @@ v1.2,  26 August 2003<br>
 v1.3,   9 November 2003<br>
 v1.4,  24 May 2004<br>
 v2.0,  25 July 2004<br>
+v2.1   27 January 2005<br>
 <hr><i>
 This document describes  how to use <b>veejay</b>, a visual 'music' instrument for Linux/GNU </i>
 <dl><hr></dl>
@@ -40,7 +41,7 @@ This document describes  how to use <b>veejay</b>, a visual 'music' instrument f
 
 <dt>4.  <a href="veejay-HOWTO.html#4">Using Veejay</a></dt>
 <dd><dl><dt>4.1 <a href="veejay-HOWTO.html#4.1">Terminology</a></dt>
-<dt>4.2 <a href="veejay-HOWTO.html#4.2">The console interface</a></dt>
+<dt>4.2 <a href="veejay-HOWTO.html#4.2">sayVIMS</a></dt>
 <dt>4.3 <a href="veejay-HOWTO.html#4.3">The keyboard interface</a></dt>
 <dt>4.4 <a href="veejay-HOWTO.html#4.4">Recording video</a></dt>
 <dt>4.5 <a href="veejay-HOWTO.html#4.5">Other utilities</a></dt></dt></dl></dd>
@@ -100,10 +101,12 @@ This document is targeted at the Linux user interested in learning a bit about v
 <dd><dl><dt>Updated Howto to match version 0.4.6. Revised chapter 2.1,2.2,3.3</dd></dl></dt>
 <b>Version 1.3</b>
 <dd><dl><dt>Updated Howto to match version 0.5.3. </dd></dl></dt>
-<b>Version 1.4></b>
+<b>Version 1.4</b>
 <dd><dl><dt>Updated Howto to match version 0.5.9</dd></dl></dt>
-<b>Version 2.0></b>
+<b>Version 2.0</b>
 <dd><dl><dt>Partial re-write to match version 0.6</dd></dl></dt>
+<b>Version 2.1</b>
+<dd><dl><dt>Updated Howto to match version 0.7.2</dd></dl></dt>
 </p>
 
 <h2><a name="1.5">1.5 New versions of this document</a></h2>
@@ -134,11 +137,12 @@ with no Front-Cover Texts , and with no Back-Cover Texts. A copy of this license
 
 
 <h2><a name="2">2. About Veejay</a></h2><p>
-Veejay is a live performance tool featuring simple non-linear editing and mixing
- from multiple sources.<br> You can load multiple video files, cut and paste portion
-s of video/audio and save it as an EditList.<br> Also, you can record new clips from
- existing clips or (live) streams. <br>With these clips you can change playback spee
-d (slow motion/acceleration), change the looptype and set markers.<br><br>
+Veejay is a 'visual' instrument and realtime video sampler, featuring simple non-linear 
+ editing and mixing from multiple sources.<br>
+You can load multiple video files, cut and paste portion
+s of video/audio and save it as an Edit Decision List.<br> Also, you can record new clips from
+ existing clips or (live) streams. <br>With these clips you can change playback speed
+ (slow motion/acceleration), change the looptype and set markers.<br><br>
 
 With both clips and streams you can edit the effect chain and mix from multiple 
 sources to one. Veejay currently has 94 effects, divided into two categories: Image and
@@ -146,8 +150,10 @@ sources to one. Veejay currently has 94 effects, divided into two categories: Im
 
 Veejay has many frame blending methods, some of these are: Additive,Substractive
 ,Difference Negate, Relative Addition and Selective Replacement. Next to blendin
-g, you can key on Luma and Chroma seperatly or combined or simply use Transition
-s or other effects.<br><br>
+g, you can key on Luma and Chroma seperatly or combined or simply use Transitions
+or other effects. Veejay has over 100 original video effects, most of them you will
+not find anywhere else (except those few ported from EffecTV, Mplayer, The Demo Effect Collection)
+<br><br>
 
 Most edit and navigation commands are mapped to single key press commands, this 
 allows you to control, depending on the playback mode, video navigation, the eff
@@ -157,10 +163,12 @@ Also, you can record a new clip on the fly from a live feed or from the video cl
 ip you are playing. If requested, the recorded videofile will be added to the ed
 it descision list and activated as a new video clip. This is particular usefull 
 for time-looping,rebouncing and rough clip scratching/editing. <br><br>
-Veejay can be remotely controled through using OSC (Open Sound Control) or via i
-ts own internal message interface 'VIMS'.<br> 'VIMS' allows you to create/load/save 
+Veejay can be remotely controled through using OSC (Open Sound Control) or via 
+its own internal message system 'VIMS'.<br> 'VIMS' allows you to create/load/save 
 effect chain templates and to add customized events which can be triggered by a 
-keypress or a remote message.<br><br>
+keypress or by a remote message.<br><br>
+Finally, you can stream (uncompressed) video over the network from peer to peer over TCP
+or by using multicast over UDP (one to many).<br> 
 <br>
 
 </p>
@@ -170,9 +178,8 @@ keypress or a remote message.<br><br>
 <h3>General</h3>
 <ul>
 <li> Free Software (GNU GPL)
-<li> TCP/IP support for media and content control
-<li> support for Open Sound Control 
-<li> Realtime video mixing from multiple video sources
+<li> Realtime video sampling from multiple sources
+<li> Native YUV processing 
 <li> XML formatted Sample Lists and Effect Templates
 <li> JACK (low latency audio server) support
 <li> SDL video output
@@ -183,19 +190,19 @@ keypress or a remote message.<br><br>
 <ul>
 <li> MJPEG (Quicktime/Movtar or AVI)
 <li> DV avi type 2 (PAL or NTSC)
-<li> IYUV avi support (uncompressed) for lossless editing
+<li> YUV 4:2:0/  4:2:2 AVI support (uncompressed) for lossless editing
 <li> limited support for MPEG4 and Divx;-)
 <li> YUV4MPEG streams 
-<li> RGB24 streams
 <li> Video4Linux support (only Input)
+<li> unicast/multicast video streaming
 </ul>
 <h3>Editing</h3>
 <ul>
-<li> Clip based (purely virtual)
+<li> Clip based (purely virtual,also called 'Sample' like in Audio Samplers)
 <li> Non descructive (Edit Decision List)
 <li> Over 40 different types of blending
 <li> Chroma / Luma keying
-<li> 94 image/video effects
+<li> 103 image/video effects
 <li> No undo/redo
 <li> Frame accurate navigation/editing
 <li> Cut/Copy/Paste/Crop/Delete editlist portions
@@ -203,10 +210,10 @@ keypress or a remote message.<br><br>
 
 <h3>Interaction</h3>
 <ul>
-<li> Remote (over TCP/IP)
-<li> Console
+<li> VIMS (over TCP/IP)
+<li> sayVIMS (command line utility)
 <li> SDL Keybindings
-<li> OSC (over UDP)
+<li> OSC (over UDP, both unicast and multicast)
 </ul>
 
 </p>
@@ -225,9 +232,10 @@ a few systems veejay was reported to work on:<br>
 <li>An Athlon XP 1600 Mhz and Matrox G550 Dualhead( TVout support through DirectFB)
 <li>A Pentium 4 2.2 Ghz and Matrox G550 Dualhead( TVout support through DirectFB)
 <li>A Pentium 4 3.0 Ghz and ATI Radeon 9600 XT/ (no TVout yet)
+<li>Sony Playstation 2 (MIPS, little endian) (but runs very slow, doesnt use PS/2 hardware features)
 </ul><br>
 Video Editing requires a lot of diskspace, make sure you you have enough diskspace available for
-your project. If you are going to use the recording functions, make sure you have sufficient free disk space available.<br> 
+your project. If you are going to use the recording functions, make sure you have sufficient free disk space available.Otherwise you are quite safe, veejay does not change your original video or fill your harddisk with needless temporary files. Neither does it waste all your resources.<br> 
 </p>
 
 <h2><a name="3">3. Installation</a></h2><p>
@@ -236,14 +244,15 @@ your project. If you are going to use the recording functions, make sure you hav
 <h2><a name="3.1">3.1 Dependencies</a></h2><p>
 Before you install Veejay, make sure you have the following dependencies installed:<br>
 <ul> 
-<li>(required) libdv >= 0.99 
-<li>(required) The SDL library >= 1.2.3
-<li>(required) The XML C library 2 for gnome >=2.5.4
+<li>(optional) libdv >= 0.99 
+<li>(recommended) The SDL library >= 1.2.3
+<li>(optional) The XML C library 2 for gnome >=2.5.4
 <li>(optional) JACK low latency audio server >= 0.98.1
-<li>(optional) DirectFB >= 0.9.17 
+<li>(optional) DirectFB >= 0.9.17
+<li>(optional) FreeType >= 2.1.9  
 </ul>
 <br>
-<i>On newer distributions, some of the listed software is already installed.</i><br><br>
+<i>On newer distributions, some of the listed software is already installed but you may be missing the -devel- packages! (especially on redhat, suse and debdian systems!!)</i><br><br>
 You can find the websites of these projects in <a href="veejay-HOWTO.html#6">Other Resources</a>.<br><br>
 </p>
 <h2><a name="3.2">3.2 Installing veejay</a></h2><p>
@@ -257,19 +266,22 @@ $ export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
 </pre>
 Decompress and untar the file by typing:
 <pre>
-$ tar -jxvf veejay-0.6.0.tar.bz2
+$ tar -jxvf veejay-0.7.x.tar.bz2
 </pre>
 Change to the directory containing veejay's source's:
 <pre>
-$ cd veejay-0.6
+$ cd veejay-0.7.x
 
 $ ./configure
 </pre>
 On completion it will summarize the results of the ./configure script, which could look like this:
 <pre>
-veejay 0.6.0 build configuration :
+veejay 0.7.2 build configuration :
+
+Compiler flags: -mcpu=i686 -march=i686  -Wall -Wunused -g
 
  Build configuration:
+                    x86 Architecture                : true
                     MMX enabled                     : true
                     MMX2 enabled                    : false
                     SSE enabled                     : true
@@ -280,18 +292,22 @@ veejay 0.6.0 build configuration :
  Required dependencies:
                     POSIX Threads (pthread)         : true
                     video4linux recording/playback  : true
-                    Simple Direct Media Layer       : true
-                    XML C library for Gnome libxml2 : true
-                    libDV (digital video)           : true
                     libJPEG                         : true
 
  Optional dependencies:
-                    Jack Audio Connection Kit       : true
+                    libDV (digital video)           : true
+                    Jack Audio Connection Kit       : false
                     DirectFB support                : false
+                    Simple Direct Media Layer       : true
+                    XML C library for Gnome libxml2 : true
 
+ Plugin  dependencies:
+                    FreeType support                : true
+                    Veejay Video Objects support    : true
 
 
 </pre>
+Dont worry if you dont have 'Veejay Video Objects support' ; it is still in development.
 Now, you can start building veejay
 <pre>
 $ make
@@ -306,49 +322,41 @@ Followed by
 First of all, you need to have <i>Video For Linux</i> enabled in your kernel configuration.
 Make sure that <i>V4L information in proc filesystem</i> is enabled; veejay uses the proc file
 system to find out what devices can be used to read from.
-<br><br>
-If you have no Video4Linux devices you can only stream from vloopback (only kernel <= 2.4)  or from a yuv4mpeg stream.
-<br><br>
-If you have one or more Video4Linux devices, you should load the modules for these devices prior to loading
-the vloopback module. The example below loads the vloopback module with a device offset parameter
-so it will not conflict with your Video4Linux devices:
 <br>
+Secondly, in order to use multicast streaming, you must have the option <i>IP multicast</i>
+enabled in your kernel configuration. Also, you need to add a multicast route :
 <pre>
-# insmod vloopback.o pipes=4 dev_offset=2
-</pre>
-On typing the command 
-<pre>
-# dmesg
-</pre>
-you should see something like this:
-<pre>
-Mar 31 23:41:01 dev kernel: vloopback.c: Video4linux loopback driver v0.90
-Mar 31 23:41:01 dev kernel: vloopback.c: Loopback 0 registered, input: video2, output: video3
-Mar 31 23:41:01 dev kernel: vloopback.c: Loopback 1 registered, input: video4, output: video5
-Mar 31 23:41:01 dev kernel: vloopback.c: Loopback 2 registered, input: video6, output: video7
-Mar 31 23:41:01 dev kernel: vloopback.c: Loopback 3 registered, input: video8, output: video9
+$ route add -net 224.0.0.0 netmask 255.255.255.0 dev eth0
 </pre>
 
-Refer to chapter <a href="veejay-HOWTO.html#5">5. Popular Packages</a> for using a video source.
-
-Also, the chapter <a href="veejay-HOWTO.html#4.2">4.2 The console interface</a> includes commands to create several types of streams
- 
+Chapter <a href="veejay-HOWTO.html#4.2">4.2 sayVIMS</a> includes examples to create several 
+types of input streams
+<br><br>
+Veejay can stream out to SDL (video window), to STDOUT (in yuv4mpeg) , to DirectFB secundary head (TV-Out)
+and it can stream over the network (all is uncompressed video). See the man page on how to activate one
+or more of these options.<br>
 </p>
 
 <h2><a name="4">4. Using Veejay</a></h2><p>
 Veejay uses by default a SDL window to play a video file or video stream,
 all the keybinding in veejay depend on SDL; if you move your mouse over to the
 SDL windows to focus it , you can press the keys explained in <a href="veejay-HOWTO.html#4.3">4.3 The keyboard interface</a>.<br>
-On focussing the terminal in which veejay is running, you can type short commands (followed by a Return or Enter) 
-for saving / loading samplelists , to activate other video sources and much more, see 
-<a href="veejay-HOWTO.html#4.2">4.2 The console interface</a>.<br>
-You must provide a video file to use with veejay; it will not run without a video file.
+To use veejay in commandline style interface mode, see  
+<a href="veejay-HOWTO.html#4.2">4.2 sayVIMS</a>.<br>
+You must no longer provide a video file to use with veejay; it will run in dummy mode by
+using the '-d' commandline parameter:<br>
+<pre>
+$ veejay -d
+</pre>
+
 <br>
 </p>
 <h2><a name="4.1">4.1 Terminology</a></h2><p>
 Veejay has a number of playback modes, each playback mode is unique and defines more or less
 a different functionality:<br><br>
-
+Also, note that veejay runs in only 1 resolution at a time (depending on the video dimensions of
+the first loaded movie). All movies loaded must have identical properties, otherwise veejay will not start.
+This limitation is also valid when streaming video from veejay to another veejay.<br><br><br>
 <table border=0 width=80%>
 <caption><h4>Playback modes in veejay</h4></caption>
 
@@ -392,45 +400,73 @@ a different functionality:<br><br>
 
 </p>
 
-<h2><a name="4.2">4.2 The console interface</a></h2><p>
-The console interface takes commands from STDIN , the commands you can give are:
+<h2><a name="4.2">4.2 sayVIMS</a></h2><p>
+sayVIMS is a commandline utility distributed with the veejay package,
+it allows you to give short commands in interactive mode<br>
+<i>$ sayVIMS -i -h localhost -p 3490</i><br><br>
+Typing '?' followed by pressing ENTER gives the list of command below:
 <pre>
-  vi [file]      Open video4linux device 
-  li [file]      Open vloopback device 
-  fi [file]      Open Y4M stream for input 
-  fo [file]      Open Y4M stream for output 
-  lo [file]      Open vloopback device for output 
-  cl [file]      Load cliplist from file 
-  cn [n1] [n2]   New clip from frames n1 to n2 
-  cd [n]         Delete clip n1 
-  sd [n]         Delete Stream n1 
-  cs [file]      Save cliplist to file 
-  es [file]      Save editlist to file 
-  ec [n1] [n2]   Cut frames n1 - n2 to buffer 
-  ed [n1] [n2]   Del franes n1 - n2  
-  ep [n]         Paste from buffer at frame n1 
-  ex [n1] [n2]   Copy frames n1 - n2 to buffer 
-  er [n1] [n2]   Crop frames n1 - n2 
-  al [file]      Action file Load 
-  as [file]      Action file save 
-  de             Toggle debug level (default off) 
-  be             Toggle bezerk mode (default on) 
+  vi [file]           Open video4linux device 
+  fi [file]           Open Y4M stream for input 
+  fo [file]           Open Y4M stream for output 
+  av [file]           Open (almost any) video file using FFmpeg 
+  mc [address] [port] Open a multicast UDP video stream 
+  pr [hostname][port] Open a unicast TCP video stream
+  cl [file]           Load cliplist from file 
+  cn [n1] [n2]        New clip from frames n1 to n2 
+  cd [n]              Delete clip n1 
+  sd [n]              Delete Stream n1 
+  cs [file]           Save cliplist to file 
+  es [file]           Save editlist to file 
+  ec [n1] [n2]        Cut frames n1 - n2 to buffer 
+  ed [n1] [n2]        Del franes n1 - n2  
+  ep [n]              Paste from buffer at frame n1 
+  ex [n1] [n2]        Copy frames n1 - n2 to buffer 
+  er [n1] [n2]        Crop frames n1 - n2 
+  al [file]           Action file Load 
+  as [file]           Action file save 
+  de                  Toggle debug level (default off) 
+  be                  Toggle bezerk mode (default on) 
 </pre>
-Also, you can send messages in VIMS format (or files, containing VIMS messages , with the commandline utility sendVIMS. See test/README in the source package).<br><br>
+Also, you can send messages in VIMS format (or files, containing VIMS messages )<br><br>
 For example, add the Pixelate effect on the Effect Chain of the current playing stream or clip:
 <pre>
-182:0 0 150 3;
+sayVIMS -h localhost -p 3490 "182:0 0 150 3;"
 </pre>
 See the VIMS document in the source package for a more detailed (but not yet complete) overview.<br>
-
-<br><br>
-The complete list of all console commands/keybinding and commandline parameters can be found in the Man pages, you can
-access the Man page by typing:
+<br>
+<br>
+For example, you can open /dev/video0, channel 0 (composite port) by giving the VIMS message:<br>
 <pre>
-$ man veejay
+$ sayVIMS -h localhost -p 3490 "144:0 0;"
+</pre>
+Alternativly, you can start a secundary veejay and stream from peer to peer in uncompressed video:
+<br>
+<pre>
+$ veejay -d -p 5000
+
+$ sayVIMS -h localhost -p 5000 "165:localhost 3490;"
+
+(press 'F7' in veejay to display the stream, prob. stream 7)
+</pre>
+Or for multicast:
+<pre>
+$ veejay -V 224.0.0.50 -p 5000 -n -L movie1.avi
+
+$ veejay -d 
+
+$ sayVIMS -h localhost -p 3490 "166:224.0.0.50 5000;"
+
+$ veejay -d -p 4000
+
+$ sayVIMS -h localhost -p 4000 "166:224.0.0.50 5000;"
+
 </pre>
 
-
+Or, if you want to play a XVID movie (or any other compressed format that is not I frame only):
+<pre>
+$ sayVIMS -h localhost -p 3490 "149:/tmp/my-XVID-movie.avi;"
+</pre>
 
 <h2><a name="4.3">4.3 The keyboard interface</a></h2><p>
 The keyboard interface takes keypresses (events) from SDL, almost all keys on
@@ -650,84 +686,37 @@ where possible params are:
 </pre>
 <br>
 <br><br>
-<b>sendVIMS</b> can be used to send commands or files to batch-process to veejay
+<b>sayVIMS</b> can be used to send commands or files to batch-process to veejay
 <pre>
-Usage: sendVIMS [options] [messages]
+Usage: sayVIMS [options] [messages]
 where options are:
  -p             Veejay port (3490)
  -h             Veejay host (localhost)
+ -g			    Veejay multicast address (224.0.0.50)
  -f <filename>  Send contents of this file to veejay
+ -c             Colored output (geek feature)
 
 Messages to send to veejay must be wrapped in quotes
 You can send multiple messages by seperating them with a whitespace
 </pre>
 <br><br>
-For example<br>
-<pre>
-sendVIMS "182:0 0 113 1;"
-</pre>
 
 </p>
 
 <h2><a name="5">5 Popular Packages</a></h2><p>
 Usefull software (in no apparant order):
 <ul>
-<li>EffecTV
-<li>Mplayer
 <li>The MJPEG Tools
 <li>Transcode
-<li>Motion
+<li>PureData (PD)
+<li>PDP for  PD
 </ul>
 Please refer to <a href="veejay-HOWTO.html#5">Other Resources</a> to find the project's website<br>
 </p>
-<p><a name="5.1"><h2>5.1 EffecTV</a></h2></p>
-EffecTV is a real-time video effector. You can watch TV or video through amazing effectors,
-it supports output and input from a vloopback device, enabling you to create multiple video pipelines 
-to veejay for further processing.
-<br>
-<br>
-Starting effectv to read from your video4linux device and output to veejay:
-<pre>
-$ effectv -device /dev/video0 -channel 1 -norm pal -vloopback /dev/video2
-</pre>
-If everything goes well you should see your camera input in EffecTV; continue loading veejay:
-<pre>
-$ veejay /tmp/my_video_file.avi
-</pre>
-<br>
-Now, open the vloopback device in veejay:
-<pre>
-> li video3
-</pre>
-If everything goes well again, you should see EffecTV's output in veejay.
-</p>
-
-<p><h2><a name="5.2">5.2 mplayer</b></h2></a></p>
-<p>Mplayer is the movie player for linux, it has support for different types of output 
-You can use mplayer to play a DVD or some MPEG4 file and stream it into veejay.
-
-First, create a named pipe 
-<pre>
-$ mkfifo stream.yuv
-</pre>
-Continue with starting mplayer
-<pre>
-$ mplayer -vo yuv4mpeg -ao null -zoom -x 352 -y 288 -vop scale yuy2 /tmp/mpeg4_movie.avi
-</pre>
-If everything goes well, mplayer waits until a frame has been read from the named pipe.
-Mplayer uses by default the filename stream.yuv, if you specify another mplayer will 
-create a stream.yuv.
-<br>
-Start veejay as usual and type the command <i>fi stream.yuv</i>, hit <i>ESC</i> and
-press some F-key if it is not already playing.
-<br>
-
-</p>
-
-<p><h2><a name="5.3">5.3 The MJPEG Tools</h2></a></p>
+<p><h2><a name="5.3">5.1 The MJPEG Tools</h2></a></p>
 <p>The Mjpeg tools are a set of tools that can do recording of videos and playback, simple cut-and-paste
 editing and the MPEG compression of audio and video under Linux.
-You can use the EditLists from this package in veejay.<br>
+You can use the EditLists from this package in veejay and vice versa<br>
 
 Here are a few examples for processing video data:<br><br>
 
@@ -745,12 +734,15 @@ $ cat /tmp/special_file | yuv2rawdv -v 2 > rawdv
 Encoding it to MJPEG file 'video-mjpeg.avi'
 <pre>
 $ cat /tmp/special_file | yuv2lav -v2 -f 0 -I 0 -q 90 -o video-mjpeg.avi
-</p>
+</pre>
+Encoding veejay output to MJPEG file:
+<pre>
+$ veejay movie1.avi -o stdout -O3 | yuv2lav -f 0 -I 0 -q 90 -o movie1-mjpeg.avi
 </pre>
 
 </p>
 
-<p><h2><a name="5.4">5.4 Transcode</b></h2></a></p>
+<h2><a name="5.4">5.2 Transcode</b></h2></a>
 <p>Transcode is a Linux video Stream Processing Tool, it can convert between different types of video formats<br>
 <br>
 Encode a file to mjpeg with no audio and rescale the output video to 352x288:<br><br>
@@ -773,15 +765,14 @@ you can use in combination with veejay.
 <li><a href="http://www.xmlsoft.org">The XML C library for Gnome http://www.xmlsoft.org</a>
 <li><a href="http://www.directfb.org">DirectFB http://www.directfb.org</a>
 <li><a href="http://jackit.sourceforge.net">JACK http://jackit.sourceforge.net</a>
+<li><a href="http://freetype.sourceforge.net">FreeType , http://freetype.sourceforge.net</a>
 </ul>
 </p>
 <p>
 <h3>Usefull software</h3>
 <ul>
-<li><a href="http://effectv.sourceforge.net/">EffecTV http://effectv.sourceforge.net</a>
 <li><a href="http://www.mplayerhq.hu/">Mplayer http://www.mplayerhq.hu</a>
 <li><a href="http://mjpeg.sourceforge.net">The MJPEGTools http://mjpeg.sourceforge.net</a>
-<li><a href="http://freej.dyne.org">FreeJ, a digital instrument for live performances</a>
 <li><a href="http://pure-data.sourceforge.net">Pure Data</a>
 <li><a href="http://zwizwa.fartit.com/pd/sendVIMS/">sendVIMS PD module (very cool!)</a>
 <li><a href="http://www.theorie.physik.uni-goettingen.de/~ostreich/transcode/">Transcode http://www.theorie.physik.uni-goettingen.de/~ostreich/transcode/</a>
@@ -790,6 +781,15 @@ you can use in combination with veejay.
 <h2><a name="6.2">6.2 Mailing Lists</a></h2><p>
 There is a mailing list for veejay which is hosted by Sourceforge. 
 The address is <a href="mailto:veejay-users@lists.sourceforge.net">veejay-users@lists.sourceforge.net</a>
+</p>
+<p>
+<h2><a name="6.3">6.3 Veejay developer's lounge</a></h2>
+Veejay's developer lounge provides a ticket system for you , the user, to report
+any problem or feature requests. The ticket system allows us to keep track of
+problems.<br>
+Also, the developer lounge hosts a subversion code repository where you can 
+find the 'on the bleeding edge' source codes of veejay.<br>
+Many thanks to jaromil (author of FreeJ/Muse) and the <a href="http://dyne.org">Dyne Foundation</a> for providing these tools<br>.
 </p>
 
 <h2><a name="7">7. Credits</a></h2><p>

@@ -787,8 +787,8 @@ Boolean NetworkPacketWaiting(OSCPacketBuffer packet) {
 	int n;
 	NetworkReturnAddressPtr na = OSCPacketBufferGetClientAddr(packet);
 
-	if( use_mcast_ )
-	{
+//	if( use_mcast_ )
+//	{
 		fd_set fds;
 		struct	timeval no_wait;
 		int	status;
@@ -798,13 +798,16 @@ Boolean NetworkPacketWaiting(OSCPacketBuffer packet) {
 		status = select( na->sockfd + 1, &fds, 0, 0, &no_wait );
 		if(status <= 0)
 			return FALSE;
-	}
-	else
-	{
-		if( ioctl( na->sockfd, FIONREAD, &n, 0)==-1) return FALSE;
-		if( n==0 ) return FALSE;
-	}
-	return TRUE;
+		if(FD_ISSET( na->sockfd, &fds ))
+			return TRUE;
+//	}
+//	else
+//	{
+//		if( ioctl( na->sockfd, FIONREAD, &n, 0)==-1) return FALSE;
+//		if( n==0 ) return FALSE;
+//	}
+//	return TRUE;
+	return FALSE;
 }
 
 Boolean NetworkReceivePacket( OSCPacketBuffer packet ) {

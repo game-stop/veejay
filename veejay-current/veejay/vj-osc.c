@@ -72,15 +72,18 @@ void vj_osc_cb_skip_to_start(void *context, int arglen, const void *vargs, OSCTi
 void vj_osc_cb_skip_to_end(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_set_frame(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_set_slow(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void vj_osc_cb_plain_mode( void *context,int arglen,const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra );
 void vj_osc_cb_next_second(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_prev_second(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_next_frame(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_prev_frame(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_new_clip(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void vj_osc_cb_copy_clip(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_select_start(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_select_end(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_clip_del(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_select_clip(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void vj_osc_cb_clip_set_jitter(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_clip_set_start(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_clip_set_end(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_clip_set_dup(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
@@ -90,6 +93,9 @@ void vj_osc_cb_clip_set_marker(void *context, int arglen, const void *vargs, OSC
 void vj_osc_cb_clip_clear_marker(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_clip_record_start(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_clip_record_stop(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void vj_osc_cb_record_format(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void vj_osc_cb_clip_his_render(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void vj_osc_cb_clip_his_play(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_clear(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_entry_disable_video(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_entry_enable_video(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
@@ -116,6 +122,7 @@ void vj_osc_cb_tag_record_stop(void *context, int arglen, const void *vargs, OSC
 void vj_osc_cb_tag_select(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_add(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_preset(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void vj_osc_cb_chain_toggle_all(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_set_parameter0(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_set_parameter1(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_set_parameter2(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
@@ -129,11 +136,34 @@ void vj_osc_cb_set_parameter8(void *context, int arglen, const void *vargs, OSCT
 void vj_osc_cb_tag_new_v4l(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 #endif
 void vj_osc_cb_tag_new_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+
+void vj_osc_cb_tag_new_net(void *context, int arglen, const void *vargs, OSCTimeTag when,NetworkReturnAddressPtr ra );
+
+void vj_osc_cb_tag_new_mcast(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra );
+
+void vj_osc_cb_tag_new_avformat(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+
 void vj_osc_cb_load_cliplist(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_save_cliplist(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_output_start_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_output_stop_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
-void vj_osc_cb_save_editlist(void *context, int arglen, const void *vargs,OSCTimeTag when, NetworkReturnAddressPtr ra);   
+#ifdef HAVE_SDL
+void vj_osc_cb_resize( void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra );
+void vj_osc_cb_fullscreen(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+#endif
+void vj_osc_cb_screenshot(void *context, int arglen, const void *vargs,OSCTimeTag when, NetworkReturnAddressPtr ra);
+void vj_osc_cb_sampling(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void vj_osc_cb_bezerk(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void vj_osc_cb_verbose(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void	vj_osc_cb_el_paste_at(void *context,int arglen,const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void	vj_osc_cb_el_copy(void *context,int arglen,const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void	vj_osc_cb_el_del(void *context,int arglen,const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void	vj_osc_cb_el_crop(void *context,int arglen,const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void	vj_osc_cb_el_cut(void *context,int arglen,const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void	vj_osc_cb_el_add(void *context,int arglen,const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void	vj_osc_cb_el_save(void *context,int arglen,const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void	vj_osc_cb_el_load(void *context,int arglen,const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+
 
 void vj_osc_set_veejay_t(veejay_t *t);
 
@@ -250,6 +280,7 @@ void *_vj_osc_rt_malloc(int num_bytes) {
 {\
 int arg[4];\
 int arguments[16];\
+memset(arguments,0,16);\
 arguments[1] = -1;\
 arguments[2] = d;\
 arguments[3] = arg[0];\
@@ -265,11 +296,26 @@ printf("SNET: [%s]\n",str);\
 vj_event_fire_net_event(osc_info, c, str,NULL, 1);\
 }
 
+#define SDNET_F( a,b,c )\
+{\
+char str[OSC_STRING_SIZE];\
+int  args[16];\
+int __a = 0;\
+int __n = vj_osc_parse_char_arguments(a,b,str);\
+memset( args,0,16 );\
+str[__n] = '\0';\
+__a = vj_osc_parse_int_arguments( a - __n , b + __n, args );\
+vj_event_fire_net_event(osc_info, c, str,args, 2);\
+}
+
+
+
 
 #define NET_F(a,b,c)\
 {\
 int arguments[16];\
 int num_arg = vj_osc_parse_int_arguments(a,b,arguments);\
+memset(arguments,0,16);\
 vj_event_fire_net_event( osc_info, c, NULL,arguments, num_arg );\
 }
 
@@ -285,6 +331,7 @@ int c_a = vj_osc_count_int_arguments(a,b);\
 int num_arg = vj_event_get_num_args(c);\
 int arguments[16];\
 int n_a;\
+memset(arguments,0,16);\
 if(c_a >= 0 && c != NET_CHAIN_ENTRY_SET_PRESET) {\
 if( (num_arg-1) == c_a ) {\
 arguments[0]=0;\
@@ -312,6 +359,7 @@ if(c_a >= 0 && c == NET_CHAIN_ENTRY_SET_PRESET) {\
 int c_a = vj_osc_count_int_arguments(a,b);\
 int num_arg = vj_event_get_num_args(c);\
 int arguments[16];\
+memset(arguments,0,16);\
 if(c_a == 0) {\
 arguments[0]=-1;\
 vj_event_fire_net_event( osc_info,c, NULL,arguments,num_arg );\
@@ -323,10 +371,44 @@ vj_event_fire_net_event(osc_info,c,NULL,arguments,c_a); }\
 }\
 }
 
+
+
 void vj_osc_cb_el_add_clip(void *context, int arglen, const void *vargs, OSCTimeTag when,
 		NetworkReturnAddressPtr ra)
 {
 	SNET_F(arglen, vargs, NET_EDITLIST_ADD_CLIP);
+}
+void vj_osc_cb_el_load(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	SNET_F(arglen, vargs, NET_EDITLIST_LOAD);
+}
+void vj_osc_cb_el_save(void *context, int arglen , const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	SNET_F(arglen, vargs, NET_EDITLIST_SAVE);
+}
+void vj_osc_cb_el_add(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra )
+{
+	SNET_F(arglen, vargs, NET_EDITLIST_ADD );
+}
+void vj_osc_cb_el_cut(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra )
+{
+	NET_F(arglen, vargs, NET_EDITLIST_CUT );
+}
+void vj_osc_cb_el_crop(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra )
+{
+	NET_F(arglen, vargs, NET_EDITLIST_CROP );
+}
+void vj_osc_cb_el_del(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra )
+{
+	NET_F(arglen, vargs, NET_EDITLIST_DEL );
+}
+void vj_osc_cb_el_copy(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	NET_F(arglen, vargs, NET_EDITLIST_COPY );
+}
+void vj_osc_cb_el_paste_at( void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	NET_F(arglen, vargs, NET_EDITLIST_PASTE_AT);
 }
 
 /* /video/playforward */
@@ -390,6 +472,12 @@ void vj_osc_cb_set_slow(void *context, int arglen, const void *vargs, OSCTimeTag
 	NET_F(arglen,vargs,NET_VIDEO_SET_SLOW);
 }
 
+void vj_osc_cb_plain_mode(void *context, int arglen, const void *vargs, OSCTimeTag when,
+	NetworkReturnAddressPtr ra)
+{
+	NET_F( arglen,vargs,NET_SET_PLAIN_MODE );
+}
+
 void vj_osc_cb_next_second(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
@@ -420,6 +508,11 @@ void vj_osc_cb_new_clip(void *context, int arglen, const void *vargs, OSCTimeTag
 	NET_F(arglen, vargs, NET_CLIP_NEW);
 }
 
+void vj_osc_cb_copy_clip(void *context, int arglen, const void *vargs, OSCTimeTag when,
+	NetworkReturnAddressPtr ra)
+{
+	NET_F(arglen, vargs, NET_CLIP_COPY );
+}
 
 void vj_osc_cb_select_start(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
@@ -446,7 +539,10 @@ void vj_osc_cb_select_clip(void *context, int arglen, const void *vargs, OSCTime
 {
 	DSNET_F(arglen, vargs, NET_CLIP_SELECT);
 }
-
+void vj_osc_cb_clip_set_jitter(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	DNET_F(arglen, vargs, NET_CLIP_UPDATE );
+}	
 void vj_osc_cb_clip_set_start(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
@@ -469,6 +565,14 @@ void vj_osc_cb_clip_set_speed(void *context, int arglen, const void *vargs, OSCT
 	NetworkReturnAddressPtr ra)
 {
 	DNET_F(arglen, vargs,NET_CLIP_SET_SPEED);
+}
+void vj_osc_cb_clip_his_render(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	DNET_F(arglen, vargs, NET_CLIP_RENDER_TO );
+}
+void vj_osc_cb_clip_his_play(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	DNET_F(arglen, vargs, NET_CLIP_RENDER_SELECT );
 }
 
 void vj_osc_cb_clip_set_looptype(void *context, int arglen, const void *vargs, OSCTimeTag when,
@@ -494,7 +598,10 @@ void vj_osc_cb_clip_record_start(void *context, int arglen, const void *vargs, O
 {
 	NET_F(arglen,vargs,NET_CLIP_REC_START);
 }
-
+void vj_osc_cb_record_format(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	SNET_F(arglen, vargs, NET_RECORD_DATAFORMAT );
+}
 void vj_osc_cb_clip_record_stop(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
@@ -524,7 +631,10 @@ void vj_osc_cb_chain_entry_disable_audio(void *context, int arglen, const void *
 {
 	DNET_F(arglen,vargs,NET_CHAIN_ENTRY_SET_VIDEO_OFF);
 }
-
+void vj_osc_cb_chain_toggle_all(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	DNET_F(arglen,vargs,NET_CHAIN_TOGGLE_ALL);
+}
 void vj_osc_cb_chain_entry_enable_audio(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
@@ -721,6 +831,22 @@ void vj_osc_cb_tag_new_v4l(void *context, int arglen, const void *vargs, OSCTime
 }
 #endif
 
+void vj_osc_cb_tag_new_net(void *context, int arglen, const void *vargs, OSCTimeTag when,
+    NetworkReturnAddressPtr ra)
+{
+	SDNET_F(arglen,vargs,NET_TAG_NEW_NET);
+}
+void vj_osc_cb_tag_new_mcast(void *context, int arglen, const void *vargs, OSCTimeTag when,
+	NetworkReturnAddressPtr ra )
+{
+	SDNET_F(arglen,vargs,NET_TAG_NEW_MCAST);
+}
+void vj_osc_cb_tag_new_avformat(void *context, int arglen, const void *vargs, OSCTimeTag when,
+	NetworkReturnAddressPtr ra)
+{
+	SNET_F(arglen,vargs,NET_TAG_NEW_AVFORMAT);
+}
+
 void vj_osc_cb_tag_new_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
@@ -739,12 +865,6 @@ void vj_osc_cb_save_cliplist(void *context, int arglen, const void *vargs,
 	SNET_F(arglen,vargs,NET_CLIP_SAVE_CLIPLIST);
 }
 
-void vj_osc_cb_save_editlist(void *context, int arglen, const void *vargs,
-	OSCTimeTag when, NetworkReturnAddressPtr ra)
-{
-	SNET_F(arglen,vargs,NET_EDITLIST_SAVE);
-}
-
 void vj_osc_cb_output_start_y4m(void *context, int arglen, const void *vargs,
 	OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
@@ -757,6 +877,33 @@ void vj_osc_cb_output_stop_y4m(void *context, int arglen, const void *vargs,
 	SNET_F(arglen,vargs,NET_OUTPUT_Y4M_STOP);
 }
 
+#ifdef HAVE_SDL
+void vj_osc_cb_resize(void *context, int arglen, const void *vargs, OSCTimeTag when,
+NetworkReturnAddressPtr ra )
+{
+	NET_F( arglen, vargs, NET_RESIZE_SDL_SCREEN );
+}
+void vj_osc_cb_fullscreen(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	NET_F( arglen, vargs, NET_FULLSCREEN );
+}
+#endif
+void vj_osc_cb_screenshot( void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	SNET_F(arglen, vargs, NET_SCREENSHOT);
+}
+void vj_osc_cb_sampling( void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	NET_F(arglen, vargs, NET_SAMPLE_MODE );
+}
+void vj_osc_cb_verbose( void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	NET_F( arglen, vargs, NET_DEBUG_LEVEL )
+}
+void vj_osc_cb_bezerk( void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra )
+{
+	NET_F( arglen, vargs, NET_BEZERK );
+}
 /* initialize the pointer to veejay_t */
 
 void vj_osc_set_veejay_t(veejay_t *info) {
@@ -781,69 +928,144 @@ static struct
 	int		 leave;
 } osc_methods[] = 
 {
-	{ "/video/play",		"play",		vj_osc_cb_play_forward,			0	},	
-	{ "/video/reverse",		"reverse",	vj_osc_cb_play_backward,		0	},
-	{ "/video/pause",		"pause",	vj_osc_cb_stop,				0	},
-	{ "/video/speed",		"speed",	vj_osc_cb_set_speed,			0	},
-	{ "/video/slow",		"slow",		vj_osc_cb_set_dup,			0	},
-	{ "/video/goto_start",		"goto_start",	vj_osc_cb_skip_to_start,		0	},
-	{ "/video/goto_end",		"goto_end",	vj_osc_cb_skip_to_end,			0	},
-	{ "/video/set_frame",		"set_frame",	vj_osc_cb_set_frame,			0	},
-	{ "/video/prev_frame",		"prev_frame",	vj_osc_cb_prev_frame,			0	},
-	{ "/video/next_frame",		"next_frame",	vj_osc_cb_next_frame,			0	},
-	{ "/video/next_second",		"next_second",	vj_osc_cb_next_second,			0	},
-	{ "/video/prev_second",		"prev_second",	vj_osc_cb_prev_second,			0	},
-
-	{ "/clip/new",			"new",		vj_osc_cb_new_clip,			1	},
-	{ "/clip/del",			"del",		vj_osc_cb_clip_del,			1	},
-	{ "/clip/select",		"select",	vj_osc_cb_select_clip,			1	},
-	{ "/clip/goto_start",		"goto_start",	vj_osc_cb_select_start,			1	},
-	{ "/clip/goto_end",		"goto_end",	vj_osc_cb_select_end,			1	},
-	{ "/clip/set/start",		"start",	vj_osc_cb_clip_set_start,		13	},
-	{ "/clip/set/end",		"end",		vj_osc_cb_clip_set_end,			13	},
-	{ "/clip/set/looptype",		"looptype",	vj_osc_cb_clip_set_looptype,		13	},
-	{ "/clip/set/speed",		"speed",	vj_osc_cb_clip_set_speed,		13	},
-	{ "/clip/set/marker",		"marker",	vj_osc_cb_clip_set_marker,		13	},
-	{ "/clip/set/slow",		"slow",		vj_osc_cb_clip_set_dup,			13	},
-	{ "/clip/set/nomarker",		"nomarker",	vj_osc_cb_clip_clear_marker,		13	},
-	{ "/clip/rec/start",		"start",	vj_osc_cb_clip_record_start,		14	},
-	{ "/clip/rec/stop",		"stop",		vj_osc_cb_clip_record_stop,		14	},
-
-	{ "/stream/select",		"select",	vj_osc_cb_tag_select,			2	},
+	{ "play foward",			"play",			vj_osc_cb_play_forward,				0	},	
+	{ "play reverse",			"reverse",		vj_osc_cb_play_backward,			0	},
+	{ "pause",					"pause",		vj_osc_cb_stop,						0	},
+	{ "speed ( < 0 = reverse, > 0 = forward)",
+								"speed",		vj_osc_cb_set_speed,				0	},
+	{ "slow",					"slow",			vj_osc_cb_set_dup,					0	},
+	{ "goto start",				"goto_start",	vj_osc_cb_skip_to_start,			0	},
+	{ "goto end",				"goto_end",		vj_osc_cb_skip_to_end,				0	},
+	{ "set frame <pos>",		"set_frame",	vj_osc_cb_set_frame,				0	},
+	{ "set previous frame",		"prev_frame",	vj_osc_cb_prev_frame,				0	},
+	{ "set next frame",			"next_frame",	vj_osc_cb_next_frame,				0	},
+	{ "set next second",		"next_second",	vj_osc_cb_next_second,				0	},
+	{ "set previous second",	"prev_second",	vj_osc_cb_prev_second,				0	},
+	{ "play plain video",		"plain",		vj_osc_cb_plain_mode,				0	},
+	{ "create new clip <pos start> <pos end>",	
+								"new",			vj_osc_cb_new_clip,					1	},
+	{ "copy clip <num> as new clip",
+								"copy",			vj_osc_cb_copy_clip,				1	},
+	{ "delete clip <num>",		"del",			vj_osc_cb_clip_del,					1	},
+	{ "select and play clip <num>",
+								"select",		vj_osc_cb_select_clip,				1	},
+	{ "goto clip starting position",
+								"goto_start",	vj_osc_cb_select_start,				1	},
+	{ "goto clip ending position",
+								"goto_end",		vj_osc_cb_select_end,				1	},
+	{ "relative start/end position update <pos1> <pos2>",
+								"jitter",		vj_osc_cb_clip_set_jitter,			13	},
+	{ "set clip new starting position <pos>",
+								"start",		vj_osc_cb_clip_set_start,			13	},
+	{ "set clip new ending position <pos>",
+								"end",			vj_osc_cb_clip_set_end,				13	},
+	{ "clip set looptype <0 = none, 1 = normal, 2 = bounce>",
+								"looptype",		vj_osc_cb_clip_set_looptype,		13	},
+	{ "clip set playback speed <num>",
+								"speed",		vj_osc_cb_clip_set_speed,			13	},
+	{ "clip set marker <pos1> <pos2>",
+								"marker",		vj_osc_cb_clip_set_marker,			13	},
+	{ "clip set frame duplicate <num>",
+								"slow",			vj_osc_cb_clip_set_dup,				13	},
+	{ "clip delete marker",
+								"nomarker",		vj_osc_cb_clip_clear_marker,		13	},
+	{ "clip start recording <0=entire clip, N=num frames> <0=dont play 1=play>",
+								"start",		vj_osc_cb_clip_record_start,		14	},
+	{ "clip stop recording",	"stop",			vj_osc_cb_clip_record_stop,			14	},
+	{ "clip set recorder format (mjpeg,mpeg4,dv,divx,yv12,yv16)",
+								"format",		vj_osc_cb_record_format,			14	},
+	{ "clip render new entry <num>",
+								"render",		vj_osc_cb_clip_his_render,			15	},
+	{ "clip play rendered entry <num>",
+								"play",			vj_osc_cb_clip_his_play,			15	},
+	{ "stream select and play <num>",
+								"select",		vj_osc_cb_tag_select,				2	},
 #ifdef HAVE_V4L
-	{ "/stream/new/v4l",		"v4l",		vj_osc_cb_tag_new_v4l,			19	},
+	{ "new video4linux input stream <device num> <channel num>",
+								"v4l",			vj_osc_cb_tag_new_v4l,				19	},
 #endif
-	{ "/stream/new/y4m",		"y4m",		vj_osc_cb_tag_new_y4m,			19	},
-//	{ "/stream/new/avformat",	"avformat",	vj_osc_cb_tag_new_avformat,		19	},
+	{ "new yuv4mpeg input stream <filename>",
+								"y4m",			vj_osc_cb_tag_new_y4m,				19	},
+	{ "new ffmpeg input stream <filename>",
+								"avformat",		vj_osc_cb_tag_new_avformat,			19	},
+	{ "new multicast input stream <address> <port>",
+								"mcast",		vj_osc_cb_tag_new_mcast,			19 },
+	{ "new peer-to-peer input stream <hostname> <port>",
+								"net",			vj_osc_cb_tag_new_net,				19 },
 
-	{ "/stream/rec/o_start",	"o_start",	vj_osc_cb_tag_record_offline_start,	16	},
-	{ "/stream/rec/o_stop",		"o_stop",	vj_osc_cb_tag_record_offline_stop,	16	},
-	{ "/stream/rec/start",		"start",	vj_osc_cb_tag_record_start,		16	},
-	{ "/stream/rec/stop",		"stop",		vj_osc_cb_tag_record_stop,		16	},
+	{ "hidden record from stream <num frames> <autoplay bool>",
+								"o_start",		vj_osc_cb_tag_record_offline_start,	16	},
+	{ "stop hidden recording ",	"o_stop",		vj_osc_cb_tag_record_offline_stop,	16	},
+	{ "start stream recorder <num frames> <autoplay bool>",
+								"start",		vj_osc_cb_tag_record_start,			16	},
+	{ "stop stream recorder ",	"stop",			vj_osc_cb_tag_record_stop,			16	},
+	{ "set stream recorder format (mjpeg,divx,dv,yv12,yv16,mpeg4)",
+								"format",		vj_osc_cb_record_format,			16	},
+	{ "Effect chain clear",		"reset",		vj_osc_cb_chain_clear,				4	},
+	{ "Fade in effect chain <num frames>",
+								"fade_in"	,	vj_osc_cb_chain_fade_in,			4	},
+	{ "Fade out effect chain <num frames>",	
+								"fade_out",		vj_osc_cb_chain_fade_out,			4	},
+	{ "Effect chain enabled",	"enable",		vj_osc_cb_chain_enable,				4	},
+	{ "Effect chain disabled",	"disable",		vj_osc_cb_chain_disable,			4	},
+	{ "Manual Fader (0=A 255=B",
+								"opacity",		vj_osc_cb_chain_manual_fade,		4	},
+	{ "All Effect chains on/off (1/0)",
+								"global_fx",	 vj_osc_cb_chain_toggle_all,		4	},
+	{ "Disable effect chain entry <num>",
+								"disable",		vj_osc_cb_chain_entry_disable_video,9	},
+	{ "Enable effect chain entry <num>",
+								"enable",		vj_osc_cb_chain_entry_enable_video,	9	},
+	{ "Clear effect chain entry <num>",
+								"clear",		vj_osc_cb_chain_entry_del,			9	},
+	{ "Select effect chain entry <num>",
+								"select",		vj_osc_cb_chain_entry_select,		9	},
+	{ "Set effect default values on chain entry <num>",
+								"defaults",		vj_osc_cb_chain_entry_default,		9	},
+	{ "Preset an effect on chain entry",
+								"preset",	vj_osc_cb_chain_entry_preset,		9	},
+//	{ "/entry/set",			"set",		vj_osc_cb_chain_entry_set,		9	},
+	{ "Select channel <num> for mixing effect on entry <num>",
+								"channel",	vj_osc_cb_chain_entry_channel,		9	},
+	{ "Select source (0=clip,1=stream) for mixing effect on entry <num>",
+							"source",	vj_osc_cb_chain_entry_source,		9	},
 
-	{ "/chain/reset",		"reset",	vj_osc_cb_chain_clear,			4	},
-	{ "/chain/fade_in",		"fade_in",	vj_osc_cb_chain_fade_in,		4	},
-	{ "/chain/fade_out",		"fade_out",	vj_osc_cb_chain_fade_out,		4	},
-	{ "/chain/enable",		"enable",	vj_osc_cb_chain_enable,			4	},
-	{ "/chain/disable",		"disable",	vj_osc_cb_chain_disable,		4	},
-	{ "/chain/opacity",		"opacity",	vj_osc_cb_chain_manual_fade,		4	},
-
-	{ "/entry/disable",		"disable",	vj_osc_cb_chain_entry_disable_video,	9	},
-	{ "/entry/enable",		"enable",	vj_osc_cb_chain_entry_enable_video,	9	},
-	{ "/entry/del",			"del",		vj_osc_cb_chain_entry_del,		9	},
-	{ "/entry/select",		"select",	vj_osc_cb_chain_entry_select,		9	},
-	{ "/entry/defaults",		"defaults",	vj_osc_cb_chain_entry_default,		9	},
-	{ "/entry/preset",		"preset",	vj_osc_cb_chain_entry_preset,		9	},
-	{ "/entry/set",			"set",		vj_osc_cb_chain_entry_set,		9	},
-	{ "/entry/channel",		"channel",	vj_osc_cb_chain_entry_channel,		9	},
-	{ "/entry/source",		"source",	vj_osc_cb_chain_entry_source,		9	},
-
-	{ "/arg/set",			"set",		vj_osc_cb_chain_entry_set_arg_val,	8	},
+	{ "Set argument <num> to value <num> for effect on entry <num>",
+							"set",		vj_osc_cb_chain_entry_set_arg_val,	8	},
 
 
-	{ "/cl/load",			"load",		vj_osc_cb_load_cliplist,		6 	},
-	{ "/cl/save",			"save",		vj_osc_cb_save_cliplist,		6	},
-	{ "/el/add_clip",		"add_clip", vj_osc_cb_el_add_clip,			7	},
+	{ "Cliplist load <filename>",			"load",		vj_osc_cb_load_cliplist,		6 	},
+	{ "Cliplist save <filename>",			"save",		vj_osc_cb_save_cliplist,		6	},
+	{ "Editlist add filename (as new clip)","add_clip", vj_osc_cb_el_add_clip,			7	},
+	{ "EditList paste frames from buf at frame <num>",
+							"paste_at",	vj_osc_cb_el_paste_at,			7	},
+	{ "EditList copy frames <n1> to <n2> to buffer",
+							"copy",		vj_osc_cb_el_copy,				7	},
+	{ "EditList delete frames <n1> to <n2>",
+							"del",		vj_osc_cb_el_del,				7	},
+	{ "EditList crop frames 0 - <n1>  <n2> - end",
+							"crop",		vj_osc_cb_el_crop,				7	},
+	{ "EditList cut frames <n1> to <n2> into buffer",
+							"cut",		vj_osc_cb_el_cut,				7	},	
+	{ "EditList add file <filename>",
+							"add",		vj_osc_cb_el_add,				7	},
+	{ "EditList save <filename>",
+							"save",		vj_osc_cb_el_save,				7	},
+	{ "EditList load <filename>",
+							"load",		vj_osc_cb_el_load,				7	},
+#ifdef HAVE_SDL
+	{ "Resize SDL video window <width> <height>",
+							"resize",	vj_osc_cb_resize,				10  },
+	{ "Toggle SDL video window fullscreen/windowed",
+							"fullscreen", vj_osc_cb_fullscreen,			10	},
+#endif
+	{ "Dump current frame as JPG <filename>",
+							"screenshot", vj_osc_cb_screenshot,			10	},
+	{ "Configure sampling mode (linear=0 or triangle=1)",
+							"sampling",	vj_osc_cb_sampling,				11	},
+	{ "Toggle verbose output mode",
+							"verbose",	vj_osc_cb_verbose,				11	},
+	{ "Toggle bezerk mode",		"bezerk",	vj_osc_cb_bezerk,				11	},
 	{ NULL,					NULL,		NULL,							0	},
 };
 
@@ -864,6 +1086,7 @@ static struct
  {	"/video/set",		"set",		 12, 0,0	},
  {	"/clip/set",   		"set",		 13, 1,0	},
  {	"/clip/rec", 		"rec",		 14, 1,0	},
+ {  "/clip/his",		"his",		 15, 1,0	},
 // {	"/clip/chain", 		"chain",	 15, 1,0	},
 // {	"/clip/entry",  	"entry",	 18, 1,0	},
  {	"/stream/rec",		"rec",		 16, 2,0	},
@@ -875,9 +1098,14 @@ static struct
  {	"/el",			"el",		 7, -1,0	},
  { 	"/arg",			"arg",		 8, -1,0	},
  {	"/entry",		"entry",	 9, -1,0	},
+#ifdef HAVE_SDL
+ {  "/output",		"output",	10, -1,0	},
+#endif
+ {  "/config",		"config",	11,	-1,0	},
 // {	"<n>",			"%d",	 	20, 9 ,20	},
 // {	"<n>",			"%d",		40, 8 ,10	},	
  {	NULL,			NULL,		0, -1,0		},
+
 };
 
 
@@ -1012,6 +1240,14 @@ vj_osc* vj_osc_allocate(int port_id) {
 
 void vj_osc_dump()
 {
+
+	veejay_msg(VEEJAY_MSG_INFO,"The OSC message space is a subset of VIMS");
+	veejay_msg(VEEJAY_MSG_INFO,"By default, the actions are applied on the current playing");
+	veejay_msg(VEEJAY_MSG_INFO,"video (clip/stream). This can be overriden by setting the");
+	veejay_msg(VEEJAY_MSG_INFO,"stream or clip number as first argument, followed by the arguments");
+	veejay_msg(VEEJAY_MSG_INFO,"required by the message.");
+	veejay_msg(VEEJAY_MSG_INFO,"For Chain commands, ditto, use second argument to identify the chain entry");
+
 	OSCPrintWholeAddressSpace();
 
 

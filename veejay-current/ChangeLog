@@ -14,6 +14,10 @@
 	+ fixed screenshot dump when playing 4:2:2
 	+ changed VIMS 054 (screenshot) 054:name.jpg; or 054:;
 	+ added multicast video transmitter/receiver !!
+	+ revisited OSC implementation ( use veejay -u -n |less )
+	+ updated documentation (Howto, MAN pages, etc)
+	+ removed obsolete VIMS messages
+	+ removed any references on dropped vloopback support
 
 0.7.1
 	+ fixed color corruption in fib

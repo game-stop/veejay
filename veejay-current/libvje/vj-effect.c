@@ -483,6 +483,12 @@ void vj_effect_shutdown() {
 
 void vj_effect_dump() {
 	int i;
+	veejay_msg(VEEJAY_MSG_INFO, "Below follow all effects in Veejay,");
+	veejay_msg(VEEJAY_MSG_INFO, "Effect numbers starting with 2xx are effects that use");
+	veejay_msg(VEEJAY_MSG_INFO, "*two* sources (by default a copy of itself)");
+	veejay_msg(VEEJAY_MSG_INFO, "Use the channel/source commands to select another clip/stream");
+	veejay_msg(VEEJAY_MSG_INFO, "to mix with.");
+	veejay_msg(VEEJAY_MSG_INFO, "\n [effect num] [effect name] [arg 0 , min/max ] [ arg 1, min/max ] ...");
 	for(i=0; i < MAX_EFFECTS; i++) 
 	{
 		if(vj_effects[i])

@@ -134,6 +134,9 @@ static int human_friendly_vims(char *buffer)
  	veejay_msg(VEEJAY_MSG_INFO, "fi\t\tOpen Y4M stream for input");
 	veejay_msg(VEEJAY_MSG_INFO, "fo\t\tOpen Y4M stream for output");
 	veejay_msg(VEEJAY_MSG_INFO, "lo\t\tOpen vloopback device for output");
+	veejay_msg(VEEJAY_MSG_INFO, "mr\t\tOpen multicast receiver [address port]");
+	veejay_msg(VEEJAY_MSG_INFO, "pr\t\tOpen unicast receiver [address port]");
+	veejay_msg(VEEJAY_MSG_INFO, "av\t\tOpen file as stream using FFmpeg [filename]");
 	veejay_msg(VEEJAY_MSG_INFO, "cl\t\tLoad cliplist from file");
 	veejay_msg(VEEJAY_MSG_INFO, "cn\t\tNew clip from frames n1 to n2");
 	veejay_msg(VEEJAY_MSG_INFO, "cd\t\tDelete clip n1");
@@ -170,6 +173,10 @@ static int human_friendly_vims(char *buffer)
    if(strncmp( buffer, "de",2 ) == 0 ) { human_friendly_msg( NET_DEBUG_LEVEL, NULL); return 1;}
    if(strncmp( buffer, "be",2 ) == 0 ) { human_friendly_msg( NET_BEZERK,NULL); return 1;}
    if(strncmp( buffer, "sa",2 ) == 0 ) { human_friendly_msg( NET_SAMPLE_MODE,NULL); return 1;}
+	if(strncmp(buffer, "mr",2 ) == 0 ) { human_friendly_msg( NET_TAG_NEW_MCAST, buffer+2); return 1; }
+	if(strncmp(buffer, "pr",2 ) == 0 ) { human_friendly_msg( NET_TAG_NEW_NET, buffer+2);
+return 1;}
+	if(strncmp(buffer, "av",2 ) == 0 ) { human_friendly_msg( NET_TAG_NEW_AVFORMAT, buffer+2); return 1; }
    return 0;
 }
 

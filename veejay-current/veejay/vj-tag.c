@@ -225,6 +225,9 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 	v = vj_tag_input->net[stream_nr];
 	if(!v) return 0;
 
+	if(!vj_client_test(host,port))
+		return 0;
+
 	v->planes[0] = w * h;
 	if( p == VIDEO_PALETTE_YUV420P )
 	{

@@ -63,5 +63,7 @@ vj_client *vj_client_alloc(int w , int h, int f);
 
 void	vj_client_free(vj_client *v);
 
+int	vj_client_test(char *addr, int port );
+
 #endif
 

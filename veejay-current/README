@@ -2,50 +2,18 @@
 Veejay - Video Mixing/Editing Instrument
 ========================================
 
-This is Veejay codename 'Dawn of New Babylon' 
+ 
+See:
+	README.quickstart
+	README.performance
+	doc/veejay-HOWTO.html
+	doc/NET.txt
+	doc/VIMS.txt
+	doc/YCbCr.txt
+	doc/COPYING	
 
-NEWEST:
-	- network (peer to peer streaming)
-	- network (multicast)
-	see doc/NET.txt
-	(90% completed, doesnt work between little <-> big endian machines)
-
-NEW:
-
-	(to be) supported platforms:
-
-		x86 architecture (intel and compatibles) (works!)
-		PS/2 (Mips)
-		PPC / MacOS X (please test!)
-		*BSD (please test!)
-
-Optional dependencies:
-======================
-
-    XML library for Gnome
-        http://libxml.gnome.org
-
-    SDL (simple direct media layer)
-		http://www.libsdl.org
-
-	Quasar DV codec
-		http://libdv.sourceforge.net
-
-    DirectFB (for output on secundary head/TV-Out) 
-		http://www.directfb.org
-
-	JACK, (a low latency audio server)
-		http://jackit.sourceforge.net
-
-    FreeType-2.1.9
-        http://freetype.sourceforge.net
- 	
-
-	    
-QUICK OVERVIEW
-==============
-
-Read the HOWTO if you a new user , see doc/veejay-HOWTO.html 
+Tips:	    
+=====
 
 To see a list of key events, type 'man veejay' in your shell or try 
 'cat veejay/vj-event.c |grep SDLK' for a more up to date version.        
@@ -103,9 +71,8 @@ CONTACT / FEEDBACK & HELP
 
 Niels Elburg <nelburg@looze.net>
 
-For usage related questions:
-
-http://veejay.sourceforge.net
+Please use the mailinglist on 
+  http://veejay.sourceforge.net
 
 BUG REPORTS / BLEEDING EDGE SOURCE CODE
 =======================================
@@ -115,6 +82,6 @@ Please use the ticket system !
 http://veejay.dyne.org
 
 
-ENJOY!
+ENJOY! And let us know about your performances/installations with veejay! 
 
 

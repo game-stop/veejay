@@ -10,7 +10,8 @@
 #undef PACKAGE_SOURCE_DIR
 #undef HAVE_XML2
 #undef HAVE_DIRECTFB
-
+#undef HAVE_VEVO
+#undef ARCH_MIPS
 #define _GNU_SOURCE 1			/* We make some use of C9X and POSIX and GNU
 								 facilities... */
 

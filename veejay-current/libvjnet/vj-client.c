@@ -260,3 +260,31 @@ int vj_client_close( vj_client *v )
 	return 1;
 }
 
+int	vj_client_test(char *host, int port)
+{
+	struct hostent *he = gethostbyname( host );
+
+	if( h_errno == HOST_NOT_FOUND )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Specified host '%s' is unknown", host );
+		return 0;
+	}
+
+	if( h_errno == NO_ADDRESS || h_errno == NO_DATA )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Specified host '%s' is valid but does not have IP address",
+			host );
+		return 0;
+	}
+	if( h_errno == NO_RECOVERY )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Non recoverable name server error occured");
+		return 0;
+	}
+	if( h_errno == TRY_AGAIN )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Temporary error occurred on an authoritative name. Try again later");
+		return 0;
+	}
+	return 1;
+}

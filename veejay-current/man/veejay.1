@@ -9,7 +9,8 @@ can be used to manipulate video in a realtime environment i.e. 'VJ'
 for visual performances or for (automated) interactive video installations.
 It provides mechanisms for simple non-desctructive editing, loop-based
 clip editing (video sampling) ,capturing from multiple streams, direct-to-disk
-recording in various formats and mixing from multiple sources to one.
+recording in various formats , mixing from multiple sources to one
+and network streaming (both unicast and multicast in uncompressed video)
 Also, it can communicate with other sound and/or video applications
 using the Open Sound Control (or through an inhouse protocol called 'VIMS') 
 Veejay uses Jack for transporting Audio (currently only output) but its support
@@ -39,7 +40,7 @@ You can select effects to put on your clips by pressing the cursor keys up and d
 .TP 
 .SH Interoperability
 .TP
-Veejay can be used with PD (PureData) by using sendVIMS, a small commandline utility that translates PD's symbols to veejay and vice versa.Look at the REFERENCES to find out where to download this utility. Also, by using the OpenSoundControl veejay can be used with a great number of sound and video processing applications.
+Veejay can be used with PD (PureData) by using sendVIMS, a small commandline utility that translates PD's symbols to veejay and vice versa.Look at the REFERENCES to find out where to download this utility. Also, by using the OpenSoundControl veejay can be used with a great number of sound and video processing applications.Also veejay can stream video data to STDOUT (-o stdout -O3) in yuv4mpeg format, or stream uncompressed video over the network (uni - and multicast)
 .SH OPTIONS
 .TP
 .B \-p/--port <num>
@@ -121,6 +122,13 @@ Specify framerate of dummy video
 .TP
 .B \-N [01]
 Specify norm of dummy video (0=PAL, 1=NTSC)
+.TP
+.B \-M/--multicast-osc
+Starts OSC receiver in multicast mode
+.TP
+.B \-V/--multicast-vims
+Starts VIMS in multicast mode (needed for multicast streaming)
+
 .SH EXAMPLES
 .TP
 .B veejay -u |less
@@ -133,7 +141,11 @@ Startup veejay listening on port 4000 (use this to use multiple veejays)
 .B veejay -d -W 352 -H 288 -R 25 -N 0
 Startup veejay using dummy video at 25 frames per second, dimensions 352x288
 and using PAL.
-
+.TP
+.B veejay movie1.avi -V 224.0.0.50 -p 5000 -n -v -L
+Startup veejay, using multicast protocol on port 5000 , with autolooping
+and no colored verbose output
+.TP
 .SH INTERFACE COMMANDS (STDIN)
 When you are running veejay with a SDL window you can use keybindings for
 realtime interaction. See 
@@ -348,7 +360,6 @@ template. Use SHIFT + [Any key] to apply the template
 .SH REFERENCES
 .TP
 sendVIMS for PD: http://zwizwa.fartit.com/pd/sendVIMS/
-sayVIMS command line utility
 .SH BUGS
 see BUGS in the source package
 .SH AUTHOR
@@ -359,5 +370,6 @@ project is:
 .I veejay-users@lists.sourceforge.net
 For more info see the website at
 .I http://veejay.sourceforge.net
+.I or http://veejay.dyne.org
 .SH "SEE ALSO"
-.B veejay yuv2rawdv rawdv2yuv sendVIMS 
+.B veejay yuv2rawdv rawdv2yuv any2yuv sayVIMS 
