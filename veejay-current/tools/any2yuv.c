@@ -31,7 +31,6 @@
 #include "mjpeg_logging.h"
 #include "yuv4mpeg.h"
 #include <fcntl.h>
-#include <libdv/dv.h>
 
 #define NTSC_W 720
 #define NTSC_H 480
@@ -233,6 +232,4 @@ int main(int argc, char *argv[] ) {
 
    return 0;
 }
-
-
 
