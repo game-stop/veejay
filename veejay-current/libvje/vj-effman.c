@@ -319,6 +319,10 @@ void vj_effman_apply_image_effect(
 void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp_kf *todo_info,int *arg, int entry, int e) {
 
     switch(e) {
+	case VJ_VIDEO_EFFECT_VIDEOWALL:
+		videowall_apply(frames[0],frames[1],frameinfo->width,
+			frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
+		break;
 	case VJ_VIDEO_EFFECT_VIDEOPLAY:
 		videoplay_apply(frames[0],frames[1],frameinfo->width,
 			frameinfo->height,arg[0],arg[1],arg[2]);

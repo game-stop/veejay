@@ -139,7 +139,7 @@
 #include "effects/maskstop.h"
 #include "effects/photoplay.h"
 #include "effects/videoplay.h"
-
+#include "effects/videowall.h"
 static struct
 {
 	int	(*mem_init)(int width, int height);
@@ -188,6 +188,7 @@ static struct
 {	maskstop_malloc,		maskstop_free,		VJ_IMAGE_EFFECT_MASKSTOP	},
 {	photoplay_malloc,		photoplay_free,		VJ_IMAGE_EFFECT_PHOTOPLAY	},
 {	videoplay_malloc,		videoplay_free,		VJ_VIDEO_EFFECT_VIDEOPLAY	},
+{	videowall_malloc,		videowall_free,		VJ_VIDEO_EFFECT_VIDEOWALL	},
 {	NULL			,	NULL			,0				},
 };
 
@@ -400,7 +401,8 @@ void vj_effect_initialize(int width, int height)
     vj_effects[35] = dissolve_init(width,height);
     vj_effects[36] = tripplicity_init(width,height);
 	vj_effects[37] = videoplay_init(width,height);
-    vj_effects[38] = dummy_init(width,height);
+	vj_effects[38] = videowall_init(width,height);
+    vj_effects[39] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);

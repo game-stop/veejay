@@ -111,6 +111,7 @@ enum {
     VJ_VIDEO_EFFECT_DISSOLVE = 235,
     VJ_VIDEO_EFFECT_TRIPPLICITY = 236,
 	VJ_VIDEO_EFFECT_VIDEOPLAY = 237,
+	VJ_VIDEO_EFFECT_VIDEOWALL = 238,
   //  VJ_VIDEO_EFFECT_CHANNELMIX = 233,
 };
 
@@ -197,7 +198,7 @@ enum {
 #define VJ_IMAGE_EFFECT_MAX 175
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 238
+#define VJ_VIDEO_EFFECT_MAX 239
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
 
@@ -506,6 +507,8 @@ extern void maskstop_apply( VJFrame *frame,
 extern void photoplay_apply(VJFrame *frame, int w, int h, int a, int b, int c);
 
 extern void videoplay_apply(VJFrame *frame,VJFrame *B, int w, int h, int a, int b, int c);
+
+extern void videowall_apply(VJFrame *frame,VJFrame *B, int w, int h, int a, int b, int c, int d);
 
 
 
