@@ -61,7 +61,7 @@ static	void	dump_host_info(void)
 	}
 }
 
-void	test_parameters( vevo_instance_t *plug )
+void	readyfy_parameters( vevo_instance_t *plug )
 {
 	int i,pi;
 	vevo_get_property( plug->self, VEVOI_N_IN_PARAMETERS, &pi );
@@ -69,30 +69,22 @@ void	test_parameters( vevo_instance_t *plug )
 	/* handle initialization of 'value' (from effect) */
 	for( i = 0; i < pi ; i ++ )
 	{
+		/* assign default value */
 		if( vevo_property_assign_value( plug->in_params[i], VEVOP_VALUE, VEVOP_DEFAULT ) !=VEVO_ERR_SUCCESS)
 		{
 			printf("Unable to initialize parameter %d\n", i);
 			exit(0);
 		}
-		else
-		{
-			if( vevo_find_property( plug->in_params[i], VEVOP_VALUE ) != 0 )
-			{
-				printf("cannot find VALUE\n");
-				exit(0);
-			}
-		}
 	}
 
 }
 
-vevo_instance_t *readyfy_plugin( vevo_instance_templ_t *tmpl )
+vevo_instance_t *readyfy_channels( vevo_instance_templ_t *tmpl )
 {
 	vevo_instance_t *plug = vevo_allocate_instance( tmpl );
 
 	int i;
 	int j;
-
 	data[0] = (uint8_t*) malloc(sizeof(uint8_t) * 1000);
 	data[1] = (uint8_t*) malloc(sizeof(uint8_t) * 1000);
 	data[2] = (uint8_t*) malloc(sizeof(uint8_t) * 1000);
@@ -133,7 +125,6 @@ vevo_instance_t *readyfy_plugin( vevo_instance_templ_t *tmpl )
 
 		vevo_set_property( plug->in_channels[i], VEVOC_PIXELDATA, 
 			VEVO_PTR_U8, 3, frame );
-	
 	}
 
 	return plug;
@@ -160,6 +151,7 @@ int main(int argc, char *argv[])
 	}
 
 	vevo_instance_templ_t *tmpl = (*vevo_setup)();
+
 	if(!tmpl) 
 	{		
 		printf("Can't get template from plugin %s\n", argv[1]);
@@ -174,7 +166,7 @@ int main(int argc, char *argv[])
 	}	
 
 	// ready data
-	vevo_instance_t *inst = readyfy_plugin( tmpl );
+	vevo_instance_t *inst = readyfy_channels( tmpl );
 
 	dump_host_info();
 	dump_plugin_info(inst, tmpl);
@@ -186,7 +178,7 @@ int main(int argc, char *argv[])
 
 	// initialize parameters (either own or DEFAULTS)
 
-	test_parameters( inst );
+	readyfy_parameters( inst );
 
 	// run process
 	vevo_process_f	*process = tmpl->process;

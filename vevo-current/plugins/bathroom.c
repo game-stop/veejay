@@ -201,6 +201,8 @@ int		deinit( vevo_instance_t *instance )
 	if( pd->data[0] ) free( pd->data[0] );
 	if( pd->data[1] ) free( pd->data[1] );
 	if( pd->data[2] ) free( pd->data[2] );
+	
+	if( pd ) free( pd );
 
 	return VEVO_ERR_SUCCESS;
 }

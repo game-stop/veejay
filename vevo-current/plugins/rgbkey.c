@@ -116,7 +116,6 @@ int		process( vevo_instance_t *instance )
 {
 	vevo_frame_t	A;
 	vevo_frame_t	B;
-	int		err;
 	double		degrees,noise;
 	double		rgba_gkey[4];
 	int		rgba_key[4];
@@ -151,7 +150,7 @@ int		init( vevo_instance_t *instance )
 {
 	/* parameter 1 , RGBA values for each component */
 	double	val[5][4] = {
-		{	0.0	0.0,	0.0,	0.0,	}, /* min */
+		{	0.0,	0.0,	0.0,	0.0,	}, /* min */
 		{	1.0 ,   1.0,	1.0,	1.0,	}, /* max */
 		{	0.0 ,	0.0,	1.0,	0.0,	}, /* default */
 		{	0.01,	0.01,	0.01,	0.01,	}, /* step size */
@@ -166,6 +165,7 @@ int		init( vevo_instance_t *instance )
 			5,
 			VEVOP_MIN, VEVOP_MAX, VEVOP_DEFAULT,
 			VEVOP_STEP_SIZE,VEVOP_PAGE_SIZE);
+
 			
 	/* parameter 0, Degrees (single atom) */
 	double	deg[5] = 
@@ -184,7 +184,6 @@ int		init( vevo_instance_t *instance )
 			5,
 			VEVOP_MIN, VEVOP_MAX, VEVOP_DEFAULT,
 			VEVOP_STEP_SIZE,VEVOP_PAGE_SIZE);
-
 	/* parameter 2, Noise suppression (single atom) */
 	double	noise[5] =
 	{
@@ -214,7 +213,6 @@ int		init( vevo_instance_t *instance )
 		NULL,
 	};
 
-
 	vevo_init_parameter_values( instance->in_params[3],
 			5, /* number of items in string list */
 			VEVO_STRING, /* type of data (can be double or int too for splines) */
@@ -222,9 +220,8 @@ int		init( vevo_instance_t *instance )
 			1, /* number of properties we want to initialize */
 			VEVOP_LIST); /* property is of type list */
 
-
 	/* setup default selected item */
-	char *group_default = group[4];
+	char *group_default = stringlist[4];
 
 	vevo_init_parameter_values( instance->in_params[3],
 		1,
@@ -232,7 +229,6 @@ int		init( vevo_instance_t *instance )
 		&group_default,
 		1,
 		VEVOP_DEFAULT);
-
 
 	return VEVO_ERR_SUCCESS;	
 }

@@ -394,6 +394,7 @@ static atom_t *vevo_put_atom( void *dst, vevo_atom_type_t ident )
 {
 	atom_t *atom; 
 	size_t atom_size = sizeof(int);
+	
 	if( ident == VEVO_DOUBLE ) atom_size = sizeof(double);
 	if( ident == VEVO_BOOLEAN ) atom_size = sizeof(vevo_boolean_t);
 
@@ -584,6 +585,7 @@ static  void	vevo_free_datatype(vevo_datatype *t)
 	t = NULL; 
 }
 
+// value NULL?
 static vevo_property_t *vevo_alloca_property( void *value, vevo_atom_type_t ident, vevo_property_type_t type, size_t num_atoms )
 {
 	vevo_property_t *p = (vevo_property_t*) malloc(sizeof(vevo_property_t));
@@ -1565,44 +1567,31 @@ vevo_port	*vevo_allocate_channel( vevo_channel_templ_t *info )
 	return p;
 }
 
+
+#define		__vevo_free_properties( port , num )\
+{\
+int i__; for( i__ = 0; i__ < num; i__ ++ ) vevo_free_port( port[i__] );\
+free( port );\
+}
+
 void		vevo_free_instance( vevo_instance_t *p )
 {
 	int ni=0,no=0,pi=0,po=0;
-	int i;
+	
 	vevo_get_property( p->self, VEVOI_N_IN_PARAMETERS, &pi );
-	if( pi > 0 )
-	{
-		for(i = 0; i < pi; i ++ )
-			vevo_free_port( p->in_params[i] );
-		free( p->in_params );
-	}
+	__vevo_free_properties( p->in_params, pi );
 
 	vevo_get_property( p->self, VEVOI_N_OUT_PARAMETERS, &po );
-	if( po > 0 )
-	{
-		for( i = 0; i < po; i ++ )
-			vevo_free_port( p->out_params[i] );
-		free( p->out_params );
-	}
+	__vevo_free_properties( p->out_params, po );
 
 	vevo_get_property( p->self, VEVOI_N_IN_CHANNELS, &ni );
-	if( ni > 0 )
-	{
-		for( i = 0; i < ni; i ++ )
-			vevo_free_port( p->in_channels[i] );
-		free( p->in_channels );
-	}
+	__vevo_free_properties( p->in_channels, ni );
 
 	vevo_get_property( p->self, VEVOI_N_OUT_CHANNELS, &no );
-	if( no > 0 )
-	{
-		for( i = 0; i < no; i ++ )
-			vevo_free_port( p->out_channels[i] );
-		free( p->out_channels );
-	}	
-
+	__vevo_free_properties( p->out_channels, no );
 
 	vevo_free_port(p->self);
+
 	free(p);
 }
 
@@ -1701,7 +1690,7 @@ vevo_set_property( port, sel, VEVO_DOUBLE, rowlen, base);\
 #define	__get_row_char( valist, rowlen, array, offset, port)\
 {\
 vevo_property_type_t sel = va_arg(valist,int);\
-char *base = array[offset];\
+char *base = (char*) &(array[offset]);\
 vevo_set_property( port, sel, VEVO_STRING, 1, base);\
 }
 
