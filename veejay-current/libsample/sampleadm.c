@@ -256,7 +256,7 @@ clip_info *clip_skeleton_new(long startFrame, long endFrame)
 	si->clip_id = id;
 	//this_clip_id++;
     }
-    sprintf(si->descr, "%s", "Untitled");
+    snprintf(si->descr,CLIP_MAX_DESCR_LEN, "%s", "Untitled");
     for(n=0; n < CLIP_MAX_RENDER;n++) {
       si->first_frame[n] = startFrame;
       si->last_frame[n] = endFrame;
@@ -752,9 +752,9 @@ int clip_set_description(int clip_id, char *description)
     if (!si)
 	return -1;
     if (!description || strlen(description) <= 0) {
-	sprintf(si->descr, "%s", "Untitled");
+	snprintf(si->descr, CLIP_MAX_DESCR_LEN, "%s", "Untitled");
     } else {
-	sprintf(si->descr, "%s", description);
+	snprintf(si->descr, CLIP_MAX_DESCR_LEN, "%s", description);
     }
     return ( clip_update(si, clip_id)==1 ? 0 : 1);
 }
@@ -765,7 +765,7 @@ int clip_get_description(int clip_id, char *description)
     si = clip_get(clip_id);
     if (!si)
 	return -1;
-    sprintf(description, "%s", si->descr);
+    snprintf(description, CLIP_MAX_DESCR_LEN,"%s", si->descr);
     return 0;
 }
 
@@ -1505,26 +1505,20 @@ int clip_chain_add(int s1, int c, int effect_nr)
 	    clip->effect_chain[c]->arg[i] = val;
 	}
     }
-    if (vj_effect_get_extra_frame(effect_nr) == 1)
+    if (vj_effect_get_extra_frame(effect_nr))
    {
     clip->effect_chain[c]->frame_offset = 0;
     clip->effect_chain[c]->frame_trimmer = 0;
-    clip->effect_chain[c]->channel = s1;
-    clip->effect_chain[c]->source_type = 0;
+
     if(s1 > 1)
-    { /* there is likely more than 1 sample*/
-		int s2 = s1 - 1;
-	 	 if(clip_exists(s2))
-		{
-		  	clip->effect_chain[c]->channel = s2;  
-		}
-		else
-		{	
-			s2 = s1 + 1;
-			if(clip_exists(s2))
-				clip->effect_chain[c]->channel = s2;
-		}
-	}
+	 s1 = s1 - 1;
+    if(!clip_exists(s1)) s1 = s1 + 1;
+
+	if(clip->effect_chain[c]->channel <= 0)
+		clip->effect_chain[c]->channel = s1;
+    if(clip->effect_chain[c]->source_type < 0)
+		clip->effect_chain[c]->source_type = 0;
+
         veejay_msg(VEEJAY_MSG_DEBUG,"Effect %s on entry %d overlaying with clip %d",
 			vj_effect_get_description(clip->effect_chain[c]->effect_id),c,clip->effect_chain[c]->channel);
     }
@@ -2161,7 +2155,7 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		sprintf(skel->descr, "%s", chTemp);
+		snprintf(skel->descr, CLIP_MAX_DESCR_LEN,"%s", chTemp);
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);

@@ -50,6 +50,9 @@
 
 #define CLIP_RENDER_START 1
 #define CLIP_RENDER_STOP 0
+
+#define CLIP_MAX_DESCR_LEN 150
+
 enum {
     CLIP_LOAD = 0,
     CLIP_RUN = 1,
@@ -79,7 +82,7 @@ typedef struct clip_info_t {
     clip_eff_chain *effect_chain[CLIP_MAX_EFFECTS];	/* effect chain */
     long first_frame[CLIP_MAX_RENDER];		/* start of clip */
     long last_frame[CLIP_MAX_RENDER];		/* end of clip */
-    char descr[150];
+    char descr[CLIP_MAX_DESCR_LEN];
     int speed;			/* playback speed */
     int looptype;		/* pingpong or loop */
     int max_loops;		/* max looops before going to */
