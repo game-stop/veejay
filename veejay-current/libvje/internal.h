@@ -181,11 +181,12 @@ enum {
 	VJ_IMAGE_EFFECT_VIDBLOB = 164,
 	VJ_IMAGE_EFFECT_VIDBOIDS = 165,
 	VJ_IMAGE_EFFECT_GHOST = 166,
+	VJ_IMAGE_EFFECT_NEIGHBOUR = 167,
 	VJ_IMAGE_EFFECT_DUMMY = 100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 167
+#define VJ_IMAGE_EFFECT_MAX 168
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 237
@@ -483,6 +484,6 @@ extern void		boids_apply( VJFrame *frame, int w, int h, int p0,int p1, int p2, i
 
 
 extern void		ghost_apply(VJFrame *frame, int w, int h, int o );
-
+extern void		neighbours_apply( VJFrame *frame, int width, int height, int brush_size, int level, int mode);
 
 #endif

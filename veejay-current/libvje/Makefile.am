@@ -36,7 +36,7 @@ libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
 			effects/contrast.c effects/motionblur.c effects/sinoids.c effects/average.c \
 		        effects/ripple.c effects/water.c effects/noisepencil.c effects/bathroom.c effects/slice.c \
 			effects/crosspixel.c effects/morphology.c effects/ghost.c effects/blob.c effects/boids.c effects/nervous.c \
-			effects/cartonize.c effects/tripplicity.c 
+			effects/cartonize.c effects/tripplicity.c effects/neighbours.c 
 
 
 libvje_la_LDFLAGS = $(VJE_ALL_LIB_OPTS) \

@@ -41,6 +41,9 @@ void vj_effman_apply_image_effect(
    int j;
 
    switch (e) {
+	case VJ_IMAGE_EFFECT_NEIGHBOUR:
+		neighbours_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
+		break;
 	case VJ_IMAGE_EFFECT_RIPPLETV:
 	 water_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
 	break;
