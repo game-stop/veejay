@@ -547,16 +547,12 @@ int	vj_server_update( vj_server *vje, int id )
 
 	if(!vje->use_mcast)
 	{
-		if( n <= 0 )
+		if( n <= 0)
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "recv error: %s", strerror(errno) );
 			_vj_server_del_client( vje, id );
 			return -1;
 		}
 	}
-
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "data in buffer : [%s]", vje->recv_buf );
 
 	return _vj_server_parse_msg( vje, id, vje->recv_buf,n );	
 }
