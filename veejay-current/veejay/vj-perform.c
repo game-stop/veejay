@@ -298,15 +298,15 @@ static int vj_perform_alloc_row(veejay_t *info, int frame, int c, int frame_len)
 	frame_buffer[c]->Y =
 	    (uint8_t *) vj_malloc(sizeof(uint8_t) * helper_frame->len);
 	if(!frame_buffer[c]->Y) return 0;
-	memset( frame_buffer[c]->Y , 16, helper_frame->len );
+	veejay_memset( frame_buffer[c]->Y , 16, helper_frame->len );
 	frame_buffer[c]->Cb =
 	    (uint8_t *) vj_malloc(sizeof(uint8_t) * helper_frame->len);
 	if(!frame_buffer[c]->Cb) return 0;
-	memset( frame_buffer[c]->Cb, 128, helper_frame->len );
+	veejay_memset( frame_buffer[c]->Cb, 128, helper_frame->len );
 	frame_buffer[c]->Cr =
 	    (uint8_t *) vj_malloc(sizeof(uint8_t) * helper_frame->len);
 	if(!frame_buffer[c]->Cr) return 0;
-	memset( frame_buffer[c]->Cr, 128, helper_frame->len );
+	veejay_memset( frame_buffer[c]->Cr, 128, helper_frame->len );
 	return (3 * helper_frame->len);
 }
 
@@ -416,9 +416,9 @@ static int vj_perform_record_buffer_init()
 		record_buffer->Y = (uint8_t*)vj_malloc(sizeof(uint8_t) * helper_frame->len);
 	if(!record_buffer->Y) return 0;
 
-	memset( record_buffer->Y , 16, helper_frame->len );
-	memset( record_buffer->Cb, 128, helper_frame->uv_len );
- 	memset( record_buffer->Cr, 128, helper_frame->uv_len );
+	veejay_memset( record_buffer->Y , 16, helper_frame->len );
+	veejay_memset( record_buffer->Cb, 128, helper_frame->uv_len );
+ 	veejay_memset( record_buffer->Cr, 128, helper_frame->uv_len );
 
 	return 1;
 }
@@ -482,13 +482,13 @@ int vj_perform_init(veejay_t * info)
     if(!primary_buffer[0]) return 0;
     primary_buffer[0]->Y = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
     if(!primary_buffer[0]->Y) return 0;
-    memset(primary_buffer[0]->Y, 16, frame_len);
+    veejay_memset(primary_buffer[0]->Y, 16, frame_len);
     primary_buffer[0]->Cb = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
     if(!primary_buffer[0]->Cb) return 0;
-    memset(primary_buffer[0]->Cb, 128, frame_len);
+    veejay_memset(primary_buffer[0]->Cb, 128, frame_len);
     primary_buffer[0]->Cr = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
     if(!primary_buffer[0]->Cr) return 0;
-    memset(primary_buffer[0]->Cr,128, frame_len);
+    veejay_memset(primary_buffer[0]->Cr,128, frame_len);
 
     clip_record_init(frame_len);
     vj_tag_record_init(w,h);
@@ -496,16 +496,16 @@ int vj_perform_init(veejay_t * info)
     // to render fading of effect chain:
     temp_buffer[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * frame_len );
     if(!temp_buffer[0]) return 0;
-	memset( temp_buffer[0], 16, frame_len );
+	veejay_memset( temp_buffer[0], 16, frame_len );
     temp_buffer[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * frame_len );
     if(!temp_buffer[1]) return 0;
-	memset( temp_buffer[1], 128, frame_len );
+	veejay_memset( temp_buffer[1], 128, frame_len );
     temp_buffer[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * frame_len );
     if(!temp_buffer[2]) return 0;
-	memset( temp_buffer[2], 128, frame_len );
+	veejay_memset( temp_buffer[2], 128, frame_len );
     // to render fading of effect chain:
     socket_buffer = (uint8_t*)vj_malloc(sizeof(uint8_t) * frame_len * 4 ); // large enough !!
-    memset( socket_buffer, 16, frame_len * 4 );
+    veejay_memset( socket_buffer, 16, frame_len * 4 );
     // to render fading of effect chain:
 
     /* allocate space for frame_buffer, the place we render effects  in */
@@ -579,14 +579,14 @@ int vj_perform_init_audio(veejay_t * info)
 		return 0;
 	x_audio_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * PERFORM_AUDIO_SIZE);
 	if(!x_audio_buffer) return 0;
-	memset( x_audio_buffer,0,PERFORM_AUDIO_SIZE);
+	veejay_memset( x_audio_buffer,0,PERFORM_AUDIO_SIZE);
 
-	memset( top_audio_buffer, 0 ,2 *  PERFORM_AUDIO_SIZE );
+	veejay_memset( top_audio_buffer, 0 ,2 *  PERFORM_AUDIO_SIZE );
 	/* chained audio */
 	for (i = 0; i < CLIP_MAX_EFFECTS; i++) {
 	    audio_buffer[i] =
 		(uint8_t *) vj_malloc(sizeof(uint8_t) * PERFORM_AUDIO_SIZE);
-		memset(audio_buffer[i], 0, PERFORM_AUDIO_SIZE);
+		veejay_memset(audio_buffer[i], 0, PERFORM_AUDIO_SIZE);
 	}
 	/* temporary buffer */
 //	bad_audio =
@@ -596,13 +596,13 @@ int vj_perform_init_audio(veejay_t * info)
   	tmp_audio_buffer =
  	   (uint8_t *) vj_malloc(sizeof(uint8_t) * PERFORM_AUDIO_SIZE * 10);
 	if(!tmp_audio_buffer) return 0;
- 	memset(tmp_audio_buffer, 0, PERFORM_AUDIO_SIZE * 10);
+ 	veejay_memset(tmp_audio_buffer, 0, PERFORM_AUDIO_SIZE * 10);
 
 	for(i=0; i < 2; i ++)
 	{
 		priv_audio[i] = (short*) vj_malloc(sizeof(short) * PERFORM_AUDIO_SIZE * 10 );
 		if(!priv_audio[i]) return 0;
-		memset( priv_audio[i], 0, PERFORM_AUDIO_SIZE * 10 );
+		veejay_memset( priv_audio[i], 0, PERFORM_AUDIO_SIZE * 10 );
 	}
 
 	if(!info->audio) return 0;
@@ -1219,7 +1219,7 @@ int vj_perform_new_audio_frame(veejay_t * info, char *dst_buf, int nframe,
 		len = vj_mlt_get_audio_frame(info->edit_list, r, bad_audio+offset);	
 		if(len < 0) {
 			len = (info->edit_list->audio_rate / info->edit_list->video_fps);
-			mymemset_generic(bad_audio+offset, 0, (len * info->edit_list->audio_bps) );
+			veejay_memset(bad_audio+offset, 0, (len * info->edit_list->audio_bps) );
 		}
 		size = len * info->edit_list->audio_bps;
 
@@ -1252,7 +1252,7 @@ int vj_perform_new_audio_frame(veejay_t * info, char *dst_buf, int nframe,
 		//vj_perform_reverse_audio_frame( info, len, bad_audio+offset);
 		if(len < 0) {
 			len = (info->edit_list->audio_rate / info->edit_list->video_fps);
-			mymemset_generic(bad_audio+offset, 0, (len * info->edit_list->audio_bps) );
+			veejay_memest(bad_audio+offset, 0, (len * info->edit_list->audio_bps) );
 		}
 		size = len * info->edit_list->audio_bps;
 
@@ -1322,7 +1322,7 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf)
 			len = audio_resample( resample_context[n_frames], audio_buf, tmp_buf, n_samples );
 			if( len < pred_len )
 			{
-				memset(audio_buf + (len * bps), 0 , (pred_len-len)*bps);
+				veejay_memset(audio_buf + (len * bps), 0 , (pred_len-len)*bps);
 			}
 		}
 		if(tmp_buf) free(tmp_buf);
@@ -1333,7 +1333,7 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf)
 		if (top_speed == 0)
 		{
 		    len = info->edit_list->audio_rate / info->edit_list->video_fps;
-		    mymemset_generic(audio_buf, 0, (len * info->edit_list->audio_bps));
+		    veejay_memset(audio_buf, 0, (len * info->edit_list->audio_bps));
 		    return len;
 		}
 		else
@@ -1354,7 +1354,7 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf)
 
     if (len <= 0)
 	{
-		mymemset_generic(audio_buf,0,PERFORM_AUDIO_SIZE);
+		veejay_memset(audio_buf,0,PERFORM_AUDIO_SIZE);
 		return (info->edit_list->audio_rate / info->edit_list->video_fps);
 	}
 
@@ -1860,9 +1860,9 @@ void vj_perform_plain_fill_buffer(veejay_t * info, int entry)
 
     if (ret <= 0 )
 	{
-		memset(frame[0], 16, helper_frame->len);
-		memset(frame[1], 128,helper_frame->uv_len);
-		memset(frame[2], 128,helper_frame->uv_len);
+		veejay_memset(frame[0], 16, helper_frame->len);
+		veejay_memset(frame[1], 128,helper_frame->uv_len);
+		veejay_memset(frame[2], 128,helper_frame->uv_len);
 	}
     if(ret == 2)
     {
@@ -2390,7 +2390,7 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 		case VJ_PLAYBACK_MODE_PLAIN:
 		    if (settings->current_playback_speed == 0)
 		    {
-		    	memset( a_buf, 0, PERFORM_AUDIO_SIZE);
+		    	veejay_memset( a_buf, 0, PERFORM_AUDIO_SIZE);
 			num_samples = (el->audio_rate/el->video_fps);
 		    }
 		    else
@@ -2400,7 +2400,7 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 
 			if(num_samples < 0)
 			{
-				memset(a_buf,0,PERFORM_AUDIO_SIZE);
+				veejay_memset(a_buf,0,PERFORM_AUDIO_SIZE);
 				num_samples = (el->audio_rate/el->video_fps);
 			}
 		    }
@@ -2419,7 +2419,7 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 			break;
 
 		default:
-			    memset( a_buf, 0 , PERFORM_AUDIO_SIZE);
+			    veejay_memset( a_buf, 0 , PERFORM_AUDIO_SIZE);
 	    	    break;
 	}
 
@@ -2431,7 +2431,7 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 
 	if(settings->audio_mute)
 	{
-		memset( a_buf, 0, num_samples * el->audio_bps);
+		veejay_memset( a_buf, 0, num_samples * el->audio_bps);
 	}
 
 	if(info->audio != AUDIO_PLAY) return 1;
