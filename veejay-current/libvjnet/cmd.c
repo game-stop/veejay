@@ -149,5 +149,8 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 
 void			sock_t_close( vj_sock_t *s )
 {
-	close( s->sock_fd );
+	if(s)
+	{
+		close(s->sock_fd);
+	}
 }

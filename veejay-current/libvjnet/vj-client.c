@@ -38,6 +38,8 @@
 #define VJC_SOCKET 2
 #define VJC_BAD_HOST 3
 
+#define PACKET_LEN 32000
+
 vj_client *vj_client_alloc( int w, int h, int f )
 {
 	vj_client *v = (vj_client*) malloc(sizeof(vj_client));
@@ -55,25 +57,27 @@ vj_client *vj_client_alloc( int w, int h, int f )
 	v->c = (conn_type_t**) malloc(sizeof(conn_type_t*) * 2);
 	v->c[0] = (conn_type_t*) malloc(sizeof(conn_type_t));
 	v->c[1] = (conn_type_t*) malloc(sizeof(conn_type_t));
-	v->blob = (unsigned char*) malloc(sizeof(unsigned char) * 4096 ); 
+	v->blob = (unsigned char*) malloc(sizeof(unsigned char) * PACKET_LEN ); 
 	if(!v->blob)
 		return NULL;
-	bzero( v->blob, 4096 );   
+	bzero( v->blob, PACKET_LEN );   
 	return v;
 }
 
 void		vj_client_free(vj_client *v)
 {
-	if(v->c[0])
-		free(v->c[0]);
-	if(v->c[1])
-		free(v->c[1]);
-	if(v->c) 
-		free(v->c);
-	if(v->blob)
-		free(v->blob);
 	if(v)
+	{
+		if(v->c[0])
+			free(v->c[0]);
+		if(v->c[1])
+			free(v->c[1]);
+		if(v->c) 
+			free(v->c);
+		if(v->blob)
+			free(v->blob);
 		free(v);
+	}
 }
 
 
@@ -108,7 +112,6 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 			v->c[1]->fd   = alloc_sock_t();
 			if(!v->c[0]->fd || !v->c[1]->fd)
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Memory allocation error");
 				return 0;
 			}
 			if( sock_t_connect( v->c[0]->fd, host, port_id ) )
@@ -201,6 +204,25 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst )
 	return n;
 }
 
+int	vj_client_get_status_fd(vj_client *v, int sock_type )
+{	
+	if(sock_type == V_STATUS)
+	{
+		if(v->c[1]->type == VSOCK_S)
+			return v->c[1]->fd->sock_fd;
+		if(v->c[1]->type == VMCAST_S)
+			return v->c[1]->r->sock_fd;
+	}
+	if(sock_type == V_CMD )
+	{
+		if(v->c[0]->type == VSOCK_C)
+			return	v->c[0]->fd->sock_fd;
+		if(v->c[0]->type == VMCAST_C )
+			return  v->c[0]->r->sock_fd;
+	}
+	return 0;	
+}
+
 int	vj_client_read(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 {
 	if( sock_type == V_STATUS )
@@ -246,18 +268,24 @@ int vj_client_send(vj_client *v, int sock_type,char *buf )
 
 int vj_client_close( vj_client *v )
 {
-	if(v->c[0]->type == VSOCK_C)
-		sock_t_close(v->c[0]->fd );
-	if(v->c[1]->type == VSOCK_S)
-		sock_t_close(v->c[1]->fd );
-	if(v->c[0]->type == VMCAST_C)
+	
+	if(v)
 	{
-		mcast_close_sender( v->c[0]->s );
-		mcast_close_receiver( v->c[0]->r );
+		if(v->c[0]->type == VSOCK_C)
+			sock_t_close(v->c[0]->fd );
+		if(v->c[1]->type == VSOCK_S)
+			sock_t_close(v->c[1]->fd );
+		if(v->c[0]->type == VMCAST_C)
+		{
+			mcast_close_sender( v->c[0]->s );
+			mcast_close_receiver( v->c[0]->r );
+		}
+		if(v->c[1]->type == VMCAST_S)
+			mcast_close_receiver( v->c[1]->r );
+		
+		return 1;
 	}
-	if(v->c[1]->type == VMCAST_S)
-		mcast_close_receiver( v->c[1]->r );
-	return 1;
+	return 0;
 }
 
 int	vj_client_test(char *host, int port)

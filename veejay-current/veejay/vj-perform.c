@@ -706,7 +706,8 @@ int vj_perform_audio_start(veejay_t * info)
 	{
 		info->audio=NO_AUDIO;
 		veejay_msg(VEEJAY_MSG_WARNING,
-			"Audio playback disabled");
+			"Audio playback disabled (unable to connect to jack)");
+		return 0;
 	}
 	if ( res == 2 )
 	{
@@ -720,9 +721,10 @@ int vj_perform_audio_start(veejay_t * info)
 			veejay_msg(VEEJAY_MSG_WARNING, "Cannot initialize resampler for %d -> %d audio rate conversion ",
 				el->audio_rate,el->play_rate);
 		}
+		return 0;
 
 	}
- 	return 1;
+	return 1;
 #else
 	veejay_msg(VEEJAY_MSG_INFO, "Jack support not compiled in (no audio)");
 	return 0;

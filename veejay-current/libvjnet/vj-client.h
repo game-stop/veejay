@@ -47,6 +47,8 @@ typedef struct
 
 int vj_client_connect( vj_client *v, char *host, char *group_name, int port_id );
   
+int	vj_client_get_status_fd(vj_client *v, int sock_type );
+
 void	vj_client_flush( vj_client *v, int delay );
 
 int	vj_client_poll( vj_client *v, int sock_type );

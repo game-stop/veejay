@@ -246,7 +246,10 @@ int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len )
 
 void	mcast_close_receiver( mcast_receiver *v )
 {
-	close(v->sock_fd);
-	free(v->group);
-	free(v);
+	if(v)
+	{
+		close(v->sock_fd);
+		if(v->group) free(v->group);
+		v->group = NULL;
+	}
 }

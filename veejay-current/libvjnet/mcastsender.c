@@ -170,7 +170,10 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame, const VJFrameInfo 
 
 void		mcast_close_sender( mcast_sender *v )
 {
-	close(v->sock_fd);
-	free(v->group);
-	free(v);	
+	if(v)
+	{
+		close(v->sock_fd);
+		if(v->group) free(v->group);
+		v->group = NULL;
+	}
 }

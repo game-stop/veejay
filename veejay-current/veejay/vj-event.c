@@ -1472,6 +1472,8 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 		memset(dargs,0,16);
 		strcpy(args,msg+4);
 
+		veejay_msg(VEEJAY_MSG_DEBUG, "msg = [%s], strlen = %d", msg, strlen(msg));
+
 		if(vj_event_list[id].format != NULL )
 		{
 			int np = vj_event_list[id].num_params;
@@ -1479,6 +1481,8 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 			int nl = 1;
 			int n_offset =0;
 			int m_len = strlen(args);
+			veejay_msg(VEEJAY_MSG_DEBUG, "Message len : %d, contents[%s]",
+				m_len, args );
 			for( ni = 0; ni < np; ni ++ )
 			{
 				if( m_len < n_offset )
@@ -1508,7 +1512,11 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 						char tmp_dec[10];
 						bzero(tmp_dec,10);
 						snprintf(tmp_dec, 10, "%d", dargs[ni]);
+						veejay_msg(VEEJAY_MSG_DEBUG, "start of token[%s]", args+n_offset);
 						n_offset += strlen(tmp_dec)+1;
+						veejay_msg(VEEJAY_MSG_DEBUG, "Num %d = %d", ni, dargs[ni]);
+						veejay_msg(VEEJAY_MSG_DEBUG, "n_offset + %d, len = %d",
+							n_offset, strlen(tmp_dec)+1);
 					}
 					else
 					{
@@ -6875,11 +6883,13 @@ void	vj_event_send_clip_history_list	(	void *ptr,	const char format[],	va_list a
 void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_list ap	)
 {
 	/* send video properties */
-	char info_msg[100];
+	char info_msg[255];
+	bzero( _s_print_buf,SEND_BUF);
+
 
 	veejay_t *v = (veejay_t*)ptr;
 	bzero(info_msg,100);
-	sprintf(info_msg, "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld",
+	snprintf(info_msg,sizeof(info_msg)-1, "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld",
 		v->edit_list->video_width,
 		v->edit_list->video_height,
 		v->edit_list->video_inter,
@@ -6892,32 +6902,45 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 		v->edit_list->num_video_files,
 		v->edit_list->video_frames
 		);	
-	SEND_MSG(v,info_msg);
-	
+	sprintf( _s_print_buf, "%03d%s",strlen(info_msg), info_msg);
+
+	SEND_MSG(v,_s_print_buf);
 }
+
 void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	editlist *el = v->edit_list;
-	int	 len = 0;
+	int	 len = 5;
 	int	 i;
+	char	num_files[5];
+	bzero( _s_print_buf,SEND_BUF);
+
 	for( i =0; i < el->num_video_files; i ++)
 	{
-		len += strlen( el->video_file_list[i] ) + 11;
+		len += strlen( el->video_file_list[i] ) + 15;
 	}
 	char *el_msg = (char*) vj_malloc(sizeof(char) * len );
 	char *p = el_msg;
 	memset(el_msg, 0,len );
-
+	sprintf(num_files, "%04d:", el->num_video_files );
+	strncat(p, num_files, strlen(num_files));
+	p += strlen(num_files);
 	for( i = 0; i < el->num_video_files; i ++)
 	{
 		char tmp[150];
-		sprintf(tmp, "%s %09ld",el->video_file_list[i], el->num_frames[i]);
+		sprintf(tmp, "%03d%s %09ld:",
+			strlen(el->video_file_list[i]) + 11 ,
+			el->video_file_list[i],
+			el->num_frames[i]
+		);
 		strncat( p, tmp, strlen(tmp));
 		p += strlen(tmp);
 	}
-	
-	SEND_MSG(v,el_msg);
+	sprintf( _s_print_buf, "%04d%s",strlen(el_msg), el_msg);
+
+	SEND_MSG(v,_s_print_buf);
+
 	if(el_msg) free(el_msg);
 }
 
