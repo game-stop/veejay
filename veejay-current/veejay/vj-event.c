@@ -1000,37 +1000,30 @@ vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id)
 	int len = 0;
 	if(!bundle_msg || strlen(bundle_msg) < 1)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Not storing empty bundles");
+		veejay_msg(VEEJAY_MSG_ERROR, "Doesnt make sense to store empty bundles in memory");
 		return NULL;
 	}	
+
 	len = strlen(bundle_msg);
-	if(len>1)
+	m = (vj_msg_bundle*) malloc(sizeof(vj_msg_bundle));
+	if(!m) 
 	{
-		m = (vj_msg_bundle*) malloc(sizeof(vj_msg_bundle));
-		if(!m) 
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error allocating memory for bundled message");
-			return NULL;
-		}
-		m->bundle = (char*) malloc(sizeof(char) * len+1);
-		bzero(m->bundle, len+1);
-		if(!m)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error allocating memory for bundled message context");
-			return NULL;
-		}
-		strncpy(m->bundle, bundle_msg, len);
-	
-		m->event_id = event_id;
-		veejay_msg(VEEJAY_MSG_DEBUG, "VIMS bundle:[%d] [%s]", event_id,bundle_msg); 
-		return m;
+		veejay_msg(VEEJAY_MSG_ERROR, "Error allocating memory for bundled message");
+		return NULL;
 	}
-	else
+	m->bundle = (char*) malloc(sizeof(char) * len+1);
+	bzero(m->bundle, len+1);
+	if(!m)
 	{
-			veejay_msg(VEEJAY_MSG_ERROR,"Cowardly refusing to store empty bundles!");
+		veejay_msg(VEEJAY_MSG_ERROR, "Error allocating memory for bundled message context");
+		return NULL;
 	}
+	strncpy(m->bundle, bundle_msg, len);
 	
-	return NULL;	
+	m->event_id = event_id;
+	veejay_msg(VEEJAY_MSG_DEBUG, "VIMS bundle:[%d] [%s]", event_id,bundle_msg); 
+
+	return m;
 }
 
 
@@ -1118,8 +1111,6 @@ void vj_event_parse_bundle(veejay_t *v, char *msg ) {
 	if ( msg[offset] == ':' )
 	{
 		int j = 0;
-		//veejay_msg(VEEJAY_MSG_INFO, "(VIMS) received message bundle [%s] %s",msg,msg+offset);
-		/* starting from 4th position there is number of messages */
 		offset += 1; /* skip ':' */
 		if( sscanf(msg+offset, "%03d", &num_msg )<= 0 )
 		{
@@ -1128,7 +1119,6 @@ void vj_event_parse_bundle(veejay_t *v, char *msg ) {
 		if ( num_msg <= 0 ) 
 		{
 			veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Invalid number of message given to execute. Skipping message [%s]",msg);
-			//veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Bad number of messages in bundle");
 			return;
 		}
 
