@@ -29,7 +29,9 @@ void 	vj_event_fmt_arg			(	int *args, 	char *str, 	const char format[], 	va_list
 void 	vj_event_init				();
 void	vj_event_print_range			(	int n1,		int n2);
 #ifdef HAVE_SDL
+#ifdef HAVE_XML2
 void    vj_event_xml_new_keyb_event		( 	xmlDocPtr doc, 	xmlNodePtr cur );
+#endif
 #endif
 
 int vj_event_get_num_args(int net_id);
