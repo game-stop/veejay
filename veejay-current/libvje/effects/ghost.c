@@ -38,7 +38,6 @@ vj_effect *ghost_init(int w, int h)
     ve->limits[0][0] = 16; 
     ve->limits[1][0] = 255;  // opacity
     ve->defaults[0] = 134;
-    ve->defaults[1] = 55;
     ve->description = "Motion Ghost";
     ve->sub_format = 1;
     ve->extra_frame = 0;
@@ -115,7 +114,9 @@ void ghost_apply(VJFrame *frame,
 	for(i = 0; i < len; i ++ )
 		bm[i] = ( abs(srcY[i] - dY[i]) > 1 ? 0xff: 0x0);
 
-	for( y = width; y < len; y += width )
+	  
+
+	for( y = width; y < (len-width); y += width )
 	{
 		for( x = 1; x < width - 1; x ++ ) 
 		{
