@@ -872,7 +872,7 @@ static struct {
   NULL,		  {0,0} },     
 	{ VJ_EVENT_DEBUG_LEVEL,			"Toggle more/less debugging information",	vj_event_debug_level,		0,	 NULL,		{0,0}},
 	{ VJ_EVENT_BEZERK,			"Toggle bezerk mode",				vj_event_bezerk,		0,	NULL,		{0,0}},
-	{ VJ_EVENT_SAMPLE_MODE,		"Toggle between box or triangle filter for 4:2:0 -> 4:4:4 sampling", vj_event_sample_mode, 0, NULL, {0,0}},
+	{ VJ_EVENT_SAMPLE_MODE,		"Toggle between box or triangle filter for 2x2 -> 1x1 sampling", vj_event_sample_mode, 0, NULL, {0,0}},
 	{ 0,NULL,0,0,NULL,{0,0}},
 };
 	
@@ -2075,7 +2075,7 @@ void  vj_event_sample_mode(void *ptr,	const char format[],	va_list ap)
 		veejay_set_sampling( v, SSM_420_JPEG_TR );
 	else
 		veejay_set_sampling( v, SSM_420_JPEG_BOX );
-	veejay_msg(VEEJAY_MSG_WARNING, "Sampling of 4:2:0 -> 4:4:4 is set to [%s]",
+	veejay_msg(VEEJAY_MSG_WARNING, "Sampling of 2x2 -> 1x1 is set to [%s]",
 		(v->settings->sample_mode == SSM_420_JPEG_BOX ? "lame box filter" : "triangle linear filter")); 
 }
 
@@ -2566,7 +2566,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 			vj_sdl_free(v->sdl_gui);
 			if(windowID != 0)
 			{
-				char env[100];
+				char env[100]; 
 				sprintf(env,"SDL_WINDOWID=%ld",windowID);
 				putenv(env);
 				veejay_msg(VEEJAY_MSG_INFO, "Using GUI's Window ID %ld",windowID);	
@@ -2603,6 +2603,7 @@ void vj_event_play_reverse(void *ptr,const char format[],va_list ap)
 
 	veejay_set_speed(v,
 			v->uc->speed );
+
 
 	veejay_msg(VEEJAY_MSG_INFO, "Video is playing in reverse at speed %d.", v->uc->speed);
 	}
@@ -6281,8 +6282,7 @@ void vj_event_effect_add(void *ptr, const char format[], va_list ap)
 				       vj_effect_get_real_id(v->uc->key_effect)) != 1)
 		{
 			int real_id = vj_effect_get_real_id(v->uc->key_effect);
-			veejay_msg(VEEJAY_MSG_INFO,"Effect %d %s on Entry %d",
-				real_id,
+			veejay_msg(VEEJAY_MSG_INFO,"Added Effect %s on chain entry %d",
 				vj_effect_get_description(real_id),
 				c
 			);
@@ -6297,8 +6297,7 @@ void vj_event_effect_add(void *ptr, const char format[], va_list ap)
 				vj_effect_get_real_id( v->uc->key_effect) ) != -1) 
 		{
 			int real_id = vj_effect_get_real_id(v->uc->key_effect);
-			veejay_msg(VEEJAY_MSG_INFO,"Effect %d %s on Entry %d",
-			  	real_id,
+			veejay_msg(VEEJAY_MSG_INFO,"Added Effect %s on chain entry %d",
 				vj_effect_get_description(real_id),
 				c
 			);
@@ -6394,7 +6393,7 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 				i,
 				y,
 				vj_tag_get_chain_status(id,i) ? "on" : "off", vj_effect_get_description(y),
-				(vj_effect_get_subformat(y) == 1 ? "4:4:4" : "4:2:0")
+				(vj_effect_get_subformat(y) == 1 ? "2x2" : "1x1")
 			);
 
 			for (j = 0; j < vj_effect_get_num_params(y); j++)
@@ -6558,7 +6557,7 @@ void vj_event_print_clip_info(veejay_t *v, int id)
 				i,
 				y,
 				clip_get_chain_status(id,i) ? "on" : "off", vj_effect_get_description(y),
-				(vj_effect_get_subformat(y) == 1 ? "4:4:4" : "4:2:0")
+				(vj_effect_get_subformat(y) == 1 ? "2x2" : "1x1")
 			);
 
 	    		for (j = 0; j < vj_effect_get_num_params(y); j++)
