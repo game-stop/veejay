@@ -1,0 +1,111 @@
+
+Veejay - Video Mixing/Editing Instrument
+========================================
+
+This is Veejay codename 'Babylon' 
+
+NEW:
+
+	Supported Platforms:
+		x86 architecture (intel and compatibles)
+		PS/2 (Mips)
+		PPC (please test!)
+		SGI (please test!)
+
+	Librified several components 
+
+	Many many smaller fixes
+
+	Better performance :)
+
+
+Requirements
+============
+
+Optional:
+
+    XML library for Gnome
+        http://libxml.gnome.org
+
+    SDL (simple direct media layer)
+		http://www.libsdl.org
+
+	Quasar DV codec
+		http://libdv.sourceforge.net
+
+    DirectFB (for output on secundary head/TV-Out) 
+		http://www.directfb.org
+
+	JACK, (a low latency audio server)
+		http://jackit.sourceforge.net
+
+    FreeType-2.1.9
+        http://freetype.sourceforge.net
+ 	
+
+	    
+QUICK OVERVIEW
+==============
+
+Read the HOWTO if you a new user , see doc/veejay-HOWTO.html 
+
+To see a list of key events, type 'man veejay' in your shell or try 
+'cat veejay/vj-event.c |grep SDLK' for a more up to date version.        
+
+For users with Intel Pentium 4 processors with Hyper Threading, benefit
+if they enable SMP in their kernel 2.6.x  
+
+Since version 0.6.3, veejay doesnt have a console interface anymore!!!
+Use 'sayVIMS -i' to enter interactive mode and give '?' or 'h' 
+to see a list of commands, or simply type VIMS style messages.
+
+
+PLUGINS
+=======
+
+ As of version 0.6.3 , veejay supports a plugin architecture for pull/push plugins.
+
+
+INSTALLING
+===========
+
+    In general, ./configure && make && make install if you meet 
+    all requirements.
+    
+    
+
+Running Veejay
+==============
+
+Start the core with
+	
+'veejay <options> <filename 1 ,... , filename N>'
+
+examples:
+
+1. have a small SDL window (for the keybindings) and DirectFB:
+
+   'veejay -O2 -S171x144 /video/video.avi'
+
+
+2. run veejay without a video file
+
+   (not anymore but perhaps in the future again ?)
+
+
+
+CONTACT / FEEDBACK & HELP
+=========================
+
+Niels Elburg <elburg@hio.hen.nl / nielselburg@yahoo.de >
+
+For usage related questions:
+
+http://veejay.sourceforge.net
+
+
+
+
+ENJOY!
+
+
