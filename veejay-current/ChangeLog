@@ -1,4 +1,11 @@
 0.7.2
+	+ fixed Network Streaming (VIMS 165:hostname port_id; )
+	+ fixed handling of multiple connections
+	+ fixed a small bug in multicast OSC
+	+ added doc/NET.txt to explain network streaming/multicast
+	+ fixed segfault in Ghost effect
+	+ added basic negotiation on frame information for Network Streaming
+	+ refactorized vj-server.c/vj-client.c
 
 0.7.1
 	+ fixed color corruption in fib
