@@ -1349,7 +1349,6 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 	int net_id=0;
 	int len = 0;
 	bzero(args,150);  
-
 	/* message is at least 5 bytes in length */
 	if( msg == NULL || strlen(msg) < MSG_MIN_LEN)
 	{
@@ -2694,13 +2693,13 @@ void vj_event_set_frame(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 	if(!TAG_PLAYING(v))
 	{
-	video_playback_setup *s = v->settings;
-	char *str = NULL;
-	P_A(args,str,format,ap);
-	if(args[0] == -1 )
-		args[0] = v->edit_list->video_frames - 1;
-	veejay_set_frame(v, args[0]);
-	veejay_msg(VEEJAY_MSG_INFO, "Video frame %d set",s->current_frame_num);
+		video_playback_setup *s = v->settings;
+		char *str = NULL;
+		P_A(args,str,format,ap);
+		if(args[0] == -1 )
+			args[0] = v->edit_list->video_frames - 1;
+		veejay_set_frame(v, args[0]);
+		veejay_msg(VEEJAY_MSG_INFO, "Video frame %d set",s->current_frame_num);
 	}
 }
 

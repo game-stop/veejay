@@ -404,7 +404,6 @@ int veejay_free(veejay_t * info)
 	(video_playback_setup *) info->settings;
     
 
-    vj_el_free(info->edit_list);
 
 	vj_tag_free();
     if( info->settings->zoom )
@@ -1597,7 +1596,7 @@ static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
     veejay_msg(VEEJAY_MSG_DEBUG, 
 		"Closing down the threading system ");
 
-    pthread_cancel(settings->software_playback_thread);
+    //pthread_cancel(settings->software_playback_thread);
     if (pthread_join(settings->software_playback_thread, NULL)) {
 	veejay_msg(VEEJAY_MSG_ERROR, 
 		    "Failure deleting software playback thread");
@@ -2226,23 +2225,18 @@ static void *veejay_playback_thread(void *data)
     veejay_playback_cycle(info);
 
       veejay_close(info); 
- 
+
     veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
     if(info->uc->is_server) {
      vj_server_shutdown(info->vjs[0]);
      vj_server_shutdown(info->vjs[1]); 
-     free(info->vjs[0]);
-     free(info->vjs[1]);
+
+
     }
     if(info->osc) vj_osc_free(info->osc);
 
     vj_yuv4mpeg_free(info->output_stream); 
     free(info->output_stream);
-
-	
-
-    veejay_close(info); 
-
 
     switch (info->video_out) {
     case 0:
@@ -2281,6 +2275,9 @@ static void *veejay_playback_thread(void *data)
     vj_perform_free(info);
     vj_effect_shutdown();
     vj_tag_close_all();
+ 
+    vj_el_free(info->edit_list);
+
 
     veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
     pthread_exit(NULL);
