@@ -150,7 +150,6 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
     in1 += width*2;
   }
 }
-
  
 /* horizontal interstitial siting
  *
@@ -348,6 +347,7 @@ static void tr_420jpeg_to_444(uint8_t *buffer, int width, int height)
 
 static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 {
+#ifndef HAVE_MMX
   uint8_t *in, *out0, *out1;
   int x, y;
   in = buffer + (width * height / 4) - 1;
@@ -364,6 +364,31 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
     out0 -= width;
     out1 -= width;
   }
+#else
+	int x,y;
+	const int mmx_stride = width/8;
+	uint8_t *src = buffer + (width * height/4)-1;
+	uint8_t *dst = buffer + (width * height) -1;
+	uint8_t *dst2 = dst - width;
+
+	for( y = height-1; y >= 0; y -= 2)
+	{
+		for( x = 0; x < mmx_stride; x ++ )
+		{
+			movq_m2r( *src,mm0 );
+			movq_m2r( *src,mm1 );
+			movq_r2m(mm0, *dst );
+			movq_r2m(mm1, *(dst+8) );
+			movq_r2m(mm0, *dst2 );
+			movq_r2m(mm1, *(dst2+8) );
+			dst += 16;
+			dst2 += 16;
+			src += 8;
+		}
+		dst -= width;	
+		dst2 -= width;
+	}
+#endif
 }
 
 
@@ -411,6 +436,62 @@ static void ss_444_to_422(uint8_t *buffer, int width, int height)
  */
 
 static mmx_t mask1 = {0xfefefefefefefefeLL};
+static mmx_t round4 = {0x0002000200020002LL};
+
+static inline void mmx_average_4_U8 (uint8_t * dest, const uint8_t * src1,
+                                     const uint8_t * src2,
+                                     const uint8_t * src3,
+                                     const uint8_t * src4)
+{
+    /* *dest = (*src1 + *src2 + *src3 + *src4 + 2)/ 4; */
+
+    movq_m2r (*src1, mm1);      /* load 8 src1 bytes */
+    movq_r2r (mm1, mm2);        /* copy 8 src1 bytes */
+
+    punpcklbw_r2r (mm0, mm1);   /* unpack low src1 bytes */
+    punpckhbw_r2r (mm0, mm2);   /* unpack high src1 bytes */
+
+    movq_m2r (*src2, mm3);      /* load 8 src2 bytes */
+    movq_r2r (mm3, mm4);        /* copy 8 src2 bytes */
+
+    punpcklbw_r2r (mm0, mm3);   /* unpack low src2 bytes */
+    punpckhbw_r2r (mm0, mm4);   /* unpack high src2 bytes */
+
+    paddw_r2r (mm3, mm1);       /* add lows */
+    paddw_r2r (mm4, mm2);       /* add highs */
+
+    /* now have partials in mm1 and mm2 */
+
+    movq_m2r (*src3, mm3);      /* load 8 src3 bytes */
+    movq_r2r (mm3, mm4);        /* copy 8 src3 bytes */
+
+    punpcklbw_r2r (mm0, mm3);   /* unpack low src3 bytes */
+    punpckhbw_r2r (mm0, mm4);   /* unpack high src3 bytes */
+
+    paddw_r2r (mm3, mm1);       /* add lows */
+    paddw_r2r (mm4, mm2);       /* add highs */
+
+    movq_m2r (*src4, mm5);      /* load 8 src4 bytes */
+    movq_r2r (mm5, mm6);        /* copy 8 src4 bytes */
+
+    punpcklbw_r2r (mm0, mm5);   /* unpack low src4 bytes */
+    punpckhbw_r2r (mm0, mm6);   /* unpack high src4 bytes */
+
+    paddw_r2r (mm5, mm1);       /* add lows */
+    paddw_r2r (mm6, mm2);       /* add highs */
+
+    /* now have subtotal in mm1 and mm2 */
+
+    paddw_m2r (round4, mm1);
+    psraw_i2r (2, mm1);         /* /4 */
+    paddw_m2r (round4, mm2);
+    psraw_i2r (2, mm2);         /* /4 */
+
+    packuswb_r2r (mm2, mm1);    /* pack (w/ saturation) */
+    movq_r2m (mm1, *dest);      /* store result in dest */
+}
+
+
 static inline void mmx_average_2_U8 (uint8_t * dest, const uint8_t * src1,
 				     const uint8_t * src2)
 {
@@ -488,7 +569,6 @@ static void tr_422_to_444(uint8_t *buffer, int width, int height)
 		}
 #endif
 	}
-
 }
 
 
@@ -554,6 +634,9 @@ void chroma_subsample(subsample_mode_t mode, uint8_t *ycbcr[],
   case SSM_420_JPEG_TR: 
     ss_444_to_420jpeg(ycbcr[1], width, height);
     ss_444_to_420jpeg(ycbcr[2], width, height);
+#ifdef HAVE_MMX
+	emms();
+#endif
     break;
   case SSM_420_MPEG2:
     ss_444_to_420mpeg2(ycbcr[1], width, height);
@@ -583,6 +666,9 @@ void chroma_supersample(subsample_mode_t mode, uint8_t *ycbcr[],
   case SSM_420_JPEG_BOX:
     ss_420jpeg_to_444(ycbcr[1], width, height);
     ss_420jpeg_to_444(ycbcr[2], width, height);
+#ifdef HAVE_MMX
+	emms();
+#endif
     break;
   case SSM_420_JPEG_TR:
     tr_420jpeg_to_444(ycbcr[1], width, height);

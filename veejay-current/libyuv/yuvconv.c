@@ -26,57 +26,6 @@
 
 
 
-void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
-		int width, int height)
-{
-
-    int i, j, w2;
-    uint8_t *y, *u, *v;
-
-    w2 = width / 2;
-
-    //I420
-    y = _y;
-    v = _v;
-    u = _u;
-
-    for (i = 0; i < height; i += 4) {
-	/* top field scanline */
-	for (j = 0; j < w2; j++) {
-	    /* packed YUV 422 is: Y[i] U[i] Y[i+1] V[i] */
-	    *(y++) = *(input++);
-	    *(u++) = *(input++);
-	    *(y++) = *(input++);
-	    *(v++) = *(input++);
-	}
-	for (j = 0; j < w2; j++)
-	{
-	    *(y++) = *(input++);
-	    *(u++) = *(input++);
-	    *(y++) = *(input++);
-	    *(v++) = *(input++);
-	
-	}
-
-	/* next two scanlines, one frome each field , interleaved */
-	for (j = 0; j < w2; j++) {
-	    /* skip every second line for U and V */
-	    *(y++) = *(input++);
-	    input++;
-	    *(y++) = *(input++);
-	    input++;
-	}
-	/* bottom field scanline*/
-	for (j = 0; j < w2; j++) {
-	    /* skip every second line for U and V */
-	    *(y++) = *(input++);
-	    input++;
-	    *(y++) = *(input++);
-	    input++;
-	}
-
-    }
-}
 /* convert 4:2:0 to yuv 4:2:2 packed */
 void yuv422p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
 		       int height)
@@ -260,9 +209,84 @@ void	yuy2toyv16(uint8_t *dst_y, uint8_t *dst_u, uint8_t *dst_v, uint8_t *srcI, i
 	
 }
 
-#else
+void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
+		int width, int height)
+{
+	int j,jmax,imax,i;
+	uint8_t *src = input;
+	uint8_t *dst_y = _y;
+	uint8_t *dst_u = _u; 
+	uint8_t *dst_v = _v;
+	jmax = width / 8;
+	imax = height;
 
+	for( i = 0; i < imax ;i ++ )
+	{
+		for( j = 0; j < jmax ; j ++ )
+		{
+			YUY2_TO_YUV_PLANAR;
+			src += 16;
+			dst_y += 8;
+			dst_u += 4;
+			dst_v += 4;
+		}
+		dst_u += width;
+		dst_v += width;
+	}
+}
+#else
 // non mmx functions
+
+void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
+		int width, int height)
+{
+  int i, j, w2;
+    uint8_t *y, *u, *v;
+
+    w2 = width / 2;
+
+    //I420
+    y = _y;
+    v = _v;
+    u = _u;
+
+    for (i = 0; i < height; i += 4) {
+	/* top field scanline */
+	for (j = 0; j < w2; j++) {
+	    /* packed YUV 422 is: Y[i] U[i] Y[i+1] V[i] */
+	    *(y++) = *(input++);
+	    *(u++) = *(input++);
+	    *(y++) = *(input++);
+	    *(v++) = *(input++);
+	}
+	for (j = 0; j < w2; j++)
+	{
+	    *(y++) = *(input++);
+	    *(u++) = *(input++);
+	    *(y++) = *(input++);
+	    *(v++) = *(input++);
+	
+	}
+
+	/* next two scanlines, one frome each field , interleaved */
+	for (j = 0; j < w2; j++) {
+	    /* skip every second line for U and V */
+	    *(y++) = *(input++);
+	    input++;
+	    *(y++) = *(input++);
+	    input++;
+	}
+	/* bottom field scanline*/
+	for (j = 0; j < w2; j++) {
+	    /* skip every second line for U and V */
+	    *(y++) = *(input++);
+	    input++;
+	    *(y++) = *(input++);
+	    input++;
+	}
+
+    }
+}
 
 void yuy2toyv16(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 		int width, int height)
