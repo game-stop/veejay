@@ -1817,14 +1817,15 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 }
 
 
-int vj_tag_sprint_status(int tag_id, int entry, int changed, char *str)
+//int vj_tag_sprint_status(int tag_id, int entry, int changed, char *str)
+int vj_tag_sprint_status( int tag_id, int pfps,int frame, int mode, char *str )
 {
     vj_tag *tag;
     tag = vj_tag_get(tag_id);
 
     if (!tag)
 	return -1;
-    
+    /*
     sprintf(str,
 	    "%d %d %d %d %d %d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d",
 	    tag->id,
@@ -1852,6 +1853,24 @@ int vj_tag_sprint_status(int tag_id, int entry, int changed, char *str)
 	    tag->effect_chain[entry]->a_flag,
 	    tag->effect_chain[entry]->volume,
 		this_tag_id-1);
+	*/
+
+	sprintf(str,
+			"%d %d %d %d %d %d %d %d %d %d %d %d %d",
+			pfps,
+			frame,
+			mode,
+			tag_id,
+			tag->effect_toggle,
+			0, // no start,
+			0, // no end,
+			0, // no speed,
+			0, // no looping
+			tag->encoder_active,
+			tag->encoder_duration,
+			tag->encoder_succes_frames,
+			vj_tag_size()-1);
+		
 
     return 0;
 }

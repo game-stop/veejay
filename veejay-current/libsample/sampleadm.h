@@ -226,8 +226,7 @@ extern int clip_set_chain_channel(int s1, int position, int channel);
 
 //int clip_chain_replace(int s1, int position, int effect_id);
 
-extern int clip_chain_sprint_status(int s1, int entry, int changed, int r_changed, char *str,
-			       int frame);
+extern int clip_chain_sprint_status(int s1, int r, int f, int m, char *s ); 
 
 extern int clip_set_render_entry(int s1, int entry);
 extern int clip_get_render_entry(int s1);

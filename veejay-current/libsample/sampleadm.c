@@ -1761,8 +1761,9 @@ int clip_apply_loop_dec(int s1, double fps) {
 
 
 /* print clip status information into an allocated string str*/
-int clip_chain_sprint_status(int s1, int entry, int changed, int r_changed,char *str,
-			       int frame)
+//int clip_chain_sprint_status(int s1, int entry, int changed, int r_changed,char *str,
+//			       int frame)
+int	clip_chain_sprint_status( int s1,int pfps, int frame, int mode, char *str )
 {
     clip_info *clip;
     clip = clip_get(s1);
@@ -1797,21 +1798,21 @@ int clip_chain_sprint_status(int s1, int entry, int changed, int r_changed,char 
 	    clip->effect_chain[entry]->channel,
 	    this_clip_id - 1);
 	*/
-
+/*
 	
     sprintf(str,
 	    "%d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d",
-/* 1 */	    frame,
+/	    frame,
 	    clip->active_render_entry,
 	    r_changed,
 	    clip->selected_entry,
-/* 5 */	    clip->effect_toggle,
+	    clip->effect_toggle,
 	    s1,
 	    clip->first_frame[clip->active_render_entry],
 	    clip->last_frame[clip->active_render_entry],
 	    clip->speed,
 	    clip->looptype,
-/* 11 */    clip->max_loops,
+	    clip->max_loops,
 	    clip->max_loops2,
 	    clip->next_clip_id,
 	    clip->depth,
@@ -1820,7 +1821,7 @@ int clip_chain_sprint_status(int s1, int entry, int changed, int r_changed,char 
 	    clip->audio_volume,
 	    0, 
 	    0, 
-/*20 */	   0,
+ 	   0,
 	    clip->encoder_active,
 	    clip->encoder_duration,
 	    clip->encoder_succes_frames,
@@ -1836,6 +1837,25 @@ int clip_chain_sprint_status(int s1, int entry, int changed, int r_changed,char 
 	    clip->effect_chain[entry]->a_flag,
 	    clip->effect_chain[entry]->volume,
 	    this_clip_id );
+    */
+
+	sprintf(str,
+		"%d %d %d %d %d %d %d %d %d %d %d %d %d",
+		pfps,
+		frame,
+		mode,
+		s1,
+		clip->effect_toggle,
+		clip->first_frame[ clip->active_render_entry ],
+		clip->last_frame[ clip->active_render_entry ],
+		clip->speed,
+		clip->looptype,
+		clip->encoder_active,
+		clip->encoder_duration,
+		clip->encoder_succes_frames,
+		clip_size());
+		
+		
  
    return 0;
 }

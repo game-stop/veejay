@@ -1159,7 +1159,7 @@ static void veejay_put_to_screen(veejay_t * info)
 {
   }
 
-static char status_who[5];
+//static char status_who[5];
 static char status_what[MESSAGE_SIZE];
 static char status_msg[MESSAGE_SIZE+5];
 //static int status_first =0;
@@ -1171,11 +1171,11 @@ static void veejay_pipe_write_status(veejay_t * info)
     int d_len = 0;
     int res = 0;
 
-    sprintf(status_who, "%d %d %d", info->uc->playback_mode, info->audio, info->real_fps  );
+ //   sprintf(status_who, "%d %d %d", info->uc->playback_mode, info->audio, info->real_fps  );
 
     switch (info->uc->playback_mode) {
       case VJ_PLAYBACK_MODE_CLIP:
-	/* get all current clip info (all buttons we can press in SDL) */
+	/* get all current clip info 
 	if (clip_chain_sprint_status
 	    (info->uc->clip_id, clip_get_selected_entry(info->uc->clip_id),
 	     info->uc->chain_changed, info->uc->render_changed, status_what,
@@ -1184,10 +1184,15 @@ static void veejay_pipe_write_status(veejay_t * info)
 			"Status of clip %d is invalid",
 			info->uc->clip_id);
 	    info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
-	}
+	}*/
+	if( clip_chain_sprint_status
+			(info->uc->clip_id, info->real_fps,settings->current_frame_num, info->uc->playback_mode, status_what ) != 0)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
+		}
 	break;
        case VJ_PLAYBACK_MODE_PLAIN:
-
+/*
 	sprintf(status_what, "%d %d %d %d %ld %f %ld %d %d %d",
 		settings->min_frame_num,
 		settings->current_frame_num,
@@ -1200,21 +1205,41 @@ static void veejay_pipe_write_status(veejay_t * info)
 		clip_size() - 1,
 		vj_tag_size()-1
 	    );
+*/
+		sprintf(status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d",
+			(int) info->real_fps,
+			settings->current_frame_num,
+			info->uc->playback_mode,
+			0,
+			0,
+			settings->min_frame_num,
+			settings->max_frame_num,
+			settings->current_playback_speed,
+			0, 
+			0,
+			0,
+			0,
+			0 );
 	break;
     case VJ_PLAYBACK_MODE_TAG:
-	if (vj_tag_sprint_status(info->uc->clip_id,
+/*	if (vj_tag_sprint_status(info->uc->clip_id,
 				 vj_tag_get_selected_entry(info->uc->clip_id),
 				 info->uc->chain_changed, status_what) != 0) {
 	    veejay_msg(VEEJAY_MSG_DEBUG, 
 			"Status of stream is invalid");
 	    info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
-	}
+	}*/
+	if( vj_tag_sprint_status( info->uc->clip_id, (int) info->real_fps,
+			settings->current_frame_num, info->uc->playback_mode, status_what ) != 0 )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
+		}
 	break;
        }
     
-    d_len = strlen(status_who) + strlen(status_what) + 1;
+    d_len = strlen(status_what);
     
-    snprintf(status_msg,MESSAGE_SIZE, "V%03dS%s %s", d_len, status_who, status_what);
+    snprintf(status_msg,MESSAGE_SIZE, "V%03dS%s", d_len, status_what);
 
     res = vj_server_status_send(info->status, status_msg, strlen(status_msg));
     if( res < 0) { /* close command socket */

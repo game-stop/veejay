@@ -27,6 +27,9 @@
 
 #define MAX_EFFECTS 103
 
+#define PARAM_WIDTH	    (1<<0x2)
+#define PARAM_HEIGHT	(1<<0x3)
+#define PARAM_FADER  	(1<<0x1)
 
 // keyframe-able parameter sets
 typedef struct
@@ -67,6 +70,7 @@ typedef struct vj_effect_t {
 
     char **param_description;	// unused.
     int *defaults;			
+	int *flags;					// parameter flags
     int *limits[2];				// [0] = min, [1] = max
 
     int extra_frame;			// effect requires a secundary frame

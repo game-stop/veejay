@@ -1,3 +1,5 @@
+0.7.2
+
 0.7.1
 	+ fixed color corruption in fib
 	+ removed veejay.spec from configure.in
@@ -13,6 +15,10 @@
 	+ added new effect 'Nervous'
 	+ added new effect 'Video Blobs'
 	+ fixed ticket #3 (editlist load bug)
+	+ added new effect 'Video Boids'
+	+ refurbished status line (all modi have 13 status bytes now)
+	+ fixed minor bug in 'video boids'
+	+ bumped version to 0.7.2
 	- render to history list mismatches frames in clip
 	  (too many)
 	
