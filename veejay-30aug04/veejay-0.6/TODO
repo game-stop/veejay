@@ -1,0 +1,5 @@
++ status processing in GUI for clip,stream and plain
+  indexing incorrect
++ cannot add an effect using the GUI
++ cannot start embedded video window (missing -g commandline option)
++ GUI is almost complete

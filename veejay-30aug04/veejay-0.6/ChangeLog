@@ -1,0 +1,483 @@
+0.6.0
+	+ fixed bug in performer when using a stream multiple times
+	+ fixed bug in veejay -u / --dump-events
+          (prints effect numbers correctly now)
+	+ changed setting playmode to 0=clip,1=stream,2=plain video
+          so it is consistent with source/channel selections.
+	+ some cleanups
+	+ fixed VIMS duplicate NET_EFFECT_LIST and VLOOPBACK_START
+          (both have unique numbers now)
+	+ fixed compile error in split.c (forgot to remove valgrind lines)
+	+ fixed possible race condition in handling events
+	+ fixed luma key effect (corrected dimensions)
+	+ veejay console has coloured text now 
+	+ fixed use of errors/warnings/debug/info troughout veejay
+	+ fixed (synchronized) looping of overlaying clips 
+        + fixed memory leak while overriding effects 
+	+ dont show effects in plain video mode 
+	+ finally found the famous last-frame editlist bug
+	+ 'HOME' includes benchmark information about render duration 
+	+ clarified (some) event names in vj-event.c
+	+ added 3 new vims events (bezerk,verbose, sample-mode)
+ 	+ added -n/--no-color commandline option
+	+ added -b/--bezerk commandline option 	
+	+ added -v/--verbose commandline option
+	+ added -F/--features commandline option
+	+ added -m/--sample-mode commandline option to select supersampling filter 
+	  (fast or high quality)
+	+ supersampling method now selectable trough console ('sa')
+	+ clip/stream information informs user if the effect is super sampled
+	  (4:4:4) or not (4:2:0)
+	+ removed -q/--quit commandline option (use VIMS)    
+	+ optimized effect fib downscale
+	+ optimized effect splitted screens
+	+ optimized effect bathroom window
+	+ optimized effect pixelate
+	+ optimized effect pixel raster
+	+ optimized effect width mirror
+	+ optimized effect replace pure white
+	+ optimized effect flip
+	+ optimized effect complex sync
+	+ optimized effect luma blend
+	+ optimized effect overlay magic
+	+ improvement to SSE/MMX/MMX2 memcpy functions (updates from xine cvs)
+	+ improvements to effect luma magick
+	+ fixed bug in effect overlay by threshold range
+	+ fixes to flexible effect manager (vj-effect and vj-perform)
+	+ set performer framebuffer to black to avoid green screens
+          while switching clip/streams that have large effect chain 
+	+ use of const keyword in most of effects now (helps compiler) 
+	+ when using -O3 -o stdout veejay will dump the yuv4mpeg
+          stream to stdout                  
+	+ cleanup and improved Performer
+	+ improvements to down sampling 4:4:4 -> 4:2:0 (slightly better quality)
+	+ pressing ESC when no clips exist will result in playing a tag
+	+ updated MAN page
+	+ updated HOWTO
+	+ updated VIMS.txt in doc/
+	+ updated some testcases in test/
+	+ added new testcase 'swirl-vims.txt' in test/code
+	+ added new effect 'Radial Blur' (from xine), both horizontal and vertical
+	+ added new effect 'Binary Overlays' 
+	+ added new effect 'Chromium' to swap chroma/invert chroma channels
+	+ added new effect 'Chrominance palette' 
+	
+
+0.5.9t9
+        + fixed small bug in magic overlay additive mode
+	+ added new commandline option '-F' to show compiled in features
+	+ JACK is optional in configure script now.  ( ./configure --disable-jack ) 
+	+ updatd MAN pages veejay,yuv2rawdv,rawdv2yuv and sendVIMS
+	+ fixes to 'Splitted Screen' effect
+	+ fixed VIMS toggle between source (streams and clips) while mixing
+	+ fixed VIMS select previous channel
+	+ fixed VIMS select next channel 
+	+ fixed VIMS print stream/clip information 
+	+ fixes to mixing different types of sources
+	+ fixed VIMS 'select effect' (displays effect type now)
+	+ added experimental shared memory streams 
+          (start writer with veejay -O4 , start reader with 253:<semaphore_id> <segment_id>)
+          works only with -a0 (no audio)
+	+ changed key for switching sources , is now SLASH
+	+ added new event 'add WAV file to clip' (VIMS 136:file.wav;)
+	  the clip recorder will , when writing to disk, use this file
+          file to import PCM WAVE. The WAV file must match the properties in your editlist
+	+ added new event 'del WAV file from clip'
+	+ disallow changing dataformat while recording
+	+ fixes to freeing of memory in vj-perform
+	+ added command line parameter '-I/--deinterlace'
+	+ added check on unsupported video codecs
+	+ updated bio2jack from cvs (july 2004)
+	+ fixed 'additive' mode in chroma magick
+	+ fixed 'subtractive' mode in chroma magick
+	+ added '24' (darken) mode to chroma magick
+	+ added '25' (lighten) mode to chroma magick
+	+ added 'sendVIMS' utility to tools/ and MAN page 
+	+ lot of cleanup
+	
+
+0.5.9t8
+	+ fixed recording of clips in DV 2 format
+	+ Magic Motion improved, p0 = anti alias p1=min threshold frame A,    
+	+ p2 = min threshold frame B, p3 = bw/color toggle
+	+ new keyboard event ALT+B to take and set a static background
+	+ (use with Magic Motion)
+	+ improved memory managment in  vj-perform.c 
+	+ removed caching of clips from vj-perform.c
+	+ new 2gb auto splitter for streams
+	+ better error handling for recording clips/streams
+	+ JACK support (dropped audiolib)
+	+ added command line parameter '-x/--geometryx'
+	+ added command line parameter '-y/--geometryy'
+	+ removed obsolete command line parameters
+	
+
+0.5.9t7
+	+ fixed bug in clip recording (never stopped recording on 130:0 0;)
+	+ renamed Magic Motion to Difference Overlay
+           p0 = lighter/darker
+	   p1 = noise level Luma channel
+	   p2 = noise level chrominance Cb
+	   p3 = noise level chrominance Cr
+
+0.5.9t6
+	+ fixed segfault in stopping clip recording
+	+ fixed possible segfault in event handler
+	+ added testcases for various effects in tests/
+	- todo: 2 gb auto splitter for stream recording 
+
+0.5.9t5
+	+ new effect 'Swirl'
+	+ new effect 'Fish Eye'
+	+ new effect 'Pixel Smear'
+	+ new effect 'Grid'
+	+ fixed bug in loading Mjpegtools'editlists
+	+ using fsincos for faster sin/cos operations (common.h) 
+	+ fixed bug in clip / stream recorder
+          (missed last frame)
+	+ 2 gb file limit - auto splitter (only for clips for now)
+	+ changed default values in (smooth) rgb key effects
+	+ fixed bug in recording the number of frames requested
+	+ new set of demos in tests/
+
+0.5.9t4
+	+ fixed bug in performer when mixing different codecs
+	+ new effect 'Pixelate'
+ 	+ new effect 'Magic Mirror'
+	+ new effect 'Distortion Map'
+	+ fixed steepness factor in gamma correction
+	+ fixed solarize effect
+	+ changed default values for saturation effect
+	+ small bugfix in RippleTV
+	+ clip recorder duration 0 results in recording of entire clip start ~ end
+	+ fixed writing of pcm wave when recording clips in any format
+	+ dynamical effect chain (greatly reduces memory hog)
+	+ various smaller fixes
+			 
+
+0.5.9t3
+	+ fixed mixing stream with clip
+	+ fixed RippleTV effect 
+	+ fixed bug in switching clips/streams while mixing
+	+ renewed Multi Mirrors effect
+	+ fixed cache system in performer
+	+ changed default values in some effects
+	+ partly updated veejay MAN page
+	+ renewed --dump-events for VIMS/effect ID's
+	+ example perl script  test/tests/auto-vj.pl 
+          that generates a textfile for use with the testclient
+	  (demonstrates the new multi mirror effect)
+	+ new fourcc 'IYUV' added, which allows storing
+          of raw YUV 4:2:0 i420 in AVI. 
+	  (experimental)
+
+0.5.9t2
+	+ fixes in ChromaMagick/MatteScratcher
+	+ fixes in Motion Blur
+	+ fixes in Splitted Screens
+	+ 'RippleTV' effect ported from EffecTV
+	+ MMX memset 
+	+ MMX optimized filters killchroma and few others
+	+ XML based Action File 
+	   (Press CTRL+Key to create a effect template from the current chain,
+	    press SHIFT+Key to apply the template.
+	    Use 'al' to load the templates from an Action File' 
+	    Use 'as' to save.
+	+ bugfixes in event handler 
+	+ new VIMS message for deleting all clips
+	+ new VIMS message for copying clips
+	+ bugfixes performer (reduced memcpy())
+	+ improved performance in v4l
+ 	+ improved performance in y4m
+	+ removed obsolete commandline parameters	
+	+ fixes in vjrender command
+	+ added '?' ,'h' and 'H' commands to console
+	+ finally fixed dummy mode
+	+ fixed keyboard events play_backward and play_forward
+          when playing at high speeds
+	+ fixed looping at high speeds
+	+ fixed use of effects, 1xx = single frame effect, 2xx = mixing effect
+	
+
+0.5.9t1
+	+ General bugfixes, fixed a few memory leaks and use of unitialized variables
+	+ fixed Makefile.am / configure.in to auto detect cpu capabilities,
+	  also fixed build order problem with ffmpeg 
+	+ added support for DivX ;) encoding/decoding
+		limitation: for mpeg4/divx every frame must be a key frame
+		or veejay cannot really work with them.
+	+ added new effect 'Enhanced Magic Blend'
+	+ added new effect 'Pencil Sketch (8)'
+	+ new effect 'Color Enhance' , allows increasing of R, G, B , each 0 - 255
+	+ new effect 'Noise Pencil'
+	+ renamed posterize to posterize (threshold range)
+	+ Export DV2/MJPG/MPEG4/Divx videofiles with sample/stream-recorder 
+	+ partly rewritten veejay socket server
+	+ Fixed handling of YUV 4:2:0 and YUV 4:2:2 data 
+	+ vloopback streams in YV12 or RGB24
+	+ added new feature 'Effect Key Frame'
+	+ Increased EditList's capacity to 4096 files (thanks to ronald bultje)
+	+ Renamed sample to clip , tag to stream
+	+ Increased Stream/Clip capacity to 16384
+	+ Up to 20 effects on the effect chain 
+	+ per clip / stream effect chain enable/disable
+	+ stream/clip effect chain by default on
+	+ fixes to all scratcher overlay effects
+	+ increased scratcher buffer to 100 frames 
+	+ rewritten OSC message structure (not decided yet)
+	+ added VIMS test cases in test/
+	+ added perl scripts to generate VIMS test cases in test/perl
+	+ factorization of callbacks routines 
+		vj-callbacks.c/h, vj-console.c/h,veejay.c => vj-event
+		+ OSC maps to VIMS (OpenSoundControl)
+		+ NET maps to VIMS (internal protocol)
+		+ SDL maps to VIMS (SDL keyboard)
+		+ can add new events to VIMS (message bundles)
+	+ finished veejay control documentation,vims/osc/sdl
+	+ removed sample countdown (use marker instead)
+	+ added --action-file to load keybundles
+	+ actionfile and bundles  scripts to remake live-cinema
+
+
+0.5.3
+	- added OMC from experimental veejay branch
+	- fixed bug in starting UDP server
+	- fixed bug in reaching end of video in plain mode
+	- added chain fade feature ,
+          this will enable the effect chain and fade in the 
+          chain to 100% in num  seconds
+	- implemented tag encoder which records from a tag
+          for num seconds and auto-adds a sample to the samplelist
+	- added OSC callbacks:
+	- implemented sample countdown ( 5....4...3...2...1 ... 0)
+	- added zoom algorithm ( best neighbour algorithm )		
+          uses deinterlacing for use with common v4l hardware.
+          (temporary)
+	- fixed rendering of samples 
+	- added Image Effect DeInterlace effect (from yuvkineco)
+	- added Video Effect Simple Mask effect 
+	- added Pixel Raster effect
+	- ffmpeg updated to ffmpeg cvs (late November)
+
+0.5.2
+	- added Motion blur by averaging frames over time. 
+	- added Average effect 
+	   allows increasing the luminance by a fraction
+	- added Sinoids Effect
+	- added Ripple Effect
+	- added Bathroom Effect (horizontal and vertical modes with p0)
+	- added 'Gesture Control Interface' and Motion Detector
+	- added feature to toggle effect upon motion
+	- added raw rgb stream out
+	- added raw rgb stream in
+	- added raw rgb interactive mode
+	- added raw rgb burst mode
+	- added y4m open/close in veejay console
+	- added new utility 'rawdv2yuv' which decodes rawdv to iv12 or i420
+           with the possibility scale to half size + simple clipping.
+	- added 22 new modes to Matte Scratcher
+	- added Sample creation on Scene Detection
+	- renamed 'Various Embossing/Edge ...' to 'Various Weird Effects'
+	- minor optimizations in playback mechanism	
+	- fixed bug in proc detection of v4l/vloopback devices
+	- fixed bug in print_sample_info
+	- fixed console command 'vi' for opening of v4l device
+	- fixes in audio playback	
+	- fixed reverse audio playback
+	- fixes in DirectFB output
+	- fixed bug in marker	
+	- fixed bug in numeric keypad key 'ENTER' (pressed state) 
+
+	
+0.5.1
+	- added mode 7  - 22 to chroma magick effect
+	  (exclusive, diffnegate and additive)
+	- changes in mode 9 of overlay magic (exclusive)
+          includes Cb/Cr now
+	- fixed bug in mixing audio while rendering
+	- fixed bug in audio playback
+	- audio/video and video files can be combined now,
+        - fixed bug in vjrender (bail if sample frames dont fit)
+	- updated spec file 
+	- fixed deleting tag multiple times 
+	  (no hangup after 2nd time opening of a yuv4mpeg stream)
+
+0.5.0
+	- fixed compile error when optimizations are enabled
+	- fixes in splitted screens effect
+	- optimizations in splitted screens effect
+	- changes in vj-performer to fix mem leaks
+	- changes in liblavplayvj to fix mem leaks
+	- fixed bug in vj-effman
+	- fixed bug in vj-server
+	- fixes in overlay scratcher for bounce mode
+	- fixed sharpen effect 
+	- fixes in render mechanism (audio)
+	- several other smaller fixes
+	- introduced 'has_internal_data' to cleanup memory
+          in use by some effect at veejay shutdown
+	- fixed creation of samples while playing tags 
+	- fixed gcc-2 compile error in split.c
+	- fixed memory leaks in vj-tag and sampleadm
+	- fixed memory leaks in vj-callbacks
+	- fixed bug in resize video
+	- fixed bug in audio toggle
+	- fixed playing audio in pause in mode plain
+	- fixed playing of last frame in mode plain 
+	- fixed bug in smooth threshold
+
+0.5.0pre1
+	- added commandline parameter to start veejay without default tags
+	- bugfix in vj-sdl 
+	- changes in vj-perform
+	- added feature to move rendered sample to a new sample
+	- added feature to delete rendered entries
+	- changed default parameter in bump 2d
+	- fixed possible crash in transition translate opacity/blend
+	- fixed parameter in multi mirror
+	- fixes in switches between playmodes
+	- fixes in getting all tags
+	- fixed queuing of non exiting frames (beyond editlist)
+	- fixed tag deletion
+	- disabled sliding door transition (possible segfault)
+	- fixed rendering of audio
+	- fixed switching between tag <-> samples
+	- fixed bug in rendering mechanism 
+	- changed code to non multithread for render job (simpler).
+	- fix bug in luma blend mode (possible crash)
+	- fix bug in noiseadd (possible crash)
+	- fix bug in softblur mode (possible crash)
+	- fixed another possible crash in distortion effect
+	- fixed bug in softblur
+	- fixed bugs in magic overlays
+	- fixed smuck
+	- fixed splitted screens
+	- fixed dices
+	- fixed a few compiler warnings.
+	- fixed out of sync effect (for real now)
+	- some experiments in enhancemask.c
+	- parameter minimum change in contrast (-255 to 255)
+
+0.4.9rc3
+	- fix bug in opening of v4l device
+	- fix bug in switching between audio/video sample and tags
+	- fix bug in general audio playback
+	- synced hash.c / hash.h from kazlib (version 1.20)
+	- minor bugfixes here and there
+
+0.4.9rc2
+	- fixes in rendering mechanism,
+          audio and samples at different speed get correctly
+          inserted 
+	- fixed ghost frame in render mechanism
+	- fixes in a few callbacks
+	- added 'Amplify low noise' effect
+	- added sharpen filter from yuvdenoise
+          allowing 0 - 2048 for extra grainy video.
+        - synced colorspace.c/colorspace.h with mjpegtools-1.6.1.90
+	- fixes in queuing mechanism
+	- fixes in vjrender initialization
+	- fixes in activating/deactivating tags
+	- fixes in default tags
+	- disallow user to render while playing
+        - disallow user to render while rendering.
+
+0.4.9
+	- added more command line parameters to vjrender
+        - added frame duplicator feature
+	- finalized sample render history
+        - added msg to retrieve devices (v4l/vloopback)
+        - veejay closes connections properly now
+	- changed default value of colored border transition
+	- changed default value of tranform cubicq (effectv)
+        - fixed bugs/assertions in a number of callbacks
+        - implemented basic functionality in veejay for history list
+	- implemented functions for finding v4l/vloopback devices
+	- default tags are activated at startup
+	- fixed serious bug in effect chain when not starting at entry 0
+	- builded a new gui 
+	- documented Tags/setting playmode in Networking.txt
+	- added new section 'VIDEO COMMANDS' to man , a few examples
+          and new commandline parameters have been included.
+	- renamed 'About Video' to 'Video Information' ('VI') in console
+	- added 'Add videofile as sample' in console 
+	- added 'Add videofile' in console
+	- added tag creation callbacks for remote
+	- added fake video 
+	- added resize screen command
+	- added command line parameters for fake video
+	- fixes in mode 2 of chromamagic (select max )
+        - sample stores frame duplicator
+	- fixed out of sync effect
+	- fixed bug in rendering of frames in effect chain 
+	- fixed bug in makefile for make uninstall 
+
+0.4.8
+        - functionality improved,
+	  veejay informs gui about disabled effects
+	  (old situation: gui sees disabled effects as <none>)
+	- fixed saving of samples (did not save parameters correctly)
+	- fixed bug in veejay_open 
+	- fixed compile errors in liblavplay (declaration after statement)
+	- new effect 3bars
+	
+
+0.4.7  - updated audiolib,lav_io,avilib 
+         (synced against mjpegtools-1.6.1)
+       - updated ffmpeg
+       - improved audio support 
+       - added german keyboard hack, GER_KEY_HACK
+       - fixed some compile errors and warnings
+       - created vjrender for rendering of samples
+       - updated doc/Networking
+       - fixed sample update start/end
+       - fixed save/load samplelist console status message
+       - updated test/client.c 
+       - restriction on set_speed : do not go outside sample
+       - fixed audio queuing/timing problems
+       - added new network command to add and set effect in 1 go
+
+0.4.6
+	- fix in out of sync
+	- new effect isolate color
+	- moved libvjplay into libveejay 
+	- fast memset/memcpy revised, code taken from DirectFB ,mplayer,
+		transcode and /usr/src/linux/arch/
+	- magic motion completed.
+	- general optimizations
+	- optimizations in sampleadm
+        - cleanups , bugfixing
+    
+0.4.5
+	- memory leaks fixed in sampleload,effectload,
+	- fixes in parameter update rules
+	- fixed bugs in veejay / gveejay
+	- fixed Magic Motion
+
+0.4.4
+	- changes in initialization phase
+	- new image effect out of sync
+	- new video effect out of sync (replace out of sync by video)
+	- new image effect complex invert
+	- new video effect complex threshold
+	- new image effect complex saturation
+        - changes to diff.c (incomplete)
+
+	memory leaks:
+	- fixed vj-comm.c (gveejay/veejay talkback)
+	- fixed vj-callbacks.c (veejay talkback)
+	- fixed liblavplayvj.c
+	- fixed vj-perform.c
+	- fixed vj-server.c
+
+0.4.3
+	- new effect 'Greyscale by Color Key'
+ 	- new effect 'Blend by Color Key'
+	- changes to Soft Blur/Sharpen (new mode: 3 set distance)
+	- new effect 'Black/White on Threshold'
+	- fixed bug in 'set defaults' (gveejay)
+	- fixed bug in sample info (duration/frames update)
+	- removed frame trimmer (gveejay)
+	- removed obsolete menu items
+
+0.4.2

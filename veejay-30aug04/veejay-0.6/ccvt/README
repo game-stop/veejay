@@ -1,0 +1,102 @@
+Colour ConVerT: conversion routines from YUV to RGB colour space and back
+Version: 0.3 (14-04-2002) (C) 2001-2002 Nemosoft Unv.  nemosoft@smcc.demon.nl
+
+This code is covered by the GPL; please see the file COPYING or
+http://www.gnu.org/ for more details.
+
+
+
+This package contains a number of colour conversion routines; these are
+often needed in image processing, compression, video conferencing, etc.
+
+There are 3 variants of the code available:
+  ccvt_c1.c	Simple, yet readable C code
+  ccvt_c2.c	More optimized, but slightly obfuscated C code
+  ccvt_mmx.S	Hand-crafted assembly code for x86 processors
+
+To use this code in your program, run the ./configure script (or pack it
+with your own program and include it in your own ./configure), run 'make'
+and link in the resulting libccvt.a into your program. The script tries to
+be smart and compile assembly routines when available for your platform
+(most notably: x86 processors with MMX).
+
+
+
+The functions have a strict naming convention and take the same amount of
+parameters; for example:
+
+   void ccvt_420p_bgr32(int width, int height, void *src, void *dst);
+
+'width' and 'height' are in pixels; the src and dst pointers are input
+and output respectively. Any YUV planar formats are assumed to be
+contiguous, i.e. the U and V data follow the Y data immediately in one
+memory block.
+
+Width and Height must be a multiple of 2.
+
+
+
+
+Showing & benchmarking
+
+If you run
+	$ make bench
+	$ make show
+this will build a total of 6 programs, 3 benchmarking and 3 verification
+tools (in case MMX is not available, you will end up with only 4 programs).
+
+The verification tool is a small Qt program that runs one of the 3 variants
+of the conversion code and shows the result. Any errors can thus be seen
+immediately.
+
+The benchmarking tool runs the conversion routine a number of times and
+measures the time, in clock-ticks; though not exactly accurate, it gives a
+good indication of the time spent in the program; also, it's independant of
+the load on the system.
+
+Here are some averaged results:
+
+bench_c1	360
+bench_c2	206
+bench_mmx	160
+
+I was a little disappointed at the relatively low speed-up of the MMX
+routine... I had expected it to be 3 times faster than bench_c1, with an
+average number of clock-ticks of 125... In the MMX routines 4 pixels are
+processed at a time, so that should increase throughput quite a bit, minus
+some overhead to get the data in and out of the MMX registers.
+
+So, I did some testing as to see what takes most time, and found the results
+quite interesting. I compiled the MMX assembly with various sections turned
+on or off, ran the benchmark a few times and averaged the numbers. The
+section numbers are in the assembly source code.
+
+The times are in ticks for 500 iterations of the ccvt_420p_bgr32() function,
+on a Celeron 400. You will note that the numbers don't always add up
+linearily; this is due to the various caching and branch-prediction
+mechanism used in the processor.
+
+No sections (just the loop overhead)			5
+ Section A1: load & prepare UV values			40
+ Section A2: multiply UV values with factors		38
+  Section A1 & A2					74
+ Section B1: load gray values and add UV values		47
+ Section B2: store 2 * 8 bytes from MMX to memory	67 (!)
+  Section B1 & B2					88
+All sections						170
+
+What was most surprising was when just section B2 was compiled in: the
+function then comprises of only a tight loop where data is transfered from
+MMX to memory; this takes a relatively long time, and appearantly memory
+access is the bottleneck here. However, if you add up the times of Section
+A1 & A2, Section B1 & B2 and the overhead, you get close to the total time.
+Still, it seems that transfering to memory is a costly operation (I estimate
+that the two 'movq' instructions from section B2 take up 25% of the total
+execution time!) Unfortunately there is not much we can do about that.
+
+However, once data is in an MMX register it is processed very fast. Adding,
+doing logical operations and even multiplication perform very quickly. In
+addition it has these 'saturated' functions, which prevent range overflow of
+data and saves costly compare and assign operators.
+
+Or maybe my assembly programming just sucks :)
