@@ -45,19 +45,16 @@ void opacity_apply(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 {
     unsigned int i, op0, op1;
     unsigned int len = width * height;
-
+    unsigned int uv_len = len / 4;
     op1 = (opacity > 255) ? 255 : opacity;
     op0 = 255 - op1;
 
     for (i = 0; i < len; i++) {
 	yuv1[0][i] = (op0 * yuv1[0][i] + op1 * yuv2[0][i]) >> 8;
     }
-    len >>= 2;		
 
-    for (i = 0; i < len; i++) {
-	op0 = yuv1[1][i];
+    for (i = 0; i < uv_len; i++) {
 	yuv1[1][i] = (op0 * yuv1[1][i] + op1 * yuv2[1][i]) >> 8;
-	op0 = yuv1[2][i];
 	yuv1[2][i] = (op0 * yuv1[2][i] + op1 * yuv2[2][i]) >> 8;
     }
  
