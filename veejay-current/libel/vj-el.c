@@ -40,6 +40,7 @@
 #include "avcodec.h"
 #include <math.h>
 #include <stdlib.h>
+#include "rawdv.h"
 
 static struct
 {
@@ -272,11 +273,10 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
     if (!el->lav_fd[n])
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Error opening file [%s]: %s", filename,
-			lav_strerror());
-		el->num_video_files--;
+		el->num_video_files--;	
+		lav_strerror();
 		return -1;
-    }
+	}
 
     _fc = lav_video_MJPG_chroma(el->lav_fd[n]);
 
@@ -315,7 +315,6 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	}
 
     el->num_frames[n] = lav_video_frames(el->lav_fd[n]);
-    
     el->video_file_list[n] = strndup(realname, strlen(realname));
     if (el->video_file_list[n] == 0)
 	{
