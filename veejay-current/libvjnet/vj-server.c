@@ -492,6 +492,10 @@ int	vj_server_new_connection(vj_server *vje)
 			return 0;
 		}	
 
+		char *host = inet_ntoa( vje->remote.sin_addr ); 
+		veejay_msg(VEEJAY_MSG_DEBUG, "Connection with %s", host);		
+			
+
 		if( vje->nr_of_connections < fd ) vje->nr_of_connections = fd;
 
 		//fcntl( fd, F_SETFL, O_NONBLOCK );
