@@ -25,7 +25,7 @@
 #include <string.h>
 #include <libsample/sampleadm.h>  
 #include <veejay/vj-tag.h>
-#include <veejay/vj-server.h>
+#include <libvjnet/vj-server.h>
 #include <libvje/vje.h>
 #include <veejay/vj-lib.h>
 #include <veejay/vj-el.h>
@@ -502,8 +502,8 @@ int vj_perform_init(veejay_t * info)
     if(!temp_buffer[2]) return 0;
 	memset( temp_buffer[2], 128, frame_len );
     // to render fading of effect chain:
-    socket_buffer = (uint8_t*)vj_malloc(sizeof(uint8_t) * frame_len * 3 + 11 );
-    memset( socket_buffer, 16, frame_len * 3 );
+    socket_buffer = (uint8_t*)vj_malloc(sizeof(uint8_t) * frame_len * 4 ); // large enough !!
+    memset( socket_buffer, 16, frame_len * 4 );
     // to render fading of effect chain:
 
     /* allocate space for frame_buffer, the place we render effects  in */
@@ -777,17 +777,21 @@ int	vj_perform_send_primary_frame_s(veejay_t *info)
 	int l = (w*h)/4;
 	unsigned char info_line[12];
 	int len = 0;
-	if(info->edit_list->pixel_format == FMT_422 )
-		l = (w*h)/2;
+	int total_len = helper_frame->len + helper_frame->uv_len + helper_frame->uv_len;
+	if( !info->vjs[0]->use_mcast )
+	{
+		sprintf(info_line, "%04d %04d %1d", w,h, info->edit_list->pixel_format );
+		len = strlen(info_line );
+		veejay_memcpy( socket_buffer, info_line, len );
+	}
+	veejay_memcpy( socket_buffer + len, primary_buffer[0]->Y, helper_frame->len );
+	veejay_memcpy( socket_buffer + len + helper_frame->len,
+					    primary_buffer[0]->Cb, helper_frame->uv_len );
+	veejay_memcpy( socket_buffer + len + helper_frame->len + helper_frame->uv_len ,
+					    primary_buffer[0]->Cr, helper_frame->uv_len );
 
-	sprintf( info_line,"%04d %04d %1d", w,h, info->edit_list->pixel_format );
-	len = strlen( info_line );
-	veejay_memcpy( socket_buffer, info_line, len );
-	veejay_memcpy( socket_buffer + len, primary_buffer[0]->Y, (w*h));
-	veejay_memcpy( socket_buffer + len + (w*h) , primary_buffer[0]->Cb , l );
-	veejay_memcpy( socket_buffer + len + (w*h) + l , primary_buffer[0]->Cr, l );
-
-	vj_server_send( info->vjs[0], info->uc->current_link, socket_buffer, (len + l+l+(w*h)));
+	vj_server_send_frame( info->vjs[0], info->uc->current_link, socket_buffer, len +total_len,
+				helper_frame, info->effect_frame_info, info->real_fps );
 
 	return 1;
 }
@@ -1379,9 +1383,10 @@ int vj_perform_apply_secundary_tag(veejay_t * info, int clip_id,
     case VJ_TAG_TYPE_VLOOPBACK:
     case VJ_TAG_TYPE_AVFORMAT:
     case VJ_TAG_TYPE_NET:
+    case VJ_TAG_TYPE_MCAST:
 	centry = vj_perform_tag_is_cached(chain_entry, entry, clip_id);
 	if (centry == -1) {	/* not cached */
-	    if(type == VJ_TAG_TYPE_NET && vj_tag_get_active(clip_id)==0)
+	    if( (type == VJ_TAG_TYPE_NET||type==VJ_TAG_TYPE_MCAST) && vj_tag_get_active(clip_id)==0)
 		vj_tag_set_active(clip_id, 1);
 
 	    if (vj_tag_get_active(clip_id) == 1 )
@@ -1531,9 +1536,10 @@ int vj_perform_apply_secundary(veejay_t * info, int clip_id, int type,
     case VJ_TAG_TYPE_VLOOPBACK:
     case VJ_TAG_TYPE_AVFORMAT:
     case VJ_TAG_TYPE_NET:
+    case VJ_TAG_TYPE_MCAST:
 	centry = vj_perform_tag_is_cached(chain_entry, entry, clip_id); // is it cached?
 	if (centry == -1) { // no it is not
-	    if( type == VJ_TAG_TYPE_NET && vj_tag_get_active(clip_id)==0)
+	    if( (type == VJ_TAG_TYPE_NET||type==VJ_TAG_TYPE_MCAST) && vj_tag_get_active(clip_id)==0)
 			vj_tag_set_active(clip_id, 1 );
 	    if (vj_tag_get_active(clip_id) == 1)
 		{ // if it is active (playing)
@@ -2161,9 +2167,20 @@ int vj_perform_tag_fill_buffer(veejay_t * info, int entry)
 {
     int error = 1;
     uint8_t *frame[3];
+	int type;
+	int active;
     frame[0] = primary_buffer[0]->Y;
     frame[1] = primary_buffer[0]->Cb;
     frame[2] = primary_buffer[0]->Cr;
+
+	type = vj_tag_get_type( info->uc->clip_id );
+	active = vj_tag_get_active(info->uc->clip_id );
+
+	if( (type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST ) && active == 0)
+	{	
+		vj_tag_enable( info->uc->clip_id );	
+		veejay_msg(VEEJAY_MSG_DEBUG, "Enabled stream %d",info->uc->clip_id);
+	}
 
     if (vj_tag_get_active(info->uc->clip_id) == 1)
     {

@@ -1,5 +1,5 @@
 # Makefile for veejay
-MAINTAINERCLEANFILES = Makefile.in
+
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg 
 
 VJE_LIB_FILE = libvje.la
@@ -35,7 +35,8 @@ libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
 			effects/isolate.c transitions/vbar.c transitions/3bar.c effects/enhancemask.c effects/noiseadd.c \
 			effects/contrast.c effects/motionblur.c effects/sinoids.c effects/average.c \
 		        effects/ripple.c effects/water.c effects/noisepencil.c effects/bathroom.c effects/slice.c \
-			effects/crosspixel.c effects/cartonize.c effects/nervous.c effects/morphology.c effects/blob.c effects/boids.c effects/ghost.c
+			effects/crosspixel.c effects/morphology.c effects/ghost.c effects/blob.c effects/boids.c effects/nervous.c \
+			effects/cartonize.c
 
 
 libvje_la_LDFLAGS = $(VJE_ALL_LIB_OPTS) \

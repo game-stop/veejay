@@ -1,11 +1,19 @@
 0.7.2
 	+ fixed Network Streaming (VIMS 165:hostname port_id; )
 	+ fixed handling of multiple connections
+	+ added new tool 'mcastOSC'
+	+ added commandline parameter '-g' to sayVIMS for multicast
+	+ added commandline parameter '-V' for veejay VIMS multicast
+	+ added commandline parameter '-M' for veejay OSC multicast
 	+ fixed a small bug in multicast OSC
 	+ added doc/NET.txt to explain network streaming/multicast
 	+ fixed segfault in Ghost effect
 	+ added basic negotiation on frame information for Network Streaming
-	+ refactorized vj-server.c/vj-client.c
+	+ refactorized vj-server.c/vj-client.c 
+	+ refactorized network dependent code to libvjnet
+	+ fixed screenshot dump when playing 4:2:2
+	+ changed VIMS 054 (screenshot) 054:name.jpg; or 054:;
+	+ added multicast video transmitter/receiver !!
 
 0.7.1
 	+ fixed color corruption in fib

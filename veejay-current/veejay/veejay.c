@@ -153,7 +153,7 @@ static void Usage(char *progname)
     fprintf(stderr,
 	    "  -a/--audio [01]\t\tEnable (1) or disable (0) audio (default 1)\n");
     fprintf(stderr,
-	    "  -s/--size NxN\t\t\twidth X height for SDL (S) or video (H) window\n");
+	    "  -s/--size NxN\t\t\twidth X height for SDL video window\n");
     fprintf(stderr,
 	    "  -X/--no-default-tags\t\tDo not create solid color tags at startup\n");
     fprintf(stderr,
@@ -182,7 +182,8 @@ static void Usage(char *progname)
 	fprintf(stderr,"  -H/--height   \t\tdummy height\n");
 	fprintf(stderr,"  -N/--norm		\t\tdummy norm\n");
 	fprintf(stderr,"  -R/--framerate \t\tdummy frame rate\n");
-	fprintf(stderr,"  -M/--multicast \t\tmulticast\n");
+	fprintf(stderr,"  -M/--multicast-osc \t\tmulticast OSC\n");
+	fprintf(stderr,"  -V/--multicast-vims \t\tmulticast VIMS\n");
     exit(-1);
 }
 
@@ -215,7 +216,12 @@ static int set_option(const char *name, char *value)
 	}
 	} else if (strcmp(name, "gui") == 0 || strcmp(name, "g") == 0) {
 	     info->video_out = -1;
-	} else if (strcmp(name, "multicast") == 0 || strcmp(name, "M") == 0 )
+	} else if (strcmp(name, "multicast-vims") == 0 || strcmp(name,"V")==0)
+	{
+		info->settings->use_vims_mcast = 1;
+		info->settings->vims_group_name = strdup(optarg);
+	
+	} else if (strcmp(name, "multicast-osc") == 0 || strcmp(name, "M") == 0 )
 	{
 		info->settings->use_mcast = 1;
 		info->settings->group_name = strdup( optarg );
@@ -225,7 +231,7 @@ static int set_option(const char *name, char *value)
     } else if (strcmp(name, "synchronization") == 0
 	       || strcmp(name, "c") == 0) {
 	info->sync_correction = atoi(optarg);
-	} else if (strcmp(name, "version") == 0 || strcmp(name, "V") == 0)
+	} else if (strcmp(name, "version") == 0 )
 	{ printf("Veejay %s\n", VERSION); exit(0); 
     } else if (strcmp(name, "graphics-driver") == 0
 	       || strcmp(name, "G") == 0
@@ -350,7 +356,8 @@ static void check_command_line_options(int argc, char *argv[])
 	{"norm",1,0,0},
 	{"framerate",1,0,0},
 	{"ycbcr",0,0,0},
-	{"multicast",1,0,0},
+	{"multicast-osc",1,0,0},
+	{"multicast-vims",1,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -364,12 +371,12 @@ static void check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:V:s:c:t:l:C:p:m:x:y:nLFPXY:VugrvdibIjf:N:H:W:R:M:",
+			"o:G:O:a:H:V:s:c:t:l:C:p:m:x:y:nLFPXY:ugrvdibIjf:N:H:W:R:M:V:",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   "o:G:s:O:a:c:t:l:t:C:x:y:m:p:nLFPXY:VY:vudgibrIjf:N:H:W:R:M:")) != EOF)
+		   "o:G:s:O:a:c:t:l:t:C:x:y:m:p:nLFPXY:Y:vudgibrIjf:N:H:W:R:M:V:")) != EOF)
 #endif
     {
 	switch (n) {
@@ -409,7 +416,7 @@ static void check_command_line_options(int argc, char *argv[])
 static void print_license()
 {
 	veejay_msg(VEEJAY_MSG_INFO,
-	    "Veejay -<|Babylon|>- %s Copyright (C) Niels Elburg and others",VERSION);
+	    "Veejay -<|Dawn of New Babylon|>- %s Copyright (C) Niels Elburg and others",VERSION);
 	veejay_msg(VEEJAY_MSG_INFO,
 	    "This software is subject to the GNU GENERAL PUBLIC LICENSE");
 
@@ -518,14 +525,14 @@ int main(int argc, char **argv)
 	info->audio = 0;
     }
 
-   if (run_server == 1)
-   {
-	if(vj_server_setup(info)==0)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot start services");
-		exit(0); 
-	}
-    }
+//   if (run_server == 1)
+  // {
+//	if(vj_server_setup(info)==0)
+//	{
+//		veejay_msg(VEEJAY_MSG_ERROR, "Cannot start services");
+//		exit(0); 
+//	}
+  //  }
 
     if(veejay_init(info,default_geometry_x,default_geometry_y,NULL,default_use_tags)!=0) return -1;
 

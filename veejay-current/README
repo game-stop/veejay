@@ -2,27 +2,25 @@
 Veejay - Video Mixing/Editing Instrument
 ========================================
 
-This is Veejay codename 'Babylon' 
+This is Veejay codename 'Dawn of New Babylon' 
+
+NEWEST:
+	- network (peer to peer streaming)
+	- network (multicast)
+	see doc/NET.txt
+	(90% completed, doesnt work between little <-> big endian machines)
 
 NEW:
 
-	Supported Platforms:
-		x86 architecture (intel and compatibles)
+	(to be) supported platforms:
+
+		x86 architecture (intel and compatibles) (works!)
 		PS/2 (Mips)
-		PPC (please test!)
-		SGI (please test!)
+		PPC / MacOS X (please test!)
+		*BSD (please test!)
 
-	Librified several components 
-
-	Many many smaller fixes
-
-	Better performance :)
-
-
-Requirements
-============
-
-Optional:
+Optional dependencies:
+======================
 
     XML library for Gnome
         http://libxml.gnome.org
@@ -63,7 +61,15 @@ to see a list of commands, or simply type VIMS style messages.
 PLUGINS
 =======
 
- As of version 0.6.3 , veejay supports a plugin architecture for pull/push plugins.
+As of version 0.6.3 , veejay supports a plugin architecture for pull/push plugins.
+libvje (veejay's effects) is obsolete, port to vevo is planned.
+
+
+NETWORK
+=======
+
+As of version 0.7.2 , network support is complete (incl. streaming video)
+and more advanced (OSC and VIMS multicast) possibilities.
 
 
 INSTALLING
@@ -71,7 +77,6 @@ INSTALLING
 
     In general, ./configure && make && make install if you meet 
     all requirements.
-    
     
 
 Running Veejay
@@ -96,13 +101,18 @@ examples:
 CONTACT / FEEDBACK & HELP
 =========================
 
-Niels Elburg <elburg@hio.hen.nl / nielselburg@yahoo.de >
+Niels Elburg <nelburg@looze.net>
 
 For usage related questions:
 
 http://veejay.sourceforge.net
 
+BUG REPORTS / BLEEDING EDGE SOURCE CODE
+=======================================
 
+Please use the ticket system !
+
+http://veejay.dyne.org
 
 
 ENJOY!

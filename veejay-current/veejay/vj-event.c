@@ -348,6 +348,7 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_GET_FRAME				=	6304,
 	VJ_EVENT_RECORD_DATAFORMAT			=	6200,
 	VJ_EVENT_STREAM_NEW_NET				=	6406,
+	VJ_EVENT_STREAM_NEW_MCAST			=	6407,
 	VJ_EVENT_SHM_OPEN				=	6210,
     	VJ_EVENT_SAMPLE_MODE			=	6995,
 	VJ_EVENT_BEZERK					=	6996,
@@ -509,6 +510,7 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_CHAIN_MANUAL,			NET_CHAIN_MANUAL_FADE	},
 	{ VJ_EVENT_FULLSCREEN,				NET_FULLSCREEN },
 	{ VJ_EVENT_STREAM_NEW_NET	,		NET_TAG_NEW_NET },
+	{ VJ_EVENT_STREAM_NEW_MCAST,			NET_TAG_NEW_MCAST },
 	{ VJ_EVENT_GET_FRAME,				NET_GET_FRAME },
 	{ VJ_EVENT_CLIP_RENDER_TO,			NET_CLIP_RENDER_TO },
 	{ VJ_EVENT_CLIP_SELECT_RENDER,			NET_CLIP_RENDER_SELECT },
@@ -795,7 +797,8 @@ static struct {
 #endif
 	{ VJ_EVENT_TAG_NEW_Y4M,			"Stream: open y4m stream by name (file)",	 vj_event_tag_new_y4m,		 1,	"%s",		{0,0}	}, 
 //	{ VJ_EVENT_TAG_NEW_RAW,			"Stream: open raw stream by name (file)",	 vj_event_tag_new_raw,		 1, 	"%s",		{0,0}	},
-	{ VJ_EVENT_STREAM_NEW_NET,			"Stream: open network stream ",	vj_event_tag_new_net, 2, "%s %d", {0,0}	},
+	{ VJ_EVENT_STREAM_NEW_NET,		"Stream: open network stream ",	vj_event_tag_new_net, 2, "%s %d", {0,0}	},
+	{ VJ_EVENT_STREAM_NEW_MCAST,		"Stream: open multicast stream", vj_event_tag_new_mcast, 2, "%s %d", {0,0} },	
 	{ VJ_EVENT_TAG_NEW_AVFORMAT,		"Stream: open file as stream with FFmpeg",	 vj_event_tag_new_avformat,	 1,	"%s",		{0,0}	},
 	{ VJ_EVENT_TAG_OFFLINE_REC_START,	"Stream: start record from an invisible stream", vj_event_tag_rec_offline_start, 3,	"%d %d %d",	{0,0}	}, 
 	{ VJ_EVENT_TAG_OFFLINE_REC_STOP,	"Stream: stop record from an invisible stream",	 vj_event_tag_rec_offline_stop,  0,	NULL,		{0,0}	},
@@ -867,7 +870,7 @@ static struct {
 #ifdef HAVE_SDL
 	{ VJ_EVENT_BUNDLE_ATTACH_KEY,		"Bundle: attach a Key to a bundle",		vj_event_attach_key_to_bundle,	3,	"%d %d %d",	{0,0} 	},
 #endif
-	{ VJ_EVENT_SCREENSHOT,			"Various: Save frame to jpeg",			vj_event_screenshot,	0,		NULL,		{0,0}   },
+	{ VJ_EVENT_SCREENSHOT,			"Various: Save frame to jpeg",			vj_event_screenshot,	1,		"%s",		{0,0}   },
 	{ VJ_EVENT_CHAIN_TOGGLE_ALL,		"Toggle Effect Chain on all clips or streams",	vj_event_all_clips_chain_toggle,1,   "%d",		{0,0}   },
 	{ VJ_EVENT_CLIP_UPDATE,		"Clip: Update starting and ending position by offset",	vj_event_clip_rel_start,3,"%d %d %d",		{0,0}	},	 
 #ifdef HAVE_V4L
@@ -1511,7 +1514,7 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 	{
 		int id;
 		int max_param;
-		int dargs[15];
+		int dargs[16];
 		char dstr[512];
 		
 		
@@ -1522,7 +1525,7 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 		id = net_list[ net_id].list_id;
 		max_param = vj_event_list[id].num_params;
 
-		memset(dargs,0,15);
+		memset(dargs,0,16);
 		strcpy(args,msg+4);
 
 		if(vj_event_list[id].format != NULL && vj_event_list[id].format[1] == 's')
@@ -1548,12 +1551,16 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 
 		}
 
-		p = sscanf(args+offset,"%d %d %d %d %d %d %d %d %d %d %d %d %d %d",&dargs[1],&dargs[2],&dargs[3],&dargs[4],&dargs[5],&dargs[6],&dargs[7],
-			&dargs[8],&dargs[9],&dargs[10],&dargs[11],&dargs[12],&dargs[13],&dargs[14]);
+		p = sscanf(args+offset,"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",&dargs[1],&dargs[2],&dargs[3],&dargs[4],&dargs[5],&dargs[6],&dargs[7],
+			&dargs[8],&dargs[9],&dargs[10],&dargs[11],&dargs[12],&dargs[13],&dargs[14],&dargs[15]);
 
 		if( p > 0 )
 		{
 			n += p;
+			int k ;
+			for( k = p+1; k < 16; k ++)
+				dargs[k] = 0;
+
 		}
 		if( n > vj_event_list[id].num_params )
 		{
@@ -1657,7 +1664,8 @@ void vj_event_update_remote(void *ptr)
 	// see if there is anything to read from the command socket
 	for( i = 0; i < v->vjs[0]->nr_of_links; i ++ )
 	{
-		if( vj_server_update(v->vjs[0],i) )
+		int res = vj_server_update(v->vjs[0],i );
+		if(res > 0)
 		{
 			v->uc->current_link = i;
 			char buf[MESSAGE_SIZE];
@@ -1667,6 +1675,11 @@ void vj_event_update_remote(void *ptr)
 				vj_event_parse_msg( v, buf );
 				bzero( buf, MESSAGE_SIZE );
 			}
+		}
+		if(res==-1)
+		{
+			_vj_server_del_client( v->vjs[0], i );
+			_vj_server_del_client( v->vjs[1], i );
 		}
 	}
 }
@@ -2098,7 +2111,6 @@ void vj_event_fmt_arg(int *args, char *str, const char format[], va_list ap)
 } 
 
 /* P_A: Parse Arguments. This macro is used in many functions */
-// make it fixme:
 #define P_A(a,b,c,d)\
 {\
 int __z = 0;\
@@ -2111,6 +2123,16 @@ while(*c) { \
 if(__z > _last_known_num_args )  break; \
 switch(*c++) { case 's': sprintf( b,"%s",va_arg(d,char*) ); break; case 'd': a[__z] = va_arg(d, int); __z++ ; break; } }\
 }
+
+/* P_A16: Parse 16 integer arguments. This macro is used in 1 function */
+#define P_A16(a,c,d)\
+{\
+int __z = 0;\
+while(*c) { \
+if(__z > 15 )  break; \
+switch(*c++) { case 'd': a[__z] = va_arg(d, int); __z++ ; break; }\
+}}\
+
 
 #define DUMP_ARG(a)\
 if(sizeof(a)>0){\
@@ -4478,6 +4500,7 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*)ptr;
 	int args[3];
 	char *str = NULL; P_A(args,str,format,ap);
+	int k;
 
 	if(CLIP_PLAYING(v)) 
 	{
@@ -4612,10 +4635,15 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 {
 	int args[16];
 	veejay_t *v = (veejay_t*)ptr;
-	char *str = NULL;
 	memset(args,0,16); 
-	P_A(args,str,format,ap);
+	P_A16(args,format,ap);
 //        DUMP_ARG(args);
+
+	int i;
+	for( i = 0; i < 16; i ++ )
+	{
+		veejay_msg(VEEJAY_MSG_INFO," arg %d = %d", i, args[i]);
+	}
 
 	if(CLIP_PLAYING(v)) 
 	{
@@ -4660,7 +4688,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 					}
 				}
 				v->uc->chain_changed = 1;	
-				if ( args[ num_p + 3 ] )
+				if ( args[ num_p + args_offset ] )
 				{
 					veejay_msg(VEEJAY_MSG_INFO, "Try to set channel %d, source %d", args[num_p+3], args[num_p+4]);
 					if(clip_set_chain_source( args[0],args[1], args[num_p+4] ) &&
@@ -5690,7 +5718,6 @@ void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 	}	
 }
 #endif
-
 void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -5702,6 +5729,20 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 	if( veejay_create_tag(v, VJ_TAG_TYPE_NET, str, v->nstreams, 0,args[0]) == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Created new input network stream %d", vj_tag_size()-1);
+	}
+}
+
+void vj_event_tag_new_mcast(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*)ptr;
+
+	char str[255];
+	int args[2];
+
+	P_A(args,str,format,ap);
+	if( veejay_create_tag(v, VJ_TAG_TYPE_MCAST, str, v->nstreams, 0,args[0]) == 0 )
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Created new multicast stream %d", vj_tag_size()-1);
 	}
 }
 
@@ -7378,7 +7419,18 @@ void vj_event_bundled_msg_add(void *ptr, const char format[], va_list ap)
 
 void vj_event_screenshot(void *ptr, const char format[], va_list ap)
 {
+	int *args = NULL;
+	char s[1024];
+	bzero(s,1024);
+
+	P_A(args,s,format,ap);
+
 	veejay_t *v = (veejay_t*)ptr;
-	v->uc->hackme = 1;
+    	v->uc->hackme = 1;
+	if( strncasecmp(s, "(NULL)", 6) == 0  )
+		v->uc->filename = NULL;
+	else
+		v->uc->filename = strdup( s );
+	
 }
 

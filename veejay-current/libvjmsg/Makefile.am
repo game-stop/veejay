@@ -1,5 +1,4 @@
 # Makefile for  logging/messages 
-MAINTAINERCLEAFILES = Makefile.in
 
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) 
 

@@ -1,5 +1,8 @@
 
 Veejay can stream over the Network (veejay-0.7.2)
+=================================================
+
+ (peer to peer)
 
 How to activate:
 
@@ -10,7 +13,7 @@ How to activate:
 
 veejay 2 makes a connection with veejay 1
 
-3. sayVIMS "165:localhost 3490;" -p 5000
+3. sayVIMS "165:localhost 3490;" -p 5000 -h localhost
 
 4. move mouse to veejay2 video window and press 'ESC'
 
@@ -18,15 +21,26 @@ if everything is OK, the video will be playing.
 
 5. stop veejay1 (CTRL-C)
 
-6. veejay2 will show last (corrupted) frame (press ESC)
+6. veejay2 will show last frame (press ESC)
 
 7. restart veejay1
 
 8. press 'ESC' in veejay2 to resume streaming (auto-reconnect)
 
+Veejay can stream over the Network (UDP / Multicast )
+=====================================================
+
+How to activate:
+
+1. veejay -V 224.0.0.50 -p 5000 -v movie1.avi
+2. veejay -d -W <movie1 width> -H <movie1 height>
+
+3. sayVIMS -h localhost -p 3490 "166:224.0.0.50 5000;"
+4. press F7 to activate newest created stream
+
 
 Veejay can receive OSC (Open Sound Control) messages over Multicast protocol
-
+============================================================================
 How to activate:
 
 1. veejay --multicast 224.0.0.30 movie1.avi
@@ -38,4 +52,47 @@ veejay's you have started with --multicast (on multiple hosts!!)
 2. export MCAST_ADDR=224.0.0.30
 4. mcastOSC -r 3490
 
+
+Veejay can send/receive VIMS (Veejay Internal Message System) packets
+over Multicast protocol
+=============================================================================
+
+How to activate:
+
+1. veejay --multicast-vims 224.0.0.32 movie1.avi
+2. veejay --multicast-vims 224.0.0.32 movie2.avi
+
+3. sayVIMS -g 224.0.0.32 -f test/vims/magicmirror-vims.txt
+
+
+How to setup multicast?
+=======================
+1. enable 'multicast' in kernel configuration
+
+2. type 'route add -net 224.0.0.0 netmask 255.255.255.0 dev eth0'
+   (or something similar, read the man page of route to figure out
+    what addresses are reserved for multicast)
+
+What is multicast?
+==================
+
+Multicasts enables you to (ab)use the network topology to transmit
+packets to multiple hosts. 
+
+
+Limitations
+===========
+
+1. Veejay can only stream to another veejay  
+2. All veejays must have identical video properties (fps,width,height, ... )
+3. Veejay will drop frames when it cannot keep up (or when packets are dropped)
+4. Audio is not supported 
+
+What header format?
+===================
+
+see libvjnet/packet.h for multicast packet definition
+
+for peer-to-peer streaming, the first 11 bytes of the buffer indicate 
+width, height and format in plain ASCII: "%04d %04d %1d"
 

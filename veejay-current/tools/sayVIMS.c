@@ -29,106 +29,83 @@
 #include <netinet/in.h>
 #include <sys/socket.h>
 #include <veejay/vims.h>
-
-typedef struct {
-	struct hostent *he;
-	struct sockaddr_in server_addr;
-	int handle;
-} veejay;
-
-static veejay *status_socket;
-static veejay *command_socket;
-static int interactive = 0;
-static char  hostname[512];
-static int   port_number = 3490;
+#include <libvjnet/vj-client.h>
+#include <libvjmsg/vj-common.h>
+static int   interactive = 0;
+static int   port_num = 3490;
 static int   use_file = 0;
-static char  filename[1024];
+static char  *filename = NULL;
+static char  *group_name = NULL;
+static char  *host_name = NULL;
+static vj_client *client;
+static int colors = 0;
 
-/* make a connection with a server 'name' at port 'port_id' */
-static int vj_connect( veejay *v, char *name, int port_id ) {
-	v->he = gethostbyname(name);
-	v->handle = socket( AF_INET, SOCK_STREAM, 0);
-	v->server_addr.sin_family = AF_INET;
-	v->server_addr.sin_port = htons(port_id);
-	v->server_addr.sin_addr = *( (struct in_addr*) v->he->h_addr);
-	if(connect(v->handle, (struct sockaddr*) &v->server_addr,sizeof(struct sockaddr))==-1) {
-		return -1; /* error */
-	}
-	return 0;
-}
-
-/* read a line of status information */
-static int vj_status_read() {
-	int nbytes,n;
-	char status[1024];
-	nbytes = 100;
-	n = recv( status_socket->handle, status, nbytes,0);
-	return n;
-}
-
-static void vj_flush_status()
-{
-	vj_status_read();
-}
 
 /* count played frames (delay) */
 static void vj_flush(int frames) { 
 	int n = 0;
-	while(frames!=0) {
-		if(vj_status_read()>0) frames--; 
+	char status[100];
+	int bytes = 100;
+	bzero(status,100);
+	while(frames>0) {
+		if( vj_client_poll(client, V_STATUS ))
+		{
+			int n = vj_client_read(client,V_STATUS,status,bytes);
+			if( n )
+			{
+				frames -- ;
+			}
+		}
 	}
-}
-
-
-/* send a message to veejay */
-static void vj_send(char *buf) {
-   char buf2[4096];
-   int len = 0;
-   sprintf(buf2, "V%03dD%s",strlen(buf),buf);
-   len = strlen(buf2);    
-   if ((send(command_socket->handle, buf2, len, 0)) == -1)
-   { /* send the command */
-            perror("send");
-            exit(1);
-   }
 }
 
 static void Usage(char *progname)
 {
-	fprintf(stderr, "Usage: %s [options] [messages]\n",progname);
-	fprintf(stderr, "where options are:\n");
-	fprintf(stderr, " -p\t\tVeejay port (3490)\n"); 
-	fprintf(stderr, " -h\t\tVeejay host (localhost)\n");
-	fprintf(stderr, " -f <filename>\tSend contents of this file to veejay\n\n");
-	fprintf(stderr, "Messages to send to veejay must be wrapped in quotes\n");
-	fprintf(stderr, "You can send multiple messages by seperating them with a whitespace\n");  
-	fprintf(stderr, "\n");
-	fprintf(stderr, "Example: 255:;\n");
-	fprintf(stderr, "         (quit veejay)\n\n");
-	fprintf(stderr, "Example: +100 255:;\n");
-	fprintf(stderr, "	  (quit veejay after playing 100 frames)\n");
+	veejay_msg(VEEJAY_MSG_INFO, "Usage: %s [options] [messages]",progname);
+	veejay_msg(VEEJAY_MSG_INFO, "where options are:");
+	veejay_msg(VEEJAY_MSG_INFO, " -p\t\tVeejay port (3490)"); 
+	veejay_msg(VEEJAY_MSG_INFO, " -g\t\tVeejay groupname (224.0.0.31)");
+	veejay_msg(VEEJAY_MSG_INFO, " -h\t\tVeejay hostname (localhost)");
+	veejay_msg(VEEJAY_MSG_INFO, " -f <filename>\tSend contents of this file to multicast group");
+	veejay_msg(VEEJAY_MSG_INFO, " -c\t\tColored output");
+	veejay_msg(VEEJAY_MSG_INFO, "Messages to send to veejay must be wrapped in quotes");
+	veejay_msg(VEEJAY_MSG_INFO, "You can send multiple messages by seperating them with a whitespace");  
+	veejay_msg(VEEJAY_MSG_INFO, "Example: 255:;");
+	veejay_msg(VEEJAY_MSG_INFO, "         (quit veejay)");
+	veejay_msg(VEEJAY_MSG_INFO, "Example: +100 255:;");
+	veejay_msg(VEEJAY_MSG_INFO, "	  (quit veejay after playing 100 frames)");
 	exit(-1);
 }
 
 static int set_option(const char *name, char *value)
 {
 	int err = 0;
-	if(strcmp(name, "h") == 0)
+	if(strcmp(name, "h") == 0 )
 	{
-		
+		host_name = strdup(optarg);
+		if(group_name) err ++;
+	}
+	else if(strcmp(name, "g") == 0)
+	{
+		if(host_name) err ++; 
+		group_name = strdup( optarg );	
 	}
 	else if (strcmp(name, "p") == 0)
 	{
-		port_number = atoi(optarg);
+		port_num = atoi(optarg);
 	}
 	else if (strcmp(name, "f") == 0)
 	{
 		use_file = 1;
-		strcpy( filename, optarg );
+		filename = strdup( optarg );
 	}
 	else if (strcmp(name, "i") == 0)
 	{
 		interactive = 1;
+	}
+	else if (strcmp(name, "c") == 0)
+	{	
+		colors = 1;
 	}
 	else err++;
 
@@ -146,31 +123,31 @@ static void human_friendly_msg( int net_id,char * buffer )
 	else
 		sprintf( vims_msg, "%03d:%s;", net_id,buffer+1);
 
-	vj_send( vims_msg);
+	vj_client_send(client,V_CMD, vims_msg);
 }
 static int human_friendly_vims(char *buffer)
 {
    if(buffer[0] == 'h' || buffer[0] == '?')
    {
-	fprintf(stderr, "vi\t\tOpen video4linux device\n");
-	fprintf(stderr, "li\t\tOpen vloopback device\n");
- 	fprintf(stderr, "fi\t\tOpen Y4M stream for input\n");
-	fprintf(stderr, "fo\t\tOpen Y4M stream for output\n");
-	fprintf(stderr, "lo\t\tOpen vloopback device for output\n");
-	fprintf(stderr, "cl\t\tLoad cliplist from file\n");
-	fprintf(stderr, "cn\t\tNew clip from frames n1 to n2\n");
-	fprintf(stderr, "cd\t\tDelete clip n1\n");
-	fprintf(stderr, "sd\t\tDelete Stream n1\n");
-	fprintf(stderr, "cs\t\tSave cliplist to file\n");
-	fprintf(stderr, "es\t\tSave editlist to file\n");
-	fprintf(stderr, "ec\t\tCut frames n1 - n2 to buffer\n");
-	fprintf(stderr, "ed\t\tDel franes n1 - n2 \n");
-	fprintf(stderr, "ep\t\tPaste from buffer at frame n1\n");
-	fprintf(stderr, "ex\t\tCopy frames n1 - n2 to buffer\n");
-	fprintf(stderr, "er\t\tCrop frames n1 - n2\n");
-        fprintf(stderr, "al\t\tAction file Load\n");
-        fprintf(stderr, "as\t\tAction file save\n");
-	fprintf(stderr, "sa\t\tToggle 4:2:0 -> 4:4:4 sampling mode\n");
+	veejay_msg(VEEJAY_MSG_INFO, "vi\t\tOpen video4linux device");
+	veejay_msg(VEEJAY_MSG_INFO, "li\t\tOpen vloopback device");
+ 	veejay_msg(VEEJAY_MSG_INFO, "fi\t\tOpen Y4M stream for input");
+	veejay_msg(VEEJAY_MSG_INFO, "fo\t\tOpen Y4M stream for output");
+	veejay_msg(VEEJAY_MSG_INFO, "lo\t\tOpen vloopback device for output");
+	veejay_msg(VEEJAY_MSG_INFO, "cl\t\tLoad cliplist from file");
+	veejay_msg(VEEJAY_MSG_INFO, "cn\t\tNew clip from frames n1 to n2");
+	veejay_msg(VEEJAY_MSG_INFO, "cd\t\tDelete clip n1");
+	veejay_msg(VEEJAY_MSG_INFO, "sd\t\tDelete Stream n1");
+	veejay_msg(VEEJAY_MSG_INFO, "cs\t\tSave cliplist to file");
+	veejay_msg(VEEJAY_MSG_INFO, "es\t\tSave editlist to file");
+	veejay_msg(VEEJAY_MSG_INFO, "ec\t\tCut frames n1 - n2 to buffer");
+	veejay_msg(VEEJAY_MSG_INFO, "ed\t\tDel franes n1 - n2");
+	veejay_msg(VEEJAY_MSG_INFO, "ep\t\tPaste from buffer at frame n1");
+	veejay_msg(VEEJAY_MSG_INFO, "ex\t\tCopy frames n1 - n2 to buffer");
+	veejay_msg(VEEJAY_MSG_INFO, "er\t\tCrop frames n1 - n2");
+        veejay_msg(VEEJAY_MSG_INFO, "al\t\tAction file Load");
+        veejay_msg(VEEJAY_MSG_INFO, "as\t\tAction file save");
+	veejay_msg(VEEJAY_MSG_INFO, "sa\t\tToggle 4:2:0 -> 4:4:4 sampling mode");
 	return 1;
    }
 
@@ -207,15 +184,17 @@ int main(int argc, char *argv[])
 	char option[2];
 	char ibuf[1024];
 	int err = 0;
-	command_socket = (veejay*)malloc(sizeof(veejay));
-	status_socket = (veejay*)malloc(sizeof(veejay));
-	sprintf(hostname,"%s", "localhost");
 
-	while( ( n = getopt(argc,argv, "h:p:f:i")) != EOF)
+
+
+	while( ( n = getopt(argc,argv, "h:g:p:f:ic")) != EOF)
 	{
 		sprintf(option,"%c",n);
 		err += set_option( option,optarg);
 	}
+
+	veejay_set_colors(colors);
+
 	if(argc <= 1 )
 		Usage(argv[0]);
 
@@ -224,22 +203,21 @@ int main(int argc, char *argv[])
 	if ( err )
 		Usage(argv[0]);
 
-
-
 	bzero( buf, 65535 );
 
-	/* setup the connection with veejay */
-        if (vj_connect( command_socket, hostname, port_number ) == -1) {  // get the host info 
-	    fprintf(stderr, "cannot connect to veejay\n");
-            exit(1);
-        }
-	/* open status */
-	if (vj_connect( status_socket, hostname, port_number+1 ) == -1) {
-		fprintf(stderr, "cannot connect to status socket\n");
-		exit(1);
-	}
+	client = vj_client_alloc( 0,0,0 );
 
-	while(interactive)
+	if(!vj_client_connect( client, host_name,group_name, port_num ))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "connecting to %s:%d",host_name,
+				port_num);
+		return 0;
+	}
+		
+	if(interactive)
+		fcntl( 0, F_SETFL, O_NONBLOCK);
+
+	while(interactive==1)
 	{
 		bzero(ibuf,1024);
 		if(read(0, ibuf,255)>0)
@@ -248,10 +226,10 @@ int main(int argc, char *argv[])
 			for(i=0; i < strlen(ibuf); i++)
 			if(ibuf[i] == '\n') ibuf[i] = '\0';
 			if(!human_friendly_vims(ibuf))
-				vj_send(ibuf);
+				vj_client_send(client,V_CMD, ibuf);
 
 		}
-		vj_flush_status();
+		vj_flush(1);
 	}
 
 	if(use_file)
@@ -268,8 +246,10 @@ int main(int argc, char *argv[])
 			else
 			{
 				if(buf[0]!='#') {
-					buf[strlen(buf)-1] = '\0';
-					vj_send(buf);
+					int len = strlen(buf)-1;
+					if(len>0){
+					buf[len] = '\0';
+					vj_client_send(client,V_CMD,buf);}
 				}
 			}	
 		}
@@ -279,26 +259,33 @@ int main(int argc, char *argv[])
 	{
 		char **msg = argv + optind;
 		int  nmsg  = argc - optind;
-		int i=0;
+		i=0;
 		while( i < nmsg )
 		{
 			if(msg[i][0] == '+')
 			{
 				int delay = 1;
 				char *tmp = msg[i];
-				sscanf(tmp + 1, "%d",&delay);
-				vj_flush(delay);
+				if(sscanf(tmp + 1, "%d",&delay) == 1 )
+				{
+					vj_flush(delay);
+				}
+				else
+				{
+					veejay_msg(VEEJAY_MSG_ERROR, "Fatal: error parsing %s", tmp );
+					exit(-1);
+				}
 			}
 			else
 			{
-				vj_send( msg[i] );
+				vj_client_send( client,V_CMD, msg[i] );
 			}
 			i++;
 		}
 	}
 
-        close(status_socket->handle);
-	close(command_socket->handle);
+	vj_client_close(client);
+	vj_client_free(client);
 
         return 0;
 } 

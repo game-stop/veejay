@@ -150,7 +150,8 @@ void 	vj_event_tag_new_raw			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_tag_new_avformat		(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_tag_new_v4l			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_tag_new_y4m			(	void *ptr, 	const char format[], 	va_list ap	);
-void	vj_event_tag_new_net			( 	void *ptr,	const char format[],	va_list ap  );
+void	vj_event_tag_new_net			( 	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_tag_new_mcast			(	void *ptr,	const char format[], 	va_list ap	);
 void 	vj_event_tag_rec_offline_start		(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_tag_rec_offline_stop		(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_tag_rec_start			(	void *ptr, 	const char format[], 	va_list ap	);
@@ -170,7 +171,7 @@ void	vj_event_send_clip_history_list		(	void *ptr,	const char format[],	va_list 
 void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_devices			(	void *ptr,	const char format[],	va_list ap	);
-void	vj_event_send_frame				(	void *ptr,	const char fomrat[],	va_list ap 	);
+void	vj_event_send_frame			(	void *ptr,	const char fomrat[],	va_list ap 	);
 void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_clip_new			(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_do_bundled_msg			(	void *ptr, 	const char format[], 	va_list ap	);

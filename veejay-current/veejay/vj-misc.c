@@ -78,37 +78,66 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
 {
     FILE *frame;
     int res = 0;
-    char filename[15];
     uint8_t *jpeg_buff;
+    VJFrame tmp;
     int jpeg_size;
 
     video_playback_setup *settings = info->settings;
 
     jpeg_buff = (uint8_t *) malloc( 65535 * 4);
     if (!jpeg_buff)
-	return -1;
+		return -1;
 
-    //vj_perform_get_primary_frame(info, src, settings->currently_processed_frame);
+    if(info->pixel_format == 0)
+	vj_el_init_420_frame( info->edit_list, &tmp );
+    else
+	vj_el_init_422_frame( info->edit_list, &tmp );
+    if( tmp.shift_v == 0 )
+    {
+	//allocate memory and convert
+	tmp.data[0] = (uint8_t*) malloc(sizeof(uint8_t) * tmp.len );
+	tmp.data[1] = (uint8_t*) malloc(sizeof(uint8_t) * tmp.uv_len );
+	tmp.data[2] = (uint8_t*) malloc(sizeof(uint8_t) * tmp.uv_len );
+	yuv422p_to_yuv420p2( src, tmp.data, info->edit_list->video_width,
+			                    info->edit_list->video_height );
+    }
+    else
+    {
+	tmp.data[0] = src[0];
+	tmp.data[1] = src[1];
+	tmp.data[2] = src[2];
+    }	
 
-    sprintf(filename, "screenshot-%08d.jpg", settings->current_frame_num);
+	if(info->uc->filename == NULL) 
+	{
+		info->uc->filename = (char*) malloc(sizeof(char) * 12); 
+		sprintf(info->uc->filename, "%06d.jpg", info->settings->current_frame_num );
+	}
+    frame = fopen(info->uc->filename, "wb");
 
-    frame = fopen(filename, "wb");
-
-    if (!frame)
-	return -1;
-
-    jpeg_size = encode_jpeg_raw(jpeg_buff, (65535*4), 100,
+    if (frame)
+    {	
+    	jpeg_size = encode_jpeg_raw(jpeg_buff, (65535*4), 100,
 				settings->dct_method,  
 				info->edit_list->video_inter, 0,
 				info->edit_list->video_width,
-				info->edit_list->video_height, src[0],
-				src[1], src[2]);
+				info->edit_list->video_height, tmp.data[0],
+				tmp.data[1], tmp.data[2]);
 
-    res = fwrite(jpeg_buff, jpeg_size, 1, frame);
-    fclose(frame);
-    if(res) veejay_msg(VEEJAY_MSG_INFO, "Dumped frame to %s", filename);
+   	 res = fwrite(jpeg_buff, jpeg_size, 1, frame);
+   	 fclose(frame);
+    	 if(res) 
+		veejay_msg(VEEJAY_MSG_INFO, "Dumped frame to %s", info->uc->filename);
+    }
+
     if (jpeg_buff)
 	free(jpeg_buff);
+    if( tmp.shift_v == 0 )
+    {
+	free(tmp.data[0]);
+	free(tmp.data[1]);
+	free(tmp.data[2]);
+    }
 
     return res;
 }

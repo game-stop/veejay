@@ -68,7 +68,7 @@
 #include <X11/Xutil.h>
 #endif
 
-#include <veejay/vj-client.h>
+#include <libvjnet/vj-client.h>
 #include <veejay/vj-misc.h>
 #ifdef HAVE_SYS_SOUNDCARD_H
 #include <sys/soundcard.h>
@@ -182,7 +182,7 @@ struct mjpeg_params
 #include "libveejay.h"
 #include "mjpeg_types.h"
 #include "vj-perform.h"
-#include "vj-server.h"
+#include <libvjnet/vj-server.h>
 #include "mjpeg_types.h"
 //#include "lav_common.h"
 #ifdef HAVE_DIRECTFB
@@ -895,7 +895,7 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 	}
 	break;
 	case VJ_TAG_TYPE_NET:
-
+	case VJ_TAG_TYPE_MCAST:
 	if( (filename != NULL) && ((strcasecmp( filename, "localhost" ) == 0)  || (strcmp( filename, "127.0.0.1" ) == 0)) )
 	{
 		if( channel == info->uc->port )
@@ -978,10 +978,13 @@ static int veejay_screen_update(veejay_t * info ) {
      
 
     /* dirty hack to save a frame to jpeg */
-    if (info->uc->hackme == 1) {
-	vj_perform_screenshot2(info, frame);
-	info->uc->hackme = 0;
+    if (info->uc->hackme == 1)
+	{
+		vj_perform_screenshot2(info, frame);
+		info->uc->hackme = 0;
+		free(info->uc->filename);
     }
+
     if (info->uc->take_bg==1)
     {
        vj_perform_take_bg(info,frame);
@@ -1228,8 +1231,8 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     snprintf(status_msg,MESSAGE_SIZE, "V%03dS%s", d_len, status_what);
     res = vj_server_send(info->vjs[1],link_id, status_msg, strlen(status_msg));
     if( res <= 0) { /* close command socket */
-		vj_server_close_connection( info->vjs[1], link_id );
-		vj_server_close_connection( info->vjs[0], link_id );
+		_vj_server_del_client(info->vjs[1], link_id );
+		_vj_server_del_client(info->vjs[0], link_id );
 	}
     if (info->uc->chain_changed == 1)
 		info->uc->chain_changed = 0;
@@ -1714,6 +1717,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		"Initialized %d Image- and Video Effects", MAX_EFFECTS);
 	/* initialize all effects */
 
+	if( !vj_server_setup(info) )
+	{
+		return 1;
+	}
 
     vj_effect_initialize(info->edit_list->video_width, info->edit_list->video_height);
 
@@ -2238,18 +2245,13 @@ static void *veejay_playback_thread(void *data)
 
 int vj_server_setup(veejay_t * info)
 {
-    if(vj_server_init()==0)
-	{
-		return 0;
-	}
-
     if (info->uc->port == 0)
 	info->uc->port = VJ_PORT;
 
-    info->vjs[0] = vj_server_alloc(info->uc->port);
+    info->vjs[0] = vj_server_alloc(info->uc->port, info->settings->vims_group_name, V_CMD);
     if(!info->vjs[0])
 		return 0;
-    info->vjs[1] = vj_server_alloc((info->uc->port + 1));
+    info->vjs[1] = vj_server_alloc((info->uc->port + 1), info->settings->vims_group_name, V_STATUS);
     if(!info->vjs[1])
 		return 0;
 
@@ -2346,6 +2348,8 @@ veejay_t *veejay_malloc()
     info->settings->clip_record_switch = 0;
     info->settings->clip_record = 0;
 	info->settings->use_mcast = 0;
+	info->settings->use_vims_mcast = 0;
+	info->settings->vims_group_name = NULL;
     info->edit_list = NULL;
     info->uc = (user_control *) vj_malloc(sizeof(user_control));
     if (!(info->uc)) {
@@ -2358,6 +2362,7 @@ veejay_t *veejay_malloc()
     info->uc->key_effect = 0;
     info->uc->take_bg = 0;
     info->uc->speed = 1;
+	info->uc->filename = NULL;
     info->uc->hackme = 0;
     info->uc->clip_select = 0;
     info->uc->current_link = -1;

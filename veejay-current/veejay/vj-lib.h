@@ -17,31 +17,24 @@
  *
  */
 
-/* CHANGES:
-	added aclib from mplayer (fast memcpy)
-	added vj-tags
-	added vj-v4lvideo for multiple v4l devices support
-	added yuv4mpeg stream to read from named pipe 
-	moved sdl code to vj-sdl
-*/
-
 #ifndef VJ_LIB_H
 #define VJ_LIB_H
 #include <config.h>
 #include <sys/time.h>
 #include <libsample/sampleadm.h>
+#include <libvjnet/vj-server.h>
+#include <libvjnet/vj-client.h>
+#ifdef HAVE_V4L
 #include "vj-v4lvideo.h"
+#endif
 #include "vj-yuv4mpeg.h"
-//#include "vj-dv.h"
 #include "vj-dfb.h"
 #include "vj-sdl.h"
-#include "vj-server.h"
 #include "vj-OSC.h"
 #include "lav_io.h"
 #include "vj-shm.h"
 #include "subsample.h"
 #include "vj-el.h"
-#include "vj-client.h"
 
 enum {
   NO_AUDIO = 0,
@@ -149,6 +142,8 @@ typedef struct {
     subsample_mode_t sample_mode;
 	int use_mcast;
 	char *group_name;
+	int use_vims_mcast;
+	char *vims_group_name;
 } video_playback_setup;
 
 
@@ -171,6 +166,7 @@ typedef struct {
 typedef struct {
     int playback_mode;		/* playing plain,clip,tag or pattern */
     int clip_id;		/* which clip or tag is beeing played */
+    char *filename;
     int hackme;
     int take_bg;
     int direction;		/* forward, reverse or pause */
@@ -212,7 +208,8 @@ typedef struct {
     int load_action_file;
     editlist *edit_list;		/* the playing editlist */
     user_control *uc;		/* user control */
-    v4l_video *vj[4];		/* v4l input */
+
+//    v4l_video *vj[4];		/* v4l input */
     vj_osc *osc;
     VJFrame *plugin_frame;
     VJFrameInfo *plugin_frame_info; 

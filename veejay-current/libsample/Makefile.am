@@ -1,7 +1,5 @@
 # Makefile for veejay
 
-MAINTAINERCLEANFILES = Makefile.in
-
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg \
 			${XML_CPPFLAGS} ${XML_CFLAGS} 
 
