@@ -28,8 +28,8 @@
 #include <veejay/vj-global.h>
 #include <veejay/vj-el.h>
 #ifdef HAVE_XML2
-#include <libxml2/xmlmemory.h>
-#include <libxml2/parser.h>
+#include <libxml/xmlmemory.h>
+#include <libxml/parser.h>
 #endif
 #define CLIP_MAX_RENDER     10 /* 10 at most */
 #define CLIP_MAX_CLIPS  16384 /* 4096 clips at most */
