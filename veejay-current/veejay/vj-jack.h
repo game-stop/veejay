@@ -21,7 +21,7 @@
 
 #include <config.h>
 #ifdef HAVE_JACK
-#include <veejay/vj-el.h>
+#include <libel/vj-el.h>
 
 int vj_jack_init(editlist *el);
 

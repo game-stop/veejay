@@ -22,7 +22,7 @@
 
 #ifdef HAVE_JACK
 #include <bio2jack/bio2jack.h>
-#include <veejay/vj-el.h>
+#include <libel/vj-el.h>
 static int driver = 0;
 static int bits_per_sample = 0;
 static unsigned long audio_rate = 0;
