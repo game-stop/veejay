@@ -92,7 +92,7 @@ int veejay_toggle_audio(veejay_t * info, int audio);
 
 int veejay_save_selection(veejay_t * info, char *filename, long start,long end);
 
-int veejay_save_all(veejay_t * info, char *filename);
+int veejay_save_all(veejay_t * info, char *filename, long n1, long n2);
 
 int vj_server_setup(veejay_t *info);
 

@@ -587,12 +587,20 @@ int clip_set_fader_active( int s1, int nframes, int direction ) {
   if(!si) return -1;
   if(nframes <= 0) return -1;
   si->fader_active = 1;
-  si->fader_val = 0.0;
+
+  if(direction<0)
+	si->fader_val = 255.0;
+  else
+	si->fader_val = 0.0;
+
   si->fader_inc = (float) (255.0 / (float) nframes);
   si->fader_direction = direction;
-
+  si->fader_inc *= si->fader_direction;
   /* inconsistency check */
-  if(si->effect_toggle == 0) si->effect_toggle = 1;
+  if(si->effect_toggle == 0)
+	{
+	si->effect_toggle = 1;
+	}
   return (clip_update(si,s1));
 }
 
@@ -644,8 +652,7 @@ int clip_apply_fader_inc(int s1) {
   if(si->fader_val > 255.0 ) si->fader_val = 255.0;
   if(si->fader_val < 0.0 ) si->fader_val = 0.0;
   clip_update(si,s1);
-  if(si->fader_direction) return si->fader_val;
-  return (255 - si->fader_val);
+  return (int) (si->fader_val+0.5);
 }
 
 

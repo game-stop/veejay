@@ -29,7 +29,7 @@ Veejay uses Jack , a low latency audio server, to transport (playback) audio in 
 .TP
 .SH General Usage (How to work with veejay)
 .TP
-Veejay has a console and a video window ; the console can be used for typing short commands (like opening a video4linux device) and when the mouse is moved over to the video window, you can use the keyboard like a piano to play/manipulate the video.
+Veejay has a console- and a video window ; the console is used for displaying messages only. If the mouse is moved over to the video window, you can use the keyboard like a piano to play/manipulate the video.
 .TP
 You can start veejay with multiple files , video files and/or Mjpegtools' EditList files. Upon startup, veejay creates a new EditList in memory containing all the files you have loaded. As a result, all files will appear as a single large video file.Next you can start making selections (clips) of your EditList. These clips will be placed in so called 'clip banks' and they can be triggered for playback by pressing the F-keys (1 to 12). You can select a bank by pressing a number 1 to 9.
 .TP
@@ -47,9 +47,6 @@ TCP port for communication with clients like gveejay (default 3490)
 .TP
 .B \-h/--host
 Start as client of another veejay session (default is server)
-.TP
-.B \-O/--graphics-driver
-Video driver to use 0=SDL (default) 2=DirectFB/SDL cloned output
 .TP
 .B \-o/--outstream <filename>
 write video in YCbCr (YUV 4:2:0) format to specified file. Use this with -O3.
@@ -88,9 +85,6 @@ Geometry x offset for SDL video window
 .B \-y/--geometryy <num>
 Geometry y offset for SDL video window
 .TP
-.B \-j/--no-ffmpeg
-Don't use ffmpeg for decoding MJPEG (use libjpeg instead)
-.TP
 .B \-l/--action-file <filename>
 Action File to load at initialization
 .TP
@@ -112,7 +106,21 @@ Show compiled in options
 .B \-Y/--ycbcr [01]
 Specify veejay to use either YUV 4:2:0 (0) or YUV 4:2:2 (1). By default,
 veejay will try to autodetect the pixel format used. 
-
+.TP
+.B \-d/--dummy
+Start veejay with no video files (dummy mode). By default it will play black video.
+.TP
+.B \-W/--width
+Specify width of dummy video.
+.TP
+.B \-H/--height
+Specify height of dummy video
+.TP
+.B \-R/--framerate
+Specify framerate of dummy video
+.TP
+.B \-N [01]
+Specify norm of dummy video (0=PAL, 1=NTSC)
 .SH EXAMPLES
 .TP
 .B veejay -u |less
@@ -121,6 +129,10 @@ Startup veejay and list all events (VIMS/OSC) and effect descriptions
 .B veejay -p 4000 ~/my_video1.avi
 Startup veejay listening on port 4000 (use this to use multiple veejays)
 .TP
+.TP
+.B veejay -d -W 352 -H 288 -R 25 -N 0
+Startup veejay using dummy video at 25 frames per second, dimensions 352x288
+and using PAL.
 
 .SH INTERFACE COMMANDS (STDIN)
 When you are running veejay with a SDL window you can use keybindings for

@@ -689,9 +689,16 @@ int vj_tag_set_fader_active(int t1, int nframes , int direction) {
   if(!tag) return -1;
   if(nframes <= 0) return -1;
   tag->fader_active = 1;
+  if(direction<0)
+	tag->fader_val = 255.0;
+  else
+	tag->fader_val = 0.0;
   tag->fader_val = 0.0;
   tag->fader_inc = (float) (255.0 / (float)nframes );
   tag->fader_direction = direction;
+  tag->fader_inc *= direction;
+  if(tag->effect_toggle == 0 )
+	tag->effect_toggle = 1;
   return ( vj_tag_update(tag, t1));
 }
 

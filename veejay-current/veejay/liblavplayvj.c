@@ -606,10 +606,6 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int clip_id )
 		{
 			veejay_msg(VEEJAY_MSG_WARNING, "Activated %d effect%s", tmp, (tmp==1? " " : "s") );
 		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_WARNING, "Activated no effects");
-		}
 		info->uc->playback_mode = new_pm;
 		veejay_set_clip(info,clip_id);
 	}
@@ -2027,10 +2023,11 @@ static void Welcome(veejay_t *info)
 			(info->no_bezerk==0?"[Bezerk]" : " " ),
 			(info->verbose==0?" " : "[Debug]")  );
     
-	veejay_msg(VEEJAY_MSG_INFO,"Your best friend is 'man'");
+	veejay_msg(VEEJAY_MSG_INFO,"Your best friends are 'man' and 'vi'");
 	veejay_msg(VEEJAY_MSG_INFO,"Type 'man veejay' in a shell to learn more about veejay");
-	veejay_msg(VEEJAY_MSG_INFO,"Type '?' in veejay's console");
-	veejay_msg(VEEJAY_MSG_INFO,"For a list of events, type 'veejay -u |less' in a shell"); 
+	veejay_msg(VEEJAY_MSG_INFO,"For a list of events, type 'veejay -u |less' in a shell");
+	veejay_msg(VEEJAY_MSG_INFO,"Use 'sayVIMS -i' or gveejay to enter interactive mode");
+	veejay_msg(VEEJAY_MSG_INFO,"Alternatives are OSC applications or 'sendVIMS' extension for PD"); 
 
 }
 
@@ -2617,7 +2614,7 @@ int veejay_edit_addmovie(veejay_t * info, char *movie, long start,
 		el->frame_list[destination + i - start] = EL_ENTRY(n, i);
 		el->video_frames++;
     }
-	veejay_msg(VEEJAY_MSG_ERROR, "Added %ld frames, it=%d start=%d end=%d dest=%d",
+	veejay_msg(VEEJAY_MSG_INFO, "Added %ld frames, it=%d start=%d end=%d dest=%d",
 		   el->video_frames- n_end, i, start,end,destination);
 		   
  
@@ -2707,20 +2704,27 @@ int veejay_save_selection(veejay_t * info, char *filename, long start,
  ******************************************************/
 
 
-int veejay_save_all(veejay_t * info, char *filename)
+int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
 {
-    //video_playback_setup *settings = (video_playback_setup *)info->settings;
-	/*
-    if (info->uc->playback_mode == VJ_PLAYBACK_MODE_PATTERN) {
-	editlist = info->pattern_info->edit_list;
-    } else {
-	editlist = info->edit_list;
-    }
-	*/
-	
 
-    veejay_msg(VEEJAY_MSG_DEBUG, 
-		"TODO:Saved all frames to editlist %s", filename);
+	if( info->edit_list->num_video_files <= 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "EditList has no contents!");
+		return 0;
+	}
+	if(n1 == 0 && n2 == 0 )
+	{
+		n2 = info->edit_list->video_frames - 1;
+	}	
+	if( vj_el_write_editlist( filename, n1,n2, info->edit_list ) )
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Saved editlist to file [%s]", filename);
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Error while saving editlist!");
+		return 0;
+	}	
 
     return 1;
 }

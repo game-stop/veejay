@@ -66,6 +66,11 @@ static int vj_status_read() {
 	return n;
 }
 
+static void vj_flush_status()
+{
+	vj_status_read();
+}
+
 /* count played frames (delay) */
 static void vj_flush(int frames) { 
 	int n = 0;
@@ -248,7 +253,7 @@ int main(int argc, char *argv[])
 				vj_send(ibuf);
 
 		}
-		vj_flush(1);
+		vj_flush_status();
 	}
 
 	if(use_file)

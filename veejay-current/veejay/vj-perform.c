@@ -1798,7 +1798,7 @@ void vj_perform_plain_fill_buffer(veejay_t * info, int entry)
 	}
     if(ret == 2)
     {
-		veejay_msg(VEEJAY_MSG_WARNING, "There is no plain video to play!");
+	veejay_msg(VEEJAY_MSG_WARNING, "There is no plain video to play!");
 	
     }
 }
@@ -2164,70 +2164,85 @@ void vj_perform_post_chain(veejay_t *info, VJFrame *frame)
 	int i;
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
-
+	uint8_t *Cr = frame->data[2];
 
   	if(info->uc->playback_mode==VJ_PLAYBACK_MODE_CLIP)
    	{
    		int op_b;
 		int mode = clip_get_fader_active( info->uc->clip_id );
 
-        if(mode == 2 )
+ 	       if(mode == 2 ) // manual fade
 			opacity = (int) clip_get_fader_val(info->uc->clip_id);
-		else
-	     	opacity = (int) clip_apply_fader_inc(info->uc->clip_id);
+		else	// fade in/fade out
+		    	opacity = (int) clip_apply_fader_inc(info->uc->clip_id);
 
-   	    if(opacity >= 255 && mode != 2)
-	 	{
-	    	if(clip_get_fader_direction(info->uc->clip_id))
+	   	if(mode != 2)
+		{
+		    	int dir =clip_get_fader_direction(info->uc->clip_id);
+
+			if((dir<0) &&(opacity == 0))
 			{
-				clip_set_effect_status(info->uc->clip_id, 0);
-   			}
-     		clip_reset_fader(info->uc->clip_id);
-	      	veejay_msg(VEEJAY_MSG_INFO, "Clip Chain Auto Fade done");
-    	}
+				clip_set_effect_status(info->uc->clip_id, 1);
+     				clip_reset_fader(info->uc->clip_id);
+	      			veejay_msg(VEEJAY_MSG_INFO, "Clip Chain Auto Fade Out done");
+			}
+			if((dir>0) && (opacity==255))
+			{
+				clip_set_effect_status(info->uc->clip_id,0);
+				clip_reset_fader(info->uc->clip_id);
+				veejay_msg(VEEJAY_MSG_INFO, "Clip Chain Auto fade In done");
+			}
+    		}
 
-	 	op_b = 255 - opacity;
-	 	for(i=0; i < helper_frame->len;i ++ )
-	 	{
-			Y[i]= (( op_b * Y[i] ) + ( opacity * temp_buffer[0][i] )) >> 8;
-	 	} 
-	 	for(i=0; i < helper_frame->uv_len;i ++ )
-	 	{
-			Cb[i]= (( op_b * Cb[i] ) + ( opacity * temp_buffer[1][i] )) >> 8;
-			Cr[i]= (( op_b * Cr[i] ) + ( opacity * temp_buffer[2][i] )) >> 8;
-	 	}
+	op_b = 255 - opacity;
+	for(i=0; i < helper_frame->len;i ++ )
+	{
+		Y[i]= (( op_b * Y[i] ) + ( opacity * temp_buffer[0][i] )) >> 8;
+	} 
+	for(i=0; i < helper_frame->uv_len;i ++ )
+	{
+		Cb[i]= (( op_b * Cb[i] ) + ( opacity * temp_buffer[1][i] )) >> 8;
+		Cr[i]= (( op_b * Cr[i] ) + ( opacity * temp_buffer[2][i] )) >> 8;
+	}
    }
    else
    {
-     int op_b;
-	 int mode = vj_tag_get_fader_active( info->uc->clip_id );
-	 if(mode == 2)
+	int op_b;
+	int mode = vj_tag_get_fader_active( info->uc->clip_id );
+
+	if(mode == 2)
 		opacity = (int) vj_tag_get_fader_val(info->uc->clip_id);
-	 else
-     	opacity = (int) vj_tag_apply_fader_inc(info->uc->clip_id);
+	else
+     		opacity = (int) vj_tag_apply_fader_inc(info->uc->clip_id);
    
-     if(opacity >= 255 && mode != 2)
-	 {
- 		if (vj_tag_get_fader_direction(info->uc->clip_id)) {
+	if(mode != 2)
+	{
+ 		int dir = vj_tag_get_fader_direction(info->uc->clip_id);
+		if((dir < 0) && (opacity == 0))
+		{
+			vj_tag_set_effect_status(info->uc->clip_id,1);
+			vj_tag_reset_fader(info->uc->clip_id);
+			veejay_msg(VEEJAY_MSG_INFO, "Stream Chain Auto Fade done");
+		}
+		if((dir > 0) && (opacity == 255))
+		{
 			vj_tag_set_effect_status(info->uc->clip_id,0);
-	    }
-		vj_tag_reset_fader(info->uc->clip_id);
-		veejay_msg(VEEJAY_MSG_INFO, "Stream Chain Auto Fade done");
-     }
+			vj_tag_reset_fader(info->uc->clip_id);
+			veejay_msg(VEEJAY_MSG_INFO, "Stream Chain Auto Fade done");
+		}
+		
+    	}
 
-	 op_b = 255 - opacity;
-	 for(i=0; i < frame->len;i ++ )
-	 {
+	op_b = 255 - opacity;
+	for(i=0; i < frame->len;i ++ )
+	{
 		Y[i]= (( op_b * Y[i] ) + ( opacity * temp_buffer[0][i] )) >> 8;
-	 } 
-	 for(i=0; i < helper_frame->uv_len;i ++ )
-	 {
+	} 
+	for(i=0; i < helper_frame->uv_len;i ++ )
+	{
 		Cb[i]= (( op_b * Cb[i] ) + ( opacity * temp_buffer[1][i] )) >> 8;
-
 		Cr[i]= (( op_b * Cr[i] ) + ( opacity * temp_buffer[2][i] )) >> 8;
-
-	 } 
+	} 
 
 
    }

@@ -90,8 +90,7 @@ examples:
 
 2. run veejay without a video file
 
-   (not anymore but perhaps in the future again ?)
-
+	veejay -d -W <width> -H <height> -R <framerate>
 
 
 CONTACT / FEEDBACK & HELP

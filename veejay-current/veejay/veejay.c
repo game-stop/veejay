@@ -153,7 +153,7 @@ static void Usage(char *progname)
     fprintf(stderr,
 	    "  -a/--audio [01]\t\tEnable (1) or disable (0) audio (default 1)\n");
     fprintf(stderr,
-	    "  -S/--size NxN\t\t\twidth X height for SDL (S) or video (H) window\n");
+	    "  -s/--size NxN\t\t\twidth X height for SDL (S) or video (H) window\n");
     fprintf(stderr,
 	    "  -X/--no-default-tags\t\tDo not create solid color tags at startup\n");
     fprintf(stderr,
@@ -177,6 +177,7 @@ static void Usage(char *progname)
     fprintf(stderr,"  -m/--sample-mode [01]\t\tSampling mode 1 = best quality (default), 0 = best performance\n");  
     fprintf(stderr,"  -Y/--ycbcr [01]\t\t0 = YUV 4:2:0 Planar, 1 = YUV 4:2:2 Planar\n");
 
+	fprintf(stderr,"  -d/--dummy	\t\tDummy playback\n");
 	fprintf(stderr,"  -W/--width    \t\tdummy width\n");
 	fprintf(stderr,"  -H/--height   \t\tdummy height\n");
 	fprintf(stderr,"  -N/--norm		\t\tdummy norm\n");

@@ -832,7 +832,7 @@ static struct {
 	{ VJ_EVENT_EDITLIST_COPY,		"EditList: Copy frames n1-n2 to buffer",	 vj_event_el_copy,		2,	"%d %d",	{0,0}	},
 	{ VJ_EVENT_EDITLIST_CROP,		"EditList: Crop frames n1-n2",			 vj_event_el_crop,		2,	"%d %d",	{0,0}   },
 	{ VJ_EVENT_EDITLIST_DEL,		"EditList: Del frames n1-n2",			 vj_event_el_del,		2,	"%d %d",	{0,0}	}, 
-	{ VJ_EVENT_EDITLIST_SAVE,		"EditList: save EditList to new file",		 vj_event_el_save_editlist,	1,	"%s",		{0,0} 	},
+	{ VJ_EVENT_EDITLIST_SAVE,		"EditList: save EditList to new file",		 vj_event_el_save_editlist,	3,	"%s %d %d",	{0,0} 	},
 	{ VJ_EVENT_EDITLIST_LOAD,		"EditList: load EditList into veejay",		 vj_event_el_load_editlist,	1,	"%s",		{0,0}	},
 	{ VJ_EVENT_EDITLIST_ADD,		"EditList: add video file to editlist",		 vj_event_el_add_video,		1,	"%s",		{0,0}	},
 	{ VJ_EVENT_EDITLIST_ADD_CLIP,		"EditList: add video file to editlist as clip", vj_event_el_add_video_clip,	1,	"%s",		{0,0}	},
@@ -922,7 +922,7 @@ vj_event	vj_event_function_by_id(int id);
 const int vj_event_get_id(int event_id);
 const char  *vj_event_name_by_id(int id);
 void  vj_event_parse_bundle(veejay_t *v, char *msg );
-
+int	vj_has_video(veejay_t *v);
 void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int arglen);
 
 void    vj_event_commit_bundle( veejay_t *v, unsigned int key_num);
@@ -953,6 +953,13 @@ void	vj_event_init(void);
 #define CURRENT_CLIP(v,s) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_CLIPS) && clip_exists(s))
 #define CURRENT_TAG(v,t) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_TAG) && vj_tag_exists(t))
 */
+
+int	vj_has_video(veejay_t *v)
+{
+	if(v->edit_list->num_video_files <= 0 )
+		return 0;
+	return 1;
+}
 
 int vj_event_bundle_update( vj_msg_bundle *bundle, int bundle_id )
 {
@@ -1494,7 +1501,7 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 		{
 			if(sscanf(args,"%s",dstr))
 			{
-			//	veejay_msg(VEEJAY_MSG_DEBUG,"(VIMS) first argument is string [%s].",dstr);
+				veejay_msg(VEEJAY_MSG_DEBUG,"(VIMS) first argument is string [%s].",dstr);
 				offset+=strlen(dstr);
 				n++;
 			}
@@ -2151,7 +2158,11 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
 	{
 		if(args[0] == VJ_PLAYBACK_MODE_PLAIN) 
 		{
-			veejay_change_playback_mode(v, args[0], 0);
+			if( vj_has_video(v) )
+				veejay_change_playback_mode(v, args[0], 0);
+			else
+				veejay_msg(VEEJAY_MSG_ERROR,
+				"There are no video files in the editlist");
 			return;
 		}
 	
@@ -2456,7 +2467,13 @@ void vj_event_set_play_mode(void *ptr, const char format[], va_list ap)
 			}
 		}
 		if(mode == VJ_PLAYBACK_MODE_PLAIN)
-			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_PLAIN, 0);
+		{
+			if(vj_has_video(v) )
+				veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_PLAIN, 0);
+			else
+				veejay_msg(VEEJAY_MSG_ERROR,
+				 "There are no video files in the editlist");
+		}
 	}
 	else 
 	{
@@ -4131,7 +4148,7 @@ void	vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap)
 	}
 
 }
-
+//out
 void vj_event_chain_fade_in(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -4145,32 +4162,32 @@ void vj_event_chain_fade_in(void *ptr, const char format[], va_list ap)
 
 	if( CLIP_PLAYING(v) && clip_exists(args[0])) 
 	{
-		if( clip_set_fader_active( args[0], args[1],0 ) )
+		if( clip_set_fader_active( args[0], args[1],-1 ) )
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Chain Fade in from clip to full effect chain in %d frames. Per frame %2.2f",
+			veejay_msg(VEEJAY_MSG_INFO, "Chain Fade In from clip to full effect chain in %d frames. Per frame %2.2f",
 				args[1], clip_get_fader_inc(args[0]));
 			if(clip_get_effect_status(args[0]==0))
 			{
-				clip_set_effect_status(args[0], 1);
+				clip_set_effect_status(args[0], -1);
 			}
 		}
 	}
 	if (TAG_PLAYING(v) && vj_tag_exists(args[0])) 
 	{
-		if( vj_tag_set_fader_active( args[0], args[1],0 ) )
+		if( vj_tag_set_fader_active( args[0], args[1],-1 ) )
 		{
-			veejay_msg(VEEJAY_MSG_INFO,"Chain Fade in from stream to full effect chain in %d frames. Per frame %2.2f",
+			veejay_msg(VEEJAY_MSG_INFO,"Chain Fade In from stream to full effect chain in %d frames. Per frame %2.2f",
 				args[1], clip_get_fader_inc(args[0]));
 			if(vj_tag_get_effect_status(args[0]==0))
 			{
-				vj_tag_set_effect_status(args[0],1);
+				vj_tag_set_effect_status(args[0],-1);
 			}
 		}
 	}
 
 }
 
-
+//in
 void vj_event_chain_fade_out(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -5339,9 +5356,12 @@ void vj_event_el_save_editlist(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
 	char str[1024];
-	int *args = NULL;
+	//int *args = NULL;
+ 	int args[2] = {0,0};
 	P_A(args,str,format,ap);
-	if( veejay_save_all(v, str) )
+	veejay_msg(VEEJAY_MSG_DEBUG, "Recv [%s] [%d] [%d]",
+		str,args[0],args[1]);
+	if( veejay_save_all(v, str,args[0],args[1]) )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Saved EditList as %s",str);
 	}
@@ -5350,6 +5370,7 @@ void vj_event_el_save_editlist(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_ERROR,"Unable to save EditList as %s",str);
 	}
 }
+
 void vj_event_el_load_editlist(void *ptr, const char format[], va_list ap)
 {
 	veejay_msg(VEEJAY_MSG_ERROR, "EditList: Load not implemented");

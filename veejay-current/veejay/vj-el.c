@@ -1141,21 +1141,23 @@ editlist *vj_el_probe_from_file( char *filename )
 
 
 
-int	vj_el_write_editlist( char *name, long n1, long n2, editlist *el )
+int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 {
 	FILE *fd;
-    int i, num_files, oldfile, oldframe;
+    int num_files;
+	uint64_t oldfile, oldframe;
     uint64_t index[MAX_EDIT_LIST_FILES];
     uint64_t n;
+	uint64_t n1 = (uint64_t) _n1;
+	uint64_t n2 = (uint64_t) _n2;
+	int i;
     /* check n1 and n2 for correctness */
 
     if (n1 < 0)
 		n1 = 0;
 
-    if (n2 >= el->video_frames)
+    if (n2 >= el->video_frames || n2 < n1)
 		n2 = el->video_frames - 1;
-
-    veejay_msg(VEEJAY_MSG_DEBUG, "Write edit list: %ld %ld %s", n1, n2, name);
 
     fd = fopen(name, "w");
 
@@ -1178,32 +1180,37 @@ int	vj_el_write_editlist( char *name, long n1, long n2, editlist *el )
 
     num_files = 0;
     for (i = 0; i < MAX_EDIT_LIST_FILES; i++)
-		if (index[i] == 1)
-
-    index[i] = num_files++;
+		if (index[i] == 1) index[i] = num_files++;
 
     fprintf(fd, "%d\n", num_files);
     for (i = 0; i < MAX_EDIT_LIST_FILES; i++)
-		if (index[i] >= 0)
-		    fprintf(fd, "%s\n", el->video_file_list[i]);
+		if (index[i] >= 0 && el->video_file_list[i] != NULL)
+		{
+			 fprintf(fd, "%s\n", el->video_file_list[i]);
+		}
 
-    oldfile = index[N_EL_FILE(el->frame_list[n1])];
-    oldframe = N_EL_FRAME(el->frame_list[n1]);
-    fprintf(fd, "%d %d ", oldfile, oldframe);
+	n = el->frame_list[ n1 ];
+    oldfile = index[N_EL_FILE(n)];
+    oldframe = N_EL_FRAME(n);
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "%lld , %lld ,%lld, %ld, %ld ",
+		n,oldfile,oldframe,_n1,_n2);
+
+
+    fprintf(fd, "%lld %lld ", oldfile, oldframe);
     for (i = n1 + 1; i <= n2; i++)
 	{
 		n = el->frame_list[i];
 		if (index[N_EL_FILE(n)] != oldfile
 		    || N_EL_FRAME(n) != oldframe + 1)
 		{
-		    fprintf(fd, "%d\n", oldframe);
-	    	fprintf(fd, "%ld %ld ",(unsigned long) index[N_EL_FILE(n)], (unsigned long)N_EL_FRAME(n));
+		    fprintf(fd, "%lld\n", oldframe);
+	    	fprintf(fd, "%lld %lld ",index[N_EL_FILE(n)], N_EL_FRAME(n));
 		}
 		oldfile = index[N_EL_FILE(n)];
 		oldframe = N_EL_FRAME(n);
     }
-    n = fprintf(fd, "%d\n", oldframe);
+    n = fprintf(fd, "%lld\n", oldframe);
 
     /* We did not check if all our prints succeeded, so check at least the last one */
 

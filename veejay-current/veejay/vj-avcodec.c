@@ -33,6 +33,20 @@
 
 static int out_pixel_format = FMT_420; 
 
+static	char*	el_get_codec_name(int codec_id )
+{
+	char name[20];
+	switch(codec_id)
+	{
+		case CODEC_ID_MJPEG: sprintf(name, "MJPEG"); break;
+		case CODEC_ID_MPEG4: sprintf(name, "MPEG4"); break;
+		case CODEC_ID_MSMPEG4V3: sprintf(name, "DIVX"); break;
+		default:
+			sprintf(name, "Unknown"); break;
+	}
+	return name; 
+}
+
 static vj_encoder *_encoders[NUM_ENCODERS];
 
 static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_format)
@@ -45,8 +59,15 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 	{
 #ifdef __FALLBACK_LIBDV
 		if(id != CODEC_ID_DVVIDEO)
+		{
 #endif
 			e->codec = avcodec_find_encoder( id );
+			if(!e->codec)
+			 veejay_msg(VEEJAY_MSG_ERROR, "Cannot find codec %d",id);
+#ifdef __FALLBACK_LIBDV
+		}
+#endif
+
 	}
 	e->context = avcodec_alloc_context();
 	e->context->width = el->video_width;
@@ -90,7 +111,6 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 #endif
 		if ( avcodec_open( e->context, e->codec ) < 0 )
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error initializing codec %d",id); 
 			if(e) free(e);
 			return NULL;
 		}
@@ -136,22 +156,21 @@ int		vj_avcodec_init(editlist *el, int pixel_format)
 
 	if(out_pixel_format == FMT_422) fmt = PIX_FMT_YUV422P;
 
-	_encoders[ENCODER_MJPEG] = vj_avcodec_new_encoder( CODEC_ID_MJPEG, el, FMT_420);
+	_encoders[ENCODER_MJPEG] = vj_avcodec_new_encoder( CODEC_ID_MJPEG, el, fmt );
 	if(!_encoders[ENCODER_MJPEG]) return 0;
 
 #ifndef __FALLBACK_LIBDV
-	_encoders[ENCODER_DVVIDEO] = vj_avcodec_new_encoder( CODEC_ID_DVVIDEO, el, out_pixel_format );
+	_encoders[ENCODER_DVVIDEO] = vj_avcodec_new_encoder( CODEC_ID_DVVIDEO, el, fmt );
 	if(!_encoders[ENCODER_DVVIDEO]) return 0;
 #else
 #ifdef SUPPORT_READ_DV2
 	vj_dv_init_encoder( el , out_pixel_format);
 #endif
 #endif
-	_encoders[ENCODER_DIVX] = vj_avcodec_new_encoder( CODEC_ID_MSMPEG4V3 , el, out_pixel_format);
+	_encoders[ENCODER_DIVX] = vj_avcodec_new_encoder( CODEC_ID_MSMPEG4V3 , el, fmt);
 	if(!_encoders[ENCODER_DIVX]) return 0;
 
-	_encoders[ENCODER_MPEG4] = vj_avcodec_new_encoder( CODEC_ID_MPEG4, el, out_pixel_format);
-
+	_encoders[ENCODER_MPEG4] = vj_avcodec_new_encoder( CODEC_ID_MPEG4, el, fmt);
 	if(!_encoders[ENCODER_MPEG4]) return 0;
 
 	_encoders[ENCODER_YUV420] = vj_avcodec_new_encoder( -1, el, FMT_420);
