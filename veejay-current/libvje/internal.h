@@ -182,11 +182,15 @@ enum {
 	VJ_IMAGE_EFFECT_VIDBOIDS = 165,
 	VJ_IMAGE_EFFECT_GHOST = 166,
 	VJ_IMAGE_EFFECT_NEIGHBOUR = 167,
+	VJ_IMAGE_EFFECT_NEIGHBOUR2= 168,
+	VJ_IMAGE_EFFECT_NEIGHBOUR3= 169,
+	VJ_IMAGE_EFFECT_NEIGHBOUR4= 170,
+	VJ_IMAGE_EFFECT_NEIGHBOUR5= 171, 
 	VJ_IMAGE_EFFECT_DUMMY = 100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 168
+#define VJ_IMAGE_EFFECT_MAX 172
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 237
@@ -485,5 +489,9 @@ extern void		boids_apply( VJFrame *frame, int w, int h, int p0,int p1, int p2, i
 
 extern void		ghost_apply(VJFrame *frame, int w, int h, int o );
 extern void		neighbours_apply( VJFrame *frame, int width, int height, int brush_size, int level, int mode);
+extern void		neighbours_apply2( VJFrame *frame, int width, int height, int brush_size, int level, int mode);
+extern void		neighbours_apply3( VJFrame *frame, int width, int height, int brush_size, int level, int mode);
+extern void		neighbours_apply4( VJFrame *frame, int width, int height, int radius, int brush_size, int level, int mode);
+extern void		neighbours_apply5( VJFrame *frame, int width, int height, int radius, int brush_size, int level);
 
 #endif

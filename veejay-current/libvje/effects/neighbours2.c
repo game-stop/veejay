@@ -19,9 +19,9 @@
  */
 #include <stdlib.h>
 #include <math.h>
-#include "neighbours.h"
+#include "neighbours2.h"
 
-vj_effect *neighbours_init(int w, int h)
+vj_effect *neighbours2_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
     ve->num_params = 3;
@@ -36,9 +36,9 @@ vj_effect *neighbours_init(int w, int h)
     ve->limits[0][2] = 0; 	/* luma only / include chroma */
     ve->limits[1][2] = 1;
     ve->defaults[0] = 4;
-    ve->defaults[1] = 4;
+    ve->defaults[1] = 15;
     ve->defaults[2] = 0;
-    ve->description = "Artistic Filter (Oilpainting, acc. add )";
+    ve->description = "Artistic Filter (Oilpaint, acc. avg)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
@@ -53,7 +53,7 @@ static uint8_t  *tmp_buf[2];
 static uint8_t  *chromacity[2];
 
 
-int		neighbours_malloc(int w, int h )
+int		neighbours2_malloc(int w, int h )
 {
 	tmp_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
 	if(!tmp_buf[0] ) return 0;
@@ -63,71 +63,13 @@ int		neighbours_malloc(int w, int h )
 	return 1;
 }
 
-int		neighbours_free(void)
+int		neighbours2_free(void)
 {
 	if(tmp_buf[0]) free(tmp_buf[0]);
 	if(tmp_buf[1]) free(tmp_buf[1]);
 	if(chromacity[0]) free(chromacity[0]);
 	if(chromacity[1]) free(chromacity[1]);
 	return 1;
-}
-
-static inline uint8_t evaluate_pixel(
-		int x, int y,			/* center pixel */
-		const int brush_size,		/* brush size (works like equal sized rectangle) */
-		const double intensity,		/* Luma value * scaling factor */
-		const int w,			/* width of image */
-		const int h,			/* height of image */
-		const uint8_t *premul,		/* map data */
-		const uint8_t *image		/* image data */
-)
-{
-	unsigned int 	brightness;		/* scaled brightnes */
-	int 		peak_value = 0;
-	int 		peak_index = 0;
-	int		i,j;
-	int 		x0 = x - brush_size;
-	int 		x1 = x + brush_size;
-	int 		y0 = y - brush_size;
-	int 		y1 = y + brush_size;
-	const int 	max_ = (int) ( 0xff * intensity );
-
-	if( x0 < 0 ) x0 = 0;			
-	if( x1 > w ) x1 = w;
-	if( y0 < 0 ) y0 = 0;
-	if( y1 > h ) y1 = h;
-
-	/* clear histogram and y_map */
-	for( i =0 ; i < max_; i ++ )
-	{
-		pixel_histogram[i] = 0;
-		y_map[i]  = 0;
-	}
-
-	/* fill histogram, cummulative add of luma values */
-	for( i = y0; i < y1; i ++ )
-	{
-		for( j = x0; j < x1; j ++ )
-		{
-			brightness = premul[ i * w + j];
-			pixel_histogram[ brightness ] ++;
-			y_map[ brightness ] += image[ i * w + j];
-		}
-	}
-
-	/* find most occuring value */
-	for( i = 0; i < max_ ; i ++ )
-	{
-		if( pixel_histogram[i] >= peak_value )
-		{
-			peak_value = pixel_histogram[i];
-			peak_index = i;
-		}
-	}
-	if( peak_value < 16)
-		return image[ y * w + x];
-
-	return( (uint8_t) (  y_map[ peak_index] / peak_value ));
 }
 
 typedef struct
@@ -138,7 +80,7 @@ typedef struct
 } pixel_t;
 
 
-static inline pixel_t evaluate_pixel_c(
+static inline pixel_t evaluate_pixel_bc(
 		int x, int y,			/* center pixel */
 		const int brush_size,		/* brush size (works like equal sized rectangle) */
 		const double intensity,		/* Luma value * scaling factor */
@@ -183,9 +125,9 @@ static inline pixel_t evaluate_pixel_c(
 		{
 			brightness = premul[ i * w + j];
 			pixel_histogram[ brightness ] ++;
-			y_map[ brightness ] += image[ i * w + j];
-			cb_map[ brightness ] += image_cb[ i * w + j ];
-			cr_map[ brightness ] += image_cr[ i * w + j ];
+			y_map[ brightness ] = (image[ i * w + j] + y_map[brightness])>>1;
+			cb_map[ brightness ] = (cb_map[brightness]  + image_cb[ i * w + j ])>>1;
+			cr_map[ brightness ] = (cr_map[brightness] + image_cr[ i * w + j ])>>1;
 		}
 	}
 
@@ -200,16 +142,76 @@ static inline pixel_t evaluate_pixel_c(
 	}
 	pixel_t val;
 
-	val.y = y_map[peak_index] / peak_value;
-	val.u = cb_map[peak_index] / peak_value;
-	val.v = cr_map[peak_index] / peak_value;
+	val.y = y_map[peak_index];
+	val.u = cb_map[peak_index];
+	val.v = cr_map[peak_index];
 
 	return val;	
 
 }
 
 
-void neighbours_apply( VJFrame *frame, int width, int height, int brush_size, int intensity_level, int mode )
+static inline uint8_t evaluate_pixel_b(
+		int x, int y,			/* center pixel */
+		const int brush_size,		/* brush size (works like equal sized rectangle) */
+		const double intensity,		/* Luma value * scaling factor */
+		const int w,			/* width of image */
+		const int h,			/* height of image */
+		const uint8_t *premul,		/* map data */
+		const uint8_t *image		/* image data */
+)
+{
+	unsigned int 	brightness;		/* scaled brightnes */
+	int 		peak_value = 0;
+	int 		peak_index = 0;
+	int		i,j;
+	int 		x0 = x - brush_size;
+	int 		x1 = x + brush_size;
+	int 		y0 = y - brush_size;
+	int 		y1 = y + brush_size;
+	const int 	max_ = (int) ( 0xff * intensity );
+
+	if( x0 < 0 ) x0 = 0;			
+	if( x1 > w ) x1 = w;
+	if( y0 < 0 ) y0 = 0;
+	if( y1 > h ) y1 = h;
+
+	/* clear histogram and y_map */
+	for( i =0 ; i < max_; i ++ )
+	{
+		pixel_histogram[i] = 0;
+		y_map[i]  = 0;
+	}
+
+	/* fill histogram, cummulative add of luma values */
+	for( i = y0; i < y1; i ++ )
+	{
+		for( j = x0; j < x1; j ++ )
+		{
+			// average while adding
+			brightness = premul[ i * w + j];
+			pixel_histogram[ brightness ] ++;
+			y_map[ brightness ] = (y_map[brightness] + image[ i * w + j]) / 2;
+			
+		}
+	}
+
+	/* find most occuring value */
+	for( i = 0; i < max_ ; i ++ )
+	{
+		if( pixel_histogram[i] >= peak_value )
+		{
+			peak_value = pixel_histogram[i];
+			peak_index = i;
+		}
+	}
+	if( peak_value < 16)
+		return image[y*w+x];
+
+	return( (uint8_t) (  y_map[ peak_index] ));
+}
+
+void neighbours2_apply( VJFrame *frame, int width, int height, int brush_size, int intensity_level, int mode )
 {
 	int x,y; 
 	const double intensity = intensity_level / 255.0;
@@ -237,7 +239,7 @@ void neighbours_apply( VJFrame *frame, int width, int height, int brush_size, in
 		{
 			for( x = 0; x < width; x ++ )
 			{
-				*(dstY)++ = evaluate_pixel(
+				*(dstY)++ = evaluate_pixel_b(
 						x,y,
 						brush_size,
 						intensity,
@@ -256,7 +258,7 @@ void neighbours_apply( VJFrame *frame, int width, int height, int brush_size, in
 		{
 			for( x = 0; x < width; x ++ )
 			{
-				tmp = evaluate_pixel_c(
+				tmp = evaluate_pixel_bc(
 						x,y,
 						brush_size,
 						intensity,

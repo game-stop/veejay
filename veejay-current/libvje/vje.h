@@ -25,7 +25,7 @@
 #include <string.h>
 #include <libvjmem/vjmem.h>
 
-#define MAX_EFFECTS 105
+#define MAX_EFFECTS 109
 
 #define PARAM_WIDTH	    (1<<0x2)
 #define PARAM_HEIGHT	(1<<0x3)

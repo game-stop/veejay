@@ -41,9 +41,26 @@ void vj_effman_apply_image_effect(
    int j;
 
    switch (e) {
+	case VJ_IMAGE_EFFECT_NEIGHBOUR4:
+		neighbours4_apply(frames[0],frameinfo->width,
+			frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
+		break;
+	case VJ_IMAGE_EFFECT_NEIGHBOUR5:
+		neighbours5_apply(frames[0],frameinfo->width,
+			frameinfo->height,arg[0],arg[1],arg[2]);
+		break;
+	case VJ_IMAGE_EFFECT_NEIGHBOUR2:
+		neighbours2_apply(frames[0],frameinfo->width,
+			frameinfo->height,arg[0],arg[1],arg[2]);
+		break;
 	case VJ_IMAGE_EFFECT_NEIGHBOUR:
 		neighbours_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
 		break;
+	case VJ_IMAGE_EFFECT_NEIGHBOUR3:
+	neighbours3_apply(frames[0],frameinfo->width,
+			frameinfo->height,arg[0],arg[1],arg[2]);
+		break;
+
 	case VJ_IMAGE_EFFECT_RIPPLETV:
 	 water_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
 	break;

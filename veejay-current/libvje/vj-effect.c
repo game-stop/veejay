@@ -131,7 +131,10 @@
 #include "effects/boids.h"
 #include "effects/tripplicity.h"
 #include "effects/neighbours.h"
-
+#include "effects/neighbours2.h"
+#include "effects/neighbours3.h"
+#include "effects/neighbours4.h"
+#include "effects/neighbours5.h"
 static struct
 {
 	int	(*mem_init)(int width, int height);
@@ -172,6 +175,10 @@ static struct
 {	boids_malloc,			boids_free,		VJ_IMAGE_EFFECT_VIDBOIDS 	},
 {	ghost_malloc,			ghost_free,		VJ_IMAGE_EFFECT_GHOST		},
 {	neighbours_malloc,		neighbours_free,	VJ_IMAGE_EFFECT_NEIGHBOUR	},
+{	neighbours2_malloc,		neighbours2_free,	VJ_IMAGE_EFFECT_NEIGHBOUR2	},
+{	neighbours3_malloc,		neighbours3_free,	VJ_IMAGE_EFFECT_NEIGHBOUR3	},
+{	neighbours4_malloc,		neighbours4_free,	VJ_IMAGE_EFFECT_NEIGHBOUR4	},
+{	neighbours5_malloc,		neighbours5_free,	VJ_IMAGE_EFFECT_NEIGHBOUR5	},
 {	NULL			,	NULL			,0				},
 };
 
@@ -450,7 +457,11 @@ void vj_effect_initialize(int width, int height)
 	vj_effects[i + 64] = blob_init(width,height);
 	vj_effects[i + 65] = boids_init(width,height);
 	vj_effects[i + 66] = ghost_init(width,height);
-	vj_effects[i + 67] = neighbours_init(width,height);	
+	vj_effects[i + 67] = neighbours_init(width,height);		
+	vj_effects[i + 68] = neighbours2_init(width,height);
+	vj_effects[i + 69] = neighbours3_init(width,height);
+	vj_effects[i + 70] = neighbours4_init(width,height);
+	vj_effects[i + 71] = neighbours5_init(width,height);
 	max_width = width;
 	max_height = height;
 
