@@ -4560,8 +4560,13 @@ void vj_event_entry_up(void *ptr, const char format[], va_list ap)
 			vj_tag_set_selected_entry(v->uc->clip_id,c);
 			effect_id = vj_tag_get_effect_any(v->uc->clip_id,c);
 		}
-		veejay_msg(VEEJAY_MSG_INFO, "Selected entry %d with Effect %s",c,
-			vj_effect_get_description(effect_id));
+		//effect_id = vj_effect_get_real_id(effect_id);
+
+		veejay_msg(VEEJAY_MSG_INFO, "[%d] Selected %s Effect %s (%d)",
+			effect_id,
+			(vj_effect_get_extra_frame(effect_id) == 1 ? "Video" : "Image"),
+			vj_effect_get_description(effect_id)
+			);
 	}
 }
 void vj_event_entry_down(void *ptr, const char format[] ,va_list ap)
@@ -4586,9 +4591,14 @@ void vj_event_entry_down(void *ptr, const char format[] ,va_list ap)
 			vj_tag_set_selected_entry(v->uc->clip_id,c);
 			effect_id = vj_tag_get_effect_any(v->uc->clip_id,c);
 		}
+		//effect_id = vj_effect_get_real_id(effect_id);
 
-		veejay_msg(VEEJAY_MSG_INFO,"Selected entry %d with Effect %s",c,
-			vj_effect_get_description(effect_id));
+		veejay_msg(VEEJAY_MSG_INFO, "[%d] Selected %s Effect %s (%d)",
+			effect_id,
+			(vj_effect_get_extra_frame(effect_id) == 1 ? "Video" : "Image"),
+			vj_effect_get_description(effect_id)
+			);
+
 	}
 }
 
