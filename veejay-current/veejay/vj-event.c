@@ -3304,15 +3304,15 @@ void vj_event_clip_rec_start( void *ptr, const char format[], va_list ap)
 		changed = 1;
 	}
 
-	int format = _recorder_format;
-	if(format==-1)
+	int format_ = _recorder_format;
+	if(format_==-1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Set a destination video format first");
 		return; 
 	}
 	veejay_msg(VEEJAY_MSG_DEBUG, "Video frames to record: %ld", args[0]);
 
-	if( clip_init_encoder( v->uc->clip_id, tmp, format, v->edit_list, args[0]) == 1)
+	if( clip_init_encoder( v->uc->clip_id, tmp, format_, v->edit_list, args[0]) == 1)
 	{
 		video_playback_setup *s = v->settings;
 		s->clip_record_id = v->uc->clip_id;
