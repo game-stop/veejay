@@ -38,7 +38,8 @@
 #include <veejay/vj-dv.h>
 #include <veejay/vj-avformat.h>
 #include <veejay/vj-avcodec.h>
-#include <veejay/vj-client.h>
+#include <libvjnet/vj-client.h>
+#include <libvjnet/common.h>
 #include <veejay/vims.h>
 #include <veejay/vj-misc.h>
 #include <libvjmem/vjmem.h>
@@ -221,7 +222,6 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 	if(stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN) return 0;
 
 	vj_tag_input->net[stream_nr] = vj_client_alloc(w,h,f);
-	//vj_client_connect( host,port ,&error);
 	v = vj_tag_input->net[stream_nr];
 	if(!v) return 0;
 
@@ -239,13 +239,13 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 
 	if( tag->socket_ready == 0 )
 	{
-		tag->socket_frame = (uint8_t*) vj_malloc(sizeof(uint8_t) * (v->planes[0] + v->planes[1] + v->planes[2]));
+		tag->socket_frame = (uint8_t*) vj_malloc(sizeof(uint8_t) * v->planes[0] * 4);
 		if(!tag->socket_frame) 
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Insufficient error to allocate memory for Network Stream");
 			return 0;
 		}
-		memset(tag->socket_frame, 0 , (v->planes[0] + v->planes[1] + v->planes[2]));
+		memset(tag->socket_frame, 0 , (v->planes[0] * 4 ));
 		tag->socket_ready = 1;
 	}
 
@@ -367,7 +367,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	    vj_tag_get_source_name(i, sourcename);
 	    if (strcmp(sourcename, filename) == 0) {
 		vj_tag *tt = vj_tag_get( i );
-		if( tt->source_type == VJ_TAG_TYPE_NET )
+		if( tt->source_type == VJ_TAG_TYPE_NET || tt->source_type == VJ_TAG_TYPE_MCAST )
 		{
 			if( tt->video_channel == channel )
 			{
@@ -461,6 +461,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	    return -1;
 	break;
 #endif
+	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
 		sprintf(tag->source_name, "%s", filename );
 		if( _vj_tag_new_net( tag,stream_nr, w,h,pix_fmt, filename, channel ,palette) != 1 )
@@ -589,6 +590,7 @@ int vj_tag_del(int id)
 	case VJ_TAG_TYPE_SHM:
 		veejay_msg(VEEJAY_MSG_INFO, "huh ?");
 		break;
+	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
 		veejay_msg(VEEJAY_MSG_INFO, "Closing Network Stream");
 		if(tag->socket_frame) free(tag->socket_frame);
@@ -1322,7 +1324,7 @@ int vj_tag_disable(int t1) {
 		veejay_msg(VEEJAY_MSG_INFO, "Already inactive");
 		return 1;
 	}
-	if(tag->source_type == VJ_TAG_TYPE_NET )
+	if(tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST)
 	{
 		vj_client_close( vj_tag_input->net[tag->index] );
 		veejay_msg(VEEJAY_MSG_DEBUG, "Disconnected from %s", tag->source_name);
@@ -1342,17 +1344,26 @@ int vj_tag_enable(int t1) {
 	}
 	if(tag->source_type == VJ_TAG_TYPE_NET )
 	{
-		int error = 0;
 		//vj_tag_input->net[tag->index] = 
-		vj_client_connect( vj_tag_input->net[tag->index], tag->source_name,tag->video_channel ,&error);
-		if( error != 0 )
-		{
+		int success = vj_client_connect( vj_tag_input->net[tag->index], tag->source_name,NULL,tag->video_channel);
+		if( success == 0 )
 			return -1;
-		}
 		veejay_msg(VEEJAY_MSG_DEBUG, "Connected to %s, port %d",
 			tag->source_name, tag->video_channel );
 		//vj_client_flush( vj_tag_input->net[tag->index] );
 	}
+	if( tag->source_type == VJ_TAG_TYPE_MCAST )
+	{
+		int success = vj_client_connect( vj_tag_input->net[tag->index], NULL, tag->source_name, tag->video_channel );
+		if( success == 0  )
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "Canot connect to %s, %d", tag->source_name, tag->video_channel );
+			return -1;
+		}
+		veejay_msg(VEEJAY_MSG_DEBUG, "Streaming from %s, port %d", tag->source_name, tag->video_channel );
+	}
+
+
 	tag->active = 1;
 	if(!vj_tag_update(tag,t1)) return -1;
 	return 1;
@@ -1405,6 +1416,7 @@ int vj_tag_set_active(int t1, int active)
 		     vj_yuv_stream_stop_read( vj_tag_input->stream[tag->index]);
 		}
 	break;
+	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
 		if(active == 1 )
 			vj_tag_enable( t1 );
@@ -1598,6 +1610,9 @@ void vj_tag_get_description(int id, char *description)
 	break;
     case VJ_TAG_TYPE_NONE:
 	sprintf(description, "%s", "EditList");
+	break;
+	case VJ_TAG_TYPE_MCAST:
+	sprintf(description, "%s", "Multicast layer");
 	break;
 	case VJ_TAG_TYPE_NET:
 	sprintf(description, "%s", "Network layer");
@@ -1800,22 +1815,26 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		 return -1;
 	break;
 	case VJ_TAG_TYPE_NET:
-	vj_client_flush	( vj_tag_input->net[tag->index]);
+	case VJ_TAG_TYPE_MCAST:
+	vj_client_flush	( vj_tag_input->net[tag->index],1);
 	
 
 	sprintf(buf, "%03d:;", NET_GET_FRAME);
-	if(vj_client_send( vj_tag_input->net[tag->index], buf ))
+	if(vj_client_send( vj_tag_input->net[tag->index],V_CMD, buf ))
 	{
-		if(vj_client_read( vj_tag_input->net[tag->index], tag->socket_frame  ) ==0 )
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Missed frame from stream %d", tag->id); 
-		}
 		vj_client *v = vj_tag_input->net[tag->index];
-		veejay_memcpy( buffer[0], tag->socket_frame, v->planes[0] );
-		veejay_memcpy( buffer[1], tag->socket_frame + v->planes[0], v->planes[1] );
-		veejay_memcpy( buffer[2], tag->socket_frame + v->planes[0] + v->planes[1] , v->planes[2] );
-			return 1;
-    }
+		if(vj_client_read_i( v, tag->socket_frame ) <= 0)
+		{	
+			veejay_msg(VEEJAY_MSG_DEBUG, "Missed frame");
+		}
+		else
+		{
+			veejay_memcpy( buffer[0], tag->socket_frame, v->planes[0] );
+			veejay_memcpy( buffer[1], tag->socket_frame + v->planes[0], v->planes[1] );
+			veejay_memcpy( buffer[2], tag->socket_frame + v->planes[0] + v->planes[1] , v->planes[2] );
+		}
+		return 1;
+        }
 	else
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Lost connection! ");
