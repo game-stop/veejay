@@ -10,21 +10,5 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir)\
 		-I$(top_srcdir)/utils
 
 SAMPLEREC_LIB_FILE = libsamplerec.la
-
-SAMPLEREC_ALL_LIB_OPTS = \
-	-version-info $(LT_AGE):$(LT_REVISION):$(LT_AGE) \
-	-release $(LT_RELEASE) \
-	-export-dynamic 
-
 noinst_LTLIBRARIES = $(SAMPLEREC_LIB_FILE)
-
 libsamplerec_la_SOURCES =	samplerecord.c 
-
-
-libsamplerec_la_LDFLAGS = $(SAMPLEREC_ALL_LIB_OPTS) \
-			-L$(top_builddir)/libvjmem -lvjmem \
-			-L$(top_builddir)/libvjmsg -lvjmsg \
-			-L$(top_builddir)/libel -lel \
-			${XML_LIBS} \
-			-DDYNAMIC -O3 -Wall -rdynamic 
-

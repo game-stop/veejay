@@ -3,12 +3,6 @@
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg 
 
 VJE_LIB_FILE = libvje.la
-
-VJE_ALL_LIB_OPTS = \
-	-version-info $(LT_AGE):$(LT_REVISION):$(LT_AGE) \
-	-release $(LT_RELEASE) \
-	-export-dynamic 
-
 noinst_LTLIBRARIES = $(VJE_LIB_FILE)
 
 libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
@@ -40,8 +34,4 @@ libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
 			effects/neighbours3.c effects/neighbours4.c effects/neighbours5.c effects/cutstop.c\
 			effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/videowall.c 
 
-
-libvje_la_LDFLAGS = $(VJE_ALL_LIB_OPTS) \
-			-L$(top_builddir)/libvjmem -lvjmem \
-			-DDYNAMIC -O3 -Wall -rdynamic 
 

@@ -1,6 +1,6 @@
 # Process with automake to produce Makefile.in
 
-SUBDIRS    = ffmpeg utils bio2jack libOSC libhash libvjmsg libvjmem libpostproc libvje libsample libvjnet libyuv libel libstream liblavjpeg libsamplerec plugins veejay tools man 
+SUBDIRS    = ffmpeg utils bio2jack libOSC libhash libvjmsg libvjmem libpostproc libvje libsample libvjnet libyuv libel libstream liblavjpeg libsamplerec plugins veejay tools gveejay man 
 
 #bin_SCRIPTS = veejay-config
 
@@ -12,7 +12,8 @@ EXTRA_DIST = \
  autogen.sh\
  depcomp \
  cpuinfo.sh \
- autogen.sh 
+ autogen.sh \
+ gveejay-paths.sh.in  
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = veejay.pc
@@ -23,7 +24,8 @@ DISTCLEANFILES = \
 	confdefs.h \
 	config.cache \
 	config.status \
-	config.log
+	config.log \
+	gveejay-paths.h
 
 
 MAINTAINERCLEANFILES = \
@@ -40,6 +42,39 @@ MAINTAINERCLEANFILES = \
 	configure \
 	ltmain.sh \
 	stamp-h.in
+
+## .glade files must be in same directory as pixmaps ?!!
+install-data-local:
+	@$(NORMAL_INSTALL)
+	if test -d $(srcdir)/share; then \
+	 $(mkinstalldirs) $(DESTDIR)$(pkgdatadir); \
+	 for dialog in $(srcdir)/share/*; do \
+	 	if test -f $$dialog; then \
+		 $(INSTALL_DATA) $$dialog $(DESTDIR)$(pkgdatadir); \
+		fi \
+	 done \
+	fi
+
+gveejay-path.h: gveejay-paths.sh
+	@sh $< > $@.tmp ;
+	if cmp -s $@.tmp $@; then
+		rm $@.tmp;
+	else
+		mv $@.tmp $@ ; echo updated gveejay-paths.h;
+	fi
+
+dist-hook:
+	rm -f %(distdir)/gveejay-paths.sh \
+	if test -d share; then \
+	  mkdir $(distdir)/dialogs; \
+	 for dialog in share/*; do \
+		if test -f $$dialog; then \
+			cp -p $$dialog $(distdir)/dialogs; \
+		fi \
+		done \
+	fi
+
+
 
 ## make rpms
 rpm: Makefile
