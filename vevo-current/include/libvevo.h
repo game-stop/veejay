@@ -289,7 +289,7 @@ typedef struct vevo_property vevo_property_t; 				///< property type specifier
 #define VEVOP_HINT_COORD2D		2			///< parameter is 2d coordinate (numeric only)
 #define VEVOP_HINT_TRANSITION		4			///< parameter is a transition (numeric only)
 #define VEVOP_HINT_GROUP		5			///< parameter is a group of values (numeric of text)
-typedef int vevo_param_hint_t;
+typedef int vevo_param_hint_t;					///< parameter hint specifier
 
 #define	VEVOP_FLAG_REINIT		(1<<0x1)		///< tell host to call init after changing this parameter
 #define VEVOP_FLAG_KEYFRAME		(1<<0x2)		///< tell host this parameter is keyframeable
@@ -394,7 +394,7 @@ struct vevo_parameter_template
 	struct vevo_parameter_template *next; 				///< next parameter
 };
 
-typedef struct vevo_parameter_template vevo_parameter_templ_t;
+typedef struct vevo_parameter_template vevo_parameter_templ_t;		///< vevo parameter template typedef
 /// @}
 
 /**
@@ -445,7 +445,7 @@ struct vevo_channel_template
 	vevo_format_t	format[];				///< list of supported colorspaces (0 terminated)
 };
 
-typedef struct vevo_channel_template vevo_channel_templ_t;
+typedef struct vevo_channel_template vevo_channel_templ_t;	///< vevo channel typedef
 
 #define VEVO_FRAME_U8 	1		///< image data is of type uint8_t*
 #define VEVO_FRAME_U16 2		///< image data is of type uint16_t*
@@ -485,14 +485,13 @@ struct vevo_frame
 	int			 shift_v;				///< vertical shifting value
 };
 
-typedef struct vevo_frame vevo_frame_t;
+typedef struct vevo_frame vevo_frame_t;					///< vevo frame typedef
 
 /// @}
 
 /**
 	@defgroup vevoinstance Vevo Instance
 */
-//!Vevo Instance
 /**
 	@brief instance data
 
@@ -563,8 +562,10 @@ typedef struct
 
 } vevo_instance_templ_t;
 
-
-typedef vevo_instance_templ_t * (vevo_setup_f) (void);
+/**
+	@brief Plugins Mandatory Functions
+*/
+typedef vevo_instance_templ_t * (vevo_setup_f) (void);		///< setup function for plugin
 /**
 	@brief  Functions host must setup
 
@@ -579,7 +580,7 @@ typedef void	(vevo_memcpy_f)	(void *to, const void *from, size_t); ///< host mem
 /**
 	get the number of objects stored in a property
 	@param *p pointer to vevo port
-	@param t property type
+	@param type property type
 	@param *size pointer to result
 	@return Error code
 */
@@ -587,7 +588,7 @@ int		vevo_get_num_items( vevo_port *p, vevo_property_type_t type, int *size );
 /**
 	retrieve the byte size per object in a property
 	@param *p pointer to vevo port
-	@param t property type
+	@param type property type
 	@param index number of object
 	@param *size pointer to result
 	@return Error code
@@ -651,7 +652,8 @@ void		vevo_set_property(  vevo_port *p, vevo_property_type_t type, vevo_atom_typ
 	automaticaly scales/converts values between numeric type specifiers.
 	@param *p pointer to vevo port
 	@param type property
-	@param type specifier of data
+	@param src_ident specifier of data
+	@param arglen the length of data
 	@param *value pointer to data
 	@return Error code
 */
@@ -684,9 +686,9 @@ void		vevo_free_port	(	vevo_port *p );
 
 /**
 	free memory used by plugin's instance. Used by host
-	@param *p pointer to vevo instance
+	@param *i pointer to vevo instance
 */
-void		vevo_free_instance( vevo_instance_t * );
+void		vevo_free_instance( vevo_instance_t *i );
 
 /**
 	instantiate a parameter based on some template
@@ -722,6 +724,7 @@ int		vevo_collect_frame_data( vevo_port *p, vevo_frame_t *dst );
 	@param *p vevo parameter port
 	@param p_args the length of data
 	@param ident the type specifier of data
+	@param *val pointer to data
 	@param n_types the number of properties to initialize 
 	@param ... variable list of properties (in order of data)
 	@return Error code
