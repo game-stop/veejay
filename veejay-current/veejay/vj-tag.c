@@ -1830,12 +1830,12 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		{	
 			veejay_msg(VEEJAY_MSG_DEBUG, "Missed frame");
 		}
-		else
-		{
+//		else
+//		{
 			veejay_memcpy( buffer[0], tag->socket_frame, v->planes[0] );
 			veejay_memcpy( buffer[1], tag->socket_frame + v->planes[0], v->planes[1] );
 			veejay_memcpy( buffer[2], tag->socket_frame + v->planes[0] + v->planes[1] , v->planes[2] );
-		}
+//		}
 		return 1;
         }
 	else
