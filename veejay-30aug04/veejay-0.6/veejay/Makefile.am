@@ -44,7 +44,7 @@ libveejay_la_SOURCES =  vj-common.c cpu_accel.c memcpy.c subsample.c hash.c colo
 			vj-keyframe.c vj-effect.c vj-effman.c vj-motion.c vj-sdl.c vj-dfb.c sampleadm.c samplerecord.c \
 			vj-vloopback.c vj-yuv4mpeg.c vj-rgb.c vj-v4lvideo.c vj-dv.c vj-ffmpeg.c vj-tag.c vj-audio.c editlist.c \
 			effects/common.c effects/diff.c effects/fibdownscale.c effects/killchroma.c effects/lumamagick.c\
-		        effects/mirrors.c effects/negation.c effects/opacity.c effects/posterize.c \
+		        effects/mirrors.c effects/negation.c effects/dissolve.c effects/opacity.c effects/posterize.c \
 			effects/dither.c effects/dices.c effects/emboss.c effects/flip.c \
 			effects/revtv.c effects/softblur.c effects/zoom.c effects/split.c effects/widthmirror.c \
 			effects/frameborder.c effects/dummy.c effects/rawman.c effects/rawval.c \

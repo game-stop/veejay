@@ -253,7 +253,7 @@ libveejay_la_SOURCES = vj-common.c cpu_accel.c memcpy.c subsample.c hash.c color
 			vj-keyframe.c vj-effect.c vj-effman.c vj-motion.c vj-sdl.c vj-dfb.c sampleadm.c samplerecord.c \
 			vj-vloopback.c vj-yuv4mpeg.c vj-rgb.c vj-v4lvideo.c vj-dv.c vj-ffmpeg.c vj-tag.c vj-audio.c editlist.c \
 			effects/common.c effects/diff.c effects/fibdownscale.c effects/killchroma.c effects/lumamagick.c\
-		        effects/mirrors.c effects/negation.c effects/opacity.c effects/posterize.c \
+		        effects/mirrors.c effects/negation.c effects/dissolve.c effects/opacity.c effects/posterize.c \
 			effects/dither.c effects/dices.c effects/emboss.c effects/flip.c \
 			effects/revtv.c effects/softblur.c effects/zoom.c effects/split.c effects/widthmirror.c \
 			effects/frameborder.c effects/dummy.c effects/rawman.c effects/rawval.c \
@@ -318,11 +318,11 @@ am_libveejay_la_OBJECTS = vj-common.lo cpu_accel.lo memcpy.lo \
 	vj-yuv4mpeg.lo vj-rgb.lo vj-v4lvideo.lo vj-dv.lo vj-ffmpeg.lo \
 	vj-tag.lo vj-audio.lo editlist.lo common.lo diff.lo \
 	fibdownscale.lo killchroma.lo lumamagick.lo mirrors.lo \
-	negation.lo opacity.lo posterize.lo dither.lo dices.lo \
-	emboss.lo flip.lo revtv.lo softblur.lo zoom.lo split.lo \
-	widthmirror.lo frameborder.lo dummy.lo rawman.lo rawval.lo \
-	smuck.lo transform.lo borders.lo rgbkey.lo solarize.lo \
-	mirrors2.lo whiteframe.lo deinterlace.lo lumakey.lo \
+	negation.lo dissolve.lo opacity.lo posterize.lo dither.lo \
+	dices.lo emboss.lo flip.lo revtv.lo softblur.lo zoom.lo \
+	split.lo widthmirror.lo frameborder.lo dummy.lo rawman.lo \
+	rawval.lo smuck.lo transform.lo borders.lo rgbkey.lo \
+	solarize.lo mirrors2.lo whiteframe.lo deinterlace.lo lumakey.lo \
 	coloradjust.lo gamma.lo reflection.lo rotozoom.lo transblend.lo \
 	slidingdoor.lo color.lo transline.lo transop.lo transcarot.lo \
 	fadecolor.lo lumablend.lo chromamagick.lo fadecolorrgb.lo \
@@ -370,10 +370,10 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/crosspixel.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/deinterlace.Plo ./$(DEPDIR)/dices.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/diff.Plo ./$(DEPDIR)/diffimg.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/distort.Plo ./$(DEPDIR)/dither.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/dummy.Plo ./$(DEPDIR)/dupmagic.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/editlist.Plo ./$(DEPDIR)/emboss.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/enhancemask.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/dissolve.Plo ./$(DEPDIR)/distort.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/dither.Plo ./$(DEPDIR)/dummy.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/dupmagic.Plo ./$(DEPDIR)/editlist.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/emboss.Plo ./$(DEPDIR)/enhancemask.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/fadecolor.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/fadecolorrgb.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/fibdownscale.Plo \
@@ -561,6 +561,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dices.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diff.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/diffimg.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dissolve.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/distort.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dither.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dummy.Plo@am__quote@
@@ -930,6 +931,39 @@ negation.lo: effects/negation.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/negation.Plo' tmpdepfile='$(DEPDIR)/negation.TPlo' @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o negation.lo `test -f 'effects/negation.c' || echo '$(srcdir)/'`effects/negation.c
+
+dissolve.o: effects/dissolve.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT dissolve.o -MD -MP -MF "$(DEPDIR)/dissolve.Tpo" \
+@am__fastdepCC_TRUE@	  -c -o dissolve.o `test -f 'effects/dissolve.c' || echo '$(srcdir)/'`effects/dissolve.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/dissolve.Tpo" "$(DEPDIR)/dissolve.Po"; \
+@am__fastdepCC_TRUE@	else rm -f "$(DEPDIR)/dissolve.Tpo"; exit 1; \
+@am__fastdepCC_TRUE@	fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='effects/dissolve.c' object='dissolve.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/dissolve.Po' tmpdepfile='$(DEPDIR)/dissolve.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o dissolve.o `test -f 'effects/dissolve.c' || echo '$(srcdir)/'`effects/dissolve.c
+
+dissolve.obj: effects/dissolve.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT dissolve.obj -MD -MP -MF "$(DEPDIR)/dissolve.Tpo" \
+@am__fastdepCC_TRUE@	  -c -o dissolve.obj `if test -f 'effects/dissolve.c'; then $(CYGPATH_W) 'effects/dissolve.c'; else $(CYGPATH_W) '$(srcdir)/effects/dissolve.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/dissolve.Tpo" "$(DEPDIR)/dissolve.Po"; \
+@am__fastdepCC_TRUE@	else rm -f "$(DEPDIR)/dissolve.Tpo"; exit 1; \
+@am__fastdepCC_TRUE@	fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='effects/dissolve.c' object='dissolve.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/dissolve.Po' tmpdepfile='$(DEPDIR)/dissolve.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o dissolve.obj `if test -f 'effects/dissolve.c'; then $(CYGPATH_W) 'effects/dissolve.c'; else $(CYGPATH_W) '$(srcdir)/effects/dissolve.c'; fi`
+
+dissolve.lo: effects/dissolve.c
+@am__fastdepCC_TRUE@	if $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT dissolve.lo -MD -MP -MF "$(DEPDIR)/dissolve.Tpo" \
+@am__fastdepCC_TRUE@	  -c -o dissolve.lo `test -f 'effects/dissolve.c' || echo '$(srcdir)/'`effects/dissolve.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/dissolve.Tpo" "$(DEPDIR)/dissolve.Plo"; \
+@am__fastdepCC_TRUE@	else rm -f "$(DEPDIR)/dissolve.Tpo"; exit 1; \
+@am__fastdepCC_TRUE@	fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='effects/dissolve.c' object='dissolve.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/dissolve.Plo' tmpdepfile='$(DEPDIR)/dissolve.TPlo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o dissolve.lo `test -f 'effects/dissolve.c' || echo '$(srcdir)/'`effects/dissolve.c
 
 opacity.o: effects/opacity.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT opacity.o -MD -MP -MF "$(DEPDIR)/opacity.Tpo" \

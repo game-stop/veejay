@@ -310,6 +310,8 @@ void vj_effman_apply_video_effect( vj_video_block *data, vj_clip_instr *todo_inf
 	case VJ_VIDEO_EFFECT_LUMAMASK:
 	lumamask_apply(data->src1, data->src3, data->width,data->height,arg[0],arg[1]);
 	break;
+	case VJ_VIDEO_EFFECT_DISSOLVE:
+	dissolve_apply(data->src1,data->src3,data->width,data->height,arg[0]);break; 
       case VJ_VIDEO_EFFECT_OPACITY:
 	opacity_apply(data->src1, data->src3, data->width,
 		      data->height, arg[0]);

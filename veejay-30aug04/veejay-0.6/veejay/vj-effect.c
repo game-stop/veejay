@@ -119,6 +119,7 @@
 #include "effects/chromium.h"
 #include "effects/chromapalette.h"
 #include "effects/uvcorrect.h"
+#include "effects/dissolve.h"
 
 static struct
 {
@@ -354,7 +355,8 @@ void vj_effect_initialize(int width, int height)
     vj_effects[33] = lumamask_init(width,height);
 //    vj_effects[33] = channelmix_init(width, int height);
     vj_effects[34] = binaryoverlay_init(width,height);
-    vj_effects[35] = dummy_init(width,height);
+    vj_effects[35] = dissolve_init(width,height);
+    vj_effects[36] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);
