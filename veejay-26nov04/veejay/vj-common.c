@@ -95,7 +95,8 @@ void	get_cache_line_size()
 		do_cpuid(  0x00000001, regs2 );
 		ret = (( regs2[1] >> 8) & 0xff) * 8;
 		veejay_msg(VEEJAY_MSG_INFO, "Detected cache-line size is %u bytes", ret);
-		CACHE_LINE_SIZE = ret;
+		if(ret > 0)
+			CACHE_LINE_SIZE = ret;
 	}
 }
 
