@@ -6,7 +6,8 @@ INCLUDES = 	-I$(top_srcdir) \
 		-I$(includedir) \
 		-I$(top_srcdir)/vjmem \
 		-I$(top_srcdir)/vjmsg \
-		-I$(top_srcdir)/libpostproc
+		-I$(top_srcdir)/libpostproc \
+		$(CFLAGS) $(ALTIVEC_CFLAGS)
 
 POSTPROC_LIB_OPTS = -export-dynamic 
 
