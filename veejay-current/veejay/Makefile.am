@@ -52,9 +52,9 @@ libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS) \
 			-L$(top_builddir)/libyuv -lyuv \
 			-L$(top_builddir)/liblavjpeg -llavjpeg \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
-			${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} ${X_LIBS} \
+			${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} \
 			${XML_LIBS} ${JPEG_LIBS} ${JACK_LIBS} \
-			${DV_LIBS} ${SAMPLERATE_LIBS} \
+			${LIBDV_LIBS} ${LIBM_LIBS}\
 			-DDYNAMIC -O3 -Wall -rdynamic 
 
 # *********************************************************************

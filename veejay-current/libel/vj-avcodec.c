@@ -160,7 +160,7 @@ int		vj_avcodec_init(editlist *el, int pixel_format)
 	if(!_encoders[ENCODER_MJPEG]) return 0;
 
 #ifdef __FALLBACK_LIBDV
-	dv_encoder = vj_dv_init_encoder( el , out_pixel_format);
+	dv_encoder = vj_dv_init_encoder( (void*)el , out_pixel_format);
 #else
 	_encoders[ENCODER_DVVIDEO] = vj_avcodec_new_encoder( CODEC_ID_DVVIDEO, el, fmt );
 	if(!_encoders[ENCODER_DVVIDEO]) return 0;

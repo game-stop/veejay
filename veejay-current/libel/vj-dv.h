@@ -20,7 +20,6 @@
 #define VJ_DV_H
 #include <config.h>
 #ifdef SUPPORT_READ_DV2
-#include "vj-el.h"
 #include <libdv/dv.h>
 typedef struct
 {
@@ -41,7 +40,7 @@ typedef struct
 
 vj_dv_decoder *vj_dv_decoder_init(int quality,int width, int height, int pixel_format);
 
-vj_dv_encoder *vj_dv_init_encoder(editlist * el, int pixel_format);
+vj_dv_encoder *vj_dv_init_encoder(void * el, int pixel_format);
 
 void	   vj_dv_decoder_get_audio(vj_dv_decoder *d, uint8_t *audio_buf);
 

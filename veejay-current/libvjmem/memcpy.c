@@ -176,17 +176,18 @@ static inline void * __memcpy(void * to, const void * from, size_t n)
 
 /* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
 #ifdef HAVE_3DNOW
-#define EMMS     "femms"
+	#define	PREFETCH "prefetch"
+	#define PREFETCHW "prefetchw"
+	#define EMMS	"femms"
+#elif defined ( HAVE_ASM_MMX2 )
+	#define PREFETCH "prefetchnta"
+	#define PREFETCHW "prefetcht0"
 #else
-#define EMMS     "emms"
+	#define	PREFETCH "/nop"
+	#define PREFETCHW "/nop"
 #endif
-
-#ifdef HAVE_ASM_MMX2
-#define PREFETCH "prefetchnta"
-#elif defined ( HAVE_3DNOW )
-#define PREFETCH  "prefetch"
-#else
-#define PREFETCH "/nop"
+#ifndef HAVE_3DNOW
+	#define EMMS	"emms"
 #endif
 
 
@@ -273,12 +274,13 @@ void * agp_memcpy(void *to, const void *from , size_t len) {
 	return retval;
 }
 
+#endif
 
-
+#ifdef HAVE_ASM_MMX
 #define MMX1_MIN_LEN 0x800  /* 2K blocks */
 //#define MIN_LEN 0x40  
 
-static void * mmx_memset(void *what, uint8_t v, size_t len )
+void * mmx_memset(void *what, int v, size_t len )
 {
 	uint8_t val[8];
 	uint8_t *to = (uint8_t*)what;
@@ -301,7 +303,7 @@ static void * mmx_memset(void *what, uint8_t v, size_t len )
 	return retval;
 }
 
-static void * mmx_memcpy(void * to, const void * from, size_t len)
+void * mmx_memcpy(void * to, const void * from, size_t len)
 {
      void *retval;
      size_t i;
@@ -577,15 +579,15 @@ static struct {
 
 static struct {
      char                 *name;
-     void               *(*function)(void *to, uint8_t what, size_t len);
+     void               *(*function)(void *to, int c, size_t len);
      unsigned long long    time;
 } memset_method[] =
 {
      { NULL, NULL, 0},
      { "glibc memset()",            memset, 0},
-#ifdef HAVE_MMX
-     { "MMX optimized memset()",    mmx_memset, 0},
-#endif
+//#ifdef HAVE_ASM_MMX
+  //   { "MMX optimized memset()",    mmx_memset, 0},
+//#endif
      { NULL, NULL, 0},
 };
 
@@ -621,6 +623,10 @@ void find_best_memcpy()
      char *buf1, *buf2;
      int i, j, best = 0;
 
+	veejay_memcpy = memcpy;
+	veejay_memset =memset;
+	return;
+
      if (!(buf1 = (char*) malloc( BUFSIZE * 2000 * sizeof(char) )))
           return;
 
@@ -649,6 +655,7 @@ void find_best_memcpy()
 
      if (best) {
           veejay_memcpy = memcpy_method[best].function;
+	veejay_msg(VEEJAY_MSG_INFO, "Using %s", memcpy_method[best].name );
      }
 
 	best = 0;
@@ -664,7 +671,7 @@ void find_best_memcpy()
      }
 
      if (best) {
-          veejay_memset = memset_method[best].function;
+         veejay_memset = memset_method[best].function;
      }
 
 

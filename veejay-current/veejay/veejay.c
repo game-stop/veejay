@@ -24,11 +24,8 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
-
-#ifdef HAVE_GETOPT_H
 #include <getopt.h>
-#endif
-
+#include <sched.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <veejay/vj-lib.h>
@@ -488,7 +485,6 @@ int main(int argc, char **argv)
     if(info->video_out == 3)
     {
 	veejay_silent();
-
     }
 
     if(info->dump)
@@ -523,29 +519,9 @@ int main(int argc, char **argv)
 
     fcntl(0, F_SETFL, O_NONBLOCK);
 
-//	mlockall( MCL_FUTURE );
-
-
-
-    if(info->video_out==5) {
-	/* when streaming rgb , no sync, no timer, only 1 buffer in render queue, no audio yet */
-	info->uc->use_timer = 2;
-	info->sync_correction = 0;
-	info->audio = 0;
-    }
-
-//   if (run_server == 1)
-  // {
-//	if(vj_server_setup(info)==0)
-//	{
-//		veejay_msg(VEEJAY_MSG_ERROR, "Cannot start services");
-//		exit(0); 
-//	}
-  //  }
+	smp_check();
 
     if(veejay_init(info,default_geometry_x,default_geometry_y,NULL,default_use_tags)!=0) return -1;
-
-   smp_check();
 
 	if(auto_loop) veejay_auto_loop(info);
 

@@ -23,7 +23,7 @@
 
 extern void find_best_memcpy(void);
 
-int CACHE_LINE_SIZE = 16;
+static int MEM_ALIGNMENT_SIZE = 0;
 
 #ifdef ARCH_X86
 int has_cpuid(void)
@@ -86,7 +86,7 @@ void	get_cache_line_size()
 		do_cpuid(  0x00000001, regs2 );
 		ret = (( regs2[1] >> 8) & 0xff) * 8;
 		if(ret > 0)
-			CACHE_LINE_SIZE = ret;
+			MEM_ALIGNMENT_SIZE = ret;
 	}
 }
 
@@ -122,29 +122,31 @@ void vj_mem_init(void)
 #ifdef ARCH_X86 
 	get_cache_line_size();
 #endif
+	if(MEM_ALIGNMENT_SIZE == 0)
+		MEM_ALIGNMENT_SIZE = getpagesize();
+
 	find_best_memcpy();	
-	
 }
 
 void *vj_malloc(unsigned int size)
 {
-
-	void *ptr;
-
 	if( size == 0 )
 		return NULL;
+	void *ptr;
 
-#if defined (HAVE_MEMALIGN)
-//	ptr = memalign( 16, size );
- 	posix_memalign( ptr, CACHE_LINE_SIZE, size );
+#ifdef HAVE_POSIX_MEMALIGN
+	posix_memalign( &ptr, MEM_ALIGNMENT_SIZE, size );
+#else
+#ifdef HAVE_MEMALIGN
+	ptr = memalign( MEM_ALIGNMENT_SIZE, size );
 #else	
 	ptr = malloc ( size ) ;
+#endif
 #endif
 	if(!ptr)
         {
 		return NULL;
         }
-
 
 	return ptr;
 }

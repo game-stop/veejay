@@ -29,7 +29,9 @@
 #include <libvje/vje.h>
 #include <veejay/vj-misc.h>
 #include <veejay/vj-lib.h>
+#ifdef HAVE_JPEG
 #include <liblavjpeg/jpegutils.h>
+#endif
 #include <libvjmsg/vj-common.h>
 
 
@@ -74,7 +76,7 @@ int vj_perform_take_bg(veejay_t *info, uint8_t **src)
 
 	return 1;
 }
-
+#ifdef HAVE_JPEG
 int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
 {
     FILE *frame;
@@ -142,6 +144,8 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
 
     return res;
 }
+
+#endif
 
 int	veejay_create_temp_file(const char *prefix, char *dst)
 {

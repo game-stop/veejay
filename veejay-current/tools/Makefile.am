@@ -13,10 +13,10 @@ VJLIBS = $(top_builddir)/libvjnet/libvjnet.la \
 	 $(top_builddir)/libvjmem/libvjmem.la
 
 yuv2rawdv_SOURCES = yuv2rawdv.c 
-yuv2rawdv_LDFLAGS = $(DV_LIBS) $(LAV_ALL_LIB_OPTS)
+yuv2rawdv_LDFLAGS = $(LIBDV_LIBS) $(LAV_ALL_LIB_OPTS)
 yuv2rawdv_LDADD = $(UTILS) @LIBGETOPT_LIB@
 rawdv2yuv_SOURCES = rawdv2yuv.c
-rawdv2yuv_LDFLAGS = $(DV_LIBS) $(LAV_ALL_LIB_OPTS)
+rawdv2yuv_LDFLAGS = $(LIBDV_LIBS) $(LAV_ALL_LIB_OPTS)
 rawdv2yuv_LDADD = $(UTILS) @LIBGETOPT_LIB@
 any2yuv_SOURCES = any2yuv.c
 any2yuv_LDFLAGS = $(LAV_ALL_LIB_OPTS)

@@ -845,7 +845,9 @@ static struct {
 #ifdef HAVE_SDL
 	{ VJ_EVENT_BUNDLE_ATTACH_KEY,		"Bundle: attach a Key to a bundle",		vj_event_attach_key_to_bundle,	3,	"%d %d %d",	{0,0} 	},
 #endif
+#ifdef HAVE_JPEG
 	{ VJ_EVENT_SCREENSHOT,			"Various: Save frame to jpeg",			vj_event_screenshot,	1,		"%s",		{0,0}   },
+#endif
 	{ VJ_EVENT_CHAIN_TOGGLE_ALL,		"Toggle Effect Chain on all clips or streams",	vj_event_all_clips_chain_toggle,1,   "%d",		{0,0}   },
 	{ VJ_EVENT_CLIP_UPDATE,		"Clip: Update starting and ending position by offset",	vj_event_clip_rel_start,3,"%d %d %d",		{0,0}	},	 
 #ifdef HAVE_V4L
@@ -7063,6 +7065,7 @@ void vj_event_bundled_msg_add(void *ptr, const char format[], va_list ap)
 	}
 }
 
+#ifdef HAVE_JPEG
 void vj_event_screenshot(void *ptr, const char format[], va_list ap)
 {
 	int *args = NULL;
@@ -7079,4 +7082,4 @@ void vj_event_screenshot(void *ptr, const char format[], va_list ap)
 		v->uc->filename = strdup( s );
 	
 }
-
+#endif

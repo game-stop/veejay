@@ -18,6 +18,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  */
+#include <config.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <libdv/dv.h>

@@ -20,6 +20,7 @@
 #include <libvjmsg/vj-common.h>
 #ifdef SUPPORT_READ_DV2
 #include <libdv/dv.h>
+#include <libel/vj-el.h>
 #include <stdint.h>
 #include <libel/vj-dv.h>
 #include <libel/vj-avcodec.h>
@@ -54,8 +55,9 @@ vj_dv_decoder *vj_dv_decoder_init(int quality, int width, int height, int pixel_
 }
 
 /* init the dv encoder and encode buffer */
-vj_dv_encoder *vj_dv_init_encoder(editlist * el, int pixel_format)
+vj_dv_encoder *vj_dv_init_encoder(void * edl, int pixel_format)
 {
+	editlist *el = (editlist*) edl;
 	vj_dv_encoder *e = (vj_dv_encoder*) vj_malloc(sizeof(vj_dv_encoder));
 	if(!e) return NULL;
 	e->encoder = dv_encoder_new(0,0,0);
@@ -172,13 +174,6 @@ void	   vj_dv_decoder_get_audio(vj_dv_decoder *d, uint8_t *audio_buf)
 		*(audio_buf+3) = (ch1[i] >> 8) & 0xff;		//hi
 	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG,
-		"Audio %f, samples %d, frames %d, channels %d quant %d",
-		d->decoder->audio->frequency,
-		d->decoder->audio->samples_this_frame,
-		d->decoder->audio->aaux_as.pc3.system == 1 ? 50:60,
-		d->decoder->audio->num_channels,
-		d->decoder->audio->aaux_as.pc4.qu == 0 ? 16:12);
 
 }
 
@@ -193,7 +188,6 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 
     if (dv_parse_header(d->decoder, input_buf) < 0)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid DV header");
 		return 0;
 	}
     if (!((d->decoder->num_dif_seqs == 10)
@@ -233,10 +227,6 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 	pitches[1] = 0;
 	pitches[2] = 0;
 
-/*	if(d->audio)
-		if(!dv_decode_full_audio( d->decoder, input_buf, d->audio_buffers ))
-			veejay_msg(VEEJAY_MSG_DEBUG, "No audio data");
-*/
 
 	if( d->decoder->sampling == e_dv_sample_420 )
 	{

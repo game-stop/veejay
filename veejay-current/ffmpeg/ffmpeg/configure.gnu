@@ -6,7 +6,7 @@
 if test x"$1" = x"-h" -o x"$1" = x"--help" ; then
 cat << EOF
 
-Usage: configure [options]
+Usage: configure.gnu [options]
 Options: [defaults in brackets after descriptions]
 
 EOF
@@ -64,7 +64,7 @@ echo "  --disable-risky          disables patent encumbered codecs"
 echo "  --enable-small           optimize for size instead of speed"
 echo "  --enable-memalign-hack   emulate memalign, interferes with memory debuggers"
 echo ""
-echo "NOTE: The object files are build at the place where configure is launched"
+echo "NOTE: The object files are build at the place where configure.gnu is launched"
 exit 1
 fi
 
@@ -326,7 +326,7 @@ TARGET_OS=`( uname -s ) 2>&1`
 # find source path
 # XXX: we assume an absolute path is given when launching configure, 
 # except in './configure' case.
-source_path="`echo $0 | sed -e 's#/configure##'`"
+source_path="`echo $0 | sed -e 's#/configure.gnu##'`"
 source_path_used="yes"
 if test -z "$source_path" -o "$source_path" = "." ; then
     source_path=`pwd`

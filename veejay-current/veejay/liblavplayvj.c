@@ -989,7 +989,7 @@ static int veejay_screen_update(veejay_t * info ) {
     // get the frame to output, in 420 or 422
     vj_perform_get_primary_frame(info,frame,0);   
      
-
+#ifdef HAVE_JPEG
     /* dirty hack to save a frame to jpeg */
     if (info->uc->hackme == 1)
 	{
@@ -997,7 +997,7 @@ static int veejay_screen_update(veejay_t * info ) {
 		info->uc->hackme = 0;
 		free(info->uc->filename);
     }
-
+#endif
     if (info->uc->take_bg==1)
     {
        vj_perform_take_bg(info,frame);
@@ -1843,7 +1843,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
     case 3:
 	veejay_msg(VEEJAY_MSG_INFO, 
 		    "Entering render mode (no visual output)");
+        
 	info->render_stream = vj_yuv4mpeg_alloc(info->edit_list);
+
+
+
 	if (vj_yuv_stream_start_write
 	  	  (info->render_stream, info->stream_outname,
 	  	   info->edit_list) == 0) {
@@ -2318,11 +2322,6 @@ veejay_t *veejay_malloc()
     info->verbose = 0;
     info->gui_screen = 0;
 	info->audio = 0;
-#ifdef HAVE_SDL
-    info->video_out = 0;	/* SDL */
-#else
-    info->video_out=3;
-#endif
     info->no_bezerk = 1;
     info->nstreams = 1;
     //info->vli_enabled=0;
@@ -2368,35 +2367,17 @@ veejay_t *veejay_malloc()
 		    "Malloc error. Out of memory");
 	return NULL;
     }
+    memset(info->uc, 0, sizeof(user_control));
     info->last_tag_id = 0;
     info->last_clip_id = 0;
-    info->uc->key_effect = 0;
-    info->uc->take_bg = 0;
-    info->uc->speed = 1;
-	info->uc->filename = NULL;
-    info->uc->hackme = 0;
-    info->uc->clip_select = 0;
-    info->uc->current_link = -1;
-    info->uc->clip_pressed = 0;
     info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
     info->uc->use_timer = 2;
     info->render_now = 0;
     info->render_continous = 0;
-    info->uc->chain_changed = 0;
     info->uc->clip_key = 1;
-    info->uc->clip_id = 0;	/* no clip selected */
     info->uc->direction = 1;	/* pause */
-    info->uc->looptype = 0;	/* no ping pong */
     info->uc->clip_start = -1;
     info->uc->clip_end = -1;
-    info->uc->effect_id = 0;
-    info->uc->next = 0;
-    info->uc->loops = 0;
-    info->uc->render_changed = 0;
-    info->uc->use_timer = 2;
-    info->uc->port = 0;
-    info->uc->rtc_delay = 0.0;
-    info->uc->is_server = 0;
     info->effect_frame1 = (VJFrame*) vj_malloc(sizeof(VJFrame));
     info->effect_frame2 = (VJFrame*) vj_malloc(sizeof(VJFrame));
     info->effect_frame_info = (VJFrameInfo*) vj_malloc(sizeof(VJFrameInfo));
@@ -2410,8 +2391,21 @@ veejay_t *veejay_malloc()
     info->net = 1;
     bzero(info->action_file,256); 
     bzero(info->stream_outname,256);
+
     for (i = 0; i < CLIP_MAX_PARAMETERS; i++)
 	info->effect_info->tmp[i] = 0;
+
+#ifdef HAVE_SDL
+    info->video_out = 0;
+#else
+#ifdef HAVE_DIRECTFB
+    info->video_out = 1;
+#else
+    info->video_out = 3;
+    sprintf(info->stream_outname, "%s", "stdout");
+#endif
+#endif
+
       return info;
 }
 

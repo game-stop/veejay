@@ -23,9 +23,8 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  */
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
+#include <config.h>
+#ifdef HAVE_JPEG
 #include <stdio.h>
 #include <string.h>
 #include <setjmp.h>
@@ -1102,3 +1101,4 @@ int encode_jpeg_raw(unsigned char *jpeg_data, int len, int quality,int dct_metho
     jpeg_destroy_compress(&cinfo);
     return -1;
 }
+#endif
