@@ -5295,7 +5295,7 @@ void vj_event_el_save_editlist(void *ptr, const char format[], va_list ap)
 	char str[1024];
 	//int *args = NULL;
  	int args[2] = {0,0};
-	P_A(args,str,format,ap);
+	P_A2ndStr(args,str,format,ap,1);
 	if( veejay_save_all(v, str,args[0],args[1]) )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Saved EditList as %s",str);
