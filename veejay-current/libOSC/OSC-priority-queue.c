@@ -39,7 +39,8 @@ The OpenSound Control WWW page is
 #include <libOSC/OSC-common.h>
 #include <libOSC/OSC-timetag.h>
 #include <libOSC/OSC-priority-queue.h>
-
+#include <stdint.h>
+#include <sys/time.h>
 #define PRINT_PRIORITY_QUEUE
 
 #ifdef DEBUG_OSC_PRIORITY_QUEUE

@@ -40,6 +40,10 @@ The OpenSound Control WWW page is
 #include <libOSC/NetworkReturnAddress.h>
 #include <libOSC/OSC-receive.h>
 #include <libOSC/OSC-drop.h>
+#include <netinet/in.h>
+#include <stdint.h>
+#include <sys/time.h>
+
 
 
 void DropPacket(OSCPacketBuffer p) {

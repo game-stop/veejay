@@ -35,7 +35,8 @@ The OpenSound Control WWW page is
 */
 
 #include <libOSC/OSC-common.h>  /* For Boolean */
-
+#include <stdint.h>
+#include <sys/time.h>
 #define STRING_ALIGN_PAD 4
 
 char *OSCDataAfterAlignedString(const char *string, const char *boundary, char **errorMsg) {

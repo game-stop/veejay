@@ -44,6 +44,8 @@ The OpenSound Control WWW page is
     #include <sys/socket.h>
     #include <netinet/in.h>
     #include <arpa/inet.h>
+#include <stdint.h>
+#include <sys/time.h>
 #include <libOSC/OSC-common.h>
 #include <libOSC/OSC-timetag.h>
 #include <libOSC/OSC-address-space.h>

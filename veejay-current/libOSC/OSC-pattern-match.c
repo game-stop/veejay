@@ -36,7 +36,8 @@ The OpenSound Control WWW page is
 
 #include <libOSC/OSC-common.h>
 #include <libOSC/OSC-pattern-match.h>
-
+#include <stdint.h>
+#include <sys/time.h>
 static const char *theWholePattern;	/* Just for warning messages */
 
 static Boolean MatchBrackets (const char *pattern, const char *test);

@@ -242,6 +242,12 @@ int main(int argc, char *argv[])
 	if(use_file)
 	{
 		FILE *fd = fopen( filename ,"r");
+		if(!fd)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot open %s",
+					filename);
+			exit(1);
+		}
 		while( fgets(buf,4096,fd) )
 		{
 			if(buf[0]=='+')

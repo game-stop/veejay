@@ -37,7 +37,8 @@ The OpenSound Control WWW page is
 */
 
 #include <libOSC/OSC-timetag.h>
-
+#include <stdint.h>
+#include <sys/time.h>
 
 #ifdef HAS8BYTEINT
 #define TWO_TO_THE_32_FLOAT 4294967296.0f
