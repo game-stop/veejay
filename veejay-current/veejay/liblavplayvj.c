@@ -56,10 +56,8 @@
 #include <sys/resource.h>
 #include <poll.h>
 #include <sys/wait.h>
-#include <sys/vfs.h>
 #include <sys/signal.h>
 #include <time.h>
-#include <linux/rtc.h>
 #include "jpegutils.h"
 #include "vj-event.h"
 #include <libstream/vj-shm.h>
@@ -204,7 +202,7 @@ struct mjpeg_params
 
 #define VALUE_NOT_FILLED -10000
 static float time_frame = 0;
-static int rtc_fd = -1;
+
 //static double _usecs_passed = 0.0;
 #ifdef HAVE_SDL
 extern void vj_event_single_fire(void *ptr, SDL_Event event, int pressed);
@@ -495,7 +493,6 @@ int veejay_init_editlist(veejay_t * info)
     settings->previous_frame_num = 1;
     settings->spvf = 1.0 / el->video_fps;
     settings->msec_per_frame = 1000 / settings->spvf;
-    info->uc->rtc_delay = settings->spvf / 1000;
     veejay_msg(VEEJAY_MSG_DEBUG, 
 		"1.0/Seconds per video Frame = %4.4f",
 		1.0 / settings->spvf);
@@ -1158,25 +1155,6 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 	    nsecsleep.tv_sec = 0;
 	    nanosleep(&nsecsleep, NULL);
 	}
-    } else {
-	if (info->uc->use_timer == 1) {	/* not so wasteful timer routine */
-	    time_frame = vj_get_relative_time();	
-	   
-	    if (rtc_fd >= 0) {
-		while (time_frame > 0.000) {
-		    unsigned long rtc_ts;
-		    veejay_msg(VEEJAY_MSG_WARNING, "Read rtc fd : %ld", time_frame);
-		    if (read(rtc_fd, &rtc_ts, sizeof(rtc_ts)) <= 0) {
-			veejay_msg(VEEJAY_MSG_WARNING, 
-				    "Linux RTC read error: %s. Using nanosleep",
-				    strerror(errno));
-			info->uc->use_timer = 1;
-		    }
-		}
-		time_frame -= vj_get_relative_time();
-		
-	    }
-	}
     }
 
     settings->first_frame = 0;
@@ -1639,45 +1617,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
     }	
 
-  	/* try rtc timer */
-    if (info->uc->use_timer == 1) {
-	if ((rtc_fd = open("/dev/rtc", O_RDONLY)) < 0) {
-	    veejay_msg(VEEJAY_MSG_ERROR, 
-			"Failed to open /dev/rtc: %s", strerror(errno));
-	    info->uc->use_timer = 2;
-	} else {
-	    
-	    if(ioctl( rtc_fd, RTC_UIE_ON, 0 ) < 0 )
-		{	veejay_msg(VEEJAY_MSG_ERROR, "Cannot set alarm event");
-	    	}
-		else
-		{
-	    /*if(ioctl(rtc_fd, RTC_IRQP_READ, &irqp) < 0) {
-		veejay_msg(VEEJAY_MSG_ERROR, "RTC: Cannot get periodic IRQ rate");
-		irqp = 512;
-	    }
-	    else {
-		veejay_msg(VEEJAY_MSG_ERROR,"RTC: Periodic IRQ rate is %ldHz", irqp);
-	    }
-		*/
-	    info->uc->use_timer = 1;
-		/*
-	    if (ioctl(rtc_fd, RTC_IRQP_SET, irqp) < 0) {
-		veejay_msg(VEEJAY_MSG_ERROR, 
-			    "Linux RTC init error in ioctl");
-		close(rtc_fd);
-		info->uc->use_timer = 2;
-	    } else {
-		if (ioctl(rtc_fd, RTC_PIE_ON, 0) < 0) {
-		    veejay_msg(VEEJAY_MSG_ERROR, 
-				"Linux RTC init error in ioctl PIE_ON");
-		    close(rtc_fd);
-		    info->uc->use_timer = 2;
-		}
-		*/
-	    }
-	}
-    }
 	/* see what timer we have */
     switch (info->uc->use_timer) {
     case 0:
@@ -1685,7 +1624,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	break;
     case 1:
 	veejay_msg(VEEJAY_MSG_DEBUG, 
-		    "Using Linux RTC /dev/rtc hardware timer");
+		    "RTC /dev/rtc hardware timer is broken!");
+	info->uc->use_timer = 2;
 	break;
     case 2:
 	veejay_msg(VEEJAY_MSG_DEBUG, "Using nanosleep timer");
@@ -2241,9 +2181,6 @@ static void *veejay_playback_thread(void *data)
 		break;
     }
     
-
-    if(info->uc->use_timer==1) close(rtc_fd);
-
 #ifdef HAVE_SDL
     if(info->gui_screen) vj_sdl_free(info->sdl_gui);
 #endif

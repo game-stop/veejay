@@ -24,6 +24,7 @@
 #include <sys/sem.h>
 #include <sys/shm.h>
 
+#ifdef _SYS_SEM_H
 union semun 
 {
 	int 	val;	
@@ -31,6 +32,7 @@ union semun
 	unsigned short *array;
 	struct seminfo *__buf;
 };
+#endif
 
 typedef struct video_segment_t
 {
