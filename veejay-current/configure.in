@@ -1,0 +1,975 @@
+dnl Process this file with autoconf to produce a configure script.
+dnl AC_INIT
+dnl AC_CONFIG_SRCDIR([veejay/lav_io.c])
+AC_INIT
+AC_CANONICAL_TARGET
+AC_CONFIG_SRCDIR([configure.in])
+
+VEEJAY_MAJOR_VERSION=0
+VEEJAY_MINOR_VERSION=7
+VEEJAY_MICRO_VERSION=0
+VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
+PACKAGE_VERSION=VEEJAY_VERSION
+
+AM_INIT_AUTOMAKE(veejay, $VEEJAY_VERSION)
+AM_CONFIG_HEADER(config.h)
+AM_MAINTAINER_MODE
+AM_OUTPUT_DEPENDENCY_COMMANDS
+
+dnl pick up the gnome macros
+dnl AM_ACLOCAL_INCLUDE(macros)
+
+AC_PROG_CC
+AM_PROG_AS
+AC_PROG_CPP
+AC_PROG_CXX
+AC_PROG_CXXCPP
+AC_PROG_GCC_TRADITIONAL
+AC_ISC_POSIX
+AC_HEADER_STDC
+
+dnl Set PACKAGE_LOCALE_DIR in config.h.
+dnl if test "x${prefix}" = "xNONE"; then
+dnl   AC_DEFINE_UNQUOTED(PACKAGE_LOCALE_DIR, "${ac_default_prefix}/${DATADIRNAME}/locale")
+dnl else
+dnl  AC_DEFINE_UNQUOTED(PACKAGE_LOCALE_DIR, "${prefix}/${DATADIRNAME}/locale")
+dnl fi
+rabbit_support=yes
+jack_support=yes
+have_ps2=no
+# libtool versioning
+
+LT_RELEASE=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION
+LT_CURRENT=$VEEJAY_MICRO_VERSION
+LT_REVISION=$VEEJAY_MICRO_VERSION
+LT_AGE=$VEEJAY_MICRO_VERSION
+AC_SUBST(LT_RELEASE)
+AC_SUBST(LT_CURRENT)
+AC_SUBST(LT_REVISION)
+AC_SUBST(LT_AGE)
+
+dnl **********************************************************************
+dnl Options
+AC_ARG_ENABLE(ps2,
+  [	--enable-ps2,			Disable ZLIB support.], have_ps2=yes)
+
+AC_ARG_ENABLE(compile-warnings,     
+  [  --enable-compile-warnings,        Turn on compiler warnings.])
+
+AC_ARG_ENABLE(warnings_as_errors,   
+  [  --enable-warnings_as_errors,      Compiler warnings are errors.])
+AC_ARG_ENABLE(samplerate,
+	[  --disable-samplerate		Disable Samplerate support (default=no)],
+	rabbit_support=no)
+AC_ARG_ENABLE(jack,
+	[  --disable-jack	       Disable JACK support (default=no)],
+	jack_support=no)
+AC_ARG_WITH(dv,
+  [  --with-dv,                        libDV (digital video) support])
+AC_ARG_WITH(dv-yv12,
+  [  --with-dv-yv12,                   libDV PAL YV12 read-support])
+AC_ARG_ENABLE(large-file,
+  [  --disable-large-file,             disable large file support (>2GB)])
+AC_PROG_AWK
+AC_PROG_INSTALL
+AC_PROG_LN_S
+AC_PROG_MAKE_SET
+AC_PROG_RANLIB
+AC_C_BIGENDIAN
+AC_C_CONST
+AC_C_INLINE
+have_asm_mmx=false
+have_asm_sse=false
+have_asm_nasm=false
+have_cmov=false
+have_asm_3dnow=false
+have_asm_mmx2=false
+have_x86cpu=false
+have_mips=false
+have_ppccpu=false
+have_ppc_altivec=false
+have_darwin=false
+dnl check for intel
+AC_CACHE_CHECK(for Intel processor(s), ac_cv_flag_intelcpu, [
+if [ uname -m |grep -q "i.86" ]; then
+ ac_cv_flag_intelcpu=yes
+else
+ ac_cv_flag_intelcpu=no
+fi
+])
+
+dnl check for mmx
+AC_CACHE_CHECK(for MMX on processor(s), ac_cv_flag_mxx, [
+if grep "^flags.* mmx" /proc/cpuinfo > /dev/null; then
+ ac_cv_flag_mmx=yes
+else
+ ac_cv_flag_mmx=no
+fi
+])
+
+if test $ac_cv_flag_mmx = yes; then
+       AC_DEFINE(HAVE_ASM_MMX,1)
+       AC_DEFINE(HAVE_MMX,1)
+       have_asm_mmx=true
+fi
+
+dnl check for sse
+AC_CACHE_CHECK(for SSE on processor(s), ac_cv_flag_sse, [
+if grep "^flags.* sse" /proc/cpuinfo > /dev/null; then
+ ac_cv_flag_sse=yes
+else
+ ac_cv_flag_sse=no
+fi
+])
+
+if test $ac_cv_flag_sse = yes; then
+	AC_DEFINE(HAVE_ASM_SSE,1)
+	have_asm_sse=true
+fi
+
+dnl check for 3dnow
+AC_CACHE_CHECK(for 3DNOW on processor(s), ac_cv_flag_3dnow, [
+if grep "^flags.* 3dnow" /proc/cpuinfo > /dev/null; then
+ ac_cv_flag_3dnow=yes
+else
+ ac_cv_flag_3dnow=no
+fi
+])
+
+if test $ac_cv_flag_3dnow = yes; then
+	AC_DEFINE(HAVE_ASM_3DNOW,1)
+	have_asm_3dnow=true
+fi
+
+dnl check for CMOV
+AC_CACHE_CHECK(for CMOV on processor(s), ac_cv_flag_cmov, [
+if grep "^flags.* cmov" /proc/cpuinfo > /dev/null; then
+ ac_cv_flag_cmov=yes
+else
+ ac_cv_flag_cmov=no
+fi
+])
+
+if test $ac_cv_flag_cmov = yes; then
+	AC_DEFINE(HAVE_CMOV,1)
+	have_cmov=true
+fi
+
+
+dnl check for MMX2
+AC_CACHE_CHECK(for MMX2 on processor(s), ac_cv_flag_mmx2, [
+if grep "^flags.* mmxext" /proc/cpuinfo > /dev/null; then
+ ac_cv_flag_mmx2=yes
+else
+ ac_cv_flag_mmx2=no
+fi
+])
+
+if test $ac_cv_flag_mmx2 = yes; then
+	AC_DEFINE(HAVE_ASM_MMX2,1)
+	have_asm_mmx2=true
+fi
+
+
+dnl Initialize libtool
+AM_PROG_LIBTOOL
+
+AC_CHECK_HEADERS(fenv.h stdint.h inttypes.h sys/types.h stdbool.h getopt.h alloca.h sys/soundcard.h)
+
+dnl sizeof PRId64 etc...
+AC_CHECK_SIZEOF(int)
+AC_CHECK_SIZEOF(long)
+AC_CHECK_SIZEOF(long long)
+case 8 in
+$ac_cv_sizeof_int)
+  PRID64_STRING_FORMAT="d"
+  ;;
+$ac_cv_sizeof_long)
+  PRID64_STRING_FORMAT="ld"
+  ;;
+$ac_cv_sizeof_long_long)
+  PRID64_STRING_FORMAT="lld"
+  ;;
+*)
+  AC_MSG_WARN(No suitable variant for 64bits integers found)
+  ;;
+esac
+AC_DEFINE_UNQUOTED(PRID64_STRING_FORMAT, "$PRID64_STRING_FORMAT")
+AC_SUBST(PRID64_STRING_FORMAT)
+
+AC_CHECK_FUNC(getopt_long,[AC_DEFINE(HAVE_GETOPT_LONG,1,long getopt support)],
+[ # FreeBSD and BSD/OS have a gnugetopt library for this:
+  AC_CHECK_LIB([gnugetopt],[getopt_long],
+  [AC_DEFINE(HAVE_GETOPT_LONG,1,getopt support) LIBGETOPT_LIB="-lgnugetopt"])])
+AC_SUBST(LIBGETOPT_LIB)
+
+AC_TYPE_SIGNAL
+
+AC_CHECK_FUNCS([bzero])
+AC_CHECK_FUNCS([floot])
+AC_CHECK_FUNCS([ftruncate])
+AC_CHECK_FUNCS([gettimeofday])
+AC_CHECK_FUNCS([getwd])
+AC_CHECK_FUNCS([memmove])
+AC_CHECK_FUNCS([memset])
+AC_CHECK_FUNCS([mkdir])
+AC_CHECK_FUNCS([mkfifo])
+AC_CHECK_FUNCS([munmap])
+AC_CHECK_FUNCS([pow])
+AC_CHECK_FUNCS([realpath])
+AC_CHECK_FUNCS([rint])
+AC_CHECK_FUNCS([select])
+AC_CHECK_FUNCS([setenv])
+AC_CHECK_FUNCS([socket])
+AC_CHECK_FUNCS([sqrt])
+AC_CHECK_FUNCS([strchr])
+AC_CHECK_FUNCS([strdup])
+AC_CHECK_FUNCS([strerror])
+AC_CHECK_FUNCS([strncasecmp])
+AC_CHECK_FUNCS([strndup])
+AC_CHECK_FUNCS([strstr])
+AC_CHECK_FUNCS([strrchr])
+AC_CHECK_FUNCS([strtol])
+AC_CHECK_HEADERS([fcntl.h])
+AC_CHECK_HEADERS([limits.h])
+AC_CHECK_HEADERS([malloc.h])
+AC_CHECK_HEADERS([netinet/in.h.])
+AC_CHECK_HEADERS([stddef.h])
+AC_CHECK_HEADERS([sys/ioctl.h])
+AC_CHECK_HEADERS([sys/param.h])
+AC_CHECK_HEADERS([sys/socket.h])
+AC_CHECK_HEADERS([sys/time.h])
+AC_CHECK_HEADERS([sys/vfs.h])
+AC_FUNC_FORK
+AC_FUNC_MALLOC
+AC_FUNC_MMAP
+AC_FUNC_STAT
+AC_FUNC_STRTOD
+AC_FUNC_VPRINTF
+AC_FUNC_MEMCMP
+AC_FUNC_REALLOC
+AC_FUNC_SELECT_ARGTYPES
+
+AC_HEADER_TIME
+AC_HEADER_SYS_WAIT
+AC_HEADER_DIRENT
+AC_HEADER_STDC
+AC_TYPE_SIZE_T
+AC_TYPE_PID_T
+AC_TYPE_OFF_T
+AC_C_VOLATILE
+
+OS_ARCH=`uname -s | sed -e 's|/|_|g'`
+OS_RELEASE=`uname -r`
+OS_CPU=`uname -m`
+
+
+dnl Set up the usual compiler infos...
+have_large_file=false
+if test ! x$enable_large_file = xno
+then
+  if test x$OS_ARCH = xLinux ; then
+    AC_MSG_CHECKING([whether glibc supports 64-bit file offsets])
+    AC_COMPILE_IFELSE([AC_LANG_PROGRAM([[ 
+#define _LARGEFILE_SOURCE
+#define _LARGEFILE64_SOURCE
+#define _FILE_OFFSET_BITS 64
+#include <gnu/libc-version.h>
+#include <stdio.h> ]], [[ 
+if(sizeof(__off_t) == 8 && sizeof(fpos_t) == 8) return 0;
+return 1;
+]])],[ have_large_file=true 
+        AC_MSG_RESULT([yes])],[ have_large_file=false
+        AC_MSG_RESULT([no])])
+            
+  fi
+dnl test for glibc 2.1.3 or later
+dnl test for kernel 2.4.0 or later
+  AC_DEFINE(_FILE_OFFSET_BITS,64)
+  AC_DEFINE(_LARGEFILE_SOURCE)
+  AC_DEFINE(_LARGEFILE64_SOURCE)
+dnl  CFLAGS="$CFLAGS -D_LARGEFILE_SOURCE -D_LARGEFILE64_SOURCE -D_FILE_OFFSET_BITS=64"
+else
+  AC_DEFINE(_FILE_OFFSET_BITS,32)
+fi
+
+dnl test for alpha architecture, and Compaq Math Library (cpml) -- much faster
+dnl than GNU libm on this arch.
+dnl does veejay work for alpha ?
+LIBM_LIBS="-lm "
+AC_SUBST(LIBM_LIBS)
+AC_MSG_CHECKING([for alpha architecture])
+if test x$OS_ARCH = xLinux && test x$OS_CPU = xalpha ; then
+    AC_MSG_RESULT([yes])
+    AC_CHECK_LIB(cpml, asin,
+      [ LIBM_LIBS="-lcpml"
+        have_cpml=true ],,)
+else
+    AC_MSG_RESULT([no])
+fi
+
+dnl *********************************************************************
+dnl Test whether we're linux or not. If so, define HAVE_V4L and build the
+dnl video4linux/hardware dependent tools. Else, undefine HAVE_V4L
+
+os_type=`uname`
+have_video4linux=false
+if test x$os_type = x"Linux"; then
+  AC_CHECK_HEADER(linux/videodev.h,
+    have_video4linux=true
+    AC_DEFINE(HAVE_V4L),
+    AC_MSG_ERROR([videodev.h not found - please install the linux kernel headers])
+    )
+else
+  AC_MSG_WARN([Did not find linux platform - no v4l. ])
+  AC_MSG_WARN([Happy porting!])
+fi
+
+dnl *********************************************************************
+dnl Check for the various libraries we depend on.
+dnl
+dnl First lets see if glib is present on this machine
+
+AM_PATH_GLIB(1.2.0)
+
+dnl *********************************************************************
+dnl Check for the pthread lib
+dnl
+AC_SUBST(PTHREAD_LIBS)
+have_pthread=false
+AC_CHECK_LIB(pthread, pthread_create,
+  [ PTHREAD_LIBS="-lpthread" 
+    AC_DEFINE(HAVE_LIBPTHREAD)
+    have_pthread=true ],,)
+
+AC_CHECK_FUNC(pthread_attr_getstacksize,
+	          [
+				AC_DEFINE(HAVE_PTHREADSTACKSIZE)
+			  ] )
+
+
+
+dnl ********************************************************************
+dnl Check for Ncurses
+dnl
+
+dnl AC_SUBST(NCURSES_LIBS)
+dnl have_ncurses=false
+dnl AC_CHECK_LIB(ncurses, initscr,
+dnl  [ NCURSES_LIBS="-lncurses"
+dnl    AC_DEFINE(HAVE_NCURSES)
+dnl    have_ncurses=true ],,)
+
+
+
+dnl *********************************************************************
+dnl Check for the special mmx accelerated jpeg library
+dnl At the end of this mess, JPEG_LIBS will contain the libraries and 
+dnl flags needed to link with the jpeg library and JPEG_CFLAGS will 
+dnl have the needed flags to compile against said library
+AC_SUBST(JPEG_LIBS)
+AC_SUBST(JPEG_CFLAGS)
+have_jpeg=false
+if test x$with_jpeg_mmx = xyes ; then
+  AC_MSG_ERROR([
+*** A directory must be specified for --with-jpeg-mmx option.])
+fi
+if test x$with_jpeg_mmx = x ; then
+  dnl Special case for building .deb's
+  if test -d ../jpeg-mmx ; then
+    with_jpeg_mmx=`pwd`/../jpeg-mmx
+  elif test -d ../jpeg-mmx-0.1.4 ; then
+    with_jpeg_mmx=`pwd`/../jpeg-mmx-0.1.4
+  else
+    with_jpeg_mmx=/usr/local/src/jpeg-mmx
+  fi
+fi
+
+dnl
+dnl Look for the installed/specified copy
+dnl
+
+OLD_CFLAGS="$CFLAGS"
+OLD_LIBS="$LIBS"
+LIBS="$LIBS -L$with_jpeg_mmx"
+CFLAGS="$CFLAGS -I$with_jpeg_mmx"
+AC_CHECK_LIB(jpeg-mmx, jpeg_start_compress,
+   [ JPEG_LIBS="$LIBS -ljpeg-mmx"
+     JPEG_CFLAGS="-I$with_jpeg_mmx"
+       have_jpeg=true ],,)
+  LIBS="$OLD_LIBS"
+  CFLAGS="$OLD_CFLAGS"
+
+dnl 
+dnl Look for _a_ jpeg lib that will work.
+dnl
+if test x$have_jpeg = xfalse ; then
+  AC_CHECK_LIB(jpeg, jpeg_start_compress,
+    [ JPEG_LIBS="-ljpeg"
+      JPEG_CFLAGS=""
+      have_jpeg=true ],,)
+fi
+
+
+
+dnl *********************************************************************
+dnl Check for the libdv
+dnl At the end of this mess, DV_LIBS will contain the libraries and 
+dnl flags needed to link with the jpeg library and DV_CFLAGS will 
+dnl have the needed flags to compile against said library
+AC_SUBST(DV_LIBS)
+AC_SUBST(DV_CFLAGS)
+if test x$with_dv = xyes ; then
+  AC_MSG_ERROR([
+*** A directory must be specified for the --with-dv option.])
+else if test x$with_dv = x ; then
+  with_dv_l=/usr/local/lib
+  with_dv_i=/usr/local/include
+fi
+fi
+
+have_dv=false
+if test x$have_pthread = xtrue ; then
+  EXTRA_LIBS=" $LIBM_LIBS $GLIB_LIBS  $PTHREAD_LIBS -ldl "
+else
+  EXTRA_LIBS="-L$with_dv$with_dv_l $LIBM_LIBS $GLIB_LIBS -ldl "
+fi
+AC_CHECK_LIB(dv, dv_init,
+  [ DV_LIBS="-L$with_dv$with_dv_l -ldv ${EXTRA_LIBS}"
+    DV_CFLAGS="-I$with_dv$with_dv_i"
+    AC_DEFINE(SUPPORT_READ_DV2)
+    AC_DEFINE(SUPPORT_READ_YUV420)
+    have_dv=true],, 
+    -L$with_dv$with_dv_l  ${EXTRA_LIBS})
+
+dnl ******************
+dnl ...and now if we have libdv, check if version >= 0.9.9
+dnl (by checking if the new function dv_decoder_free() exists)
+have_dv_gte_0_9_9=false
+if test x$have_dv = xtrue; then
+   AC_CHECK_LIB(dv, dv_decoder_free,
+	[ DV_LIBS="-L$with_dv$with_dv_l -ldv ${EXTRA_LIBS}"
+	  DV_CFLAGS="-I$with_dv$with_dv_i"
+	  have_dv_gte_0_9_9=true ],
+	[ AC_DEFINE(LIBDV_PRE_0_9_9) ],
+    -L$with_dv$with_dv_l  ${EXTRA_LIBS})
+else
+	AC_MSG_WARN([Cannot find libdv])
+fi
+
+dnl *********************************************************************
+dnl Check for libDV YV12 read-support
+if test x$with_dv_yv12 = xyes; then
+if test x$have_pthread = xtrue ; then
+  EXTRA_LIBS=" $LIBM_LIBS $GLIB_LIBS  $PTHREAD_LIBS -ldl "
+else
+  EXTRA_LIBS="-L$with_dv$with_dv_l $LIBM_LIBS $GLIB_LIBS -ldl "
+fi
+build_dv=false
+AC_CHECK_LIB(dv, dv_init,
+  [ DV_LIBS="-L$with_dv$with_dv_l -ldv ${EXTRA_LIBS}"
+    build_dv=true
+    DV_CFLAGS="-I$with_dv$with_dv_i"
+    AC_DEFINE(LIBDV_PAL_YV12)],,
+    -L$with_dv$with_dv_l  ${EXTRA_LIBS})
+fi
+
+
+dnl *********************************************************************
+dnl  Lets find where xwindows lives on this machine. Punt if not found.
+AC_PATH_XTRA
+
+if test "-DX_DISPLAY_MISSING" = "$X_CFLAGS"; then
+AC_MSG_ERROR(can not find X11)                                                
+fi
+
+dnl add some more libs which are probably needed
+if test x$have_pthread = xtrue ; then
+  EXTRA_LIBS="$LIBM_LIBS $GLIB_LIBS  $PTHREAD_LIBS  -ldl"
+else
+  EXTRA_LIBS="$LIBM_LIBS $GLIB_LIBS -ldl"
+fi
+
+AC_SUBST(X_CFLAGS)                                                             
+AC_SUBST(X_PRE_LIBS)
+AC_SUBST(X_EXTRA_LIBS)
+AC_SUBST(X_LIBS)
+AC_SUBST(x_libraries)
+
+dnl ********************************************************************
+dnl Check to see if __progname is provided by the system
+dnl ********************************************************************
+AC_MSG_CHECKING(for __progname)
+AC_CACHE_VAL(ac_cv_extern__progname,
+AC_LINK_IFELSE([AC_LANG_PROGRAM([[]], [[extern char *__progname;
+	puts(__progname)]])],[ac_cv_extern___progname=yes],[ac_cv_extern___progname=no]))
+if test x$ac_cv_extern___progname = xyes ; then
+	AC_DEFINE(HAVE___PROGNAME,,[Is __progname defined by system?])
+	AC_MSG_RESULT(yes)
+else
+	AC_MSG_RESULT(no)
+fi
+
+
+
+
+dnl ********************************************************************
+dnl Check for DGA (for v4l-conf)
+dnl ********************************************************************
+AC_SUBST(V4LCONF_LIBS)
+AC_CHECK_LIB(Xxf86dga, XF86DGAQueryExtension,
+	V4LCONF_LIBS="$X_LIBS -lXxf86dga" AC_DEFINE(HAVE_LIBXXF86DGA),,
+	$X_LIBS $X_PRE_LIBS -lXext -lX11 $X_EXTRA_LIBS)
+
+dnl ********************************************************************
+dnl Check for the SDL library (for software playback)
+dnl
+dnl AM_PATH_SDL defines SDL_CFLAGS and SDL_LIBS for us..
+have_sdl=false
+ifdef([AM_PATH_SDL],
+	[ AM_PATH_SDL(1.2.3, [ AC_DEFINE(BUILD_VEEJAY)
+                      have_sdl=true
+                      AC_DEFINE(HAVE_SDL)],,) ])
+
+
+
+dnl *********************************************************************
+dnl Check for the DirectFB library (for Matrox G550 Tvout)
+dnl
+have_directfb=false
+PKG_CHECK_MODULES(DIRECTFB, directfb >= 0.9.17, have_directfb=true,
+	have_directfb=false)
+
+if test x$have_directfb = xtrue ; then
+AC_SUBST(DIRECTFB_LIBS)
+AC_SUBST(DIRECTFB_CFLAGS)
+AC_DEFINE(HAVE_DIRECTFB)
+fi
+
+dnl **********************************************************************
+dnl Check for the Jack audio connection kit
+dnl
+
+have_jack=false
+if test x$jack_support = xyes ; then
+  PKG_CHECK_MODULES(JACK, jack >= 0.98.1 , have_jack=true, have_jack=false)
+  if test x$have_jack = xtrue ; then
+    AC_SUBST(JACK_LIBS)
+    AC_SUBST(JACK_CFLAGS)
+    AC_DEFINE(HAVE_JACK,1)
+  else
+    AC_MSG_WARN([Jack >= 0.981.1 is required, get it at http://jackit.sourceforge.net]);
+  fi
+fi
+
+have_rabbit=false
+if test x$rabbit_support = xyes ; then
+ PKG_CHECK_MODULES(SAMPLERATE, samplerate >= 0.1.2 , have_rabbit=true, have_rabbit=false)
+ if test x$have_rabbit = xtrue; then
+	AC_SUBST(SAMPLERATE_LIBS)
+	AC_SUBST(SAMPLERATE_CFLAGS)
+	AC_DEFINE(HAVE_SAMPLERATE,1)
+ else
+    AC_MSG_WARN([Samplerate >= 0.1.2 is not found]);
+ fi
+fi 
+
+
+dnl ********************************************************************
+dnl Check for the libxml2 library (for saving/loading project files)
+dnl
+dnl AM_PATH_SDL defines SDL_CFLAGS and SDL_LIBS for us..
+have_xml2=false
+ifdef([AM_PATH_XML2],
+	[ AM_PATH_XML2(2.5.4, [ AC_DEFINE(BUILD_VEEJAY)
+                      have_xml2=true
+                      AC_DEFINE(HAVE_XML2)],,) ])
+
+if test x$have_xml2 = xfalse ; then
+AC_MSG_WARN(cannot find The XML C library for gnome)
+fi
+
+have_freetype=false
+AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
+if test $FREETYPE_CONFIG = yes; then
+  FT_CFLAGS="`freetype-config --cflags`"
+  FT_WORD="`freetype-config --libs`"
+  FT_LDFLAGS=""
+  FT_LIBS=""
+  for word in $FT_WORD ; do
+	beginning=`echo $word | cut -c -2`
+	if test ".$beginning" = ".-L"; then
+		FT_LDFLAGS="$FT_LDFLAGS $word"  
+	else
+		FT_LIBS="$FT_LIBS $word"
+	fi
+  done
+  AC_DEFINE(HAVE_FREETYPE)
+  AC_SUBST(FT_LIBS)
+  AC_SUBST(FT_LDFLAGS)
+  AC_SUBST(FT_CFLAGS)
+  have_freetype=true
+fi  
+
+dnl ********************************************************************
+dnl Test for MMX support, if we find an IA32 platform then check to see
+dnl if gcc and its tools can generate MMX instructions, also make sure
+dnl nasm is present for the files that need that. 
+dnl Both are checked for for the maximum flexablity.
+dnl
+dnl TODO: host = non intel, target = intel <blah> do the checks also?
+dnl       remeber we are checking that the toolchain can generate the
+dnl       code, not whether the host can execute the code, thats done
+dnl       at run time with the exception of the SSE code.
+dnl
+dnl 
+
+
+
+AC_MSG_CHECKING([for Intel Pentium architecture (IA32)])
+if test "$host_cpu" = "i386" -o "$host_cpu" = "i486" \
+   -o "$host_cpu" = "i586" -o "$host_cpu" = "i686" \
+   -o "$host_cpu" = "i786" ; then
+  AC_MSG_RESULT(yes)
+  AC_DEFINE(HAVE_X86CPU,1)
+  AC_DEFINE(ARCH_X86,1)
+  have_x86cpu=true
+else
+  AC_MSG_RESULT(no)
+fi
+
+AC_MSG_CHECKING([for PowerPC architecture])
+if test "$host_cpu" = "powerpc" ; then
+  AC_MSG_RESULT(yes)
+  have_ppccpu=true
+  AC_DEFINE(ARCH_PPC,1)
+  AC_CACHE_CHECK([if \$CC groks AltiVec inline assembly],
+    [ac_cv_altivec_inline],
+    [CFLAGS="${CFLAGS_save}"
+     AC_TRY_COMPILE(,[asm volatile("vperm 0,1,2,3");],
+         ac_cv_altivec_inline=yes,
+         [CFLAGS="${CFLAGS_save} -Wa,-m7400"
+          AC_TRY_COMPILE(,[asm volatile("vperm 0,1,2,3");],
+            [ac_cv_altivec_inline="-Wa,-m7400"],
+            ac_cv_altivec_inline=no)
+         ])])
+     if test "x${ac_cv_altivec_inline}" != "xno"; then
+	AC_DEFINE(HAVE_PPC_ALTIVEC, 1, Define if \$CC groks AltiVec inline assembly.)
+       if test "x${ac_cv_altivec_inline}" != "xyes"; then
+    	 use_altivec=yes
+       fi
+     fi
+
+else
+  AC_MSG_RESULT(no)
+  have_c_altivec=no
+fi
+
+
+AC_MSG_CHECKING([for MIPS architecture])
+if test "$host_cpu" = "mips" -o "$host_cpu" = "mipsel" ; then
+	AC_MSG_RESULT(yes)
+	have_mips=true
+	AC_DEFINE(ARCH_MIPS,1)
+else
+	AC_MSG_RESULT(no)
+	have_mips=no
+fi	
+
+AC_CACHE_CHECK([if \$CC groks AltiVec C extensions],
+    [ac_cv_c_altivec],
+    [CFLAGS="${CFLAGS_save} -faltivec"
+     # Darwin test
+     AC_TRY_COMPILE(,[vec_mtvscr((vector unsigned int)(0));],
+        ac_cv_c_altivec=-faltivec, [
+        # Linux/PPC test
+        CFLAGS="${CFLAGS_save} ${CFLAGS_idctaltivec} -fvec"
+        AC_TRY_COMPILE(,[vec_mtvscr((vector unsigned int)(0));],
+            [ac_cv_c_altivec="-fvec"], ac_cv_c_altivec=no)
+        ])
+     CFLAGS="${CFLAGS_save}"])
+if test "x${ac_cv_c_altivec}" != "xno"; then
+  AC_DEFINE(CAN_COMPILE_C_ALTIVEC, 1, Define if your compiler groks C AltiVec extensions.)
+  have_c_altivec=true
+fi
+
+AC_CACHE_CHECK([if linker needs -framework vecLib],
+    [ac_cv_ld_altivec],
+    [LDFLAGS_save="${LDFLAGS}"
+     LDFLAGS="${LDFLAGS} -framework vecLib"
+     AC_TRY_LINK([],,ac_cv_ld_altivec=yes,ac_cv_ld_altivec=no)
+     LDFLAGS="${LDFLAGS_save}"
+    ])
+if test "x${ac_cv_ld_altivec}" != "xno"; then
+  LDFLAGS_save="${LDFLAGS_save} -framework vecLib"; LDFLAGS="${LDFLAGS_save}"
+fi
+
+echo enable_simd_accel = X"$enable_simd_accel"X
+
+if test "$enable_simd_accel" != "false" -a "$enable_simd_accel" != "no"
+then
+  if test x$have_x86cpu = xtrue
+  then
+   AC_DEFINE(HAVE_X86CPU,1)
+   AC_DEFINE(ARCH_X86,1)
+   AC_MSG_CHECKING([for support for gcc-style register parameters on Intel])
+   AC_TRY_COMPILE([],
+    [extern void x(
+     const unsigned char *src1,
+     const unsigned char *src2,
+     unsigned count,
+     unsigned char *dst) __attribute((regparm(3)));],
+   [AC_MSG_RESULT(yes)
+    AC_MSG_CHECKING([for support of MMX in assembly code])
+    cat > conftest.S <<EOF
+       .text
+
+       psubusb %mm3, %mm4
+EOF
+    if $CC -c conftest.S ; then
+      AC_MSG_RESULT(yes)
+      rm -f conftest.*
+      AC_DEFINE(HAVE_ASM_MMX)
+      have_asm_mmx=true
+    else
+      AC_MSG_RESULT(no)
+      echo "configure: failed program was:" >&AC_FD_CC
+      cat conftest.S >&AC_FD_CC
+      rm -f conftest.*;
+    fi
+    AC_PATH_PROGS(AS, nasm nasmw)
+    if test x$AS = x -o x$AS = x'"$AS"'; then
+        echo "*************************************************************************"
+        echo "** nasm not found!  X86 optimizations disabled!  (MMX/SSE instructions)**"
+        echo "** INSTALL NASM OR PERFORMANCE WILL BE CRAP!                           **"
+        echo "*************************************************************************"
+        enable_3dnow_accel=no
+        enable_cmov_extension=no
+        enable_simd_accel=no
+        have_asm_mmx=false
+        have_asm_sse=false
+        have_asm_nasm=false
+    else
+     AC_DEFINE(HAVE_ASM_NASM)
+	 have_asm_nasm=true
+     ASFLAGS="-f elf"
+     if test x$CYGWIN = xyes; then
+       ASFLAGS="-f coff"
+     fi
+     AC_SUBST(ASFLAGS)
+    fi
+   ],
+   [AC_MSG_RESULT(no)
+    AC_MSG_WARN(*** MMX Optimizations disabled....)]);
+  fi
+fi
+
+
+
+
+dnl *********************************************************************
+dnl For x86 machines only check which code model we should use
+dnl and whether the GCC tool chain can generate 3DNow assmebly instructions
+dnl 
+
+if test x$have_x86cpu = xtrue ; then
+AC_MSG_CHECKING(x86 sub-architecture settings)
+
+  if test "$enable_cmov_extension" != "no" ; then
+    arch=`uname -m`
+  else
+    arch=i586
+  fi 
+  have_cmov=false
+  case $arch in
+  i786) ARCHFLAGS="-mcpu=i786 -march=$arch"
+  have_cmov=true
+  ;;
+  i686) ARCHFLAGS="-mcpu=i686 -march=$arch"
+  have_cmov=true
+  ;;
+  i586) ARCHFLAGS="-mcpu=i586 -march=$arch"
+  have_cmov=false
+  ;;
+  *) 
+  have_cmov=false
+  ;;
+  esac
+AC_MSG_RESULT($ARCHFLAGS)
+
+else
+  have_cmov=false
+fi
+
+dnl **********************************************************************
+dnl All the conditional stuff for the Makefiles
+dnl
+AM_CONDITIONAL(HAVE_FREETYPE, test x$have_freetype = xtrue)
+AM_CONDITIONAL(BUILD_VEEJAY, test x$have_sdl = xtrue)
+AM_CONDITIONAL(HAVE_ASM_MMX, test x$have_asm_mmx = xtrue)
+AM_CONDITIONAL(HAVE_ASM_MMX2, test x$have_asm_mmx2 = xtrue)
+AM_CONDITIONAL(HAVE_ASM_SSE, test x$have_asm_sse = xtrue)
+AM_CONDITIONAL(HAVE_ASM_NASM, test x$have_asm_nasm = xtrue)
+AM_CONDITIONAL(HAVE_ASM_CMOV,test x$have_cmov = xtrue)
+AM_CONDITIONAL(HAVE_X86CPU, test x$have_x86cpu = xtrue)
+AM_CONDITIONAL(ARCH_X86, test x$have_x86cpu = xtrue)
+AM_CONDITIONAL(HAVE_PPCCPU, test x$have_ppccpu = xtrue)
+AM_CONDITIONAL(HAVE_MIPS, test x$have_mips = xtrue)
+AM_CONDITIONAL(HAVE_SDL, test x$have_sdl = xtrue)
+AM_CONDITIONAL(HAVE_XML2, test x$have_xml2 = xtrue)
+AM_CONDITIONAL(HAVE_V4L, test x$have_video4linux = xtrue)
+AM_CONDITIONAL(HAVE_DIRECTFB, test x$have_directfb = xtrue)
+AM_CONDITIONAL(HAVE_JACK, test x$jack_support = xyes)
+AM_CONDITIONAL(HAVE_SAMPLERATE, test x$rabbit_support = xyes)
+AM_CONDITIONAL(ARCH_PPC, test x$have_ppccpu = xtrue)
+AM_CONDITIONAL(CAN_COMPILE_C_ALTIVEC,test, "x${have_c_altivec}" = xtrue)
+AM_CONDITIONAL(LIBDV_PRE_0_9_9, test x$have_dv_gte_0_9_9 = xtrue)
+AM_CONDITIONAL(HAVE_MMX, test x$have_asm_mmx = xtrue)
+AM_CONDITIONAL(SYSTEM_DARWIN,test x$have_darwin = xtrue)
+dnl AM_CONDITIONAL(HAVE_NCURSES, test x$have_ncurses = xtrue)
+dnl *********************************************************************
+dnl Check for what warnings we want gcc to use and adjust the CFLAGS
+dnl as needed. This only works for GCC.
+dnl We do this last as it can screw up library detection etc...
+dnl 
+
+
+
+CFLAGS="$ARCHFLAGS $CFLAGS"
+if test "x${GCC}" != "xyes" ; then
+  enable_compile_warnings=no
+fi
+
+dnl CFLAGS="$CFLAGS -g -Wall"
+
+CFLAGS="$CFLAGS"  
+
+AC_MSG_CHECKING(what warning flags to pass to the C compiler)
+warnCFLAGS=
+if test "x$enable_compile_warnings" != "xno" ; then
+ if test "x$GCC" = "xyes" ; then
+    case "$CFLAGS" in
+     *-Wall*) ;;
+     *) warnCFLAGS="-Wall -Wunused" ;;
+    esac
+  if test "x$enable_compile_warnings" = "xyes" ; then
+    warnCFLAGS="$warnCFLAGS -Wmissing-prototypes -Wmissing-declarations -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual"
+  fi
+  if test "x$enable_warnings_as_errors" = "xyes" ; then
+    warnCFLAGS="$warnCFLAGS -Werror"
+  fi
+ fi
+fi
+
+AC_MSG_RESULT($warnCFLAGS)
+if test "x$cflags_set" != "xyes" ; then
+  CFLAGS="$CFLAGS $warnCFLAGS"
+  cflags_set=yes
+fi
+
+AC_ARG_ENABLE(altivec, AC_HELP_STRING([--enable-altivec], [enable Altivec code portions (yes)]),[case "${enableval}" in
+  yes) use_altivec=yes ;;
+  no)  use_altivec=no ;;
+  *) AC_MSG_ERROR(bad value ${enableval} for --enable-altivec) ;;
+esac], [if test x"$have_ppc_altivec" = x"true"; then use_altivec=yes; else use_altivec=no;fi])
+
+AM_CONDITIONAL(HAVE_PPC_ALTIVEC, test x"$use_altivec" = x"yes")
+
+
+AC_ARG_ENABLE(assert,
+ [  --disable-assert        Do not assert parameters to functions in libraries.],
+ [ case "$enableval" in yes|no) : ;; *) AC_MSG_ERROR(bad value for --enable-assert)                ;; esac ],
+ [ enable_assert=yes ])
+
+if test x"$enable_assert"                 = x"no"; then NDEBUG=1;                fi
+
+if test $ac_cv_flag_mmx = yes; then
+ WHAT=mmx
+else
+ WHAT=c2
+fi
+AC_SUBST(WHAT)
+
+dnl AC_DEFINE(VEEJAYTOOLS)
+dnl case x"$NDEBUG"                in x"1") AC_DEFINE(NDEBUG)                ;; esac
+
+
+AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED, 1,
+                    [Defined if building against uninstalled FFmpeg source])
+
+if test $have_ps2 = yes; then
+ ac_configure_args="$ac_configure_args --disable-v4l --disable-audio-oss --disable-dv1394 --disable-vhook --disable-ffmpeg --disable-ffserver --disable-zlib"
+else
+ac_configure_args="$ac_configure_args --disable-v4l --disable-audio-oss --disable-dv1394 --disable-vhook --disable-ffmpeg --disable-ffserver"
+fi
+
+AC_CONFIG_SUBDIRS(ffmpeg/ffmpeg)
+
+dnl sh ffmpeg-configure.in 
+
+dnl **********************************************************************
+dnl Output a Makefile or two and the lib/header descriptor script
+dnl
+AC_CONFIG_FILES([
+Makefile
+ffmpeg/Makefile
+libOSC/Makefile
+libvjmsg/Makefile
+libvjmem/Makefile
+libvje/Makefile
+libsample/Makefile
+utils/Makefile
+bio2jack/Makefile
+plugins/Makefile
+veejay/Makefile
+man/Makefile
+tools/Makefile
+])
+AC_OUTPUT
+
+AC_DEFINE(VERSION, ${VERSION})
+
+dnl ************************************************************************
+dnl Summarize the config for the user.
+dnl
+
+echo ""
+echo " veejay ${VERSION} build configuration :"
+echo ""
+echo " Build configuration:"
+if test x$have_x86cpu = xtrue ; then
+echo "                    x86 Architecture                : ${have_x86cpu}"
+echo "                    MMX enabled                     : ${have_asm_mmx}"
+echo "                    MMX2 enabled                    : ${have_asm_mmx2}"
+echo "                    SSE enabled                     : ${have_asm_sse}"
+echo "                    3DNow enabled                   : ${have_asm_3dnow}"
+echo "                    CMOV enabled                    : ${have_cmov}"
+fi
+
+if test x$have_ppccpu = xtrue ; then
+echo "			  PowerPC Architecture            : ${have_ppccpu}"
+fi
+
+if test x$have_mips = xtrue ; then
+echo "                    MIPS Architecture               : ${have_mips}"
+fi
+
+echo "                    glibc support for >2GB files    : ${have_large_file}"
+echo ""
+echo " Required dependencies:"
+echo "                    POSIX Threads (pthread)         : ${have_pthread}"  
+echo "                    video4linux recording/playback  : ${have_video4linux}"
+echo "                    libJPEG                         : ${have_jpeg}"
+echo ""
+echo " Optional dependencies:"
+echo "                    libDV (digital video)           : ${have_dv}"
+echo "                    Jack Audio Connection Kit       : ${have_jack}"
+echo "                    DirectFB support                : ${have_directfb}"
+echo "                    Simple Direct Media Layer       : ${have_sdl}"
+echo "                    XML C library for Gnome libxml2 : ${have_xml2}"
+echo ""
+echo " Plugin  dependencies:"
+echo "                    FreeType support                : ${have_freetype}"
+
+
+
