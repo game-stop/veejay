@@ -17,17 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
+#include <config.h>
 #include "opacity.h"
-#include "../../config.h"
-#include <stdlib.h>
-#include "../subsample.h"
 
 vj_effect *opacity_init(int w, int h)
 {
-    int width = 720;
-    int height = 576;
-	int len = width * height;
     vj_effect *ve = (vj_effect *) malloc(sizeof(vj_effect));
     ve->num_params = 1;
     ve->defaults = (int *) malloc(sizeof(int) * ve->num_params);	/* default values */
@@ -57,46 +51,15 @@ void opacity_apply(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 
     for (i = 0; i < len; i++) {
 	yuv1[0][i] = (op0 * yuv1[0][i] + op1 * yuv2[0][i]) >> 8;
-	}
+    }
     len >>= 2;		
 
     for (i = 0; i < len; i++) {
+	op0 = yuv1[1][i];
 	yuv1[1][i] = (op0 * yuv1[1][i] + op1 * yuv2[1][i]) >> 8;
+	op0 = yuv1[2][i];
 	yuv1[2][i] = (op0 * yuv1[2][i] + op1 * yuv2[2][i]) >> 8;
     }
-/*
-
-	unsigned int scale_x,nx,ny,x,i,y,len=width*height;
-	double c1 = opacity;
-	const double w_ratio = width / 255.0; 
-	const double h_ratio = height / 255.0;
-	int diff;
-
-	memcpy(buf[0], yuv1[0],len);  
-	memcpy(buf[1], yuv1[1],len);
-	memcpy(buf[2], yuv1[2],len);
-
-	for(y=0; y < height ; y++)
-	{
-		for(x=0; x < width; x++)
-		{
-			i = y * width + x;
-			diff = abs( yuv1[0][i] - yuv2[0][i] );
-			if(diff > opacity)	
-			{
-			diff = diff - 128;
-			nx = diff * w_ratio + x;
-			ny = diff * h_ratio + y;
-			if(nx < 0) nx += width;
-			if(nx < 0) nx = 0; else if (nx >= width) nx = width-1;
-			if(ny < 0) ny = 0; else if (ny >= height) ny = height-1;
-			yuv1[0][i] = buf[0][ny * width + nx];
-			yuv1[1][i] = buf[1][ny * width + nx];
-			yuv1[2][i] = buf[2][ny * width + nx];
-			}
-		}
-	}	
-*/	
  
 }
 
