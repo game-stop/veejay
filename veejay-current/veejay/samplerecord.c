@@ -329,6 +329,8 @@ void clip_reset_encoder(int s1) {
 	si->encoder_max_size = 0;
 	si->encoder_active = 0;
 	si->rec_total_bytes = 0;
+	si->encoder_duration = 0;
+
 	clip_update(si, s1);
 }
 

@@ -524,6 +524,107 @@ int veejay_init_editlist(veejay_t * info)
 
 }
 
+/*
+	initialize array of editlists and set pointer to it in the clip as user data
+*/
+int	veejay_prep_el( veejay_t *info, int s1 )
+{ 
+	editlist **el;
+	void *data = clip_get_user_data(s1);
+	int i;
+	if(data == NULL)
+	{
+		// allocate array of el
+		el = (editlist**) vj_malloc(sizeof(editlist*) * CLIP_MAX_RENDER );
+		for(i = 0; i < CLIP_MAX_RENDER; i ++)
+			el[i] = NULL;
+
+		data = (void*) el;
+		if(clip_set_user_data( s1, data ) )
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG,"Allocated place holder for render entries");
+			return 1;
+		}
+		if(el) free(el);
+	}
+	return 1;
+}
+
+/*
+	open a file and add the resulting editlist to clip's user_data
+*/
+int	veejay_add_el_entry( veejay_t *info, int s1, char *filename, int dst )
+{
+	editlist *el = vj_el_new( filename, info->edit_list->video_norm,
+		info->auto_deinterlace );
+	void *data;
+	editlist **el_list;
+	int entry;
+	int current;
+	if(!el)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Error adding %s",filename);
+		return 0;
+	}
+	if( dst <= 0 || dst >= CLIP_MAX_RENDER)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR ,"Invalid render entry %d", dst );
+		return 0;
+	}
+	
+	data = clip_get_user_data( s1 );
+	el_list = (editlist**) data;
+
+	// current
+	current = clip_get_render_entry( s1 );
+
+	
+	if( el_list[dst] != NULL )
+	{
+		// close file, delete file, ...
+		veejay_msg(VEEJAY_MSG_ERROR, "Removing old editlist");
+		vj_el_close( el_list[dst] );
+	}
+
+	el_list[dst] = el;
+
+	// now , update start and end positions
+	clip_set_render_entry( s1, dst );
+	clip_set_startframe( s1, 0 );
+	clip_set_endframe( s1, el->video_frames-1);
+	// back to current entry
+	clip_set_render_entry( s1, current );
+
+	return 1;
+}
+
+/*
+	get editlist pointer from clip's user_data
+*/
+/*
+editlist *veejay_get_el( veejay_t *info, int s1 )
+{
+	void *data;
+	editlist **el_list;
+	int entry;
+
+	data = clip_get_user_data( s1 );
+	if(data == NULL) return NULL;
+	el_list = (editlist**) data;
+	entry   = clip_get_render_entry( s1 );
+	if( entry < 0 ) return NULL;
+	if(entry > 0 && entry < CLIP_MAX_RENDER) 
+		return el_list[entry];
+
+	return info->edit_list;
+}
+*/
+/*
+	setup start/end of rendered clip
+*/
+
+
+
 #ifdef HAVE_XML2
 void   veejay_load_action_file( veejay_t *info, char *file_name)
 {

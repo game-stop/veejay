@@ -254,6 +254,8 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_CLIP_ADD_WAVE				=	2041,
 	VJ_EVENT_CLIP_DEL_WAVE				=	2042,
 	VJ_EVENT_CLIP_COPY				=	2040,
+	VJ_EVENT_CLIP_SELECT_RENDER			=	2051,
+	VJ_EVENT_CLIP_RENDER_TO				=	2052,
 	VJ_EVENT_TAG_SELECT				=	2100,
 	VJ_EVENT_TAG_ACTIVATE				=	2101,
 	VJ_EVENT_TAG_DEACTIVATE				=	2102,
@@ -508,6 +510,8 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_FULLSCREEN,			NET_FULLSCREEN },
 	{ VJ_EVENT_STREAM_NEW_NET	,	NET_TAG_NEW_NET },
 	{ VJ_EVENT_GET_FRAME,			NET_GET_FRAME },
+	{ VJ_EVENT_CLIP_RENDER_TO,		NET_CLIP_RENDER_TO },
+	{ VJ_EVENT_CLIP_SELECT_RENDER,	NET_CLIP_RENDER_SELECT },
 	{0,0}
 };
 
@@ -777,6 +781,9 @@ static struct {
 	{ VJ_EVENT_CLIP_REC_START,		"Clip: record this clip to new",	 vj_event_clip_rec_start,	  2,	"%d %d",	{0,0}   },
 	{ VJ_EVENT_CLIP_REC_STOP,		"Clip: stop recording this clip",	 vj_event_clip_rec_stop,	  0,	NULL,
 	  {0,0}   },
+
+	{ VJ_EVENT_CLIP_RENDER_TO,		"Clip: render to inlined entry",	vj_event_clip_ren_start,	  2,	"%d %d",    {0,1}   },
+	{ VJ_EVENT_CLIP_SELECT_RENDER,	"Clip: select and play inlined entry",vj_event_clip_sel_render,	 2,		"%d %d",	{0,0}	},
 	{ VJ_EVENT_CLIP_DEL,			"Clip: delete",		 vj_event_clip_del,		  1,	"%d",		{0,0}	},
 	{ VJ_EVENT_CLIP_DEL_ALL,		"Clip: delete all",	vj_event_clip_clear_all,		  0,    NULL,		{0,0}	},
 	{ VJ_EVENT_CLIP_COPY,			"Clip: copy clip <num>", vj_event_clip_copy,		  1,    "%d",		{0,0}   },
@@ -3335,6 +3342,130 @@ void vj_event_clip_his_entry_to_new(void *ptr, const char format[],va_list ap)
 
 }
 
+void 	vj_event_clip_ren_start			( 	void *ptr, 	const char format[], 	va_list ap	)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	char *str = NULL;
+	int entry;
+	int s1;
+	int n;
+	int l; 
+	int changed = 0;
+	char tmp[255];
+	P_A( args,str, format, ap );
+
+	s1 = args[0];
+	entry = args[1];
+	if(entry < 0 || entry > CLIP_MAX_RENDER)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid renderlist entry given. Use %d - %d", 0,CLIP_MAX_RENDER);
+		return;
+	}
+	if(s1 == 0)	
+	{
+		s1 = v->uc->clip_id;
+		if(!CLIP_PLAYING(v))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR,"Not playing a clip");
+			return;
+		}
+	}
+
+	if(!clip_exists(s1))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Selected clip %d does not exist", s1);
+		return;
+	}
+
+	if(entry == clip_get_render_entry(s1) )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Destination entry cannot be the same as source entry.");
+		return;
+	}	
+
+	n = clip_get_speed( s1 );
+	if( n <= 0) 
+	{
+		if(n == 0) n = 1; else n = n * -1;
+		changed = 1;
+	}
+	l = clip_get_longest( s1 );
+
+	sprintf(tmp, "clip-%d-%d-XXXXXX", s1,l);
+
+	if( mkstemp( tmp ) != -1 ) 
+	{
+		int format = _recorder_format;
+		if(format==-1)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR,"Set a destination video format first");
+			return; 
+		}
+		// wrong format
+		if(! veejay_prep_el( v, s1 ))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize render editlist");
+			return;
+		}
+		if( clip_init_encoder( s1, tmp, format, v->edit_list, l) == 1)
+		{
+			video_playback_setup *s = v->settings;
+			s->clip_record_id = v->uc->clip_id;
+			s->render_list = entry;
+			veejay_msg(VEEJAY_MSG_INFO, "Rendering clip to render list entry %d", 
+				entry );
+		}
+	}
+}
+void	vj_event_clip_sel_render		(	void *ptr,	const char format[],	va_list ap  )
+{
+	int args[2];
+	int entry;
+	int s1;
+	char *str = NULL;
+	void *data;
+	editlist **el;
+	veejay_t *v = (veejay_t*) ptr;
+	P_A(args,str,format,ap);
+	
+	s1 = args[0];
+	entry = args[1];
+	if(entry < 0 || entry > CLIP_MAX_RENDER)
+		return;
+
+	if(s1 == 0 )
+	{
+		s1 = v->uc->clip_id;
+		if(!CLIP_PLAYING(v))
+			return;
+	}
+	if(!clip_exists(s1))
+		return;
+
+	if(entry == 0 )
+	{
+		if(clip_set_render_entry(s1, 0 ) )
+			veejay_msg(VEEJAY_MSG_INFO, "Selected main clip %d", s1 );  
+		return;
+	}
+
+	// check if entry is playable
+	data = clip_get_user_data( s1 );
+	el = (editlist**) data;
+
+	if(el[entry])  
+	{
+		if(clip_set_render_entry( s1, entry ))
+		{
+				veejay_msg(VEEJAY_MSG_INFO, "Selected render entry %d of clip %d", entry, s1 );
+		}
+	}
+
+}
+
+
+
 void vj_event_clip_rec_start( void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
@@ -3342,6 +3473,7 @@ void vj_event_clip_rec_start( void *ptr, const char format[], va_list ap)
 	int changed = 0;
 	int result = 0;
 	char *str = NULL;
+
 	P_A(args,str,format,ap);
 
 

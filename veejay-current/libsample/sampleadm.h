@@ -122,6 +122,7 @@ typedef struct clip_info_t {
     int selected_entry;
     int effect_toggle;
     int offset;
+    void *user_data;
 } clip_info;
 
 #define CLIP_YUV420_BUFSIZE 16
@@ -129,6 +130,8 @@ typedef struct clip_info_t {
 #define CLIP_DEC_BIBBER 1
 #define CLIP_DEC_FREEZE 2
 
+extern void *clip_get_user_data(int clip_id);
+extern int clip_set_user_data(int clip_id, void *data);
 extern int clip_chain_malloc(int clip_id);
 extern int clip_chain_free(int clip_id);
 extern int clip_size();

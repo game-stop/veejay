@@ -1450,6 +1450,38 @@ int vj_perform_apply_secundary_tag(veejay_t * info, int clip_id,
     return 0;
 }
 
+
+static int vj_perform_get_frame_(veejay_t *info, int s1, long nframe, uint8_t *img[3])
+{
+	int entry = clip_get_render_entry( s1 );
+	if(entry == 0)
+		return vj_el_get_video_frame(
+					info->edit_list,
+					nframe,
+					img,
+					info->pixel_format );
+	if(entry > 0)
+	{
+		editlist **el_list;
+		void	 *data = NULL;
+		data = clip_get_user_data( s1 );
+
+		if(data == NULL)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "No editlist at this entry!");
+			return 0;
+		}
+
+		el_list = (editlist**) data;
+		return vj_el_get_video_frame(
+				el_list[ entry ],
+				nframe,
+				img,
+				info->pixel_format );
+	}
+	return 1;
+}
+
 /********************************************************************
  * int vj_perform_apply_nsecundary( ... )
  *
@@ -1510,8 +1542,10 @@ int vj_perform_apply_secundary(veejay_t * info, int clip_id, int type,
         if(centry == -2)
 	    {
 		//not cached
-	        len =
-			vj_el_get_video_frame(info->edit_list,nframe,helper_frame->data, info->pixel_format); // and the length of that frame
+		len = vj_perform_get_frame_( info, clip_id, nframe, helper_frame->data );	
+	    //    len =
+		
+	//	vj_el_get_video_frame(info->edit_list,nframe,helper_frame->data, info->pixel_format); // and the length of that frame
 
 			if(len > 0 )
 			{
@@ -1787,8 +1821,13 @@ void vj_perform_plain_fill_buffer(veejay_t * info, int entry)
     frame[1] = primary_buffer[0]->Cb;
     frame[2] = primary_buffer[0]->Cr;
 
-    ret =	vj_el_get_video_frame( info->edit_list,
-			  settings->current_frame_num,frame,info->pixel_format);
+//    ret =	vj_el_get_video_frame( info->edit_list,
+//			  settings->current_frame_num,frame,info->pixel_format);
+	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_CLIP)
+		ret = vj_perform_get_frame_(info, info->uc->clip_id, settings->current_frame_num,frame );
+	else
+		ret = vj_el_get_video_frame(info->edit_list,settings->current_frame_num,frame,info->pixel_format);
+	
 
     if (ret <= 0 )
 	{
@@ -1874,10 +1913,25 @@ long vj_perform_record_commit_single(veejay_t *info, int entry)
   {
  	 if(clip_get_encoded_file(info->uc->clip_id, filename))
   	{
-		long dest = info->edit_list->video_frames;
-		if( veejay_edit_addmovie(info, filename, -1, dest,dest))
+
+		if( info->settings->render_list == 0)
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Added file %s", filename);
+			long dest = info->edit_list->video_frames;
+			if( veejay_edit_addmovie(info, filename, -1, dest,dest))
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "Added file %s", filename);
+			}
+		}
+		else
+		{
+			long dest = 0;
+			if( veejay_add_el_entry( info, info->uc->clip_id, filename, 
+					info->settings->render_list ))
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "New playable render entry %d",
+					info->settings->render_list );
+			}
+		    return -1;
 		}
  	 }
 	  return start_el_pos;
@@ -1917,6 +1971,7 @@ void vj_perform_record_stop(veejay_t *info)
 	 settings->clip_record = 0;
 	 settings->clip_record_id = 0;
 	 settings->clip_record_switch =0;
+     settings->render_list = 0;
  }
 
  if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
@@ -1945,6 +2000,8 @@ void vj_perform_record_stop(veejay_t *info)
 	veejay_set_clip(info, clip_size()-1);
  }
 
+
+
 }
 
 
@@ -1966,15 +2023,20 @@ void vj_perform_record_clip_frame(veejay_t *info, int entry) {
 		int len = clip_get_total_frames(info->uc->clip_id);
 		long frames_left = clip_get_frames_left(info->uc->clip_id) ;
 		// stop encoder
+		int n;
 		veejay_msg(VEEJAY_MSG_INFO, "Creating new file (reached 2gb AVI limit)");
 		clip_stop_encoder( info->uc->clip_id );
 		// close file, add to editlist
-		vj_perform_record_commit_single( info, entry );
+		
+
+
+		n = vj_perform_record_commit_single( info, entry );
 		// clear encoder
 		clip_reset_encoder( info->uc->clip_id );
 		// initialize a encoder
 		if(frames_left > 0 )
 		{
+			// todo: add to other editlist .. ?
 			if( clip_init_encoder( info->uc->clip_id, NULL,
 				df, info->edit_list, frames_left)==-1)
 			{
@@ -1984,7 +2046,7 @@ void vj_perform_record_clip_frame(veejay_t *info, int entry) {
 		}
 		else
 		{
-			vj_perform_record_commit_clip(info,-1,len);
+			if(n!=-1) vj_perform_record_commit_clip(info,-1,len);
 		}
 	 }
 
@@ -1993,8 +2055,10 @@ void vj_perform_record_clip_frame(veejay_t *info, int entry) {
 	 {
 		int len = clip_get_total_frames(info->uc->clip_id);
 		clip_stop_encoder(info->uc->clip_id);
-		vj_perform_record_commit_single( info, entry );	    
-		vj_perform_record_commit_clip(info, -1,len);
+		if(vj_perform_record_commit_single( info, entry ) != -1)
+		{	    
+			vj_perform_record_commit_clip(info, -1,len);
+		}
 		vj_perform_record_stop(info);
 	 }
 

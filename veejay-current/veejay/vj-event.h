@@ -37,7 +37,6 @@ int vj_event_get_video_format(void);
 int vj_event_get_num_args(int net_id);
 void vj_event_update_remote(void *ptr);
 void	vj_event_dump(void);
-
 void 	vj_event_chain_arg_inc			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_chain_arg_set			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_chain_disable			(	void *ptr, 	const char format[], 	va_list ap	);
@@ -114,6 +113,10 @@ void 	vj_event_clip_his_set_entry		(	void *ptr, 	const char format[], 	va_list a
 void 	vj_event_clip_his_unlock_entry		(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_clip_load_list			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_clip_rec_start			( 	void *ptr, 	const char format[], 	va_list ap	);
+
+void 	vj_event_clip_ren_start			( 	void *ptr, 	const char format[], 	va_list ap	);
+void	vj_event_clip_sel_render		(	void *ptr,	const char format[],	va_list ap  );
+
 void 	vj_event_clip_rec_stop			(	void *ptr, 	const char format[], 	va_list ap	); 
 #ifdef HAVE_XML2
 void 	vj_event_clip_save_list			(	void *ptr, 	const char format[], 	va_list ap	); 

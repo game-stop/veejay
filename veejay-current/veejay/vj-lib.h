@@ -121,6 +121,8 @@ typedef struct {
     int first_frame;		/* software sync variable */
     int valid[MJPEG_MAX_BUF];	/* num of frames to be played */
     long buffer_entry[MJPEG_MAX_BUF];
+    int render_entry;
+    int render_list;
     int last_rendered_frame;
     long rendered_frames;
     long currently_processed_entry;

@@ -805,6 +805,19 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 	return el;
 }
 
+void	vj_el_close( editlist *el )
+{
+	int i;
+	for ( i = 0; i < el->num_video_files; i ++ )
+	{
+		if( el->lav_fd[i] ) lav_close( el->lav_fd[i] );
+		if( el->video_file_list[i]) free(el->video_file_list[i]);
+	}
+	if( el->frame_list )
+		free(el->frame_list );
+	free(el);
+}
+
 
 editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int deinterlace, int force)
 {
@@ -1034,10 +1047,10 @@ void	vj_el_free(editlist *el)
 		free(el);   
 		el = NULL;
 	}
-	for(i=0; i < MAX_CODECS; i++)
-	{
-		if(el_codecs[i]) _el_free_decoder(el_codecs[i]);
-	}
+//	for(i=0; i < MAX_CODECS; i++)
+//	{
+//		if(el_codecs[i]) _el_free_decoder(el_codecs[i]);
+//	}
 }
 
 void	vj_el_print(editlist *el)
@@ -1224,5 +1237,66 @@ int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 
 	return 1;
 }
+
+editlist *vj_el_new(char *filename, char *norm, int deinterlace) 
+{
+	editlist *el = vj_malloc(sizeof(editlist));
+	uint64_t	index_list[MAX_EDIT_LIST_FILES];
+	uint64_t 	i = 0;
+	uint64_t 	n = 0;
+
+	if(!el) return NULL;
+
+	memset( el, 0, sizeof(editlist) );  
+
+	el->pixel_format = -1;
+	el->has_video = 1; //assume we get it   
+	el->MJPG_chroma = CHROMA420;
+	el->video_norm = norm;
+
+    n = open_video_file(filename, el, 0, deinterlace,0);
+
+	if(n<0)
+	{
+		vj_el_free(el);
+		return NULL;
+	}
+
+	el->frame_list = (uint64_t *) realloc(el->frame_list,
+		      (el->video_frames +
+		       el->num_frames[n]) *
+		      sizeof(uint64_t));
+
+	if (el->frame_list==NULL)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
+		vj_el_free(el);
+		return NULL;
+	}
+
+	for (i = 0; i < el->num_frames[n]; i++)
+	{
+		el->frame_list[el->video_frames] = EL_ENTRY(n, i);
+		el->video_frames++;
+	}
+	
+    /* Calculate maximum frame size */
+
+    for (i = 0; i < el->video_frames; i++)
+	{
+		n = el->frame_list[i];
+		if (lav_frame_size(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n)) >
+		    el->max_frame_size)
+		    el->max_frame_size =
+			lav_frame_size(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n));
+   	}
+
+    /* Help for audio positioning */
+    el->last_afile = -1;
+	el->auto_deinter = 0;
+
+	return el;
+}
+
 
 

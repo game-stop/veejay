@@ -298,6 +298,7 @@ clip_info *clip_skeleton_new(long startFrame, long endFrame)
     si->selected_entry = 0;
     si->effect_toggle = 1;
     si->offset = 0;
+    si->user_data = NULL;
     sprintf(si->descr, "%s", "Untitled");
 
     /* the effect chain is initially empty ! */
@@ -1177,6 +1178,21 @@ int clip_set_chain_source(int s1, int position, int input)
  * returns -1  on error.
  *
  ****************************************************************************************************/
+
+int clip_set_user_data(int s1, void *data)
+{
+	clip_info *clip = clip_get(s1);
+	if(!clip) return -1;
+	clip->user_data = data;
+	return ( clip_update(clip, s1) );
+}
+
+void *clip_get_user_data(int s1)
+{
+	clip_info *clip = clip_get(s1);
+	if(!clip) return NULL;
+	return clip->user_data;
+}
 
 int clip_set_speed(int s1, int speed)
 {
