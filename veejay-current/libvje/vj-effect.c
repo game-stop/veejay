@@ -128,6 +128,7 @@
 #include "effects/morphology.h"
 #include "effects/blob.h"
 #include "effects/ghost.h"
+#include "effects/boids.h"
 
 static struct
 {
@@ -166,6 +167,7 @@ static struct
 {	nervous_malloc,			nervous_free,		VJ_IMAGE_EFFECT_NERVOUS		},
 {	morphology_malloc,		morphology_free,	VJ_IMAGE_EFFECT_MORPHOLOGY	},
 {	blob_malloc,			blob_free,		VJ_IMAGE_EFFECT_VIDBLOB },
+{	boids_malloc,			boids_free,		VJ_IMAGE_EFFECT_VIDBOIDS 	},
 {	ghost_malloc,			ghost_free,		VJ_IMAGE_EFFECT_GHOST		},
 {	NULL			,	NULL			,0				},
 };
@@ -444,7 +446,8 @@ void vj_effect_initialize(int width, int height)
 	vj_effects[i + 62] = nervous_init(width,height);
 	vj_effects[i + 63] = morphology_init(width,height);
 	vj_effects[i + 64] = blob_init(width,height);
-	vj_effects[i + 65] = ghost_init(width,height);	
+	vj_effects[i + 65] = boids_init(width,height);
+	vj_effects[i + 66] = ghost_init(width,height);	
 	max_width = width;
 	max_height = height;
 

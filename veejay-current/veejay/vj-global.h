@@ -67,7 +67,7 @@ enum {
 #define EDIT_COPY		103
 #define EDIT_CROP		104
 #define EDIT_DEL		105
-#define MAX_EFFECTS 		102 
+#define MAX_EFFECTS 		103 
 #define MESSAGE_SIZE		1024	/* enough for my needs */
 #define EL_MIN_BUF		(65535 * 4)
 #define XMLTAG_BUNDLE_FILE  "ACTIONFILE"
