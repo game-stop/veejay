@@ -1031,6 +1031,7 @@ Optional Features:
   --disable-dependency-tracking Speeds up one-time builds
   --enable-dependency-tracking  Do not reject slow dependency extractors
 	--enable-ps2,			Disable ZLIB support.
+ --enable-debug,		Turn on debugging options.
   --enable-compile-warnings,        Turn on compiler warnings.
   --enable-warnings_as_errors,      Compiler warnings are errors.
   --disable-samplerate		Disable Samplerate support (default=no)
@@ -4235,6 +4236,11 @@ if test "${enable_ps2+set}" = set; then
   enableval="$enable_ps2"
   have_ps2=yes
 fi;
+# Check whether --enable-debug or --disable-debug was given.
+if test "${enable_debug+set}" = set; then
+  enableval="$enable_debug"
+
+fi;
 
 # Check whether --enable-compile-warnings or --disable-compile-warnings was given.
 if test "${enable_compile_warnings+set}" = set; then
@@ -6252,7 +6258,7 @@ test "x$enable_libtool_lock" != xno && enable_libtool_lock=yes
 case $host in
 *-*-irix6*)
   # Find out which ABI we are using.
-  echo '#line 6255 "configure"' > conftest.$ac_ext
+  echo '#line 6261 "configure"' > conftest.$ac_ext
   if { (eval echo "$as_me:$LINENO: \"$ac_compile\"") >&5
   (eval $ac_compile) 2>&5
   ac_status=$?
@@ -6781,7 +6787,7 @@ chmod -w .
 save_CFLAGS="$CFLAGS"
 CFLAGS="$CFLAGS -o out/conftest2.$ac_objext"
 compiler_c_o=no
-if { (eval echo configure:6784: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>out/conftest.err; } && test -s out/conftest2.$ac_objext; then
+if { (eval echo configure:6790: \"$ac_compile\") 1>&5; (eval $ac_compile) 2>out/conftest.err; } && test -s out/conftest2.$ac_objext; then
   # The compiler can only warn and ignore the option if not recognized
   # So say no if there are warnings
   if test -s out/conftest.err; then
@@ -8613,7 +8619,7 @@ else
     lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 8616 "configure"
+#line 8622 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -8711,7 +8717,7 @@ else
     lt_dlunknown=0; lt_dlno_uscore=1; lt_dlneed_uscore=2
   lt_status=$lt_dlunknown
   cat > conftest.$ac_ext <<EOF
-#line 8714 "configure"
+#line 8720 "configure"
 #include "confdefs.h"
 
 #if HAVE_DLFCN_H
@@ -21568,6 +21574,7 @@ fi
 CFLAGS="$ARCHFLAGS $CFLAGS"
 if test "x${GCC}" != "xyes" ; then
   enable_compile_warnings=no
+  enable_debug=no
 fi
 
 
@@ -21591,12 +21598,21 @@ if test "x$enable_compile_warnings" != "xno" ; then
  fi
 fi
 
+echo "$as_me:$LINENO: checking whether to pass debugging options to the C compiler" >&5
+echo $ECHO_N "checking whether to pass debugging options to the C compiler... $ECHO_C" >&6
+debugCFLAGS=
+if test "x$enable_debug" != "xno"; then
+ debugCFLAGS="-g"
+fi
+
 echo "$as_me:$LINENO: result: $warnCFLAGS" >&5
 echo "${ECHO_T}$warnCFLAGS" >&6
 if test "x$cflags_set" != "xyes" ; then
   CFLAGS="$CFLAGS $warnCFLAGS"
   cflags_set=yes
 fi
+
+CFLAGS="$CFLAGS $debugCFLAGS"
 
 # Check whether --enable-altivec or --disable-altivec was given.
 if test "${enable_altivec+set}" = set; then
@@ -23429,6 +23445,8 @@ _ACEOF
 
 echo ""
 echo " veejay ${VERSION} build configuration :"
+echo ""
+echo "Compiler flags: $CFLAGS"
 echo ""
 echo " Build configuration:"
 if test x$have_x86cpu = xtrue ; then

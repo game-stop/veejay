@@ -16,6 +16,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  */
+// todo: clean up initialization (use function pointers!)   
+
 #include <config.h>
 #include <stdlib.h>
 #include <stdio.h>
@@ -121,6 +123,11 @@
 #include "effects/uvcorrect.h"
 #include "effects/dissolve.h"
 #include "effects/overclock.h"
+#include "effects/cartonize.h"
+#include "effects/nervous.h"
+#include "effects/morphology.h"
+#include "effects/blob.h"
+#include "effects/ghost.h"
 
 static struct
 {
@@ -156,6 +163,10 @@ static struct
 {       radialblur_malloc,		radialblur_free,	 VJ_IMAGE_EFFECT_RADIALBLUR	},
 {	uvcorrect_malloc,		uvcorrect_free,		VJ_IMAGE_EFFECT_UVCORRECT	},
 {	overclock_malloc, 		overclock_free,		VJ_IMAGE_EFFECT_OVERCLOCK	},
+{	nervous_malloc,			nervous_free,		VJ_IMAGE_EFFECT_NERVOUS		},
+{	morphology_malloc,		morphology_free,	VJ_IMAGE_EFFECT_MORPHOLOGY	},
+{	blob_malloc,			blob_free,		VJ_IMAGE_EFFECT_VIDBLOB },
+{	ghost_malloc,			ghost_free,		VJ_IMAGE_EFFECT_GHOST		},
 {	NULL			,	NULL			,0				},
 };
 
@@ -429,7 +440,11 @@ void vj_effect_initialize(int width, int height)
     vj_effects[i + 58] = chromapalette_init(width,height);
     vj_effects[i + 59] = uvcorrect_init(width,height);
     vj_effects[i + 60] = overclock_init(width,height);
-
+	vj_effects[i + 61] = cartonize_init(width,height);
+	vj_effects[i + 62] = nervous_init(width,height);
+	vj_effects[i + 63] = morphology_init(width,height);
+	vj_effects[i + 64] = blob_init(width,height);
+	vj_effects[i + 65] = ghost_init(width,height);	
 	max_width = width;
 	max_height = height;
 

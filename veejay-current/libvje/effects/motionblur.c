@@ -100,15 +100,9 @@ void motionblur_apply( VJFrame *frame, int width, int height, int n) {
 	if(n_motion_frames >= n ) {
 		n_motion_frames = 0;
 
-#ifdef HAVE_ASM_MMX
-	memset_ycbcr( previous_frame[0], previous_frame[0], 0, (width*height));
-	memset_ycbcr( previous_frame[1], previous_frame[1], 0, (width*height)/4);
-	memset_ycbcr( previous_frame[2], previous_frame[2], 0, (width*height)/4);
-#else
 		memset( previous_frame[0], 0, (width*height));
-		memset( previous_frame[1], 0, len/4);
-		memset( previous_frame[2], 0, len/4);
-#endif
+		memset( previous_frame[1], 0, uv_len);
+		memset( previous_frame[2], 0, uv_len);
 	
 	}
 

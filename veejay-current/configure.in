@@ -55,6 +55,8 @@ dnl **********************************************************************
 dnl Options
 AC_ARG_ENABLE(ps2,
   [	--enable-ps2,			Disable ZLIB support.], have_ps2=yes)
+AC_ARG_ENABLE(debug,
+	[ --enable-debug,		Turn on debugging options.])
 
 AC_ARG_ENABLE(compile-warnings,     
   [  --enable-compile-warnings,        Turn on compiler warnings.])
@@ -841,6 +843,7 @@ dnl
 CFLAGS="$ARCHFLAGS $CFLAGS"
 if test "x${GCC}" != "xyes" ; then
   enable_compile_warnings=no
+  enable_debug=no
 fi
 
 dnl CFLAGS="$CFLAGS -g -Wall"
@@ -864,11 +867,19 @@ if test "x$enable_compile_warnings" != "xno" ; then
  fi
 fi
 
+AC_MSG_CHECKING(whether to pass debugging options to the C compiler)
+debugCFLAGS=
+if test "x$enable_debug" != "xno"; then
+ debugCFLAGS="-g"
+fi
+
 AC_MSG_RESULT($warnCFLAGS)
 if test "x$cflags_set" != "xyes" ; then
   CFLAGS="$CFLAGS $warnCFLAGS"
   cflags_set=yes
 fi
+
+CFLAGS="$CFLAGS $debugCFLAGS"
 
 AC_ARG_ENABLE(altivec, AC_HELP_STRING([--enable-altivec], [enable Altivec code portions (yes)]),[case "${enableval}" in
   yes) use_altivec=yes ;;
@@ -940,6 +951,8 @@ dnl
 
 echo ""
 echo " veejay ${VERSION} build configuration :"
+echo ""
+echo "Compiler flags: $CFLAGS"
 echo ""
 echo " Build configuration:"
 if test x$have_x86cpu = xtrue ; then

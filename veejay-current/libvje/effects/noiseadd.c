@@ -126,7 +126,7 @@ void noiseneg3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
 
     for (r = width; r < len; r += width) {
 	for (c = 1; c < width-1; c++) {
-		Yb_frame[c + r] = (src[0][r - width + c - 1] +
+		Yb_frame[c + r] = 255 - ((src[0][r - width + c - 1] +
 				  src[0][r - width + c] +
 				  src[0][r - width + c + 1] +
 				  src[0][r + width + c - 1] +
@@ -135,7 +135,7 @@ void noiseneg3x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {
 				  src[0][r + c] +
 				  src[0][r + c + 1] +
 				  src[0][r + c - 1]  
-		    ) / 9;
+		    )) / 9;
 	}
     }
 

@@ -316,7 +316,6 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 		  AVI_set_video(lav_fd->avi_fd,width,height,fps, "dvsd");
 		  if(asize) AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
 		  return lav_fd;
-	
 	}
 	return NULL;
 }
@@ -324,10 +323,10 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 int lav_close(lav_file_t *lav_file)
 {
 	int ret = 0;
-   video_format = lav_file->format; internal_error = 0; /* for error messages */
-   ret = AVI_close( lav_file->avi_fd );
-   if(lav_file) free(lav_file);
-   return 1;
+    video_format = lav_file->format; internal_error = 0; /* for error messages */
+  	 ret = AVI_close( lav_file->avi_fd );
+    if(lav_file) free(lav_file);
+    return 1;
 }
 
 int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)

@@ -25,7 +25,7 @@
 #include <string.h>
 #include <libvjmem/vjmem.h>
 
-#define MAX_EFFECTS 97
+#define MAX_EFFECTS 102
 
 
 // keyframe-able parameter sets

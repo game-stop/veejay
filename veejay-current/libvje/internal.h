@@ -174,11 +174,16 @@ enum {
     VJ_IMAGE_EFFECT_CHROMAPALETTE = 158,
     VJ_IMAGE_EFFECT_UVCORRECT = 159,
     VJ_IMAGE_EFFECT_OVERCLOCK = 160,
+	VJ_IMAGE_EFFECT_CARTONIZE = 161,
+	VJ_IMAGE_EFFECT_NERVOUS  = 162,
+	VJ_IMAGE_EFFECT_MORPHOLOGY = 163,
+	VJ_IMAGE_EFFECT_VIDBLOB = 164,
+	VJ_IMAGE_EFFECT_GHOST = 165,
     VJ_IMAGE_EFFECT_DUMMY = 100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 161
+#define VJ_IMAGE_EFFECT_MAX 166
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 236
@@ -463,5 +468,13 @@ extern void dissolve_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int opa
 extern void overclock_apply(VJFrame *frame, int w, int h, int val, int r);
 
 extern void diff_prepare(void *data, uint8_t *map[3], int w, int h);
+
+extern void	cartonize_apply( VJFrame *frame, int w, int h, int b1, int b2, int b3 );
+
+extern void 	morphology_apply( VJFrame *frame, int w, int h, int t, int v, int p);
+
+extern void		blob_apply( VJFrame *frame, int w, int h, int p0,int p1, int p2, int p3);
+
+extern void		ghost_apply(VJFrame *frame, int w, int h, int o );
 
 #endif

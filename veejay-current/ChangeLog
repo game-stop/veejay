@@ -1,3 +1,20 @@
+0.7.1
+	+ fixed color corruption in fib
+	+ removed veejay.spec from configure.in
+	+ added render history list
+	+ fixed bug in Displacement Map
+	+ added new effect 'Cartoon' (Flatten bitdepth)
+	+ added new effect 'Nervous'
+	+ removed obsolete file 'motiondetect' from libvje
+	+ fixed mode 2 of 'Amplify Low Noise' effect
+	+ added new effect 'Cartoon'
+	+ added new effect 'Motion Ghost'
+	+ added new effect 'Morphology' 
+	+ added new effect 'Nervous'
+	+ added new effect 'Strobo chroma scope'
+	- render to history list mismatches frames in clip
+	  (too many)
+	
 0.7.0
 	+ added --version commandline
 	+ fixed use of implicit declarations and other compiler warnings
