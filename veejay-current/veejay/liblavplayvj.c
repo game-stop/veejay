@@ -1,5 +1,4 @@
-
- /* libveejayvj - a extended librarified Linux Audio Video playback/Editing
+/* libveejayvj - a extended librarified Linux Audio Video playback/Editing
  *supports: 
  *		clip based editing
  *		pattern based editing 
@@ -691,6 +690,16 @@ void   veejay_load_action_file( veejay_t *info, char *file_name)
 
 void veejay_change_playback_mode( veejay_t *info, int new_pm, int clip_id )
 {
+	// if current is stream and playing network stream, close connection
+	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
+	{
+		int cur_id = info->uc->clip_id;
+		if( vj_tag_get_type( cur_id ) == VJ_TAG_TYPE_NET && cur_id != clip_id )
+		{
+			vj_tag_disable(cur_id);
+		}	
+	}
+
 	if(new_pm == VJ_PLAYBACK_MODE_PLAIN )
 	{
           int n = 0;
@@ -708,6 +717,16 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int clip_id )
 	if(new_pm == VJ_PLAYBACK_MODE_TAG)
 	{
 		int tmp=0;
+		// new mode is stream, see if clip_id is a network stream (if so, connect!)
+		if( vj_tag_get_type( clip_id ) == VJ_TAG_TYPE_NET )
+		{
+			if(vj_tag_enable( clip_id )<= 0 )
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Unable to activate network stream!");
+				return;
+			}
+		}	
+			
 		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_CLIP)
 		{
 			tmp = clip_chain_free(info->uc->clip_id);
@@ -887,12 +906,13 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 		}	   
 	}
 
-	if( vj_tag_new(type,filename,index,info->edit_list,info->pixel_format, channel ) )
+	if( vj_tag_new(type,filename,index,info->edit_list,info->pixel_format, channel ) != -1)
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "connected to host %s , port %d", filename, channel);
 		info->nstreams++;
 		return 0;	
-	}
+	}	
+	break;
     default:
 	veejay_msg(VEEJAY_MSG_ERROR, 
 		    "You tried to create a stream of an illegal type");
@@ -1163,49 +1183,22 @@ static void veejay_put_to_screen(veejay_t * info)
 static char status_what[MESSAGE_SIZE];
 static char status_msg[MESSAGE_SIZE+5];
 //static int status_first =0;
-static void veejay_pipe_write_status(veejay_t * info)
+void veejay_pipe_write_status(veejay_t * info, int link_id)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
-    /* identify msg by playback mode */
     int d_len = 0;
     int res = 0;
 
- //   sprintf(status_who, "%d %d %d", info->uc->playback_mode, info->audio, info->real_fps  );
-
     switch (info->uc->playback_mode) {
-      case VJ_PLAYBACK_MODE_CLIP:
-	/* get all current clip info 
-	if (clip_chain_sprint_status
-	    (info->uc->clip_id, clip_get_selected_entry(info->uc->clip_id),
-	     info->uc->chain_changed, info->uc->render_changed, status_what,
-	     settings->current_frame_num) != 0) {
-	    veejay_msg(VEEJAY_MSG_DEBUG, 
-			"Status of clip %d is invalid",
-			info->uc->clip_id);
-	    info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
-	}*/
-	if( clip_chain_sprint_status
-			(info->uc->clip_id, info->real_fps,settings->current_frame_num, info->uc->playback_mode, status_what ) != 0)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
-		}
-	break;
-       case VJ_PLAYBACK_MODE_PLAIN:
-/*
-	sprintf(status_what, "%d %d %d %d %ld %f %ld %d %d %d",
-		settings->min_frame_num,
-		settings->current_frame_num,
-		settings->max_frame_num,
-		settings->current_playback_speed,
-		info->edit_list->video_frames - 1,
-		info->edit_list->video_fps,
-		info->edit_list->num_video_files,
-		settings->audio_mute, 
-		clip_size() - 1,
-		vj_tag_size()-1
-	    );
-*/
+    	case VJ_PLAYBACK_MODE_CLIP:
+			if( clip_chain_sprint_status
+				(info->uc->clip_id, info->real_fps,settings->current_frame_num, info->uc->playback_mode, status_what ) != 0)
+				{
+				veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
+			}
+		break;
+       	case VJ_PLAYBACK_MODE_PLAIN:
 		sprintf(status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d",
 			(int) info->real_fps,
 			settings->current_frame_num,
@@ -1220,35 +1213,28 @@ static void veejay_pipe_write_status(veejay_t * info)
 			0,
 			0,
 			0 );
-	break;
-    case VJ_PLAYBACK_MODE_TAG:
-/*	if (vj_tag_sprint_status(info->uc->clip_id,
-				 vj_tag_get_selected_entry(info->uc->clip_id),
-				 info->uc->chain_changed, status_what) != 0) {
-	    veejay_msg(VEEJAY_MSG_DEBUG, 
-			"Status of stream is invalid");
-	    info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
-	}*/
-	if( vj_tag_sprint_status( info->uc->clip_id, (int) info->real_fps,
+		break;
+    	case VJ_PLAYBACK_MODE_TAG:
+		if( vj_tag_sprint_status( info->uc->clip_id, (int) info->real_fps,
 			settings->current_frame_num, info->uc->playback_mode, status_what ) != 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
 		}
-	break;
-       }
+		break;
+    }
     
     d_len = strlen(status_what);
     
     snprintf(status_msg,MESSAGE_SIZE, "V%03dS%s", d_len, status_what);
-
-    res = vj_server_status_send(info->status, status_msg, strlen(status_msg));
-    if( res < 0) { /* close command socket */
-		vj_server_close_link(info->vjs,res,0);
+    res = vj_server_send(info->vjs[1],link_id, status_msg, strlen(status_msg));
+    if( res <= 0) { /* close command socket */
+		vj_server_close_connection( info->vjs[1], link_id );
+		vj_server_close_connection( info->vjs[0], link_id );
 	}
     if (info->uc->chain_changed == 1)
-	info->uc->chain_changed = 0;
+		info->uc->chain_changed = 0;
     if (info->uc->render_changed == 1)
-	info->uc->render_changed = 0;
+		info->uc->render_changed = 0;
 }
 
 /******************************************************
@@ -1288,14 +1274,13 @@ static void veejay_handle_callbacks(veejay_t *info) {
 
 	/* send status information */
 	
-	if (info->uc->is_server) {
-	    //int n;
-	    if( vj_server_poll(info->status) )
+	if (info->uc->is_server)
+	{
+/*	    if( vj_server_poll(info->vjs[1]) )
 	    {
-		vj_server_status_check(info->status);
-	    }
- 	    if( info->status->nr_of_links > 0) veejay_pipe_write_status(info);
-
+			vj_server_new_connection( info->vjs[1] );
+	    }*/
+ 	 //   if( info->vjs[1]->nr_of_links > 0 ) veejay_pipe_write_status(info);
 	}
 }
 
@@ -2186,10 +2171,10 @@ static void *veejay_playback_thread(void *data)
     veejay_playback_cycle(info);
 
     if(info->uc->is_server) {
-     vj_server_shutdown(info->vjs,0);
-     vj_server_shutdown(info->status,1); 
-     free(info->vjs);
-     free(info->status);
+     vj_server_shutdown(info->vjs[0]);
+     vj_server_shutdown(info->vjs[1]); 
+     free(info->vjs[0]);
+     free(info->vjs[1]);
     }
     if(info->osc) vj_osc_free(info->osc);
 
@@ -2261,18 +2246,21 @@ int vj_server_setup(veejay_t * info)
     if (info->uc->port == 0)
 	info->uc->port = VJ_PORT;
 
-    info->vjs = vj_server_alloc(info->uc->port, 0);
-    if(!info->vjs)
-	return 0;
-    info->status = vj_server_alloc((info->uc->port + 1), 1);
-    if(!info->status)
-	return 0;
+    info->vjs[0] = vj_server_alloc(info->uc->port);
+    if(!info->vjs[0])
+		return 0;
+    info->vjs[1] = vj_server_alloc((info->uc->port + 1));
+    if(!info->vjs[1])
+		return 0;
+
+	if(info->settings->use_mcast)
+		GoMultiCast( info->settings->group_name );
     info->osc = (vj_osc*) vj_osc_allocate(info->uc->port+2);
     if(!info->osc) 
-	return 0;
+		return 0;
 
 
-    if (info->osc == NULL || info->vjs == NULL || info->status == NULL) {
+    if (info->osc == NULL || info->vjs[0] == NULL || info->vjs[1] == NULL) {
 	return 0;
     }
     info->uc->is_server = 1;
@@ -2357,6 +2345,7 @@ veejay_t *veejay_malloc()
     info->settings->tag_record = 0;
     info->settings->clip_record_switch = 0;
     info->settings->clip_record = 0;
+	info->settings->use_mcast = 0;
     info->edit_list = NULL;
     info->uc = (user_control *) vj_malloc(sizeof(user_control));
     if (!(info->uc)) {
@@ -2905,9 +2894,9 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, int ofps, in
 		if( !info->dummy->fps )
 			info->dummy->fps = 25.0;
 		if( !info->dummy->width )
-			info->dummy->width = 720/2;
+			info->dummy->width = 352;
 		if( !info->dummy->height)
-			info->dummy->height = 576/2;
+			info->dummy->height = 288;
 		if( !force_pix_fmt)
 			info->dummy->chroma = CHROMA420;
 		else
