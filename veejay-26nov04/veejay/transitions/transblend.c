@@ -73,10 +73,10 @@ void transblend_apply( VJFrame *frame, VJFrame *frame2, int width,
     pix_func_Y func_y = get_pix_func_Y((const int) type);
     pix_func_C func_c = get_pix_func_C((const int) type);
 
-    uvy1 = y1 / frame->shift_v;
-    uvy2 = y2 / frame->shift_v;
-    uvx1 = x1 / frame->shift_h;
-    uvx2 = x2 / frame->shift_h;
+    uvy1 = y1 >> frame->shift_v;
+    uvy2 = y2 >> frame->shift_v;
+    uvx1 = x1 >> frame->shift_h;
+    uvx2 = x2 >> frame->shift_h;
 
   	Y = frame->data[0];
 	Cb = frame->data[1];
