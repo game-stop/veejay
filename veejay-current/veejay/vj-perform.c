@@ -1850,8 +1850,6 @@ void vj_perform_plain_fill_buffer(veejay_t * info, int entry)
     frame[1] = primary_buffer[0]->Cb;
     frame[2] = primary_buffer[0]->Cr;
 
-//    ret =	vj_el_get_video_frame( info->edit_list,
-//			  settings->current_frame_num,frame,info->pixel_format);
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_CLIP)
 		ret = vj_perform_get_frame_(info, info->uc->clip_id, settings->current_frame_num,frame );
 	else
