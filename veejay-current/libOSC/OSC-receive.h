@@ -215,6 +215,8 @@ Boolean NetworkPacketWaiting(OSCPacketBuffer packet);
 
 void	GoMultiCast(const char *groupname);
 
+int		IsMultiCast( char *dst);
+
 /**************************************************
    How to use this stuff
  **************************************************/
