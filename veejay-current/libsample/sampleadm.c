@@ -2394,7 +2394,7 @@ int clip_readFromFile(char *clipFile)
     cur = cur->xmlChildrenNode;
     while (cur != NULL) {
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_CLIP)) {
-	    skel = clip_skeleton_new(0, 0);
+	    skel = clip_skeleton_new(0, 1);
 	    clip_store(skel);
 	    if (skel != NULL) {
 		ParseClip(doc, cur->xmlChildrenNode, skel);
