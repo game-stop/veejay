@@ -1059,8 +1059,8 @@ void	vj_el_print(editlist *el)
 	char timecode[64];
 	char interlacing[64];
 	MPEG_timecode_t ttc;
-	veejay_msg(VEEJAY_MSG_INFO,"EditList settings: Video:%dx%d@%2.2f %s\tAudio:%d Hz/%d channels/%d bits",
-		el->video_width,el->video_height,el->video_fps,(el->video_norm=='p' ? "PAL" :"NTSC"),
+	veejay_msg(VEEJAY_MSG_INFO,"EditList settings: Video:%s %dx%d@%2.2f %s\tAudio:%d Hz/%d channels/%d bits",
+		(el->pixel_format == FMT_420 ? "420" : "422"),el->video_width,el->video_height,el->video_fps,(el->video_norm=='p' ? "PAL" :"NTSC"),
 		el->audio_rate, el->audio_chans, el->audio_bits);
 	for(i=0; i < el->num_video_files ; i++)
 	{

@@ -355,7 +355,7 @@ static void check_command_line_options(int argc, char *argv[])
 	{"height",1,0,0},
 	{"norm",1,0,0},
 	{"framerate",1,0,0},
-	{"ycbcr",0,0,0},
+	{"ycbcr",1,0,0},
 	{"multicast-osc",1,0,0},
 	{"multicast-vims",1,0,0},
 	{0, 0, 0, 0}
