@@ -1619,6 +1619,7 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 				tag->rec_total_bytes += buf_len;
 			}
 			break;
+#ifdef SUPPORT_READ_DV2
 		case DATAFORMAT_DV2:
 			buf_len = vj_dv_encode_frame( buffer, tag_encoder_buf );
 			if(lav_write_frame( tag->encoder_file, tag_encoder_buf, buf_len, 1))
@@ -1628,6 +1629,7 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 			}
 			tag->rec_total_bytes += buf_len;
 			break;
+#endif
 		case DATAFORMAT_YUV420:
 			len = tag->encoder_width * tag->encoder_height ;
 			buf_len = len + (len/2);

@@ -1,3 +1,5 @@
+        + libdv optional now
+	+ bit of cleanup
 	+ fixed bug in radial blur that caused segmentation fault
 	+ extended chrominance palette to key on color 
 	+ cleanup overlay scratcher 

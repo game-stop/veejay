@@ -1157,9 +1157,11 @@ int vj_perform_decode_frame(veejay_t * info, uint8_t * buff, int len,
 	case DATAFORMAT_MPEG4:
 		res = vj_ffmpeg_decode_frame(info->mpeg4_decoder,buff,len,Y,Cb,Cr);
 		break;
+#ifdef SUPPORT_READ_DV2
     case DATAFORMAT_DV2:
 	vj_dv_decode_frame(buff, Y, Cb, Cr, w, h);
 	break;
+#endif
         default:
  	veejay_msg(VEEJAY_MSG_ERROR, "Unsupported video codec, aborting ...");
 	veejay_change_state(info, LAVPLAY_STATE_STOP);

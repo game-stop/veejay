@@ -28,7 +28,6 @@
 #ifndef VJ_LIB_H
 #define VJ_LIB_H
 
-#include <utils/videodev_mjpeg.h>
 #include "vj-keyframe.h"
 #include "sampleadm.h"
 #include "vj-v4lvideo.h"
@@ -86,7 +85,13 @@ enum {
 #define DUMMY_DEFAULT_FPS 25
 
 /* Video Playback Setup, necessary items for reading and playing video */
-
+struct mjpeg_sync
+{
+   unsigned long frame;      /* Frame (0 - n) for double buffer */
+   unsigned long length;     /* number of code bytes in buffer (capture only) */
+   unsigned long seq;        /* frame sequence number */
+   struct timeval timestamp; /* timestamp */
+};
 
 
 typedef struct {

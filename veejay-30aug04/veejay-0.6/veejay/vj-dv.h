@@ -18,7 +18,8 @@
  */
 #ifndef VJ_DV_H
 #define VJ_DV_H
-
+#include <config.h>
+#ifdef SUPPORT_READ_DV2
 #include "editlist.h"
 
 void vj_dv_init(int width, int height);
@@ -28,5 +29,5 @@ int vj_dv_decode_frame(uint8_t * in, uint8_t * Y,
 int vj_dv_encode_frame(uint8_t * in[3], uint8_t * out);
 void vj_dv_free_encoder();
 void vj_dv_free_decoder(); 
-
+#endif
 #endif

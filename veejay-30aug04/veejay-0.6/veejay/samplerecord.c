@@ -307,6 +307,7 @@ int clip_record_frame(vj_ffmpeg *encoder, int s1, uint8_t *buffer[3], uint8_t *a
 				si->rec_total_bytes += buf_len;
 			}
 			break;
+#ifdef SUPPORT_READ_DV2
 		case DATAFORMAT_DV2:
 			buf_len = vj_dv_encode_frame( buffer, clip_encoder_buf );
 			if(lav_write_frame( si->encoder_file, clip_encoder_buf, buf_len, 1))
@@ -316,6 +317,7 @@ int clip_record_frame(vj_ffmpeg *encoder, int s1, uint8_t *buffer[3], uint8_t *a
 			}
 			si->rec_total_bytes += ( si->encoder_width * si->encoder_height * 2 );
 			break;
+#endif
 		case DATAFORMAT_YUV420:
 	
 			veejay_memcpy(clip_encoder_buf, 

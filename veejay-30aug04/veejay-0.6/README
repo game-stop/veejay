@@ -13,11 +13,11 @@ Must have:
     SDL (simple direct media layer)
 	http://www.libsdl.org
 
-    Quasar DV Codec
-    
-	http://libdv.sourceforge.net
-	
+    	
 Optional:
+
+    Quasar DV codec
+	http://libdv.sourceforge.net
 
     DirectFB (for output on secundary head/TV-Out) 
     

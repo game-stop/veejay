@@ -5744,6 +5744,7 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		_recorder_format = DATAFORMAT_DIVX;
 		veejay_msg(VEEJAY_MSG_INFO,"Recorder writes in MSMPEG4v3 format");
 	}
+#ifdef SUPPORT_READ_DV2
 	if(strncasecmp(str,"dv",2)==0||strncasecmp(str,"dvsd",4)==0)
 	{
 		if(v->editlist->video_width == 720 &&
@@ -5757,6 +5758,7 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_ERROR,"For this movie DV must have geometry 720x%d",	(v->editlist->video_norm == 'p' ? 576 : 480));
 		}
 	}
+#endif
 	if(strncasecmp(str,"mjpeg",5)== 0 || strncasecmp(str,"mjpg",4)==0 ||
 		strncasecmp(str, "jpeg",4)==0)
 	{

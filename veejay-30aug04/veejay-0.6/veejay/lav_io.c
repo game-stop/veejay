@@ -360,13 +360,14 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 	  if(asize) AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
 	  return lav_fd;
 
+#ifdef SUPPORT_READ_DV2
       case 'd':
 	  lav_fd->avi_fd = AVI_open_output_file(filename);
 	  if(!lav_fd->avi_fd) { free(lav_fd); return 0; }
 	  AVI_set_video(lav_fd->avi_fd,width,height,fps, "dvsd");
 	  if(asize) AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
 	  return lav_fd;
-
+#endif 
       case 'j': {
 
         /* Open JPEG output file */

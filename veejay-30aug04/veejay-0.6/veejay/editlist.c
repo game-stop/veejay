@@ -270,8 +270,11 @@ int video_files_not_supported(EditList *el)
     for(n=0; n < el->num_video_files; n++)
     {
        char *c = (char*)lav_video_compressor(el->lav_fd[n]);  
-       if( 	strncasecmp("dvsd",c,4)!=0 &&
+       if( 
+#ifdef SUPPORT_READ_DV2
+		strncasecmp("dvsd",c,4)!=0 &&
 		strncasecmp("dv",c,2)!=0 &&
+#endif
 		strncasecmp("yuv",c,3)!=0 && 
 		strncasecmp("iyuv",c,4)!=0 &&
 		strncasecmp("jpeg",c,4)!=0 &&
@@ -690,10 +693,12 @@ int el_video_frame_data_format(long nframe, EditList * el)
     n = N_EL_FILE(el->frame_list[nframe]);
     comp = lav_video_compressor(el->lav_fd[n]);
 
+#ifdef SUPPORT_READ_DV2
     if (strncasecmp(comp, "dsvd",4) ==0)
 	return DATAFORMAT_DV2;
     if (strncasecmp(comp, "dv", 2) == 0)
 	return DATAFORMAT_DV2;
+#endif
     if (strncasecmp(comp, "mjp", 3) == 0)
 	return DATAFORMAT_MJPG;
     if (strncasecmp(comp, "jpeg", 4) == 0)

@@ -442,7 +442,7 @@ LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 DIST_SOURCES = $(liblavjpeg_la_SOURCES) $(libveejay_la_SOURCES) \
 	$(veejay_SOURCES)
-DIST_COMMON = $(srcdir)/Makefile.in Makefile.am TODO
+DIST_COMMON = $(srcdir)/Makefile.in Makefile.am
 SOURCES = $(liblavjpeg_la_SOURCES) $(libveejay_la_SOURCES) $(veejay_SOURCES)
 
 all: all-am

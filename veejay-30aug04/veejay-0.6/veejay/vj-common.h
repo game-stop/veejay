@@ -2,6 +2,7 @@
 #ifndef VJ_COMMON_H
 #define VJ_COMMON_H
 #include <stdarg.h>
+#include <stdint.h>
 #include "vj-lib.h"
 
 #define VEEJAY_FILE_LIMIT (1048576*1000*2)

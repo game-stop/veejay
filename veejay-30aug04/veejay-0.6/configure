@@ -18438,9 +18438,8 @@ _ACEOF
 fi
 
 else
-	{ { echo "$as_me:$LINENO: error: Cannot find libdv" >&5
-echo "$as_me: error: Cannot find libdv" >&2;}
-   { (exit 1); exit 1; }; }
+	{ echo "$as_me:$LINENO: WARNING: Cannot find libdv" >&5
+echo "$as_me: WARNING: Cannot find libdv" >&2;}
 fi
 
 if test x$with_dv_yv12 = xyes; then
@@ -18516,12 +18515,6 @@ fi
 
 fi
 
-
-if test x$have_dv = xfalse ; then
- { { echo "$as_me:$LINENO: error: libdv is required, fetch it from http://libdv.sourceforge.net" >&5
-echo "$as_me: error: libdv is required, fetch it from http://libdv.sourceforge.net" >&2;}
-   { (exit 1); exit 1; }; }
-fi
 
 echo "$as_me:$LINENO: checking for X" >&5
 echo $ECHO_N "checking for X... $ECHO_C" >&6
@@ -23031,10 +23024,10 @@ echo "                    POSIX Threads (pthread)         : ${have_pthread}"
 echo "                    video4linux recording/playback  : ${have_video4linux}"
 echo "                    Simple Direct Media Layer       : ${have_sdl}"
 echo "                    XML C library for Gnome libxml2 : ${have_xml2}"
-echo "                    libDV (digital video)           : ${have_dv}"
 echo "                    libJPEG                         : ${have_jpeg}"
 echo ""
 echo " Optional dependencies:"
+echo "                    libDV (digital video)	          : ${have_dv}"
 echo "                    Jack Audio Connection Kit       : ${have_jack}"
 echo "                    DirectFB support                : ${have_directfb}"
 

@@ -17,6 +17,7 @@
  * along with this program; if not, write to the Free Software
  */
 #include <config.h>
+
 #ifdef SUPPORT_READ_DV2
 #include <libdv/dv.h>
 #include <stdint.h>

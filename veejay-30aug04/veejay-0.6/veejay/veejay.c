@@ -55,6 +55,13 @@ static int default_geometry_y = -1;
 
 static void CompiledWith()
 {
+ fprintf(stderr, "Codecs:\n");
+ fprintf(stderr, "\tlibdv: ");
+#ifdef SUPPORT_READ_DV2
+ fprintf(stderr, "YES\n");
+#else
+ fprintf(stderr, "NO\n");
+#endif
  fprintf(stderr, "Audio:\n");
  fprintf(stderr, "\tJack : ");
 #ifdef HAVE_JACK

@@ -2,6 +2,7 @@
 #define VJ_SDL_H
 
 #include <SDL/SDL.h>
+#include <stdint.h>
 #include "vj-dv.h"
 
 

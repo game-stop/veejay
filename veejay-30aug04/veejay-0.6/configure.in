@@ -459,7 +459,7 @@ if test x$have_dv = xtrue; then
 	[ AC_DEFINE(LIBDV_PRE_0_9_9) ],
     -L$with_dv$with_dv_l  ${EXTRA_LIBS})
 else
-	AC_MSG_ERROR([Cannot find libdv])
+	AC_MSG_WARN([Cannot find libdv])
 fi
 
 dnl *********************************************************************
@@ -480,10 +480,6 @@ AC_CHECK_LIB(dv, dv_init,
 fi
 
 
-if test x$have_dv = xfalse ; then
- AC_MSG_ERROR([libdv is required, fetch it from http://libdv.sourceforge.net])
-fi 
- 
 dnl *********************************************************************
 dnl  Lets find where xwindows lives on this machine. Punt if not found.
 AC_PATH_XTRA
@@ -897,10 +893,10 @@ echo "                    POSIX Threads (pthread)         : ${have_pthread}"
 echo "                    video4linux recording/playback  : ${have_video4linux}"
 echo "                    Simple Direct Media Layer       : ${have_sdl}"
 echo "                    XML C library for Gnome libxml2 : ${have_xml2}"
-echo "                    libDV (digital video)           : ${have_dv}"
 echo "                    libJPEG                         : ${have_jpeg}"
 echo ""
 echo " Optional dependencies:"
+echo "                    libDV (digital video)	          : ${have_dv}"
 echo "                    Jack Audio Connection Kit       : ${have_jack}"
 echo "                    DirectFB support                : ${have_directfb}"
 dnl echo " 			  Ncurses support                 : ${have_ncurses}"
