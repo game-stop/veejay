@@ -1,0 +1,77 @@
+==17178== Memcheck, a memory error detector for x86-linux.
+==17178== Copyright (C) 2002-2004, and GNU GPL'd, by Julian Seward.
+==17178== Using valgrind-2.1.1, a program supervision framework for x86-linux.
+==17178== Copyright (C) 2000-2004, and GNU GPL'd, by Julian Seward.
+==17178== For more details, rerun with: -v
+==17178== 
+==17178== Syscall param write(buf) contains uninitialised or unaddressable byte(s)
+==17178==    at 0x3C935708: write (in /lib/libc-2.3.2.so)
+==17178==    by 0x3C60F48F: (within /usr/X11R6/lib/libX11.so.6.2)
+==17178==    by 0x3C6100AE: _X11TransWrite (in /usr/X11R6/lib/libX11.so.6.2)
+==17178==    by 0x3C5EFE11: (within /usr/X11R6/lib/libX11.so.6.2)
+==17178==  Address 0x3CF79AFA is 14 bytes inside a block of size 2048 alloc'd
+==17178==    at 0x3C01EB2B: calloc (vg_replace_malloc.c:141)
+==17178==    by 0x3C5E1C4B: XOpenDisplay (in /usr/X11R6/lib/libX11.so.6.2)
+==17178==    by 0x3C4D1363: (within /usr/lib/libSDL-1.2.so.0.0.6)
+==17178==    by 0x3C4CA781: SDL_VideoInit (in /usr/lib/libSDL-1.2.so.0.0.6)
+==17178== 
+==17178== Syscall param writev(vector[...]) contains uninitialised or unaddressable byte(s)
+==17178==    at 0x3C93CECD: do_writev (in /lib/libc-2.3.2.so)
+==17178==    by 0x3C60F50F: (within /usr/X11R6/lib/libX11.so.6.2)
+==17178==    by 0x3C61010E: _X11TransWritev (in /usr/X11R6/lib/libX11.so.6.2)
+==17178==    by 0x3C5F0CE4: _XSend (in /usr/X11R6/lib/libX11.so.6.2)
+==17178==  Address 0x3D188DD3 is 19 bytes inside a block of size 2048 alloc'd
+==17178==    at 0x3C01EB2B: calloc (vg_replace_malloc.c:141)
+==17178==    by 0x3C5E1C4B: XOpenDisplay (in /usr/X11R6/lib/libX11.so.6.2)
+==17178==    by 0x3C4D1382: (within /usr/lib/libSDL-1.2.so.0.0.6)
+==17178==    by 0x3C4CA781: SDL_VideoInit (in /usr/lib/libSDL-1.2.so.0.0.6)
+==17178== 
+==17178== ERROR SUMMARY: 4 errors from 2 contexts (suppressed: 47 from 2)
+==17178== malloc/free: in use at exit: 5352003 bytes in 1044 blocks.
+==17178== malloc/free: 2533 allocs, 1489 frees, 11269252 bytes allocated.
+==17178== For counts of detected errors, rerun with: -v
+==17178== searching for pointers to 1044 not-freed blocks.
+==17178== checked 15463116 bytes.
+==17178== 
+==17178== 
+==17178== 16 bytes in 1 blocks are definitely lost in loss record 12 of 178
+==17178==    at 0x3C01E394: malloc (vg_replace_malloc.c:105)
+==17178==    by 0x3C5F3902: (within /usr/X11R6/lib/libX11.so.6.2)
+==17178==    by 0x3C5F57AB: XrmGetStringDatabase (in /usr/X11R6/lib/libX11.so.6.2)
+==17178==    by 0x3C5D93A7: (within /usr/X11R6/lib/libX11.so.6.2)
+==17178== 
+==17178== 
+==17178== 80 bytes in 5 blocks are definitely lost in loss record 62 of 178
+==17178==    at 0x3C01E394: malloc (vg_replace_malloc.c:105)
+==17178==    by 0x3C071F26: hnode_create (hash.c:759)
+==17178==    by 0x3C09AB00: vj_tag_put (vj-tag.c:124)
+==17178==    by 0x3C09BBCA: vj_tag_new (vj-tag.c:505)
+==17178== 
+==17178== 
+==17178== 200 bytes in 1 blocks are definitely lost in loss record 83 of 178
+==17178==    at 0x3C01E394: malloc (vg_replace_malloc.c:105)
+==17178==    by 0x3C815E2D: my_malloc (vg_libpthread.c:334)
+==17178==    by 0x3C818B6D: get_or_allocate_specifics_ptr (vg_libpthread.c:1591)
+==17178==    by 0x3C818CFA: pthread_key_create (vg_libpthread.c:1628)
+==17178== 
+==17178== 
+==17178== 716 bytes in 1 blocks are definitely lost in loss record 100 of 178
+==17178==    at 0x3C01E394: malloc (vg_replace_malloc.c:105)
+==17178==    by 0x3C26E6F0: vj_malloc (in /usr/local/lib/libveejay-0.7.so.0.0.0)
+==17178==    by 0x3C09B59C: vj_tag_new (vj-tag.c:376)
+==17178==    by 0x3C0A4288: veejay_default_tags (liblavplayvj.c:686)
+==17178== 
+==17178== 
+==17178== 2400 bytes in 1 blocks are possibly lost in loss record 125 of 178
+==17178==    at 0x3C01E394: malloc (vg_replace_malloc.c:105)
+==17178==    by 0x3C26E6F0: vj_malloc (in /usr/local/lib/libveejay-0.7.so.0.0.0)
+==17178==    by 0x3C07B513: _vj_osc_time_malloc (vj-osc.c:238)
+==17178==    by 0x3C269931: InitPackets (in /usr/local/lib/libveejay-0.7.so.0.0.0)
+==17178== 
+==17178== LEAK SUMMARY:
+==17178==    definitely lost: 1012 bytes in 8 blocks.
+==17178==    possibly lost:   2400 bytes in 1 blocks.
+==17178==    still reachable: 5348591 bytes in 1035 blocks.
+==17178==         suppressed: 0 bytes in 0 blocks.
+==17178== Reachable blocks (those to which a pointer was found) are not shown.
+==17178== To see them, rerun with: --show-reachable=yes
