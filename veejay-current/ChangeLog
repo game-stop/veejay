@@ -20,10 +20,10 @@
 	+ librified editlist,stream and yuv functions
 	+ removed any references on dropped vloopback support
 	+ fixed ticket 6
-	
-	- fixed ticket 7
-
-	- autosplit?
+	+ fixed ticket 7
+	+ fixed autosplitting while recording
+	+ added dv1394 stream support
+          (uses libdv, so its slow even on a pentium3/1 ghz)
 
 0.7.1
 	+ fixed color corruption in fib

@@ -36,7 +36,7 @@ typedef struct
 	void *decoder;
 } vj_dv1394;
 
-vj_dv1394*	vj_dv1394_init(void *el);
+vj_dv1394*	vj_dv1394_init(void *el, int channel_nr);
 
 void		vj_dv1394_close( vj_dv1394 *v );
 

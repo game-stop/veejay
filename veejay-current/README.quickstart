@@ -95,4 +95,20 @@ Or in veejay's console
 (activate a stream or clip and) press SHIFT+S or SHIFT+B or SHIFT+ ... 
 
 
+Except all that, try this:
+
+
+sayVIMS -h localhost -p 3490 "145:;"
+(press F7)
+
+to open your dv1394 firewire device
+
+or
+sayVIMS -h localhost -p 3490 "144:0 1;"
+(press F7)
+
+to open your video4linux device /dev/video0, channel 1
+
+
+
  Enjoy!

@@ -895,7 +895,7 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 	}
 	break;
 	case VJ_TAG_TYPE_DV1394:
-	if(vj_tag_new(type, filename, index,info->edit_list, info->pixel_format, 0) )
+	if(vj_tag_new(type, filename, index,info->edit_list, info->pixel_format, channel) )
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Created new DV1394 stream");
 		info->nstreams++;

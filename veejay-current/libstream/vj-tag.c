@@ -344,9 +344,10 @@ int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el)
     return 1;
 }
 
-int	_vj_tag_new_dv1394(vj_tag *tag, int stream_nr, editlist *el)
+int	_vj_tag_new_dv1394(vj_tag *tag, int stream_nr, int channel, editlist *el)
 {
-    vj_tag_input->dv1394[0] = vj_dv1394_init( (void*) el);
+    vj_tag_input->dv1394[0] = vj_dv1394_init( (void*) el, channel);
+	veejay_msg(VEEJAY_MSG_DEBUG, "Channel in stream %d",channel);
     if(vj_tag_input->dv1394[0])
     {
 	veejay_msg(VEEJAY_MSG_INFO, "DV1394 ready for capture");
@@ -375,32 +376,35 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	}
     n = this_tag_id;
     /* see if we are already using the source */
-    for (i = 1; i < n; i++) {
-	if (vj_tag_exists(i)) {
-	    vj_tag_get_source_name(i, sourcename);
-	    if (strcmp(sourcename, filename) == 0) {
-		vj_tag *tt = vj_tag_get( i );
-		if( tt->source_type == VJ_TAG_TYPE_NET || tt->source_type == VJ_TAG_TYPE_MCAST )
+    for (i = 1; i < n; i++)
+	{
+		if (vj_tag_exists(i))
 		{
-			if( tt->video_channel == channel )
+		    vj_tag_get_source_name(i, sourcename);
+		    if (strcmp(sourcename, filename) == 0) {
+			vj_tag *tt = vj_tag_get( i );
+			if( tt->source_type == VJ_TAG_TYPE_NET || tt->source_type == VJ_TAG_TYPE_MCAST )
 			{
-				veejay_msg(VEEJAY_MSG_WARNING, "Already streaming from %s:%p in stream %d",
-					filename,channel, tt->id);
+				if( tt->video_channel == channel )
+				{
+					veejay_msg(VEEJAY_MSG_WARNING, "Already streaming from %s:%p in stream %d",
+						filename,channel, tt->id);
+					return -1;
+				}
+			}
+			else
+			{
+				veejay_msg(VEEJAY_MSG_WARNING,
+					   "Stream [%d] is already owner of file [%s]\n", n,
+					   filename);
 				return -1;
 			}
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_WARNING,
-				   "Stream [%d] is already owner of file [%s]\n", n,
-				   filename);
-			return -1;
-		}
 	    }
-	}
+		}
     }
     tag = (vj_tag *) vj_malloc(sizeof(vj_tag));
- 
+	if(!tag)
+		return -1; 
     tag->source_name = (char *) malloc(sizeof(char) * 255);
     if (!tag->source_name)
 		return -1;
@@ -482,7 +486,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	break;
     case VJ_TAG_TYPE_DV1394:
 	sprintf(tag->source_name, "/dev/dv1394");
-	if( _vj_tag_new_dv1394( tag, 0,el ) == 0 )
+	if( _vj_tag_new_dv1394( tag, 0,channel,el ) == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "error opening dv1394");
 		return -1;
@@ -881,9 +885,6 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 			0
 		);
 
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "sf = %ld , tf = %ld , nframes = %ld, duration = %ld",
-		tag->encoder_succes_frames,tag->encoder_total_frames,nframes,tag->encoder_duration );
 
 	if(!tag->encoder_file)
 	{
@@ -1759,9 +1760,6 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 	if(lav_write_frame(tag->encoder_file, tag_encoder_buf, buf_len,1))
 	{
 			veejay_msg(VEEJAY_MSG_ERROR, "writing frame, giving up :[%s]", lav_strerror());
-			veejay_msg(VEEJAY_MSG_DEBUG, "tb = %ld, tf = %ld, sf = %ld , dur = %ld",
-				tag->rec_total_bytes + buf_len, tag->encoder_total_frames,
-				tag->encoder_succes_frames, tag->encoder_duration);
 			return -1;
 	}
 	tag->rec_total_bytes += buf_len;

@@ -38,7 +38,7 @@
 #define DV1394_DEFAULT_CARD    0
 #define DV1394_RING_FRAMES     2
 
-static	int	vj_dv1394_reset(vj_dv1394 *v )
+static	int	vj_dv1394_reset(vj_dv1394 *v  )
 {
 	struct dv1394_init init;
 	init.channel = v->channel;
@@ -66,9 +66,17 @@ static	int	vj_dv1394_start(vj_dv1394 *v )
 	return 1;
 }
 
-vj_dv1394      *vj_dv1394_init(void *e)
+vj_dv1394      *vj_dv1394_init(void *e, int channel)
 {
 	editlist *el = (editlist*)e;
+
+	if(el->video_width != 720 && ( el->video_height != 576 || el->video_height != 480) )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "No software scaling to %d x %d",el->video_width,
+			el->video_height);
+		return NULL;
+	}
+
 	vj_dv1394 *v = (vj_dv1394*)vj_malloc(sizeof(vj_dv1394));
 
 	v->map_size = (el->video_norm == 'p' ? DV_PAL_SIZE: DV_NTSC_SIZE);
@@ -77,7 +85,7 @@ vj_dv1394      *vj_dv1394_init(void *e)
 	v->height = el->video_height;
 	v->norm = (el->video_norm == 'p' ? DV1394_PAL: DV1394_NTSC );
 	v->handle = open( "/dev/dv1394", O_RDONLY);
-	v->channel = DV1394_DEFAULT_CHANNEL;
+	v->channel = channel == -1 ? DV1394_DEFAULT_CHANNEL : channel;
 	v->index = 0;
 	if( v->handle == -1 )
 	{

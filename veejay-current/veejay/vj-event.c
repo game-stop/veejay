@@ -756,7 +756,7 @@ static struct {
 #ifdef HAVE_V4L
 	{ VJ_EVENT_TAG_NEW_V4L,			"Stream: open video4linux device (hw)",		 vj_event_tag_new_v4l,		 2,	"%d %d",		{0,1}	},	
 #endif
-	{ VJ_EVENT_TAG_NEW_DV1394,		"Stream: open dv1394 device",			vj_event_tag_new_dv1394,	 0, 	NULL,{0,0}	},
+	{ VJ_EVENT_TAG_NEW_DV1394,		"Stream: open dv1394 device <channel>",		vj_event_tag_new_dv1394,	 1, 	"%d",{63,0}	},
 	{ VJ_EVENT_TAG_NEW_Y4M,			"Stream: open y4m stream by name (file)",	 vj_event_tag_new_y4m,		 1,	"%s",		{0,0}	}, 
 	{ VJ_EVENT_STREAM_NEW_NET,		"Stream: open network stream ",	vj_event_tag_new_net, 2, "%s %d", {0,0}	},
 	{ VJ_EVENT_STREAM_NEW_MCAST,		"Stream: open multicast stream", vj_event_tag_new_mcast, 2, "%s %d", {0,0} },	
@@ -1509,7 +1509,7 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 		   less expansive.
 		*/ 
 		   
-		if ( vj_event_list[id].format[1] == 's' )
+		if ( vj_event_list[id].format != NULL && vj_event_list[id].format[1] == 's' )
 		{
 			vj_event_trigger_function(
 			(void*)v,
@@ -5283,17 +5283,23 @@ void vj_event_tag_new_avformat(void *ptr, const char format[], va_list ap)
 	int *args = NULL;
 	P_A(args,str,format,ap);
 
-	if( veejay_create_tag(v, VJ_TAG_TYPE_AVFORMAT, str, v->nstreams,0,0) == 0)
+	if( veejay_create_tag(v, VJ_TAG_TYPE_AVFORMAT, str, v->nstreams,0,0) != 0)
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Created new FFmpeg stream %d", vj_tag_size()-1);
+		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new FFmpeg stream");
 	}	
 }
 void	vj_event_tag_new_dv1394(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	if( veejay_create_tag(v, VJ_TAG_TYPE_DV1394, "/dev/dv1394", v->nstreams,0, 0) == 0)
+	int args[2];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+
+	if(args[0] == -1) args[0] = 63;
+	veejay_msg(VEEJAY_MSG_DEBUG, "Try channel %d", args[0]);
+	if( veejay_create_tag(v, VJ_TAG_TYPE_DV1394, "/dev/dv1394", v->nstreams,0, args[0]) != 0)
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Created new DV1394 stream %d", vj_tag_size()-1);
+		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new DV1394 stream");
 	}
 }
 #ifdef HAVE_V4L
@@ -5307,9 +5313,9 @@ void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 
 	sprintf(filename, "video%d", args[0]);
 
-	if( veejay_create_tag(v, VJ_TAG_TYPE_V4L, filename, v->nstreams,0,args[1]) == 0)
+	if( veejay_create_tag(v, VJ_TAG_TYPE_V4L, filename, v->nstreams,0,args[1]) != 0)
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Created new Video4Linux stream %d", vj_tag_size()-1);
+		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Video4Linux stream ");
 	}	
 }
 #endif
@@ -5321,9 +5327,9 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 	int args[2];
 
 	P_A(args,str,format,ap);
-	if( veejay_create_tag(v, VJ_TAG_TYPE_NET, str, v->nstreams, 0,args[0]) == 0 )
+	if( veejay_create_tag(v, VJ_TAG_TYPE_NET, str, v->nstreams, 0,args[0]) != 0 )
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Created new input network stream %d", vj_tag_size()-1);
+		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Network stream");
 	}
 }
 
@@ -5335,9 +5341,9 @@ void vj_event_tag_new_mcast(void *ptr, const char format[], va_list ap)
 	int args[2];
 
 	P_A(args,str,format,ap);
-	if( veejay_create_tag(v, VJ_TAG_TYPE_MCAST, str, v->nstreams, 0,args[0]) == 0 )
+	if( veejay_create_tag(v, VJ_TAG_TYPE_MCAST, str, v->nstreams, 0,args[0]) != 0 )
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Created new multicast stream %d", vj_tag_size()-1);
+		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new multicast stream");
 	}
 }
 
@@ -5347,9 +5353,9 @@ void vj_event_tag_new_y4m(void *ptr, const char format[], va_list ap)
 	char str[255];
 	int *args = NULL;
 	P_A(args,str,format,ap);
-	if( veejay_create_tag(v, VJ_TAG_TYPE_YUV4MPEG, str, v->nstreams,0,0) == 0)
+	if( veejay_create_tag(v, VJ_TAG_TYPE_YUV4MPEG, str, v->nstreams,0,0) != 0)
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Created new YUV4MPEG stream %d", vj_tag_size()-1);
+		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Yuv4mpeg stream");
 	}
 }
 #ifdef HAVE_V4L
