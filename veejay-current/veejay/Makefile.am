@@ -1,5 +1,7 @@
 # Makefile for veejay
 
+MAINTAINERCLEANFILES = Makefile.in
+
 INCLUDES = 	-I$(top_srcdir)/ffmpeg/ffmpeg/libavcodec -I$(top_srcdir)/ffmpeg/ffmpeg/libavformat \
 		-I$(top_srcdir) -I$(includedir) \
 		-DG_LOG_DOMAIN=\"veejay\" -DVEEJAY_VERSION=\"$(VERSION)\" \

@@ -13,6 +13,8 @@
 	+ fixed cycling of effect parameters (keyboard)
 	+ added optimized memcpy for ppc
 	+ added --auto-loop commandline option
+        + changes to build configuration
+	+ minor bugfix in remotely adding effects on streams
 
 0.6.4 / 0.6.5
 	+ added experimental network streaming

@@ -4327,8 +4327,7 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);	
 		if(vj_tag_exists(args[0]))
 		{
-			int real_id = vj_effect_get_real_id(args[2]);
-			if(vj_tag_set_effect(args[0],args[1], real_id) != -1)
+			if(vj_tag_set_effect(args[0],args[1], args[2]) != -1)
 			{
 			//	veejay_msg(VEEJAY_MSG_INFO, "Stream %d chain entry %d has effect %s",
 			//		args[0],args[1],vj_effect_get_description(real_id));

@@ -1,4 +1,7 @@
 # Makefile for memory managment / platform specific optimizations
+
+MAINTAINERCLEANFILES = Makefile.in
+
 EXTRA_DIST = \
 	ppcasm_memcpy.S \
 	ppcasm_memcpy_cachable.S \

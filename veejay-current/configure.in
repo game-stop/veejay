@@ -1,18 +1,21 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
 dnl AC_CONFIG_SRCDIR([veejay/lav_io.c])
-AC_INIT
-AC_CANONICAL_TARGET
-AC_CONFIG_SRCDIR([configure.in])
-
+AC_INIT(veejay/veejay.c)
 VEEJAY_MAJOR_VERSION=0
 VEEJAY_MINOR_VERSION=7
 VEEJAY_MICRO_VERSION=0
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 PACKAGE_VERSION=VEEJAY_VERSION
 
+dnl AC_CANONICAL_TARGET
+AC_CANONICAL_HOST
+AC_CANONICAL_TARGET
 AM_INIT_AUTOMAKE(veejay, $VEEJAY_VERSION)
 AM_CONFIG_HEADER(config.h)
+AC_CONFIG_SRCDIR([configure.in])
+
+
 AM_MAINTAINER_MODE
 AM_OUTPUT_DEPENDENCY_COMMANDS
 
@@ -924,6 +927,9 @@ plugins/Makefile
 veejay/Makefile
 man/Makefile
 tools/Makefile
+veejay-config
+veejay.pc
+veejay.spec
 ])
 AC_OUTPUT
 

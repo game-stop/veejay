@@ -1,5 +1,5 @@
 # Makefile for veejay
-
+MAINTAINERCLEANFILES = Makefile.in
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg 
 
 VJE_LIB_FILE = libvje.la

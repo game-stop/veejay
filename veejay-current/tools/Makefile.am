@@ -1,3 +1,4 @@
+MAINTAINERCLEANFILES = Makefile.in
 	
 INCLUDES = -I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/utils
 UTILS = $(top_builddir)/utils/libmjpegutils.a

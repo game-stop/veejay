@@ -4,7 +4,7 @@ libdir=@libdir@
 includedir=@includedir@/@PACKAGE@
 
 Name: veejay
-Description: Video-Tracker, -editing, ,-effects and interactive mixer
+Description: video sampler
 Version: @VERSION@
-Libs: -L${libdir} -lveejay -lvjrender -lvjplay
+Libs: -L${libdir} -lveejay 
 Cflags: -I${includedir}
