@@ -550,6 +550,24 @@ int	veejay_prep_el( veejay_t *info, int s1 )
 	return 1;
 }
 
+long	veejay_el_max_frames( veejay_t *info, int s1 )
+{
+	editlist **el_list;
+	void *data = clip_get_user_data(s1);
+	int current = clip_get_render_entry(s1);
+	if(!clip_exists(s1))
+		return info->edit_list->video_frames - 1;
+
+	if(current <= 0 || data == NULL )
+	{
+		return info->edit_list->video_frames - 1;
+	}
+	el_list = (editlist**) data;
+	if(el_list[current] == NULL )
+		return info->edit_list->video_frames - 1;
+	return el_list[current]->video_frames - 1;
+}
+
 /*
 	open a file and add the resulting editlist to clip's user_data
 */

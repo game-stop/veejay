@@ -3704,6 +3704,7 @@ void vj_event_clip_set_start(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	int args[2];
+	int mf;
 	video_playback_setup *s = v->settings;
 	char *str = NULL;
 	P_A(args,str,format,ap);
@@ -3711,8 +3712,11 @@ void vj_event_clip_set_start(void *ptr, const char format[], va_list ap)
 	{
 		args[0] = v->uc->clip_id;
 	}
-	if(args[0] == -1) args[0] = clip_size()-1;	
-	if( (args[1] >= s->min_frame_num) && (args[1] <= (v->edit_list->video_frames-1)) && clip_exists(args[0])) 
+	if(args[0] == -1) args[0] = clip_size()-1;
+	
+	mf = veejay_el_max_frames(v, args[0]);
+
+	if( (args[1] >= s->min_frame_num) && (args[1] <= mf) && clip_exists(args[0])) 
 	{
 	  if( args[1] < clip_get_endFrame(args[0])) {
 		if( clip_set_startframe(args[0],args[1] ) ) {
@@ -3740,6 +3744,7 @@ void vj_event_clip_set_end(void *ptr, const char format[] , va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	int args[2];
+	int mf;
 	video_playback_setup *s = v->settings;
 	char *str = NULL;
 	P_A(args,str,format,ap);
@@ -3751,7 +3756,10 @@ void vj_event_clip_set_end(void *ptr, const char format[] , va_list ap)
 	{
 		args[1] = v->edit_list->video_frames-1;
 	}
-	if( (args[1] >= s->min_frame_num) && (args[1] <= (v->edit_list->video_frames-1)) && (clip_exists(args[0])))
+
+	mf = veejay_el_max_frames( v, args[0]);
+
+	if( (args[1] >= s->min_frame_num) && (args[1] <= mf) && (clip_exists(args[0])))
 	{
 		if( args[1] >= clip_get_startFrame(v->uc->clip_id)) {
 	       		if(clip_set_endframe(args[0],args[1])) {
