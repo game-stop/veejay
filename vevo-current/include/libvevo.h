@@ -530,7 +530,7 @@ typedef int		(vevo_process_f)	(vevo_instance_t*);  ///< function to process
 	The function below defines a callback host can use to
 	keyframe the plugins parameters.
 */
-typedef int		(vevo_cb_f)		(void *ptr, vevo_instance_t *, vevo_port *port, vevo_timecode_t pos, vevo_timecode_t keyframe);
+typedef int		(vevo_cb_f)		(void *host_data, vevo_port *parameter,  vevo_timecode_t position, vevo_timecode_t keyframe);
 
 
 /**

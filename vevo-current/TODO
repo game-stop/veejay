@@ -1,11 +1,8 @@
 
-Test/Example programs:
-
-	- more testcases
-	- complete host example
 
 Vevo library:
 
+	- key framed parameters
 	- data conversion routines
 	  ( uint8_t -> int8_t , uint8_t -> int16_t etc etc)
 	- color space conversion routines
