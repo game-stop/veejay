@@ -6235,19 +6235,19 @@ void vj_event_print_clip_info(veejay_t *v, int id)
 				value = clip_get_effect_arg(id, i, j);
 				if (j == 0)
 				{
-		    			veejay_msg(VEEJAY_MSG_INFO, "\t\t\t P%d=[%d]",j, value);
+		    			veejay_msg(VEEJAY_MSG_PRINT, "I:\t\t\tP%d=[%d]",j, value);
 				}
 				else
 				{
 		    			veejay_msg(VEEJAY_MSG_PRINT, " P%d=[%d] ",j,value);
 				}
 			}
-
+			veejay_msg(VEEJAY_MSG_PRINT, "\n");
 	    		if (vj_effect_get_extra_frame(y) == 1)
 			{
 				int source = clip_get_chain_source(id, i);
 						 
-				veejay_msg(VEEJAY_MSG_INFO, "\t\t\t Mixing with %s %d",(source == VJ_TAG_TYPE_NONE ? "clip" : "stream"),
+				veejay_msg(VEEJAY_MSG_PRINT, "I:\t\t\t Mixing with %s %d\n",(source == VJ_TAG_TYPE_NONE ? "clip" : "stream"),
 			    		clip_get_chain_channel(id,i)
 					);
 	    		}

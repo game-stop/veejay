@@ -289,7 +289,6 @@ vj_event_fire_net_event( osc_info, c, NULL, arguments, 4);\
 char str[OSC_STRING_SIZE];\
 int __n = vj_osc_parse_char_arguments(a,b,str);\
 str[__n] = '\0';\
-printf("SNET: [%s]\n",str);\
 vj_event_fire_net_event(osc_info, c, str,NULL, 1);\
 }
 
