@@ -24,7 +24,9 @@
 
 
 #include <config.h>
-
+#ifdef HAVE_MMX
+#include "mmx.h"
+#endif
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -66,10 +68,9 @@ void ss_422_to_420(uint8_t *buffer, int width, int height);
 
 static uint8_t *sample_buffer;
 static int go = 0;
-void subsample_init()
+void subsample_init(int len)
 {
-	sample_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * 720 * 576 );
-	memset(sample_buffer,128,(720*576));
+	sample_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
 	go = 1;
 }
 
@@ -378,22 +379,19 @@ void ss_422_to_420(uint8_t *buffer, int width, int height )
 	//todo 2x1 down sampling (box)
 }
 
-
-
+#ifndef HAVE_MMX
 static void ss_444_to_422(uint8_t *buffer, int width, int height)
 {
-	int dst_stride = width/2;
-	int len = width * height;
-
+	const int dst_stride = width/2;
 	int x,y;
 
-	if(go == 0) subsample_init();
-	memcpy( sample_buffer, buffer, len );
+	if(go==0) subsample_init(width);
 
 	for(y = 0; y < height; y ++)
 	{
-		uint8_t *src = sample_buffer + (y * width);
+		uint8_t *src = sample_buffer;
 		uint8_t *dst = buffer + (y*dst_stride);
+		veejay_memcpy( src, buffer + (y*width), width );
 		for(x=0; x < dst_stride; x++)
 		{
 			*(dst++) = ( src[0] + src[1] ) >> 1;
@@ -401,38 +399,95 @@ static void ss_444_to_422(uint8_t *buffer, int width, int height)
 		}
 	}
 
+}
+
+#else
+
+/* mmx_average_2_u8 (function taken from mpeg2dec, a free MPEG-2 video
+ * stream decoder 
+ *
+ * Copyright (C) 2000-2003 Michel Lespinasse <walken@zoy.org>
+ * Copyright (C) 1999-2000 Aaron Holtzman <aholtzma@ess.engr.uvic.ca>
+ */
+
+static mmx_t mask1 = {0xfefefefefefefefeLL};
+static inline void mmx_average_2_U8 (uint8_t * dest, const uint8_t * src1,
+				     const uint8_t * src2)
+{
+    /* *dest = (*src1 + *src2 + 1)/ 2; */
+
+    movq_m2r (*src1, mm1);	/* load 8 src1 bytes */
+    movq_r2r (mm1, mm2);	/* copy 8 src1 bytes */
+
+    movq_m2r (*src2, mm3);	/* load 8 src2 bytes */
+    movq_r2r (mm3, mm4);	/* copy 8 src2 bytes */
+
+    pxor_r2r (mm1, mm3);	/* xor src1 and src2 */
+    pand_m2r (mask1, mm3);	/* mask lower bits */
+    psrlq_i2r (1, mm3);		/* /2 */
+    por_r2r (mm2, mm4);		/* or src1 and src2 */
+    psubb_r2r (mm3, mm4);	/* subtract subresults */
+    movq_r2m (mm4, *dest);	/* store result in dest */
+}
+static void ss_444_to_422(uint8_t *buffer, int width, int height)
+{
+	const int dst_stride = width/2;
+	const int len = width * height;
+	const int mmx_stride = dst_stride / 8;
+	int x,y;
+
+	if(go==0) subsample_init(width);
+
+	for(y = 0; y < height; y ++)
+	{
+		uint8_t *src = sample_buffer;
+		uint8_t *dst = buffer + (y*dst_stride);
+		veejay_memcpy( src, buffer + (y*width), width );
+		for(x=0; x < mmx_stride; x++)
+		{
+			mmx_average_2_U8( dst,src, src+8 );
+			src += 16;
+			dst += 8;
+		}
+	}
 
 }
+#endif
 
 static void tr_422_to_444(uint8_t *buffer, int width, int height)
 {
 	/* YUV 4:2:2 Planar to 4:4:4 Planar */
 
-	int stride = width/2;
-	int len = stride * height; 
+	const int stride = width/2;
+	const int len = stride * height; 
+#ifdef HAVE_MMX
+	const int mmx_stride = stride / 8;
+#endif
 	int x,y;
-	int s = 0;
-	int d = 0;
-	// super
-	if(go == 0) subsample_init();
 
-	memcpy(sample_buffer, buffer, len );
-
-	for(y = 0; y < height; y++)
+	for( y = height-1; y > 0 ; y -- )
 	{
-		uint8_t *row = sample_buffer + (y*stride); // chroma plane 
-		uint8_t *dst = buffer + (y*width);         // destination plane
+		uint8_t *dst = buffer + (y * width);
+		uint8_t *src = buffer + (y * stride);
+#ifdef HAVE_MMX
+		for( x = 0; x < mmx_stride; x ++ )
+		{
+			movq_m2r( *src,mm0 );
+			movq_m2r( *src,mm1 );
+			movq_r2m(mm0, *dst );
+			movq_r2m(mm1, *(dst+8) );
+			dst += 16;
+			src += 8;
+		}
+#else
 		for(x=0; x < stride; x++) // for 1 row
 		{
-			uint8_t c = row[x]; // get pixel
-			dst[0] = c; //put to dst
-			dst[1] = c;
+			dst[0] = row[x]; //put to dst
+			dst[1] = row[x];
 			dst+=2; // increment dst
-			d+=2;
-			s++;
 		}
+#endif
 	}
-	
 
 }
 
