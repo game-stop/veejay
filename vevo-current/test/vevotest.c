@@ -276,7 +276,7 @@ int main(int argc, char *argv[])
 		colors[4][0],colors[4][1],colors[4][2],colors[4][3],
 		test_cast[0], 
 		test_cast[1], test_cast[2], test_cast[3] );
-	exit(0);
+	
 /***************** rgba string -> double -> int  **************/
 
 	out(0, "\nRGBA (string)");
