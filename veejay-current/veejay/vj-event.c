@@ -3438,7 +3438,10 @@ void	vj_event_clip_sel_render		(	void *ptr,	const char format[],	va_list ap  )
 	{
 		s1 = v->uc->clip_id;
 		if(!CLIP_PLAYING(v))
+		{
+			veejay_msg(VEEJAY_MSG_INFO,"Not playing a clip");
 			return;
+		}
 	}
 	if(!clip_exists(s1))
 		return;
@@ -3460,6 +3463,10 @@ void	vj_event_clip_sel_render		(	void *ptr,	const char format[],	va_list ap  )
 		{
 				veejay_msg(VEEJAY_MSG_INFO, "Selected render entry %d of clip %d", entry, s1 );
 		}
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_INFO,"Render entry %d is empty", s1);
 	}
 
 }
