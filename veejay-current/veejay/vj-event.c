@@ -6170,7 +6170,7 @@ void vj_event_print_clip_info(veejay_t *v, int id)
 	MPEG_timecode_t tc;
 	int start = clip_get_startFrame( id );
 	int end = clip_get_endFrame( id );
-	
+	int speed = clip_get_speed(id);
 	int len = end - start;
 
 	if(start == 0) len ++;
@@ -6179,16 +6179,17 @@ void vj_event_print_clip_info(veejay_t *v, int id)
  		mpeg_framerate_code(mpeg_conform_framerate(v->edit_list->video_fps)),v->edit_list->video_fps);
 	sprintf(timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
 
-	mpeg_timecode(&tc, (end - s->current_frame_num),
+	mpeg_timecode(&tc,  s->current_frame_num,
 		mpeg_framerate_code(mpeg_conform_framerate
 		   (v->edit_list->video_fps)),
 	  	v->edit_list->video_fps);
 
 	sprintf(curtime, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
-
+	veejay_msg(VEEJAY_MSG_PRINT, "\n");
 	veejay_msg(VEEJAY_MSG_INFO, 
 		"Clip [%4d]/[%4d]\t[duration: %s | %8d ]",
 		id,clip_size()-1,timecode,len);
+
 	if(clip_encoder_active(v->uc->clip_id))
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "REC %09d\t[timecode: %s | %8ld ]",
@@ -6201,24 +6202,31 @@ void vj_event_print_clip_info(veejay_t *v, int id)
 		veejay_msg(VEEJAY_MSG_INFO, "                \t[timecode: %s | %8ld ]",
 			curtime,(long)v->settings->current_frame_num);
 	}
-    	veejay_msg(VEEJAY_MSG_INFO, 
-		"|Start  |  End  | Speed | Looptype |");
 	veejay_msg(VEEJAY_MSG_INFO, 
-		"|%6d |%6d |%6d | %s |",
-		start, end, clip_get_speed(id),
+		"[%09d] - [%09d] @ %4.2f (speed %d)",
+		start,end, (float)speed * v->edit_list->video_fps,speed);
+	veejay_msg(VEEJAY_MSG_INFO,
+		"[%s looping]",
 		(clip_get_looptype(id) ==
-		2 ? "PingPong" : (clip_get_looptype(id)==1 ? "Normal  " : "None    ")  )
+		2 ? "pingpong" : (clip_get_looptype(id)==1 ? "normal" : "no")  )
 		);
-	veejay_msg(VEEJAY_MSG_INFO,  "|-----------------------------------|");
+
+	int first = 0;
     	for (i = 0; i < CLIP_MAX_EFFECTS; i++)
 	{
 		y = clip_get_effect_any(id, i);
 		if (y != -1)
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "%02d  [%d] [%s] %s (%s)",
+			if(!first)
+			{
+			 veejay_msg(VEEJAY_MSG_INFO, "\nI: E F F E C T  C H A I N\nI:");
+			 veejay_msg(VEEJAY_MSG_INFO,"Entry|Effect ID|SW | Name");
+				first = 1;
+			}
+			veejay_msg(VEEJAY_MSG_INFO, "%02d   |%03d      |%s| %s %s",
 				i,
 				y,
-				clip_get_chain_status(id,i) ? "on" : "off", vj_effect_get_description(y),
+				clip_get_chain_status(id,i) ? "on " : "off", vj_effect_get_description(y),
 				(vj_effect_get_subformat(y) == 1 ? "2x2" : "1x1")
 			);
 
@@ -6227,26 +6235,22 @@ void vj_event_print_clip_info(veejay_t *v, int id)
 				value = clip_get_effect_arg(id, i, j);
 				if (j == 0)
 				{
-		    			veejay_msg(VEEJAY_MSG_PRINT, "        [%04ld]", value);
+		    			veejay_msg(VEEJAY_MSG_INFO, "\t\t\t P%d=[%d]",j, value);
 				}
 				else
 				{
-		    			veejay_msg(VEEJAY_MSG_PRINT, " [%04ld] ",value);
+		    			veejay_msg(VEEJAY_MSG_PRINT, " P%d=[%d] ",j,value);
 				}
 			}
-	    		veejay_msg(VEEJAY_MSG_PRINT,"\n");
 
 	    		if (vj_effect_get_extra_frame(y) == 1)
 			{
 				int source = clip_get_chain_source(id, i);
 						 
-				veejay_msg(VEEJAY_MSG_INFO, "     V %s [%d]",(source == VJ_TAG_TYPE_NONE ? "Clip" : "Stream"),
+				veejay_msg(VEEJAY_MSG_INFO, "\t\t\t Mixing with %s %d",(source == VJ_TAG_TYPE_NONE ? "clip" : "stream"),
 			    		clip_get_chain_channel(id,i)
 					);
-				//veejay_msg(VEEJAY_MSG_INFO, "     A: %s",   clip_get_chain_audio(id, i) ? "yes" : "no");
 	    		}
-
-	    		veejay_msg(VEEJAY_MSG_PRINT, "\n");
 		}
     	}
 	v->real_fps = -1;
