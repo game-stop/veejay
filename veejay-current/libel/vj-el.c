@@ -759,6 +759,13 @@ int	vj_el_get_audio_frame_at(editlist *el, uint32_t nframe, uint8_t *dst, int nu
     if (!el->has_audio)
 	return 0;
 
+    if  (!el->has_video)
+	{
+		int size = el->audio_rate / el->video_fps * el->audio_bps;
+		memset(dst,0,size);
+		return size;
+	}
+
     if (nframe < 0)
 		nframe = 0;
 
@@ -785,6 +792,7 @@ int	vj_el_get_audio_frame_at(editlist *el, uint32_t nframe, uint8_t *dst, int nu
     return (ns1 - ns0);
 
 }
+
 
 editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int width, int height, float fps)
 {

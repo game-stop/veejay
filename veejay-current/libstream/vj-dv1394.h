@@ -33,10 +33,11 @@ typedef struct
 	int avail;
 	int done;
 	int index;
+	int quality;
 	void *decoder;
 } vj_dv1394;
 
-vj_dv1394*	vj_dv1394_init(void *el, int channel_nr);
+vj_dv1394*	vj_dv1394_init(void *el, int channel_nr, int quality);
 
 void		vj_dv1394_close( vj_dv1394 *v );
 

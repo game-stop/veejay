@@ -27,6 +27,8 @@ typedef struct
 	dv_decoder_t	*decoder;
 	uint8_t		*dv_video;
 	int		fmt;
+	int		audio;
+	int16_t		**audio_buffers;
 } vj_dv_decoder;
 
 typedef struct
@@ -37,9 +39,15 @@ typedef struct
 } vj_dv_encoder;
 
 
-vj_dv_decoder *vj_dv_decoder_init(int width, int height, int pixel_format);
+vj_dv_decoder *vj_dv_decoder_init(int quality,int width, int height, int pixel_format);
 
 vj_dv_encoder *vj_dv_init_encoder(editlist * el, int pixel_format);
+
+void	   vj_dv_decoder_get_audio(vj_dv_decoder *d, uint8_t *audio_buf);
+
+
+void		vj_dv_decoder_set_audio(vj_dv_decoder *d, int audio);
+
 
 int vj_dv_decode_frame(vj_dv_decoder *d,uint8_t * in, uint8_t * Y,
 		       uint8_t * Cb, uint8_t * Cr, int w, int h, int fmt);

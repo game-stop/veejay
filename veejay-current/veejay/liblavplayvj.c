@@ -503,12 +503,16 @@ int veejay_init_editlist(veejay_t * info)
  
    if (el->has_audio && info->audio == AUDIO_PLAY) {
 	if (vj_perform_audio_start(info)) {
+	    veejay_msg(VEEJAY_MSG_INFO, "Started Audio Task");
 	//    stats.audio = 1;
 	} else {
 	    veejay_msg(VEEJAY_MSG_ERROR, "Could not start Audio Task");
 	}
     }
-
+   if( !el->has_audio )
+	veejay_msg(VEEJAY_MSG_DEBUG, "EditList contains no audio");
+   if( info->audio != AUDIO_PLAY)
+	veejay_msg(VEEJAY_MSG_DEBUG, "Not configured for audio playback");
 
    if (el->has_audio && (info->audio==AUDIO_PLAY || info->audio==AUDIO_RENDER))
    {
@@ -2914,6 +2918,17 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, int ofps, in
 		veejay_msg(VEEJAY_MSG_DEBUG, "Dummy: %d x %d, %s %s ",
 			info->dummy->width,info->dummy->height, (info->dummy->norm == 'p' ? "PAL": "NTSC" ),	
 				( force_pix_fmt == 0 ? "4:2:0" : "4:2:2" ));
+		if( info->dummy->arate )
+		{
+			editlist *el = info->edit_list;
+			el->has_audio = 1;
+			el->play_rate = el->audio_rate = info->dummy->arate;
+			el->audio_chans = info->dummy->achans;
+			el->audio_bits = 16;
+			el->audio_bps = 4;
+			veejay_msg(VEEJAY_MSG_DEBUG, "Dummy AUdio: %f KHz, %d channels, %d bps, %d bit audio",
+				(float)el->audio_rate/1000.0,el->audio_chans,el->audio_bps,el->audio_bits);
+		}
 	}
 	else
 	{

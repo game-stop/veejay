@@ -618,6 +618,27 @@ typedef struct {
 #define STR_PLAYMODE_HELP "Playback mode, use 0 for clips, 1 for streams, 2 for plain video"
 */
 
+/*
+static struct {
+	const int event_id;
+	const char *help;
+	const char *args[];
+} vj_event_help[] = 
+{
+	{	VJ_EVENT_TAG_NEW_DV1394,
+		"Creates a new DV1394 input stream",
+		{ "channel number (defaults to 63)", NULL }
+	},
+	{	VJ_EVENT_TAG_NEW_V4L,	
+		"Creates a new Video4linux input stream",
+		{ "device number", "channel number", NULL }
+	},
+	{
+		0,
+		NULL,
+		NULL
+	},
+};*/
 
 static struct {
 	const int event_id;

@@ -34,24 +34,22 @@
 #define DV_AUDIO_MAX_SAMPLES 1944
 
 /* init the dv decoder and decode buffer*/
-vj_dv_decoder *vj_dv_decoder_init(int width, int height, int pixel_format)
+vj_dv_decoder *vj_dv_decoder_init(int quality, int width, int height, int pixel_format)
 {
+	int dv_q = DV_QUALITY_COLOR;
 	vj_dv_decoder *d = (vj_dv_decoder*)vj_malloc(sizeof(vj_dv_decoder));
 	if(!d) return NULL;
 	d->decoder = dv_decoder_new( 1,1,0 );
-	d->decoder->quality = DV_QUALITY_BEST;
+	if( quality == 0 )
+		dv_q = DV_QUALITY_FASTEST;
+	if( quality == 1 )
+		dv_q = DV_QUALITY_BEST;
+
+	d->decoder->quality = dv_q;
 	d->dv_video = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height * 4);
     	memset( d->dv_video, 0, (width*height*4));
 	d->fmt = pixel_format;
-	dv_set_audio_correction( d->decoder, DV_AUDIO_CORRECT_AVERAGE );
-/*	d->audio_buffers = (int16_t**) vj_malloc(sizeof(uint16_t*) * 4);
-	int i;
-	for( i = 0; i < 4; i ++ )
-	{
-		d->audio_buffers[i] = (int16_t*) vj_malloc(sizeof(uint16_t) *
-				2 * DV_AUDIO_MAX_SAMPLES );
-	}
-*/
+	d->audio = 0; // audio off
 	return d;
 }
 
@@ -135,7 +133,7 @@ void vj_dv_free_encoder(vj_dv_encoder *e)
 {
 	if(e->encoder)
 		dv_encoder_free( e->encoder);
-    if(e->dv_video)
+	if(e->dv_video)
 		free(e->dv_video);
 	if(e)
 		free(e);
@@ -148,6 +146,40 @@ void vj_dv_free_decoder(vj_dv_decoder *d) {
 		free(d->dv_video);
 	if(d) 
 		free(d);
+}
+
+void	vj_dv_decoder_set_audio(vj_dv_decoder *d, int audio)
+{
+}
+
+void	   vj_dv_decoder_get_audio(vj_dv_decoder *d, uint8_t *audio_buf)
+{
+
+	if(!d->audio) return;
+
+	int n_samples = dv_get_num_samples( d->decoder);
+	int channels  = dv_get_num_channels( d->decoder );
+	int i,j;
+	int16_t *ch0  = d->audio_buffers[0];
+	int16_t *ch1  = d->audio_buffers[1];
+	// convert short to uint8_t, 
+	// interleave audio into single buffer
+	for(i = 0; i < n_samples; i ++ )
+	{
+		*(audio_buf)   = ch0[i] & 0xff;			//lo
+		*(audio_buf+1) = (ch0[i] >> 8) & 0xff; 		//hi
+		*(audio_buf+2) = ch1[i] & 0xff;			//lo
+		*(audio_buf+3) = (ch1[i] >> 8) & 0xff;		//hi
+	}
+
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"Audio %f, samples %d, frames %d, channels %d quant %d",
+		d->decoder->audio->frequency,
+		d->decoder->audio->samples_this_frame,
+		d->decoder->audio->aaux_as.pc3.system == 1 ? 50:60,
+		d->decoder->audio->num_channels,
+		d->decoder->audio->aaux_as.pc4.qu == 0 ? 16:12);
+
 }
 
 int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
@@ -201,8 +233,10 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 	pitches[1] = 0;
 	pitches[2] = 0;
 
-//	dv_decode_full_audio( d->decoder , input_buf,
-
+/*	if(d->audio)
+		if(!dv_decode_full_audio( d->decoder, input_buf, d->audio_buffers ))
+			veejay_msg(VEEJAY_MSG_DEBUG, "No audio data");
+*/
 
 	if( d->decoder->sampling == e_dv_sample_420 )
 	{
@@ -228,6 +262,7 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 		pixels[2] = d->dv_video + (width * height) + (width * height/2);
 		dv_decode_full_frame( d->decoder, input_buf, e_dv_color_yuv,
 				pixels,pitches);
+
 		if(fmt==FMT_422)
 			yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
 		else

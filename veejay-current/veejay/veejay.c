@@ -284,6 +284,14 @@ static int set_option(const char *name, char *value)
 	else if(strcmp(name, "norm") == 0 || strcmp(name, "N") == 0 ) {
 		info->dummy->norm = optarg[0];
 	}
+	else if(strcmp(name, "audiorate") == 0 )
+	{
+		info->dummy->arate = atoi(optarg);
+	}
+	else if(strcmp(name, "audiochannels") == 0)
+	{
+		info->dummy->achans = atoi(optarg);
+	}
 	else if(strcmp(name, "framerate") == 0 || strcmp(name, "R" ) == 0 ) {
 		info->dummy->fps = atof(optarg);
 	}
@@ -355,6 +363,8 @@ static void check_command_line_options(int argc, char *argv[])
 	{"height",1,0,0},
 	{"norm",1,0,0},
 	{"framerate",1,0,0},
+	{"audiorate",1,0,0},
+	{"audiochannels",1,0,0},
 	{"ycbcr",1,0,0},
 	{"multicast-osc",1,0,0},
 	{"multicast-vims",1,0,0},

@@ -16,7 +16,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
+/*
+	inspired by ffmpeg/ffmpeg/libavformat/dv1394.c
+	dv1394 has no audio apparently ...
+*/
 #include <stdint.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -36,7 +39,7 @@
 
 #define DV1394_DEFAULT_CHANNEL 63
 #define DV1394_DEFAULT_CARD    0
-#define DV1394_RING_FRAMES     2
+#define DV1394_RING_FRAMES     10
 
 static	int	vj_dv1394_reset(vj_dv1394 *v  )
 {
@@ -66,7 +69,7 @@ static	int	vj_dv1394_start(vj_dv1394 *v )
 	return 1;
 }
 
-vj_dv1394      *vj_dv1394_init(void *e, int channel)
+vj_dv1394      *vj_dv1394_init(void *e, int channel, int quality)
 {
 	editlist *el = (editlist*)e;
 
@@ -87,6 +90,7 @@ vj_dv1394      *vj_dv1394_init(void *e, int channel)
 	v->handle = open( "/dev/dv1394", O_RDONLY);
 	v->channel = channel == -1 ? DV1394_DEFAULT_CHANNEL : channel;
 	v->index = 0;
+	v->quality = quality;
 	if( v->handle == -1 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "opening /dev/dv1394'");
@@ -119,7 +123,7 @@ vj_dv1394      *vj_dv1394_init(void *e, int channel)
 	}
 
 
-	v->decoder = (void*)vj_dv_decoder_init( v->width,v->height, el->pixel_format );
+	v->decoder = (void*)vj_dv_decoder_init( v->quality,v->width,v->height, el->pixel_format );
 	if(!v->decoder)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to initailize DV decoder");

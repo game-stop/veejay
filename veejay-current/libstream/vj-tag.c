@@ -344,15 +344,15 @@ int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el)
     return 1;
 }
 
-int	_vj_tag_new_dv1394(vj_tag *tag, int stream_nr, int channel, editlist *el)
+int	_vj_tag_new_dv1394(vj_tag *tag, int stream_nr, int channel,int quality, editlist *el)
 {
-    vj_tag_input->dv1394[stream_nr] = vj_dv1394_init( (void*) el, channel);
-	veejay_msg(VEEJAY_MSG_DEBUG, "Channel in stream %d",channel);
-    if(vj_tag_input->dv1394[stream_nr])
-    {
+   vj_tag_input->dv1394[stream_nr] = vj_dv1394_init( (void*) el, channel,quality);
+   if(vj_tag_input->dv1394[stream_nr])
+   {
 	veejay_msg(VEEJAY_MSG_INFO, "DV1394 ready for capture");
+	vj_dv_decoder_set_audio( vj_tag_input->dv1394[stream_nr], el->has_audio);
 	return 1;
-   	} 
+   } 
    return 0;
 }
 
@@ -486,7 +486,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	break;
     case VJ_TAG_TYPE_DV1394:
 	sprintf(tag->source_name, "/dev/dv1394");
-	if( _vj_tag_new_dv1394( tag, stream_nr,channel,el ) == 0 )
+	if( _vj_tag_new_dv1394( tag, stream_nr,channel,1,el ) == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "error opening dv1394");
 		return -1;
@@ -1786,9 +1786,12 @@ int vj_tag_get_audio_frame(int t1, uint8_t *dst_buffer)
 {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return 0;
+	if(tag->source_type == VJ_TAG_TYPE_DV1394)
+	{
+		vj_dv_decoder_get_audio( vj_tag_input->dv1394[tag->index], dst_buffer );	
+	}
 	if(tag->source_type != VJ_TAG_TYPE_AVFORMAT) return 0;
 	return (vj_avformat_get_audio( vj_tag_input->avformat[tag->index], dst_buffer, -1 ));    
-	
 }
 
 
