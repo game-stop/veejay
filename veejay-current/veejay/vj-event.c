@@ -5605,45 +5605,55 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	video_playback_setup *s = v->settings;
+
 	if( TAG_PLAYING(v)  && v->settings->tag_record) 
 	{
-		if(vj_tag_stop_encoder( v->uc->clip_id))
+		int play_now = s->tag_record_switch;
+		if(!vj_tag_stop_encoder( v->uc->clip_id))
 		{
-			char avi_file[255];
-			int start = -1;
-			int destination = v->edit_list->video_frames - 1;
+			veejay_msg(VEEJAY_MSG_ERROR, "Wasnt recording anyway");
+			return;
+		}
+		
+		char avi_file[255];
+		int start = -1;
+		int destination = v->edit_list->video_frames - 1;
 
-			if( vj_tag_get_encoded_file(v->uc->clip_id, avi_file)!=0) return;
-			
-
-			if( veejay_edit_addmovie(
-				v,avi_file,start,destination,destination))
-			{
-				int len = vj_tag_get_encoded_frames(v->uc->clip_id) - 1;
-				clip_info *skel = clip_skeleton_new(destination, destination+len);		
-				if(clip_store(skel)==0) 
-				{
-					veejay_msg(VEEJAY_MSG_INFO, "Created new clip %d from file %s",
-						skel->clip_id,avi_file);
-					clip_set_looptype( skel->clip_id,1);
-				}	
-			}		
-			else
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList!",avi_file);
-			}
-
-			vj_tag_reset_encoder( v->uc->clip_id);
-
-			if(s->tag_record_switch) 
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "Playing clip %d now", clip_size()-1);
-				veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_CLIP, clip_size()-1 );
-			}
-
+		if( !vj_tag_get_encoded_file(v->uc->clip_id, avi_file)) 
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Dont know where I put the file?!");
+			return;
 		}	
+
+		if( veejay_edit_addmovie(
+			v,avi_file,start,destination,destination))
+		{
+			int len = vj_tag_get_encoded_frames(v->uc->clip_id) - 1;
+			clip_info *skel = clip_skeleton_new(destination, destination+len);		
+			if(clip_store(skel)==0) 
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "Created new clip %d from file %s",
+					skel->clip_id,avi_file);
+				clip_set_looptype( skel->clip_id,1);
+			}
+			veejay_msg(VEEJAY_MSG_INFO,"Added file %s (%d frames) to EditList",
+				avi_file, len );	
+		}		
+		else
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList!",avi_file);
+		}
+
+		veejay_msg(VEEJAY_MSG_ERROR, "Stopped recording from stream %d", v->uc->clip_id);
+		vj_tag_reset_encoder( v->uc->clip_id);
 		s->tag_record = 0;
 		s->tag_record_switch = 0;
+
+		if(play_now) 
+		{
+			veejay_msg(VEEJAY_MSG_INFO, "Playing clip %d now", clip_size()-1);
+			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_CLIP, clip_size()-1 );
+		}
 	}
 	else
 	{
@@ -5652,7 +5662,7 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_ERROR, "Perhaps you want to stop recording from a non visible stream ? See VIMS id %d",
 				NET_TAG_OFFLINE_REC_STOP);
 		}
-		veejay_msg(VEEJAY_MSG_ERROR, "Stream record was even started!");
+		veejay_msg(VEEJAY_MSG_ERROR, "Not recording from visible stream");
 	}
 }
 
