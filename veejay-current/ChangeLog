@@ -11,7 +11,7 @@
 	+ added new effect 'Motion Ghost'
 	+ added new effect 'Morphology' 
 	+ added new effect 'Nervous'
-	+ added new effect 'Strobo chroma scope'
+	+ added new effect 'Video Blobs'
 	- render to history list mismatches frames in clip
 	  (too many)
 	
