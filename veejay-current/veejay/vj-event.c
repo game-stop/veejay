@@ -34,7 +34,7 @@
 #include <veejay/hash.h>
 #include <veejay/libveejay.h>
 #include <libel/vj-avcodec.h>
-#include <veejay/samplerecord.h>
+#include <libsamplerec/samplerecord.h>
 #include <utils/mpegconsts.h>
 #include <utils/mpegtimecode.h>
 #include <veejay/vims.h>

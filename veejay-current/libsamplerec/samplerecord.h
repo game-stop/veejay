@@ -19,7 +19,7 @@
 #ifndef CLIPREC_H
 #define CLIPREC_H
 #include <stdint.h>
-#include "vj-lib.h"
+#include <libel/vj-el.h>
 int clip_record_init(int len);
 int clip_init_encoder(int clip_id, char *filename, int format, editlist *el,long nframes);
 int clip_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_size);

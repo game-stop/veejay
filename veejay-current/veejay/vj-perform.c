@@ -40,7 +40,7 @@
 #include <libvjmsg/vj-common.h>
 #include <veejay/vj-perform.h>
 #include <veejay/libveejay.h>
-#include <veejay/samplerecord.h>
+#include <libsamplerec/samplerecord.h>
 #include <jpeglib.h>
 #ifdef HAVE_SAMPLERATE
 #include <samplerate.h>

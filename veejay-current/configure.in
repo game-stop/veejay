@@ -950,6 +950,7 @@ libyuv/Makefile
 libel/Makefile
 libstream/Makefile
 liblavjpeg/Makefile
+libsamplerec/Makefile
 utils/Makefile
 bio2jack/Makefile
 plugins/Makefile

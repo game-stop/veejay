@@ -19,11 +19,10 @@
 #include <config.h>
 #include <string.h>
 #include <libsample/sampleadm.h>
-#include <veejay/vj-misc.h>
 #include <libel/vj-avcodec.h>
 #include <libvjmsg/vj-common.h>
-#include <veejay/vj-lib.h>
-#include <veejay/samplerecord.h>
+#include <libsamplerec/samplerecord.h>
+#include <veejay/vj-misc.h>
 void	clip_reset_encoder(int clip_id);
 
 static uint8_t *clip_encoder_buf;
