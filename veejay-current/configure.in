@@ -616,6 +616,18 @@ if test $FREETYPE_CONFIG = yes; then
   have_freetype=true
 fi  
 
+have_vevo=false
+AC_CHECK_PROG( VEVO_CONFIG, vevo-config,yes,no)
+if test $VEVO_CONFIG = yes ; then
+ VEVO_CFLAGS="`vevo-config --cflags`"
+ VEVO_LIBS="`vevo-config --libs`"
+ AC_DEFINE(HAVE_VEVO)
+ AC_SUBST( VEVO_CFLAGS )
+ AC_SUBST( VEVO_LIBS )
+ have_vevo=true
+fi 
+
+
 dnl ********************************************************************
 dnl Test for MMX support, if we find an IA32 platform then check to see
 dnl if gcc and its tools can generate MMX instructions, also make sure
@@ -810,6 +822,7 @@ dnl **********************************************************************
 dnl All the conditional stuff for the Makefiles
 dnl
 AM_CONDITIONAL(HAVE_FREETYPE, test x$have_freetype = xtrue)
+AM_CONDITIONAL(HAVE_VEVO, test x$have_vevo = xtrue )
 AM_CONDITIONAL(BUILD_VEEJAY, test x$have_sdl = xtrue)
 AM_CONDITIONAL(HAVE_ASM_MMX, test x$have_asm_mmx = xtrue)
 AM_CONDITIONAL(HAVE_ASM_MMX2, test x$have_asm_mmx2 = xtrue)
@@ -988,6 +1001,7 @@ echo "                    XML C library for Gnome libxml2 : ${have_xml2}"
 echo ""
 echo " Plugin  dependencies:"
 echo "                    FreeType support                : ${have_freetype}"
+echo "                    Veejay Video Objects support    : ${have_vevo}"
 
 
 

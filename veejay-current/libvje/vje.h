@@ -74,7 +74,7 @@ typedef struct vj_effect_t {
     int has_user;				// has private data?
     int static_bg;				// unused
     int has_help;				// unused
-	void *user_data;			// private effect data
+    void *user_data;			// private effect data
 } vj_effect;
 
 // initialize library

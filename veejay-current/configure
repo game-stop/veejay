@@ -469,7 +469,7 @@ ac_includes_default="\
 #endif"
 
 ac_subdirs_all="$ac_subdirs_all ffmpeg/ffmpeg"
-ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS build build_cpu build_vendor build_os host host_cpu host_vendor host_os target target_cpu target_vendor target_os INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA CYGPATH_W PACKAGE VERSION ACLOCAL AUTOCONF AUTOMAKE AUTOHEADER MAKEINFO AMTAR install_sh STRIP ac_ct_STRIP INSTALL_STRIP_PROGRAM AWK SET_MAKE am__leading_dot MAINTAINER_MODE_TRUE MAINTAINER_MODE_FALSE MAINT CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT DEPDIR am__include am__quote AMDEP_TRUE AMDEP_FALSE AMDEPBACKSLASH CCDEPMODE am__fastdepCC_TRUE am__fastdepCC_FALSE CCAS CCASFLAGS CPP CXX CXXFLAGS ac_ct_CXX CXXDEPMODE am__fastdepCXX_TRUE am__fastdepCXX_FALSE CXXCPP EGREP LT_RELEASE LT_CURRENT LT_REVISION LT_AGE LN_S RANLIB ac_ct_RANLIB ECHO LIBTOOL PRID64_STRING_FORMAT LIBGETOPT_LIB LIBOBJS POW_LIB LIBM_LIBS GLIB_CONFIG GLIB_CFLAGS GLIB_LIBS PTHREAD_LIBS JPEG_LIBS JPEG_CFLAGS DV_LIBS DV_CFLAGS X_CFLAGS X_PRE_LIBS X_LIBS X_EXTRA_LIBS x_libraries V4LCONF_LIBS SDL_CONFIG SDL_CFLAGS SDL_LIBS PKG_CONFIG DIRECTFB_CFLAGS DIRECTFB_LIBS JACK_CFLAGS JACK_LIBS SAMPLERATE_CFLAGS SAMPLERATE_LIBS XML2_CONFIG XML_CPPFLAGS XML_LIBS FREETYPE_CONFIG FT_LIBS FT_LDFLAGS FT_CFLAGS AS ASFLAGS HAVE_FREETYPE_TRUE HAVE_FREETYPE_FALSE BUILD_VEEJAY_TRUE BUILD_VEEJAY_FALSE HAVE_ASM_MMX_TRUE HAVE_ASM_MMX_FALSE HAVE_ASM_MMX2_TRUE HAVE_ASM_MMX2_FALSE HAVE_ASM_SSE_TRUE HAVE_ASM_SSE_FALSE HAVE_ASM_NASM_TRUE HAVE_ASM_NASM_FALSE HAVE_ASM_CMOV_TRUE HAVE_ASM_CMOV_FALSE HAVE_X86CPU_TRUE HAVE_X86CPU_FALSE ARCH_X86_TRUE ARCH_X86_FALSE HAVE_PPCCPU_TRUE HAVE_PPCCPU_FALSE HAVE_MIPS_TRUE HAVE_MIPS_FALSE HAVE_SDL_TRUE HAVE_SDL_FALSE HAVE_XML2_TRUE HAVE_XML2_FALSE HAVE_V4L_TRUE HAVE_V4L_FALSE HAVE_DIRECTFB_TRUE HAVE_DIRECTFB_FALSE HAVE_JACK_TRUE HAVE_JACK_FALSE HAVE_SAMPLERATE_TRUE HAVE_SAMPLERATE_FALSE ARCH_PPC_TRUE ARCH_PPC_FALSE CAN_COMPILE_C_ALTIVEC_TRUE CAN_COMPILE_C_ALTIVEC_FALSE LIBDV_PRE_0_9_9_TRUE LIBDV_PRE_0_9_9_FALSE HAVE_MMX_TRUE HAVE_MMX_FALSE SYSTEM_DARWIN_TRUE SYSTEM_DARWIN_FALSE HAVE_PPC_ALTIVEC_TRUE HAVE_PPC_ALTIVEC_FALSE WHAT subdirs LTLIBOBJS'
+ac_subst_vars='SHELL PATH_SEPARATOR PACKAGE_NAME PACKAGE_TARNAME PACKAGE_VERSION PACKAGE_STRING PACKAGE_BUGREPORT exec_prefix prefix program_transform_name bindir sbindir libexecdir datadir sysconfdir sharedstatedir localstatedir libdir includedir oldincludedir infodir mandir build_alias host_alias target_alias DEFS ECHO_C ECHO_N ECHO_T LIBS build build_cpu build_vendor build_os host host_cpu host_vendor host_os target target_cpu target_vendor target_os INSTALL_PROGRAM INSTALL_SCRIPT INSTALL_DATA CYGPATH_W PACKAGE VERSION ACLOCAL AUTOCONF AUTOMAKE AUTOHEADER MAKEINFO AMTAR install_sh STRIP ac_ct_STRIP INSTALL_STRIP_PROGRAM AWK SET_MAKE am__leading_dot MAINTAINER_MODE_TRUE MAINTAINER_MODE_FALSE MAINT CC CFLAGS LDFLAGS CPPFLAGS ac_ct_CC EXEEXT OBJEXT DEPDIR am__include am__quote AMDEP_TRUE AMDEP_FALSE AMDEPBACKSLASH CCDEPMODE am__fastdepCC_TRUE am__fastdepCC_FALSE CCAS CCASFLAGS CPP CXX CXXFLAGS ac_ct_CXX CXXDEPMODE am__fastdepCXX_TRUE am__fastdepCXX_FALSE CXXCPP EGREP LT_RELEASE LT_CURRENT LT_REVISION LT_AGE LN_S RANLIB ac_ct_RANLIB ECHO LIBTOOL PRID64_STRING_FORMAT LIBGETOPT_LIB LIBOBJS POW_LIB LIBM_LIBS GLIB_CONFIG GLIB_CFLAGS GLIB_LIBS PTHREAD_LIBS JPEG_LIBS JPEG_CFLAGS DV_LIBS DV_CFLAGS X_CFLAGS X_PRE_LIBS X_LIBS X_EXTRA_LIBS x_libraries V4LCONF_LIBS SDL_CONFIG SDL_CFLAGS SDL_LIBS PKG_CONFIG DIRECTFB_CFLAGS DIRECTFB_LIBS JACK_CFLAGS JACK_LIBS SAMPLERATE_CFLAGS SAMPLERATE_LIBS XML2_CONFIG XML_CPPFLAGS XML_LIBS FREETYPE_CONFIG FT_LIBS FT_LDFLAGS FT_CFLAGS VEVO_CONFIG VEVO_CFLAGS  VEVO_LIBS  AS ASFLAGS HAVE_FREETYPE_TRUE HAVE_FREETYPE_FALSE HAVE_VEVO_TRUE HAVE_VEVO_FALSE BUILD_VEEJAY_TRUE BUILD_VEEJAY_FALSE HAVE_ASM_MMX_TRUE HAVE_ASM_MMX_FALSE HAVE_ASM_MMX2_TRUE HAVE_ASM_MMX2_FALSE HAVE_ASM_SSE_TRUE HAVE_ASM_SSE_FALSE HAVE_ASM_NASM_TRUE HAVE_ASM_NASM_FALSE HAVE_ASM_CMOV_TRUE HAVE_ASM_CMOV_FALSE HAVE_X86CPU_TRUE HAVE_X86CPU_FALSE ARCH_X86_TRUE ARCH_X86_FALSE HAVE_PPCCPU_TRUE HAVE_PPCCPU_FALSE HAVE_MIPS_TRUE HAVE_MIPS_FALSE HAVE_SDL_TRUE HAVE_SDL_FALSE HAVE_XML2_TRUE HAVE_XML2_FALSE HAVE_V4L_TRUE HAVE_V4L_FALSE HAVE_DIRECTFB_TRUE HAVE_DIRECTFB_FALSE HAVE_JACK_TRUE HAVE_JACK_FALSE HAVE_SAMPLERATE_TRUE HAVE_SAMPLERATE_FALSE ARCH_PPC_TRUE ARCH_PPC_FALSE CAN_COMPILE_C_ALTIVEC_TRUE CAN_COMPILE_C_ALTIVEC_FALSE LIBDV_PRE_0_9_9_TRUE LIBDV_PRE_0_9_9_FALSE HAVE_MMX_TRUE HAVE_MMX_FALSE SYSTEM_DARWIN_TRUE SYSTEM_DARWIN_FALSE HAVE_PPC_ALTIVEC_TRUE HAVE_PPC_ALTIVEC_FALSE WHAT subdirs LTLIBOBJS'
 ac_subst_files=''
 
 # Initialize some variables set by options.
@@ -20862,6 +20862,56 @@ _ACEOF
   have_freetype=true
 fi
 
+have_vevo=false
+# Extract the first word of "vevo-config", so it can be a program name with args.
+set dummy vevo-config; ac_word=$2
+echo "$as_me:$LINENO: checking for $ac_word" >&5
+echo $ECHO_N "checking for $ac_word... $ECHO_C" >&6
+if test "${ac_cv_prog_VEVO_CONFIG+set}" = set; then
+  echo $ECHO_N "(cached) $ECHO_C" >&6
+else
+  if test -n "$VEVO_CONFIG"; then
+  ac_cv_prog_VEVO_CONFIG="$VEVO_CONFIG" # Let the user override the test.
+else
+as_save_IFS=$IFS; IFS=$PATH_SEPARATOR
+for as_dir in $PATH
+do
+  IFS=$as_save_IFS
+  test -z "$as_dir" && as_dir=.
+  for ac_exec_ext in '' $ac_executable_extensions; do
+  if $as_executable_p "$as_dir/$ac_word$ac_exec_ext"; then
+    ac_cv_prog_VEVO_CONFIG="yes"
+    echo "$as_me:$LINENO: found $as_dir/$ac_word$ac_exec_ext" >&5
+    break 2
+  fi
+done
+done
+
+  test -z "$ac_cv_prog_VEVO_CONFIG" && ac_cv_prog_VEVO_CONFIG="no"
+fi
+fi
+VEVO_CONFIG=$ac_cv_prog_VEVO_CONFIG
+if test -n "$VEVO_CONFIG"; then
+  echo "$as_me:$LINENO: result: $VEVO_CONFIG" >&5
+echo "${ECHO_T}$VEVO_CONFIG" >&6
+else
+  echo "$as_me:$LINENO: result: no" >&5
+echo "${ECHO_T}no" >&6
+fi
+
+if test $VEVO_CONFIG = yes ; then
+ VEVO_CFLAGS="`vevo-config --cflags`"
+ VEVO_LIBS="`vevo-config --libs`"
+ cat >>confdefs.h <<\_ACEOF
+#define HAVE_VEVO 1
+_ACEOF
+
+
+
+ have_vevo=true
+fi
+
+
 
 
 
@@ -21360,6 +21410,16 @@ fi
 
 
 
+if test x$have_vevo = xtrue ; then
+  HAVE_VEVO_TRUE=
+  HAVE_VEVO_FALSE='#'
+else
+  HAVE_VEVO_TRUE='#'
+  HAVE_VEVO_FALSE=
+fi
+
+
+
 if test x$have_sdl = xtrue; then
   BUILD_VEEJAY_TRUE=
   BUILD_VEEJAY_FALSE='#'
@@ -21804,6 +21864,13 @@ if test -z "${HAVE_FREETYPE_TRUE}" && test -z "${HAVE_FREETYPE_FALSE}"; then
   { { echo "$as_me:$LINENO: error: conditional \"HAVE_FREETYPE\" was never defined.
 Usually this means the macro was only invoked conditionally." >&5
 echo "$as_me: error: conditional \"HAVE_FREETYPE\" was never defined.
+Usually this means the macro was only invoked conditionally." >&2;}
+   { (exit 1); exit 1; }; }
+fi
+if test -z "${HAVE_VEVO_TRUE}" && test -z "${HAVE_VEVO_FALSE}"; then
+  { { echo "$as_me:$LINENO: error: conditional \"HAVE_VEVO\" was never defined.
+Usually this means the macro was only invoked conditionally." >&5
+echo "$as_me: error: conditional \"HAVE_VEVO\" was never defined.
 Usually this means the macro was only invoked conditionally." >&2;}
    { (exit 1); exit 1; }; }
 fi
@@ -22612,10 +22679,15 @@ s,@FREETYPE_CONFIG@,$FREETYPE_CONFIG,;t t
 s,@FT_LIBS@,$FT_LIBS,;t t
 s,@FT_LDFLAGS@,$FT_LDFLAGS,;t t
 s,@FT_CFLAGS@,$FT_CFLAGS,;t t
+s,@VEVO_CONFIG@,$VEVO_CONFIG,;t t
+s,@VEVO_CFLAGS@,$VEVO_CFLAGS,;t t
+s,@VEVO_LIBS@,$VEVO_LIBS,;t t
 s,@AS@,$AS,;t t
 s,@ASFLAGS@,$ASFLAGS,;t t
 s,@HAVE_FREETYPE_TRUE@,$HAVE_FREETYPE_TRUE,;t t
 s,@HAVE_FREETYPE_FALSE@,$HAVE_FREETYPE_FALSE,;t t
+s,@HAVE_VEVO_TRUE@,$HAVE_VEVO_TRUE,;t t
+s,@HAVE_VEVO_FALSE@,$HAVE_VEVO_FALSE,;t t
 s,@BUILD_VEEJAY_TRUE@,$BUILD_VEEJAY_TRUE,;t t
 s,@BUILD_VEEJAY_FALSE@,$BUILD_VEEJAY_FALSE,;t t
 s,@HAVE_ASM_MMX_TRUE@,$HAVE_ASM_MMX_TRUE,;t t
@@ -23482,6 +23554,7 @@ echo "                    XML C library for Gnome libxml2 : ${have_xml2}"
 echo ""
 echo " Plugin  dependencies:"
 echo "                    FreeType support                : ${have_freetype}"
+echo "                    Veejay Video Objects support    : ${have_vevo}"
 
 
 

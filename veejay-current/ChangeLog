@@ -12,6 +12,7 @@
 	+ added new effect 'Morphology' 
 	+ added new effect 'Nervous'
 	+ added new effect 'Video Blobs'
+	+ fixed ticket #3 (editlist load bug)
 	- render to history list mismatches frames in clip
 	  (too many)
 	

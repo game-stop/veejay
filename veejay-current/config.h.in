@@ -74,6 +74,8 @@
 
 #undef HAVE_FREETYPE
 
+#undef HAVE_VEVO
+
 /* Define if the libXxf86dga library is available */
 #undef HAVE_LIBXXF86DGA
 
