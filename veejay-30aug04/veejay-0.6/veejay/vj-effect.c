@@ -120,6 +120,7 @@
 #include "effects/chromapalette.h"
 #include "effects/uvcorrect.h"
 #include "effects/dissolve.h"
+#include "effects/overclock.h"
 
 static struct
 {
@@ -154,6 +155,7 @@ static struct
 {	swirl_malloc		,	swirl_free		,VJ_IMAGE_EFFECT_SWIRL		},
 {       radialblur_malloc,		radialblur_free,	 VJ_IMAGE_EFFECT_RADIALBLUR	},
 {	uvcorrect_malloc,		uvcorrect_free,		VJ_IMAGE_EFFECT_UVCORRECT	},
+{	overclock_malloc, 		overclock_free,		VJ_IMAGE_EFFECT_OVERCLOCK	},
 {	NULL			,	NULL			,0				},
 };
 
@@ -416,6 +418,7 @@ void vj_effect_initialize(int width, int height)
     vj_effects[i + 57] = chromium_init(width,height);
     vj_effects[i + 58] = chromapalette_init(width,height);
     vj_effects[i + 59] = uvcorrect_init(width,height);
+    vj_effects[i + 60] = overclock_init(width,height);
     max_width = width;
     max_height = height;
 

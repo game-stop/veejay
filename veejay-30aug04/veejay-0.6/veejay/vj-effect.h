@@ -211,11 +211,12 @@ enum {
     VJ_IMAGE_EFFECT_CHROMIUM = 157,
     VJ_IMAGE_EFFECT_CHROMAPALETTE = 158,
     VJ_IMAGE_EFFECT_UVCORRECT = 159,
+    VJ_IMAGE_EFFECT_OVERCLOCK = 160,
     VJ_IMAGE_EFFECT_DUMMY = 100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 160
+#define VJ_IMAGE_EFFECT_MAX 161
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 236
@@ -518,6 +519,8 @@ extern void uvcorrect_apply(uint8_t *yuv[3], int width, int height, int angle, i
 //		 int opacity_c, int opacity_a2, int opacity_b2, int opacity_c2, int mode, int luma);
 
 extern void dissolve_apply(uint8_t *a[3],uint8_t *b[3], int w, int h, int opacity);
+
+extern void overclock_apply(uint8_t *a[3], int w, int h, int val, int r);
 
 void vj_effect_initialize(int width, int height);
 void vj_effect_shutdown();

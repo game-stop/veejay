@@ -253,7 +253,7 @@ libveejay_la_SOURCES = vj-common.c cpu_accel.c memcpy.c subsample.c hash.c color
 			vj-keyframe.c vj-effect.c vj-effman.c vj-motion.c vj-sdl.c vj-dfb.c sampleadm.c samplerecord.c \
 			vj-vloopback.c vj-yuv4mpeg.c vj-rgb.c vj-v4lvideo.c vj-dv.c vj-ffmpeg.c vj-tag.c vj-audio.c editlist.c \
 			effects/common.c effects/diff.c effects/fibdownscale.c effects/killchroma.c effects/lumamagick.c\
-		        effects/mirrors.c effects/negation.c effects/dissolve.c effects/opacity.c effects/posterize.c \
+		        effects/mirrors.c effects/negation.c effects/overclock.c effects/dissolve.c effects/opacity.c effects/posterize.c \
 			effects/dither.c effects/dices.c effects/emboss.c effects/flip.c \
 			effects/revtv.c effects/softblur.c effects/zoom.c effects/split.c effects/widthmirror.c \
 			effects/frameborder.c effects/dummy.c effects/rawman.c effects/rawval.c \
@@ -318,10 +318,10 @@ am_libveejay_la_OBJECTS = vj-common.lo cpu_accel.lo memcpy.lo \
 	vj-yuv4mpeg.lo vj-rgb.lo vj-v4lvideo.lo vj-dv.lo vj-ffmpeg.lo \
 	vj-tag.lo vj-audio.lo editlist.lo common.lo diff.lo \
 	fibdownscale.lo killchroma.lo lumamagick.lo mirrors.lo \
-	negation.lo dissolve.lo opacity.lo posterize.lo dither.lo \
-	dices.lo emboss.lo flip.lo revtv.lo softblur.lo zoom.lo \
-	split.lo widthmirror.lo frameborder.lo dummy.lo rawman.lo \
-	rawval.lo smuck.lo transform.lo borders.lo rgbkey.lo \
+	negation.lo overclock.lo dissolve.lo opacity.lo posterize.lo \
+	dither.lo dices.lo emboss.lo flip.lo revtv.lo softblur.lo \
+	zoom.lo split.lo widthmirror.lo frameborder.lo dummy.lo \
+	rawman.lo rawval.lo smuck.lo transform.lo borders.lo rgbkey.lo \
 	solarize.lo mirrors2.lo whiteframe.lo deinterlace.lo lumakey.lo \
 	coloradjust.lo gamma.lo reflection.lo rotozoom.lo transblend.lo \
 	slidingdoor.lo color.lo transline.lo transop.lo transcarot.lo \
@@ -396,6 +396,7 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/noisepencil.Plo ./$(DEPDIR)/opacity.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/opacityadv.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/opacitythreshold.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/overclock.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/pencilsketch.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/pixelate.Plo ./$(DEPDIR)/posterize.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/radialblur.Plo ./$(DEPDIR)/raster.Plo \
@@ -603,6 +604,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/opacity.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/opacityadv.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/opacitythreshold.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/overclock.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pencilsketch.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/pixelate.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/posterize.Plo@am__quote@
@@ -931,6 +933,39 @@ negation.lo: effects/negation.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/negation.Plo' tmpdepfile='$(DEPDIR)/negation.TPlo' @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o negation.lo `test -f 'effects/negation.c' || echo '$(srcdir)/'`effects/negation.c
+
+overclock.o: effects/overclock.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT overclock.o -MD -MP -MF "$(DEPDIR)/overclock.Tpo" \
+@am__fastdepCC_TRUE@	  -c -o overclock.o `test -f 'effects/overclock.c' || echo '$(srcdir)/'`effects/overclock.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/overclock.Tpo" "$(DEPDIR)/overclock.Po"; \
+@am__fastdepCC_TRUE@	else rm -f "$(DEPDIR)/overclock.Tpo"; exit 1; \
+@am__fastdepCC_TRUE@	fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='effects/overclock.c' object='overclock.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/overclock.Po' tmpdepfile='$(DEPDIR)/overclock.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o overclock.o `test -f 'effects/overclock.c' || echo '$(srcdir)/'`effects/overclock.c
+
+overclock.obj: effects/overclock.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT overclock.obj -MD -MP -MF "$(DEPDIR)/overclock.Tpo" \
+@am__fastdepCC_TRUE@	  -c -o overclock.obj `if test -f 'effects/overclock.c'; then $(CYGPATH_W) 'effects/overclock.c'; else $(CYGPATH_W) '$(srcdir)/effects/overclock.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/overclock.Tpo" "$(DEPDIR)/overclock.Po"; \
+@am__fastdepCC_TRUE@	else rm -f "$(DEPDIR)/overclock.Tpo"; exit 1; \
+@am__fastdepCC_TRUE@	fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='effects/overclock.c' object='overclock.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/overclock.Po' tmpdepfile='$(DEPDIR)/overclock.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o overclock.obj `if test -f 'effects/overclock.c'; then $(CYGPATH_W) 'effects/overclock.c'; else $(CYGPATH_W) '$(srcdir)/effects/overclock.c'; fi`
+
+overclock.lo: effects/overclock.c
+@am__fastdepCC_TRUE@	if $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT overclock.lo -MD -MP -MF "$(DEPDIR)/overclock.Tpo" \
+@am__fastdepCC_TRUE@	  -c -o overclock.lo `test -f 'effects/overclock.c' || echo '$(srcdir)/'`effects/overclock.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/overclock.Tpo" "$(DEPDIR)/overclock.Plo"; \
+@am__fastdepCC_TRUE@	else rm -f "$(DEPDIR)/overclock.Tpo"; exit 1; \
+@am__fastdepCC_TRUE@	fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='effects/overclock.c' object='overclock.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/overclock.Plo' tmpdepfile='$(DEPDIR)/overclock.TPlo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o overclock.lo `test -f 'effects/overclock.c' || echo '$(srcdir)/'`effects/overclock.c
 
 dissolve.o: effects/dissolve.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT dissolve.o -MD -MP -MF "$(DEPDIR)/dissolve.Tpo" \

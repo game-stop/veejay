@@ -173,6 +173,8 @@ void vj_effman_apply_image_effect(vj_video_block *data, vj_clip_instr *todo_info
    case VJ_IMAGE_EFFECT_CHROMIUM:
 	chromium_apply( data->src1, data->width, data->height, arg[0]);
 	break;
+	case VJ_IMAGE_EFFECT_OVERCLOCK:
+	overclock_apply(data->src1, data->width, data->height,arg[0],arg[1]);break;
      case VJ_IMAGE_EFFECT_NEGATION:
 	negation_apply(data->src1, data->width, data->height, arg[0]);
 	break;
