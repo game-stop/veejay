@@ -45,8 +45,68 @@ static inline void linearBlend(unsigned char *src, int stride)
 }
 
 
+matrix_t matrix_placementA(int photoindex, int size, int w , int h)
+{
+	matrix_t m;
+	m.w = (photoindex % size) * (w/size);
+	m.h = (photoindex / size) * (h/size);
+	return m;
+}
+
+matrix_t matrix_placementB(int photoindex, int size, int w , int h)
+{
+	matrix_t m;
+	m.w = (photoindex/size) * (w/size);
+	m.h = (photoindex % size) * (h/size);
+	return m;
+}
+
+matrix_t matrix_placementC(int photoindex, int size, int w , int h)
+{
+	matrix_t m;
+	int n = size*size-1;
+	m.w = ((n-photoindex) % size) * (w/size);
+	m.h = ((n-photoindex) / size) * (h/size);
+	return m;
+}
+
+matrix_t matrix_placementD(int photoindex, int size, int w , int h)
+{
+	matrix_t m;
+	int n = size*size-1;
+	m.w = ((n-photoindex) / size) * (w/size);
+	m.h = ((n-photoindex) % size) * (h/size);
+	return m;
+}
+
+matrix_f	get_matrix_func(int type)
+{
+	if(type==0)
+		return &matrix_placementA;
+	if(type==1)
+		return &matrix_placementB;
+	if(type==2)
+		return &matrix_placementC;
+	return &matrix_placementD;		
+}
 
 
+int power_of(int size)
+{
+	int power = 1;
+	while( size-- )
+		power *= 2;
+
+	return power;
+}
+
+int max_power(int w)
+{
+	int i=1;
+	while(power_of(i) < w)
+		i++;
+	return i;
+}
 /* some parts (linearBlend() and deinterlace() from :
  * 
  * Simple xawtv deinterlacing plugin - linear blend

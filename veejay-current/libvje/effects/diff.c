@@ -176,8 +176,11 @@ void diff_apply(void *ed, VJFrame *frame,
 	// calculate if pixel is much different (has greater distance)
 	// accepted pixels are 0xff 
 	if(!ud->has_bg)
+	{
+		printf("No static bg in has_bg\n");
 		return;
-	
+	}
+
 	for(i = 0 ; i < len ; i ++ )
 	{
 		d = tab[ ( map[i]) ][ (Y[i]) ];

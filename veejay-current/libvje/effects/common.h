@@ -84,6 +84,28 @@ typedef uint8_t (*_pf) (uint8_t a, uint8_t b);
 pix_func_Y get_pix_func_Y(const int pix_type);	/* get blend function for luminance values */
 pix_func_C get_pix_func_C(const int pix_type);	/* get blend function for chrominance values */
 
+typedef struct
+{
+	uint8_t *data[3];
+	int	w;
+	int	h;
+} picture_t;
+
+typedef struct
+{
+	int w;
+	int h;
+} matrix_t;
+
+typedef	matrix_t (*matrix_f)(int i, int s, int w, int h);
+matrix_t matrix_placementA(int photoindex, int size, int w , int h);
+matrix_t matrix_placementB(int photoindex, int size, int w , int h);
+matrix_f	get_matrix_func(int type);
+
+
+
+int power_of(int size);
+int max_power(int w);
 
 void frameborder_yuvdata(uint8_t * input_y, uint8_t * input_u,
 			 uint8_t * input_v, uint8_t * putin_y,

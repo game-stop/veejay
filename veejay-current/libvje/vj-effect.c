@@ -137,6 +137,8 @@
 #include "effects/neighbours5.h"
 #include "effects/cutstop.h"
 #include "effects/maskstop.h"
+#include "effects/photoplay.h"
+#include "effects/videoplay.h"
 
 static struct
 {
@@ -184,6 +186,8 @@ static struct
 {	neighbours5_malloc,		neighbours5_free,	VJ_IMAGE_EFFECT_NEIGHBOUR5	},
 {	cutstop_malloc,			cutstop_free,		VJ_IMAGE_EFFECT_CUTSTOP		},
 {	maskstop_malloc,		maskstop_free,		VJ_IMAGE_EFFECT_MASKSTOP	},
+{	photoplay_malloc,		photoplay_free,		VJ_IMAGE_EFFECT_PHOTOPLAY	},
+{	videoplay_malloc,		videoplay_free,		VJ_VIDEO_EFFECT_VIDEOPLAY	},
 {	NULL			,	NULL			,0				},
 };
 
@@ -395,7 +399,8 @@ void vj_effect_initialize(int width, int height)
     vj_effects[34] = binaryoverlay_init(width,height);
     vj_effects[35] = dissolve_init(width,height);
     vj_effects[36] = tripplicity_init(width,height);
-    vj_effects[37] = dummy_init(width,height);
+	vj_effects[37] = videoplay_init(width,height);
+    vj_effects[38] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);
@@ -469,6 +474,7 @@ void vj_effect_initialize(int width, int height)
 	vj_effects[i + 71] = neighbours5_init(width,height);
 	vj_effects[i + 72] = cutstop_init(width,height);
 	vj_effects[i + 73] = maskstop_init(width,height);
+	vj_effects[i + 74] = photoplay_init(width,height);
 	max_width = width;
 	max_height = height;
 

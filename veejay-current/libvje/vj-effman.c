@@ -41,6 +41,10 @@ void vj_effman_apply_image_effect(
    int j;
 
    switch (e) {
+	case VJ_IMAGE_EFFECT_PHOTOPLAY:
+		photoplay_apply(frames[0],frameinfo->width,
+			frameinfo->height,arg[0],arg[1],arg[2]);
+			break;
 	case VJ_IMAGE_EFFECT_MASKSTOP:
 		maskstop_apply(frames[0],frameinfo->width,
 			frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
@@ -315,6 +319,10 @@ void vj_effman_apply_image_effect(
 void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp_kf *todo_info,int *arg, int entry, int e) {
 
     switch(e) {
+	case VJ_VIDEO_EFFECT_VIDEOPLAY:
+		videoplay_apply(frames[0],frames[1],frameinfo->width,
+			frameinfo->height,arg[0],arg[1],arg[2]);
+		break;
 	case VJ_VIDEO_EFFECT_TRIPPLICITY:
 	tripplicity_apply(frames[0],frames[1], 
 		frameinfo->width,frameinfo->height, arg[0],arg[1],arg[2]);
