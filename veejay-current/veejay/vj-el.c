@@ -871,7 +871,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		fgets(line, 1024, fd);
 		if (strcmp(line, "LAV Edit List\n") == 0)
 		{
-				fprintf(stderr, "Thi si werids hit\n");
 			   	/* Ok, it is a edit list */
 		    	veejay_msg(VEEJAY_MSG_DEBUG, "Edit list %s opened", filename[nf]);
 		    	/* Read second line: Video norm */
@@ -914,22 +913,25 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 				{
 					fgets(line, 1024, fd);
 					n = strlen(line);
+
 					if (line[n - 1] != '\n')
 					{
 					    veejay_msg(VEEJAY_MSG_ERROR, "Filename in edit list too long");
 						vj_el_free(el);
 						return NULL;
 					}
+
 					line[n - 1] = 0;	/* Get rid of \n at end */
 	
 					index_list[i] =
 					    open_video_file(line, el, flags, deinterlace,force);
+	
 					if(index_list[i]<0)
 					{
 						vj_el_free(el);
 						return NULL;
 					}
-		   		 
+		   		 }
 	
 				    /* Read edit list entries */
 			
@@ -973,7 +975,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 							}
 						}
 		    		} /* done reading editlist entries */
-				} /* done all files */ 
 			fclose(fd);
 		}
 		else
