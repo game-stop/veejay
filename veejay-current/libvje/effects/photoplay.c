@@ -24,19 +24,19 @@
 vj_effect *photoplay_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
-    ve->num_params = 3;
+    ve->num_params = 4;
 
     ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 2; // divider
     ve->limits[1][0] = max_power(w);
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 1; // waterfall
+    ve->limits[0][1] = 1;
+    ve->limits[1][1] = 250; // waterfall
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 3; // mode
     ve->defaults[0] = 2;
-    ve->defaults[1] = 0;
+    ve->defaults[1] = 1;
     ve->defaults[2] = 1;  
     ve->description = "Photoplay (timestretched mosaic)";
     ve->sub_format = 1;
@@ -48,7 +48,7 @@ vj_effect *photoplay_init(int w, int h)
 static picture_t **photo_list = NULL;
 static int	   num_photos = 0;
 static int	  frame_counter = 0;
-
+static int	  frame_delay = 0;
 
 static	int prepare_filmstrip(int film_length, int w, int h)
 {
@@ -197,12 +197,22 @@ void photoplay_apply( VJFrame *frame, int width, int height, int size, int delay
 		{
 			return;
 		}
+		frame_delay = 0;
 	}
-	
-	for( i = 0; i < 3; i ++ )
-	{
-		take_photo( frame->data[i], photo_list[(frame_counter%num_photos)]->data[i], width, height , frame_counter % num_photos);
+
+	if( frame_delay )
+		frame_delay --;
+
+	if( frame_delay == 0)
+	{	
+		for( i = 0; i < 3; i ++ )
+		{
+			take_photo( frame->data[i], photo_list[(frame_counter%num_photos)]->data[i], width, height , frame_counter % num_photos);
+		}
+		frame_delay = delay;
 	}
+
+
 
 	for ( i = 0; i < num_photos; i ++ )
 	{
@@ -213,6 +223,7 @@ void photoplay_apply( VJFrame *frame, int width, int height, int size, int delay
 	}
 
 
-	frame_counter ++;
+	if(frame_delay == delay)
+		frame_counter ++;
 }
 

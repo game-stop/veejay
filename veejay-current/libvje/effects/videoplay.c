@@ -32,12 +32,12 @@ vj_effect *videoplay_init(int w, int h)
     ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 2; // divider
     ve->limits[1][0] = max_power(w);
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 1; // waterfall
+    ve->limits[0][1] = 1;
+    ve->limits[1][1] = 250; // waterfall
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 3; // mode
     ve->defaults[0] = 2;
-    ve->defaults[1] = 0;
+    ve->defaults[1] = 1;
     ve->defaults[2] = 1;  
     ve->description = "Videoplay (timestretched mosaic)";
     ve->sub_format = 1;
@@ -49,7 +49,7 @@ vj_effect *videoplay_init(int w, int h)
 static picture_t **video_list = NULL;
 static int	   num_videos = 0;
 static int	  frame_counter = 0;
-
+static int	  frame_delay = 0;
 
 static	int prepare_filmstrip(int film_length, int w, int h)
 {
@@ -198,21 +198,50 @@ void videoplay_apply( VJFrame *frame, VJFrame *B, int width, int height, int siz
 		{
 			return;
 		}
+		frame_delay = delay;
+	}
+
+	if( frame_delay )
+		frame_delay --;	
+
+	if( frame_delay == 0)
+	{	
+		frame_delay = delay;
+	}
+
+	
+	if(frame_delay == delay)
+	{
+		for( i = 0; i < 3; i ++ )
+		{
+			take_video( B->data[i], video_list[(frame_counter%num_videos)]->data[i],
+				width, height , frame_counter % num_videos);
+		}
+		for( i = 0; i < 3; i ++ )
+		{
+			take_video( frame->data[i], video_list[((frame_counter+1)%num_videos)]->data[i],
+			width, height , (frame_counter+1) % num_videos);
+		}
+	}
+	else
+	{
+		int n = frame_counter - 1;
+		if(n>=0)
+		{	
+			for( i = 0; i < 3; i ++ )
+			{
+				take_video( frame->data[i], video_list[(n%num_videos)]->data[i],
+					width, height , frame_counter % num_videos);
+			}
+			n++;
+			for( i = 0; i < 3; i ++ )
+			{
+				take_video( B->data[i], video_list[(n%num_videos)]->data[i],
+				width, height , (frame_counter+1) % num_videos);
+			}
+		}
 	}
 	
-	for( i = 0; i < 3; i ++ )
-	{
-		take_video( frame->data[i], video_list[(frame_counter%num_videos)]->data[i],
-			width, height , frame_counter % num_videos);
-	}
-	frame_counter++;
-	for( i = 0; i < 3; i ++ )
-	{
-		take_video( B->data[i], video_list[(frame_counter%num_videos)]->data[i],
-			width, height , frame_counter % num_videos);
-	}
-	frame_counter++;
-
 	for ( i = 0; i < num_videos; i ++ )
 	{
 		matrix_t m = matrix_placement(i, size,width,height );
@@ -221,6 +250,8 @@ void videoplay_apply( VJFrame *frame, VJFrame *B, int width, int height, int siz
 		put_video( dstV, video_list[i]->data[2],width,height,i, m);
 	}
 
+	if( frame_delay == delay)
+		frame_counter+=2;
 
 }
 
