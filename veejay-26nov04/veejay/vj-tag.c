@@ -699,13 +699,15 @@ int	vj_tag_get_sequenced_file(int t1, char *descr, int num)
 int	vj_tag_try_filename(int t1, char *filename)
 {
 	vj_tag *tag = vj_tag_get(t1);
-	if(!tag) return 0;
+	if(!tag) 
+	{
+		return 0;
+	}
 	if(filename != NULL)
 	{
 		snprintf(tag->encoder_base, 255, "%s", filename);
 	}
-	sprintf(tag->encoder_destination, "%s-%05ld.avi", tag->encoder_base, tag->sequence_num);
-	veejay_msg(VEEJAY_MSG_INFO, "Recording to [%s]" , tag->encoder_destination);
+	sprintf(tag->encoder_destination, "%s-%03d.avi", tag->encoder_base, (int)tag->sequence_num);
 	return (vj_tag_update(tag,t1));
 }
 
@@ -731,7 +733,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		if(!ok)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Video dimensions must match DV geometry!");
-			return -1;
+			return 0;
 		}
 	}
 
@@ -746,7 +748,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		case ENCODER_DIVX: sprintf(descr, "DIVX"); cformat='D'; break;
 		default:
 		   veejay_msg(VEEJAY_MSG_ERROR, "Unsupported video codec");
-		   return -1;
+		   return 0;
                 break;
 	}
 
@@ -767,7 +769,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Cannot write to %s (%s)",tag->encoder_destination,
 		lav_strerror());
-		return -1;
+		return 0;
 	}
 		veejay_msg(VEEJAY_MSG_INFO, "Encoding to %s file [%s] %dx%d@%2.2f %d/%d/%d %s >%09d<",
 		    descr,
@@ -829,38 +831,34 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	tag->encoder_width = _tag_info->edit_list->video_width;
 	tag->encoder_height = _tag_info->edit_list->video_height;
 
-	if( vj_tag_update(tag,clip_id)==0) return 1;
-	return -1;
+	vj_tag_update(tag,clip_id);
+	return 1;
 }
 
 
 
 int vj_tag_init_encoder(int t1, char *filename, int format, long nframes ) {
   vj_tag *tag = vj_tag_get(t1);
-  if(!tag) return -1;
+  if(!tag) return 0;
 
-  if(tag->encoder_active) {
+  if(tag->encoder_active)
+  {
 	veejay_msg(VEEJAY_MSG_ERROR, "Already recording Stream %d to [%s]",t1, tag->encoder_destination);
- 	return -1;
-	}
+  return 0;
+  }
 
   if(!vj_tag_try_filename( t1,filename))
   {
-	return -1;
+	return 0;
   }
-  if(nframes <= 0) {
+  if(nframes <= 0)
+  {
 	veejay_msg(VEEJAY_MSG_ERROR, "It makes no sense to encode for %ld frames", nframes);
-	return -1;
-	}
+	return 0;
+  }
   /* todo: clean this mess up */
 
-  if( vj_tag_start_encoder( tag,format, nframes ) == 0)
-	{
-		return 1;
-	}
-
-
-   return -1;
+  return vj_tag_start_encoder( tag,format, nframes );
 }
 
 int vj_tag_continue_record( int t1 )

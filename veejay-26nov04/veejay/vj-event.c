@@ -6391,6 +6391,13 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 
 	vj_tag_get_description(id,description);
 	vj_tag_get_source_name(id, source);
+
+	if(v->settings->tag_record)
+		veejay_msg(VEEJAY_MSG_INFO, "Stream [%d]/[%d] [%s] %s recorded: %06ld frames ",
+			id,vj_tag_size()-1,description,
+		(vj_tag_get_active(id) ? "is active" : "is not active"),
+		vj_tag_get_encoded_frames(id));
+	else
 	veejay_msg(VEEJAY_MSG_INFO,
 		"Stream [%d]/[%d] [%s] %s ",
 		id, vj_tag_size()-1, description,
