@@ -800,7 +800,7 @@ void vj_tag_reset_encoder(int t1)
 int vj_tag_get_encoded_file(int t1, char *description)
 {
 	vj_tag *tag = vj_tag_get(t1);
-	if(!tag) return -1;
+	if(!tag) return 0;
 	sprintf(description, "%s", tag->encoder_destination );
 	return 1;
 }
