@@ -1251,6 +1251,8 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 		return;
 	}	
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "str arg = %s, format [1] = %c",
+		str_arg, vj_event_list[id].format[1]);
 	if( str_arg != NULL && vj_event_list[id].format[1] == 's' )
 	{
 		char *str = strdup( str_arg);
@@ -1442,11 +1444,6 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 	if( strlen(msg) == (MSG_MIN_LEN-1) )
 	{
 		int id = net_list[net_id].list_id;
-		//veejay_msg(VEEJAY_MSG_DEBUG, 
-		//	"(VIMS) Network %03d: '%s' defaults",
-		//	net_id,
-		//	vj_event_list[id].name
-		//);
 		_last_known_num_args = vj_event_list[id].num_params; 
 
 		vj_event_trigger_function(
@@ -1464,44 +1461,71 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 		int max_param;
 		int dargs[16];
 		char dstr[512];
-		
+		int with_str = 0;		
 		
 		int n = 0;
 		int p = 0;
 		int offset = 0;
-		
+		bzero(dstr,512);
+
 		id = net_list[ net_id].list_id;
 		max_param = vj_event_list[id].num_params;
 
 		memset(dargs,0,16);
 		strcpy(args,msg+4);
 
-		if(vj_event_list[id].format != NULL && vj_event_list[id].format[1] == 's')
+		if(vj_event_list[id].format != NULL )
 		{
-			if(sscanf(args,"%s",dstr))
+			int np = vj_event_list[id].num_params;
+			int ni;
+			int nl = 1;
+			int n_offset =0;
+			int m_len = strlen(args);
+			for( ni = 0; ni < np; ni ++ )
 			{
-				veejay_msg(VEEJAY_MSG_DEBUG,"(VIMS) first argument is string [%s].",dstr);
-				offset+=strlen(dstr);
-				n++;
+				if( m_len < n_offset )
+				{
+					// no more arguments in message (use 0 by default)
+					break;
+				}
+
+				if( vj_event_list[id].format[nl] == 's')
+				{
+					if( sscanf( args+n_offset, "%s", dstr ) )
+					{
+						n_offset += strlen(dstr) + 1;
+						dargs[ni] = 0;
+						with_str = 1;
+					}
+					else
+					{
+						veejay_msg(VEEJAY_MSG_ERROR, "Expected string for argument %d but got something else", ni);
+						return;
+					}
+				}
+				if( vj_event_list[id].format[nl] == 'd')
+				{
+					if( sscanf( args+n_offset, "%d", &dargs[ni]) )
+					{
+						char tmp_dec[10];
+						bzero(tmp_dec,10);
+						snprintf(tmp_dec, 10, "%d", dargs[ni]);
+						n_offset += strlen(tmp_dec) + 1;
+					}
+					else
+					{
+						veejay_msg(VEEJAY_MSG_ERROR, "Expected number for argument %d but got something else",ni);
+						return;
+					}
+				}
+				nl += 3;
 			}
-		}
-		else
-		{
-			if(sscanf(args,"%d",&dargs[0]))
-			{
-				char dec[10];
-				bzero(dec,10);
-			 	snprintf(dec, 10, "%d", dargs[0]);
-				offset += strlen(dec);
-				veejay_msg(VEEJAY_MSG_DEBUG,"(VIMS) next arguments start at [%s]",args+offset);
-				n++;
-			}
-
+			p = np;
+			
 		}
 
-		p = sscanf(args+offset,"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",&dargs[1],&dargs[2],&dargs[3],&dargs[4],&dargs[5],&dargs[6],&dargs[7],
-			&dargs[8],&dargs[9],&dargs[10],&dargs[11],&dargs[12],&dargs[13],&dargs[14],&dargs[15]);
 
+		// cleare remaining arguments
 		if( p > 0 )
 		{
 			n += p;
@@ -1509,12 +1533,6 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 			for( k = p+1; k < 16; k ++)
 				dargs[k] = 0;
 
-		}
-		if( n > vj_event_list[id].num_params )
-		{
-				veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Network: %03d has too many parameters (%d given, need %d)!",
-					net_id, n,vj_event_list[id].num_params);
-				return;
 		}
 
 		_last_known_num_args = n;
@@ -1531,8 +1549,8 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 		   the otherway arround may be va_copy to have 2 tries but I think an expression would be
 		   less expansive.
 		*/ 
-		   
-		if ( vj_event_list[id].format != NULL && vj_event_list[id].format[1] == 's' )
+
+		if ( with_str )
 		{
 			vj_event_trigger_function(
 			(void*)v,
@@ -1560,27 +1578,27 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 		}
 		else
 		{
-		vj_event_trigger_function(
-			(void*)v,
-			net_list[ net_id ].act,
-			max_param,
-			vj_event_list[id].format,
-			dargs[0],
-			dargs[1],
-			dargs[2],
-			dargs[3],
-			dargs[4],
-			dargs[5],
-			dargs[6],
-			dargs[7],
-			dargs[8],
-			dargs[9],
-			dargs[10],
-			dargs[11],
-			dargs[12],
-			dargs[13],
-			dargs[14]
-		) ;	
+			vj_event_trigger_function(
+				(void*)v,
+				net_list[ net_id ].act,
+				max_param,
+				vj_event_list[id].format,
+				dargs[0],
+				dargs[1],
+				dargs[2],
+				dargs[3],
+				dargs[4],
+				dargs[5],
+				dargs[6],
+				dargs[7],
+				dargs[8],
+				dargs[9],
+				dargs[10],
+				dargs[11],
+				dargs[12],
+				dargs[13],
+				dargs[14]
+			);	
 		}
 	}	
 }	
@@ -2058,6 +2076,19 @@ void vj_event_fmt_arg(int *args, char *str, const char format[], va_list ap)
 	}
 } 
 
+/* P_A: Parse Arguments. This macro is used in 1 function to sort the arguments (string first) */
+#define P_A2ndStr(a,b,c,d,n)\
+{\
+unsigned int __p = 0;\
+if(a!=NULL){\
+unsigned int __rplen = (sizeof(a) / sizeof(int) );\
+for(__p = 0; __p < __rplen; __p++) a[__p] = 0;\
+}\
+sprintf(b, "%s", va_arg(d, char*));\
+for( __p = 0; __p < n ; __p ++ ) \
+{ a[__p] = va_arg(d, int); }\
+}
+
 /* P_A: Parse Arguments. This macro is used in many functions */
 #define P_A(a,b,c,d)\
 {\
@@ -2069,7 +2100,12 @@ for(__rp = 0; __rp < __rplen; __rp++) a[__rp] = 0;\
 }\
 while(*c) { \
 if(__z > _last_known_num_args )  break; \
-switch(*c++) { case 's': sprintf( b,"%s",va_arg(d,char*) ); break; case 'd': a[__z] = va_arg(d, int); __z++ ; break; } }\
+switch(*c++) {\
+ case 's': sprintf( b,"%s",va_arg(d,char*) ); __z++ ;\
+ break;\
+ case 'd': a[__z] = va_arg(d, int); __z++ ;\
+ break; }\
+ }\
 }
 
 /* P_A16: Parse 16 integer arguments. This macro is used in 1 function */
@@ -3071,15 +3107,16 @@ void vj_event_clip_set_dup(void *ptr, const char format[], va_list ap)
 
 void vj_event_clip_set_descr(void *ptr, const char format[], va_list ap)
 {
-	char str[255];
-	int args[1];
+	char str[CLIP_MAX_DESCR_LEN];
+	int args[5];
 	veejay_t *v = (veejay_t*) ptr;
+	P_A2ndStr(args,str,format,ap,1);
 
-	P_A(args,str,format,ap);
 	if( args[0] == 0 ) 
 	{
 		args[0] = v->uc->clip_id;
 	}
+
 	if(args[0] == -1) args[0] = clip_size()-1;
 
 	if(clip_set_description(args[0],str) == 0)
@@ -4305,8 +4342,8 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 			{
 				int args_offset = 3;
 				
-				veejay_msg(VEEJAY_MSG_DEBUG, "Clip %d Chain entry %d has effect %s",
-					args[0],args[1],vj_effect_get_description(real_id));
+				veejay_msg(VEEJAY_MSG_DEBUG, "Clip %d Chain entry %d has effect %s with %d arguments",
+					args[0],args[1],vj_effect_get_description(real_id),num_p);
 				for(i=0; i < num_p; i++)
 				{	
 					if(vj_effect_valid_value(real_id,i,args[(i+args_offset)]) )
@@ -4329,15 +4366,27 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 							);
 					}
 				}
-				v->uc->chain_changed = 1;	
-				if ( args[ num_p + args_offset ] )
+
+				if ( vj_effect_get_extra_frame( real_id ) && args[num_p + args_offset])
 				{
-					veejay_msg(VEEJAY_MSG_INFO, "Try to set channel %d, source %d", args[num_p+3], args[num_p+4]);
-					if(clip_set_chain_source( args[0],args[1], args[num_p+4] ) &&
-				       clip_set_chain_channel( args[0],args[1], args[num_p+3] ))
+					int source = args[num_p+4];	
+					int channel_id = args[num_p+3];
+					int err = 1;
+					if( (source != VJ_TAG_TYPE_NONE && vj_tag_exists(channel_id))|| (source == VJ_TAG_TYPE_NONE && clip_exists(channel_id)) )
 					{
-					  veejay_msg(VEEJAY_MSG_INFO, "Updated mixing channel to %d, source %d", args[num_p+3],
-						args[num_p+4]);
+						err = 0;
+					}
+					if(	err == 0 && clip_set_chain_source( args[0],args[1], source ) &&
+				       		clip_set_chain_channel( args[0],args[1], channel_id  ))
+					{
+					  veejay_msg(VEEJAY_MSG_INFO, "Updated mixing channel to %s %d",
+						(source == VJ_TAG_TYPE_NONE ? "clip" : "stream" ),
+						channel_id);
+					}
+					else
+					{
+					  veejay_msg(VEEJAY_MSG_ERROR, "updating mixing channel (channel %d is an invalid %s?)",
+					   channel_id, (source == 0 ? "stream" : "clip" ));
 					}
 				}
 			}
@@ -4369,7 +4418,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 					{
 						if(vj_tag_set_effect_arg(args[0],args[1],i,args[i+3]) == -1)
 						{
-							veejay_msg(VEEJAY_MSG_ERROR, "Error setting argument %d value %d for  %s",
+							veejay_msg(VEEJAY_MSG_ERROR, "setting argument %d value %d for  %s",
 								i,
 								args[i+3],
 								vj_effect_get_description(real_id));
@@ -4385,13 +4434,28 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 				}
 				v->uc->chain_changed = 1;
 			}
+
 			if( args[ num_p + 3] && vj_effect_get_extra_frame(real_id) )
 			{
-				if( vj_tag_set_chain_source( args[0],args[1], args[ num_p + 4] ) &&
-				    vj_tag_set_chain_channel( args[0],args[1],args[num_p + 3] ))
+				int channel_id = args[num_p + 3];
+				int source = args[ num_p + 4];
+				int err = 1;
+
+				if( (source != VJ_TAG_TYPE_NONE && vj_tag_exists(channel_id))|| (source == VJ_TAG_TYPE_NONE && clip_exists(channel_id)) )
 				{
-					veejay_msg(VEEJAY_MSG_INFO,"Updated mixing channel %d, source %d",
-						args[num_p + 3], args[num_p + 4] );
+					err = 0;
+				}
+
+				if( err == 0 && vj_tag_set_chain_source( args[0],args[1], source ) &&
+				    vj_tag_set_chain_channel( args[0],args[1], channel_id ))
+				{
+					veejay_msg(VEEJAY_MSG_INFO,"Updated mixing channel to %s %d",
+						(source == VJ_TAG_TYPE_NONE ? "clip" : "stream"), channel_id  );
+				}
+				else
+				{
+					  veejay_msg(VEEJAY_MSG_ERROR, "updating mixing channel (channel %d is an invalid %s?)",
+					   channel_id, (source == 0 ? "stream" : "clip" ));
 				}
 			}
 		}
@@ -4535,8 +4599,8 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 			   clip_set_chain_channel(args[0],args[1], c);
 			   clip_set_chain_source (args[0],args[1],src);
 
-				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source %s (%d), Channel %d", 
-					clip_get_chain_source(args[0],args[1])==VJ_TAG_TYPE_NONE ?"Clip" : "Stream",src,c);
+				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source (%s %d)", 
+					src == VJ_TAG_TYPE_NONE ? "clip" : "stream",c);
 				if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
 
 			}
@@ -4588,8 +4652,8 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 			{
 			   vj_tag_set_chain_channel(args[0],args[1], c);
 			   vj_tag_set_chain_source (args[0],args[1],src);
-				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source %s (%d), Channel %d", 
-					vj_tag_get_chain_source(args[0],args[1])==VJ_TAG_TYPE_NONE ?"Clip" : "Stream",src,c);
+				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source (%s %d)", 
+					src==VJ_TAG_TYPE_NONE ? "clip" : "stream",c);
 			if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
 
 			}	
@@ -4823,36 +4887,33 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
 		if(v_chi(args[1]))
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of bounds: %d", args[1]);
 			return;
 		}
 
 		if(clip_exists(args[0]))
 		{
 			int src = clip_get_chain_source( args[0],args[1]);
-			if(src == VJ_TAG_TYPE_NONE)
+			int err = 1;
+			if(src == VJ_TAG_TYPE_NONE && clip_exists(args[2]))
 			{
-				if(clip_exists(args[2])) 
-				{
-					if(clip_set_chain_channel(args[0],args[1], args[2])!=-1)	
-					{
-						veejay_msg(VEEJAY_MSG_INFO, "Selected clip channel %d", args[2]);
-						if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
+				err = 0;
+			}
+			if(src != VJ_TAG_TYPE_NONE && vj_tag_exists(args[2]))
+			{
+				err = 0;
+			}	
+			if(err == 0 && clip_set_chain_channel(args[0],args[1], args[2])>= 0)	
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d)",
+				  (src == VJ_TAG_TYPE_NONE ? "clip" : "stream"),args[2]);
+				if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
 
-					}
-				}
 			}
 			else
 			{
-				if(vj_tag_exists(args[2])) 
-				{
-					if(clip_set_chain_channel(args[0],args[1],args[2])!=-1)
-					{
-						veejay_msg(VEEJAY_MSG_INFO, "Selected tag channel %d", args[2]);
-						if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
-
-					}
-				}
+				veejay_msg(VEEJAY_MSG_ERROR, "Invalid channel (%s %d) given",
+					(src ==VJ_TAG_TYPE_NONE ? "clip" : "stream") , args[2]);
 			}
 		}
 	}
@@ -4869,30 +4930,23 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 		if(vj_tag_exists(args[0]))
 		{
 			int src = vj_tag_get_chain_source(args[0],args[1]);
-			if(src == VJ_TAG_TYPE_NONE)
-			{
-				if(clip_exists(args[2])) 
-				{
-					if(vj_tag_set_chain_channel(args[0],args[1],args[2])!=-1)
-					{
-						veejay_msg(VEEJAY_MSG_INFO, "Selected clip %d to mix in",args[2]);
-						if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
+			int err = 1;
+			if( src == VJ_TAG_TYPE_NONE && clip_exists( args[2]))
+				err = 0;
+			if( src != VJ_TAG_TYPE_NONE && vj_tag_exists( args[2] ))
+				err = 0;
 
-					}
-				}
+			if( err == 0 && vj_tag_set_chain_channel(args[0],args[1],args[2])>=0)
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d)",
+				(src==VJ_TAG_TYPE_NONE ? "clip" : "stream"), args[2]);
+				if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
+
 			}
 			else
 			{
-				if(vj_tag_exists(args[2])) 
-				{
-					if(vj_tag_set_chain_channel(args[0],args[1],args[2])!=-1)		
-					{
-						veejay_msg(VEEJAY_MSG_INFO, "Selected stream %d to mix in", args[2]);
-						if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
-
-					}
-				}
-
+				veejay_msg(VEEJAY_MSG_ERROR, "Invalid channel (%s %d) given",
+					(src ==VJ_TAG_TYPE_NONE ? "clip" : "stream") , args[2]);
 			}
 		}
 	}
@@ -4917,28 +4971,27 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 
 		if(clip_exists(args[0]))
 		{
-			if(args[2] == VJ_TAG_TYPE_NONE)
+			int source = args[2];
+			int channel_id = args[3];
+			int err = 1;
+			if( source == VJ_TAG_TYPE_NONE && clip_exists(channel_id))
+				err = 0;
+			if( source != VJ_TAG_TYPE_NONE && vj_tag_exists(channel_id))
+				err = 0;
+
+	
+			if(	err == 0 &&
+				clip_set_chain_source(args[0],args[1],source)!=-1 &&
+				clip_set_chain_channel(args[0],args[1],channel_id) != -1)
 			{
-				if(clip_exists(args[3])) {
-					if(	clip_set_chain_source(args[0],args[1],0)!=-1 &&
-						clip_set_chain_channel(args[0],args[1],args[3]) != -1)
-					{
-						veejay_msg(VEEJAY_MSG_INFO, "Selected clip %d to mix in", args[3]);
-						if(v->no_bezerk) veejay_set_clip(v,v->uc->clip_id);
-					}
-				}
+				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d) to mix in",
+					(source == VJ_TAG_TYPE_NONE ? "clip" : "stream") , channel_id);
+				if(v->no_bezerk) veejay_set_clip(v,v->uc->clip_id);
 			}
 			else
 			{
-				if(vj_tag_exists(args[3])) {
-					int src = vj_tag_get_type( args[3] );
-					if(	clip_set_chain_source(args[0],args[1],src ) != -1 &&
-						clip_set_chain_channel(args[0],args[1],args[3]) != -1)
-					{
-						veejay_msg(VEEJAY_MSG_INFO, "Selected stream %d to mix in", args[3]);
-						if(v->no_bezerk) veejay_set_clip(v,v->uc->clip_id);
-					}
-				}
+				veejay_msg(VEEJAY_MSG_ERROR, "Invalid channel (%s %d) given",
+					(source ==VJ_TAG_TYPE_NONE ? "clip" : "stream") , args[2]);
 			}
 		}
 	}
@@ -4955,33 +5008,29 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 
 	 	if(vj_tag_exists(args[0])) 
 		{
-			if(args[2] == VJ_TAG_TYPE_NONE)
+			int source = args[2];
+			int channel_id = args[3];
+			int err = 1;
+			if( source == VJ_TAG_TYPE_NONE && clip_exists(channel_id))
+				err = 0;
+			if( source != VJ_TAG_TYPE_NONE && vj_tag_exists(channel_id))
+				err = 0;
+
+	
+			if(	err == 0 &&
+				vj_tag_set_chain_source(args[0],args[1],source)!=-1 &&
+				vj_tag_set_chain_channel(args[0],args[1],channel_id) != -1)
 			{
-				if(clip_exists(args[3])) 
-				{
-					if(	vj_tag_set_chain_source(args[0],args[1],0) != -1 &&
-						vj_tag_set_chain_channel(args[0],args[1],args[3]) != -1 )
-					{
-						veejay_msg(VEEJAY_MSG_INFO, "Selected clip %d to mix in",args[3]);
-						if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
-					}
-				}
+				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d) to mix in",
+					(source == VJ_TAG_TYPE_NONE ? "clip" : "stream") , channel_id);
+				if(v->no_bezerk) veejay_set_clip(v,v->uc->clip_id);
 			}
 			else
 			{
-				if(vj_tag_exists(args[3])) 
-				{
-					int src = vj_tag_get_type( args[3]);
-					if(	vj_tag_set_chain_source(args[0],args[1],src) != -1 &&
-						vj_tag_set_chain_channel(args[0],args[1],args[3])!= -1)
-					{
-						veejay_msg(VEEJAY_MSG_INFO, "Selected stream %d to mix in", args[3]);
-						if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
-					}
-				}
-	
+				veejay_msg(VEEJAY_MSG_ERROR, "Invalid channel (%s %d) given",
+					(source ==VJ_TAG_TYPE_NONE ? "clip" : "stream") , args[2]);
 			}
-		}
+		}	
 	}
 
 }
@@ -6545,7 +6594,7 @@ void	vj_event_send_clip_list		(	void *ptr,	const char format[],	va_list ap	)
 			if(clip_exists(i))
 			{	
 				MPEG_timecode_t tc;
-				char description[255];
+				char description[CLIP_MAX_DESCR_LEN];
 				char timecode[20];
 				int len = clip_get_endFrame(i) - clip_get_startFrame(i);
 				bzero(cmd, 300);
