@@ -346,9 +346,9 @@ int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el)
 
 int	_vj_tag_new_dv1394(vj_tag *tag, int stream_nr, int channel, editlist *el)
 {
-    vj_tag_input->dv1394[0] = vj_dv1394_init( (void*) el, channel);
+    vj_tag_input->dv1394[stream_nr] = vj_dv1394_init( (void*) el, channel);
 	veejay_msg(VEEJAY_MSG_DEBUG, "Channel in stream %d",channel);
-    if(vj_tag_input->dv1394[0])
+    if(vj_tag_input->dv1394[stream_nr])
     {
 	veejay_msg(VEEJAY_MSG_INFO, "DV1394 ready for capture");
 	return 1;
@@ -486,7 +486,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	break;
     case VJ_TAG_TYPE_DV1394:
 	sprintf(tag->source_name, "/dev/dv1394");
-	if( _vj_tag_new_dv1394( tag, 0,channel,el ) == 0 )
+	if( _vj_tag_new_dv1394( tag, stream_nr,channel,el ) == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "error opening dv1394");
 		return -1;
@@ -609,7 +609,7 @@ int vj_tag_del(int id)
 //		vj_yuv4mpeg_free( vj_tag_input->stream[tag->index]);
 	 break;	
       case VJ_TAG_TYPE_DV1394:
-		vj_dv1394_close( vj_tag_input->dv1394[0] );
+		vj_dv1394_close( vj_tag_input->dv1394[tag->index] );
 		break;
      case VJ_TAG_TYPE_AVFORMAT:
 		veejay_msg(VEEJAY_MSG_INFO, "Closing avformat stream %s", tag->source_name);
@@ -1898,7 +1898,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	}
 	break;
         case VJ_TAG_TYPE_DV1394:
-		vj_dv1394_read_frame( vj_tag_input->dv1394[0], buffer , abuffer,vj_tag_input->pix_fmt);
+		vj_dv1394_read_frame( vj_tag_input->dv1394[tag->index], buffer , abuffer,vj_tag_input->pix_fmt);
 		break;
     case VJ_TAG_TYPE_SHM:
 	veejay_msg(VEEJAY_MSG_DEBUG, "Consume shm");

@@ -51,7 +51,7 @@ typedef struct {
     vj_yuv *stream[VJ_TAG_MAX_STREAM_IN];
     vj_avformat *avformat[VJ_TAG_MAX_STREAM_IN];
 	vj_client *net[VJ_TAG_MAX_STREAM_IN];
-    vj_dv1394 *dv1394[1];
+    vj_dv1394 *dv1394[VJ_TAG_MAX_STREAM_IN];
     int width;
     int height;
     int depth;
