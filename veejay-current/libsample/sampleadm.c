@@ -463,7 +463,7 @@ int clip_get_longest(int clip_id)
 		int tmp = 0;
 		int t=0;
 		int _id=0;
-		int speed = si->speed;
+		int speed = abs(si->speed);
 		int duration = len / speed; //how many frames are played of this clip
 
 		if( si->looptype == 2) duration *= 2; // pingpong loop duration     
