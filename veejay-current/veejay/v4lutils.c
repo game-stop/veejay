@@ -23,7 +23,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  *
  */
-
+#include <config.h>
+#ifdef HAVE_V4L
 #include <stdio.h>
 #include <assert.h>
 #include <sys/ioctl.h>
@@ -49,43 +50,6 @@
 static void v4lperror(const char *str)
 {
     fprintf(stderr, "%s\n", str);
-}
-
-/*
- * v4lopenvloopback - open the v4loopback device.
- *
- * name: device file
- * vd: v4l device object
- * different open because vloopback does not return from v4lgetcapability()
- */
-
-int v4lopenvloopback(char *name, v4ldevice * vd, int palette)
-{
-
-    if (name == NULL)
-		return -1;
-    if ((vd->fd = open(name, O_RDWR)) < 0) {
-	fprintf(stderr, "v4lvloopback:open error [%s]\n",  name);
-	return -1;
-    }
- 
-    if (v4lgetcapability(vd) != 0)
-	return -1;
-   v4lsetdefaultnorm(vd, vd->norm);
-
-#ifdef V4L_DEBUG
-    fprintf(stderr, "v4lvloopback:open:VIDIOCGCHAN...\n");
-#endif
-    vd->capability.channels = 1;
-    vd->capability.audios = 0;
-    vd->capability.type = VID_TYPE_CAPTURE;
-    vd->preferred_palette = palette;
-    v4lprint(vd);
-
-#ifdef V4L_DEBUG
-    fprintf(stderr, "v4lvloopback: open:quit\n");
-#endif
-    return 0;
 }
 
 /*
@@ -670,7 +634,6 @@ int v4lreadframe(v4ldevice * vd, uint8_t * buf, int width, int height)
 	{
 	    if (read(vd->fd, buf, (width * height * 3)) != (width * height * 3)) 
 		{
-		veejay_msg(VEEJAY_MSG_ERROR, "Reading frame from vloopback input pipe");
 		return -1;
 		  }
 	}
@@ -712,3 +675,4 @@ void v4lprint(v4ldevice * vd)
     veejay_msg(VEEJAY_MSG_INFO,"\tNorm\t\t%s",
 		(vd->norm == 0 ? "PAL" : "NTSC"));
 }
+#endif
