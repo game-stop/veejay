@@ -265,7 +265,7 @@ libveejay_la_SOURCES = vj-common.c cpu_accel.c memcpy.c subsample.c hash.c color
 			transitions/transline.c transitions/transop.c transitions/transcarot.c \
 			transitions/fadecolor.c effects/lumablend.c effects/chromamagick.c \
 			transitions/fadecolorrgb.c effects/magicoverlays.c  effects/binaryoverlays.c effects/pencilsketch.c effects/diffimg.c \
-			effects/swirl.c effects/chromium.c effects/chromapalette.c effects/radialblur.c effects/fisheye.c effects/raster.c effects/smear.c effects/magicmirror.c effects/lumamask.c effects/pixelate.c effects/colorshift.c effects/scratcher.c effects/opacitythreshold.c \
+			effects/swirl.c effects/chromium.c effects/uvcorrect.c effects/chromapalette.c effects/radialblur.c effects/fisheye.c effects/raster.c effects/smear.c effects/magicmirror.c effects/lumamask.c effects/pixelate.c effects/colorshift.c effects/scratcher.c effects/opacitythreshold.c \
 			effects/opacityadv.c effects/rgbkeysmooth.c effects/mask.c effects/distort.c \
 			transitions/wipe.c effects/magicscratcher.c effects/chromascratcher.c \
 			effects/tracer.c effects/mtracer.c effects/dupmagic.c effects/keyselect.c \
@@ -327,17 +327,17 @@ am_libveejay_la_OBJECTS = vj-common.lo cpu_accel.lo memcpy.lo \
 	slidingdoor.lo color.lo transline.lo transop.lo transcarot.lo \
 	fadecolor.lo lumablend.lo chromamagick.lo fadecolorrgb.lo \
 	magicoverlays.lo binaryoverlays.lo pencilsketch.lo diffimg.lo \
-	swirl.lo chromium.lo chromapalette.lo radialblur.lo fisheye.lo \
-	raster.lo smear.lo magicmirror.lo lumamask.lo pixelate.lo \
-	colorshift.lo scratcher.lo opacitythreshold.lo opacityadv.lo \
-	rgbkeysmooth.lo mask.lo distort.lo wipe.lo magicscratcher.lo \
-	chromascratcher.lo tracer.lo mtracer.lo dupmagic.lo \
-	keyselect.lo greyselect.lo bwselect.lo complexsaturate.lo \
-	complexthreshold.lo complexinvert.lo complexsync.lo isolate.lo \
-	vbar.lo 3bar.lo enhancemask.lo noiseadd.lo contrast.lo \
-	motionblur.lo sinoids.lo average.lo ripple.lo water.lo \
-	noisepencil.lo bathroom.lo slice.lo crosspixel.lo \
-	liblavplayvj.lo
+	swirl.lo chromium.lo uvcorrect.lo chromapalette.lo \
+	radialblur.lo fisheye.lo raster.lo smear.lo magicmirror.lo \
+	lumamask.lo pixelate.lo colorshift.lo scratcher.lo \
+	opacitythreshold.lo opacityadv.lo rgbkeysmooth.lo mask.lo \
+	distort.lo wipe.lo magicscratcher.lo chromascratcher.lo \
+	tracer.lo mtracer.lo dupmagic.lo keyselect.lo greyselect.lo \
+	bwselect.lo complexsaturate.lo complexthreshold.lo \
+	complexinvert.lo complexsync.lo isolate.lo vbar.lo 3bar.lo \
+	enhancemask.lo noiseadd.lo contrast.lo motionblur.lo sinoids.lo \
+	average.lo ripple.lo water.lo noisepencil.lo bathroom.lo \
+	slice.lo crosspixel.lo liblavplayvj.lo
 libveejay_la_OBJECTS = $(am_libveejay_la_OBJECTS)
 bin_PROGRAMS = veejay$(EXEEXT)
 PROGRAMS = $(bin_PROGRAMS)
@@ -414,13 +414,13 @@ am__depfiles_maybe = depfiles
 @AMDEP_TRUE@	./$(DEPDIR)/transblend.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/transcarot.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/transform.Plo ./$(DEPDIR)/transline.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/transop.Plo ./$(DEPDIR)/v4lutils.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/vbar.Plo ./$(DEPDIR)/veejay.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/vj-audio.Plo ./$(DEPDIR)/vj-client.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/vj-common.Plo ./$(DEPDIR)/vj-dfb.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/vj-dv.Plo ./$(DEPDIR)/vj-effect.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/vj-effman.Plo ./$(DEPDIR)/vj-event.Plo \
-@AMDEP_TRUE@	./$(DEPDIR)/vj-ffmpeg.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/transop.Plo ./$(DEPDIR)/uvcorrect.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/v4lutils.Plo ./$(DEPDIR)/vbar.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/veejay.Po ./$(DEPDIR)/vj-audio.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/vj-client.Plo ./$(DEPDIR)/vj-common.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/vj-dfb.Plo ./$(DEPDIR)/vj-dv.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/vj-effect.Plo ./$(DEPDIR)/vj-effman.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/vj-event.Plo ./$(DEPDIR)/vj-ffmpeg.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/vj-frameinfo.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/vj-keyframe.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/vj-motion.Plo ./$(DEPDIR)/vj-osc.Plo \
@@ -634,6 +634,7 @@ distclean-compile:
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/transform.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/transline.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/transop.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/uvcorrect.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/v4lutils.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/vbar.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/veejay.Po@am__quote@
@@ -2381,6 +2382,39 @@ chromium.lo: effects/chromium.c
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/chromium.Plo' tmpdepfile='$(DEPDIR)/chromium.TPlo' @AMDEPBACKSLASH@
 @AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
 @am__fastdepCC_FALSE@	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o chromium.lo `test -f 'effects/chromium.c' || echo '$(srcdir)/'`effects/chromium.c
+
+uvcorrect.o: effects/uvcorrect.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT uvcorrect.o -MD -MP -MF "$(DEPDIR)/uvcorrect.Tpo" \
+@am__fastdepCC_TRUE@	  -c -o uvcorrect.o `test -f 'effects/uvcorrect.c' || echo '$(srcdir)/'`effects/uvcorrect.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/uvcorrect.Tpo" "$(DEPDIR)/uvcorrect.Po"; \
+@am__fastdepCC_TRUE@	else rm -f "$(DEPDIR)/uvcorrect.Tpo"; exit 1; \
+@am__fastdepCC_TRUE@	fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='effects/uvcorrect.c' object='uvcorrect.o' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/uvcorrect.Po' tmpdepfile='$(DEPDIR)/uvcorrect.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o uvcorrect.o `test -f 'effects/uvcorrect.c' || echo '$(srcdir)/'`effects/uvcorrect.c
+
+uvcorrect.obj: effects/uvcorrect.c
+@am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT uvcorrect.obj -MD -MP -MF "$(DEPDIR)/uvcorrect.Tpo" \
+@am__fastdepCC_TRUE@	  -c -o uvcorrect.obj `if test -f 'effects/uvcorrect.c'; then $(CYGPATH_W) 'effects/uvcorrect.c'; else $(CYGPATH_W) '$(srcdir)/effects/uvcorrect.c'; fi`; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/uvcorrect.Tpo" "$(DEPDIR)/uvcorrect.Po"; \
+@am__fastdepCC_TRUE@	else rm -f "$(DEPDIR)/uvcorrect.Tpo"; exit 1; \
+@am__fastdepCC_TRUE@	fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='effects/uvcorrect.c' object='uvcorrect.obj' libtool=no @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/uvcorrect.Po' tmpdepfile='$(DEPDIR)/uvcorrect.TPo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o uvcorrect.obj `if test -f 'effects/uvcorrect.c'; then $(CYGPATH_W) 'effects/uvcorrect.c'; else $(CYGPATH_W) '$(srcdir)/effects/uvcorrect.c'; fi`
+
+uvcorrect.lo: effects/uvcorrect.c
+@am__fastdepCC_TRUE@	if $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT uvcorrect.lo -MD -MP -MF "$(DEPDIR)/uvcorrect.Tpo" \
+@am__fastdepCC_TRUE@	  -c -o uvcorrect.lo `test -f 'effects/uvcorrect.c' || echo '$(srcdir)/'`effects/uvcorrect.c; \
+@am__fastdepCC_TRUE@	then mv -f "$(DEPDIR)/uvcorrect.Tpo" "$(DEPDIR)/uvcorrect.Plo"; \
+@am__fastdepCC_TRUE@	else rm -f "$(DEPDIR)/uvcorrect.Tpo"; exit 1; \
+@am__fastdepCC_TRUE@	fi
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	source='effects/uvcorrect.c' object='uvcorrect.lo' libtool=yes @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	depfile='$(DEPDIR)/uvcorrect.Plo' tmpdepfile='$(DEPDIR)/uvcorrect.TPlo' @AMDEPBACKSLASH@
+@AMDEP_TRUE@@am__fastdepCC_FALSE@	$(CCDEPMODE) $(depcomp) @AMDEPBACKSLASH@
+@am__fastdepCC_FALSE@	$(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -c -o uvcorrect.lo `test -f 'effects/uvcorrect.c' || echo '$(srcdir)/'`effects/uvcorrect.c
 
 chromapalette.o: effects/chromapalette.c
 @am__fastdepCC_TRUE@	if $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) $(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS) -MT chromapalette.o -MD -MP -MF "$(DEPDIR)/chromapalette.Tpo" \
