@@ -26,7 +26,7 @@
 #include <dirent.h>
 #include <string.h>
 #include <stdlib.h>
-#include <veejay/hash.h>
+#include <libhash/hash.h>
 #include <veejay/vj-plugin.h>
 static hash_t	*PluginHash;
 

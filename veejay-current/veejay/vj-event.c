@@ -26,12 +26,12 @@
 #include <SDL/SDL.h>
 #endif
 #include <stdarg.h>
+#include <libhash/hash.h>
 #include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-common.h>
 #include <veejay/vj-lib.h>
 #include <veejay/vj-perform.h>
-#include <veejay/hash.h>
 #include <veejay/libveejay.h>
 #include <libel/vj-avcodec.h>
 #include <libsamplerec/samplerecord.h>

@@ -21739,7 +21739,7 @@ subdirs="$subdirs ffmpeg/ffmpeg"
 
 
 
-                                                                                                                                                                                                                  ac_config_files="$ac_config_files Makefile ffmpeg/Makefile libOSC/Makefile libvjmsg/Makefile libvjmem/Makefile libvje/Makefile libsample/Makefile libvjnet/Makefile libyuv/Makefile libel/Makefile libstream/Makefile liblavjpeg/Makefile libsamplerec/Makefile utils/Makefile bio2jack/Makefile plugins/Makefile veejay/Makefile man/Makefile tools/Makefile veejay-config veejay.pc"
+                                                                                                                                                                                                                            ac_config_files="$ac_config_files Makefile ffmpeg/Makefile libOSC/Makefile libhash/Makefile libvjmsg/Makefile libvjmem/Makefile libvje/Makefile libsample/Makefile libvjnet/Makefile libyuv/Makefile libel/Makefile libstream/Makefile liblavjpeg/Makefile libsamplerec/Makefile utils/Makefile bio2jack/Makefile plugins/Makefile veejay/Makefile man/Makefile tools/Makefile veejay-config veejay.pc"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -22474,6 +22474,7 @@ do
   "Makefile" ) CONFIG_FILES="$CONFIG_FILES Makefile" ;;
   "ffmpeg/Makefile" ) CONFIG_FILES="$CONFIG_FILES ffmpeg/Makefile" ;;
   "libOSC/Makefile" ) CONFIG_FILES="$CONFIG_FILES libOSC/Makefile" ;;
+  "libhash/Makefile" ) CONFIG_FILES="$CONFIG_FILES libhash/Makefile" ;;
   "libvjmsg/Makefile" ) CONFIG_FILES="$CONFIG_FILES libvjmsg/Makefile" ;;
   "libvjmem/Makefile" ) CONFIG_FILES="$CONFIG_FILES libvjmem/Makefile" ;;
   "libvje/Makefile" ) CONFIG_FILES="$CONFIG_FILES libvje/Makefile" ;;

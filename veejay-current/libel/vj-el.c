@@ -28,7 +28,6 @@
 #include <config.h>
 #include <string.h>
 #include <libvjmsg/vj-common.h>
-#include <veejay/hash.h>
 #include <veejay/vj-global.h>
 #include <libel/lav_io.h>
 #include <libel/vj-el.h>

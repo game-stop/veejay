@@ -5,6 +5,7 @@ MAINTAINERCLEANFILES = Makefile.in
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-DG_LOG_DOMAIN=\"veejay\" -DVEEJAY_VERSION=\"$(VERSION)\" \
      		-I /usr/X11R6/include -I$(top_srcdir)/libOSC -I$(top_srcdir)/utils \
+		-I$(top_srcdir)/libhash \
 		-I$(top_srcdir)/libvje \
 		-I$(top_srcdir)/libvjmem \
 		-I$(top_srcdir)/libvjmsg \
@@ -28,7 +29,7 @@ VEEJAY_ALL_LIB_OPTS = \
 	-release $(LT_RELEASE) \
 	-export-dynamic 
 
-libveejay_la_SOURCES =  vj-misc.c hash.c \
+libveejay_la_SOURCES =  vj-misc.c \
 			vj-plugin.c vj-osc.c vj-event.c vj-pjack.c vj-perform.c \
 			vj-sdl.c vj-dfb.c \
 			liblavplayvj.c
@@ -38,6 +39,7 @@ libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS) \
 			-L$(top_builddir)/ffmpeg/ffmpeg/libavcodec -lavcodec \
 			-L$(top_builddir)/ffmpeg/ffmpeg/libavformat -lavformat \
 			-L$(top_builddir)/libOSC / -lOSC \
+			-L$(top_builddir)/libhash / -lhash \
 			-L$(top_builddir)/utils/ -lmjpegutils \
 			-L$(top_builddir)/bio2jack/ -lbio2jack \
 			-L$(top_builddir)/libvjmsg -lvjmsg \

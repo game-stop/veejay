@@ -26,7 +26,7 @@
 #include <config.h>
 #include <string.h>
 #include <libstream/vj-tag.h>
-#include <libstream/hash.h>
+#include <libhash/hash.h>
 #include <libvje/vje.h>
 #ifdef HAVE_V4L
 #include <libstream/vj-v4lvideo.h>

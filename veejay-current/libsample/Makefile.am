@@ -1,6 +1,6 @@
 # Makefile for veejay
 
-INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg \
+INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg -I$(top_srcdir)/libhash\
 			${XML_CFLAGS} ${XML_CPPFLAGS} 
 
 SAMPLE_LIB_FILE = libsample.la
@@ -12,12 +12,13 @@ SAMPLE_ALL_LIB_OPTS = \
 
 noinst_LTLIBRARIES = $(SAMPLE_LIB_FILE)
 
-libsample_la_SOURCES =	hash.c sampleadm.c 
+libsample_la_SOURCES = sampleadm.c 
 
 
 libsample_la_LDFLAGS = $(SAMPLE_ALL_LIB_OPTS) \
 			-L$(top_builddir)/libvjmem -lvjmem \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
+			-L$(top_builddir)/libhash -lhash \
 			${XML_LIBS} \
 			-DDYNAMIC -O3 -Wall -rdynamic 
 
