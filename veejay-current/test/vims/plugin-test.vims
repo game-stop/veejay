@@ -1,0 +1,18 @@
+249:/usr/local/lib/libvj_dummy_plugin.so;
++10
+248:ExamplePlugin;
++10
+249:/usr/local/lib/libvj_drawtext_plugin.so;
++100
+245:DrawText:text="Veejay 0.6.3":x=10:y=10;
++50
+245:DrawText:text="With font rendering":x=10:y=80;
++50
+245:DrawText:text="Change fgcolor":fgcolor=#40ff20:x=10:y=80;
++50
+245:DrawText:text="Change bgcolor":bgcolor=#ff10ff:x=10:y=80;
++50
+245:DrawText:text="Bordering":border:x=10:y=80;
++50
+248:DrawText;
+
