@@ -1,26 +1,4 @@
 /*
- *  Veejay's EditList (bloated version of mjpegtools' editlist.c)
- * 	- probes with avformat for some properties
- *	- supports up to 4096 files (thanks to Ronald Bultje for this)
- *       
- *  Copyright (C) 2004 nelburg@looze.net
- *
- *  This program is free software; you can redistribute it and/or modify
- *  it under the terms of the GNU General Public License as published by
- *  the Free Software Foundation; either version 2 of the License, or
- *  (at your option) any later version.
- *
- *  This program is distributed in the hope that it will be useful,
- *  but WITHOUT ANY WARRANTY; without even the implied warranty of
- *  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- *  GNU General Public License for more details.
- *
- *  You should have received a copy of the GNU General Public License
- *  along with this program; if not, write to the Free Software
- *  Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
- */
-
-/*
 
 
 	This file contains code-snippets from the mjpegtools' EditList
@@ -162,16 +140,13 @@ static vj_decoder *_el_new_decoder( int id , int width, int height, float fps, i
 
 static 	void	_el_free_decoder(vj_decoder *d)
 {
-	if(d)
-	{
-		if(d->tmp_buffer) free(d->tmp_buffer);
-		//if( d->context ) avcodec_close( d->context );
-		if(d->deinterlace_buffer[0]) free( d->deinterlace_buffer[0]);
-		if(d->deinterlace_buffer[1]) free( d->deinterlace_buffer[1]);
-		if(d->deinterlace_buffer[2]) free( d->deinterlace_buffer[2]);
-		free(d);
-		d = NULL;
-	}
+		if(d)
+		{
+			if(d->tmp_buffer) free(d->tmp_buffer);
+			avcodec_close( d->context );
+			free(d);
+			d = NULL;
+		}
 }
 
 static int _el_lav_fallback( char *filename )
@@ -193,7 +168,7 @@ static int _el_probe_for_pixel_fmt( char *filename )
 	vj_avformat *tmp = vj_avformat_open_input(filename);
 	if(!tmp)
 	{
-//	 veejay_msg(VEEJAY_MSG_WARNING,"Cannot probe with avformat in %s",filename);
+	 veejay_msg(VEEJAY_MSG_WARNING,"Cannot probe with avformat in %s",filename);
 	 /* check if we can open the file with lav */
  	 if(_el_lav_fallback(filename))
 	 {
@@ -210,9 +185,38 @@ static int _el_probe_for_pixel_fmt( char *filename )
 	}
 
 	name = (char*)avcodec_get_pix_fmt_name( pix_fmt );
-	veejay_msg(VEEJAY_MSG_INFO, "Video is in %s pixel format", name);
+	veejay_msg(VEEJAY_MSG_DEBUG, "Video is in %s pixel format", name);
 	if(tmp) vj_avformat_close_input(tmp);
 	return pix_fmt;
+}
+
+static int _el_probe_for_gop_size( char *filename )
+{
+	int gop_size = -1;
+	int codec_id = -1;
+ 	char *name;
+	vj_avformat *tmp = vj_avformat_open_input(filename);
+	if(!tmp)
+	{
+	 if(_el_lav_fallback( filename ))
+	 {
+		gop_size = 0;
+		return gop_size;
+	 }
+	 else
+	 {
+	 	return -1;
+	 }
+	}
+	else
+	{
+		codec_id = vj_avformat_get_video_codec( tmp );
+		if(codec_id == CODEC_ID_MJPEG || codec_id == CODEC_ID_DVVIDEO )
+			return 0;
+		gop_size = vj_avformat_get_video_gop_size(tmp);
+		vj_avformat_close_input(tmp);
+	}
+	return gop_size;
 }
 
 
@@ -227,6 +231,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	int decoder_id = 0;
 	char *compr_type;
 	int pix_fmt = -1;
+	int gop_size = 0;
     /* Get full pathname of file if the user hasn't specified preservation
        of pathnames...
      */
@@ -242,6 +247,16 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		return -1;
     }
 	/* Probe file for validation */
+    	gop_size = _el_probe_for_gop_size( filename );
+	if(gop_size != 0 )
+	{
+	    if(gop_size < 0)
+			return -1;
+		if(!force)
+		{
+			return -1;  
+		}
+	}
     /* Check if this filename is allready present */
 	pix_fmt = _el_probe_for_pixel_fmt(realname);
 	if(pix_fmt == -1)
@@ -310,8 +325,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
     el->num_frames[n] = lav_video_frames(el->lav_fd[n]);
     
     el->video_file_list[n] = strndup(realname, strlen(realname));
-
-    if (el->video_file_list[n] == NULL)
+    if (el->video_file_list[n] == 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate a few bytes");
 		return -1;	
@@ -697,20 +711,17 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
     ns1 = (double) (N_EL_FRAME(n) + 1) * el->audio_rate / el->video_fps;
     ns0 = (double) N_EL_FRAME(n) * el->audio_rate / el->video_fps;
 
+    //asize = el->audio_rate / el->video_fps;
+    pos = nframe * asize;
     ret = lav_set_audio_position(el->lav_fd[N_EL_FILE(n)], ns0);
 
     if (ret < 0)
 		return -1;
 
-	ret = lav_read_audio( el->lav_fd[N_EL_FILE(n)], dst, (ns1-ns0));
-
-	if(ret < 0)
-		return -1;
-
-	if( ret < (ns1-ns0) )
-			memset( dst + (ret * el->audio_bps), 0, ( (ns1-ns0) * el->audio_bps) );
-
     //mlt need int16_t
+    ret = lav_read_audio(el->lav_fd[N_EL_FILE(n)], dst, (ns1 - ns0));
+    if (ret < 0)
+		return -1;
 
     return (ns1 - ns0);
 
@@ -722,9 +733,9 @@ int	vj_el_init_420_frame(editlist *el, VJFrame *frame)
 	frame->data[0] = NULL;
 	frame->data[1] = NULL;
 	frame->data[2] = NULL;
-	frame->uv_len = (el->video_width * el->video_height)/4;
-	frame->uv_width = el->video_width /2;
-	frame->uv_height = el->video_height /2;
+	frame->uv_len = (el->video_width>>1) * (el->video_height>>1);
+	frame->uv_width = el->video_width >> 1;
+	frame->uv_height = el->video_height >> 1;
 	frame->len = el->video_width * el->video_height;
 	frame->shift_v = 1;
 	frame->shift_h = 1;
@@ -739,15 +750,11 @@ int	vj_el_init_422_frame(editlist *el, VJFrame *frame)
 	frame->data[1] = NULL;
 	frame->data[2] = NULL;
 	frame->uv_len = (el->video_width>>1) * (el->video_height);
-//	frame->uv_len = el->video_width * (  (el->video_height/2));
 	frame->uv_width = el->video_width >> 1;
-//	frame->uv_width = el->video_width;
-
 	frame->uv_height = el->video_height;
-//	frame->uv_height = el->video_height / 2;
 	frame->len = el->video_width * el->video_height;
-	frame->shift_v = 1; // 0 
-	frame->shift_h = 0; // 1
+	frame->shift_v = 0;
+	frame->shift_h = 1;
 	return 1;
 }
 
@@ -756,24 +763,25 @@ int	vj_el_get_audio_frame_at(editlist *el, uint32_t nframe, uint8_t *dst, int nu
 	// get audio from current frame + n frames
     long pos, asize;
     int ret = 0;
-    uint64_t n,p;	
+    uint64_t n;	
     int ns0, ns1;
 
     if (!el->has_audio)
-		return 0;
+	return 0;
 
     if (nframe < 0)
 		nframe = 0;
 
     if (nframe > el->video_frames)
-		nframe = el->video_frames - 1;
+		nframe = el->video_frames - num;
 
     n = el->frame_list[nframe];
-	p = el->frame_list[nframe + num];
 
-    ns1 = (double) N_EL_FRAME(p) * el->audio_rate / el->video_fps;
+    ns1 = (double) (N_EL_FRAME(n) + num) * el->audio_rate / el->video_fps;
     ns0 = (double) N_EL_FRAME(n) * el->audio_rate / el->video_fps;
 
+    //asize = el->audio_rate / el->video_fps;
+    pos = nframe * asize;
     ret = lav_set_audio_position(el->lav_fd[N_EL_FILE(n)], ns0);
 
     if (ret < 0)
@@ -822,6 +830,11 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		nf = 1;
 		veejay_msg(VEEJAY_MSG_DEBUG,"Norm set to %s",  el->video_norm == 'n' ? "NTSC" : "PAL");
     }
+
+	if(force)
+	{
+		veejay_msg(VEEJAY_MSG_WARNING, "Forcing load on interlacing and gop_size");
+	}
 
 	for (; nf < num_files; nf++)
 	{
@@ -992,6 +1005,9 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
     //if(el->video_inter != 0 ) el->auto_deinter = 0;
 	el->auto_deinter = 0;
 
+	// FIXME
+	veejay_msg(VEEJAY_MSG_WARNING, "Editlist is using %s", (el->pixel_format == FMT_420 ? "yuv420p" : "yuv422p"));
+
 	return el;
 }
 
@@ -1004,10 +1020,7 @@ void	vj_el_free(editlist *el)
 		int n = el->num_video_files;
 		int i;
 		for( i = 0; i < n ; i++ )
-		{
 			if( el->video_file_list[n]) free(el->video_file_list[n]);
-			if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
-		}
 		if(el->frame_list) free(el->frame_list);
 		free(el);   
 		el = NULL;

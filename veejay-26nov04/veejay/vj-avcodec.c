@@ -18,7 +18,7 @@ static vj_encoder *_encoders[NUM_ENCODERS];
 static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_format)
 {
 	vj_encoder *e = (vj_encoder*) vj_malloc(sizeof(vj_encoder));
-	if(!e) return NULL;
+	if(!e) exit(0);
 	memset(e, 0, sizeof(vj_encoder));
 		
 	if(id != -1)
@@ -111,8 +111,9 @@ static	void		vj_avcodec_close_encoder( vj_encoder *av )
 
 int		vj_avcodec_init(editlist *el, int pixel_format)
 {
-	int fmt = PIX_FMT_YUV420P;
 	if(!el) return 0;
+	int fmt = PIX_FMT_YUV420P;
+
 	out_pixel_format = pixel_format;
 
 	if(out_pixel_format == FMT_422) fmt = PIX_FMT_YUV422P;
@@ -427,9 +428,8 @@ int		vj_avcodec_encode_frame( int format, uint8_t *src[3], uint8_t *buf, int buf
 {
 	//AVPicture pict;
 	AVFrame pict;
-	int res = 0;
-	vj_encoder *av;
 	memset( &pict, 0, sizeof(pict));
+	int res=0;
 
 	if(format == ENCODER_YUV420) // no compression, just copy
 		return vj_avcodec_copy_frame( _encoders[ENCODER_YUV420],src, buf );
@@ -445,7 +445,7 @@ int		vj_avcodec_encode_frame( int format, uint8_t *src[3], uint8_t *buf, int buf
 	return 0;
 #endif
 #endif
-	av = _encoders[format];
+	vj_encoder *av = _encoders[format];
 
 	pict.quality = 1;
 	pict.data[0] = src[0];
@@ -477,15 +477,13 @@ static	int	vj_avcodec_copy_audio_frame( uint8_t *src, uint8_t *buf, int len)
 
 int		vj_avcodec_encode_audio( int format, uint8_t *src, uint8_t *dst, int len, int nsamples )
 {
-	vj_encoder *av;
-	int len;
 	if(format == ENCODER_YUV420)
 		return vj_avcodec_copy_audio_frame;
 	if(format == ENCODER_YUV422)
 		return vj_avcodec_copy_audio_frame;
-	av = _encoders[format];
+	vj_encoder *av = _encoders[format];
 
-	len = avcodec_encode_audio( av->context, src, len, nsamples );
+	int len = avcodec_encode_audio( av->context, src, len, nsamples );
 	return len;
 }
 */

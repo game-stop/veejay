@@ -2,7 +2,6 @@
 #include <veejay/vj-avformat.h>
 #include <veejay/vj-common.h>
 
-// somethings changes in avformat api, so I hack arround it 
 #if LIBAVFORMAT_BUILD >= 4620
 #define m_av_seek_frame( a,b,c,d ) \
  ( av_seek_frame( a,b,c,d ) )
@@ -10,8 +9,6 @@
 #define m_av_seek_frame(a,b,c,d ) \
  ( av_seek_frame( a,b,c ) )
 #endif 
- 
-
 
 void	vj_avformat_init()
 {
@@ -126,7 +123,6 @@ vj_avformat *vj_avformat_open_input(const char *filename)
 	int i;
 	vj_avformat *av = (vj_avformat*) vj_malloc(sizeof(struct vj_avformat_t));
 	AVFormatParameters *ap = av->av_format_par;
-	int err;
 	if(!av) return NULL;
 
 	av->av_input_format = NULL;
@@ -142,7 +138,7 @@ vj_avformat *vj_avformat_open_input(const char *filename)
 	av->expected_timecode = 0;
 	av->video_index = -1;
 	av->audio_index = -1;
-	err = av_open_input_file(
+	int err = av_open_input_file(
 			&(av->context),
 			filename,
 			av->av_input_format,
@@ -152,7 +148,7 @@ vj_avformat *vj_avformat_open_input(const char *filename)
 
 	if(err < 0 )
 	{
-		//vj_avformat_err(err);
+		vj_avformat_err(err);
 		free(av);
 		return NULL;
 	}
