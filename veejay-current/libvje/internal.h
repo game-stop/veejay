@@ -180,7 +180,6 @@ enum {
 	VJ_IMAGE_EFFECT_VIDBLOB = 164,
 	VJ_IMAGE_EFFECT_VIDBOIDS = 165,
 	VJ_IMAGE_EFFECT_GHOST = 166,
-    
 	VJ_IMAGE_EFFECT_DUMMY = 100,
 };
 
@@ -482,5 +481,6 @@ extern void		boids_apply( VJFrame *frame, int w, int h, int p0,int p1, int p2, i
 
 
 extern void		ghost_apply(VJFrame *frame, int w, int h, int o );
+
 
 #endif

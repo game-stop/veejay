@@ -75,7 +75,7 @@ int diff_malloc(void **d, int width, int height)
 		my->sqrt_table[i] = (double*)vj_malloc(sizeof(double)* 256);
 	
 	my->has_bg = 0;
-	return 0;
+	return 1;
 }
 
 void diff_free(void *d)
