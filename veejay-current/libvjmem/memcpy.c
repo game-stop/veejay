@@ -130,7 +130,7 @@
 #include <libvjmsg/vj-common.h>
 #include <sys/time.h>
 #include <time.h>
-
+#include <libyuv/mmx.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -277,6 +277,29 @@ void * agp_memcpy(void *to, const void *from , size_t len) {
 
 #define MMX1_MIN_LEN 0x800  /* 2K blocks */
 //#define MIN_LEN 0x40  
+
+static void * mmx_memset(void *what, uint8_t v, size_t len )
+{
+	uint8_t val[8];
+	uint8_t *to = (uint8_t*)what;
+	void *retval = what;
+	int i;
+	for(i = 0; i < 8; i++) val[i] = v;
+	movq_m2r(val, mm0);
+	for( i = 0; i < (len/8); i += 8)
+	{
+		movq_r2m( mm0, *to );
+		*(to) += 8;
+	}
+	while(i < len)
+	  {
+		*(to)++ = val[0];
+		i++;
+	  }
+	emms();
+
+	return retval;
+}
 
 static void * mmx_memcpy(void * to, const void * from, size_t len)
 {
@@ -426,6 +449,8 @@ static void * mmx2_memcpy(void * to, const void * from, size_t len)
 /* SSE note: i tried to move 128 bytes a time instead of 64 but it
 didn't make any measureable difference. i'm using 64 for the sake of
 simplicity. [MF]*/ 
+
+
 #ifdef HAVE_ASM_SSE
 
 static void * sse_memcpy(void * to, const void * from, size_t len)
@@ -546,15 +571,23 @@ static struct {
      { "SSE optimized memcpy()",    sse_memcpy, 0},
 #endif 
 
-#ifdef HAVE_PPCCPU
-	{ "PPC optimized memcpy()",	ppcasm_memcpy, 0 },
-	{ "PPC cachable memcpy()",	ppcasm_cacheable_memcpy, 0 },
-#endif
-
 #endif
     { NULL, NULL, 0},
 };
 
+static struct {
+     char                 *name;
+     void               *(*function)(void *to, uint8_t what, size_t len);
+     unsigned long long    time;
+} memset_method[] =
+{
+     { NULL, NULL, 0},
+     { "glibc memset()",            memset, 0},
+#ifdef HAVE_MMX
+     { "MMX optimized memset()",    mmx_memset, 0},
+#endif
+     { NULL, NULL, 0},
+};
 
 #ifdef ARCH_X86
 static inline unsigned long long int rdtsc()
@@ -575,6 +608,8 @@ static inline unsigned long long int rdtsc()
 
 
 void *(* veejay_memcpy)(void *to, const void *from, size_t len) = 0;
+
+void *(* veejay_memset)(void *what, uint8_t val, size_t len ) = 0;
 
 #define BUFSIZE 1024
 
@@ -603,8 +638,7 @@ void find_best_memcpy()
      for (i=1; memcpy_method[i].name; i++) {
           t = rdtsc();
 
-          for (j=0; j<2000; j++)
-               memcpy_method[i].function( buf1 + j*BUFSIZE, buf2 + j*BUFSIZE, BUFSIZE );
+          memcpy_method[i].function( buf1 , buf2 , 2000 * BUFSIZE );
 
           t = rdtsc() - t;
           memcpy_method[i].time = t;
@@ -615,7 +649,27 @@ void find_best_memcpy()
 
      if (best) {
           veejay_memcpy = memcpy_method[best].function;
+	  veejay_msg(VEEJAY_MSG_INFO, "Using [%s]", memcpy_method[best].name);
      }
+
+	best = 0;
+     for (i=1; memset_method[i].name; i++) {
+          t = rdtsc();
+
+               memset_method[i].function( buf1 , 0, 2000 * BUFSIZE );
+
+          t = rdtsc() - t;
+          memset_method[i].time = t;
+          if (best == 0 || t <= memset_method[best].time)
+               best = i;
+     }
+
+     if (best) {
+          veejay_memset = memset_method[best].function;
+	  veejay_msg(VEEJAY_MSG_INFO, "Using [%s]", memset_method[best].name );
+     }
+
+
 
      free( buf1 );
      free( buf2 );

@@ -2,10 +2,12 @@
 #define VJ_X86_H
 
 
-
+#include <stdint.h>
 #include <stdlib.h>
 
 extern void *(* veejay_memcpy)(void *to, const void *from, size_t len);
+
+extern void *(* veejay_memset)(void *to, uint8_t val, size_t len);
 
 //#define veejay_memcpy(t,f,l) memcpy(t,f,l)
 
