@@ -17,6 +17,7 @@
  * along with this program; if not, write to the Free Software
  */
 #include <config.h>
+#ifdef HAVE_V4L
 #include <stdio.h>
 #include <stdlib.h>
 #include <veejay/vj-v4lvideo.h>
@@ -357,3 +358,4 @@ void vj_v4l_print_info(v4l_video * v4l)
 {
 	v4lprint(v4l->device);
 }
+#endif
