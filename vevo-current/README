@@ -1,0 +1,77 @@
+----------------------------------- 
+Vevo  - VeEjay Video Objects 
+-----------------------------------
+
+Introduction
+------------
+
+During the last couple of years we have been observing a blooming
+development in the field of realtime video software for the Linux/GNU
+platform. 
+
+An increasing number of artists and other users are exploring the
+possibilities of several unique software packages for video editing, mixing
+and effect processing. 
+
+The question arises here how we (the developers)
+balance the growing number of features against complexity, (re)usability
+and manageability of larger scale software design.
+
+As users, we choose our applications because their features fit our
+purposes , as developers we serve the needs of the users who want an
+increasing number of features added to our applications while we should
+focus on flexible core engines and program frameworks.
+
+An elegant solution to this problem is to provide the Free Software
+community with a flexible architecture that allows a shared pool of video
+plugins. 
+
+This brings a number of benefits:
+
+ -  we can give designers of plugins the opportunity to develop their (video)
+    processing algorithms without the distraction of resolving interface
+    problems;
+ -  we can share a set of unique plugins among a great number of programs;
+    we can give the user the opportunity to control at least some aspects of
+    the features they want.
+
+The library attempts to give programmers the ability to write simple 'plugin'
+video processors in C/C++ and link them dynamically with a range of
+software packages (called hosts). It should be possible for any host and any
+plugin to communicate through this interface.
+
+
+What about Livido ?!
+---------------------
+
+VeVo is not Livido but was proposed as an alternative solution (libvido) 
+Here is a short summary on the differences between the two systems.
+
+					VEVO		Livido
+Generic datastructures			 + 		  -	
+Strict datastructures			 - 		  +
+Datafields can be added without		 + 	          - 
+breaking binary compatibility			
+Scaling/Conversion of datatypes		 +		  -
+Input/Output data arranged by 'Ports'    +                -
+Header only (interface definition)	 -		  +
+Requires library			 +                -
+
+
+  
+Vevo package structure
+----------------------
+
+	src/		: vevo library source       
+	include/	: vevo interface definition
+	test		: vevo test cases
+	examples	: vevo host example
+	plugins		: vevo plugin collection
+
+
+
+License:
+----------------------
+
+Vevo is free software, released under the (revised) BSD license 
+

@@ -1,0 +1,16 @@
+
+Test/Example programs:
+
+	- more testcases
+	- complete host example
+
+Vevo library:
+
+	- data conversion routines
+	  ( uint8_t -> int8_t , uint8_t -> int16_t etc etc)
+	- color space conversion routines
+	  ( YCbCr -> RGB  etc etc)
+	- sub/super sampling routines
+	  ( 4:2:0 sampling -> 4:2:2 -> 4:4:4 )
+	
+
