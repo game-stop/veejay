@@ -28,9 +28,11 @@
 #include <veejay/vj-tag.h>
 #include <veejay/hash.h>
 #include <libvje/vje.h>
+#ifdef HAVE_V4L
 #include <veejay/vj-v4lvideo.h>
-#include <veejay/libveejay.h>
 #include <linux/videodev.h>
+#endif
+#include <veejay/libveejay.h>
 #include <libvjmsg/vj-common.h>
 #include <veejay/vj-shm.h>
 #include <veejay/vj-dv.h>
@@ -53,7 +55,7 @@ static int last_added_tag = 0;
 //forward decl
 
 
-int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h, char *host, int port, int p );
+int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p );
 int _vj_tag_new_avformat( vj_tag *tag, int stream_nr, editlist *el);
 int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el);
 
@@ -208,12 +210,9 @@ void vj_tag_record_init(int w, int h)
   memset( tag_encoder_buf, 0 , (w*h) );
 }
 
-static int socket_ready = 0;
-static uint8_t *socket_frame = NULL;
 
 
-
-int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h, char *host, int port, int p )
+int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p )
 {
 	int error = 0;
 	vj_client *v;
@@ -221,7 +220,8 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h, char *host, int po
 	if( port <= 0 ) return 0;
 	if(stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN) return 0;
 
-	vj_tag_input->net[stream_nr] = vj_client_connect( host,port ,&error);
+	vj_tag_input->net[stream_nr] = vj_client_alloc(w,h,f);
+	//vj_client_connect( host,port ,&error);
 	v = vj_tag_input->net[stream_nr];
 	if(!v) return 0;
 
@@ -237,21 +237,21 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h, char *host, int po
 		v->planes[2] = v->planes[0] / 2;
 	}
 
-	if( socket_ready == 0 )
+	if( tag->socket_ready == 0 )
 	{
-		socket_frame = (uint8_t*) vj_malloc(sizeof(uint8_t) * (v->planes[0] + v->planes[1] + v->planes[2]));
-		if(!socket_frame) return 0;
-		memset(socket_frame, 0 , (v->planes[0] + v->planes[1] + v->planes[2]));
-		socket_ready = 1;
+		tag->socket_frame = (uint8_t*) vj_malloc(sizeof(uint8_t) * (v->planes[0] + v->planes[1] + v->planes[2]));
+		if(!tag->socket_frame) 
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Insufficient error to allocate memory for Network Stream");
+			return 0;
+		}
+		memset(tag->socket_frame, 0 , (v->planes[0] + v->planes[1] + v->planes[2]));
+		tag->socket_ready = 1;
 	}
 
-	if(vj_client_flush(v)<0) 
-	{
-		return 0;
-	}
 	return 1;
 }
-
+#ifdef HAVE_V4L
 int _vj_tag_new_v4l(vj_tag * tag, int stream_nr, int width, int height,
 		    int norm, int palette, int freq, int channel)
 {
@@ -289,7 +289,7 @@ int _vj_tag_new_v4l(vj_tag * tag, int stream_nr, int width, int height,
 
     return 1;
 }
-
+#endif
 
 int _vj_tag_new_avformat( vj_tag *tag, int stream_nr, editlist *el)
 {
@@ -366,10 +366,23 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	if (vj_tag_exists(i)) {
 	    vj_tag_get_source_name(i, sourcename);
 	    if (strcmp(sourcename, filename) == 0) {
-		veejay_msg(VEEJAY_MSG_WARNING,
-			   "Stream [%d] is already owner of file [%s]\n", n,
-			   filename);
-		return -1;
+		vj_tag *tt = vj_tag_get( i );
+		if( tt->source_type == VJ_TAG_TYPE_NET )
+		{
+			if( tt->video_channel == channel )
+			{
+				veejay_msg(VEEJAY_MSG_WARNING, "Already streaming from %s:%p in stream %d",
+					filename,channel, tt->id);
+				return -1;
+			}
+		}
+		else
+		{
+			veejay_msg(VEEJAY_MSG_WARNING,
+				   "Stream [%d] is already owner of file [%s]\n", n,
+				   filename);
+			return -1;
+		}
 	    }
 	}
     }
@@ -406,12 +419,10 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
    
     tag->next_id = 0;
     tag->nframes = 0;
-    tag->video_channel = 0;
+    tag->video_channel = channel;
     tag->source_type = type;
     tag->index = stream_nr;
     tag->active = 1;
-    //tag->encoder_base = (char*) vj_malloc(sizeof(char) * 255);
-    //tag->encoder_destination = (char*)vj_malloc(sizeof(char) * 280);
     tag->sequence_num = 0;
     tag->encoder_format = 0;
     tag->encoder_active = 0;
@@ -434,12 +445,14 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->selected_entry = 0;
 	tag->depth = 0;
     tag->effect_toggle = 1; /* same as for clips */
-
+    tag->socket_ready = 0;
+    tag->socket_frame = NULL;
 
     
     palette = (pix_fmt == FMT_420 ? VIDEO_PALETTE_YUV420P : VIDEO_PALETTE_YUV422P);
     
     switch (type) {
+#ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
 	sprintf(tag->source_name, "/dev/%s", filename);
 	tag->active =0; //active at selection
@@ -447,9 +460,12 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	    (tag, stream_nr, w, h, el->video_norm, palette,0,channel ) != 1)
 	    return -1;
 	break;
+#endif
 	case VJ_TAG_TYPE_NET:
-		if( _vj_tag_new_net( tag,stream_nr, w,h, filename, channel ,palette) != 1 )
+		sprintf(tag->source_name, "%s", filename );
+		if( _vj_tag_new_net( tag,stream_nr, w,h,pix_fmt, filename, channel ,palette) != 1 )
 			return -1;
+		tag->active = 0;
 	break;
     case VJ_TAG_TYPE_AVFORMAT:
 	sprintf(tag->source_name, "%s", filename);
@@ -552,12 +568,14 @@ int vj_tag_del(int id)
 
     /* stop streaming in first */
     switch(tag->source_type) {
+#ifdef HAVE_V4L
      case VJ_TAG_TYPE_V4L: 
 		veejay_msg(VEEJAY_MSG_INFO, "Closing video4linux device %s (Stream %d)",
 			tag->source_name, id);
 		vj_v4l_video_grab_stop(vj_tag_input->v4l[tag->index]);
 //		vj_v4lvideo_free(vj_tag_input->v4l[tag->index]);
 	break;
+#endif
      case VJ_TAG_TYPE_YUV4MPEG: 
 		veejay_msg(VEEJAY_MSG_INFO,"Closing yuv4mpeg file %s (Stream %d)",
 			tag->source_name,id);
@@ -572,6 +590,8 @@ int vj_tag_del(int id)
 		veejay_msg(VEEJAY_MSG_INFO, "huh ?");
 		break;
 	case VJ_TAG_TYPE_NET:
+		veejay_msg(VEEJAY_MSG_INFO, "Closing Network Stream");
+		if(tag->socket_frame) free(tag->socket_frame);
 		vj_client_close( vj_tag_input->net[tag->index] );
 		break;
     }
@@ -967,7 +987,7 @@ int vj_tag_continue_record( int t1 )
 	return 0;
 
 }
-
+#ifdef HAVE_V4L
 int vj_tag_set_brightness(int t1, int value)
 {
 	vj_tag *tag = vj_tag_get(t1);
@@ -1056,6 +1076,7 @@ int vj_tag_set_color(int t1, int value)
 	}
 	return 1;
 }
+#endif
 
 int vj_tag_get_effect_any(int t1, int position) {
 	vj_tag *tag = vj_tag_get(t1);
@@ -1296,6 +1317,16 @@ int vj_tag_get_depth(int t1)
 int vj_tag_disable(int t1) {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return -1;
+	if(tag->active == 0)
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Already inactive");
+		return 1;
+	}
+	if(tag->source_type == VJ_TAG_TYPE_NET )
+	{
+		vj_client_close( vj_tag_input->net[tag->index] );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Disconnected from %s", tag->source_name);
+	}
 	tag->active = 0;
 	if(!vj_tag_update(tag,t1)) return -1;
 	return 1;
@@ -1304,6 +1335,24 @@ int vj_tag_disable(int t1) {
 int vj_tag_enable(int t1) {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return -1;
+	if(tag->active ) 
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Already active");
+		return 1;
+	}
+	if(tag->source_type == VJ_TAG_TYPE_NET )
+	{
+		int error = 0;
+		//vj_tag_input->net[tag->index] = 
+		vj_client_connect( vj_tag_input->net[tag->index], tag->source_name,tag->video_channel ,&error);
+		if( error != 0 )
+		{
+			return -1;
+		}
+		veejay_msg(VEEJAY_MSG_DEBUG, "Connected to %s, port %d",
+			tag->source_name, tag->video_channel );
+		//vj_client_flush( vj_tag_input->net[tag->index] );
+	}
 	tag->active = 1;
 	if(!vj_tag_update(tag,t1)) return -1;
 	return 1;
@@ -1331,6 +1380,7 @@ int vj_tag_set_active(int t1, int active)
     if(active == tag->active) return 1;
  
     switch (tag->source_type) {
+#ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:	/* (d)activate double buffered grabbing of v4l device */
 	if (active == 1) {
 	    if (vj_v4l_video_grab_start(vj_tag_input->v4l[tag->index]) ==
@@ -1347,6 +1397,7 @@ int vj_tag_set_active(int t1, int active)
 	    tag->active = 0;
 	}
 	break;
+#endif
 	case VJ_TAG_TYPE_YUV4MPEG:
 	     if(active==0)
 		{
@@ -1354,6 +1405,12 @@ int vj_tag_set_active(int t1, int active)
 		     vj_yuv_stream_stop_read( vj_tag_input->stream[tag->index]);
 		}
 	break;
+	case VJ_TAG_TYPE_NET:
+		if(active == 1 )
+			vj_tag_enable( t1 );
+		else
+			vj_tag_disable( t1 );
+		break;
     default:
 	tag->active = active;
 	break;
@@ -1548,9 +1605,11 @@ void vj_tag_get_description(int id, char *description)
     case VJ_TAG_TYPE_AVFORMAT:
 	sprintf(description, "%s", "FFmpeg layer");
 	break;
+#ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
 	sprintf(description, "%s", "Video4Linux");
 	break;
+#endif
     case VJ_TAG_TYPE_YUV4MPEG:
 	sprintf(description, "%s", "YUV4MPEG");
 	break;
@@ -1701,7 +1760,6 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
     int uv_len = (vj_tag_input->width * vj_tag_input->height);
     int len = (width * height);
 	char buf[10];
-
     if( vj_tag_input->pix_fmt == FMT_420) uv_len = uv_len / 4;
     if( vj_tag_input->pix_fmt == FMT_422) uv_len = uv_len / 2;
 
@@ -1711,6 +1769,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		return -1;
 	}
     switch (tag->source_type) {
+#ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
 	if (vj_v4l_video_sync_frame(vj_tag_input->v4l[tag->index]) != 0)
 	{
@@ -1734,28 +1793,35 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	    return -1;
 
 	break;
+#endif
     case VJ_TAG_TYPE_AVFORMAT:
 	if(!vj_avformat_get_video_frame( vj_tag_input->avformat[tag->index], buffer, -1,
 		vj_tag_input->pix_fmt )) 
 		 return -1;
 	break;
 	case VJ_TAG_TYPE_NET:
+	vj_client_flush	( vj_tag_input->net[tag->index]);
+	
+
 	sprintf(buf, "%03d:;", NET_GET_FRAME);
 	if(vj_client_send( vj_tag_input->net[tag->index], buf ))
 	{
-		if(vj_client_poll( vj_tag_input->net[tag->index] ) )
+		if(vj_client_read( vj_tag_input->net[tag->index], tag->socket_frame  ) ==0 )
 		{
-		if(vj_client_read( vj_tag_input->net[tag->index], socket_frame  ) > 0 )
-		{
-			vj_client *v = vj_tag_input->net[tag->index];
-			veejay_memcpy( buffer[0], socket_frame, v->planes[0] );
-			veejay_memcpy( buffer[1], socket_frame + v->planes[0], v->planes[1] );
-			veejay_memcpy( buffer[2], socket_frame + v->planes[0] + v->planes[1] , v->planes[2] );
+			veejay_msg(VEEJAY_MSG_DEBUG, "Missed frame from stream %d", tag->id); 
 		}
-		}
-		return 1;
-    	}
-	vj_client_flush( vj_tag_input->net[tag->index]);
+		vj_client *v = vj_tag_input->net[tag->index];
+		veejay_memcpy( buffer[0], tag->socket_frame, v->planes[0] );
+		veejay_memcpy( buffer[1], tag->socket_frame + v->planes[0], v->planes[1] );
+		veejay_memcpy( buffer[2], tag->socket_frame + v->planes[0] + v->planes[1] , v->planes[2] );
+			return 1;
+    }
+	else
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Lost connection! ");
+		vj_tag_disable( t1 );
+	}
+//	vj_client_flush( vj_tag_input->net[tag->index]);
 	return -1;
 	break;
 	case VJ_TAG_TYPE_YUV4MPEG:
