@@ -59,7 +59,7 @@ typedef struct
 } vj_proto;
 
 #define VJ_MAX_PENDING_MSG 64
-#define RECV_SIZE (1024*256)
+#define RECV_SIZE (16384)
 
 int		_vj_server_free_slot(vj_server *vje);
 int		_vj_server_new_client(vj_server *vje, int socket_fd);
@@ -217,7 +217,6 @@ static int	_vj_server_classic(vj_server *vjs, int port_num)
 	vjs->nr_of_connections = vjs->handle;
 	return 1;
 }
-
 vj_server *vj_server_alloc(int port, char *mcast_group_name, int type)
 {
     vj_server *vjs = (vj_server *) vj_malloc(sizeof(struct vj_server_t));
@@ -227,13 +226,13 @@ vj_server *vj_server_alloc(int port, char *mcast_group_name, int type)
 
 	memset( vjs, 0, sizeof(vjs) );
 
-	vjs->recv_buf = (char*) malloc(sizeof(char) * 1024 * 256 );
+	vjs->recv_buf = (char*) malloc(sizeof(char) * 16384 );
 	if(!vjs->recv_buf)
 	{
 		if(vjs) free(vjs);
 		return NULL;
 	}	
-	bzero( vjs->recv_buf, 1024 * 256 );
+	bzero( vjs->recv_buf, 16384 );
 
 	vjs->ports[type] = port;
 	vjs->server_type = type;
@@ -522,6 +521,9 @@ int	vj_server_update( vj_server *vje, int id )
 
 		if(!FD_ISSET( sock_fd, &(vje->fds)) )
 			return 0;
+
+		// clear recv_buf
+		bzero( vje->recv_buf, 16384);
 		n = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
 	}
 	else
@@ -535,6 +537,7 @@ int	vj_server_update( vj_server *vje, int id )
 			{
 				if( mcast_poll( proto[1]->r ))
 				{
+					bzero( vje->recv_buf, RECV_SIZE );
 					n = mcast_recv( proto[1]->r , vje->recv_buf, RECV_SIZE );  
 				}
 			}
