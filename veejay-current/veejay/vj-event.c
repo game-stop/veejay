@@ -345,11 +345,11 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_BUNDLE_SAVE				=	6006,
 	VJ_EVENT_SCREENSHOT				=	6010,
 	VJ_EVENT_INIT_GUI_SCREEN			=	6011,
-	VJ_EVENT_GET_FRAME					=	6304,
+	VJ_EVENT_GET_FRAME				=	6304,
 	VJ_EVENT_RECORD_DATAFORMAT			=	6200,
 	VJ_EVENT_STREAM_NEW_NET				=	6406,
 	VJ_EVENT_SHM_OPEN				=	6210,
-    VJ_EVENT_SAMPLE_MODE			=	6995,
+    	VJ_EVENT_SAMPLE_MODE			=	6995,
 	VJ_EVENT_BEZERK					=	6996,
 	VJ_EVENT_DEBUG_LEVEL				=	6997,
 	VJ_EVENT_SUSPEND				=	6998,
@@ -502,16 +502,16 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_SUSPEND			,	NET_SUSPEND				},
 	{ VJ_EVENT_DEBUG_LEVEL,				NET_DEBUG_LEVEL				},
 	{ VJ_EVENT_BEZERK,				NET_BEZERK				},
-	{ VJ_EVENT_SAMPLE_MODE,			NET_SAMPLE_MODE			},
-	{ VJ_EVENT_LOAD_PLUGIN,			NET_LOAD_PLUGIN		},
-	{ VJ_EVENT_UNLOAD_PLUGIN,		NET_UNLOAD_PLUGIN	},
-	{ VJ_EVENT_CMD_PLUGIN,			NET_CMD_PLUGIN		},
-	{ VJ_EVENT_CHAIN_MANUAL,		NET_CHAIN_MANUAL_FADE	},
-	{ VJ_EVENT_FULLSCREEN,			NET_FULLSCREEN },
-	{ VJ_EVENT_STREAM_NEW_NET	,	NET_TAG_NEW_NET },
-	{ VJ_EVENT_GET_FRAME,			NET_GET_FRAME },
-	{ VJ_EVENT_CLIP_RENDER_TO,		NET_CLIP_RENDER_TO },
-	{ VJ_EVENT_CLIP_SELECT_RENDER,	NET_CLIP_RENDER_SELECT },
+	{ VJ_EVENT_SAMPLE_MODE,				NET_SAMPLE_MODE			},
+	{ VJ_EVENT_LOAD_PLUGIN,				NET_LOAD_PLUGIN		},
+	{ VJ_EVENT_UNLOAD_PLUGIN,			NET_UNLOAD_PLUGIN	},
+	{ VJ_EVENT_CMD_PLUGIN,				NET_CMD_PLUGIN		},
+	{ VJ_EVENT_CHAIN_MANUAL,			NET_CHAIN_MANUAL_FADE	},
+	{ VJ_EVENT_FULLSCREEN,				NET_FULLSCREEN },
+	{ VJ_EVENT_STREAM_NEW_NET	,		NET_TAG_NEW_NET },
+	{ VJ_EVENT_GET_FRAME,				NET_GET_FRAME },
+	{ VJ_EVENT_CLIP_RENDER_TO,			NET_CLIP_RENDER_TO },
+	{ VJ_EVENT_CLIP_SELECT_RENDER,			NET_CLIP_RENDER_SELECT },
 	{0,0}
 };
 
@@ -790,7 +790,9 @@ static struct {
 	{ VJ_EVENT_CLIP_SELECT,			"Clip: select and play a clip",		 vj_event_clip_select,	 1,	"%d",		{0,0}	},
 	{ VJ_EVENT_TAG_SELECT,			"Stream: select and play a stream",		 vj_event_tag_select,		 1,	"%d",		{0,0}	},
 	{ VJ_EVENT_TAG_DELETE,			"Stream: delete",				 vj_event_tag_del,		 1,	"%d",		{0,0}	},		
+#ifdef HAVE_V4L
 	{ VJ_EVENT_TAG_NEW_V4L,			"Stream: open video4linux device (hw)",		 vj_event_tag_new_v4l,		 2,	"%d %d",		{0,1}	},	
+#endif
 	{ VJ_EVENT_TAG_NEW_Y4M,			"Stream: open y4m stream by name (file)",	 vj_event_tag_new_y4m,		 1,	"%s",		{0,0}	}, 
 //	{ VJ_EVENT_TAG_NEW_RAW,			"Stream: open raw stream by name (file)",	 vj_event_tag_new_raw,		 1, 	"%s",		{0,0}	},
 	{ VJ_EVENT_STREAM_NEW_NET,			"Stream: open network stream ",	vj_event_tag_new_net, 2, "%s %d", {0,0}	},
@@ -820,7 +822,7 @@ static struct {
 	{ VJ_EVENT_CHAIN_FADE_IN,		"Chain: fade in",				 vj_event_chain_fade_in,	2,	"%d %d",	{0,0}		}, 
 	{ VJ_EVENT_CHAIN_FADE_OUT,		"Chain: fade out",				 vj_event_chain_fade_out,	2,	"%d %d",	{0,0}		},
 	{ VJ_EVENT_CHAIN_MANUAL,		"Chain: set opacity",			 vj_event_manual_chain_fade,2, "%d %d",	{0,0} 	},
-	{ VJ_EVENT_CHAIN_SET_ENTRY,		"Chain: select active entry n1",		 vj_event_chain_entry_select,	1,	"%d",		{0,0}	},
+	{ VJ_EVENT_CHAIN_SET_ENTRY,		"Chain: select entry ",		 vj_event_chain_entry_select,	1,	"%d",		{0,0}	},
 	{ VJ_EVENT_OUTPUT_Y4M_START,		"Output: Yuv4Mpeg start writing to file",	 vj_event_output_y4m_start,	1,	"%s",		{0,0}	},
 	{ VJ_EVENT_OUTPUT_Y4M_STOP,		"Output: Yuv4Mpeg stop writing to file",	 vj_event_output_y4m_stop,	0,	NULL,		{0,0}	},
 //	{ VJ_EVENT_OUTPUT_RAW_START,		"Output: RAW start writing to file",		 vj_event_output_raw_start,	1,	"%s",		{0,0}	},
@@ -868,10 +870,12 @@ static struct {
 	{ VJ_EVENT_SCREENSHOT,			"Various: Save frame to jpeg",			vj_event_screenshot,	0,		NULL,		{0,0}   },
 	{ VJ_EVENT_CHAIN_TOGGLE_ALL,		"Toggle Effect Chain on all clips or streams",	vj_event_all_clips_chain_toggle,1,   "%d",		{0,0}   },
 	{ VJ_EVENT_CLIP_UPDATE,		"Clip: Update starting and ending position by offset",	vj_event_clip_rel_start,3,"%d %d %d",		{0,0}	},	 
+#ifdef HAVE_V4L
 	{ VJ_EVENT_TAG_SET_BRIGHTNESS,		"Video4Linux: set v4l brightness value",		vj_event_v4l_set_brightness,	2,	"%d %d",	{0,0} },
 	{ VJ_EVENT_TAG_SET_CONTRAST,		"Video4Linux: set v4l contrast value",			vj_event_v4l_set_contrast,	2,	"%d %d",	{0,0} },
 	{ VJ_EVENT_TAG_SET_HUE,			"Video4Linux: set v4l hue value",			vj_event_v4l_set_hue,		2,	"%d %d",	{0,0} },
 	{ VJ_EVENT_TAG_SET_COLOR,		"Video4Linux: set v4l color value",			vj_event_v4l_set_color,		2,	"%d %d",	{0,0} },
+#endif
 	{ VJ_EVENT_EFFECT_SET_BG,		"Effect: set background (if supported)",		vj_event_effect_set_bg,		0,	NULL,		{0,0} },
 	{ VJ_EVENT_SHM_OPEN,			"Shared memory",					vj_event_tag_new_shm,		2,	"%d %d",	{0,0} },
 	{ VJ_EVENT_QUIT,			"Quit veejay",					vj_event_quit,			0, 	NULL, 		{0,0} },
@@ -1076,7 +1080,7 @@ vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id)
 }
 
 
-void vj_event_trigger_function(void *ptr, vj_event f, int max_args, const char format[], ...) 
+void vj_event_trigger_function(void *ptr, vj_event f, int max_args, const char *format, ...) 
 {
 	va_list ap;
 	va_start(ap,format);
@@ -1281,6 +1285,7 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 
 	if( str_arg != NULL && vj_event_list[id].format[1] == 's' )
 	{
+		char *str = strdup( str_arg);
 		veejay_msg(VEEJAY_MSG_DEBUG, 
 			"(VIMS) Network %03d:   '%s' [%s]",
 			net_id,
@@ -1292,13 +1297,15 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 		{
 			argument_list[i] = 0;
 		}
+
+		_last_known_num_args = vj_event_list[id].num_params;
 	
 		vj_event_trigger_function(
 			(void*) v,
 			net_list[net_id].act,
 			vj_event_list[id].num_params,
 			vj_event_list[id].format,
-			str_arg,
+			str,
 			argument_list[0],
 			argument_list[1],
 			argument_list[2],
@@ -1313,7 +1320,7 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 			argument_list[11],
 			argument_list[12]
 		);
-
+		free(str);
 	}
 	else
 	{
@@ -1353,6 +1360,9 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 		{
 			argument_list[i] = 0;
 		}
+
+			_last_known_num_args = vj_event_list[id].num_params;
+
 			vj_event_trigger_function(
 			(void*) v,
 			net_list[net_id].act,
@@ -1623,26 +1633,39 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 void vj_event_update_remote(void *ptr)
 {
 	veejay_t *v = (veejay_t*)ptr;
+	int cmd_poll = 0;
+	int sta_poll = 0;
+	int new_link = -1;
+	int sta_link = -1;
 	int i;
-	if(vj_server_poll(v->vjs))
+	cmd_poll = vj_server_poll(v->vjs[0]);
+	sta_poll = vj_server_poll(v->vjs[1]);
+	// accept connection command socket    
+	if( cmd_poll > 0)
 	{
+		new_link = vj_server_new_connection ( v->vjs[0] );
+	}
+	// accept connection on status socket
+	if( sta_poll > 0) 
+	{
+		sta_link = vj_server_new_connection ( v->vjs[1] );
+	}
+	// see if there is any link interested in status information
+	for( i = 0; i < v->vjs[1]->nr_of_links; i ++ )
+		veejay_pipe_write_status( v, i );
 
-		int p = vj_server_update(v->vjs);	
-		if( p==0 )
+	// see if there is anything to read from the command socket
+	for( i = 0; i < v->vjs[0]->nr_of_links; i ++ )
+	{
+		if( vj_server_update(v->vjs[0],i) )
 		{
-			veejay_msg(VEEJAY_MSG_WARNING, "New connection");
-		}
-		else {
+			v->uc->current_link = i;
 			char buf[MESSAGE_SIZE];
-			bzero( buf, MESSAGE_SIZE );
-			for(i=0; i < VJ_MAX_CONNECTIONS; i++)
+			bzero(buf, MESSAGE_SIZE);
+			while( vj_server_retrieve_msg( v->vjs[0], i, buf ) )
 			{
-				while( vj_server_retrieve_msg( i , buf ) >= 0 )	
-				{
-					v->uc->current_link = i;
-					vj_event_parse_msg(v, buf );
-					bzero( buf, sizeof(buf));
-				}
+				vj_event_parse_msg( v, buf );
+				bzero( buf, MESSAGE_SIZE );
 			}
 		}
 	}
@@ -2085,10 +2108,9 @@ unsigned int __rplen = (sizeof(a) / sizeof(int) );\
 for(__rp = 0; __rp < __rplen; __rp++) a[__rp] = 0;\
 }\
 while(*c) { \
-if(__z == _last_known_num_args ) break;\
+if(__z > _last_known_num_args )  break; \
 switch(*c++) { case 's': sprintf( b,"%s",va_arg(d,char*) ); break; case 'd': a[__z] = va_arg(d, int); __z++ ; break; } }\
 }
-
 
 #define DUMP_ARG(a)\
 if(sizeof(a)>0){\
@@ -4687,7 +4709,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 				}
 				v->uc->chain_changed = 1;
 			}
-			if( args[ num_p + 3] )
+			if( args[ num_p + 3] && vj_effect_get_extra_frame(real_id) )
 			{
 				if( vj_tag_set_chain_source( args[0],args[1], args[ num_p + 4] ) &&
 				    vj_tag_set_chain_channel( args[0],args[1],args[num_p + 3] ))
@@ -5526,6 +5548,7 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 	int *args = NULL;
 	P_A(args,str,format,ap);
 
+
 	if ( veejay_edit_addmovie(v,str,start,destination,destination))
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Appended video file %s to EditList",str); 
@@ -5542,13 +5565,13 @@ void vj_event_el_add_video_clip(void *ptr, const char format[], va_list ap)
 	int start = -1;
 	int destination = v->edit_list->video_frames-1;
 	char str[1024];
-	int args[1];
+	int *args = NULL;
 	P_A(args,str,format,ap);
 
 	if ( veejay_edit_addmovie(v,str,start,destination,destination))
 	{
 		int start_pos = destination;
-		int end_pos = (args[0]==0 ? v->edit_list->video_frames-1 : destination+args[0]);
+		int end_pos = v->edit_list->video_frames-1;
 		clip_info *skel = clip_skeleton_new(start_pos,end_pos);
 		if(clip_store(skel) == 0)
 		{
@@ -5650,7 +5673,7 @@ void vj_event_tag_new_avformat(void *ptr, const char format[], va_list ap)
 	}	
 }
 
-
+#ifdef HAVE_V4L
 void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -5666,6 +5689,7 @@ void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_INFO, "Created new Video4Linux stream %d", vj_tag_size()-1);
 	}	
 }
+#endif
 
 void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 {
@@ -5692,7 +5716,7 @@ void vj_event_tag_new_y4m(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_INFO, "Created new YUV4MPEG stream %d", vj_tag_size()-1);
 	}
 }
-
+#ifdef HAVE_V4L
 void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -5761,7 +5785,7 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 	}
 
 }
-
+#endif
 
 void	vj_event_tag_new_shm(void *ptr, const char format[], va_list ap)
 {
@@ -6630,13 +6654,12 @@ void vj_event_print_info(void *ptr, const char format[], va_list ap)
 
 #define SEND_MSG(v,str)\
 {\
-vj_server_send(v->uc->current_link, str, strlen(str));\
+vj_server_send(v->vjs[0], v->uc->current_link, str, strlen(str));\
 }
 
 #define RAW_SEND_MSG(v,str,len)\
 {\
-int _bla = vj_server_raw_send(v->uc->current_link, str, len); \
- veejay_msg(VEEJAY_MSG_ERROR, "sended %d bytes",_bla);\
+vj_server_send(v->vjs[0],v->uc->current_link, str, len );\
 }
 
 
