@@ -213,6 +213,8 @@ Boolean NetworkStartUDPServer(OSCPacketBuffer packet, int port_id);
 
 Boolean NetworkPacketWaiting(OSCPacketBuffer packet); 
 
+void	GoMultiCast(const char *groupname);
+
 /**************************************************
    How to use this stuff
  **************************************************/
