@@ -1,4 +1,3 @@
-
 /**
 @file	libvevo.h
 @brief	VeVO - Veejay Video Objects header file
@@ -73,20 +72,18 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-
-/**
-	@defgroup	vevo_error Error Codes
-	@{
-*/
-
 # ifndef VEVO_H_INCLUDED
 # define VEVO_H_INCLUDED
 
 #include <stdio.h>
-
 #include <stdint.h>
 
-#define		VEVO_VERSION				(VERSION)		
+#define		VEVO_VERSION				(VERSION)	
+
+/**
+	@defgroup	vevo_error Error Codes
+	@{
+*/	
 
 #define 	VEVO_ERR_SUCCESS			0	///< success 
 #define 	VEVO_ERR_NO_SUCH_PROPERTY 		1	///< property does not exist/
@@ -103,38 +100,10 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 /// @}
 
 /**
-	@defgroup	vevo_colorspace Colorspaces
-	@{
-*/ 
-#define		VEVO_INVALID				0	///< denotes end of list of supported colorspaces
-#define		VEVO_RGBAFLOAT				1	///< RGBA float , 24 bits per component  (packed)
-#define		VEVO_RGBA8888				2	///< RGBA  8 bps, 4 components per pixel (packed)
-#define		VEVO_RGB888				3	///< RGBA  8 bps, 3 components per pixel (packed)
-#define		VEVO_RGB161616				4	///< RGB  16 bps, 3 components per pixel (packed)
-#define		VEVO_RGBA16161616			5	///< RGBA 16 bps, 4 components per pixel (packed)
-#define		VEVO_RGB565				6	///< RGB Mask: R=0xf800, G=0x07e0, B = 0x001f 
-#define		VEVO_BGR888				7	///< BGR   8 bps, 3 components per pixel (packed)
-#define		VEVO_YUV888				8	///< YUV   8 bps, 3 components per pixel (packed), 1 U/V component for every Y 
-#define		VEVO_YUVA8888				9	///< YUV with Alpha, 8 bps, 4 components per pixel (packed), 1 U/V component for every Y
-#define		VEVO_YUV161616				10	///< YUV  16 bps, 3 components per pixel (packed) , 1 U/V component for every Y 
-#define		VEVO_YUVA16161616			11	///< YUV with Alpha, 16 bps, 4 components per pixel (packed), 1 U/V component for every Y
-#define		VEVO_YUV422P				12	///< YUV 4:2:2 Planar 
-#define		VEVO_YUV420P				13	///< YUV 4:2:0 Planar
-#define		VEVO_YUV444P				14	///< YUV 4:4:4 Planar
-#define		VEVO_YUYV8888				15	///< YUYV, 32 bits per sample (packed) 
-#define		VEVO_UYVY8888				16	///< UYVY, 32 bits per sample (packed)
-#define		VEVO_ALPHAFLOAT				17	///< Alpha float
-#define		VEVO_ALPHA8				18	///< Alpha 8 bps
-#define		VEVO_ALPHA16				19	///< Alpha 16 bps
+	@defgroup	atom	Vevo Objects
 
-typedef int vevo_format_t;					///< dataformat identifier
-/// @}
-
-
-/**
-	@defgroup	atom	Atoms
-
-	An atom describes into what type the data should be casted.
+	Vevo stores data into generic objects and remembers 
+	what type specifier belongs to the attribute 
 
 	@{
 */
@@ -169,12 +138,14 @@ typedef int vevo_storage_t;		///< atom storage specifier
 
 typedef int vevo_cntl_flags_t;		///< datatype flags
 
+//! Atom structure (for holding single attributes)
 typedef struct
 {
 	 void	 *value;			///< valueless pointer  
 	size_t	 size;				///< memory size of atom
 } atom_t;
 
+//! Generic Object storage structure (for holding one or more attributes of the same type)
 typedef struct
 {
 	vevo_storage_t		type;		///< storage type (ATOM or ARRAY)
@@ -199,9 +170,22 @@ typedef struct
 
 	The properties below are variables for both host and plugin,
 	They are divided into Parameters, Channels and Instance.
+	The plugin and host store and retrieve their runtime information
+	from these properties. 
 
 	@{
 */
+typedef int vevo_property_type_t;				///< property type identifier
+//! The vevo property is a linked list of generic objects
+struct vevo_property
+{
+	vevo_property_type_t type;		 			///< type of property
+	vevo_datatype	*data;			 			///< pointer to generic object
+	struct	vevo_property *next; 					///< pointer to next property
+};
+typedef struct vevo_property vevo_property_t; 				///< property type specifier
+
+
 #define VEVO_PROPERTY_PARAMETER			0
 #define VEVO_PROPERTY_CHANNEL  			100
 #define VEVO_PROPERTY_INSTANCE 			200
@@ -290,7 +274,7 @@ typedef struct
 #define VEVOI_N_OUT_CHANNELS	(VEVO_PROPERTY_INSTANCE + 11)	///< number of output channels
 
 
-typedef int vevo_property_type_t;				///< property type identifier
+
 
 /*
 	Parameter Hints
@@ -342,20 +326,6 @@ typedef int vevo_param_hint_t;
 
 	
 
-typedef struct vevo_property vevo_property_t; 				///< property type specifier
-
-
-/*
-	Vevo Property 
-
-	The vevo property is used to storage generic objects
-*/
-struct vevo_property
-{
-	vevo_property_type_t type;		 			///< type of property
-	vevo_datatype	*data;			 			///< pointer to generic object
-	struct	vevo_property *next; 					///< pointer to next property
-};
 
 /// @}
 
@@ -377,8 +347,8 @@ struct vevo_property
 #define		VEVO_INSTANCE					2		///< Port is Plugin (global properties)
 
 typedef int vevo_port_type_id_t;						///< port type specifier
-
-
+typedef int vevo_format_t;							///< dataformat identifier
+//! Vevo Port type (distinguish control from data)
 typedef struct
 {
 	vevo_port_type_id_t		id;				///< type of port (DATA or CONTROL)
@@ -389,6 +359,7 @@ typedef struct
 	};		
 } vevo_port_type_t;
 
+//! Vevo Port (single parameter, channel or instance) 
 typedef struct
 {
 	vevo_port_type_t		*type;				///< port type description
@@ -404,6 +375,13 @@ typedef double	vevo_timecode_t;					///< timecode (only used for keyframing)
 	@defgroup vevoparam Vevo Parameter
 
 	@{
+*/
+//! Vevo Parameter Template
+/**
+	@brief setting up templates
+
+	A parameter template is setup by the plugin and describes 
+	the properties of a parameter.
 */
 struct vevo_parameter_template
 {
@@ -423,23 +401,52 @@ typedef struct vevo_parameter_template vevo_parameter_templ_t;
 	@defgroup vevochan Vevo Channel
 	@{
 */
+
+
+#define		VEVO_INVALID				0	///< denotes end of list of supported colorspaces
+#define		VEVO_RGBAFLOAT				1	///< RGBA float , 24 bits per component  (packed)
+#define		VEVO_RGBA8888				2	///< RGBA  8 bps, 4 components per pixel (packed)
+#define		VEVO_RGB888				3	///< RGBA  8 bps, 3 components per pixel (packed)
+#define		VEVO_RGB161616				4	///< RGB  16 bps, 3 components per pixel (packed)
+#define		VEVO_RGBA16161616			5	///< RGBA 16 bps, 4 components per pixel (packed)
+#define		VEVO_RGB565				6	///< RGB Mask: R=0xf800, G=0x07e0, B = 0x001f 
+#define		VEVO_BGR888				7	///< BGR   8 bps, 3 components per pixel (packed)
+#define		VEVO_YUV888				8	///< YUV   8 bps, 3 components per pixel (packed), 1 U/V component for every Y 
+#define		VEVO_YUVA8888				9	///< YUV with Alpha, 8 bps, 4 components per pixel (packed), 1 U/V component for every Y
+#define		VEVO_YUV161616				10	///< YUV  16 bps, 3 components per pixel (packed) , 1 U/V component for every Y 
+#define		VEVO_YUVA16161616			11	///< YUV with Alpha, 16 bps, 4 components per pixel (packed), 1 U/V component for every Y
+#define		VEVO_YUV422P				12	///< YUV 4:2:2 Planar 
+#define		VEVO_YUV420P				13	///< YUV 4:2:0 Planar
+#define		VEVO_YUV444P				14	///< YUV 4:4:4 Planar
+#define		VEVO_YUYV8888				15	///< YUYV, 32 bits per sample (packed) 
+#define		VEVO_UYVY8888				16	///< UYVY, 32 bits per sample (packed)
+#define		VEVO_ALPHAFLOAT				17	///< Alpha float
+#define		VEVO_ALPHA8				18	///< Alpha 8 bps
+#define		VEVO_ALPHA16				19	///< Alpha 16 bps
+
+
+
+//!Vevo Channel Template
+/**
+	@brief channel templates
+
+	A channel template is setup by the Plugin to describe what
+	data the Plugin needs.
+	Rules for the host how to handle this Channel can be setup with
+	the variable 'flags'.	
+*/
 struct vevo_channel_template
 {
-	const char		*name;					///< channel name
-	const char		*help;					///< channel help
-	int			flags;					///< optional flags
-	const char		*same_as;				///< must be same as channel <name>
-	struct 	vevo_channel_template *next;  				///< next channel
-	vevo_format_t	format[];					///< list of supported colorspaces (0 terminated)
+	const char		*name;				///< channel name
+	const char		*help;				///< channel help
+	int			flags;				///< optional flags
+	const char		*same_as;			///< must be same as channel <name>
+	struct 	vevo_channel_template *next;  			///< next channel
+	vevo_format_t	format[];				///< list of supported colorspaces (0 terminated)
 };
 
 typedef struct vevo_channel_template vevo_channel_templ_t;
 
-/*
-	The effect requires the data to be arranged specifically,
-	Below are the supported datatypes. 
-
-*/
 #define VEVO_FRAME_U8 	1		///< image data is of type uint8_t*
 #define VEVO_FRAME_U16 2		///< image data is of type uint16_t*
 #define VEVO_FRAME_U32 3		///< image data is of type uint32_t*
@@ -447,10 +454,17 @@ typedef struct vevo_channel_template vevo_channel_templ_t;
 #define VEVO_FRAME_S16 5		///< image data is of type int16_t*
 #define VEVO_FRAME_S32 6		///< image data is of type int32_t*
 #define VEVO_FRAME_FLOAT 7		///< image data is of type double*
-typedef int vevo_pixel_info_t;
+typedef int vevo_pixel_info_t;		///< image data type specifier
 
 
+//! Vevo Frame (created from port properties)
+/**
+	@brief getting image data
 
+	The vevo frame structure is a convenience structure
+	for the plugin programmer. It is setup by the function
+	vevo_collect_frame_data.   
+*/
 struct vevo_frame
 {
 	int			fmt;					///< pixel colorspace 
@@ -478,6 +492,12 @@ typedef struct vevo_frame vevo_frame_t;
 /**
 	@defgroup vevoinstance Vevo Instance
 */
+//!Vevo Instance
+/**
+	@brief instance data
+
+	The instance data is setup by Host and passed to all mandatory plugin's functions.
+*/
 typedef struct
 {
 	vevo_port	*self;						///< instance
@@ -491,18 +511,35 @@ typedef struct
 
 /**
 	@defgroup vevohostfunc Plugins Functions
+
+	@{
+*/
+
+
+//! Plugin Instance template
+/**
+	@brief	Plugins Mandatory functions
+
+	The 3 functions below must be provided by the Plugin.
 */
 typedef	int		(vevo_init_f)		(vevo_instance_t*);  ///< function to initialize plugin
 typedef int		(vevo_deinit_f)		(vevo_instance_t*);  ///< function to deinitialize plugin
 typedef int		(vevo_process_f)	(vevo_instance_t*);  ///< function to process
+/**
+	@brief	Plugin Optional functions
 
+	The function below defines a callback host can use to
+	keyframe the plugins parameters.
+*/
 typedef int		(vevo_cb_f)		(void *ptr, vevo_instance_t *, vevo_port *port, vevo_timecode_t pos, vevo_timecode_t keyframe);
 
-typedef void*	(vevo_malloc_f)	(size_t);
-typedef void*	(vevo_free_f)	(void*);
-typedef void*	(vevo_memset_f) (void *src, int c, size_t);
-typedef void	(vevo_memcpy_f)	(void *to, const void *from, size_t); 
 
+/**
+	@brief	plugin's setup
+
+	The Plugin provides a function 'setup' that returns
+	this template filled with the appropriate values.
+*/
 typedef struct 
 {
 	const char			*name;			///< Name of vevo plugin
@@ -528,47 +565,189 @@ typedef struct
 
 
 typedef vevo_instance_templ_t * (vevo_setup_f) (void);
+/**
+	@brief  Functions host must setup
+
+*/
+typedef void*	(vevo_malloc_f)	(size_t);			///< host memory allocation function
+typedef void*	(vevo_free_f)	(void*);			///< host free memory function
+typedef void*	(vevo_memset_f) (void *src, int c, size_t);	///< host memset function
+typedef void	(vevo_memcpy_f)	(void *to, const void *from, size_t); ///< host memcopy function
 
 
+
+/**
+	get the number of objects stored in a property
+	@param *p pointer to vevo port
+	@param t property type
+	@param *size pointer to result
+	@return Error code
+*/
 int		vevo_get_num_items( vevo_port *p, vevo_property_type_t type, int *size );
-
+/**
+	retrieve the byte size per object in a property
+	@param *p pointer to vevo port
+	@param t property type
+	@param index number of object
+	@param *size pointer to result
+	@return Error code
+*/
 int		vevo_get_item_size( vevo_port *p, vevo_property_type_t type,int index, int *size );
 
-int		vevo_get_data_type( vevo_port *p, vevo_property_type_t type, int *dst );
+/**
+	get the type specifier of a property
+	@param *p pointer to vevo port
+	@param type property type
+	@param *dst pointer to result
+	@return vevo_atom_type_t
+*/
+	
+vevo_atom_type_t	vevo_get_data_type( vevo_port *p, vevo_property_type_t type, int *dst );
 
+/**
+	see if a property is in the list of properties
+	@param *p pointer to vevo port
+	@param t property type to search
+	@return Error code
+*/
 int		vevo_find_property( vevo_port *p, vevo_property_type_t t );
 
+/**
+	put a property as the first item in the list of properties
+	@param *p pointer to vevo port
+	@param t property type
+	@return Error code
+*/
 int		vevo_sort_property( vevo_port *p, vevo_property_type_t t );
-
+/**
+	change flags of a property in the propertylist
+	@param *p pointer to vevo port
+	@param t property type
+	@param ro_flag flag to set (WRITEABLE or READONLY)
+	@return Error code
+*/
 int		vevo_cntl_property( vevo_port *p, vevo_property_type_t t, vevo_cntl_flags_t ro_flag );
 
-void		vevo_del_property(  vevo_port *p, vevo_property_type_t t );
+/**
+	delete a property from the list of properties
+	@param *p pointer to vevo port
+	@param t property type to delete
+	@return Error code
+*/
+int		vevo_del_property(  vevo_port *p, vevo_property_type_t t );
 
+/**
+	put a new property in the list of properties
+	@param *p pointer to vevo port
+	@param type property type to (re)create
+	@param ident the type specifier of the data
+	@param arglen the length of data
+	@param *value pointer to data
+*/
 void		vevo_set_property(  vevo_port *p, vevo_property_type_t type, vevo_atom_type_t ident,size_t arglen, void *value );
 
+/**
+	put a new property to the list of properties from a different type specifier
+	automaticaly scales/converts values between numeric type specifiers.
+	@param *p pointer to vevo port
+	@param type property
+	@param type specifier of data
+	@param *value pointer to data
+	@return Error code
+*/
 int		vevo_set_property_by( vevo_port *p, vevo_property_type_t type, vevo_atom_type_t src_ident, size_t arglen, void *value );
 
+/**
+	get the data from a property
+	@param *p pointer to vevo port
+	@param type property
+	@param *dst pointer to result
+	@return Error code
+*/
 int		vevo_get_property(  vevo_port *p, vevo_property_type_t type, void *dst );
 
+/**
+	get and scale/cast the data from a property
+	@param *p pointer to vevo port
+	@param type property
+	@param ident type specifier of data
+	@param *dst pointer to data 
+	@return Error code
+*/
 int		vevo_get_property_as( vevo_port *p, vevo_property_type_t type, vevo_atom_type_t ident, void *dst );
 
+/**
+	free memory used by a port (destroys all properties). Used by host
+	@param *p pointer to vevo port 
+*/	
 void		vevo_free_port	(	vevo_port *p );
 
+/**
+	free memory used by plugin's instance. Used by host
+	@param *p pointer to vevo instance
+*/
 void		vevo_free_instance( vevo_instance_t * );
 
+/**
+	instantiate a parameter based on some template
+	@param *info  pointer to template
+	@return vevo_port
+*/
 vevo_port 	*vevo_allocate_parameter( vevo_parameter_templ_t *info );
 
+/**
+	instantiate a channel based on some template
+	@param *info pointer to template
+	@return vevo_port
+*/
 vevo_port 	*vevo_allocate_channel( vevo_channel_templ_t *info );
 
+/**
+	instantiate a plugin based on the plugin's instance template. Used by host
+	@param *info pointer to vevo instance template
+	@return vevo_instance_t
+*/
 vevo_instance_t	*vevo_allocate_instance( vevo_instance_templ_t *info );
 
+/**
+	fill in a frame structure based on port settings
+	@param *p vevo channel port
+	@param *dst pointer to vevo_frame to fill
+	@return Error code 
+*/
 int		vevo_collect_frame_data( vevo_port *p, vevo_frame_t *dst );
 
+/**
+	prepare a list of properties based on some type
+	@param *p vevo parameter port
+	@param p_args the length of data
+	@param ident the type specifier of data
+	@param n_types the number of properties to initialize 
+	@param ... variable list of properties (in order of data)
+	@return Error code
+*/
 int		vevo_init_parameter_values( vevo_port *p, int p_args, vevo_atom_type_t ident, void *val, int n_types, ...);
+
+/**
+	assign the value of some property to another property
+	@param *p pointer to vevo port
+	@param left property type to (re)create
+	@param right property type to copy values from
+	@return Error code
+*/
 
 int		vevo_property_assign_value( vevo_port *p, vevo_property_type_t left, vevo_property_type_t right );
 
-int		vevo_property_assign_value_from( vevo_port *p, vevo_property_type_t left, vevo_property_type_t right_ident, void *right );
+/**
+	assign the value of some property 
+	from a different type specifier
+	@param *p pointer to vevo port
+	@param left property type to (re)create
+	@param ident datatype of pointer to data
+	@param *data pointer to data
+	@return Error code
+*/
+int		vevo_property_assign_value_from( vevo_port *p, vevo_property_type_t left, vevo_atom_type_t ident, void *data );
 
 /// @}
 

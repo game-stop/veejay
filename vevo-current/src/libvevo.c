@@ -721,7 +721,7 @@ int		vevo_cntl_property( vevo_port *p, vevo_property_type_t type, vevo_cntl_flag
 }
 
 
-void	vevo_del_property( vevo_port *p, vevo_property_type_t t ) 
+int	vevo_del_property( vevo_port *p, vevo_property_type_t t ) 
 {
 	vevo_property_t *next;
 
@@ -731,7 +731,9 @@ void	vevo_del_property( vevo_port *p, vevo_property_type_t t )
  		next = p->properties->next;
 		vevo_free_property( p->properties );  
 		p->properties = next;
+		return VEVO_ERR_SUCCESS;
 	}
+	return VEVO_ERR_NO_SUCH_PROPERTY;
 }
 
 int	vevo_verify_runnable( vevo_instance_t *inst )
@@ -913,7 +915,7 @@ int		vevo_get_item_size( vevo_port *p, vevo_property_type_t type,int index, int 
 	return VEVO_ERR_NO_SUCH_PROPERTY;
 }
 
-int		vevo_get_data_type( vevo_port *p, vevo_property_type_t type, int *dt )
+vevo_atom_type_t	vevo_get_data_type( vevo_port *p, vevo_property_type_t type, int *dt )
 {
 	vevo_property_t *property = p->properties;
 	while( property != NULL )
