@@ -1,6 +1,6 @@
 # Makefile for memory managment / platform specific optimizations
 
-INCLUDES = 	-I$(top_srcdir) -I$(includedir)  -I$(top_builddir)/libvjmsg $(ppcasm_headers)
+INCLUDES = 	-I$(top_srcdir) -I$(includedir)  -I$(top_builddir)/libvjmsg
 
 
 
