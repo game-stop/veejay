@@ -646,10 +646,6 @@ int vj_tag_stop_encoder(int t1) {
  	tag->encoder_active = 0;
 	return (vj_tag_update(tag,t1));
    }
-   else
-   {
-	veejay_msg(VEEJAY_MSG_ERROR, "Recording from a stream was never started");
-   }
    return 0;
 }
 
@@ -834,7 +830,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	tag->encoder_height = _tag_info->edit_list->video_height;
 
 	if( vj_tag_update(tag,clip_id)==0) return 1;
-	return 0;
+	return -1;
 }
 
 
