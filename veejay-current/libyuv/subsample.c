@@ -562,6 +562,9 @@ void chroma_subsample(subsample_mode_t mode, uint8_t *ycbcr[],
   case SSM_422_444:
     ss_444_to_422(ycbcr[1],width,height);
     ss_444_to_422(ycbcr[2],width,height);
+#ifdef HAVE_MMX
+	emms();
+#endif
     break;
   case SSM_420_422:
     ss_422_to_420(ycbcr[1],width,height);
@@ -588,8 +591,9 @@ void chroma_supersample(subsample_mode_t mode, uint8_t *ycbcr[],
   case SSM_422_444:
     tr_422_to_444(ycbcr[2],width,height);
     tr_422_to_444(ycbcr[1],width,height);
-//	memset( ycbcr[1], 128,(width*height));
-  //  tr_422_to_444(ycbcr[1],width,height);
+#ifdef HAVE_MMX
+	emms();
+#endif
     break;
   case SSM_420_422:
     ss_420_to_422( ycbcr[1], width, height );
