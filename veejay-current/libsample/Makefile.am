@@ -1,7 +1,7 @@
 # Makefile for veejay
 
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg \
-			${XML_CPPFLAGS} ${XML_CFLAGS} 
+			${XML_CFLAGS} 
 
 SAMPLE_LIB_FILE = libsample.la
 

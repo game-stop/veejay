@@ -10,7 +10,7 @@ INCLUDES = 	-I$(top_srcdir)/ffmpeg/ffmpeg/libavcodec -I$(top_srcdir)/ffmpeg/ffmp
 		-I$(top_srcdir)/libvjmem \
 		-I$(top_srcdir)/libvjmsg \
 		-I$(top_srcdir)/libvjnet \
-		$(AVIPLAY_CFLAGS) ${GTK_CFLAGS} ${DV_FLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} \
+		$(AVIPLAY_CFLAGS) ${XML_CFLAGS} ${GTK_CFLAGS} ${DV_FLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} \
 		$(DIRECTFB_CFLAGS) ${SDL_CFLAGS} ${JPEG_CFLAGS} ${PTHREAD_CFLAGS} ${SAMPLERATE_CFLAGS} 
 
 VEEJAY_LIB_FILE = libveejay.la
