@@ -422,7 +422,7 @@ case $host_cpu in
     dnl If the host is pentium, align on double word boundary
     case $host_cpu in
 	i686)
-		CFLAGS="$CFLAGS -malign-double"
+		CFLAGS="$CFLAGS -malign-double -mfpmath=sse"
 		;;
 	*)
 		;;
