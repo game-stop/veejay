@@ -1206,8 +1206,10 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 	}
     }
     if (vj_effect_get_extra_frame(effect_id)) {
-	tag->effect_chain[position]->source_type = tag->source_type;
-	tag->effect_chain[position]->channel = t1;
+	if(tag->effect_chain[position]->source_type < 0)
+	 tag->effect_chain[position]->source_type = tag->source_type;
+	if(tag->effect_chain[position]->channel <= 0 )
+	 tag->effect_chain[position]->channel = t1;
     }
 
     if (!vj_tag_update(tag,t1))
