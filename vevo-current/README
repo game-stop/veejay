@@ -47,18 +47,42 @@ What about Livido ?!
 VeVo is not Livido but was proposed as an alternative solution (libvido) 
 Here is a short summary on the differences between the two systems.
 
+
 					VEVO		Livido
 Generic datastructures			 + 		  -	
 Strict datastructures			 - 		  +
 Datafields can be added without		 + 	          - 
 breaking binary compatibility			
-Scaling/Conversion of datatypes		 +		  -
+Scaling/Conversion of parameters	 +		  -
 Input/Output data arranged by 'Ports'    +                -
 Header only (interface definition)	 -		  +
 Requires library			 +                -
 
 
+Vevo allows parameter values to be of any type ( double, int, char*, boolean )
+and it can convert between numeric values. 
+This allows for host defined (graphical) presentation of plugin controls,
+the parameter hint sytem can be used to 'identify' a parameter
+(for example, PARAM_HINT_RGBA ) and scale its values to,
+for example webbased notation or simply in the range of 0-255.
   
+Another option vevo allows is to use different type specifiers for
+image data (signed vs. unsigned, different bytedepths).
+However, there are no conversion functions for those yet.
+
+Also, vevo simplifies both host and plugin implementation.
+
+When using vevo, the init() method of the plugin should always
+initialize the DEFAULT values for each parameter.
+This allows the Host to setup its own default values , or
+it can simply use a library function to intialize a current value
+for the plugin to use.
+Future versions of Vevo may include an expression evaluation function to
+calculate new parameter values (by adding/increment STEP or 
+PAGE size). 
+ 
+
+ 
 Vevo package structure
 ----------------------
 
@@ -67,6 +91,38 @@ Vevo package structure
 	test		: vevo test cases
 	examples	: vevo host example
 	plugins		: vevo plugin collection
+
+
+Main features:
+
+	o	Simple to write plugins
+	o	Cross platform (POSIX.1b) (C99 compatible)
+	 	tested on x86 and MIPS
+ 	o	Support for multi input/output channels
+	o	Support for multi input/output parameters
+	o	Support for both RT and NLE applications
+	o	Support for Parameter scaling/interpretation
+	o	Uses hint system to describe plugin behaviour/requirements.
+	o	Plugins are binary compatible
+	o	New properties can be added without breaking binary compatibility.
+	o	Library is REENTRANT
+
+Know more:
+	o	Browse the source
+		(see include/libvevo.h , plugins/*)
+	o	Create Doxygen code documentation with  
+		$ doxygen doc/config
+	o	ChangeLog
+
+To get the latest vevo version from the repository , use the command:
+
+$ svn checkout svn://dyne.org/veejay/trunk/vevo-current
+
+The user/development mailinglist is
+
+	veejay-libvevo@lists.sourceforge.net     
+
+
 
 
 
