@@ -62,7 +62,4 @@ void yuv422_to_yuyv( uint8_t *yuv422[3], uint8_t *dst, int w, int h );
 // scene detection
 int luminance_mean(uint8_t * frame[], int w, int h);
 
-// scale
-int yuv_affine_scale( const uint8_t *src, int src_width, int src_height, uint8_t *dest, int dest_width, int dest_height);
-
 #endif

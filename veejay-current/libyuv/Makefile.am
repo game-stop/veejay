@@ -10,7 +10,7 @@ YUV_LIB_FILE = libyuv.la
 
 noinst_LTLIBRARIES = $(YUV_LIB_FILE)
 
-libyuv_la_SOURCES =	subsample.c affine.c yuvconv.c
+libyuv_la_SOURCES =	subsample.c swscale.c yuvconv.c
 
 
 libyuv_la_LDFLAGS = $(YUV_LIB_OPTS) \

@@ -20,7 +20,6 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <libyuv/yuvconv.h>
-#include <libyuv/affine.h>
 /* this routine is the same as frame_YUV422_to_YUV420P , unpack
  * libdv's 4:2:2-packed into 4:2:0 planar 
  * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)
@@ -394,76 +393,4 @@ int luminance_mean(uint8_t * frame[], int w, int h)
     }
     return sum / count;
 }
-
-
-#define __CLAMP(x, low, high)  (((x) > (high)) ? (high) : (((x) < (low)) ? (low) : (x)))
-/*
-	The 'yuv_affine_scale' function is taken from dc1394_vloopback.c (part of libdc1394).
-	It is modified since veejay would like to scale per plane, regardless of what yuv goes through.
- */
-
-int yuv_affine_scale( const uint8_t *src, int src_width, int src_height, uint8_t *dest, int dest_width, int dest_height)
-{	
-	affine_transform_t affine;
-	double scale_x = (double) dest_width / (double) src_width;
-	double scale_y = (double) dest_height / (double) src_height;
-	const int scx = src_width / 2;
-	const int scy = src_height / 2;
-	const int dcx = dest_width / 2;
-	const int dcy = dest_height / 2;
-	register uint8_t *d = dest;
- 	register const uint8_t  *s = src;
-	register int i, j, x, y;
-
-	if (scale_x == 1.0 && scale_y == 1.0)
-	{
-		/* src must be in dst */
-		veejay_memcpy( dest, src, (src_height * src_width) );	
-		return 0;
-	}
-	
-	affine_transform_init( &affine );
-	
-	/* down */
-	if ( scale_x <= 1.0 && scale_y <= 1.0 )
-	{
-		affine_transform_scale( &affine, scale_x, scale_y );
-
-		for( j = 0; j < src_height; j++ )
-			for( i = 0; i < src_width; i++ )
-			{
-				x = (int) ( affine_transform_mapx( &affine, i - scx, j - scy ) );
-				y = (int) ( affine_transform_mapy( &affine, i - scx, j - scy ) );
-				x += dcx;
-				x = __CLAMP( x, 0, dest_width);
-				y += dcy;
-				y = __CLAMP( y, 0, dest_height);
-				s = src  + (j*src_width) + i;
-				d = dest + (y*dest_width) + x;
-				swab(s, d,4);
-			}
-	}
-
-	/* up */
-	else if ( scale_x >= 1.0 && scale_y >= 1.0 )
-	{
-		affine_transform_scale( &affine, 1.0/scale_x, 1.0/scale_y );
-	
-		for( y = 0; y < dest_height; y++ )
-			for( x = 0; x < dest_width; x++ )
-			{
-				i = (int) ( affine_transform_mapx( &affine, x - dcx, y - dcy ) );
-				j = (int) ( affine_transform_mapy( &affine, x - dcx, y - dcy ) );
-				i += scx;
-				i = __CLAMP( i, 0, dest_width);
-				j += scy;
-				j = __CLAMP( j, 0, dest_height);
-				s = src + (j*scx) + i;
-				d = dest + (y*dcx) + x;
-				swab( s, d, 4);
-			}
-	}
-	return 0;
-}
-
 
