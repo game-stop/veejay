@@ -59,7 +59,8 @@ The OpenSound Control WWW page is
 #include <stdio.h>
 #endif
 
-
+static 	int	use_mcast_ = 0;
+static	char	mcast_groupname[200];
 
 struct {
     OSCQueue TheQueue;		/* The Priority Queue */
@@ -785,25 +786,56 @@ Boolean OSCScheduleInternalMessages(OSCTimeTag when, int numMessages,
 Boolean NetworkPacketWaiting(OSCPacketBuffer packet) {
 	int n;
 	NetworkReturnAddressPtr na = OSCPacketBufferGetClientAddr(packet);
-	if( ioctl( na->sockfd, FIONREAD, &n, 0)==-1) return FALSE;
-	if( n==0 ) return FALSE;
+
+	if( use_mcast_ )
+	{
+		fd_set fds;
+		struct	timeval no_wait;
+		int	status;
+		memset( &no_wait, 0, sizeof(no_wait));
+		FD_ZERO(&fds);
+		FD_SET( na->sockfd , &fds );
+		status = select( na->sockfd + 1, &fds, 0, 0, &no_wait );
+		if(status <= 0)
+			return FALSE;
+	}
+	else
+	{
+		if( ioctl( na->sockfd, FIONREAD, &n, 0)==-1) return FALSE;
+		if( n==0 ) return FALSE;
+	}
 	return TRUE;
 }
 
 Boolean NetworkReceivePacket( OSCPacketBuffer packet ) {
     int n;	
     NetworkReturnAddressPtr na = OSCPacketBufferGetClientAddr(packet);
-    
-    n = recvfrom( na->sockfd, packet->buf, 100, 0,
-	 (struct sockaddr*) &(na->cl_addr), &(na->clilen));
-	if(n<=0) {
-		return FALSE;
+   
+	if( use_mcast_ )
+	{
+		n = recv( na->sockfd, packet->buf, 100, 0 );
+		if( n<= 0)
+			return FALSE;
+		packet->n = n;
 	}
-    packet->n = n;
-    
+	else
+	{ 
+  	  n = recvfrom( na->sockfd, packet->buf, 100, 0,
+		 (struct sockaddr*) &(na->cl_addr), &(na->clilen));
+		if(n<=0) {
+			return FALSE;
+		}
+	    packet->n = n;
+    }
+
     return TRUE;
 }	 
 
+void	GoMultiCast( const char *group_name )
+{
+	use_mcast_ = 1;
+	strncpy( mcast_groupname, group_name, strlen(group_name ));
+}
 
 Boolean NetworkStartUDPServer(OSCPacketBuffer packet, int port_id) {
 	struct sockaddr_in my_addr;
@@ -813,11 +845,33 @@ Boolean NetworkStartUDPServer(OSCPacketBuffer packet, int port_id) {
 
 	memset( &(my_addr.sin_zero), 0, 8);
 	
-	packet->returnAddr->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
-	if( bind( packet->returnAddr->sockfd,
-		  (struct sockaddr*) &my_addr,
-		  sizeof(struct sockaddr)) == -1) return FALSE;
+	if( use_mcast_ )
+	{
+		struct ip_mreq	mcast_req;
+		int on = 1;
+		memset( &mcast_req, 0, sizeof(mcast_req));
+		packet->returnAddr->sockfd = socket( AF_INET, SOCK_DGRAM, 0);
+#ifdef SO_REUSEADDR
+		setsockopt( packet->returnAddr->sockfd, SOL_SOCKET, SO_REUSEADDR, &on, sizeof(on));
+#endif
+#ifdef SO_REUSEPORT
+		setsockopt( packet->returnAddr->sockfd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on));
+#endif
+		bind( packet->returnAddr->sockfd, (struct sockaddr*) &my_addr, sizeof( my_addr ));
+		
+		mcast_req.imr_multiaddr.s_addr = inet_addr( mcast_groupname );
+		mcast_req.imr_interface.s_addr = htonl( INADDR_ANY );	
+		setsockopt( packet->returnAddr->sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP,
+			&mcast_req, sizeof(mcast_req) );
+	}
+	else
+	{
+		packet->returnAddr->sockfd = socket(AF_INET, SOCK_DGRAM, 0);
+		if( bind( packet->returnAddr->sockfd,
+			  (struct sockaddr*) &my_addr,
+			  sizeof(struct sockaddr)) == -1) return FALSE;
 
-	packet->returnAddr->clilen = sizeof(struct sockaddr);
+		packet->returnAddr->clilen = sizeof(struct sockaddr);
+	}
 	return TRUE;
 }
