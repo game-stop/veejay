@@ -43,7 +43,6 @@ void 	vj_event_chain_disable			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_chain_enable			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_chain_entry_audio_toggle	(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_chain_entry_audio_vol_inc	(	void *ptr, 	const char format[], 	va_list ap	); 
-void 	vj_event_chain_entry_audio_volume	(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_chain_entry_channel		(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_chain_entry_channel_inc	(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_chain_entry_del		(	void *ptr, 	const char format[], 	va_list ap	);
@@ -57,8 +56,6 @@ void	vj_event_chain_entry_src_toggle		(	void *ptr,	const char format[],	va_list 
 void 	vj_event_chain_entry_source		(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_chain_entry_srccha		(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_chain_entry_video_toggle	(	void *ptr, 	const char format[], 	va_list ap	);
-void 	vj_event_chain_entry_disable_audio	(	void *ptr, 	const char format[], 	va_list ap	);
-void 	vj_event_chain_entry_enable_audio	(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_chain_entry_disable_video	(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_chain_entry_enable_video	(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_chain_entry_set_defaults	(	void *ptr,	const char format[],	va_list ap	);

@@ -1868,7 +1868,7 @@ void vj_perform_plain_fill_buffer(veejay_t * info, int entry)
     if(ret == 2)
     {
 	veejay_msg(VEEJAY_MSG_WARNING, "There is no plain video to play!");
-	
+	veejay_change_state(info, LAVPLAY_STATE_STOP);
     }
 }
 
@@ -1953,21 +1953,22 @@ long vj_perform_record_commit_single(veejay_t *info, int entry)
 {
   //video_playback_setup *settings = info->settings;
 
-  char filename[255];
+  char filename[512];
   //int n_files = 0;
   long start_el_pos = info->edit_list->video_frames;
 
   if(info->uc->playback_mode == VJ_PLAYBACK_MODE_CLIP)
   {
- 	 if(clip_get_encoded_file(info->uc->clip_id, filename))
+ 	if(clip_get_encoded_file(info->uc->clip_id, filename))
   	{
 
 		if( info->settings->render_list == 0)
 		{
 			long dest = info->edit_list->video_frames;
-			if( veejay_edit_addmovie(info, filename, -1, dest,dest))
+			if( !veejay_edit_addmovie(info, filename, -1, dest,dest))
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Added file %s", filename);
+				veejay_msg(VEEJAY_MSG_ERROR, "Adding file %s", filename);
+				return -1;
 			}
 		}
 		else
@@ -1979,24 +1980,28 @@ long vj_perform_record_commit_single(veejay_t *info, int entry)
 				veejay_msg(VEEJAY_MSG_INFO, "New playable render entry %d",
 					info->settings->render_list );
 			}
-		    return -1;
+		    	return -1; // dont commit
 		}
+		return start_el_pos;
  	 }
-	  return start_el_pos;
   }
+
   if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG)
   {
 	 int stream_id = (info->settings->offline_record ? info->settings->offline_tag_id : info->uc->clip_id);
  	 if(vj_tag_get_encoded_file(stream_id, filename))
   	 {
 		long dest = info->edit_list->video_frames;
-		if( veejay_edit_addmovie(info, filename, -1, dest,dest))
+		if( !veejay_edit_addmovie(info, filename, -1, dest,dest))
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Added file %s", filename);
+			veejay_msg(VEEJAY_MSG_ERROR, "Adding file %s", filename);
+			return -1;
 		}
+		return start_el_pos;
 	}
   }
-  return start_el_pos;
+
+  return -1;
 
 }
 
@@ -2087,6 +2092,7 @@ void vj_perform_record_clip_frame(veejay_t *info, int entry) {
 		// initialize a encoder
 		if(frames_left > 0 )
 		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "continue, %d frames left to record", frames_left);
 			// todo: add to other editlist .. ?
 			if( clip_init_encoder( info->uc->clip_id, NULL,
 				df, info->edit_list, frames_left)==-1)
@@ -2097,6 +2103,7 @@ void vj_perform_record_clip_frame(veejay_t *info, int entry) {
 		}
 		else
 		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "Added new clip of %d frames",len);
 			if(n!=-1) vj_perform_record_commit_clip(info,-1,len);
 		}
 	 }
@@ -2147,7 +2154,7 @@ void vj_perform_record_tag_frame(veejay_t *info, int entry) {
 	{
 		/* auto split file */
 		int df = vj_event_get_video_format();
-		int len = vj_tag_get_total_frames(stream_id);
+		int len = vj_tag_get_duration(stream_id);
 		long frames_left = vj_tag_get_frames_left(stream_id) ;
 		// stop encoder
 		vj_tag_stop_encoder( stream_id );
@@ -2167,7 +2174,6 @@ void vj_perform_record_tag_frame(veejay_t *info, int entry) {
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "never enaluated statement?!");
 			vj_perform_record_commit_clip(info,-1,len);
 		}
 	 }

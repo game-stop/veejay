@@ -99,15 +99,12 @@ void vj_osc_cb_clip_his_play(void *context, int arglen, const void *vargs, OSCTi
 void vj_osc_cb_chain_clear(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_entry_disable_video(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_entry_enable_video(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
-void vj_osc_cb_chain_entry_disable_audio(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
-void vj_osc_cb_chain_entry_enable_audio(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_entry_del(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_entry_select(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_entry_default(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_entry_preset(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_entry_set(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_entry_set_arg_val(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
-void vj_osc_cb_chain_entry_set_volume(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_entry_channel(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_entry_source(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_manual_fade(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
@@ -626,19 +623,9 @@ void vj_osc_cb_chain_entry_enable_video(void *context, int arglen, const void *v
 	DNET_F(arglen,vargs,NET_CHAIN_ENTRY_SET_VIDEO_ON);
 }
 
-void vj_osc_cb_chain_entry_disable_audio(void *context, int arglen, const void *vargs, OSCTimeTag when,
-	NetworkReturnAddressPtr ra)
-{
-	DNET_F(arglen,vargs,NET_CHAIN_ENTRY_SET_VIDEO_OFF);
-}
 void vj_osc_cb_chain_toggle_all(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
 	DNET_F(arglen,vargs,NET_CHAIN_TOGGLE_ALL);
-}
-void vj_osc_cb_chain_entry_enable_audio(void *context, int arglen, const void *vargs, OSCTimeTag when,
-	NetworkReturnAddressPtr ra)
-{
-	DNET_F(arglen,vargs,NET_CHAIN_ENTRY_SET_AUDIO_ON);
 }
 
 void vj_osc_cb_chain_entry_del(void *context, int arglen, const void *vargs, OSCTimeTag when,
@@ -677,11 +664,6 @@ void vj_osc_cb_chain_entry_set_arg_val(void *context, int arglen, const void *va
 	DNET_F(arglen,vargs,NET_CHAIN_ENTRY_SET_ARG_VAL);
 }
 
-void vj_osc_cb_chain_entry_set_volume(void *context, int arglen, const void *vargs, OSCTimeTag when,
-	NetworkReturnAddressPtr ra)
-{
-	DNET_F(arglen,vargs,NET_CHAIN_ENTRY_SET_AUDIO_VOL);
-}
 
 void vj_osc_cb_chain_entry_channel(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)

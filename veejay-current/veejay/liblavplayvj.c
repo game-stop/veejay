@@ -2752,9 +2752,6 @@ int veejay_edit_addmovie(veejay_t * info, char *movie, long start,
 		el->frame_list[destination + i - start] = EL_ENTRY(n, i);
 		el->video_frames++;
     }
-	veejay_msg(VEEJAY_MSG_INFO, "Added %ld frames, it=%d start=%d end=%d dest=%d",
-		   el->video_frames- n_end, i, start,end,destination);
-		   
  
     settings->max_frame_num = el->video_frames - 1;
     settings->min_frame_num = 1;

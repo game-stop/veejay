@@ -21,7 +21,7 @@
 #include <stdarg.h>
 #include "vj-lib.h"
 
-#define VEEJAY_FILE_LIMIT (1048576 * 2000)
+#define VEEJAY_FILE_LIMIT (1048576 * 1900)
 
 
 int vj_perform_screenshot2(veejay_t * info, uint8_t ** src);
@@ -29,5 +29,7 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src);
 float	vj_get_relative_time(void);
 
 int	vj_perform_take_bg( veejay_t *info, uint8_t **src);
+
+int	veejay_create_temp_file(const char *prefix, char *dst);
 
 #endif

@@ -739,6 +739,7 @@ int vj_tag_stop_encoder(int t1) {
  	tag->encoder_active = 0;
 	return (vj_tag_update(tag,t1));
    }
+
    return 0;
 }
 
@@ -858,6 +859,9 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		);
 
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "sf = %ld , tf = %ld , nframes = %ld, duration = %ld",
+		tag->encoder_succes_frames,tag->encoder_total_frames,nframes,tag->encoder_duration );
+
 	if(!tag->encoder_file)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Cannot write to %s (%s)",tag->encoder_destination,
@@ -945,7 +949,8 @@ int vj_tag_continue_record( int t1 )
 	vj_tag *si = vj_tag_get(t1);
 	if(!si) return -1;
 
-	if( si->rec_total_bytes == 0) return -1;
+	if( si->rec_total_bytes == 0) return 0;
+
 	if(si->encoder_num_frames >= si->encoder_duration)
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Ready recording %ld frames", si->encoder_succes_frames);
@@ -956,9 +961,11 @@ int vj_tag_continue_record( int t1 )
 	// 2 GB barrier
 	if (si->rec_total_bytes  >= VEEJAY_FILE_LIMIT)
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Auto splitting files (reached internal 2GB barrier see vj-common.h)");
+		veejay_msg(VEEJAY_MSG_INFO, "Auto splitting files (reached internal 2GB barrier)");
 		si->sequence_num ++;
 		si->rec_total_bytes = 0;
+	//	si->encoder_duration
+	//	reset some variables
 
 		printf(" %d %ld %d (%ld)%ld \n",
 			(int)si->sequence_num,
@@ -1665,8 +1672,15 @@ int vj_tag_get_encoded_frames(int s1) {
   //return ( si->encoder_total_frames );
 }
 
+long vj_tag_get_duration(int s1)
+{
+	vj_tag *t = vj_tag_get(s1);
+	if(!t) return -1;
+	return ( t->encoder_duration );
+}
 
-int vj_tag_get_total_frames( int s1 )
+
+long vj_tag_get_total_frames( int s1 )
 {
   vj_tag *si = vj_tag_get(s1);
   if(!si) return -1;
@@ -1680,7 +1694,6 @@ int vj_tag_reset_autosplit(int s1)
   if(!si) return -1;
   bzero( si->encoder_base, 255 );
   bzero( si->encoder_destination , 255 );
-  si->encoder_total_frames = 0;
   si->sequence_num = 0;
   return (vj_tag_update(si,s1));  
 }
@@ -1719,8 +1732,11 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 
 	if(lav_write_frame(tag->encoder_file, tag_encoder_buf, buf_len,1))
 	{
-				veejay_msg(VEEJAY_MSG_ERROR, "writing frame, giving up %s", lav_strerror());
-				return -1;
+			veejay_msg(VEEJAY_MSG_ERROR, "writing frame, giving up :[%s]", lav_strerror());
+			veejay_msg(VEEJAY_MSG_DEBUG, "tb = %ld, tf = %ld, sf = %ld , dur = %ld",
+				tag->rec_total_bytes + buf_len, tag->encoder_total_frames,
+				tag->encoder_succes_frames, tag->encoder_duration);
+			return -1;
 	}
 	tag->rec_total_bytes += buf_len;
 	

@@ -46,6 +46,7 @@
 #define NET_MAX		256
 #define MSG_MIN_LEN	  5
 
+
 static int _last_known_num_args = 0;
 
 static hash_t *BundleHash;
@@ -275,9 +276,6 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_CHAIN_ENTRY_SET_ARG_VAL		=	2203,
 	VJ_EVENT_CHAIN_ENTRY_SET_VIDEO_ON		=	2204,
 	VJ_EVENT_CHAIN_ENTRY_SET_VIDEO_OFF		=	2225,
-	VJ_EVENT_CHAIN_ENTRY_SET_AUDIO_ON		=	2206,
-	VJ_EVENT_CHAIN_ENTRY_SET_AUDIO_OFF		=	2207,
-	VJ_EVENT_CHAIN_ENTRY_SET_AUDIO_VOL		=	2208,
 	VJ_EVENT_CHAIN_ENTRY_SET_DEFAULTS		=	2209,
 	VJ_EVENT_CHAIN_ENTRY_SET_CHANNEL		=	2210,
 	VJ_EVENT_CHAIN_ENTRY_SET_SOURCE			=	2211,
@@ -407,9 +405,6 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_CHAIN_ENTRY_SET_ARG_VAL,		NET_CHAIN_ENTRY_SET_ARG_VAL		},
 	{ VJ_EVENT_CHAIN_ENTRY_SET_VIDEO_ON,		NET_CHAIN_ENTRY_SET_VIDEO_ON		},
 	{ VJ_EVENT_CHAIN_ENTRY_SET_VIDEO_OFF,		NET_CHAIN_ENTRY_SET_VIDEO_OFF		},
-	{ VJ_EVENT_CHAIN_ENTRY_SET_AUDIO_ON,		NET_CHAIN_ENTRY_SET_AUDIO_ON		},	
-	{ VJ_EVENT_CHAIN_ENTRY_SET_AUDIO_OFF,		NET_CHAIN_ENTRY_SET_AUDIO_OFF		},
-	{ VJ_EVENT_CHAIN_ENTRY_SET_AUDIO_VOL,		NET_CHAIN_ENTRY_SET_AUDIO_VOL		},
 	{ VJ_EVENT_CHAIN_ENTRY_SET_DEFAULTS,		NET_CHAIN_ENTRY_SET_DEFAULTS		},
 	{ VJ_EVENT_CHAIN_ENTRY_SET_CHANNEL,		NET_CHAIN_ENTRY_SET_CHANNEL		},
 	{ VJ_EVENT_CHAIN_ENTRY_SET_SOURCE,		NET_CHAIN_ENTRY_SET_SOURCE		},
@@ -774,9 +769,6 @@ static struct {
 	{ VJ_EVENT_CHAIN_ENTRY_SET_ARG_VAL,	"ChainEntry: set parameter x value y",		 vj_event_chain_entry_set_arg_val,4,	"%d %d %d %d",	{0,-1}	},
 	{ VJ_EVENT_CHAIN_ENTRY_SET_VIDEO_ON,	"ChainEntry: set video on entry on",		 vj_event_chain_entry_enable_video,2,	"%d %d",	{0,-1}	},
 	{ VJ_EVENT_CHAIN_ENTRY_SET_VIDEO_OFF,	"ChainEntry: set video on entry off",		 vj_event_chain_entry_disable_video,2,	"%d %d",	{0,-1}	},
-	{ VJ_EVENT_CHAIN_ENTRY_SET_AUDIO_ON,	"ChainEntry: set audio on entry on",		 vj_event_chain_entry_enable_audio,2,	"%d %d",	{0,-1}	},
-	{ VJ_EVENT_CHAIN_ENTRY_SET_AUDIO_OFF,	"ChainEntry: set audio on entry off",		 vj_event_chain_entry_disable_audio,2,	"%d %d",	{0,-1}	},
-	{ VJ_EVENT_CHAIN_ENTRY_SET_AUDIO_VOL,	"ChainEntry: set audio volume on entry to",	 vj_event_chain_entry_audio_volume,3,	"%d %d %d",	{0,-1}	},
 	{ VJ_EVENT_CHAIN_ENTRY_SET_DEFAULTS,	"ChainEntry: set effect on entry to defaults",	 vj_event_chain_entry_set_defaults,2,	"%d %d",	{0,-1}	},
 	{ VJ_EVENT_CHAIN_ENTRY_SET_CHANNEL,	"ChainEntry: set mixing channel on entry to",	 vj_event_chain_entry_channel,3,	"%d %d %d",	{0,-1}	},
 	{ VJ_EVENT_CHAIN_ENTRY_SET_SOURCE,	"ChainEntry: set mixing source on entry to",	 vj_event_chain_entry_source,3,		"%d %d %d",	{0,-1}	},
@@ -920,7 +912,7 @@ void	vj_event_init(void);
 #define p_no_clip(a) {  veejay_msg(VEEJAY_MSG_ERROR, "Clip %d does not exist",a); }
 #define p_no_tag(a)    {  veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist",a); }
 #define p_invalid_mode() {  veejay_msg(VEEJAY_MSG_DEBUG, "Invalid playback mode for this action"); }
-
+#define v_chi(v) ( (v < 0  || v >= CLIP_MAX_EFFECTS ) ) 
 
 /*
 #define CURRENT_CLIP(v,s) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_CLIPS) && clip_exists(s))
@@ -3262,67 +3254,61 @@ void vj_event_clip_rec_start( void *ptr, const char format[], va_list ap)
 	int changed = 0;
 	int result = 0;
 	char *str = NULL;
-
+	char prefix[20];
 	P_A(args,str,format,ap);
 
-
-	if( CLIP_PLAYING(v) ) 
+	if(!CLIP_PLAYING(v)) 
 	{
-		char tmp[255];
-		sprintf(tmp, "clip-%d-%d-XXXXXX", v->uc->clip_id,args[0]);
+		p_invalid_mode();
+		return;
+	}
 
-		if( args[0] == 0 )
-		{
-			int n = clip_get_speed(v->uc->clip_id);
-			if( n == 0) 
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "Clip was paused, forcing normal speed");
-				n = 1;
-			}
-			else
-			{
-			 if (n < 0 ) n = n * -1;
-			}
-			args[0] = clip_get_longest(v->uc->clip_id);
-			//args[0] = (clip_get_endFrame(v->uc->clip_id) - clip_get_startFrame(v->uc->clip_id)) / n;  
-			changed = 1;
-		}
+	char tmp[255];
+	sprintf(prefix, "clip-%04d", v->uc->clip_id);
+	if(!veejay_create_temp_file(prefix, tmp))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot create file %s",
+			tmp);
+		return;
+	}
 
-		if( mkstemp( tmp ) != -1 ) 
+	if( args[0] == 0 )
+	{
+		int n = clip_get_speed(v->uc->clip_id);
+		if( n == 0) 
 		{
-			int format = _recorder_format;
-			if(format==-1)
-			{
-				veejay_msg(VEEJAY_MSG_ERROR,"Set a destination video format first");
-				return; 
-			}
-			// wrong format
-			if( clip_init_encoder( v->uc->clip_id, tmp, format, v->edit_list, args[0]) == 1)
-			{
-				video_playback_setup *s = v->settings;
-				s->clip_record_id = v->uc->clip_id;
-				if(args[1])
-				{
-					s->clip_record_switch = 1;
-				}
-				result = 1;
-			}
-			else
-			{
-				veejay_msg(VEEJAY_MSG_ERROR,"Unable to initialize clip recorder");
-				return;
-			}   
+			veejay_msg(VEEJAY_MSG_INFO, "Clip was paused, forcing normal speed");
+			n = 1;
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to create temporary file name %s",tmp);
-			return;
+			if (n < 0 ) n = n * -1;
 		}
+		args[0] = clip_get_longest(v->uc->clip_id);
+		changed = 1;
 	}
-	else 
+
+	int format = _recorder_format;
+	if(format==-1)
 	{
-		p_invalid_mode();
+		veejay_msg(VEEJAY_MSG_ERROR,"Set a destination video format first");
+		return; 
 	}
+	veejay_msg(VEEJAY_MSG_DEBUG, "Video frames to record: %ld", args[0]);
+
+	if( clip_init_encoder( v->uc->clip_id, tmp, format, v->edit_list, args[0]) == 1)
+	{
+		video_playback_setup *s = v->settings;
+		s->clip_record_id = v->uc->clip_id;
+		if(args[1])
+			s->clip_record_switch = 1;
+		result = 1;
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Unable to initialize clip recorder");
+	}   
+
 	if(changed)
 	{
 		veejay_set_clip(v,v->uc->clip_id);
@@ -3331,17 +3317,10 @@ void vj_event_clip_rec_start( void *ptr, const char format[], va_list ap)
 
 	if(result == 1)
 	{
-		if(changed)
-		{
-			veejay_msg(VEEJAY_MSG_INFO,"Recording editlist frames %d - %d at speed %d  (%d frames and %s)",clip_get_startFrame(v->uc->clip_id),
-				clip_get_endFrame(v->uc->clip_id),clip_get_speed(v->uc->clip_id), args[0],
-				(args[1]==1 ? "autoplay" : "no autoplay")
-			);
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Recording editlist frames starting from %d (%d frames and %s)", v->settings->current_frame_num, args[0], (args[1]==1? "autoplay" : "no autoplay"));
-		}
+		veejay_msg(VEEJAY_MSG_INFO,
+			"Recording editlist frames starting from %d (%d frames and %s)", 
+			v->settings->current_frame_num,
+			args[0], (args[1]==1? "autoplay" : "no autoplay"));
 		v->settings->clip_record = 1;
 		v->settings->clip_record_switch = args[1];
 	}
@@ -3877,10 +3856,18 @@ void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list 
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
+
 	if(CLIP_PLAYING(v)) 
 	{
 	 	if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(clip_exists(args[0]))
 		{
 			if(clip_set_chain_status(args[0],args[1],0)!=-1)
@@ -3894,6 +3881,13 @@ void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list 
 	{
 		if(args[0] == 0) args[0] = v->uc->clip_id;	
 		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(vj_tag_exists(args[0]))
 		{
 			if(vj_tag_set_chain_status(args[0],args[1],0)!=-1)
@@ -3904,137 +3898,6 @@ void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list 
 		}
 	}
 
-}
-void vj_event_chain_entry_enable_audio(void *ptr, const char format[], va_list ap)
-{
-	veejay_msg(VEEJAY_MSG_ERROR,"TODO - No chaining of Audio yet");
-/*
-	veejay_t *v = (veejay_t*)ptr;
-	int args[2];
-	char *str = NULL;
-	P_A(args,str,format,ap);
-
-	if(CLIP_PLAYING(v)) 
-	{
-	 	if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
-		if(clip_exists(args[0]))
-		{
-			if(clip_set_chain_audio(args[0],args[1],1) != -1)
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "Clip %d: Audio on chain entry %d is %s",args[0],args[1],
-					( clip_get_chain_audio(args[0],args[1]) == 1? "Enabled" : "Disabled"));
-			}
-		}
-	}
-	if(TAG_PLAYING(v))
-	{
-		if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
-		if(vj_tag_exists(args[0]))
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Stream: mixing with audio not yet supported");
-		}
-	}
-*/
-}
-
-void vj_event_chain_entry_disable_audio(void *ptr, const char format[], va_list ap)
-{
-	veejay_msg(VEEJAY_MSG_ERROR, "TODO - No chaining of Audio yet");
-/*
-	veejay_t *v = (veejay_t*)ptr;
-	int args[2];
-	char *str = NULL; P_A(args,str,format,ap);
-
-	if(CLIP_PLAYING(v)) 
-	{
-	 	if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
-		if(clip_exists(args[0]))
-		{
-			if(clip_set_chain_audio(args[0],args[1],0) != -1)
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "Stream %d: Audio on chain entry %d is %s",args[0],args[1],
-					( clip_get_chain_audio(args[0],args[1]) == 1? "Enabled" : "Disabled"));
-			}
-		}
-	}
-	if(TAG_PLAYING(v))
-	{
-		if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
-		if(vj_tag_exists(args[0]))
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Stream: mixing with audio not yet supported");
-		}
-	}
-*/
-}
-
-void vj_event_chain_entry_audio_toggle(void *ptr, const char format[], va_list ap) 
-{
-	veejay_msg(VEEJAY_MSG_ERROR, "TODO - No Chaining of Audio yet");
-/*
-	veejay_t *v = (veejay_t*)ptr;
-
-	if(CLIP_PLAYING(v)) 
-	{
-		int c = clip_get_selected_entry(v->uc->clip_id);
-		clip_set_chain_audio(v->uc->clip_id, c, !(clip_get_chain_audio(v->uc->clip_id,c)));
-		veejay_msg(VEEJAY_MSG_INFO, "%s audio mixing with chain entry %d",	
-			(clip_get_chain_audio(v->uc->clip_id,c) == 1 ? "Enabled" : "Disabled"),
-			c); 
-	}
-*/
-}
-
-
-void vj_event_chain_entry_audio_volume(void *ptr, const char format[], va_list ap)
-{
-	veejay_msg(VEEJAY_MSG_ERROR, "TODO - No chaining of Audio yet");
-/*
-
-	veejay_t *v = (veejay_t*)ptr;
-	int args[3];
-	char *str = NULL; P_A(args,str,format,ap);
-	if(CLIP_PLAYING(v)) 
-	{
-	 	if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
-		if(clip_exists(args[0]))
-		{
-			clip_set_chain_volume(args[0],args[1], args[2]);
-			veejay_msg(VEEJAY_MSG_INFO, "Clip %d, Setted volume to %d on entry %d",args[0],args[2],args[1]);
-		}
-	}
-	if(TAG_PLAYING(v) && vj_tag_exists(args[0]))
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Stream: Setting of audio volume not yet supported");
-	}
-*/
-}
-
-
-
-void vj_event_chain_entry_audio_vol_inc(void *ptr, const char format[], va_list ap) 
-{
-	int args[1];
-	veejay_t *v = (veejay_t*)ptr;
-
-	char *str = NULL; P_A(args,str,format,ap);
-	if(CLIP_PLAYING(v))
-	{
-		int c = clip_get_selected_entry(v->uc->clip_id);
-		int vol = clip_get_chain_volume(v->uc->clip_id,c);
-		vol += args[0];
-		clip_set_chain_volume(v->uc->clip_id,c, vol);
-		veejay_msg(VEEJAY_MSG_INFO, "Setted volume to %d on entry %d",vol,c);
-	}
-	if(TAG_PLAYING(v))
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Stream: Increment audio volume not yet supported");
-	}
 }
 
 void	vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap)
@@ -4077,7 +3940,7 @@ void	vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap)
 	}
 
 }
-//out
+
 void vj_event_chain_fade_in(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -4116,7 +3979,6 @@ void vj_event_chain_fade_in(void *ptr, const char format[], va_list ap)
 
 }
 
-//in
 void vj_event_chain_fade_out(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -4204,6 +4066,12 @@ void vj_event_chain_entry_del(void *ptr, const char format[], va_list ap)
 	{
 	 	if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(clip_exists(args[0]))
 		{
 			int effect = clip_get_effect_any(args[0],args[1]);
@@ -4221,6 +4089,12 @@ void vj_event_chain_entry_del(void *ptr, const char format[], va_list ap)
 	{
 		if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(vj_tag_exists(args[0])) 		
 		{
 			int effect = vj_tag_get_effect_any(args[0],args[1]);
@@ -4252,6 +4126,13 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 	 	if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[0] == -1) args[0] = clip_size()-1;
 		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(clip_exists(args[0]))
 		{
 			//int real_id = vj_effect_real_to_sequence(args[2]);
@@ -4272,6 +4153,13 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 		if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[0] == -1) args[0] = vj_tag_size()-1;
 		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);	
+
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(vj_tag_exists(args[0]))
 		{
 			if(vj_tag_set_effect(args[0],args[1], args[2]) != -1)
@@ -4382,19 +4270,18 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 	veejay_t *v = (veejay_t*)ptr;
 	memset(args,0,16); 
 	P_A16(args,format,ap);
-//        DUMP_ARG(args);
-
-	int i;
-	for( i = 0; i < 16; i ++ )
-	{
-		veejay_msg(VEEJAY_MSG_INFO," arg %d = %d", i, args[i]);
-	}
 
 	if(CLIP_PLAYING(v)) 
 	{
 	    int num_p = 0;
 	 	if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(clip_exists(args[0]))
 		{
 			int real_id = args[2];
@@ -4450,6 +4337,12 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 	{
 		if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(vj_tag_exists(v->uc->clip_id)) 
 		{
 			int real_id = args[2];
@@ -4584,20 +4477,19 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	int args[3];
-	char *str = NULL; P_A(args,str,format,ap);
-	
-	
+	char *str = NULL;
+	P_A(args,str,format,ap);
 
-	//DUMP_ARG(args);
-	if(args[1] != -1)
-	if(!(args[1] >= 0 && args[1]<= CLIP_MAX_EFFECTS))
-	{//woops.. forget this one. FIXME (all events args[1] chain entry)
-		return;
-	}
 	if(CLIP_PLAYING(v)) 
 	{
 	 	if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(clip_exists(args[0]))
 		{
 			int src = args[2];
@@ -4645,6 +4537,11 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 	{
 		if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
 
 		if(vj_tag_exists(args[0]))
 		{
@@ -4914,6 +4811,12 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 	{
 	 	if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(clip_exists(args[0]))
 		{
 			int src = clip_get_chain_source( args[0],args[1]);
@@ -4947,6 +4850,12 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 	{
 		if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(vj_tag_exists(args[0]))
 		{
 			int src = vj_tag_get_chain_source(args[0],args[1]);
@@ -4990,6 +4899,12 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 	 	if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[0] == -1) args[0] = clip_size()-1;
 		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(clip_exists(args[0]))
 		{
 			if(args[2] == VJ_TAG_TYPE_NONE)
@@ -5021,8 +4936,13 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 	{
 		if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[0] == -1) args[0] = clip_size()-1;
-
 		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 	 	if(vj_tag_exists(args[0])) 
 		{
 			if(args[2] == VJ_TAG_TYPE_NONE)
@@ -5085,25 +5005,11 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 				veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0],(val+args[1]));
 			}
 		   }
-	/*
-		   else 
+		   if(clip_set_effect_arg( v->uc->clip_id, c,args[0],tval) )
 		   {
-			if( (val+args[1]) >= vj_effect_get_max_limit( effect, args[0]))
-			{
-				args[1] = vj_effect_get_min_limit( effect, args[0]);
-			}
-			if ( (val+args[1]) <= vj_effect_get_min_limit(effect, args[0])) 
-			{
-				args[1] = vj_effect_get_max_limit(effect, args[0]);
-			}
-*/
-			if(clip_set_effect_arg( v->uc->clip_id, c,args[0],tval) )
-			{
-				veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0],tval);
-			}
+			veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0],tval);
+		   }
 				
-			
-		//   }
 		}
 	}
 	if(TAG_PLAYING(v)) 
@@ -5121,35 +5027,10 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 				tval = vj_effect_get_max_limit( effect,args[0] );
 
 	
-/*		if( vj_effect_valid_value( effect,args[0],(val+args[1]) )  )
+		if(vj_tag_set_effect_arg(v->uc->clip_id, c, args[0], tval) )
 		{
-			if(vj_tag_set_effect_arg(v->uc->clip_id, c, args[0], (val+args[1])) )
-			{
-				veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0],(val+args[1]));
-			}
+			veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0], tval );
 		}
-		else
-		{
-			if ( (val+args[1]) > vj_effect_get_max_limit( effect,args[0] ))
-			{
-				args[1] = vj_effect_get_min_limit( effect,args[0] );
-			}
-			if ( (val+args[1]) < vj_effect_get_min_limit( effect, args[0] ))
-			{
-				args[1] = vj_effect_get_max_limit( effect, args[0] );
-			}
-			if( clip_set_effect_arg( v->uc->clip_id, c,args[0],args[1]) )
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "Set parameter %d to value %d",args[0],args[1]);
-			}
-		}
-*/
-			if(vj_tag_set_effect_arg(v->uc->clip_id, c, args[0], tval) )
-			{
-				veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0], tval );
-			}
-
-		
 	}
 }
 
@@ -5163,8 +5044,13 @@ void vj_event_chain_entry_set_arg_val(void *ptr, const char format[], va_list ap
 	{
 	 	if(args[0] == 0) args[0] = v->uc->clip_id;
 		if(args[0] == -1) args[0] = clip_size()-1;
-
 		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(clip_exists(args[0]))
 		{
 			int effect = clip_get_effect_any( args[0], args[1] );
@@ -5184,8 +5070,13 @@ void vj_event_chain_entry_set_arg_val(void *ptr, const char format[], va_list ap
 	if(TAG_PLAYING(v))
 	{
 		if(args[0] == 0) args[0] = v->uc->clip_id;
-
 		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(v_chi(args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
+			return;
+		}
+
 		if(vj_tag_exists(args[0]))
 		{
 			int effect = vj_tag_get_effect_any(args[0],args[1] );
@@ -5621,48 +5512,56 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 
 static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
 {
-	if( TAG_PLAYING(v))
+	if(!TAG_PLAYING(v))
 	{
-		char tmp[255];
-		if(args[0] <= 0) 
-		{
-			veejay_msg(VEEJAY_MSG_ERROR,"Number of frames to record must be > 0");
-			return;
-		}
-		if(args[1] < 0 || args[1] > 1)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR,"Auto play is either on or off");
-			return;
-		}	
-		//todo: let user set base filename for recording
-		sprintf(tmp, "tag-%d-%d-XXXXXX", v->uc->clip_id, args[0]);
-		if( mkstemp(tmp) != -1)
-		{
-			int format = _recorder_format;
-			if(_recorder_format == -1)
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Set a destination format first");
-				return;
-			}
-			veejay_msg(VEEJAY_MSG_INFO, "Base name [%s]", tmp);	
-			if( vj_tag_init_encoder( v->uc->clip_id, tmp, format,		
-				args[0]) != 1 ) 
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "Error trying to start recording from stream %d", v->uc->clip_id);
-				vj_tag_stop_encoder(v->uc->clip_id);
-				v->settings->tag_record = 0;
-				return;
-			} 
-
-			if(args[1]==0) 
-				v->settings->tag_record_switch = 0;
-			else
-				v->settings->tag_record_switch = 1;
-
-			v->settings->tag_record = 1;
-	//		v->settings->tag_record_id = v->uc->clip_id;
-		}
+		p_invalid_mode();
+		return;
 	}
+
+	char tmp[255];
+	char prefix[20];
+	if(args[0] <= 0) 
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Number of frames to record must be > 0");
+		return;
+	}
+
+	if(args[1] < 0 || args[1] > 1)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Auto play is either on or off");
+		return;
+	}	
+	sprintf(prefix,"stream-%02d", v->uc->clip_id);
+	//todo: let user set base filename for recording
+	if(! veejay_create_temp_file(prefix, tmp )) 
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot create temporary file %s", tmp);
+		return;
+	}
+
+	int format = _recorder_format;
+	if(_recorder_format == -1)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Set a destination format first");
+		return;
+	}
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Base name [%s]", tmp);	
+	if( vj_tag_init_encoder( v->uc->clip_id, tmp, format,		
+			args[0]) != 1 ) 
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Error trying to start recording from stream %d", v->uc->clip_id);
+		vj_tag_stop_encoder(v->uc->clip_id);
+		v->settings->tag_record = 0;
+		return;
+	} 
+
+	if(args[1]==0) 
+		v->settings->tag_record_switch = 0;
+	else
+		v->settings->tag_record_switch = 1;
+
+	v->settings->tag_record = 1;
 }
 
 void vj_event_tag_rec_start(void *ptr, const char format[], va_list ap)
@@ -5758,28 +5657,35 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 	if( vj_tag_exists(args[0]))
 	{
 		char tmp[255];
+		char time[20];
 		int format = _recorder_format;
-		sprintf(tmp, "stream-%d-%d-XXXXXX", args[0], args[1]);
-		if( mkstemp(tmp) != -1)
+		char prefix[40];
+		sprintf(prefix, "stream-%02d", args[0]);
+
+		if(!veejay_create_temp_file(prefix, tmp ))
 		{
-			if(format==-1)
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Set a destination format first");
-				return;
-			}
-			if( vj_tag_init_encoder( args[0], tmp, format,		
-				args[1]) ) 
-			{
-				video_playback_setup *s = v->settings;
-				veejay_msg(VEEJAY_MSG_INFO, "(Offline) recording from stream %d", args[0]);
-				s->offline_record = 1;
-				s->offline_tag_id = args[0];
-				s->offline_created_clip = args[2];
-			} 
-			else
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "(Offline) error starting recording stream %d",args[0]);
-			}
+			veejay_msg(VEEJAY_MSG_ERROR, "Error creating temporary file %s", tmp);
+			return;
+		}
+
+		if(format==-1)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Set a destination format first");
+			return;
+		}
+	
+		if( vj_tag_init_encoder( args[0], tmp, format,		
+			args[1]) ) 
+		{
+			video_playback_setup *s = v->settings;
+			veejay_msg(VEEJAY_MSG_INFO, "(Offline) recording from stream %d", args[0]);
+			s->offline_record = 1;
+			s->offline_tag_id = args[0];
+			s->offline_created_clip = args[2];
+		} 
+		else
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "(Offline) error starting recording stream %d",args[0]);
 		}
 	}
 	else
