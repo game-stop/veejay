@@ -450,6 +450,10 @@ int	_vj_server_parse_msg( vj_server *vje,int link_id, char *buf, int buf_len )
 	vj_message **v = Link[link_id]->m_queue;
 	while( i < buf_len )
 	{
+
+		while( buf[i] != 'V' && buf[i+4] != 'D' )
+			i++;
+
 		if( buf[i] == 'V' && buf[i+4] == 'D' )
 		{
 			int len, n;
@@ -467,7 +471,6 @@ int	_vj_server_parse_msg( vj_server *vje,int link_id, char *buf, int buf_len )
 				num_msg ++; 
 			}
 		}
-		i ++;		
 	}
 	Link[link_id]->n_queued = num_msg;
 	Link[link_id]->n_retrieved = 0;
@@ -548,6 +551,9 @@ int	vj_server_update( vj_server *vje, int id )
 			return -1;
 		}
 	}
+
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "data in buffer : [%s]", vje->recv_buf );
 
 	return _vj_server_parse_msg( vje, id, vje->recv_buf,n );	
 }
