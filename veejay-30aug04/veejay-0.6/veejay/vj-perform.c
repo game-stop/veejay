@@ -51,6 +51,8 @@ extern void *(* veejay_memcpy)(void *to, const void *from, size_t len) ;
 #define PERFORM_AUDIO_SIZE 16384
 static int simple_frame_duplicator;
 
+static int performer_framelen = 0;
+
 struct ycbcr_frame {
     uint8_t *Y;
     uint8_t *Cb;
@@ -333,10 +335,10 @@ int vj_perform_increase_clip_frame(veejay_t * info, long num)
 
 static int vj_perform_el_buff_alloc(veejay_t *info,int frame,int c)
 {
-    sec_buff[0]->row[c] = (uint8_t*) vj_malloc (sizeof(uint8_t) * (EL_MIN_BUF));
-    memset( sec_buff[0]->row[c], 0, EL_MIN_BUF);
+    sec_buff[0]->row[c] = (uint8_t*) vj_malloc (sizeof(uint8_t) * (performer_framelen));
+    memset( sec_buff[0]->row[c], 0, performer_framelen);
     if(!sec_buff[0]->row[c]) return 0;
-    return (EL_MIN_BUF);
+    return (performer_framelen);
 }
 static void vj_perform_el_buff_free(veejay_t *info,int c) 
 {
@@ -512,9 +514,10 @@ int vj_perform_init(veejay_t * info)
     int i,c;
 
     // buffer used to store encoded frames (for plain and clip mode)
-    top_buff = (uint8_t*)   vj_malloc( sizeof(uint8_t) * EL_MIN_BUF); 
+    top_buff = (uint8_t*)   vj_malloc( sizeof(uint8_t) * frame_len*2); 
     if(!top_buff) return 0;
-    memset( top_buff, 0, EL_MIN_BUF );
+    memset( top_buff, 0, frame_len *2);
+    performer_framelen = frame_len *2;
 
     // chain entry buffers used to store encoded frames
     sec_buff = (el_row**) vj_malloc(sizeof(el_row*) );
