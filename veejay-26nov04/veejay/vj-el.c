@@ -88,11 +88,12 @@ static vj_decoder *_el_new_decoder( int id , int width, int height, float fps, i
 		if(d->codec)
 		{
 			d->context = avcodec_alloc_context();
-			d->frame =   avcodec_alloc_frame();
+			//d->frame =   avcodec_alloc_frame();
 			d->context->width = width;
 			d->context->height= height;
 			d->context->frame_rate = fps;
 			d->context->pix_fmt = (pixel_format==FMT_420 ? PIX_FMT_YUV420P : PIX_FMT_YUV422P);
+			d->frame = avcodec_alloc_frame();
 		}
 		else
 		{
@@ -161,64 +162,24 @@ static int _el_lav_fallback( char *filename )
 	return 0;
 }
 
-static int _el_probe_for_pixel_fmt( char *filename )
+static int _el_probe_for_pixel_fmt( lav_file_t *fd )
 {
 	int pix_fmt = -1;
- 	char *name;
-	vj_avformat *tmp = vj_avformat_open_input(filename);
-	if(!tmp)
+	if(!fd) return -1;
+	if( fd->MJPG_chroma == CHROMA420 )
+		return PIX_FMT_YUV420P;
+	if( fd->MJPG_chroma == CHROMA422 )
+		return PIX_FMT_YUV422P;
+	if( fd->MJPG_chroma == CHROMA444 )
 	{
-	 veejay_msg(VEEJAY_MSG_WARNING,"Cannot probe with avformat in %s",filename);
-	 /* check if we can open the file with lav */
- 	 if(_el_lav_fallback(filename))
-	 {
-		pix_fmt = PIX_FMT_YUV420P;
-	 }
-	 else
-	 {
-		return -1; 
-	 }
+		veejay_msg(VEEJAY_MSG_WARNING, "YUV 4:4:4 is not supported yet. ");
+		return PIX_FMT_YUV422P;
 	}
-	else
-	{
-		pix_fmt = vj_avformat_get_video_pixfmt(tmp);
-	}
+	if( fd->MJPG_chroma == CHROMAUNKNOWN )
+		return PIX_FMT_YUV420P;
 
-	name = (char*)avcodec_get_pix_fmt_name( pix_fmt );
-	veejay_msg(VEEJAY_MSG_DEBUG, "Video is in %s pixel format", name);
-	if(tmp) vj_avformat_close_input(tmp);
-	return pix_fmt;
+	return -1;
 }
-
-static int _el_probe_for_gop_size( char *filename )
-{
-	int gop_size = -1;
-	int codec_id = -1;
- 	char *name;
-	vj_avformat *tmp = vj_avformat_open_input(filename);
-	if(!tmp)
-	{
-	 if(_el_lav_fallback( filename ))
-	 {
-		gop_size = 0;
-		return gop_size;
-	 }
-	 else
-	 {
-	 	return -1;
-	 }
-	}
-	else
-	{
-		codec_id = vj_avformat_get_video_codec( tmp );
-		if(codec_id == CODEC_ID_MJPEG || codec_id == CODEC_ID_DVVIDEO )
-			return 0;
-		gop_size = vj_avformat_get_video_gop_size(tmp);
-		vj_avformat_close_input(tmp);
-	}
-	return gop_size;
-}
-
 
 
 // this method should add a new producer to the playlist
@@ -246,28 +207,6 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		veejay_msg(VEEJAY_MSG_ERROR ,"Cannot deduce real filename");
 		return -1;
     }
-	/* Probe file for validation */
-    	gop_size = _el_probe_for_gop_size( filename );
-	if(gop_size != 0 )
-	{
-	    if(gop_size < 0)
-			return -1;
-		if(!force)
-		{
-			return -1;  
-		}
-	}
-    /* Check if this filename is allready present */
-	pix_fmt = _el_probe_for_pixel_fmt(realname);
-	if(pix_fmt == -1)
-	{
-		return -1;
-	}
-
-	if(!el->pixel_format)
-	{
-		el->pixel_format = pix_fmt;
-	}
     for (i = 0; i < el->num_video_files; i++)
 		if (strcmp(realname, el->video_file_list[i]) == 0)
 		{
@@ -320,6 +259,26 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	{ /* set chroma */
   	  el->MJPG_chroma = _fc;
 	  chroma = _fc;
+	}
+	pix_fmt = _el_probe_for_pixel_fmt( el->lav_fd[n] );
+	if(pix_fmt < 0)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to determine pixel format");
+		return -1;
+	}
+
+	if(el->pixel_format != -1)
+	{
+		el->pixel_format = pix_fmt;
+	}
+	else
+	{
+			// check on sanity
+			if( pix_fmt > el->pixel_format)
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Cannot handle mixed 4:2:2 and 4:2:0 editlists");
+				return -1;
+			}
 	}
 
     el->num_frames[n] = lav_video_frames(el->lav_fd[n]);
@@ -382,7 +341,9 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		lav_video_clipaspect(el->lav_fd[n],
 				       &el->video_sar_width,
 				       &el->video_sar_height);
-		if (!el->video_norm) {
+
+		if (!el->video_norm)
+		{
 		    /* TODO: This guessing here is a bit dubious but it can be over-ridden */
 		    if (el->video_fps > 24.95 && el->video_fps < 25.05)
 			el->video_norm = 'p';
@@ -523,11 +484,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 	if(decoder_id == 0)	
 	{
-		if( _el_probe_for_pixel_fmt(filename) >= 0)
-		{
-			return -2; 
-		}
-		veejay_msg(VEEJAY_MSG_ERROR, "Dont know how to handle %s ", compr_type);
+		veejay_msg(VEEJAY_MSG_ERROR, "Dont know how to handle %s (fmt %d)", compr_type, pix_fmt);
 		return -1;
 	}
 
@@ -815,6 +772,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 
 	memset( el, 0, sizeof(editlist) );  
 	el->has_audio = 0; 
+	el->pixel_format = -1;
 	el->has_video = 1; //assume we get it   
 	el->MJPG_chroma = CHROMA420;
     /* Check if a norm parameter is present */
@@ -1089,7 +1047,7 @@ editlist *vj_el_probe_from_file( char *filename )
 	editlist *el = vj_malloc(sizeof(editlist));
 	if(!el) return NULL;
 	memset(el, 0, sizeof(editlist));
-
+	el->pixel_format = -1;
 	int pix_fmt = -1;
  	char *name;
 	vj_avformat *tmp = vj_avformat_open_input(filename);

@@ -358,15 +358,8 @@ static void check_command_line_options(int argc, char *argv[])
     if(!info->dump)
        if(veejay_open_files(info, argv + optind, argc - optind,override_fps, force_video_file, override_pix_fmt)<=0)
        {
-	//veejay_msg(VEEJAY_MSG_ERROR, "Cannot start veejay");
-	//try avformat
-		char *filename = (char*) argv[optind];
-		if(!veejay_dummy_open(info, override_fps, filename, override_pix_fmt))
-		{
-			exit(1);
-		}
-		dummy_mode = 1;
-		strcpy( dummy_filename, filename);
+	veejay_msg(VEEJAY_MSG_ERROR, "Cannot start veejay");
+	exit(-1);
        }
 
      

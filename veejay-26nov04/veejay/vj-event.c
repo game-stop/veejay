@@ -1402,6 +1402,7 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 {
 	char args[150];
 	int net_id=0;
+	int len = 0;
 	bzero(args,150);  
 
 	/* message is at least 5 bytes in length */
@@ -1431,7 +1432,7 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 	}
 
 	/* 4th position is ':' */
-	if( msg[3] != ':' )
+	if( msg[3] != 0x3a )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Unexpected character '%c' must be ':' to indicate start of argument list ",
 			msg[3]);
@@ -1475,16 +1476,17 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 
 		return;
 	}
-
+	len = strlen(msg)-1;
+	veejay_msg(VEEJAY_MSG_DEBUG, "[%s] %d bytes [%x]", msg, len,(char) msg[ len ]);
 	/* message must end with ';' */
-	if( msg[strlen(msg)-1] != ';')
+	if( msg[len] != 0x3b)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Unexpected character '%c' must be ';' to indicate end of message",msg[strlen(msg)-1]);
+		veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Unexpected character '%c' must be ';' to indicate end of message",msg[len]);
 		return;
 	}
 
 	/* remove ';' from string */
-	msg[strlen(msg)-1] = '\0';	
+	msg[len] = '\0';	
 
 	if( strlen(msg) == (MSG_MIN_LEN-1) )
 	{
