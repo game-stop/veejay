@@ -23,6 +23,9 @@
  * libdv's 4:2:2-packed into 4:2:0 planar 
  * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)
  */
+
+
+
 void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 		int width, int height)
 {
@@ -74,41 +77,6 @@ void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 
     }
 }
-
-void yuy2toyv16(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
-		int width, int height)
-{
-
-    int i, j, w2;
-    uint8_t *y, *u, *v;
-
-    w2 = width / 2;
-	// *input is in 420
-    //YV16
-    y = _y;
-    v = _v;
-    u = _u;
-
-    for( i = 0; i < (width * height)/2; i ++)
-    {
-	*(y++) = *(input++);
-	*(u++) = *(input++);
-	*(y++) = *(input++);
-	*(v++) = *(input++);
-    }
-	/*
-    for (i = 0; i < height; i +=2)
-    {
-	for (j = 0; j < w2; j++) {
-	    *(y++) = *(input++);
-	    *(u++) = *(input++);
-	    *(y++) = *(input++);
-	    *(v++) = *(input++);
-	}
-    }
-	*/
-
-}
 /* convert 4:2:0 to yuv 4:2:2 packed */
 void yuv422p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
 		       int height)
@@ -159,7 +127,169 @@ void yuv420p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
     }
 }
 
-/* convert yuv422 planar to YUYV */
+#ifdef HAVE_MMX 
+#include "mmx_macros.h"
+#include "mmx.h"
+
+/*****************************************************************
+
+  _yuv_yuv_mmx.c
+
+  Copyright (c) 2001-2002 by Burkhard Plaum - plaum@ipf.uni-stuttgart.de
+
+  http://gmerlin.sourceforge.net
+
+  This program is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with this program; if not, write to the Free Software
+  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111, USA.
+
+
+	- took yuy2 -> planar 422 and 422 planar -> yuy2 mmx conversion
+							     routines.
+	  (Niels, 02/2005)
+
+*****************************************************************/
+
+static mmx_t mmx_00ffw =   { 0x00ff00ff00ff00ffLL };
+
+#ifdef MMXEXT
+#define MOVQ_R2M(reg,mem) movntq_r2m(reg, mem)
+#else
+#define MOVQ_R2M(reg,mem) movq_r2m(reg, mem)
+#endif
+
+#define PLANAR_TO_YUY2   movq_m2r(*src_y, mm0);/*   mm0: Y7 Y6 Y5 Y4 Y3 Y2 Y1 Y0 */\
+                         movd_m2r(*src_u, mm1);/*   mm1: 00 00 00 00 U6 U4 U2 U0 */\
+                         movd_m2r(*src_v, mm2);/*   mm2: 00 00 00 00 V6 V4 V2 V0 */\
+                         pxor_r2r(mm3, mm3);/*      Zero mm3                     */\
+                         movq_r2r(mm0, mm7);/*      mm7: Y7 Y6 Y5 Y4 Y3 Y2 Y1 Y0 */\
+                         punpcklbw_r2r(mm3, mm0);/* mm0: 00 Y3 00 Y2 00 Y1 00 Y0 */\
+                         punpckhbw_r2r(mm3, mm7);/* mm7: 00 Y7 00 Y6 00 Y5 00 Y4 */\
+                         pxor_r2r(mm4, mm4);     /* Zero mm4                     */\
+                         punpcklbw_r2r(mm1, mm4);/* mm4: U6 00 U4 00 U2 00 U0 00 */\
+                         pxor_r2r(mm5, mm5);     /* Zero mm5                     */\
+                         punpcklbw_r2r(mm2, mm5);/* mm5: V6 00 V4 00 V2 00 V0 00 */\
+                         movq_r2r(mm4, mm6);/*      mm6: U6 00 U4 00 U2 00 U0 00 */\
+                         punpcklwd_r2r(mm3, mm6);/* mm6: 00 00 U2 00 00 00 U0 00 */\
+                         por_r2r(mm6, mm0);      /* mm0: 00 Y3 U2 Y2 00 Y1 U0 Y0 */\
+                         punpcklwd_r2r(mm3, mm4);/* mm4: 00 00 U6 00 00 00 U4 00 */\
+                         por_r2r(mm4, mm7);      /* mm7: 00 Y7 U6 Y6 00 Y5 U4 Y4 */\
+                         pxor_r2r(mm6, mm6);     /* Zero mm6                     */\
+                         punpcklwd_r2r(mm5, mm6);/* mm6: V2 00 00 00 V0 00 00 00 */\
+                         por_r2r(mm6, mm0);      /* mm0: V2 Y3 U2 Y2 V0 Y1 U0 Y0 */\
+                         punpckhwd_r2r(mm5, mm3);/* mm3: V6 00 00 00 V4 00 00 00 */\
+                         por_r2r(mm3, mm7);      /* mm7: V6 Y7 U6 Y6 V4 Y5 U4 Y4 */\
+                         MOVQ_R2M(mm0, *dst);\
+                         MOVQ_R2M(mm7, *(dst+8));
+
+
+#define YUY2_TO_YUV_PLANAR movq_m2r(*src,mm0);\
+                           movq_m2r(*(src+8),mm1);\
+                           movq_r2r(mm0,mm2);/*       mm2: V2 Y3 U2 Y2 V0 Y1 U0 Y0 */\
+                           pand_m2r(mmx_00ffw,mm2);/* mm2: 00 Y3 00 Y2 00 Y1 00 Y0 */\
+                           pxor_r2r(mm4, mm4);/*      Zero mm4 */\
+                           packuswb_r2r(mm4,mm2);/*   mm2: 00 00 00 00 Y3 Y2 Y1 Y0 */\
+                           movq_r2r(mm1,mm3);/*       mm3: V6 Y7 U6 Y6 V4 Y5 U4 Y4 */\
+                           pand_m2r(mmx_00ffw,mm3);/* mm3: 00 Y7 00 Y6 00 Y5 00 Y4 */\
+                           pxor_r2r(mm6, mm6);/*      Zero mm6 */\
+                           packuswb_r2r(mm3,mm6);/*   mm6: Y7 Y6 Y5 Y4 00 00 00 00 */\
+                           por_r2r(mm2,mm6);/*        mm6: Y7 Y6 Y5 Y4 Y3 Y2 Y1 Y0 */\
+                           psrlw_i2r(8,mm0);/*        mm0: 00 V2 00 U2 00 V0 00 U0 */\
+                           psrlw_i2r(8,mm1);/*        mm1: 00 V6 00 U6 00 V4 00 U4 */\
+                           packuswb_r2r(mm1,mm0);/*   mm0: V6 U6 V4 U4 V2 U2 V0 U0 */\
+                           movq_r2r(mm0,mm1);/*       mm1: V6 U6 V4 U4 V2 U2 V0 U0 */\
+                           pand_m2r(mmx_00ffw,mm0);/* mm0: 00 U6 00 U4 00 U2 00 U0 */\
+                           psrlw_i2r(8,mm1);/*        mm1: 00 V6 00 V4 00 V2 00 V0 */\
+                           packuswb_r2r(mm4,mm0);/*   mm0: 00 00 00 00 U6 U4 U2 U0 */\
+                           packuswb_r2r(mm4,mm1);/*   mm1: 00 00 00 00 V6 V4 V2 V0 */\
+                           MOVQ_R2M(mm6, *dst_y);\
+                           movd_r2m(mm0, *dst_u);\
+                           movd_r2m(mm1, *dst_v);
+
+void	yuv422_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
+{
+	int j,jmax,imax,i;
+	uint8_t *dst = dstI;
+	uint8_t *src_y = src[0];
+	uint8_t *src_u = src[1];
+	uint8_t *src_v = src[2];
+	
+	jmax = w / 8;
+	imax = h;
+
+	for( i = 0; i < imax ;i ++ )
+	{
+		for( j = 0; j < jmax ; j ++ )
+		{
+			PLANAR_TO_YUY2
+			dst += 16;
+			src_y += 8;
+			src_u += 4;
+			src_v += 4;
+		}
+	}
+
+	emms();
+}
+
+
+void	yuy2toyv16(uint8_t *dst_y, uint8_t *dst_u, uint8_t *dst_v, uint8_t *srcI, int w, int h )
+{
+	int j,jmax,imax,i;
+	uint8_t *src = srcI;
+	
+	jmax = w / 8;
+	imax = h;
+
+	for( i = 0; i < imax ;i ++ )
+	{
+		for( j = 0; j < jmax ; j ++ )
+		{
+			YUY2_TO_YUV_PLANAR;
+			src += 16;
+			dst_y += 8;
+			dst_u += 4;
+			dst_v += 4;
+		}
+	}
+	
+}
+
+#else
+
+// non mmx functions
+
+void yuy2toyv16(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
+		int width, int height)
+{
+
+    int i, j, w2;
+    uint8_t *y, *u, *v;
+
+    w2 = width / 2;
+
+    //YV16
+    y = _y;
+    v = _v;
+    u = _u;
+
+    for (i = 0; i < height; i ++ )
+    {
+	for (j = 0; j < w2; j++) {
+	    /* packed YUV 422 is: Y[i] U[i] Y[i+1] V[i] */
+	    *(y++) = *(input++);
+	    *(u++) = *(input++);
+	    *(y++) = *(input++);
+	    *(v++) = *(input++);
+	}
+    }
+}
+
 void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
 {
     int x,y;
@@ -171,18 +301,6 @@ void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
 		Y = yuv422[0] + y * w;
 		U = yuv422[1] + (y>>1) * w;
 		V = yuv422[2] + (y>>1) * w;
-	/*	for(x=0; x < w; x+= 2)
-		{
-			*(pixels + 0) = Y[0];
-			*(pixels + 1) = U[0];
-			*(pixels + 2) = Y[1];
-			*(pixels + 3) = V[0];
-			pixels += 4;
-			Y+=2;
-			++U;
-			++V;
-		}
-	*/
 		for( x = 0 ; x < w ; x += 4 )
 		{
 			*(pixels + 0) = Y[0];
@@ -200,6 +318,8 @@ void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
 		}
     }
 }
+#endif
+
 
 /* lav_common - some general utility functionality used by multiple
 	lavtool utilities. */
@@ -214,15 +334,6 @@ void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
  *   subtly incorrect or just plain Wrong.  Feedback is welcome.
  */
 
-
-/***********************
- *
- * Take a random(ish) clipd mean of a frame luma and chroma
- * Its intended as a rough and ready hash of frame content.
- * The idea is that changes above a certain threshold are treated as
- * scene changes.
- *
- **********************/
 
 int luminance_mean(uint8_t * frame[], int w, int h)
 {

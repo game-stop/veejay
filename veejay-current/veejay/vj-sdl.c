@@ -237,6 +237,8 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
     else
     {
 		yuv422_to_yuyv( yuv420, vjsdl->yuv_overlay->pixels[0], vjsdl->width,vjsdl->height);
+
+
 /*
     int w = vjsdl->width;
     int h = vjsdl->height;
