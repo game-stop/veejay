@@ -3907,7 +3907,7 @@ void vj_event_chain_entry_video_toggle(void *ptr, const char format[], va_list a
 		{	
 			clip_set_chain_status(v->uc->clip_id, c,0);
 		}
-		veejay_msg(VEEJAY_MSG_INFO, "Video on chain entry %d is %s", clip_get_chain_status(v->uc->clip_id,c),
+		veejay_msg(VEEJAY_MSG_INFO, "Video on chain entry %d is %s", c,
 			(flag==0 ? "Disabled" : "Enabled"));
 	}
 	if(TAG_PLAYING(v))
@@ -3922,7 +3922,7 @@ void vj_event_chain_entry_video_toggle(void *ptr, const char format[], va_list a
 		{	
 			vj_tag_set_chain_status(v->uc->clip_id, c,0);
 		}
-		veejay_msg(VEEJAY_MSG_INFO, "Video on chain entry %d is %s", vj_tag_get_chain_status(v->uc->clip_id,c),
+		veejay_msg(VEEJAY_MSG_INFO, "Video on chain entry %d is %s", c,
 			(flag==0 ? "Disabled" : "Enabled"));
 
 	}
