@@ -182,7 +182,7 @@ static void Usage(char *progname)
 	fprintf(stderr,"  -H/--height   \t\tdummy height\n");
 	fprintf(stderr,"  -N/--norm		\t\tdummy norm\n");
 	fprintf(stderr,"  -R/--framerate \t\tdummy frame rate\n");
-
+	fprintf(stderr,"  -M/--multicast \t\tmulticast\n");
     exit(-1);
 }
 
@@ -215,6 +215,10 @@ static int set_option(const char *name, char *value)
 	}
 	} else if (strcmp(name, "gui") == 0 || strcmp(name, "g") == 0) {
 	     info->video_out = -1;
+	} else if (strcmp(name, "multicast") == 0 || strcmp(name, "M") == 0 )
+	{
+		info->settings->use_mcast = 1;
+		info->settings->group_name = strdup( optarg );
 	} else if (strcmp(name, "sample-mode" ) == 0 || strcmp(name, "m" ) == 0)
 	{
 		veejay_set_sampling( info,atoi(optarg));
@@ -346,6 +350,7 @@ static void check_command_line_options(int argc, char *argv[])
 	{"norm",1,0,0},
 	{"framerate",1,0,0},
 	{"ycbcr",0,0,0},
+	{"multicast",1,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -359,12 +364,12 @@ static void check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:V:s:c:t:l:C:p:m:x:y:nLFPXY:VugrvdibIjf:N:H:W:R:",
+			"o:G:O:a:H:V:s:c:t:l:C:p:m:x:y:nLFPXY:VugrvdibIjf:N:H:W:R:M:",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   "o:G:s:O:a:c:t:l:t:C:x:y:m:p:nLFPXY:VY:vudgibrIjf:N:H:W:R:")) != EOF)
+		   "o:G:s:O:a:c:t:l:t:C:x:y:m:p:nLFPXY:VY:vudgibrIjf:N:H:W:R:M:")) != EOF)
 #endif
     {
 	switch (n) {
