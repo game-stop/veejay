@@ -114,9 +114,6 @@ int vj_v4lvideo_init(v4l_video * v4l, char *filename, int channel,
 	    return -1;
 	}
 	if (vj_v4l_video_palette_ok(v4l, palette) == -1) {
-	    veejay_msg(VEEJAY_MSG_ERROR,
-		       "Unable to find a supported pixel format\n");
-		return -1;
 	}
 
 	v4lgetpicture(v4l->device);
