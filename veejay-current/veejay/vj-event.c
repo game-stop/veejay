@@ -808,7 +808,7 @@ static struct {
 	{ VJ_EVENT_OUTPUT_Y4M_START,		"Output: Yuv4Mpeg start writing to file",	 vj_event_output_y4m_start,	1,	"%s",		{0,0}	},
 	{ VJ_EVENT_OUTPUT_Y4M_STOP,		"Output: Yuv4Mpeg stop writing to file",	 vj_event_output_y4m_stop,	0,	NULL,		{0,0}	},
 #ifdef HAVE_SDL
-	{ VJ_EVENT_RESIZE_SDL_SCREEN,		"Output: Resize SDL video screen",		 vj_event_set_screen_size,	2,	"%d %d", 	{0,0}	},
+	{ VJ_EVENT_RESIZE_SDL_SCREEN,		"Output: Resize SDL video screen",		 vj_event_set_screen_size,	4,	"%d %d %d %d", 	{0,0}	},
 	{ VJ_EVENT_INIT_GUI_SCREEN,		"Output: Initialize GUI screen",		vj_event_init_gui_screen,	2,	"%s %d",	{0,0}	},
 #endif
 	{ VJ_EVENT_SET_PLAY_MODE,		"Playback: switch playmode clip/tag/plain", 	 vj_event_set_play_mode,	1,	"%d",		{2,0}	},
@@ -2569,6 +2569,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 	char *s = NULL;
 	P_A(args,s,format,ap);
+
 	if( args[0] > 0 && args[1] > 0 && args[0] < 4096 && args[1] < 4096 ) 
 	{
 		const char *title = "Veejay";
@@ -2578,6 +2579,9 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 					vj_sdl_init(v->sdl,args[0],args[1],title, 1, v->settings->full_screen);
 			veejay_msg(VEEJAY_MSG_INFO, "Resized SDL screen to %d x %d (video is %ld x %ld)",
 				args[0],args[1],v->edit_list->video_width,v->edit_list->video_height);
+			if(args[2] > 0 && args[3] > 0)
+				vj_sdl_set_geometry(v->sdl,args[2],args[3]);
+
 		}
 		if(v->gui_screen == 1)
 		{
@@ -2594,6 +2598,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_INFO,"Resized GUI SDL screen to %d x %d (video is %ld x %ld)",
 				args[0],args[1],v->edit_list->video_width,v->edit_list->video_height);
 		}
+
 	}
 	else
 	{
