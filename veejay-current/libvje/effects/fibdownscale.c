@@ -100,8 +100,8 @@ void _fibrectangle_apply(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
 {
     unsigned int i, f1;
-	const int len = frame->len;
-	const int uv_len = frame->uv_len;
+	const int len = frame->len /2;
+	const int uv_len = frame->uv_len/2;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
@@ -111,20 +111,22 @@ void _fibrectangle_apply(VJFrame *frame, VJFrame *frame2, int width,
 
     for (i = 2; i < len; i++) {
 		f1 = (i - 1) + (i - 2);
-		if (f1 < len)
+//		if (f1 < len)
 		    Y[i] = Y2[f1];
-	else
-	    Y[i] = Y[(f1 - len)];
+//	else
+//	    Y[i] = Y[(f1 - len)];
     }
-    for (i = 2; i < uv_len; i++) {
+  
+  for (i = 2; i < uv_len; i++) {
+
 	f1 = (i - 1) + (i - 2);
-	if (f1 < len) {
+//	if (f1 < len) {
 	    Cb[i] = Cb2[f1];
 	    Cr[i] = Cr2[f1];
-	} else {
-	    Cb[i] = Cb2[f1 - len];
-	    Cr[i] = Cr2[f1 - len];
-	}
+//	} else {
+//	    Cb[i] = Cb2[f1 - len];
+//	    Cr[i] = Cr2[f1 - len];
+//	}
     }
 }
 void fibdownscale_free(){}

@@ -929,7 +929,6 @@ man/Makefile
 tools/Makefile
 veejay-config
 veejay.pc
-veejay.spec
 ])
 AC_OUTPUT
 

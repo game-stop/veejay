@@ -1481,7 +1481,7 @@ ac_compiler_gnu=$ac_cv_c_compiler_gnu
 
 VEEJAY_MAJOR_VERSION=0
 VEEJAY_MINOR_VERSION=7
-VEEJAY_MICRO_VERSION=0
+VEEJAY_MICRO_VERSION=1
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 PACKAGE_VERSION=VEEJAY_VERSION
 
@@ -21663,7 +21663,7 @@ subdirs="$subdirs ffmpeg/ffmpeg"
 
 
 
-                                                                                                                                                                ac_config_files="$ac_config_files Makefile ffmpeg/Makefile libOSC/Makefile libvjmsg/Makefile libvjmem/Makefile libvje/Makefile libsample/Makefile utils/Makefile bio2jack/Makefile plugins/Makefile veejay/Makefile man/Makefile tools/Makefile veejay-config veejay.pc veejay.spec"
+                                                                                                                                                      ac_config_files="$ac_config_files Makefile ffmpeg/Makefile libOSC/Makefile libvjmsg/Makefile libvjmem/Makefile libvje/Makefile libsample/Makefile utils/Makefile bio2jack/Makefile plugins/Makefile veejay/Makefile man/Makefile tools/Makefile veejay-config veejay.pc"
 
 cat >confcache <<\_ACEOF
 # This file is a shell script that caches the results of configure
@@ -22403,7 +22403,6 @@ do
   "tools/Makefile" ) CONFIG_FILES="$CONFIG_FILES tools/Makefile" ;;
   "veejay-config" ) CONFIG_FILES="$CONFIG_FILES veejay-config" ;;
   "veejay.pc" ) CONFIG_FILES="$CONFIG_FILES veejay.pc" ;;
-  "veejay.spec" ) CONFIG_FILES="$CONFIG_FILES veejay.spec" ;;
   "depfiles" ) CONFIG_COMMANDS="$CONFIG_COMMANDS depfiles" ;;
   "config.h" ) CONFIG_HEADERS="$CONFIG_HEADERS config.h" ;;
   *) { { echo "$as_me:$LINENO: error: invalid argument: $ac_config_target" >&5
