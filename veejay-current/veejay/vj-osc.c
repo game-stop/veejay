@@ -125,7 +125,9 @@ void vj_osc_cb_set_parameter5(void *context, int arglen, const void *vargs, OSCT
 void vj_osc_cb_set_parameter6(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_set_parameter7(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_set_parameter8(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+#ifdef HAVE_V4L
 void vj_osc_cb_tag_new_v4l(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+#endif
 void vj_osc_cb_tag_new_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_load_cliplist(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_save_cliplist(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
@@ -257,7 +259,8 @@ vj_event_fire_net_event( osc_info, c, NULL, arguments, 4);\
 #define SNET_F(a,b,c)\
 {\
 char str[OSC_STRING_SIZE];\
-vj_osc_parse_char_arguments(a,b,str);\
+int __n = vj_osc_parse_char_arguments(a,b,str);\
+str[__n] = '\0';\
 printf("SNET: [%s]\n",str);\
 vj_event_fire_net_event(osc_info, c, str,NULL, 1);\
 }
@@ -320,6 +323,11 @@ vj_event_fire_net_event(osc_info,c,NULL,arguments,c_a); }\
 }\
 }
 
+void vj_osc_cb_el_add_clip(void *context, int arglen, const void *vargs, OSCTimeTag when,
+		NetworkReturnAddressPtr ra)
+{
+	SNET_F(arglen, vargs, NET_EDITLIST_ADD_CLIP);
+}
 
 /* /video/playforward */
 void vj_osc_cb_play_forward(void *context, int arglen, const void *vargs, OSCTimeTag when,
@@ -705,12 +713,13 @@ void vj_osc_cb_set_parameter8(void *context, int arglen, const void *vargs, OSCT
 {
 	PNET_F(arglen,vargs,NET_CHAIN_ENTRY_SET_ARG_VAL,8);
 }
-
+#ifdef HAVE_V4L
 void vj_osc_cb_tag_new_v4l(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
 	NET_F(arglen,vargs,NET_TAG_NEW_V4L);
 }
+#endif
 
 void vj_osc_cb_tag_new_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
@@ -801,7 +810,9 @@ static struct
 	{ "/clip/rec/stop",		"stop",		vj_osc_cb_clip_record_stop,		14	},
 
 	{ "/stream/select",		"select",	vj_osc_cb_tag_select,			2	},
+#ifdef HAVE_V4L
 	{ "/stream/new/v4l",		"v4l",		vj_osc_cb_tag_new_v4l,			19	},
+#endif
 	{ "/stream/new/y4m",		"y4m",		vj_osc_cb_tag_new_y4m,			19	},
 //	{ "/stream/new/avformat",	"avformat",	vj_osc_cb_tag_new_avformat,		19	},
 
@@ -832,7 +843,7 @@ static struct
 
 	{ "/cl/load",			"load",		vj_osc_cb_load_cliplist,		6 	},
 	{ "/cl/save",			"save",		vj_osc_cb_save_cliplist,		6	},
-
+	{ "/el/add_clip",		"add_clip", vj_osc_cb_el_add_clip,			7	},
 	{ NULL,					NULL,		NULL,							0	},
 };
 
@@ -949,6 +960,7 @@ int	vj_osc_attach_methods( vj_osc *o )
 
 /* initialization, setup a UDP socket and invoke OSC magic */
 vj_osc* vj_osc_allocate(int port_id) {
+	char tmp[200];
 	vj_osc *o = (vj_osc*)vj_malloc(sizeof(vj_osc));
 	o->osc_args = (osc_arg*)vj_malloc(50 * sizeof(*o->osc_args));
 	o->rt.InitTimeMemoryAllocator = _vj_osc_time_malloc;
@@ -974,6 +986,12 @@ vj_osc* vj_osc_allocate(int port_id) {
 				port_id);
 	}
 
+	if( IsMultiCast( tmp ) )
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Multicast address %s, port %d",
+			tmp, port_id );
+	}
+
 	/* Top level container / */
 	o->container = OSCInitAddressSpace(&(o->t));
 
@@ -986,6 +1004,7 @@ vj_osc* vj_osc_allocate(int port_id) {
 	OSCInitMethodQueryResponseInfo( &(o->ris));
 	if( !vj_osc_attach_methods( o ))
 		return NULL;
+
 
      return o;
 }	
