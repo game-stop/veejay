@@ -67,7 +67,7 @@ typedef struct
 	int 		last_afile;
 	long 		last_apos;
 	int		auto_deinter;
-
+	
 	int		pixel_format;
 	
 } editlist;  
@@ -94,6 +94,7 @@ void	vj_el_print(editlist *el);
 int     vj_el_init_420_frame(editlist *el, VJFrame *frame);
 int     vj_el_init_422_frame(editlist *el, VJFrame *frame);
 
+void	vj_el_frame_cache(int n);
 
 editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int width, int height, float fps);
 

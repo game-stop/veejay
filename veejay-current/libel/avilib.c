@@ -595,6 +595,8 @@ int AVI_close(avi_t *AVI)
       ret = 0;
 
    /* Even if there happened a error, we first clean up */
+   
+   mmap_free( AVI->mmap_region );
 
    close(AVI->fdes);
    if(AVI->idx) free(AVI->idx);
@@ -619,7 +621,7 @@ int AVI_fileno(avi_t *AVI)
    return 0; \
 }
 
-avi_t *AVI_open_input_file(char *filename, int getIndex)
+avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
 {
    avi_t *AVI;
    long i, n, rate, scale, idx_type;
@@ -955,6 +957,21 @@ avi_t *AVI_open_input_file(char *filename, int getIndex)
    lseek(AVI->fdes,AVI->movi_start,SEEK_SET);
    AVI->video_pos = 0;
 
+   /* map file to memory */
+
+   struct stat _tmp;
+   int ret = fstat( AVI->fdes, &_tmp );
+  
+   // check if mmap_size is not smaller than filesize
+  // AVI->mmap_size = 2048 * 1024;
+
+   AVI->mmap_region = NULL;
+   AVI->mmap_size = AVI->width * AVI->height * mmap_size;
+   if(AVI->mmap_size > 0)
+   {
+  	 AVI->mmap_region = mmap_file( AVI->fdes, 0, AVI->mmap_size, _tmp.st_size );
+   }
+
    return AVI;
 }
 
@@ -1042,13 +1059,21 @@ long AVI_read_frame(avi_t *AVI, uint8_t *vidbuf)
    if(!AVI->video_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
 
    if(AVI->video_pos < 0 || AVI->video_pos >= AVI->video_frames) return 0;
-   n = AVI->video_index[AVI->video_pos].len;
-			
+
+	n = AVI->video_index[AVI->video_pos].len;
+   if( AVI->mmap_region == NULL )
+   {			
    lseek(AVI->fdes, AVI->video_index[AVI->video_pos].pos, SEEK_SET);
    if (read(AVI->fdes,vidbuf,n) != n)
    {
       AVI_errno = AVI_ERR_READ;
       return -1;
+   }
+   } 
+   else
+   {
+   n = mmap_read( AVI->mmap_region, AVI->video_index[AVI->video_pos].pos,
+ 		n, vidbuf );
    }
 
    AVI->video_pos++;

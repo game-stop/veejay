@@ -161,8 +161,6 @@ static void Usage(char *progname)
     fprintf(stderr,
 	    "  -u/--dump-events  \t\tDump event information to screen\n");
     fprintf(stderr,
-	    "  -j/--no-ffmpeg   \t\tDont use FFmpeg for MJPEG decoding\n");
-    fprintf(stderr,
 	    "  -I/--deinterlace\t\tDeinterlace video if it is interlaced\n");    
     fprintf(stderr,"  -x/--geometryx <num> \t\tTop left x offset for SDL video window\n");
     fprintf(stderr,"  -y/--geometryy <num> \t\tTop left y offset for SDL video window\n");
@@ -184,6 +182,7 @@ static void Usage(char *progname)
 	fprintf(stderr,"  -R/--framerate \t\tdummy frame rate\n");
 	fprintf(stderr,"  -M/--multicast-osc \t\tmulticast OSC\n");
 	fprintf(stderr,"  -V/--multicast-vims \t\tmulticast VIMS\n");
+	fprintf(stderr,"     --map-from-file <num frames> \t\tmap N frames to memory\n");
     exit(-1);
 }
 
@@ -263,8 +262,8 @@ static int set_option(const char *name, char *value)
 	info->load_action_file = 1;
 #endif
 	}
-	else if(strcmp(name,"no-ffmpeg")==0 || strcmp(name,"j")==0) {
-		info->no_ffmpeg = 1;
+	else if(strcmp(name,"map-from-file") == 0 ) {
+		info->seek_cache = atoi(optarg);
 	}
 	else if (strcmp(name, "geometry-x") == 0 || strcmp(name, "x")==0) {
 		default_geometry_x = atoi(optarg);
@@ -344,7 +343,6 @@ static void check_command_line_options(int argc, char *argv[])
 	{"action-file",1,0,0},
 	{"features",0,0,0},
 	{"deinterlace",0,0,0},
-	{"no-ffmpeg",0,0,0},
 	{"port", 1, 0, 0},
 	{"host", 1, 0, 0},
 	{"sample-mode",1,0,0},
@@ -368,6 +366,7 @@ static void check_command_line_options(int argc, char *argv[])
 	{"ycbcr",1,0,0},
 	{"multicast-osc",1,0,0},
 	{"multicast-vims",1,0,0},
+	{"map-from-file",1,0,0},
 	{0, 0, 0, 0}
     };
 #endif

@@ -635,7 +635,7 @@ int lav_filetype(lav_file_t *lav_file)
    return lav_file->format;
 }
 
-lav_file_t *lav_open_input_file(char *filename)
+lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 {
    int n;
    const char *video_comp = NULL;
@@ -662,10 +662,10 @@ lav_file_t *lav_open_input_file(char *filename)
    lav_fd->bps         = 0;
    lav_fd->is_MJPG     = 0;
    lav_fd->MJPG_chroma = CHROMAUNKNOWN;
-
+   lav_fd->mmap_size   = mmap_size;
    /* open video file, try AVI first */
 
-   lav_fd->avi_fd = AVI_open_input_file(filename,1);
+   lav_fd->avi_fd = AVI_open_input_file(filename,1,mmap_size);
    video_format = 'a'; /* for error messages */
 
 //	if(!lav_fd->avi_fd) { if(lav_fd) free(lav_fd); return 0;}
@@ -683,7 +683,7 @@ lav_file_t *lav_open_input_file(char *filename)
    else if( AVI_errno==AVI_ERR_NO_AVI )
    {
 #ifdef SUPPORT_READ_DV2
-		lav_fd->dv_fd = rawdv_open_input_file(filename);
+		lav_fd->dv_fd = rawdv_open_input_file(filename,mmap_size);
 	  	if(lav_fd->dv_fd)
 		{
 			lav_fd->format = 'b'; 

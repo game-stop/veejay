@@ -128,6 +128,12 @@ Starts OSC receiver in multicast mode
 .TP
 .B \-V/--multicast-vims
 Starts VIMS in multicast mode (needed for multicast streaming)
+.TP
+.B \  /--map-from-file
+To reduce transfers between memory and disk, you can set a number
+of frames to be cached in memory from file (only valid for rawDV and AVI)
+Use smaller values for better performance (mapping several hundreds of
+megabytes can become a problem)
 
 .SH EXAMPLES
 .TP

@@ -14,7 +14,7 @@ VJEL_LIB_FILE = libel.la
 
 noinst_LTLIBRARIES = $(VJEL_LIB_FILE)
 
-libel_la_SOURCES =	avilib.c lav_io.c vj-dv.c rawdv.c vj-avcodec.c vj-avformat.c vj-el.c
+libel_la_SOURCES = vj-mmap.c avilib.c lav_io.c vj-dv.c rawdv.c vj-avcodec.c vj-avformat.c vj-el.c
 
 
 libel_la_LDFLAGS = $(VJEL_LIB_OPTS) \

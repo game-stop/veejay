@@ -55,6 +55,8 @@ static struct
 	{	"4:4:4"		},
 };
 
+static	int mmap_size = 0;
+
 #define MAX_CODECS 7
 #define CODEC_ID_YUV420 999
 #define CODEC_ID_YUV422 998
@@ -178,7 +180,7 @@ static 	void	_el_free_decoder(vj_decoder *d)
 /*
 static int _el_lav_fallback( char *filename )
 {
- 	lav_file_t *fd = lav_open_input_file( filename );
+ 	lav_file_t *fd = lav_open_input_file( filename, mmap_size );
 	 if(fd)
 	 {
 	//	veejay_msg(VEEJAY_MSG_DEBUG,"Probe finds %s", lav_video_compressor(fd));
@@ -271,7 +273,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
     }
     el->num_video_files++;
 
-    el->lav_fd[n] = lav_open_input_file(filename);
+    el->lav_fd[n] = lav_open_input_file(filename,mmap_size);
 
     if (!el->lav_fd[n])
 	{
@@ -1324,5 +1326,11 @@ editlist *vj_el_new(char *filename, char *norm, int deinterlace)
 	return el;
 }
 
-
+void	vj_el_frame_cache(int n )
+{
+	if(n > 1  || n < 1000)
+	{
+		mmap_size = n;
+	}
+}
 

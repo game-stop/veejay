@@ -21,6 +21,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <libdv/dv.h>
+#include <libel/vj-mmap.h>
 typedef struct
 {
 	int	fd;
@@ -39,10 +40,11 @@ typedef struct
 	uint8_t *buf;
 	int	size;
 	int	fmt;
+	mmap_region_t *mmap_region;
 } dv_t;
 
 int	rawdv_close(dv_t *dv);
-dv_t	*rawdv_open_input_file(const char *filename);
+dv_t	*rawdv_open_input_file(const char *filename, int mmap_size);
 int	rawdv_set_position(dv_t *dv, long nframe);
 int	rawdv_read_frame(dv_t *dv, uint8_t *buf );
 int	rawdv_read_audio_frame(dv_t *dv, uint8_t *buf);

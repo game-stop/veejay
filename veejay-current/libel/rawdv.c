@@ -27,7 +27,7 @@
 #include <fcntl.h>
 #include <libvjmsg/vj-common.h>
 #include <libvjmem/vjmem.h>
-
+#include <libel/vj-mmap.h>
 #include <libdv/dv.h>
 #include "avcodec.h"
 
@@ -44,12 +44,13 @@ static void	rawdv_free(dv_t *dv)
 int	rawdv_close(dv_t *dv)
 {
 	close(dv->fd);
+	mmap_free(dv->mmap_region);
 	rawdv_free( dv);
 	return 1;
 }
 
 #define DV_HEADER_SIZE 120000
-dv_t	*rawdv_open_input_file(const char *filename)
+dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 {
 	struct stat stat_;
 	dv_t *dv = (dv_t*)vj_malloc(sizeof(dv_t));
@@ -65,8 +66,21 @@ dv_t	*rawdv_open_input_file(const char *filename)
 		return NULL;
 	}
 	int n = fstat( dv->fd, &stat_ );
+	dv->mmap_region = NULL;
+	if( mmap_size > 0 )
+	{
+		dv->mmap_region = mmap_file( dv->fd, 0, (mmap_size * 720 * 576 * 3),
+			stat_.st_size );
+	}
 
-	n = read( dv->fd, tmp, DV_HEADER_SIZE );
+	if( dv->mmap_region == NULL )
+	{
+		n = read( dv->fd, tmp, DV_HEADER_SIZE );
+	}
+	else
+	{
+		n = mmap_read( dv->mmap_region, 0, DV_HEADER_SIZE, tmp );
+	}
 	if( n < 0 )
 	{
 		rawdv_free(dv);
@@ -95,6 +109,7 @@ dv_t	*rawdv_open_input_file(const char *filename)
 	dv->size = dv->decoder->frame_size;
 	dv->fmt = ( dv->decoder->sampling == e_dv_sample_422 ? 1 : 0);
 	dv->buf = (uint8_t*) vj_malloc(sizeof(uint8_t*) * dv->size);
+	dv->offset = 0;
 	if(dv->decoder->sampling == e_dv_sample_411)
 	{
 		veejay_msg(VEEJAY_MSG_WARNING , "Untested YUV format");
@@ -142,6 +157,8 @@ int	rawdv_set_position(dv_t *dv, long nframe)
 		if(nframe > dv->num_frames) 
 			offset = dv->num_frames * dv->size;
 
+	dv->offset = offset;
+
 	if( lseek( dv->fd, offset, SEEK_SET ) < 0 )
 		return 0;
 	return 1;
@@ -151,8 +168,16 @@ int	rawdv_read_frame(dv_t *dv, uint8_t *buf )
 {
 	int pitches[3];
 	uint8_t *pixels[3];
-	int n = read( dv->fd, dv->buf, dv->size );
-	memcpy( buf, dv->buf, dv->size );
+	int n = 0;
+	if(dv->mmap_region == NULL)
+	{
+		n = read( dv->fd, dv->buf, dv->size );
+		memcpy( buf, dv->buf, dv->size );
+	}
+	else
+	{
+		n = mmap_read( dv->mmap_region, dv->offset, dv->size, buf );
+	}
 	return n;
 }
 

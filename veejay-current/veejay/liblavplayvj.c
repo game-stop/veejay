@@ -2314,6 +2314,7 @@ veejay_t *veejay_malloc()
     info->preserve_pathnames = 0;
     info->stream_enabled = 0;
     info->stream_outformat = -1;
+    info->seek_cache = 0;
     info->verbose = 0;
     info->gui_screen = 0;
 	info->audio = 0;
@@ -2891,6 +2892,8 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, int ofps, in
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
+
+	vj_el_frame_cache(info->seek_cache );
 
     	vj_avformat_init();
  

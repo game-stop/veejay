@@ -257,6 +257,7 @@ typedef struct {
     int no_bezerk;
     int pixel_format;
 	dummy_t *dummy;
+	int seek_cache;
 } veejay_t;
 
 typedef struct {

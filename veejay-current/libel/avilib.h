@@ -18,6 +18,7 @@
 #define AVILIB_H
 
 #include <utils/mjpeg_types.h>
+#include <libel/vj-mmap.h>
 
 typedef struct
 {
@@ -69,6 +70,9 @@ typedef struct
    long   last_len;          /* Length of last frame written */
    int    must_use_index;    /* Flag if frames are duplicated */
    long   movi_start;
+   mmap_region_t	*mmap_region;
+   off_t		mmap_offset;
+   size_t		mmap_size;
 } avi_t;
 
 #define AVI_MODE_WRITE  0
@@ -147,7 +151,7 @@ long AVI_bytes_remain(avi_t *AVI);
 int  AVI_close(avi_t *AVI);
 int  AVI_fileno(avi_t *AVI);
 
-avi_t *AVI_open_input_file(char *filename, int getIndex);
+avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size);
 
 long AVI_video_frames(avi_t *AVI);
 int  AVI_video_width(avi_t *AVI);
