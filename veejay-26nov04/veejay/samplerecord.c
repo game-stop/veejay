@@ -209,7 +209,7 @@ static int clip_start_encoder(clip_info *si, editlist *el, int format, long nfra
 	si->encoder_width = el->video_width;
 	si->encoder_height = el->video_height;
 
-	if(clip_update(si,clip_id)==0) return 1;
+	clip_update(si,clip_id);
 	return 0;
 }
 
