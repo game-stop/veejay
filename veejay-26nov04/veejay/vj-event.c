@@ -342,6 +342,7 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_LOAD_PLUGIN				=	5500,
 	VJ_EVENT_UNLOAD_PLUGIN				=	5501,
 	VJ_EVENT_CMD_PLUGIN				=	5502,
+	VJ_EVENT_FULLSCREEN				=	5555,
 	VJ_EVENT_BUNDLE_DEL				=	6000,
 	VJ_EVENT_BUNDLE_ADD				=	6001,
 	VJ_EVENT_BUNDLE_ATTACH_KEY			=	6002,
@@ -514,7 +515,7 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_UNLOAD_PLUGIN,		NET_UNLOAD_PLUGIN	},
 	{ VJ_EVENT_CMD_PLUGIN,			NET_CMD_PLUGIN		},
 	{ VJ_EVENT_CHAIN_MANUAL,		NET_CHAIN_MANUAL_FADE	},
-
+	{ VJ_EVENT_FULLSCREEN,			NET_FULLSCREEN },
 	{0,0}
 };
 
@@ -548,6 +549,7 @@ static struct {			/* hardcoded keyboard layout (the default keys) */
 	{ VJ_EVENT_VIDEO_SPEED9,		SDLK_l 		,0	,0	,0 },
 	{ VJ_EVENT_VIDEO_SLOW0,			SDLK_a		,1	,0	,0 },
 	{ VJ_EVENT_VIDEO_SLOW1,			SDLK_s		,1	,0	,0 },
+	{ VJ_EVENT_FULLSCREEN,			SDLK_f		,0	,0  ,1 },
 	{ VJ_EVENT_VIDEO_SLOW2,			SDLK_d		,1	,0	,0 },
 	{ VJ_EVENT_VIDEO_SLOW3,			SDLK_f		,1	,0	,0 },
 	{ VJ_EVENT_VIDEO_SLOW4,			SDLK_g		,1	,0	,0 },
@@ -892,6 +894,9 @@ static struct {
 	{ VJ_EVENT_LOAD_PLUGIN,		"Load a plugin from disk",	vj_event_load_plugin, 1, "%s", {0,0}},
 	{ VJ_EVENT_CMD_PLUGIN,		"Send a command to the plugin",	vj_event_plugin_command, 1, "%s", {0,0}},
 	{ VJ_EVENT_UNLOAD_PLUGIN,	"Unload a plugin from disk",	vj_event_unload_plugin, 1, "%s", {0,0}},
+#ifdef HAVE_SDL
+	{ VJ_EVENT_FULLSCREEN,		"Fullscreen video toggle",		vj_event_fullscreen,	0, NULL , {0,0}},
+#endif
 	{ 0,NULL,0,0,NULL,{0,0}},
 };
 	
@@ -1685,11 +1690,9 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 	SDLMod mod = key->keysym.mod;
 	vj_event f;
 	int id;
-	char word[30];
 
 	if( (mod & KMOD_LSHIFT) || (mod & KMOD_RSHIFT))
 	{
-		sprintf(word, "SHIFT + %d",key->keysym.sym);
 		f = sdl_shift[ key->keysym.sym ].act;
 		id = sdl_shift[ key->keysym.sym].list_id;
 	}
@@ -1697,16 +1700,13 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 	{
 		if ( (mod & KMOD_LALT) || (mod & KMOD_RALT))
 		{
-			//veejay_msg(VEEJAY_MSG_DEBUG,"Alt modifier for key %d",key->keysym.sym);
-			sprintf(word, "ALT + %d" , key->keysym.sym);
 			f = sdl_alt[ key->keysym.sym].act;
 			id = sdl_alt[ key->keysym.sym].list_id;
 		}	
 		else
 		{
-			if ( (mod & KMOD_LCTRL) || (mod & KMOD_RCTRL)) 
+			if( ( mod & KMOD_LCTRL ) && (mod & KMOD_RCTRL ) )
 			{
-				sprintf(word, "CTRL(burn) + %d",key->keysym.sym);
 				f = sdl_ctrl[ key->keysym.sym].act;
 				id = sdl_ctrl[ key->keysym.sym].list_id;
 				vj_event_commit_bundle( (veejay_t*) ptr, key->keysym.sym);
@@ -1714,9 +1714,16 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 			}
 			else
 			{
-				word[0] = '\0';
-				f = sdl_normal[ key->keysym.sym ].act;
-				id = sdl_normal[ key->keysym.sym ].list_id;
+				if( (mod & KMOD_LCTRL) || (mod & KMOD_RCTRL) )
+				{
+					f = sdl_ctrl[ key->keysym.sym ].act;
+					id = sdl_ctrl[ key->keysym.sym ].list_id;
+				}
+				else
+				{
+					f = sdl_normal[ key->keysym.sym].act;
+					id = sdl_normal[ key->keysym.sym ].list_id;
+				}
 			}
 		}
 	}
@@ -1726,8 +1733,6 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 		/* networked message, parameters in message
                    do_bundle finds content by looking in hash of custom events  
 		   */
-		veejay_msg(VEEJAY_MSG_DEBUG,"(VIMS) Key %s (custom bundle)",
-			word[0] == '\0' ? " " : word);
 		vj_event_trigger_function( 
 			ptr, 
 			f, 
@@ -1738,35 +1743,14 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 	}
 	else {
 
-	if( vj_event_list[id].num_params == 0 )
-	{
-		//veejay_msg(VEEJAY_MSG_DEBUG,"[Key] Fire event %d [%s] ", 
-		//	vj_event_list[id].event_id,
-		//	vj_event_list[id].name);
-		veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) Key %s [%s]",
-			 word[0] == '\0' ? " " : word ,
-			 vj_event_list[id].name );
-		f(ptr,NULL,NULL);
-
-	}	
-	else 
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) Key %s [%s]",
-				word[0] == '\0' ? " " : word ,
-				 vj_event_list[id].name );
-
-		vj_event_trigger_function( ptr, f, vj_event_list[id].num_params, vj_event_list[id].format, vj_event_list[id].args[0], vj_event_list[id].args[1] );
-
-//		veejay_msg(VEEJAY_MSG_DEBUG,"[Key] Fire event %d [%s] format [%s] default 0 [%d] default 1 [%d]",
-//			vj_event_list[id].event_id,
-//			vj_event_list[id].name,
-//			vj_event_list[id].format,
-//			vj_event_list[id].args[0],
-//			vj_event_list[id].args[1]
-//		);
-
-	
-	}
+		if( vj_event_list[id].num_params == 0 )
+		{
+			f(ptr,NULL,NULL);
+		}	
+		else 
+		{
+			vj_event_trigger_function( ptr, f, vj_event_list[id].num_params, vj_event_list[id].format, vj_event_list[id].args[0], vj_event_list[id].args[1] );
+		}
 
 	}
 }
@@ -2629,6 +2613,20 @@ void vj_event_clip_new(void *ptr, const char format[], va_list ap)
 	}
 }
 #ifdef HAVE_SDL
+void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	if(v->settings->full_screen)
+		v->settings->full_screen = 0;
+	else
+		v->settings->full_screen = 1;
+
+	vj_sdl_free(v->sdl);
+	vj_sdl_init(v->sdl, v->edit_list->video_width, v->edit_list->video_height, "Veejay", 1, v->settings->full_screen);
+
+	veejay_msg(VEEJAY_MSG_INFO,"Video screen is %s", (v->settings->full_screen ? "full screen" : "windowed"));
+}
+
 void vj_event_set_screen_size(void *ptr, const char format[], va_list ap) 
 {
 	int args[2];
@@ -2642,7 +2640,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 		if(v->video_out == 0 || v->video_out == 2)
 		{
 			vj_sdl_free(v->sdl);
-					vj_sdl_init(v->sdl,args[0],args[1],title, 1);
+					vj_sdl_init(v->sdl,args[0],args[1],title, 1, v->settings->full_screen);
 			veejay_msg(VEEJAY_MSG_INFO, "Resized SDL screen to %d x %d (video is %ld x %ld)",
 				args[0],args[1],v->edit_list->video_width,v->edit_list->video_height);
 		}
@@ -2657,7 +2655,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 				veejay_msg(VEEJAY_MSG_INFO, "Using GUI's Window ID %ld",windowID);	
 			}
 
-			vj_sdl_init(v->sdl_gui,args[0],args[1],title,1);
+			vj_sdl_init(v->sdl_gui,args[0],args[1],title,1, 0);
 			veejay_msg(VEEJAY_MSG_INFO,"Resized GUI SDL screen to %d x %d (video is %ld x %ld)",
 				args[0],args[1],v->edit_list->video_width,v->edit_list->video_height);
 		}
@@ -6704,7 +6702,7 @@ void vj_event_init_gui_screen(void *ptr, const char format[], va_list ap)
 			v->edit_list->video_width,v->edit_list->video_height, v->pixel_format);
 
 		if( !vj_sdl_init(v->sdl_gui,
-			v->edit_list->video_width,v->edit_list->video_height,"veejay",1))
+			v->edit_list->video_width,v->edit_list->video_height,"veejay",1,0))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR,
 				"initializing SDL screen");

@@ -19,7 +19,7 @@
  */
 
 
-
+#include <config.h>
 #include <stdint.h>
 #include <sys/types.h>
 
@@ -36,11 +36,17 @@
 #define MMX_load8byte_mm7(data)__asm__("\n\t movq %0,%%mm7\n":	"=m" (data):)
 #endif
 
-#define WITH_SINCOS
-/* intentionally dangerous internal macro */
-#ifndef WITH_SINCOS
+#ifdef ARCH_PPC
 # define sin_cos(si, co, x)     si = sin(x); co = cos(x)
-#else
+# define fast_sqrt( res,x ) res = sqrt(x) 
+# define fast_sin(res,x ) res = sin(x)
+# define fast_cos(res,x ) res = cos(x) 
+# define fast_abs(res,x ) res = abs(x)
+# define fast_exp(res,x ) res = exp(x)
+#endif
+
+// possible dangerous macros
+#ifdef ARCH_X86
 # define sin_cos(si, co, x)     asm ("fsincos" : "=t" (co), "=u" (si) : "0" (x))
 # define fast_sqrt(res,x) 	asm ("fsqrt" : "=t" (res) : "0" (x)) 
 # define fast_sin(res,x)	asm ("fsin" : "=t" (res) : "0" (x))
@@ -74,8 +80,8 @@
 #define V_Blueco	(-0.071 )
 
 
-typedef uint8_t(*pix_func_Y) (uint8_t y1, uint8_t y2);
-typedef uint8_t(*pix_func_C) (uint8_t y1, uint8_t y2);
+typedef uint8_t (*pix_func_Y) (uint8_t y1, uint8_t y2);
+typedef uint8_t (*pix_func_C) (uint8_t y1, uint8_t y2);
 
 pix_func_Y get_pix_func_Y(const int pix_type);	/* get blend function for luminance values */
 pix_func_C get_pix_func_C(const int pix_type);	/* get blend function for chrominance values */

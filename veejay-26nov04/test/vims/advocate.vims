@@ -1,6 +1,30 @@
 249:/usr/local/lib/libvj_drawtext_plugin.so;
 +10
-245:DrawText::text=Veejay:x=10:y=50:size=14:font=1:pf:;
+245:DrawText::text=Veejay is copying CPU cycles to RAM:size=14:font=1:;
 +100
+245:DrawText::text=Future loop trademark:size=14:font=1:;
++100
+245:DrawText::text=Would a piece of cloth do?:size=14:font=1:;
++100
+245:DrawText::text=Mapping lost CPU cycles to memory:size=14:font=1:;
++100
+245:DrawText::text=Believe, Desire and Intention parsing system for pre-emptive scheduling:size=14:font=1:;
++100
+245:DrawText::text=Write once, debug many times:size=14:font=1:;
++100
+245:DrawText::text=Veejay has been designed as a usage based application not user based:size=10:font=1:;
++100
+245:DrawText::text=No user , no cry (c)piksel:size=20:font=1:;
++100
+245:DrawText::text=How many segfaults do you want today:size=15:font=1:;
++100
+245:DrawText::text=This kernel doesn't support CPU's with broken WP:size=10:font=1:;
++100
+245:DrawText::text=Cannot alloc pae_pgd SLAB cache:size=20:font=1:;
++100
+245:DrawText::text=Huh?:size=40:font=1:;
++100
+245:DrawText::text=IO panic! Fix the panic by writing zero-length microcode:size=14:font=1:;
++100 
 248:DrawText;
 

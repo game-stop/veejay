@@ -281,7 +281,7 @@ CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 DIST_SOURCES = $(libOSC_la_SOURCES)
-DIST_COMMON = $(srcdir)/Makefile.in AUTHORS ChangeLog Makefile.am NEWS
+DIST_COMMON = $(srcdir)/Makefile.in AUTHORS Makefile.am NEWS
 SOURCES = $(libOSC_la_SOURCES)
 
 all: all-am

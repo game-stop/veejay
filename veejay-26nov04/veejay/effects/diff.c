@@ -32,7 +32,7 @@ static double *sqrt_table[256];
 
 vj_effect *diff_init(int width, int height)
 {
-    int i,j;
+    //int i,j;
     vj_effect *ve = (vj_effect *) malloc(sizeof(vj_effect));
     ve->num_params = 4;
     ve->defaults = (int *) malloc(sizeof(int) * ve->num_params);	/* default values */
@@ -201,12 +201,9 @@ void diff_apply(vj_effect_data *ed, VJFrame *frame,
 {
     
 	unsigned int i;
-	unsigned int ps=0;
-	unsigned int tmp;
 	double d;
 	int x,y;
-	int sum,k,K = 0;
-	double nn;
+	int K = 0;
 	uint8_t *dst;
 	double level1 = (double)noise_level / 100.0;
 	double level2 = (double)noise_level2 / 100.0;
@@ -225,7 +222,7 @@ void diff_apply(vj_effect_data *ed, VJFrame *frame,
 	// calculate if pixel is much different (has greater distance)
 	// accepted pixels are 0xff 
 	if(!diff_can_apply())
-		return 0;
+		return;
 	
 	for(i = 0 ; i < len ; i ++ )
 	{
@@ -280,8 +277,8 @@ void diff_apply(vj_effect_data *ed, VJFrame *frame,
 			if(dst[i] == 0xf0)
 			{
 				Y[i] = Y2[i];
-				Cr[i] = Cb2[i];
-				Cr[i] = Cr[i];
+				Cb[i] = Cb2[i];
+				Cr[i] = Cr2[i];
 			}
 		}
 	}

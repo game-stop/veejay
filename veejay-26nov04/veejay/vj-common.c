@@ -16,6 +16,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  */
+#include <config.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -31,6 +32,7 @@
 
 static int CACHE_LINE_SIZE = 16;
 
+#ifdef ARCH_X86
 static int has_cpuid()
 {
         int a, c;
@@ -111,6 +113,12 @@ __asm__ __volatile__(
 	:"a" (c),"1" (s),"0" (count)
 	:"memory");
 }
+
+#else 
+
+#define mymemset_generic( s,c,n ) memset( s,c,n )
+
+#endif
 
 static unsigned int vj_relative_time = 0;
 

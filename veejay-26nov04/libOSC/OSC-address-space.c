@@ -470,15 +470,16 @@ static void PrintHelp(OSCcontainer c) {
 
     /* Forgive this quadratic kludge: */
     for (i = 0; i < c->numChildren; ++i) {
+	int matches = 0;
 	for (j = 0; j < i; ++j) {
 	    if (c->children[j] == c->children[i]) {
 		/* c->children[i] is just an alias to c->children[j], 
 		   which we already printed, so ignore it. */
-		goto SkipAlias;
+		matches ++;
 	    }
 	}
-	PrintHelp(c->children[i]);
-	SkipAlias:
+
+	if(matches == 0 ) PrintHelp(c->children[i]);
     }
 }
 

@@ -31,7 +31,7 @@ typedef struct vj_sdl_t {
 vj_sdl *vj_sdl_allocate(int width, int height, int pixel_format);
 void vj_sdl_set_geometry(vj_sdl *sdl, int w, int h);
 void vj_sdl_show(vj_sdl *vjsdl);
-int vj_sdl_init(vj_sdl * vjsdl, int scaled_width, int scaled_height,char *caption, int show);
+int vj_sdl_init(vj_sdl * vjsdl, int scaled_width, int scaled_height,char *caption, int show, int fs);
 int vj_sdl_lock(vj_sdl * vjsdl);
 int vj_sdl_unlock(vj_sdl * vjsdl);
 int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420);

@@ -1,4 +1,5 @@
-/* 
+
+#define mymemset_generic( s,c,n ) memset( s,c,n )/* 
 
  * libveejayvj - a extended librarified Linux Audio Video playback/Editing
  *supports: 
@@ -1612,7 +1613,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg)
 	}
 
 	/* init SDL if we want SDL */
-	if (!vj_sdl_init(info->sdl, info->sdl_width, info->sdl_height, "Veejay",1))
+	if (!vj_sdl_init(info->sdl, info->sdl_width, info->sdl_height, "Veejay",1,
+		info->settings->full_screen))
 	    return -1;
 	break;
 #endif
@@ -1638,7 +1640,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg)
 	info->sdl =
 	    (vj_sdl *) vj_sdl_allocate(el->video_width,
 				       el->video_height, info->pixel_format);
-	if (!vj_sdl_init(info->sdl, info->sdl_width, info->sdl_height,"Veejay",1))
+	if (!vj_sdl_init(info->sdl, info->sdl_width, info->sdl_height,"Veejay",1),
+		info->settings->full_screen)
 	    return -1;
 #endif
 	info->dfb =
@@ -2098,9 +2101,9 @@ veejay_t *veejay_malloc()
     int j;
     veejay_t *info;
     int i;
- 
+#ifdef ARCH_X86
 	get_cache_line_size();	
-
+#endif
     info = (veejay_t *) vj_malloc(sizeof(veejay_t));
     if (!info) {
 	veejay_msg(VEEJAY_MSG_ERROR, 
@@ -2163,6 +2166,7 @@ veejay_t *veejay_malloc()
     info->settings->offline_record = 0;
     info->settings->offline_tag_id = 0;
     info->settings->offline_created_clip = 0;
+	info->settings->full_screen = 0;
     info->settings->tag_record_switch = 0;
     info->settings->tag_record = 0;
     info->settings->pure_black = 0;

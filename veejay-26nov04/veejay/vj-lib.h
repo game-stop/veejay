@@ -140,6 +140,7 @@ typedef struct {
     int clip_record;
     int clip_record_id;
     int clip_record_switch;
+	int full_screen;
     int tag_record_switch;
     int tag_record;
     int dct_method;

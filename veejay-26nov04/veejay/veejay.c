@@ -24,9 +24,11 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>
+
 #ifdef HAVE_GETOPT_H
 #include <getopt.h>
 #endif
+
 #include <fcntl.h>
 #include <unistd.h>
 #include "vj-lib.h"
@@ -36,17 +38,11 @@
 #include "vj-global.h"
 #include <sys/mman.h>
 #include <sys/sysinfo.h>
-static int dummy_mode = 0;
-static char dummy_filename[512];
-static int skip_seconds = 0;
-static int current_frame = 0;
-static char _vjdir[1024];
+
+
 static int run_server = 1;
 static veejay_t *info;
 static int default_use_tags=1;
-static int default_fps = 25;
-static int default_width = 352;
-static int default_height = 288;
 static char default_name[1024];
 static int override_fps = 0;
 static int default_geometry_x = -1;
@@ -380,15 +376,6 @@ static void print_license()
 	    "The license must be included in the (source) package (COPYING)");
 }
 
-static void process_input(char *buffer)
-{
-	char msg[100];
-	buffer[strlen(buffer)-1] = '\0';
-	//vj_lock(info);
-	vj_event_parse_msg((void*)info, buffer);
-	//vj_unlock(info);
-}
-
 static void smp_check()
 {
 	int n_cpu = get_nprocs();
@@ -407,7 +394,6 @@ static void smp_check()
 
 int main(int argc, char **argv)
 {
-    int uid;
     video_playback_setup *settings;
     char buffer[256];
     int d_i=0,d_j=1,d_t=0;
@@ -420,7 +406,6 @@ int main(int argc, char **argv)
     find_best_memcpy();
 
     fflush(stdout);
-    sprintf(default_name , "dummy.avi");
 
     info = veejay_malloc();
     /* start with initing */
@@ -503,28 +488,10 @@ int main(int argc, char **argv)
     if(default_use_tags)
       veejay_default_tags(info);
 
-   
-  if(dummy_mode)
-    {
-		if(veejay_create_tag( info, 12, dummy_filename,0,0,0)==0)
-		{
-			veejay_msg(VEEJAY_MSG_WARNING, "Starting with Stream %d",vj_tag_get_last_tag());
-			info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
-			veejay_set_clip(info, vj_tag_get_last_tag());
+   smp_check();
 
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot continue, stream creation failed for %s", dummy_filename);
-			return 1;
-		}
-    }
-
-
-	smp_check();
-
-   if (!veejay_main(info))
-	return 1;
+    if (!veejay_main(info))
+		return 1;
 
 
    if(info->video_out != 5 )

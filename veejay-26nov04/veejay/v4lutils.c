@@ -541,16 +541,11 @@ int v4lgrabstart(v4ldevice * vd, int frame)
     fprintf(stderr, "v4lgrabstart: grab frame %d.\n", frame);
 #endif
     if (vd->framestat[frame]) {
-	fprintf(stderr,
-		"v4lgrabstart: frame %d is already used to grab.\n",
-		frame);
-	fprintf(stderr,
-		"v4lgrabstart: delete this tag and check the signal from your camera.");
-    }
+		return -1;
+	}
     vd->mmap.frame = frame;
     if (ioctl(vd->fd, VIDIOCMCAPTURE, &(vd->mmap)) < 0) {
-//	v4lperror("v4lgrabstart:VIDIOCMCAPTURE");
-	return -1;
+		return -1;
     }
     vd->framestat[frame] = 1;
     return 0;

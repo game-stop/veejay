@@ -58,7 +58,7 @@ void vj_sdl_set_geometry(vj_sdl* sdl, int w, int h)
 }
 
 
-int vj_sdl_init(vj_sdl * vjsdl, int scaled_width, int scaled_height, char *caption, int show)
+int vj_sdl_init(vj_sdl * vjsdl, int scaled_width, int scaled_height, char *caption, int show, int fs)
 {
     uint8_t *sbuffer;
     int i = 0;
@@ -89,10 +89,18 @@ int vj_sdl_init(vj_sdl * vjsdl, int scaled_width, int scaled_height, char *capti
     if (scaled_height)
 	vjsdl->sw_scale_height = scaled_height;
 
+
+	if(fs == 0 )
     vjsdl->screen =
 	SDL_SetVideoMode(vjsdl->sw_scale_width, vjsdl->sw_scale_height, 0,
 			 SDL_HWSURFACE | SDL_ASYNCBLIT | SDL_DOUBLEBUF |
 			 SDL_HWACCEL);
+	else
+   vjsdl->screen =
+	SDL_SetVideoMode(vjsdl->sw_scale_width, vjsdl->sw_scale_height, 0,
+			 SDL_HWSURFACE | SDL_ASYNCBLIT | SDL_DOUBLEBUF |
+			 SDL_HWACCEL | SDL_FULLSCREEN);
+	
 
     if (!vjsdl->screen) {
 	sprintf(vjsdl->last_error, "%s", SDL_GetError());

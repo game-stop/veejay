@@ -204,5 +204,6 @@ void	vj_event_bezerk				(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_plugin_command			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_load_plugin			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_unload_plugin			(	void *ptr,	const char format[], 	va_list ap	);
+void	vj_event_fullscreen			( void *ptr, const char format[],	va_list ap );
 void	vj_event_sample_mode		(	void *ptr,	const char format[],	va_list ap 	);
 #endif
