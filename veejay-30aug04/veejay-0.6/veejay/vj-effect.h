@@ -209,11 +209,12 @@ enum {
     VJ_IMAGE_EFFECT_RADIALBLUR = 156,
     VJ_IMAGE_EFFECT_CHROMIUM = 157,
     VJ_IMAGE_EFFECT_CHROMAPALETTE = 158,
+    VJ_IMAGE_EFFECT_UVCORRECT = 159,
     VJ_IMAGE_EFFECT_DUMMY = 100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 159
+#define VJ_IMAGE_EFFECT_MAX 160
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 235
@@ -508,9 +509,14 @@ extern void chromium_apply( uint8_t *yuv1[3], int w, int h, int n);
 
 extern void chromapalette_apply( uint8_t *yuv[3], int w, int h, int a, int r, int g, int b, int c1, int c2);
 
+
+extern void uvcorrect_apply(uint8_t *yuv[3], int width, int height, int angle, int urot_center, int vrot_center, int iuFactor, int ivFactor, int uvmin, int uvmax );
+
 //extern void yuvchannelmix_apply(uint8_t *yuv1[3],uint8_t *yuv2[3], int width, int height,
 //		 int opacity_a, int opacity_b,
 //		 int opacity_c, int opacity_a2, int opacity_b2, int opacity_c2, int mode, int luma);
+
+
 
 void vj_effect_initialize(int width, int height);
 void vj_effect_shutdown();
