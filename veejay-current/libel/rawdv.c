@@ -18,7 +18,6 @@
  */
 #include <config.h>
 #include <sys/types.h>
-#include <sys/stat.h>
 #ifdef SUPPORT_READ_DV2
 #include <libel/rawdv.h>
 #include <unistd.h>
@@ -31,7 +30,7 @@
 #include <libdv/dv.h>
 #include "avcodec.h"
 
-
+#include <errno.h>
 #define	DV_PAL_SIZE 144000
 #define DV_NTSC_SIZE 120000
 
@@ -52,11 +51,12 @@ int	rawdv_close(dv_t *dv)
 #define DV_HEADER_SIZE 120000
 dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 {
-	struct stat stat_;
-	dv_t *dv = (dv_t*)vj_malloc(sizeof(dv_t));
-	dv->decoder = dv_decoder_new(1,0,0);
+	dv_t *dv = (dv_t*) vj_malloc(sizeof(dv_t));
+	if(!dv) return NULL;
 	uint8_t *tmp = (uint8_t*) vj_malloc(sizeof(uint8_t) * DV_HEADER_SIZE);
-
+	long file_size = 0;
+	int n = 0;
+	dv->decoder = dv_decoder_new( 1,0,0);
 	dv->fd = open( filename, O_RDONLY );
 	
 	if(!dv->fd)
@@ -65,22 +65,40 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot open '%s'",filename);
 		return NULL;
 	}
-	int n = fstat( dv->fd, &stat_ );
+	/* fseek sometimes lies about filesize - seek to end (lseek returns file offset from start)*/
+	file_size = lseek( dv->fd, 0, SEEK_END );
+	if( file_size < DV_HEADER_SIZE)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "% is too small! ", filename);
+		rawdv_free(dv);
+		return NULL;
+	}
+	/* And back to start offset */
+	if( lseek(dv->fd,0, SEEK_SET ) < 0)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Seek errror");
+		rawdv_free(dv);
+		return NULL;
+	}
+
 	dv->mmap_region = NULL;
-	if( mmap_size > 0 )
+	if( mmap_size > 0 ) // user wants mmap
 	{
 		dv->mmap_region = mmap_file( dv->fd, 0, (mmap_size * 720 * 576 * 3),
-			stat_.st_size );
+			file_size );
 	}
 
 	if( dv->mmap_region == NULL )
 	{
+		if(mmap_size>0)
+			veejay_msg(VEEJAY_MSG_DEBUG, "Mmap failed - fallback to read");
 		n = read( dv->fd, tmp, DV_HEADER_SIZE );
 	}
 	else
 	{
 		n = mmap_read( dv->mmap_region, 0, DV_HEADER_SIZE, tmp );
 	}
+
 	if( n < 0 )
 	{
 		rawdv_free(dv);
@@ -94,12 +112,12 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot parse header");
 		return NULL;
 	}
+
 	if(dv_is_PAL( dv->decoder ) )
 		dv->chunk_size = DV_PAL_SIZE;
 	else
 		dv->chunk_size = DV_NTSC_SIZE;
 
-	dv->num_frames = (stat_.st_size - 120000) / dv->chunk_size;
 	dv->width = dv->decoder->width;
 	dv->height = dv->decoder->height;
 	dv->audio_rate = dv->decoder->audio->frequency;
@@ -107,12 +125,15 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	dv->audio_qbytes = dv->decoder->audio->quantization;
 	dv->fps = ( dv_is_PAL( dv->decoder) ? 25.0 : 29.97 );
 	dv->size = dv->decoder->frame_size;
+	dv->num_frames = (file_size - DV_HEADER_SIZE) / dv->size;
+	
 	dv->fmt = ( dv->decoder->sampling == e_dv_sample_422 ? 1 : 0);
 	dv->buf = (uint8_t*) vj_malloc(sizeof(uint8_t*) * dv->size);
 	dv->offset = 0;
+
 	if(dv->decoder->sampling == e_dv_sample_411)
 	{
-		veejay_msg(VEEJAY_MSG_WARNING , "Untested YUV format");
+		veejay_msg(VEEJAY_MSG_WARNING , "Untested YUV (4:1:1) format.");
 	}
 
 
@@ -120,16 +141,16 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	if(tmp)
 		free(tmp);
 
-	if(dv->audio_rate)
+/*	if(dv->audio_rate)
 	{
 		int i;
 		for( i = 0; i < 4; i ++ )
 		dv->audio_buffers[i] = (int16_t*) vj_malloc(sizeof(int16_t) * 2 * DV_AUDIO_MAX_SAMPLES);
-	}
+	}*/
 
 
 	veejay_msg(VEEJAY_MSG_DEBUG,
-		"rawDV: num frames %d, dimensions %d x %d, at %2.2f in %s",
+		"rawDV: num frames %ld, dimensions %d x %d, at %2.2f in %s",
 		dv->num_frames,
 		dv->width,
 		dv->height,
@@ -184,6 +205,8 @@ int	rawdv_read_frame(dv_t *dv, uint8_t *buf )
 int	rawdv_read_audio_frame(dv_t *dv, uint8_t *audio )
 {
 
+	return 0;
+/*
 	int n = dv_decode_full_audio( dv->decoder, dv->buf, dv->audio_buffers );
 	// interleave buffers to audio
 	int n_samples = dv_get_num_samples( dv->decoder );
@@ -202,6 +225,7 @@ int	rawdv_read_audio_frame(dv_t *dv, uint8_t *audio )
 		*(audio) += 4;
 	}
 	return n_samples * 4;
+*/
 }
 
 int	rawdv_video_frames(dv_t *dv)

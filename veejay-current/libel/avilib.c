@@ -954,24 +954,19 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
 
    AVI->audio_bytes = tot;
 
-   /* Reposition the file */
+   long file_size = 0;
+   file_size = (long) lseek( AVI->fdes, 0, SEEK_END );
 
+   /* Reposition the file */
    lseek(AVI->fdes,AVI->movi_start,SEEK_SET);
    AVI->video_pos = 0;
 
    /* map file to memory */
-
-   struct stat _tmp;
-   int ret = fstat( AVI->fdes, &_tmp );
-  
-   // check if mmap_size is not smaller than filesize
-  // AVI->mmap_size = 2048 * 1024;
-
    AVI->mmap_region = NULL;
    AVI->mmap_size = AVI->width * AVI->height * mmap_size;
    if(AVI->mmap_size > 0)
    {
-  	 AVI->mmap_region = mmap_file( AVI->fdes, 0, AVI->mmap_size, _tmp.st_size );
+  	 AVI->mmap_region = mmap_file( AVI->fdes, 0, AVI->mmap_size, file_size );
    }
 
    return AVI;
