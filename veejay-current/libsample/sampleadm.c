@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl> / <nelburg@looze.net>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -1884,10 +1884,11 @@ unsigned char *UTF8toLAT1(unsigned char *in)
 	return (NULL);
     }
 
-    if (UTF8Toisolat1(out, &out_size, in, &in_size) != 0) {
-	fprintf(stderr, "Cannot convert %s\n", in);
-	free(out);
-	return (NULL);
+    if (UTF8Toisolat1(out, &out_size, in, &in_size) != 0)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot convert '%s'", in );
+		free(out);
+		return (NULL);
     }
 
     out = realloc(out, out_size + 1);
@@ -2578,6 +2579,7 @@ void CreateClip(xmlNodePtr node, clip_info * clip)
 int clip_writeToFile(char *clipFile)
 {
     int i;
+	char *encoding = "UTF-8";	
     clip_info *next_clip;
     xmlDocPtr doc;
     xmlNodePtr rootnode, childnode;
@@ -2595,8 +2597,8 @@ int clip_writeToFile(char *clipFile)
 	    CreateClip(childnode, next_clip);
 	}
     }
-    xmlSaveFormatFile(clipFile, doc, 1);
-
+    //xmlSaveFormatFile(clipFile, doc, 1);
+	xmlSaveFormatFileEnc( clipFile, doc, encoding, 1 );
     xmlFreeDoc(doc);
 
     return 1;
