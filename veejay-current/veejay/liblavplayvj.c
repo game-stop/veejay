@@ -441,27 +441,27 @@ int veejay_set_frame(veejay_t * info, long framenum)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
-    if(framenum < 0) {
-	veejay_msg(VEEJAY_MSG_ERROR ,"Cannot set frame %ld",framenum);
-	//veejay_change_state(info, LAVPLAY_STATE_STOP);
-	return -1;
+
+    if(framenum < 0)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR ,"Negative frame numbers are bogus",framenum);
+		return -1;
 	}
 
-    if(framenum > (info->edit_list->video_frames-1)) {
-	veejay_msg(VEEJAY_MSG_ERROR, "Cannot set frame %ld",framenum);
-	return -1;
+    if(framenum > (info->edit_list->video_frames-1))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot set frame %ld",framenum);
+	  	return -1;
 	}
 
     if(info->uc->playback_mode==VJ_PLAYBACK_MODE_CLIP)
 	{
 		int start,end,loop,speed;	
 		clip_get_short_info(info->uc->clip_id,&start,&end,&loop,&speed);
-		if(framenum < start) {
+		if(framenum < start)
 		  framenum = start;
-		}
-		if(framenum > end) {
+		if(framenum > end) 
 		  framenum = end;
-		}
     }
 
     settings->current_frame_num = framenum;
@@ -1657,8 +1657,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 					info->video_output_height,
 					info->pixel_format );
 
-		    vj_perform_get_primary_frame(info, &src.data,0 );
-		    vj_perform_init_output_frame(info, &dst.data,
+		    vj_perform_get_primary_frame(info, &(src.data) ,0 );
+		    vj_perform_init_output_frame(info, &(dst.data),
 			info->video_output_width, info->video_output_height );
 
 		// Todo: we can have yuv_scale routine blit directly to sdl surface,

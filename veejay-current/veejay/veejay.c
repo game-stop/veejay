@@ -203,6 +203,7 @@ static void Usage(char *progname)
 	fprintf(stderr,"\t\t\t\t--chs=<h>\tChroma horizontal shifting\n");
 	fprintf(stderr,"\t\t\t\t--cvs=<v>\tChroma vertical shifting\n");
 #endif
+	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
     exit(-1);
 }
@@ -380,6 +381,10 @@ static int set_option(const char *name, char *value)
 		info->settings->sws_templ.use_filter = 1;
 
 	}
+	else if (strcmp(name, "quit") == 0 || strcmp(name, "q") == 0 )
+	{
+		info->continuous = 0;
+	}
 	else if (strcmp(name, "dummy") == 0 || strcmp(name, "d" ) == 0 )
 	{
 
@@ -440,6 +445,7 @@ static void check_command_line_options(int argc, char *argv[])
 	{"cs",1,0,0},
 	{"chs",1,0,0},
 	{"cvs",1,0,0},
+	{"quit",0,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -453,12 +459,12 @@ static void check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:V:s:c:t:l:C:p:m:x:y:nLFPXY:ugrvdibIjf:N:H:W:R:M:V:z:",
+			"o:G:O:a:H:V:s:c:t:l:C:p:m:x:y:nLFPXY:ugrvdibIjf:N:H:W:R:M:V:z:q",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   "o:G:s:O:a:c:t:l:t:C:x:y:m:p:nLFPXY:Y:vudgibrIjf:N:H:W:R:M:V:z:")) != EOF)
+		   "o:G:s:O:a:c:t:l:t:C:x:y:m:p:nLFPXY:Y:vudgibrIjf:N:H:W:R:M:V:z:q")) != EOF)
 #endif
     {
 	switch (n) {

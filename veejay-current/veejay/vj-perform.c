@@ -196,6 +196,11 @@ int vj_perform_increase_plain_frame(veejay_t * info, long num)
 	return 0;
     }
     if (settings->current_frame_num > settings->max_frame_num) {
+	if(!info->continuous)
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Reached end of video - stopping ... ");
+		veejay_change_state(info, LAVPLAY_STATE_STOP);
+	}
 	settings->current_frame_num = settings->max_frame_num;
 	return 0;
     }
