@@ -78,8 +78,9 @@ This allows the Host to setup its own default values , or
 it can simply use a library function to intialize a current value
 for the plugin to use.
 Future versions of Vevo may include an expression evaluation function to
-calculate new parameter values (by adding/increment STEP or 
-PAGE size). 
+calculate new parameter values (decrement/increment STEP or 
+PAGE size). If host does handle parameters, it should keep them
+in boundaries (MIN/MAX). 
  
 
  
