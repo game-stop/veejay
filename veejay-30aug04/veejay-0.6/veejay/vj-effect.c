@@ -118,6 +118,7 @@
 #include "effects/binaryoverlays.h"
 #include "effects/chromium.h"
 #include "effects/chromapalette.h"
+#include "effects/uvcorrect.h"
 
 static struct
 {
@@ -151,6 +152,7 @@ static struct
 {	fisheye_malloc,			fisheye_free		,VJ_IMAGE_EFFECT_FISHEYE	},
 {	swirl_malloc		,	swirl_free		,VJ_IMAGE_EFFECT_SWIRL		},
 {       radialblur_malloc,		radialblur_free,	 VJ_IMAGE_EFFECT_RADIALBLUR	},
+{	uvcorrect_malloc,		uvcorrect_free,		VJ_IMAGE_EFFECT_UVCORRECT	},
 {	NULL			,	NULL			,0				},
 };
 
@@ -411,6 +413,7 @@ void vj_effect_initialize(int width, int height)
     vj_effects[i + 56] = radialblur_init(width,height);
     vj_effects[i + 57] = chromium_init(width,height);
     vj_effects[i + 58] = chromapalette_init(width,height);
+    vj_effects[i + 59] = uvcorrect_init(width,height);
     max_width = width;
     max_height = height;
 
