@@ -33,18 +33,16 @@ The OpenSound Control WWW page is
 
    Matt Wright, 3/16/98
 */
-
+#include <sys/types.h>
+#include <netinet/in.h>
+#include <stdint.h>
+#include <sys/time.h>
 #include <libOSC/OSC-common.h>
 #include <libOSC/OSC-timetag.h>
 #include <libOSC/OSC-address-space.h>
 #include <libOSC/NetworkReturnAddress.h>
 #include <libOSC/OSC-receive.h>
 #include <libOSC/OSC-drop.h>
-#include <netinet/in.h>
-#include <stdint.h>
-#include <sys/time.h>
-
-
 
 void DropPacket(OSCPacketBuffer p) {
     OSCWarning("Packet dropped.");

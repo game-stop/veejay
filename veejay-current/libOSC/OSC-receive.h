@@ -92,13 +92,6 @@ The OpenSound Control WWW page is
 
 */
 
-#include <netinet/in.h>
-#include <sys/types.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
-#include <sys/ioctl.h>
-#include <arpa/inet.h>
-
 struct OSCReceiveMemoryTuner {
     void *(*InitTimeMemoryAllocator)(int numBytes);
     void *(*RealTimeMemoryAllocator)(int numBytes);
