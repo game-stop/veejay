@@ -109,6 +109,7 @@ enum {
     VJ_VIDEO_EFFECT_LUMAMASK = 233,
     VJ_VIDEO_EFFECT_BINARYOVERLAY = 234,
     VJ_VIDEO_EFFECT_DISSOLVE = 235,
+    VJ_VIDEO_EFFECT_TRIPPLICITY = 236,
   //  VJ_VIDEO_EFFECT_CHANNELMIX = 233,
 };
 
@@ -187,7 +188,7 @@ enum {
 #define VJ_IMAGE_EFFECT_MAX 167
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 236
+#define VJ_VIDEO_EFFECT_MAX 237
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
 
@@ -227,7 +228,8 @@ enum {
     VJ_EFFECT_BLEND_SUBDISTORT = 31,
 
 };
-
+extern void tripplicity_apply(VJFrame *frame1,VJFrame *frame2, int w, int h,
+		int a, int b, int c );
 
 extern void dices_apply(void * data, VJFrame *frame, int width,
 			int height, int cube_bits);

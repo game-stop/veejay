@@ -1632,7 +1632,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	if(!vj_perform_init(info))
     {
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Performer");
-		return 0;
+		return -1;
     }
     else
 	{
@@ -1676,7 +1676,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		if(!info->video_out_scaler)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize SwScaler");
-			return 0;
+			return -1;
 		}
 
 		veejay_msg(VEEJAY_MSG_DEBUG,"Using Software Scaler (%dx%d -> %dx%d)",
@@ -1764,11 +1764,13 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 	if( !vj_server_setup(info) )
 	{
-		return 1;
+		veejay_msg(VEEJAY_MSG_ERROR,"Setting up server");
+		return -1;
 	}
 
     vj_effect_initialize(info->edit_list->video_width, info->edit_list->video_height);
 
+	vj_event_init();
     if(vj_osc_setup_addr_space(info->osc) == 0) {
 	veejay_msg(VEEJAY_MSG_INFO, "Initialized OSC (http://www.cnmat.berkeley.edu/OpenSoundControl/)");
 	}
@@ -1779,7 +1781,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	info->plugin_frame = vj_perform_init_plugin_frame(info);
 	info->plugin_frame_info = vj_perform_init_plugin_frame_info(info);
 
-    vj_event_init();
+
 #ifdef HAVE_XML2
     if(info->load_action_file)
 	{
@@ -1796,7 +1798,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 #ifdef HAVE_XML2
    	 if (!clip_readFromFile( arg )) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error loading cliplist [%s]",arg);
-		return 1;
+		return -1;
     	}
 #endif
     }
@@ -1897,7 +1899,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	return -1;
 	break;
     }
-
 
 
     /* After we have fired up the audio and video threads system (which

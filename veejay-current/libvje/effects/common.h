@@ -23,7 +23,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <libvje/vje.h>
-
+#include <math.h>
 #define MAX_SCRATCH_FRAMES 25
 #define func_opacity(a,b,p,q) (  ((a * p) + (b * q)) >> 8 )
 #define limit_luma(c)  ( c < 16 ? 16 : ( c > 235 ? 235 : c) )
@@ -75,7 +75,6 @@
 #define V_Redco		( 0.439 )
 #define V_Greenco	(-0.368 )
 #define V_Blueco	(-0.071 )
-
 
 typedef uint8_t (*pix_func_Y) (uint8_t y1, uint8_t y2);
 typedef uint8_t (*pix_func_C) (uint8_t y1, uint8_t y2);

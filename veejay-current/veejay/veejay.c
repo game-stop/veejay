@@ -583,35 +583,46 @@ int main(int argc, char **argv)
 
     //print_license();
 
-
 	dont_use = getenv("VEEJAY_SCHEDULE_NORMAL");
 	if(dont_use==NULL || strcmp(dont_use, "0")==0||strcmp(dont_use,"no")==0)
 	{
  	 mymemset_generic(&schp, 0, sizeof(schp));
     	schp.sched_priority = sched_get_priority_max(SCHED_FIFO);
-   	 if (sched_setscheduler(0, SCHED_FIFO, &schp) != 0) {
+   	 if (sched_setscheduler(0, SCHED_FIFO, &schp) != 0)
+	 {
 		veejay_msg(VEEJAY_MSG_ERROR,
 			    "Cannot set real-time playback thread scheduling (not root?)");
-   	 } else {
+   	 }
+	 else
+	 {
 		veejay_msg(VEEJAY_MSG_WARNING,
 		    "Using First In-First Out II scheduling");
-	    }
+	 }
 	}
-
-
-    fcntl(0, F_SETFL, O_NONBLOCK);
 
 	smp_check();
 
-    if(veejay_init(info,default_geometry_x,default_geometry_y,NULL,default_use_tags)!=0) return -1;
+    if(veejay_init(
+		info,
+		default_geometry_x,
+		default_geometry_y,
+		NULL,
+		default_use_tags)<0)
+	{	
+		veejay_msg(VEEJAY_MSG_ERROR, "Initializing veejay");
+		return 0;
+	}
 
-	if(auto_loop) veejay_auto_loop(info);
+	if(auto_loop)
+		veejay_auto_loop(info);
 
-    if (!veejay_main(info))
+    if(!veejay_main(info))
+	{
+	    veejay_msg(VEEJAY_MSG_ERROR, "Cannot start main playback cycle");
 		return 1;
+	}
 
-
-	veejay_set_frame(info, 0 );
+	veejay_set_frame(info, 0);
 	veejay_set_speed(info, 1);
 	  
     while (veejay_get_state(info) != LAVPLAY_STATE_STOP) 
@@ -623,6 +634,5 @@ int main(int argc, char **argv)
     veejay_busy(info);		/* wait for all the nice goodies to shut down */
     veejay_free(info);
 
-   
     return 0;
 }
