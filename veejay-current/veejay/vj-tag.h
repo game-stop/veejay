@@ -94,6 +94,8 @@ typedef struct {
     float fader_inc;
     int selected_entry;	
     int effect_toggle;
+    int socket_ready;
+    uint8_t *socket_frame;
 //    int video_palette;
 } vj_tag;
 
