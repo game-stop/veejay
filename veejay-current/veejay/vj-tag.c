@@ -1815,9 +1815,9 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		 return -1;
 	break;
 	case VJ_TAG_TYPE_NET:
-	case VJ_TAG_TYPE_MCAST:
+//	case VJ_TAG_TYPE_MCAST:
 	vj_client_flush	( vj_tag_input->net[tag->index],1);
-	
+	case VJ_TAG_TYPE_MCAST:	
 
 	sprintf(buf, "%03d:;", NET_GET_FRAME);
 	if(vj_client_send( vj_tag_input->net[tag->index],V_CMD, buf ))
