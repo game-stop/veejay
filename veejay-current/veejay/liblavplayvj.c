@@ -2441,6 +2441,7 @@ int veejay_main(veejay_t * info)
     sync();
 //    veejay_change_state(info, LAVPLAY_STATE_PAUSED);
    // veejay_msg(VEEJAY_MSG_INFO, "Starting playback thread. Giving control to main app");
+
     /* fork ourselves to return control to the main app */
     if (pthread_create(&(settings->playback_thread), NULL,
 		       veejay_playback_thread, (void *) info)) {
@@ -2511,6 +2512,7 @@ int veejay_edit_delete(veejay_t * info, long start, long end)
 
 	if(info->dummy->active)
 	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Playing dummy video!");
 		return 0;
 	}
 
@@ -2594,15 +2596,18 @@ int veejay_edit_paste(veejay_t * info, long destination)
 
     if (!settings->save_list_len || !settings->save_list)
 	{
-		veejay_msg(VEEJAY_MSG_WARNING, 
+		veejay_msg(VEEJAY_MSG_ERROR, 
 			    "No frames in the buffer to paste");
 		return 0;
     }
 
     if (destination < 0 || destination >= el->video_frames)
 	{
-		veejay_msg(VEEJAY_MSG_WARNING, 
-			    "Incorrect parameters for pasting frames");
+		if(destination < 0)
+			veejay_msg(VEEJAY_MSG_ERROR, 
+				    "Destination cannot be negative");
+		if(destination >= el->video_frames)
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot paste beyond Edit List!");
 		return 0;
     }
 
@@ -2654,14 +2659,18 @@ int veejay_edit_move(veejay_t * info, long start, long end,
     editlist *el  = info->edit_list;
     long dest_real;
 
-	if( info->dummy->active) return 0;
-
+	if( info->dummy->active)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Playing dummy video!");
+		return 0;
+	}
     if (destination >= el->video_frames || destination < 0
 		|| start < 0 || end < 0 || start >= el->video_frames
 		|| end >= el->video_frames || end < start)
 	{
-		veejay_msg(VEEJAY_MSG_WARNING, 
-			    "Incorrect parameters for moving frames");
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid parameters for moving video from %ld - %ld to position %ld",
+			start,end,destination);
+		veejay_msg(VEEJAY_MSG_ERROR, "Range is 0 - %ld", el->video_frames);   
 		return 0;
     }
 
@@ -2705,6 +2714,7 @@ int veejay_edit_addmovie(veejay_t * info, char *movie, long start,
 
     if (n == -1 || n == -2)
     {
+	veejay_msg(VEEJAY_MSG_ERROR,"Error opening file '%s' ", movie );
 	return 0;
     }
 
@@ -2719,18 +2729,17 @@ int veejay_edit_addmovie(veejay_t * info, char *movie, long start,
 		if( end < 0 || start < 0 || start > end || start > el->num_frames[n] || end > el->num_frames[n] || destination < 0
 			|| destination > el->video_frames)
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Wrong parameters for adding a new movie %d %d", start,end);
-			if( el_end != el->video_frames)
-			{
-			  veejay_msg(VEEJAY_MSG_WARNING, "Reached state of insanity");                    
-			}
+			veejay_msg(VEEJAY_MSG_ERROR, "Wrong parameters to add frames %d - %d of file '%s' to position %ld", 
+				start,end,movie,destination);
 			return 0;
 		}
+
 	    el->frame_list = (uint64_t *) realloc( el->frame_list, (el->video_frames + (end-start+1)) * sizeof(uint64_t));
-        if(el->frame_list==NULL)
+	       if(el->frame_list==NULL)
 	    {
 			veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to reallocate frame_list");
 			veejay_change_state(info, LAVPLAY_STATE_STOP);
+			return 0;
 	    }
     }
 	else
@@ -2763,6 +2772,7 @@ int veejay_edit_addmovie(veejay_t * info, char *movie, long start,
  
     settings->max_frame_num = el->video_frames - 1;
     settings->min_frame_num = 1;
+
     if(el->has_video == 0 )
     {
 		el->has_video = 1;

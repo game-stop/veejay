@@ -5112,8 +5112,18 @@ void vj_event_el_cut(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t *)ptr;
 	int args[2];
 	char *str = NULL; P_A(args,str,format,ap);
+
+	if ( CLIP_PLAYING(v) || TAG_PLAYING(v)) 
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot cut frames in this playback mode");
+		return;
+	}
+
 	if( PLAIN_PLAYING(v)) 
 	{
+		if(clip_size()>0)
+			veejay_msg(VEEJAY_MSG_WARNING, "Cutting frames from the Edit List to a buffer affects your clips");
+
 		if(veejay_edit_cut( v, args[0], args[1] ))
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Cut frames %d-%d into buffer",args[0],args[1]);
@@ -5126,8 +5136,18 @@ void vj_event_el_copy(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 	int args[2];
 	char *str = NULL; P_A(args,str,format,ap);
+
+	if ( CLIP_PLAYING(v) || TAG_PLAYING(v)) 
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot copy frames in this playback mode");
+		return;
+	}
+
 	if( PLAIN_PLAYING(v)) 
 	{
+		if(clip_size()>0)
+			veejay_msg(VEEJAY_MSG_WARNING, "Copying frames to the Edit List affects your clips");
+
 		if(veejay_edit_copy( v, args[0],args[1] )) 
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Copy frames %d-%d into buffer",args[0],args[1]);
@@ -5142,11 +5162,20 @@ void vj_event_el_del(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL; P_A(args,str,format,ap);
 
+	if ( CLIP_PLAYING(v) || TAG_PLAYING(v)) 
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot delete frames in this playback mode");
+		return;
+	}
+
 	if( PLAIN_PLAYING(v)) 
 	{
+		if(clip_size()>0)
+			veejay_msg(VEEJAY_MSG_WARNING, "Deleting frames from the Edit List affects your clips!");
+ 
 		if(veejay_edit_delete(v, args[0],args[1])) 
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Del frames %d-%d into buffer", args[0],args[1]);
+			veejay_msg(VEEJAY_MSG_INFO, "Deleted frames %d-%d into buffer", args[0],args[1]);
 		}
 	}
 }
@@ -5157,11 +5186,21 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL; P_A(args,str,format,ap);
 
+	if ( CLIP_PLAYING(v) || TAG_PLAYING(v)) 
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot delete frames in this playback mode");
+		return;
+	}
+
 	if( PLAIN_PLAYING(v)) 
 	{
 		if(args[0] >= 1 && args[1] <= v->edit_list->video_frames-1 && args[1] >= 1 && args[1] > args[0] && args[1] <= 
 			v->edit_list->video_frames-1) 
 		{
+
+			if(clip_size()>0)
+				veejay_msg(VEEJAY_MSG_WARNING, "Deleting frames from the Edit List affects your clips!");
+
 			if(veejay_edit_delete(v, 1, args[0]) && veejay_edit_delete(v, args[1], v->edit_list->video_frames-1) )
 			{
 				veejay_set_frame(v,1);
@@ -5176,8 +5215,20 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 	int args[1];
 	char *str = NULL; P_A(args,str,format,ap);
+
+	if ( CLIP_PLAYING(v) || TAG_PLAYING(v)) 
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot paste frames in this playback mode");
+		return;
+	}
+
+
 	if( PLAIN_PLAYING(v)) 
 	{
+		if(clip_size()>0)
+			veejay_msg(VEEJAY_MSG_WARNING, "Pasting frames to the Edit List affects your clips!");
+
+
 		if( args[0] >= 1 && args[0] <= v->edit_list->video_frames-1)
 		{		
 			if( veejay_edit_paste( v, args[0] ) ) 
