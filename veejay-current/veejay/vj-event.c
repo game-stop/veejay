@@ -1464,7 +1464,6 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 		
 		int n = 0;
 		int p = 0;
-		int offset = 0;
 		bzero(dstr,512);
 
 		id = net_list[ net_id].list_id;
@@ -1509,7 +1508,7 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 						char tmp_dec[10];
 						bzero(tmp_dec,10);
 						snprintf(tmp_dec, 10, "%d", dargs[ni]);
-						n_offset += strlen(tmp_dec) + 1;
+						n_offset += strlen(tmp_dec)+1;
 					}
 					else
 					{
@@ -1519,20 +1518,15 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 				}
 				nl += 3;
 			}
-			p = np;
-			
+			n = ni;
 		}
+		for( p = n; p < 16; p ++ )
+			dargs[p] = 0;
 
-
-		// cleare remaining arguments
-		if( p > 0 )
-		{
-			n += p;
-			int k ;
-			for( k = p+1; k < 16; k ++)
-				dargs[k] = 0;
-
-		}
+		veejay_msg(VEEJAY_MSG_DEBUG, "[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d]",
+			dargs[0],dargs[1],dargs[2],dargs[3],dargs[4],dargs[5],
+			dargs[6],dargs[7],dargs[8],dargs[9],dargs[10],dargs[11],
+			dargs[12],dargs[13],dargs[14]);
 
 		_last_known_num_args = n;
 
@@ -4165,7 +4159,6 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*)ptr;
 	int args[3];
 	char *str = NULL; P_A(args,str,format,ap);
-	int k;
 
 	if(CLIP_PLAYING(v)) 
 	{
@@ -6899,40 +6892,30 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 }
 void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 {
-	// TODO vj_event_send_editlist
-/*
 	veejay_t *v = (veejay_t*) ptr;
-	char timecode[20];
-	char filename[255];
-	MPEG_timecode_t tc;
-	int n = v->edit_list->num_video_files;
-	char *editlist_msg = (char*)malloc(sizeof(char) * n * 300);
-	char line[300];
-	int i;
-	if(!editlist_msg)
+	editlist *el = v->edit_list;
+	int	 len = 0;
+	int	 i;
+	for( i =0; i < el->num_video_files; i ++)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, vj_event_err(VJ_ERROR_MEM));
-		return;
+		len += strlen( el->video_file_list[i] ) + 11;
 	}
+	char *el_msg = (char*) vj_malloc(sizeof(char) * len );
+	char *p = el_msg;
+	memset(el_msg, 0,len );
 
-	bzero(editlist_msg, (sizeof(char)*n*300));
-	for(i=0; i < n; i++)
+	for( i = 0; i < el->num_video_files; i ++)
 	{
-		char cmd[300];
-		int nframes = lav_video_frames(v->edit_list->lav_fd[i]);
-
-		sprintf(filename,"%3d%s", strlen( v->edit_list->video_file_list[i] ), v->edit_list->video_file_list[i] );	
-		mpeg_timecode(&tc,nframes,mpeg_framerate_code(mpeg_conform_framerate(v->edit_list->video_fps)),v->edit_list->video_fps);
-		sprintf(timecode, "%2.2d:%2.2d:%2.2d:%2.2d",tc.h,tc.m,tc.s,tc.f);
-		sprintf(cmd, "%02d %s %s", i, filename, timecode);
-		FORMAT_MSG(line,cmd);
-		APPEND_MSG(editlist_msg,line);
+		char tmp[150];
+		sprintf(tmp, "%s %09ld",el->video_file_list[i], el->num_frames[i]);
+		strncat( p, tmp, strlen(tmp));
+		p += strlen(tmp);
 	}
-	SEND_MSG(v,editlist_msg);
-
-	if(editlist_msg) free(editlist_msg);
-*/
+	
+	SEND_MSG(v,el_msg);
+	if(el_msg) free(el_msg);
 }
+
 void	vj_event_send_devices			(	void *ptr,	const char format[],	va_list ap	)
 {
 	char str[255];
