@@ -837,6 +837,13 @@ void	GoMultiCast( const char *group_name )
 	strncpy( mcast_groupname, group_name, strlen(group_name ));
 }
 
+int		IsMultiCast( char *dst )
+{
+	if(use_mcast_)
+		sprintf(dst, "%s", mcast_groupname );
+	return use_mcast_;
+}
+
 Boolean NetworkStartUDPServer(OSCPacketBuffer packet, int port_id) {
 	struct sockaddr_in my_addr;
 	my_addr.sin_family = AF_INET;
@@ -849,6 +856,7 @@ Boolean NetworkStartUDPServer(OSCPacketBuffer packet, int port_id) {
 	{
 		struct ip_mreq	mcast_req;
 		int on = 1;
+		int err= 0;
 		memset( &mcast_req, 0, sizeof(mcast_req));
 		packet->returnAddr->sockfd = socket( AF_INET, SOCK_DGRAM, 0);
 #ifdef SO_REUSEADDR
@@ -857,8 +865,10 @@ Boolean NetworkStartUDPServer(OSCPacketBuffer packet, int port_id) {
 #ifdef SO_REUSEPORT
 		setsockopt( packet->returnAddr->sockfd, SOL_SOCKET, SO_REUSEPORT, &on, sizeof(on));
 #endif
-		bind( packet->returnAddr->sockfd, (struct sockaddr*) &my_addr, sizeof( my_addr ));
-		
+		err = bind( packet->returnAddr->sockfd, (struct sockaddr*) &my_addr, sizeof( my_addr ));
+		if( err < 0 )
+			return FALSE;
+
 		mcast_req.imr_multiaddr.s_addr = inet_addr( mcast_groupname );
 		mcast_req.imr_interface.s_addr = htonl( INADDR_ANY );	
 		setsockopt( packet->returnAddr->sockfd, IPPROTO_IP, IP_ADD_MEMBERSHIP,
