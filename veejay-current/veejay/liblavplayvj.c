@@ -285,49 +285,58 @@ int veejay_set_speed(veejay_t * info, int speed)
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     int len=0;
+	
 
+    switch (info->uc->playback_mode)
+	{
 
-    if(speed != 0) settings->previous_playback_speed = speed;
-
-    switch (info->uc->playback_mode) {
 	case VJ_PLAYBACK_MODE_PLAIN:
-	settings->current_playback_speed = speed;	
-	info->uc->speed = speed;
-	break;
-     case VJ_PLAYBACK_MODE_CLIP:
-	len = clip_get_endFrame(info->uc->clip_id) - clip_get_startFrame(info->uc->clip_id);
-	if( speed < 0) {
-		if ( (-1*len) > speed ) {
-			veejay_msg(VEEJAY_MSG_ERROR,"Speed %d too high to set! (not enough frames)",speed);
-			return 1;
-		}
-	} else {
-		if(speed >= 0) {
-			if( len < speed ) {
-				veejay_msg(VEEJAY_MSG_ERROR, "Speed %d too high to set (not enought frames)",speed);
+		len = info->edit_list->video_frames - 1;
+		if( abs(speed) <= len )
+			settings->current_playback_speed = speed;	
+		else
+			veejay_msg(VEEJAY_MSG_DEBUG, "Speed too high to set!");
+
+		break;
+    case VJ_PLAYBACK_MODE_CLIP:
+		len = clip_get_endFrame(info->uc->clip_id) - clip_get_startFrame(info->uc->clip_id);
+		if( speed < 0)
+		{
+			if ( (-1*len) > speed )
+			{
+				veejay_msg(VEEJAY_MSG_ERROR,"Speed %d too high to set! (not enough frames)",speed);
 				return 1;
 			}
 		}
-	}
-	//fixme: vj-perform.c/vj-event.c interchange the following 2 identical variables
-	settings->current_playback_speed = speed;	
-	info->uc->speed = speed;
-	clip_set_speed(info->uc->clip_id, speed);
-	return 1;
-	break;
+		else
+		{
+			if(speed >= 0)
+			{
+				if( len < speed )
+				{
+					veejay_msg(VEEJAY_MSG_ERROR, "Speed %d too high to set (not enought frames)",speed);
+					return 1;
+				}
+			}
+		}
+		settings->current_playback_speed = speed;	
+		clip_set_speed(info->uc->clip_id, speed);
+		break;
+
     case VJ_PLAYBACK_MODE_TAG:
-	  settings->current_playback_speed = 1;
-	return 1;
-      default:
-	veejay_msg(VEEJAY_MSG_ERROR, "insanity, unknown playback mode");
-	break;
+		
+		settings->current_playback_speed = 1;
+		break;
+    default:
+		veejay_msg(VEEJAY_MSG_ERROR, "insanity, unknown playback mode");
+		break;
     }
 #ifdef HAVE_JACK
+
     if(info->audio == AUDIO_PLAY )
-    {
-	vj_jack_continue( speed );
-    }
+		vj_jack_continue( speed );
 #endif
+
     return 1;
 }
 
@@ -781,23 +790,19 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int clip_id )
 void veejay_set_clip(veejay_t * info, int clipid)
 {
     int start,end,speed,looptype;
-    //int same =0;
-    //int tmp = 0;
-    //video_playback_setup *settings = info->settings;
     if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
     {
 	    if(!vj_tag_exists(clipid))
-            {
-
+        {
 		    veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist", clipid);
 	     	   return;
-            }
+        }
 	    info->last_tag_id = clipid;
 	    info->uc->clip_id = clipid;
-	    if(info->uc->speed==0) 
-	    {
-		veejay_set_speed(info, 1);
-	    }
+
+	    if(info->settings->current_playback_speed==0) 
+			veejay_set_speed(info, 1);
+
  		veejay_msg(VEEJAY_MSG_INFO, "Playing stream %d",
 			clipid);
 	
@@ -2377,7 +2382,6 @@ veejay_t *veejay_malloc()
     info->stream_outformat = -1;
 
     info->settings->currently_processed_entry = -1;
-    info->settings->previous_playback_speed = 1;
     info->settings->first_frame = 1;
     info->settings->state = LAVPLAY_STATE_PAUSED;
     info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;

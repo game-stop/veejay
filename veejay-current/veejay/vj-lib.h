@@ -108,7 +108,6 @@ typedef struct {
     int max_frame_num;		/* the latest frame to be played back - normally num_frames - 1 */
     int current_frame_num;	/* the current frame */
     int previous_frame_num;	/* previous frame num */
-    int previous_playback_speed;
     int current_playback_speed;	/* current playback speed */
     int currently_processed_frame;	/* changes constantly */
     int currently_synced_frame;	/* changes constantly */
@@ -173,7 +172,6 @@ typedef struct {
     int hackme;
     int take_bg;
     int direction;		/* forward, reverse or pause */
-    int speed;			/* seperate speed control. */
     int looptype;		/* loop setting depending on playmode */
     long clip_end;		/* end of clip */
     long clip_start;		/* start of clip */

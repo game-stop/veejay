@@ -2578,8 +2578,9 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 	if(!TAG_PLAYING(v))
 	{
-		veejay_set_speed(v, (v->uc->speed == 0 ? v->uc->speed = 1 : 0  ));
-		veejay_msg(VEEJAY_MSG_INFO,"Video is %s", (v->uc->speed==0 ? "paused" : "playing"));
+		int speed = v->settings->current_playback_speed;
+		veejay_set_speed(v, (speed == 0 ? 1 : 0  ));
+		veejay_msg(VEEJAY_MSG_INFO,"Video is %s", (speed==0 ? "paused" : "playing"));
 	}
 }
 
@@ -2589,13 +2590,15 @@ void vj_event_play_reverse(void *ptr,const char format[],va_list ap)
 	veejay_t *v = (veejay_t*)ptr;
 	if(!TAG_PLAYING(v))
 	{
-	if( v->uc->speed == 0 ) v->uc->speed = -1;
-	else if(v->uc->speed > 0) v->uc->speed = -(v->uc->speed);
+		int speed = v->settings->current_playback_speed;
+		if( speed == 0 ) speed = -1;
+		else 
+			if(speed > 0) speed = -(speed);
 
-	veejay_set_speed(v,
-			v->uc->speed );
+		veejay_set_speed(v,
+				speed );
 
-	veejay_msg(VEEJAY_MSG_INFO, "Video is playing in reverse at speed %d.", v->uc->speed);
+		veejay_msg(VEEJAY_MSG_INFO, "Video is playing in reverse at speed %d.", speed);
 	}
 }
 
@@ -2604,39 +2607,30 @@ void vj_event_play_forward(void *ptr, const char format[],va_list ap)
 	veejay_t *v = (veejay_t*)ptr;
 	if(!TAG_PLAYING(v))
 	{
-	if(v->uc->speed == 0) v->uc->speed = 1;
-	else if(v->uc->speed < 0 ) v->uc->speed = -1 * v->uc->speed;
+		int speed = v->settings->current_playback_speed;
+		if(speed == 0) speed = 1;
+		else if(speed < 0 ) speed = -1 * speed;
 
- 	veejay_set_speed(v,
-		v->uc->speed );  
+	 	veejay_set_speed(v,
+			speed );  
 
-	veejay_msg(VEEJAY_MSG_INFO, "Video is playing forward at speed %d" , v->uc->speed);
+		veejay_msg(VEEJAY_MSG_INFO, "Video is playing forward at speed %d" ,speed);
 	}
 }
 
 void vj_event_play_speed(void *ptr, const char format[], va_list ap)
 {
-	int args[1];
+	int args[2];
 	veejay_t *v = (veejay_t*) ptr;
 	if(!TAG_PLAYING(v))
 	{
-	char *s = NULL;
-	int speed = v->uc->speed;
-	P_A(args,s,format,ap);
-
-	if(v->uc->speed >= 0)
-	{
-		speed = args[0];
-	}
-	else
-	{
-		speed = -1 * args[0];
-	}
-	
-	veejay_set_speed(v, speed);
-
-	veejay_msg(VEEJAY_MSG_INFO, "Video is playing at speed %d now (%s)",
-		v->uc->speed , v->uc->speed == 0 ? "paused" : v->uc->speed < 0 ? "reverse" : "forward" );
+		char *s = NULL;
+		int speed = 0;
+		P_A(args,s,format,ap);
+		veejay_set_speed(v, args[0] );
+		speed = v->settings->current_playback_speed;
+		veejay_msg(VEEJAY_MSG_INFO, "Video is playing at speed %d now (%s)",
+			speed, speed == 0 ? "paused" : speed < 0 ? "reverse" : "forward" );
 	}
 }
 
@@ -5792,8 +5786,8 @@ void vj_event_output_y4m_start(void *ptr, const char format[], va_list ap)
 		n= vj_yuv_stream_start_write(v->output_stream,str,v->edit_list);
 		if(n==1) 
 		{
-			int s = v->uc->speed;
-			veejay_msg(VEEJAY_MSG_INFO, "Pausing veejay");
+			int s = v->settings->current_playback_speed;
+			veejay_msg(VEEJAY_MSG_DEBUG, "Pausing veejay");
 			
 			veejay_set_speed(v,0);
 			if(vj_yuv_stream_open_pipe(v->output_stream,str,v->edit_list))
@@ -5801,6 +5795,7 @@ void vj_event_output_y4m_start(void *ptr, const char format[], va_list ap)
 				vj_yuv_stream_header_pipe(v->output_stream,v->edit_list);
 				v->stream_enabled = 1;
 			}
+			veejay_msg(VEEJAY_MSG_DEBUG, "Resuming veejay");
 			veejay_set_speed(v,s);
 			
 		}
