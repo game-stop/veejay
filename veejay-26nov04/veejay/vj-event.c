@@ -5830,7 +5830,7 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 	bzero(str,255);
 	P_A(args,str,format,ap);
 
-	if(v->settings->clip_record || v->settings->tag_record || v->settings->offline_record)
+	if(v->settings->tag_record || v->settings->offline_record)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot change data format while recording to disk");
 		return;
@@ -5914,10 +5914,16 @@ static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
 				args[0]) != 1 ) 
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Error trying to start recording from stream %d", v->uc->clip_id);
+				vj_tag_stop_encoder(v->uc->clip_id);
+				v->settings->tag_record = 0;
 				return;
 			} 
 
-			if(args[1]==0) v->settings->tag_record_switch = 0;else v->settings->tag_record_switch = 1;
+			if(args[1]==0) 
+				v->settings->tag_record_switch = 0;
+			else
+				v->settings->tag_record_switch = 1;
+
 			v->settings->tag_record = 1;
 	//		v->settings->tag_record_id = v->uc->clip_id;
 		}
@@ -5938,7 +5944,7 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	video_playback_setup *s = v->settings;
-	if( TAG_PLAYING(v)  && (v->settings->tag_record != 0)) 
+	if( TAG_PLAYING(v)  && v->settings->tag_record) 
 	{
 		if(vj_tag_stop_encoder( v->uc->clip_id))
 		{
@@ -5970,15 +5976,15 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 
 			veejay_msg(VEEJAY_MSG_INFO, "Recorded new clip %d from stream %d", 
 				s->offline_created_clip,s->offline_tag_id);
-			s->tag_record = 0;
-			//FIXME
 			if(s->tag_record_switch) 
 			{
+				veejay_msg(VEEJAY_MSG_INFO, "Playing clip %d now", clip_size()-1);
 				veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_CLIP, clip_size()-1 );
 			}
-			s->tag_record_switch = 0;
 
-		}
+		}	
+		s->tag_record = 0;
+		s->tag_record_switch = 0;
 	}
 	else
 	{
@@ -6085,21 +6091,15 @@ void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
 
 			veejay_msg(VEEJAY_MSG_INFO, "Recorded new clip %d from stream %d", 
 				s->offline_created_clip,s->offline_tag_id);
-			s->offline_record = 0;
 
 			if(s->offline_created_clip) 
 			{
+				veejay_msg(VEEJAY_MSG_INFO, "Playing new clip %d now ", clip_size()-1);
 				veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_CLIP , clip_size()-1);
 			}
-			s->offline_record = 0;
-			s->offline_tag_id = 0;
 		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Clip recorder was never started for clip %d",v->uc->clip_id);
-		}
-
-
+		s->offline_record = 0;
+		s->offline_tag_id = 0;
 	}
 }
 
