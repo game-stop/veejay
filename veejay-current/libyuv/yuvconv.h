@@ -25,6 +25,7 @@
  *
  */
 
+#include <libvje/vje.h>
 typedef enum subsample_mode {
     SSM_UNKNOWN = 0,
     SSM_420_JPEG_TR = 1,
@@ -61,5 +62,27 @@ void yuv422_to_yuyv( uint8_t *yuv422[3], uint8_t *dst, int w, int h );
 
 // scene detection
 int luminance_mean(uint8_t * frame[], int w, int h);
+
+/* software scaler from ffmpeg project: */
+
+typedef struct
+{
+	float lumaGBlur;
+	float chromaGBlur;
+	float lumaSarpen;
+	float chromaSharpen;
+	float chromaHShift;
+	float chromaVShift;
+	int	verbose;
+	int	flags;
+} sws_template;
+
+void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *templ, int cpu_flags);
+
+void	yuv_convert_and_scale( void *sws, VJFrame *src, VJFrame *dst );
+
+int	yuv_sws_get_cpu_flags(void);
+
+void	yuv_free_swscaler(void *sws);
 
 #endif

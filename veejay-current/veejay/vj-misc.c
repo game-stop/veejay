@@ -32,7 +32,9 @@
 #include <liblavjpeg/jpegutils.h>
 #endif
 #include <libvjmsg/vj-common.h>
-
+#include <libvje/vje.h>
+#include <libyuv/yuvconv.h>
+#include <libpostproc/img_format.h>
 
 static unsigned int vj_relative_time = 0;
 
@@ -90,18 +92,17 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
     if (!jpeg_buff)
 		return -1;
 
-    if(info->pixel_format == 0)
-	vj_el_init_420_frame( info->edit_list, &tmp );
-    else
-	vj_el_init_422_frame( info->edit_list, &tmp );
+    vj_get_yuv_template( &tmp,
+				info->video_output_width,
+				info->video_output_height,
+				info->pixel_format );
+
     if( tmp.shift_v == 0 )
     {
-	//allocate memory and convert
 	tmp.data[0] = (uint8_t*) malloc(sizeof(uint8_t) * tmp.len );
 	tmp.data[1] = (uint8_t*) malloc(sizeof(uint8_t) * tmp.uv_len );
 	tmp.data[2] = (uint8_t*) malloc(sizeof(uint8_t) * tmp.uv_len );
-	yuv422p_to_yuv420p2( src, tmp.data, info->edit_list->video_width,
-			                    info->edit_list->video_height );
+	yuv422p_to_yuv420p2( src, tmp.data, tmp.width, tmp.height );
     }
     else
     {
@@ -122,8 +123,9 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
     	jpeg_size = encode_jpeg_raw(jpeg_buff, (65535*4), 100,
 				settings->dct_method,  
 				info->edit_list->video_inter, 0,
-				info->edit_list->video_width,
-				info->edit_list->video_height, tmp.data[0],
+				info->video_output_width,
+				info->video_output_height,
+				tmp.data[0],
 				tmp.data[1], tmp.data[2]);
 
    	 res = fwrite(jpeg_buff, jpeg_size, 1, frame);
@@ -170,3 +172,32 @@ int	veejay_create_temp_file(const char *prefix, char *dst)
 		today->tm_sec);
 	return 1;
 }
+
+
+void	vj_get_yuv_template(VJFrame *src, int w, int h, int fmt)
+{
+	src->width = w;
+	src->uv_width = w >> 1;
+	src->height = h;
+	
+	if(fmt == 0)
+	{
+		src->format = IMGFMT_YV12;
+		src->uv_height = h >> 1;
+		src->shift_v = 1;
+	}
+	if(fmt == 1)
+	{
+		src->format = IMGFMT_422P;
+		src->uv_height = h;
+		src->shift_v = 0;
+	}
+	src->len = w * h;
+	src->uv_len = src->uv_width * src->uv_height;
+	src->shift_h = 1;
+	src->data[0] = NULL;
+	src->data[1] = NULL;
+	src->data[2] = NULL;
+
+}
+

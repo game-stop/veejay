@@ -67,6 +67,7 @@ struct ycbcr_frame {
 
 // audio buffer is 16 bit signed integer
 
+static struct ycbcr_frame **video_output_buffer; /* scaled video output */
 static struct ycbcr_frame **frame_buffer;	/* chain */
 static struct ycbcr_frame **primary_buffer;	/* normal */
 static int cached_tag_frames[2][CLIP_MAX_EFFECTS];	/* cache a frame into the buffer only once */
@@ -490,6 +491,16 @@ int vj_perform_init(veejay_t * info)
     if(!primary_buffer[0]->Cr) return 0;
     veejay_memset(primary_buffer[0]->Cr,128, frame_len);
 
+    video_output_buffer =
+	(struct ycbcr_frame**) vj_malloc(sizeof(struct ycbcr_frame**) * 1 );
+    if(!video_output_buffer)
+	return 0;
+    video_output_buffer[0] = (struct ycbcr_frame*) vj_malloc(sizeof(struct ycbcr_frame));
+    video_output_buffer[0]->Y = NULL;
+    video_output_buffer[0]->Cb = NULL;
+    video_output_buffer[0]->Cr = NULL; 
+
+
     clip_record_init(frame_len);
     vj_tag_record_init(w,h);
 
@@ -654,12 +665,20 @@ void vj_perform_free(veejay_t * info)
    if(primary_buffer[0]->Cr) free(primary_buffer[0]->Cr);
    if(primary_buffer[0]) free(primary_buffer[0]);
    if(primary_buffer) free(primary_buffer);
-	if(socket_buffer) free(socket_buffer);
+   if(socket_buffer) free(socket_buffer);
+
    for(c=0; c < 3; c ++)
    {
       if(temp_buffer[c]) free(temp_buffer[c]);
    }
    vj_perform_record_buffer_free();
+
+	if(video_output_buffer[0]->Y )
+		free(video_output_buffer[0]->Y);
+	if(video_output_buffer[0]->Cb )
+		free(video_output_buffer[0]->Y );
+	if(video_output_buffer[0]->Cr )
+		free(video_output_buffer[0]->Cr );
 }
 
 /***********************************************************************
@@ -774,6 +793,41 @@ void vj_perform_get_primary_frame(veejay_t * info, uint8_t ** frame,
     frame[1] = primary_buffer[0]->Cb;
     frame[2] = primary_buffer[0]->Cr;
 }
+
+void	vj_perform_get_output_frame( veejay_t *info, uint8_t **frame )
+{
+	
+	frame[0] = video_output_buffer[0]->Y;
+	frame[1] = video_output_buffer[0]->Cb;
+	frame[2] = video_output_buffer[0]->Cr;
+
+}
+
+void vj_perform_init_output_frame( veejay_t *info, uint8_t **frame,
+				int dst_w, int dst_h )
+{
+	if( video_output_buffer[0]->Y != NULL )
+ 		free(video_output_buffer[0]->Y );
+	if( video_output_buffer[0]->Cb != NULL )
+		free(video_output_buffer[0]->Cb );
+	if( video_output_buffer[0]->Cr != NULL )
+		free(video_output_buffer[0]->Cr );
+
+	video_output_buffer[0]->Y = (uint8_t*)
+			vj_malloc(sizeof(uint8_t) * dst_w * dst_h );
+	video_output_buffer[0]->Cb = (uint8_t*)
+			vj_malloc(sizeof(uint8_t) * dst_w * dst_h );
+	video_output_buffer[0]->Cr = (uint8_t*)
+			vj_malloc(sizeof(uint8_t) * dst_w * dst_h );
+
+	frame[0] = video_output_buffer[0]->Y;
+	frame[1] = video_output_buffer[0]->Cb;
+	frame[2] = video_output_buffer[0]->Cr;
+
+}
+
+
+
 
 int	vj_perform_send_primary_frame_s(veejay_t *info)
 {

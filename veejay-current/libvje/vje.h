@@ -49,6 +49,9 @@ typedef struct VJFrame_t
 	int	uv_height;
 	int	shift_v;
 	int	shift_h;
+	int	format;
+	int 	width;
+	int	height;
 } VJFrame;
 
 

@@ -35,7 +35,7 @@ typedef struct {
     long audio_rate;
 } vj_yuv;
 
-vj_yuv *vj_yuv4mpeg_alloc(editlist * el);
+vj_yuv *vj_yuv4mpeg_alloc(editlist * el, int dst_w, int dst_h);
 
 
 void vj_yuv4mpeg_free(vj_yuv *v) ;

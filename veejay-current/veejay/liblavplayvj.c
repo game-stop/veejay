@@ -399,6 +399,8 @@ int veejay_free(veejay_t * info)
     vj_el_free(info->edit_list);
 
 	vj_tag_free();
+    if( info->settings->zoom )
+		yuv_free_swscaler( info->video_out_scaler );
 
 	if( info->plugin_frame) vj_perform_free_plugin_frame(info->plugin_frame);
 	if( info->plugin_frame_info) free(info->plugin_frame_info);
@@ -984,8 +986,33 @@ static int veejay_screen_update(veejay_t * info ) {
     uint8_t *c_frame[3];
 
     // get the frame to output, in 420 or 422
-    vj_perform_get_primary_frame(info,frame,0);   
-     
+    
+	// scale the image if wanted
+	if(settings->zoom )
+	{
+		VJFrame src,dst;
+		memset(&src,0,sizeof(VJFrame));
+		memset(&dst,0,sizeof(VJFrame));
+
+		vj_get_yuv_template( &src, info->edit_list->video_width,
+								   info->edit_list->video_height,
+								   info->pixel_format );
+
+		vj_get_yuv_template( &dst, info->video_output_width,
+								   info->video_output_height,
+								   info->pixel_format );
+
+		vj_perform_get_primary_frame(info, src.data, 0 );
+		vj_perform_get_output_frame(info, dst.data );
+
+		yuv_convert_and_scale( info->video_out_scaler, src.data, dst.data );	
+
+		vj_perform_get_output_frame( info, frame );
+	}
+ 	else
+		vj_perform_get_primary_frame(info,frame,0);
+	
+
 #ifdef HAVE_JPEG
     /* dirty hack to save a frame to jpeg */
     if (info->uc->hackme == 1)
@@ -1595,12 +1622,75 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 {
   //  struct mjpeg_params bp;
     editlist *el = info->edit_list;
+    video_playback_setup *settings = info->settings;
     
     if (veejay_init_editlist(info) != 0) {
 	veejay_msg(VEEJAY_MSG_ERROR, 
 		    "Cannot initialize the EditList");
 	return -1;
     }
+
+	if(!vj_perform_init(info))
+    {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Performer");
+		return 0;
+    }
+    else
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Initialized Performer");
+    }
+
+	if( info->settings->zoom )
+	{
+    		sws_template templ;
+		VJFrame src;
+		VJFrame dst;
+		memset( &src, 0, sizeof(VJFrame));
+		memset( &dst, 0, sizeof(VJFrame));
+		memset( &templ, 0, sizeof(sws_template));
+		info->video_output_width = info->dummy->width;
+		info->video_output_height = info->dummy->height;
+
+		vj_get_yuv_template( &src,
+					info->edit_list->video_width,
+					info->edit_list->video_height,
+					info->pixel_format );
+		vj_get_yuv_template( &dst,
+					info->video_output_width,
+					info->video_output_height,
+					info->pixel_format );
+
+		    vj_perform_get_primary_frame(info, &src.data,0 );
+		    vj_perform_init_output_frame(info, &dst.data,
+			info->video_output_width, info->video_output_height );
+
+		// Todo: we can have yuv_scale routine blit directly to sdl surface,
+   		// set to YUY2 if input source is 4:2:2 planar 
+
+		templ.flags  = info->settings->zoom;
+	        info->video_out_scaler = (void*) yuv_init_swscaler( &src, &dst, &templ, yuv_sws_get_cpu_flags() );
+		if(!info->video_out_scaler)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize SwScaler");
+			return 0;
+		}
+		veejay_msg(VEEJAY_MSG_DEBUG, "SWS scale video output from %d x %d to %d x %d",
+			src.width,src.height,
+			dst.width, dst.height );
+	}
+	else
+	{
+	    /* setup output dimensions */
+	    info->video_output_width = el->video_width;
+	    info->video_output_height = el->video_height;
+	}
+
+	if(!info->bes_width)
+		info->bes_width = info->video_output_width;
+	if(!info->bes_height)
+		info->bes_height = info->video_output_height;		
+	
+
     	/* initialize tags (video4linux/yuv4mpeg stream ... ) */
     if (vj_tag_init(el->video_width, el->video_height, info->pixel_format) != 0) {
 	veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing stream manager");
@@ -1646,16 +1736,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 	plugins_allocate();
 
-    if(!vj_perform_init(info))
-    {
-	veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Performer");
-	return 0;
-    }
-    else
-    {
-	veejay_msg(VEEJAY_MSG_INFO, "Initialized Performer");
-    }
-
     if(info->edit_list->has_audio) {
 	if (vj_perform_init_audio(info) == 0) {
 		veejay_msg(VEEJAY_MSG_INFO, "Initialized Audio Task");
@@ -1696,7 +1776,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	}
 #endif
     if(info->dump) vj_effect_dump(); 	
-    info->output_stream = vj_yuv4mpeg_alloc(info->edit_list);
+    info->output_stream = vj_yuv4mpeg_alloc(info->edit_list,
+		info->video_output_width, info->video_output_height);
 
       if(arg != NULL ) {
 	  veejay_msg(VEEJAY_MSG_INFO, "Loading cliplist [%s]", arg);
@@ -1707,12 +1788,17 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
     	}
 #endif
     }
+    if(info->video_out<0)
+    {
+		veejay_msg(VEEJAY_MSG_ERROR, "No video output driver selected (see man veejay)");
+		return -1;
+	}
 
     /* now setup the output driver */
-    if(info->video_out != -1) 
     switch (info->video_out) {
+
   case 4:
-	info->segment = new_segment( el->video_width*el->video_height*2);
+	info->segment = new_segment( info->video_output_width * info->video_output_height * 3);
 	if(!info->segment)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize shared memory");
@@ -1725,14 +1811,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 #ifdef HAVE_SDL
     case 0:
-	if (!info->sdl_width)
-	    info->sdl_width = el->video_width;
-	if (!info->sdl_height)
-	    info->sdl_height = el->video_height;
 
 	info->sdl =
-	    (vj_sdl *) vj_sdl_allocate(el->video_width,
-				       el->video_height,
+	    (vj_sdl *) vj_sdl_allocate( info->video_output_width,
+				      info->video_output_height,
 					info->pixel_format);
 
 	if( x != -1 && y != -1 )
@@ -1740,19 +1822,20 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		vj_sdl_set_geometry(info->sdl,x,y);
 	}
 
-	/* init SDL if we want SDL */
-	if (!vj_sdl_init(info->sdl, info->sdl_width, info->sdl_height, "Veejay",1,
-		info->settings->full_screen))
-	    return -1;
+	if (!vj_sdl_init(info->sdl, info->bes_width, info->bes_height, "Veejay",1,
+			info->settings->full_screen))
+		    return -1;
+	
 	break;
 #endif
 #ifdef HAVE_DIRECTFB
     case 1:
 	veejay_msg(VEEJAY_MSG_DEBUG, "Initializing DirectFB");
 	info->dfb =
-	    (vj_dfb *) vj_dfb_allocate(el->video_width,
-				       el->video_height,
-				       el->video_norm);
+	    (vj_dfb *) vj_dfb_allocate(
+						info->video_output_width,
+				       	info->video_output_height,
+				       	el->video_norm);
 	if (vj_dfb_init(info->dfb) != 0)
 	    return -1;
 	break;
@@ -1760,21 +1843,16 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	veejay_msg(VEEJAY_MSG_DEBUG, 
 		    "Initializing cloned output (if both SDL/DirectFB are compiled in)");
 #ifdef HAVE_SDL
-	if (!info->sdl_width)
-	    info->sdl_width = el->video_width;
-	if (!info->sdl_height)
-	    info->sdl_height = el->video_height;
-
 	info->sdl =
-	    (vj_sdl *) vj_sdl_allocate(el->video_width,
-				       el->video_height, info->pixel_format);
-	if (!vj_sdl_init(info->sdl, info->sdl_width, info->sdl_height,"Veejay",1,
+	    (vj_sdl *) vj_sdl_allocate(info->video_output_width,
+				      info->video_output_height, info->pixel_format);
+	if (!vj_sdl_init(info->sdl, info->bes_width, info->bes_height,"Veejay",1,
 		info->settings->full_screen))
 	    return -1;
 #endif
 	info->dfb =
-	    (vj_dfb *) vj_dfb_allocate(el->video_width,
-				       el->video_height,
+	    (vj_dfb *) vj_dfb_allocate( info->video_output_width,
+				       info->video_output_height,
 				       el->video_norm);
 	if (vj_dfb_init(info->dfb) != 0)
 	    return -1;
@@ -1784,7 +1862,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	veejay_msg(VEEJAY_MSG_INFO, 
 		    "Entering render mode (no visual output)");
         
-	info->render_stream = vj_yuv4mpeg_alloc(info->edit_list);
+	info->render_stream = vj_yuv4mpeg_alloc(info->edit_list, info->video_output_width,info->video_output_height);
 
 
 
@@ -2241,8 +2319,8 @@ veejay_t *veejay_malloc()
 	return NULL;
     }
     info->auto_deinterlace = 0;
-    info->sdl_width = 0;	/* use video size */
-    info->sdl_height = 0;	/* use video size */
+    info->video_output_width = 0;	/* use video size */
+    info->video_output_height = 0;	/* use video size */
     info->load_action_file = 0;
     info->real_fps = 0;
     info->display = ":0.0";
@@ -2264,6 +2342,8 @@ veejay_t *veejay_malloc()
     //info->vli_enabled=0;
     info->sfd = 0;
     info->net = 0;
+	info->bes_width = 0;
+	info->bes_height = 0;
     info->dump = 0;
 	info->no_ffmpeg = 0; /* use ffmpeg by default */
     info->settings =
@@ -2297,6 +2377,7 @@ veejay_t *veejay_malloc()
 	info->settings->use_mcast = 0;
 	info->settings->use_vims_mcast = 0;
 	info->settings->vims_group_name = NULL;
+    info->settings->zoom = 0;
     info->edit_list = NULL;
     info->uc = (user_control *) vj_malloc(sizeof(user_control));
     if (!(info->uc)) {

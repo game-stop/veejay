@@ -336,7 +336,7 @@ int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el)
 {
     if (stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN)
 	return 0;
-    vj_tag_input->stream[stream_nr] = vj_yuv4mpeg_alloc(el);
+    vj_tag_input->stream[stream_nr] = vj_yuv4mpeg_alloc(el,el->video_width,el->video_height);
 
     if(vj_tag_input->stream[stream_nr] == NULL) 
 	return 0;

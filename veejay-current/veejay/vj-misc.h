@@ -32,4 +32,6 @@ int	vj_perform_take_bg( veejay_t *info, uint8_t **src);
 
 int	veejay_create_temp_file(const char *prefix, char *dst);
 
+void	vj_get_yuv_template(VJFrame *src, int w, int h, int fmt);
+
 #endif

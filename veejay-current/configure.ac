@@ -758,6 +758,7 @@ AC_CONFIG_FILES([
 Makefile
 ffmpeg/Makefile
 libOSC/Makefile
+libpostproc/Makefile
 libhash/Makefile
 libvjmsg/Makefile
 libvjmem/Makefile

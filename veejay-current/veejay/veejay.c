@@ -173,13 +173,29 @@ static void Usage(char *progname)
     fprintf(stderr,"  -Y/--ycbcr [01]\t\t0 = YUV 4:2:0 Planar, 1 = YUV 4:2:2 Planar\n");
 
 	fprintf(stderr,"  -d/--dummy	\t\tDummy playback\n");
-	fprintf(stderr,"  -W/--width    \t\tdummy width\n");
-	fprintf(stderr,"  -H/--height   \t\tdummy height\n");
-	fprintf(stderr,"  -N/--norm		\t\tdummy norm\n");
-	fprintf(stderr,"  -R/--framerate \t\tdummy frame rate\n");
+	fprintf(stderr,"  -W/--width <num>\t\tdummy width\n");
+	fprintf(stderr,"  -H/--height <num>\t\tdummy height\n");
+	fprintf(stderr,"  -N/--norm [01]\t\tdummy norm\n");
+	fprintf(stderr,"  -R/--framerate <num>\t\tdummy frame rate\n");
 	fprintf(stderr,"  -M/--multicast-osc \t\tmulticast OSC\n");
 	fprintf(stderr,"  -V/--multicast-vims \t\tmulticast VIMS\n");
-	fprintf(stderr,"     --map-from-file <num frames> \t\tmap N frames to memory\n");
+	fprintf(stderr,"     --map-from-file <num>\tmap N frames to memory\n");
+
+	fprintf(stderr,"  -z/--zoom [1-11]\n");
+	fprintf(stderr,"\t\t\t\tsoftware scaler type (also use -W, -H ). \n");
+	fprintf(stderr,"\t\t\t\tAvailable types are:\n");         
+	fprintf(stderr,"\t\t\t\t1\tFast bilinear (default)\n");
+	fprintf(stderr,"\t\t\t\t2\tBilinear\n");
+	fprintf(stderr,"\t\t\t\t3\tBicubic (good quality)\n");
+	fprintf(stderr,"\t\t\t\t4\tExperimental\n");
+	fprintf(stderr,"\t\t\t\t5\tNearest Neighbour (bad quality)\n");
+	fprintf(stderr,"\t\t\t\t6\tArea\n");
+	fprintf(stderr,"\t\t\t\t7\tLuma bicubic / chroma bilinear\n");
+	fprintf(stderr,"\t\t\t\t9\tGauss\n");
+	fprintf(stderr,"\t\t\t\t9\tsincR\n");
+	fprintf(stderr,"\t\t\t\t10\tLanczos\n");
+	fprintf(stderr,"\t\t\t\t11\tNatural bicubic spline\n");
+	fprintf(stderr,"\n\n");
     exit(-1);
 }
 
@@ -245,7 +261,7 @@ static int set_option(const char *name, char *value)
     } else if (strcmp(name, "deinterlace") == 0 || strcmp(name, "I" )==0) {
 	info->auto_deinterlace = 1;
     } else if (strcmp(name, "size") == 0 || strcmp(name, "s") == 0) {
-	if (sscanf(value, "%dx%d", &info->sdl_width, &info->sdl_height) !=
+	if (sscanf(value, "%dx%d", &info->bes_width, &info->bes_height) !=
 	    2) {
 	    mjpeg_error("--size parameter requires NxN argument");
 	    nerr++;
@@ -308,6 +324,15 @@ static int set_option(const char *name, char *value)
     else if (strcmp(name,"no-default-tags")==0||strcmp(name, "X")==0) {
 	default_use_tags=0;
 	}
+	else if (strcmp(name, "zoom") == 0 || strcmp(name, "z" ) == 0)
+	{
+		info->settings->zoom = atoi(optarg);
+		if(info->settings->zoom < 1 || info->settings->zoom > 11)
+		{
+			fprintf(stderr, "Use --zoom [1-11] or -z [1-11]\n");
+			exit(-1);
+		}
+	}
 	else if (strcmp(name, "dummy") == 0 || strcmp(name, "d" ) == 0 )
 	{
 
@@ -340,6 +365,7 @@ static void check_command_line_options(int argc, char *argv[])
 	{"action-file",1,0,0},
 	{"features",0,0,0},
 	{"deinterlace",0,0,0},
+	{"zoom",1,0,0},
 	{"port", 1, 0, 0},
 	{"host", 1, 0, 0},
 	{"sample-mode",1,0,0},
@@ -377,12 +403,12 @@ static void check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:V:s:c:t:l:C:p:m:x:y:nLFPXY:ugrvdibIjf:N:H:W:R:M:V:",
+			"o:G:O:a:H:V:s:c:t:l:C:p:m:x:y:nLFPXY:ugrvdibIjf:N:H:W:R:M:V:z:",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   "o:G:s:O:a:c:t:l:t:C:x:y:m:p:nLFPXY:Y:vudgibrIjf:N:H:W:R:M:V:")) != EOF)
+		   "o:G:s:O:a:c:t:l:t:C:x:y:m:p:nLFPXY:Y:vudgibrIjf:N:H:W:R:M:V:z:")) != EOF)
 #endif
     {
 	switch (n) {

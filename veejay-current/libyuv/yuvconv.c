@@ -20,6 +20,8 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <libyuv/yuvconv.h>
+#include <libpostproc/swscale.h>
+#include <libvjmsg/vj-common.h>
 /* this routine is the same as frame_YUV422_to_YUV420P , unpack
  * libdv's 4:2:2-packed into 4:2:0 planar 
  * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)
@@ -394,3 +396,137 @@ int luminance_mean(uint8_t * frame[], int w, int h)
     return sum / count;
 }
 
+typedef struct
+{
+	struct SwsContext *sws;
+	SwsFilter	  *src_filter;
+	SwsFilter	  *dst_filter;
+} vj_sws;
+#include <libpostproc/img_format.h>
+void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flags)
+{
+	vj_sws *s = (vj_sws*) vj_malloc(sizeof(vj_sws));
+	if(!s)
+		return NULL;
+
+	int	sws_type = 0;
+
+	memset( s, 0, sizeof(vj_sws) );
+
+/*		s->src_filter = sws_getDefaultFilter(
+			tmpl->lumaGBlur,
+			tmpl->chromaGBlur,
+			tmpl->lumaSarpen,
+			tmpl->chromaSharpen,
+			tmpl->chromaHShift,
+			tmpl->chromaVShift,
+			tmpl->verbose );*/
+
+	switch(tmpl->flags)
+	{
+		case 1:
+			sws_type = SWS_FAST_BILINEAR;
+			break;
+		case 2:
+			sws_type = SWS_BILINEAR;
+			break;
+		case 3:
+			sws_type = SWS_BICUBIC;
+			break;
+		case 4:
+			sws_type = SWS_POINT;
+			break;
+		case 5:
+			sws_type = SWS_X;
+			break;
+		case 6:
+			sws_type = SWS_AREA;
+			break;
+		case 7:
+			sws_type = SWS_BICUBLIN;
+			break;
+		case 8: 
+			sws_type = SWS_GAUSS;
+			break;
+		case 9:
+			sws_type = SWS_SINC;
+			break;
+		case 10:
+			sws_type = SWS_LANCZOS;
+			break;
+		case 11:
+			sws_type = SWS_SPLINE;
+			break;
+	}	
+
+	s->sws = sws_getContext(
+			src->width,
+			src->height,
+			src->format,
+			dst->width,
+			dst->height,
+			dst->format,
+			sws_type | cpu_flags,
+			s->src_filter,
+			s->dst_filter,
+			NULL
+		);
+
+	if(!s->sws)
+	{
+		if(s)free(s);
+		return NULL;
+	}	
+
+	sws_rgb2rgb_init( cpu_flags );
+
+	return ((void*)s);
+
+}
+
+void	yuv_free_swscaler(void *sws)
+{
+	if(sws)
+	{
+		vj_sws *s = (vj_sws*) sws;
+		if(s->src_filter)
+			sws_freeFilter(s->src_filter);
+		if(s->dst_filter)
+			sws_freeFilter(s->dst_filter);
+		if(s->sws)
+			sws_freeContext( s->sws );
+	}
+}
+
+void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
+{
+	vj_sws *s = (vj_sws*) sws;
+	int src_stride[3] = { src->width,src->uv_width,src->uv_width };
+	int dst_stride[3] = { dst->width,dst->uv_width,dst->uv_width };
+
+	sws_scale( s->sws, src->data, src_stride, 0, src->height,
+		dst->data, dst_stride );
+
+#ifdef 	HAVE_ASM_MMX
+	asm volatile ("emms\n\t");
+#endif
+	
+}
+
+int	yuv_sws_get_cpu_flags(void)
+{
+	int cpu_flags = 0;
+#ifdef HAVE_ASM_MMX
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX;
+#endif
+#ifdef HAVE_ASM_3DNOW
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_3DNOW;
+#endif
+#ifdef HAVE_ASM_MMX2
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX2;
+#endif
+#ifdef HAVE_ALTIVEC
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_ALTIVEC;
+#endif
+	return cpu_flags;
+}

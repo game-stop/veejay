@@ -59,7 +59,7 @@ t_wave_hdr *wave_hdr;
 
 int bytecount = 0;
 
-vj_yuv *vj_yuv4mpeg_alloc(editlist * el)
+vj_yuv *vj_yuv4mpeg_alloc(editlist * el, int w, int h)
 {
     vj_yuv *yuv4mpeg = (vj_yuv *) malloc(sizeof(vj_yuv));
     if(!yuv4mpeg) return NULL;
@@ -67,8 +67,8 @@ vj_yuv *vj_yuv4mpeg_alloc(editlist * el)
     yuv4mpeg->dar = y4m_dar_4_3;
     y4m_init_stream_info(&(yuv4mpeg->streaminfo));
     y4m_init_frame_info(&(yuv4mpeg->frameinfo));
-    yuv4mpeg->width = el->video_width;
-    yuv4mpeg->height = el->video_height;
+    yuv4mpeg->width = w;
+    yuv4mpeg->height = h;
     yuv4mpeg->audio_rate = el->audio_rate;
     yuv4mpeg->video_fps = el->video_fps;
     yuv4mpeg->has_audio = el->has_audio;

@@ -145,6 +145,7 @@ typedef struct {
 	char *group_name;
 	int use_vims_mcast;
 	char *vims_group_name;
+	int zoom;
 } video_playback_setup;
 
 
@@ -194,8 +195,8 @@ typedef struct {
 } user_control;
 
 typedef struct {
-    int sdl_width;		/* width of the SDL playback window in case of software playback */
-    int sdl_height;		/* height of the SDL playback window in case of software playback */
+    int video_output_width;		/* width of the SDL playback window in case of software playback */
+    int video_output_height;		/* height of the SDL playback window in case of software playback */
     int soft_full_screen;	/* [0-1] set software-driven full-screen/screen-output, 1 = yes, 0 = no */
     int double_factor;		/* while playing, duplicate each frame double_factor times */
     int preserve_pathnames;
@@ -235,6 +236,7 @@ typedef struct {
     vj_yuv *render_stream;
     video_segment *segment;
     video_segment *client;
+    void *video_out_scaler;
     int render_now;	        /* write RGB */
     int render_continous;
     char action_file[256];
@@ -258,6 +260,8 @@ typedef struct {
     int pixel_format;
 	dummy_t *dummy;
 	int seek_cache;
+	int bes_width;
+	int bes_height;
 } veejay_t;
 
 typedef struct {

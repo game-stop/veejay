@@ -41,6 +41,7 @@ libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS) \
 			-L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libhash / -lhash \
 			-L$(top_builddir)/utils/ -lmjpegutils \
+			-L$(top_builddir)/libpostproc/ -lpostproc \
 			-L$(top_builddir)/bio2jack/ -lbio2jack \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
 			-L$(top_builddir)/libvjmem/ -lvjmem \
@@ -61,9 +62,16 @@ libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS) \
 # The tools themselves
 VEEJAY_BIN = veejay
 
+VJ_LIBS = \
+	-L$(top_builddir)/libvjnet -lvjnet \
+	-L$(top_builddir)/libpostproc -lpostproc \
+	-L$(top_builddir)/libyuv -lyuv \
+	-L$(top_builddir)/ffmpeg/ffmpeg/libavcodec -lavcodec 
+
 bin_PROGRAMS = $(VEEJAY_BIN)  
 
 veejay_headers = vims.h
 
 veejay_SOURCES	= veejay.c ${veejay_headers} 
-veejay_LDADD 	= libveejay.la @LIBGETOPT_LIB@ -L$(top_builddir)/libvjnet -lvjnet -L$(top_builddir)/ffmpeg/ffmpeg/libavcodec -lavcodec
+veejay_LDADD 	= libveejay.la $(VJ_LIBS) @LIBGETOPT_LIB@ 
+
