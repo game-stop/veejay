@@ -34,9 +34,12 @@ typedef struct
 	fd_set master;
 	fd_set current;
 	fd_set exceptions;
+	int cur_width;
+	int cur_height;
+	int cur_fmt;
 } vj_client;
 
-vj_client *vj_client_connect( char *host, int port_id, int *error );
+int vj_client_connect( vj_client *v, char *host, int port_id, int *error );
 
 int vj_client_read( vj_client *v, uint8_t *dst );
 
@@ -46,7 +49,7 @@ int vj_client_flush(vj_client *v);
 
 int vj_client_send( vj_client *v, char *buf);
 
-int	vj_client_poll( vj_client *v );
+vj_client *vj_client_alloc(int w , int h, int f);
 
 #endif
 
