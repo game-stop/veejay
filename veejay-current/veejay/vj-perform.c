@@ -89,7 +89,6 @@ static void vj_perform_record_buffer_free();
 
 #define N_RESAMPLE (10)
 static ReSampleContext *resample_context[N_RESAMPLE];
-//static SRC_STATE *resample_context;
 static ReSampleContext *resample_jack;
 
 #define MLIMIT(var, low, high) \
@@ -563,7 +562,7 @@ static void vj_perform_close_audio() {
 		for(i=1; i <= N_RESAMPLE; i ++)
 		{
 			if(resample_context[(i-1)])
-			audio_resample_close( resample_context[(i-1)] );
+				audio_resample_close( resample_context[(i-1)] );
 		}
 	}
 	if(resample_jack)
@@ -645,7 +644,9 @@ void vj_perform_free(veejay_t * info)
 {
     int fblen = CLIP_MAX_EFFECTS; // mjpg buf
     int c;
-    vj_perform_close_audio();
+
+    if(info->edit_list->has_audio)
+	    vj_perform_close_audio();
 
     for (c = 0; c < fblen; c++) {
 	if(vj_perform_row_used(0,c)) vj_perform_free_row(0,c);

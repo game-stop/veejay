@@ -75,6 +75,7 @@ typedef struct
 	float chromaVShift;
 	int	verbose;
 	int	flags;
+	int	use_filter;
 } sws_template;
 
 void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *templ, int cpu_flags);

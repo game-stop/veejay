@@ -389,10 +389,9 @@ void veejay_busy(veejay_t * info)
  *
  * return value: 1 on succes, 0 on error
  ******************************************************/
-
 int veejay_free(veejay_t * info)
 {
-    video_playback_setup *settings =
+	video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     
 
@@ -1045,9 +1044,6 @@ static int veejay_screen_update(veejay_t * info ) {
 
 	plugins_process( (void*) info->plugin_frame_info, (void*) info->plugin_frame );
 
-
-
-	
 	plugins_process_video_out( (void*) info->plugin_frame_info, (void*) info->plugin_frame );
 
 #ifdef HAVE_SDL
@@ -1368,7 +1364,6 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 	    settings->currently_processed_frame;
 
 
-//#ifdef HAVE_SDL
 	veejay_handle_callbacks(info);
 #ifdef HAVE_SDL
     SDL_Event event;
@@ -1406,7 +1401,6 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 
     veejay_msg(VEEJAY_MSG_DEBUG, 
 		"Playback thread: was told to exit");
-    //pthread_exit(NULL);
     return NULL;
 }
 
@@ -1642,12 +1636,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 	if( info->settings->zoom )
 	{
-    		sws_template templ;
 		VJFrame src;
 		VJFrame dst;
 		memset( &src, 0, sizeof(VJFrame));
 		memset( &dst, 0, sizeof(VJFrame));
-		memset( &templ, 0, sizeof(sws_template));
 		info->video_output_width = info->dummy->width;
 		info->video_output_height = info->dummy->height;
 
@@ -1667,16 +1659,31 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		// Todo: we can have yuv_scale routine blit directly to sdl surface,
    		// set to YUY2 if input source is 4:2:2 planar 
 
-		templ.flags  = info->settings->zoom;
-	        info->video_out_scaler = (void*) yuv_init_swscaler( &src, &dst, &templ, yuv_sws_get_cpu_flags() );
+		info->settings->sws_templ.flags  = info->settings->zoom;
+	        info->video_out_scaler = (void*)
+			yuv_init_swscaler(
+				&src,
+				&dst,
+				&(info->settings->sws_templ),
+				yuv_sws_get_cpu_flags()
+			);
+
 		if(!info->video_out_scaler)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize SwScaler");
 			return 0;
 		}
-		veejay_msg(VEEJAY_MSG_DEBUG, "SWS scale video output from %d x %d to %d x %d",
-			src.width,src.height,
-			dst.width, dst.height );
+
+		veejay_msg(VEEJAY_MSG_DEBUG,"Using Software Scaler (%dx%d -> %dx%d)",
+			src.width,src.height,dst.width,dst.height);
+		if(info->settings->sws_templ.use_filter)
+		{
+			sws_template *t = &(info->settings->sws_templ);
+			veejay_msg(VEEJAY_MSG_DEBUG, "Using software scaler options:");
+			veejay_msg(VEEJAY_MSG_DEBUG, "lgb=%f, cgb=%f, ls=%f, cs=%f, chs=%d, cvs=%d",
+				t->lumaGBlur,t->chromaGBlur,t->lumaSarpen,
+				t->chromaSharpen,t->chromaHShift,t->chromaVShift);
+		}
 	}
 	else
 	{
@@ -2212,6 +2219,9 @@ static void *veejay_playback_thread(void *data)
    
     veejay_playback_cycle(info);
 
+      veejay_close(info); 
+ 
+    veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
     if(info->uc->is_server) {
      vj_server_shutdown(info->vjs[0]);
      vj_server_shutdown(info->vjs[1]); 
@@ -2311,107 +2321,78 @@ veejay_t *veejay_malloc()
     veejay_t *info;
     int i;
 
-
     info = (veejay_t *) vj_malloc(sizeof(veejay_t));
-    if (!info) {
-	veejay_msg(VEEJAY_MSG_ERROR, 
-		    "Malloc error, you\'re probably out of memory");
-	return NULL;
-    }
-    info->auto_deinterlace = 0;
-    info->video_output_width = 0;	/* use video size */
-    info->video_output_height = 0;	/* use video size */
-    info->load_action_file = 0;
-    info->real_fps = 0;
-    info->display = ":0.0";
+    if (!info)
+		return NULL;
+	memset(info,0,sizeof(veejay_t));
+
+    info->settings = (video_playback_setup *) vj_malloc(sizeof(video_playback_setup));
+    if (!(info->settings)) 
+		return NULL;
+   	memset( info->settings, 0, sizeof(video_playback_setup));
+
+	info->uc = (user_control *) vj_malloc(sizeof(user_control));
+    if (!(info->uc)) 
+		return NULL;
+	memset( info->uc, 0, sizeof(user_control));
+
+    info->effect_frame1 = (VJFrame*) vj_malloc(sizeof(VJFrame));
+	if(!info->effect_frame1)
+		return NULL;
+	memset( info->effect_frame1, 0, sizeof(VJFrame));
+
+    info->effect_frame2 = (VJFrame*) vj_malloc(sizeof(VJFrame));
+	if(!info->effect_frame2)
+		return NULL;
+	memset( info->effect_frame2, 0, sizeof(VJFrame));
+
+
+    info->effect_frame_info = (VJFrameInfo*) vj_malloc(sizeof(VJFrameInfo));
+	if(!info->effect_frame_info)
+		return NULL;
+	memset( info->effect_frame_info, 0, sizeof(VJFrameInfo));
+
+
+    info->effect_info = (vjp_kf*) vj_malloc(sizeof(vjp_kf));
+	if(!info->effect_info) 
+		return NULL;   
+	memset( info->effect_info, 0, sizeof(vjp_kf)); 
+
+	info->dummy = (dummy_t*) vj_malloc(sizeof(dummy_t));
+    if(!info->dummy)
+		return NULL;
+	memset( info->dummy, 0, sizeof(dummy_t));
+
+	memset(&(info->settings->sws_templ), 0, sizeof(sws_template));
+
+
     info->audio = AUDIO_PLAY;
     info->continuous = 1;
     info->sync_correction = 1;
     info->sync_ins_frames = 1;
     info->sync_skip_frames = 1;
     info->double_factor = 1;
-    info->preserve_pathnames = 0;
-    info->stream_enabled = 0;
-    info->stream_outformat = -1;
-    info->seek_cache = 0;
-    info->verbose = 0;
-    info->gui_screen = 0;
-	info->audio = 0;
     info->no_bezerk = 1;
     info->nstreams = 1;
-    //info->vli_enabled=0;
-    info->sfd = 0;
-    info->net = 0;
-	info->bes_width = 0;
-	info->bes_height = 0;
-    info->dump = 0;
-	info->no_ffmpeg = 0; /* use ffmpeg by default */
-    info->settings =
-	(video_playback_setup *) vj_malloc(sizeof(video_playback_setup));
-    if (!(info->settings)) {
-	veejay_msg(VEEJAY_MSG_ERROR,
-		    "Malloc error, you\'re probably out of memory");
-	return NULL;
-    }
-	info->settings->audio_mute = 0; 
-    info->settings->current_playback_speed = 0;
-    info->settings->currently_synced_frame = 0;
-    info->settings->currently_processed_frame = 0;
+    info->stream_outformat = -1;
+
     info->settings->currently_processed_entry = -1;
-    info->settings->current_frame_num = 0;
-    info->settings->rendered_frames = 0;
-    info->settings->save_list = NULL;
-    info->settings->save_list_len = 0;
     info->settings->previous_playback_speed = 1;
     info->settings->first_frame = 1;
     info->settings->state = LAVPLAY_STATE_PAUSED;
-    info->settings->offline_ready = 0;
-    info->settings->offline_record = 0;
-    info->settings->offline_tag_id = 0;
-    info->settings->offline_created_clip = 0;
-	info->settings->full_screen = 0;
-    info->settings->tag_record_switch = 0;
-    info->settings->tag_record = 0;
-    info->settings->clip_record_switch = 0;
-    info->settings->clip_record = 0;
-	info->settings->use_mcast = 0;
-	info->settings->use_vims_mcast = 0;
-	info->settings->vims_group_name = NULL;
-    info->settings->zoom = 0;
-    info->edit_list = NULL;
-    info->uc = (user_control *) vj_malloc(sizeof(user_control));
-    if (!(info->uc)) {
-	veejay_msg(VEEJAY_MSG_ERROR, 
-		    "Malloc error. Out of memory");
-	return NULL;
-    }
-    memset(info->uc, 0, sizeof(user_control));
-    info->last_tag_id = 0;
-    info->last_clip_id = 0;
     info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
     info->uc->use_timer = 2;
-    info->render_now = 0;
-    info->render_continous = 0;
     info->uc->clip_key = 1;
     info->uc->direction = 1;	/* pause */
     info->uc->clip_start = -1;
     info->uc->clip_end = -1;
-    info->effect_frame1 = (VJFrame*) vj_malloc(sizeof(VJFrame));
-    info->effect_frame2 = (VJFrame*) vj_malloc(sizeof(VJFrame));
-    info->effect_frame_info = (VJFrameInfo*) vj_malloc(sizeof(VJFrameInfo));
-    info->effect_info = (vjp_kf*) vj_malloc(sizeof(vjp_kf));
-    info->effect_info->ref = 0;
-    info->effect_info->type = 0;
-
-	info->dummy = (dummy_t*) vj_malloc(sizeof(dummy_t));
-	memset(info->dummy, 0, sizeof( dummy_t ));	
-
     info->net = 1;
+
     bzero(info->action_file,256); 
     bzero(info->stream_outname,256);
 
     for (i = 0; i < CLIP_MAX_PARAMETERS; i++)
-	info->effect_info->tmp[i] = 0;
+		info->effect_info->tmp[i] = 0;
 
 #ifdef HAVE_SDL
     info->video_out = 0;
@@ -2424,7 +2405,7 @@ veejay_t *veejay_malloc()
 #endif
 #endif
 
-      return info;
+    return info;
 }
 
 

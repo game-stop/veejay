@@ -413,14 +413,17 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 
 	memset( s, 0, sizeof(vj_sws) );
 
-/*		s->src_filter = sws_getDefaultFilter(
+	if( tmpl->use_filter )
+	{
+		s->src_filter = sws_getDefaultFilter(
 			tmpl->lumaGBlur,
 			tmpl->chromaGBlur,
 			tmpl->lumaSarpen,
 			tmpl->chromaSharpen,
 			tmpl->chromaHShift,
 			tmpl->chromaVShift,
-			tmpl->verbose );*/
+			tmpl->verbose );
+	}
 
 	switch(tmpl->flags)
 	{

@@ -560,7 +560,6 @@ int	vj_server_update( vj_server *vje, int id )
 
 	return _vj_server_parse_msg( vje, id, vje->recv_buf,n );	
 }
-
 void vj_server_shutdown(vj_server *vje)
 {
 	int j,i;
@@ -568,7 +567,7 @@ void vj_server_shutdown(vj_server *vje)
 	int k = VJ_MAX_CONNECTIONS;
 
 	if(vje->use_mcast) k = 1;
-
+    
 	for(i=0; i < k; i++)
 	{
 		if(Link[i]->in_use) 
@@ -602,6 +601,7 @@ void vj_server_shutdown(vj_server *vje)
 		free(vje->recv_buf);
 
 	free(Link);
+	if(vje) free(vje);
 }
 
 int vj_server_retrieve_msg(vj_server *vje, int id, char *dst )

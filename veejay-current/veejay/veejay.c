@@ -162,7 +162,6 @@ static void Usage(char *progname)
     fprintf(stderr,"  -x/--geometryx <num> \t\tTop left x offset for SDL video window\n");
     fprintf(stderr,"  -y/--geometryy <num> \t\tTop left y offset for SDL video window\n");
     fprintf(stderr,"  -F/--features  \t\tList of compiled features\n");
-    fprintf(stderr,"  -g/--gui      \t\tSetup a SDL video window on a given WindowID (see -u)\n");
     fprintf(stderr,"  -v/--verbose  \t\tEnable debugging output (default off)\n");
     fprintf(stderr,"  -b/--bezerk    \t\tBezerk (default off)   \n");
     fprintf(stderr,"  -L/--auto-loop   \t\tStart with default sample\n");
@@ -195,10 +194,22 @@ static void Usage(char *progname)
 	fprintf(stderr,"\t\t\t\t9\tsincR\n");
 	fprintf(stderr,"\t\t\t\t10\tLanczos\n");
 	fprintf(stderr,"\t\t\t\t11\tNatural bicubic spline\n");
+#ifdef HAVE_GETOPT_LONG
+	fprintf(stderr,"\n\t\t\t\tsoftware scaler options:\n");
+	fprintf(stderr,"\t\t\t\t--lgb=<0-100>\tGaussian blur filter (luma)\n");
+	fprintf(stderr,"\t\t\t\t--cgb=<0-100>\tGuassian blur filter (chroma)\n");
+	fprintf(stderr,"\t\t\t\t--ls=<0-100>\tSharpen filter (luma)\n");
+	fprintf(stderr,"\t\t\t\t--cs=<0-100>\tSharpen filter (chroma)\n");
+	fprintf(stderr,"\t\t\t\t--chs=<h>\tChroma horizontal shifting\n");
+	fprintf(stderr,"\t\t\t\t--cvs=<v>\tChroma vertical shifting\n");
+#endif
 	fprintf(stderr,"\n\n");
     exit(-1);
 }
 
+#define OUT_OF_RANGE(val) ( val < 0 ? 1 : ( val > 100 ? 1 : 0) )
+
+#define OUT_OF_RANGE_ERR(val) if(OUT_OF_RANGE(val)) { fprintf(stderr,"\tValue must be 0-100\n"); exit(-1); }
 
 static int set_option(const char *name, char *value)
 {
@@ -207,7 +218,6 @@ static int set_option(const char *name, char *value)
     if (strcmp(name, "host") == 0 || strcmp(name, "h") == 0) {
 	run_server = 0;
 	fprintf(stderr, "Run as server, host is not yet implemented.\n");
-	veejay_free(info);
 	exit(0);
     } else if (strcmp(name, "port") == 0 || strcmp(name, "p") == 0) {
 	info->uc->port = atoi(optarg);
@@ -226,8 +236,6 @@ static int set_option(const char *name, char *value)
 	    printf("Valid timers:\n\t0=none\n\t2=normal\n\t1=rtc\n");
 	    exit(1);
 	}
-	} else if (strcmp(name, "gui") == 0 || strcmp(name, "g") == 0) {
-	     info->video_out = -1;
 	} else if (strcmp(name, "multicast-vims") == 0 || strcmp(name,"V")==0)
 	{
 		info->settings->use_vims_mcast = 1;
@@ -250,8 +258,6 @@ static int set_option(const char *name, char *value)
 	       || strcmp(name, "output-driver") == 0
 	       || strcmp(name, "O") == 0) {
 	    info->video_out = atoi(optarg);	/* use SDL */
-    } else if (strcmp(name, "gui") == 0 || strcmp(name,"g") == 0) {
-		info->gui_screen = 1;
     } else if (strcmp(name, "F") == 0 || strcmp(name, "features")==0) {
 	CompiledWith();
         exit(0);
@@ -333,6 +339,47 @@ static int set_option(const char *name, char *value)
 			exit(-1);
 		}
 	}
+	else if (strcmp(name, "lgb") == 0) 	
+	{
+		info->settings->sws_templ.lumaGBlur = (float)atof(optarg);
+		OUT_OF_RANGE_ERR( info->settings->sws_templ.lumaGBlur);
+		info->settings->sws_templ.use_filter = 1;
+	}
+	else if (strcmp(name, "cgb") == 0)
+	{
+		info->settings->sws_templ.chromaGBlur = (float)atof(optarg);
+		OUT_OF_RANGE_ERR( info->settings->sws_templ.chromaGBlur );
+		info->settings->sws_templ.use_filter = 1;
+
+	}
+	else if (strcmp(name, "ls") == 0)
+	{
+		info->settings->sws_templ.lumaSarpen = (float) atof(optarg);
+		OUT_OF_RANGE_ERR( info->settings->sws_templ.lumaSarpen);
+		info->settings->sws_templ.use_filter = 1;
+
+	}
+	else if (strcmp(name, "cs") == 0)
+	{
+		info->settings->sws_templ.chromaSharpen = (float) atof(optarg);
+		OUT_OF_RANGE_ERR(info->settings->sws_templ.chromaSharpen);
+		info->settings->sws_templ.use_filter = 1;
+
+	}	
+	else if (strcmp(name, "chs") == 0)
+	{
+		info->settings->sws_templ.chromaHShift = (float) atof(optarg);
+		OUT_OF_RANGE_ERR(info->settings->sws_templ.chromaHShift );
+		info->settings->sws_templ.use_filter = 1;
+
+	}
+	else if (strcmp(name, "cvs") == 0)
+	{
+		info->settings->sws_templ.chromaVShift = (float) atof(optarg);
+		OUT_OF_RANGE_ERR(info->settings->sws_templ.chromaVShift );
+		info->settings->sws_templ.use_filter = 1;
+
+	}
 	else if (strcmp(name, "dummy") == 0 || strcmp(name, "d" ) == 0 )
 	{
 
@@ -369,13 +416,10 @@ static void check_command_line_options(int argc, char *argv[])
 	{"port", 1, 0, 0},
 	{"host", 1, 0, 0},
 	{"sample-mode",1,0,0},
-	{"gui",0,0,0},
-	{"interactive",0,0,0},
 	{"dummy",0,0,0},
 	{"geometry-x",1,0,0},
 	{"geometry-y",1,0,0},
 	{"auto-loop",0,0,0},
-	{"gui",0,0,0},
 	{"fps",1,0,0},
 	{"force",0,0,0},
 	{"no-color",0,0,0},
@@ -390,6 +434,12 @@ static void check_command_line_options(int argc, char *argv[])
 	{"multicast-osc",1,0,0},
 	{"multicast-vims",1,0,0},
 	{"map-from-file",1,0,0},
+	{"lgb",1,0,0},
+	{"cgb",1,0,0},
+	{"ls",1,0,0},
+	{"cs",1,0,0},
+	{"chs",1,0,0},
+	{"cvs",1,0,0},
 	{0, 0, 0, 0}
     };
 #endif

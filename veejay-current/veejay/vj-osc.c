@@ -918,8 +918,8 @@ void vj_osc_set_veejay_t(veejay_t *info) {
 
 void vj_osc_free(void *d)
 {
+	if(!d) return;
 	vj_osc *c = (vj_osc*) d;
-	if(c==NULL) return;
 	if(c->leaves) free(c->leaves);
 	if(c) free(c);
 	c = NULL;
