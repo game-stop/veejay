@@ -129,11 +129,69 @@ Starts OSC receiver in multicast mode
 .B \-V/--multicast-vims
 Starts VIMS in multicast mode (needed for multicast streaming)
 .TP
-.B \  /--map-from-file
+.B \  /--map-from-file <num frames>
 To reduce transfers between memory and disk, you can set a number
 of frames to be cached in memory from file (only valid for rawDV and AVI)
 Use smaller values for better performance (mapping several hundreds of
 megabytes can become a problem)
+.TP
+.TP
+.B \--lgb=<0-100>
+For use with \-z/--zoom, use Gaussian blur filter (luma)
+.TP
+.B \--cgb=<0-100>
+For use with \-z/--zoom, use Gaussian blur filter (chroma)
+.TP
+.B \--ls=<0-100>
+For use with \-z/--zoom, use Sharpen filter (luma)
+.TP
+.B \--cs=<0-100>
+For use with \-z/--zoom, use Sharpen filter (chroma)
+.TP
+.B \--chs=<h>
+For use with \-z/--zoom, Chroma horizontal shifting 
+.TP
+.B \--cvs=<v>
+For use with \-z/--zoom, Chroma vertical shifting
+.B \-z/--zoom <num>
+Use the software scaler (this affects output video). (Also see \-H and \-W)
+Available modes are:
+.RS
+.TP
+.B 1
+Fast Bilinear (default)
+.TP
+.B 2
+Bilinear
+.TP
+.B 3
+Bicubic (good quality)
+.TP
+.B 4
+Experimental
+.TP
+.B 5
+Nearest Neighbour (bad quality)
+.TP
+.B 6
+Area
+.TP
+.B 7
+Luma bicubic / chroma bilinear 
+.TP
+.B 8
+Gauss
+.TP
+.B 9
+sincR
+.TP
+.B 10
+Lanczos
+.TP
+.B 11
+Natural bicubic spline
+.TP
+
 
 .SH EXAMPLES
 .TP
