@@ -175,10 +175,8 @@ static int human_friendly_vims(char *buffer)
    }
 
    if(strncmp( buffer, "vi",2 ) == 0 ) { human_friendly_msg( NET_TAG_NEW_V4L, buffer+2); return 1; }
-   if(strncmp( buffer, "li",2 ) == 0 ) { human_friendly_msg( NET_TAG_NEW_VLOOP_BY_NAME,buffer+2); return 1; }
    if(strncmp( buffer, "fi",2 ) == 0 ) { human_friendly_msg( NET_TAG_NEW_Y4M, buffer+2); return 1; }
    if(strncmp( buffer, "fo",2 ) == 0 ) { human_friendly_msg( NET_OUTPUT_Y4M_START,buffer+2); return 1; }
-   if(strncmp( buffer, "lo",2 ) == 0 ) { human_friendly_msg( NET_OUTPUT_VLOOPBACK_STARTN, buffer+2); return 1;}
    if(strncmp( buffer, "cl",2 ) == 0 ) { human_friendly_msg( NET_CLIP_LOAD_CLIPLIST, buffer+2); return 1;}
    if(strncmp( buffer, "cn",2 ) == 0 ) { human_friendly_msg( NET_CLIP_NEW, buffer+2); return 1;}
    if(strncmp( buffer, "cd",2 ) == 0 ) { human_friendly_msg( NET_CLIP_DEL, buffer+2); return 1;}
