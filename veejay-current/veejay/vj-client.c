@@ -34,28 +34,37 @@
 #define VJC_SOCKET 2
 #define VJC_BAD_HOST 3
 
-vj_client *vj_client_connect( char *host, int port_id, int *error  )
+vj_client *vj_client_alloc( int w, int h, int f )
 {
 	vj_client *v = (vj_client*) vj_malloc(sizeof(vj_client));
 	if(!v)
 	{
-		*error = VJC_NO_MEM;
 		return NULL;
 	}
+	v->planes[0] = 0;
+	v->planes[1] = 0;
+	v->planes[2] = 0;
+	// recv. format / w/h 
+	v->cur_width = w;
+	v->cur_height = h;
+	v->cur_fmt = f;
+	return v;
+}
+
+int vj_client_connect(vj_client *v, char *host, int port_id, int *error  )
+{
 	v->he = gethostbyname( host );
 	if(v->he == NULL )
 	{
 		*error = VJC_BAD_HOST;
-		if(v) free(v);
-		return NULL;
+		return 0;
 	}
 	v->handle = socket( AF_INET, SOCK_STREAM, 0 );
 
 	if(v->handle < 0)
 	{
 		*error = VJC_SOCKET;	
-		free(v);
-		return NULL;
+		return 0;
 	}
 
 	v->serv_addr.sin_family = AF_INET;
@@ -66,8 +75,7 @@ vj_client *vj_client_connect( char *host, int port_id, int *error  )
 	if(v->status < 0 )
 	{
 		*error = VJC_SOCKET;
-		free(v);
-		return NULL;
+		return 0;
 	}
 
 	v->stat_addr.sin_family = AF_INET;
@@ -77,60 +85,126 @@ vj_client *vj_client_connect( char *host, int port_id, int *error  )
 	if( connect( v->handle, (struct sockaddr*) &v->serv_addr,
 		sizeof(struct sockaddr)) == -1 )
 	{
-		free(v);
-		return NULL;
+		return 0;
 	}
 
 	if( connect( v->status, (struct sockaddr*) &v->stat_addr,
 		sizeof(struct sockaddr)) == -1)
 	{
-		free(v);
-		return NULL;
+		return 1;
 	}
 
-	v->planes[0] = 0;
-	v->planes[1] = 0;
-	v->planes[2] = 0;
-	// recv. format / w/h 
-
- 	FD_ZERO( &(v->master) );
+	FD_ZERO( &(v->master) );
 	FD_ZERO( &(v->current) );
+	FD_ZERO( &(v->exceptions) );
 	FD_SET( v->handle, &(v->master) );
-
-	return v;
+	return 1;
 }
 
-int	vj_client_poll(vj_client *v)
-{	
-	struct timeval tv;
-	v->current = v->master;
-	tv.tv_sec = 0;
-	tv.tv_usec = 0;
-	if ( select ( v->handle, &(v->current), NULL,NULL,&tv) == -1 )
-		return 0;
-	return 1;
+static int _vj_client_poll( vj_client *v )
+{
+	int status;
+	fd_set fds;
+	struct timeval no_wait;
+	memset( &no_wait, 0, sizeof(no_wait ));
+	FD_ZERO( &fds );
+	FD_SET( v->handle, &fds );
+	status = select( v->handle + 1, &fds, 0,0, &no_wait );
+	if( status <= 0)
+		return status;
+	if(FD_ISSET( v->handle, &fds ) )
+		return 1;
+	return 0;
 }
 
 int vj_client_flush(vj_client *v)
 {
 	int nbytes = 100;
 	int n  = 0;
-	char status[100];
-	n = recv( v->status, status, nbytes,0 );
+	char stat[100];
+	int status;
+	fd_set fds;
+	struct timeval no_wait;
+	memset( &no_wait, 0, sizeof(no_wait));
+	FD_ZERO( &fds );
+	FD_SET( v->status, &fds);
+	status = select( v->status + 1, &fds, 0,0, &no_wait );
+	if(status <= 0 )
+	{
+		//veejay_msg(VEEJAY_MSG_DEBUG, "Missed status line!!");
+		return 0;
+	}
+	if(status > 0 )
+	if( FD_ISSET(v->status, &fds ))
+	{
+		//veejay_msg(VEEJAY_MSG_DEBUG, "OK, accepting status from sock %d",
+		//	v->status);
+		n = recv( v->status, stat, nbytes,0 );
+		//veejay_msg(VEEJAY_MSG_DEBUG, "Flushed %d : [%s]", n,stat );
+		return n;
+	}
+	return 0;
+}
+
+int vj_client_flush_block(vj_client *v)
+{
+	int nbytes = 100;
+	char stat[100];
+	int n = recv( v->status, stat, nbytes, MSG_WAITALL );
+	if( n <= 0 )
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection");
+	}
+//	if( n > 0 )
+//		veejay_msg(VEEJAY_MSG_DEBUG, "Flushed %d : [%s]", n,stat);
 	return n;
 }
+
 
 // todo: while bytes left do a recv , if it returns -1 , flush the data
 int	vj_client_read(vj_client *v, uint8_t *dst )
 {
 	int nb = 0;
 	int len = v->planes[0] + v->planes[1] + v->planes[2];
-	int n = recv( v->handle, dst, len, MSG_WAITALL );
+	int n;
+	char line[12];
+	int w = 0, h = 0, f = 0;
+	bzero(line,12);
+	if( _vj_client_poll( v ) <= 0 )
+		return 0;
+	
+	n = recv( v->handle, line, 11, MSG_WAITALL);
+	if( n <= 0 )
+	{
+		return 0;
+	}	
+	n = sscanf( line, "%d %d %d", &w, &h , &f );
+	if (n != 3 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Error parsing frame info");
+		return 0;
+	}
+	if( v->cur_width != w || v->cur_height != h || v->cur_fmt != f )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Mismatched frame info: Remote sends %dx%d:%d, Need %dx%d:%d",
+			w,h,f,v->cur_width,v->cur_height,v->cur_fmt );
+		return 0;
+	}
+
+
+	n = recv( v->handle, dst, len, MSG_WAITALL );
+	if( n == 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Remote closed connection");
+		return 0;
+	}
+
 	if( n < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Nothing to read");
 		 return 0;
 	}
+
 	nb += n;
 	if( len != nb )
 	{
@@ -148,7 +222,6 @@ int vj_client_send(vj_client *v, char *buf )
    len = strlen(buf2);   
    if ((send(v->handle, buf2, len, 0)) == -1)
    { /* send the command */
-		veejay_msg(VEEJAY_MSG_ERROR, "Error sending [%s]", buf2);
 		return 0;
    }
    return 1;
@@ -157,6 +230,7 @@ int vj_client_send(vj_client *v, char *buf )
 int vj_client_close( vj_client *v )
 {
 	close( v->handle );
+	close( v->status );
 	return 1;
 }
 
