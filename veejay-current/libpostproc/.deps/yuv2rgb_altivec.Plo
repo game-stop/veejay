@@ -1,3 +1,0 @@
-yuv2rgb_altivec.lo yuv2rgb_altivec.o: yuv2rgb_altivec.c ../config.h
-
-../config.h:
