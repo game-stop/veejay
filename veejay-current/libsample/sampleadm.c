@@ -1887,9 +1887,10 @@ unsigned char *UTF8toLAT1(unsigned char *in)
 
     if (UTF8Toisolat1(out, &out_size, in, &in_size) != 0)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot convert '%s'", in );
-		free(out);
-		return (NULL);
+		//veejay_msg(VEEJAY_MSG_ERROR, "Cannot convert '%s'", in );
+		//free(out);
+		//return (NULL);
+		strncpy( out, in, out_size );
     }
 
     out = realloc(out, out_size + 1);
