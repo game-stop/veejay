@@ -344,7 +344,10 @@ int vj_server_update(vj_server * vje)
 				  }
 				}
 		  	}
-			j++;
+			else
+			{
+				j++;
+			}
 		}	
 		bzero(recv_buffer, j);
 		return n_msg;
