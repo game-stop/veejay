@@ -1,0 +1,51 @@
+#
+# $  perl rand-overlay.txt > vims-script.vims
+#
+# $ ./client localhost 3490 vims-script.vims 
+#
+#
+#
+#
+#
+#
+
+
+
+my $rand_clip = 0;		
+my $min_frames = 10;		# minimum frames tussen switchen channels
+my $max_frames = 40;		# max frames
+my $rand_frames = 0;
+my $maxfr = 31;
+
+for(my $i=0 ; $i < 99; $i++)	# 99 opdrachten
+{
+
+	# 190 = set mixing channel
+	
+	# randclip is minimaal 1 + random getal tussen 0 en 32
+	$rand_clip = 1 + int( rand($maxfr));
+	printf("190:0 0 $rand_clip;\n");
+	$rand_frames = $min_frames + int( rand( $max_frames-$min_frames));
+	printf("+$rand_frames\n");
+
+	$rand_clip = 1 + int( rand($maxfr));
+	printf("190:0 1 $rand_clip;\n");
+	$rand_frames = $min_frames + int( rand( $max_frames-$min_frames));
+	printf("+$rand_frames\n");
+
+	$rand_clip = 1 + int( rand($maxfr));
+	printf("190:0 2 $rand_clip;\n");
+	$rand_frames = $min_frames + int( rand( $max_frames-$min_frames));
+	printf("+$rand_frames\n");
+
+	$rand_clip = 1 + int( rand($maxfr));
+	printf("190:0 3 $rand_clip;\n");
+	$rand_frames = $min_frames + int( rand( $max_frames-$min_frames));
+	printf("+$rand_frames\n");
+
+	$rand_clip = 1 + int( rand($maxfr));
+	printf("190:0 4 $rand_clip;\n");
+	$rand_frames = $min_frames + int( rand( $max_frames-$min_frames));
+	printf("+$rand_frames\n");
+
+}

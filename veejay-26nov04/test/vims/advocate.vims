@@ -1,0 +1,6 @@
+249:/usr/local/lib/libvj_drawtext_plugin.so;
++10
+245:DrawText::text=Veejay:x=10:y=50:size=14:font=1:pf:;
++100
+248:DrawText;
+

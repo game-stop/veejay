@@ -1,0 +1,6 @@
+Installing bio2jack
+----------------------
+
+This library is intended only for static linking as it is small and there 
+is no need to require yet another library for a user to install.  So 
+please, statically link to this library.

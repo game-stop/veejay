@@ -1,0 +1,30 @@
+bio2jack
+-----------
+
+To Build:
+----------
+run ./autogen.sh
+run ./configure
+run make
+enjoy ;-)
+
+
+Bio(blocked i/o) 2 jack.
+
+A library for enabling easy porting of blocked io(OSS/ALSA) applications to 
+the jack sound server(http://jackit.sourceforge.net).  This library allows the 
+person porting the code to simply replace the calls into OSS/ALSA with 
+calls into interface functions of this library.  The library buffers a 
+small amount of audio data and takes care of the rest of the jack 
+implementation including the linked list of audio data buffers and the jack 
+callback.  
+
+Interface functions:
+TODO: once these become stable copy and paste from the header file
+
+
+Currently these drivers use the bio2jack library:
+---------------------------------------------------
+xmms-jack: Written in conjunction with this library
+xine: 
+
