@@ -110,42 +110,27 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
   in0 = buffer;
   in1 = buffer + width;
   out = buffer;
+  for (y = 0; y < height; y += 4) {
+    for (x = 0; x < width; x += 4) {
+     out[0] = (in0[0] + 3 * (in0[1] + in1[0]) + (9 * in1[1]) + 8) >> 4;
+     out[1] = (in0[2] + 3 * (in0[3] + in1[2]) + (9 * in1[3]) + 8) >> 4;
+     out[2] = (in0[4] + 3 * (in0[5] + in1[4]) + (9 * in1[5]) + 8) >> 4;
+     out[3] = (in0[6] + 3 * (in0[7] + in1[6]) + (9 * in1[7]) + 8) >> 4;
 
-//  for (y = 0; y < height; y += 2) {
-//    for (x = 0; x < width; x += 2) {
-//     *out = (in0[0] + 3 * (in0[1] + in1[0]) + (9 * in1[1]) + 8) >> 4;
-//      in0 += 2;
-//      in1 += 2;
-//      out++;
-//    }
-//    in0 += width;
-//    in1 += width;
-//  }
-    for(; y > 0; y -- )
-    {
-         in0 = buffer;
-	 in1 = buffer + width;
-	 out = buffer;
-         for( x = width; x >= 4; x -= 4 )
-	 {
-		out[0] = ( in0[0] + 3 * ( in0[1] + in1[0] ) + (9 * in1[1]) + 8) >> 4;
-   		out[1] = ( in0[2] + 3 * ( in0[3] + in1[2] ) + (9 * in1[3]) + 8) >> 4;
-		out[2] = ( in0[4] + 3 * ( in0[5] + in1[4] ) + (9 * in1[5]) + 8) >> 4;
-		out[3] = ( in0[6] + 3 * ( in0[7] + in1[6] ) + (9 * in1[7]) + 8) >> 4;
-		in0 += 8;
-		in1 += 8;
-		out += 4;
-         }
-	 for(; x > 0; x -- )
-	 {
-		out[0] = ( in0[0] + 3 * ( in0[1] + in1[0] ) + (9 * in1[1] ) + 8) >> 4;
-		in0 += 2;
-		in1 += 2;
-		out ++;
-	 }	
-	 buffer += (width << 1);
-	 out    += width;
+      in0 += 8;
+      in1 += 8;
+      out += 4;
     }
+    for (  ; x < width; x +=2 )
+    {
+ 	out[0] = (in0[0] + 3 * (in0[1] + in1[0]) + (9 * in1[1]) + 8) >> 4;
+        in0 += 2;
+        in1 += 2;
+	out++;
+    }
+    in0 += width*2;
+    in1 += width*2;
+  }
 }
 
 
