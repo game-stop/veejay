@@ -59,8 +59,8 @@ void cartonize_apply( VJFrame *frame, int width, int height, int b1, int b2, int
     uint8_t *Cr = frame->data[2];
 
 	const int	base = (const int) b1;
-	const int	ubase= (const int) b2 - 128;
-	const int 	vbase= (const int) b3 - 128;
+	int	ubase= (const int) b2 - 128;
+	int 	vbase= (const int) b3 - 128;
 	// ubase/vbase cannot be 0
 	if(ubase==0) ubase=1;
 	if(vbase==0) vbase=1;
