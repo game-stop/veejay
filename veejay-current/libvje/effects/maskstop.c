@@ -123,9 +123,9 @@ void maskstop_apply( VJFrame *frame, int width, int height, int negmask, int swa
 	{
 		for( i = 0; i < len; i ++ )
 		{
-			Ydest[i] = ((Yframe[i] * Ymask[i]) + (Ydest[i] * (0xff-Ymask[i])))>>8; 
-			Udest[i] = ((Uframe[i] * Umask[i]) + (Udest[i] * (0xff-Umask[i])))>>8;
-			Vdest[i] = ((Vframe[i] * Vmask[i]) + (Vdest[i] * (0xff-Vmask[i])))>>8;
+			Ydest[i] = ((Yframe[i] * Ymask[i]) + ((0xff-Ydest[i]) * (0xff-Ymask[i])))>>8; 
+			Udest[i] = ((Uframe[i] * Umask[i]) + ((0xff-Udest[i]) * (0xff-Umask[i])))>>8;
+			Vdest[i] = ((Vframe[i] * Vmask[i]) + ((0xff-Vdest[i]) * (0xff-Vmask[i])))>>8;
 		}
 	}
 	if(swapmask && !negmask)
@@ -141,9 +141,9 @@ void maskstop_apply( VJFrame *frame, int width, int height, int negmask, int swa
 	{
 		for( i = 0; i < len; i ++ )
 		{
-			Ydest[i] = ((Ymask[i] * Yframe[i]) + ( Ydest[i] * (0xff-Yframe[i])) ) >> 8;
-			Udest[i] = ((Umask[i] * Uframe[i]) + ( Udest[i] * (0xff-Uframe[i])) ) >> 8;
-			Vdest[i] = ((Vmask[i] * Vframe[i]) + ( Vdest[i] * (0xff-Vframe[i])) ) >> 8;
+			Ydest[i] = ((Ymask[i] * Yframe[i]) + ( (0xff-Ydest[i]) * (0xff-Yframe[i])) ) >> 8;
+			Udest[i] = ((Umask[i] * Uframe[i]) + ( (0xff-Udest[i]) * (0xff-Uframe[i])) ) >> 8;
+			Vdest[i] = ((Vmask[i] * Vframe[i]) + ( (0xff-Vdest[i]) * (0xff-Vframe[i])) ) >> 8;
 		}
 	}
 	if(!swapmask && !negmask)
@@ -156,6 +156,7 @@ void maskstop_apply( VJFrame *frame, int width, int height, int negmask, int swa
 		}
 	
 	}
+
 
 /*
 	for (i = 0; i < len; i++) {
@@ -190,6 +191,6 @@ void maskstop_apply( VJFrame *frame, int width, int height, int negmask, int swa
 		}
 
 	}
-*/	
+	*/
 }
 
