@@ -83,6 +83,8 @@ struct ycbcr_frame *record_buffer;	// needed for recording invisible streams
 static	short	*priv_audio[2];
 static VJFrame *helper_frame;
 
+static int vj_perform_record_buffer_init();
+static void vj_perform_record_buffer_free();
 
 #define N_RESAMPLE (10)
 static ReSampleContext *resample_context[N_RESAMPLE];
@@ -320,6 +322,7 @@ static void vj_perform_free_row(int frame,int c)
 //	also, update cache if appropriate
 	cached_clip_frames[0][c] = 0;
 	cached_tag_frames[0][c] = 0;
+
 }
 
 static int	vj_perform_row_used(int frame, int c)
@@ -400,17 +403,17 @@ static int	vj_perform_verify_rows(veejay_t *info, int frame)
 }
 
 
-static int vj_perform_record_buffer_init(int entry, int frame_len)
+static int vj_perform_record_buffer_init()
 {
 	if(record_buffer->Cb==NULL)
-	        record_buffer->Cb = (uint8_t*)vj_malloc(sizeof(uint8_t) * helper_frame->len );
+	        record_buffer->Cb = (uint8_t*)vj_malloc(sizeof(uint8_t) * helper_frame->uv_len );
 	if(!record_buffer->Cb) return 0;
 	if(record_buffer->Cr==NULL)
 	        record_buffer->Cr = (uint8_t*)vj_malloc(sizeof(uint8_t) * helper_frame->uv_len );
 	if(!record_buffer->Cr) return 0;
 
 	if(record_buffer->Y == NULL)
-		record_buffer->Y = (uint8_t*)vj_malloc(sizeof(uint8_t) * helper_frame->uv_len);
+		record_buffer->Y = (uint8_t*)vj_malloc(sizeof(uint8_t) * helper_frame->len);
 	if(!record_buffer->Y) return 0;
 
 	memset( record_buffer->Y , 16, helper_frame->len );
@@ -523,7 +526,9 @@ int vj_perform_init(veejay_t * info)
 	memset( frame_info[0],0,CLIP_MAX_EFFECTS);
 
     helper_frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
-	memcpy(helper_frame, info->effect_frame1, sizeof(VJFrame));
+    memcpy(helper_frame, info->effect_frame1, sizeof(VJFrame));
+
+    vj_perform_record_buffer_init();
 
     return 1;
 }
@@ -653,7 +658,7 @@ void vj_perform_free(veejay_t * info)
    {
       if(temp_buffer[c]) free(temp_buffer[c]);
    }
-
+   vj_perform_record_buffer_free();
 }
 
 /***********************************************************************
@@ -1891,12 +1896,23 @@ int vj_perform_render_clip_frame(veejay_t *info, uint8_t *frame[3])
 int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[3])
 {
 	long nframe = info->settings->current_frame_num;
-
+	int clip_id = info->uc->clip_id;
 	if(last_rendered_frame == nframe) return 0; // skip frame 
 	
 	last_rendered_frame = info->settings->current_frame_num;
+	if(info->settings->offline_record)
+		clip_id = info->settings->offline_tag_id;
 
-	return vj_tag_record_frame( info->uc->clip_id, frame, NULL, 0);
+	if(info->settings->offline_record)
+	{
+		if (!vj_tag_get_frame(clip_id, frame, NULL))
+	   	{
+			veejay_msg(VEEJAY_MSG_ERROR, "cannot get frame ?! (skip)" ); 
+			return 0;//skip
+		}
+	}
+
+	return vj_tag_record_frame( clip_id, frame, NULL, 0);
 }	
 
 void vj_perform_record_commit_clip(veejay_t *info,long start_el_pos,int len)
@@ -1906,10 +1922,17 @@ void vj_perform_record_commit_clip(veejay_t *info,long start_el_pos,int len)
 
  long el_pos = start_el_pos;
 
+
  if(start_el_pos==-1)
  {
- 	el_pos = (info->edit_list->video_frames - 1) - len;//+1
+ 	el_pos = (info->edit_list->video_frames - 1);//+1 // + len ??
+	if(!info->edit_list->has_video)
+	  el_pos = 0;
+	else
+	  el_pos -= len;
  }
+
+
  skel = clip_skeleton_new( el_pos, len + el_pos -1  );//-1
  // figure out true starting position
  if(skel)
@@ -1963,7 +1986,8 @@ long vj_perform_record_commit_single(veejay_t *info, int entry)
   }
   if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG)
   {
- 	 if(vj_tag_get_encoded_file(info->uc->clip_id, filename))
+	 int stream_id = (info->settings->offline_record ? info->settings->offline_tag_id : info->uc->clip_id);
+ 	 if(vj_tag_get_encoded_file(stream_id, filename))
   	 {
 		long dest = info->edit_list->video_frames;
 		if( veejay_edit_addmovie(info, filename, -1, dest,dest))
@@ -2001,43 +2025,45 @@ void vj_perform_record_stop(veejay_t *info)
 
  if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
  {
-	vj_tag_reset_encoder(info->uc->clip_id);
-        vj_tag_reset_autosplit(info->uc->clip_id);
-	if( settings->tag_record && settings->tag_record_switch )
+	int stream_id = (settings->offline_record ? settings->offline_tag_id : info->uc->clip_id);
+	int play = settings->tag_record_switch;
+	vj_tag_reset_encoder(stream_id);
+        vj_tag_reset_autosplit(stream_id);
+	if(settings->offline_record)
 	{
-		settings->tag_record_switch = 0;
-		info->uc->playback_mode = VJ_PLAYBACK_MODE_CLIP;
+		play = settings->offline_created_clip;
+		settings->offline_record = 0;
+		settings->offline_created_clip = 0;
+		settings->offline_tag_id = 0;
+	}
+	else 
+	{
 		settings->tag_record = 0;
+		settings->tag_record_switch = 0;
+	}
+
+	if(play)
+	{
+		info->uc->playback_mode = VJ_PLAYBACK_MODE_CLIP;
 		veejay_set_clip(info ,clip_size()-1);
 	}
 	else
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Not autoplaying new clip");
 	}
- }
-
- if( settings->offline_record && settings->offline_created_clip )
- {
-	info->uc->playback_mode = VJ_PLAYBACK_MODE_CLIP;
-        settings->offline_record = 0;
-	settings->offline_tag_id = 0;
-	settings->offline_created_clip = 0;
-	veejay_set_clip(info, clip_size()-1);
- }
-
-
+ 
+  }
 
 }
 
 
 void vj_perform_record_clip_frame(veejay_t *info, int entry) {
-	//video_playback_setup *settings = info->settings;
+	video_playback_setup *settings = info->settings;
 	uint8_t *frame[3];
 	int res = 0;
 	frame[0] = primary_buffer[entry]->Y;
 	frame[1] = primary_buffer[entry]->Cb;
 	frame[2] = primary_buffer[entry]->Cr;
-
 	
 	res = vj_perform_render_clip_frame(info, frame);
 
@@ -2099,6 +2125,9 @@ void vj_perform_record_tag_frame(veejay_t *info, int entry) {
 	video_playback_setup *settings = info->settings;
 	uint8_t *frame[3];
 	int res = 0;
+	int stream_id = info->uc->clip_id;
+	if( settings->offline_record )
+	  stream_id = settings->offline_tag_id;
 
         if(settings->offline_record)
 	{
@@ -2112,25 +2141,24 @@ void vj_perform_record_tag_frame(veejay_t *info, int entry) {
 		frame[1] = primary_buffer[entry]->Cb;
 		frame[2] = primary_buffer[entry]->Cr;
 	}
-	
+	// not done?! by offline?1	
 	res = vj_perform_render_tag_frame(info, frame);
-
 	if( res == 2)
 	{
 		/* auto split file */
 		int df = vj_event_get_video_format();
-		int len = vj_tag_get_total_frames(info->uc->clip_id);
-		long frames_left = vj_tag_get_frames_left(info->uc->clip_id) ;
+		int len = vj_tag_get_total_frames(stream_id);
+		long frames_left = vj_tag_get_frames_left(stream_id) ;
 		// stop encoder
-		vj_tag_stop_encoder( info->uc->clip_id );
+		vj_tag_stop_encoder( stream_id );
 		// close file, add to editlist
 		vj_perform_record_commit_single( info, entry );
 		// clear encoder
-		vj_tag_reset_encoder( info->uc->clip_id );
+		vj_tag_reset_encoder( stream_id );
 		// initialize a encoder
 		if(frames_left > 0 )
 		{
-			if( vj_tag_init_encoder( info->uc->clip_id, NULL,
+			if( vj_tag_init_encoder( stream_id, NULL,
 				df, frames_left)==-1)
 			{
 				veejay_msg(VEEJAY_MSG_INFO,
@@ -2139,6 +2167,7 @@ void vj_perform_record_tag_frame(veejay_t *info, int entry) {
 		}
 		else
 		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "never enaluated statement?!");
 			vj_perform_record_commit_clip(info,-1,len);
 		}
 	 }
@@ -2146,8 +2175,8 @@ void vj_perform_record_tag_frame(veejay_t *info, int entry) {
 	
 	 if( res == 1)
 	 {
-		int len = vj_tag_get_total_frames(info->uc->clip_id);
-		vj_tag_stop_encoder(info->uc->clip_id);
+		int len = vj_tag_get_encoded_frames(stream_id);
+		vj_tag_stop_encoder(stream_id);
 		vj_perform_record_commit_single( info, entry );	    
 		vj_perform_record_commit_clip(info, -1,len);
 		vj_perform_record_stop(info);
@@ -2155,7 +2184,7 @@ void vj_perform_record_tag_frame(veejay_t *info, int entry) {
 
 	 if( res == -1)
 	{
-		vj_tag_stop_encoder(info->uc->clip_id);
+		vj_tag_stop_encoder(stream_id);
 		vj_perform_record_stop(info);
  	}
 
@@ -2192,34 +2221,6 @@ int vj_perform_tag_fill_buffer(veejay_t * info, int entry)
 	    cached_tag_frames[1][0] = tag_id;
 	    	
    	}
-
-	if(settings->offline_tag_id == info->uc->clip_id && settings->offline_record && error==0) {
-	    uint8_t *rframe[3];
-	    int w = info->edit_list->video_width;
-	    int h = info->edit_list->video_height;
-
-	    if(!settings->offline_ready)  
-	    {   // get ready for recording
-		vj_perform_record_buffer_init(entry, (w*h) ); 
-		settings->offline_ready = 1;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Allocated memory for recording non visible stream");
-	    }   
-		// record to record_buffer
-	    rframe[0] = record_buffer->Y;
-	    rframe[1] = record_buffer->Cb;
-	    rframe[2] = record_buffer->Cr;
-	    	// copy frame
-	    veejay_memcpy( frame[0], rframe[0],helper_frame->len);
-	    veejay_memcpy( frame[1], rframe[1],helper_frame->uv_len);
-	    veejay_memcpy( frame[2], rframe[2],helper_frame->uv_len);
-	    cached_tag_frames[1][0] = tag_id;
-	}
-        else 
-	if(settings->offline_ready)
-	{
-		vj_perform_record_buffer_free();
-		settings->offline_ready = 0;
-        }
    }         
 
 	
@@ -2410,7 +2411,6 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 			{
 				num_samples = (el->audio_rate/el->video_fps);
 			}
-			veejay_msg(VEEJAY_MSG_DEBUG, "I have %d audio samples",num_samples);
 			break;
 
 		default:
@@ -2465,17 +2465,10 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 	primary_frame_len[frame] = 0;
 	if(info->video_out==5 && info->render_now == 0) return 1;
 
-        if(settings->offline_record) {
-		vj_perform_record_tag_frame(info, frame) ;
-	}
-	
-/*
-	memset( primary_buffer[0]->Y, 0, info->edit_list->video_width * info->edit_list->video_height);
-	memset( primary_buffer[0]->Cb,0,info->edit_list->video_width * info->edit_list->video_height);
-	memset( primary_buffer[0]->Cr,0,info->edit_list->video_width * info->edit_list->video_height);
-*/
+	if(settings->offline_record)	
+		vj_perform_record_tag_frame(info,0);
 
-	
+
 	switch (info->uc->playback_mode) {
 		case VJ_PLAYBACK_MODE_CLIP:
 		    	vj_perform_plain_fill_buffer(info, frame);	/* primary frame */

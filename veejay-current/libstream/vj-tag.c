@@ -864,20 +864,6 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		lav_strerror());
 		return 0;
 	}
-		veejay_msg(VEEJAY_MSG_INFO, "Encoding to %s file [%s] %dx%d@%2.2f %d/%d/%d %s >%09d<",
-		    descr,
-		    tag->encoder_destination, 
-		    _tag_info->edit_list->video_width,
-		    _tag_info->edit_list->video_height,
-		    (float) _tag_info->edit_list->video_fps,
-		    0,
-		    0,
-		    0,
-			( _tag_info->edit_list->video_inter == 0 ? "Deinterlaced" : "Interlaced"),
-			( tag->encoder_duration - tag->encoder_total_frames)
-		);
-
-
 
 	tag->encoder_active = 1;
 	tag->encoder_format = format;
@@ -923,9 +909,9 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	tag->encoder_succes_frames = 0;
 	tag->encoder_width = _tag_info->edit_list->video_width;
 	tag->encoder_height = _tag_info->edit_list->video_height;
-
-	vj_tag_update(tag,clip_id);
-	return 1;
+	
+	return vj_tag_update(tag,clip_id);
+//	return 1;
 }
 
 
@@ -1675,8 +1661,8 @@ int vj_tag_get_offset(int t1, int chain_entry)
 int vj_tag_get_encoded_frames(int s1) {
   vj_tag *si = vj_tag_get(s1);
   if(!si) return -1;
-  //return ( si->encoder_succes_frames );
-  return ( si->encoder_total_frames );
+  return ( si->encoder_succes_frames );
+  //return ( si->encoder_total_frames );
 }
 
 
@@ -1685,6 +1671,7 @@ int vj_tag_get_total_frames( int s1 )
   vj_tag *si = vj_tag_get(s1);
   if(!si) return -1;
   return ( si->encoder_total_frames );
+//	return si->encoder_succes_frames;
 }
 
 int vj_tag_reset_autosplit(int s1)

@@ -19,6 +19,11 @@
 	+ removed obsolete VIMS messages
 	+ librified editlist,stream and yuv functions
 	+ removed any references on dropped vloopback support
+	+ fixed ticket 6
+	
+	- fixed ticket 7
+
+	- autosplit?
 
 0.7.1
 	+ fixed color corruption in fib

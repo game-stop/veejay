@@ -228,9 +228,10 @@ clip_info *clip_skeleton_new(long startFrame, long endFrame)
 	}
     si = (clip_info *) vj_malloc(sizeof(clip_info));
     if(startFrame < 0) startFrame = 0;
-    if(endFrame <= startFrame && (endFrame !=0 && startFrame != 0))
-    {
-	veejay_msg(VEEJAY_MSG_ERROR,"End frame must be greater then start frame");
+//    if(endFrame <= startFrame&& (endFrame !=0 && startFrame != 0))
+	if(endFrame <= startFrame ) 
+   {
+	veejay_msg(VEEJAY_MSG_ERROR,"End frame %ld must be greater then start frame %ld", startFrame, endFrame);
 	return NULL;
     }
 

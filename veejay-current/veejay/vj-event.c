@@ -5295,8 +5295,6 @@ void vj_event_el_save_editlist(void *ptr, const char format[], va_list ap)
 	//int *args = NULL;
  	int args[2] = {0,0};
 	P_A(args,str,format,ap);
-	veejay_msg(VEEJAY_MSG_DEBUG, "Recv [%s] [%d] [%d]",
-		str,args[0],args[1]);
 	if( veejay_save_all(v, str,args[0],args[1]) )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Saved EditList as %s",str);
@@ -5711,8 +5709,6 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 
 			vj_tag_reset_encoder( v->uc->clip_id);
 
-			veejay_msg(VEEJAY_MSG_INFO, "Recorded new clip %d from stream %d", 
-				s->offline_created_clip,s->offline_tag_id);
 			if(s->tag_record_switch) 
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Playing clip %d now", clip_size()-1);
@@ -5778,7 +5774,7 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 				veejay_msg(VEEJAY_MSG_INFO, "(Offline) recording from stream %d", args[0]);
 				s->offline_record = 1;
 				s->offline_tag_id = args[0];
-				s->offline_created_clip = args[1];
+				s->offline_created_clip = args[2];
 			} 
 			else
 			{
@@ -5825,9 +5821,6 @@ void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
 			}
 
 			vj_tag_reset_encoder( v->uc->clip_id);
-
-			veejay_msg(VEEJAY_MSG_INFO, "Recorded new clip %d from stream %d", 
-				s->offline_created_clip,s->offline_tag_id);
 
 			if(s->offline_created_clip) 
 			{

@@ -39,6 +39,7 @@
 #include <libvjmem/vjmem.h>
 #include "avcodec.h"
 #include <math.h>
+#include <stdlib.h>
 
 static struct
 {
@@ -210,25 +211,35 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
     int i, n, nerr;
     int chroma=0;
     int _fc;
-    char realname[PATH_MAX];
+    //char realname[PATH_MAX];
 	int decoder_id = 0;
 	const char *compr_type;
 	int pix_fmt = -1;
-	
+    char *realname;	
     /* Get full pathname of file if the user hasn't specified preservation
        of pathnames...
      */
-    bzero(realname, PATH_MAX);
+  //  bzero(realname, PATH_MAX);
 
     if (preserve_pathname)
 	{
-		strcpy(realname, filename);
+		realname = strdup(filename);
+	//	strcpy(realname, filename);
     }
-	else if (realpath(filename, realname) == 0)
+    else
+	realname = canonicalize_file_name( filename );
+
+	//else if (realpath(filename, realname) == 0)
+	//{
+	//	veejay_msg(VEEJAY_MSG_ERROR ,"Cannot deduce real filename");
+	//	return -1;
+    //}
+
+	if(!realname)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR ,"Cannot deduce real filename");
-		return -1;
-    }
+		veejay_msg(VEEJAY_MSG_ERROR, "Errorss ? [%s] %d",filename,preserve_pathname);
+	}
+
     for (i = 0; i < el->num_video_files; i++)
 		if (strcmp(realname, el->video_file_list[i]) == 0)
 		{

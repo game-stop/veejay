@@ -568,6 +568,7 @@ lav_file_t *lav_open_input_file(char *filename)
 
 	if(!lav_fd->avi_fd) { if(lav_fd) free(lav_fd); return 0;}
 
+
    if(lav_fd->avi_fd)
    {
       /* It is an AVI file */
@@ -763,6 +764,8 @@ lav_file_t *lav_open_input_file(char *filename)
 
    		return lav_fd;
 	}
+
+	ierr = ERROR_FORMAT;
 
 
 ERREXIT:

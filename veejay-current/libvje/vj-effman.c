@@ -471,8 +471,16 @@ int vj_effect_prepare( VJFrame *frame, VJFrameInfo *frameinfo, int selector)
 	if(selector == VJ_VIDEO_EFFECT_DIFF && vj_effect_has_cb(selector))
 	{
 		int i = vj_effect_real_to_sequence( selector );
-		diff_prepare( (void*) vj_effects[i]->user_data, frame->data, frameinfo->width,frameinfo->height );
-		return 1;
+		if( vj_effects[i]->user_data != NULL)
+		{
+			diff_prepare(
+				(void*) vj_effects[i]->user_data,
+				frame->data,
+				frameinfo->width,
+				frameinfo->height );
+	
+			return 1;
+		}
 	}
 	return 0;
 }
