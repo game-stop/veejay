@@ -328,10 +328,11 @@ int lav_close(lav_file_t *lav_file)
 {
 	int ret = 0;
     video_format = lav_file->format; internal_error = 0; /* for error messages */
-
+#ifdef SUPPORT_READ_DV2
 	if(video_format == 'b')
 		ret = rawdv_close(lav_file->dv_fd );
 	else	
+#endif
   	 ret = AVI_close( lav_file->avi_fd );
 
     if(lav_file) free(lav_file);
@@ -346,10 +347,10 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
    long jpglen = 0;
 
    video_format = lav_file->format; internal_error = 0; /* for error messages */
-
+#ifdef SUPPORT_READ_DV2
    if(video_format == 'b')
 	return -1;
-
+#endif
    /* For interlaced video insert the apropriate APPn markers */
 
    if(lav_file->interlacing!=LAV_NOT_INTERLACED && (lav_file->format == 'a' || lav_file->format=='A'))
@@ -399,8 +400,10 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
 int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
    if(video_format == 'b')
 	return 0;
+#endif
    return AVI_write_audio( lav_file->avi_fd, buff, samps*lav_file->bps);
 }
 
@@ -409,40 +412,49 @@ int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
 long lav_video_frames(lav_file_t *lav_file)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
    if(video_format == 'b')
 	return rawdv_video_frames(lav_file->dv_fd);
+#endif
    return AVI_video_frames(lav_file->avi_fd);
 }
 
 int lav_video_width(lav_file_t *lav_file)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
 	if(video_format=='b')
 		return rawdv_width(lav_file->dv_fd);
+#endif
    return AVI_video_width(lav_file->avi_fd);
 }
 
 int lav_video_height(lav_file_t *lav_file)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
 	if(video_format == 'b')
 		return rawdv_height( lav_file->dv_fd );
+#endif
    return AVI_video_height(lav_file->avi_fd);
 }
 
 double lav_frame_rate(lav_file_t *lav_file)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
 	if(video_format == 'b')
 		return rawdv_fps(lav_file->dv_fd);
-
+#endif
    return AVI_frame_rate(lav_file->avi_fd);
 }
 
 int lav_video_interlacing(lav_file_t *lav_file)
 {
+#ifdef SUPPORT_READ_DV2
 	if(video_format == 'b')
 		return rawdv_interlacing(lav_file->dv_fd);
+#endif
    return lav_file->interlacing;
 }
 
@@ -464,19 +476,23 @@ int lav_video_MJPG_chroma(lav_file_t *lav_file)
 }
 int lav_video_compressor_type(lav_file_t *lav_file)
 {
+#ifdef SUPPORT_READ_DV2
 	if(lav_file->format == 'b')
 		return rawdv_compressor( lav_file->dv_fd );
+#endif
 	return AVI_video_compressor_type( lav_file->avi_fd );
 }
 
 const char *lav_video_compressor(lav_file_t *lav_file)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
    if( video_format == 'b' )
    {
 	const char *tmp = (const char*) strdup("dvsd");
 	return tmp;
    }
+#endif
    return AVI_video_compressor(lav_file->avi_fd);
 }
 
@@ -484,8 +500,10 @@ int lav_audio_channels(lav_file_t *lav_file)
 {
    if(!lav_file->has_audio) return 0;
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
    if(video_format == 'b')
 	return rawdv_audio_channels(lav_file->dv_fd);
+#endif
    return AVI_audio_channels(lav_file->avi_fd);
 }
 
@@ -493,8 +511,10 @@ int lav_audio_bits(lav_file_t *lav_file)
 {
    if(!lav_file->has_audio) return 0;
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
    if(video_format == 'b')
 	return rawdv_audio_bits(lav_file->dv_fd);
+#endif
    return (AVI_audio_bits(lav_file->avi_fd));
 }
 
@@ -502,8 +522,10 @@ long lav_audio_rate(lav_file_t *lav_file)
 {
    if(!lav_file->has_audio) return 0;
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
 	if(video_format=='b')
 	 return rawdv_audio_rate(lav_file->dv_fd);
+#endif
    return (AVI_audio_rate(lav_file->avi_fd));
 }
 
@@ -511,32 +533,40 @@ long lav_audio_clips(lav_file_t *lav_file)
 {
    if(!lav_file->has_audio) return 0;
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
    if(video_format=='b')
 	return rawdv_audio_bps(lav_file->dv_fd);
+#endif
    return (AVI_audio_bytes(lav_file->avi_fd)/lav_file->bps);
 }
 
 long lav_frame_size(lav_file_t *lav_file, long frame)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
    if(video_format == 'b')
 	return rawdv_frame_size( lav_file->dv_fd );
+#endif
    return (AVI_frame_size(lav_file->avi_fd,frame));
 }
 
 int lav_seek_start(lav_file_t *lav_file)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
    if(video_format == 'b')
 	return rawdv_set_position( lav_file->dv_fd, 0 );
+#endif
    return (AVI_seek_start(lav_file->avi_fd));
 }
 
 int lav_set_video_position(lav_file_t *lav_file, long frame)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
    if(video_format == 'b')
 	return rawdv_set_position( lav_file->dv_fd, frame );
+#endif
    return (AVI_set_video_position(lav_file->avi_fd,frame));
 }
 
@@ -556,17 +586,21 @@ int lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf)
 		// convert tmp_buffer to vidbuf , set flag as YUV 4:2:2 planar
 	}
 #endif
+#ifdef SUPPORT_READ_DV2
     if(lav_file->format == 'b')
 	{
 		return rawdv_read_frame( lav_file->dv_fd, vidbuf );
 	}
+#endif
    return (AVI_read_frame(lav_file->avi_fd,vidbuf));
 }
 
 int lav_is_DV(lav_file_t *lav_file)
 {
+#ifdef SUPPORT_READ_DV2
 	if(lav_file->format == 'b')
 		return 1;
+#endif
 	return 0;
 }
 
@@ -574,8 +608,10 @@ int lav_set_audio_position(lav_file_t *lav_file, long clip)
 {
    if(!lav_file->has_audio) return 0;
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef SUPPORT_READ_DV2
    if(video_format == 'b')
 	return 0;
+#endif
    return (AVI_set_audio_position(lav_file->avi_fd,clip*lav_file->bps));
 }
 
@@ -586,8 +622,10 @@ long lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps)
       internal_error = ERROR_NOAUDIO;
       return -1;
    }
+#ifdef SUPPORT_READ_DV2
 	if(video_format == 'b')
 		return rawdv_read_audio_frame( lav_file->dv_fd, audbuf );
+#endif
    video_format = lav_file->format; internal_error = 0; /* for error messages */
    return (AVI_read_audio(lav_file->avi_fd,audbuf,samps*lav_file->bps)/lav_file->bps);
 }
@@ -613,7 +651,9 @@ lav_file_t *lav_open_input_file(char *filename)
    /* Set lav_fd */
 
    lav_fd->avi_fd      = 0;
+#ifdef SUPPORT_READ_DV2
    lav_fd->dv_fd	= 0;
+#endif
    lav_fd->format      = 0;
    lav_fd->interlacing = LAV_INTER_UNKNOWN;
    lav_fd->sar_w       = 0; /* (0,0) == unknown */
@@ -642,6 +682,7 @@ lav_file_t *lav_open_input_file(char *filename)
    }
    else if( AVI_errno==AVI_ERR_NO_AVI )
    {
+#ifdef SUPPORT_READ_DV2
 		lav_fd->dv_fd = rawdv_open_input_file(filename);
 	  	if(lav_fd->dv_fd)
 		{
@@ -652,11 +693,14 @@ lav_file_t *lav_open_input_file(char *filename)
 	    	}
 		else
 		{
+#endif
 	   	 free(lav_fd);
 	   	 internal_error = ERROR_FORMAT; /* Format not recognized */
 		 veejay_msg(VEEJAY_MSG_ERROR, "Unable to identify file");
 	   	 return 0;
+#ifdef SUPPORT_READ_DV2
  		  }
+#endif
 	}
 
    lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;

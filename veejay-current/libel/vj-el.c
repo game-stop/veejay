@@ -40,7 +40,9 @@
 #include "avcodec.h"
 #include <math.h>
 #include <stdlib.h>
+#ifdef SUPPORT_READ_DV2
 #include "rawdv.h"
+#endif
 
 static struct
 {

@@ -24,8 +24,9 @@
 #endif
 
 #include <libel/avilib.h>
+#ifdef SUPPORT_READ_DV2
 #include <libel/rawdv.h>
-
+#endif
 // play with mlt here, avformat producer/several consumers (we can write to)
 // for normalized output (720x576/480) , dv1394 capture and playback
 
@@ -60,7 +61,9 @@ typedef struct
 	mlt_audio_format afmt;  
 #endif
    avi_t       *avi_fd;
+#ifdef SUPPORT_READ_DV2
    dv_t		*dv_fd;
+#endif
    int         jpeg_fd;
    char        *jpeg_filename;
    int         format;

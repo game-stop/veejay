@@ -32,7 +32,9 @@
 #include <libstream/vj-v4lvideo.h>
 #include <linux/videodev.h>
 #endif
+#ifdef SUPPORT_READ_DV2
 #include <libstream/vj-dv1394.h>
+#endif
 #include <libvjmsg/vj-common.h>
 #include <libstream/vj-shm.h>
 #include <libel/vj-avformat.h>
@@ -344,7 +346,7 @@ int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el)
     }
     return 1;
 }
-
+#ifdef SUPPORT_READ_DV2
 int	_vj_tag_new_dv1394(vj_tag *tag, int stream_nr, int channel,int quality, editlist *el)
 {
    vj_tag_input->dv1394[stream_nr] = vj_dv1394_init( (void*) el, channel,quality);
@@ -356,7 +358,7 @@ int	_vj_tag_new_dv1394(vj_tag *tag, int stream_nr, int channel,int quality, edit
    } 
    return 0;
 }
-
+#endif
 // for network, filename /channel is passed as host/port num
 int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	        int pix_fmt, int channel )
@@ -485,6 +487,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 			return -1;
 		tag->active = 0;
 	break;
+#ifdef SUPPORT_READ_DV2
     case VJ_TAG_TYPE_DV1394:
 	sprintf(tag->source_name, "/dev/dv1394");
 	if( _vj_tag_new_dv1394( tag, stream_nr,channel,1,el ) == 0 )
@@ -494,6 +497,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	}
 	tag->active = 1;
 	break;
+#endif
     case VJ_TAG_TYPE_AVFORMAT:
 	sprintf(tag->source_name, "%s", filename);
 	if( _vj_tag_new_avformat( tag,stream_nr, el ) != 1 )
@@ -609,9 +613,11 @@ int vj_tag_del(int id)
 		vj_yuv_stream_stop_read(vj_tag_input->stream[tag->index]);
 //		vj_yuv4mpeg_free( vj_tag_input->stream[tag->index]);
 	 break;	
+#ifdef SUPPORT_READ_DV2
       case VJ_TAG_TYPE_DV1394:
 		vj_dv1394_close( vj_tag_input->dv1394[tag->index] );
 		break;
+#endif
      case VJ_TAG_TYPE_AVFORMAT:
 		veejay_msg(VEEJAY_MSG_INFO, "Closing avformat stream %s", tag->source_name);
 		vj_avformat_close_input( vj_tag_input->avformat[tag->index]);
@@ -1644,9 +1650,11 @@ void vj_tag_get_description(int id, char *description)
 	sprintf(description, "%s", "Video4Linux");
 	break;
 #endif
+#ifdef SUPPORT_READ_DV2
 	case VJ_TAG_TYPE_DV1394:
 	sprintf(description, "%s", "dv1394");
 	break;
+#endif
     case VJ_TAG_TYPE_YUV4MPEG:
 	sprintf(description, "%s", "YUV4MPEG");
 	break;
@@ -1787,10 +1795,12 @@ int vj_tag_get_audio_frame(int t1, uint8_t *dst_buffer)
 {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return 0;
+#ifdef SUPPORT_READ_DV2
 	if(tag->source_type == VJ_TAG_TYPE_DV1394)
 	{
 		vj_dv_decoder_get_audio( vj_tag_input->dv1394[tag->index], dst_buffer );	
 	}
+#endif
 	if(tag->source_type != VJ_TAG_TYPE_AVFORMAT) return 0;
 	return (vj_avformat_get_audio( vj_tag_input->avformat[tag->index], dst_buffer, -1 ));    
 }
@@ -1901,9 +1911,11 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		return 1;
 	}
 	break;
+#ifdef SUPPORT_READ_DV2
         case VJ_TAG_TYPE_DV1394:
 		vj_dv1394_read_frame( vj_tag_input->dv1394[tag->index], buffer , abuffer,vj_tag_input->pix_fmt);
 		break;
+#endif
     case VJ_TAG_TYPE_SHM:
 	veejay_msg(VEEJAY_MSG_DEBUG, "Consume shm");
 	consume( _tag_info->client, buffer, width * height  );

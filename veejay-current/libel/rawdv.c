@@ -16,8 +16,10 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  */
+#include <config.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#ifdef SUPPORT_READ_DV2
 #include <libel/rawdv.h>
 #include <unistd.h>
 #include <stdlib.h>
@@ -28,6 +30,7 @@
 
 #include <libdv/dv.h>
 #include "avcodec.h"
+
 
 #define	DV_PAL_SIZE 144000
 #define DV_NTSC_SIZE 120000
@@ -242,3 +245,4 @@ int	rawdv_interlacing(dv_t *dv)
 {
 	return 0;
 }
+#endif

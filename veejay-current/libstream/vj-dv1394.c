@@ -20,6 +20,8 @@
 	inspired by ffmpeg/ffmpeg/libavformat/dv1394.c
 	dv1394 has no audio apparently ...
 */
+#include <config.h>
+#ifdef SUPPORT_READ_DV2
 #include <stdint.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -222,4 +224,4 @@ restart_poll:
 
 	return 1;
 }
-
+#endif 
