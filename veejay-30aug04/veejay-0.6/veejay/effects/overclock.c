@@ -36,8 +36,8 @@ vj_effect *overclock_init(int w, int h)
     ve->limits[1][0] = (h/8);
     ve->limits[0][1] = 1;
     ve->limits[1][1] = 90;
-    ve->defaults[0] = 4;
-    ve->defaults[1] = 33;
+    ve->defaults[0] = 5;
+    ve->defaults[1] = 2;
     ve->description = "Radial cubics";
     ve->sub_format = 0;
     ve->extra_frame = 0;
