@@ -185,12 +185,14 @@ enum {
 	VJ_IMAGE_EFFECT_NEIGHBOUR2= 168,
 	VJ_IMAGE_EFFECT_NEIGHBOUR3= 169,
 	VJ_IMAGE_EFFECT_NEIGHBOUR4= 170,
-	VJ_IMAGE_EFFECT_NEIGHBOUR5= 171, 
+	VJ_IMAGE_EFFECT_NEIGHBOUR5= 171,
+	VJ_IMAGE_EFFECT_CUTSTOP = 172, 
+	VJ_IMAGE_EFFECT_MASKSTOP = 173,
 	VJ_IMAGE_EFFECT_DUMMY = 100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 172
+#define VJ_IMAGE_EFFECT_MAX 174
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 237
@@ -493,5 +495,10 @@ extern void		neighbours_apply2( VJFrame *frame, int width, int height, int brush
 extern void		neighbours_apply3( VJFrame *frame, int width, int height, int brush_size, int level, int mode);
 extern void		neighbours_apply4( VJFrame *frame, int width, int height, int radius, int brush_size, int level, int mode);
 extern void		neighbours_apply5( VJFrame *frame, int width, int height, int radius, int brush_size, int level);
-
+extern void cutstop_apply( VJFrame *frame,
+        int width, int height, int treshold,
+        int freq, int cutmode, int holdmode);
+extern void maskstop_apply( VJFrame *frame,
+        int width, int height, int treshold,
+        int freq, int cutmode, int holdmode);
 #endif

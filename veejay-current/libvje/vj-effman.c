@@ -41,6 +41,14 @@ void vj_effman_apply_image_effect(
    int j;
 
    switch (e) {
+	case VJ_IMAGE_EFFECT_MASKSTOP:
+		maskstop_apply(frames[0],frameinfo->width,
+			frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
+		break;
+	case VJ_IMAGE_EFFECT_CUTSTOP:
+		cutstop_apply(frames[0],frameinfo->width,
+			frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
+		break;
 	case VJ_IMAGE_EFFECT_NEIGHBOUR4:
 		neighbours4_apply(frames[0],frameinfo->width,
 			frameinfo->height,arg[0],arg[1],arg[2],arg[3]);

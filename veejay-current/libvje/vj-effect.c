@@ -135,6 +135,9 @@
 #include "effects/neighbours3.h"
 #include "effects/neighbours4.h"
 #include "effects/neighbours5.h"
+#include "effects/cutstop.h"
+#include "effects/maskstop.h"
+
 static struct
 {
 	int	(*mem_init)(int width, int height);
@@ -179,6 +182,8 @@ static struct
 {	neighbours3_malloc,		neighbours3_free,	VJ_IMAGE_EFFECT_NEIGHBOUR3	},
 {	neighbours4_malloc,		neighbours4_free,	VJ_IMAGE_EFFECT_NEIGHBOUR4	},
 {	neighbours5_malloc,		neighbours5_free,	VJ_IMAGE_EFFECT_NEIGHBOUR5	},
+{	cutstop_malloc,			cutstop_free,		VJ_IMAGE_EFFECT_CUTSTOP		},
+{	maskstop_malloc,		maskstop_free,		VJ_IMAGE_EFFECT_MASKSTOP	},
 {	NULL			,	NULL			,0				},
 };
 
@@ -462,6 +467,8 @@ void vj_effect_initialize(int width, int height)
 	vj_effects[i + 69] = neighbours3_init(width,height);
 	vj_effects[i + 70] = neighbours4_init(width,height);
 	vj_effects[i + 71] = neighbours5_init(width,height);
+	vj_effects[i + 72] = cutstop_init(width,height);
+	vj_effects[i + 73] = maskstop_init(width,height);
 	max_width = width;
 	max_height = height;
 
