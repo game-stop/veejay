@@ -949,6 +949,7 @@ libvjnet/Makefile
 libyuv/Makefile
 libel/Makefile
 libstream/Makefile
+liblavjpeg/Makefile
 utils/Makefile
 bio2jack/Makefile
 plugins/Makefile

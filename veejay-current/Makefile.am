@@ -1,6 +1,6 @@
 # Process with automake to produce Makefile.in
 
-SUBDIRS    = ffmpeg utils bio2jack libOSC libvjmsg libvjmem libvje libsample libvjnet libyuv libel libstream plugins veejay tools man 
+SUBDIRS    = ffmpeg utils bio2jack libOSC libvjmsg libvjmem libvje libsample libvjnet libyuv libel libstream liblavjpeg plugins veejay tools man 
 
 #bin_SCRIPTS = veejay-config
 

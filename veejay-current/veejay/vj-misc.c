@@ -28,7 +28,7 @@
 #include <libvje/vje.h>
 #include <veejay/vj-misc.h>
 #include <veejay/vj-lib.h>
-#include "veejay/jpegutils.h"
+#include <liblavjpeg/jpegutils.h>
 #include <libvjmsg/vj-common.h>
 
 

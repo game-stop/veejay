@@ -34,10 +34,10 @@
 #include <jerror.h>
 #include <assert.h>
 
-#include "mjpeg_logging.h"
+#include <utils/mjpeg_logging.h>
 
 #include "jpegutils.h"
-#include "lav_io.h"
+#include <libel/lav_io.h>
 
  /*
   * jpeg_data:       buffer with input / output jpeg

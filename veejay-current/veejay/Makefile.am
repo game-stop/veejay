@@ -12,6 +12,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/libel \
 		-I$(top_srcdir)/libstream \
 		-I$(top_scrdir)/libyuv \
+		-I$(top_srcdir)/liblavjpeg \
 		-I$(top_srcdir)/ffmpeg/ffmpeg/libavcodec \
 		-I$(top_srcdir)/ffmpeg/ffmpeg/libavformat \
 		$(AVIPLAY_CFLAGS) ${XML_CFLAGS} ${GTK_CFLAGS} ${DV_FLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} \
@@ -21,17 +22,10 @@ VEEJAY_LIB_FILE = libveejay.la
 
 lib_LTLIBRARIES = $(VEEJAY_LIB_FILE) 
 
-noinst_LTLIBRARIES = liblavjpeg.la 
-
-
-
 VEEJAY_ALL_LIB_OPTS = \
 	-version-info $(LT_AGE):$(LT_REVISION):$(LT_AGE) \
 	-release $(LT_RELEASE) \
 	-export-dynamic 
-
-liblavjpeg_la_SOURCES = jpegutils.c 
-liblavjpeg_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS) $(JPEG_LIBS)
 
 libveejay_la_SOURCES =  vj-misc.c hash.c \
 			vj-plugin.c vj-osc.c vj-event.c vj-pjack.c vj-perform.c \
@@ -53,7 +47,7 @@ libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS) \
 			-L$(top_builddir)/libel -lel \
 			-L$(top_builddir)/libstream -lstream \
 			-L$(top_builddir)/libyuv -lyuv \
-			-L$(top_builddir)/veejay/ -llavjpeg \
+			-L$(top_builddir)/liblavjpeg -llavjpeg \
 			${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} ${X_LIBS} \
 			${XML_LIBS} ${JPEG_LIBS} ${JACK_LIBS} \
 			${DV_LIBS} ${SAMPLERATE_LIBS} \

@@ -35,7 +35,7 @@
 //#ifdef SUPPORT_READ_DV2
 //#include "vj-dv.h"
 //#endif
-#include <veejay/jpegutils.h>
+#include <liblavjpeg/jpegutils.h>
 #include <libyuv/yuvconv.h>
 #include <libvjmsg/vj-common.h>
 #include <veejay/vj-perform.h>
