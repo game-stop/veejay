@@ -19,8 +19,12 @@
 #ifndef VJ_SHM
 #define VJ_SHM
 #include <stdint.h>
+#include <sys/ipc.h>
 #include <sys/sem.h>
 #include <sys/shm.h>
+
+#ifndef HAVE_UNION_SEMUN
+#define HAVE_UNION_SEMUN
 union semun 
 {
 	int 	val;	
@@ -28,7 +32,7 @@ union semun
 	unsigned short *array;
 	struct seminfo *__buf;
 };
-
+#endif
 
 
 typedef struct video_segment_t

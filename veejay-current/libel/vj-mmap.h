@@ -18,6 +18,7 @@
  */
 #ifndef VJ_MMAP_H
 #define VJ_MMAP_H
+#include <sys/types.h>
 #include <sys/mman.h>
 #include <stdint.h>
 typedef struct

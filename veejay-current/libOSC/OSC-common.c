@@ -52,9 +52,11 @@ The OpenSound Control WWW page is
 #include <stdarg.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <stdint.h>
+#include <sys/types.h>
+#include <sys/time.h>
 #include <netinet/in.h>
 #include <stdint.h>
-#include <sys/time.h>
 
 void fatal_error(char *s, ...) {
     va_list ap;

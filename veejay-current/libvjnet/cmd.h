@@ -19,8 +19,9 @@
  */
 #ifndef CMD_H_INCLUDED
 #define CMD_H_INCLUDED
-#include <netinet/in.h>
+#include <sys/time.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
 #include <netdb.h>
 #include <arpa/inet.h>
 typedef struct

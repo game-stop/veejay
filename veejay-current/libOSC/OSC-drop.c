@@ -33,10 +33,10 @@ The OpenSound Control WWW page is
 
    Matt Wright, 3/16/98
 */
-#include <sys/types.h>
-#include <netinet/in.h>
 #include <stdint.h>
+#include <sys/types.h>
 #include <sys/time.h>
+#include <netinet/in.h>
 #include <libOSC/OSC-common.h>
 #include <libOSC/OSC-timetag.h>
 #include <libOSC/OSC-address-space.h>

@@ -41,13 +41,17 @@
 #include <config.h>
 #include <libsample/sampleadm.h>
 #include <libstream/vj-yuv4mpeg.h>
+#ifdef HAVE_V4L
 #include <libstream/vj-v4lvideo.h>
+#endif
 #include <libvjnet/vj-client.h>
 #include <libel/vj-avformat.h>
 #include <libstream/vj-dv1394.h>
 
 typedef struct {
+#ifdef HAVE_V4L
     v4l_video *v4l[VJ_TAG_MAX_V4L];
+#endif
     vj_yuv *stream[VJ_TAG_MAX_STREAM_IN];
     vj_avformat *avformat[VJ_TAG_MAX_STREAM_IN];
 	vj_client *net[VJ_TAG_MAX_STREAM_IN];
@@ -130,9 +134,9 @@ int 	vj_tag_get_effect(int t1, int position);
 int 	vj_tag_size();
 
 vj_tag 	*vj_tag_get(int id);
-
+#ifdef HAVE_V4L
 int 	_vj_tag_new_v4l(vj_tag *t, int nr , int w , int h, int n, int p, int f, int chan);
-
+#endif
 /* always return effect (-1 = empty) */
 int 	vj_tag_get_effect_any(int t1, int position);
 

@@ -27,11 +27,10 @@
 /* Define pthread lib stack size */
 #undef HAVE_PTHREADSTACKSIZE
 
-/* Define for an Intel based CPU */
-#undef HAVE_X86CPU 	
 
 /* For HAVEX86CPU: Define for availability of CMOV instruction (P6, P7
  * and Athlon cores).*/
+
 #undef HAVE_CMOV
 
 /* For HAVEX86CPU: Define if the installed GCC tool chain can generate
@@ -47,6 +46,8 @@
 #undef ARCH_X86
 
 #undef HAVE_JACK
+
+#undef HAVE_UNION_SEMUN
 
 #undef HAVE_NCURSES
 

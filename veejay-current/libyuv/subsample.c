@@ -563,8 +563,8 @@ static void tr_422_to_444(uint8_t *buffer, int width, int height)
 #else
 		for(x=0; x < stride; x++) // for 1 row
 		{
-			dst[0] = row[x]; //put to dst
-			dst[1] = row[x];
+			dst[0] = src[x]; //put to dst
+			dst[1] = src[x];
 			dst+=2; // increment dst
 		}
 #endif

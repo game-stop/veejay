@@ -31,7 +31,11 @@
 #ifdef HAVE_V4L
 #include <libstream/vj-v4lvideo.h>
 #include <linux/videodev.h>
+#else
+#define VIDEO_PALETTE_YUV420P 15
+#define VIDEO_PALETTE_YUV422P 13
 #endif
+
 #ifdef SUPPORT_READ_DV2
 #include <libstream/vj-dv1394.h>
 #endif
@@ -353,7 +357,7 @@ int	_vj_tag_new_dv1394(vj_tag *tag, int stream_nr, int channel,int quality, edit
    if(vj_tag_input->dv1394[stream_nr])
    {
 	veejay_msg(VEEJAY_MSG_INFO, "DV1394 ready for capture");
-	vj_dv_decoder_set_audio( vj_tag_input->dv1394[stream_nr], el->has_audio);
+//	vj_dv_decoder_set_audio( vj_tag_input->dv1394[stream_nr], el->has_audio);
 	return 1;
    } 
    return 0;

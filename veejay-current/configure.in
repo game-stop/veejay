@@ -90,6 +90,7 @@ have_cmov=false
 have_asm_3dnow=false
 have_asm_mmx2=false
 have_x86cpu=false
+have_union_semun=false
 have_mips=false
 have_ppccpu=false
 have_ppc_altivec=false
@@ -818,6 +819,15 @@ else
   have_cmov=false
 fi
 
+AC_TRY_COMPILE([#include <sys/types.h>
+#include <sys/ipc.h>
+#include <sys/sem.h>],[union semun foo;], [have_semun=true],[have_semun=false])
+if test x$have_semun = xtrue 
+then
+	AC_DEFINE(HAVE_UNION_SEMUN,1)
+fi
+
+
 dnl **********************************************************************
 dnl All the conditional stuff for the Makefiles
 dnl
@@ -833,6 +843,7 @@ AM_CONDITIONAL(HAVE_X86CPU, test x$have_x86cpu = xtrue)
 AM_CONDITIONAL(ARCH_X86, test x$have_x86cpu = xtrue)
 AM_CONDITIONAL(HAVE_PPCCPU, test x$have_ppccpu = xtrue)
 AM_CONDITIONAL(HAVE_MIPS, test x$have_mips = xtrue)
+AM_CONDITIONAL(HAVE_UNION_SEMUN, test x$have_semun = xtrue)
 AM_CONDITIONAL(HAVE_SDL, test x$have_sdl = xtrue)
 AM_CONDITIONAL(HAVE_XML2, test x$have_xml2 = xtrue)
 AM_CONDITIONAL(HAVE_V4L, test x$have_video4linux = xtrue)
