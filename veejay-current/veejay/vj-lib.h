@@ -147,6 +147,8 @@ typedef struct {
     int tag_record;
     int dct_method;
     subsample_mode_t sample_mode;
+	int use_mcast;
+	char *group_name;
 } video_playback_setup;
 
 
@@ -245,8 +247,7 @@ typedef struct {
     int last_tag_id;
     int nstreams;
     int sfd;
-    vj_server *vjs;
-    vj_server *status;
+    vj_server *vjs[2];
     int net;
     int no_ffmpeg;		/* use libjpeg for decoding of video */
     int render_entry;
