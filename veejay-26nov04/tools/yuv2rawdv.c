@@ -20,6 +20,8 @@
 #ifndef HAVE_STDINT_H
 #define HAVE_STDINT_H
 #endif
+#include <config.h>
+#ifdef SUPPORT_READ_DV2
 #include <signal.h>
 #include <config.h>
 #include "mjpeg_logging.h"
@@ -242,3 +244,10 @@ int main(int argc, char *argv[])
 
    return 0;
 }
+#else
+
+int main(int argc, char *argv[])
+{
+	printf("yuv2rawdv needs libdv\n");
+}
+#endif
