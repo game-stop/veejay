@@ -298,8 +298,6 @@ int vj_effect_deactivate(int effect_id)
 	}
 	if( vj_effect_ready[seq] == 0 )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Effect %s was not activated",
-			vj_effects[seq]->description);
 		return 1;
 	}
 	if( vj_effect_ready[seq] == 1 )
