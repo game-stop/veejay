@@ -66,7 +66,7 @@ void revtv_apply(VJFrame *frame, int width, int height, int linespace,
       
 
     int colorCb = bl_pix_get_color_cb(color);
-    int colorCr = bl_pix_get_color_cr(color);
+    int colorCr = bl_pix_get_color_cr(color_num);
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
