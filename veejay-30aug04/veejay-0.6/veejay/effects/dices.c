@@ -90,7 +90,7 @@ unsigned int dices_fastrand()
 void dice_create_map(int w, int h)
 {
     int k,x, y, i = 0;
-    const int maplen = (w * h);
+    int maplen = (w * h);
     g_map_height = h >> g_cube_bits;
     g_map_width = w >> g_cube_bits;
     g_cube_size = 1 << g_cube_bits;
