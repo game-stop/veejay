@@ -58,6 +58,7 @@ typedef struct vj_effect_t {
     int sub_format;
     int has_internal_data;      /*specify if effect_free needs to be called */
     int static_bg;
+    int has_help;
     //      int dataformat;
     /* effect requires this dataformat */
 } vj_effect;
@@ -505,7 +506,7 @@ extern void binaryoverlay_apply(uint8_t *yuv1[3], uint8_t *yuv2[3],int w, int h,
 
 extern void chromium_apply( uint8_t *yuv1[3], int w, int h, int n);
 
-extern void chromapalette_apply( uint8_t *yuv[3], int w, int h, int c1, int c2);
+extern void chromapalette_apply( uint8_t *yuv[3], int w, int h, int a, int r, int g, int b, int c1, int c2);
 
 //extern void yuvchannelmix_apply(uint8_t *yuv1[3],uint8_t *yuv2[3], int width, int height,
 //		 int opacity_a, int opacity_b,

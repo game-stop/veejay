@@ -1,3 +1,7 @@
+	+ fixed bug in radial blur that caused segmentation fault
+	+ extended chrominance palette to key on color 
+	+ cleanup overlay scratcher 
+
 0.6.0
 	+ fixed bug in performer when using a stream multiple times
 	+ fixed bug in veejay -u / --dump-events

@@ -165,7 +165,7 @@ void vj_effman_apply_image_effect(vj_video_block *data, vj_clip_instr *todo_info
 	pixelate_apply(data->src1,data->width,data->height,arg[0]);
 	break;
    case VJ_IMAGE_EFFECT_CHROMAPALETTE:
-	chromapalette_apply(data->src1,data->width,data->height,arg[0],arg[1]);
+	chromapalette_apply(data->src1,data->width,data->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
 	break;
    case VJ_IMAGE_EFFECT_CHROMIUM:
 	chromium_apply( data->src1, data->width, data->height, arg[0]);

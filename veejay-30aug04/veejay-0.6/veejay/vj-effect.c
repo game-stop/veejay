@@ -419,6 +419,7 @@ void vj_effect_initialize(int width, int height)
 		if(vj_effects[i])
 		{
 			if(i!=3) vj_effects[i]->static_bg = 0;
+			if(i!=(VJ_VIDEO_COUNT+58)) vj_effects[i]->has_help = 0; 
 		}
 	}
 
@@ -584,6 +585,14 @@ int vj_effect_get_extra_frame(int effect_id)
     if (entry > 0)
 	return vj_effects[entry]->extra_frame;
     return 0;
+}
+
+int vj_effect_get_help(int entry)
+{
+	if(!vj_effects[entry])
+		return 0;
+	
+	return 0;
 }
 
 int vj_effect_get_summary(int entry, char *dst)
