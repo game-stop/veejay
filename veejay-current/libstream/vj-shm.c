@@ -27,7 +27,7 @@
 #include <sys/time.h>
 #include <stdint.h>
 #include <libvjmsg/vj-common.h>
-#include <veejay/vj-shm.h>
+#include <libstream/vj-shm.h>
 #include <libvjmem/vjmem.h>
 #include <stdlib.h>
 

@@ -39,9 +39,10 @@
 
 #include <config.h>
 #include <libsample/sampleadm.h>
-#include <veejay/vj-yuv4mpeg.h>
-#include <veejay/vj-v4lvideo.h>
-#include <veejay/vj-lib.h>
+#include <libstream/vj-yuv4mpeg.h>
+#include <libstream/vj-v4lvideo.h>
+#include <libvjnet/vj-client.h>
+#include <libel/vj-avformat.h>
 
 typedef struct {
     v4l_video *v4l[VJ_TAG_MAX_V4L];
@@ -222,7 +223,7 @@ int 	vj_tag_set_contrast(int t1, int value);
 int 	vj_tag_set_color(int t1, int value);
 int 	vj_tag_set_hue(int t1, int value);
 
-void 	vj_tag_set_veejay_t(veejay_t *info);
+void 	vj_tag_set_veejay_t(void *info);
 
 int 	vj_tag_set_manual_fader(int t1, int value );
 

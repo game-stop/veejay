@@ -17,7 +17,7 @@
 #ifndef AVILIB_H
 #define AVILIB_H
 
-#include <mjpeg_types.h>
+#include <utils/mjpeg_types.h>
 
 typedef struct
 {

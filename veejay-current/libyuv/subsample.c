@@ -28,11 +28,11 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <mjpeg_types.h>
+#include <utils/mjpeg_types.h>
 
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-common.h>
-#include <veejay/subsample.h>
+#include <libyuv/yuvconv.h>
 
 
 const char *ssm_id[SSM_COUNT] = {

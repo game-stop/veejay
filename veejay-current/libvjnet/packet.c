@@ -33,17 +33,22 @@ packet_header_t		packet_construct_header(uint8_t flag)
 	gettimeofday(&tv, NULL);
 	packet_header_t header;
 	header.flag = flag;
-	header.seq_num = 0;	// not set
-	header.sec = tv.tv_sec;
-	header.usec = tv.tv_usec;
-	header.timeout = 50000;
+	header.seq_num = htons(0);	// not set
+	header.sec = htonl(tv.tv_sec);
+	header.usec = htonl(tv.tv_usec);
+	header.timeout = htonl(40000);
 	return header;
 }
 
 packet_header_t		packet_get_header(const void *data)
 {
-	packet_header_t h;
-	veejay_memcpy( &h, data, sizeof(packet_header_t) );
+	packet_header_t h,tmp;
+	veejay_memcpy( &tmp, data, sizeof(packet_header_t) );
+	h.flag = tmp.flag;
+	h.seq_num = ntohs( tmp.seq_num );
+	h.sec = ntohl( tmp.sec );
+	h.usec = ntohl( tmp.usec );
+	h.timeout = ntohl( tmp.timeout );
 	return h;
 }
 
@@ -66,6 +71,7 @@ int			packet_put_data(packet_header_t *h, frame_info_t *i , void *payload, const
 	size_t len = sizeof( packet_header_t );
 	
 	veejay_memcpy( payload, h , len );
+	
 	if(h->flag)
 	{
 		veejay_memcpy( payload + len, i , sizeof( frame_info_t ));

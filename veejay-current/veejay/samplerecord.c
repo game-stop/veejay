@@ -20,7 +20,7 @@
 #include <string.h>
 #include <libsample/sampleadm.h>
 #include <veejay/vj-misc.h>
-#include <veejay/vj-avcodec.h>
+#include <libel/vj-avcodec.h>
 #include <libvjmsg/vj-common.h>
 #include <veejay/vj-lib.h>
 #include <veejay/samplerecord.h>

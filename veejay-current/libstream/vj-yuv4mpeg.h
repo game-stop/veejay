@@ -18,8 +18,9 @@
  */
 #ifndef VJ_YUV4MPEG_H
 #define VJ_YUV4MPEG_H
-#include <veejay/vj-el.h>
-#include "mpegconsts.h"
+#include <libel/vj-el.h>
+#include <utils/mpegconsts.h>
+
 typedef struct {
     y4m_stream_info_t streaminfo;
     y4m_frame_info_t frameinfo;

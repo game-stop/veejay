@@ -23,7 +23,7 @@
 #include <libvjmsg/vj-common.h>
 #include <veejay/vj-global.h>
 #include <libvjmem/vjmem.h>
-#include <veejay/vj-avcodec.h>
+#include <libel/vj-avcodec.h>
 #include <string.h>
 #include <stdlib.h>
 //extern void *(* veejay_memcpy)(void *to, const void *from, size_t len) ;

@@ -24,25 +24,24 @@
 #include <stdlib.h>
 #include <string.h>
 #include <libsample/sampleadm.h>  
-#include <veejay/vj-tag.h>
+#include <libstream/vj-tag.h>
 #include <libvjnet/vj-server.h>
 #include <libvje/vje.h>
 #include <veejay/vj-lib.h>
-#include <veejay/vj-el.h>
+#include <libel/vj-el.h>
 #include <math.h>
-#include <veejay/vj-avcodec.h>
+#include <libel/vj-avcodec.h>
 #include <veejay/vj-event.h>
 //#ifdef SUPPORT_READ_DV2
 //#include "vj-dv.h"
 //#endif
 #include <veejay/jpegutils.h>
-#include <veejay/subsample.h>
+#include <libyuv/yuvconv.h>
 #include <libvjmsg/vj-common.h>
 #include <veejay/vj-perform.h>
 #include <veejay/libveejay.h>
 #include <veejay/samplerecord.h>
 #include <jpeglib.h>
-//#include <avcodec.h>
 #ifdef HAVE_SAMPLERATE
 #include <samplerate.h>
 #endif

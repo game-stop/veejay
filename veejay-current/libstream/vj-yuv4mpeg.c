@@ -23,8 +23,7 @@
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <libvjmsg/vj-common.h>
-#include <veejay/vj-lib.h>
-#include "vj-yuv4mpeg.h"
+#include <libstream/vj-yuv4mpeg.h>
 #include <string.h>
 /* see vj-v4lvideo for details about structure */
 

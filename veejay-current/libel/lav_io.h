@@ -23,12 +23,12 @@
 #include <mlt/framework/mlt.h>
 #endif
 
-#include <avilib.h>
+#include <libel/avilib.h>
 
 // play with mlt here, avformat producer/several consumers (we can write to)
 // for normalized output (720x576/480) , dv1394 capture and playback
 
-#include "yuv4mpeg.h"
+#include <utils/yuv4mpeg.h>
 
 #define LAV_INTER_UNKNOWN       Y4M_UNKNOWN
 #define LAV_NOT_INTERLACED      Y4M_ILACE_NONE

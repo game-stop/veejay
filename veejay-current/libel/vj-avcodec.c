@@ -17,18 +17,16 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <config.h>
-#include <veejay/vj-misc.h>
-#include <veejay/vj-avcodec.h>
-#include <veejay/vj-el.h>
-#include <veejay/vj-lib.h>
+#include <libel/vj-avcodec.h>
+#include <libel/vj-el.h>
 #include <libvjmsg/vj-common.h>
 #include <libvjmem/vjmem.h>
 #include <string.h>
-
+#include <libyuv/yuvconv.h>
 #define __FALLBACK_LIBDV 1
 
 #ifdef __FALLBACK_LIBDV
-#include <veejay/vj-dv.h>
+#include <libel/vj-dv.h>
 #endif
 
 static int out_pixel_format = FMT_420; 
@@ -196,153 +194,6 @@ int		vj_avcodec_free()
 #endif
 #endif
 	return 1;
-}
-
-/* this routine is the same as frame_YUV422_to_YUV420P , unpack
- * libdv's 4:2:2-packed into 4:2:0 planar 
- * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)
- */
-void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
-		int width, int height)
-{
-
-    int i, j, w2;
-    uint8_t *y, *u, *v;
-
-    w2 = width / 2;
-
-    //I420
-    y = _y;
-    v = _v;
-    u = _u;
-
-    for (i = 0; i < height; i += 4) {
-	/* top field scanline */
-	for (j = 0; j < w2; j++) {
-	    /* packed YUV 422 is: Y[i] U[i] Y[i+1] V[i] */
-	    *(y++) = *(input++);
-	    *(u++) = *(input++);
-	    *(y++) = *(input++);
-	    *(v++) = *(input++);
-	}
-	for (j = 0; j < w2; j++)
-	{
-	    *(y++) = *(input++);
-	    *(u++) = *(input++);
-	    *(y++) = *(input++);
-	    *(v++) = *(input++);
-	
-	}
-
-	/* next two scanlines, one frome each field , interleaved */
-	for (j = 0; j < w2; j++) {
-	    /* skip every second line for U and V */
-	    *(y++) = *(input++);
-	    input++;
-	    *(y++) = *(input++);
-	    input++;
-	}
-	/* bottom field scanline*/
-	for (j = 0; j < w2; j++) {
-	    /* skip every second line for U and V */
-	    *(y++) = *(input++);
-	    input++;
-	    *(y++) = *(input++);
-	    input++;
-	}
-
-    }
-}
-/* convert 4:2:0 to yuv 4:2:2 packed */
-void yuv422p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
-		       int height)
-{
-    unsigned int x, y;
-
-
-    for (y = 0; y < height; ++y) {
-	uint8_t *Y = yuv420[0] + y * width;
-	uint8_t *Cb = yuv420[1] + (y / 2) * (width);
-	uint8_t *Cr = yuv420[2] + (y / 2) * (width);
-	for (x = 0; x < width; x +=2) {
-	    *(dest + 0) = Y[0];
-	    *(dest + 1) = Cb[0];
-	    *(dest + 2) = Y[1];
-	    *(dest + 3) = Cr[0];
-	    dest += 4;
-	    Y += 2;
-	    ++Cb;
-	    ++Cr;
-	}
-    }
-}
-
-
-
-/* convert 4:2:0 to yuv 4:2:2 */
-void yuv420p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
-		       int height)
-{
-    unsigned int x, y;
-
-
-    for (y = 0; y < height; ++y) {
-	uint8_t *Y = yuv420[0] + y * width;
-	uint8_t *Cb = yuv420[1] + (y >> 1) * (width >> 1);
-	uint8_t *Cr = yuv420[2] + (y >> 1) * (width >> 1);
-	for (x = 0; x < width; x += 2) {
-	    *(dest + 0) = Y[0];
-	    *(dest + 1) = Cb[0];
-	    *(dest + 2) = Y[1];
-	    *(dest + 3) = Cr[0];
-	    dest += 4;
-	    Y += 2;
-	    ++Cb;
-	    ++Cr;
-	}
-    }
-}
-
-/* convert yuv422 planar to YUYV */
-void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
-{
-    int x,y;
-    uint8_t *Y = yuv422[0];
-    uint8_t *U = yuv422[1];
-    uint8_t *V = yuv422[2]; // U Y V Y
-	for(y = 0; y < h; y ++ )
-	{
-		Y = yuv422[0] + y * w;
-		U = yuv422[1] + (y>>1) * w;
-		V = yuv422[2] + (y>>1) * w;
-	/*	for(x=0; x < w; x+= 2)
-		{
-			*(pixels + 0) = Y[0];
-			*(pixels + 1) = U[0];
-			*(pixels + 2) = Y[1];
-			*(pixels + 3) = V[0];
-			pixels += 4;
-			Y+=2;
-			++U;
-			++V;
-		}
-	*/
-		for( x = 0 ; x < w ; x += 4 )
-		{
-			*(pixels + 0) = Y[0];
-			*(pixels + 1) = U[0];
-			*(pixels + 2) = Y[1];
-			*(pixels + 3) = V[0];
-			*(pixels + 4) = Y[2];
-			*(pixels + 5) = U[1];
-			*(pixels + 6) = Y[3];
-			*(pixels + 7) = V[1];
-			pixels += 8;
-			Y+=4;
-			U+=2;
-			V+=2;
-		}
-    }
 }
 
 void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h)

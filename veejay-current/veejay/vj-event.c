@@ -33,13 +33,13 @@
 #include <veejay/vj-perform.h>
 #include <veejay/hash.h>
 #include <veejay/libveejay.h>
-#include <veejay/vj-avcodec.h>
+#include <libel/vj-avcodec.h>
 #include <veejay/samplerecord.h>
-#include <mpegconsts.h>
-#include <mpegtimecode.h>
+#include <utils/mpegconsts.h>
+#include <utils/mpegtimecode.h>
 #include <veejay/vims.h>
 #include <veejay/vj-event.h>
-#include <veejay/vj-tag.h>
+#include <libstream/vj-tag.h>
 #include <veejay/vj-plugin.h>
 /* Highest possible SDL Key identifier */
 #define MAX_SDL_KEY	350

@@ -17,6 +17,7 @@
 	+ revisited OSC implementation ( use veejay -u -n |less )
 	+ updated documentation (Howto, MAN pages, etc)
 	+ removed obsolete VIMS messages
+	+ librified editlist,stream and yuv functions
 	+ removed any references on dropped vloopback support
 
 0.7.1

@@ -25,19 +25,17 @@
  */
 #include <config.h>
 #include <string.h>
-#include <veejay/vj-tag.h>
-#include <veejay/hash.h>
+#include <libstream/vj-tag.h>
+#include <libstream/hash.h>
 #include <libvje/vje.h>
 #ifdef HAVE_V4L
-#include <veejay/vj-v4lvideo.h>
+#include <libstream/vj-v4lvideo.h>
 #include <linux/videodev.h>
 #endif
-#include <veejay/libveejay.h>
 #include <libvjmsg/vj-common.h>
-#include <veejay/vj-shm.h>
-#include <veejay/vj-dv.h>
-#include <veejay/vj-avformat.h>
-#include <veejay/vj-avcodec.h>
+#include <libstream/vj-shm.h>
+#include <libel/vj-avformat.h>
+#include <libel/vj-avcodec.h>
 #include <libvjnet/vj-client.h>
 #include <libvjnet/common.h>
 #include <veejay/vims.h>
@@ -87,8 +85,8 @@ int vj_tag_size()
     return this_tag_id;
 }
 
-void vj_tag_set_veejay_t(veejay_t *info) {
-	_tag_info = info;
+void vj_tag_set_veejay_t(void *info) {
+	_tag_info = (veejay_t*)info;
 }
 
 static inline hash_val_t int_tag_hash(const void *key)

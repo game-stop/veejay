@@ -55,25 +55,11 @@ int		vj_avcodec_free();
  */
 
 
-// from yuv 4:2:2 packed to yuv 4:2:0 planar
-void 	yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input, int w, int h);
-
-// from yuv 4:2:2 planar to yuv 4:2:2 packed
-void 	yuv422p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int w, int h);
-
-// from yuv 4:2:0 planar to yuv 4:2:2 packed
-void 	yuv420p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int w, int h );
-
-// from yuv 4:2:2 planar to yuv 4:2:0 planar
-int		yuv422p_to_yuv420p( uint8_t *src[3], uint8_t *dst, int w, int h);
 
 // from yuv 4:2:0 planar to yuv 4:2:2 planar
 int		yuv420p_to_yuv422p( uint8_t *Y, uint8_t *Cb, uint8_t *Cr, uint8_t *dst[3], int w, int h );
 
 void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h );
-
-// from yuv 4:2:0 planar to YUYV
-void 	yuv422_to_yuyv( uint8_t *yuv422[3], uint8_t *pixels, int w, int h );
 
 int		yuv420p_to_yuv422p2( uint8_t *sY,uint8_t *sCb, uint8_t *sCr, uint8_t *dst[3], int w, int h );
 

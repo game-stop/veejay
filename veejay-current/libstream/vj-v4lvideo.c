@@ -20,15 +20,14 @@
 #ifdef HAVE_V4L
 #include <stdio.h>
 #include <stdlib.h>
-#include <veejay/vj-v4lvideo.h>
-#include <veejay/v4lutils.h>
+#include <libstream/vj-v4lvideo.h>
+#include <libstream/v4lutils.h>
 #include <veejay/vj-global.h>
 #include <string.h>
 #include <libvjmsg/vj-common.h>
 #include <veejay/vj-lib.h>
-#include <veejay/vj-tag.h>
+#include <libstream/vj-tag.h>
 #include <libvjmem/vjmem.h>
-#include <veejay/vj-v4lvideo.h>
 
 #define VJ_V4L_DEBUG
 

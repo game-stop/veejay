@@ -247,16 +247,6 @@ libvjnet_la_LDFLAGS = $(VJNET_LIB_OPTS) \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
 			-DDYNAMIC -O3 -Wall 
 
-
-SERVER_BIN = dummy
-
-check_PROGRAMS = $(SERVER_BIN)
-
-dummy_SOURCES = dummy.c 
-dummy_LDADD = libvjnet.la \
-		$(top_builddir)/libvjmsg/libvjmsg.la \
-		$(top_builddir)/libvjmem/libvjmem.la 
-
 subdir = libvjnet
 ACLOCAL_M4 = $(top_srcdir)/aclocal.m4
 mkinstalldirs = $(SHELL) $(top_srcdir)/mkinstalldirs
@@ -268,17 +258,11 @@ libvjnet_la_LIBADD =
 am_libvjnet_la_OBJECTS = packet.lo mcastsender.lo mcastreceiver.lo \
 	cmd.lo vj-server.lo vj-client.lo
 libvjnet_la_OBJECTS = $(am_libvjnet_la_OBJECTS)
-check_PROGRAMS = dummy$(EXEEXT)
-am_dummy_OBJECTS = dummy.$(OBJEXT)
-dummy_OBJECTS = $(am_dummy_OBJECTS)
-dummy_DEPENDENCIES = libvjnet.la $(top_builddir)/libvjmsg/libvjmsg.la \
-	$(top_builddir)/libvjmem/libvjmem.la
-dummy_LDFLAGS =
 
 DEFAULT_INCLUDES =  -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
-@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/cmd.Plo ./$(DEPDIR)/dummy.Po \
+@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/cmd.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/mcastreceiver.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/mcastsender.Plo ./$(DEPDIR)/packet.Plo \
 @AMDEP_TRUE@	./$(DEPDIR)/vj-client.Plo ./$(DEPDIR)/vj-server.Plo
@@ -289,9 +273,9 @@ LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) $(DEFAULT_INCLUDES) \
 CCLD = $(CC)
 LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
-DIST_SOURCES = $(libvjnet_la_SOURCES) $(dummy_SOURCES)
+DIST_SOURCES = $(libvjnet_la_SOURCES)
 DIST_COMMON = $(srcdir)/Makefile.in Makefile.am
-SOURCES = $(libvjnet_la_SOURCES) $(dummy_SOURCES)
+SOURCES = $(libvjnet_la_SOURCES)
 
 all: all-am
 
@@ -314,16 +298,6 @@ clean-noinstLTLIBRARIES:
 libvjnet.la: $(libvjnet_la_OBJECTS) $(libvjnet_la_DEPENDENCIES) 
 	$(LINK)  $(libvjnet_la_LDFLAGS) $(libvjnet_la_OBJECTS) $(libvjnet_la_LIBADD) $(LIBS)
 
-clean-checkPROGRAMS:
-	@list='$(check_PROGRAMS)'; for p in $$list; do \
-	  f=`echo $$p|sed 's/$(EXEEXT)$$//'`; \
-	  echo " rm -f $$p $$f"; \
-	  rm -f $$p $$f ; \
-	done
-dummy$(EXEEXT): $(dummy_OBJECTS) $(dummy_DEPENDENCIES) 
-	@rm -f dummy$(EXEEXT)
-	$(LINK) $(dummy_LDFLAGS) $(dummy_OBJECTS) $(dummy_LDADD) $(LIBS)
-
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT) core *.core
 
@@ -331,7 +305,6 @@ distclean-compile:
 	-rm -f *.tab.c
 
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cmd.Plo@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/dummy.Po@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mcastreceiver.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mcastsender.Plo@am__quote@
 @AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/packet.Plo@am__quote@
@@ -467,7 +440,6 @@ distdir: $(DISTFILES)
 	  fi; \
 	done
 check-am: all-am
-	$(MAKE) $(AM_MAKEFLAGS) $(check_PROGRAMS)
 check: check-am
 all-am: Makefile $(LTLIBRARIES)
 
@@ -499,8 +471,8 @@ maintainer-clean-generic:
 	-test -z "$(MAINTAINERCLEANFILES)" || rm -f $(MAINTAINERCLEANFILES)
 clean: clean-am
 
-clean-am: clean-checkPROGRAMS clean-generic clean-libtool \
-	clean-noinstLTLIBRARIES mostlyclean-am
+clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
+	mostlyclean-am
 
 distclean: distclean-am
 	-rm -rf ./$(DEPDIR)
@@ -548,9 +520,9 @@ ps-am:
 
 uninstall-am: uninstall-info-am
 
-.PHONY: CTAGS GTAGS all all-am check check-am clean clean-checkPROGRAMS \
-	clean-generic clean-libtool clean-noinstLTLIBRARIES ctags \
-	distclean distclean-compile distclean-generic distclean-libtool \
+.PHONY: CTAGS GTAGS all all-am check check-am clean clean-generic \
+	clean-libtool clean-noinstLTLIBRARIES ctags distclean \
+	distclean-compile distclean-generic distclean-libtool \
 	distclean-tags distdir dvi dvi-am info info-am install \
 	install-am install-data install-data-am install-exec \
 	install-exec-am install-info install-info-am install-man \

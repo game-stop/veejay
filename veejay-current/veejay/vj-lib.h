@@ -24,17 +24,17 @@
 #include <libsample/sampleadm.h>
 #include <libvjnet/vj-server.h>
 #include <libvjnet/vj-client.h>
+#include <libyuv/yuvconv.h>
 #ifdef HAVE_V4L
-#include "vj-v4lvideo.h"
+#include <libstream/vj-v4lvideo.h>
 #endif
-#include "vj-yuv4mpeg.h"
+#include <libstream/vj-yuv4mpeg.h>
 #include "vj-dfb.h"
 #include "vj-sdl.h"
 #include "vj-OSC.h"
-#include "lav_io.h"
-#include "vj-shm.h"
-#include "subsample.h"
-#include "vj-el.h"
+#include <libel/lav_io.h>
+#include <libstream/vj-shm.h>
+#include <libel/vj-el.h>
 
 enum {
   NO_AUDIO = 0,

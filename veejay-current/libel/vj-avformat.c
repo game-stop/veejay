@@ -17,10 +17,11 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <config.h>
-#include <veejay/vj-avformat.h>
-#include <veejay/vj-misc.h>
+#include <stdint.h>
+#include <libel/vj-avformat.h>
 #include <libvjmsg/vj-common.h>
 #include <string.h>
+#include <libel/vj-el.h>
 #if LIBAVFORMAT_BUILD >= 4620
 #define m_av_seek_frame( a,b,c,d ) \
  ( av_seek_frame( a,b,c,d ) )

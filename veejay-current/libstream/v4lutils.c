@@ -36,8 +36,8 @@
 #include <pthread.h>
 #include <errno.h>
 #include <libvjmsg/vj-common.h>
-#include <veejay/vj-lib.h>
-#include <veejay/v4lutils.h>
+//#include <veejay/vj-lib.h>
+#include <libstream/v4lutils.h>
 #ifdef V4L_DEBUG
 #undef V4L_DEBUG
 #endif

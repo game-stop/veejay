@@ -62,7 +62,7 @@
 #include <linux/rtc.h>
 #include "jpegutils.h"
 #include "vj-event.h"
-#include "vj-shm.h"
+#include <libstream/vj-shm.h>
 #ifndef X_DISPLAY_MISSING
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
@@ -85,8 +85,8 @@
 #include <veejay/vj-plugin.h>
 #include <veejay/vj-plug.h>
 #include <veejay/vj-lib.h>
-#include <veejay/vj-avcodec.h>
-
+#include <libel/vj-avcodec.h>
+#include <libyuv/yuvconv.h>
 // following struct copied from ../utils/videodev.h
 
 /* This is identical with the mgavideo internal params struct, 
@@ -178,9 +178,9 @@ struct mjpeg_params
 #include <mpegconsts.h>
 #include <mpegtimecode.h>
 //#include "vj-common.h"
-#include "vj-tag.h"
+#include <libstream/vj-tag.h>
 #include "libveejay.h"
-#include "mjpeg_types.h"
+#include <utils/mjpeg_types.h>
 #include "vj-perform.h"
 #include <libvjnet/vj-server.h>
 #include "mjpeg_types.h"
@@ -188,7 +188,7 @@ struct mjpeg_params
 #ifdef HAVE_DIRECTFB
 #include "vj-dfb.h"
 #endif
-#include "subsample.h"
+
 /* TODO: set_clip and clip_action clean up; important items need more updates */
 
 /* On some systems MAP_FAILED seems to be missing */
@@ -199,7 +199,7 @@ struct mjpeg_params
 #define HZ 100
 
 
-#include <veejay/vj-el.h>
+#include <libel/vj-el.h>
 
 #define VALUE_NOT_FILLED -10000
 static float time_frame = 0;

@@ -946,6 +946,9 @@ libvjmem/Makefile
 libvje/Makefile
 libsample/Makefile
 libvjnet/Makefile
+libyuv/Makefile
+libel/Makefile
+libstream/Makefile
 utils/Makefile
 bio2jack/Makefile
 plugins/Makefile

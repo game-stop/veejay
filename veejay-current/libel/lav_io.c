@@ -28,8 +28,8 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <fcntl.h>
-#include <veejay/lav_io.h>
-#include <veejay/vj-lib.h>
+#include <libel/lav_io.h>
+//#include <veejay/vj-lib.h>
 #include <libvjmsg/vj-common.h>
 
 extern int AVI_errno;

@@ -21,8 +21,8 @@
 #ifdef SUPPORT_READ_DV2
 #include <libdv/dv.h>
 #include <stdint.h>
-#include <veejay/vj-dv.h>
-#include <veejay/vj-avcodec.h>
+#include <libel/vj-dv.h>
+#include <libel/vj-avcodec.h>
 #include <string.h>
 
 #define NTSC_W 720
@@ -71,33 +71,6 @@ void vj_dv_init_encoder(editlist * el, int pixel_format)
 			   (vj_dv_encoder->
 			    isPAL ? DV_PAL_SIZE : DV_NTSC_SIZE)));
 }
-
-
-/* convert 4:2:0 to yuv 4:2:2 
-static void convert_yuv420p_to_yuv422(uint8_t * yuv_in[3],
-				      uint8_t * yuv422, int width,
-				      int height)
-{
-    unsigned int x, y;
-    unsigned int i = 0;
-
-    for (y = 0; y < height; ++y) {
-	uint8_t *Y = yuv_in[0] + y * width;
-	uint8_t *Cb = yuv_in[1] + (y / 2) * (width / 2);
-	uint8_t *Cr = yuv_in[2] + (y / 2) * (width / 2);
-	for (x = 0; x < width; x += 2) {
-	    *(yuv422 + i) = Y[0];
-	    *(yuv422 + i + 1) = Cb[0];
-	    *(yuv422 + i + 2) = Y[1];
-	    *(yuv422 + i + 3) = Cr[0];
-	    i += 4;
-	    Y += 2;
-	    ++Cb;
-	    ++Cr;
-	}
-    }
-}
-*/
 
 /* encode frame to dv format, dv frame will be in output_buf */
 int vj_dv_encode_frame(uint8_t * input_buf[3], uint8_t * output_buf)
