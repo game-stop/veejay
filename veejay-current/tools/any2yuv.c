@@ -21,7 +21,7 @@
 
 #include <config.h>
 #include <stdlib.h>
-
+#include <stdio.h>
 #ifndef HAVE_STDINT_H
 #define HAVE_STDINT_H
 #endif
