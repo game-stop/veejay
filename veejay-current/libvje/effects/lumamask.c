@@ -107,9 +107,9 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
 			if(ny < 0) ny+=height;
 			if(ny < 0) ny = 0; else if (ny >= height) ny = height-1;
 			// put pixels from local copy
-			Y[y*width+x] = buf[0][ny * width + x];
-			Cb[y*width+x] = buf[1][ny * width + x];
-			Cr[y*width+x] = buf[2][ny * width + x];
+			Y[y*width+x] = buf[0][ny * width + nx];
+			Cb[y*width+x] = buf[1][ny * width + nx];
+			Cr[y*width+x] = buf[2][ny * width + nx];
 		}
 	}
 }
