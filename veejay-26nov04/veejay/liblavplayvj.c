@@ -1519,9 +1519,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg)
 */
 
  	clip_init( (el->video_width * el->video_height)  ); 
-
-	vj_avcodec_init(el, info->pixel_format);
-
          /// OLDOLD    
 
 	plugins_allocate();
@@ -2716,6 +2713,9 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, int ofps, in
 			(info->pixel_format == FMT_422 ? "4:2:2" : "4:2:0"));
 	}	
 	
+
+	vj_avcodec_init(info->edit_list ,   info->edit_list->pixel_format);
+
 
 	if(info->pixel_format == FMT_422 )
 	{

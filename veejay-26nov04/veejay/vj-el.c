@@ -167,16 +167,16 @@ static int _el_probe_for_pixel_fmt( lav_file_t *fd )
 	int pix_fmt = -1;
 	if(!fd) return -1;
 	if( fd->MJPG_chroma == CHROMA420 )
-		return PIX_FMT_YUV420P;
+		return FMT_420;
 	if( fd->MJPG_chroma == CHROMA422 )
-		return PIX_FMT_YUV422P;
+		return FMT_422;
 	if( fd->MJPG_chroma == CHROMA444 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "YUV 4:4:4 is not supported yet. ");
-		return PIX_FMT_YUV422P;
+		return FMT_422;
 	}
 	if( fd->MJPG_chroma == CHROMAUNKNOWN )
-		return PIX_FMT_YUV420P;
+		return FMT_420;
 
 	return -1;
 }
@@ -267,7 +267,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		return -1;
 	}
 
-	if(el->pixel_format != -1)
+	if(el->pixel_format == -1)
 	{
 		el->pixel_format = pix_fmt;
 	}

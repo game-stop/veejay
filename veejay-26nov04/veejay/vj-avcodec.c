@@ -63,6 +63,9 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 		e->context->pix_fmt = PIX_FMT_YUV420P;
 	}
 
+	veejay_msg(VEEJAY_MSG_WARNING, "ffmpeg using %s",
+		( pixel_format == FMT_422 ? "422"  :"420" ) );
+
 	if( id != -1)
 	{
 #ifdef __FALLBACK_LIBDV
