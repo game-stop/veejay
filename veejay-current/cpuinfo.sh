@@ -6,7 +6,7 @@ if test x"$CC" = x; then
 fi
 
 if test $# -ne 1; then
-   echo "Please give the arch (ppc or x86) as an argument!" 1>&2
+   echo "Please give the arch (ppc, x86) as an argument!" 1>&2
    exit 1
 fi
 

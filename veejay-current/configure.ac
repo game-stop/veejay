@@ -410,7 +410,7 @@ have_ps2=false
 
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
-  i[[3-7]]86)
+	i[[3-7]]86)
     AC_DEFINE(HAVE_X86CPU,, [Compiling for x86 architecture CPU])
     AC_DEFINE(ARCH_X86,1,[Compiling for x86 architecture]) 
     have_x86cpu=true
@@ -418,7 +418,7 @@ case $host_cpu in
 
     if test "x$enable_debug" != "xyes" ; then
 	dnl optimize if not debugging
-	CFLAGS="-O2 -fomit-frame-pointer"
+	CFLAGS="-fno-common -O2 -fomit-frame-pointer"
     fi
  
     dnl If the host is pentium, align on double word boundary
@@ -641,31 +641,21 @@ EOF
   fi
 fi
 
-dnl *********************************************************************
-dnl For x86 and ppc machines check which code model we should use.  This is
-dnl done with the helper script cpuinfo.sh because the logic to do the job
-dnl correctly is complex and lengthy (about as long as the entire configure.ac
-dnl file).
-
-if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
-  if test x$host_alias != x; then
-    dnl This is to allow cross compiling
-    AC_MSG_CHECKING(sub-architecture settings)
-    if test x$have_x86cpu = xtrue; then
-       host_mod_cpu=`echo $host_cpu | tr _ -`
-       ARCHFLAGS="-march=$host_mod_cpu -mcpu=$host_mod_cpu"
-    fi
-  else
-    if test ! -r $srcdir/cpuinfo.sh; then
+if test ! -r $srcdir/cpuinfo.sh; then
        AC_MSG_ERROR([cpuinfo.sh script not found - do a cvs update])
-    fi
-    AC_MSG_CHECKING(sub-architecture settings)
-    chmod +x $srcdir/cpuinfo.sh
-    if test x$have_x86cpu = xtrue; then
+fi
+
+
+AC_MSG_CHECKING(sub-architecture settings)
+chmod +x $srcdir/cpuinfo.sh
+
+if test x$have_x86cpu = xtrue; then
        ARCHFLAGS=`$srcdir/cpuinfo.sh x86`
-    elif test x$have_ppccpu = xtrue; then
+else
+  if test x$have_ppccpu = xtrue; then
        ARCHFLAGS=`$srcdir/cpuinfo.sh ppc`
-    fi
+  else
+       ARCHFLAGS=`$srcdir/cpuinfo.sh mips`
   fi
   AC_MSG_RESULT($ARCHFLAGS)
 fi
