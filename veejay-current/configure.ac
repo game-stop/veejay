@@ -375,6 +375,9 @@ AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
  debugCFLAGS="-g"
+ AC_MSG_RESULT([yes])
+else
+ AC_MSG_RESULT([no])
 fi
 
 
@@ -406,6 +409,7 @@ have_ps2=false
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
 	i[[3-7]]86)
+	AC_MSG_RESULT([x86])
     AC_DEFINE(HAVE_X86CPU,, [Compiling for x86 architecture CPU])
     AC_DEFINE(ARCH_X86,1,[Compiling for x86 architecture]) 
     have_x86cpu=true
@@ -424,10 +428,10 @@ case $host_cpu in
 	*)
 		;;
 	esac 
-
+	
     ;;
   x86_64*)
-    AC_MSG_RESULT(x86_64)
+	AC_MSG_RESULT([x86-64])
     AC_DEFINE(HAVE_X86_CPU,, [Compiling for x86-64 architecture CPU])
     AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
     have_x86cpu=true
@@ -435,7 +439,7 @@ case $host_cpu in
     PROGRAM_NOPIC="-fno-PIC"
     ;;
   powerpc | powerpc64)
-    AC_MSG_RESULT(PowerPC)
+	AC_MSG_RESULT([powerpc])
     AC_DEFINE(HAVE_PPCCPU,, [Compiling for PowerPC CPU])
     AC_DEFINE(ARCH_PPC,,[Compiling for PowerPC])
     have_ppccpu=true
@@ -449,7 +453,7 @@ case $host_cpu in
     esac
     ;;
    mips | mipsel)
-	AC_MSG_RESULT(MIPS)
+	AC_MSG_RESULT([mips])
 	AC_DEFINE(ARCH_MIPS,,[Compiling for MIPS CPU])
 	AC_DEFINE(HAVE_MIPS,,[Compiling for MIPS CPU])
 	have_mips=true
@@ -470,7 +474,7 @@ case $host_cpu in
 
 	;;
   *)
-    AC_MSG_RESULT(unknown)
+    AC_MSG_RESULT([unknown])
     PROGRAM_NOPIC=""
     ;;
 esac
@@ -479,6 +483,7 @@ dnl This flag is used for PROGRAMS not SHARED LIBRARIES.  PIC code is required
 dnl for shared libraries but is slower than non-pic code.  Compute bound 
 dnl programs such as yuvdenoise and y4mspatialfilter can use this flag by
 dnl simply adding programname_CFLAGS=@PROGRAM_NOPIC@ to the Makefile.am
+
 
 AC_SUBST(PROGRAM_NOPIC)
 
@@ -652,8 +657,8 @@ else
   else
        ARCHFLAGS=`$srcdir/cpuinfo.sh mips`
   fi
-  AC_MSG_RESULT($ARCHFLAGS)
 fi
+AC_MSG_RESULT([$ARCHFLAGS])
 
 dnl **********************************************************************
 dnl All the conditional stuff for the Makefiles
@@ -800,6 +805,7 @@ AC_MSG_NOTICE([    3DNOW   enabled     : ${have_asm_3dnow}])
 AC_MSG_NOTICE([    CMOV    enabled     : ${have_cmov}])
 AC_MSG_NOTICE([    Nasm    enabled     : ${have_asm_nasm}])
 fi
+
 if test "$have_ppccpu" = "true" ; then
 AC_MSG_NOTICE([   ppc])
 AC_MSG_NOTICE([    AltiVec enabled     : ${have_altivec}])
@@ -833,3 +839,18 @@ AC_MSG_NOTICE([  - jack                          : ${have_jack}])
 AC_MSG_NOTICE([  - xml c library for gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - freetype support              : ${have_freetype}])
 AC_MSG_NOTICE([])
+
+if test "$GCC" = yes ; then
+	AC_MSG_NOTICE([])
+	ac_gcc_version=`echo __GNUC__ | $CC -E - | grep -v ^\#`
+	ac_gcc_minor_version=`echo __GNUC_MINOR__ | $CC -E - | grep -v ^\#`
+
+	if test "$ac_gcc_version" = 3 -a "$ac_gcc_minor_version" = 4 ; then
+		if test x$with_pic != xno ; then
+			AC_MSG_NOTICE([*** You are using gcc >= 3.4])
+			AC_MSG_NOTICE([*** Please re-rerun configure with --without-pic])
+		fi
+	fi
+fi
+
+
