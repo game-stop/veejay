@@ -165,9 +165,8 @@ RECURSIVE_TARGETS = info-recursive dvi-recursive pdf-recursive \
 	check-recursive installcheck-recursive
 DIST_COMMON = README $(srcdir)/Makefile.in $(srcdir)/configure AUTHORS \
 	COPYING ChangeLog INSTALL Makefile.am NEWS TODO aclocal.m4 \
-	config.guess config.h.in config.sub configure configure.in \
-	depcomp install-sh ltmain.sh missing mkinstalldirs \
-	vevo-config.in
+	config.guess config.h.in config.sub configure.in depcomp \
+	install-sh ltmain.sh missing mkinstalldirs vevo-config.in
 DIST_SUBDIRS = $(SUBDIRS)
 all: config.h
 	$(MAKE) $(AM_MAKEFLAGS) all-recursive

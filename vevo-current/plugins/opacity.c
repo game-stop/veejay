@@ -71,26 +71,19 @@ int							 process( vevo_instance_t *inst )
 	int 			i,err;
 	int				uv_len,len;
 	int				op0=0,op1=0;
-
+	double				opacity;
 	err = vevo_collect_frame_data( inst->in_channels[0], &A ); 
 	if(err != VEVO_ERR_SUCCESS)
-	{
-		printf("Cannot collect data for channel 0\n");
 		return err;
-	}
 	err	= vevo_collect_frame_data( inst->in_channels[1], &B );
 	if(err != VEVO_ERR_SUCCESS) 
-	{
-		printf("Cannot collect data for channel 1\n");
 		return err;
-	}
-
-	err	= vevo_get_property( inst->in_params[0], VEVOP_VALUE, &op0);
+	err	= vevo_get_property_as( inst->in_params[0], VEVOP_VALUE,VEVO_INT, &op0);
 	if( err != VEVO_ERR_SUCCESS)
-	{
-		printf("No value in parameter 0\n");
 		return err;
-	}
+	err	= vevo_get_property( inst->in_params[0], VEVOP_VALUE,&opacity );	
+	if( err != VEVO_ERR_SUCCESS)
+		return err;
 	
 	len = (A.width * A.height);
 
@@ -98,7 +91,9 @@ int							 process( vevo_instance_t *inst )
 
 	op1 = 255 - op0;
 
-	printf("\tFrame A (%p,%p,%p) \n\tFrame B (%p,%p,%p), %d ~ %d :\n\t opacity A = %d, B = %d\n",
+	printf("\t\tParameter 0: Opacity %g\n", opacity);
+	printf("\t\tParameter 0: Opacity scaled %d\n", op0);
+	printf("\t\tFrame A (%p,%p,%p) \n\t\tFrame B (%p,%p,%p), %d  %d :\n\t\topacity A = %d, B = %d\n",
 		A.data_u8[0], A.data_u8[1], A.data_u8[2],
 		B.data_u8[0], B.data_u8[1], B.data_u8[2],	
 		len,
@@ -120,15 +115,24 @@ int							 process( vevo_instance_t *inst )
 
 int							deinit( vevo_instance_t *i )
 {
-	printf("\tI am the simple bogus deinit routine who\n");
-	printf("\tshould cleanup what init() did!\n");
 	return 0;
 }
 
 int							init( vevo_instance_t *i )
 {
-	printf("\tI am the simple bogus init routine who\n");
-	printf("\tcould allocate and setup private data\n");
+	double op[5] =
+		{
+		0.0,
+		1.0,
+		0.5,
+		0.25,
+		1.0
+		};
+
+	vevo_init_parameter_values( i->in_params[0], 1, VEVO_DOUBLE, op, 5,
+		VEVOP_MIN,VEVOP_MAX,VEVOP_DEFAULT,
+		VEVOP_STEP_SIZE, VEVOP_PAGE_SIZE );
+
 	return 0;
 }
 

@@ -127,11 +127,11 @@ int		process( vevo_instance_t *instance )
 	if( err != VEVO_ERR_SUCCESS )
 		return err;
 
-	err = vevo_get_property_as(	instance->in_params[0], VEVOP_VALUE, VEVO_INT, &p0 );
+	err = vevo_get_property(	instance->in_params[0], VEVOP_VALUE, &p0 );
 	if( err != VEVO_ERR_SUCCESS)
 		return err;
 
-	err = vevo_get_property_as( instance->in_params[1], VEVOP_VALUE, VEVO_INT, &p1 );
+	err = vevo_get_property( instance->in_params[1], VEVOP_VALUE, &p1 );
 	if( err != VEVO_ERR_SUCCESS) 
 		return err;
 
@@ -141,7 +141,10 @@ int		process( vevo_instance_t *instance )
 
 	len = A.width * A.height;
 
-	// inplace,so we must copy the buffer first.
+	printf("\t\tParameter 0: %d\n", p0);
+	printf("\t\tParameter 1: %d\n", p1);
+
+	
 	memcpy( pd->data[0], A.data_u8[0], len );
 	memcpy( pd->data[1], A.data_u8[1], len );
 	memcpy( pd->data[2], A.data_u8[2], len );
@@ -175,6 +178,15 @@ int		init( vevo_instance_t *instance )
 	pd->data[2] = (uint8_t*) malloc( sizeof(uint8_t) * width * height );
 	
 	vevo_set_property( instance->self, VEVOI_PRIVATE, VEVO_PTR_VOID, 1, &pd );
+
+	int	p0_val[5] = { 0,1,1,0,1 };
+	vevo_init_parameter_values( instance->in_params[0], 1, VEVO_INT, p0_val,5,
+		VEVOP_MIN,VEVOP_MAX,VEVOP_DEFAULT,VEVOP_STEP_SIZE,VEVOP_PAGE_SIZE);
+
+	int 	p1_val[5] = { 0,64,32,2,8 };
+	vevo_init_parameter_values( instance->in_params[1], 1, VEVO_INT, p1_val,5,
+		VEVOP_MIN,VEVOP_MAX,VEVOP_DEFAULT,VEVOP_STEP_SIZE,VEVOP_PAGE_SIZE);
+	
 
 	return VEVO_ERR_SUCCESS;	
 }

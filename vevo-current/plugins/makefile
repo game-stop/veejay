@@ -13,11 +13,13 @@ all:
 	#  export LD_LIBRARY_PATH=`pwd`
 	#  host <plugin.so>
 
-plugins:	opacity.so bathroom.so 
+plugins:	opacity.so bathroom.so rgbkey.so 
 
 opacity.so:    opacity.o 
 
 bathroom.so:	bathroom.o
+
+rgbkey.so:	rgbkey.o
 
 clean:
 	rm -rf *.o *.so 

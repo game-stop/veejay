@@ -28,6 +28,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <string.h>
 #include <stdlib.h>
+#include <stdarg.h>
 #include <include/libvevo.h>
 
 /***********************
@@ -38,8 +39,11 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define __IS_INSTANCE_PROPERTY(a)  ( (a >= VEVO_PROPERTY_INSTANCE ) ? 1: 0)
 #define __IS_PARAM_PROPERTY(a)  ( (a < VEVO_PROPERTY_CHANNEL ) ? 1: 0)
 
-
 static void		parse_gt( vevo_atom_type_t i, atom_t *t, void *dst );
+static	vevo_property_t *vevo_clone_property( vevo_property_t *p, vevo_property_type_t type );
+static	vevo_datatype *vevo_clone_datatype(vevo_datatype *in );
+static vevo_property_t	*vevo_get_property_ptr( vevo_port *p, vevo_property_type_t t );
+
 
 static void		parse_pd( atom_t *t , double *dst )
 {
@@ -176,6 +180,11 @@ static	void	vevo_scale_double_to_int_arr( atom_t **val, vevo_atom_type_t type, i
 		dst[i] = (int) ( cur * m );
 	}
 } 
+
+/* scale string to int, int to string 
+    - needs stringlist to get data from (min/max of int)
+
+*/
 
 static void		vevo_scale_int_to_string_arr( atom_t **val, vevo_atom_type_t type, unsigned char *dst, size_t len, double m)
 {
@@ -414,6 +423,14 @@ static atom_t *vevo_put_atom( void *dst, vevo_atom_type_t ident )
 	return atom;
 }
 
+static atom_t *vevo_clone_atom( atom_t *atom )
+{
+	atom_t *a;
+	a = vevo_alloca_atom( atom->size );
+	memcpy( a->value, atom->value, atom->size);
+	return a;
+}
+
 // put a value *src into an atom 
 static void	put_g( void *src, int n, vevo_datatype *d, vevo_storage_t i , vevo_atom_type_t v )
 {
@@ -520,6 +537,29 @@ static	vevo_datatype *vevo_alloca_datatype(vevo_storage_t type)
 	return d;
 }
 
+static	vevo_datatype *vevo_clone_datatype(vevo_datatype *in )
+{
+	vevo_datatype *d = (vevo_datatype*) malloc(sizeof(vevo_datatype));
+	d->type = in->type;
+	d->ident = in->ident;
+	d->length = in->length;
+	d->cmd = in->cmd;
+	if(d->type == VEVOP_ARRAY)
+	{
+		int array_len = in->length;
+		int i;
+		d->array = (atom_t**) malloc(sizeof(atom_t*) * array_len );
+		for( i = 0; i < array_len; i ++ )
+		{
+			d->array[i] = vevo_clone_atom( in->array[i] ); 
+		}
+	}
+	if(d->type == VEVOP_ATOM)
+	{
+		d->atom = vevo_clone_atom( in->atom );
+	}
+	return d;
+}
 
 
 static  void	vevo_free_datatype(vevo_datatype *t)
@@ -553,6 +593,14 @@ static vevo_property_t *vevo_alloca_property( void *value, vevo_atom_type_t iden
 	return p;
 }
 
+static	vevo_property_t *vevo_clone_property( vevo_property_t *p, vevo_property_type_t type )
+{
+	vevo_property_t *clone = (vevo_property_t*) malloc(sizeof(vevo_property_t));
+	clone->type = type;
+	clone->data = vevo_clone_datatype( p->data );
+	return clone;
+}
+
 static void	vevo_free_property( vevo_property_t *p )
 {
 	if(p)
@@ -582,6 +630,18 @@ static	int	vevo_property_writeable( vevo_port *p, vevo_property_type_t t )
 		curr = curr->next;
 	}
 	return VEVO_ERR_NO_SUCH_PROPERTY;
+}
+
+static vevo_property_t	*vevo_get_property_ptr( vevo_port *p, vevo_property_type_t t )
+{
+	vevo_property_t *curr = p->properties;
+	while(curr != NULL)
+	{
+		if( curr->type == t )
+			return curr;	
+		curr = curr->next;
+	}
+	return NULL;
 }
 
 /*****************************
@@ -1358,6 +1418,7 @@ int		vevo_set_property_by( vevo_port *p, vevo_property_type_t type, vevo_atom_ty
 	}
 	return VEVO_ERR_SUCCESS;	
 }
+#
 int		vevo_get_property_as( vevo_port *p, vevo_property_type_t type, vevo_atom_type_t dest_ident, void *dst )
 {
 	vevo_property_t *property = p->properties;
@@ -1365,11 +1426,11 @@ int		vevo_get_property_as( vevo_port *p, vevo_property_type_t type, vevo_atom_ty
 	{
 		if(property->type == type )
 		{
-				if( p->type->id == VEVO_CONTROL ) 
-					return vevo_get_parameter_as_( property, p->type->hint, dest_ident, dst );
-				else 
-					vevo_get_value_as_( property, dest_ident, dst );
-				return VEVO_ERR_SUCCESS;
+			if( p->type->id == VEVO_CONTROL ) 
+				return vevo_get_parameter_as_( property, p->type->hint, dest_ident, dst );
+			else 
+				vevo_get_value_as_( property, dest_ident, dst );
+			return VEVO_ERR_SUCCESS;
 		}
 		property = property->next;
 	}	
@@ -1623,5 +1684,150 @@ void			vevo_free_port( vevo_port *p )
 	}
 }
 
+#define	__get_row_dbl( valist, rowlen, array, offset, port)\
+{\
+vevo_property_type_t sel = va_arg(valist,int);\
+double *base = array + offset;\
+vevo_set_property( port, sel, VEVO_DOUBLE, rowlen, base);\
+}
 
+#define	__get_row_int( valist, rowlen, array, offset, port)\
+{\
+vevo_property_type_t sel = va_arg(valist,int);\
+int *base = array + offset;\
+vevo_set_property( port, sel, VEVO_DOUBLE, rowlen, base);\
+}
+/*char *base = array + offset;*/
+#define	__get_row_char( valist, rowlen, array, offset, port)\
+{\
+vevo_property_type_t sel = va_arg(valist,int);\
+char *base = array[offset];\
+vevo_set_property( port, sel, VEVO_STRING, 1, base);\
+}
+
+int	vevo_init_parameter_values( vevo_port *p, int p_args, vevo_atom_type_t ident, void *val, int n_types, ... )
+{
+	int i=0;
+	va_list args;
+	va_start(args,n_types);
+	if(ident == VEVO_DOUBLE)
+	{
+		double *arr = val;
+		while(i < n_types)
+		{
+			__get_row_dbl( args, p_args, arr, p_args * i, p );
+			i++;  
+		}
+	}
+	if(ident == VEVO_INT)
+	{
+		int *arr = val;
+		while(i < n_types)
+		{
+			__get_row_int( args, p_args, arr, p_args * i , p );
+			i++;
+		}
+	}
+	if(ident == VEVO_STRING)
+	{
+		char **arr = val;
+		while( i < n_types )
+		{
+			__get_row_char( args,p_args,arr, i ,p );	
+			i++;
+		}
+	}
+	va_end(args);
+
+	return 0;
+}
+
+int		vevo_property_assign_value( vevo_port *p, vevo_property_type_t left, vevo_property_type_t right )
+{
+	vevo_property_t *property;
+	
+	property = vevo_get_property_ptr( p, right );
+	if(property == NULL)
+		return VEVO_ERR_NO_SUCH_PROPERTY;
+
+	int err = vevo_property_writeable(p, left );
+
+	if( err == VEVO_ERR_NO_SUCH_PROPERTY )
+	{
+		vevo_property_t *tmp = vevo_clone_property( property, left );
+		tmp->next = p->properties;
+		p->properties = tmp;
+	}
+	else
+	{
+	    if(err == VEVO_ERR_SUCCESS )
+		{
+			vevo_property_t *tmp;
+			vevo_del_property( p, left ); 
+			tmp = vevo_clone_property( property, left ); 
+			tmp->next = p->properties;
+			p->properties = tmp;
+		}
+	}
+	return VEVO_ERR_SUCCESS;
+}
+
+int		vevo_property_assign_value_from( 
+			vevo_port *p, vevo_property_type_t type, vevo_atom_type_t val_ident, void *value )
+{
+	vevo_property_t *property;
+  	int length , *index;
+	atom_t *atom;
+
+	if(value == NULL)
+		return VEVO_ERR_INVALID_PROPERTY_VALUE;
+
+	property = vevo_get_property_ptr( p, VEVOP_LIST );
+	if(property != NULL && val_ident != VEVO_INT)
+		return VEVO_ERR_INVALID_STORAGE_TYPE;
+
+	if(property != NULL)
+	{
+		length = property->data->length;
+		index = (int*) value;
+
+		if( *index < 0 || *index > length )
+			return VEVO_ERR_OOB;
+
+
+		atom  = property->data->array[*index];
+		if( property->data->ident == VEVO_STRING)
+		{
+			char *tmp = (char*) malloc(sizeof(char) * atom->size );
+			parse_gt( property->data->ident, atom, tmp);
+			vevo_set_property( p, VEVOP_VALUE, property->data->ident, atom->size, tmp);
+			free(tmp);
+			return VEVO_ERR_SUCCESS;
+		}
+		if( property->data->ident == VEVO_DOUBLE)
+		{
+			double *tmp = (double*) malloc(sizeof(char) * atom->size);
+			parse_gt( property->data->ident, atom, tmp );
+			vevo_set_property( p, VEVOP_VALUE, property->data->ident, atom->size, tmp);
+			free(tmp);
+			return VEVO_ERR_SUCCESS;
+		}	
+		if( property->data->ident == VEVO_INT)
+		{
+			int *tmp = (int*) malloc(sizeof(int) * atom->size);
+			parse_gt( property->data->ident, atom, tmp );
+			vevo_set_property( p, VEVOP_VALUE, property->data->ident, atom->size, tmp);
+			free(tmp);
+			return VEVO_ERR_SUCCESS;
+		}
+		return	VEVO_ERR_INVALID_CONVERSION;
+	}
+	property = vevo_get_property_ptr( p, VEVOP_DEFAULT );
+	if(property == NULL)
+		return VEVO_ERR_NO_SUCH_PROPERTY;
+
+	return vevo_set_property_by(
+			p, type, val_ident, property->data->length, value );
+
+}
 

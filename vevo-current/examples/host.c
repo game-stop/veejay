@@ -61,11 +61,36 @@ static	void	dump_host_info(void)
 	}
 }
 
+void	test_parameters( vevo_instance_t *plug )
+{
+	int i,pi;
+	vevo_get_property( plug->self, VEVOI_N_IN_PARAMETERS, &pi );
+
+	/* handle initialization of 'value' (from effect) */
+	for( i = 0; i < pi ; i ++ )
+	{
+		if( vevo_property_assign_value( plug->in_params[i], VEVOP_VALUE, VEVOP_DEFAULT ) !=VEVO_ERR_SUCCESS)
+		{
+			printf("Unable to initialize parameter %d\n", i);
+			exit(0);
+		}
+		else
+		{
+			if( vevo_find_property( plug->in_params[i], VEVOP_VALUE ) != 0 )
+			{
+				printf("cannot find VALUE\n");
+				exit(0);
+			}
+		}
+	}
+
+}
+
 vevo_instance_t *readyfy_plugin( vevo_instance_templ_t *tmpl )
 {
 	vevo_instance_t *plug = vevo_allocate_instance( tmpl );
 
-
+	int i;
 	int j;
 
 	data[0] = (uint8_t*) malloc(sizeof(uint8_t) * 1000);
@@ -80,17 +105,10 @@ vevo_instance_t *readyfy_plugin( vevo_instance_templ_t *tmpl )
 	int val = 130;
 	int bars=25;
 	int pi;
-	vevo_get_property( plug->self, VEVOI_N_IN_PARAMETERS, &pi );
-	
-	if( pi > 0 )   
-	vevo_set_property( plug->in_params[0], VEVOP_VALUE,VEVO_INT,1, &val ); 
-	if( pi > 1 )
-	vevo_set_property( plug->in_params[1], VEVOP_VALUE,VEVO_INT,1, &bars );
 
 	int ni;
 	vevo_get_property( plug->self, VEVOI_N_IN_CHANNELS, &ni );
 
-	int i;
 	for(i = 0; i < ni; i ++ )
 	{
 		uint8_t* frame[3];
@@ -147,11 +165,6 @@ int main(int argc, char *argv[])
 		printf("Can't get template from plugin %s\n", argv[1]);
 		return 0;
 	}
-	vevo_instance_t *inst = readyfy_plugin( tmpl );
-
-	dump_host_info();
-	dump_plugin_info(inst, tmpl);
-
 	vevo_init_f	*init = tmpl->init;
 	if(!init)
 	{
@@ -160,10 +173,22 @@ int main(int argc, char *argv[])
 		return 0;
 	}	
 
+	// ready data
+	vevo_instance_t *inst = readyfy_plugin( tmpl );
+
+	dump_host_info();
+	dump_plugin_info(inst, tmpl);
+
+
+	// ready init
 	if ( init(inst) == 0 )
 		out(1,"Called init() succesfully\n");
 
+	// initialize parameters (either own or DEFAULTS)
 
+	test_parameters( inst );
+
+	// run process
 	vevo_process_f	*process = tmpl->process;
 	if(!process)
 	{
@@ -172,10 +197,11 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-	if ( process(inst) == 0 )
+	err = process(inst);
+	if( err == 0 )
 		out(1, "Called process() successfully\n");
 	else
-		out(1, "Error in process()\n");
+		out(1, "Error in process(): %d\n", err);
 
 	vevo_deinit_f	*deinit = tmpl->deinit;
 	if(!deinit)
@@ -185,8 +211,8 @@ int main(int argc, char *argv[])
 		return 0;
 	}
 
-	if ( deinit(inst) == 0 )
-		out(1,"Called deinit() successfully\n");
+	if ( deinit(inst) != 0 )
+		out(1,"Error calling deinit()\n");
 
 	vevo_free_instance( inst );
 

@@ -245,6 +245,7 @@ int main(int argc, char *argv[])
 
 /****************** rgba parameter ***************/
 
+	int z;
 	vevo_port *p1 = vevo_allocate_parameter( &p1info );
 	double colors[5][4] =
 	{
@@ -255,15 +256,18 @@ int main(int argc, char *argv[])
 		{ 0.25, 0.25, 0.25, 0.25 }
 	};
 
-	out(0, "\nRGBA (real)");
-
-	vevo_set_property( p1, VEVOP_MIN, VEVO_DOUBLE, p1info.arglen, colors[0] );
+/*	vevo_set_property( p1, VEVOP_MIN, VEVO_DOUBLE, p1info.arglen, colors[0] );
 	vevo_set_property( p1, VEVOP_MAX,VEVO_DOUBLE, p1info.arglen, colors[1] );
 	vevo_set_property( p1, VEVOP_DEFAULT,VEVO_DOUBLE, p1info.arglen, colors[2] );
 	vevo_set_property( p1, VEVOP_STEP_SIZE, VEVO_DOUBLE,p1info.arglen, colors[3] );
 	vevo_set_property( p1, VEVOP_PAGE_SIZE, VEVO_DOUBLE,p1info.arglen, colors[4] );
 	vevo_set_property( p1, VEVOP_VALUE, VEVO_DOUBLE,p1info.arglen, colors[2] );
-
+*/
+	printf("base ptr %p\n",colors);
+	printf("row 1=%p, 2=%p\n", colors[1],colors[2]);
+	vevo_init_parameter_values( p1, 4, VEVO_DOUBLE, colors, 6,
+		VEVOP_MIN,VEVOP_MAX,VEVOP_DEFAULT, VEVOP_STEP_SIZE,
+		VEVOP_PAGE_SIZE,VEVOP_VALUE );  
 	int test_cast[4];
 
 	vevo_get_property_as( p1, VEVOP_VALUE, VEVO_INT, test_cast );
@@ -272,7 +276,7 @@ int main(int argc, char *argv[])
 		colors[4][0],colors[4][1],colors[4][2],colors[4][3],
 		test_cast[0], 
 		test_cast[1], test_cast[2], test_cast[3] );
-
+	exit(0);
 /***************** rgba string -> double -> int  **************/
 
 	out(0, "\nRGBA (string)");
@@ -432,6 +436,9 @@ int main(int argc, char *argv[])
 		out(2,"U8 = %p, %p, %p",
 			A.data_u8[0], A.data_u8[1], A.data_u8[2] ); 
 	}
+
+	
+
 
 	free(blob2[0]);
 	free(blob2[1]);
