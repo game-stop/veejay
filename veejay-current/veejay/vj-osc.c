@@ -53,6 +53,31 @@
 
 static veejay_t *osc_info;
 
+#include <libOSC/libosc.h>
+#include <sys/types.h>
+
+typedef struct osc_arg_t {
+    int a;
+    int b;
+    int c;
+} osc_arg;
+
+typedef struct vj_osc_t {
+  struct OSCAddressSpaceMemoryTuner t;
+  struct OSCReceiveMemoryTuner rt;
+  struct OSCContainerQueryResponseInfoStruct cqinfo;
+  struct OSCMethodQueryResponseInfoStruct ris;
+  struct sockaddr_in cl_addr;
+  int sockfd;
+  int clilen;
+  fd_set readfds;
+  OSCcontainer container;
+  OSCcontainer *leaves;
+  OSCPacketBuffer packet;
+  osc_arg *osc_args;
+} vj_osc;
+
+
 /* VIMS does the job */
 extern void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int arglen);
 
@@ -891,8 +916,9 @@ void vj_osc_set_veejay_t(veejay_t *info) {
 	osc_info = info;
 }
 
-void vj_osc_free(vj_osc *c)
+void vj_osc_free(void *d)
 {
+	vj_osc *c = (vj_osc*) d;
 	if(c==NULL) return;
 	if(c->leaves) free(c->leaves);
 	if(c) free(c);
@@ -1168,7 +1194,8 @@ int	vj_osc_attach_methods( vj_osc *o )
 
 
 /* initialization, setup a UDP socket and invoke OSC magic */
-vj_osc* vj_osc_allocate(int port_id) {
+void* vj_osc_allocate(int port_id) {
+	void *res;
 	char tmp[200];
 	vj_osc *o = (vj_osc*)vj_malloc(sizeof(vj_osc));
 	o->osc_args = (osc_arg*)vj_malloc(50 * sizeof(*o->osc_args));
@@ -1214,8 +1241,8 @@ vj_osc* vj_osc_allocate(int port_id) {
 	if( !vj_osc_attach_methods( o ))
 		return NULL;
 
-
-     return o;
+	res =(void*) o;
+     return res;
 }	
 
 
@@ -1235,8 +1262,9 @@ void vj_osc_dump()
 }
  
 /* dump the OSC address space to screen */
-int vj_osc_setup_addr_space(vj_osc *o) {
+int vj_osc_setup_addr_space(void *d) {
 	char addr[100];
+	vj_osc *o = (vj_osc*) d;
 	//struct OSCMethodQueryResponseInfoStruct qri;
 
 	if(OSCGetAddressString( addr, 100, o->container ) == FALSE) {
@@ -1249,12 +1277,12 @@ int vj_osc_setup_addr_space(vj_osc *o) {
 
 
 /* get a packet */
-int vj_osc_get_packet(vj_osc *o) {
+int vj_osc_get_packet(void *d) {
    //OSCTimeTag tag;
    struct timeval tv;
    tv.tv_sec=0;
    tv.tv_usec = 0;
-
+	vj_osc *o = (vj_osc*) d;
    /* see if there is something to read , this is effectivly NetworkPacketWaiting */
   // if(ioctl( o->sockfd, FIONREAD, &bytes,0 ) == -1) return 0;
   // if(bytes==0) return 0;

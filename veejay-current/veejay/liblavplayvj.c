@@ -87,6 +87,7 @@
 #include <veejay/vj-lib.h>
 #include <libel/vj-avcodec.h>
 #include <libyuv/yuvconv.h>
+#include <veejay/vj-OSC.h>
 // following struct copied from ../utils/videodev.h
 
 /* This is identical with the mgavideo internal params struct, 
@@ -2266,7 +2267,7 @@ int vj_server_setup(veejay_t * info)
 
 	if(info->settings->use_mcast)
 		GoMultiCast( info->settings->group_name );
-    info->osc = (vj_osc*) vj_osc_allocate(info->uc->port+2);
+    info->osc = (void*) vj_osc_allocate(info->uc->port+2);
     if(!info->osc) 
 		return 0;
 

@@ -29,9 +29,8 @@
 #include <libstream/vj-v4lvideo.h>
 #endif
 #include <libstream/vj-yuv4mpeg.h>
-#include "vj-dfb.h"
-#include "vj-sdl.h"
-#include "vj-OSC.h"
+#include <veejay/vj-dfb.h>
+#include <veejay/vj-sdl.h>
 #include <libel/lav_io.h>
 #include <libstream/vj-shm.h>
 #include <libel/vj-el.h>
@@ -212,7 +211,7 @@ typedef struct {
     user_control *uc;		/* user control */
 
 //    v4l_video *vj[4];		/* v4l input */
-    vj_osc *osc;
+    void *osc;
     VJFrame *plugin_frame;
     VJFrameInfo *plugin_frame_info; 
     VJFrame *effect_frame1;

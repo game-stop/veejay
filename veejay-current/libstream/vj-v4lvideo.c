@@ -25,7 +25,7 @@
 #include <veejay/vj-global.h>
 #include <string.h>
 #include <libvjmsg/vj-common.h>
-#include <veejay/vj-lib.h>
+//#include <veejay/vj-lib.h>
 #include <libstream/vj-tag.h>
 #include <libvjmem/vjmem.h>
 

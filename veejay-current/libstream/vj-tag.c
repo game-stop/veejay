@@ -40,6 +40,7 @@
 #include <libvjnet/vj-client.h>
 #include <libvjnet/common.h>
 #include <veejay/vims.h>
+#include <veejay/vj-lib.h>
 #include <veejay/vj-misc.h>
 #include <libvjmem/vjmem.h>
 #include <libvje/internal.h>

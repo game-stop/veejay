@@ -21,34 +21,11 @@
 #ifndef VJ_OSC 
 #define VJ_OSC
 
-#include <libOSC/libosc.h>
-#include "vj-lib.h"
-#include <sys/types.h>
-typedef struct osc_arg_t {
-    int a;
-    int b;
-    int c;
-} osc_arg;
 
-typedef struct vj_osc_t {
-  struct OSCAddressSpaceMemoryTuner t;
-  struct OSCReceiveMemoryTuner rt;
-  struct OSCContainerQueryResponseInfoStruct cqinfo;
-  struct OSCMethodQueryResponseInfoStruct ris;
-  struct sockaddr_in cl_addr;
-  int sockfd;
-  int clilen;
-  fd_set readfds;
-  OSCcontainer container;
-  OSCcontainer *leaves;
-  OSCPacketBuffer packet;
-  osc_arg *osc_args;
-} vj_osc;
-
-int vj_osc_setup_addr_space(vj_osc *o);
-int vj_osc_get_packet(vj_osc *o);
-void vj_osc_free(vj_osc *o);
+int vj_osc_setup_addr_space(void *o);
+int vj_osc_get_packet(void *o);
+void vj_osc_free(void *o);
 void vj_osc_dump();
-vj_osc* vj_osc_allocate(int port_id);
+void* vj_osc_allocate(int port_id);
  
 #endif
