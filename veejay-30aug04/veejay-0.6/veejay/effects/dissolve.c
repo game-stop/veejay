@@ -52,7 +52,7 @@ void dissolve_apply(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
     {
 	// set pixel as completely transparent or completely solid
 
-	if(yuv2[0][i] > opacity) // completely transparent
+	if(yuv1[0][i] > opacity) // completely transparent
 	{
 		yuv1[0][i] = (op0 * yuv1[0][i] + op1 * yuv2[0][i]) >> 8;
 		yuv1[1][i] = (op0 * yuv1[1][i] + op1 * yuv2[1][i]) >> 8;
