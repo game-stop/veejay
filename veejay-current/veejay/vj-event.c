@@ -1458,6 +1458,9 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 
 		return;
 	}
+
+	
+
 	len = strlen(msg)-1;
 	/* message must end with ';' */
 	if( msg[len] != 0x3b)
@@ -1468,6 +1471,12 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 
 	/* remove ';' from string */
 	msg[len] = '\0';	
+
+	if( net_list[ net_id ].list_id == 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) No such event : %03d",net_id);
+		return;
+	}
 
 	if( strlen(msg) == (MSG_MIN_LEN-1) )
 	{
@@ -1490,8 +1499,8 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 
 	if( strlen(msg) >= MSG_MIN_LEN)
 	{
-		int id = net_list[ net_id ].list_id;
-		int max_param = vj_event_list[id].num_params;
+		int id;
+		int max_param;
 		int dargs[15];
 		char dstr[512];
 		
@@ -1500,7 +1509,9 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 		int p = 0;
 		int offset = 0;
 		
-	
+		id = net_list[ net_id].list_id;
+		max_param = vj_event_list[id].num_params;
+
 		memset(dargs,0,15);
 		strcpy(args,msg+4);
 
@@ -1521,24 +1532,6 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 				bzero(dec,10);
 			 	snprintf(dec, 10, "%d", dargs[0]);
 				offset += strlen(dec);
-			/*
-				veejay_msg(VEEJAY_MSG_DEBUG,"(VIMS) first argument is number [%d].",dargs[0]);
-				if(dargs[0] < 0) {
-					if(dargs[0] <= -9) offset += 2;
-					if(dargs[0] <= -99 && dargs[0] > -9) offset += 3;
-					if(dargs[0] <= -999 && dargs[0] > -99) offset += 4;
-				}
-				else 
-				{
-					if(dargs[0] <= 9) offset += 1;
-					if(dargs[0] <= 99 && dargs[0] > 9) offset += 2;	 
-					if(dargs[0] <= 999 && dargs[0] > 99) offset += 3;
-					if(dargs[0] <= 9999 && dargs[0] > 999) offset += 4;
-					if(dargs[0] <= 99999 && dargs[0] >  9999) offset += 5;
-					if(dargs[0] <= 999999 && dargs[0] > 99999) offset += 6;
-					if(dargs[0] <= 9999999 && dargs[0]> 999999) offset += 7; 
-				}
-			*/
 				veejay_msg(VEEJAY_MSG_DEBUG,"(VIMS) next arguments start at [%s]",args+offset);
 				n++;
 			}

@@ -129,7 +129,6 @@ void vj_osc_cb_tag_new_v4l(void *context, int arglen, const void *vargs, OSCTime
 void vj_osc_cb_tag_new_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_load_cliplist(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_save_cliplist(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
-void vj_osc_cb_output_start_vloopback(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_output_start_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_output_stop_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_save_editlist(void *context, int arglen, const void *vargs,OSCTimeTag when, NetworkReturnAddressPtr ra);   
@@ -737,11 +736,6 @@ void vj_osc_cb_save_editlist(void *context, int arglen, const void *vargs,
 	SNET_F(arglen,vargs,NET_EDITLIST_SAVE);
 }
 
-void vj_osc_cb_output_start_vloopback(void *context, int arglen, const void *vargs,
-	OSCTimeTag when, NetworkReturnAddressPtr ra)
-{
-	SNET_F(arglen,vargs,NET_OUTPUT_VLOOPBACK_STARTN);
-}
 void vj_osc_cb_output_start_y4m(void *context, int arglen, const void *vargs,
 	OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
