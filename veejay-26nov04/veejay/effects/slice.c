@@ -45,7 +45,6 @@ vj_effect *slice_init(int width,int height)
     ve->limits[1][1] = 1;
     ve->defaults[0] = 63;
     ve->defaults[1] = 0;
-    ve->defaults[2] = 0;
     ve->description = "Slice Window";
     ve->sub_format = 1;
     ve->extra_frame = 0;
