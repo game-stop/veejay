@@ -44,19 +44,15 @@
 
 	p0: radius
 	p1: number of blobs
-	p2: speed 
-	p3: shape (rect,circle)
-	p4: influence boids trying to fly towards centre of mass of neighbouring boids
-	p5: influence boids trying to keep a small distance away from other boids
-	p6: influence boids trying to match velocity with near boids
+	p2: shape (rect,circle)
+	p3: influence boids trying to fly towards centre of mass of neighbouring boids
+	p4: influence boids trying to keep a small distance away from other boids
+	p5: influence boids trying to match velocity with near boids
+	p6: speed limiter
+	p7: home position distance to center point
 
-	added basic flock rules:
-	1.
-	2.
-	3.
-	
 	added optional flock rules:
-	- limiting speed
+	+ limiting speed
 
 */
 
@@ -73,11 +69,12 @@ typedef struct
 	short x;	// x
 	short y;	// y
 	double vx;	// velocity x
-	double vy;  // velocity y
+	double vy;  	// velocity y
 } blob_t;
 
-#define DEFAULT_RADIUS 10
+#define DEFAULT_RADIUS 16
 #define DEFAULT_NUM 100
+#define DEFAULT_HOME_RADIUS 203
 
 #define	BLOB_RECT 0
 #define BLOB_CIRCLE 1
@@ -85,24 +82,26 @@ typedef struct
 static blob_t 		*blobs_;
 static uint8_t 		**blob_;
 static uint8_t 		*blob_image_;
-static int		blob_ready_		 = 0;
+
+static int		blob_ready_	 = 0;
 static int		blob_radius_ 	 = 16;
 static int		blob_dradius_ 	 = 0;
 static int		blob_sradius_ 	 = 0;
-static int		blob_num_		 = 50;
-static int		blob_type_		 = 1;
+static int		blob_num_	 = 100;
+static int		blob_type_	 = 1;
+static int		blob_home_radius_= 203;
 
 vj_effect *boids_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
-    ve->num_params = 7;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 360;  // radius
-    ve->limits[0][1] = 2; 
-    ve->limits[1][1] = 100;  // num blobs
+	vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+	ve->num_params = 8;
+	ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+	ve->limits[0][0] = 1;
+	ve->limits[1][0] = 360;  // radius
+	ve->limits[0][1] = 2; 
+	ve->limits[1][1] = 256;  // num blobs
 	ve->limits[0][2] = 0;
 	ve->limits[1][2] = 1;	// shape
 	ve->limits[0][3] = 0;
@@ -112,30 +111,37 @@ vj_effect *boids_init(int w, int h)
 	ve->limits[0][5] = 0;
 	ve->limits[1][5] = 100;  // m3
 	ve->limits[0][6] = 1;
-	ve->limits[1][6] = 1000;
+	ve->limits[1][6] = 100;
+	ve->limits[0][7] = 1;
+	ve->limits[1][7] = 360;
 	ve->defaults[0] = DEFAULT_RADIUS;
 	ve->defaults[1] = DEFAULT_NUM;
-	ve->defaults[2] = 2;
+	ve->defaults[2] = 1;
 	ve->defaults[3] = 1;
 	ve->defaults[4] = 0;
 	ve->defaults[5] = 0;
-	ve->defaults[6] = 1;
+	ve->defaults[6] = 199;
+	ve->defaults[7] = DEFAULT_HOME_RADIUS;
 
-    ve->description = "Video Boids";
-    ve->sub_format = 1;
-    ve->extra_frame = 0;
+	ve->description = "Video Boids";
+	ve->sub_format = 1;
+	ve->extra_frame = 0;
 	ve->has_user =0;
-    return ve;
+	return ve;
 }
+
+
+
 
 static void	blob_home_position( int blob_id, int w, int h , double v[2] )
 {
 	double theta = 360.0 / ( (double) blob_num_ ) * blob_id;
 	double rad = (theta / 180.0 ) * M_PI;
-	double cx = ( double )( w/2);
-	double cy = ( double )( h/2);
-	v[0] = cx + cos(rad) * (w/3);
-	v[1] = cy + sin(rad) * (h/3);
+	double ratio = (w/h);
+	double cx = ( double )( w/ 2);
+	double cy = ( double )( h/ 2) * ratio;
+	v[0] = cx + cos(rad) * blob_home_radius_;
+	v[1] = cy + sin(rad) * blob_home_radius_;
 }
 
 static void	blob_init_( blob_t *b , int blob_id, int w , int h)
@@ -333,7 +339,7 @@ static void	boid_rule4_( int boid_id, int vlim )
 }
 
 void boids_apply(VJFrame *frame,
-			   int width, int height, int radius, int num, int shape, int m1, int m2, int m3, int speed )
+			   int width, int height, int radius, int num, int shape, int m1, int m2, int m3, int speed, int home_radius )
 {
 	const int len = frame->len;
 	uint8_t *srcY = frame->data[0];
@@ -343,7 +349,7 @@ void boids_apply(VJFrame *frame,
 	const double M1 = ( (m1==0? 0.0 : m1/100.0) );
 	const double M2 = ( (m2==0? 0.0 : m2/100.0) );
 	const double M3 = ( (m3==0? 0.0 : m3/100.0) );
-
+	
 	blob_func f = blob_render();
 
 	blob_type_ = shape;
@@ -354,6 +360,13 @@ void boids_apply(VJFrame *frame,
 		blob_num_ 	 = num;
 		boids_free();
 		boids_malloc(width,height);
+	}
+
+	if( home_radius != blob_home_radius_ )
+	{
+		blob_home_radius_ = home_radius;
+		for( i = 0; i < blob_num_ ; i ++ )
+			blob_init_(blobs_ + i , i, width, height);
 	}
 
 	// move boid to new positions
