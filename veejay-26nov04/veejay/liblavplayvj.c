@@ -1640,8 +1640,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg)
 	info->sdl =
 	    (vj_sdl *) vj_sdl_allocate(el->video_width,
 				       el->video_height, info->pixel_format);
-	if (!vj_sdl_init(info->sdl, info->sdl_width, info->sdl_height,"Veejay",1),
-		info->settings->full_screen)
+	if (!vj_sdl_init(info->sdl, info->sdl_width, info->sdl_height,"Veejay",1,
+		info->settings->full_screen))
 	    return -1;
 #endif
 	info->dfb =
@@ -2024,9 +2024,9 @@ static void *veejay_playback_thread(void *data)
     case 2:
 #ifdef HAVE_SDL
 	vj_sdl_free(info->sdl);
+	free(info->sdl);
 #endif
 	vj_dfb_free(info->dfb);
-	free(info->sdl);
 	free(info->dfb);
 #endif
     case 3:

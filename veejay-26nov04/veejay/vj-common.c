@@ -116,8 +116,10 @@ __asm__ __volatile__(
 
 #else 
 
-#define mymemset_generic( s,c,n ) memset( s,c,n )
-
+void mymemset_generic(void *s, char c, size_t cc )
+{
+	memset(s,c,cc);
+} 
 #endif
 
 static unsigned int vj_relative_time = 0;
