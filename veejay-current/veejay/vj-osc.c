@@ -335,8 +335,8 @@ vj_event_fire_net_event(osc_info, c, str,args, 2);\
 #define NET_F(a,b,c)\
 {\
 int arguments[16];\
+memset( arguments,0,16 ); \
 int num_arg = vj_osc_parse_int_arguments(a,b,arguments);\
-memset(arguments,0,16);\
 vj_event_fire_net_event( osc_info, c, NULL,arguments, num_arg );\
 }
 
