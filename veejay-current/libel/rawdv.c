@@ -50,7 +50,7 @@ dv_t	*rawdv_open_input_file(const char *filename)
 {
 	struct stat stat_;
 	dv_t *dv = (dv_t*)vj_malloc(sizeof(dv_t));
-	dv_decoder_t *decoder = dv_decoder_new(1,0,0);
+	dv->decoder = dv_decoder_new(1,0,0);
 	uint8_t *tmp = (uint8_t*) vj_malloc(sizeof(uint8_t) * DV_HEADER_SIZE);
 
 	dv->fd = open( filename, O_RDONLY );
@@ -71,37 +71,43 @@ dv_t	*rawdv_open_input_file(const char *filename)
 		return NULL;
 	}
 
-	if( dv_parse_header( decoder, tmp) < 0 )
+	if( dv_parse_header( dv->decoder, tmp) < 0 )
 	{
 		rawdv_free(dv);
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot parse header");
 		return NULL;
 	}
-	if(dv_is_PAL( decoder ) )
+	if(dv_is_PAL( dv->decoder ) )
 		dv->chunk_size = DV_PAL_SIZE;
 	else
 		dv->chunk_size = DV_NTSC_SIZE;
 
 	dv->num_frames = (stat_.st_size - 120000) / dv->chunk_size;
-	dv->width = decoder->width;
-	dv->height = decoder->height;
-	dv->audio_rate = decoder->audio->frequency;
-	dv->audio_chans = decoder->audio->num_channels;
-	dv->audio_qbytes = decoder->audio->quantization;
-	dv->fps = ( dv_is_PAL( decoder) ? 25.0 : 29.97 );
-	dv->size = decoder->frame_size;
-	dv->fmt = ( decoder->sampling == e_dv_sample_422 ? 1 : 0);
-	
-	if(decoder->sampling == e_dv_sample_411)
+	dv->width = dv->decoder->width;
+	dv->height = dv->decoder->height;
+	dv->audio_rate = dv->decoder->audio->frequency;
+	dv->audio_chans = dv->decoder->audio->num_channels;
+	dv->audio_qbytes = dv->decoder->audio->quantization;
+	dv->fps = ( dv_is_PAL( dv->decoder) ? 25.0 : 29.97 );
+	dv->size = dv->decoder->frame_size;
+	dv->fmt = ( dv->decoder->sampling == e_dv_sample_422 ? 1 : 0);
+	dv->buf = (uint8_t*) vj_malloc(sizeof(uint8_t*) * dv->size);
+	if(dv->decoder->sampling == e_dv_sample_411)
 	{
 		veejay_msg(VEEJAY_MSG_WARNING , "Untested YUV format");
 	}
 
 
-	dv_decoder_free( decoder );
+	dv_decoder_free( dv->decoder );
 	if(tmp)
 		free(tmp);
 
+	if(dv->audio_rate)
+	{
+		int i;
+		for( i = 0; i < 4; i ++ )
+		dv->audio_buffers[i] = (int16_t*) vj_malloc(sizeof(int16_t) * 2 * DV_AUDIO_MAX_SAMPLES);
+	}
 
 
 	veejay_msg(VEEJAY_MSG_DEBUG,
@@ -142,10 +148,33 @@ int	rawdv_read_frame(dv_t *dv, uint8_t *buf )
 {
 	int pitches[3];
 	uint8_t *pixels[3];
-	int n = read( dv->fd, buf, dv->size );
+	int n = read( dv->fd, dv->buf, dv->size );
+	memcpy( buf, dv->buf, dv->size );
 	return n;
 }
 
+int	rawdv_read_audio_frame(dv_t *dv, uint8_t *audio )
+{
+
+	int n = dv_decode_full_audio( dv->decoder, dv->buf, dv->audio_buffers );
+	// interleave buffers to audio
+	int n_samples = dv_get_num_samples( dv->decoder );
+	int n_chans   = dv->audio_chans;
+	int16_t *ch0 = dv->audio_buffers[0];
+	int16_t *ch1 = dv->audio_buffers[1];
+	int i,j;
+	for( i = 0; i < n_samples; i ++ )
+	{
+		*(audio) = *(ch0)  & 0xff;
+		*(audio+1) =  (*(ch0) << 8) & 0xff;
+		*(audio+2) =  *(ch1) & 0xff;
+		*(audio+3) = (*(ch1)<<8) & 0xff;
+		*(ch0) ++;
+		*(ch1) ++;
+		*(audio) += 4;
+	}
+	return n_samples * 4;
+}
 
 int	rawdv_video_frames(dv_t *dv)
 {

@@ -20,7 +20,7 @@
  */
 #include <stdint.h>
 #include <sys/types.h>
-
+#include <libdv/dv.h>
 typedef struct
 {
 	int	fd;
@@ -33,7 +33,10 @@ typedef struct
 	long	audio_rate;
 	int	audio_chans;
 	int	audio_qbytes;
+	dv_decoder_t *decoder;
+	int16_t	*audio_buffers[4];
 	off_t	offset;
+	uint8_t *buf;
 	int	size;
 	int	fmt;
 } dv_t;
@@ -42,6 +45,7 @@ int	rawdv_close(dv_t *dv);
 dv_t	*rawdv_open_input_file(const char *filename);
 int	rawdv_set_position(dv_t *dv, long nframe);
 int	rawdv_read_frame(dv_t *dv, uint8_t *buf );
+int	rawdv_read_audio_frame(dv_t *dv, uint8_t *buf);
 int	rawdv_video_frames(dv_t *dv);
 int	rawdv_width(dv_t *dv);
 int	rawdv_height(dv_t *dv);

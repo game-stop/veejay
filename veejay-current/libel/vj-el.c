@@ -697,11 +697,18 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
 
     n = el->frame_list[nframe];
 
+    if( lav_is_DV( el->lav_fd[N_EL_FILE(n)] ) )
+    {
+	lav_set_video_position( el->lav_fd[N_EL_FILE(n)] , nframe );
+	return lav_read_audio( el->lav_fd[N_EL_FILE(n)], dst, 0  );
+    }
+
     ns1 = (double) (N_EL_FRAME(n) + 1) * el->audio_rate / el->video_fps;
     ns0 = (double) N_EL_FRAME(n) * el->audio_rate / el->video_fps;
 
     //asize = el->audio_rate / el->video_fps;
     pos = nframe * asize;
+
     ret = lav_set_audio_position(el->lav_fd[N_EL_FILE(n)], ns0);
 
     if (ret < 0)
