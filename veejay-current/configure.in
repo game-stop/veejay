@@ -925,9 +925,9 @@ AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED, 1,
                     [Defined if building against uninstalled FFmpeg source])
 
 if test $have_ps2 = yes; then
- ac_configure_args="$ac_configure_args --disable-v4l --disable-audio-oss --disable-dv1394 --disable-vhook --disable-ffmpeg --disable-ffserver --disable-zlib"
+ ac_configure_args="$ac_configure_args --disable-v4l --disable-audio-oss --disable-vhook --disable-ffmpeg --disable-ffserver --disable-zlib"
 else
-ac_configure_args="$ac_configure_args --disable-v4l --disable-audio-oss --disable-dv1394 --disable-vhook --disable-ffmpeg --disable-ffserver"
+ac_configure_args="$ac_configure_args --disable-v4l --disable-audio-oss --disable-vhook --disable-ffmpeg --disable-ffserver"
 fi
 
 AC_CONFIG_SUBDIRS(ffmpeg/ffmpeg)

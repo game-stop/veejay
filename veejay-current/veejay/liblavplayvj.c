@@ -894,6 +894,14 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 		return 0;
 	}
 	break;
+	case VJ_TAG_TYPE_DV1394:
+	if(vj_tag_new(type, filename, index,info->edit_list, info->pixel_format, 0) )
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Created new DV1394 stream");
+		info->nstreams++;
+		return 0;
+	}
+	break;
 	case VJ_TAG_TYPE_NET:
 	case VJ_TAG_TYPE_MCAST:
 	if( (filename != NULL) && ((strcasecmp( filename, "localhost" ) == 0)  || (strcmp( filename, "127.0.0.1" ) == 0)) )
@@ -2227,9 +2235,6 @@ static void *veejay_playback_thread(void *data)
 
     if(info->uc->use_timer==1) close(rtc_fd);
 
-#ifdef SUPPORT_READ_DV2
-	vj_dv_free_decoder();
-#endif
 #ifdef HAVE_SDL
     if(info->gui_screen) vj_sdl_free(info->sdl_gui);
 #endif

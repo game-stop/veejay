@@ -30,6 +30,8 @@
 #endif
 
 static int out_pixel_format = FMT_420; 
+static vj_dv_encoder *dv_encoder;
+
 
 static	char*	el_get_codec_name(int codec_id )
 {
@@ -162,7 +164,7 @@ int		vj_avcodec_init(editlist *el, int pixel_format)
 	if(!_encoders[ENCODER_DVVIDEO]) return 0;
 #else
 #ifdef SUPPORT_READ_DV2
-	vj_dv_init_encoder( el , out_pixel_format);
+	dv_encoder = vj_dv_init_encoder( el , out_pixel_format);
 #endif
 #endif
 	_encoders[ENCODER_DIVX] = vj_avcodec_new_encoder( CODEC_ID_MSMPEG4V3 , el, fmt);
@@ -190,7 +192,7 @@ int		vj_avcodec_free()
 	}
 #ifdef __FALLBACK_LIBDV
 #ifdef SUPPORT_READ_DV2
-	vj_dv_free_encoder();
+	vj_dv_free_encoder(dv_encoder);
 #endif
 #endif
 	return 1;
@@ -325,7 +327,7 @@ int		vj_avcodec_encode_frame( int format, uint8_t *src[3], uint8_t *buf, int buf
 #ifdef __FALLBACK_LIBDV
 	if(format == ENCODER_DVVIDEO )
 #ifdef SUPPORT_READ_DV2
-		return vj_dv_encode_frame( src, buf );
+		return vj_dv_encode_frame( dv_encoder,src, buf );
 #else
 	return 0;
 #endif

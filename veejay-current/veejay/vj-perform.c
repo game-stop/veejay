@@ -626,6 +626,7 @@ int vj_perform_init_audio(veejay_t * info)
 		veejay_msg(VEEJAY_MSG_DEBUG, "Speed %d -> %d Hz ", i, out_rate );
 		//(i * info->edit_list->audio_rate));
 	}
+
     return 0;
 }
 
@@ -1309,7 +1310,7 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf)
 			alen = vj_el_get_audio_frame(info->edit_list,settings->current_frame_num + i, tmp_buf + blen);
 			if( alen < 0 ) return 0;
 			n_samples += alen;
-			blen += (alen * bps );    	
+			blen += (alen * bps);
 		}
 
 
@@ -1326,8 +1327,6 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf)
 		}
 		if(tmp_buf) free(tmp_buf);
 	
-	//	veejay_msg(VEEJAY_MSG_DEBUG, "[%d] (%d) samples, [%g floor] [ %g ceil ] , resampled to %d n_frame = %d ",
-	//		n_samples, pred_len*n_frames,fl,cl, len ,n_frames);
 	}
 	else
 	{

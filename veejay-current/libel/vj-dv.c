@@ -17,7 +17,7 @@
  * along with this program; if not, write to the Free Software
  */
 #include <config.h>
-
+#include <libvjmsg/vj-common.h>
 #ifdef SUPPORT_READ_DV2
 #include <libdv/dv.h>
 #include <stdint.h>
@@ -31,59 +31,72 @@
 #define PAL_H 576
 #define DV_PAL_SIZE 144000
 #define DV_NTSC_SIZE 120000
+#define DV_AUDIO_MAX_SAMPLES 1944
 
-static dv_decoder_t *vj_dv_decoder;
-static dv_encoder_t *vj_dv_encoder;
-static uint8_t *vj_dv_video[3];
-static uint8_t *vj_dv_encode_buf;
-static int out_format; 
 /* init the dv decoder and decode buffer*/
-void vj_dv_init(int width, int height)
+vj_dv_decoder *vj_dv_decoder_init(int width, int height, int pixel_format)
 {
-	
-    vj_dv_decoder = dv_decoder_new(1, 1, 0);
-    vj_dv_decoder->quality = DV_QUALITY_BEST;
-    vj_dv_video[0] =
-	(uint8_t *) malloc(width * height * 4 * sizeof(uint8_t));
-    vj_dv_video[1] = NULL;
-    vj_dv_video[2] = NULL;
-
-
-    memset( vj_dv_video[0], 0, (width*height*4));
+	vj_dv_decoder *d = (vj_dv_decoder*)vj_malloc(sizeof(vj_dv_decoder));
+	if(!d) return NULL;
+	d->decoder = dv_decoder_new( 1,1,0 );
+	d->decoder->quality = DV_QUALITY_BEST;
+	d->dv_video = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height * 4);
+    	memset( d->dv_video, 0, (width*height*4));
+	d->fmt = pixel_format;
+	dv_set_audio_correction( d->decoder, DV_AUDIO_CORRECT_AVERAGE );
+/*	d->audio_buffers = (int16_t**) vj_malloc(sizeof(uint16_t*) * 4);
+	int i;
+	for( i = 0; i < 4; i ++ )
+	{
+		d->audio_buffers[i] = (int16_t*) vj_malloc(sizeof(uint16_t) *
+				2 * DV_AUDIO_MAX_SAMPLES );
+	}
+*/
+	return d;
 }
 
 /* init the dv encoder and encode buffer */
-void vj_dv_init_encoder(editlist * el, int pixel_format)
+vj_dv_encoder *vj_dv_init_encoder(editlist * el, int pixel_format)
 {
-    vj_dv_encoder = dv_encoder_new(0, 0, 0);
-    vj_dv_encoder->isPAL = (el->video_norm == 'p' ? 1 : 0);
-    vj_dv_encoder->is16x9 = FALSE;
-    vj_dv_encoder->vlc_encode_passes = 3;
-    vj_dv_encoder->static_qno = 0;
-    vj_dv_encoder->force_dct = DV_DCT_AUTO;
-    out_format = pixel_format;
+	vj_dv_encoder *e = (vj_dv_encoder*) vj_malloc(sizeof(vj_dv_encoder));
+	if(!e) return NULL;
+	e->encoder = dv_encoder_new(0,0,0);
+	e->encoder->isPAL = (el->video_norm == 'p' ? 1 : 0);
+	e->encoder->is16x9 = (el->video_width / el->video_height >= 1.777 ? 1: 0);
+	e->encoder->vlc_encode_passes = 3;
+    	e->encoder->static_qno = 0;
+    	e->encoder->force_dct = DV_DCT_AUTO;
+    	e->fmt = pixel_format;
 
-    vj_dv_encode_buf =
-	(uint8_t *) malloc(sizeof(uint8_t) * 3 *
-			   (vj_dv_encoder->
-			    isPAL ? DV_PAL_SIZE : DV_NTSC_SIZE));
-    memset( vj_dv_encode_buf, 0 ,  (3 *
-			   (vj_dv_encoder->
-			    isPAL ? DV_PAL_SIZE : DV_NTSC_SIZE)));
+    	e->dv_video =
+	(uint8_t *) vj_malloc(sizeof(uint8_t) * 3 *
+			   (e->encoder->isPAL ?
+			    	DV_PAL_SIZE : DV_NTSC_SIZE));
+	if(!e->dv_video)
+	{
+		if(e) free(e);
+		return NULL;
+	}
+
+	memset( e->dv_video, 0 ,
+		(3 * e->encoder->isPAL ? DV_PAL_SIZE: DV_NTSC_SIZE ) );
+	return e;
 }
 
+
 /* encode frame to dv format, dv frame will be in output_buf */
-int vj_dv_encode_frame(uint8_t * input_buf[3], uint8_t * output_buf)
+int vj_dv_encode_frame(vj_dv_encoder *encoder, uint8_t *input_buf[3], uint8_t *output_buf)
 {
 
     time_t now = time(NULL);
     uint8_t *pixels[3];
     int w=0; int h = 0;
     if (!input_buf)
-	return 0;
+		return 0;
 
-    pixels[0] = (uint8_t *) vj_dv_encode_buf;
-    if (vj_dv_encoder->isPAL)
+    pixels[0] = (uint8_t *) encoder->dv_video;
+
+    if (encoder->encoder->isPAL)
     {
 		h = PAL_H;
 		w = PAL_W;
@@ -94,54 +107,65 @@ int vj_dv_encode_frame(uint8_t * input_buf[3], uint8_t * output_buf)
 		w = NTSC_W;
     }
 
-	pixels[2] = (uint8_t *) vj_dv_encode_buf + (w * h);
-	pixels[1] = (uint8_t *) vj_dv_encode_buf + (w * h * 5) / 4;
-    
-
-    if( out_format == FMT_420)
-    {  // convert to 422 packed
-		yuv420p_to_yuv422(input_buf,vj_dv_encode_buf, w, h);
-    }
+	if( encoder->fmt == FMT_420)
+	{	
+		pixels[1] = (uint8_t *) encoder->dv_video + (w * h);
+		pixels[2] = (uint8_t *) encoder->dv_video + (w * h * 5) / 4;
+    	yuv420p_to_yuv422(input_buf, encoder->dv_video, w, h );	
+	}
     else
     {  // convert 422 planar to packed
-		yuv422p_to_yuv422(input_buf,vj_dv_encode_buf,w,h);
+		int off = w * h / 2;
+		pixels[1] = (uint8_t *) encoder->dv_video + (w * h );
+		pixels[2] = (uint8_t *) encoder->dv_video + (w * h) + off;
+		yuv422p_to_yuv422(input_buf,encoder->dv_video,w,h);
     }	
   
-    dv_encode_full_frame(vj_dv_encoder, pixels, e_dv_color_yuv,
+    dv_encode_full_frame( encoder->encoder, pixels, e_dv_color_yuv,
 			 output_buf);
-    dv_encode_metadata(output_buf, vj_dv_encoder->isPAL,
-		       vj_dv_encoder->is16x9, &now, 0);
-    dv_encode_timecode(output_buf, vj_dv_encoder->isPAL, 0);
+    dv_encode_metadata(output_buf, encoder->encoder->isPAL,
+		       encoder->encoder->is16x9, &now, 0);
+    dv_encode_timecode(output_buf, encoder->encoder->isPAL, 0);
 
-    if(vj_dv_encoder->isPAL) return DV_PAL_SIZE;
+    if(encoder->encoder->isPAL) return DV_PAL_SIZE;
     return DV_NTSC_SIZE;
 }
 
-void vj_dv_free_encoder()
+void vj_dv_free_encoder(vj_dv_encoder *e)
 {
-    dv_encoder_free(vj_dv_encoder);
-    if(vj_dv_encode_buf) free(vj_dv_encode_buf);
+	if(e->encoder)
+		dv_encoder_free( e->encoder);
+    if(e->dv_video)
+		free(e->dv_video);
+	if(e)
+		free(e);
 }
 
-void vj_dv_free_decoder() {
-	if(vj_dv_video[0]) free(vj_dv_video[0]);
-	dv_decoder_free(vj_dv_decoder);
+void vj_dv_free_decoder(vj_dv_decoder *d) {
+	if(d->decoder)
+		dv_decoder_free( d->decoder );
+	if(d->dv_video)
+		free(d->dv_video);
+	if(d) 
+		free(d);
 }
 
-int vj_dv_decode_frame(uint8_t * input_buf, uint8_t * Y,
-		       uint8_t * Cb, uint8_t * Cr, int width, int height)
+int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
+		       uint8_t * Cb, uint8_t * Cr, int width, int height, int fmt)
 {
 
     int pitches[3];
 
     if (!input_buf)
-	return 0;
+		return 0;
 
-    if (dv_parse_header(vj_dv_decoder, input_buf) < 0)
-	return 0;
-
-    if (!((vj_dv_decoder->num_dif_seqs == 10)
-	  || (vj_dv_decoder->num_dif_seqs == 12)))
+    if (dv_parse_header(d->decoder, input_buf) < 0)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid DV header");
+		return 0;
+	}
+    if (!((d->decoder->num_dif_seqs == 10)
+	  || (d->decoder->num_dif_seqs == 12)))
 	return 0;
 
     /*
@@ -152,23 +176,64 @@ int vj_dv_decode_frame(uint8_t * input_buf, uint8_t * Y,
        default: fprintf(stderr,"unknown\n");break;
        }
      */
+/*
+    if (d->decoder->sampling == e_dv_sample_411 ||
+		d->decoder->sampling == e_dv_sample_422 ||
+		d->decoder->sampling == e_dv_sample_420)
+	{
+		pitches[0] = width * 2;
+		pitches[1] = 0;
+		pitches[2] = 0;
+		uint8_t *pixels[3] = { Y , Cb, Cr };
 
-    if (vj_dv_decoder->sampling == e_dv_sample_411 ||
-	vj_dv_decoder->sampling == e_dv_sample_422 ||
-	vj_dv_decoder->sampling == e_dv_sample_420) {
+		dv_decode_full_frame(d->decoder, input_buf,
+				     e_dv_color_yuv, pixels, pitches);
 
+		if(fmt == FMT_420)
+			yuy2toyv12(Y, Cb, Cr, d->dv_video, width, height);
+		else
+			yuy2toyv16(Y, Cb, Cr, d->dv_video, width, height);
+
+		return 1;
+    }
+*/
 	pitches[0] = width * 2;
 	pitches[1] = 0;
 	pitches[2] = 0;
 
+//	dv_decode_full_audio( d->decoder , input_buf,
 
-	dv_decode_full_frame(vj_dv_decoder, input_buf,
-			     e_dv_color_yuv, vj_dv_video, pitches);
 
-	yuy2toyv12(Y, Cb, Cr, vj_dv_video[0], width, height);
+	if( d->decoder->sampling == e_dv_sample_420 )
+	{
+		uint8_t *pixels[3];
+		pixels[0] = d->dv_video;
+		pixels[1] = d->dv_video + (width * height);
+		pixels[2] = d->dv_video + (width * height * 5)/4;
+		dv_decode_full_frame( d->decoder, input_buf, e_dv_color_yuv,
+				pixels,pitches);
+		if(fmt==FMT_422)
+			yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
+		else
+			yuy2toyv12( Y,Cb,Cr, d->dv_video, width, height );
 
-	return 1;
-    }
+		return 1;
+	}
+
+	if( d->decoder->sampling == e_dv_sample_422 )
+	{	
+		uint8_t *pixels[3];
+		pixels[0] = d->dv_video;
+		pixels[1] = d->dv_video + (width * height);
+		pixels[2] = d->dv_video + (width * height) + (width * height/2);
+		dv_decode_full_frame( d->decoder, input_buf, e_dv_color_yuv,
+				pixels,pitches);
+		if(fmt==FMT_422)
+			yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
+		else
+			yuy2toyv12( Y,Cb,Cr, d->dv_video, width, height );
+		return 1;
+	}
 
     return 0;
 }

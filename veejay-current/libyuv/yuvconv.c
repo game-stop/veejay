@@ -74,6 +74,32 @@ void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 
     }
 }
+
+void yuy2toyv16(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
+		int width, int height)
+{
+
+    int i, j, w2;
+    uint8_t *y, *u, *v;
+
+    w2 = width / 2;
+
+    //YV16
+    y = _y;
+    v = _v;
+    u = _u;
+
+    for (i = 0; i < height; i ++ )
+    {
+	for (j = 0; j < w2; j++) {
+	    /* packed YUV 422 is: Y[i] U[i] Y[i+1] V[i] */
+	    *(y++) = *(input++);
+	    *(u++) = *(input++);
+	    *(y++) = *(input++);
+	    *(v++) = *(input++);
+	}
+    }
+}
 /* convert 4:2:0 to yuv 4:2:2 packed */
 void yuv422p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
 		       int height)

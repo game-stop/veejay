@@ -17,7 +17,7 @@ STREAM_LIB_FILE = libstream.la
 
 noinst_LTLIBRARIES = $(STREAM_LIB_FILE)
 
-libstream_la_SOURCES =	v4lutils.c vj-v4lvideo.c vj-yuv4mpeg.c vj-shm.c vj-tag.c
+libstream_la_SOURCES =	v4lutils.c vj-v4lvideo.c vj-yuv4mpeg.c vj-shm.c vj-dv1394.c vj-tag.c
 
 
 libstream_la_LDFLAGS = $(STREAM_LIB_OPTS) \

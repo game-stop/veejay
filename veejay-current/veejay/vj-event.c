@@ -255,6 +255,7 @@ enum {				/* all events, network/keyboard crossover */
 #ifdef HAVE_V4L
 	VJ_EVENT_TAG_NEW_V4L				=	2104,
 #endif
+	VJ_EVENT_TAG_NEW_DV1394				=	2105,
 	VJ_EVENT_TAG_NEW_Y4M				=	2107,
 	VJ_EVENT_TAG_OFFLINE_REC_START			=	2109,
 	VJ_EVENT_TAG_OFFLINE_REC_STOP			=	2110,
@@ -392,6 +393,7 @@ static struct {		      /* internal message relay for remote host */
 #ifdef HAVE_V4L
 	{ VJ_EVENT_TAG_NEW_V4L,				NET_TAG_NEW_V4L				},
 #endif
+	{ VJ_EVENT_TAG_NEW_DV1394,			NET_TAG_NEW_DV1394			},
 	{ VJ_EVENT_TAG_NEW_Y4M,				NET_TAG_NEW_Y4M				},
 	{ VJ_EVENT_TAG_NEW_AVFORMAT,			NET_TAG_NEW_AVFORMAT			},
 	{ VJ_EVENT_TAG_OFFLINE_REC_START,		NET_TAG_OFFLINE_REC_START		},
@@ -754,6 +756,7 @@ static struct {
 #ifdef HAVE_V4L
 	{ VJ_EVENT_TAG_NEW_V4L,			"Stream: open video4linux device (hw)",		 vj_event_tag_new_v4l,		 2,	"%d %d",		{0,1}	},	
 #endif
+	{ VJ_EVENT_TAG_NEW_DV1394,		"Stream: open dv1394 device",			vj_event_tag_new_dv1394,	 0, 	NULL,{0,0}	},
 	{ VJ_EVENT_TAG_NEW_Y4M,			"Stream: open y4m stream by name (file)",	 vj_event_tag_new_y4m,		 1,	"%s",		{0,0}	}, 
 	{ VJ_EVENT_STREAM_NEW_NET,		"Stream: open network stream ",	vj_event_tag_new_net, 2, "%s %d", {0,0}	},
 	{ VJ_EVENT_STREAM_NEW_MCAST,		"Stream: open multicast stream", vj_event_tag_new_mcast, 2, "%s %d", {0,0} },	
@@ -5285,7 +5288,14 @@ void vj_event_tag_new_avformat(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_INFO, "Created new FFmpeg stream %d", vj_tag_size()-1);
 	}	
 }
-
+void	vj_event_tag_new_dv1394(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	if( veejay_create_tag(v, VJ_TAG_TYPE_DV1394, "/dev/dv1394", v->nstreams,0, 0) == 0)
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Created new DV1394 stream %d", vj_tag_size()-1);
+	}
+}
 #ifdef HAVE_V4L
 void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 {

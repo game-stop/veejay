@@ -38,7 +38,6 @@ void vj_effman_apply_image_effect(
 
 	{
 
-
    int j;
 
    switch (e) {
@@ -271,14 +270,13 @@ void vj_effman_apply_image_effect(
 	 deinterlace_apply( frames[0], frameinfo->width, frameinfo->height, arg[0]);
 	 break;
      case VJ_IMAGE_EFFECT_SLICE:
-	if(arg[2] > 0) { /* after x frames, randomize slice window*/
-	   todo_info->tmp[0] ++; /* val / max frames */
+	if(arg[2] > 0) { 
+	   todo_info->tmp[0] ++; 
 	   if(todo_info->tmp[0] > arg[2]) { todo_info->tmp[0] = 0; todo_info->tmp[1] = 1; }
-	} else { /* arg2 = off , copy arg*/
+	} else { 
 	     todo_info->tmp[1] = arg[1];
 	}
 
-	/* auto switch arg1 off after applying effect */
 	slice_apply(frames[0],frameinfo->width,frameinfo->height,arg[0], todo_info->tmp[1]);
 	todo_info->tmp[1] = 0;
 	break;

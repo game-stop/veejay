@@ -21,13 +21,32 @@
 #include <config.h>
 #ifdef SUPPORT_READ_DV2
 #include "vj-el.h"
+#include <libdv/dv.h>
+typedef struct
+{
+	dv_decoder_t	*decoder;
+	uint8_t		*dv_video;
+	int		fmt;
+} vj_dv_decoder;
 
-void vj_dv_init(int width, int height);
-void vj_dv_init_encoder(editlist * el, int pixel_format);
-int vj_dv_decode_frame(uint8_t * in, uint8_t * Y,
-		       uint8_t * Cb, uint8_t * Cr, int w, int h);
-int vj_dv_encode_frame(uint8_t * in[3], uint8_t * out);
-void vj_dv_free_encoder(void);
-void vj_dv_free_decoder(void); 
+typedef struct
+{
+	dv_encoder_t	*encoder;
+	uint8_t		*dv_video;
+	int		fmt;
+} vj_dv_encoder;
+
+
+vj_dv_decoder *vj_dv_decoder_init(int width, int height, int pixel_format);
+
+vj_dv_encoder *vj_dv_init_encoder(editlist * el, int pixel_format);
+
+int vj_dv_decode_frame(vj_dv_decoder *d,uint8_t * in, uint8_t * Y,
+		       uint8_t * Cb, uint8_t * Cr, int w, int h, int fmt);
+
+int vj_dv_encode_frame(vj_dv_encoder *e,uint8_t * in[3], uint8_t * out);
+void vj_dv_free_encoder(vj_dv_encoder *e);
+void vj_dv_free_decoder(vj_dv_decoder *d); 
+
 #endif
 #endif

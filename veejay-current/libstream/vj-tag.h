@@ -35,6 +35,7 @@
 #define VJ_TAG_TYPE_MCAST 14
 #define VJ_TAG_MAX_V4L 16
 #define VJ_TAG_MAX_STREAM_IN 16
+#define VJ_TAG_TYPE_DV1394 17
 #define VJ_TAG_TYPE_AVFORMAT 12
 
 #include <config.h>
@@ -43,12 +44,14 @@
 #include <libstream/vj-v4lvideo.h>
 #include <libvjnet/vj-client.h>
 #include <libel/vj-avformat.h>
+#include <libstream/vj-dv1394.h>
 
 typedef struct {
     v4l_video *v4l[VJ_TAG_MAX_V4L];
     vj_yuv *stream[VJ_TAG_MAX_STREAM_IN];
     vj_avformat *avformat[VJ_TAG_MAX_STREAM_IN];
 	vj_client *net[VJ_TAG_MAX_STREAM_IN];
+    vj_dv1394 *dv1394[1];
     int width;
     int height;
     int depth;

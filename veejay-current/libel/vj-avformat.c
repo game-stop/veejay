@@ -159,13 +159,34 @@ vj_avformat *vj_avformat_open_input(const char *filename)
 	av->expected_timecode = 0;
 	av->video_index = -1;
 	av->audio_index = -1;
-	err = av_open_input_file(
+/*
+	if( strcasecmp(filename, "/dev/dv1394" )==0)
+	{
+		av->av_input_format = av_find_input_format("dv1394");
+		av->av_format_par = (AVFormatParameters*) vj_malloc(sizeof(AVFormatParameters));
+		av->av_format_par->width = 720;
+		av->av_format_par->height = 576;
+		av->av_format_par->frame_rate = 25;
+		av->av_format_par->frame_rate_base=1;
+		av->av_format_par->device = filename;
+		av->av_format_par->standard = "PAL";
+		av->av_format_par->channel = 0;
+		err = av_open_input_file(
 			&(av->context),
 			filename,
 			av->av_input_format,
 			0,
 			av->av_format_par );
-
+	}
+	else
+	{
+*/	err = av_open_input_file(
+			&(av->context),
+			filename,
+			av->av_input_format,
+			0,
+			av->av_format_par );
+//	}
 
 	if(err < 0 )
 	{
