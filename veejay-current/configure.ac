@@ -100,11 +100,6 @@ AC_SYS_LARGEFILE
 dnl configure AS and ASFLAGS...
 AM_PROG_AS
 
-if test x"$with_extra_cflags" != "x"; then
-   CFLAGS="$with_extra_cflags"
-   CXXFLAGS="$CXXFLAGS $with_extra_cflags"
-fi
-
 AC_CHECK_HEADERS([fenv.h stdint.h inttypes.h sys/types.h alloca.h])
 
 dnl AX_PREFIXED_DEFINE([VEEJAY], [HAVE_STDINT_H])
@@ -727,6 +722,11 @@ if test "x$cflags_set" != "xyes" ; then
   cflags_set=yes
 fi
 
+
+if test x"$with_extra_cflags" != "x"; then
+   CFLAGS="$CFLAGS $with_extra_cflags"
+   CXXFLAGS="$CXXFLAGS $with_extra_cflags"
+fi
 
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
