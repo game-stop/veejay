@@ -21,8 +21,8 @@
 #define VJ_EVENT_H
 #include <config.h>
 #ifdef HAVE_XML2
-#include <libxml/xmlmemory.h>
-#include <libxml/parser.h>
+#include <libxml2/xmlmemory.h>
+#include <libxml2/parser.h>
 #endif
 
 void 	vj_event_fmt_arg			(	int *args, 	char *str, 	const char format[], 	va_list ap);
