@@ -74,7 +74,6 @@ typedef struct
 
 #define DEFAULT_RADIUS 16
 #define DEFAULT_NUM 100
-#define DEFAULT_HOME_RADIUS 203
 
 #define	BLOB_RECT 0
 #define BLOB_CIRCLE 1
@@ -99,7 +98,7 @@ vj_effect *boids_init(int w, int h)
 	ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
 	ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
 	ve->limits[0][0] = 1;
-	ve->limits[1][0] = 360;  // radius
+	ve->limits[1][0] = w/2;  // radius
 	ve->limits[0][1] = 2; 
 	ve->limits[1][1] = 256;  // num blobs
 	ve->limits[0][2] = 0;
@@ -121,7 +120,7 @@ vj_effect *boids_init(int w, int h)
 	ve->defaults[4] = 0;
 	ve->defaults[5] = 0;
 	ve->defaults[6] = 199;
-	ve->defaults[7] = DEFAULT_HOME_RADIUS;
+	ve->defaults[7] = w/4;
 
 	ve->description = "Video Boids";
 	ve->sub_format = 1;
