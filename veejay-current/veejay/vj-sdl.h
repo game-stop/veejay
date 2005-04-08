@@ -56,6 +56,7 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420);
 int vj_sdl_direct_yuv_overlay(vj_sdl * vjsdl, uint8_t * buffer, int buflen,
 			      int dataformat);
 void vj_sdl_free(vj_sdl * vjsdl);
+void vj_sdl_quit();
 
 #endif
 #endif

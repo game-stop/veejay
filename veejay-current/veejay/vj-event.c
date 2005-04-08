@@ -48,7 +48,6 @@
 
 
 static int _last_known_num_args = 0;
-
 static hash_t *BundleHash;
 
 static int vj_event_valid_mode(int mode) {
@@ -248,6 +247,8 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_CLIP_COPY				=	2040,
 	VJ_EVENT_CLIP_SELECT_RENDER			=	2051,
 	VJ_EVENT_CLIP_RENDER_TO				=	2052,
+	VJ_EVENT_CLIP_RENDERLIST			=	2053,
+	VJ_EVENT_CLIP_RENDER_MOVE			=	2054,
 	VJ_EVENT_TAG_SELECT				=	2100,
 	VJ_EVENT_TAG_ACTIVATE				=	2101,
 	VJ_EVENT_TAG_DEACTIVATE				=	2102,
@@ -256,11 +257,13 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_TAG_NEW_V4L				=	2104,
 #endif
 	VJ_EVENT_TAG_NEW_DV1394				=	2105,
+	VJ_EVENT_TAG_NEW_COLOR				=	2108,
 	VJ_EVENT_TAG_NEW_Y4M				=	2107,
 	VJ_EVENT_TAG_OFFLINE_REC_START			=	2109,
 	VJ_EVENT_TAG_OFFLINE_REC_STOP			=	2110,
 	VJ_EVENT_TAG_REC_START				=	2111,
 	VJ_EVENT_TAG_REC_STOP				=	2112,
+	VJ_EVENT_TAG_SET_DESCR				=	2113,
 	VJ_EVENT_TAG_LIST				=	2115,
 	VJ_EVENT_TAG_DEVICES				=	2116,
 	VJ_EVENT_TAG_CHAIN_DISABLE			=	2117,
@@ -271,6 +274,8 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_TAG_SET_CONTRAST			=	2302,
 	VJ_EVENT_TAG_SET_HUE				=	2303,
 	VJ_EVENT_TAG_SET_COLOR				=	2304,
+	VJ_EVENT_TAG_SET_WHITE				=	2305,
+	VJ_EVENT_TAG_GET_V4L				=	2306,
 #endif
 	VJ_EVENT_CHAIN_ENTRY_SET_EFFECT			=	2201,
 	VJ_EVENT_CHAIN_ENTRY_SET_PRESET			=	2202,
@@ -301,6 +306,8 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_SET_MODE_AND_GO			=	3010,
 	VJ_EVENT_AUDIO_ENABLE				=	3011,
 	VJ_EVENT_AUDIO_DISABLE				=	3012,
+	VJ_EVENT_STREAM_COLOR				=	3013,
+	VJ_EVENT_RGB_PARAMETER				=	3014,
 	VJ_EVENT_EDITLIST_PASTE_AT			=	4001,
 	VJ_EVENT_EDITLIST_SEL_START			=	4002,
 	VJ_EVENT_EDITLIST_SEL_END			=	4003,
@@ -312,10 +319,11 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_EDITLIST_ADD_CLIP			=	4009,
 	VJ_EVENT_EDITLIST_SAVE				=	4011,
 	VJ_EVENT_EDITLIST_LOAD				=	4012,
-	/* message bundles are bundles of events, start at 5000 */
+	/* message bundles are bundles of events, start at 5001 - 5499 */
 	VJ_EVENT_EFFECT_SET_BG				=	4050,
 	VJ_EVENT_SET_VOLUME				=	4080, 
 	VJ_EVENT_BUNDLE					=	5000,
+	/* possible conflicting range ..  fixme */
 	VJ_EVENT_LOAD_PLUGIN				=	5500,
 	VJ_EVENT_UNLOAD_PLUGIN				=	5501,
 	VJ_EVENT_CMD_PLUGIN				=	5502,
@@ -325,6 +333,8 @@ enum {				/* all events, network/keyboard crossover */
 	VJ_EVENT_BUNDLE_ATTACH_KEY			=	6002,
 	VJ_EVENT_BUNDLE_FILE				=	6005,
 	VJ_EVENT_BUNDLE_SAVE				=	6006,
+	VJ_EVENT_BUNDLE_LIST				=	6007,
+	VJ_EVENT_BUNDLE_CAPTURE				=	6008,
 	VJ_EVENT_SCREENSHOT				=	6010,
 	VJ_EVENT_INIT_GUI_SCREEN			=	6011,
 	VJ_EVENT_GET_FRAME				=	6304,
@@ -389,12 +399,15 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_ENTRY_CHANNEL_DOWN,			NET_CHAIN_CHANNEL_DEC			},
 	{ VJ_EVENT_TAG_ACTIVATE,			NET_TAG_ACTIVATE			},
 	{ VJ_EVENT_TAG_DEACTIVATE,			NET_TAG_DEACTIVATE			},
+	{ VJ_EVENT_STREAM_COLOR,			NET_STREAM_COLOR			},
+	{ VJ_EVENT_RGB_PARAMETER,			NET_RGB_PARAMETER_TYPE			},
 	{ VJ_EVENT_TAG_DELETE,				NET_TAG_DELETE				},
 #ifdef HAVE_V4L
 	{ VJ_EVENT_TAG_NEW_V4L,				NET_TAG_NEW_V4L				},
 #endif
 	{ VJ_EVENT_TAG_NEW_DV1394,			NET_TAG_NEW_DV1394			},
 	{ VJ_EVENT_TAG_NEW_Y4M,				NET_TAG_NEW_Y4M				},
+	{ VJ_EVENT_TAG_NEW_COLOR,			NET_TAG_NEW_COLOR			},
 	{ VJ_EVENT_TAG_NEW_AVFORMAT,			NET_TAG_NEW_AVFORMAT			},
 	{ VJ_EVENT_TAG_OFFLINE_REC_START,		NET_TAG_OFFLINE_REC_START		},
 	{ VJ_EVENT_TAG_OFFLINE_REC_STOP,		NET_TAG_OFFLINE_REC_STOP		},
@@ -438,14 +451,18 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_EDITLIST_SAVE,			NET_EDITLIST_SAVE			},
 	{ VJ_EVENT_EDITLIST_LOAD,			NET_EDITLIST_LOAD			},
 	{ VJ_EVENT_BUNDLE,				NET_BUNDLE				},
+	{ VJ_EVENT_BUNDLE_LIST,				NET_LIST_BUNDLES,
+		},
 	{ VJ_EVENT_BUNDLE_DEL,				NET_DEL_BUNDLE				},
 	{ VJ_EVENT_BUNDLE_ADD,				NET_ADD_BUNDLE				},
 	{ VJ_EVENT_BUNDLE_FILE,				NET_BUNDLE_FILE				},
 	{ VJ_EVENT_BUNDLE_ATTACH_KEY,			NET_BUNDLE_ATTACH_KEY			},
+	{ VJ_EVENT_BUNDLE_CAPTURE,			NET_BUNDLE_CAPTURE			},
 	{ VJ_EVENT_BUNDLE_SAVE,				NET_BUNDLE_SAVE				},
 	{ VJ_EVENT_SCREENSHOT,				NET_SCREENSHOT				},
 	{ VJ_EVENT_TAG_CHAIN_ENABLE,			NET_TAG_CHAIN_ENABLE			},
 	{ VJ_EVENT_TAG_CHAIN_DISABLE,			NET_TAG_CHAIN_DISABLE			},
+	{ VJ_EVENT_TAG_SET_DESCR,			NET_TAG_SET_DESCRIPTION			},
 	{ VJ_EVENT_CLIP_CHAIN_ENABLE,			NET_CLIP_CHAIN_ENABLE			},
 	{ VJ_EVENT_CLIP_CHAIN_DISABLE,			NET_CLIP_CHAIN_DISABLE		},
 	{ VJ_EVENT_CHAIN_GET_ENTRY,			NET_CHAIN_GET_ENTRY			},
@@ -455,6 +472,8 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_TAG_SET_BRIGHTNESS,			NET_TAG_SET_BRIGHTNESS			},
 	{ VJ_EVENT_TAG_SET_CONTRAST,			NET_TAG_SET_CONTRAST			},
 	{ VJ_EVENT_TAG_SET_HUE,				NET_TAG_SET_HUE				},
+	{ VJ_EVENT_TAG_SET_WHITE,			NET_TAG_SET_WHITE			},
+	{ VJ_EVENT_TAG_GET_V4L,				NET_TAG_GET_V4L				},
 #endif
 	{ VJ_EVENT_RECORD_DATAFORMAT,			NET_RECORD_DATAFORMAT			},
 #ifdef HAVE_V4L
@@ -479,6 +498,8 @@ static struct {		      /* internal message relay for remote host */
 	{ VJ_EVENT_STREAM_NEW_MCAST,			NET_TAG_NEW_MCAST },
 	{ VJ_EVENT_GET_FRAME,				NET_GET_FRAME },
 	{ VJ_EVENT_CLIP_RENDER_TO,			NET_CLIP_RENDER_TO },
+	{ VJ_EVENT_CLIP_RENDER_MOVE,			NET_CLIP_RENDER_MOVE },
+	{ VJ_EVENT_CLIP_RENDERLIST,			NET_CLIP_RENDERLIST	},
 	{ VJ_EVENT_CLIP_SELECT_RENDER,			NET_CLIP_RENDER_SELECT },
 	{0,0}
 };
@@ -766,7 +787,9 @@ static struct {
 	{ VJ_EVENT_CLIP_REC_STOP,		"Clip: stop recording this clip",	 vj_event_clip_rec_stop,	  0,	NULL,
 	  {0,0}   },
 
+	{ VJ_EVENT_CLIP_RENDERLIST,		"Clip: send renderlist",	vj_event_send_clip_history_list,		1,	"%d",		{0,0},			},
 	{ VJ_EVENT_CLIP_RENDER_TO,		"Clip: render to inlined entry",	vj_event_clip_ren_start,	  2,	"%d %d",    {0,1}   },
+	{ VJ_EVENT_CLIP_RENDER_MOVE,		"Clip: move rendered entry to edl",	vj_event_clip_move_render,	2,	"%d %d",	{0, 0}, 		},
 	{ VJ_EVENT_CLIP_SELECT_RENDER,	"Clip: select and play inlined entry",vj_event_clip_sel_render,	 2,		"%d %d",	{0,0}	},
 	{ VJ_EVENT_CLIP_DEL,			"Clip: delete",		 vj_event_clip_del,		  1,	"%d",		{0,0}	},
 	{ VJ_EVENT_CLIP_DEL_ALL,		"Clip: delete all",	vj_event_clip_clear_all,		  0,    NULL,		{0,0}	},
@@ -779,11 +802,15 @@ static struct {
 #endif
 	{ VJ_EVENT_TAG_NEW_DV1394,		"Stream: open dv1394 device <channel>",		vj_event_tag_new_dv1394,	 1, 	"%d",{63,0}	},
 	{ VJ_EVENT_TAG_NEW_Y4M,			"Stream: open y4m stream by name (file)",	 vj_event_tag_new_y4m,		 1,	"%s",		{0,0}	}, 
+	{ VJ_EVENT_TAG_NEW_COLOR,		"Stream: new color stream by RGB color",	vj_event_tag_new_color,		 3,     "%d %d %d",{0,0}	},
+	{ VJ_EVENT_RGB_PARAMETER,		"Effect: RGB parameter type",			vj_event_set_rgb_parameter_type,1,"%d",{0,0}			}, 
+	{ VJ_EVENT_STREAM_COLOR,		"Stream: set color of a solid stream",		vj_event_set_stream_color,	4,	"%d %d %d %d",{0,0}	},
 	{ VJ_EVENT_STREAM_NEW_NET,		"Stream: open network stream ",	vj_event_tag_new_net, 2, "%s %d", {0,0}	},
 	{ VJ_EVENT_STREAM_NEW_MCAST,		"Stream: open multicast stream", vj_event_tag_new_mcast, 2, "%s %d", {0,0} },	
 	{ VJ_EVENT_TAG_NEW_AVFORMAT,		"Stream: open file as stream with FFmpeg",	 vj_event_tag_new_avformat,	 1,	"%s",		{0,0}	},
 	{ VJ_EVENT_TAG_OFFLINE_REC_START,	"Stream: start record from an invisible stream", vj_event_tag_rec_offline_start, 3,	"%d %d %d",	{0,0}	}, 
 	{ VJ_EVENT_TAG_OFFLINE_REC_STOP,	"Stream: stop record from an invisible stream",	 vj_event_tag_rec_offline_stop,  0,	NULL,		{0,0}	},
+	{ VJ_EVENT_TAG_SET_DESCR,		"Stream: set title ",				vj_event_tag_set_descr,		 2,	"%d %s",	{0,0} 	},
 	{ VJ_EVENT_TAG_REC_START,		"Stream: start recording from stream",	 vj_event_tag_rec_start,	 2,	"%d %d",	{0,0}   },
 	{ VJ_EVENT_TAG_REC_STOP,		"Stream: stop recording from stream",	 vj_event_tag_rec_stop,		 0,	NULL,		{0,0}	},
 	{ VJ_EVENT_TAG_CHAIN_ENABLE,		"Stream: enable effect chain",			 vj_event_tag_chain_enable,	1,	"%d",		{0,0}	},
@@ -808,8 +835,7 @@ static struct {
 	{ VJ_EVENT_OUTPUT_Y4M_START,		"Output: Yuv4Mpeg start writing to file",	 vj_event_output_y4m_start,	1,	"%s",		{0,0}	},
 	{ VJ_EVENT_OUTPUT_Y4M_STOP,		"Output: Yuv4Mpeg stop writing to file",	 vj_event_output_y4m_stop,	0,	NULL,		{0,0}	},
 #ifdef HAVE_SDL
-	{ VJ_EVENT_RESIZE_SDL_SCREEN,		"Output: Resize SDL video screen",		 vj_event_set_screen_size,	4,	"%d %d %d %d", 	{0,0}	},
-	{ VJ_EVENT_INIT_GUI_SCREEN,		"Output: Initialize GUI screen",		vj_event_init_gui_screen,	2,	"%s %d",	{0,0}	},
+	{ VJ_EVENT_RESIZE_SDL_SCREEN,		"Output: Re(initialize) SDL video screen",	 vj_event_set_screen_size,	4,	"%d %d %d %d", 	{0,0}	},
 #endif
 	{ VJ_EVENT_SET_PLAY_MODE,		"Playback: switch playmode clip/tag/plain", 	 vj_event_set_play_mode,	1,	"%d",		{2,0}	},
 	{ VJ_EVENT_SET_MODE_AND_GO,		"Playback: set playmode (and fire clip/tag)",  vj_event_set_play_mode_go,	2,	"%d %d",	{0,0}	},
@@ -837,7 +863,9 @@ static struct {
 #ifdef HAVE_XML2
 	{ VJ_EVENT_BUNDLE_SAVE,			"Bundle: save action file",			vj_event_write_actionfile,	1,	"%s",		{0,0}   },
 #endif
-	{ VJ_EVENT_BUNDLE_ADD,			"Bundle: add a new bundle to event system",	vj_event_bundled_msg_add,	2,	"%s %d",	{0,0}	},
+	{ VJ_EVENT_BUNDLE_LIST,			"Bundle: get all contents",			vj_event_send_bundles,		0,	NULL,		{0,0}	},
+	{ VJ_EVENT_BUNDLE_ADD,			"Bundle: add a new bundle to event system",	vj_event_bundled_msg_add,	2,	"%d %s",	{0,0}	},
+	{ VJ_EVENT_BUNDLE_CAPTURE,		"Bundle: capture effect chain",			vj_event_quick_bundle,		0,	NULL,		{0,0}	},
 	{ VJ_EVENT_CHAIN_LIST,			"Chain: get all contents",			vj_event_send_chain_list,	1,	"%d",		{0,0}	},
 	{ VJ_EVENT_CHAIN_GET_ENTRY,		"Chain: get entry contents",			vj_event_send_chain_entry,	2,	"%d %d",	{0,0}	},		
 	{ VJ_EVENT_EFFECT_LIST,			"EffectList: list all effects",			vj_event_send_effect_list,	0,	NULL,		{0,0}	},
@@ -855,6 +883,8 @@ static struct {
 	{ VJ_EVENT_TAG_SET_CONTRAST,		"Video4Linux: set v4l contrast value",			vj_event_v4l_set_contrast,	2,	"%d %d",	{0,0} },
 	{ VJ_EVENT_TAG_SET_HUE,			"Video4Linux: set v4l hue value",			vj_event_v4l_set_hue,		2,	"%d %d",	{0,0} },
 	{ VJ_EVENT_TAG_SET_COLOR,		"Video4Linux: set v4l color value",			vj_event_v4l_set_color,		2,	"%d %d",	{0,0} },
+	{ VJ_EVENT_TAG_SET_WHITE,		"Video4Linux: set v4l white value",			vj_event_v4l_set_white,		2,	"%d %d",	{0,0} },
+	{ VJ_EVENT_TAG_GET_V4L,			"Video4Linux: get properties",				vj_event_v4l_get_info,		2,	"%d",		{0,0} },
 #endif
 	{ VJ_EVENT_EFFECT_SET_BG,		"Effect: set background (if supported)",		vj_event_effect_set_bg,		0,	NULL,		{0,0} },
 	{ VJ_EVENT_SHM_OPEN,			"Shared memory",					vj_event_tag_new_shm,		2,	"%d %d",	{0,0} },
@@ -871,11 +901,29 @@ static struct {
 	{ VJ_EVENT_UNLOAD_PLUGIN,	"Unload a plugin from disk",	vj_event_unload_plugin, 1, "%s", {0,0}},
 	{ VJ_EVENT_GET_FRAME,		"Send a frame to the client",	vj_event_send_frame, 0,NULL, {0,0}},
 #ifdef HAVE_SDL
-	{ VJ_EVENT_FULLSCREEN,		"Fullscreen video toggle",		vj_event_fullscreen,	0, NULL , {0,0}},
+	{ VJ_EVENT_FULLSCREEN,		"Fullscreen video toggle",		vj_event_fullscreen,	1, "%d" , {0,0}},
 #endif
 	{ 0,NULL,0,0,NULL,{0,0}},
 };
-	
+
+
+#define FORMAT_MSG(dst,str) sprintf(dst,"%03d%s",strlen(str),str)
+
+#define APPEND_MSG(dst,str) strncat(dst,str,strlen(str))
+
+#define SEND_MSG_DEBUG(v,str) veejay_msg(VEEJAY_MSG_INFO, "[%d][%s]",strlen(str),str)
+
+
+
+#define SEND_MSG(v,str)\
+{\
+vj_server_send(v->vjs[0], v->uc->current_link, str, strlen(str));\
+}
+
+#define RAW_SEND_MSG(v,str,len)\
+{\
+vj_server_send(v->vjs[0],v->uc->current_link, str, len );\
+}	
 	
 static inline hash_val_t int_bundle_hash(const void *key)
 {
@@ -895,7 +943,7 @@ typedef struct {
 } vj_msg_bundle;
 
 /* forward declarations (former console clip/tag print info) */
-
+#define CLAMPVAL(a) { if(a<0)a=0; else if(a >255) a =255; }
 void vj_event_print_plain_info(void *ptr, int x);
 void vj_event_print_clip_info(veejay_t *v, int id); 
 void vj_event_print_tag_info(veejay_t *v, int id); 
@@ -944,7 +992,6 @@ void	vj_event_init(void);
 #define CURRENT_CLIP(v,s) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_CLIPS) && clip_exists(s))
 #define CURRENT_TAG(v,t) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_TAG) && vj_tag_exists(t))
 */
-
 int	vj_has_video(veejay_t *v)
 {
 	if(v->edit_list->num_video_files <= 0 )
@@ -956,6 +1003,7 @@ int vj_event_bundle_update( vj_msg_bundle *bundle, int bundle_id )
 {
 	if(bundle) {
 		hnode_t *n = hnode_create(bundle);
+		if(!n) return 0;
 		hnode_put( n, (void*) bundle_id);
 		hnode_destroy(n);
 		return 1;
@@ -970,32 +1018,39 @@ vj_msg_bundle *vj_event_bundle_get(int event_id)
 	if(n) 
 	{
 		m = (vj_msg_bundle*) hnode_get(n);
-		if(m) return m;
+		if(m)
+		{
+			return m;
+		}
 	}
 	return NULL;
 }
 
 int vj_event_bundle_exists(int event_id)
 {
+	hnode_t *n = hash_lookup( BundleHash, (void*) event_id );
+	if(!n)
+		return 0;
 	return ( vj_event_bundle_get(event_id) == NULL ? 0 : 1);
 }
 
 int vj_event_suggest_bundle_id(void)
 {
 	int i;
-	for(i=5000 ; i < 6000; i++)
+	for(i=5001 ; i < 5499; i++)
 	{
 		if ( vj_event_bundle_exists(i ) == 0 ) return i;
 	}
+
 	return -1;
 }
 
 int vj_event_bundle_store( vj_msg_bundle *m )
 {
 	hnode_t *n;
-	if(!m) return -1;
+	if(!m) return 0;
 	n = hnode_create(m);
-	if(!n) return -1;
+	if(!n) return 0;
 	if(!vj_event_bundle_exists(m->event_id))
 	{
 		hash_insert( BundleHash, n, (void*) m->event_id);
@@ -1003,21 +1058,34 @@ int vj_event_bundle_store( vj_msg_bundle *m )
 	else
 	{
 		hnode_put( n, (void*) m->event_id);
+		hnode_destroy( n );
 	}
-	return 0;
+	return 1;
 }
 int vj_event_bundle_del( int event_id )
 {
 	hnode_t *n;
 	vj_msg_bundle *m = vj_event_bundle_get( event_id );
 	if(!m) return -1;
-	n = hash_lookup( BundleHash , (void*) event_id);
-	if(n)
-	{
-		hash_delete( BundleHash, n );
-		return 0;
-	}
-	return -1;
+
+	n = hash_lookup( BundleHash, (void*) event_id );
+	if(!n)
+		return -1;
+
+	// large fixme: redefine all keys
+#ifdef HAVE_SDL
+	unregister_bundle_as_key( m->accelerator, 3 );
+#endif	
+
+	if( m->bundle )
+		free(m->bundle);
+	if(m)
+		free(m);
+	m = NULL;
+
+	hash_delete( BundleHash, n );
+
+	return 0;
 }
 
 vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id)
@@ -1037,9 +1105,11 @@ vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id)
 		veejay_msg(VEEJAY_MSG_ERROR, "Error allocating memory for bundled message");
 		return NULL;
 	}
+	memset(m, 0, sizeof(m) );
 	m->bundle = (char*) malloc(sizeof(char) * len+1);
 	bzero(m->bundle, len+1);
-	if(!m)
+	m->accelerator = 0;
+	if(!m->bundle)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Error allocating memory for bundled message context");
 		return NULL;
@@ -1047,7 +1117,13 @@ vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id)
 	strncpy(m->bundle, bundle_msg, len);
 	
 	m->event_id = event_id;
-	veejay_msg(VEEJAY_MSG_DEBUG, "VIMS bundle:[%d] [%s]", event_id,bundle_msg); 
+
+	veejay_msg(VEEJAY_MSG_DEBUG, 
+		"New Event %d [%s]",
+			event_id, m->bundle );
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"\tKey %d (SHIFT)",
+		m->accelerator );
 
 	return m;
 }
@@ -1178,7 +1254,6 @@ void vj_event_parse_bundle(veejay_t *v, char *msg ) {
 					atomic_msg[ (found_end_of_msg-offset) ] ='\0';
 					offset += j + 1;
 					j = 0;
-					//veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) Atomic message [%s]", atomic_msg);
 					vj_event_parse_msg( v, atomic_msg );
 				}
 				j++;
@@ -1251,17 +1326,11 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 		return;
 	}	
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "str arg = %s, format [1] = %c",
-		str_arg, vj_event_list[id].format[1]);
-	if( str_arg != NULL && vj_event_list[id].format[1] == 's' )
+	if( str_arg != NULL && (vj_event_list[id].format[1] == 's') )
 	{
 		char *str = strdup( str_arg);
 
 		_last_known_num_args = vj_event_list[id].num_params;
-
-	    veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) Network %04d: [%s] [%d][%d][%d][%d] ...",
-			net_id, vj_event_list[id].name, str_arg, argument_list[0],argument_list[1],
-					argument_list[2],argument_list[3]);
 
 		vj_event_trigger_function(
 			(void*) v,
@@ -1348,6 +1417,8 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 	char args[150];
 	int net_id=0;
 	int len = 0;
+	char *bun_msg= NULL;
+	int special = 0;
 	bzero(args,150);  
 	/* message is at least 5 bytes in length */
 	if( msg == NULL || strlen(msg) < MSG_MIN_LEN)
@@ -1381,6 +1452,12 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 		veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Unexpected character '%c' must be ':' to indicate start of argument list ",
 			msg[3]);
 		return;
+	}
+
+	if( net_id == NET_ADD_BUNDLE )
+	{
+		special = 1;
+		veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Special message (like plugin) for handling blobs of text");
 	}
 	
 	if( net_id == NET_CMD_PLUGIN )
@@ -1470,9 +1547,7 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 		max_param = vj_event_list[id].num_params;
 
 		memset(dargs,0,16);
-		strcpy(args,msg+4);
-
-		veejay_msg(VEEJAY_MSG_DEBUG, "msg = [%s], strlen = %d", msg, strlen(msg));
+		strcpy(args,msg+4);  // hmmm
 
 		if(vj_event_list[id].format != NULL )
 		{
@@ -1481,8 +1556,6 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 			int nl = 1;
 			int n_offset =0;
 			int m_len = strlen(args);
-			veejay_msg(VEEJAY_MSG_DEBUG, "Message len : %d, contents[%s]",
-				m_len, args );
 			for( ni = 0; ni < np; ni ++ )
 			{
 				if( m_len < n_offset )
@@ -1493,18 +1566,31 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 
 				if( vj_event_list[id].format[nl] == 's')
 				{
-					if( sscanf( args+n_offset, "%s", dstr ) )
+					if(special && ni == 1)
 					{
-						n_offset += strlen(dstr) + 1;
-						dargs[ni] = 0;
+						// only BUNDLE_ADD is special (what a crappy code is this)
+						// find end of bundle 
+						strncpy( dstr, args + n_offset, 512 );
+						veejay_msg(VEEJAY_MSG_DEBUG, "parsed bundle str [%s]", dstr);
 						with_str = 1;
+						dargs[ni] = 0;
 					}
 					else
 					{
-						veejay_msg(VEEJAY_MSG_ERROR, "Expected string for argument %d but got something else", ni);
-						return;
+						if( sscanf( args+n_offset, "%s", dstr ) )
+						{
+							n_offset += strlen(dstr) + 1;
+							dargs[ni] = 0;
+							with_str = 1;
+						}
+						else
+						{
+							veejay_msg(VEEJAY_MSG_ERROR, "Expected string for argument %d but got something else", ni);
+							return;
+						}
 					}
 				}
+
 				if( vj_event_list[id].format[nl] == 'd')
 				{
 					if( sscanf( args+n_offset, "%d", &dargs[ni]) )
@@ -1512,11 +1598,7 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 						char tmp_dec[10];
 						bzero(tmp_dec,10);
 						snprintf(tmp_dec, 10, "%d", dargs[ni]);
-						veejay_msg(VEEJAY_MSG_DEBUG, "start of token[%s]", args+n_offset);
 						n_offset += strlen(tmp_dec)+1;
-						veejay_msg(VEEJAY_MSG_DEBUG, "Num %d = %d", ni, dargs[ni]);
-						veejay_msg(VEEJAY_MSG_DEBUG, "n_offset + %d, len = %d",
-							n_offset, strlen(tmp_dec)+1);
 					}
 					else
 					{
@@ -1530,11 +1612,6 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 		}
 		for( p = n; p < 16; p ++ )
 			dargs[p] = 0;
-
-		veejay_msg(VEEJAY_MSG_DEBUG, "[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d],[%d]",
-			dargs[0],dargs[1],dargs[2],dargs[3],dargs[4],dargs[5],
-			dargs[6],dargs[7],dargs[8],dargs[9],dargs[10],dargs[11],
-			dargs[12],dargs[13],dargs[14]);
 
 		_last_known_num_args = n;
 
@@ -1553,12 +1630,15 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 
 		if ( with_str )
 		{
+			veejay_msg(VEEJAY_MSG_DEBUG,
+				"arg %d, %d, [%s]",dargs[0],dargs[1],dstr );
 			vj_event_trigger_function(
 			(void*)v,
 			net_list[ net_id ].act,
 			max_param,
 			vj_event_list[id].format,
 			dstr,
+			dargs[0],
 			dargs[1],
 			dargs[2],
 			dargs[3],
@@ -1572,7 +1652,7 @@ void vj_event_parse_msg(veejay_t *v, char *msg)
 			dargs[11],
 			dargs[12],
 			dargs[13],
-			dargs[14],
+			dargs[14],	
 			dargs[15]
 		) ;	
 
@@ -1811,17 +1891,18 @@ void vj_event_xml_new_keyb_event( xmlDocPtr doc, xmlNodePtr cur )
 			vj_msg_bundle *m = vj_event_bundle_new( msg, event_id);
 			if(m)
 			{
-				vj_event_bundle_store(m);
-#ifdef HAVE_SDL
-				sdl_parameter[key] = event_id;
-				if( key != -1 && key_mode != -1)
+				if(vj_event_bundle_store(m))
 				{
-					if( register_new_bundle_as_key( key, key_mode ))
+#ifdef HAVE_SDL
+					sdl_parameter[key] = event_id;
+					if( key != -1 && key_mode != -1)
 					{
-						veejay_msg(VEEJAY_MSG_INFO, "Attached key %d to Bundle %d ", key,event_id);
+						if( register_new_bundle_as_key( key, key_mode ))
+								veejay_msg(VEEJAY_MSG_INFO, "Attached key %d to Bundle %d ", key,event_id);
 					}
-				}
 #endif
+					veejay_msg(VEEJAY_MSG_DEBUG, "Created new Bundle %d",event_id );
+				}
 			}
 			else
 			{
@@ -1868,7 +1949,6 @@ int vj_event_register_keyb_event(int event_id, int event_entry)
 				sdl_normal[ j ].act = vj_event_list[event_entry].function;
 				sdl_normal[ j ].list_id = event_entry;
 			}	
-			//veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) Registered SDL keybinding '%s'",vj_event_list[event_entry].name);
 			return 1;
 		}
 	}
@@ -1899,6 +1979,26 @@ static void vj_event_get_key( int event_id, int *key_id, int *key_mod )
 	
 	*key_id  = -1;
 	*key_mod = -1;
+}
+
+void	vj_event_unset_sdl_key( int sdl_key, int modifier )
+{
+	switch(modifier)
+	{
+		case 0:
+			sdl_normal[ sdl_key].act= vj_event_none;
+			sdl_normal[ sdl_key].list_id = 0;
+			break;
+		case 1: sdl_ctrl[ sdl_key ].act = vj_event_none;
+			sdl_ctrl[ sdl_key ].list_id = 0;
+			break;
+		case 2: sdl_alt[ sdl_key ].act = vj_event_none;
+			sdl_alt[ sdl_key ].list_id = 0;
+			break;
+		case 3: sdl_shift[ sdl_key ].act = vj_event_none;
+			sdl_shift[ sdl_key ].list_id = 0;
+			break;
+	}
 }
 
 void vj_event_set_new_sdl_key(int event_entry,int sdl_key, int modifier)
@@ -1936,14 +2036,23 @@ int vj_event_register_network_event(int event_id, int event_entry)
 		{
 			net_list[ vj_event_remote_list[i].internal_msg_id ].act = vj_event_list[event_entry].function;
 			net_list[ vj_event_remote_list[i].internal_msg_id ].list_id = event_entry;
-			//veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) Registered Network event '%s'",vj_event_list[event_entry].name);
 			return 1;
 		}
 	}
 	return 0;
 }
-	
 #ifdef HAVE_SDL
+int unregister_bundle_as_key(int sdl_key, int modifier)
+{
+	if( sdl_key > 0 && sdl_key <= MAX_SDL_KEY && modifier >=0 && modifier <= 3)
+	{
+		vj_event_unset_sdl_key( sdl_key,modifier );
+
+		return 1;
+	}
+	return 0;
+}
+	
 int register_new_bundle_as_key(int sdl_key, int modifier) 
 {
 
@@ -2024,7 +2133,6 @@ void vj_event_init()
 	veejay_msg(VEEJAY_MSG_INFO, "(VIMS) Registered %d Network Events",net_events);
 	veejay_msg(VEEJAY_MSG_INFO, "(VIMS) Registered %d Keyboard Events",keyb_events);
 //	vj_event_dump();
-	
 	if( !(BundleHash = hash_create(HASHCOUNT_T_MAX, int_bundle_compare, int_bundle_hash)))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize hashtable for message bundles");
@@ -2273,12 +2381,90 @@ void	vj_event_format_xml_bundle( xmlNodePtr node, int event_id )
 }
 #endif
 
+void	vj_event_set_rgb_parameter_type(void *ptr, const char format[], va_list ap)
+{	
+	veejay_t  *v = (veejay_t*) ptr;
+	int args[2];
+	char *s = NULL;
+	P_A(args,s,format,ap);
+	if(args[0] >= 0 && args[0] < 3 )
+	{
+		rgb_parameter_conversion_type_ = args[0];
+		if(args[0] == 0)
+			veejay_msg(VEEJAY_MSG_INFO,"GIMP's RGB -> YUV");
+		if(args[1] == 1)
+			veejay_msg(VEEJAY_MSG_INFO,"CCIR601 RGB -> YUV");
+		if(args[2] == 2)
+			veejay_msg(VEEJAY_MSG_INFO,"Broken RGB -> YUV");
+	}
+
+}
+
 void vj_event_effect_set_bg(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	v->uc->take_bg = 1;
 	veejay_msg(VEEJAY_MSG_INFO, "Next frame will be taken for static background\n");
 }
+
+void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	vj_msg_bundle *m;
+	int i;
+
+	int len = 0;
+
+	for( i = 5001; i < 5499; i ++ )
+	{
+		if( vj_event_bundle_exists(i))
+		{
+			m = vj_event_bundle_get( i );
+			if(m)
+			{
+				//veejay_msg(VEEJAY_MSG_DEBUG,"Event ID [%d] %d : [%s]",
+				//	i,strlen(m->bundle), m->bundle );
+				len += strlen( m->bundle );
+				len += 15;
+			}
+		}
+	}
+
+	if(len > 0)
+	{
+		char *buf = (char*) vj_malloc(sizeof(char) * (len+4) );
+		bzero(buf, len+4 );
+		sprintf(buf, "%04d", len ); 
+		for( i = 5001; i < 5499; i ++ )
+		{
+			if( vj_event_bundle_exists(i))
+			{
+				m = vj_event_bundle_get( i );
+				if(m)
+				{
+					int key_id = 0;
+					int key_mod = 0;
+	
+					char tmp[14];
+					bzero(tmp,14);
+					vj_event_get_key( i, &key_id, &key_mod );
+	
+					sprintf(tmp, "%04d%03d%03d%04d",
+						i,key_id,key_mod, strlen( m->bundle ) );
+					strncat( buf, tmp, 14 );
+					strncat( buf, m->bundle, strlen(m->bundle) );
+				}
+			}
+		}
+		SEND_MSG(v,buf);
+	}	
+	else
+	{
+		const char *buf = "0000";
+		SEND_MSG(v,buf);
+	}
+}
+
 #ifdef HAVE_XML2
 void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 {
@@ -2296,7 +2482,7 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 	xmlDocSetRootElement( doc, rootnode );
 	
 	// iterate trough bundles and stoer
-	for( i = 5000; i < 6000; i++)
+	for( i = 5001; i < 5499; i++)
 	{
 		if( vj_event_bundle_exists(i))	
 		{
@@ -2560,58 +2746,81 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
 	const char *caption = "Veejay";
-	if(v->settings->full_screen)
-		v->settings->full_screen = 0;
-	else
-		v->settings->full_screen = 1;
+	int args[2];
+	char *s = NULL;
+	P_A(args,s,format,ap);
+	// parsed display num!! -> index of SDL array
 
-	vj_sdl_free(v->sdl);
-	vj_sdl_init(v->sdl, v->edit_list->video_width, v->edit_list->video_height, caption, 1, v->settings->full_screen);
+	//int id = args[0];
+	int id = 0;
+	int status = args[0];
 
-	veejay_msg(VEEJAY_MSG_INFO,"Video screen is %s", (v->settings->full_screen ? "full screen" : "windowed"));
+	if( status < 0 || status > 1 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid argument passed to FULLSCREEN");
+		return;
+	}
+	
+	if( status != v->settings->full_screen[id] )
+	{
+		v->settings->full_screen[id] = status;
+
+		vj_sdl_free(v->sdl[id]);
+		vj_sdl_init(v->sdl[id],
+			v->edit_list->video_width,
+			v->edit_list->video_height,
+			caption,
+			1,
+			v->settings->full_screen[id]
+		);
+	}
+	veejay_msg(VEEJAY_MSG_INFO,"Video screen is %s", (v->settings->full_screen[id] ? "full screen" : "windowed"));
+	
 }
 
 void vj_event_set_screen_size(void *ptr, const char format[], va_list ap) 
 {
-	int args[2];
+	int args[5];
 	veejay_t *v = (veejay_t*) ptr;
 	char *s = NULL;
 	P_A(args,s,format,ap);
 
-	if( args[0] > 0 && args[1] > 0 && args[0] < 4096 && args[1] < 4096 ) 
+	int id = 0;
+	int w  = args[0];
+	int h  = args[1];
+        int x  = args[2];
+        int y  = args[3];
+
+	// multiple sdl screen needs fixing
+	const char *title = "Veejay";
+	
+	if( w < 0 || w > 4096 || h < 0 || h > 4096 || x < 0 || y < 0 )
 	{
-		const char *title = "Veejay";
-		if(v->video_out == 0 || v->video_out == 2)
-		{
-			vj_sdl_free(v->sdl);
-					vj_sdl_init(v->sdl,args[0],args[1],title, 1, v->settings->full_screen);
-			veejay_msg(VEEJAY_MSG_INFO, "Resized SDL screen to %d x %d (video is %ld x %ld)",
-				args[0],args[1],v->edit_list->video_width,v->edit_list->video_height);
-			if(args[2] > 0 && args[3] > 0)
-				vj_sdl_set_geometry(v->sdl,args[2],args[3]);
-
-		}
-		if(v->gui_screen == 1)
-		{
-			vj_sdl_free(v->sdl_gui);
-			if(windowID != 0)
-			{
-				char env[100]; 
-				sprintf(env,"SDL_WINDOWID=%ld",windowID);
-				putenv(env);
-				veejay_msg(VEEJAY_MSG_INFO, "Using GUI's Window ID %ld",windowID);	
-			}
-
-			vj_sdl_init(v->sdl_gui,args[0],args[1],title,1, 0);
-			veejay_msg(VEEJAY_MSG_INFO,"Resized GUI SDL screen to %d x %d (video is %ld x %ld)",
-				args[0],args[1],v->edit_list->video_width,v->edit_list->video_height);
-		}
-
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid parameters");
+		return;
 	}
-	else
+
+	if( v->sdl[id] )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"%s %dx%d", vj_event_err(VJ_ERROR_DIMEN) ,args[0],args[1]);
+		veejay_msg(VEEJAY_MSG_DEBUG, "Free existing ID %d", id );
+		vj_sdl_free( v->sdl[id] );
+		free(v->sdl[id]);
+		v->sdl[id] = NULL;
 	}
+
+	if(v->sdl[id]==NULL)	
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Allocate screen %d: %d x %d", id, v->video_output_width,
+				v->video_output_height );
+		v->sdl[id] = vj_sdl_allocate( v->video_output_width,
+					      v->video_output_height,
+					      v->pixel_format );
+	}
+
+	vj_sdl_init( v->sdl[id],w, h, title, 1, v->settings->full_screen[id] );
+	if(x > 0 && y > 0 )
+		vj_sdl_set_geometry(v->sdl[id],x,y);
+
 }
 #endif
 
@@ -2942,35 +3151,28 @@ void vj_event_clip_set_marker_start(void *ptr, const char format[], va_list ap)
 	
 	if( args[0] == 0) 
 	{
-		args[0] = v->uc->clip_id;
+		if(CLIP_PLAYING(v))
+			args[0] = v->uc->clip_id;
 	}
 
 	if(args[0] == -1) args[0] = clip_size()-1;
 
 	if( clip_exists(args[0]) )
 	{
-		if ( args[1] == 0 ) args[1] = s->current_frame_num;
-
-		if ( args[1] >= clip_get_startFrame(args[0]) && args[1] <= clip_get_endFrame(args[0]))
-		{
+		int start = 0; int end = 0;
+		if ( clip_get_el_position( args[0], &start, &end ) )
+		{	// marker in relative positions given !
+			args[1] += start; // add sample's start position
 			if( clip_set_marker_start( args[0], args[1] ) )
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Clip %d marker starting position at %d", args[0],args[1]);
 			}
 			else
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker position %d for clip %d",args[1],args[0]);
+				veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker position %d for clip %d (limits are %d - %d)",args[1],args[0],start,end);
 			}
 		}
-		else 
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Marker position out side of clip boundaries");
-		}
 	}	
-	else 
-	{
-		p_no_clip(args[0]);
-	}
 }
 
 
@@ -2984,28 +3186,26 @@ void vj_event_clip_set_marker_end(void *ptr, const char format[], va_list ap)
 	
 	if( args[0] == 0 ) 
 	{
-		args[0] = v->uc->clip_id;
+		if(CLIP_PLAYING(v))
+			args[0] = v->uc->clip_id;
 	}
 	if(args[0] == -1) args[0] = clip_size()-1;
 
 	if( clip_exists(args[0]) )
 	{
-		if ( args[1] == 0 ) args[1] = s->current_frame_num;
-		if ( args[1] >= clip_get_startFrame(args[0]) && args[1] <= clip_get_endFrame(args[0]))
+		int start = 0; int end = 0;
+		if ( clip_get_el_position( args[0], &start, &end ) )
 		{
+			args[1] = end - args[1]; // add sample's ending position
 			if( clip_set_marker_end( args[0], args[1] ) )
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Clip %d marker ending position at position %d", args[0],args[1]);
 			}
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Marker position out side of clip boundaries");
-		}
-	}	
-	else 
-	{
-		p_no_clip(args[0]);
+			else
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "Marker position out side of clip boundaries");
+			}
+		}	
 	}
 }
 
@@ -3019,25 +3219,29 @@ void vj_event_clip_set_marker(void *ptr, const char format[], va_list ap)
 	
 	if( args[0] == 0) 
 	{
-		args[0] = v->uc->clip_id;
+		if(CLIP_PLAYING(v))
+			args[0] = v->uc->clip_id;
 	}
 	if(args[0] == -1) args[0] = clip_size()-1;
 
 	if( clip_exists(args[0]) )
 	{
-		if( clip_set_marker( args[0], args[1],args[2] ) )
+		int start = 0;
+		int end = 0;
+		if( clip_get_el_position( args[0], &start, &end ) )
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Clip %d marker starting position at %d, ending position at %d", args[0],args[1],args[2]);
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker %d-%d for clip %d",args[1],args[2],args[0]);
+			args[1] += start;
+			args[2] = end - args[2];
+			if( clip_set_marker( args[0], args[1],args[2] ) )
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "Clip %d marker starting position at %d, ending position at %d", args[0],args[1],args[2]);
+			}
+			else
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker %d-%d for clip %d",args[1],args[2],args[0]);
+			}
 		}
 	}	
-	else
-	{
-		p_no_clip(args[0]);
-	}
 }
 
 
@@ -3050,7 +3254,8 @@ void vj_event_clip_set_marker_clear(void *ptr, const char format[],va_list ap)
 	
 	if( args[0] == 0) 
 	{
-		args[0] = v->uc->clip_id;
+		if(CLIP_PLAYING(v))
+			args[0] = v->uc->clip_id;
 	}
 	if(args[0] == -1) args[0] = clip_size()-1;
 
@@ -3065,11 +3270,6 @@ void vj_event_clip_set_marker_clear(void *ptr, const char format[],va_list ap)
 			veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker %d-%d for clip %d",args[1],args[2],args[0]);
 		}
 	}	
-	else
-	{
-		p_no_clip(args[0]);
-	}
-	
 }
 
 void vj_event_clip_set_dup(void *ptr, const char format[], va_list ap)
@@ -3110,6 +3310,22 @@ void vj_event_clip_set_dup(void *ptr, const char format[], va_list ap)
 	}
 }
 
+void	vj_event_tag_set_descr( void *ptr, const char format[], va_list ap)
+{
+	char str[TAG_MAX_DESCR_LEN];
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	P_A2ndStr(args,str,format,ap,1);
+	if(args[0] == 0 && TAG_PLAYING(v))
+	{
+		args[0] = v->uc->clip_id;
+	}
+	if(args[0] == -1)
+		args[0] = vj_tag_size()-1;
+	if( vj_tag_set_description(args[0],str) == 1)
+		veejay_msg(VEEJAY_MSG_INFO, "Streamd %d description [%s]", args[0], str );
+}
+
 
 void vj_event_clip_set_descr(void *ptr, const char format[], va_list ap)
 {
@@ -3118,7 +3334,7 @@ void vj_event_clip_set_descr(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 	P_A2ndStr(args,str,format,ap,1);
 
-	if( args[0] == 0 ) 
+	if( args[0] == 0 && CLIP_PLAYING(v)) 
 	{
 		args[0] = v->uc->clip_id;
 	}
@@ -3177,11 +3393,11 @@ void 	vj_event_clip_ren_start			( 	void *ptr, 	const char format[], 	va_list ap	
 	int entry;
 	int s1;
 	int n;
-	int l; 
-	int changed = 0;
 	char tmp[255];
+	char prefix[150];
 	P_A( args,str, format, ap );
-
+	bzero(tmp,255);
+	bzero(prefix,150);
 	s1 = args[0];
 	entry = args[1];
 	if(entry < 0 || entry > CLIP_MAX_RENDER)
@@ -3211,47 +3427,95 @@ void 	vj_event_clip_ren_start			( 	void *ptr, 	const char format[], 	va_list ap	
 		return;
 	}	
 
-	n = clip_get_speed( s1 );
-	if( n <= 0) 
+	clip_get_description( s1, prefix );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Prefix for filename [%s]",prefix);
+	if(!veejay_create_temp_file(prefix, tmp))
 	{
-		if(n == 0) n = 1; else n = n * -1;
-		changed = 1;
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot create file %s",
+			tmp);
+		return;
 	}
-	l = clip_get_longest( s1 );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Filename [%s]", tmp );
 
-	sprintf(tmp, "clip-%d-%d-XXXXXX", s1,l);
 
-	if( mkstemp( tmp ) != -1 ) 
+	int fformat = _recorder_format;
+	if(fformat==-1)
 	{
-		int format = _recorder_format;
-		if(format==-1)
+		veejay_msg(VEEJAY_MSG_ERROR,"Set a destination video format first");
+		return; 
+	}
+	// wrong format
+	if(! veejay_prep_el( v, s1 ))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize render editlist");
+		return;
+	}
+
+	int nf = clip_get_endFrame( s1 ) - clip_get_startFrame( s1 );
+	nf = nf / clip_get_speed(s1);
+	if( clip_get_looptype(s1) == 2 )
+		nf *= 2;
+
+	if( clip_init_encoder( s1, tmp, fformat, v->edit_list, nf) == 1)
+	{
+		video_playback_setup *s = v->settings;
+		s->clip_record_id = v->uc->clip_id;
+		s->render_list = entry;
+		veejay_msg(VEEJAY_MSG_INFO, "Rendering clip to render list entry %d", 
+			entry );
+	}
+	
+}
+
+void	vj_event_clip_move_render		( 	void *ptr,	const char format[],	va_list ap )
+{
+
+	int args[2];
+	char *str = NULL;
+	editlist **el;
+	veejay_t *v = (veejay_t*) ptr;
+	P_A(args,str,format,ap);
+
+	int sample_id = args[0];
+	int entry = args[1];
+
+	if(CLIP_PLAYING(v))
+	{
+		if(sample_id==0) sample_id = v->uc->clip_id;
+		if(sample_id==-1) sample_id = clip_size()-1;
+	}
+
+	if(clip_exists(sample_id))
+	{
+		el = (editlist**) clip_get_user_data(sample_id);
+		if(el==NULL)
 		{
-			veejay_msg(VEEJAY_MSG_ERROR,"Set a destination video format first");
-			return; 
-		}
-		// wrong format
-		if(! veejay_prep_el( v, s1 ))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize render editlist");
+			veejay_msg(VEEJAY_MSG_ERROR, "Nothing rendered yet");
 			return;
 		}
-		if( clip_init_encoder( s1, tmp, format, v->edit_list, l) == 1)
+		editlist *elentry = el[entry];
+		if(elentry)
 		{
-			video_playback_setup *s = v->settings;
-			s->clip_record_id = v->uc->clip_id;
-			s->render_list = entry;
-			veejay_msg(VEEJAY_MSG_INFO, "Rendering clip to render list entry %d", 
-				entry );
+			char *filename = strdup( elentry->video_file_list[0] );
+			//vj_el_append_video_file( v->edit_list, filename);
+			if( veejay_edit_addmovie(
+				v,filename,0,0,v->edit_list->video_frames - 1))
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "Moved history entry %d to EDL", entry );
+
+			}		
+			vj_el_free( elentry );
 		}
 	}
+
 }
+
 void	vj_event_clip_sel_render		(	void *ptr,	const char format[],	va_list ap  )
 {
 	int args[2];
 	int entry;
 	int s1;
 	char *str = NULL;
-	void *data;
 	editlist **el;
 	veejay_t *v = (veejay_t*) ptr;
 	P_A(args,str,format,ap);
@@ -3281,8 +3545,12 @@ void	vj_event_clip_sel_render		(	void *ptr,	const char format[],	va_list ap  )
 	}
 
 	// check if entry is playable
-	data = clip_get_user_data( s1 );
-	el = (editlist**) data;
+	el = (editlist**) clip_get_user_data( s1 );
+	if( el == NULL )
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Nothing rendered yet for sample %d", s1 );
+		return;
+	}
 
 	if(el[entry])  
 	{
@@ -3293,7 +3561,7 @@ void	vj_event_clip_sel_render		(	void *ptr,	const char format[],	va_list ap  )
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_INFO,"Render entry %d is empty", s1);
+		veejay_msg(VEEJAY_MSG_INFO,"Render entry %d is empty", entry);
 	}
 
 }
@@ -3307,7 +3575,7 @@ void vj_event_clip_rec_start( void *ptr, const char format[], va_list ap)
 	int changed = 0;
 	int result = 0;
 	char *str = NULL;
-	char prefix[20];
+	char prefix[150];
 	P_A(args,str,format,ap);
 
 	if(!CLIP_PLAYING(v)) 
@@ -3317,7 +3585,9 @@ void vj_event_clip_rec_start( void *ptr, const char format[], va_list ap)
 	}
 
 	char tmp[255];
-	sprintf(prefix, "clip-%04d", v->uc->clip_id);
+	bzero(tmp,255);
+	bzero(prefix,150);
+	clip_get_description(v->uc->clip_id, prefix );
 	if(!veejay_create_temp_file(prefix, tmp))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot create file %s",
@@ -3637,7 +3907,13 @@ void vj_event_clip_copy(void *ptr, const char format[] , va_list ap)
 	char *s = NULL;
 	P_A(args,s,format,ap);
 
-	if(CLIP_PLAYING(v)) 
+	if(CLIP_PLAYING(v))
+	{
+		if( args[0] == 0 ) args[0] = v->uc->clip_id;
+		if( args[0] == -1) args[0] = clip_size()-1;
+	}
+
+	if( clip_exists(args[0] ))
 	{
 		int new_clip = clip_copy(args[0]);
 		if(new_clip)
@@ -3648,10 +3924,6 @@ void vj_event_clip_copy(void *ptr, const char format[] , va_list ap)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Failed to copy clip %d.",args[0]);
 		}
-	}
-	else
-	{
-		p_invalid_mode();
 	}
 }
 
@@ -4547,7 +4819,7 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 		vj_tag_set_chain_channel(v->uc->clip_id,entry,cha);
 		if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
 
-		vj_tag_get_description(cha, description);
+		vj_tag_get_descriptive(cha, description);
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses channel %d (%s)", entry, cha,description);
 	} 
 }
@@ -4762,7 +5034,7 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 			vj_tag_set_chain_source( v->uc->clip_id, entry, src);
 		}
 		vj_tag_set_chain_channel( v->uc->clip_id, entry, cha );
-		vj_tag_get_description( cha, description);
+		vj_tag_get_descriptive( cha, description);
 
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses Stream %d (%s)",entry,cha,description);
 		if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
@@ -4873,7 +5145,7 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 		}
 
 		vj_tag_set_chain_channel( v->uc->clip_id, entry, cha );
-		vj_tag_get_description( cha, description);
+		vj_tag_get_descriptive( cha, description);
 		if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
 
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses Stream %d (%s)",entry,
@@ -5283,14 +5555,13 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_WARNING, "Pasting frames to the Edit List affects your clips!");
 
 
-		if( args[0] >= 1 && args[0] <= v->edit_list->video_frames-1)
+		if( args[0] >= 0 && args[0] <= v->edit_list->video_frames-1)
 		{		
 			if( veejay_edit_paste( v, args[0] ) ) 
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Pasted buffer at frame %d",args[0]);
 			}
 		}
-
 	}
 }
 
@@ -5469,6 +5740,27 @@ void vj_event_tag_new_mcast(void *ptr, const char format[], va_list ap)
 	}
 }
 
+
+
+void vj_event_tag_new_color(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v= (veejay_t*) ptr;
+	char *str=NULL;
+	int args[4];
+	P_A(args,str,format,ap);
+
+	int i;
+	for(i = 0 ; i < 3; i ++ )
+		CLAMPVAL( args[i] );
+
+	
+	int id =  vj_tag_new( VJ_TAG_TYPE_COLOR, NULL, -1, v->edit_list,v->pixel_format, -1 );
+	if(id > 0)
+	{
+		vj_tag_set_stream_color( id, args[0],args[1],args[2] );
+	}	
+}
+
 void vj_event_tag_new_y4m(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v= (veejay_t*) ptr;
@@ -5498,6 +5790,37 @@ void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 	}
 	
 }
+// 159, 164 for white
+void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+	if(args[0]==0) args[0] = v->uc->clip_id;
+	if(args[0]==-1) args[0] = vj_tag_size()-1;
+
+	char send_msg[33];
+	char message[30];
+	bzero(send_msg, sizeof(send_msg));
+	bzero(message,sizeof(message));
+
+	if(vj_tag_exists(args[0]))
+	{
+		int values[5];
+		memset(values,0,sizeof(values));
+		if(vj_tag_get_v4l_properties( args[0], &values[0], &values[1], &values[2], &values[3],
+				&values[4]))
+		{
+			sprintf(message, "%05d%05d%05d%05d%05d",
+				values[0],values[1],values[2],values[3],values[4] );
+		}
+	}
+	FORMAT_MSG(send_msg, message);
+	SEND_MSG( v,send_msg );
+}
+
+
 void vj_event_v4l_set_contrast(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -5511,6 +5834,25 @@ void vj_event_v4l_set_contrast(void *ptr, const char format[], va_list ap)
 		if(vj_tag_set_contrast(args[0],args[1]))
 		{
 			veejay_msg(VEEJAY_MSG_INFO,"Set contrast to %d",args[1]);
+		}
+	}
+
+}
+
+
+void vj_event_v4l_set_white(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+	if(args[0]==0) args[0] = v->uc->clip_id;
+	if(args[0]==-1)args[0] = vj_tag_size()-1;
+	if(vj_tag_exists(args[0]) && TAG_PLAYING(v))
+	{
+		if(vj_tag_set_white(args[0],args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_INFO,"Set whiteness to %d",args[1]);
 		}
 	}
 
@@ -5647,7 +5989,7 @@ static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
 	}
 
 	char tmp[255];
-	char prefix[20];
+	char prefix[255];
 	if(args[0] <= 0) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Number of frames to record must be > 0");
@@ -5659,8 +6001,12 @@ static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
 		veejay_msg(VEEJAY_MSG_ERROR,"Auto play is either on or off");
 		return;
 	}	
-	sprintf(prefix,"stream-%02d", v->uc->clip_id);
-	//todo: let user set base filename for recording
+
+	char sourcename[255];	
+	bzero(sourcename,255);
+	vj_tag_get_description( v->uc->clip_id, sourcename );
+	sprintf(prefix,"%s-%02d-", sourcename, v->uc->clip_id);
+	//todo let user set base name
 	if(! veejay_create_temp_file(prefix, tmp )) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot create temporary file %s", tmp);
@@ -6165,13 +6511,14 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 	int i, y, j, value;
 	char description[100];
 	char source[150];
-
-	vj_tag_get_description(id,description);
+	char title[150];
+	vj_tag_get_descriptive(id,description);
+	vj_tag_get_description(id, title);
 	vj_tag_get_source_name(id, source);
 
 	if(v->settings->tag_record)
-		veejay_msg(VEEJAY_MSG_INFO, "Stream [%d]/[%d] [%s] %s recorded: %06ld frames ",
-			id,vj_tag_size()-1,description,
+		veejay_msg(VEEJAY_MSG_INFO, "Stream '%s' [%d]/[%d] [%s] %s recorded: %06ld frames ",
+			title,id,vj_tag_size()-1,description,
 		(vj_tag_get_active(id) ? "is active" : "is not active"),
 		vj_tag_get_encoded_frames(id));
 	else
@@ -6236,8 +6583,12 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id )
 	bzero( prefix, 20);
 	bzero( blob, (50 * CLIP_MAX_EFFECTS));
    
-	if(!CLIP_PLAYING(v) && !TAG_PLAYING(v)) return;
-	
+	if(!CLIP_PLAYING(v) && !TAG_PLAYING(v)) 
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot take snapshot of Effect Chain");
+		return;
+	}
+
  	for (i = 0; i < CLIP_MAX_EFFECTS; i++)
 	{
 		y = (CLIP_PLAYING(v) ? clip_get_effect_any(id, i) : vj_tag_get_effect_any(id,i) );
@@ -6246,7 +6597,11 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id )
 			num_cmd++;
 		}
 	}
-	if(num_cmd < 0) return;
+	if(num_cmd < 0) 
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Effect Chain is empty." );           
+		return;
+	}
 
 	for (i=0; i < CLIP_MAX_EFFECTS; i++)
 	{
@@ -6283,19 +6638,29 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id )
 	sprintf(buf, "%s%s}",prefix,blob);
 	event_id = vj_event_suggest_bundle_id();
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "Bundle systems suggest ID %d", event_id );
+
 	if(event_id > 0) 
 	{
 		vj_msg_bundle *m = vj_event_bundle_new( buf, event_id);
 		if(m)
 		{
-			vj_event_bundle_store(m);
-#ifdef HAVE_SDL
-			sdl_parameter[key_id] = event_id;
-			if( register_new_bundle_as_key( key_id, 3 ))
+			if(!vj_event_bundle_store(m))
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Created Effect Template : press SHIFT - Key %d to trigger Bundle %d ", key_id,event_id);
+				veejay_msg(VEEJAY_MSG_ERROR, "Error storing Bundle %d", event_id);
+				return;
+			}
+#ifdef HAVE_SDL
+			if(key_id > 0 )
+			{
+				sdl_parameter[key_id] = event_id;
+				if( register_new_bundle_as_key( key_id, 3 ))
+				{
+					veejay_msg(VEEJAY_MSG_INFO, "press SHIFT - Key %d to trigger Bundle %d ", key_id,event_id);
+				}
 			}
 #endif
+			veejay_msg(VEEJAY_MSG_INFO, "Created Effect Chain Template.");
 		}
 		else
 		{
@@ -6316,6 +6681,7 @@ void vj_event_print_clip_info(veejay_t *v, int id)
 	long value;
 	char timecode[15];
 	char curtime[15];
+	char cliptitle[200];
 	MPEG_timecode_t tc;
 	int start = clip_get_startFrame( id );
 	int end = clip_get_endFrame( id );
@@ -6323,7 +6689,7 @@ void vj_event_print_clip_info(veejay_t *v, int id)
 	int len = end - start;
 
 	if(start == 0) len ++;
-		
+	bzero(cliptitle,200);	
 	mpeg_timecode(&tc, len,
  		mpeg_framerate_code(mpeg_conform_framerate(v->edit_list->video_fps)),v->edit_list->video_fps);
 	sprintf(timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
@@ -6334,10 +6700,11 @@ void vj_event_print_clip_info(veejay_t *v, int id)
 	  	v->edit_list->video_fps);
 
 	sprintf(curtime, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
+	clip_get_description( id, cliptitle );
 	veejay_msg(VEEJAY_MSG_PRINT, "\n");
 	veejay_msg(VEEJAY_MSG_INFO, 
-		"Clip [%4d]/[%4d]\t[duration: %s | %8d ]",
-		id,clip_size()-1,timecode,len);
+		"Clip '%s'[%4d]/[%4d]\t[duration: %s | %8d ]",
+		cliptitle,id,clip_size()-1,timecode,len);
 
 	if(clip_encoder_active(v->uc->clip_id))
 	{
@@ -6435,83 +6802,6 @@ void vj_event_print_info(void *ptr, const char format[], va_list ap)
 	}
 }
 
-
-#define FORMAT_MSG(dst,str) sprintf(dst,"%03d%s",strlen(str),str)
-
-#define APPEND_MSG(dst,str) strncat(dst,str,strlen(str))
-
-
-#define SEND_MSG(v,str)\
-{\
-vj_server_send(v->vjs[0], v->uc->current_link, str, strlen(str));\
-}
-
-#define RAW_SEND_MSG(v,str,len)\
-{\
-vj_server_send(v->vjs[0],v->uc->current_link, str, len );\
-}
-
-
-/*
-#define SEND_MSG(v,str) veejay_msg(VEEJAY_MSG_INFO, "[%d][%s]",strlen(str),str)\
-
-
-*/
-
-#ifdef HAVE_SDL
-void vj_event_init_gui_screen(void *ptr, const char format[], va_list ap)
-{
-	int args[2];
-	char str[100];
-	veejay_t *v = (veejay_t*) ptr;
-	P_A(args,str,format,ap);
-
-	if(v->gui_screen==1)
-	{
-	  veejay_msg(VEEJAY_MSG_ERROR,"Use this at initialization only");
-	  return;
-	}
-	else
-	{
-		char msg[100];
-		long id = 0;
-		const char *title = "Veejay";
-		id =  atol( str );
-		if(id <= 0)
-		{
-		 veejay_msg(VEEJAY_MSG_ERROR, "Invalid Window ID '%s' given",str);
-		 return;
-		}
-		veejay_msg(VEEJAY_MSG_INFO, "Using Window ID %ld",id);
-		sprintf(msg,"SDL_WINDOWID=%ld",id);
-		putenv(msg);
-
-		v->sdl_gui = (vj_sdl*) vj_sdl_allocate(
-			v->edit_list->video_width,v->edit_list->video_height, v->pixel_format);
-
-		if( !vj_sdl_init(v->sdl_gui,
-			v->edit_list->video_width,v->edit_list->video_height,title,1,0))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR,
-				"initializing SDL screen");
-			if(v->sdl_gui) vj_sdl_free(v->sdl_gui);
-			if(v->sdl_gui) free(v->sdl_gui);
-			return;
-		}	
-		v->gui_screen = 1;
-		windowID = id;
-		if(args[0]==1)
-		{
-			char send_msg[30];
-			veejay_msg(VEEJAY_MSG_INFO, "Initialized SDL screen. Informing GUI");
-			sprintf(msg, "%d %d", v->edit_list->video_width, v->edit_list->video_height); 
-			FORMAT_MSG(send_msg,msg);
-			SEND_MSG(v,send_msg);
-		}
-	}
-}
-#endif
-
 void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 {
 	int args[1];
@@ -6522,10 +6812,10 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 	
 	if(args[0]>0) start_from_tag = args[0];
 
-	if( ((vj_tag_size()-1) <= 0) || (args[0] > vj_tag_size()-1))
+	if( ((vj_tag_size()-1) <= 0) || (args[0] >= vj_tag_size()-1))
 	{
 		/* there are no tags */
-		const char *empty = "000000";
+		const char *empty = "00000";
 		veejay_msg(VEEJAY_MSG_ERROR, "No Streams (%d) or asking for non existing (%d)",
 			vj_tag_size()-1,args[0]);
 		SEND_MSG(v, empty);
@@ -6538,18 +6828,27 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 		{
 			char line[300];
 			bzero( _print_buf, n * 300 );
-
 			for(i=start_from_tag; i <= n; i++)
 			{
 				/* tag_id | source_type | source_name */
 				if(vj_tag_exists(i))
 				{	
+					vj_tag *tag = vj_tag_get(i);
 					char source_name[255];
 					char cmd[300];
 					bzero(source_name,200);bzero(cmd,255);
+					bzero(line,300);
 					vj_tag_get_description( i, source_name );
-					source_name[strlen(source_name)] = '\0';
-					sprintf(line,"%-5d%03d%s", i, strlen(source_name),source_name);
+					sprintf(line,"%05d%02d%03d%03d%03d%03d%03d%s",
+						i,
+						vj_tag_get_type(i),
+						tag->color_r,
+						tag->color_g,
+						tag->color_b,
+						tag->opacity, 
+						strlen(source_name),
+						source_name
+					);
 					sprintf(cmd, "%03d%s",strlen(line),line);
 					APPEND_MSG(_print_buf,cmd); 
 				}
@@ -6598,21 +6897,23 @@ void	vj_event_send_clip_list		(	void *ptr,	const char format[],	va_list ap	)
 			/* clip_id | description */
 			if(clip_exists(i))
 			{	
-				MPEG_timecode_t tc;
 				char description[CLIP_MAX_DESCR_LEN];
-				char timecode[20];
-				int len = clip_get_endFrame(i) - clip_get_startFrame(i);
+				int end_frame = clip_get_endFrame(i);
+				int start_frame = clip_get_startFrame(i);
 				bzero(cmd, 300);
-				mpeg_timecode(&tc,len,mpeg_framerate_code(mpeg_conform_framerate(v->edit_list->video_fps)),
-					v->edit_list->video_fps);
 
-				sprintf(timecode,"%2.2d:%2.2d:%2.2d:%2.2d",tc.h,tc.m,tc.s,tc.f);
-
+				/* format of clip:
+				 	00000 : id
+				    000000000 : start    
+                                    000000000 : end
+                                    xxx: str  : description
+				*/
 				clip_get_description( i, description );
 				
-				sprintf(cmd,"%-5d%s%03d%s",
-					i,	
-					timecode,
+				sprintf(cmd,"%05d%09d%09d%03d%s",
+					i,
+					start_frame,	
+					end_frame,
 					strlen(description),
 					description
 				);
@@ -6847,39 +7148,43 @@ void	vj_event_send_clip_history_list	(	void *ptr,	const char format[],	va_list a
 
 	if(args[0] == 0)
 	{
-		args[0] = v->uc->clip_id;
+		if(CLIP_PLAYING(v))
+			args[0] = v->uc->clip_id;
 	}
 	if(args[0] == -1) args[0] = clip_size()-1;
 
-	if(clip_exists(args[0])) {
-		clip_info *clip = clip_get(args[0]);
-		int start = clip->first_frame[0];
-		int end = clip->last_frame[0];
-		char line[20];
-		char history_list[20 * CLIP_MAX_RENDER];
-		int i;
-		bzero(history_list,(20 * CLIP_MAX_RENDER));
-		for(i=0; i < CLIP_MAX_RENDER; i++)
-		{
-			bzero(line,20);
-			if( clip->first_frame[i] != start &&
-			    clip->last_frame[i] != end)
-			{
-				sprintf( line, "%02d%08ld%08ld",i, clip->first_frame[i],clip->last_frame[i]);
-			}
+	bzero( _s_print_buf,SEND_BUF);
+	bzero( _print_buf, SEND_BUF);
+
+	if(clip_exists(args[0]))
+	{
+		int entry = 0;
+		int id = args[0];
+		clip_info *clip = clip_get( id );
+		char hisline[25];
+		
+		for( entry = 0; entry < CLIP_MAX_RENDER; entry ++ )
+		{	
+			// check if entry is playable
+			void *data = clip_get_user_data( id );
+			editlist **el = (editlist**) clip_get_user_data( id );
+			bzero(hisline,25);
+			if(el && el[entry])
+				sprintf(hisline,"%02d%010d%010d", entry, clip->first_frame[entry],  clip->last_frame[entry] );
 			else
-			{
-				sprintf( line, "%02d%08d%08d", i, 0,0);
-			}
-			strncat(history_list, line, 18);
+				sprintf(hisline,"%02d%010d%010d", entry, 0, 0 );
+			strncat( _print_buf, hisline, strlen(hisline ));
 		}
-		SEND_MSG(v, history_list);
+		sprintf( _s_print_buf, "%03d%s", strlen( _print_buf ), _print_buf );
+		SEND_MSG(v, _s_print_buf);
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Clip %d does not exists",args[0]);
+		sprintf( _s_print_buf, "%03d", 0 );
+		SEND_MSG(v, _s_print_buf);
 	}
 }
+
 void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_list ap	)
 {
 	/* send video properties */
@@ -6914,34 +7219,21 @@ void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 	int	 len = 5;
 	int	 i;
 	char	num_files[5];
-	bzero( _s_print_buf,SEND_BUF);
 
-	for( i =0; i < el->num_video_files; i ++)
+	if( el->num_video_files <= 0 )
 	{
-		len += strlen( el->video_file_list[i] ) + 15;
+		SEND_MSG( v, "00040000");
+		return;
 	}
-	char *el_msg = (char*) vj_malloc(sizeof(char) * len );
-	char *p = el_msg;
-	memset(el_msg, 0,len );
-	sprintf(num_files, "%04d:", el->num_video_files );
-	strncat(p, num_files, strlen(num_files));
-	p += strlen(num_files);
-	for( i = 0; i < el->num_video_files; i ++)
-	{
-		char tmp[150];
-		sprintf(tmp, "%03d%s %09ld:",
-			strlen(el->video_file_list[i]) + 11 ,
-			el->video_file_list[i],
-			el->num_frames[i]
-		);
-		strncat( p, tmp, strlen(tmp));
-		p += strlen(tmp);
-	}
-	sprintf( _s_print_buf, "%04d%s",strlen(el_msg), el_msg);
 
-	SEND_MSG(v,_s_print_buf);
+	bzero( _s_print_buf, SEND_BUF );
+	int b = 0;
+	int nf = 0;
+	char *msg = (char*) vj_el_write_line_ascii( v->edit_list, &b,&nf );
+	sprintf( _s_print_buf, "%04d%s", b, msg );
+	free(msg);
 
-	if(el_msg) free(el_msg);
+	SEND_MSG( v, _s_print_buf );
 }
 
 void	vj_event_send_devices			(	void *ptr,	const char format[],	va_list ap	)
@@ -7049,7 +7341,7 @@ int vj_event_load_bundles(char *bundle_file)
 				vj_msg_bundle *m = vj_event_bundle_new( event_msg, event_id );
 				if(m != NULL) 
 				{
-					if( vj_event_bundle_store(m) == 0) 
+					if( vj_event_bundle_store(m) ) 
 					{
 						veejay_msg(VEEJAY_MSG_INFO, "(VIMS) Registered a bundle as event %03d",event_id);
 					}
@@ -7087,7 +7379,6 @@ void vj_event_attach_key_to_bundle(void *ptr, const char format[], va_list ap)
 	char s[1024];
 	vj_msg_bundle *m;
 	P_A(args,s,format,ap);
-	// args[0] = custom event id, args[1] = sdl key , args[2] = sdl modifier
 	m = vj_event_bundle_get(args[0]);
 	if(m) 
 	{
@@ -7137,36 +7428,79 @@ void vj_event_bundled_msg_del(void *ptr, const char format[], va_list ap)
 void vj_event_bundled_msg_add(void *ptr, const char format[], va_list ap)
 {
 	
-	int args[1];
+	int args[2] = {0,0};
 	char s[1024];
-	P_A(args,s,format,ap);
-	if(args[0] > 5000 && args[0] < 6000)
+	bzero(s, 1024);
+	P_A2ndStr(args,s,format,ap,1);
+//	P_A(args,s,format,ap);
+	veejay_msg(VEEJAY_MSG_DEBUG, "Parse (%d %d), [%s]", args[0],args[1], s );
+
+	if(args[0] == 0)
 	{
-		if(!vj_event_bundle_exists(args[0]))
-		{
-			vj_msg_bundle *m;
-			veejay_strrep( s, '_' , ' ');
-			m = vj_event_bundle_new( s, args[0] );
-			if(m != NULL ) 
-			{
-				if( vj_event_bundle_store(m) == 0) 
-				{
-					veejay_msg(VEEJAY_MSG_INFO, "(VIMS) Registered Bundle %d in VIMS",args[0]);
-				}
-			}
-			else 
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Unable to add bundle %d to VIMS", args[0]);
-			}
-		}
-		else 
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Bundle %d already exists", args[0]);
-		}
+		args[0] = vj_event_suggest_bundle_id();
+		veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) suggested new Event id %d", args[0]);
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Events %d-%d is reserved for VIMS", 5001,5999);
+		veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) requested to add/replace %d", args[0]);
+	}
+
+	if(args[0] <= 5000 || args[0] > 5499 )
+	{
+		// invalid bundle
+		veejay_msg(VEEJAY_MSG_ERROR, "Customized events range from 5001-5499");
+	}
+	// allocate new
+	veejay_strrep( s, '_', ' ');
+	vj_msg_bundle *m = vj_event_bundle_new(s, args[0]);
+	if(!m)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Error adding bundle ?!");
+		return;
+	}
+
+	// bye existing bundle
+	if( vj_event_bundle_exists(args[0]))
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG,"(VIMS) Bundle exists - replace ");
+		vj_event_bundle_del( args[0] );
+	}
+
+	if( vj_event_bundle_store(m)) 
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "(VIMS) Registered Bundle %d in VIMS",args[0]);
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Error in Bundle %d '%s'",args[0],s );
+	}
+}
+
+void	vj_event_set_stream_color(void *ptr, const char format[], va_list ap)
+{
+	int args[4];
+	char *s = NULL;
+	P_A(args,s,format,ap);
+	veejay_t *v = (veejay_t*) ptr;
+	
+	if(TAG_PLAYING(v))
+	{
+		if(args[0] == 0 ) args[0] = v->uc->clip_id;
+		if(args[0] == -1) args[0] = vj_tag_size()-1;
+	}
+	// allow changing of color while playing plain/sample
+	if(vj_tag_exists(args[0]) &&
+		vj_tag_get_type(args[0]) == VJ_TAG_TYPE_COLOR )
+	{
+		CLAMPVAL( args[1] );
+		CLAMPVAL( args[2] );
+		CLAMPVAL( args[3] );	
+		vj_tag_set_stream_color(args[0],args[1],args[2],args[3]);
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist",
+			args[0]);
 	}
 }
 
@@ -7187,4 +7521,10 @@ void vj_event_screenshot(void *ptr, const char format[], va_list ap)
 		v->uc->filename = strdup( s );
 	
 }
+
+void		vj_event_quick_bundle( void *ptr, const char format[], va_list ap)
+{
+	vj_event_commit_bundle( (veejay_t*) ptr,0);
+}
+
 #endif

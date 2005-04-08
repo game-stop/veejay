@@ -37,6 +37,7 @@ int vj_event_get_video_format(void);
 int vj_event_get_num_args(int net_id);
 void vj_event_update_remote(void *ptr);
 void	vj_event_dump(void);
+void	vj_event_set_stream_color		(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_chain_arg_inc			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_chain_arg_set			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_chain_disable			(	void *ptr, 	const char format[], 	va_list ap	);
@@ -110,7 +111,7 @@ void 	vj_event_clip_his_set_entry		(	void *ptr, 	const char format[], 	va_list a
 void 	vj_event_clip_his_unlock_entry		(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_clip_load_list			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_clip_rec_start			( 	void *ptr, 	const char format[], 	va_list ap	);
-
+void	vj_event_clip_move_render		(	void *ptr,	const char format[],	va_list	ap );
 void 	vj_event_clip_ren_start			( 	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_clip_sel_render		(	void *ptr,	const char format[],	va_list ap  );
 
@@ -147,6 +148,7 @@ void 	vj_event_tag_new_raw			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_tag_new_avformat		(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_tag_new_v4l			(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_tag_new_dv1394			( 	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_tag_new_color			(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_tag_new_y4m			(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_tag_new_net			( 	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_tag_new_mcast			(	void *ptr,	const char format[], 	va_list ap	);
@@ -188,6 +190,8 @@ void	vj_event_v4l_set_brightness		(	void *ptr,	const char format[],	va_list ap	)
 void	vj_event_v4l_set_contrast		(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_v4l_set_color			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_v4l_set_hue			(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_v4l_set_white			(	void *ptr,	const char format[], 	va_list ap	);
+void	vj_event_v4l_get_info			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap);
 void	vj_event_tag_chain_disable		(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_all_clips_chain_toggle		(	void *ptr,	const char format[],	va_list ap	);
@@ -196,9 +200,6 @@ void    vj_event_effect_set_bg			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_quit				(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_suspend			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_tag_set_format			( 	void *ptr,	const char format[],	va_list ap	);
-#ifdef HAVE_SDL
-void	vj_event_init_gui_screen		( 	void *ptr,	const char format[],	va_list ap 	);
-#endif
 void	vj_event_set_volume			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_tag_new_shm			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_debug_level			( 	void *ptr,	const char format[],	va_list ap	);
@@ -208,4 +209,8 @@ void	vj_event_load_plugin			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_unload_plugin			(	void *ptr,	const char format[], 	va_list ap	);
 void	vj_event_fullscreen			( void *ptr, const char format[],	va_list ap );
 void	vj_event_sample_mode		(	void *ptr,	const char format[],	va_list ap 	);
+void	vj_event_set_rgb_parameter_type		(	void *ptr,const char format[],	va_list ap	);
+void	vj_event_tag_set_descr		(	void *ptr,	const char format[],	va_list ap	);	
+void	vj_event_send_bundles	(void *ptr, const char format[], va_list ap);
+void	vj_event_quick_bundle  (void *ptr, const char format[], va_list ap);
 #endif

@@ -99,7 +99,7 @@ typedef struct {
     struct timeval lastframe_completion;	/* software sync variable */
 
     long old_field_len;
-    long save_list_len;		/* for editing purposes */
+    uint64_t save_list_len;		/* for editing purposes */
 
     double spvf;		/* seconds per video frame */
     int usec_per_frame;		/* milliseconds per frame */
@@ -120,7 +120,7 @@ typedef struct {
     long rendered_frames;
     long currently_processed_entry;
     struct mjpeg_sync syncinfo[MJPEG_MAX_BUF];	/* synchronization info */
-    unsigned long *save_list;	/* for editing purposes */
+    uint64_t *save_list;	/* for editing purposes */
     int abuf_len;
     double spas;		/* seconds per audio clip */
     int audio_mute;		/* controls whether to currently play audio or not */
@@ -135,7 +135,7 @@ typedef struct {
     int clip_record;
     int clip_record_id;
     int clip_record_switch;
-	int full_screen;
+	int full_screen[2];
     int tag_record_switch;
     int tag_record;
     int dct_method;
@@ -196,7 +196,6 @@ typedef struct {
 typedef struct {
     int video_output_width;		/* width of the SDL playback window in case of software playback */
     int video_output_height;		/* height of the SDL playback window in case of software playback */
-    int soft_full_screen;	/* [0-1] set software-driven full-screen/screen-output, 1 = yes, 0 = no */
     int double_factor;		/* while playing, duplicate each frame double_factor times */
     int preserve_pathnames;
     int audio;			/* [0-1] Whether to play audio, 0 = no, 1 = yes */
@@ -224,11 +223,7 @@ typedef struct {
     //int vli_enabled;
     int video_out;
 #ifdef HAVE_SDL
-    vj_sdl *sdl;		/* SDL window */
-#endif
-    int gui_screen;
-#ifdef HAVE_SDL
-    vj_sdl *sdl_gui;		/* SDL gui window */
+    vj_sdl **sdl;		/* array of SDL windows */
 #endif
     vj_yuv *output_stream;	/* output stream for dumping video */
     vj_yuv *render_stream;
@@ -259,6 +254,8 @@ typedef struct {
 	int seek_cache;
 	int bes_width;
 	int bes_height;
+	char *status_what;
+	char *status_msg;
 } veejay_t;
 
 typedef struct {

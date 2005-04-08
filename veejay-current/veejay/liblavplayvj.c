@@ -173,6 +173,7 @@ struct mjpeg_params
 #include <pthread.h>
 #ifdef HAVE_SDL
 #include <SDL/SDL.h>
+#define MAX_SDL_OUT	2
 #endif
 #include <mpegconsts.h>
 #include <mpegtimecode.h>
@@ -185,25 +186,15 @@ struct mjpeg_params
 #include "mjpeg_types.h"
 //#include "lav_common.h"
 #ifdef HAVE_DIRECTFB
-#include "vj-dfb.h"
+#include <veejay/vj-dfb.h>
 #endif
-
-/* TODO: set_clip and clip_action clean up; important items need more updates */
-
 /* On some systems MAP_FAILED seems to be missing */
 #ifndef MAP_FAILED
 #define MAP_FAILED ( (caddr_t) -1 )
 #endif
-#include "vj-dv.h"  
 #define HZ 100
-
-
 #include <libel/vj-el.h>
-
 #define VALUE_NOT_FILLED -10000
-static float time_frame = 0;
-
-//static double _usecs_passed = 0.0;
 #ifdef HAVE_SDL
 extern void vj_event_single_fire(void *ptr, SDL_Event event, int pressed);
 #endif
@@ -416,6 +407,8 @@ int veejay_free(veejay_t * info)
 	if( info->effect_frame2) free(info->effect_frame2);
 	if( info->effect_info) free( info->effect_info );
 	if( info->dummy ) free(info->dummy );
+    free(info->status_msg);
+    free(info->status_what);
     free(info->uc);
     free(settings);
     free(info);
@@ -831,24 +824,25 @@ void veejay_set_clip(veejay_t * info, int clipid)
     		 veejay_set_speed(info, speed);
      }
 }
-void veejay_default_tags(veejay_t *info) {
-	char cs[100];
-	int i;
-	sprintf(cs, "yuv420p");
-	
-	for(i=4; i <= 9; i++) {
-		if( vj_tag_new(i,"/solid",info->nstreams,info->edit_list,info->pixel_format,0)==-1 ){
-			veejay_msg(VEEJAY_MSG_WARNING,"Unable to create solid stream" );
-		}
-		else {
-			char name[100];
-			vj_tag_get_description( vj_tag_get_last_tag(), name );
-			veejay_msg(VEEJAY_MSG_DEBUG, "Created solid stream %d (%s)",vj_tag_size()-1,name);
-			vj_tag_set_active( vj_tag_get_last_tag() , 1);
-			info->nstreams++;
-		}
-	}
-}
+
+static struct
+{
+	int id;
+	int r;
+	int g;
+	int b;
+} solid_colors[] =
+{
+	{0,	255,	255,	255},
+	{1,	0,	0,	0  },
+	{2,	255,	0,	0  },
+	{3,	0,	255,	0  },
+	{4,	0,	0,	255},
+	{5,	255,	255,	0  },
+	{6,	0,	255,	255},
+	{-1,	0,	0,	0, }
+};
+
 /******************************************************
  * veejay_create_clip
  *  create a new clip
@@ -857,81 +851,37 @@ void veejay_default_tags(veejay_t *info) {
 int veejay_create_tag(veejay_t * info, int type, char *filename,
 			int index, int palette, int channel)
 {
-    switch (type) {
-    case VJ_TAG_TYPE_V4L:
-	if (vj_tag_new(type, filename, index, info->edit_list, info->pixel_format, channel) ==
-	    -1) {
-	    return -1;
-	} else {
-	    veejay_msg(VEEJAY_MSG_DEBUG, "Created new stream %d , video4linux device %s ",vj_tag_size()-1, filename);
-	    info->nstreams++;
-	    vj_tag_set_active( vj_tag_get_last_tag(), 1);
-	    return 0;
+	if( type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST )
+	{
+		if( (filename != NULL) && ((strcasecmp( filename, "localhost" ) == 0)  || (strcmp( filename, "127.0.0.1" ) == 0)) )
+		{
+			if( channel == info->uc->port )
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "It makes no sense to connect to myself (%s - %d)",
+					filename,channel);
+				return -1;
+			}	   
+		}
 	}
-	break;
-    case VJ_TAG_TYPE_YUV4MPEG:
-	if (vj_tag_new(type, filename, index, info->edit_list, info->pixel_format,0) != 1) 
-	    {
-	    veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new stream from file %s", filename);
-	    return -1;
-	} else {
-	    info->nstreams++;
-	    vj_tag_set_active( vj_tag_get_last_tag(), 1);
-	    return 0;
-	}
-	break;
-    case VJ_TAG_TYPE_SHM:
-	if( vj_tag_new(type, filename, index, info->edit_list, info->pixel_format,0)==-1)
-	{	
-		return -1;
+
+	int id = vj_tag_new(type, filename, index, info->edit_list, info->pixel_format, channel);
+	char descr[200];
+	bzero(descr,200);
+	vj_tag_get_descriptive(type,descr);
+	if(id > 0 )
+	{
+		info->nstreams++;
+		if(type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_MCAST || type== VJ_TAG_TYPE_NET)
+			vj_tag_set_active( id, 1 );
+		veejay_msg(VEEJAY_MSG_INFO, "New stream %d of type %s created", id, descr );
+		return 0;
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Created new SHM stream %d ", vj_tag_size()-1);
-		info->nstreams ++;
-		vj_tag_set_active(vj_tag_get_last_tag(),1);
-		return 0;
-	}
-	break;
-	case VJ_TAG_TYPE_AVFORMAT:
-	if( vj_tag_new(type, filename, index,info->edit_list, info->pixel_format,0) )
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Created new AVFORMAT stream %d", vj_tag_size()-1);
-		info->nstreams++;
-		return 0;
-	}
-	break;
-	case VJ_TAG_TYPE_DV1394:
-	if(vj_tag_new(type, filename, index,info->edit_list, info->pixel_format, channel) )
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Created new DV1394 stream");
-		info->nstreams++;
-		return 0;
-	}
-	break;
-	case VJ_TAG_TYPE_NET:
-	case VJ_TAG_TYPE_MCAST:
-	if( (filename != NULL) && ((strcasecmp( filename, "localhost" ) == 0)  || (strcmp( filename, "127.0.0.1" ) == 0)) )
-	{
-		if( channel == info->uc->port )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "It makes no sense to connect to myself (%s - %d)",
-				filename,channel);
-			return -1;
-		}	   
-	}
-
-	if( vj_tag_new(type,filename,index,info->edit_list,info->pixel_format, channel ) != -1)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "connected to host %s , port %d", filename, channel);
-		info->nstreams++;
-		return 0;	
-	}	
-	break;
-    default:
-	veejay_msg(VEEJAY_MSG_ERROR, 
-		    "You tried to create a stream of an illegal type");
-	
+	    char descr[200];
+		bzero(descr,200);
+	 	vj_tag_get_descriptive( type, descr );
+		veejay_msg(VEEJAY_MSG_ERROR, "Failed to create stream of type %s", descr );
     }
     return -1;
 }
@@ -982,14 +932,21 @@ void veejay_stop_sampling(veejay_t * info)
  *   this will probably change.
  * return value: 1 on success, 0 on error
  ******************************************************/
-static int veejay_screen_update(veejay_t * info ) {
-
+static int veejay_screen_update(veejay_t * info )
+{
     video_playback_setup *settings = info->settings;
     uint8_t *frame[3];
     uint8_t *c_frame[3];
+	int i = 0;
 
     // get the frame to output, in 420 or 422
-    
+    if (info->uc->take_bg==1)
+    {
+		// fixme: 
+		vj_perform_get_primary_frame(info,frame,0);
+        vj_perform_take_bg(info,frame);
+        info->uc->take_bg = 0;
+    } 
 	// scale the image if wanted
 	if(settings->zoom )
 	{
@@ -1025,23 +982,22 @@ static int veejay_screen_update(veejay_t * info ) {
 		free(info->uc->filename);
     }
 #endif
-    if (info->uc->take_bg==1)
-    {
-       vj_perform_take_bg(info,frame);
-       info->uc->take_bg = 0;
-    }
 
-    /* hack to write YCbCr data to stream*/
+  /* hack to write YCbCr data to stream*/
     if (info->stream_enabled == 1) {
-	// Y4m is always 4:2:0  
-        vj_perform_get_primary_frame_420p(info,c_frame);
-	if (vj_yuv_put_frame(info->output_stream, c_frame) == -1) {
+	// Y4m is always 4:2:0 , this function ensures it 
+	vj_perform_get_primary_frame_420p(
+				info, c_frame );
+	if (vj_yuv_put_frame(info->output_stream, c_frame) == -1)
+	{
 	    veejay_msg(VEEJAY_MSG_ERROR, 
 			"Error stopping YUV4MPEG output stream ");
 	    vj_yuv_stream_stop_write(info->output_stream);
 	    info->stream_enabled = 0;
 	}
     }
+
+
 
 	//vj_perform_get_p_data( info->plugin_frame );
 	vj_perform_update_plugin_frame( info->plugin_frame );
@@ -1050,20 +1006,13 @@ static int veejay_screen_update(veejay_t * info ) {
 
 	plugins_process_video_out( (void*) info->plugin_frame_info, (void*) info->plugin_frame );
 
-#ifdef HAVE_SDL
-	if(info->gui_screen==1)
-	{
-		// vjsdl handles both 422 / 420
-		if(!vj_sdl_update_yuv_overlay(info->sdl_gui,frame)) return 0;
-	}
-#endif
 	//todo: this sucks, have it modular.( video out drivers )
     switch (info->video_out) {
 #ifdef HAVE_SDL
 	case 0:
-	    if (!vj_sdl_update_yuv_overlay(info->sdl, frame)) {
-		return 0;
-	    }
+	    for(i = 0 ; i < MAX_SDL_OUT; i ++ )
+		if( info->sdl[i] )
+			if(!vj_sdl_update_yuv_overlay( info->sdl[i], frame ) )  return 0;  
 	    break;
 #endif
 #ifdef HAVE_DIRECTFB
@@ -1077,10 +1026,9 @@ static int veejay_screen_update(veejay_t * info ) {
 	    break;
 	case 2:
 #ifdef HAVE_SDL
-	    if (!vj_sdl_update_yuv_overlay(info->sdl, frame)) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Error updating image");
-		return 0;
-	    }
+	    for( i = 0; i < MAX_SDL_OUT; i ++ )
+		if( info->sdl[i] ) 	
+		  if(!vj_sdl_update_yuv_overlay( info->sdl[i], frame ) ) return 0;
 #endif
 	    // again, directfb blits to i420
 	    vj_perform_get_primary_frame_420p(info,c_frame);
@@ -1091,14 +1039,11 @@ static int veejay_screen_update(veejay_t * info ) {
 	    break;
 #endif
 	case 3:
-	     if( info->pixel_format != FMT_420 )
-		{
-		veejay_msg(VEEJAY_MSG_WARNING,
-		  "Start veejay with -Y 0 to force output to YUV 4:2:0 / i420 planar (required by yuv4mpeg)");
-		}
-	     veejay_msg(VEEJAY_MSG_DEBUG, "Frame %d",
-			settings->current_frame_num);
-	     vj_perform_get_primary_frame_420p(info,c_frame);
+	     if(settings->zoom)
+	     	vj_perform_get_output_frame_420p(info, c_frame, info->video_output_width, info->video_output_height );
+	     else
+		vj_perform_get_primary_frame_420p(info,c_frame);
+
 	     if (vj_yuv_put_frame(info->render_stream, c_frame) == -1)
 	     {
 		veejay_msg(VEEJAY_MSG_ERROR, 
@@ -1123,8 +1068,7 @@ static int veejay_screen_update(veejay_t * info ) {
 		return 0;
 		break;
     }
-
-	
+  	
     return 1;
 }
 
@@ -1195,15 +1139,6 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 }
 
 
-
-static void veejay_put_to_screen(veejay_t * info)
-{
-  }
-
-//static char status_who[5];
-static char status_what[MESSAGE_SIZE];
-static char status_msg[MESSAGE_SIZE+5];
-//static int status_first =0;
 void veejay_pipe_write_status(veejay_t * info, int link_id)
 {
     video_playback_setup *settings =
@@ -1214,13 +1149,13 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     switch (info->uc->playback_mode) {
     	case VJ_PLAYBACK_MODE_CLIP:
 			if( clip_chain_sprint_status
-				(info->uc->clip_id, info->real_fps,settings->current_frame_num, info->uc->playback_mode, status_what ) != 0)
+				(info->uc->clip_id, info->real_fps,settings->current_frame_num, info->uc->playback_mode, info->status_what ) != 0)
 				{
 				veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
 			}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		sprintf(status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d",
+		sprintf(info->status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d",
 			(int) info->real_fps,
 			settings->current_frame_num,
 			info->uc->playback_mode,
@@ -1237,16 +1172,16 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
 		if( vj_tag_sprint_status( info->uc->clip_id, (int) info->real_fps,
-			settings->current_frame_num, info->uc->playback_mode, status_what ) != 0 )
+			settings->current_frame_num, info->uc->playback_mode, info->status_what ) != 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
 		}
 		break;
     }
     
-    d_len = strlen(status_what);
-    snprintf(status_msg,MESSAGE_SIZE, "V%03dS%s", d_len, status_what);
-    res = vj_server_send(info->vjs[1],link_id, status_msg, strlen(status_msg));
+    d_len = strlen(info->status_what);
+    snprintf(info->status_msg,MESSAGE_SIZE, "V%03dS%s", d_len, info->status_what);
+    res = vj_server_send(info->vjs[1],link_id, info->status_msg, strlen(info->status_msg));
     if( res <= 0) { /* close command socket */
 		_vj_server_del_client(info->vjs[1], link_id );
 		_vj_server_del_client(info->vjs[0], link_id );
@@ -1620,21 +1555,40 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
   //  struct mjpeg_params bp;
     editlist *el = info->edit_list;
     video_playback_setup *settings = info->settings;
-    
-    if (veejay_init_editlist(info) != 0) {
-	veejay_msg(VEEJAY_MSG_ERROR, 
-		    "Cannot initialize the EditList");
-	return -1;
-    }
+	/* see what timer we have */
+    if(info->video_out<0)
+    {
+		veejay_msg(VEEJAY_MSG_ERROR, "No video output driver selected (see man veejay)");
+		return -1;
+	}
+
+
+    switch (info->uc->use_timer)
+	{
+	    case 0:
+			veejay_msg(VEEJAY_MSG_WARNING, "Not timing audio/video");
+		break;
+  		case 1:
+			veejay_msg(VEEJAY_MSG_DEBUG, 
+			    "RTC /dev/rtc hardware timer is broken!");
+			info->uc->use_timer = 2;
+		break;
+    	case 2:
+			veejay_msg(VEEJAY_MSG_DEBUG, "Using nanosleep timer");
+		break;
+    }    
+
+    if (veejay_init_editlist(info) != 0) 
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, 
+			    "Cannot initialize the EditList");
+		return -1;
+	}
 
 	if(!vj_perform_init(info))
-    {
+	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Performer");
 		return -1;
-    }
-    else
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Initialized Performer");
     }
 
 	if( info->settings->zoom )
@@ -1658,9 +1612,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		    vj_perform_get_primary_frame(info, &(src.data) ,0 );
 		    vj_perform_init_output_frame(info, &(dst.data),
 			info->video_output_width, info->video_output_height );
-
-		// Todo: we can have yuv_scale routine blit directly to sdl surface,
-   		// set to YUY2 if input source is 4:2:2 planar 
 
 		info->settings->sws_templ.flags  = info->settings->zoom;
 	        info->video_out_scaler = (void*)
@@ -1703,79 +1654,29 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
     	/* initialize tags (video4linux/yuv4mpeg stream ... ) */
     if (vj_tag_init(el->video_width, el->video_height, info->pixel_format) != 0) {
-	veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing stream manager");
+		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing stream manager");
+	    return -1;
     }
-    else
-    {
-		if(def_tags) veejay_default_tags(info);
-		if(info->dummy->active)
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Activating dummy mode (Stream %d)", 2);
-			veejay_change_playback_mode(info,VJ_PLAYBACK_MODE_TAG,2);
-		}
-
-
-    }	
-
-	/* see what timer we have */
-    switch (info->uc->use_timer) {
-    case 0:
-	veejay_msg(VEEJAY_MSG_WARNING, "Not timing audio/video");
-	break;
-    case 1:
-	veejay_msg(VEEJAY_MSG_DEBUG, 
-		    "RTC /dev/rtc hardware timer is broken!");
-	info->uc->use_timer = 2;
-	break;
-    case 2:
-	veejay_msg(VEEJAY_MSG_DEBUG, "Using nanosleep timer");
-	break;
-    }
-
-
-	/* initialize edit decision list */
-/*  
-#ifdef SUPPORT_READ_DV2
-	vj_dv_init( el->video_width, el->video_height );
-	vj_dv_init_encoder(el);
-#endif
-*/
 
  	clip_init( (el->video_width * el->video_height)  ); 
-         /// OLDOLD    
-
 	plugins_allocate();
 
-    if(info->edit_list->has_audio) {
-	if (vj_perform_init_audio(info) == 0) {
-		veejay_msg(VEEJAY_MSG_INFO, "Initialized Audio Task");
-   	 }
-	 else {
-		veejay_msg(VEEJAY_MSG_ERROR, 
-			    "Unable to initialize Audio Task");
-     	 } 
-    }
-
-    veejay_msg(VEEJAY_MSG_INFO, 
-		"Initialized %d Image- and Video Effects", MAX_EFFECTS);
-	/* initialize all effects */
-
-	if( !vj_server_setup(info) )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Setting up server");
-		return -1;
+	if(info->edit_list->has_audio) {
+		if (vj_perform_init_audio(info) == 0)
+			veejay_msg(VEEJAY_MSG_INFO, "Initialized Audio Task");
+		else
+			veejay_msg(VEEJAY_MSG_ERROR, 
+				"Unable to initialize Audio Task");
 	}
 
+  	veejay_msg(VEEJAY_MSG_INFO, 
+		"Initialized %d Image- and Video Effects", MAX_EFFECTS);
     vj_effect_initialize(info->edit_list->video_width, info->edit_list->video_height);
+		veejay_msg(VEEJAY_MSG_INFO,	 
+			"Setup solid color streams 1 - 6");
 
 	vj_event_init();
-    if(vj_osc_setup_addr_space(info->osc) == 0) {
-	veejay_msg(VEEJAY_MSG_INFO, "Initialized OSC (http://www.cnmat.berkeley.edu/OpenSoundControl/)");
-	}
-
-    // pix fmt 422
-
-
+   
 	info->plugin_frame = vj_perform_init_plugin_frame(info);
 	info->plugin_frame_info = vj_perform_init_plugin_frame_info(info);
 
@@ -1788,113 +1689,110 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	}
 #endif
     if(info->dump) vj_effect_dump(); 	
-    info->output_stream = vj_yuv4mpeg_alloc(info->edit_list,
-		info->video_output_width, info->video_output_height);
-
-      if(arg != NULL ) {
-	  veejay_msg(VEEJAY_MSG_INFO, "Loading cliplist [%s]", arg);
-#ifdef HAVE_XML2
-   	 if (!clip_readFromFile( arg )) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Error loading cliplist [%s]",arg);
+    info->output_stream = vj_yuv4mpeg_alloc(info->edit_list, info->video_output_width,
+		info->video_output_height );
+	if(!info->output_stream)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot setup output stream?");
 		return -1;
+	}
+
+	if(arg != NULL ) {
+		veejay_msg(VEEJAY_MSG_INFO, "Loading cliplist [%s]", arg);
+#ifdef HAVE_XML2
+   	 	if (!clip_readFromFile( arg )) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Error loading cliplist [%s]",arg);
+			return -1;
     	}
 #endif
     }
-    if(info->video_out<0)
-    {
-		veejay_msg(VEEJAY_MSG_ERROR, "No video output driver selected (see man veejay)");
-		return -1;
-	}
 
     /* now setup the output driver */
     switch (info->video_out) {
-
-  case 4:
-	info->segment = new_segment( info->video_output_width * info->video_output_height * 3);
-	if(!info->segment)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize shared memory");
-		return -1;
-	}
-	attach_segment(info->segment, 1);
-	veejay_msg(VEEJAY_MSG_DEBUG , "Shared memory key = %d, Semaphore = %d",
-		get_segment_id(info->segment), get_semaphore_id(info->segment));
-	break;
-
+ 		case 4:
+		info->segment = new_segment( info->video_output_width * info->video_output_height * 3);
+		if(!info->segment)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize shared memory");
+			return -1;
+		}
+		attach_segment(info->segment, 1);
+		veejay_msg(VEEJAY_MSG_DEBUG , "Shared memory key = %d, Semaphore = %d",
+			get_segment_id(info->segment), get_semaphore_id(info->segment));
+		break;
 #ifdef HAVE_SDL
     case 0:
 
-	info->sdl =
-	    (vj_sdl *) vj_sdl_allocate( info->video_output_width,
-				      info->video_output_height,
-					info->pixel_format);
+		info->sdl[0] =
+		    (vj_sdl *) vj_sdl_allocate( info->video_output_width,
+					      info->video_output_height,
+						info->pixel_format);
 
-	if( x != -1 && y != -1 )
-	{
-		vj_sdl_set_geometry(info->sdl,x,y);
-	}
+		if( x != -1 && y != -1 )
+			vj_sdl_set_geometry(info->sdl[0],x,y);
 
-	if (!vj_sdl_init(info->sdl, info->bes_width, info->bes_height, "Veejay",1,
-			info->settings->full_screen))
+		if (!vj_sdl_init(info->sdl[0], info->bes_width, info->bes_height, "Veejay",1,
+			info->settings->full_screen[0]))
 		    return -1;
 	
-	break;
+		break;
 #endif
 #ifdef HAVE_DIRECTFB
     case 1:
-	veejay_msg(VEEJAY_MSG_DEBUG, "Initializing DirectFB");
-	info->dfb =
-	    (vj_dfb *) vj_dfb_allocate(
-						info->video_output_width,
-				       	info->video_output_height,
-				       	el->video_norm);
-	if (vj_dfb_init(info->dfb) != 0)
-	    return -1;
-	break;
-      case 2:
-	veejay_msg(VEEJAY_MSG_DEBUG, 
+		veejay_msg(VEEJAY_MSG_DEBUG, "Initializing DirectFB");
+		info->dfb =
+		    (vj_dfb *) vj_dfb_allocate(
+							info->video_output_width,
+					       	info->video_output_height,
+					       	el->video_norm);
+		if (vj_dfb_init(info->dfb) != 0)
+	    	return -1;
+		break;
+	case 2:
+		veejay_msg(VEEJAY_MSG_DEBUG, 
 		    "Initializing cloned output (if both SDL/DirectFB are compiled in)");
 #ifdef HAVE_SDL
-	info->sdl =
-	    (vj_sdl *) vj_sdl_allocate(info->video_output_width,
+		info->sdl[0] =
+	    	(vj_sdl *) vj_sdl_allocate(info->video_output_width,
 				      info->video_output_height, info->pixel_format);
-	if (!vj_sdl_init(info->sdl, info->bes_width, info->bes_height,"Veejay",1,
-		info->settings->full_screen))
-	    return -1;
+
+		if (!vj_sdl_init(info->sdl[0], info->bes_width, info->bes_height,"Veejay",1,
+			info->settings->full_screen[0]))
+	   	 return -1;
 #endif
-	info->dfb =
-	    (vj_dfb *) vj_dfb_allocate( info->video_output_width,
-				       info->video_output_height,
-				       el->video_norm);
-	if (vj_dfb_init(info->dfb) != 0)
-	    return -1;
-	break;
+		info->dfb =
+		    (vj_dfb *) vj_dfb_allocate( info->video_output_width,
+					       info->video_output_height,
+					       el->video_norm);
+		if (vj_dfb_init(info->dfb) != 0)
+		    return -1;
+		break;
 #endif
     case 3:
-	veejay_msg(VEEJAY_MSG_INFO, 
+		veejay_msg(VEEJAY_MSG_INFO, 
 		    "Entering render mode (no visual output)");
         
-	info->render_stream = vj_yuv4mpeg_alloc(info->edit_list, info->video_output_width,info->video_output_height);
+		info->render_stream = vj_yuv4mpeg_alloc(info->edit_list, info->video_output_width,info->video_output_height);
 
 
 
-	if (vj_yuv_stream_start_write
-	  	  (info->render_stream, info->stream_outname,
-	  	   info->edit_list) == 0) {
-	   	 veejay_msg(VEEJAY_MSG_INFO, 
-				"Rendering to [%s].",
-				info->stream_outname);
+		if (vj_yuv_stream_start_write
+		  	  (info->render_stream, info->stream_outname,
+	  		   info->edit_list) == 0) {
+	   	 		veejay_msg(VEEJAY_MSG_INFO, 
+					"Rendering to [%s].",
+					info->stream_outname);
  		}
-	 else {
-	    veejay_msg(VEEJAY_MSG_ERROR, 
-			"Cannot create render stream. Aborting");
-	    return -1;
-	}
-	break;
+	 	else {
+	   		veejay_msg(VEEJAY_MSG_ERROR, 
+				"Cannot create render stream. Aborting");
+	    	return -1;
+		}
+		break;
     default:
-	veejay_msg(VEEJAY_MSG_ERROR,
+		veejay_msg(VEEJAY_MSG_ERROR,
 		    "Invalid playback mode. Use -O [0123]");
-	return -1;
+		return -1;
 	break;
     }
 
@@ -1911,20 +1809,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
     }
 
 
-	//CUTCUT
-  /*  bp.input = 0;
-    bp.norm =
-	(editlist->video_norm == 'n') ? VIDEO_MODE_NTSC : VIDEO_MODE_PAL;
-    veejay_msg(VEEJAY_MSG_DEBUG, "Output norm: %s",
-		bp.norm == VIDEO_MODE_NTSC ? "NTSC" : "PAL");
-    hn = bp.norm == VIDEO_MODE_NTSC ? 480 : 576;
-
-    veejay_msg(VEEJAY_MSG_DEBUG, 
-		"Output dimensions: %ldx%ld",
-		editlist->video_width, editlist->video_height);
-
-    bp.odd_even = (editlist->video_inter == LAV_INTER_TOP_FIRST);
-*/
     if (!veejay_mjpeg_set_playback_rate(info, el->video_fps,
 					 el->video_norm ==
 					 'p' ? VIDEO_MODE_PAL : VIDEO_MODE_NTSC)) {
@@ -1932,9 +1816,32 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
     }
 
 
+	if( !vj_server_setup(info) )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Setting up server");
+		return -1;
+	}
+ if(vj_osc_setup_addr_space(info->osc) == 0) {
+	veejay_msg(VEEJAY_MSG_INFO, "Initialized OSC (http://www.cnmat.berkeley.edu/OpenSoundControl/)");
+	}
 
-  if (veejay_open(info) != 1) {
-	veejay_msg(VEEJAY_MSG_ERROR, 
+	if(info->dummy->active)
+	{
+	 	int dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, "Solid", -1, info->edit_list,info->pixel_format,-1);
+		if(dummy_id > 0)
+		{
+			veejay_msg(VEEJAY_MSG_INFO, "Activating dummy mode (Stream %d)", dummy_id);
+			veejay_change_playback_mode(info,VJ_PLAYBACK_MODE_TAG,dummy_id);
+		}
+		else
+		{
+			veejay_msg(VEEJAY_MSG_INFO, "Failed to create dummy stream");
+			return -1;
+		}
+	}
+
+  	if (veejay_open(info) != 1) {
+		veejay_msg(VEEJAY_MSG_ERROR, 
 		    "Unable to initialize the threading system");
     }
     return 0;
@@ -1945,7 +1852,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
  * veejay_playback_cycle()
  *   the playback cycle
  ******************************************************/
-//static int only_once=0;
 static void veejay_playback_cycle(veejay_t * info)
 {
     video_playback_stats stats;
@@ -2216,7 +2122,7 @@ static void Welcome(veejay_t *info)
 static void *veejay_playback_thread(void *data)
 {
     veejay_t *info = (veejay_t *) data;
-    
+    int i;
     
 
     Welcome(info);
@@ -2236,51 +2142,44 @@ static void *veejay_playback_thread(void *data)
 
     vj_yuv4mpeg_free(info->output_stream); 
     free(info->output_stream);
-
-    switch (info->video_out) {
-    case 0:
-#ifdef HAVE_SDL
-	vj_sdl_free(info->sdl);
-	free(info->sdl);
-#endif
-	break;
-#ifdef HAVE_DIRECTFB
-    case 1:
-	vj_dfb_free(info->dfb);
-    case 2:
-#ifdef HAVE_SDL
-	vj_sdl_free(info->sdl);
-	free(info->sdl);
-#endif
-	vj_dfb_free(info->dfb);
-	free(info->dfb);
-#endif
-    case 3:
-	vj_yuv_stream_stop_write(info->render_stream);
-	veejay_msg(VEEJAY_MSG_DEBUG, "Stopped rendering to [%s]",
-		    info->stream_outname);
-	break;
-    case 4:
-	del_segment(info->segment);
-	veejay_msg(VEEJAY_MSG_DEBUG,  "Deleted shared memory");
-	break;
-	default:
-		break;
-    }
     
 #ifdef HAVE_SDL
-    if(info->gui_screen) vj_sdl_free(info->sdl_gui);
+    for ( i = 0; i < MAX_SDL_OUT ; i ++ )
+		if( info->sdl[i] )
+		{
+			 vj_sdl_free(info->sdl[i]);
+			 free(info->sdl[i]);
+		}
+
+	vj_sdl_quit();
 #endif
+#ifdef HAVE_DIRECTFB
+    if( info->dfb )
+	{
+		vj_dfb_free(info->dfb);
+		free(info->dfb);
+	}
+#endif
+
+    if( info->video_out == 3 )
+	{
+		vj_yuv_stream_stop_write(info->render_stream);
+		veejay_msg(VEEJAY_MSG_DEBUG, "Stopped rendering to [%s]",
+			    info->stream_outname);
+	}
+	if( info->video_out == 4 )
+	{
+		del_segment(info->segment);
+		veejay_msg(VEEJAY_MSG_DEBUG,  "Deleted shared memory");
+    }
+    
     vj_perform_free(info);
     vj_effect_shutdown();
     vj_tag_close_all();
- 
     vj_el_free(info->edit_list);
-
 
     veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
     pthread_exit(NULL);
-
     return NULL;
 }
 
@@ -2332,6 +2231,11 @@ veejay_t *veejay_malloc()
     if (!(info->settings)) 
 		return NULL;
    	memset( info->settings, 0, sizeof(video_playback_setup));
+
+    info->status_what = (char*) vj_malloc(sizeof(char) * MESSAGE_SIZE );
+    info->status_msg = (char*) vj_malloc(sizeof(char) * MESSAGE_SIZE+5);
+    bzero(info->status_what,MESSAGE_SIZE);
+    bzero(info->status_what,MESSAGE_SIZE);
 
 	info->uc = (user_control *) vj_malloc(sizeof(user_control));
     if (!(info->uc)) 
@@ -2406,6 +2310,14 @@ veejay_t *veejay_malloc()
 #endif
 #endif
 
+
+#ifdef HAVE_SDL
+	info->sdl = (vj_sdl**) vj_malloc(sizeof(vj_sdl*) * MAX_SDL_OUT ); 
+	for( i = 0; i < MAX_SDL_OUT;i++ )
+		info->sdl[i] = NULL;
+#endif
+
+
     return info;
 }
 
@@ -2465,13 +2377,14 @@ int veejay_edit_copy(veejay_t * info, long start, long end)
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     editlist *el = info->edit_list;
-    int k, i;
-
+    uint64_t k, i;
+    uint64_t n1 = (uint64_t) start;
+    uint64_t n2 = (uint64_t) end;
     if (settings->save_list)
 		free(settings->save_list);
 
     settings->save_list =
-		(long *) vj_malloc((end - start + 1) * sizeof(long));
+		(uint64_t *) vj_malloc((n2 - n1 + 1) * sizeof(uint64_t));
 
     if (!settings->save_list)
 	{
@@ -2483,7 +2396,7 @@ int veejay_edit_copy(veejay_t * info, long start, long end)
 
     k = 0;
 
-    for (i = start; i <= end; i++)
+    for (i = n1; i <= n2; i++)
 		settings->save_list[k++] = el->frame_list[i];
   
 	settings->save_list_len = k;
@@ -2503,8 +2416,9 @@ int veejay_edit_delete(veejay_t * info, long start, long end)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
-    int i;
-
+    uint64_t i;
+    uint64_t n1 =  (uint64_t) start;
+    uint64_t n2 =  (uint64_t) end;
     editlist *el = info->edit_list;
 
 	if(info->dummy->active)
@@ -2520,8 +2434,8 @@ int veejay_edit_delete(veejay_t * info, long start, long end)
 		return 0;
     }
 
-    for (i = end + 1; i < el->video_frames; i++)
-		el->frame_list[i - (end - start + 1)] =
+    for (i = n2 + 1; i < el->video_frames; i++)
+		el->frame_list[i - (n2 - n1 + 1)] =
 	    	el->frame_list[i];
 
     if (start - 1 < settings->min_frame_num)
@@ -2588,7 +2502,7 @@ int veejay_edit_paste(veejay_t * info, long destination)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
-    int i, k;
+    long i, k;
     editlist *el = info->edit_list;
 
     if (!settings->save_list_len || !settings->save_list)
@@ -2621,11 +2535,10 @@ int veejay_edit_paste(veejay_t * info, long destination)
 		return 0;
     }
 
-    k = settings->save_list_len;
+    k = (long)settings->save_list_len;
 
     for (i = el->video_frames - 1; i >= destination; i--)
 		el->frame_list[i + k] = el->frame_list[i];
-
     k = destination;
     for (i = 0; i < settings->save_list_len; i++)
 	{
@@ -2639,7 +2552,7 @@ int veejay_edit_paste(veejay_t * info, long destination)
     el->video_frames += settings->save_list_len;
 
     veejay_increase_frame(info, 0);
-	return 1;
+    return 1;
 }
 
 

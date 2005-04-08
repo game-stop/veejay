@@ -278,9 +278,14 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
 }
 
 
+void	vj_sdl_quit()
+{
+	SDL_Quit();
+}
+
 void vj_sdl_free(vj_sdl * vjsdl)
 {
     SDL_FreeYUVOverlay(vjsdl->yuv_overlay);
-    SDL_Quit();
+//    SDL_Quit();
 }
 #endif

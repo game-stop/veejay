@@ -205,12 +205,12 @@ static void Usage(char *progname)
 #endif
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
-    exit(-1);
+    exit(1);
 }
 
 #define OUT_OF_RANGE(val) ( val < 0 ? 1 : ( val > 100 ? 1 : 0) )
 
-#define OUT_OF_RANGE_ERR(val) if(OUT_OF_RANGE(val)) { fprintf(stderr,"\tValue must be 0-100\n"); exit(-1); }
+#define OUT_OF_RANGE_ERR(val) if(OUT_OF_RANGE(val)) { fprintf(stderr,"\tValue must be 0-100\n"); exit(1); }
 
 static int set_option(const char *name, char *value)
 {
@@ -219,7 +219,7 @@ static int set_option(const char *name, char *value)
     if (strcmp(name, "host") == 0 || strcmp(name, "h") == 0) {
 	run_server = 0;
 	fprintf(stderr, "Run as server, host is not yet implemented.\n");
-	exit(0);
+	exit(1);
     } else if (strcmp(name, "port") == 0 || strcmp(name, "p") == 0) {
 	info->uc->port = atoi(optarg);
     } else if (strcmp(name, "verbose") == 0 || strcmp(name, "v") == 0) {
@@ -337,7 +337,7 @@ static int set_option(const char *name, char *value)
 		if(info->settings->zoom < 1 || info->settings->zoom > 11)
 		{
 			fprintf(stderr, "Use --zoom [1-11] or -z [1-11]\n");
-			exit(-1);
+			exit(1);
 		}
 	}
 	else if (strcmp(name, "lgb") == 0) 	
@@ -451,7 +451,7 @@ static void check_command_line_options(int argc, char *argv[])
 #endif
     if (argc < 2) {
 	Usage(argv[0]);
-	exit(-1);
+	exit(1);
     }
     
 /* Get options */
@@ -495,7 +495,7 @@ static void check_command_line_options(int argc, char *argv[])
        if(veejay_open_files(info, argv + optind, argc - optind,override_fps, force_video_file, override_pix_fmt)<=0)
        {
 	veejay_msg(VEEJAY_MSG_ERROR, "Cannot start veejay");
-	exit(-1);
+	exit(1);
        }
 
      
@@ -622,7 +622,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	veejay_set_frame(info, 0);
+	veejay_set_frame(info, 1);
 	veejay_set_speed(info, 1);
 	  
     while (veejay_get_state(info) != LAVPLAY_STATE_STOP) 
