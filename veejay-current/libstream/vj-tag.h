@@ -20,12 +20,7 @@
 #define VJ_TAG_H
 
 
-#define VJ_TAG_TYPE_RED 9
-#define VJ_TAG_TYPE_GREEN 8
-#define VJ_TAG_TYPE_YELLOW 7
-#define VJ_TAG_TYPE_BLUE 6
-#define VJ_TAG_TYPE_BLACK 5
-#define VJ_TAG_TYPE_WHITE 4
+#define VJ_TAG_TYPE_COLOR 4
 #define VJ_TAG_TYPE_VLOOPBACK 3
 #define VJ_TAG_TYPE_V4L 2
 #define VJ_TAG_TYPE_YUV4MPEG 1
@@ -37,7 +32,7 @@
 #define VJ_TAG_MAX_STREAM_IN 16
 #define VJ_TAG_TYPE_DV1394 17
 #define VJ_TAG_TYPE_AVFORMAT 12
-
+#define TAG_MAX_DESCR_LEN 150
 #include <config.h>
 #include <libsample/sampleadm.h>
 #include <libstream/vj-yuv4mpeg.h>
@@ -75,7 +70,6 @@ typedef struct {
     int active;
     int source;
     int video_channel;
-
     int encoder_active;
     unsigned long sequence_num;
     unsigned long rec_total_bytes;
@@ -84,6 +78,7 @@ typedef struct {
 //    char *encoder_destination;
     char encoder_base[256];
     char encoder_destination[256];
+    char descr[TAG_MAX_DESCR_LEN];
     int encoder_format;
     lav_file_t *encoder_file;
     long encoder_duration; /* in seconds */
@@ -92,10 +87,10 @@ typedef struct {
     int encoder_width;
     int encoder_height;
     int encoder_max_size;
-
-    int freeze_mode;
-    int freeze_nframes;
-    int freeze_pframes;
+    int color_r;
+    int color_g; 
+    int color_b;
+    int opacity; 
     int fader_active;
     int fader_direction;
     float fader_val;
@@ -104,18 +99,19 @@ typedef struct {
     int effect_toggle;
     int socket_ready;
     uint8_t *socket_frame;
-//    int video_palette;
 } vj_tag;
 
 int 	vj_tag_chain_malloc(int e);
 int 	vj_tag_chain_free(int e);
-
+int	vj_tag_get_v4l_properties(int t1,
+		int *brightness, int *hue,int *contrast, int *color, int *white );
 int 	vj_tag_init(int w, int h, int pix_fmt);
 
 int 	vj_tag_get_last_tag();
 
 void	vj_tag_free(void);
-
+/* Change color of solid stream*/
+int	vj_tag_set_stream_color(int t1, int r, int g, int b);
 /* create a new tag, type is yuv4mpeg or v4l  
    stream_nr indicates which stream to take of the same type
  */
@@ -201,7 +197,7 @@ int 	vj_tag_get_chain_source(int t1, int position);
 
 int 	vj_tag_set_chain_source(int t1, int position, int source);
 
-void 	vj_tag_get_description(int type, char *dst);
+void 	vj_tag_get_descriptive(int type, char *dst);
 
 int 	vj_tag_by_type(int type);
 
@@ -229,7 +225,7 @@ int 	vj_tag_set_brightness(int t1, int value);
 int 	vj_tag_set_contrast(int t1, int value);
 int 	vj_tag_set_color(int t1, int value);
 int 	vj_tag_set_hue(int t1, int value);
-
+int	vj_tag_set_white(int t1, int value);
 void 	vj_tag_set_veejay_t(void *info);
 
 int 	vj_tag_set_manual_fader(int t1, int value );
@@ -275,6 +271,7 @@ int 	vj_tag_is_deleted(int id);
 void 	vj_tag_close_all(); 
 int 	vj_tag_continue_record( int t1 );
 int 	vj_tag_set_logical_index(int t1, int stream_nr);
-
+int	vj_tag_set_description(int t1, char *descr);
+int	vj_tag_get_description(int t1, char *descr);
 
 #endif

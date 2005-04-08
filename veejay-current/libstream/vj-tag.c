@@ -21,7 +21,11 @@
    this is one of veejay's most important components.
    and it needs to be refactorized
     (vj-v4lvideo, vj-avcodec, vj-avformat, vj-yuv4mpeg, vj-rgb)
-       
+ 
+   TODO:(2005)
+   refactor this pile of junk (merge with libsample),
+   
+      
  */
 #include <config.h>
 #include <string.h>
@@ -60,7 +64,6 @@ static int avail_tag[CLIP_MAX_CLIPS];
 static int last_added_tag = 0;
 
 //forward decl
-
 
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p );
 int _vj_tag_new_avformat( vj_tag *tag, int stream_nr, editlist *el);
@@ -363,6 +366,25 @@ int	_vj_tag_new_dv1394(vj_tag *tag, int stream_nr, int channel,int quality, edit
    return 0;
 }
 #endif
+
+int	vj_tag_set_stream_color(int t1, int r, int g, int b)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag)
+	return 0;
+    if(tag->source_type != VJ_TAG_TYPE_COLOR)
+	return 0;
+
+	veejay_msg(VEEJAY_MSG_DEBUG,"Set stream %d color %d,%d,%d",t1,
+		r,g, b );
+ 
+    tag->color_r = r;
+    tag->color_g = g;
+    tag->color_b = b;
+
+    return (vj_tag_update(tag,t1));
+}
+
 // for network, filename /channel is passed as host/port num
 int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	        int pix_fmt, int channel )
@@ -383,12 +405,15 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	}
     n = this_tag_id;
     /* see if we are already using the source */
-    for (i = 1; i < n; i++)
-	{
-		if (vj_tag_exists(i))
+    if( type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST )
+    {
+	for (i = 1; i < n; i++)
+	{	
+		if (vj_tag_exists(i) )
 		{
 		    vj_tag_get_source_name(i, sourcename);
-		    if (strcmp(sourcename, filename) == 0) {
+		    if (strcmp(sourcename, filename) == 0)
+		    {
 			vj_tag *tt = vj_tag_get( i );
 			if( tt->source_type == VJ_TAG_TYPE_NET || tt->source_type == VJ_TAG_TYPE_MCAST )
 			{
@@ -399,23 +424,18 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 					return -1;
 				}
 			}
-			else
-			{
-				veejay_msg(VEEJAY_MSG_WARNING,
-					   "Stream [%d] is already owner of file [%s]\n", n,
-					   filename);
-				return -1;
-			}
-	    }
+	    	    }
 		}
+    	}
     }
     tag = (vj_tag *) vj_malloc(sizeof(vj_tag));
 	if(!tag)
 		return -1; 
+
     tag->source_name = (char *) malloc(sizeof(char) * 255);
     if (!tag->source_name)
 		return -1;
-
+    bzero(tag->source_name, 255 );
 
      /* see if we can reclaim some id */
     for(i=0; i <= next_avail_tag; i++) {
@@ -459,9 +479,6 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->rec_total_bytes = 0;
     tag->encoder_total_frames = 0;
 	tag->source = 0;
-    tag->freeze_mode = 0;
-    tag->freeze_nframes = 0;
-    tag->freeze_pframes = 0;
     tag->fader_active = 0;
     tag->fader_val = 0.0;
     tag->fader_inc = 0.0;
@@ -471,9 +488,13 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->effect_toggle = 1; /* same as for clips */
     tag->socket_ready = 0;
     tag->socket_frame = NULL;
-
+    tag->color_r = 0;
+    tag->color_g = 0;
+    tag->color_b = 0;
+    tag->opacity = 0; 
     palette = (pix_fmt == FMT_420 ? VIDEO_PALETTE_YUV420P : VIDEO_PALETTE_YUV422P);
     
+ 
     switch (type) {
 #ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
@@ -491,8 +512,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 			return -1;
 		tag->active = 0;
 	break;
-#ifdef SUPPORT_READ_DV2
     case VJ_TAG_TYPE_DV1394:
+#ifdef SUPPORT_READ_DV2
 	sprintf(tag->source_name, "/dev/dv1394");
 	if( _vj_tag_new_dv1394( tag, stream_nr,channel,1,el ) == 0 )
 	{
@@ -501,6 +522,9 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	}
 	tag->active = 1;
 	break;
+#else
+	veejay_msg(VEEJAY_MSG_DEBUG, "libdv not enabled at compile time");
+	return -1;
 #endif
     case VJ_TAG_TYPE_AVFORMAT:
 	sprintf(tag->source_name, "%s", filename);
@@ -522,17 +546,27 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	sprintf(tag->source_name, "%s", "SHM");  
 	veejay_msg(VEEJAY_MSG_INFO, "Opened SHM as Stream");
 	break;
+/*
     case VJ_TAG_TYPE_WHITE:
     case VJ_TAG_TYPE_BLACK:
     case VJ_TAG_TYPE_RED:
     case VJ_TAG_TYPE_GREEN:
     case VJ_TAG_TYPE_YELLOW:
     case VJ_TAG_TYPE_BLUE:
-	vj_tag_get_description(type,tag->source_name);
+*/
+	case VJ_TAG_TYPE_COLOR:
+	sprintf(tag->source_name, "solid-[%d,%d,%d]",
+		tag->color_r,tag->color_g,tag->color_b );
+		
 	break;
+
     default:
 	return -1;
     }
+
+
+   sprintf( tag->descr, "%s", tag->source_name );
+
 
     /* effect chain is empty */
     for (i = 0; i < CLIP_MAX_EFFECTS; i++)
@@ -558,7 +592,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     last_added_tag = tag->id; 
 
 
-   return 1;
+   return (int)(tag->id);
 }
 
 
@@ -638,20 +672,20 @@ int vj_tag_del(int id)
     }
 
     tag_node = hash_lookup(TagHash, (void *) tag->id);
-    if(tag_node) {
-      for (i = 0; i < CLIP_MAX_EFFECTS; i++) {
-	if (tag->effect_chain[i])
-	    free(tag->effect_chain[i]);
-      }
-      if(tag->source_name) free(tag->source_name);
-      if(tag->encoder_active)
+    if(tag_node)
 	{
+        if(tag->encoder_active)
 		vj_tag_stop_encoder( tag->id );	
-	}
-      if(tag) free(tag);
-      avail_tag[ next_avail_tag] = id;
-      next_avail_tag++;
-      hash_delete(TagHash, tag_node);
+        if(tag->source_name) free(tag->source_name);
+
+      	for (i = 0; i < CLIP_MAX_EFFECTS; i++) 
+		if (tag->effect_chain[i])
+		    free(tag->effect_chain[i]);
+
+      	if(tag) free(tag);
+      	avail_tag[ next_avail_tag] = id;
+      	next_avail_tag++;
+      	hash_delete(TagHash, tag_node);
       return 1;
   }
   return -1;
@@ -688,6 +722,26 @@ float vj_tag_get_fader_val(int t1) {
    vj_tag *tag = vj_tag_get(t1);
    if(!tag) return -1;
    return ( tag->fader_val );
+}
+
+
+int	vj_tag_set_description(int t1, char *description)
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return 0;
+	if(!description || strlen(description) <= 0 )
+		snprintf( tag->descr, TAG_MAX_DESCR_LEN, "%s","Untitled"); 
+	else
+		snprintf( tag->descr, TAG_MAX_DESCR_LEN, "%s", description );
+	return ( vj_tag_update(tag, t1)) ;
+}
+
+int	vj_tag_get_description( int t1, char *description )
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return 0;
+	snprintf( description ,TAG_MAX_DESCR_LEN, "%s", tag->descr );
+	return 1;
 }
 
 int vj_tag_set_manual_fader(int t1, int value )
@@ -1040,6 +1094,30 @@ int vj_tag_set_brightness(int t1, int value)
 	}
 	return 1;
 }
+
+int vj_tag_set_white(int t1, int value)
+{
+	vj_tag *tag = vj_tag_get(t1);
+
+	if(!tag) return -1;
+	if(tag->source_type!=VJ_TAG_TYPE_V4L)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Brightness adjustment only for v4l devices");
+		return -1;
+	}
+	if(value < 0 || value > 65535)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Brightness valid range is 0 - 65535");
+		return -1;
+	}
+	else
+	{
+		v4l_video *v4l = vj_tag_input->v4l[tag->index];
+		v4lsetpicture( v4l->device, -1,-1,-1,-1,value );
+	}
+	return 1;
+}
+
 int vj_tag_set_hue(int t1, int value)
 {
 	vj_tag *tag = vj_tag_get(t1);
@@ -1107,6 +1185,34 @@ int vj_tag_set_color(int t1, int value)
 	}
 	return 1;
 }
+
+
+int	vj_tag_get_v4l_properties(int t1,
+		int *brightness, int *hue,int *contrast, int *color, int *white )
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return -1;
+	if(tag->source_type!=VJ_TAG_TYPE_V4L)
+	{
+		return -1;
+	}
+
+	v4l_video *v4l = vj_tag_input->v4l[tag->index];	
+	v4ldevice *vd = v4l->device;
+
+	int err = v4lgetpicture( vd );
+	if(err == 0 )
+	{
+		*brightness = vd->picture.brightness;
+		*hue	    = vd->picture.hue;
+		*contrast   = vd->picture.contrast;
+		*white	    = vd->picture.whiteness;
+		*color	    = vd->picture.colour;
+		return 1;
+	}
+	return 0;
+}
+
 #endif
 
 int vj_tag_get_effect_any(int t1, int position) {
@@ -1612,32 +1718,17 @@ void vj_tag_get_source_name(int t1, char *dst)
 	sprintf(dst, "error in tag %d", t1);
     }
 }
-
-void vj_tag_get_description(int id, char *description)
+#include <valgrind/memcheck.h>
+void vj_tag_get_descriptive(int id, char *description)
 {
     vj_tag *tag = vj_tag_get(id);
-    int type ;
     if(!tag) {sprintf(description, "invalid");return;}
     	
-    type = tag->source_type;
+    int type = tag->source_type;
     switch (type) {
-    case VJ_TAG_TYPE_WHITE:
-	sprintf(description,"%s", "Solid_White");
-	break;
-    case VJ_TAG_TYPE_BLACK:
-   	sprintf(description,"%s", "Solid_Black");
-	break;
-    case VJ_TAG_TYPE_RED:
-	sprintf(description,"%s", "Solid_Red");
-	break;
-    case VJ_TAG_TYPE_BLUE:
-	sprintf(description, "%s", "Solid_Blue");
-	break;
-    case VJ_TAG_TYPE_YELLOW:
-	sprintf(description, "%s", "Solid_Yellow");
-	break;
-    case VJ_TAG_TYPE_GREEN:
-	sprintf(description, "%s", "Solid_Green");
+    case VJ_TAG_TYPE_COLOR:
+	sprintf(description, "Solid {R=%d,G=%d,B=%d}",
+		tag->color_r,tag->color_g,tag->color_b);
 	break;
     case VJ_TAG_TYPE_NONE:
 	sprintf(description, "%s", "EditList");
@@ -1807,8 +1898,9 @@ int vj_tag_get_audio_frame(int t1, uint8_t *dst_buffer)
 		vj_dv_decoder_get_audio( vj_tag_input->dv1394[tag->index], dst_buffer );	
 	}
 #endif
-	if(tag->source_type != VJ_TAG_TYPE_AVFORMAT) return 0;
-	return (vj_avformat_get_audio( vj_tag_input->avformat[tag->index], dst_buffer, -1 ));    
+	if(tag->source_type == VJ_TAG_TYPE_AVFORMAT)
+		return (vj_avformat_get_audio( vj_tag_input->avformat[tag->index], dst_buffer, -1 ));
+    return 0;    
 }
 
 
@@ -1822,15 +1914,13 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
     int height = vj_tag_input->height;
     int uv_len = (vj_tag_input->width * vj_tag_input->height);
     int len = (width * height);
-	char buf[10];
+    char buf[10];
+
+	if(!tag) return -1;  
+
     if( vj_tag_input->pix_fmt == FMT_420) uv_len = uv_len / 4;
     if( vj_tag_input->pix_fmt == FMT_422) uv_len = uv_len / 2;
 
-    if (!tag)
-	{	
-		veejay_msg(VEEJAY_MSG_ERROR,"Stream %d doesnt exist!!!",t1);
-		return -1;
-	}
     switch (tag->source_type) {
 #ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
@@ -1838,12 +1928,12 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	{
 	    if(!vj_v4l_video_grab_start( vj_tag_input->v4l[tag->index])!=0)
 	    {
-	    veejay_msg(VEEJAY_MSG_ERROR, "Error syncing frame from v4l");
-	    memset( buffer[0], 16, len );
-	    memset( buffer[1], 128, uv_len);
-	    memset( buffer[2], 128, uv_len);
-	    return 1;
-            }
+	    	veejay_msg(VEEJAY_MSG_ERROR, "Error syncing frame from v4l");
+	    	memset( buffer[0], 16, len );
+	    	memset( buffer[1], 128, uv_len);
+	   		memset( buffer[2], 128, uv_len);
+	 		return 1;
+        }
 	}
 	/*todo: pointer to colorspace converter function */
 	address = vj_v4l_video_get_address(vj_tag_input->v4l[tag->index]);
@@ -1927,29 +2017,21 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	consume( _tag_info->client, buffer, width * height  );
 	return 1;
 	break;
-	break;
-    case VJ_TAG_TYPE_RED: dummy_color = VJ_EFFECT_COLOR_RED; break;
-    case VJ_TAG_TYPE_WHITE: dummy_color = VJ_EFFECT_COLOR_WHITE; break;
-    case VJ_TAG_TYPE_BLACK: dummy_color = VJ_EFFECT_COLOR_BLACK; break;
-    case VJ_TAG_TYPE_YELLOW: dummy_color =VJ_EFFECT_COLOR_YELLOW; break;
-    case VJ_TAG_TYPE_BLUE: dummy_color = VJ_EFFECT_COLOR_BLUE;  break;
-    case VJ_TAG_TYPE_GREEN: dummy_color =VJ_EFFECT_COLOR_GREEN; break;	
-		
-    case VJ_TAG_TYPE_NONE:
-	/* clip */
-    default:
-	break;
-    }
-	if(dummy_color >=0)
-	{
-		_tmp->len 	= len;
-		_tmp->uv_len = uv_len;
+    case VJ_TAG_TYPE_COLOR:
+		_tmp->len     = len;
+		_tmp->uv_len  = uv_len;
 		_tmp->data[0] = buffer[0];
 		_tmp->data[1] = buffer[1];
 		_tmp->data[2] = buffer[2];
-		dummy_apply( _tmp, width, height, dummy_color );
-	}
-
+		dummy_rgb_apply( _tmp, width, height, 
+			tag->color_r,tag->color_g,tag->color_b );
+		break;
+    case VJ_TAG_TYPE_NONE:
+	/* clip */
+		break;
+    default:
+	break;
+    }
     return 1;
 
 }
@@ -2000,9 +2082,9 @@ int vj_tag_sprint_status( int tag_id, int pfps,int frame, int mode, char *str )
 			mode,
 			tag_id,
 			tag->effect_toggle,
-			0, // no start,
-			0, // no end,
-			0, // no speed,
+			tag->color_r, // no start, but color
+			tag->color_g, // no end,
+			tag->color_b, // no speed,
 			0, // no looping
 			tag->encoder_active,
 			tag->encoder_duration,

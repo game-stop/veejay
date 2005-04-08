@@ -117,8 +117,8 @@ int vj_yuv_stream_start_read(vj_yuv * yuv4mpeg, char *filename, int width,
 int vj_yuv_stream_write_header(vj_yuv * yuv4mpeg, editlist * el)
 {
     int i = 0;
-    y4m_si_set_width(&(yuv4mpeg->streaminfo), el->video_width);
-    y4m_si_set_height(&(yuv4mpeg->streaminfo), el->video_height);
+    y4m_si_set_width(&(yuv4mpeg->streaminfo), yuv4mpeg->width);
+    y4m_si_set_height(&(yuv4mpeg->streaminfo), yuv4mpeg->height);
     y4m_si_set_interlace(&(yuv4mpeg->streaminfo), el->video_inter);
     y4m_si_set_framerate(&(yuv4mpeg->streaminfo),
 			 mpeg_conform_framerate(el->video_fps));
@@ -129,8 +129,8 @@ int vj_yuv_stream_write_header(vj_yuv * yuv4mpeg, editlist * el)
 	yuv4mpeg->sar.d = el->video_sar_height;
 	y4m_si_set_sampleaspect(&(yuv4mpeg->streaminfo), yuv4mpeg->sar);
     } else {
-	y4m_ratio_t dar2 = y4m_guess_sar(el->video_width,
-					 el->video_height,
+	y4m_ratio_t dar2 = y4m_guess_sar(yuv4mpeg->width,
+					 yuv4mpeg->height,
 					 yuv4mpeg->dar);
 	y4m_si_set_sampleaspect(&(yuv4mpeg->streaminfo), dar2);
     }
