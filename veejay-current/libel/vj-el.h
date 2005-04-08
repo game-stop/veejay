@@ -89,6 +89,8 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3], int pix_fm
 
 int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst);
 
+int	vj_el_get_file_fourcc(editlist *el, int num, char *buf);
+
 void	vj_el_print(editlist *el);
 
 int     vj_el_init_420_frame(editlist *el, VJFrame *frame);

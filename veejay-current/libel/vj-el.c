@@ -24,7 +24,7 @@
 
 	http://mjpeg.sourceforge.net
 */
-
+#include <valgrind/memcheck.h>
 #include <config.h>
 #include <string.h>
 #include <libvjmsg/vj-common.h>
@@ -40,6 +40,10 @@
 #include "avcodec.h"
 #include <math.h>
 #include <stdlib.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #ifdef SUPPORT_READ_DV2
 #include "rawdv.h"
 #endif
@@ -226,33 +230,27 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
      */
   //  bzero(realname, PATH_MAX);
 
+    if( filename == NULL ) 
+	return -1;
+
+
     if (preserve_pathname)
-	{
 		realname = strdup(filename);
-	//	strcpy(realname, filename);
-    }
     else
 	realname = canonicalize_file_name( filename );
-
-	//else if (realpath(filename, realname) == 0)
-	//{
-	//	veejay_msg(VEEJAY_MSG_ERROR ,"Cannot deduce real filename");
-	//	return -1;
-    //}
-
-	if(!realname)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Errorss ? [%s] %d",filename,preserve_pathname);
-	}
+    if(realname == NULL )
+	return -1;
 
     for (i = 0; i < el->num_video_files; i++)
+   {
+	/* crash here if file doesnt exist !*/
 		if (strcmp(realname, el->video_file_list[i]) == 0)
 		{
 		    veejay_msg(VEEJAY_MSG_ERROR, "File %s already open", realname);
 	    	return i;
 		}
-
-    /* Check if MAX_EDIT_LIST_FILES will be exceeded */
+   }
+     /* Check if MAX_EDIT_LIST_FILES will be exceeded */
 
     if (el->num_video_files >= MAX_EDIT_LIST_FILES)
 	{
@@ -320,12 +318,6 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
     el->num_frames[n] = lav_video_frames(el->lav_fd[n]);
     el->video_file_list[n] = strndup(realname, strlen(realname));
-    if (el->video_file_list[n] == 0)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate a few bytes");
-		return -1;	
-	}	
-
     /* Debug Output */
 
     veejay_msg(VEEJAY_MSG_DEBUG,"File: %s, absolute name: %s", filename, realname);
@@ -537,6 +529,20 @@ static int	vj_el_dummy_frame( uint8_t *dst[3], editlist *el ,int pix_fmt)
 	return 1;
 }
 
+int	vj_el_get_file_fourcc(editlist *el, int num, char *fourcc)
+{
+	if(num >= el->num_video_files)
+		return 0;
+	if( fourcc == NULL)
+		return 0;
+
+	const char *compr = lav_video_compressor( el->lav_fd[num] );
+	if(compr == NULL)
+		return 0;
+	snprintf(fourcc,4,"%s", compr );
+	return 1;
+}
+
 int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3], int pix_fmt)
 {
 	int res;
@@ -556,12 +562,9 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3], int pix_fm
 
     n = el->frame_list[nframe];
 
-    res = lav_set_video_position(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n));
-
+    	res = lav_set_video_position(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n));
 	decoder_id = lav_video_compressor_type( el->lav_fd[N_EL_FILE(n)] );
-
 	c_i = _el_get_codec( decoder_id );
-
  	if(c_i >= 0 && c_i < MAX_CODECS)
 	{
 		d = el_codecs[c_i];
@@ -573,18 +576,12 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3], int pix_fm
 		return -1;
 	}
 
-    if (res < 0)
+	if (res < 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Error setting video position: %s",
 			  lav_strerror());
-    }
-    res = lav_read_frame(el->lav_fd[N_EL_FILE(n)], d->tmp_buffer);
-
-  	if (res < 0)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Error reading video frame: %s", lav_strerror());
-		return -1;
-    	}
+ 	}
+	res = lav_read_frame(el->lav_fd[N_EL_FILE(n)], d->tmp_buffer);
 
 	if( decoder_id == CODEC_ID_YUV420 )
 	{	/* yuv420 raw */
@@ -634,6 +631,11 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3], int pix_fm
 		int len;
 		int got_picture = 0;
 		int inter = lav_video_interlacing(el->lav_fd[N_EL_FILE(n)]);
+
+		VALGRIND_CHECK_DEFINED(d->context);
+		VALGRIND_CHECK_DEFINED(d->frame);
+		VALGRIND_CHECK_DEFINED(d->tmp_buffer);
+		VALGRIND_CHECK_DEFINED(res);
 		len = avcodec_decode_video(d->context, d->frame, &got_picture, d->tmp_buffer, res); 	
 		if(len>0)
 		{
@@ -887,39 +889,43 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 
 	for (; nf < num_files; nf++)
 	{
-		/* Check if filename[nf] is a edit list */
-		fd = fopen(filename[nf], "r");
-		if (fd == 0)
-		{
-	   	 veejay_msg(VEEJAY_MSG_ERROR,"Error opening %s:", filename[nf]);
-	 	 vj_el_free(el);
-	 	 return NULL;
-		}
-		fgets(line, 1024, fd);
-		if (strcmp(line, "LAV Edit List\n") == 0)
-		{
-			   	/* Ok, it is a edit list */
-		    	veejay_msg(VEEJAY_MSG_DEBUG, "Edit list %s opened", filename[nf]);
-		    	/* Read second line: Video norm */
-		    	fgets(line, 1024, fd);
-		    	if (line[0] != 'N' && line[0] != 'n' && line[0] != 'P' && line[0] != 'p')
+		/* Check if file really exists, is mounted etc... */
+		struct stat fileinfo;
+		if(stat( filename[nf], &fileinfo)!= -1) 
+		{	/* Check if filename[nf] is a edit list */
+			fd = fopen(filename[nf], "r");
+			if (fd <= 0)
+			{
+			   	 veejay_msg(VEEJAY_MSG_ERROR,"Error opening %s:", filename[nf]);
+			 	 vj_el_free(el);
+	 			 return NULL;
+			}
+		
+			fgets(line, 1024, fd);
+			if (strcmp(line, "LAV Edit List\n") == 0)
+			{
+				   	/* Ok, it is a edit list */
+			    	veejay_msg(VEEJAY_MSG_DEBUG, "Edit list %s opened", filename[nf]);
+			    	/* Read second line: Video norm */
+			    	fgets(line, 1024, fd);
+			    	if (line[0] != 'N' && line[0] != 'n' && line[0] != 'P' && line[0] != 'p')
 				{
 					veejay_msg(VEEJAY_MSG_ERROR,"Edit list second line is not NTSC/PAL");
 					vj_el_free(el);
 					return NULL;
 				}
 				veejay_msg(VEEJAY_MSG_DEBUG,"Edit list norm is %s", line[0] =='N' || line[0] == 'n' ? "NTSC" : "PAL" );
-		    	if (line[0] == 'N' || line[0] == 'n')
-				{
-					if (el->video_norm == 'p')
-					{	
-						veejay_msg(VEEJAY_MSG_ERROR, "Norm already set to PAL");
-						vj_el_free(el);
-						return NULL;
+			    	if (line[0] == 'N' || line[0] == 'n')
+					{
+						if (el->video_norm == 'p')
+						{	
+							veejay_msg(VEEJAY_MSG_ERROR, "Norm already set to PAL");
+							vj_el_free(el);
+							return NULL;
+						}
+						el->video_norm = 'n';
 					}
-					el->video_norm = 'n';
-				}
-		    	else
+		    		else
 				{
 					if (el->video_norm == 'n')
 					{
@@ -928,15 +934,15 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 						return NULL;
 					}
 					el->video_norm = 'p';
-		    	}
-		    	/* read third line: Number of files */
-		    	fgets(line, 1024, fd);
-		    	sscanf(line, "%d", &num_list_files);
+			    	}
+		   	 	/* read third line: Number of files */
+		    		fgets(line, 1024, fd);
+		    		sscanf(line, "%d", &num_list_files);
 
-		    	veejay_msg(VEEJAY_MSG_DEBUG, "Edit list contains %d files", num_list_files);
+		   	 	veejay_msg(VEEJAY_MSG_DEBUG, "Edit list contains %d files", num_list_files);
 		   		/* read files */
 
-		    	for (i = 0; i < num_list_files; i++)
+			    	for (i = 0; i < num_list_files; i++)
 				{
 					fgets(line, 1024, fd);
 					n = strlen(line);
@@ -971,7 +977,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 						    if (nl < 0 || nl >= num_list_files)
 							{
 					    		veejay_msg(VEEJAY_MSG_ERROR,"Wrong file number in edit list entry");
-								//vj_el_free(el);
+								vj_el_free(el);
 								return NULL;
 			    				}
 						    if (n1 < 0)
@@ -981,7 +987,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 			    			    if (n2 < n1)
 							continue;
 	
-						    el->frame_list = (uint64_t *) realloc(el->frame_list,
+					 el->frame_list = (uint64_t *) realloc(el->frame_list,
 								      (el->video_frames +
 								       n2 - n1 +
 								       1) * sizeof(uint64_t));
@@ -1003,52 +1009,63 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 						}
 		    		} /* done reading editlist entries */
 			fclose(fd);
-		}
-		else
-		{
-	    	/* Not an edit list - should be a ordinary video file */
-	    		fclose(fd);
-
-		     	n = open_video_file(filename[nf], el, flags, deinterlace,force);
-	    		if(n==-1 || n==-2)
-			{
-				veejay_msg(VEEJAY_MSG_DEBUG, "Cannot put file %s  in editlist", filename[nf]);
-				vj_el_free(el);
-				return NULL;
 			}
-		        el->frame_list = (uint64_t *) realloc(el->frame_list,
+			else
+			{
+	    		/* Not an edit list - should be a ordinary video file */
+	    			fclose(fd);
+
+		     		n = open_video_file(filename[nf], el, flags, deinterlace,force);
+	   	 		if(n==-1 || n==-2)
+				{
+					veejay_msg(VEEJAY_MSG_DEBUG, "Cannot put file %s  in editlist", filename[nf]);
+					vj_el_free(el);
+					return NULL;
+				}
+			        el->frame_list = (uint64_t *) realloc(el->frame_list,
 					      (el->video_frames +
 					       el->num_frames[n]) *
 					      sizeof(uint64_t));
-			if (el->frame_list==NULL)
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
-				vj_el_free(el);
-				return NULL;
-			}
+				if (el->frame_list==NULL)
+				{
+					veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
+					vj_el_free(el);
+					return NULL;
+				}
 
-	    		for (i = 0; i < el->num_frames[n]; i++)
-			{
-				el->frame_list[el->video_frames] = EL_ENTRY(n, i);
-				el->video_frames++;
+	    			for (i = 0; i < el->num_frames[n]; i++)
+				{
+					el->frame_list[el->video_frames] = EL_ENTRY(n, i);
+					el->video_frames++;
+				}
 			}
+    		}
+		else
+		{
+			/* file is not there anymore ? */
+			veejay_msg(VEEJAY_MSG_WARNING,
+				"File %s is not acceessible (anymore?)", filename[nf]);
+			vj_el_free(el);
+			return NULL;
 		}
-    }
+	}
 
-    /* Calculate maximum frame size */
+	/* Calculate maximum frame size */
 
-    for (i = 0; i < el->video_frames; i++)
+	for (i = 0; i < el->video_frames; i++)
 	{
 		n = el->frame_list[i];
+		if(!el->lav_fd[N_EL_FILE(n)] )
+			{ vj_el_free(el); return NULL; }
 		if (lav_frame_size(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n)) >
 		    el->max_frame_size)
 		    el->max_frame_size =
 			lav_frame_size(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n));
    	}
 
-    /* Help for audio positioning */
+	/* Help for audio positioning */
 
-    el->last_afile = -1;
+	el->last_afile = -1;
 
 
     //el->auto_deinter = auto_deinter;
@@ -1180,6 +1197,116 @@ editlist *vj_el_probe_from_file( char *filename )
 	return el;
 }
 
+MPEG_timecode_t get_timecode(editlist *el, long num_frames)
+{
+	MPEG_timecode_t tc;
+	memset(&tc,0,sizeof(tc));
+	mpeg_timecode(&tc, num_frames,
+			mpeg_framerate_code( mpeg_conform_framerate( el->video_fps )),
+			el->video_fps );
+	return tc;
+}
+
+char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
+{
+	int num_files;
+	int64_t oldfile, oldframe;
+	int64_t index[MAX_EDIT_LIST_FILES];
+	int64_t n;
+	char *result = NULL;
+	int64_t n1 = 0;
+	int64_t j = 0;
+	int64_t n2 = el->video_frames-1;
+	/* get which files are actually referenced in the edit list entries */
+	int est_len = 0;
+	int row_num = 0;
+   	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
+		index[j] = -1;
+
+   	for (j = n1; j <= n2; j++)
+	{
+		n = el->frame_list[j];
+		index[N_EL_FILE(n)] = 1;
+	}
+   
+	num_files = 0;
+   	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
+	{
+		if (index[j] > 0 )
+			index[j] = (uint64_t)num_files++;
+	}
+	int nnf = 0;
+	for ( j = 0; j < MAX_EDIT_LIST_FILES ; j ++ )
+		if(index[j] >= 0 && el->video_file_list[j] != NULL)
+		{
+			nnf ++;
+		}
+	n = el->frame_list[n1];
+	oldfile = index[ N_EL_FILE(n) ];
+   	oldframe = N_EL_FRAME(n);
+ 
+	
+	est_len = num_files * 1024;
+	result = (char*) vj_malloc(sizeof(char) * est_len );
+	bzero( result, est_len );
+	sprintf(result, "%04d",num_files );
+
+	int te = 0;
+	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
+	{
+		if (index[j] >= 0 && el->video_file_list[j] != NULL)
+		{
+			char filename[400];
+			char fourcc[5];
+			bzero(filename,400);
+			sprintf(fourcc, "%s", "????");
+			vj_el_get_file_fourcc( el, j, fourcc );
+			sprintf(filename ,"%03d%s%04d%010d%02d%s",
+				strlen( el->video_file_list[j]  ),
+				el->video_file_list[j],
+				(int) j,
+				el->num_frames[j],
+				strlen(fourcc),
+				fourcc 
+			);
+			sprintf(fourcc, "%04d", strlen( filename ));
+			strncat( result, fourcc, strlen(fourcc ));
+			strncat ( result, filename, strlen(filename));
+		}
+	}
+
+	char first[33];
+	bzero(first,33);
+	sprintf(first, "%016lld%016lld",oldfile, oldframe);
+	strncat( result, first, strlen(first) );
+
+  	for (j = n1+1; j <= n2; j++)
+	{
+		n = el->frame_list[j];
+		if ( index[ N_EL_FILE(n) ] != oldfile ||
+			N_EL_FRAME(n) != oldframe + 1 )	
+		{
+			int len = 20 + (16 * 3 ) + strlen( el->video_file_list[ index[N_EL_FILE(n)] ] );
+			char *tmp = (char*) vj_malloc(sizeof(char) * len );
+			bzero(tmp,len);	
+			sprintf( tmp, "%016lld%016lld%016lld",
+				 oldframe,
+				 index[N_EL_FILE(n)],
+				 N_EL_FRAME(n) );
+			strncat( result, tmp, strlen(tmp) );
+			free(tmp);
+		}
+		oldfile = index[N_EL_FILE(n)];
+		oldframe = N_EL_FRAME(n);
+    	}
+
+	char last_word[16];
+	sprintf(last_word,"%016lld", oldframe);
+	strncat( result, last_word, 16 );
+	*bytes_written = strlen( result );
+
+	return result;
+}
 
 
 int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )

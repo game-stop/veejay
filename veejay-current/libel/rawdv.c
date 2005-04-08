@@ -181,8 +181,8 @@ int	rawdv_set_position(dv_t *dv, long nframe)
 	dv->offset = offset;
 
 	if( lseek( dv->fd, offset, SEEK_SET ) < 0 )
-		return 0;
-	return 1;
+		return -1;
+	return 0;
 }
 
 int	rawdv_read_frame(dv_t *dv, uint8_t *buf )
