@@ -34,10 +34,10 @@ vj_effect *greyselect_init(int w, int h)
     ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 10;	/* angle */
-    ve->defaults[1] = 0;	/* r */
+    ve->defaults[0] = 300;	/* angle */
+    ve->defaults[1] = 255;	/* r */
     ve->defaults[2] = 0;	/* g */
-    ve->defaults[3] = 255;	/* b */
+    ve->defaults[3] = 0;	/* b */
     ve->limits[0][0] = 5;
     ve->limits[1][0] = 900;
 
@@ -53,6 +53,7 @@ vj_effect *greyselect_init(int w, int h)
     ve->description = "Grayscale by Color Key";
     ve->extra_frame = 0;
     ve->sub_format = 1;
+    ve->rgb_conv = 1;
     return ve;
 }
 
@@ -73,11 +74,12 @@ void greyselect_apply( VJFrame *frame, int width,
 	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
+	int iy,iu,iv;
+	_rgb2yuv(r,g,b,iy,iu,iv);
+	_y = (float) iy;
+	aa = (float) iu;
+	bb = (float) iv;
 
-
-    _y = ((Y_Redco * r) + (Y_Greenco * g) + (Y_Blueco * b) + 16);
-    aa = ((U_Redco * r) - (U_Greenco * g) - (U_Blueco * b) + 128);
-    bb = (-(V_Redco * r) - (V_Greenco * g) + (V_Blueco * b) + 128);
     tmp = sqrt(((aa * aa) + (bb * bb)));
     cb = 127 * (aa / tmp);
     cr = 127 * (bb / tmp);

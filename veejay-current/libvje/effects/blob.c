@@ -69,12 +69,12 @@ typedef struct
 static blob_t 	*blobs_;
 static uint8_t 	**blob_;
 static uint8_t 	*blob_image_;
-static int		blob_ready_		 = 0;
+static int		blob_ready_	 = 0;
 static int		blob_radius_ 	 = 16;
 static int		blob_dradius_ 	 = 0;
 static int		blob_sradius_ 	 = 0;
-static int		blob_num_		 = 50;
-static int		blob_type_		 = 1;
+static int		blob_num_	 = 50;
+static int		blob_type_	 = 1;
 
 vj_effect *blob_init(int w, int h)
 {
@@ -83,7 +83,7 @@ vj_effect *blob_init(int w, int h)
     ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
+    ve->limits[0][0] = 1;
     ve->limits[1][0] = 360;  // radius
     ve->limits[0][1] = 1; 
     ve->limits[1][1] = 100;  // num blobs
@@ -124,6 +124,7 @@ int	blob_malloc(int w, int h)
 	{
 		blob_[i] = (uint8_t*) vj_malloc(sizeof(uint8_t) * blob_dradius_ );
 		if(!blob_[i]) return 0;
+		memset( blob_[i], 0 , blob_dradius_ );
 	}
 
 	blobs_ = (blob_t*) vj_malloc(sizeof(blob_t) * blob_num_ );
@@ -131,7 +132,6 @@ int	blob_malloc(int w, int h)
 
 	blob_image_ = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
 	if(!blob_image_) return 0;
-
 		
 	for( i = -blob_radius_ ; i < blob_radius_ ; ++ i )
 	{
@@ -172,6 +172,8 @@ void blob_free()
 		free(blobs_);
 	if(blob_image_)
 		free(blob_image_);
+	blobs_ = NULL;
+	blob_image_ = NULL;
 }
 
 typedef void (*blob_func)(int s, int width);

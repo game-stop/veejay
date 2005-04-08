@@ -18,9 +18,11 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include "dummy.h"
-#include "common.h"
+#include <config.h>
 #include <stdlib.h>
+#include <libvje/vje.h>
+#include <libvje/effects/common.h>
+
 vj_effect *dummy_init(int w, int h)
 {
 
@@ -47,16 +49,15 @@ vj_effect *dummy_init(int w, int h)
 	ve->has_user= 0;
 	return ve;
 }
-
 void dummy_apply( VJFrame *frame, int width, int height, int color)
 {
     const int len = frame->len;
-	const int uv_len = frame->uv_len;
+    const int uv_len = frame->uv_len;
     char colorCb, colorCr, colorY;
 
- 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
+    uint8_t *Y = frame->data[0];
+    uint8_t *Cb = frame->data[1];
+    uint8_t *Cr = frame->data[2];
 
     colorY = bl_pix_get_color_y(color);
     colorCb = bl_pix_get_color_cb(color);
@@ -65,5 +66,23 @@ void dummy_apply( VJFrame *frame, int width, int height, int color)
     memset( Y, colorY, len);
     memset( Cb,colorCb,uv_len);
     memset( Cr,colorCr,uv_len);
+}
+
+void dummy_rgb_apply( VJFrame *frame, int width, int height, int r,int g, int b)
+{
+    	const int len = frame->len;
+	const int uv_len = frame->uv_len;
+	int colorCb, colorCr, colorY;
+
+ 	uint8_t *Y = frame->data[0];
+	uint8_t *Cb = frame->data[1];
+	uint8_t *Cr = frame->data[2];
+
+ 
+	_rgb2yuv(r,g,b,colorY,colorCb,colorCr);
+  
+ 	memset( Y, colorY, len);
+    	memset( Cb,colorCb,uv_len);
+   	memset( Cr,colorCr,uv_len);
 }
 void dummy_free(){}

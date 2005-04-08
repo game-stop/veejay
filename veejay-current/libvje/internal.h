@@ -364,7 +364,7 @@ extern void diffimg_apply(VJFrame *frame,
 			  int zeta);
 extern void rgbkeysmooth_apply(VJFrame *frame, VJFrame *frame2, int w,
 			       int h, int angle, int r, int g, int b,
-			       int level);
+			       int level, int noise);
 extern void scratcher_apply(VJFrame *frame, int w, int h, int o, int n,
 			    int r);
 extern void colorshift_apply(VJFrame *frame, int width, int height,
@@ -390,7 +390,7 @@ extern void mtracer_apply(VJFrame *frame, VJFrame *frame2, int w,
 			  int h, int mode, int n);
 
 extern void keyselect_apply(VJFrame *frame, VJFrame *frame2,int w,int h, int angle,int r,
-	int g, int b, int mode);
+	int g, int b, int mode, int noise);
 
 extern void greyselect_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b);
 extern void isolate_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b,
@@ -398,9 +398,9 @@ int opacity);
 
 extern void bwselect_apply(VJFrame *frame, int w, int h, int a , int b);
 
-extern void complexinvert_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b, int level);
+extern void complexinvert_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b, int i_noise);
 
-extern void complexsaturation_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b, int adj, int adjv);
+extern void complexsaturation_apply(VJFrame *frame, int w, int h, int angle, int r, int g, int b, int adj, int adjv, int inoise);
 
 extern void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int w, int h, int angle, int r, 
 	int g, int b, int level, int threshold);

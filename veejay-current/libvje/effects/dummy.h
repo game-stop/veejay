@@ -26,5 +26,6 @@
 
 vj_effect *dummy_init();
 void dummy_apply(VJFrame *frame, int width, int height, int n);
+void dummy_rgb_apply(VJFrame *frame, int width, int height, int r, int g, int b);
 void dummy_free();
 #endif

@@ -211,6 +211,8 @@ int max_width = 0;
 int max_height =0;
 
 
+int	rgb_parameter_conversion_type_ = 0;
+
 static int _get_simple_effect( int effect_id)
 {
 	int i;
@@ -486,6 +488,10 @@ void vj_effect_initialize(int width, int height)
 		{
 			if(i!=3) vj_effects[i]->static_bg = 0;
 			if(i!=(VJ_VIDEO_COUNT+58)) vj_effects[i]->has_help = 0; 
+		
+			/* bah really need to clean this up:  */
+			if(vj_effects[i]->rgb_conv != 1)
+				vj_effects[i]->rgb_conv = 0;
 		}
 	}
 
@@ -688,12 +694,13 @@ int vj_effect_get_summary(int entry, char *dst)
 
 	if(!vj_effects[entry])
 		return 0;
-		
-	sprintf(dst,"%03d%s%03d%1d%02d",
+	
+	sprintf(dst,"%03d%s%03d%1d%1d%02d",
 		strlen( vj_effects[entry]->description),
 		vj_effects[entry]->description,
 		vj_effect_get_real_id(entry),
 		vj_effects[entry]->extra_frame,
+		vj_effects[entry]->rgb_conv,
 		p
 		);
 	for(i=0; i < p; i++)
@@ -773,6 +780,18 @@ int vj_effect_get_min_v()
 int vj_effect_get_max_v()
 {
 	return VJ_VIDEO_EFFECT_MAX;
+}
+
+int	vj_effect_has_rgbkey(int effect_id)
+{
+   int entry;
+   entry = vj_effect_real_to_sequence(effect_id);
+   if (entry >= 0)
+	{
+		return ( vj_effects[entry]->rgb_conv);
+
+	}	
+   return 0;
 }
 
 int vj_effect_is_valid(int effect_id)

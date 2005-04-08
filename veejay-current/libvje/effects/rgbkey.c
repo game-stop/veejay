@@ -38,6 +38,10 @@
 	Isolate by Color ,  Complex Threshold and Blend by Color Key, 
 */
 
+/*
+	(march,2005) fixed flaw (signed vs. unsigned) in algorithm
+	             use selectable rgb -> yuv formula,
+ */
 
 vj_effect *rgbkey_init(int w,int h)
 {
@@ -47,17 +51,18 @@ vj_effect *rgbkey_init(int w,int h)
     ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 210;	/* angle */
-    ve->defaults[1] = 3500;	/* noise */
-    ve->defaults[2] = 255;	/* r */
-    ve->defaults[3] = 0;	/* g */
-    ve->defaults[4] = 0;	/* b */
-    ve->defaults[5] = 1;	/* type */
+    ve->defaults[0] = 319;	/* angle , 45 degrees*/
+    ve->defaults[1] = 0;	/* r */
+    ve->defaults[2] = 0;	/* g */
+    ve->defaults[3] = 255;	/* b */
+    ve->defaults[4] = 1;	/* type */
+    ve->defaults[5] = 3500;	/* noise */
+
     ve->limits[0][0] = 5;
     ve->limits[1][0] = 900;
 
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = 6300;
+    ve->limits[0][1] = 0;
+    ve->limits[1][1] = 255;
 
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 255;
@@ -66,14 +71,17 @@ vj_effect *rgbkey_init(int w,int h)
     ve->limits[1][3] = 255;
 
     ve->limits[0][4] = 0;
-    ve->limits[1][4] = 255;
+    ve->limits[1][4] = 1;	/* total noise suppression off */
 
-    ve->limits[0][5] = 0;
-    ve->limits[1][5] = 1;	/* total noise suppression off */
+    ve->limits[0][5] = 1;
+    ve->limits[1][5] = 6300;
+
+
 	ve->has_user = 0;
     ve->description = "Chroma Key (RGB)";
     ve->extra_frame = 1;
     ve->sub_format = 1;
+	ve->rgb_conv = 1;
     return ve;
 }
 /*
@@ -88,8 +96,8 @@ void rgbkey_scan_fg(uint8_t * src2[3], int *r, int *g, int *b)
 }
 */
 void rgbkey_apply1(VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int i_angle, int i_noise, int r, int g,
-		   int b)
+		   int height, int i_angle, int r, int g,
+		   int b, int i_noise)
 {
 
     uint8_t *fg_y, *fg_cb, *fg_cr;
@@ -99,7 +107,7 @@ void rgbkey_apply1(VJFrame *frame, VJFrame *frame2, int width,
     int cb, cr;
     int kbg, x1, y1;
     float kg1, tmp, aa = 128, bb = 128, _y = 0;
-    float angle = (float) i_angle / 10.0;
+    float angle = (float) i_angle * 0.1f;
     float noise_level = (i_noise / 100.0);
     unsigned int pos;
     uint8_t val, tmp1;
@@ -109,10 +117,11 @@ void rgbkey_apply1(VJFrame *frame, VJFrame *frame2, int width,
     uint8_t *Y2 = frame2->data[0];
  	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-
-    _y = ((Y_Redco * r) + (Y_Greenco * g) + (Y_Blueco * b) + 16);
-    aa = ((U_Redco * r) - (U_Greenco * g) - (U_Blueco * b) + 128);
-    bb = (-(V_Redco * r) - (V_Greenco * g) + (V_Blueco * b) + 128);
+	int	iy=16,iu=128,iv=128;
+	_rgb2yuv( r,g,b, iy,iu,iv );
+	_y = (float) iy;
+	aa = (float) iu;
+	bb = (float) iv;
     tmp = sqrt(((aa * aa) + (bb * bb)));
     cb = 127 * (aa / tmp);
     cr = 127 * (bb / tmp);
@@ -131,7 +140,7 @@ void rgbkey_apply1(VJFrame *frame, VJFrame *frame2, int width,
     fg_y = Y;
     fg_cb = Cb;
     fg_cr = Cr;
-
+	/* 2005: swap these !! */
     bg_y = Y2;
     bg_cb = Cb2;
     bg_cr = Cr2;
@@ -156,7 +165,7 @@ void rgbkey_apply1(VJFrame *frame, VJFrame *frame2, int width,
 	    yy = -128;
 	}
 	if (yy > 127) {
-	    yy = 127;
+	    yy = 127;	
 	}
 
 
@@ -184,26 +193,22 @@ void rgbkey_apply1(VJFrame *frame, VJFrame *frame2, int width,
 		kbg = 255;
 
 	    val = (tmp1 * kfgy_scale) >> 4;
-	    if (val > 0xff)
-		val = 0xff;
 	    val = fg_y[pos] - val;
 
 	    Y[pos] = val;
 
 	    // convert suppressed fg back to cbcr 
-
-	    val = ((x1 * cb) - (y1 * cr)) >> 7;
+		// cb,cr are signed, go back to unsigned !
+	    val = ((x1 * (cb-128)) - (y1 * (cr-128))) >> 7;
 
 	    Cb[pos] = val;
 
-	    val = ((x1 * cr) - (y1 * cb)) >> 7;
+	    val = ((x1 * (cr-128)) - (y1 * (cb-128))) >> 7;
 	    Cr[pos] = val;
 
 	    // deal with noise 
 
 	    val = (yy * yy) + (kg * kg);
-	    if (val > 0xff)
-		val = 0xff;
 	    if (val < (noise_level * noise_level)) {
 		kbg = 255;
 	    }
@@ -234,8 +239,8 @@ void rgbkey_apply1(VJFrame *frame, VJFrame *frame2, int width,
 }
 
 void rgbkey_apply2(VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int i_angle, int i_noise, int r, int g,
-		   int b)
+		   int height, int i_angle,int r, int g,
+		   int b, int i_noise)
 {
 
     uint8_t *fg_y, *fg_cb, *fg_cr;
@@ -245,7 +250,7 @@ void rgbkey_apply2(VJFrame *frame, VJFrame *frame2, int width,
     int cb, cr;
     int kbg, x1, y1;
     float kg1, tmp, aa = 128, bb = 128, _y = 0;
-    float angle = (float) i_angle;
+    float angle = (float) i_angle * 0.1f;
     float noise_level = (i_noise / 100.0);
     unsigned int pos;
     uint8_t val, tmp1;
@@ -255,10 +260,11 @@ void rgbkey_apply2(VJFrame *frame, VJFrame *frame2, int width,
     uint8_t *Y2 = frame2->data[0];
  	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-
-    _y = ((Y_Redco * r) + (Y_Greenco * g) + (Y_Blueco * b) + 16);
-    aa = ((U_Redco * r) - (U_Greenco * g) - (U_Blueco * b) + 128);
-    bb = (-(V_Redco * r) - (V_Greenco * g) + (V_Blueco * b) + 128);
+	int	iy=16,iu=128,iv=128;
+	_rgb2yuv( r,g,b, iy,iu,iv );
+	_y = (float) iy;
+	aa = (float) iu;
+	bb = (float) iv;
     tmp = sqrt(((aa * aa) + (bb * bb)));
     cb = 127 * (aa / tmp);
     cr = 127 * (bb / tmp);
@@ -282,7 +288,9 @@ void rgbkey_apply2(VJFrame *frame, VJFrame *frame2, int width,
     bg_cb = Cb2;
     bg_cr = Cr2;
 
-    for (pos = (width * height); pos != 0; pos--) {
+    int len = frame->len;
+
+    for (pos = 0; pos < len; pos++) {
 	short xx, yy;
 	/* convert foreground to xz coordinates where x direction is
 	   defined by key color */
@@ -330,26 +338,22 @@ void rgbkey_apply2(VJFrame *frame, VJFrame *frame2, int width,
 		kbg = 255;
 
 	    val = (tmp1 * kfgy_scale) >> 4;
-	    if (val > 0xff)
-		val = 0xff;
 	    val = fg_y[pos] - val;
 
 	    Y[pos] = val;
 
 	    /* convert suppressed fg back to cbcr */
 
-	    val = ((x1 * cb) - (y1 * cr)) >> 7;
+	    val = ((x1 * (cb-128)) - (y1 * (cr-128))) >> 7;
 
 	    Cb[pos] = val;
 
-	    val = ((x1 * cr) - (y1 * cb)) >> 7;
+	    val = ((x1 * (cr-128)) - (y1 * (cb-128))) >> 7;
 	    Cr[pos] = val;
 
 	    /* deal with noise */
 
 	    val = (yy * yy) + (kg * kg);
-	    if (val > 0xff)
-		val = 0xff;
 	    if (val < (noise_level * noise_level)) {
 		Y[pos] = Cb[pos] = Cr[pos] = 0;
 		kbg = 255;
@@ -383,18 +387,18 @@ void rgbkey_apply2(VJFrame *frame, VJFrame *frame2, int width,
   */
 
 void rgbkey_apply(VJFrame *frame, VJFrame *frame2, int width,
-		  int height, int i_angle, int i_noise, int red, int green,
-		  int blue, int type)
+		  int height, int i_angle, int red, int green,
+		  int blue, int type, int i_noise)
 {
 
     switch (type) {
     case 0:
-	rgbkey_apply1(frame, frame2, width, height, i_angle, i_noise, red,
-		      green, blue);
+	rgbkey_apply1(frame, frame2, width, height, i_angle, red,
+		      green, blue, i_noise);
 	break;
     case 1:
-	rgbkey_apply2(frame, frame2, width, height, i_angle, i_noise, red,
-		      green, blue);
+	rgbkey_apply2(frame, frame2, width, height, i_angle, red,
+		      green, blue, i_noise);
 	break;
     }
 

@@ -140,10 +140,18 @@ static inline pixel_t evaluate_pixel_bc(
 	}
 	pixel_t val;
 
-	val.y = y_map[peak_index] / peak_value;
-	val.u = cb_map[peak_index] / peak_value;
-	val.v = cr_map[peak_index] / peak_value;
-
+	if( peak_value > 0 )
+	{
+		val.y = y_map[peak_index] / peak_value;
+		val.u = cb_map[peak_index] / peak_value;
+		val.v = cr_map[peak_index] / peak_value;
+	}
+	else
+	{
+		val.y = y_map[y * w + x];
+		val.u = cb_map[y * w + x];
+		val.v = cb_map[y * w + x];
+	}	
 	return val;	
 
 }
@@ -250,7 +258,7 @@ void neighbours3_apply( VJFrame *frame, int width, int height, int brush_size, i
 	else
 	{
 		pixel_t tmp;
-		for( y = 0; y < height; y ++ )
+		for( y = 0; y < height-1; y ++ )
 		{
 			for( x = 0; x < width; x ++ )
 			{

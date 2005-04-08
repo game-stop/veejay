@@ -27,6 +27,6 @@
 vj_effect *keyselect_init();
 void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
 		  int height, int i_angle, 
-		  int red, int green, int blue, int mode);
+		  int red, int green, int blue, int mode, int noise);
 void keyselect_free();
 #endif

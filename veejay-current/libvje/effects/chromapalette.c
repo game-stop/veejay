@@ -34,7 +34,7 @@ vj_effect *chromapalette_init(int w, int h)
 	//angle,r,g,b,cbc,crc
 
     ve->limits[0][0] = 1;
-    ve->limits[1][0] = 9000;
+    ve->limits[1][0] = 900;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
     ve->limits[0][2] = 0;
@@ -48,17 +48,18 @@ vj_effect *chromapalette_init(int w, int h)
     ve->limits[0][5] = 0;
     ve->limits[1][5] = 255;	
 
-    ve->defaults[0] = 1500;//angle
-    ve->defaults[1] = 0;   //r
+    ve->defaults[0] = 319;//angle
+    ve->defaults[1] = 255;   //r
     ve->defaults[2] = 0;   //g
-    ve->defaults[3] = 255; //b
-    ve->defaults[4] = 40;  //cb default
-    ve->defaults[5] = 0; //cr default
+    ve->defaults[3] = 0; //b
+    ve->defaults[4] = 200;  //cb default
+    ve->defaults[5] = 20; //cr default
     ve->description = "Chrominance Palette (rgb key) ";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_help = 1;
 	ve->has_user = 0;
+	ve->rgb_conv = 1;
     return ve;
 }
 
@@ -116,14 +117,19 @@ void chromapalette_apply(VJFrame *frame, int width, int height, int angle, int r
 	uint8_t *Cr = frame->data[2];
 	uint8_t U;
 	uint8_t V;
-    const float cb_mul = 0.492;
+	int	y,u,v;
+ 	const float cb_mul = 0.492;
 	const float cr_mul = 0.877;
-    const float aa = ((U_Redco * r) - (U_Greenco * g) - (U_Blueco * b) + 128);
-    const float bb = (-(V_Redco * r) - (V_Greenco * g) + (V_Blueco * b) + 128);
+	
+	_rgb2yuv( r,g,b,y,u,v );
+
+	const float aa = (const float) u;
+	const float bb = (const float) v;
+
     float tmp = sqrt(((aa * aa) + (bb * bb)));
     const int colorKeycb = 127 * (aa / tmp);
     const int colorKeycr = 127 * (bb / tmp);
-	float angle_f = (angle*0.01);
+	float angle_f = (angle*0.1);
     const int accept_angle = 0xf * tan(M_PI * angle_f / 180.0);
 
 	/*
@@ -148,9 +154,9 @@ void chromapalette_apply(VJFrame *frame, int width, int height, int angle, int r
 		{
 				if( _chroma_key( Cb[i] , Cr[i], colorKeycb,colorKeycr, accept_angle))
 				{
-					U = 128 + (int)( (float) (color_cb - Y[i]) * cb_mul );
+					U =  128+(int)( (float) (color_cb - Y[i]) * cb_mul );
 					if(U < 16) U = 16; else if ( U > 240 ) U = 240;
-					V = 128 + (int)( (float) (color_cr - Y[i]) * cr_mul );
+					V =  128+(int)( (float) (color_cr - Y[i]) * cr_mul );
 					if(V < 16) V = 16; else if ( V > 240 ) V = 240;
 					Cb[i] = U;
 					Cr[i] = V;
@@ -163,7 +169,7 @@ void chromapalette_apply(VJFrame *frame, int width, int height, int angle, int r
 		{
 				if( _chroma_key( Cb[i], Cr[i], colorKeycb, colorKeycr, accept_angle))
 				{
-					V = 128 + (int)( (float) (color_cr - Y[i]) * cr_mul );
+					V = 128+(int)( (float) (color_cr - Y[i]) * cr_mul );
 					if( V < 16 ) V = 16; else if ( V > 240 ) V = 240;
 					Cr[i] = V;
 				}

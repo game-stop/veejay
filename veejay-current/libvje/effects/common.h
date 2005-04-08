@@ -66,15 +66,65 @@
 #define V_Green		(-0.41869)
 #define V_Blue		(-0.08131)
 
-#define Y_Redco		( 0.257 )
-#define Y_Greenco	( 0.504 )
-#define Y_Blueco	( 0.098 )
-#define U_Redco		(-0.148 )
-#define U_Greenco	(-0.291 )
-#define U_Blueco	( 0.439 )
-#define V_Redco		( 0.439 )
-#define V_Greenco	(-0.368 )
-#define V_Blueco	(-0.071 )
+/* RGB to YUV conversion, www.fourcc.org */
+
+#define Y_Redco		( 0.257f )
+#define Y_Greenco	( 0.504f )
+#define Y_Blueco	( 0.098f )
+
+#define U_Redco		( 0.439f )
+#define U_Greenco	( 0.368f )
+#define U_Blueco	( 0.071f )
+
+#define V_Redco		( 0.148f )
+#define V_Greenco	(0.291f )
+#define V_Blueco	(0.439f )
+
+
+#define COLOR_rgb2yuv(r,g,b, y,u,v ) \
+ {\
+ y = (int) (  (Y_Redco  * (float) r) + (Y_Greenco * (float)g) + (Y_Blueco * (float)b) + 16.0);\
+ u = (int) (  (U_Redco  * (float) r) - (U_Greenco * (float)g) + (U_Blueco * (float)b) + 128.0);\
+ v = (int) ( -(V_Redco  * (float) r) - (V_Greenco * (float)g) + (V_Blueco * (float)b) + 128.0);\
+ }
+
+#define CCIR601_rgb2yuv(r,g,b,y,u,v) \
+ {\
+ float Ey = (0.299f * (float)r) + (0.587f * (float) g) + (0.114f * (float)b );\
+ float Eu = (0.713f * ( ((float)r) - Ey ) );\
+ float Ev = (0.564f * ( ((float)b) - Ey ) );\
+ y = (int) ( 255.0 * Ey );\
+ u = (int) (( 255.0 * Eu ) + 128);\
+ v = (int) (( 255.0 * Ev ) + 128);\
+}
+
+
+#define GIMP_rgb2yuv(r,g,b,y,u,v) \
+ {\
+	float Ey = (0.299 * (float)r) + (0.587 * (float)g) + (0.114 * (float)b);\
+	float Eu = (-0.169 * (float)r) - (0.331 * (float)g) + (0.500 * (float)b) + 128.0;\
+	float Ev = (0.500 * (float)r) - (0.419 * (float)g) - (0.081 * (float)b) + 128.0;\
+    y = (int) Ey;\
+	u = (int) Eu;\
+	v = (int) Ev;\
+ }
+
+enum 
+{
+	GIMP_RGB=0,
+	CCIR601_RGB=1,
+	OLD_RGB=2,
+};
+
+#define	_rgb2yuv(r,g,b,y,u,v)\
+{\
+ if( rgb_parameter_conversion_type_ == GIMP_RGB )\
+	GIMP_rgb2yuv(r,g,b,y,u,v)\
+ if( rgb_parameter_conversion_type_ == CCIR601_RGB )\
+	CCIR601_rgb2yuv(r,g,b,y,u,v)\
+ if( rgb_parameter_conversion_type_ == OLD_RGB )\
+	COLOR_rgb2yuv(r,g,b,y,u,v)\
+}	
 
 typedef uint8_t (*pix_func_Y) (uint8_t y1, uint8_t y2);
 typedef uint8_t (*pix_func_C) (uint8_t y1, uint8_t y2);

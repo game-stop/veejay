@@ -25,14 +25,14 @@
 #include <stdio.h>
 #include <math.h>
 #include "common.h"
-#include "complexthreshold.h"
+#include "complexopacity.h"
 
 
-vj_effect *complexthreshold_init(int w, int h)
+vj_effect *complexopacity_init(int w, int h)
 {
     vj_effect *ve;
     ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
-    ve->num_params = 6;
+    ve->num_params = 5;
     ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
@@ -40,8 +40,7 @@ vj_effect *complexthreshold_init(int w, int h)
     ve->defaults[1] = 0;	/* r */
     ve->defaults[2] = 0;	/* g */
     ve->defaults[3] = 255;	/* b */
-    ve->defaults[4] = 1;	/* smoothen level */
-    ve->defaults[5] = 255;	/* threshold */
+    ve->defaults[4] = 150;	/* opacity */
     ve->limits[0][0] = 5;
     ve->limits[1][0] = 900;
 
@@ -54,20 +53,18 @@ vj_effect *complexthreshold_init(int w, int h)
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 255;
 
-    ve->limits[0][5] = 0;
-    ve->limits[1][5] = 255;
     ve->limits[0][4] = 0;
-    ve->limits[1][4] = 4;
-    ve->description = "Complex Threshold (fixme)";
+    ve->limits[1][4] = 255;
+	ve->has_user = 0;
+    ve->description = "Complex Overlay";
     ve->extra_frame = 1;
     ve->sub_format = 1;
-	ve->has_user = 0;
-	ve->rgb_conv = 1;
+    ve->rgb_conv = 1;
     return ve;
 }
 
 /* this method decides whether or not a pixel from the fg will be accepted for keying */
-int accept_tpixel(uint8_t fg_cb, uint8_t fg_cr, int cb, int cr,
+int accept_ipixel(uint8_t fg_cb, uint8_t fg_cr, int cb, int cr,
 		 int accept_angle_tg)
 {
     short xx, yy;
@@ -107,9 +104,9 @@ int accept_tpixel(uint8_t fg_cb, uint8_t fg_cr, int cb, int cr,
     return 0;
 }
 
-void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
+void complexopacity_apply(VJFrame *frame, int width,
 			int height, int i_angle, int r, int g, int b,
-			int level, int threshold)
+			int level )
 {
 
     uint8_t *fg_y, *fg_cb, *fg_cr;
@@ -118,26 +115,21 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
     int kfgy_scale, kg;
 
     int cb, cr;
-    int kbg, x1, y1;
     float kg1, tmp, aa = 128, bb = 128, _y = 0;
     float angle = (float) i_angle / 10.0;
     //float noise_level = 350.0;
     unsigned int pos;
     int matrix[5];
-    uint8_t val, tmp1;
+    uint8_t val;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
-	int iy,iv,iu;
+	int	iy,iu,iv;
 	_rgb2yuv(r,g,b,iy,iu,iv);
-	_y = (float)iy;
-	aa = (float)iu;
-	bb = (float)iv;
-
+	_y = (float) iy;
+	aa = (float) iu;
+	bb = (float) iv;  
     tmp = sqrt(((aa * aa) + (bb * bb)));
     cb = 127 * (aa / tmp);
     cr = 127 * (bb / tmp);
@@ -153,13 +145,13 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
     kg = kg1;
 
     /* intialize pointers */
-    fg_y = Y2;
-    fg_cb = Cb2;
-    fg_cr = Cr2;
+    fg_y = frame->data[0];
+    fg_cb = frame->data[1];
+    fg_cr = frame->data[2];
 
-    bg_y = Y;
-    bg_cb = Cb;
-    bg_cr = Cr;
+    bg_y = frame->data[0];
+    bg_cb = frame->data[1];
+    bg_cr = frame->data[2];
 
     for (pos = width + 1; pos < (len) - width - 1; pos++) {
 	int i = 0;
@@ -173,11 +165,11 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
 	   [ 1 0 1 ]                    
 	   [ 0 1 0 ]
 	 */
-	matrix[0] = accept_tpixel(fg_cb[pos], fg_cr[pos], cb, cr, accept_angle_tg);	/* center pixel */
-	matrix[1] = accept_tpixel(fg_cb[pos - 1], fg_cr[pos - 1], cb, cr, accept_angle_tg);	/* left pixel */
-	matrix[2] = accept_tpixel(fg_cb[pos + 1], fg_cr[pos + 1], cb, cr, accept_angle_tg);	/* right pixel */
-	matrix[3] = accept_tpixel(fg_cb[pos + width], fg_cr[pos + width], cb, cr, accept_angle_tg);	/* top pixel */
-	matrix[4] = accept_tpixel(fg_cb[pos - width], fg_cr[pos - width], cb, cr, accept_angle_tg);	/* bottom pixel */
+	matrix[0] = accept_ipixel(fg_cb[pos], fg_cr[pos], cb, cr, accept_angle_tg);	/* center pixel */
+	matrix[1] = accept_ipixel(fg_cb[pos - 1], fg_cr[pos - 1], cb, cr, accept_angle_tg);	/* left pixel */
+	matrix[2] = accept_ipixel(fg_cb[pos + 1], fg_cr[pos + 1], cb, cr, accept_angle_tg);	/* right pixel */
+	matrix[3] = accept_ipixel(fg_cb[pos + width], fg_cr[pos + width], cb, cr, accept_angle_tg);	/* top pixel */
+	matrix[4] = accept_ipixel(fg_cb[pos - width], fg_cr[pos - width], cb, cr, accept_angle_tg);	/* bottom pixel */
 	for (i = 0; i < 5; i++) {
 	    if (matrix[i] == 1)
 		smooth++;
@@ -193,7 +185,7 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
 	    uint8_t p5 =
 		(matrix[4] == 0 ? fg_y[pos - width] : bg_y[pos - width]);
 	    /* and blur the pixel */
-	    fg_y[pos] = (p1 + p2 + p3 + p4 + p5 + p1) / 6;
+	    fg_y[pos] = (p1 + p2 + p3 + p4 + p5) / 5;
 
 	    /* convert foreground to xz coordinates where x direction is
 	       defined by key color */
@@ -218,68 +210,13 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
 	    val = (xx * accept_angle_tg) >> 4;
 	    if (val > 127)
 		val = 127;
-	    /* see if pixel is within range of color and threshold */
-	    if (abs(yy) < val && fg_y[pos] > threshold) {
-
-		val = (xx * accept_angle_tg) >> 4;
-		if (val > 127)
-		    val = 127;
-		val = (yy * accept_angle_ctg) >> 4;
-
-		x1 = abs(val);
-		y1 = yy;
-		tmp1 = xx - x1;
-
-		kbg = (tmp1 * one_over_kc) >> 1;
-		if (kbg < 0)
-		    kbg = 0;
-		if (kbg > 255)
-		    kbg = 255;
-
-		val = (tmp1 * kfgy_scale) >> 4;
-		if (val > 0xff)
-		    val = 0xff;
-		val = fg_y[pos] - val;
-
-		Y[pos] = val;
-
-		/* convert suppressed fg back to cbcr */
-
-		val = ((x1 * cb) - (y1 * cr)) >> 7;
-
-		Cb[pos] = val;
-
-		val = ((x1 * cr) - (y1 * cb)) >> 7;
-		Cr[pos] = val;
-		val = (yy * yy) + (kg * kg);
-		if (val > 0xff)
-		    val = 0xff;
-		if (val < (35 * 35)) {
-		    kbg = 255;
-		}
-
-		val = Y[pos] + (kbg * bg_y[pos]) >> 8;
-		if (val < 16)
-		    val = 16;
-		else if (val > 235)
-		    val = 235;
-		Y[pos] = val;
-
-		val = Cb[pos] + (kbg * bg_cb[pos]) >> 8;
-		if (val < 16)
-		    val = 16;
-		else if (val > 240)
-		    val = 240;
-		Cb[pos] = val;
-
-		val = Cr[pos] + (kbg * bg_cr[pos]) >> 8;
-		if (val < 16)
-		    val = 16;
-		else if (val > 240)
-		    val = 240;
-		Cr[pos] = val;
+	    /* see if pixel is within range of color and opacity it */
+	    if (abs(yy) < val ) {
+		Y[pos] = 255 - Y[pos];
+		Cb[pos] = 255 - Cb[pos];
+		Cr[pos] = 255 - Cr[pos];
 	    }
 	}
     }
 }
-void complexthreshold_free(){}
+void complexopacity_free(){}

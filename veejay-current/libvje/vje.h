@@ -81,6 +81,7 @@ typedef struct vj_effect_t {
     int has_user;				// has private data?
     int static_bg;				// unused
     int has_help;				// unused
+    int rgb_conv;			// temporary fix for color effects
     void *user_data;			// private effect data
 } vj_effect;
 
@@ -103,7 +104,8 @@ extern int vj_effect_get_max_limit(int effect_id, int param_nr);
 extern int vj_effect_valid_value(int effect_id, int param_nr, int value);
 extern int vj_effect_get_subformat(int effect_id);
 extern int vj_effect_has_cb(int effect_id);
-
+// if effect has rgbkey its always p1,p2,p3 (r,g,b)
+extern int vj_effect_has_rgbkey(int effect_id);
 extern int vj_effect_is_valid(int effect_id);
 extern int vj_effect_get_summary(int entry, char *dst);
 
@@ -125,5 +127,7 @@ extern int	vj_effect_prepare( VJFrame *frame, VJFrameInfo *frameinfo, int select
 extern	void	vj_effect_dump(void);
 
 // see veejay/vj-perform 'apply_first' for an example on how to use this.
+
+extern int	rgb_parameter_conversion_type_;
 
 #endif

@@ -235,7 +235,7 @@ void neighbours2_apply( VJFrame *frame, int width, int height, int brush_size, i
 
 	if(!mode)
 	{
-		for( y = 0; y < height; y ++ )
+		for( y = 0; y < height-1; y ++ )
 		{
 			for( x = 0; x < width; x ++ )
 			{
