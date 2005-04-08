@@ -503,6 +503,22 @@ int clip_get_startFrame(int clip_id)
     return -1;
 }
 
+
+int	clip_get_el_position( int clip_id, int *start, int *end )
+{
+	clip_info *si = clip_get(clip_id);
+	if(si)
+	{
+		*start = si->first_frame[ si->active_render_entry ];
+		*end   = si->last_frame[ si->active_render_entry ];
+		return;
+	}
+	return -1;
+}
+
+
+
+
 int clip_get_short_info(int clip_id, int *start, int *end, int *loop, int *speed) {
     clip_info *si = clip_get(clip_id);
     if(si) {
@@ -672,10 +688,6 @@ int clip_marker_clear(int clip_id) {
 	return -1;
     si->marker_start = 0;
     si->marker_end = 0;
-    if(si->marker_speed) {
-	si->speed = (si->speed * -1);
-	si->marker_speed=0;
-	}
     veejay_msg(VEEJAY_MSG_INFO, "Marker cleared (%d - %d) - (speed=%d)",
 	si->marker_start, si->marker_end, si->speed);
     return ( clip_update(si,clip_id));
@@ -685,39 +697,38 @@ int clip_set_marker_start(int clip_id, int marker)
 {
     clip_info *si = clip_get(clip_id);
     if (!si)
-	return -1;
-    if(si->marker_end != 0) {
-	/* the end frame is set, so it may not be > marker_end */
-	if(marker > si->marker_end) return -1;
+		return -1;
+	if(si->speed < 0 )
+	{
+		int swap = si->marker_end;
+		si->marker_end = marker;
+		si->marker_start = swap;
 	}
-    si->marker_start = marker;
+	else
+	{
+		si->marker_start = marker;
+	}
     return ( clip_update(si,clip_id));
 }
 
-int clip_set_marker(int clip_id, int start, int end) {
+int clip_set_marker(int clip_id, int start, int end)
+{
     clip_info *si = clip_get(clip_id);
     int tmp;
     if(!si) return -1;
     
-    if(end == -1 || end > si->last_frame[si->active_render_entry] ) 
-	end = si->last_frame[si->active_render_entry];
-    if(start < 0) start = 0;
-    if(start <= end) {
-      tmp = si->last_frame[si->active_render_entry] - end;
-      if( (si->first_frame[si->active_render_entry] + start) > si->last_frame[si->active_render_entry]) {
-	 veejay_msg(VEEJAY_MSG_ERROR, "Invalid start parameter");
-	 return -1;
-	}
-      if( (si->last_frame[si->active_render_entry]-tmp) < si->first_frame[si->active_render_entry]) {
-	veejay_msg(VEEJAY_MSG_ERROR, "Invalid end parameter");
-	return -1;
-      }
-      si->marker_start = si->first_frame[si->active_render_entry] + start;
-      si->marker_end = si->last_frame[si->active_render_entry] - tmp;
-      si->marker_speed = 0; 
-      veejay_msg(VEEJAY_MSG_INFO, "Clip marker at %d - %d",si->marker_start,
-		si->marker_end);
-    }
+    if( start < si->first_frame[ si->active_render_entry ] )
+		return 0;
+	if( start > si->last_frame[ si->active_render_entry ] )
+		return 0;
+	if( end < si->first_frame[ si->active_render_entry ] )
+		return 0;
+	if( end > si->last_frame[ si->active_render_entry ] )
+		return 0; 
+
+    si->marker_start	= start;
+    si->marker_end		= end;
+    
     return ( clip_update( si , clip_id ) );	
 }
 
@@ -725,24 +736,20 @@ int clip_set_marker_end(int clip_id, int marker)
 {
     clip_info *si = clip_get(clip_id);
     if (!si)
-	return -1;
-    if( si->marker_start == 0) return -1;
+		return -1;
 
-  /*  if (si->speed < 0) {
-	si->marker_end = si->marker_start;
-	si->marker_start = marker;
-    } else {
-*/
-
-    if(si->marker_start > marker) return -1;
-    si->marker_end = marker;
-    if(si->speed < 0) {
-	int swap = si->marker_start;
-	si->marker_start = marker;
-	si->marker_end = swap;
+	if(si->speed < 0 )
+	{
+		// mapping in reverse!
+		int swap			= si->marker_start;
+		si->marker_start	= marker;
+		si->marker_end		= swap;
 	}
-
-//    }
+	else
+	{
+		si->marker_end 		= marker;
+	}
+	
     return (clip_update(si,clip_id));
 }
 

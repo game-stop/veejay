@@ -80,6 +80,10 @@ AC_ARG_WITH(jpeg-mmx,
             AC_HELP_STRING([--with-jpegmmx=PFX],
                            [Prefix where jpeg-mmx is installed (optional).]))
 
+AC_ARG_WITH(gui,
+		AC_HELP_STRING([--without-gui], [Do not build gveejay]),
+		[],	[with_gui=yes])
+
 AC_GNU_SOURCE
 
 dnl Initialize libtool
@@ -258,7 +262,7 @@ dnl   (creates LIBDV_CFLAGS, LIBDV_LIBS; defines HAVE_LIBDV)
 dnl *********************************************************************
 have_libdv=false
 if test x$with_libdv != xno ; then
-  PKG_CHECK_MODULES(LIBDV, [libdv >= 0.99],
+  PKG_CHECK_MODULES(LIBDV, [libdv >= 0.102],
                     [have_libdv=true
                      AC_DEFINE(SUPPORT_READ_DV2, 1, [libdv is present])],
                     [have_libdv=false])
@@ -413,6 +417,8 @@ case $host_cpu in
     AC_DEFINE(HAVE_X86CPU,, [Compiling for x86 architecture CPU])
     AC_DEFINE(ARCH_X86,1,[Compiling for x86 architecture]) 
     have_x86cpu=true
+
+    dnl Programs without PIC!
     PROGRAM_NOPIC="-fno-PIC"
 
     if test "x$enable_debug" != "xyes" ; then
@@ -446,6 +452,8 @@ case $host_cpu in
     case $host in
       *-apple-darwin*)
        PROGRAM_NOPIC="-mdynamic-no-pic" # dynamic-no-pic is an Apple gcc option
+dnl	PROGRAM_NOPIC="-bundle -flat_namespace -undefined suppress"
+dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
        ;;
       *)
        PROGRAM_NOPIC=""
@@ -475,7 +483,6 @@ case $host_cpu in
 	;;
   *)
     AC_MSG_RESULT([unknown])
-    PROGRAM_NOPIC=""
     ;;
 esac
 
@@ -483,7 +490,6 @@ dnl This flag is used for PROGRAMS not SHARED LIBRARIES.  PIC code is required
 dnl for shared libraries but is slower than non-pic code.  Compute bound 
 dnl programs such as yuvdenoise and y4mspatialfilter can use this flag by
 dnl simply adding programname_CFLAGS=@PROGRAM_NOPIC@ to the Makefile.am
-
 
 AC_SUBST(PROGRAM_NOPIC)
 
@@ -722,7 +728,11 @@ AC_MSG_RESULT($warnCFLAGS)
 AC_MSG_RESULT($warnCXXFLAGS)
 
 if test "x$cflags_set" != "xyes" ; then
-  CFLAGS="$CFLAGS $warnCFLAGS $debugCFLAGS"
+  if test "x$enable_debug" = "xyes" ; then
+  	CFLAGS="-g -Wall-Wunused"
+  else
+ 	CFLAGS="$CFLAGS $warnCFLAGS $debugCFLAGS"
+  fi
   CXXFLAGS="$CXXFLAGS $warnCXXFLAGS"
   cflags_set=yes
 fi
@@ -745,6 +755,32 @@ fi
 dnl  bah autoreconf wants to play with independent package ffmpeg 
 dnl  (needs configure.ac). so, instead of AC_CONFIG_SUBDIRS(ffmpeg/ffmeg)
 dnl  do it manually
+
+if test x$with_gui != xno ; then
+
+	gveejay_datadir="${datadir}/veejay"
+	AC_SUBST(gveejay_datadir)
+	sh gveejay-paths.sh > gveejay-paths.h
+
+
+	glib_modules="glib-2.0 >= 2.6.0"
+	PKG_CHECK_MODULES(GLIB, [$glib_modules])
+	AC_SUBST(GLIB_CFLAGS)
+	AC_SUBST(GLIB_LIBS)
+
+
+	gtk_modules="gtk+-2.0 >= 2.6.1"
+	PKG_CHECK_MODULES(GTK, [$gtk_modules])
+	AC_SUBST(GTK_CFLAGS)
+	AC_SUBST(GTK_LIBS)
+
+
+	libglade_modules="libglade-2.0 >= 2.4.0"
+	PKG_CHECK_MODULES(GLADE, [$libglade_modules])
+	AC_SUBST(GLADE_CFLAGS)
+	AC_SUBST(GLADE_LIBS)
+
+fi
  
 dnl  AC_CONFIG_SUBDIRS(ffmpeg/ffmpeg)
 
@@ -753,6 +789,7 @@ dnl  AC_CONFIG_SUBDIRS(ffmpeg/ffmpeg)
 	./configure.gnu $ac_configure_args
 
 )
+
 
 AC_DEFINE(VEEJAY,,[Building veejay])
 
@@ -779,8 +816,10 @@ utils/Makefile
 bio2jack/Makefile
 plugins/Makefile
 veejay/Makefile
+gveejay/Makefile
 man/Makefile
 tools/Makefile
+gveejay-paths.sh
 veejay-config
 veejay.pc
 ])
@@ -839,6 +878,11 @@ AC_MSG_NOTICE([  - jack                          : ${have_jack}])
 AC_MSG_NOTICE([  - xml c library for gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - freetype support              : ${have_freetype}])
 AC_MSG_NOTICE([])
+
+if test x$with_gui != xno ; then
+	AC_MSG_NOTICE([   - GVeejay UI])
+	AC_MSG_NOTICE([     share : ${gveejay_datadir}])
+fi
 
 if test "$GCC" = yes ; then
 	AC_MSG_NOTICE([])
