@@ -945,13 +945,13 @@ info->uc.priout_lock=0;\
 }
 void	on_priout_width_value_changed(GtkWidget *widget, gpointer user_data)
 {
-	if(!info->status_lock)
+	if(!info->status_lock && !info->uc.priout_lock)
 	if( is_button_toggled( "priout_ratio" ))
 		atom_aspect_ratio( "priout_height", 1 );
 }
 void	on_priout_height_value_changed(GtkWidget *widget, gpointer user_data)
 {
-	if(!info->status_lock)
+	if(!info->status_lock && !info->uc.priout_lock)
 	if( is_button_toggled( "priout_ratio" ))
 		atom_aspect_ratio( "priout_width", 0 );
 }
@@ -1054,6 +1054,7 @@ void	on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		multi_vims( NET_BUNDLE_FILE, "%s", filename );
 		g_free( filename );
+		info->uc.reload_hint[HINT_BUNDLES] = 1;
 	}
 }
 
@@ -1102,7 +1103,7 @@ void	on_check_priout_fullscreen_clicked(
 		GtkWidget *widget, gpointer user_data)
 {
 	gint on = 0;
-	if(is_button_toggled( "priout_fullscreen" ) )
+	if(is_button_toggled( "check_priout_fullscreen" ) )
 		on = 1;
 	multi_vims ( NET_FULLSCREEN, "%d", on );
 }
