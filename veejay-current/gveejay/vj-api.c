@@ -1770,7 +1770,7 @@ static void 	update_globalinfo()
 		info->status_tokens[TOTAL_FRAMES])
 	{
 		gint tf = info->status_tokens[TOTAL_FRAMES];
-		if( pm == MODE_SAMPLE || pm == MODE_PLAIN )
+		if( pm == MODE_PLAIN ) 
 		{
 			for( i = 0; i < 3; i ++)
 				if(info->selection[i] > tf ) info->selection[i] = tf;
@@ -1781,11 +1781,12 @@ static void 	update_globalinfo()
 				"button_el_selend", 0, tf, info->selection[1]);
 			update_spin_range(
 				"button_el_selpaste", 0, tf, info->selection[2]);
+			// dont update in mode sample
 			update_spin_range(
 				"spin_samplestart", 0, tf, 0 );
 			update_spin_range(
 				"spin_sampleend", 0, tf, 0 );
-	
+				
 			info->uc.reload_hint[HINT_EL] = 1;
 		}
 		update_spin_range(
