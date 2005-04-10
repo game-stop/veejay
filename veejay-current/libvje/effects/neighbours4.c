@@ -29,8 +29,8 @@ vj_effect *neighbours4_init(int w, int h)
     ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = w;	/* radius */
+    ve->limits[0][0] = 2;
+    ve->limits[1][0] = 32;	/* radius */
     ve->limits[0][1] = 1;
     ve->limits[1][1] = 200;     /* distance from center */
     ve->limits[0][2] = 1;
@@ -279,7 +279,7 @@ void neighbours4_apply( VJFrame *frame, int width, int height, int radius, int b
 
 	if(!mode)
 	{
-		for( y = 0; y < height-1; y ++ )
+		for( y = 0; y < height; y ++ )
 		{
 			for( x = 0; x < width; x ++ )
 			{

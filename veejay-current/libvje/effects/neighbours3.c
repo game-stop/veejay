@@ -29,8 +29,8 @@ vj_effect *neighbours3_init(int w, int h)
     ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = 64;	/* line size */
+    ve->limits[0][0] = 2;
+    ve->limits[1][0] = 32;	/* line size */
     ve->limits[0][1] = 1;
     ve->limits[1][1] = 255;     /* smoothness */
     ve->limits[0][2] = 0; 	/* luma only / include chroma */
@@ -258,7 +258,7 @@ void neighbours3_apply( VJFrame *frame, int width, int height, int brush_size, i
 	else
 	{
 		pixel_t tmp;
-		for( y = 0; y < height-1; y ++ )
+		for( y = 0; y < height; y ++ )
 		{
 			for( x = 0; x < width; x ++ )
 			{
