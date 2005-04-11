@@ -441,6 +441,107 @@ int vj_server_poll(vj_server * vje)
 	return 0;
 }
 
+static	int	_vj_server_empty_queue(vj_server *vje, int link_id)
+{
+	// ensure message queue is empty!!
+	int num_msg = 0;
+	vj_link **Link = (vj_link**) vje->link;
+	vj_message **v = Link[link_id]->m_queue;
+
+	int i;
+	for( i = 0; i < VJ_MAX_PENDING_MSG; i ++ )
+	{
+		if( v[i]->msg )
+			free(v[i]->msg);
+		v[i]->msg = NULL;
+		v[i]->len = 0;
+	}
+	Link[link_id]->n_queued = 0;
+	Link[link_id]->n_retrieved = 0;
+	return 1;
+}
+
+static  int	_vj_parse_highpriority_msg(vj_server *vje,int link_id, char *buf, int buf_len )
+{
+	int nmsgs = 0;
+	int i = 0;
+	char *s = buf;
+	int num_msg = 0;
+	vj_link **Link = (vj_link**) vje->link;
+	vj_message **v = Link[link_id]->m_queue;
+
+	while( i < buf_len )
+	{
+		while( s[i] != 'V' && s[i+4] != 'D' )
+			i ++ ; 
+
+		if( s[i] == 'V' && s[i+4] == 'D' )
+		{ // found message
+			char tmp_len[4];
+			char net_id[4];
+			int  strlen = 0;
+			int	netid = 0;
+			bzero(tmp_len,4);
+			bzero(net_id,4 );
+			strncpy( tmp_len, s + (i + 1 ), 3 );
+			if(sscanf(tmp_len,"%03d", &strlen))
+			{	
+				i += 5;
+				strncpy( net_id, s + i , 3 );
+				if(sscanf(net_id, "%03d", &netid ))
+				{
+					if(netid >= 255 )
+					{
+						v[num_msg]->len = strlen;
+						v[num_msg]->msg = (char*)strndup( s + i , strlen );
+						num_msg ++; 
+						if(num_msg == VJ_MAX_PENDING_MSG )
+							return num_msg; // cant take more
+					}
+				}
+				i += strlen;
+			}
+			else
+			{
+				i ++;
+			}
+		}
+	}
+	return num_msg;
+}
+
+
+static	int	_vj_get_n_msg_waiting(char *buf, int buf_len, int *offset )
+{
+	int nmsgs = 0;
+	int i = 0;
+	char *s = buf;
+	while( i < buf_len )
+	{
+		while( s[i] != 'V' && s[i+4] != 'D' )
+			i ++ ; 
+
+		if( s[i] == 'V' && s[i+4] == 'D' )
+		{ // found message
+			char tmp_len[4];
+			int  strlen = 0;
+			bzero(tmp_len,4);
+			strncpy( tmp_len, s + (i + 1 ), 3 );
+			if(sscanf(tmp_len,"%03d", &strlen))
+				nmsgs++;
+			i += 5;
+			i += strlen;
+			if( nmsgs >= VJ_MAX_PENDING_MSG )
+			{
+				*offset = i;
+				return VJ_MAX_PENDING_MSG;
+			}
+		}
+	}
+	return nmsgs;
+}
+
+
 int	_vj_server_parse_msg( vj_server *vje,int link_id, char *buf, int buf_len )
 {
 	int i = 0;
@@ -460,12 +561,15 @@ int	_vj_server_parse_msg( vj_server *vje,int link_id, char *buf, int buf_len )
 			if( n == 1)
 			{
 				i += 5; // skip header
+				while( (v[num_msg]->len > 0 ) || v[num_msg]->msg != NULL )
+					num_msg ++;
+
+				if(num_msg == VJ_MAX_PENDING_MSG)
+					return VJ_MAX_PENDING_MSG;
+				
 				v[num_msg]->len = len;
-
-				if(v[num_msg]->msg != NULL)
-					free( v[num_msg]->msg );
-
 				v[num_msg]->msg = (char*)strndup( buf + i , len );
+	
 				i += len;
 				num_msg ++; 
 			}
@@ -558,7 +662,36 @@ int	vj_server_update( vj_server *vje, int id )
 		}
 	}
 
-	return _vj_server_parse_msg( vje, id, vje->recv_buf,n );	
+//	return _vj_server_parse_msg( vje, id, vje->recv_buf,n );	
+
+	// ensure all is empty
+	_vj_server_empty_queue(vje, id);
+	char *tmp_buf = vje->recv_buf;
+	int bytes_left = n;
+	int skip_bytes = 0;
+
+	while( bytes_left > 0 )
+	{
+		int n_msg = _vj_get_n_msg_waiting( tmp_buf, bytes_left, &skip_bytes );
+		if( n_msg >= VJ_MAX_PENDING_MSG)
+		{
+			// cant skip all!
+			int hmsg = _vj_parse_highpriority_msg( vje, id,tmp_buf, skip_bytes );
+			if(hmsg == VJ_MAX_PENDING_MSG)
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Link %d is acting very sucispous !", id);
+				return VJ_MAX_PENDING_MSG;
+			}
+			bzero( tmp_buf, skip_bytes );
+			tmp_buf += skip_bytes;
+			bytes_left -= skip_bytes;
+		}
+		else
+		{
+			return _vj_server_parse_msg( vje, id, tmp_buf, bytes_left );
+		}
+	}
+	return 0;
 }
 void vj_server_shutdown(vj_server *vje)
 {

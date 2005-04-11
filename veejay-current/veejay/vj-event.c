@@ -43,7 +43,7 @@
 #include <veejay/vj-plugin.h>
 /* Highest possible SDL Key identifier */
 #define MAX_SDL_KEY	350
-#define NET_MAX		256
+#define NET_MAX		300
 #define MSG_MIN_LEN	  5
 
 
