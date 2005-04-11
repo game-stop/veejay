@@ -585,7 +585,9 @@ int vj_perform_init_audio(veejay_t * info)
 {
   //  video_playback_setup *settings = info->settings;
     int i;
-
+#ifndef HAVE_JACK
+	return 1;
+#endif
 	if(info->audio==AUDIO_PLAY)
 	{
  	//vj_jack_start();
@@ -625,7 +627,7 @@ int vj_perform_init_audio(veejay_t * info)
 	}
 
 	if(!info->audio) return 0;
-
+#ifdef HAVE_JACK
 	for(i=1; i <= N_RESAMPLE; i++)
 	{
 		//veejay_msg(VEEJAY_MSG_DEBUG, "Resampler at %d Hz", (info->edit_list->audio_rate * i));
@@ -645,7 +647,7 @@ int vj_perform_init_audio(veejay_t * info)
 		veejay_msg(VEEJAY_MSG_DEBUG, "Speed %d -> %d Hz ", i, out_rate );
 		//(i * info->edit_list->audio_rate));
 	}
-
+#endif
     return 0;
 }
 
