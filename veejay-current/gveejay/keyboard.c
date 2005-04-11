@@ -20,23 +20,25 @@ int		gdk2sdl_key(int gdk_key)
 gchar		*sdlkey_by_id( int sdl_key )
 {
 	int i;
+	gchar *ret = NULL;
 	for ( i = 0; key_translation_table_t[i].title != NULL ; i ++ )
 	{
 		if( sdl_key == key_translation_table_t[i].sdl_sym )
 			return key_translation_table_t[i].title;
 	}
-	return NULL;
+	return ret;
 }
 
 gchar		*sdlmod_by_id( int sdl_mod )
 {
 	int i;
+	gchar *ret = NULL;
 	for ( i = 0; modifier_translation_table_t[i].title != NULL ; i ++ )
 	{
 		if( sdl_mod == modifier_translation_table_t[i].sdl_mod )
 			return modifier_translation_table_t[i].title;
 	}
-	return NULL;
+	return ret;
 }
 
 gchar		*gdkkey_by_id( int gdk_key )

@@ -4,7 +4,6 @@
 #include <gdk/gdkkeysyms.h>
 #include <SDL/SDL_keysym.h>
 #include <glib.h>
-#include <stdint.h>
 #include <stdio.h>
 
 static struct
@@ -21,33 +20,76 @@ static struct
 	{	0,	0,	NULL		},
 };
 
-
-/*
-	incomplete list of all keys
- */
-
-
+/* fixme: introduce keyboard mapping functionality
+        1. attach VIMS events/VIMS BUNDLES to keys (with arguments)
+	2. save/load VIMS keyboard mapping
+*/
 
 static struct
 {
-	const uint8_t gdk_sym;			// GDK key
-	const uint8_t sdl_sym;			// SDL key
+	const int gdk_sym;			// GDK key
+	const int sdl_sym;			// SDL key
 	const gchar   *title;				// plain text
 } key_translation_table_t[] =
 {
 
-{	GDK_space,	SDLK_SPACE,		"space"		},
-{	GDK_exclam,	SDLK_EXCLAIM,		"exclaim"	},
-{	GDK_quotedbl,	SDLK_QUOTEDBL,		"double quote"  },
-{	GDK_numbersign, SDLK_DOLLAR,		"dollar"	},
-{	GDK_percent,	SDLK_PAUSE,		"percent"	},
-{	GDK_ampersand,  SDLK_AMPERSAND,		"ampersand"	},
-{	GDK_apostrophe, SDLK_BACKQUOTE,		"aphostrophe"	},
-{	GDK_plus,	SDLK_PLUS,		"plus"		},
-{	GDK_comma,	SDLK_COMMA,		"comma"		},
-{	GDK_minus,	SDLK_MINUS,		"minus"		},
-{	GDK_period,	SDLK_PERIOD,		"period"	},
-{	GDK_slash,	SDLK_SLASH,		"slash"		},
+{	GDK_space,	SDLK_SPACE,		"Space"		},
+{	GDK_exclam,	SDLK_EXCLAIM,		"Exclaim"	},
+{	GDK_quotedbl,	SDLK_QUOTEDBL,		"Double quote"  },
+{	GDK_numbersign, SDLK_DOLLAR,		"Dollar"	},
+{	GDK_percent,	SDLK_PAUSE,		"Percent"	},
+{	GDK_ampersand,  SDLK_AMPERSAND,		"Ampersand"	},
+{	GDK_apostrophe, SDLK_BACKQUOTE,		"Aphostrophe"	},
+{	GDK_asterisk,	SDLK_ASTERISK,		"Asterisk"	},
+{	GDK_plus,	SDLK_PLUS,		"Plus"		},
+{	GDK_comma,	SDLK_COMMA,		"Comma"		},
+{	GDK_minus,	SDLK_MINUS,		"Minus"		},
+{	GDK_period,	SDLK_PERIOD,		"Period"	},
+{	GDK_slash,	SDLK_SLASH,		"Slash"		},
+{	GDK_Home,	SDLK_HOME,		"Home"		},
+{	GDK_End,	SDLK_END,		"End"		},
+{	GDK_Page_Up,	SDLK_PAGEUP,		"PageUp"	},
+{	GDK_Page_Down,	SDLK_PAGEDOWN,		"PageDown"	},
+{	GDK_Insert,	SDLK_INSERT,		"Insert"	},
+{	GDK_Up,		SDLK_UP,		"Up"		},
+{	GDK_Down,	SDLK_DOWN,		"Down"		},
+{	GDK_Left,	SDLK_LEFT,		"Left"		},
+{	GDK_Right,	SDLK_RIGHT,		"Right"		},
+{	GDK_Tab,	SDLK_TAB,		"TAB"		},
+{	GDK_BackSpace,	SDLK_BACKSPACE,		"Backspace"	},
+{	GDK_Escape,	SDLK_ESCAPE,		"Escape"	},
+{	GDK_Delete,	SDLK_DELETE,		"Delete"	},
+{	GDK_F1,		SDLK_F1,		"F1"		},
+{	GDK_F2,		SDLK_F2,		"F2"		},
+{	GDK_F3,		SDLK_F3,		"F3"		},
+{	GDK_F4,		SDLK_F4,		"F4"		},
+{	GDK_F5,		SDLK_F5,		"F5"		},
+{	GDK_F6,		SDLK_F6,		"F6"		},
+{	GDK_F7,		SDLK_F7,		"F7"		},
+{	GDK_F8,		SDLK_F8,		"F8"		},
+{	GDK_F9,		SDLK_F9,		"F9"		},
+{	GDK_F10,	SDLK_F10,		"F10"		},
+{	GDK_F11,	SDLK_F11,		"F11"		},
+{	GDK_F12,	SDLK_F12,		"F12"		},
+{	GDK_EuroSign,	SDLK_EURO,		"Euro"		},
+{	GDK_KP_0,	SDLK_KP0,		"keypad 0"	},
+{	GDK_KP_1,	SDLK_KP1,		"keypad 1"	},
+{	GDK_KP_2,	SDLK_KP2,		"keypad 2"	},
+{	GDK_KP_3,	SDLK_KP3,		"keypad 3"	},
+{	GDK_KP_4,	SDLK_KP4,		"keypad 4"	},
+{	GDK_KP_5,	SDLK_KP5,		"keypad 5"	},
+{	GDK_KP_6,	SDLK_KP6,		"keypad 6"	},
+{	GDK_KP_7,	SDLK_KP7,		"keypad 7"	},
+{	GDK_KP_8,	SDLK_KP8,		"keypad 8"	},
+{	GDK_KP_9,	SDLK_KP9,		"keypad 9"	},
+{	GDK_KP_Divide,	SDLK_KP_DIVIDE,		"keypad /"	},
+{	GDK_KP_Multiply,SDLK_KP_MULTIPLY,	"keypad *"	},
+{	GDK_KP_Subtract,SDLK_KP_MINUS,		"keypad -"	},
+{	GDK_KP_Add,	SDLK_KP_PLUS,		"keypad +"	},
+{	GDK_KP_Equal,	SDLK_KP_EQUALS,		"keypad ="	},
+{	GDK_KP_Enter,	SDLK_KP_ENTER,		"keypad ENTER"	},
+{	GDK_ISO_Enter,	SDLK_RETURN,		"ENTER"		},
+{	GDK_3270_Enter, SDLK_RETURN,		"ENTER"		},  
 {	GDK_0,		SDLK_0,			"0"		},
 {	GDK_1,		SDLK_1,			"1"		},
 {	GDK_2,		SDLK_2,			"2"		},
