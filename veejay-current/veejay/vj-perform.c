@@ -1748,18 +1748,16 @@ int vj_perform_apply_secundary(veejay_t * info, int clip_id, int type,
  *
  * returns 0 on success 
  */
-static int	vj_perform_tag_next_entry_subsample(veejay_t *info, int chain_entry, int *b_sample)
+static int	vj_perform_tag_next_entry_subsample(veejay_t *info, int chain_entry)
 {
 	int i;
-	for( i = chain_entry; i < CLIP_MAX_EFFECTS; i ++ )
+	for( i = chain_entry+1; i < CLIP_MAX_EFFECTS; i ++ )
 	{
 		int effect_id = vj_tag_get_effect_any( info->uc->clip_id, i );
 		if(effect_id > 0 )
 		{
 			if(vj_effect_get_subformat(effect_id))
 			{
-				if(vj_effect_get_extra_frame(effect_id))
-					*b_sample = effect_id;
 				return 1;
 			}
 			return 0;
@@ -1817,9 +1815,6 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry, co
 						frameinfo->height );
 			}
 
-			if( !sub_mode && !sampled )
-				result = 0; // down sampled
-
 			if( sub_mode && !sampled )
 			{
 				chroma_supersample(
@@ -1829,15 +1824,10 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry, co
 					frameinfo->height );
 				result = 1; // sampled !
 			}			
-			if( !sub_mode && sampled )
-			{
-				chroma_subsample( settings->sample_mode,
-					frames[0]->data,frameinfo->width,
-						frameinfo->height );	
-				result = 0; // downsampled
-			}	
 			vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
 				(int) settings->current_frame_num );
+			if( sub_mode )
+				result = 0;
 	    } // if
 	} // for
 	return result;
@@ -1845,18 +1835,16 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry, co
 
 
 
-static int	vj_perform_next_entry_subsample(veejay_t *info, int chain_entry, int *b_sample)
+static int	vj_perform_next_entry_subsample(veejay_t *info, int chain_entry)
 {
 	int i;
-	for( i = chain_entry; i < CLIP_MAX_EFFECTS; i ++ )
+	for( i = chain_entry+1; i < CLIP_MAX_EFFECTS; i ++ )
 	{
 		int effect_id = clip_get_effect_any( info->uc->clip_id, i );
 		if(effect_id > 0 )
 		{
 			if(vj_effect_get_subformat(effect_id))
 			{
-				if(vj_effect_get_extra_frame(effect_id))
-					*b_sample = effect_id;
 				return 1;
 			}
 			return 0;
@@ -1916,10 +1904,7 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry, const 
 						frameinfo->height );
 			}
 
-			if( !sub_mode && !sampled )
-				result = 0; // down sampled
-
-			if( sub_mode && !sampled )
+			if( sub_mode && !sampled)
 			{
 				chroma_supersample(
 					settings->sample_mode,
@@ -1928,17 +1913,13 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry, const 
 					frameinfo->height );
 				result = 1; // sampled !
 			}			
-			if( !sub_mode && sampled )
-			{
-				chroma_subsample( settings->sample_mode,
-					frames[0]->data,frameinfo->width,
-						frameinfo->height );	
-				result = 0; // downsampled
-			}	
 			vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
 				(int) settings->current_frame_num );
-	    } // if
-	} // for
+
+			if( sub_mode )
+				result = 0; // hint to downsample
+	    	} // if
+	} // status
 	return result;
 }
 
@@ -1968,23 +1949,28 @@ int vj_perform_clip_complete_buffers(veejay_t * info, int entry, const int skip_
 		vj_perform_pre_chain( info, frames[0] );
 
 	int subsample = 0;
+	int tmpsample = 0;
 	for(chain_entry = 0; chain_entry < CLIP_MAX_EFFECTS; chain_entry++)
 	{
-		// do an entry
-		int Bsample = 0;
-		int tmpsample = vj_perform_render_chain_entry(	
+		tmpsample = vj_perform_render_chain_entry(	
 				info, chain_entry, skip_incr, subsample);
-		// entry is SUP or SUB
-		if(tmpsample >= 0 )
-		{
-			// decide whether to downsample
-			int nextsample = vj_perform_next_entry_subsample( info, chain_entry, &Bsample );
-			subsample = nextsample;	
+		if(tmpsample == 0 )
+		{ // should be subsampled
+			if( vj_perform_next_entry_subsample(
+				info,chain_entry ) <= 0 )
+			{
+				// next is downsampled or 420
+				chroma_subsample( settings->sample_mode,
+					frames[0]->data,frameinfo->width,
+					frameinfo->height );
+				subsample = 0;
+			}
+			else
+			{	// next is super sampled format, keep 444
+				subsample = 1;
+			}
 		}
 	}
-
-	if(subsample)
-		chroma_subsample(settings->sample_mode,frames[0]->data,frameinfo->width,frameinfo->height);
 
     	if (chain_fade)
 		vj_perform_post_chain(info,frames[0]);
@@ -2022,23 +2008,31 @@ int vj_perform_tag_complete_buffers(veejay_t * info, int entry, const int skip_i
 		vj_perform_pre_chain( info, frames[0] );
 
 	int subsample = 0;
+	int tmpsample = 0;
 	for(chain_entry = 0; chain_entry < CLIP_MAX_EFFECTS; chain_entry++)
 	{
 		// do an entry
-		int Bsample = 0;
-		int tmpsample = vj_perform_tag_render_chain_entry(	
+		tmpsample = vj_perform_tag_render_chain_entry(	
 				info, chain_entry, skip_incr, subsample);
 		// entry is SUP or SUB
-		if(tmpsample >= 0 )
+		if(tmpsample == 0 )
 		{
-			// decide whether to downsample
-			int nextsample = vj_perform_tag_next_entry_subsample( info, chain_entry, &Bsample );
-			subsample = nextsample;	
+			if(vj_perform_tag_next_entry_subsample(
+				info, chain_entry) <= 0)
+			{
+				// no more entries, or entry needs subsampling anyway
+				chroma_subsample( settings->sample_mode,
+					frames[0]->data,frameinfo->width,
+						frameinfo->height );		
+				subsample = 0;
+			}
+			else
+			{
+				subsample = 1;
+			}
+
 		}
 	}
-
-	if(subsample)
-		chroma_subsample(settings->sample_mode,frames[0]->data,frameinfo->width,frameinfo->height);
 
     	if (chain_fade)
 		vj_perform_post_chain(info,frames[0]);
