@@ -1074,6 +1074,8 @@ prompt_keydialog(const char *title, char *msg)
 	GtkWidget *hbox2 = gtk_hbox_new( FALSE, 12 );
 	gtk_container_set_border_width( GTK_CONTAINER( hbox2 ), 6 );
 
+	GtkWidget *hbox3 = gtk_hbox_new( FALSE, 12 );
+
 	GtkWidget *icon = gtk_image_new_from_file( pixmap );
 
 	GtkWidget *label = gtk_label_new( msg );
@@ -1086,13 +1088,18 @@ prompt_keydialog(const char *title, char *msg)
 			info->uc.selected_key_sym ))
 	{
 		char tmp[100];
+		if( info->uc.selected_key_mod )
 		sprintf(tmp,"VIMS %d : %s + %s",
 			info->uc.selected_vims_entry,
 			sdlmod_by_id( info->uc.selected_key_mod ),
 			sdlkey_by_id( info->uc.selected_key_sym ) );
-
+		else
+		sprintf(tmp, "VIMS %d : %s",
+			info->uc.selected_vims_entry,
+			sdlkey_by_id( info->uc.selected_key_sym ) );
+		
 		GtkWidget *current = gtk_label_new( tmp );
-		gtk_container_add( GTK_CONTAINER( hbox1 ), current );
+		gtk_container_add( GTK_CONTAINER( hbox3 ), current );
 	
 		if( vj_event_list[ info->uc.selected_vims_entry ].params > 0 )
 		{
@@ -1110,8 +1117,9 @@ prompt_keydialog(const char *title, char *msg)
 
 
 	gtk_container_add( GTK_CONTAINER( GTK_DIALOG( dialog )->vbox ), hbox1 );
+	gtk_container_add( GTK_CONTAINER( GTK_DIALOG( dialog )->vbox ), hbox3 );
 	gtk_container_add( GTK_CONTAINER( GTK_DIALOG( dialog )->vbox ), hbox2 );
-
+	
 	gtk_widget_show_all( dialog );
 
 	int id = gtk_key_snooper_install( dialogkey_snooper, (gpointer*) keyentry );
@@ -3863,7 +3871,7 @@ static	void	reload_editlist_contents()
 	gint i;
 	gint len = 0;
 	single_vims( VIMS_EDITLIST_LIST );
-	gchar *eltext = recv_vims(4,&len); // msg len
+	gchar *eltext = recv_vims(6,&len); // msg len
 
 	gint 	offset = 0;
 	gint	num_files=0;
@@ -3876,7 +3884,6 @@ static	void	reload_editlist_contents()
 	
 	strncpy( str_nf, eltext , sizeof(str_nf));
 	sscanf( str_nf, "%04d", &num_files );
-
 	offset += 4;
 	int n = 0;
 	el_constr *el;
@@ -4395,7 +4402,6 @@ void	vj_fork_or_connect_veejay()
 	char	*remote = get_text( "entry_hostname" );
 	char	*files  = get_text( "entry_filename" );
 	int	port	= get_nums( "button_portnum" );
-	int	dummy	= is_button_toggled( "button_dummy");
 	gchar	*args[20];
 	int	n_args = 0;
 	char	port_str[15];
@@ -4416,7 +4422,7 @@ void	vj_fork_or_connect_veejay()
 
 	args[n_args++] = g_strdup(port_str);
 
-	if(files == NULL || strlen(files)<= 0 || dummy)
+	if(files == NULL || strlen(files)<= 0 )
 	{
 		args[n_args++] = g_strdup("-d");
 		args[n_args++] = NULL;

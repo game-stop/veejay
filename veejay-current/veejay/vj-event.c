@@ -225,7 +225,6 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 #define VIMS_DONT_PARSE_PARAMS (1<<1)		/* dont parse arguments */
 #define VIMS_LONG_PARAMS (1<<3)				/* long string arguments (bundle, plugin) */
 #define VIMS_ALLOW_ANY (1<<4)				/* use defaults when optional arguments are not given */			
-
 /* the main event list */
 static struct {
 
@@ -551,7 +550,7 @@ static struct {
 	{ VIMS_SAMPLE_MODE,			"Toggle between box or triangle filter for 2x2 -> 1x1 sampling",
 		vj_event_sample_mode, 		0, 	NULL, 		{0,0}, VIMS_ALLOW_ANY },
 	{ VIMS_CMD_PLUGIN,			"Send a command to the plugin",
-		vj_event_plugin_command,	1, 	"%s", 		{0,0}, VIMS_DONT_PARSE_PARAMS },
+		vj_event_plugin_command,	1, 	"%s", 		{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS },
 	{ VIMS_LOAD_PLUGIN,			"Load a plugin from disk",
 		vj_event_load_plugin, 		1, 	"%s", 		{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS},
 	{ VIMS_UNLOAD_PLUGIN,			"Unload a plugin from disk",
@@ -983,49 +982,6 @@ int vj_event_get_num_args(int net_id)
 	return (int) vj_event_list[id].num_params;	
 }
 
-static int parse_plugin_cmd(const char *vims_msg)
-{
-	char str_args[1024];
-	char pluginname[50];
-
-	bzero( str_args, 1024 );
-	bzero( pluginname, 50 );
-
-	char *p = &pluginname[0];
-	char *s = (char*)vims_msg;
-		
-	int mlen = 0;
-	while( *(s) != ':' && *(s) != ';' && *(s) != '\0')
-	{
-		*(p)++ = *(s)++;
-		mlen++;
-	}
-	if (*(s) == ':' )
-	{
-		*(s)++;
-		mlen++;
-	}	
-	else
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Plugin message parse error");
-		veejay_msg(VEEJAY_MSG_ERROR, " Use: %03d:PluginName:commandline;",
-			VIMS_CMD_PLUGIN);
-	}
-	if ( *(s) != '\0' )
-	{
-		strcpy( str_args, vims_msg + mlen);
-		//FIXME: possible error here (needs check)
-		veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) Plugin '%s' message '%s' ",pluginname,str_args);
-		plugins_event( pluginname, str_args ); 
-		return 1;
-	}
-	
-	return 0;
-}
-// PluginFixme parsing of plugin commands need to be 
-// intercepted (hacked) here, event id is VIMS_CMD_PLUGIN
-
-
 typedef struct
 {
 	void *value;
@@ -1248,19 +1204,6 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 		memset( vims_arguments, 0, sizeof(vims_arguments) );
 		memset( num_array, 0, sizeof(num_array));
 		int flags = vj_event_list[id].flags;
-
-		if(flags & VIMS_DONT_PARSE_PARAMS )
-		{
-		 	int n = parse_plugin_cmd(arguments);
-			if(n == 0)
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) error parsing plugin arguments");
-				if(arguments) free(arguments);
-				return 0;
-			}
-			if(arguments) free(arguments);
-			return 1;
-		}
 
 		for( i = 0; i < np; i ++ )
 		{
@@ -6342,24 +6285,34 @@ void	vj_event_plugin_command(void *ptr,	const char	format[],	va_list ap)
 	int args[2];
 	char str[1024];
 	char *plugin_name;
+	char *p = &str[0];
+	char *d = &plugin_name[0];
+	int oops = 19;
 	P_A(args,str,format,ap);
-
-	plugin_name = strtok( str, ":");	
-
-	plugins_event( plugin_name, str ); 
+	bzero(plugin_name,0);
+	while ( *(p) != ':' && *(p) != '\0' && *(p) != ';' && oops != 0)
+	{
+		*(d++) = *(p++);
+		oops--;
+	}
+	if(oops==0)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Plugin name too long");
+		return;
+	}
+	*(d++) = '\0';
+	*(p++);
+	plugins_event( plugin_name, p ); 
 }
 
 void	vj_event_unload_plugin(void *ptr, const char format[], va_list ap) 
 {
 	int args[2];
 	char str[1024];
-	char *plugin_name;
 	P_A(args,str,format,ap);
+	veejay_msg(VEEJAY_MSG_DEBUG, "Try to close plugin '%s'", str);
 	
-	plugin_name = strtok( str, ":");
-	veejay_msg(VEEJAY_MSG_DEBUG, "Try to close plugin '%s'", plugin_name);
-	
-	plugins_free( plugin_name );
+	plugins_free( str );
 }
 
 void	vj_event_load_plugin(void *ptr, const char format[], va_list ap)
@@ -7099,7 +7052,7 @@ void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 	int b = 0;
 	int nf = 0;
 	char *msg = (char*) vj_el_write_line_ascii( v->edit_list, &b,&nf );
-	sprintf( _s_print_buf, "%04d%s", b, msg );
+	sprintf( _s_print_buf, "%06d%s", b, msg );
 	free(msg);
 
 	SEND_MSG( v, _s_print_buf );

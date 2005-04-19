@@ -1252,10 +1252,10 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 			bzero(filename,400);
 			sprintf(fourcc, "%s", "????");
 			vj_el_get_file_fourcc( el, j, fourcc );
-			sprintf(filename ,"%03d%s%04d%010d%02d%s",
+			sprintf(filename ,"%03d%s%04d%010ld%02d%s",
 				strlen( el->video_file_list[j]  ),
 				el->video_file_list[j],
-				(int) j,
+				(unsigned long) j,
 				el->num_frames[j],
 				strlen(fourcc),
 				fourcc 

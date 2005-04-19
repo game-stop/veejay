@@ -33,7 +33,7 @@ static hash_t	*PluginHash;
 /*
 
 	This hosts a Veejay Plugin.
-
+	TODO: modify for vevo compatibility
 
 */
 
