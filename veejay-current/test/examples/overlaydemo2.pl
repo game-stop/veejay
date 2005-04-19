@@ -5,12 +5,12 @@
 
 my $len = 50;
 
-print "177:;\n";
+print "355:;\n";
 
 
 for(my $mode =0; $mode < 31; $mode++)
 {
-	print "182:0 1 201 $mode;\n";
+	print "361:0 1 201 $mode;\n";
 	print "+$len\n";
 }
 
@@ -19,11 +19,11 @@ for(my $mode=0; $mode < 23; $mode++)
 {
 for(my $val = 0; $val < 255; $val+=8)
 {
-print "182:0 1 207 $mode $val;\n";
+print "361:0 1 207 $mode $val;\n";
 }
 for(my $val = 255; $val > 1; $val-=8)
 {
-print "182:0 1 207 $mode $val;\n";
+print "361:0 1 207 $mode $val;\n";
 }
 }
 
@@ -32,11 +32,11 @@ for(my $mode=0; $mode < 31; $mode++)
 {
 for(my $val = 0; $val < 100; $val+=4)
 {
-print "182:0 1 202 $mode $val;\n";
+print "361:0 1 202 $mode $val;\n";
 }
 for(my $val = 100; $val > 1; $val-=4)
 {
-print "182:0 1 202 $mode $val;\n";
+print "361:0 1 202 $mode $val;\n";
 }
 }
 

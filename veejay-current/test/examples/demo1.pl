@@ -16,18 +16,18 @@ my $j=0;
 my $k=0;
 my $l=0;
 
-print "177:;\n";
+print "355:;\n";
 
 
 for (my $i = 2; $i < 25; $i+=2)
 {
-print "182:0 3 154 $i;\n";
+print "361:0 3 154 $i;\n";
 print "+10;\n";
 }
 
 for (my $i = 2; $i < 25; $i+=2)
 {
-print "182:0 3 154 -$i;\n";
+print "361:0 3 154 -$i;\n";
 print "+10;\n";
 }
 
@@ -35,11 +35,11 @@ print "+10;\n";
 print "+200;\n";
 
 
-print "182:0 3 154 -100;\n";
+print "361:0 3 154 -100;\n";
 
 print "+200;\n";
 
-print "182:0 3 154 40;\n";
+print "361:0 3 154 40;\n";
 
 print "+200;\n";
 
@@ -54,7 +54,7 @@ for(my $i=$p1_start; $i < $p1_end; $i+=2)
 	# preset effect 102 (multi mirrors)
 	# somewhere on the current playing clip/stream
 	# with sequenced parameters 0..3 0..25 
-	print "182:0 1 151 $i $j $k $l;\n";
+	print "361:0 1 151 $i $j $k $l;\n";
 }
 for(my $i=$p1_end; $i != $p1_start; $i-=2)
 {
@@ -65,7 +65,7 @@ for(my $i=$p1_end; $i != $p1_start; $i-=2)
 	# preset effect 102 (multi mirrors)
 	# somewhere on the current playing clip/stream
 	# with sequenced parameters 0..3 0..25 
-	print "182:0 1 151 $i $j $k $l;\n";
+	print "361:0 1 151 $i $j $k $l;\n";
 }
 
 
@@ -76,7 +76,7 @@ for(my $i=$p1_end; $i != $p1_start; $i-=2)
 
 
 # smear:
-print "182:0 5 152 0 31;\n";
+print "361:0 5 152 0 31;\n";
 
 
 print "+100;\n";
@@ -92,7 +92,7 @@ for(my $i=$p1_start; $i < $p1_end; $i+=2)
 	# preset effect 102 (multi mirrors)
 	# somewhere on the current playing clip/stream
 	# with sequenced parameters 0..3 0..25 
-	print "182:0 1 151 $i $j $k $l;\n";
+	print "361:0 1 151 $i $j $k $l;\n";
 }
 for(my $i=$p1_end; $i != $p1_start; $i-=2)
 {
@@ -103,7 +103,7 @@ for(my $i=$p1_end; $i != $p1_start; $i-=2)
 	# preset effect 102 (multi mirrors)
 	# somewhere on the current playing clip/stream
 	# with sequenced parameters 0..3 0..25 
-	print "182:0 1 151 $i $j $k $l;\n";
+	print "361:0 1 151 $i $j $k $l;\n";
 }
 
 

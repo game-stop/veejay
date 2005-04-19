@@ -10,7 +10,7 @@ for(my $j = 0; $j < 25; $j ++)
 	# preset effect 102 (multi mirrors)
 	# somewhere on the current playing clip/stream
 	# with sequenced parameters 0..3 0..25 
-	print "182:0 -1 150 $j;\n";
+	print "361:0 -1 150 $j;\n";
 }
 
 
@@ -21,5 +21,5 @@ for(my $j = 25; $j != 0 ; $j --)
 	# preset effect 102 (multi mirrors)
 	# somewhere on the current playing clip/stream
 	# with sequenced parameters 0..3 0..25 
-	print "182:0 -1 150 $j;\n";
+	print "361:0 -1 150 $j;\n";
 }

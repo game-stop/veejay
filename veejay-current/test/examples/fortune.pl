@@ -1,5 +1,5 @@
 
-print "249:/usr/local/lib/libvj_drawtext_plugin.so;\n";
+print "310:/usr/local/lib/libvj_drawtext_plugin.so;;";
 print "+10\n";
 for ( my $m = 0; $m < 200 ; $m ++ )
 {
@@ -13,7 +13,7 @@ for ( my $m = 0; $m < 200 ; $m ++ )
 	$lines =~ s/"="//;
 	$lines =~ s/";"//;
 
-	print "245:DrawText::text=$lines:size=$size:x=2:y=$y:rand=41;\n";
+	print "312:DrawText::text=$lines:size=$size:x=2:y=$y:rand=41;\n";
 
 	
 

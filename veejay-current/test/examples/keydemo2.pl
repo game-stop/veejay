@@ -5,16 +5,16 @@
 
 my $len = 100;
 
-print "177:;\n";
+print "355:;\n";
 
 
 #clip a = blue, clip b = green
 
-print "182:0 1 242 44 255;\n";
+print "361:0 1 242 44 255;\n";
 
 print "+$len\n";
 
-print "182:0 1 223 2990 255 0 0;\n";
+print "361:0 1 223 2990 255 0 0;\n";
 print "+$len\n";
 
 
