@@ -13,11 +13,11 @@ static struct
 	const gchar	*title;
 } modifier_translation_table_t[] = 
 {
-	{	0,	0,	"None"},
-	{	3,	0,	"Shift" },
-	{	1, 	0,	"CTRL"	},
-	{	2, 	0,	"ALT"	},
-	{	0,	0,	NULL		},
+	{	0,	0,			" "  },
+	{	3,	1,			"shift" },
+	{	1, 	8,			"alt"	},
+	{	2, 	4,			"ctrl"	},
+	{	0,	0,			NULL	},
 };
 
 /* fixme: introduce keyboard mapping functionality
@@ -36,10 +36,18 @@ static struct
 {	GDK_space,	SDLK_SPACE,		"Space"		},
 {	GDK_exclam,	SDLK_EXCLAIM,		"Exclaim"	},
 {	GDK_quotedbl,	SDLK_QUOTEDBL,		"Double quote"  },
-{	GDK_numbersign, SDLK_DOLLAR,		"Dollar"	},
+{	GDK_numbersign, SDLK_HASH,		"Hash"		},
+{	GDK_dollar,	SDLK_DOLLAR,		"Dollar"	},
 {	GDK_percent,	SDLK_PAUSE,		"Percent"	},
+{	GDK_parenleft,	SDLK_LEFTPAREN,		"Leftparen"	},
+{	GDK_parenright, SDLK_RIGHTPAREN,	"Rightparen"	},
+{	GDK_asciicircum,SDLK_CARET,		"Caret"		},
 {	GDK_ampersand,  SDLK_AMPERSAND,		"Ampersand"	},
-{	GDK_apostrophe, SDLK_BACKQUOTE,		"Aphostrophe"	},
+{	GDK_underscore,	SDLK_UNDERSCORE,	"Underscore"	},
+{	GDK_braceright, 123,			"Rightbrace"	},
+{	GDK_braceleft,  125,			"Leftbrace"	},
+{	GDK_grave, 	SDLK_BACKQUOTE,		"Aphostrophe"	},
+{	GDK_asciitilde, 126,			"Tilde"		},
 {	GDK_asterisk,	SDLK_ASTERISK,		"Asterisk"	},
 {	GDK_plus,	SDLK_PLUS,		"Plus"		},
 {	GDK_comma,	SDLK_COMMA,		"Comma"		},
@@ -90,6 +98,21 @@ static struct
 {	GDK_KP_Enter,	SDLK_KP_ENTER,		"keypad ENTER"	},
 {	GDK_ISO_Enter,	SDLK_RETURN,		"ENTER"		},
 {	GDK_3270_Enter, SDLK_RETURN,		"ENTER"		},  
+
+/* GDK_KP doesnt word on all systems ... */
+{	0xff9f,		SDLK_KP0,		"keypad 0"	},
+{	0xff9c,		SDLK_KP1,		"keypad 1"	},
+{	0xff99,		SDLK_KP2,		"keypad 2"	},
+{	0xff9b,		SDLK_KP3,		"keypad 3"	},
+{	0xff96,		SDLK_KP4,		"keypad 4"	},
+{	0xff9d,		SDLK_KP5,		"keypad 5"	},
+{	0xff98,		SDLK_KP6,		"keypad 6"	},
+{	0xff95,		SDLK_KP7,		"keypad 7"	},
+{	0xff97,		SDLK_KP8,		"keypad 8"	},
+{	0xff9a,		SDLK_KP9,		"keypad 9"	},
+{	0xff9f,		SDLK_KP_PERIOD,		"keypad ."	},
+
+
 {	GDK_0,		SDLK_0,			"0"		},
 {	GDK_1,		SDLK_1,			"1"		},
 {	GDK_2,		SDLK_2,			"2"		},
@@ -111,7 +134,31 @@ static struct
 {	GDK_backslash, 	SDLK_BACKSLASH,		"backslash"	},
 {	GDK_bracketright,SDLK_RIGHTBRACKET,	"right bracket" },
 {	GDK_underscore, SDLK_UNDERSCORE,	"underscore" 	},
-{	GDK_grave,	SDLK_CARET,		"caret"		},
+{	GDK_A,		SDLK_a,			"A"		},
+{	GDK_B,		SDLK_b,			"B"		},
+{	GDK_C,		SDLK_c,			"C"		},
+{	GDK_D,		SDLK_d,			"D"		},
+{	GDK_E,		SDLK_e,			"E"		},
+{	GDK_F,		SDLK_f,			"F"		},
+{	GDK_G,		SDLK_g,			"G"		},
+{	GDK_H,		SDLK_h,			"H"		},
+{	GDK_I,		SDLK_i,			"I"		},
+{	GDK_J,		SDLK_j,			"J"		},
+{	GDK_K,		SDLK_k,			"K"		},
+{	GDK_L,		SDLK_l,			"L"		},
+{	GDK_M,		SDLK_m,			"M"		},
+{	GDK_N,		SDLK_n,			"N"		},
+{	GDK_O,		SDLK_o,			"O"		},
+{	GDK_P,		SDLK_p,			"P"		},
+{	GDK_Q,		SDLK_q,			"Q"		},
+{	GDK_R,		SDLK_r,			"R"		},
+{	GDK_S,		SDLK_s,			"S"		},
+{	GDK_T,		SDLK_t,			"T"		},
+{	GDK_U,		SDLK_u,			"U"		},
+{	GDK_V,		SDLK_v,			"V"		},
+{	GDK_W,		SDLK_w,			"W"		},
+{	GDK_X,		SDLK_y,			"Y"		},
+{	GDK_Z,		SDLK_z,			"Z"		},
 {	GDK_a,		SDLK_a,			"a"		},
 {	GDK_b,		SDLK_b,			"b"		},
 {	GDK_c,		SDLK_c,			"c"		},
@@ -145,9 +192,14 @@ static struct
 
 int		sdl2gdk_key( int sdl_key );
 int		gdk2sdl_key( int gdk_key );
+int		gdk2sdl_mod( int gdk_mod );
 gchar		*sdlkey_by_id( int sdl_key );
 gchar		*sdlmod_by_id( int sdk_mod );
 gchar		*gdkkey_by_id( int gdk_key );
+gchar		*gdkmod_by_id(int gdkmod);
+int		sdlmod_by_name( gchar *name );
+int		sdlkey_by_name( gchar *name );
+int		gdk2sdl_mod( int gdk_mod );
 
 gboolean	key_snooper(GtkWidget *w, GdkEventKey *event, gpointer user_data);
 

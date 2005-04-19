@@ -644,54 +644,6 @@ editlist *veejay_get_el( veejay_t *info, int s1 )
 	setup start/end of rendered clip
 */
 
-
-
-#ifdef HAVE_XML2
-void   veejay_load_action_file( veejay_t *info, char *file_name)
-{
-	xmlDocPtr doc;
-	xmlNodePtr cur;
-	doc = xmlParseFile( file_name );
-	if(doc==NULL)	
-	{
-		if(!file_name)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Invalid filename");
-			return;
-		}
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot read file %s", file_name );
-		return;
-	}
-	cur = xmlDocGetRootElement( doc );
-	if( cur == NULL)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "This is not a keyboard configuration file");
-		xmlFreeDoc(doc);
-		return;
-	}
-	if( xmlStrcmp( cur->name, (const xmlChar *) XMLTAG_BUNDLE_FILE))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "This is not a XML Action File");
-			xmlFreeDoc(doc);
-			return;
-		}
-
-	cur = cur->xmlChildrenNode;
-	while( cur != NULL )
-	{
-		if( !xmlStrcmp( cur->name, (const xmlChar *) XMLTAG_EVENT_AS_KEY))
-		{
-			vj_event_xml_new_keyb_event( doc, cur->xmlChildrenNode );
-		}
-		cur = cur->next;
-	}
-	xmlFreeDoc(doc);	
-
-	return;
-
-}
-#endif
-
 void veejay_change_playback_mode( veejay_t *info, int new_pm, int clip_id )
 {
 	// if current is stream and playing network stream, close connection
@@ -824,24 +776,6 @@ void veejay_set_clip(veejay_t * info, int clipid)
     		 veejay_set_speed(info, speed);
      }
 }
-
-static struct
-{
-	int id;
-	int r;
-	int g;
-	int b;
-} solid_colors[] =
-{
-	{0,	255,	255,	255},
-	{1,	0,	0,	0  },
-	{2,	255,	0,	0  },
-	{3,	0,	255,	0  },
-	{4,	0,	0,	255},
-	{5,	255,	255,	0  },
-	{6,	0,	255,	255},
-	{-1,	0,	0,	0, }
-};
 
 /******************************************************
  * veejay_create_clip
@@ -1377,6 +1311,8 @@ int veejay_open(veejay_t * info)
 
       veejay_msg(VEEJAY_MSG_DEBUG,"Starting software playback thread"); 
 
+
+
      if( pthread_create(&(settings->software_playback_thread), NULL,
 		       veejay_mjpeg_playback_thread, (void *) info)) {
 	veejay_msg(VEEJAY_MSG_ERROR, 
@@ -1555,13 +1491,29 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
   //  struct mjpeg_params bp;
     editlist *el = info->edit_list;
     video_playback_setup *settings = info->settings;
-	/* see what timer we have */
+
+	vj_event_init();
+
+	veejay_change_state( info, LAVPLAY_STATE_PLAYING );
+#ifdef HAVE_XML2
+    if(info->load_action_file)
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Loading configuaration file %s", info->action_file);
+		veejay_load_action_file(info, info->action_file );
+	}
+#endif
     if(info->video_out<0)
     {
 		veejay_msg(VEEJAY_MSG_ERROR, "No video output driver selected (see man veejay)");
 		return -1;
 	}
 
+    	// override geometry set in config file   
+	if( info->uc->geox != 0 && info->uc->geoy != 0 )
+	{
+		x = info->uc->geox;
+		y = info->uc->geoy;
+	}
 
     switch (info->uc->use_timer)
 	{
@@ -1672,22 +1624,12 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
   	veejay_msg(VEEJAY_MSG_INFO, 
 		"Initialized %d Image- and Video Effects", MAX_EFFECTS);
     vj_effect_initialize(info->edit_list->video_width, info->edit_list->video_height);
-		veejay_msg(VEEJAY_MSG_INFO,	 
-			"Setup solid color streams 1 - 6");
-
-	vj_event_init();
    
 	info->plugin_frame = vj_perform_init_plugin_frame(info);
 	info->plugin_frame_info = vj_perform_init_plugin_frame_info(info);
 
 
-#ifdef HAVE_XML2
-    if(info->load_action_file)
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Trying to load action file %s", info->action_file);
-		veejay_load_action_file(info, info->action_file );
-	}
-#endif
+
     if(info->dump) vj_effect_dump(); 	
     info->output_stream = vj_yuv4mpeg_alloc(info->edit_list, info->video_output_width,
 		info->video_output_height );
@@ -2284,7 +2226,7 @@ veejay_t *veejay_malloc()
 
     info->settings->currently_processed_entry = -1;
     info->settings->first_frame = 1;
-    info->settings->state = LAVPLAY_STATE_PAUSED;
+    info->settings->state = LAVPLAY_STATE_STOP;
     info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
     info->uc->use_timer = 2;
     info->uc->clip_key = 1;
@@ -2902,11 +2844,6 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, int ofps, in
 	}
     /* open the new movie(s) */
  
-    if (settings->state == LAVPLAY_STATE_STOP) {
-		/* we're not running yet, yay! */
-		veejay_msg(VEEJAY_MSG_WARNING, "Not ready to run!");
-    }
-
     return 1;
 }
 

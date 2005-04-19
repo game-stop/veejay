@@ -3,39 +3,39 @@
 
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims(NET_VIDEO_SKIP_SECOND);
+	single_vims(VIMS_VIDEO_SKIP_SECOND);
 }
 void	on_button_084_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims(NET_VIDEO_PREV_FRAME );
+	single_vims(VIMS_VIDEO_PREV_FRAME );
 }
 void	on_button_080_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims(NET_VIDEO_PLAY_FORWARD);
+	single_vims(VIMS_VIDEO_PLAY_FORWARD);
 }
 void	on_button_081_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims(NET_VIDEO_PLAY_BACKWARD);
+	single_vims(VIMS_VIDEO_PLAY_BACKWARD);
 }
 void	on_button_082_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( NET_VIDEO_PLAY_STOP );
+	single_vims( VIMS_VIDEO_PLAY_STOP );
 }
 void	on_button_083_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( NET_VIDEO_SKIP_FRAME );
+	single_vims( VIMS_VIDEO_SKIP_FRAME );
 }
 void 	on_button_086_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( NET_VIDEO_PREV_SECOND );
+	single_vims( VIMS_VIDEO_PREV_SECOND );
 }
 void	on_button_087_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( NET_VIDEO_GOTO_START );
+	single_vims( VIMS_VIDEO_GOTO_START );
 }
 void	on_button_088_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( NET_VIDEO_GOTO_END);
+	single_vims( VIMS_VIDEO_GOTO_END);
 }
 void	on_videobar_move_slider(GtkWidget *widget, gpointer user_data)
 {
@@ -50,7 +50,7 @@ void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
 		GtkWidget *w = glade_xml_get_widget(
 					info->main_window, "videobar");
 		gdouble slider_val = scale * GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
-		multi_vims( NET_VIDEO_SET_FRAME, "%d", (gint) slider_val );
+		multi_vims( VIMS_VIDEO_SET_FRAME, "%d", (gint) slider_val );
 			
 		info->slider_lock = 0;
 	}
@@ -60,38 +60,38 @@ void	on_audiovolume_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *w = glade_xml_get_widget(info->main_window, "audiovolume");
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
-	multi_vims( NET_SET_VOLUME, "%d", (gint) val );
+	multi_vims( VIMS_SET_VOLUME, "%d", (gint) val );
 }
 
 void	on_button_001_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( NET_SET_PLAIN_MODE );
+	single_vims( VIMS_SET_PLAIN_MODE );
 }
 
 void	on_button_252_clicked( GtkWidget *widget, gpointer user_data)
 {
-	single_vims( NET_DEBUG_LEVEL );
+	single_vims( VIMS_DEBUG_LEVEL );
 }
 
 void	on_button_251_clicked( GtkWidget *widget, gpointer user_data)
 {
-	single_vims( NET_BEZERK );
+	single_vims( VIMS_BEZERK );
 }	
 
 void	on_button_054_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( NET_SCREENSHOT );
+	single_vims( VIMS_SCREENSHOT );
 }
 void	on_button_200_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( NET_EFFECT_SET_BG ); 
+	single_vims( VIMS_EFFECT_SET_BG ); 
 }
 void	on_button_5_4_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("button_5_4") )
-		single_vims( NET_AUDIO_ENABLE );
+		single_vims( VIMS_AUDIO_ENABLE );
 	else
-		single_vims( NET_AUDIO_DISABLE );	
+		single_vims( VIMS_AUDIO_DISABLE );	
 }
 void	on_button_samplestart_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -100,7 +100,7 @@ void	on_button_samplestart_clicked(GtkWidget *widget, gpointer user_data)
 void	on_button_sampleend_clicked(GtkWidget *widget, gpointer user_data)
 {
 	info->sample[1] = info->status_tokens[FRAME_NUM];
-	multi_vims( NET_CLIP_NEW, "%d %d", info->sample[0],info->sample[1]);
+	multi_vims( VIMS_CLIP_NEW, "%d %d", info->sample[0],info->sample[1]);
 	info->uc.reload_hint[HINT_SLIST] = 1;
 }
 
@@ -130,20 +130,20 @@ void	on_button_vimshelp_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_fadeout_clicked(GtkWidget *w, gpointer user_data)
 {
-	multi_vims( NET_CHAIN_FADE_OUT, "0 %d",
+	multi_vims( VIMS_CHAIN_FADE_OUT, "0 %d",
 		(int)get_numd( "button_fadedur"));
 }
 
 void	on_button_fadein_clicked(GtkWidget *w, gpointer user_data)
 {
-	multi_vims( NET_CHAIN_FADE_IN, "0 %d",
+	multi_vims( VIMS_CHAIN_FADE_IN, "0 %d",
 		(int)get_numd( "button_fadedur"));
 }
 
 void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 {
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
-	multi_vims( NET_CHAIN_MANUAL_FADE, "0 %d",
+	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d",
 		(int)(255.0 * val));
 }
 
@@ -190,7 +190,7 @@ static	gboolean verify_selection()
 void	on_button_el_cut_clicked(GtkWidget *w, gpointer *user_data)
 {
 	if(verify_selection())
-	{	multi_vims( NET_EDITLIST_CUT, "%d %d",
+	{	multi_vims( VIMS_EDITLIST_CUT, "%d %d",
 			info->selection[0], info->selection[1]);
 	}
 }
@@ -198,7 +198,7 @@ void	on_button_el_del_clicked(GtkWidget *w, gpointer *user_data)
 {
 	if(verify_selection())
 	{
-		multi_vims( NET_EDITLIST_DEL, "%d %d",
+		multi_vims( VIMS_EDITLIST_DEL, "%d %d",
 			info->selection[0], info->selection[1]);
 	}
 }
@@ -206,7 +206,7 @@ void	on_button_el_crop_clicked(GtkWidget *w, gpointer *user_data)
 {
 	if(verify_selection())
 	{
-		multi_vims( NET_EDITLIST_CROP, "%d %d",
+		multi_vims( VIMS_EDITLIST_CROP, "%d %d",
 			info->selection[0], info->selection[1]);
 	}
 }
@@ -214,15 +214,28 @@ void	on_button_el_copy_clicked(GtkWidget *w, gpointer *user_data)
 {
 	if(verify_selection())
 	{
-		multi_vims( NET_EDITLIST_COPY, "%d %d",
+		multi_vims( VIMS_EDITLIST_COPY, "%d %d",
 			info->selection[0], info->selection[1] );
 	}
 }
+
+void	on_button_el_newclip_clicked(GtkWidget *w, gpointer *user)
+{
+	if(verify_selection())
+	{
+		multi_vims( VIMS_CLIP_NEW, "%d %d",
+			info->selection[0], info->selection[1] );
+		info->uc.reload_hint[HINT_SLIST] = 1;
+	}
+
+
+}
+
 void	on_button_el_pasteat_clicked(GtkWidget *w, gpointer *user_data)
 {
 	gint val = get_nums( "button_el_selpaste" );
 	info->selection[2] = val;
-	multi_vims( NET_EDITLIST_PASTE_AT, "%d",
+	multi_vims( VIMS_EDITLIST_PASTE_AT, "%d",
 		info->selection[2]);
 }
 void	on_button_el_save_clicked(GtkWidget *w, gpointer *user_data)
@@ -230,7 +243,7 @@ void	on_button_el_save_clicked(GtkWidget *w, gpointer *user_data)
 	gchar *filename = dialog_save_file( "Save EditList" );
 	if(filename)
 	{
-		multi_vims( NET_EDITLIST_SAVE, "%s %d %d",
+		multi_vims( VIMS_EDITLIST_SAVE, "%s %d %d",
 			filename, 0, info->el.num_frames );
 		g_free(filename);
 	}
@@ -242,7 +255,7 @@ void	on_button_el_savesel_clicked(GtkWidget *w, gpointer *user_data)
 	{
 		gint start = get_nums( "button_el_selstart" );
 		gint end = get_nums( "button_el_selend" );
-		multi_vims( NET_EDITLIST_SAVE, "%s %d %d",
+		multi_vims( VIMS_EDITLIST_SAVE, "%s %d %d",
 			filename, start, end ); 
 		g_free(filename);
 	}
@@ -253,7 +266,7 @@ void	on_button_el_add_clicked(GtkWidget *w, gpointer *user_data)
 	gchar *filename = dialog_open_file( "Append videofile to EditList" );
 	if(filename)
 	{
-		multi_vims( NET_EDITLIST_ADD, "%s",
+		multi_vims( VIMS_EDITLIST_ADD, "%s",
 		filename );
 		g_free(filename);
 	}
@@ -263,7 +276,7 @@ void	on_button_el_addclip_clicked(GtkWidget *w, gpointer *user_data)
 	gchar *filename = dialog_open_file( "Append videofile (and create sample)");
 	if( filename )
 	{
-		multi_vims( NET_EDITLIST_ADD_CLIP, "%s", filename );
+		multi_vims( VIMS_EDITLIST_ADD_CLIP, "%s", filename );
 		g_free(filename);
 	}
 }
@@ -272,14 +285,14 @@ void	on_button_el_delfile_clicked(GtkWidget *w, gpointer *user_data)
 	int frame = _el_ref_start_frame( info->uc.selected_el_entry );
 	int first_frame = frame;
 	int last_frame = _el_ref_end_frame( info->uc.selected_el_entry );
-	multi_vims( NET_EDITLIST_DEL, "%d %d", first_frame, last_frame );
+	multi_vims( VIMS_EDITLIST_DEL, "%d %d", first_frame, last_frame );
 } 
 /*
 void	on_button_fx_add_clicked(GtkWidget *w, gpointer user_data)
 {
 	if(info->uc.selected_effect_id > 0)
 	{
-		multi_vims( NET_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",	
+		multi_vims( VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",	
 			0, info->uc.selected_chain_entry, info->uc.selected_effect_id );
 		info->uc.reload_hint[HINT_CHAIN] = 1;
 		info->uc.reload_hint[HINT_ENTRY] = 1;
@@ -287,7 +300,7 @@ void	on_button_fx_add_clicked(GtkWidget *w, gpointer user_data)
 }*/
 void	on_button_fx_clearchain_clicked(GtkWidget *w, gpointer user_data)
 {
-	multi_vims( NET_CHAIN_CLEAR, "%d",0);
+	multi_vims( VIMS_CHAIN_CLEAR, "%d",0);
 	info->uc.reload_hint[HINT_CHAIN] = 1;
 	info->uc.reload_hint[HINT_ENTRY] = 1;
 }
@@ -298,10 +311,10 @@ void	on_button_entry_toggle_clicked(GtkWidget *w, gpointer user_data)
 	{
 		gint val = is_button_toggled( "button_entry_toggle" );
 		if(val)
-			multi_vims( NET_CHAIN_ENTRY_SET_VIDEO_ON,
+			multi_vims( VIMS_CHAIN_ENTRY_SET_VIDEO_ON,
 				"%d %d", 0, info->uc.selected_chain_entry );
 		else
-			multi_vims( NET_CHAIN_ENTRY_SET_VIDEO_OFF,
+			multi_vims( VIMS_CHAIN_ENTRY_SET_VIDEO_OFF,
 				"%d %d", 0, info->uc.selected_chain_entry );
 	}	
 }
@@ -311,11 +324,11 @@ void	on_button_fx_entry_value_changed(GtkWidget *w, gpointer user_data)
 	if(!info->status_lock)
 	{
 		int  *p = &(info->uc.entry_tokens[0]);
-		multi_vims( NET_CHAIN_SET_ENTRY, "%d",
+		multi_vims( VIMS_CHAIN_SET_ENTRY, "%d",
 			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w))
 		);
 
-		multi_vims( NET_CHAIN_GET_ENTRY, "%d %d", 0, 
+		multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, 
 			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w)) );
 		int len = 0;
 		gchar *answer = recv_vims(3,&len);
@@ -334,7 +347,7 @@ void	on_button_fx_entry_value_changed(GtkWidget *w, gpointer user_data)
 }
 void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 {
-	multi_vims( NET_CHAIN_ENTRY_CLEAR, "%d %d", 0, 
+	multi_vims( VIMS_CHAIN_ENTRY_CLEAR, "%d %d", 0, 
 		info->uc.selected_chain_entry );
 	info->uc.reload_hint[HINT_CHAIN] = 1;
 	info->uc.reload_hint[HINT_ENTRY] = 1;
@@ -343,7 +356,7 @@ void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 void	on_button_fx_mixapply_clicked(GtkWidget *w, gpointer user_data)
 {
 	if(info->uc.selected_mix_sample_id)
-		multi_vims( NET_CHAIN_ENTRY_SET_SOURCE_CHANNEL,"%d %d %d %d",
+		multi_vims( VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,"%d %d %d %d",
 			0,
 			info->uc.selected_chain_entry,
 			0,
@@ -351,7 +364,7 @@ void	on_button_fx_mixapply_clicked(GtkWidget *w, gpointer user_data)
 			);
 
 	if(info->uc.selected_mix_stream_id)
-		multi_vims( NET_CHAIN_ENTRY_SET_SOURCE_CHANNEL, "%d %d %d %d",
+		multi_vims( VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL, "%d %d %d %d",
 			0,
 			info->uc.selected_chain_entry,
 			1,
@@ -365,7 +378,7 @@ void	on_button_fx_mixapply_clicked(GtkWidget *w, gpointer user_data)
 if(!info->status_lock && !info->parameter_lock)\
 {\
 info->parameter_lock = 1;\
-multi_vims( NET_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d", 0, info->uc.selected_chain_entry,arg_num, value );\
+multi_vims( VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d", 0, info->uc.selected_chain_entry,arg_num, value );\
 if(info->uc.selected_rgbkey) update_rgbkey_from_slider(); \
 info->parameter_lock = 0;\
 }\
@@ -376,7 +389,7 @@ info->parameter_lock = 0;\
 if(!info->status_lock && !info->parameter_lock)\
 {\
 info->parameter_lock = 1;\
-multi_vims( NET_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d", 0, info->uc.selected_chain_entry,arg_num, (get_slider_val(name) + fraction) );\
+multi_vims( VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d", 0, info->uc.selected_chain_entry,arg_num, (get_slider_val(name) + fraction) );\
 update_slider_value( name, (get_slider_val(name) + fraction), 0 );\
 if(info->uc.selected_rgbkey) update_rgbkey_from_slider(); \
 info->parameter_lock = 0;\
@@ -500,12 +513,12 @@ void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(info->uc.selected_sample_id != 0)
 	{
-		multi_vims( NET_SET_MODE_AND_GO , "%d %d" , 0,
+		multi_vims( VIMS_SET_MODE_AND_GO , "%d %d" , 0,
 			info->uc.selected_sample_id );
 	}
 	if(info->uc.selected_stream_id != 0)
 	{
-		multi_vims( NET_SET_MODE_AND_GO, "%d %d", 1,
+		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d", 1,
 			info->uc.selected_stream_id );
 	}
 
@@ -515,13 +528,13 @@ void	on_button_sample_del_clicked(GtkWidget *widget, gpointer user_data)
 	int query = 0;
 	if(info->uc.selected_sample_id )
 	{
-		multi_vims( NET_CLIP_DEL, "%d",
+		multi_vims( VIMS_CLIP_DEL, "%d",
 			info->uc.selected_sample_id );
 		query = 1;
 	}
 	if(info->uc.selected_stream_id)
 	{
-		multi_vims( NET_TAG_DELETE, "%d",
+		multi_vims( VIMS_STREAM_DELETE, "%d",
 			info->uc.selected_stream_id );
 		query = 1;
 	}
@@ -546,10 +559,10 @@ void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		if(erase_all)
 		{
-			single_vims( NET_SET_PLAIN_MODE );
-			single_vims( NET_CLIP_DEL_ALL ); 
+			single_vims( VIMS_SET_PLAIN_MODE );
+			single_vims( VIMS_CLIP_DEL_ALL ); 
 		}
-		multi_vims( NET_CLIP_LOAD_CLIPLIST, "%s", filename );
+		multi_vims( VIMS_CLIP_LOAD_CLIPLIST, "%s", filename );
 		g_free(filename );
 	}
 }
@@ -558,7 +571,7 @@ void	on_button_samplelist_save_clicked(GtkWidget *widget, gpointer user_data)
 	gchar *filename = dialog_save_file( "Save samplelist");
 	if(filename)
 	{
-		multi_vims( NET_CLIP_SAVE_CLIPLIST, "%s", filename );
+		multi_vims( VIMS_CLIP_SAVE_CLIPLIST, "%s", filename );
 		g_free(filename);
 	}
 }
@@ -567,7 +580,7 @@ void	on_spin_samplestart_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims(NET_CLIP_SET_START, "%d %d",0,
+		multi_vims(VIMS_CLIP_SET_START, "%d %d",0,
 			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) ) );
 	}
 }
@@ -576,7 +589,7 @@ void	on_spin_sampleend_value_changed( GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims(NET_CLIP_SET_END, "%d %d", 0,
+		multi_vims(VIMS_CLIP_SET_END, "%d %d", 0,
 			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget)) );
 	}
 }
@@ -585,7 +598,7 @@ void	on_speedslider_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{	
-		multi_vims( NET_VIDEO_SET_SPEED, "%d",
+		multi_vims( VIMS_VIDEO_SET_SPEED, "%d",
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value ) );
 	}
 }
@@ -594,7 +607,7 @@ void	on_spin_samplespeed_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims( NET_CLIP_SET_SPEED, "%d %d",0,
+		multi_vims( VIMS_CLIP_SET_SPEED, "%d %d",0,
 			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) ) );
 	}
 }
@@ -603,7 +616,7 @@ void	on_v4l_brightness_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims( NET_TAG_SET_BRIGHTNESS, "%d %d",
+		multi_vims( VIMS_STREAM_SET_BRIGHTNESS, "%d %d",
 			info->uc.current_stream_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) );
 	}
@@ -613,7 +626,7 @@ void	on_v4l_contrast_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims( NET_TAG_SET_CONTRAST, "%d %d", 
+		multi_vims( VIMS_STREAM_SET_CONTRAST, "%d %d", 
 			info->uc.current_stream_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0 ) );
 	}
@@ -623,7 +636,7 @@ void	on_v4l_hue_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims( NET_TAG_SET_HUE, "%d %d",
+		multi_vims( VIMS_STREAM_SET_HUE, "%d %d",
 			info->uc.current_stream_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0 ) );
 	}
@@ -633,7 +646,7 @@ void	on_v4l_white_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims( NET_TAG_SET_WHITE, "%d %d",
+		multi_vims( VIMS_STREAM_SET_WHITE, "%d %d",
 			info->uc.current_stream_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0 ) );
 	}
@@ -643,7 +656,7 @@ void	on_v4l_color_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims( NET_TAG_SET_COLOR, "%d %d",
+		multi_vims( VIMS_STREAM_SET_COLOR, "%d %d",
 			info->uc.current_stream_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) );
 	}
@@ -663,11 +676,11 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 
 	if(format != NULL)
 	{
-		multi_vims( NET_RECORD_DATAFORMAT,"%s",
+		multi_vims( VIMS_RECORD_DATAFORMAT,"%s",
 			format );
 	}		
 
-	multi_vims( NET_TAG_REC_START,
+	multi_vims( VIMS_STREAM_REC_START,
 		"%d %d",
 		nframes,
 		autoplay );
@@ -676,7 +689,7 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_stream_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( NET_TAG_REC_STOP );
+	single_vims( VIMS_STREAM_REC_STOP );
 }
 
 void	on_spin_streamduration_value_changed(GtkWidget *widget , gpointer user_data)
@@ -702,11 +715,11 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	
 	if(format != NULL)
 	{
-		multi_vims( NET_RECORD_DATAFORMAT,"%s",
+		multi_vims( VIMS_RECORD_DATAFORMAT,"%s",
 			format );
 	}		
 
-	multi_vims( NET_CLIP_REC_START,
+	multi_vims( VIMS_CLIP_REC_START,
 		"%d %d",
 		nframes,
 		autoplay );
@@ -715,7 +728,7 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_sample_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( NET_CLIP_REC_STOP );
+	single_vims( VIMS_CLIP_REC_STOP );
 }
 
 static	int	sample_calctime()
@@ -770,9 +783,9 @@ void	on_check_samplefx_clicked(GtkWidget *widget , gpointer user_data)
 	if(!info->status_lock)
 	{
 		if( is_button_toggled( "check_samplefx" ) )
-			multi_vims( NET_CLIP_CHAIN_ENABLE , "%d", 0 );
+			multi_vims( VIMS_CLIP_CHAIN_ENABLE , "%d", 0 );
 		else
-			multi_vims( NET_CLIP_CHAIN_DISABLE, "%d", 0 );
+			multi_vims( VIMS_CLIP_CHAIN_DISABLE, "%d", 0 );
 	}
 }
 void	on_check_streamfx_clicked(GtkWidget *widget, gpointer user_data)
@@ -780,23 +793,23 @@ void	on_check_streamfx_clicked(GtkWidget *widget, gpointer user_data)
 	if(!info->status_lock)
 	{
 		if( is_button_toggled( "check_streamfx"))
-			multi_vims( NET_TAG_CHAIN_ENABLE, "%d", 0 );
+			multi_vims( VIMS_STREAM_CHAIN_ENABLE, "%d", 0 );
 		else
-			multi_vims( NET_TAG_CHAIN_DISABLE, "%d", 0 );	
+			multi_vims( VIMS_STREAM_CHAIN_DISABLE, "%d", 0 );	
 	}
 }
 
 void	on_loop_none_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
-		multi_vims( NET_CLIP_SET_LOOPTYPE,
+		multi_vims( VIMS_CLIP_SET_LOOPTYPE,
 			"%d %d", 0,
 			get_loop_value() );
 }
 void	on_loop_normal_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
-		multi_vims( NET_CLIP_SET_LOOPTYPE,
+		multi_vims( VIMS_CLIP_SET_LOOPTYPE,
 			"%d %d", 0,
 			get_loop_value() );
 
@@ -804,7 +817,7 @@ void	on_loop_normal_clicked(GtkWidget *widget, gpointer user_data)
 void	on_loop_pingpong_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
-		multi_vims( NET_CLIP_SET_LOOPTYPE,
+		multi_vims( VIMS_CLIP_SET_LOOPTYPE,
 			"%d %d", 0,
 			get_loop_value() );
 
@@ -828,10 +841,10 @@ void	on_slider_m0_value_changed(GtkWidget *widget, gpointer user_data)
 			atom_marker("slider_m1", val);
 		}
 		if(info->uc.marker.bind)
-			multi_vims( NET_CLIP_SET_MARKER , "%d %d %d", 0,
+			multi_vims( VIMS_CLIP_SET_MARKER , "%d %d %d", 0,
 				info->uc.marker.start, get_slider_val( "slider_m1" ) );
 		else
-			multi_vims( NET_CLIP_SET_MARKER_START, "%d %d", 0,
+			multi_vims( VIMS_CLIP_SET_MARKER_START, "%d %d", 0,
 				info->uc.marker.start );
 	}
 	
@@ -847,10 +860,10 @@ void	on_slider_m1_value_changed(GtkWidget *widget, gpointer user_data)
 			atom_marker("slider_m0", val);
 		}
 		if(info->uc.marker.bind)
-			multi_vims( NET_CLIP_SET_MARKER , "%d %d %d", 0,
+			multi_vims( VIMS_CLIP_SET_MARKER , "%d %d %d", 0,
 				get_slider_val( "slider_m0" ), info->uc.marker.end );
 		else
-			multi_vims( NET_CLIP_SET_MARKER_END, "%d %d", 0,
+			multi_vims( VIMS_CLIP_SET_MARKER_END, "%d %d", 0,
 				info->uc.marker.end );
 
 	}
@@ -879,7 +892,7 @@ void	on_button_clearmarker_clicked(GtkWidget *widget, gpointer user_data)
 	info->uc.marker.end = 0;
 	atom_marker( "slider_m0", 0 );
 	atom_marker( "slider_m1", (info->uc.marker.upper_bound - info->uc.marker.lower_bound) );
-	multi_vims( NET_CLIP_CLEAR_MARKER, "%d", 0 ); 
+	multi_vims( VIMS_CLIP_CLEAR_MARKER, "%d", 0 ); 
 }
 
 
@@ -892,7 +905,7 @@ void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 	gchar *filename = dialog_open_file("Load samplelist");
 	if( filename )
 	{
-		multi_vims( NET_CLIP_LOAD_CLIPLIST, "%s", filename );
+		multi_vims( VIMS_CLIP_LOAD_CLIPLIST, "%s", filename );
 		g_free(filename);
 	}
 }
@@ -914,7 +927,7 @@ void	on_button_el_takeend_clicked(GtkWidget *widget, gpointer user_data)
 }
 void	on_button_el_paste_clicked(GtkWidget *widget, gpointer user_data)
 {
-	multi_vims( NET_EDITLIST_PASTE_AT, "%d",
+	multi_vims( VIMS_EDITLIST_PASTE_AT, "%d",
 		info->status_tokens[FRAME_NUM] );
 }
 void	on_new_colorstream_clicked(GtkWidget *widget, gpointer user_data)
@@ -933,7 +946,7 @@ void	on_new_colorstream_clicked(GtkWidget *widget, gpointer user_data)
 	gint blue = current_color.blue / 256.0;
 
 	info->uc.reload_hint[HINT_SLIST] = 1;
-	multi_vims( NET_TAG_NEW_COLOR, "%d %d %d",
+	multi_vims( VIMS_STREAM_NEW_COLOR, "%d %d %d",
 		red,green,blue );
 }
 
@@ -964,7 +977,7 @@ void	on_priout_apply_clicked(GtkWidget *widget, gpointer user_data)
 
 	if( width > 0 && height > 0 )
 	{
-		multi_vims( NET_RESIZE_SDL_SCREEN, "%d %d %d %d",
+		multi_vims( VIMS_RESIZE_SDL_SCREEN, "%d %d %d %d",
 			width,height,x , y );
 	}
 
@@ -973,8 +986,23 @@ void	on_priout_apply_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_vims_take_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( NET_BUNDLE_CAPTURE );
+	single_vims( VIMS_BUNDLE_CAPTURE );
 	info->uc.reload_hint[HINT_BUNDLES] = 1;
+}
+void	on_button_key_detach_clicked(GtkWidget *widget, gpointer user)
+{
+	int key_val  = info->uc.selected_key_sym;
+	int key_mod  = info->uc.selected_key_mod;
+
+
+	if( key_val > 0 )
+	{
+		multi_vims( 
+			VIMS_BUNDLE_ATTACH_KEY,
+			"0 %d %d",
+			key_val, key_mod );
+		info->uc.reload_hint[HINT_BUNDLES] = 1; 
+	}
 }
 
 void	on_vims_key_clicked( GtkWidget *widget, gpointer user_data)
@@ -987,11 +1015,11 @@ void	on_vims_key_clicked( GtkWidget *widget, gpointer user_data)
 	{
 		int event_id = info->uc.selected_vims_entry;
 		int key_val  = gdk2sdl_key( info->uc.pressed_key );
-		int mod	     = 3;
+		int mod	     = gdk2sdl_mod( info->uc.pressed_mod );
 		if( event_id > 0 && key_val > 0 )
 		{
 			multi_vims( 
-				NET_BUNDLE_ATTACH_KEY,
+				VIMS_BUNDLE_ATTACH_KEY,
 				"%d %d %d",
 				event_id, key_val, mod );
 			info->uc.reload_hint[HINT_BUNDLES] = 1; 
@@ -1007,7 +1035,7 @@ void	on_button_vimsupdate_clicked(GtkWidget *widget, gpointer user_data)
 	if(count_textview_buffer( "vimsview" ) > 0 )
 	{
 		gchar *buf = get_textview_buffer( "vimsview" );
-		multi_vims( NET_ADD_BUNDLE, "%d %s",
+		multi_vims( VIMS_BUNDLE_ADD, "%d %s",
 			info->uc.selected_vims_entry, buf );
 		info->uc.reload_hint[HINT_BUNDLES] = 1; 
 	} 
@@ -1023,7 +1051,7 @@ void	on_vims_clear_clicked(GtkWidget *widget, gpointer user_data)
 void	on_vims_delete_clicked(GtkWidget *widget, gpointer user_data)
 {
 	// delete selected bundle
-	multi_vims( NET_DEL_BUNDLE, "%d", info->uc.selected_vims_entry );
+	multi_vims( VIMS_BUNDLE_DEL, "%d", info->uc.selected_vims_entry );
 	info->uc.reload_hint[HINT_BUNDLES] = 1;
 }
 
@@ -1032,7 +1060,7 @@ void	on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data)
 	gchar *filename = dialog_save_file( "Save Bundles");
 	if(filename)
 	{
-		multi_vims( NET_BUNDLE_SAVE, "%s", filename );
+		multi_vims( VIMS_BUNDLE_SAVE, "%s", filename );
 		g_free(filename);
 	} 	
 }
@@ -1042,7 +1070,7 @@ void	on_button_newbundle_clicked(GtkWidget *widget, gpointer user_data)
 	if(count_textview_buffer( "vimsview" ) > 0 )
 	{
 		gchar *buf = get_textview_buffer( "vimsview" );
-		multi_vims( NET_ADD_BUNDLE, "%d %s", 0, buf );
+		multi_vims( VIMS_BUNDLE_ADD, "%d %s", 0, buf );
 		info->uc.reload_hint[HINT_BUNDLES] = 1;
 	}
 }
@@ -1052,7 +1080,7 @@ void	on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data)
 	gchar *filename = dialog_open_file( "Load Bundles" );
 	if(filename)
 	{
-		multi_vims( NET_BUNDLE_FILE, "%s", filename );
+		multi_vims( VIMS_BUNDLE_FILE, "%s", filename );
 		g_free( filename );
 		info->uc.reload_hint[HINT_BUNDLES] = 1;
 	}
@@ -1073,7 +1101,7 @@ void	on_button_historyrec_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(info->uc.selected_history_entry > 0)
 	{
-		multi_vims( NET_CLIP_RENDER_TO, "%d %d", 0, info->uc.selected_history_entry );
+		multi_vims( VIMS_CLIP_RENDER_TO, "%d %d", 0, info->uc.selected_history_entry );
 	}
 	info->uc.render_record=1;
 }
@@ -1082,7 +1110,7 @@ void	on_button_historymove_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(info->uc.selected_history_entry > 0 )
 	{
-		multi_vims( NET_CLIP_RENDER_MOVE, "%d %d", 0, info->uc.selected_history_entry );
+		multi_vims( VIMS_CLIP_RENDER_MOVE, "%d %d", 0, info->uc.selected_history_entry );
 	}
 	info->uc.reload_hint[HINT_EL] =1;
 	info->uc.reload_hint[HINT_HISTORY] = 1;
@@ -1092,7 +1120,7 @@ void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(info->uc.selected_sample_id != 0)
 	{
-		multi_vims( NET_CLIP_COPY , "%d",
+		multi_vims( VIMS_CLIP_COPY , "%d",
 			info->uc.selected_sample_id );
 		if(info->status_tokens[PLAY_MODE] == MODE_PLAIN )
 			info->uc.reload_hint[HINT_SLIST] = 1;
@@ -1105,5 +1133,5 @@ void	on_check_priout_fullscreen_clicked(
 	gint on = 0;
 	if(is_button_toggled( "check_priout_fullscreen" ) )
 		on = 1;
-	multi_vims ( NET_FULLSCREEN, "%d", on );
+	multi_vims ( VIMS_FULLSCREEN, "%d", on );
 }

@@ -154,29 +154,29 @@ static int human_friendly_vims(char *buffer)
 	return 1;
    }
 
-   if(strncmp( buffer, "vi",2 ) == 0 ) { human_friendly_msg( NET_TAG_NEW_V4L, buffer+2); return 1; }
-   if(strncmp( buffer, "fi",2 ) == 0 ) { human_friendly_msg( NET_TAG_NEW_Y4M, buffer+2); return 1; }
-   if(strncmp( buffer, "fo",2 ) == 0 ) { human_friendly_msg( NET_OUTPUT_Y4M_START,buffer+2); return 1; }
-   if(strncmp( buffer, "cl",2 ) == 0 ) { human_friendly_msg( NET_CLIP_LOAD_CLIPLIST, buffer+2); return 1;}
-   if(strncmp( buffer, "cn",2 ) == 0 ) { human_friendly_msg( NET_CLIP_NEW, buffer+2); return 1;}
-   if(strncmp( buffer, "cd",2 ) == 0 ) { human_friendly_msg( NET_CLIP_DEL, buffer+2); return 1;}
-   if(strncmp( buffer, "sd",2 ) == 0 ) { human_friendly_msg( NET_TAG_DELETE,buffer+2); return 1;}
-   if(strncmp( buffer, "cs",2 ) == 0 ) { human_friendly_msg( NET_CLIP_SAVE_CLIPLIST,buffer+2); return 1;}
-   if(strncmp( buffer, "es",2 ) == 0 ) { human_friendly_msg( NET_EDITLIST_SAVE,buffer+2); return 1;}
-   if(strncmp( buffer, "ec",2 ) == 0 ) { human_friendly_msg( NET_EDITLIST_CUT,buffer+2); return 1;}
-   if(strncmp( buffer, "ed",2 ) == 0 ) { human_friendly_msg( NET_EDITLIST_DEL,buffer+2); return 1;}
-   if(strncmp( buffer, "ep",2 ) == 0 ) { human_friendly_msg( NET_EDITLIST_PASTE_AT,buffer+2); return 1; }
-   if(strncmp( buffer, "ex",2 ) == 0 ) { human_friendly_msg( NET_EDITLIST_COPY, buffer+2); return 1; }
-   if(strncmp( buffer, "er",2 ) == 0 ) { human_friendly_msg( NET_EDITLIST_CROP, buffer+2); return 1; }   
-   if(strncmp( buffer, "al",2 ) == 0 ) { human_friendly_msg( NET_BUNDLE_FILE,buffer+2); return 1; }
-   if(strncmp( buffer, "as",2 ) == 0 ) { human_friendly_msg( NET_BUNDLE_SAVE,buffer+2); return 1; }
-   if(strncmp( buffer, "de",2 ) == 0 ) { human_friendly_msg( NET_DEBUG_LEVEL, NULL); return 1;}
-   if(strncmp( buffer, "be",2 ) == 0 ) { human_friendly_msg( NET_BEZERK,NULL); return 1;}
-   if(strncmp( buffer, "sa",2 ) == 0 ) { human_friendly_msg( NET_SAMPLE_MODE,NULL); return 1;}
-	if(strncmp(buffer, "mr",2 ) == 0 ) { human_friendly_msg( NET_TAG_NEW_MCAST, buffer+2); return 1; }
-	if(strncmp(buffer, "pr",2 ) == 0 ) { human_friendly_msg( NET_TAG_NEW_NET, buffer+2);
+   if(strncmp( buffer, "vi",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_NEW_V4L, buffer+2); return 1; }
+   if(strncmp( buffer, "fi",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_NEW_Y4M, buffer+2); return 1; }
+   if(strncmp( buffer, "fo",2 ) == 0 ) { human_friendly_msg( VIMS_OUTPUT_Y4M_START,buffer+2); return 1; }
+   if(strncmp( buffer, "cl",2 ) == 0 ) { human_friendly_msg( VIMS_CLIP_LOAD_CLIPLIST, buffer+2); return 1;}
+   if(strncmp( buffer, "cn",2 ) == 0 ) { human_friendly_msg( VIMS_CLIP_NEW, buffer+2); return 1;}
+   if(strncmp( buffer, "cd",2 ) == 0 ) { human_friendly_msg( VIMS_CLIP_DEL, buffer+2); return 1;}
+   if(strncmp( buffer, "sd",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_DELETE,buffer+2); return 1;}
+   if(strncmp( buffer, "cs",2 ) == 0 ) { human_friendly_msg( VIMS_CLIP_SAVE_CLIPLIST,buffer+2); return 1;}
+   if(strncmp( buffer, "es",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_SAVE,buffer+2); return 1;}
+   if(strncmp( buffer, "ec",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_CUT,buffer+2); return 1;}
+   if(strncmp( buffer, "ed",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_DEL,buffer+2); return 1;}
+   if(strncmp( buffer, "ep",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_PASTE_AT,buffer+2); return 1; }
+   if(strncmp( buffer, "ex",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_COPY, buffer+2); return 1; }
+   if(strncmp( buffer, "er",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_CROP, buffer+2); return 1; }   
+   if(strncmp( buffer, "al",2 ) == 0 ) { human_friendly_msg( VIMS_BUNDLE_FILE,buffer+2); return 1; }
+   if(strncmp( buffer, "as",2 ) == 0 ) { human_friendly_msg( VIMS_BUNDLE_SAVE,buffer+2); return 1; }
+   if(strncmp( buffer, "de",2 ) == 0 ) { human_friendly_msg( VIMS_DEBUG_LEVEL, NULL); return 1;}
+   if(strncmp( buffer, "be",2 ) == 0 ) { human_friendly_msg( VIMS_BEZERK,NULL); return 1;}
+   if(strncmp( buffer, "sa",2 ) == 0 ) { human_friendly_msg( VIMS_SAMPLE_MODE,NULL); return 1;}
+	if(strncmp(buffer, "mr",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_NEW_MCAST, buffer+2); return 1; }
+	if(strncmp(buffer, "pr",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_NEW_UNICAST, buffer+2);
 return 1;}
-	if(strncmp(buffer, "av",2 ) == 0 ) { human_friendly_msg( NET_TAG_NEW_AVFORMAT, buffer+2); return 1; }
+	if(strncmp(buffer, "av",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_NEW_AVFORMAT, buffer+2); return 1; }
    return 0;
 }
 

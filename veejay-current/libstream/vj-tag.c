@@ -1957,7 +1957,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	vj_client_flush	( vj_tag_input->net[tag->index],1);
 	case VJ_TAG_TYPE_MCAST:	
 
-	sprintf(buf, "%03d:;", NET_GET_FRAME);
+	sprintf(buf, "%03d:;", VIMS_GET_FRAME);
 	if(vj_client_send( vj_tag_input->net[tag->index],V_CMD, buf ))
 	{
 		vj_client *v = vj_tag_input->net[tag->index];

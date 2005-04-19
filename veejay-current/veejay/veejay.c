@@ -154,7 +154,7 @@ static void Usage(char *progname)
     fprintf(stderr,
 	    "  -X/--no-default-tags\t\tDo not create solid color tags at startup\n");
     fprintf(stderr,
-	    "  -l/--action-file <filename>\tLoad an Action File (none at default)\n");
+	    "  -l/--action-file <filename>\tLoad an Configuartion/Action File (none at default)\n");
     fprintf(stderr,
 	    "  -u/--dump-events  \t\tDump event information to screen\n");
     fprintf(stderr,
@@ -278,6 +278,8 @@ static int set_option(const char *name, char *value)
 	snprintf(info->stream_outname,256,"%s",(char*) optarg);
 #ifdef HAVE_XML2
     } else if (strcmp(name, "action-file")==0 || strcmp(name,"l")==0) {
+	if(!veejay_load_action_file( info, (char*) optarg ))
+		exit(1);
 	strcpy(info->action_file,(char*) optarg);
 	info->load_action_file = 1;
 #endif
@@ -481,6 +483,7 @@ static void check_command_line_options(int argc, char *argv[])
 	    nerr += set_option(option, optarg);
 	    break;
 	}
+	
     }
     if (optind > argc)
 	nerr++;

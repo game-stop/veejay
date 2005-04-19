@@ -17,6 +17,42 @@ int		gdk2sdl_key(int gdk_key)
 	return 0;
 }
 
+int		gdk2sdl_mod( int gdk_mod )
+{
+	int i;
+	for ( i = 0; modifier_translation_table_t[i].title != NULL ; i ++ )
+	{
+		if( gdk_mod == modifier_translation_table_t[i].gdk_mod )
+			return modifier_translation_table_t[i].sdl_mod;
+	}
+	return 0;
+}
+
+int		sdlmod_by_name( gchar *name )
+{
+	int i;
+	for ( i = 0; modifier_translation_table_t[i].title != NULL ; i ++ )
+	{
+		if( g_utf8_collate(name,
+				modifier_translation_table_t[i].title) == 0)
+			return modifier_translation_table_t[i].sdl_mod;
+	}
+
+	return 0;
+}
+
+int		sdlkey_by_name( gchar *name )
+{
+	int i;
+	for ( i = 0; key_translation_table_t[i].title != NULL ; i ++ )
+	{
+		if( g_utf8_collate(name,
+				key_translation_table_t[i].title) == 0)
+			return key_translation_table_t[i].sdl_sym;
+	}
+	return 0;
+}
+
 gchar		*sdlkey_by_id( int sdl_key )
 {
 	int i;
@@ -39,6 +75,18 @@ gchar		*sdlmod_by_id( int sdl_mod )
 			return modifier_translation_table_t[i].title;
 	}
 	return ret;
+}
+gchar		*gdkmod_by_id( int gdk_mod )
+{
+	int i;
+	printf("MODIFIER = %x\n", gdk_mod);
+	for( i = 0; modifier_translation_table_t[i].title != NULL ; i ++ )
+	{
+		if( gdk_mod == modifier_translation_table_t[i].gdk_mod ||
+			gdk_mod & modifier_translation_table_t[i].gdk_mod )
+			return modifier_translation_table_t[i].title;
+	}
+	return NULL;
 }
 
 gchar		*gdkkey_by_id( int gdk_key )

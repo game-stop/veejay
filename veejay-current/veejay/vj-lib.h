@@ -191,6 +191,8 @@ typedef struct {
     int is_server;
     int render_changed;
     int input_device;
+    int geox;
+    int geoy;
 } user_control;
 
 typedef struct {

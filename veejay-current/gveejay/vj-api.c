@@ -167,6 +167,9 @@ typedef struct
 	int	selected_sample_id;
 	int	selected_stream_id;
 	int	selected_history_entry;
+	int	selected_key_mod;
+	int	selected_key_sym;
+	int	selected_vims_id;
 	int	render_record; 
 	int	entry_tokens[STATUS_TOKENS];
 	int	entry_history[STATUS_TOKENS];
@@ -187,6 +190,9 @@ typedef struct
 	int	selected_rgbkey;
 	int	priout_lock;
 	int	pressed_key;
+	int	pressed_mod;
+	int     keysnoop;
+	char	*selected_arg_buf;
 	stream_templ_t	strtmpl[2]; // v4l, dv1394
 	sample_marker_t marker;
 } veejay_user_ctrl_t;
@@ -230,7 +236,15 @@ enum
 	RUN_STATE_REMOTE = 2,
 };
 
+typedef struct
+{
+	gint event_id;
+	gint params;
+	gchar *format;
+	gchar *descr;
+} vims_t;
 
+static	vims_t	vj_event_list[VIMS_MAX];
 
 typedef struct
 {
@@ -285,33 +299,6 @@ enum
 	FXC_N_COLS,
 };
 
-
-static struct
-{
-	const char *name;
-} unit_stream_t[] = 
-{
-	{NULL},
-	{"radio_frames_streams"},
-	{"radio_seconds_stream"},
-	{"radio_minutes_stream"},
-	{"radio_hours_stream"},
-	{NULL}	
-};
-
-static struct
-{
-	const char *name;
-} unit_sample_t[] = 
-{
-	{"radio_loop"},
-	{"radio_frames"},
-	{"radio_seconds"},
-	{"radio_minutes"},
-	{"radio_hours"},
-	{NULL}
-};
-
 enum
 {
 	V4L_NUM=0,
@@ -320,7 +307,16 @@ enum
 	V4L_BUTTON=3,
 };
 
-
+enum
+{
+	VIMS_ID=0,
+	VIMS_DESCR=1,
+	VIMS_KEY=2,
+	VIMS_MOD=3,
+	VIMS_PARAMS=4,
+	VIMS_FORMAT=5,
+	VIMS_CONTENTS=6,
+};
 
 
 #define MAX_PATH_LEN 1024
@@ -335,7 +331,6 @@ static	void	msg_vims(char *message);
 static  void    multi_vims(int id, const char format[],...);
 static  void 	single_vims(int id);
 static	gdouble	get_numd(const char *name);
-static	void	set_nums(const char *name, gint value);
 static  int     get_nums(const char *name);
 static  gchar   *get_text(const char *name);
 static	void	put_text(const char *name, char *text);
@@ -345,7 +340,6 @@ static  void	update_slider_gvalue(const char *name, gdouble value );
 static  void    update_slider_value(const char *name, gint value, gint scale);
 static  void    update_slider_range(const char *name, gint min, gint max, gint value, gint scaled);
 static	void	update_spin_range(const char *name, gint min, gint max, gint val);
-static void	update_spin_gvalue(const char *name, gdouble value);
 static	void	update_spin_value(const char *name, gint value);
 static  void    update_label_i(const char *name, int num, int prefix);
 static	void	update_label_f(const char *name, float val);
@@ -357,7 +351,6 @@ static  void    update_plaininfo();
 static	void	load_parameter_info();
 static	void	load_v4l_info();
 static	void	reload_editlist_contents();
-static  void    load_effectcontrols_info();
 static  void    load_effectchain_info();
 static  void    load_effectlist_info();
 static  void    load_samplelist_info(const char *name);
@@ -373,14 +366,20 @@ static	gchar	*_utf8str( char *c_str );
 static gchar	*recv_vims(int strlen, int *bytes_written);
 void	vj_gui_stop_launch();
 static	void	get_gd(char *buf, char *suf, const char *filename);
-static	void	vj_get_widget_root_size( const char *name, int *x, int *y );
-static	void	vj_get_widget_size(const char *name, int *x, int *y );
-gboolean	veejay_io_update(gpointer data);
-static	void	setup_tree_texteditable_column( const char *tree_name, int type, const char *title );
-static	void	update_rgbkey();
-static	void	resize_primary();   
-void	vj_launch_toggle(gboolean value);
 
+int	resize_primary_ratio_y();
+int	resize_primary_ratio_x();
+gboolean	veejay_io_update(gpointer data);
+static	void	setup_tree_texteditable_column( const char *tree_name, int type, const char *title, void (*callbackfunction)() );
+static	void	update_rgbkey();
+static	int	count_textview_buffer(const char *name);
+static	void	clear_textview_buffer(const char *name);
+static	void	init_recorder(int total_frames, gint mode);
+static	void	reload_bundles();
+static void	reload_hislist();
+static	void	update_rgbkey_from_slider();
+void	vj_launch_toggle(gboolean value);
+static	gchar	*get_textview_buffer(const char *name);
 
 static struct
 {
@@ -478,6 +477,7 @@ static void scan_devices( const char *name)
 		(GTK_TREE_VIEW(tree));
 	store = GTK_LIST_STORE(model);
 
+	// kernel 2.6
 	const char *v4lpath = "/sys/class/video4linux/";
 	n = stat( v4lpath, &v4ldir );
 	if(n < 0) return;
@@ -540,9 +540,11 @@ static void scan_devices( const char *name)
 		
 	}
 
-
 /*	TODO:
 		Put DV 1394 device here too !!
+		har har must do cleanup
+		refactor all gtk tree related code into a more generic
+		function set
 */ 
 //	const char *dvpath = "/proc/bus/ieee1394/dv";
 
@@ -566,7 +568,7 @@ void	on_devicelist_row_activated(GtkTreeView *treeview,
 		gtk_tree_model_get(model,&iter, V4L_NUM, &num, -1);
 		if( num == info->uc.strtmpl[V4L_DEVICE].dev )
 		{
-			multi_vims( NET_TAG_NEW_V4L,"%d %d",
+			multi_vims( VIMS_STREAM_NEW_V4L,"%d %d",
 				info->uc.strtmpl[V4L_DEVICE].dev,
 				info->uc.strtmpl[V4L_DEVICE].channel );
 			info->uc.reload_hint[HINT_SLIST] = 1;
@@ -1006,27 +1008,46 @@ void	about_dialog()
 
 }
 
-gboolean	dialogkey_snooper(GtkWidget *w, GdkEventKey *event, gpointer user_data)
+gboolean	dialogkey_snooper( GtkWidget *w, GdkEventKey *event, gpointer user_data)
 {
 	GtkWidget *entry = (GtkWidget*) user_data;
+ 	if(gtk_widget_is_focus(entry) == FALSE )
+	{	// entry doesnt have focus, bye!
+		return FALSE;
+	}
+	
 	if(event->type == GDK_KEY_PRESS)
 	{
 		gchar tmp[100];
 		bzero(tmp,100);
 		info->uc.pressed_key = event->keyval;
+		info->uc.pressed_mod = event->state;
 		gchar *text = gdkkey_by_id( event->keyval );
-		sprintf(tmp, "Shift + %s", text );
-		gchar *utf8_text = _utf8str( tmp );
-		gtk_label_set_text( GTK_LABEL(entry), utf8_text);
-		g_free(utf8_text);
-	}
+		gchar *mod  = gdkmod_by_id( event->state );
 
+		if( mod != NULL )
+		{
+			if(strlen(mod) < 2 )
+				sprintf(tmp, "%s", text );
+			else
+				sprintf(tmp, "%s + %s", text,mod);
+			gchar *utf8_text = _utf8str( tmp );
+			gtk_entry_set_text( GTK_ENTRY(entry), utf8_text);
+			g_free(utf8_text);
+		}
+	}
+	
 	return FALSE;
 }
+
 
 int
 prompt_keydialog(const char *title, char *msg)
 {
+	char pixmap[512];
+	bzero(pixmap,512);
+	get_gd( pixmap, NULL, "icon_key.png");
+
 	GtkWidget *mainw = glade_xml_get_widget(info->main_window, "gveejay_window");
 	GtkWidget *dialog = gtk_dialog_new_with_buttons( title,
 				GTK_WINDOW( mainw ),
@@ -1036,28 +1057,64 @@ prompt_keydialog(const char *title, char *msg)
 				GTK_STOCK_YES,	
 				GTK_RESPONSE_ACCEPT,
 				NULL);
-	GtkWidget *entry = gtk_label_new(NULL);
+
+
+
+	GtkWidget *keyentry = gtk_entry_new();
+	gtk_entry_set_text( GTK_ENTRY(keyentry), "<press a key>");
+	gtk_editable_set_editable( GTK_ENTRY(keyentry), FALSE );  
 	gtk_dialog_set_default_response( GTK_DIALOG(dialog), GTK_RESPONSE_REJECT );
 	gtk_window_set_resizable( GTK_WINDOW(dialog), FALSE );
+
 	g_signal_connect( G_OBJECT(dialog), "response", 
 		G_CALLBACK( gtk_widget_hide ), G_OBJECT(dialog ) );
+
 	GtkWidget *hbox1 = gtk_hbox_new( FALSE, 12 );
 	gtk_container_set_border_width( GTK_CONTAINER( hbox1 ), 6 );
 	GtkWidget *hbox2 = gtk_hbox_new( FALSE, 12 );
 	gtk_container_set_border_width( GTK_CONTAINER( hbox2 ), 6 );
-	GtkWidget *icon = gtk_image_new_from_stock( GTK_STOCK_DIALOG_QUESTION,
-		GTK_ICON_SIZE_DIALOG );
+
+	GtkWidget *icon = gtk_image_new_from_file( pixmap );
+
 	GtkWidget *label = gtk_label_new( msg );
 	gtk_container_add( GTK_CONTAINER( hbox1 ), icon );
 	gtk_container_add( GTK_CONTAINER( hbox1 ), label );
-	gtk_container_add( GTK_CONTAINER( hbox2 ), entry );
+	gtk_container_add( GTK_CONTAINER( hbox1 ), keyentry );
+
+	if( info->uc.selected_vims_entry &&
+			(info->uc.selected_key_mod || 
+			info->uc.selected_key_sym ))
+	{
+		char tmp[100];
+		sprintf(tmp,"VIMS %d : %s + %s",
+			info->uc.selected_vims_entry,
+			sdlmod_by_id( info->uc.selected_key_mod ),
+			sdlkey_by_id( info->uc.selected_key_sym ) );
+
+		GtkWidget *current = gtk_label_new( tmp );
+		gtk_container_add( GTK_CONTAINER( hbox1 ), current );
+	
+		if( vj_event_list[ info->uc.selected_vims_entry ].params > 0 )
+		{
+			GtkWidget *arglabel = gtk_label_new("Enter arguments for VIMS");
+			GtkWidget *argentry = gtk_entry_new();
+			gtk_entry_set_text( 
+				GTK_ENTRY(argentry), 
+				info->uc.selected_arg_buf
+			);
+			gtk_container_add( GTK_CONTAINER( hbox2 ), arglabel );
+			gtk_container_add( GTK_CONTAINER( hbox2 ), argentry );
+		}
+
+	}
+
+
 	gtk_container_add( GTK_CONTAINER( GTK_DIALOG( dialog )->vbox ), hbox1 );
 	gtk_container_add( GTK_CONTAINER( GTK_DIALOG( dialog )->vbox ), hbox2 );
+
 	gtk_widget_show_all( dialog );
 
-
-	int id = gtk_key_snooper_install( dialogkey_snooper, (gpointer*) entry );
-
+	int id = gtk_key_snooper_install( dialogkey_snooper, (gpointer*) keyentry );
 	int n = gtk_dialog_run(GTK_DIALOG(dialog));
 
 	gtk_key_snooper_remove( id );
@@ -1107,7 +1164,7 @@ gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 		return TRUE;
 
 	if(info->run_state == RUN_STATE_LOCAL)
-		single_vims( NET_QUIT );
+		single_vims( VIMS_QUIT );
 	
 	vj_gui_disconnect();
 	vj_gui_free();
@@ -1126,40 +1183,6 @@ enum
 };
 
 static	int	line_count = 0;
-
-
-
-
-static struct
-{
-	int index;
-	GdkColor color;
-} color_table[] = 
-{
-	{ COLOR_RED	, { 166,	13,	31	} }, 
-	{ COLOR_BLUE	, { 13,		117,	166	} },
-	{ COLOR_GREEN	, { 13,		117,	166	} },
-};
-
-static	void	vj_setup_text_box(const char *name)
-{
-	GtkWidget *view = glade_xml_get_widget(info->main_window, name );
-	GtkTextBuffer *buf = gtk_text_view_get_buffer( GTK_TEXT_VIEW(view) );
-
-	int i;
-	for( i =0; i < COLOR_NUM ; i ++ )
-	{
-		if(!gdk_color_alloc( info->color_map, &(color_table[i].color) ))
-			g_error("Couldnt allocate color ?!");
-	} 
-
-	gtk_text_buffer_create_tag( buf, "infomsg", "foreground-gdk", &color_table[COLOR_GREEN], NULL );
-	gtk_text_buffer_create_tag( buf, "errormsg", "foreground-gdk",&color_table[COLOR_RED], NULL );
-	gtk_text_buffer_create_tag( buf, "warnmsg", "foreground-gdk", &color_table[COLOR_RED], NULL );
-	gtk_text_buffer_create_tag( buf, "debugmsg", "foreground-gdk", &color_table[COLOR_GREEN], NULL );
-	
-}
-
 static  void	vj_msg(int type, const char format[], ...)
 {
 	GtkWidget *view = glade_xml_get_widget( info->main_window,(type==4 ? "veejaytext": "gveejaytext"));
@@ -1319,12 +1342,6 @@ static	gdouble	get_numd(const char *name)
 	if(!w) return 0;
 	return (gdouble) gtk_spin_button_get_value( GTK_SPIN_BUTTON( w ) );
 }
-static	void	set_nums(const char *name, gint value)
-{
-	GtkWidget *w = glade_xml_get_widget( info->main_window, name );
-	if(!w) return;
-	gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble)value );
-}
 
 static	int	get_slider_val(const char *name)
 {
@@ -1464,14 +1481,6 @@ static	void	update_spin_range(const char *name, gint min, gint max, gint val)
 	gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble)val);
 }
 
-static	void	update_spin_gvalue(const char *name, gdouble value )
-{
-	GtkWidget *w = glade_xml_get_widget(info->main_window, name );
-	if(w)
-	{
-		gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble) value );
-	}
-}
 static	void	update_spin_value(const char *name, gint value )
 {
 	GtkWidget *w = glade_xml_get_widget(info->main_window, name );
@@ -1608,7 +1617,7 @@ static	void	update_rgbkey()
 
 		gtk_color_selection_set_current_color(
 			GTK_COLOR_SELECTION( colorsel ),
-			(const) &color );
+			&color );
 		info->entry_lock = 0;
 	}
 }
@@ -1922,7 +1931,6 @@ static void 	update_globalinfo()
 	{
 		info->uc.reload_hint[HINT_ENTRY] = 1;
 	}
-
 	if(info->uc.reload_hint[HINT_V4L] == 1 )
 	{
 		load_v4l_info();
@@ -2165,7 +2173,7 @@ gboolean
 
       if (!path_currently_selected)
       {
-	multi_vims( NET_CHAIN_SET_ENTRY, "%d", name );
+	multi_vims( VIMS_CHAIN_SET_ENTRY, "%d", name );
 	info->uc.reload_hint[HINT_ENTRY] = 1;
      	info->uc.selected_chain_entry = name;
 	 }
@@ -2312,7 +2320,9 @@ static	void	setup_tree_spin_column( const char *tree_name, int type, const char 
 static void 	setup_tree_texteditable_column(
 		const char *tree_name,
 		int type,
-		const char *title)
+		const char *title,
+		void (*callbackfunction)()
+		)
 {
 	GtkWidget *tree = glade_xml_get_widget( info->main_window, tree_name );
 	GtkCellRenderer *renderer;
@@ -2324,24 +2334,9 @@ static void 	setup_tree_texteditable_column(
 	gtk_tree_view_append_column( GTK_TREE_VIEW( tree ), column );
 
 	g_object_set(renderer, "editable", TRUE, NULL );
-	GtkTreeModel *model =  gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
-	g_signal_connect(renderer, "edited", G_CALLBACK(on_samplelist_edited), model );
+	GtkTreeModel *model =  gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));
+	g_signal_connect( renderer, "edited", G_CALLBACK( callbackfunction ), model );
 }
-static	void	setup_tree_text_columnwh( const char *tree_name, int type, const char *title, int n )
-{
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, tree_name );
-	GtkCellRenderer *renderer;
-	GtkTreeViewColumn *column;
-
-	renderer = gtk_cell_renderer_text_new();
-	gtk_cell_renderer_text_set_fixed_height_from_font( renderer, n );
-	column = gtk_tree_view_column_new_with_attributes( title, renderer, "text", type, NULL );
-	gtk_tree_view_append_column( GTK_TREE_VIEW( tree ), column );
-
-	
-
-}
-
 
 static	void	setup_tree_text_column( const char *tree_name, int type, const char *title )
 {
@@ -2392,7 +2387,7 @@ static	void	load_v4l_info()
 {
 	int values[5];
 	int len = 0;
-	multi_vims( NET_TAG_GET_V4L, "%d", info->uc.current_stream_id );
+	multi_vims( VIMS_STREAM_GET_V4L, "%d", info->uc.current_stream_id );
 	gchar *answer = recv_vims(3, &len);
 	if(len > 0 )
 	{
@@ -2414,7 +2409,7 @@ static	void	load_parameter_info()
 {
 	int	*p = &(info->uc.entry_tokens[0]);
 	int	len = 0;
-	multi_vims( NET_CHAIN_GET_ENTRY, "%d %d", 0, 
+	multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, 
 		info->uc.selected_chain_entry );
 
 	gchar *answer = recv_vims(3,&len);
@@ -2464,7 +2459,7 @@ static	void	load_effectchain_info()
 	
 	
 	gint fxlen = 0;
-	single_vims( NET_CHAIN_LIST );
+	single_vims( VIMS_CHAIN_LIST );
 	gchar *fxtext = recv_vims(3,&fxlen);
 
 	reset_tree( "tree_chain" );
@@ -2554,7 +2549,7 @@ gboolean
       if (!path_currently_selected)
       {
 	 info->uc.selected_effect_id = name;
-	 multi_vims( NET_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
+	 multi_vims( VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
 			0, info->uc.selected_chain_entry,
 			name, );
  	 gui->uc.reload_hint[HINT_CHAIN] = 1;
@@ -2618,7 +2613,7 @@ on_effectlist_row_activated(GtkTreeView *treeview,
 
 		if(gid)
 		{
-			multi_vims(NET_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
+			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
 				0, info->uc.selected_chain_entry,gid );
 			info->uc.reload_hint[HINT_CHAIN] = 1;
 			info->uc.reload_hint[HINT_ENTRY] = 1;
@@ -2627,7 +2622,6 @@ on_effectlist_row_activated(GtkTreeView *treeview,
 	}
 
 }
-
 gint
 sort_iter_compare_func( GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b,
 		gpointer userdata)
@@ -2654,6 +2648,37 @@ sort_iter_compare_func( GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b,
 		}
 		g_free(name1);
 		g_free(name2);
+	}
+	return ret;
+}
+
+
+
+gint
+sort_vims_func( GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b,
+		gpointer userdata)
+{
+	gint sortcol = GPOINTER_TO_INT(userdata);
+	gint ret = 0;
+	if(sortcol == VIMS_ID)
+	{
+		gchar *name1 = NULL;
+		gchar *name2 = NULL;
+	
+		gtk_tree_model_get(model,a, VIMS_ID, &name1, -1 );
+		gtk_tree_model_get(model,b, VIMS_ID, &name2, -1 );
+		if( name1 == NULL || name2 == NULL )
+		{
+			if( name1==NULL && name2== NULL)
+			{
+				return 0;
+			}
+			ret = (name1==NULL) ? -1 : 1;
+		} 
+		else
+		{
+			ret = g_utf8_collate(name1,name2);
+		}
 	}
 	return ret;
 }
@@ -2714,14 +2739,14 @@ on_samplelist_row_activated(GtkTreeView *treeview,
 			if(strcasecmp( what, "tree_samples") == 0 )
 			{
 				// play sample / stream
-				multi_vims( NET_SET_MODE_AND_GO, "%d %d",
+				multi_vims( VIMS_SET_MODE_AND_GO, "%d %d",
 					( idstr[0] == 'T' ? 1 : 0 ), id );
 			}
 			else
 			if(strcasecmp( what, "tree_sources") == 0 )
 			{
 				// set source / channel
-				multi_vims( NET_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
+				multi_vims( VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
 					"%d %d %d %d",
 					0,
 					info->uc.selected_chain_entry,
@@ -2802,10 +2827,10 @@ void	on_samplelist_edited(GtkCellRendererText *cell,
 		}
 
 		if( id[0] == 'S' )
-			multi_vims( NET_CLIP_SET_DESCRIPTION,
+			multi_vims( VIMS_CLIP_SET_DESCRIPTION,
 				"%d %s", sample_id, descr );
 		else
-			multi_vims( NET_TAG_SET_DESCRIPTION,
+			multi_vims( VIMS_STREAM_SET_DESCRIPTION,
 				"%d %s", sample_id, descr );
 
 		info->uc.reload_hint[HINT_SLIST] = 1;
@@ -2822,7 +2847,7 @@ void	setup_samplelist_info(const char *name)
 	g_object_unref( G_OBJECT( store ));
 
 	setup_tree_text_column( name, SL_ID, "Id" );
-	setup_tree_texteditable_column( name, SL_DESCR , "Title" );
+	setup_tree_texteditable_column( name, SL_DESCR , "Title" ,G_CALLBACK(on_samplelist_edited));
 	setup_tree_text_column( name, SL_TIMECODE, "Length" );
 
 	GtkTreeSelection *selection;
@@ -2860,7 +2885,7 @@ void	load_effectlist_info()
 	
 	
 	gint fxlen = 0;
-	single_vims( NET_EFFECT_LIST );
+	single_vims( VIMS_EFFECT_LIST );
 	gchar *fxtext = recv_vims(5,&fxlen);
 
 	_effect_reset();
@@ -2942,7 +2967,7 @@ static	void	load_samplelist_info(const char *name)
 
 	reset_tree( name );
 
-	single_vims( NET_CLIP_LIST );
+	single_vims( VIMS_CLIP_LIST );
 	gint fxlen = 0;
 	gchar *fxtext = recv_vims(5,&fxlen);
 
@@ -2989,7 +3014,7 @@ static	void	load_samplelist_info(const char *name)
 	if( fxtext ) g_free(fxtext);
 	fxlen = 0;
 
-	single_vims( NET_TAG_LIST );
+	single_vims( VIMS_STREAM_LIST );
 	fxtext = recv_vims(5, &fxlen);
 
 	if(fxtext == NULL || fxlen <= 5 )
@@ -3077,10 +3102,7 @@ gboolean
       {
 		info->uc.selected_el_entry = num;
 		gint frame_num =0;
-		gint i ;
-
 		frame_num = _el_ref_start_frame( num );
-
 		update_spin_value( "button_el_selstart",
 			frame_num);
 		update_spin_value( "button_el_selend",
@@ -3088,9 +3110,9 @@ gboolean
       }
 
     }
-
     return TRUE; /* allow selection state to change */
   }
+
 gboolean
   view_history_selection_func (GtkTreeSelection *selection,
                        GtkTreeModel     *model,
@@ -3128,16 +3150,101 @@ on_vims_row_activated(GtkTreeView *treeview,
 
 	if(gtk_tree_model_get_iter(model,&iter,path))
 	{
+		gchar *vimsid = NULL;
 		gint event_id =0;
-		gtk_tree_model_get(model,&iter, COLUMN_INT, &event_id, -1);
+		gtk_tree_model_get(model,&iter, VIMS_ID, &vimsid, -1);
 
-		if(event_id)
+		if(sscanf( vimsid, "%d", &event_id ))
 		{
-			multi_vims( NET_BUNDLE, "%d", event_id );
-			info->uc.reload_hint[HINT_CHAIN] = 1;
+			if(event_id > VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END)
+			{
+				multi_vims( VIMS_BUNDLE, "%d", event_id );
+				info->uc.reload_hint[HINT_CHAIN] = 1;
+			}
+			else
+			{
+				gchar *args = NULL;
+				gchar *format = NULL;
+				gtk_tree_model_get(model,&iter, VIMS_FORMAT,  &format, -1);
+				gtk_tree_model_get(model,&iter, VIMS_CONTENTS, &args, -1 );
+	
+				if( event_id == VIMS_QUIT )
+				{
+					if( prompt_dialog("Stop Veejay", "Are you sure  ? (All unsaved work will be lost)" ) ==	
+							GTK_RESPONSE_REJECT )
+					return;	
+				}
+				if( (format == NULL||args==NULL) || (strlen(format) <= 0) )
+					single_vims( event_id );
+				else
+				{
+					if( args == NULL || strlen(args) <= 0 )
+						vj_msg(VEEJAY_MSG_ERROR,"VIMS %d requires arguments!", event_id);
+					else
+						multi_vims( event_id, format, args );
+				}
+			}
 		}
 	}
 }
+void
+on_vimslist_row_activated(GtkTreeView *treeview,
+		GtkTreePath *path,
+		GtkTreeViewColumn *col,
+		gpointer user_data)
+{
+	GtkTreeModel *model;
+	GtkTreeIter iter;
+	model = gtk_tree_view_get_model(treeview);
+
+	if(gtk_tree_model_get_iter(model,&iter,path))
+	{
+		gchar *vimsid = NULL;
+		gint event_id =0;
+		gtk_tree_model_get(model,&iter, VIMS_ID, &vimsid, -1);
+
+		if(sscanf( vimsid, "%d", &event_id ))
+		{
+			// prompt for key!
+			int n = prompt_keydialog("Press Key", "Key for VIMS");
+			if( n == GTK_RESPONSE_ACCEPT )
+			{
+				int key_val = gdk2sdl_key( info->uc.pressed_key );
+				int key_mod = gdk2sdl_mod( info->uc.pressed_mod );
+				multi_vims(
+					VIMS_BUNDLE_ATTACH_KEY,
+					"%d %d %d",  // 4th = string arguments
+					event_id, key_val, key_mod );	
+				info->uc.reload_hint[HINT_BUNDLES] = 1;
+			}		
+		}
+	}
+}
+
+gboolean
+  view_vimslist_selection_func (GtkTreeSelection *selection,
+                       GtkTreeModel     *model,
+                       GtkTreePath      *path,
+                       gboolean          path_currently_selected,
+                       gpointer          userdata)
+  {
+    GtkTreeIter iter;
+
+    if (gtk_tree_model_get_iter(model, &iter, path))
+    {
+	gchar *vimsid = NULL;
+ 	gint event_id = 0;
+
+        gtk_tree_model_get(model, &iter, VIMS_ID, &vimsid, -1);
+
+	if(sscanf( vimsid, "%d", &event_id ))
+	{
+		info->uc.selected_vims_id = event_id;
+    	}
+    }
+
+    return TRUE; /* allow selection state to change */
+  }
 
 
 gboolean
@@ -3151,19 +3258,48 @@ gboolean
 
     if (gtk_tree_model_get_iter(model, &iter, path))
     {
+	gchar *vimsid = NULL;
  	gint event_id = 0;
 	gchar *text = NULL;
 
-        gtk_tree_model_get(model, &iter, COLUMN_INT, &event_id, -1);
-	gtk_tree_model_get(model, &iter, COLUMN_STRINGB, &text, -1 );
+        gtk_tree_model_get(model, &iter, VIMS_ID, &vimsid, -1);
+	gtk_tree_model_get(model, &iter, VIMS_CONTENTS, &text, -1 );
+	int k=0; 
+	int m=0;
+	gchar *key = NULL;
+	gchar *mod = NULL;
 
-	set_textview_buffer( "vimsview", text );
-	info->uc.selected_vims_entry = event_id;
+	gtk_tree_model_get(model,&iter, VIMS_KEY, &key, -1);
+	gtk_tree_model_get(model,&iter, VIMS_MOD, &mod, -1);
 
+	if(sscanf( vimsid, "%d", &event_id ))
+	{
+		k = sdlkey_by_name( key );
+		m = sdlmod_by_name( mod );	
+
+		if( event_id > 500 && event_id < 600 )
+			set_textview_buffer( "vimsview", text );
+
+		if( info->uc.selected_arg_buf != NULL )
+			free(info->uc.selected_arg_buf );
+		info->uc.selected_arg_buf = NULL;
+		if( vj_event_list[event_id].params > 0 )
+			info->uc.selected_arg_buf = (text == NULL ? NULL: strdup( text ));
+
+		info->uc.selected_vims_entry = event_id;
+		if(k > 0)
+		{
+			info->uc.selected_key_mod = m;
+			info->uc.selected_key_sym = k;
+		}
+    	}
     }
 
     return TRUE; /* allow selection state to change */
   }
+
+
+
 
 void 
 on_history_row_activated(GtkTreeView *treeview,
@@ -3181,7 +3317,7 @@ on_history_row_activated(GtkTreeView *treeview,
 		gtk_tree_model_get(model,&iter, COLUMN_INT, &num, -1);
 		//gint frame_num = _el_ref_start_frame( num );
 
-		multi_vims( NET_CLIP_RENDER_SELECT, "%d %d", 0, num );
+		multi_vims( VIMS_CLIP_RENDER_SELECT, "%d %d", 0, num );
 
 	}
 
@@ -3205,9 +3341,9 @@ on_editlist_row_activated(GtkTreeView *treeview,
 		gint frame_num = _el_ref_start_frame( num );
 
 		if(info->uc.playmode != MODE_PLAIN)
-			multi_vims( NET_SET_PLAIN_MODE, "%d" ,MODE_PLAIN );
+			multi_vims( VIMS_SET_PLAIN_MODE, "%d" ,MODE_PLAIN );
 
-		multi_vims( NET_VIDEO_SET_FRAME, "%d", (int) frame_num );
+		multi_vims( VIMS_VIDEO_SET_FRAME, "%d", (int) frame_num );
 	}
 
 }
@@ -3215,7 +3351,6 @@ on_editlist_row_activated(GtkTreeView *treeview,
 void
 on_stream_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 {
-//	printf("color changed!\n");
 	if(!info->status_lock)
 	{
 	GdkColor current_color;
@@ -3230,7 +3365,7 @@ on_stream_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 	gint green = current_color.green / 256.0;
 	gint blue = current_color.blue / 256.0;
 
-	multi_vims( NET_STREAM_COLOR, "%d %d %d %d",
+	multi_vims( VIMS_STREAM_COLOR, "%d %d %d %d",
 		info->uc.current_stream_id,
 		red,
 		green,
@@ -3270,13 +3405,13 @@ on_rgbkey_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 		// send p1,p2,p3 to veejay
 		// (if effect currently on entry has rgb, this will be enabled but not here) 
 		multi_vims( 
-			NET_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d",
+			VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d",
 			0, info->uc.selected_chain_entry, 1, red );
 		multi_vims(
-			NET_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d",
+			VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d",
 			0, info->uc.selected_chain_entry, 2, green );
 		multi_vims(
-			NET_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d",
+			VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d",
 			0, info->uc.selected_chain_entry, 3, blue );
 
 		info->parameter_lock = 1;
@@ -3300,18 +3435,145 @@ static	void	setup_rgbkey()
 
 }
 
+static	void	setup_vimslist()
+{
+	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_vims");
+	GtkListStore *store = gtk_list_store_new( 2,G_TYPE_STRING, G_TYPE_STRING);
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+	g_object_unref( G_OBJECT( store ));
+
+	setup_tree_text_column( "tree_vims", VIMS_ID, 		"VIMS ID");
+	setup_tree_text_column( "tree_vims", VIMS_DESCR,	"Description" );
+
+	g_signal_connect( tree, "row-activated",
+		(GCallback) on_vimslist_row_activated, NULL );
+
+  	GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+    	gtk_tree_selection_set_select_function(selection, view_vimslist_selection_func, NULL, NULL);
+   	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
+}
+
+
+void	on_vimslist_edited(GtkCellRendererText *cell,
+		gchar *path_string,
+		gchar *new_text,
+		gpointer user_data
+		)
+{
+	// welke sample id is klikked?
+	GtkWidget *tree = glade_xml_get_widget(info->main_window,
+				"tree_bundles");
+	GtkTreeIter iter;
+	gchar *id = NULL;
+	gchar *contents = NULL;
+	gchar *format = NULL;
+	gchar *key_sym = NULL;
+	gchar *key_mod = NULL;
+	gint event_id = 0;
+	int n;
+	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
+	n = gtk_tree_model_get_iter_from_string(
+		model,
+		&iter,
+		path_string);
+
+	// error !!
+
+	gtk_tree_model_get(
+		model,
+		&iter,
+		VIMS_ID,
+		&id,
+		-1);
+	gtk_tree_model_get(
+		model,
+		&iter,
+		VIMS_FORMAT,
+		&format,
+		-1);
+	gtk_tree_model_get(
+		model,
+		&iter,
+		VIMS_CONTENTS,
+		&contents
+		-1 );	
+	gtk_tree_model_get(
+		model,
+		&iter,
+		VIMS_KEY,
+		&key_sym,
+		-1);
+	gtk_tree_model_get(
+		model,
+		&iter,
+		VIMS_MOD,
+		&key_mod
+		-1 );	
+
+	sscanf( id, "%d", &event_id );
+
+	gint bytes_read = 0;
+	gint bytes_written = 0;
+	GError *error = NULL;
+	gchar *sysstr = g_locale_from_utf8( new_text, -1, &bytes_read, &bytes_written,&error);	
+	
+	if(sysstr == NULL || error != NULL)
+	{
+		return;
+	}
+
+	if( event_id < VIMS_BUNDLE_START || event_id > VIMS_BUNDLE_END ) 	
+	{
+		int np = vj_event_list[ event_id ].params; 
+		char *c = format+1;
+		int i;	
+		int tmp_val = 0;
+		int k = sdlkey_by_name( key_sym );
+		int m = sdlmod_by_name( key_mod );
+
+		for( i =0 ; i < np; i ++ )
+		{
+			if(*(c) == 'd')
+			  if( sscanf( sysstr, "%d", &tmp_val ) != 1 )	 
+				return;
+			c+=2;
+		}
+
+		multi_vims( VIMS_BUNDLE_ATTACH_KEY, "%d %d %d %s",
+			event_id, k, m, sysstr );
+		info->uc.reload_hint[HINT_BUNDLES]=1;
+		
+	}	
+	g_free(sysstr);
+
+}
 
 static	void	setup_bundles()
 {
 	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_bundles");
-	GtkListStore *store = gtk_list_store_new( 4,G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING);
+	GtkListStore *store = gtk_list_store_new( 7,G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING ,G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING);
+
+	gtk_widget_set_size_request( tree, 300, -1 );
+
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+	GtkTreeSortable *sortable = GTK_TREE_SORTABLE(store);
+
+	gtk_tree_sortable_set_sort_func(
+		sortable, VIMS_ID, sort_vims_func,
+			GINT_TO_POINTER(VIMS_ID),NULL);
+
+	gtk_tree_sortable_set_sort_column_id( 
+		sortable, VIMS_ID, GTK_SORT_ASCENDING);
+
 	g_object_unref( G_OBJECT( store ));
 
-	setup_tree_text_column( "tree_bundles", COLUMN_INT, "Event ID");
-	setup_tree_text_column( "tree_bundles", COLUMN_STRING0, "Key Modifier" );
-	setup_tree_text_column( "tree_bundles", COLUMN_STRINGA, "Symbol");
-	setup_tree_text_column( "tree_bundles", COLUMN_STRINGB, "VIMS Bundle");
+	setup_tree_text_column( "tree_bundles", VIMS_ID, 	"VIMS");
+	setup_tree_text_column( "tree_bundles", VIMS_DESCR,     "Description" );
+	setup_tree_text_column( "tree_bundles", VIMS_KEY, 	"Key");
+	setup_tree_text_column( "tree_bundles", VIMS_MOD, 	"Mod");
+	setup_tree_text_column( "tree_bundles", VIMS_PARAMS,	"Max args");
+	setup_tree_text_column( "tree_bundles", VIMS_FORMAT,	"Format" );
+	setup_tree_texteditable_column( "tree_bundles", VIMS_CONTENTS,	"Content", G_CALLBACK(on_vimslist_edited) );
 
 	g_signal_connect( tree, "row-activated",
 		(GCallback) on_vims_row_activated, NULL );
@@ -3325,17 +3587,14 @@ static	void	setup_bundles()
 	
 }
 
-void	reload_hislist()
+static void	reload_hislist()
 {
 	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_history");
 	GtkListStore *store;
-	
 	GtkTreeIter iter;
-	gint i,offset=0;
-	
-	
+	gint offset=0;
 	gint hislen = 0;
-	single_vims( NET_CLIP_RENDERLIST );
+	single_vims( VIMS_CLIP_RENDERLIST );
 	gchar *fxtext = recv_vims(3,&hislen);
 
  	reset_tree( "tree_history");
@@ -3424,8 +3683,8 @@ static	void	reload_bundles()
 	GtkTreeIter iter;
 	
 	gint len = 0;
-	single_vims( NET_LIST_BUNDLES );
-	gchar *eltext = recv_vims(4,&len); // msg len
+	single_vims( VIMS_BUNDLE_LIST );
+	gchar *eltext = recv_vims(5,&len); // msg len
 
 	gint 	offset = 0;
 
@@ -3457,21 +3716,56 @@ static	void	reload_bundles()
 		if(val[3] > 0)
 		{
 			message = strndup( eltext + offset , val[3] );
-
 			offset += val[3];
+		}
 
-			gchar *content = _utf8str( message );
-			gchar *keyname = sdlkey_by_id( val[1] );
-			gchar *keymod = sdlmod_by_id( val[2] );
-			gtk_list_store_append( store, &iter );
-			gtk_list_store_set(store, &iter,
-				COLUMN_INT, (guint) val[0],
-				COLUMN_STRING0, keymod,
-				COLUMN_STRINGA, keyname,
-				COLUMN_STRINGB, content,
-				-1 ); 
-			g_free(content);
-			free(message);
+		if( val[0] < 400 || val[0] > 500 )
+		{ // query VIMS ! (ignore in userlist) 
+
+		gchar *content = (message == NULL ? NULL : _utf8str( message ));
+		gchar *keyname = sdlkey_by_id( val[1] );
+		gchar *keymod = sdlmod_by_id( val[2] );
+		gchar *descr = NULL;
+		gchar *format = NULL;
+		char vimsid[5];
+		bzero(vimsid,5);
+		sprintf(vimsid, "%03d", val[0]);
+
+		if( val[0] > VIMS_BUNDLE_START && val[0] < VIMS_BUNDLE_END )
+		{
+			if( vj_event_list[ val[0] ].event_id != val[0] && vj_event_list[val[0]].event_id != 0)
+			{
+				if( vj_event_list[ val[0] ].format )
+					g_free( vj_event_list[ val[0] ].format );
+				if( vj_event_list[ val[0] ].descr )
+					g_free( vj_event_list[ val[0] ].descr  );
+			}
+
+			vj_event_list[ val[0] ].event_id = val[0];
+			vj_event_list[ val[0] ].params   = 0;
+			vj_event_list[ val[0] ].format   = NULL;
+			vj_event_list[ val[0] ].descr    = _utf8str( "custom event (fixme: set bundle title)" );
+		}
+
+
+		if( vj_event_list[ val[0] ].event_id != 0 )
+			descr = vj_event_list[ val[0] ].descr;
+		if( vj_event_list[ val[0] ].event_id != 0 )
+			format = vj_event_list[ val[0] ].format;
+
+		gtk_list_store_append( store, &iter );
+
+		gtk_list_store_set(store, &iter,
+			VIMS_ID, vimsid,
+			VIMS_DESCR, descr,
+			VIMS_KEY, keyname,
+			VIMS_MOD, keymod,
+			VIMS_PARAMS, vj_event_list[ val[0] ].params,
+			VIMS_FORMAT, format,
+			VIMS_CONTENTS, content,
+			-1 );
+		if(content) g_free(content);
+		if(message) free(message);
 		}
 		free( line );
 	}
@@ -3479,7 +3773,87 @@ static	void	reload_bundles()
 
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	g_free( eltext );
+
 }
+
+static	void	reload_vimslist()
+{
+	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_vims");
+	GtkListStore *store;
+	GtkTreeIter iter;
+	
+	gint len = 0;
+	single_vims( VIMS_VIMS_LIST );
+	gchar *eltext = recv_vims(5,&len); // msg len
+	gint 	offset = 0;
+	reset_tree("tree_vims");
+
+	if(len == 0 || eltext == NULL )
+	{
+		return;
+	}
+
+	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
+	store = GTK_LIST_STORE(model);
+
+	while( offset < len )
+	{
+		char *format = NULL;
+		char *descr = NULL;
+		char *line = strndup( eltext + offset,
+				      14 );
+		int val[4];
+		sscanf( line, "%04d%02d%03d%03d",
+			&val[0],&val[1],&val[2],&val[3]);
+
+		char vimsid[5];
+
+		offset += 12;
+
+		{
+			format = strndup( eltext + offset, val[2] );	
+			offset += val[2];
+		}
+
+		if(val[3] > 0 )
+		{
+			descr = strndup( eltext + offset, val[3] );
+			offset += val[3];
+		}
+
+
+		gchar *g_format = (format == NULL ? NULL :_utf8str( format ));
+		gchar *g_descr  = (descr == NULL ? NULL :_utf8str( descr  ));
+
+
+		gtk_list_store_append( store, &iter );
+
+		vj_event_list[ val[0] ].event_id = val[0];
+		vj_event_list[ val[0] ].params   = val[1];
+		vj_event_list[ val[0] ].format   = (format == NULL ? NULL :_utf8str( format ));
+		vj_event_list[ val[0] ].descr	 = (descr == NULL ? NULL : _utf8str( descr ));
+
+		sprintf(vimsid, "%03d", val[0] );
+		gtk_list_store_set( store, &iter,
+				VIMS_ID, vimsid, 
+				VIMS_DESCR, g_descr,-1 );
+	
+
+		if(g_format) g_free(g_format);
+		if(g_descr) g_free(g_descr);
+
+		if(format) free(format);
+		if(descr) free(descr);
+		
+		free( line );
+	}
+	/* entry, start frame, end frame */ 
+
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+	g_free( eltext );
+
+}
+
 
 static	void	reload_editlist_contents()
 {
@@ -3488,18 +3862,18 @@ static	void	reload_editlist_contents()
 	GtkTreeIter iter;
 	gint i;
 	gint len = 0;
-	single_vims( NET_EDITLIST_LIST );
+	single_vims( VIMS_EDITLIST_LIST );
 	gchar *eltext = recv_vims(4,&len); // msg len
 
 	gint 	offset = 0;
-	gint	num_files=0, num_rows = 0;
+	gint	num_files=0;
 
 	reset_tree("editlisttree");
 	_el_ref_reset();
 	_el_entry_reset();
 
 	char	str_nf[4];
-	char	str_nr[4];
+	
 	strncpy( str_nf, eltext , sizeof(str_nf));
 	sscanf( str_nf, "%04d", &num_files );
 
@@ -3549,7 +3923,7 @@ static	void	reload_editlist_contents()
 	{
 		char *tmp = (char*)strndup( eltext + offset, (3*16) );
 		offset += (3*16);
-		long nl=0, n1=0,n2=0, entry=0;
+		long nl=0, n1=0,n2=0;
 
 		sscanf( tmp, "%016ld%016ld%016ld",
 			&nl,&n1,&n2 );
@@ -3612,7 +3986,7 @@ static	void	load_editlist_info()
 	long rate = 0;
 	long dum[2];
 	memset(values, 0, 10);
-	single_vims( NET_VIDEO_INFORMATION );
+	single_vims( VIMS_VIDEO_INFORMATION );
 	gint len = 0;
 	gchar *res = recv_vims(3,&len);
 	
@@ -3675,8 +4049,6 @@ static	void	load_editlist_info()
 static	int	get_page(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget(info->main_window, name);
-	if(!w)
-		printf("cannot find widget %s\n",name);
 	return gtk_notebook_get_current_page( GTK_NOTEBOOK(w) );
 }
 
@@ -3734,43 +4106,6 @@ static	gchar	*format_selection_time(int start, int end)
 	snprintf( tmp, 20, "%2d:%2.2d:%2.2d:%2.2d",	
 		tc.h, tc.m, tc.s, tc.f );
 	return tmp;
-}
-
-static	void		set_color_bg(const char *name, GdkColor *col)
-{
-	GtkWidget *w = glade_xml_get_widget( info->main_window,name );
-	if(w)
-	{
- 		GtkStyle *style;
-		style = gtk_style_copy(gtk_widget_get_style(w));
-		style->bg[GTK_STATE_NORMAL].pixel = col->pixel;
-		style->bg[GTK_STATE_NORMAL].red = col->red;
-		style->bg[GTK_STATE_NORMAL].green = col->green;
-		style->bg[GTK_STATE_NORMAL].blue = col->blue;
-		gtk_widget_set_style(w, style);
-	}
-}
-
-static	void		set_pixmap_bg(const char *name, const char *file)
-{
-/*
-	char pixmap[512];
-	bzero(pixmap,512);
-	get_gd( pixmap, NULL, file );
-	GError *error = NULL;
-	GdkPixbuf *icon = gdk_pixbuf_new_from_file(pixmap, &error);
-
-	if(error)
-	{
-		vj_msg(VEEJAY_MSG_ERROR, "loading pixmap %s", error->message);
-		return;
-	}
-
-	GtkWidget *w = glade_xml_get_widget(info->main_window,name);
-
-	see API on GtkStyle
-	*/
-
 }
 
 static	void		set_color_fg(const char *name, GdkColor *col)
@@ -4111,8 +4446,6 @@ void	vj_fork_or_connect_veejay()
 				veejay_io_t iot;
 				memset( &iot,0,sizeof(iot));
 
-				int i;
-
 				gboolean ret = g_spawn_async_with_pipes( 
 							NULL,
 							args,
@@ -4128,7 +4461,7 @@ void	vj_fork_or_connect_veejay()
 							&error );
 				if(error)
 				{
-					printf("There was an error: [%s]\n", error->message );
+					vj_msg(VEEJAY_MSG_ERROR, "There was an error: [%s]\n", error->message );
 				}
 				if( ret == FALSE )
 				{
@@ -4202,19 +4535,6 @@ void	vj_gui_free()
 	gtk_main_quit();
 }
 
-static	void	vj_get_widget_root_size( const char *name, int *x, int *y )
-{
-	GtkWidget *w = glade_xml_get_widget(info->main_window,name);
-	gdk_window_get_root_origin( GDK_WINDOW(GTK_WIDGET(w)->window), x,y);
-}
-
-static	void	vj_get_widget_size(const char *name, int *w, int *h )
-{
-	//GtkWidget *w = glade_xml_get_widget( info->main_window, name );
-//	w = &w->requisition.width;
-//	h = &w->requisition.height;
-}
-
 static	void	vj_init_style( const char *name, const char *font )
 {
 	GtkWidget *window = glade_xml_get_widget(info->main_window, "gveejay_window");
@@ -4236,27 +4556,17 @@ void	vj_gui_style_setup()
 {
 	if(!info) return;
 	info->color_map = gdk_colormap_get_system();
-
-	const char path[MAX_PATH_LEN];
-
 	vj_init_style( "veejaytext", "Monospace, 8" );
 	vj_init_style( "gveejaytext", "Monospace, 8");
 }
 
 void	vj_gui_theme_setup()
 {
-//	char *resource_files[2];
 	char path[MAX_PATH_LEN];
 	bzero(path,MAX_PATH_LEN);
 	get_gd(path,NULL, "gveejay.rc");
 
-//	resource_files[0] = strdup( path );
-//	resource_files[1] = NULL;
-
-//	gtk_rc_set_default_files(resource_files);
-
 	gtk_rc_parse(path);
-//	free( resource_files[0] );
 }
 
 gint
@@ -4320,6 +4630,8 @@ void 	vj_gui_init(char *glade_file)
 		vj_gui_free();
 	}	
 
+	memset( vj_event_list, 0, sizeof(vj_event_list));
+
 	get_gd( path, NULL, glade_file);
 	gui->client = NULL;
 	gui->main_window = glade_xml_new(path,NULL,NULL);
@@ -4351,6 +4663,7 @@ void 	vj_gui_init(char *glade_file)
 			G_CALLBACK( gveejay_quit ),
 			NULL );
 
+	setup_vimslist();
 	setup_effectchain_info();
 	setup_effectlist_info();
 	setup_editlist_info();
@@ -4384,6 +4697,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	load_effectlist_info();
 	load_editlist_info();
+	reload_vimslist();
 	reload_editlist_contents();
 	reload_bundles();
 	load_effectchain_info();
@@ -4413,7 +4727,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 gboolean	veejay_io_update(gpointer data)
 {
-	vj_gui_t *gui = (vj_gui_t*) data;
 	int in_fd = info->io.stdout_pipe;
 	struct timeval no_wait;
 	fd_set fds;

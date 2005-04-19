@@ -685,17 +685,19 @@ void vj_perform_free(veejay_t * info)
    }
    vj_perform_record_buffer_free();
 
-   for( c = 0 ; c < 2 ; c ++ )
+	for( c = 0 ; c < 2 ; c ++ )
 	{
-	if(video_output_buffer[c]->Y )
-		free(video_output_buffer[c]->Y);
-	if(video_output_buffer[c]->Cb )
-		free(video_output_buffer[c]->Cb );
-	if(video_output_buffer[c]->Cr )
-		free(video_output_buffer[c]->Cr );
-    free(video_output_buffer[c]);
+		if(video_output_buffer[c])
+		{
+			if(video_output_buffer[c]->Y )
+				free(video_output_buffer[c]->Y);
+			if(video_output_buffer[c]->Cb )
+				free(video_output_buffer[c]->Cb );
+			if(video_output_buffer[c]->Cr )
+				free(video_output_buffer[c]->Cr );
+    			free(video_output_buffer[c]);
+		}
 	}
-    free(video_output_buffer);
 }
 
 /***********************************************************************

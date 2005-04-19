@@ -43,8 +43,6 @@ void veejay_quit(veejay_t *info);
 
 int veejay_dummy_open(veejay_t * info,int ofps, char *file, int pixfmt);
 
-void veejay_load_action_file(veejay_t *info, char *name);
-
 int veejay_close(veejay_t *info);
 
 void veejay_stop_sampling(veejay_t *info);

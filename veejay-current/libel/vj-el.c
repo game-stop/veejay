@@ -181,19 +181,6 @@ static 	void	_el_free_decoder(vj_decoder *d)
 			d = NULL;
 		}
 }
-/*
-static int _el_lav_fallback( char *filename )
-{
- 	lav_file_t *fd = lav_open_input_file( filename, mmap_size );
-	 if(fd)
-	 {
-	//	veejay_msg(VEEJAY_MSG_DEBUG,"Probe finds %s", lav_video_compressor(fd));
-		lav_close(fd);
-		return 1;
-	 }
-	return 0;
-}
-*/
 
 static int _el_probe_for_pixel_fmt( lav_file_t *fd )
 {
@@ -213,49 +200,48 @@ static int _el_probe_for_pixel_fmt( lav_file_t *fd )
 	return -1;
 }
 
-
-// this method should add a new producer to the playlist
 int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force)
 {
     int i, n, nerr;
     int chroma=0;
     int _fc;
-    //char realname[PATH_MAX];
 	int decoder_id = 0;
 	const char *compr_type;
 	int pix_fmt = -1;
-    char *realname;	
-    /* Get full pathname of file if the user hasn't specified preservation
-       of pathnames...
-     */
-  //  bzero(realname, PATH_MAX);
+    char *realname = NULL;	
 
     if( filename == NULL ) 
-	return -1;
-
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "No files to open!");
+		return -1;
+	}
 
     if (preserve_pathname)
 		realname = strdup(filename);
     else
-	realname = canonicalize_file_name( filename );
+		realname = canonicalize_file_name( filename );
+
     if(realname == NULL )
-	return -1;
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot get full path of '%s'", filename);
+		return -1;
+	}
 
     for (i = 0; i < el->num_video_files; i++)
-   {
-	/* crash here if file doesnt exist !*/
-		if (strcmp(realname, el->video_file_list[i]) == 0)
+	{
+		if (strncmp(realname, el->video_file_list[i], strlen( el->video_file_list[i])) == 0)
 		{
-		    veejay_msg(VEEJAY_MSG_ERROR, "File %s already open", realname);
-	    	return i;
+		    veejay_msg(VEEJAY_MSG_ERROR, "File %s already in editlist", realname);
+		    if(realname) free(realname);
+	      	return i;
 		}
-   }
-     /* Check if MAX_EDIT_LIST_FILES will be exceeded */
+	}
 
     if (el->num_video_files >= MAX_EDIT_LIST_FILES)
 	{
 		// mjpeg_error_exit1("Maximum number of video files exceeded");
 		veejay_msg(VEEJAY_MSG_ERROR,"Maximum number of video files exceeded\n");
+        if(realname) free(realname);
 		return -1; 
     }
 
@@ -263,12 +249,14 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		chroma = el->MJPG_chroma;
          
     n = el->num_video_files;
+
     if(el->has_video == 0)
     { // in case we have initialized from probing
-	el->video_frames = 0;
+		el->video_frames = 0;
         if(el->frame_list) free(el->frame_list);
- 	el->frame_list = NULL;
+		el->frame_list = NULL;
     }
+
     el->num_video_files++;
 
     el->lav_fd[n] = lav_open_input_file(filename,mmap_size);
@@ -277,6 +265,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	{
 		el->num_video_files--;	
 		lav_strerror();
+	    if(realname) free(realname);
 		return -1;
 	}
 
@@ -286,6 +275,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Input file %s is not in a valid format (%d)",filename,_fc);
 		el->num_video_files --;
+	    if(realname) free(realname);
+		if( el->lav_fd[n] ) lav_close(el->lav_fd[n]);
 		return -1;
 
 	}
@@ -299,6 +290,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	if(pix_fmt < 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to determine pixel format");
+		if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
+	    if(realname) free(realname);
 		return -1;
 	}
 
@@ -312,6 +305,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 			if( pix_fmt > el->pixel_format)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Cannot handle mixed 4:2:2 and 4:2:0 editlists");
+				if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
+			    if( realname ) free(realname );
 				return -1;
 			}
 	}
@@ -451,6 +446,9 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 	if (nerr) {
 	    el->num_video_files --;
+		if(el->lav_fd[n]) lav_close( el->lav_fd[n] );
+		if(realname) free(realname);
+	    if(el->video_file_list[n]) free(el->video_file_list[n]);
 	    return -1;
         }
     }
@@ -458,6 +456,9 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	if(!compr_type)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot get codec information from lav file");
+		if(el->lav_fd[n]) lav_close( el->lav_fd[n] );
+		if(realname) free(realname);
+		if(el->video_file_list[n]) free(el->video_file_list[n]);
 		return -1;
 	}
 
@@ -485,18 +486,15 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	if( strncasecmp("yv16", compr_type,4) == 0)
 		decoder_id = CODEC_ID_YUV422;
 
-//	if( decoder_id == CODEC_ID_MPEG4 || decoder_id == CODEC_ID_MSMPEG4V3)
-//	{
-//	
-//	}
-
-
 	if(decoder_id > 0)
 	{
 		int c_i = _el_get_codec(decoder_id);
 		if(c_i == -1)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unsupported codec %s",compr_type);
+		    if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
+			if( realname ) free(realname );
+			if( el->video_file_list[n]) free(el->video_file_list[n]);
 			return -1;
 		}
 		if( el_codecs[c_i] == NULL )
@@ -505,6 +503,9 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 			if(!el_codecs[c_i])
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,"Cannot initialize %s codec", compr_type);
+				if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
+			    if(realname) free(realname);
+				if( el->video_file_list[n]) free(el->video_file_list[n]);
 				return -1;
 			}
 		}
@@ -513,8 +514,14 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	if(decoder_id == 0)	
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Dont know how to handle %s (fmt %d)", compr_type, pix_fmt);
+		if(realname) free(realname);
+		if( el->video_file_list[n]) free( el->video_file_list[n] );
+		if( el->lav_fd[n] ) lav_close( el->lav_fd[n]);
 		return -1;
 	}
+
+	if(realname)
+		free(realname);
 
     return n;
 }
@@ -587,9 +594,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3], int pix_fm
 	{	/* yuv420 raw */
 		int len = el->video_width * el->video_height;
 		int uv_len = len / 4;
-		//memset( dst[0], 0, len);
-		//memset( dst[1], 0, uv_len*2);
-		//memset( dst[2], 0, uv_len*2);	
 		if(pix_fmt == FMT_420)
 		{
 			veejay_memcpy( dst[0], d->tmp_buffer, len);
@@ -603,17 +607,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3], int pix_fm
 					    d->tmp_buffer+len+uv_len,
 						dst, el->video_width, el->video_height));
 		}
-	
-	/*	this should be faster (img_convert copies plane [0] but ss_420_to_422 is not yet implemented)
- 
-		int len = el->video_width * el->video_height;
-		int uv_len = len / 4;
-		veejay_memcpy( dst[0], d->tmp_buffer, len);
-		veejay_memcpy( dst[1], d->tmp_buffer+len,uv_len);
-		veejay_memcpy( dst[2], d->tmp_buffer+(len+uv_len), uv_len);
-		ss_420_to_422( dst[1], el->video_width, el->video_height );
-		ss_420_to_422( dst[2], el->video_width, el->video_height );*/
-
 	}
 	else
 	{
@@ -1081,21 +1074,19 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 
 void	vj_el_free(editlist *el)
 {
-	int i=0;
 	if(el)
 	{
 		int n = el->num_video_files;
 		int i;
 		for( i = 0; i < n ; i++ )
-			if( el->video_file_list[n]) free(el->video_file_list[n]);
+		{
+			if( el->video_file_list[i]) free(el->video_file_list[i]);
+			if( el->lav_fd[i] ) lav_close( el->lav_fd[i]);
+		}
 		if(el->frame_list) free(el->frame_list);
 		free(el);   
 		el = NULL;
 	}
-//	for(i=0; i < MAX_CODECS; i++)
-//	{
-//		if(el_codecs[i]) _el_free_decoder(el_codecs[i]);
-//	}
 }
 
 void	vj_el_print(editlist *el)

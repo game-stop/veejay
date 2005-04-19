@@ -28,9 +28,11 @@
 void 	vj_event_fmt_arg			(	int *args, 	char *str, 	const char format[], 	va_list ap);
 void 	vj_event_init				();
 void	vj_event_print_range			(	int n1,		int n2);
+
+int	veejay_load_action_file( void *ptr, char *filename );
 #ifdef HAVE_SDL
 #ifdef HAVE_XML2
-void    vj_event_xml_new_keyb_event		( 	xmlDocPtr doc, 	xmlNodePtr cur );
+void    vj_event_xml_new_keyb_event		( 	void *v,	xmlDocPtr doc, 	xmlNodePtr cur );
 #endif
 #endif
 int vj_event_get_video_format(void);
@@ -179,7 +181,7 @@ void 	vj_event_bundled_msg_del		(	void *ptr, 	const char format[], 	va_list ap	)
 void	vj_event_bundled_msg_add		(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_read_file			(	void *ptr,	const char format[],	va_list ap	);
 #ifdef HAVE_SDL
-void	vj_event_attach_key_to_bundle		(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_attach_detach_key		(	void *ptr,	const char format[],	va_list ap	);
 #endif
 void	vj_event_write_actionfile		(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_screenshot			(	void *ptr,	const char format[],	va_list ap	);
@@ -210,7 +212,8 @@ void	vj_event_unload_plugin			(	void *ptr,	const char format[], 	va_list ap	);
 void	vj_event_fullscreen			( void *ptr, const char format[],	va_list ap );
 void	vj_event_sample_mode		(	void *ptr,	const char format[],	va_list ap 	);
 void	vj_event_set_rgb_parameter_type		(	void *ptr,const char format[],	va_list ap	);
-void	vj_event_tag_set_descr		(	void *ptr,	const char format[],	va_list ap	);	
+void	vj_event_tag_set_descr		(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_send_vimslist		(	void *ptr,	const char format[],	va_list ap	);	
 void	vj_event_send_bundles	(void *ptr, const char format[], va_list ap);
 void	vj_event_quick_bundle  (void *ptr, const char format[], va_list ap);
 #endif

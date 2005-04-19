@@ -134,11 +134,12 @@ dnl video4linux/hardware dependent tools. Else, undefine HAVE_V4L
 have_v4l=false
 have_linux=false
 have_darwin=false
-
+with_gui=no
 case $host in
   *-*-linux*)
 	AC_CHECK_HEADER(linux/version.h,
 		[have_linux=true
+		 with_gui=yes
 	         AC_DEFINE(HAVE_LINUX,,[Linux platform])
 		],
 		[AC_MSG_ERROR([version.h not found - please install the linux kernel headers])
@@ -861,6 +862,7 @@ fi
 
 if test "$have_darwin" = "true" ; then
 AC_MSG_NOTICE([   Platform: Darwin])
+AC_MSG_NOTICE([      Veejay will not compile ])
 fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])

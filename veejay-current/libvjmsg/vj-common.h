@@ -32,7 +32,7 @@ enum {
 extern void veejay_strrep(char *s, char delim, char tok);
 
 extern void veejay_msg(int type, const char format[], ...);
-
+extern int veejay_is_colored();
 extern void veejay_set_debug_level(int level);
 extern void veejay_set_colors(int level);
 extern void veejay_silent();

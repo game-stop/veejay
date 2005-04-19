@@ -54,6 +54,12 @@ void veejay_set_colors(int l)
 	if(l) _color_level = 1;
 	else _color_level = 0;
 }
+
+int	veejay_is_colored()
+{
+	return _color_level;
+}
+
 void veejay_silent()
 {
 	_no_msg = 1;
