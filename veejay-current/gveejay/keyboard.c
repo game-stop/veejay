@@ -79,7 +79,6 @@ gchar		*sdlmod_by_id( int sdl_mod )
 gchar		*gdkmod_by_id( int gdk_mod )
 {
 	int i;
-	printf("MODIFIER = %x\n", gdk_mod);
 	for( i = 0; modifier_translation_table_t[i].title != NULL ; i ++ )
 	{
 		if( gdk_mod == modifier_translation_table_t[i].gdk_mod ||
