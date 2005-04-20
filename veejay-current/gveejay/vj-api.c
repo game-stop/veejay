@@ -30,7 +30,7 @@
 #include <valgrind/memcheck.h>
 #include <gveejay/keyboard.h>
 
-#define	TIMEOUT_SECONDS	10	// to be commandline option
+static int	TIMEOUT_SECONDS = 0;
 #define STATUS_BYTES 	100
 #define STATUS_TOKENS 	16
 
@@ -59,6 +59,11 @@
 #define STREAM_RECORDING 9
 
 /* Stream type identifiers */
+
+void	vj_gui_set_timeout(int timer)
+{
+	TIMEOUT_SECONDS = timer;
+}
 
 enum
 {
@@ -423,6 +428,8 @@ static	gchar	*_utf8str(char *c_str)
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "%s cannot convert [%s] : %s",__FUNCTION__ , c_str, error->message);
 		g_free(error);
+		if( result )
+			g_free(result);
 		result = NULL;
 	}
 
@@ -987,6 +994,20 @@ void	about_dialog()
       "Niels Elburg <nelburg@looze.net>", 
       NULL 
     };
+
+	const gchar *license = 
+	{
+		"This program is Free Software; You can redistribute it and/or modify\n" \
+		"under the terms of the GNU General Public License as published by\n" \
+		"the Free Software Foundation; either version 2, or (at your option)\n"\
+		"any later version.\n\n"\
+		"This program is distributed in the hope it will be useful,\n"\
+		"but WITHOUT ANY WARRANTY; without even the implied warranty of\n"\
+		"MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n"\
+		"See the GNU General Public License for more details.\n\n"\
+		"For more information , see also: http://www.gnu.org\n"
+	};
+
 	char path[MAX_PATH_LEN];
 	bzero(path,MAX_PATH_LEN);
 	get_gd( path, NULL,  "veejay-logo.png" );
@@ -1000,6 +1021,7 @@ void	about_dialog()
 		"comments", "A graphical interface for Veejay",
 		"authors", authors,
 		"artists", artists,
+		"license", license,
 		"logo", pixbuf, NULL );
 	g_object_unref(pixbuf);
 
@@ -1074,8 +1096,6 @@ prompt_keydialog(const char *title, char *msg)
 	GtkWidget *hbox2 = gtk_hbox_new( FALSE, 12 );
 	gtk_container_set_border_width( GTK_CONTAINER( hbox2 ), 6 );
 
-	GtkWidget *hbox3 = gtk_hbox_new( FALSE, 12 );
-
 	GtkWidget *icon = gtk_image_new_from_file( pixmap );
 
 	GtkWidget *label = gtk_label_new( msg );
@@ -1088,18 +1108,13 @@ prompt_keydialog(const char *title, char *msg)
 			info->uc.selected_key_sym ))
 	{
 		char tmp[100];
-		if( info->uc.selected_key_mod )
 		sprintf(tmp,"VIMS %d : %s + %s",
 			info->uc.selected_vims_entry,
 			sdlmod_by_id( info->uc.selected_key_mod ),
 			sdlkey_by_id( info->uc.selected_key_sym ) );
-		else
-		sprintf(tmp, "VIMS %d : %s",
-			info->uc.selected_vims_entry,
-			sdlkey_by_id( info->uc.selected_key_sym ) );
-		
+
 		GtkWidget *current = gtk_label_new( tmp );
-		gtk_container_add( GTK_CONTAINER( hbox3 ), current );
+		gtk_container_add( GTK_CONTAINER( hbox1 ), current );
 	
 		if( vj_event_list[ info->uc.selected_vims_entry ].params > 0 )
 		{
@@ -1117,9 +1132,8 @@ prompt_keydialog(const char *title, char *msg)
 
 
 	gtk_container_add( GTK_CONTAINER( GTK_DIALOG( dialog )->vbox ), hbox1 );
-	gtk_container_add( GTK_CONTAINER( GTK_DIALOG( dialog )->vbox ), hbox3 );
 	gtk_container_add( GTK_CONTAINER( GTK_DIALOG( dialog )->vbox ), hbox2 );
-	
+
 	gtk_widget_show_all( dialog );
 
 	int id = gtk_key_snooper_install( dialogkey_snooper, (gpointer*) keyentry );
@@ -1224,18 +1238,7 @@ static  void	vj_msg(int type, const char format[], ...)
 	snprintf(buf, sizeof(buf), "%s %s\n",prefix,tmp );
 	int nr,nw;
 	gchar *text = g_locale_to_utf8( buf, -1, &nr, &nw, NULL);
-/*
-	if(color>=0 )
-	{
-		gtk_text_buffer_insert_with_tags_by_name( buffer, &iter,
-				text, -1, level, NULL );	
-	}
-	else
-	{*/
-		gtk_text_buffer_insert( buffer, &iter, text,nw);
-//	}
-
-	// get rid of '\n' at the end of line 
+	gtk_text_buffer_insert( buffer, &iter, text,nw);
 	text[strlen(text)-1] = '\0';
 	put_text( "lastmessage", text );
 
@@ -2174,7 +2177,7 @@ gboolean
     if (gtk_tree_model_get_iter(model, &iter, path))
     {
       gint name = 0;
-      gchar *toggle;	
+      gchar *toggle = NULL;	
 
       gtk_tree_model_get(model, &iter, FXC_ID, &name, -1);
       gtk_tree_model_get(model, &iter, FXC_FXSTATUS, &toggle, -1 );
@@ -2184,8 +2187,8 @@ gboolean
 	multi_vims( VIMS_CHAIN_SET_ENTRY, "%d", name );
 	info->uc.reload_hint[HINT_ENTRY] = 1;
      	info->uc.selected_chain_entry = name;
-	 }
-
+      }
+      if(toggle) g_free(toggle);
     }
 
     return TRUE; /* allow selection state to change */
@@ -2200,8 +2203,8 @@ gboolean
     GtkTreeIter iter;
     if (gtk_tree_model_get_iter(model, &iter, path))
     {
-      gchar *name;
-      gchar *toggle;	
+      gchar *name = NULL;
+      gchar *toggle = NULL;	
 
       gtk_tree_model_get(model, &iter, FXC_ID, &name, -1);
       gtk_tree_model_get(model, &iter, FXC_FXSTATUS, &toggle, -1 );
@@ -2220,7 +2223,9 @@ gboolean
 		info->uc.selected_sample_id = 0;
 		info->uc.selected_stream_id = id;
 	}
-	 }
+	}
+	if(name) g_free(name);
+	if(toggle) g_free(toggle);
 
     }
 
@@ -2236,8 +2241,8 @@ gboolean
     GtkTreeIter iter;
     if (gtk_tree_model_get_iter(model, &iter, path))
     {
-      gchar *name;
-      gchar *toggle;	
+      gchar *name = NULL;
+      gchar *toggle = NULL;	
 
       gtk_tree_model_get(model, &iter, FXC_ID, &name, -1);
       gtk_tree_model_get(model, &iter, FXC_FXSTATUS, &toggle, -1 );
@@ -2258,6 +2263,8 @@ gboolean
 	}
 	 }
 
+	if(name) g_free(name);
+	if(toggle) g_free(toggle);
     }
 
     return TRUE; /* allow selection state to change */
@@ -2290,7 +2297,6 @@ on_dev_edited (GtkCellRendererText *celltext,
 {
         GtkTreeModel *model = GTK_TREE_MODEL(data);
         GtkTreeIter   iter;
-        gchar        *name = NULL;
         gfloat        oldval = 0.0;
         gfloat        newval = 0.0;
 
@@ -2302,7 +2308,6 @@ on_dev_edited (GtkCellRendererText *celltext,
 
         gtk_list_store_set(GTK_LIST_STORE(model), &iter, V4L_SPINBOX, newval, -1);
 	
-        g_free(name);
 }
 
 
@@ -2539,41 +2544,6 @@ enum
 	FX_STRING =2,
 	FX_NUM,
 };
-/*
-gboolean
-  view_fx_activation_func (GtkTreeSelection *selection,
-                       GtkTreeModel     *model,
-                       GtkTreePath      *path,
-                       gboolean          path_currently_selected,
-                       gpointer          userdata)
-  {
-    GtkTreeIter iter;
-
-    if (gtk_tree_model_get_iter(model, &iter, path))
-    {
-	gint name = 0;
-      gtk_tree_model_get(model, &iter, FX_ID, &name, -1);
-
-      if (!path_currently_selected)
-      {
-	 info->uc.selected_effect_id = name;
-	 multi_vims( VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
-			0, info->uc.selected_chain_entry,
-			name, );
- 	 gui->uc.reload_hint[HINT_CHAIN] = 1;
-
-      }
-      else
-      {
-        g_print ("%d is going to be unselected.\n", name);
-      }
-
-    }
-	return TRUE;
-  }
-*/
-
-
 
 gboolean
   view_fx_selection_func (GtkTreeSelection *selection,
@@ -2639,7 +2609,8 @@ sort_iter_compare_func( GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b,
 
 	if(sortcol == FX_STRING)
 	{
-		gchar *name1, *name2;
+		gchar *name1=NULL;
+		gchar *name2=NULL;
 		gtk_tree_model_get(model,a, FX_STRING, &name1, -1 );
 		gtk_tree_model_get(model,b, FX_STRING, &name2, -1 );
 		if( name1 == NULL || name2 == NULL )
@@ -2654,8 +2625,8 @@ sort_iter_compare_func( GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b,
 		{
 			ret = g_utf8_collate(name1,name2);
 		}
-		g_free(name1);
-		g_free(name2);
+		if(name1) g_free(name1);
+		if(name2) g_free(name2);
 	}
 	return ret;
 }
@@ -2687,6 +2658,8 @@ sort_vims_func( GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b,
 		{
 			ret = g_utf8_collate(name1,name2);
 		}
+		if(name1) g_free(name1);
+		if(name2) g_free(name2);
 	}
 	return ret;
 }
@@ -2739,7 +2712,7 @@ on_samplelist_row_activated(GtkTreeView *treeview,
 
 	if(gtk_tree_model_get_iter(model,&iter,path))
 	{
-		gchar *idstr;
+		gchar *idstr = NULL;
 		gtk_tree_model_get(model,&iter, SL_ID, &idstr, -1);
 		gint id = 0;
 		if( sscanf( idstr+1, "%04d", &id ) )
@@ -2762,6 +2735,7 @@ on_samplelist_row_activated(GtkTreeView *treeview,
 					id );
 			}	
 		}
+		if(idstr) g_free(idstr);
 	}
 
 }
@@ -2775,7 +2749,7 @@ void	on_samplelist_edited(GtkCellRendererText *cell,
 	GtkWidget *tree = glade_xml_get_widget(info->main_window,
 				"tree_samples");
 	GtkTreeIter iter;
-	gchar *id;
+	gchar *id = NULL;
 	int n;
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
 	n = gtk_tree_model_get_iter_from_string(
@@ -2809,6 +2783,9 @@ void	on_samplelist_edited(GtkCellRendererText *cell,
 		if(error)
 		{
 			vj_msg(VEEJAY_MSG_ERROR,"Invalid string: %s", error->message );
+			if(sysstr) g_free(sysstr);
+			if(sysid) g_free(sysid);
+			if(id)	g_free(id);
 			return;
 		}
 		
@@ -2842,9 +2819,11 @@ void	on_samplelist_edited(GtkCellRendererText *cell,
 				"%d %s", sample_id, descr );
 
 		info->uc.reload_hint[HINT_SLIST] = 1;
+		if(sysstr) g_free( sysstr );
 	}
-	
 
+	if(sysid) g_free(sysid);
+	if(id) g_free(id);
 }
 
 void	setup_samplelist_info(const char *name)
@@ -3193,6 +3172,7 @@ on_vims_row_activated(GtkTreeView *treeview,
 				}
 			}
 		}
+		if( vimsid ) g_free( vimsid );
 	}
 }
 void
@@ -3226,6 +3206,7 @@ on_vimslist_row_activated(GtkTreeView *treeview,
 				info->uc.reload_hint[HINT_BUNDLES] = 1;
 			}		
 		}
+		if( vimsid ) g_free(vimsid);
 	}
 }
 
@@ -3249,6 +3230,7 @@ gboolean
 	{
 		info->uc.selected_vims_id = event_id;
     	}
+	if(vimsid) g_free(vimsid);
     }
 
     return TRUE; /* allow selection state to change */
@@ -3301,6 +3283,10 @@ gboolean
 			info->uc.selected_key_sym = k;
 		}
     	}
+	if(vimsid) g_free( vimsid );
+	if(text) g_free( text );
+	if(key) g_free( key );
+	if(mod) g_free( mod );
     }
 
     return TRUE; /* allow selection state to change */
@@ -3527,7 +3513,7 @@ void	on_vimslist_edited(GtkCellRendererText *cell,
 	
 	if(sysstr == NULL || error != NULL)
 	{
-		return;
+		goto vimslist_error;
 	}
 
 	if( event_id < VIMS_BUNDLE_START || event_id > VIMS_BUNDLE_END ) 	
@@ -3543,7 +3529,7 @@ void	on_vimslist_edited(GtkCellRendererText *cell,
 		{
 			if(*(c) == 'd')
 			  if( sscanf( sysstr, "%d", &tmp_val ) != 1 )	 
-				return;
+				goto vimslist_error;
 			c+=2;
 		}
 
@@ -3552,7 +3538,15 @@ void	on_vimslist_edited(GtkCellRendererText *cell,
 		info->uc.reload_hint[HINT_BUNDLES]=1;
 		
 	}	
-	g_free(sysstr);
+
+	vimslist_error:
+
+	if(sysstr) g_free(sysstr);
+	if(id) g_free(id);
+	if(contents) g_free(contents);
+	if(key_sym) g_free(key_sym);
+	if(key_mod) g_free(key_mod);
+	if(format) g_free(format);
 
 }
 
@@ -3873,6 +3867,8 @@ static	void	reload_editlist_contents()
 	single_vims( VIMS_EDITLIST_LIST );
 	gchar *eltext = recv_vims(6,&len); // msg len
 
+	printf("Editlist is %d bytes\n", len);
+
 	gint 	offset = 0;
 	gint	num_files=0;
 
@@ -3884,13 +3880,14 @@ static	void	reload_editlist_contents()
 	
 	strncpy( str_nf, eltext , sizeof(str_nf));
 	sscanf( str_nf, "%04d", &num_files );
+
+	printf("Editlist has %d files\n", num_files);
+
 	offset += 4;
 	int n = 0;
 	el_constr *el;
 	for( i = 0; i < num_files ; i ++ )	
 	{
-		
-		
 		int itmp =0;
 		char *tmp = (char*) strndup( eltext+offset, 4 );
 		int line_len = 0;
@@ -3909,7 +3906,7 @@ static	void	reload_editlist_contents()
 			free(tmp);
 			tmp = (char*) strndup( line + 3 + itmp, 16 );
 			int a,b,c;
-			sscanf(tmp, "%04d%010d%02d", &a,&b,&c);
+			int n = sscanf(tmp, "%04d%010d%02d", &a,&b,&c);
 			free(tmp);
 			strncpy(fourcc, line + 3 + itmp + 16, c );
 			el = _el_entry_new( i, file,   b, fourcc );
@@ -4388,8 +4385,31 @@ void	vj_gui_stop_launch()
 			info->state = STATE_IDLE;
 			memset( &(info->timer), 0, sizeof(struct timeval));
 			memset( &(info->alarm), 0, sizeof(struct timeval));
+			if(info->connecting)
+			{
+				gtk_progress_bar_set_fraction(
+					GTK_PROGRESS_BAR (glade_xml_get_widget(info->main_window, "connecting")),0.0);
+				g_source_remove( info->connecting );
+				info->connecting = 0;
+			}
 			break;
 		case STATE_PLAYING:
+			if( info->run_state  == RUN_STATE_LOCAL )
+			{
+			  if( prompt_dialog("Quit Veejay ?" , "Are you sure?" ) !=
+				 GTK_RESPONSE_REJECT )
+				{
+				  printf("Run state is local\n");
+				  single_vims( VIMS_QUIT );
+					printf("single VIMS %d\n", VIMS_QUIT );
+				  vj_gui_disconnect();
+				}
+			}
+			if( info->run_state == RUN_STATE_REMOTE )
+			{
+			  printf("Didnt launch (but was connected)\n");
+			  vj_gui_disconnect();
+			}
 			break;
 		default:
 			break;
@@ -4402,6 +4422,7 @@ void	vj_fork_or_connect_veejay()
 	char	*remote = get_text( "entry_hostname" );
 	char	*files  = get_text( "entry_filename" );
 	int	port	= get_nums( "button_portnum" );
+	int	dummy	= is_button_toggled( "button_dummy");
 	gchar	*args[20];
 	int	n_args = 0;
 	char	port_str[15];
@@ -4422,7 +4443,7 @@ void	vj_fork_or_connect_veejay()
 
 	args[n_args++] = g_strdup(port_str);
 
-	if(files == NULL || strlen(files)<= 0 )
+	if(files == NULL || strlen(files)<= 0 || dummy)
 	{
 		args[n_args++] = g_strdup("-d");
 		args[n_args++] = NULL;
@@ -4468,7 +4489,9 @@ void	vj_fork_or_connect_veejay()
 				if(error)
 				{
 					vj_msg(VEEJAY_MSG_ERROR, "There was an error: [%s]\n", error->message );
+					ret = FALSE;
 				}
+
 				if( ret == FALSE )
 				{
 					info->state = STATE_IDLE;
@@ -4481,14 +4504,13 @@ void	vj_fork_or_connect_veejay()
 					info->state = STATE_RECONNECT;
 					vj_launch_toggle(FALSE);
 					vj_msg(VEEJAY_MSG_INFO,
-						"Launched Veejay !"); 
+						"Spawning Veejay ...!"); 
 
 					fcntl( iot.stdout_pipe , F_SETFD, O_NDELAY );	
 					
 					
 					memcpy( &(info->io), &(iot), sizeof(iot));
-					g_timeout_add( G_PRIORITY_LOW, 
-						veejay_io_update,
+					g_timeout_add( G_PRIORITY_LOW, veejay_io_update,
 						(gpointer*) info );
 
 				
@@ -4507,7 +4529,7 @@ void	vj_fork_or_connect_veejay()
 					(mcast==NULL ? remote:mcast), port );
 		}
 	}
-	else
+/*	else
 	{
 		if( info->state == STATE_PLAYING )
 		{
@@ -4515,7 +4537,7 @@ void	vj_fork_or_connect_veejay()
 			vj_msg(VEEJAY_MSG_ERROR, "Disconnected.");
 			info->state = STATE_RECONNECT;
 		}
-	}
+	}*/
 
 	for( i = 0; i < n_args; i ++)
 	{
@@ -4545,6 +4567,7 @@ static	void	vj_init_style( const char *name, const char *font )
 {
 	GtkWidget *window = glade_xml_get_widget(info->main_window, "gveejay_window");
 	GtkWidget *widget = glade_xml_get_widget(info->main_window, name );
+	gtk_text_view_set_wrap_mode( GTK_TEXT_VIEW(widget), GTK_WRAP_WORD_CHAR );
 
 	GtkStyle *style = gtk_style_copy( gtk_widget_get_style(GTK_WIDGET(window)));
 	PangoFontDescription *desc = pango_font_description_from_string( font );
@@ -4552,10 +4575,6 @@ static	void	vj_init_style( const char *name, const char *font )
 	style->font_desc = desc;
 	gtk_widget_set_style( widget, style );
 	gtk_style_ref(style);
-
-//	vj_setup_text_box( "gveejaytext");
-	gtk_text_view_set_wrap_mode( GTK_TEXT_VIEW(widget), GTK_WRAP_WORD_CHAR );
-
 }	
 
 void	vj_gui_style_setup()
@@ -4696,7 +4715,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		info->run_state = 0;
 		return 0;
 	}
-	vj_msg(VEEJAY_MSG_INFO, "New connection established with %s : %d",
+	vj_msg(VEEJAY_MSG_INFO, "New connection established with Veejay running on %s port %d",
 		(group_name == NULL ? hostname : group_name), port_num );
 
 	info->channel = g_io_channel_unix_new( vj_client_get_status_fd( info->client, V_STATUS));
@@ -4704,7 +4723,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	load_effectlist_info();
 	load_editlist_info();
 	reload_vimslist();
-	reload_editlist_contents();
+	//reload_editlist_contents();
 	reload_bundles();
 	load_effectchain_info();
 	load_samplelist_info("tree_samples");
@@ -4757,6 +4776,17 @@ gboolean	veejay_io_update(gpointer data)
 	return TRUE;
 }
 
+static	void	veejay_stop_connecting(vj_gui_t *gui)
+{
+	if(!gui->sensitive)
+		vj_gui_enable();
+	vj_launch_toggle(TRUE);
+	gtk_progress_bar_set_fraction(
+		GTK_PROGRESS_BAR (glade_xml_get_widget(info->main_window, "connecting")),0.0);
+	g_source_remove( info->connecting );
+	info->connecting = 0;
+}
+
 gboolean	is_alive(gpointer data)
 {
 	vj_gui_t *gui = (vj_gui_t*) data;
@@ -4787,14 +4817,11 @@ gboolean	is_alive(gpointer data)
 					memcpy(&(info->timer),&timenow,sizeof(timenow));
 				}
 				else
-				{
-					if(!gui->sensitive)
-						vj_gui_enable();
-					vj_launch_toggle(TRUE);
-					gtk_progress_bar_set_fraction(
-						GTK_PROGRESS_BAR (glade_xml_get_widget(info->main_window, "connecting")),1.0);
-					g_source_remove( info->connecting );
-				}
+				{	/* veejay connected */
+					veejay_stop_connecting(gui);
+				}	
+				
+				if( mcast ) free( mcast );
 			}
 		}
 		else
@@ -4846,7 +4873,6 @@ static struct
 	{"button_054"}, 
 	{"speedslider"},
 	{"new_colorstream"},
-	{"button_stoplaunch"},
 	{"audiovolume"},
 	{"manualopacity"},
 	{"button_fadedur"},
@@ -4879,6 +4905,12 @@ void	vj_gui_disconnect()
 	reset_tree("tree_samples");
 	reset_tree("tree_sources");
 	reset_tree("editlisttree");
+	
+	/* clear console text */
+	clear_textview_buffer("veejaytext");
+	clear_textview_buffer("gveejaytext");
+
+
 }
 
 void	vj_launch_toggle(gboolean value)

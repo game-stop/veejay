@@ -7039,12 +7039,9 @@ void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 	veejay_t *v = (veejay_t*) ptr;
 	editlist *el = v->edit_list;
 	
-	
-	
-
 	if( el->num_video_files <= 0 )
 	{
-		SEND_MSG( v, "00040000");
+		SEND_MSG( v, "00000000");
 		return;
 	}
 
