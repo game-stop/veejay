@@ -149,7 +149,9 @@ void 	vj_event_tag_del			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_tag_new_raw			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_tag_new_avformat		(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_tag_new_v4l			(	void *ptr, 	const char format[], 	va_list ap	);
+#ifdef SUPPORT_READ_DV2
 void	vj_event_tag_new_dv1394			( 	void *ptr,	const char format[],	va_list ap	);
+#endif
 void	vj_event_tag_new_color			(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_tag_new_y4m			(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_tag_new_net			( 	void *ptr,	const char format[],	va_list ap	);

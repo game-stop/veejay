@@ -375,8 +375,10 @@ static struct {
 	{ VIMS_STREAM_NEW_V4L,			"Stream: open video4linux device (hw)",
 		vj_event_tag_new_v4l,		2,	"%d %d",	{0,1}, VIMS_REQUIRE_ALL_PARAMS	},	
 #endif
+#ifdef SUPPORT_READ_DV2
 	{ VIMS_STREAM_NEW_DV1394,		"Stream: open dv1394 device <channel>",
 		vj_event_tag_new_dv1394,	 1, 	"%d",		{63,0}, VIMS_ALLOW_ANY	},
+#endif
 	{ VIMS_STREAM_NEW_Y4M,			"Stream: open y4m stream by name (file)",
 		vj_event_tag_new_y4m,		 1,	"%s",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	}, 
 	{ VIMS_STREAM_NEW_COLOR,		"Stream: new color stream by RGB color",
@@ -5533,6 +5535,7 @@ void vj_event_tag_new_avformat(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new FFmpeg stream");
 	}	
 }
+#ifdef SUPPORT_READ_DV2
 void	vj_event_tag_new_dv1394(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -5547,6 +5550,8 @@ void	vj_event_tag_new_dv1394(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new DV1394 stream");
 	}
 }
+#endif
+
 #ifdef HAVE_V4L
 void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 {
