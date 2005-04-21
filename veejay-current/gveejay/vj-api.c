@@ -131,7 +131,8 @@ enum
 	HINT_RGBSOLID = 9,
 	HINT_BUNDLES = 10,
 	HINT_HISTORY = 11,
-	NUM_HINTS = 12
+	HINT_MARKER = 12,
+	NUM_HINTS = 13
 };
 
 enum
@@ -250,6 +251,7 @@ typedef struct
 } vims_t;
 
 static	vims_t	vj_event_list[VIMS_MAX];
+static  vims_verbosity = 0;
 
 typedef struct
 {
@@ -1210,6 +1212,11 @@ static  void	vj_msg(int type, const char format[], ...)
 	GtkWidget *view = glade_xml_get_widget( info->main_window,(type==4 ? "veejaytext": "gveejaytext"));
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
 	GtkTextIter iter;
+
+
+	if( type == VEEJAY_MSG_DEBUG && vims_verbosity == 0 )
+		return;
+
 	char tmp[1024];
 	char buf[1024];
 	char prefix[20];
@@ -1858,25 +1865,26 @@ static void 	update_globalinfo()
 		if( history[SAMPLE_START] != info->status_tokens[SAMPLE_START] )
 		{
 			update_spin_value( "spin_samplestart", info->status_tokens[SAMPLE_START]);
+			info->uc.marker.lower_bound = 0;
 			sample_changed = 1;
 			update_slider_range("slider_m0", 0, 
 				info->status_tokens[SAMPLE_END]-info->status_tokens[SAMPLE_START],
 				0,
 				0 );
-			//info->uc.marker.lower_bound = info->status_tokens[SAMPLE_START];
-			info->uc.marker.lower_bound = 0;
 		}
 
 		if( history[SAMPLE_END] != info->status_tokens[SAMPLE_END])
 		{
 			update_spin_value( "spin_sampleend", info->status_tokens[SAMPLE_END]);
+			info->uc.marker.upper_bound = (info->status_tokens[SAMPLE_END] -
+							info->status_tokens[SAMPLE_START]);
+
 			update_slider_range("slider_m1", 0,
-					info->status_tokens[SAMPLE_END]-info->status_tokens[SAMPLE_START],
-					info->status_tokens[SAMPLE_END]-info->status_tokens[SAMPLE_START],
+					info->uc.marker.upper_bound,
+					info->uc.marker.lower_bound,
 					0);
+
 			sample_changed = 1;
-		//	info->uc.marker.upper_bound = info->status_tokens[SAMPLE_END];
-			info->uc.marker.upper_bound = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
 		}
 		if( history[SAMPLE_LOOP] != info->status_tokens[SAMPLE_LOOP])
 		{
@@ -2108,6 +2116,14 @@ static void 	update_globalinfo()
 	if(info->uc.reload_hint[HINT_BUNDLES] == 1 )
 	{
 		reload_bundles();
+	}
+
+	if(info->uc.reload_hint[HINT_MARKER] == 1 )
+	{
+		info->uc.marker.lower_bound = 0;
+		info->uc.marker.upper_bound = 0;
+		update_slider_value( "slider_m0", info->uc.marker.lower_bound, 0);
+		update_slider_value( "slider_m1", info->uc.marker.upper_bound, 0 );
 	}
 
 
@@ -2562,12 +2578,7 @@ gboolean
 
       if (!path_currently_selected)
       {
-        g_print ("%d is going to be selected.\n", name);
 	info->uc.selected_effect_id = name;
-      }
-      else
-      {
-        g_print ("%d is going to be unselected.\n", name);
       }
 
     }
@@ -3143,7 +3154,7 @@ on_vims_row_activated(GtkTreeView *treeview,
 
 		if(sscanf( vimsid, "%d", &event_id ))
 		{
-			if(event_id > VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END)
+			if(event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END)
 			{
 				multi_vims( VIMS_BUNDLE, "%d", event_id );
 				info->uc.reload_hint[HINT_CHAIN] = 1;
@@ -3439,6 +3450,15 @@ static	void	setup_vimslist()
 	setup_tree_text_column( "tree_vims", VIMS_ID, 		"VIMS ID");
 	setup_tree_text_column( "tree_vims", VIMS_DESCR,	"Description" );
 
+	GtkTreeSortable *sortable = GTK_TREE_SORTABLE(store);
+
+	gtk_tree_sortable_set_sort_func(
+		sortable, VIMS_ID, sort_vims_func,
+			GINT_TO_POINTER(VIMS_ID),NULL);
+
+	gtk_tree_sortable_set_sort_column_id( 
+		sortable, VIMS_ID, GTK_SORT_ASCENDING);
+
 	g_signal_connect( tree, "row-activated",
 		(GCallback) on_vimslist_row_activated, NULL );
 
@@ -3721,7 +3741,7 @@ static	void	reload_bundles()
 			offset += val[3];
 		}
 
-		if( val[0] < 400 || val[0] > 500 )
+		if( val[0] < 400 || val[0] >= VIMS_BUNDLE_START )
 		{ // query VIMS ! (ignore in userlist) 
 
 		gchar *content = (message == NULL ? NULL : _utf8str( message ));
@@ -3733,7 +3753,7 @@ static	void	reload_bundles()
 		bzero(vimsid,5);
 		sprintf(vimsid, "%03d", val[0]);
 
-		if( val[0] > VIMS_BUNDLE_START && val[0] < VIMS_BUNDLE_END )
+		if( val[0] >= VIMS_BUNDLE_START && val[0] < VIMS_BUNDLE_END )
 		{
 			if( vj_event_list[ val[0] ].event_id != val[0] && vj_event_list[val[0]].event_id != 0)
 			{
@@ -4186,7 +4206,11 @@ static	gboolean	update_sample_record_timeout(gpointer data)
 			if(info->uc.render_record)
 			{
 				info->uc.reload_hint[HINT_HISTORY]=1;
-				info->uc.render_record = 0;
+				info->uc.render_record = 0;  // render list has private edl
+			}
+			else
+			{
+ 				info->uc.reload_hint[HINT_EL] = 1; 
 			}
 			return FALSE;
 		}
@@ -4213,6 +4237,7 @@ static	gboolean	update_stream_record_timeout(gpointer data)
 			gtk_progress_bar_set_fraction( GTK_PROGRESS_BAR(w), 0.0);
 			info->streamrecording = 0;
 			info->uc.recording[MODE_STREAM] = 0;
+			info->uc.reload_hint[HINT_EL] = 1; // recording finished, reload edl 
 			return FALSE;
 		}
 		else
@@ -4617,7 +4642,12 @@ gui_client_event_signal(GtkWidget *widget, GdkEventClient *event,
 void	vj_gui_set_debug_level(int level)
 {
 	veejay_set_debug_level( level );
+
+	vims_verbosity = level;
+	if(level)
+		veejay_msg(VEEJAY_MSG_INFO, "Be verbose");
 }
+
 
 
 void 	vj_gui_init(char *glade_file)
@@ -4699,6 +4729,9 @@ void 	vj_gui_init(char *glade_file)
 	setup_colorselection();
 	setup_rgbkey();
 	setup_bundles();
+
+	set_toggle_button( "button_252", vims_verbosity );
+
 	vj_gui_disable();
 
 }

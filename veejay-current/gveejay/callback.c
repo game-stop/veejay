@@ -1,4 +1,21 @@
-
+/* gveejay - Linux VeeJay - GVeejay GTK+-2/Glade User Interface
+ *           (C) 2002-2005 Niels Elburg <nelburg@looze.net> 
+ *
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
 #define DBG_C() { 	vj_msg(VEEJAY_MSG_DEBUG, "Implement %s", __FUNCTION__ ); }  
 
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
@@ -71,6 +88,10 @@ void	on_button_001_clicked(GtkWidget *widget, gpointer user_data)
 void	on_button_252_clicked( GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_DEBUG_LEVEL );
+	if(is_button_toggled( "button_252" ))
+		vims_verbosity = 1;
+	else
+		vims_verbosity = 0;
 }
 
 void	on_button_251_clicked( GtkWidget *widget, gpointer user_data)
@@ -101,7 +122,8 @@ void	on_button_sampleend_clicked(GtkWidget *widget, gpointer user_data)
 {
 	info->sample[1] = info->status_tokens[FRAME_NUM];
 	multi_vims( VIMS_CLIP_NEW, "%d %d", info->sample[0],info->sample[1]);
-	info->uc.reload_hint[HINT_SLIST] = 1;
+	if(info->status_tokens[PLAY_MODE] == MODE_PLAIN )
+		info->uc.reload_hint[HINT_SLIST] = 1;
 }
 
 void	on_button_veejay_clicked(GtkWidget *widget, gpointer user_data)
@@ -825,7 +847,7 @@ void	on_loop_pingpong_clicked(GtkWidget *widget, gpointer user_data)
 
 #define atom_marker(name,value) {\
 info->uc.marker.lock=1;\
-update_slider_value("slider_m1", info->uc.marker.start+1,0);\
+update_slider_value(name, info->uc.marker.start+1,0);\
 info->uc.marker.lock=0;\
 }
 
@@ -890,9 +912,12 @@ void	on_button_clearmarker_clicked(GtkWidget *widget, gpointer user_data)
 {
 	info->uc.marker.start = 0;
 	info->uc.marker.end = 0;
-	atom_marker( "slider_m0", 0 );
-	atom_marker( "slider_m1", (info->uc.marker.upper_bound - info->uc.marker.lower_bound) );
-	multi_vims( VIMS_CLIP_CLEAR_MARKER, "%d", 0 ); 
+	atom_marker( "slider_m0", info->uc.marker.lower_bound );
+	atom_marker( "slider_m1", info->uc.marker.upper_bound );
+	multi_vims( VIMS_CLIP_CLEAR_MARKER, "%d", 0 );
+
+	info->uc.reload_hint[ HINT_MARKER ] = 1;
+ 
 }
 
 

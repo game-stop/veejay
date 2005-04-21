@@ -565,8 +565,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     }
 
 
-   sprintf( tag->descr, "%s", tag->source_name );
-
+	vj_tag_get_by_type( tag->source_type, tag->descr);
 
     /* effect chain is empty */
     for (i = 0; i < CLIP_MAX_EFFECTS; i++)
@@ -1718,29 +1717,24 @@ void vj_tag_get_source_name(int t1, char *dst)
 	sprintf(dst, "error in tag %d", t1);
     }
 }
-#include <valgrind/memcheck.h>
-void vj_tag_get_descriptive(int id, char *description)
+
+void	vj_tag_get_by_type(int type, char *description )
 {
-    vj_tag *tag = vj_tag_get(id);
-    if(!tag) {sprintf(description, "invalid");return;}
-    	
-    int type = tag->source_type;
-    switch (type) {
+ 	switch (type) {
     case VJ_TAG_TYPE_COLOR:
-	sprintf(description, "Solid {R=%d,G=%d,B=%d}",
-		tag->color_r,tag->color_g,tag->color_b);
+	sprintf(description, "Solid" );
 	break;
     case VJ_TAG_TYPE_NONE:
 	sprintf(description, "%s", "EditList");
 	break;
 	case VJ_TAG_TYPE_MCAST:
-	sprintf(description, "%s", "Multicast layer");
+	sprintf(description, "%s", "Multicast");
 	break;
 	case VJ_TAG_TYPE_NET:
-	sprintf(description, "%s", "Network layer");
+	sprintf(description, "%s", "Unicast");
 	break;
     case VJ_TAG_TYPE_AVFORMAT:
-	sprintf(description, "%s", "FFmpeg layer");
+	sprintf(description, "%s", "AVFormat");
 	break;
 #ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
@@ -1749,7 +1743,7 @@ void vj_tag_get_descriptive(int id, char *description)
 #endif
 #ifdef SUPPORT_READ_DV2
 	case VJ_TAG_TYPE_DV1394:
-	sprintf(description, "%s", "dv1394");
+	sprintf(description, "%s", "DV1394");
 	break;
 #endif
     case VJ_TAG_TYPE_YUV4MPEG:
@@ -1759,6 +1753,20 @@ void vj_tag_get_descriptive(int id, char *description)
 	sprintf(description, "%s","SHM");
 	break;
     }
+
+}
+
+void vj_tag_get_descriptive(int id, char *description)
+{
+    vj_tag *tag = vj_tag_get(id);
+    if(!tag)
+	{
+		sprintf(description, "invalid");
+	}
+    else	
+	{
+		vj_tag_get_by_type( tag->source_type, description );
+	}
 }
 
 /* this method tries to find a tag of given type */

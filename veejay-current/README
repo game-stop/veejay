@@ -2,6 +2,10 @@
 Veejay - Video Mixing/Editing Instrument
 ========================================
 
+Important:
+----------
+This version of veejay is not compatible with any earlier versions.
+
  
 See:
 	README.quickstart
@@ -15,7 +19,7 @@ See:
 Tips:	    
 =====
 
-To see a list of key events, type 'man veejay' in your shell or try 
+To see a list of all default keyboard events, type 'man veejay' in your shell or try 
 'cat veejay/vj-event.c |grep SDLK' for a more up to date version.        
 
 For users with Intel Pentium 4 processors with Hyper Threading, benefit
@@ -25,6 +29,10 @@ Since version 0.6.3, veejay doesnt have a console interface anymore!!!
 Use 'sayVIMS -i' to enter interactive mode and give '?' or 'h' 
 to see a list of commands, or simply type VIMS style messages.
 
+Starting of version 0.8, Veejay has a graphical user interface GVeejay
+which is distributed with this package. 
+The quickest way to start with Veejay is by launching gveejay.
+(No user manual on Gveejay yet).
 
 PLUGINS
 =======
@@ -63,8 +71,7 @@ examples:
 
 2. run veejay without a video file
 
-	veejay -d -W <width> -H <height> -R <framerate>
-
+	veejay -d -W <width> -H <height> 
 
 CONTACT / FEEDBACK & HELP
 =========================

@@ -1284,7 +1284,7 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 					net_id, i , (i < 2 ? vj_event_list[id].args[i]: num_array[i]));
 				if(i<2)	vims_arguments[i].value = (void*) &(vj_event_list[id].args[i]);
 				else
-					vims_arguments[i].value = (void*) &(num_array[i]);	
+					vims_arguments[i].value = NULL;	
 			}
 			fmt_offset += 3;	
 		}
@@ -2297,9 +2297,13 @@ void	vj_event_send_vimslist(void *ptr, const char format[], va_list ap)
 
 	for( i = 1; vj_event_list[i].name != NULL ; i ++ )
 	{
-		len += strlen( vj_event_list[i].name );
-		len += (vj_event_list[i].format == NULL ? 0 : strlen(vj_event_list[i].format) );
-		len += 12; /* event_id: 4, num_params: 2 , format:3 (strlen), descr: 3 (strlen) */
+		// dont include bundles or query messages
+		if( vj_event_list[i].event_id < 400 || vj_event_list[i].event_id > 599 )
+		{
+			len += strlen( vj_event_list[i].name );
+			len += (vj_event_list[i].format == NULL ? 0 : strlen(vj_event_list[i].format) );
+			len += 12; /* event_id: 4, num_params: 2 , format:3 (strlen), descr: 3 (strlen) */
+		}
 	}
 
 	if(len > 1)
@@ -2312,23 +2316,25 @@ void	vj_event_send_vimslist(void *ptr, const char format[], va_list ap)
 
 		for( i = 1; vj_event_list[i].name != NULL ; i ++ )
 		{
-			char tmp[12];
-			bzero(tmp,12);
-			int event_id = vj_event_list[i].event_id;
-			char *description = (char*) vj_event_list[i].name;
-			char *format	  = (char*) vj_event_list[i].format;
-			int   format_len  = ( vj_event_list[i].format == NULL ? 0:strlen( vj_event_list[i].format ));
-			int   descr_len   = strlen(description);
-			
-			sprintf(tmp, "%04d%02d%03d%03d",
-					event_id, vj_event_list[i].num_params , format_len, descr_len );
+			if( vj_event_list[i].event_id < 400 || vj_event_list[i].event_id > 599 )
+			{
+				char tmp[12];
+				bzero(tmp,12);
+				int event_id = vj_event_list[i].event_id;
+				char *description = (char*) vj_event_list[i].name;
+				char *format	  = (char*) vj_event_list[i].format;
+				int   format_len  = ( vj_event_list[i].format == NULL ? 0:strlen( vj_event_list[i].format ));
+				int   descr_len   = strlen(description);
+				
+				sprintf(tmp, "%04d%02d%03d%03d",
+						event_id, vj_event_list[i].num_params , format_len, descr_len );
 
-			strncat( buf, tmp, 12 );
-			if(format != NULL) 
-				strncat( buf, format,	   format_len		 );
-			strncat( buf, description, descr_len );
+				strncat( buf, tmp, 12 );
+				if(format != NULL) 
+					strncat( buf, format,	   format_len		 );
+				strncat( buf, description, descr_len );
+			}
 		}
-
 
 		SEND_MSG(v,buf);
 		if(buf) free(buf);
