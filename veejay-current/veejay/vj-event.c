@@ -1385,7 +1385,6 @@ void	vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)
 }
 
 #ifdef HAVE_SDL
-#include <valgrind/memcheck.h>
 void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 {
 	
@@ -1435,8 +1434,6 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 		char msg[100];
 		if( ev->arguments != NULL)
 		{
-			VALGRIND_CHECK_DEFINED( ev->arguments );
-	
 			sprintf(msg,"%03d:%s;", event_id, ev->arguments );
 		}
 		else

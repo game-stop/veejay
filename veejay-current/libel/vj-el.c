@@ -24,7 +24,6 @@
 
 	http://mjpeg.sourceforge.net
 */
-#include <valgrind/memcheck.h>
 #include <config.h>
 #include <string.h>
 #include <libvjmsg/vj-common.h>
@@ -625,10 +624,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3], int pix_fm
 		int got_picture = 0;
 		int inter = lav_video_interlacing(el->lav_fd[N_EL_FILE(n)]);
 
-		VALGRIND_CHECK_DEFINED(d->context);
-		VALGRIND_CHECK_DEFINED(d->frame);
-		VALGRIND_CHECK_DEFINED(d->tmp_buffer);
-		VALGRIND_CHECK_DEFINED(res);
 		len = avcodec_decode_video(d->context, d->frame, &got_picture, d->tmp_buffer, res); 	
 		if(len>0)
 		{
