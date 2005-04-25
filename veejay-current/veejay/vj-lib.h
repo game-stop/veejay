@@ -29,7 +29,6 @@
 #include <libstream/vj-v4lvideo.h>
 #endif
 #include <libstream/vj-yuv4mpeg.h>
-#include <veejay/vj-dfb.h>
 #include <veejay/vj-sdl.h>
 #include <libel/lav_io.h>
 #include <libstream/vj-shm.h>
@@ -219,7 +218,7 @@ typedef struct {
 	VJFrameInfo *effect_frame_info;
     vjp_kf *effect_info;	/* effect dependent variables */
 #ifdef HAVE_DIRECTFB
-    vj_dfb *dfb;
+    void *dfb;
 #endif
     //vj_ladspa_instance *vli;
     //int vli_enabled;

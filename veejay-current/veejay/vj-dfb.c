@@ -23,11 +23,10 @@
 
 #include <stdio.h>
 #include <stdlib.h>
-
-#include "vj-dfb.h"
+#include <config.h>
 #ifdef HAVE_DIRECTFB
-
-vj_dfb *vj_dfb_allocate(int width, int height, int norm)
+#include "vj-dfb.h"
+void *vj_dfb_allocate(int width, int height, int norm)
 {
     vj_dfb *dfb = (vj_dfb *) malloc(sizeof(vj_dfb));
     if (!dfb)
@@ -43,11 +42,12 @@ vj_dfb *vj_dfb_allocate(int width, int height, int norm)
     dfb->height = height;
     dfb->norm = norm;
     dfb->stretch = 0;
-    return dfb;
+    return (void*)dfb;
 }
 
-int vj_dfb_init(vj_dfb * framebuffer)
+int vj_dfb_init(void *ptr)
 {
+    vj_dfb *framebuffer = (vj_dfb*) ptr;
     DFBDisplayLayerConfig dlc;
     DFBDisplayLayerConfigFlags failed;
     DFBSurfaceDescription dsc;
@@ -163,8 +163,9 @@ int vj_dfb_init(vj_dfb * framebuffer)
     return 0;
 }
 
-int vj_dfb_lock(vj_dfb * framebuffer)
+int vj_dfb_lock(void *ptr)
 {
+    vj_dfb *framebuffer = (vj_dfb*) ptr;
     if (!framebuffer)
 	return -1;
     framebuffer->c2frame->Lock(framebuffer->c2frame,
@@ -175,8 +176,9 @@ int vj_dfb_lock(vj_dfb * framebuffer)
     return 0;
 }
 
-int vj_dfb_unlock(vj_dfb * framebuffer)
+int vj_dfb_unlock(void *ptr)
 {
+	vj_dfb *framebuffer = (vj_dfb*) ptr;
     if (!framebuffer)
 	return -1;
 
@@ -185,8 +187,9 @@ int vj_dfb_unlock(vj_dfb * framebuffer)
 }
 
 
-int vj_dfb_free(vj_dfb * framebuffer)
+int vj_dfb_free(void *ptr)
 {
+	vj_dfb *framebuffer = (vj_dfb*)ptr;
     if (!framebuffer)
 	return -1;
 
@@ -209,23 +212,27 @@ int vj_dfb_free(vj_dfb * framebuffer)
 }
 
 
-void vj_dfb_wait_for_sync(vj_dfb * framebuffer)
+void vj_dfb_wait_for_sync( void *ptr)
 {
+    vj_dfb *framebuffer = (vj_dfb*) ptr;
     framebuffer->d->WaitForSync(framebuffer->d);
 }
 
-int vj_dfb_get_pitch(vj_dfb * framebuffer)
+int vj_dfb_get_pitch( void *ptr)
 {
+	vj_dfb *framebuffer = (vj_dfb*) ptr;
     return (int) framebuffer->screen_pitch;
 }
 
-uint8_t *vj_dfb_get_address(vj_dfb * framebuffer)
+uint8_t *vj_dfb_get_address(void *ptr)
 {
+	vj_dfb *framebuffer = (vj_dfb*) ptr;
     return (uint8_t *) framebuffer->screen_framebuffer;
 }
 
-int vj_dfb_get_output_field(vj_dfb * framebuffer)
+int vj_dfb_get_output_field( void *ptr)
 {
+	vj_dfb *framebuffer = (vj_dfb*) ptr;
     int fieldid;
     framebuffer->crtc2->GetCurrentOutputField(framebuffer->crtc2,
 					      &fieldid);
@@ -233,8 +240,9 @@ int vj_dfb_get_output_field(vj_dfb * framebuffer)
 }
 
 /*
-int vj_dfb_update_yuv_overlay(vj_dfb *framebuffer , uint8_t **frame) {
+int vj_dfb_update_yuv_overlay(void *ptr , uint8_t **frame) {
 	uint8_t *output;
+	vj_dfb *framebuffer = (vj_dfb*) ptr;
 	int pitch,i,p;
 	while(vj_dfb_get_output_field(framebuffer) != 0) {
 		fprintf(stderr, "resyncing...\n");
@@ -273,8 +281,9 @@ int vj_dfb_update_yuv_overlay(vj_dfb *framebuffer , uint8_t **frame) {
 }
 */
 
-int vj_dfb_update_yuv_overlay(vj_dfb * framebuffer, uint8_t ** frame)
+int vj_dfb_update_yuv_overlay(void *ptr, uint8_t ** frame)
 {
+	vj_dfb *framebuffer = (vj_dfb*) ptr;
     void *dst;
     int i, p, pitch;
     if (framebuffer->frame->Lock(framebuffer->frame,

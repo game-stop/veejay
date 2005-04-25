@@ -46,26 +46,26 @@ typedef struct vj_dfb_t {
     int norm;
 } vj_dfb;
 
-vj_dfb *vj_dfb_allocate(int width, int height, int norm);
+void *vj_dfb_allocate(int width, int height, int norm);
 
-int vj_dfb_init(vj_dfb * dfb);
+int vj_dfb_init(void *dfb);
 
-int vj_dfb_lock(vj_dfb * dfb);
+int vj_dfb_lock(void *dfb);
 
-int vj_dfb_unlock(vj_dfb * dfb);
+int vj_dfb_unlock(void * dfb);
 
-int vj_dfb_update_yuv_overlay(vj_dfb * dfb, uint8_t ** yuv420);
+int vj_dfb_update_yuv_overlay(void * dfb, uint8_t ** yuv420);
 
-int vj_dfb_free(vj_dfb * dfb);
+int vj_dfb_free(void * dfb);
 
 void vj_dfb_wait_for_sync();
 
-int vj_dfb_get_pitch(vj_dfb * framebuffer);
+int vj_dfb_get_pitch( void *dfb);
 
-int vj_dfb_update_yuv_overlay(vj_dfb * framebuffer, uint8_t ** frame);
+int vj_dfb_update_yuv_overlay(void *dfb, uint8_t ** frame);
 
-uint8_t *vj_dfb_get_address(vj_dfb * framebuffer);
+uint8_t *vj_dfb_get_address(void *dfb );
 
-int vj_dfb_get_output_field(vj_dfb * framebuffer);
+int vj_dfb_get_output_field( void *dfb );
 #endif
 #endif
