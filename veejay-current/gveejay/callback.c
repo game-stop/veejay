@@ -684,6 +684,21 @@ void	on_v4l_color_value_changed(GtkWidget *widget, gpointer user_data)
 	}
 }
 
+#ifndef HAVE_GTK2_6
+static gchar	*my_gtk_combo_box_get_active_text(GtkComboBox *combo )
+{
+ GtkTreeIter _iter = { 0 };
+ gchar *_format = NULL;
+ GtkTreeModel *_model=NULL;
+ g_return_val_if_fail( GTK_IS_COMBO_BOX(combo),NULL);
+ _model = gtk_combo_box_get_model(combo);
+ g_return_val_if_fail( GTK_IS_LIST_STORE(_model),NULL);
+ if(gtk_combo_box_get_active_iter(combo,&_iter))
+	gtk_tree_model_get(_model, &_iter,0,&_format,-1);
+ return _format;
+}
+#define gtk_combo_box_get_active_text( combo ) my_gtk_combo_box_get_active_text(combo)
+#endif
 
 void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -706,7 +721,7 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 		"%d %d",
 		nframes,
 		autoplay );
-	
+	g_free(format);	
 }
 
 void	on_stream_recordstop_clicked(GtkWidget *widget, gpointer user_data)
@@ -745,7 +760,7 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 		"%d %d",
 		nframes,
 		autoplay );
-	
+	g_free(format);	
 }
 
 void	on_button_sample_recordstop_clicked(GtkWidget *widget, gpointer user_data)

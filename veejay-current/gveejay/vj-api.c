@@ -27,8 +27,15 @@
 #include <unistd.h>
 #include <widgets/cellrendererspin.h>
 #include <libgen.h>
-#include <valgrind/memcheck.h>
 #include <gveejay/keyboard.h>
+#include <gtk/gtkversion.h>
+
+//if gtk2_6 is not defined, 2.4 is assumed.
+#ifdef GTK_CHECK_VERSION
+#if GTK_MINOR_VERSION >= 6
+  #define HAVE_GTK2_6 1
+#endif  
+#endif
 
 static int	TIMEOUT_SECONDS = 0;
 #define STATUS_BYTES 	100
@@ -984,6 +991,8 @@ gchar *dialog_open_file(const char *title)
 	return NULL;
 }
 
+
+
 void	about_dialog()
 {
     const gchar *artists[] = { 
@@ -1010,6 +1019,7 @@ void	about_dialog()
 		"For more information , see also: http://www.gnu.org\n"
 	};
 
+#ifdef HAVE_GTK2_6
 	char path[MAX_PATH_LEN];
 	bzero(path,MAX_PATH_LEN);
 	get_gd( path, NULL,  "veejay-logo.png" );
@@ -1029,6 +1039,19 @@ void	about_dialog()
 
 	g_signal_connect( about , "response", G_CALLBACK( gtk_widget_destroy),NULL);
 	gtk_window_present( GTK_WINDOW( about ) );
+#else
+	int i;
+	vj_msg( VEEJAY_MSG_INFO, "%s", license );
+	for(i = 0; artists[i] != NULL ; i ++ )
+		vj_msg( VEEJAY_MSG_INFO, "%s", artists[i] );
+	for(i = 0; authors[i] != NULL ; i ++ )
+		vj_msg( VEEJAY_MSG_INFO, "%s", authors[i] );
+	vj_msg( VEEJAY_MSG_INFO,
+		"Copyright (C) 2004 - 2005. N. Elburg et all." );
+	vj_msg( VEEJAY_MSG_INFO,
+		"GVeejay - A graphical interface for Veejay");
+
+#endif
 
 }
 
@@ -4615,7 +4638,6 @@ void	vj_gui_theme_setup()
 	char path[MAX_PATH_LEN];
 	bzero(path,MAX_PATH_LEN);
 	get_gd(path,NULL, "gveejay.rc");
-
 	gtk_rc_parse(path);
 }
 

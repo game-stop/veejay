@@ -764,19 +764,19 @@ if test x$with_gui != xno ; then
 	sh gveejay-paths.sh > gveejay-paths.h
 
 
-	glib_modules="glib-2.0 >= 2.6.0"
+	glib_modules="glib-2.0 >= 2.4"
 	PKG_CHECK_MODULES(GLIB, [$glib_modules])
 	AC_SUBST(GLIB_CFLAGS)
 	AC_SUBST(GLIB_LIBS)
 
 
-	gtk_modules="gtk+-2.0 >= 2.6.1"
+	gtk_modules="gtk+-2.0 >= 2.4"
 	PKG_CHECK_MODULES(GTK, [$gtk_modules])
 	AC_SUBST(GTK_CFLAGS)
 	AC_SUBST(GTK_LIBS)
 
 
-	libglade_modules="libglade-2.0 >= 2.4.0"
+	libglade_modules="libglade-2.0 >= 2.2.0"
 	PKG_CHECK_MODULES(GLADE, [$libglade_modules])
 	AC_SUBST(GLADE_CFLAGS)
 	AC_SUBST(GLADE_LIBS)
