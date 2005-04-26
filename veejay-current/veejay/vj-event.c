@@ -1438,8 +1438,8 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 		}
 		else
 			sprintf(msg,"%03d:;", event_id );
-		veejay_msg(VEEJAY_MSG_DEBUG, "Keyboard fires Event %d (with value %s) : [%s]", event_id,
-			ev->arguments, msg );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Keyboard fires Event %d [%s]", event_id,
+			msg );
 		vj_event_parse_msg( (veejay_t*) ptr, msg );
 	}
 
@@ -1925,7 +1925,6 @@ void	vj_event_unregister_keyb_event( int sdl_key, int modifier )
 }
 int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const char *value)
 {
-
 	int offset = SDLK_LAST * modifier;
 	if( symbol > 0 )
 	{
@@ -1974,7 +1973,7 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 	keyboard_events[offset + symbol].key_mod      = modifier;
 
 	char *args = NULL;
-	if( value != NULL )
+	if( value != NULL && vj_event_list[ id].format != NULL )
 		args = strndup( value, 30 ); 
 
 	if( keyboard_events[offset+symbol].arguments != NULL)
