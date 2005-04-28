@@ -20,15 +20,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <errno.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
-#include <netinet/in.h>
-#include <netinet/tcp.h>
-#include <arpa/inet.h>
-#include <string.h>
 #include <libvjmsg/vj-common.h>
 #include <libvjnet/vj-server.h>
+#include <string.h>
+
 
 #define __INVALID 0
 #define __SENDER 1
@@ -444,7 +441,6 @@ int vj_server_poll(vj_server * vje)
 static	int	_vj_server_empty_queue(vj_server *vje, int link_id)
 {
 	// ensure message queue is empty!!
-	int num_msg = 0;
 	vj_link **Link = (vj_link**) vje->link;
 	vj_message **v = Link[link_id]->m_queue;
 
@@ -463,7 +459,6 @@ static	int	_vj_server_empty_queue(vj_server *vje, int link_id)
 
 static  int	_vj_parse_highpriority_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 {
-	int nmsgs = 0;
 	int i = 0;
 	char *s = buf;
 	int num_msg = 0;
@@ -483,14 +478,14 @@ static  int	_vj_parse_highpriority_msg(vj_server *vje,int link_id, char *buf, in
 			int	netid = 0;
 			bzero(tmp_len,4);
 			bzero(net_id,4 );
-			strncpy( tmp_len, s + (i + 1 ), 3 );
+			strncpy( tmp_len, (s + (i + 1 )), 3 );
 			if(sscanf(tmp_len,"%03d", &strlen))
 			{	
 				i += 5;
-				strncpy( net_id, s + i , 3 );
+				strncpy( net_id, (s + i) , 3 );
 				if(sscanf(net_id, "%03d", &netid ))
 				{
-					if(netid >= 255 )
+					if(netid >= 0 && netid <= 600 )
 					{
 						v[num_msg]->len = strlen;
 						v[num_msg]->msg = (char*)strndup( s + i , strlen );
@@ -526,7 +521,7 @@ static	int	_vj_get_n_msg_waiting(char *buf, int buf_len, int *offset )
 			char tmp_len[4];
 			int  strlen = 0;
 			bzero(tmp_len,4);
-			strncpy( tmp_len, s + (i + 1 ), 3 );
+			strncpy( tmp_len, (s + (i + 1 )), 3 );
 			if(sscanf(tmp_len,"%03d", &strlen))
 				nmsgs++;
 			i += 5;
