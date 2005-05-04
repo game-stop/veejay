@@ -298,10 +298,9 @@ dnl   (defines SDL_CFLAGS and SDL_LIBS)
 dnl ********************************************************************
 have_sdl=false
 if test x$with_sdl != xno ; then
-AM_PATH_SDL(1.2.3,
-            [have_sdl=true
-             AC_DEFINE(HAVE_SDL, 1, [SDL library present]) ],
-            [have_sdl=false])
+AM_PATH_SDL(1.2.3,[
+            have_sdl=true
+            AC_DEFINE(HAVE_SDL,, [SDL library present])],,)
 fi
 
 dnl *********************************************************************
@@ -338,18 +337,15 @@ fi
 dnl ********************************************************************
 dnl Check for the libxml2 library (for saving/loading project files)
 dnl
-dnl AM_PATH_SDL defines SDL_CFLAGS and SDL_LIBS for us..
 have_xml2=false
 if test x$with_xml2 != xno; then
-ifdef([AM_PATH_XML2],
-	[ AM_PATH_XML2(2.5.4, [ 
-                      have_xml2=true
-                      AC_DEFINE(HAVE_XML2,,[Compiling with XML2])],,) ])
+AM_PATH_XML2(2.5.4, [ 
+	have_xml2=true
+	AC_DEFINE(HAVE_XML2,,[Compiling with XML2])],,)
 
-if test x$have_xml2 = xfalse ; then
-AC_MSG_WARN(cannot find The XML C library for gnome)
-fi
-
+	if test x$have_xml2 = xfalse ; then
+		AC_MSG_WARN([cannot find The XML C library for gnome])
+	fi
 fi
 
 have_freetype=false
@@ -872,6 +868,9 @@ AC_MSG_NOTICE([ Optional dependencies])
 
 AC_MSG_NOTICE([  - video4linux                   : ${have_v4l}])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
+if test x$have_sdl != xyes ; then
+AC_MSG_NOTICE([      There will be NO video window ])
+fi
 AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
 AC_MSG_NOTICE([  - AVI MJPEG playback/recording  : true (always)])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
@@ -891,9 +890,16 @@ if test "$GCC" = yes ; then
 	ac_gcc_version=`echo __GNUC__ | $CC -E - | grep -v ^\#`
 	ac_gcc_minor_version=`echo __GNUC_MINOR__ | $CC -E - | grep -v ^\#`
 
+	dnl wierd things happen with 3.4 
+	dnl the compile flag --without-pic somehow affects the compile error
+	dnl when gcc fails to find sufficient free registers in the postproc
+	dnl library when compiling inline MMX asm. 
+	dnl Also, depending on your luck, the -O2 (optimization) might be  
+	dnl able to "optimize" so there are sufficient free registers 
+	dnl compiler bug ??? who knows. Apperently its not in gcc 4.0 
 	if test "$ac_gcc_version" = 3 -a "$ac_gcc_minor_version" = 4 ; then
 		if test x$with_pic != xno ; then
-			AC_MSG_NOTICE([*** You are using gcc >= 3.4])
+			AC_MSG_NOTICE([*** You are using gcc >= 3.4 !!])
 			AC_MSG_NOTICE([*** Please re-rerun configure with --without-pic])
 		fi
 	fi
