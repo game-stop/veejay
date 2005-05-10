@@ -29,7 +29,7 @@
 
 static void print_error(char *msg)
 {
-	veejay_msg(VEEJAY_MSG_ERROR, "%s: %s\n", msg,strerror(errno));
+	veejay_msg(VEEJAY_MSG_ERROR, "%s: %s", msg,strerror(errno));
 }
 
 mcast_sender	*mcast_new_sender( const char *group_name )
@@ -128,8 +128,15 @@ int		mcast_send( mcast_sender *v, const void *buf, int len, int port_num )
 	v->addr.sin_port = htons( port_num );
 	
 	n =  sendto( v->sock_fd, buf, len, 0, (struct sockaddr*) &(v->addr), v->addr_len );
+
 	if( n == -1 )
-		print_error("send");
+	{
+		char msg[100];
+		sprintf(msg, "mcast send -> %d",
+			port_num );
+		print_error(msg);
+	}
+
 	return n;
 } 
 
@@ -147,7 +154,7 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame, const VJFrameInfo 
 	info.width = descr->width;
 	info.height = descr->height;
 	header.timeout = ms * 10000;
-
+//	header.timeout = 22000;
 	uint8_t	chunk[PACKET_PAYLOAD_SIZE];
 
 	for ( i = 0 ; i <= n_chunks ; i ++ )
@@ -157,10 +164,9 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame, const VJFrameInfo 
 		header.seq_num = i;
 		packet_put_data( &header, &info, chunk, data );
 		n = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
-		if(n == -1)
+		if(n <= 0)
 		{
-			print_error("mcast frame");
-			return 0;
+			return -1;
 		}
 		tb += n;
 	} 

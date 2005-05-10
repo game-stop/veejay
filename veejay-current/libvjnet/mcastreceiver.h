@@ -49,4 +49,6 @@ int		mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf , int total_len);
 
 void		mcast_close_receiver( mcast_receiver *v );
 
+int		mcast_receiver_set_peer( mcast_receiver *v, const char *hostname );
+
 #endif

@@ -1,8 +1,15 @@
 
-Veejay can stream over the Network (veejay-0.7.2)
+Veejay can stream over the Network 
 =================================================
 
- (peer to peer)
+With -p you can give Veejay's port offset
+
+TCP socket for sending commands: + 0 (sayVIMS -h)
+TCP socket for receiving status: + 1 (gveejay)
+TCP socket for querying commands:+ 2 (gveejay - editlist/sampellist etc)
+UDP multicast frame sender      : + 3 (input stream multicast/other applications)
+UDP multicast for sending commands: + 4 (sayVIMS -g)
+
 
 How to activate:
 
@@ -35,7 +42,7 @@ How to activate:
 1. veejay -V 224.0.0.50 -p 5000 -v movie1.avi
 2. veejay -d -W <movie1 width> -H <movie1 height>
 
-3. sayVIMS -h localhost -p 3490 "246:224.0.0.50 5000;"
+3. sayVIMS -h localhost -p 3490 "246:5000 224.0.0.50;"
 4. press F7 to activate newest created stream
 
 
@@ -50,7 +57,7 @@ Use the tool 'mcastOSC' in test/OSC to send OSC messages to all
 veejay's you have started with --multicast (on multiple hosts!!)
 
 2. export MCAST_ADDR=224.0.0.30
-4. mcastOSC -r 3490
+4. mcastOSC -r 3495
 
 
 Veejay can send/receive VIMS (Veejay Internal Message System) packets

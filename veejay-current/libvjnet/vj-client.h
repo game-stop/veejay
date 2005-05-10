@@ -41,6 +41,7 @@ typedef struct
 	int cur_fmt;
 	conn_type_t **c;
 	int ports[3];
+	int mcast;
 	unsigned char *blob;
 } vj_client;
 

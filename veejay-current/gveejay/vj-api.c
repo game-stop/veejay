@@ -340,7 +340,6 @@ static	vj_gui_t	*info = NULL;
 
 static	int	get_slider_val(const char *name);
 static  void    vj_msg(int type, const char format[], ...);
-static  int     is_mcast_address(char *ip_addr);
 static	void	msg_vims(char *message);
 static  void    multi_vims(int id, const char format[],...);
 static  void 	single_vims(int id);
@@ -377,13 +376,13 @@ static	void	setup_tree_spin_column(const char *tree_name, int type, const char *
 static	void	setup_tree_text_column( const char *tree_name, int type, const char *title );
 static	void	setup_tree_pixmap_column( const char *tree_name, int type, const char *title );
 static	gchar	*_utf8str( char *c_str );
-static gchar	*recv_vims(int strlen, int *bytes_written);
+static gchar	*recv_vims(int len, int *bytes_written);
 void	vj_gui_stop_launch();
 static	void	get_gd(char *buf, char *suf, const char *filename);
 
 int	resize_primary_ratio_y();
 int	resize_primary_ratio_x();
-gboolean	veejay_io_update(gpointer data);
+//gboolean	veejay_io_update(gpointer data);
 static	void	setup_tree_texteditable_column( const char *tree_name, int type, const char *title, void (*callbackfunction)() );
 static	void	update_rgbkey();
 static	int	count_textview_buffer(const char *name);
@@ -1276,33 +1275,6 @@ static  void	vj_msg(int type, const char format[], ...)
 	va_end(args);
 }
 
-static	int	is_mcast_address(char *ip_addr)
-{
-	int	ip_num[4];
-	int     n = sscanf(ip_addr, "%d.%d.%d.%d", &ip_num[0],&ip_num[1],&ip_num[2],&ip_num[3]);
-	if( n != 4 )
-	{
-		struct hostent *h;
-		h = gethostbyname( ip_addr );
-		if(h==NULL)
-			return 0;
-		char *ip = inet_ntoa( *((struct in_addr*)h->h_addr));
-		n = sscanf( ip, "%d.%d.%d.%d", &ip_num[0], &ip_num[1], &ip_num[2],&ip_num[3]);
-		if( n != 4 )
-			return 0;
-	}
-	/*
-		224.0.0.0 to 239.255.255.255
-	
-	*/
-
-	if( ip_num[0] >= 224 && ip_num[0] <= 239 )
-	{
-		return 1;
-	}
-	return 0;
-}
-
 static	void	msg_vims(char *message)
 {
 	if(!info->client)
@@ -1354,14 +1326,15 @@ static	void single_vims(int id)
 	vj_client_send( info->client, V_CMD, block );
 }
 
-static gchar	*recv_vims(int strlen, int *bytes_written)
+static gchar	*recv_vims(int slen, int *bytes_written)
 {
-	gchar tmp[strlen+1];
-	bzero(tmp,strlen+1);
-	vj_client_read( info->client, V_CMD, tmp, strlen );
+	gchar tmp[slen+1];
+	bzero(tmp,slen+1);
+	int ret = vj_client_read( info->client, V_CMD, tmp, slen );
 	int len = atoi(tmp);
 	gchar *result = NULL;
 	int n = 0;
+
 	if(len > 0)
 	{
 		result = g_new( gchar, len+1 );
@@ -4036,7 +4009,7 @@ static	void	load_editlist_info()
 	single_vims( VIMS_VIDEO_INFORMATION );
 	gint len = 0;
 	gchar *res = recv_vims(3,&len);
-	
+
 	if(len > 0 )
 	{
 		sscanf( res, "%d %d %d %c %f %d %d %ld %d %ld %ld",
@@ -4124,7 +4097,6 @@ static	gchar	*format_time(int pos)
 {
 	MPEG_timecode_t	tc;
 	//int	tf = info->status_tokens[TOTAL_FRAMES];
-
 	if(pos==0)
 		memset(&tc, 0, sizeof(tc));
 	else
@@ -4363,9 +4335,9 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 {
 	vj_gui_t *gui = (vj_gui_t*) data;
 
-	if( (condition&G_IO_ERR) )return FALSE;
-	if( (condition&G_IO_HUP) )return FALSE;
-	if( (condition&G_IO_NVAL) ) return FALSE;
+	if( (condition&G_IO_ERR) ) return FALSE; 
+	if( (condition&G_IO_HUP) ) return FALSE; 
+	if( (condition&G_IO_NVAL) ) return FALSE; 
 
 	if(gui->state==STATE_PLAYING && (condition & G_IO_IN) )
 	{	//vj_client_poll( gui->client, V_STATUS ))
@@ -4447,15 +4419,12 @@ void	vj_gui_stop_launch()
 			  if( prompt_dialog("Quit Veejay ?" , "Are you sure?" ) !=
 				 GTK_RESPONSE_REJECT )
 				{
-				  printf("Run state is local\n");
 				  single_vims( VIMS_QUIT );
-					printf("single VIMS %d\n", VIMS_QUIT );
 				  vj_gui_disconnect();
 				}
 			}
 			if( info->run_state == RUN_STATE_REMOTE )
 			{
-			  printf("Didnt launch (but was connected)\n");
 			  vj_gui_disconnect();
 			}
 			break;
@@ -4474,17 +4443,11 @@ void	vj_fork_or_connect_veejay()
 	gchar	*args[20];
 	int	n_args = 0;
 	char	port_str[15];
-	char	*mcast = NULL;
 	int 	i = 0;
 
 	args[n_args++] = g_strdup("veejay");
 
 	sprintf(port_str, "-p%d", port);
-	if( is_mcast_address( remote ))
-	{
-		args[n_args++] = strdup("--multicast-vims");
-		mcast = strdup(remote);
-	}
 
 	args[n_args++] = g_strdup("-v");
 	args[n_args++] = g_strdup("-n");
@@ -4510,7 +4473,7 @@ void	vj_fork_or_connect_veejay()
 		{
 
 			// another veejay may be locally running at host:port
-			if(!vj_gui_reconnect( remote, mcast, port ))
+			if(!vj_gui_reconnect( remote, NULL, port ))
 			{
 				GError *error = NULL;
 				int pid;
@@ -4558,8 +4521,8 @@ void	vj_fork_or_connect_veejay()
 					
 					
 					memcpy( &(info->io), &(iot), sizeof(iot));
-					g_timeout_add( G_PRIORITY_LOW, veejay_io_update,
-						(gpointer*) info );
+				//	g_timeout_add( G_PRIORITY_LOW, veejay_io_update,
+				//		(gpointer*) info );
 
 				
 				}
@@ -4572,9 +4535,11 @@ void	vj_fork_or_connect_veejay()
 		}
 		else
 		{	
-			if(!vj_gui_reconnect(remote,mcast,port ))
+			if(!vj_gui_reconnect(remote,NULL,port ))
+			{
 				vj_msg(VEEJAY_MSG_ERROR, "Cannot establish connection with %s : %d",
-					(mcast==NULL ? remote:mcast), port );
+					remote, port );
+			}
 		}
 	}
 /*	else
@@ -4768,6 +4733,8 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 			vj_client_free(info->client);
 		info->client = NULL;
 		info->run_state = 0;
+		vj_msg(VEEJAY_MSG_INFO, "Cannot establish connection with %s:%d",
+			group_name,port_num);
 		return 0;
 	}
 	vj_msg(VEEJAY_MSG_INFO, "New connection established with Veejay running on %s port %d",
@@ -4775,8 +4742,9 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	info->channel = g_io_channel_unix_new( vj_client_get_status_fd( info->client, V_STATUS));
 
-	load_effectlist_info();
 	load_editlist_info();
+
+	load_effectlist_info();
 	reload_vimslist();
 	//reload_editlist_contents();
 	reload_bundles();
@@ -4804,7 +4772,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	update_slider_range( "speedslider",(-1 * 64),68, info->status_tokens[SAMPLE_SPEED], 0);
 	return 1;
 }
-
+/*
 gboolean	veejay_io_update(gpointer data)
 {
 	int in_fd = info->io.stdout_pipe;
@@ -4830,7 +4798,7 @@ gboolean	veejay_io_update(gpointer data)
 	}
 	return TRUE;
 }
-
+*/
 static	void	veejay_stop_connecting(vj_gui_t *gui)
 {
 	if(!gui->sensitive)
@@ -4860,13 +4828,7 @@ gboolean	is_alive(gpointer data)
 			{
 				char	*remote = get_text( "entry_hostname" );
 				int	port	= get_nums( "button_portnum" );
-				char	*mcast	= NULL;
-				if( is_mcast_address( remote ))
-				{
-					mcast = strdup(remote);
-					remote = NULL;
-				}
-				if(!vj_gui_reconnect( remote, mcast, port ))
+				if(!vj_gui_reconnect( remote, NULL, port ))
 				{
 					gui->state = STATE_RECONNECT;
 					memcpy(&(info->timer),&timenow,sizeof(timenow));
@@ -4875,8 +4837,6 @@ gboolean	is_alive(gpointer data)
 				{	/* veejay connected */
 					veejay_stop_connecting(gui);
 				}	
-				
-				if( mcast ) free( mcast );
 			}
 		}
 		else

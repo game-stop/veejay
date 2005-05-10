@@ -58,6 +58,7 @@ vj_client *vj_client_alloc( int w, int h, int f )
 	v->c[0] = (conn_type_t*) malloc(sizeof(conn_type_t));
 	v->c[1] = (conn_type_t*) malloc(sizeof(conn_type_t));
 	v->blob = (unsigned char*) malloc(sizeof(unsigned char) * PACKET_LEN ); 
+	v->mcast = 0;
 	if(!v->blob)
 		return NULL;
 	bzero( v->blob, PACKET_LEN );   
@@ -83,64 +84,68 @@ void		vj_client_free(vj_client *v)
 
 void	vj_client_flush(vj_client *v, int num_frames)
 {
-		if(vj_client_poll(v, V_STATUS ))
-		{
-			char status[100];
-			int bytes = 100;
-			int n = vj_client_read( v, V_STATUS,status,bytes);
-			if( n > 0 )
-			{	num_frames --;	
-			}
-		
+	if(vj_client_poll(v, V_STATUS ))
+	{
+		char status[100];
+		int bytes = 100;
+		int n = vj_client_read( v, V_STATUS,status,bytes);
+		if( n > 0 )
+		{	num_frames --;	
 		}
+	
+	}
 }
 
 int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 {
-		int error = 0;
-		if( group_name == NULL )
+	int error = 0;
+	if( group_name == NULL )
+	{
+
+		if(host == NULL)
+			return 0;
+		if(port_id <= 0 || port_id > 65535)
+			return 0;
+
+		v->c[0]->type = VSOCK_C;
+		v->c[0]->fd   = alloc_sock_t();
+		v->c[1]->type = VSOCK_S;
+		v->c[1]->fd   = alloc_sock_t();
+		if(!v->c[0]->fd || !v->c[1]->fd)
 		{
-
-			if(host == NULL)
-				return 0;
-			if(port_id <= 0 || port_id > 65535)
-				return 0;
-
-			v->c[0]->type = VSOCK_C;
-			v->c[0]->fd   = alloc_sock_t();
-			v->c[1]->type = VSOCK_S;
-			v->c[1]->fd   = alloc_sock_t();
-			if(!v->c[0]->fd || !v->c[1]->fd)
-			{
-				return 0;
-			}
-			if( sock_t_connect( v->c[0]->fd, host, port_id ) )
-			{
-				if( sock_t_connect( v->c[1]->fd, host, port_id + 1 ) )
-				{			
-					return 1;
-				}
+			return 0;
+		}
+		if( sock_t_connect( v->c[0]->fd, host, port_id + VJ_CMD_PORT ) )
+		{
+			if( sock_t_connect( v->c[1]->fd, host, port_id + VJ_STA_PORT ) )
+			{			
+				return 1;
 			}
 		}
-		else
-		{
-			if(port_id <= 0 || port_id > 65535 )
-				return 0;
+	}
+	else
+	{
+		if(port_id <= 0 || port_id > 65535 )
+			return 0;
 
-			v->c[0]->type = VMCAST_C;
-			v->c[0]->s    = mcast_new_sender( group_name );
-			v->c[0]->r    = mcast_new_receiver( group_name, port_id ); // + 3?
-			v->c[1]->type = VMCAST_S;
-			v->c[1]->r	  = mcast_new_receiver( group_name, port_id + 1);
-			v->ports[0] = port_id;
-			v->ports[1] = port_id + 1;
-			v->ports[2] = port_id + 3;
-			mcast_sender_set_peer( v->c[0]->s , group_name );
+		v->c[0]->type = VMCAST_C;
+		v->c[0]->r    = mcast_new_receiver( group_name, port_id + VJ_CMD_MCAST ); 
+		v->c[0]->s    = mcast_new_sender( group_name );
+		v->ports[0] = port_id + VJ_CMD_MCAST;
+		v->ports[1] = port_id + VJ_CMD_MCAST_IN;
+		mcast_sender_set_peer( v->c[0]->s , group_name );
+		v->mcast = 1;
+//		mcast_receiver_set_peer( v->c[0]->r, group_name);
+//		veejay_msg(VEEJAY_MSG_DEBUG, "Added peer");
+		veejay_msg(VEEJAY_MSG_DEBUG, "Client is interested in packets from group %s : %d, send to %d",
+			group_name, port_id + VJ_CMD_MCAST , port_id + VJ_CMD_MCAST_IN);
 
-			return 1;
-		}
-		return error;
+		return 1;
+	}
+	return error;
 }
+
+
 
 int	vj_client_poll( vj_client *v, int sock_type )
 {
@@ -148,8 +153,6 @@ int	vj_client_poll( vj_client *v, int sock_type )
 	{
 		if(v->c[1]->type == VSOCK_S)
 			return ( sock_t_poll(v->c[1]->fd ) );
-		if(v->c[1]->type == VMCAST_S )
-			return ( mcast_poll( v->c[1]->r ) ); 
 	}
 	if(sock_type == V_CMD )
 	{
@@ -208,16 +211,13 @@ int	vj_client_get_status_fd(vj_client *v, int sock_type )
 {	
 	if(sock_type == V_STATUS)
 	{
-		if(v->c[1]->type == VSOCK_S)
-			return v->c[1]->fd->sock_fd;
-		if(v->c[1]->type == VMCAST_S)
-			return v->c[1]->r->sock_fd;
+		return v->c[1]->fd->sock_fd;
 	}
 	if(sock_type == V_CMD )
 	{
-		if(v->c[0]->type == VSOCK_C)
+		if(!v->mcast)
 			return	v->c[0]->fd->sock_fd;
-		if(v->c[0]->type == VMCAST_C )
+		else
 			return  v->c[0]->r->sock_fd;
 	}
 	return 0;	
@@ -229,15 +229,11 @@ int	vj_client_read(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 	{
 		if(v->c[1]->type == VSOCK_S)
 			return( sock_t_recv( v->c[1]->fd, dst, bytes ) );
-		if(v->c[1]->type == VMCAST_S)
-			return( mcast_recv( v->c[1]->r, dst, bytes ));
 	}
 	if( sock_type == V_CMD )
 	{
 		if(v->c[0]->type == VSOCK_C)
 			return ( sock_t_recv( v->c[0]->fd, dst, bytes ) );
-		if(v->c[0]->type == VMCAST_C)
-			return ( mcast_recv( v->c[0]->r, dst, bytes ));
 	}
 	return 0;
 }
@@ -251,24 +247,17 @@ int vj_client_send(vj_client *v, int sock_type,char *buf )
 		int len = strlen( buf );
 		sprintf(v->blob, "V%03dD%s", len, buf);
 		if(v->c[0]->type == VSOCK_C)
-		{
 			return ( sock_t_send( v->c[0]->fd, v->blob, len + 5 ));
-		}
 		if(v->c[0]->type == VMCAST_C)
-		{
-			return ( mcast_send( v->c[0]->s, v->blob,len + 5, v->ports[2] ));
-		}
-
-
+			return ( mcast_send( v->c[0]->s, (void*) v->blob, len + 5,
+					v->ports[1] ));
 	}
-	
-   return 1;
+   	return 1;
 }
 
 
 int vj_client_close( vj_client *v )
 {
-	
 	if(v)
 	{
 		if(v->c[0]->type == VSOCK_C)
@@ -277,12 +266,9 @@ int vj_client_close( vj_client *v )
 			sock_t_close(v->c[1]->fd );
 		if(v->c[0]->type == VMCAST_C)
 		{
-			mcast_close_sender( v->c[0]->s );
 			mcast_close_receiver( v->c[0]->r );
+			mcast_close_sender( v->c[0]->s );
 		}
-		if(v->c[1]->type == VMCAST_S)
-			mcast_close_receiver( v->c[1]->r );
-		
 		return 1;
 	}
 	return 0;

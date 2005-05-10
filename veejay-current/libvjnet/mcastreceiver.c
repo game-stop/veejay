@@ -44,11 +44,10 @@ mcast_receiver	*mcast_new_receiver( const char *group_name, int port )
 	mcast_receiver *v = (mcast_receiver*) malloc(sizeof(mcast_receiver));
 	if(!v) return NULL;
 	int	on = 1;
-	struct sockaddr_in recv_addr;
 	struct ip_mreq mcast_req;
 	
 	memset( &mcast_req, 0, sizeof(mcast_req ));
-	memset( &recv_addr, 0, sizeof(recv_addr) );
+	memset( &(v->addr), 0, sizeof(struct sockaddr_in) );
 	v->group = (char*) strdup( group_name );
 	v->port = port;
 
@@ -80,10 +79,10 @@ mcast_receiver	*mcast_new_receiver( const char *group_name, int port )
 	}
 #endif
 
-	recv_addr.sin_addr.s_addr = htonl( INADDR_ANY );
-	recv_addr.sin_port = htons( v->port );
+	v->addr.sin_addr.s_addr = htonl( INADDR_ANY );
+	v->addr.sin_port = htons( v->port );
 
-	if( bind( v->sock_fd, (struct sockaddr*) &recv_addr, sizeof(recv_addr))<0)
+	if( bind( v->sock_fd, (struct sockaddr*) &(v->addr), sizeof(struct sockaddr_in))<0)
 	{
 		print_error("bind");
 		if(v->group) free(v->group);
@@ -100,10 +99,30 @@ mcast_receiver	*mcast_new_receiver( const char *group_name, int port )
 		if(v) free(v);
 		return NULL;
 	}
-	veejay_msg(VEEJAY_MSG_DEBUG, "mcastreceiver ready (group %s) at port %d",
-		v->group, v->port );
 
 	return v;
+}
+int     mcast_receiver_set_peer( mcast_receiver *v, const char *hostname )
+{
+        struct hostent *host;
+        host = gethostbyname( hostname );
+        if(host)
+        {
+                v->addr.sin_family = host->h_addrtype;
+                if( host->h_length > (int) sizeof(v->addr.sin_addr))
+                        host->h_length = sizeof( v->addr.sin_addr );
+                memcpy( &(v->addr.sin_addr), host->h_addr, host->h_length );
+        }
+        else
+        {
+                v->addr.sin_family = AF_INET;
+                if( !inet_aton( hostname, &(v->addr.sin_addr) ) )
+                {
+                        print_error(" unknown host");
+                        return 0;
+                }
+        }
+        return 1;
 }
 
 int	mcast_poll( mcast_receiver *v )
@@ -125,7 +144,7 @@ static int	mcast_poll_timeout( mcast_receiver *v, long timeout )
 	struct timeval tv;
 	int n = 0;
 	tv.tv_sec = 0;
-	tv.tv_usec = 20000 + timeout; // 0.05 seconds
+	tv.tv_usec = 10000 + timeout; // 0.05 seconds
 	FD_ZERO( &fds );	
 	FD_SET( v->sock_fd, &fds );
 
@@ -146,6 +165,7 @@ int	mcast_recv( mcast_receiver *v, void *buf, int len )
 	int n = recv( v->sock_fd, buf, len, 0 );
 	if ( n == -1 )
 		print_error("recv");
+
 	return n;
 }
 
@@ -153,14 +173,14 @@ int	mcast_recv( mcast_receiver *v, void *buf, int len )
 int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len )
 {
 	uint32_t sec,usec;
-	int	 n_packets = total_len / CHUNK_SIZE;
+	int	 n_packets = ( total_len / CHUNK_SIZE);
 	int	 i=0;
 	int	 tb=0;
 	uint8_t  chunk[PACKET_PAYLOAD_SIZE];
 	packet_header_t header;
 	frame_info_t 	info;
 
-	header.timeout = 60000; // first time timeout
+	header.timeout = 20000; // first time timeout
 
 	while( i <= n_packets )
 	{
@@ -173,7 +193,6 @@ int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len )
 		/* Bah... we must take note that some packets will never arrive */
 		if( mcast_poll_timeout(v, header.timeout) == 0 )
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "TIMEOUT OCCURED!");
 			return 0;
 		}
 		/* peek , dont remove data from queue */

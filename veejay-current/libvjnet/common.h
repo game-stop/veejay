@@ -27,5 +27,14 @@
 #define VMCAST_S 4
 #define VMCAST_C 5
 
+enum
+{
+	VJ_CMD_PORT=0,
+	VJ_STA_PORT=1,
+	VJ_CMD_MCAST=3,
+	VJ_CMD_MCAST_IN=4,
+	VJ_CMD_OSC=2,
+};
+
 #endif
 

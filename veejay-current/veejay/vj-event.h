@@ -217,5 +217,10 @@ void	vj_event_set_rgb_parameter_type		(	void *ptr,const char format[],	va_list a
 void	vj_event_tag_set_descr		(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_vimslist		(	void *ptr,	const char format[],	va_list ap	);	
 void	vj_event_send_bundles	(void *ptr, const char format[], va_list ap);
+
+void	vj_event_mcast_start(	void *ptr,	const char format[], va_list ap);
+
+void	vj_event_mcast_stop( void *ptr,		const char format[], va_list ap);
+
 void	vj_event_quick_bundle  (void *ptr, const char format[], va_list ap);
 #endif

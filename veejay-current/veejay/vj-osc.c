@@ -185,7 +185,8 @@ void	vj_osc_cb_el_cut(void *context,int arglen,const void *vargs, OSCTimeTag whe
 void	vj_osc_cb_el_add(void *context,int arglen,const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void	vj_osc_cb_el_save(void *context,int arglen,const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void	vj_osc_cb_el_load(void *context,int arglen,const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
-
+void	vj_osc_cb_mcast_start(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void	vj_osc_cb_mcast_stop(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 
 void vj_osc_set_veejay_t(veejay_t *t);
 
@@ -415,6 +416,15 @@ void vj_osc_cb_el_cut(void *context, int arglen, const void *vargs, OSCTimeTag w
 {
 	NET_F(arglen, vargs, VIMS_EDITLIST_CUT );
 }
+void	vj_osc_cb_mcast_start(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	NET_F(arglen,vargs, VIMS_VIDEO_MCAST_START );
+}
+void	vj_osc_cb_mcast_stop(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	NET_F(arglen,vargs, VIMS_VIDEO_MCAST_STOP );
+}
+
 void vj_osc_cb_el_crop(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra )
 {
 	NET_F(arglen, vargs, VIMS_EDITLIST_CROP );
@@ -1073,6 +1083,10 @@ static struct
 	{ "Toggle verbose output mode",
 							"verbose",	vj_osc_cb_verbose,				11	},
 	{ "Toggle bezerk mode",		"bezerk",	vj_osc_cb_bezerk,				11	},
+
+	{ "Stop mcast frame sender",	"mcaststop",	vj_osc_cb_mcast_stop,				5	},
+	{ "Start mcast frame sender",	"mcaststart",	vj_osc_cb_mcast_start,				5	},
+
 	{ NULL,					NULL,		NULL,							0	},
 };
 

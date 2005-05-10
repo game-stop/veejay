@@ -139,6 +139,7 @@ typedef struct {
     int tag_record;
     int dct_method;
     subsample_mode_t sample_mode;
+	int mcast_frame_sender;
 	int use_mcast;
 	char *group_name;
 	int use_vims_mcast;
@@ -241,7 +242,7 @@ typedef struct {
     int last_tag_id;
     int nstreams;
     int sfd;
-    vj_server *vjs[2];
+    vj_server *vjs[3]; /* 0=cmd, 1 = sta, 2 = mcast */
     int net;
     int render_entry;
     int render_continue;

@@ -76,6 +76,8 @@ enum {
 	VIMS_VIDEO_SET_FRAME			=	19,
 	VIMS_VIDEO_SET_SPEED			=	20,
 	VIMS_VIDEO_SET_SLOW			=	21,
+	VIMS_VIDEO_MCAST_START			=	22,
+	VIMS_VIDEO_MCAST_STOP			=	23,
 		
 /* editlist commands */
 

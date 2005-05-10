@@ -65,7 +65,7 @@ static int last_added_tag = 0;
 
 //forward decl
 
-int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p );
+int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int ty );
 int _vj_tag_new_avformat( vj_tag *tag, int stream_nr, editlist *el);
 int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el);
 
@@ -222,7 +222,7 @@ void vj_tag_record_init(int w, int h)
 
 
 
-int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p )
+int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int type )
 {
 	int error = 0;
 	vj_client *v;
@@ -259,6 +259,13 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 		}
 		memset(tag->socket_frame, 0 , (v->planes[0] * 4 ));
 		tag->socket_ready = 1;
+	}
+
+	if( type == VJ_TAG_TYPE_MCAST )
+	{
+		/*  connect and send message ! */
+		veejay_msg(VEEJAY_MSG_INFO,
+		  "You can stop the Server by sending VIMS 023");
 	}
 
 	return 1;
@@ -466,7 +473,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->video_channel = channel;
     tag->source_type = type;
     tag->index = stream_nr;
-    tag->active = 1;
+    tag->active = 0;
     tag->sequence_num = 0;
     tag->encoder_format = 0;
     tag->encoder_active = 0;
@@ -499,7 +506,6 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 #ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
 	sprintf(tag->source_name, "/dev/%s", filename);
-	tag->active =0; //active at selection
 	if (_vj_tag_new_v4l
 	    (tag, stream_nr, w, h, el->video_norm, palette,0,channel ) != 1)
 	    return -1;
@@ -508,9 +514,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
 		sprintf(tag->source_name, "%s", filename );
-		if( _vj_tag_new_net( tag,stream_nr, w,h,pix_fmt, filename, channel ,palette) != 1 )
+		if( _vj_tag_new_net( tag,stream_nr, w,h,pix_fmt, filename, channel ,palette,type) != 1 )
 			return -1;
-		tag->active = 0;
 	break;
     case VJ_TAG_TYPE_DV1394:
 #ifdef SUPPORT_READ_DV2
@@ -557,7 +562,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	case VJ_TAG_TYPE_COLOR:
 	sprintf(tag->source_name, "solid-[%d,%d,%d]",
 		tag->color_r,tag->color_g,tag->color_b );
-		
+	tag->active = 1;	
 	break;
 
     default:
@@ -1462,6 +1467,13 @@ int vj_tag_disable(int t1) {
 	}
 	if(tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST)
 	{
+		if(tag->source_type == VJ_TAG_TYPE_MCAST)
+		{
+			char mcast_stop[6];
+			sprintf(mcast_stop, "%03d:;", VIMS_VIDEO_MCAST_STOP );
+			vj_client_send( vj_tag_input->net[tag->index] , V_CMD, 
+				mcast_stop);
+		}
 		vj_client_close( vj_tag_input->net[tag->index] );
 		veejay_msg(VEEJAY_MSG_DEBUG, "Disconnected from %s", tag->source_name);
 	}
@@ -1473,6 +1485,9 @@ int vj_tag_disable(int t1) {
 int vj_tag_enable(int t1) {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return -1;
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Enable stream %d", t1 );
+
 	if(tag->active ) 
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Already active");
@@ -1490,13 +1505,21 @@ int vj_tag_enable(int t1) {
 	}
 	if( tag->source_type == VJ_TAG_TYPE_MCAST )
 	{
+		char start_mcast[6];
+		sprintf(start_mcast, "%03d:;", VIMS_VIDEO_MCAST_START);
 		int success = vj_client_connect( vj_tag_input->net[tag->index], NULL, tag->source_name, tag->video_channel );
+		
+		veejay_msg(VEEJAY_MSG_DEBUG, "Sending 'start mcast'");
+		vj_client_send(
+			vj_tag_input->net[tag->index], V_CMD, start_mcast);
+
 		if( success == 0  )
 		{
 			veejay_msg(VEEJAY_MSG_DEBUG, "Canot connect to %s, %d", tag->source_name, tag->video_channel );
 			return -1;
 		}
-		veejay_msg(VEEJAY_MSG_DEBUG, "Streaming from %s, port %d", tag->source_name, tag->video_channel );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Streaming from %s", tag->source_name );
+		
 	}
 
 
@@ -1923,7 +1946,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
     int uv_len = (vj_tag_input->width * vj_tag_input->height);
     int len = (width * height);
     char buf[10];
-
+	vj_client *v;
 	if(!tag) return -1;  
 
     if( vj_tag_input->pix_fmt == FMT_420) uv_len = uv_len / 4;
@@ -1961,33 +1984,32 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		 return -1;
 	break;
 	case VJ_TAG_TYPE_NET:
-//	case VJ_TAG_TYPE_MCAST:
-	vj_client_flush	( vj_tag_input->net[tag->index],1);
-	case VJ_TAG_TYPE_MCAST:	
-
-	sprintf(buf, "%03d:;", VIMS_GET_FRAME);
-	if(vj_client_send( vj_tag_input->net[tag->index],V_CMD, buf ))
-	{
-		vj_client *v = vj_tag_input->net[tag->index];
-		if(vj_client_read_i( v, tag->socket_frame ) <= 0)
-		{	
-			veejay_msg(VEEJAY_MSG_DEBUG, "Missed frame");
+		vj_client_flush	( vj_tag_input->net[tag->index],1);
+		sprintf(buf, "%03d:;", VIMS_GET_FRAME);
+		if( vj_client_send( vj_tag_input->net[tag->index], V_CMD, buf ) <= 0 )
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "Lost connection! ");
+			vj_tag_disable( t1 );
 		}
-//		else
-//		{
-			veejay_memcpy( buffer[0], tag->socket_frame, v->planes[0] );
-			veejay_memcpy( buffer[1], tag->socket_frame + v->planes[0], v->planes[1] );
-			veejay_memcpy( buffer[2], tag->socket_frame + v->planes[0] + v->planes[1] , v->planes[2] );
-//		}
+	
+	case VJ_TAG_TYPE_MCAST:	
+		v = vj_tag_input->net[tag->index];
+
+		int ret = vj_client_read_i ( v, tag->socket_frame );
+		veejay_memcpy( buffer[0], tag->socket_frame, v->planes[0] );
+		veejay_memcpy( buffer[1], tag->socket_frame + v->planes[0], v->planes[1] );
+		veejay_memcpy( buffer[2], tag->socket_frame + v->planes[0] + v->planes[1] , v->planes[2] );
+
+		if( ret == -1)
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "Lost connection! ");
+			vj_tag_disable( t1 );
+		}
+		
+		if( ret == 0 )
+			veejay_msg(VEEJAY_MSG_DEBUG, "Missed frame (using old)");
+	
 		return 1;
-        }
-	else
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Lost connection! ");
-		vj_tag_disable( t1 );
-	}
-//	vj_client_flush( vj_tag_input->net[tag->index]);
-	return -1;
 	break;
 	case VJ_TAG_TYPE_YUV4MPEG:
 	// only for 4:2:0 , must convert to 4:2:2

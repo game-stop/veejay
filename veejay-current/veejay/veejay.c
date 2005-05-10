@@ -129,8 +129,7 @@ static void Usage(char *progname)
     fprintf(stderr, "where options are:\n");
 
     fprintf(stderr,
-	    "  -p/--port\t\t\tTCP port to accept/send messages (default: 3490)\n");
-    fprintf(stderr, "  -h/--host\t\t\tStart as host (default: server)\n");
+	    "  -p/--portoffset\t\t\tTCP port to accept/send messages (default: 3490)\n");
     fprintf(stderr,
 	    "  -t/--timer num\t\tspecify timer to use (none:0,normal:2,rtc:1) default is 1\n");
 
@@ -138,7 +137,7 @@ static void Usage(char *progname)
     fprintf(stderr,
 	    "  -O/--output\t\t\tSDL(0) , DirectFB(1), SDL and DirectFB(2), YUV4MPEG stream (3)\n");
 #else
-    fprintf(stderr, "  -O/--output\t\t\tSDL(0), (3) yuv4mpeg (4) SHM (experimental)\n");
+    fprintf(stderr, "  -O/--output\t\t\tSDL(0), (3) yuv4mpeg (4) SHM (broken) (5) no visual\n");
 #endif
     fprintf(stderr,
 	    "  -o/--outstream <filename>\twhere to write the yuv4mpeg stream (use with -O3)\n");
@@ -212,15 +211,22 @@ static void Usage(char *progname)
 
 #define OUT_OF_RANGE_ERR(val) if(OUT_OF_RANGE(val)) { fprintf(stderr,"\tValue must be 0-100\n"); exit(1); }
 
+#define check_val(val,msg) {\
+char *v = strdup(val);\
+if(v==NULL){\
+fprintf(stderr, " Invalid argument given for %s\n",msg);\
+}\
+else\
+{\
+free(v);\
+}\
+}
+
 static int set_option(const char *name, char *value)
 {
     /* return 1 means error, return 0 means okay */
     int nerr = 0;
-    if (strcmp(name, "host") == 0 || strcmp(name, "h") == 0) {
-	run_server = 0;
-	fprintf(stderr, "Run as server, host is not yet implemented.\n");
-	exit(1);
-    } else if (strcmp(name, "port") == 0 || strcmp(name, "p") == 0) {
+    if (strcmp(name, "portoffset") == 0 || strcmp(name, "p") == 0) {
 	info->uc->port = atoi(optarg);
     } else if (strcmp(name, "verbose") == 0 || strcmp(name, "v") == 0) {
 	info->verbose = 1;
@@ -239,11 +245,13 @@ static int set_option(const char *name, char *value)
 	}
 	} else if (strcmp(name, "multicast-vims") == 0 || strcmp(name,"V")==0)
 	{
+		check_val(optarg, name);
 		info->settings->use_vims_mcast = 1;
 		info->settings->vims_group_name = strdup(optarg);
-	
-	} else if (strcmp(name, "multicast-osc") == 0 || strcmp(name, "M") == 0 )
+	}
+	else if (strcmp(name, "multicast-osc") == 0 || strcmp(name, "M") == 0 )
 	{
+		check_val(optarg,name);
 		info->settings->use_mcast = 1;
 		info->settings->group_name = strdup( optarg );
 	} else if (strcmp(name, "sample-mode" ) == 0 || strcmp(name, "m" ) == 0)
@@ -275,9 +283,11 @@ static int set_option(const char *name, char *value)
 	}
      }
     else if (strcmp(name, "outstream") == 0 || strcmp(name, "o") == 0) {
-	snprintf(info->stream_outname,256,"%s",(char*) optarg);
+	check_val(optarg,name);
+	snprintf(info->stream_outname,256,"%s", (char*) optarg);
 #ifdef HAVE_XML2
     } else if (strcmp(name, "action-file")==0 || strcmp(name,"l")==0) {
+	check_val(optarg,name);
 	if(!veejay_load_action_file( info, (char*) optarg ))
 		exit(1);
 	strcpy(info->action_file,(char*) optarg);
@@ -420,8 +430,7 @@ static void check_command_line_options(int argc, char *argv[])
 	{"features",0,0,0},
 	{"deinterlace",0,0,0},
 	{"zoom",1,0,0},
-	{"port", 1, 0, 0},
-	{"host", 1, 0, 0},
+	{"portoffset", 1, 0, 0},
 	{"sample-mode",1,0,0},
 	{"dummy",0,0,0},
 	{"geometry-x",1,0,0},

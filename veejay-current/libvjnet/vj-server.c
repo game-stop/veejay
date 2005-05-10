@@ -47,11 +47,8 @@ typedef struct {
 
 typedef struct
 {
-	union
-	{
-		mcast_receiver  *r;
-		mcast_sender	*s;
-	};
+	mcast_sender	*s;  // for sending frames only
+	mcast_receiver	*r; // for taking commands
 	int type;
 } vj_proto;
 
@@ -71,46 +68,22 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 
 	vj_proto	**proto  = (vj_proto**) malloc(sizeof( vj_proto* ) * 2);
 	
-	for( i = 0; i < 2; i ++ )
-		proto[i] = (vj_proto*) malloc(sizeof( vj_proto ) );
-
+	proto[0] = (vj_proto*) vj_malloc(sizeof( vj_proto ) );
 	if( v->server_type == V_CMD )
 	{
 		proto[0]->s = mcast_new_sender( group_name );
 		if(!proto[0]->s)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "cannot setup cmd sender (%s:%d)", group_name, port);
 			return 0;
-		}
-		proto[1]->r = mcast_new_receiver( group_name, port + 3 );
-		if(!proto[1]->r)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "cannot setup cmd receiver (%s:%d)", group_name, port + 3 );
+
+		proto[0]->r = mcast_new_receiver( group_name , port + VJ_CMD_MCAST_IN );
+		if(!proto[0]->r )
 			return 0;
-		}
-		proto[0]->type = __SENDER;
-		proto[1]->type = __RECEIVER; 
-		v->ports[0] = port;
-		v->ports[1] = port + 3;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Multicast command server OUT %d, IN %d", port, port+3 );
+
+		v->ports[0] = port + VJ_CMD_MCAST;
+		v->ports[1] = port + VJ_CMD_MCAST_IN;
 	}
 
-	if( v->server_type == V_STATUS )
-	{
-		proto[0]->s = mcast_new_sender( group_name );
-		if(!proto[0]->s)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "cannot setup status sender (%s:%d)", group_name, port );
-			return 0;
-		}
-		proto[0]->type = __SENDER;
-		proto[1]->type = __INVALID; // no recv on status port !
-		v->ports[0] = port;
-		v->ports[1] = 0;
-	}
-	
 	v->protocol = (void**) proto;
-
 	link = (vj_link **) vj_malloc(sizeof(vj_link *) * VJ_MAX_CONNECTIONS);
 
 	if(!link)
@@ -119,7 +92,8 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 		return 0;
 	}
 
-	for( i = 0; i < 1; i ++ ) // only 1 link needed for multicast
+	for( i = 0; i < 1; i ++ ) /* only 1 link needed for multicast:
+					the link hold all messages received  */
 	{
 		int j;
 		link[i] = (vj_link*) vj_malloc(sizeof(vj_link));
@@ -144,40 +118,50 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 	}
 	v->link = (void**) link;
 	v->nr_of_links = 1;
+	veejay_msg(VEEJAY_MSG_INFO, "UDP multicast frame sender ready at port %d (group '%s')",
+	  	 v->ports[0], group_name );
+	veejay_msg(VEEJAY_MSG_INFO, "UDP multicast command receiver ready at port %d (group '%s')",
+		v->ports[1], group_name );
 
 	return 1;
 }
 
-static int	_vj_server_classic(vj_server *vjs, int port_num)
+static int	_vj_server_classic(vj_server *vjs, int port_offset)
 {
 	int on = 1;
-	
+	int port_num = 0;   
 	vj_link **link;
 	int i = 0;
 	if ((vjs->handle = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
 		return 0;
-    }
-    if (setsockopt( vjs->handle, SOL_SOCKET, SO_REUSEADDR, (const char*) &on, sizeof(on) )== -1)
+    	}
+    	if (setsockopt( vjs->handle, SOL_SOCKET, SO_REUSEADDR, (const char*) &on, sizeof(on) )== -1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
 		return 0;
-    }
-    vjs->myself.sin_family = AF_INET;
-    vjs->myself.sin_addr.s_addr = INADDR_ANY;
-    vjs->myself.sin_port = htons(port_num);
-    memset(&(vjs->myself.sin_zero), 0, 8);
-    if (bind(vjs->handle, (struct sockaddr *) &(vjs->myself), sizeof(vjs->myself) ) == -1 )
+   	}
+	vjs->myself.sin_family = AF_INET;
+	vjs->myself.sin_addr.s_addr = INADDR_ANY;
+
+	if( vjs->server_type == V_CMD )
+		port_num = port_offset + VJ_CMD_PORT;
+	if( vjs->server_type == V_STATUS )
+		port_num = port_offset + VJ_STA_PORT;
+
+	vjs->myself.sin_port = htons(port_num);
+	memset(&(vjs->myself.sin_zero), 0, 8);
+	if (bind(vjs->handle, (struct sockaddr *) &(vjs->myself), sizeof(vjs->myself) ) == -1 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
 		return 0;
-    }
-    if (listen(vjs->handle, VJ_MAX_CONNECTIONS) == -1)
+	}
+	if (listen(vjs->handle, VJ_MAX_CONNECTIONS) == -1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
 		return 0;
-    }
+   	}
 
 	link = (vj_link **) vj_malloc(sizeof(vj_link *) * VJ_MAX_CONNECTIONS);
 	if(!link)
@@ -212,13 +196,17 @@ static int	_vj_server_classic(vj_server *vjs, int port_num)
 	vjs->link = (void**) link;
 	vjs->nr_of_links = 0;
 	vjs->nr_of_connections = vjs->handle;
+	veejay_msg(VEEJAY_MSG_INFO, "TCP/IP Unicast %s channel ready at port %d",
+	  (vjs->server_type == V_CMD ? "command" : "status" ),	 port_num );
+
+
 	return 1;
 }
-vj_server *vj_server_alloc(int port, char *mcast_group_name, int type)
+vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
 {
-    vj_server *vjs = (vj_server *) vj_malloc(sizeof(struct vj_server_t));
+	vj_server *vjs = (vj_server *) vj_malloc(sizeof(struct vj_server_t));
 	
-    if (!vjs)
+	if (!vjs)
 		return NULL;
 
 	memset( vjs, 0, sizeof(vjs) );
@@ -231,28 +219,23 @@ vj_server *vj_server_alloc(int port, char *mcast_group_name, int type)
 	}	
 	bzero( vjs->recv_buf, 16384 );
 
-	vjs->ports[type] = port;
 	vjs->server_type = type;
 
 	/* setup peer to peer socket */
 	if( mcast_group_name == NULL )
 	{
 		vjs->use_mcast = 0;
-		if ( _vj_server_classic( vjs,port ) )
+		if ( _vj_server_classic( vjs,port_offset ) )
 			return vjs;
 	}
-    else
+ 	else
 	{	/* setup multicast socket */
 		vjs->use_mcast = 1;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Setup multicast server, port offset %d, group %s", port, mcast_group_name);
-		if ( _vj_server_multicast(vjs, mcast_group_name, port) )
+		if ( _vj_server_multicast(vjs, mcast_group_name, port_offset) )
 			return vjs;
 	}
 	  
-	if(vjs)
-		free(vjs);
-
-    return NULL;
+    	return NULL;
 }
 
 
@@ -285,7 +268,7 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 			if (n <= 0)
 			{
 				if(n == -1) 
-					veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
+					veejay_msg(VEEJAY_MSG_ERROR, "unicast: %s", strerror(errno));
 		   		return 0;
 			}
 			total += n;
@@ -295,18 +278,9 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 	else
 	{
 		vj_proto **proto = (vj_proto**) vje->protocol;
-		if( vje->server_type == V_STATUS )
-			return mcast_send( proto[0]->s, buf, bytes_left, vje->ports[0] );
 
 		if( vje->server_type == V_CMD )
 			return mcast_send( proto[0]->s, buf, bytes_left, vje->ports[0] );
-/*		if( vje->server_type == V_CMD && len > 512 )
-		{	
-			VJFrame frame;
-			frame.data[0] = buf;
-			frame.len = 352 * 288;
-			return mcast_send_frame( proto[0]->s, &frame, vje->ports[0]);
-		}	*/
 	}
   
  
@@ -318,6 +292,7 @@ int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len,
 {
 	if(len <= 0 || buf == NULL )
 		return 0;
+
 	if(!vje->use_mcast )
 	{
 		return vj_server_send( vje, link_id, buf, len );
@@ -325,12 +300,8 @@ int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len,
 	else
 	{
 		vj_proto **proto = (vj_proto**) vje->protocol;
-		if(vje->server_type == V_STATUS )
-			return 0;
 		if( vje->server_type == V_CMD  )
-		{
-			return mcast_send_frame( proto[0]->s, frame,info, buf,len,ms, vje->ports[0] );
-		}
+			return mcast_send_frame( proto[0]->s, frame, info, buf,len,ms, vje->ports[0] );
 	}
 	return 0;
 }
@@ -382,19 +353,6 @@ int _vj_server_del_client(vj_server * vje, int link_id)
 
 void	vj_server_close_connection(vj_server *vje, int link_id )
 {
-	if(vje->use_mcast)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "\n*\n*\n* test me");
-		vj_proto **proto = (vj_proto**) vje->protocol;
-		if( proto[0]->type == __SENDER )    
-			mcast_close_sender( proto[0]->s );
-		if( proto[0]->type == __RECEIVER )
-			mcast_close_receiver( proto[0]->r );
-		if( proto[1]->type == __SENDER )
-			mcast_close_sender( proto[1]->s );
-		if( proto[1]->type == __RECEIVER )
-			mcast_close_receiver( proto[1]->r );
-	}
 	_vj_server_del_client( vje, link_id );
 }
 
@@ -403,8 +361,12 @@ int vj_server_poll(vj_server * vje)
 	int status = 0;
 	struct timeval t;
 	int i;
-	if(vje->use_mcast)	// no polling for mcast here ! (see recv)
-		return 0 ;
+
+	if( vje->use_mcast )
+	{
+		vj_proto **proto = (vj_proto**) vje->protocol;
+		return mcast_poll( proto[0]->r );
+	}
 
 	memset( &t, 0, sizeof(t));
 
@@ -429,8 +391,6 @@ int vj_server_poll(vj_server * vje)
  
 	status = select(vje->nr_of_connections + 1, &(vje->fds), &(vje->wds), 0, &t);
 
-
-
 	if( status > 0 )
 	{
 		return 1;
@@ -444,7 +404,6 @@ static	int	_vj_server_empty_queue(vj_server *vje, int link_id)
 	// ensure message queue is empty!!
 	vj_link **Link = (vj_link**) vje->link;
 	vj_message **v = Link[link_id]->m_queue;
-
 	int i;
 	for( i = 0; i < VJ_MAX_PENDING_MSG; i ++ )
 	{
@@ -542,6 +501,12 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 			_vj_malfunction( "VIMS selector out of range", buf,buf_len, i );
 			return 0;
 		}
+		if( vje->use_mcast )
+			if( netid >= 400 && netid < 500 )
+			{
+				_vj_malfunction( "VIMS multicast doesnt allow querying of data",buf,buf_len,i);
+				return 0;
+			}
 
 		num_msg ++; 
 		i += slen; // try next message
@@ -592,8 +557,6 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 			v[num_msg]->len = slen;
 			v[num_msg]->msg = (char*)strndup( str_ptr , slen );
 			num_msg++;
-			veejay_msg(VEEJAY_MSG_DEBUG,
-				 "Stored msg %d [%s]", num_msg, v[num_msg-1]->msg);
 		}
 		if(priority && netid > 255 )
 		{
@@ -615,7 +578,6 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 
 	if( ! priority )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Queued %d messages from link %d", num_msg,link_id);
 		Link[link_id]->n_queued = num_msg;
 		Link[link_id]->n_retrieved = 0;
 	}
@@ -661,9 +623,6 @@ static	int	_vj_get_n_msg_waiting(char *buf, int buf_len, int *offset )
 
 int	vj_server_new_connection(vj_server *vje)
 {
-	if( vje->use_mcast )
-		return -1;
-
 	if( FD_ISSET( vje->handle, &(vje->fds) ) )
 	{
 		int addr_len = sizeof(vje->remote);
@@ -697,59 +656,53 @@ int	vj_server_update( vj_server *vje, int id )
 {
 	int sock_fd = vje->handle;
 	int n = 0;
+	// ensure all is empty
+	_vj_server_empty_queue(vje, id);
 
-	if( !vje->use_mcast)
+ 	if(!vj_server_poll(vje))
+		return 0;
+
+	if(!vje->use_mcast)
 	{
- 		if(!vj_server_poll(vje))
-			return 0;
-
 		vj_link **Link = (vj_link**) vje->link;
 		sock_fd = Link[id]->handle;
 
 		if(!FD_ISSET( sock_fd, &(vje->fds)) )
 			return 0;
-
-		// clear recv_buf
-		bzero( vje->recv_buf, 16384);
-		n = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
 	}
-	else
-	{
-		// command socket ?
-		if(vje->server_type == V_CMD )
-		{
-			vj_proto **proto = (vj_proto**) vje->protocol;
-			// get data from command socket
-			if( proto[1]->type == __RECEIVER )
-			{
-				if( mcast_poll( proto[1]->r ))
-				{
-					bzero( vje->recv_buf, RECV_SIZE );
-					n = mcast_recv( proto[1]->r , vje->recv_buf, RECV_SIZE );  
-				}
-			}
-		}
-
-	}
+	// clear recv_buf
+	bzero( vje->recv_buf, 16384);
 
 	if(!vje->use_mcast)
 	{
+		n = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
 		if( n <= 0)
 		{
-			_vj_server_del_client( vje, id );
-			return -1;
+			_vj_server_del_client(vje, id );  	
+			return 0;
 		}
 	}
+	else
+	{
+		vj_proto **proto = (vj_proto**) vje->protocol;
+		n = mcast_recv( proto[0]->r, (void*) vje->recv_buf, RECV_SIZE );
+		if( n <= 0 )
+			return 0;
+	}
 
-	// ensure all is empty
-	_vj_server_empty_queue(vje, id);
+
 	char *msg_buf = vje->recv_buf;
 	int bytes_left = n;
 
 	int n_msg = _vj_verify_msg( vje, id, msg_buf, bytes_left ); 
+
+	if(n_msg == 0 )
+	{
+		return 0;
+	}
+
 	if( n_msg < VJ_MAX_PENDING_MSG )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) received %d bytes and %d from remote", bytes_left, n_msg);
 		return _vj_parse_msg( vje, id, msg_buf, bytes_left,0 );
 	}
 	else
@@ -806,21 +759,19 @@ void vj_server_shutdown(vj_server *vje)
 		}
 		if( Link[i]->m_queue ) free( Link[i]->m_queue );
 		if( Link[i] ) free( Link[i] );
-    }
+    	}
 
-	if(!vje->use_mcast)
+	if(!vje->use_mcast)	
+	{
 	    close(vje->handle);
+	}
 	else
 	{
 		vj_proto **proto = (vj_proto**) vje->protocol;
-		if(proto[0]->type == __SENDER)
-			mcast_close_sender( proto[0]->s );
-		if(proto[1]->type == __RECEIVER)
-			mcast_close_receiver( proto[1]->r );
+		mcast_close_sender( proto[0]->s );
+		mcast_close_receiver( proto[0]->r );
 		if(proto[0])
 			free(proto[0]);
-		if(proto[1])
-			free(proto[1]);
 		if(proto) free(proto);
 	}
 
@@ -854,7 +805,7 @@ int vj_server_retrieve_msg(vj_server *vje, int id, char *dst )
 
 	index ++;
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "\tExec message %d [%s]",
+	veejay_msg(VEEJAY_MSG_DEBUG, "\tExec VIMS %d [%s]",
 		index-1, msg );
 
 	Link[id]->n_retrieved = index;

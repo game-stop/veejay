@@ -388,11 +388,11 @@ static struct {
 	{ VIMS_STREAM_COLOR,			"Stream: set color of a solid stream",
 		vj_event_set_stream_color,	 4,	"%d %d %d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
 	{ VIMS_STREAM_NEW_UNICAST,		"Stream: open network stream ",
-		vj_event_tag_new_net, 		 2, 	"%s %d", 	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+		vj_event_tag_new_net, 		 2, 	"%d %s", 	{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS },
 	{ VIMS_STREAM_NEW_MCAST,		"Stream: open multicast stream",
-		vj_event_tag_new_mcast, 	 2, 	"%s %d", 	{0,0}, VIMS_REQUIRE_ALL_PARAMS },	
+		vj_event_tag_new_mcast, 	 2, 	"%d %s", 	{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS },	
 	{ VIMS_STREAM_NEW_AVFORMAT,		"Stream: open file as stream with FFmpeg",
-		vj_event_tag_new_avformat,	 1,	"%s",		{0,0}, VIMS_LONG_PARAMS	| VIMS_REQUIRE_ALL_PARAMS},
+		vj_event_tag_new_avformat,	 1,	"%s",		{0,0}, VIMS_LONG_PARAMS	| VIMS_REQUIRE_ALL_PARAMS },
 	{ VIMS_STREAM_OFFLINE_REC_START,	"Stream: start record from an invisible stream",
 		vj_event_tag_rec_offline_start,  3,	"%d %d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	}, 
 	{ VIMS_STREAM_OFFLINE_REC_STOP,		"Stream: stop record from an invisible stream",
@@ -557,6 +557,11 @@ static struct {
 		vj_event_load_plugin, 		1, 	"%s", 		{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS},
 	{ VIMS_UNLOAD_PLUGIN,			"Unload a plugin from disk",
 		vj_event_unload_plugin, 	1, 	"%s", 		{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS},
+
+	{ VIMS_VIDEO_MCAST_START,		"Start mcast frame sender",
+		vj_event_mcast_start,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY },
+	{ VIMS_VIDEO_MCAST_STOP,		"Stop mcast frame sender",
+		vj_event_mcast_stop,		0,	NULL,		{0,0},	VIMS_ALLOW_ANY },
 	{ VIMS_GET_FRAME,			"Send a frame to the client",
 		vj_event_send_frame, 		0,	NULL, 		{0,0}, VIMS_ALLOW_ANY },
 #ifdef HAVE_SDL
@@ -1330,17 +1335,21 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 	return 1;
 }	
 
+/*
+	update connections
+ */
 void vj_event_update_remote(void *ptr)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	int cmd_poll = 0;
-	int sta_poll = 0;
+	int cmd_poll = 0;	// command port
+	int sta_poll = 0;	// status port
 	int new_link = -1;
 	int sta_link = -1;
 	int i;
 	cmd_poll = vj_server_poll(v->vjs[0]);
 	sta_poll = vj_server_poll(v->vjs[1]);
 	// accept connection command socket    
+
 	if( cmd_poll > 0)
 	{
 		new_link = vj_server_new_connection ( v->vjs[0] );
@@ -1353,6 +1362,23 @@ void vj_event_update_remote(void *ptr)
 	// see if there is any link interested in status information
 	for( i = 0; i < v->vjs[1]->nr_of_links; i ++ )
 		veejay_pipe_write_status( v, i );
+
+	if( v->settings->use_vims_mcast )
+	{
+		int res = vj_server_update(v->vjs[2],0 );
+		if(res > 0)
+		{
+			v->uc->current_link = 0;
+			char buf[MESSAGE_SIZE];
+			bzero(buf, MESSAGE_SIZE);
+			while( vj_server_retrieve_msg( v->vjs[2], 0, buf ) )
+			{
+				vj_event_parse_msg( v, buf );
+				bzero( buf, MESSAGE_SIZE );
+			}
+		}
+		
+	}
 
 	// see if there is anything to read from the command socket
 	for( i = 0; i < v->vjs[0]->nr_of_links; i ++ )
@@ -1375,6 +1401,10 @@ void vj_event_update_remote(void *ptr)
 			_vj_server_del_client( v->vjs[1], i );
 		}
 	}
+
+
+	
+
 }
 
 void	vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)
@@ -5593,10 +5623,12 @@ void vj_event_tag_new_mcast(void *ptr, const char format[], va_list ap)
 	int args[2];
 
 	P_A(args,str,format,ap);
-	if( veejay_create_tag(v, VJ_TAG_TYPE_MCAST, str, v->nstreams, 0,args[0]) != 0 )
+	int id = veejay_create_tag(v, VJ_TAG_TYPE_MCAST, str, v->nstreams, 0,args[0]);
+	if( id <= 0)
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new multicast stream");
 	}
+
 }
 
 
@@ -7108,7 +7140,35 @@ void	vj_event_send_devices			(	void *ptr,	const char format[],	va_list ap	)
 void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	vj_perform_send_primary_frame_s( v );
+
+	// send frame (peer to peer) on demand
+	vj_perform_send_primary_frame_s( v,0 );
+}
+
+
+void	vj_event_mcast_start				(	void *ptr,	const char format[],	va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	if(!v->settings->use_vims_mcast)
+		veejay_msg(VEEJAY_MSG_ERROR, "start veejay in multicast mode (see -V commandline option)");	
+	else
+	{
+		v->settings->mcast_frame_sender = 1;
+		veejay_msg(VEEJAY_MSG_INFO, "Veejay started mcast frame sender");
+	}	
+}
+
+
+void	vj_event_mcast_stop				(	void *ptr,	const char format[],	va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	if(!v->settings->use_vims_mcast)
+		veejay_msg(VEEJAY_MSG_ERROR, "start veejay in multicast mode (see -V commandline option)");	
+	else
+	{
+		v->settings->mcast_frame_sender = 0;
+		veejay_msg(VEEJAY_MSG_INFO, "Veejay stopped mcast frame sender");
+	}	
 }
 
 void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)

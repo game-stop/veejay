@@ -23,8 +23,8 @@
 
 void		packet_dump_header( packet_header_t *h)
 {
-	veejay_msg(VEEJAY_MSG_DEBUG, "Flag: %x, Sequence Num %x, Timestamp %x:%x Timeout : %ld",
-		h->flag, h->seq_num, h->sec, h->usec,h->timeout );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Flag: %x, Sequence Num %x/%d, Timestamp %x:%x Timeout : %ld",
+		h->flag, h->seq_num,h->seq_num, h->sec, h->usec,h->timeout );
 }
 
 packet_header_t		packet_construct_header(uint8_t flag)
@@ -36,7 +36,7 @@ packet_header_t		packet_construct_header(uint8_t flag)
 	header.seq_num = 0;	// not set
 	header.sec = tv.tv_sec;
 	header.usec = tv.tv_usec;
-	header.timeout = 40000;
+	header.timeout = 350000;
 	return header;
 }
 

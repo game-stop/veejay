@@ -43,8 +43,8 @@ You can select effects to put on your clips by pressing the cursor keys up and d
 Veejay can be used with PD (PureData) by using sendVIMS, a small commandline utility that translates PD's symbols to veejay and vice versa.Look at the REFERENCES to find out where to download this utility. Also, by using the OpenSoundControl veejay can be used with a great number of sound and video processing applications.Also veejay can stream video data to STDOUT (-o stdout -O3) in yuv4mpeg format, or stream uncompressed video over the network (uni - and multicast)
 .SH OPTIONS
 .TP
-.B \-p/--port <num>
-TCP port for communication with clients like gveejay (default 3490)
+.B \-p/--portoffset <num>
+TCP port offset for communication with clients like gveejay (default 3490)
 .TP
 .B \-h/--host
 Start as client of another veejay session (default is server)
@@ -53,8 +53,8 @@ Start as client of another veejay session (default is server)
 write video in YCbCr (YUV 4:2:0) format to specified file. Use this with -O3.
 If you use 'stdout' here, veejay will be silent and write yuv4mpeg streams to STDOUT
 .TP
-.B \-O/--output [01234]
-specify video output 0 = SDL (default) 1 = DirectFB 2 = SDL and DirectFB 3 = YUV4MPEG stream , 4 = System V SHM
+.B \-O/--output [012345]
+specify video output 0 = SDL (default) 1 = DirectFB 2 = SDL and DirectFB 3 = YUV4MPEG stream , 4 = System V SHM, 5 = Silent (no visual output)
 .TP
 .B \-s/--size NxN
 Scaled video dimensions for SDL video output
@@ -127,7 +127,7 @@ Specify norm of dummy video (0=PAL, 1=NTSC)
 Starts OSC receiver in multicast mode
 .TP
 .B \-V/--multicast-vims
-Starts VIMS in multicast mode (needed for multicast streaming)
+Setup additional multicast frame sender / command receiver ( port offset +[3,4] )
 .TP
 .B \  /--map-from-file <num frames>
 To reduce transfers between memory and disk, you can set a number

@@ -86,6 +86,8 @@
 #include <libel/vj-avcodec.h>
 #include <libyuv/yuvconv.h>
 #include <veejay/vj-OSC.h>
+
+#include <veejay/vims.h>
 // following struct copied from ../utils/videodev.h
 
 /* This is identical with the mgavideo internal params struct, 
@@ -674,7 +676,8 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int clip_id )
 	{
 		int tmp=0;
 		// new mode is stream, see if clip_id is a network stream (if so, connect!)
-		if( vj_tag_get_type( clip_id ) == VJ_TAG_TYPE_NET )
+		if( vj_tag_get_type( clip_id ) == VJ_TAG_TYPE_NET ||
+			vj_tag_get_type( clip_id) == VJ_TAG_TYPE_MCAST )
 		{
 			if(vj_tag_enable( clip_id )<= 0 )
 			{
@@ -808,7 +811,7 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 		if(type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_MCAST || type== VJ_TAG_TYPE_NET)
 			vj_tag_set_active( id, 1 );
 		veejay_msg(VEEJAY_MSG_INFO, "New stream %d of type %s created", id, descr );
-		return 0;
+		return id;
 	}
 	else
 	{
@@ -940,6 +943,10 @@ static int veejay_screen_update(veejay_t * info )
 
 	plugins_process_video_out( (void*) info->plugin_frame_info, (void*) info->plugin_frame );
 
+	// send a frame to all participants when using mcast
+	// (activated after sending VIMS MCAST SENDER START/STOP)
+	vj_perform_send_primary_frame_s(info, 1);
+
 	//todo: this sucks, have it modular.( video out drivers )
     switch (info->video_out) {
 #ifdef HAVE_SDL
@@ -994,6 +1001,8 @@ static int veejay_screen_update(veejay_t * info )
 			frame,
 			info->edit_list->video_width*info->edit_list->video_height);	
 
+		break;
+	case 5:
 		break;	
 	default:
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode");
@@ -1160,17 +1169,6 @@ static void veejay_handle_callbacks(veejay_t *info) {
 
 	/*  update network */
 	vj_event_update_remote( (void*)info );
-
-	/* send status information */
-	
-	if (info->uc->is_server)
-	{
-/*	    if( vj_server_poll(info->vjs[1]) )
-	    {
-			vj_server_new_connection( info->vjs[1] );
-	    }*/
- 	 //   if( info->vjs[1]->nr_of_links > 0 ) veejay_pipe_write_status(info);
-	}
 }
 
 void vj_lock(veejay_t *info)
@@ -1492,6 +1490,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
     editlist *el = info->edit_list;
     video_playback_setup *settings = info->settings;
 
+
 	vj_event_init();
 
 	veejay_change_state( info, LAVPLAY_STATE_PLAYING );
@@ -1504,9 +1503,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 #endif
     if(info->video_out<0)
     {
-		veejay_msg(VEEJAY_MSG_ERROR, "No video output driver selected (see man veejay)");
-		return -1;
-	}
+	veejay_msg(VEEJAY_MSG_ERROR, "No video output driver selected (see man veejay)");
+	return -1;
+    }
 
     	// override geometry set in config file   
 	if( info->uc->geox != 0 && info->uc->geoy != 0 )
@@ -1648,6 +1647,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
     	}
 #endif
     }
+	if( !vj_server_setup(info) )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Setting up server");
+		return -1;
+	}
 
     /* now setup the output driver */
     switch (info->video_out) {
@@ -1731,9 +1735,12 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	    	return -1;
 		}
 		break;
+	
+	case 5:
+		break;
     default:
 		veejay_msg(VEEJAY_MSG_ERROR,
-		    "Invalid playback mode. Use -O [0123]");
+		    "Invalid playback mode. Use -O [012345]");
 		return -1;
 	break;
     }
@@ -1757,15 +1764,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	return -1;
     }
 
-
-	if( !vj_server_setup(info) )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Setting up server");
-		return -1;
-	}
- if(vj_osc_setup_addr_space(info->osc) == 0) {
-	veejay_msg(VEEJAY_MSG_INFO, "Initialized OSC (http://www.cnmat.berkeley.edu/OpenSoundControl/)");
-	}
 
 	if(info->dummy->active)
 	{
@@ -2075,10 +2073,8 @@ static void *veejay_playback_thread(void *data)
 
     veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
     if(info->uc->is_server) {
-     vj_server_shutdown(info->vjs[0]);
-     vj_server_shutdown(info->vjs[1]); 
-
-
+	for(i = 0; i < 3; i ++ )
+	  if(info->vjs[i]) vj_server_shutdown(info->vjs[i]); 
     }
     if(info->osc) vj_osc_free(info->osc);
 
@@ -2125,30 +2121,75 @@ static void *veejay_playback_thread(void *data)
     return NULL;
 }
 
+/*
+	port 3490 = command, 3491 = status
+	port 3492 = OSC
+	port 3493 = mcast frame sender (optional)
+	port 3494 = mcast command receiver (optional)
+ */
+
 int vj_server_setup(veejay_t * info)
 {
-    if (info->uc->port == 0)
-	info->uc->port = VJ_PORT;
+	if (info->uc->port == 0)
+		info->uc->port = VJ_PORT;
+	info->vjs[0] = vj_server_alloc(info->uc->port, NULL, V_CMD);
 
-    info->vjs[0] = vj_server_alloc(info->uc->port, info->settings->vims_group_name, V_CMD);
-    if(!info->vjs[0])
-		return 0;
-    info->vjs[1] = vj_server_alloc((info->uc->port + 1), info->settings->vims_group_name, V_STATUS);
-    if(!info->vjs[1])
+	if(!info->vjs[0])
 		return 0;
 
+	info->vjs[1] = vj_server_alloc(info->uc->port, NULL, V_STATUS);
+	if(!info->vjs[1])
+		return 0;
+
+	info->vjs[2] = NULL;
+	if( info->settings->use_vims_mcast )
+	{
+		info->vjs[2] =
+			vj_server_alloc(info->uc->port, info->settings->vims_group_name, V_CMD );
+		if(!info->vjs[2])
+		{
+			veejay_msg(VEEJAY_MSG_ERROR,
+		  		 "Unable to initialize mcast sender");
+			return 0;
+		}
+		//info->settings->mcast_frame_sender = 1;
+	}
 	if(info->settings->use_mcast)
 		GoMultiCast( info->settings->group_name );
-    info->osc = (void*) vj_osc_allocate(info->uc->port+2);
-    if(!info->osc) 
+
+	info->osc = (void*) vj_osc_allocate(info->uc->port+2);
+
+    	if(!info->osc) 
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,
+		  "Unable to start OSC server at port %d",
+			info->uc->port + 2 );
 		return 0;
+	}
+
+	// see libvjnet/common.h
+
+	if( info->settings->use_mcast )
+		veejay_msg(VEEJAY_MSG_INFO, "UDP multicast OSC channel ready at port %d (group '%s')",
+			info->uc->port + 2, info->settings->group_name );
+	else
+		veejay_msg(VEEJAY_MSG_INFO, "UDP unicast OSC channel ready at port %d",
+			info->uc->port + 2 );
+
+	if(vj_osc_setup_addr_space(info->osc) == 0)
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Initialized OSC (http://www.cnmat.berkeley.edu/OpenSoundControl/)");
+	}
 
 
-    if (info->osc == NULL || info->vjs[0] == NULL || info->vjs[1] == NULL) {
-	return 0;
-    }
-    info->uc->is_server = 1;
-    return 1;
+
+
+    	if (info->osc == NULL || info->vjs[0] == NULL || info->vjs[1] == NULL) 
+		return 0;
+    	
+    	info->uc->is_server = 1;
+
+	return 1;
 }
 
 /******************************************************
