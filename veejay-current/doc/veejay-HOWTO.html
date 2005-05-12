@@ -3,7 +3,7 @@ Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">
 <html>
 <head>
 <meta http-equiv="content-type" content="text/html; charset=UTF-8" >
-<title>veejay HOWTO</title>
+<title>veejay HOWTO (work in progress)</title>
 </head>
 <body><div>
 <h2>Veejay HOWTO</h2>
@@ -38,14 +38,15 @@ This document describes  how to use <b>veejay</b>, a visual 'music' instrument f
 <dt>3.  <a href="veejay-HOWTO.html#3">Installation</a></dt>
 <dd><dl><dt>3.1 <a href="veejay-HOWTO.html#3.1">Dependencies</a></dt>
 <dt>3.2 <a href="veejay-HOWTO.html#3.2">Installing veejay</a></dt>
-<dt>3.3 <a href="veejay-HOWTO.html#3.3">Setting up streams</a></dt></dl></dd>
+<dt>3.3 <a href="veejay-HOWTO.html#3.3">Setting up multicast</a></dt></dl></dd>
 
 <dt>4.  <a href="veejay-HOWTO.html#4">Using Veejay</a></dt>
-<dd><dl><dt>4.1 <a href="veejay-HOWTO.html#4.1">Terminology</a></dt>
-<dt>4.2 <a href="veejay-HOWTO.html#4.2">sayVIMS</a></dt>
+<dd><dl><dt>4.1 <a href="veejay-HOWTO.html#4.1">Terminology and limitations</a></dt>
+<dt>4.2 <a href="veejay-HOWTO.html#4.2">VIMS</a></dt>
 <dt>4.3 <a href="veejay-HOWTO.html#4.3">The keyboard interface</a></dt>
 <dt>4.4 <a href="veejay-HOWTO.html#4.4">Recording video</a></dt>
-<dt>4.5 <a href="veejay-HOWTO.html#4.5">Other utilities</a></dt></dt></dl></dd>
+<dt>4.5 <a href="veejay-HOWTO.html#4.5">Streaming video</a></dt>
+<dt>4.6 <a href="veejay-HOWTO.html#4.5">Other utilities</a></dt></dt></dl></dd>
 
 <dt>5<a href="veejay-HOWTO.html#5">Popular packages</a></dt>
 <dd><dl><dt>5.1<a href="veejay-HOWTO.html#5.1">EffecTV</a></dt>
@@ -157,6 +158,8 @@ As of version 0.8 Veejay comes with a graphical user interface GVeejay.
 You can use GVeejay to connect (and switch) to any Veejay on the network , alternativly
 it can launch a veejay locally on your machine.<br>
 Use GVeejay to customize keyboard mappings and save the configuration file.<br>
+Gveejay supports hot switching between multiple running instances of veejay,
+simply disconnect and connect to another veejay.<br>
 </p>
 
 <h2><a name="2.1">2.1 Features</a></h2><p>
@@ -326,7 +329,11 @@ in your kernel configuration.
 <br><br>
 Finally you need to add a multicast route :
 <pre>
-  $ route add -net 224.0.0.0 netmask 255.255.255.0 dev eth0
+for 1 ethernet device:
+# route add -net 224.0.0.0 netmask 255.255.255.0 dev eth0
+
+for > 1 
+# route add -net 224.0.0.0 netmask 255.255.255.0 gw 192.168.100.1 dev eth1
 </pre>
 <br>
 Next, Veejay can be started with the commandline flags
@@ -349,12 +356,14 @@ $ veejay -d
 
 <br>
 </p>
-<h2><a name="4.1">4.1 Terminology</a></h2><p>
+<h2><a name="4.1">4.1 Terminology and limitations</a></h2><p>
 Veejay has a number of playback modes, each playback mode is unique and defines more or less
 a different functionality:<br><br>
 Also, note that veejay runs in only 1 resolution at a time (depending on the video dimensions of
 the first loaded movie). All movies loaded must have identical properties, otherwise veejay will not start.
-This limitation is also valid when streaming video from veejay to another veejay.<br><br><br>
+This limitation is also valid when streaming video from veejay to another veejay.<br>
+
+<br><br>
 <table border=0 width=80%>
 <caption><h4>Playback modes in veejay</h4></caption>
 
@@ -398,7 +407,132 @@ This limitation is also valid when streaming video from veejay to another veejay
 
 </p>
 
-<h2><a name="4.2">4.2 sayVIMS</a></h2><p>
+<h2><a name="4.2">4.2 VIMS</a></h2><p>
+<pre>
+
+Use the command 
+$ veejay -u -n |less
+
+to dump all VIMS messages.
+
+1.1 Message Format
+==================
+
+A message is described as:
+
+	 <Action Identifer> : <Argument List> ; 
+
+Example:
+
+	080:;
+	099:0 0;
+
+
+<Action Identifier>
+The action identifier is a 3 digit number describing a Network Event  
+The colon is used to indicate the start of the Argument List and must be given. 
+
+
+<Argument List>
+The Argument List is described by a printf() style formatted template 
+which describes the number and type of arguments to be used. 
+
+The semicolon must be given to indicate the end of this message
+
+1.2 Bundled Messages
+====================
+
+A message bundle is a special message that contains an ordered list of at least 1 or more messages. Each message is executed from left to right (first in, first out) while parsing the bundle.   
+
+
+Example:
+
+	5032|BUN:002{361:0 3 56 230 93 0;361:0 4 1 7;}|
+	5033|BUN:003{361:0 3 56 230 93 0;361:0 4 1 7;361:0 5 1 7;}|
+	5034|BUN:003{361:0 3 56 230 93 0;361:0 4 1 7;361:0 5 1 8;}|
+
+
+A message bundle is described as:
+
+	 BUN: <Number of Messages> { 
+		<Action Idenfifier> : <Argument List> ;
+		<Action Identifier> : <Argument List> ;
+		... 
+		}
+		;
+
+
+The token 'BUN:' indicates the start of a messaage bundle, the first 3 digit numeric value represents the total number of messages in the bundle. The '{' symbol indicates the start of a message block and is ended with '};' or just '}'. 
+
+
+1.3 Format of an Action File/Attaching Keys to Bundles
+======================================================
+
+	<501 - 599> | <message bundle> |
+
+The contents of some action file can be :
+
+	516|BUN:001{355:;}|
+
+
+
+The message bundle BUN sends '355' for clear effect chain.
+This message bundle is attached to action identifier 516.
+
+A key is attached to this function trough using the GUI (GVeejay)
+or by using: 
+
+
+DYNAMIC KEYMAPPING:
+==================
+
+	"083:516 <sdl symbol> <modifier> <optional arguments>;"
+
+
+The message bundle can be attached to a key , for example 'SHIFT + A' by sending 
+	
+	083:516 97 3;
+
+Which attaches bundle '516' to SDL key '97' using a modifier '3', which is SHIFT. 
+
+Modifiers: 0 = none, 1 = alt , 2 = ctrl,  3 = shift
+Keys     : see SDLkeysym.h somewhere in include/SDL/
+
+If the number 0 is used for an event number, a given key combination can be
+unset (wiped) :
+
+	083:0 97 3;
+
+Alternativly, you can bind keys to any action identifier. The complete
+list can be viewd by typing veejay -u |less or with Gveejay. 
+
+	083:20 97 0 4;
+
+The example above sets key 'a' to 'change video speed to 4'
+
+
+
+General  description of VIMS messages
+=====================================  
+
+
+Some reserved numbers:
+
+	clip id		0	:	select currently playing clip	
+	clip id		-1	:	select highest clip number 
+        chain entry	-1      :   	select current chain entry 
+	stream id 	0	:	select currently playing stream 
+	stream id 	-1	:	select highest stream number
+	key modifier	        :	0 = normal, 1= alt , 2 = ctrl, 3 = shift
+	frame		-1	:	use highest possible frame number (usually num video frames)
+	playback mode   	:	0 = clip, 1 = stream, 2 = plain
+	data format     	: 	yv16 (yuv 4:2:2 raw) , mpeg4, divx, msmpeg4v3,
+					div3, dvvideo, dvsd, mjpeg, i420 and yv12 (yuv 4:2:0 raw)
+	loop type		:  	0 = no looping, 1 = normal loop, 2 = pingpong (bounce) loop
+</pre>
+<br><br>
+<h2><a name="#4.2"></a>sayVIMS</h2>
+<br><br>
 sayVIMS is a commandline utility distributed with the veejay package,
 it allows you to give short commands in interactive mode<br><br>
 <i>$ sayVIMS -i -h localhost -p 3490</i><br><br>
@@ -438,7 +572,6 @@ scripts that output a VIMS script.<br>
 <pre>
 sayVIMS -f advocate.vims -h localhost -p 3490
 </pre>
-See the VIMS.txt file in the source package for a more detailed (but not yet complete) overview.<br>
 <br>
 Alternativly, you can start a secundary veejay and stream from peer to peer in uncompressed video:
 <br>
@@ -575,7 +708,59 @@ It is possible to start veejay headless and have it write all video data to
 a (special) file for further processing.<br><br>
 Refer to chapter <a href="veejay-HOWTO.html#5.3">5.3</a> for some examples.<br><br>
 
-<h2><a name="4.5">4.5 Other utilities</a></h2><p>
+<h2><a name="4.5">4.5 Streaming video</a></h2><p>
+You can create an input stream to read video coming from a video4linux device, from a pipe 
+or from a network socket (both unicast and multicast).<br>
+<h3><a name="4.5.1">4.5.1 video4linux</a></h3>
+To open a video4linux device use gveejay or type the command:<br>
+<br>
+<pre>
+$ sayVIMS 240:0 1;
+</pre>
+The selector '240' tells veejay to open a video4linux device, the first argument '0' indicates
+the device number (i.e. /dev/video0) and the last argument '1' indicates the video in port
+of your capture card (in this case composite).<br>
+Veejay will create a new stream see <a href="#4.4">chapter 4.4</a> for activating the stream.<br>
+</p>
+<h3><a name="4.5.2">4.5.2 pipe</a></h3>
+Veejay supports reading video data from a pipe (FIFO) by means of an input stream.<br>
+The only supported transport format is yuv4mpeg (yuv 4:2:0). When playing YUV 4:2:2
+the video stream will be sampled to YUV 4:2:0 and vice versa<br>
+You can create the input stream by typing the command
+<pre>
+$ sayVIMS 243:/tmp/stream.yuv;
+</pre> 
+<h3><a name="4.5.3">4.5.3 network</a></h3>
+To get frames from another running veejay, use the command:
+<br>
+<pre>
+$ sayVIMS 245:<hostname> <portnum>;
+</pre>
+For example, sayVIMS 245:localhost 5000;<br>
+<br>
+If you want to send the same video to multiple running veejays accross the network,
+you can save bandwith by starting the veejay you wish to use as server with the -V option.
+<br>
+You can use the -V <multicast address> option to start an optional multicast frame sender.<br>
+First, you need a multicast route in your routing table. See chapter <a href="#3.3">3.3</a> for
+a short introduction 
+or consult a howto that disuccess setting up multicast for your operating system.
+<br>
+<br>
+   
+<pre>
+$ veejay -V 224.0.0.50 -p 5000
+</pre>
+
+Start another veejay, and use this command:
+<br>
+<pre>
+$ sayVIMS "246:5000 224.0.0.50;" 
+</pre>
+To create a new input stream. Start more veejays and use sayVIMS with the -p option to give
+it a port offset number. <br> 
+</p>
+<h2><a name="4.6">4.6 Other utilities</a></h2><p>
 
 Currently there are 4 extra utilities <b>yuv2rawdv</b> , <b>rawdv2yuv</b> , <b>sayVIMS</b> and <b>any2yuv</b> included in the veejay package for encoding
 a Y'C<sub>B</sub>C<sub>R</sub> 4:2:0 stream to raw DV and vice versa.

@@ -5,16 +5,18 @@ veejay - a visual (video) instrument and video sampler for GNU/Linux
 .B veejay [options] Videofile1 [Videofile2 ... VideofileN]
 .SH DESCRIPTION
 .B veejay
-can be used to manipulate video in a realtime environment i.e. 'VJ'
-for visual performances or for (automated) interactive video installations.
-It provides mechanisms for simple non-desctructive editing, loop-based
-clip editing (video sampling) ,capturing from multiple streams, direct-to-disk
-recording in various formats , mixing from multiple sources to one
-and network streaming (both unicast and multicast in uncompressed video)
-Also, it can communicate with other sound and/or video applications
-using the Open Sound Control (or through an inhouse protocol called 'VIMS') 
-Veejay uses Jack for transporting Audio (currently only output) but its support
-is currently limited.     
+Veejay is a visual instrument and realtime video sampler. It allos you
+to "play" the video like you would play a Piano and it allows you to
+record the resulting video directly to disk for immediate playback (video sampling).
+
+Thus, Veejay can be operated live by using the keyboard (which is 100% user definable)
+and remotely over network (both unicast and multicast) using an inhouse message
+system that allows mapping of various protocols on top of it, including OSC.
+
+Veejay is beeing developed in the hope it will be usefull for VJ's , media artists
+theathers and other interested users that want to use Free Software for their
+performances and/or video installations.
+
 .TP
 .SH Supported video codecs
 .TP

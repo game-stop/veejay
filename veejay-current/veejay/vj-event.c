@@ -1115,7 +1115,7 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 	
 	
 	char *tmp = NULL;
-	int msg_len = strlen(msg)-1;
+	int msg_len = strlen(msg);
 	int id = 0;
 	bzero(args,150);  
 	/* message is at least 5 bytes in length */
@@ -1124,6 +1124,18 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 		veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Message [%s] too small (only %d bytes, need at least %d)",
 			(msg==NULL? "(Empty)": msg), msg_len, MSG_MIN_LEN);
 		return 0;
+	}
+
+	/* Sometimes, messages can have a trailing sequence of characters (like newline or spaces)*/
+	while( msg[msg_len] != ';' )
+	{
+		msg[msg_len] = '\0';
+		msg_len --;
+		if(msg_len < MSG_MIN_LEN)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Syntax error: Message does not end with ';'");
+			return 0;
+		}	
 	}
 
 	tmp = strndup( msg, 3 );
@@ -1150,6 +1162,8 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 	if( msg[3] != 0x3a || msg[msg_len] != ';' )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Syntax error, use \"<VIMS selector>:<arguments>;\" ");
+		veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) [%s] : '%c' , '%c' ", msg,
+			msg[3], msg[msg_len] );
 		return 0;
 	}
 
@@ -1195,7 +1209,6 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 	{
 		const char *fmt = vj_event_list[id].format;
 		const int   np  = vj_event_list[id].num_params;
-		int  offlen     = ((msg_len-4) > 0 ? 4 : msg_len ); 
 		int		fmt_offset = 1; // fmt offset
 		int 		i;
 		int		offset = 0;  // arguments offset
@@ -2062,8 +2075,7 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 void	vj_event_init_network_events()
 {
 	int i;
-	
-	int net_id;
+	int net_id = 0;
 	for( i = 1; vj_event_list[i].event_id != 0; i ++ )
 	{
 		net_id = vj_event_list[i].event_id;
@@ -2341,7 +2353,7 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 	}	
 	else
 	{
-		const char *buf = "0000";
+		char *buf = "0000";
 		SEND_MSG(v,buf);
 	}
 }
@@ -2401,7 +2413,7 @@ void	vj_event_send_vimslist(void *ptr, const char format[], va_list ap)
 	}	
 	else
 	{
-		const char *buf = "0000";
+		char *buf = "0000";
 		SEND_MSG(v,buf);
 	}
 }
@@ -6040,7 +6052,7 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 	if( vj_tag_exists(args[0]))
 	{
 		char tmp[255];
-		char time[20];
+		
 		int format = _recorder_format;
 		char prefix[40];
 		sprintf(prefix, "stream-%02d", args[0]);
@@ -6710,7 +6722,7 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 	if( ((vj_tag_size()-1) <= 0) || (args[0] >= vj_tag_size()-1))
 	{
 		/* there are no tags */
-		const char *empty = "00000";
+		char *empty = "00000";
 		veejay_msg(VEEJAY_MSG_ERROR, "No Streams (%d) or asking for non existing (%d)",
 			vj_tag_size()-1,args[0]);
 		SEND_MSG(v, empty);
@@ -7061,7 +7073,7 @@ void	vj_event_send_clip_history_list	(	void *ptr,	const char format[],	va_list a
 		for( entry = 0; entry < CLIP_MAX_RENDER; entry ++ )
 		{	
 			// check if entry is playable
-			void *data = clip_get_user_data( id );
+			//void *data = clip_get_user_data( id );
 			editlist **el = (editlist**) clip_get_user_data( id );
 			bzero(hisline,25);
 			if(el && el[entry])

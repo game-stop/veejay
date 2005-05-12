@@ -55,6 +55,10 @@ static void vj_flush(int frames) {
 			{
 				frames -- ;
 			}
+			if(n == -1)
+			{
+				exit(0);
+			}
 		}
 	}
 }
@@ -213,6 +217,8 @@ int main(int argc, char *argv[])
 	bzero( buf, 65535 );
 
 	client = vj_client_alloc( 0,0,0 );
+	if(host_name == NULL)
+		host_name = strdup( "localhost" );
 
 	if(!vj_client_connect( client, host_name,group_name, port_num ))
 	{
@@ -258,11 +264,14 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				if(buf[0]!='#') {
-					int len = strlen(buf)-1;
-					if(len>0){
-					buf[len] = '\0';
-					vj_client_send(client,V_CMD,buf);}
+				if(buf[0]!='#')
+				{
+					int len = strlen(buf);
+					if(len>0)
+					{
+						buf[len] = '\0';
+						vj_client_send(client,V_CMD,buf);
+					}
 				}
 			}	
 		}
