@@ -794,8 +794,8 @@ int vj_server_retrieve_msg(vj_server *vje, int id, char *dst )
 
 	if( index == Link[id]->n_queued )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "\tRetrieved %d messages from queue",
-			index);
+//		veejay_msg(VEEJAY_MSG_DEBUG, "\tRetrieved %d messages from queue",
+//			index);
 		return 0; // done
 	}
 	msg = Link[id]->m_queue[index]->msg;
@@ -805,8 +805,8 @@ int vj_server_retrieve_msg(vj_server *vje, int id, char *dst )
 
 	index ++;
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "\tExec VIMS %d [%s]",
-		index-1, msg );
+//	veejay_msg(VEEJAY_MSG_DEBUG, "\tExec VIMS %d [%s]",
+//		index-1, msg );
 
 	Link[id]->n_retrieved = index;
     return 1;			

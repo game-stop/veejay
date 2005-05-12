@@ -1072,6 +1072,11 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 			}
 		}
 
+		for( i = 0; i < 16; i ++ )
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "vims argument [%p]", vims_arguments[i].value );
+		}
+
 		vj_event_trigger_function( (void*) v, net_list[net_id].act,
 			vj_event_list[id].num_params, vj_event_list[id].format,
 			vims_arguments[0].value,
@@ -1184,16 +1189,26 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 			&(vj_event_list[id].args[1])
 		);	
 	}
-	veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) received message '%s' of %d bytes", msg, msg_len);
+	veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) '%s' -> %s", msg,
+			vj_event_list[id].name );
 	if( msg_len > MSG_MIN_LEN)
 	{
 		const char *fmt = vj_event_list[id].format;
 		const int   np  = vj_event_list[id].num_params;
-		const char *arguments = strndup( msg + 4, msg_len - 4 );		
+		int  offlen     = ((msg_len-4) > 0 ? 4 : msg_len ); 
 		int		fmt_offset = 1; // fmt offset
 		int 		i;
 		int		offset = 0;  // arguments offset
 		int		num_array[16];
+		char		*arguments;
+
+		arguments = strndup( (msg + 4) , (msg_len -4) );
+		if( arguments == NULL )
+		{	
+			veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) %d requires %d arguments but none were given",
+				net_id, np );
+			return 0;
+		} 
 		if( np <= 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) %d accepts no arguments", net_id); 
@@ -1201,12 +1216,7 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 				free( (void*) arguments);
 			return 0; // Ffree mem
 		}
-		if( arguments == NULL )
-		{	
-			veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) %d requires %d arguments but none were given",
-				net_id, np );
-			return 0;
-		} 
+	
 		vims_arg_t	vims_arguments[16];
 		memset( vims_arguments, 0, sizeof(vims_arguments) );
 		memset( num_array, 0, sizeof(num_array));
@@ -1216,6 +1226,12 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 		{
 			int failed_arg = 0;
 			int type = 0;
+
+			if(offset >= (msg_len - 4))
+			{
+				break;
+			}
+
 			if( fmt[fmt_offset] == 's' )
 			{		
 				type = 1;
@@ -1266,7 +1282,7 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 					}
 				}
 			}
-
+		
 			if( flags & VIMS_REQUIRE_ALL_PARAMS && failed_arg > 0)
 			{
 				if(type == 0 )
@@ -1290,12 +1306,24 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 				if(i<2)	vims_arguments[i].value = (void*) &(vj_event_list[id].args[i]);
 				else
 					vims_arguments[i].value = NULL;	
+				
 			}
 			fmt_offset += 3;	
 		}
-		if(arguments)
-			free( (void*)arguments);
 
+		while( i < np)
+		{
+			int zero = 0;
+			if( fmt[fmt_offset] == 'd' )
+				vims_arguments[i].value = (void*) &zero;
+			else
+				vims_arguments[i].value = NULL;
+			i++;
+			fmt_offset += 3;
+		}
+
+
+		// should be 'I' ?
 		_last_known_num_args = np;
 
 		vj_event_trigger_function(
@@ -1328,7 +1356,8 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 				free( vims_arguments[i].value );
 			fmt_offset += 3;
 		}
-
+		if(arguments)
+			free( (void*)arguments);
 	}
 	else
 		_last_known_num_args = 0;
@@ -1541,8 +1570,11 @@ static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *ds
 		tmp = xmlNodeListGetString( doc, cur->xmlChildrenNode,1 );
 		t   = UTF8toLAT1(tmp);
 		if(!t)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Input not in UTF8 format!");
 			return 0;
-		
+		}
+
 		n = sscanf( t, "%d", &tmp_i );
 		free(t);
 		xmlFree(tmp);
@@ -1550,8 +1582,10 @@ static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *ds
 		if( n )
 			*dst = tmp_i;
 		else
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot convert value '%s'to number", t);
 			return 0;
-
+		}
 		return 1;
 	}
 	return 0;
@@ -1714,7 +1748,7 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 	{
 		if( vj_event_bundle_exists(event_id))
 		{
-			veejay_msg(VEEJAY_MSG_WARNING, "Bundle %d already exists in VIMS system! (Bundle in configfile was ignored)");
+			veejay_msg(VEEJAY_MSG_WARNING, "Bundle %d already exists in VIMS system! (Bundle in configfile was ignored)",event_id);
 			return;
 		}
 

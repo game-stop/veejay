@@ -122,7 +122,7 @@ void	on_button_sampleend_clicked(GtkWidget *widget, gpointer user_data)
 {
 	info->sample[1] = info->status_tokens[FRAME_NUM];
 	multi_vims( VIMS_CLIP_NEW, "%d %d", info->sample[0],info->sample[1]);
-	if(info->status_tokens[PLAY_MODE] == MODE_PLAIN )
+	if(info->status_tokens[PLAY_MODE] == MODE_PLAIN)
 		info->uc.reload_hint[HINT_SLIST] = 1;
 }
 

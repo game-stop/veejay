@@ -503,11 +503,10 @@ int vj_perform_init(veejay_t * info)
 
     for(c=0; c < 2; c ++ )
 	{
-    video_output_buffer[c] = (struct ycbcr_frame*) vj_malloc(sizeof(struct ycbcr_frame));
-    video_output_buffer[c]->Y = NULL;
-    video_output_buffer[c]->Cb = NULL;
-    video_output_buffer[c]->Cr = NULL; 
-    video_output_buffer[c] = (struct ycbcr_frame*) vj_malloc(sizeof(struct ycbcr_frame));
+	    video_output_buffer[c] = (struct ycbcr_frame*) vj_malloc(sizeof(struct ycbcr_frame));
+	    video_output_buffer[c]->Y = NULL;
+	    video_output_buffer[c]->Cb = NULL;
+	    video_output_buffer[c]->Cr = NULL; 
 	}
 
     clip_record_init(frame_len);
@@ -988,32 +987,25 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
 int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
 	VJFrame **frames, VJFrameInfo *frameinfo, int e , int c, int n_frame)
 {
-	int *args = NULL;
 	int n_a = vj_effect_get_num_params(e);
 	int entry = e;
 	int err = 0;
-	args = (int*) malloc(sizeof(int) * n_a );
-	memset( args, 0 , n_a );
-	
+	int args[16];
+
+	memset( args, 0 , 16 );
+
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
 	{
 		if(!vj_tag_get_all_effect_args(todo_info->ref, c, args, n_a ))
-		{
-			free(args);
 			return 1;
-		}
 	}
 	else
 	{
 		if(!clip_get_all_effect_arg( todo_info->ref, c, args, n_a, n_frame))
-		{
-			free(args);
 			return 1;
-		}
 	}
 	err = vj_effect_apply( frames, frameinfo, todo_info,entry, args );
 	
-	free(args);
 	return err;
 }
 

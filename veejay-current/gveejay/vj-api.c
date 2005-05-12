@@ -418,7 +418,13 @@ enum
 	TC_STREAM_M = 6,
 	TC_STREAM_H = 7
 };
+/*
 
+	todo:
+	* generalize tree view usage (cleans up a lot of code)
+	
+
+ */
 void	on_samplelist_edited(GtkCellRendererText *cell,
 		gchar *path_string,
 		gchar *new_text,
