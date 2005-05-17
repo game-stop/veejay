@@ -493,7 +493,7 @@ static struct {
 		vj_event_bundled_msg_del,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
 #ifdef HAVE_XML2
 	{ VIMS_BUNDLE_SAVE,			"Veejay save configuration file",
-		vj_event_write_actionfile,	2,	"%s %d",	{0,0}, VIMS_LONG_PARAMS | VIMS_ALLOW_ANY  },
+		vj_event_write_actionfile,	2,	"%d %s",	{0,0}, VIMS_LONG_PARAMS | VIMS_ALLOW_ANY  },
 #endif
 	{ VIMS_BUNDLE_LIST,			"Bundle: get all contents",
 		vj_event_send_bundles,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY		},
@@ -2759,7 +2759,6 @@ void vj_event_play_reverse(void *ptr,const char format[],va_list ap)
 		if( speed == 0 ) speed = -1;
 		else 
 			if(speed > 0) speed = -(speed);
-
 		veejay_set_speed(v,
 				speed );
 
@@ -3051,14 +3050,22 @@ void vj_event_clip_set_speed(void *ptr, const char format[], va_list ap)
 
 	if(clip_exists(args[0]))
 	{	
-		if( clip_set_speed(args[0], args[1]) != -1)
+		if( CLIP_PLAYING(v))
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Clip %d speed set to %d",args[0],args[1]);
+			veejay_set_speed(v, args[1] );
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Speed %d it too high to set on clip %d !",
-				args[1],args[0]); 
+			if( clip_set_speed(args[0], args[1]) != -1)
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "Clip %d speed set to %d",args[0],args[1]);
+			}
+			else
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Speed %d it too high to set on clip %d !",
+					args[1],args[0]); 
+			}
+
 		}
 	}
 	else

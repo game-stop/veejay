@@ -340,6 +340,7 @@ static	vj_gui_t	*info = NULL;
 
 static	int	get_slider_val(const char *name);
 static  void    vj_msg(int type, const char format[], ...);
+static  void    vj_msg_detail(int type, const char format[], ...);
 static	void	msg_vims(char *message);
 static  void    multi_vims(int id, const char format[],...);
 static  void 	single_vims(int id);
@@ -959,10 +960,6 @@ gchar *dialog_save_file(const char *title )
 		gchar *file = gtk_file_chooser_get_filename(
 				GTK_FILE_CHOOSER(dialog) );
 
-		if(info->run_state == RUN_STATE_REMOTE )
-		{
-			vj_msg(VEEJAY_MSG_INFO, "Not sure if path exists on remote!");
-		}
 		gtk_widget_destroy(dialog);
 		return file;
 	}
@@ -1048,12 +1045,12 @@ void	about_dialog()
 	int i;
 	vj_msg( VEEJAY_MSG_INFO, "%s", license );
 	for(i = 0; artists[i] != NULL ; i ++ )
-		vj_msg( VEEJAY_MSG_INFO, "%s", artists[i] );
+		vj_msg_detail( VEEJAY_MSG_INFO, "%s", artists[i] );
 	for(i = 0; authors[i] != NULL ; i ++ )
-		vj_msg( VEEJAY_MSG_INFO, "%s", authors[i] );
-	vj_msg( VEEJAY_MSG_INFO,
+		vj_msg_detail( VEEJAY_MSG_INFO, "%s", authors[i] );
+	vj_msg_detail( VEEJAY_MSG_INFO,
 		"Copyright (C) 2004 - 2005. N. Elburg et all." );
-	vj_msg( VEEJAY_MSG_INFO,
+	vj_msg_detail( VEEJAY_MSG_INFO,
 		"GVeejay - A graphical interface for Veejay");
 
 #endif
@@ -1237,6 +1234,43 @@ enum
 static	int	line_count = 0;
 static  void	vj_msg(int type, const char format[], ...)
 {
+	if( type == VEEJAY_MSG_DEBUG && vims_verbosity == 0 )
+		return;
+
+	char tmp[1024];
+	char buf[1024];
+	char prefix[20];
+	va_list args;
+	gchar level[6];
+	bzero(level,0);	
+	bzero(tmp, 1024);
+	bzero(buf, 1024);
+
+	va_start( args,format );
+	vsnprintf( tmp, sizeof(tmp), format, args );
+	
+	switch(type)
+	{
+		case 2: sprintf(prefix,"Info   : ");break;
+		case 1: sprintf(prefix,"Warning: ");break;
+		case 0: sprintf(prefix,"Error  : ");break;
+		case 3:
+			sprintf(prefix,"Debug  : ");break;
+		case 4:
+			sprintf(prefix, " ");break;
+	}
+
+	snprintf(buf, sizeof(buf), "%s %s\n",prefix,tmp );
+	int nr,nw;
+        gchar *text = g_locale_to_utf8( buf, -1, &nr, &nw, NULL);
+        text[strlen(text)-1] = '\0';
+        put_text( "lastmessage", text );
+
+	g_free( text );
+	va_end(args);
+}
+static  void	vj_msg_detail(int type, const char format[], ...)
+{
 	GtkWidget *view = glade_xml_get_widget( info->main_window,(type==4 ? "veejaytext": "gveejaytext"));
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
 	GtkTextIter iter;
@@ -1274,9 +1308,6 @@ static  void	vj_msg(int type, const char format[], ...)
 	int nr,nw;
 	gchar *text = g_locale_to_utf8( buf, -1, &nr, &nw, NULL);
 	gtk_text_buffer_insert( buffer, &iter, text,nw);
-	text[strlen(text)-1] = '\0';
-	put_text( "lastmessage", text );
-
 	g_free( text );
 	va_end(args);
 }
@@ -1285,7 +1316,7 @@ static	void	msg_vims(char *message)
 {
 	if(!info->client)
 		return;
-	vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, message );
+	//vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, message );
 	vj_client_send(info->client, V_CMD, message);
 }
 
@@ -1318,7 +1349,7 @@ static	void	multi_vims(int id, const char format[],...)
 	vsnprintf(tmp, sizeof(tmp)-1, format, args );
 	snprintf(block, sizeof(block)-1, "%03d:%s;",id,tmp);
 	va_end(args);
-	vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, block );
+	//vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, block );
 	vj_client_send( info->client, V_CMD, block); 
 }
 
@@ -1328,7 +1359,7 @@ static	void single_vims(int id)
 	if(!info->client)
 		return;
 	sprintf(block, "%03d:;",id);
-	vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__ , block );
+	//vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__ , block );
 	vj_client_send( info->client, V_CMD, block );
 }
 
@@ -1347,7 +1378,7 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 		n = vj_client_read( info->client, V_CMD, result, len );
 		*bytes_written = n;
 		result[len] = '\0';
-		vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, result );
+		//vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, result );
 		return result;
 	}	
 	return result;
@@ -1476,6 +1507,19 @@ static	void	update_slider_gvalue(const char *name, gdouble value)
 		return;
 	gtk_adjustment_set_value(
 		GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment), value );	
+}
+
+static	void	update_slider_rel_value(const char *name, gint value, gint minus, gint scale)
+{
+	GtkWidget *w = glade_xml_get_widget( info->main_window, name );
+	if(!w)
+		return;
+	gdouble gvalue = (gdouble)(value - minus);
+	if(scale)
+		gvalue = (100.0 / (gdouble)scale) * gvalue;
+
+	gtk_adjustment_set_value(
+		GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment), gvalue );	
 }
 
 
@@ -1752,11 +1796,6 @@ static void 	update_globalinfo()
 			enable_widget("vbox_fxtree");
 
 
-		vj_msg(VEEJAY_MSG_INFO,	
-		 "Playmode mode is %s",
-			 ( pm == MODE_PLAIN ? "Plain" :
-                           ( pm == MODE_SAMPLE ? "Sample" : "Stream" ) ) 
-		);
 		if( pm == MODE_SAMPLE || pm == MODE_STREAM)
 		{
 			info->uc.reload_hint[HINT_CHAIN] = 1;
@@ -1774,13 +1813,18 @@ static void 	update_globalinfo()
 		{
 			if(pm == MODE_STREAM)
 				update_slider_value( "videobar", 0, 0 );
-			if(pm == MODE_PLAIN || pm == MODE_SAMPLE )
+			if(pm == MODE_PLAIN )
 				update_slider_value( "videobar", info->status_tokens[FRAME_NUM], 
 					         info->status_tokens[TOTAL_FRAMES] );
+			if(pm == MODE_SAMPLE)
+				update_slider_rel_value( "videobar",
+						info->status_tokens[FRAME_NUM],
+						info->status_tokens[SAMPLE_START],
+						0);
 		}
 		if(pm == MODE_SAMPLE )
 		{
-			gchar *time = format_time( info->status_tokens[SAMPLE_END] - info->status_tokens[FRAME_NUM]);
+			gchar *time = format_time( info->status_tokens[FRAME_NUM] - info->status_tokens[SAMPLE_START]);
 
 			update_label_str( "label_sampleposition", time);
 			g_free(time); 
@@ -1820,11 +1864,19 @@ static void 	update_globalinfo()
 		}
 		update_spin_range(
 			"button_fadedur", 0, tf, 0 );
-
-		update_slider_range( "videobar", 0, tf, 
-			info->status_tokens[FRAME_NUM], 1 );	
+		if( pm == MODE_SAMPLE )
+		{
+			update_slider_range( "videobar", 0, (info->status_tokens[SAMPLE_END] -
+			info->status_tokens[SAMPLE_START]), (info->status_tokens[FRAME_NUM] - 
+			info->status_tokens[SAMPLE_START]), 0);
+		}
+		else
+		{
+			update_slider_range( "videobar", 0, tf, 
+				info->status_tokens[FRAME_NUM], 1 );	
+		}	
 		update_label_i( "label_totframes", tf, 1 );
-		
+			
 		gchar *time = format_selection_time( 1, tf );
 		update_label_str( "label_totaltime", time );
 		g_free(time);
@@ -2457,8 +2509,6 @@ static	void	load_parameter_info()
 		info->uc.selected_rgbkey = _effect_get_rgb( p[0] );
 		if(info->uc.selected_rgbkey)
 		{
-			vj_msg(VEEJAY_MSG_INFO,
- 				"You can use the color selection panel with this effecT");
 			enable_widget( "rgbkey");
 			// update values
 			update_rgbkey();
@@ -2795,7 +2845,7 @@ void	on_samplelist_edited(GtkCellRendererText *cell,
 	
 		if(error)
 		{
-			vj_msg(VEEJAY_MSG_ERROR,"Invalid string: %s", error->message );
+			vj_msg_detail(VEEJAY_MSG_ERROR,"Invalid string: %s", error->message );
 			if(sysstr) g_free(sysstr);
 			if(sysid) g_free(sysid);
 			if(id)	g_free(id);
@@ -3179,7 +3229,7 @@ on_vims_row_activated(GtkTreeView *treeview,
 				else
 				{
 					if( args == NULL || strlen(args) <= 0 )
-						vj_msg(VEEJAY_MSG_ERROR,"VIMS %d requires arguments!", event_id);
+						vj_msg_detail(VEEJAY_MSG_ERROR,"VIMS %d requires arguments!", event_id);
 					else
 						multi_vims( event_id, format, args );
 				}
@@ -3201,13 +3251,26 @@ on_vimslist_row_activated(GtkTreeView *treeview,
 	if(gtk_tree_model_get_iter(model,&iter,path))
 	{
 		gchar *vimsid = NULL;
-		gint event_id =0;
+		gint event_id = 0;
 		gtk_tree_model_get(model,&iter, VIMS_ID, &vimsid, -1);
 
-		if(sscanf( vimsid, "%d", &event_id ))
+
+		if(!sscanf(vimsid, "%d", &event_id))
 		{
+			printf("Error\n");
+			return;
+		}	
+		info->uc.selected_vims_entry = event_id;
+
+		info->uc.selected_key_mod = 0;
+		info->uc.selected_key_sym = 0;
+
+		if(sscanf( vimsid, "%d", &event_id ) && event_id > 0)
+		{
+			char msg[100];
+			sprintf(msg, "Press a key for VIMS %03d", event_id);
 			// prompt for key!
-			int n = prompt_keydialog("Press Key", "Key for VIMS");
+			int n = prompt_keydialog("Attach key to VIMS event", msg);
 			if( n == GTK_RESPONSE_ACCEPT )
 			{
 				int key_val = gdk2sdl_key( info->uc.pressed_key );
@@ -4505,7 +4568,7 @@ void	vj_fork_or_connect_veejay()
 							&error );
 				if(error)
 				{
-					vj_msg(VEEJAY_MSG_ERROR, "There was an error: [%s]\n", error->message );
+					vj_msg_detail(VEEJAY_MSG_ERROR, "There was an error: [%s]\n", error->message );
 					ret = FALSE;
 				}
 

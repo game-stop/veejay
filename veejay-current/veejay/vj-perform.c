@@ -88,8 +88,7 @@ static VJFrame *helper_frame;
 static int vj_perform_record_buffer_init();
 static void vj_perform_record_buffer_free();
 
-#define N_RESAMPLE (10)
-static ReSampleContext *resample_context[N_RESAMPLE];
+static ReSampleContext *resample_context[MAX_SPEED];
 static ReSampleContext *resample_jack;
 
 #define MLIMIT(var, low, high) \
@@ -567,7 +566,7 @@ static void vj_perform_close_audio() {
 	if(resample_context)
 	{
 		int i;
-		for(i=1; i <= N_RESAMPLE; i ++)
+		for(i=1; i <= MAX_SPEED; i ++)
 		{
 			if(resample_context[(i-1)])
 				audio_resample_close( resample_context[(i-1)] );
@@ -627,7 +626,7 @@ int vj_perform_init_audio(veejay_t * info)
 
 	if(!info->audio) return 0;
 #ifdef HAVE_JACK
-	for(i=1; i <= N_RESAMPLE; i++)
+	for(i=1; i <= MAX_SPEED; i++)
 	{
 		//veejay_msg(VEEJAY_MSG_DEBUG, "Resampler at %d Hz", (info->edit_list->audio_rate * i));
 		int out_rate = info->edit_list->audio_rate * i;

@@ -16,43 +16,52 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-#define DBG_C() { 	vj_msg(VEEJAY_MSG_DEBUG, "Implement %s", __FUNCTION__ ); }  
+#define DBG_C() { 	vj_msg_detail(VEEJAY_MSG_DEBUG, "Implement %s", __FUNCTION__ ); }  
 
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_SKIP_SECOND);
+	vj_msg(VEEJAY_MSG_INFO, "Next second"); 
 }
-void	on_button_084_clicked(GtkWidget *widget, gpointer user_data)
+void	on_button_086_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims(VIMS_VIDEO_PREV_FRAME );
+	single_vims(VIMS_VIDEO_PREV_SECOND );
+	vj_msg(VEEJAY_MSG_INFO, "Previous second");
 }
 void	on_button_080_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_PLAY_FORWARD);
+	vj_msg(VEEJAY_MSG_INFO, "Play Forward");
 }
 void	on_button_081_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_PLAY_BACKWARD);
+	vj_msg(VEEJAY_MSG_INFO, "Play Backward");
 }
 void	on_button_082_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_PLAY_STOP );
+	vj_msg(VEEJAY_MSG_INFO, "Stop");
 }
 void	on_button_083_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_SKIP_FRAME );
+	vj_msg(VEEJAY_MSG_INFO, "Next frame");
 }
-void 	on_button_086_clicked(GtkWidget *widget, gpointer user_data)
+void 	on_button_084_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( VIMS_VIDEO_PREV_SECOND );
+	single_vims( VIMS_VIDEO_PREV_FRAME );
+	vj_msg(VEEJAY_MSG_INFO, "Previous frame");
 }
 void	on_button_087_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_GOTO_START );
+	vj_msg(VEEJAY_MSG_INFO, "Goto starting position");
 }
 void	on_button_088_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_GOTO_END);
+	vj_msg(VEEJAY_MSG_INFO, "Goto ending position");
 }
 void	on_videobar_move_slider(GtkWidget *widget, gpointer user_data)
 {
@@ -77,12 +86,14 @@ void	on_audiovolume_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *w = glade_xml_get_widget(info->main_window, "audiovolume");
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
-	multi_vims( VIMS_SET_VOLUME, "%d", (gint) val );
+	multi_vims( VIMS_SET_VOLUME, "%d", (gint) (val * 100.0) );
+	vj_msg(VEEJAY_MSG_INFO,"Set volume to %d", (gint)(val * 100.0));
 }
 
 void	on_button_001_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_SET_PLAIN_MODE );
+	vj_msg(VEEJAY_MSG_INFO, "Playing plain video (EditList operations allowed)");
 }
 
 void	on_button_252_clicked( GtkWidget *widget, gpointer user_data)
@@ -92,31 +103,48 @@ void	on_button_252_clicked( GtkWidget *widget, gpointer user_data)
 		vims_verbosity = 1;
 	else
 		vims_verbosity = 0;
+	vj_msg(VEEJAY_MSG_INFO, "%s debug information",
+		vims_verbosity ? "Displaying" : "Not displaying" );
 }
 
 void	on_button_251_clicked( GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_BEZERK );
+	vj_msg(VEEJAY_MSG_INFO, "Bezerk mode toggled");
 }	
 
 void	on_button_054_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_SCREENSHOT );
+	vj_msg(VEEJAY_MSG_INFO, "Requested veejay to take screenshot of frame %d",
+		info->status_tokens[FRAME_NUM] + 1 );
 }
 void	on_button_200_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_EFFECT_SET_BG ); 
+	vj_msg(VEEJAY_MSG_INFO,
+		"Requested veejay to take background mask of frame %d",
+			info->status_tokens[FRAME_NUM] + 1 );
 }
 void	on_button_5_4_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("button_5_4") )
+	{
 		single_vims( VIMS_AUDIO_ENABLE );
+		vj_msg(VEEJAY_MSG_INFO, "Audio is enabled");
+	}
 	else
+	{
 		single_vims( VIMS_AUDIO_DISABLE );	
+		vj_msg(VEEJAY_MSG_INFO, "Audio is disabled");
+	}
+
 }
 void	on_button_samplestart_clicked(GtkWidget *widget, gpointer user_data)
 {
 	info->sample[0] = info->status_tokens[FRAME_NUM];
+	vj_msg(VEEJAY_MSG_INFO, "New sample startings position is %d",
+		info->sample[0] );
 }
 void	on_button_sampleend_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -124,6 +152,8 @@ void	on_button_sampleend_clicked(GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_CLIP_NEW, "%d %d", info->sample[0],info->sample[1]);
 	if(info->status_tokens[PLAY_MODE] == MODE_PLAIN)
 		info->uc.reload_hint[HINT_SLIST] = 1;
+	vj_msg(VEEJAY_MSG_INFO, "New sample from EditList %d - %d",
+		info->sample[0], info->sample[1]);
 }
 
 void	on_button_veejay_clicked(GtkWidget *widget, gpointer user_data)
@@ -133,17 +163,20 @@ void	on_button_veejay_clicked(GtkWidget *widget, gpointer user_data)
 void	on_button_sendvims_clicked(GtkWidget *widget, gpointer user_data)
 {
 	gchar *text = get_text("vimsmessage");
-	if(strncasecmp( text, "255:;",5 ) == 0)
+	if(strncasecmp( text, "600:;",5 ) == 0)
 	{
+		vj_msg(VEEJAY_MSG_INFO, "Do you want to quit?");
 		if( prompt_dialog("Quit veejay", "Close Veejay ? All unsaved work will be lost.")
 			== GTK_RESPONSE_REJECT)
 			return;
 	}
+	vj_msg(VEEJAY_MSG_INFO, "User defined VIMS message sent '%s'",text );
 	msg_vims( text );
 }
 void	on_vimsmessage_activate(GtkWidget *widget, gpointer user_data)
 {
 	msg_vims( get_text( "vimsmessage") );
+	vj_msg(VEEJAY_MSG_INFO, "User defined VIMS message sent '%s'", get_text("vimsmessage"));
 }
 void	on_button_vimshelp_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -152,14 +185,25 @@ void	on_button_vimshelp_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_fadeout_clicked(GtkWidget *w, gpointer user_data)
 {
-	multi_vims( VIMS_CHAIN_FADE_OUT, "0 %d",
-		(int)get_numd( "button_fadedur"));
+	gint num = (gint)get_numd( "button_fadedur");
+	gchar *timenow = format_time( num );
+	multi_vims( VIMS_CHAIN_FADE_OUT, "0 %d", num );
+	vj_msg(VEEJAY_MSG_INFO, "Fade out duration %s (frames %d)",
+		timenow,
+		num );
+	if(timenow) g_free(timenow);
 }
 
 void	on_button_fadein_clicked(GtkWidget *w, gpointer user_data)
 {
-	multi_vims( VIMS_CHAIN_FADE_IN, "0 %d",
-		(int)get_numd( "button_fadedur"));
+	gint num = (gint)get_numd( "button_fadedur");
+	gchar *timenow = format_time( num );
+	multi_vims( VIMS_CHAIN_FADE_IN, "0 %d", num );
+	vj_msg(VEEJAY_MSG_INFO, "Fade in duration %s (frames %d)",
+		timenow,
+		num );
+	if(timenow) g_free(timenow);
+
 }
 
 void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
@@ -167,12 +211,15 @@ void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
 	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d",
 		(int)(255.0 * val));
+	vj_msg(VEEJAY_MSG_INFO, "FX Opacity set to %1.2f", val ); 
 }
 
 static void	el_selection_update()
 {
 	gchar *text = format_selection_time(info->selection[0], info->selection[1]);
 	update_label_str( "label_el_selection", text );
+	vj_msg( VEEJAY_MSG_INFO, "Updated EditList selection %d - %d Timecode: %s",
+		info->selection[0], info->selection[1], text );
 	g_free(text);
 }
 
@@ -214,6 +261,12 @@ void	on_button_el_cut_clicked(GtkWidget *w, gpointer *user_data)
 	if(verify_selection())
 	{	multi_vims( VIMS_EDITLIST_CUT, "%d %d",
 			info->selection[0], info->selection[1]);
+		gchar *time1 = format_time( info->selection[0] );
+		gchar *time2 = format_time( info->selection[1] );
+		vj_msg(VEEJAY_MSG_INFO, "Cut %s - %s from EditList to buffer",
+			time1, time2 );
+		g_free(time1);
+		g_free(time2);
 	}
 }
 void	on_button_el_del_clicked(GtkWidget *w, gpointer *user_data)
@@ -222,6 +275,13 @@ void	on_button_el_del_clicked(GtkWidget *w, gpointer *user_data)
 	{
 		multi_vims( VIMS_EDITLIST_DEL, "%d %d",
 			info->selection[0], info->selection[1]);
+		gchar *time1 = format_time( info->selection[0] );
+		gchar *time2 = format_time( info->selection[1] );
+		vj_msg(VEEJAY_MSG_INFO, "Delete %s - %s from EditList",
+			time1, time2 );
+		g_free(time1);
+		g_free(time2);
+
 	}
 }
 void	on_button_el_crop_clicked(GtkWidget *w, gpointer *user_data)
@@ -230,6 +290,15 @@ void	on_button_el_crop_clicked(GtkWidget *w, gpointer *user_data)
 	{
 		multi_vims( VIMS_EDITLIST_CROP, "%d %d",
 			info->selection[0], info->selection[1]);
+		gchar *total = format_time( info->status_tokens[TOTAL_FRAMES] );
+		gchar *time2 = format_time( info->selection[1] );
+		gchar *time1 = format_time( info->selection[0] );
+		vj_msg(VEEJAY_MSG_INFO, "Delete 00:00:00 - %s and %s - %s from EditList",
+			time1, time2, total );
+		g_free(time1);
+		g_free(time2);
+		g_free(total);
+
 	}
 }
 void	on_button_el_copy_clicked(GtkWidget *w, gpointer *user_data)
@@ -238,6 +307,12 @@ void	on_button_el_copy_clicked(GtkWidget *w, gpointer *user_data)
 	{
 		multi_vims( VIMS_EDITLIST_COPY, "%d %d",
 			info->selection[0], info->selection[1] );
+		gchar *time1 = format_time( info->selection[0] );
+		gchar *time2 = format_time( info->selection[1] );
+		vj_msg(VEEJAY_MSG_INFO, "Copy %s - %s to buffer",
+			time1,time2);
+		g_free(time1);
+		g_free(time2);
 	}
 }
 
@@ -248,6 +323,8 @@ void	on_button_el_newclip_clicked(GtkWidget *w, gpointer *user)
 		multi_vims( VIMS_CLIP_NEW, "%d %d",
 			info->selection[0], info->selection[1] );
 		info->uc.reload_hint[HINT_SLIST] = 1;
+		vj_msg(VEEJAY_MSG_INFO, "New sample from EditList %d - %d" ,
+			info->selection[0], info->selection[1] );
 	}
 
 
@@ -259,6 +336,10 @@ void	on_button_el_pasteat_clicked(GtkWidget *w, gpointer *user_data)
 	info->selection[2] = val;
 	multi_vims( VIMS_EDITLIST_PASTE_AT, "%d",
 		info->selection[2]);
+	gchar *time1 = format_time( info->selection[2] );
+	vj_msg(VEEJAY_MSG_INFO, "Paste contents from buffer to frame %d (timecode %s)",
+		info->selection[2], time1);
+	g_free(time1);
 }
 void	on_button_el_save_clicked(GtkWidget *w, gpointer *user_data)
 {
@@ -267,6 +348,7 @@ void	on_button_el_save_clicked(GtkWidget *w, gpointer *user_data)
 	{
 		multi_vims( VIMS_EDITLIST_SAVE, "%s %d %d",
 			filename, 0, info->el.num_frames );
+		vj_msg(VEEJAY_MSG_INFO, "Saved EditList to %s", filename);
 		g_free(filename);
 	}
 }
@@ -278,7 +360,8 @@ void	on_button_el_savesel_clicked(GtkWidget *w, gpointer *user_data)
 		gint start = get_nums( "button_el_selstart" );
 		gint end = get_nums( "button_el_selend" );
 		multi_vims( VIMS_EDITLIST_SAVE, "%s %d %d",
-			filename, start, end ); 
+			filename, start, end );
+		vj_msg(VEEJAY_MSG_INFO,"Save EditList selection to %s", filename); 
 		g_free(filename);
 	}
 }
@@ -290,6 +373,7 @@ void	on_button_el_add_clicked(GtkWidget *w, gpointer *user_data)
 	{
 		multi_vims( VIMS_EDITLIST_ADD, "%s",
 		filename );
+		vj_msg(VEEJAY_MSG_INFO, "Try to add file '%s' to EditList", filename);
 		g_free(filename);
 	}
 }
@@ -299,6 +383,8 @@ void	on_button_el_addclip_clicked(GtkWidget *w, gpointer *user_data)
 	if( filename )
 	{
 		multi_vims( VIMS_EDITLIST_ADD_CLIP, "%s", filename );
+		vj_msg(VEEJAY_MSG_INFO, "Try to add file '%s' to EditList and create a new sample",
+			filename);
 		g_free(filename);
 	}
 }
@@ -308,23 +394,19 @@ void	on_button_el_delfile_clicked(GtkWidget *w, gpointer *user_data)
 	int first_frame = frame;
 	int last_frame = _el_ref_end_frame( info->uc.selected_el_entry );
 	multi_vims( VIMS_EDITLIST_DEL, "%d %d", first_frame, last_frame );
+	gchar *time1 = format_time( first_frame );
+	gchar *time2 = format_time( last_frame );
+	vj_msg(VEEJAY_MSG_INFO, "Delete %s - %s",
+		time1,time2);
+	g_free(time1);
+	g_free(time2);
 } 
-/*
-void	on_button_fx_add_clicked(GtkWidget *w, gpointer user_data)
-{
-	if(info->uc.selected_effect_id > 0)
-	{
-		multi_vims( VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",	
-			0, info->uc.selected_chain_entry, info->uc.selected_effect_id );
-		info->uc.reload_hint[HINT_CHAIN] = 1;
-		info->uc.reload_hint[HINT_ENTRY] = 1;
-	}
-}*/
 void	on_button_fx_clearchain_clicked(GtkWidget *w, gpointer user_data)
 {
 	multi_vims( VIMS_CHAIN_CLEAR, "%d",0);
 	info->uc.reload_hint[HINT_CHAIN] = 1;
 	info->uc.reload_hint[HINT_ENTRY] = 1;
+	vj_msg(VEEJAY_MSG_INFO, "Clear FX Chain");
 }
 
 void	on_button_entry_toggle_clicked(GtkWidget *w, gpointer user_data)
@@ -338,6 +420,9 @@ void	on_button_entry_toggle_clicked(GtkWidget *w, gpointer user_data)
 		else
 			multi_vims( VIMS_CHAIN_ENTRY_SET_VIDEO_OFF,
 				"%d %d", 0, info->uc.selected_chain_entry );
+		vj_msg(VEEJAY_MSG_INFO, "Chain Entry %d is %s",
+			info->uc.selected_chain_entry,
+			(val ? "Enabled" : "Disabled" ));
 	}	
 }
 
@@ -349,21 +434,7 @@ void	on_button_fx_entry_value_changed(GtkWidget *w, gpointer user_data)
 		multi_vims( VIMS_CHAIN_SET_ENTRY, "%d",
 			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w))
 		);
-
-		multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, 
-			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w)) );
-		int len = 0;
-		gchar *answer = recv_vims(3,&len);
-		if(len>0)	
-		{
-			int res = sscanf( answer,
-				"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-				p+0,p+1,p+2,p+3,p+4,p+5,p+6,p+7,p+8,p+9,p+10,
-				p+11,p+12,p+13,p+14,p+15);
-			if( res <= 0 )
-				memset( p, 0, 16 );    
-			g_free(answer);
-		}
+		info->uc.reload_hint[HINT_ENTRY] = 1;	
 	}  	
 				
 }
@@ -373,6 +444,8 @@ void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 		info->uc.selected_chain_entry );
 	info->uc.reload_hint[HINT_CHAIN] = 1;
 	info->uc.reload_hint[HINT_ENTRY] = 1;
+	vj_msg(VEEJAY_MSG_INFO, "Clear Effect from Entry %d",
+		info->uc.selected_chain_entry);
 }
 /*
 void	on_button_fx_mixapply_clicked(GtkWidget *w, gpointer user_data)
@@ -537,11 +610,13 @@ void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		multi_vims( VIMS_SET_MODE_AND_GO , "%d %d" , 0,
 			info->uc.selected_sample_id );
+		vj_msg(VEEJAY_MSG_INFO, "Play sample %d", info->uc.selected_sample_id);
 	}
 	if(info->uc.selected_stream_id != 0)
 	{
 		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d", 1,
 			info->uc.selected_stream_id );
+		vj_msg(VEEJAY_MSG_INFO, "Play stream %d", info->uc.selected_stream_id );
 	}
 
 }
@@ -553,12 +628,14 @@ void	on_button_sample_del_clicked(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_CLIP_DEL, "%d",
 			info->uc.selected_sample_id );
 		query = 1;
+		vj_msg(VEEJAY_MSG_INFO, "Delete sample %d", info->uc.selected_sample_id);
 	}
 	if(info->uc.selected_stream_id)
 	{
 		multi_vims( VIMS_STREAM_DELETE, "%d",
 			info->uc.selected_stream_id );
 		query = 1;
+		vj_msg(VEEJAY_MSG_INFO, "Delete stream %d", info->uc.selected_stream_id );
 	}
 
 	if(query)
@@ -594,6 +671,7 @@ void	on_button_samplelist_save_clicked(GtkWidget *widget, gpointer user_data)
 	if(filename)
 	{
 		multi_vims( VIMS_CLIP_SAVE_CLIPLIST, "%s", filename );
+		vj_msg(VEEJAY_MSG_INFO, "Saved samples to %s", filename);
 		g_free(filename);
 	}
 }
@@ -602,8 +680,12 @@ void	on_spin_samplestart_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims(VIMS_CLIP_SET_START, "%d %d",0,
-			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) ) );
+		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+		gchar *time1 = format_time(value);
+		multi_vims(VIMS_CLIP_SET_START, "%d %d",0, value );
+		vj_msg(VEEJAY_MSG_INFO, "Set sample's starting position to %d (timecode %s)",
+			value, time1);
+		g_free(time1);
 	}
 }
 
@@ -611,8 +693,14 @@ void	on_spin_sampleend_value_changed( GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims(VIMS_CLIP_SET_END, "%d %d", 0,
-			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget)) );
+		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+		gchar *time1 = format_time(value);
+		
+		multi_vims(VIMS_CLIP_SET_END, "%d %d", 0, value );
+		vj_msg(VEEJAY_MSG_INFO, "Set sample's ending position to %d (timecode %s)",
+			value, time1);
+		g_free(time1);
+
 	}
 }
 
@@ -620,8 +708,11 @@ void	on_speedslider_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{	
-		multi_vims( VIMS_VIDEO_SET_SPEED, "%d",
-			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value ) );
+		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+		
+		multi_vims( VIMS_VIDEO_SET_SPEED, "%d",value );
+		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
+			value );
 	}
 }
 
@@ -629,8 +720,11 @@ void	on_spin_samplespeed_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		multi_vims( VIMS_CLIP_SET_SPEED, "%d %d",0,
-			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) ) );
+		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+		
+		multi_vims( VIMS_CLIP_SET_SPEED, "%d %d",0, value );
+		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
+			value );
 	}
 }
 
@@ -651,6 +745,7 @@ void	on_v4l_contrast_value_changed(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_STREAM_SET_CONTRAST, "%d %d", 
 			info->uc.current_stream_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0 ) );
+
 	}
 }
 
@@ -715,18 +810,24 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		multi_vims( VIMS_RECORD_DATAFORMAT,"%s",
 			format );
+		vj_msg(VEEJAY_MSG_INFO, "Set recording format to %s", format);
 	}		
 
 	multi_vims( VIMS_STREAM_REC_START,
 		"%d %d",
 		nframes,
 		autoplay );
+	
+	gchar *time1 = format_time( nframes );
+	vj_msg(VEEJAY_MSG_INFO, "Record duration: %s", time1); 
+	g_free(time1);
 	g_free(format);	
 }
 
 void	on_stream_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_STREAM_REC_STOP );
+	vj_msg(VEEJAY_MSG_INFO, "Stream record stop");
 }
 
 void	on_spin_streamduration_value_changed(GtkWidget *widget , gpointer user_data)
@@ -760,12 +861,19 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 		"%d %d",
 		nframes,
 		autoplay );
+
+	gchar *time1 = format_time(nframes);
+	vj_msg(VEEJAY_MSG_INFO,"Record duration: %s",
+		time1);
+	g_free(time1);
+
 	g_free(format);	
 }
 
 void	on_button_sample_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_CLIP_REC_STOP );
+	vj_msg(VEEJAY_MSG_INFO, "Sample record stop");
 }
 
 static	int	sample_calctime()
@@ -914,10 +1022,12 @@ void	on_check_marker_bind_clicked(GtkWidget *widget, gpointer user_data)
 		info->uc.marker.bind = 1;
 		if(info->uc.marker.start >= info->uc.marker.end)
 			atom_marker("slider_m0", 0 );    
+		vj_msg(VEEJAY_MSG_INFO, "Marker is bound");
 	}
 	else
 	{
 		info->uc.marker.bind = 0;
+		vj_msg(VEEJAY_MSG_INFO, "Released marker binding");
 		if(info->uc.marker.end <= info->uc.marker.start)
 			atom_marker("slider_m1", info->uc->upper_bound );
 	}
@@ -932,7 +1042,7 @@ void	on_button_clearmarker_clicked(GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_CLIP_CLEAR_MARKER, "%d", 0 );
 
 	info->uc.reload_hint[ HINT_MARKER ] = 1;
- 
+ 	vj_msg(VEEJAY_MSG_INFO, "Clear Marker");
 }
 
 
@@ -946,6 +1056,7 @@ void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 	if( filename )
 	{
 		multi_vims( VIMS_CLIP_LOAD_CLIPLIST, "%s", filename );
+		vj_msg(VEEJAY_MSG_INFO, "Try to load sample list %s", filename);
 		g_free(filename);
 	}
 }
@@ -959,16 +1070,24 @@ void	on_button_el_takestart_clicked(GtkWidget *widget, gpointer user_data)
 {
 	update_spin_value( "button_el_selstart",
 			info->status_tokens[FRAME_NUM] );
+	vj_msg(VEEJAY_MSG_INFO, "Set current frame %d as editlist starting position",
+		info->status_tokens[FRAME_NUM]);
 }
 void	on_button_el_takeend_clicked(GtkWidget *widget, gpointer user_data)
 {
 	update_spin_value ("button_el_selend", 
 			info->status_tokens[FRAME_NUM] );	
+	vj_msg(VEEJAY_MSG_INFO, "Set current frame %d as editlist ending position",
+		info->status_tokens[FRAME_NUM]);
 }
 void	on_button_el_paste_clicked(GtkWidget *widget, gpointer user_data)
 {
 	multi_vims( VIMS_EDITLIST_PASTE_AT, "%d",
 		info->status_tokens[FRAME_NUM] );
+	gchar *time1 = format_time( info->status_tokens[FRAME_NUM] );
+	vj_msg(VEEJAY_MSG_INFO, "Paste contents of buffer at Frame %d (Tiemcode %s)",
+		info->status_tokens[FRAME_NUM], time1);
+	g_free(time1);
 }
 void	on_new_colorstream_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -988,6 +1107,10 @@ void	on_new_colorstream_clicked(GtkWidget *widget, gpointer user_data)
 	info->uc.reload_hint[HINT_SLIST] = 1;
 	multi_vims( VIMS_STREAM_NEW_COLOR, "%d %d %d",
 		red,green,blue );
+	// open sample list
+	if( get_page( "veejaypanel") != PAGE_SAMPLEEDIT)
+		set_page( "sample_stream_pad", 0 );
+	vj_msg(VEEJAY_MSG_INFO, "Created new colid colored stream");	
 }
 
 #define atom_aspect_ratio(name,type) {\
@@ -1019,6 +1142,7 @@ void	on_priout_apply_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		multi_vims( VIMS_RESIZE_SDL_SCREEN, "%d %d %d %d",
 			width,height,x , y );
+		vj_msg(VEEJAY_MSG_INFO, "Resize Video Window to %dx%d", width,height);
 	}
 
 }
@@ -1028,6 +1152,7 @@ void	on_vims_take_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_BUNDLE_CAPTURE );
 	info->uc.reload_hint[HINT_BUNDLES] = 1;
+	vj_msg(VEEJAY_MSG_INFO, "Create a new bundle from FX Chain");
 }
 void	on_button_key_detach_clicked(GtkWidget *widget, gpointer user)
 {
@@ -1093,6 +1218,8 @@ void	on_vims_delete_clicked(GtkWidget *widget, gpointer user_data)
 	// delete selected bundle
 	multi_vims( VIMS_BUNDLE_DEL, "%d", info->uc.selected_vims_entry );
 	info->uc.reload_hint[HINT_BUNDLES] = 1;
+	vj_msg(VEEJAY_MSG_INFO, "Delete bundle %d from VIMS event list",
+		info->uc.selected_vims_entry );
 }
 
 void	on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data)
@@ -1100,7 +1227,8 @@ void	on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data)
 	gchar *filename = dialog_save_file( "Save Bundles");
 	if(filename)
 	{
-		multi_vims( VIMS_BUNDLE_SAVE, "%s", filename );
+		multi_vims( VIMS_BUNDLE_SAVE, "%d %s",0, filename );
+		vj_msg(VEEJAY_MSG_INFO, "Save Bundles and Keybindings to %s", filename );
 		g_free(filename);
 	} 	
 }
@@ -1110,8 +1238,8 @@ void	on_button_newbundle_clicked(GtkWidget *widget, gpointer user_data)
 	if(count_textview_buffer( "vimsview" ) > 0 )
 	{
 		gchar *buf = get_textview_buffer( "vimsview" );
-		multi_vims( VIMS_BUNDLE_ADD, "%d %s", 0, buf );
-		info->uc.reload_hint[HINT_BUNDLES] = 1;
+		multi_vims( VIMS_BUNDLE_ADD, "%d %s", 0, buf ); 
+		info->uc.reload_hint[HINT_BUNDLES] = 1;	
 	}
 }
 
@@ -1142,6 +1270,8 @@ void	on_button_historyrec_clicked(GtkWidget *widget, gpointer user_data)
 	if(info->uc.selected_history_entry > 0)
 	{
 		multi_vims( VIMS_CLIP_RENDER_TO, "%d %d", 0, info->uc.selected_history_entry );
+		vj_msg(VEEJAY_MSG_INFO, "Rendering sample to inline EditList no. %d",
+			info->uc.selected_history_entry );
 	}
 	info->uc.render_record=1;
 }
@@ -1151,6 +1281,8 @@ void	on_button_historymove_clicked(GtkWidget *widget, gpointer user_data)
 	if(info->uc.selected_history_entry > 0 )
 	{
 		multi_vims( VIMS_CLIP_RENDER_MOVE, "%d %d", 0, info->uc.selected_history_entry );
+		vj_msg(VEEJAY_MSG_INFO, "Move inline Editlist %d to EditList",
+			info->uc.selected_history_entry );
 	}
 	info->uc.reload_hint[HINT_EL] =1;
 	info->uc.reload_hint[HINT_HISTORY] = 1;
@@ -1164,6 +1296,7 @@ void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 			info->uc.selected_sample_id );
 		if(info->status_tokens[PLAY_MODE] == MODE_PLAIN )
 			info->uc.reload_hint[HINT_SLIST] = 1;
+		vj_msg(VEEJAY_MSG_INFO, "Copy sample %d to new", info->uc.selected_sample_id);
 	}
 }
 

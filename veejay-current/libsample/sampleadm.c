@@ -511,7 +511,7 @@ int	clip_get_el_position( int clip_id, int *start, int *end )
 	{
 		*start = si->first_frame[ si->active_render_entry ];
 		*end   = si->last_frame[ si->active_render_entry ];
-		return;
+		return 1;
 	}
 	return -1;
 }
@@ -1206,6 +1206,14 @@ int clip_set_speed(int s1, int speed)
 {
     clip_info *clip = clip_get(s1);
     if (!clip) return -1;
+	int len = clip->last_frame[clip->active_render_entry] -
+			clip->first_frame[clip->active_render_entry];
+    if( (speed < -(MAX_SPEED) ) || (speed > MAX_SPEED))
+	return -1;
+    if( speed > len )
+	return -1;
+    if( speed < -(len))
+	return -1;
     clip->speed = speed;
     return ( clip_update(clip,s1));
 }

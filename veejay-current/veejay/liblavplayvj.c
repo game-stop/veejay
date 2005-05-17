@@ -280,6 +280,11 @@ int veejay_set_speed(veejay_t * info, int speed)
     int len=0;
 	
 
+    if( speed > MAX_SPEED )
+		speed = MAX_SPEED;
+    if( speed < -(MAX_SPEED))
+		speed = -(MAX_SPEED);
+
     switch (info->uc->playback_mode)
 	{
 
@@ -312,8 +317,8 @@ int veejay_set_speed(veejay_t * info, int speed)
 				}
 			}
 		}
-		settings->current_playback_speed = speed;	
-		clip_set_speed(info->uc->clip_id, speed);
+		if(clip_set_speed(info->uc->clip_id, speed) != -1)
+			settings->current_playback_speed = speed;
 		break;
 
     case VJ_PLAYBACK_MODE_TAG:
@@ -327,8 +332,12 @@ int veejay_set_speed(veejay_t * info, int speed)
 #ifdef HAVE_JACK
 
     if(info->audio == AUDIO_PLAY )
-		vj_jack_continue( speed );
+		vj_jack_continue( settings->current_playback_speed );
 #endif
+
+    if( settings->current_playback_speed != 0 &&
+	settings->state != LAVPLAY_STATE_PLAYING)
+	veejay_change_state( info, LAVPLAY_STATE_PLAYING );
 
     return 1;
 }

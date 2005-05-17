@@ -69,6 +69,12 @@ AC_ARG_WITH(v4l,
 AC_ARG_WITH(xml2,
 		AC_HELP_STRING([--without-xml2], [Do not use the XML library for Gnome]),
 		[], [with_xml2=yes])
+AC_ARG_WITH(gveejay,
+		AC_HELP_STRING([--without-gveejay], [Do not build GVeejay]),
+		[], [with_gveejay=yes])
+
+
+
 AC_ARG_WITH(freetype2,
 		AC_HELP_STRING([--without-freetype2], [Do not use the freetype library]),
 		[], [with_freetype2=yes])
@@ -80,9 +86,6 @@ AC_ARG_WITH(jpeg-mmx,
             AC_HELP_STRING([--with-jpegmmx=PFX],
                            [Prefix where jpeg-mmx is installed (optional).]))
 
-AC_ARG_WITH(gui,
-		AC_HELP_STRING([--without-gui], [Do not build gveejay]),
-		[],	[with_gui=yes])
 
 AC_GNU_SOURCE
 
@@ -134,12 +137,15 @@ dnl video4linux/hardware dependent tools. Else, undefine HAVE_V4L
 have_v4l=false
 have_linux=false
 have_darwin=false
-with_gui=no
+use_gveejay=false
 case $host in
   *-*-linux*)
 	AC_CHECK_HEADER(linux/version.h,
 		[have_linux=true
-		 with_gui=yes
+
+		if test x$with_gveejay != xno ; then
+			 use_gveejay=true
+		fi
 	         AC_DEFINE(HAVE_LINUX,,[Linux platform])
 		],
 		[AC_MSG_ERROR([version.h not found - please install the linux kernel headers])
@@ -687,12 +693,12 @@ AM_CONDITIONAL(HAVE_V4L, test x$have_v4l = xtrue)
 AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
+AM_CONDITIONAL(USE_GVEEJAY,
+			test x$use_gveejay = xtrue )
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
 dnl We do this last as it can screw up library detection etc...
-
-dnl maddog:  check out AC-COMPILE-WARNINGS ???????
 
 CFLAGS="$ARCHFLAGS $CFLAGS"
 CXXFLAGS="$ARCHFLAGS $CXXFLAGS"
@@ -753,32 +759,33 @@ dnl  bah autoreconf wants to play with independent package ffmpeg
 dnl  (needs configure.ac). so, instead of AC_CONFIG_SUBDIRS(ffmpeg/ffmeg)
 dnl  do it manually
 
-if test x$with_gui != xno ; then
+if test x$use_gveejay != xfalse ; then
+	if test x$with_gveejay != xno ; then
 
-	gveejay_datadir="${datadir}/veejay"
-	AC_SUBST(gveejay_datadir)
-	sh gveejay-paths.sh > gveejay-paths.h
-
-
-	glib_modules="glib-2.0 >= 2.4"
-	PKG_CHECK_MODULES(GLIB, [$glib_modules])
-	AC_SUBST(GLIB_CFLAGS)
-	AC_SUBST(GLIB_LIBS)
+		gveejay_datadir="${datadir}/veejay"
+		AC_SUBST(gveejay_datadir)
+		sh gveejay-paths.sh > gveejay-paths.h
 
 
-	gtk_modules="gtk+-2.0 >= 2.4"
-	PKG_CHECK_MODULES(GTK, [$gtk_modules])
-	AC_SUBST(GTK_CFLAGS)
-	AC_SUBST(GTK_LIBS)
+		glib_modules="glib-2.0 >= 2.4"
+		PKG_CHECK_MODULES(GLIB, [$glib_modules])
+		AC_SUBST(GLIB_CFLAGS)
+		AC_SUBST(GLIB_LIBS)
 
 
-	libglade_modules="libglade-2.0 >= 2.2.0"
-	PKG_CHECK_MODULES(GLADE, [$libglade_modules])
-	AC_SUBST(GLADE_CFLAGS)
-	AC_SUBST(GLADE_LIBS)
+		gtk_modules="gtk+-2.0 >= 2.4"
+		PKG_CHECK_MODULES(GTK, [$gtk_modules])
+		AC_SUBST(GTK_CFLAGS)
+		AC_SUBST(GTK_LIBS)
 
-fi
- 
+
+		libglade_modules="libglade-2.0 >= 2.2.0"
+		PKG_CHECK_MODULES(GLADE, [$libglade_modules])
+		AC_SUBST(GLADE_CFLAGS)
+		AC_SUBST(GLADE_LIBS)
+
+	fi
+ fi
 dnl  AC_CONFIG_SUBDIRS(ffmpeg/ffmpeg)
 
 (
@@ -868,7 +875,7 @@ AC_MSG_NOTICE([ Optional dependencies])
 
 AC_MSG_NOTICE([  - video4linux                   : ${have_v4l}])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
-if test x$have_sdl != xyes ; then
+if test x$have_sdl != xtrue ; then
 AC_MSG_NOTICE([      There will be NO video window ])
 fi
 AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
@@ -878,12 +885,8 @@ AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
 AC_MSG_NOTICE([  - jack                          : ${have_jack}])
 AC_MSG_NOTICE([  - xml c library for gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - freetype support              : ${have_freetype}])
-AC_MSG_NOTICE([])
+AC_MSG_NOTICE([  - GVeejay UI                    : ${use_gveejay}])
 
-if test x$with_gui != xno ; then
-	AC_MSG_NOTICE([   - GVeejay UI])
-	AC_MSG_NOTICE([     share : ${gveejay_datadir}])
-fi
 
 if test "$GCC" = yes ; then
 	AC_MSG_NOTICE([])

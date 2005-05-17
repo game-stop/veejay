@@ -56,7 +56,7 @@ enum {
 #include <libvje/vje.h>
 
 /* request messages, global */
-
+#define MAX_SPEED		64
 #define CLIP_MAX_EFFECTS 	20
 #define PATTERN_MAX_TRACKS	3
 #define CELL_LENGTH		30
