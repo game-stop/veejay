@@ -41,6 +41,8 @@ static	char*	el_get_codec_name(int codec_id )
 		case CODEC_ID_MJPEG: sprintf(name, "MJPEG"); break;
 		case CODEC_ID_MPEG4: sprintf(name, "MPEG4"); break;
 		case CODEC_ID_MSMPEG4V3: sprintf(name, "DIVX"); break;
+		case CODEC_ID_DVVIDEO: sprintf(name, "DVVideo"); break;
+		case -1 : sprintf(name, "RAW YUV"); break;
 		default:
 			sprintf(name, "Unknown"); break;
 	}
@@ -52,7 +54,7 @@ static vj_encoder *_encoders[NUM_ENCODERS];
 static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_format)
 {
 	vj_encoder *e = (vj_encoder*) vj_malloc(sizeof(vj_encoder));
-	if(!e) exit(0);
+	if(!e) return NULL;
 	memset(e, 0, sizeof(vj_encoder));
 		
 	if(id != -1)
@@ -63,7 +65,8 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 #endif
 			e->codec = avcodec_find_encoder( id );
 			if(!e->codec)
-			 veejay_msg(VEEJAY_MSG_ERROR, "Cannot find codec %d",id);
+			 veejay_msg(VEEJAY_MSG_ERROR, "Cannot find Encoder codec %s", 	el_get_codec_name(id ) );
+
 #ifdef __FALLBACK_LIBDV
 		}
 #endif
