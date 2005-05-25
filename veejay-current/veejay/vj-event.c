@@ -6723,62 +6723,46 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 	veejay_t *v = (veejay_t*)ptr;
 	char *str = NULL; 
 	P_A(args,str,format,ap);
-	
+	int i,n;
+	bzero( _s_print_buf,SEND_BUF);
+	sprintf(_s_print_buf, "%05d",0);
+
 	if(args[0]>0) start_from_tag = args[0];
 
-	if( ((vj_tag_size()-1) <= 0) || (args[0] >= vj_tag_size()-1))
+	n = vj_tag_size()-1;
+
+	if (n >= 1 )
 	{
-		/* there are no tags */
-		char *empty = "00000";
-		veejay_msg(VEEJAY_MSG_ERROR, "No Streams (%d) or asking for non existing (%d)",
-			vj_tag_size()-1,args[0]);
-		SEND_MSG(v, empty);
-	}
-	else
-	{
-		int i;
-		int n = vj_tag_size()-1;
-		if (n >= 1 )
+		char line[300];
+		bzero( _print_buf, SEND_BUF);
+
+		for(i=start_from_tag; i <= n; i++)
 		{
-			char line[300];
-			bzero( _print_buf, n * 300 );
-			for(i=start_from_tag; i <= n; i++)
-			{
-				/* tag_id | source_type | source_name */
-				if(vj_tag_exists(i))
-				{	
-					vj_tag *tag = vj_tag_get(i);
-					char source_name[255];
-					char cmd[300];
-					bzero(source_name,200);bzero(cmd,255);
-					bzero(line,300);
-					vj_tag_get_description( i, source_name );
-					sprintf(line,"%05d%02d%03d%03d%03d%03d%03d%s",
-						i,
-						vj_tag_get_type(i),
-						tag->color_r,
-						tag->color_g,
-						tag->color_b,
-						tag->opacity, 
-						strlen(source_name),
-						source_name
-					);
-					sprintf(cmd, "%03d%s",strlen(line),line);
-					APPEND_MSG(_print_buf,cmd); 
-				}
-	
+			if(vj_tag_exists(i))
+			{	
+				vj_tag *tag = vj_tag_get(i);
+				char source_name[255];
+				char cmd[300];
+				bzero(source_name,200);bzero(cmd,255);
+				bzero(line,300);
+				vj_tag_get_description( i, source_name );
+				sprintf(line,"%05d%02d%03d%03d%03d%03d%03d%s",
+					i,
+					vj_tag_get_type(i),
+					tag->color_r,
+					tag->color_g,
+					tag->color_b,
+					tag->opacity, 
+					strlen(source_name),
+					source_name
+				);
+				sprintf(cmd, "%03d%s",strlen(line),line);
+				APPEND_MSG(_print_buf,cmd); 
 			}
-			bzero( _s_print_buf, strlen(_print_buf) + 6 );
-			sprintf(_s_print_buf, "%05d%s",strlen(_print_buf),_print_buf);
-			SEND_MSG(v,_s_print_buf);
 		}
-		else
-		{
-			char stag_list[5];
-			sprintf(stag_list,"%05d",0);
-			SEND_MSG(v,stag_list);
-		}
+		sprintf(_s_print_buf, "%05d%s",strlen(_print_buf),_print_buf);
 	}
+	SEND_MSG(v,_s_print_buf);
 }
 
 
@@ -6789,26 +6773,22 @@ void	vj_event_send_clip_list		(	void *ptr,	const char format[],	va_list ap	)
 	int args[1];
 	int start_from_clip = 1;
 	char cmd[300];
-	char *str = NULL; P_A(args,str,format,ap);
+	char *str = NULL;
+	int i,n;
+	P_A(args,str,format,ap);
 
 	if(args[0]>0) start_from_clip = args[0];
 
-	if( ((clip_size()-1) <= 0) || (args[0] > clip_size()-1))
+	bzero( _s_print_buf,SEND_BUF);
+	sprintf(_s_print_buf, "%05d", 0);
+
+	n = clip_size()-1;
+	if( n >= 1 )
 	{
-		/* there are no tags */
-		veejay_msg(VEEJAY_MSG_ERROR, "No Clips (%d) or asking for non existing (%d)",
-			clip_size()-1,args[0]);
-		SEND_MSG(v, "00000");
-	}
-	else
-	{
-		int i;
-		int n = clip_size()-1;
 		char line[308];
 		bzero(_print_buf, SEND_BUF);
 		for(i=start_from_clip; i <= n; i++)
 		{
-			/* clip_id | description */
 			if(clip_exists(i))
 			{	
 				char description[CLIP_MAX_DESCR_LEN];
@@ -6837,8 +6817,8 @@ void	vj_event_send_clip_list		(	void *ptr,	const char format[],	va_list ap	)
 
 		}
 		sprintf(_s_print_buf, "%05d%s", strlen(_print_buf),_print_buf);
-		SEND_MSG(v, _s_print_buf);
 	}
+	SEND_MSG(v, _s_print_buf);
 }
 
 void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
@@ -6847,34 +6827,22 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 	char line[255];
 	int args[2];
 	char *str = NULL;
+	int error = 1;
 	veejay_t *v = (veejay_t*)ptr;
 	P_A(args,str,format,ap);
 
 	bzero(fline,255);
+	sprintf(line, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);
 
 	if(args[0] == 0) 
-	{
 		args[0] = v->uc->clip_id;
-	}
 
-	if(PLAIN_PLAYING(v))
-	{
-		
-		sprintf(line, "%d %d %d %d %d %d %d %d %d %d %d %d",
-			0,0,0,0,0,0,0,0,0,0,0,0);
-		FORMAT_MSG(fline,line);	
-		SEND_MSG(v,fline);
-		return;	
-	}
 	if(CLIP_PLAYING(v))
 	{
-	int effect_id = clip_get_effect_any(args[0], args[1]);
-	if(args[1]==-1) args[1] = clip_get_selected_entry(args[0]);
-		if(args[1] < 0 || args[1] >= CLIP_MAX_EFFECTS)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Invalid chain entry %d was given",args[1]);
-			return;
-		}
+		if(args[1]==-1) args[1] = clip_get_selected_entry(args[0]);
+		int effect_id = clip_get_effect_any(args[0], args[1]);
+		
 		if(effect_id > 0)
 		{
 			int is_video = vj_effect_get_extra_frame(effect_id);
@@ -6911,25 +6879,14 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 				clip_get_chain_source(args[0],args[1]),
 				clip_get_chain_channel(args[0],args[1]) 
 			);				
-			
+			error = 0;
 		}
-		else
-		{
-			sprintf(line, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-					0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0 ,0);
-
-		}
-
-		FORMAT_MSG(fline,line);
-		SEND_MSG(v, fline);
-		return;
 	}
+	
 	if(STREAM_PLAYING(v))
 	{
-
-		int effect_id;
 		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
- 		effect_id = vj_tag_get_effect_any(args[0], args[1]);
+ 		int effect_id = vj_tag_get_effect_any(args[0], args[1]);
 
 		if(effect_id > 0)
 		{
@@ -6965,42 +6922,38 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 				vj_tag_get_chain_source(args[0],args[1]),
 				vj_tag_get_chain_channel(args[0],args[1])
 			);				
-			
+			error = 0;
 		}
-		else
-		{
-			sprintf(line, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-					0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,0,0,0 ,0);
-
-		}
-
-		FORMAT_MSG(fline,line);
-		SEND_MSG(v, fline);
-		return;
 	}
-	
+
+
+	FORMAT_MSG(fline,line);
+	SEND_MSG(v, fline);
 }
 
 void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 {
 	int i;
 	char line[18];
-	char chain_list[CLIP_MAX_EFFECTS*18];
-	char send_buf[CLIP_MAX_EFFECTS*18];
 	int args[1];
 	char *str = NULL;
 	veejay_t *v = (veejay_t*)ptr;
 	P_A(args,str,format,ap);
-	bzero(send_buf,18*CLIP_MAX_EFFECTS);
-	bzero(chain_list, 18*CLIP_MAX_EFFECTS);
+
 	if(args[0] == 0) 
 	{
 		args[0] = v->uc->clip_id;
 	}
-	if(args[0] == -1) args[0] = clip_size()-1;
+
+	bzero( _s_print_buf,SEND_BUF);
+	bzero( _print_buf, SEND_BUF);
+
+	sprintf( _s_print_buf, "%03d",0 );
 
 	if(CLIP_PLAYING(v))
 	{
+		if(args[0] == -1) args[0] = clip_size()-1;
+
 		for(i=0; i < CLIP_MAX_EFFECTS; i++)
 		{
 			int effect_id = clip_get_effect_any(args[0], i);
@@ -7018,12 +6971,16 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 					(using_audio  <= 0  ? 0 : 1 )
 				);
 						
-				APPEND_MSG(chain_list,line);
+				APPEND_MSG(_print_buf,line);
 			}
 		}
+		sprintf(_s_print_buf, "%03d%s",strlen(_print_buf), _print_buf);
+
 	}
 	if(STREAM_PLAYING(v))
 	{
+		if(args[0] == -1) args[0] = vj_tag_size()-1;
+
 		for(i=0; i < CLIP_MAX_EFFECTS; i++) 
 		{
 			int effect_id = vj_tag_get_effect_any(args[0], i);
@@ -7038,21 +6995,15 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 					(using_effect <= 0  ? 0 : 1 ),
 					0
 				);
-				APPEND_MSG(chain_list, line);
-				
+				APPEND_MSG(_print_buf, line);
 			}
 		}
-	}
-	if(strlen(chain_list) == 0)
-		{
-			/* empty chain */	
-			sprintf(chain_list, "%s","empty");
-		}
-	sprintf(send_buf, "%03d%s",strlen(chain_list), chain_list);
-	SEND_MSG(v, send_buf);
+		sprintf(_s_print_buf, "%03d%s",strlen( _print_buf ), _print_buf);
 
-	
+	}
+	SEND_MSG(v, _s_print_buf);
 }
+
 void	vj_event_send_clip_history_list	(	void *ptr,	const char format[],	va_list ap	)
 {
 	int args[2];
@@ -7070,6 +7021,8 @@ void	vj_event_send_clip_history_list	(	void *ptr,	const char format[],	va_list a
 	bzero( _s_print_buf,SEND_BUF);
 	bzero( _print_buf, SEND_BUF);
 
+	sprintf( _s_print_buf, "%03d", 0 );
+
 	if(clip_exists(args[0]))
 	{
 		int entry = 0;
@@ -7079,24 +7032,19 @@ void	vj_event_send_clip_history_list	(	void *ptr,	const char format[],	va_list a
 		
 		for( entry = 0; entry < CLIP_MAX_RENDER; entry ++ )
 		{	
-			// check if entry is playable
-			//void *data = clip_get_user_data( id );
 			editlist **el = (editlist**) clip_get_user_data( id );
 			bzero(hisline,25);
 			if(el && el[entry])
-				sprintf(hisline,"%02d%010d%010d", entry, (int)clip->first_frame[entry], (int) clip->last_frame[entry] );
+				sprintf(hisline,"%02d%010d%010d",
+					entry, (int)clip->first_frame[entry],
+					(int) clip->last_frame[entry] );
 			else
 				sprintf(hisline,"%02d%010d%010d", entry, 0, 0 );
 			strncat( _print_buf, hisline, strlen(hisline ));
 		}
 		sprintf( _s_print_buf, "%03d%s", strlen( _print_buf ), _print_buf );
-		SEND_MSG(v, _s_print_buf);
 	}
-	else
-	{
-		sprintf( _s_print_buf, "%03d", 0 );
-		SEND_MSG(v, _s_print_buf);
-	}
+	SEND_MSG(v, _s_print_buf);
 }
 
 void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_list ap	)

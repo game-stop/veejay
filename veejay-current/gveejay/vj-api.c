@@ -30,6 +30,7 @@
 #include <gveejay/keyboard.h>
 #include <gtk/gtkversion.h>
 
+
 //if gtk2_6 is not defined, 2.4 is assumed.
 #ifdef GTK_CHECK_VERSION
 #if GTK_MINOR_VERSION >= 6
@@ -237,6 +238,9 @@ static struct
 { 
 	{MODE_SAMPLE, "frame_sampleproperties"},
 	{MODE_SAMPLE, "frame_samplerecord"},
+	{MODE_SAMPLE, "tree_history"},
+	{MODE_SAMPLE, "button_historymove"},
+	{MODE_SAMPLE, "button_historyrec"},
 	{MODE_STREAM, "frame_streamproperties"},
 	{MODE_STREAM, "frame_streamrecord"},	
 	{-1	,	"vbox_fxtree" },
@@ -487,12 +491,24 @@ static	int	read_file(const char *filename, int what, void *dst)
 	return 0;
 }
 
+GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
+{
+	GtkWidget *widget = glade_xml_get_widget( m , name );
+	if(!widget)
+	{
+		fprintf(stderr,"gveejay fatal: widget %s does not exist\n",name);
+		exit(0);
+	
+	}
+	return widget;		
+}
+
 
 static void scan_devices( const char *name)
 {
 	struct stat	v4ldir;
 	int	n;
-	GtkWidget *tree = glade_xml_get_widget(info->main_window,name);
+	GtkWidget *tree = glade_xml_get_widget_(info->main_window,name);
 	GtkListStore *store;
 	GtkTreeIter iter;
 	GtkTreeModel *model = gtk_tree_view_get_model
@@ -601,7 +617,7 @@ void	on_devicelist_row_activated(GtkTreeView *treeview,
 
 static void	setup_v4l_devices()
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_v4ldevices");
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_v4ldevices");
 	GtkListStore *store = gtk_list_store_new( 3, G_TYPE_INT, G_TYPE_STRING, G_TYPE_FLOAT );
 
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
@@ -945,7 +961,7 @@ static		gchar *get_relative_path(char *path)
 
 gchar *dialog_save_file(const char *title )
 {
-	GtkWidget *parent_window = glade_xml_get_widget(
+	GtkWidget *parent_window = glade_xml_get_widget_(
 			info->main_window, "gveejay_window" );
 	GtkWidget *dialog = 
 		gtk_file_chooser_dialog_new( title,
@@ -971,7 +987,7 @@ gchar *dialog_save_file(const char *title )
 
 gchar *dialog_open_file(const char *title)
 {
-	GtkWidget *parent_window = glade_xml_get_widget(
+	GtkWidget *parent_window = glade_xml_get_widget_(
 			info->main_window, "gveejay_window" );
 	GtkWidget *dialog = 
 		gtk_file_chooser_dialog_new( title,
@@ -1097,7 +1113,7 @@ prompt_keydialog(const char *title, char *msg)
 	bzero(pixmap,512);
 	get_gd( pixmap, NULL, "icon_key.png");
 
-	GtkWidget *mainw = glade_xml_get_widget(info->main_window, "gveejay_window");
+	GtkWidget *mainw = glade_xml_get_widget_(info->main_window, "gveejay_window");
 	GtkWidget *dialog = gtk_dialog_new_with_buttons( title,
 				GTK_WINDOW( mainw ),
 				GTK_DIALOG_DESTROY_WITH_PARENT,
@@ -1177,7 +1193,7 @@ prompt_keydialog(const char *title, char *msg)
 int
 prompt_dialog(const char *title, char *msg)
 {
-	GtkWidget *mainw = glade_xml_get_widget(info->main_window, "gveejay_window");
+	GtkWidget *mainw = glade_xml_get_widget_(info->main_window, "gveejay_window");
 	GtkWidget *dialog = gtk_dialog_new_with_buttons( title,
 				GTK_WINDOW( mainw ),
 				GTK_DIALOG_DESTROY_WITH_PARENT,
@@ -1271,7 +1287,7 @@ static  void	vj_msg(int type, const char format[], ...)
 }
 static  void	vj_msg_detail(int type, const char format[], ...)
 {
-	GtkWidget *view = glade_xml_get_widget( info->main_window,(type==4 ? "veejaytext": "gveejaytext"));
+	GtkWidget *view = glade_xml_get_widget_( info->main_window,(type==4 ? "veejaytext": "gveejaytext"));
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
 	GtkTextIter iter;
 
@@ -1350,7 +1366,7 @@ static	void	multi_vims(int id, const char format[],...)
 	snprintf(block, sizeof(block)-1, "%03d:%s;",id,tmp);
 	va_end(args);
 	//vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, block );
-	vj_client_send( info->client, V_CMD, block); 
+	int error = vj_client_send( info->client, V_CMD, block); 
 }
 
 static	void single_vims(int id)
@@ -1389,29 +1405,28 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 */
 static	gdouble	get_numd(const char *name)
 {
-	GtkWidget *w = glade_xml_get_widget( info->main_window, name);
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name);
 	if(!w) return 0;
 	return (gdouble) gtk_spin_button_get_value( GTK_SPIN_BUTTON( w ) );
 }
 
 static	int	get_slider_val(const char *name)
 {
-	GtkWidget *w = glade_xml_get_widget( info->main_window, name );
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
 	if(!w) return 0;
 	return ((gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value); 
 }
 
 static	int	get_nums(const char *name)
 {
-	GtkWidget *w = glade_xml_get_widget( info->main_window, name);
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name);
 	if(!w) return 0;
-
 	return (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON( w ) );
 }
 
 static	int	count_textview_buffer(const char *name)
 {
-	GtkWidget *view = glade_xml_get_widget( info->main_window, name );
+	GtkWidget *view = glade_xml_get_widget_( info->main_window, name );
 	if(view)
 	{
 		GtkTextBuffer *tb = NULL;
@@ -1424,7 +1439,7 @@ static	int	count_textview_buffer(const char *name)
 
 static	void	clear_textview_buffer(const char *name)
 {
-	GtkWidget *view = glade_xml_get_widget( info->main_window, name );
+	GtkWidget *view = glade_xml_get_widget_( info->main_window, name );
 	if(view)
 	{
 		GtkTextBuffer *tb = NULL;
@@ -1438,7 +1453,7 @@ static	void	clear_textview_buffer(const char *name)
 
 static	gchar	*get_textview_buffer(const char *name)
 {
-	GtkWidget *view = glade_xml_get_widget( info->main_window,name );
+	GtkWidget *view = glade_xml_get_widget_( info->main_window,name );
 	if(view)
 	{
 		GtkTextBuffer *tb = NULL;
@@ -1455,7 +1470,7 @@ static	gchar	*get_textview_buffer(const char *name)
 
 static	void set_textview_buffer(const char *name, gchar *utf8text)
 {
-	GtkWidget *view = glade_xml_get_widget( info->main_window, name );	
+	GtkWidget *view = glade_xml_get_widget_( info->main_window, name );	
 	if(view)
 	{
 		GtkTextBuffer *tb = gtk_text_view_get_buffer(
@@ -1466,14 +1481,14 @@ static	void set_textview_buffer(const char *name, gchar *utf8text)
 
 static	gchar	*get_text(const char *name)
 {
-	GtkWidget *w = glade_xml_get_widget(info->main_window, name );
+	GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
 	if(!w) return NULL;
 	return (gchar*) gtk_entry_get_text( GTK_ENTRY(w));
 }
 
 static	void	put_text(const char *name, char *text)
 {
-	GtkWidget *w = glade_xml_get_widget(info->main_window, name );
+	GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
 	if(w)
 	{
 		gchar *utf8_text = _utf8str( text );
@@ -1484,7 +1499,7 @@ static	void	put_text(const char *name, char *text)
 
 static	int	is_button_toggled(const char *name)
 {
-	GtkWidget *w = glade_xml_get_widget( info->main_window, name);
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name);
 	if(!w) return 0;
 	if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(w) ) == TRUE )
 		return 1;
@@ -1492,7 +1507,7 @@ static	int	is_button_toggled(const char *name)
 }
 static	void	set_toggle_button(const char *name, int status)
 {
-	GtkWidget *w = glade_xml_get_widget(info->main_window, name );
+	GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
 	if(w)
 	{
 		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), (status==1 ? TRUE: FALSE));
@@ -1502,7 +1517,7 @@ static	void	set_toggle_button(const char *name, int status)
 
 static	void	update_slider_gvalue(const char *name, gdouble value)
 {
-	GtkWidget *w = glade_xml_get_widget( info->main_window, name );
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
 	if(!w)
 		return;
 	gtk_adjustment_set_value(
@@ -1511,7 +1526,7 @@ static	void	update_slider_gvalue(const char *name, gdouble value)
 
 static	void	update_slider_rel_value(const char *name, gint value, gint minus, gint scale)
 {
-	GtkWidget *w = glade_xml_get_widget( info->main_window, name );
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
 	if(!w)
 		return;
 	gdouble gvalue = (gdouble)(value - minus);
@@ -1525,7 +1540,7 @@ static	void	update_slider_rel_value(const char *name, gint value, gint minus, gi
 
 static	void	update_slider_value(const char *name, gint value, gint scale)
 {
-	GtkWidget *w = glade_xml_get_widget( info->main_window, name );
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
 	if(!w)
 		return;
 	gdouble gvalue;
@@ -1539,7 +1554,7 @@ static	void	update_slider_value(const char *name, gint value, gint scale)
 
 static	void	update_spin_range(const char *name, gint min, gint max, gint val)
 {
-	GtkWidget *w = glade_xml_get_widget( info->main_window, name );
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
 	if(!w) return;
 	gtk_spin_button_set_range( GTK_SPIN_BUTTON(w), (gdouble)min, (gdouble) max );
 	gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble)val);
@@ -1547,7 +1562,7 @@ static	void	update_spin_range(const char *name, gint min, gint max, gint val)
 
 static	void	update_spin_value(const char *name, gint value )
 {
-	GtkWidget *w = glade_xml_get_widget(info->main_window, name );
+	GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
 	if(w)
 	{
 		gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble) value );
@@ -1556,10 +1571,15 @@ static	void	update_spin_value(const char *name, gint value )
 
 static  void	update_slider_range(const char *name, gint min, gint max, gint value, gint scaled)
 {
-	GtkWidget *w = glade_xml_get_widget( info->main_window, name );
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
 	GtkRange *range = GTK_RANGE(w);
 	if(!w)
 		return;
+	if( min >= max )
+	{
+		fprintf(stderr, "gveejay fatal : %s , %d - %d", name,min,max );
+	}
+
 	if(!scaled)
 	{
 		gtk_range_set_range(range, (gdouble) min, (gdouble) max );
@@ -1576,7 +1596,7 @@ static  void	update_slider_range(const char *name, gint min, gint max, gint valu
 }
 static	void	update_label_i(const char *name, int num, int prefix)
 {
-	GtkWidget *label = glade_xml_get_widget(
+	GtkWidget *label = glade_xml_get_widget_(
 				info->main_window, name);
 	if(!label) return;
 	char	str[20];
@@ -1590,7 +1610,7 @@ static	void	update_label_i(const char *name, int num, int prefix)
 }
 static	void	update_label_f(const char *name, float val )
 {
-	GtkWidget *label = glade_xml_get_widget(
+	GtkWidget *label = glade_xml_get_widget_(
 				info->main_window, name);
 	if(!label) return;
 	char value[10];
@@ -1602,7 +1622,7 @@ static	void	update_label_f(const char *name, float val )
 }
 static	void	update_label_str(const char *name, gchar *text)
 {
-	GtkWidget *label = glade_xml_get_widget(
+	GtkWidget *label = glade_xml_get_widget_(
 				info->main_window, name);
 	if(!label) return;
 	gchar *utf8_text = _utf8str( text );
@@ -1634,7 +1654,7 @@ GSList *gui_tree_selection_get_paths(GtkTreeView *view)
 
 static	void	update_colorselection()
 {
-	GtkWidget *colorsel = glade_xml_get_widget( info->main_window, 
+	GtkWidget *colorsel = glade_xml_get_widget_( info->main_window, 
 				"colorselection");
 	GdkColor color;
 
@@ -1666,7 +1686,7 @@ static	void	update_rgbkey()
 	if(!info->entry_lock)
 	{
 		info->entry_lock =1;
-		GtkWidget *colorsel = glade_xml_get_widget( info->main_window, 
+		GtkWidget *colorsel = glade_xml_get_widget_( info->main_window, 
 				"rgbkey");
 		GdkColor color;
 		/* update from entry tokens (delivered by GET_CHAIN_ENTRY */
@@ -1690,7 +1710,7 @@ static	void	update_rgbkey_from_slider()
 {
 	if(!info->entry_lock)
 	{
-		GtkWidget *colorsel = glade_xml_get_widget( info->main_window,
+		GtkWidget *colorsel = glade_xml_get_widget_( info->main_window,
 				"rgbkey");
 		info->entry_lock = 1;
 		GdkColor color;
@@ -1709,7 +1729,7 @@ static	void	update_rgbkey_from_slider()
 static	void	v4l_expander_toggle(int mode)
 {
 	// we can set the expanded of the ABC expander
-	GtkWidget *exp = glade_xml_get_widget(
+	GtkWidget *exp = glade_xml_get_widget_(
 			info->main_window, "v4l_expander");
 	GtkExpander *e = GTK_EXPANDER(exp);
 	gtk_expander_set_expanded( e ,(mode==0 ? FALSE : TRUE) );
@@ -1753,6 +1773,10 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 
 static void 	update_globalinfo()
 {
+
+	if( info->uc.playmode == MODE_STREAM )
+		info->status_tokens[FRAME_NUM] = 0;
+
 	update_label_i( "label_curframe", info->status_tokens[FRAME_NUM] , 1 );
 
 	gchar *ctime = format_time( info->status_tokens[FRAME_NUM] );
@@ -1782,6 +1806,9 @@ static void 	update_globalinfo()
 		{
 			enable_widget("frame_streamproperties");
 			enable_widget("frame_streamrecord");
+			disable_widget("tree_history");
+			disable_widget("button_historyrec");
+			disable_widget("button_historymove");  
 			disable_widget("frame_samplerecord");
 			disable_widget("frame_sampleproperties");
 		}
@@ -1789,6 +1816,9 @@ static void 	update_globalinfo()
 		{
 			enable_widget("frame_samplerecord");
 			enable_widget("frame_sampleproperties");
+			enable_widget("tree_history");
+			enable_widget("button_historyrec");
+			enable_widget("button_historymove");  
 			disable_widget("frame_streamproperties");
 			disable_widget("frame_streamrecord");
 		}
@@ -1833,9 +1863,9 @@ static void 	update_globalinfo()
 		{
 			gchar *time = format_time( info->status_tokens[FRAME_NUM]);
 
-			update_label_str( "label_streamposition", time);
+			update_label_str( "label_sampleposition", time);
 			g_free(time); 
-			update_label_str( "label_streamlength", "infinite");
+			update_label_str( "label_samplelength", "infinite");
 		}
 	}
 
@@ -1862,6 +1892,8 @@ static void 	update_globalinfo()
 				
 			info->uc.reload_hint[HINT_EL] = 1;
 		}
+		if( pm == MODE_STREAM )
+			tf = 1;
 		update_spin_range(
 			"button_fadedur", 0, tf, 0 );
 		if( pm == MODE_SAMPLE )
@@ -2015,10 +2047,9 @@ static void 	update_globalinfo()
 	if(info->uc.reload_hint[HINT_ENTRY] == 1)
 	{
 		char slider_name[10];
-		char spin_name[10];
+		char button_name[10];
 		gint np = 0;
 		/* update effect description */
-
 		load_parameter_info();
 		
 		if( entry_tokens[ENTRY_FXID] == 0)
@@ -2032,7 +2063,7 @@ static void 	update_globalinfo()
 			enable_widget( "button_entry_toggle");
 			set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_FXSTATUS] );
 			np = _effect_get_np( entry_tokens[ENTRY_FXID] );
-			GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget(
+			GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
 					info->main_window, "tree_chain") ));
 
   			gtk_tree_model_foreach(
@@ -2041,14 +2072,15 @@ static void 	update_globalinfo()
 			for( i = 0; i < np ; i ++ )
 			{
 				sprintf(slider_name, "slider_p%d",i);
-				sprintf(spin_name, "spin_p%d", i);
 				enable_widget( slider_name );
-				enable_widget( spin_name );
+				sprintf(button_name, "inc_p%d", i);
+				enable_widget( button_name );
+				sprintf(button_name, "dec_p%d", i );
+				enable_widget( button_name );
 				gint min,max,value;
 				value = entry_tokens[3 + i];
 				if( _effect_get_minmax( entry_tokens[ENTRY_FXID], &min,&max, i ))
 				{
-					update_spin_range( spin_name, min,max,value);
 					update_slider_range( slider_name,min,max, value, 0);
 				}
 			}
@@ -2058,12 +2090,13 @@ static void 	update_globalinfo()
 		for( i = np; i < 8 ; i ++ )
 		{
 			sprintf(slider_name, "slider_p%d",i);
-			sprintf(spin_name, "spin_p%d", i);
 			gint min = 0, max = 1, value = 0;
-			update_spin_range( spin_name, min,max, value );
 			update_slider_range( slider_name, min,max, value, 0 );
 			disable_widget( slider_name );
-			disable_widget( spin_name );
+			sprintf( button_name, "inc_p%d", i);
+			disable_widget( button_name );
+			sprintf( button_name, "dec_p%d", i);
+			disable_widget( button_name );
 		}
 
 	}
@@ -2189,7 +2222,7 @@ static void 	update_globalinfo()
 
 static	void	reset_tree(const char *name)
 {
-	GtkWidget *tree_widget = glade_xml_get_widget( info->main_window,name );
+	GtkWidget *tree_widget = glade_xml_get_widget_( info->main_window,name );
 	GtkTreeModel *tree_model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree_widget) );
 	
 	// get a GList of all TreeViewColumns
@@ -2383,7 +2416,7 @@ on_dev_edited (GtkCellRendererText *celltext,
 
 static	void	setup_tree_spin_column( const char *tree_name, int type, const char *title)
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, tree_name );
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, tree_name );
 	GtkCellRenderer *renderer;
 	GtkTreeViewColumn *column;
 	renderer = gui_cell_renderer_spin_new(0.0, 3.0 , 1.0, 1.0, 1.0, 1.0, 0.0);
@@ -2407,7 +2440,7 @@ static void 	setup_tree_texteditable_column(
 		void (*callbackfunction)()
 		)
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, tree_name );
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, tree_name );
 	GtkCellRenderer *renderer;
 	GtkTreeViewColumn *column;
 
@@ -2423,7 +2456,7 @@ static void 	setup_tree_texteditable_column(
 
 static	void	setup_tree_text_column( const char *tree_name, int type, const char *title )
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, tree_name );
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, tree_name );
 	GtkCellRenderer *renderer;
 	GtkTreeViewColumn *column;
 
@@ -2434,7 +2467,7 @@ static	void	setup_tree_text_column( const char *tree_name, int type, const char 
 
 static	void	setup_tree_pixmap_column( const char *tree_name, int type, const char *title )
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, tree_name );
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, tree_name );
 	GtkCellRenderer *renderer;
 	GtkTreeViewColumn *column;
 
@@ -2447,7 +2480,7 @@ static	void	setup_tree_pixmap_column( const char *tree_name, int type, const cha
 
 static void	setup_effectchain_info( void )
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_chain");
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
 	GtkListStore *store = gtk_list_store_new( 3, G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING );
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	g_object_unref( G_OBJECT( store ));
@@ -2458,10 +2491,10 @@ static void	setup_effectchain_info( void )
 	
   	GtkTreeSelection *selection; 
 
-	tree = glade_xml_get_widget( info->main_window, "tree_chain");
+	tree = glade_xml_get_widget_( info->main_window, "tree_chain");
   	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
-    	gtk_tree_selection_set_select_function(selection, view_entry_selection_func, NULL, NULL);
-    	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
+    	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE); 
+   	gtk_tree_selection_set_select_function(selection, view_entry_selection_func, NULL, NULL);
 }
 
 
@@ -2492,6 +2525,7 @@ static	void	load_parameter_info()
 {
 	int	*p = &(info->uc.entry_tokens[0]);
 	int	len = 0;
+
 	multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, 
 		info->uc.selected_chain_entry );
 
@@ -2532,7 +2566,7 @@ static	void	load_parameter_info()
 // load effect chain
 static	void	load_effectchain_info()
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_chain");
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
 	GtkListStore *store;
 	
 	GtkTreeIter iter;
@@ -2730,7 +2764,7 @@ sort_vims_func( GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b,
 // load effectlist from veejay
 void	setup_effectlist_info()
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_effectlist");
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_effectlist");
 	GtkListStore *store = gtk_list_store_new( 3, G_TYPE_INT, GDK_TYPE_PIXBUF, G_TYPE_STRING );
 
 	GtkTreeSortable *sortable = GTK_TREE_SORTABLE(store);
@@ -2753,7 +2787,7 @@ void	setup_effectlist_info()
 	g_signal_connect( tree, "row-activated",
 		(GCallback) on_effectlist_row_activated, NULL );
 
-	tree = glade_xml_get_widget( info->main_window, "tree_effectlist");
+	tree = glade_xml_get_widget_( info->main_window, "tree_effectlist");
   	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
     	gtk_tree_selection_set_select_function(selection, view_fx_selection_func, NULL, NULL);
     	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
@@ -2809,7 +2843,7 @@ void	on_samplelist_edited(GtkCellRendererText *cell,
 		gpointer user_data)
 {
 	// welke sample id is klikked?
-	GtkWidget *tree = glade_xml_get_widget(info->main_window,
+	GtkWidget *tree = glade_xml_get_widget_(info->main_window,
 				"tree_samples");
 	GtkTreeIter iter;
 	gchar *id = NULL;
@@ -2891,7 +2925,7 @@ void	on_samplelist_edited(GtkCellRendererText *cell,
 
 void	setup_samplelist_info(const char *name)
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, name);
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, name);
 	GtkListStore *store = gtk_list_store_new( 3, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING );
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	g_object_unref( G_OBJECT( store ));
@@ -2927,7 +2961,7 @@ void	setup_samplelist_info(const char *name)
 
 void	load_effectlist_info()
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_effectlist");
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_effectlist");
 	GtkListStore *store;
 	
 	GtkTreeIter iter;
@@ -2998,7 +3032,7 @@ void	load_effectlist_info()
 // same for load_mixlist_info(), only different widget !!
 static	void	load_samplelist_info(const char *name)
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window,name);
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window,name);
 	GtkListStore *store;
 	
 	GtkTreeIter iter;
@@ -3257,7 +3291,6 @@ on_vimslist_row_activated(GtkTreeView *treeview,
 
 		if(!sscanf(vimsid, "%d", &event_id))
 		{
-			printf("Error\n");
 			return;
 		}	
 		info->uc.selected_vims_entry = event_id;
@@ -3424,7 +3457,7 @@ on_stream_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 	if(!info->status_lock)
 	{
 	GdkColor current_color;
-	GtkWidget *colorsel = glade_xml_get_widget(info->main_window,
+	GtkWidget *colorsel = glade_xml_get_widget_(info->main_window,
 			"colorselection" );
 	gtk_color_selection_get_current_color(
 		GTK_COLOR_SELECTION( colorsel ),
@@ -3449,7 +3482,7 @@ on_stream_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 
 static	void	setup_colorselection()
 {
-	GtkWidget *sel = glade_xml_get_widget(info->main_window, "colorselection");
+	GtkWidget *sel = glade_xml_get_widget_(info->main_window, "colorselection");
 	g_signal_connect( sel, "color-changed",
 		(GCallback) on_stream_color_changed, NULL );
 
@@ -3461,7 +3494,7 @@ on_rgbkey_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 	if(!info->entry_lock)
 	{
 		GdkColor current_color;
-		GtkWidget *colorsel = glade_xml_get_widget(info->main_window,
+		GtkWidget *colorsel = glade_xml_get_widget_(info->main_window,
 			"rgbkey" );
 		gtk_color_selection_get_current_color(
 			GTK_COLOR_SELECTION( colorsel ),
@@ -3499,7 +3532,7 @@ on_rgbkey_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 
 static	void	setup_rgbkey()
 {
-	GtkWidget *sel = glade_xml_get_widget(info->main_window, "rgbkey");
+	GtkWidget *sel = glade_xml_get_widget_(info->main_window, "rgbkey");
 	g_signal_connect( sel, "color-changed",
 		(GCallback) on_rgbkey_color_changed, NULL );
 
@@ -3507,7 +3540,7 @@ static	void	setup_rgbkey()
 
 static	void	setup_vimslist()
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_vims");
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_vims");
 	GtkListStore *store = gtk_list_store_new( 2,G_TYPE_STRING, G_TYPE_STRING);
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	g_object_unref( G_OBJECT( store ));
@@ -3540,7 +3573,7 @@ void	on_vimslist_edited(GtkCellRendererText *cell,
 		)
 {
 	// welke sample id is klikked?
-	GtkWidget *tree = glade_xml_get_widget(info->main_window,
+	GtkWidget *tree = glade_xml_get_widget_(info->main_window,
 				"tree_bundles");
 	GtkTreeIter iter;
 	gchar *id = NULL;
@@ -3637,7 +3670,7 @@ void	on_vimslist_edited(GtkCellRendererText *cell,
 
 static	void	setup_bundles()
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_bundles");
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_bundles");
 	GtkListStore *store = gtk_list_store_new( 7,G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING ,G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING);
 
 	gtk_widget_set_size_request( tree, 300, -1 );
@@ -3669,14 +3702,14 @@ static	void	setup_bundles()
     	gtk_tree_selection_set_select_function(selection, view_vims_selection_func, NULL, NULL);
     	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 
-	GtkWidget *tv = glade_xml_get_widget( info->main_window, "vimsview" );
+	GtkWidget *tv = glade_xml_get_widget_( info->main_window, "vimsview" );
 	gtk_text_view_set_wrap_mode( GTK_TEXT_VIEW(tv), GTK_WRAP_WORD_CHAR );
 	
 }
 
 static void	reload_hislist()
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_history");
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_history");
 	GtkListStore *store;
 	GtkTreeIter iter;
 	gint offset=0;
@@ -3719,7 +3752,7 @@ static void	reload_hislist()
 
 static	void	setup_hislist_info()
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_history");
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_history");
 	GtkListStore *store = gtk_list_store_new( 2,G_TYPE_INT, G_TYPE_STRING );
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	g_object_unref( G_OBJECT( store ));
@@ -3736,7 +3769,7 @@ static	void	setup_hislist_info()
 }
 static	void	setup_editlist_info()
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, "editlisttree");
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "editlisttree");
 	GtkListStore *store = gtk_list_store_new( 5,G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING ,G_TYPE_STRING);
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	g_object_unref( G_OBJECT( store ));
@@ -3765,7 +3798,7 @@ static	void	setup_editlist_info()
 
 static	void	reload_bundles()
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_bundles");
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_bundles");
 	GtkListStore *store;
 	GtkTreeIter iter;
 	
@@ -3865,7 +3898,7 @@ static	void	reload_bundles()
 
 static	void	reload_vimslist()
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, "tree_vims");
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_vims");
 	GtkListStore *store;
 	GtkTreeIter iter;
 	
@@ -3944,15 +3977,13 @@ static	void	reload_vimslist()
 
 static	void	reload_editlist_contents()
 {
-	GtkWidget *tree = glade_xml_get_widget( info->main_window, "editlisttree");
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "editlisttree");
 	GtkListStore *store;
 	GtkTreeIter iter;
 	gint i;
 	gint len = 0;
 	single_vims( VIMS_EDITLIST_LIST );
 	gchar *eltext = recv_vims(6,&len); // msg len
-
-	printf("Editlist is %d bytes\n", len);
 
 	gint 	offset = 0;
 	gint	num_files=0;
@@ -3965,8 +3996,6 @@ static	void	reload_editlist_contents()
 	
 	strncpy( str_nf, eltext , sizeof(str_nf));
 	sscanf( str_nf, "%04d", &num_files );
-
-	printf("Editlist has %d files\n", num_files);
 
 	offset += 4;
 	int n = 0;
@@ -4137,18 +4166,18 @@ static	void	load_editlist_info()
 
 static	int	get_page(const char *name)
 {
-	GtkWidget *w = glade_xml_get_widget(info->main_window, name);
+	GtkWidget *w = glade_xml_get_widget_(info->main_window, name);
 	return gtk_notebook_get_current_page( GTK_NOTEBOOK(w) );
 }
 
 static	void	set_page(const char *name , int pg)
 {
-	GtkWidget *w = glade_xml_get_widget( info->main_window, name );
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
 	gtk_notebook_set_current_page( GTK_NOTEBOOK(w), pg);
 }
 static	void	disable_widget(const char *name)
 {
-	GtkWidget *w = glade_xml_get_widget(info->main_window,name);
+	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
 	if(w)
 	{
 		 gtk_widget_set_sensitive( GTK_WIDGET(w), FALSE );
@@ -4156,7 +4185,7 @@ static	void	disable_widget(const char *name)
 }
 static	void	enable_widget(const char *name)
 {
-	GtkWidget *w = glade_xml_get_widget(info->main_window,name);
+	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
 	if(w)
 	{
 		gtk_widget_set_sensitive( GTK_WIDGET(w), TRUE );
@@ -4198,7 +4227,7 @@ static	gchar	*format_selection_time(int start, int end)
 
 static	void		set_color_fg(const char *name, GdkColor *col)
 {
-	GtkWidget *w = glade_xml_get_widget( info->main_window,name );
+	GtkWidget *w = glade_xml_get_widget_( info->main_window,name );
 	if(w)
 	{
  		GtkStyle *style;
@@ -4213,7 +4242,7 @@ static	void		set_color_fg(const char *name, GdkColor *col)
 
 static	gboolean	update_cpumeter_timeout( gpointer data )
 {
-	GtkWidget *w = glade_xml_get_widget(
+	GtkWidget *w = glade_xml_get_widget_(
 			info->main_window, "cpumeter");
 	gdouble ms   = (gdouble)info->status_tokens[ELAPSED_TIME]; 
 	gdouble max  = ((1.0/info->el.fps)*1000);
@@ -4254,7 +4283,7 @@ static	gboolean	update_sample_record_timeout(gpointer data)
 {
 	if( info->uc.playmode == MODE_SAMPLE )
 	{
-		GtkWidget *w = glade_xml_get_widget( info->main_window, 
+		GtkWidget *w = glade_xml_get_widget_( info->main_window, 
 			"samplerecord_progress" );
 	
 		gdouble	tf = info->status_tokens[STREAM_DURATION];
@@ -4288,7 +4317,7 @@ static	gboolean	update_sample_record_timeout(gpointer data)
 }
 static	gboolean	update_stream_record_timeout(gpointer data)
 {
-	GtkWidget *w = glade_xml_get_widget( info->main_window, 
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, 
 			"streamrecord_progress" );
 	if( info->uc.playmode == MODE_STREAM )
 	{
@@ -4314,14 +4343,14 @@ static	gboolean	update_stream_record_timeout(gpointer data)
 
 static gboolean	update_progress_timeout(gpointer data)
 {
-	GtkWidget *w = glade_xml_get_widget( info->main_window, "connecting");
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, "connecting");
 	gtk_progress_bar_pulse (GTK_PROGRESS_BAR (w));
 	return TRUE;
 }
 
 static	void	init_progress()
 {
-	//GtkWidget *w = glade_xml_get_widget( info->main_window, "connecting");
+	//GtkWidget *w = glade_xml_get_widget_( info->main_window, "connecting");
 	info->connecting = g_timeout_add( 100 , update_progress_timeout, (gpointer*) info );
 }
 
@@ -4477,7 +4506,7 @@ void	vj_gui_stop_launch()
 			if(info->connecting)
 			{
 				gtk_progress_bar_set_fraction(
-					GTK_PROGRESS_BAR (glade_xml_get_widget(info->main_window, "connecting")),0.0);
+					GTK_PROGRESS_BAR (glade_xml_get_widget_(info->main_window, "connecting")),0.0);
 				g_source_remove( info->connecting );
 				info->connecting = 0;
 			}
@@ -4508,7 +4537,6 @@ void	vj_fork_or_connect_veejay()
 	char	*remote = get_text( "entry_hostname" );
 	char	*files  = get_text( "entry_filename" );
 	int	port	= get_nums( "button_portnum" );
-	int	dummy	= is_button_toggled( "button_dummy");
 	gchar	*args[20];
 	int	n_args = 0;
 	char	port_str[15];
@@ -4523,7 +4551,7 @@ void	vj_fork_or_connect_veejay()
 
 	args[n_args++] = g_strdup(port_str);
 
-	if(files == NULL || strlen(files)<= 0 || dummy)
+	if(files == NULL || strlen(files)<= 0)
 	{
 		args[n_args++] = g_strdup("-d");
 		args[n_args++] = NULL;
@@ -4647,8 +4675,8 @@ void	vj_gui_free()
 
 static	void	vj_init_style( const char *name, const char *font )
 {
-	GtkWidget *window = glade_xml_get_widget(info->main_window, "gveejay_window");
-	GtkWidget *widget = glade_xml_get_widget(info->main_window, name );
+	GtkWidget *window = glade_xml_get_widget_(info->main_window, "gveejay_window");
+	GtkWidget *widget = glade_xml_get_widget_(info->main_window, name );
 	gtk_text_view_set_wrap_mode( GTK_TEXT_VIEW(widget), GTK_WRAP_WORD_CHAR );
 
 	GtkStyle *style = gtk_style_copy( gtk_widget_get_style(GTK_WIDGET(window)));
@@ -4758,7 +4786,7 @@ void 	vj_gui_init(char *glade_file)
 
 	g_timeout_add_full( G_PRIORITY_DEFAULT_IDLE, 500, is_alive, (gpointer*) info,NULL);
 
-	GtkWidget *mainw = glade_xml_get_widget(info->main_window,
+	GtkWidget *mainw = glade_xml_get_widget_(info->main_window,
 		"gveejay_window" );
     /* Make this run after any internal handling of the client event happened
      * to make sure that all changes implicated by it are already in place and
@@ -4832,7 +4860,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		);
 	
 	// we can set the expanded of the ABC expander
-	GtkWidget *exp = glade_xml_get_widget(
+	GtkWidget *exp = glade_xml_get_widget_(
 			info->main_window, "veejay_expander");
 	gtk_expander_set_expanded( GTK_EXPANDER(exp), FALSE );
 
@@ -4874,7 +4902,7 @@ static	void	veejay_stop_connecting(vj_gui_t *gui)
 		vj_gui_enable();
 	vj_launch_toggle(TRUE);
 	gtk_progress_bar_set_fraction(
-		GTK_PROGRESS_BAR (glade_xml_get_widget(info->main_window, "connecting")),0.0);
+		GTK_PROGRESS_BAR (glade_xml_get_widget_(info->main_window, "connecting")),0.0);
 	g_source_remove( info->connecting );
 	info->connecting = 0;
 }
@@ -4978,7 +5006,7 @@ void	vj_gui_disconnect()
 		info->client = NULL;
 		info->run_state = 0;
 
-		GtkWidget *exp = glade_xml_get_widget(
+		GtkWidget *exp = glade_xml_get_widget_(
 			info->main_window, "veejay_expander");
 		gtk_expander_set_expanded( GTK_EXPANDER(exp), TRUE );
 			vj_msg(VEEJAY_MSG_INFO, "Disconnected - Use Launcher"); 
@@ -4999,7 +5027,7 @@ void	vj_gui_disconnect()
 
 void	vj_launch_toggle(gboolean value)
 {
-	GtkWidget *w = glade_xml_get_widget(info->main_window, "button_veejay" );
+	GtkWidget *w = glade_xml_get_widget_(info->main_window, "button_veejay" );
 	gtk_widget_set_sensitive( GTK_WIDGET(w), value );
 	info->launch_sensitive = ( value == TRUE ? 1 : 0);
 }
@@ -5009,7 +5037,7 @@ void	vj_gui_disable()
 	int i = 0;
 	while( gwidgets[i].name != NULL )
 	{
-	 GtkWidget *w = glade_xml_get_widget( 
+	 GtkWidget *w = glade_xml_get_widget_( 
 				info->main_window, gwidgets[i].name);
 	 gtk_widget_set_sensitive( GTK_WIDGET(w), FALSE );
 	 i++;
@@ -5022,7 +5050,7 @@ void	vj_gui_enable()
 	int i =0;
 	while( gwidgets[i].name != NULL)
 	{
-	 GtkWidget *w = glade_xml_get_widget(
+	 GtkWidget *w = glade_xml_get_widget_(
 				info->main_window, gwidgets[i].name );
 	 gtk_widget_set_sensitive( GTK_WIDGET(w), TRUE );
 	 i++;

@@ -516,6 +516,7 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 	return 0;
 }
 
+
 static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, int priority )
 {
 	int i = 0;
@@ -534,7 +535,8 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 		bzero(net_id,4 );
 
 		char *str_ptr = &s[i];
-		str_ptr ++;  // skip 'V'
+
+		str_ptr ++;
 
 		strncpy( tmp_len,str_ptr, 3 ); // header length   
 
@@ -546,6 +548,8 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 		str_ptr += 4;
 		strncpy( net_id, str_ptr, 3 );
 
+		slen ++; // what a joke, the message ends with ';' and its not included in the payload size
+                     
 
 		if( sscanf( net_id, "%03d", &netid ) <= 0 )
 		{
@@ -703,7 +707,13 @@ int	vj_server_update( vj_server *vje, int id )
 
 	if( n_msg < VJ_MAX_PENDING_MSG )
 	{
-		return _vj_parse_msg( vje, id, msg_buf, bytes_left,0 );
+		int nn = _vj_parse_msg( vje, id, msg_buf, bytes_left,0 );
+		if(nn != n_msg)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Veejay's message queue corrupted (end session!)");
+			return 0; 
+		}
+		return nn;
 	}
 	else
 	{
@@ -794,8 +804,6 @@ int vj_server_retrieve_msg(vj_server *vje, int id, char *dst )
 
 	if( index == Link[id]->n_queued )
 	{
-//		veejay_msg(VEEJAY_MSG_DEBUG, "\tRetrieved %d messages from queue",
-//			index);
 		return 0; // done
 	}
 	msg = Link[id]->m_queue[index]->msg;
@@ -805,10 +813,7 @@ int vj_server_retrieve_msg(vj_server *vje, int id, char *dst )
 
 	index ++;
 
-//	veejay_msg(VEEJAY_MSG_DEBUG, "\tExec VIMS %d [%s]",
-//		index-1, msg );
-
 	Link[id]->n_retrieved = index;
-    return 1;			
+	return 1;			
 }
 

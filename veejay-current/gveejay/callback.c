@@ -183,6 +183,11 @@ void	on_button_vimshelp_clicked(GtkWidget *widget, gpointer user_data)
 	about_dialog();	
 }
 
+void	on_button_fadedur_value_changed(GtkWidget *widget, gpointer user_data)
+{
+
+}
+
 void	on_button_fadeout_clicked(GtkWidget *w, gpointer user_data)
 {
 	gint num = (gint)get_numd( "button_fadedur");
@@ -468,7 +473,7 @@ void	on_button_fx_mixapply_clicked(GtkWidget *w, gpointer user_data)
 }
 */
 
-#define	slider_changed( arg_num, value, name ) \
+#define	slider_changed( arg_num, value ) \
 {\
 if(!info->status_lock && !info->parameter_lock)\
 {\
@@ -494,38 +499,38 @@ info->parameter_lock = 0;\
 
 void	on_slider_p0_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 0, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value, "spin_p0" );
+	slider_changed( 0, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p1_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 1, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value, "spin_p1" );
+	slider_changed( 1, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p2_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 2, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value, "spin_p2" );
+	slider_changed( 2, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 
 void	on_slider_p3_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 3, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value, "spin_p3" );
+	slider_changed( 3, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p4_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 4, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value, "spin_p4" );
+	slider_changed( 4, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 
 void	on_slider_p5_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 5, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value, "spin_p5" );
+	slider_changed( 5, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p6_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 6, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value, "spin_p6" );
+	slider_changed( 6, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 
 void	on_slider_p7_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 7, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value, "spin_p7" );
+	slider_changed( 7, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 
 void	on_inc_p0_clicked(GtkWidget *w, gpointer user_data)
@@ -708,8 +713,8 @@ void	on_speedslider_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{	
-		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
-		
+		gint value = (gint)GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
+
 		multi_vims( VIMS_VIDEO_SET_SPEED, "%d",value );
 		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
