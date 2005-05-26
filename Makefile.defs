@@ -1,3 +1,0 @@
-CC = cc
-PREFIX = /usr/local/
-OPTI_CFLAGS = -O3 -fomit-frame-pointer -ffast-math -funroll-loops
