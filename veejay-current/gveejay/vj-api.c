@@ -2146,6 +2146,13 @@ static void 	update_globalinfo()
 
 
 		info->uc.reload_hint[HINT_HISTORY] = 1;
+
+		gint n_frames = sample_calctime();
+		time = format_time( n_frames );
+		update_label_str( "label_samplerecord_duration", time );
+		info->uc.sample_rec_duration = n_frames;
+		g_free(time);
+
 	}
 
 	if(stream_changed)
