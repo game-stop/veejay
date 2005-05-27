@@ -1137,7 +1137,7 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 			return 0;
 		}	
 	}
-
+	veejay_msg(VEEJAY_MSG_DEBUG, "Remaining: [%s]", msg );
 	tmp = strndup( msg, 3 );
 	if( strncasecmp( tmp, "bun", 3) == 0 )
 	{
@@ -1215,7 +1215,10 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 		int		num_array[16];
 		char		*arguments;
 
+	
 		arguments = strndup( (msg + 4) , (msg_len -4) );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Arguments: [%s]",arguments);
+
 		if( arguments == NULL )
 		{	
 			veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) %d requires %d arguments but none were given",
@@ -1316,10 +1319,18 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 			{
 				veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) %d argument %d not specified, using default %d",
 					net_id, i , (i < 2 ? vj_event_list[id].args[i]: num_array[i]));
-				if(i<2)	vims_arguments[i].value = (void*) &(vj_event_list[id].args[i]);
+				if(i<2)
+				{	
+					vims_arguments[i].value = (void*) &(vj_event_list[id].args[i]);
+				}
 				else
-					vims_arguments[i].value = NULL;	
-				
+				{
+					int zero = 0;
+					if( fmt[fmt_offset] == 'd' )
+						vims_arguments[i].value = (void*) &zero;
+					else
+						vims_arguments[i].value = NULL;
+				}
 			}
 			fmt_offset += 3;	
 		}
@@ -1337,7 +1348,7 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 
 
 		// should be 'I' ?
-		_last_known_num_args = np;
+		_last_known_num_args = i;
 
 		vj_event_trigger_function(
 					(void*)v,
@@ -4561,25 +4572,17 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 				veejay_msg(VEEJAY_MSG_DEBUG, "Clip %d Chain entry %d has effect %s with %d arguments",
 					args[0],args[1],vj_effect_get_description(real_id),num_p);
 				for(i=0; i < num_p; i++)
-				{	
+				{
 					if(vj_effect_valid_value(real_id,i,args[(i+args_offset)]) )
 					{
+
 				 		if(clip_set_effect_arg(args[0],args[1],i,args[(i+args_offset)] )==-1)	
 						{
-							veejay_msg(VEEJAY_MSG_ERROR,
 							"Error setting argument %d value %d for %s",
 							i,
 							args[(i+args_offset)],
-							vj_effect_get_description(real_id));
+							vj_effect_get_description(real_id);
 						}
-					}
-					else
-					{
-						veejay_msg(VEEJAY_MSG_ERROR, "Parameter %d value %d is invalid for effect %d (%d-%d)",
-							i,args[(i+args_offset)], real_id,
-							vj_effect_get_min_limit(real_id,i),
-							vj_effect_get_max_limit(real_id,i)
-							);
 					}
 				}
 
@@ -4626,8 +4629,6 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 		
 			if(vj_tag_set_effect(args[0],args[1], args[2]) != -1)
 			{
-				//veejay_msg(VEEJAY_MSG_INFO, "Clip %d Chain entry %d has effect %s",
-				//	args[0], args[1], vj_effect_get_description(real_id));
 				for(i=0; i < num_p; i++) 
 				{
 					if(vj_effect_valid_value(real_id, i, args[i+3]) )

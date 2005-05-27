@@ -487,8 +487,8 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 			return 0;
 		}
 
-		i += 5; // advance to message content
-		str_ptr += 5;
+		i += 4; // advance to message content
+		str_ptr += 4;
 		strncpy( net_id, str_ptr, 3 );
 
 		if( sscanf( net_id, "%03d", &netid ) <= 0 )
@@ -508,8 +508,19 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 				return 0;
 			}
 
-		num_msg ++; 
-		i += slen; // try next message
+		//FIXME: malformed endings
+		int ch = i + slen - 1;
+	
+		if( str_ptr[ slen-1] == ';')
+		{
+			num_msg ++; 
+			i += slen + 1; // try next message
+		}
+		else
+		{
+			_vj_malfunction("VIMS message does not end with ';'", buf, buf_len , i);
+			return 0;
+		}
 	}
 	if(num_msg > 0 )
 		return num_msg;
@@ -576,7 +587,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 				VJ_MAX_PENDING_MSG );	
 			   return num_msg; // cant take more
 		}
-				
+		
 		i += slen; // try next message
 	}
 
