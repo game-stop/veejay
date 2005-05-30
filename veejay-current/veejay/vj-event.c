@@ -78,13 +78,14 @@ static	vj_events	net_list[VIMS_MAX];
 #ifdef HAVE_SDL
 typedef struct
 {
-	vj_events	vims;
+	vj_events	*vims;
 	int		key_symbol;
 	int		key_mod;
+	int		arg_len;
 	char		*arguments;
 } vj_keyboard_event;
 
-static vj_keyboard_event keyboard_events[MAX_SDL_KEY];
+static hash_t *keyboard_events;
 #endif
 
 static int _recorder_format = ENCODER_YUV420;
@@ -599,6 +600,7 @@ vj_server_send(v->vjs[0],v->uc->current_link, str, len );\
 #define P_A(a,b,c,d)\
 {\
 int __z = 0;\
+unsigned char *__tmpstr = NULL;\
 if(a!=NULL){\
 unsigned int __rp;\
 unsigned int __rplen = (sizeof(a) / sizeof(int) );\
@@ -607,7 +609,12 @@ for(__rp = 0; __rp < __rplen; __rp++) a[__rp] = 0;\
 while(*c) { \
 if(__z > _last_known_num_args )  break; \
 switch(*c++) {\
- case 's': sprintf( b,"%s",va_arg(d,char*) ); __z++ ;\
+ case 's':\
+__tmpstr = va_arg(d,char*);\
+if(__tmpstr != NULL) {\
+	sprintf( b,"%s",va_arg(d,char*));\
+	free(__tmpstr); }\
+__z++ ;\
  break;\
  case 'd': a[__z] = *( va_arg(d, int*)); __z++ ;\
  break; }\
@@ -652,7 +659,15 @@ typedef struct {
 	char *bundle;
 } vj_msg_bundle;
 
+
 /* forward declarations (former console clip/tag print info) */
+vj_keyboard_event *new_keyboard_event(
+	int symbol, int modifier, const char *value, int event_id );
+vj_keyboard_event *get_keyboard_event( int id );
+int	keyboard_event_exists(int id);
+int	del_keyboard_event(int id );
+char *find_keyboard_default(int id);
+
 void vj_event_print_plain_info(void *ptr, int x);
 void vj_event_print_clip_info(veejay_t *v, int id); 
 void vj_event_print_tag_info(veejay_t *v, int id); 
@@ -718,6 +733,116 @@ vj_msg_bundle *vj_event_bundle_get(int event_id)
 	}
 	return NULL;
 }
+
+int			del_keyboard_event(int id )
+{
+	hnode_t *node;
+	vj_keyboard_event *ev = get_keyboard_event( id );
+	if(ev == NULL)
+		return 0;
+	node = hash_lookup( keyboard_events, (void*) id );
+	if(!node)
+		return 0;
+	if(ev->arguments)
+		free(ev->arguments);
+	if(ev->vims )
+		free(ev->vims );
+	hash_delete( keyboard_events, node );
+	return 1;  
+}
+
+vj_keyboard_event	*get_keyboard_event(int id )
+{
+	hnode_t *node = hash_lookup( keyboard_events, (void*) id );
+	if(node)
+		return ((vj_keyboard_event*) hnode_get( node ));
+	return NULL;
+}
+
+int		keyboard_event_exists(int id)
+{
+	hnode_t *node = hash_lookup( keyboard_events, (void*) id );
+	if(node)
+		if( hnode_get(node) != NULL )
+			return 1;
+	return 0;
+}
+//(int event_id, int symbol, int modifier, const char *value)
+
+vj_keyboard_event *new_keyboard_event(
+		int symbol, int modifier, const char *value, int event_id )
+{
+	int vims_id = vj_event_get_id( event_id );
+
+	if(vims_id == 0)
+	{
+		if(!vj_event_bundle_exists( event_id ))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR,
+				"VIMS %d does not exist", event_id);
+			return NULL;
+		}
+	}
+
+	if( event_id <= 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,
+		 "VIMS event %d does not exist", event_id );
+		return NULL;
+	}
+
+	vj_keyboard_event *ev = (vj_keyboard_event*)vj_malloc(sizeof(vj_keyboard_event));
+	if(!ev)
+		return NULL;
+	memset( ev, 0, sizeof(vj_keyboard_event));
+
+	// assume all is valid
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"%s : %d, %d , %p (%s), %d",
+		__FUNCTION__,
+		symbol, modifier, value,value, event_id );
+
+	ev->vims = (vj_events*) vj_malloc(sizeof(vj_events));
+	if(!ev->vims)
+		return NULL;
+	memset(ev->vims, 0, sizeof(vj_events));
+
+
+
+	if(value)
+	{
+		ev->arg_len = strlen(value);
+		ev->arguments = strndup( value, ev->arg_len );
+	}
+	else
+	{
+		if(event_id <= VIMS_BUNDLE_START || event_id > VIMS_BUNDLE_END)
+		{
+			ev->arguments = find_keyboard_default( event_id );
+			if(ev->arguments)
+				ev->arg_len = strlen(ev->arguments);
+		}	
+	}
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "\t\tValue = %p, %s", value,value );
+
+	if(vims_id != 0 )
+	{
+		ev->vims->act = vj_event_list[ vims_id ].function;
+		ev->vims->list_id  = event_id;
+	}
+	else
+	{
+		// bundle!
+		ev->vims->act = vj_event_none;
+		ev->vims->list_id = event_id;
+	}
+	ev->key_symbol = symbol;
+	ev->key_mod = modifier;
+
+	return ev;
+}
+
 
 int vj_event_bundle_exists(int event_id)
 {
@@ -859,9 +984,6 @@ vj_event vj_event_function_by_id(int id)
 const int vj_event_get_id(int event_id)
 {
 	int i;
-	if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
-		return vj_event_bundle_exists(event_id);
-
 	for(i=1; vj_event_list[i].name != NULL; i++)
 	{
 		if( vj_event_list[i].event_id == event_id ) return i;
@@ -1486,15 +1608,18 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 	int vims_key = key->keysym.sym;
 	int index = vims_mod * SDLK_LAST + vims_key;
 
-	vj_keyboard_event *ev = &keyboard_events[index];
-
-	int event_id = ev->vims.list_id;
-
-	if(event_id == 0)
+//	vj_keyboard_event *ev = &keyboard_events[index];
+	vj_keyboard_event *ev = get_keyboard_event( index );
+	if(!ev )
 	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Keyboard event %d unknown", index );
 		return;
 	}
 
+	// event_id is here VIMS list entry!
+	int event_id = ev->vims->list_id;
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Key fires event %d ?", event_id );
 	if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
 	{
 		vj_msg_bundle *bun = vj_event_bundle_get(event_id );
@@ -1515,7 +1640,7 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 	else
 	{
 		char msg[100];
-		if( ev->arguments != NULL)
+		if( ev->arg_len > 0 )
 		{
 			sprintf(msg,"%03d:%s;", event_id, ev->arguments );
 		}
@@ -1790,21 +1915,6 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 		veejay_msg(VEEJAY_MSG_DEBUG, "Added bundle %d", event_id);
 	}
 
-	if ( !vj_event_get_id( event_id ) )
-	{
-		if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
-		{
-			 veejay_msg(VEEJAY_MSG_DEBUG, "Bundle %d in configuration file is never defined",
-				event_id );
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "VIMS %d is invalid or missing in veejay (The event may depend on packages found at compile time)");
-			veejay_msg(VEEJAY_MSG_ERROR, "For a hint about this event, look in veejay/vims.h (may the source be with you)");
-		}
-		return; // and exit, no need for nonsense bindings.
-	}
-
 #ifdef HAVE_SDL
 	if( key > 0 && key_mod >= 0)
 	{
@@ -1984,11 +2094,18 @@ static void vj_event_get_key( int event_id, int *key_id, int *key_mod )
 		int i;
 		for ( i = 0; i < MAX_SDL_KEY ; i ++ )
 		{
-			if (keyboard_events[i].vims.list_id == event_id )
+			if( keyboard_event_exists( i ) )
 			{
-				*key_id =  keyboard_events[ i ].key_symbol;
-  				*key_mod=  keyboard_events[ i ].key_mod;
-				return;
+				vj_keyboard_event *ev = get_keyboard_event(i);
+				if(ev)
+				{
+					if(ev->vims->list_id == event_id )
+					{
+						*key_id =  ev->key_symbol;
+  						*key_mod=  ev->key_mod;
+						return;
+					}
+				}
 			}
 		}
 		// see if binding is in 
@@ -2001,82 +2118,55 @@ static void vj_event_get_key( int event_id, int *key_id, int *key_mod )
 
 void	vj_event_unregister_keyb_event( int sdl_key, int modifier )
 {
-	int sdl_index = modifier * SDLK_LAST;
-	vj_keyboard_event *ev = &keyboard_events[ sdl_index + sdl_key ];
-	ev->vims.act = vj_event_none;
-	ev->vims.list_id = 0;
-	ev->key_symbol = 0;
-	ev->key_mod = 0;
-	if(ev->arguments)
-		free(ev->arguments);
-	ev->arguments = NULL;
+	int index = (modifier * SDLK_LAST) + sdl_key;
+	vj_keyboard_event *ev = get_keyboard_event( index );
+	if(ev)
+	{
+		if( ev->vims )
+			free(ev->vims);
+		if( ev->arguments)
+			free(ev->arguments );
+		memset(ev, 0, sizeof( vj_keyboard_event ));
+		
+		if( del_keyboard_event( index ))
+			veejay_msg(VEEJAY_MSG_ERROR, "deregistered %d + %d " , modifier, sdl_key );
+
+	}
 }
+
 int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const char *value)
 {
 	int offset = SDLK_LAST * modifier;
-	if( symbol > 0 )
-	{
-		/* If an event has been attached to some other event, abort registring and let the
-                   user explicitly remove the binding */
-		if( keyboard_events[offset + symbol].vims.list_id > 0 && event_id != keyboard_events[offset+symbol].vims.list_id )
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Key %d + %d already exists ", symbol, modifier );
-			return 0;
-		}
-	}
-/*	else 
-	{	// finds only 1st occurence 
-		if(symbol == 0)
-		{
-			int i;
-			for( i = 0; i < MAX_SDL_KEY; i ++ )
-			{
-				if( keyboard_events[i].vims.list_id == event_id )
-				{
-					symbol = keyboard_events[i].key_symbol;
-					modifier = keyboard_events[i].key_mod;
-					break;
-				}
-			}              
-			// find symbol / mod!
-			if( i == MAX_SDL_KEY )
-			{
-				veejay_msg(VEEJAY_MSG_ERROR,
-					"VIMS  %d is not bound to any key !", event_id);
-				return 0;
-			}
-		}
-	}*/
+	int index = offset + symbol;
+	char *copy_str = NULL;
 
-	int id = vj_event_get_id( event_id );
-	if( id <= 0 )
+	if( keyboard_event_exists( index ))
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Event %d does not exist (%s)", event_id, __FUNCTION__);
+		veejay_msg(VEEJAY_MSG_ERROR,
+		"Keboard binding %d + %d already exists", modifier, symbol);
 		return 0;
 	}
 
-	keyboard_events[offset + symbol].vims.act     = vj_event_list[ id ].function;
-	keyboard_events[offset + symbol].vims.list_id = event_id;
-	keyboard_events[offset + symbol].key_symbol   = symbol;
-	keyboard_events[offset + symbol].key_mod      = modifier;
+	vj_keyboard_event *ev = new_keyboard_event(	
+		symbol, modifier, value, event_id );
 
-	char *args = NULL;
-	if( value != NULL && vj_event_list[ id].format != NULL )
-		args = strndup( value, 30 ); 
-
-	if( keyboard_events[offset+symbol].arguments != NULL)
+	if(!ev)
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "going to free existing arguments %s",
-			keyboard_events[offset+symbol].arguments );
-		free( keyboard_events[offset+symbol].arguments );
-		keyboard_events[offset+symbol].arguments = NULL;
+		veejay_msg(VEEJAY_MSG_DEBUG, "Error in %s, %d + %d (%s, %p)  VIMS %d",
+			__FUNCTION__ , modifier, symbol,  value, value, event_id );
+		return NULL;
 	}
-
-	if( value )
-		keyboard_events[offset + symbol].arguments    =	args;
-	else
-		keyboard_events[offset + symbol].arguments    = args;  
-
+	
+	hnode_t *node = hnode_create( ev );
+	if(!node)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,
+			"Cannot store keyboard event in hash!");
+		return 0;
+	}
+	
+	hash_insert( keyboard_events, node, (void*) index );
+	
 	return 1;
 }
 
@@ -2097,6 +2187,21 @@ void	vj_event_init_network_events()
 	veejay_msg(VEEJAY_MSG_DEBUG, "Registered %d VIMS events", net_id );
 }
 
+char *find_keyboard_default(int id)
+{
+	char *result = NULL;
+	int i;
+	for( i = 1; vj_event_default_sdl_keys[i].event_id != 0; i ++ )
+	{
+		if( vj_event_default_sdl_keys[i].event_id == id )
+		{
+			if( vj_event_default_sdl_keys[i].value != NULL )
+				result = strdup( vj_event_default_sdl_keys[i].value );
+			break;
+		}
+	}
+	return result;
+}
 
 
 #ifdef HAVE_SDL
@@ -2130,13 +2235,10 @@ void vj_event_init()
 	
 	int i;
 #ifdef HAVE_SDL
-	for(i=0; i < MAX_SDL_KEY; i++)
+	if( !(keyboard_events = hash_create( HASHCOUNT_T_MAX, int_bundle_compare, int_bundle_hash)))
 	{
-		keyboard_events[i].vims.act = vj_event_none;
-		keyboard_events[i].vims.list_id  = 0;
-		keyboard_events[i].key_symbol = 0;
-		keyboard_events[i].key_mod = 0;
-		keyboard_events[i].arguments = NULL;
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize hash for keyboard events");
+		return;
 	}
 #endif
 
@@ -2285,15 +2387,17 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 	int i;
 	int len = 0;
 	const int token_len = 14;
-
 	for( i =0 ; i < MAX_SDL_KEY ; i ++ )
 	{
-		vj_keyboard_event *ev = &keyboard_events[i];
-		if( ev->key_symbol > 0 )
+		if(keyboard_event_exists(i))
 		{
-			len += token_len;
-			if(ev->arguments != NULL)
-				len += strlen(ev->arguments);
+			vj_keyboard_event *ev = get_keyboard_event(i);
+			if(ev)
+			{
+				len += token_len;
+				if(ev->arguments != NULL)
+					len += strlen(ev->arguments);
+			}
 		}
 	}
 
@@ -2320,19 +2424,22 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 		sprintf(buf, "%05d", len ); 
 		for ( i = 0; i < MAX_SDL_KEY; i ++ )
 		{
-			vj_keyboard_event *ev = &keyboard_events[i];
-			if( ev->key_symbol > 0 )
+			if( keyboard_event_exists(i))
 			{
-				int id = ev->vims.list_id;
-				int arg_len = (ev->arguments == NULL ? 0 : strlen(ev->arguments));
-				char tmp[token_len];
-				bzero(tmp,token_len); 
-
-				sprintf(tmp, "%04d%03d%03d%04d", id, ev->key_symbol, ev->key_mod, arg_len );
-				strncat(buf,tmp,token_len);
-				if( arg_len > 0 )
+				vj_keyboard_event *ev = get_keyboard_event(i);
+				if( ev )
 				{
-					strncat( buf, ev->arguments, arg_len );
+					int id = ev->vims->list_id;
+					int arg_len = (ev->arguments == NULL ? 0 : strlen(ev->arguments));
+					char tmp[token_len];
+					bzero(tmp,token_len); 
+	
+					sprintf(tmp, "%04d%03d%03d%04d", id, ev->key_symbol, ev->key_mod, arg_len );
+					strncat(buf,tmp,token_len);
+					if( arg_len > 0 )
+					{
+						strncat( buf, ev->arguments, arg_len );
+					}
 				}
 			}
 		}
@@ -7301,8 +7408,6 @@ void vj_event_attach_detach_key(void *ptr, const char format[], va_list ap)
 
 	if( mode == 1 )
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Detached key %d + %d from event %d", 
-			args[1],args[2],keyboard_events[(args[2]*SDLK_LAST)+args[1]].vims.list_id);
 		vj_event_unregister_keyb_event( args[1],args[2] );
 	}
 	if( mode == 2 )
@@ -7312,7 +7417,8 @@ void vj_event_attach_detach_key(void *ptr, const char format[], va_list ap)
 		 veejay_msg(VEEJAY_MSG_DEBUG, "Trigger VIMS %d with %d,%d (%s)",
 			args[0],args[1],args[2], value );
 		}
-}	}
+	}
+}	
 #endif
 
 void vj_event_bundled_msg_del(void *ptr, const char format[], va_list ap)
