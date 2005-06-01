@@ -148,7 +148,7 @@ static inline pixel_t evaluate_pixel_bc(
 	{
 		dx = points[i].x + x;
 		dy = points[i].y + y;
-		if(dx < 0) dx = 0; else if (dx >= w) dx = w-1;
+		if(dx < 0) dx = 0; else if (dx > w) dx = w;
 		if(dy < 0) dy = 0; else if (dy >= h) dy = h-1;
 
 		brightness = premul[ dy * w + dx];
@@ -212,7 +212,7 @@ static inline uint8_t evaluate_pixel_b(
 	if( x0 < 0 ) x0 = 0;			
 	if( x1 > w ) x1 = w;
 	if( y0 < 0 ) y0 = 0;
-	if( y1 > h ) y1 = h;
+	if( y1 >= h ) y1 = h-1;
 
 	/* clear histogram and y_map */
 	for( i =0 ; i < max_; i ++ )

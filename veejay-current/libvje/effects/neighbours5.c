@@ -101,8 +101,10 @@ static inline pixel_t evaluate_pixel_bc(
 	int 		y1 = y + brush_size;
 	const int 	max_ = (int) ( 0xff * intensity );
 
-	if( y0 < 0 ) y0 = 0;
-	if( y1 > h ) y1 = h;
+	if( y0 < 0 ) y0 = 0; 
+	if( y1 >= h ) y1 = h-1;
+	if( x0 < 0 ) x0 = 0;
+	if( x1 > w ) x1 = w; 
 
 	/* clear histogram and y_map */
 	for( i =0 ; i < max_; i ++ )
@@ -177,7 +179,9 @@ static inline uint8_t evaluate_pixel_b(
 	const int 	max_ = (int) ( 0xff * intensity );
 
 	if( y0 < 0 ) y0 = 0;
-	if( y1 > h ) y1 = h;
+	if( y1 >= h ) y1 = h - 1;
+	if( x0 < 0 ) x0 = 0;
+	if( x1 > w ) x1 = w;
 
 	/* clear histogram and y_map */
 	for( i =0 ; i < max_; i ++ )

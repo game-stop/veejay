@@ -105,7 +105,7 @@ static inline pixel_t evaluate_pixel_bc(
 	if( x0 < 0 ) x0 = 0;			
 	if( x1 > w ) x1 = w;
 	if( y0 < 0 ) y0 = 0;
-	if( y1 > h ) y1 = h;
+	if( y1 >= h ) y1 = h-1;
 
 	/* clear histogram and y_map */
 	for( i =0 ; i < max_; i ++ )
