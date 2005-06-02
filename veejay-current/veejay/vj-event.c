@@ -610,10 +610,10 @@ while(*c) { \
 if(__z > _last_known_num_args )  break; \
 switch(*c++) {\
  case 's':\
-__tmpstr = va_arg(d,char*);\
+__tmpstr = (char*)va_arg(d,char*);\
 if(__tmpstr != NULL) {\
-	sprintf( b,"%s",va_arg(d,char*));\
-	free(__tmpstr); }\
+	sprintf( b,"%s",__tmpstr);\
+	}\
 __z++ ;\
  break;\
  case 'd': a[__z] = *( va_arg(d, int*)); __z++ ;\
