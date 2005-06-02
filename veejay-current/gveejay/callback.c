@@ -630,6 +630,16 @@ void	on_button_sample_del_clicked(GtkWidget *widget, gpointer user_data)
 	int query = 0;
 	if(info->uc.selected_sample_id )
 	{
+		if(info->uc.playmode == MODE_SAMPLE )
+		{
+			if(info->uc.selected_sample_id == info->status_tokens[CURRENT_ID])
+			{
+				vj_msg(VEEJAY_MSG_ERROR,
+					"Cannot delete current playing sample %d",
+					info->status_tokens[CURRENT_ID]);
+				return;
+			}
+		}
 		multi_vims( VIMS_CLIP_DEL, "%d",
 			info->uc.selected_sample_id );
 		query = 1;
@@ -637,6 +647,17 @@ void	on_button_sample_del_clicked(GtkWidget *widget, gpointer user_data)
 	}
 	if(info->uc.selected_stream_id)
 	{
+		if(info->uc.playmode == MODE_STREAM )
+		{
+			if(info->uc.selected_stream_id == info->status_tokens[CURRENT_ID])
+			{
+				vj_msg(VEEJAY_MSG_ERROR,
+					"Cannot delete current playing stream %d",
+					info->status_tokens[CURRENT_ID]);
+				return;
+			}
+		}
+
 		multi_vims( VIMS_STREAM_DELETE, "%d",
 			info->uc.selected_stream_id );
 		query = 1;
