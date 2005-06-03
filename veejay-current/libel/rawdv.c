@@ -54,7 +54,7 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	dv_t *dv = (dv_t*) vj_malloc(sizeof(dv_t));
 	if(!dv) return NULL;
 	uint8_t *tmp = (uint8_t*) vj_malloc(sizeof(uint8_t) * DV_HEADER_SIZE);
-	long file_size = 0;
+	off_t file_size = 0;
 	int n = 0;
 	dv->decoder = dv_decoder_new( 1,0,0);
 	dv->fd = open( filename, O_RDONLY );
