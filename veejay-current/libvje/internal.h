@@ -191,11 +191,12 @@ enum {
 	VJ_IMAGE_EFFECT_CUTSTOP = 172, 
 	VJ_IMAGE_EFFECT_MASKSTOP = 173,
 	VJ_IMAGE_EFFECT_PHOTOPLAY = 174,
+	VJ_IMAGE_EFFECT_FLARE = 175,
 	VJ_IMAGE_EFFECT_DUMMY = 100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 175
+#define VJ_IMAGE_EFFECT_MAX 176
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 239
@@ -510,6 +511,6 @@ extern void videoplay_apply(VJFrame *frame,VJFrame *B, int w, int h, int a, int 
 
 extern void videowall_apply(VJFrame *frame,VJFrame *B, int w, int h, int a, int b, int c, int d);
 
-
+extern void flare_apply(VJFrame *frame, int w, int h, int type, int threshold, int radius );
 
 #endif

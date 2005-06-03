@@ -140,6 +140,8 @@
 #include "effects/photoplay.h"
 #include "effects/videoplay.h"
 #include "effects/videowall.h"
+#include "effects/flare.h"
+
 static struct
 {
 	int	(*mem_init)(int width, int height);
@@ -189,6 +191,7 @@ static struct
 {	photoplay_malloc,		photoplay_free,		VJ_IMAGE_EFFECT_PHOTOPLAY	},
 {	videoplay_malloc,		videoplay_free,		VJ_VIDEO_EFFECT_VIDEOPLAY	},
 {	videowall_malloc,		videowall_free,		VJ_VIDEO_EFFECT_VIDEOWALL	},
+{	flare_malloc,			flare_free,		VJ_IMAGE_EFFECT_FLARE		},
 {	NULL			,	NULL			,0				},
 };
 
@@ -479,6 +482,7 @@ void vj_effect_initialize(int width, int height)
 	vj_effects[i + 72] = cutstop_init(width,height);
 	vj_effects[i + 73] = maskstop_init(width,height);
 	vj_effects[i + 74] = photoplay_init(width,height);
+	vj_effects[i + 75] = flare_init(width,height );
 	max_width = width;
 	max_height = height;
 

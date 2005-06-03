@@ -1553,3 +1553,59 @@ double	m_get_polar_y( double r, double a)
 {
 	return ( r * sin(a) );
 }
+
+//copied from xine
+inline void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep){
+	int x;
+	const int length= radius*2 + 1;
+	const int inv= ((1<<16) + length/2)/length;
+
+	int sum= 0;
+
+	for(x=0; x<radius; x++){
+		sum+= src[x*srcStep]<<1;
+	}
+	sum+= src[radius*srcStep];
+
+	for(x=0; x<=radius; x++){
+		sum+= src[(radius+x)*srcStep] - src[(radius-x)*srcStep];
+		dst[x*dstStep]= (sum*inv + (1<<15))>>16;
+	}
+
+	for(; x<w-radius; x++){
+		sum+= src[(radius+x)*srcStep] - src[(x-radius-1)*srcStep];
+		dst[x*dstStep]= (sum*inv + (1<<15))>>16;
+	}
+
+	for(; x<w; x++){
+		sum+= src[(2*w-radius-x-1)*srcStep] - src[(x-radius-1)*srcStep];
+		dst[x*dstStep]= (sum*inv + (1<<15))>>16;
+	}
+}
+
+//copied from xine
+inline void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep){
+	uint8_t temp[2][4096];
+	uint8_t *a= temp[0], *b=temp[1];
+	
+	if(radius){
+		blur(a, src, w, radius, 1, srcStep);
+		for(; power>2; power--){
+			uint8_t *c;
+			blur(b, a, w, radius, 1, 1);
+			c=a; a=b; b=c;
+		}
+		if(power>1)
+			blur(dst, a, w, radius, dstStep, 1);
+		else{
+			int i;
+			for(i=0; i<w; i++)
+				dst[i*dstStep]= a[i];
+		}
+	}else{
+		int i;
+		for(i=0; i<w; i++)
+			dst[i*dstStep]= src[i*srcStep];
+	}
+}
+

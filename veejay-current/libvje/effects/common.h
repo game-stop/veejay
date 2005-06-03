@@ -235,3 +235,5 @@ double m_get_angle(int x, int y);
 double m_get_polar_x(double r, double a);
 double m_get_polar_y(double r, double a);
 
+inline void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep);
+inline void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep);
