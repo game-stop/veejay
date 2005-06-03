@@ -209,7 +209,7 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_CHAIN_ENTRY_CLEAR,		SDLK_DELETE,	VIMS_MOD_NONE,	NULL	},
 	{ VIMS_FXLIST_INC,			SDLK_UP,	VIMS_MOD_NONE,	"1"	},
 	{ VIMS_FXLIST_DEC,			SDLK_DOWN,	VIMS_MOD_NONE,	"1"	},
-	{ VIMS_FXLIST_ADD,			SDLK_RETURN,	VIMS_MOD_NONE,	"NULL"	},
+	{ VIMS_FXLIST_ADD,			SDLK_RETURN,	VIMS_MOD_NONE,	NULL	},
 	{ VIMS_SET_CLIP_START,			SDLK_LEFTBRACKET,	VIMS_MOD_NONE,	NULL	},
 	{ VIMS_SET_CLIP_END,			SDLK_RIGHTBRACKET,	VIMS_MOD_NONE,	NULL	},
 	{ VIMS_CLIP_SET_MARKER_START,		SDLK_LEFTBRACKET,	VIMS_MOD_ALT,	NULL	},
@@ -1619,7 +1619,7 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 	// event_id is here VIMS list entry!
 	int event_id = ev->vims->list_id;
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Key fires event %d ?", event_id );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Key fires event %d on symbol %d ?", event_id, vims_key );
 	if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
 	{
 		vj_msg_bundle *bun = vj_event_bundle_get(event_id );
