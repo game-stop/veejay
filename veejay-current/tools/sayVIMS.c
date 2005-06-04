@@ -33,13 +33,13 @@
 #include <libvjmsg/vj-common.h>
 static int   interactive = 0;
 static int   port_num = 3490;
-static int   use_file = 0;
 static char  *filename = NULL;
 static char  *group_name = NULL;
 static char  *host_name = NULL;
-static vj_client *client;
+static vj_client *sayvims = NULL;
 static int colors = 0;
-
+static int fd_in = 0; // stdin
+static int single_msg = 0;
 
 /* count played frames (delay) */
 static void vj_flush(int frames) { 
@@ -48,9 +48,9 @@ static void vj_flush(int frames) {
 	int bytes = 100;
 	bzero(status,100);
 	while(frames>0) {
-		if( vj_client_poll(client, V_STATUS ))
+		if( vj_client_poll(sayvims, V_STATUS ))
 		{
-			int n = vj_client_read(client,V_STATUS,status,bytes);
+			int n = vj_client_read(sayvims,V_STATUS,status,bytes);
 			if( n )
 			{
 				frames -- ;
@@ -70,14 +70,14 @@ static void Usage(char *progname)
 	veejay_msg(VEEJAY_MSG_INFO, " -p\t\tVeejay port (3490)"); 
 	veejay_msg(VEEJAY_MSG_INFO, " -g\t\tVeejay groupname (224.0.0.31)");
 	veejay_msg(VEEJAY_MSG_INFO, " -h\t\tVeejay hostname (localhost)");
-	veejay_msg(VEEJAY_MSG_INFO, " -f <filename>\tSend contents of this file to multicast group");
+	veejay_msg(VEEJAY_MSG_INFO, " -m\t\tSend single message");
 	veejay_msg(VEEJAY_MSG_INFO, " -c\t\tColored output");
 	veejay_msg(VEEJAY_MSG_INFO, "Messages to send to veejay must be wrapped in quotes");
 	veejay_msg(VEEJAY_MSG_INFO, "You can send multiple messages by seperating them with a whitespace");  
-	veejay_msg(VEEJAY_MSG_INFO, "Example: 255:;");
+	veejay_msg(VEEJAY_MSG_INFO, "Example: %s \"600:;\"",progname);
 	veejay_msg(VEEJAY_MSG_INFO, "         (quit veejay)");
-	veejay_msg(VEEJAY_MSG_INFO, "Example: +100 255:;");
-	veejay_msg(VEEJAY_MSG_INFO, "	  (quit veejay after playing 100 frames)");
+	veejay_msg(VEEJAY_MSG_INFO, "Example: echo \"%03d:;\" | %s ", VIMS_QUIT, progname);
+
 	exit(-1);
 }
 
@@ -98,11 +98,6 @@ static int set_option(const char *name, char *value)
 	{
 		port_num = atoi(optarg);
 	}
-	else if (strcmp(name, "f") == 0)
-	{
-		use_file = 1;
-		filename = strdup( optarg );
-	}
 	else if (strcmp(name, "i") == 0)
 	{
 		interactive = 1;
@@ -110,6 +105,10 @@ static int set_option(const char *name, char *value)
 	else if (strcmp(name, "c") == 0)
 	{	
 		colors = 1;
+	}
+	else if (strcmp(name, "m") == 0 )
+	{
+		single_msg = 1;
 	}
 	else err++;
 
@@ -127,7 +126,7 @@ static void human_friendly_msg( int net_id,char * buffer )
 	else
 		sprintf( vims_msg, "%03d:%s;", net_id,buffer+1);
 
-	vj_client_send(client,V_CMD, vims_msg);
+	vj_client_send(sayvims,V_CMD, vims_msg);
 }
 static int human_friendly_vims(char *buffer)
 {
@@ -185,6 +184,19 @@ return 1;}
 }
 
 
+vj_client	*sayvims_connect(void)
+{
+	vj_client *client = vj_client_alloc( 0,0,0 );
+	if(host_name == NULL)
+		host_name = strdup( "localhost" );
+
+	if(!vj_client_connect( client, host_name,group_name, port_num ))
+	{
+		return NULL;
+	}
+	return client;
+}
+
 int main(int argc, char *argv[])
 {
        	int i;
@@ -195,10 +207,9 @@ int main(int argc, char *argv[])
 	char option[2];
 	char ibuf[1024];
 	int err = 0;
-
-
-
-	while( ( n = getopt(argc,argv, "h:g:p:f:ic")) != EOF)
+	FILE *infile;
+	// parse commandline parameters
+	while( ( n = getopt(argc,argv, "h:g:p:mic")) != EOF)
 	{
 		sprintf(option,"%c",n);
 		err += set_option( option,optarg);
@@ -206,8 +217,8 @@ int main(int argc, char *argv[])
 
 	veejay_set_colors(colors);
 
-	if(argc <= 1 )
-		Usage(argv[0]);
+//	if(argc <= 1 )
+//		Usage(argv[0]);
 
 	if( optind > argc )
 		err ++;
@@ -216,17 +227,14 @@ int main(int argc, char *argv[])
 
 	bzero( buf, 65535 );
 
-	client = vj_client_alloc( 0,0,0 );
-	if(host_name == NULL)
-		host_name = strdup( "localhost" );
-
-	if(!vj_client_connect( client, host_name,group_name, port_num ))
+	// make connection with veejay
+	sayvims = sayvims_connect();
+	if(!sayvims)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "connecting to %s:%d",host_name,
-				port_num);
-		return 0;
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot connect to %s", host_name);
+		exit(1);
 	}
-		
+			
 	if(interactive)
 		fcntl( 0, F_SETFL, O_NONBLOCK);
 
@@ -239,45 +247,15 @@ int main(int argc, char *argv[])
 			for(i=0; i < strlen(ibuf); i++)
 			if(ibuf[i] == '\n') ibuf[i] = '\0';
 			if(!human_friendly_vims(ibuf))
-				vj_client_send(client,V_CMD, ibuf);
+				vj_client_send(sayvims,V_CMD, ibuf);
 
 		}
 		vj_flush(1);
 	}
+	if ( interactive )
+		return 0;
 
-	if(use_file)
-	{
-		FILE *fd = fopen( filename ,"r");
-		if(!fd)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot open %s",
-					filename);
-			exit(1);
-		}
-		while( fgets(buf,4096,fd) )
-		{
-			if(buf[0]=='+')
-			{
-				int delay=1;	
-				sscanf(buf+1,"%d",&delay);
-				vj_flush(delay);
-			}
-			else
-			{
-				if(buf[0]!='#')
-				{
-					int len = strlen(buf);
-					if(len>0)
-					{
-						buf[len] = '\0';
-						vj_client_send(client,V_CMD,buf);
-					}
-				}
-			}	
-		}
-		fclose(fd);
-	}
-	else
+	if(single_msg)
 	{
 		char **msg = argv + optind;
 		int  nmsg  = argc - optind;
@@ -300,14 +278,45 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				vj_client_send( client,V_CMD, msg[i] );
+				vj_client_send( sayvims,V_CMD, msg[i] );
 			}
 			i++;
 		}
+		
+		vj_client_close(sayvims);
+		vj_client_free(sayvims);
+		return 0;
 	}
 
-	vj_client_close(client);
-	vj_client_free(client);
+	/* read from stdin*/
+	int not_done = 1;
+
+	infile = fdopen( fd_in, "r" );
+	if(!infile)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cant read from stdin");
+		return 0;
+	}
+
+	while( fgets(buf, 4096, infile) )
+	{
+		if( buf[0] == '+' )
+		{
+			int wait_ = 1;
+	
+			if(!sscanf( buf+1, "%d", &wait_ ) )
+			{
+				return 0;
+			}
+			vj_flush( wait_ );
+		}
+		else
+		{
+			buf[strlen(buf)-1] = '\0';
+			vj_client_send( sayvims, V_CMD, buf );
+		}
+	}
+
 
         return 0;
 } 
