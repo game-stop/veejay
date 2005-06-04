@@ -173,6 +173,7 @@ static void Usage(char *progname)
 	fprintf(stderr,"  -d/--dummy	\t\tDummy playback\n");
 	fprintf(stderr,"  -W/--width <num>\t\tdummy width\n");
 	fprintf(stderr,"  -H/--height <num>\t\tdummy height\n");
+
 	fprintf(stderr,"  -N/--norm [01]\t\tdummy norm\n");
 	fprintf(stderr,"  -R/--framerate <num>\t\tdummy frame rate\n");
 	fprintf(stderr,"  -M/--multicast-osc \t\tmulticast OSC\n");
@@ -180,6 +181,8 @@ static void Usage(char *progname)
 	fprintf(stderr,"     --map-from-file <num>\tmap N frames to memory\n");
 
 	fprintf(stderr,"  -z/--zoom [1-11]\n");
+	fprintf(stderr,"  -w/--zoomwidth \n");
+	fprintf(stderr,"  -h/--zoomheight \n");
 	fprintf(stderr,"\t\t\t\tsoftware scaler type (also use -W, -H ). \n");
 	fprintf(stderr,"\t\t\t\tAvailable types are:\n");         
 	fprintf(stderr,"\t\t\t\t1\tFast bilinear (default)\n");
@@ -315,6 +318,12 @@ static int set_option(const char *name, char *value)
 	else if(strcmp(name, "norm") == 0 || strcmp(name, "N") == 0 ) {
 		info->dummy->norm = optarg[0];
 	}
+	else if(strcmp(name, "zoomwidth") == 0 || strcmp(name, "w") == 0) {
+		info->video_output_width = atoi(optarg);
+	}
+	else if(strcmp(name, "zoomheight") == 0 || strcmp(name, "h") == 0) {
+		info->video_output_height = atoi(optarg);
+	}
 	else if(strcmp(name, "audiorate") == 0 )
 	{
 		info->dummy->arate = atoi(optarg);
@@ -442,6 +451,8 @@ static void check_command_line_options(int argc, char *argv[])
 	{"version",0,0,0},
 	{"width",1,0,0},
 	{"height",1,0,0},
+	{"zoomwidth", 1,0,0 },
+	{"zoomheight", 1,0,0 },
 	{"norm",1,0,0},
 	{"framerate",1,0,0},
 	{"audiorate",1,0,0},
@@ -470,12 +481,12 @@ static void check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:V:s:c:t:l:C:p:m:x:y:nLFPXY:ugrvdibIjf:N:H:W:R:M:V:z:q",
+			"o:G:O:a:H:V:s:c:t:l:C:p:m:x:y:nLFPXY:ugrvdibIjf:N:H:W:R:M:V:z:qw:h:",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   "o:G:s:O:a:c:t:l:t:C:x:y:m:p:nLFPXY:Y:vudgibrIjf:N:H:W:R:M:V:z:q")) != EOF)
+		   "o:G:s:O:a:c:t:l:t:C:x:y:m:p:nLFPXY:Y:vudgibrIjf:N:H:W:R:M:V:z:qw:h:")) != EOF)
 #endif
     {
 	switch (n) {

@@ -1557,8 +1557,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		VJFrame dst;
 		memset( &src, 0, sizeof(VJFrame));
 		memset( &dst, 0, sizeof(VJFrame));
-		info->video_output_width = info->dummy->width;
-		info->video_output_height = info->dummy->height;
+//		info->video_output_width = info->dummy->width;
+//		info->video_output_height = info->dummy->height;
 
 		vj_get_yuv_template( &src,
 					info->edit_list->video_width,
@@ -1588,8 +1588,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 			return -1;
 		}
 
-		veejay_msg(VEEJAY_MSG_DEBUG,"Using Software Scaler (%dx%d -> %dx%d)",
-			src.width,src.height,dst.width,dst.height);
+
 		if(info->settings->sws_templ.use_filter)
 		{
 			sws_template *t = &(info->settings->sws_templ);
@@ -2060,6 +2059,12 @@ static void Welcome(veejay_t *info)
 			(info->no_bezerk==0?"[Bezerk]" : " " ),
 			(info->verbose==0?" " : "[Debug]")  );
     
+	if(info->settings->zoom)
+	{
+		veejay_msg(VEEJAY_MSG_INFO,"Software scaler - output stream dimensions %d x %d ",
+			info->video_output_width, info->video_output_height );
+	}
+
 	veejay_msg(VEEJAY_MSG_INFO,"Your best friends are 'man' and 'vi'");
 	veejay_msg(VEEJAY_MSG_INFO,"Type 'man veejay' in a shell to learn more about veejay");
 	veejay_msg(VEEJAY_MSG_INFO,"For a list of events, type 'veejay -u |less' in a shell");
