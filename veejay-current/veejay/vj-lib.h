@@ -73,6 +73,16 @@ struct mjpeg_sync
    unsigned long seq;        /* frame sequence number */
    struct timeval timestamp; /* timestamp */
 };
+#define VJ_SCHED_NONE (1<<0)
+#define VJ_SCHED_SL   (1<<1)
+#define VJ_SCHED_EL   (1<<2)
+
+typedef struct {
+	int state;
+	char *sl;
+	char *el;
+} vj_schedule_t;
+
 
 typedef struct
 {
@@ -146,6 +156,7 @@ typedef struct {
 	char *vims_group_name;
 	int zoom;
 	sws_template sws_templ;
+	vj_schedule_t action_scheduler;
 } video_playback_setup;
 
 
@@ -269,7 +280,5 @@ typedef struct {
     int minterpolate;
     int interpolate;
 } vj_key;
-
-
 
 #endif

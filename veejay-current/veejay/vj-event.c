@@ -1770,6 +1770,9 @@ static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *ds
 #define XML_CONFIG_SETTING_MCASTVIMS "mcast_vims"
 #define XML_CONFIG_SETTING_SCALE     "output_scaler"	
 
+#define XML_CONFIG_SETTING_SAMPLELIST "sample_list"
+#define XML_CONFIG_SETTING_EDITLIST   "edit_list"
+
 #define __xml_cint( buf, var , node, name )\
 {\
 sprintf(buf,"%d", var);\
@@ -1788,6 +1791,7 @@ if(var != NULL){\
 strncpy(buf,var,strlen(var));\
 xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );}\
 }
+
 
 void	vj_event_format_xml_settings( veejay_t *v, xmlNodePtr node  )
 {
@@ -1830,9 +1834,16 @@ void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 		return;
 
 	int c = 0;
+	char sample_list[1024];
+	char edit_list[1024];
+	bzero(sample_list, 1024 );
+	bzero(edit_list, 1024 );
+	// todo: editlist loading ; veejay restart
 
 	while( cur != NULL )
 	{
+		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SAMPLELIST, sample_list );
+		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_EDITLIST,   edit_list );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PORTNUM, &(v->uc->port) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PRIOUTPUT, &(v->video_out) );
 		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PRINAME, v->stream_outname);
@@ -1860,8 +1871,11 @@ void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 	}
 
 	veejay_set_colors( c );
-
-
+	
+	if(strlen(sample_list) > 0 )
+		v->settings->action_scheduler.sl = strdup( sample_list );
+	if(strlen(edit_list) > 0 )
+		v->settings->action_scheduler.el = strdup( edit_list );
 }
 
 // not only for keyboard, also check if events in the list exist
@@ -2028,6 +2042,7 @@ void	vj_event_format_xml_event( xmlNodePtr node, int event_id )
 void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 {
 	char file_name[512];
+	char live_set[512];
 	int args[2] = {0,0};
 	int i;
 	//veejay_t *v = (veejay_t*) ptr;
@@ -2037,12 +2052,30 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 	doc = xmlNewDoc( "1.0" );
 	rootnode = xmlNewDocNode( doc, NULL, (const xmlChar*) XML_CONFIG_FILE,NULL);
 	xmlDocSetRootElement( doc, rootnode );
+	veejay_t *v = (veejay_t*) ptr;
 	/* Here, we can save the cliplist, editlist as it is now */
 	if(args[0]==1 || args[1]==1)
 	{
 		/* write cliplist into XML bundle */	
+		char tmp_buf[4064];
+		bzero(tmp_buf,4096);
 		childnode = xmlNewChild( rootnode, NULL, (const xmlChar*) XML_CONFIG_SETTINGS, NULL );
 		vj_event_format_xml_settings( (veejay_t*) ptr, childnode );
+
+		sprintf(live_set, "%s-EDL", file_name );
+		int res = vj_el_write_editlist( live_set, 0,
+						v->edit_list->video_frames-1, v->edit_list );
+		if(!res)
+			veejay_msg(VEEJAY_MSG_ERROR, "Cant save editlist to %s", live_set );
+		else
+			__xml_cstr( tmp_buf, live_set, childnode, XML_CONFIG_SETTING_EDITLIST );
+
+		sprintf(live_set, "%s-SL", file_name );
+		res = clip_writeToFile( live_set );
+		if(!res)
+			veejay_msg(VEEJAY_MSG_ERROR,"Error saving sample list to %s", live_set ); 
+		else
+			__xml_cstr( tmp_buf, live_set, childnode, XML_CONFIG_SETTING_SAMPLELIST );
 	}
 
 	for( i = 0; i < VIMS_MAX; i ++ )
@@ -2154,7 +2187,7 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Error in %s, %d + %d (%s, %p)  VIMS %d",
 			__FUNCTION__ , modifier, symbol,  value, value, event_id );
-		return NULL;
+		return 0;
 	}
 	
 	hnode_t *node = hnode_create( ev );
@@ -6033,7 +6066,6 @@ static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
 	bzero(sourcename,255);
 	vj_tag_get_description( v->uc->clip_id, sourcename );
 	sprintf(prefix,"%s-%02d-", sourcename, v->uc->clip_id);
-	//todo let user set base name
 	if(! veejay_create_temp_file(prefix, tmp )) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot create temporary file %s", tmp);

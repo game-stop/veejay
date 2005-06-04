@@ -1630,7 +1630,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
   	veejay_msg(VEEJAY_MSG_INFO, 
 		"Initialized %d Image- and Video Effects", MAX_EFFECTS);
-    vj_effect_initialize(info->edit_list->video_width, info->edit_list->video_height);
+    	vj_effect_initialize(info->edit_list->video_width, info->edit_list->video_height);
    
 	info->plugin_frame = vj_perform_init_plugin_frame(info);
 	info->plugin_frame_info = vj_perform_init_plugin_frame_info(info);
@@ -1647,14 +1647,24 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	}
 
 	if(arg != NULL ) {
-		veejay_msg(VEEJAY_MSG_INFO, "Loading cliplist [%s]", arg);
 #ifdef HAVE_XML2
-   	 	if (!clip_readFromFile( arg )) {
+		veejay_msg(VEEJAY_MSG_INFO, "Loading cliplist [%s]", arg);
+   	 	if (!clip_readFromFile( arg ))
+		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Error loading cliplist [%s]",arg);
 			return -1;
-    	}
+    		}
 #endif
-    }
+	}
+	else
+	{
+		// try from loaded action file
+		if( info->settings->action_scheduler.sl )
+			if(clip_readFromFile( info->settings->action_scheduler.sl ) )
+				veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list %s from actionfile",
+					info->settings->action_scheduler.sl );
+	}
+    
 	if( !vj_server_setup(info) )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Setting up server");
@@ -2228,6 +2238,7 @@ veejay_t *veejay_malloc()
     if (!(info->settings)) 
 		return NULL;
    	memset( info->settings, 0, sizeof(video_playback_setup));
+	memset( &(info->settings->action_scheduler), 0, sizeof(vj_schedule_t));
 
     info->status_what = (char*) vj_malloc(sizeof(char) * MESSAGE_SIZE );
     info->status_msg = (char*) vj_malloc(sizeof(char) * MESSAGE_SIZE+5);
