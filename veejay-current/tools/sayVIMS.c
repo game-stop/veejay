@@ -217,9 +217,6 @@ int main(int argc, char *argv[])
 
 	veejay_set_colors(colors);
 
-//	if(argc <= 1 )
-//		Usage(argv[0]);
-
 	if( optind > argc )
 		err ++;
 	if ( err )
@@ -255,7 +252,7 @@ int main(int argc, char *argv[])
 	if ( interactive )
 		return 0;
 
-	if(single_msg)
+	if(single_msg || optind == 1)
 	{
 		char **msg = argv + optind;
 		int  nmsg  = argc - optind;
@@ -287,7 +284,9 @@ int main(int argc, char *argv[])
 		vj_client_free(sayvims);
 		return 0;
 	}
-
+	else
+	{
+	veejay_msg(VEEJAY_MSG_INFO, "sayVIMS read from STDIN");
 	/* read from stdin*/
 	int not_done = 1;
 
@@ -316,7 +315,7 @@ int main(int argc, char *argv[])
 			vj_client_send( sayvims, V_CMD, buf );
 		}
 	}
-
+	}
 
         return 0;
 } 
