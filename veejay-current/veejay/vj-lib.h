@@ -157,6 +157,7 @@ typedef struct {
 	int zoom;
 	sws_template sws_templ;
 	vj_schedule_t action_scheduler;
+	float	output_fps;
 } video_playback_setup;
 
 

@@ -405,11 +405,19 @@ int veejay_free(veejay_t * info)
 	video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     
-
+	veejay_reap_messages();
 
 	vj_tag_free();
-    if( info->settings->zoom )
+  	if( info->settings->zoom )
 		yuv_free_swscaler( info->video_out_scaler );
+
+	if( info->settings->action_scheduler.state )
+	{
+		if(info->settings->action_scheduler.el )
+			free(info->settings->action_scheduler.el );
+		if(info->settings->action_scheduler.sl )
+			free(info->settings->action_scheduler.sl );
+	}
 
 	if( info->plugin_frame) vj_perform_free_plugin_frame(info->plugin_frame);
 	if( info->plugin_frame_info) free(info->plugin_frame_info);
@@ -813,23 +821,20 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 	int id = vj_tag_new(type, filename, index, info->edit_list, info->pixel_format, channel);
 	char descr[200];
 	bzero(descr,200);
-	vj_tag_get_descriptive(type,descr);
+	vj_tag_get_by_type(type,descr);
 	if(id > 0 )
 	{
 		info->nstreams++;
 		if(type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_MCAST || type== VJ_TAG_TYPE_NET)
 			vj_tag_set_active( id, 1 );
-		veejay_msg(VEEJAY_MSG_INFO, "New stream %d of type %s created", id, descr );
+		veejay_msg(VEEJAY_MSG_INFO, "New stream %s with ID %d created",descr, id );
 		return id;
 	}
 	else
 	{
-	    char descr[200];
-		bzero(descr,200);
-	 	vj_tag_get_descriptive( type, descr );
-		veejay_msg(VEEJAY_MSG_ERROR, "Failed to create stream of type %s", descr );
-    }
-    return -1;
+		veejay_msg(VEEJAY_MSG_ERROR, "Failed to create %s stream", descr );
+    	}
+ 	return -1;
 }
 
 /******************************************************
@@ -954,7 +959,8 @@ static int veejay_screen_update(veejay_t * info )
 
 	// send a frame to all participants when using mcast
 	// (activated after sending VIMS MCAST SENDER START/STOP)
-	vj_perform_send_primary_frame_s(info, 1);
+	if( info->settings->use_vims_mcast)
+		vj_perform_send_primary_frame_s(info, 1);
 
 	//todo: this sucks, have it modular.( video out drivers )
     switch (info->video_out) {
@@ -1502,7 +1508,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 	vj_event_init();
 
-	veejay_change_state( info, LAVPLAY_STATE_PLAYING );
 #ifdef HAVE_XML2
     if(info->load_action_file)
 	{
@@ -1611,13 +1616,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		info->bes_height = info->video_output_height;		
 	
 
-    	/* initialize tags (video4linux/yuv4mpeg stream ... ) */
-    if (vj_tag_init(el->video_width, el->video_height, info->pixel_format) != 0) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing stream manager");
-	    return -1;
-    }
 
- 	clip_init( (el->video_width * el->video_height)  ); 
 	plugins_allocate();
 
 	if(info->edit_list->has_audio) {
@@ -1658,13 +1657,18 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	}
 	else
 	{
-		// try from loaded action file
-		if( info->settings->action_scheduler.sl )
+		// try samplelist from loaded action file, if the editlist was initialized
+		if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state == 2 )
 			if(clip_readFromFile( info->settings->action_scheduler.sl ) )
 				veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list %s from actionfile",
 					info->settings->action_scheduler.sl );
 	}
-    
+   
+	if( settings->action_scheduler.state )
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Finish pending actions from configuration file ...");
+		veejay_finish_action_file(info,info->action_file);
+ 	}
 	if( !vj_server_setup(info) )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Setting up server");
@@ -1775,6 +1779,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	return -1;
     }
 
+	veejay_change_state( info, LAVPLAY_STATE_PLAYING );
 
     if (!veejay_mjpeg_set_playback_rate(info, el->video_fps,
 					 el->video_norm ==
@@ -1785,7 +1790,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 	if(info->dummy->active)
 	{
-	 	int dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, "Solid", -1, info->edit_list,info->pixel_format,-1);
+	 	int dummy_id;
+		if( settings->action_scheduler.state )
+			dummy_id = vj_tag_size()-1;
+		else 
+			dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, "Solid", -1, info->edit_list,info->pixel_format,-1);
 		if(dummy_id > 0)
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Activating dummy mode (Stream %d)", dummy_id);
@@ -2813,17 +2822,14 @@ int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
  * return value: 1 on succes, 0 on error
  ******************************************************/
 
-int veejay_open_files(veejay_t * info, char **files, int num_files, int ofps, int force,int force_pix_fmt)
+static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, int force_pix_fmt, int force )
 {
-    video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
-
 	vj_el_frame_cache(info->seek_cache );
-
     	vj_avformat_init();
  
 	if(info->auto_deinterlace)
-	{	veejay_msg(VEEJAY_MSG_DEBUG, "Auto deinterlacing (for playback on monitor / beamer with vga input");
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Auto deinterlacing (for playback on monitor / beamer with vga input");
 		veejay_msg(VEEJAY_MSG_DEBUG, "Note that this will effect your recorded video clips");
 	}
 
@@ -2841,12 +2847,16 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, int ofps, in
 			info->dummy->chroma = CHROMA420;
 		else
 			info->dummy->chroma = CHROMA422;	
+
 		info->edit_list = vj_el_dummy( 0, info->auto_deinterlace, info->dummy->chroma,
 				info->dummy->norm, info->dummy->width, info->dummy->height, info->dummy->fps );
+
 		info->dummy->active = 1;
+
 		veejay_msg(VEEJAY_MSG_DEBUG, "Dummy: %d x %d, %s %s ",
 			info->dummy->width,info->dummy->height, (info->dummy->norm == 'p' ? "PAL": "NTSC" ),	
 				( force_pix_fmt == 0 ? "4:2:0" : "4:2:2" ));
+
 		if( info->dummy->arate )
 		{
 			editlist *el = info->edit_list;
@@ -2861,7 +2871,7 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, int ofps, in
 	}
 	else
 	{
-    	info->edit_list = vj_el_init_with_args(files, num_files, info->preserve_pathnames, info->auto_deinterlace, force);
+	    	info->edit_list = vj_el_init_with_args(files, num_files, info->preserve_pathnames, info->auto_deinterlace, force);
 	}
 
 	if(info->edit_list==NULL)
@@ -2871,7 +2881,6 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, int ofps, in
 
 	if(force_pix_fmt != -1)
 	{
-	//FMT_YUV422 or FMT_YUV420P
 		info->pixel_format = (force_pix_fmt == 1 ? FMT_422 : FMT_420);
 		veejay_msg(VEEJAY_MSG_WARNING, "Pixel format forced to YCbCr %s",
 			(info->pixel_format == FMT_422 ? "4:2:2" : "4:2:0"));
@@ -2885,9 +2894,7 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, int ofps, in
 	
 
 	vj_avcodec_init(info->edit_list ,   info->edit_list->pixel_format);
-
-
-	if(info->pixel_format == FMT_422 )
+    	if(info->pixel_format == FMT_422 )
 	{
 		if(!vj_el_init_422_frame( info->edit_list, info->effect_frame1)) return 0;
 		if(!vj_el_init_422_frame( info->edit_list, info->effect_frame2)) return 0;
@@ -2903,13 +2910,90 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, int ofps, in
 	info->effect_frame_info->width = info->edit_list->video_width;
 	info->effect_frame_info->height= info->edit_list->video_height;
 
-	if(ofps)
+	if(info->settings->output_fps > 0.0)
 	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Overriding frame rate with %2.2f", (float)ofps);
-		info->edit_list->video_fps = (float) ofps;
+		veejay_msg(VEEJAY_MSG_WARNING, "Overriding frame rate with %2.2f", 
+			info->settings->output_fps);
+		info->edit_list->video_fps = info->settings->output_fps;
+	}	
+	else
+	{
+		info->settings->output_fps = info->edit_list->video_fps;
 	}
-    /* open the new movie(s) */
- 
-    return 1;
+
+	return 1;
+}
+
+int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, int force,int force_pix_fmt)
+{
+	char *argv[1];
+	int ret = 0;
+	argv[0] = NULL;
+   	video_playback_setup *settings =
+		(video_playback_setup *) info->settings;
+
+	/* see if action file conflicts with files given on commandline */
+	if(settings->action_scheduler.state == 2 && num_files > 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "An EditList is defined in the configuration file : %s",
+			settings->action_scheduler.el );
+		veejay_msg(VEEJAY_MSG_ERROR, "Start Veejay without -d and without any filename");
+		return 0;
+	}
+
+	/* override options */
+	if(settings->action_scheduler.state )
+	{
+		ofps = settings->output_fps;
+		force = 0;
+		force_pix_fmt = info->pixel_format;
+		veejay_msg(VEEJAY_MSG_INFO,
+			 "Liveset: %2.2f FPS, pixel format %s",
+			ofps, (force_pix_fmt ==  FMT_422 ? "YUV 4:2:2 (SMPTE)" : "YUV 4:2:0 (JPEG/MPEG1)" ));
+	}	
+
+	settings->output_fps = ofps;
+
+	/* load editlist from configfile */
+	if( settings->action_scheduler.state == 2 )
+	{
+		argv[0] = strdup( settings->action_scheduler.el );
+		veejay_msg(VEEJAY_MSG_INFO,
+			"Liveset: Try loading EditList or video file %s",
+			argv[0] );
+		ret = veejay_open_video_files( info, argv, 1 , force_pix_fmt, force );
+		if(argv[0])
+			free(argv[0]);
+		if(!ret)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Cant open editlist in configfile!");
+			return 0;
+		}
+	}
+
+	if( settings->action_scheduler.state == 1 )
+	{
+		veejay_msg(VEEJAY_MSG_INFO,
+			"Liveset: start in Dummy mode");
+		ret = veejay_open_video_files( info, NULL, 0 , force_pix_fmt, force );
+	}
+
+	if(!ret)
+		ret = veejay_open_video_files( info, files, num_files, force_pix_fmt, force );
+
+	if( ret )
+	{
+		/* initialize tags (video4linux/yuv4mpeg stream ... ) */
+		if (vj_tag_init(info->edit_list->video_width, info->edit_list->video_height, info->pixel_format) != 0) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing stream manager");
+			return 0;
+    		}
+
+ 		clip_init( (info->edit_list->video_width * info->edit_list->video_height)  ); 
+	}
+
+
+
+	return ret;
 }
 

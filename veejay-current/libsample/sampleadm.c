@@ -45,45 +45,6 @@
 //#define KAZLIB_OPAQUE_DEBUG 1
 
 #ifdef HAVE_XML2
-
-#define XMLTAG_RENDER_ENTRY "render_entry"
-#define XMLTAG_CLIPS    "veejay_clips"
-#define XMLTAG_CLIP     "clip"
-#define XMLTAG_CLIPID   "clipid"
-#define XMLTAG_CLIPDESCR "description"
-#define XMLTAG_FIRSTFRAME "startframe"
-#define XMLTAG_LASTFRAME  "endframe"
-#define XMLTAG_EFFECTS    "effects"
-#define XMLTAG_VOL	  "volume"
-#define XMLTAG_EFFECT     "effect"
-#define XMLTAG_EFFECTID   "effectid"
-#define XMLTAG_ARGUMENTS  "arguments"
-#define XMLTAG_ARGUMENT   "argument"
-#define XMLTAG_EFFECTSOURCE "source"
-#define XMLTAG_EFFECTCHANNEL "channel"
-#define XMLTAG_EFFECTTRIMMER "trimmer"
-#define XMLTAG_EFFECTOFFSET "offset"
-#define XMLTAG_EFFECTACTIVE "active"
-#define XMLTAG_EFFECTAUDIOFLAG "use_audio"
-#define XMLTAG_EFFECTAUDIOVOLUME "chain_volume"
-#define XMLTAG_SPEED      "speed"
-#define XMLTAG_FRAMEDUP   "frameduplicator"
-#define XMLTAG_LOOPTYPE   "looptype"
-#define XMLTAG_MAXLOOPS   "maxloops"
-#define XMLTAG_NEXTCLIP "nextclip"
-#define XMLTAG_DEPTH	  "depth"
-#define XMLTAG_PLAYMODE   "playmode"
-#define XMLTAG_VOLUME	  "volume"
-#define XMLTAG_SUBAUDIO	  "subaudio"
-#define XMLTAG_MARKERSTART "markerstart"
-#define XMLTAG_MARKEREND   "markerend"
-#define XMLTAG_EFFECTPOS   "position"
-#define XMLTAG_FADER_ACTIVE "chain_fade"
-#define XMLTAG_FADER_VAL    "chain_fade_value"
-#define XMLTAG_FADER_INC    "chain_fade_increment"
-#define XMLTAG_FADER_DIRECTION "chain_direction"
-#define XMLTAG_LASTENTRY    "current_entry"
-#define XMLTAG_CHAIN_ENABLED "fx"
 #endif
 
 #define FOURCC(a,b,c,d) ( (d<<24) | ((c&0xff)<<16) | ((b&0xff)<<8) | (a&0xff) )
@@ -186,8 +147,6 @@ void clip_init(int len)
 	if (!
 	    (ClipHash =
 	     hash_create(HASHCOUNT_T_MAX, int_compare, int_hash))) {
-	    fprintf(stderr,
-		    "--DEBUG: clip_init(): cannot create clipHash\n");
 	}
 	initialized = 1;
     }
@@ -223,7 +182,6 @@ clip_info *clip_skeleton_new(long startFrame, long endFrame)
     int i, j, n, id = 0;
 
     if (!initialized) {
-	fprintf(stderr, "Clip Administrator not initialized! Re-init\n");
     	return NULL;
 	}
     si = (clip_info *) vj_malloc(sizeof(clip_info));
@@ -236,7 +194,6 @@ clip_info *clip_skeleton_new(long startFrame, long endFrame)
     }
 
     if (!si) {
-	fprintf(stderr, "Unable to allocate memory for new clip\n");
 	return NULL;
     }
 
@@ -1921,7 +1878,8 @@ void ParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg)
     unsigned char *chTemp = NULL;
     int argIndex = 0;
     if (cur == NULL)
-	fprintf(stderr, "error parsing arguments\n");
+	return;
+
     while (cur != NULL && argIndex < CLIP_MAX_PARAMETERS) {
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_ARGUMENT))
 	{
@@ -1973,7 +1931,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_clip)
     }
 
     if (cur == NULL)
-	fprintf(stderr, "Error in parseEffect\n");
+	return;
 
 
     while (cur != NULL) {
@@ -2085,7 +2043,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_clip)
     if (effect_id != -1) {
 	int j;
 	if (clip_chain_add(dst_clip, chain_index, effect_id) == -1) {
-	    fprintf(stderr, "Error parsing effect %d (pos %d)\n",
+	    veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d)\n",
 		    effect_id, chain_index);
 	}
 
@@ -2093,8 +2051,6 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_clip)
 	for (j = 0; j < vj_effect_get_num_params(effect_id); j++) {
 	    clip_set_effect_arg(dst_clip, chain_index, j, arg[j]);
 	}
-	fprintf(stderr, "clip %d %d - E:%d p:%d, source %d channel %d\n",
-		dst_clip,chain_index,effect_id,j,source_type,channel); 
 	clip_set_chain_channel(dst_clip, chain_index, channel);
 	clip_set_chain_source(dst_clip, chain_index, source_type);
 
@@ -2389,13 +2345,13 @@ int clip_readFromFile(char *clipFile)
 
     cur = xmlDocGetRootElement(doc);
     if (cur == NULL) {
-	fprintf(stderr, "Empty cliplist. Nothing to do.\n");
+	veejay_msg(VEEJAY_MSG_ERROR,"Empty cliplist. Nothing to do.\n");
 	xmlFreeDoc(doc);
 	return (0);
     }
 
     if (xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_CLIPS)) {
-	fprintf(stderr, "This is not a cliplist: %s",
+	veejay_msg(VEEJAY_MSG_ERROR, "This is not a cliplist: %s",
 		XMLTAG_CLIPS);
 	xmlFreeDoc(doc);
 	return (0);

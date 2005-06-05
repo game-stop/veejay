@@ -305,7 +305,7 @@ int vj_effect_activate(int effect_id)
 		}
 		else
 		{
-				veejay_msg(VEEJAY_MSG_DEBUG, "Initialilzed simple effect %s",
+				veejay_msg(VEEJAY_MSG_DEBUG, "Initialized simple effect %s",
 						vj_effects[seq]->description);
 				vj_effect_ready[seq]= 1;
 				return 1;

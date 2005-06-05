@@ -28,7 +28,7 @@
 void 	vj_event_fmt_arg			(	int *args, 	char *str, 	const char format[], 	va_list ap);
 void 	vj_event_init				();
 void	vj_event_print_range			(	int n1,		int n2);
-
+int	veejay_finish_action_file(void *ptr, char *filename );
 int	veejay_load_action_file( void *ptr, char *filename );
 #ifdef HAVE_SDL
 #ifdef HAVE_XML2

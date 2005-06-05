@@ -280,7 +280,7 @@ int	vj_client_test(char *host, int port)
 
 	if( h_errno == HOST_NOT_FOUND )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Specified host '%s' is unknown", host );
+		veejay_msg(VEEJAY_MSG_ERROR, "Specified host '%s':'%d' is unknown", host,port );
 		return 0;
 	}
 

@@ -858,8 +858,8 @@ void vj_perform_init_output_frame( veejay_t *info, uint8_t **frame,
 int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 {
 
-	if(!info->settings->use_vims_mcast)
-		return 1;
+//	if(!info->settings->use_vims_mcast)
+//		return 1;
 
 	if( info->settings->use_vims_mcast &&
 		!info->settings->mcast_frame_sender )
@@ -889,7 +889,7 @@ int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 					    primary_buffer[0]->Cr, helper_frame->uv_len );
 
 	
-	int id = (mcast == 1? 2: 0);
+	int id = (mcast ? 2: 0);
 
 	if(vj_server_send_frame( info->vjs[id], info->uc->current_link, socket_buffer, len +total_len,
 				helper_frame, info->effect_frame_info, info->real_fps )<=0)
@@ -898,7 +898,6 @@ int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 		veejay_msg(VEEJAY_MSG_ERROR,
 		  "Error sending frame");
 		/* uncomment below to end veejay session */
-		//veejay_change_state( info, LAVPLAY_STATE_STOP );
 	}
 
 	return 1;
@@ -2432,7 +2431,6 @@ int vj_perform_tag_fill_buffer(veejay_t * info, int entry)
 	if( (type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST ) && active == 0)
 	{	
 		vj_tag_enable( info->uc->clip_id );	
-		veejay_msg(VEEJAY_MSG_DEBUG, "Enabled stream %d",info->uc->clip_id);
 	}
 
     if (vj_tag_get_active(info->uc->clip_id) == 1)

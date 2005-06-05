@@ -65,6 +65,7 @@ typedef struct {
     int nframes;
     int source_type;
     char *source_name;
+	char *method_filename;
     int index;
     int depth;
     int active;
@@ -112,6 +113,7 @@ int 	vj_tag_get_last_tag();
 void	vj_tag_free(void);
 /* Change color of solid stream*/
 int	vj_tag_set_stream_color(int t1, int r, int g, int b);
+int	vj_tag_get_stream_color(int t1, int *r, int *g, int *b );
 /* create a new tag, type is yuv4mpeg or v4l  
    stream_nr indicates which stream to take of the same type
  */
@@ -274,4 +276,8 @@ int 	vj_tag_set_logical_index(int t1, int stream_nr);
 int	vj_tag_set_description(int t1, char *descr);
 int	vj_tag_get_description(int t1, char *descr);
 
+#ifdef HAVE_XML2
+void tagCreateStreamFX(xmlNodePtr node, vj_tag *tag);
+void tagParseStreamFX(xmlDocPtr doc, xmlNodePtr cur, vj_tag *tag);
+#endif
 #endif

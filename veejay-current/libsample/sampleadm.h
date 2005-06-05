@@ -43,7 +43,46 @@
 #define CLIP_ARG8 7
 #define CLIP_ARG9 8
 #define CLIP_ARG10 9
-
+#ifdef HAVE_XML2
+#define XMLTAG_RENDER_ENTRY "render_entry"
+#define XMLTAG_CLIPS    "veejay_clips"
+#define XMLTAG_CLIP     "clip"
+#define XMLTAG_CLIPID   "clipid"
+#define XMLTAG_CLIPDESCR "description"
+#define XMLTAG_FIRSTFRAME "startframe"
+#define XMLTAG_LASTFRAME  "endframe"
+#define XMLTAG_EFFECTS    "effects"
+#define XMLTAG_VOL	  "volume"
+#define XMLTAG_EFFECT     "effect"
+#define XMLTAG_EFFECTID   "effectid"
+#define XMLTAG_ARGUMENTS  "arguments"
+#define XMLTAG_ARGUMENT   "argument"
+#define XMLTAG_EFFECTSOURCE "source"
+#define XMLTAG_EFFECTCHANNEL "channel"
+#define XMLTAG_EFFECTTRIMMER "trimmer"
+#define XMLTAG_EFFECTOFFSET "offset"
+#define XMLTAG_EFFECTACTIVE "active"
+#define XMLTAG_EFFECTAUDIOFLAG "use_audio"
+#define XMLTAG_EFFECTAUDIOVOLUME "chain_volume"
+#define XMLTAG_SPEED      "speed"
+#define XMLTAG_FRAMEDUP   "frameduplicator"
+#define XMLTAG_LOOPTYPE   "looptype"
+#define XMLTAG_MAXLOOPS   "maxloops"
+#define XMLTAG_NEXTCLIP "nextclip"
+#define XMLTAG_DEPTH	  "depth"
+#define XMLTAG_PLAYMODE   "playmode"
+#define XMLTAG_VOLUME	  "volume"
+#define XMLTAG_SUBAUDIO	  "subaudio"
+#define XMLTAG_MARKERSTART "markerstart"
+#define XMLTAG_MARKEREND   "markerend"
+#define XMLTAG_EFFECTPOS   "position"
+#define XMLTAG_FADER_ACTIVE "chain_fade"
+#define XMLTAG_FADER_VAL    "chain_fade_value"
+#define XMLTAG_FADER_INC    "chain_fade_increment"
+#define XMLTAG_FADER_DIRECTION "chain_direction"
+#define XMLTAG_LASTENTRY    "current_entry"
+#define XMLTAG_CHAIN_ENABLED "fx"
+#endif
 #define CLIP_FREEZE_NONE 0
 #define CLIP_FREEZE_PAUSE 1
 #define CLIP_FREEZE_BLACK 2

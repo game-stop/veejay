@@ -1808,6 +1808,7 @@ static void 	update_globalinfo()
 		{
 			for(i =0; notepad_widgets[i].name != NULL; i ++ )
 			 disable_widget( notepad_widgets[i].name );	
+			enable_widget ("speedslider");
 		}
 		if( pm == MODE_STREAM )
 		{
@@ -1818,6 +1819,7 @@ static void 	update_globalinfo()
 			disable_widget("button_historymove");  
 			disable_widget("frame_samplerecord");
 			disable_widget("frame_sampleproperties");
+			disable_widget("speedslider");
 		}
 		if( pm == MODE_SAMPLE )
 		{
@@ -1828,6 +1830,7 @@ static void 	update_globalinfo()
 			enable_widget("button_historymove");  
 			disable_widget("frame_streamproperties");
 			disable_widget("frame_streamrecord");
+			enable_widget("speedslider");
 		}
 		if( pm == MODE_SAMPLE || pm == MODE_STREAM)
 			enable_widget("vbox_fxtree");
@@ -4562,7 +4565,7 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	char	config[512];
 	int 	i = 0;
 
-	args = g_new ( gchar *, 7 );
+	args = g_new ( gchar *, 6 );
 
 	args[0] = g_strdup("veejay");
 
@@ -4574,17 +4577,20 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	args[2] = g_strdup("-n");
 	args[3] = g_strdup(port_str);
 
-	if(files == NULL || strlen(files)<= 0)
-		args[4] = g_strdup("-d");
+	if( config_file_status == 0 )
+	{
+		if(files == NULL || strlen(files)<= 0)
+			args[4] = g_strdup("-d");
+		else
+			args[4] = g_strdup(files);	
+	}
 	else
-		args[4] = g_strdup(files);	
+	{
+		printf("FIXME: Cant guess port num / hostname yet !\n");
+		args[4] = g_strdup( config );
+	}
 
-	if(configfile)
-		args[5] = g_strdup( config );
-	else
-		args[5] = NULL;
-
-	args[6] = NULL;
+	args[5] = NULL;
 
 	if( info->state == STATE_IDLE )
 	{
@@ -4835,9 +4841,12 @@ void 	vj_gui_init(char *glade_file)
 }
 static	gboolean	update_log(gpointer data)
 {
+	if(info->state != STATE_PLAYING)
+		return TRUE;
+	gint len = 0;		
 	single_vims( VIMS_LOG );
-	int len =0;
 	gchar *buf = recv_vims(6, &len );
+
 	if(len > 0 )
 	{	
 		GtkWidget *view = glade_xml_get_widget_( info->main_window, "veejaytext");

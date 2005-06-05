@@ -41,7 +41,7 @@
 static int run_server = 1;
 static veejay_t *info;
 static int default_use_tags=1;
-static int override_fps = 0;
+static float override_fps = 0.0;
 static int default_geometry_x = -1;
 static int default_geometry_y = -1;
 static int force_video_file = 0;
@@ -336,7 +336,7 @@ static int set_option(const char *name, char *value)
 		info->dummy->fps = atof(optarg);
 	}
     else if (strcmp(name,"fps")==0 || strcmp(name, "f")==0) {
-	override_fps = atoi(optarg);
+	override_fps = atof(optarg);
 	}
 	else if(strcmp(name,"ycbcr")==0 || strcmp(name,"Y")==0)
 	{

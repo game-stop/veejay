@@ -699,6 +699,7 @@ void vj_event_unregister_keyb_event(int key_id, int key_mod);
 
 #ifdef HAVE_XML2
 void    vj_event_format_xml_event( xmlNodePtr node, int event_id );
+void	vj_event_format_xml_stream( xmlNodePtr node, int stream_id );
 #endif
 void	vj_event_init(void);
 
@@ -1726,6 +1727,14 @@ static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *ds
 	}
 	return 0;
 }
+#define XML_CONFIG_STREAM		"stream"
+#define XML_CONFIG_STREAM_SOURCE	"source"
+#define XML_CONFIG_STREAM_FILENAME	"filename"
+#define XML_CONFIG_STREAM_TYPE		"type"
+#define XML_CONFIG_STREAM_COLOR		"rgb"
+#define XML_CONFIG_STREAM_OPTION	"option"
+#define XML_CONFIG_STREAM_CHAIN		"fxchain"
+
 #define XML_CONFIG_KEY_SYM "key_symbol"
 #define XML_CONFIG_KEY_MOD "key_modifier"
 #define XML_CONFIG_KEY_VIMS "vims_id"
@@ -1756,7 +1765,8 @@ static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *ds
 #define XML_CONFIG_SETTING_MCASTOSC  "mcast_osc"
 #define XML_CONFIG_SETTING_MCASTVIMS "mcast_vims"
 #define XML_CONFIG_SETTING_SCALE     "output_scaler"	
-
+#define XML_CONFIG_SETTING_PMODE	"play_mode"
+#define XML_CONFIG_SETTING_PID		"play_id"
 #define XML_CONFIG_SETTING_SAMPLELIST "sample_list"
 #define XML_CONFIG_SETTING_EDITLIST   "edit_list"
 
@@ -1807,6 +1817,9 @@ void	vj_event_format_xml_settings( veejay_t *v, xmlNodePtr node  )
 	__xml_cint( buf, v->settings->use_mcast,node, XML_CONFIG_SETTING_MCASTOSC );
 	__xml_cint( buf, v->settings->use_vims_mcast,node, XML_CONFIG_SETTING_MCASTVIMS );
 	__xml_cint( buf, v->settings->zoom ,node,	XML_CONFIG_SETTING_SCALE );
+	__xml_cfloat( buf, v->settings->output_fps, node, XML_CONFIG_SETTING_FPS );
+	__xml_cint( buf, v->uc->playback_mode, node, XML_CONFIG_SETTING_PMODE );
+	__xml_cint( buf, v->uc->clip_id, node, XML_CONFIG_SETTING_PID );
 #ifdef HAVE_SDL
 #endif
 
@@ -1852,16 +1865,64 @@ void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_MCASTOSC, &(v->settings->use_mcast) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_MCASTVIMS, &(v->settings->use_vims_mcast) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SCALE, &(v->settings->zoom) );
-
+		get_fstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_FPS, &(v->settings->output_fps ) );
+		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PMODE, &(v->uc->playback_mode) );
+		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PID, &(v->uc->clip_id ) );
 		cur = cur->next;
 	}
 
 	veejay_set_colors( c );
-	
 	if(strlen(sample_list) > 0 )
 		v->settings->action_scheduler.sl = strdup( sample_list );
 	if(strlen(edit_list) > 0 )
 		v->settings->action_scheduler.el = strdup( edit_list );
+
+	if( v->settings->action_scheduler.el == NULL )
+		v->settings->action_scheduler.state = 1;
+	else
+		v->settings->action_scheduler.state = 2;
+
+}
+
+void	vj_event_xml_parse_stream( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
+{
+	if( veejay_get_state(v) != LAVPLAY_STATE_STOP)
+		return;
+	xmlNodePtr fxchain = NULL;
+	int type = -1;
+	int channel = 0;
+	char source_name[150];
+	char file_name[1024];
+	char color[20];
+	bzero(source_name,150);
+	bzero(file_name, 1024 );
+	while( cur != NULL )
+	{
+		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_STREAM_TYPE, &type );
+		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_STREAM_SOURCE, source_name);
+		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_STREAM_FILENAME, file_name );
+		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_STREAM_COLOR, color );
+		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_STREAM_OPTION, &channel );
+		if(!xmlStrcmp( cur->name, (const xmlChar*) XML_CONFIG_STREAM_CHAIN ))
+			fxchain = cur; 	
+		cur = cur->next;
+	}
+	if(type != -1 )
+	{
+		int id = veejay_create_tag( v, type, file_name, v->nstreams, 0,channel );
+
+		if(id > 0 )
+		{
+			vj_tag_set_description( id, source_name );
+			int rgb[3] = {0,0,0};
+			sscanf( color, "%03d %03d %03d", &rgb[0],&rgb[1], &rgb[2] );
+			if(type == VJ_TAG_TYPE_COLOR )
+				vj_tag_set_stream_color( id, rgb[0],rgb[1],rgb[2] );
+			if(fxchain != NULL )
+				tagParseStreamFX( doc, fxchain->xmlChildrenNode, vj_tag_get( id ));
+		}
+	}
+
 }
 
 // not only for keyboard, also check if events in the list exist
@@ -1928,14 +1989,60 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 	{
 		if( override_keyboard )
 			vj_event_unregister_keyb_event( key, key_mod );
-		if( vj_event_register_keyb_event( event_id, key, key_mod, NULL ))
-			veejay_msg(VEEJAY_MSG_INFO, "Attached key %d + %d to Bundle %d ", key,key_mod,event_id);
+		if( !vj_event_register_keyb_event( event_id, key, key_mod, NULL ))
+			veejay_msg(VEEJAY_MSG_ERROR, "Attaching key %d + %d to Bundle %d ", key,key_mod,event_id);
 	}
 	else
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "No keyboard binding for VIMS %d", event_id);
 	}
 #endif
+}
+int  veejay_finish_action_file( void *ptr, char *file_name )
+{
+	xmlDocPtr doc;
+	xmlNodePtr cur;
+	veejay_t *v = (veejay_t*) ptr;
+	if(!file_name)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Invalid filename");
+			return 0;
+		}
+
+	doc = xmlParseFile( file_name );
+
+	if(doc==NULL)	
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot read file %s", file_name );
+		return 0;
+	}
+	cur = xmlDocGetRootElement( doc );
+	if( cur == NULL)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "This is not a XML document");
+		xmlFreeDoc(doc);
+		return 0;
+	}
+	if( xmlStrcmp( cur->name, (const xmlChar *) XML_CONFIG_FILE))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "This is not a Veejay Configuration File");
+		xmlFreeDoc(doc);
+		return 0;
+	}
+
+	cur = cur->xmlChildrenNode;
+	override_keyboard = 1;
+	while( cur != NULL )
+	{
+		if( !xmlStrcmp( cur->name, (const xmlChar*) XML_CONFIG_STREAM ))
+		{	
+			vj_event_xml_parse_stream( v, doc, cur->xmlChildrenNode );
+		}		
+		cur = cur->next;
+	}
+	override_keyboard = 0;
+	xmlFreeDoc(doc);	
+	return 1;
 }
 
 int  veejay_load_action_file( void *ptr, char *file_name )
@@ -2037,6 +2144,46 @@ void	vj_event_format_xml_event( xmlNodePtr node, int event_id )
 #endif
 }
 
+void	vj_event_format_xml_stream( xmlNodePtr node, int stream_id )
+{
+	char buffer[4096];
+	char tmp[1024];
+	
+	int type = vj_tag_get_type(stream_id);
+	int col[3] = {0,0,0};
+
+	vj_tag *stream = vj_tag_get( stream_id );
+	if(!stream )
+		return;
+
+	vj_tag_get_source_name( stream_id, tmp );
+	xmlNewChild(node, NULL, (const xmlChar*) XML_CONFIG_STREAM_SOURCE , (const xmlChar*) tmp );
+
+	vj_tag_get_method_filename( stream_id, tmp );
+	xmlNewChild(node, NULL, (const xmlChar*) XML_CONFIG_STREAM_FILENAME, (const xmlChar*) tmp );
+	
+	sprintf (tmp, "%d", type );
+	xmlNewChild(node, NULL, (const xmlChar*) XML_CONFIG_STREAM_TYPE, (const xmlChar*) tmp );
+
+	if( type == VJ_TAG_TYPE_COLOR )
+	{
+		vj_tag_get_stream_color( stream_id, &col[0], &col[1], &col[2] );
+		sprintf(tmp, "%03d %03d %03d", col[0],col[1],col[2] );
+		xmlNewChild( node, NULL, (const xmlChar*) XML_CONFIG_STREAM_COLOR,
+			(const xmlChar*) tmp );
+	}
+	else
+	{
+		sprintf(tmp, "%d", stream->video_channel );
+		xmlNewChild( node, NULL, (const xmlChar*) XML_CONFIG_STREAM_OPTION,
+			(const xmlChar*) tmp );
+	}
+
+	xmlNodePtr cnode = xmlNewChild( node, NULL, (const xmlChar*) XML_CONFIG_STREAM_CHAIN , 
+		NULL );
+	tagCreateStreamFX( cnode, stream );
+}
+
 void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 {
 	char file_name[512];
@@ -2060,22 +2207,29 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 		childnode = xmlNewChild( rootnode, NULL, (const xmlChar*) XML_CONFIG_SETTINGS, NULL );
 		vj_event_format_xml_settings( (veejay_t*) ptr, childnode );
 
-		sprintf(live_set, "%s-EDL", file_name );
-		int res = vj_el_write_editlist( live_set, 0,
-						v->edit_list->video_frames-1, v->edit_list );
-		if(!res)
-			veejay_msg(VEEJAY_MSG_ERROR, "Cant save editlist to %s", live_set );
-		else
-			__xml_cstr( tmp_buf, live_set, childnode, XML_CONFIG_SETTING_EDITLIST );
-		bzero( tmp_buf, 1024 );
-		bzero( live_set, 512 );
-
-		sprintf(live_set, "%s-SL", file_name );
-		res = clip_writeToFile( live_set );
-		if(!res)
-			veejay_msg(VEEJAY_MSG_ERROR,"Error saving sample list to %s", live_set ); 
-		else
-			__xml_cstr( tmp_buf, live_set, childnode, XML_CONFIG_SETTING_SAMPLELIST );
+		if( v->edit_list->video_frames > 1  && !v->dummy->active)
+		{
+			sprintf(live_set, "%s-EDL", file_name );
+			int res = vj_el_write_editlist( live_set, 0,
+							v->edit_list->video_frames-1, v->edit_list );
+			if(!res)
+				veejay_msg(VEEJAY_MSG_ERROR, "Cant save editlist to %s", live_set );
+			else
+				__xml_cstr( tmp_buf, live_set, childnode, XML_CONFIG_SETTING_EDITLIST );
+		
+			bzero( tmp_buf, 1024 );
+		}
+		if( clip_size() > 1 )	
+		{	
+			bzero( live_set, 512 );
+		
+			sprintf(live_set, "%s-SL", file_name );
+			int res = clip_writeToFile( live_set );
+			if(!res)
+				veejay_msg(VEEJAY_MSG_ERROR,"Error saving sample list to %s", live_set ); 
+			else
+				__xml_cstr( tmp_buf, live_set, childnode, XML_CONFIG_SETTING_SAMPLELIST );
+		}
 	}
 
 	for( i = 0; i < VIMS_MAX; i ++ )
@@ -2087,7 +2241,14 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 		}
 	}
 	
-
+	for ( i = 1 ; i < vj_tag_size(); i ++ )
+	{
+		if(vj_tag_exists(i))
+		{
+			childnode = xmlNewChild( rootnode, NULL, (const xmlChar*) XML_CONFIG_STREAM , NULL );
+			vj_event_format_xml_stream( childnode, i );
+		}
+	}
 	xmlSaveFormatFile( file_name, doc, 1);
 	xmlFreeDoc(doc);	
 }
@@ -5801,7 +5962,8 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 	int args[2];
 
 	P_A(args,str,format,ap);
-	if( veejay_create_tag(v, VJ_TAG_TYPE_NET, str, v->nstreams, 0,args[0]) != 0 )
+	int id = veejay_create_tag(v, VJ_TAG_TYPE_NET, str, v->nstreams, 0,args[0]);
+	if(id <= 0)
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Network stream");
 	}

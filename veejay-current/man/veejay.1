@@ -89,7 +89,9 @@ Geometry x offset for SDL video window
 Geometry y offset for SDL video window
 .TP
 .B \-l/--action-file <filename>
-Action File to load at initialization
+Configuration File to load at initialization.
+The configuration file stores custom keybindings, custom bundles, available VIMS events, editlist,samplelist,streamlist
+and commandline options.
 .TP
 .B \-b/--bezerk
 Bezerk mode, if enabled it allows you to change input channels on the fly (without restarting the clip)      
@@ -125,11 +127,12 @@ Specify framerate of dummy video
 .B \-N [01]
 Specify norm of dummy video (0=PAL, 1=NTSC)
 .TP
-.B \-M/--multicast-osc
+.B \-M/--multicast-osc <address>
 Starts OSC receiver in multicast mode
 .TP
-.B \-V/--multicast-vims
-Setup additional multicast frame sender / command receiver ( port offset +[3,4] )
+.B \-V/--multicast-vims <address>
+Setup additional multicast frame sender / command receiver.
+The frame sender transmits on port offset + 3, send commands to port offset + 4, 
 .TP
 .B \  /--map-from-file <num frames>
 To reduce transfers between memory and disk, you can set a number
@@ -137,6 +140,12 @@ of frames to be cached in memory from file (only valid for rawDV and AVI)
 Use smaller values for better performance (mapping several hundreds of
 megabytes can become a problem)
 .TP
+.TP
+.B \-w/--zoomwidth=<0-4096>
+For use with \-z/--zoom, specify output width
+.TP
+.B \-h/--zoomheight=<0-4096>
+For use with \-z/--zoom, specify output height
 .TP
 .B \--lgb=<0-100>
 For use with \-z/--zoom, use Gaussian blur filter (luma)
@@ -156,7 +165,7 @@ For use with \-z/--zoom, Chroma horizontal shifting
 .B \--cvs=<v>
 For use with \-z/--zoom, Chroma vertical shifting
 .B \-z/--zoom <num>
-Use the software scaler (this affects output video). (Also see \-H and \-W)
+Use the software scaler (this affects output video). (Also see \-w and \-h)
 Available modes are:
 .RS
 .TP
@@ -426,6 +435,7 @@ template. Use SHIFT + [Any key] to apply the template
 .SH REFERENCES
 .TP
 sendVIMS for PD: http://zwizwa.fartit.com/pd/sendVIMS/
+SVN repository: http://veejay.dyne.org
 .SH BUGS
 see BUGS in the source package
 .SH AUTHOR
@@ -435,7 +445,7 @@ contact the developers, the main mailing list for this
 project is: 
 .I veejay-users@lists.sourceforge.net
 For more info see the website at
+.I http://veejay.dyne.org
 .I http://veejay.sourceforge.net
-.I or http://veejay.dyne.org
 .SH "SEE ALSO"
 .B veejay yuv2rawdv rawdv2yuv any2yuv sayVIMS 

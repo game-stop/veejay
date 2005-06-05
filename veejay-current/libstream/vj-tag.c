@@ -224,7 +224,6 @@ void vj_tag_record_init(int w, int h)
 
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int type )
 {
-	int error = 0;
 	vj_client *v;
 	if( !host  ) return 0;
 	if( port <= 0 ) return 0;
@@ -234,8 +233,8 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 	v = vj_tag_input->net[stream_nr];
 	if(!v) return 0;
 
-	if(!vj_client_test(host,port))
-		return 0;
+//	if(!vj_client_test(host,port))
+//		return 0;
 
 	v->planes[0] = w * h;
 	if( p == VIDEO_PALETTE_YUV420P )
@@ -392,6 +391,21 @@ int	vj_tag_set_stream_color(int t1, int r, int g, int b)
     return (vj_tag_update(tag,t1));
 }
 
+int	vj_tag_get_stream_color(int t1, int *r, int *g, int *b )
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if(!tag)
+	return 0;
+    if(tag->source_type != VJ_TAG_TYPE_COLOR)
+	return 0;
+
+    *r = tag->color_r;
+    *g = tag->color_g;
+    *b = tag->color_b;
+
+	return 1;
+}
+
 // for network, filename /channel is passed as host/port num
 int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	        int pix_fmt, int channel )
@@ -483,6 +497,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->encoder_width = 0;
     tag->encoder_height = 0;
     tag->encoder_num_frames = 0;
+    tag->method_filename = (filename == NULL ? NULL :strdup(filename));
     tag->rec_total_bytes = 0;
     tag->encoder_total_frames = 0;
 	tag->source = 0;
@@ -681,7 +696,7 @@ int vj_tag_del(int id)
         if(tag->encoder_active)
 		vj_tag_stop_encoder( tag->id );	
         if(tag->source_name) free(tag->source_name);
-
+	if(tag->method_filename) free(tag->method_filename);
       	for (i = 0; i < CLIP_MAX_EFFECTS; i++) 
 		if (tag->effect_chain[i])
 		    free(tag->effect_chain[i]);
@@ -1278,6 +1293,7 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 {
     int params, i;
     vj_tag *tag = vj_tag_get(t1);
+
     if (!tag)
 		return -1;
     if (position < 0 || position >= CLIP_MAX_EFFECTS)
@@ -1485,8 +1501,6 @@ int vj_tag_disable(int t1) {
 int vj_tag_enable(int t1) {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return -1;
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "Enable stream %d", t1 );
 
 	if(tag->active ) 
 	{
@@ -1740,6 +1754,15 @@ void vj_tag_get_source_name(int t1, char *dst)
 	sprintf(dst, "error in tag %d", t1);
     }
 }
+
+void vj_tag_get_method_filename(int t1, char *dst)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if (tag) {
+	if(tag->method_filename != NULL) sprintf(dst, tag->method_filename);
+    }
+}
+
 
 void	vj_tag_get_by_type(int type, char *description )
 {
@@ -2125,3 +2148,372 @@ int vj_tag_sprint_status( int tag_id, int pfps,int frame, int mode, char *str )
     return 0;
 }
 
+#ifdef HAVE_XML2
+static void tagParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg)
+{
+    xmlChar *xmlTemp = NULL;
+    unsigned char *chTemp = NULL;
+    int argIndex = 0;
+    if (cur == NULL)
+	return;
+
+    while (cur != NULL && argIndex < CLIP_MAX_PARAMETERS) {
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_ARGUMENT))
+	{
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+	    if (chTemp) {
+		arg[argIndex] = atoi(chTemp);
+		argIndex++;
+	    }
+	    if (xmlTemp)
+	   	 xmlFree(xmlTemp);
+   	    if (chTemp)
+	    	free(chTemp);
+	
+	}
+	// xmlTemp and chTemp should be freed after use
+	xmlTemp = NULL;
+	chTemp = NULL;
+	cur = cur->next;
+    }
+}
+
+
+static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_clip)
+{
+    xmlChar *xmlTemp = NULL;
+    unsigned char *chTemp = NULL;
+    int effect_id = -1;
+    int arg[CLIP_MAX_PARAMETERS];
+    int i;
+    int source_type = 0;
+    int channel = 0;
+    int frame_trimmer = 0;
+    int frame_offset = 0;
+    int e_flag = 0;
+    int volume = 0;
+    int a_flag = 0;
+    int chain_index = 0;
+
+    for (i = 0; i < CLIP_MAX_PARAMETERS; i++) {
+	arg[i] = 0;
+    }
+
+    if (cur == NULL)
+	return;
+
+
+    while (cur != NULL) {
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTID)) {
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+	    if (chTemp) {
+		effect_id = atoi(chTemp);
+		free(chTemp);
+	    }
+	    if(xmlTemp) xmlFree(xmlTemp);
+	}
+
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTPOS)) {
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+	    if (chTemp) {
+		chain_index = atoi(chTemp);
+		free(chTemp);
+	    }
+	    if(xmlTemp) xmlFree(xmlTemp);
+	}
+
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_ARGUMENTS)) {
+	    tagParseArguments(doc, cur->xmlChildrenNode, arg);
+	}
+
+	/* add source,channel,trimmer,e_flag */
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTSOURCE)) {
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+	    if (chTemp) {
+		source_type = atoi(chTemp);
+		free(chTemp);
+	    }
+            if(xmlTemp) xmlFree(xmlTemp);
+	}
+
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTCHANNEL)) {
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+	    if (chTemp) {
+		channel = atoi(chTemp);
+		free(chTemp);
+	    }
+	    if(xmlTemp) xmlFree(xmlTemp);
+	}
+
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTTRIMMER)) {
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+	    if (chTemp) {
+		frame_trimmer = atoi(chTemp);
+		free(chTemp);
+	    }
+	    if(xmlTemp) xmlFree(xmlTemp);
+	}
+
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTOFFSET)) {
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+	    if (chTemp) {
+		frame_offset = atoi(chTemp);
+		free(chTemp);
+	    }
+	    if(xmlTemp) xmlFree(xmlTemp);
+	}
+
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTACTIVE)) {
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+	    if (chTemp) {
+		e_flag = atoi(chTemp);
+		free(chTemp);
+	    } 
+	    if(xmlTemp) xmlFree(xmlTemp);
+	
+	}
+
+	if (!xmlStrcmp
+	    (cur->name, (const xmlChar *) XMLTAG_EFFECTAUDIOFLAG)) {
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+	    if (chTemp) {
+		a_flag = atoi(chTemp);
+		free(chTemp);
+	    }
+	    if(xmlTemp) xmlFree(xmlTemp);
+	
+	}
+
+	if (!xmlStrcmp
+	    (cur->name, (const xmlChar *) XMLTAG_EFFECTAUDIOVOLUME)) {
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+	    if (chTemp) {
+		volume = atoi(chTemp);
+		free(chTemp);
+	    }
+	    if(xmlTemp) xmlFree(xmlTemp);
+	}
+	// xmlTemp and chTemp should be freed after use
+	xmlTemp = NULL;
+	chTemp = NULL;
+	cur = cur->next;
+    }
+
+    if (effect_id != -1) {
+	int j;
+	int res = vj_tag_set_effect( dst_clip, chain_index, effect_id );
+
+	if(res < 0 )
+	veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d) to stream %d\n",
+		    effect_id, chain_index, dst_clip);
+	
+
+	/* load the parameter values */
+	for (j = 0; j < vj_effect_get_num_params(effect_id); j++) {
+	    vj_tag_set_effect_arg(dst_clip, chain_index, j, arg[j]);
+	}
+	vj_tag_set_chain_channel(dst_clip, chain_index, channel);
+	vj_tag_set_chain_source(dst_clip, chain_index, source_type);
+
+	vj_tag_set_chain_status(dst_clip, chain_index, e_flag);
+
+	vj_tag_set_offset(dst_clip, chain_index, frame_offset);
+	vj_tag_set_trimmer(dst_clip, chain_index, frame_trimmer);
+    }
+
+}
+
+/*************************************************************************************************
+ *
+ * ParseEffect()
+ *
+ * Parse the effects array 
+ *
+ ****************************************************************************************************/
+static void tagParseEffects(xmlDocPtr doc, xmlNodePtr cur, int dst_stream)
+{
+    int effectIndex = 0;
+    while (cur != NULL && effectIndex < CLIP_MAX_EFFECTS) {
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECT)) {
+	    tagParseEffect(doc, cur->xmlChildrenNode, dst_stream);
+		effectIndex++;
+	}
+	//effectIndex++;
+	cur = cur->next;
+    }
+}
+/*************************************************************************************************
+ *
+ * ParseClip()
+ *
+ * Parse a clip
+ *
+ ****************************************************************************************************/
+void tagParseStreamFX(xmlDocPtr doc, xmlNodePtr cur, vj_tag *skel)
+{
+
+    xmlChar *xmlTemp = NULL;
+    unsigned char *chTemp = NULL;
+
+    while (cur != NULL) {
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_CHAIN_ENABLED))
+	{
+		xmlTemp = xmlNodeListGetString( doc, cur->xmlChildrenNode,1);
+		chTemp = UTF8toLAT1( xmlTemp );
+		if(chTemp)
+		{
+			skel->effect_toggle = atoi(chTemp);
+			free(chTemp);
+		}
+		if(xmlTemp) xmlFree(xmlTemp);
+	}
+	if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADER_ACTIVE)) {
+		xmlTemp = xmlNodeListGetString(doc,cur->xmlChildrenNode,1);
+		chTemp = UTF8toLAT1(xmlTemp);
+		if(chTemp) {
+			skel->fader_active = atoi(chTemp);
+		        free(chTemp);
+		}
+		if(xmlTemp) xmlFree(xmlTemp);
+	}
+	if (!xmlStrcmp(cur->name,(const xmlChar *) XMLTAG_FADER_VAL)) {
+		xmlTemp = xmlNodeListGetString(doc,cur->xmlChildrenNode,1);
+		chTemp = UTF8toLAT1(xmlTemp);
+		if(chTemp){
+			skel->fader_val = atoi(chTemp);
+			free(chTemp);
+		}
+		if(xmlTemp) xmlFree(xmlTemp);
+	}
+	if (!xmlStrcmp(cur->name,(const xmlChar*) XMLTAG_FADER_INC)) {
+		xmlTemp = xmlNodeListGetString(doc,cur->xmlChildrenNode,1);
+		chTemp = UTF8toLAT1(xmlTemp);
+		if(chTemp) {
+			skel->fader_inc = atof(chTemp);
+			free(chTemp);
+		}
+		if(xmlTemp) xmlFree(xmlTemp);
+	}
+
+	if (!xmlStrcmp(cur->name,(const xmlChar*) XMLTAG_FADER_DIRECTION)) {
+		xmlTemp = xmlNodeListGetString(doc,cur->xmlChildrenNode,1);
+		chTemp = UTF8toLAT1(xmlTemp);
+		if(chTemp) {
+			skel->fader_inc = atoi(chTemp);
+			free(chTemp);
+		}
+		if(xmlTemp) xmlFree(xmlTemp);
+	}
+
+	tagParseEffects(doc, cur->xmlChildrenNode, skel->id);
+
+	// xmlTemp and chTemp should be freed after use
+	xmlTemp = NULL;
+	chTemp = NULL;
+
+	cur = cur->next;
+    }
+    return;
+}
+
+
+
+static void tagCreateArguments(xmlNodePtr node, int *arg, int argcount)
+{
+    int i;
+    char buffer[100];
+    argcount = CLIP_MAX_PARAMETERS;
+    for (i = 0; i < argcount; i++) {
+	//if (arg[i]) {
+	    sprintf(buffer, "%d", arg[i]);
+	    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_ARGUMENT,
+			(const xmlChar *) buffer);
+	//}
+    }
+}
+
+
+static void tagCreateEffect(xmlNodePtr node, clip_eff_chain * effect, int position)
+{
+    char buffer[100];
+    xmlNodePtr childnode;
+
+    sprintf(buffer, "%d", position);
+    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTPOS,
+		(const xmlChar *) buffer);
+
+    sprintf(buffer, "%d", effect->effect_id);
+    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTID,
+		(const xmlChar *) buffer);
+
+    sprintf(buffer, "%d", effect->e_flag);
+    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTACTIVE,
+		(const xmlChar *) buffer);
+
+    sprintf(buffer, "%d", effect->source_type);
+    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTSOURCE,
+		(const xmlChar *) buffer);
+
+    sprintf(buffer, "%d", effect->channel);
+    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTCHANNEL,
+		(const xmlChar *) buffer);
+
+    sprintf(buffer, "%d", effect->frame_offset);
+    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTOFFSET,
+		(const xmlChar *) buffer);
+
+    sprintf(buffer, "%d", effect->frame_trimmer);
+    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTTRIMMER,
+		(const xmlChar *) buffer);
+
+    sprintf(buffer, "%d", effect->a_flag);
+    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTAUDIOFLAG,
+		(const xmlChar *) buffer);
+
+    sprintf(buffer, "%d", effect->volume);
+    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTAUDIOVOLUME,
+		(const xmlChar *) buffer);
+
+
+    childnode =
+	xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_ARGUMENTS, NULL);
+    tagCreateArguments(childnode, effect->arg,
+		    vj_effect_get_num_params(effect->effect_id));
+
+    
+}
+
+static void tagCreateEffects(xmlNodePtr node, clip_eff_chain ** effects)
+{
+    int i;
+    xmlNodePtr childnode;
+
+    for (i = 0; i < CLIP_MAX_EFFECTS; i++) {
+	if (effects[i]->effect_id != -1) {
+	    childnode =
+		xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECT,
+			    NULL);
+	    tagCreateEffect(childnode, effects[i], i);
+	}
+    }
+    
+}
+    
+void tagCreateStreamFX(xmlNodePtr node, vj_tag *tag)
+{   
+   xmlNodePtr childnode =
+	xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTS, NULL);
+
+   tagCreateEffects(childnode, tag->effect_chain);
+}
+#endif

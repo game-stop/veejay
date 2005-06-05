@@ -18,6 +18,7 @@
  */
 #define DBG_C() { 	vj_msg_detail(VEEJAY_MSG_DEBUG, "Implement %s", __FUNCTION__ ); }  
 
+static int config_file_status = 0;
 static gchar *config_file = NULL;
 
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
@@ -1263,29 +1264,25 @@ void	on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_loadconfigfile_clicked(GtkWidget *widget, gpointer user_data)
 {
-
 	gchar *filename = dialog_open_file( "Load liveset / configfile");
-	if(filename)
+
+	if(!filename)
+		return;
+
+	if( info->run_state == RUN_STATE_REMOTE )
 	{
-
-		if( info->run_state == RUN_STATE_REMOTE )
-		{
-			multi_vims( VIMS_BUNDLE_FILE, "%s", filename );
-		}
-		else
-		{
-			gchar gfile[1024];
-			sprintf(gfile, "%s-EDL", filename );
-			put_text( "entry_filename", gfile );
-
-			if(config_file)
-				g_free(config_file);
-			config_file = g_strdup( filename );
-	
-			vj_msg(VEEJAY_MSG_INFO, "You can launch Veejay now");
-		}
+		multi_vims( VIMS_BUNDLE_FILE, "%s", filename );
+	}
+	else
+	{
+		if(config_file)
+			g_free(config_file);
+		config_file = g_strdup( filename );
+		config_file_status = 1;	
+		vj_msg(VEEJAY_MSG_INFO, "You can launch Veejay now");
 	}
 }
+
 void	on_button_saveconfigfile_clicked(GtkWidget *widget, gpointer user_data)
 {
 	gchar *filename = dialog_save_file( "Save liveset / configfile");
@@ -1371,4 +1368,71 @@ void	on_check_priout_fullscreen_clicked(
 	if(is_button_toggled( "check_priout_fullscreen" ) )
 		on = 1;
 	multi_vims ( VIMS_FULLSCREEN, "%d", on );
+}
+
+
+void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
+{
+	gint mcast = is_button_toggled( "inputstream_networktype" );
+	gchar *remote_ = get_text( "inputstream_remote" );
+	gint port = get_nums( "inputstream_portnum" );
+
+	gint bw = 0;
+	gint br = 0;
+
+	gchar *remote = g_locale_from_utf8(
+			remote_ , -1, &br, &bw, NULL ); 
+
+	veejay_msg(VEEJAY_MSG_ERROR, 
+		"%d, [%s], %d ~ %d", mcast,remote, port, strlen(remote) );
+
+	remote[strlen(remote)] = '\0';
+
+	if(bw == 0 || br == 0 || port <= 0 )
+	{
+		vj_msg(VEEJAY_MSG_ERROR, "You must enter a valid remote address and/or port number");
+		return;
+	}
+
+	if(mcast)
+		multi_vims( VIMS_STREAM_NEW_MCAST,"%d %s", port, remote );
+	else
+		multi_vims( VIMS_STREAM_NEW_UNICAST, "%d %s", port, remote );
+
+
+	info->uc.reload_hint[HINT_SLIST] = 1;
+	if(remote) g_free(remote);
+	if(remote_) g_free(remote_);
+}
+
+void	on_inputstream_filebrowse_clicked(GtkWidget *w, gpointer user_data)
+{
+	gchar *filename = dialog_open_file( "Open video file" );
+	if(filename)
+	{
+		put_text( "inputstream_filename", filename );
+		g_free(filename);
+	}
+}
+
+void	on_inputstream_file_button_clicked(GtkWidget *w, gpointer user_data)
+{
+	gint use_y4m = is_button_toggled( "inputstream_filey4m" );
+	gchar *file = get_text( "inputstream_filename" );	
+	gint br = 0;
+	gint bw = 0;
+	gchar *filename = g_locale_from_utf8( file, -1, &br , &bw, NULL );
+	if( br == 0 || bw == 0 )
+	{
+		vj_msg(VEEJAY_MSG_ERROR, "No filename given");
+		return;
+	}
+	if(use_y4m)
+		multi_vims( VIMS_STREAM_NEW_Y4M, "%s", filename );
+	else
+		multi_vims( VIMS_STREAM_NEW_AVFORMAT, "%s", filename );
+
+	if(filename) g_free( filename );
+	if(file) g_free(file);
+	info->uc.reload_hint[HINT_SLIST] = 1;
 }
