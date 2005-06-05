@@ -221,15 +221,6 @@ typedef struct
 	int 	height;
 } veejay_el_t;
 
-typedef struct
-{
-	int	stdin_pipe;
-	int	stdout_pipe;
-	int	stderr_pipe;
-	FILE	*out;
-	FILE	*err;
-} veejay_io_t;
-
 static struct
 {
 	int pm;
@@ -286,10 +277,10 @@ typedef struct
 	GIOChannel	*channel;
 	GdkColormap	*color_map;
 	gint		connecting;
+	gint		logging;
 	gint		streamrecording;
 	gint		samplerecording;
 	gint		cpumeter;
-	veejay_io_t	io;
 	veejay_el_t	el;
 	veejay_user_ctrl_t uc;
 	GList		*effect_info;
@@ -387,7 +378,6 @@ static	void	get_gd(char *buf, char *suf, const char *filename);
 
 int	resize_primary_ratio_y();
 int	resize_primary_ratio_x();
-//gboolean	veejay_io_update(gpointer data);
 static	void	setup_tree_texteditable_column( const char *tree_name, int type, const char *title, void (*callbackfunction)() );
 static	void	update_rgbkey();
 static	int	count_textview_buffer(const char *name);
@@ -440,7 +430,8 @@ static	gchar	*_utf8str(char *c_str)
 	gint	bytes_read;
 	gint 	bytes_written;
 	GError	*error = NULL;
-
+	if(!c_str)
+		return NULL;
 	gchar	*result = g_locale_to_utf8( c_str, -1, &bytes_read, &bytes_written, &error );
 
 	if(error)
@@ -1247,7 +1238,7 @@ enum
 	COLOR_NUM
 };
 
-static	int	line_count = 0;
+static	int	line_count = 1;
 static  void	vj_msg(int type, const char format[], ...)
 {
 	if( type == VEEJAY_MSG_DEBUG && vims_verbosity == 0 )
@@ -1282,6 +1273,7 @@ static  void	vj_msg(int type, const char format[], ...)
         text[strlen(text)-1] = '\0';
         put_text( "lastmessage", text );
 
+	fprintf(stderr, "%s", buf);
 	g_free( text );
 	va_end(args);
 }
@@ -1292,8 +1284,8 @@ static  void	vj_msg_detail(int type, const char format[], ...)
 	GtkTextIter iter;
 
 
-	if( type == VEEJAY_MSG_DEBUG && vims_verbosity == 0 )
-		return;
+	//if( type == VEEJAY_MSG_DEBUG && vims_verbosity == 0 )
+	//	return;
 
 	char tmp[1024];
 	char buf[1024];
@@ -1307,8 +1299,8 @@ static  void	vj_msg_detail(int type, const char format[], ...)
 	va_start( args,format );
 	vsnprintf( tmp, sizeof(tmp), format, args );
 	
-	gtk_text_buffer_get_iter_at_line(buffer, &iter, line_count );
-
+	gtk_text_buffer_get_end_iter(buffer, &iter);
+	
 	switch(type)
 	{
 		case 2: sprintf(prefix,"Info   : ");sprintf(level, "infomsg"); color=COLOR_GREEN; break;
@@ -1316,14 +1308,29 @@ static  void	vj_msg_detail(int type, const char format[], ...)
 		case 0: sprintf(prefix,"Error  : ");sprintf(level, "errormsg"); color=COLOR_RED; break;
 		case 3:
 			sprintf(prefix,"Debug  : ");sprintf(level, "debugmsg"); color=COLOR_BLUE; break;
-		case 4:
-			sprintf(prefix, " ");color=-1; break;
 	}
 
-	snprintf(buf, sizeof(buf), "%s %s\n",prefix,tmp );
+	if(type==4)
+		snprintf(buf,sizeof(buf),"%s",tmp);
+	else
+		snprintf(buf, sizeof(buf), "%s %s\n",prefix,tmp );
 	int nr,nw;
+
 	gchar *text = g_locale_to_utf8( buf, -1, &nr, &nw, NULL);
-	gtk_text_buffer_insert( buffer, &iter, text,nw);
+	gtk_text_buffer_insert( buffer, &iter, text, nw );
+
+	GtkTextIter enditer;
+	gtk_text_buffer_get_end_iter(buffer, &enditer);
+	gtk_text_view_scroll_to_iter(
+		GTK_TEXT_VIEW(view),
+		&enditer,
+		0.0,
+		FALSE,
+		0.0,
+		0.0 );
+		
+
+
 	g_free( text );
 	va_end(args);
 }
@@ -1394,7 +1401,7 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 		n = vj_client_read( info->client, V_CMD, result, len );
 		*bytes_written = n;
 		result[len] = '\0';
-		//vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, result );
+		vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, result );
 		return result;
 	}	
 	return result;
@@ -1847,10 +1854,14 @@ static void 	update_globalinfo()
 				update_slider_value( "videobar", info->status_tokens[FRAME_NUM], 
 					         info->status_tokens[TOTAL_FRAMES] );
 			if(pm == MODE_SAMPLE)
+			{
 				update_slider_rel_value( "videobar",
 						info->status_tokens[FRAME_NUM],
 						info->status_tokens[SAMPLE_START],
 						0);
+				update_label_i( "label_samplepos",
+						info->status_tokens[FRAME_NUM] - info->status_tokens[SAMPLE_START] , 1);
+			}
 		}
 		if(pm == MODE_SAMPLE )
 		{
@@ -4347,7 +4358,6 @@ static	gboolean	update_stream_record_timeout(gpointer data)
 	}
 	return TRUE;
 }
-
 static gboolean	update_progress_timeout(gpointer data)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, "connecting");
@@ -4359,6 +4369,7 @@ static	void	init_progress()
 {
 	//GtkWidget *w = glade_xml_get_widget_( info->main_window, "connecting");
 	info->connecting = g_timeout_add( 100 , update_progress_timeout, (gpointer*) info );
+
 }
 
 static	void	init_recorder(int total_frames, gint mode)
@@ -4539,36 +4550,41 @@ void	vj_gui_stop_launch()
 	}
 }
 
-void	vj_fork_or_connect_veejay()
+
+void	vj_fork_or_connect_veejay(char *configfile)
 {
 	char	*remote = get_text( "entry_hostname" );
 	char	*files  = get_text( "entry_filename" );
 	int	port	= get_nums( "button_portnum" );
-	gchar	*args[20];
+	gchar	**args;
 	int	n_args = 0;
 	char	port_str[15];
+	char	config[512];
 	int 	i = 0;
 
-	args[n_args++] = g_strdup("veejay");
+	args = g_new ( gchar *, 7 );
+
+	args[0] = g_strdup("veejay");
 
 	sprintf(port_str, "-p%d", port);
+	if(configfile)
+		sprintf(config,   "-l%s", configfile);
 
-	args[n_args++] = g_strdup("-v");
-	args[n_args++] = g_strdup("-n");
-
-	args[n_args++] = g_strdup(port_str);
+	args[1] = g_strdup("-v");
+	args[2] = g_strdup("-n");
+	args[3] = g_strdup(port_str);
 
 	if(files == NULL || strlen(files)<= 0)
-	{
-		args[n_args++] = g_strdup("-d");
-		args[n_args++] = NULL;
-	}
+		args[4] = g_strdup("-d");
 	else
-	{
-		args[n_args++] = g_strdup(files);	
-		args[n_args++] = NULL;
-	}
+		args[4] = g_strdup(files);	
 
+	if(configfile)
+		args[5] = g_strdup( config );
+	else
+		args[5] = NULL;
+
+	args[6] = NULL;
 
 	if( info->state == STATE_IDLE )
 	{
@@ -4585,26 +4601,26 @@ void	vj_fork_or_connect_veejay()
 				gettimeofday( &(info->timer) , NULL );
 				memcpy( &(info->alarm), &(info->timer), sizeof(struct timeval));
 
-				veejay_io_t iot;
-				memset( &iot,0,sizeof(iot));
 
 				gboolean ret = g_spawn_async_with_pipes( 
 							NULL,
 							args,
 							NULL,
-							G_SPAWN_SEARCH_PATH,
+							G_SPAWN_SEARCH_PATH | G_SPAWN_STDOUT_TO_DEV_NULL,
 							NULL,
 							NULL,
 							&pid,
 							NULL,
-							&(iot.stdout_pipe),
-							//NULL,
 							NULL,
+							NULL, //&(iot.stderr_pipe),
 							&error );
+				g_strfreev( args );
+
 				if(error)
 				{
 					vj_msg_detail(VEEJAY_MSG_ERROR, "There was an error: [%s]\n", error->message );
 					ret = FALSE;
+					g_error_free(error);
 				}
 
 				if( ret == FALSE )
@@ -4620,15 +4636,6 @@ void	vj_fork_or_connect_veejay()
 					vj_launch_toggle(FALSE);
 					vj_msg(VEEJAY_MSG_INFO,
 						"Spawning Veejay ...!"); 
-
-					fcntl( iot.stdout_pipe , F_SETFD, O_NDELAY );	
-					
-					
-					memcpy( &(info->io), &(iot), sizeof(iot));
-				//	g_timeout_add( G_PRIORITY_LOW, veejay_io_update,
-				//		(gpointer*) info );
-
-				
 				}
 				
 			}
@@ -4826,6 +4833,44 @@ void 	vj_gui_init(char *glade_file)
 	vj_gui_disable();
 
 }
+static	gboolean	update_log(gpointer data)
+{
+	single_vims( VIMS_LOG );
+	int len =0;
+	gchar *buf = recv_vims(6, &len );
+	if(len > 0 )
+	{	
+		GtkWidget *view = glade_xml_get_widget_( info->main_window, "veejaytext");
+		GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
+		GtkTextIter iter,enditer;
+
+		if(line_count > 100)
+		{
+			clear_textview_buffer( "veejaytext" );
+			line_count = 1;
+		}
+		gtk_text_buffer_get_end_iter(buffer, &iter);
+	
+		int nr,nw;
+
+		gchar *text = g_locale_to_utf8( buf, -1, &nr, &nw, NULL);
+		gtk_text_buffer_insert( buffer, &iter, text, nw );
+
+		line_count ++;	
+		gtk_text_buffer_get_end_iter(buffer, &enditer);
+		gtk_text_view_scroll_to_iter(
+			GTK_TEXT_VIEW(view),
+			&enditer,
+			0.0,
+			FALSE,
+			0.0,
+			0.0 );
+		
+		g_free( text );
+	}
+	return TRUE;
+}
+
 
 int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 {
@@ -4846,6 +4891,8 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	info->channel = g_io_channel_unix_new( vj_client_get_status_fd( info->client, V_STATUS));
 
+
+
 	load_editlist_info();
 
 	load_effectlist_info();
@@ -4857,6 +4904,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	load_samplelist_info("tree_sources");
 	
 	info->state = STATE_PLAYING;
+
 	g_io_add_watch_full(
 			info->channel,
 			G_PRIORITY_DEFAULT,
@@ -4865,6 +4913,8 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 			(gpointer*) info,
 			veejay_untick
 		);
+	info->logging = g_timeout_add( 100, update_log,(gpointer*) info );
+
 	
 	// we can set the expanded of the ABC expander
 	GtkWidget *exp = glade_xml_get_widget_(
@@ -4876,33 +4926,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	update_slider_range( "speedslider",(-1 * 64),68, info->status_tokens[SAMPLE_SPEED], 0);
 	return 1;
 }
-/*
-gboolean	veejay_io_update(gpointer data)
-{
-	int in_fd = info->io.stdout_pipe;
-	struct timeval no_wait;
-	fd_set fds;
-	memset(&no_wait, 0,sizeof(no_wait));
-	FD_ZERO(&fds);
-	FD_SET( in_fd, &fds);
-	int status = select( in_fd+1, &fds, 0,0,&no_wait);
-	if(status > 0)
-	{
-		if(FD_ISSET( in_fd, &fds ))
-		{
-			char buf[4096];
-			bzero(buf,4096);
-			int nb = read( in_fd, buf,sizeof(buf));
-			if(nb > 0)
-			{
-				gchar *message = _utf8str( buf );
-				g_free(message);
-			}
-		}
-	}
-	return TRUE;
-}
-*/
+
 static	void	veejay_stop_connecting(vj_gui_t *gui)
 {
 	if(!gui->sensitive)
@@ -4911,6 +4935,7 @@ static	void	veejay_stop_connecting(vj_gui_t *gui)
 	gtk_progress_bar_set_fraction(
 		GTK_PROGRESS_BAR (glade_xml_get_widget_(info->main_window, "connecting")),0.0);
 	g_source_remove( info->connecting );
+
 	info->connecting = 0;
 }
 
@@ -5007,7 +5032,8 @@ void	vj_gui_disconnect()
 	{
 		g_io_channel_shutdown(info->channel, FALSE, NULL);
 		g_io_channel_unref(info->channel);
-	
+		g_source_remove( info->logging );
+
 		vj_client_close(info->client);
 		vj_client_free(info->client);
 		info->client = NULL;
@@ -5049,6 +5075,8 @@ void	vj_gui_disable()
 	 gtk_widget_set_sensitive( GTK_WIDGET(w), FALSE );
 	 i++;
 	}
+	gtk_widget_set_sensitive( GTK_WIDGET(
+			glade_xml_get_widget_(info->main_window, "button_loadconfigfile") ), TRUE );
 	info->sensitive = 0;
 }
 
@@ -5062,5 +5090,10 @@ void	vj_gui_enable()
 	 gtk_widget_set_sensitive( GTK_WIDGET(w), TRUE );
 	 i++;
 	}
+
+	// disable loadconfigfile
+	gtk_widget_set_sensitive( GTK_WIDGET(
+			glade_xml_get_widget_(info->main_window, "button_loadconfigfile") ), FALSE );
+
 	info->sensitive = 1;
 }

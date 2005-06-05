@@ -74,7 +74,7 @@ typedef struct {
 } vj_events;
 
 static	vj_events	net_list[VIMS_MAX];
-
+static	int		override_keyboard = 0;
 #ifdef HAVE_SDL
 typedef struct
 {
@@ -504,6 +504,8 @@ static struct {
 		vj_event_bundled_msg_add,	2,	"%d %s",	{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS		},
 	{ VIMS_BUNDLE_CAPTURE,			"Bundle: capture effect chain",
 		vj_event_quick_bundle,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY		},
+	{ VIMS_LOG,				"Send console output",
+		vj_event_send_log,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY		},
 	{ VIMS_CHAIN_LIST,			"Chain: get all contents",
 		vj_event_send_chain_list,	1,	"%d",		{0,0}, VIMS_ALLOW_ANY		},
 	{ VIMS_CHAIN_GET_ENTRY,			"Chain: get entry contents",
@@ -796,12 +798,6 @@ vj_keyboard_event *new_keyboard_event(
 		return NULL;
 	memset( ev, 0, sizeof(vj_keyboard_event));
 
-	// assume all is valid
-	veejay_msg(VEEJAY_MSG_DEBUG,
-		"%s : %d, %d , %p (%s), %d",
-		__FUNCTION__,
-		symbol, modifier, value,value, event_id );
-
 	ev->vims = (vj_events*) vj_malloc(sizeof(vj_events));
 	if(!ev->vims)
 		return NULL;
@@ -823,8 +819,6 @@ vj_keyboard_event *new_keyboard_event(
 				ev->arg_len = strlen(ev->arguments);
 		}	
 	}
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "\t\tValue = %p, %s", value,value );
 
 	if(vims_id != 0 )
 	{
@@ -1194,11 +1188,6 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 			}
 		}
 
-		for( i = 0; i < 16; i ++ )
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "vims argument [%p]", vims_arguments[i].value );
-		}
-
 		vj_event_trigger_function( (void*) v, net_list[net_id].act,
 			vj_event_list[id].num_params, vj_event_list[id].format,
 			vims_arguments[0].value,
@@ -1259,7 +1248,7 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 			return 0;
 		}	
 	}
-	veejay_msg(VEEJAY_MSG_DEBUG, "Remaining: [%s]", msg );
+//	veejay_msg(VEEJAY_MSG_DEBUG, "Remaining: [%s]", msg );
 	tmp = strndup( msg, 3 );
 	if( strncasecmp( tmp, "bun", 3) == 0 )
 	{
@@ -1314,7 +1303,7 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 
 	if( msg_len <= MSG_MIN_LEN )
 	{	
-		veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) Single fire %d", net_id);
+//		veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) Single fire %d", net_id);
 		_last_known_num_args = vj_event_list[id].num_params; 
 
 		vj_event_trigger_function(
@@ -1325,8 +1314,6 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 			&(vj_event_list[id].args[1])
 		);	
 	}
-	veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) '%s' -> %s", msg,
-			vj_event_list[id].name );
 	if( msg_len > MSG_MIN_LEN)
 	{
 		const char *fmt = vj_event_list[id].format;
@@ -1339,7 +1326,6 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 
 	
 		arguments = strndup( (msg + 4) , (msg_len -4) );
-		veejay_msg(VEEJAY_MSG_DEBUG, "Arguments: [%s]",arguments);
 
 		if( arguments == NULL )
 		{	
@@ -1577,7 +1563,8 @@ void vj_event_update_remote(void *ptr)
 		}
 	}
 
-
+	if(!veejay_keep_messages())
+		veejay_reap_messages();
 	
 
 }
@@ -1798,7 +1785,6 @@ void	vj_event_format_xml_settings( veejay_t *v, xmlNodePtr node  )
 	char buf[4069];
 	bzero(buf,4069);
 	int c = veejay_is_colored();
-	veejay_msg(VEEJAY_MSG_DEBUG, "Format XML settings %s", __FUNCTION__ );	
 	__xml_cint( buf, v->uc->port, node, 	XML_CONFIG_SETTING_PORTNUM );
 	__xml_cint( buf, v->video_out, node, 	XML_CONFIG_SETTING_PRIOUTPUT);
 	__xml_cstr( buf, v->stream_outname,node,XML_CONFIG_SETTING_PRINAME );
@@ -1911,8 +1897,16 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 	{
 		if( vj_event_bundle_exists(event_id))
 		{
-			veejay_msg(VEEJAY_MSG_WARNING, "Bundle %d already exists in VIMS system! (Bundle in configfile was ignored)",event_id);
-			return;
+			if(!override_keyboard)
+			{
+				veejay_msg(VEEJAY_MSG_WARNING, "Bundle %d already exists in VIMS system! (Bundle in configfile was ignored)",event_id);
+				return;
+			}
+			else
+			{
+				if(vj_event_bundle_del(event_id) != 0)
+					return;
+			}
 		}
 
 		vj_msg_bundle *m = vj_event_bundle_new( msg, event_id);
@@ -1932,6 +1926,8 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 #ifdef HAVE_SDL
 	if( key > 0 && key_mod >= 0)
 	{
+		if( override_keyboard )
+			vj_event_unregister_keyb_event( key, key_mod );
 		if( vj_event_register_keyb_event( event_id, key, key_mod, NULL ))
 			veejay_msg(VEEJAY_MSG_INFO, "Attached key %d + %d to Bundle %d ", key,key_mod,event_id);
 	}
@@ -1975,6 +1971,7 @@ int  veejay_load_action_file( void *ptr, char *file_name )
 	}
 
 	cur = cur->xmlChildrenNode;
+	override_keyboard = 1;
 	while( cur != NULL )
 	{
 		if( !xmlStrcmp( cur->name, (const xmlChar*) XML_CONFIG_SETTINGS ) )
@@ -1987,6 +1984,7 @@ int  veejay_load_action_file( void *ptr, char *file_name )
 		}
 		cur = cur->next;
 	}
+	override_keyboard = 0;
 	xmlFreeDoc(doc);	
 	return 1;
 }
@@ -2057,8 +2055,8 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 	if(args[0]==1 || args[1]==1)
 	{
 		/* write cliplist into XML bundle */	
-		char tmp_buf[4064];
-		bzero(tmp_buf,4096);
+		char tmp_buf[1024];
+		bzero(tmp_buf,1024);
 		childnode = xmlNewChild( rootnode, NULL, (const xmlChar*) XML_CONFIG_SETTINGS, NULL );
 		vj_event_format_xml_settings( (veejay_t*) ptr, childnode );
 
@@ -2069,6 +2067,8 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_ERROR, "Cant save editlist to %s", live_set );
 		else
 			__xml_cstr( tmp_buf, live_set, childnode, XML_CONFIG_SETTING_EDITLIST );
+		bzero( tmp_buf, 1024 );
+		bzero( live_set, 512 );
 
 		sprintf(live_set, "%s-SL", file_name );
 		res = clip_writeToFile( live_set );
@@ -2162,7 +2162,7 @@ void	vj_event_unregister_keyb_event( int sdl_key, int modifier )
 		memset(ev, 0, sizeof( vj_keyboard_event ));
 		
 		if( del_keyboard_event( index ))
-			veejay_msg(VEEJAY_MSG_ERROR, "deregistered %d + %d " , modifier, sdl_key );
+			veejay_msg(VEEJAY_MSG_DEBUG, "deregistered %d + %d " , modifier, sdl_key );
 
 	}
 }
@@ -2175,8 +2175,8 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 
 	if( keyboard_event_exists( index ))
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,
-		"Keboard binding %d + %d already exists", modifier, symbol);
+		veejay_msg(VEEJAY_MSG_DEBUG,
+			"Keboard binding %d + %d already exists", modifier, symbol);
 		return 0;
 	}
 
@@ -2193,8 +2193,6 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 	hnode_t *node = hnode_create( ev );
 	if(!node)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,
-			"Cannot store keyboard event in hash!");
 		return 0;
 	}
 	
@@ -6961,6 +6959,25 @@ void	vj_event_send_clip_list		(	void *ptr,	const char format[],	va_list ap	)
 	SEND_MSG(v, _s_print_buf);
 }
 
+void	vj_event_send_log			(	void *ptr,	const char format[],	va_list ap 	)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	int num_lines = 0;
+	int str_len = 0;
+	char *messages = NULL;
+	bzero( _s_print_buf,SEND_BUF);
+
+	messages = veejay_pop_messages( &num_lines, &str_len );
+
+	if(str_len == 0 || num_lines == 0 )
+		sprintf(_s_print_buf, "%06d", 0);
+	else
+		sprintf(_s_print_buf, "%06d%s", str_len, messages );
+	if(messages)
+		free(messages);	
+	SEND_MSG( v, _s_print_buf );
+}
+
 void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 {
 	char fline[255];
@@ -7433,10 +7450,6 @@ void vj_event_attach_detach_key(void *ptr, const char format[], va_list ap)
 	else
 		mode = 2; // assign key symbol / key modifier
 
-
-	veejay_msg(VEEJAY_MSG_DEBUG,
-	   "%s , event_id = %d, symbol = %d, modifier = %d, arguments = %s",
-		__FUNCTION__, args[0], args[1], args[2], value );
 
 	if( mode == 1 )
 	{

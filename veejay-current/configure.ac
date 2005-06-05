@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[0.8.0],[veejay-users@lissts.sourceforge.net])
+AC_INIT([veejay],[0.8.1],[veejay-users@lissts.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 

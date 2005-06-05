@@ -558,16 +558,15 @@ static void smp_check()
 int main(int argc, char **argv)
 {
     video_playback_setup *settings;
-    
-    
     char *dont_use; 
     
     struct sched_param schp;
     /*EditList *editlist = info->editlist; */
 
-    vj_mem_init();
+	fflush(stdout);
 
-    fflush(stdout);
+
+    vj_mem_init();
 
     info = veejay_malloc();
     /* start with initing */

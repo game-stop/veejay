@@ -33,6 +33,7 @@ enum {
 #endif
 	VIMS_CHAIN_GET_ENTRY			=	410,
 	VIMS_VIMS_LIST				=	411,
+	VIMS_LOG				=	412,
 
 /* general controls */
 	VIMS_SET_VOLUME				=	300,

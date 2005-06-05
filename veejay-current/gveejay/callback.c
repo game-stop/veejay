@@ -18,6 +18,8 @@
  */
 #define DBG_C() { 	vj_msg_detail(VEEJAY_MSG_DEBUG, "Implement %s", __FUNCTION__ ); }  
 
+static gchar *config_file = NULL;
+
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_SKIP_SECOND);
@@ -158,7 +160,7 @@ void	on_button_sampleend_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_veejay_clicked(GtkWidget *widget, gpointer user_data)
 {
-	vj_fork_or_connect_veejay();
+	vj_fork_or_connect_veejay( config_file );
 }
 void	on_button_sendvims_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -1258,6 +1260,42 @@ void	on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data)
 		g_free(filename);
 	} 	
 }
+
+void	on_button_loadconfigfile_clicked(GtkWidget *widget, gpointer user_data)
+{
+
+	gchar *filename = dialog_open_file( "Load liveset / configfile");
+	if(filename)
+	{
+
+		if( info->run_state == RUN_STATE_REMOTE )
+		{
+			multi_vims( VIMS_BUNDLE_FILE, "%s", filename );
+		}
+		else
+		{
+			gchar gfile[1024];
+			sprintf(gfile, "%s-EDL", filename );
+			put_text( "entry_filename", gfile );
+
+			if(config_file)
+				g_free(config_file);
+			config_file = g_strdup( filename );
+	
+			vj_msg(VEEJAY_MSG_INFO, "You can launch Veejay now");
+		}
+	}
+}
+void	on_button_saveconfigfile_clicked(GtkWidget *widget, gpointer user_data)
+{
+	gchar *filename = dialog_save_file( "Save liveset / configfile");
+	if(filename)
+	{
+		multi_vims( VIMS_BUNDLE_SAVE, "%d %s", 1, filename );
+		g_free(filename);
+	}
+}
+
 
 void	on_button_newbundle_clicked(GtkWidget *widget, gpointer user_data)
 {

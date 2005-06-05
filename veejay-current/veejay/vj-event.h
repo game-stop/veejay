@@ -169,6 +169,7 @@ void 	vj_event_disable_audio			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_print_info			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_clip_list			(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_send_log			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_clip_history_list		(	void *ptr,	const char format[],	va_list ap	);

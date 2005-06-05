@@ -37,7 +37,9 @@ extern void veejay_set_debug_level(int level);
 extern void veejay_set_colors(int level);
 extern void veejay_silent();
 extern int  veejay_is_silent();
-
+extern int	veejay_keep_messages(void);
+extern void	veejay_reap_messages(void);
+extern char *veejay_pop_messages(int *num_lines, int *total_len);
 extern void	get_cache_line_size(void);
 
 #endif
