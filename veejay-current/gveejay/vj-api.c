@@ -4883,7 +4883,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		info->client = NULL;
 		info->run_state = 0;
 		vj_msg(VEEJAY_MSG_INFO, "Cannot establish connection with %s:%d",
-			group_name,port_num);
+			(hostname == NULL ? group_name: hostname ),port_num);
 		return 0;
 	}
 	vj_msg(VEEJAY_MSG_INFO, "New connection established with Veejay running on %s port %d",
