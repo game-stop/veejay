@@ -90,18 +90,25 @@ void veejay_msg(int type, const char format[], ...)
     char sline[260];
     va_list args;
     int line = 0;
-    if(_no_msg) return;
-    if(type == 4 && _debug_level==0 ) return; // bye
 
+    FILE *out = (_no_msg ? stderr: stdout );
+
+    if( type != VEEJAY_MSG_ERROR && _no_msg )
+		return;
+
+    if( !_debug_level && type == VEEJAY_MSG_DEBUG )
+	return ; // bye
+
+    // parse arguments
     va_start(args, format);
     bzero(buf,256);
     vsnprintf(buf, sizeof(buf) - 1, format, args);
  
-	if(!_message_his_status)
-	{
-		memset( &_message_history , 0 , sizeof(vj_msg_hist));
-		_message_his_status = 1;
-	}
+    if(!_message_his_status)
+    {
+	memset( &_message_history , 0 , sizeof(vj_msg_hist));
+	_message_his_status = 1;
+    }
 
     if(_color_level)
     {
@@ -123,9 +130,9 @@ void veejay_msg(int type, const char format[], ...)
 		break;
 	 }
  	 if(!line)
-	     printf("%s %s %s\n", prefix, buf, TXT_END);
+	     fprintf(out,"%s %s %s\n", prefix, buf, TXT_END);
 	     else
-	     printf("%s%s%s", TXT_GRE, buf, TXT_END );
+	     fprintf(out,"%s%s%s", TXT_GRE, buf, TXT_END );
  
 	if( _message_history.w_index < MAX_LINES )
 	{
@@ -156,9 +163,9 @@ void veejay_msg(int type, const char format[], ...)
 		break;
 	   }
 	   if(!line)
-	     printf("%s %s\n", prefix, buf);
+	     fprintf(out,"%s %s\n", prefix, buf);
 	     else
-	     printf("%s", buf );
+	     fprintf(out,"%s", buf );
 
 	  if( _message_history.w_index < MAX_LINES )
 	  {

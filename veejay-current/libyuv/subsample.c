@@ -24,9 +24,11 @@
 
 
 #include <config.h>
-#ifdef HAVE_MMX
+
+#ifdef HAVE_ASM_MMX
 #include "mmx.h"
 #endif
+
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
@@ -64,16 +66,37 @@ const char *ssm_description[SSM_COUNT] = {
 void ss_420_to_422(uint8_t *buffer, int width, int height);
 void ss_422_to_420(uint8_t *buffer, int width, int height);
 
-
-
-static uint8_t *sample_buffer;
-static int go = 0;
-void subsample_init(int len)
+typedef struct
 {
-	sample_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
-	go = 1;
+	uint8_t *buf; 
+} yuv_sampler_t;
+
+static uint8_t *sample_buffer = NULL;
+static int go = 0;
+
+void *subsample_init(int len)
+{
+	void *ret = NULL;
+	yuv_sampler_t *s = (yuv_sampler_t*) vj_malloc(sizeof(yuv_sampler_t) );
+	if(!s)
+		return ret;
+	s->buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
+	if(!s->buf)
+		return ret;
+
+	return (void*) s;
 }
 
+void	subsample_free(void *data)
+{
+	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
+	if(sampler)
+	{
+		if(sampler->buf) free(sampler->buf);
+		free(sampler);
+	}
+	sampler = NULL;
+}
 
 /*************************************************************************
  * Chroma Subsampling
@@ -194,19 +217,16 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
 #define BLANK_CRB in0[1]
 #define BLANK_CRB_2 (in0[1] << 1)
 
-static void tr_420jpeg_to_444(uint8_t *buffer, int width, int height)
+static void tr_420jpeg_to_444(void *data, uint8_t *buffer, int width, int height)
 {
   uint8_t *inm, *in0, *inp, *out0, *out1;
   uint8_t cmm, cm0, cmp, c0m, c00, c0p, cpm, cp0, cpp;
   int x, y;
-  static uint8_t *saveme = NULL;
-  static int saveme_size = 0;
-  if (width > saveme_size) {
-    free(saveme);
-    saveme_size = width;
-    saveme = vj_malloc(saveme_size * sizeof(saveme[0]));
-    assert(saveme != NULL);
-  }
+
+  yuv_sampler_t *sampler = (yuv_sampler_t*) data;
+
+  uint8_t *saveme = sampler->buf;
+
   veejay_memcpy(saveme, buffer, width);
 
   in0 = buffer + ( width * height /4) - 2;
@@ -347,7 +367,7 @@ static void tr_420jpeg_to_444(uint8_t *buffer, int width, int height)
 
 static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 {
-#ifndef HAVE_MMX
+#ifndef HAVE_ASM_MMX
   uint8_t *in, *out0, *out1;
   int x, y;
   in = buffer + (width * height / 4) - 1;
@@ -404,17 +424,16 @@ void ss_422_to_420(uint8_t *buffer, int width, int height )
 	//todo 2x1 down sampling (box)
 }
 
-#ifndef HAVE_MMX
-static void ss_444_to_422(uint8_t *buffer, int width, int height)
+#ifndef HAVE_ASM_MMX
+static void ss_444_to_422(void *data, uint8_t *buffer, int width, int height)
 {
 	const int dst_stride = width/2;
 	int x,y;
-
-	if(go==0) subsample_init(width);
-
+	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
+	
 	for(y = 0; y < height; y ++)
 	{
-		uint8_t *src = sample_buffer;
+		uint8_t *src = sampler->buf;
 		uint8_t *dst = buffer + (y*dst_stride);
 		veejay_memcpy( src, buffer + (y*width), width );
 		for(x=0; x < dst_stride; x++)
@@ -510,18 +529,18 @@ static inline void mmx_average_2_U8 (uint8_t * dest, const uint8_t * src1,
     psubb_r2r (mm3, mm4);	/* subtract subresults */
     movq_r2m (mm4, *dest);	/* store result in dest */
 }
-static void ss_444_to_422(uint8_t *buffer, int width, int height)
+static void ss_444_to_422(void *data,uint8_t *buffer, int width, int height)
 {
 	const int dst_stride = width/2;
 	const int len = width * height;
 	const int mmx_stride = dst_stride / 8;
 	int x,y;
 
-	if(go==0) subsample_init(width);
+	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
 
 	for(y = 0; y < height; y ++)
 	{
-		uint8_t *src = sample_buffer;
+		uint8_t *src = sampler->buf;
 		uint8_t *dst = buffer + (y*dst_stride);
 		veejay_memcpy( src, buffer + (y*width), width );
 		for(x=0; x < mmx_stride; x++)
@@ -541,7 +560,7 @@ static void tr_422_to_444(uint8_t *buffer, int width, int height)
 
 	const int stride = width/2;
 	const int len = stride * height; 
-#ifdef HAVE_MMX
+#ifdef HAVE_ASM_MMX
 	const int mmx_stride = stride / 8;
 #endif
 	int x,y;
@@ -550,7 +569,7 @@ static void tr_422_to_444(uint8_t *buffer, int width, int height)
 	{
 		uint8_t *dst = buffer + (y * width);
 		uint8_t *src = buffer + (y * stride);
-#ifdef HAVE_MMX
+#ifdef HAVE_ASM_MMX
 		for( x = 0; x < mmx_stride; x ++ )
 		{
 			movq_m2r( *src,mm0 );
@@ -626,15 +645,16 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
 
 
 
-void chroma_subsample(subsample_mode_t mode, uint8_t *ycbcr[],
+void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
 		      int width, int height)
 {
+
   switch (mode) {
   case SSM_420_JPEG_BOX:
   case SSM_420_JPEG_TR: 
     ss_444_to_420jpeg(ycbcr[1], width, height);
     ss_444_to_420jpeg(ycbcr[2], width, height);
-#ifdef HAVE_MMX
+#ifdef HAVE_ASM_MMX
 	emms();
 #endif
     break;
@@ -643,9 +663,9 @@ void chroma_subsample(subsample_mode_t mode, uint8_t *ycbcr[],
     ss_444_to_420mpeg2(ycbcr[2], width, height);
     break;
   case SSM_422_444:
-    ss_444_to_422(ycbcr[1],width,height);
-    ss_444_to_422(ycbcr[2],width,height);
-#ifdef HAVE_MMX
+    ss_444_to_422(data,ycbcr[1],width,height);
+    ss_444_to_422(data,ycbcr[2],width,height);
+#ifdef HAVE_ASM_MMX
 	emms();
 #endif
     break;
@@ -659,25 +679,26 @@ void chroma_subsample(subsample_mode_t mode, uint8_t *ycbcr[],
 }
 
 
-void chroma_supersample(subsample_mode_t mode, uint8_t *ycbcr[],
+void chroma_supersample(subsample_mode_t mode,void *data, uint8_t *ycbcr[],
 			int width, int height)
 {
+
   switch (mode) {
   case SSM_420_JPEG_BOX:
     ss_420jpeg_to_444(ycbcr[1], width, height);
     ss_420jpeg_to_444(ycbcr[2], width, height);
-#ifdef HAVE_MMX
+#ifdef HAVE_ASM_MMX
 	emms();
 #endif
     break;
   case SSM_420_JPEG_TR:
-    tr_420jpeg_to_444(ycbcr[1], width, height);
-    tr_420jpeg_to_444(ycbcr[2], width, height);
+    tr_420jpeg_to_444(data,ycbcr[1], width, height);
+    tr_420jpeg_to_444(data,ycbcr[2], width, height);
     break;
   case SSM_422_444:
     tr_422_to_444(ycbcr[2],width,height);
     tr_422_to_444(ycbcr[1],width,height);
-#ifdef HAVE_MMX
+#ifdef HAVE_ASM_MMX
 	emms();
 #endif
     break;

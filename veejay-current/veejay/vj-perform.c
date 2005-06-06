@@ -67,10 +67,15 @@ struct ycbcr_frame {
 
 // audio buffer is 16 bit signed integer
 
+static void 	*effect_sampler = NULL;
+static void	*crop_sampler = NULL;
+
 static struct ycbcr_frame **video_output_tmp_buffer; 
 static struct ycbcr_frame **video_output_buffer; /* scaled video output */
+static int	video_output_buffer_convert = 0;
 static struct ycbcr_frame **frame_buffer;	/* chain */
 static struct ycbcr_frame **primary_buffer;	/* normal */
+static VJFrame *crop_frame = NULL;
 static int cached_tag_frames[2][CLIP_MAX_EFFECTS];	/* cache a frame into the buffer only once */
 static int cached_clip_frames[2][CLIP_MAX_EFFECTS]; 
 static int frame_info[64][CLIP_MAX_EFFECTS];	/* array holding frame lengths  */
@@ -494,7 +499,7 @@ int vj_perform_init(veejay_t * info)
     primary_buffer[0]->Cr = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
     if(!primary_buffer[0]->Cr) return 0;
     veejay_memset(primary_buffer[0]->Cr,128, frame_len);
-
+    video_output_buffer_convert = 0;
     video_output_buffer =
 	(struct ycbcr_frame**) vj_malloc(sizeof(struct ycbcr_frame**) * 2 );
     if(!video_output_buffer)
@@ -546,6 +551,8 @@ int vj_perform_init(veejay_t * info)
     memcpy(helper_frame, info->effect_frame1, sizeof(VJFrame));
 
     vj_perform_record_buffer_init();
+
+	effect_sampler = subsample_init( w );
 
     return 1;
 }
@@ -676,6 +683,17 @@ void vj_perform_free(veejay_t * info)
    if(primary_buffer[0]) free(primary_buffer[0]);
    if(primary_buffer) free(primary_buffer);
    if(socket_buffer) free(socket_buffer);
+
+	if(crop_frame)
+	{
+		if(crop_frame->data[0]) free(crop_frame->data[0]);
+		if(crop_frame->data[1]) free(crop_frame->data[1]);
+		if(crop_frame->data[2]) free(crop_frame->data[2]);
+	}
+   if(crop_sampler)
+	subsample_free(crop_sampler);
+   if(effect_sampler)
+	subsample_free(effect_sampler);
 
    for(c=0; c < 3; c ++)
    {
@@ -813,13 +831,73 @@ void vj_perform_get_primary_frame(veejay_t * info, uint8_t ** frame,
     frame[2] = primary_buffer[0]->Cr;
 }
 
+
 void	vj_perform_get_output_frame( veejay_t *info, uint8_t **frame )
 {
-	
 	frame[0] = video_output_buffer[0]->Y;
 	frame[1] = video_output_buffer[0]->Cb;
 	frame[2] = video_output_buffer[0]->Cr;
+}
 
+void	vj_perform_get_crop_dimensions(veejay_t *info, int *w, int *h)
+{
+	*w = info->edit_list->video_width - info->settings->viewport.left - info->settings->viewport.right;
+	*h = info->edit_list->video_height - info->settings->viewport.top - info->settings->viewport.bottom;
+
+}
+
+int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop )
+{
+	if(crop)
+	{
+		VJFrame src;
+		memset( &src, 0, sizeof(VJFrame));
+
+		vj_get_yuv_template( &src,
+				info->edit_list->video_width,
+				info->edit_list->video_height,
+				info->pixel_format );
+
+		src.data[0] = primary_buffer[0]->Y;
+		src.data[1] = primary_buffer[0]->Cb;
+		src.data[2] = primary_buffer[0]->Cr;
+
+		// yuv crop needs supersampled data
+		chroma_supersample( info->settings->sample_mode,effect_sampler, src.data, src.width,src.height );
+		yuv_crop( &src, crop_frame, &(info->settings->viewport));
+		chroma_subsample( info->settings->sample_mode,crop_sampler, crop_frame->data, crop_frame->width, crop_frame->height );
+	}
+
+	frame[0] = crop_frame->data[0];
+	frame[1] = crop_frame->data[1];
+	frame[2] = crop_frame->data[2];
+
+	return 1;
+}
+
+int	vj_perform_init_cropped_output_frame(veejay_t *info, VJFrame *src, int *dw, int *dh )
+{
+	video_playback_setup *settings = info->settings;
+	if( crop_frame )
+		free(crop_frame);
+	crop_frame = yuv_allocate_crop_image( src, &(settings->viewport) );
+	if(!crop_frame)
+		return 0;
+
+	*dw = crop_frame->width;
+	*dh = crop_frame->height;
+
+	crop_sampler = subsample_init( *dw );
+
+	/* enough space to supersample*/
+	int i;
+	for( i = 0; i < 3; i ++ )
+	{
+		crop_frame->data[i] = (uint8_t*) vj_malloc(sizeof(uint8_t) * crop_frame->len );
+		if(!crop_frame->data[i])
+			return 0;
+	}
+	return 1;
 }
 
 void vj_perform_init_output_frame( veejay_t *info, uint8_t **frame,
@@ -905,25 +983,19 @@ int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 
 void	vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, int h )
 {
-	static long _last_frame = -1;
-
 	if(info->pixel_format == FMT_422)
 	{
 		frame[0] = video_output_buffer[1]->Y;
 		frame[1] = video_output_buffer[1]->Cb;
 		frame[2] = video_output_buffer[1]->Cr;
 			
-		if(_last_frame != info->settings->current_frame_num)
-		{
-			uint8_t *src_frame[3];
-			src_frame[0] = video_output_buffer[0]->Y;
-			src_frame[1] = video_output_buffer[0]->Cb;
-			src_frame[2] = video_output_buffer[0]->Cr;
+		uint8_t *src_frame[3];
+		src_frame[0] = video_output_buffer[0]->Y;
+		src_frame[1] = video_output_buffer[0]->Cb;
+		src_frame[2] = video_output_buffer[0]->Cr;
 
-			yuv422p_to_yuv420p2(
-					src_frame, frame,w, h );
-			_last_frame = info->settings->current_frame_num;
-		}	
+		yuv422p_to_yuv420p2(
+				src_frame, frame,w, h );
 	}
 	else
 	{
@@ -947,16 +1019,20 @@ int	vj_perform_is_ready(veejay_t *info)
 	return 1;
 }
 
+void	vj_perform_unlock_primary_frame( void )
+{
+	video_output_buffer_convert = 0;
+	// call this every cycle
+}
+
 void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )   
 {
-	static long _last_frame = -1;
 	editlist *el = info->edit_list;
 	if(info->pixel_format==FMT_422)
 	{
-		if(_last_frame != info->settings->current_frame_num)
+		if( video_output_buffer_convert == 0 )
 		{
 			uint8_t *pframe[3];
-			_last_frame = info->settings->current_frame_num;
 			 pframe[0] = primary_buffer[0]->Y;
 			 pframe[1] = primary_buffer[0]->Cb;
 			 pframe[2] = primary_buffer[0]->Cr;
@@ -967,7 +1043,7 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
 	//		ss_422_to_420( primary_buffer[0]->Cr,	
 	//			el->video_width/2,
 	//			el->video_height );	
-			_last_frame = info->settings->current_frame_num;\
+			video_output_buffer_convert = 1;
 		}
 		frame[0] = temp_buffer[0];
 		frame[1] = temp_buffer[1];
@@ -1827,6 +1903,7 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry, co
 	   			if(sub_mode)
 					chroma_supersample(
 						settings->sample_mode,
+						effect_sampler,
 						frames[1]->data,
 						frameinfo->width,
 						frameinfo->height );
@@ -1836,6 +1913,7 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry, co
 			{
 				chroma_supersample(
 					settings->sample_mode,
+					effect_sampler,
 					frames[0]->data,
 					frameinfo->width,
 					frameinfo->height );
@@ -1916,6 +1994,7 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry, const 
 	   			if(sub_mode)
 					chroma_supersample(
 						settings->sample_mode,
+						effect_sampler,	
 						frames[1]->data,
 						frameinfo->width,
 						frameinfo->height );
@@ -1925,6 +2004,7 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry, const 
 			{
 				chroma_supersample(
 					settings->sample_mode,
+					effect_sampler,
 					frames[0]->data,
 					frameinfo->width,
 					frameinfo->height );
@@ -1978,6 +2058,7 @@ int vj_perform_clip_complete_buffers(veejay_t * info, int entry, const int skip_
 			{
 				// next is downsampled or 420
 				chroma_subsample( settings->sample_mode,
+						effect_sampler,
 					frames[0]->data,frameinfo->width,
 					frameinfo->height );
 				subsample = 0;
@@ -2039,6 +2120,7 @@ int vj_perform_tag_complete_buffers(veejay_t * info, int entry, const int skip_i
 			{
 				// no more entries, or entry needs subsampling anyway
 				chroma_subsample( settings->sample_mode,
+					effect_sampler,
 					frames[0]->data,frameinfo->width,
 						frameinfo->height );		
 				subsample = 0;

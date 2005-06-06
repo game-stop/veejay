@@ -54,6 +54,13 @@ typedef struct VJFrame_t
 	int	height;
 } VJFrame;
 
+typedef struct VJRectangle_t
+{
+	int top;
+	int bottom;
+	int left;
+	int right;
+} VJRectangle;
 
 typedef struct VJFrameInfo_t
 {

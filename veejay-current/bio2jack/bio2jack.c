@@ -67,10 +67,6 @@
     #define TRACE(...) do{}while(0)
 #endif
 
-    #define ERR(...) fprintf(OUTFILE, "ERR: %s:", __FUNCTION__),\
-         fprintf(OUTFILE, __VA_ARGS__),				\
-         fflush(OUTFILE);
-
 #define min(a,b)   (((a) < (b)) ? (a) : (b))
 #define max(a,b)   (((a) < (b)) ? (b) : (a))
 
@@ -283,7 +279,7 @@ static void sample_move_d16_d16(short *dst, short *src,
 
   if(!nSrcChannels && !nDstChannels)
   {
-    ERR("nSrcChannels of %d, nDstChannels of %d, can't have zero channels\n", nSrcChannels, nDstChannels);
+    //ERR("nSrcChannels of %d, nDstChannels of %d, can't have zero channels\n", nSrcChannels, nDstChannels);
     return; /* in the off chance we have zero channels somewhere */
   }
 
@@ -360,8 +356,8 @@ static int JACK_callback (nframes_t nframes, void *arg)
   TRACE("nframes %ld, sizeof(sample_t) == %d\n", (long)nframes, sizeof(sample_t));
 #endif
 
-  if(!this->client)
-    ERR("client is closed, this is weird...\n");
+ // if(!this->client)
+   // ERR("client is closed, this is weird...\n");
 
   if(nframes != this->chunk_size)
 	this->chunk_size = nframes;
@@ -414,7 +410,7 @@ static int JACK_callback (nframes_t nframes, void *arg)
       TRACE("deviceID(%d), setting played_bytes to %d\n", this->deviceID, this->played_bytes);
     } else
     {
-      ERR("unknown type for this->setType\n");
+      //ERR("unknown type for this->setType\n");
     }
 #endif
     this->pMessages = msg->pNext;    /* take this message off of the queue */
@@ -455,9 +451,9 @@ static int JACK_callback (nframes_t nframes, void *arg)
     /* so frame * 2 bytes(16 bits) * X output channels */
     if(this->buffer_size < (jackFramesAvailable * sizeof(short) * this->num_output_channels))
     {
-      ERR("our buffer must have changed size\n");
-      ERR("allocated %ld bytes, need %ld bytes\n", this->buffer_size,
-	  jackFramesAvailable * sizeof(short) * this->num_output_channels);
+      //ERR("our buffer must have changed size\n");
+      //ERR("allocated %ld bytes, need %ld bytes\n", this->buffer_size,
+	 // jackFramesAvailable * sizeof(short) * this->num_output_channels);
       return 0;
     }
 
@@ -663,7 +659,7 @@ static int JACK_bufsize (nframes_t nframes, void *arg)
     /* if we don't have a buffer then error out */
     if(!this->sound_buffer)
     {
-      ERR("error allocating sound_buffer memory\n");
+      //ERR("error allocating sound_buffer memory\n");
       return 0;
     }
   }
@@ -707,7 +703,7 @@ void JACK_shutdown(void* arg)
   /* lets see if we can't reestablish the connection */
   if(JACK_OpenDevice(this) != ERR_SUCCESS)
   {
-    ERR("unable to reconnect with jack\n");
+    //ERR("unable to reconnect with jack\n");
   }
 }
 
@@ -719,7 +715,7 @@ void JACK_shutdown(void* arg)
  */
 static void JACK_Error(const char *desc)
 {
-  ERR("%s\n", desc);
+  //ERR("%s\n", desc);
 }
 
 
@@ -736,7 +732,7 @@ static bool JACK_SendMessage(jack_driver_t* this, enum cmd_enum command, long da
   newMessage = (message_t*)malloc(sizeof(message_t));
   if(!newMessage)
   {
-    ERR("error allocating new message\n");
+    //ERR("error allocating new message\n");
     return FALSE;
   }
 
@@ -799,7 +795,7 @@ static int JACK_OpenDevice(jack_driver_t* this)
     /* try once more */
     if ((this->client = jack_client_new(client_name)) == 0)
     {
-      ERR("jack server not running?\n");
+      //ERR("jack server not running?\n");
       return ERR_OPENING_JACK;
     }
   }
@@ -854,7 +850,7 @@ static int JACK_OpenDevice(jack_driver_t* this)
   TRACE("calling jack_activate()\n");
   if(jack_activate(this->client))
   {
-    ERR( "cannot activate client\n");
+    //ERR( "cannot activate client\n");
     return ERR_OPENING_JACK;
   }
 
@@ -890,7 +886,7 @@ static int JACK_OpenDevice(jack_driver_t* this)
       TRACE("jack_connect() to port %d('%p')\n", i, this->output_port[i]);
       if(jack_connect(this->client, jack_port_name(this->output_port[i]), ports[i]))
       {
-          ERR("cannot connect to output port %d('%s')\n", i, ports[i]);
+          //ERR("cannot connect to output port %d('%s')\n", i, ports[i]);
           failed = 1;
       }
     } 
@@ -906,7 +902,7 @@ static int JACK_OpenDevice(jack_driver_t* this)
 
       if(!ports)
       {
-          ERR("jack_get_ports() failed to find ports with jack port flags of 0x%lX'\n", this->jack_port_flags);
+          //ERR("jack_get_ports() failed to find ports with jack port flags of 0x%lX'\n", this->jack_port_flags);
           return ERR_PORT_NOT_FOUND;
       }
 
@@ -914,7 +910,7 @@ static int JACK_OpenDevice(jack_driver_t* this)
       TRACE("jack_connect() to port %d('%p')\n", i, this->output_port[i]);
       if(jack_connect(this->client, jack_port_name(this->output_port[i]), ports[0]))
       {
-          ERR("cannot connect to output port %d('%s')\n", 0, ports[0]);
+          //ERR("cannot connect to output port %d('%s')\n", 0, ports[0]);
           failed = 1;
       }
       free(ports); /* free the returned array of ports */
@@ -1061,7 +1057,7 @@ int JACK_OpenEx(int* deviceID, unsigned int bits_per_channel, unsigned long *rat
 
   if(output_channels > MAX_OUTPUT_PORTS)
   {
-    ERR("output_channels == %d, MAX_OUTPUT_PORTS == %d\n", output_channels, MAX_OUTPUT_PORTS);
+    //ERR("output_channels == %d, MAX_OUTPUT_PORTS == %d\n", output_channels, MAX_OUTPUT_PORTS);
     releaseDriver(this);
     return ERR_TOO_MANY_OUTPUT_CHANNELS;
   }
@@ -1071,8 +1067,8 @@ int JACK_OpenEx(int* deviceID, unsigned int bits_per_channel, unsigned long *rat
   /* check that we have the correct number of port names */
   if((jack_port_name_count > 1) && (jack_port_name_count != output_channels))
   {
-    ERR("specified individual port names but not enough, gave %d names, need %d\n",
-	jack_port_name_count, output_channels);
+    //ERR("specified individual port names but not enough, gave %d names, need %d\n",
+	//jack_port_name_count, output_channels);
     releaseDriver(this);
     return ERR_PORT_NAME_OUTPUT_CHANNEL_MISMATCH;
   } else
@@ -1115,7 +1111,7 @@ int JACK_OpenEx(int* deviceID, unsigned int bits_per_channel, unsigned long *rat
   /* make sure bytes_per_frame is valid and non-zero */
   if(!this->bytes_per_output_frame)
   {
-    ERR("bytes_per_output_frame is zero\n");
+    //ERR("bytes_per_output_frame is zero\n");
     releaseDriver(this);
     return ERR_BYTES_PER_OUTPUT_FRAME_INVALID;
   }
@@ -1123,7 +1119,7 @@ int JACK_OpenEx(int* deviceID, unsigned int bits_per_channel, unsigned long *rat
   /* make sure bytes_per_frame is valid and non-zero */
   if(!this->bytes_per_input_frame)
   {
-    ERR("bytes_per_output_frame is zero\n");
+    //ERR("bytes_per_output_frame is zero\n");
     releaseDriver(this);
     return ERR_BYTES_PER_INPUT_FRAME_INVALID;
   }
@@ -1219,7 +1215,7 @@ long JACK_Write(int deviceID, char *data, unsigned long bytes)
   newWaveHeader = (wave_header_t*)malloc(sizeof(wave_header_t));   /* create a wave header for this data */
   if(!newWaveHeader)
   {
-    ERR("error allocating memory for newWaveHeader\n");
+    //ERR("error allocating memory for newWaveHeader\n");
   }
 
   newWaveHeader->pData = (char*)malloc(sizeof(char) * bytes); /* allocate memory for the data */
@@ -1453,9 +1449,6 @@ static long JACK_GetBytesStoredFromThis(jack_driver_t *this)
   long return_val;
 
   return_val = (this->client_bytes - this->played_client_bytes);
-
-  if(return_val < 0)
-    ERR("client_bytes == %ld < played_client_bytes == %ld\n", this->client_bytes, this->played_client_bytes);
 
   TRACE("this->deviceID(%d), return_val = %ld\n", this->deviceID, return_val);
 

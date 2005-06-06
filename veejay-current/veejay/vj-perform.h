@@ -7,6 +7,8 @@
 
 void	vj_perform_update_plugin_frame(VJFrame *frame);         
 
+void	vj_perform_unlock_primary_frame( void );
+
 VJFrame	*vj_perform_init_plugin_frame(veejay_t *info);
 VJFrameInfo *vj_perform_init_plugin_frame_info(veejay_t *info);
 
@@ -141,5 +143,10 @@ void vj_perform_record_clip_frame(veejay_t *info, int entry);
 
 void vj_perform_record_tag_frame(veejay_t *info, int entry); 
 void	vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, int h );
+
+
+int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop );
+int	vj_perform_init_cropped_output_frame(veejay_t *info, VJFrame *src, int *dw, int *dh );
+void	vj_perform_get_crop_dimensions(veejay_t *info, int *w, int *h);
 
 #endif

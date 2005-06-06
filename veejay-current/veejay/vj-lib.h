@@ -158,6 +158,8 @@ typedef struct {
 	sws_template sws_templ;
 	vj_schedule_t action_scheduler;
 	float	output_fps;
+	int crop;
+	VJRectangle viewport;
 } video_playback_setup;
 
 

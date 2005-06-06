@@ -525,7 +525,7 @@ int veejay_init_editlist(veejay_t * info)
 	    veejay_msg(VEEJAY_MSG_INFO, "Started Audio Task");
 	//    stats.audio = 1;
 	} else {
-	    veejay_msg(VEEJAY_MSG_ERROR, "Could not start Audio Task");
+	    veejay_msg(VEEJAY_MSG_WARNING, "Could not start Audio Task");
 	}
     }
    if( !el->has_audio )
@@ -890,6 +890,9 @@ static int veejay_screen_update(veejay_t * info )
     uint8_t *c_frame[3];
 	int i = 0;
 
+
+
+	vj_perform_unlock_primary_frame();
     // get the frame to output, in 420 or 422
     if (info->uc->take_bg==1)
     {
@@ -905,15 +908,29 @@ static int veejay_screen_update(veejay_t * info )
 		memset(&src,0,sizeof(VJFrame));
 		memset(&dst,0,sizeof(VJFrame));
 
-		vj_get_yuv_template( &src, info->edit_list->video_width,
-								   info->edit_list->video_height,
-								   info->pixel_format );
+		if(info->settings->crop)
+		{
+			int w = 0;
+			int h = 0;
+			vj_perform_get_crop_dimensions( info, &w, &h );
+			vj_get_yuv_template( &src, w,h, info->pixel_format );
+		}	
+		else
+		{
+			vj_get_yuv_template( &src, info->edit_list->video_width,
+						   info->edit_list->video_height,
+						   info->pixel_format );
+		}
 
 		vj_get_yuv_template( &dst, info->video_output_width,
-								   info->video_output_height,
-								   info->pixel_format );
+					   info->video_output_height,
+					   info->pixel_format );
 
-		vj_perform_get_primary_frame(info, src.data, 0 );
+		if(info->settings->crop)
+			vj_perform_get_cropped_frame(info, &(src.data), 1);
+		else
+			vj_perform_get_primary_frame(info, src.data, 0 );
+
 		vj_perform_get_output_frame(info, dst.data );
 
 		yuv_convert_and_scale( info->video_out_scaler, src.data, dst.data );	
@@ -1501,26 +1518,13 @@ static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
 
 int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 {
-  //  struct mjpeg_params bp;
-    editlist *el = info->edit_list;
-    video_playback_setup *settings = info->settings;
-
-
-	vj_event_init();
-
-#ifdef HAVE_XML2
-    if(info->load_action_file)
+	editlist *el = info->edit_list;
+	video_playback_setup *settings = info->settings;
+	if(info->video_out<0)
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Loading configuaration file %s", info->action_file);
-		veejay_load_action_file(info, info->action_file );
-	}
-#endif
-    if(info->video_out<0)
-    {
-	veejay_msg(VEEJAY_MSG_ERROR, "No video output driver selected (see man veejay)");
-	return -1;
-    }
-
+		veejay_msg(VEEJAY_MSG_ERROR, "No video output driver selected (see man veejay)");
+		return -1;
+    	}
     	// override geometry set in config file   
 	if( info->uc->geox != 0 && info->uc->geoy != 0 )
 	{
@@ -1528,22 +1532,34 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		y = info->uc->geoy;
 	}
 
-    switch (info->uc->use_timer)
+
+	vj_event_init();
+
+#ifdef HAVE_XML2
+	if(info->load_action_file)
 	{
-	    case 0:
+		veejay_msg(VEEJAY_MSG_INFO, "Loading configuaration file %s", info->action_file);
+		veejay_load_action_file(info, info->action_file );
+	}
+#endif
+
+	switch (info->uc->use_timer)
+	{
+		case 0:
 			veejay_msg(VEEJAY_MSG_WARNING, "Not timing audio/video");
 		break;
   		case 1:
 			veejay_msg(VEEJAY_MSG_DEBUG, 
 			    "RTC /dev/rtc hardware timer is broken!");
 			info->uc->use_timer = 2;
+			return -1;
 		break;
-    	case 2:
+    		case 2:
 			veejay_msg(VEEJAY_MSG_DEBUG, "Using nanosleep timer");
 		break;
-    }    
+    	}    
 
-    if (veejay_init_editlist(info) != 0) 
+ 	if (veejay_init_editlist(info) != 0) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, 
 			    "Cannot initialize the EditList");
@@ -1554,7 +1570,42 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Performer");
 		return -1;
-    }
+    	}
+
+	if( info->settings->crop && info->settings->zoom)
+	{
+		VJFrame src;
+		memset( &src,0,sizeof(VJFrame));
+		int w = 0; int h = 0;
+		vj_get_yuv_template( &src,
+			info->edit_list->video_width,
+			info->edit_list->video_height,
+			info->pixel_format );
+
+		int res = vj_perform_init_cropped_output_frame(
+				info,
+				&src,
+				&w,
+				&h
+				);
+		if( res == 0 )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR ,"Invalid crop parameters: %d:%d:%d:%d (%dx%d)",
+				info->settings->viewport.top,
+				info->settings->viewport.bottom,
+				info->settings->viewport.left,
+				info->settings->viewport.right,w,h);
+			return -1; 
+		}
+		veejay_msg(VEEJAY_MSG_INFO, "Crop video %dx%d to %dx%d (top %d, bottom %d, left %d, right %d",
+				info->edit_list->video_width, info->edit_list->video_height,
+				w,h,
+				info->settings->viewport.top,
+				info->settings->viewport.bottom,
+				info->settings->viewport.left,
+				info->settings->viewport.right );
+		
+	}
 
 	if( info->settings->zoom )
 	{
@@ -1562,20 +1613,33 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		VJFrame dst;
 		memset( &src, 0, sizeof(VJFrame));
 		memset( &dst, 0, sizeof(VJFrame));
-//		info->video_output_width = info->dummy->width;
-//		info->video_output_height = info->dummy->height;
 
-		vj_get_yuv_template( &src,
+		if(info->settings->crop)
+		{
+			int w = 0;
+			int h = 0;
+			vj_perform_get_crop_dimensions( info, &w, &h );
+			vj_get_yuv_template( &src, w,h, info->pixel_format );
+		}	
+		else
+		{
+			vj_get_yuv_template( &src,
 					info->edit_list->video_width,
 					info->edit_list->video_height,
 					info->pixel_format );
+		}
+
 		vj_get_yuv_template( &dst,
 					info->video_output_width,
 					info->video_output_height,
 					info->pixel_format );
 
-		    vj_perform_get_primary_frame(info, &(src.data) ,0 );
-		    vj_perform_init_output_frame(info, &(dst.data),
+		if(info->settings->crop)
+			vj_perform_get_cropped_frame(info, &src.data, 0);
+		else
+			vj_perform_get_primary_frame(info, &src.data ,0 );
+	
+		vj_perform_init_output_frame(info, &(dst.data),
 			info->video_output_width, info->video_output_height );
 
 		info->settings->sws_templ.flags  = info->settings->zoom;
@@ -2248,6 +2312,7 @@ veejay_t *veejay_malloc()
 		return NULL;
    	memset( info->settings, 0, sizeof(video_playback_setup));
 	memset( &(info->settings->action_scheduler), 0, sizeof(vj_schedule_t));
+	memset( &(info->settings->viewport ), 0, sizeof(VJRectangle)); 
 
     info->status_what = (char*) vj_malloc(sizeof(char) * MESSAGE_SIZE );
     info->status_msg = (char*) vj_malloc(sizeof(char) * MESSAGE_SIZE+5);

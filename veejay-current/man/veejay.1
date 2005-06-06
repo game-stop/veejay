@@ -79,9 +79,6 @@ timer to use ( none, normal, rtc )
 .B \-f/--fps <num>
 Override framerate of video 
 .TP
-.B \-X/--no-default-tags
-Do not create solid color tags at startup
-.TP
 .B \-x/--geometryx <num>
 Geometry x offset for SDL video window
 .TP
@@ -141,11 +138,15 @@ Use smaller values for better performance (mapping several hundreds of
 megabytes can become a problem)
 .TP
 .TP
-.B \-w/--zoomwidth=<0-4096>
+.B \-w/--zoomwidth <0-4096>
 For use with \-z/--zoom, specify output width
 .TP
-.B \-h/--zoomheight=<0-4096>
+.B \-h/--zoomheight <0-4096>
 For use with \-z/--zoom, specify output height
+.TP
+.B \-C/--zoomcrop top:bottom:left:right
+For use with \-z/--zoom, crops the input image before scaling.
+Set in pixels.
 .TP
 .B \--lgb=<0-100>
 For use with \-z/--zoom, use Gaussian blur filter (luma)

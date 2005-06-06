@@ -487,6 +487,63 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 
 }
 
+void  yuv_crop(VJFrame *src, VJFrame *dst, VJRectangle *rect )
+{
+	int x;
+	int y;
+	uint8_t *sy = src->data[0];
+	uint8_t *su = src->data[1];
+	uint8_t *sv = src->data[2];
+
+	uint8_t *dstY = dst->data[0];	
+	uint8_t *dstU = dst->data[1];
+	uint8_t *dstV = dst->data[2];
+	int i = 0;
+
+	for( i = 0 ; i < 3 ; i ++ )
+	{
+		int j = 0;
+		uint8_t *srcPlane = src->data[i];
+		uint8_t *dstPlane = dst->data[i];
+		for( y = rect->top ; y < ( src->height - rect->bottom ); y ++ )
+		{
+			for ( x = rect->left ; x < ( src->width - rect->right ); x ++ )
+			{
+				dstPlane[j] = srcPlane[ y * src->width + x ];
+				j++;
+			}
+		}
+	}
+
+}
+
+VJFrame	*yuv_allocate_crop_image( VJFrame *src, VJRectangle *rect )
+{
+	int w = src->width - rect->left - rect->right;
+	int h = src->height - rect->top - rect->bottom;
+
+	if( w <= 0 )
+		return NULL;
+	if( h <= 0 )
+		return NULL;
+
+	VJFrame *new = (VJFrame*) vj_malloc(sizeof(VJFrame));
+	if(!new)	
+		return NULL;
+
+	new->width = w;
+	new->height = h;	
+	new->uv_len = (w >> src->shift_h) * (h >> src->shift_v );
+	new->len = w * h;
+	new->uv_width  = (w >> src->shift_h );
+	new->uv_height = (h >> src->shift_v );
+	new->shift_v = src->shift_v;
+	new->shift_h = src->shift_h;
+
+	return new;
+}
+
+
 void	yuv_free_swscaler(void *sws)
 {
 	if(sws)

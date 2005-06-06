@@ -40,7 +40,6 @@
 
 static int run_server = 1;
 static veejay_t *info;
-static int default_use_tags=1;
 static float override_fps = 0.0;
 static int default_geometry_x = -1;
 static int default_geometry_y = -1;
@@ -139,36 +138,34 @@ static void Usage(char *progname)
 #else
     fprintf(stderr, "  -O/--output\t\t\tSDL(0), (3) yuv4mpeg (4) SHM (broken) (5) no visual\n");
 #endif
-    fprintf(stderr,
+    	fprintf(stderr,
 	    "  -o/--outstream <filename>\twhere to write the yuv4mpeg stream (use with -O3)\n");
-    fprintf(stderr,
+    	fprintf(stderr,
 	    "  -c/--synchronization [01]\tSync correction off/on (default on)\n");
-    fprintf(stderr, "  -f/--fps num\t\t\tOverride default framerate (default read from file)\n");
-    fprintf(stderr,
+    	fprintf(stderr, "  -f/--fps num\t\t\tOverride default framerate (default read from file)\n");
+    	fprintf(stderr,
 	    "  -P/--preserve-pathnames\tDo not 'canonicalise' pathnames in editlists\n");
-    fprintf(stderr,
+    	fprintf(stderr,
 	    "  -a/--audio [01]\t\tEnable (1) or disable (0) audio (default 1)\n");
-    fprintf(stderr,
+    	fprintf(stderr,
 	    "  -s/--size NxN\t\t\twidth X height for SDL video window\n");
-    fprintf(stderr,
-	    "  -X/--no-default-tags\t\tDo not create solid color tags at startup\n");
-    fprintf(stderr,
+	fprintf(stderr,
 	    "  -l/--action-file <filename>\tLoad an Configuartion/Action File (none at default)\n");
-    fprintf(stderr,
+	fprintf(stderr,
 	    "  -u/--dump-events  \t\tDump event information to screen\n");
-    fprintf(stderr,
+	fprintf(stderr,
 	    "  -I/--deinterlace\t\tDeinterlace video if it is interlaced\n");    
-    fprintf(stderr,"  -x/--geometryx <num> \t\tTop left x offset for SDL video window\n");
-    fprintf(stderr,"  -y/--geometryy <num> \t\tTop left y offset for SDL video window\n");
-    fprintf(stderr,"  -F/--features  \t\tList of compiled features\n");
-    fprintf(stderr,"  -v/--verbose  \t\tEnable debugging output (default off)\n");
-    fprintf(stderr,"  -b/--bezerk    \t\tBezerk (default off)   \n");
-    fprintf(stderr,"  -L/--auto-loop   \t\tStart with default sample\n");
+	fprintf(stderr,"  -x/--geometryx <num> \t\tTop left x offset for SDL video window\n");
+	fprintf(stderr,"  -y/--geometryy <num> \t\tTop left y offset for SDL video window\n");
+ 	fprintf(stderr,"  -F/--features  \t\tList of compiled features\n");
+	fprintf(stderr,"  -v/--verbose  \t\tEnable debugging output (default off)\n");
+	fprintf(stderr,"  -b/--bezerk    \t\tBezerk (default off)   \n");
+ 	fprintf(stderr,"  -L/--auto-loop   \t\tStart with default sample\n");
 
-    fprintf(stderr,"  -n/--no-color     \t\tDont use colored text\n");
+	fprintf(stderr,"  -n/--no-color     \t\tDont use colored text\n");
 	fprintf(stderr,"  -r/--force	\t\tForce loading of videofiles\n");
-    fprintf(stderr,"  -m/--sample-mode [01]\t\tSampling mode 1 = best quality (default), 0 = best performance\n");  
-    fprintf(stderr,"  -Y/--ycbcr [01]\t\t0 = YUV 4:2:0 Planar, 1 = YUV 4:2:2 Planar\n");
+	fprintf(stderr,"  -m/--sample-mode [01]\t\tSampling mode 1 = best quality (default), 0 = best performance\n");  
+	fprintf(stderr,"  -Y/--ycbcr [01]\t\t0 = YUV 4:2:0 Planar, 1 = YUV 4:2:2 Planar\n");
 
 	fprintf(stderr,"  -d/--dummy	\t\tDummy playback\n");
 	fprintf(stderr,"  -W/--width <num>\t\tdummy width\n");
@@ -181,8 +178,6 @@ static void Usage(char *progname)
 	fprintf(stderr,"     --map-from-file <num>\tmap N frames to memory\n");
 
 	fprintf(stderr,"  -z/--zoom [1-11]\n");
-	fprintf(stderr,"  -w/--zoomwidth \n");
-	fprintf(stderr,"  -h/--zoomheight \n");
 	fprintf(stderr,"\t\t\t\tsoftware scaler type (also use -W, -H ). \n");
 	fprintf(stderr,"\t\t\t\tAvailable types are:\n");         
 	fprintf(stderr,"\t\t\t\t1\tFast bilinear (default)\n");
@@ -196,7 +191,6 @@ static void Usage(char *progname)
 	fprintf(stderr,"\t\t\t\t9\tsincR\n");
 	fprintf(stderr,"\t\t\t\t10\tLanczos\n");
 	fprintf(stderr,"\t\t\t\t11\tNatural bicubic spline\n");
-#ifdef HAVE_GETOPT_LONG
 	fprintf(stderr,"\n\t\t\t\tsoftware scaler options:\n");
 	fprintf(stderr,"\t\t\t\t--lgb=<0-100>\tGaussian blur filter (luma)\n");
 	fprintf(stderr,"\t\t\t\t--cgb=<0-100>\tGuassian blur filter (chroma)\n");
@@ -204,7 +198,9 @@ static void Usage(char *progname)
 	fprintf(stderr,"\t\t\t\t--cs=<0-100>\tSharpen filter (chroma)\n");
 	fprintf(stderr,"\t\t\t\t--chs=<h>\tChroma horizontal shifting\n");
 	fprintf(stderr,"\t\t\t\t--cvs=<v>\tChroma vertical shifting\n");
-#endif
+	fprintf(stderr,"\t\t\t\t-w/--zoomwidth \n");
+	fprintf(stderr,"\t\t\t\t-h/--zoomheight \n");
+	fprintf(stderr,"\t\t\t\t-C/--zoomcrop [top:bottom:left:right] (crop source before scaling)\n");
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
     exit(1);
@@ -349,9 +345,6 @@ static int set_option(const char *name, char *value)
 	{
 		auto_loop = 1;
 	} 
-    else if (strcmp(name,"no-default-tags")==0||strcmp(name, "X")==0) {
-	default_use_tags=0;
-	}
 	else if (strcmp(name, "zoom") == 0 || strcmp(name, "z" ) == 0)
 	{
 		info->settings->zoom = atoi(optarg);
@@ -401,6 +394,18 @@ static int set_option(const char *name, char *value)
 		OUT_OF_RANGE_ERR(info->settings->sws_templ.chromaVShift );
 		info->settings->sws_templ.use_filter = 1;
 
+	}	
+	else if (strcmp(name, "C") == 0 || strcmp(name, "zoomcrop") == 0 )
+	{
+		if (sscanf(value, "%d:%d:%d:%d", &(info->settings->viewport.top),
+						 &(info->settings->viewport.bottom),
+						 &(info->settings->viewport.left),
+						 &(info->settings->viewport.right)) < 4)
+		{
+			fprintf(stderr, "Crop requires top:bottom:left:right\n");
+			exit(1);
+		}
+		info->settings->crop = 1;
 	}
 	else if (strcmp(name, "quit") == 0 || strcmp(name, "q") == 0 )
 	{
@@ -431,7 +436,6 @@ static void check_command_line_options(int argc, char *argv[])
 	{"size", 1, 0, 0},	/* -S/--size            */
 	{"graphics-driver", 1, 0, 0},
 	{"timer", 1, 0, 0},	/* timer */
-	{"no-default-tags",0,0,0},
 	{"dump-events",0,0,0},
 	{"bezerk",0,0,0},
 	{"outstream", 1, 0, 0},
@@ -461,6 +465,7 @@ static void check_command_line_options(int argc, char *argv[])
 	{"multicast-osc",1,0,0},
 	{"multicast-vims",1,0,0},
 	{"map-from-file",1,0,0},
+	{"zoomcrop",1,0,0},
 	{"lgb",1,0,0},
 	{"cgb",1,0,0},
 	{"ls",1,0,0},
@@ -481,12 +486,12 @@ static void check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:V:s:c:t:l:C:p:m:x:y:nLFPXY:ugrvdibIjf:N:H:W:R:M:V:z:qw:h:",
+			"o:G:O:a:H:V:s:c:t:l:p:m:x:y:nLFPY:ugrvdibIjf:N:H:W:R:M:V:z:qw:h:C:",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   "o:G:s:O:a:c:t:l:t:C:x:y:m:p:nLFPXY:Y:vudgibrIjf:N:H:W:R:M:V:z:qw:h:")) != EOF)
+		   "o:G:s:O:a:c:t:l:t:x:y:m:p:nLFPY:vudgibrIjf:N:H:W:R:M:V:z:qw:h:C:")) != EOF)
 #endif
     {
 	switch (n) {
@@ -512,16 +517,22 @@ static void check_command_line_options(int argc, char *argv[])
 	Usage(argv[0]);
 
     veejay_set_debug_level(info->verbose);
-    mjpeg_default_handler_verbosity( (info->verbose ? 2:0) );
 
+    if(info->video_out == 3)
+    {
+	veejay_silent();
+	mjpeg_default_handler_verbosity( 0 );	
+    }
+    else
+    {
+    	mjpeg_default_handler_verbosity( (info->verbose ? 1:0) );
+    }
     if(!info->dump)
        if(veejay_open_files(info, argv + optind, argc - optind,override_fps, force_video_file, override_pix_fmt)<=0)
        {
 	veejay_msg(VEEJAY_MSG_ERROR, "Cannot start veejay");
 	exit(1);
        }
-
-     
 }
 
 static void print_license()
@@ -564,8 +575,6 @@ int main(int argc, char **argv)
     /*EditList *editlist = info->editlist; */
 
 	fflush(stdout);
-
-
     vj_mem_init();
 
     info = veejay_malloc();
@@ -586,10 +595,7 @@ int main(int argc, char **argv)
 
     print_license();
 
-    if(info->video_out == 3)
-    {
-	veejay_silent();
-    }
+   
 
     if(info->dump)
  	{
@@ -629,7 +635,7 @@ int main(int argc, char **argv)
 		default_geometry_x,
 		default_geometry_y,
 		NULL,
-		default_use_tags)<0)
+		1)<0)
 	{	
 		veejay_msg(VEEJAY_MSG_ERROR, "Initializing veejay");
 		return 0;
