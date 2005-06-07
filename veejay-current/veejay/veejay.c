@@ -650,7 +650,7 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
-	veejay_set_frame(info, 1);
+	veejay_set_frame(info, 0);
 	veejay_set_speed(info, 1);
 	  
     while (veejay_get_state(info) != LAVPLAY_STATE_STOP) 

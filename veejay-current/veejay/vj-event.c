@@ -5759,19 +5759,35 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 
 	if( PLAIN_PLAYING(v)) 
 	{
-		if(args[0] >= 1 && args[1] <= v->edit_list->video_frames-1 && args[1] >= 1 && args[1] > args[0] && args[1] <= 
-			v->edit_list->video_frames-1) 
+		if( args[0] < 0 || args[0] >= v->edit_list->video_frames || args[1] < 0 || args[1] >= v->edit_list->video_frames)
 		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Frame number out of bounds");
+			return;
+		}
 
-			if(clip_size()>0)
-				veejay_msg(VEEJAY_MSG_WARNING, "Deleting frames from the Edit List affects your clips!");
-
-			if(veejay_edit_delete(v, 1, args[0]) && veejay_edit_delete(v, args[1], v->edit_list->video_frames-1) )
+		if( args[1] <= args[0] )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Crop: start - end (start must be smaller then end)");
+			return;
+		}
+		int s2 =0;
+		int s1 = veejay_edit_delete(v, 0, args[0]);	
+		int res = 0;
+		if(s1)
+		{
+			args[1] -= args[0]; // after deleting the first part, move arg[1]
+			s2 = veejay_edit_delete(v, args[1], v->edit_list->video_frames-1); 
+			if(s2)
 			{
-				veejay_set_frame(v,1);
-				veejay_msg(VEEJAY_MSG_INFO, "Cropped frames %d-%d", args[0],args[1]);
+				veejay_set_frame(v,0);
+				veejay_msg(VEEJAY_MSG_INFO, "Delete frames 0- %d , %d - %d", 0,args[0],args[1],
+					v->edit_list->video_frames - 1);
+				res = 1;
 			}
 		}
+		if(!res)
+			veejay_msg(VEEJAY_MSG_ERROR, "Invalid range given to crop ! %d - %d", args[0],args[1] );
+	
 	}
 }
 
