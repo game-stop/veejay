@@ -4565,32 +4565,33 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	char	config[512];
 	int 	i = 0;
 
-	args = g_new ( gchar *, 6 );
+	args = g_new ( gchar *, 4 );
 
 	args[0] = g_strdup("veejay");
 
 	sprintf(port_str, "-p%d", port);
 	if(configfile)
 		sprintf(config,   "-l%s", configfile);
-
-	args[1] = g_strdup("-v");
-	args[2] = g_strdup("-n");
-	args[3] = g_strdup(port_str);
+	args[1] = g_strdup( port_str );
+	
+//	args[1] = g_strdup("-v");
+//	args[2] = g_strdup("-n");
+//	args[3] = g_strdup(port_str);
 
 	if( config_file_status == 0 )
 	{
 		if(files == NULL || strlen(files)<= 0)
-			args[4] = g_strdup("-d");
+			args[2] = g_strdup("-d");
 		else
-			args[4] = g_strdup(files);	
+			args[2] = g_strdup(files);	
 	}
 	else
 	{
 		printf("FIXME: Cant guess port num / hostname yet !\n");
-		args[4] = g_strdup( config );
+		args[2] = g_strdup( config );
 	}
 
-	args[5] = NULL;
+	args[3] = NULL;
 
 	if( info->state == STATE_IDLE )
 	{

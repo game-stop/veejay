@@ -303,6 +303,7 @@ void	on_button_el_crop_clicked(GtkWidget *w, gpointer *user_data)
 		gchar *time1 = format_time( info->selection[0] );
 		vj_msg(VEEJAY_MSG_INFO, "Delete 00:00:00 - %s and %s - %s from EditList",
 			time1, time2, total );
+		fprintf(stderr, "Crop %d , %d ", info->selection[0], info->selection[1] );
 		g_free(time1);
 		g_free(time2);
 		g_free(total);
