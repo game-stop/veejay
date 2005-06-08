@@ -630,6 +630,14 @@ int main(int argc, char **argv)
 
 	smp_check();
 
+
+	char *mem_func = get_memcpy_descr();
+	if(mem_func)
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Using SIMD %s", mem_func);
+		free(mem_func);
+	}
+
     if(veejay_init(
 		info,
 		default_geometry_x,

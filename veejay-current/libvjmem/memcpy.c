@@ -133,9 +133,12 @@
 #include <libyuv/mmx.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
+/* definitions */
+#define BUFSIZE 1024
 
-#ifdef ARCH_X86
 
+#if defined(ARCH_X86) || defined (ARCH_X86_64)
 /* for small memory blocks (<256 bytes) this version is faster */
 #define small_memcpy(to,from,n)\
 {\
@@ -147,139 +150,56 @@ __asm__ __volatile__(\
   : "memory");\
 }
 
+static inline unsigned long long int rdtsc()
+{
+     unsigned long long int x;
+     __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
+     return x;
+}
+#else
+static inline unsigned long long int rdtsc()
+{
+     struct timeval tv;
+   
+     gettimeofday (&tv, NULL);
+     return (tv.tv_sec * 1000000 + tv.tv_usec);
+}
+#endif
+
+
+#if defined (ARCH_X86) || defined(ARCH_X86_64)
+
+#define MMX1_MIN_LEN 0x800 	/* 2K blocks */
+#define MIN_LEN 0x40  		/* 64-byte blocks */
+#define SSE_MMREG_SIZE 16
+#define MMX_MMREG_SIZE 8
+
+
 /* linux kernel __memcpy (from: /include/asm/string.h) */
 static inline void * __memcpy(void * to, const void * from, size_t n)
 {
      int d0, d1, d2;
-
-     if ( n < 256 ) { //4
+     if ( n < 4 ) { 
           small_memcpy(to,from,n);
      }
      else
           __asm__ __volatile__(
-                              "rep ; movsl\n\t"
-                              "testb $2,%b4\n\t"
-                              "je 1f\n\t"
-                              "movsw\n"
-                              "1:\ttestb $1,%b4\n\t"
-                              "je 2f\n\t"
-                              "movsb\n"
-                              "2:"
-                              : "=&c" (d0), "=&D" (d1), "=&S" (d2)
-                              :"0" (n/4), "q" (n),"1" ((long) to),"2" ((long) from)
-                              : "memory");
+            "rep ; movsl\n\t"
+            "testb $2,%b4\n\t"
+            "je 1f\n\t"
+            "movsw\n"
+            "1:\ttestb $1,%b4\n\t"
+            "je 2f\n\t"
+            "movsb\n"
+            "2:"
+            : "=&c" (d0), "=&D" (d1), "=&S" (d2)
+            :"0" (n/4), "q" (n),"1" ((long) to),"2" ((long) from)
+            : "memory");
 
      return(to);
 }
 
-
-
-/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
-#ifdef HAVE_3DNOW
-	#define	PREFETCH "prefetch"
-	#define PREFETCHW "prefetchw"
-	#define EMMS	"femms"
-#elif defined ( HAVE_ASM_MMX2 )
-	#define PREFETCH "prefetchnta"
-	#define PREFETCHW "prefetcht0"
-#else
-	#define	PREFETCH "/nop"
-	#define PREFETCHW "/nop"
-#endif
-#ifndef HAVE_3DNOW
-	#define EMMS	"emms"
-#endif
-
-
-#undef MOVNTQ
-#ifdef HAVE_ASM_MMX2
-#define MOVNTQ "movntq"
-#else
-#define MOVNTQ "movq"
-#endif
-
-#undef MIN_LEN
 #ifdef HAVE_ASM_MMX
-#define MIN_LEN 0x800  /* 2K blocks */
-#else
-#define MIN_LEN 0x40  /* 64-byte blocks */
-#endif
-
-#define SSE_MMREG_SIZE 16
-#define MMX_MMREG_SIZE 8
-
-#ifdef HAVE_ASM_MMX
-void * agp_memcpy(void *to, const void *from , size_t len) {
-	void *retval;
-	size_t i;
-	retval = to;
-       if(len >= MIN_LEN)
-	{
-	  register unsigned long int delta;
-          /* Align destinition to MMREG_SIZE -boundary */
-          delta = ((unsigned long int)to)&7;
-          if(delta)
-	  {
-	    delta=8-delta;
-	    len -= delta;
-	    small_memcpy(to, from, delta);
-	  }
-	  i = len >> 6; /* len/64 */
-	  len &= 63;
-        /*
-           This algorithm is top effective when the code consequently
-           reads and writes blocks which have size of cache line.
-           Size of cache line is processor-dependent.
-           It will, however, be a minimum of 32 bytes on any processors.
-           It would be better to have a number of instructions which
-           perform reading and writing to be multiple to a number of
-           processor's decoders, but it's not always possible.
-        */
-	for(; i>0; i--)
-	{
-		__asm__ __volatile__ (
-        	PREFETCH" 320(%0)\n"
-		"movq (%0), %%mm0\n"
-		"movq 8(%0), %%mm1\n"
-		"movq 16(%0), %%mm2\n"
-		"movq 24(%0), %%mm3\n"
-		"movq 32(%0), %%mm4\n"
-		"movq 40(%0), %%mm5\n"
-		"movq 48(%0), %%mm6\n"
-		"movq 56(%0), %%mm7\n"
-		MOVNTQ" %%mm0, (%1)\n"
-		MOVNTQ" %%mm1, 8(%1)\n"
-		MOVNTQ" %%mm2, 16(%1)\n"
-		MOVNTQ" %%mm3, 24(%1)\n"
-		MOVNTQ" %%mm4, 32(%1)\n"
-		MOVNTQ" %%mm5, 40(%1)\n"
-		MOVNTQ" %%mm6, 48(%1)\n"
-		MOVNTQ" %%mm7, 56(%1)\n"
-		:: "r" (from), "r" (to) : "memory");
-		((const unsigned char *)from)+=64;
-		((unsigned char *)to)+=64;
-	}
-#ifdef HAVE_ASM_MMX2
-                /* since movntq is weakly-ordered, a "sfence"
-		 * is needed to become ordered again. */
-		__asm__ __volatile__ ("sfence":::"memory");
-#endif
-		/* enables to use FPU */
-		__asm__ __volatile__ (EMMS:::"memory");
-	}
-	/*
-	 *	Now do the tail of the block
-	 */
-	if(len) small_memcpy(to, from, len);
-	return retval;
-}
-
-#endif
-
-#ifdef HAVE_ASM_MMX
-#define MMX1_MIN_LEN 0x800  /* 2K blocks */
-//#define MIN_LEN 0x40  
-
 void * mmx_memset(void *what, int v, size_t len )
 {
 	uint8_t val[8];
@@ -387,17 +307,17 @@ static void * mmx2_memcpy(void * to, const void * from, size_t len)
 
      /* PREFETCH has effect even for MOVSB instruction ;) */
      __asm__ __volatile__ (
-                          "   prefetchnta (%0)\n"
-			  "   prefetchnta 32(%0)\n"
-                          "   prefetchnta 64(%0)\n"
-			  "   prefetchnta 96(%0)\n"
-                          "   prefetchnta 128(%0)\n"
-			  "   prefetchnta 160(%0)\n"
-                          "   prefetchnta 192(%0)\n"
-			  "   prefetchnta 224(%0)\n"
-                          "   prefetchnta 256(%0)\n"
-			  "   prefetchnta 288(%0)\n"
-                          : : "r" (from) );
+         "   prefetchnta (%0)\n"
+	 "   prefetchnta 32(%0)\n"
+         "   prefetchnta 64(%0)\n"
+	 "   prefetchnta 96(%0)\n"
+         "   prefetchnta 128(%0)\n"
+	 "   prefetchnta 160(%0)\n"
+         "   prefetchnta 192(%0)\n"
+	 "   prefetchnta 224(%0)\n"
+         "   prefetchnta 256(%0)\n"
+	 "   prefetchnta 288(%0)\n"
+         : : "r" (from) );
 
      if (len >= MIN_LEN) {
           register unsigned long int delta;
@@ -412,27 +332,27 @@ static void * mmx2_memcpy(void * to, const void * from, size_t len)
           len&=63;
           for (; i>0; i--) {
                __asm__ __volatile__ (
-                                    "prefetchnta 320(%0)\n"
-				    "prefetchnta 352(%0)\n"
-                                    "movq (%0), %%mm0\n"
-                                    "movq 8(%0), %%mm1\n"
-                                    "movq 16(%0), %%mm2\n"
-                                    "movq 24(%0), %%mm3\n"
-                                    "movq 32(%0), %%mm4\n"
-                                    "movq 40(%0), %%mm5\n"
-                                    "movq 48(%0), %%mm6\n"
-                                    "movq 56(%0), %%mm7\n"
-                                    "movntq %%mm0, (%1)\n"
-                                    "movntq %%mm1, 8(%1)\n"
-                                    "movntq %%mm2, 16(%1)\n"
-                                    "movntq %%mm3, 24(%1)\n"
-                                    "movntq %%mm4, 32(%1)\n"
-                                    "movntq %%mm5, 40(%1)\n"
-                                    "movntq %%mm6, 48(%1)\n"
-                                    "movntq %%mm7, 56(%1)\n"
-                                    :: "r" (from), "r" (to) : "memory");
-               ((const unsigned char *)from)+=64;
-               ((unsigned char *)to)+=64;
+            "prefetchnta 320(%0)\n"
+  	    "prefetchnta 352(%0)\n"
+            "movq (%0), %%mm0\n"
+            "movq 8(%0), %%mm1\n"
+            "movq 16(%0), %%mm2\n"
+            "movq 24(%0), %%mm3\n"
+            "movq 32(%0), %%mm4\n"
+            "movq 40(%0), %%mm5\n"
+            "movq 48(%0), %%mm6\n"
+            "movq 56(%0), %%mm7\n"
+            "movntq %%mm0, (%1)\n"
+            "movntq %%mm1, 8(%1)\n"
+            "movntq %%mm2, 16(%1)\n"
+            "movntq %%mm3, 24(%1)\n"
+            "movntq %%mm4, 32(%1)\n"
+            "movntq %%mm5, 40(%1)\n"
+            "movntq %%mm6, 48(%1)\n"
+            "movntq %%mm7, 56(%1)\n"
+            :: "r" (from), "r" (to) : "memory");
+            ((const unsigned char *)from)+=64;
+            ((unsigned char *)to)+=64;
           }
           /* since movntq is weakly-ordered, a "sfence"
           * is needed to become ordered again. */
@@ -448,31 +368,27 @@ static void * mmx2_memcpy(void * to, const void * from, size_t len)
 
 #endif
 
+#ifdef HAVE_ASM_SSE
 /* SSE note: i tried to move 128 bytes a time instead of 64 but it
 didn't make any measureable difference. i'm using 64 for the sake of
 simplicity. [MF]*/ 
-
-
-#ifdef HAVE_ASM_SSE
-
 static void * sse_memcpy(void * to, const void * from, size_t len)
 {
      void *retval;
      size_t i;
      retval = to;
-   //  if(len <= 0) return retval;
 
      __asm__ __volatile__ (
-                          "   prefetchnta (%0)\n"
-			  "   prefetchnta 32(%0)\n"
-                          "   prefetchnta 64(%0)\n"
-                          "   prefetchnta 128(%0)\n"
-			  "   prefetchnta 160(%0)\n"
-                          "   prefetchnta 192(%0)\n"
-			  "   prefetchnta 224(%0)\n"
-                          "   prefetchnta 256(%0)\n"
-			  "   prefetchnta 288(%0)\n"
-                          : : "r" (from) );
+          "   prefetchnta (%0)\n"
+	  "   prefetchnta 32(%0)\n"
+          "   prefetchnta 64(%0)\n"
+          "   prefetchnta 128(%0)\n"
+	  "   prefetchnta 160(%0)\n"
+          "   prefetchnta 192(%0)\n"
+	  "   prefetchnta 224(%0)\n"
+          "   prefetchnta 256(%0)\n"
+	  "   prefetchnta 288(%0)\n"
+          : : "r" (from) );
 
      if (len >= MIN_LEN) {
           register unsigned long int delta;
@@ -489,17 +405,17 @@ static void * sse_memcpy(void * to, const void * from, size_t len)
                // if SRC is misaligned 
                for (; i>0; i--) {
                     __asm__ __volatile__ (
-                                         "prefetchnta 320(%0)\n"
-					 "prefetchnta 352(%0)\n"
-                                         "movups (%0), %%xmm0\n"
-                                         "movups 16(%0), %%xmm1\n"
-                                         "movups 32(%0), %%xmm2\n"
-                                         "movups 48(%0), %%xmm3\n"
-                                         "movntps %%xmm0, (%1)\n"
-                                         "movntps %%xmm1, 16(%1)\n"
-                                         "movntps %%xmm2, 32(%1)\n"
-                                         "movntps %%xmm3, 48(%1)\n"
-                                         :: "r" (from), "r" (to) : "memory");
+			"prefetchnta 320(%0)\n"
+			"prefetchnta 352(%0)\n"
+                        "movups (%0), %%xmm0\n"
+                        "movups 16(%0), %%xmm1\n"
+                        "movups 32(%0), %%xmm2\n"
+                        "movups 48(%0), %%xmm3\n"
+                        "movntps %%xmm0, (%1)\n"
+                        "movntps %%xmm1, 16(%1)\n"
+                        "movntps %%xmm2, 32(%1)\n"
+                        "movntps %%xmm3, 48(%1)\n"
+                     :: "r" (from), "r" (to) : "memory");
                     ((const unsigned char *)from)+=64;
                     ((unsigned char *)to)+=64;
                }
@@ -512,17 +428,17 @@ static void * sse_memcpy(void * to, const void * from, size_t len)
                
                for (; i>0; i--) {
                     __asm__ __volatile__ (
-                                         "prefetchnta 320(%0)\n"
-					 "prefetchnta 352(%0)\n"
-                                         "movaps (%0), %%xmm0\n"
-                                         "movaps 16(%0), %%xmm1\n"
-                                         "movaps 32(%0), %%xmm2\n"
-                                         "movaps 48(%0), %%xmm3\n"
-                                         "movntps %%xmm0, (%1)\n"
-                                         "movntps %%xmm1, 16(%1)\n"
-                                         "movntps %%xmm2, 32(%1)\n"
-                                         "movntps %%xmm3, 48(%1)\n"
-                                         :: "r" (from), "r" (to) : "memory");
+                     "prefetchnta 320(%0)\n"
+		     "prefetchnta 352(%0)\n"
+                     "movaps (%0), %%xmm0\n"
+                     "movaps 16(%0), %%xmm1\n"
+                     "movaps 32(%0), %%xmm2\n"
+                     "movaps 48(%0), %%xmm3\n"
+                     "movntps %%xmm0, (%1)\n"
+                     "movntps %%xmm1, 16(%1)\n"
+                     "movntps %%xmm2, 32(%1)\n"
+                     "movntps %%xmm3, 48(%1)\n"
+                     :: "r" (from), "r" (to) : "memory");
                     ((const unsigned char *)from)+=64;
                     ((unsigned char *)to)+=64;
                }
@@ -559,20 +475,15 @@ static struct {
      { "glibc memcpy()",            memcpy, 0},
 #ifdef ARCH_X86
      { "linux kernel memcpy()",     linux_kernel_memcpy, 0},
-
 #ifdef HAVE_ASM_MMX
-     { "agp optimized memcpy()",    agp_memcpy,0},
      { "MMX optimized memcpy()",    mmx_memcpy, 0},
 #endif
-
 #ifdef HAVE_ASM_MMX2
      { "MMXEXT optimized memcpy()", mmx2_memcpy, 0},
 #endif
-
 #ifdef HAVE_ASM_SSE
      { "SSE optimized memcpy()",    sse_memcpy, 0},
 #endif 
-
 #endif
     { NULL, NULL, 0},
 };
@@ -585,35 +496,30 @@ static struct {
 {
      { NULL, NULL, 0},
      { "glibc memset()",            memset, 0},
-//#ifdef HAVE_ASM_MMX
-  //   { "MMX optimized memset()",    mmx_memset, 0},
-//#endif
      { NULL, NULL, 0},
 };
 
-#ifdef ARCH_X86
-static inline unsigned long long int rdtsc()
-{
-     unsigned long long int x;
-     __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
-     return x;
-}
-#else
-static inline unsigned long long int rdtsc()
-{
-     struct timeval tv;
-   
-     gettimeofday (&tv, NULL);
-     return (tv.tv_sec * 1000000 + tv.tv_usec);
-}
-#endif
+
 
 
 void *(* veejay_memcpy)(void *to, const void *from, size_t len) = 0;
 
 void *(* veejay_memset)(void *what, uint8_t val, size_t len ) = 0;
 
-#define BUFSIZE 1024
+char *get_memcpy_descr( void )
+{
+	int i = 1;
+	int best = 1;
+	unsigned long long t=0;
+	for (i=1; memcpy_method[i].name; i++)
+	{
+		if( memcpy_method[i].time <= memcpy_method[best].time )
+			best = i;	
+     	}
+	char *res = strdup( memcpy_method[best].name );
+	return res;
+}
+
 
 void find_best_memcpy()
 {
@@ -624,7 +530,7 @@ void find_best_memcpy()
      int i, j, best = 0;
 
 	veejay_memcpy = memcpy;
-	veejay_memset =memset;
+	veejay_memset = memset;
 	return;
 
      if (!(buf1 = (char*) malloc( BUFSIZE * 2000 * sizeof(char) )))
@@ -655,7 +561,6 @@ void find_best_memcpy()
 
      if (best) {
           veejay_memcpy = memcpy_method[best].function;
-	veejay_msg(VEEJAY_MSG_INFO, "Using %s", memcpy_method[best].name );
      }
 
 	best = 0;

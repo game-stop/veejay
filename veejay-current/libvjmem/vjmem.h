@@ -15,6 +15,8 @@ extern void mymemset_generic(void *s, char c, size_t count);
 
 extern void vj_mem_init(void);
 
+extern char *get_memcpy_descr( void );
+
 extern void *vj_malloc(unsigned int size);
 
 #endif
