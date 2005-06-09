@@ -149,9 +149,9 @@ static inline pixel_t evaluate_pixel_bc(
 	}
 	else
 	{
-		val.y = y_map[ y * w + x];
-		val.u = cb_map[ y * w + x];
-		val.v = cr_map[ y * w + x];
+		val.y = image[ y * w + x];
+		val.u = image_cb[ y * w + x];
+		val.v = image_cr[ y * w + x];
 	}
 	return val;	
 
