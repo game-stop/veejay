@@ -190,6 +190,11 @@ struct mjpeg_params
 #ifdef HAVE_DIRECTFB
 #include <veejay/vj-dfb.h>
 #endif
+
+#ifdef HAVE_V4L
+#include <libstream/vj-vloopback.h>
+#endif
+
 /* On some systems MAP_FAILED seems to be missing */
 #ifndef MAP_FAILED
 #define MAP_FAILED ( (caddr_t) -1 )
@@ -964,8 +969,16 @@ static int veejay_screen_update(veejay_t * info )
 	    info->stream_enabled = 0;
 	}
     }
-
-
+#ifdef HAVE_V4L
+	if( info->vloopback )
+	{
+		// push buffer
+		vj_vloopback_fill_buffer( info->vloopback , frame );		
+		// if piping 
+		if( vj_vloopback_get_mode( info->vloopback ))
+			vj_vloopback_write_pipe( info->vloopback );
+	}
+#endif
 
 	//vj_perform_get_p_data( info->plugin_frame );
 	vj_perform_update_plugin_frame( info->plugin_frame );

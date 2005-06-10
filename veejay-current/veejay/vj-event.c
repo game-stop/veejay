@@ -40,6 +40,9 @@
 #include <veejay/vims.h>
 #include <veejay/vj-event.h>
 #include <libstream/vj-tag.h>
+#ifdef HAVE_V4L
+#include <libstream/vj-vloopback.h>
+#endif
 #include <veejay/vj-plugin.h>
 
 /* Highest possible SDL Key identifier */
@@ -539,6 +542,10 @@ static struct {
 		vj_event_v4l_set_white,		2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS },
 	{ VIMS_STREAM_GET_V4L,			"Video4Linux: get properties",
 		vj_event_v4l_get_info,		2,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS },
+	{ VIMS_VLOOPBACK_START,			"Vloopback: start pipe (device num)",
+		vj_event_vloopback_start,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS },
+	{ VIMS_VLOOPBACK_STOP,			"Vloopback: stop",
+		vj_event_vloopback_stop,	0,	NULL,		{0,0}, VIMS_ALLOW_ANY }, 
 #endif
 	{ VIMS_EFFECT_SET_BG,			"Effect: set background (if supported)",
 		vj_event_effect_set_bg,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY },
@@ -7763,5 +7770,71 @@ void		vj_event_quick_bundle( void *ptr, const char format[], va_list ap)
 {
 	vj_event_commit_bundle( (veejay_t*) ptr,0,0);
 }
+
+
+#ifdef HAVE_V4L
+void	vj_event_vloopback_start(void *ptr, const char format[], va_list ap)
+{
+	int args[2];
+	char *s = NULL;
+	char device_name[100];
+
+	P_A(args,s,format,ap);
+	
+	veejay_t *v = (veejay_t*)ptr;
+
+	sprintf(device_name, "/dev/video%d", args[0] );
+
+	veejay_msg(VEEJAY_MSG_INFO, "Open vloopback %s", device_name );
+
+	v->vloopback = vj_vloopback_open( device_name, 	
+			(v->edit_list->video_norm == 'p' ? 1 : 0),
+			 1, // pipe, 0 = mmap 
+			 v->video_output_width,
+			 v->video_output_height,
+			 v->pixel_format );
+	if(v->vloopback == NULL)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,
+			"Cannot open vloopback %s", device_name );
+
+		return;
+	}
+
+	int ret = 0;
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Vloopback pipe");
+	ret = vj_vloopback_start_pipe( v->vloopback );
+	/*
+		veejay_msg(VEEJAY_MSG_DEBUG, "Vloopback mmap");
+		ret = vj_vloopback_start_mmap( v->vloopback );
+	*/
+
+	if(ret)
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG,
+			"Setup vloopback!");
+	}
+
+	if(!ret)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,
+			"closing vloopback");
+		if(v->vloopback)
+			vj_vloopback_close( v->vloopback );
+		v->vloopback = NULL;
+	}	
+
+	if( v->vloopback == NULL )
+		veejay_msg(VEEJAY_MSG_ERROR, "Failed to setup vloopback pusher"); 
+
+}
+
+void	vj_event_vloopback_stop( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	vj_vloopback_close( v->vloopback );
+}
+#endif
 
 #endif

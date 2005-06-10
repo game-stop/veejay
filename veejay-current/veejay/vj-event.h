@@ -222,6 +222,9 @@ void	vj_event_send_bundles	(void *ptr, const char format[], va_list ap);
 void	vj_event_mcast_start(	void *ptr,	const char format[], va_list ap);
 
 void	vj_event_mcast_stop( void *ptr,		const char format[], va_list ap);
-
+#ifdef HAVE_V4L
+void	vj_event_vloopback_start		(	void *ptr,	const char format[], 	va_list ap	);
+void	vj_event_vloopback_stop			(	void *ptr,	const char format[],	va_list ap	);
+#endif
 void	vj_event_quick_bundle  (void *ptr, const char format[], va_list ap);
 #endif

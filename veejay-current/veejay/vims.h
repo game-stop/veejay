@@ -201,7 +201,10 @@ enum {
 	VIMS_OUTPUT_Y4M_STOP			=	41,
 	VIMS_GET_FRAME				=	42,
 
-
+#ifdef HAVE_V4L
+	VIMS_VLOOPBACK_START			=	45,
+	VIMS_VLOOPBACK_STOP			=	46,
+#endif
 
 };
 #endif
