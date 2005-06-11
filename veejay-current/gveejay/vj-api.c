@@ -1273,7 +1273,6 @@ static  void	vj_msg(int type, const char format[], ...)
         text[strlen(text)-1] = '\0';
         put_text( "lastmessage", text );
 
-	fprintf(stderr, "%s", buf);
 	g_free( text );
 	va_end(args);
 }
@@ -1390,19 +1389,35 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 {
 	gchar tmp[slen+1];
 	bzero(tmp,slen+1);
+
 	int ret = vj_client_read( info->client, V_CMD, tmp, slen );
 	int len = atoi(tmp);
 	gchar *result = NULL;
 	int n = 0;
-
 	if(len > 0)
 	{
 		result = g_new( gchar, len+1 );
 		n = vj_client_read( info->client, V_CMD, result, len );
 		*bytes_written = n;
 		result[len] = '\0';
-		vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, result );
-		return result;
+	}	
+	return result;
+}
+static gchar	*recv_log_vims(int slen, int *bytes_written)
+{
+	gchar tmp[slen+1];
+	bzero(tmp,slen+1);
+
+	int ret = vj_client_read( info->client, V_MSG, tmp, slen );
+	int len = atoi(tmp);
+	gchar *result = NULL;
+	int n = 0;
+	if(len > 0)
+	{
+		result = g_new( gchar, len+1 );
+		n = vj_client_read( info->client, V_MSG, result, len );
+		*bytes_written = n;
+		result[len] = '\0';
 	}	
 	return result;
 }
@@ -4271,6 +4286,9 @@ static	gboolean	update_cpumeter_timeout( gpointer data )
 	gdouble invert = 0.0;
 
 	invert = 1.0 - (frac * (ms > max ? max : ms));
+	if(invert < 0.0)
+		invert = 0.0;
+	
 
 	if(ms > max)
 	{
@@ -4371,7 +4389,7 @@ static gboolean	update_progress_timeout(gpointer data)
 static	void	init_progress()
 {
 	//GtkWidget *w = glade_xml_get_widget_( info->main_window, "connecting");
-	info->connecting = g_timeout_add( 100 , update_progress_timeout, (gpointer*) info );
+	info->connecting = g_timeout_add( 300 , update_progress_timeout, (gpointer*) info );
 
 }
 
@@ -4379,18 +4397,18 @@ static	void	init_recorder(int total_frames, gint mode)
 {
 	if(mode == MODE_STREAM)
 	{
-		info->streamrecording = g_timeout_add(100, update_stream_record_timeout, (gpointer*) info );
+		info->streamrecording = g_timeout_add(300, update_stream_record_timeout, (gpointer*) info );
 	}
 	if(mode == MODE_SAMPLE)
 	{
-		info->samplerecording = g_timeout_add(100, update_sample_record_timeout, (gpointer*) info );
+		info->samplerecording = g_timeout_add(300, update_sample_record_timeout, (gpointer*) info );
 	}
 	info->uc.recording[mode] = 1;
 }
 
 static	void	init_cpumeter()
 {
-	info->cpumeter = g_timeout_add(100,update_cpumeter_timeout,
+	info->cpumeter = g_timeout_add(300,update_cpumeter_timeout,
 			(gpointer*) info );
 }
 
@@ -4454,31 +4472,40 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 {
 	vj_gui_t *gui = (vj_gui_t*) data;
 
-	if( (condition&G_IO_ERR) ) return FALSE; 
-	if( (condition&G_IO_HUP) ) return FALSE; 
-	if( (condition&G_IO_NVAL) ) return FALSE; 
+	if( (condition&G_IO_ERR) ) {
+		return FALSE; }
+	if( (condition&G_IO_HUP) ) {
+		return FALSE; }
+	if( (condition&G_IO_NVAL) ) {
+		return FALSE; 
+	}
 
 	if(gui->state==STATE_PLAYING && (condition & G_IO_IN) )
 	{	//vj_client_poll( gui->client, V_STATUS ))
 		int nb = 0;
+		char sta_len[6];
+		bzero(sta_len,6);
+		nb = vj_client_read( gui->client, V_STATUS, sta_len, 5 );
 
+		if(sta_len[0] != 'V' )
+		{
+			return FALSE;
+		}
+		int n_bytes = 0;
+		sscanf( sta_len+1, "%03d", &n_bytes );
+		if( n_bytes == 0 || n_bytes >= STATUS_BYTES )
+		{
+			return FALSE;
+		}
 		bzero( gui->status_msg, STATUS_BYTES ); 
 
+		nb = vj_client_read( gui->client, V_STATUS, gui->status_msg, n_bytes );
+
+
 		gui->status_lock = 1;
-		nb = vj_client_read( gui->client, V_STATUS, gui->status_msg, STATUS_BYTES );
 		if(nb > 0)
 		{
-			// is a status message ? 
-			if(gui->status_msg[4] != 'S')
-			{
-				while(vj_client_poll(gui->client,V_STATUS))
-				{
-					vj_client_read(gui->client,V_STATUS,gui->status_msg,STATUS_BYTES);
-				}
-				return TRUE;
-			}
-			// parse
-			int n = sscanf( gui->status_msg+5, "%d %d %d %d %d %d %d %d %d %d %d %d %d",
+			int n = sscanf( gui->status_msg, "%d %d %d %d %d %d %d %d %d %d %d %d %d",
 				gui->status_tokens + 0,
 				gui->status_tokens + 1,
 				gui->status_tokens + 2,
@@ -4511,6 +4538,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 			return FALSE;
 		}
 	}
+ 
 	return TRUE;
 }
 
@@ -4553,7 +4581,6 @@ void	vj_gui_stop_launch()
 	}
 }
 
-
 void	vj_fork_or_connect_veejay(char *configfile)
 {
 	char	*remote = get_text( "entry_hostname" );
@@ -4565,18 +4592,17 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	char	config[512];
 	int 	i = 0;
 
-	args = g_new ( gchar *, 4 );
+	int arglen = vims_verbosity ? 5 :4 ;
+
+	args = g_new ( gchar *, arglen );
 
 	args[0] = g_strdup("veejay");
 
 	sprintf(port_str, "-p%d", port);
+	args[1] = g_strdup( port_str );
+
 	if(configfile)
 		sprintf(config,   "-l%s", configfile);
-	args[1] = g_strdup( port_str );
-	
-//	args[1] = g_strdup("-v");
-//	args[2] = g_strdup("-n");
-//	args[3] = g_strdup(port_str);
 
 	if( config_file_status == 0 )
 	{
@@ -4591,7 +4617,10 @@ void	vj_fork_or_connect_veejay(char *configfile)
 		args[2] = g_strdup( config );
 	}
 
-	args[3] = NULL;
+	if(vims_verbosity)
+		args[3] = g_strdup("-v");
+	else
+		args[3] = NULL;
 
 	if( info->state == STATE_IDLE )
 	{
@@ -4846,7 +4875,7 @@ static	gboolean	update_log(gpointer data)
 		return TRUE;
 	gint len = 0;		
 	single_vims( VIMS_LOG );
-	gchar *buf = recv_vims(6, &len );
+	gchar *buf = recv_log_vims(6, &len );
 
 	if(len > 0 )
 	{	
@@ -4917,13 +4946,15 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	g_io_add_watch_full(
 			info->channel,
-			G_PRIORITY_DEFAULT,
+			G_PRIORITY_HIGH,
 			G_IO_IN| G_IO_ERR | G_IO_NVAL | G_IO_HUP,
 			veejay_tick,
 			(gpointer*) info,
 			veejay_untick
 		);
-	info->logging = g_timeout_add( 100, update_log,(gpointer*) info );
+
+
+	info->logging = g_timeout_add( 400, update_log,(gpointer*) info );
 
 	
 	// we can set the expanded of the ABC expander

@@ -1170,10 +1170,13 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     d_len = strlen(info->status_what);
     snprintf(info->status_msg,MESSAGE_SIZE, "V%03dS%s", d_len, info->status_what);
     res = vj_server_send(info->vjs[1],link_id, info->status_msg, strlen(info->status_msg));
-    if( res <= 0) { /* close command socket */
+
+   if( res <= 0) { /* close command socket */
 		_vj_server_del_client(info->vjs[1], link_id );
 		_vj_server_del_client(info->vjs[0], link_id );
+		_vj_server_del_client(info->vjs[3], link_id );
 	}
+
     if (info->uc->chain_changed == 1)
 		info->uc->chain_changed = 0;
     if (info->uc->render_changed == 1)
@@ -2183,7 +2186,7 @@ static void *veejay_playback_thread(void *data)
 
     veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
     if(info->uc->is_server) {
-	for(i = 0; i < 3; i ++ )
+	for(i = 0; i < 4; i ++ )
 	  if(info->vjs[i]) vj_server_shutdown(info->vjs[i]); 
     }
     if(info->osc) vj_osc_free(info->osc);
@@ -2249,6 +2252,10 @@ int vj_server_setup(veejay_t * info)
 
 	info->vjs[1] = vj_server_alloc(info->uc->port, NULL, V_STATUS);
 	if(!info->vjs[1])
+		return 0;
+
+	info->vjs[3] = vj_server_alloc(info->uc->port, NULL, V_MSG );
+	if(!info->vjs[3])
 		return 0;
 
 	info->vjs[2] = NULL;

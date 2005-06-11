@@ -260,7 +260,7 @@ typedef struct {
     int last_tag_id;
     int nstreams;
     int sfd;
-    vj_server *vjs[3]; /* 0=cmd, 1 = sta, 2 = mcast */
+    vj_server *vjs[4]; /* 0=cmd, 1 = sta, 2 = mcast, 3 = msg */
     int net;
     int render_entry;
     int render_continue;

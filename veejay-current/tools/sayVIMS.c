@@ -231,9 +231,13 @@ int main(int argc, char *argv[])
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot connect to %s", host_name);
 		exit(1);
 	}
-			
+	veejay_msg(VEEJAY_MSG_INFO,
+		"Connected to %s", host_name );			
 	if(interactive)
+	{
 		fcntl( 0, F_SETFL, O_NONBLOCK);
+		veejay_msg(VEEJAY_MSG_INFO, "Interactive mode");
+	}
 
 	while(interactive==1)
 	{
@@ -252,7 +256,7 @@ int main(int argc, char *argv[])
 	if ( interactive )
 		return 0;
 
-	if(single_msg || optind == 1)
+	if(single_msg || (optind == 1 && err == 0 && argc > 1 )) 
 	{
 		char **msg = argv + optind;
 		int  nmsg  = argc - optind;
@@ -286,17 +290,13 @@ int main(int argc, char *argv[])
 	}
 	else
 	{
-	veejay_msg(VEEJAY_MSG_INFO, "sayVIMS read from STDIN");
 	/* read from stdin*/
 	int not_done = 1;
-
 	infile = fdopen( fd_in, "r" );
 	if(!infile)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cant read from stdin");
 		return 0;
 	}
-
 	while( fgets(buf, 4096, infile) )
 	{
 		if( buf[0] == '+' )
@@ -311,11 +311,9 @@ int main(int argc, char *argv[])
 		}
 		else
 		{
-			buf[strlen(buf)-1] = '\0';
 			vj_client_send( sayvims, V_CMD, buf );
 		}
 	}
 	}
-
         return 0;
 } 

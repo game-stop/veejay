@@ -241,3 +241,15 @@ void veejay_strrep(char *s, char delim, char tok)
   }
 }
 
+void	veejay_chomp_str( char *msg, int *nlen )
+{
+	int len = strlen( msg ) - 1;
+	if(len > 0 )
+	{
+		if( msg[len] == '\n' )
+		{
+			msg[len] = '\0';
+			*nlen = len;
+		}
+	}
+}

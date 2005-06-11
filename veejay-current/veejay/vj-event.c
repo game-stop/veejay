@@ -594,6 +594,11 @@ vj_server_send(v->vjs[0], v->uc->current_link, str, strlen(str));\
 vj_server_send(v->vjs[0],v->uc->current_link, str, len );\
 }	
 
+#define SEND_LOG_MSG(v,str)\
+{\
+vj_server_send(v->vjs[3], v->uc->current_link,str,strlen(str));\
+}
+
 /* some macros for commonly used checks */
 
 #define CLIP_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_CLIP) )
@@ -1232,11 +1237,15 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 	char args[150];
 	int net_id=0;
 	
-	
-	char *tmp = NULL;
 	int msg_len = strlen(msg);
+	char *tmp = NULL;
 	int id = 0;
 	bzero(args,150);  
+
+	/* remove newline */
+	veejay_chomp_str( msg, &msg_len );
+	msg_len --;
+
 	/* message is at least 5 bytes in length */
 	if( msg == NULL || msg_len < MSG_MIN_LEN)
 	{
@@ -1245,18 +1254,6 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 		return 0;
 	}
 
-	/* Sometimes, messages can have a trailing sequence of characters (like newline or spaces)*/
-	while( msg[msg_len] != ';' )
-	{
-		msg[msg_len] = '\0';
-		msg_len --;
-		if(msg_len < MSG_MIN_LEN)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Syntax error: Message does not end with ';'");
-			return 0;
-		}	
-	}
-//	veejay_msg(VEEJAY_MSG_DEBUG, "Remaining: [%s]", msg );
 	tmp = strndup( msg, 3 );
 	if( strncasecmp( tmp, "bun", 3) == 0 )
 	{
@@ -1281,12 +1278,12 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 	if( msg[3] != 0x3a || msg[msg_len] != ';' )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Syntax error, use \"<VIMS selector>:<arguments>;\" ");
-		veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) [%s] : '%c' , '%c' ", msg,
-			msg[3], msg[msg_len] );
+		veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) [%s] : '%c' (%x) , '%c' (%x)", msg,
+			msg[3],msg[3], msg[msg_len],msg[msg_len] );
 		return 0;
 	}
 
-	msg[msg_len] = '\0'; // null terminate (uses semicolon position)
+	//msg[msg_len] = '\0'; // null terminate (uses semicolon position)
 
 	if( net_list[ net_id ].list_id == 0 )
 	{
@@ -1514,9 +1511,12 @@ void vj_event_update_remote(void *ptr)
 	int sta_poll = 0;	// status port
 	int new_link = -1;
 	int sta_link = -1;
+	int msg_link = -1;
+	int msg_poll = 0;
 	int i;
 	cmd_poll = vj_server_poll(v->vjs[0]);
 	sta_poll = vj_server_poll(v->vjs[1]);
+	msg_poll = vj_server_poll(v->vjs[3]);
 	// accept connection command socket    
 
 	if( cmd_poll > 0)
@@ -1527,6 +1527,10 @@ void vj_event_update_remote(void *ptr)
 	if( sta_poll > 0) 
 	{
 		sta_link = vj_server_new_connection ( v->vjs[1] );
+	}
+	if( msg_poll > 0)
+	{
+		msg_link = vj_server_new_connection( v->vjs[3] );
 	}
 	// see if there is any link interested in status information
 	for( i = 0; i < v->vjs[1]->nr_of_links; i ++ )
@@ -1568,6 +1572,7 @@ void vj_event_update_remote(void *ptr)
 		{
 			_vj_server_del_client( v->vjs[0], i );
 			_vj_server_del_client( v->vjs[1], i );
+			_vj_server_del_client( v->vjs[3], i );
 		}
 	}
 
@@ -6699,25 +6704,18 @@ void	vj_event_plugin_command(void *ptr,	const char	format[],	va_list ap)
 {
 	int args[2];
 	char str[1024];
-	char *plugin_name;
-	char *p = &str[0];
-	char *d = &plugin_name[0];
-	int oops = 19;
+	const char delimiters[] = ":";
+	bzero(str,1024);
 	P_A(args,str,format,ap);
-	bzero(plugin_name,0);
-	while ( *(p) != ':' && *(p) != '\0' && *(p) != ';' && oops != 0)
-	{
-		*(d++) = *(p++);
-		oops--;
-	}
-	if(oops==0)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Plugin name too long");
-		return;
-	}
-	*(d++) = '\0';
-	*(p++);
-	plugins_event( plugin_name, p ); 
+
+	char *plugargs = strdup( strstr( str, ":" ) );
+	char *plugname = strtok( str, delimiters );
+
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"Plugin '%s' : '%s' ", plugname, plugargs );
+
+	if( plugargs != NULL && plugname == NULL )
+		plugins_event( plugname, plugargs+1 ); 
 }
 
 void	vj_event_unload_plugin(void *ptr, const char format[], va_list ap) 
@@ -7160,7 +7158,8 @@ void	vj_event_send_log			(	void *ptr,	const char format[],	va_list ap 	)
 		sprintf(_s_print_buf, "%06d%s", str_len, messages );
 	if(messages)
 		free(messages);	
-	SEND_MSG( v, _s_print_buf );
+
+	SEND_LOG_MSG( v, _s_print_buf );
 }
 
 void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)

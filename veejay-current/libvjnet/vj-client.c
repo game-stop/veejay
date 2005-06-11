@@ -54,9 +54,10 @@ vj_client *vj_client_alloc( int w, int h, int f )
 	v->cur_width = w;
 	v->cur_height = h;
 	v->cur_fmt = f;
-	v->c = (conn_type_t**) malloc(sizeof(conn_type_t*) * 2);
+	v->c = (conn_type_t**) malloc(sizeof(conn_type_t*) * 3);
 	v->c[0] = (conn_type_t*) malloc(sizeof(conn_type_t));
 	v->c[1] = (conn_type_t*) malloc(sizeof(conn_type_t));
+	v->c[2] = (conn_type_t*) malloc(sizeof(conn_type_t));
 	v->blob = (unsigned char*) malloc(sizeof(unsigned char) * PACKET_LEN ); 
 	v->mcast = 0;
 	if(!v->blob)
@@ -73,6 +74,8 @@ void		vj_client_free(vj_client *v)
 			free(v->c[0]);
 		if(v->c[1])
 			free(v->c[1]);
+		if(v->c[2])
+			free(v->c[2]);
 		if(v->c) 
 			free(v->c);
 		if(v->blob)
@@ -111,15 +114,19 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 		v->c[0]->fd   = alloc_sock_t();
 		v->c[1]->type = VSOCK_S;
 		v->c[1]->fd   = alloc_sock_t();
-		if(!v->c[0]->fd || !v->c[1]->fd)
+		v->c[2]->type = VSOCK_C;
+		v->c[2]->fd   = alloc_sock_t();
+
+		if(!v->c[0]->fd || !v->c[1]->fd || !v->c[2] )
 		{
 			return 0;
 		}
 		if( sock_t_connect( v->c[0]->fd, host, port_id + VJ_CMD_PORT ) )
 		{
 			if( sock_t_connect( v->c[1]->fd, host, port_id + VJ_STA_PORT ) )
-			{			
-				return 1;
+			{		
+				if( sock_t_connect( v->c[2]->fd, host, port_id + VJ_MSG_PORT ) )	
+					return 1;
 			}
 		}
 	}
@@ -161,6 +168,12 @@ int	vj_client_poll( vj_client *v, int sock_type )
 		if(v->c[0]->type == VMCAST_C )
 			return  ( mcast_poll( v->c[0]->r ));
 	}
+	if(sock_type == V_MSG )
+	{
+		if(v->c[2]->type == VSOCK_C)
+			return	( sock_t_poll( v->c[2]->fd ));
+	}
+
 	return 0;
 }
 
@@ -220,6 +233,11 @@ int	vj_client_get_status_fd(vj_client *v, int sock_type )
 		else
 			return  v->c[0]->r->sock_fd;
 	}
+	if(sock_type == V_MSG )
+	{
+		return  v->c[2]->fd->sock_fd;
+	}
+
 	return 0;	
 }
 
@@ -234,6 +252,11 @@ int	vj_client_read(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 	{
 		if(v->c[0]->type == VSOCK_C)
 			return ( sock_t_recv( v->c[0]->fd, dst, bytes ) );
+	}
+	if( sock_type == V_MSG )
+	{
+		if(v->c[2]->type == VSOCK_C)
+			return ( sock_t_recv( v->c[2]->fd, dst, bytes ) );
 	}
 	return 0;
 }
@@ -252,6 +275,16 @@ int vj_client_send(vj_client *v, int sock_type,char *buf )
 			return ( mcast_send( v->c[0]->s, (void*) v->blob, len + 5,
 					v->ports[1] ));
 	}
+	if( sock_type == V_MSG )
+	{
+
+		// format msg
+		int len = strlen( buf );
+		sprintf(v->blob, "V%03dD%s", len, buf);
+		if(v->c[2]->type == VSOCK_C)
+			return ( sock_t_send( v->c[2]->fd, v->blob, len + 5 ));
+	}
+
    	return 1;
 }
 
@@ -264,6 +297,8 @@ int vj_client_close( vj_client *v )
 			sock_t_close(v->c[0]->fd );
 		if(v->c[1]->type == VSOCK_S)
 			sock_t_close(v->c[1]->fd );
+		if(v->c[2]->type == VSOCK_C )
+			sock_t_close(v->c[2]->fd );
 		if(v->c[0]->type == VMCAST_C)
 		{
 			mcast_close_receiver( v->c[0]->r );

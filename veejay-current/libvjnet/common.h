@@ -24,6 +24,7 @@
 #define VSOCK_C 1
 #define V_STATUS 0
 #define V_CMD 1
+#define V_MSG 2
 #define VMCAST_S 4
 #define VMCAST_C 5
 
@@ -33,6 +34,7 @@ enum
 	VJ_STA_PORT=1,
 	VJ_CMD_MCAST=3,
 	VJ_CMD_MCAST_IN=4,
+	VJ_MSG_PORT=5,
 	VJ_CMD_OSC=2,
 };
 

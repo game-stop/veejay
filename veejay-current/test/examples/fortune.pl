@@ -1,5 +1,5 @@
 
-print "310:/usr/local/lib/libvj_drawtext_plugin.so;;";
+print "310:/usr/local/lib/libvj_drawtext_plugin.so;\n";
 print "+10\n";
 for ( my $m = 0; $m < 200 ; $m ++ )
 {
