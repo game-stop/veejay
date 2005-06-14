@@ -8,9 +8,7 @@ $ veejay -d
 This should show some moving black/white footage. Most of the effects will be boring on this footage,
 so you can try to open your video4linux device with
 
-(in veejay console)
-
-> vi video0
+sayVIMS "240:0 1;" (device 0, channel 1)
 
 Or, to use mplayer, create a FIFO first:
 
@@ -20,7 +18,7 @@ Use something like 'mplayer -vo yuv4mpeg -x 352 -y 288 -vf scale -zoom'
 
 and open the stream in veejay's console:
 
-> fi stream.yuv
+sayVIMS "243:stream.yuv;"
 
 Move your mouse pointer to the SDL window (so it dissapears) and press 'ESC' to
 switch from the dummy footage to the last created or played video stream. 
@@ -98,13 +96,13 @@ Or in veejay's console
 Except all that, try this:
 
 
-sayVIMS -h localhost -p 3490 "145:;"
+sayVIMS -h localhost -p 3490 "241:63;"
 (press F7)
 
 to open your dv1394 firewire device
 
 or
-sayVIMS -h localhost -p 3490 "144:0 1;"
+sayVIMS -h localhost -p 3490 "240:0 1;"
 (press F7)
 
 to open your video4linux device /dev/video0, channel 1
