@@ -564,7 +564,7 @@ unsigned int fastrand(int val)
 pix_func_Y get_pix_func_Y(const int pix_type)
 {
     if (pix_type == 0)
-	return &bl_pix_noswap_Y;
+	return &bl_pix_swap_Y;
     if (pix_type == VJ_EFFECT_BLEND_ADDDISTORT)
 	return &bl_pix_add_distorted_Y;
     if (pix_type == VJ_EFFECT_BLEND_SUBDISTORT)
@@ -636,14 +636,14 @@ pix_func_Y get_pix_func_Y(const int pix_type)
        if(pix_type == VJ_EFFECT_BLEND_SELECTFREEZE) return &bl_pix_selfreeze_Y;
        if(pix_type == VJ_EFFECT_BLEND_SELECTUNFREEZE) return &bl_pix_selunfreeze_Y;
      */
-    return &bl_pix_swap_Y;
+    return &bl_pix_noswap_Y;
 }
 
 /* function to blend chrominance pixel */
 pix_func_C get_pix_func_C(const int pix_type)
 {
     if (pix_type == 0)
-	return &bl_pix_noswap_C;
+	return &bl_pix_swap_C;
     if (pix_type == VJ_EFFECT_BLEND_ADDDISTORT)
 	return &bl_pix_add_distorted_C;
     if (pix_type == VJ_EFFECT_BLEND_SUBDISTORT)
@@ -663,7 +663,7 @@ pix_func_C get_pix_func_C(const int pix_type)
        if(pix_type == VJ_EFFECT_BLEND_SELECTFREEZE) return &bl_pix_swap_C;
        if(pix_type == VJ_EFFECT_BLEND_SELECTUNFREEZE) return &bl_pix_swap_C;
      */
-    return &bl_pix_swap_C;
+    return &bl_pix_noswap_C;
 }
 
 
@@ -672,50 +672,25 @@ pix_func_C get_pix_func_C(const int pix_type)
 /* multiply pixel a with pixel b */
 uint8_t bl_pix_multiply_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t new_Y = (y1 * y2) >> 8;
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
-    return new_Y;
+	return ( (y1 * y2) >> 8);
 }
-
 /* divide pixel a with pixel b */
 uint8_t bl_pix_divide_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
-    a = (y1 * y2);
-    b = 256 - y2;
-    if (b < 16)
-	b = 16;
-    new_Y = a / b;
-    if (new_Y > 235)
-	new_Y = 235;
-    if (new_Y < 16)
-	new_Y = 16;
-
-    return new_Y;
+	int c = y1 * y2;
+	if( c < 16 ) return 16;
+	return ( c / (0xff-y2) );
 }
 
 uint8_t bl_pix_additive_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t new_Y = y1 + (2 * y2) - 235;
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
-    return new_Y;
+	return (y1 + ((2 * y2) - 0xff) );
 }
 
 
 uint8_t bl_pix_substract_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t new_Y = y1 + (y2 - 235);
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
-    return new_Y;
+	return ( y1 + (y2 - 0xff ) );
 }
 
 uint8_t bl_pix_softburn_Y(uint8_t y1, uint8_t y2)
@@ -723,22 +698,18 @@ uint8_t bl_pix_softburn_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    if (a + b < 235) {
-	if (a == 235) {
-	    new_Y = a;
+    if( a < 16) a = 16;
+    if( b < 16) b = 16;
+    if (a + b < 0xff) {
+	if (a > 235) {
+	    new_Y = 235;
 	} else {
-	    new_Y = (b >> 7) / (256 - a);
+	    new_Y = (b >> 7) / (0xff - a);
 	    if (new_Y > 235)
 		new_Y = 235;
 	}
     } else {
-	if (a < 16)
-	    a = 16;
-	if (b < 16)
-	    b = 16;
-	new_Y = 256 - (((256 - a) >> 7) / b);
-	if (new_Y < 16)
-	    new_Y = 16;
+	new_Y = 0xff - (((0xff - a) >> 7) / b);
     }
     return new_Y;
 }
@@ -751,9 +722,7 @@ uint8_t bl_pix_inverseburn_Y(uint8_t y1, uint8_t y2)
     if (a < 16) {
 	new_Y = 16;
     } else {
-	new_Y = 256 - (((256 - b) >> 8) / a);
-	if (new_Y < 16)
-	    new_Y = 16;
+	new_Y = 0xff - (((0xff - b) >> 8) / a);
     }
     return new_Y;
 }
@@ -761,32 +730,21 @@ uint8_t bl_pix_inverseburn_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_colordodge_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
-    a = y1;
-    b = y2;
-    if (a > 235) {
-	new_Y = 235;
-    } else {
-	new_Y = (b >> 8) / (256 - a);
-	if (new_Y > 235)
-	    new_Y = 235;
-    }
-    return new_Y;
+    if(y2 < 16) y2 = 16;
+    if(y1 > 235) y1 = 235;
+    return ((y2 >> 8) / (0xff - y1));
 }
 
 uint8_t bl_pix_mulsub_Y(uint8_t y1, uint8_t y2)
 {
     uint8_t a, b, new_Y;
     a = y1;
-    b = (256 - y2);
+    b = (0xff - y2);
+    if( a < 16 )
+        a = 16;
     if (b < 16)
 	b = 16;
-    new_Y = a / b;
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
-    return new_Y;
+    return ( a / b );
 }
 
 uint8_t bl_pix_lighten_Y(uint8_t y1, uint8_t y2)
@@ -814,23 +772,14 @@ uint8_t bl_pix_difference_Y(uint8_t y1, uint8_t y2)
 uint8_t bl_pix_diffnegate_Y(uint8_t y1, uint8_t y2)
 {
     uint8_t a, b, new_Y;
-    a = 256 - y1;
+    a = 0xff - y1;
     b = y2;
-    new_Y = 256 - abs(a - b);
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
-    return new_Y;
+    return ( 0xff - abs(a - b) );
 }
 
 uint8_t bl_pix_exclusive_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
-    a = y1;
-    b = y2;
-    new_Y = a + b - ((a * b) >> 8);
-    return new_Y;
+    return ( y1 + y2 - ((y1 * y2) >> 8) );
 }
 
 
@@ -844,11 +793,7 @@ uint8_t bl_pix_basecolor_Y(uint8_t y1, uint8_t y2)
     if (b < 16)
 	b = 16;
     c = a * b >> 7;
-    new_Y = c + a * ((256 - (((256 - a) * (256 - b)) >> 7) - c) >> 7);
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
+    new_Y = c + a * ((0xff - (((0xff - a) * (0xff - b)) >> 7) - c) >> 7);
     return new_Y;
 }
 
@@ -860,11 +805,7 @@ uint8_t bl_pix_freeze_Y(uint8_t y1, uint8_t y2)
     if (b < 16) {
 	new_Y = 16;
     } else {
-	new_Y = 256 - ((256 - a) * (256 - a)) / b;
-	if (new_Y < 16)
-	    new_Y = 16;
-	if (new_Y > 235)
-	    new_Y = 235;
+	new_Y = 0xff - ((0xff - a) * (0xff - a)) / b;
     }
     return new_Y;
 }
@@ -877,11 +818,8 @@ uint8_t bl_pix_unfreeze_Y(uint8_t y1, uint8_t y2)
     if (a < 16) {
 	new_Y = 16;
     } else {
-	new_Y = 256 - ((256 - b) * (256 - b)) / a;
-	if (new_Y > 235)
-	    new_Y = 235;
-	if (new_Y < 16)
-	    new_Y = 16;
+	if(b > 235) b = 235;
+	new_Y = 0xff - ((0xff - b) * (0xff - b)) / a;
     }
     return new_Y;
 }
@@ -894,12 +832,8 @@ uint8_t bl_pix_hardlight_Y(uint8_t y1, uint8_t y2)
     if (b < 128) {
 	new_Y = (a * b) >> 7;
     } else {
-	new_Y = 256 - ((256 - b) * (256 - a) >> 7);
+	new_Y = 0xff - ((0xff - b) * (0xff - a) >> 7);
     }
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
     return new_Y;
 }
 
@@ -911,21 +845,13 @@ uint8_t bl_pix_relativeadd_Y(uint8_t y1, uint8_t y2)
     c = a >> 1;
     d = b >> 1;
     new_Y = c + d;
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
     return new_Y;
 }
 
 uint8_t bl_pix_relativeadd_C(uint8_t y1, uint8_t y2)
 {
     uint8_t new_C;
-    new_C = (y1 - y2 + 256) >> 1;
-    if (new_C < 16)
-	new_C = 16;
-    if (new_C > 240)
-	new_C = 240;
+    new_C = (y1 - y2 + 0xff) >> 1;
     return new_C;
 }
 
@@ -934,11 +860,7 @@ uint8_t bl_pix_relativesub_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    new_Y = (a - b + 256) >> 1;
-    if (new_Y > 235)
-	new_Y = 235;
-    if (new_Y < 16)
-	new_Y = 16;
+    new_Y = (a - b + 0xff) >> 1;
     return new_Y;
 }
 
@@ -948,14 +870,10 @@ uint8_t bl_pix_maxsubsel_Y(uint8_t y1, uint8_t y2)
     a = y1;
     b = y2;
     if (b > a) {
-	new_Y = (b - a + 256) >> 1;
+	new_Y = (b - a + 0xff) >> 1;
     } else {
-	new_Y = (a - b + 256) >> 1;
+	new_Y = (a - b + 0xff) >> 1;
     }
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
     return new_Y;
 }
 
@@ -965,102 +883,44 @@ uint8_t bl_pix_minsubsel_Y(uint8_t y1, uint8_t y2)
     a = y1;
     b = y2;
     if (b < a) {
-	new_Y = (b - a + 256) >> 1;
+	new_Y = (b - a + 0xff) >> 1;
     } else {
-	new_Y = (a - b + 256) >> 1;
+	new_Y = (a - b + 0xff) >> 1;
     }
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
     return new_Y;
 }
 
 uint8_t bl_pix_addsubsel_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
-    a = y1;
-    b = y2;
-    if (b < 16)
-	b = 16;
-    else if (b > 235)
-	b = 235;
-    if (a < 16)
-	a = 16;
-    else if (a > 235)
-	a = 235;
-    if (b < a) {
-	new_Y = (a + b) >> 1;
-	return new_Y;
-    }
-    return y1;
+	return ( (y1 + y2) >> 1 );
 }
 
 uint8_t bl_pix_maxsel_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b;
-    a = y1;
-    b = y2;
-    if (b > a) {
-	return b;
-    }
-    return y1;
+	return ( (y2>y1 ? y2 : y1 ) );
 }
 
 uint8_t bl_pix_minsel_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b;
-    a = y1;
-    b = y2;
-    if (b < a) {
-	return b;
-    }
-    return y1;
+	return ( (y2 < y1  ? y2: y1 ));
 }
 
 
 uint8_t bl_pix_dblbneg_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
-    a = y1;
-    b = y2;
-    new_Y = a + (b << 1) - 256;
-    if (new_Y < 16)
-	new_Y = 16;
-    else if (new_Y > 235)
-	new_Y = 235;
-    return new_Y;
+	return ( (y1 + (y2 << 1 ) - 0xff ) );
 }
 
 uint8_t bl_pix_dblbneg_C(uint8_t y1, uint8_t y2)
 {
-    uint8_t new_C;
-    new_C = y1 + (y2 << 1) - 256;
-    if (new_C < 16)
-	new_C = 16;
-    else if (new_C > 240)
-	new_C = 240;
-    return new_C;
+	return ( (y1 + (y2 << 1 ) - 0xff ));
 }
 
 uint8_t bl_pix_muldiv_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
-
-    a = y1;
-    b = 256 - y2;
-    if (a < 16)
-	a = 16;
-    if (b < 16)
-	b = y1;
-    if (b < 16)
-	b = 16;
-    new_Y = (a * a) / b;
-    if (new_Y < 16)
-	new_Y = 16;
-    else if (new_Y > 235)
-	new_Y = 235;
-    return new_Y;
+	if( y2 > 235 ) y2 = 235;
+	if( y1 < 16 ) y1 = 16;
+	return ( (y1*y1) / (0xff - y2 ) );
 }
 
 uint8_t bl_pix_add_Y(uint8_t y1, uint8_t y2)
@@ -1070,19 +930,15 @@ uint8_t bl_pix_add_Y(uint8_t y1, uint8_t y2)
     b = y2;
     if (b < 16)
 	b = 16;
-    else if (b > 235)
-	b = 235;
     if (a < 16)
 	a = 16;
-    else if (a > 235)
-	a = 235;
-    if ((256 - b) <= 0) {
-	new_Y = (a * a) / 256;
+    if ((0xff - b) <= 0) {
+	new_Y = (a * a) >> 8;
     } else {
-	new_Y = (a * a) / (256 - b);
+	if( b > 235)
+		b= 235;
+	new_Y = (a * a) / (0xff - b);
     }
-    if (new_Y > 235)
-	new_Y = 235;
     return new_Y;
 }
 
@@ -1090,7 +946,7 @@ uint8_t bl_pix_relneg_Y(uint8_t y1, uint8_t y2)
 {
     uint8_t a, b, new_Y;
     a = y1;
-    b = 256 - y2;
+    b = 0xff - y2;
     if (a < 16)
 	a = 16;
     if (b < 16)
@@ -1098,10 +954,6 @@ uint8_t bl_pix_relneg_Y(uint8_t y1, uint8_t y2)
     if (b < 16)
 	b = 16;
     new_Y = (a * a) / b;
-    if (new_Y < 16)
-	new_Y = 16;
-    else if (new_Y > 235)
-	new_Y = 235;
     return new_Y;
 }
 
@@ -1109,7 +961,7 @@ uint8_t bl_pix_relneg_C(uint8_t y1, uint8_t y2)
 {
     uint8_t a, b, new_C;
     a = y1;
-    b = 256 - y2;
+    b = 0xff - y2;
     if (b < 16)
 	b = y2;
     if (b < 16)
@@ -1119,8 +971,6 @@ uint8_t bl_pix_relneg_C(uint8_t y1, uint8_t y2)
     new_C = (a >> 1) + (b >> 1);
     if (new_C < 16)
 	new_C = 16;
-    else if (new_C > 240)
-	new_C = 240;
     return new_C;
 }
 
@@ -1134,9 +984,7 @@ uint8_t bl_pix_selfreeze_Y(uint8_t y1, uint8_t y2)
 	if (a < 16) {
 	    new_Y = 16;
 	} else {
-	    new_Y = 256 - ((256 - b) * (256 - b)) / a;
-	    if (new_Y < 16)
-		new_Y = 16;
+	    new_Y = 0xff - ((0xff - b) * (0xff - b)) / a;
 	}
 	return new_Y;
     }
@@ -1153,7 +1001,8 @@ uint8_t bl_pix_selunfreeze_Y(uint8_t y1, uint8_t y2)
 	if (b < 16) {
 	    new_Y = 16;
 	} else {
-	    new_Y = 256 - ((256 - a) * (256 - a)) / b;
+	    if( a > 235 ) a = 235;
+	    new_Y = 0xff - ((0xff - a) * (0xff - a)) / b;
 	    if (new_Y < 16)
 		new_Y = 16;
 	}
@@ -1181,11 +1030,7 @@ uint8_t bl_pix_seldiffneg_Y(uint8_t y1, uint8_t y2)
     a = y1;
     b = y2;
     if (a > b) {
-	new_Y = 256 - abs(256 - a - b);
-	if (new_Y > 235)
-	    new_Y = 235;
-	if (new_Y < 16)
-	    new_Y = 16;
+	new_Y = 0xff - abs(0xff - a - b);
 	return new_Y;
     }
     return 0;
@@ -1193,66 +1038,32 @@ uint8_t bl_pix_seldiffneg_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_swap_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t new_Y;
-    new_Y = y2;
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
-    return new_Y;
+    return y2;
 }
 
 uint8_t bl_pix_swap_C(uint8_t y1, uint8_t y2)
 {
-    if (y2 < 16)
-	y2 = 16;
-    if (y2 > 240)
-	y2 = 240;
     return y2;
 }
 
 uint8_t bl_pix_noswap_C(uint8_t y1, uint8_t y2)
 {
-    if (y1 < 16)
-	y1 = 16;
-    if (y2 > 240)
-	y1 = 240;
     return y1;
 }
 
 uint8_t bl_pix_noswap_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t new_Y;
-    new_Y = y1;
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
-    return new_Y;
+    return y1;
 }
 
 uint8_t bl_pix_add_distorted_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
-    a = y1;
-    b = y2;
-    new_Y = a + b;
-    if (new_Y > 235)
-	new_Y = 235;
-    if (new_Y < 16)
-	new_Y = 16;
-    return new_Y;
+	return ( y1 + y2 );
 }
 
 uint8_t bl_pix_add_distorted_C(uint8_t y1, uint8_t y2)
 {
-    uint8_t new_C;
-    new_C = y1 + y2;
-    if (new_C > 240)
-	new_C = 240;
-    if (new_C < 16)
-	new_C = 16;
-    return new_C;
+	return ( y1 + y2 );
 }
 
 uint8_t bl_pix_sub_distorted_Y(uint8_t y1, uint8_t y2)
@@ -1262,10 +1073,6 @@ uint8_t bl_pix_sub_distorted_Y(uint8_t y1, uint8_t y2)
     b = y2;
     new_Y = y1 - y2;
     new_Y -= y2;
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
     return new_Y;
 }
 
@@ -1274,10 +1081,6 @@ uint8_t bl_pix_sub_distorted_C(uint8_t y1, uint8_t y2)
     uint8_t new_C;
     new_C = y1 - y2;
     new_C -= y2;
-    if (new_C < 16)
-	new_C = 16;
-    if (new_C > 240)
-	new_C = 240;
     return new_C;
 }
 
@@ -1292,10 +1095,6 @@ uint8_t bl_pix_test3_Y(uint8_t y1, uint8_t y2)
     if (a < 16)
 	a = 16;
     new_Y = (a >> 1) + (b >> 1);
-    if (new_Y < 16)
-	new_Y = 16;
-    if (new_Y > 235)
-	new_Y = 235;
     return new_Y;
 }
 
@@ -1303,16 +1102,12 @@ uint8_t bl_pix_test3_C(uint8_t y1, uint8_t y2)
 {
     uint8_t a, b, new_C;
     a = y1;
-    b = 256 - y2;
+    b = 0xff - y2;
     if (b < 16)
 	b = y2;
     if (a < 16)
 	a = 16;
     new_C = (a >> 1) + (b >> 1);
-    if (new_C < 16)
-	new_C = 16;
-    if (new_C > 240)
-	new_C = 240;
     return new_C;
 }
 

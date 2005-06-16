@@ -141,6 +141,7 @@
 #include "effects/videoplay.h"
 #include "effects/videowall.h"
 #include "effects/flare.h"
+#include "effects/constantblend.h"
 
 static struct
 {
@@ -483,6 +484,7 @@ void vj_effect_initialize(int width, int height)
 	vj_effects[i + 73] = maskstop_init(width,height);
 	vj_effects[i + 74] = photoplay_init(width,height);
 	vj_effects[i + 75] = flare_init(width,height );
+	vj_effects[i + 76] = constantblend_init(width,height);
 	max_width = width;
 	max_height = height;
 
