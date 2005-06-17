@@ -227,4 +227,8 @@ void	vj_event_vloopback_start		(	void *ptr,	const char format[], 	va_list ap	);
 void	vj_event_vloopback_stop			(	void *ptr,	const char format[],	va_list ap	);
 #endif
 void	vj_event_quick_bundle  (void *ptr, const char format[], va_list ap);
+
+void	vj_event_clip_rand_start(	void *ptr, const char format[], va_list ap);
+void	vj_event_clip_rand_stop(	void *ptr, const char format[], va_list ap);
+
 #endif

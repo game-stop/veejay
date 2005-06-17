@@ -999,7 +999,7 @@ void	on_loop_pingpong_clicked(GtkWidget *widget, gpointer user_data)
 
 #define atom_marker(name,value) {\
 info->uc.marker.lock=1;\
-update_slider_value(name, info->uc.marker.start+1,0);\
+update_slider_gvalue(name, value);\
 info->uc.marker.lock=0;\
 }
 
@@ -1008,18 +1008,19 @@ void	on_slider_m0_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->uc.marker.lock && !info->status_lock)
 	{
-		info->uc.marker.start = (gint)GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
+		int real_len = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
+		
+		info->uc.marker.start = GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
 		if(info->uc.marker.bind)
 		{
-			int val = info->uc.marker.upper_bound - info->uc.marker.start; 
-			atom_marker("slider_m1", val);
+			info->uc.marker.end = 1.0 - info->uc.marker.start - info->uc.marker.bind_len;
+			if(info->uc.marker.start < 0.0)
+				info->uc.marker.start = 0.0;
 		}
-		if(info->uc.marker.bind)
-			multi_vims( VIMS_CLIP_SET_MARKER , "%d %d %d", 0,
-				info->uc.marker.start, get_slider_val( "slider_m1" ) );
-		else
-			multi_vims( VIMS_CLIP_SET_MARKER_START, "%d %d", 0,
-				info->uc.marker.start );
+
+		multi_vims( VIMS_CLIP_SET_MARKER , "%d %d %d", 0,
+			(gint ) (info->uc.marker.start * real_len), (gint)(info->uc.marker.end * real_len));
+
 	}
 	
 }
@@ -1027,18 +1028,19 @@ void	on_slider_m1_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->uc.marker.lock && !info->status_lock)
 	{
-		info->uc.marker.end = (gint)GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
+		int real_len = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
+		info->uc.marker.end = GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
+	
 		if(info->uc.marker.bind)
-		{
-			int val = info->uc.marker.upper_bound - info->uc.marker.start; 
-			atom_marker("slider_m0", val);
+		{	
+			info->uc.marker.start = 
+					1.0 - info->uc.marker.end - info->uc.marker.bind_len;
+			if( info->uc.marker.start  > 1.0 )
+				info->uc.marker.start = 1.0;
 		}
-		if(info->uc.marker.bind)
-			multi_vims( VIMS_CLIP_SET_MARKER , "%d %d %d", 0,
-				get_slider_val( "slider_m0" ), info->uc.marker.end );
-		else
-			multi_vims( VIMS_CLIP_SET_MARKER_END, "%d %d", 0,
-				info->uc.marker.end );
+
+		multi_vims( VIMS_CLIP_SET_MARKER , "%d %d %d", 0,
+			(gint ) (info->uc.marker.start * real_len), (gint)(info->uc.marker.end * real_len));
 
 	}
 
@@ -1046,31 +1048,32 @@ void	on_slider_m1_value_changed(GtkWidget *widget, gpointer user_data)
 void	on_check_marker_bind_clicked(GtkWidget *widget, gpointer user_data)
 {
 	// might need to adjust slider m0,m1
-	if( is_button_toggled( "check_marker_bind" ) )
+
+	info->uc.marker.bind = is_button_toggled( "check_marker_bind");
+	if(info->uc.marker.bind)
 	{
-		info->uc.marker.bind = 1;
-		if(info->uc.marker.start >= info->uc.marker.end)
-			atom_marker("slider_m0", 0 );    
 		vj_msg(VEEJAY_MSG_INFO, "Marker is bound");
+		GtkWidget *w1 = glade_xml_get_widget_( info->main_window, "slider_m0" );
+		GtkWidget *w2 = glade_xml_get_widget_( info->main_window, "slider_m1" );
+		gdouble start = GTK_ADJUSTMENT(GTK_RANGE(w1)->adjustment)->value;
+		gdouble end   = GTK_ADJUSTMENT(GTK_RANGE(w2)->adjustment)->value;
+		info->uc.marker.bind_len = 1.0 - start - end;
+		if(info->uc.marker.bind_len < 0.0 )
+		{
+			set_toggle_button( "check_marker_bind", 0 );
+		}
 	}
 	else
 	{
-		info->uc.marker.bind = 0;
-		vj_msg(VEEJAY_MSG_INFO, "Released marker binding");
-		if(info->uc.marker.end <= info->uc.marker.start)
-			atom_marker("slider_m1", info->uc->upper_bound );
+		vj_msg(VEEJAY_MSG_INFO, "Marker is released");
+		info->uc.marker.bind_len = 0;
 	}
-
 }
 void	on_button_clearmarker_clicked(GtkWidget *widget, gpointer user_data)
 {
-	info->uc.marker.start = 0;
-	info->uc.marker.end = 0;
-	atom_marker( "slider_m0", info->uc.marker.lower_bound );
-	atom_marker( "slider_m1", info->uc.marker.upper_bound );
 	multi_vims( VIMS_CLIP_CLEAR_MARKER, "%d", 0 );
-
 	info->uc.reload_hint[ HINT_MARKER ] = 1;
+	memset( &(info->uc.marker), 0, sizeof( sample_marker_t ));
  	vj_msg(VEEJAY_MSG_INFO, "Clear Marker");
 }
 
@@ -1435,4 +1438,18 @@ void	on_inputstream_file_button_clicked(GtkWidget *w, gpointer user_data)
 	if(filename) g_free( filename );
 	if(file) g_free(file);
 	info->uc.reload_hint[HINT_SLIST] = 1;
+}
+
+void	on_samplerand_toggled(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		int arg = is_button_toggled( "freestyle" );
+		int start = is_button_toggled( "samplerand" );
+
+		if( start == 0 )
+			single_vims( VIMS_CLIP_RAND_STOP );
+		else
+			multi_vims( VIMS_CLIP_RAND_START, "%d", arg );
+	}
 }

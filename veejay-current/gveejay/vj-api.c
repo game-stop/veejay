@@ -40,7 +40,7 @@
 
 static int	TIMEOUT_SECONDS = 0;
 #define STATUS_BYTES 	100
-#define STATUS_TOKENS 	16
+#define STATUS_TOKENS 	18
 
 /* Status bytes */
 
@@ -52,11 +52,14 @@ static int	TIMEOUT_SECONDS = 0;
 #define SAMPLE_END	6
 #define SAMPLE_SPEED	7
 #define SAMPLE_LOOP	8
+#define SAMPLE_MARKER_START   13
+#define SAMPLE_MARKER_END     14
 #define FRAME_NUM	1
 #define TOTAL_FRAMES	6
 #define TOTAL_SAMPLES	12
 #define	MODE_PLAIN	2
 #define MODE_SAMPLE	0
+#define MODE_PATTERN    3
 #define MODE_STREAM	1
 #define STREAM_COL_R	5
 #define STREAM_COL_G	6
@@ -166,9 +169,10 @@ enum
 typedef struct
 {
 	int bind;
-	int start;
-	int end;
+	gdouble start;
+	gdouble end;
 	int lock;
+	gdouble bind_len;
 	int lower_bound;
 	int upper_bound;
 } sample_marker_t;
@@ -206,6 +210,7 @@ typedef struct
 	int	pressed_key;
 	int	pressed_mod;
 	int     keysnoop;
+	int	randplayer;
 	char	*selected_arg_buf;
 	stream_templ_t	strtmpl[2]; // v4l, dv1394
 	sample_marker_t marker;
@@ -1812,6 +1817,7 @@ static void 	update_globalinfo()
 	int	sample_changed = 0;
 	gint	i;
 
+
 	info->uc.playmode = pm;
 
 	if(info->uc.previous_playmode != info->uc.playmode )
@@ -1819,6 +1825,18 @@ static void 	update_globalinfo()
 		if( pm == MODE_STREAM ) stream_changed = 1;
 		if( pm == MODE_SAMPLE ) sample_changed = 1;
 
+		if( pm != MODE_SAMPLE )
+		{
+			disable_widget( "samplerand" );
+			disable_widget( "freestyle" );
+		}
+		else	
+		{
+			enable_widget( "samplerand" );
+			enable_widget( "freestyle" );
+
+		}
+	
 		if( pm == MODE_PLAIN )
 		{
 			for(i =0; notepad_widgets[i].name != NULL; i ++ )
@@ -1976,31 +1994,64 @@ static void 	update_globalinfo()
 
 	if( pm == MODE_SAMPLE )
 	{
-
-		if( history[SAMPLE_START] != info->status_tokens[SAMPLE_START] )
+		int marker_go = 0;
+		if( (history[SAMPLE_MARKER_START] != info->status_tokens[SAMPLE_MARKER_START]) )
 		{
-			update_spin_value( "spin_samplestart", info->status_tokens[SAMPLE_START]);
-			info->uc.marker.lower_bound = 0;
-			sample_changed = 1;
-			update_slider_range("slider_m0", 0, 
-				info->status_tokens[SAMPLE_END]-info->status_tokens[SAMPLE_START],
-				0,
-				0 );
+			info->uc.marker.lower_bound = info->status_tokens[SAMPLE_MARKER_START] -
+				info->status_tokens[SAMPLE_START];
+			if(info->uc.marker.lower_bound == info->status_tokens[SAMPLE_START])
+				info->uc.marker.lower_bound = 0;
+			marker_go = 1;
 		}
 
-		if( history[SAMPLE_END] != info->status_tokens[SAMPLE_END])
+		if( (history[SAMPLE_MARKER_END] != info->status_tokens[SAMPLE_MARKER_END]) )
+		{
+			info->uc.marker.upper_bound = 	info->status_tokens[SAMPLE_END] -
+					info->status_tokens[SAMPLE_MARKER_END];
+			if(info->uc.marker.upper_bound == info->status_tokens[SAMPLE_END] )
+				info->uc.marker.upper_bound = 0;
+			marker_go = 1;
+		}
+
+		if( (history[SAMPLE_START] != info->status_tokens[SAMPLE_START] ))
+		{
+			update_spin_value( "spin_samplestart", info->status_tokens[SAMPLE_START] );
+			sample_changed = 1;
+		}
+		if( (history[SAMPLE_END] != info->status_tokens[SAMPLE_END] ))
 		{
 			update_spin_value( "spin_sampleend", info->status_tokens[SAMPLE_END]);
-			info->uc.marker.upper_bound = (info->status_tokens[SAMPLE_END] -
-							info->status_tokens[SAMPLE_START]);
-
-			update_slider_range("slider_m1", 0,
-					info->uc.marker.upper_bound,
-					info->uc.marker.lower_bound,
-					0);
-
 			sample_changed = 1;
 		}
+
+		if( marker_go )
+		{
+
+			int abs_start = info->status_tokens[SAMPLE_START];
+			int abs_end   = info->status_tokens[SAMPLE_END];
+			int re = abs_end - abs_start;
+			double mul = (double) re;
+			gdouble value_start = ( mul > 0.0 ?  info->uc.marker.lower_bound / mul : 0.0) ;
+			gdouble value_end = (mul > 0.0 ? info->uc.marker.upper_bound / mul: 0.0 );
+			update_slider_gvalue( "slider_m0", value_start );
+			update_slider_gvalue( "slider_m1", value_end );
+			if( is_button_toggled( "check_marker_bind" ) )
+			{
+				info->uc.marker.bind_len = 1.0 - value_start - value_end;
+				if(info->uc.marker.bind_len <= 0.0)
+				{
+					info->uc.marker.bind_len = 0;
+					set_toggle_button( "check_marker_bind", 0 );
+				}
+			}
+			else
+			{
+				info->uc.marker.bind_len = 0.0;
+			}
+		}
+
+
+
 		if( history[SAMPLE_LOOP] != info->status_tokens[SAMPLE_LOOP])
 		{
 			switch( get_loop_value() )
@@ -2158,6 +2209,7 @@ static void 	update_globalinfo()
 		}	
 	}
 
+
 	if(sample_changed)
 	{
 		gint len = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
@@ -2243,10 +2295,16 @@ static void 	update_globalinfo()
 
 	if(info->uc.reload_hint[HINT_MARKER] == 1 )
 	{
-		info->uc.marker.lower_bound = 0;
-		info->uc.marker.upper_bound = 0;
-		update_slider_value( "slider_m0", info->uc.marker.lower_bound, 0);
-		update_slider_value( "slider_m1", info->uc.marker.upper_bound, 0 );
+		int abs_start = info->status_tokens[SAMPLE_START];
+		int abs_end   = info->status_tokens[SAMPLE_END];
+		int re = abs_end - abs_start;
+		if (re == 0 ) re = 1;
+		double mul = (double) re;
+		gdouble value_start = info->uc.marker.lower_bound / mul;
+		gdouble value_end = info->uc.marker.upper_bound / mul;
+	
+		update_slider_gvalue( "slider_m0", value_start );
+		update_slider_gvalue( "slider_m1", value_end );
 	}
 
 
@@ -4416,25 +4474,31 @@ static void	update_gui()
 {
 
 	int pm = info->status_tokens[PLAY_MODE];
+	if( pm == MODE_SAMPLE && info->uc.randplayer )
+	{
+		info->uc.randplayer = 0;
+		set_toggle_button( "samplerand", 0 );
+	}
+	if( pm == MODE_PATTERN )
+	{
+		if(!info->uc.randplayer )
+		{
+			info->uc.randplayer = 1;
+			enable_widget( "freestyle" );
+			enable_widget( "samplerand" );
+			set_toggle_button( "samplerand", 1 );
+		}
+		info->status_tokens[PLAY_MODE] = MODE_SAMPLE;
+		pm = MODE_SAMPLE;
+	}
+	
+
 	if(pm < 0 || pm > 2)
 	{
-		return;
-		//exit(0);
+		fprintf(stderr, "Cannot deal with veejay\n");
+		exit(0);
 	}
 	update_globalinfo();
-
-	switch(info->status_tokens[0])
-	{
-		case MODE_SAMPLE:
-			update_sampleinfo();
-			break;
-		case MODE_STREAM:
-			update_streaminfo();
-			break;
-		case MODE_PLAIN:
-			update_plaininfo();
-			break;
-	}
 
 	int *history = info->history_tokens[pm];
 	int i;
@@ -4505,7 +4569,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		gui->status_lock = 1;
 		if(nb > 0)
 		{
-			int n = sscanf( gui->status_msg, "%d %d %d %d %d %d %d %d %d %d %d %d %d",
+			int n = sscanf( gui->status_msg, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 				gui->status_tokens + 0,
 				gui->status_tokens + 1,
 				gui->status_tokens + 2,
@@ -4518,9 +4582,11 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 				gui->status_tokens + 9,
 				gui->status_tokens + 10,
 				gui->status_tokens + 11,
-				gui->status_tokens + 12 );
+				gui->status_tokens + 12,
+				gui->status_tokens + 13,
+				gui->status_tokens + 14 );
 
-			if( n != 13 )
+			if( n != 15 )
 			{
 				// restore status (to prevent gui from going bezerk)
 				int *history = info->history_tokens[ info->uc.playmode ];

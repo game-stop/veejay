@@ -1807,7 +1807,7 @@ int	clip_chain_sprint_status( int s1,int pfps, int frame, int mode, char *str )
     */
 
 	sprintf(str,
-		"%d %d %d %d %d %d %d %d %d %d %d %d %d",
+		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		pfps,
 		frame,
 		mode,
@@ -1820,7 +1820,9 @@ int	clip_chain_sprint_status( int s1,int pfps, int frame, int mode, char *str )
 		clip->encoder_active,
 		clip->encoder_duration,
 		clip->encoder_succes_frames,
-		clip_size());
+		clip_size(),
+		clip->marker_start,
+		clip->marker_end);
 		
 		
  

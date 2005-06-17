@@ -1133,17 +1133,20 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 	(video_playback_setup *) info->settings;
     int d_len = 0;
     int res = 0;
-
+    int pm = info->uc->playback_mode;
     switch (info->uc->playback_mode) {
     	case VJ_PLAYBACK_MODE_CLIP:
+			if( info->settings->randplayer.mode ==
+				RANDMODE_SAMPLE)
+				pm = VJ_PLAYBACK_MODE_PATTERN;
 			if( clip_chain_sprint_status
-				(info->uc->clip_id, info->real_fps,settings->current_frame_num, info->uc->playback_mode, info->status_what ) != 0)
+				(info->uc->clip_id, info->real_fps,settings->current_frame_num, pm, info->status_what ) != 0)
 				{
 				veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
 			}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		sprintf(info->status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d",
+		sprintf(info->status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			(int) info->real_fps,
 			settings->current_frame_num,
 			info->uc->playback_mode,
@@ -1153,6 +1156,8 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 			settings->max_frame_num,
 			settings->current_playback_speed,
 			0, 
+			0,
+			0,
 			0,
 			0,
 			0,

@@ -32,6 +32,8 @@
 #include <math.h>
 #include <libel/vj-avcodec.h>
 #include <veejay/vj-event.h>
+#include <utils/mpegconsts.h>
+#include <utils/mpegtimecode.h>
 //#ifdef SUPPORT_READ_DV2
 //#include "vj-dv.h"
 //#endif
@@ -282,6 +284,7 @@ int vj_perform_increase_clip_frame(veejay_t * info, long num)
 	}
     }
     clip_update_offset( info->uc->clip_id, settings->current_frame_num );	
+    vj_perform_rand_update( info );
 
     return ret_val;
 }
@@ -2847,3 +2850,76 @@ int vj_perform_queue_frame(veejay_t * info, int skip_incr, int frame )
 }
 
 
+
+int	vj_perform_randomize(veejay_t *info)
+{
+	video_playback_setup *settings = info->settings;
+	if(settings->randplayer.mode == RANDMODE_INACTIVE)
+		return 0;
+	if(settings->randplayer.mode == RANDMODE_SAMPLE)
+	{
+		double n_sample = (double) (clip_size()-1);
+		int take_n   = 1 + (int) (n_sample * rand() / (RAND_MAX+1.0));
+		int min_delay = 1;
+		int max_delay = 0;
+		char timecode[15];
+		if(!clip_exists(take_n))
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, 
+			 "Sample to play (at random) %d does not exist",
+				take_n);
+			take_n = info->uc->clip_id;
+		}
+
+		max_delay = ( clip_get_endFrame(take_n) -
+			      clip_get_startFrame(take_n) );
+
+		if(settings->randplayer.timer == RANDTIMER_LENGTH)
+			min_delay = max_delay;
+		else
+			max_delay = min_delay + (int) ((double)max_delay * rand() / (RAND_MAX+1.0));
+		settings->randplayer.max_delay = max_delay;
+		settings->randplayer.min_delay = min_delay;	
+
+		MPEG_timecode_t tc;
+		int start = 0;
+		int end = max_delay;
+		mpeg_timecode(&tc, max_delay,
+	                mpeg_framerate_code(mpeg_conform_framerate(
+				info->edit_list->video_fps)),
+				info->edit_list->video_fps );
+
+		sprintf(timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
+
+		veejay_msg(VEEJAY_MSG_DEBUG,
+		 "Clip randomizer trigger in %s",
+			timecode );
+
+		veejay_set_clip( info, take_n );
+
+		return 1;
+	}
+	return 0;
+}
+
+int	vj_perform_rand_update(veejay_t *info)
+{
+	video_playback_setup *settings = info->settings;
+	if(settings->randplayer.mode == RANDMODE_INACTIVE)
+		return 0;
+	if(settings->randplayer.mode == RANDMODE_SAMPLE)
+	{
+		settings->randplayer.max_delay --;
+		if(settings->randplayer.max_delay <= 0 )
+		{
+			if(!vj_perform_randomize(info))
+			{
+			  veejay_msg(VEEJAY_MSG_ERROR,
+			   "Woops cant start randomizer");
+			  settings->randplayer.mode = RANDMODE_INACTIVE;
+			}
+		}
+		return 1;
+	}
+	return 0;	
+}

@@ -84,6 +84,23 @@ typedef struct {
 	char *el;
 } vj_schedule_t;
 
+#define RANDMODE_INACTIVE 0
+#define RANDMODE_SAMPLE 1
+#define RANDTYPE_NOFX 0
+#define RANDTYPE_PIXEL 1
+#define RANDTYPE_GEO 2
+#define RANDTYPE_MIXED 3 
+#define RANDTIMER_FRAME 1
+#define RANDTIMER_LENGTH 0
+
+typedef struct
+{
+	int mode;
+	int type;
+	int timer;
+	int min_delay;
+	int max_delay;
+} vj_rand_player;
 
 typedef struct
 {
@@ -161,6 +178,7 @@ typedef struct {
 	float	output_fps;
 	int crop;
 	VJRectangle viewport;
+	vj_rand_player randplayer;
 } video_playback_setup;
 
 

@@ -305,6 +305,10 @@ static struct {
 		vj_event_select_bank,		1,	"%d",		{1,0}, VIMS_ALLOW_ANY	},
 	{ VIMS_SELECT_ID,			 "Set clip/stream N of current bank",
 		vj_event_select_id,		1,	"%d",		{2,0}, VIMS_ALLOW_ANY	},
+	{ VIMS_CLIP_RAND_START,			"Start clip randomizer (0=rand duration,1=clip duration)",
+		vj_event_clip_rand_start,	1,	"%d",		{0,0}, VIMS_ALLOW_ANY   },
+	{ VIMS_CLIP_RAND_STOP,			"Stop clip randomzier",
+		vj_event_clip_rand_stop,	0,	NULL,		{0,0}, VIMS_ALLOW_ANY	},
 	{ VIMS_CLIP_TOGGLE_LOOP,		 "Toggle looptype to normal or pingpong",
 		vj_event_clip_set_loop_type,	2,	"%d %d",	{0,-1}, VIMS_REQUIRE_ALL_PARAMS   },
 	{ VIMS_RECORD_DATAFORMAT,		 "Set dataformat for stream/clip record",
@@ -3289,6 +3293,38 @@ void vj_event_goto_start(void *ptr, const char format[], va_list ap)
 	{
 		veejay_set_frame(v,0);
   	}
+}
+
+void	vj_event_clip_rand_start( void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	video_playback_setup *settings = v->settings;
+	int args[2];
+	char *s = NULL;
+	P_A(args,s,format,ap);
+	if(args[0] == RANDTIMER_FRAME)
+		settings->randplayer.timer = RANDTIMER_FRAME;
+	else
+		settings->randplayer.timer = RANDTIMER_LENGTH;
+	settings->randplayer.mode = RANDMODE_SAMPLE;
+
+	if(!vj_perform_randomize(v))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "randomizer start failed");
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Started clip randomizer");	
+	}
+}
+void	vj_event_clip_rand_stop( void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	video_playback_setup *settings = v->settings;
+
+	if(settings->randplayer.mode != RANDMODE_INACTIVE)
+		veejay_msg(VEEJAY_MSG_ERROR, "Stopped clip randomizer");
+	settings->randplayer.mode = RANDMODE_INACTIVE;
 }
 
 void vj_event_clip_set_loop_type(void *ptr, const char format[], va_list ap)
@@ -7835,5 +7871,6 @@ void	vj_event_vloopback_stop( void *ptr, const char format[], va_list ap )
 	vj_vloopback_close( v->vloopback );
 }
 #endif
+
 
 #endif
