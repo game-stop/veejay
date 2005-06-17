@@ -26,7 +26,7 @@
    The named pipes are defined in libveejayvj.c 
  
    status:
-   	current_frame, total_frames, clips, clip_id,
+   	current_frame, total_frames, samples, sample_id,
 	speed, looptype, chain_on, speedlock
 	
  
@@ -41,7 +41,7 @@
 
 enum {
     VJ_PLAYBACK_MODE_PLAIN = 2,
-    VJ_PLAYBACK_MODE_CLIP = 0,
+    VJ_PLAYBACK_MODE_SAMPLE = 0,
     VJ_PLAYBACK_MODE_PATTERN = 3,
     VJ_PLAYBACK_MODE_TAG = 1,
     VJ_PLAYBACK_MODE_MEM = 4,
@@ -57,7 +57,7 @@ enum {
 
 /* request messages, global */
 #define MAX_SPEED		64
-#define CLIP_MAX_EFFECTS 	20
+#define SAMPLE_MAX_EFFECTS 	20
 #define PATTERN_MAX_TRACKS	3
 #define CELL_LENGTH		30
 #define ROW_SIZE		(PATTERN_MAX_TRACKS * CELL_LENGTH)

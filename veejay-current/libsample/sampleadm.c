@@ -19,8 +19,8 @@
  *
  *
  * 05/03/2003: Added XML code from Jeff Carpenter ( jrc@dshome.net )
- * 05/03/2003: Included more clip properties in Jeff's code 
- *	       Create is used to write the Clip to XML, Parse is used to load from XML
+ * 05/03/2003: Included more sample properties in Jeff's code 
+ *	       Create is used to write the Sample to XML, Parse is used to load from XML
  
 */
 
@@ -60,32 +60,32 @@
 #define VJ_VIDEO_EFFECT_MIN vj_effect_get_min_v()
 #define VJ_VIDEO_EFFECT_MAX vj_effect_get_max_v()
 
-static int this_clip_id = 0;	/* next available clip id */
-static int next_avail_num = 0;	/* available clip id */
+static int this_sample_id = 0;	/* next available sample id */
+static int next_avail_num = 0;	/* available sample id */
 static int initialized = 0;	/* whether we are initialized or not */
-static hash_t *ClipHash;	/* hash of clip information structs */
-static int avail_num[CLIP_MAX_CLIPS];	/* an array of freed clip id's */
+static hash_t *SampleHash;	/* hash of sample information structs */
+static int avail_num[SAMPLE_MAX_SAMPLES];	/* an array of freed sample id's */
 
-static int clipadm_state = CLIP_PEEK;	/* default state */
+static int sampleadm_state = SAMPLE_PEEK;	/* default state */
 
 
 
 
 /****************************************************************************************************
  *
- * clip_size
+ * sample_size
  *
- * returns current clip_id pointer. size is actually this_clip_id - next_avail_num,
+ * returns current sample_id pointer. size is actually this_sample_id - next_avail_num,
  * but people tend to use size as in length.
  *
  ****************************************************************************************************/
-int clip_size()
+int sample_size()
 {
-    return this_clip_id;
+    return this_sample_id;
 }
 
-int clip_verify() {
-   return hash_verify( ClipHash );
+int sample_verify() {
+   return hash_verify( SampleHash );
 }
 
 
@@ -117,12 +117,12 @@ static inline int int_compare(const void *key1, const void *key2)
 	    ((int) key1 > (int) key2 ? +1 : 0));
 }
 
-int clip_update(clip_info *clip, int s1) {
-  if(s1 <= 0 || s1 >= CLIP_MAX_CLIPS) return 0;
-  if(clip) {
-    hnode_t *clip_node = hnode_create(clip);
-    hnode_put(clip_node, (void*) s1);
-    hnode_destroy(clip_node);
+int sample_update(sample_info *sample, int s1) {
+  if(s1 <= 0 || s1 >= SAMPLE_MAX_SAMPLES) return 0;
+  if(sample) {
+    hnode_t *sample_node = hnode_create(sample);
+    hnode_put(sample_node, (void*) s1);
+    hnode_destroy(sample_node);
     return 1;
   }
   return 0;
@@ -132,59 +132,59 @@ int clip_update(clip_info *clip, int s1) {
 
 /****************************************************************************************************
  *
- * clip_init()
+ * sample_init()
  *
- * call before using any other function as clip_skeleton_new
+ * call before using any other function as sample_skeleton_new
  *
  ****************************************************************************************************/
-void clip_init(int len)
+void sample_init(int len)
 {
     if (!initialized) {
 	int i;
-	for (i = 0; i < CLIP_MAX_CLIPS; i++)
+	for (i = 0; i < SAMPLE_MAX_SAMPLES; i++)
 	    avail_num[i] = 0;
-	this_clip_id = 1;	/* do not start with zero */
+	this_sample_id = 1;	/* do not start with zero */
 	if (!
-	    (ClipHash =
+	    (SampleHash =
 	     hash_create(HASHCOUNT_T_MAX, int_compare, int_hash))) {
 	}
 	initialized = 1;
     }
 }
 
-int clip_set_state(int new_state)
+int sample_set_state(int new_state)
 {
-    if (new_state == CLIP_LOAD || new_state == CLIP_RUN
-	|| new_state == CLIP_PEEK) {
-	clipadm_state = new_state;
+    if (new_state == SAMPLE_LOAD || new_state == SAMPLE_RUN
+	|| new_state == SAMPLE_PEEK) {
+	sampleadm_state = new_state;
     }
-    return clipadm_state;
+    return sampleadm_state;
 }
 
-int clip_get_state()
+int sample_get_state()
 {
-    return clipadm_state;
+    return sampleadm_state;
 }
 
 /****************************************************************************************************
  *
- * clip_skeleton_new(long , long)
+ * sample_skeleton_new(long , long)
  *
- * create a new clip, give start and end of new clip. returns clip info block.
+ * create a new sample, give start and end of new sample. returns sample info block.
  *
  ****************************************************************************************************/
 
-clip_info *clip_skeleton_new(long startFrame, long endFrame)
+sample_info *sample_skeleton_new(long startFrame, long endFrame)
 {
 
 
-    clip_info *si;
+    sample_info *si;
     int i, j, n, id = 0;
 
     if (!initialized) {
     	return NULL;
 	}
-    si = (clip_info *) vj_malloc(sizeof(clip_info));
+    si = (sample_info *) vj_malloc(sizeof(sample_info));
     if(startFrame < 0) startFrame = 0;
 //    if(endFrame <= startFrame&& (endFrame !=0 && startFrame != 0))
 	if(endFrame <= startFrame ) 
@@ -197,7 +197,7 @@ clip_info *clip_skeleton_new(long startFrame, long endFrame)
 	return NULL;
     }
 
-    /* perhaps we can reclaim a clip id */
+    /* perhaps we can reclaim a sample id */
     for (n = 0; n <= next_avail_num; n++) {
 	if (avail_num[n] != 0) {
 	    id = avail_num[n];
@@ -206,22 +206,22 @@ clip_info *clip_skeleton_new(long startFrame, long endFrame)
 	}
     }
     if (id == 0) {		/* no we cannot not */
-	if(this_clip_id==0) this_clip_id = 1; // first clip to create
-	si->clip_id = this_clip_id;
-	this_clip_id++; // set next number
+	if(this_sample_id==0) this_sample_id = 1; // first sample to create
+	si->sample_id = this_sample_id;
+	this_sample_id++; // set next number
     } else {			/* yet it is possible */
-	si->clip_id = id;
-	//this_clip_id++;
+	si->sample_id = id;
+	//this_sample_id++;
     }
-    snprintf(si->descr,CLIP_MAX_DESCR_LEN, "%s", "Untitled");
-    for(n=0; n < CLIP_MAX_RENDER;n++) {
+    snprintf(si->descr,SAMPLE_MAX_DESCR_LEN, "%s", "Untitled");
+    for(n=0; n < SAMPLE_MAX_RENDER;n++) {
       si->first_frame[n] = startFrame;
       si->last_frame[n] = endFrame;
 	}
     si->speed = 1;
     si->looptype = 1;
     si->max_loops = 0;
-    si->next_clip_id = 0;
+    si->next_sample_id = 0;
     si->playmode = 0;
     si->depth = 0;
     si->sub_audio = 0;
@@ -260,12 +260,12 @@ clip_info *clip_skeleton_new(long startFrame, long endFrame)
     sprintf(si->descr, "%s", "Untitled");
 
     /* the effect chain is initially empty ! */
-    for (i = 0; i < CLIP_MAX_EFFECTS; i++) {
+    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
 	
 	si->effect_chain[i] =
-	    (clip_eff_chain *) vj_malloc(sizeof(clip_eff_chain));
+	    (sample_eff_chain *) vj_malloc(sizeof(sample_eff_chain));
 	if (si->effect_chain[i] == NULL) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Error allocating entry %d in Effect Chain for new clip",i);
+		veejay_msg(VEEJAY_MSG_ERROR, "Error allocating entry %d in Effect Chain for new sample",i);
 		return NULL;
 		}
 	si->effect_chain[i]->is_rendering = 0;
@@ -278,7 +278,7 @@ clip_info *clip_skeleton_new(long startFrame, long endFrame)
 	si->effect_chain[i]->source_type = 0;
 	si->effect_chain[i]->channel = id;	/* with myself by default */
 	/* effect parameters initially 0 */
-	for (j = 0; j < CLIP_MAX_PARAMETERS; j++) {
+	for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++) {
 	    si->effect_chain[i]->arg[j] = 0;
 	}
 
@@ -286,43 +286,43 @@ clip_info *clip_skeleton_new(long startFrame, long endFrame)
     return si;
 }
 
-int clip_store(clip_info * skel)
+int sample_store(sample_info * skel)
 {
-    hnode_t *clip_node;
+    hnode_t *sample_node;
     if (!skel)
 	return -1;
-    clip_node = hnode_create(skel);
-    if (!clip_node)
+    sample_node = hnode_create(skel);
+    if (!sample_node)
 	return -1;
-    if (!clip_exists(skel->clip_id)) {
-	hash_insert(ClipHash, clip_node, (void *) skel->clip_id);
+    if (!sample_exists(skel->sample_id)) {
+	hash_insert(SampleHash, sample_node, (void *) skel->sample_id);
     } else {
-	hnode_put(clip_node, (void *) skel->clip_id);
+	hnode_put(sample_node, (void *) skel->sample_id);
     }
     return 0;
 }
 
 /****************************************************************************************************
  *
- * clip_get(int clip_id)
+ * sample_get(int sample_id)
  *
- * returns clip information struct or NULL on error.
+ * returns sample information struct or NULL on error.
  *
  ****************************************************************************************************/
-clip_info *clip_get(int clip_id)
+sample_info *sample_get(int sample_id)
 {
-    clip_info *si;
-    //hnode_t *clip_node;
+    sample_info *si;
+    //hnode_t *sample_node;
   //  if (!initialized)
 //	return NULL;
-  //  if (clip_id <= 0)
+  //  if (sample_id <= 0)
 //	return NULL;
   //  for (i = 0; i <= next_avail_num; i++)
-//	if (avail_num[i] == clip_id)
+//	if (avail_num[i] == sample_id)
 //	    return NULL;
-    hnode_t *clip_node = hash_lookup(ClipHash, (void *) clip_id);
-    if (clip_node) {
-   	 si = (clip_info *) hnode_get(clip_node);
+    hnode_t *sample_node = hash_lookup(SampleHash, (void *) sample_id);
+    if (sample_node) {
+   	 si = (sample_info *) hnode_get(sample_node);
    	 if(si) return si;
 	}
     return NULL;
@@ -330,88 +330,88 @@ clip_info *clip_get(int clip_id)
 
 /****************************************************************************************************
  *
- * clip_exists(int clip_id)
+ * sample_exists(int sample_id)
  *
- * returns 1 if a clip exists in cliphash, or 0 if not.
+ * returns 1 if a sample exists in samplehash, or 0 if not.
  *
  ****************************************************************************************************/
 
 
-int clip_exists(int clip_id) {
+int sample_exists(int sample_id) {
 	
-	hnode_t *clip_node;
-	if (!clip_id) return 0;
+	hnode_t *sample_node;
+	if (!sample_id) return 0;
 	
-	clip_node = hash_lookup(ClipHash, (void*) clip_id);
-	if (!clip_node) {
+	sample_node = hash_lookup(SampleHash, (void*) sample_id);
+	if (!sample_node) {
 		return 0;
 	}
 	
-	if(!clip_get(clip_id)) return 0;
+	if(!sample_get(sample_id)) return 0;
 	return 1;
 }
 /*
-int clip_exists(int clip_id)
+int sample_exists(int sample_id)
 {
-    if(clip_id < 1 || clip_id > CLIP_MAX_CLIPS) return 0;
-    return (clip_get(clip_id) == NULL ? 0 : 1);
+    if(sample_id < 1 || sample_id > SAMPLE_MAX_SAMPLES) return 0;
+    return (sample_get(sample_id) == NULL ? 0 : 1);
 }
 */
 
-int clip_copy(int clip_id)
+int sample_copy(int sample_id)
 {
-    clip_info *org, *copy;
+    sample_info *org, *copy;
     int c, i;
-    if (!clip_exists(clip_id))
+    if (!sample_exists(sample_id))
 	return -1;
-    org = clip_get(clip_id);
-    copy = clip_skeleton_new(org->first_frame[org->active_render_entry], org->last_frame[org->active_render_entry]);
+    org = sample_get(sample_id);
+    copy = sample_skeleton_new(org->first_frame[org->active_render_entry], org->last_frame[org->active_render_entry]);
 
-    if (clip_store(copy) != 0)
+    if (sample_store(copy) != 0)
 	return -1;
 
-    clip_set_framedup(copy->clip_id, clip_get_framedup(clip_id));
-    clip_set_speed(copy->clip_id, clip_get_speed(clip_id));
-    clip_set_looptype(copy->clip_id, clip_get_looptype(clip_id));
-    clip_set_next(copy->clip_id, clip_get_next(clip_id));
-    clip_set_loops(copy->clip_id, clip_get_loops(clip_id));
-    clip_set_depth(copy->clip_id, clip_get_depth(clip_id));
+    sample_set_framedup(copy->sample_id, sample_get_framedup(sample_id));
+    sample_set_speed(copy->sample_id, sample_get_speed(sample_id));
+    sample_set_looptype(copy->sample_id, sample_get_looptype(sample_id));
+    sample_set_next(copy->sample_id, sample_get_next(sample_id));
+    sample_set_loops(copy->sample_id, sample_get_loops(sample_id));
+    sample_set_depth(copy->sample_id, sample_get_depth(sample_id));
 
-    for (c = 0; c < CLIP_MAX_EFFECTS; c++) {
-	int effect_id = clip_get_effect(clip_id, c);
+    for (c = 0; c < SAMPLE_MAX_EFFECTS; c++) {
+	int effect_id = sample_get_effect(sample_id, c);
 	if (effect_id != -1) {
-	    clip_chain_add(copy->clip_id, c, effect_id);
+	    sample_chain_add(copy->sample_id, c, effect_id);
 	    if (vj_effect_get_extra_frame(effect_id)) {
-		int source = clip_get_chain_source(clip_id, c);
+		int source = sample_get_chain_source(sample_id, c);
 
-		int args[CLIP_MAX_PARAMETERS];
+		int args[SAMPLE_MAX_PARAMETERS];
 		int *p = &args[0];
 		int n_args = vj_effect_get_num_params(effect_id);
-		clip_set_chain_source(copy->clip_id, c, source);
-		clip_set_chain_channel(copy->clip_id, c, source);
+		sample_set_chain_source(copy->sample_id, c, source);
+		sample_set_chain_channel(copy->sample_id, c, source);
 
-		clip_get_all_effect_arg(clip_id, c, p, n_args, -1);
+		sample_get_all_effect_arg(sample_id, c, p, n_args, -1);
 
-		for (i = 0; i < CLIP_MAX_PARAMETERS; i++) {
-		    clip_set_effect_arg(copy->clip_id, c, i, args[i]
+		for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++) {
+		    sample_set_effect_arg(copy->sample_id, c, i, args[i]
 			);
 		}
 	    }
 	}
     }
-    return copy->clip_id;
+    return copy->sample_id;
 }
 
 /****************************************************************************************************
  *
- * clip_get_startFrame(int clip_id)
+ * sample_get_startFrame(int sample_id)
  *
- * returns first frame of clip.
+ * returns first frame of sample.
  *
  ****************************************************************************************************/
-int clip_get_longest(int clip_id)
+int sample_get_longest(int sample_id)
 {
-	clip_info *si = clip_get(clip_id);
+	sample_info *si = sample_get(sample_id);
 	if(si)
 	{
 		int len = (si->last_frame[si->active_render_entry] -
@@ -421,36 +421,36 @@ int clip_get_longest(int clip_id)
 		int t=0;
 		int _id=0;
 		int speed = abs(si->speed);
-		int duration = len / speed; //how many frames are played of this clip
+		int duration = len / speed; //how many frames are played of this sample
 
 		if( si->looptype == 2) duration *= 2; // pingpong loop duration     
 
-		for(c=0; c < CLIP_MAX_EFFECTS; c++)
+		for(c=0; c < SAMPLE_MAX_EFFECTS; c++)
 		{
-			_id = clip_get_chain_channel(clip_id,c);
-			t   = clip_get_chain_source(clip_id,c);
+			_id = sample_get_chain_channel(sample_id,c);
+			t   = sample_get_chain_source(sample_id,c);
 	
-                        if(t==0 && clip_exists(_id))
+                        if(t==0 && sample_exists(_id))
 			{
-				tmp = clip_get_endFrame( _id) - clip_get_startFrame(_id);
+				tmp = sample_get_endFrame( _id) - sample_get_startFrame(_id);
 				if(tmp>0)
 				{
-					tmp = tmp / clip_get_speed(_id);
+					tmp = tmp / sample_get_speed(_id);
 					if(tmp < 0) tmp *= -1;
-					if(clip_get_looptype(_id)==2) tmp *= 2; //pingpong loop underlying clip
+					if(sample_get_looptype(_id)==2) tmp *= 2; //pingpong loop underlying sample
 				}
 				if(tmp > duration) duration = tmp; //which one is longer ...	
 		        }
 		}
-		veejay_msg(VEEJAY_MSG_WARNING, "Length of clip in video frames: %ld",duration);
+		veejay_msg(VEEJAY_MSG_WARNING, "Length of sample in video frames: %ld",duration);
 		return duration;
 	}
 	return 0;
 }
 
-int clip_get_startFrame(int clip_id)
+int sample_get_startFrame(int sample_id)
 {
-    clip_info *si = clip_get(clip_id);
+    sample_info *si = sample_get(sample_id);
     if (si) {
    	if (si->marker_start != 0 && si->marker_end != 0)
 		return si->marker_start;
@@ -461,9 +461,9 @@ int clip_get_startFrame(int clip_id)
 }
 
 
-int	clip_get_el_position( int clip_id, int *start, int *end )
+int	sample_get_el_position( int sample_id, int *start, int *end )
 {
-	clip_info *si = clip_get(clip_id);
+	sample_info *si = sample_get(sample_id);
 	if(si)
 	{
 		*start = si->first_frame[ si->active_render_entry ];
@@ -476,8 +476,8 @@ int	clip_get_el_position( int clip_id, int *start, int *end )
 
 
 
-int clip_get_short_info(int clip_id, int *start, int *end, int *loop, int *speed) {
-    clip_info *si = clip_get(clip_id);
+int sample_get_short_info(int sample_id, int *start, int *end, int *loop, int *speed) {
+    sample_info *si = sample_get(sample_id);
     if(si) {
 	if(si->marker_start != 0 && si->marker_end !=0) {
 	   *start = si->marker_start;
@@ -498,53 +498,53 @@ int clip_get_short_info(int clip_id, int *start, int *end, int *loop, int *speed
     return -1;
 }
 
-int clip_entry_is_rendering(int s1, int position) {
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+int sample_entry_is_rendering(int s1, int position) {
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (position >= CLIP_MAX_EFFECTS || position < 0)
+    if (position >= SAMPLE_MAX_EFFECTS || position < 0)
 	return -1;
-    return clip->effect_chain[position]->is_rendering;
+    return sample->effect_chain[position]->is_rendering;
 }
 
-int clip_entry_set_is_rendering(int s1, int position, int value) {
-    clip_info *si = clip_get(s1);
+int sample_entry_set_is_rendering(int s1, int position, int value) {
+    sample_info *si = sample_get(s1);
     if (!si)
 	return -1;
-    if( position >= CLIP_MAX_EFFECTS || position < 0) return -1;
+    if( position >= SAMPLE_MAX_EFFECTS || position < 0) return -1;
 
     si->effect_chain[position]->is_rendering = value;
-    return ( clip_update( si,s1 ));
+    return ( sample_update( si,s1 ));
 }
 
 
-int clip_update_offset(int s1, int n_frame)
+int sample_update_offset(int s1, int n_frame)
 {
 	int len;
-	clip_info *si = clip_get(s1);
+	sample_info *si = sample_get(s1);
 
 	if(!si) return -1;
 	si->offset = (n_frame - si->first_frame[si->active_render_entry]);
 	len = si->last_frame[si->active_render_entry] - si->first_frame[si->active_render_entry];
 	if(si->offset < 0) 
 	{	
-		veejay_msg(VEEJAY_MSG_WARNING,"Clip bounces outside clip by %d frames",
+		veejay_msg(VEEJAY_MSG_WARNING,"Sample bounces outside sample by %d frames",
 			si->offset);
 		si->offset = 0;
 	}
 	if(si->offset > len) 
 	{
-		 veejay_msg(VEEJAY_MSG_WARNING,"Clip bounces outside clip with %d frames",
+		 veejay_msg(VEEJAY_MSG_WARNING,"Sample bounces outside sample with %d frames",
 			si->offset);
 		 si->offset = len;
 	}
-	return ( clip_update(si,s1));
+	return ( sample_update(si,s1));
 }	
 
-int clip_set_manual_fader( int s1, int value)
+int sample_set_manual_fader( int s1, int value)
 {
-  clip_info *si = clip_get(s1);
+  sample_info *si = sample_get(s1);
   if(!si) return -1;
   si->fader_active = 2;
   si->fader_val = (float) value;
@@ -553,12 +553,12 @@ int clip_set_manual_fader( int s1, int value)
 
   /* inconsistency check */
   if(si->effect_toggle == 0) si->effect_toggle = 1;
-  return (clip_update(si,s1));
+  return (sample_update(si,s1));
 
 }
 
-int clip_set_fader_active( int s1, int nframes, int direction ) {
-  clip_info *si = clip_get(s1);
+int sample_set_fader_active( int s1, int nframes, int direction ) {
+  sample_info *si = sample_get(s1);
   if(!si) return -1;
   if(nframes <= 0) return -1;
   si->fader_active = 1;
@@ -576,83 +576,83 @@ int clip_set_fader_active( int s1, int nframes, int direction ) {
 	{
 	si->effect_toggle = 1;
 	}
-  return (clip_update(si,s1));
+  return (sample_update(si,s1));
 }
 
 
-int clip_reset_fader(int s1) {
-  clip_info *si = clip_get(s1);
+int sample_reset_fader(int s1) {
+  sample_info *si = sample_get(s1);
   if(!si) return -1;
   si->fader_active = 0;
   si->fader_val = 0;
   si->fader_inc = 0;
-  return (clip_update(si,s1));
+  return (sample_update(si,s1));
 }
 
-int clip_get_fader_active(int s1) {
-  clip_info *si = clip_get(s1);
+int sample_get_fader_active(int s1) {
+  sample_info *si = sample_get(s1);
   if(!si) return -1;
   return (si->fader_active);
 }
 
-float clip_get_fader_val(int s1) {
-  clip_info *si = clip_get(s1);
+float sample_get_fader_val(int s1) {
+  sample_info *si = sample_get(s1);
   if(!si) return -1;
   return (si->fader_val);
 }
 
-float clip_get_fader_inc(int s1) {
-  clip_info *si = clip_get(s1);
+float sample_get_fader_inc(int s1) {
+  sample_info *si = sample_get(s1);
   if(!si) return -1;
   return (si->fader_inc);
 }
 
-int clip_get_fader_direction(int s1) {
-  clip_info *si = clip_get(s1);
+int sample_get_fader_direction(int s1) {
+  sample_info *si = sample_get(s1);
   if(!si) return -1;
   return si->fader_direction;
 }
 
-int clip_set_fader_val(int s1, float val) {
-  clip_info *si = clip_get(s1);
+int sample_set_fader_val(int s1, float val) {
+  sample_info *si = sample_get(s1);
   if(!si) return -1;
   si->fader_val = val;
-  return (clip_update(si,s1));
+  return (sample_update(si,s1));
 }
 
-int clip_apply_fader_inc(int s1) {
-  clip_info *si = clip_get(s1);
+int sample_apply_fader_inc(int s1) {
+  sample_info *si = sample_get(s1);
   if(!si) return -1;
   si->fader_val += si->fader_inc;
   if(si->fader_val > 255.0 ) si->fader_val = 255.0;
   if(si->fader_val < 0.0 ) si->fader_val = 0.0;
-  clip_update(si,s1);
+  sample_update(si,s1);
   return (int) (si->fader_val+0.5);
 }
 
 
 
-int clip_set_fader_inc(int s1, float inc) {
-  clip_info *si = clip_get(s1);
+int sample_set_fader_inc(int s1, float inc) {
+  sample_info *si = sample_get(s1);
   if(!si) return -1;
   si->fader_inc = inc;
-  return (clip_update(si,s1));
+  return (sample_update(si,s1));
 }
 
-int clip_marker_clear(int clip_id) {
-    clip_info *si = clip_get(clip_id);
+int sample_marker_clear(int sample_id) {
+    sample_info *si = sample_get(sample_id);
     if (!si)
 	return -1;
     si->marker_start = 0;
     si->marker_end = 0;
     veejay_msg(VEEJAY_MSG_INFO, "Marker cleared (%d - %d) - (speed=%d)",
 	si->marker_start, si->marker_end, si->speed);
-    return ( clip_update(si,clip_id));
+    return ( sample_update(si,sample_id));
 }
 
-int clip_set_marker_start(int clip_id, int marker)
+int sample_set_marker_start(int sample_id, int marker)
 {
-    clip_info *si = clip_get(clip_id);
+    sample_info *si = sample_get(sample_id);
     if (!si)
 		return -1;
 	if(si->speed < 0 )
@@ -665,12 +665,12 @@ int clip_set_marker_start(int clip_id, int marker)
 	{
 		si->marker_start = marker;
 	}
-    return ( clip_update(si,clip_id));
+    return ( sample_update(si,sample_id));
 }
 
-int clip_set_marker(int clip_id, int start, int end)
+int sample_set_marker(int sample_id, int start, int end)
 {
-    clip_info *si = clip_get(clip_id);
+    sample_info *si = sample_get(sample_id);
     int tmp;
     if(!si) return -1;
     
@@ -686,12 +686,12 @@ int clip_set_marker(int clip_id, int start, int end)
     si->marker_start	= start;
     si->marker_end		= end;
     
-    return ( clip_update( si , clip_id ) );	
+    return ( sample_update( si , sample_id ) );	
 }
 
-int clip_set_marker_end(int clip_id, int marker)
+int sample_set_marker_end(int sample_id, int marker)
 {
-    clip_info *si = clip_get(clip_id);
+    sample_info *si = sample_get(sample_id);
     if (!si)
 		return -1;
 
@@ -707,42 +707,42 @@ int clip_set_marker_end(int clip_id, int marker)
 		si->marker_end 		= marker;
 	}
 	
-    return (clip_update(si,clip_id));
+    return (sample_update(si,sample_id));
 }
 
-int clip_set_description(int clip_id, char *description)
+int sample_set_description(int sample_id, char *description)
 {
-    clip_info *si = clip_get(clip_id);
+    sample_info *si = sample_get(sample_id);
     if (!si)
 	return -1;
     if (!description || strlen(description) <= 0) {
-	snprintf(si->descr, CLIP_MAX_DESCR_LEN, "%s", "Untitled");
+	snprintf(si->descr, SAMPLE_MAX_DESCR_LEN, "%s", "Untitled");
     } else {
-	snprintf(si->descr, CLIP_MAX_DESCR_LEN, "%s", description);
+	snprintf(si->descr, SAMPLE_MAX_DESCR_LEN, "%s", description);
     }
-    return ( clip_update(si, clip_id)==1 ? 0 : 1);
+    return ( sample_update(si, sample_id)==1 ? 0 : 1);
 }
 
-int clip_get_description(int clip_id, char *description)
+int sample_get_description(int sample_id, char *description)
 {
-    clip_info *si;
-    si = clip_get(clip_id);
+    sample_info *si;
+    si = sample_get(sample_id);
     if (!si)
 	return -1;
-    snprintf(description, CLIP_MAX_DESCR_LEN,"%s", si->descr);
+    snprintf(description, SAMPLE_MAX_DESCR_LEN,"%s", si->descr);
     return 0;
 }
 
 /****************************************************************************************************
  *
- * clip_get_endFrame(int clip_id)
+ * sample_get_endFrame(int sample_id)
  *
- * returns last frame of clip.
+ * returns last frame of sample.
  *
  ****************************************************************************************************/
-int clip_get_endFrame(int clip_id)
+int sample_get_endFrame(int sample_id)
 {
-    clip_info *si = clip_get(clip_id);
+    sample_info *si = sample_get(sample_id);
     if (si) {
    	if (si->marker_end != 0 && si->marker_start != 0)
 		return si->marker_end;
@@ -754,33 +754,33 @@ int clip_get_endFrame(int clip_id)
 }
 /****************************************************************************************************
  *
- * clip_del( clip_nr )
+ * sample_del( sample_nr )
  *
- * deletes a clip from the hash. returns -1 on error, 1 on success.
+ * deletes a sample from the hash. returns -1 on error, 1 on success.
  *
  ****************************************************************************************************/
-int clip_del(int clip_id)
+int sample_del(int sample_id)
 {
-    hnode_t *clip_node;
-    clip_info *si;
-    si = clip_get(clip_id);
+    hnode_t *sample_node;
+    sample_info *si;
+    si = sample_get(sample_id);
     if (!si)
 	return -1;
 
-    clip_node = hash_lookup(ClipHash, (void *) si->clip_id);
-    if (clip_node) {
+    sample_node = hash_lookup(SampleHash, (void *) si->sample_id);
+    if (sample_node) {
     int i;
-    for(i=0; i < CLIP_MAX_EFFECTS; i++) 
+    for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
     {
 		if (si->effect_chain[i])
 			free(si->effect_chain[i]);
     }
     if (si)
       free(si);
-    /* store freed clip_id */
-    avail_num[next_avail_num] = clip_id;
+    /* store freed sample_id */
+    avail_num[next_avail_num] = sample_id;
     next_avail_num++;
-    hash_delete(ClipHash, clip_node);
+    hash_delete(SampleHash, sample_node);
 
     return 1;
     }
@@ -789,331 +789,331 @@ int clip_del(int clip_id)
 }
 
 
-void clip_del_all()
+void sample_del_all()
 {
-    int end = clip_size();
+    int end = sample_size();
     int i;
     for (i = 0; i < end; i++) {
-	if (clip_exists(i)) {
-	    clip_del(i);
+	if (sample_exists(i)) {
+	    sample_del(i);
 	}
     }
-    this_clip_id = 0;
+    this_sample_id = 0;
 }
 
 /****************************************************************************************************
  *
- * clip_get_effect( clip_nr , position)
+ * sample_get_effect( sample_nr , position)
  *
  * returns effect in effect_chain on position X , -1 on error.
  *
  ****************************************************************************************************/
-int clip_get_effect(int s1, int position)
+int sample_get_effect(int s1, int position)
 {
-    clip_info *clip = clip_get(s1);
-    if(position >= CLIP_MAX_EFFECTS || position < 0 ) return -1;
-    if(clip) {
-	if(clip->effect_chain[position]->e_flag==0) return -1;
-   	return clip->effect_chain[position]->effect_id;
+    sample_info *sample = sample_get(s1);
+    if(position >= SAMPLE_MAX_EFFECTS || position < 0 ) return -1;
+    if(sample) {
+	if(sample->effect_chain[position]->e_flag==0) return -1;
+   	return sample->effect_chain[position]->effect_id;
     }
     return -1;
 }
 
-int clip_get_effect_any(int s1, int position) {
-	clip_info *clip = clip_get(s1);
-	if(position >= CLIP_MAX_EFFECTS || position < 0 ) return -1;
-	if(clip) {
-		return clip->effect_chain[position]->effect_id;
+int sample_get_effect_any(int s1, int position) {
+	sample_info *sample = sample_get(s1);
+	if(position >= SAMPLE_MAX_EFFECTS || position < 0 ) return -1;
+	if(sample) {
+		return sample->effect_chain[position]->effect_id;
 	}
 	return -1;
 }
 
-int clip_get_chain_status(int s1, int position)
+int sample_get_chain_status(int s1, int position)
 {
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (position >= CLIP_MAX_EFFECTS)
+    if (position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    return clip->effect_chain[position]->e_flag;
+    return sample->effect_chain[position]->e_flag;
 }
 
 
-int clip_get_offset(int s1, int position)
+int sample_get_offset(int s1, int position)
 {
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (position >= CLIP_MAX_EFFECTS)
+    if (position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    return clip->effect_chain[position]->frame_offset;
+    return sample->effect_chain[position]->frame_offset;
 }
 
-int clip_get_trimmer(int s1, int position)
+int sample_get_trimmer(int s1, int position)
 {
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    return clip->effect_chain[position]->frame_trimmer;
+    return sample->effect_chain[position]->frame_trimmer;
 }
 
-int clip_get_chain_volume(int s1, int position)
+int sample_get_chain_volume(int s1, int position)
 {
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (position >= CLIP_MAX_EFFECTS)
+    if (position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    return clip->effect_chain[position]->volume;
+    return sample->effect_chain[position]->volume;
 }
 
-int clip_get_chain_audio(int s1, int position)
+int sample_get_chain_audio(int s1, int position)
 {
-    clip_info *clip = clip_get(s1);
-    if (clip) {
-     return clip->effect_chain[position]->a_flag;
+    sample_info *sample = sample_get(s1);
+    if (sample) {
+     return sample->effect_chain[position]->a_flag;
     }
     return -1;
 }
 
 /****************************************************************************************************
  *
- * clip_get_looptype
+ * sample_get_looptype
  *
- * returns the type of loop set on the clip. 0 on no loop, 1 on ping pong
+ * returns the type of loop set on the sample. 0 on no loop, 1 on ping pong
  * returns -1  on error.
  *
  ****************************************************************************************************/
 
-int clip_get_looptype(int s1)
+int sample_get_looptype(int s1)
 {
-    clip_info *clip = clip_get(s1);
-    if (clip) {
-    	return clip->looptype;
+    sample_info *sample = sample_get(s1);
+    if (sample) {
+    	return sample->looptype;
     }
     return 0;
 }
 
-int clip_get_playmode(int s1)
+int sample_get_playmode(int s1)
 {
-   clip_info *clip = clip_get(s1);
-   if (clip) {
-   	 return clip->playmode;
+   sample_info *sample = sample_get(s1);
+   if (sample) {
+   	 return sample->playmode;
    }
    return -1;
 }
 
 /********************
- * get depth: 1 means do what is in underlying clip.
+ * get depth: 1 means do what is in underlying sample.
  *******************/
-int clip_get_depth(int s1)
+int sample_get_depth(int s1)
 {
-    clip_info *clip = clip_get(s1);
-    if (clip)
-      return clip->depth;
+    sample_info *sample = sample_get(s1);
+    if (sample)
+      return sample->depth;
     return 0;
 }
 
-int clip_set_depth(int s1, int n)
+int sample_set_depth(int s1, int n)
 {
-    clip_info *clip;
-    hnode_t *clip_node;
+    sample_info *sample;
+    hnode_t *sample_node;
 
     if (n == 0 || n == 1) {
-	clip = clip_get(s1);
-	if (!clip)
+	sample = sample_get(s1);
+	if (!sample)
 	    return -1;
-	if (clip->depth == n)
+	if (sample->depth == n)
 	    return 1;
-	clip->depth = n;
-	clip_node = hnode_create(clip);
-	if (!clip_node) {
+	sample->depth = n;
+	sample_node = hnode_create(sample);
+	if (!sample_node) {
 	    return -1;
 	}
 	return 1;
     }
     return -1;
 }
-int clip_set_chain_status(int s1, int position, int status)
+int sample_set_chain_status(int s1, int position, int status)
 {
-    clip_info *clip;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    sample_info *sample;
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    clip = clip_get(s1);
-    if (!clip)
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    clip->effect_chain[position]->e_flag = status;
-    clip_update(clip,s1);
+    sample->effect_chain[position]->e_flag = status;
+    sample_update(sample,s1);
     return 1;
 }
 
 /****************************************************************************************************
  *
- * clip_get_speed
+ * sample_get_speed
  *
- * returns the playback speed set on the clip.
+ * returns the playback speed set on the sample.
  * returns -1  on error.
  *
  ****************************************************************************************************/
-int clip_get_render_entry(int s1)
+int sample_get_render_entry(int s1)
 {
-    clip_info *clip = clip_get(s1);
-    if (clip)
-   	 return clip->active_render_entry;
+    sample_info *sample = sample_get(s1);
+    if (sample)
+   	 return sample->active_render_entry;
     return 0;
 }
 
-int clip_get_speed(int s1)
+int sample_get_speed(int s1)
 {
-    clip_info *clip = clip_get(s1);
-    if (clip)
-   	 return clip->speed;
+    sample_info *sample = sample_get(s1);
+    if (sample)
+   	 return sample->speed;
     return 0;
 }
 
-int clip_get_framedup(int s1) {
-	clip_info *clip = clip_get(s1);
-	if(clip) return clip->dup;
+int sample_get_framedup(int s1) {
+	sample_info *sample = sample_get(s1);
+	if(sample) return sample->dup;
 	return 0;
 }
 
 
-int clip_get_effect_status(int s1)
+int sample_get_effect_status(int s1)
 {
-	clip_info *clip = clip_get(s1);
-	if(clip) return clip->effect_toggle;
+	sample_info *sample = sample_get(s1);
+	if(sample) return sample->effect_toggle;
 	return 0;
 }
 
 /****************************************************************************************************
  *
- * clip_get_effect_arg( clip_nr, position, argnr )
+ * sample_get_effect_arg( sample_nr, position, argnr )
  *
- * returns the required argument set on position X in the effect_chain of clip Y.
+ * returns the required argument set on position X in the effect_chain of sample Y.
  * returns -1 on error.
  ****************************************************************************************************/
-int clip_get_effect_arg(int s1, int position, int argnr)
+int sample_get_effect_arg(int s1, int position, int argnr)
 {
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (position >= CLIP_MAX_EFFECTS)
+    if (position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    if (argnr < 0 || argnr > CLIP_MAX_PARAMETERS)
+    if (argnr < 0 || argnr > SAMPLE_MAX_PARAMETERS)
 	return -1;
-    return clip->effect_chain[position]->arg[argnr];
+    return sample->effect_chain[position]->arg[argnr];
 }
 
-int clip_get_selected_entry(int s1) 
+int sample_get_selected_entry(int s1) 
 {
-	clip_info *clip;
-	clip = clip_get(s1);
-	if(!clip) return -1;
-	return clip->selected_entry;
+	sample_info *sample;
+	sample = sample_get(s1);
+	if(!sample) return -1;
+	return sample->selected_entry;
 }	
 
-int clip_get_all_effect_arg(int s1, int position, int *args, int arg_len, int n_frame)
+int sample_get_all_effect_arg(int s1, int position, int *args, int arg_len, int n_frame)
 {
     int i;
-    clip_info *clip;
-    clip = clip_get(s1);
+    sample_info *sample;
+    sample = sample_get(s1);
     if( arg_len == 0)
 	return 1;
-    if (!clip)
+    if (!sample)
 	return -1;
-    if (position >= CLIP_MAX_EFFECTS)
+    if (position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    if (arg_len < 0 || arg_len > CLIP_MAX_PARAMETERS)
+    if (arg_len < 0 || arg_len > SAMPLE_MAX_PARAMETERS)
 	return -1;
     for (i = 0; i < arg_len; i++) {
-		args[i] = clip->effect_chain[position]->arg[i];
+		args[i] = sample->effect_chain[position]->arg[i];
     }
     return i;
 }
 
 /********************************************
- * clip_has_extra_frame.
+ * sample_has_extra_frame.
  * return 1 if an effect on the given chain entry 
  * requires another frame, -1 otherwise.
  */
-int clip_has_extra_frame(int s1, int position)
+int sample_has_extra_frame(int s1, int position)
 {
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (position >= CLIP_MAX_EFFECTS)
+    if (position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    if (clip->effect_chain[position]->effect_id == -1)
+    if (sample->effect_chain[position]->effect_id == -1)
 	return -1;
     if (vj_effect_get_extra_frame
-	(clip->effect_chain[position]->effect_id) == 1)
+	(sample->effect_chain[position]->effect_id) == 1)
 	return 1;
     return -1;
 }
 
 /****************************************************************************************************
  *
- * clip_set_effect_arg
+ * sample_set_effect_arg
  *
- * sets an argument ARGNR in the chain on position X of clip Y
+ * sets an argument ARGNR in the chain on position X of sample Y
  * returns -1  on error.
  *
  ****************************************************************************************************/
 
-int clip_set_effect_arg(int s1, int position, int argnr, int value)
+int sample_set_effect_arg(int s1, int position, int argnr, int value)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (position >= CLIP_MAX_EFFECTS)
+    if (position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    if (argnr < 0 || argnr > CLIP_MAX_PARAMETERS)
+    if (argnr < 0 || argnr > SAMPLE_MAX_PARAMETERS)
 	return -1;
-    clip->effect_chain[position]->arg[argnr] = value;
-    return ( clip_update(clip,s1));
+    sample->effect_chain[position]->arg[argnr] = value;
+    return ( sample_update(sample,s1));
 }
 
-int clip_set_selected_entry(int s1, int position) 
+int sample_set_selected_entry(int s1, int position) 
 {
-	clip_info *clip = clip_get(s1);
-	if(!clip) return -1;
-	if(position< 0 || position >= CLIP_MAX_EFFECTS) return -1;
-	clip->selected_entry = position;
-	return (clip_update(clip,s1));
+	sample_info *sample = sample_get(s1);
+	if(!sample) return -1;
+	if(position< 0 || position >= SAMPLE_MAX_EFFECTS) return -1;
+	sample->selected_entry = position;
+	return (sample_update(sample,s1));
 }
 
-int clip_set_effect_status(int s1, int status)
+int sample_set_effect_status(int s1, int status)
 {
-	clip_info *clip = clip_get(s1);
-	if(!clip) return -1;
+	sample_info *sample = sample_get(s1);
+	if(!sample) return -1;
 	if(status == 1 || status == 0 )
 	{
-		clip->effect_toggle = status;
-		return ( clip_update(clip,s1));
+		sample->effect_toggle = status;
+		return ( sample_update(sample,s1));
 	}
 	return -1;
 }
 
-int clip_set_chain_channel(int s1, int position, int input)
+int sample_set_chain_channel(int s1, int position, int input)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    clip->effect_chain[position]->channel = input;
-    return ( clip_update(clip,s1));
+    sample->effect_chain[position]->channel = input;
+    return ( sample_update(sample,s1));
 }
 
-int clip_is_deleted(int s1)
+int sample_is_deleted(int s1)
 {
     int i;
     for (i = 0; i < next_avail_num; i++) {
@@ -1123,140 +1123,140 @@ int clip_is_deleted(int s1)
     return 0;
 }
 
-int clip_set_chain_source(int s1, int position, int input)
+int sample_set_chain_source(int s1, int position, int input)
 {
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    clip->effect_chain[position]->source_type = input;
-    return (clip_update(clip,s1));
+    sample->effect_chain[position]->source_type = input;
+    return (sample_update(sample,s1));
 }
 
 /****************************************************************************************************
  *
- * clip_set_speed
+ * sample_set_speed
  *
- * store playback speed in the clip.
+ * store playback speed in the sample.
  * returns -1  on error.
  *
  ****************************************************************************************************/
 
-int clip_set_user_data(int s1, void *data)
+int sample_set_user_data(int s1, void *data)
 {
-	clip_info *clip = clip_get(s1);
-	if(!clip) return -1;
-	clip->user_data = data;
-	return ( clip_update(clip, s1) );
+	sample_info *sample = sample_get(s1);
+	if(!sample) return -1;
+	sample->user_data = data;
+	return ( sample_update(sample, s1) );
 }
 
-void *clip_get_user_data(int s1)
+void *sample_get_user_data(int s1)
 {
-	clip_info *clip = clip_get(s1);
-	if(!clip) return NULL;
-	return clip->user_data;
+	sample_info *sample = sample_get(s1);
+	if(!sample) return NULL;
+	return sample->user_data;
 }
 
-int clip_set_speed(int s1, int speed)
+int sample_set_speed(int s1, int speed)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip) return -1;
-	int len = clip->last_frame[clip->active_render_entry] -
-			clip->first_frame[clip->active_render_entry];
+    sample_info *sample = sample_get(s1);
+    if (!sample) return -1;
+	int len = sample->last_frame[sample->active_render_entry] -
+			sample->first_frame[sample->active_render_entry];
     if( (speed < -(MAX_SPEED) ) || (speed > MAX_SPEED))
 	return -1;
     if( speed > len )
 	return -1;
     if( speed < -(len))
 	return -1;
-    clip->speed = speed;
-    return ( clip_update(clip,s1));
+    sample->speed = speed;
+    return ( sample_update(sample,s1));
 }
 
-int clip_set_render_entry(int s1, int entry)
+int sample_set_render_entry(int s1, int entry)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip) return -1;
-    if( entry < 0 || entry >= CLIP_MAX_RENDER) return -1;
-    clip->active_render_entry = entry;
-    return ( clip_update(clip,s1));
+    sample_info *sample = sample_get(s1);
+    if (!sample) return -1;
+    if( entry < 0 || entry >= SAMPLE_MAX_RENDER) return -1;
+    sample->active_render_entry = entry;
+    return ( sample_update(sample,s1));
 }
 
-int clip_set_framedup(int s1, int n) {
-	clip_info *clip = clip_get(s1);
-	if(!clip) return -1;
-	clip->dup = n;
-	return ( clip_update(clip,s1));
+int sample_set_framedup(int s1, int n) {
+	sample_info *sample = sample_get(s1);
+	if(!sample) return -1;
+	sample->dup = n;
+	return ( sample_update(sample,s1));
 }
 
-int clip_get_chain_channel(int s1, int position)
+int sample_get_chain_channel(int s1, int position)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    return clip->effect_chain[position]->channel;
+    return sample->effect_chain[position]->channel;
 }
 
-int clip_get_chain_source(int s1, int position)
+int sample_get_chain_source(int s1, int position)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    return clip->effect_chain[position]->source_type;
+    return sample->effect_chain[position]->source_type;
 }
 
-int clip_get_loops(int s1)
+int sample_get_loops(int s1)
 {
-    clip_info *clip = clip_get(s1);
-    if (clip) {
-    	return clip->max_loops;
+    sample_info *sample = sample_get(s1);
+    if (sample) {
+    	return sample->max_loops;
 	}
     return -1;
 }
-int clip_get_loops2(int s1)
+int sample_get_loops2(int s1)
 {
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    return clip->max_loops2;
+    return sample->max_loops2;
 }
 
 /****************************************************************************************************
  *
- * clip_set_looptype
+ * sample_set_looptype
  *
- * store looptype in the clip.
+ * store looptype in the sample.
  * returns -1  on error.
  *
  ****************************************************************************************************/
 
-int clip_set_looptype(int s1, int looptype)
+int sample_set_looptype(int s1, int looptype)
 {
-    clip_info *clip = clip_get(s1);
-    if(!clip) return -1;
+    sample_info *sample = sample_get(s1);
+    if(!sample) return -1;
 
     if (looptype == 0 || looptype == 1 || looptype == 2) {
-	clip->looptype = looptype;
-	return ( clip_update(clip,s1));
+	sample->looptype = looptype;
+	return ( sample_update(sample,s1));
     }
     return -1;
 }
 
-int clip_set_playmode(int s1, int playmode)
+int sample_set_playmode(int s1, int playmode)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
 
-    clip->playmode = playmode;
-    return ( clip_update(clip,s1));
+    sample->playmode = playmode;
+    return ( sample_update(sample,s1));
 }
 
 
@@ -1265,121 +1265,121 @@ int clip_set_playmode(int s1, int playmode)
  * update start frame
  *
  *************************************************************************************************/
-int clip_set_startframe(int s1, long frame_num)
+int sample_set_startframe(int s1, long frame_num)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
     if(frame_num < 0) return frame_num = 0;
-    clip->first_frame[clip->active_render_entry] = frame_num;
-    return (clip_update(clip,s1));
+    sample->first_frame[sample->active_render_entry] = frame_num;
+    return (sample_update(sample,s1));
 }
 
-int clip_set_endframe(int s1, long frame_num)
+int sample_set_endframe(int s1, long frame_num)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
     if(frame_num < 0) return -1;
-    clip->last_frame[clip->active_render_entry] = frame_num;
-    return (clip_update(clip,s1));
+    sample->last_frame[sample->active_render_entry] = frame_num;
+    return (sample_update(sample,s1));
 }
-int clip_get_next(int s1)
+int sample_get_next(int s1)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    return clip->next_clip_id;
+    return sample->next_sample_id;
 }
-int clip_set_loops(int s1, int nr_of_loops)
+int sample_set_loops(int s1, int nr_of_loops)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    clip->max_loops = nr_of_loops;
-    return (clip_update(clip,s1));
+    sample->max_loops = nr_of_loops;
+    return (sample_update(sample,s1));
 }
-int clip_set_loops2(int s1, int nr_of_loops)
+int sample_set_loops2(int s1, int nr_of_loops)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    clip->max_loops2 = nr_of_loops;
-    return (clip_update(clip,s1));
+    sample->max_loops2 = nr_of_loops;
+    return (sample_update(sample,s1));
 }
 
-int clip_get_sub_audio(int s1)
+int sample_get_sub_audio(int s1)
 {
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    return clip->sub_audio;
+    return sample->sub_audio;
 }
 
-int clip_set_sub_audio(int s1, int audio)
+int sample_set_sub_audio(int s1, int audio)
 {
-    clip_info *clip = clip_get(s1);
-    if(!clip) return -1;
+    sample_info *sample = sample_get(s1);
+    if(!sample) return -1;
     if (audio < 0 && audio > 1)
 	return -1;
-    clip->sub_audio = audio;
-    return (clip_update(clip,s1));
+    sample->sub_audio = audio;
+    return (sample_update(sample,s1));
 }
 
-int clip_get_audio_volume(int s1)
+int sample_get_audio_volume(int s1)
 {
-    clip_info *clip = clip_get(s1);
-    if (clip) {
-   	 return clip->audio_volume;
+    sample_info *sample = sample_get(s1);
+    if (sample) {
+   	 return sample->audio_volume;
 	}
    return -1;
 }
 
-int clip_set_audio_volume(int s1, int volume)
+int sample_set_audio_volume(int s1, int volume)
 {
-    clip_info *clip = clip_get(s1);
+    sample_info *sample = sample_get(s1);
     if (volume < 0)
 	volume = 0;
     if (volume > 100)
 	volume = 100;
-    clip->audio_volume = volume;
-    return (clip_update(clip,s1));
+    sample->audio_volume = volume;
+    return (sample_update(sample,s1));
 }
 
 
-int clip_set_next(int s1, int next_clip_id)
+int sample_set_next(int s1, int next_sample_id)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
     /* just add, do not verify 
-       on module generation, next clip may not yet be created.
+       on module generation, next sample may not yet be created.
        checks in parameter set in libveejayvj.c
      */
-    clip->next_clip_id = next_clip_id;
-    return (clip_update(clip,s1));
+    sample->next_sample_id = next_sample_id;
+    return (sample_update(sample,s1));
 }
 
 /****************************************************************************************************
  *
  *
  * add a new effect to the chain, returns chain index number on success or -1  if  
- * the requested clip does not exist.
+ * the requested sample does not exist.
  *
  ****************************************************************************************************/
 
-int clip_chain_malloc(int s1)
+int sample_chain_malloc(int s1)
 {
-    clip_info *clip = clip_get(s1);
+    sample_info *sample = sample_get(s1);
     int i=0;
     int e_id = 0; 
     int sum =0;
-    if (!clip)
+    if (!sample)
 	return -1;
-    for(i=0; i < CLIP_MAX_EFFECTS; i++)
+    for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
     {
-	e_id = clip->effect_chain[i]->effect_id;
+	e_id = sample->effect_chain[i]->effect_id;
 	if(e_id)
 	{
 		if(vj_effect_activate(e_id))
@@ -1390,17 +1390,17 @@ int clip_chain_malloc(int s1)
     return sum; 
 }
 
-int clip_chain_free(int s1)
+int sample_chain_free(int s1)
 {
-    clip_info *clip = clip_get(s1);
+    sample_info *sample = sample_get(s1);
     int i=0;
     int e_id = 0; 
     int sum = 0;
-    if (!clip)
+    if (!sample)
 	return -1;
-    for(i=0; i < CLIP_MAX_EFFECTS; i++)
+    for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
     {
-	e_id = clip->effect_chain[i]->effect_id;
+	e_id = sample->effect_chain[i]->effect_id;
 	if(e_id!=-1)
 	{
 		if(vj_effect_initialized(e_id))
@@ -1413,13 +1413,13 @@ int clip_chain_free(int s1)
     return sum;
 }
 
-int clip_chain_add(int s1, int c, int effect_nr)
+int sample_chain_add(int s1, int c, int effect_nr)
 {
     int effect_params = 0, i;
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 		return -1;
-    if (c < 0 || c >= CLIP_MAX_EFFECTS)
+    if (c < 0 || c >= SAMPLE_MAX_EFFECTS)
 		return -1;
 	
 	if ( effect_nr < VJ_IMAGE_EFFECT_MIN ) return -1;
@@ -1431,29 +1431,29 @@ int clip_chain_add(int s1, int c, int effect_nr)
 		return -1;	
 	
 /*
-    if(clip->effect_chain[c]->effect_id != -1 &&
-		clip->effect_chain[c]->effect_id != effect_nr &&
-	  vj_effect_initialized( clip->effect_chain[c]->effect_id ))
+    if(sample->effect_chain[c]->effect_id != -1 &&
+		sample->effect_chain[c]->effect_id != effect_nr &&
+	  vj_effect_initialized( sample->effect_chain[c]->effect_id ))
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Effect %s must be freed??", vj_effect_get_description(
-			clip->effect_chain[c]->effect_id));
-		vj_effect_deactivate( clip->effect_chain[c]->effect_id );
+			sample->effect_chain[c]->effect_id));
+		vj_effect_deactivate( sample->effect_chain[c]->effect_id );
 	}
 */
-    if( clip->effect_chain[c]->effect_id != -1 && clip->effect_chain[c]->effect_id != effect_nr )
+    if( sample->effect_chain[c]->effect_id != -1 && sample->effect_chain[c]->effect_id != effect_nr )
     {
 	//verify if the effect should be discarded
-	if(vj_effect_initialized( clip->effect_chain[c]->effect_id ))
+	if(vj_effect_initialized( sample->effect_chain[c]->effect_id ))
 	{
 		// it is using some memory, see if we can free it ...
 		int i;
 		int ok = 1;
-		for(i=(c+1); i < CLIP_MAX_EFFECTS; i++)
+		for(i=(c+1); i < SAMPLE_MAX_EFFECTS; i++)
 		{
-			if( clip->effect_chain[i]->effect_id == clip->effect_chain[c]->effect_id) ok = 0;
+			if( sample->effect_chain[i]->effect_id == sample->effect_chain[c]->effect_id) ok = 0;
 		}
 		// ok, lets get rid of it.
-		if( ok ) vj_effect_deactivate( clip->effect_chain[c]->effect_id );
+		if( ok ) vj_effect_deactivate( sample->effect_chain[c]->effect_id );
 	}
     }
 
@@ -1465,8 +1465,8 @@ int clip_chain_add(int s1, int c, int effect_nr)
 	if(!vj_effect_activate( effect_nr ))	return -1;
     }
 
-    clip->effect_chain[c]->effect_id = effect_nr;
-    clip->effect_chain[c]->e_flag = 1;	/* effect enabled standard */
+    sample->effect_chain[c]->effect_id = effect_nr;
+    sample->effect_chain[c]->e_flag = 1;	/* effect enabled standard */
     effect_params = vj_effect_get_num_params(effect_nr);
     if (effect_params > 0)
     {
@@ -1474,92 +1474,92 @@ int clip_chain_add(int s1, int c, int effect_nr)
 	for (i = 0; i < effect_params; i++)
         {
 	    int val = vj_effect_get_default(effect_nr, i);
-	    clip->effect_chain[c]->arg[i] = val;
+	    sample->effect_chain[c]->arg[i] = val;
 	}
     }
     if (vj_effect_get_extra_frame(effect_nr))
    {
-    clip->effect_chain[c]->frame_offset = 0;
-    clip->effect_chain[c]->frame_trimmer = 0;
+    sample->effect_chain[c]->frame_offset = 0;
+    sample->effect_chain[c]->frame_trimmer = 0;
 
     if(s1 > 1)
 	 s1 = s1 - 1;
-    if(!clip_exists(s1)) s1 = s1 + 1;
+    if(!sample_exists(s1)) s1 = s1 + 1;
 
-	if(clip->effect_chain[c]->channel <= 0)
-		clip->effect_chain[c]->channel = s1;
-    if(clip->effect_chain[c]->source_type < 0)
-		clip->effect_chain[c]->source_type = 0;
+	if(sample->effect_chain[c]->channel <= 0)
+		sample->effect_chain[c]->channel = s1;
+    if(sample->effect_chain[c]->source_type < 0)
+		sample->effect_chain[c]->source_type = 0;
 
-        veejay_msg(VEEJAY_MSG_DEBUG,"Effect %s on entry %d overlaying with clip %d",
-			vj_effect_get_description(clip->effect_chain[c]->effect_id),c,clip->effect_chain[c]->channel);
+        veejay_msg(VEEJAY_MSG_DEBUG,"Effect %s on entry %d overlaying with sample %d",
+			vj_effect_get_description(sample->effect_chain[c]->effect_id),c,sample->effect_chain[c]->channel);
     }
-    clip_update(clip,s1);
+    sample_update(sample,s1);
 
     return c;			/* return position on which it was added */
 }
 
-int clip_reset_offset(int s1)
+int sample_reset_offset(int s1)
 {
-	clip_info *clip = clip_get(s1);
+	sample_info *sample = sample_get(s1);
 	int i;
-	if(!clip) return -1;
-	for(i=0; i < CLIP_MAX_EFFECTS; i++)
+	if(!sample) return -1;
+	for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
-		clip->effect_chain[i]->frame_offset = 0;
+		sample->effect_chain[i]->frame_offset = 0;
 	}
-	return ( clip_update(clip,s1));
+	return ( sample_update(sample,s1));
 }
 
-int clip_set_offset(int s1, int chain_entry, int frame_offset)
+int sample_set_offset(int s1, int chain_entry, int frame_offset)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    /* set to zero if frame_offset is greater than clip length */
-    //if(frame_offset > (clip->last_frame - clip->first_frame)) frame_offset=0;
-    clip->effect_chain[chain_entry]->frame_offset = frame_offset;
-    return (clip_update(clip,s1));
+    /* set to zero if frame_offset is greater than sample length */
+    //if(frame_offset > (sample->last_frame - sample->first_frame)) frame_offset=0;
+    sample->effect_chain[chain_entry]->frame_offset = frame_offset;
+    return (sample_update(sample,s1));
 }
 
-int clip_set_trimmer(int s1, int chain_entry, int trimmer)
+int sample_set_trimmer(int s1, int chain_entry, int trimmer)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    /* set to zero if frame_offset is greater than clip length */
-    if (chain_entry < 0 || chain_entry >= CLIP_MAX_PARAMETERS)
+    /* set to zero if frame_offset is greater than sample length */
+    if (chain_entry < 0 || chain_entry >= SAMPLE_MAX_PARAMETERS)
 	return -1;
-    if (trimmer > (clip->last_frame[clip->active_render_entry] - clip->first_frame[clip->active_render_entry]))
+    if (trimmer > (sample->last_frame[sample->active_render_entry] - sample->first_frame[sample->active_render_entry]))
 	trimmer = 0;
     if (trimmer < 0 ) trimmer = 0;
-    clip->effect_chain[chain_entry]->frame_trimmer = trimmer;
+    sample->effect_chain[chain_entry]->frame_trimmer = trimmer;
 
-    return (clip_update(clip,s1));
+    return (sample_update(sample,s1));
 }
-int clip_set_chain_audio(int s1, int chain_entry, int val)
+int sample_set_chain_audio(int s1, int chain_entry, int val)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (chain_entry < 0 || chain_entry >= CLIP_MAX_PARAMETERS)
+    if (chain_entry < 0 || chain_entry >= SAMPLE_MAX_PARAMETERS)
 	return -1;
-    clip->effect_chain[chain_entry]->a_flag = val;
-    return ( clip_update(clip,s1));
+    sample->effect_chain[chain_entry]->a_flag = val;
+    return ( sample_update(sample,s1));
 }
 
-int clip_set_chain_volume(int s1, int chain_entry, int volume)
+int sample_set_chain_volume(int s1, int chain_entry, int volume)
 {
-    clip_info *clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    /* set to zero if frame_offset is greater than clip length */
+    /* set to zero if frame_offset is greater than sample length */
     if (volume < 0)
 	volume = 100;
     if (volume > 100)
 	volume = 0;
-    clip->effect_chain[chain_entry]->volume = volume;
-    return (clip_update(clip,s1));
+    sample->effect_chain[chain_entry]->volume = volume;
+    return (sample_update(sample,s1));
 }
 
 
@@ -1567,79 +1567,79 @@ int clip_set_chain_volume(int s1, int chain_entry, int volume)
 
 /****************************************************************************************************
  *
- * clip_chain_clear( clip_nr )
+ * sample_chain_clear( sample_nr )
  *
  * clear the entire effect chain.
  * 
  ****************************************************************************************************/
 
-int clip_chain_clear(int s1)
+int sample_chain_clear(int s1)
 {
     int i, j;
-    clip_info *clip = clip_get(s1);
+    sample_info *sample = sample_get(s1);
 
-    if (!clip)
+    if (!sample)
 	return -1;
     /* the effect chain is gonna be empty! */
-    for (i = 0; i < CLIP_MAX_EFFECTS; i++) {
-	if(clip->effect_chain[i]->effect_id != -1)
+    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
+	if(sample->effect_chain[i]->effect_id != -1)
 	{
-		if(vj_effect_initialized( clip->effect_chain[i]->effect_id ))
-			vj_effect_deactivate( clip->effect_chain[i]->effect_id ); 
+		if(vj_effect_initialized( sample->effect_chain[i]->effect_id ))
+			vj_effect_deactivate( sample->effect_chain[i]->effect_id ); 
 	}
-	clip->effect_chain[i]->effect_id = -1;
-	clip->effect_chain[i]->frame_offset = -1;
-	clip->effect_chain[i]->frame_trimmer = 0;
-	clip->effect_chain[i]->volume = 0;
-	clip->effect_chain[i]->a_flag = 0;
-	clip->effect_chain[i]->source_type = 0;
-	clip->effect_chain[i]->channel = s1;
-	for (j = 0; j < CLIP_MAX_PARAMETERS; j++)
-	    clip->effect_chain[i]->arg[j] = 0;
+	sample->effect_chain[i]->effect_id = -1;
+	sample->effect_chain[i]->frame_offset = -1;
+	sample->effect_chain[i]->frame_trimmer = 0;
+	sample->effect_chain[i]->volume = 0;
+	sample->effect_chain[i]->a_flag = 0;
+	sample->effect_chain[i]->source_type = 0;
+	sample->effect_chain[i]->channel = s1;
+	for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
+	    sample->effect_chain[i]->arg[j] = 0;
     }
 
-    return (clip_update(clip,s1));
+    return (sample_update(sample,s1));
 }
 
 
 /****************************************************************************************************
  *
- * clip_chain_size( clip_nr )
+ * sample_chain_size( sample_nr )
  *
  * returns the number of effects in the effect_chain 
  *
  ****************************************************************************************************/
-int clip_chain_size(int s1)
+int sample_chain_size(int s1)
 {
     int i, e;
 
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
     e = 0;
-    for (i = 0; i < CLIP_MAX_EFFECTS; i++)
-	if (clip->effect_chain[i]->effect_id != -1)
+    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
+	if (sample->effect_chain[i]->effect_id != -1)
 	    e++;
     return e;
 }
 
 /****************************************************************************************************
  *
- * clip_chain_get_free_entry( clip_nr )
+ * sample_chain_get_free_entry( sample_nr )
  *
  * returns last available entry 
  *
  ****************************************************************************************************/
-int clip_chain_get_free_entry(int s1)
+int sample_chain_get_free_entry(int s1)
 {
     int i;
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    for (i = 0; i < CLIP_MAX_EFFECTS; i++)
-	if (clip->effect_chain[i]->effect_id == -1)
+    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
+	if (sample->effect_chain[i]->effect_id == -1)
 	    return i;
     return -1;
 }
@@ -1647,163 +1647,163 @@ int clip_chain_get_free_entry(int s1)
 
 /****************************************************************************************************
  *
- * clip_chain_remove( clip_nr, position )
+ * sample_chain_remove( sample_nr, position )
  *
- * Removes an Effect from the chain of clip <clip_nr> on entry <position>
+ * Removes an Effect from the chain of sample <sample_nr> on entry <position>
  *
  ****************************************************************************************************/
 
-static int _clip_can_free(clip_info *clip, int reserved, int effect_id)
+static int _sample_can_free(sample_info *sample, int reserved, int effect_id)
 {
 	int i;
-	for(i=0; i < CLIP_MAX_EFFECTS; i++)
+	for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
-		if(i != reserved && effect_id == clip->effect_chain[i]->effect_id) return 0;
+		if(i != reserved && effect_id == sample->effect_chain[i]->effect_id) return 0;
 	}
 	return 1;
 }
 
-int clip_chain_remove(int s1, int position)
+int sample_chain_remove(int s1, int position)
 {
     int j;
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    if(clip->effect_chain[position]->effect_id != -1)
+    if(sample->effect_chain[position]->effect_id != -1)
     {
-	if(vj_effect_initialized( clip->effect_chain[position]->effect_id) && 
-	 _clip_can_free(clip,position, clip->effect_chain[position]->effect_id))
-		vj_effect_deactivate( clip->effect_chain[position]->effect_id);    
+	if(vj_effect_initialized( sample->effect_chain[position]->effect_id) && 
+	 _sample_can_free(sample,position, sample->effect_chain[position]->effect_id))
+		vj_effect_deactivate( sample->effect_chain[position]->effect_id);    
     }
-    clip->effect_chain[position]->effect_id = -1;
-    clip->effect_chain[position]->frame_offset = -1;
-    clip->effect_chain[position]->frame_trimmer = 0;
-    clip->effect_chain[position]->volume = 0;
-    clip->effect_chain[position]->a_flag = 0;
-    clip->effect_chain[position]->source_type = 0;
-    clip->effect_chain[position]->channel = 0;
-    for (j = 0; j < CLIP_MAX_PARAMETERS; j++)
-	clip->effect_chain[position]->arg[j] = 0;
+    sample->effect_chain[position]->effect_id = -1;
+    sample->effect_chain[position]->frame_offset = -1;
+    sample->effect_chain[position]->frame_trimmer = 0;
+    sample->effect_chain[position]->volume = 0;
+    sample->effect_chain[position]->a_flag = 0;
+    sample->effect_chain[position]->source_type = 0;
+    sample->effect_chain[position]->channel = 0;
+    for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
+	sample->effect_chain[position]->arg[j] = 0;
 
-    return (clip_update(clip,s1));
+    return (sample_update(sample,s1));
 }
 
-int clip_set_loop_dec(int s1, int active, int periods) {
-    clip_info *clip = clip_get(s1);
-    if(!clip) return -1;
+int sample_set_loop_dec(int s1, int active, int periods) {
+    sample_info *sample = sample_get(s1);
+    if(!sample) return -1;
     if(periods <=0) return -1;
     if(periods > 25) return -1;
-    clip->loop_dec = active;
-    clip->loop_periods = periods;
-    return (clip_update(clip,s1));
+    sample->loop_dec = active;
+    sample->loop_periods = periods;
+    return (sample_update(sample,s1));
 }
 
-int clip_get_loop_dec(int s1) {
-    clip_info *clip = clip_get(s1);
-    if(!clip) return -1;
-    return clip->loop_dec;
+int sample_get_loop_dec(int s1) {
+    sample_info *sample = sample_get(s1);
+    if(!sample) return -1;
+    return sample->loop_dec;
 }
 
-int clip_apply_loop_dec(int s1, double fps) {
-    clip_info *clip = clip_get(s1);
+int sample_apply_loop_dec(int s1, double fps) {
+    sample_info *sample = sample_get(s1);
     int inc = (int) fps;
-    if(!clip) return -1;
-    if(clip->loop_dec==1) {
-	if( (clip->first_frame[clip->active_render_entry] + inc) >= clip->last_frame[clip->active_render_entry]) {
-		clip->first_frame[clip->active_render_entry] = clip->last_frame[clip->active_render_entry]-1;
-		clip->loop_dec = 0;
+    if(!sample) return -1;
+    if(sample->loop_dec==1) {
+	if( (sample->first_frame[sample->active_render_entry] + inc) >= sample->last_frame[sample->active_render_entry]) {
+		sample->first_frame[sample->active_render_entry] = sample->last_frame[sample->active_render_entry]-1;
+		sample->loop_dec = 0;
 	}
 	else {
-		clip->first_frame[clip->active_render_entry] += (inc / clip->loop_periods);
+		sample->first_frame[sample->active_render_entry] += (inc / sample->loop_periods);
 	}
 	veejay_msg(VEEJAY_MSG_DEBUG, "New starting postions are %ld - %ld",
-		clip->first_frame[clip->active_render_entry], clip->last_frame[clip->active_render_entry]);
-	return ( clip_update(clip, s1));
+		sample->first_frame[sample->active_render_entry], sample->last_frame[sample->active_render_entry]);
+	return ( sample_update(sample, s1));
     }
     return -1;
 }
 
 
-/* print clip status information into an allocated string str*/
-//int clip_chain_sprint_status(int s1, int entry, int changed, int r_changed,char *str,
+/* print sample status information into an allocated string str*/
+//int sample_chain_sprint_status(int s1, int entry, int changed, int r_changed,char *str,
 //			       int frame)
-int	clip_chain_sprint_status( int s1,int pfps, int frame, int mode, char *str )
+int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode, char *str )
 {
-    clip_info *clip;
-    clip = clip_get(s1);
-    if (!clip)
+    sample_info *sample;
+    sample = sample_get(s1);
+    if (!sample)
 	return -1;
 	/*
 	fprintf(stderr,
       "%d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 	    frame,
-	    clip->active_render_entry,
+	    sample->active_render_entry,
 	    r_changed,
 	    s1,
-	    clip->first_frame[clip->active_render_entry],
-	    clip->last_frame[clip->active_render_entry],
-	    clip->speed,
-	    clip->looptype,
-	    clip->max_loops,
-	    clip->max_loops2,
-	    clip->next_clip_id,
-	    clip->depth,
-	    clip->playmode,
-	    clip->audio_volume,
-	    clip->selected_entry,
- 	    clip->effect_toggle,
+	    sample->first_frame[sample->active_render_entry],
+	    sample->last_frame[sample->active_render_entry],
+	    sample->speed,
+	    sample->looptype,
+	    sample->max_loops,
+	    sample->max_loops2,
+	    sample->next_sample_id,
+	    sample->depth,
+	    sample->playmode,
+	    sample->audio_volume,
+	    sample->selected_entry,
+ 	    sample->effect_toggle,
 	    changed,
-	    vj_effect_real_to_sequence(clip->effect_chain[entry]->effect_id),
+	    vj_effect_real_to_sequence(sample->effect_chain[entry]->effect_id),
 				      // effect_id),
-	    clip->effect_chain[entry]->e_flag,
-	    clip->effect_chain[entry]->frame_offset,
-	    clip->effect_chain[entry]->frame_trimmer,
-	    clip->effect_chain[entry]->source_type,
-	    clip->effect_chain[entry]->channel,
-	    this_clip_id - 1);
+	    sample->effect_chain[entry]->e_flag,
+	    sample->effect_chain[entry]->frame_offset,
+	    sample->effect_chain[entry]->frame_trimmer,
+	    sample->effect_chain[entry]->source_type,
+	    sample->effect_chain[entry]->channel,
+	    this_sample_id - 1);
 	*/
 /*
 	
     sprintf(str,
 	    "%d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d",
 /	    frame,
-	    clip->active_render_entry,
+	    sample->active_render_entry,
 	    r_changed,
-	    clip->selected_entry,
-	    clip->effect_toggle,
+	    sample->selected_entry,
+	    sample->effect_toggle,
 	    s1,
-	    clip->first_frame[clip->active_render_entry],
-	    clip->last_frame[clip->active_render_entry],
-	    clip->speed,
-	    clip->looptype,
-	    clip->max_loops,
-	    clip->max_loops2,
-	    clip->next_clip_id,
-	    clip->depth,
-	    clip->playmode,
-	    clip->dup,
-	    clip->audio_volume,
+	    sample->first_frame[sample->active_render_entry],
+	    sample->last_frame[sample->active_render_entry],
+	    sample->speed,
+	    sample->looptype,
+	    sample->max_loops,
+	    sample->max_loops2,
+	    sample->next_sample_id,
+	    sample->depth,
+	    sample->playmode,
+	    sample->dup,
+	    sample->audio_volume,
 	    0, 
 	    0, 
  	   0,
-	    clip->encoder_active,
-	    clip->encoder_duration,
-	    clip->encoder_succes_frames,
-	    clip->auto_switch,
+	    sample->encoder_active,
+	    sample->encoder_duration,
+	    sample->encoder_succes_frames,
+	    sample->auto_switch,
 	    changed,
-	    vj_effect_real_to_sequence(clip->effect_chain[entry]->effect_id),
+	    vj_effect_real_to_sequence(sample->effect_chain[entry]->effect_id),
 				      // effect_id),
-	    clip->effect_chain[entry]->e_flag,
-	    clip->effect_chain[entry]->frame_offset,
-	    clip->effect_chain[entry]->frame_trimmer,
-	    clip->effect_chain[entry]->source_type,
-	    clip->effect_chain[entry]->channel,
-	    clip->effect_chain[entry]->a_flag,
-	    clip->effect_chain[entry]->volume,
-	    this_clip_id );
+	    sample->effect_chain[entry]->e_flag,
+	    sample->effect_chain[entry]->frame_offset,
+	    sample->effect_chain[entry]->frame_trimmer,
+	    sample->effect_chain[entry]->source_type,
+	    sample->effect_chain[entry]->channel,
+	    sample->effect_chain[entry]->a_flag,
+	    sample->effect_chain[entry]->volume,
+	    this_sample_id );
     */
 
 	sprintf(str,
@@ -1812,17 +1812,17 @@ int	clip_chain_sprint_status( int s1,int pfps, int frame, int mode, char *str )
 		frame,
 		mode,
 		s1,
-		clip->effect_toggle,
-		clip->first_frame[ clip->active_render_entry ],
-		clip->last_frame[ clip->active_render_entry ],
-		clip->speed,
-		clip->looptype,
-		clip->encoder_active,
-		clip->encoder_duration,
-		clip->encoder_succes_frames,
-		clip_size(),
-		clip->marker_start,
-		clip->marker_end);
+		sample->effect_toggle,
+		sample->first_frame[ sample->active_render_entry ],
+		sample->last_frame[ sample->active_render_entry ],
+		sample->speed,
+		sample->looptype,
+		sample->encoder_active,
+		sample->encoder_duration,
+		sample->encoder_succes_frames,
+		sample_size(),
+		sample->marker_start,
+		sample->marker_end);
 		
 		
  
@@ -1882,7 +1882,7 @@ void ParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg)
     if (cur == NULL)
 	return;
 
-    while (cur != NULL && argIndex < CLIP_MAX_PARAMETERS) {
+    while (cur != NULL && argIndex < SAMPLE_MAX_PARAMETERS) {
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_ARGUMENT))
 	{
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
@@ -1912,12 +1912,12 @@ void ParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg)
  * Parse an effect using libxml2
  *
  ****************************************************************************************************/
-void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_clip)
+void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 {
     xmlChar *xmlTemp = NULL;
     unsigned char *chTemp = NULL;
     int effect_id = -1;
-    int arg[CLIP_MAX_PARAMETERS];
+    int arg[SAMPLE_MAX_PARAMETERS];
     int i;
     int source_type = 0;
     int channel = 0;
@@ -1928,7 +1928,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_clip)
     int a_flag = 0;
     int chain_index = 0;
 
-    for (i = 0; i < CLIP_MAX_PARAMETERS; i++) {
+    for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++) {
 	arg[i] = 0;
     }
 
@@ -2044,28 +2044,28 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_clip)
 
     if (effect_id != -1) {
 	int j;
-	if (clip_chain_add(dst_clip, chain_index, effect_id) == -1) {
+	if (sample_chain_add(dst_sample, chain_index, effect_id) == -1) {
 	    veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d)\n",
 		    effect_id, chain_index);
 	}
 
 	/* load the parameter values */
 	for (j = 0; j < vj_effect_get_num_params(effect_id); j++) {
-	    clip_set_effect_arg(dst_clip, chain_index, j, arg[j]);
+	    sample_set_effect_arg(dst_sample, chain_index, j, arg[j]);
 	}
-	clip_set_chain_channel(dst_clip, chain_index, channel);
-	clip_set_chain_source(dst_clip, chain_index, source_type);
+	sample_set_chain_channel(dst_sample, chain_index, channel);
+	sample_set_chain_source(dst_sample, chain_index, source_type);
 
 	/* set other parameters */
 	if (a_flag) {
-	    clip_set_chain_audio(dst_clip, chain_index, a_flag);
-	    clip_set_chain_volume(dst_clip, chain_index, volume);
+	    sample_set_chain_audio(dst_sample, chain_index, a_flag);
+	    sample_set_chain_volume(dst_sample, chain_index, volume);
 	}
 
-	clip_set_chain_status(dst_clip, chain_index, e_flag);
+	sample_set_chain_status(dst_sample, chain_index, e_flag);
 
-	clip_set_offset(dst_clip, chain_index, frame_offset);
-	clip_set_trimmer(dst_clip, chain_index, frame_trimmer);
+	sample_set_offset(dst_sample, chain_index, frame_offset);
+	sample_set_trimmer(dst_sample, chain_index, frame_trimmer);
     }
 
 }
@@ -2077,12 +2077,12 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_clip)
  * Parse the effects array 
  *
  ****************************************************************************************************/
-void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
+void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
 {
     int effectIndex = 0;
-    while (cur != NULL && effectIndex < CLIP_MAX_EFFECTS) {
+    while (cur != NULL && effectIndex < SAMPLE_MAX_EFFECTS) {
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECT)) {
-	    ParseEffect(doc, cur->xmlChildrenNode, skel->clip_id);
+	    ParseEffect(doc, cur->xmlChildrenNode, skel->sample_id);
 		effectIndex++;
 	}
 	//effectIndex++;
@@ -2092,23 +2092,23 @@ void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 
 /*************************************************************************************************
  *
- * ParseClip()
+ * ParseSample()
  *
- * Parse a clip
+ * Parse a sample
  *
  ****************************************************************************************************/
-void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
+void ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
 {
 
     xmlChar *xmlTemp = NULL;
     unsigned char *chTemp = NULL;
 
     while (cur != NULL) {
-	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_CLIPID)) {
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLEID)) {
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		skel->clip_id = atoi(chTemp);
+		skel->sample_id = atoi(chTemp);
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2124,11 +2124,11 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 		}
 		if(xmlTemp) xmlFree(xmlTemp);
 	}
-	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_CLIPDESCR)) {
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLEDESCR)) {
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		snprintf(skel->descr, CLIP_MAX_DESCR_LEN,"%s", chTemp);
+		snprintf(skel->descr, SAMPLE_MAX_DESCR_LEN,"%s", chTemp);
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2138,7 +2138,7 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		clip_set_startframe(skel->clip_id, atol(chTemp));
+		sample_set_startframe(skel->sample_id, atol(chTemp));
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2147,7 +2147,7 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		clip_set_audio_volume(skel->clip_id, atoi(chTemp));
+		sample_set_audio_volume(skel->sample_id, atoi(chTemp));
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2157,7 +2157,7 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		clip_set_endframe(skel->clip_id, atol(chTemp));
+		sample_set_endframe(skel->sample_id, atol(chTemp));
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2166,7 +2166,7 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		clip_set_speed(skel->clip_id, atoi(chTemp));
+		sample_set_speed(skel->sample_id, atoi(chTemp));
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2176,7 +2176,7 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 		chTemp = UTF8toLAT1(xmlTemp);
 		if(chTemp)
 		{
-			clip_set_framedup(skel->clip_id, atoi(chTemp));
+			sample_set_framedup(skel->sample_id, atoi(chTemp));
 			free(chTemp);
 		}
 		if(xmlTemp) xmlFree(xmlTemp);
@@ -2185,7 +2185,7 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		clip_set_looptype(skel->clip_id, atoi(chTemp));
+		sample_set_looptype(skel->sample_id, atoi(chTemp));
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2194,16 +2194,16 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		clip_set_loops(skel->clip_id, atoi(chTemp));
+		sample_set_loops(skel->sample_id, atoi(chTemp));
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
-	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_NEXTCLIP)) {
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_NEXTSAMPLE)) {
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		clip_set_next(skel->clip_id, atoi(chTemp));
+		sample_set_next(skel->sample_id, atoi(chTemp));
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2212,7 +2212,7 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		clip_set_depth(skel->clip_id, atoi(chTemp));
+		sample_set_depth(skel->sample_id, atoi(chTemp));
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2221,7 +2221,7 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		clip_set_playmode(skel->clip_id, atoi(chTemp));
+		sample_set_playmode(skel->sample_id, atoi(chTemp));
 	        free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2277,14 +2277,14 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 	   xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	   chTemp = UTF8toLAT1( xmlTemp );
 	   if( chTemp ){
-	   //clip_set_volume(skel->clip_id, atoi(chTemp ));
+	   //sample_set_volume(skel->sample_id, atoi(chTemp ));
 	   }
 	   }
 	   if (!xmlStrcmp(cur->name, (const xmlChar *)XMLTAG_SUBAUDIO)) {
 	   xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	   chTemp = UTF8toLAT1( xmlTemp );
 	   if( chTemp ){
-	   clip_set_sub_audio(skel->clip_id, atoi(chTemp ));
+	   sample_set_sub_audio(skel->sample_id, atoi(chTemp ));
 	   }
 	   }
 	 */
@@ -2292,7 +2292,7 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		clip_set_marker_start(skel->clip_id, atoi(chTemp));
+		sample_set_marker_start(skel->sample_id, atoi(chTemp));
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2301,7 +2301,7 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		clip_set_marker_end(skel->clip_id, atoi(chTemp));
+		sample_set_marker_end(skel->sample_id, atoi(chTemp));
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2322,21 +2322,21 @@ void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel)
 
 /****************************************************************************************************
  *
- * clip_readFromFile( filename )
+ * sample_readFromFile( filename )
  *
- * load clips and effect chain from an xml file. 
+ * load samples and effect chain from an xml file. 
  *
  ****************************************************************************************************/
-int clip_readFromFile(char *clipFile)
+int sample_readFromFile(char *sampleFile)
 {
     xmlDocPtr doc;
     xmlNodePtr cur;
-    clip_info *skel;
+    sample_info *skel;
 
     /*
      * build an XML tree from a the file;
      */
-    doc = xmlParseFile(clipFile);
+    doc = xmlParseFile(sampleFile);
     if (doc == NULL) {
 	return (0);
     }
@@ -2347,25 +2347,25 @@ int clip_readFromFile(char *clipFile)
 
     cur = xmlDocGetRootElement(doc);
     if (cur == NULL) {
-	veejay_msg(VEEJAY_MSG_ERROR,"Empty cliplist. Nothing to do.\n");
+	veejay_msg(VEEJAY_MSG_ERROR,"Empty samplelist. Nothing to do.\n");
 	xmlFreeDoc(doc);
 	return (0);
     }
 
-    if (xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_CLIPS)) {
-	veejay_msg(VEEJAY_MSG_ERROR, "This is not a cliplist: %s",
-		XMLTAG_CLIPS);
+    if (xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLES)) {
+	veejay_msg(VEEJAY_MSG_ERROR, "This is not a samplelist: %s",
+		XMLTAG_SAMPLES);
 	xmlFreeDoc(doc);
 	return (0);
     }
 
     cur = cur->xmlChildrenNode;
     while (cur != NULL) {
-	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_CLIP)) {
-	    skel = clip_skeleton_new(0, 1);
-	    clip_store(skel);
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLE)) {
+	    skel = sample_skeleton_new(0, 1);
+	    sample_store(skel);
 	    if (skel != NULL) {
-		ParseClip(doc, cur->xmlChildrenNode, skel);
+		ParseSample(doc, cur->xmlChildrenNode, skel);
 	    }
 	}
 	cur = cur->next;
@@ -2379,7 +2379,7 @@ void CreateArguments(xmlNodePtr node, int *arg, int argcount)
 {
     int i;
     char buffer[100];
-    argcount = CLIP_MAX_PARAMETERS;
+    argcount = SAMPLE_MAX_PARAMETERS;
     for (i = 0; i < argcount; i++) {
 	//if (arg[i]) {
 	    sprintf(buffer, "%d", arg[i]);
@@ -2390,7 +2390,7 @@ void CreateArguments(xmlNodePtr node, int *arg, int argcount)
 }
 
 
-void CreateEffect(xmlNodePtr node, clip_eff_chain * effect, int position)
+void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int position)
 {
     char buffer[100];
     xmlNodePtr childnode;
@@ -2443,12 +2443,12 @@ void CreateEffect(xmlNodePtr node, clip_eff_chain * effect, int position)
 
 
 
-void CreateEffects(xmlNodePtr node, clip_eff_chain ** effects)
+void CreateEffects(xmlNodePtr node, sample_eff_chain ** effects)
 {
     int i;
     xmlNodePtr childnode;
 
-    for (i = 0; i < CLIP_MAX_EFFECTS; i++) {
+    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
 	if (effects[i]->effect_id != -1) {
 	    childnode =
 		xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECT,
@@ -2459,74 +2459,74 @@ void CreateEffects(xmlNodePtr node, clip_eff_chain ** effects)
     
 }
 
-void CreateClip(xmlNodePtr node, clip_info * clip)
+void CreateSample(xmlNodePtr node, sample_info * sample)
 {
     char buffer[100];
     xmlNodePtr childnode;
 
-    sprintf(buffer, "%d", clip->clip_id);
-    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_CLIPID,
+    sprintf(buffer, "%d", sample->sample_id);
+    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_SAMPLEID,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", clip->effect_toggle);
+    sprintf(buffer, "%d", sample->effect_toggle);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_CHAIN_ENABLED,
 		(const xmlChar *) buffer);
 
 
-    sprintf(buffer,"%d", clip->active_render_entry);
+    sprintf(buffer,"%d", sample->active_render_entry);
     xmlNewChild(node,NULL,(const xmlChar*) XMLTAG_RENDER_ENTRY,(const xmlChar*)buffer);
-    sprintf(buffer, "%s", clip->descr);
-    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_CLIPDESCR,
+    sprintf(buffer, "%s", sample->descr);
+    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_SAMPLEDESCR,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%ld", clip->first_frame[clip->active_render_entry]);
+    sprintf(buffer, "%ld", sample->first_frame[sample->active_render_entry]);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_FIRSTFRAME,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%ld", clip->last_frame[clip->active_render_entry]);
+    sprintf(buffer, "%ld", sample->last_frame[sample->active_render_entry]);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_LASTFRAME,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", clip->speed);
+    sprintf(buffer, "%d", sample->speed);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_SPEED,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", clip->dup);
+    sprintf(buffer, "%d", sample->dup);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_FRAMEDUP,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", clip->looptype);
+    sprintf(buffer, "%d", sample->looptype);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_LOOPTYPE,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", clip->max_loops);
+    sprintf(buffer, "%d", sample->max_loops);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_MAXLOOPS,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", clip->next_clip_id);
-    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_NEXTCLIP,
+    sprintf(buffer, "%d", sample->next_sample_id);
+    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_NEXTSAMPLE,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", clip->depth);
+    sprintf(buffer, "%d", sample->depth);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_DEPTH,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", clip->playmode);
+    sprintf(buffer, "%d", sample->playmode);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_PLAYMODE,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", clip->audio_volume);
+    sprintf(buffer, "%d", sample->audio_volume);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_VOL,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", clip->marker_start);
+    sprintf(buffer, "%d", sample->marker_start);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_MARKERSTART,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%d", clip->marker_end);
+    sprintf(buffer, "%d", sample->marker_end);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_MARKEREND,
 		(const xmlChar *) buffer);
 
-	sprintf(buffer,"%d",clip->fader_active);
+	sprintf(buffer,"%d",sample->fader_active);
 	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_FADER_ACTIVE,
 		(const xmlChar *) buffer);
-	sprintf(buffer,"%f",clip->fader_inc);
+	sprintf(buffer,"%f",sample->fader_inc);
 	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_FADER_INC,
 		(const xmlChar *) buffer);
-	sprintf(buffer,"%f",clip->fader_val);
+	sprintf(buffer,"%f",sample->fader_val);
 	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_FADER_VAL,
 		(const xmlChar *) buffer);
-	sprintf(buffer,"%d",clip->fader_direction);
+	sprintf(buffer,"%d",sample->fader_direction);
 	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_FADER_DIRECTION,
 		(const xmlChar *) buffer);
-	sprintf(buffer,"%d",clip->selected_entry);
+	sprintf(buffer,"%d",sample->selected_entry);
 	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_LASTENTRY,
 		(const xmlChar *)buffer);
     childnode =
@@ -2534,40 +2534,40 @@ void CreateClip(xmlNodePtr node, clip_info * clip)
 
     
     
-    CreateEffects(childnode, clip->effect_chain);
+    CreateEffects(childnode, sample->effect_chain);
 
 }
 
 /****************************************************************************************************
  *
- * clip_writeToFile( filename )
+ * sample_writeToFile( filename )
  *
- * writes all clip info to a file. 
+ * writes all sample info to a file. 
  *
  ****************************************************************************************************/
-int clip_writeToFile(char *clipFile)
+int sample_writeToFile(char *sampleFile)
 {
     int i;
 	char *encoding = "UTF-8";	
-    clip_info *next_clip;
+    sample_info *next_sample;
     xmlDocPtr doc;
     xmlNodePtr rootnode, childnode;
 
     doc = xmlNewDoc("1.0");
     rootnode =
-	xmlNewDocNode(doc, NULL, (const xmlChar *) XMLTAG_CLIPS, NULL);
+	xmlNewDocNode(doc, NULL, (const xmlChar *) XMLTAG_SAMPLES, NULL);
     xmlDocSetRootElement(doc, rootnode);
-    for (i = 1; i < clip_size(); i++) {
-	next_clip = clip_get(i);
-	if (next_clip) {
+    for (i = 1; i < sample_size(); i++) {
+	next_sample = sample_get(i);
+	if (next_sample) {
 	    childnode =
 		xmlNewChild(rootnode, NULL,
-			    (const xmlChar *) XMLTAG_CLIP, NULL);
-	    CreateClip(childnode, next_clip);
+			    (const xmlChar *) XMLTAG_SAMPLE, NULL);
+	    CreateSample(childnode, next_sample);
 	}
     }
-    //xmlSaveFormatFile(clipFile, doc, 1);
-	xmlSaveFormatFileEnc( clipFile, doc, encoding, 1 );
+    //xmlSaveFormatFile(sampleFile, doc, 1);
+	xmlSaveFormatFileEnc( sampleFile, doc, encoding, 1 );
     xmlFreeDoc(doc);
 
     return 1;

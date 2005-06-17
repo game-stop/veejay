@@ -149,7 +149,7 @@ typedef struct {
     struct mjpeg_sync syncinfo[MJPEG_MAX_BUF];	/* synchronization info */
     uint64_t *save_list;	/* for editing purposes */
     int abuf_len;
-    double spas;		/* seconds per audio clip */
+    double spas;		/* seconds per audio sample */
     int audio_mute;		/* controls whether to currently play audio or not */
     int state;			/* playing, paused or stoppped */
     int effect;			/* realtime effect during play */
@@ -158,10 +158,10 @@ typedef struct {
     int offline_ready;
     int offline_record;
     int offline_tag_id;
-    int offline_created_clip;
-    int clip_record;
-    int clip_record_id;
-    int clip_record_switch;
+    int offline_created_sample;
+    int sample_record;
+    int sample_record_id;
+    int sample_record_switch;
 	int full_screen[2];
     int tag_record_switch;
     int tag_record;
@@ -199,23 +199,23 @@ typedef struct {
 
 /* User Control , it keeps track of user's actions */
 typedef struct {
-    int playback_mode;		/* playing plain,clip,tag or pattern */
-    int clip_id;		/* which clip or tag is beeing played */
+    int playback_mode;		/* playing plain,sample,tag or pattern */
+    int sample_id;		/* which sample or tag is beeing played */
     char *filename;
     int hackme;
     int take_bg;
     int direction;		/* forward, reverse or pause */
     int looptype;		/* loop setting depending on playmode */
-    long clip_end;		/* end of clip */
-    long clip_start;		/* start of clip */
-    int play_clip;		/* playing clip or not */
+    long sample_end;		/* end of sample */
+    long sample_start;		/* start of sample */
+    int play_sample;		/* playing sample or not */
     int key_effect;		/* selected effect */
     int effect_id;		/* current effect id */
     int loops;
     int next;
-    int clip_key;		/* clip by key */
-    int clip_select;		/* selected clip */
-    int clip_pressed;		/* which clip key was pressed */
+    int sample_key;		/* sample by key */
+    int sample_select;		/* selected sample */
+    int sample_pressed;		/* which sample key was pressed */
     int chain_changed;
     int use_timer;
     int current_link;
@@ -274,7 +274,7 @@ typedef struct {
     char stream_outname[256];
     int stream_outformat;
     int stream_enabled;
-    int last_clip_id;
+    int last_sample_id;
     int last_tag_id;
     int nstreams;
     int sfd;

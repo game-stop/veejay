@@ -47,10 +47,10 @@ typedef struct {
     unsigned long fmt_len;
     unsigned short wFormatTag;
     unsigned short nChannels;
-    unsigned long nClipsPerSec;
+    unsigned long nSamplesPerSec;
     unsigned long nAvgBytesPerSec;
     unsigned short nBlockAlign;
-    unsigned short wBitsPerClip;
+    unsigned short wBitsPerSample;
     unsigned long datatag;
     unsigned long datalen;
 } t_wave_hdr;

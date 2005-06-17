@@ -21,7 +21,7 @@
 
 veejay_t *veejay_malloc(void);
 
-void veejay_change_playback_mode(veejay_t *info, int pm, int clip);
+void veejay_change_playback_mode(veejay_t *info, int pm, int sample);
 
 int veejay_free(veejay_t *info);
 
@@ -47,7 +47,7 @@ int veejay_close(veejay_t *info);
 
 void veejay_stop_sampling(veejay_t *info);
 
-void veejay_set_clip(veejay_t *info, int clip);
+void veejay_set_sample(veejay_t *info, int sample);
 
 int veejay_set_frame(veejay_t *info, long frame_num);
 
@@ -66,7 +66,7 @@ int veejay_set_framedup(veejay_t *info, int n);
 
 int veejay_get_state(veejay_t *info); 
 
-int veejay_create_clip(veejay_t * info, long start, long end);
+int veejay_create_sample(veejay_t * info, long start, long end);
 
 int veejay_edit_copy(veejay_t *info, long start, long end);
 

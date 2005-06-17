@@ -18,8 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef CLIPADM_H
-#define CLIPADM_H
+#ifndef SAMPLEADM_H
+#define SAMPLEADM_H
 #include <stdint.h>
 #include <config.h>
 #include <libvje/vje.h>
@@ -29,26 +29,26 @@
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>
 #endif
-#define CLIP_MAX_RENDER     10 /* 10 at most */
-#define CLIP_MAX_CLIPS  16384 /* 4096 clips at most */
+#define SAMPLE_MAX_RENDER     10 /* 10 at most */
+#define SAMPLE_MAX_SAMPLES  16384 /* 4096 samples at most */
 
-#define CLIP_MAX_PARAMETERS 10	/* 10 parameters per effect at most */
-#define CLIP_ARG1 0
-#define CLIP_ARG2 1
-#define CLIP_ARG3 2
-#define CLIP_ARG4 3
-#define CLIP_ARG5 4
-#define CLIP_ARG6 5
-#define CLIP_ARG7 6
-#define CLIP_ARG8 7
-#define CLIP_ARG9 8
-#define CLIP_ARG10 9
+#define SAMPLE_MAX_PARAMETERS 10	/* 10 parameters per effect at most */
+#define SAMPLE_ARG1 0
+#define SAMPLE_ARG2 1
+#define SAMPLE_ARG3 2
+#define SAMPLE_ARG4 3
+#define SAMPLE_ARG5 4
+#define SAMPLE_ARG6 5
+#define SAMPLE_ARG7 6
+#define SAMPLE_ARG8 7
+#define SAMPLE_ARG9 8
+#define SAMPLE_ARG10 9
 #ifdef HAVE_XML2
 #define XMLTAG_RENDER_ENTRY "render_entry"
-#define XMLTAG_CLIPS    "veejay_clips"
-#define XMLTAG_CLIP     "clip"
-#define XMLTAG_CLIPID   "clipid"
-#define XMLTAG_CLIPDESCR "description"
+#define XMLTAG_SAMPLES    "veejay_samples"
+#define XMLTAG_SAMPLE     "sample"
+#define XMLTAG_SAMPLEID   "sampleid"
+#define XMLTAG_SAMPLEDESCR "description"
 #define XMLTAG_FIRSTFRAME "startframe"
 #define XMLTAG_LASTFRAME  "endframe"
 #define XMLTAG_EFFECTS    "effects"
@@ -68,7 +68,7 @@
 #define XMLTAG_FRAMEDUP   "frameduplicator"
 #define XMLTAG_LOOPTYPE   "looptype"
 #define XMLTAG_MAXLOOPS   "maxloops"
-#define XMLTAG_NEXTCLIP "nextclip"
+#define XMLTAG_NEXTSAMPLE "nextsample"
 #define XMLTAG_DEPTH	  "depth"
 #define XMLTAG_PLAYMODE   "playmode"
 #define XMLTAG_VOLUME	  "volume"
@@ -83,28 +83,28 @@
 #define XMLTAG_LASTENTRY    "current_entry"
 #define XMLTAG_CHAIN_ENABLED "fx"
 #endif
-#define CLIP_FREEZE_NONE 0
-#define CLIP_FREEZE_PAUSE 1
-#define CLIP_FREEZE_BLACK 2
+#define SAMPLE_FREEZE_NONE 0
+#define SAMPLE_FREEZE_PAUSE 1
+#define SAMPLE_FREEZE_BLACK 2
 
-#define CLIP_RENDER_START 1
-#define CLIP_RENDER_STOP 0
+#define SAMPLE_RENDER_START 1
+#define SAMPLE_RENDER_STOP 0
 
-#define CLIP_MAX_DESCR_LEN 150
+#define SAMPLE_MAX_DESCR_LEN 150
 
 enum {
-    CLIP_LOAD = 0,
-    CLIP_RUN = 1,
-    CLIP_PEEK = 2,
+    SAMPLE_LOAD = 0,
+    SAMPLE_RUN = 1,
+    SAMPLE_PEEK = 2,
 };
 
 
 
-typedef struct clip_eff_t {
+typedef struct sample_eff_t {
     int effect_id;		/* effect ID */
     int e_flag;
 
-    int arg[CLIP_MAX_PARAMETERS];	/* array of arguments */
+    int arg[SAMPLE_MAX_PARAMETERS];	/* array of arguments */
     int frame_offset;
     int frame_trimmer;		/* sub frame scratcher */
     /* audio settings */
@@ -113,27 +113,27 @@ typedef struct clip_eff_t {
     int source_type;		/* source type to mix with */
     int channel;		/* secundary source id */
     int is_rendering;		/* is rendering */
-} clip_eff_chain;
+} sample_eff_chain;
 
 
-typedef struct clip_info_t {
-    int clip_id;		/* identifies a unique clip */
-    clip_eff_chain *effect_chain[CLIP_MAX_EFFECTS];	/* effect chain */
-    long first_frame[CLIP_MAX_RENDER];		/* start of clip */
-    long last_frame[CLIP_MAX_RENDER];		/* end of clip */
-    char descr[CLIP_MAX_DESCR_LEN];
+typedef struct sample_info_t {
+    int sample_id;		/* identifies a unique sample */
+    sample_eff_chain *effect_chain[SAMPLE_MAX_EFFECTS];	/* effect chain */
+    long first_frame[SAMPLE_MAX_RENDER];		/* start of sample */
+    long last_frame[SAMPLE_MAX_RENDER];		/* end of sample */
+    char descr[SAMPLE_MAX_DESCR_LEN];
     int speed;			/* playback speed */
     int looptype;		/* pingpong or loop */
     int max_loops;		/* max looops before going to */
     int max_loops2;		/* count remaining loops */
-    int next_clip_id;		/* the next clip */
-    int depth;			/* clip effect chain render depth */
+    int next_sample_id;		/* the next sample */
+    int depth;			/* sample effect chain render depth */
     int source;			/* source or tag */
     int channel;		/* which channel (which tag) */
     int playmode;		/* various playmodes */
     int playmode_frame;
-    int sub_audio;		/* mix underlying clip yes or no */
-    int audio_volume;		/* volume setting of this clip */
+    int sub_audio;		/* mix underlying sample yes or no */
+    int audio_volume;		/* volume setting of this sample */
     int marker_start;
     int marker_end;
     int dup;			/* frame duplicator */
@@ -165,150 +165,150 @@ typedef struct clip_info_t {
     int effect_toggle;
     int offset;
     void *user_data;
-} clip_info;
+} sample_info;
 
-#define CLIP_YUV420_BUFSIZE 16
-#define CLIP_MAX_DEPTH 4
-#define CLIP_DEC_BIBBER 1
-#define CLIP_DEC_FREEZE 2
+#define SAMPLE_YUV420_BUFSIZE 16
+#define SAMPLE_MAX_DEPTH 4
+#define SAMPLE_DEC_BIBBER 1
+#define SAMPLE_DEC_FREEZE 2
 
-extern void *clip_get_user_data(int clip_id);
-extern int clip_set_user_data(int clip_id, void *data);
-extern int clip_chain_malloc(int clip_id);
-extern int clip_chain_free(int clip_id);
-extern int clip_size();
-extern int clip_verify();
-extern void clip_init(int len);
-extern int clip_update(clip_info *clip, int s1);
+extern void *sample_get_user_data(int sample_id);
+extern int sample_set_user_data(int sample_id, void *data);
+extern int sample_chain_malloc(int sample_id);
+extern int sample_chain_free(int sample_id);
+extern int sample_size();
+extern int sample_verify();
+extern void sample_init(int len);
+extern int sample_update(sample_info *sample, int s1);
 #ifdef HAVE_XML2
-extern int clip_readFromFile(char *);
-extern int clip_writeToFile(char *);
+extern int sample_readFromFile(char *);
+extern int sample_writeToFile(char *);
 #endif
-extern int clip_update_offset(int s1, int nframe);
-extern int clip_set_state(int new_state);
-extern int clip_get_state();
-extern clip_info *clip_skeleton_new(long startFrame, long endFrame);
-extern clip_info *clip_get(int clip_id);
-extern int clip_store(clip_info * skel);
-extern int clip_is_deleted(int s1);
-extern int clip_exists(int clip_id);
-extern int clip_del(int clip_id);
-extern void clip_del_all();
-extern int clip_get_startFrame(int clip_id);
-extern int clip_get_endFrame(int clip_id);
-extern int clip_set_marker_start(int clip_id, int marker);
-extern int clip_set_marker_end(int clip_id, int marker);
-extern int clip_set_startframe(int s1, long frame_num);
-extern int clip_set_endframe(int s1, long frame_num);
-extern int clip_set_marker(int s1, int start, int end);
-extern int clip_get_longest(int clip_id);
-extern int clip_get_playmode(int s1);
-extern int clip_set_playmode(int s1, int playmode);
-extern int clip_get_loops(int s1);
-extern int clip_get_loops2(int s1);
-extern int clip_get_next(int s1);
-extern int clip_get_depth(int s1);
-extern int clip_set_depth(int s1, int n);
-extern int clip_set_speed(int s1, int speed);
-extern int clip_set_framedup(int s1, int n);
-extern int clip_get_framedup(int s1);
-extern int clip_marker_clear(int clip_id); 
-extern int clip_set_looptype(int s1, int looptype);
-extern int clip_get_speed(int s1);
-extern int clip_get_looptype(int s1);
-extern int clip_set_loops(int s1, int nr_of_loops);
-extern int clip_set_loops2(int s1, int nr);
-extern int clip_set_next(int s1, int next_clip_id);
-extern int clip_get_chain_source(int clip_id, int position);
-extern int clip_set_chain_source(int clip_id, int position, int source);
-extern int clip_get_sub_audio(int s1);
-extern int clip_set_sub_audio(int s1, int audio);
-extern int clip_get_audio_volume(int s1);
-extern int clip_set_audio_volume(int s1, int volume);
-extern int clip_copy(int s1);
-extern int clip_get_effect(int s1, int position);
+extern int sample_update_offset(int s1, int nframe);
+extern int sample_set_state(int new_state);
+extern int sample_get_state();
+extern sample_info *sample_skeleton_new(long startFrame, long endFrame);
+extern sample_info *sample_get(int sample_id);
+extern int sample_store(sample_info * skel);
+extern int sample_is_deleted(int s1);
+extern int sample_exists(int sample_id);
+extern int sample_del(int sample_id);
+extern void sample_del_all();
+extern int sample_get_startFrame(int sample_id);
+extern int sample_get_endFrame(int sample_id);
+extern int sample_set_marker_start(int sample_id, int marker);
+extern int sample_set_marker_end(int sample_id, int marker);
+extern int sample_set_startframe(int s1, long frame_num);
+extern int sample_set_endframe(int s1, long frame_num);
+extern int sample_set_marker(int s1, int start, int end);
+extern int sample_get_longest(int sample_id);
+extern int sample_get_playmode(int s1);
+extern int sample_set_playmode(int s1, int playmode);
+extern int sample_get_loops(int s1);
+extern int sample_get_loops2(int s1);
+extern int sample_get_next(int s1);
+extern int sample_get_depth(int s1);
+extern int sample_set_depth(int s1, int n);
+extern int sample_set_speed(int s1, int speed);
+extern int sample_set_framedup(int s1, int n);
+extern int sample_get_framedup(int s1);
+extern int sample_marker_clear(int sample_id); 
+extern int sample_set_looptype(int s1, int looptype);
+extern int sample_get_speed(int s1);
+extern int sample_get_looptype(int s1);
+extern int sample_set_loops(int s1, int nr_of_loops);
+extern int sample_set_loops2(int s1, int nr);
+extern int sample_set_next(int s1, int next_sample_id);
+extern int sample_get_chain_source(int sample_id, int position);
+extern int sample_set_chain_source(int sample_id, int position, int source);
+extern int sample_get_sub_audio(int s1);
+extern int sample_set_sub_audio(int s1, int audio);
+extern int sample_get_audio_volume(int s1);
+extern int sample_set_audio_volume(int s1, int volume);
+extern int sample_copy(int s1);
+extern int sample_get_effect(int s1, int position);
 /* get effect any, even if effect is disabled (required for informational purposes)*/
-extern int clip_get_effect_any(int s1, int position);
-extern int clip_get_offset(int s1, int position);
+extern int sample_get_effect_any(int s1, int position);
+extern int sample_get_offset(int s1, int position);
 
-/* trimmer is usefull for underlying clips in the effect chain.
-   you can manual adjust the video/audio sync of the underlying clip */
-extern int clip_get_trimmer(int s1, int position);
-extern int clip_set_trimmer(int s1, int position, int trimmer);
-extern int clip_get_short_info(int clip_id, int *, int *, int *, int *) ;
-extern int clip_get_chain_volume(int s1, int position);
+/* trimmer is usefull for underlying samples in the effect chain.
+   you can manual adjust the video/audio sync of the underlying sample */
+extern int sample_get_trimmer(int s1, int position);
+extern int sample_set_trimmer(int s1, int position, int trimmer);
+extern int sample_get_short_info(int sample_id, int *, int *, int *, int *) ;
+extern int sample_get_chain_volume(int s1, int position);
 
 /* set volume of audio data coming to the chain */
-extern int clip_set_chain_volume(int s1, int position, int volume);
+extern int sample_set_chain_volume(int s1, int position, int volume);
 
-/* whether to mix underlying clip's audio */
-extern int clip_get_chain_audio(int s1, int position);
-extern int clip_has_extra_frame(int s1, int position);
+/* whether to mix underlying sample's audio */
+extern int sample_get_chain_audio(int s1, int position);
+extern int sample_has_extra_frame(int s1, int position);
 /* mix the audio from entry from the effect chain, if any */
-extern int clip_set_chain_audio(int s1, int position, int flag);
+extern int sample_set_chain_audio(int s1, int position, int flag);
 
-extern int clip_set_chain_status(int s1, int position, int status);
-extern int clip_get_chain_status(int s1, int position);
+extern int sample_set_chain_status(int s1, int position, int status);
+extern int sample_get_chain_status(int s1, int position);
 
-extern int clip_set_offset(int s1, int position, int frame_offset);
-extern int clip_get_effect_arg(int s1, int position, int argnr);
-extern int clip_set_effect_arg(int s1, int position, int argnr, int value);
+extern int sample_set_offset(int s1, int position, int frame_offset);
+extern int sample_get_effect_arg(int s1, int position, int argnr);
+extern int sample_set_effect_arg(int s1, int position, int argnr, int value);
 
-extern int clip_get_all_effect_arg(int s1, int position, int *args,
+extern int sample_get_all_effect_arg(int s1, int position, int *args,
 			      int arg_len, int n_elapsed);
-extern int clip_chain_remove(int s1, int position);
-extern int clip_chain_clear(int s1);
-extern int clip_chain_size(int s1);
-extern int clip_chain_get_free_entry(int s1);
-extern int clip_chain_add(int s1, int c, int effect_nr);
+extern int sample_chain_remove(int s1, int position);
+extern int sample_chain_clear(int s1);
+extern int sample_chain_size(int s1);
+extern int sample_chain_get_free_entry(int s1);
+extern int sample_chain_add(int s1, int c, int effect_nr);
 
 /* channel depends on source , it select a channel of a certain video source */
-extern int clip_get_chain_channel(int s1, int position);
-extern int clip_set_chain_channel(int s1, int position, int channel);
+extern int sample_get_chain_channel(int s1, int position);
+extern int sample_set_chain_channel(int s1, int position, int channel);
 
-//int clip_chain_replace(int s1, int position, int effect_id);
+//int sample_chain_replace(int s1, int position, int effect_id);
 
-extern int clip_chain_sprint_status(int s1, int r, int f, int m, char *s ); 
+extern int sample_chain_sprint_status(int s1, int r, int f, int m, char *s ); 
 
-extern int clip_set_render_entry(int s1, int entry);
-extern int clip_get_render_entry(int s1);
+extern int sample_set_render_entry(int s1, int entry);
+extern int sample_get_render_entry(int s1);
 
-extern int clip_set_description(int clip_id, char *description);
-extern int clip_get_description(int clip_id, char *description);
+extern int sample_set_description(int sample_id, char *description);
+extern int sample_get_description(int sample_id, char *description);
 
-extern int clip_entry_is_rendering(int clip_id, int entry);
-extern int clip_entry_set_is_rendering(int clip_id, int entry, int value);
-extern int clip_get_loop_dec(int s1);
-extern int clip_set_loop_dec(int s1, int active, int periods);
-extern int clip_apply_loop_dec(int s1, double fps); 
+extern int sample_entry_is_rendering(int sample_id, int entry);
+extern int sample_entry_set_is_rendering(int sample_id, int entry, int value);
+extern int sample_get_loop_dec(int s1);
+extern int sample_set_loop_dec(int s1, int active, int periods);
+extern int sample_apply_loop_dec(int s1, double fps); 
 
-extern int	clip_set_manual_fader(int s1, int value );
-extern int clip_apply_fader_inc(int s1);
-extern int clip_set_fader_active(int s1, int nframes, int direction);
-extern int clip_set_fader_val(int s1, float val);
-extern int clip_get_fader_active(int s1);
-extern float clip_get_fader_val(int s1);
-extern float clip_get_fader_inc(int s1);
-extern int clip_get_fader_direction(int s1);
-extern int clip_reset_fader(int t1);
+extern int	sample_set_manual_fader(int s1, int value );
+extern int sample_apply_fader_inc(int s1);
+extern int sample_set_fader_active(int s1, int nframes, int direction);
+extern int sample_set_fader_val(int s1, float val);
+extern int sample_get_fader_active(int s1);
+extern float sample_get_fader_val(int s1);
+extern float sample_get_fader_inc(int s1);
+extern int sample_get_fader_direction(int s1);
+extern int sample_reset_fader(int t1);
 
-extern int clip_reset_offset(int s1);
+extern int sample_reset_offset(int s1);
 
-extern int clip_get_effect_status(int s1);
-extern int clip_get_selected_entry(int s1);
+extern int sample_get_effect_status(int s1);
+extern int sample_get_selected_entry(int s1);
 
-extern int clip_set_effect_status(int s1, int status);
-extern int clip_set_selected_entry(int s1, int position);
+extern int sample_set_effect_status(int s1, int status);
+extern int sample_set_selected_entry(int s1, int position);
 
 
 #ifdef HAVE_XML2
-extern void CreateClip(xmlNodePtr node, clip_info * clip);
-extern void CreateEffects(xmlNodePtr node, clip_eff_chain ** effects);
-extern void CreateEffect(xmlNodePtr node, clip_eff_chain * effect, int pos);
+extern void CreateSample(xmlNodePtr node, sample_info * sample);
+extern void CreateEffects(xmlNodePtr node, sample_eff_chain ** effects);
+extern void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int pos);
 extern void CreateArguments(xmlNodePtr node, int *arg, int argcount);
-extern void ParseClip(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel);
-extern void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, clip_info * skel);
-extern void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_clip);
+extern void ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel);
+extern void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel);
+extern void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample);
 extern void ParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg);
 extern unsigned char *UTF8toLAT1(unsigned char *in);
 #endif

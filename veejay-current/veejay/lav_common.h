@@ -68,7 +68,7 @@ typedef struct {
     int output_width;
     int output_height;
     int interlace;
-    y4m_ratio_t sar;		/* clip aspect ratio (default 0:0 == unspecified) */
+    y4m_ratio_t sar;		/* sample aspect ratio (default 0:0 == unspecified) */
     y4m_ratio_t dar;		/* 'suggested' display aspect ratio */
 
     int chroma_width;

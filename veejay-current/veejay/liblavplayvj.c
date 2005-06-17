@@ -1,6 +1,6 @@
 /* libveejayvj - a extended librarified Linux Audio Video playback/Editing
  *supports: 
- *		clip based editing
+ *		sample based editing
  *		pattern based editing 
  *		throughput of v4l / fifo
  *		
@@ -265,7 +265,7 @@ int veejay_set_framedup(veejay_t *info, int n) {
 	video_playback_setup *settings = (video_playback_setup*) settings;
 	switch(info->uc->playback_mode) {
 	  case VJ_PLAYBACK_MODE_PLAIN: info->sfd = n; break;
-	  case VJ_PLAYBACK_MODE_CLIP: info->sfd = n; clip_set_framedup(info->uc->clip_id,n);break;
+	  case VJ_PLAYBACK_MODE_SAMPLE: info->sfd = n; sample_set_framedup(info->uc->sample_id,n);break;
 	  default:
 		return -1;
 	}
@@ -301,8 +301,8 @@ int veejay_set_speed(veejay_t * info, int speed)
 			veejay_msg(VEEJAY_MSG_DEBUG, "Speed too high to set!");
 
 		break;
-    case VJ_PLAYBACK_MODE_CLIP:
-		len = clip_get_endFrame(info->uc->clip_id) - clip_get_startFrame(info->uc->clip_id);
+    case VJ_PLAYBACK_MODE_SAMPLE:
+		len = sample_get_endFrame(info->uc->sample_id) - sample_get_startFrame(info->uc->sample_id);
 		if( speed < 0)
 		{
 			if ( (-1*len) > speed )
@@ -322,7 +322,7 @@ int veejay_set_speed(veejay_t * info, int speed)
 				}
 			}
 		}
-		if(clip_set_speed(info->uc->clip_id, speed) != -1)
+		if(sample_set_speed(info->uc->sample_id, speed) != -1)
 			settings->current_playback_speed = speed;
 		break;
 
@@ -374,12 +374,12 @@ int veejay_increase_frame(veejay_t * info, long num)
 		if(settings->current_frame_num > settings->max_frame_num) return 0;
    }
 
-   if (info->uc->playback_mode == VJ_PLAYBACK_MODE_CLIP)
+   if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
 	{
 		if ((settings->current_frame_num + num) <=
-		    clip_get_startFrame(info->uc->clip_id)) return 0;
+		    sample_get_startFrame(info->uc->sample_id)) return 0;
 		if((settings->current_frame_num + num) >=
-		    clip_get_endFrame(info->uc->clip_id)) return 0;
+		    sample_get_endFrame(info->uc->sample_id)) return 0;
     
     }
 
@@ -470,10 +470,10 @@ int veejay_set_frame(veejay_t * info, long framenum)
 	  	return -1;
 	}
 
-    if(info->uc->playback_mode==VJ_PLAYBACK_MODE_CLIP)
+    if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE)
 	{
 		int start,end,loop,speed;	
-		clip_get_short_info(info->uc->clip_id,&start,&end,&loop,&speed);
+		sample_get_short_info(info->uc->sample_id,&start,&end,&loop,&speed);
 		if(framenum < start)
 		  framenum = start;
 		if(framenum > end) 
@@ -523,7 +523,7 @@ int veejay_init_editlist(veejay_t * info)
 		"1.0/Seconds per video Frame = %4.4f",
 		1.0 / settings->spvf);
 
-    /* Seconds per audio clip: */
+    /* Seconds per audio sample: */
  
    if (el->has_audio && info->audio == AUDIO_PLAY) {
 	if (vj_perform_audio_start(info)) {
@@ -552,22 +552,22 @@ int veejay_init_editlist(veejay_t * info)
 }
 
 /*
-	initialize array of editlists and set pointer to it in the clip as user data
+	initialize array of editlists and set pointer to it in the sample as user data
 */
 int	veejay_prep_el( veejay_t *info, int s1 )
 { 
 	editlist **el;
-	void *data = clip_get_user_data(s1);
+	void *data = sample_get_user_data(s1);
 	int i;
 	if(data == NULL)
 	{
 		// allocate array of el
-		el = (editlist**) vj_malloc(sizeof(editlist*) * CLIP_MAX_RENDER );
-		for(i = 0; i < CLIP_MAX_RENDER; i ++)
+		el = (editlist**) vj_malloc(sizeof(editlist*) * SAMPLE_MAX_RENDER );
+		for(i = 0; i < SAMPLE_MAX_RENDER; i ++)
 			el[i] = NULL;
 
 		data = (void*) el;
-		if(clip_set_user_data( s1, data ) )
+		if(sample_set_user_data( s1, data ) )
 		{
 			veejay_msg(VEEJAY_MSG_DEBUG,"Allocated place holder for render entries");
 			return 1;
@@ -580,9 +580,9 @@ int	veejay_prep_el( veejay_t *info, int s1 )
 long	veejay_el_max_frames( veejay_t *info, int s1 )
 {
 	editlist **el_list;
-	void *data = clip_get_user_data(s1);
-	int current = clip_get_render_entry(s1);
-	if(!clip_exists(s1))
+	void *data = sample_get_user_data(s1);
+	int current = sample_get_render_entry(s1);
+	if(!sample_exists(s1))
 		return info->edit_list->video_frames - 1;
 
 	if(current <= 0 || data == NULL )
@@ -596,7 +596,7 @@ long	veejay_el_max_frames( veejay_t *info, int s1 )
 }
 
 /*
-	open a file and add the resulting editlist to clip's user_data
+	open a file and add the resulting editlist to sample's user_data
 */
 int	veejay_add_el_entry( veejay_t *info, int s1, char *filename, int dst )
 {
@@ -611,17 +611,17 @@ int	veejay_add_el_entry( veejay_t *info, int s1, char *filename, int dst )
 		veejay_msg(VEEJAY_MSG_ERROR, "Error adding %s",filename);
 		return 0;
 	}
-	if( dst <= 0 || dst >= CLIP_MAX_RENDER)
+	if( dst <= 0 || dst >= SAMPLE_MAX_RENDER)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR ,"Invalid render entry %d", dst );
 		return 0;
 	}
 	
-	data = clip_get_user_data( s1 );
+	data = sample_get_user_data( s1 );
 	el_list = (editlist**) data;
 
 	// current
-	current = clip_get_render_entry( s1 );
+	current = sample_get_render_entry( s1 );
 
 	
 	if( el_list[dst] != NULL )
@@ -634,17 +634,17 @@ int	veejay_add_el_entry( veejay_t *info, int s1, char *filename, int dst )
 	el_list[dst] = el;
 
 	// now , update start and end positions
-	clip_set_render_entry( s1, dst );
-	clip_set_startframe( s1, 0 );
-	clip_set_endframe( s1, el->video_frames-1);
+	sample_set_render_entry( s1, dst );
+	sample_set_startframe( s1, 0 );
+	sample_set_endframe( s1, el->video_frames-1);
 	// back to current entry
-	clip_set_render_entry( s1, current );
+	sample_set_render_entry( s1, current );
 
 	return 1;
 }
 
 /*
-	get editlist pointer from clip's user_data
+	get editlist pointer from sample's user_data
 */
 /*
 editlist *veejay_get_el( veejay_t *info, int s1 )
@@ -653,28 +653,28 @@ editlist *veejay_get_el( veejay_t *info, int s1 )
 	editlist **el_list;
 	int entry;
 
-	data = clip_get_user_data( s1 );
+	data = sample_get_user_data( s1 );
 	if(data == NULL) return NULL;
 	el_list = (editlist**) data;
-	entry   = clip_get_render_entry( s1 );
+	entry   = sample_get_render_entry( s1 );
 	if( entry < 0 ) return NULL;
-	if(entry > 0 && entry < CLIP_MAX_RENDER) 
+	if(entry > 0 && entry < SAMPLE_MAX_RENDER) 
 		return el_list[entry];
 
 	return info->edit_list;
 }
 */
 /*
-	setup start/end of rendered clip
+	setup start/end of rendered sample
 */
 
-void veejay_change_playback_mode( veejay_t *info, int new_pm, int clip_id )
+void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 {
 	// if current is stream and playing network stream, close connection
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
 	{
-		int cur_id = info->uc->clip_id;
-		if( vj_tag_get_type( cur_id ) == VJ_TAG_TYPE_NET && cur_id != clip_id )
+		int cur_id = info->uc->sample_id;
+		if( vj_tag_get_type( cur_id ) == VJ_TAG_TYPE_NET && cur_id != sample_id )
 		{
 			vj_tag_disable(cur_id);
 		}	
@@ -684,9 +684,9 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int clip_id )
 	{
           int n = 0;
 	  if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG) 
-		n = vj_tag_chain_free( info->uc->clip_id );
-	  if(info->uc->playback_mode == VJ_PLAYBACK_MODE_CLIP )
-		n = clip_chain_free( info->uc->clip_id);
+		n = vj_tag_chain_free( info->uc->sample_id );
+	  if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
+		n = sample_chain_free( info->uc->sample_id);
 	  info->uc->playback_mode = new_pm;
 	  if(n > 0)
 	  {
@@ -697,114 +697,114 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int clip_id )
 	if(new_pm == VJ_PLAYBACK_MODE_TAG)
 	{
 		int tmp=0;
-		// new mode is stream, see if clip_id is a network stream (if so, connect!)
-		if( vj_tag_get_type( clip_id ) == VJ_TAG_TYPE_NET ||
-			vj_tag_get_type( clip_id) == VJ_TAG_TYPE_MCAST )
+		// new mode is stream, see if sample_id is a network stream (if so, connect!)
+		if( vj_tag_get_type( sample_id ) == VJ_TAG_TYPE_NET ||
+			vj_tag_get_type( sample_id) == VJ_TAG_TYPE_MCAST )
 		{
-			if(vj_tag_enable( clip_id )<= 0 )
+			if(vj_tag_enable( sample_id )<= 0 )
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Unable to activate network stream!");
 				return;
 			}
 		}	
 			
-		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_CLIP)
+		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE)
 		{
-			tmp = clip_chain_free(info->uc->clip_id);
+			tmp = sample_chain_free(info->uc->sample_id);
 			veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated %d effect%s", tmp, (tmp==1 ? " " : "s"));
 		}
 		if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
 		{
-			if(clip_id == info->uc->clip_id) return;
+			if(sample_id == info->uc->sample_id) return;
 
-			tmp = vj_tag_chain_free(info->uc->clip_id);
+			tmp = vj_tag_chain_free(info->uc->sample_id);
 			veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated %d effect%s", tmp,(tmp==1 ? " " : "s"));
 		}
-		tmp = vj_tag_chain_malloc( clip_id);
+		tmp = vj_tag_chain_malloc( sample_id);
 		if(tmp > 0 )
 		{
 			veejay_msg(VEEJAY_MSG_WARNING, "Activated %d effect%s", tmp, (tmp==1? " " : "s") );
 		}
 		info->uc->playback_mode = new_pm;
-		veejay_set_clip(info,clip_id);
+		veejay_set_sample(info,sample_id);
 	}
-	if(new_pm == VJ_PLAYBACK_MODE_CLIP) 
+	if(new_pm == VJ_PLAYBACK_MODE_SAMPLE) 
 	{
 		int tmp =0;
 		
 		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG)
 		{
-			tmp = vj_tag_chain_free(info->uc->clip_id);
+			tmp = vj_tag_chain_free(info->uc->sample_id);
 			veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated %d effect%s", tmp, (tmp==1 ? " " : "s"));
 		}
-		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_CLIP)	
+		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE)	
 		{
-			if(clip_id != info->uc->clip_id)
+			if(sample_id != info->uc->sample_id)
 			{
-				tmp = clip_chain_free( info->uc->clip_id );
+				tmp = sample_chain_free( info->uc->sample_id );
 				veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated %d effect%s", tmp, (tmp==1 ? " " : "s"));
 			}
 		}
-		tmp = clip_chain_malloc( clip_id );
+		tmp = sample_chain_malloc( sample_id );
 		if(tmp > 0)
 		{
 			veejay_msg(VEEJAY_MSG_WARNING, "Activated %d effect%s", tmp,tmp==0 ? " " : "s" );
 		}
 		info->uc->playback_mode = new_pm;
-		veejay_set_clip(info, clip_id);
+		veejay_set_sample(info, sample_id);
 	}
 }
 
 
-void veejay_set_clip(veejay_t * info, int clipid)
+void veejay_set_sample(veejay_t * info, int sampleid)
 {
     int start,end,speed,looptype;
     if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
     {
-	    if(!vj_tag_exists(clipid))
+	    if(!vj_tag_exists(sampleid))
         {
-		    veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist", clipid);
+		    veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist", sampleid);
 	     	   return;
         }
-	    info->last_tag_id = clipid;
-	    info->uc->clip_id = clipid;
+	    info->last_tag_id = sampleid;
+	    info->uc->sample_id = sampleid;
 
 	    if(info->settings->current_playback_speed==0) 
 			veejay_set_speed(info, 1);
 
  		veejay_msg(VEEJAY_MSG_INFO, "Playing stream %d",
-			clipid);
+			sampleid);
 	
 	    return;
      }
 
-     if( info->uc->playback_mode == VJ_PLAYBACK_MODE_CLIP)
+     if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
      {
-		if(!clip_exists(clipid))
+		if(!sample_exists(sampleid))
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Clip %d does not exist", clipid);
+			veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist", sampleid);
 			return;
 		}
 	
-	   	 clip_get_short_info( clipid , &start,&end,&looptype,&speed);
+	   	 sample_get_short_info( sampleid , &start,&end,&looptype,&speed);
 
- 		 veejay_msg(VEEJAY_MSG_INFO, "Playing clip %d (frames %d - %d) at speed %d",
-			clipid, start,end,speed);
+ 		 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (frames %d - %d) at speed %d",
+			sampleid, start,end,speed);
 
-		 info->uc->clip_id = clipid;
-		 info->last_clip_id = clipid;
-		 info->sfd = clip_get_framedup(clipid);
+		 info->uc->sample_id = sampleid;
+		 info->last_sample_id = sampleid;
+		 info->sfd = sample_get_framedup(sampleid);
 
 		 info->uc->render_changed = 1; /* different render list */
-    		 clip_reset_offset( clipid );	/* reset mixing offsets */
+    		 sample_reset_offset( sampleid );	/* reset mixing offsets */
     		 veejay_set_frame(info, start);
     		 veejay_set_speed(info, speed);
      }
 }
 
 /******************************************************
- * veejay_create_clip
- *  create a new clip
+ * veejay_create_sample
+ *  create a new sample
  * return value: 1 on success, -1 on error
  ******************************************************/
 int veejay_create_tag(veejay_t * info, int type, char *filename,
@@ -856,7 +856,7 @@ int veejay_stop(veejay_t * info)
 
     if (settings->state == LAVPLAY_STATE_STOP) {
 	if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG) {
-		vj_tag_set_active(info->uc->clip_id,0);
+		vj_tag_set_active(info->uc->sample_id,0);
 	}
 	if(info->stream_enabled) {
 	  info->stream_enabled = 0;
@@ -872,13 +872,13 @@ int veejay_stop(veejay_t * info)
     return 1;
 }
 
-/* stop playing a clip, continue with video */
+/* stop playing a sample, continue with video */
 void veejay_stop_sampling(veejay_t * info)
 {
     info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
-    info->uc->clip_id = 0;
-    info->uc->clip_start = -1;
-    info->uc->clip_end = -1;
+    info->uc->sample_id = 0;
+    info->uc->sample_start = -1;
+    info->uc->sample_end = -1;
 }
 
 /******************************************************
@@ -1135,12 +1135,12 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     int res = 0;
     int pm = info->uc->playback_mode;
     switch (info->uc->playback_mode) {
-    	case VJ_PLAYBACK_MODE_CLIP:
+    	case VJ_PLAYBACK_MODE_SAMPLE:
 			if( info->settings->randplayer.mode ==
 				RANDMODE_SAMPLE)
 				pm = VJ_PLAYBACK_MODE_PATTERN;
-			if( clip_chain_sprint_status
-				(info->uc->clip_id, info->real_fps,settings->current_frame_num, pm, info->status_what ) != 0)
+			if( sample_chain_sprint_status
+				(info->uc->sample_id, info->real_fps,settings->current_frame_num, pm, info->status_what ) != 0)
 				{
 				veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
 			}
@@ -1164,7 +1164,7 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 			0 );
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
-		if( vj_tag_sprint_status( info->uc->clip_id, (int) info->real_fps,
+		if( vj_tag_sprint_status( info->uc->sample_id, (int) info->real_fps,
 			settings->current_frame_num, info->uc->playback_mode, info->status_what ) != 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
@@ -1732,10 +1732,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 	if(arg != NULL ) {
 #ifdef HAVE_XML2
-		veejay_msg(VEEJAY_MSG_INFO, "Loading cliplist [%s]", arg);
-   	 	if (!clip_readFromFile( arg ))
+		veejay_msg(VEEJAY_MSG_INFO, "Loading samplelist [%s]", arg);
+   	 	if (!sample_readFromFile( arg ))
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error loading cliplist [%s]",arg);
+			veejay_msg(VEEJAY_MSG_ERROR, "Error loading samplelist [%s]",arg);
 			return -1;
     		}
 #endif
@@ -1744,7 +1744,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	{
 		// try samplelist from loaded action file, if the editlist was initialized
 		if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state == 2 )
-			if(clip_readFromFile( info->settings->action_scheduler.sl ) )
+			if(sample_readFromFile( info->settings->action_scheduler.sl ) )
 				veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list %s from actionfile",
 					info->settings->action_scheduler.sl );
 	}
@@ -2394,16 +2394,16 @@ veejay_t *veejay_malloc()
     info->settings->state = LAVPLAY_STATE_STOP;
     info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
     info->uc->use_timer = 2;
-    info->uc->clip_key = 1;
+    info->uc->sample_key = 1;
     info->uc->direction = 1;	/* pause */
-    info->uc->clip_start = -1;
-    info->uc->clip_end = -1;
+    info->uc->sample_start = -1;
+    info->uc->sample_end = -1;
     info->net = 1;
 
     bzero(info->action_file,256); 
     bzero(info->stream_outname,256);
 
-    for (i = 0; i < CLIP_MAX_PARAMETERS; i++)
+    for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++)
 		info->effect_info->tmp[i] = 0;
 
 #ifdef HAVE_SDL
@@ -2920,7 +2920,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	if(info->auto_deinterlace)
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Auto deinterlacing (for playback on monitor / beamer with vga input");
-		veejay_msg(VEEJAY_MSG_DEBUG, "Note that this will effect your recorded video clips");
+		veejay_msg(VEEJAY_MSG_DEBUG, "Note that this will effect your recorded video samples");
 	}
 
 	if( num_files == 0 )
@@ -3079,7 +3079,7 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 			return 0;
     		}
 
- 		clip_init( (info->edit_list->video_width * info->edit_list->video_height)  ); 
+ 		sample_init( (info->edit_list->video_width * info->edit_list->video_height)  ); 
 	}
 
 

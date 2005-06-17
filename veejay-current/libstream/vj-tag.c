@@ -60,7 +60,7 @@ static hash_t *TagHash;
 static int this_tag_id = 0;
 static vj_tag_data *vj_tag_input;
 static int next_avail_tag = 0;
-static int avail_tag[CLIP_MAX_CLIPS];
+static int avail_tag[SAMPLE_MAX_SAMPLES];
 static int last_added_tag = 0;
 
 //forward decl
@@ -200,7 +200,7 @@ int vj_tag_init(int width, int height, int pix_fmt)
 		_tmp->uv_len = (width * height)/4;
 	}	
 
-    for(i=0; i < CLIP_MAX_CLIPS; i++) {
+    for(i=0; i < SAMPLE_MAX_SAMPLES; i++) {
 	avail_tag[i] = 0;
     }
     return 0;
@@ -507,7 +507,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->fader_direction = 0;
     tag->selected_entry = 0;
 	tag->depth = 0;
-    tag->effect_toggle = 1; /* same as for clips */
+    tag->effect_toggle = 1; /* same as for samples */
     tag->socket_ready = 0;
     tag->socket_frame = NULL;
     tag->color_r = 0;
@@ -588,10 +588,10 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	vj_tag_get_by_type( tag->source_type, tag->descr);
 
     /* effect chain is empty */
-    for (i = 0; i < CLIP_MAX_EFFECTS; i++)
+    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
 		tag->effect_chain[i] =
-		    (clip_eff_chain *) vj_malloc(sizeof(clip_eff_chain));
+		    (sample_eff_chain *) vj_malloc(sizeof(sample_eff_chain));
 		tag->effect_chain[i]->effect_id = -1;
 		tag->effect_chain[i]->e_flag = 0;
 		tag->effect_chain[i]->frame_trimmer = 0;
@@ -601,7 +601,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 		tag->effect_chain[i]->channel = 0;
 		tag->effect_chain[i]->source_type = 1;
 		tag->effect_chain[i]->is_rendering = 0; 
-		for (j = 0; j < CLIP_MAX_PARAMETERS; j++) {
+		for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++) {
 		    tag->effect_chain[i]->arg[j] = 0;
 		}
 
@@ -636,7 +636,7 @@ int vj_tag_exists(int id)
 int vj_tag_clear_chain(int id)
 {
     int i = 0;
-    for (i = 0; i < CLIP_MAX_EFFECTS; i++) {
+    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
 	if (vj_tag_chain_remove(id, i) == -1)
 	    return -1;
     }
@@ -697,7 +697,7 @@ int vj_tag_del(int id)
 		vj_tag_stop_encoder( tag->id );	
         if(tag->source_name) free(tag->source_name);
 	if(tag->method_filename) free(tag->method_filename);
-      	for (i = 0; i < CLIP_MAX_EFFECTS; i++) 
+      	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) 
 		if (tag->effect_chain[i])
 		    free(tag->effect_chain[i]);
 
@@ -730,7 +730,7 @@ int vj_tag_get_effect(int t1, int position)
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
 	return -1;
-    if (position >= CLIP_MAX_EFFECTS)
+    if (position >= SAMPLE_MAX_EFFECTS)
 	return -1;
     if (tag->effect_chain[position]->e_flag == 0)
 	return -1;
@@ -922,7 +922,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 {
 	char descr[100];
 	char cformat = 'Y';
-	int clip_id = tag->id;
+	int sample_id = tag->id;
 
 	if(format == ENCODER_DVVIDEO)
 	{
@@ -1022,7 +1022,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	tag->encoder_width = _tag_info->edit_list->video_width;
 	tag->encoder_height = _tag_info->edit_list->video_height;
 	
-	return vj_tag_update(tag,clip_id);
+	return vj_tag_update(tag,sample_id);
 //	return 1;
 }
 
@@ -1237,7 +1237,7 @@ int	vj_tag_get_v4l_properties(int t1,
 int vj_tag_get_effect_any(int t1, int position) {
 	vj_tag *tag = vj_tag_get(t1);
 	if (!tag) return -1;
-	if( position >= CLIP_MAX_EFFECTS) return -1;
+	if( position >= SAMPLE_MAX_EFFECTS) return -1;
 	return tag->effect_chain[position]->effect_id;
 }
 
@@ -1250,7 +1250,7 @@ int vj_tag_chain_malloc(int t1)
     if (!tag)
 	return -1;
 
-    for(i=0; i < CLIP_MAX_EFFECTS; i++)
+    for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
     {
 	e_id = tag->effect_chain[i]->effect_id;
 	if(e_id!=-1)
@@ -1273,7 +1273,7 @@ int vj_tag_chain_free(int t1)
     int sum = 0;
     if (!tag)
 	return -1;
-    for(i=0; i < CLIP_MAX_EFFECTS; i++)
+    for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
     {
 	e_id = tag->effect_chain[i]->effect_id;
 	if(e_id!=-1)
@@ -1296,7 +1296,7 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 
     if (!tag)
 		return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 		return -1;
 
 	if( tag->effect_chain[position]->effect_id != -1 && tag->effect_chain[position]->effect_id != effect_id )
@@ -1306,7 +1306,7 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 		{
 			// it is using some memory, see if we can free it ...
 			int ok = 1;
-			for(i=(position+1); i < CLIP_MAX_EFFECTS; i++)
+			for(i=(position+1); i < SAMPLE_MAX_EFFECTS; i++)
 			{
 				if( tag->effect_chain[i]->effect_id == tag->effect_chain[position]->effect_id) ok = 0;
 			}
@@ -1348,7 +1348,7 @@ int vj_tag_get_chain_status(int t1, int position)
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
 	return -1;
-    if (position >= CLIP_MAX_EFFECTS)
+    if (position >= SAMPLE_MAX_EFFECTS)
 	return -1;
     return tag->effect_chain[position]->e_flag;
 }
@@ -1357,7 +1357,7 @@ int vj_tag_set_chain_status(int t1, int position, int status)
 {
     vj_tag *tag = vj_tag_get(t1);
     
-    if (position >= CLIP_MAX_EFFECTS)
+    if (position >= SAMPLE_MAX_EFFECTS)
 	return -1;
     tag->effect_chain[position]->e_flag = status;
     if (!vj_tag_update(tag,t1))
@@ -1370,7 +1370,7 @@ int vj_tag_get_trimmer(int t1, int position)
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
 	return 0;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return 0;
     return tag->effect_chain[position]->frame_trimmer;
 }
@@ -1380,7 +1380,7 @@ int vj_tag_set_trimmer(int t1, int position, int trim)
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
     tag->effect_chain[position]->frame_trimmer = trim;
     if (!vj_tag_update(tag,t1))
@@ -1399,9 +1399,9 @@ int vj_tag_get_all_effect_args(int t1, int position, int *args,
 	return 1;
     if (!args)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    if (arg_len < 0 || arg_len > CLIP_MAX_PARAMETERS)
+    if (arg_len < 0 || arg_len > SAMPLE_MAX_PARAMETERS)
 	return -1;
     for (i = 0; i < arg_len; i++)
 	args[i] = tag->effect_chain[position]->arg[i];
@@ -1414,9 +1414,9 @@ int vj_tag_get_effect_arg(int t1, int position, int argnr)
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    if (argnr < 0 || argnr > CLIP_MAX_PARAMETERS)
+    if (argnr < 0 || argnr > SAMPLE_MAX_PARAMETERS)
 	return -1;
 
     return tag->effect_chain[position]->arg[argnr];
@@ -1427,9 +1427,9 @@ int vj_tag_set_effect_arg(int t1, int position, int argnr, int value)
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    if (argnr < 0 || argnr > CLIP_MAX_PARAMETERS)
+    if (argnr < 0 || argnr > SAMPLE_MAX_PARAMETERS)
 	return -1;
 
     tag->effect_chain[position]->arg[argnr] = value;
@@ -1620,7 +1620,7 @@ int vj_tag_set_chain_channel(int t1, int position, int channel)
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
     tag->effect_chain[position]->channel = channel;
 
@@ -1634,7 +1634,7 @@ int vj_tag_get_chain_channel(int t1, int position)
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
     return tag->effect_chain[position]->channel;
 }
@@ -1643,7 +1643,7 @@ int vj_tag_set_chain_source(int t1, int position, int source)
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
     tag->effect_chain[position]->source_type = source;
     if (!vj_tag_update(tag,t1))
@@ -1656,7 +1656,7 @@ int vj_tag_get_chain_source(int t1, int position)
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
 	return -1;
-    if (position < 0 || position >= CLIP_MAX_EFFECTS)
+    if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
     return tag->effect_chain[position]->source_type;
 }
@@ -1667,7 +1667,7 @@ int vj_tag_chain_size(int t1)
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
 	return -1;
-    for (i = CLIP_MAX_EFFECTS - 1; i != 0; i--) {
+    for (i = SAMPLE_MAX_EFFECTS - 1; i != 0; i--) {
 	if (tag->effect_chain[i]->effect_id != -1)
 	    return i;
     }
@@ -1701,7 +1701,7 @@ int vj_tag_set_selected_entry(int t1, int position)
 {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return -1;
-	if(position < 0 || position >= CLIP_MAX_EFFECTS) return -1;
+	if(position < 0 || position >= SAMPLE_MAX_EFFECTS) return -1;
 	tag->selected_entry = position;
 	return (vj_tag_update(tag,t1));
 }
@@ -1709,7 +1709,7 @@ int vj_tag_set_selected_entry(int t1, int position)
 static int vj_tag_chain_can_delete(vj_tag *tag, int s_pos, int e_id)
 {
 	int i;
-	for(i=0; i < CLIP_MAX_EFFECTS;i++)
+	for(i=0; i < SAMPLE_MAX_EFFECTS;i++)
 	{
 		// effect is on chain > 1
 		if(e_id == tag->effect_chain[i]->effect_id && i != s_pos)
@@ -1735,7 +1735,7 @@ int vj_tag_chain_remove(int t1, int index)
     if (tag->effect_chain[index]->effect_id != -1) {
 	tag->effect_chain[index]->effect_id = -1;
 	tag->effect_chain[index]->e_flag = 0;
-	for (i = 0; i < CLIP_MAX_PARAMETERS; i++) {
+	for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++) {
 	    vj_tag_set_effect_arg(t1, index, i, 0);
 	}
     }
@@ -1833,7 +1833,7 @@ int vj_tag_set_offset(int t1, int chain_entry, int frame_offset)
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
 	return -1;
-    /* set to zero if frame_offset is greater than clip length */
+    /* set to zero if frame_offset is greater than sample length */
     if (frame_offset < 0)
 	frame_offset = 0;
 
@@ -2080,7 +2080,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 			tag->color_r,tag->color_g,tag->color_b );
 		break;
     case VJ_TAG_TYPE_NONE:
-	/* clip */
+	/* sample */
 		break;
     default:
 	break;
@@ -2159,7 +2159,7 @@ static void tagParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg)
     if (cur == NULL)
 	return;
 
-    while (cur != NULL && argIndex < CLIP_MAX_PARAMETERS) {
+    while (cur != NULL && argIndex < SAMPLE_MAX_PARAMETERS) {
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_ARGUMENT))
 	{
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
@@ -2182,12 +2182,12 @@ static void tagParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg)
 }
 
 
-static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_clip)
+static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 {
     xmlChar *xmlTemp = NULL;
     unsigned char *chTemp = NULL;
     int effect_id = -1;
-    int arg[CLIP_MAX_PARAMETERS];
+    int arg[SAMPLE_MAX_PARAMETERS];
     int i;
     int source_type = 0;
     int channel = 0;
@@ -2198,7 +2198,7 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_clip)
     int a_flag = 0;
     int chain_index = 0;
 
-    for (i = 0; i < CLIP_MAX_PARAMETERS; i++) {
+    for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++) {
 	arg[i] = 0;
     }
 
@@ -2313,24 +2313,24 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_clip)
 
     if (effect_id != -1) {
 	int j;
-	int res = vj_tag_set_effect( dst_clip, chain_index, effect_id );
+	int res = vj_tag_set_effect( dst_sample, chain_index, effect_id );
 
 	if(res < 0 )
 	veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d) to stream %d\n",
-		    effect_id, chain_index, dst_clip);
+		    effect_id, chain_index, dst_sample);
 	
 
 	/* load the parameter values */
 	for (j = 0; j < vj_effect_get_num_params(effect_id); j++) {
-	    vj_tag_set_effect_arg(dst_clip, chain_index, j, arg[j]);
+	    vj_tag_set_effect_arg(dst_sample, chain_index, j, arg[j]);
 	}
-	vj_tag_set_chain_channel(dst_clip, chain_index, channel);
-	vj_tag_set_chain_source(dst_clip, chain_index, source_type);
+	vj_tag_set_chain_channel(dst_sample, chain_index, channel);
+	vj_tag_set_chain_source(dst_sample, chain_index, source_type);
 
-	vj_tag_set_chain_status(dst_clip, chain_index, e_flag);
+	vj_tag_set_chain_status(dst_sample, chain_index, e_flag);
 
-	vj_tag_set_offset(dst_clip, chain_index, frame_offset);
-	vj_tag_set_trimmer(dst_clip, chain_index, frame_trimmer);
+	vj_tag_set_offset(dst_sample, chain_index, frame_offset);
+	vj_tag_set_trimmer(dst_sample, chain_index, frame_trimmer);
     }
 
 }
@@ -2345,7 +2345,7 @@ static void tagParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_clip)
 static void tagParseEffects(xmlDocPtr doc, xmlNodePtr cur, int dst_stream)
 {
     int effectIndex = 0;
-    while (cur != NULL && effectIndex < CLIP_MAX_EFFECTS) {
+    while (cur != NULL && effectIndex < SAMPLE_MAX_EFFECTS) {
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECT)) {
 	    tagParseEffect(doc, cur->xmlChildrenNode, dst_stream);
 		effectIndex++;
@@ -2356,9 +2356,9 @@ static void tagParseEffects(xmlDocPtr doc, xmlNodePtr cur, int dst_stream)
 }
 /*************************************************************************************************
  *
- * ParseClip()
+ * ParseSample()
  *
- * Parse a clip
+ * Parse a sample
  *
  ****************************************************************************************************/
 void tagParseStreamFX(xmlDocPtr doc, xmlNodePtr cur, vj_tag *skel)
@@ -2434,7 +2434,7 @@ static void tagCreateArguments(xmlNodePtr node, int *arg, int argcount)
 {
     int i;
     char buffer[100];
-    argcount = CLIP_MAX_PARAMETERS;
+    argcount = SAMPLE_MAX_PARAMETERS;
     for (i = 0; i < argcount; i++) {
 	//if (arg[i]) {
 	    sprintf(buffer, "%d", arg[i]);
@@ -2445,7 +2445,7 @@ static void tagCreateArguments(xmlNodePtr node, int *arg, int argcount)
 }
 
 
-static void tagCreateEffect(xmlNodePtr node, clip_eff_chain * effect, int position)
+static void tagCreateEffect(xmlNodePtr node, sample_eff_chain * effect, int position)
 {
     char buffer[100];
     xmlNodePtr childnode;
@@ -2495,12 +2495,12 @@ static void tagCreateEffect(xmlNodePtr node, clip_eff_chain * effect, int positi
     
 }
 
-static void tagCreateEffects(xmlNodePtr node, clip_eff_chain ** effects)
+static void tagCreateEffects(xmlNodePtr node, sample_eff_chain ** effects)
 {
     int i;
     xmlNodePtr childnode;
 
-    for (i = 0; i < CLIP_MAX_EFFECTS; i++) {
+    for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
 	if (effects[i]->effect_id != -1) {
 	    childnode =
 		xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECT,

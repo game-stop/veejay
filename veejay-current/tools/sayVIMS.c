@@ -140,11 +140,11 @@ static int human_friendly_vims(char *buffer)
 	veejay_msg(VEEJAY_MSG_INFO, "mr\t\tOpen multicast receiver [address port]");
 	veejay_msg(VEEJAY_MSG_INFO, "pr\t\tOpen unicast receiver [address port]");
 	veejay_msg(VEEJAY_MSG_INFO, "av\t\tOpen file as stream using FFmpeg [filename]");
-	veejay_msg(VEEJAY_MSG_INFO, "cl\t\tLoad cliplist from file");
-	veejay_msg(VEEJAY_MSG_INFO, "cn\t\tNew clip from frames n1 to n2");
-	veejay_msg(VEEJAY_MSG_INFO, "cd\t\tDelete clip n1");
+	veejay_msg(VEEJAY_MSG_INFO, "cl\t\tLoad samplelist from file");
+	veejay_msg(VEEJAY_MSG_INFO, "cn\t\tNew sample from frames n1 to n2");
+	veejay_msg(VEEJAY_MSG_INFO, "cd\t\tDelete sample n1");
 	veejay_msg(VEEJAY_MSG_INFO, "sd\t\tDelete Stream n1");
-	veejay_msg(VEEJAY_MSG_INFO, "cs\t\tSave cliplist to file");
+	veejay_msg(VEEJAY_MSG_INFO, "cs\t\tSave samplelist to file");
 	veejay_msg(VEEJAY_MSG_INFO, "es\t\tSave editlist to file");
 	veejay_msg(VEEJAY_MSG_INFO, "ec\t\tCut frames n1 - n2 to buffer");
 	veejay_msg(VEEJAY_MSG_INFO, "ed\t\tDel franes n1 - n2");
@@ -160,11 +160,11 @@ static int human_friendly_vims(char *buffer)
    if(strncmp( buffer, "vi",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_NEW_V4L, buffer+2); return 1; }
    if(strncmp( buffer, "fi",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_NEW_Y4M, buffer+2); return 1; }
    if(strncmp( buffer, "fo",2 ) == 0 ) { human_friendly_msg( VIMS_OUTPUT_Y4M_START,buffer+2); return 1; }
-   if(strncmp( buffer, "cl",2 ) == 0 ) { human_friendly_msg( VIMS_CLIP_LOAD_CLIPLIST, buffer+2); return 1;}
-   if(strncmp( buffer, "cn",2 ) == 0 ) { human_friendly_msg( VIMS_CLIP_NEW, buffer+2); return 1;}
-   if(strncmp( buffer, "cd",2 ) == 0 ) { human_friendly_msg( VIMS_CLIP_DEL, buffer+2); return 1;}
+   if(strncmp( buffer, "cl",2 ) == 0 ) { human_friendly_msg( VIMS_SAMPLE_LOAD_SAMPLELIST, buffer+2); return 1;}
+   if(strncmp( buffer, "cn",2 ) == 0 ) { human_friendly_msg( VIMS_SAMPLE_NEW, buffer+2); return 1;}
+   if(strncmp( buffer, "cd",2 ) == 0 ) { human_friendly_msg( VIMS_SAMPLE_DEL, buffer+2); return 1;}
    if(strncmp( buffer, "sd",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_DELETE,buffer+2); return 1;}
-   if(strncmp( buffer, "cs",2 ) == 0 ) { human_friendly_msg( VIMS_CLIP_SAVE_CLIPLIST,buffer+2); return 1;}
+   if(strncmp( buffer, "cs",2 ) == 0 ) { human_friendly_msg( VIMS_SAMPLE_SAVE_SAMPLELIST,buffer+2); return 1;}
    if(strncmp( buffer, "es",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_SAVE,buffer+2); return 1;}
    if(strncmp( buffer, "ec",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_CUT,buffer+2); return 1;}
    if(strncmp( buffer, "ed",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_DEL,buffer+2); return 1;}

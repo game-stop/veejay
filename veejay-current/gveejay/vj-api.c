@@ -133,9 +133,9 @@ enum
 	HINT_CHAIN = 0,
 	HINT_EL = 1,
 	HINT_MIXLIST = 2,
-	HINT_CLIPLIST = 3,
+	HINT_SAMPLELIST = 3,
 	HINT_ENTRY = 4,
-	HINT_CLIP = 5,
+	HINT_SAMPLE = 5,
 	HINT_SLIST = 6,
 	HINT_V4L = 7,
 	HINT_RECORDING = 8,
@@ -1965,7 +1965,7 @@ static void 	update_globalinfo()
 	{
 		if(pm == MODE_SAMPLE || pm == MODE_STREAM)
 		{
-			info->uc.reload_hint[HINT_CLIP] = 1;
+			info->uc.reload_hint[HINT_SAMPLE] = 1;
 			info->uc.reload_hint[HINT_ENTRY] = 1;
 			sample_changed = 1;
 			stream_changed = 1;		
@@ -2187,7 +2187,7 @@ static void 	update_globalinfo()
 		reload_editlist_contents();
 		vj_msg(VEEJAY_MSG_WARNING, "EditList has changed");
 	}
-	if( info->uc.reload_hint[HINT_CHAIN] == 1 || info->uc.reload_hint[HINT_CLIP] == 1)
+	if( info->uc.reload_hint[HINT_CHAIN] == 1 || info->uc.reload_hint[HINT_SAMPLE] == 1)
 	{
 		load_effectchain_info(); 
 	}
@@ -3003,7 +3003,7 @@ void	on_samplelist_edited(GtkCellRendererText *cell,
 		}
 
 		if( id[0] == 'S' )
-			multi_vims( VIMS_CLIP_SET_DESCRIPTION,
+			multi_vims( VIMS_SAMPLE_SET_DESCRIPTION,
 				"%d %s", sample_id, descr );
 		else
 			multi_vims( VIMS_STREAM_SET_DESCRIPTION,
@@ -3145,7 +3145,7 @@ static	void	load_samplelist_info(const char *name)
 
 	reset_tree( name );
 
-	single_vims( VIMS_CLIP_LIST );
+	single_vims( VIMS_SAMPLE_LIST );
 	gint fxlen = 0;
 	gchar *fxtext = recv_vims(5,&fxlen);
 
@@ -3514,7 +3514,7 @@ on_history_row_activated(GtkTreeView *treeview,
 		gtk_tree_model_get(model,&iter, COLUMN_INT, &num, -1);
 		//gint frame_num = _el_ref_start_frame( num );
 
-		multi_vims( VIMS_CLIP_RENDER_SELECT, "%d %d", 0, num );
+		multi_vims( VIMS_SAMPLE_RENDER_SELECT, "%d %d", 0, num );
 
 	}
 
@@ -3808,7 +3808,7 @@ static void	reload_hislist()
 	GtkTreeIter iter;
 	gint offset=0;
 	gint hislen = 0;
-	single_vims( VIMS_CLIP_RENDERLIST );
+	single_vims( VIMS_SAMPLE_RENDERLIST );
 	gchar *fxtext = recv_vims(3,&hislen);
 
  	reset_tree( "tree_history");

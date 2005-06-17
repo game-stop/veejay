@@ -55,12 +55,12 @@ uint8_t *dv_frame[3] = { NULL, NULL, NULL };
 /*
  * As far as I (maddog) can tell, this is what is going on with libdv-0.9
  *  and the unpacking routine... 
- *    o Ft/Fb refer to top/bottom scanlines (interleaved) --- each clip
- *       is implicitly tagged by 't' or 'b' (clips are not mixed between
+ *    o Ft/Fb refer to top/bottom scanlines (interleaved) --- each sample
+ *       is implicitly tagged by 't' or 'b' (samples are not mixed between
  *       fields)
- *    o Indices on Cb and Cr clips indicate the Y clip with which
+ *    o Indices on Cb and Cr samples indicate the Y sample with which
  *       they are co-sited.
- *    o '^' indicates which clips are preserved by the unpacking
+ *    o '^' indicates which samples are preserved by the unpacking
  *
  * libdv packs both NTSC 4:1:1 and PAL 4:2:0 into a common frame format of
  *  packed 4:2:2 pixels as follows:
@@ -162,7 +162,7 @@ void frame_YUV422_to_YUV420P(uint8_t ** output, uint8_t * input,
 
 /***********************
  *
- * Take a random(ish) clipd mean of a frame luma and chroma
+ * Take a random(ish) sampled mean of a frame luma and chroma
  * Its intended as a rough and ready hash of frame content.
  * The idea is that changes above a certain threshold are treated as
  * scene changes.

@@ -23,24 +23,24 @@
 #include <libvjmsg/vj-common.h>
 #include <libsamplerec/samplerecord.h>
 #include <veejay/vj-misc.h>
-void	clip_reset_encoder(int clip_id);
+void	sample_reset_encoder(int sample_id);
 
-static uint8_t *clip_encoder_buf;
+static uint8_t *sample_encoder_buf;
 
-int clip_record_init(int len)
+int sample_record_init(int len)
 {
 	if(len <= 0) return 0;
-	if(clip_encoder_buf) free(clip_encoder_buf);
-	clip_encoder_buf = (uint8_t*) malloc(sizeof(uint8_t) * len * 3);
-	if(!clip_encoder_buf) return 0;
-	memset(clip_encoder_buf, 0, len * 3 );
+	if(sample_encoder_buf) free(sample_encoder_buf);
+	sample_encoder_buf = (uint8_t*) malloc(sizeof(uint8_t) * len * 3);
+	if(!sample_encoder_buf) return 0;
+	memset(sample_encoder_buf, 0, len * 3 );
 	return 1;
 }
 
-int clip_get_encoded_file(int clip_id, char *description)
+int sample_get_encoded_file(int sample_id, char *description)
 {
-    clip_info *si;
-    si = clip_get(clip_id);
+    sample_info *si;
+    si = sample_get(sample_id);
     if (!si)
 	return -1;
     sprintf(description, "%s", si->encoder_destination
@@ -48,18 +48,18 @@ int clip_get_encoded_file(int clip_id, char *description)
     return 1;
 }
 
-int clip_get_num_encoded_files(int clip_id)
+int sample_get_num_encoded_files(int sample_id)
 {
-	clip_info *si;
-	si = clip_get(clip_id);
+	sample_info *si;
+	si = sample_get(sample_id);
 	if(!si) return -1;
 	return si->sequence_num;
 }
 
-int clip_get_sequenced_file(int clip_id, char *descr, int num)
+int sample_get_sequenced_file(int sample_id, char *descr, int num)
 {
-    clip_info *si;
-    si = clip_get(clip_id);
+    sample_info *si;
+    si = sample_get(sample_id);
     if (!si)
 	return -1;
     sprintf(descr, "%s-%05d.avi", si->encoder_destination,
@@ -68,17 +68,17 @@ int clip_get_sequenced_file(int clip_id, char *descr, int num)
 
 }
 
-int clip_get_encoder_format(int clip_id)
+int sample_get_encoder_format(int sample_id)
 {
-	clip_info *si;
-	si = clip_get(clip_id);
+	sample_info *si;
+	si = sample_get(sample_id);
 	if(!si) return -1;
 	return si->encoder_format;
 }
 
-int clip_try_filename(int clip_id, char *filename)
+int sample_try_filename(int sample_id, char *filename)
 {
-	clip_info *si= clip_get(clip_id);
+	sample_info *si= sample_get(sample_id);
 	if(!si) return 0;
 	
 	if(filename != NULL)
@@ -88,15 +88,15 @@ int clip_try_filename(int clip_id, char *filename)
 	sprintf(si->encoder_destination, "%s-%05ld.avi", si->encoder_base,si->sequence_num);
 
 	veejay_msg(VEEJAY_MSG_INFO, "Recording to [%s]", si->encoder_destination);
-	return (clip_update(si,clip_id));	
+	return (sample_update(si,sample_id));	
 }
 
 
-static int clip_start_encoder(clip_info *si, editlist *el, int format, long nframes)
+static int sample_start_encoder(sample_info *si, editlist *el, int format, long nframes)
 {
 	char descr[100];
 	char cformat = 'Y';
-	int clip_id = si->clip_id;
+	int sample_id = si->sample_id;
 	switch(format)
 	{
 		case ENCODER_DVVIDEO: sprintf(descr,"DV2"); cformat='d'; break;
@@ -173,21 +173,21 @@ static int clip_start_encoder(clip_info *si, editlist *el, int format, long nfra
 	si->encoder_width = el->video_width;
 	si->encoder_height = el->video_height;
 
-	clip_update(si,clip_id);
+	sample_update(si,sample_id);
 	return 0;
 }
 
-int clip_init_encoder(int clip_id, char *filename, int format, editlist *el,
+int sample_init_encoder(int sample_id, char *filename, int format, editlist *el,
 	long nframes) {
 
-	clip_info *si;
+	sample_info *si;
 
-	if(! clip_try_filename( clip_id, filename ) )
+	if(! sample_try_filename( sample_id, filename ) )
 	{
 		return -1;
 	}  
 
-	si  = clip_get(clip_id);
+	si  = sample_get(sample_id);
 	if(!si)
 	{
 		 return -1; 
@@ -200,12 +200,12 @@ int clip_init_encoder(int clip_id, char *filename, int format, editlist *el,
 	if(!el) return -1;
 
 	if(si->encoder_active) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Clip is already encoding to [%s]",
+		veejay_msg(VEEJAY_MSG_ERROR, "Sample is already encoding to [%s]",
 		   si->encoder_destination);
 		return -1;
 	}
 
-	if (clip_start_encoder( si , el, format, nframes ) == 0) 	
+	if (sample_start_encoder( si , el, format, nframes ) == 0) 	
 	{
 		return 1;
 	}
@@ -214,9 +214,9 @@ int clip_init_encoder(int clip_id, char *filename, int format, editlist *el,
 	return -1;
 }
 
-int clip_continue_record( int s1 )
+int sample_continue_record( int s1 )
 {
-	clip_info *si = clip_get(s1);
+	sample_info *si = sample_get(s1);
 	if(!si) return -1;
 
 	if( si->rec_total_bytes == 0) return -1;
@@ -242,7 +242,7 @@ int clip_continue_record( int s1 )
 			si->encoder_duration);
 
 	
-		clip_update(si,s1);
+		sample_update(si,s1);
 		return 2;
 	}
 		
@@ -250,8 +250,8 @@ int clip_continue_record( int s1 )
 	return 0;
 }
 
-int clip_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_size) {
-   clip_info *si = clip_get(s1);
+int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_size) {
+   sample_info *si = sample_get(s1);
    int buf_len = 0;
    if(!si) return -1;
 
@@ -263,14 +263,14 @@ int clip_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_size
    // si->encoder_format has one of ENCODER_*
 
 
-   buf_len =  vj_avcodec_encode_frame( si->encoder_format, buffer, clip_encoder_buf, si->encoder_max_size);
+   buf_len =  vj_avcodec_encode_frame( si->encoder_format, buffer, sample_encoder_buf, si->encoder_max_size);
    if(buf_len <= 0) 
    {
 
   	veejay_msg(VEEJAY_MSG_ERROR, "Cannot encode frame");
 	return -1;
    }
-    if(lav_write_frame( (lav_file_t*) si->encoder_file,clip_encoder_buf,buf_len,1))
+    if(lav_write_frame( (lav_file_t*) si->encoder_file,sample_encoder_buf,buf_len,1))
 	{
 			veejay_msg(VEEJAY_MSG_ERROR, "writing frame, giving up %s", lav_strerror());
 			return 1;
@@ -293,32 +293,32 @@ int clip_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_size
 	si->encoder_num_frames ++;
 	si->encoder_total_frames ++;
 
-	clip_update(si,s1);
+	sample_update(si,s1);
 
-	return (clip_continue_record(s1));
+	return (sample_continue_record(s1));
 }
 
 
 
-int clip_stop_encoder(int s1) {
-   clip_info *si = clip_get(s1);
+int sample_stop_encoder(int s1) {
+   sample_info *si = sample_get(s1);
    if(!si) return -1;
    if(si->encoder_active) {
      lav_close((lav_file_t*)si->encoder_file);
-     veejay_msg(VEEJAY_MSG_INFO, "Stopped clip encoder [%s]",si->encoder_destination);
+     veejay_msg(VEEJAY_MSG_INFO, "Stopped sample encoder [%s]",si->encoder_destination);
      si->encoder_active = 0;
-     clip_update(si,s1);	
-     //clip_reset_encoder(s1);
+     sample_update(si,s1);	
+     //sample_reset_encoder(s1);
      return 1; 
   }
    return 0;
 }
 
 
-void clip_reset_encoder(int s1) {
-	clip_info *si = clip_get(s1);
+void sample_reset_encoder(int s1) {
+	sample_info *si = sample_get(s1);
 	if(!si) return;
-	  /* added clip */
+	  /* added sample */
  	si->encoder_active = 0;
 	si->encoder_format = 0;
 	si->encoder_succes_frames = 0;
@@ -330,45 +330,45 @@ void clip_reset_encoder(int s1) {
 	si->rec_total_bytes = 0;
 	si->encoder_duration = 0;
 
-	clip_update(si, s1);
+	sample_update(si, s1);
 }
 
-int clip_get_encoded_frames(int s1) {
-  clip_info *si = clip_get(s1);
+int sample_get_encoded_frames(int s1) {
+  sample_info *si = sample_get(s1);
   if(!si) return -1;
   //return ( si->encoder_succes_frames );
   return ( si->encoder_total_frames );
 }
 
 
-int clip_get_total_frames( int s1 )
+int sample_get_total_frames( int s1 )
 {
-  clip_info *si = clip_get(s1);
+  sample_info *si = sample_get(s1);
   if(!si) return -1;
   return ( si->encoder_total_frames );
 }
 
-int clip_reset_autosplit(int s1)
+int sample_reset_autosplit(int s1)
 {
-  clip_info *si = clip_get(s1);
+  sample_info *si = sample_get(s1);
   if(!si) return -1;
   bzero( si->encoder_base, 255 );
   bzero( si->encoder_destination , 255 );
   si->encoder_total_frames = 0;
   si->sequence_num = 0;
-  return (clip_update(si,s1));  
+  return (sample_update(si,s1));  
 }
 
-int clip_get_frames_left(int s1)
+int sample_get_frames_left(int s1)
 {
-	clip_info *si= clip_get(s1);
+	sample_info *si= sample_get(s1);
 	if(!si) return 0;
 	return ( si->encoder_duration - si->encoder_total_frames );
 }
 
-int clip_encoder_active(int s1)
+int sample_encoder_active(int s1)
 {
-	clip_info *si = clip_get(s1);
+	sample_info *si = sample_get(s1);
 	if(!si)return 0;
 	return si->encoder_active;
 }

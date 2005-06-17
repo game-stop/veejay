@@ -60,7 +60,7 @@ typedef struct {
 typedef struct {
     int id;
 //      char description[100];
-    clip_eff_chain *effect_chain[CLIP_MAX_EFFECTS];
+    sample_eff_chain *effect_chain[SAMPLE_MAX_EFFECTS];
     int next_id;
     int nframes;
     int source_type;
@@ -235,7 +235,7 @@ int 	vj_tag_set_manual_fader(int t1, int value );
 int 	vj_tag_get_fader_direction(int t1);
 int 	vj_tag_set_fader_active(int t1, int nframes, int direction);
 int 	vj_tag_set_fade_to_tag(int t1, int t2);
-int 	vj_tag_set_fade_to_clip(int t1, int s1);
+int 	vj_tag_set_fade_to_sample(int t1, int s1);
 int 	vj_tag_set_fader_val(int t1, float val);
 int 	vj_tag_apply_fader_inc(int t1);
 int 	vj_tag_get_fader_active(int t1);

@@ -48,7 +48,6 @@ typedef struct {
     struct video_capability capability;
     struct video_channel channel[10];
     struct video_picture picture;
-    struct video_clip clip;
     struct video_window window;
     struct video_capture capture;
     struct video_buffer buffer;

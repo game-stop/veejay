@@ -56,7 +56,7 @@ static hash_t *BundleHash;
 
 static int vj_event_valid_mode(int mode) {
 	switch(mode) {
-	 case VJ_PLAYBACK_MODE_CLIP:
+	 case VJ_PLAYBACK_MODE_SAMPLE:
 	 case VJ_PLAYBACK_MODE_TAG:
 	 case VJ_PLAYBACK_MODE_PLAIN:
 	 return 1;
@@ -165,7 +165,7 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_CHAIN_ENTRY_UP,			SDLK_KP_PLUS,	VIMS_MOD_NONE,	"1"	},
 	{ VIMS_CHAIN_ENTRY_CHANNEL_INC,		SDLK_EQUALS,	VIMS_MOD_NONE,	NULL	},
 	{ VIMS_CHAIN_ENTRY_CHANNEL_DEC,		SDLK_MINUS,	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_CHAIN_ENTRY_SOURCE_TOGGLE,	SDLK_SLASH,	VIMS_MOD_NONE,	NULL	}, // stream/clip
+	{ VIMS_CHAIN_ENTRY_SOURCE_TOGGLE,	SDLK_SLASH,	VIMS_MOD_NONE,	NULL	}, // stream/sample
 	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_PAGEUP,	VIMS_MOD_NONE,	"0 1"	},
 	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_KP_PERIOD,	VIMS_MOD_NONE,	"1 1"	},
 	{ VIMS_CHAIN_ENTRY_INC_ARG,		SDLK_PERIOD,	VIMS_MOD_NONE,	"2 1"	},
@@ -213,14 +213,14 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_FXLIST_INC,			SDLK_UP,	VIMS_MOD_NONE,	"1"	},
 	{ VIMS_FXLIST_DEC,			SDLK_DOWN,	VIMS_MOD_NONE,	"1"	},
 	{ VIMS_FXLIST_ADD,			SDLK_RETURN,	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_SET_CLIP_START,			SDLK_LEFTBRACKET,	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_SET_CLIP_END,			SDLK_RIGHTBRACKET,	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_CLIP_SET_MARKER_START,		SDLK_LEFTBRACKET,	VIMS_MOD_ALT,	NULL	},
-	{ VIMS_CLIP_SET_MARKER_END,		SDLK_RIGHTBRACKET,	VIMS_MOD_ALT,	NULL	},
-	{ VIMS_CLIP_TOGGLE_LOOP,		SDLK_KP_MULTIPLY,	VIMS_MOD_NONE,NULL	},
-	{ VIMS_SWITCH_CLIP_STREAM,		SDLK_ESCAPE,		VIMS_MOD_NONE, NULL	},
+	{ VIMS_SET_SAMPLE_START,			SDLK_LEFTBRACKET,	VIMS_MOD_NONE,	NULL	},
+	{ VIMS_SET_SAMPLE_END,			SDLK_RIGHTBRACKET,	VIMS_MOD_NONE,	NULL	},
+	{ VIMS_SAMPLE_SET_MARKER_START,		SDLK_LEFTBRACKET,	VIMS_MOD_ALT,	NULL	},
+	{ VIMS_SAMPLE_SET_MARKER_END,		SDLK_RIGHTBRACKET,	VIMS_MOD_ALT,	NULL	},
+	{ VIMS_SAMPLE_TOGGLE_LOOP,		SDLK_KP_MULTIPLY,	VIMS_MOD_NONE,NULL	},
+	{ VIMS_SWITCH_SAMPLE_STREAM,		SDLK_ESCAPE,		VIMS_MOD_NONE, NULL	},
 	{ VIMS_PRINT_INFO,			SDLK_HOME,		VIMS_MOD_NONE, NULL	},
-	{ VIMS_CLIP_CLEAR_MARKER,		SDLK_BACKSPACE,		VIMS_MOD_NONE, NULL },
+	{ VIMS_SAMPLE_CLEAR_MARKER,		SDLK_BACKSPACE,		VIMS_MOD_NONE, NULL },
 	{ 0,0,0,NULL },
 };
 #endif
@@ -286,14 +286,14 @@ static struct {
 	{ VIMS_CHAIN_TOGGLE,			 "Chain: Toggle effect chain on/off",
 		vj_event_chain_toggle,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY },
 
-	{ VIMS_SET_CLIP_START,			 "Clip: set starting frame at current position",
-		vj_event_clip_start,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY   },
-	{ VIMS_SET_CLIP_END,			 "Clip: set ending frame at current position and create new clip",
-		vj_event_clip_end,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY   },
-	{ VIMS_CLIP_SET_MARKER_START,		 "Clip: set clip N1 marker start to N2",
-		vj_event_clip_set_marker_start,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_CLIP_SET_MARKER_END,		 "Clip: set clip N1 marker end to N2",
-		vj_event_clip_set_marker_end,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SET_SAMPLE_START,			 "Sample: set starting frame at current position",
+		vj_event_sample_start,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY   },
+	{ VIMS_SET_SAMPLE_END,			 "Sample: set ending frame at current position and create new sample",
+		vj_event_sample_end,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY   },
+	{ VIMS_SAMPLE_SET_MARKER_START,		 "Sample: set sample N1 marker start to N2",
+		vj_event_sample_set_marker_start,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_SET_MARKER_END,		 "Sample: set sample N1 marker end to N2",
+		vj_event_sample_set_marker_end,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
 
 	{ VIMS_FXLIST_INC,		 	"EffectList: select next effect",
 		 vj_event_effect_inc,		1,	"%d",		{1,0}, VIMS_ALLOW_ANY	},
@@ -301,80 +301,80 @@ static struct {
 		vj_event_effect_dec,		1,	"%d",		{1,0}, VIMS_ALLOW_ANY	},
 	{ VIMS_FXLIST_ADD,		 	"EffectList: add selected effect on current chain enry",
 		 vj_event_effect_add,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY	},
-	{ VIMS_SELECT_BANK,			 "Set clip/stream bank N",
+	{ VIMS_SELECT_BANK,			 "Set sample/stream bank N",
 		vj_event_select_bank,		1,	"%d",		{1,0}, VIMS_ALLOW_ANY	},
-	{ VIMS_SELECT_ID,			 "Set clip/stream N of current bank",
+	{ VIMS_SELECT_ID,			 "Set sample/stream N of current bank",
 		vj_event_select_id,		1,	"%d",		{2,0}, VIMS_ALLOW_ANY	},
-	{ VIMS_CLIP_RAND_START,			"Start clip randomizer (0=rand duration,1=clip duration)",
-		vj_event_clip_rand_start,	1,	"%d",		{0,0}, VIMS_ALLOW_ANY   },
-	{ VIMS_CLIP_RAND_STOP,			"Stop clip randomzier",
-		vj_event_clip_rand_stop,	0,	NULL,		{0,0}, VIMS_ALLOW_ANY	},
-	{ VIMS_CLIP_TOGGLE_LOOP,		 "Toggle looptype to normal or pingpong",
-		vj_event_clip_set_loop_type,	2,	"%d %d",	{0,-1}, VIMS_REQUIRE_ALL_PARAMS   },
-	{ VIMS_RECORD_DATAFORMAT,		 "Set dataformat for stream/clip record",
+	{ VIMS_SAMPLE_RAND_START,			"Start sample randomizer (0=rand duration,1=sample duration)",
+		vj_event_sample_rand_start,	1,	"%d",		{0,0}, VIMS_ALLOW_ANY   },
+	{ VIMS_SAMPLE_RAND_STOP,			"Stop sample randomzier",
+		vj_event_sample_rand_stop,	0,	NULL,		{0,0}, VIMS_ALLOW_ANY	},
+	{ VIMS_SAMPLE_TOGGLE_LOOP,		 "Toggle looptype to normal or pingpong",
+		vj_event_sample_set_loop_type,	2,	"%d %d",	{0,-1}, VIMS_REQUIRE_ALL_PARAMS   },
+	{ VIMS_RECORD_DATAFORMAT,		 "Set dataformat for stream/sample record",
 		vj_event_tag_set_format,	1,	"%s",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	 },
-	{ VIMS_REC_AUTO_START,			 "Record clip/stream and auto play after recording",
+	{ VIMS_REC_AUTO_START,			 "Record sample/stream and auto play after recording",
 		 vj_event_misc_start_rec_auto,	0,	NULL,		{0,0}, VIMS_ALLOW_ANY		},
-	{ VIMS_REC_START,			 "Record clip/stream start",
+	{ VIMS_REC_START,			 "Record sample/stream start",
 		vj_event_misc_start_rec,	0,	NULL,		{0,0}, VIMS_ALLOW_ANY		},
-	{ VIMS_REC_STOP,			 "Record clip/stream stop",
+	{ VIMS_REC_STOP,			 "Record sample/stream stop",
 		vj_event_misc_stop_rec,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY		},
-	{ VIMS_CLIP_NEW,			 "Clip: create new",
-		vj_event_clip_new,		2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_PRINT_INFO,			 "Info: output clip/stream details",
+	{ VIMS_SAMPLE_NEW,			 "Sample: create new",
+		vj_event_sample_new,		2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_PRINT_INFO,			 "Info: output sample/stream details",
 		vj_event_print_info,		1,	"%d",		{0,0}, VIMS_ALLOW_ANY		},
 	{ VIMS_SET_PLAIN_MODE,			 "Video: set plain video mode",
 		vj_event_set_play_mode,		1,	"%d",		{2,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_CLIP_SET_LOOPTYPE,		 "Clip: set looptype",
-		vj_event_clip_set_loop_type, 	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS  }, 
-	{ VIMS_CLIP_SET_SPEED,			 "Clip: set speed",
-		vj_event_clip_set_speed,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS   },
-	{ VIMS_CLIP_SET_DESCRIPTION,		"Clip: set description",
-		vj_event_clip_set_descr,	2,	"%d %s",	{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS   },
-	{ VIMS_CLIP_SET_END,			"Clip: set ending position",
-		vj_event_clip_set_end, 		2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS   },
-	{ VIMS_CLIP_SET_START,			"Clip: set starting position",
-		vj_event_clip_set_start,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS   },
-	{ VIMS_CLIP_SET_DUP,			"Clip: set frame duplication",
-		vj_event_clip_set_dup,		2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS   },
-	{ VIMS_CLIP_SET_MARKER_START,		"Clip: set marker starting position",
-		vj_event_clip_set_marker_start,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_CLIP_SET_MARKER_END,		"Clip: set marker ending position",
-		vj_event_clip_set_marker_end,  	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_CLIP_SET_MARKER,			"Clip: set marker starting and ending position",
-		vj_event_clip_set_marker,	3,	"%d %d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_CLIP_CLEAR_MARKER,		"Clip: clear marker",
-		vj_event_clip_set_marker_clear,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_SET_LOOPTYPE,		 "Sample: set looptype",
+		vj_event_sample_set_loop_type, 	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS  }, 
+	{ VIMS_SAMPLE_SET_SPEED,			 "Sample: set speed",
+		vj_event_sample_set_speed,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS   },
+	{ VIMS_SAMPLE_SET_DESCRIPTION,		"Sample: set description",
+		vj_event_sample_set_descr,	2,	"%d %s",	{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS   },
+	{ VIMS_SAMPLE_SET_END,			"Sample: set ending position",
+		vj_event_sample_set_end, 		2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS   },
+	{ VIMS_SAMPLE_SET_START,			"Sample: set starting position",
+		vj_event_sample_set_start,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS   },
+	{ VIMS_SAMPLE_SET_DUP,			"Sample: set frame duplication",
+		vj_event_sample_set_dup,		2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS   },
+	{ VIMS_SAMPLE_SET_MARKER_START,		"Sample: set marker starting position",
+		vj_event_sample_set_marker_start,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_SET_MARKER_END,		"Sample: set marker ending position",
+		vj_event_sample_set_marker_end,  	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_SET_MARKER,			"Sample: set marker starting and ending position",
+		vj_event_sample_set_marker,	3,	"%d %d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_CLEAR_MARKER,		"Sample: clear marker",
+		vj_event_sample_set_marker_clear,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
 #ifdef HAVE_XML2
-	{ VIMS_CLIP_LOAD_CLIPLIST,		"Clip: load clips from file",
-		vj_event_clip_load_list,	1,	"%s",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_CLIP_SAVE_CLIPLIST,		"Clip: save clips to file",
-		vj_event_clip_save_list,	1,	"%s",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_LOAD_SAMPLELIST,		"Sample: load samples from file",
+		vj_event_sample_load_list,	1,	"%s",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_SAVE_SAMPLELIST,		"Sample: save samples to file",
+		vj_event_sample_save_list,	1,	"%s",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
 #endif
-	{ VIMS_CLIP_CHAIN_ENABLE,		"Clip: enable effect chain",
-		vj_event_clip_chain_enable,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_CLIP_CHAIN_DISABLE,		"Clip: disable effect chain",
-		vj_event_clip_chain_disable,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_CLIP_REC_START,			"Clip: record this clip to new",
-		vj_event_clip_rec_start,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS   },
-	{ VIMS_CLIP_REC_STOP,			"Clip: stop recording this clip",
-		vj_event_clip_rec_stop,	  	0,	NULL,		{0,0}, VIMS_ALLOW_ANY  },
-	{ VIMS_CLIP_RENDERLIST,			"Clip: send renderlist",
-		vj_event_send_clip_history_list,1,	"%d",		{0,0}, VIMS_ALLOW_ANY	}, 
-	{ VIMS_CLIP_RENDER_TO,			"Clip: render to inlined entry",
-		vj_event_clip_ren_start,	2,	"%d %d",    	{0,1}, VIMS_REQUIRE_ALL_PARAMS   },
-	{ VIMS_CLIP_RENDER_MOVE,		"Clip: move rendered entry to edl",
-		vj_event_clip_move_render,	2,	"%d %d",	{0, 0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_CLIP_RENDER_SELECT,		"Clip: select and play inlined entry",
-		vj_event_clip_sel_render,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_CLIP_DEL,			"Clip: delete",
-		vj_event_clip_del,		1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_CLIP_DEL_ALL,			"Clip: delete all",
-		vj_event_clip_clear_all,	0,    	NULL,		{0,0}, VIMS_ALLOW_ANY	},
-	{ VIMS_CLIP_COPY,			"Clip: copy clip <num>",
-		vj_event_clip_copy,		1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS   },
-	{ VIMS_CLIP_SELECT,			"Clip: select and play a clip",
-		vj_event_clip_select,		1,	"%d",		{0,0}, VIMS_ALLOW_ANY	}, // use default 
+	{ VIMS_SAMPLE_CHAIN_ENABLE,		"Sample: enable effect chain",
+		vj_event_sample_chain_enable,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_CHAIN_DISABLE,		"Sample: disable effect chain",
+		vj_event_sample_chain_disable,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_REC_START,			"Sample: record this sample to new",
+		vj_event_sample_rec_start,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS   },
+	{ VIMS_SAMPLE_REC_STOP,			"Sample: stop recording this sample",
+		vj_event_sample_rec_stop,	  	0,	NULL,		{0,0}, VIMS_ALLOW_ANY  },
+	{ VIMS_SAMPLE_RENDERLIST,			"Sample: send renderlist",
+		vj_event_send_sample_history_list,1,	"%d",		{0,0}, VIMS_ALLOW_ANY	}, 
+	{ VIMS_SAMPLE_RENDER_TO,			"Sample: render to inlined entry",
+		vj_event_sample_ren_start,	2,	"%d %d",    	{0,1}, VIMS_REQUIRE_ALL_PARAMS   },
+	{ VIMS_SAMPLE_RENDER_MOVE,		"Sample: move rendered entry to edl",
+		vj_event_sample_move_render,	2,	"%d %d",	{0, 0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_RENDER_SELECT,		"Sample: select and play inlined entry",
+		vj_event_sample_sel_render,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_DEL,			"Sample: delete",
+		vj_event_sample_del,		1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_DEL_ALL,			"Sample: delete all",
+		vj_event_sample_clear_all,	0,    	NULL,		{0,0}, VIMS_ALLOW_ANY	},
+	{ VIMS_SAMPLE_COPY,			"Sample: copy sample <num>",
+		vj_event_sample_copy,		1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS   },
+	{ VIMS_SAMPLE_SELECT,			"Sample: select and play a sample",
+		vj_event_sample_select,		1,	"%d",		{0,0}, VIMS_ALLOW_ANY	}, // use default 
 	{ VIMS_STREAM_SELECT,			"Stream: select and play a stream",
 		vj_event_tag_select,		1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
 	{ VIMS_STREAM_DELETE,			"Stream: delete",
@@ -457,12 +457,12 @@ static struct {
 	{ VIMS_RESIZE_SDL_SCREEN,		"Output: Re(initialize) SDL video screen",
 		vj_event_set_screen_size,	4,	"%d %d %d %d", 	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
 #endif
-	{ VIMS_SET_PLAY_MODE,			"Playback: switch playmode clip/tag/plain",
+	{ VIMS_SET_PLAY_MODE,			"Playback: switch playmode sample/tag/plain",
 		vj_event_set_play_mode,		1,	"%d",		{2,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_SET_MODE_AND_GO,		"Playback: set playmode (and fire clip/tag)",
+	{ VIMS_SET_MODE_AND_GO,		"Playback: set playmode (and fire sample/tag)",
 		vj_event_set_play_mode_go,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_SWITCH_CLIP_STREAM,		"Playback: switch between clips/tags",
-		vj_event_switch_clip_tag,	0,	NULL,		{0,0}, VIMS_ALLOW_ANY	},
+	{ VIMS_SWITCH_SAMPLE_STREAM,		"Playback: switch between samples/tags",
+		vj_event_switch_sample_tag,	0,	NULL,		{0,0}, VIMS_ALLOW_ANY	},
 	{ VIMS_AUDIO_DISABLE,			"Playback: disable audio",
 		vj_event_disable_audio,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY   },
 	{ VIMS_AUDIO_ENABLE,			"Playback: enable audio",
@@ -483,12 +483,12 @@ static struct {
 		vj_event_el_load_editlist,	1,	"%s",		{0,0}, VIMS_LONG_PARAMS	| VIMS_REQUIRE_ALL_PARAMS},
 	{ VIMS_EDITLIST_ADD,			"EditList: add video file to editlist",
 		vj_event_el_add_video,		1,	"%s",		{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_EDITLIST_ADD_CLIP,		"EditList: add video file to editlist as clip",
-		vj_event_el_add_video_clip,	1,	"%s",		{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_EDITLIST_ADD_SAMPLE,		"EditList: add video file to editlist as sample",
+		vj_event_el_add_video_sample,	1,	"%s",		{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS	},
 	{ VIMS_STREAM_LIST,			"Stream: send list of all streams",
 		vj_event_send_tag_list,		1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
-	{ VIMS_CLIP_LIST,			"Clip: send list of Clips",
-		vj_event_send_clip_list,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_LIST,			"Sample: send list of Samples",
+		vj_event_send_sample_list,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
 	{ VIMS_EDITLIST_LIST,			"EditList: send list of all files",
 		vj_event_send_editlist,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY   },
 	{ VIMS_BUNDLE,				"Bundle: execute collection of messages",
@@ -529,10 +529,10 @@ static struct {
 	{ VIMS_SCREENSHOT,			"Various: Save frame to jpeg",
 		vj_event_screenshot,		1,	"%s",		{0,0}, VIMS_LONG_PARAMS | VIMS_ALLOW_ANY  },
 #endif
-	{ VIMS_CHAIN_TOGGLE_ALL,		"Toggle Effect Chain on all clips or streams",
-		vj_event_all_clips_chain_toggle,1,	"%d",		{0,0} , VIMS_REQUIRE_ALL_PARAMS  },
-	{ VIMS_CLIP_UPDATE,			"Clip: Update starting and ending position by offset",
-		vj_event_clip_rel_start,	3,	"%d %d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},	 
+	{ VIMS_CHAIN_TOGGLE_ALL,		"Toggle Effect Chain on all samples or streams",
+		vj_event_all_samples_chain_toggle,1,	"%d",		{0,0} , VIMS_REQUIRE_ALL_PARAMS  },
+	{ VIMS_SAMPLE_UPDATE,			"Sample: Update starting and ending position by offset",
+		vj_event_sample_rel_start,	3,	"%d %d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},	 
 #ifdef HAVE_V4L
 	{ VIMS_STREAM_SET_BRIGHTNESS,		"Video4Linux: set v4l brightness value",
 		vj_event_v4l_set_brightness,	2,	"%d %d",	{0,0}, 	VIMS_REQUIRE_ALL_PARAMS },
@@ -605,14 +605,14 @@ vj_server_send(v->vjs[3], v->uc->current_link,str,strlen(str));\
 
 /* some macros for commonly used checks */
 
-#define CLIP_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_CLIP) )
+#define SAMPLE_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) )
 #define STREAM_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_TAG) )
 #define PLAIN_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN) )
 
-#define p_no_clip(a) {  veejay_msg(VEEJAY_MSG_ERROR, "Clip %d does not exist",a); }
+#define p_no_sample(a) {  veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist",a); }
 #define p_no_tag(a)    {  veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist",a); }
 #define p_invalid_mode() {  veejay_msg(VEEJAY_MSG_DEBUG, "Invalid playback mode for this action"); }
-#define v_chi(v) ( (v < 0  || v >= CLIP_MAX_EFFECTS ) ) 
+#define v_chi(v) ( (v < 0  || v >= SAMPLE_MAX_EFFECTS ) ) 
 
 /* P_A: Parse Arguments. This macro is used in many functions */
 #define P_A(a,b,c,d)\
@@ -678,7 +678,7 @@ typedef struct {
 } vj_msg_bundle;
 
 
-/* forward declarations (former console clip/tag print info) */
+/* forward declarations (former console sample/tag print info) */
 vj_keyboard_event *new_keyboard_event(
 	int symbol, int modifier, const char *value, int event_id );
 vj_keyboard_event *get_keyboard_event( int id );
@@ -687,7 +687,7 @@ int	del_keyboard_event(int id );
 char *find_keyboard_default(int id);
 
 void vj_event_print_plain_info(void *ptr, int x);
-void vj_event_print_clip_info(veejay_t *v, int id); 
+void vj_event_print_sample_info(veejay_t *v, int id); 
 void vj_event_print_tag_info(veejay_t *v, int id); 
 int vj_event_bundle_update( vj_msg_bundle *bundle, int bundle_id );
 vj_msg_bundle *vj_event_bundle_get(int event_id);
@@ -1835,7 +1835,7 @@ void	vj_event_format_xml_settings( veejay_t *v, xmlNodePtr node  )
 	__xml_cint( buf, v->settings->zoom ,node,	XML_CONFIG_SETTING_SCALE );
 	__xml_cfloat( buf, v->settings->output_fps, node, XML_CONFIG_SETTING_FPS );
 	__xml_cint( buf, v->uc->playback_mode, node, XML_CONFIG_SETTING_PMODE );
-	__xml_cint( buf, v->uc->clip_id, node, XML_CONFIG_SETTING_PID );
+	__xml_cint( buf, v->uc->sample_id, node, XML_CONFIG_SETTING_PID );
 #ifdef HAVE_SDL
 #endif
 
@@ -1883,7 +1883,7 @@ void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SCALE, &(v->settings->zoom) );
 		get_fstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_FPS, &(v->settings->output_fps ) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PMODE, &(v->uc->playback_mode) );
-		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PID, &(v->uc->clip_id ) );
+		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PID, &(v->uc->sample_id ) );
 		cur = cur->next;
 	}
 
@@ -2214,10 +2214,10 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 	rootnode = xmlNewDocNode( doc, NULL, (const xmlChar*) XML_CONFIG_FILE,NULL);
 	xmlDocSetRootElement( doc, rootnode );
 	veejay_t *v = (veejay_t*) ptr;
-	/* Here, we can save the cliplist, editlist as it is now */
+	/* Here, we can save the samplelist, editlist as it is now */
 	if(args[0]==1 || args[1]==1)
 	{
-		/* write cliplist into XML bundle */	
+		/* write samplelist into XML bundle */	
 		char tmp_buf[1024];
 		bzero(tmp_buf,1024);
 		childnode = xmlNewChild( rootnode, NULL, (const xmlChar*) XML_CONFIG_SETTINGS, NULL );
@@ -2235,12 +2235,12 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 		
 			bzero( tmp_buf, 1024 );
 		}
-		if( clip_size() > 1 )	
+		if( sample_size() > 1 )	
 		{	
 			bzero( live_set, 512 );
 		
 			sprintf(live_set, "%s-SL", file_name );
-			int res = clip_writeToFile( live_set );
+			int res = sample_writeToFile( live_set );
 			if(!res)
 				veejay_msg(VEEJAY_MSG_ERROR,"Error saving sample list to %s", live_set ); 
 			else
@@ -2492,9 +2492,9 @@ void vj_event_bezerk(void *ptr, const char format[], va_list ap)
 	if(v->no_bezerk) v->no_bezerk = 0; else v->no_bezerk = 1;
 	veejay_msg(VEEJAY_MSG_INFO, "Bezerk mode is %s", (v->no_bezerk==0? "enabled" : "disabled"));
 	if(v->no_bezerk==1)
-		veejay_msg(VEEJAY_MSG_DEBUG,"Bezerk On  :No clip-restart when changing input channels");
+		veejay_msg(VEEJAY_MSG_DEBUG,"Bezerk On  :No sample-restart when changing input channels");
 	else
-		veejay_msg(VEEJAY_MSG_DEBUG,"Bezerk Off :Clip-restart when changing input channels"); 
+		veejay_msg(VEEJAY_MSG_DEBUG,"Bezerk Off :Sample-restart when changing input channels"); 
 }
 
 void vj_event_debug_level(void *ptr, const char format[], va_list ap)
@@ -2531,23 +2531,23 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
 			return;
 		}
 	
-		if(args[0] == VJ_PLAYBACK_MODE_CLIP) 
+		if(args[0] == VJ_PLAYBACK_MODE_SAMPLE) 
 		{
-			if(args[1]==0) args[1] = v->uc->clip_id;
-			if(args[1]==-1) args[1] = clip_size()-1;
-			if(clip_exists(args[1]))
+			if(args[1]==0) args[1] = v->uc->sample_id;
+			if(args[1]==-1) args[1] = sample_size()-1;
+			if(sample_exists(args[1]))
 			{
 				veejay_change_playback_mode(v,args[0] ,args[1]);
 			}
 			else
 			{	
-				p_no_clip(args[1]);
+				p_no_sample(args[1]);
 			}
 		}
 		if(args[0] == VJ_PLAYBACK_MODE_TAG)
 		{
-			if(args[1]==0) args[1] = v->uc->clip_id;
-			if(args[1]==-1) args[1] = clip_size()-1;
+			if(args[1]==0) args[1] = v->uc->sample_id;
+			if(args[1]==-1) args[1] = sample_size()-1;
 			if(vj_tag_exists(args[1]))
 			{
 				veejay_change_playback_mode(v,args[0],args[1]);
@@ -2746,7 +2746,7 @@ void	vj_event_send_vimslist(void *ptr, const char format[], va_list ap)
 
 
 
-void vj_event_clip_select(void *ptr, const char format[], va_list ap)
+void vj_event_sample_select(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	int args[1];
@@ -2755,19 +2755,19 @@ void vj_event_clip_select(void *ptr, const char format[], va_list ap)
 
 	if(args[0] == 0 )
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 	if(args[0] == -1)
 	{
-		args[0] = clip_size()-1;
+		args[0] = sample_size()-1;
 	}
-	if(clip_exists(args[0]))
+	if(sample_exists(args[0]))
 	{
-		veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_CLIP,args[0] );
+		veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE,args[0] );
 	}
 	else
 	{
-		p_no_clip(args[0]);
+		p_no_sample(args[0]);
 	}
 }
 
@@ -2780,7 +2780,7 @@ void vj_event_tag_select(void *ptr, const char format[], va_list ap)
 
 	if(args[0] == 0 )
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 	if(args[0]==-1)
 	{
@@ -2798,15 +2798,15 @@ void vj_event_tag_select(void *ptr, const char format[], va_list ap)
 }
 
 
-void vj_event_switch_clip_tag(void *ptr, const char format[], va_list ap)
+void vj_event_switch_sample_tag(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
 
-	if(!STREAM_PLAYING(v) && !CLIP_PLAYING(v))
+	if(!STREAM_PLAYING(v) && !SAMPLE_PLAYING(v))
 	{
-		if(clip_exists(v->last_clip_id)) 
+		if(sample_exists(v->last_sample_id)) 
 		{
-			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_CLIP, v->last_clip_id);
+			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE, v->last_sample_id);
 			return;
 		}
 		if(vj_tag_exists(v->last_tag_id))
@@ -2814,7 +2814,7 @@ void vj_event_switch_clip_tag(void *ptr, const char format[], va_list ap)
 			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, v->last_tag_id);
 			return;
 		}
-		if(clip_size()-1 <= 0)
+		if(sample_size()-1 <= 0)
 		{
 			if(vj_tag_exists( vj_tag_size()-1 ))
 			{
@@ -2824,7 +2824,7 @@ void vj_event_switch_clip_tag(void *ptr, const char format[], va_list ap)
 		}	
 	}
 
-	if(CLIP_PLAYING(v))
+	if(SAMPLE_PLAYING(v))
 	{
 		if(vj_tag_exists(v->last_tag_id))
 		{
@@ -2846,20 +2846,20 @@ void vj_event_switch_clip_tag(void *ptr, const char format[], va_list ap)
 	else
 	if(STREAM_PLAYING(v))
 	{
-		if(clip_exists(v->last_clip_id) )
+		if(sample_exists(v->last_sample_id) )
 		{
-			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_CLIP, v->last_clip_id);
+			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE, v->last_sample_id);
 		}
 		else
 		{
-			int id = clip_size() - 1;
+			int id = sample_size() - 1;
 			if(id)
 			{
-				veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_CLIP,id);
+				veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE,id);
 			}
 			else
 			{
-				p_no_clip(id);
+				p_no_sample(id);
 			}
 		}
 	}
@@ -2891,21 +2891,21 @@ void vj_event_set_play_mode(void *ptr, const char format[], va_list ap)
 	{
 		int mode = args[0];
 		/* check if current playing ID is valid for this mode */
-		if(mode == VJ_PLAYBACK_MODE_CLIP)
+		if(mode == VJ_PLAYBACK_MODE_SAMPLE)
 		{
-			int last_id = clip_size()-1;
+			int last_id = sample_size()-1;
 			if(last_id == 0)
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "There are no clips. Cannot switch to clip mode");
+				veejay_msg(VEEJAY_MSG_ERROR, "There are no samples. Cannot switch to sample mode");
 				return;
 			}
-			if(!clip_exists(v->last_clip_id))
+			if(!sample_exists(v->last_sample_id))
 			{
-				v->uc->clip_id = last_id;
+				v->uc->sample_id = last_id;
 			}
-			if(clip_exists(v->uc->clip_id))
+			if(sample_exists(v->uc->sample_id))
 			{
-				veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_CLIP, v->uc->clip_id );
+				veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_SAMPLE, v->uc->sample_id );
 			}
 		}
 		if(mode == VJ_PLAYBACK_MODE_TAG)
@@ -2919,11 +2919,11 @@ void vj_event_set_play_mode(void *ptr, const char format[], va_list ap)
 			
 			if(!vj_tag_exists(v->last_tag_id)) /* jump to last used Tag if ok */
 			{
-				v->uc->clip_id = last_id;
+				v->uc->sample_id = last_id;
 			}
-			if(vj_tag_exists(v->uc->clip_id))
+			if(vj_tag_exists(v->uc->sample_id))
 			{
-				veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, v->uc->clip_id);
+				veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, v->uc->sample_id);
 			}
 		}
 		if(mode == VJ_PLAYBACK_MODE_PLAIN)
@@ -2937,10 +2937,10 @@ void vj_event_set_play_mode(void *ptr, const char format[], va_list ap)
 	}
 }
 
-void vj_event_clip_new(void *ptr, const char format[], va_list ap)
+void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
-	if(CLIP_PLAYING(v) || PLAIN_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v) || PLAIN_PLAYING(v)) 
 	{
 		int args[2];
 		char *s = NULL;
@@ -2964,11 +2964,11 @@ void vj_event_clip_new(void *ptr, const char format[], va_list ap)
 		if(args[0] >= 0 && args[1] > 0 && args[0] <= args[1] && args[0] <= num_frames &&
 			args[1] <= num_frames ) 
 		{
-			clip_info *skel = clip_skeleton_new(args[0],args[1]);
-			if(clip_store(skel)==0) 
+			sample_info *skel = sample_skeleton_new(args[0],args[1]);
+			if(sample_store(skel)==0) 
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Created new clip [%d]", skel->clip_id);
-				clip_set_looptype(skel->clip_id,1);
+				veejay_msg(VEEJAY_MSG_INFO, "Created new sample [%d]", skel->sample_id);
+				sample_set_looptype(skel->sample_id,1);
 			}
 		}
 		else
@@ -3131,7 +3131,7 @@ void vj_event_play_slow(void *ptr, const char format[],va_list ap)
 	char *s = NULL;
 	P_A(args,s,format,ap);
 	
-	if(PLAIN_PLAYING(v) || CLIP_PLAYING(v))
+	if(PLAIN_PLAYING(v) || SAMPLE_PLAYING(v))
 	{
 		if(veejay_set_framedup(v, args[0]))
 		{
@@ -3213,14 +3213,14 @@ void vj_event_next_second(void *ptr, const char format[], va_list ap)
 }
 
 
-void vj_event_clip_start(void *ptr, const char format[], va_list ap)
+void vj_event_sample_start(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	video_playback_setup *s = v->settings;
-	if(CLIP_PLAYING(v) || PLAIN_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v) || PLAIN_PLAYING(v)) 
 	{
-		v->uc->clip_start = s->current_frame_num;
-		veejay_msg(VEEJAY_MSG_INFO, "Clip starting position set to frame %ld", v->uc->clip_start);
+		v->uc->sample_start = s->current_frame_num;
+		veejay_msg(VEEJAY_MSG_INFO, "Sample starting position set to frame %ld", v->uc->sample_start);
 	}	
 	else
 	{
@@ -3230,27 +3230,27 @@ void vj_event_clip_start(void *ptr, const char format[], va_list ap)
 
 
 
-void vj_event_clip_end(void *ptr, const char format[] , va_list ap)
+void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	video_playback_setup *s = v->settings;
-	if(CLIP_PLAYING(v) || PLAIN_PLAYING(v))
+	if(SAMPLE_PLAYING(v) || PLAIN_PLAYING(v))
 	{
-		v->uc->clip_end = s->current_frame_num;
-		if( v->uc->clip_end > v->uc->clip_start) {
-			clip_info *skel = clip_skeleton_new(v->uc->clip_start,v->uc->clip_end);
-			if(clip_store(skel)==0) {
-				veejay_msg(VEEJAY_MSG_INFO,"Created new clip [%d]", skel->clip_id);
-				clip_set_looptype(skel->clip_id, 1);	
+		v->uc->sample_end = s->current_frame_num;
+		if( v->uc->sample_end > v->uc->sample_start) {
+			sample_info *skel = sample_skeleton_new(v->uc->sample_start,v->uc->sample_end);
+			if(sample_store(skel)==0) {
+				veejay_msg(VEEJAY_MSG_INFO,"Created new sample [%d]", skel->sample_id);
+				sample_set_looptype(skel->sample_id, 1);	
 			}
 			else
 			{
-				veejay_msg(VEEJAY_MSG_ERROR,"%s %d: Cannot store new clip!",__FILE__,__LINE__);
+				veejay_msg(VEEJAY_MSG_ERROR,"%s %d: Cannot store new sample!",__FILE__,__LINE__);
 			}
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Clip ending position before starting position. Cannot create new clip");
+			veejay_msg(VEEJAY_MSG_ERROR, "Sample ending position before starting position. Cannot create new sample");
 		}
 	}
 	else
@@ -3267,9 +3267,9 @@ void vj_event_goto_end(void *ptr, const char format[], va_list ap)
 		p_invalid_mode();
 		return;
 	} 
- 	if(CLIP_PLAYING(v))
+ 	if(SAMPLE_PLAYING(v))
   	{	
-		veejay_set_frame(v, clip_get_endFrame(v->uc->clip_id));
+		veejay_set_frame(v, sample_get_endFrame(v->uc->sample_id));
   	}
   	if(PLAIN_PLAYING(v)) 
  	{
@@ -3285,9 +3285,9 @@ void vj_event_goto_start(void *ptr, const char format[], va_list ap)
 		p_invalid_mode();
 		return;
 	}
-  	if( CLIP_PLAYING(v))
+  	if( SAMPLE_PLAYING(v))
 	{
-		veejay_set_frame(v, clip_get_startFrame(v->uc->clip_id));
+		veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
   	}
   	if ( PLAIN_PLAYING(v))
 	{
@@ -3295,7 +3295,7 @@ void vj_event_goto_start(void *ptr, const char format[], va_list ap)
   	}
 }
 
-void	vj_event_clip_rand_start( void *ptr, const char format[], va_list ap)
+void	vj_event_sample_rand_start( void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	video_playback_setup *settings = v->settings;
@@ -3314,82 +3314,82 @@ void	vj_event_clip_rand_start( void *ptr, const char format[], va_list ap)
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Started clip randomizer");	
+		veejay_msg(VEEJAY_MSG_INFO, "Started sample randomizer");	
 	}
 }
-void	vj_event_clip_rand_stop( void *ptr, const char format[], va_list ap)
+void	vj_event_sample_rand_stop( void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	video_playback_setup *settings = v->settings;
 
 	if(settings->randplayer.mode != RANDMODE_INACTIVE)
-		veejay_msg(VEEJAY_MSG_ERROR, "Stopped clip randomizer");
+		veejay_msg(VEEJAY_MSG_ERROR, "Stopped sample randomizer");
 	settings->randplayer.mode = RANDMODE_INACTIVE;
 }
 
-void vj_event_clip_set_loop_type(void *ptr, const char format[], va_list ap)
+void vj_event_sample_set_loop_type(void *ptr, const char format[], va_list ap)
 {
 	int args[2];
 	veejay_t *v = (veejay_t*) ptr;
 	char *s = NULL;
 	P_A(args,s,format,ap);
 
-	if(!CLIP_PLAYING(v)) return;
+	if(!SAMPLE_PLAYING(v)) return;
 
 	if( args[0] == 0) 
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
-	if(args[0] == -1) args[0] = clip_size()-1;
+	if(args[0] == -1) args[0] = sample_size()-1;
 
 	if(args[1] == -1)
 	{
-		if(clip_exists(args[0]))
+		if(sample_exists(args[0]))
 		{
-			if(clip_get_looptype(args[0])==2)
+			if(sample_get_looptype(args[0])==2)
 			{
 				int lp;
-				clip_set_looptype(args[0],1);
-				lp = clip_get_looptype(args[0]);
-				veejay_msg(VEEJAY_MSG_INFO, "Clip %d loop type is now %s",args[0],
+				sample_set_looptype(args[0],1);
+				lp = sample_get_looptype(args[0]);
+				veejay_msg(VEEJAY_MSG_INFO, "Sample %d loop type is now %s",args[0],
 		  			( lp==1 ? "Normal Looping" : (lp==2 ? "Pingpong Looping" : "No Looping" ) ) );
 				return;
 			}
 			else
 			{
 				int lp;
-				clip_set_looptype(args[0],2);
-				lp = clip_get_looptype(args[0]);
-				veejay_msg(VEEJAY_MSG_INFO, "Clip %d loop type is now %s",args[0],
+				sample_set_looptype(args[0],2);
+				lp = sample_get_looptype(args[0]);
+				veejay_msg(VEEJAY_MSG_INFO, "Sample %d loop type is now %s",args[0],
 		  			( lp==1 ? "Normal Looping" : lp==2 ? "Pingpong Looping" : "No Looping" ) );
 				return;
 			}
 		}
 		else
 		{
-			p_no_clip(args[0]);
+			p_no_sample(args[0]);
 			return;
 		}
 	}
 
 	if(args[1] >= 0 && args[1] <= 2) 
 	{
-		if(clip_exists(args[0]))
+		if(sample_exists(args[0]))
 		{
 			int lp;
-			clip_set_looptype( args[0] , args[1]);
-			lp = clip_get_looptype(args[0]);
-			veejay_msg(VEEJAY_MSG_INFO, "Clip %d loop type is now %s",args[0],
+			sample_set_looptype( args[0] , args[1]);
+			lp = sample_get_looptype(args[0]);
+			veejay_msg(VEEJAY_MSG_INFO, "Sample %d loop type is now %s",args[0],
 			  ( args[1]==1 ? "Normal Looping" : lp==2 ? "Pingpong Looping" : "No Looping" ) );
 		}
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Clip %d does not exist or invalid looptype %d",args[1],args[0]);
+		veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist or invalid looptype %d",args[1],args[0]);
 	}
 }
 
-void vj_event_clip_set_speed(void *ptr, const char format[], va_list ap)
+void vj_event_sample_set_speed(void *ptr, const char format[], va_list ap)
 {
 	int args[2];
 	veejay_t *v = (veejay_t*) ptr;
@@ -3398,29 +3398,29 @@ void vj_event_clip_set_speed(void *ptr, const char format[], va_list ap)
 
 	if(args[0] == -1)
 	{
-		args[0] = clip_size() - 1;
+		args[0] = sample_size() - 1;
 	}
 
 	if( args[0] == 0) 
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 
-	if(clip_exists(args[0]))
+	if(sample_exists(args[0]))
 	{	
-		if( CLIP_PLAYING(v))
+		if( SAMPLE_PLAYING(v))
 		{
 			veejay_set_speed(v, args[1] );
 		}
 		else
 		{
-			if( clip_set_speed(args[0], args[1]) != -1)
+			if( sample_set_speed(args[0], args[1]) != -1)
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Clip %d speed set to %d",args[0],args[1]);
+				veejay_msg(VEEJAY_MSG_INFO, "Sample %d speed set to %d",args[0],args[1]);
 			}
 			else
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Speed %d it too high to set on clip %d !",
+				veejay_msg(VEEJAY_MSG_ERROR, "Speed %d it too high to set on sample %d !",
 					args[1],args[0]); 
 			}
 
@@ -3428,11 +3428,11 @@ void vj_event_clip_set_speed(void *ptr, const char format[], va_list ap)
 	}
 	else
 	{
-		p_no_clip(args[0]);
+		p_no_sample(args[0]);
 	}
 }
 
-void vj_event_clip_set_marker_start(void *ptr, const char format[], va_list ap) 
+void vj_event_sample_set_marker_start(void *ptr, const char format[], va_list ap) 
 {
 	int args[2];
 	veejay_t *v = (veejay_t*)ptr;
@@ -3442,32 +3442,32 @@ void vj_event_clip_set_marker_start(void *ptr, const char format[], va_list ap)
 	
 	if( args[0] == 0) 
 	{
-		if(CLIP_PLAYING(v))
-			args[0] = v->uc->clip_id;
+		if(SAMPLE_PLAYING(v))
+			args[0] = v->uc->sample_id;
 	}
 
-	if(args[0] == -1) args[0] = clip_size()-1;
+	if(args[0] == -1) args[0] = sample_size()-1;
 
-	if( clip_exists(args[0]) )
+	if( sample_exists(args[0]) )
 	{
 		int start = 0; int end = 0;
-		if ( clip_get_el_position( args[0], &start, &end ) )
+		if ( sample_get_el_position( args[0], &start, &end ) )
 		{	// marker in relative positions given !
 			args[1] += start; // add sample's start position
-			if( clip_set_marker_start( args[0], args[1] ) )
+			if( sample_set_marker_start( args[0], args[1] ) )
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Clip %d marker starting position at %d", args[0],args[1]);
+				veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker starting position at %d", args[0],args[1]);
 			}
 			else
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker position %d for clip %d (limits are %d - %d)",args[1],args[0],start,end);
+				veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker position %d for sample %d (limits are %d - %d)",args[1],args[0],start,end);
 			}
 		}
 	}	
 }
 
 
-void vj_event_clip_set_marker_end(void *ptr, const char format[], va_list ap) 
+void vj_event_sample_set_marker_end(void *ptr, const char format[], va_list ap) 
 {
 	int args[2];
 	veejay_t *v = (veejay_t*) ptr;
@@ -3477,31 +3477,31 @@ void vj_event_clip_set_marker_end(void *ptr, const char format[], va_list ap)
 	
 	if( args[0] == 0 ) 
 	{
-		if(CLIP_PLAYING(v))
-			args[0] = v->uc->clip_id;
+		if(SAMPLE_PLAYING(v))
+			args[0] = v->uc->sample_id;
 	}
-	if(args[0] == -1) args[0] = clip_size()-1;
+	if(args[0] == -1) args[0] = sample_size()-1;
 
-	if( clip_exists(args[0]) )
+	if( sample_exists(args[0]) )
 	{
 		int start = 0; int end = 0;
-		if ( clip_get_el_position( args[0], &start, &end ) )
+		if ( sample_get_el_position( args[0], &start, &end ) )
 		{
 			args[1] = end - args[1]; // add sample's ending position
-			if( clip_set_marker_end( args[0], args[1] ) )
+			if( sample_set_marker_end( args[0], args[1] ) )
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Clip %d marker ending position at position %d", args[0],args[1]);
+				veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker ending position at position %d", args[0],args[1]);
 			}
 			else
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Marker position out side of clip boundaries");
+				veejay_msg(VEEJAY_MSG_INFO, "Marker position out side of sample boundaries");
 			}
 		}	
 	}
 }
 
 
-void vj_event_clip_set_marker(void *ptr, const char format[], va_list ap) 
+void vj_event_sample_set_marker(void *ptr, const char format[], va_list ap) 
 {
 	int args[3];
 	veejay_t *v = (veejay_t*) ptr;
@@ -3510,33 +3510,33 @@ void vj_event_clip_set_marker(void *ptr, const char format[], va_list ap)
 	
 	if( args[0] == 0) 
 	{
-		if(CLIP_PLAYING(v))
-			args[0] = v->uc->clip_id;
+		if(SAMPLE_PLAYING(v))
+			args[0] = v->uc->sample_id;
 	}
-	if(args[0] == -1) args[0] = clip_size()-1;
+	if(args[0] == -1) args[0] = sample_size()-1;
 
-	if( clip_exists(args[0]) )
+	if( sample_exists(args[0]) )
 	{
 		int start = 0;
 		int end = 0;
-		if( clip_get_el_position( args[0], &start, &end ) )
+		if( sample_get_el_position( args[0], &start, &end ) )
 		{
 			args[1] += start;
 			args[2] = end - args[2];
-			if( clip_set_marker( args[0], args[1],args[2] ) )
+			if( sample_set_marker( args[0], args[1],args[2] ) )
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Clip %d marker starting position at %d, ending position at %d", args[0],args[1],args[2]);
+				veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker starting position at %d, ending position at %d", args[0],args[1],args[2]);
 			}
 			else
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker %d-%d for clip %d",args[1],args[2],args[0]);
+				veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker %d-%d for sample %d",args[1],args[2],args[0]);
 			}
 		}
 	}	
 }
 
 
-void vj_event_clip_set_marker_clear(void *ptr, const char format[],va_list ap) 
+void vj_event_sample_set_marker_clear(void *ptr, const char format[],va_list ap) 
 {
 	int args[1];
 	veejay_t *v = (veejay_t*) ptr;
@@ -3545,25 +3545,25 @@ void vj_event_clip_set_marker_clear(void *ptr, const char format[],va_list ap)
 	
 	if( args[0] == 0) 
 	{
-		if(CLIP_PLAYING(v))
-			args[0] = v->uc->clip_id;
+		if(SAMPLE_PLAYING(v))
+			args[0] = v->uc->sample_id;
 	}
-	if(args[0] == -1) args[0] = clip_size()-1;
+	if(args[0] == -1) args[0] = sample_size()-1;
 
-	if( clip_exists(args[0]) )
+	if( sample_exists(args[0]) )
 	{
-		if( clip_marker_clear( args[0] ) )
+		if( sample_marker_clear( args[0] ) )
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Clip %d marker cleared", args[0]);
+			veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker cleared", args[0]);
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker %d-%d for clip %d",args[1],args[2],args[0]);
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot set marker %d-%d for sample %d",args[1],args[2],args[0]);
 		}
 	}	
 }
 
-void vj_event_clip_set_dup(void *ptr, const char format[], va_list ap)
+void vj_event_sample_set_dup(void *ptr, const char format[], va_list ap)
 {
 	int args[2];
 	veejay_t *v = (veejay_t*) ptr;
@@ -3572,16 +3572,16 @@ void vj_event_clip_set_dup(void *ptr, const char format[], va_list ap)
 
 	if( args[0] == 0) 
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
-	if(args[0] == -1) args[0] = clip_size()-1;
+	if(args[0] == -1) args[0] = sample_size()-1;
 
-	if( clip_exists(args[0])) 
+	if( sample_exists(args[0])) 
 	{
-		if( clip_set_framedup( args[0], args[1] ) != -1) 
+		if( sample_set_framedup( args[0], args[1] ) != -1) 
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Clip %d frame duplicator set to %d", args[0],args[1]);
-			if( args[0] == v->uc->clip_id)
+			veejay_msg(VEEJAY_MSG_INFO, "Sample %d frame duplicator set to %d", args[0],args[1]);
+			if( args[0] == v->uc->sample_id)
 			{
 			    if(veejay_set_framedup(v, args[1]))
                		    {
@@ -3592,12 +3592,12 @@ void vj_event_clip_set_dup(void *ptr, const char format[], va_list ap)
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR,"Cannot set frame duplicator to %d for clip %d",args[0],args[1]);
+			veejay_msg(VEEJAY_MSG_ERROR,"Cannot set frame duplicator to %d for sample %d",args[0],args[1]);
 		}
 	}
 	else
 	{
-		p_no_clip(args[0]);
+		p_no_sample(args[0]);
 	}
 }
 
@@ -3609,7 +3609,7 @@ void	vj_event_tag_set_descr( void *ptr, const char format[], va_list ap)
 	P_A(args,str,format,ap);
 	if(args[0] == 0 && STREAM_PLAYING(v))
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 	if(args[0] == -1)
 		args[0] = vj_tag_size()-1;
@@ -3618,65 +3618,65 @@ void	vj_event_tag_set_descr( void *ptr, const char format[], va_list ap)
 }
 
 
-void vj_event_clip_set_descr(void *ptr, const char format[], va_list ap)
+void vj_event_sample_set_descr(void *ptr, const char format[], va_list ap)
 {
-	char str[CLIP_MAX_DESCR_LEN];
+	char str[SAMPLE_MAX_DESCR_LEN];
 	int args[5];
 	veejay_t *v = (veejay_t*) ptr;
 	P_A(args,str,format,ap);
 
-	if( args[0] == 0 && CLIP_PLAYING(v)) 
+	if( args[0] == 0 && SAMPLE_PLAYING(v)) 
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 
-	if(args[0] == -1) args[0] = clip_size()-1;
+	if(args[0] == -1) args[0] = sample_size()-1;
 
-	if(clip_set_description(args[0],str) == 0)
+	if(sample_set_description(args[0],str) == 0)
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Clip %d description [%s]",args[0],str);
+		veejay_msg(VEEJAY_MSG_INFO, "Sample %d description [%s]",args[0],str);
 	}
 }
 
 #ifdef HAVE_XML2
-void vj_event_clip_save_list(void *ptr, const char format[], va_list ap)
+void vj_event_sample_save_list(void *ptr, const char format[], va_list ap)
 {
 	char str[255];
 	int *args = NULL;
 	P_A(args,str,format,ap);
-	if(clip_size()-1 < 1) 
+	if(sample_size()-1 < 1) 
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "No clips to save");
+		veejay_msg(VEEJAY_MSG_ERROR, "No samples to save");
 		return;
 	}
-	if(clip_writeToFile( str) )
+	if(sample_writeToFile( str) )
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Wrote %d clips to file %s", clip_size()-1, str);
+		veejay_msg(VEEJAY_MSG_INFO, "Wrote %d samples to file %s", sample_size()-1, str);
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Error saving clips to file %s", str);
+		veejay_msg(VEEJAY_MSG_ERROR, "Error saving samples to file %s", str);
 	}
 }
 
-void vj_event_clip_load_list(void *ptr, const char format[], va_list ap)
+void vj_event_sample_load_list(void *ptr, const char format[], va_list ap)
 {
 	char str[255];
 	int *args = NULL;
 	P_A( args, str, format, ap);
 
-	if( clip_readFromFile( str ) ) 
+	if( sample_readFromFile( str ) ) 
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Loaded clip list [%s]", str);
+		veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list [%s]", str);
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Error loading clip list [%s]", str);
+		veejay_msg(VEEJAY_MSG_ERROR, "Error loading sample list [%s]", str);
 	}
 }
 #endif
 
-void 	vj_event_clip_ren_start			( 	void *ptr, 	const char format[], 	va_list ap	)
+void 	vj_event_sample_ren_start			( 	void *ptr, 	const char format[], 	va_list ap	)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	int args[2];
@@ -3691,34 +3691,34 @@ void 	vj_event_clip_ren_start			( 	void *ptr, 	const char format[], 	va_list ap	
 	bzero(prefix,150);
 	s1 = args[0];
 	entry = args[1];
-	if(entry < 0 || entry > CLIP_MAX_RENDER)
+	if(entry < 0 || entry > SAMPLE_MAX_RENDER)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid renderlist entry given. Use %d - %d", 0,CLIP_MAX_RENDER);
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid renderlist entry given. Use %d - %d", 0,SAMPLE_MAX_RENDER);
 		return;
 	}
 	if(s1 == 0)	
 	{
-		s1 = v->uc->clip_id;
-		if(!CLIP_PLAYING(v))
+		s1 = v->uc->sample_id;
+		if(!SAMPLE_PLAYING(v))
 		{
-			veejay_msg(VEEJAY_MSG_ERROR,"Not playing a clip");
+			veejay_msg(VEEJAY_MSG_ERROR,"Not playing a sample");
 			return;
 		}
 	}
 
-	if(!clip_exists(s1))
+	if(!sample_exists(s1))
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Selected clip %d does not exist", s1);
+		veejay_msg(VEEJAY_MSG_ERROR, "Selected sample %d does not exist", s1);
 		return;
 	}
 
-	if(entry == clip_get_render_entry(s1) )
+	if(entry == sample_get_render_entry(s1) )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Destination entry cannot be the same as source entry.");
 		return;
 	}	
 
-	clip_get_description( s1, prefix );
+	sample_get_description( s1, prefix );
 	if(!veejay_create_temp_file(prefix, tmp))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot create file %s",
@@ -3741,23 +3741,23 @@ void 	vj_event_clip_ren_start			( 	void *ptr, 	const char format[], 	va_list ap	
 		return;
 	}
 
-	int nf = clip_get_endFrame( s1 ) - clip_get_startFrame( s1 );
-	nf = nf / clip_get_speed(s1);
-	if( clip_get_looptype(s1) == 2 )
+	int nf = sample_get_endFrame( s1 ) - sample_get_startFrame( s1 );
+	nf = nf / sample_get_speed(s1);
+	if( sample_get_looptype(s1) == 2 )
 		nf *= 2;
 
-	if( clip_init_encoder( s1, tmp, fformat, v->edit_list, nf) == 1)
+	if( sample_init_encoder( s1, tmp, fformat, v->edit_list, nf) == 1)
 	{
 		video_playback_setup *s = v->settings;
-		s->clip_record_id = v->uc->clip_id;
+		s->sample_record_id = v->uc->sample_id;
 		s->render_list = entry;
-		veejay_msg(VEEJAY_MSG_INFO, "Rendering clip to render list entry %d", 
+		veejay_msg(VEEJAY_MSG_INFO, "Rendering sample to render list entry %d", 
 			entry );
 	}
 	
 }
 
-void	vj_event_clip_move_render		( 	void *ptr,	const char format[],	va_list ap )
+void	vj_event_sample_move_render		( 	void *ptr,	const char format[],	va_list ap )
 {
 
 	int args[2];
@@ -3769,15 +3769,15 @@ void	vj_event_clip_move_render		( 	void *ptr,	const char format[],	va_list ap )
 	int sample_id = args[0];
 	int entry = args[1];
 
-	if(CLIP_PLAYING(v))
+	if(SAMPLE_PLAYING(v))
 	{
-		if(sample_id==0) sample_id = v->uc->clip_id;
-		if(sample_id==-1) sample_id = clip_size()-1;
+		if(sample_id==0) sample_id = v->uc->sample_id;
+		if(sample_id==-1) sample_id = sample_size()-1;
 	}
 
-	if(clip_exists(sample_id))
+	if(sample_exists(sample_id))
 	{
-		el = (editlist**) clip_get_user_data(sample_id);
+		el = (editlist**) sample_get_user_data(sample_id);
 		if(el==NULL)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Nothing rendered yet");
@@ -3800,7 +3800,7 @@ void	vj_event_clip_move_render		( 	void *ptr,	const char format[],	va_list ap )
 
 }
 
-void	vj_event_clip_sel_render		(	void *ptr,	const char format[],	va_list ap  )
+void	vj_event_sample_sel_render		(	void *ptr,	const char format[],	va_list ap  )
 {
 	int args[2];
 	int entry;
@@ -3812,30 +3812,30 @@ void	vj_event_clip_sel_render		(	void *ptr,	const char format[],	va_list ap  )
 	
 	s1 = args[0];
 	entry = args[1];
-	if(entry < 0 || entry > CLIP_MAX_RENDER)
+	if(entry < 0 || entry > SAMPLE_MAX_RENDER)
 		return;
 
 	if(s1 == 0 )
 	{
-		s1 = v->uc->clip_id;
-		if(!CLIP_PLAYING(v))
+		s1 = v->uc->sample_id;
+		if(!SAMPLE_PLAYING(v))
 		{
-			veejay_msg(VEEJAY_MSG_INFO,"Not playing a clip");
+			veejay_msg(VEEJAY_MSG_INFO,"Not playing a sample");
 			return;
 		}
 	}
-	if(!clip_exists(s1))
+	if(!sample_exists(s1))
 		return;
 
 	if(entry == 0 )
 	{
-		if(clip_set_render_entry(s1, 0 ) )
-			veejay_msg(VEEJAY_MSG_INFO, "Selected main clip %d", s1 );  
+		if(sample_set_render_entry(s1, 0 ) )
+			veejay_msg(VEEJAY_MSG_INFO, "Selected main sample %d", s1 );  
 		return;
 	}
 
 	// check if entry is playable
-	el = (editlist**) clip_get_user_data( s1 );
+	el = (editlist**) sample_get_user_data( s1 );
 	if( el == NULL )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Nothing rendered yet for sample %d", s1 );
@@ -3844,9 +3844,9 @@ void	vj_event_clip_sel_render		(	void *ptr,	const char format[],	va_list ap  )
 
 	if(el[entry])  
 	{
-		if(clip_set_render_entry( s1, entry ))
+		if(sample_set_render_entry( s1, entry ))
 		{
-				veejay_msg(VEEJAY_MSG_INFO, "Selected render entry %d of clip %d", entry, s1 );
+				veejay_msg(VEEJAY_MSG_INFO, "Selected render entry %d of sample %d", entry, s1 );
 		}
 	}
 	else
@@ -3858,7 +3858,7 @@ void	vj_event_clip_sel_render		(	void *ptr,	const char format[],	va_list ap  )
 
 
 
-void vj_event_clip_rec_start( void *ptr, const char format[], va_list ap)
+void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	int args[2];
@@ -3868,7 +3868,7 @@ void vj_event_clip_rec_start( void *ptr, const char format[], va_list ap)
 	char prefix[150];
 	P_A(args,str,format,ap);
 
-	if(!CLIP_PLAYING(v)) 
+	if(!SAMPLE_PLAYING(v)) 
 	{
 		p_invalid_mode();
 		return;
@@ -3877,7 +3877,7 @@ void vj_event_clip_rec_start( void *ptr, const char format[], va_list ap)
 	char tmp[255];
 	bzero(tmp,255);
 	bzero(prefix,150);
-	clip_get_description(v->uc->clip_id, prefix );
+	sample_get_description(v->uc->sample_id, prefix );
 	if(!veejay_create_temp_file(prefix, tmp))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot create file %s",
@@ -3887,17 +3887,17 @@ void vj_event_clip_rec_start( void *ptr, const char format[], va_list ap)
 
 	if( args[0] == 0 )
 	{
-		int n = clip_get_speed(v->uc->clip_id);
+		int n = sample_get_speed(v->uc->sample_id);
 		if( n == 0) 
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Clip was paused, forcing normal speed");
+			veejay_msg(VEEJAY_MSG_INFO, "Sample was paused, forcing normal speed");
 			n = 1;
 		}
 		else
 		{
 			if (n < 0 ) n = n * -1;
 		}
-		args[0] = clip_get_longest(v->uc->clip_id);
+		args[0] = sample_get_longest(v->uc->sample_id);
 		changed = 1;
 	}
 
@@ -3909,22 +3909,22 @@ void vj_event_clip_rec_start( void *ptr, const char format[], va_list ap)
 	}
 	veejay_msg(VEEJAY_MSG_DEBUG, "Video frames to record: %ld", args[0]);
 
-	if( clip_init_encoder( v->uc->clip_id, tmp, format_, v->edit_list, args[0]) == 1)
+	if( sample_init_encoder( v->uc->sample_id, tmp, format_, v->edit_list, args[0]) == 1)
 	{
 		video_playback_setup *s = v->settings;
-		s->clip_record_id = v->uc->clip_id;
+		s->sample_record_id = v->uc->sample_id;
 		if(args[1])
-			s->clip_record_switch = 1;
+			s->sample_record_switch = 1;
 		result = 1;
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Unable to initialize clip recorder");
+		veejay_msg(VEEJAY_MSG_ERROR,"Unable to initialize sample recorder");
 	}   
 
 	if(changed)
 	{
-		veejay_set_clip(v,v->uc->clip_id);
+		veejay_set_sample(v,v->uc->sample_id);
 	}
 
 
@@ -3934,39 +3934,39 @@ void vj_event_clip_rec_start( void *ptr, const char format[], va_list ap)
 			"Recording editlist frames starting from %d (%d frames and %s)", 
 			v->settings->current_frame_num,
 			args[0], (args[1]==1? "autoplay" : "no autoplay"));
-		v->settings->clip_record = 1;
-		v->settings->clip_record_switch = args[1];
+		v->settings->sample_record = 1;
+		v->settings->sample_record_switch = args[1];
 	}
 
 }
 
-void vj_event_clip_rec_stop(void *ptr, const char format[], va_list ap) 
+void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap) 
 {
 	veejay_t *v = (veejay_t*)ptr;
 	
-	if( CLIP_PLAYING(v)) 
+	if( SAMPLE_PLAYING(v)) 
 	{
 		video_playback_setup *s = v->settings;
-		if( clip_stop_encoder( v->uc->clip_id ) == 1 ) 
+		if( sample_stop_encoder( v->uc->sample_id ) == 1 ) 
 		{
 			char avi_file[255];
 			int start = -1;
 			int destination = v->edit_list->video_frames - 1;
-			v->settings->clip_record = 0;
-			if( clip_get_encoded_file(v->uc->clip_id, avi_file)!=0) return;
+			v->settings->sample_record = 0;
+			if( sample_get_encoded_file(v->uc->sample_id, avi_file)!=0) return;
 			
-			clip_reset_encoder( v->uc->clip_id );
+			sample_reset_encoder( v->uc->sample_id );
 
 			if( veejay_edit_addmovie(
 				v,avi_file,start,destination,destination))
 			{
-				int len = clip_get_encoded_frames(v->uc->clip_id) - 1;
-				clip_info *skel = clip_skeleton_new(destination, destination+len);		
-				if(clip_store(skel)==0) 
+				int len = sample_get_encoded_frames(v->uc->sample_id) - 1;
+				sample_info *skel = sample_skeleton_new(destination, destination+len);		
+				if(sample_store(skel)==0) 
 				{
-					veejay_msg(VEEJAY_MSG_INFO, "Created new clip %d from file %s",
-						skel->clip_id,avi_file);
-					clip_set_looptype( skel->clip_id,1);
+					veejay_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s",
+						skel->sample_id,avi_file);
+					sample_set_looptype( skel->sample_id,1);
 				}	
 			}		
 			else
@@ -3974,19 +3974,19 @@ void vj_event_clip_rec_stop(void *ptr, const char format[], va_list ap)
 				veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList!",avi_file);
 			}
 
-			clip_reset_encoder( v->uc->clip_id);
-			s->clip_record = 0;	
-			s->clip_record_id = 0;
-			if(s->clip_record_switch) 
+			sample_reset_encoder( v->uc->sample_id);
+			s->sample_record = 0;	
+			s->sample_record_id = 0;
+			if(s->sample_record_switch) 
 			{
-				veejay_set_clip( v, clip_size()-1);
-				s->clip_record_switch = 0;
-				veejay_msg(VEEJAY_MSG_INFO, "Switching to clip %d (recording)", clip_size()-1);
+				veejay_set_sample( v, sample_size()-1);
+				s->sample_record_switch = 0;
+				veejay_msg(VEEJAY_MSG_INFO, "Switching to sample %d (recording)", sample_size()-1);
 			}
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Clip recorder was never started for clip %d",v->uc->clip_id);
+			veejay_msg(VEEJAY_MSG_ERROR, "Sample recorder was never started for sample %d",v->uc->sample_id);
 		}
 		
 	}
@@ -3997,37 +3997,37 @@ void vj_event_clip_rec_stop(void *ptr, const char format[], va_list ap)
 }
 
 
-void vj_event_clip_set_num_loops(void *ptr, const char format[], va_list ap) 
+void vj_event_sample_set_num_loops(void *ptr, const char format[], va_list ap) 
 {
 	veejay_t *v = (veejay_t *)ptr;
 	int args[2];
 	char *s = NULL;
 	P_A(args,s,format,ap);
 
-	if(args[0] == 0) args[0] = v->uc->clip_id;
-	if(args[0] == -1) args[0] = clip_size()-1;
+	if(args[0] == 0) args[0] = v->uc->sample_id;
+	if(args[0] == -1) args[0] = sample_size()-1;
 
-	if(clip_exists(args[0]))
+	if(sample_exists(args[0]))
 	{
 
-		if(	clip_set_loops(v->uc->clip_id, args[1]))
-		{	veejay_msg(VEEJAY_MSG_INFO, "Setted %d no. of loops for clip %d",
-				clip_get_loops(v->uc->clip_id),args[0]);
+		if(	sample_set_loops(v->uc->sample_id, args[1]))
+		{	veejay_msg(VEEJAY_MSG_INFO, "Setted %d no. of loops for sample %d",
+				sample_get_loops(v->uc->sample_id),args[0]);
 		}
 		else	
 		{
-			veejay_msg(VEEJAY_MSG_ERROR,"Cannot set %d loops for clip %d",args[1],args[0]);
+			veejay_msg(VEEJAY_MSG_ERROR,"Cannot set %d loops for sample %d",args[1],args[0]);
 		}
 
 	}
 	else
 	{
-		p_no_clip(args[0]);
+		p_no_sample(args[0]);
 	}
 }
 
 
-void vj_event_clip_rel_start(void *ptr, const char format[], va_list ap)
+void vj_event_sample_rel_start(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	int args[4];
@@ -4037,31 +4037,31 @@ void vj_event_clip_rel_start(void *ptr, const char format[], va_list ap)
 	int s_end;
 
 	P_A(args,str,format,ap);
-	if(CLIP_PLAYING(v))
+	if(SAMPLE_PLAYING(v))
 	{
 
 		if(args[0] == 0)
 		{
-			args[0] = v->uc->clip_id;
+			args[0] = v->uc->sample_id;
 		}
-	if(args[0] == -1) args[0] = clip_size()-1;	
-		if(!clip_exists(args[0]))
+	if(args[0] == -1) args[0] = sample_size()-1;	
+		if(!sample_exists(args[0]))
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Clip does not exist");
+			veejay_msg(VEEJAY_MSG_ERROR, "Sample does not exist");
 			return;
 		}
 		
-		s_start = clip_get_startFrame(args[0]) + args[1];
-		s_end = clip_get_endFrame(args[0]) + args[2];
+		s_start = sample_get_startFrame(args[0]) + args[1];
+		s_end = sample_get_endFrame(args[0]) + args[2];
 
 		if(s_end > v->edit_list->video_frames-1) s_end = v->edit_list->video_frames - 1;
 
 		if( s_start >= 1 && s_end <= (v->edit_list->video_frames-1) )
 		{ 
-			if	(clip_set_startframe(args[0],s_start) &&
-				clip_set_endframe(args[0],s_end))
+			if	(sample_set_startframe(args[0],s_start) &&
+				sample_set_endframe(args[0],s_end))
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Clip update start %d end %d",
+				veejay_msg(VEEJAY_MSG_INFO, "Sample update start %d end %d",
 					s_start,s_end);
 			}
 	
@@ -4074,7 +4074,7 @@ void vj_event_clip_rel_start(void *ptr, const char format[], va_list ap)
 
 }
 
-void vj_event_clip_set_start(void *ptr, const char format[], va_list ap) 
+void vj_event_sample_set_start(void *ptr, const char format[], va_list ap) 
 {
 	veejay_t *v = (veejay_t *)ptr;
 	int args[2];
@@ -4084,37 +4084,37 @@ void vj_event_clip_set_start(void *ptr, const char format[], va_list ap)
 	P_A(args,str,format,ap);
 	if(args[0] == 0) 
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
-	if(args[0] == -1) args[0] = clip_size()-1;
+	if(args[0] == -1) args[0] = sample_size()-1;
 	
 	mf = veejay_el_max_frames(v, args[0]);
 
-	if( (args[1] >= s->min_frame_num) && (args[1] <= mf) && clip_exists(args[0])) 
+	if( (args[1] >= s->min_frame_num) && (args[1] <= mf) && sample_exists(args[0])) 
 	{
-	  if( args[1] < clip_get_endFrame(args[0])) {
-		if( clip_set_startframe(args[0],args[1] ) ) {
-			veejay_msg(VEEJAY_MSG_INFO, "Clip starting frame updated to frame %d",
-			  clip_get_startFrame(args[0]));
+	  if( args[1] < sample_get_endFrame(args[0])) {
+		if( sample_set_startframe(args[0],args[1] ) ) {
+			veejay_msg(VEEJAY_MSG_INFO, "Sample starting frame updated to frame %d",
+			  sample_get_startFrame(args[0]));
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to update clip %d 's starting position to %d",args[0],args[1]);
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to update sample %d 's starting position to %d",args[0],args[1]);
 		}
 	  }
 	  else 
 	  {
-		veejay_msg(VEEJAY_MSG_ERROR, "Clip %d 's starting position %d must be greater than ending position %d.",
-			args[0],args[1], clip_get_endFrame(args[0]));
+		veejay_msg(VEEJAY_MSG_ERROR, "Sample %d 's starting position %d must be greater than ending position %d.",
+			args[0],args[1], sample_get_endFrame(args[0]));
 	  }
 	}
 	else
 	{
-		if(!clip_exists(args[0])) p_no_clip(args[0]) else veejay_msg(VEEJAY_MSG_ERROR, "Invalid position %d given",args[1]);
+		if(!sample_exists(args[0])) p_no_sample(args[0]) else veejay_msg(VEEJAY_MSG_ERROR, "Invalid position %d given",args[1]);
 	}
 }
 
-void vj_event_clip_set_end(void *ptr, const char format[] , va_list ap)
+void vj_event_sample_set_end(void *ptr, const char format[] , va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	int args[2];
@@ -4124,7 +4124,7 @@ void vj_event_clip_set_end(void *ptr, const char format[] , va_list ap)
 	P_A(args,str,format,ap);
 	if(args[0] == 0) 
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 	if(args[1] == -1)
 	{
@@ -4133,54 +4133,54 @@ void vj_event_clip_set_end(void *ptr, const char format[] , va_list ap)
 
 	mf = veejay_el_max_frames( v, args[0]);
 
-	if( (args[1] >= s->min_frame_num) && (args[1] <= mf) && (clip_exists(args[0])))
+	if( (args[1] >= s->min_frame_num) && (args[1] <= mf) && (sample_exists(args[0])))
 	{
-		if( args[1] >= clip_get_startFrame(v->uc->clip_id)) {
-	       		if(clip_set_endframe(args[0],args[1])) {
-	   			veejay_msg(VEEJAY_MSG_INFO,"Clip ending frame updated to frame %d",
-	        		clip_get_endFrame(args[0]));
+		if( args[1] >= sample_get_startFrame(v->uc->sample_id)) {
+	       		if(sample_set_endframe(args[0],args[1])) {
+	   			veejay_msg(VEEJAY_MSG_INFO,"Sample ending frame updated to frame %d",
+	        		sample_get_endFrame(args[0]));
 			}
 			else
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Unable to update clip %d 's ending position to %d",
+				veejay_msg(VEEJAY_MSG_ERROR, "Unable to update sample %d 's ending position to %d",
 					args[0],args[1]);
 			}
 	      	}
 		else 
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Clip %d 's ending position %d must be greater than or equal to starting position %d.",
-				args[0],args[1], clip_get_startFrame(v->uc->clip_id));
+			veejay_msg(VEEJAY_MSG_ERROR, "Sample %d 's ending position %d must be greater than or equal to starting position %d.",
+				args[0],args[1], sample_get_startFrame(v->uc->sample_id));
 		}
 	}
 	else
 	{
-		if(!clip_exists(args[0])) p_no_clip(args[0]) else veejay_msg(VEEJAY_MSG_ERROR, "Invalid position %d given",args[1]);
+		if(!sample_exists(args[0])) p_no_sample(args[0]) else veejay_msg(VEEJAY_MSG_ERROR, "Invalid position %d given",args[1]);
 	}
 	
 }
 
-void vj_event_clip_del(void *ptr, const char format[], va_list ap)
+void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	int args[1];
 	char *s = NULL;
 	P_A(args,s,format,ap);
 
-	if(CLIP_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v)) 
 	{
-		if(v->uc->clip_id == args[0])
+		if(v->uc->sample_id == args[0])
 		{
-			veejay_msg(VEEJAY_MSG_INFO,"Cannot delete clip while playing");
+			veejay_msg(VEEJAY_MSG_INFO,"Cannot delete sample while playing");
 		}
 		else
 		{
-			if(clip_del(args[0]))
+			if(sample_del(args[0]))
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Deleted clip %d", args[0]);
+				veejay_msg(VEEJAY_MSG_INFO, "Deleted sample %d", args[0]);
 			}
 			else
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Unable to delete clip %d",args[0]);
+				veejay_msg(VEEJAY_MSG_ERROR, "Unable to delete sample %d",args[0]);
 			}
 		}	
 	}
@@ -4190,39 +4190,39 @@ void vj_event_clip_del(void *ptr, const char format[], va_list ap)
 	}
 }
 
-void vj_event_clip_copy(void *ptr, const char format[] , va_list ap)
+void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	int args[1];
 	char *s = NULL;
 	P_A(args,s,format,ap);
 
-	if(CLIP_PLAYING(v))
+	if(SAMPLE_PLAYING(v))
 	{
-		if( args[0] == 0 ) args[0] = v->uc->clip_id;
-		if( args[0] == -1) args[0] = clip_size()-1;
+		if( args[0] == 0 ) args[0] = v->uc->sample_id;
+		if( args[0] == -1) args[0] = sample_size()-1;
 	}
 
-	if( clip_exists(args[0] ))
+	if( sample_exists(args[0] ))
 	{
-		int new_clip = clip_copy(args[0]);
-		if(new_clip)
+		int new_sample = sample_copy(args[0]);
+		if(new_sample)
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Copied clip %d to %d",args[0],new_clip);
+			veejay_msg(VEEJAY_MSG_INFO, "Copied sample %d to %d",args[0],new_sample);
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Failed to copy clip %d.",args[0]);
+			veejay_msg(VEEJAY_MSG_ERROR, "Failed to copy sample %d.",args[0]);
 		}
 	}
 }
 
-void vj_event_clip_clear_all(void *ptr, const char format[], va_list ap)
+void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
-	if( !CLIP_PLAYING(v)) 
+	if( !SAMPLE_PLAYING(v)) 
 	{
-		clip_del_all();
+		sample_del_all();
 	}
 	else
 	{
@@ -4235,13 +4235,13 @@ void vj_event_clip_clear_all(void *ptr, const char format[], va_list ap)
 void vj_event_chain_enable(void *ptr, const char format[], va_list ap) 
 {
 	veejay_t *v = (veejay_t*)ptr;
-	if(CLIP_PLAYING(v))
+	if(SAMPLE_PLAYING(v))
 	{
-		clip_set_effect_status(v->uc->clip_id, 1);
+		sample_set_effect_status(v->uc->sample_id, 1);
 	}
 	if(STREAM_PLAYING(v))
 	{
-		vj_tag_set_effect_status(v->uc->clip_id, 1);
+		vj_tag_set_effect_status(v->uc->sample_id, 1);
 	}
 	veejay_msg(VEEJAY_MSG_INFO, "Effect chain is enabled");
 	
@@ -4251,20 +4251,20 @@ void vj_event_chain_enable(void *ptr, const char format[], va_list ap)
 void vj_event_chain_disable(void *ptr, const char format[], va_list ap) 
 {
 	veejay_t *v = (veejay_t*)ptr;
-	if(CLIP_PLAYING(v) )
+	if(SAMPLE_PLAYING(v) )
 	{
-		clip_set_effect_status(v->uc->clip_id, 0);
-		veejay_msg(VEEJAY_MSG_INFO, "Effect chain on Clip %d is disabled",v->uc->clip_id);
+		sample_set_effect_status(v->uc->sample_id, 0);
+		veejay_msg(VEEJAY_MSG_INFO, "Effect chain on Sample %d is disabled",v->uc->sample_id);
 	}
 	if(STREAM_PLAYING(v) )
 	{
-		vj_tag_set_effect_status(v->uc->clip_id, 0);
-		veejay_msg(VEEJAY_MSG_INFO, "Effect chain on Stream %d is enabled",v->uc->clip_id);
+		vj_tag_set_effect_status(v->uc->sample_id, 0);
+		veejay_msg(VEEJAY_MSG_INFO, "Effect chain on Stream %d is enabled",v->uc->sample_id);
 	}
 
 }
 
-void vj_event_clip_chain_enable(void *ptr, const char format[], va_list ap) 
+void vj_event_sample_chain_enable(void *ptr, const char format[], va_list ap) 
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int args[4];
@@ -4272,31 +4272,31 @@ void vj_event_clip_chain_enable(void *ptr, const char format[], va_list ap)
 	P_A(args,s,format,ap);
 	if(args[0] == 0)
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 	
-	if(CLIP_PLAYING(v) && clip_exists(args[0]))
+	if(SAMPLE_PLAYING(v) && sample_exists(args[0]))
 	{
-		clip_set_effect_status(args[0], 1);
-		veejay_msg(VEEJAY_MSG_INFO, "Effect chain on Clip %d is enabled",args[0]);
+		sample_set_effect_status(args[0], 1);
+		veejay_msg(VEEJAY_MSG_INFO, "Effect chain on Sample %d is enabled",args[0]);
 	}
 	
 }
 
-void	vj_event_all_clips_chain_toggle(void *ptr, const char format[], va_list ap)
+void	vj_event_all_samples_chain_toggle(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	int args[1];
 	char *s = NULL;
 	P_A(args,s,format,ap);
-	if(CLIP_PLAYING(v))
+	if(SAMPLE_PLAYING(v))
 	{
 		int i;
-		for(i=0; i < clip_size()-1; i++)
+		for(i=0; i < sample_size()-1; i++)
 		{
-			clip_set_effect_status( i, args[0] );
+			sample_set_effect_status( i, args[0] );
 		}
-		veejay_msg(VEEJAY_MSG_INFO, "Effect Chain on all clips %s", (args[0]==0 ? "Disabled" : "Enabled"));
+		veejay_msg(VEEJAY_MSG_INFO, "Effect Chain on all samples %s", (args[0]==0 ? "Disabled" : "Enabled"));
 	}
 	if(STREAM_PLAYING(v))
 	{
@@ -4339,7 +4339,7 @@ void vj_event_tag_chain_disable(void *ptr, const char format[], va_list ap)
 
 }
 
-void vj_event_clip_chain_disable(void *ptr, const char format[], va_list ap) 
+void vj_event_sample_chain_disable(void *ptr, const char format[], va_list ap) 
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int args[2];
@@ -4347,12 +4347,12 @@ void vj_event_clip_chain_disable(void *ptr, const char format[], va_list ap)
 	P_A(args,s,format,ap);
 	if(args[0] == 0)
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 	
-	if(CLIP_PLAYING(v) && clip_exists(args[0]))
+	if(SAMPLE_PLAYING(v) && sample_exists(args[0]))
 	{
-		clip_set_effect_status(args[0], 0);
+		sample_set_effect_status(args[0], 0);
 		veejay_msg(VEEJAY_MSG_INFO, "Effect chain on stream %d is disabled",args[0]);
 	}
 	if(STREAM_PLAYING(v) && vj_tag_exists(args[0]))
@@ -4367,63 +4367,63 @@ void vj_event_clip_chain_disable(void *ptr, const char format[], va_list ap)
 void vj_event_chain_toggle(void *ptr, const char format[], va_list ap) 
 {
 	veejay_t *v = (veejay_t*)ptr;
-	if(CLIP_PLAYING(v))
+	if(SAMPLE_PLAYING(v))
 	{
-		int flag = clip_get_effect_status(v->uc->clip_id);
+		int flag = sample_get_effect_status(v->uc->sample_id);
 		if(flag == 0) 
 		{
-			clip_set_effect_status(v->uc->clip_id,1); 
+			sample_set_effect_status(v->uc->sample_id,1); 
 		}
 		else
 		{
-			clip_set_effect_status(v->uc->clip_id,0);
+			sample_set_effect_status(v->uc->sample_id,0);
 		}
-		veejay_msg(VEEJAY_MSG_INFO, "Effect chain is %s.", (clip_get_effect_status(v->uc->clip_id) ? "enabled" : "disabled"));
+		veejay_msg(VEEJAY_MSG_INFO, "Effect chain is %s.", (sample_get_effect_status(v->uc->sample_id) ? "enabled" : "disabled"));
 	}
 	if(STREAM_PLAYING(v))
 	{
-		int flag = vj_tag_get_effect_status(v->uc->clip_id);
+		int flag = vj_tag_get_effect_status(v->uc->sample_id);
 		if(flag == 0) 	
 		{
-			vj_tag_set_effect_status(v->uc->clip_id,1); 
+			vj_tag_set_effect_status(v->uc->sample_id,1); 
 		}
 		else
 		{
-			vj_tag_set_effect_status(v->uc->clip_id,0);
+			vj_tag_set_effect_status(v->uc->sample_id,0);
 		}
-		veejay_msg(VEEJAY_MSG_INFO, "Effect chain is %s.", (vj_tag_get_effect_status(v->uc->clip_id) ? "enabled" : "disabled"));
+		veejay_msg(VEEJAY_MSG_INFO, "Effect chain is %s.", (vj_tag_get_effect_status(v->uc->sample_id) ? "enabled" : "disabled"));
 	}
 }	
 
 void vj_event_chain_entry_video_toggle(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	if(CLIP_PLAYING(v))
+	if(SAMPLE_PLAYING(v))
 	{
-		int c = clip_get_selected_entry(v->uc->clip_id);
-		int flag = clip_get_chain_status(v->uc->clip_id,c);
+		int c = sample_get_selected_entry(v->uc->sample_id);
+		int flag = sample_get_chain_status(v->uc->sample_id,c);
 		if(flag == 0)
 		{
-			clip_set_chain_status(v->uc->clip_id, c,1);	
+			sample_set_chain_status(v->uc->sample_id, c,1);	
 		}
 		else
 		{	
-			clip_set_chain_status(v->uc->clip_id, c,0);
+			sample_set_chain_status(v->uc->sample_id, c,0);
 		}
 		veejay_msg(VEEJAY_MSG_INFO, "Video on chain entry %d is %s", c,
 			(flag==0 ? "Disabled" : "Enabled"));
 	}
 	if(STREAM_PLAYING(v))
 	{
-		int c = vj_tag_get_selected_entry(v->uc->clip_id);
-		int flag = vj_tag_get_chain_status( v->uc->clip_id,c);
+		int c = vj_tag_get_selected_entry(v->uc->sample_id);
+		int flag = vj_tag_get_chain_status( v->uc->sample_id,c);
 		if(flag == 0)
 		{
-			vj_tag_set_chain_status(v->uc->clip_id, c,1);	
+			vj_tag_set_chain_status(v->uc->sample_id, c,1);	
 		}
 		else
 		{	
-			vj_tag_set_chain_status(v->uc->clip_id, c,0);
+			vj_tag_set_chain_status(v->uc->sample_id, c,0);
 		}
 		veejay_msg(VEEJAY_MSG_INFO, "Video on chain entry %d is %s", c,
 			(flag==0 ? "Disabled" : "Enabled"));
@@ -4438,23 +4438,23 @@ void vj_event_chain_entry_enable_video(void *ptr, const char format[], va_list a
 	char *s = NULL;
 	P_A(args,s,format,ap);
 
-	if(CLIP_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
-		if(clip_exists(args[0]))
+	 	if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
+		if(sample_exists(args[0]))
 		{
-			if(clip_set_chain_status(args[0],args[1],1) != -1)	
+			if(sample_set_chain_status(args[0],args[1],1) != -1)	
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Clip %d: Video on chain entry %d is %s",args[0],args[1],
-					( clip_get_chain_status(args[0],args[1]) == 1 ? "Enabled" : "Disabled"));
+				veejay_msg(VEEJAY_MSG_INFO, "Sample %d: Video on chain entry %d is %s",args[0],args[1],
+					( sample_get_chain_status(args[0],args[1]) == 1 ? "Enabled" : "Disabled"));
 			}
 		}
 	}
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0)args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(args[0] == 0)args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
 		if(vj_tag_exists(args[0])) 
 		{
 			if(vj_tag_set_chain_status(args[0],args[1],1)!=-1)
@@ -4472,10 +4472,10 @@ void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list 
 	char *str = NULL;
 	P_A(args,str,format,ap);
 
-	if(CLIP_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+	 	if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
 
 		if(v_chi(args[1]))
 		{
@@ -4483,19 +4483,19 @@ void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list 
 			return;
 		}
 
-		if(clip_exists(args[0]))
+		if(sample_exists(args[0]))
 		{
-			if(clip_set_chain_status(args[0],args[1],0)!=-1)
+			if(sample_set_chain_status(args[0],args[1],0)!=-1)
 			{	
-				veejay_msg(VEEJAY_MSG_INFO, "Clip %d: Video on chain entry %d is %s",args[0],args[1],
-				( clip_get_chain_status(args[0],args[1])==1 ? "Enabled" : "Disabled"));
+				veejay_msg(VEEJAY_MSG_INFO, "Sample %d: Video on chain entry %d is %s",args[0],args[1],
+				( sample_get_chain_status(args[0],args[1])==1 ? "Enabled" : "Disabled"));
 			}
 		}
 	}
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) args[0] = v->uc->clip_id;	
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(args[0] == 0) args[0] = v->uc->sample_id;	
+		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
 
 		if(v_chi(args[1]))
 		{
@@ -4522,9 +4522,9 @@ void	vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap)
 	char *str = NULL;
 	P_A(args,str,format,ap);
 
-	if(args[0] == 0 && (CLIP_PLAYING(v) || STREAM_PLAYING(v)) )
+	if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 
 	if( args[1] < 0 || args[1] > 255)
@@ -4534,16 +4534,16 @@ void	vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap)
 	}
 	args[1] = 255 - args[1];
 
-	if( CLIP_PLAYING(v) && clip_exists(args[0])) 
+	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
 	{
-		if( clip_set_manual_fader( args[0], args[1] ) )
+		if( sample_set_manual_fader( args[0], args[1] ) )
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Set chain opacity to %d",
-				clip_get_fader_val( args[0] ));
+				sample_get_fader_val( args[0] ));
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error setting chain opacity of clip %d to %d", args[0],args[1]);
+			veejay_msg(VEEJAY_MSG_ERROR, "Error setting chain opacity of sample %d to %d", args[0],args[1]);
 		}
 	}
 	if (STREAM_PLAYING(v) && vj_tag_exists(args[0])) 
@@ -4562,20 +4562,20 @@ void vj_event_chain_fade_in(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if(args[0] == 0 && (CLIP_PLAYING(v) || STREAM_PLAYING(v)) )
+	if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 
-	if( CLIP_PLAYING(v) && clip_exists(args[0])) 
+	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
 	{
-		if( clip_set_fader_active( args[0], args[1],-1 ) )
+		if( sample_set_fader_active( args[0], args[1],-1 ) )
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Chain Fade In from clip to full effect chain in %d frames. Per frame %2.2f",
-				args[1], clip_get_fader_inc(args[0]));
-			if(clip_get_effect_status(args[0]==0))
+			veejay_msg(VEEJAY_MSG_INFO, "Chain Fade In from sample to full effect chain in %d frames. Per frame %2.2f",
+				args[1], sample_get_fader_inc(args[0]));
+			if(sample_get_effect_status(args[0]==0))
 			{
-				clip_set_effect_status(args[0], -1);
+				sample_set_effect_status(args[0], -1);
 			}
 		}
 	}
@@ -4584,7 +4584,7 @@ void vj_event_chain_fade_in(void *ptr, const char format[], va_list ap)
 		if( vj_tag_set_fader_active( args[0], args[1],-1 ) )
 		{
 			veejay_msg(VEEJAY_MSG_INFO,"Chain Fade In from stream to full effect chain in %d frames. Per frame %2.2f",
-				args[1], clip_get_fader_inc(args[0]));
+				args[1], sample_get_fader_inc(args[0]));
 			if(vj_tag_get_effect_status(args[0]==0))
 			{
 				vj_tag_set_effect_status(args[0],-1);
@@ -4600,17 +4600,17 @@ void vj_event_chain_fade_out(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if(args[0] == 0 && (CLIP_PLAYING(v) || STREAM_PLAYING(v)) )
+	if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 
-	if( CLIP_PLAYING(v) && clip_exists(args[0])) 
+	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
 	{
-		if( clip_set_fader_active( args[0], args[1],1 ) )
+		if( sample_set_fader_active( args[0], args[1],1 ) )
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Chain Fade Out from clip to full effect chain in %d frames. Per frame %2.2f",
-				args[1], clip_get_fader_inc(args[0]));
+			veejay_msg(VEEJAY_MSG_INFO, "Chain Fade Out from sample to full effect chain in %d frames. Per frame %2.2f",
+				args[1], sample_get_fader_inc(args[0]));
 		}
 	}
 	if (STREAM_PLAYING(v) && vj_tag_exists(args[0])) 
@@ -4618,7 +4618,7 @@ void vj_event_chain_fade_out(void *ptr, const char format[], va_list ap)
 		if( vj_tag_set_fader_active( args[0], args[1],1 ) )
 		{
 			veejay_msg(VEEJAY_MSG_INFO,"Chain Fade Out from stream to full effect chain in %d frames. Per frame %2.2f",
-				args[1], clip_get_fader_inc(args[0]));
+				args[1], sample_get_fader_inc(args[0]));
 		}
 	}
 }
@@ -4632,21 +4632,21 @@ void vj_event_chain_clear(void *ptr, const char format[], va_list ap)
 	char *str = NULL; 
 	P_A(args,str,format,ap);
 
-	if(args[0] == 0 && (CLIP_PLAYING(v) || STREAM_PLAYING(v)) )
+	if(args[0] == 0 && (SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) )
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 
-	if( CLIP_PLAYING(v) && clip_exists(args[0])) 
+	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
 	{
 		int i;
-		for(i=0; i < CLIP_MAX_EFFECTS;i++)
+		for(i=0; i < SAMPLE_MAX_EFFECTS;i++)
 		{
-			int effect = clip_get_effect_any(args[0],i);
+			int effect = sample_get_effect_any(args[0],i);
 			if(vj_effect_is_valid(effect))
 			{
-				clip_chain_remove(args[0],i);
-				veejay_msg(VEEJAY_MSG_INFO,"Clip %d: Deleted effect %s from entry %d",
+				sample_chain_remove(args[0],i);
+				veejay_msg(VEEJAY_MSG_INFO,"Sample %d: Deleted effect %s from entry %d",
 					args[0],vj_effect_get_description(effect), i);
 			}
 		}
@@ -4655,7 +4655,7 @@ void vj_event_chain_clear(void *ptr, const char format[], va_list ap)
 	if (STREAM_PLAYING(v) && vj_tag_exists(args[0])) 
 	{
 		int i;
-		for(i=0; i < CLIP_MAX_EFFECTS;i++)
+		for(i=0; i < SAMPLE_MAX_EFFECTS;i++)
 		{
 			int effect = vj_tag_get_effect_any(args[0],i);
 			if(vj_effect_is_valid(effect))
@@ -4677,24 +4677,24 @@ void vj_event_chain_entry_del(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if(CLIP_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+	 	if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
 			return;
 		}
 
-		if(clip_exists(args[0]))
+		if(sample_exists(args[0]))
 		{
-			int effect = clip_get_effect_any(args[0],args[1]);
+			int effect = sample_get_effect_any(args[0],args[1]);
 			if( vj_effect_is_valid(effect)) 
 			{
-				clip_chain_remove(args[0],args[1]);
+				sample_chain_remove(args[0],args[1]);
 				v->uc->chain_changed = 1;
-				veejay_msg(VEEJAY_MSG_INFO,"Clip %d: Deleted effect %s from entry %d",
+				veejay_msg(VEEJAY_MSG_INFO,"Sample %d: Deleted effect %s from entry %d",
 					args[0],vj_effect_get_description(effect), args[1]);
 			}
 		}
@@ -4702,8 +4702,8 @@ void vj_event_chain_entry_del(void *ptr, const char format[], va_list ap)
 
 	if (STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
@@ -4735,11 +4735,11 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 	int args[3];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if(CLIP_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[0] == -1) args[0] = clip_size()-1;
-		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+	 	if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[0] == -1) args[0] = sample_size()-1;
+		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
 
 		if(v_chi(args[1]))
 		{
@@ -4747,26 +4747,26 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 			return;
 		}
 
-		if(clip_exists(args[0]))
+		if(sample_exists(args[0]))
 		{
 			//int real_id = vj_effect_real_to_sequence(args[2]);
-			if(clip_chain_add(args[0],args[1],args[2]) != -1) 
+			if(sample_chain_add(args[0],args[1],args[2]) != -1) 
 			{
-				veejay_msg(VEEJAY_MSG_DEBUG, "Clip %d chain entry %d has effect %s",
+				veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d chain entry %d has effect %s",
 					args[0],args[1],vj_effect_get_description(args[2]));
 				v->uc->chain_changed = 1;
 			}
 			else
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Cannot set effect %d on clip %d chain %d",args[2],args[0],args[1]);
+				veejay_msg(VEEJAY_MSG_ERROR, "Cannot set effect %d on sample %d chain %d",args[2],args[0],args[1]);
 			}
 		}
 	}
 	if( STREAM_PLAYING(v)) 
 	{
-		if(args[0] == 0) args[0] = v->uc->clip_id;
+		if(args[0] == 0) args[0] = v->uc->sample_id;
 		if(args[0] == -1) args[0] = vj_tag_size()-1;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);	
+		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);	
 
 		if(v_chi(args[1]))
 		{
@@ -4796,29 +4796,29 @@ void vj_event_chain_entry_select(void *ptr, const char format[], va_list ap)
 	int args[1];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if( CLIP_PLAYING(v)  )
+	if( SAMPLE_PLAYING(v)  )
 	{
-		if(args[0] >= 0 && args[0] < CLIP_MAX_EFFECTS)
+		if(args[0] >= 0 && args[0] < SAMPLE_MAX_EFFECTS)
 		{
-			if( clip_set_selected_entry( v->uc->clip_id, args[0])) 
+			if( sample_set_selected_entry( v->uc->sample_id, args[0])) 
 			{
 			veejay_msg(VEEJAY_MSG_INFO,"Selected entry %d [%s]",
-			  clip_get_selected_entry(v->uc->clip_id), 
+			  sample_get_selected_entry(v->uc->sample_id), 
 			  vj_effect_get_description( 
-				clip_get_effect_any(v->uc->clip_id,clip_get_selected_entry(v->uc->clip_id))));
+				sample_get_effect_any(v->uc->sample_id,sample_get_selected_entry(v->uc->sample_id))));
 			}
 		}
 	}
 	if ( STREAM_PLAYING(v))
 	{
-		if(args[0] >= 0 && args[0] < CLIP_MAX_EFFECTS)
+		if(args[0] >= 0 && args[0] < SAMPLE_MAX_EFFECTS)
 		{
-			if( vj_tag_set_selected_entry(v->uc->clip_id,args[0]))
+			if( vj_tag_set_selected_entry(v->uc->sample_id,args[0]))
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Selected entry %d [%s]",
-			 	vj_tag_get_selected_entry(v->uc->clip_id),
+			 	vj_tag_get_selected_entry(v->uc->sample_id),
 				vj_effect_get_description( 
-					vj_tag_get_effect_any(v->uc->clip_id,vj_tag_get_selected_entry(v->uc->clip_id))));
+					vj_tag_get_effect_any(v->uc->sample_id,vj_tag_get_selected_entry(v->uc->sample_id))));
 			}
 		}	
 	}
@@ -4830,23 +4830,23 @@ void vj_event_entry_up(void *ptr, const char format[], va_list ap)
 	int args[1];
 	char *s = NULL;
 	P_A(args,s,format,ap);
-	if(CLIP_PLAYING(v) || STREAM_PLAYING(v))
+	if(SAMPLE_PLAYING(v) || STREAM_PLAYING(v))
 	{
 		int effect_id=-1;
 		int c=-1;
-		if(CLIP_PLAYING(v))
+		if(SAMPLE_PLAYING(v))
 		{
-			c = clip_get_selected_entry(v->uc->clip_id) + args[0];
-			if(c >= CLIP_MAX_EFFECTS) c = 0;
-			clip_set_selected_entry( v->uc->clip_id, c);
-			effect_id = clip_get_effect_any(v->uc->clip_id, c );
+			c = sample_get_selected_entry(v->uc->sample_id) + args[0];
+			if(c >= SAMPLE_MAX_EFFECTS) c = 0;
+			sample_set_selected_entry( v->uc->sample_id, c);
+			effect_id = sample_get_effect_any(v->uc->sample_id, c );
 		}
 		if(STREAM_PLAYING(v))
 		{
-			c = vj_tag_get_selected_entry(v->uc->clip_id)+args[0];
-			if( c>= CLIP_MAX_EFFECTS) c = 0;
-			vj_tag_set_selected_entry(v->uc->clip_id,c);
-			effect_id = vj_tag_get_effect_any(v->uc->clip_id,c);
+			c = vj_tag_get_selected_entry(v->uc->sample_id)+args[0];
+			if( c>= SAMPLE_MAX_EFFECTS) c = 0;
+			vj_tag_set_selected_entry(v->uc->sample_id,c);
+			effect_id = vj_tag_get_effect_any(v->uc->sample_id,c);
 		}
 
 		veejay_msg(VEEJAY_MSG_INFO, "Entry %d has effect %s",
@@ -4860,24 +4860,24 @@ void vj_event_entry_down(void *ptr, const char format[] ,va_list ap)
 	int args[1];
 	char *s = NULL;
 	P_A(args,s,format,ap);
-	if(CLIP_PLAYING(v) || STREAM_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) 
 	{
 		int effect_id=-1;
 		int c = -1;
 		
-		if(CLIP_PLAYING(v))
+		if(SAMPLE_PLAYING(v))
 		{
-			c = clip_get_selected_entry( v->uc->clip_id ) - args[0];
-			if(c < 0) c = CLIP_MAX_EFFECTS-1;
-			clip_set_selected_entry( v->uc->clip_id, c);
-			effect_id = clip_get_effect_any(v->uc->clip_id, c );
+			c = sample_get_selected_entry( v->uc->sample_id ) - args[0];
+			if(c < 0) c = SAMPLE_MAX_EFFECTS-1;
+			sample_set_selected_entry( v->uc->sample_id, c);
+			effect_id = sample_get_effect_any(v->uc->sample_id, c );
 		}
 		if(STREAM_PLAYING(v))
 		{
-			c = vj_tag_get_selected_entry(v->uc->clip_id) - args[0];
-			if(c<0) c= CLIP_MAX_EFFECTS-1;
-			vj_tag_set_selected_entry(v->uc->clip_id,c);
-			effect_id = vj_tag_get_effect_any(v->uc->clip_id,c);
+			c = vj_tag_get_selected_entry(v->uc->sample_id) - args[0];
+			if(c<0) c= SAMPLE_MAX_EFFECTS-1;
+			vj_tag_set_selected_entry(v->uc->sample_id,c);
+			effect_id = vj_tag_get_effect_any(v->uc->sample_id,c);
 		}
 		veejay_msg(VEEJAY_MSG_INFO , "Entry %d has effect %s",
 			c, vj_effect_get_description(effect_id));
@@ -4892,18 +4892,18 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 	//P_A16(args,format,ap);
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(CLIP_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v)) 
 	{
 	    int num_p = 0;
-	 	if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+	 	if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
 			return;
 		}
 
-		if(clip_exists(args[0]))
+		if(sample_exists(args[0]))
 		{
 			int real_id = args[2];
 			int i;
@@ -4912,18 +4912,18 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_DEBUG, "Effect %d , params %d known as %s",
 				real_id, num_p, vj_effect_get_description(real_id));
 
-			if(clip_chain_add( args[0],args[1],args[2])!=-1)
+			if(sample_chain_add( args[0],args[1],args[2])!=-1)
 			{
 				int args_offset = 3;
 				
-				veejay_msg(VEEJAY_MSG_DEBUG, "Clip %d Chain entry %d has effect %s with %d arguments",
+				veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d Chain entry %d has effect %s with %d arguments",
 					args[0],args[1],vj_effect_get_description(real_id),num_p);
 				for(i=0; i < num_p; i++)
 				{
 					if(vj_effect_valid_value(real_id,i,args[(i+args_offset)]) )
 					{
 
-				 		if(clip_set_effect_arg(args[0],args[1],i,args[(i+args_offset)] )==-1)	
+				 		if(sample_set_effect_arg(args[0],args[1],i,args[(i+args_offset)] )==-1)	
 						{
 							"Error setting argument %d value %d for %s",
 							i,
@@ -4938,21 +4938,21 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 					int source = args[num_p+4];	
 					int channel_id = args[num_p+3];
 					int err = 1;
-					if( (source != VJ_TAG_TYPE_NONE && vj_tag_exists(channel_id))|| (source == VJ_TAG_TYPE_NONE && clip_exists(channel_id)) )
+					if( (source != VJ_TAG_TYPE_NONE && vj_tag_exists(channel_id))|| (source == VJ_TAG_TYPE_NONE && sample_exists(channel_id)) )
 					{
 						err = 0;
 					}
-					if(	err == 0 && clip_set_chain_source( args[0],args[1], source ) &&
-				       		clip_set_chain_channel( args[0],args[1], channel_id  ))
+					if(	err == 0 && sample_set_chain_source( args[0],args[1], source ) &&
+				       		sample_set_chain_channel( args[0],args[1], channel_id  ))
 					{
 					  veejay_msg(VEEJAY_MSG_INFO, "Updated mixing channel to %s %d",
-						(source == VJ_TAG_TYPE_NONE ? "clip" : "stream" ),
+						(source == VJ_TAG_TYPE_NONE ? "sample" : "stream" ),
 						channel_id);
 					}
 					else
 					{
 					  veejay_msg(VEEJAY_MSG_ERROR, "updating mixing channel (channel %d is an invalid %s?)",
-					   channel_id, (source == 0 ? "stream" : "clip" ));
+					   channel_id, (source == 0 ? "stream" : "sample" ));
 					}
 				}
 			}
@@ -4960,15 +4960,15 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 	}
 	if( STREAM_PLAYING(v)) 
 	{
-		if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
 			return;
 		}
 
-		if(vj_tag_exists(v->uc->clip_id)) 
+		if(vj_tag_exists(v->uc->sample_id)) 
 		{
 			int real_id = args[2];
 			int num_p   = vj_effect_get_num_params(real_id);
@@ -5005,7 +5005,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 				int source = args[ num_p + 4];
 				int err = 1;
 
-				if( (source != VJ_TAG_TYPE_NONE && vj_tag_exists(channel_id))|| (source == VJ_TAG_TYPE_NONE && clip_exists(channel_id)) )
+				if( (source != VJ_TAG_TYPE_NONE && vj_tag_exists(channel_id))|| (source == VJ_TAG_TYPE_NONE && sample_exists(channel_id)) )
 				{
 					err = 0;
 				}
@@ -5014,12 +5014,12 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 				    vj_tag_set_chain_channel( args[0],args[1], channel_id ))
 				{
 					veejay_msg(VEEJAY_MSG_INFO,"Updated mixing channel to %s %d",
-						(source == VJ_TAG_TYPE_NONE ? "clip" : "stream"), channel_id  );
+						(source == VJ_TAG_TYPE_NONE ? "sample" : "stream"), channel_id  );
 				}
 				else
 				{
 					  veejay_msg(VEEJAY_MSG_ERROR, "updating mixing channel (channel %d is an invalid %s?)",
-					   channel_id, (source == 0 ? "stream" : "clip" ));
+					   channel_id, (source == 0 ? "stream" : "sample" ));
 				}
 			}
 		}
@@ -5030,12 +5030,12 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	if(CLIP_PLAYING(v))
+	if(SAMPLE_PLAYING(v))
 	{
-		int entry = clip_get_selected_entry(v->uc->clip_id);
-		int src = clip_get_chain_source(v->uc->clip_id, entry);
-		int cha = clip_get_chain_channel( v->uc->clip_id, entry );
-		if(src == 0 ) // source is clip, toggle to stream
+		int entry = sample_get_selected_entry(v->uc->sample_id);
+		int src = sample_get_chain_source(v->uc->sample_id, entry);
+		int cha = sample_get_chain_channel( v->uc->sample_id, entry );
+		if(src == 0 ) // source is sample, toggle to stream
 		{
 			if(!vj_tag_exists(cha))
 			{
@@ -5046,34 +5046,34 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 					return;
 				}
 			}
-			veejay_msg(VEEJAY_MSG_DEBUG, "Switched from source Clip to Stream");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Switched from source Sample to Stream");
 			src = vj_tag_get_type(cha);
 		}
 		else
 		{
-			src = 0; // source is stream, toggle to clip
-			if(!clip_exists(cha))
+			src = 0; // source is stream, toggle to sample
+			if(!sample_exists(cha))
 			{
-				cha = clip_size()-1;
+				cha = sample_size()-1;
 				if(cha<=0)
 				{
-					veejay_msg(VEEJAY_MSG_ERROR, "No clips to mix with");
+					veejay_msg(VEEJAY_MSG_ERROR, "No samples to mix with");
 					return;
 				}
 			}
-			veejay_msg(VEEJAY_MSG_DEBUG, "Switched from source Stream to Clip");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Switched from source Stream to Sample");
 		}
-		clip_set_chain_source( v->uc->clip_id, entry, src );
-		clip_set_chain_channel(v->uc->clip_id,entry,cha);
-		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d", entry,(src==VJ_TAG_TYPE_NONE ? "Clip":"Stream"), cha);
-		if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
+		sample_set_chain_source( v->uc->sample_id, entry, src );
+		sample_set_chain_channel(v->uc->sample_id,entry,cha);
+		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d", entry,(src==VJ_TAG_TYPE_NONE ? "Sample":"Stream"), cha);
+		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 	} 
 
 	if(STREAM_PLAYING(v))
 	{
-		int entry = vj_tag_get_selected_entry(v->uc->clip_id);
-		int src = vj_tag_get_chain_source(v->uc->clip_id, entry);
-		int cha = vj_tag_get_chain_channel( v->uc->clip_id, entry );
+		int entry = vj_tag_get_selected_entry(v->uc->sample_id);
+		int src = vj_tag_get_chain_source(v->uc->sample_id, entry);
+		int cha = vj_tag_get_chain_channel( v->uc->sample_id, entry );
 		char description[100];
 
 		if(src == VJ_TAG_TYPE_NONE ) 
@@ -5092,19 +5092,19 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 		else
 		{
 			src = 0;
-			if(!clip_exists(cha))
+			if(!sample_exists(cha))
 			{
-				cha = clip_size()-1;
+				cha = sample_size()-1;
 				if(cha<=0)
 				{
-					veejay_msg(VEEJAY_MSG_ERROR, "No clips to mix with");
+					veejay_msg(VEEJAY_MSG_ERROR, "No samples to mix with");
 					return;
 				}
 			}
 		}
-		vj_tag_set_chain_source( v->uc->clip_id, entry, src );
-		vj_tag_set_chain_channel(v->uc->clip_id,entry,cha);
-		if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
+		vj_tag_set_chain_source( v->uc->sample_id, entry, src );
+		vj_tag_set_chain_channel(v->uc->sample_id,entry,cha);
+		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 
 		vj_tag_get_descriptive(cha, description);
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses channel %d (%s)", entry, cha,description);
@@ -5118,28 +5118,28 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 	char *str = NULL;
 	P_A(args,str,format,ap);
 
-	if(CLIP_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+	 	if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
 			return;
 		}
 
-		if(clip_exists(args[0]))
+		if(sample_exists(args[0]))
 		{
 			int src = args[2];
-			int c = clip_get_chain_channel(args[0],args[1]);
+			int c = sample_get_chain_channel(args[0],args[1]);
 			if(src == VJ_TAG_TYPE_NONE)
 			{
-				if(!clip_exists(c))
+				if(!sample_exists(c))
 				{
-					c = clip_size()-1;
+					c = sample_size()-1;
 					if(c<=0)
 					{
-						veejay_msg(VEEJAY_MSG_ERROR, "You should create a clip first\n");
+						veejay_msg(VEEJAY_MSG_ERROR, "You should create a sample first\n");
 						return;
 					}
 				}
@@ -5160,12 +5160,12 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 
 			if(c > 0)
 			{
-			   clip_set_chain_channel(args[0],args[1], c);
-			   clip_set_chain_source (args[0],args[1],src);
+			   sample_set_chain_channel(args[0],args[1], c);
+			   sample_set_chain_source (args[0],args[1],src);
 
 				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source (%s %d)", 
-					src == VJ_TAG_TYPE_NONE ? "clip" : "stream",c);
-				if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
+					src == VJ_TAG_TYPE_NONE ? "sample" : "stream",c);
+				if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 
 			}
 				
@@ -5173,8 +5173,8 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 	}
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
@@ -5188,12 +5188,12 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 
 			if(src == VJ_TAG_TYPE_NONE)
 			{
-				if(!clip_exists(c))
+				if(!sample_exists(c))
 				{
-					c = clip_size()-1;
+					c = sample_size()-1;
 					if(c<=0)
 					{
-						veejay_msg(VEEJAY_MSG_ERROR, "You should create a clip first\n");
+						veejay_msg(VEEJAY_MSG_ERROR, "You should create a sample first\n");
 						return;
 					}
 				}
@@ -5217,8 +5217,8 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 			   vj_tag_set_chain_channel(args[0],args[1], c);
 			   vj_tag_set_chain_source (args[0],args[1],src);
 				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source (%s %d)", 
-					src==VJ_TAG_TYPE_NONE ? "clip" : "stream",c);
-			if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
+					src==VJ_TAG_TYPE_NONE ? "sample" : "stream",c);
+			if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 
 			}	
 		}
@@ -5233,20 +5233,20 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 
 	//DUMP_ARG(args);
 
-	if(CLIP_PLAYING(v))
+	if(SAMPLE_PLAYING(v))
 	{
-		int entry = clip_get_selected_entry(v->uc->clip_id);
-		int cha = clip_get_chain_channel(v->uc->clip_id,entry);
-		int src = clip_get_chain_source(v->uc->clip_id,entry);
+		int entry = sample_get_selected_entry(v->uc->sample_id);
+		int cha = sample_get_chain_channel(v->uc->sample_id,entry);
+		int src = sample_get_chain_source(v->uc->sample_id,entry);
 
 		if(src==VJ_TAG_TYPE_NONE)
-		{	//decrease clip id
+		{	//decrease sample id
 			if(cha <= 1)
 			{
-				cha = clip_size()-1;
+				cha = sample_size()-1;
 				if(cha <= 0)
 				{
-					veejay_msg(VEEJAY_MSG_ERROR, "No clips to mix with");
+					veejay_msg(VEEJAY_MSG_ERROR, "No samples to mix with");
 					return;
 				}		
 			}
@@ -5271,29 +5271,29 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 				cha = cha - args[0];
 			}
 			src = vj_tag_get_type( cha );
-			clip_set_chain_source( v->uc->clip_id,entry,src);
+			sample_set_chain_source( v->uc->sample_id,entry,src);
 		}
-		clip_set_chain_channel( v->uc->clip_id, entry, cha );
+		sample_set_chain_channel( v->uc->sample_id, entry, cha );
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d",entry,
-				(src==VJ_TAG_TYPE_NONE ? "Clip" : "Stream"),cha);
+				(src==VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),cha);
 			 
-		if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
+		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 
 	}
 	if(STREAM_PLAYING(v))
 	{
-		int entry = vj_tag_get_selected_entry(v->uc->clip_id);
-		int cha   = vj_tag_get_chain_channel(v->uc->clip_id,entry);
-		int src   = vj_tag_get_chain_source(v->uc->clip_id,entry);
+		int entry = vj_tag_get_selected_entry(v->uc->sample_id);
+		int cha   = vj_tag_get_chain_channel(v->uc->sample_id,entry);
+		int src   = vj_tag_get_chain_source(v->uc->sample_id,entry);
 		char description[100];
 		if(src==VJ_TAG_TYPE_NONE)
-		{	//decrease clip id
+		{	//decrease sample id
 			if(cha <= 1)
 			{
-				cha = clip_size()-1;
+				cha = sample_size()-1;
 				if(cha <= 0)
 				{
-					veejay_msg(VEEJAY_MSG_ERROR, "No clips to mix with");
+					veejay_msg(VEEJAY_MSG_ERROR, "No samples to mix with");
 					return;
 				}		
 			}
@@ -5318,13 +5318,13 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 				cha = cha - args[0];
 			}
 			src = vj_tag_get_type( cha );
-			vj_tag_set_chain_source( v->uc->clip_id, entry, src);
+			vj_tag_set_chain_source( v->uc->sample_id, entry, src);
 		}
-		vj_tag_set_chain_channel( v->uc->clip_id, entry, cha );
+		vj_tag_set_chain_channel( v->uc->sample_id, entry, cha );
 		vj_tag_get_descriptive( cha, description);
 
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses Stream %d (%s)",entry,cha,description);
-		if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
+		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
  
 	}
 
@@ -5338,20 +5338,20 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 
 	//DUMP_ARG(args);
 
-	if(CLIP_PLAYING(v))
+	if(SAMPLE_PLAYING(v))
 	{
-		int entry = clip_get_selected_entry(v->uc->clip_id);
-		int cha = clip_get_chain_channel(v->uc->clip_id,entry);
-		int src = clip_get_chain_source(v->uc->clip_id,entry);
+		int entry = sample_get_selected_entry(v->uc->sample_id);
+		int cha = sample_get_chain_channel(v->uc->sample_id,entry);
+		int src = sample_get_chain_source(v->uc->sample_id,entry);
 		if(src==VJ_TAG_TYPE_NONE)
 		{
-			int num_c = clip_size()-1;
+			int num_c = sample_size()-1;
 			if(num_c <= 0)
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "No clips to mix with");
+				veejay_msg(VEEJAY_MSG_ERROR, "No samples to mix with");
 				return;
 			}
-			//decrease clip id
+			//decrease sample id
 			if(cha >= num_c)
 			{
 				cha = 1;
@@ -5378,30 +5378,30 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 				cha = cha + args[0];
 			}
 			src = vj_tag_get_type( cha );
-			clip_set_chain_source( v->uc->clip_id, entry,src );
+			sample_set_chain_source( v->uc->sample_id, entry,src );
 		}
-		clip_set_chain_channel( v->uc->clip_id, entry, cha );
+		sample_set_chain_channel( v->uc->sample_id, entry, cha );
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d",entry,
-			(src==VJ_TAG_TYPE_NONE ? "Clip" : "Stream"),cha);
-		if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
+			(src==VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),cha);
+		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 	
 			 
 	}
 	if(STREAM_PLAYING(v))
 	{
-		int entry = vj_tag_get_selected_entry(v->uc->clip_id);
-		int cha   = vj_tag_get_chain_channel(v->uc->clip_id,entry);
-		int src   = vj_tag_get_chain_source(v->uc->clip_id,entry);
+		int entry = vj_tag_get_selected_entry(v->uc->sample_id);
+		int cha   = vj_tag_get_chain_channel(v->uc->sample_id,entry);
+		int src   = vj_tag_get_chain_source(v->uc->sample_id,entry);
 		char description[100];
 		if(src==VJ_TAG_TYPE_NONE)
 		{
-			int num_c = clip_size()-1;
+			int num_c = sample_size()-1;
 			if(num_c <= 0)
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "No clips to mix with");
+				veejay_msg(VEEJAY_MSG_ERROR, "No samples to mix with");
 				return;
 			}
-			//decrease clip id
+			//decrease sample id
 			if(cha >= num_c)
 			{
 				cha = 1;
@@ -5428,15 +5428,15 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 				cha = cha + args[0];
 			}
 			src = vj_tag_get_type( cha );
-			vj_tag_set_chain_source( v->uc->clip_id, entry, src);
+			vj_tag_set_chain_source( v->uc->sample_id, entry, src);
 		}
 
-		vj_tag_set_chain_channel( v->uc->clip_id, entry, cha );
+		vj_tag_set_chain_channel( v->uc->sample_id, entry, cha );
 		vj_tag_get_descriptive( cha, description);
-		if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
+		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses Stream %d (%s)",entry,
-			vj_tag_get_chain_channel(v->uc->clip_id,entry),description);
+			vj_tag_get_chain_channel(v->uc->sample_id,entry),description);
 	}
 }
 
@@ -5445,21 +5445,21 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*)ptr;
 	int args[3];
 	char *str = NULL; P_A(args,str,format,ap);
-	if(CLIP_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+	 	if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of bounds: %d", args[1]);
 			return;
 		}
 
-		if(clip_exists(args[0]))
+		if(sample_exists(args[0]))
 		{
-			int src = clip_get_chain_source( args[0],args[1]);
+			int src = sample_get_chain_source( args[0],args[1]);
 			int err = 1;
-			if(src == VJ_TAG_TYPE_NONE && clip_exists(args[2]))
+			if(src == VJ_TAG_TYPE_NONE && sample_exists(args[2]))
 			{
 				err = 0;
 			}
@@ -5467,24 +5467,24 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 			{
 				err = 0;
 			}	
-			if(err == 0 && clip_set_chain_channel(args[0],args[1], args[2])>= 0)	
+			if(err == 0 && sample_set_chain_channel(args[0],args[1], args[2])>= 0)	
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d)",
-				  (src == VJ_TAG_TYPE_NONE ? "clip" : "stream"),args[2]);
-				if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
+				  (src == VJ_TAG_TYPE_NONE ? "sample" : "stream"),args[2]);
+				if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 
 			}
 			else
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Invalid channel (%s %d) given",
-					(src ==VJ_TAG_TYPE_NONE ? "clip" : "stream") , args[2]);
+					(src ==VJ_TAG_TYPE_NONE ? "sample" : "stream") , args[2]);
 			}
 		}
 	}
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
@@ -5495,7 +5495,7 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 		{
 			int src = vj_tag_get_chain_source(args[0],args[1]);
 			int err = 1;
-			if( src == VJ_TAG_TYPE_NONE && clip_exists( args[2]))
+			if( src == VJ_TAG_TYPE_NONE && sample_exists( args[2]))
 				err = 0;
 			if( src != VJ_TAG_TYPE_NONE && vj_tag_exists( args[2] ))
 				err = 0;
@@ -5503,14 +5503,14 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 			if( err == 0 && vj_tag_set_chain_channel(args[0],args[1],args[2])>=0)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d)",
-				(src==VJ_TAG_TYPE_NONE ? "clip" : "stream"), args[2]);
-				if(v->no_bezerk) veejay_set_clip(v, v->uc->clip_id);
+				(src==VJ_TAG_TYPE_NONE ? "sample" : "stream"), args[2]);
+				if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 
 			}
 			else
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Invalid channel (%s %d) given",
-					(src ==VJ_TAG_TYPE_NONE ? "clip" : "stream") , args[2]);
+					(src ==VJ_TAG_TYPE_NONE ? "sample" : "stream") , args[2]);
 			}
 		}
 	}
@@ -5522,48 +5522,48 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 	int args[4];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if(CLIP_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[0] == -1) args[0] = clip_size()-1;
-		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+	 	if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[0] == -1) args[0] = sample_size()-1;
+		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
 			return;
 		}
 
-		if(clip_exists(args[0]))
+		if(sample_exists(args[0]))
 		{
 			int source = args[2];
 			int channel_id = args[3];
 			int err = 1;
-			if( source == VJ_TAG_TYPE_NONE && clip_exists(channel_id))
+			if( source == VJ_TAG_TYPE_NONE && sample_exists(channel_id))
 				err = 0;
 			if( source != VJ_TAG_TYPE_NONE && vj_tag_exists(channel_id))
 				err = 0;
 
 	
 			if(	err == 0 &&
-				clip_set_chain_source(args[0],args[1],source)!=-1 &&
-				clip_set_chain_channel(args[0],args[1],channel_id) != -1)
+				sample_set_chain_source(args[0],args[1],source)!=-1 &&
+				sample_set_chain_channel(args[0],args[1],channel_id) != -1)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d) to mix in",
-					(source == VJ_TAG_TYPE_NONE ? "clip" : "stream") , channel_id);
-				if(v->no_bezerk) veejay_set_clip(v,v->uc->clip_id);
+					(source == VJ_TAG_TYPE_NONE ? "sample" : "stream") , channel_id);
+				if(v->no_bezerk) veejay_set_sample(v,v->uc->sample_id);
 			}
 			else
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Invalid channel (%s %d) given",
-					(source ==VJ_TAG_TYPE_NONE ? "clip" : "stream") , args[2]);
+					(source ==VJ_TAG_TYPE_NONE ? "sample" : "stream") , args[2]);
 			}
 		}
 	}
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[0] == -1) args[0] = clip_size()-1;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[0] == -1) args[0] = sample_size()-1;
+		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
@@ -5575,7 +5575,7 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 			int source = args[2];
 			int channel_id = args[3];
 			int err = 1;
-			if( source == VJ_TAG_TYPE_NONE && clip_exists(channel_id))
+			if( source == VJ_TAG_TYPE_NONE && sample_exists(channel_id))
 				err = 0;
 			if( source != VJ_TAG_TYPE_NONE && vj_tag_exists(channel_id))
 				err = 0;
@@ -5586,13 +5586,13 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 				vj_tag_set_chain_channel(args[0],args[1],channel_id) != -1)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d) to mix in",
-					(source == VJ_TAG_TYPE_NONE ? "clip" : "stream") , channel_id);
-				if(v->no_bezerk) veejay_set_clip(v,v->uc->clip_id);
+					(source == VJ_TAG_TYPE_NONE ? "sample" : "stream") , channel_id);
+				if(v->no_bezerk) veejay_set_sample(v,v->uc->sample_id);
 			}
 			else
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Invalid channel (%s %d) given",
-					(source ==VJ_TAG_TYPE_NONE ? "clip" : "stream") , args[2]);
+					(source ==VJ_TAG_TYPE_NONE ? "sample" : "stream") , args[2]);
 			}
 		}	
 	}
@@ -5606,11 +5606,11 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if(CLIP_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v)) 
 	{
-		int c = clip_get_selected_entry(v->uc->clip_id);
-		int effect = clip_get_effect_any(v->uc->clip_id, c);
-		int val = clip_get_effect_arg(v->uc->clip_id,c,args[0]);
+		int c = sample_get_selected_entry(v->uc->sample_id);
+		int effect = sample_get_effect_any(v->uc->sample_id, c);
+		int val = sample_get_effect_arg(v->uc->sample_id,c,args[0]);
 		if ( vj_effect_is_valid( effect  ) )
 		{
 
@@ -5623,12 +5623,12 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 					
 		   if( vj_effect_valid_value( effect, args[0],tval ) )
 		   {
-			if(clip_set_effect_arg( v->uc->clip_id, c,args[0],(val+args[1]))!=-1 )
+			if(sample_set_effect_arg( v->uc->sample_id, c,args[0],(val+args[1]))!=-1 )
 			{
 				veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0],(val+args[1]));
 			}
 		   }
-		   if(clip_set_effect_arg( v->uc->clip_id, c,args[0],tval) )
+		   if(sample_set_effect_arg( v->uc->sample_id, c,args[0],tval) )
 		   {
 			veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0],tval);
 		   }
@@ -5637,9 +5637,9 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 	}
 	if(STREAM_PLAYING(v)) 
 	{
-		int c = vj_tag_get_selected_entry(v->uc->clip_id);
-		int effect = vj_tag_get_effect_any(v->uc->clip_id, c);
-		int val = vj_tag_get_effect_arg(v->uc->clip_id, c, args[0]);
+		int c = vj_tag_get_selected_entry(v->uc->sample_id);
+		int effect = vj_tag_get_effect_any(v->uc->sample_id, c);
+		int val = vj_tag_get_effect_arg(v->uc->sample_id, c, args[0]);
 
 		int tval = val + args[1];
 
@@ -5650,7 +5650,7 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 				tval = vj_effect_get_max_limit( effect,args[0] );
 
 	
-		if(vj_tag_set_effect_arg(v->uc->clip_id, c, args[0], tval) )
+		if(vj_tag_set_effect_arg(v->uc->sample_id, c, args[0], tval) )
 		{
 			veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0], tval );
 		}
@@ -5663,24 +5663,24 @@ void vj_event_chain_entry_set_arg_val(void *ptr, const char format[], va_list ap
 	veejay_t *v = (veejay_t*)ptr;
 	char *str = NULL; P_A(args,str,format,ap);
 	
-	if(CLIP_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v)) 
 	{
-	 	if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[0] == -1) args[0] = clip_size()-1;
-		if(args[1] == -1) args[1] = clip_get_selected_entry(v->uc->clip_id);
+	 	if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[0] == -1) args[0] = sample_size()-1;
+		if(args[1] == -1) args[1] = sample_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
 			return;
 		}
 
-		if(clip_exists(args[0]))
+		if(sample_exists(args[0]))
 		{
-			int effect = clip_get_effect_any( args[0], args[1] );
+			int effect = sample_get_effect_any( args[0], args[1] );
 			if( vj_effect_valid_value(effect,args[2],args[3]) )
 			{
-				if(clip_set_effect_arg( args[0], args[1], args[2], args[3])) {
-				  veejay_msg(VEEJAY_MSG_INFO, "Set parameter %d to %d on Entry %d of Clip %d", args[2], args[3],args[1],args[0]);
+				if(sample_set_effect_arg( args[0], args[1], args[2], args[3])) {
+				  veejay_msg(VEEJAY_MSG_INFO, "Set parameter %d to %d on Entry %d of Sample %d", args[2], args[3],args[1],args[0]);
 				}
 			}
 			else
@@ -5688,12 +5688,12 @@ void vj_event_chain_entry_set_arg_val(void *ptr, const char format[], va_list ap
 				veejay_msg(VEEJAY_MSG_ERROR,"Tried to set invalid parameter value/type: %d %d for effect %d on entry %d",
 		args[2],args[3],effect,args[1]);
 			}
-		} else { veejay_msg(VEEJAY_MSG_ERROR, "Clip %d does not exist", args[0]); }	
+		} else { veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist", args[0]); }	
 	}
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0) args[0] = v->uc->clip_id;
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->clip_id);
+		if(args[0] == 0) args[0] = v->uc->sample_id;
+		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(v->uc->sample_id);
 		if(v_chi(args[1]))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Chain index out of boundaries: %d", args[1]);
@@ -5726,7 +5726,7 @@ void vj_event_el_cut(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if ( CLIP_PLAYING(v) || STREAM_PLAYING(v)) 
+	if ( SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot cut frames in this playback mode");
 		return;
@@ -5734,8 +5734,8 @@ void vj_event_el_cut(void *ptr, const char format[], va_list ap)
 
 	if( PLAIN_PLAYING(v)) 
 	{
-		if(clip_size()>0)
-			veejay_msg(VEEJAY_MSG_WARNING, "Cutting frames from the Edit List to a buffer affects your clips");
+		if(sample_size()>0)
+			veejay_msg(VEEJAY_MSG_WARNING, "Cutting frames from the Edit List to a buffer affects your samples");
 
 		if(veejay_edit_cut( v, args[0], args[1] ))
 		{
@@ -5750,7 +5750,7 @@ void vj_event_el_copy(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if ( CLIP_PLAYING(v) || STREAM_PLAYING(v)) 
+	if ( SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot copy frames in this playback mode");
 		return;
@@ -5758,8 +5758,8 @@ void vj_event_el_copy(void *ptr, const char format[], va_list ap)
 
 	if( PLAIN_PLAYING(v)) 
 	{
-		if(clip_size()>0)
-			veejay_msg(VEEJAY_MSG_WARNING, "Copying frames to the Edit List affects your clips");
+		if(sample_size()>0)
+			veejay_msg(VEEJAY_MSG_WARNING, "Copying frames to the Edit List affects your samples");
 
 		if(veejay_edit_copy( v, args[0],args[1] )) 
 		{
@@ -5775,7 +5775,7 @@ void vj_event_el_del(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if ( CLIP_PLAYING(v) || STREAM_PLAYING(v)) 
+	if ( SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot delete frames in this playback mode");
 		return;
@@ -5783,8 +5783,8 @@ void vj_event_el_del(void *ptr, const char format[], va_list ap)
 
 	if( PLAIN_PLAYING(v)) 
 	{
-		if(clip_size()>0)
-			veejay_msg(VEEJAY_MSG_WARNING, "Deleting frames from the Edit List affects your clips!");
+		if(sample_size()>0)
+			veejay_msg(VEEJAY_MSG_WARNING, "Deleting frames from the Edit List affects your samples!");
  
 		if(veejay_edit_delete(v, args[0],args[1])) 
 		{
@@ -5799,7 +5799,7 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if ( CLIP_PLAYING(v) || STREAM_PLAYING(v)) 
+	if ( SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot delete frames in this playback mode");
 		return;
@@ -5845,7 +5845,7 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 	int args[1];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if ( CLIP_PLAYING(v) || STREAM_PLAYING(v)) 
+	if ( SAMPLE_PLAYING(v) || STREAM_PLAYING(v)) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot paste frames in this playback mode");
 		return;
@@ -5854,8 +5854,8 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 
 	if( PLAIN_PLAYING(v)) 
 	{
-		if(clip_size()>0)
-			veejay_msg(VEEJAY_MSG_WARNING, "Pasting frames to the Edit List affects your clips!");
+		if(sample_size()>0)
+			veejay_msg(VEEJAY_MSG_WARNING, "Pasting frames to the Edit List affects your samples!");
 
 
 		if( args[0] >= 0 && args[0] <= v->edit_list->video_frames-1)
@@ -5910,7 +5910,7 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 	}
 }
 
-void vj_event_el_add_video_clip(void *ptr, const char format[], va_list ap)
+void vj_event_el_add_video_sample(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int start = -1;
@@ -5923,10 +5923,10 @@ void vj_event_el_add_video_clip(void *ptr, const char format[], va_list ap)
 	{
 		int start_pos = destination;
 		int end_pos = v->edit_list->video_frames-1;
-		clip_info *skel = clip_skeleton_new(start_pos,end_pos);
-		if(clip_store(skel) == 0)
+		sample_info *skel = sample_skeleton_new(start_pos,end_pos);
+		if(sample_store(skel) == 0)
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Appended video file %s to EditList as new clip %d",str,skel->clip_id); 
+			veejay_msg(VEEJAY_MSG_INFO, "Appended video file %s to EditList as new sample %d",str,skel->sample_id); 
 		}
 	}
 	else
@@ -5943,7 +5943,7 @@ void vj_event_tag_del(void *ptr, const char format[] , va_list ap )
 	char *str = NULL; P_A(args,str,format,ap);
 
 	
-	if(STREAM_PLAYING(v) && v->uc->clip_id == args[0])
+	if(STREAM_PLAYING(v) && v->uc->sample_id == args[0])
 	{
 		veejay_msg(VEEJAY_MSG_INFO,"Cannot delete stream while playing");
 	}
@@ -5966,9 +5966,9 @@ void vj_event_tag_toggle(void *ptr, const char format[], va_list ap)
 	char *str = NULL; P_A(args,str,format,ap);
 	if(STREAM_PLAYING(v))
 	{
-		int active = vj_tag_get_active(v->uc->clip_id);
-		vj_tag_set_active( v->uc->clip_id, !active);
-		veejay_msg(VEEJAY_MSG_INFO, "Stream is %s", (vj_tag_get_active(v->uc->clip_id) ? "active" : "disabled"));
+		int active = vj_tag_get_active(v->uc->sample_id);
+		vj_tag_set_active( v->uc->sample_id, !active);
+		veejay_msg(VEEJAY_MSG_INFO, "Stream is %s", (vj_tag_get_active(v->uc->sample_id) ? "active" : "disabled"));
 	}
 }
 
@@ -6088,7 +6088,7 @@ void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0]==0) args[0] = v->uc->clip_id;
+	if(args[0]==0) args[0] = v->uc->sample_id;
 	if(args[0]==-1) args[0] = vj_tag_size()-1;
 	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
 	{
@@ -6106,7 +6106,7 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0]==0) args[0] = v->uc->clip_id;
+	if(args[0]==0) args[0] = v->uc->sample_id;
 	if(args[0]==-1) args[0] = vj_tag_size()-1;
 
 	char send_msg[33];
@@ -6136,7 +6136,7 @@ void vj_event_v4l_set_contrast(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0]==0) args[0] = v->uc->clip_id;
+	if(args[0]==0) args[0] = v->uc->sample_id;
 	if(args[0]==-1)args[0] = vj_tag_size()-1;
 	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
 	{
@@ -6155,7 +6155,7 @@ void vj_event_v4l_set_white(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0]==0) args[0] = v->uc->clip_id;
+	if(args[0]==0) args[0] = v->uc->sample_id;
 	if(args[0]==-1)args[0] = vj_tag_size()-1;
 	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
 	{
@@ -6172,7 +6172,7 @@ void vj_event_v4l_set_color(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0] == 0) args[0] = v->uc->clip_id;
+	if(args[0] == 0) args[0] = v->uc->sample_id;
 	if(args[0] == -1) args[0] = vj_tag_size()-1;
 	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
 	{
@@ -6189,7 +6189,7 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-	if(args[0] == 0) args[0] = v->uc->clip_id;
+	if(args[0] == 0) args[0] = v->uc->sample_id;
 	if(args[0] == -1) args[0] = vj_tag_size()-1;
 	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
 	{
@@ -6288,8 +6288,8 @@ static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
 
 	char sourcename[255];	
 	bzero(sourcename,255);
-	vj_tag_get_description( v->uc->clip_id, sourcename );
-	sprintf(prefix,"%s-%02d-", sourcename, v->uc->clip_id);
+	vj_tag_get_description( v->uc->sample_id, sourcename );
+	sprintf(prefix,"%s-%02d-", sourcename, v->uc->sample_id);
 	if(! veejay_create_temp_file(prefix, tmp )) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot create temporary file %s", tmp);
@@ -6303,11 +6303,11 @@ static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
 		return;
 	}
 
-	if( vj_tag_init_encoder( v->uc->clip_id, tmp, format,		
+	if( vj_tag_init_encoder( v->uc->sample_id, tmp, format,		
 			args[0]) != 1 ) 
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Error trying to start recording from stream %d", v->uc->clip_id);
-		vj_tag_stop_encoder(v->uc->clip_id);
+		veejay_msg(VEEJAY_MSG_INFO, "Error trying to start recording from stream %d", v->uc->sample_id);
+		vj_tag_stop_encoder(v->uc->sample_id);
 		v->settings->tag_record = 0;
 		return;
 	} 
@@ -6338,7 +6338,7 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 	if( STREAM_PLAYING(v)  && v->settings->tag_record) 
 	{
 		int play_now = s->tag_record_switch;
-		if(!vj_tag_stop_encoder( v->uc->clip_id))
+		if(!vj_tag_stop_encoder( v->uc->sample_id))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Wasnt recording anyway");
 			return;
@@ -6348,7 +6348,7 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 		int start = -1;
 		int destination = v->edit_list->video_frames - 1;
 
-		if( !vj_tag_get_encoded_file(v->uc->clip_id, avi_file)) 
+		if( !vj_tag_get_encoded_file(v->uc->sample_id, avi_file)) 
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Dont know where I put the file?!");
 			return;
@@ -6357,13 +6357,13 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 		if( veejay_edit_addmovie(
 			v,avi_file,start,destination,destination))
 		{
-			int len = vj_tag_get_encoded_frames(v->uc->clip_id) - 1;
-			clip_info *skel = clip_skeleton_new(destination, destination+len);		
-			if(clip_store(skel)==0) 
+			int len = vj_tag_get_encoded_frames(v->uc->sample_id) - 1;
+			sample_info *skel = sample_skeleton_new(destination, destination+len);		
+			if(sample_store(skel)==0) 
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Created new clip %d from file %s",
-					skel->clip_id,avi_file);
-				clip_set_looptype( skel->clip_id,1);
+				veejay_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s",
+					skel->sample_id,avi_file);
+				sample_set_looptype( skel->sample_id,1);
 			}
 			veejay_msg(VEEJAY_MSG_INFO,"Added file %s (%d frames) to EditList",
 				avi_file, len );	
@@ -6373,15 +6373,15 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList!",avi_file);
 		}
 
-		veejay_msg(VEEJAY_MSG_ERROR, "Stopped recording from stream %d", v->uc->clip_id);
-		vj_tag_reset_encoder( v->uc->clip_id);
+		veejay_msg(VEEJAY_MSG_ERROR, "Stopped recording from stream %d", v->uc->sample_id);
+		vj_tag_reset_encoder( v->uc->sample_id);
 		s->tag_record = 0;
 		s->tag_record_switch = 0;
 
 		if(play_now) 
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Playing clip %d now", clip_size()-1);
-			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_CLIP, clip_size()-1 );
+			veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d now", sample_size()-1);
+			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_SAMPLE, sample_size()-1 );
 		}
 	}
 	else
@@ -6412,7 +6412,7 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-	if( STREAM_PLAYING(v) && (args[0] == v->uc->clip_id) )
+	if( STREAM_PLAYING(v) && (args[0] == v->uc->sample_id) )
 	{
 		veejay_msg(VEEJAY_MSG_INFO,"Using stream recorder for stream  %d (is playing)",args[0]);
 		_vj_event_tag_record(v, args+1, str);
@@ -6447,7 +6447,7 @@ void vj_event_tag_rec_offline_start(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_INFO, "(Offline) recording from stream %d", args[0]);
 			s->offline_record = 1;
 			s->offline_tag_id = args[0];
-			s->offline_created_clip = args[2];
+			s->offline_created_sample = args[2];
 		} 
 		else
 		{
@@ -6472,19 +6472,19 @@ void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
 			int start = -1;
 			int destination = v->edit_list->video_frames - 1;
 
-			if( vj_tag_get_encoded_file(v->uc->clip_id, avi_file)!=0) return;
+			if( vj_tag_get_encoded_file(v->uc->sample_id, avi_file)!=0) return;
 			
 
 			if( veejay_edit_addmovie(
 				v,avi_file,start,destination,destination))
 			{
-				int len = vj_tag_get_encoded_frames(v->uc->clip_id) - 1;
-				clip_info *skel = clip_skeleton_new(destination, destination+len);		
-				if(clip_store(skel)==0) 
+				int len = vj_tag_get_encoded_frames(v->uc->sample_id) - 1;
+				sample_info *skel = sample_skeleton_new(destination, destination+len);		
+				if(sample_store(skel)==0) 
 				{
-					veejay_msg(VEEJAY_MSG_INFO, "Created new clip %d from file %s",
-						skel->clip_id,avi_file);
-					clip_set_looptype( skel->clip_id,1);
+					veejay_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s",
+						skel->sample_id,avi_file);
+					sample_set_looptype( skel->sample_id,1);
 				}	
 			}		
 			else
@@ -6492,12 +6492,12 @@ void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
 				veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList!",avi_file);
 			}
 
-			vj_tag_reset_encoder( v->uc->clip_id);
+			vj_tag_reset_encoder( v->uc->sample_id);
 
-			if(s->offline_created_clip) 
+			if(s->offline_created_sample) 
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Playing new clip %d now ", clip_size()-1);
-				veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_CLIP , clip_size()-1);
+				veejay_msg(VEEJAY_MSG_INFO, "Playing new sample %d now ", sample_size()-1);
+				veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE , sample_size()-1);
 			}
 		}
 		s->offline_record = 0;
@@ -6612,7 +6612,7 @@ void vj_event_effect_inc(void *ptr, const char format[], va_list ap)
 	int args[1];
 	char *s = NULL;
 	P_A(args,s,format,ap);	
-	if(!CLIP_PLAYING(v) && !STREAM_PLAYING(v))
+	if(!SAMPLE_PLAYING(v) && !STREAM_PLAYING(v))
 	{
 		p_invalid_mode();
 		return;
@@ -6635,7 +6635,7 @@ void vj_event_effect_dec(void *ptr, const char format[], va_list ap)
 	int args[1];
 	char *s = NULL;
 	P_A(args,s,format,ap);
-	if(!CLIP_PLAYING(v) && !STREAM_PLAYING(v))
+	if(!SAMPLE_PLAYING(v) && !STREAM_PLAYING(v))
 	{
 		p_invalid_mode();
 		return;
@@ -6653,10 +6653,10 @@ void vj_event_effect_dec(void *ptr, const char format[], va_list ap)
 void vj_event_effect_add(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
-	if(CLIP_PLAYING(v)) 
+	if(SAMPLE_PLAYING(v)) 
 	{	
-		int c = clip_get_selected_entry(v->uc->clip_id);
-		if ( clip_chain_add( v->uc->clip_id, c, 
+		int c = sample_get_selected_entry(v->uc->sample_id);
+		if ( sample_chain_add( v->uc->sample_id, c, 
 				       vj_effect_get_real_id(v->uc->key_effect)) != 1)
 		{
 			int real_id = vj_effect_get_real_id(v->uc->key_effect);
@@ -6664,14 +6664,14 @@ void vj_event_effect_add(void *ptr, const char format[], va_list ap)
 				vj_effect_get_description(real_id),
 				c
 			);
-			if(v->no_bezerk && vj_effect_get_extra_frame(real_id) ) veejay_set_clip(v,v->uc->clip_id);
+			if(v->no_bezerk && vj_effect_get_extra_frame(real_id) ) veejay_set_sample(v,v->uc->sample_id);
 			v->uc->chain_changed = 1;
 		}
 	}
 	if(STREAM_PLAYING(v))
 	{
-		int c = vj_tag_get_selected_entry(v->uc->clip_id);
-		if ( vj_tag_set_effect( v->uc->clip_id, c,
+		int c = vj_tag_get_selected_entry(v->uc->sample_id);
+		if ( vj_tag_set_effect( v->uc->sample_id, c,
 				vj_effect_get_real_id( v->uc->key_effect) ) != -1) 
 		{
 			int real_id = vj_effect_get_real_id(v->uc->key_effect);
@@ -6679,7 +6679,7 @@ void vj_event_effect_add(void *ptr, const char format[], va_list ap)
 				vj_effect_get_description(real_id),
 				c
 			);
-			if(v->no_bezerk && vj_effect_get_extra_frame(real_id)) veejay_set_clip(v,v->uc->clip_id);
+			if(v->no_bezerk && vj_effect_get_extra_frame(real_id)) veejay_set_sample(v,v->uc->sample_id);
 			v->uc->chain_changed = 1;
 		}
 	}
@@ -6707,28 +6707,28 @@ void vj_event_select_id(void *ptr, const char format[], va_list ap)
 	P_A(args,str, format, ap);
 	if(!STREAM_PLAYING(v))
 	{ 
-		int clip_id = (v->uc->clip_key*12)-12 + args[0];
-		if(clip_exists(clip_id))
+		int sample_id = (v->uc->sample_key*12)-12 + args[0];
+		if(sample_exists(sample_id))
 		{
-			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_CLIP, clip_id);
-			vj_event_print_clip_info(v,clip_id);
+			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_SAMPLE, sample_id);
+			vj_event_print_sample_info(v,sample_id);
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR,"Selected clip %d does not exist",clip_id);
+			veejay_msg(VEEJAY_MSG_ERROR,"Selected sample %d does not exist",sample_id);
 		}
 	}	
 	else
 	{
-		int clip_id = (v->uc->clip_key*12)-12 + args[0];
-		if(vj_tag_exists(clip_id ))
+		int sample_id = (v->uc->sample_key*12)-12 + args[0];
+		if(vj_tag_exists(sample_id ))
 		{
-			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG ,clip_id);
+			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG ,sample_id);
 
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_INFO,"Selected stream %d does not exist",clip_id);
+			veejay_msg(VEEJAY_MSG_INFO,"Selected stream %d does not exist",sample_id);
 		}
 	}
 
@@ -6790,9 +6790,9 @@ void vj_event_select_bank(void *ptr, const char format[], va_list ap)
 	char *str = NULL; P_A(args,str,format,ap);
 	if(args[0] >= 1 && args[0] <= 9)
 	{
-		veejay_msg(VEEJAY_MSG_INFO,"Selected bank %d (active clip range is now %d-%d)",args[0],
+		veejay_msg(VEEJAY_MSG_INFO,"Selected bank %d (active sample range is now %d-%d)",args[0],
 			(12 * args[0]) - 12 , (12 * args[0]));
-		v->uc->clip_key = args[0];
+		v->uc->sample_key = args[0];
 	}
 }
 
@@ -6818,7 +6818,7 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 		(vj_tag_get_active(id) == 1 ? "is active" : "is not active"));
 
 	veejay_msg(VEEJAY_MSG_INFO,  "|-----------------------------------|");	
-	for (i = 0; i < CLIP_MAX_EFFECTS; i++)
+	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
 		y = vj_tag_get_effect_any(id, i);
 		if (y != -1) 
@@ -6848,7 +6848,7 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 			if (vj_effect_get_extra_frame(y) == 1)
 			{
 				int source = vj_tag_get_chain_source(id, i);
-				veejay_msg(VEEJAY_MSG_INFO, "     V %s [%d]",(source == VJ_TAG_TYPE_NONE ? "Clip" : "Stream"),
+				veejay_msg(VEEJAY_MSG_INFO, "     V %s [%d]",(source == VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),
 			    		vj_tag_get_chain_channel(id,i)
 					);
 				//veejay_msg(VEEJAY_MSG_INFO, "     A: %s",   vj_tag_get_chain_audio(id, i) ? "yes" : "no");
@@ -6863,25 +6863,25 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 
 void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_mod )
 {
-	char blob[50 * CLIP_MAX_EFFECTS];
+	char blob[50 * SAMPLE_MAX_EFFECTS];
 	char prefix[20];
 	int i ,y,j;
 	int num_cmd = 0;
-	int id = v->uc->clip_id;
+	int id = v->uc->sample_id;
 	int event_id = 0;
 	int bunlen=0;
 	bzero( prefix, 20);
-	bzero( blob, (50 * CLIP_MAX_EFFECTS));
+	bzero( blob, (50 * SAMPLE_MAX_EFFECTS));
    
-	if(!CLIP_PLAYING(v) && !STREAM_PLAYING(v)) 
+	if(!SAMPLE_PLAYING(v) && !STREAM_PLAYING(v)) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot take snapshot of Effect Chain");
 		return;
 	}
 
- 	for (i = 0; i < CLIP_MAX_EFFECTS; i++)
+ 	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
-		y = (CLIP_PLAYING(v) ? clip_get_effect_any(id, i) : vj_tag_get_effect_any(id,i) );
+		y = (SAMPLE_PLAYING(v) ? sample_get_effect_any(id, i) : vj_tag_get_effect_any(id,i) );
 		if (y != -1)
 		{
 			num_cmd++;
@@ -6893,9 +6893,9 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 		return;
 	}
 
-	for (i=0; i < CLIP_MAX_EFFECTS; i++)
+	for (i=0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
-		y = (CLIP_PLAYING(v) ? clip_get_effect_any(id, i) : vj_tag_get_effect_any(id,i) );
+		y = (SAMPLE_PLAYING(v) ? sample_get_effect_any(id, i) : vj_tag_get_effect_any(id,i) );
 		if( y != -1)
 		{
 			//int entry = i;
@@ -6909,7 +6909,7 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 		    		for (j = 0; j < np; j++)
 				{
 					char svalue[10];
-					int value = (CLIP_PLAYING(v) ? clip_get_effect_arg(id, i, j) : vj_tag_get_effect_arg(id,i,j));
+					int value = (SAMPLE_PLAYING(v) ? sample_get_effect_arg(id, i, j) : vj_tag_get_effect_arg(id,i,j));
 					if(value != -1)
 					{
 						if(j == (np-1))
@@ -6945,22 +6945,22 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 }
 
 
-void vj_event_print_clip_info(veejay_t *v, int id) 
+void vj_event_print_sample_info(veejay_t *v, int id) 
 {
 	video_playback_setup *s = v->settings;
 	int y, i, j;
 	long value;
 	char timecode[15];
 	char curtime[15];
-	char cliptitle[200];
+	char sampletitle[200];
 	MPEG_timecode_t tc;
-	int start = clip_get_startFrame( id );
-	int end = clip_get_endFrame( id );
-	int speed = clip_get_speed(id);
+	int start = sample_get_startFrame( id );
+	int end = sample_get_endFrame( id );
+	int speed = sample_get_speed(id);
 	int len = end - start;
 
 	if(start == 0) len ++;
-	bzero(cliptitle,200);	
+	bzero(sampletitle,200);	
 	mpeg_timecode(&tc, len,
  		mpeg_framerate_code(mpeg_conform_framerate(v->edit_list->video_fps)),v->edit_list->video_fps);
 	sprintf(timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
@@ -6971,16 +6971,16 @@ void vj_event_print_clip_info(veejay_t *v, int id)
 	  	v->edit_list->video_fps);
 
 	sprintf(curtime, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
-	clip_get_description( id, cliptitle );
+	sample_get_description( id, sampletitle );
 	veejay_msg(VEEJAY_MSG_PRINT, "\n");
 	veejay_msg(VEEJAY_MSG_INFO, 
-		"Clip '%s'[%4d]/[%4d]\t[duration: %s | %8d ]",
-		cliptitle,id,clip_size()-1,timecode,len);
+		"Sample '%s'[%4d]/[%4d]\t[duration: %s | %8d ]",
+		sampletitle,id,sample_size()-1,timecode,len);
 
-	if(clip_encoder_active(v->uc->clip_id))
+	if(sample_encoder_active(v->uc->sample_id))
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "REC %09d\t[timecode: %s | %8ld ]",
-			clip_get_frames_left(v->uc->clip_id),
+			sample_get_frames_left(v->uc->sample_id),
 			curtime,(long)v->settings->current_frame_num);
 
 	}
@@ -6994,14 +6994,14 @@ void vj_event_print_clip_info(veejay_t *v, int id)
 		start,end, (float)speed * v->edit_list->video_fps,speed);
 	veejay_msg(VEEJAY_MSG_INFO,
 		"[%s looping]",
-		(clip_get_looptype(id) ==
-		2 ? "pingpong" : (clip_get_looptype(id)==1 ? "normal" : "no")  )
+		(sample_get_looptype(id) ==
+		2 ? "pingpong" : (sample_get_looptype(id)==1 ? "normal" : "no")  )
 		);
 
 	int first = 0;
-    	for (i = 0; i < CLIP_MAX_EFFECTS; i++)
+    	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
-		y = clip_get_effect_any(id, i);
+		y = sample_get_effect_any(id, i);
 		if (y != -1)
 		{
 			if(!first)
@@ -7013,13 +7013,13 @@ void vj_event_print_clip_info(veejay_t *v, int id)
 			veejay_msg(VEEJAY_MSG_INFO, "%02d   |%03d      |%s| %s %s",
 				i,
 				y,
-				clip_get_chain_status(id,i) ? "on " : "off", vj_effect_get_description(y),
+				sample_get_chain_status(id,i) ? "on " : "off", vj_effect_get_description(y),
 				(vj_effect_get_subformat(y) == 1 ? "2x2" : "1x1")
 			);
 
 	    		for (j = 0; j < vj_effect_get_num_params(y); j++)
 			{
-				value = clip_get_effect_arg(id, i, j);
+				value = sample_get_effect_arg(id, i, j);
 				if (j == 0)
 				{
 		    			veejay_msg(VEEJAY_MSG_PRINT, "I:\t\t\tP%d=[%d]",j, value);
@@ -7032,10 +7032,10 @@ void vj_event_print_clip_info(veejay_t *v, int id)
 			veejay_msg(VEEJAY_MSG_PRINT, "\n");
 	    		if (vj_effect_get_extra_frame(y) == 1)
 			{
-				int source = clip_get_chain_source(id, i);
+				int source = sample_get_chain_source(id, i);
 						 
-				veejay_msg(VEEJAY_MSG_PRINT, "I:\t\t\t Mixing with %s %d\n",(source == VJ_TAG_TYPE_NONE ? "clip" : "stream"),
-			    		clip_get_chain_channel(id,i)
+				veejay_msg(VEEJAY_MSG_PRINT, "I:\t\t\t Mixing with %s %d\n",(source == VJ_TAG_TYPE_NONE ? "sample" : "stream"),
+			    		sample_get_chain_channel(id,i)
 					);
 	    		}
 		}
@@ -7058,14 +7058,14 @@ void vj_event_print_info(void *ptr, const char format[], va_list ap)
 	char *str = NULL; P_A(args,str,format,ap);
 	if(args[0]==0)
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 
 	vj_event_print_plain_info(v,args[0]);
 
-	if( CLIP_PLAYING(v) && clip_exists(args[0])  )
+	if( SAMPLE_PLAYING(v) && sample_exists(args[0])  )
 	{
-		vj_event_print_clip_info( v, args[0] );
+		vj_event_print_sample_info( v, args[0] );
 	}
 	if( STREAM_PLAYING(v) && vj_tag_exists(args[0]) )
 	{
@@ -7124,42 +7124,42 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 
 
 
-void	vj_event_send_clip_list		(	void *ptr,	const char format[],	va_list ap	)
+void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int args[1];
-	int start_from_clip = 1;
+	int start_from_sample = 1;
 	char cmd[300];
 	char *str = NULL;
 	int i,n;
 	P_A(args,str,format,ap);
 
-	if(args[0]>0) start_from_clip = args[0];
+	if(args[0]>0) start_from_sample = args[0];
 
 	bzero( _s_print_buf,SEND_BUF);
 	sprintf(_s_print_buf, "%05d", 0);
 
-	n = clip_size()-1;
+	n = sample_size()-1;
 	if( n >= 1 )
 	{
 		char line[308];
 		bzero(_print_buf, SEND_BUF);
-		for(i=start_from_clip; i <= n; i++)
+		for(i=start_from_sample; i <= n; i++)
 		{
-			if(clip_exists(i))
+			if(sample_exists(i))
 			{	
-				char description[CLIP_MAX_DESCR_LEN];
-				int end_frame = clip_get_endFrame(i);
-				int start_frame = clip_get_startFrame(i);
+				char description[SAMPLE_MAX_DESCR_LEN];
+				int end_frame = sample_get_endFrame(i);
+				int start_frame = sample_get_startFrame(i);
 				bzero(cmd, 300);
 
-				/* format of clip:
+				/* format of sample:
 				 	00000 : id
 				    000000000 : start    
                                     000000000 : end
                                     xxx: str  : description
 				*/
-				clip_get_description( i, description );
+				sample_get_description( i, description );
 				
 				sprintf(cmd,"%05d%09d%09d%03d%s",
 					i,
@@ -7213,27 +7213,27 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);
 
 	if(args[0] == 0) 
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 
-	if(CLIP_PLAYING(v))
+	if(SAMPLE_PLAYING(v))
 	{
-		if(args[1]==-1) args[1] = clip_get_selected_entry(args[0]);
-		int effect_id = clip_get_effect_any(args[0], args[1]);
+		if(args[1]==-1) args[1] = sample_get_selected_entry(args[0]);
+		int effect_id = sample_get_effect_any(args[0], args[1]);
 		
 		if(effect_id > 0)
 		{
 			int is_video = vj_effect_get_extra_frame(effect_id);
-			int params[CLIP_MAX_PARAMETERS];
+			int params[SAMPLE_MAX_PARAMETERS];
 			int p;
-			int video_on = clip_get_chain_status(args[0],args[1]);
+			int video_on = sample_get_chain_status(args[0],args[1]);
 			int audio_on = 0;
-			//int audio_on = clip_get_chain_audio(args[0],args[1]);
+			//int audio_on = sample_get_chain_audio(args[0],args[1]);
 			int num_params = vj_effect_get_num_params(effect_id);
 			for(p = 0 ; p < num_params; p++)
 			{
-				params[p] = clip_get_effect_arg(args[0],args[1],p);
+				params[p] = sample_get_effect_arg(args[0],args[1],p);
 			}
-			for(p = num_params; p < CLIP_MAX_PARAMETERS; p++)
+			for(p = num_params; p < SAMPLE_MAX_PARAMETERS; p++)
 			{
 				params[p] = 0;
 			}
@@ -7253,8 +7253,8 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 				params[8],
 				video_on,
 				audio_on,
-				clip_get_chain_source(args[0],args[1]),
-				clip_get_chain_channel(args[0],args[1]) 
+				sample_get_chain_source(args[0],args[1]),
+				sample_get_chain_channel(args[0],args[1]) 
 			);				
 			error = 0;
 		}
@@ -7268,7 +7268,7 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 		if(effect_id > 0)
 		{
 			int is_video = vj_effect_get_extra_frame(effect_id);
-			int params[CLIP_MAX_PARAMETERS];
+			int params[SAMPLE_MAX_PARAMETERS];
 			int p;
 			int num_params = vj_effect_get_num_params(effect_id);
 			int video_on = vj_tag_get_chain_status(args[0], args[1]);
@@ -7276,7 +7276,7 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 			{
 				params[p] = vj_tag_get_effect_arg(args[0],args[1],p);
 			}
-			for(p = num_params; p < CLIP_MAX_PARAMETERS;p++)
+			for(p = num_params; p < SAMPLE_MAX_PARAMETERS;p++)
 			{
 				params[p] = 0;
 			}
@@ -7319,7 +7319,7 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 
 	if(args[0] == 0) 
 	{
-		args[0] = v->uc->clip_id;
+		args[0] = v->uc->sample_id;
 	}
 
 	bzero( _s_print_buf,SEND_BUF);
@@ -7327,19 +7327,19 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 
 	sprintf( _s_print_buf, "%03d",0 );
 
-	if(CLIP_PLAYING(v))
+	if(SAMPLE_PLAYING(v))
 	{
-		if(args[0] == -1) args[0] = clip_size()-1;
+		if(args[0] == -1) args[0] = sample_size()-1;
 
-		for(i=0; i < CLIP_MAX_EFFECTS; i++)
+		for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
 		{
-			int effect_id = clip_get_effect_any(args[0], i);
+			int effect_id = sample_get_effect_any(args[0], i);
 			if(effect_id > 0)
 			{
 				int is_video = vj_effect_get_extra_frame(effect_id);
-				int using_effect = clip_get_chain_status(args[0], i);
+				int using_effect = sample_get_chain_status(args[0], i);
 				int using_audio = 0;
-				//int using_audio = clip_get_chain_audio(args[0],i);
+				//int using_audio = sample_get_chain_audio(args[0],i);
 				sprintf(line,"%02d%03d%1d%1d%1d",
 					i,
 					effect_id,
@@ -7358,7 +7358,7 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 	{
 		if(args[0] == -1) args[0] = vj_tag_size()-1;
 
-		for(i=0; i < CLIP_MAX_EFFECTS; i++) 
+		for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
 		{
 			int effect_id = vj_tag_get_effect_any(args[0], i);
 			if(effect_id > 0)
@@ -7381,7 +7381,7 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 	SEND_MSG(v, _s_print_buf);
 }
 
-void	vj_event_send_clip_history_list	(	void *ptr,	const char format[],	va_list ap	)
+void	vj_event_send_sample_history_list	(	void *ptr,	const char format[],	va_list ap	)
 {
 	int args[2];
 	char *s = NULL;
@@ -7390,31 +7390,31 @@ void	vj_event_send_clip_history_list	(	void *ptr,	const char format[],	va_list a
 
 	if(args[0] == 0)
 	{
-		if(CLIP_PLAYING(v))
-			args[0] = v->uc->clip_id;
+		if(SAMPLE_PLAYING(v))
+			args[0] = v->uc->sample_id;
 	}
-	if(args[0] == -1) args[0] = clip_size()-1;
+	if(args[0] == -1) args[0] = sample_size()-1;
 
 	bzero( _s_print_buf,SEND_BUF);
 	bzero( _print_buf, SEND_BUF);
 
 	sprintf( _s_print_buf, "%03d", 0 );
 
-	if(clip_exists(args[0]))
+	if(sample_exists(args[0]))
 	{
 		int entry = 0;
 		int id = args[0];
-		clip_info *clip = clip_get( id );
+		sample_info *sample = sample_get( id );
 		char hisline[25];
 		
-		for( entry = 0; entry < CLIP_MAX_RENDER; entry ++ )
+		for( entry = 0; entry < SAMPLE_MAX_RENDER; entry ++ )
 		{	
-			editlist **el = (editlist**) clip_get_user_data( id );
+			editlist **el = (editlist**) sample_get_user_data( id );
 			bzero(hisline,25);
 			if(el && el[entry])
 				sprintf(hisline,"%02d%010d%010d",
-					entry, (int)clip->first_frame[entry],
-					(int) clip->last_frame[entry] );
+					entry, (int)sample->first_frame[entry],
+					(int) sample->last_frame[entry] );
 			else
 				sprintf(hisline,"%02d%010d%010d", entry, 0, 0 );
 			strncat( _print_buf, hisline, strlen(hisline ));
@@ -7764,7 +7764,7 @@ void	vj_event_set_stream_color(void *ptr, const char format[], va_list ap)
 	
 	if(STREAM_PLAYING(v))
 	{
-		if(args[0] == 0 ) args[0] = v->uc->clip_id;
+		if(args[0] == 0 ) args[0] = v->uc->sample_id;
 		if(args[0] == -1) args[0] = vj_tag_size()-1;
 	}
 	// allow changing of color while playing plain/sample

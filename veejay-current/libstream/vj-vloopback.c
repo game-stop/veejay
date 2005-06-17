@@ -353,7 +353,7 @@ int	vj_vloopback_ioctl( void *vloop, unsigned long int cmd, void *arg )
 			vidwin->height=v->height;
 			vidwin->chromakey=0; 
 			vidwin->flags=0;
-			vidwin->clipcount=0;
+			vidwin->samplecount=0;
 			break;
 		}
 		case VIDIOCSWIN:
