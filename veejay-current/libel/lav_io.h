@@ -66,6 +66,9 @@ typedef struct
 #endif
    int         jpeg_fd;
    char        *jpeg_filename;
+#ifdef USE_GDK_PIXBUF
+   void	       *picture;
+#endif
    int         format;
    int         interlacing;
    int         sar_w;  /* "clip aspect ratio" width  */
@@ -113,5 +116,8 @@ int  lav_get_field_size(uint8_t * jpegdata, long jpeglen);
 const char *lav_strerror(void);
 int  lav_fileno( lav_file_t *lav_file );
 void lav_set_default_chroma(int c);
-
+#ifdef USE_GDK_PIXBUF
+uint8_t *lav_get_frame_ptr( lav_file_t *lav_file );
+void	lav_set_project( int w, int h, float fps, int shift );
+#endif
 #endif

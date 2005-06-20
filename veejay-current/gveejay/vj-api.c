@@ -82,7 +82,6 @@ enum
 	STREAM_GREEN = 8,
 	STREAM_YELLOW = 7,
 	STREAM_BLUE = 6,
-	STREAM_BLACK = 5,
 	STREAM_WHITE = 4,
 	STREAM_VIDEO4LINUX = 2,
 	STREAM_DV1394 = 17,
@@ -90,6 +89,7 @@ enum
 	STREAM_MCAST = 14,
 	STREAM_YUV4MPEG = 1,
 	STREAM_AVFORMAT = 12,
+	STREAM_PICTURE = 5,
 };
 
 enum
@@ -992,17 +992,16 @@ gchar *dialog_open_file(const char *title)
 				GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
 				GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
 				NULL);
-
+	gchar *file = NULL;
+	
 	if( gtk_dialog_run( GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
 	{
-		gchar *file = gtk_file_chooser_get_filename(
+		file = gtk_file_chooser_get_filename(
 				GTK_FILE_CHOOSER(dialog) );
-		gtk_widget_destroy(dialog);
-		return file;
 	}
 
-	gtk_widget_destroy(dialog);
-	return NULL;
+	gtk_widget_destroy(GTK_WIDGET(dialog));
+	return file;
 }
 
 
@@ -3239,6 +3238,7 @@ static	void	load_samplelist_info(const char *name)
 				case STREAM_YUV4MPEG	:sprintf(source,"(Streaming from Yuv4Mpeg file)");break;
 				case STREAM_AVFORMAT	:sprintf(source,"(Streaming from libavformat");break;
 				case STREAM_DV1394	:sprintf(source,"(Streaming from DV1394 Camera");break;
+				case STREAM_PICTURE	:sprintf(source,"(Streaming from Image");break;
 				default:
 					sprintf(source,"(Streaming from unknown)");	
 			}
@@ -4078,7 +4078,6 @@ static	void	reload_editlist_contents()
 	gint len = 0;
 	single_vims( VIMS_EDITLIST_LIST );
 	gchar *eltext = recv_vims(6,&len); // msg len
-
 	gint 	offset = 0;
 	gint	num_files=0;
 
@@ -4142,6 +4141,7 @@ static	void	reload_editlist_contents()
 
 		if(nl < 0 || nl >= num_files)
 		{
+			printf("exceed max files\n");
 			return;
 		}
 		int file_len = _el_get_nframes( nl );

@@ -45,6 +45,10 @@
 #endif
 #include <veejay/vj-plugin.h>
 
+#ifdef USE_GDK_PIXBUF
+#include <libel/pixbuf.h>
+#endif
+
 /* Highest possible SDL Key identifier */
 #define MAX_SDL_KEY	(3 * SDLK_LAST) + 1  
 #define MSG_MIN_LEN	  4 /* stripped ';' */
@@ -401,6 +405,10 @@ static struct {
 		vj_event_tag_new_mcast, 	 2, 	"%d %s", 	{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS },	
 	{ VIMS_STREAM_NEW_AVFORMAT,		"Stream: open file as stream with FFmpeg",
 		vj_event_tag_new_avformat,	 1,	"%s",		{0,0}, VIMS_LONG_PARAMS	| VIMS_REQUIRE_ALL_PARAMS },
+#ifdef USE_GDK_PIXBUF
+	{ VIMS_STREAM_NEW_PICTURE,		"Stream: open image from file",
+		vj_event_tag_new_picture,	1,	"%s",		{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS },
+#endif
 	{ VIMS_STREAM_OFFLINE_REC_START,	"Stream: start record from an invisible stream",
 		vj_event_tag_rec_offline_start,  3,	"%d %d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	}, 
 	{ VIMS_STREAM_OFFLINE_REC_STOP,		"Stream: stop record from an invisible stream",
@@ -525,9 +533,14 @@ static struct {
 	{ VIMS_BUNDLE_ATTACH_KEY,		"Attach/Detach a Key to VIMS event",
 		vj_event_attach_detach_key,	4,	"%d %d %d %s",	{0,0}, VIMS_ALLOW_ANY 	},
 #endif
+#ifdef USE_GDK_PIXBUF
+	{ VIMS_SCREENSHOT,			"Various: Save image to file",
+		vj_event_screenshot,		3,	"%d %d %s",	{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS  },
+#else
 #ifdef HAVE_JPEG
-	{ VIMS_SCREENSHOT,			"Various: Save frame to jpeg",
-		vj_event_screenshot,		1,	"%s",		{0,0}, VIMS_LONG_PARAMS | VIMS_ALLOW_ANY  },
+	{ VIMS_SCREENSHOT,			"Various: Save file to jpeg",
+		vj_event_screenshot,		3,	"%d %d %s",	{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS },
+#endif
 #endif
 	{ VIMS_CHAIN_TOGGLE_ALL,		"Toggle Effect Chain on all samples or streams",
 		vj_event_all_samples_chain_toggle,1,	"%d",		{0,0} , VIMS_REQUIRE_ALL_PARAMS  },
@@ -614,7 +627,6 @@ vj_server_send(v->vjs[3], v->uc->current_link,str,strlen(str));\
 #define p_invalid_mode() {  veejay_msg(VEEJAY_MSG_DEBUG, "Invalid playback mode for this action"); }
 #define v_chi(v) ( (v < 0  || v >= SAMPLE_MAX_EFFECTS ) ) 
 
-/* P_A: Parse Arguments. This macro is used in many functions */
 #define P_A(a,b,c,d)\
 {\
 int __z = 0;\
@@ -5972,6 +5984,21 @@ void vj_event_tag_toggle(void *ptr, const char format[], va_list ap)
 	}
 }
 
+#ifdef USE_GDK_PIXBUF
+void vj_event_tag_new_picture(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	char str[255];
+	int *args = NULL;
+	P_A(args,str,format,ap);
+
+	if( veejay_create_tag(v, VJ_TAG_TYPE_PICTURE, str, v->nstreams,0,0) == -1)
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Picture stream");
+	}	
+}
+#endif
+
 void vj_event_tag_new_avformat(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -5979,7 +6006,7 @@ void vj_event_tag_new_avformat(void *ptr, const char format[], va_list ap)
 	int *args = NULL;
 	P_A(args,str,format,ap);
 
-	if( veejay_create_tag(v, VJ_TAG_TYPE_AVFORMAT, str, v->nstreams,0,0) != 0)
+	if( veejay_create_tag(v, VJ_TAG_TYPE_AVFORMAT, str, v->nstreams,0,0) == -1)
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new FFmpeg stream");
 	}	
@@ -5994,7 +6021,7 @@ void	vj_event_tag_new_dv1394(void *ptr, const char format[], va_list ap)
 
 	if(args[0] == -1) args[0] = 63;
 	veejay_msg(VEEJAY_MSG_DEBUG, "Try channel %d", args[0]);
-	if( veejay_create_tag(v, VJ_TAG_TYPE_DV1394, "/dev/dv1394", v->nstreams,0, args[0]) != 0)
+	if( veejay_create_tag(v, VJ_TAG_TYPE_DV1394, "/dev/dv1394", v->nstreams,0, args[0]) == -1)
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new DV1394 stream");
 	}
@@ -6012,7 +6039,7 @@ void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 
 	sprintf(filename, "video%d", args[0]);
 
-	if( veejay_create_tag(v, VJ_TAG_TYPE_V4L, filename, v->nstreams,0,args[1]) != 0)
+	if( veejay_create_tag(v, VJ_TAG_TYPE_V4L, filename, v->nstreams,0,args[1]) == -1)
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Video4Linux stream ");
 	}	
@@ -6076,7 +6103,7 @@ void vj_event_tag_new_y4m(void *ptr, const char format[], va_list ap)
 	char str[255];
 	int *args = NULL;
 	P_A(args,str,format,ap);
-	if( veejay_create_tag(v, VJ_TAG_TYPE_YUV4MPEG, str, v->nstreams,0,0) != 0)
+	if( veejay_create_tag(v, VJ_TAG_TYPE_YUV4MPEG, str, v->nstreams,0,0) == -1)
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Yuv4mpeg stream");
 	}
@@ -7102,7 +7129,8 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 				char cmd[300];
 				bzero(source_name,200);bzero(cmd,255);
 				bzero(line,300);
-				vj_tag_get_description( i, source_name );
+				//vj_tag_get_description( i, source_name );
+				vj_tag_get_source_name( i, source_name );
 				sprintf(line,"%05d%02d%03d%03d%03d%03d%03d%s",
 					i,
 					vj_tag_get_type(i),
@@ -7783,23 +7811,49 @@ void	vj_event_set_stream_color(void *ptr, const char format[], va_list ap)
 	}
 }
 
+#ifdef USE_GDK_PIXBUF
+void vj_event_screenshot(void *ptr, const char format[], va_list ap)
+{
+	int args[4];
+	char filename[1024];
+	bzero(filename,1024);
+	P_A(args, filename, format, ap );
+	veejay_t *v = (veejay_t*) ptr;
+
+	char type[5];
+	bzero(type,5); 
+
+
+	veejay_get_file_ext( filename, type, sizeof(type));
+
+	if(args[0] == 0 )
+		args[0] = v->video_output_width;
+	if(args[1] == 0 )
+		args[1] = v->video_output_height;
+	
+	v->settings->export_image = 
+		vj_picture_prepare_save( filename , type, args[0], args[1] );
+	if(v->settings->export_image)
+	  v->uc->hackme = 1;
+}
+#else
 #ifdef HAVE_JPEG
 void vj_event_screenshot(void *ptr, const char format[], va_list ap)
 {
-	int *args = NULL;
-	char s[1024];
-	bzero(s,1024);
+	int args[4];
+	char filename[1024];
+	bzero(filename,1024);
+	P_A(args, filename, format, ap );
+	veejay_t *v = (veejay_t*) ptr;
 
-	P_A(args,s,format,ap);
-
-	veejay_t *v = (veejay_t*)ptr;
-    	v->uc->hackme = 1;
-	if( strncasecmp(s, "(NULL)", 6) == 0  )
-		v->uc->filename = NULL;
-	else
-		v->uc->filename = strdup( s );
-	
+	v->uc->hackme = 1;
+	v->uc->filename = strdup( filename );
 }
+#endif
+#endif
+
+
+
 
 void		vj_event_quick_bundle( void *ptr, const char format[], va_list ap)
 {
@@ -7873,4 +7927,3 @@ void	vj_event_vloopback_stop( void *ptr, const char format[], va_list ap )
 #endif
 
 
-#endif

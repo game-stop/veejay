@@ -31,7 +31,9 @@
 #include <libel/lav_io.h>
 //#include <veejay/vj-lib.h>
 #include <libvjmsg/vj-common.h>
-
+#ifdef USE_GDK_PIXBUF
+#include <libel/pixbuf.h>
+#endif
 extern int AVI_errno;
 static int _lav_io_default_chroma = CHROMAUNKNOWN;
 static char video_format=' ';
@@ -51,6 +53,22 @@ static unsigned long jpeg_data_offset    = 0;
 static unsigned long jpeg_padded_len     = 0;
 static unsigned long jpeg_app0_offset    = 0;
 static unsigned long jpeg_app1_offset    = 0;
+
+#ifdef USE_GDK_PIXBUF
+static int 		output_scale_width = 0;
+static int		output_scale_height = 0;
+static float		output_fps = 25.0;
+static int 		output_yuv = 0; // 422
+
+void	lav_set_project(int w, int h, float f, int fmt)
+{
+	output_scale_width = w;
+	output_scale_height = h;
+	output_fps = f;
+	output_yuv = fmt;
+}
+
+#endif
 
 #define M_SOF0  0xC0
 #define M_SOF1  0xC1
@@ -244,6 +262,7 @@ int lav_query_polarity(char format)
       case 'j': return LAV_INTER_TOP_FIRST;
       case 'q': return LAV_INTER_TOP_FIRST;
       case 'm': return LAV_INTER_TOP_FIRST;
+      case 'x': return LAV_NOT_INTERLACED; // picture is always not interlaced
       default:  return LAV_INTER_TOP_FIRST;
    }
 }
@@ -321,6 +340,7 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 		  if(asize) AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
 		  return lav_fd;
 	}
+	if(lav_fd) free(lav_fd);
 	return NULL;
 }
 
@@ -328,16 +348,27 @@ int lav_close(lav_file_t *lav_file)
 {
 	int ret = 0;
     video_format = lav_file->format; internal_error = 0; /* for error messages */
+	switch(video_format)
+	{
 #ifdef SUPPORT_READ_DV2
-	if(video_format == 'b')
-		ret = rawdv_close(lav_file->dv_fd );
-	else	
+		case 'b':
+			ret = rawdv_close(lav_file->dv_fd);
+			break;
 #endif
-  	 ret = AVI_close( lav_file->avi_fd );
+#ifdef USE_GDK_PIXBUF
+		case 'x':
+			vj_picture_cleanup( lav_file->picture );
+			ret = 1;
+			break;
+#endif
+		default:
+			ret = AVI_close(lav_file->avi_fd);
+			break;
+	}
 
-    if(lav_file) free(lav_file);
+        if(lav_file) free(lav_file);
     
-    return 1;
+    	return ret;
 }
 
 int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
@@ -352,7 +383,10 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
 	return -1;
 #endif
    /* For interlaced video insert the apropriate APPn markers */
-
+#ifdef USE_GDK_PIXBUF
+    if(video_format == 'x')
+	return -1;
+#endif
    if(lav_file->interlacing!=LAV_NOT_INTERLACED && (lav_file->format == 'a' || lav_file->format=='A'))
    {
             jpgdata = buff;
@@ -404,6 +438,10 @@ int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
    if(video_format == 'b')
 	return 0;
 #endif
+#ifdef USE_GDK_PIXBUF
+   if(video_format == 'x')
+	return 0;
+#endif
    return AVI_write_audio( lav_file->avi_fd, buff, samps*lav_file->bps);
 }
 
@@ -416,6 +454,10 @@ long lav_video_frames(lav_file_t *lav_file)
    if(video_format == 'b')
 	return rawdv_video_frames(lav_file->dv_fd);
 #endif
+#ifdef USE_GDK_PIXBUF
+   if(video_format == 'x')
+	return 2;
+#endif
    return AVI_video_frames(lav_file->avi_fd);
 }
 
@@ -425,6 +467,10 @@ int lav_video_width(lav_file_t *lav_file)
 #ifdef SUPPORT_READ_DV2
 	if(video_format=='b')
 		return rawdv_width(lav_file->dv_fd);
+#endif
+#ifdef USE_GDK_PIXBUF
+ 	if(video_format=='x')
+		return (output_scale_width == 0 ? vj_picture_get_width( lav_file->picture ) : output_scale_width);
 #endif
    return AVI_video_width(lav_file->avi_fd);
 }
@@ -436,6 +482,10 @@ int lav_video_height(lav_file_t *lav_file)
 	if(video_format == 'b')
 		return rawdv_height( lav_file->dv_fd );
 #endif
+#ifdef USE_GDK_PIXBUF
+	if(video_format == 'x')
+		return (output_scale_height == 0 ? vj_picture_get_height( lav_file->picture ) : output_scale_height);
+#endif
    return AVI_video_height(lav_file->avi_fd);
 }
 
@@ -446,6 +496,10 @@ double lav_frame_rate(lav_file_t *lav_file)
 	if(video_format == 'b')
 		return rawdv_fps(lav_file->dv_fd);
 #endif
+#ifdef USE_GDK_PIXBUF
+	if(video_format == 'x')
+		return output_fps;
+#endif
    return AVI_frame_rate(lav_file->avi_fd);
 }
 
@@ -454,6 +508,10 @@ int lav_video_interlacing(lav_file_t *lav_file)
 #ifdef SUPPORT_READ_DV2
 	if(video_format == 'b')
 		return rawdv_interlacing(lav_file->dv_fd);
+#endif
+#ifdef USE_GDK_PIXBUF
+	if(video_format == 'x')
+		return LAV_NOT_INTERLACED;
 #endif
    return lav_file->interlacing;
 }
@@ -480,6 +538,10 @@ int lav_video_compressor_type(lav_file_t *lav_file)
 	if(lav_file->format == 'b')
 		return rawdv_compressor( lav_file->dv_fd );
 #endif
+#ifdef USE_GDK_PIXBUF
+	if(lav_file->format == 'x')
+		return 0xffff;
+#endif
 	return AVI_video_compressor_type( lav_file->avi_fd );
 }
 
@@ -490,6 +552,13 @@ const char *lav_video_compressor(lav_file_t *lav_file)
    if( video_format == 'b' )
    {
 	const char *tmp = (const char*) strdup("dvsd");
+	return tmp;
+   }
+#endif
+#ifdef USE_GDK_PIXBUF
+   if( video_format == 'x')
+   {
+	const char *tmp = (const char*) strdup("PICT");
 	return tmp;
    }
 #endif
@@ -504,6 +573,10 @@ int lav_audio_channels(lav_file_t *lav_file)
    if(video_format == 'b')
 	return rawdv_audio_channels(lav_file->dv_fd);
 #endif
+#ifdef USE_GDK_PIXBUF
+   if(video_format == 'x')
+	return 0;
+#endif
    return AVI_audio_channels(lav_file->avi_fd);
 }
 
@@ -514,6 +587,10 @@ int lav_audio_bits(lav_file_t *lav_file)
 #ifdef SUPPORT_READ_DV2
    if(video_format == 'b')
 	return rawdv_audio_bits(lav_file->dv_fd);
+#endif
+#ifdef USE_GDK_PIXBUF
+	if(video_format == 'x' )
+		return 0;
 #endif
    return (AVI_audio_bits(lav_file->avi_fd));
 }
@@ -526,6 +603,10 @@ long lav_audio_rate(lav_file_t *lav_file)
 	if(video_format=='b')
 	 return rawdv_audio_rate(lav_file->dv_fd);
 #endif
+#ifdef USE_GDK_PIXBUF
+	if(video_format == 'x')
+		return 0;
+#endif
    return (AVI_audio_rate(lav_file->avi_fd));
 }
 
@@ -537,6 +618,10 @@ long lav_audio_clips(lav_file_t *lav_file)
    if(video_format=='b')
 	return rawdv_audio_bps(lav_file->dv_fd);
 #endif
+#ifdef USE_GDK_PIXBUF
+	if(video_format == 'x')
+		return 0;
+#endif
    return (AVI_audio_bytes(lav_file->avi_fd)/lav_file->bps);
 }
 
@@ -546,6 +631,10 @@ long lav_frame_size(lav_file_t *lav_file, long frame)
 #ifdef SUPPORT_READ_DV2
    if(video_format == 'b')
 	return rawdv_frame_size( lav_file->dv_fd );
+#endif
+#ifdef USE_GDK_PIXBUF
+	if(video_format == 'x')
+		return 1;
 #endif
    return (AVI_frame_size(lav_file->avi_fd,frame));
 }
@@ -557,6 +646,10 @@ int lav_seek_start(lav_file_t *lav_file)
    if(video_format == 'b')
 	return rawdv_set_position( lav_file->dv_fd, 0 );
 #endif
+#ifdef USE_GDK_PIXBUF
+   if(video_format == 'x')
+	return 1;
+#endif
    return (AVI_seek_start(lav_file->avi_fd));
 }
 
@@ -567,33 +660,37 @@ int lav_set_video_position(lav_file_t *lav_file, long frame)
    if(video_format == 'b')
 	return rawdv_set_position( lav_file->dv_fd, frame );
 #endif
+#ifdef USE_GDK_PIXBUF
+   if(video_format == 'x')
+	return 1;
+#endif
    return (AVI_set_video_position(lav_file->avi_fd,frame));
 }
 
 int lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
-#ifdef HAVE_MLT
-   if(lav_file->format == 't')
-	{
-	    mlt_frame frame;
-		mlt_service_get_frame( mlt_producer( lav_file->producer ), &frame, 0);
-	 	mlt_properties_set(
-			mlt_frame_properties( frame ), "rescale.interp", "full");
-		mlt_frame_get_image( frame, &_tmp_buffer, lav_file->iformat, lav_file->out_width,
-			lav_file->out_height , 0);
-		// convert to planar (mlt gives 422 packed)
-		// convert tmp_buffer to vidbuf , set flag as YUV 4:2:2 planar
-	}
-#endif
 #ifdef SUPPORT_READ_DV2
     if(lav_file->format == 'b')
 	{
 		return rawdv_read_frame( lav_file->dv_fd, vidbuf );
 	}
 #endif
+#ifdef USE_GDK_PIXBUF
+	if(lav_file->format == 'x')
+	return -1;
+#endif
    return (AVI_read_frame(lav_file->avi_fd,vidbuf));
 }
+
+#ifdef USE_GDK_PIXBUF
+uint8_t *lav_get_frame_ptr( lav_file_t *lav_file )
+{
+	if(lav_file->format == 'x')
+		return vj_picture_get( lav_file->picture );
+	return NULL;
+}
+#endif
 
 int lav_is_DV(lav_file_t *lav_file)
 {
@@ -612,6 +709,10 @@ int lav_set_audio_position(lav_file_t *lav_file, long clip)
    if(video_format == 'b')
 	return 0;
 #endif
+#ifdef USE_GDK_PIXBUF
+   if(video_format == 'x')
+	return 0;
+#endif
    return (AVI_set_audio_position(lav_file->avi_fd,clip*lav_file->bps));
 }
 
@@ -625,6 +726,10 @@ long lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps)
 #ifdef SUPPORT_READ_DV2
 	if(video_format == 'b')
 		return rawdv_read_audio_frame( lav_file->dv_fd, audbuf );
+#endif
+#ifdef USE_GDK_PIXBUF
+   if(video_format == 'x')
+	return 0;
 #endif
    video_format = lav_file->format; internal_error = 0; /* for error messages */
    return (AVI_read_audio(lav_file->avi_fd,audbuf,samps*lav_file->bps)/lav_file->bps);
@@ -654,6 +759,9 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 #ifdef SUPPORT_READ_DV2
    lav_fd->dv_fd	= 0;
 #endif
+#ifdef USE_GDK_PIXBUF
+   lav_fd->picture	= NULL;
+#endif
    lav_fd->format      = 0;
    lav_fd->interlacing = LAV_INTER_UNKNOWN;
    lav_fd->sar_w       = 0; /* (0,0) == unknown */
@@ -682,6 +790,21 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
    }
    else if( AVI_errno==AVI_ERR_NO_AVI )
    {
+	int ret = 0;
+#ifdef USE_GDK_PIXBUF
+		lav_fd->picture = vj_picture_open( (const char*) filename,
+				output_scale_width, output_scale_height, output_yuv );
+		if(lav_fd->picture)
+		{
+			lav_fd->format = 'x';
+			lav_fd->has_audio = 0;
+			video_comp = strdup( "PICT" );
+			ret = 1;
+		}
+		else
+		{
+#endif
+
 #ifdef SUPPORT_READ_DV2
 		lav_fd->dv_fd = rawdv_open_input_file(filename,mmap_size);
 	  	if(lav_fd->dv_fd)
@@ -690,22 +813,33 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 			lav_fd->has_audio = 0;
 			//(rawdv_audio_bits(lav_fd->dv_fd) > 0 ? 1:0);
 			video_comp = rawdv_video_compressor( lav_fd->dv_fd );
+			ret = 1;
 	    	}
-		else
-		{
 #endif
-	   	 free(lav_fd);
-	   	 internal_error = ERROR_FORMAT; /* Format not recognized */
-		 veejay_msg(VEEJAY_MSG_ERROR, "Unable to identify file");
-	   	 return 0;
-#ifdef SUPPORT_READ_DV2
- 		  }
-#endif
+#ifdef USE_GDK_PIXBUF
+		}
+#endif	
+	if(ret == 0)
+	{
+		free(lav_fd);
+		internal_error = ERROR_FORMAT; /* Format not recognized */
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to identify file '%s'", filename);
+		return 0;
 	}
+   }
 
    lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
 
    if(lav_fd->bps==0) lav_fd->bps=1; /* make it save since we will divide by that value */
+
+   if(strncasecmp(video_comp, "PICT",4) == 0 )
+   {
+	lav_fd->MJPG_chroma = (output_yuv == 1 ? CHROMA420: CHROMA422 );
+	lav_fd->format = 'x';
+	lav_fd->interlacing = LAV_NOT_INTERLACED;
+	veejay_msg(VEEJAY_MSG_DEBUG, "Playing image");
+	return lav_fd;
+   }
 
    if(strncasecmp(video_comp, "div3",4)==0) {
 		lav_fd->MJPG_chroma = CHROMA420;

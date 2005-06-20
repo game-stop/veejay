@@ -40,6 +40,10 @@
 #define VIDEO_PALETTE_YUV422P 13
 #endif
 
+#ifdef USE_GDK_PIXBUF
+#include <libel/pixbuf.h>
+#endif
+
 #ifdef SUPPORT_READ_DV2
 #include <libstream/vj-dv1394.h>
 #endif
@@ -308,7 +312,6 @@ int _vj_tag_new_v4l(vj_tag * tag, int stream_nr, int width, int height,
     return 1;
 }
 #endif
-
 int _vj_tag_new_avformat( vj_tag *tag, int stream_nr, editlist *el)
 {
 	int stop = 0;
@@ -340,6 +343,30 @@ int _vj_tag_new_avformat( vj_tag *tag, int stream_nr, editlist *el)
 
 	return 1;
 }
+#ifdef USE_GDK_PIXBUF
+int _vj_tag_new_picture( vj_tag *tag, int stream_nr, editlist *el)
+{
+	int stop = 0;
+	if(stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN) return 0;
+	vj_picture *p =	NULL;
+
+	if( vj_picture_probe( tag->source_name ) == 0 )
+		return 0;
+
+ 	p = (vj_picture*) vj_malloc(sizeof(vj_picture));
+	if(!p)
+		return 0;
+	memset(p, 0, sizeof(vj_picture));
+
+	vj_tag_input->picture[stream_nr] = p;
+
+	veejay_msg(VEEJAY_MSG_INFO, "Opened [%s] , %d x %d @ %2.2f fps ",
+			tag->source_name,
+			el->video_width, el->video_height, el->video_fps );
+
+	return 1;
+}
+#endif
 
 int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el)
 {
@@ -520,7 +547,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     switch (type) {
 #ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
-	sprintf(tag->source_name, "/dev/%s", filename);
+	sprintf(tag->source_name, "/dev/%s/%d", filename,channel);
 	if (_vj_tag_new_v4l
 	    (tag, stream_nr, w, h, el->video_norm, palette,0,channel ) != 1)
 	    return -1;
@@ -534,7 +561,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	break;
     case VJ_TAG_TYPE_DV1394:
 #ifdef SUPPORT_READ_DV2
-	sprintf(tag->source_name, "/dev/dv1394");
+	sprintf(tag->source_name, "/dev/dv1394/%d", channel);
 	if( _vj_tag_new_dv1394( tag, stream_nr,channel,1,el ) == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "error opening dv1394");
@@ -552,6 +579,13 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 		return -1;
 	tag->active = 1;
 	break;
+#ifdef USE_GDK_PIXBUF
+	case VJ_TAG_TYPE_PICTURE:
+	sprintf(tag->source_name, "%s", filename);
+	if( _vj_tag_new_picture(tag, stream_nr, el) != 1 )
+		return -1;
+	break;
+#endif
     case VJ_TAG_TYPE_YUV4MPEG:
 	sprintf(tag->source_name, "%s", filename);
 	if (_vj_tag_new_yuv4mpeg(tag, stream_nr, el) != 1)
@@ -575,7 +609,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     case VJ_TAG_TYPE_BLUE:
 */
 	case VJ_TAG_TYPE_COLOR:
-	sprintf(tag->source_name, "solid-[%d,%d,%d]",
+	sprintf(tag->source_name, "[%d,%d,%d]",
 		tag->color_r,tag->color_g,tag->color_b );
 	tag->active = 1;	
 	break;
@@ -679,6 +713,18 @@ int vj_tag_del(int id)
 		veejay_msg(VEEJAY_MSG_INFO, "Closing avformat stream %s", tag->source_name);
 		vj_avformat_close_input( vj_tag_input->avformat[tag->index]);
 	break;
+#ifdef USE_GDK_PIXBUF
+	case VJ_TAG_TYPE_PICTURE:
+		veejay_msg(VEEJAY_MSG_INFO, "Closing picture stream %s", tag->source_name);
+		vj_picture *pic = vj_tag_input->picture[tag->index];
+		if(pic)
+		{
+			vj_picture_cleanup( pic->pic );
+			free( pic );
+		}
+		vj_tag_input->picture[tag->index] = NULL;
+		break;
+#endif
 	case VJ_TAG_TYPE_SHM:
 		veejay_msg(VEEJAY_MSG_INFO, "huh ?");
 		break;
@@ -1493,6 +1539,15 @@ int vj_tag_disable(int t1) {
 		vj_client_close( vj_tag_input->net[tag->index] );
 		veejay_msg(VEEJAY_MSG_DEBUG, "Disconnected from %s", tag->source_name);
 	}
+	if(tag->source_type == VJ_TAG_TYPE_PICTURE )
+	{
+		vj_picture *pic = vj_tag_input->picture[tag->index];
+		if(pic)
+		{
+			vj_picture_cleanup( pic->pic );
+		}
+		vj_tag_input->picture[tag->index] = pic;
+	}
 	tag->active = 0;
 	if(!vj_tag_update(tag,t1)) return -1;
 	return 1;
@@ -1501,6 +1556,8 @@ int vj_tag_disable(int t1) {
 int vj_tag_enable(int t1) {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return -1;
+
+	veejay_msg(VEEJAY_MSG_INFO, "Enable stream %d", t1 );
 
 	if(tag->active ) 
 	{
@@ -1535,7 +1592,19 @@ int vj_tag_enable(int t1) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "Streaming from %s", tag->source_name );
 		
 	}
+	if( tag->source_type == VJ_TAG_TYPE_PICTURE )
+	{
+		vj_picture *p = vj_tag_input->picture[ tag->index ];
+		p->pic = vj_picture_open( tag->source_name, 
+			vj_tag_input->width, vj_tag_input->height,
+			vj_tag_input->pix_fmt == FMT_420 ? 1:0);
 
+		if(!p->pic)
+			return -1;
+
+		vj_tag_input->picture[tag->index] = p;
+		veejay_msg(VEEJAY_MSG_DEBUG, "Streaming from picture '%s'", tag->source_name );
+	}
 
 	tag->active = 1;
 	if(!vj_tag_update(tag,t1)) return -1;
@@ -1591,6 +1660,7 @@ int vj_tag_set_active(int t1, int active)
 	break;
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
+	case VJ_TAG_TYPE_PICTURE:
 		if(active == 1 )
 			vj_tag_enable( t1 );
 		else
@@ -1751,7 +1821,7 @@ void vj_tag_get_source_name(int t1, char *dst)
     if (tag) {
 	sprintf(dst, tag->source_name);
     } else {
-	sprintf(dst, "error in tag %d", t1);
+	vj_tag_get_description( tag->source_type, dst );
     }
 }
 
@@ -1782,6 +1852,11 @@ void	vj_tag_get_by_type(int type, char *description )
     case VJ_TAG_TYPE_AVFORMAT:
 	sprintf(description, "%s", "AVFormat");
 	break;
+#ifdef USE_GDK_PIXBUF
+	case VJ_TAG_TYPE_PICTURE:
+	sprintf(description, "%s", "GdkPixbuf");
+	break;
+#endif
 #ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
 	sprintf(description, "%s", "Video4Linux");
@@ -1954,7 +2029,8 @@ int vj_tag_get_audio_frame(int t1, uint8_t *dst_buffer)
 #endif
 	if(tag->source_type == VJ_TAG_TYPE_AVFORMAT)
 		return (vj_avformat_get_audio( vj_tag_input->avformat[tag->index], dst_buffer, -1 ));
-    return 0;    
+
+	return 0;    
 }
 
 
@@ -1969,6 +2045,9 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
     int uv_len = (vj_tag_input->width * vj_tag_input->height);
     int len = (width * height);
     char buf[10];
+#ifdef USE_GDK_PIXBUF
+	vj_picture *p = NULL;
+#endif
 	vj_client *v;
 	if(!tag) return -1;  
 
@@ -2000,6 +2079,21 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	    return -1;
 
 	break;
+#endif
+#ifdef USE_GDK_PIXBUF
+	case VJ_TAG_TYPE_PICTURE:
+		p = vj_tag_input->picture[tag->index];
+		if(!p)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Picture never opened");
+			vj_tag_disable(t1);
+			return -1;
+		}
+		address = vj_picture_get( p->pic );
+		veejay_memcpy(buffer[0],address, len);
+		veejay_memcpy(buffer[1],address + len, uv_len);
+		veejay_memcpy(buffer[2],address + len + uv_len, uv_len);
+		break;
 #endif
     case VJ_TAG_TYPE_AVFORMAT:
 	if(!vj_avformat_get_video_frame( vj_tag_input->avformat[tag->index], buffer, -1,

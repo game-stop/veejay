@@ -47,6 +47,7 @@ static void vj_flush(int frames) {
 	char status[100];
 	int bytes = 100;
 	bzero(status,100);
+
 	while(frames>0) {
 		if( vj_client_poll(sayvims, V_STATUS ))
 		{
@@ -254,8 +255,11 @@ int main(int argc, char *argv[])
 		vj_flush(1);
 	}
 	if ( interactive )
+	{
+		vj_client_close( sayvims );
+		vj_client_free(sayvims );
 		return 0;
-
+	}
 	if(single_msg || (optind == 1 && err == 0 && argc > 1 )) 
 	{
 		char **msg = argv + optind;
@@ -283,37 +287,36 @@ int main(int argc, char *argv[])
 			}
 			i++;
 		}
-		
-		vj_client_close(sayvims);
-		vj_client_free(sayvims);
-		return 0;
 	}
 	else
 	{
-	/* read from stdin*/
-	int not_done = 1;
-	infile = fdopen( fd_in, "r" );
-	if(!infile)
-	{
-		return 0;
-	}
-	while( fgets(buf, 4096, infile) )
-	{
-		if( buf[0] == '+' )
+		/* read from stdin*/
+		int not_done = 1;
+		infile = fdopen( fd_in, "r" );
+		if(!infile)
 		{
-			int wait_ = 1;
-	
-			if(!sscanf( buf+1, "%d", &wait_ ) )
+			return 0;
+		}
+		while( fgets(buf, 4096, infile) )
+		{
+			if( buf[0] == '+' )
 			{
-				return 0;
+				int wait_ = 1;
+		
+				if(!sscanf( buf+1, "%d", &wait_ ) )
+				{
+					return 0;
+				}
+				vj_flush( wait_ );
 			}
-			vj_flush( wait_ );
-		}
-		else
-		{
-			vj_client_send( sayvims, V_CMD, buf );
+			else
+			{
+				vj_client_send( sayvims, V_CMD, buf );
+			}
 		}
 	}
-	}
+	veejay_msg(VEEJAY_MSG_INFO, "closing ...");	
+	vj_client_close(sayvims);
+	vj_client_free(sayvims);
         return 0;
 } 

@@ -19,7 +19,7 @@
 #ifndef VJ_TAG_H
 #define VJ_TAG_H
 
-
+#define VJ_TAG_TYPE_PICTURE 5
 #define VJ_TAG_TYPE_COLOR 4
 #define VJ_TAG_TYPE_VLOOPBACK 3
 #define VJ_TAG_TYPE_V4L 2
@@ -29,7 +29,7 @@
 #define VJ_TAG_TYPE_NET 13
 #define VJ_TAG_TYPE_MCAST 14
 #define VJ_TAG_MAX_V4L 16
-#define VJ_TAG_MAX_STREAM_IN 16
+#define VJ_TAG_MAX_STREAM_IN 255
 #define VJ_TAG_TYPE_DV1394 17
 #define VJ_TAG_TYPE_AVFORMAT 12
 #define TAG_MAX_DESCR_LEN 150
@@ -42,6 +42,12 @@
 #include <libvjnet/vj-client.h>
 #include <libel/vj-avformat.h>
 #include <libstream/vj-dv1394.h>
+#ifdef USE_GDK_PIXBUF
+typedef struct
+{
+	void *pic;
+} vj_picture;
+#endif
 
 typedef struct {
 #ifdef HAVE_V4L
@@ -51,6 +57,9 @@ typedef struct {
     vj_avformat *avformat[VJ_TAG_MAX_STREAM_IN];
 	vj_client *net[VJ_TAG_MAX_STREAM_IN];
     vj_dv1394 *dv1394[VJ_TAG_MAX_STREAM_IN];
+#ifdef USE_GDK_PIXBUF
+	vj_picture *picture[VJ_TAG_MAX_STREAM_IN];
+#endif  
     int width;
     int height;
     int depth;

@@ -674,7 +674,8 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
 	{
 		int cur_id = info->uc->sample_id;
-		if( vj_tag_get_type( cur_id ) == VJ_TAG_TYPE_NET && cur_id != sample_id )
+		int type = vj_tag_get_type( cur_id );
+		if( (type == VJ_TAG_TYPE_NET||type==VJ_TAG_TYPE_PICTURE) && cur_id != sample_id )
 		{
 			vj_tag_disable(cur_id);
 		}	
@@ -946,14 +947,34 @@ static int veejay_screen_update(veejay_t * info )
 		vj_perform_get_primary_frame(info,frame,0);
 	
 
-#ifdef HAVE_JPEG
+#ifdef HAVE_JPEG || USE_GDK_PIXBUF
     /* dirty hack to save a frame to jpeg */
     if (info->uc->hackme == 1)
 	{
-		vj_perform_screenshot2(info, frame);
 		info->uc->hackme = 0;
-		free(info->uc->filename);
-    }
+
+#ifdef USE_GDK_PIXBUF
+		if(vj_picture_save( info->settings->export_image, frame, 
+				info->video_output_width, info->video_output_height,
+				(info->pixel_format == FMT_420 ? 1 : 0 ) ) )
+		{
+			veejay_msg(VEEJAY_MSG_INFO,
+				"Saved frame %ld to image", info->settings->current_frame_num );
+		}
+		else
+		{
+			veejay_msg(VEEJAY_MSG_ERROR,
+				"Error writing frame %ld to image",
+					info->settings->current_frame_num );
+		}
+#else
+#ifdef HAVE_JPEG
+		vj_perform_screenshot2(info, frame);
+		if(info->uc->filename) free(info->uc->filename);
+#endif
+#endif
+
+	}
 #endif
 
   /* hack to write YCbCr data to stream*/

@@ -118,9 +118,15 @@ void	on_button_251_clicked( GtkWidget *widget, gpointer user_data)
 
 void	on_button_054_clicked(GtkWidget *widget, gpointer user_data)
 {
-	single_vims( VIMS_SCREENSHOT );
-	vj_msg(VEEJAY_MSG_INFO, "Requested veejay to take screenshot of frame %d",
-		info->status_tokens[FRAME_NUM] + 1 );
+	gchar *ext = get_text( "screenshotformat" );
+	if(ext)
+	{
+		gchar filename[100];
+		sprintf(filename, "frame-%d.%s", info->status_tokens[FRAME_NUM] + 1 , ext);
+		multi_vims( VIMS_SCREENSHOT,"%d %d %s",0,0,filename );
+		vj_msg(VEEJAY_MSG_INFO, "Requested veejay to take screenshot of frame %d",
+			info->status_tokens[FRAME_NUM] + 1 );
+	}
 }
 void	on_button_200_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -324,7 +330,7 @@ void	on_button_el_copy_clicked(GtkWidget *w, gpointer *user_data)
 	}
 }
 
-void	on_button_el_newsample_clicked(GtkWidget *w, gpointer *user)
+void	on_button_el_newclip_clicked(GtkWidget *w, gpointer *user)
 {
 	if(verify_selection())
 	{
@@ -1352,7 +1358,7 @@ void	on_button_historymove_clicked(GtkWidget *widget, gpointer user_data)
 	info->uc.reload_hint[HINT_HISTORY] = 1;
 }
 
-void	on_button_samplecopy_clicked(GtkWidget *widget, gpointer user_data)
+void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(info->uc.selected_sample_id != 0)
 	{
@@ -1410,7 +1416,7 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_inputstream_filebrowse_clicked(GtkWidget *w, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Open video file" );
+	gchar *filename = dialog_open_file( "Open new input stream" );
 	if(filename)
 	{
 		put_text( "inputstream_filename", filename );
@@ -1421,6 +1427,10 @@ void	on_inputstream_filebrowse_clicked(GtkWidget *w, gpointer user_data)
 void	on_inputstream_file_button_clicked(GtkWidget *w, gpointer user_data)
 {
 	gint use_y4m = is_button_toggled( "inputstream_filey4m" );
+	gint use_ffmpeg = is_button_toggled( "inputstream_fileffmpeg");
+	gint use_pic = is_button_toggled( "inputstream_filepixbuf");
+	
+
 	gchar *file = get_text( "inputstream_filename" );	
 	gint br = 0;
 	gint bw = 0;
@@ -1432,11 +1442,13 @@ void	on_inputstream_file_button_clicked(GtkWidget *w, gpointer user_data)
 	}
 	if(use_y4m)
 		multi_vims( VIMS_STREAM_NEW_Y4M, "%s", filename );
-	else
+	if(use_ffmpeg)
 		multi_vims( VIMS_STREAM_NEW_AVFORMAT, "%s", filename );
-
+#ifdef USE_GDK_PIXBUF
+	if(use_pic)
+		multi_vims( VIMS_STREAM_NEW_PICTURE, "%s", filename);
+#endif
 	if(filename) g_free( filename );
-	if(file) g_free(file);
 	info->uc.reload_hint[HINT_SLIST] = 1;
 }
 

@@ -230,6 +230,35 @@ void	veejay_reap_messages(void)
 
 }
 
+int	veejay_get_file_ext( char *file, char *dst, int dlen)
+{
+	int len = strlen(file)-1;
+	int i = 0;
+	char tmp[dlen];
+	bzero(tmp,dlen);
+	while(len)
+	{
+		if(file[len] == '.')
+		{
+			if(i==0) return 0;
+			int j;
+			int k = 0;
+			for(j = i-1; j >= 0;j--)
+			{
+			  dst[k] = tmp[j];
+			 k ++;
+			}
+			return 1;
+		}
+		tmp[i] = file[len];
+		i++;
+		if( i >= dlen)
+			return 0;
+		len --;
+	}
+	return 0;
+}
+
 void veejay_strrep(char *s, char delim, char tok)
 {
   unsigned int i;

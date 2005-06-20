@@ -360,6 +360,11 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		el->video_width = lav_video_width(el->lav_fd[n]);
 		el->video_inter = lav_video_interlacing(el->lav_fd[n]);
 		el->video_fps = lav_frame_rate(el->lav_fd[n]);
+#ifdef USE_GDK_PIXBUF
+		lav_set_project(
+			el->video_width, el->video_height, el->video_fps ,
+				el->pixel_format == FMT_420 ? 1 :0);
+#endif
 		lav_video_clipaspect(el->lav_fd[n],
 				       &el->video_sar_width,
 				       &el->video_sar_height);
@@ -484,8 +489,10 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		decoder_id = CODEC_ID_YUV420;
 	if( strncasecmp("yv16", compr_type,4) == 0)
 		decoder_id = CODEC_ID_YUV422;
+	if( strncasecmp("PICT", compr_type,4) == 0)
+		decoder_id = 0xffff;
 
-	if(decoder_id > 0)
+	if(decoder_id > 0 && decoder_id != 0xffff)
 	{
 		int c_i = _el_get_codec(decoder_id);
 		if(c_i == -1)
@@ -512,7 +519,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 	if(decoder_id == 0)	
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Dont know how to handle %s (fmt %d)", compr_type, pix_fmt);
+		veejay_msg(VEEJAY_MSG_ERROR, "Dont know how to handle %s (fmt %d) %x", compr_type, pix_fmt,decoder_id);
 		if(realname) free(realname);
 		if( el->video_file_list[n]) free( el->video_file_list[n] );
 		if( el->lav_fd[n] ) lav_close( el->lav_fd[n]);
@@ -546,6 +553,7 @@ int	vj_el_get_file_fourcc(editlist *el, int num, char *fourcc)
 	if(compr == NULL)
 		return 0;
 	snprintf(fourcc,4,"%s", compr );
+	fourcc[5] = '\0';
 	return 1;
 }
 
@@ -570,24 +578,37 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3], int pix_fm
 
     	res = lav_set_video_position(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n));
 	decoder_id = lav_video_compressor_type( el->lav_fd[N_EL_FILE(n)] );
-	c_i = _el_get_codec( decoder_id );
- 	if(c_i >= 0 && c_i < MAX_CODECS)
+	if(decoder_id != 0xffff)
 	{
-		d = el_codecs[c_i];
+		c_i = _el_get_codec( decoder_id );
+ 		if(c_i >= 0 && c_i < MAX_CODECS)
+			d = el_codecs[c_i];
+		if(!d)
+		{	
+			veejay_msg(VEEJAY_MSG_DEBUG, "Cannot find codec for id %d (%d)", decoder_id,
+				c_i);
+			return -1;
+		}
 	}
-	if(!d)
-	{	
-		veejay_msg(VEEJAY_MSG_DEBUG, "Cannot find codec for id %d (%d)", decoder_id,
-			c_i);
-		return -1;
-	}
-
 	if (res < 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Error setting video position: %s",
 			  lav_strerror());
  	}
-	res = lav_read_frame(el->lav_fd[N_EL_FILE(n)], d->tmp_buffer);
+	if(lav_filetype( el->lav_fd[N_EL_FILE(n)] ) != 'x')
+		res = lav_read_frame(el->lav_fd[N_EL_FILE(n)], d->tmp_buffer);
+
+	if( decoder_id == 0xffff )
+	{
+		uint8_t *p = lav_get_frame_ptr( el->lav_fd[N_EL_FILE(n)] );
+		if(!p) return -1;
+		int len = el->video_width * el->video_height;
+		int uv_len = (el->video_width >> 1) * (el->video_height >> (pix_fmt == FMT_420 ? 1:0)); 
+		veejay_memcpy( dst[0], p, len );
+		veejay_memcpy( dst[1], p + len, uv_len );
+		veejay_memcpy( dst[2], p + len + uv_len, uv_len );
+		return 1;	
+	}
 
 	if( decoder_id == CODEC_ID_YUV420 )
 	{	/* yuv420 raw */
@@ -851,7 +872,9 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	uint64_t n =0;
 
 	if(!el) return NULL;
-
+#ifdef USE_GDK_PIXBUF
+	vj_picture_init();
+#endif
 	memset( el, 0, sizeof(editlist) );  
 	el->pixel_format = -1;
 	el->has_video = 1; //assume we get it   
@@ -1243,8 +1266,9 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 		if (index[j] >= 0 && el->video_file_list[j] != NULL)
 		{
 			char filename[400];
-			char fourcc[5];
+			char fourcc[6];
 			bzero(filename,400);
+			bzero(fourcc,6);
 			sprintf(fourcc, "%s", "????");
 			vj_el_get_file_fourcc( el, j, fourcc );
 			sprintf(filename ,"%03d%s%04d%010ld%02d%s",
@@ -1257,6 +1281,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 			);
 			sprintf(fourcc, "%04d", strlen( filename ));
 			strncat( result, fourcc, strlen(fourcc ));
+			veejay_msg(VEEJAY_MSG_DEBUG, "%s:%s", fourcc, filename );
 			strncat ( result, filename, strlen(filename));
 		}
 	}

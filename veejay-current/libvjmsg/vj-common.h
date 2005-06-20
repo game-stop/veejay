@@ -41,5 +41,6 @@ extern int	veejay_keep_messages(void);
 extern void	veejay_reap_messages(void);
 extern char *veejay_pop_messages(int *num_lines, int *total_len);
 extern void	get_cache_line_size(void);
+extern int	veejay_get_file_ext( char *file, char *dst, int dlen);
 extern void	veejay_chomp_str( char *str, int *dlen );
 #endif

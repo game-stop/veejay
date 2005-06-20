@@ -179,6 +179,7 @@ typedef struct {
 	int crop;
 	VJRectangle viewport;
 	vj_rand_player randplayer;
+	void	*export_image;
 } video_playback_setup;
 
 

@@ -54,6 +54,9 @@ AC_ARG_WITH(extra-cflags,
 AC_ARG_WITH(libdv,
             AC_HELP_STRING([--without-libdv], [Do not use libdv.]),
             [], [with_libdv=yes])
+AC_ARG_WITH(pixbuf
+		AC_HELP_STRING([--without-pixbuf], [Do not use pixbuf]),
+		[], [with_pixbuf=yes])
 AC_ARG_WITH(directfb,
 	     AC_HELP_STRING([--without-directfb], [Do not use DirectFB.]),
 	 	[], [with_directfb=yes])
@@ -262,7 +265,16 @@ if test x$with_jpeg != xno ; then
 		AC_DEFINE(HAVE_JPEG,,[Define is JPEG libraries are available])
 	fi
 fi
-
+have_pixbuf=false
+if test x$with_pixbuf != xno ; then
+  PKG_CHECK_MODULES(PIXBUF, [gtk+-2.0 >= 2.4 gdk-pixbuf-2.0],
+                    [
+ 		     AC_SUBST( PIXBUF_CFLAGS )
+		     AC_SUBST( PIXBUF_LIBS )
+		     have_pixbuf=true
+                     AC_DEFINE(USE_GDK_PIXBUF, 1, [use gdk image load / save])],
+                    [have_pixbuf=false])
+fi
 dnl *********************************************************************
 dnl Check for libdv
 dnl   (creates LIBDV_CFLAGS, LIBDV_LIBS; defines HAVE_LIBDV)
@@ -882,6 +894,7 @@ AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
 AC_MSG_NOTICE([  - AVI MJPEG playback/recording  : true (always)])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
+AC_MSG_NOTICE([  - GDK Pixbuf support	         : ${have_pixbuf}])
 AC_MSG_NOTICE([  - jack                          : ${have_jack}])
 AC_MSG_NOTICE([  - xml c library for gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - freetype support              : ${have_freetype}])
