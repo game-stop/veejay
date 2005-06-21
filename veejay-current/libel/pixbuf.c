@@ -306,7 +306,7 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 	}
 
 	pict2.data[0] =  (uint8_t*) gdk_pixbuf_get_pixels( img_ );;
-        pict2.linesize[0] = w;
+        pict2.linesize[0] = w * 3;
 
 	img_convert( &pict2, PIX_FMT_RGB24, &pict1, (fmt == 1 ? PIX_FMT_YUV420P:
                                                                          PIX_FMT_YUV422P),
