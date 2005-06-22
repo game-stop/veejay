@@ -1104,10 +1104,36 @@ void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 		g_free(filename);
 	}
 }
-
+void	on_veejay_expander_activate(GtkWidget *exp, gpointer user_data)
+{
+}
 void	on_veejay_ctrl_expander_activate(GtkWidget *exp, gpointer user_data)
 {
-	DBG_C();
+	gint width= 0;
+	gint height = 0;
+
+	GtkWindow *window = GTK_WINDOW( glade_xml_get_widget_( info->main_window, "gveejay_window"));
+
+	gtk_window_get_size( window, &width, &height );
+
+	if(!gtk_expander_get_expanded(GTK_EXPANDER(exp)))
+	{
+		gtk_widget_set_size_request(
+			glade_xml_get_widget_(info->main_window, "veejaypanel" ), 
+		 width,
+		 400 );
+
+		gtk_window_resize( window, width, 600 );
+
+	}
+	else
+	{	
+		gtk_widget_set_size_request(
+			glade_xml_get_widget_(info->main_window, "veejaypanel" ), 
+			 width,
+			 0 );
+		gtk_window_resize( window, width, 100 );
+	}
 }
 
 void	on_button_el_takestart_clicked(GtkWidget *widget, gpointer user_data)

@@ -3974,8 +3974,8 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
 			if( veejay_edit_addmovie(
 				v,avi_file,start,destination,destination))
 			{
-				int len = sample_get_encoded_frames(v->uc->sample_id) - 1;
-				sample_info *skel = sample_skeleton_new(destination, destination+len);		
+				int len = sample_get_encoded_frames(v->uc->sample_id);
+				sample_info *skel = sample_skeleton_new(destination + 1, destination+len);		
 				if(sample_store(skel)==0) 
 				{
 					veejay_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s",

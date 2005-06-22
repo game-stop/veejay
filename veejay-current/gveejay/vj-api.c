@@ -1940,13 +1940,19 @@ static void 	update_globalinfo()
 		}
 		if( pm == MODE_STREAM )
 			tf = 1;
-		update_spin_range(
-			"button_fadedur", 0, tf, 0 );
+
+	//	update_spin_range(
+	//		"button_fadedur", 0, tf, 0 );
+
 		if( pm == MODE_SAMPLE )
 		{
 			update_slider_range( "videobar", 0, (info->status_tokens[SAMPLE_END] -
-			info->status_tokens[SAMPLE_START]), (info->status_tokens[FRAME_NUM] - 
-			info->status_tokens[SAMPLE_START]), 0);
+				info->status_tokens[SAMPLE_START]), (info->status_tokens[FRAME_NUM] - 
+				info->status_tokens[SAMPLE_START]), 0);
+			update_spin_range( "spin_samplestart", 0, info->status_tokens[TOTAL_FRAMES],
+				info->status_tokens[SAMPLE_START] );
+			update_spin_range( "spin_samplestart", 0, info->status_tokens[TOTAL_FRAMES],
+				info->status_tokens[SAMPLE_END] );  
 		}
 		else
 		{
@@ -2211,6 +2217,8 @@ static void 	update_globalinfo()
 		}
 		update_label_str( "label_currentsource", "Sample");
 
+		update_spin_value( "spin_samplestart", info->status_tokens[SAMPLE_START]);
+		update_spin_value( "spin_sampleend", info->status_tokens[SAMPLE_END]);
 
 		info->uc.reload_hint[HINT_HISTORY] = 1;
 

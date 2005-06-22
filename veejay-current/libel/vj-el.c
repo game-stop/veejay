@@ -1281,7 +1281,6 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 			);
 			sprintf(fourcc, "%04d", strlen( filename ));
 			strncat( result, fourcc, strlen(fourcc ));
-			veejay_msg(VEEJAY_MSG_DEBUG, "%s:%s", fourcc, filename );
 			strncat ( result, filename, strlen(filename));
 		}
 	}
