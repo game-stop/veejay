@@ -2034,19 +2034,6 @@ static void 	update_globalinfo()
 			gdouble value_end = (mul > 0.0 ? info->uc.marker.upper_bound / mul: 0.0 );
 			update_slider_gvalue( "slider_m0", value_start );
 			update_slider_gvalue( "slider_m1", value_end );
-			if( is_button_toggled( "check_marker_bind" ) )
-			{
-				info->uc.marker.bind_len = 1.0 - value_start - value_end;
-				if(info->uc.marker.bind_len <= 0.0)
-				{
-					info->uc.marker.bind_len = 0;
-					set_toggle_button( "check_marker_bind", 0 );
-				}
-			}
-			else
-			{
-				info->uc.marker.bind_len = 0.0;
-			}
 		}
 
 

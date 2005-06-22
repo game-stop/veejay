@@ -1020,8 +1020,10 @@ void	on_slider_m0_value_changed(GtkWidget *widget, gpointer user_data)
 		if(info->uc.marker.bind)
 		{
 			info->uc.marker.end = 1.0 - info->uc.marker.start - info->uc.marker.bind_len;
-			if(info->uc.marker.start < 0.0)
-				info->uc.marker.start = 0.0;
+			if(info->uc.marker.end < 0.0)
+				info->uc.marker.end = 0.0;
+			if(info->uc.marker.end > 1.0)
+				info->uc.marker.end = 1.0;
 		}
 
 		multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0,
@@ -1043,6 +1045,8 @@ void	on_slider_m1_value_changed(GtkWidget *widget, gpointer user_data)
 					1.0 - info->uc.marker.end - info->uc.marker.bind_len;
 			if( info->uc.marker.start  > 1.0 )
 				info->uc.marker.start = 1.0;
+			if( info->uc.marker.start < 0.0 )
+				info->uc.marker.start = 0.0;
 		}
 
 		multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0,
@@ -1054,6 +1058,8 @@ void	on_slider_m1_value_changed(GtkWidget *widget, gpointer user_data)
 void	on_check_marker_bind_clicked(GtkWidget *widget, gpointer user_data)
 {
 	// might need to adjust slider m0,m1
+	if(info->status_lock)
+		return;
 
 	info->uc.marker.bind = is_button_toggled( "check_marker_bind");
 	if(info->uc.marker.bind)
