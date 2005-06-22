@@ -3965,9 +3965,11 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
 			int start = -1;
 			int destination = v->edit_list->video_frames - 1;
 			v->settings->sample_record = 0;
-			if( sample_get_encoded_file(v->uc->sample_id, avi_file)!=0) return;
-			
-			sample_reset_encoder( v->uc->sample_id );
+			if( sample_get_encoded_file(v->uc->sample_id, avi_file) <= 0 )
+			{
+			 	veejay_msg(VEEJAY_MSG_ERROR, "adding file");
+				return;
+			}
 
 			if( veejay_edit_addmovie(
 				v,avi_file,start,destination,destination))
