@@ -45,6 +45,7 @@ static int default_geometry_x = -1;
 static int default_geometry_y = -1;
 static int force_video_file = 0;
 static int override_pix_fmt = -1;
+static char override_norm = 'p';
 static int auto_loop = 0;
 
 static void CompiledWith()
@@ -171,7 +172,7 @@ static void Usage(char *progname)
 	fprintf(stderr,"  -W/--width <num>\t\tdummy width\n");
 	fprintf(stderr,"  -H/--height <num>\t\tdummy height\n");
 
-	fprintf(stderr,"  -N/--norm [01]\t\tdummy norm\n");
+	fprintf(stderr,"  -N/--norm [0=PAL, 1=NTSC (defaults to PAL)]\t\tdummy norm , PAL or NTSC\n");
 	fprintf(stderr,"  -R/--framerate <num>\t\tdummy frame rate\n");
 	fprintf(stderr,"  -M/--multicast-osc \t\tmulticast OSC\n");
 	fprintf(stderr,"  -V/--multicast-vims \t\tmulticast VIMS\n");
@@ -313,6 +314,8 @@ static int set_option(const char *name, char *value)
 	}
 	else if(strcmp(name, "norm") == 0 || strcmp(name, "N") == 0 ) {
 		info->dummy->norm = optarg[0];
+		if(info->dummy->norm == 1 )	
+			override_norm = 'n';
 	}
 	else if(strcmp(name, "zoomwidth") == 0 || strcmp(name, "w") == 0) {
 		info->video_output_width = atoi(optarg);
@@ -528,7 +531,7 @@ static void check_command_line_options(int argc, char *argv[])
     	mjpeg_default_handler_verbosity( (info->verbose ? 1:0) );
     }
     if(!info->dump)
-       if(veejay_open_files(info, argv + optind, argc - optind,override_fps, force_video_file, override_pix_fmt)<=0)
+       if(veejay_open_files(info, argv + optind, argc - optind,override_fps, force_video_file, override_pix_fmt, override_norm )<=0)
        {
 	veejay_msg(VEEJAY_MSG_ERROR, "Cannot start veejay");
 	exit(1);

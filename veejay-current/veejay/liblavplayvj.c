@@ -2747,7 +2747,8 @@ int veejay_edit_addmovie(veejay_t * info, char *movie, long start,
     editlist *el = info->edit_list;
     long el_end = el->video_frames;
     long n_end;
-    n = open_video_file(movie, el, info->preserve_pathnames, info->auto_deinterlace,1 );
+    n = open_video_file(movie, el, info->preserve_pathnames, info->auto_deinterlace,1,
+		info->edit_list->video_norm );
 
 
     if (n == -1 || n == -2)
@@ -2933,7 +2934,7 @@ int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
  * return value: 1 on succes, 0 on error
  ******************************************************/
 
-static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, int force_pix_fmt, int force )
+static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, int force_pix_fmt, int force , char override_norm)
 {
 	vj_el_frame_cache(info->seek_cache );
     	vj_avformat_init();
@@ -2982,7 +2983,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	}
 	else
 	{
-	    	info->edit_list = vj_el_init_with_args(files, num_files, info->preserve_pathnames, info->auto_deinterlace, force);
+	    	info->edit_list = vj_el_init_with_args(files, num_files, info->preserve_pathnames, info->auto_deinterlace, force, override_norm);
 	}
 
 	if(info->edit_list==NULL)
@@ -3035,7 +3036,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	return 1;
 }
 
-int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, int force,int force_pix_fmt)
+int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, int force,int force_pix_fmt, char override_norm)
 {
 	char *argv[1];
 	int ret = 0;
@@ -3072,7 +3073,8 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 		veejay_msg(VEEJAY_MSG_INFO,
 			"Liveset: Try loading EditList or video file %s",
 			argv[0] );
-		ret = veejay_open_video_files( info, argv, 1 , force_pix_fmt, force );
+		ret = veejay_open_video_files( info, argv, 1 , force_pix_fmt, force,
+			override_norm );
 		if(argv[0])
 			free(argv[0]);
 		if(!ret)
@@ -3086,11 +3088,13 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	{
 		veejay_msg(VEEJAY_MSG_INFO,
 			"Liveset: start in Dummy mode");
-		ret = veejay_open_video_files( info, NULL, 0 , force_pix_fmt, force );
+		ret = veejay_open_video_files( info, NULL, 0 , force_pix_fmt, force,
+			override_norm );
 	}
 
 	if(!ret)
-		ret = veejay_open_video_files( info, files, num_files, force_pix_fmt, force );
+		ret = veejay_open_video_files( info, files, num_files, force_pix_fmt, force,
+			override_norm );
 
 	if( ret )
 	{

@@ -94,7 +94,8 @@ typedef struct
 static	vj_decoder *el_codecs[MAX_CODECS];
 
 
-int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force);
+int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force,
+		char norm);
 
 static int _el_get_codec(int id)
 {
@@ -199,7 +200,7 @@ static int _el_probe_for_pixel_fmt( lav_file_t *fd )
 	return -1;
 }
 
-int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force)
+int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force, char override_norm)
 {
     int i, n, nerr;
     int chroma=0;
@@ -376,6 +377,18 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 			el->video_norm = 'p';
 		    else if (el->video_fps > 29.92 && el->video_fps <= 30.02)
 			el->video_norm = 'n';
+		}
+
+		if (!el->video_norm)
+		{
+			if(override_norm == 'p' || override_norm == 'n')
+				el->video_norm = override_norm;
+			else
+			{
+				veejay_msg(VEEJAY_MSG_ERROR,
+				"Invalid video norm - override with -N / --norm");
+				nerr++;
+			}
 		}
 	
 		el->audio_chans = lav_audio_channels(el->lav_fd[n]);
@@ -857,7 +870,8 @@ void	vj_el_close( editlist *el )
 }
 
 
-editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int deinterlace, int force)
+editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int deinterlace, int force
+	,char norm)
 {
 	editlist *el = vj_malloc(sizeof(editlist));
 
@@ -968,7 +982,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 					line[n - 1] = 0;	/* Get rid of \n at end */
 	
 					index_list[i] =
-					    open_video_file(line, el, flags, deinterlace,force);
+					    open_video_file(line, el, flags, deinterlace,force,norm);
 	
 					if(index_list[i]<0)
 					{
@@ -1026,7 +1040,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	    		/* Not an edit list - should be a ordinary video file */
 	    			fclose(fd);
 
-		     		n = open_video_file(filename[nf], el, flags, deinterlace,force);
+		     		n = open_video_file(filename[nf], el, flags, deinterlace,force,norm);
 	   	 		if(n==-1 || n==-2)
 				{
 					veejay_msg(VEEJAY_MSG_DEBUG, "Cannot put file %s  in editlist", filename[nf]);
@@ -1419,7 +1433,7 @@ editlist *vj_el_new(char *filename, char *norm, int deinterlace)
 	el->MJPG_chroma = CHROMA420;
 	el->video_norm = norm;
 
-    n = open_video_file(filename, el, 0, deinterlace,0);
+    n = open_video_file(filename, el, 0, deinterlace,0, 'p');
 
 	if(n<0)
 	{

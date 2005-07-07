@@ -7458,12 +7458,11 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 {
 	/* send video properties */
 	char info_msg[255];
+	veejay_t *v = (veejay_t*)ptr;
+	bzero(info_msg,sizeof(info_msg));
 	bzero( _s_print_buf,SEND_BUF);
 
-
-	veejay_t *v = (veejay_t*)ptr;
-	bzero(info_msg,100);
-	snprintf(info_msg,sizeof(info_msg)-1, "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld",
+	snprintf(info_msg,sizeof(info_msg), "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld",
 		v->edit_list->video_width,
 		v->edit_list->video_height,
 		v->edit_list->video_inter,

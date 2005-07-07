@@ -73,7 +73,7 @@ typedef struct
 } editlist;  
 
 
-editlist *vj_el_init_with_args(char **filenames, int n, int flags, int deinter, int force);
+editlist *vj_el_init_with_args(char **filenames, int n, int flags, int deinter, int force, char norm);
 
 editlist *vj_el_probe_from_file( char *filename );
 
