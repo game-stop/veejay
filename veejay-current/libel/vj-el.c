@@ -265,7 +265,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	{
 		el->num_video_files--;	
 		lav_strerror();
-	    if(realname) free(realname);
+	 	if(realname) free(realname);
 		return -1;
 	}
 
@@ -290,8 +290,9 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	if(pix_fmt < 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to determine pixel format");
+		el->num_video_files--;	
 		if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
-	    if(realname) free(realname);
+		if(realname) free(realname);
 		return -1;
 	}
 
@@ -301,14 +302,15 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	}
 	else
 	{
-			// check on sanity
-			if( pix_fmt > el->pixel_format)
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Cannot handle mixed 4:2:2 and 4:2:0 editlists");
-				if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
-			    if( realname ) free(realname );
-				return -1;
-			}
+		// check on sanity
+		if( pix_fmt > el->pixel_format)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot handle mixed 4:2:2 and 4:2:0 editlists");
+			el->num_video_files--;	
+			if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
+		    	if( realname ) free(realname );
+			return -1;
+		}
 	}
 
     el->num_frames[n] = lav_video_frames(el->lav_fd[n]);
@@ -544,6 +546,38 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
     return n;
 }
+
+void		vj_el_show_formats(void)
+{
+#ifdef SUPPORT_READ_DV2
+		veejay_msg(VEEJAY_MSG_INFO,
+			"Video formats: AVI and  RAW DV");
+		veejay_msg(VEEJAY_MSG_INFO, 
+			"\t[dvsd|dv] DV Video (Quasar DV codec)");
+#else
+		veejay_msg(VEEJAY_MSG_INFO,
+			"Video format: AVI");	
+#endif
+		veejay_msg(VEEJAY_MSG_INFO,
+			"\t[yv16] Planer YUV 4:2:2");
+		veejay_msg(VEEJAY_MSG_INFO,
+			"\t[iyuv] Planer YUV 4:2:0");
+		veejay_msg(VEEJAY_MSG_INFO,
+			"\t[mjpg|mjpa] Motion JPEG");
+		veejay_msg(VEEJAY_MSG_INFO,
+			"Limited support for:");
+		veejay_msg(VEEJAY_MSG_INFO,
+			"\t[div3] MS MPEG4v3 Divx Video");
+		veejay_msg(VEEJAY_MSG_INFO,
+			"\t[mp4v] MPEG4 Video (ffmpeg experimental)");  		
+#ifdef USE_GDK_PIXBUF
+		veejay_msg(VEEJAY_MSG_INFO,
+			"Image types supported:");
+		vj_picture_display_formats();
+#endif
+
+}
+
 
 static int	vj_el_dummy_frame( uint8_t *dst[3], editlist *el ,int pix_fmt)
 {
@@ -1041,27 +1075,29 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	    			fclose(fd);
 
 		     		n = open_video_file(filename[nf], el, flags, deinterlace,force,norm);
-	   	 		if(n==-1 || n==-2)
+				if(n >= 0 )
 				{
-					veejay_msg(VEEJAY_MSG_DEBUG, "Cannot put file %s  in editlist", filename[nf]);
-					vj_el_free(el);
-					return NULL;
-				}
-			        el->frame_list = (uint64_t *) realloc(el->frame_list,
+			       		el->frame_list = (uint64_t *) realloc(el->frame_list,
 					      (el->video_frames +
 					       el->num_frames[n]) *
 					      sizeof(uint64_t));
-				if (el->frame_list==NULL)
-				{
-					veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
-					vj_el_free(el);
-					return NULL;
-				}
+					if (el->frame_list==NULL)
+					{
+						veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
+						vj_el_free(el);
+						return NULL;
+					}
 
-	    			for (i = 0; i < el->num_frames[n]; i++)
+	    				for (i = 0; i < el->num_frames[n]; i++)
+					{
+						el->frame_list[el->video_frames] = EL_ENTRY(n, i);
+						el->video_frames++;
+					}
+				}
+				else
 				{
-					el->frame_list[el->video_frames] = EL_ENTRY(n, i);
-					el->video_frames++;
+					veejay_msg(VEEJAY_MSG_WARNING,
+						"Cant put %s in EditList", filename[nf] );
 				}
 			}
     		}

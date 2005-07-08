@@ -533,6 +533,7 @@ static void check_command_line_options(int argc, char *argv[])
     if(!info->dump)
        if(veejay_open_files(info, argv + optind, argc - optind,override_fps, force_video_file, override_pix_fmt, override_norm )<=0)
        {
+	vj_el_show_formats();
 	veejay_msg(VEEJAY_MSG_ERROR, "Cannot start veejay");
 	exit(1);
        }

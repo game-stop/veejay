@@ -744,7 +744,7 @@ void	on_speedslider_value_changed(GtkWidget *widget, gpointer user_data)
 	if(!info->status_lock)
 	{	
 		gint value = (gint)GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
-
+		value *= info->play_direction;
 		multi_vims( VIMS_VIDEO_SET_SPEED, "%d",value );
 		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
@@ -756,7 +756,7 @@ void	on_spin_samplespeed_value_changed(GtkWidget *widget, gpointer user_data)
 	if(!info->status_lock)
 	{
 		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
-		
+		value *= info->play_direction;
 		multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
 		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );

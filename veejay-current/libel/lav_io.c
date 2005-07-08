@@ -743,7 +743,7 @@ int lav_filetype(lav_file_t *lav_file)
 lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 {
    int n;
-   const char *video_comp = NULL;
+   char *video_comp = NULL;
    unsigned char *frame = NULL; /* Make sure un-init segfaults! */
    long len;
    int jpg_height, jpg_width, ncomps, hf[3], vf[3];
@@ -788,7 +788,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
       video_comp = AVI_video_compressor(lav_fd->avi_fd);
       veejay_msg(VEEJAY_MSG_DEBUG, "Video compressor [%s]",video_comp);
    }
-   else if( AVI_errno==AVI_ERR_NO_AVI )
+   else if( AVI_errno==AVI_ERR_NO_AVI || AVI_errno == AVI_ERR_READ )
    {
 	int ret = 0;
 #ifdef USE_GDK_PIXBUF
@@ -823,7 +823,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	{
 		free(lav_fd);
 		internal_error = ERROR_FORMAT; /* Format not recognized */
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to identify file '%s'", filename);
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to load file '%s'", filename);
 		return 0;
 	}
    }

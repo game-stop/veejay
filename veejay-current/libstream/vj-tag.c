@@ -547,7 +547,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     switch (type) {
 #ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
-	sprintf(tag->source_name, "/dev/%s/%d", filename,channel);
+//	sprintf(tag->source_name, "/dev/%s/%d", filename,channel);
+	sprintf(tag->source_name, "/dev/%s", filename,channel);
 	if (_vj_tag_new_v4l
 	    (tag, stream_nr, w, h, el->video_norm, palette,0,channel ) != 1)
 	    return -1;
@@ -562,6 +563,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     case VJ_TAG_TYPE_DV1394:
 #ifdef SUPPORT_READ_DV2
 	sprintf(tag->source_name, "/dev/dv1394/%d", channel);
+//	FIXME: dev fs
 	if( _vj_tag_new_dv1394( tag, stream_nr,channel,1,el ) == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "error opening dv1394");

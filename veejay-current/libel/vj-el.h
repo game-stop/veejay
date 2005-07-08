@@ -98,6 +98,8 @@ int     vj_el_init_422_frame(editlist *el, VJFrame *frame);
 
 void	vj_el_frame_cache(int n);
 
+void	vj_el_show_formats(void);
+
 editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int width, int height, float fps);
 
 #endif

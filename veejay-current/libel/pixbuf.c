@@ -225,7 +225,7 @@ static	void	add_if_writeable( GdkPixbufFormat *data, GSList **list)
 	if( gdk_pixbuf_format_is_writable( data ))
 		*list = g_slist_prepend( *list, data );
 	gchar *name = gdk_pixbuf_format_get_name( data );
-	veejay_msg(VEEJAY_MSG_DEBUG, "supported formats : %s", name );
+	if(name) g_free(name);
 } 
 
 void *	vj_picture_prepare_save(
@@ -235,14 +235,14 @@ void *	vj_picture_prepare_save(
 	if(!pic)
 		return NULL;
 	  
- 
+/* 
 	GSList *f = gdk_pixbuf_get_formats();
 	GSList *res = NULL;
 
 	g_slist_foreach( f, add_if_writeable, &res);
 
 	g_slist_free( f );
-	g_slist_free( res );
+	g_slist_free( res ); */
 
 	pic->filename = strdup( filename );
 
@@ -255,6 +255,24 @@ void *	vj_picture_prepare_save(
 	pic->out_h = out_h;
 
 	return (void*) pic;
+}
+static	void	display_if_writeable( GdkPixbufFormat *data, GSList **list)
+{
+	if( gdk_pixbuf_format_is_writable( data ))
+		*list = g_slist_prepend( *list, data );
+	gchar *name = gdk_pixbuf_format_get_name( data );
+	veejay_msg(VEEJAY_MSG_INFO, "\t%s", name );
+	if( name ) g_free(name);
+} 
+void	vj_picture_display_formats()
+{
+	GSList *f = gdk_pixbuf_get_formats();
+	GSList *res = NULL;
+
+	g_slist_foreach( f, display_if_writeable, &res);
+
+	g_slist_free( f );
+	g_slist_free( res );
 }
 
 static	void	vj_picture_out_cleanup( vj_pixbuf_out_t *pic )
@@ -334,7 +352,7 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 	else
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,
-			"Cant save file as %s.%s size %dx%d", pic->filename,pic->type, pic->out_w, pic->out_h);
+			"Cant save file as %s (%s) size %d x %d", pic->filename,pic->type, pic->out_w, pic->out_h);
 	}
 	
 	if( img_ ) 

@@ -295,6 +295,7 @@ typedef struct
 	GList		*elref;
 	long		window_id;
 	int		run_state;
+	int		play_direction;
 } vj_gui_t;
 
 enum
@@ -2060,8 +2061,11 @@ static void 	update_globalinfo()
 			}	
 		}
 		if( history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] && !sample_changed)
-		{
-			update_spin_value( "spin_samplespeed", info->status_tokens[SAMPLE_SPEED]);
+		{	
+			int speed = info->status_tokens[SAMPLE_SPEED];
+			if( speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
+			if( speed < 0 ) speed *= -1;
+			update_spin_value( "spin_samplespeed", speed);
 		}
 	}
 
@@ -2070,11 +2074,10 @@ static void 	update_globalinfo()
 		if( history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] && !sample_changed)
 		{
 			int plainspeed =  info->status_tokens[SAMPLE_SPEED];
-			if( plainspeed < -64 ) plainspeed = -64;
-			if( plainspeed > 64 ) plainspeed = 64;
+			if( plainspeed < 0 ) info->play_direction = -1; else info->play_direction = 1;
+			if( plainspeed < 0 ) plainspeed *= -1;
 			update_slider_value( "speedslider", plainspeed, 0);
 		}
-
 	}
 
 	if( history[SAMPLE_FX] != info->status_tokens[SAMPLE_FX])
@@ -2205,7 +2208,11 @@ static void 	update_globalinfo()
 	if(sample_changed)
 	{
 		gint len = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
-		update_spin_range( "spin_samplespeed", -1 * len, len, info->status_tokens[SAMPLE_SPEED]);
+		int speed = info->status_tokens[SAMPLE_SPEED];
+		if(speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
+		if(speed < 0 ) speed *= -1;
+		
+		update_spin_range( "spin_samplespeed", 0, len, speed );
 
 		gchar *time = format_selection_time( 0, len );
 		update_label_str( "label_samplelength", time );
@@ -5024,8 +5031,10 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	gtk_expander_set_expanded( GTK_EXPANDER(exp), FALSE );
 
 	init_cpumeter();
-
-	update_slider_range( "speedslider",(-1 * 64),68, info->status_tokens[SAMPLE_SPEED], 0);
+	int speed = info->status_tokens[SAMPLE_SPEED];
+	if( speed < 0 ) info->play_direction = -1; else info->play_direction=1;
+	if( speed < 0 ) speed *= -1;
+	update_slider_range( "speedslider",0,68, speed, 0);
 	return 1;
 }
 

@@ -806,7 +806,7 @@
 				      <property name="editable">True</property>
 				      <property name="visibility">True</property>
 				      <property name="max_length">4</property>
-				      <property name="text" translatable="yes">jpeg</property>
+				      <property name="text" translatable="yes">jpg</property>
 				      <property name="has_frame">False</property>
 				      <property name="invisible_char">*</property>
 				      <property name="activates_default">False</property>
