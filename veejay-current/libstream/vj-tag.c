@@ -548,7 +548,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 #ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
 //	sprintf(tag->source_name, "/dev/%s/%d", filename,channel);
-	sprintf(tag->source_name, "/dev/%s", filename,channel);
+//	sprintf(tag->source_name, "/dev/%s", filename,channel);
+	sprintf(tag->source_name, "/dev/%s",filename);
 	if (_vj_tag_new_v4l
 	    (tag, stream_nr, w, h, el->video_norm, palette,0,channel ) != 1)
 	    return -1;

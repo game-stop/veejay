@@ -284,7 +284,7 @@ int 	vj_tag_continue_record( int t1 );
 int 	vj_tag_set_logical_index(int t1, int stream_nr);
 int	vj_tag_set_description(int t1, char *descr);
 int	vj_tag_get_description(int t1, char *descr);
-
+void	vj_tag_get_by_type( int type, char *descr );
 #ifdef HAVE_XML2
 void tagCreateStreamFX(xmlNodePtr node, vj_tag *tag);
 void tagParseStreamFX(xmlDocPtr doc, xmlNodePtr cur, vj_tag *tag);
