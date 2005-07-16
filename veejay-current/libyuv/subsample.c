@@ -27,6 +27,7 @@
 
 #ifdef HAVE_ASM_MMX
 #include "mmx.h"
+#define clear_reg pxor_r2r(mm0,mm0)
 #endif
 
 #include <stdlib.h>
@@ -391,6 +392,8 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 	uint8_t *dst = buffer + (width * height) -1;
 	uint8_t *dst2 = dst - width;
 
+	clear_reg;
+
 	for( y = height-1; y >= 0; y -= 2)
 	{
 		for( x = 0; x < mmx_stride; x ++ )
@@ -538,6 +541,8 @@ static void ss_444_to_422(void *data,uint8_t *buffer, int width, int height)
 
 	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
 
+	clear_reg;
+
 	for(y = 0; y < height; y ++)
 	{
 		uint8_t *src = sampler->buf;
@@ -562,6 +567,8 @@ static void tr_422_to_444(uint8_t *buffer, int width, int height)
 	const int len = stride * height; 
 #ifdef HAVE_ASM_MMX
 	const int mmx_stride = stride / 8;
+
+	clear_reg;
 #endif
 	int x,y;
 
@@ -572,7 +579,6 @@ static void tr_422_to_444(uint8_t *buffer, int width, int height)
 #ifdef HAVE_ASM_MMX
 		for( x = 0; x < mmx_stride; x ++ )
 		{
-			pxor_r2r( mm0, mm0 ); // zero out
 			movq_m2r( *src,mm0 );
 			movq_m2r( *src,mm1 );
 			movq_r2m(mm0, *dst );
