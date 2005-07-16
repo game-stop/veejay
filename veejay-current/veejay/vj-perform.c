@@ -116,23 +116,36 @@ int vj_perform_tag_is_cached(int chain_entry, int entry, int tag_id)
 {
  	int c;
  	int cache_entry = chain_entry + CACHE;
-
+	int res = -1;
 	for(c=cache_entry; c > 0 ; c--)
   	{
-	    if(cached_sample_frames[c] == tag_id) return c;
+	    if(cached_sample_frames[c] == tag_id) 
+	    {
+		res = c;
+		break;	
+	    }
   	}
+	if( res == cache_entry )
+		res = -1;
+
 	return -1;
 }
 int vj_perform_sample_is_cached(int nframe, int chain_entry)
 {
 	int c;
  	int cache_entry = chain_entry + CACHE;
-
+	int res = -1;
 	for(c=cache_entry; c > 0 ; c--)
   	{
-	    if(cached_sample_frames[c] == nframe) return c;
+	    	if(cached_sample_frames[c] == nframe) 
+		{
+			res = c;
+			break;
+		}
   	}
-	return -1;
+	if( res == cache_entry )
+		res = -1;
+	return res;
 }
 
 /**********************************************************************
