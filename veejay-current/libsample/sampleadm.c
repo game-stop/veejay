@@ -174,6 +174,29 @@ int sample_get_state()
  *
  ****************************************************************************************************/
 
+static int _new_id()
+{
+  /* perhaps we can reclaim a sample id */
+	int n;
+	int id = 0;
+	for (n = 0; n <= next_avail_num; n++)
+	{
+		if (avail_num[n] != 0)	
+		{
+			id = avail_num[n];
+			avail_num[n] = 0;
+			break;
+		}
+	}
+	if( id == 0 )
+	{
+		if(!this_sample_id) this_sample_id = 1;
+		id = this_sample_id;
+		this_sample_id ++;
+	}
+	return id;
+}
+
 sample_info *sample_skeleton_new(long startFrame, long endFrame)
 {
 
@@ -197,22 +220,8 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 	return NULL;
     }
 
-    /* perhaps we can reclaim a sample id */
-    for (n = 0; n <= next_avail_num; n++) {
-	if (avail_num[n] != 0) {
-	    id = avail_num[n];
-	    avail_num[n] = 0;
-	    break;
-	}
-    }
-    if (id == 0) {		/* no we cannot not */
-	if(this_sample_id==0) this_sample_id = 1; // first sample to create
-	si->sample_id = this_sample_id;
-	this_sample_id++; // set next number
-    } else {			/* yet it is possible */
-	si->sample_id = id;
-	//this_sample_id++;
-    }
+    si->sample_id = _new_id();
+
     snprintf(si->descr,SAMPLE_MAX_DESCR_LEN, "%s", "Untitled");
     for(n=0; n < SAMPLE_MAX_RENDER;n++) {
       si->first_frame[n] = startFrame;
@@ -360,46 +369,30 @@ int sample_exists(int sample_id)
 
 int sample_copy(int sample_id)
 {
-    sample_info *org, *copy;
-    int c, i;
-    if (!sample_exists(sample_id))
-	return -1;
-    org = sample_get(sample_id);
-    copy = sample_skeleton_new(org->first_frame[org->active_render_entry], org->last_frame[org->active_render_entry]);
-
-    if (sample_store(copy) != 0)
-	return -1;
-
-    sample_set_framedup(copy->sample_id, sample_get_framedup(sample_id));
-    sample_set_speed(copy->sample_id, sample_get_speed(sample_id));
-    sample_set_looptype(copy->sample_id, sample_get_looptype(sample_id));
-    sample_set_next(copy->sample_id, sample_get_next(sample_id));
-    sample_set_loops(copy->sample_id, sample_get_loops(sample_id));
-    sample_set_depth(copy->sample_id, sample_get_depth(sample_id));
-
-    for (c = 0; c < SAMPLE_MAX_EFFECTS; c++) {
-	int effect_id = sample_get_effect(sample_id, c);
-	if (effect_id != -1) {
-	    sample_chain_add(copy->sample_id, c, effect_id);
-	    if (vj_effect_get_extra_frame(effect_id)) {
-		int source = sample_get_chain_source(sample_id, c);
-
-		int args[SAMPLE_MAX_PARAMETERS];
-		int *p = &args[0];
-		int n_args = vj_effect_get_num_params(effect_id);
-		sample_set_chain_source(copy->sample_id, c, source);
-		sample_set_chain_channel(copy->sample_id, c, source);
-
-		sample_get_all_effect_arg(sample_id, c, p, n_args, -1);
-
-		for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++) {
-		    sample_set_effect_arg(copy->sample_id, c, i, args[i]
-			);
+	int i;
+	sample_info *org, *copy;
+	if (!sample_exists(sample_id))
+		return 0;
+	org = sample_get(sample_id);
+	copy = (sample_info*) vj_malloc(sizeof(sample_info));
+	veejay_memcpy( copy,org,sizeof(sample_info));\
+	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
+	{
+		copy->effect_chain[i] =
+			(sample_eff_chain *) vj_malloc(sizeof(sample_eff_chain));
+		if (copy->effect_chain[i] == NULL)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Error allocating entry %d in Effect Chain for new sample",i);
+			return 0;
 		}
-	    }
+		veejay_memcpy( copy->effect_chain[i], org->effect_chain[i], sizeof( sample_eff_chain ) );
 	}
-    }
-    return copy->sample_id;
+
+	copy->sample_id = _new_id(); 
+	if (sample_store(copy) != 0)
+		return 0;
+
+	return 1;
 }
 
 /****************************************************************************************************
