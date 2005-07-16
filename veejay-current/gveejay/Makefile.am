@@ -9,5 +9,5 @@ GVEEJAY_BIN=gveejay
 bin_PROGRAMS = $(GVEEJAY_BIN) 
 gveejay_SOURCES = widgets/cellrendererspin.c gveejay.c keyboard.c vj-api.c ${gveejay_headers}
 gveejay_LDADD = $(top_builddir)/libvjmem/libvjmem.la $(top_builddir)/libvjmsg/libvjmsg.la $(top_builddir)/libvjnet/libvjnet.la $(top_builddir)/utils/libmjpegutils.a 
-gveejay_LDFLAGS = $(GTK_LIBS) $(GLIB_LIBS) $(GLADE_LIBS) -export-dynamic
+gveejay_LDFLAGS = $(GTK_LIBS) $(GLIB_LIBS) $(GLADE_LIBS) 
 
