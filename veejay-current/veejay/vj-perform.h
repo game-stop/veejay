@@ -56,7 +56,7 @@ int vj_perform_sample_is_cached(int nframe, int chain_entry);
 
 void vj_perform_clear_frame_info(int entry);
 
-void vj_perform_clear_cache(int entry);
+void vj_perform_clear_cache(void);
 
 int vj_perform_increase_tag_frame(veejay_t * info, long num);
 
