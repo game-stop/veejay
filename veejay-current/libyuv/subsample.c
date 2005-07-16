@@ -572,6 +572,7 @@ static void tr_422_to_444(uint8_t *buffer, int width, int height)
 #ifdef HAVE_ASM_MMX
 		for( x = 0; x < mmx_stride; x ++ )
 		{
+			pxor_r2r( mm0, mm0 ); // zero out
 			movq_m2r( *src,mm0 );
 			movq_m2r( *src,mm1 );
 			movq_r2m(mm0, *dst );
