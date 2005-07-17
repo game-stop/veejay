@@ -30,8 +30,7 @@ typedef struct vj_sdl_t {
     SDL_Overlay *yuv_overlay;
     SDL_Rect rectangle;
     SDL_Event event;
-    int use_yuv_direct;
-    int use_yuv_hwaccel;
+    uint32_t flags[2];
     int show_cursor;
     int mouse_motion;
     int use_keyboard;

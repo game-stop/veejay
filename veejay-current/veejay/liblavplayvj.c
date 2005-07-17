@@ -1807,8 +1807,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 		if (!vj_sdl_init(info->sdl[0], info->bes_width, info->bes_height, "Veejay",1,
 			info->settings->full_screen[0]))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Error initializing SDL");
 		    return -1;
-	
+		}
 		break;
 #endif
 #ifdef HAVE_DIRECTFB
