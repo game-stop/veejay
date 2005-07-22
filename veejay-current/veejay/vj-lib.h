@@ -173,7 +173,9 @@ typedef struct {
 	int use_vims_mcast;
 	char *vims_group_name;
 	int zoom;
+#ifdef USE_SWSCALER
 	sws_template sws_templ;
+#endif
 	vj_schedule_t action_scheduler;
 	float	output_fps;
 	int crop;

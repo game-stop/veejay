@@ -76,7 +76,10 @@ AC_ARG_WITH(xml2,
 AC_ARG_WITH(gveejay,
 		AC_HELP_STRING([--without-gveejay], [Do not build GVeejay]),
 		[], [with_gveejay=yes])
-
+AC_ARG_WITH(swscaler,
+		AC_HELP_STRING([--with-swscaler], [Build with Swscaler support]),
+		[with_swscaler=yes],
+		[with_swscaler=no])
 
 
 AC_ARG_WITH(freetype2,
@@ -133,6 +136,12 @@ AC_SUBST(LIBGETOPT_LIB)
 AC_TYPE_SIGNAL
 
 AC_MSG_NOTICE([The host is $host  $host_cpu  $host_vendor  $host_os .])
+use_swscaler=false
+if test x$with_swscaler != xno ; then
+	use_swscaler=true;
+	AC_SUBST( USE_SWSCALER )
+	AC_DEFINE( USE_SWSCALER,1, [use swscaler])
+fi
 
 
 dnl *********************************************************************
@@ -706,6 +715,7 @@ AM_CONDITIONAL(HAVE_V4L, test x$have_v4l = xtrue)
 AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
+AM_CONDITIONAL(USE_SWSCALER, test x$use_swscaler = xtrue)
 AM_CONDITIONAL(USE_GVEEJAY,
 			test x$use_gveejay = xtrue )
 dnl *********************************************************************
@@ -878,7 +888,7 @@ fi
 
 if test "$have_darwin" = "true" ; then
 AC_MSG_NOTICE([   Platform: Darwin])
-AC_MSG_NOTICE([      Veejay will not compile ])
+AC_MSG_NOTICE([      Good luck! You can be the first! ])
 fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
@@ -900,7 +910,7 @@ AC_MSG_NOTICE([  - jack                          : ${have_jack}])
 AC_MSG_NOTICE([  - xml c library for gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - freetype support              : ${have_freetype}])
 AC_MSG_NOTICE([  - GVeejay UI                    : ${use_gveejay}])
-
+AC_MSG_NOTICE([  - Swscaler support              : ${use_swscaler}])
 
 if test "$GCC" = yes ; then
 	AC_MSG_NOTICE([])
@@ -916,8 +926,7 @@ if test "$GCC" = yes ; then
 	dnl compiler bug ??? who knows. Apperently its not in gcc 4.0 
 	if test "$ac_gcc_version" = 3 -a "$ac_gcc_minor_version" = 4 ; then
 		if test x$with_pic != xno ; then
-			AC_MSG_NOTICE([*** You are using gcc >= 3.4 !!])
-			AC_MSG_NOTICE([*** Please re-rerun configure with --without-pic])
+			AC_MSG_NOTICE([*** Buggy compiler ? If build fails, try without --without-pic])
 		fi
 	fi
 fi

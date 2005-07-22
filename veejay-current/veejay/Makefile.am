@@ -34,14 +34,17 @@ libveejay_la_SOURCES =  vj-misc.c \
 			vj-sdl.c vj-dfb.c \
 			liblavplayvj.c
 
+libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS )
 
-libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS) \
-			-L$(top_builddir)/ffmpeg/ffmpeg/libavcodec -lavcodec \
+if USE_SWSCALER
+libveejay_la_LDFLAGS += -L$(top_builddir)/libpostproc/ -lpostproc 
+endif
+
+libveejay_la_LDFLAGS +=	-L$(top_builddir)/ffmpeg/ffmpeg/libavcodec -lavcodec \
 			-L$(top_builddir)/ffmpeg/ffmpeg/libavformat -lavformat \
 			-L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libhash / -lhash \
 			-L$(top_builddir)/utils/ -lmjpegutils \
-			-L$(top_builddir)/libpostproc/ -lpostproc \
 			-L$(top_builddir)/bio2jack/ -lbio2jack \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
 			-L$(top_builddir)/libvjmem/ -lvjmem \
@@ -58,15 +61,20 @@ libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS) \
 			${LIBDV_LIBS} ${LIBM_LIBS} ${PIXBUF_LIBS}\
 			-DDYNAMIC -O3 -Wall -rdynamic 
 
+
+
 # *********************************************************************
 # The tools themselves
 VEEJAY_BIN = veejay
 
 VJ_LIBS = \
 	-L$(top_builddir)/libvjnet -lvjnet \
-	-L$(top_builddir)/libpostproc -lpostproc \
 	-L$(top_builddir)/libyuv -lyuv \
 	-L$(top_builddir)/ffmpeg/ffmpeg/libavcodec -lavcodec 
+
+if USE_SWSCALER
+VJ_LIBS += -L$(top_builddir)/libpostproc -lpostproc
+endif
 
 bin_PROGRAMS = $(VEEJAY_BIN)  
 

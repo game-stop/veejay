@@ -413,9 +413,10 @@ int veejay_free(veejay_t * info)
 	veejay_reap_messages();
 
 	vj_tag_free();
+#ifdef USE_SWSCALER
   	if( info->settings->zoom )
 		yuv_free_swscaler( info->video_out_scaler );
-
+#endif
 	if( info->settings->action_scheduler.state )
 	{
 		if(info->settings->action_scheduler.el )
@@ -907,6 +908,7 @@ static int veejay_screen_update(veejay_t * info )
         vj_perform_take_bg(info,frame);
         info->uc->take_bg = 0;
     } 
+#ifdef USE_SWSCALER
 	// scale the image if wanted
 	if(settings->zoom )
 	{
@@ -944,10 +946,12 @@ static int veejay_screen_update(veejay_t * info )
 		vj_perform_get_output_frame( info, frame );
 	}
  	else
+#endif
 		vj_perform_get_primary_frame(info,frame,0);
 	
 
-#ifdef HAVE_JPEG || USE_GDK_PIXBUF
+#ifdef HAVE_JPEG
+#ifdef USE_GDK_PIXBUF 
     /* dirty hack to save a frame to jpeg */
     if (info->uc->hackme == 1)
 	{
@@ -976,7 +980,7 @@ static int veejay_screen_update(veejay_t * info )
 
 	}
 #endif
-
+#endif
   /* hack to write YCbCr data to stream*/
     if (info->stream_enabled == 1) {
 	// Y4m is always 4:2:0 , this function ensures it 
@@ -1046,9 +1050,11 @@ static int veejay_screen_update(veejay_t * info )
 	    break;
 #endif
 	case 3:
+#ifdef USE_SWSCALER
 	     if(settings->zoom)
 	     	vj_perform_get_output_frame_420p(info, c_frame, info->video_output_width, info->video_output_height );
 	     else
+#endif
 		vj_perform_get_primary_frame_420p(info,c_frame);
 
 	     if (vj_yuv_put_frame(info->render_stream, c_frame) == -1)
@@ -1613,7 +1619,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Performer");
 		return -1;
     	}
-
+#ifdef USE_SWSCALER
 	if( info->settings->crop && info->settings->zoom)
 	{
 		VJFrame src;
@@ -1648,7 +1654,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 				info->settings->viewport.right );
 		
 	}
-
 	if( info->settings->zoom )
 	{
 		VJFrame src;
@@ -1711,10 +1716,13 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	}
 	else
 	{
+#endif
 	    /* setup output dimensions */
 	    info->video_output_width = el->video_width;
 	    info->video_output_height = el->video_height;
+#ifdef USE_SWSCALER
 	}
+#endif
 
 	if(!info->bes_width)
 		info->bes_width = info->video_output_width;
@@ -2185,13 +2193,14 @@ static void Welcome(veejay_t *info)
 			info->edit_list->audio_bits,
 			(info->no_bezerk==0?"[Bezerk]" : " " ),
 			(info->verbose==0?" " : "[Debug]")  );
-    
+  
+#ifdef USE_SWSCALER  
 	if(info->settings->zoom)
 	{
 		veejay_msg(VEEJAY_MSG_INFO,"Software scaler - output stream dimensions %d x %d ",
 			info->video_output_width, info->video_output_height );
 	}
-
+#endif
 	veejay_msg(VEEJAY_MSG_INFO,"Your best friends are 'man' and 'vi'");
 	veejay_msg(VEEJAY_MSG_INFO,"Type 'man veejay' in a shell to learn more about veejay");
 	veejay_msg(VEEJAY_MSG_INFO,"For a list of events, type 'veejay -u |less' in a shell");
@@ -2399,8 +2408,9 @@ veejay_t *veejay_malloc()
 		return NULL;
 	memset( info->dummy, 0, sizeof(dummy_t));
 
+#ifdef USE_SWSCALER
 	memset(&(info->settings->sws_templ), 0, sizeof(sws_template));
-
+#endif
 
     info->audio = AUDIO_PLAY;
     info->continuous = 1;

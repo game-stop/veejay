@@ -20,7 +20,9 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <libyuv/yuvconv.h>
+#ifdef USE_SWSCALER
 #include <libpostproc/swscale.h>
+#endif
 #include <libvjmsg/vj-common.h>
 /* this routine is the same as frame_YUV422_to_YUV420P , unpack
  * libdv's 4:2:2-packed into 4:2:0 planar 
@@ -396,6 +398,8 @@ int luminance_mean(uint8_t * frame[], int w, int h)
     return sum / count;
 }
 
+#ifdef USE_SWSCALER
+
 typedef struct
 {
 	struct SwsContext *sws;
@@ -591,3 +595,4 @@ int	yuv_sws_get_cpu_flags(void)
 #endif
 	return cpu_flags;
 }
+#endif

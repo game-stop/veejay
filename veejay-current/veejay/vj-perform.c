@@ -70,14 +70,16 @@ struct ycbcr_frame {
 // audio buffer is 16 bit signed integer
 
 static void 	*effect_sampler = NULL;
+#ifdef USE_SWSCALER
 static void	*crop_sampler = NULL;
+static VJFrame *crop_frame = NULL;
 
+#endif
 static struct ycbcr_frame **video_output_tmp_buffer; 
 static struct ycbcr_frame **video_output_buffer; /* scaled video output */
 static int	video_output_buffer_convert = 0;
 static struct ycbcr_frame **frame_buffer;	/* chain */
 static struct ycbcr_frame **primary_buffer;	/* normal */
-static VJFrame *crop_frame = NULL;
 
 #define CACHE_TOP 0
 #define CACHE 1
@@ -703,7 +705,7 @@ void vj_perform_free(veejay_t * info)
    if(primary_buffer[0]) free(primary_buffer[0]);
    if(primary_buffer) free(primary_buffer);
    if(socket_buffer) free(socket_buffer);
-
+#ifdef USE_SWSCALER
 	if(crop_frame)
 	{
 		if(crop_frame->data[0]) free(crop_frame->data[0]);
@@ -712,6 +714,7 @@ void vj_perform_free(veejay_t * info)
 	}
    if(crop_sampler)
 	subsample_free(crop_sampler);
+#endif
    if(effect_sampler)
 	subsample_free(effect_sampler);
 
@@ -858,14 +861,13 @@ void	vj_perform_get_output_frame( veejay_t *info, uint8_t **frame )
 	frame[1] = video_output_buffer[0]->Cb;
 	frame[2] = video_output_buffer[0]->Cr;
 }
-
+#ifdef USE_SWSCALER
 void	vj_perform_get_crop_dimensions(veejay_t *info, int *w, int *h)
 {
 	*w = info->edit_list->video_width - info->settings->viewport.left - info->settings->viewport.right;
 	*h = info->edit_list->video_height - info->settings->viewport.top - info->settings->viewport.bottom;
 
 }
-
 int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop )
 {
 	if(crop)
@@ -919,7 +921,7 @@ int	vj_perform_init_cropped_output_frame(veejay_t *info, VJFrame *src, int *dw, 
 	}
 	return 1;
 }
-
+#endif
 void vj_perform_init_output_frame( veejay_t *info, uint8_t **frame,
 				int dst_w, int dst_h )
 {

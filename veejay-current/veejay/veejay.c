@@ -177,7 +177,7 @@ static void Usage(char *progname)
 	fprintf(stderr,"  -M/--multicast-osc \t\tmulticast OSC\n");
 	fprintf(stderr,"  -V/--multicast-vims \t\tmulticast VIMS\n");
 	fprintf(stderr,"     --map-from-file <num>\tmap N frames to memory\n");
-
+#ifdef USE_SWSCALER
 	fprintf(stderr,"  -z/--zoom [1-11]\n");
 	fprintf(stderr,"\t\t\t\tsoftware scaler type (also use -W, -H ). \n");
 	fprintf(stderr,"\t\t\t\tAvailable types are:\n");         
@@ -202,9 +202,11 @@ static void Usage(char *progname)
 	fprintf(stderr,"\t\t\t\t-w/--zoomwidth \n");
 	fprintf(stderr,"\t\t\t\t-h/--zoomheight \n");
 	fprintf(stderr,"\t\t\t\t-C/--zoomcrop [top:bottom:left:right] (crop source before scaling)\n");
+#endif
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
-    exit(1);
+ 
+	exit(1);
 }
 
 #define OUT_OF_RANGE(val) ( val < 0 ? 1 : ( val > 100 ? 1 : 0) )
@@ -347,7 +349,8 @@ static int set_option(const char *name, char *value)
 	else if( strcmp(name,"auto-loop")==0 || strcmp(name,"L") == 0)
 	{
 		auto_loop = 1;
-	} 
+	}
+#ifdef USE_SWSCALER 
 	else if (strcmp(name, "zoom") == 0 || strcmp(name, "z" ) == 0)
 	{
 		info->settings->zoom = atoi(optarg);
@@ -410,6 +413,7 @@ static int set_option(const char *name, char *value)
 		}
 		info->settings->crop = 1;
 	}
+#endif
 	else if (strcmp(name, "quit") == 0 || strcmp(name, "q") == 0 )
 	{
 		info->continuous = 0;
