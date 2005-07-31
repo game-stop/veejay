@@ -34,6 +34,7 @@ enum {
 	VIMS_CHAIN_GET_ENTRY			=	410,
 	VIMS_VIMS_LIST				=	411,
 	VIMS_LOG				=	412,
+	VIMS_SAMPLE_INFO			=	413,
 
 /* general controls */
 	VIMS_SET_VOLUME				=	300,
@@ -65,6 +66,7 @@ enum {
 	VIMS_SET_MODE_AND_GO			=	328,
 	VIMS_RGB_PARAMETER_TYPE			=	329,
 	VIMS_SCREENSHOT				=	330,
+	VIMS_RGB24_IMAGE			=	333,
 
 /* video controls */
 	VIMS_VIDEO_PLAY_FORWARD			=	10,

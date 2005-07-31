@@ -493,9 +493,9 @@ void	veejay_auto_loop(veejay_t *info)
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN)
 	{
 		char sam[20];
-		sprintf(sam, "099:1 0;");
+		sprintf(sam, "%03d:1 0;", VIMS_SAMPLE_NEW);
 		vj_event_parse_msg(info, sam);
-		sprintf(sam, "100:-1;");
+		sprintf(sam, "%03d:-1;", VIMS_SAMPLE_SELECT);
 		vj_event_parse_msg(info,sam);
 	}
 }
@@ -960,7 +960,7 @@ static int veejay_screen_update(veejay_t * info )
 #ifdef USE_GDK_PIXBUF
 		if(vj_picture_save( info->settings->export_image, frame, 
 				info->video_output_width, info->video_output_height,
-				(info->pixel_format == FMT_420 ? 1 : 0 ) ) )
+				info->edit_list->pixel_format ) )
 		{
 			veejay_msg(VEEJAY_MSG_INFO,
 				"Saved frame %ld to image", info->settings->current_frame_num );

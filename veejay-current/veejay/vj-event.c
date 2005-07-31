@@ -47,6 +47,7 @@
 
 #ifdef USE_GDK_PIXBUF
 #include <libel/pixbuf.h>
+#include <gdk-pixbuf/gdk-pixbuf.h>
 #endif
 
 /* Highest possible SDL Key identifier */
@@ -497,6 +498,8 @@ static struct {
 		vj_event_send_tag_list,		1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
 	{ VIMS_SAMPLE_LIST,			"Sample: send list of Samples",
 		vj_event_send_sample_list,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_SAMPLE_INFO,			"Sample: send sample information (timecode and title)",
+		vj_event_send_sample_info,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS },
 	{ VIMS_EDITLIST_LIST,			"EditList: send list of all files",
 		vj_event_send_editlist,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY   },
 	{ VIMS_BUNDLE,				"Bundle: execute collection of messages",
@@ -536,6 +539,8 @@ static struct {
 #ifdef USE_GDK_PIXBUF
 	{ VIMS_SCREENSHOT,			"Various: Save image to file",
 		vj_event_screenshot,		3,	"%d %d %s",	{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS  },
+	{ VIMS_RGB24_IMAGE,			"Various: get a (scaled) image from veejay in rgb24",
+		vj_event_get_scaled_image,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS },
 #else
 #ifdef HAVE_JPEG
 	{ VIMS_SCREENSHOT,			"Various: Save file to jpeg",
@@ -7152,8 +7157,112 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 	SEND_MSG(v,_s_print_buf);
 }
 
+void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[2];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+	if(args[0] == 0 )
+		args[0] = v->uc->sample_id;
+	if(args[0] == -1)
+		args[0] = sample_size() - 1;
+
+	bzero( _s_print_buf,SEND_BUF);
+
+	if(sample_exists(args[0]))
+	{
+		char description[SAMPLE_MAX_DESCR_LEN];
+		int end_frame 	= sample_get_endFrame(args[0]);
+		int start_frame = sample_get_startFrame(args[0]);
+		char timecode[15];
+		MPEG_timecode_t tc;
+
+		mpeg_timecode( &tc, (end_frame - start_frame),
+			mpeg_framerate_code( mpeg_conform_framerate(v->edit_list->video_fps) ),
+			v->edit_list->video_fps );
+
+		sprintf( timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h,tc.m,tc.s,tc.f );
+		sample_get_description( args[0], description );
+	
+		int dlen = strlen(description);
+		int tlen = strlen(timecode);	
+
+		sprintf( _s_print_buf, 
+			"%05d%03d%s%03d%s",
+			( 5 + 3 + 3 + dlen + tlen),
+			dlen,
+			description,
+			tlen,
+			timecode );			
+	}
+	else
+	{
+		sprintf( _s_print_buf, "%05d", 0 );
+	}
+
+	SEND_MSG(v , _s_print_buf );
+}
+#ifdef USE_GDK_PIXBUF
+void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[2];
+	uint8_t *frame[3];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Acuiring frame");
+
+	vj_perform_get_primary_frame( v, frame, 0);
+	veejay_image_t *img = vj_picture_save_to_memory(
+					frame,
+					v->edit_list->video_width,
+					v->edit_list->video_height,
+					args[0],
+					args[1],
+					v->edit_list->pixel_format );
+	 
+	if(img)
+	{
+		GdkPixbuf *p = NULL;
+		int w,h;
+		int len;
+		if( img->scaled_image )
+		{
+			p =  (GdkPixbuf*) img->scaled_image;
+			w = args[0]; h = args[1];
+		}	
+		else
+		{
+			p =  (GdkPixbuf*) img->image;
+			w = v->edit_list->video_width;
+			h = v->edit_list->video_height;
+		}
 
 
+		unsigned char *msg = gdk_pixbuf_get_pixels( p );
+		unsigned char *con = (unsigned char*) vj_malloc(sizeof(unsigned char)  * 5 + (w * h * 3 ));
+		sprintf(con, "%05d", (w * h * 3));
+		veejay_memcpy( con + 5 , msg , (w * h * 3 ));
+		vj_server_send(v->vjs[0], v->uc->current_link, con, 5 + (w*h*3));
+		if(con) free(con);
+		if(img->image )
+			gdk_pixbuf_unref( (GdkPixbuf*) img->image );
+		if(img->scaled_image)
+			gdk_pixbuf_unref( (GdkPixbuf*) img->scaled_image );
+		if(img)
+			free(img);
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Failed to get image");
+		char empty[5];
+		bzero(empty, 5 );
+		SEND_MSG( v, empty );
+	}
+}
+#endif
 void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 {
 	veejay_t *v = (veejay_t*)ptr;

@@ -1800,7 +1800,6 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 
 static void 	update_globalinfo()
 {
-
 	if( info->uc.playmode == MODE_STREAM )
 		info->status_tokens[FRAME_NUM] = 0;
 
@@ -2313,6 +2312,8 @@ static void 	update_globalinfo()
 	info->uc.previous_playmode = pm;
 	for( i = 0; i < 2; i ++)
 		info->uc.last_list_length[i] = info->uc.list_length[i];
+
+
 }
 
 static	void	reset_tree(const char *name)
@@ -5208,3 +5209,57 @@ void	vj_gui_enable()
 
 	info->sensitive = 1;
 }
+/*
+void	vj_gui_put_image(void)
+{
+	GtkWidget *pixbuf_widget = glade_xml_get_widget_( info->main_window, "scaledimage" );
+	GdkPixbuf *pixbuf = NULL;
+	gint w = 100;
+	gint h = 100;
+	gint row_strides = 3 * w;
+	gint bw = 0;
+
+	// veejay sends current frame as image in RGB, 8 bytes per sample 
+	// send 'get image' message
+	multi_vims( VIMS_RGB24_IMAGE, "%d %d", w ,h );
+	// read image from socket, store length of image in bw
+	gchar *rawdata = recv_vims( 5, &bw );
+
+	if(bw<=0 ) { if (rawdata) free(rawdata); return ; }
+
+	GdkPixbuf *old_image = gtk_image_get_pixbuf( pixbuf_widget );
+	// create a new picture from memory
+	pixbuf = gdk_pixbuf_new_from_data( rawdata,GDK_COLORSPACE_RGB, false,8,w,h,row_strides,NULL,NULL );
+	// set picture
+	gtk_image_set_from_pixbuf(pixbuf_widget,pixbuf);
+	// free ?
+	//@ gdk_pixbuf_unref(pixbuf);
+	g_free(rawdata);
+}
+
+
+void	vj_gui_get_sample_info(void)
+{
+	int sample_id = 0; // 0 = current playing, -1 = last created, > 0 = sample number
+	multi_vims( VIMS_SAMPLE_INFO, "%d", sample_id );
+	gint sample_info_len = 0;
+	gchar *sample_info = recv_vims( 5, &sample_info_len);
+	gint title_len = 0;
+
+	if(sample_info_len <= 0 )
+		return;
+
+	sscanf(sample_info, "%d",&title_len );
+	sample_info += 3;
+	gchar *title = g_strndup( sample_info, title_len );
+	sample_info += title_len;
+
+	gint  timecode_len = 0;
+	sscanf( sample_info,"%d", &timecode_len );
+	sample_info += 3;
+	gchar *timecode = g_strndup( sample_info, timecode_len );
+
+	//printf("sample title [%s] timecode [%s]\n", title, timecode );
+}
+
+ */

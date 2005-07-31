@@ -20,6 +20,12 @@
 #define VJ_PIXBUF_H
 #include <config.h>
 
+typedef struct
+{	
+	void *image;
+	void *scaled_image;
+} veejay_image_t;
+
 #ifdef USE_GDK_PIXBUF
 void	vj_picture_init();
 void	vj_picture_cleanup( void *pic );
@@ -32,6 +38,8 @@ void	vj_picture_display_formats(void);
 
 void *	vj_picture_prepare_save( const char *filename, char *type, int out_w, int out_h);
 int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt );
+
+veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int out_w, int out_h, int fmt  );
 #endif
 
 #endif

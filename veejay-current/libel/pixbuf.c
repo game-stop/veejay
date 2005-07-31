@@ -28,7 +28,7 @@
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include <libvje/effects/common.h>
 #include <libyuv/yuvconv.h>
-
+#include <libel/pixbuf.h>
 typedef struct
 {
 	char *filename;
@@ -244,7 +244,10 @@ void *	vj_picture_prepare_save(
 	g_slist_free( f );
 	g_slist_free( res ); */
 
-	pic->filename = strdup( filename );
+	if(filename)
+		pic->filename = strdup( filename );
+	else
+		pic->filename = NULL;
 
 	if(strncasecmp(type,"jpg",3 ) == 0)
 		pic->type = strdup("jpeg");
@@ -256,6 +259,9 @@ void *	vj_picture_prepare_save(
 
 	return (void*) pic;
 }
+
+
+
 static	void	display_if_writeable( GdkPixbufFormat *data, GSList **list)
 {
 	if( gdk_pixbuf_format_is_writable( data ))
@@ -326,7 +332,7 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 	pict2.data[0] =  (uint8_t*) gdk_pixbuf_get_pixels( img_ );;
         pict2.linesize[0] = w * 3;
 
-	img_convert( &pict2, PIX_FMT_RGB24, &pict1, (fmt == 1 ? PIX_FMT_YUV420P:
+	img_convert( &pict2, PIX_FMT_RGB24, &pict1, (fmt == 0 ? PIX_FMT_YUV420P:
                                                                          PIX_FMT_YUV422P),
 				w, 	h );
 
@@ -362,4 +368,57 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 	
 	return ret;
 }
+
+veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int out_w, int out_h, int fmt  )
+{
+	int ret = 0;
+	veejay_image_t *image = (veejay_image_t*) vj_malloc(sizeof(veejay_image_t*));
+	if(!image)
+		return NULL;
+
+	memset(image, 0,sizeof(veejay_image_t));
+
+	AVPicture pict1,pict2;
+	memset(&pict1,0,sizeof(pict1));
+        memset(&pict2,0,sizeof(pict2));
+
+	pict1.data[0] = frame[0];
+	pict1.data[1] = frame[1];
+	pict1.data[2] = frame[2];
+        pict1.linesize[0] = w;
+	pict1.linesize[1] = w >> 1;
+	pict1.linesize[2] = w >> 1;
+
+	image->image = (void*)gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, w, h );
+	if(!image->image)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cant allocate buffer for RGB");
+		return NULL;
+	}
+
+	pict2.data[0] =  (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );;
+        pict2.linesize[0] = w * 3;
+
+	img_convert( &pict2, PIX_FMT_RGB24, &pict1, (fmt == 0 ? PIX_FMT_YUV420P:
+                                                                         PIX_FMT_YUV422P),
+				w, 	h );
+
+	if( out_w != w || out_h != h )
+	{
+		image->scaled_image = (void*)gdk_pixbuf_scale_simple(
+				(GdkPixbuf*) image->image, out_w, out_h,
+			 GDK_INTERP_BILINEAR );
+	}
+
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"In memory picture %d x %d , %d rowstrides, %d bits per sample",
+		gdk_pixbuf_get_width( (GdkPixbuf*)image->scaled_image ),
+		gdk_pixbuf_get_height( (GdkPixbuf*) image->scaled_image ),
+		gdk_pixbuf_get_rowstride( (GdkPixbuf*) image->scaled_image ),
+		gdk_pixbuf_get_bits_per_sample( (GdkPixbuf*) image->scaled_image ) );
+
+	return image;
+}
+
+
 #endif
