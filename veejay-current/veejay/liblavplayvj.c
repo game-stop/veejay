@@ -3117,6 +3117,21 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
     		}
 
  		sample_init( (info->edit_list->video_width * info->edit_list->video_height)  ); 
+
+		/* create samples from EDL */
+		if( info->uc->file_as_sample)
+		{
+			long i,n=info->edit_list->num_video_files;
+			for(i = 0; i < n; i ++ )
+			{
+				long start,end;
+				if(vj_el_get_file_entry( info->edit_list, &start,&end, i ))
+				{
+					sample_info *skel = sample_skeleton_new( start,end );
+					sample_store(skel);
+				}	
+			}
+		}
 	}
 
 

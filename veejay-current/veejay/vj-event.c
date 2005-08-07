@@ -2704,7 +2704,6 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 void	vj_event_send_vimslist(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
-	
 	int i;
 
 	int len = 1;
@@ -5909,6 +5908,17 @@ void vj_event_el_load_editlist(void *ptr, const char format[], va_list ap)
 	veejay_msg(VEEJAY_MSG_ERROR, "EditList: Load not implemented");
 }
 
+static int	_vj_event_new_sample( veejay_t *v, int start,int end )
+{
+	sample_info *skel = sample_skeleton_new(start,end);
+	if(sample_store(skel) == 0)
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Created new sample %d",skel->sample_id); 
+		return skel->sample_id;
+	}
+	return 0;
+}
+
 void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -5922,6 +5932,9 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 	if ( veejay_edit_addmovie(v,str,start,destination,destination))
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Appended video file %s to EditList",str); 
+		if( v->uc->file_as_sample )
+			_vj_event_new_sample( v, destination,
+					v->edit_list->video_frames -1 );
 	}
 	else
 	{
@@ -5938,21 +5951,17 @@ void vj_event_el_add_video_sample(void *ptr, const char format[], va_list ap)
 	int *args = NULL;
 	P_A(args,str,format,ap);
 
+	int new_sample_id = 0;
+	char result[6];
+	bzero(result,6);
+	bzero( _s_print_buf,SEND_BUF);
+
 	if ( veejay_edit_addmovie(v,str,start,destination,destination))
-	{
-		int start_pos = destination;
-		int end_pos = v->edit_list->video_frames-1;
-		sample_info *skel = sample_skeleton_new(start_pos,end_pos);
-		if(sample_store(skel) == 0)
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Appended video file %s to EditList as new sample %d",str,skel->sample_id); 
-		}
-	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Appended file %s to EditList",str);
-	}
-	
+		new_sample_id = _vj_event_new_sample( v, destination,v->edit_list->video_frames-1 );
+
+	sprintf(result, "%05d",new_sample_id );
+	sprintf(_s_print_buf, "%03d%s",strlen(result) + 3, result);	
+	SEND_MSG( v,_s_print_buf );
 }
 
 void vj_event_tag_del(void *ptr, const char format[] , va_list ap ) 
@@ -7157,10 +7166,63 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 	SEND_MSG(v,_s_print_buf);
 }
 
+static	void	_vj_event_gatter_sample_info( veejay_t *v, int id )
+{
+	char description[SAMPLE_MAX_DESCR_LEN];
+	int end_frame 	= sample_get_endFrame( id );
+	int start_frame = sample_get_startFrame( id );
+	char timecode[15];
+	MPEG_timecode_t tc;
+
+	mpeg_timecode( &tc, (end_frame - start_frame),
+		mpeg_framerate_code( mpeg_conform_framerate(v->edit_list->video_fps) ),
+		v->edit_list->video_fps );
+
+	sprintf( timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h,tc.m,tc.s,tc.f );
+	sample_get_description( id, description );
+
+	int dlen = strlen(description);
+	int tlen = strlen(timecode);	
+
+	sprintf( _s_print_buf, 
+		"%05d%03d%s%03d%s%02d",
+		( 5 + 3 + 3 + 2 + dlen + tlen),
+		dlen,
+		description,
+		tlen,
+		timecode,
+		0
+	);	
+
+}
+static	void	_vj_event_gatter_stream_info( veejay_t *v, int id )
+{
+	char description[SAMPLE_MAX_DESCR_LEN];
+	char source[255];
+	int  stream_type = vj_tag_get_type( id );
+	bzero( source, 255 );
+	vj_tag_get_source_name( id, source );
+	vj_tag_get_description( id, description );
+	
+	int dlen = strlen( description );
+	int tlen = strlen( source );
+	sprintf( _s_print_buf,
+		"%05d%03d%s%03d%s%02d",
+		( 5 + 3 + 3 + 2 + dlen + tlen ),
+		dlen,
+		description,
+		tlen,
+		source,
+		stream_type 
+	);
+}
+
 void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int args[2];
+	int id = 0;
+	int failed = 1;
 	char *str = NULL;
 	P_A(args,str,format,ap);
 	if(args[0] == 0 )
@@ -7170,39 +7232,34 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 
 	bzero( _s_print_buf,SEND_BUF);
 
-	if(sample_exists(args[0]))
+	id = args[0];
+
+	switch( v->uc->playback_mode )
 	{
-		char description[SAMPLE_MAX_DESCR_LEN];
-		int end_frame 	= sample_get_endFrame(args[0]);
-		int start_frame = sample_get_startFrame(args[0]);
-		char timecode[15];
-		MPEG_timecode_t tc;
-
-		mpeg_timecode( &tc, (end_frame - start_frame),
-			mpeg_framerate_code( mpeg_conform_framerate(v->edit_list->video_fps) ),
-			v->edit_list->video_fps );
-
-		sprintf( timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h,tc.m,tc.s,tc.f );
-		sample_get_description( args[0], description );
+		case VJ_PLAYBACK_MODE_SAMPLE:
+			if(sample_exists(id))
+			{
+				_vj_event_gatter_sample_info(v,id);
+				failed = 0;
+			}
+			break;
+		case  VJ_PLAYBACK_MODE_TAG:
+			if(vj_tag_exists(id))
+			{
+				_vj_event_gatter_stream_info(v,id);	
+				failed = 0;
+			}
+			break;
+		default:
+			break;
+	}
 	
-		int dlen = strlen(description);
-		int tlen = strlen(timecode);	
-
-		sprintf( _s_print_buf, 
-			"%05d%03d%s%03d%s",
-			( 5 + 3 + 3 + dlen + tlen),
-			dlen,
-			description,
-			tlen,
-			timecode );			
-	}
-	else
-	{
+	if(failed)
 		sprintf( _s_print_buf, "%05d", 0 );
-	}
 
 	SEND_MSG(v , _s_print_buf );
 }
+
 #ifdef USE_GDK_PIXBUF
 void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 {

@@ -5241,13 +5241,18 @@ void	vj_gui_put_image(void)
 void	vj_gui_get_sample_info(void)
 {
 	int sample_id = 0; // 0 = current playing, -1 = last created, > 0 = sample number
+
 	multi_vims( VIMS_SAMPLE_INFO, "%d", sample_id );
 	gint sample_info_len = 0;
 	gchar *sample_info = recv_vims( 5, &sample_info_len);
 	gint title_len = 0;
+	gchar *ptr = sample_info;
 
 	if(sample_info_len <= 0 )
+	{
+		if(sample_info) g_free(sample_info);
 		return;
+	}
 
 	sscanf(sample_info, "%d",&title_len );
 	sample_info += 3;
@@ -5258,8 +5263,20 @@ void	vj_gui_get_sample_info(void)
 	sscanf( sample_info,"%d", &timecode_len );
 	sample_info += 3;
 	gchar *timecode = g_strndup( sample_info, timecode_len );
+	sample_info += timecode_len;
 
-	//printf("sample title [%s] timecode [%s]\n", title, timecode );
+	gint	sample_type = 0;
+	sscanf( sample_info, "%2d", &sample_type );
+
+	// if 0 , its a sample, else its some type of stream
+	// see cat libstream/vj-tag.h|grep TYPE
+	if( sample_type == 0 )
+		printf("sample title [%s] timecode [%s]\n", title, timecode );
+	else
+		printf("stream descr [%s] source [%s] type %d\n", title,timecode,sample_type );
+
+	if(ptr)
+		g_free(ptr);
 }
 
- */
+*/ 

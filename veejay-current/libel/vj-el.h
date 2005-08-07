@@ -102,4 +102,7 @@ void	vj_el_show_formats(void);
 
 editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int width, int height, float fps);
 
+int	vj_el_get_file_entry( editlist *el,long *start_pos, long *end_pos, long entry );
+
+
 #endif

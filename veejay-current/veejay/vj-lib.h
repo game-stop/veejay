@@ -229,6 +229,7 @@ typedef struct {
     int input_device;
     int geox;
     int geoy;
+    int file_as_sample;
 } user_control;
 
 typedef struct {

@@ -394,13 +394,24 @@ void	on_button_el_add_clicked(GtkWidget *w, gpointer *user_data)
 void	on_button_el_addsample_clicked(GtkWidget *w, gpointer *user_data)
 {
 	gchar *filename = dialog_open_file( "Append videofile (and create sample)");
-	if( filename )
+	if( !filename )
+		return;
+	
+	int sample_id = 0;
+	int result_len = 0;
+	multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%s", filename );
+
+	gchar *result = recv_vims( 3, &result_len );
+	if(result_len > 0 )
 	{
-		multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%s", filename );
-		vj_msg(VEEJAY_MSG_INFO, "Try to add file '%s' to EditList and create a new sample",
-			filename);
-		g_free(filename);
+		sscanf( result, "%5d", &sample_id );
+		vj_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s", sample_id, filename);
+		g_free(result);
+		// force reloading of sample list
+		info->uc.reload_hint[HINT_SLIST] = 1;
 	}
+	
+	g_free(filename );
 }
 void	on_button_el_delfile_clicked(GtkWidget *w, gpointer *user_data)
 {

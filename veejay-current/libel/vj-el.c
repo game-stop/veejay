@@ -1266,6 +1266,29 @@ MPEG_timecode_t get_timecode(editlist *el, long num_frames)
 	return tc;
 }
 
+int	vj_el_get_file_entry(editlist *el, long *start_pos, long *end_pos, long entry )
+{
+	if(entry >= el->num_video_files)
+		return 0;
+
+	int64_t	n = (int64_t) entry;
+	int64_t i = 0;
+
+	if( el->video_file_list[ n ] == NULL )
+		return 0;
+
+	*start_pos = 0;
+
+	for( i = 0;i < n ; i ++ )
+		*start_pos += el->num_frames[i];
+
+	*end_pos = (*start_pos + el->num_frames[n] - 1);
+
+	return 1;
+}
+
+
+
 char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 {
 	int num_files;

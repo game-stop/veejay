@@ -162,7 +162,7 @@ static void Usage(char *progname)
 	fprintf(stderr,"  -v/--verbose  \t\tEnable debugging output (default off)\n");
 	fprintf(stderr,"  -b/--bezerk    \t\tBezerk (default off)   \n");
  	fprintf(stderr,"  -L/--auto-loop   \t\tStart with default sample\n");
-
+	fprintf(stderr,"  -g/--clip-as-sample	\t\tLoad every video clip as a new sample\n");	
 	fprintf(stderr,"  -n/--no-color     \t\tDont use colored text\n");
 	fprintf(stderr,"  -r/--force	\t\tForce loading of videofiles\n");
 	fprintf(stderr,"  -m/--sample-mode [01]\t\tSampling mode 1 = best quality (default), 0 = best performance\n");  
@@ -418,6 +418,10 @@ static int set_option(const char *name, char *value)
 	{
 		info->continuous = 0;
 	}
+	else if (strcmp(name, "clip-as-sample") == 0 || strcmp(name, "g") == 0 )
+	{	
+		info->uc->file_as_sample = 1;
+	}
 	else if (strcmp(name, "dummy") == 0 || strcmp(name, "d" ) == 0 )
 	{
 
@@ -450,6 +454,7 @@ static void check_command_line_options(int argc, char *argv[])
 	{"features",0,0,0},
 	{"deinterlace",0,0,0},
 	{"zoom",1,0,0},
+	{"clip-as-sample",0,0,0},
 	{"portoffset", 1, 0, 0},
 	{"sample-mode",1,0,0},
 	{"dummy",0,0,0},
