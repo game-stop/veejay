@@ -392,7 +392,7 @@ int sample_copy(int sample_id)
 	if (sample_store(copy) != 0)
 		return 0;
 
-	return 1;
+	return copy->sample_id;
 }
 
 /****************************************************************************************************
@@ -1723,7 +1723,7 @@ int sample_apply_loop_dec(int s1, double fps) {
 /* print sample status information into an allocated string str*/
 //int sample_chain_sprint_status(int s1, int entry, int changed, int r_changed,char *str,
 //			       int frame)
-int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode, char *str )
+int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode,int total_slots, char *str )
 {
     sample_info *sample;
     sample = sample_get(s1);
@@ -1731,7 +1731,7 @@ int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode, char *str 
 	return -1;
 	/*
 	fprintf(stderr,
-      "%d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+      "%d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 	    frame,
 	    sample->active_render_entry,
 	    r_changed,
@@ -1756,7 +1756,8 @@ int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode, char *str 
 	    sample->effect_chain[entry]->frame_trimmer,
 	    sample->effect_chain[entry]->source_type,
 	    sample->effect_chain[entry]->channel,
-	    this_sample_id - 1);
+	    this_sample_id - 1,
+		total_slots,);
 	*/
 /*
 	
@@ -1800,7 +1801,7 @@ int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode, char *str 
     */
 
 	sprintf(str,
-		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		pfps,
 		frame,
 		mode,
@@ -1815,7 +1816,8 @@ int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode, char *str 
 		sample->encoder_succes_frames,
 		sample_size(),
 		sample->marker_start,
-		sample->marker_end);
+		sample->marker_end,
+		total_slots);
 		
 		
  

@@ -500,6 +500,8 @@ static struct {
 		vj_event_send_sample_list,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
 	{ VIMS_SAMPLE_INFO,			"Sample: send sample information (timecode and title)",
 		vj_event_send_sample_info,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS },
+	{ VIMS_SAMPLE_OPTIONS,			"Sample: send sample options",
+		vj_event_send_sample_options,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS },
 	{ VIMS_EDITLIST_LIST,			"EditList: send list of all files",
 		vj_event_send_editlist,		0,	NULL,		{0,0}, VIMS_ALLOW_ANY   },
 	{ VIMS_BUNDLE,				"Bundle: execute collection of messages",
@@ -2217,6 +2219,20 @@ void	vj_event_format_xml_stream( xmlNodePtr node, int stream_id )
 	tagCreateStreamFX( cnode, stream );
 }
 
+static	void	vj_event_send_new_id(veejay_t * v, int new_id)
+{
+	char result[6];
+
+	if(new_id < 0 ) new_id = 0;
+
+	bzero(result,6);
+	bzero( _s_print_buf,SEND_BUF);
+
+	sprintf( result, "%05d",new_id );
+	sprintf(_s_print_buf, "%03d%s",5, result);	
+	SEND_MSG( v,_s_print_buf );
+}
+
 void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 {
 	char file_name[512];
@@ -2564,7 +2580,7 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
 		if(args[0] == VJ_PLAYBACK_MODE_TAG)
 		{
 			if(args[1]==0) args[1] = v->uc->sample_id;
-			if(args[1]==-1) args[1] = sample_size()-1;
+			if(args[1]==-1) args[1] = vj_tag_size()-1;
 			if(vj_tag_exists(args[1]))
 			{
 				veejay_change_playback_mode(v,args[0],args[1]);
@@ -2626,7 +2642,7 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 		}
 	}
 
-	len ++;
+	//len ++;
 
 	for( i = VIMS_BUNDLE_START; i < VIMS_BUNDLE_END; i ++ )
 	{
@@ -2644,8 +2660,11 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 	// token len too small !!
 	if(len > 0)
 	{
-		char *buf = (char*) vj_malloc(sizeof(char) * (len+5) );
-		bzero(buf, len+5 );
+	//	char *buf = (char*) vj_malloc(sizeof(char) * (len+5) );
+	
+	//	bzero(buf, len+5 );
+		char *buf = _s_print_buf;
+		bzero(buf, SEND_BUF);
 		sprintf(buf, "%05d", len ); 
 		for ( i = 0; i < MAX_SDL_KEY; i ++ )
 		{
@@ -2692,7 +2711,7 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 			}
 		}
 		SEND_MSG(v,buf);
-		if(buf) free(buf);
+	//	if(buf) free(buf);
 	}	
 	else
 	{
@@ -2706,7 +2725,7 @@ void	vj_event_send_vimslist(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 	int i;
 
-	int len = 1;
+	int len = 0;
 	// send event list seperatly
 
 	for( i = 1; vj_event_list[i].name != NULL ; i ++ )
@@ -2722,8 +2741,9 @@ void	vj_event_send_vimslist(void *ptr, const char format[], va_list ap)
 
 	if(len > 1)
 	{
-		char *buf = (char*) vj_malloc(sizeof(char) * (len+5) );
-		bzero(buf, len+5 );
+	//	char *buf = (char*) vj_malloc(sizeof(char) * (len+5) );
+		char *buf = _s_print_buf;
+		bzero(buf, SEND_BUF );
 		sprintf(buf, "%05d", len ); 
 
 		
@@ -2749,9 +2769,9 @@ void	vj_event_send_vimslist(void *ptr, const char format[], va_list ap)
 				strncat( buf, description, descr_len );
 			}
 		}
-
+	
 		SEND_MSG(v,buf);
-		if(buf) free(buf);
+	//	if(buf) free(buf);
 	}	
 	else
 	{
@@ -4183,7 +4203,7 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 	int args[1];
 	char *s = NULL;
 	P_A(args,s,format,ap);
-
+	int deleted_sample = 0;
 	if(SAMPLE_PLAYING(v)) 
 	{
 		if(v->uc->sample_id == args[0])
@@ -4195,6 +4215,7 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 			if(sample_del(args[0]))
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Deleted sample %d", args[0]);
+				deleted_sample = args[0];
 			}
 			else
 			{
@@ -4206,6 +4227,9 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 	{
 		p_invalid_mode();
 	}
+
+	vj_event_send_new_id(  v, deleted_sample );
+
 }
 
 void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
@@ -4213,6 +4237,7 @@ void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 	int args[1];
 	char *s = NULL;
+	int new_sample =0;
 	P_A(args,s,format,ap);
 
 	if(SAMPLE_PLAYING(v))
@@ -4220,19 +4245,13 @@ void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
 		if( args[0] == 0 ) args[0] = v->uc->sample_id;
 		if( args[0] == -1) args[0] = sample_size()-1;
 	}
-
 	if( sample_exists(args[0] ))
 	{
-		int new_sample = sample_copy(args[0]);
-		if(new_sample)
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Copied sample %d to %d",args[0],new_sample);
-		}
-		else
-		{
+		new_sample = sample_copy(args[0]);
+		if(!new_sample)
 			veejay_msg(VEEJAY_MSG_ERROR, "Failed to copy sample %d.",args[0]);
-		}
 	}
+	vj_event_send_new_id( v, new_sample );
 }
 
 void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
@@ -4943,10 +4962,10 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 
 				 		if(sample_set_effect_arg(args[0],args[1],i,args[(i+args_offset)] )==-1)	
 						{
-							"Error setting argument %d value %d for %s",
+							veejay_msg(VEEJAY_MSG_ERROR, "Error setting argument %d value %d for %s",
 							i,
 							args[(i+args_offset)],
-							vj_effect_get_description(real_id);
+							vj_effect_get_description(real_id));
 						}
 					}
 				}
@@ -5952,16 +5971,13 @@ void vj_event_el_add_video_sample(void *ptr, const char format[], va_list ap)
 	P_A(args,str,format,ap);
 
 	int new_sample_id = 0;
-	char result[6];
-	bzero(result,6);
-	bzero( _s_print_buf,SEND_BUF);
+
 
 	if ( veejay_edit_addmovie(v,str,start,destination,destination))
 		new_sample_id = _vj_event_new_sample( v, destination,v->edit_list->video_frames-1 );
 
-	sprintf(result, "%05d",new_sample_id );
-	sprintf(_s_print_buf, "%03d%s",strlen(result) + 3, result);	
-	SEND_MSG( v,_s_print_buf );
+	vj_event_send_new_id( v,new_sample_id );
+
 }
 
 void vj_event_tag_del(void *ptr, const char format[] , va_list ap ) 
@@ -6008,10 +6024,11 @@ void vj_event_tag_new_picture(void *ptr, const char format[], va_list ap)
 	int *args = NULL;
 	P_A(args,str,format,ap);
 
-	if( veejay_create_tag(v, VJ_TAG_TYPE_PICTURE, str, v->nstreams,0,0) == -1)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Picture stream");
-	}	
+	int id = veejay_create_tag(v, VJ_TAG_TYPE_PICTURE, str, v->nstreams,0,0);
+
+	vj_event_send_new_id( v, id );
+	if(id <= 0 )
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new Picture stream");
 }
 #endif
 
@@ -6022,10 +6039,11 @@ void vj_event_tag_new_avformat(void *ptr, const char format[], va_list ap)
 	int *args = NULL;
 	P_A(args,str,format,ap);
 
-	if( veejay_create_tag(v, VJ_TAG_TYPE_AVFORMAT, str, v->nstreams,0,0) == -1)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new FFmpeg stream");
-	}	
+	int id = veejay_create_tag(v, VJ_TAG_TYPE_AVFORMAT, str, v->nstreams,0,0);
+
+	vj_event_send_new_id( v, id );
+	if( id <= 0 );
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new FFmpeg stream");
 }
 #ifdef SUPPORT_READ_DV2
 void	vj_event_tag_new_dv1394(void *ptr, const char format[], va_list ap)
@@ -6037,10 +6055,10 @@ void	vj_event_tag_new_dv1394(void *ptr, const char format[], va_list ap)
 
 	if(args[0] == -1) args[0] = 63;
 	veejay_msg(VEEJAY_MSG_DEBUG, "Try channel %d", args[0]);
-	if( veejay_create_tag(v, VJ_TAG_TYPE_DV1394, "/dev/dv1394", v->nstreams,0, args[0]) == -1)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new DV1394 stream");
-	}
+	int id = veejay_create_tag(v, VJ_TAG_TYPE_DV1394, "/dev/dv1394", v->nstreams,0, args[0]);
+	vj_event_send_new_id( v, id );
+	if( id <= 0)
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new DV1394 stream");
 }
 #endif
 
@@ -6055,10 +6073,11 @@ void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 
 	sprintf(filename, "video%d", args[0]);
 
-	if( veejay_create_tag(v, VJ_TAG_TYPE_V4L, filename, v->nstreams,0,args[1]) == -1)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Video4Linux stream ");
-	}	
+	int id = veejay_create_tag(v, VJ_TAG_TYPE_V4L, filename, v->nstreams,0,args[1]);
+	vj_event_send_new_id( v, id );
+
+	if( id <= 0 )
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new Video4Linux stream ");
 }
 #endif
 void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
@@ -6070,10 +6089,10 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 
 	P_A(args,str,format,ap);
 	int id = veejay_create_tag(v, VJ_TAG_TYPE_NET, str, v->nstreams, 0,args[0]);
+	vj_event_send_new_id( v, id);
+
 	if(id <= 0)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Network stream");
-	}
+		veejay_msg(VEEJAY_MSG_ERROR, "create new Network stream");
 }
 
 void vj_event_tag_new_mcast(void *ptr, const char format[], va_list ap)
@@ -6085,10 +6104,10 @@ void vj_event_tag_new_mcast(void *ptr, const char format[], va_list ap)
 
 	P_A(args,str,format,ap);
 	int id = veejay_create_tag(v, VJ_TAG_TYPE_MCAST, str, v->nstreams, 0,args[0]);
+	vj_event_send_new_id( v, id  );
+
 	if( id <= 0)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new multicast stream");
-	}
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new multicast stream");
 
 }
 
@@ -6111,6 +6130,11 @@ void vj_event_tag_new_color(void *ptr, const char format[], va_list ap)
 	{
 		vj_tag_set_stream_color( id, args[0],args[1],args[2] );
 	}	
+
+	vj_event_send_new_id( v , id );
+	if( id <= 0 )
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new solid color stream");
+
 }
 
 void vj_event_tag_new_y4m(void *ptr, const char format[], va_list ap)
@@ -6119,10 +6143,11 @@ void vj_event_tag_new_y4m(void *ptr, const char format[], va_list ap)
 	char str[255];
 	int *args = NULL;
 	P_A(args,str,format,ap);
-	if( veejay_create_tag(v, VJ_TAG_TYPE_YUV4MPEG, str, v->nstreams,0,0) == -1)
-	{
+	int id  = veejay_create_tag(v, VJ_TAG_TYPE_YUV4MPEG, str, v->nstreams,0,0);
+
+	vj_event_send_new_id( v, id );
+	if( id <= 0 )
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Yuv4mpeg stream");
-	}
 }
 #ifdef HAVE_V4L
 void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
@@ -7185,13 +7210,14 @@ static	void	_vj_event_gatter_sample_info( veejay_t *v, int id )
 	int tlen = strlen(timecode);	
 
 	sprintf( _s_print_buf, 
-		"%05d%03d%s%03d%s%02d",
-		( 5 + 3 + 3 + 2 + dlen + tlen),
+		"%05d%03d%s%03d%s%02d%02d",
+		( 5 + 3 + 3 + 2 + 2+ dlen + tlen),
 		dlen,
 		description,
 		tlen,
 		timecode,
-		0
+		0,
+		id
 	);	
 
 }
@@ -7208,12 +7234,13 @@ static	void	_vj_event_gatter_stream_info( veejay_t *v, int id )
 	int tlen = strlen( source );
 	sprintf( _s_print_buf,
 		"%05d%03d%s%03d%s%02d",
-		( 5 + 3 + 3 + 2 + dlen + tlen ),
+		( 5 + 3 + 3 + 2 + 2 + dlen + tlen ),
 		dlen,
 		description,
 		tlen,
 		source,
-		stream_type 
+		stream_type,
+		id 
 	);
 }
 
@@ -8093,4 +8120,140 @@ void	vj_event_vloopback_stop( void *ptr, const char format[], va_list ap )
 }
 #endif
 
+
+/* 
+ * Function that returns the options for a special sample (markers, looptype, speed ...) or
+ * for a special stream ... 
+ *
+ * Needs two Parameters, first on: -1 last created sample, 0 == current playing sample, >=1 id of sample
+ * second parameter is the playmode of this sample to decide if its a video sample or any kind of stream
+ * (for this see comment on void vj_event_send_sample_info(..) 
+ */ 
+void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[2];
+	int id=0;
+	char *str = NULL;
+	int failed = 1;	
+
+	P_A(args,str,format,ap);
+	if(args[0] == 0 )
+		args[0] = v->uc->sample_id;
+	if(args[0] == -1)
+		args[0] = sample_size() - 1;
+
+	bzero( _s_print_buf,SEND_BUF);
+
+	id = args[0];
+	char options[100];
+	char prefix[4];
+	bzero(prefix, 4 );
+	bzero(options, 100);
+
+	switch(args[1])
+	    {
+	    case VJ_PLAYBACK_MODE_SAMPLE: 
+		if(sample_exists(id))
+		    {
+		    /* For gathering sample-infos use the sample_info_t-structure that is defined in /libsample/sampleadm.h */
+		    sample_info *si = sample_get(id);
+	        	if (si)
+		        {
+		        int start = si->first_frame[si->active_render_entry];
+		        int end   = si->last_frame[si->active_render_entry];
+		        int speed = si->speed;
+    		        int loop = si->looptype;
+		        int marker_start = si->marker_start;
+		        int marker_end = si->marker_end;
+		        int effects_on = si->effect_toggle;
+
+			sprintf( options,
+		        "%06d%06d%03d%02d%06d%06d%01d",
+	    	    	     start,
+		             end,
+			     speed,
+			     loop,
+			     marker_start,
+			     marker_end,
+			     effects_on);
+			failed = 0;
+
+			sprintf(prefix, "%02d", 0 );
+
+			}	
+		    }
+		break;
+	    case VJ_PLAYBACK_MODE_TAG:		
+		if(vj_tag_exists(id)) 
+		    {
+		    /* For gathering further informations of the stream first decide which type of stream it is 
+		       the types are definded in libstream/vj-tag.h and uses then the structure that is definded in 
+		       libstream/vj-tag.h as well as some functions that are defined there */
+		    vj_tag *si = vj_tag_get(id);
+		    int stream_type = si->source_type;
+		    
+			sprintf(prefix, "%02d", stream_type );
+
+		    if (stream_type == VJ_TAG_TYPE_COLOR)
+			{
+			int col[3] = {0,0,0};
+			col[0] = si->color_r;
+			col[1] = si->color_g;
+			col[2] = si->color_b;
+			
+			sprintf( options,
+		        "%03d%03d%03d",
+			    col[0],
+			    col[1],
+			    col[2]
+			    );
+			failed = 0;
+			}
+		    /* this part of returning v4l-properties is here implemented again ('cause there is
+		     * actually a VIMS-command to get these values) to get all necessary stream-infos at 
+		     * once so only ONE VIMS-command is needed */
+		    else if (stream_type == VJ_TAG_TYPE_V4L)
+			{
+			int brightness=0;
+			int hue = 0;
+			int contrast = 0;
+			int color = 0;
+			int white = 0;
+			int effects_on = 0;
+			
+			vj_tag_get_v4l_properties(id,&brightness,&hue, &contrast, &color, &white );			
+			effects_on = si->effect_toggle;
+			
+			sprintf( options,
+		        "%05d%05d%05d%05d%05d%01d",
+			    brightness,
+			    hue,
+			    contrast,
+			    color,
+			    white,
+			    effects_on);
+			failed = 0;
+			}
+		    else	
+			{
+			int effects_on = si->effect_toggle;
+			sprintf( options,
+		        "%01d",
+			    effects_on);
+			failed = 0;
+			}
+		    }
+		break;
+	    default:
+		break;		
+	    }	
+
+	if(failed)
+		sprintf( _s_print_buf, "%05d", 0 );
+	else
+		sprintf( _s_print_buf, "%05d%s%s",strlen(prefix) + strlen(options), prefix,options );
+
+	SEND_MSG(v , _s_print_buf );
+}
 

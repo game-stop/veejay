@@ -9,6 +9,10 @@ SUBDIRS += plugins veejay
 if USE_GVEEJAY
 SUBDIRS += gveejay
 endif
+if USE_GVEEJAYRELOADED
+SUBDIRS += gveejay-reloaded
+endif
+
 SUBDIRS += tools
 SUBDIRS += man
 

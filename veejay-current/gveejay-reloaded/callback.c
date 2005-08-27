@@ -16,6 +16,10 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+ 
+#include <gveejay/vj-api.h>
+#include <veejay/vj-global.h>
+
 #define DBG_C() { 	vj_msg_detail(VEEJAY_MSG_DEBUG, "Implement %s", __FUNCTION__ ); }  
 
 static int config_file_status = 0;
@@ -631,66 +635,28 @@ void	on_button_stoplaunch_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
 {
-	if(info->uc.selected_sample_id != 0)
+	if(info->selected_slot)
 	{
-		multi_vims( VIMS_SET_MODE_AND_GO , "%d %d" , 0,
-			info->uc.selected_sample_id );
-		vj_msg(VEEJAY_MSG_INFO, "Play sample %d", info->uc.selected_sample_id);
+		multi_vims( VIMS_SET_MODE_AND_GO , "%d %d" ,
+			info->selected_slot->sample_id,		
+			info->selected_slot->sample_type );
 	}
-	if(info->uc.selected_stream_id != 0)
-	{
-		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d", 1,
-			info->uc.selected_stream_id );
-		vj_msg(VEEJAY_MSG_INFO, "Play stream %d", info->uc.selected_stream_id );
-	}
-
 }
 void	on_button_sample_del_clicked(GtkWidget *widget, gpointer user_data)
 {
-	int query = 0;
-	if(info->uc.selected_sample_id )
+	if( info->selected_slot )	
 	{
-		if(info->uc.playmode == MODE_SAMPLE )
-		{
-			if(info->uc.selected_sample_id == info->status_tokens[CURRENT_ID])
-			{
-				vj_msg(VEEJAY_MSG_ERROR,
-					"Cannot delete current playing sample %d",
-					info->status_tokens[CURRENT_ID]);
-				return;
-			}
-		}
-		multi_vims( VIMS_SAMPLE_DEL, "%d",
-			info->uc.selected_sample_id );
-		query = 1;
-		vj_msg(VEEJAY_MSG_INFO, "Delete sample %d", info->uc.selected_sample_id);
+		remove_sample_from_slot();
 	}
-	if(info->uc.selected_stream_id)
+	else
 	{
-		if(info->uc.playmode == MODE_STREAM )
-		{
-			if(info->uc.selected_stream_id == info->status_tokens[CURRENT_ID])
-			{
-				vj_msg(VEEJAY_MSG_ERROR,
-					"Cannot delete current playing stream %d",
-					info->status_tokens[CURRENT_ID]);
-				return;
-			}
-		}
-
-		multi_vims( VIMS_STREAM_DELETE, "%d",
-			info->uc.selected_stream_id );
-		query = 1;
-		vj_msg(VEEJAY_MSG_INFO, "Delete stream %d", info->uc.selected_stream_id );
+		vj_msg(VEEJAY_MSG_ERROR, "No slot selected\n");
 	}
-
-	if(query)
-		info->uc.reload_hint[HINT_SLIST] = 1;
 }
 void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
 {
 	gint erase_all = 0;
-	if(info->uc.list_length[MODE_SAMPLE] > 0 )
+	if(info->status_tokens[TOTAL_SLOTS] > 0 )
 	{
 		if(prompt_dialog("Load samplelist",
 			"Loading a samplelist will delete any existing samples" ) == GTK_RESPONSE_REJECT)
@@ -726,11 +692,12 @@ void	on_spin_samplestart_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
-		gchar *time1 = format_time(value);
-		multi_vims(VIMS_SAMPLE_SET_START, "%d %d",0, value );
-		vj_msg(VEEJAY_MSG_INFO, "Set sample's starting position to %d (timecode %s)",
-			value, time1);
+		gint value[1];
+		value[0] = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+		gchar *time1 = format_time(value[0]);
+		gchar buf[256];
+		sprintf( buf, "Set sample's starting position to %d (timecode %s)",value[0], time1);
+		vj_gui_change_slot_option(VIMS_SAMPLE_SET_START, &value, &buf);		
 		g_free(time1);
 	}
 }
@@ -739,12 +706,12 @@ void	on_spin_sampleend_value_changed( GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
-		gchar *time1 = format_time(value);
-		
-		multi_vims(VIMS_SAMPLE_SET_END, "%d %d", 0, value );
-		vj_msg(VEEJAY_MSG_INFO, "Set sample's ending position to %d (timecode %s)",
-			value, time1);
+		gint value[1];
+		value[0] = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+		gchar *time1 = format_time(value[0]);
+		gchar buf[256];
+		sprintf( buf, "Set sample's ending position to %d (timecode %s)",value[0], time1);
+		vj_gui_change_slot_option(VIMS_SAMPLE_SET_END, &value, &buf);		
 		g_free(time1);
 
 	}
@@ -766,11 +733,12 @@ void	on_spin_samplespeed_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
-		value *= info->play_direction;
-		multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
-		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
-			value );
+		gint value[1];
+		value[0] = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+		value[0] *= info->play_direction;		
+		gchar buf[256];
+		sprintf( buf, "Change video playback speed to %d",value[0] );
+		vj_gui_change_slot_option(VIMS_SAMPLE_SET_SPEED, &value, &buf);		
 	}
 }
 
@@ -779,7 +747,7 @@ void	on_v4l_brightness_value_changed(GtkWidget *widget, gpointer user_data)
 	if(!info->status_lock)
 	{
 		multi_vims( VIMS_STREAM_SET_BRIGHTNESS, "%d %d",
-			info->uc.current_stream_id,
+			info->selected_slot->sample_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) );
 	}
 }
@@ -789,7 +757,7 @@ void	on_v4l_contrast_value_changed(GtkWidget *widget, gpointer user_data)
 	if(!info->status_lock)
 	{
 		multi_vims( VIMS_STREAM_SET_CONTRAST, "%d %d", 
-			info->uc.current_stream_id,
+			info->selected_slot->sample_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0 ) );
 
 	}
@@ -800,7 +768,7 @@ void	on_v4l_hue_value_changed(GtkWidget *widget, gpointer user_data)
 	if(!info->status_lock)
 	{
 		multi_vims( VIMS_STREAM_SET_HUE, "%d %d",
-			info->uc.current_stream_id,
+			info->selected_slot->sample_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0 ) );
 	}
 }	
@@ -810,7 +778,7 @@ void	on_v4l_white_value_changed(GtkWidget *widget, gpointer user_data)
 	if(!info->status_lock)
 	{
 		multi_vims( VIMS_STREAM_SET_WHITE, "%d %d",
-			info->uc.current_stream_id,
+			info->selected_slot->sample_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0 ) );
 	}
 }
@@ -820,7 +788,7 @@ void	on_v4l_color_value_changed(GtkWidget *widget, gpointer user_data)
 	if(!info->status_lock)
 	{
 		multi_vims( VIMS_STREAM_SET_COLOR, "%d %d",
-			info->uc.current_stream_id,
+			info->selected_slot->sample_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) );
 	}
 }
@@ -973,10 +941,18 @@ void	on_check_samplefx_clicked(GtkWidget *widget , gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		if( is_button_toggled( "check_samplefx" ) )
-			multi_vims( VIMS_SAMPLE_CHAIN_ENABLE , "%d", 0 );
-		else
-			multi_vims( VIMS_SAMPLE_CHAIN_DISABLE, "%d", 0 );
+	if( is_button_toggled( "check_samplefx" ) )
+	    {
+	    gchar buf[256];
+	    sprintf( buf, "Effect chain toggled on");
+	    vj_gui_change_slot_option(VIMS_SAMPLE_CHAIN_ENABLE , NULL, &buf);			
+	    }
+	else
+	    {
+	    gchar buf[256];
+	    sprintf( buf, "Effect chain toggled off");
+	    vj_gui_change_slot_option(VIMS_SAMPLE_CHAIN_DISABLE , NULL, &buf);			
+	    }
 	}
 }
 void	on_check_streamfx_clicked(GtkWidget *widget, gpointer user_data)
@@ -993,25 +969,38 @@ void	on_check_streamfx_clicked(GtkWidget *widget, gpointer user_data)
 void	on_loop_none_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
-		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
-			"%d %d", 0,
-			get_loop_value() );
+		{		
+		gint value[1];
+		value[0] = get_loop_value();
+		gchar buf[256];
+		sprintf( buf, "Change loop type to no loop");
+		vj_gui_change_slot_option(VIMS_SAMPLE_SET_LOOPTYPE, &value, &buf);		
+		}
+		
 }
+
 void	on_loop_normal_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
-		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
-			"%d %d", 0,
-			get_loop_value() );
-
+		{	
+		gint value[1];
+		value[0] = get_loop_value();
+		gchar buf[256];
+		sprintf( buf, "Change loop type to normal loop");
+		vj_gui_change_slot_option(VIMS_SAMPLE_SET_LOOPTYPE, &value, &buf);		
+		}	
 }
+
 void	on_loop_pingpong_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
-		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
-			"%d %d", 0,
-			get_loop_value() );
-
+		{		
+		gint value[1];
+		value[0] = get_loop_value();
+		gchar buf[256];
+		sprintf( buf, "Change loop type to ping pong");
+		vj_gui_change_slot_option(VIMS_SAMPLE_SET_LOOPTYPE, &value, &buf);		
+		}		
 }
 
 #define atom_marker(name,value) {\
@@ -1172,7 +1161,6 @@ void	on_button_el_paste_clicked(GtkWidget *widget, gpointer user_data)
 }
 void	on_new_colorstream_clicked(GtkWidget *widget, gpointer user_data)
 {
-
 	GdkColor current_color;
 	GtkWidget *colorsel = glade_xml_get_widget(info->main_window,
 			"colorselection" );
@@ -1184,17 +1172,10 @@ void	on_new_colorstream_clicked(GtkWidget *widget, gpointer user_data)
 	gint red = current_color.red / 256.0;
 	gint green = current_color.green / 256.0;
 	gint blue = current_color.blue / 256.0;
-
-	info->uc.reload_hint[HINT_SLIST] = 1;
 	multi_vims( VIMS_STREAM_NEW_COLOR, "%d %d %d",
 		red,green,blue );
 
-	if ( gveejay_new_slot(1))
-	{
-		if( get_page( "veejaypanel") != PAGE_SAMPLEEDIT)
-			set_page( "sample_stream_pad", 0 );
-		vj_msg(VEEJAY_MSG_INFO, "Created new colid colored stream");	
-	}
+	gveejay_new_slot(1);
 }
 
 #define atom_aspect_ratio(name,type) {\
@@ -1406,13 +1387,11 @@ void	on_button_historymove_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 {
-	if(info->uc.selected_sample_id != 0)
+	if(info->selected_slot)
 	{
 		multi_vims( VIMS_SAMPLE_COPY , "%d",
-			info->uc.selected_sample_id );
-		if(info->status_tokens[PLAY_MODE] == MODE_PLAIN )
-			info->uc.reload_hint[HINT_SLIST] = 1;
-		vj_msg(VEEJAY_MSG_INFO, "Copy sample %d to new", info->uc.selected_sample_id);
+			info->selected_slot->sample_id );
+		gveejay_new_slot(0);
 	}
 }
 
@@ -1454,12 +1433,9 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 	else
 		multi_vims( VIMS_STREAM_NEW_UNICAST, "%d %s", port, remote );
 
-	if( gveejay_new_slot(1))
-	{ // FIXME use get sample options instead of entire list reloading
-		info->uc.reload_hint[HINT_SLIST] = 1;
-		if(remote) g_free(remote);
-		if(remote_) g_free(remote_);
-	}
+	gveejay_new_slot(1);	
+	if(remote) g_free(remote);
+	if(remote_) g_free(remote_);
 }
 
 void	on_inputstream_filebrowse_clicked(GtkWidget *w, gpointer user_data)
@@ -1496,12 +1472,9 @@ void	on_inputstream_file_button_clicked(GtkWidget *w, gpointer user_data)
 	if(use_pic)
 		multi_vims( VIMS_STREAM_NEW_PICTURE, "%s", filename);
 #endif
+	
+	gveejay_new_slot(1);
 
-	if( gveejay_new_slot(1 ))
-	{
-		//FIXME: reload sample options, append to list
-		info->uc.reload_hint[HINT_SLIST] = 1;
-	}
 	if(filename) g_free( filename );
 }
 
@@ -1518,3 +1491,221 @@ void	on_samplerand_toggled(GtkWidget *widget, gpointer user_data)
 			multi_vims( VIMS_SAMPLE_RAND_START, "%d", arg );
 	}
 }
+
+
+
+/* 
+ * Handler to open the veejay_connection-dialog via menu
+ */
+void on_openConnection_activate             (GtkMenuItem     *menuitem,
+	                                     gpointer         user_data)
+{
+    if(!info->status_lock)
+	{
+	GtkWidget *veejay_conncection_window = glade_xml_get_widget(info->main_window, "veejay_connection");
+	gtk_widget_show(veejay_conncection_window);	
+	} 
+}
+
+
+/* 
+ * Handler to close the veejay_connection-dialog
+ */
+void on_veejay_connection_close             (GtkDialog       *dialog,
+	                                     gpointer         user_data)
+{
+    if(!info->status_lock)
+	{
+	GtkWidget *veejay_conncection_window = glade_xml_get_widget(info->main_window, "veejay_connection");
+	gtk_widget_hide(veejay_conncection_window);	
+	} 
+}
+
+
+/* 
+ * Handler to show the video_settings-dialog via menu
+ */
+void on_VideoSettings_activate              (GtkMenuItem     *menuitem,
+	                                     gpointer         user_data)
+{
+    if(!info->status_lock)
+	{
+	GtkWidget *veejay_settings_window = glade_xml_get_widget(info->main_window, "video_options");
+	gtk_widget_show(veejay_settings_window);	
+	} 
+}
+
+
+
+/* 
+ * Handler to close the video_settings-dialog 
+ */
+void on_video_options_close                 (GtkDialog       *dialog,
+	                                     gpointer         user_data)
+{
+    if(!info->status_lock)
+	{
+	GtkWidget *veejay_settings_window = glade_xml_get_widget(info->main_window, "video_options");
+	gtk_widget_hide(veejay_settings_window);	
+	}
+}
+
+
+/* 
+ * Handler to apply the settings of the video_settings-dialog 
+ */
+void on_video_options_apply_clicked         (GtkButton       *button,
+	                                     gpointer         user_data)
+{
+	gint width = get_nums( "priout_width" );
+	gint height = get_nums( "priout_height" );
+	gint x = get_nums("priout_x" );
+	gint y = get_nums("priout_y" );
+
+	if( width > 0 && height > 0 )
+	{
+		multi_vims( VIMS_RESIZE_SDL_SCREEN, "%d %d %d %d",
+			width,height,x , y );
+		vj_msg(VEEJAY_MSG_INFO, "Resize Video Window to %dx%d", width,height);
+	}
+}
+
+/* 
+ * Handler to apply the settings of the video_settings-dialog AND close the dialog 
+ */
+void on_video_options_ok_clicked            (GtkButton       *button,
+	                                     gpointer         user_data)
+{
+    on_video_options_apply_clicked(button,user_data);
+    if(!info->status_lock)
+	{
+	GtkWidget *veejay_settings_window = glade_xml_get_widget(info->main_window, "video_options");
+	gtk_widget_hide(veejay_settings_window);	
+	}
+}
+
+
+/*
+ * Handler to show the VIMS_Bundles-dialog
+ */ 
+void on_vims_bundles_activate               (GtkMenuItem     *menuitem,
+	                                     gpointer         user_data)
+{
+    if(!info->status_lock)
+	{
+	GtkWidget *vims_bundles_window = glade_xml_get_widget(info->main_window, "vims_bundles");
+	gtk_widget_show(vims_bundles_window);	
+	} 
+}
+
+
+/*
+ * Handler to close the VIMS_Bundles-dialog
+ */ 
+void on_vims_bundles_close                  (GtkDialog       *dialog,
+	                                     gpointer         user_data)
+{
+    if(!info->status_lock)
+	{
+	GtkWidget *vims_bundles_window = glade_xml_get_widget(info->main_window, "vims_bundles");
+	gtk_widget_hide(vims_bundles_window);	
+	} 
+}
+
+
+/*
+ * Handler to show the Sample-Options-dialog
+ */ 
+void on_samples_options_clicked             (GtkButton       *button,
+	                                     gpointer         user_data)
+{
+    if(!info->status_lock)
+	{
+	GtkWidget *sample_options_window = glade_xml_get_widget(info->main_window, "sample_options");
+	gtk_widget_show(sample_options_window);	
+	vj_gui_show_sample_options();
+	} 
+}
+
+/*
+ * Handler to show the Sample-Options-dialog
+ */ 
+void on_sample_options_close                (GtkDialog       *dialog,
+	                                     gpointer         user_data)
+{
+    if(!info->status_lock)
+	{
+	GtkWidget *sample_options_window = glade_xml_get_widget(info->main_window, "sample_options");
+	gtk_widget_hide(sample_options_window);	
+	} 
+}
+
+
+/* 
+ * Handler to show the EDL and directly choose the selected sample
+ */
+void on_edit_sample_clicked                 (GtkButton       *button,
+	                                     gpointer         user_data)
+{
+    if(!info->status_lock)
+	{
+	GtkWidget *edl_window = glade_xml_get_widget(info->main_window, "sample_edit");
+	gtk_widget_show(edl_window);	
+	} 
+}
+
+
+/* 
+ * Handler to close the EDL 
+ */
+void on_sample_edit_close                   (GtkDialog       *dialog,
+	                                     gpointer         user_data)
+{
+    if(!info->status_lock)
+	{
+	GtkWidget *edl_window = glade_xml_get_widget(info->main_window, "sample_edit");
+	gtk_widget_hide(edl_window);	
+	} 
+}
+
+
+/*
+ * Handler to show the open-samples-dialog
+ */ 
+void on_open_samples_clicked                (GtkButton       *button,
+	                                     gpointer         user_data)
+{
+    if(!info->status_lock)
+	{
+	GtkWidget *open_samples_window = glade_xml_get_widget(info->main_window, "open_samples");
+	gtk_widget_show(open_samples_window);	
+	} 	
+}
+
+
+/*
+ * Handler to close the open-samples-dialog and add the selected sample/stream
+ * gives the filename and the type of the desired input to vj-api.c
+ */ 
+void
+on_open_samples_close                  (GtkDialog       *dialog,
+                                        gpointer         user_data)
+{
+    gchar *filename = NULL;
+    gint mode;
+
+    if(!info->status_lock)
+	{
+	GtkWidget *open_samples_window = glade_xml_get_widget(info->main_window, "open_samples");
+	gtk_widget_hide(open_samples_window);	
+	filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (open_samples_window));
+	if (filename !=NULL) 
+	    { 
+	    // the function gets a status flag defined in veejay/vj-global.h to know, that here is loaded an video-sample, not a stream
+	    // see void vj_event_send_sample_info in vj-event.c for further informations
+	    vj_gui_add_sample(filename,VJ_PLAYBACK_MODE_SAMPLE);
+	    g_free(filename );
+	    }
+	} 
+}
+

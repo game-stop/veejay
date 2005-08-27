@@ -73,6 +73,11 @@ AC_ARG_WITH(v4l,
 AC_ARG_WITH(xml2,
 		AC_HELP_STRING([--without-xml2], [Do not use the XML library for Gnome]),
 		[], [with_xml2=yes])
+
+AC_ARG_WITH(gveejayreloaded,
+		AC_HELP_STRING([--with-gveejayreloaded], [build GVeejay Reloaded (experimental)]),
+		[with_gveejayreloaded=yes], [with_gveejayreloaded=no])
+
 AC_ARG_WITH(gveejay,
 		AC_HELP_STRING([--without-gveejay], [Do not build GVeejay]),
 		[], [with_gveejay=yes])
@@ -80,8 +85,6 @@ AC_ARG_WITH(swscaler,
 		AC_HELP_STRING([--with-swscaler], [Build with Swscaler support]),
 		[with_swscaler=yes],
 		[with_swscaler=no])
-
-
 AC_ARG_WITH(freetype2,
 		AC_HELP_STRING([--without-freetype2], [Do not use the freetype library]),
 		[], [with_freetype2=yes])
@@ -150,12 +153,15 @@ dnl video4linux/hardware dependent tools. Else, undefine HAVE_V4L
 have_v4l=false
 have_linux=false
 have_darwin=false
+use_gveejayreloaded=false
 use_gveejay=false
 case $host in
   *-*-linux*)
 	AC_CHECK_HEADER(linux/version.h,
 		[have_linux=true
-
+		if test x$with_gveejayreloaded != xno ; then
+			 use_gveejayreloaded=true
+		fi
 		if test x$with_gveejay != xno ; then
 			 use_gveejay=true
 		fi
@@ -718,6 +724,8 @@ AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
 AM_CONDITIONAL(USE_SWSCALER, test x$use_swscaler = xtrue)
 AM_CONDITIONAL(USE_GVEEJAY,
 			test x$use_gveejay = xtrue )
+AM_CONDITIONAL(USE_GVEEJAYRELOADED,
+			test x$use_gveejayreloaded = xtrue )
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
@@ -778,37 +786,33 @@ else
 ac_configure_args="$ac_configure_args --disable-ffserver --disable-ffplay --disable-v4l --disable-audio-oss --disable-vhook --disable-dv1394 --disable-mpeg-audio-hp --disable-network --disable-audio-oss --disable-audio-beos"
 fi
 
-dnl  bah autoreconf wants to play with independent package ffmpeg 
-dnl  (needs configure.ac). so, instead of AC_CONFIG_SUBDIRS(ffmpeg/ffmeg)
-dnl  do it manually
+AC_MSG_NOTICE([ Gveejay ${use_gveejayreloaded} ${with_gveejayreloaded} ])
 
-if test x$use_gveejay != xfalse ; then
-	if test x$with_gveejay != xno ; then
+with_gimp_stuff=false
+if test x$use_gveejay != xfalse ; then with_gimp_stuff=true ; fi
+if test x$use_gveejayreloaded != xfalse ; then with_gimp_stuff=true ; fi
 
-		gveejay_datadir="${datadir}/veejay"
-		AC_SUBST(gveejay_datadir)
-		sh gveejay-paths.sh > gveejay-paths.h
+if test x$with_gimp_stuff != xfalse ; then
+	gveejay_datadir="${datadir}/veejay"
+	AC_SUBST(gveejay_datadir)
+	sh gveejay-paths.sh > gveejay-paths.h
 
+	glib_modules="glib-2.0 >= 2.4"
+	PKG_CHECK_MODULES(GLIB, [$glib_modules])
+	AC_SUBST(GLIB_CFLAGS)
+	AC_SUBST(GLIB_LIBS)
 
-		glib_modules="glib-2.0 >= 2.4"
-		PKG_CHECK_MODULES(GLIB, [$glib_modules])
-		AC_SUBST(GLIB_CFLAGS)
-		AC_SUBST(GLIB_LIBS)
+	gtk_modules="gtk+-2.0 >= 2.4"
+	PKG_CHECK_MODULES(GTK, [$gtk_modules])
+	AC_SUBST(GTK_CFLAGS)
+	AC_SUBST(GTK_LIBS)
 
+	libglade_modules="libglade-2.0 >= 2.2.0"
+	PKG_CHECK_MODULES(GLADE, [$libglade_modules])
+	AC_SUBST(GLADE_CFLAGS)
+	AC_SUBST(GLADE_LIBS)
+fi
 
-		gtk_modules="gtk+-2.0 >= 2.4"
-		PKG_CHECK_MODULES(GTK, [$gtk_modules])
-		AC_SUBST(GTK_CFLAGS)
-		AC_SUBST(GTK_LIBS)
-
-
-		libglade_modules="libglade-2.0 >= 2.2.0"
-		PKG_CHECK_MODULES(GLADE, [$libglade_modules])
-		AC_SUBST(GLADE_CFLAGS)
-		AC_SUBST(GLADE_LIBS)
-
-	fi
- fi
 dnl  AC_CONFIG_SUBDIRS(ffmpeg/ffmpeg)
 
 (
@@ -844,6 +848,7 @@ bio2jack/Makefile
 plugins/Makefile
 veejay/Makefile
 gveejay/Makefile
+gveejay-reloaded/Makefile
 man/Makefile
 tools/Makefile
 gveejay-paths.sh
@@ -905,11 +910,12 @@ AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
 AC_MSG_NOTICE([  - AVI MJPEG playback/recording  : true (always)])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
-AC_MSG_NOTICE([  - GDK Pixbuf support	         : ${have_pixbuf}])
+AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 AC_MSG_NOTICE([  - jack                          : ${have_jack}])
 AC_MSG_NOTICE([  - xml c library for gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - freetype support              : ${have_freetype}])
 AC_MSG_NOTICE([  - GVeejay UI                    : ${use_gveejay}])
+AC_MSG_NOTICE([  - GVeejay Reloaded UI           : ${use_gveejayreloaded}])
 AC_MSG_NOTICE([  - Swscaler support              : ${use_swscaler}])
 
 if test "$GCC" = yes ; then

@@ -2188,7 +2188,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 
 
 //int vj_tag_sprint_status(int tag_id, int entry, int changed, char *str)
-int vj_tag_sprint_status( int tag_id, int pfps,int frame, int mode, char *str )
+int vj_tag_sprint_status( int tag_id, int pfps,int frame, int mode,int ts, char *str )
 {
     vj_tag *tag;
     tag = vj_tag_get(tag_id);
@@ -2226,7 +2226,7 @@ int vj_tag_sprint_status( int tag_id, int pfps,int frame, int mode, char *str )
 	*/
 
 	sprintf(str,
-			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			pfps,
 			frame,
 			mode,
@@ -2240,8 +2240,9 @@ int vj_tag_sprint_status( int tag_id, int pfps,int frame, int mode, char *str )
 			tag->encoder_duration,
 			tag->encoder_succes_frames,
 			vj_tag_size()-1,
-			0, // no markers
-			0);
+			tag->source_type, // no markers
+			0,
+			ts);
 		
 
     return 0;

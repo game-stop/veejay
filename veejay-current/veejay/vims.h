@@ -35,7 +35,7 @@ enum {
 	VIMS_VIMS_LIST				=	411,
 	VIMS_LOG				=	412,
 	VIMS_SAMPLE_INFO			=	413,
-
+	VIMS_SAMPLE_OPTIONS			=	414,
 /* general controls */
 	VIMS_SET_VOLUME				=	300,
 	VIMS_FULLSCREEN				=	301,

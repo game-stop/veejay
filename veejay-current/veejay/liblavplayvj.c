@@ -1161,19 +1161,22 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     int d_len = 0;
     int res = 0;
     int pm = info->uc->playback_mode;
+    int total_slots = (sample_size() - 1 ) + (vj_tag_size() -1 );
+    if(total_slots < 0)
+	total_slots = 0;
     switch (info->uc->playback_mode) {
     	case VJ_PLAYBACK_MODE_SAMPLE:
 			if( info->settings->randplayer.mode ==
 				RANDMODE_SAMPLE)
 				pm = VJ_PLAYBACK_MODE_PATTERN;
 			if( sample_chain_sprint_status
-				(info->uc->sample_id, info->real_fps,settings->current_frame_num, pm, info->status_what ) != 0)
+				(info->uc->sample_id, info->real_fps,settings->current_frame_num, pm, total_slots,info->status_what ) != 0)
 				{
 				veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
 			}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		sprintf(info->status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		sprintf(info->status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			(int) info->real_fps,
 			settings->current_frame_num,
 			info->uc->playback_mode,
@@ -1188,11 +1191,12 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 			0,
 			0,
 			0,
-			0 );
+			0,
+			total_slots );
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
 		if( vj_tag_sprint_status( info->uc->sample_id, (int) info->real_fps,
-			settings->current_frame_num, info->uc->playback_mode, info->status_what ) != 0 )
+			settings->current_frame_num, info->uc->playback_mode,total_slots, info->status_what ) != 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
 		}
