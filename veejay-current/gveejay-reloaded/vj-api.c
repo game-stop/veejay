@@ -224,25 +224,6 @@ typedef struct
 	int 	height;
 } veejay_el_t;
 
-// test renew
-// modified because this is handled now by the options-dialog-routine
-static struct
-{
-	int pm;
-	const char *name;
-} notepad_widgets[] =
-{ 
-	// {MODE_SAMPLE, "frame_sampleproperties"},
-	// {MODE_SAMPLE, "frame_samplerecord"},
-	{MODE_SAMPLE, "tree_history"},
-	{MODE_SAMPLE, "button_historymove"},
-	{MODE_SAMPLE, "button_historyrec"},
-	//{MODE_STREAM, "frame_streamproperties"},
-	//{MODE_STREAM, "frame_streamrecord"},	
-	{-1	,     "vbox_fxtree" },
-	{ 0,	NULL	},
-};
-
 enum 
 {
 	RUN_STATE_LOCAL = 1,
@@ -349,6 +330,7 @@ typedef struct
 	sample_gui_slot_t *selected_gui_slot;
 	int		image_dimensions[2];
 	guchar		*rawdata;
+	int		prev_mode;
 } vj_gui_t;
 
 enum
@@ -490,6 +472,73 @@ static struct
 	{ "v4l_contrast" },
 	{ "v4l_color" },
 	{ "v4l_white" }
+};
+static struct
+{
+	const char *name;
+} gwidgets[] = {
+	{"button_sendvims"},
+	{"button_087"},
+	{"button_086"},
+	{"button_081"},
+	{"button_082"},
+	{"button_080"},
+	{"button_085"},
+//	{"button_036"},
+	{"button_084"},
+	{"button_083"},
+	{"button_084"},
+	{"button_088"},
+	{"videobar"},
+	{"button_samplestart"},
+	{"button_sampleend"},
+	{"button_fadeout"},
+	{"button_fadein"},
+	{"button_5_4"},
+	{"button_200"},
+	{"button_001"},
+	{"button_252"},
+	{"button_251"},
+	{"button_054"}, 
+	{"speedslider"},
+	{"new_colorstream"},
+	{"audiovolume"},
+	{"manualopacity"},
+	{"button_fadedur"},
+	{"vimsmessage"},
+	{NULL} 
+};
+static struct
+{
+	const char *name;
+} videowidgets[] = {
+	{"button_sendvims"},
+	{"button_087"},
+	{"button_086"},
+	{"button_081"},
+	{"button_082"},
+	{"button_080"},
+	{"button_085"},
+	{"button_084"},
+	{"button_083"},
+	{"button_084"},
+	{"button_088"},
+	{"videobar"},
+	{"button_samplestart"},
+	{"button_sampleend"},
+	{"speedslider"},
+	{NULL}
+};
+
+static struct
+{
+	const char *name;
+} plainwidgets[] = 
+{
+	{"manualopacity"},
+	{"loglinear"},
+	{"vbox_fxtree"},
+	{NULL}
 };
 
 enum
@@ -1823,7 +1872,7 @@ static	void	update_slider_value(const char *name, gint value, gint scale)
 	if(scale)
 	{
 		GtkAdjustment *adj = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment );
-		gvalue = (gdouble) value / (adj->upper);
+		gvalue = (gdouble) value / (gdouble) scale;
 	}
 	else
 		gvalue = (gdouble) value;
@@ -2052,34 +2101,12 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 
 static	void	update_status_accessibility(int pm)
 {
-	int *history = info->history_tokens[pm];
-
 	int i;
-	if(info->status_tokens[PLAY_MODE] != history[PLAY_MODE] )
-	{
-		if( pm != MODE_SAMPLE )
-		{
-			disable_widget( "samplerand" );
-			disable_widget( "freestyle" );
-		}
-		else	
-		{
-			enable_widget( "samplerand" );
-			enable_widget( "freestyle" );
 
-		}
-		if( pm == MODE_PLAIN )
-		{
-			for(i =0; notepad_widgets[i].name != NULL; i ++ )
-			 disable_widget( notepad_widgets[i].name );
-			enable_widget ("speedslider");
-		}
-	}
-	
-	if(selected_is_playing())
+	if( pm != info->prev_mode )
 	{
 		/* If mode changed, enable/disable widgets etc first */
-		if( history[PLAY_MODE] != pm )
+		if( info->status_tokens[PLAY_MODE] != info->prev_mode )
 		{
 			if( pm == MODE_STREAM )
 			{
@@ -2090,8 +2117,16 @@ static	void	update_status_accessibility(int pm)
 				disable_widget("button_historymove");  
 				disable_widget("frame_samplerecord");
 				disable_widget("frame_sampleproperties");
-				disable_widget("speedslider");
+				for(i=0; videowidgets[i].name != NULL; i++)
+					disable_widget( videowidgets[i].name);
+
 			}
+			else
+			{
+				for(i=0; videowidgets[i].name != NULL; i++)
+					enable_widget( videowidgets[i].name);
+			}
+
 			if( pm == MODE_SAMPLE )
 			{
 				enable_widget("frame_samplerecord");
@@ -2101,9 +2136,21 @@ static	void	update_status_accessibility(int pm)
 				enable_widget("button_historymove");  
 				disable_widget("frame_streamproperties");
 				disable_widget("frame_streamrecord");
-				enable_widget("speedslider");
+				enable_widget( "samplerand" );
+				enable_widget( "freestyle" );
 			}
-		
+			else
+			{
+				disable_widget( "samplerand" );
+				disable_widget( "freestyle" );
+			}
+
+			if( pm == MODE_PLAIN)
+				for( i = 0; plainwidgets[i].name != NULL ;i++ )
+					disable_widget( plainwidgets[i].name );
+			else
+				for( i = 0; plainwidgets[i].name != NULL ; i ++ )
+					enable_widget( plainwidgets[i].name );
 		}
 	}
 }
@@ -2124,7 +2171,7 @@ static void	update_current_slot(int pm)
 
 	/* Mode changed or ID changed, 
 	   Reload FX Chain, Reload current entry and disable widgets based on stream type */
-	if( pm != history[PLAY_MODE] || info->status_tokens[CURRENT_ID] != history[CURRENT_ID] )
+	if( pm != info->prev_mode || info->status_tokens[CURRENT_ID] != history[CURRENT_ID] )
 	{
 		int k;
 		info->uc.reload_hint[HINT_ENTRY] = 1;
@@ -2326,13 +2373,12 @@ static void 	update_globalinfo()
 
 	info->uc.playmode = pm;
 
+	update_status_accessibility(pm);
 	if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
-		info->status_tokens[PLAY_MODE] != history[PLAY_MODE] )
+		info->status_tokens[PLAY_MODE] != info->prev_mode )
 	{
-		if( pm == MODE_PLAIN )
-			disable_widget("vbox_fxtree");
 		if( pm == MODE_SAMPLE || MODE_STREAM )
-		{	enable_widget("vbox_fxtree");
+		{
 			info->uc.reload_hint[HINT_ENTRY] = 1;	
 			info->uc.reload_hint[HINT_CHAIN] = 1;
 		}
@@ -2343,8 +2389,6 @@ static void 	update_globalinfo()
 	{
 		info->uc.reload_hint[HINT_SLIST] = 1;
 	}
-
-	update_status_accessibility(pm);
 
 	if( history[TOTAL_FRAMES] != info->status_tokens[TOTAL_FRAMES])
 	{
@@ -2381,14 +2425,14 @@ static void 	update_globalinfo()
 			}
 			if(pm == MODE_PLAIN )
 			{
-				update_slider_value( "videobar", info->status_tokens[FRAME_NUM], 1 ); 
+				update_slider_value( "videobar", info->status_tokens[FRAME_NUM], 
+					info->status_tokens[TOTAL_FRAMES] ); 
 			}
 			if(pm == MODE_SAMPLE)
 			{
 				gint f = info->status_tokens[FRAME_NUM] - info->status_tokens[SAMPLE_START];
 				gint m = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
-				gdouble v = (f / (gdouble)m) * 100.0;
-				update_slider_gvalue( "videobar",v);
+				update_slider_value( "videobar",f,m);
 			}
 			
 		}
@@ -4732,6 +4776,7 @@ static void	update_gui()
 {
 
 	int pm = info->status_tokens[PLAY_MODE];
+
 	if( pm == MODE_SAMPLE && info->uc.randplayer )
 	{
 		info->uc.randplayer = 0;
@@ -4772,6 +4817,7 @@ static void	update_gui()
 		entry_history[i] = entry_tokens[i];
 	}
 
+	info->prev_mode = pm;
 
 }
 
@@ -5380,39 +5426,6 @@ gboolean	is_alive(gpointer data)
 	return TRUE;
 }
 
-static struct
-{
-	const char *name;
-} gwidgets[] = {
-	{"button_sendvims"},
-	{"button_087"},
-	{"button_086"},
-	{"button_081"},
-	{"button_082"},
-	{"button_080"},
-	{"button_085"},
-//	{"button_036"},
-	{"button_084"},
-	{"button_083"},
-	{"button_084"},
-	{"button_samplestart"},
-	{"button_sampleend"},
-	{"button_fadeout"},
-	{"button_fadein"},
-	{"button_5_4"},
-	{"button_200"},
-	{"button_001"},
-	{"button_252"},
-	{"button_251"},
-	{"button_054"}, 
-	{"speedslider"},
-	{"new_colorstream"},
-	{"audiovolume"},
-	{"manualopacity"},
-	{"button_fadedur"},
-	{"vimsmessage"},
-	{NULL} 
-};
 
 void	vj_gui_disconnect()
 {
@@ -5858,16 +5871,9 @@ image_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 
 }
 
-/* this function creates a new GUI slot. At initialization, all possible slots are initialized
- * so we add to the table of GUI slots directly.
- * FIXME: return new malloced gui_slot_slot_t
- */
-
+// TODO: 
 static void open_sample_edit_dialog( GtkWidget *widget, gpointer data )
 {
-	multi_vims( VIMS_SET_MODE_AND_GO, "%d %d", info->selected_slot->sample_id,
-		    info->selected_slot->sample_type );
-	
 	if(!GTK_WIDGET_VISIBLE(glade_xml_get_widget(info->main_window, "sample_options")))
 		{GtkWidget *w = glade_xml_get_widget_( info->main_window, "sample_options" );
 		 gtk_widget_show(w); }
@@ -5952,6 +5958,9 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 //	gtk_box_pack_start( GTK_BOX(gui_slot->upper_hbox), GTK_WIDGET(label), TRUE, TRUE, 0 );
 //	gtk_widget_show(label);
 	/* the edit button */
+
+	/* Todo: add pointer to sample slot to callback function.
+           edit mode needs ID and type */ 
 	gui_slot->edit_button = GTK_BUTTON( gtk_button_new_with_label("edit"));
 	gtk_box_pack_start( GTK_BOX(gui_slot->upper_hbox), GTK_WIDGET(gui_slot->edit_button), FALSE, FALSE, 0 );
 	g_signal_connect( gui_slot->edit_button, "clicked",

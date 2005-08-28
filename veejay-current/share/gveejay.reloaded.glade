@@ -4386,7 +4386,7 @@
 					      <property name="digits">4</property>
 					      <property name="update_policy">GTK_UPDATE_CONTINUOUS</property>
 					      <property name="inverted">False</property>
-					      <property name="adjustment">0 0 100 0.0010000000475 0.00999999977648 0</property>
+					      <property name="adjustment">0.00999999977648 0 1 0.0010000000475 0.00999999977648 0</property>
 					      <signal name="value_changed" handler="on_videobar_value_changed" last_modification_time="Sun, 28 Aug 2005 18:06:02 GMT"/>
 					    </widget>
 					    <packing>

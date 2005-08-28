@@ -75,21 +75,20 @@ void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-	//	gint slider_val = get_slider_val( "videobar" );
 		gdouble slider_val = GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
 		gint val = 0;
 		switch(info->status_tokens[PLAY_MODE])
 		{
 			case MODE_PLAIN:
-				val = (gint) (slider_val * info->status_tokens[TOTAL_FRAMES] );
+				val = slider_val * info->status_tokens[TOTAL_FRAMES];
 				break;
 			case MODE_SAMPLE:
-				val = (gint) (slider_val * (info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_END]));
+				val = slider_val * (info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START]);
+				val += info->status_tokens[SAMPLE_START];
 				break;
 			default:
 				return;
 		}
-	fprintf(stderr, "Set frame %d\n", val );
 		multi_vims( VIMS_VIDEO_SET_FRAME, "%d", val );
 	}
 }
