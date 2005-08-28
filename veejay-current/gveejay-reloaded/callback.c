@@ -70,22 +70,27 @@ void	on_button_088_clicked(GtkWidget *widget, gpointer user_data)
 	single_vims( VIMS_VIDEO_GOTO_END);
 	vj_msg(VEEJAY_MSG_INFO, "Goto ending position");
 }
-void	on_videobar_move_slider(GtkWidget *widget, gpointer user_data)
-{
-	DBG_C();
-}
 
 void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		gdouble scale = info->status_tokens[TOTAL_FRAMES] / 100.0;
-		GtkWidget *w = glade_xml_get_widget(
-					info->main_window, "videobar");
-		gdouble slider_val = scale * GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
-		multi_vims( VIMS_VIDEO_SET_FRAME, "%d", (gint) slider_val );
-			
-		info->slider_lock = 0;
+	//	gint slider_val = get_slider_val( "videobar" );
+		gdouble slider_val = GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
+		gint val = 0;
+		switch(info->status_tokens[PLAY_MODE])
+		{
+			case MODE_PLAIN:
+				val = (gint) (slider_val * info->status_tokens[TOTAL_FRAMES] );
+				break;
+			case MODE_SAMPLE:
+				val = (gint) (slider_val * (info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_END]));
+				break;
+			default:
+				return;
+		}
+	fprintf(stderr, "Set frame %d\n", val );
+		multi_vims( VIMS_VIDEO_SET_FRAME, "%d", val );
 	}
 }
 
@@ -226,9 +231,22 @@ void	on_button_fadein_clicked(GtkWidget *w, gpointer user_data)
 
 void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 {
+	gdouble min_val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->lower;
+	gdouble max_val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->upper;
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
+	gdouble nval = (val - min_val) / (max_val - min_val);
+	
+	if(val < 0.0 )
+		val = 0.0;
+	if(val > 1.0) 
+		val = 1.0;
+
+	if( is_button_toggled( "loglinear" ))
+		if(val > 0.0) val = log( val /0.1 ) / log( max_val / 0.1 );	
+
 	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d",
 		(int)(255.0 * val));
+
 	vj_msg(VEEJAY_MSG_INFO, "FX Opacity set to %1.2f", val ); 
 }
 
@@ -1175,7 +1193,7 @@ void	on_new_colorstream_clicked(GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_STREAM_NEW_COLOR, "%d %d %d",
 		red,green,blue );
 
-	gveejay_new_slot(1);
+	gveejay_new_slot(MODE_STREAM);
 }
 
 #define atom_aspect_ratio(name,type) {\
@@ -1391,7 +1409,7 @@ void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		multi_vims( VIMS_SAMPLE_COPY , "%d",
 			info->selected_slot->sample_id );
-		gveejay_new_slot(0);
+		gveejay_new_slot(MODE_SAMPLE);
 	}
 }
 
@@ -1433,7 +1451,7 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 	else
 		multi_vims( VIMS_STREAM_NEW_UNICAST, "%d %s", port, remote );
 
-	gveejay_new_slot(1);	
+	gveejay_new_slot(MODE_STREAM);	
 	if(remote) g_free(remote);
 	if(remote_) g_free(remote_);
 }
@@ -1473,7 +1491,7 @@ void	on_inputstream_file_button_clicked(GtkWidget *w, gpointer user_data)
 		multi_vims( VIMS_STREAM_NEW_PICTURE, "%s", filename);
 #endif
 	
-	gveejay_new_slot(1);
+	gveejay_new_slot(MODE_STREAM);
 
 	if(filename) g_free( filename );
 }

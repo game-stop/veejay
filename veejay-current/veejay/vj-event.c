@@ -499,7 +499,7 @@ static struct {
 	{ VIMS_SAMPLE_LIST,			"Sample: send list of Samples",
 		vj_event_send_sample_list,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
 	{ VIMS_SAMPLE_INFO,			"Sample: send sample information (timecode and title)",
-		vj_event_send_sample_info,	1,	"%d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS },
+		vj_event_send_sample_info,	2,	"%d %d",		{0,0}, VIMS_REQUIRE_ALL_PARAMS },
 	{ VIMS_SAMPLE_OPTIONS,			"Sample: send sample options",
 		vj_event_send_sample_options,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS },
 	{ VIMS_EDITLIST_LIST,			"EditList: send list of all files",
@@ -7211,7 +7211,7 @@ static	void	_vj_event_gatter_sample_info( veejay_t *v, int id )
 
 	sprintf( _s_print_buf, 
 		"%05d%03d%s%03d%s%02d%02d",
-		( 5 + 3 + 3 + 2 + 2+ dlen + tlen),
+		( 3 + dlen + 3+ tlen + 2 +2),
 		dlen,
 		description,
 		tlen,
@@ -7234,7 +7234,7 @@ static	void	_vj_event_gatter_stream_info( veejay_t *v, int id )
 	int tlen = strlen( source );
 	sprintf( _s_print_buf,
 		"%05d%03d%s%03d%s%02d",
-		( 5 + 3 + 3 + 2 + 2 + dlen + tlen ),
+		(     3 + dlen + 3 + tlen + 2 ),
 		dlen,
 		description,
 		tlen,
@@ -7248,32 +7248,33 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int args[2];
-	int id = 0;
 	int failed = 1;
 	char *str = NULL;
 	P_A(args,str,format,ap);
 	if(args[0] == 0 )
 		args[0] = v->uc->sample_id;
-	if(args[0] == -1)
-		args[0] = sample_size() - 1;
 
 	bzero( _s_print_buf,SEND_BUF);
 
-	id = args[0];
-
-	switch( v->uc->playback_mode )
+	switch( args[1] )
 	{
-		case VJ_PLAYBACK_MODE_SAMPLE:
-			if(sample_exists(id))
+		case 0:
+			if(args[0] == -1)
+				args[0] = sample_size() - 1;
+
+			if(sample_exists(args[0]))
 			{
-				_vj_event_gatter_sample_info(v,id);
+				_vj_event_gatter_sample_info(v,args[0]);
 				failed = 0;
 			}
 			break;
-		case  VJ_PLAYBACK_MODE_TAG:
-			if(vj_tag_exists(id))
+		case  1:
+			if(args[0] == -1)
+				args[0] = vj_tag_size() - 1;
+
+			if(vj_tag_exists(args[0]))
 			{
-				_vj_event_gatter_stream_info(v,id);	
+				_vj_event_gatter_stream_info(v,args[0]);	
 				failed = 0;
 			}
 			break;
@@ -7283,7 +7284,6 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 	
 	if(failed)
 		sprintf( _s_print_buf, "%05d", 0 );
-
 	SEND_MSG(v , _s_print_buf );
 }
 
