@@ -69,18 +69,19 @@ int veejay_get_state(veejay_t *info);
 
 int veejay_create_sample(veejay_t * info, long start, long end);
 
-int veejay_edit_copy(veejay_t *info, long start, long end);
+int veejay_edit_copy(veejay_t *info, editlist *el, long start, long end);
 
-int veejay_edit_delete(veejay_t *info, long start, long end);
+int veejay_edit_delete(veejay_t *info, editlist *el,  long start, long end);
 
-int veejay_edit_cut(veejay_t * info, long start, long end);
+int veejay_edit_cut(veejay_t * info, editlist *el, long start, long end);
 
-int veejay_edit_paste(veejay_t * info, long destination);
+int veejay_edit_paste(veejay_t * info, editlist *el, long destination);
 
-int veejay_edit_move(veejay_t * info, long start, long end,long dest);
+int veejay_edit_move(veejay_t * info, editlist *el , long start, long end,long dest);
 
-int veejay_edit_addmovie(veejay_t * info, char *movie, long start,
+int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start,
 			  long end, long destination);
+int veejay_edit_addmovie_sample(veejay_t * info, char *movie , int new_s);
 
 int veejay_edit_set_playable(veejay_t * info, long start, long end);
 
@@ -99,4 +100,5 @@ void veejay_default_tags(veejay_t *info);
 
 void veejay_loop_count(veejay_t *info);
 
+editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, long end);
 #endif

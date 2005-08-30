@@ -223,10 +223,9 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->sample_id = _new_id();
 
     snprintf(si->descr,SAMPLE_MAX_DESCR_LEN, "%s", "Untitled");
-    for(n=0; n < SAMPLE_MAX_RENDER;n++) {
-      si->first_frame[n] = startFrame;
-      si->last_frame[n] = endFrame;
-	}
+    si->first_frame = startFrame;
+    si->last_frame = endFrame;
+    si->edit_list = NULL;	// clone later
     si->speed = 1;
     si->looptype = 1;
     si->max_loops = 0;
@@ -238,7 +237,6 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->marker_start = 0;
     si->marker_end = 0;
     si->dup = 0;
-    si->active_render_entry = 0;
     si->loop_dec = 0;
 	si->max_loops2 = 0;
     si->fader_active = 0;
@@ -265,7 +263,6 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->selected_entry = 0;
     si->effect_toggle = 1;
     si->offset = 0;
-    si->user_data = NULL;
     sprintf(si->descr, "%s", "Untitled");
 
     /* the effect chain is initially empty ! */
@@ -389,6 +386,10 @@ int sample_copy(int sample_id)
 	}
 
 	copy->sample_id = _new_id(); 
+
+	if(org->edit_list)
+		copy->edit_list = vj_el_clone( org->edit_list );
+
 	if (sample_store(copy) != 0)
 		return 0;
 
@@ -407,8 +408,8 @@ int sample_get_longest(int sample_id)
 	sample_info *si = sample_get(sample_id);
 	if(si)
 	{
-		int len = (si->last_frame[si->active_render_entry] -
-			  si->first_frame[si->active_render_entry] );
+		int len = (si->last_frame -
+			  si->first_frame );
 		int c = 0;
 		int tmp = 0;
 		int t=0;
@@ -448,7 +449,7 @@ int sample_get_startFrame(int sample_id)
    	if (si->marker_start != 0 && si->marker_end != 0)
 		return si->marker_start;
     	else
-		return si->first_frame[si->active_render_entry];
+		return si->first_frame;
 	}
     return -1;
 }
@@ -459,8 +460,8 @@ int	sample_get_el_position( int sample_id, int *start, int *end )
 	sample_info *si = sample_get(sample_id);
 	if(si)
 	{
-		*start = si->first_frame[ si->active_render_entry ];
-		*end   = si->last_frame[ si->active_render_entry ];
+		*start = si->first_frame;
+		*end   = si->last_frame;
 		return 1;
 	}
 	return -1;
@@ -477,8 +478,8 @@ int sample_get_short_info(int sample_id, int *start, int *end, int *loop, int *s
 	   *end = si->marker_end;
 	} 
         else {
-	   *start = si->first_frame[si->active_render_entry];
-	   *end = si->last_frame[si->active_render_entry];
+	   *start = si->first_frame;
+	   *end = si->last_frame;
 	}
         *speed = si->speed;
         *loop = si->looptype;
@@ -518,8 +519,8 @@ int sample_update_offset(int s1, int n_frame)
 	sample_info *si = sample_get(s1);
 
 	if(!si) return -1;
-	si->offset = (n_frame - si->first_frame[si->active_render_entry]);
-	len = si->last_frame[si->active_render_entry] - si->first_frame[si->active_render_entry];
+	si->offset = (n_frame - si->first_frame);
+	len = si->last_frame - si->first_frame;
 	if(si->offset < 0) 
 	{	
 		veejay_msg(VEEJAY_MSG_WARNING,"Sample bounces outside sample by %d frames",
@@ -667,13 +668,13 @@ int sample_set_marker(int sample_id, int start, int end)
     int tmp;
     if(!si) return -1;
     
-    if( start < si->first_frame[ si->active_render_entry ] )
+    if( start < si->first_frame )
 		return 0;
-	if( start > si->last_frame[ si->active_render_entry ] )
+	if( start > si->last_frame )
 		return 0;
-	if( end < si->first_frame[ si->active_render_entry ] )
+	if( end < si->first_frame )
 		return 0;
-	if( end > si->last_frame[ si->active_render_entry ] )
+	if( end > si->last_frame )
 		return 0; 
 
     si->marker_start	= start;
@@ -740,7 +741,7 @@ int sample_get_endFrame(int sample_id)
    	if (si->marker_end != 0 && si->marker_start != 0)
 		return si->marker_end;
    	 else {
-		return si->last_frame[si->active_render_entry];
+		return si->last_frame;
 	}
     }
     return -1;
@@ -768,6 +769,8 @@ int sample_del(int sample_id)
 		if (si->effect_chain[i])
 			free(si->effect_chain[i]);
     }
+    if(si->edit_list)
+	vj_el_free(si->edit_list);
     if (si)
       free(si);
     /* store freed sample_id */
@@ -954,13 +957,6 @@ int sample_set_chain_status(int s1, int position, int status)
  * returns -1  on error.
  *
  ****************************************************************************************************/
-int sample_get_render_entry(int s1)
-{
-    sample_info *sample = sample_get(s1);
-    if (sample)
-   	 return sample->active_render_entry;
-    return 0;
-}
 
 int sample_get_speed(int s1)
 {
@@ -1137,27 +1133,12 @@ int sample_set_chain_source(int s1, int position, int input)
  *
  ****************************************************************************************************/
 
-int sample_set_user_data(int s1, void *data)
-{
-	sample_info *sample = sample_get(s1);
-	if(!sample) return -1;
-	sample->user_data = data;
-	return ( sample_update(sample, s1) );
-}
-
-void *sample_get_user_data(int s1)
-{
-	sample_info *sample = sample_get(s1);
-	if(!sample) return NULL;
-	return sample->user_data;
-}
-
 int sample_set_speed(int s1, int speed)
 {
     sample_info *sample = sample_get(s1);
     if (!sample) return -1;
-	int len = sample->last_frame[sample->active_render_entry] -
-			sample->first_frame[sample->active_render_entry];
+	int len = sample->last_frame -
+			sample->first_frame;
     if( (speed < -(MAX_SPEED) ) || (speed > MAX_SPEED))
 	return -1;
     if( speed > len )
@@ -1165,15 +1146,6 @@ int sample_set_speed(int s1, int speed)
     if( speed < -(len))
 	return -1;
     sample->speed = speed;
-    return ( sample_update(sample,s1));
-}
-
-int sample_set_render_entry(int s1, int entry)
-{
-    sample_info *sample = sample_get(s1);
-    if (!sample) return -1;
-    if( entry < 0 || entry >= SAMPLE_MAX_RENDER) return -1;
-    sample->active_render_entry = entry;
     return ( sample_update(sample,s1));
 }
 
@@ -1264,7 +1236,10 @@ int sample_set_startframe(int s1, long frame_num)
     if (!sample)
 	return -1;
     if(frame_num < 0) return frame_num = 0;
-    sample->first_frame[sample->active_render_entry] = frame_num;
+    if(sample->edit_list)
+	if( frame_num > sample->edit_list->video_frames - 1 )
+		frame_num = sample->edit_list->video_frames - 1;
+    sample->first_frame = frame_num;
     return (sample_update(sample,s1));
 }
 
@@ -1274,7 +1249,12 @@ int sample_set_endframe(int s1, long frame_num)
     if (!sample)
 	return -1;
     if(frame_num < 0) return -1;
-    sample->last_frame[sample->active_render_entry] = frame_num;
+    if(sample->edit_list)
+	if( frame_num > sample->edit_list->video_frames - 1 )
+		frame_num = sample->edit_list->video_frames - 1;
+
+    sample->last_frame = frame_num;
+
     return (sample_update(sample,s1));
 }
 int sample_get_next(int s1)
@@ -1523,7 +1503,7 @@ int sample_set_trimmer(int s1, int chain_entry, int trimmer)
     /* set to zero if frame_offset is greater than sample length */
     if (chain_entry < 0 || chain_entry >= SAMPLE_MAX_PARAMETERS)
 	return -1;
-    if (trimmer > (sample->last_frame[sample->active_render_entry] - sample->first_frame[sample->active_render_entry]))
+    if (trimmer > (sample->last_frame - sample->first_frame))
 	trimmer = 0;
     if (trimmer < 0 ) trimmer = 0;
     sample->effect_chain[chain_entry]->frame_trimmer = trimmer;
@@ -1700,20 +1680,43 @@ int sample_get_loop_dec(int s1) {
     return sample->loop_dec;
 }
 
+editlist *sample_get_editlist(int s1)
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample) return -1;
+	return sample->edit_list;
+}
+
+int	sample_set_editlist(int s1, editlist *edl)
+{
+	char tmp_file[1024];
+	sample_info *sample = sample_get(s1);
+	if(!sample) return -1;
+	if(sample->edit_list)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Sample %d already has EDL", s1 );
+		return 0;
+	}
+	sprintf(tmp_file, "sample-%05d.edl", s1 );
+	sample->edit_list = edl;
+	sample->edit_list_file = strdup(tmp_file);
+	return (sample_update(sample,s1));
+}
+
 int sample_apply_loop_dec(int s1, double fps) {
     sample_info *sample = sample_get(s1);
     int inc = (int) fps;
     if(!sample) return -1;
     if(sample->loop_dec==1) {
-	if( (sample->first_frame[sample->active_render_entry] + inc) >= sample->last_frame[sample->active_render_entry]) {
-		sample->first_frame[sample->active_render_entry] = sample->last_frame[sample->active_render_entry]-1;
+	if( (sample->first_frame + inc) >= sample->last_frame) {
+		sample->first_frame = sample->last_frame-1;
 		sample->loop_dec = 0;
 	}
 	else {
-		sample->first_frame[sample->active_render_entry] += (inc / sample->loop_periods);
+		sample->first_frame += (inc / sample->loop_periods);
 	}
 	veejay_msg(VEEJAY_MSG_DEBUG, "New starting postions are %ld - %ld",
-		sample->first_frame[sample->active_render_entry], sample->last_frame[sample->active_render_entry]);
+		sample->first_frame, sample->last_frame);
 	return ( sample_update(sample, s1));
     }
     return -1;
@@ -1729,76 +1732,6 @@ int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode,int total_s
     sample = sample_get(s1);
     if (!sample)
 	return -1;
-	/*
-	fprintf(stderr,
-      "%d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-	    frame,
-	    sample->active_render_entry,
-	    r_changed,
-	    s1,
-	    sample->first_frame[sample->active_render_entry],
-	    sample->last_frame[sample->active_render_entry],
-	    sample->speed,
-	    sample->looptype,
-	    sample->max_loops,
-	    sample->max_loops2,
-	    sample->next_sample_id,
-	    sample->depth,
-	    sample->playmode,
-	    sample->audio_volume,
-	    sample->selected_entry,
- 	    sample->effect_toggle,
-	    changed,
-	    vj_effect_real_to_sequence(sample->effect_chain[entry]->effect_id),
-				      // effect_id),
-	    sample->effect_chain[entry]->e_flag,
-	    sample->effect_chain[entry]->frame_offset,
-	    sample->effect_chain[entry]->frame_trimmer,
-	    sample->effect_chain[entry]->source_type,
-	    sample->effect_chain[entry]->channel,
-	    this_sample_id - 1,
-		total_slots,);
-	*/
-/*
-	
-    sprintf(str,
-	    "%d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d",
-/	    frame,
-	    sample->active_render_entry,
-	    r_changed,
-	    sample->selected_entry,
-	    sample->effect_toggle,
-	    s1,
-	    sample->first_frame[sample->active_render_entry],
-	    sample->last_frame[sample->active_render_entry],
-	    sample->speed,
-	    sample->looptype,
-	    sample->max_loops,
-	    sample->max_loops2,
-	    sample->next_sample_id,
-	    sample->depth,
-	    sample->playmode,
-	    sample->dup,
-	    sample->audio_volume,
-	    0, 
-	    0, 
- 	   0,
-	    sample->encoder_active,
-	    sample->encoder_duration,
-	    sample->encoder_succes_frames,
-	    sample->auto_switch,
-	    changed,
-	    vj_effect_real_to_sequence(sample->effect_chain[entry]->effect_id),
-				      // effect_id),
-	    sample->effect_chain[entry]->e_flag,
-	    sample->effect_chain[entry]->frame_offset,
-	    sample->effect_chain[entry]->frame_trimmer,
-	    sample->effect_chain[entry]->source_type,
-	    sample->effect_chain[entry]->channel,
-	    sample->effect_chain[entry]->a_flag,
-	    sample->effect_chain[entry]->volume,
-	    this_sample_id );
-    */
 
 	sprintf(str,
 		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
@@ -1807,8 +1740,8 @@ int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode,int total_s
 		mode,
 		s1,
 		sample->effect_toggle,
-		sample->first_frame[ sample->active_render_entry ],
-		sample->last_frame[ sample->active_render_entry ],
+		sample->first_frame,
+		sample->last_frame,
 		sample->speed,
 		sample->looptype,
 		sample->encoder_active,
@@ -2108,6 +2041,16 @@ void ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
+	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EDIT_LIST_FILE)) {
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+	    if (chTemp) {
+		skel->edit_list_file = strdup(chTemp);
+		free(chTemp);
+	    }
+	    if(xmlTemp) xmlFree(xmlTemp);
+	}
+
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_CHAIN_ENABLED))
 	{
 		xmlTemp = xmlNodeListGetString( doc, cur->xmlChildrenNode,1);
@@ -2311,6 +2254,10 @@ void ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
 
 	cur = cur->next;
     }
+
+    	if( skel->edit_list_file )
+		sample_read_edl( skel );
+
     return;
 }
 
@@ -2322,6 +2269,27 @@ void ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
  * load samples and effect chain from an xml file. 
  *
  ****************************************************************************************************/
+static	int sample_read_edl( sample_info *sample )
+{
+	char *files[1];
+	int res = -1;
+	files[0] = strdup(sample->edit_list_file);
+	if(sample->edit_list)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cleanup old editlist");
+		vj_el_free(sample->edit_list);
+	}
+
+	sample->edit_list = vj_el_init_with_args( files,1, 1,1,0,'p' );
+	if(sample->edit_list)
+		res = 1;
+
+	if(files[0])
+		free(files[0]);
+
+	return res;
+}
+
 int sample_readFromFile(char *sampleFile)
 {
     xmlDocPtr doc;
@@ -2383,7 +2351,6 @@ void CreateArguments(xmlNodePtr node, int *arg, int argcount)
 	//}
     }
 }
-
 
 void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int position)
 {
@@ -2466,16 +2433,20 @@ void CreateSample(xmlNodePtr node, sample_info * sample)
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_CHAIN_ENABLED,
 		(const xmlChar *) buffer);
 
+	if(sample->edit_list_file)
+	{
+    		sprintf(buffer, "%s", sample->edit_list_file);
+     		xmlNewChild(node, NULL, (const xmlChar*) XMLTAG_EDIT_LIST_FILE,
+			(const xmlChar*) buffer );
+	}
 
-    sprintf(buffer,"%d", sample->active_render_entry);
-    xmlNewChild(node,NULL,(const xmlChar*) XMLTAG_RENDER_ENTRY,(const xmlChar*)buffer);
     sprintf(buffer, "%s", sample->descr);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_SAMPLEDESCR,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%ld", sample->first_frame[sample->active_render_entry]);
+    sprintf(buffer, "%ld", sample->first_frame);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_FIRSTFRAME,
 		(const xmlChar *) buffer);
-    sprintf(buffer, "%ld", sample->last_frame[sample->active_render_entry]);
+    sprintf(buffer, "%ld", sample->last_frame);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_LASTFRAME,
 		(const xmlChar *) buffer);
     sprintf(buffer, "%d", sample->speed);
@@ -2540,6 +2511,21 @@ void CreateSample(xmlNodePtr node, sample_info * sample)
  * writes all sample info to a file. 
  *
  ****************************************************************************************************/
+static	int sample_write_edl(sample_info *sample)
+{
+	editlist *edl = sample->edit_list;
+	if(edl)
+	{
+		vj_el_write_editlist( sample->edit_list_file,
+			sample->first_frame,
+			sample->last_frame,
+			edl );
+		return 1;
+	}
+	return 0;
+}
+
+
 int sample_writeToFile(char *sampleFile)
 {
     int i;
@@ -2555,6 +2541,10 @@ int sample_writeToFile(char *sampleFile)
     for (i = 1; i < sample_size(); i++) {
 	next_sample = sample_get(i);
 	if (next_sample) {
+	    if(sample_write_edl( next_sample ))
+		veejay_msg(VEEJAY_MSG_DEBUG ,"Saved sample %d EDL '%s'", next_sample->sample_id,
+				next_sample->edit_list_file );	
+
 	    childnode =
 		xmlNewChild(rootnode, NULL,
 			    (const xmlChar *) XMLTAG_SAMPLE, NULL);

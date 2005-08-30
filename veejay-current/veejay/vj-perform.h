@@ -133,9 +133,7 @@ int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type, int cha
 
 int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[3]);
 
-void vj_perform_record_commit_sample(veejay_t *info,long start_el_pos,int len);
-
-long vj_perform_record_commit_single(veejay_t *info, int entry);
+int vj_perform_record_commit_single(veejay_t *info, int entry);
 
 void vj_perform_record_stop(veejay_t *info);
 

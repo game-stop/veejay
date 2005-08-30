@@ -75,13 +75,21 @@ void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		gdouble scale = info->status_tokens[TOTAL_FRAMES] / 100.0;
-		GtkWidget *w = glade_xml_get_widget(
-					info->main_window, "videobar");
-		gdouble slider_val = scale * GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
-		multi_vims( VIMS_VIDEO_SET_FRAME, "%d", (gint) slider_val );
-			
-		info->slider_lock = 0;
+		gdouble slider_val = GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
+		gint val = 0;
+		switch(info->status_tokens[PLAY_MODE])
+		{
+			case MODE_PLAIN:
+				val = slider_val * info->status_tokens[TOTAL_FRAMES];
+				break;
+			case MODE_SAMPLE:
+				val = slider_val * (info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START]);
+				val += info->status_tokens[SAMPLE_START];
+				break;
+			default:
+				return;
+		}
+		multi_vims( VIMS_VIDEO_SET_FRAME, "%d", val );
 	}
 }
 
@@ -159,10 +167,6 @@ void	on_button_sampleend_clicked(GtkWidget *widget, gpointer user_data)
 {
 	info->sample[1] = info->status_tokens[FRAME_NUM];
 	multi_vims( VIMS_SAMPLE_NEW, "%d %d", info->sample[0],info->sample[1]);
-	if(info->status_tokens[PLAY_MODE] == MODE_PLAIN)
-		info->uc.reload_hint[HINT_SLIST] = 1;
-	vj_msg(VEEJAY_MSG_INFO, "New sample from EditList %d - %d",
-		info->sample[0], info->sample[1]);
 }
 
 void	on_button_veejay_clicked(GtkWidget *widget, gpointer user_data)
@@ -336,9 +340,6 @@ void	on_button_el_newclip_clicked(GtkWidget *w, gpointer *user)
 	{
 		multi_vims( VIMS_SAMPLE_NEW, "%d %d",
 			info->selection[0], info->selection[1] );
-		info->uc.reload_hint[HINT_SLIST] = 1;
-		vj_msg(VEEJAY_MSG_INFO, "New sample from EditList %d - %d" ,
-			info->selection[0], info->selection[1] );
 	}
 
 
@@ -399,7 +400,7 @@ void	on_button_el_addsample_clicked(GtkWidget *w, gpointer *user_data)
 	
 	int sample_id = 0;
 	int result_len = 0;
-	multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%s", filename );
+	multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%d %s",info->status_tokens[CURRENT_ID], filename );
 
 	gchar *result = recv_vims( 3, &result_len );
 	if(result_len > 0 )
@@ -408,7 +409,6 @@ void	on_button_el_addsample_clicked(GtkWidget *w, gpointer *user_data)
 		vj_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s", sample_id, filename);
 		g_free(result);
 		// force reloading of sample list
-		info->uc.reload_hint[HINT_SLIST] = 1;
 	}
 	
 	g_free(filename );
@@ -683,14 +683,11 @@ void	on_button_sample_del_clicked(GtkWidget *widget, gpointer user_data)
 		query = 1;
 		vj_msg(VEEJAY_MSG_INFO, "Delete stream %d", info->uc.selected_stream_id );
 	}
-
-	if(query)
-		info->uc.reload_hint[HINT_SLIST] = 1;
 }
 void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
 {
 	gint erase_all = 0;
-	if(info->uc.list_length[MODE_SAMPLE] > 0 )
+	if(info->status_tokens[TOTAL_SLOTS] > 0 )
 	{
 		if(prompt_dialog("Load samplelist",
 			"Loading a samplelist will delete any existing samples" ) == GTK_RESPONSE_REJECT)
@@ -1185,7 +1182,6 @@ void	on_new_colorstream_clicked(GtkWidget *widget, gpointer user_data)
 	gint green = current_color.green / 256.0;
 	gint blue = current_color.blue / 256.0;
 
-	info->uc.reload_hint[HINT_SLIST] = 1;
 	multi_vims( VIMS_STREAM_NEW_COLOR, "%d %d %d",
 		red,green,blue );
 
@@ -1381,38 +1377,12 @@ void	on_button_browse_clicked(GtkWidget *widget, gpointer user_data)
 	}
 }
 
-void	on_button_historyrec_clicked(GtkWidget *widget, gpointer user_data)
-{
-	if(info->uc.selected_history_entry > 0)
-	{
-		multi_vims( VIMS_SAMPLE_RENDER_TO, "%d %d", 0, info->uc.selected_history_entry );
-		vj_msg(VEEJAY_MSG_INFO, "Rendering sample to inline EditList no. %d",
-			info->uc.selected_history_entry );
-	}
-	info->uc.render_record=1;
-}
-
-void	on_button_historymove_clicked(GtkWidget *widget, gpointer user_data)
-{
-	if(info->uc.selected_history_entry > 0 )
-	{
-		multi_vims( VIMS_SAMPLE_RENDER_MOVE, "%d %d", 0, info->uc.selected_history_entry );
-		vj_msg(VEEJAY_MSG_INFO, "Move inline Editlist %d to EditList",
-			info->uc.selected_history_entry );
-	}
-	info->uc.reload_hint[HINT_EL] =1;
-	info->uc.reload_hint[HINT_HISTORY] = 1;
-}
-
 void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(info->uc.selected_sample_id != 0)
 	{
 		multi_vims( VIMS_SAMPLE_COPY , "%d",
 			info->uc.selected_sample_id );
-		if(info->status_tokens[PLAY_MODE] == MODE_PLAIN )
-			info->uc.reload_hint[HINT_SLIST] = 1;
-		vj_msg(VEEJAY_MSG_INFO, "Copy sample %d to new", info->uc.selected_sample_id);
 	}
 }
 
@@ -1456,7 +1426,6 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 
 	if( gveejay_new_slot(1))
 	{ // FIXME use get sample options instead of entire list reloading
-		info->uc.reload_hint[HINT_SLIST] = 1;
 		if(remote) g_free(remote);
 		if(remote_) g_free(remote_);
 	}
@@ -1500,7 +1469,6 @@ void	on_inputstream_file_button_clicked(GtkWidget *w, gpointer user_data)
 	if( gveejay_new_slot(1 ))
 	{
 		//FIXME: reload sample options, append to list
-		info->uc.reload_hint[HINT_SLIST] = 1;
 	}
 	if(filename) g_free( filename );
 }

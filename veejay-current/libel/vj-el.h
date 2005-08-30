@@ -104,5 +104,6 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 
 int	vj_el_get_file_entry( editlist *el,long *start_pos, long *end_pos, long entry );
 
+editlist *vj_el_clone(editlist *el);
 
 #endif

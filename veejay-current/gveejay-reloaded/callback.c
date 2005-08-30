@@ -167,8 +167,6 @@ void	on_button_sampleend_clicked(GtkWidget *widget, gpointer user_data)
 {
 	info->sample[1] = info->status_tokens[FRAME_NUM];
 	multi_vims( VIMS_SAMPLE_NEW, "%d %d", info->sample[0],info->sample[1]);
-	if(info->status_tokens[PLAY_MODE] == MODE_PLAIN)
-		info->uc.reload_hint[HINT_SLIST] = 1;
 	vj_msg(VEEJAY_MSG_INFO, "New sample from EditList %d - %d",
 		info->sample[0], info->sample[1]);
 }
@@ -357,7 +355,6 @@ void	on_button_el_newclip_clicked(GtkWidget *w, gpointer *user)
 	{
 		multi_vims( VIMS_SAMPLE_NEW, "%d %d",
 			info->selection[0], info->selection[1] );
-		info->uc.reload_hint[HINT_SLIST] = 1;
 		vj_msg(VEEJAY_MSG_INFO, "New sample from EditList %d - %d" ,
 			info->selection[0], info->selection[1] );
 	}
@@ -420,7 +417,7 @@ void	on_button_el_addsample_clicked(GtkWidget *w, gpointer *user_data)
 	
 	int sample_id = 0;
 	int result_len = 0;
-	multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%s", filename );
+	multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%d %s", info->status_tokens[CURRENT_ID], filename );
 
 	gchar *result = recv_vims( 3, &result_len );
 	if(result_len > 0 )
@@ -429,7 +426,6 @@ void	on_button_el_addsample_clicked(GtkWidget *w, gpointer *user_data)
 		vj_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s", sample_id, filename);
 		g_free(result);
 		// force reloading of sample list
-		info->uc.reload_hint[HINT_SLIST] = 1;
 	}
 	
 	g_free(filename );
@@ -709,12 +705,11 @@ void	on_spin_samplestart_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		gint value[1];
-		value[0] = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
-		gchar *time1 = format_time(value[0]);
-		gchar buf[256];
-		sprintf( buf, "Set sample's starting position to %d (timecode %s)",value[0], time1);
-		vj_gui_change_slot_option(VIMS_SAMPLE_SET_START, &value, &buf);		
+		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+		gchar *time1 = format_time(value);
+		multi_vims(VIMS_SAMPLE_SET_START, "%d %d",0, value );
+		vj_msg(VEEJAY_MSG_INFO, "Set sample's starting position to %d (timecode %s)",
+			value, time1);
 		g_free(time1);
 	}
 }
@@ -723,24 +718,23 @@ void	on_spin_sampleend_value_changed( GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		gint value[1];
-		value[0] = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
-		gchar *time1 = format_time(value[0]);
-		gchar buf[256];
-		sprintf( buf, "Set sample's ending position to %d (timecode %s)",value[0], time1);
-		vj_gui_change_slot_option(VIMS_SAMPLE_SET_END, &value, &buf);		
+		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+		gchar *time1 = format_time(value);
+		
+		multi_vims(VIMS_SAMPLE_SET_END, "%d %d", 0, value );
+		vj_msg(VEEJAY_MSG_INFO, "Set sample's ending position to %d (timecode %s)",
+			value, time1);
 		g_free(time1);
-
 	}
 }
 
 void	on_speedslider_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
-	{	
-		gint value = (gint)GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
+	{
+		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
 		value *= info->play_direction;
-		multi_vims( VIMS_VIDEO_SET_SPEED, "%d",value );
+		multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
 		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
 	}
@@ -750,12 +744,11 @@ void	on_spin_samplespeed_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		gint value[1];
-		value[0] = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
-		value[0] *= info->play_direction;		
-		gchar buf[256];
-		sprintf( buf, "Change video playback speed to %d",value[0] );
-		vj_gui_change_slot_option(VIMS_SAMPLE_SET_SPEED, &value, &buf);		
+		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+		value *= info->play_direction;
+		multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
+		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
+			value );
 	}
 }
 
@@ -958,18 +951,10 @@ void	on_check_samplefx_clicked(GtkWidget *widget , gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-	if( is_button_toggled( "check_samplefx" ) )
-	    {
-	    gchar buf[256];
-	    sprintf( buf, "Effect chain toggled on");
-	    vj_gui_change_slot_option(VIMS_SAMPLE_CHAIN_ENABLE , NULL, &buf);			
-	    }
-	else
-	    {
-	    gchar buf[256];
-	    sprintf( buf, "Effect chain toggled off");
-	    vj_gui_change_slot_option(VIMS_SAMPLE_CHAIN_DISABLE , NULL, &buf);			
-	    }
+		if( is_button_toggled( "check_samplefx" ) )
+			multi_vims( VIMS_SAMPLE_CHAIN_ENABLE , "%d", 0 );
+		else
+			multi_vims( VIMS_SAMPLE_CHAIN_DISABLE, "%d", 0 );
 	}
 }
 void	on_check_streamfx_clicked(GtkWidget *widget, gpointer user_data)
@@ -986,38 +971,25 @@ void	on_check_streamfx_clicked(GtkWidget *widget, gpointer user_data)
 void	on_loop_none_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
-		{		
-		gint value[1];
-		value[0] = get_loop_value();
-		gchar buf[256];
-		sprintf( buf, "Change loop type to no loop");
-		vj_gui_change_slot_option(VIMS_SAMPLE_SET_LOOPTYPE, &value, &buf);		
-		}
-		
+		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
+			"%d %d", 0,
+			get_loop_value() );
 }
 
 void	on_loop_normal_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
-		{	
-		gint value[1];
-		value[0] = get_loop_value();
-		gchar buf[256];
-		sprintf( buf, "Change loop type to normal loop");
-		vj_gui_change_slot_option(VIMS_SAMPLE_SET_LOOPTYPE, &value, &buf);		
-		}	
+		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
+			"%d %d", 0,
+			get_loop_value() );
 }
 
 void	on_loop_pingpong_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
-		{		
-		gint value[1];
-		value[0] = get_loop_value();
-		gchar buf[256];
-		sprintf( buf, "Change loop type to ping pong");
-		vj_gui_change_slot_option(VIMS_SAMPLE_SET_LOOPTYPE, &value, &buf);		
-		}		
+		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
+			"%d %d", 0,
+			get_loop_value() );
 }
 
 #define atom_marker(name,value) {\
@@ -1379,29 +1351,6 @@ void	on_button_browse_clicked(GtkWidget *widget, gpointer user_data)
 	}
 }
 
-void	on_button_historyrec_clicked(GtkWidget *widget, gpointer user_data)
-{
-	if(info->uc.selected_history_entry > 0)
-	{
-		multi_vims( VIMS_SAMPLE_RENDER_TO, "%d %d", 0, info->uc.selected_history_entry );
-		vj_msg(VEEJAY_MSG_INFO, "Rendering sample to inline EditList no. %d",
-			info->uc.selected_history_entry );
-	}
-	info->uc.render_record=1;
-}
-
-void	on_button_historymove_clicked(GtkWidget *widget, gpointer user_data)
-{
-	if(info->uc.selected_history_entry > 0 )
-	{
-		multi_vims( VIMS_SAMPLE_RENDER_MOVE, "%d %d", 0, info->uc.selected_history_entry );
-		vj_msg(VEEJAY_MSG_INFO, "Move inline Editlist %d to EditList",
-			info->uc.selected_history_entry );
-	}
-	info->uc.reload_hint[HINT_EL] =1;
-	info->uc.reload_hint[HINT_HISTORY] = 1;
-}
-
 void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(info->selected_slot)
@@ -1626,21 +1575,6 @@ void on_vims_bundles_close                  (GtkDialog       *dialog,
 	{
 	GtkWidget *vims_bundles_window = glade_xml_get_widget(info->main_window, "vims_bundles");
 	gtk_widget_hide(vims_bundles_window);	
-	} 
-}
-
-
-/*
- * Handler to show the Sample-Options-dialog
- */ 
-void on_samples_options_clicked             (GtkButton       *button,
-	                                     gpointer         user_data)
-{
-    if(!info->status_lock)
-	{
-	GtkWidget *sample_options_window = glade_xml_get_widget(info->main_window, "sample_options");
-	gtk_widget_show(sample_options_window);	
-	vj_gui_show_sample_options();
 	} 
 }
 

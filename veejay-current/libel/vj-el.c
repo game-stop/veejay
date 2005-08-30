@@ -60,6 +60,7 @@ static struct
 
 static	int mmap_size = 0;
 
+
 #define MAX_CODECS 7
 #define CODEC_ID_YUV420 999
 #define CODEC_ID_YUV422 998
@@ -90,9 +91,7 @@ typedef struct
 } vj_decoder;
 
 
-
 static	vj_decoder *el_codecs[MAX_CODECS];
-
 
 int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force,
 		char norm);
@@ -1544,3 +1543,19 @@ void	vj_el_frame_cache(int n )
 	}
 }
 
+
+editlist	*vj_el_clone(editlist *el)
+{
+	editlist *clone = (editlist*) vj_malloc(sizeof(editlist));
+	if(!clone)
+		return 0;
+	veejay_memcpy(clone, el,sizeof(editlist));
+	clone->frame_list = (uint64_t*) vj_malloc(sizeof(uint64_t) * el->video_frames );
+	if(!clone->frame_list)
+	{
+		if(clone)
+			free(clone);
+	}
+	veejay_memcpy(clone->frame_list, el->frame_list, (sizeof(uint64_t) * el->video_frames )); 
+	return clone;
+}

@@ -597,14 +597,6 @@ void vj_osc_cb_sample_set_speed(void *context, int arglen, const void *vargs, OS
 {
 	DNET_F(arglen, vargs,VIMS_SAMPLE_SET_SPEED);
 }
-void vj_osc_cb_sample_his_render(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
-{
-	DNET_F(arglen, vargs, VIMS_SAMPLE_RENDER_TO );
-}
-void vj_osc_cb_sample_his_play(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
-{
-	DNET_F(arglen, vargs, VIMS_SAMPLE_RENDER_SELECT );
-}
 
 void vj_osc_cb_sample_set_looptype(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
@@ -991,10 +983,6 @@ static struct
 	{ "sample stop recording",	"stop",			vj_osc_cb_sample_record_stop,			14	},
 	{ "sample set recorder format (mjpeg,mpeg4,dv,divx,yv12,yv16)",
 								"format",		vj_osc_cb_record_format,			14	},
-	{ "sample render new entry <num>",
-								"render",		vj_osc_cb_sample_his_render,			15	},
-	{ "sample play rendered entry <num>",
-								"play",			vj_osc_cb_sample_his_play,			15	},
 	{ "stream select and play <num>",
 								"select",		vj_osc_cb_tag_select,				2	},
 #ifdef HAVE_V4L
@@ -1107,7 +1095,6 @@ static struct
  {	"/video/set",		"set",		 12, 0,0	},
  {	"/sample/set",   		"set",		 13, 1,0	},
  {	"/sample/rec", 		"rec",		 14, 1,0	},
- {  "/sample/his",		"his",		 15, 1,0	},
 // {	"/sample/chain", 		"chain",	 15, 1,0	},
 // {	"/sample/entry",  	"entry",	 18, 1,0	},
  {	"/stream/rec",		"rec",		 16, 2,0	},

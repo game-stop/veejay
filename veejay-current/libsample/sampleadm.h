@@ -25,11 +25,11 @@
 #include <libvje/vje.h>
 #include <libhash/hash.h>
 #include <veejay/vj-global.h>
+#include <libel/vj-el.h>
 #ifdef HAVE_XML2
 #include <libxml/xmlmemory.h>
 #include <libxml/parser.h>
 #endif
-#define SAMPLE_MAX_RENDER     10 /* 10 at most */
 #define SAMPLE_MAX_SAMPLES  16384 /* 4096 samples at most */
 
 #define SAMPLE_MAX_PARAMETERS 10	/* 10 parameters per effect at most */
@@ -82,6 +82,7 @@
 #define XMLTAG_FADER_DIRECTION "chain_direction"
 #define XMLTAG_LASTENTRY    "current_entry"
 #define XMLTAG_CHAIN_ENABLED "fx"
+#define XMLTAG_EDIT_LIST_FILE "editlist_filename"
 #endif
 #define SAMPLE_FREEZE_NONE 0
 #define SAMPLE_FREEZE_PAUSE 1
@@ -119,8 +120,8 @@ typedef struct sample_eff_t {
 typedef struct sample_info_t {
     int sample_id;		/* identifies a unique sample */
     sample_eff_chain *effect_chain[SAMPLE_MAX_EFFECTS];	/* effect chain */
-    long first_frame[SAMPLE_MAX_RENDER];		/* start of sample */
-    long last_frame[SAMPLE_MAX_RENDER];		/* end of sample */
+    long first_frame;		/* start of sample */
+    long last_frame;		/* end of sample */
     char descr[SAMPLE_MAX_DESCR_LEN];
     int speed;			/* playback speed */
     int looptype;		/* pingpong or loop */
@@ -137,7 +138,6 @@ typedef struct sample_info_t {
     int marker_start;
     int marker_end;
     int dup;			/* frame duplicator */
-    int active_render_entry;
     int loop_dec;
     int loop_periods;
     int marker_speed;
@@ -164,7 +164,8 @@ typedef struct sample_info_t {
     int selected_entry;
     int effect_toggle;
     int offset;
-    void *user_data;
+    editlist *edit_list;
+    char     *edit_list_file;
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
@@ -172,8 +173,6 @@ typedef struct sample_info_t {
 #define SAMPLE_DEC_BIBBER 1
 #define SAMPLE_DEC_FREEZE 2
 
-extern void *sample_get_user_data(int sample_id);
-extern int sample_set_user_data(int sample_id, void *data);
 extern int sample_chain_malloc(int sample_id);
 extern int sample_chain_free(int sample_id);
 extern int sample_size();
@@ -300,6 +299,8 @@ extern int sample_get_selected_entry(int s1);
 extern int sample_set_effect_status(int s1, int status);
 extern int sample_set_selected_entry(int s1, int position);
 
+extern int sample_set_editlist( int s1, editlist *edl );
+extern editlist *sample_get_editlist(int s1 );
 
 #ifdef HAVE_XML2
 extern void CreateSample(xmlNodePtr node, sample_info * sample);

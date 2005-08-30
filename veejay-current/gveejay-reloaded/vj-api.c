@@ -185,7 +185,6 @@ typedef struct
 	int	selected_chain_entry;
 	int	selected_el_entry;
 	int	selected_vims_entry;
-	int	selected_history_entry;
 	int	selected_key_mod;
 	int	selected_key_sym;
 	int	selected_vims_id;
@@ -437,7 +436,6 @@ static	int	count_textview_buffer(const char *name);
 static	void	clear_textview_buffer(const char *name);
 static	void	init_recorder(int total_frames, gint mode);
 static	void	reload_bundles();
-static void	reload_hislist();
 static	void	update_rgbkey_from_slider();
 void	vj_launch_toggle(gboolean value);
 static	gchar	*get_textview_buffer(const char *name);
@@ -456,8 +454,6 @@ static sample_slot_t *vj_gui_get_sample_info(gint which_one, gint mode );
 static void 	  add_sample_to_effect_sources_list(gint id, gint type, gchar *title, gchar *timecode);
 static void 	  add_sample_to_editlist(guint row_number, gchar *timeline, gchar *fname, gchar *timecode, gchar *gfourcc);
 static void 	  set_activation_of_slot_in_samplebank(gboolean activate);
-static void 	  update_sample_options_dialog(void);
-static void 	  vj_gui_show_sample_options();
 int		gveejay_new_slot(int stream);
 static	int	selected_is_playing();
 
@@ -1413,7 +1409,6 @@ int		gveejay_new_slot(int mode)
 	int id = 0;
 	int result_len = 0;
 	gchar *result = recv_vims( 3, &result_len );
-
 	if(result_len > 0 )
 	{
 		sscanf( result, "%d", &id );
@@ -1432,7 +1427,7 @@ int		gveejay_new_slot(int mode)
 			{
 				tmp_slot->slot_number = poke_slot;
 				add_sample_to_sample_banks( bank_page, tmp_slot );
-				free_slot( tmp_slot );	
+				free_slot( tmp_slot );
 				info->uc.expected_slots =
 				 info->status_tokens[TOTAL_SLOTS] + 1;
 			}
@@ -2112,9 +2107,6 @@ static	void	update_status_accessibility(int pm)
 			{
 				enable_widget("frame_streamproperties");
 				enable_widget("frame_streamrecord");
-				disable_widget("tree_history");
-				disable_widget("button_historyrec");
-				disable_widget("button_historymove");  
 				disable_widget("frame_samplerecord");
 				disable_widget("frame_sampleproperties");
 				for(i=0; videowidgets[i].name != NULL; i++)
@@ -2129,11 +2121,10 @@ static	void	update_status_accessibility(int pm)
 
 			if( pm == MODE_SAMPLE )
 			{
+				enable_widget("frame132");
+				enable_widget("frame88");
 				enable_widget("frame_samplerecord");
 				enable_widget("frame_sampleproperties");
-				enable_widget("tree_history");
-				enable_widget("button_historyrec");
-				enable_widget("button_historymove");  
 				disable_widget("frame_streamproperties");
 				disable_widget("frame_streamrecord");
 				enable_widget( "samplerand" );
@@ -2141,8 +2132,10 @@ static	void	update_status_accessibility(int pm)
 			}
 			else
 			{
+				disable_widget( "frame132");
 				disable_widget( "samplerand" );
 				disable_widget( "freestyle" );
+				disable_widget( "frame88");
 			}
 
 			if( pm == MODE_PLAIN)
@@ -2202,6 +2195,24 @@ static void	update_current_slot(int pm)
 			v4l_expander_toggle(0);
 		}
 
+		if(pm == MODE_PLAIN)
+		{
+			if(info->selected_gui_slot != NULL || info->selected_slot != NULL )
+				set_activation_of_slot_in_samplebank( false );
+		}
+		else
+		{
+			int poke_slot = 0;
+			int bank_page = find_bank_by_sample( info->status_tokens[CURRENT_ID], pm, &poke_slot );
+			if(bank_page >= 0 )
+			{
+				if(info->selected_gui_slot != NULL || info->selected_slot != NULL )
+					set_activation_of_slot_in_samplebank( false );
+				info->selected_gui_slot = info->sample_banks[bank_page]->gui_slot[poke_slot];
+				info->selected_slot = info->sample_banks[bank_page]->slot[poke_slot];
+				set_activation_of_slot_in_samplebank(true);
+			}
+		}
 	}
 	/* Actions for stream */
 	if( pm == MODE_STREAM )
@@ -2297,7 +2308,7 @@ static void	update_current_slot(int pm)
 
 		if( history[SAMPLE_LOOP] != info->status_tokens[SAMPLE_LOOP])
 		{
-			switch( get_loop_value() )
+			switch( info->status_tokens[SAMPLE_LOOP] )
 			{
 				case 0:
 					set_toggle_button( "loop_none", 1 );
@@ -2382,11 +2393,14 @@ static void 	update_globalinfo()
 			info->uc.reload_hint[HINT_ENTRY] = 1;	
 			info->uc.reload_hint[HINT_CHAIN] = 1;
 		}
+		if( pm != MODE_STREAM )
+		info->uc.reload_hint[HINT_EL] = 1;
 	}
 
 	if( info->status_tokens[TOTAL_SLOTS] !=
 		history[TOTAL_SLOTS] && info->status_tokens[TOTAL_SLOTS]!= info->uc.expected_slots )
 	{
+		fprintf(stderr, "Reloading samples\n");
 		info->uc.reload_hint[HINT_SLIST] = 1;
 	}
 
@@ -2405,8 +2419,6 @@ static void 	update_globalinfo()
 			update_spin_range(
 				"button_el_selpaste", 0, tf, info->selection[2]);
 		}	
-
-		info->uc.reload_hint[HINT_EL] = 1;
 
 		update_spin_range("button_fadedur", 0, tf, 0 );
 		update_label_i( "label_totframes", tf, 1 );
@@ -2439,8 +2451,7 @@ static void 	update_globalinfo()
 	}
 
 	/* Update current playing sample in dialog window */
-	if( selected_is_playing())
-		update_current_slot(pm);
+	update_current_slot(pm);
 	
 	
 	if( history[CURRENT_ID] != info->status_tokens[CURRENT_ID] )
@@ -2475,13 +2486,6 @@ static void 	update_globalinfo()
 
 	int	*entry_history = &(info->uc.entry_history[0]);
 	int	*entry_tokens = &(info->uc.entry_tokens[0]);
-
-	/* For now, always reload entry on hint from Host */
-	if( entry_history[ENTRY_FXID] !=
-		entry_tokens[ENTRY_FXID] )
-	{
-		info->uc.reload_hint[HINT_ENTRY] = 1;
-	}
 
 	if(info->uc.reload_hint[HINT_V4L] == 1 )
 	{
@@ -2607,12 +2611,6 @@ static void 	update_globalinfo()
 	}
 
 
-	if(info->uc.reload_hint[HINT_HISTORY] == 1 )
-	{
-		reload_hislist();
-	}
-
-
 	if(info->uc.reload_hint[HINT_BUNDLES] == 1 )
 	{
 		reload_bundles();
@@ -2648,7 +2646,6 @@ static void 	update_globalinfo()
 		}
 	}	
 	// test renew
-//	update_sample_options_dialog(sample_changed, stream_changed, false);
 	
 	
 	memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));	
@@ -3605,31 +3602,6 @@ gboolean
     return TRUE; /* allow selection state to change */
   }
 
-gboolean
-  view_history_selection_func (GtkTreeSelection *selection,
-                       GtkTreeModel     *model,
-                       GtkTreePath      *path,
-                       gboolean          path_currently_selected,
-                       gpointer          userdata)
-  {
-    GtkTreeIter iter;
-
-    if (gtk_tree_model_get_iter(model, &iter, path))
-    {
-      gint num = 0;
-
-      gtk_tree_model_get(model, &iter, COLUMN_INT, &num, -1);
-
-      if (!path_currently_selected)
-      {
-		info->uc.selected_history_entry = num;
-      }
-
-    }
-
-    return TRUE; /* allow selection state to change */
-  }
-
 void
 on_vims_row_activated(GtkTreeView *treeview,
 		GtkTreePath *path,
@@ -3809,32 +3781,6 @@ gboolean
     return TRUE; /* allow selection state to change */
   }
 
-
-
-
-void 
-on_history_row_activated(GtkTreeView *treeview,
-		GtkTreePath *path,
-		GtkTreeViewColumn *col,
-		gpointer user_data)
-{
-	GtkTreeModel *model;
-	GtkTreeIter iter;
-
-	model = gtk_tree_view_get_model(treeview);
-	if(gtk_tree_model_get_iter(model,&iter,path))
-	{
-		gint num = 0;
-		gtk_tree_model_get(model,&iter, COLUMN_INT, &num, -1);
-		//gint frame_num = _el_ref_start_frame( num );
-
-		multi_vims( VIMS_SAMPLE_RENDER_SELECT, "%d %d", 0, num );
-
-	}
-
-}
-
-
 void 
 on_editlist_row_activated(GtkTreeView *treeview,
 		GtkTreePath *path,
@@ -3862,7 +3808,7 @@ on_editlist_row_activated(GtkTreeView *treeview,
 void
 on_stream_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 {
-	if(!info->status_lock)
+	if(!info->status_lock && info->selected_slot)
 	{
 	GdkColor current_color;
 	GtkWidget *colorsel = glade_xml_get_widget_(info->main_window,
@@ -4115,66 +4061,6 @@ static	void	setup_bundles()
 	
 }
 
-static void	reload_hislist()
-{
-	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_history");
-	GtkListStore *store;
-	GtkTreeIter iter;
-	gint offset=0;
-	gint hislen = 0;
-	single_vims( VIMS_SAMPLE_RENDERLIST );
-	gchar *fxtext = recv_vims(3,&hislen);
-
- 	reset_tree( "tree_history");
-	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
-	store = GTK_LIST_STORE(model);
-
-	while( offset < hislen )
-	{
-		gchar *timecode;
-		int values[3];
-		char tmp_len[22];
-		bzero(tmp_len, 22);
-		strncpy(tmp_len, fxtext + offset, 22 );
-		int n = sscanf( tmp_len, "%02d%010d%010d",&values[0],&values[1],&values[2]);
-		if(n>1)
-		{
-			
-		}	
-
-		if(offset == 0)
-			timecode = strdup( "original sample" );
-		else
-			timecode = format_time( values[2] - values[1] );
-		offset += 22;
-		gtk_list_store_append( store, &iter );
-		gtk_list_store_set( store, &iter, COLUMN_INT, (guint) values[0],
-			COLUMN_STRING0, timecode, -1 );
-
-		g_free(timecode);
-	}
-
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
-	g_free(fxtext);
-}
-
-static	void	setup_hislist_info()
-{
-	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_history");
-	GtkListStore *store = gtk_list_store_new( 2,G_TYPE_INT, G_TYPE_STRING );
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
-	g_object_unref( G_OBJECT( store ));
-
-	setup_tree_text_column( "tree_history", COLUMN_INT, "Seq");
-	setup_tree_text_column( "tree_history", COLUMN_STRING0, "Duration" );
-
-	g_signal_connect( tree, "row-activated",
-		(GCallback) on_history_row_activated, NULL );
-
-  	GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
- 	gtk_tree_selection_set_select_function(selection, view_history_selection_func, NULL, NULL);
-    	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
-}
 static	void	setup_editlist_info()
 {
 	editlist_tree = glade_xml_get_widget_( info->main_window, "editlisttree");
@@ -4768,7 +4654,7 @@ static	void	init_cpumeter()
 {
 	info->cpumeter = g_timeout_add(300,update_cpumeter_timeout,
 			(gpointer*) info );
-	info->imageA = g_timeout_add(100,update_imageA, (gpointer*)info);
+	info->imageA = g_timeout_add(300,update_imageA, (gpointer*)info);
 }
 
 
@@ -5249,7 +5135,6 @@ void 	vj_gui_init(char *glade_file)
 	setup_effectlist_info();
 	setup_editlist_info();
 	setup_samplelist_info();
-	setup_hislist_info();
 	//setup_v4l_devices();
 	setup_colorselection();
 	setup_rgbkey();
@@ -5319,6 +5204,9 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	}
 	vj_msg(VEEJAY_MSG_INFO, "New connection established with Veejay running on %s port %d",
 		(group_name == NULL ? hostname : group_name), port_num );
+	int k = 0;
+	for( k = 0; k < 3; k ++ )
+		memset( info->history_tokens[k] , 0, (sizeof(int) * STATUS_TOKENS) );
 
 	info->channel = g_io_channel_unix_new( vj_client_get_status_fd( info->client, V_STATUS));
 
@@ -5871,26 +5759,19 @@ image_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 
 }
 
-// TODO: 
-static void open_sample_edit_dialog( GtkWidget *widget, gpointer data )
-{
-	if(!GTK_WIDGET_VISIBLE(glade_xml_get_widget(info->main_window, "sample_options")))
-		{GtkWidget *w = glade_xml_get_widget_( info->main_window, "sample_options" );
-		 gtk_widget_show(w); }
-}
 
 static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 {
 	gchar hotkey[3];
 	gchar descr[50];
 	char debug[15];	
-	sprintf(debug,"%d %d", bank_nr, slot_nr );
 
 	sample_bank_t **sample_banks = info->sample_banks;	
 	sample_gui_slot_t *gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
 	
-	sprintf( descr, "%s %d", (sample_banks[bank_nr]->slot[slot_nr]->sample_type == 0 ? "Sample" : "Stream" ),
-		sample_banks[bank_nr]->slot[slot_nr]->sample_id );
+//	sprintf( descr, "%s %d", (sample_banks[bank_nr]->slot[slot_nr]->sample_type == 0 ? "Sample" : "Stream" ),
+//		sample_banks[bank_nr]->slot[slot_nr]->sample_id );
+
 
 	if(gui_slot->event_box != NULL )
 	{
@@ -5947,9 +5828,15 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 	gtk_box_pack_start (GTK_BOX (gui_slot->main_vbox), gui_slot->upper_hbox, FALSE, TRUE, 0);
 	gtk_widget_show(GTK_WIDGET(gui_slot->upper_hbox));
 
-	/* the hotkey that is assigned to this slot */
-	sprintf(hotkey, "F-%d", (slot_nr+1));	
-	gui_slot->hotkey = GTK_LABEL(gtk_label_new(hotkey));
+
+	if( sample_banks[bank_nr]->slot[slot_nr]->sample_type >= 0 )
+	{ 
+		/* the hotkey that is assigned to this slot */
+		sprintf(hotkey, "F-%d", (slot_nr+1));	
+		gui_slot->hotkey = GTK_LABEL(gtk_label_new(hotkey));
+	}
+	else
+		gui_slot->hotkey = GTK_LABEL(gtk_label_new(""));
 	gtk_misc_set_alignment(GTK_MISC(gui_slot->hotkey), 0.0, 0.0);
 	gtk_misc_set_padding (GTK_MISC(gui_slot->hotkey), 0, 0);	
 	gtk_box_pack_start (GTK_BOX (gui_slot->upper_hbox), GTK_WIDGET(gui_slot->hotkey), FALSE, FALSE, 0);
@@ -5960,7 +5847,7 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 	/* the edit button */
 
 	/* Todo: add pointer to sample slot to callback function.
-           edit mode needs ID and type */ 
+           edit mode needs ID and type  
 	gui_slot->edit_button = GTK_BUTTON( gtk_button_new_with_label("edit"));
 	gtk_box_pack_start( GTK_BOX(gui_slot->upper_hbox), GTK_WIDGET(gui_slot->edit_button), FALSE, FALSE, 0 );
 	g_signal_connect( gui_slot->edit_button, "clicked",
@@ -5968,21 +5855,21 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 			NULL  );
 
 	 gtk_widget_set_sensitive( GTK_WIDGET(gui_slot->edit_button), FALSE );
-	gtk_widget_show(GTK_WIDGET(gui_slot->edit_button));
+	gtk_widget_show(GTK_WIDGET(gui_slot->edit_button));*/  
 
 	/* the upper container that holds title, timecode and so on  */
 	gui_slot->upper_vbox = gtk_vbox_new(false,0);
 	gtk_box_pack_start (GTK_BOX (gui_slot->upper_hbox), gui_slot->upper_vbox, TRUE, TRUE, 0);
 	gtk_widget_show(GTK_WIDGET(gui_slot->upper_vbox));
 	/* the title of the loaded sample (if there is any) */
-	gui_slot->title = GTK_LABEL(gtk_label_new(debug));
+	gui_slot->title = GTK_LABEL(gtk_label_new(""));
 	gtk_misc_set_alignment(GTK_MISC(gui_slot->title), 0.00, 0.00);
 	gtk_misc_set_padding (GTK_MISC(gui_slot->title), 0, 0);	
 	gtk_box_pack_start (GTK_BOX (gui_slot->upper_vbox), GTK_WIDGET(gui_slot->title), FALSE, FALSE, 0);
 	gtk_widget_show(GTK_WIDGET(gui_slot->title));	
 	
 	/* the timecode of the loaded sample (if there is any) */
-	gui_slot->timecode = GTK_LABEL(gtk_label_new("timecode"));
+	gui_slot->timecode = GTK_LABEL(gtk_label_new(""));
 	gtk_misc_set_alignment(GTK_MISC(gui_slot->timecode), 0.0, 0.0);
 	gtk_misc_set_padding (GTK_MISC(gui_slot->timecode), 0,0 );	
 	gtk_box_pack_start (GTK_BOX (gui_slot->upper_vbox), GTK_WIDGET(gui_slot->timecode), FALSE, FALSE, 0);
@@ -6051,10 +5938,10 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
 	else 
 		gtk_frame_set_shadow_type(info->selected_gui_slot->frame,GTK_SHADOW_ETCHED_IN);
 
-	if( activate )
-		 gtk_widget_set_sensitive( GTK_WIDGET(info->selected_gui_slot->edit_button), TRUE  );
-	else
-		gtk_widget_set_sensitive( GTK_WIDGET(info->selected_gui_slot->edit_button), FALSE );
+//	if( activate )
+//		 gtk_widget_set_sensitive( GTK_WIDGET(info->selected_gui_slot->edit_button), TRUE  );
+//	else
+//		gtk_widget_set_sensitive( GTK_WIDGET(info->selected_gui_slot->edit_button), FALSE );
 }
 
 
@@ -6200,7 +6087,6 @@ static void add_sample_to_editlist(guint row_number, gchar *timeline, gchar *fna
  */
 static void update_sample_slot_data(int page_num, int slot_num, int sample_id, gint sample_type, gchar *title, gchar *timecode)
 {
-
 	/* See if we must add a new Page */
 	if( info->sample_banks[page_num ] == NULL )
 	{
@@ -6218,7 +6104,8 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
     	slot->sample_id = sample_id;
     	slot->sample_type = sample_type;
 	slot->timecode = timecode == NULL ? strdup("") : strdup( timecode );
-	slot->title =  title == NULL ? strdup("") : strdup( title );
+	slot->title = title == NULL ? strdup("") : strdup( title );
+	
 
 	if(gui_slot)
 	{
@@ -6226,6 +6113,12 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 			gtk_label_set_text( GTK_LABEL( gui_slot->title ), slot->title );
 		if(gui_slot->timecode)
 			gtk_label_set_text( GTK_LABEL( gui_slot->timecode ), slot->timecode );
+		if(sample_id > 0 )
+		{
+			gchar frame_title[20];
+			sprintf(frame_title, "%s-%d", (sample_type == 0 ? "Sample" : "Stream" ), sample_id);
+			gtk_frame_set_label( gui_slot->frame, frame_title );
+		}
 	}
 
 	if( sample_id == 0 )
@@ -6257,11 +6150,6 @@ static void vj_gui_add_sample(gchar *filename, gint mode)
  * Function that is used for the VJ-GUI to show the options-dailog for a selected sample/stream
  * and decides if the selected slot contains an video-sample or an stream
  * -------------------------------------------------------------------------------------------------------------------------- */ 
-static void vj_gui_show_sample_options()
-{
-	update_sample_options_dialog();
-}
-
 /* -------------------------------------------------------------------------------------------------------------------------- 
  * Function that is used to show in the options dialog the values of the selected sample... This function decides wether to 
  * take these values from the current loaded sample or by using a different way if the selected sample is not the currently
@@ -6270,185 +6158,7 @@ static void vj_gui_show_sample_options()
  * shows data of a non-played sample
    -------------------------------------------------------------------------------------------------------------------------- */ 
 
-//fixme
-static void update_sample_options_dialog(void)
-    {
-    gboolean selected_is_playing = false;    
-    int pm = info->status_tokens[PLAY_MODE];
-
-    /* if options-dailog not visible, stop here, no need to do anything more */
-    // TODO: move sample options dialog back into FX panel (notebook)
-    if (!GTK_WIDGET_VISIBLE(glade_xml_get_widget(info->main_window, "sample_options")))
-	return;
-
- 	/* No slots selected, or selected is playing:
-           If selected is playing, it will be updated by the veejay_tick IO function
-           that processes veejay's status information */
-
- 
-    if(!info->selected_slot || selected_is_playing == true )
-	return; // nothing to do
-
-    /* this VIMS-Command gets as second parameter a global FLAG that is definded in veejay/vj-global.h 
-     * to decide if gather the informations for a sample or a stream */
-
-	/* A sample slot was selected and this slot is not playing,
-           Update the sample edit window with the properties of the selected slot */
-
-	multi_vims( VIMS_SAMPLE_OPTIONS, "%d %d", info->selected_slot->sample_id, info->selected_slot->sample_type );
-
-	gint s_info_len = 0;
-	gchar *s_info = recv_vims( 5, &s_info_len);
-	gchar *ptr = s_info;
-	
-	if(s_info == NULL || s_info_len <= 0 )
-		return; // nothing to do
-
-	int stream_type = 0;
-	gchar type[4];
-	bzero(type,4);
-	strncpy(type, 2, s_info );
-	sscanf( type, "%2d", &stream_type );
-	s_info += 2;
-
-	switch( stream_type )
-	{   
-		case 0: // Update sample
-	     	{
-		        gint start_frame, end_frame,speed,loop,marker_start_frame,marker_end_frame,effects_on,len;	
-			gchar *time;
-		        int lower_bound;
-			int upper_bound;
-			int abs_start;
-			int abs_end;
-		        int re;
-		        double mul;		
-
-			sscanf( s_info,
-				"%06d%06d%03d%02d%06d%06d%01d",
-				&start_frame,&end_frame,&speed,&loop,&marker_start_frame,&marker_end_frame,&effects_on);
-
-			// show speed 
-		        len = end_frame - start_frame;
-		        update_spin_range( "spin_sample_speed", 0, len, speed );
-
-			// show sample length
-		        time = format_selection_time( 0, len );
-	//	        update_label_str( "label_samplelength", time );    
-
-		        // show start and end frame
-		        update_spin_value( "spin_sample_start", start_frame);
-		        update_spin_value( "spin_sample_end", end_frame);
-
-			// show loop-type
-		        switch( loop )
-			    {
-		    	    case 0: set_toggle_button( "loop_none", 1 );
-				break;
-			    case 1: set_toggle_button( "loop_normal", 1 );
-				break;
-			    case 2: set_toggle_button("loop_pingpong", 1 );
-				break;
-			    }
-	    	
-			// set effect-chain-toggle
-		        set_toggle_button( "check_samplefx", effects_on);	    
-
-			// set markers
-		        lower_bound = marker_start_frame - start_frame;
-			if (lower_bound == start_frame) lower_bound = 0;
-				upper_bound = end_frame - marker_end_frame;
-			if (upper_bound == end_frame) upper_bound = 0;
-				abs_start = start_frame;
-			abs_end   = end_frame;
-	       		re = abs_end - abs_start;
-		        if (re == 0 ) re = 1;
-		        mul = (double) re;
-			gdouble value_start = lower_bound / mul;
-		        gdouble value_end = upper_bound / mul;	
-		        update_slider_gvalue( "slider_m0", value_start );
-		        update_slider_gvalue( "slider_m1", value_end );
-		}
-    	    gtk_notebook_set_current_page(GTK_NOTEBOOK(glade_xml_get_widget(info->main_window, "sample_stream_pad")),0);	    
-	    gtk_widget_set_sensitive(gtk_notebook_get_nth_page(GTK_NOTEBOOK(glade_xml_get_widget(info->main_window, "sample_stream_pad")),0),true);
-	    disable_widget("frame_samplerecord");
-	    gtk_widget_set_sensitive(gtk_notebook_get_nth_page(GTK_NOTEBOOK(glade_xml_get_widget(info->main_window, "sample_stream_pad")),1),false);
-    	    gtk_widget_set_sensitive(gtk_notebook_get_nth_page(GTK_NOTEBOOK(glade_xml_get_widget(info->main_window, "sample_stream_pad")),2),false);
-		break;  
-   	    
-		case 4: // VJ_TAG_TYPE_COLOR
-	    	{    
-			gint col[3] = {0,0,0};
-			sscanf( s_info, "%03d%03d%03d", &col[0], &col[1], &col[2]);
-		        // set color
-			GdkColor color;
-		        color.red = 255 * col[0];
-		        color.green = 255 * col[1];
-		        color.blue = 255 * col[2];
-		        gtk_color_selection_set_current_color(GTK_COLOR_SELECTION(glade_xml_get_widget(info->main_window, "colorselection")),&color );
-		    
-	   		gtk_notebook_set_current_page(GTK_NOTEBOOK(glade_xml_get_widget(info->main_window, "sample_stream_pad")),2);	    
-		    	gtk_widget_set_sensitive(gtk_notebook_get_nth_page(GTK_NOTEBOOK(glade_xml_get_widget(info->main_window, "sample_stream_pad")),0),false);
-		    	gtk_widget_set_sensitive(gtk_notebook_get_nth_page(GTK_NOTEBOOK(glade_xml_get_widget(info->main_window, "sample_stream_pad")),1),false);
-		    	gtk_widget_set_sensitive(gtk_notebook_get_nth_page(GTK_NOTEBOOK(glade_xml_get_widget(info->main_window, "sample_stream_pad")),2),true);	    	    
-		}
-		break;
-		case 2: // VJ_TAG_TYPE_V4L
-		{
-		  	  int values[5];
-		 	  int effects_on;
-		   	  int	 i;
-    		    
-		   	  sscanf( s_info, "%05d%05d%05d%05d%05d%01d", &values[0],&values[1],&values[2],&values[3],&values[4],&effects_on);
-		    
-		   	 // set v4l-capture-card-properties
-		    	for	(i = 0; i < 5; i ++ ) update_slider_gvalue( capt_card_set[i].name, (gdouble)values[i]/65535.0 );
-		    
-		  	  // set effect-chain-toggle
-			    set_toggle_button( "check_streamfx", effects_on);	    
-		 }
-		 break;
-		 default: // other cases
-		 {
-		    int effects_on;
-		        		    
-		    sscanf( s_info, "%01d", &effects_on);
-
-		    // set effect-chain-toggle
-		    set_toggle_button( "check_streamfx", effects_on);	    
-		
-    	    gtk_notebook_set_current_page(GTK_NOTEBOOK(glade_xml_get_widget(info->main_window, "sample_stream_pad")),1);	    
-	    gtk_widget_set_sensitive(gtk_notebook_get_nth_page(GTK_NOTEBOOK(glade_xml_get_widget(info->main_window, "sample_stream_pad")),0),false);
-	    gtk_widget_set_sensitive(gtk_notebook_get_nth_page(GTK_NOTEBOOK(glade_xml_get_widget(info->main_window, "sample_stream_pad")),1),true);
-	    disable_widget("frame_streamrecord");	    
-	    gtk_widget_set_sensitive(gtk_notebook_get_nth_page(GTK_NOTEBOOK(glade_xml_get_widget(info->main_window, "sample_stream_pad")),2),false);	    	    	//gtk_label_set_text(glade_xml_get_widget(info->main_window, "label_samplelength"), gtk_label_get_text(info->selected_slot->timecode));
-		 update_label_str( "label_sampleposition", "0:00:00:00");
-		update_label_str( "label_samplepos", "000000000");
-
-	    	}
-		break;
-	}	
-}
-
-
-
 /* -------------------------------------------------------------------------------------------------------------------------- 
  * Function that is used for the VJ-GUI to apply all changes that are made within the sample/stream-options dialog
  * to the sample/stream that is shown within this dialog (which is the selected slot of the sample bank)
  * -------------------------------------------------------------------------------------------------------------------------- */ 
-static void vj_gui_change_slot_option(gint vims_command, int *value[], gchar *vims_msg)
-    {
-	if( info->selected_slot == 0 )
-	{
-		fprintf(stderr, "No selection !\n" ); exit(0);
-		exit(0);
-	}
-    gint id = info->selected_slot->sample_id;
-    
-    if (value == NULL) multi_vims(vims_command, "%d",id);
-    else if (vims_command == VIMS_STREAM_COLOR) multi_vims( vims_command, "%d %d %d %d", id, value[0], value[1], value[2]);
-    else multi_vims(vims_command, "%d %d",id, value[0] );
-    
-    vj_msg(VEEJAY_MSG_INFO, vims_msg);
-    }
-    

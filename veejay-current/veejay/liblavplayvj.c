@@ -419,8 +419,6 @@ int veejay_free(veejay_t * info)
 #endif
 	if( info->settings->action_scheduler.state )
 	{
-		if(info->settings->action_scheduler.el )
-			free(info->settings->action_scheduler.el );
 		if(info->settings->action_scheduler.sl )
 			free(info->settings->action_scheduler.sl );
 	}
@@ -552,123 +550,6 @@ int veejay_init_editlist(veejay_t * info)
 
 }
 
-/*
-	initialize array of editlists and set pointer to it in the sample as user data
-*/
-int	veejay_prep_el( veejay_t *info, int s1 )
-{ 
-	editlist **el;
-	void *data = sample_get_user_data(s1);
-	int i;
-	if(data == NULL)
-	{
-		// allocate array of el
-		el = (editlist**) vj_malloc(sizeof(editlist*) * SAMPLE_MAX_RENDER );
-		for(i = 0; i < SAMPLE_MAX_RENDER; i ++)
-			el[i] = NULL;
-
-		data = (void*) el;
-		if(sample_set_user_data( s1, data ) )
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG,"Allocated place holder for render entries");
-			return 1;
-		}
-		if(el) free(el);
-	}
-	return 1;
-}
-
-long	veejay_el_max_frames( veejay_t *info, int s1 )
-{
-	editlist **el_list;
-	void *data = sample_get_user_data(s1);
-	int current = sample_get_render_entry(s1);
-	if(!sample_exists(s1))
-		return info->edit_list->video_frames - 1;
-
-	if(current <= 0 || data == NULL )
-	{
-		return info->edit_list->video_frames - 1;
-	}
-	el_list = (editlist**) data;
-	if(el_list[current] == NULL )
-		return info->edit_list->video_frames - 1;
-	return el_list[current]->video_frames - 1;
-}
-
-/*
-	open a file and add the resulting editlist to sample's user_data
-*/
-int	veejay_add_el_entry( veejay_t *info, int s1, char *filename, int dst )
-{
-	editlist *el = vj_el_new( filename, info->edit_list->video_norm,
-		info->auto_deinterlace );
-	void *data;
-	editlist **el_list;
-	int entry;
-	int current;
-	if(!el)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Error adding %s",filename);
-		return 0;
-	}
-	if( dst <= 0 || dst >= SAMPLE_MAX_RENDER)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR ,"Invalid render entry %d", dst );
-		return 0;
-	}
-	
-	data = sample_get_user_data( s1 );
-	el_list = (editlist**) data;
-
-	// current
-	current = sample_get_render_entry( s1 );
-
-	
-	if( el_list[dst] != NULL )
-	{
-		// close file, delete file, ...
-		veejay_msg(VEEJAY_MSG_ERROR, "Removing old editlist");
-		vj_el_close( el_list[dst] );
-	}
-
-	el_list[dst] = el;
-
-	// now , update start and end positions
-	sample_set_render_entry( s1, dst );
-	sample_set_startframe( s1, 0 );
-	sample_set_endframe( s1, el->video_frames-1);
-	// back to current entry
-	sample_set_render_entry( s1, current );
-
-	return 1;
-}
-
-/*
-	get editlist pointer from sample's user_data
-*/
-/*
-editlist *veejay_get_el( veejay_t *info, int s1 )
-{
-	void *data;
-	editlist **el_list;
-	int entry;
-
-	data = sample_get_user_data( s1 );
-	if(data == NULL) return NULL;
-	el_list = (editlist**) data;
-	entry   = sample_get_render_entry( s1 );
-	if( entry < 0 ) return NULL;
-	if(entry > 0 && entry < SAMPLE_MAX_RENDER) 
-		return el_list[entry];
-
-	return info->edit_list;
-}
-*/
-/*
-	setup start/end of rendered sample
-*/
-
 void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 {
 	// if current is stream and playing network stream, close connection
@@ -695,6 +576,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		veejay_msg(VEEJAY_MSG_WARNING, "Deactivated %d effect%s", n, (n==1 ? " " : "s" ));
 	  }
 	  veejay_msg(VEEJAY_MSG_INFO, "Playing plain video now");
+	  info->edit_list = info->current_edit_list;
 	}
 	if(new_pm == VJ_PLAYBACK_MODE_TAG)
 	{
@@ -782,6 +664,17 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 
      if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
      {
+		editlist *edl = 
+			sample_get_editlist( sampleid );
+		if(edl)
+		{
+			info->edit_list = sample_get_editlist( sampleid );
+		}
+		else
+		{
+			veejay_msg(VEEJAY_MSG_ERROR,
+			 "Sample has not EDL data");
+		}
 		if(!sample_exists(sampleid))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist", sampleid);
@@ -2516,11 +2409,10 @@ int veejay_main(veejay_t * info)
  * return value: 1 on succes, 0 on error
  ******************************************************/
 
-int veejay_edit_copy(veejay_t * info, long start, long end)
+int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
-    editlist *el = info->edit_list;
     uint64_t k, i;
     uint64_t n1 = (uint64_t) start;
     uint64_t n2 = (uint64_t) end;
@@ -2547,7 +2439,52 @@ int veejay_edit_copy(veejay_t * info, long start, long end)
 
     return 1;
 }
+editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, long end)
+{
+    video_playback_setup *settings =
+	(video_playback_setup *) info->settings;
+    uint64_t k, i;
+    uint64_t n1 = (uint64_t) start;
+    uint64_t n2 = (uint64_t) end;
 
+    uint64_t len = n2 - n1 + 1;
+
+    if( n1 < 0 || n2 > info->edit_list->video_frames-1)
+    {
+	veejay_msg(VEEJAY_MSG_ERROR, "Sample start and end are outside of editlist");
+	return;
+    }
+
+    if(len <= 0 )
+    {
+	veejay_msg(VEEJAY_MSG_ERROR, "Sample too short");
+	return;
+    }
+
+    /* Copy edl */
+    editlist *el = (editlist*) vj_malloc(sizeof(editlist));
+    memcpy( el, info->edit_list , sizeof(editlist));
+    /* copy edl frames */
+    el->frame_list =
+		(uint64_t *) vj_malloc(  sizeof(uint64_t) * len );
+
+    if (!el->frame_list)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, 
+		    "Malloc error, you\'re probably out of memory");
+		veejay_change_state(info, LAVPLAY_STATE_STOP);
+		return 0;
+    	}
+
+    k = 0;
+
+    for (i = n1; i <= n2; i++)
+		el->frame_list[k++] = info->edit_list->frame_list[i];
+    // set length
+    el->video_frames = len;
+
+    return el;
+}
 
 /******************************************************
  * veejay_edit_delete()
@@ -2556,14 +2493,13 @@ int veejay_edit_copy(veejay_t * info, long start, long end)
  * return value: 1 on succes, 0 on error
  ******************************************************/
 
-int veejay_edit_delete(veejay_t * info, long start, long end)
+int veejay_edit_delete(veejay_t * info, editlist *el, long start, long end)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     uint64_t i;
     uint64_t n1 =  (uint64_t) start;
     uint64_t n2 =  (uint64_t) end;
-    editlist *el = info->edit_list;
 
 	if(info->dummy->active)
 	{
@@ -2624,11 +2560,11 @@ int veejay_edit_delete(veejay_t * info, long start, long end)
  * return value: 1 on succes, 0 on error
  ******************************************************/
 
-int veejay_edit_cut(veejay_t * info, long start, long end)
+int veejay_edit_cut(veejay_t * info, editlist *el, long start, long end)
 {
-    if (!veejay_edit_copy(info, start, end))
+    if (!veejay_edit_copy(info, el,start, end))
 	return 0;
-    if (!veejay_edit_delete(info, start, end))
+    if (!veejay_edit_delete(info, el,start, end))
 	return 0;
 
     return 1;
@@ -2642,12 +2578,11 @@ int veejay_edit_cut(veejay_t * info, long start, long end)
  * return value: 1 on succes, 0 on error
  ******************************************************/
 
-int veejay_edit_paste(veejay_t * info, long destination)
+int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     long i, k;
-    editlist *el = info->edit_list;
 
     if (!settings->save_list_len || !settings->save_list)
 	{
@@ -2707,10 +2642,9 @@ int veejay_edit_paste(veejay_t * info, long destination)
  * return value: 1 on succes, 0 on error
  ******************************************************/
 
-int veejay_edit_move(veejay_t * info, long start, long end,
+int veejay_edit_move(veejay_t * info,editlist *el, long start, long end,
 		      long destination)
 {
-    editlist *el  = info->edit_list;
     long dest_real;
 
 	if( info->dummy->active)
@@ -2735,10 +2669,10 @@ int veejay_edit_move(veejay_t * info, long start, long end,
     else
 		dest_real = start;
 
-    if (!veejay_edit_cut(info, start, end))
+    if (!veejay_edit_cut(info, el, start, end))
 		return 0;
 
-    if (!veejay_edit_paste(info, dest_real))
+    if (!veejay_edit_paste(info, el,dest_real))
 		return 0;
 
 
@@ -2754,13 +2688,74 @@ int veejay_edit_move(veejay_t * info, long start, long end,
  * return value: 1 on succes, 0 on error
  ******************************************************/
 
-int veejay_edit_addmovie(veejay_t * info, char *movie, long start,
-			  long end, long destination)
+int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
+{
+	video_playback_setup *settings =
+		(video_playback_setup *) info->settings;
+	char *files[1];
+
+	files[0] = strdup(movie);
+	sample_info *sample = NULL;
+	editlist *sample_edl = NULL;
+	// if sample exists, get it for update
+	if(sample_exists(id) )
+		sample = sample_get(id);
+	// if sample exists, it could have a edit list */
+	if(sample)
+		sample_edl = sample_get_editlist( id );
+	
+	// if both, append it to sample's edit list 
+	if(sample_edl && sample)
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Adding video file to sample %d", id );
+		if(veejay_edit_addmovie_sample( info, movie, id))
+			return 1;
+		return 0;
+	}
+
+	// create initial edit list for sample
+	if(!sample_edl) 
+		sample_edl = vj_el_init_with_args( files,1,info->preserve_pathnames,info->auto_deinterlace,0,
+				info->edit_list->video_norm );
+	// if that fails, bye
+	if(!sample_edl)
+		return 0;
+
+	sample_edl->pixel_format = info->pixel_format;
+
+	// the editlist dimensions must match (there's more)
+	if( sample_edl->video_width != info->edit_list->video_width ||
+	    sample_edl->video_height != info->edit_list->video_height )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot add this video file");
+		if(sample_edl) vj_el_free(sample_edl);
+		return 0;
+	}
+
+	// the sample is not there yet,create it
+	if(!sample)
+	{
+		sample = sample_skeleton_new( 0, sample_edl->video_frames - 1 );
+		sample_store(sample);
+		sample_set_editlist( sample->sample_id , sample_edl );
+		veejay_msg(VEEJAY_MSG_INFO,
+			"Created new sample %d from file %s",sample->sample_id,
+				files[0]);
+
+	}
+
+	// free temporary values
+   	if(files[0]) free(files[0]);
+
+	// return new id
+        return sample->sample_id;
+}
+
+int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start,long end, long destination )
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     uint64_t n, i;
-    editlist *el = info->edit_list;
     long el_end = el->video_frames;
     long n_end;
     n = open_video_file(movie, el, info->preserve_pathnames, info->auto_deinterlace,1,
@@ -2832,8 +2827,7 @@ int veejay_edit_addmovie(veejay_t * info, char *movie, long start,
     {
 		el->has_video = 1;
     }
-
-    return 1;
+	return 1;
 }
 
 
@@ -3001,6 +2995,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	{
 	    	info->edit_list = vj_el_init_with_args(files, num_files, info->preserve_pathnames, info->auto_deinterlace, force, override_norm);
 	}
+	info->current_edit_list = info->edit_list;
 
 	if(info->edit_list==NULL)
 	{
@@ -3061,11 +3056,9 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 		(video_playback_setup *) info->settings;
 
 	/* see if action file conflicts with files given on commandline */
-	if(settings->action_scheduler.state == 2 && num_files > 0 )
+	if(settings->action_scheduler.state == 2 && num_files <= 0 )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "An EditList is defined in the configuration file : %s",
-			settings->action_scheduler.el );
-		veejay_msg(VEEJAY_MSG_ERROR, "Start Veejay without -d and without any filename");
+		veejay_msg(VEEJAY_MSG_ERROR, "Start Veejay with -d and without any filename");
 		return 0;
 	}
 
@@ -3082,23 +3075,13 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 
 	settings->output_fps = ofps;
 
-	/* load editlist from configfile */
+	/* load editlist from configfile 
 	if( settings->action_scheduler.state == 2 )
 	{
-		argv[0] = strdup( settings->action_scheduler.el );
-		veejay_msg(VEEJAY_MSG_INFO,
-			"Liveset: Try loading EditList or video file %s",
-			argv[0] );
-		ret = veejay_open_video_files( info, argv, 1 , force_pix_fmt, force,
-			override_norm );
-		if(argv[0])
-			free(argv[0]);
-		if(!ret)
-		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Cant open editlist in configfile!");
 			return 0;
 		}
-	}
+	}*/
 
 	if( settings->action_scheduler.state == 1 )
 	{

@@ -104,19 +104,8 @@ void 	vj_event_sample_clear_all			(	void *ptr, 	const char format[], 	va_list ap
 void 	vj_event_sample_copy			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_sample_del			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_sample_end			(	void *ptr, 	const char format[],	va_list ap	);
-void 	vj_event_sample_his_del_entry		(	void *ptr, 	const char format[], 	va_list ap	);
-void 	vj_event_sample_his_entry_to_new		(	void *ptr, 	const char format[],	va_list ap	);
-void	vj_event_sample_his_play_entry		(	void *ptr,	const char format[],	va_list ap	);
-void 	vj_event_sample_his_lock_entry		(	void *ptr, 	const char format[], 	va_list ap	);
-void 	vj_event_sample_his_render_entry		(	void *ptr, 	const char format[], 	va_list ap	); 
-void 	vj_event_sample_his_set_entry		(	void *ptr, 	const char format[], 	va_list ap	);
-void 	vj_event_sample_his_unlock_entry		(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_sample_load_list			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_sample_rec_start			( 	void *ptr, 	const char format[], 	va_list ap	);
-void	vj_event_sample_move_render		(	void *ptr,	const char format[],	va_list	ap );
-void 	vj_event_sample_ren_start			( 	void *ptr, 	const char format[], 	va_list ap	);
-void	vj_event_sample_sel_render		(	void *ptr,	const char format[],	va_list ap  );
-
 void 	vj_event_sample_rec_stop			(	void *ptr, 	const char format[], 	va_list ap	); 
 #ifdef HAVE_XML2
 void 	vj_event_sample_save_list			(	void *ptr, 	const char format[], 	va_list ap	); 

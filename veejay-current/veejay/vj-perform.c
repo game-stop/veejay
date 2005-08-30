@@ -1715,33 +1715,11 @@ int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 
 static int vj_perform_get_frame_(veejay_t *info, int s1, long nframe, uint8_t *img[3])
 {
-	int entry = sample_get_render_entry( s1 );
-	if(entry == 0)
-		return vj_el_get_video_frame(
-					info->edit_list,
-					nframe,
-					img,
-					info->pixel_format );
-	if(entry > 0)
-	{
-		editlist **el_list;
-		void	 *data = NULL;
-		data = sample_get_user_data( s1 );
-
-		if(data == NULL)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "No editlist at this entry!");
-			return 0;
-		}
-
-		el_list = (editlist**) data;
-		return vj_el_get_video_frame(
-				el_list[ entry ],
+	return vj_el_get_video_frame(
+				info->edit_list,
 				nframe,
 				img,
 				info->pixel_format );
-	}
-	return 1;
 }
 
 /********************************************************************
@@ -2265,74 +2243,23 @@ int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[3])
 	return vj_tag_record_frame( sample_id, frame, NULL, 0);
 }	
 
-void vj_perform_record_commit_sample(veejay_t *info,long start_el_pos,int len)
-{
- //video_playback_setup *settings = info->settings;
- sample_info *skel;
-
- long el_pos = start_el_pos;
-
-
- if(start_el_pos==-1)
- {
- 	el_pos = (info->edit_list->video_frames - 1);//+1 // + len ??
-	if(!info->edit_list->has_video)
-	  el_pos = 0;
-	else
-	  el_pos -= len;
- }
-
-
- skel = sample_skeleton_new( el_pos, len + el_pos -1  );//-1
- // figure out true starting position
- if(skel)
- {
-	if(sample_store(skel)==0)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Created new sample [%d] [%d-%d], total frames in el:%ld",
-		skel->sample_id, sample_get_startFrame(skel->sample_id), sample_get_endFrame(skel->sample_id),
-			info->edit_list->video_frames  );
-		sample_set_looptype( skel->sample_id, 1 );
-	} 
-
-  }
-
-}
-
-long vj_perform_record_commit_single(veejay_t *info, int entry)
+int vj_perform_record_commit_single(veejay_t *info, int entry)
 {
   //video_playback_setup *settings = info->settings;
 
   char filename[512];
   //int n_files = 0;
-  long start_el_pos = info->edit_list->video_frames;
-
   if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
   {
  	if(sample_get_encoded_file(info->uc->sample_id, filename))
   	{
-
-		if( info->settings->render_list == 0)
+		int id = veejay_edit_addmovie_sample(info,filename, 0 );
+		if(id <= 0)
 		{
-			long dest = info->edit_list->video_frames;
-			if( !veejay_edit_addmovie(info, filename, -1, dest,dest))
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Adding file %s", filename);
-				return -1;
-			}
+			veejay_msg(VEEJAY_MSG_ERROR, "Adding file %s to new sample", filename);
+			return 0;
 		}
-		else
-		{
-			long dest = 0;
-			if( veejay_add_el_entry( info, info->uc->sample_id, filename, 
-					info->settings->render_list ))
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "New playable render entry %d",
-					info->settings->render_list );
-			}
-		    	return -1; // dont commit
-		}
-		return start_el_pos;
+		return id;
  	 }
   }
 
@@ -2341,18 +2268,16 @@ long vj_perform_record_commit_single(veejay_t *info, int entry)
 	 int stream_id = (info->settings->offline_record ? info->settings->offline_tag_id : info->uc->sample_id);
  	 if(vj_tag_get_encoded_file(stream_id, filename))
   	 {
-		long dest = info->edit_list->video_frames;
-		if( !veejay_edit_addmovie(info, filename, -1, dest,dest))
+		int id = veejay_edit_addmovie_sample(info, filename, 0);
+		if( id <= 0 )
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Adding file %s", filename);
-			return -1;
+			veejay_msg(VEEJAY_MSG_ERROR, "Adding file %s to new sample", filename);
+			return 0;
 		}
-		return start_el_pos;
+		return id;
 	}
   }
-
-  return -1;
-
+  return 0;
 }
 
 void vj_perform_record_stop(veejay_t *info)
@@ -2416,6 +2341,7 @@ void vj_perform_record_sample_frame(veejay_t *info, int entry) {
 	video_playback_setup *settings = info->settings;
 	uint8_t *frame[3];
 	int res = 0;
+	int n = 0;
 	frame[0] = primary_buffer[entry]->Y;
 	frame[1] = primary_buffer[entry]->Cb;
 	frame[2] = primary_buffer[entry]->Cr;
@@ -2429,13 +2355,9 @@ void vj_perform_record_sample_frame(veejay_t *info, int entry) {
 		int len = sample_get_total_frames(info->uc->sample_id);
 		long frames_left = sample_get_frames_left(info->uc->sample_id) ;
 		// stop encoder
-		int n;
 		veejay_msg(VEEJAY_MSG_INFO, "Creating new file (reached 2gb AVI limit)");
 		sample_stop_encoder( info->uc->sample_id );
 		// close file, add to editlist
-		
-
-
 		n = vj_perform_record_commit_single( info, entry );
 		// clear encoder
 		sample_reset_encoder( info->uc->sample_id );
@@ -2453,8 +2375,7 @@ void vj_perform_record_sample_frame(veejay_t *info, int entry) {
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Added new sample of %d frames",len);
-			if(n!=-1) vj_perform_record_commit_sample(info,-1,len);
+			veejay_msg(VEEJAY_MSG_DEBUG, "Added new sample %d of %d frames",n,len);
 		}
 	 }
 
@@ -2463,11 +2384,10 @@ void vj_perform_record_sample_frame(veejay_t *info, int entry) {
 	 {
 		int len = sample_get_total_frames(info->uc->sample_id);
 		sample_stop_encoder(info->uc->sample_id);
-		if(vj_perform_record_commit_single( info, entry ) != -1)
-		{	    
-			vj_perform_record_commit_sample(info, -1,len);
-		}
+		n = vj_perform_record_commit_single( info, entry );
 		vj_perform_record_stop(info);
+		if(n) veejay_msg(VEEJAY_MSG_DEBUG, "Added new sample %d of %d frames",n,len);
+
 	 }
 
 	 if( res == -1)
@@ -2522,10 +2442,6 @@ void vj_perform_record_tag_frame(veejay_t *info, int entry) {
 				"Error while auto splitting "); 
 			}
 		}
-		else
-		{
-			vj_perform_record_commit_sample(info,-1,len);
-		}
 	 }
 
 	
@@ -2534,7 +2450,6 @@ void vj_perform_record_tag_frame(veejay_t *info, int entry) {
 		int len = vj_tag_get_encoded_frames(stream_id);
 		vj_tag_stop_encoder(stream_id);
 		vj_perform_record_commit_single( info, entry );	    
-		vj_perform_record_commit_sample(info, -1,len);
 		vj_perform_record_stop(info);
 	 }
 

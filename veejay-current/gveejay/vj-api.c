@@ -57,6 +57,7 @@ static int	TIMEOUT_SECONDS = 0;
 #define FRAME_NUM	1
 #define TOTAL_FRAMES	6
 #define TOTAL_SAMPLES	12
+#define TOTAL_SLOTS	15
 #define	MODE_PLAIN	2
 #define MODE_SAMPLE	0
 #define MODE_PATTERN    3
@@ -184,7 +185,6 @@ typedef struct
 	int	selected_vims_entry;
 	int	selected_sample_id;
 	int	selected_stream_id;
-	int	selected_history_entry;
 	int	selected_key_mod;
 	int	selected_key_sym;
 	int	selected_vims_id;
@@ -200,8 +200,6 @@ typedef struct
 	int	streams[4096];
 	int	current_sample_id;
 	int	current_stream_id;
-	int	list_length[2];
-	int	last_list_length[2];
 	int	recording[2];
 	int	selected_mix_sample_id;
 	int	selected_mix_stream_id;
@@ -234,9 +232,6 @@ static struct
 { 
 	{MODE_SAMPLE, "frame_sampleproperties"},
 	{MODE_SAMPLE, "frame_samplerecord"},
-	{MODE_SAMPLE, "tree_history"},
-	{MODE_SAMPLE, "button_historymove"},
-	{MODE_SAMPLE, "button_historyrec"},
 	{MODE_STREAM, "frame_streamproperties"},
 	{MODE_STREAM, "frame_streamrecord"},	
 	{-1	,	"vbox_fxtree" },
@@ -390,7 +385,6 @@ static	int	count_textview_buffer(const char *name);
 static	void	clear_textview_buffer(const char *name);
 static	void	init_recorder(int total_frames, gint mode);
 static	void	reload_bundles();
-static void	reload_hislist();
 static	void	update_rgbkey_from_slider();
 void	vj_launch_toggle(gboolean value);
 static	gchar	*get_textview_buffer(const char *name);
@@ -1571,20 +1565,6 @@ static	void	update_slider_gvalue(const char *name, gdouble value)
 		GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment), value );	
 }
 
-static	void	update_slider_rel_value(const char *name, gint value, gint minus, gint scale)
-{
-	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
-	if(!w)
-		return;
-	gdouble gvalue = (gdouble)(value - minus);
-	if(scale)
-		gvalue = (100.0 / (gdouble)scale) * gvalue;
-
-	gtk_adjustment_set_value(
-		GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment), gvalue );	
-}
-
-
 static	void	update_slider_value(const char *name, gint value, gint scale)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
@@ -1592,9 +1572,13 @@ static	void	update_slider_value(const char *name, gint value, gint scale)
 		return;
 	gdouble gvalue;
 	if(scale)
-		gvalue = (100.0 / (gdouble)scale) * value;
+	{
+		GtkAdjustment *adj = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment );
+		gvalue = (gdouble) value / (gdouble) scale;
+	}
 	else
 		gvalue = (gdouble) value;
+
 	gtk_adjustment_set_value(
 		GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment), gvalue );	
 }
@@ -1848,9 +1832,11 @@ static void 	update_globalinfo()
 		{
 			disable_widget( "samplerand" );
 			disable_widget( "freestyle" );
+			disable_widget( "frame88");
 		}
 		else	
 		{
+			enable_widget( "frame88");
 			enable_widget( "samplerand" );
 			enable_widget( "freestyle" );
 
@@ -1867,8 +1853,6 @@ static void 	update_globalinfo()
 			enable_widget("frame_streamproperties");
 			enable_widget("frame_streamrecord");
 			disable_widget("tree_history");
-			disable_widget("button_historyrec");
-			disable_widget("button_historymove");  
 			disable_widget("frame_samplerecord");
 			disable_widget("frame_sampleproperties");
 			disable_widget("speedslider");
@@ -1877,9 +1861,6 @@ static void 	update_globalinfo()
 		{
 			enable_widget("frame_samplerecord");
 			enable_widget("frame_sampleproperties");
-			enable_widget("tree_history");
-			enable_widget("button_historyrec");
-			enable_widget("button_historymove");  
 			disable_widget("frame_streamproperties");
 			disable_widget("frame_streamrecord");
 			enable_widget("speedslider");
@@ -1893,11 +1874,10 @@ static void 	update_globalinfo()
 			info->uc.reload_hint[HINT_CHAIN] = 1;
 			info->uc.reload_hint[HINT_ENTRY] = 1;
 		}
+
+		if(pm!=MODE_STREAM)
+			info->uc.reload_hint[HINT_EL] = 1;
 	}
-
-	if( pm != MODE_PLAIN)
-		info->uc.list_length[pm] = info->status_tokens[TOTAL_SAMPLES];
-
 
 	if( !info->slider_lock )
 	{
@@ -1910,12 +1890,11 @@ static void 	update_globalinfo()
 					         info->status_tokens[TOTAL_FRAMES] );
 			if(pm == MODE_SAMPLE)
 			{
-				update_slider_rel_value( "videobar",
-						info->status_tokens[FRAME_NUM],
-						info->status_tokens[SAMPLE_START],
-						0);
 				update_label_i( "label_samplepos",
 						info->status_tokens[FRAME_NUM] - info->status_tokens[SAMPLE_START] , 1);
+				gint f = info->status_tokens[FRAME_NUM] - info->status_tokens[SAMPLE_START];
+				gint m = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
+				update_slider_value( "videobar",f,m);
 			}
 		}
 		if(pm == MODE_SAMPLE )
@@ -1961,14 +1940,15 @@ static void 	update_globalinfo()
 		if( pm == MODE_STREAM )
 			tf = 1;
 
-	//	update_spin_range(
-	//		"button_fadedur", 0, tf, 0 );
+		if( pm != MODE_PLAIN )
+			update_spin_range(
+				"button_fadedur", 0, tf, 0 );
 
 		if( pm == MODE_SAMPLE )
 		{
-			update_slider_range( "videobar", 0, (info->status_tokens[SAMPLE_END] -
-				info->status_tokens[SAMPLE_START]), (info->status_tokens[FRAME_NUM] - 
-				info->status_tokens[SAMPLE_START]), 0);
+			//update_slider_range( "videobar", 0, (info->status_tokens[SAMPLE_END] -
+			//	info->status_tokens[SAMPLE_START]), (info->status_tokens[FRAME_NUM] - 
+			//	info->status_tokens[SAMPLE_START]), 0);
 			update_spin_range( "spin_samplestart", 0, info->status_tokens[TOTAL_FRAMES],
 				info->status_tokens[SAMPLE_START] );
 			update_spin_range( "spin_samplestart", 0, info->status_tokens[TOTAL_FRAMES],
@@ -1976,8 +1956,8 @@ static void 	update_globalinfo()
 		}
 		else
 		{
-			update_slider_range( "videobar", 0, tf, 
-				info->status_tokens[FRAME_NUM], 1 );	
+			//update_slider_range( "videobar", 0, tf, 
+			//	info->status_tokens[FRAME_NUM], 1 );	
 		}	
 		update_label_i( "label_totframes", tf, 1 );
 			
@@ -1996,6 +1976,7 @@ static void 	update_globalinfo()
 			stream_changed = 1;		
 			update_label_i( "label_currentid", info->status_tokens[CURRENT_ID] ,0);
 		}
+		info->uc.reload_hint[HINT_EL] = 1;
 	}
 
 	if( history[STREAM_RECORDING] != info->status_tokens[STREAM_RECORDING] )
@@ -2006,6 +1987,9 @@ static void 	update_globalinfo()
 			vj_msg(VEEJAY_MSG_INFO, "Veejay is recording");
 		}
 	}
+
+	if ( history[TOTAL_SLOTS] != info->status_tokens[TOTAL_SLOTS] )
+		info->uc.reload_hint[HINT_SLIST] = 1;
 
 	if( pm == MODE_STREAM )
 	{
@@ -2062,11 +2046,9 @@ static void 	update_globalinfo()
 			update_slider_gvalue( "slider_m1", value_end );
 		}
 
-
-
 		if( history[SAMPLE_LOOP] != info->status_tokens[SAMPLE_LOOP])
 		{
-			switch( get_loop_value() )
+			switch( info->status_tokens[SAMPLE_LOOP] )
 			{
 				case 0:
 					set_toggle_button( "loop_none", 1 );
@@ -2108,17 +2090,6 @@ static void 	update_globalinfo()
 		if(pm == MODE_STREAM)	
 			set_toggle_button( "check_streamfx",
 				info->status_tokens[SAMPLE_FX]);
-	}
-
-
-	if( (info->uc.last_list_length[0] != info->uc.list_length[0])  ||
-	    (info->uc.last_list_length[1] != info->uc.list_length[1]) )
-	{
-		info->uc.reload_hint[HINT_SLIST] = 1;
-		if(info->uc.last_list_length[0] != info->uc.list_length[0] )
-			vj_msg(VEEJAY_MSG_INFO, "A new sample was created");
-		else
-			vj_msg(VEEJAY_MSG_INFO, "A new stream was created");
 	}
 
 	int	*entry_history = &(info->uc.entry_history[0]);
@@ -2302,12 +2273,6 @@ static void 	update_globalinfo()
 		}
 	}
 
-	if(info->uc.reload_hint[HINT_HISTORY] == 1 )
-	{
-		reload_hislist();
-	}
-
-
 	if(info->uc.reload_hint[HINT_BUNDLES] == 1 )
 	{
 		reload_bundles();
@@ -2330,8 +2295,6 @@ static void 	update_globalinfo()
 
 	memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));	
 	info->uc.previous_playmode = pm;
-	for( i = 0; i < 2; i ++)
-		info->uc.last_list_length[i] = info->uc.list_length[i];
 
 
 }
@@ -3314,31 +3277,6 @@ gboolean
     return TRUE; /* allow selection state to change */
   }
 
-gboolean
-  view_history_selection_func (GtkTreeSelection *selection,
-                       GtkTreeModel     *model,
-                       GtkTreePath      *path,
-                       gboolean          path_currently_selected,
-                       gpointer          userdata)
-  {
-    GtkTreeIter iter;
-
-    if (gtk_tree_model_get_iter(model, &iter, path))
-    {
-      gint num = 0;
-
-      gtk_tree_model_get(model, &iter, COLUMN_INT, &num, -1);
-
-      if (!path_currently_selected)
-      {
-		info->uc.selected_history_entry = num;
-      }
-
-    }
-
-    return TRUE; /* allow selection state to change */
-  }
-
 void
 on_vims_row_activated(GtkTreeView *treeview,
 		GtkTreePath *path,
@@ -3517,32 +3455,6 @@ gboolean
 
     return TRUE; /* allow selection state to change */
   }
-
-
-
-
-void 
-on_history_row_activated(GtkTreeView *treeview,
-		GtkTreePath *path,
-		GtkTreeViewColumn *col,
-		gpointer user_data)
-{
-	GtkTreeModel *model;
-	GtkTreeIter iter;
-
-	model = gtk_tree_view_get_model(treeview);
-	if(gtk_tree_model_get_iter(model,&iter,path))
-	{
-		gint num = 0;
-		gtk_tree_model_get(model,&iter, COLUMN_INT, &num, -1);
-		//gint frame_num = _el_ref_start_frame( num );
-
-		multi_vims( VIMS_SAMPLE_RENDER_SELECT, "%d %d", 0, num );
-
-	}
-
-}
-
 
 void 
 on_editlist_row_activated(GtkTreeView *treeview,
@@ -3824,66 +3736,6 @@ static	void	setup_bundles()
 	
 }
 
-static void	reload_hislist()
-{
-	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_history");
-	GtkListStore *store;
-	GtkTreeIter iter;
-	gint offset=0;
-	gint hislen = 0;
-	single_vims( VIMS_SAMPLE_RENDERLIST );
-	gchar *fxtext = recv_vims(3,&hislen);
-
- 	reset_tree( "tree_history");
-	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
-	store = GTK_LIST_STORE(model);
-
-	while( offset < hislen )
-	{
-		gchar *timecode;
-		int values[3];
-		char tmp_len[22];
-		bzero(tmp_len, 22);
-		strncpy(tmp_len, fxtext + offset, 22 );
-		int n = sscanf( tmp_len, "%02d%010d%010d",&values[0],&values[1],&values[2]);
-		if(n>1)
-		{
-			
-		}	
-
-		if(offset == 0)
-			timecode = strdup( "original sample" );
-		else
-			timecode = format_time( values[2] - values[1] );
-		offset += 22;
-		gtk_list_store_append( store, &iter );
-		gtk_list_store_set( store, &iter, COLUMN_INT, (guint) values[0],
-			COLUMN_STRING0, timecode, -1 );
-
-		g_free(timecode);
-	}
-
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
-	g_free(fxtext);
-}
-
-static	void	setup_hislist_info()
-{
-	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_history");
-	GtkListStore *store = gtk_list_store_new( 2,G_TYPE_INT, G_TYPE_STRING );
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
-	g_object_unref( G_OBJECT( store ));
-
-	setup_tree_text_column( "tree_history", COLUMN_INT, "Seq");
-	setup_tree_text_column( "tree_history", COLUMN_STRING0, "Duration" );
-
-	g_signal_connect( tree, "row-activated",
-		(GCallback) on_history_row_activated, NULL );
-
-  	GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
- 	gtk_tree_selection_set_select_function(selection, view_history_selection_func, NULL, NULL);
-    	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
-}
 static	void	setup_editlist_info()
 {
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "editlisttree");
@@ -4107,6 +3959,9 @@ static	void	reload_editlist_contents()
 	reset_tree("editlisttree");
 	_el_ref_reset();
 	_el_entry_reset();
+
+	if(eltext == NULL || len == 0 )
+		return;
 
 	char	str_nf[4];
 	
@@ -4592,7 +4447,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		gui->status_lock = 1;
 		if(nb > 0)
 		{
-			int n = sscanf( gui->status_msg, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+			int n = sscanf( gui->status_msg, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 				gui->status_tokens + 0,
 				gui->status_tokens + 1,
 				gui->status_tokens + 2,
@@ -4607,10 +4462,13 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 				gui->status_tokens + 11,
 				gui->status_tokens + 12,
 				gui->status_tokens + 13,
-				gui->status_tokens + 14 );
+				gui->status_tokens + 14,
+				gui->status_tokens + 15 );
 
-			if( n != 15 )
+			if( n != 16 )
 			{
+		fprintf(stderr, "Cant read status\n");
+		exit(0);
 				// restore status (to prevent gui from going bezerk)
 				int *history = info->history_tokens[ info->uc.playmode ];
 				int i;
@@ -4947,7 +4805,6 @@ void 	vj_gui_init(char *glade_file)
 	setup_editlist_info();
 	setup_samplelist_info("tree_samples");
 	setup_samplelist_info("tree_sources");
-	setup_hislist_info();
 	setup_v4l_devices();
 	setup_colorselection();
 	setup_rgbkey();
@@ -5017,6 +4874,10 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	vj_msg(VEEJAY_MSG_INFO, "New connection established with Veejay running on %s port %d",
 		(group_name == NULL ? hostname : group_name), port_num );
 
+	int k = 0;
+	for( k = 0; k < 3; k ++ )
+		memset( info->history_tokens[k] , 0, (sizeof(int) * STATUS_TOKENS) );
+
 	info->channel = g_io_channel_unix_new( vj_client_get_status_fd( info->client, V_STATUS));
 
 
@@ -5035,7 +4896,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	g_io_add_watch_full(
 			info->channel,
-			G_PRIORITY_HIGH,
+			G_PRIORITY_LOW,
 			G_IO_IN| G_IO_ERR | G_IO_NVAL | G_IO_HUP,
 			veejay_tick,
 			(gpointer*) info,

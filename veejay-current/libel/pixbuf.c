@@ -372,7 +372,7 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int out_w, int out_h, int fmt  )
 {
 	int ret = 0;
-	veejay_image_t *image = (veejay_image_t*) vj_malloc(sizeof(veejay_image_t*));
+	veejay_image_t *image = (veejay_image_t*) vj_malloc(sizeof(veejay_image_t));
 	if(!image)
 		return NULL;
 
