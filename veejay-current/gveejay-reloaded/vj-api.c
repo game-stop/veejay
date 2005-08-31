@@ -323,7 +323,6 @@ typedef struct
 	int		play_direction;
 	int		load_image_slot;
 	GtkWidget	*sample_bank_pad;
-	int		*free_banks;
 	sample_bank_t	**sample_banks;
 	sample_slot_t	*selected_slot;
 	sample_gui_slot_t *selected_gui_slot;
@@ -502,6 +501,22 @@ static struct
 	{"manualopacity"},
 	{"button_fadedur"},
 	{"vimsmessage"},
+	{"frame_fxtree"},
+	{"button_clipcopy"},
+	{"button_sample_play"},
+	{"button_samplelist_open"},
+	{"button_samplelist_save"},
+	{"button_sample_del"},
+	{"samplerand"},
+	{"freestyle"},
+	{"frame_sampleproperties"},
+	{"frame88"}, 
+	{"frame_samplerecord"},
+	{"frame132"}, // edl
+	{"colorselection"},
+	{"frame_streamproperties"},
+	{"frame_streamrecord"},
+	{"loglinear"},
 	{NULL} 
 };
 static struct
@@ -533,7 +548,7 @@ static struct
 {
 	{"manualopacity"},
 	{"loglinear"},
-	{"vbox_fxtree"},
+	{"frame_fxtree"},
 	{NULL}
 };
 
@@ -569,11 +584,12 @@ static	int	selected_is_playing()
 	
 
  */
+/*
 void	on_samplelist_edited(GtkCellRendererText *cell,
 		gchar *path_string,
 		gchar *new_text,
 		gpointer user_data);
-
+*/
 static	gchar	*_utf8str(char *c_str)
 {
 	gint	bytes_read;
@@ -1158,7 +1174,8 @@ void	about_dialog()
     };
 
     const gchar *authors[] = { 
-      "Niels Elburg <nelburg@looze.net>", 
+      "Niels Elburg <nelburg@looze.net>",
+      "Thomas Reinhold <stan@jf-chemnitz.de>",
       NULL 
     };
 
@@ -1183,10 +1200,10 @@ void	about_dialog()
 		( path, NULL );
 	GtkWidget *about = g_object_new(
 		GTK_TYPE_ABOUT_DIALOG,
-		"name", "GVeejay",
+		"name", "GVeejay Reloaded",
 		"version", VERSION,
 		"copyright", "(C) 2004 - 2005 N. Elburg et all.",
-		"comments", "A graphical interface for Veejay",
+		"comments", "Another graphical interface for Veejay",
 		"authors", authors,
 		"artists", artists,
 		"license", license,
@@ -1205,7 +1222,7 @@ void	about_dialog()
 	vj_msg_detail( VEEJAY_MSG_INFO,
 		"Copyright (C) 2004 - 2005. N. Elburg et all." );
 	vj_msg_detail( VEEJAY_MSG_INFO,
-		"GVeejay - A graphical interface for Veejay");
+		"GVeejay Reloaded - Another graphical interface for Veejay");
 
 #endif
 
@@ -2394,7 +2411,7 @@ static void 	update_globalinfo()
 			info->uc.reload_hint[HINT_CHAIN] = 1;
 		}
 		if( pm != MODE_STREAM )
-		info->uc.reload_hint[HINT_EL] = 1;
+			info->uc.reload_hint[HINT_EL] = 1;
 	}
 
 	if( info->status_tokens[TOTAL_SLOTS] !=
@@ -3032,8 +3049,7 @@ static	void	load_effectchain_info()
 enum 
 {
 	FX_ID = 0,
-	FX_PIXMAP = 1,
-	FX_STRING =2,
+	FX_STRING = 1,
 	FX_NUM,
 };
 
@@ -3061,6 +3077,32 @@ gboolean
 
     return TRUE; /* allow selection state to change */
   }
+void
+on_effectmixlist_row_activated(GtkTreeView *treeview,
+		GtkTreePath *path,
+		GtkTreeViewColumn *col,
+		gpointer user_data)
+{
+	GtkTreeModel *model;
+	GtkTreeIter iter;
+	model = gtk_tree_view_get_model(treeview);
+
+	if(gtk_tree_model_get_iter(model,&iter,path))
+	{
+		gint gid =0;
+		gtk_tree_model_get(model,&iter, FX_ID, &gid, -1);
+
+		if(gid)
+		{
+			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
+				0, info->uc.selected_chain_entry,gid );
+			info->uc.reload_hint[HINT_CHAIN] = 1;
+			info->uc.reload_hint[HINT_ENTRY] = 1;
+		}
+
+	}
+
+}
 void
 on_effectlist_row_activated(GtkTreeView *treeview,
 		GtkTreePath *path,
@@ -3154,34 +3196,48 @@ sort_vims_func( GtkTreeModel *model, GtkTreeIter *a, GtkTreeIter *b,
 // load effectlist from veejay
 void	setup_effectlist_info()
 {
-	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_effectlist");
-	GtkListStore *store = gtk_list_store_new( 3, G_TYPE_INT, GDK_TYPE_PIXBUF, G_TYPE_STRING );
+	int i;
+	GtkWidget *trees[2];
+	trees[0] = glade_xml_get_widget_( info->main_window, "tree_effectlist");
+	trees[1] = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
+	GtkListStore *stores[2];
+	stores[0] = gtk_list_store_new( 2, G_TYPE_INT, G_TYPE_STRING );
+	stores[1] = gtk_list_store_new( 2, G_TYPE_INT, G_TYPE_STRING );
 
-	GtkTreeSortable *sortable = GTK_TREE_SORTABLE(store);
+	for(i = 0; i < 2; i ++ )
+	{
+		GtkTreeSortable *sortable = GTK_TREE_SORTABLE(stores[i]);
+		gtk_tree_sortable_set_sort_func(
+			sortable, FX_STRING, sort_iter_compare_func,
+				GINT_TO_POINTER(FX_STRING),NULL);
 
-	gtk_tree_sortable_set_sort_func(
-		sortable, FX_STRING, sort_iter_compare_func,
-			GINT_TO_POINTER(FX_STRING),NULL);
+		gtk_tree_sortable_set_sort_column_id( 
+			sortable, FX_STRING, GTK_SORT_ASCENDING);
+	
 
-	gtk_tree_sortable_set_sort_column_id( 
-		sortable, FX_STRING, GTK_SORT_ASCENDING);
-
-	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
-	g_object_unref( G_OBJECT( store ));
+		gtk_tree_view_set_model( GTK_TREE_VIEW(trees[i]), GTK_TREE_MODEL(stores[i]));
+		g_object_unref( G_OBJECT( stores[i] ));
+	}
 
 	setup_tree_text_column( "tree_effectlist", FX_ID, "id" );
-	setup_tree_pixmap_column( "tree_effectlist", FX_PIXMAP , "type" );
 	setup_tree_text_column( "tree_effectlist", FX_STRING, "effect" );
-	GtkTreeSelection *selection; 
 
-	g_signal_connect( tree, "row-activated",
+	setup_tree_text_column( "tree_effectmixlist", FX_ID, "id" );
+	setup_tree_text_column( "tree_effectmixlist", FX_STRING, "effect" );
+
+	g_signal_connect( trees[0], "row-activated",
 		(GCallback) on_effectlist_row_activated, NULL );
 
-	tree = glade_xml_get_widget_( info->main_window, "tree_effectlist");
-  	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+	g_signal_connect( trees[1] ,"row-activated",
+		(GCallback) on_effectmixlist_row_activated, NULL );
+
+	GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(trees[0]));
     	gtk_tree_selection_set_select_function(selection, view_fx_selection_func, NULL, NULL);
     	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
-
+	
+	selection = gtk_tree_view_get_selection( GTK_TREE_VIEW(trees[1] ));
+	gtk_tree_selection_set_select_function( selection, view_fx_selection_func, NULL,NULL );
+	gtk_tree_selection_set_mode( selection, GTK_SELECTION_SINGLE );
 
 }
 
@@ -3197,12 +3253,14 @@ on_effectlist_sources_row_activated(GtkTreeView *treeview,
 	model = gtk_tree_view_get_model(treeview);
 	gchar *what = (gchar*) user_data;
 
+
 	if(gtk_tree_model_get_iter(model,&iter,path))
 	{
 		gchar *idstr = NULL;
 		gtk_tree_model_get(model,&iter, SL_ID, &idstr, -1);
+		fprintf(stderr, "idstr = %s\n", idstr );
 		gint id = 0;
-		if( sscanf( idstr+1, "%04d", &id ) )
+		if( sscanf( idstr+1, "%d", &id ) )
 		{
 		    // set source / channel
 		    multi_vims( VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
@@ -3211,11 +3269,12 @@ on_effectlist_sources_row_activated(GtkTreeView *treeview,
 			info->uc.selected_chain_entry,
 			( idstr[0] == 'T' ? 1 : 0 ),
 			id );	
+		    vj_msg(VEEJAY_MSG_INFO, "Set source channel to %d, %d", info->uc.selected_chain_entry,id );
 		}
 		if(idstr) g_free(idstr);
 	}
 }
-
+/*
 void	on_samplelist_edited(GtkCellRendererText *cell,
 		gchar *path_string,
 		gchar *new_text,
@@ -3311,7 +3370,7 @@ void	on_samplelist_edited(GtkCellRendererText *cell,
 	if(sysid) g_free(sysid);
 	if(id) g_free(id);
 }
-
+*/
 /*
  *  Creates the effects-sources-list and save the references in global pointers to access them immediately
  */ 
@@ -3325,7 +3384,7 @@ void	setup_samplelist_info()
 	effect_sources_store = GTK_LIST_STORE(effect_sources_model);
 
 	setup_tree_text_column( "tree_sources", SL_ID, "Id" );
-	setup_tree_texteditable_column( "tree_sources", SL_DESCR , "Title" ,G_CALLBACK(on_samplelist_edited));
+//	setup_tree_texteditable_column( "tree_sources", SL_DESCR , "Title" ,G_CALLBACK(on_samplelist_edited));
 	setup_tree_text_column( "tree_sources", SL_TIMECODE, "Length" );
 
 	GtkTreeSelection *selection;
@@ -3343,7 +3402,8 @@ void	setup_samplelist_info()
 void	load_effectlist_info()
 {
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_effectlist");
-	GtkListStore *store;
+	GtkWidget *tree2 = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
+	GtkListStore *store,*store2;
 	
 	GtkTreeIter iter;
 	gint i,offset=0;
@@ -3358,6 +3418,9 @@ void	load_effectlist_info()
 //	store = gtk_list_store_new( 3, G_TYPE_INT,GDK_TYPE_PIXBUF , G_TYPE_STRING );
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
 	store = GTK_LIST_STORE(model);
+
+	GtkTreeModel *model2 = gtk_tree_view_get_model( GTK_TREE_VIEW(tree2));
+	store2 = GTK_LIST_STORE(model2);
 
 	while( offset < fxlen )
 	{
@@ -3387,16 +3450,17 @@ void	load_effectlist_info()
 		gchar *name = _utf8str( _effect_get_description( ec->id ) );
 		if( name != NULL)
 		{
-			char pixmap[512];
-			bzero(pixmap,512);
-			get_gd( pixmap, NULL, (_effect_get_mix(ec->id) ? "bg_blue.png": "bg_yellow.png"));
-			GError *error = NULL;
-			GdkPixbuf *icon = gdk_pixbuf_new_from_file(pixmap, &error);
-			if(error == NULL)
+			if( _effect_get_mix(ec->id) > 0 )
+			{
+				gtk_list_store_append( store2, &iter );
+				gtk_list_store_set( store2, &iter, FX_ID,(guint) ec->id, FX_STRING, name, -1 );
+			}
+			else
 			{
 				gtk_list_store_append( store, &iter );
-				gtk_list_store_set( store, &iter, FX_ID,(guint) ec->id, FX_PIXMAP, icon, FX_STRING, name, -1 );
+				gtk_list_store_set( store, &iter, FX_ID,(guint) ec->id, FX_STRING, name, -1 );
 			}
+
 		}
 		g_free(name);
 	}
@@ -3404,7 +3468,7 @@ void	load_effectlist_info()
 
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 //	g_object_unref( G_OBJECT( store ) );
-
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(store2));
 	g_free(fxtext);
 	
 }
@@ -3780,7 +3844,7 @@ gboolean
 
     return TRUE; /* allow selection state to change */
   }
-
+/*
 void 
 on_editlist_row_activated(GtkTreeView *treeview,
 		GtkTreePath *path,
@@ -3804,6 +3868,7 @@ on_editlist_row_activated(GtkTreeView *treeview,
 	}
 
 }
+*/
 
 void
 on_stream_color_changed(GtkColorSelection *colorsel, gpointer user_data)
@@ -4076,8 +4141,8 @@ static	void	setup_editlist_info()
 	setup_tree_text_column( "editlisttree", COLUMN_STRINGB, "Duration");
 	setup_tree_text_column( "editlisttree", COLUMN_STRINGC, "FOURCC");
 
-	g_signal_connect( editlist_tree, "row-activated",
-		(GCallback) on_editlist_row_activated, NULL );
+//	g_signal_connect( editlist_tree, "row-activated",
+//		(GCallback) on_editlist_row_activated, NULL );
 
   	GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(editlist_tree));
     	gtk_tree_selection_set_select_function(selection, view_el_selection_func, NULL, NULL);
@@ -4274,6 +4339,10 @@ static	void	reload_vimslist()
 
 static	void	reload_editlist_contents()
 {
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "editlisttree");
+	GtkListStore *store;
+	GtkTreeIter iter;
+
 	gint i;
 	gint len = 0;
 	single_vims( VIMS_EDITLIST_LIST );
@@ -4289,28 +4358,28 @@ static	void	reload_editlist_contents()
 		return;
 
 	char	str_nf[4];
-	
+
 	strncpy( str_nf, eltext , sizeof(str_nf));
 	sscanf( str_nf, "%04d", &num_files );
 
 	offset += 4;
 	int n = 0;
 	el_constr *el;
+
 	for( i = 0; i < num_files ; i ++ )	
 	{
 		int itmp =0;
-		char *tmp = (char*) strndup( eltext+offset, 4 );
+		char *tmp1 = (char*) strndup( eltext+offset, 4 );
 		int line_len = 0;
 		char fourcc[4];
 		bzero(fourcc,4);
-		n = sscanf( tmp, "%04d", &line_len ); // line len
-		free(tmp);
+		n = sscanf( tmp1, "%04d", &line_len ); // line len
 		if(line_len>0)
 		{
 			offset += 4;
 			char *line = (char*)strndup( eltext + offset, line_len );
 			offset += line_len;
-			tmp = (char*) strndup( line, 3 );
+			char *tmp = (char*) strndup( line, 3 );
 			sscanf(tmp, "%03d",&itmp );
 			char *file = strndup( line + 3, itmp );
 			free(tmp);
@@ -4325,7 +4394,10 @@ static	void	reload_editlist_contents()
 			free(line);
 			free(file);
 		}
+		free(tmp1);
 	}
+	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
+	store = GTK_LIST_STORE(model);
 
 	int total_frames = 0; // running total of frames
 	int row_num = 0;
@@ -4368,7 +4440,15 @@ static	void	reload_editlist_contents()
 		gchar *timeline = format_selection_time( 0, total_frames );
 
 		// insert values to editlist
-		//add_sample_to_editlist((guint)row_num,timeline,fname,timecode,gfourcc);				
+		//add_sample_to_editlist((guint)row_num,timeline,fname,timecode,gfourcc);
+
+		gtk_list_store_append( store, &iter );
+		gtk_list_store_set( store, &iter,
+				COLUMN_INT, (guint) row_num,
+				COLUMN_STRING0, timeline,
+				COLUMN_STRINGA, fname,
+				COLUMN_STRINGB, timecode,
+				COLUMN_STRINGC, gfourcc,-1 );		
 				
 		g_free(timecode);
 		g_free(gfourcc);
@@ -4380,7 +4460,8 @@ static	void	reload_editlist_contents()
 		row_num ++;
 	}
 	info->el.num_frames = total_frames;
-			
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+		
 	g_free( eltext );
 
 }
@@ -4556,6 +4637,7 @@ static	gboolean	update_cpumeter_timeout( gpointer data )
 static	gboolean	update_imageA( gpointer data )
 {
 	
+	if( info->state == STATE_PLAYING )
 	gveejay_update_image2(
 			glade_xml_get_widget_(info->main_window, "imageA"), 176,144 );
 
@@ -4654,7 +4736,7 @@ static	void	init_cpumeter()
 {
 	info->cpumeter = g_timeout_add(300,update_cpumeter_timeout,
 			(gpointer*) info );
-	info->imageA = g_timeout_add(300,update_imageA, (gpointer*)info);
+	info->imageA = g_timeout_add(100,update_imageA, (gpointer*)info);
 }
 
 
@@ -4690,21 +4772,6 @@ static void	update_gui()
 
 
 	update_globalinfo();
-
-
-	int *history = info->history_tokens[pm];
-	int i;
-	int *entry_history = &(info->uc.entry_history[0]);
-	int *entry_tokens = &(info->uc.entry_tokens[0]);
-
-	for( i = 0; i < STATUS_TOKENS; i ++ )
-	{
-		history[i] = info->status_tokens[i];
-		entry_history[i] = entry_tokens[i];
-	}
-
-	info->prev_mode = pm;
-
 }
 
 static	void	get_gd(char *buf, char *suf, const char *filename)
@@ -4749,9 +4816,8 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		nb = vj_client_read( gui->client, V_STATUS, sta_len, 5 );
 
 		if(sta_len[0] != 'V' )
-		{
 			return FALSE;
-		}
+
 		int n_bytes = 0;
 		sscanf( sta_len+1, "%03d", &n_bytes );
 		if( n_bytes == 0 || n_bytes >= STATUS_BYTES )
@@ -4794,19 +4860,32 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 				{
 					gui->status_tokens[i] = history[i];
 				}
+				fprintf(stderr, "Warning: using outdated status tokens\n");
 			}
 
-
 			update_gui();
-			
-
 		}
+
 		gui->status_lock = 0;
+
+		int pm = info->status_tokens[PLAY_MODE];
+		int *history = info->history_tokens[pm];
+		int i;
+		int *entry_history = &(info->uc.entry_history[0]);
+		int *entry_tokens = &(info->uc.entry_tokens[0]);
+
+		for( i = 0; i < STATUS_TOKENS; i ++ )
+		{
+			history[i] = info->status_tokens[i];
+			entry_history[i] = entry_tokens[i];
+		}
+
+		info->prev_mode = pm;
+
 		if(nb <= 0)
 		{
 			return FALSE;
 		}
-
 	}
  
 	return TRUE;
@@ -5074,6 +5153,7 @@ void 	vj_gui_init(char *glade_file)
 	memset( gui->sample, 0, 2 );
 	memset( gui->selection, 0, 3 );
 	memset( &(gui->uc), 0, sizeof(veejay_user_ctrl_t));
+	gui->prev_mode = -1; 
 	memset( &(gui->el), 0, sizeof(veejay_el_t));
 	// FIXME: Set to max samples / SAMPLES_PER_PAGE , 50 pages for now
 	gui->sample_banks = (sample_bank_t**) vj_malloc(sizeof(sample_bank_t*) * NUM_BANKS );
@@ -5083,7 +5163,7 @@ void 	vj_gui_init(char *glade_file)
 	for( i = 0 ; i < 3 ; i ++ )
 	{
 		gui->history_tokens[i] = (int*) vj_malloc(sizeof(int) * STATUS_TOKENS);
-		memset( gui->history_tokens[i], 0, sizeof(int) *STATUS_TOKENS);
+		memset( gui->history_tokens[i], 0xffff, sizeof(int) *STATUS_TOKENS);
 	}
 	gui->uc.reload_force_avoid = false;
 
@@ -5135,7 +5215,7 @@ void 	vj_gui_init(char *glade_file)
 	setup_effectlist_info();
 	setup_editlist_info();
 	setup_samplelist_info();
-	//setup_v4l_devices();
+	setup_v4l_devices();
 	setup_colorselection();
 	setup_rgbkey();
 	setup_bundles();
@@ -5232,7 +5312,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	load_effectlist_info();
 	reload_vimslist();
-	//reload_editlist_contents();
+	reload_editlist_contents();
 	reload_bundles();
 	load_samplelist_info(true);
 
@@ -5333,6 +5413,7 @@ void	vj_gui_disconnect()
 	}
 	/* reset all trees */
 	reset_tree("tree_effectlist");
+	reset_tree("tree_effectmixlist");
 	reset_tree("tree_chain");
 	reset_samplebank(true);
 	reset_tree("tree_sources");
@@ -5340,6 +5421,8 @@ void	vj_gui_disconnect()
 	
 	/* clear console text */
 	clear_textview_buffer("veejaytext");
+
+	free_samplebank();
 
 }
 
@@ -5561,6 +5644,56 @@ static int	add_bank( gint bank_num  )
 	return bank_num;
 }
 
+void	free_samplebank(void)
+{
+	int i,j;
+	while( gtk_notebook_get_n_pages(GTK_NOTEBOOK(info->sample_bank_pad) ) > 0 )
+		gtk_notebook_remove_page( GTK_NOTEBOOK(info->sample_bank_pad), -1 );
+	
+	for( i = 0; i < NUM_BANKS; i ++ )
+	{
+
+		if(info->sample_banks[i])
+		{
+			/* free memory in use */
+			for(j = 0; j < NUM_SAMPLES_PER_PAGE ; j ++ )
+			{
+				sample_slot_t *slot = info->sample_banks[i]->slot[j];
+				sample_gui_slot_t *gslot = info->sample_banks[i]->gui_slot[j];
+				if(slot->title) free(slot->title);
+				if(slot->timecode) free(slot->timecode);
+				if(slot->pixbuf) gdk_pixbuf_unref(slot->pixbuf);
+				if(slot->rawdata) free(slot->rawdata);
+				free(slot);
+			//	if(gslot->title) g_object_unref( gslot->title );
+			//	if(gslot->timecode) g_object_unref(gslot->title);
+			//	if(gslot->image) g_object_unref( gslot->image );
+			//	if(gslot->event_box) g_object_unref( gslot->event_box );		
+			//	if(gslot->main_vbox) g_object_unref( gslot->main_vbox );
+			//	if(gslot->upper_vbox) g_object_unref( gslot->upper_vbox );
+			//	if(gslot->upper_hbox) g_object_unref( gslot->upper_hbox );
+			//	if(gslot->frame ) g_object_unref( gslot->frame );
+				if(gslot)
+					free(gslot);
+			}			
+			free(info->sample_banks[i]);
+		}
+	}
+	memset( info->sample_banks, 0, sizeof(sample_bank_t*) * NUM_BANKS );
+
+	GtkWidget *imgA = glade_xml_get_widget_ (info->main_window, "imageA" );
+	if(imgA)
+	{
+		char path[MAX_PATH_LEN];
+		bzero(path,MAX_PATH_LEN);
+		get_gd(path,NULL, "veejay-logo.png");
+		GdkPixbuf *buf = gdk_pixbuf_new_from_file( path,NULL );
+		gtk_image_set_from_pixbuf( imgA, buf );
+		gdk_pixbuf_unref( buf );
+	}
+	g_source_remove( info->imageA );
+}
+
 static	void	del_bank( gint page )
 {
 	/* Todo: delete entire bank */
@@ -5707,7 +5840,6 @@ image_configure_event (GtkWidget *widget, GdkEventConfigure *event, gpointer dat
 	GdkPixbuf *pixbuf = info->sample_banks[page]->slot[slot]->pixbuf;
 	g_object_set_data( G_OBJECT(widget), "pixbuf", pixbuf );
 	g_object_unref( old_pixbuf );
-	fprintf(stderr, "Refered pixbuf of drawable to %p ", pixbuf );
   return FALSE;
 }
 */
@@ -5977,7 +6109,7 @@ static void remove_sample_from_sample_banks(gint bank_nr, gint slot_nr)
 	if(slot == info->selected_slot || gui_slot == info->selected_gui_slot )
 	{
 		set_activation_of_slot_in_samplebank( false );
-
+		gtk_frame_set_label( gui_slot->frame, NULL );
 		info->selected_gui_slot = NULL;
 		info->selected_slot = NULL;
 	}
@@ -6046,7 +6178,7 @@ static gint compare_index(gint *index_1, gint *index_2 )
    -------------------------------------------------------------------------------------------------------------------------- */ 
 static void add_sample_to_effect_sources_list(gint id, gint type, gchar *title, gchar *timecode)
 {
-/*	gchar id_string[10];
+	gchar id_string[10];
 	GtkTreeIter iter;	
 
 	if (type == STREAM_NO_STREAM) sprintf( id_string, "S%04d", id);    
@@ -6054,7 +6186,7 @@ static void add_sample_to_effect_sources_list(gint id, gint type, gchar *title, 
 
 	gtk_list_store_append( effect_sources_store, &iter );
 	gtk_list_store_set( effect_sources_store, &iter, SL_ID, id_string, SL_DESCR, title, SL_TIMECODE , timecode,-1 );
-*/
+
 }
 
 
@@ -6132,6 +6264,9 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 		
 		}
 	}
+
+	// add sample/stream to sources
+	add_sample_to_effect_sources_list(sample_id, sample_type, title, timecode);
 }
 
 

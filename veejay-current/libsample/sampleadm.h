@@ -191,6 +191,7 @@ extern sample_info *sample_get(int sample_id);
 extern int sample_store(sample_info * skel);
 extern int sample_is_deleted(int s1);
 extern int sample_exists(int sample_id);
+extern int sample_verify_delete( int sample_id, int sample_type );
 extern int sample_del(int sample_id);
 extern void sample_del_all();
 extern int sample_get_startFrame(int sample_id);

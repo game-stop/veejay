@@ -199,7 +199,7 @@ static int _new_id()
 
 sample_info *sample_skeleton_new(long startFrame, long endFrame)
 {
-
+	char tmp_file[20];
 
     sample_info *si;
     int i, j, n, id = 0;
@@ -264,6 +264,8 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->effect_toggle = 1;
     si->offset = 0;
     sprintf(si->descr, "%s", "Untitled");
+    sprintf(tmp_file, "sample_%05d.edl", si->sample_id );
+    si->edit_list_file = strdup( tmp_file );
 
     /* the effect chain is initially empty ! */
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
@@ -753,6 +755,31 @@ int sample_get_endFrame(int sample_id)
  * deletes a sample from the hash. returns -1 on error, 1 on success.
  *
  ****************************************************************************************************/
+int sample_verify_delete( int sample_id, int sample_type )
+{
+	int i,j;
+	for( i = 1; i < sample_size()-1; i ++ )
+	{
+		sample_info *s = sample_get(i);
+		if(s)
+		{
+			for( j = 0 ; j < SAMPLE_MAX_EFFECTS; j ++ )
+			{
+				if(s->effect_chain[j]->channel == sample_id &&
+				   s->effect_chain[j]->source_type == sample_type )
+				{
+					s->effect_chain[j]->channel = i;
+					s->effect_chain[j]->source_type = 0;
+	veejay_msg(VEEJAY_MSG_INFO, "Dereferenced mix entry %d of Sample %d",
+		j, i );
+					sample_update( s, i );
+				}
+			}
+		}
+	}
+	return 1;
+}
+
 int sample_del(int sample_id)
 {
     hnode_t *sample_node;
@@ -764,6 +791,8 @@ int sample_del(int sample_id)
     sample_node = hash_lookup(SampleHash, (void *) si->sample_id);
     if (sample_node) {
     int i;
+    int j;
+
     for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
     {
 		if (si->effect_chain[i])
@@ -1683,7 +1712,7 @@ int sample_get_loop_dec(int s1) {
 editlist *sample_get_editlist(int s1)
 {
 	sample_info *sample = sample_get(s1);
-	if(!sample) return -1;
+	if(!sample) return NULL;
 	return sample->edit_list;
 }
 
@@ -1697,9 +1726,7 @@ int	sample_set_editlist(int s1, editlist *edl)
 		veejay_msg(VEEJAY_MSG_ERROR, "Sample %d already has EDL", s1 );
 		return 0;
 	}
-	sprintf(tmp_file, "sample-%05d.edl", s1 );
 	sample->edit_list = edl;
-	sample->edit_list_file = strdup(tmp_file);
 	return (sample_update(sample,s1));
 }
 
@@ -2254,9 +2281,9 @@ void ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
 
 	cur = cur->next;
     }
+    if(!sample_read_edl( skel ))
+	veejay_msg(VEEJAY_MSG_ERROR, "No EDL '%s' for sample %d", skel->edit_list_file, skel->sample_id );
 
-    	if( skel->edit_list_file )
-		sample_read_edl( skel );
 
     return;
 }
@@ -2269,7 +2296,7 @@ void ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
  * load samples and effect chain from an xml file. 
  *
  ****************************************************************************************************/
-static	int sample_read_edl( sample_info *sample )
+int sample_read_edl( sample_info *sample )
 {
 	char *files[1];
 	int res = -1;
@@ -2279,8 +2306,8 @@ static	int sample_read_edl( sample_info *sample )
 		veejay_msg(VEEJAY_MSG_ERROR, "Cleanup old editlist");
 		vj_el_free(sample->edit_list);
 	}
-
 	sample->edit_list = vj_el_init_with_args( files,1, 1,1,0,'p' );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Read edl '%s', p = %p ", files[0], sample->edit_list);
 	if(sample->edit_list)
 		res = 1;
 
@@ -2516,11 +2543,17 @@ static	int sample_write_edl(sample_info *sample)
 	editlist *edl = sample->edit_list;
 	if(edl)
 	{
-		vj_el_write_editlist( sample->edit_list_file,
+		if(vj_el_write_editlist( sample->edit_list_file,
 			sample->first_frame,
 			sample->last_frame,
-			edl );
+			edl ))
+			veejay_msg(VEEJAY_MSG_DEBUG, "Saved EDL '%s' of sample %d",
+				sample->edit_list_file, sample->sample_id );
 		return 1;
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Sample %d has no EDL", sample->sample_id );
 	}
 	return 0;
 }

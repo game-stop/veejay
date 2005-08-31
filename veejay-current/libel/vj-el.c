@@ -876,7 +876,7 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 	el->num_video_files = 0;
 	el->video_width = width;
 	el->video_height = height;
-	el->video_frames = 2;
+	el->video_frames = 0;
 	el->video_fps = fps;
 	el->video_inter = LAV_NOT_INTERLACED;
 	el->pixel_format = (chroma == CHROMA420 ? FMT_420 : FMT_422);
@@ -1314,7 +1314,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
    	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
 	{
 		if (index[j] > 0 )
-			index[j] = (uint64_t)num_files++;
+			index[j] = (int64_t)num_files++;
 	}
 	int nnf = 0;
 	for ( j = 0; j < MAX_EDIT_LIST_FILES ; j ++ )
@@ -1390,65 +1390,60 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	return result;
 }
 
-
 int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 {
 	FILE *fd;
-    int num_files;
-	uint64_t oldfile, oldframe;
-    uint64_t index[MAX_EDIT_LIST_FILES];
-    uint64_t n;
-	uint64_t n1 = (uint64_t) _n1;
-	uint64_t n2 = (uint64_t) _n2;
-	int i;
+    	int num_files;
+	int64_t oldfile, oldframe;
+	int64_t index[MAX_EDIT_LIST_FILES];
+	int64_t n;
+	int64_t n1 = (uint64_t) _n1;
+	int64_t n2 = (uint64_t) _n2;
+	int64_t i;
     /* check n1 and n2 for correctness */
 
-    if (n1 < 0)
+    	if (n1 < 0)
 		n1 = 0;
 
-    if (n2 >= el->video_frames || n2 < n1)
+    	if (n2 >= el->video_frames || n2 < n1)
 		n2 = el->video_frames - 1;
 
-    fd = fopen(name, "w");
+    	fd = fopen(name, "w");
 
-    if (fd == 0)
+	if (!fd)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Can not open %s - no edit list written!", name);
 		return 0;
-    }
+    	}
 
-    fprintf(fd, "LAV Edit List\n");
-    fprintf(fd, "%s\n", el->video_norm == 'n' ? "NTSC" : "PAL");
+	fprintf(fd, "LAV Edit List\n");
+	fprintf(fd, "%s\n", el->video_norm == 'n' ? "NTSC" : "PAL");
 
-    /* get which files are actually referenced in the edit list entries */
+	/* get which files are actually referenced in the edit list entries */
 
-    for (i = 0; i < MAX_EDIT_LIST_FILES; i++)
+	for (i = 0; i < MAX_EDIT_LIST_FILES; i++)
 		index[i] = -1;
 
-    for (i = n1; i <= n2; i++)
+	for (i = n1; i <= n2; i++)
 		index[N_EL_FILE(el->frame_list[i])] = 1;
 
-    num_files = 0;
-    for (i = 0; i < MAX_EDIT_LIST_FILES; i++)
-		if (index[i] == 1) index[i] = num_files++;
+	num_files = 0;
+	for (i = 0; i < MAX_EDIT_LIST_FILES; i++)
+		if (index[i] > 0) index[i] = (int64_t)num_files++;
 
-    fprintf(fd, "%d\n", num_files);
-    for (i = 0; i < MAX_EDIT_LIST_FILES; i++)
+	fprintf(fd, "%d\n", num_files);
+	for (i = 0; i < MAX_EDIT_LIST_FILES; i++)
 		if (index[i] >= 0 && el->video_file_list[i] != NULL)
 		{
 			 fprintf(fd, "%s\n", el->video_file_list[i]);
 		}
 
 	n = el->frame_list[ n1 ];
-    oldfile = index[N_EL_FILE(n)];
-    oldframe = N_EL_FRAME(n);
+	oldfile = index[N_EL_FILE(n)];
+	oldframe = N_EL_FRAME(n);
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "%lld , %lld ,%lld, %ld, %ld ",
-		n,oldfile,oldframe,_n1,_n2);
-
-
-    fprintf(fd, "%lld %lld ", oldfile, oldframe);
-    for (i = n1 + 1; i <= n2; i++)
+    	fprintf(fd, "%lld %lld ", oldfile, oldframe);
+    	for (i = n1 + 1; i <= n2; i++)
 	{
 		n = el->frame_list[i];
 		if (index[N_EL_FILE(n)] != oldfile
@@ -1459,18 +1454,17 @@ int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 		}
 		oldfile = index[N_EL_FILE(n)];
 		oldframe = N_EL_FRAME(n);
-    }
-    n = fprintf(fd, "%lld\n", oldframe);
+    	}
+    	n = fprintf(fd, "%lld\n", oldframe);
 
-    /* We did not check if all our prints succeeded, so check at least the last one */
-
-    if (n <= 0)
+    	/* We did not check if all our prints succeeded, so check at least the last one */
+    	if (n <= 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Error writing edit list: ");
 		return 0;
-    }
+    	}
 
-    fclose(fd);
+    	fclose(fd);
 
 	return 1;
 }

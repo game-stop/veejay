@@ -91,9 +91,6 @@ static int	picture_prepare_decode( vj_pixbuf_t *picture )
 	if( gdk_pixbuf_get_width( picture->image ) != picture->display_w ||
 		gdk_pixbuf_get_height( picture->image ) != picture->display_h )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG,
-			"Scale image to %d x %d", picture->display_w, 
-				picture->display_h );
 		img = gdk_pixbuf_scale_simple( picture->image, picture->display_w,
 				picture->display_h, GDK_INTERP_BILINEAR );
 		scale = 1;
@@ -267,7 +264,6 @@ static	void	display_if_writeable( GdkPixbufFormat *data, GSList **list)
 	if( gdk_pixbuf_format_is_writable( data ))
 		*list = g_slist_prepend( *list, data );
 	gchar *name = gdk_pixbuf_format_get_name( data );
-	veejay_msg(VEEJAY_MSG_INFO, "\t%s", name );
 	if( name ) g_free(name);
 } 
 void	vj_picture_display_formats()
@@ -409,13 +405,6 @@ veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int o
 				(GdkPixbuf*) image->image, out_w, out_h,
 			 GDK_INTERP_BILINEAR );
 	}
-
-	veejay_msg(VEEJAY_MSG_DEBUG,
-		"In memory picture %d x %d , %d rowstrides, %d bits per sample",
-		gdk_pixbuf_get_width( (GdkPixbuf*)image->scaled_image ),
-		gdk_pixbuf_get_height( (GdkPixbuf*) image->scaled_image ),
-		gdk_pixbuf_get_rowstride( (GdkPixbuf*) image->scaled_image ),
-		gdk_pixbuf_get_bits_per_sample( (GdkPixbuf*) image->scaled_image ) );
 
 	return image;
 }

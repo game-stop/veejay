@@ -680,6 +680,30 @@ int vj_tag_clear_chain(int id)
     return 1;
 }
 
+int	vj_tag_verify_delete(int id, int type )
+{
+	int i,j;
+	for( i = 1; i < vj_tag_size()-1; i ++ )
+	{
+		vj_tag *s = vj_tag_get(i);
+		if(s)
+		{
+			for( j = 0 ; j < SAMPLE_MAX_EFFECTS; j ++ )
+			{
+				if(s->effect_chain[j]->channel == id &&
+				   s->effect_chain[j]->source_type == type )
+				{
+					s->effect_chain[j]->channel = i;
+					s->effect_chain[j]->source_type = 1;
+	veejay_msg(VEEJAY_MSG_INFO, "Dereferenced mix entry %d of Stream %d",
+		j, i );
+					vj_tag_update( s, i );
+				}
+			}
+		}
+	}
+	return 1;
+}
 
 int vj_tag_del(int id)
 {

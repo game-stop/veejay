@@ -1673,7 +1673,9 @@ int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
  	    centry = vj_perform_sample_is_cached(sample_id, chain_entry);
             if(centry == -1)
 	    {   // not cached, cache it
-		len = vj_el_get_video_frame(info->edit_list, nframe,helper_frame->data, info->pixel_format); 
+		editlist *el = sample_get_editlist( sample_id );
+		if(el)
+			len = vj_el_get_video_frame(el, nframe,helper_frame->data, info->pixel_format); 
 		if(len > 0)
 			error = 0;
 	    }
@@ -1716,7 +1718,8 @@ int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 static int vj_perform_get_frame_(veejay_t *info, int s1, long nframe, uint8_t *img[3])
 {
 	return vj_el_get_video_frame(
-				info->edit_list,
+				//info->edit_list,
+				sample_get_editlist( s1 ),
 				nframe,
 				img,
 				info->pixel_format );

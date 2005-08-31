@@ -135,6 +135,8 @@ int 	vj_tag_exists(int id);
 /* return 1 if tag gets deleted, 0 on error */
 int 	vj_tag_del(int id);
 
+int	vj_tag_verify_delete(int id, int type );
+
 /* return -1 if there is no effect or if it is disabled, otherwise a positive value */
 int 	vj_tag_get_effect(int t1, int position);
 

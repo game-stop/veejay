@@ -299,7 +299,8 @@ void	on_button_el_del_clicked(GtkWidget *w, gpointer *user_data)
 			time1, time2 );
 		g_free(time1);
 		g_free(time2);
-
+		update_spin_value( "button_el_selstart", 0 );
+		update_spin_value( "button_el_selend" , 0);
 	}
 }
 void	on_button_el_crop_clicked(GtkWidget *w, gpointer *user_data)

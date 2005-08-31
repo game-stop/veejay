@@ -104,7 +104,6 @@ void	on_audiovolume_value_changed(GtkWidget *widget, gpointer user_data)
 void	on_button_001_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_SET_PLAIN_MODE );
-	vj_msg(VEEJAY_MSG_INFO, "Playing plain video (EditList operations allowed)");
 }
 
 void	on_button_252_clicked( GtkWidget *widget, gpointer user_data)
@@ -192,10 +191,6 @@ void	on_vimsmessage_activate(GtkWidget *widget, gpointer user_data)
 {
 	msg_vims( get_text( "vimsmessage") );
 	vj_msg(VEEJAY_MSG_INFO, "User defined VIMS message sent '%s'", get_text("vimsmessage"));
-}
-void	on_button_vimshelp_clicked(GtkWidget *widget, gpointer user_data)
-{
-	about_dialog();	
 }
 
 void	on_button_fadedur_value_changed(GtkWidget *widget, gpointer user_data)
@@ -314,7 +309,8 @@ void	on_button_el_del_clicked(GtkWidget *w, gpointer *user_data)
 			time1, time2 );
 		g_free(time1);
 		g_free(time2);
-
+		update_spin_value( "button_el_selstart", 0 );
+		update_spin_value( "button_el_selend", 0);
 	}
 }
 void	on_button_el_crop_clicked(GtkWidget *w, gpointer *user_data)
@@ -732,9 +728,11 @@ void	on_speedslider_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+	//	gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
+		gint value = (gint) get_slider_val( "speedslider" );
 		value *= info->play_direction;
-		multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
+	//	multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
+		multi_vims( VIMS_VIDEO_SET_SPEED, "%d", value );
 		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
 	}
@@ -1578,85 +1576,64 @@ void on_vims_bundles_close                  (GtkDialog       *dialog,
 	} 
 }
 
-/*
- * Handler to show the Sample-Options-dialog
- */ 
-void on_sample_options_close                (GtkDialog       *dialog,
-	                                     gpointer         user_data)
+/* Menu entries */
+void	on_quit1_activate( GtkWidget *w, gpointer user_data )
 {
-    if(!info->status_lock)
+	gveejay_quit(NULL,NULL);
+}
+/* depending on the state, we either load an action file or a sample list !*/
+void	on_open2_activate( GtkWidget *w, gpointer user_data)
+{
+	gchar *filename = NULL;
+	switch( info->state )
 	{
-	GtkWidget *sample_options_window = glade_xml_get_widget(info->main_window, "sample_options");
-	gtk_widget_hide(sample_options_window);	
-	} 
+		case STATE_IDLE:
+			filename = dialog_open_file( "Open Action file / Liveset" );
+			if(filename)	
+			{
+				if(config_file)
+                    		    g_free(config_file);
+               			config_file = g_strdup( filename );
+               			config_file_status = 1; 
+				g_free(filename);
+			}
+			break;
+		case STATE_PLAYING:
+			filename = dialog_open_file( "Open Samplelist ");
+			if(filename)
+			{
+				single_vims( VIMS_SET_PLAIN_MODE );
+				single_vims( VIMS_SAMPLE_DEL_ALL );
+				multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename);
+				g_free(filename);
+			}
+			break;
+		default:
+			vj_msg(VEEJAY_MSG_INFO, "Invalid state !");
+			break;
+	}
+}
+void	on_save1_activate( GtkWidget *w, gpointer user_data )
+{
+	if(info->state == STATE_PLAYING)
+		on_button_samplelist_save_clicked( NULL, NULL );
+	else
+		vj_msg(VEEJAY_MSG_ERROR, "Nothing to save (start or connect to veejay first)");
+}
+void	on_about1_activate(GtkWidget *widget, gpointer user_data)
+{
+	about_dialog();	
+}
+void	on_new_input_stream1_activate(GtkWidget *widget, gpointer user_data)
+{
+	GtkWidget *dialog = glade_xml_get_widget_( info->main_window, "inputdialog" );
+	gint result = gtk_dialog_run( GTK_DIALOG( dialog ));
+	gtk_widget_hide( dialog );
 }
 
-
-/* 
- * Handler to show the EDL and directly choose the selected sample
- */
-void on_edit_sample_clicked                 (GtkButton       *button,
-	                                     gpointer         user_data)
+void	on_istream_cancel_clicked(GtkWidget *widget, gpointer user_data)
 {
-    if(!info->status_lock)
-	{
-	GtkWidget *edl_window = glade_xml_get_widget(info->main_window, "sample_edit");
-	gtk_widget_show(edl_window);	
-	} 
+	GtkWidget *dialog = glade_xml_get_widget_( info->main_window, "inputdialog" );
+	gtk_widget_hide( dialog );
+
 }
-
-
-/* 
- * Handler to close the EDL 
- */
-void on_sample_edit_close                   (GtkDialog       *dialog,
-	                                     gpointer         user_data)
-{
-    if(!info->status_lock)
-	{
-	GtkWidget *edl_window = glade_xml_get_widget(info->main_window, "sample_edit");
-	gtk_widget_hide(edl_window);	
-	} 
-}
-
-
-/*
- * Handler to show the open-samples-dialog
- */ 
-void on_open_samples_clicked                (GtkButton       *button,
-	                                     gpointer         user_data)
-{
-    if(!info->status_lock)
-	{
-	GtkWidget *open_samples_window = glade_xml_get_widget(info->main_window, "open_samples");
-	gtk_widget_show(open_samples_window);	
-	} 	
-}
-
-
-/*
- * Handler to close the open-samples-dialog and add the selected sample/stream
- * gives the filename and the type of the desired input to vj-api.c
- */ 
-void
-on_open_samples_close                  (GtkDialog       *dialog,
-                                        gpointer         user_data)
-{
-    gchar *filename = NULL;
-    gint mode;
-
-    if(!info->status_lock)
-	{
-	GtkWidget *open_samples_window = glade_xml_get_widget(info->main_window, "open_samples");
-	gtk_widget_hide(open_samples_window);	
-	filename = gtk_file_chooser_get_filename (GTK_FILE_CHOOSER (open_samples_window));
-	if (filename !=NULL) 
-	    { 
-	    // the function gets a status flag defined in veejay/vj-global.h to know, that here is loaded an video-sample, not a stream
-	    // see void vj_event_send_sample_info in vj-event.c for further informations
-	    vj_gui_add_sample(filename,VJ_PLAYBACK_MODE_SAMPLE);
-	    g_free(filename );
-	    }
-	} 
-}
-

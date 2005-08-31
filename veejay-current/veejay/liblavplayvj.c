@@ -785,7 +785,6 @@ void veejay_stop_sampling(veejay_t * info)
  ******************************************************/
 static int veejay_screen_update(veejay_t * info )
 {
-    video_playback_setup *settings = info->settings;
     uint8_t *frame[3];
     uint8_t *c_frame[3];
 	int i = 0;
@@ -1669,10 +1668,12 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	else
 	{
 		// try samplelist from loaded action file, if the editlist was initialized
-		if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state == 2 )
+		if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state )
+		{
 			if(sample_readFromFile( info->settings->action_scheduler.sl ) )
 				veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list %s from actionfile",
 					info->settings->action_scheduler.sl );
+		}
 	}
    
 	if( settings->action_scheduler.state )
@@ -2441,8 +2442,6 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 }
 editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, long end)
 {
-    video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
     uint64_t k, i;
     uint64_t n1 = (uint64_t) start;
     uint64_t n2 = (uint64_t) end;
@@ -2452,38 +2451,38 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
     if( n1 < 0 || n2 > info->edit_list->video_frames-1)
     {
 	veejay_msg(VEEJAY_MSG_ERROR, "Sample start and end are outside of editlist");
-	return;
+	return NULL;
     }
 
     if(len <= 0 )
     {
 	veejay_msg(VEEJAY_MSG_ERROR, "Sample too short");
-	return;
+	return NULL;
     }
 
     /* Copy edl */
-    editlist *el = (editlist*) vj_malloc(sizeof(editlist));
-    memcpy( el, info->edit_list , sizeof(editlist));
+    editlist *new_el = (editlist*) vj_malloc(sizeof(editlist));
+    memcpy( new_el, info->edit_list , sizeof(editlist));
     /* copy edl frames */
-    el->frame_list =
+    new_el->frame_list =
 		(uint64_t *) vj_malloc(  sizeof(uint64_t) * len );
 
-    if (!el->frame_list)
+    if (!new_el->frame_list)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, 
 		    "Malloc error, you\'re probably out of memory");
 		veejay_change_state(info, LAVPLAY_STATE_STOP);
-		return 0;
+		return NULL;
     	}
 
     k = 0;
 
     for (i = n1; i <= n2; i++)
-		el->frame_list[k++] = info->edit_list->frame_list[i];
+		new_el->frame_list[k++] = info->edit_list->frame_list[i];
     // set length
-    el->video_frames = len;
+    new_el->video_frames = len;
 
-    return el;
+    return new_el;
 }
 
 /******************************************************
@@ -2690,8 +2689,6 @@ int veejay_edit_move(veejay_t * info,editlist *el, long start, long end,
 
 int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 {
-	video_playback_setup *settings =
-		(video_playback_setup *) info->settings;
 	char *files[1];
 
 	files[0] = strdup(movie);
@@ -2756,7 +2753,6 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start,
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     uint64_t n, i;
-    long el_end = el->video_frames;
     long n_end;
     n = open_video_file(movie, el, info->preserve_pathnames, info->auto_deinterlace,1,
 		info->edit_list->video_norm );

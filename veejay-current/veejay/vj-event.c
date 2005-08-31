@@ -732,9 +732,9 @@ void	vj_event_init(void);
 
 int	vj_has_video(veejay_t *v)
 {
-	if(v->edit_list->num_video_files <= 0 )
-		return 0;
-	return 1;
+	if(v->current_edit_list->video_frames >= 1 )
+		return 1;
+	return 0;
 }
 
 int vj_event_bundle_update( vj_msg_bundle *bundle, int bundle_id )
@@ -1896,9 +1896,11 @@ void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 	}
 
 	veejay_set_colors( c );
-	if(strlen(sample_list) > 0 )
+	if(sample_list)
+	{
 		v->settings->action_scheduler.sl = strdup( sample_list );
-
+		veejay_msg(VEEJAY_MSG_DEBUG, "Scheduled '%s' for restart", sample_list );
+	}
 	v->settings->action_scheduler.state = 1;
 }
 
@@ -2010,10 +2012,6 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 		if( !vj_event_register_keyb_event( event_id, key, key_mod, NULL ))
 			veejay_msg(VEEJAY_MSG_ERROR, "Attaching key %d + %d to Bundle %d ", key,key_mod,event_id);
 	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "No keyboard binding for VIMS %d", event_id);
-	}
 #endif
 }
 int  veejay_finish_action_file( void *ptr, char *file_name )
@@ -2022,10 +2020,10 @@ int  veejay_finish_action_file( void *ptr, char *file_name )
 	xmlNodePtr cur;
 	veejay_t *v = (veejay_t*) ptr;
 	if(!file_name)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Invalid filename");
-			return 0;
-		}
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid filename");
+		return 0;
+	}
 
 	doc = xmlParseFile( file_name );
 
@@ -2034,6 +2032,7 @@ int  veejay_finish_action_file( void *ptr, char *file_name )
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot read file %s", file_name );
 		return 0;
 	}
+
 	cur = xmlDocGetRootElement( doc );
 	if( cur == NULL)
 	{
@@ -2060,6 +2059,9 @@ int  veejay_finish_action_file( void *ptr, char *file_name )
 	}
 	override_keyboard = 0;
 	xmlFreeDoc(doc);	
+
+	veejay_change_playback_mode( v, v->uc->playback_mode, v->uc->sample_id );
+
 	return 1;
 }
 
@@ -2067,6 +2069,7 @@ int  veejay_load_action_file( void *ptr, char *file_name )
 {
 	xmlDocPtr doc;
 	xmlNodePtr cur;
+
 	veejay_t *v = (veejay_t*) ptr;
 	if(!file_name)
 		{
@@ -2339,10 +2342,7 @@ void	vj_event_unregister_keyb_event( int sdl_key, int modifier )
 		if( ev->arguments)
 			free(ev->arguments );
 		memset(ev, 0, sizeof( vj_keyboard_event ));
-		
-		if( del_keyboard_event( index ))
-			veejay_msg(VEEJAY_MSG_DEBUG, "deregistered %d + %d " , modifier, sdl_key );
-
+		del_keyboard_event( index );
 	}
 }
 
@@ -3423,34 +3423,22 @@ void vj_event_sample_set_speed(void *ptr, const char format[], va_list ap)
 	char *s = NULL;
 	P_A(args, s, format, ap);
 
-	if(args[0] == -1)
+	if(SAMPLE_PLAYING(v))
 	{
-		args[0] = sample_size() - 1;
-	}
+		if(args[0] == -1)
+			args[0] = sample_size() - 1;
 
-	if( args[0] == 0) 
-	{
-		args[0] = v->uc->sample_id;
-	}
+		if( args[0] == 0) 
+			args[0] = v->uc->sample_id;
 
-	if(sample_exists(args[0]))
-	{	
-		if( SAMPLE_PLAYING(v))
+		if( sample_set_speed(args[0], args[1]) != -1)
 		{
-			veejay_set_speed(v, args[1] );
+			veejay_msg(VEEJAY_MSG_INFO, "Sample %d speed set to %d",args[0],args[1]);
 		}
 		else
 		{
-			if( sample_set_speed(args[0], args[1]) != -1)
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "Sample %d speed set to %d",args[0],args[1]);
-			}
-			else
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Speed %d it too high to set on sample %d !",
-					args[1],args[0]); 
-			}
-
+			veejay_msg(VEEJAY_MSG_ERROR, "Speed %d it too high to set on sample %d !",
+				args[1],args[0]); 
 		}
 	}
 	else
@@ -4020,6 +4008,7 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Deleted sample %d", args[0]);
 				deleted_sample = args[0];
+				sample_verify_delete( args[0] , 0 );
 			}
 			else
 			{
@@ -5888,9 +5877,11 @@ void vj_event_tag_del(void *ptr, const char format[] , va_list ap )
 			if(vj_tag_del(args[0]))
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Deleted stream %d", args[0]);
+				vj_tag_verify_delete( args[0], 1 );
 			}
 		}	
 	}
+	vj_event_send_new_id(  v, args[0] );
 }
 
 void vj_event_tag_toggle(void *ptr, const char format[], va_list ap)
@@ -6982,7 +6973,11 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 		}
     	}
 	v->real_fps = -1;
+
+	vj_el_print( sample_get_editlist( id ) );
+
 	veejay_msg(VEEJAY_MSG_PRINT, "\n");
+
 }
 
 void vj_event_print_plain_info(void *ptr, int x)
@@ -7168,8 +7163,6 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	uint8_t *frame[3];
 	char *str = NULL;
 	P_A(args,str,format,ap);
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "Acuiring frame");
 
 	vj_perform_get_primary_frame( v, frame, 0);
 	veejay_image_t *img = vj_picture_save_to_memory(

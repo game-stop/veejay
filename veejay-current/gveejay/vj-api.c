@@ -3455,7 +3455,7 @@ gboolean
 
     return TRUE; /* allow selection state to change */
   }
-
+/*
 void 
 on_editlist_row_activated(GtkTreeView *treeview,
 		GtkTreePath *path,
@@ -3479,7 +3479,7 @@ on_editlist_row_activated(GtkTreeView *treeview,
 	}
 
 }
-
+*/
 void
 on_stream_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 {
@@ -3749,8 +3749,8 @@ static	void	setup_editlist_info()
 	setup_tree_text_column( "editlisttree", COLUMN_STRINGB, "Duration");
 	setup_tree_text_column( "editlisttree", COLUMN_STRINGC, "FOURCC");
 
-	g_signal_connect( tree, "row-activated",
-		(GCallback) on_editlist_row_activated, NULL );
+//	g_signal_connect( tree, "row-activated",
+//		(GCallback) on_editlist_row_activated, NULL );
 
   	GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
     	gtk_tree_selection_set_select_function(selection, view_el_selection_func, NULL, NULL);
