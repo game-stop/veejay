@@ -234,8 +234,8 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->depth = 0;
     si->sub_audio = 0;
     si->audio_volume = 50;
-    si->marker_start = 0;
-    si->marker_end = 0;
+    si->marker_start = -1;
+    si->marker_end = -1;
     si->dup = 0;
     si->loop_dec = 0;
 	si->max_loops2 = 0;
@@ -448,7 +448,7 @@ int sample_get_startFrame(int sample_id)
 {
     sample_info *si = sample_get(sample_id);
     if (si) {
-   	if (si->marker_start != 0 && si->marker_end != 0)
+   	if (si->marker_start >= 0 || si->marker_end > 0)
 		return si->marker_start;
     	else
 		return si->first_frame;
@@ -475,7 +475,7 @@ int	sample_get_el_position( int sample_id, int *start, int *end )
 int sample_get_short_info(int sample_id, int *start, int *end, int *loop, int *speed) {
     sample_info *si = sample_get(sample_id);
     if(si) {
-	if(si->marker_start != 0 && si->marker_end !=0) {
+	if(si->marker_start >= 0 && si->marker_end > 0) {
 	   *start = si->marker_start;
 	   *end = si->marker_end;
 	} 
@@ -639,8 +639,8 @@ int sample_marker_clear(int sample_id) {
     sample_info *si = sample_get(sample_id);
     if (!si)
 	return -1;
-    si->marker_start = 0;
-    si->marker_end = 0;
+    si->marker_start = -1;
+    si->marker_end   = -1;
     veejay_msg(VEEJAY_MSG_INFO, "Marker cleared (%d - %d) - (speed=%d)",
 	si->marker_start, si->marker_end, si->speed);
     return ( sample_update(si,sample_id));
@@ -740,7 +740,7 @@ int sample_get_endFrame(int sample_id)
 {
     sample_info *si = sample_get(sample_id);
     if (si) {
-   	if (si->marker_end != 0 && si->marker_start != 0)
+   	if (si->marker_end > 0 && si->marker_start >= 0)
 		return si->marker_end;
    	 else {
 		return si->last_frame;
@@ -798,6 +798,7 @@ int sample_del(int sample_id)
 		if (si->effect_chain[i])
 			free(si->effect_chain[i]);
     }
+veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d EDL %p", sample_id, si->edit_list );
     if(si->edit_list)
 	vj_el_free(si->edit_list);
     if (si)
