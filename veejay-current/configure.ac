@@ -788,6 +788,24 @@ fi
 
 AC_MSG_NOTICE([ Gveejay ${use_gveejayreloaded} ${with_gveejayreloaded} ])
 
+
+if test x$use_gveejayreloaded != xfalse ; then
+
+	PKG_CHECK_MODULES( GTKCAIRO, gtkcairo >= 0.3,
+	 [use_gtkcairo=yes],
+	 [use_gtkcairo="no"]
+	)
+
+	if test "x$use_gtkcairo" = "xyes"; then
+		AC_SUBST( GTKCAIRO_CFLAGS )
+		AC_SUBST( GTKCAIRO_LIBS )
+		AC_DEFINE( USE_GTKCAIRO,,[GtkCairo widget - Cairo])
+	else
+		AC_MSG_ERROR([GtkCairo not found: get it at http://www.cairographics.org/GtkCairo])
+	fi
+fi
+
+
 with_gimp_stuff=false
 if test x$use_gveejay != xfalse ; then with_gimp_stuff=true ; fi
 if test x$use_gveejayreloaded != xfalse ; then with_gimp_stuff=true ; fi
