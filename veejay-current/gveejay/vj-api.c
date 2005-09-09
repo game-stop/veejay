@@ -291,6 +291,7 @@ typedef struct
 	long		window_id;
 	int		run_state;
 	int		play_direction;
+	int		prev_mode;
 } vj_gui_t;
 
 enum
@@ -1766,6 +1767,55 @@ static	void	v4l_expander_toggle(int mode)
 	gtk_expander_set_expanded( e ,(mode==0 ? FALSE : TRUE) );
 }
 
+static	void	update_status_accessibility(int pm)
+{
+	int i;
+
+	if( pm != info->prev_mode )
+	{
+		/* If mode changed, enable/disable widgets etc first */
+		if( info->status_tokens[PLAY_MODE] != info->prev_mode )
+		{
+			if( pm == MODE_STREAM )
+			{
+				enable_widget("frame_streamproperties");
+				enable_widget("frame_streamrecord");
+				disable_widget("frame_samplerecord");
+				disable_widget("frame_sampleproperties");
+				disable_widget("speedslider");
+			}
+			else
+			{
+				enable_widget("speedslider");
+			}
+
+			if( pm == MODE_SAMPLE )
+			{
+				enable_widget("frame88");
+				enable_widget("frame_samplerecord");
+				enable_widget("frame_sampleproperties");
+				disable_widget("frame_streamproperties");
+				disable_widget("frame_streamrecord");
+				enable_widget( "samplerand" );
+				enable_widget( "freestyle" );
+			}
+			else
+			{
+				disable_widget( "samplerand" );
+				disable_widget( "freestyle" );
+				disable_widget( "frame88");
+			}
+/*
+			if( pm == MODE_PLAIN)
+				for( i = 0; plainwidgets[i].name != NULL ;i++ )
+					disable_widget( plainwidgets[i].name );
+			else
+				for( i = 0; plainwidgets[i].name != NULL ; i ++ )
+					enable_widget( plainwidgets[i].name );*/
+		}
+	}
+}
+
 static gboolean
 chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
              gpointer data)
@@ -1820,68 +1870,53 @@ static void 	update_globalinfo()
 	int	sample_changed = 0;
 	gint	i;
 
-
-	info->uc.playmode = pm;
-
-	if(info->uc.previous_playmode != info->uc.playmode )
+	update_status_accessibility(pm);
+	if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
+		info->status_tokens[PLAY_MODE] != info->prev_mode )
 	{
-		if( pm == MODE_STREAM ) stream_changed = 1;
-		if( pm == MODE_SAMPLE ) sample_changed = 1;
-
-		if( pm != MODE_SAMPLE )
+		if( pm == MODE_SAMPLE || pm == MODE_STREAM )
 		{
-			disable_widget( "samplerand" );
-			disable_widget( "freestyle" );
-			disable_widget( "frame88");
+			info->uc.reload_hint[HINT_ENTRY] = 1;	
+			info->uc.reload_hint[HINT_CHAIN] = 1;
 		}
-		else	
-		{
-			enable_widget( "frame88");
-			enable_widget( "samplerand" );
-			enable_widget( "freestyle" );
+		if( pm != MODE_STREAM )
+			info->uc.reload_hint[HINT_EL] = 1;
 
-		}
-	
+	}
+
+	if( info->status_tokens[TOTAL_SLOTS] !=
+		history[TOTAL_SLOTS] )
+	{
+		info->uc.reload_hint[HINT_SLIST] = 1;
+	}
+
+	if( history[TOTAL_FRAMES] != info->status_tokens[TOTAL_FRAMES])
+	{
+		gint tf = info->status_tokens[TOTAL_FRAMES];
 		if( pm == MODE_PLAIN )
 		{
-			for(i =0; notepad_widgets[i].name != NULL; i ++ )
-			 disable_widget( notepad_widgets[i].name );	
-			enable_widget ("speedslider");
-		}
-		if( pm == MODE_STREAM )
-		{
-			enable_widget("frame_streamproperties");
-			enable_widget("frame_streamrecord");
-			disable_widget("tree_history");
-			disable_widget("frame_samplerecord");
-			disable_widget("frame_sampleproperties");
-			disable_widget("speedslider");
-		}
-		if( pm == MODE_SAMPLE )
-		{
-			enable_widget("frame_samplerecord");
-			enable_widget("frame_sampleproperties");
-			disable_widget("frame_streamproperties");
-			disable_widget("frame_streamrecord");
-			enable_widget("speedslider");
-		}
-		if( pm == MODE_SAMPLE || pm == MODE_STREAM)
-			enable_widget("vbox_fxtree");
+			for( i = 0; i < 3; i ++)
+				if(info->selection[i] > tf ) info->selection[i] = tf;
+		
+			update_spin_range(
+				"button_el_selstart", 0, tf, info->selection[0]);
+			update_spin_range(
+				"button_el_selend", 0, tf, info->selection[1]);
+			update_spin_range(
+				"button_el_selpaste", 0, tf, info->selection[2]);
+		}	
 
-
-		if( pm == MODE_SAMPLE || pm == MODE_STREAM)
-		{
-			info->uc.reload_hint[HINT_CHAIN] = 1;
-			info->uc.reload_hint[HINT_ENTRY] = 1;
-		}
-
-		if(pm!=MODE_STREAM)
-			info->uc.reload_hint[HINT_EL] = 1;
+		update_spin_range("button_fadedur", 0, tf, 0 );
+		update_label_i( "label_totframes", tf, 1 );
+		gchar *time = format_selection_time( 1, tf );
+		update_label_str( "label_totaltime", time );
+		g_free(time);
 	}
+
 
 	if( !info->slider_lock )
 	{
-		if( history[FRAME_NUM] != info->status_tokens[FRAME_NUM])
+		if(  history[FRAME_NUM] != info->status_tokens[FRAME_NUM] )
 		{
 			if(pm == MODE_STREAM)
 				update_slider_value( "videobar", 0, 0 );
@@ -1988,6 +2023,18 @@ static void 	update_globalinfo()
 		}
 	}
 
+	if( pm == MODE_PLAIN )
+	{
+		if( history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] )
+		{
+			int plainspeed =  info->status_tokens[SAMPLE_SPEED];
+			if( plainspeed < 0 ) info->play_direction = -1; else info->play_direction = 1;
+			if( plainspeed < 0 ) plainspeed *= -1;
+			update_slider_value( "speedslider", plainspeed, 0);
+		}
+	}
+
+
 	if ( history[TOTAL_SLOTS] != info->status_tokens[TOTAL_SLOTS] )
 		info->uc.reload_hint[HINT_SLIST] = 1;
 
@@ -2000,6 +2047,9 @@ static void 	update_globalinfo()
 			info->uc.reload_hint[HINT_RGBSOLID] = 1;
 		}
 	}
+
+
+// MISSING
 
 	if( pm == MODE_SAMPLE )
 	{
@@ -2109,6 +2159,22 @@ static void 	update_globalinfo()
 	if( info->uc.reload_hint[HINT_RGBSOLID] == 1 )
 		update_colorselection();
 
+	if( info->uc.reload_hint[HINT_EL] ==  1 )
+	{
+		load_editlist_info();
+		reload_editlist_contents();
+		vj_msg(VEEJAY_MSG_WARNING, "EditList has changed");
+	}
+	if( info->uc.reload_hint[HINT_SLIST] == 1 )
+	{
+		load_samplelist_info("tree_samples");
+		load_samplelist_info("tree_sources");
+	}
+
+	if( info->uc.reload_hint[HINT_CHAIN] == 1 )
+	{
+		load_effectchain_info(); 
+	}
 	if(info->uc.reload_hint[HINT_ENTRY] == 1)
 	{
 		char slider_name[10];
@@ -2164,23 +2230,6 @@ static void 	update_globalinfo()
 			disable_widget( button_name );
 		}
 
-	}
-
-	if( info->uc.reload_hint[HINT_EL] ==  1 )
-	{
-		load_editlist_info();
-		reload_editlist_contents();
-		vj_msg(VEEJAY_MSG_WARNING, "EditList has changed");
-	}
-	if( info->uc.reload_hint[HINT_CHAIN] == 1 || info->uc.reload_hint[HINT_SAMPLE] == 1)
-	{
-		load_effectchain_info(); 
-	}
-
-	if( info->uc.reload_hint[HINT_SLIST] == 1 )
-	{
-		load_samplelist_info("tree_samples");
-		load_samplelist_info("tree_sources");
 	}
 
 	if( info->uc.reload_hint[HINT_RECORDING] == 1 )
@@ -2561,13 +2610,14 @@ static void	setup_effectchain_info( void )
 {
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
 	GtkListStore *store = gtk_list_store_new( 3, G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING );
+
+
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	g_object_unref( G_OBJECT( store ));
 
 	setup_tree_text_column( "tree_chain", FXC_ID, "Entry" );
 	setup_tree_text_column( "tree_chain", FXC_FXID, "Effect" );
-	setup_tree_text_column( "tree_chain", FXC_FXSTATUS, "Status"); // todo: could be checkbox!!
-	
+	setup_tree_text_column( "tree_chain", FXC_FXSTATUS, "Status"); 
   	GtkTreeSelection *selection; 
 
 	tree = glade_xml_get_widget_( info->main_window, "tree_chain");
@@ -4388,6 +4438,10 @@ static void	update_gui()
 		history[i] = info->status_tokens[i];
 		entry_history[i] = entry_tokens[i];
 	}
+
+	info->prev_mode = pm;
+
+
 }
 
 static	void	get_gd(char *buf, char *suf, const char *filename)
@@ -4752,6 +4806,7 @@ void 	vj_gui_init(char *glade_file)
 	memset( gui->selection, 0, 3 );
 	memset( &(gui->uc), 0, sizeof(veejay_user_ctrl_t));
 	memset( &(gui->el), 0, sizeof(veejay_el_t));
+	gui->prev_mode = -1;
 	for( i = 0 ; i < 3 ; i ++ )
 	{
 		gui->history_tokens[i] = (int*) vj_malloc(sizeof(int) * STATUS_TOKENS);

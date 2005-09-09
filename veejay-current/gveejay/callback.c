@@ -167,7 +167,14 @@ void	on_button_sampleend_clicked(GtkWidget *widget, gpointer user_data)
 {
 	info->sample[1] = info->status_tokens[FRAME_NUM];
 	multi_vims( VIMS_SAMPLE_NEW, "%d %d", info->sample[0],info->sample[1]);
+	
+	if ( gveejay_new_slot(1))
+	{
+		vj_msg(VEEJAY_MSG_INFO, "Created new sample!");	
+	}
+
 }
+
 
 void	on_button_veejay_clicked(GtkWidget *widget, gpointer user_data)
 {
