@@ -168,7 +168,7 @@ int vj_tag_init(int width, int height, int pix_fmt)
 {
     int i;
     TagHash = hash_create(HASHCOUNT_T_MAX, int_tag_compare, int_tag_hash);
-    if (!TagHash)
+    if (!TagHash || width <= 0 || height <= 0)
 	return -1;
     vj_tag_input = (vj_tag_data *) vj_malloc(sizeof(vj_tag_data));
     if (vj_tag_input == NULL) {

@@ -290,8 +290,6 @@ static int set_option(const char *name, char *value)
 #ifdef HAVE_XML2
     } else if (strcmp(name, "action-file")==0 || strcmp(name,"l")==0) {
 	check_val(optarg,name);
-	if(!veejay_load_action_file( info, (char*) optarg ))
-		exit(1);
 	strcpy(info->action_file,(char*) optarg);
 	info->load_action_file = 1;
 #endif
@@ -424,7 +422,7 @@ static int set_option(const char *name, char *value)
 	}
 	else if (strcmp(name, "dummy") == 0 || strcmp(name, "d" ) == 0 )
 	{
-
+		info->dummy->active = 1; // enable DUMMY MODE
 	}	
     else
 	nerr++;			/* unknown option - error */
@@ -671,7 +669,11 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	//veejay_set_frame(info, 0);
+	veejay_msg(VEEJAY_MSG_DEBUG, "Starting playback");
+	veejay_change_state(info, LAVPLAY_STATE_PLAYING);
 	veejay_set_frame(info, 0);
+
 	veejay_set_speed(info, 1);
 	  
     while (veejay_get_state(info) != LAVPLAY_STATE_STOP) 

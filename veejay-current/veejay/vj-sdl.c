@@ -52,6 +52,7 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
     vjsdl->sw_scale_height = 0;
     vjsdl->custom_geo[0] = -1;
     vjsdl->custom_geo[1] = -1;
+    vjsdl->show_cursor = 0;
     return vjsdl;
 }
 

@@ -3611,6 +3611,8 @@ on_effectlist_row_activated(GtkTreeView *treeview,
 		{
 			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
 				0, info->uc.selected_chain_entry,gid );
+			if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE)
+				vj_kf_delete_parameter(info->uc.selected_chain_entry);
 			info->uc.reload_hint[HINT_CHAIN] = 1;
 			info->uc.reload_hint[HINT_ENTRY] = 1;
 		}

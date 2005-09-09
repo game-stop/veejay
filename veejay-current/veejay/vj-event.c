@@ -57,7 +57,7 @@
 
 
 static int _last_known_num_args = 0;
-static hash_t *BundleHash;
+static hash_t *BundleHash = NULL;
 
 static int vj_event_valid_mode(int mode) {
 	switch(mode) {
@@ -1900,8 +1900,9 @@ void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 	{
 		v->settings->action_scheduler.sl = strdup( sample_list );
 		veejay_msg(VEEJAY_MSG_DEBUG, "Scheduled '%s' for restart", sample_list );
+		
+		v->settings->action_scheduler.state = 1;
 	}
-	v->settings->action_scheduler.state = 1;
 }
 
 void	vj_event_xml_parse_stream( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
@@ -1952,10 +1953,6 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 	int key_mod = 0;
 	int event_id = 0;	
 	
-	if( veejay_get_state( (veejay_t*) ptr ) == LAVPLAY_STATE_STOP )
-	{
-		return;
-	}
 	char msg[4096];
 	bzero( msg,4096 );
 
@@ -2061,7 +2058,6 @@ int  veejay_finish_action_file( void *ptr, char *file_name )
 	xmlFreeDoc(doc);	
 
 	veejay_change_playback_mode( v, v->uc->playback_mode, v->uc->sample_id );
-
 	return 1;
 }
 

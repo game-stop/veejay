@@ -214,14 +214,22 @@ int veejay_get_state(veejay_t *info) {
  * veejay_change_state()
  *   change the state
  ******************************************************/
+void breaknow() { }
 void veejay_change_state(veejay_t * info, int new_state)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     settings->state = new_state;
     if(settings->state == LAVPLAY_STATE_STOP) { 
-		veejay_msg(VEEJAY_MSG_WARNING, "Stopping veejay");
+		veejay_msg(VEEJAY_MSG_WARNING, "Stop");
 	}
+    if(settings->state == LAVPLAY_STATE_PLAYING) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Play");
+    }
+    if(settings->state == LAVPLAY_STATE_PAUSED) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Paused");
+	}
+	
 }
 
 void veejay_set_sampling(veejay_t *info, subsample_mode_t m)
@@ -340,9 +348,9 @@ int veejay_set_speed(veejay_t * info, int speed)
 		vj_jack_continue( settings->current_playback_speed );
 #endif
 
-    if( settings->current_playback_speed != 0 &&
+/*    if( settings->current_playback_speed != 0 &&
 	settings->state != LAVPLAY_STATE_PLAYING)
-	veejay_change_state( info, LAVPLAY_STATE_PLAYING );
+	veejay_change_state( info, LAVPLAY_STATE_PLAYING );*/
 
     return 1;
 }
@@ -421,6 +429,7 @@ int veejay_free(veejay_t * info)
 	{
 		if(info->settings->action_scheduler.sl )
 			free(info->settings->action_scheduler.sl );
+		info->settings->action_scheduler.state = 0;
 	}
 
 	if( info->plugin_frame) vj_perform_free_plugin_frame(info->plugin_frame);
@@ -466,7 +475,7 @@ int veejay_set_frame(veejay_t * info, long framenum)
     if(framenum > (info->edit_list->video_frames-1))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot set frame %ld",framenum);
-	  	return -1;
+//	  	return -1;
 	}
 
     if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE)
@@ -659,7 +668,6 @@ void veejay_set_sample(veejay_t * info, int sampleid)
  	veejay_msg(VEEJAY_MSG_INFO, "Playing stream %d",
 		sampleid);
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "EDL = %p, New EDL = %p", info->edit_list, info->current_edit_list );
 	info->edit_list = info->current_edit_list;
 
 	return;
@@ -786,8 +794,6 @@ static int veejay_screen_update(veejay_t * info )
     uint8_t *frame[3];
     uint8_t *c_frame[3];
 	int i = 0;
-
-
 
 	vj_perform_unlock_primary_frame();
     // get the frame to output, in 420 or 422
@@ -1197,7 +1203,6 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 		veejay_change_state( info, LAVPLAY_STATE_STOP);
 	}
 
-
 	settings->currently_processed_entry = 
 		settings->buffer_entry[settings->currently_processed_frame];
 	/* sync timestamp */
@@ -1283,7 +1288,6 @@ int veejay_open(veejay_t * info)
     settings->currently_processed_entry = -1;
 
       veejay_msg(VEEJAY_MSG_DEBUG,"Starting software playback thread"); 
-
 
 
      if( pthread_create(&(settings->software_playback_thread), NULL,
@@ -1388,7 +1392,6 @@ static int veejay_mjpeg_queue_buf(veejay_t * info, int frame,
     settings->valid[frame] = frame_periods;
     pthread_cond_broadcast(&(settings->buffer_filled[frame]));
     pthread_mutex_unlock(&(settings->valid_mutex));
-
     return 1;
 }
 
@@ -1478,6 +1481,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 	vj_event_init();
 
+
 #ifdef HAVE_XML2
 	if(info->load_action_file)
 	{
@@ -1508,6 +1512,19 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 			    "Cannot initialize the EditList");
 		return -1;
 	}
+	/* initialize tags (video4linux/yuv4mpeg stream ... ) */
+	veejay_msg(VEEJAY_MSG_DEBUG, 
+	 "Editlist is supposed to be ready %d, %d\n", info->current_edit_list->video_width,
+			info->current_edit_list->video_height );
+
+	if (vj_tag_init(info->current_edit_list->video_width, info->current_edit_list->video_height, info->pixel_format) != 0) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing stream manager");
+		return -1;
+    	}
+
+ 	sample_init( (info->current_edit_list->video_width * info->current_edit_list->video_height)  ); 
+
+
 
 	if(!vj_perform_init(info))
 	{
@@ -1654,32 +1671,20 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		return -1;
 	}
 
-	if(arg != NULL ) {
-#ifdef HAVE_XML2
-		veejay_msg(VEEJAY_MSG_INFO, "Loading samplelist [%s]", arg);
-   	 	if (!sample_readFromFile( arg ))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error loading samplelist [%s]",arg);
-			return -1;
-    		}
-#endif
-	}
-	else
+	if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state )
 	{
-		// try samplelist from loaded action file, if the editlist was initialized
-		if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state )
-		{
-			if(sample_readFromFile( info->settings->action_scheduler.sl ) )
-				veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list %s from actionfile",
+		if(sample_readFromFile( info->settings->action_scheduler.sl ) )
+			veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list %s from actionfile",
 					info->settings->action_scheduler.sl );
-		}
 	}
+	
    
 	if( settings->action_scheduler.state )
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Finish pending actions from configuration file ...");
 		veejay_finish_action_file(info,info->action_file);
- 	}
+		settings->action_scheduler.state = 0; 
+	}
 	if( !vj_server_setup(info) )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Setting up server");
@@ -1781,33 +1786,17 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
     }
 
 
-    /* After we have fired up the audio and video threads system (which
-     * are assisted if we're installed setuid root, we want to set the
-     * effective user id to the real user id
-     */
-    if (seteuid(getuid()) < 0) {
-	/* fixme: get rid of sys_errlist and use sys_strerror */
-	veejay_msg(VEEJAY_MSG_ERROR, 
-		    "Can't set effective user-id: %s", sys_errlist[errno]);
-	return -1;
-    }
-
-	veejay_change_state( info, LAVPLAY_STATE_PLAYING );
-
-    if (!veejay_mjpeg_set_playback_rate(info, el->video_fps,
-					 el->video_norm ==
-					 'p' ? VIDEO_MODE_PAL : VIDEO_MODE_NTSC)) {
-	return -1;
-    }
 
 
 	if(info->dummy->active)
 	{
 	 	int dummy_id;
-		if( settings->action_scheduler.state )
-			dummy_id = vj_tag_size()-1;
-		else 
+		/* Use dummy mode, action file could have specified something */
+		if( vj_tag_size()-1 <= 0 )
 			dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, "Solid", -1, info->current_edit_list,info->pixel_format,-1);
+		else
+			dummy_id = vj_tag_size()-1;
+
 		if(dummy_id > 0)
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Activating dummy mode (Stream %d)", dummy_id);
@@ -1820,10 +1809,30 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		}
 	}
 
-  	if (veejay_open(info) != 1) {
-		veejay_msg(VEEJAY_MSG_ERROR, 
-		    "Unable to initialize the threading system");
+    /* After we have fired up the audio and video threads system (which
+     * are assisted if we're installed setuid root, we want to set the
+     * effective user id to the real user id
+     */
+    if (seteuid(getuid()) < 0) {
+	/* fixme: get rid of sys_errlist and use sys_strerror */
+	veejay_msg(VEEJAY_MSG_ERROR, 
+		    "Can't set effective user-id: %s", sys_errlist[errno]);
+	return -1;
     }
+
+    veejay_change_state( info, LAVPLAY_STATE_PLAYING );  
+
+    if (!veejay_mjpeg_set_playback_rate(info, el->video_fps,
+					 el->video_norm ==
+					 'p' ? VIDEO_MODE_PAL : VIDEO_MODE_NTSC)) {
+	return -1;
+    }
+
+    if(veejay_open(info) != 1) {
+	veejay_msg(VEEJAY_MSG_ERROR, 
+	    "Unable to initialize the threading system");
+	return -1;   
+      	}
     return 0;
 }
 
@@ -2386,7 +2395,7 @@ int veejay_main(veejay_t * info)
   
     sync();
 //    veejay_change_state(info, LAVPLAY_STATE_PAUSED);
-   // veejay_msg(VEEJAY_MSG_INFO, "Starting playback thread. Giving control to main app");
+    veejay_msg(VEEJAY_MSG_INFO, "Starting playback thread. Giving control to main app");
 
     /* fork ourselves to return control to the main app */
     if (pthread_create(&(settings->playback_thread), NULL,
@@ -2945,7 +2954,7 @@ int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
  *
  * return value: 1 on succes, 0 on error
  ******************************************************/
-
+// open_video_files is called BEFORE init
 static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, int force_pix_fmt, int force , char override_norm)
 {
 	vj_el_frame_cache(info->seek_cache );
@@ -2957,7 +2966,13 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		veejay_msg(VEEJAY_MSG_DEBUG, "Note that this will effect your recorded video samples");
 	}
 
-	if( num_files == 0 )
+	if(num_files<=0 || files == NULL)
+	{
+		veejay_msg(VEEJAY_MSG_WARNING, "Fallback to dummy - no video files given at commandline");
+		info->dummy->active = 1;
+	}
+
+	if( info->dummy->active )
 	{
 		if( !info->dummy->norm )
 			info->dummy->norm = 'p'; 
@@ -2974,8 +2989,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 
 		info->current_edit_list = vj_el_dummy( 0, info->auto_deinterlace, info->dummy->chroma,
 				info->dummy->norm, info->dummy->width, info->dummy->height, info->dummy->fps );
-
-		info->dummy->active = 1;
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "Dummy: %d x %d, %s %s ",
 			info->dummy->width,info->dummy->height, (info->dummy->norm == 'p' ? "PAL": "NTSC" ),	
@@ -3045,85 +3058,56 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	{
 		info->settings->output_fps = info->current_edit_list->video_fps;
 	}
+// init tags , samples ?
 
 	return 1;
 }
 
 int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, int force,int force_pix_fmt, char override_norm)
 {
-	char *argv[1];
 	int ret = 0;
-	argv[0] = NULL;
    	video_playback_setup *settings =
 		(video_playback_setup *) info->settings;
 
-	/* see if action file conflicts with files given on commandline */
-	if(settings->action_scheduler.state == 2 && num_files <= 0 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Start Veejay with -d and without any filename");
-		return 0;
-	}
-
 	/* override options */
-	if(settings->action_scheduler.state )
-	{
+	if(ofps<=0.0)
 		ofps = settings->output_fps;
-		force = 0;
+	if(force_pix_fmt<0)	
 		force_pix_fmt = info->pixel_format;
-		veejay_msg(VEEJAY_MSG_INFO,
-			 "Liveset: %2.2f FPS, pixel format %s",
-			ofps, (force_pix_fmt ==  FMT_422 ? "YUV 4:2:2 (SMPTE)" : "YUV 4:2:0 (JPEG/MPEG1)" ));
-	}	
 
 	settings->output_fps = ofps;
 
-	/* load editlist from configfile 
-	if( settings->action_scheduler.state == 2 )
+	if(num_files == 0)
 	{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cant open editlist in configfile!");
-			return 0;
-		}
-	}*/
-
-	if( settings->action_scheduler.state == 1 )
-	{
-		veejay_msg(VEEJAY_MSG_INFO,
-			"Liveset: start in Dummy mode");
+		veejay_msg(VEEJAY_MSG_DEBUG, "Trying to start without video");
 		ret = veejay_open_video_files( info, NULL, 0 , force_pix_fmt, force,
+			override_norm );
+	}
+	else
+	{
+		ret = veejay_open_video_files( info, files, num_files, force_pix_fmt, force,
 			override_norm );
 	}
 
 	if(!ret)
-		ret = veejay_open_video_files( info, files, num_files, force_pix_fmt, force,
-			override_norm );
-
-	if( ret )
 	{
-		/* initialize tags (video4linux/yuv4mpeg stream ... ) */
-		if (vj_tag_init(info->current_edit_list->video_width, info->current_edit_list->video_height, info->pixel_format) != 0) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing stream manager");
-			return 0;
-    		}
-
- 		sample_init( (info->current_edit_list->video_width * info->current_edit_list->video_height)  ); 
-
-		/* create samples from EDL */
-		if( info->uc->file_as_sample)
+		veejay_msg(VEEJAY_MSG_ERROR, "Failed to start veejay");
+		return ret;
+	}
+	/* create samples from EDL */
+	if( info->uc->file_as_sample)
+	{
+		long i,n=info->current_edit_list->num_video_files;
+		for(i = 0; i < n; i ++ )
 		{
-			long i,n=info->current_edit_list->num_video_files;
-			for(i = 0; i < n; i ++ )
+			long start,end;
+			if(vj_el_get_file_entry( info->current_edit_list, &start,&end, i ))
 			{
-				long start,end;
-				if(vj_el_get_file_entry( info->current_edit_list, &start,&end, i ))
-				{
-					sample_info *skel = sample_skeleton_new( start,end );
-					sample_store(skel);
-				}	
-			}
+				sample_info *skel = sample_skeleton_new( start,end );
+				sample_store(skel);
+			}	
 		}
 	}
-
-
 
 	return ret;
 }
