@@ -2665,7 +2665,7 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 				{
 					int key_id = 0;
 					int key_mod = 0;
-					int bun_len = strlen(m->bundle)-1;	
+					int bun_len = strlen(m->bundle);	
 					char tmp[token_len];
 					bzero(tmp,token_len);
 					vj_event_get_key( i, &key_id, &key_mod );
@@ -2678,12 +2678,15 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 				}
 			}
 		}
+
+fprintf(stderr, "Buf = %d\n", len );
+
 		SEND_MSG(v,buf);
 	//	if(buf) free(buf);
 	}	
 	else
 	{
-		char *buf = "0000";
+		char *buf = "00000";
 		SEND_MSG(v,buf);
 	}
 }
@@ -2943,8 +2946,7 @@ void vj_event_set_play_mode(void *ptr, const char format[], va_list ap)
 
 void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 {
-	// Todo: clone EditList
-
+	int new_id = 0;
 	veejay_t *v = (veejay_t*) ptr;
 	if(SAMPLE_PLAYING(v) || PLAIN_PLAYING(v)) 
 	{
@@ -2959,9 +2961,6 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 			int nframe = args[0];
 			args[0] = v->edit_list->video_frames - 1 + nframe;
 		}
-		//if(args[0] == 0)
-		//	args[0] = 1;
-
 		if(args[1] == 0)
 		{
 			args[1] = v->edit_list->video_frames - 1;
@@ -2990,9 +2989,11 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 
 			if(sample_store(skel)==0) 
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Created new sample [%d]", skel->sample_id);
+				veejay_msg(VEEJAY_MSG_INFO, "Created new sample [%d] with EDL", skel->sample_id);
 				sample_set_looptype(skel->sample_id,1);
+				new_id = skel->sample_id;
 			}
+		
 		}
 		else
 		{
@@ -3004,6 +3005,9 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 	{
 		p_invalid_mode();
 	}
+
+	vj_event_send_new_id( v, new_id);
+
 }
 #ifdef HAVE_SDL
 void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
@@ -3261,7 +3265,7 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 	{
 		v->uc->sample_end = s->current_frame_num;
 		if( v->uc->sample_end > v->uc->sample_start) {
-			editlist *el = veejay_edit_copy_to_new( v, v->edit_list, v->uc->sample_start,v->uc->sample_end );
+			editlist *el = veejay_edit_copy_to_new( v, (SAMPLE_PLAYING(v)  ? v->edit_list : v->current_edit_list), v->uc->sample_start,v->uc->sample_end );
 			int start = 0;
 			int end = el->video_frames -1;
 			sample_info *skel = sample_skeleton_new(start,end);
@@ -3274,6 +3278,7 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,"%s %d: Cannot store new sample!",__FILE__,__LINE__);
 			}
+			veejay_msg(VEEJAY_MSG_DEBUG, "New el = %p (from %p)", el, v->edit_list );
 		}
 		else
 		{
@@ -3468,7 +3473,7 @@ void vj_event_sample_set_marker_start(void *ptr, const char format[], va_list ap
 		int start = 0; int end = 0;
 		if ( sample_get_el_position( args[0], &start, &end ) )
 		{	// marker in relative positions given !
-			args[1] += start; // add sample's start position
+		//	args[1] += start; // add sample's start position
 			if( sample_set_marker_start( args[0], args[1] ) )
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker starting position at %d", args[0],args[1]);
@@ -3536,8 +3541,8 @@ void vj_event_sample_set_marker(void *ptr, const char format[], va_list ap)
 		int end = 0;
 		if( sample_get_el_position( args[0], &start, &end ) )
 		{
-			args[1] += start;
-			args[2] = end - args[2];
+		//	args[1] += start;
+		//	args[2] = end - args[2];
 			if( sample_set_marker( args[0], args[1],args[2] ) )
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Sample %d marker starting position at %d, ending position at %d", args[0],args[1],args[2]);
@@ -3996,33 +4001,24 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 	char *s = NULL;
 	P_A(args,s,format,ap);
 	int deleted_sample = 0;
-	if(SAMPLE_PLAYING(v)) 
+
+	if(SAMPLE_PLAYING(v) && v->uc->sample_id == args[0])
 	{
-		if(v->uc->sample_id == args[0])
-		{
-			veejay_msg(VEEJAY_MSG_INFO,"Cannot delete sample while playing");
-		}
-		else
-		{
-			if(sample_del(args[0]))
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "Deleted sample %d", args[0]);
-				deleted_sample = args[0];
-				sample_verify_delete( args[0] , 0 );
-			}
-			else
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Unable to delete sample %d",args[0]);
-			}
-		}	
+		veejay_msg(VEEJAY_MSG_INFO,"Cannot delete sample while playing");
+		return;
+	}
+
+	if(sample_del(args[0]))
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Deleted sample %d", args[0]);
+		deleted_sample = args[0];
+		sample_verify_delete( args[0] , 0 );
 	}
 	else
 	{
-		p_invalid_mode();
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to delete sample %d",args[0]);
 	}
-
 	vj_event_send_new_id(  v, deleted_sample );
-
 }
 
 void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
@@ -4033,11 +4029,6 @@ void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
 	int new_sample =0;
 	P_A(args,s,format,ap);
 
-	if(SAMPLE_PLAYING(v))
-	{
-		if( args[0] == 0 ) args[0] = v->uc->sample_id;
-		if( args[0] == -1) args[0] = sample_size()-1;
-	}
 	if( sample_exists(args[0] ))
 	{
 		new_sample = sample_copy(args[0]);
@@ -5835,7 +5826,7 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 	P_A(args,str,format,ap);
 
 
-	if ( veejay_edit_addmovie(v,v->current_edit_list,str,start,destination,destination))
+	if ( veejay_edit_addmovie(v,v->edit_list,str,start,destination,destination))
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Appended video file %s to EditList",str); 
 	}
@@ -5855,7 +5846,7 @@ void vj_event_el_add_video_sample(void *ptr, const char format[], va_list ap)
 	int new_sample_id = args[0];
 
 	new_sample_id = veejay_edit_addmovie_sample(v,str,new_sample_id );
-
+	veejay_msg(VEEJAY_MSG_DEBUG , "New sample %d from file %s", new_sample_id, str );
 	vj_event_send_new_id( v,new_sample_id );
 }
 
@@ -6974,7 +6965,10 @@ void vj_event_print_sample_info(veejay_t *v, int id)
     	}
 	v->real_fps = -1;
 
-	vj_el_print( sample_get_editlist( id ) );
+	//vj_el_print( sample_get_editlist( id ) );
+
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"Sample has EDL %p, Plain at %p", sample_get_editlist( id ), v->current_edit_list );
 
 	veejay_msg(VEEJAY_MSG_PRINT, "\n");
 
@@ -7020,16 +7014,16 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 	bzero( _s_print_buf,SEND_BUF);
 	sprintf(_s_print_buf, "%05d",0);
 
-	if(args[0]>0) start_from_tag = args[0];
+	//if(args[0]>0) start_from_tag = args[0];
 
 	n = vj_tag_size()-1;
-
+	veejay_msg(VEEJAY_MSG_DEBUG, "I have %d streams to describe", n );
 	if (n >= 1 )
 	{
 		char line[300];
 		bzero( _print_buf, SEND_BUF);
 
-		for(i=start_from_tag; i <= n; i++)
+		for(i=0; i <= n; i++)
 		{
 			if(vj_tag_exists(i))
 			{	
@@ -7056,6 +7050,7 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 		}
 		sprintf(_s_print_buf, "%05d%s",strlen(_print_buf),_print_buf);
 	}
+veejay_msg(VEEJAY_MSG_DEBUG, "[%s]", _s_print_buf);
 	SEND_MSG(v,_s_print_buf);
 }
 

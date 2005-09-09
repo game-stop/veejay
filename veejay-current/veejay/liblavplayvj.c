@@ -294,7 +294,7 @@ int veejay_set_speed(veejay_t * info, int speed)
 	{
 
 	case VJ_PLAYBACK_MODE_PLAIN:
-		len = info->edit_list->video_frames - 1;
+		len = info->current_edit_list->video_frames - 1;
 		if( abs(speed) <= len )
 			settings->current_playback_speed = speed;	
 		else
@@ -508,7 +508,7 @@ int veejay_init_editlist(veejay_t * info)
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
 
-    editlist *el = info->edit_list;
+    editlist *el = info->current_edit_list;
 
     /* Set min/max options so that it runs like it should */
     settings->min_frame_num = 0;
@@ -645,43 +645,41 @@ void veejay_set_sample(veejay_t * info, int sampleid)
     int start,end,speed,looptype;
     if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
     {
-	    if(!vj_tag_exists(sampleid))
+	if(!vj_tag_exists(sampleid))
         {
 		    veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist", sampleid);
 	     	   return;
         }
-	    info->last_tag_id = sampleid;
-	    info->uc->sample_id = sampleid;
+	info->last_tag_id = sampleid;
+	info->uc->sample_id = sampleid;
 
-	    if(info->settings->current_playback_speed==0) 
-			veejay_set_speed(info, 1);
+	if(info->settings->current_playback_speed==0) 
+		veejay_set_speed(info, 1);
 
- 		veejay_msg(VEEJAY_MSG_INFO, "Playing stream %d",
-			sampleid);
-	
-	    return;
+ 	veejay_msg(VEEJAY_MSG_INFO, "Playing stream %d",
+		sampleid);
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "EDL = %p, New EDL = %p", info->edit_list, info->current_edit_list );
+	info->edit_list = info->current_edit_list;
+
+	return;
      }
 
      if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
      {
-		editlist *edl = 
-			sample_get_editlist( sampleid );
-		if(edl)
-		{
-			info->edit_list = sample_get_editlist( sampleid );
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR,
-			 "Sample has not EDL data");
-		}
 		if(!sample_exists(sampleid))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist", sampleid);
 			return;
 		}
+
+		editlist *edl = 
+			sample_get_editlist( sampleid );
+		info->edit_list = sample_get_editlist( sampleid );
+
+		veejay_msg(VEEJAY_MSG_DEBUG, "Sample EDL = %p, PM EDL = %p", info->edit_list, info->current_edit_list );
 	
-	   	 sample_get_short_info( sampleid , &start,&end,&looptype,&speed);
+	   	sample_get_short_info( sampleid , &start,&end,&looptype,&speed);
 
  		 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (frames %d - %d) at speed %d",
 			sampleid, start,end,speed);
@@ -718,7 +716,7 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 		}
 	}
 
-	int id = vj_tag_new(type, filename, index, info->edit_list, info->pixel_format, channel);
+	int id = vj_tag_new(type, filename, index, info->current_edit_list, info->pixel_format, channel);
 	char descr[200];
 	bzero(descr,200);
 	vj_tag_get_by_type(type,descr);
@@ -802,6 +800,7 @@ static int veejay_screen_update(veejay_t * info )
     } 
 #ifdef USE_SWSCALER
 	// scale the image if wanted
+	video_playback_setup *settings = info->settings;
 	if(settings->zoom )
 	{
 		VJFrame src,dst;
@@ -817,8 +816,8 @@ static int veejay_screen_update(veejay_t * info )
 		}	
 		else
 		{
-			vj_get_yuv_template( &src, info->edit_list->video_width,
-						   info->edit_list->video_height,
+			vj_get_yuv_template( &src, info->current_edit_list->video_width,
+						   info->current_edit_list->video_height,
 						   info->pixel_format );
 		}
 
@@ -852,7 +851,7 @@ static int veejay_screen_update(veejay_t * info )
 #ifdef USE_GDK_PIXBUF
 		if(vj_picture_save( info->settings->export_image, frame, 
 				info->video_output_width, info->video_output_height,
-				info->edit_list->pixel_format ) )
+				info->current_edit_list->pixel_format ) )
 		{
 			veejay_msg(VEEJAY_MSG_INFO,
 				"Saved frame %ld to image", info->settings->current_frame_num );
@@ -963,7 +962,7 @@ static int veejay_screen_update(veejay_t * info )
 		produce( 
 			info->segment,
 			frame,
-			info->edit_list->video_width*info->edit_list->video_height);	
+			info->current_edit_list->video_width*info->current_edit_list->video_height);	
 
 		break;
 	case 5:
@@ -1462,7 +1461,7 @@ static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
 
 int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 {
-	editlist *el = info->edit_list;
+	editlist *el = info->current_edit_list;
 	video_playback_setup *settings = info->settings;
 	if(info->video_out<0)
 	{
@@ -1522,8 +1521,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		memset( &src,0,sizeof(VJFrame));
 		int w = 0; int h = 0;
 		vj_get_yuv_template( &src,
-			info->edit_list->video_width,
-			info->edit_list->video_height,
+			info->current_edit_list->video_width,
+			info->current_edit_list->video_height,
 			info->pixel_format );
 
 		int res = vj_perform_init_cropped_output_frame(
@@ -1542,7 +1541,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 			return -1; 
 		}
 		veejay_msg(VEEJAY_MSG_INFO, "Crop video %dx%d to %dx%d (top %d, bottom %d, left %d, right %d",
-				info->edit_list->video_width, info->edit_list->video_height,
+				info->current_edit_list->video_width, info->current_edit_list->video_height,
 				w,h,
 				info->settings->viewport.top,
 				info->settings->viewport.bottom,
@@ -1567,8 +1566,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		else
 		{
 			vj_get_yuv_template( &src,
-					info->edit_list->video_width,
-					info->edit_list->video_height,
+					info->current_edit_list->video_width,
+					info->current_edit_list->video_height,
 					info->pixel_format );
 		}
 
@@ -1629,7 +1628,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 	plugins_allocate();
 
-	if(info->edit_list->has_audio) {
+	if(info->current_edit_list->has_audio) {
 		if (vj_perform_init_audio(info) == 0)
 			veejay_msg(VEEJAY_MSG_INFO, "Initialized Audio Task");
 		else
@@ -1639,7 +1638,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
   	veejay_msg(VEEJAY_MSG_INFO, 
 		"Initialized %d Image- and Video Effects", MAX_EFFECTS);
-    	vj_effect_initialize(info->edit_list->video_width, info->edit_list->video_height);
+    	vj_effect_initialize(info->current_edit_list->video_width, info->current_edit_list->video_height);
    
 	info->plugin_frame = vj_perform_init_plugin_frame(info);
 	info->plugin_frame_info = vj_perform_init_plugin_frame_info(info);
@@ -1647,7 +1646,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 
     if(info->dump) vj_effect_dump(); 	
-    info->output_stream = vj_yuv4mpeg_alloc(info->edit_list, info->video_output_width,
+    info->output_stream = vj_yuv4mpeg_alloc(info->current_edit_list, info->video_output_width,
 		info->video_output_height );
 	if(!info->output_stream)
 	{
@@ -1754,13 +1753,13 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		veejay_msg(VEEJAY_MSG_INFO, 
 		    "Entering render mode (no visual output)");
         
-		info->render_stream = vj_yuv4mpeg_alloc(info->edit_list, info->video_output_width,info->video_output_height);
+		info->render_stream = vj_yuv4mpeg_alloc(info->current_edit_list, info->video_output_width,info->video_output_height);
 
 
 
 		if (vj_yuv_stream_start_write
 		  	  (info->render_stream, info->stream_outname,
-	  		   info->edit_list) == 0) {
+	  		   info->current_edit_list) == 0) {
 	   	 		veejay_msg(VEEJAY_MSG_INFO, 
 					"Rendering to [%s].",
 					info->stream_outname);
@@ -1808,7 +1807,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		if( settings->action_scheduler.state )
 			dummy_id = vj_tag_size()-1;
 		else 
-			dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, "Solid", -1, info->edit_list,info->pixel_format,-1);
+			dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, "Solid", -1, info->current_edit_list,info->pixel_format,-1);
 		if(dummy_id > 0)
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Activating dummy mode (Stream %d)", dummy_id);
@@ -2078,17 +2077,17 @@ static void veejay_playback_cycle(veejay_t * info)
 static void Welcome(veejay_t *info)
 {
 	veejay_msg(VEEJAY_MSG_WARNING, "Video project settings: %ldx%ld, Norm: [%s], fps [%2.2f], %s",
-			info->edit_list->video_width,
-			info->edit_list->video_height,
-			info->edit_list->video_norm == 'n' ? "NTSC" : "PAL",
-			info->edit_list->video_fps, 
-			info->edit_list->video_inter==0 ? "Not interlaced" : "Interlaced" );
+			info->current_edit_list->video_width,
+			info->current_edit_list->video_height,
+			info->current_edit_list->video_norm == 'n' ? "NTSC" : "PAL",
+			info->current_edit_list->video_fps, 
+			info->current_edit_list->video_inter==0 ? "Not interlaced" : "Interlaced" );
 	if(info->audio==AUDIO_PLAY && info->edit_list->has_audio)
 	veejay_msg(VEEJAY_MSG_WARNING, "                        %ldHz %d Channels %dBps (%d Bit) %s %s",
-			info->edit_list->audio_rate,
-			info->edit_list->audio_chans,
-			info->edit_list->audio_bps,
-			info->edit_list->audio_bits,
+			info->current_edit_list->audio_rate,
+			info->current_edit_list->audio_chans,
+			info->current_edit_list->audio_bps,
+			info->current_edit_list->audio_bits,
 			(info->no_bezerk==0?"[Bezerk]" : " " ),
 			(info->verbose==0?" " : "[Debug]")  );
   
@@ -2162,7 +2161,7 @@ static void *veejay_playback_thread(void *data)
     vj_perform_free(info);
     vj_effect_shutdown();
     vj_tag_close_all();
-    vj_el_free(info->edit_list);
+    vj_el_free(info->current_edit_list);
 
     veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
     pthread_exit(NULL);
@@ -2448,7 +2447,7 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 
     uint64_t len = n2 - n1 + 1;
 
-    if( n1 < 0 || n2 > info->edit_list->video_frames-1)
+    if( n1 < 0 || n2 > el->video_frames-1)
     {
 	veejay_msg(VEEJAY_MSG_ERROR, "Sample start and end are outside of editlist");
 	return NULL;
@@ -2461,8 +2460,13 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
     }
 
     /* Copy edl */
-    editlist *new_el = (editlist*) vj_malloc(sizeof(editlist));
-    memcpy( new_el, info->edit_list , sizeof(editlist));
+
+	editlist *new_el = vj_el_soft_clone( el );
+	if(!new_el)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot soft clone EDL");
+	}
+
     /* copy edl frames */
     new_el->frame_list =
 		(uint64_t *) vj_malloc(  sizeof(uint64_t) * len );
@@ -2478,9 +2482,11 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
     k = 0;
 
     for (i = n1; i <= n2; i++)
-		new_el->frame_list[k++] = info->edit_list->frame_list[i];
+		new_el->frame_list[k++] = el->frame_list[i];
+	veejay_msg(VEEJAY_MSG_DEBUG, "Copied %d frames to new EDL %p from %p", k, new_el,el);
     // set length
     new_el->video_frames = len;
+
 
     return new_el;
 }
@@ -2710,7 +2716,7 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 		return 0;
 	}
 
-	// create initial edit list for sample
+	// create initial edit list for sample (is currently playing)
 	if(!sample_edl) 
 		sample_edl = vj_el_init_with_args( files,1,info->preserve_pathnames,info->auto_deinterlace,0,
 				info->edit_list->video_norm );
@@ -2840,7 +2846,7 @@ int veejay_toggle_audio(veejay_t * info, int audio)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
-    editlist *el = info->edit_list;
+    editlist *el = info->current_edit_list;
 
     if( !(el->has_audio) ) {
 	veejay_msg(VEEJAY_MSG_WARNING, 
@@ -2966,7 +2972,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		else
 			info->dummy->chroma = CHROMA422;	
 
-		info->edit_list = vj_el_dummy( 0, info->auto_deinterlace, info->dummy->chroma,
+		info->current_edit_list = vj_el_dummy( 0, info->auto_deinterlace, info->dummy->chroma,
 				info->dummy->norm, info->dummy->width, info->dummy->height, info->dummy->fps );
 
 		info->dummy->active = 1;
@@ -2977,7 +2983,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 
 		if( info->dummy->arate )
 		{
-			editlist *el = info->edit_list;
+			editlist *el = info->current_edit_list;
 			el->has_audio = 1;
 			el->play_rate = el->audio_rate = info->dummy->arate;
 			el->audio_chans = info->dummy->achans;
@@ -2989,9 +2995,9 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	}
 	else
 	{
-	    	info->edit_list = vj_el_init_with_args(files, num_files, info->preserve_pathnames, info->auto_deinterlace, force, override_norm);
+	    	info->current_edit_list = vj_el_init_with_args(files, num_files, info->preserve_pathnames, info->auto_deinterlace, force, override_norm);
 	}
-	info->current_edit_list = info->edit_list;
+	info->edit_list = info->current_edit_list;
 
 	if(info->edit_list==NULL)
 	{
@@ -3006,38 +3012,38 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	}
 	else
 	{
-		info->pixel_format = info->edit_list->pixel_format;
+		info->pixel_format = info->current_edit_list->pixel_format;
 		veejay_msg(VEEJAY_MSG_WARNING, "Using pixel format YCbCr %s found in video file ",
 			(info->pixel_format == FMT_422 ? "4:2:2" : "4:2:0"));
 	}	
 	
 
-	vj_avcodec_init(info->edit_list ,   info->edit_list->pixel_format);
+	vj_avcodec_init(info->current_edit_list ,   info->current_edit_list->pixel_format);
     	if(info->pixel_format == FMT_422 )
 	{
-		if(!vj_el_init_422_frame( info->edit_list, info->effect_frame1)) return 0;
-		if(!vj_el_init_422_frame( info->edit_list, info->effect_frame2)) return 0;
+		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame1)) return 0;
+		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame2)) return 0;
 		info->settings->sample_mode = SSM_422_444;
 	}
 	else 
 	{
-		if(!vj_el_init_420_frame( info->edit_list, info->effect_frame1)) return 0;
-		if(!vj_el_init_420_frame( info->edit_list, info->effect_frame2)) return 0;
+		if(!vj_el_init_420_frame( info->current_edit_list, info->effect_frame1)) return 0;
+		if(!vj_el_init_420_frame( info->current_edit_list, info->effect_frame2)) return 0;
 		info->settings->sample_mode = SSM_420_JPEG_TR;
 	}
 
-	info->effect_frame_info->width = info->edit_list->video_width;
-	info->effect_frame_info->height= info->edit_list->video_height;
+	info->effect_frame_info->width = info->current_edit_list->video_width;
+	info->effect_frame_info->height= info->current_edit_list->video_height;
 
 	if(info->settings->output_fps > 0.0)
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Overriding frame rate with %2.2f", 
 			info->settings->output_fps);
-		info->edit_list->video_fps = info->settings->output_fps;
+		info->current_edit_list->video_fps = info->settings->output_fps;
 	}	
 	else
 	{
-		info->settings->output_fps = info->edit_list->video_fps;
+		info->settings->output_fps = info->current_edit_list->video_fps;
 	}
 
 	return 1;
@@ -3094,21 +3100,21 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	if( ret )
 	{
 		/* initialize tags (video4linux/yuv4mpeg stream ... ) */
-		if (vj_tag_init(info->edit_list->video_width, info->edit_list->video_height, info->pixel_format) != 0) {
+		if (vj_tag_init(info->current_edit_list->video_width, info->current_edit_list->video_height, info->pixel_format) != 0) {
 			veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing stream manager");
 			return 0;
     		}
 
- 		sample_init( (info->edit_list->video_width * info->edit_list->video_height)  ); 
+ 		sample_init( (info->current_edit_list->video_width * info->current_edit_list->video_height)  ); 
 
 		/* create samples from EDL */
 		if( info->uc->file_as_sample)
 		{
-			long i,n=info->edit_list->num_video_files;
+			long i,n=info->current_edit_list->num_video_files;
 			for(i = 0; i < n; i ++ )
 			{
 				long start,end;
-				if(vj_el_get_file_entry( info->edit_list, &start,&end, i ))
+				if(vj_el_get_file_entry( info->current_edit_list, &start,&end, i ))
 				{
 					sample_info *skel = sample_skeleton_new( start,end );
 					sample_store(skel);
