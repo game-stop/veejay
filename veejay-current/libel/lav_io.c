@@ -806,8 +806,9 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 #endif
 
 #ifdef SUPPORT_READ_DV2
+		ret = 0;
 		lav_fd->dv_fd = rawdv_open_input_file(filename,mmap_size);
-	  	if(lav_fd->dv_fd)
+	  	if(lav_fd->dv_fd > 0)
 		{
 			lav_fd->format = 'b'; 
 			lav_fd->has_audio = 0;

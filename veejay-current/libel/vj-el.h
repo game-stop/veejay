@@ -61,6 +61,7 @@ typedef struct
 
 	char		*(video_file_list[MAX_EDIT_LIST_FILES]);
 	lav_file_t	*(lav_fd[MAX_EDIT_LIST_FILES]);
+	int		ref[MAX_EDIT_LIST_FILES];
 	long 		num_frames[MAX_EDIT_LIST_FILES];
 	uint64_t 	*frame_list;
 
@@ -100,10 +101,17 @@ void	vj_el_frame_cache(int n);
 
 void	vj_el_show_formats(void);
 
+void	vj_el_ref(editlist *el, int num);
+
+void	vj_el_unref(editlist *el, int num);
+
 editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int width, int height, float fps);
 
 int	vj_el_get_file_entry( editlist *el,long *start_pos, long *end_pos, long entry );
 
 editlist *vj_el_clone(editlist *el);
 
+editlist *vj_el_soft_clone(editlist *el);
+
+int		vj_el_framelist_clone( editlist *src, editlist *dst);
 #endif

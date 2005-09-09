@@ -215,6 +215,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		return -1;
 	}
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "Opening file '%s'", filename );
+
     if (preserve_pathname)
 		realname = strdup(filename);
     else
@@ -254,16 +256,18 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		el->video_frames = 0;
         if(el->frame_list) free(el->frame_list);
 		el->frame_list = NULL;
+		veejay_msg(VEEJAY_MSG_DEBUG, "Cleared frame list ");
     }
 
     el->num_video_files++;
 
     el->lav_fd[n] = lav_open_input_file(filename,mmap_size);
 
-    if (!el->lav_fd[n])
+    if (el->lav_fd[n] == NULL)
 	{
 		el->num_video_files--;	
-		lav_strerror();
+	veejay_msg(VEEJAY_MSG_ERROR,"Error loading '%s' :%s",
+		realname,lav_strerror());
 	 	if(realname) free(realname);
 		return -1;
 	}
@@ -285,6 +289,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
   	  el->MJPG_chroma = _fc;
 	  chroma = _fc;
 	}
+
+
 	pix_fmt = _el_probe_for_pixel_fmt( el->lav_fd[n] );
 	if(pix_fmt < 0)
 	{
@@ -304,7 +310,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		// check on sanity
 		if( pix_fmt > el->pixel_format)
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot handle mixed 4:2:2 and 4:2:0 editlists");
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot handle mixed editlists");
 			el->num_video_files--;	
 			if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
 		    	if( realname ) free(realname );
@@ -315,12 +321,12 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
     el->num_frames[n] = lav_video_frames(el->lav_fd[n]);
     el->video_file_list[n] = strndup(realname, strlen(realname));
     /* Debug Output */
-
-    veejay_msg(VEEJAY_MSG_DEBUG,"File: %s, absolute name: %s", filename, realname);
+	if(n == 0 )
+	{
+    veejay_msg(VEEJAY_MSG_DEBUG,"\tFull name:       %s", filename, realname);
     veejay_msg(VEEJAY_MSG_DEBUG,"\tFrames:          %ld", lav_video_frames(el->lav_fd[n]));
     veejay_msg(VEEJAY_MSG_DEBUG,"\tWidth:           %d", lav_video_width(el->lav_fd[n]));
     veejay_msg(VEEJAY_MSG_DEBUG,"\tHeight:          %d", lav_video_height(el->lav_fd[n]));
-
     {
 	const char *int_msg;
 	switch (lav_video_interlacing(el->lav_fd[n]))
@@ -352,7 +358,13 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
     veejay_msg(VEEJAY_MSG_DEBUG,"\tAudio chans:      %d", lav_audio_channels(el->lav_fd[n]));
     veejay_msg(VEEJAY_MSG_DEBUG,"\tAudio bits:       %d", lav_audio_bits(el->lav_fd[n]));
     veejay_msg(VEEJAY_MSG_DEBUG,"\tAudio rate:       %ld", lav_audio_rate(el->lav_fd[n]));
-
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tFull name	%s",realname);	
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tFrames	        %d", lav_video_frames(el->lav_fd[n]));
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tDecodes into    %s", _chroma_str[ lav_video_MJPG_chroma( el->lav_fd[n]) ]);
+	}
 
     nerr = 0;
     if (n == 0) {
@@ -633,6 +645,8 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3], int pix_fm
 		{	
 			veejay_msg(VEEJAY_MSG_DEBUG, "Cannot find codec for id %d (%d)", decoder_id,
 				c_i);
+			veejay_msg(VEEJAY_MSG_DEBUG, "EL %p, frame %d , decoder %x -> %p", el,nframe, decoder_id,
+					el->lav_fd[N_EL_FILE(n)]);
 			return -1;
 		}
 	}
@@ -894,7 +908,12 @@ void	vj_el_close( editlist *el )
 	int i;
 	for ( i = 0; i < el->num_video_files; i ++ )
 	{
-		if( el->lav_fd[i] ) lav_close( el->lav_fd[i] );
+		if(!el->ref[i])
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG,
+				"Closing file ref %p", el->lav_fd[i]);
+			if( el->lav_fd[i] ) lav_close( el->lav_fd[i] );
+		}
 		if( el->video_file_list[i]) free(el->video_file_list[i]);
 	}
 	if( el->frame_list )
@@ -1017,8 +1036,9 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 					index_list[i] =
 					    open_video_file(line, el, flags, deinterlace,force,norm);
 	
-					if(index_list[i]<0)
+					if(index_list[i]< 0)
 					{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Clean up EDL %p", el);
 						vj_el_free(el);
 						return NULL;
 					}
@@ -1135,6 +1155,21 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	// FIXME
 	veejay_msg(VEEJAY_MSG_WARNING, "Editlist is using %s", (el->pixel_format == FMT_420 ? "yuv420p" : "yuv422p"));
 
+
+	/* Now, check if we have loaded any file 
+           (because we skip the files that fail) */
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Num video files = %d",
+		el->num_video_files);
+
+	if( el->num_video_files == 0 || 
+		el->video_width == 0 || el->video_height == 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Failed");
+		vj_el_free(el);
+		return NULL;
+	}
+
 	return el;
 }
 
@@ -1148,12 +1183,28 @@ void	vj_el_free(editlist *el)
 		for( i = 0; i < n ; i++ )
 		{
 			if( el->video_file_list[i]) free(el->video_file_list[i]);
-			if( el->lav_fd[i] ) lav_close( el->lav_fd[i]);
+			/* close fd if ref counter is zero */
+			if(!el->ref[i] && el->lav_fd[i])
+			{
+	veejay_msg(VEEJAY_MSG_DEBUG, "%s : closing fd %p",
+		__FUNCTION__, el->lav_fd[i]);
+				//lav_close( el->lav_fd[i]);
+			}
 		}
 		if(el->frame_list) free(el->frame_list);
 		free(el);   
 		el = NULL;
 	}
+}
+
+void	vj_el_ref(editlist *el, int n)
+{
+	el->ref[n]++;
+}
+void	vj_el_unref(editlist *el, int n)
+{
+	if(el->ref[n])
+		el->ref[n]--;
 }
 
 void	vj_el_print(editlist *el)
@@ -1483,12 +1534,13 @@ editlist *vj_el_new(char *filename, char *norm, int deinterlace)
 	el->pixel_format = -1;
 	el->has_video = 1; //assume we get it   
 	el->MJPG_chroma = CHROMA420;
-	el->video_norm = norm;
+	el->video_norm = (char)norm;
 
     n = open_video_file(filename, el, 0, deinterlace,0, 'p');
 
 	if(n<0)
 	{
+	veejay_msg(VEEJAY_MSG_DEBUG, "Clean up EDL %p", el);
 		vj_el_free(el);
 		return NULL;
 	}
@@ -1537,19 +1589,86 @@ void	vj_el_frame_cache(int n )
 	}
 }
 
-
-editlist	*vj_el_clone(editlist *el)
+editlist	*vj_el_soft_clone(editlist *el)
 {
 	editlist *clone = (editlist*) vj_malloc(sizeof(editlist));
 	if(!clone)
 		return 0;
-	veejay_memcpy(clone, el,sizeof(editlist));
-	clone->frame_list = (uint64_t*) vj_malloc(sizeof(uint64_t) * el->video_frames );
-	if(!clone->frame_list)
+	clone->has_video = el->has_video;
+	clone->video_width = el->video_width;
+	clone->video_height = el->video_height;
+	clone->video_fps = el->video_fps;
+	clone->video_sar_width = el->video_sar_width;
+	clone->video_sar_height = el->video_sar_height;
+	clone->video_norm = el->video_norm;
+	clone->has_audio = el->has_audio;
+	clone->audio_rate = el->audio_rate;
+	clone->audio_chans = el->audio_chans;
+	clone->audio_bits = el->audio_bits;
+	clone->audio_bps = el->audio_bps;
+	clone->play_rate = el->play_rate;
+	clone->video_frames = el->video_frames;
+	clone->num_video_files = el->num_video_files;
+	clone->max_frame_size = el->max_frame_size;
+	clone->MJPG_chroma = el->MJPG_chroma;
+
+	clone->frame_list = NULL;
+	clone->last_afile = el->last_afile;
+	clone->last_apos  = el->last_apos;
+	clone->auto_deinter = el->auto_deinter;
+	clone->pixel_format = el->pixel_format;
+
+	memset( clone->video_file_list, 0 , sizeof(char*) * MAX_EDIT_LIST_FILES );
+	memset( clone->lav_fd , 0, sizeof(lav_file_t*) * MAX_EDIT_LIST_FILES );
+	memset( clone->num_frames, 0, sizeof(long) * MAX_EDIT_LIST_FILES);
+	int i;
+	for( i = 0; i < MAX_EDIT_LIST_FILES; i ++ )
 	{
-		if(clone)
-			free(clone);
+		if( el->lav_fd[i] )
+		{
+			clone->video_file_list[i] = strdup( el->video_file_list[i] );
+			clone->lav_fd[i] = el->lav_fd[i];
+			clone->ref[i] = 1; // clone starts with ref count of 1
+			clone->num_frames[i] = el->num_frames[i];
+		}
 	}
-	veejay_memcpy(clone->frame_list, el->frame_list, (sizeof(uint64_t) * el->video_frames )); 
+
+	return clone;
+}
+
+int		vj_el_framelist_clone( editlist *src, editlist *dst)
+{
+	if(!src || !dst) return 0;
+	if(dst->frame_list)
+		return 0;
+	dst->frame_list = (uint64_t*) vj_malloc(sizeof(uint64_t) * src->video_frames );
+	if(!dst->frame_list)
+		return 0;
+	veejay_msg(VEEJAY_MSG_DEBUG, "Frame list is %2.2f Mb",
+		(float)(sizeof(uint64_t) * src->video_frames) / 1048576.0 );
+
+	veejay_memcpy(
+		dst->frame_list,
+		src->frame_list,
+		(sizeof(uint64_t) * src->video_frames )
+	); 
+	
+	return 1;
+}
+
+editlist	*vj_el_clone(editlist *el)
+{
+	editlist *clone = (editlist*) vj_el_soft_clone(el);
+	if(!clone)
+		return NULL;
+
+	if( vj_el_framelist_clone( el, clone ) )
+		return clone;
+	else
+	{
+		if(clone) vj_el_free(clone);
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot clone: Memory error?!");
+	}	
+	
 	return clone;
 }
