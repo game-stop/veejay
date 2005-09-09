@@ -19,7 +19,7 @@
  
 #include <gveejay/vj-api.h>
 #include <veejay/vj-global.h>
-
+#include "widgets/gtktimeselection.h"
 #define DBG_C() { 	vj_msg_detail(VEEJAY_MSG_DEBUG, "Implement %s", __FUNCTION__ ); }  
 
 static int config_file_status = 0;
@@ -92,13 +92,20 @@ void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_VIDEO_SET_FRAME, "%d", val );
 	}
 }
-
+/*
 void	on_audiovolume_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *w = glade_xml_get_widget(info->main_window, "audiovolume");
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
 	multi_vims( VIMS_SET_VOLUME, "%d", (gint) (val * 100.0) );
 	vj_msg(VEEJAY_MSG_INFO,"Set volume to %d", (gint)(val * 100.0));
+}*/
+void	on_audiovolume_knob_value_changed(GtkAdjustment *adj, gpointer user_data)
+{
+	gdouble val = gtk_adjustment_get_value(adj);
+	multi_vims( VIMS_SET_VOLUME, "%d", (gint) (val * 100.0) );
+	vj_msg(VEEJAY_MSG_INFO,"Set volume to %d", (gint)(val * 100.0)); 
+	update_label_i( "volume_label", (gint)(val*100.0),0);
 }
 
 void	on_button_001_clicked(GtkWidget *widget, gpointer user_data)
@@ -168,6 +175,7 @@ void	on_button_sampleend_clicked(GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_SAMPLE_NEW, "%d %d", info->sample[0],info->sample[1]);
 	vj_msg(VEEJAY_MSG_INFO, "New sample from EditList %d - %d",
 		info->sample[0], info->sample[1]);
+	gveejay_new_slot(MODE_SAMPLE);
 }
 
 void	on_button_veejay_clicked(GtkWidget *widget, gpointer user_data)
@@ -226,7 +234,6 @@ void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 	gdouble min_val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->lower;
 	gdouble max_val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->upper;
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
-	gdouble nval = (val - min_val) / (max_val - min_val);
 	
 	if(val < 0.0 )
 		val = 0.0;
@@ -444,6 +451,7 @@ void	on_button_fx_clearchain_clicked(GtkWidget *w, gpointer user_data)
 	multi_vims( VIMS_CHAIN_CLEAR, "%d",0);
 	info->uc.reload_hint[HINT_CHAIN] = 1;
 	info->uc.reload_hint[HINT_ENTRY] = 1;
+	vj_akf_delete();
 	vj_msg(VEEJAY_MSG_INFO, "Clear FX Chain");
 }
 
@@ -461,6 +469,7 @@ void	on_button_entry_toggle_clicked(GtkWidget *w, gpointer user_data)
 		vj_msg(VEEJAY_MSG_INFO, "Chain Entry %d is %s",
 			info->uc.selected_chain_entry,
 			(val ? "Enabled" : "Disabled" ));
+		info->uc.reload_hint[HINT_ENTRY] = 1;
 	}	
 }
 
@@ -468,10 +477,11 @@ void	on_button_fx_entry_value_changed(GtkWidget *w, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-		int  *p = &(info->uc.entry_tokens[0]);
+		sample_slot_t *s = info->selected_slot;
 		multi_vims( VIMS_CHAIN_SET_ENTRY, "%d",
 			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w))
 		);
+		info->uc.selected_chain_entry = gtk_spin_button_get_value( GTK_SPIN_BUTTON(w));
 		info->uc.reload_hint[HINT_ENTRY] = 1;	
 	}  	
 				
@@ -484,6 +494,8 @@ void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 	info->uc.reload_hint[HINT_ENTRY] = 1;
 	vj_msg(VEEJAY_MSG_INFO, "Clear Effect from Entry %d",
 		info->uc.selected_chain_entry);
+	vj_kf_delete_parameter( info->uc.selected_chain_entry );
+	//FIXME
 }
 /*
 void	on_button_fx_mixapply_clicked(GtkWidget *w, gpointer user_data)
@@ -529,6 +541,14 @@ info->parameter_lock = 0;\
 }\
 }
 
+
+#define kf_changed( arg_num ) \
+{\
+if(!info->status_lock)\
+{\
+vj_kf_select_parameter(arg_num);\
+}\
+}
 
 void	on_slider_p0_value_changed(GtkWidget *w, gpointer user_data)
 {
@@ -644,23 +664,17 @@ void	on_button_stoplaunch_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
 {
-	if(info->selected_slot)
+	if(info->selection_slot)
 	{
 		multi_vims( VIMS_SET_MODE_AND_GO , "%d %d" ,
-			info->selected_slot->sample_id,		
-			info->selected_slot->sample_type );
+			info->selection_slot->sample_id,		
+			info->selection_slot->sample_type );
 	}
 }
 void	on_button_sample_del_clicked(GtkWidget *widget, gpointer user_data)
 {
-	if( info->selected_slot )	
-	{
+	if( info->selection_slot )	
 		remove_sample_from_slot();
-	}
-	else
-	{
-		vj_msg(VEEJAY_MSG_ERROR, "No slot selected\n");
-	}
 }
 void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -723,7 +737,7 @@ void	on_spin_sampleend_value_changed( GtkWidget *widget, gpointer user_data)
 		g_free(time1);
 	}
 }
-
+/*
 void	on_speedslider_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
@@ -735,6 +749,18 @@ void	on_speedslider_value_changed(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_VIDEO_SET_SPEED, "%d", value );
 		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
+	}
+}*/
+void on_speed_knob_value_changed(GtkAdjustment *adj, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		gint value = gtk_adjustment_get_value(adj);
+		value *= info->play_direction;
+		multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
+		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
+			value );
+		update_label_i( "speed_label", value,0);
 	}
 }
 
@@ -1015,7 +1041,9 @@ void	on_slider_m0_value_changed(GtkWidget *widget, gpointer user_data)
 
 		multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0,
 			(gint ) (info->uc.marker.start * real_len), (gint)(info->uc.marker.end * real_len));
-
+		gchar *dur = format_time( info->uc.marker.end - info->uc.marker.start );
+		update_label_str( "label_markerduration", dur );
+		g_free(dur);
 	}
 	
 }
@@ -1038,6 +1066,9 @@ void	on_slider_m1_value_changed(GtkWidget *widget, gpointer user_data)
 
 		multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0,
 			(gint ) (info->uc.marker.start * real_len), (gint)(info->uc.marker.end * real_len));
+		gchar *dur = format_time( info->uc.marker.end - info->uc.marker.start );
+		update_label_str( "label_markerduration", dur );
+		g_free(dur);
 
 	}
 
@@ -1351,7 +1382,7 @@ void	on_button_browse_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)
 {
-	if(info->selected_slot)
+	if(info->selection_slot)
 	{
 		multi_vims( VIMS_SAMPLE_COPY , "%d",
 			info->selected_slot->sample_id );
@@ -1636,4 +1667,251 @@ void	on_istream_cancel_clicked(GtkWidget *widget, gpointer user_data)
 	GtkWidget *dialog = glade_xml_get_widget_( info->main_window, "inputdialog" );
 	gtk_widget_hide( dialog );
 
+}
+
+void	on_curve_togglerun_toggled(GtkWidget *widget , gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		int i = info->uc.selected_chain_entry;
+		int j = info->uc.selected_parameter_id;
+
+		sample_slot_t *s = info->selected_slot;
+		key_parameter_t *k = s->ec->effects[i]->parameters[j];
+		k->running = is_button_toggled( "curve_togglerun");
+	}
+}
+
+void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
+{
+	// store the values in keyframe
+	sample_slot_t *s = info->selected_slot;
+	if(!s)
+		return;
+	int i = info->uc.selected_chain_entry;
+	int j = info->uc.selected_parameter_id;
+
+	// set parent effect
+	s->ec->effects[i]->parameters[j]->parameter_id = 
+		info->uc.entry_tokens[ENTRY_FXID];
+	s->ec->effects[i]->parameters[j]->start_pos = 
+		get_nums( "curve_spinstart" );
+	s->ec->effects[i]->parameters[j]->end_pos =
+		get_nums( "curve_spinend" );
+
+	gint curve_type = GTK_CURVE_TYPE_LINEAR;
+	if( is_button_toggled( "curve_typespline" ))
+		curve_type = GTK_CURVE_TYPE_SPLINE;
+	if( is_button_toggled( "curve_typefreehand" ))
+		curve_type = GTK_CURVE_TYPE_FREE;
+
+	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+
+	update_parameter_key( s->ec->effects[i]->parameters[j], curve );
+	reset_curve( s->ec->effects[i]->parameters[j] , curve );
+	set_parameter_key( s->ec->effects[i]->parameters[j], curve );
+
+	s->ec->enabled = is_button_toggled( "curve_toggleentry" );
+}
+
+void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
+{
+	sample_slot_t *s = info->selected_slot;
+	if(!s)
+		return;
+
+	gint id = info->status_tokens[ENTRY_FXID];
+	if( id < 0 )
+		id = 0;
+	int i = info->uc.selected_chain_entry;
+	int j = info->uc.selected_parameter_id;
+
+	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+	
+	reset_curve( s->ec->effects[i]->parameters[j], glade_xml_get_widget_(info->main_window, "curve" ));
+ 	clear_parameter_values ( s->ec->effects[i]->parameters[j]);
+	
+
+	renew_parameter_key( s->ec->effects[i]->parameters[j], 
+		id, info->status_tokens[SAMPLE_START], info->status_tokens[SAMPLE_END], 0,
+		info->status_tokens[SAMPLE_START], info->status_tokens[SAMPLE_END]);
+ 	s->ec->effects[i]->parameters[j]->running = 0;
+	set_toggle_button( "curve_togglerun", 0 );
+
+	fprintf(stderr, "Cleared");
+	//set_parameter_key( s->ec->effects[i]->parameters[j], curve );
+}
+
+void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+
+	if( is_button_toggled("curve_typelinear"))
+	{
+		sample_slot_t *s = info->selected_slot;
+		if(!s)
+			return;
+		GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+		int i = info->uc.selected_chain_entry;
+		int j = info->uc.selected_parameter_id;
+		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_LINEAR;
+		update_parameter_key( s->ec->effects[i]->parameters[j], curve );
+		reset_curve( s->ec->effects[i]->parameters[j] , curve );
+		set_parameter_key( s->ec->effects[i]->parameters[j], curve );
+	
+	}
+}	
+void	on_curve_typespline_toggled(GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+
+	if( is_button_toggled("curve_typespline"))
+	{
+		sample_slot_t *s = info->selected_slot;
+		if(!s)
+			return;
+		GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+		int i = info->uc.selected_chain_entry;
+		int j = info->uc.selected_parameter_id;
+		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_SPLINE;
+		update_parameter_key( s->ec->effects[i]->parameters[j], curve );
+		reset_curve( s->ec->effects[i]->parameters[j] , curve );
+		set_parameter_key( s->ec->effects[i]->parameters[j], curve );
+	}
+}	
+void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+
+	if( is_button_toggled("curve_typefreehand"))
+	{
+		sample_slot_t *s = info->selected_slot;
+		if(!s)
+			return;
+		GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+		int i = info->uc.selected_chain_entry;
+		int j = info->uc.selected_parameter_id;
+		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_FREE;
+		update_parameter_key( s->ec->effects[i]->parameters[j], curve );
+		reset_curve( s->ec->effects[i]->parameters[j] , curve );
+		set_parameter_key( s->ec->effects[i]->parameters[j], curve );
+	}
+}
+
+void	on_curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+	int i;
+
+	sample_slot_t *s = info->selected_slot;
+	if(!s)
+		return;
+
+// set enabled/disabled (see interpolate_parameters)
+
+	s->ec->effects[(info->uc.selected_chain_entry)]->enabled = is_button_toggled( "curve_toggleentry" );
+	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
+					info->main_window, "tree_chain") ));
+
+ 	gtk_tree_model_foreach(
+                    	model,
+			chain_update_row, (gpointer*) info );
+
+}
+
+void	on_kf_p0_toggled( GtkWidget *widget, gpointer user_data)
+{
+	kf_changed( 0 );
+}
+void	on_kf_p1_toggled( GtkWidget *widget, gpointer user_data)
+{
+	kf_changed( 1 );
+}
+void	on_kf_p2_toggled( GtkWidget *widget, gpointer user_data)
+{
+	kf_changed( 2 );
+}
+void	on_kf_p3_toggled( GtkWidget *widget, gpointer user_data)
+{
+	kf_changed( 3 );
+}
+void	on_kf_p4_toggled( GtkWidget *widget, gpointer user_data)
+{
+	kf_changed( 4 );
+}
+void	on_kf_p5_toggled( GtkWidget *widget, gpointer user_data)
+{
+	kf_changed( 5 );
+}
+void	on_kf_p6_toggled( GtkWidget *widget, gpointer user_data)
+{
+	kf_changed( 6 );
+}
+void	on_kf_p7_toggled( GtkWidget *widget, gpointer user_data)
+{
+	kf_changed( 7 );
+}
+
+void	on_curve_toggleglobal_toggled(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		sample_slot_t *s = info->selected_slot;
+		s->ec->enabled = is_button_toggled( "curve_toggleglobal" );
+	}
+}
+void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
+{
+	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
+	// set page 1 from notebook panels
+	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
+	if(page == 0)
+		gtk_notebook_next_page( GTK_NOTEBOOK(n) );
+	if(page == 2)
+		gtk_notebook_prev_page( GTK_NOTEBOOK(n) );
+}
+
+
+void	on_timeline_value_changed( GtkWidget *widget, gpointer user_data )
+{
+	if(!info->status_lock)
+	{
+		gdouble pos = timeline_get_pos( TIMELINE_SELECTION(widget) );
+		multi_vims( VIMS_VIDEO_SET_FRAME, "%d", (gint)pos );
+	}
+}
+
+void	on_timeline_out_point_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+
+		gdouble pos1 = timeline_get_in_point( TIMELINE_SELECTION(widget) );
+		gdouble pos2 = timeline_get_out_point( TIMELINE_SELECTION(widget) );
+		pos1 *= info->status_tokens[TOTAL_FRAMES];
+		pos2 *= info->status_tokens[TOTAL_FRAMES];
+		if(pos2 > pos1 )
+			multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0, (gint) pos1, (gint) pos2 );
+		else
+			vj_msg(VEEJAY_MSG_INFO, "Set Out point after In point !");
+	}
+}
+
+void	on_timeline_in_point_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		gdouble pos1 = timeline_get_in_point( TIMELINE_SELECTION(widget) );
+		gdouble pos2 = timeline_get_out_point( TIMELINE_SELECTION(widget) );
+		pos1 *= info->status_tokens[TOTAL_FRAMES];
+		pos2 *= info->status_tokens[TOTAL_FRAMES];
+		if(pos1 < pos2 )
+			multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0, (gint) pos1, (gint) pos2 );
+		else
+			vj_msg(VEEJAY_MSG_INFO,"Set In Point before Out Point !");
+	}
 }

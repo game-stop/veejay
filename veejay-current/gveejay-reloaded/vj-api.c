@@ -1,3 +1,22 @@
+/* Gveejay Reloaded - graphical interface for VeeJay
+ * 	     (C) 2002-2004 Niels Elburg <nelburg@looze.net> 
+ *           (C) 2005      Thomas Rheinhold 
+ *
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
 #include <config.h>
 #include <math.h>
 #include <stdlib.h>
@@ -26,11 +45,12 @@
 #include <sys/stat.h>
 #include <unistd.h>
 #include <widgets/cellrendererspin.h>
+#include <widgets/gtkknob.h>
 #include <libgen.h>
-#include <gveejay/keyboard.h>
+#include <gveejay-reloaded/keyboard.h>
 #include <gtk/gtkversion.h>
 #include <gdk/gdk.h>
-
+#include <gveejay-reloaded/curve.h>
 
 //if gtk2_6 is not defined, 2.4 is assumed.
 #ifdef GTK_CHECK_VERSION
@@ -146,7 +166,8 @@ enum
 	HINT_BUNDLES = 10,
 	HINT_HISTORY = 11,
 	HINT_MARKER = 12,
-	NUM_HINTS = 13
+	HINT_KF = 13,
+	NUM_HINTS = 14
 };
 
 enum
@@ -211,6 +232,7 @@ typedef struct
 	int	expected_slots;
 	stream_templ_t	strtmpl[2]; // v4l, dv1394
 	sample_marker_t marker;
+	int	selected_parameter_id; // current kf
 } veejay_user_ctrl_t;
 
 typedef struct
@@ -243,6 +265,10 @@ typedef struct
 #define NUM_SAMPLES_PER_PAGE 12
 #define NUM_SAMPLES_PER_COL 3
 #define NUM_SAMPLES_PER_ROW 4
+
+
+#define SEQUENCE_LENGTH 10*NUM_SAMPLES_PER_PAGE
+
 static	vims_t	vj_event_list[VIMS_MAX];
 static  int vims_verbosity = 0;
 
@@ -262,6 +288,16 @@ typedef struct
 
 typedef struct
 {
+	GtkFrame *frame;
+	GtkWidget *image;
+	GtkWidget *event_box;
+	GtkWidget *loop_button;
+	GtkWidget *main_vbox;
+} sequence_gui_slot_t;
+
+
+typedef struct
+{
 	gint slot_number;
 	gint sample_id;
 	gint sample_type;
@@ -270,8 +306,21 @@ typedef struct
 	gint refresh_image;
 	GdkPixbuf *pixbuf;
 	guchar *rawdata;
+	key_chain_t	*ec;
 } sample_slot_t;
 
+typedef struct
+{
+	sample_slot_t *sample;	
+} sequence_slot_t;
+
+typedef struct
+{
+	gint bank_number;
+	gint page_num;
+	sequence_slot_t **slot;
+	sequence_gui_slot_t **gui_slot;
+} sequence_bank_t;
 
 typedef struct
 {
@@ -280,9 +329,6 @@ typedef struct
 	sample_slot_t **slot;
 	sample_gui_slot_t **gui_slot;
 } sample_bank_t;
-
-
-
 
 typedef struct
 {
@@ -325,10 +371,16 @@ typedef struct
 	GtkWidget	*sample_bank_pad;
 	sample_bank_t	**sample_banks;
 	sample_slot_t	*selected_slot;
+	sample_slot_t 	*selection_slot;
 	sample_gui_slot_t *selected_gui_slot;
+	sample_gui_slot_t *selection_gui_slot;
+	sequence_bank_t *sequence_banks;
+	GtkKnob		*audiovolume_knob;
+	GtkKnob		*speed_knob;	
 	int		image_dimensions[2];
 	guchar		*rawdata;
 	int		prev_mode;
+	GtkWidget	*tl;
 } vj_gui_t;
 
 enum
@@ -342,8 +394,9 @@ enum
 enum
 {
 	FXC_ID = 0,
-	FXC_FXID,
-	FXC_FXSTATUS,
+	FXC_FXID = 1,
+	FXC_FXSTATUS = 2,
+	FXC_KF =3, 
 	FXC_N_COLS,
 };
 
@@ -391,6 +444,11 @@ static	void	msg_vims(char *message);
 static  void    multi_vims(int id, const char format[],...);
 static  void 	single_vims(int id);
 static	gdouble	get_numd(const char *name);
+static void	vj_kf_delete_parameter(int idx);
+static void	vj_akf_delete(void);
+static void	vj_kf_select_parameter(int id);
+static	int	interpolate_parameters(void);
+static	int	verify_interpolator( int effect_id, int max_p );
 static  int     get_nums(const char *name);
 static  gchar   *get_text(const char *name);
 static	void	put_text(const char *name, char *text);
@@ -399,7 +457,9 @@ static	void	set_toggle_button(const char *name, int status);
 static  void	update_slider_gvalue(const char *name, gdouble value );
 static  void    update_slider_value(const char *name, gint value, gint scale);
 static  void    update_slider_range(const char *name, gint min, gint max, gint value, gint scaled);
+static  void	update_knob_range( GtkWidget *w, gdouble min, gdouble max, gdouble value, gint scaled );
 static	void	update_spin_range(const char *name, gint min, gint max, gint val);
+static	void	update_knob_value(GtkWidget *w, gdouble value, gdouble scale );
 static	void	update_spin_value(const char *name, gint value);
 static  void    update_label_i(const char *name, int num, int prefix);
 static	void	update_label_f(const char *name, float val);
@@ -408,7 +468,7 @@ static	void	update_globalinfo();
 static  void    update_sampleinfo();
 static  void    update_streaminfo();
 static  void    update_plaininfo();
-static	void	load_parameter_info();
+static	gint	load_parameter_info();
 static	void	load_v4l_info();
 static	void	reload_editlist_contents();
 static  void    load_effectchain_info();
@@ -423,7 +483,13 @@ static	void	setup_tree_pixmap_column( const char *tree_name, int type, const cha
 static	gchar	*_utf8str( char *c_str );
 static gchar	*recv_vims(int len, int *bytes_written);
 static int	recv_vims_binary(int len, int *bytes_written, guchar *buf);
-
+static	void	disable_widget_by_pointer(GtkWidget *w);
+static	void	enable_widget_by_pointer(GtkWidget *w);
+static  GdkPixbuf *	update_pixmap_kf( int status );
+static  GdkPixbuf *	update_pixmap_entry( int status );
+static gboolean
+chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
+             gpointer data);
 void	vj_gui_stop_launch();
 static	void	get_gd(char *buf, char *suf, const char *filename);
 
@@ -442,12 +508,10 @@ static	gchar	*get_textview_buffer(const char *name);
 static void 	  create_slot(gint bank_nr, gint slot_nr, gint w, gint h);
 static void 	  setup_samplebank(gint c, gint r);
 static int 	  add_sample_to_sample_banks( int bank_page,sample_slot_t *slot );
-static void 	  remove_sample_from_sample_banks(gint bank_number, gint slot_number);
 static void 	  update_sample_slot_data(int bank_num, int slot_num, int id, gint sample_type, gchar *title, gchar *timecode);
 static gint 	  compare_index(gint *index_1, gint *index_2 );
 static gboolean   on_slot_activated_by_key (GtkWidget *widget, GdkEventKey *event, gpointer user_data);
 static gboolean   on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *event, gpointer user_data);
-static void 	  reset_samplebank(gboolean with_selection);
 static void 	  vj_gui_add_sample(gchar *filename, gint mode);
 static sample_slot_t *vj_gui_get_sample_info(gint which_one, gint mode );
 static void 	  add_sample_to_effect_sources_list(gint id, gint type, gchar *title, gchar *timecode);
@@ -468,6 +532,7 @@ static struct
 	{ "v4l_color" },
 	{ "v4l_white" }
 };
+
 static struct
 {
 	const char *name;
@@ -484,7 +549,7 @@ static struct
 	{"button_083"},
 	{"button_084"},
 	{"button_088"},
-	{"videobar"},
+//	{"videobar"},
 	{"button_samplestart"},
 	{"button_sampleend"},
 	{"button_fadeout"},
@@ -495,9 +560,9 @@ static struct
 	{"button_252"},
 	{"button_251"},
 	{"button_054"}, 
-	{"speedslider"},
+//	{"speedslider"},
 	{"new_colorstream"},
-	{"audiovolume"},
+//	{"audiovolume"},
 	{"manualopacity"},
 	{"button_fadedur"},
 	{"vimsmessage"},
@@ -517,6 +582,10 @@ static struct
 	{"frame_streamproperties"},
 	{"frame_streamrecord"},
 	{"loglinear"},
+	{"curve"},
+	{"curve_toggleglobal"},
+	{"curve_table"},
+	{"curve_toggleentry"},
 	{NULL} 
 };
 static struct
@@ -534,10 +603,10 @@ static struct
 	{"button_083"},
 	{"button_084"},
 	{"button_088"},
-	{"videobar"},
+//	{"videobar"},
 	{"button_samplestart"},
 	{"button_sampleend"},
-	{"speedslider"},
+//	{"speedslider"},
 	{NULL}
 };
 
@@ -567,11 +636,13 @@ enum
 /* Function to see if selected is playing */
 static	int	selected_is_playing()
 {
+	int *history = info->history_tokens[ (info->status_tokens[PLAY_MODE]) ];
 	if(!info->selected_slot)
 		return 0;
 
 	if(info->selected_slot->sample_id == info->status_tokens[CURRENT_ID]
-		&& info->selected_slot->sample_type == info->status_tokens[PLAY_MODE])
+		&& info->selected_slot->sample_type == info->status_tokens[PLAY_MODE] &&
+		history[CURRENT_ID] == info->status_tokens[CURRENT_ID])
 		return 1;
 
 	return 0;
@@ -647,14 +718,19 @@ static	int	read_file(const char *filename, int what, void *dst)
 	return 0;
 }
 
+static  void break_here(void)
+{
+
+}
+
 GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
 {
 	GtkWidget *widget = glade_xml_get_widget( m , name );
 	if(!widget)
 	{
 		fprintf(stderr,"gveejay fatal: widget %s does not exist\n",name);
+		break_here();
 		exit(0);
-	
 	}
 	return widget;		
 }
@@ -1399,6 +1475,8 @@ static	void	free_slot( sample_slot_t *slot )
 	{
 		if(slot->title) free(slot->title);
 		if(slot->timecode) free(slot->timecode);
+		if(slot->ec)
+			del_chain( slot->ec );
 		free(slot);
 	}
 }
@@ -1437,8 +1515,11 @@ int		gveejay_new_slot(int mode)
 				(mode == MODE_SAMPLE ? "Sample" : "Stream" ) );
 		if( id > 0 )
 		{ /* Add the sample/stream to a sample bank */
+
+
 			int poke_slot = 0;
-			int bank_page = find_bank_by_sample( id, mode, &poke_slot );
+			int bank_page = 0;
+			verify_bank_capacity( &bank_page, &poke_slot, id, mode );
 			sample_slot_t *tmp_slot = vj_gui_get_sample_info(id, mode );
 			if(tmp_slot)
 			{
@@ -1468,7 +1549,6 @@ void		gveejay_update_image( sample_slot_t *slot, sample_gui_slot_t *gui_slot, gi
 
 void		gveejay_update_image2( GtkWidget *img,  gint w, gint h )
 {
-	GdkPixbuf *pixbuf = NULL;
 	gint row_strides = 3 * w;
 	gint bw = 0;
 	// veejay sends current frame as image in RGB, 8 bytes per sample 
@@ -1622,7 +1702,7 @@ static	void	msg_vims(char *message)
 {
 	if(!info->client)
 		return;
-	//vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, message );
+	vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, message );
 	int error = vj_client_send(info->client, V_CMD, message);
 }
 
@@ -1656,6 +1736,7 @@ static	void	multi_vims(int id, const char format[],...)
 	snprintf(block, sizeof(block)-1, "%03d:%s;",id,tmp);
 	va_end(args);
 	vj_client_send( info->client, V_CMD, block); 
+	if(id != 333) fprintf(stderr, "%s : %d [%s]\n", __FUNCTION__, id, block );
 }
 
 static	void single_vims(int id)
@@ -1665,6 +1746,7 @@ static	void single_vims(int id)
 		return;
 	sprintf(block, "%03d:;",id);
 	vj_client_send( info->client, V_CMD, block );
+	fprintf(stderr, "%s : %d [%s]\n", __FUNCTION__ , id, block );
 }
 
 static gchar	*recv_vims(int slen, int *bytes_written)
@@ -1672,12 +1754,16 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 	int tmp_len = slen+1;
 	gchar tmp[tmp_len];
 	bzero(tmp,tmp_len);
+
+	fprintf(stderr, "%s : header of %d\n", __FUNCTION__, slen );
 	int ret = vj_client_read( info->client, V_CMD, tmp, slen );
-	int len = atoi(tmp);
+	int len = ret;
+	sscanf( tmp, "%d", &len );
 	gchar *result = NULL;
 	if( len <= 0 || slen <= 0)
+	{
 		return result;
-
+	}
 	result = (gchar*) vj_malloc(sizeof(gchar) * (len + 1) );
 	bzero(result, (len+1));
 	int bytes_left = len;
@@ -1766,6 +1852,207 @@ static	int	get_slider_val(const char *name)
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
 	if(!w) return 0;
 	return ((gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value); 
+}
+static	void	vj_kf_delete_parameter(int idx)
+{
+	sample_slot_t *s = info->selected_slot;
+	int i;
+	for( i = 0;i < MAX_PARAMETERS; i ++ )
+	{
+		key_parameter_t *key = 	s->ec->effects[idx]->parameters[i];
+  		clear_parameter_values ( key );
+	      
+	 	renew_parameter_key( key, 0,0,0,0,0,0 ); 
+        	key->running = 0;
+	}
+}
+static	void	vj_akf_delete()
+{
+	sample_slot_t *s = info->selected_slot;
+	int i,j;
+	for(i = 0; i < MAX_CHAIN_LEN; i ++)
+		vj_kf_delete_parameter(i);
+}
+
+static	void	vj_kf_select_parameter(int num)
+{
+	sample_slot_t *s = info->selected_slot;
+	/* Parameter changed !*/
+	info->uc.selected_parameter_id = num;
+
+	if(!info->status_lock)
+	{
+		/* Reload KEY  now */
+		update_curve_surroundings();
+		update_curve_widget( "curve" );
+		update_curve_accessibility("curve");
+	}
+	char name[20];	
+	sprintf(name, "P%d", num);
+	update_label_str( "curve_parameter", name );
+}
+
+static	int	interpolate_parameters(void)
+{
+	sample_slot_t *s = info->selected_slot;
+	if(!s)	
+		return 0;
+	int i,j;
+	int res = 0;
+	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve" );
+
+	if(!s->ec->enabled)
+		return 0;	
+	
+	for( i = 0; i < MAX_CHAIN_LEN; i ++ )
+	{
+		int values[MAX_PARAMETERS];
+		int skip = 1;
+		int id = 0;
+		char slider_name[20];
+		if(s->ec->effects[i]->enabled)
+		{
+			for( j = 0; j < MAX_PARAMETERS; j ++ )
+			{
+				sprintf(slider_name, "slider_p%d", j );
+				values[j] = get_slider_val ( slider_name );
+			}
+			for( j = 0; j < MAX_PARAMETERS; j ++ )
+			{
+				key_parameter_t *p = s->ec->effects[i]->parameters[j];
+				if( p->running == 1 && parameter_for_frame(p, info->status_tokens[FRAME_NUM]) )
+				{
+					int min,max;
+					
+					if(_effect_get_minmax( p->parameter_id, &min, &max, j ))
+					{
+						float scale = get_parameter_key_value( p,
+							info->status_tokens[FRAME_NUM] );
+						float min_value = (float)min;	
+						float max_value = (float)max;
+						float max_range = fabs( min_value ) + fabs( max_value );
+						float value = scale * max_range;
+						value += min_value;
+					//	float min_val = scale * min;
+					//	float min_val = scale * max;
+						values[j] =(int) value;
+					//	values[j] = value - ( min * scale );
+						skip = 0;
+						id = p->parameter_id;
+						sprintf(slider_name, "slider_p%d", j );
+						update_slider_value( slider_name, values[j],0 );
+					}
+				}
+			}
+			if(!skip)
+			{ // sample, chain entry, effect_id, arg i .. arg n
+				multi_vims( VIMS_CHAIN_ENTRY_SET_PRESET,
+					"%d %d %d %d %d %d %d %d %d %d %d %d",
+					0,i,id, values[0],values[1],values[2],values[3],values[3],values[4],values[5],
+						values[6], values[7] );
+				res ++;
+			}
+		}
+	}
+	return res;
+}
+
+static	void	update_curve_surroundings()
+{
+	sample_slot_t *s = info->selected_slot;
+	if(!s)
+		return;
+	int i = info->uc.selected_chain_entry; /* chain entry */
+	int j = info->uc.selected_parameter_id;
+
+	key_parameter_t *key = s->ec->effects[i]->parameters[j];
+
+	/* Restore AKF status */
+	set_toggle_button( "curve_toggleglobal", s->ec->enabled );
+	/* Restore AKF entry toggle */
+	set_toggle_button( "curve_toggleentry", s->ec->effects[i]->enabled  );
+	/* Positions changed (sample/marker) */
+	int changed = 0;
+
+	if(key->min != info->status_tokens[SAMPLE_START] )
+	{	key->min = info->status_tokens[SAMPLE_START]; changed = 1; }
+	if(key->max != info->status_tokens[SAMPLE_END] )
+	{	key->max = info->status_tokens[SAMPLE_END]; changed = 1; }
+
+	if(changed)
+	{
+		update_spin_range( "curve_spinstart", key->min, key->max, key->min );
+		update_spin_range( "curve_spinend", key->min,key->max, key->max );
+	}
+
+	// Set start/end timecodes
+	gchar *start_time = format_time(
+			key->min );
+	gchar *end_time = format_time(
+			key->max );
+	update_label_str( "curve_starttime", start_time );
+	update_label_str( "curve_endtime", end_time );
+
+	g_free(start_time);
+	g_free(end_time);
+
+	struct tog_w {
+		const char *name;
+	} tog_w[] = {
+		"curve_typelinear",
+		"curve_typespline",
+		"curve_typefreehand"
+	};
+
+	// Check me: on the fly redraw of curve !
+	if( key->type == GTK_CURVE_TYPE_LINEAR )
+		set_toggle_button( tog_w[0].name,1 );
+	else
+		if(key->type == GTK_CURVE_TYPE_SPLINE )
+			set_toggle_button( tog_w[1].name ,1);
+		else
+			set_toggle_button( tog_w[2].name ,1);
+
+	set_toggle_button( "curve_togglerun" , key->running );
+
+}
+
+static  void	update_curve_widget(const char *name)
+{
+	GtkWidget *curve = glade_xml_get_widget_( info->main_window,name);
+	sample_slot_t *s = info->selected_slot;
+	if(!s)
+		return;
+	int i = info->uc.selected_chain_entry; /* chain entry */
+	int j = info->uc.selected_parameter_id;
+
+	key_parameter_t *key = s->ec->effects[i]->parameters[j];
+	set_parameter_key( key , curve );
+}
+
+static	void	update_curve_accessibility(const char *name)
+{
+	GtkWidget *curve = glade_xml_get_widget_( info->main_window,name);
+	sample_slot_t *s = info->selected_slot;
+	if(!s)
+		return;
+	int i;
+
+
+
+	if( info->uc.entry_tokens[ENTRY_FXID] <= 0 || !info->selected_slot)
+	{
+		disable_widget( "curve_table" );
+		disable_widget( "curve" );
+	}
+	else
+	{
+		if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE)
+		{
+			enable_widget( "curve_table" );
+			enable_widget( "curve" );
+		}
+	}		
 }
 
 static	int	get_nums(const char *name)
@@ -1892,6 +2179,39 @@ static	void	update_slider_value(const char *name, gint value, gint scale)
 	gtk_adjustment_set_value(
 		GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment), gvalue );	
 }
+static void 	update_knob_value(GtkWidget *w, gdouble value, gdouble scale)
+{
+	GtkAdjustment *adj = gtk_knob_get_adjustment(w);
+	gdouble gvalue;
+
+	if(scale) gvalue = (gdouble) value / (gdouble) scale;
+	else gvalue = (gdouble) value;
+
+	gtk_adjustment_set_value(adj, gvalue );	
+}
+
+
+static  void	update_knob_range(GtkWidget *w, gdouble min, gdouble max, gdouble value, gint scaled)
+{
+	GtkAdjustment *adj = gtk_knob_get_adjustment(w);
+
+	if(!scaled)
+	{
+	    adj->lower = min;
+	    adj->upper = max;
+	    adj->value = value;	
+	}
+	else
+	{
+	    gdouble gmin =0.0;
+	    gdouble gmax =100.0;
+	    gdouble gval = gmax / value;
+	    adj->lower = gmin;
+	    adj->upper = gmax;
+	    adj->value = gval;		    
+	}	
+}
+
 
 static	void	update_spin_range(const char *name, gint min, gint max, gint val)
 {
@@ -1899,6 +2219,22 @@ static	void	update_spin_range(const char *name, gint min, gint max, gint val)
 	if(!w) return;
 	gtk_spin_button_set_range( GTK_SPIN_BUTTON(w), (gdouble)min, (gdouble) max );
 	gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble)val);
+}
+static	int	get_mins(const char *name)
+{
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
+	if(!w) return 0;
+	GtkAdjustment *adj = gtk_spin_button_get_adjustment( GTK_SPIN_BUTTON(w) );
+	return (int) adj->lower;
+}
+
+
+static	int	get_maxs(const char *name)
+{
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
+	if(!w) return 0;
+	GtkAdjustment *adj = gtk_spin_button_get_adjustment( GTK_SPIN_BUTTON(w) );
+	return (int) adj->upper;
 }
 
 static	void	update_spin_value(const char *name, gint value )
@@ -2075,6 +2411,42 @@ static	void	v4l_expander_toggle(int mode)
 	gtk_expander_set_expanded( e ,(mode==0 ? FALSE : TRUE) );
 }
 
+
+
+static  GdkPixbuf	*update_pixmap_kf( int status )
+{
+	char path[MAX_PATH_LEN];
+	char filename[MAX_PATH_LEN];
+	bzero(path,MAX_PATH_LEN);
+
+	sprintf(filename, "fx_entry_%s.png", ( status == 1 ? "on" : "off" ));
+	get_gd(path,NULL, filename);
+		
+	GError *error = NULL;
+	GdkPixbuf *toggle = gdk_pixbuf_new_from_file( path , &error);
+	if(error)
+	{
+	fprintf(stderr, "[%s\n" , error->message );
+		return NULL;
+	}
+	return toggle;
+}	
+static  GdkPixbuf	*update_pixmap_entry( int status )
+{
+	char path[MAX_PATH_LEN];
+	char filename[MAX_PATH_LEN];
+	bzero(path,MAX_PATH_LEN);
+
+	sprintf(filename, "fx_entry_%s.png", ( status == 1 ? "on" : "off" ));
+	get_gd(path,NULL, filename);
+
+	GError *error = NULL;
+	GdkPixbuf *icon = gdk_pixbuf_new_from_file(path, &error);
+	if(error)
+		return 0;
+	return icon;
+}	
+
 static gboolean
 chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
              gpointer data)
@@ -2083,30 +2455,35 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 	vj_gui_t *gui = (vj_gui_t*) data;
 	int entry = gui->uc.selected_chain_entry;
 	int effect_id = gui->uc.entry_tokens[ ENTRY_FXID ];
-	guint gentry;
-
-    /* Note: here we use 'iter' and not '&iter', because we did not allocate
-     *  the iter on the stack and are already getting the pointer to a tree iter */
-
+	gint gentry = 0;
 	gtk_tree_model_get (model, iter,
                         FXC_ID, &gentry, -1);
 
-	if( gentry == entry && effect_id <= 0 )
+	if(gentry == entry)
 	{
-		gtk_list_store_set( GTK_LIST_STORE(model), iter, 0 , FALSE, - 1);
-	}	
-	if( gentry == entry && effect_id > 0)
+	if( effect_id <= 0 )
+	{
+	//	gtk_list_store_set( GTK_LIST_STORE(model), iter, 0 , FALSE, - 1);
+		gtk_list_store_set( GTK_LIST_STORE(model),iter, FXC_ID, entry,
+			FXC_FXID, "", FXC_FXSTATUS, NULL, FXC_KF, NULL , -1);
+	}
+	else
 	{
 		gchar *descr = _utf8str( _effect_get_description( effect_id ));
-		gchar toggle[5];
-		sprintf(toggle, "%s", ( gui->uc.entry_tokens[ ENTRY_FXSTATUS ] == 1 ? "on" : "off" ));
+		sample_slot_t *s = info->selected_slot;
+		int on = s->ec->effects[entry]->enabled;
+		GdkPixbuf *toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_FXSTATUS] );
+		GdkPixbuf *kf_toggle = update_pixmap_kf( on );
 		gtk_list_store_set( GTK_LIST_STORE(model),iter,
 			FXC_ID, entry,
 			FXC_FXID, descr,
-			FXC_FXSTATUS, toggle, -1 );
+			FXC_FXSTATUS, toggle,
+			FXC_KF, kf_toggle, -1 );
 		g_free(descr);
+		g_object_unref( kf_toggle );
+		g_object_unref( toggle );
 	}
-
+	}
 
   return FALSE;
 }
@@ -2128,12 +2505,14 @@ static	void	update_status_accessibility(int pm)
 				disable_widget("frame_sampleproperties");
 				for(i=0; videowidgets[i].name != NULL; i++)
 					disable_widget( videowidgets[i].name);
+				disable_widget_by_pointer(info->speed_knob);
 
 			}
 			else
 			{
 				for(i=0; videowidgets[i].name != NULL; i++)
 					enable_widget( videowidgets[i].name);
+				enable_widget_by_pointer(info->speed_knob);	
 			}
 
 			if( pm == MODE_SAMPLE )
@@ -2169,15 +2548,39 @@ static	void	update_status_accessibility(int pm)
    This function updates the sample/stream editor if the current playing stream/sample
    matches with the selected sample slot */
 
+static	void	update_record_tab(int pm)
+{
+	if(pm == MODE_STREAM)
+	{
+		update_spin_value( "spin_streamduration" , 1 );
+		gint n_frames = get_nums( "spin_streamduration" );
+		gchar *time = format_time(n_frames);
+		update_label_str( "label_streamrecord_duration", time );
+		g_free(time);
+	}
+	if(pm == MODE_SAMPLE)
+	{
+		update_spin_value( "spin_sampleduration", 1 );
+		// combo_samplecodec
+		gint n_frames = sample_calctime();
+		gchar *time = format_time( n_frames );
+		update_label_str( "label_samplerecord_duration", time );
+		g_free(time);
+	}
+}
+
 static void	update_current_slot(int pm)
 {
 	gchar *time = format_time( info->status_tokens[FRAME_NUM] - info->status_tokens[SAMPLE_START]);
-	int pm = info->status_tokens[PLAY_MODE];
 	int *history = info->history_tokens[pm];
 
 	update_label_str( "label_sampleposition", time);
 	g_free(time); 
 	gint update = 0;
+
+//	if( pm == MODE_SAMPLE )
+//		if( animate_parameters() )
+//		
 
 	/* Mode changed or ID changed, 
 	   Reload FX Chain, Reload current entry and disable widgets based on stream type */
@@ -2188,6 +2591,8 @@ static void	update_current_slot(int pm)
 		info->uc.reload_hint[HINT_CHAIN] = 1;
 		update = 1;
 
+		update_record_tab( pm );
+	
 		if( info->status_tokens[STREAM_TYPE] == STREAM_WHITE )
 		{
 			enable_widget( "colorselection" );
@@ -2212,23 +2617,14 @@ static void	update_current_slot(int pm)
 			v4l_expander_toggle(0);
 		}
 
-		if(pm == MODE_PLAIN)
+		
+
+		if( pm == MODE_PLAIN )
 		{
-			if(info->selected_gui_slot != NULL || info->selected_slot != NULL )
-				set_activation_of_slot_in_samplebank( false );
-		}
-		else
-		{
-			int poke_slot = 0;
-			int bank_page = find_bank_by_sample( info->status_tokens[CURRENT_ID], pm, &poke_slot );
-			if(bank_page >= 0 )
-			{
-				if(info->selected_gui_slot != NULL || info->selected_slot != NULL )
-					set_activation_of_slot_in_samplebank( false );
-				info->selected_gui_slot = info->sample_banks[bank_page]->gui_slot[poke_slot];
-				info->selected_slot = info->sample_banks[bank_page]->slot[poke_slot];
-				set_activation_of_slot_in_samplebank(true);
-			}
+			if(info->selected_slot)	 
+				set_activation_of_slot_in_samplebank(false);
+			info->selected_slot = NULL;
+			info->selected_gui_slot = NULL;
 		}
 	}
 	/* Actions for stream */
@@ -2269,10 +2665,12 @@ static void	update_current_slot(int pm)
 			 	"spin_samplestart", 0, info->status_tokens[TOTAL_FRAMES], 0 );
 			update_spin_range(
 				"spin_sampleend", 0, info->status_tokens[TOTAL_FRAMES], 0 );
+
+		
 		}
 
 		/* Update label and video slider*/
-		update_label_i( "label_samplepos",
+		update_label_i( "label_sampleposition",
 			info->status_tokens[FRAME_NUM] - info->status_tokens[SAMPLE_START] , 1);
 
 
@@ -2280,24 +2678,44 @@ static void	update_current_slot(int pm)
 
 		int tf = info->status_tokens[TOTAL_FRAMES];
 		int marker_go = 0;
-
 		/* Update marker bounds */
 		if( (history[SAMPLE_MARKER_START] != info->status_tokens[SAMPLE_MARKER_START]) )
 		{
-			info->uc.marker.lower_bound = info->status_tokens[SAMPLE_MARKER_START] -
-				info->status_tokens[SAMPLE_START];
-			if(info->uc.marker.lower_bound == info->status_tokens[SAMPLE_START])
-				info->uc.marker.lower_bound = 0;
-			marker_go = 1;
+			gint nm =  info->status_tokens[SAMPLE_MARKER_START];
+			if(nm >= 0)
+			{
+				gdouble in = (1.0 / (gdouble)info->status_tokens[TOTAL_FRAMES]) * nm;
+				timeline_set_in_point( info->tl, in );
+				marker_go = 1;
+			}
+			else
+			{
+				if(pm == MODE_SAMPLE)
+				{
+					timeline_set_in_point( info->tl, 0.0 );
+					marker_go = 1;
+				}
+			}
 		}
 
 		if( (history[SAMPLE_MARKER_END] != info->status_tokens[SAMPLE_MARKER_END]) )
 		{
-			info->uc.marker.upper_bound = 	info->status_tokens[SAMPLE_END] -
-					info->status_tokens[SAMPLE_MARKER_END];
-			if(info->uc.marker.upper_bound == info->status_tokens[SAMPLE_END] )
-				info->uc.marker.upper_bound = 0;
-			marker_go = 1;
+			gint nm = info->status_tokens[SAMPLE_MARKER_END];
+			if(nm > 0 )
+			{
+				gdouble out = (1.0/ (gdouble)info->status_tokens[TOTAL_FRAMES]) * nm;
+		
+				timeline_set_out_point( info->tl, out );
+				marker_go = 1;
+			}
+			else
+			{
+				if(pm == MODE_SAMPLE)
+				{
+					timeline_set_out_point(info->tl, 1.0 );
+					marker_go = 1;
+				}
+			}
 		}
 	
 		if( (history[SAMPLE_START] != info->status_tokens[SAMPLE_START] ))
@@ -2313,14 +2731,7 @@ static void	update_current_slot(int pm)
 		
 		if( marker_go )
 		{
-			int abs_start = info->status_tokens[SAMPLE_START];
-			int abs_end   = info->status_tokens[SAMPLE_END];
-			int re = abs_end - abs_start;
-			double mul = (double) re;
-			gdouble value_start = ( mul > 0.0 ?  info->uc.marker.lower_bound / mul : 0.0) ;
-			gdouble value_end = (mul > 0.0 ? info->uc.marker.upper_bound / mul: 0.0 );
-			update_slider_gvalue( "slider_m0", value_start );
-			update_slider_gvalue( "slider_m1", value_end );
+			info->uc.reload_hint[HINT_MARKER] = 1;	
 		}
 
 		if( history[SAMPLE_LOOP] != info->status_tokens[SAMPLE_LOOP])
@@ -2347,6 +2758,7 @@ static void	update_current_slot(int pm)
 			if( speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
 			if( speed < 0 ) speed *= -1;
 			update_spin_value( "spin_samplespeed", speed);
+			update_knob_value(info->speed_knob, speed, 0);
 		}
 
 		if(update)
@@ -2375,9 +2787,7 @@ static void	update_current_slot(int pm)
 		
 			gint n_frames = sample_calctime();
 			time = format_time( n_frames );
-			update_label_str( "label_samplerecord_duration", time );
-			info->uc.sample_rec_duration = n_frames;
-			g_free(time);
+
 		}
 	}
 
@@ -2396,7 +2806,6 @@ static void 	update_globalinfo()
 	int pm = info->status_tokens[PLAY_MODE];
 	int *history = info->history_tokens[pm];
 	int stream_changed = 0;
-	int sample_changed = 0;
 	gint	i;
 
 	info->uc.playmode = pm;
@@ -2405,19 +2814,29 @@ static void 	update_globalinfo()
 	if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
 		info->status_tokens[PLAY_MODE] != info->prev_mode )
 	{
-		if( pm == MODE_SAMPLE || MODE_STREAM )
+		if( pm == MODE_SAMPLE || pm == MODE_STREAM )
 		{
 			info->uc.reload_hint[HINT_ENTRY] = 1;	
 			info->uc.reload_hint[HINT_CHAIN] = 1;
 		}
 		if( pm != MODE_STREAM )
 			info->uc.reload_hint[HINT_EL] = 1;
+		if( pm == MODE_SAMPLE )
+			info->uc.reload_hint[HINT_KF] = 1;
+
+		if( pm == MODE_SAMPLE )
+			timeline_set_selection( info->tl, TRUE );
+		else
+			timeline_set_selection( info->tl, FALSE );
+		timeline_set_length( info->tl,
+			(gdouble) info->status_tokens[TOTAL_FRAMES] , info->status_tokens[FRAME_NUM]);
+
 	}
 
 	if( info->status_tokens[TOTAL_SLOTS] !=
-		history[TOTAL_SLOTS] && info->status_tokens[TOTAL_SLOTS]!= info->uc.expected_slots )
+		history[TOTAL_SLOTS] 
+			|| info->status_tokens[TOTAL_SLOTS] != info->uc.expected_slots )
 	{
-		fprintf(stderr, "Reloading samples\n");
 		info->uc.reload_hint[HINT_SLIST] = 1;
 	}
 
@@ -2446,6 +2865,16 @@ static void 	update_globalinfo()
 
 	if(info->status_lock )
 	{
+		if( history[TOTAL_FRAMES] != info->status_tokens[TOTAL_FRAMES] )
+		{
+			timeline_set_length( info->tl,
+				(gdouble) info->status_tokens[TOTAL_FRAMES] , info->status_tokens[FRAME_NUM]);
+		}
+		else
+		if( history[FRAME_NUM] != info->status_tokens[FRAME_NUM] )
+			timeline_set_pos( info->tl, (gdouble) info->status_tokens[FRAME_NUM] );
+
+/*
 		if( history[FRAME_NUM] != info->status_tokens[FRAME_NUM])
 		{
 			if(pm == MODE_STREAM)
@@ -2462,21 +2891,15 @@ static void 	update_globalinfo()
 				gint f = info->status_tokens[FRAME_NUM] - info->status_tokens[SAMPLE_START];
 				gint m = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
 				update_slider_value( "videobar",f,m);
+
 			}
 			
-		}
+		} */
 	}
-
-	/* Update current playing sample in dialog window */
-	update_current_slot(pm);
-	
-	
 	if( history[CURRENT_ID] != info->status_tokens[CURRENT_ID] )
 	{
 		if(pm == MODE_SAMPLE || pm == MODE_STREAM)
-		{
 			update_label_i( "label_currentid", info->status_tokens[CURRENT_ID] ,0);
-		}
 	}
 
 	if( history[STREAM_RECORDING] != info->status_tokens[STREAM_RECORDING] )
@@ -2489,7 +2912,6 @@ static void 	update_globalinfo()
 		}
 	}
 
-
 	if( pm == MODE_PLAIN )
 	{
 		if( history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] )
@@ -2497,46 +2919,142 @@ static void 	update_globalinfo()
 			int plainspeed =  info->status_tokens[SAMPLE_SPEED];
 			if( plainspeed < 0 ) info->play_direction = -1; else info->play_direction = 1;
 			if( plainspeed < 0 ) plainspeed *= -1;
-			update_slider_value( "speedslider", plainspeed, 0);
+		//	update_slider_value( "speedslider", plainspeed, 0);
+			update_knob_value( info->speed_knob, plainspeed, 0 );
 		}
 	}
+
+	/* Update current playing sample in dialog window */
+	update_current_slot(pm);
+
+	if( (pm == MODE_SAMPLE || pm == MODE_STREAM ) )
+	{
+		int upd = 0;
+		if(info->selected_slot)
+		{
+			if( info->selected_slot->sample_id != info->status_tokens[CURRENT_ID] ||
+			    info->selected_slot->sample_type != pm )
+			{
+				set_activation_of_slot_in_samplebank(false);
+				info->selected_slot = NULL;
+			}	
+		}
+		if(!info->selected_slot )
+			upd = 1;
+		else
+		if( info->selected_slot->sample_id != info->status_tokens[CURRENT_ID] ||
+		    info->selected_slot->sample_type != pm )
+			{
+			set_activation_of_slot_in_samplebank(false);
+			}
+
+	}
+
+	if(info->selected_slot && info->selected_gui_slot )
+	{
+			
+		gveejay_update_image( info->selected_slot,info->selected_gui_slot, info->image_dimensions[0],	
+			info->image_dimensions[1] );	
+	}
+
+}	
+
+
+static void	process_reload_hints(void)
+{
+	int pm = info->status_tokens[PLAY_MODE];
+	int *history = info->history_tokens[pm];
 
 	int	*entry_history = &(info->uc.entry_history[0]);
 	int	*entry_tokens = &(info->uc.entry_tokens[0]);
 
-	if(info->uc.reload_hint[HINT_V4L] == 1 )
+	if(info->uc.reload_hint[HINT_V4L] == 1 && pm == MODE_STREAM)
 	{
 		load_v4l_info();
 		vj_msg(VEEJAY_MSG_INFO, "Video4Linux color setup available");
 	}
 
-	if( info->uc.reload_hint[HINT_RGBSOLID] == 1 )
+	if( info->uc.reload_hint[HINT_RGBSOLID] == 1 && pm == MODE_STREAM )
 		update_colorselection();
 
-	if(info->uc.reload_hint[HINT_ENTRY] == 1)
+	if( info->uc.reload_hint[HINT_EL] ==  1 )
+	{
+		load_editlist_info();
+		reload_editlist_contents();
+		vj_msg(VEEJAY_MSG_WARNING, "EditList has changed");
+	}
+	if( info->uc.reload_hint[HINT_SLIST] == 1 )
+	{
+		load_samplelist_info(true);
+		info->uc.expected_slots = info->status_tokens[TOTAL_SLOTS];
+	}
+
+	select_slot();
+
+	if( info->uc.reload_hint[HINT_RECORDING] == 1 && pm != MODE_PLAIN)
+	{
+		if(info->status_tokens[STREAM_RECORDING])
+		{
+			if(!info->uc.recording[pm]) init_recorder( info->status_tokens[STREAM_DURATION], pm );
+		}	
+	}
+
+	if(info->uc.reload_hint[HINT_BUNDLES] == 1 )
+		reload_bundles();
+
+	if( info->selected_slot && info->selected_slot->sample_id == info->status_tokens[CURRENT_ID] &&
+			info->selected_slot->sample_type == 0 && pm == MODE_PLAIN)
+	{
+		if(info->uc.reload_hint[HINT_MARKER] == 1 )
+		{
+			int abs_start = info->status_tokens[SAMPLE_START];
+			int abs_end   = info->status_tokens[SAMPLE_END];
+			gchar *dur = format_time( abs_end - abs_start );
+			update_label_str( "label_markerduration", dur );
+			g_free(dur);
+		}
+		if( history[SAMPLE_FX] != info->status_tokens[SAMPLE_FX])
+		{
+			//also for stream (index is equivalent)
+			if(pm == MODE_SAMPLE)
+				set_toggle_button( "check_samplefx",
+					info->status_tokens[SAMPLE_FX]);
+			if(pm == MODE_STREAM)	
+				set_toggle_button( "check_streamfx",
+					info->status_tokens[SAMPLE_FX]);
+		}
+	}
+	if( info->uc.reload_hint[HINT_CHAIN] == 1 && pm != MODE_PLAIN)
+	{
+		load_effectchain_info(); 
+	}
+
+	if(info->uc.reload_hint[HINT_ENTRY] == 1 && pm != MODE_PLAIN)
 	{
 		char slider_name[10];
 		char button_name[10];
 		gint np = 0;
+		gint i;
 		/* update effect description */
-		load_parameter_info();
+		gint curve_changed_ = load_parameter_info( 
+			info->uc.reload_hint[HINT_KF] );
+		/* Update curve if effect ID changed */
+		if(curve_changed_ && pm == MODE_SAMPLE)
+			info->uc.reload_hint[HINT_KF] = 1;
+
 		if( entry_tokens[ENTRY_FXID] == 0)
 		{
 			put_text( "entry_effectname" ,"" );
-			disable_widget( "button_entry_toggle" );
+			disable_widget( "FXframe" );
 		}
 		else
 		{
 			put_text( "entry_effectname", _effect_get_description( entry_tokens[ENTRY_FXID] ));
-			enable_widget( "button_entry_toggle");
-			set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_FXSTATUS] );
-			np = _effect_get_np( entry_tokens[ENTRY_FXID] );
-			GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
-					info->main_window, "tree_chain") ));
+			enable_widget( "FXframe");
 
-  			gtk_tree_model_foreach(
-                        	model,
-				chain_update_row, (gpointer*) info );
+			set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_FXSTATUS] );
+/* FIXME: Update curve here ?! */
+			np = _effect_get_np( entry_tokens[ENTRY_FXID] );
 			for( i = 0; i < np ; i ++ )
 			{
 				sprintf(slider_name, "slider_p%d",i);
@@ -2551,7 +3069,10 @@ static void 	update_globalinfo()
 				{
 					update_slider_range( slider_name,min,max, value, 0);
 				}
+				sprintf(button_name, "kf_p%d", i );
+				enable_widget( button_name );
 			}
+			vj_kf_select_parameter(0);
 		}
 		update_spin_value( "button_fx_entry", info->uc.selected_chain_entry);	
 
@@ -2565,105 +3086,25 @@ static void 	update_globalinfo()
 			disable_widget( button_name );
 			sprintf( button_name, "dec_p%d", i);
 			disable_widget( button_name );
+			sprintf( button_name, "kf_p%d", i );
+			disable_widget( button_name );
 		}
+			GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
+					info->main_window, "tree_chain") ));
 
+  			gtk_tree_model_foreach(
+                       	model,
+			chain_update_row, (gpointer*) info );
 	}
 
-	if( info->uc.reload_hint[HINT_EL] ==  1 )
+	/* Curve needs update (start/end changed, effect id changed */
+	if ( info->uc.reload_hint[HINT_KF] && pm != MODE_PLAIN )
 	{
-		load_editlist_info();
-		reload_editlist_contents();
-		vj_msg(VEEJAY_MSG_WARNING, "EditList has changed");
-	}
-	if( info->uc.reload_hint[HINT_CHAIN] == 1 )
-	{
-		load_effectchain_info(); 
-	}
-
-	if( info->uc.reload_hint[HINT_SLIST] == 1 )
-	{
-		load_samplelist_info(true);
-		fprintf(stderr, "reloaded sample list from external \n");
-	}
-	
-
-	if( info->uc.reload_hint[HINT_RECORDING] == 1 )
-	{
-		if(info->status_tokens[STREAM_RECORDING])
-		{
-			if(!info->uc.recording[pm]) init_recorder( info->status_tokens[STREAM_DURATION], pm );
-		}	
-	}
-//	gveejay_update_image2(
-//			glade_xml_get_widget_(info->main_window, "imageA"), 176,144 );
-
-
-	if(info->selected_slot && info->selected_gui_slot )
-	{
-			
-		if( info->selected_slot->refresh_image )
-		{
-
-			if( info->selected_slot->sample_id == info->status_tokens[CURRENT_ID] &&
-				info->selected_slot->sample_type == pm )
-			{
-
-			fprintf(stderr, "\trefresh image now for sample %d\n", info->selected_slot->sample_id);
-			gveejay_update_image( info->selected_slot,info->selected_gui_slot, info->image_dimensions[0],	
-				info->image_dimensions[1] );	
-			info->selected_slot->refresh_image = 0;
-			}
-		}	
-		else
-		{
-
-		if( info->selected_slot->sample_id == info->status_tokens[CURRENT_ID])
-		{
-			gveejay_update_image( info->selected_slot,info->selected_gui_slot, info->image_dimensions[0],	
-				info->image_dimensions[1] );	
-		}	
-
-		}
-
+		update_curve_surroundings();
+		update_curve_widget( "curve" );
 	}
 
 
-	if(info->uc.reload_hint[HINT_BUNDLES] == 1 )
-	{
-		reload_bundles();
-	}
-
-	// reload marker
-
-	if( info->selected_slot && info->selected_slot->sample_id == info->status_tokens[CURRENT_ID] &&
-			info->selected_slot->sample_type == 0 )
-	{
-		if(info->uc.reload_hint[HINT_MARKER] == 1 )
-		{
-			int abs_start = info->status_tokens[SAMPLE_START];
-			int abs_end   = info->status_tokens[SAMPLE_END];
-			int re = abs_end - abs_start;
-			if (re == 0 ) re = 1;
-			double mul = (double) re;
-			gdouble value_start = info->uc.marker.lower_bound / mul;
-			gdouble value_end = info->uc.marker.upper_bound / mul;
-		
-			update_slider_gvalue( "slider_m0", value_start );
-			update_slider_gvalue( "slider_m1", value_end );
-		}
-		if( history[SAMPLE_FX] != info->status_tokens[SAMPLE_FX])
-		{
-			//also for stream (index is equivalent)
-			if(pm == MODE_SAMPLE)
-				set_toggle_button( "check_samplefx",
-					info->status_tokens[SAMPLE_FX]);
-			if(pm == MODE_STREAM)	
-				set_toggle_button( "check_streamfx",
-					info->status_tokens[SAMPLE_FX]);
-		}
-	}	
-	// test renew
-	
 	
 	memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));	
 }
@@ -2704,16 +3145,6 @@ static	void	reset_tree(const char *name)
 	
 }
 
-static	void	update_sampleinfo()
-{
-}
-static	void	update_streaminfo()
-{
-
-}
-static	void	update_plaininfo()
-{
-}
 
 // load effect controls
 
@@ -2728,18 +3159,15 @@ gboolean
     if (gtk_tree_model_get_iter(model, &iter, path))
     {
       gint name = 0;
-      gchar *toggle = NULL;	
 
       gtk_tree_model_get(model, &iter, FXC_ID, &name, -1);
-      gtk_tree_model_get(model, &iter, FXC_FXSTATUS, &toggle, -1 );
 
-      if (!path_currently_selected)
+      if (!path_currently_selected && name != info->uc.selected_chain_entry)
       {
 	multi_vims( VIMS_CHAIN_SET_ENTRY, "%d", name );
 	info->uc.reload_hint[HINT_ENTRY] = 1;
      	info->uc.selected_chain_entry = name;
       }
-      if(toggle) g_free(toggle);
     }
 
     return TRUE; /* allow selection state to change */
@@ -2756,10 +3184,8 @@ gboolean
     if (gtk_tree_model_get_iter(model, &iter, path))
     {
       gchar *name = NULL;
-      gchar *toggle = NULL;	
 
       gtk_tree_model_get(model, &iter, FXC_ID, &name, -1);
-      gtk_tree_model_get(model, &iter, FXC_FXSTATUS, &toggle, -1 );
 
       if (!path_currently_selected)
       {
@@ -2778,7 +3204,6 @@ gboolean
 	 }
 
 	if(name) g_free(name);
-	if(toggle) g_free(toggle);
     }
 
     return TRUE; /* allow selection state to change */
@@ -2892,14 +3317,14 @@ static	void	setup_tree_pixmap_column( const char *tree_name, int type, const cha
 static void	setup_effectchain_info( void )
 {
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_chain");
-	GtkListStore *store = gtk_list_store_new( 3, G_TYPE_INT, G_TYPE_STRING, G_TYPE_STRING );
+	GtkListStore *store = gtk_list_store_new( 4, G_TYPE_INT, G_TYPE_STRING, GDK_TYPE_PIXBUF,GDK_TYPE_PIXBUF );
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	g_object_unref( G_OBJECT( store ));
 
 	setup_tree_text_column( "tree_chain", FXC_ID, "Entry" );
 	setup_tree_text_column( "tree_chain", FXC_FXID, "Effect" );
-	setup_tree_text_column( "tree_chain", FXC_FXSTATUS, "Status"); // todo: could be checkbox!!
-	
+	setup_tree_pixmap_column( "tree_chain", FXC_FXSTATUS, "Status"); // todo: could be checkbox!!
+	setup_tree_pixmap_column( "tree_chain", FXC_KF , "KF" ); // parameter interpolation on/off per entry
   	GtkTreeSelection *selection; 
 
 	tree = glade_xml_get_widget_( info->main_window, "tree_chain");
@@ -2931,44 +3356,91 @@ static	void	load_v4l_info()
 		g_free(answer);
 	}
 }
+//FIXME
 
-static	void	load_parameter_info()
+static int verify_interpolator( int effect_id, int num_p )
 {
-	int	*p = &(info->uc.entry_tokens[0]);
+	int reload = 0;
+	gint i = 0;
+	sample_slot_t *s = info->selected_slot;
+	/* Current selected entry changed Effect ID */
+	if( effect_id != info->uc.entry_tokens[ENTRY_FXID])
+		return 1;
+
+	if(s)
+	{
+		if(!effect_id)
+		{
+			vj_kf_delete_parameter(info->uc.selected_chain_entry);
+			reload = 1; 
+		}
+		else
+		{
+		/* Verify all parameters */
+		for( i = 0; i < num_p; i ++ )
+		{
+			key_parameter_t *k = s->ec->effects[(info->uc.selected_chain_entry)]->parameters[i];
+			k->parameter_id = effect_id;
+			reload = 1;
+		}
+		for( i = num_p; i < MAX_PARAMETERS; i ++ )
+		{
+			key_parameter_t *k = s->ec->effects[(info->uc.selected_chain_entry)]->parameters[i];
+			k->parameter_id = 0;
+			reload = 1;
+		}
+		}
+	}
+
+	return reload;
+}
+
+static	gint load_parameter_info(int cv)
+{
+//	int	*p = &(info->uc.entry_tokens[0]);
 	int	len = 0;
+	int	p[15];
+	int 	i;
 
 	multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, 
 		info->uc.selected_chain_entry );
 
 	gchar *answer = recv_vims(3,&len);
 
-	if(len > 0 )
+	if(len < 0 )
 	{
-		int res = sscanf( answer,
-			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-			p+0,p+1,p+2,p+3,p+4,p+5,p+6,p+7,p+8,p+9,p+10,
-			p+11,p+12,p+13,p+14,p+15);
-
-		if( res <= 0 )
-			memset( p, 0, 16 ); 
-
-		info->uc.selected_rgbkey = _effect_get_rgb( p[0] );
-		if(info->uc.selected_rgbkey)
-		{
-			enable_widget( "rgbkey");
-			// update values
-			update_rgbkey();
-			
-		 // enable rgb
-		}  
-     		else
-		{
-		 // disable rgb
-			disable_widget( "rgbkey");
-		} 
-		g_free(answer);
+		if(answer) g_free(answer);
+		return 0;
 	}
-}
+
+	int res = sscanf( answer,
+		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		p+0,p+1,p+2,p+3,p+4,p+5,p+6,p+7,p+8,p+9,p+10,
+		p+11,p+12,p+13,p+14,p+15);
+
+	if( res <= 0 )
+		memset( p, 0, 16 ); 
+
+	info->uc.selected_rgbkey = _effect_get_rgb( p[0] );
+	if(info->uc.selected_rgbkey)
+	{
+		enable_widget( "rgbkey");
+		update_rgbkey();
+	}  
+     	else
+	{
+		disable_widget( "rgbkey");
+	} 
+	g_free(answer);
+		
+	int result = verify_interpolator( p[0],p[2] );
+
+	int *d = &(info->uc.entry_tokens[0] );
+	for( i = 0; i < 16; i ++ )
+		d[i] = p[i];
+
+	return result;
+}	  
 
 // load effect chain
 static	void	load_effectchain_info()
@@ -2978,8 +3450,7 @@ static	void	load_effectchain_info()
 	
 	GtkTreeIter iter;
 	gint offset=0;
-	
-	
+
 	gint fxlen = 0;
 	single_vims( VIMS_CHAIN_LIST );
 	gchar *fxtext = recv_vims(3,&fxlen);
@@ -2999,8 +3470,10 @@ static	void	load_effectchain_info()
 	while( offset < fxlen )
 	{
 		gchar toggle[4];
+		gchar kf_toggle[4];
 		guint arr[6];
 		bzero(toggle,4);
+		bzero(kf_toggle,4);
 		memset(arr,0,sizeof(arr));
 		char line[12];
 		bzero(line,12);
@@ -3008,6 +3481,7 @@ static	void	load_effectchain_info()
 		sscanf( line, "%02d%03d%1d%1d%1d",
 			&arr[0],&arr[1],&arr[2],&arr[3],&arr[4]);
 
+		
 		char *name = _effect_get_description( arr[1] );
 		sprintf(toggle,"%s",
 			arr[3] == 1 ? "on" : "off" );
@@ -3022,15 +3496,27 @@ static	void	load_effectchain_info()
 		if( last_index == arr[0])
 		{
 			gchar *utf8_name = _utf8str( name );
-			gchar *utf8_toggle = _utf8str( toggle );
+			sample_slot_t *s = info->selected_slot;
+			int on = 0;
+			if(s) on = s->ec->effects[last_index]->enabled;
+
 			gtk_list_store_append( store, &iter );
+		/*	gtk_list_store_set( store, &iter,
+				FXC_ID, arr[0],
+				FXC_FXID, utf8_name,
+				FXC_FXSTATUS, utf8_toggle,
+				FXC_KF, utf8_kf, -1 );*/
+			GdkPixbuf *toggle = update_pixmap_entry( arr[3] );
+			GdkPixbuf *kf_toggle = update_pixmap_kf( on );
 			gtk_list_store_set( store, &iter,
 				FXC_ID, arr[0],
 				FXC_FXID, utf8_name,
-				FXC_FXSTATUS, utf8_toggle, -1 );
+				FXC_FXSTATUS, toggle,
+				FXC_KF, kf_toggle, -1 );
 			last_index ++;
 			g_free(utf8_name);
-			g_free(utf8_toggle);
+			g_object_unref( toggle );
+			g_object_unref( kf_toggle );
 		}
 		offset += 8;
 	}
@@ -3043,6 +3529,9 @@ static	void	load_effectchain_info()
 	}
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	g_free(fxtext);
+
+
+	//TODO
 	
 }
 
@@ -3258,7 +3747,6 @@ on_effectlist_sources_row_activated(GtkTreeView *treeview,
 	{
 		gchar *idstr = NULL;
 		gtk_tree_model_get(model,&iter, SL_ID, &idstr, -1);
-		fprintf(stderr, "idstr = %s\n", idstr );
 		gint id = 0;
 		if( sscanf( idstr+1, "%d", &id ) )
 		{
@@ -3371,9 +3859,28 @@ void	on_samplelist_edited(GtkCellRendererText *cell,
 	if(id) g_free(id);
 }
 */
-/*
- *  Creates the effects-sources-list and save the references in global pointers to access them immediately
- */ 
+
+/* Return a bank page and slot number to place sample in */
+
+void	verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_type )
+{
+	int poke_slot = 0;
+	int bank_page = find_bank_by_sample( sample_id, sample_type, &poke_slot );
+			
+	if(bank_page == -1)
+		fprintf(stderr, "BANKS + SLOTS FULL\n");
+
+	if( !bank_exists(bank_page))
+		add_bank( bank_page );
+
+	if(!info->sample_banks[bank_page])
+		fprintf(stderr, "BANK IS NULL\n");
+
+	*bank_page_ = bank_page;
+	*slot_      = poke_slot;
+}
+
+
 void	setup_samplelist_info()
 {
 	effect_sources_tree = glade_xml_get_widget_( info->main_window, "tree_sources");
@@ -3472,7 +3979,25 @@ void	load_effectlist_info()
 	g_free(fxtext);
 	
 }
+static	void	select_slot()
+{
+	if(!info->selected_slot && info->status_tokens[PLAY_MODE] != MODE_PLAIN)
+	{
+		int b = 0; int p = 0;
 
+
+		verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID],
+			info->status_tokens[PLAY_MODE] );
+
+
+fprintf(stderr, "SELECT SLOT %d, %d, %d %d\n", b, p, info->status_tokens[CURRENT_ID],
+		info->status_tokens[PLAY_MODE]);
+
+
+		info->selected_slot = info->sample_banks[b]->slot[p];
+		info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
+	}
+}
 /* execute after sample/stream/mixing sources list update
  * same for load_mixlist_info(), only different widget !! 
  * with_reset_slotselection should be true when the reset
@@ -3484,13 +4009,13 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	int has_samples = 0;
 	int has_streams = 0;
 	int page = 0;
-
+	int n_slots = 0;
 	reset_tree( "tree_sources" );
-	reset_samplebank(with_reset_slotselection);
 
 	single_vims( VIMS_SAMPLE_LIST );
 	gint fxlen = 0;
 	gchar *fxtext = recv_vims(5,&fxlen);
+
 	if(fxlen > 0 && fxtext != NULL)
 	{
 		has_samples = 1;
@@ -3525,18 +4050,16 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
                                    Loading the entire list will be necessary to scan for updated slots.
 		                   The sample itself is updated automatically on edit() or play()
 				 */
-				int poke_slot = 0;
-				int bank_page = find_bank_by_sample( int_id, 0, &poke_slot );
+				int poke_slot= 0; int bank_page = 0;
+				verify_bank_capacity( &bank_page , &poke_slot, int_id, 0);
 				if(bank_page >= 0 )
 				{			
-					if(!info->sample_banks[bank_page] )
-						add_bank(bank_page);
-
 					if( info->sample_banks[bank_page]->slot[poke_slot]->sample_id <= 0 )
 					{
 						sample_slot_t *tmp_slot = create_temporary_slot(poke_slot,int_id,0, title,timecode );
 						add_sample_to_sample_banks(bank_page, tmp_slot );					
-						free_slot(tmp_slot);				
+						free_slot(tmp_slot);	
+						n_slots ++;			
 					}
 					else
 					{
@@ -3556,81 +4079,80 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 
 	single_vims( VIMS_STREAM_LIST );
 	fxtext = recv_vims(5, &fxlen);
-
-	has_streams = 1;
-	while( offset < fxlen )
+	if( fxlen > 0 && fxtext != NULL)
 	{
-		char tmp_len[4];
-		bzero(tmp_len, 4);
-		strncpy(tmp_len, fxtext + offset, 3 );
-
-		int  len = atoi(tmp_len);
-		offset += 3;
-		if(len > 0)
+		has_streams = 1;
+		while( offset < fxlen )
 		{
-			char line[300];
-			char source[255];
-			char descr[255];
-			bzero( line, 300 );
-			bzero( descr, 255 );
-			bzero( source, 255 ); 
-			strncpy( line, fxtext + offset, len );
-
-			int values[4];
-
-			sscanf( line, "%05d%02d%03d%03d%03d%03d%03d%03d",
-				&values[0], &values[1], &values[2], 
-				&values[3], &values[4], &values[5],
-				&values[6], &values[7]
-			);
-			strncpy( descr, line + 22, values[6] );
-			switch( values[1] )
+			char tmp_len[4];
+			bzero(tmp_len, 4);
+			strncpy(tmp_len, fxtext + offset, 3 );
+	
+			int  len = atoi(tmp_len);
+			offset += 3;
+			if(len > 0)
 			{
-				case STREAM_VIDEO4LINUX :sprintf(source,"Video4Linux stream");break;
-				case STREAM_WHITE	:sprintf(source,"Solid stream"); 
-							 sprintf(descr,"infinite"); 
-							 break;
-				case STREAM_MCAST	:sprintf(source,"Multicast stream");break;
-				case STREAM_NETWORK	:sprintf(source,"Unicast stream");break;
-				case STREAM_YUV4MPEG	:sprintf(source,"Yuv4Mpeg file stream");break;
-				case STREAM_AVFORMAT	:sprintf(source,"libavformat stream");break;
-				case STREAM_DV1394	:sprintf(source,"DV1394 Camera stream");break;
-				case STREAM_PICTURE	:sprintf(source,"Image stream");break;
-				default:
-					sprintf(source,"Streaming from unknown");	
-			}
-			gchar *gsource = _utf8str( descr );
-			gchar *gtype = _utf8str( source );
-
-			// add to effect-sources-lists tree
-		//	add_sample_to_effect_sources_list(values[0], values[1], gtype, gsource);				
-				
-			// add to sample_banks
-		//	add_sample_to_sample_banks(values[0], values[1], gtype, gsource);							
-			int poke_slot = 0;
-			int bank_page = find_bank_by_sample( values[0], 1, &poke_slot );
-
-			if(bank_page >= 0 )
-			{			
-				if(!info->sample_banks[bank_page] )
-					add_bank(bank_page);
-
-				if( info->sample_banks[bank_page]->slot[poke_slot] <= 0 )
-				{				
-					sample_slot_t *tmp_slot = create_temporary_slot(poke_slot,values[0],1, gtype,gsource );
-					add_sample_to_sample_banks(bank_page, tmp_slot );					
-					free_slot(tmp_slot);	
-				}
-				else
+				char line[300];
+				char source[255];
+				char descr[255];
+				bzero( line, 300 );
+				bzero( descr, 255 );
+				bzero( source, 255 ); 
+				strncpy( line, fxtext + offset, len );
+	
+				int values[4];
+	
+				sscanf( line, "%05d%02d%03d%03d%03d%03d%03d%03d",
+					&values[0], &values[1], &values[2], 
+					&values[3], &values[4], &values[5],
+					&values[6], &values[7]
+				);
+				strncpy( descr, line + 22, values[6] );
+				switch( values[1] )
 				{
-					update_sample_slot_data( bank_page, poke_slot, values[0],1,gsource,gtype);
+					case STREAM_VIDEO4LINUX :sprintf(source,"Video4Linux stream");break;
+					case STREAM_WHITE	:sprintf(source,"Solid stream"); 
+								 sprintf(descr,"infinite"); 
+								 break;
+					case STREAM_MCAST	:sprintf(source,"Multicast stream");break;
+					case STREAM_NETWORK	:sprintf(source,"Unicast stream");break;
+					case STREAM_YUV4MPEG	:sprintf(source,"Yuv4Mpeg file stream");break;
+					case STREAM_AVFORMAT	:sprintf(source,"libavformat stream");break;
+					case STREAM_DV1394	:sprintf(source,"DV1394 Camera stream");break;
+					case STREAM_PICTURE	:sprintf(source,"Image stream");break;
+					default:
+					sprintf(source,"Streaming from unknown");	
 				}
-			}
+				gchar *gsource = _utf8str( descr );
+				gchar *gtype = _utf8str( source );
 
-			g_free(gsource);
-			g_free(gtype);
+				// add to effect-sources-lists tree
+			//	add_sample_to_effect_sources_list(values[0], values[1], gtype, gsource);				
+					
+				// add to sample_banks
+			//	add_sample_to_sample_banks(values[0], values[1], gtype, gsource);							
+				int bank_page = 0; int poke_slot = 0;
+				verify_bank_capacity( &bank_page , &poke_slot, values[0], 1);
+				if(bank_page >= 0 )
+				{			
+					if( info->sample_banks[bank_page]->slot[poke_slot] <= 0 )
+					{				
+						sample_slot_t *tmp_slot = create_temporary_slot(poke_slot,values[0],1, gtype,gsource );
+						add_sample_to_sample_banks(bank_page, tmp_slot );								n_slots ++;
+						free_slot(tmp_slot);	
+					}
+					else
+					{
+					update_sample_slot_data( bank_page, poke_slot, values[0],1,gsource,gtype);
+					}
+				}
+
+				g_free(gsource);
+				g_free(gtype);
+			}
+			offset += len;
 		}
-		offset += len;
+
 	}
 
 	g_free(fxtext);
@@ -4516,12 +5038,15 @@ static	void	load_editlist_info()
 	if( values[4] == 0 )
 	{
 		disable_widget( "button_5_4");
-		disable_widget( "audiovolume");
+		disable_widget_by_pointer(info->audiovolume_knob);	
+//		disable_widget( "audiovolume");
 	}
 	else
 	{
 		enable_widget( "button_5_4");
-		enable_widget( "audiovolume");
+		enable_widget_by_pointer(info->audiovolume_knob);
+
+	//	enable_widget( "audiovolume");
 	}
 	g_free(res);
 }
@@ -4533,6 +5058,14 @@ static	void	disable_widget(const char *name)
 	{
 		 gtk_widget_set_sensitive( GTK_WIDGET(w), FALSE );
 	}
+}
+static	void	disable_widget_by_pointer(GtkWidget *w)
+{
+        gtk_widget_set_sensitive( GTK_WIDGET(w), FALSE );
+}
+static	void	enable_widget_by_pointer(GtkWidget *w)
+{
+        gtk_widget_set_sensitive( GTK_WIDGET(w), TRUE );
 }
 static	void	enable_widget(const char *name)
 {
@@ -4638,7 +5171,7 @@ static	gboolean	update_imageA( gpointer data )
 {
 	
 	if( info->state == STATE_PLAYING )
-	gveejay_update_image2(
+		gveejay_update_image2(
 			glade_xml_get_widget_(info->main_window, "imageA"), 176,144 );
 
 	return TRUE;
@@ -4772,6 +5305,14 @@ static void	update_gui()
 
 
 	update_globalinfo();
+
+	process_reload_hints();
+
+	if( pm == MODE_SAMPLE)
+		interpolate_parameters();
+
+	update_curve_accessibility("curve");
+
 }
 
 static	void	get_gd(char *buf, char *suf, const char *filename)
@@ -5165,6 +5706,10 @@ void 	vj_gui_init(char *glade_file)
 		gui->history_tokens[i] = (int*) vj_malloc(sizeof(int) * STATUS_TOKENS);
 		memset( gui->history_tokens[i], 0xffff, sizeof(int) *STATUS_TOKENS);
 	}
+
+	gui->sequence_banks = (sequence_bank_t**) vj_malloc(sizeof(sequence_bank_t*) * SEQUENCE_LENGTH );
+	memset( gui->sequence_banks, 0, sizeof( sequence_bank_t*) * NUM_BANKS );
+
 	gui->uc.reload_force_avoid = false;
 
 /*	if(info || )
@@ -5185,6 +5730,21 @@ void 	vj_gui_init(char *glade_file)
 	info = gui;
 
 	glade_xml_signal_autoconnect( gui->main_window );
+	GtkWidget *frame = glade_xml_get_widget_( info->main_window, "markerframe" );
+	info->tl = timeline_new();
+	gtk_widget_set_size_request(frame, 200,14 );
+	g_signal_connect( info->tl, "pos_changed",
+		(GCallback) on_timeline_value_changed, NULL );
+	g_signal_connect( info->tl, "in_point_changed",
+		(GCallback) on_timeline_in_point_changed, NULL );
+	g_signal_connect( info->tl, "out_point_changed",
+		(GCallback) on_timeline_out_point_changed, NULL );
+	
+
+	gtk_widget_show(frame);
+	gtk_container_add( GTK_CONTAINER(frame), info->tl );
+	gtk_widget_show(info->tl);
+
 
 
 	g_timeout_add_full( G_PRIORITY_DEFAULT_IDLE, 500, is_alive, (gpointer*) info,NULL);
@@ -5209,7 +5769,10 @@ void 	vj_gui_init(char *glade_file)
 	gtk_notebook_set_tab_pos( GTK_NOTEBOOK(info->sample_bank_pad), GTK_POS_BOTTOM );
 	gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET(info->sample_bank_pad), TRUE, TRUE, 0);
 	gtk_widget_show( info->sample_bank_pad );
+
+
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
+	setup_knobs();
 	setup_vimslist();
 	setup_effectchain_info();
 	setup_effectlist_info();
@@ -5227,6 +5790,7 @@ void 	vj_gui_init(char *glade_file)
 	vj_gui_disable();
 
 }
+
 static	gboolean	update_log(gpointer data)
 {
 	if(info->state != STATE_PLAYING)
@@ -5304,7 +5868,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		);
 
 
-//	info->logging = g_timeout_add( 400, update_log,(gpointer*) info );
+//	info->logging = g_timeout_add( 600, update_log,(gpointer*) info );
 
 	init_cpumeter();
 
@@ -5314,14 +5878,16 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	reload_vimslist();
 	reload_editlist_contents();
 	reload_bundles();
-	load_samplelist_info(true);
+//	load_samplelist_info(true);
 
-
+	info->uc.reload_hint[HINT_SLIST] = 1;
+ 
 	int speed = info->status_tokens[SAMPLE_SPEED];
 	if( speed < 0 ) info->play_direction = -1; else info->play_direction=1;
 	if( speed < 0 ) speed *= -1;
-	update_slider_range( "speedslider",0,68, speed, 0);
+	//update_slider_range( "speedslider",0,68, speed, 0);
 
+	update_knob_range(info->speed_knob, 1,13, speed, 0);
 
 	return 1;
 }
@@ -5381,7 +5947,9 @@ gboolean	is_alive(gpointer data)
 	if( gui->state == STATE_PLAYING )
 	{
 		if(!gui->sensitive)
+		{
 			vj_gui_enable();
+		}
 	}
 
 	if( gui->state == STATE_IDLE )
@@ -5415,7 +5983,6 @@ void	vj_gui_disconnect()
 	reset_tree("tree_effectlist");
 	reset_tree("tree_effectmixlist");
 	reset_tree("tree_chain");
-	reset_samplebank(true);
 	reset_tree("tree_sources");
 	reset_tree("editlisttree");
 	
@@ -5438,13 +6005,15 @@ void	vj_gui_disable()
 	int i = 0;
 	while( gwidgets[i].name != NULL )
 	{
-	 GtkWidget *w = glade_xml_get_widget_( 
-				info->main_window, gwidgets[i].name);
-	 gtk_widget_set_sensitive( GTK_WIDGET(w), FALSE );
+	 disable_widget( gwidgets[i].name );
 	 i++;
 	}
+
+	disable_widget_by_pointer(info->audiovolume_knob);		
+	disable_widget_by_pointer(info->speed_knob);	
 	gtk_widget_set_sensitive( GTK_WIDGET(
 			glade_xml_get_widget_(info->main_window, "button_loadconfigfile") ), TRUE );
+
 	info->sensitive = 0;
 }
 
@@ -5453,12 +6022,12 @@ void	vj_gui_enable()
 	int i =0;
 	while( gwidgets[i].name != NULL)
 	{
-	 GtkWidget *w = glade_xml_get_widget_(
-				info->main_window, gwidgets[i].name );
-	 gtk_widget_set_sensitive( GTK_WIDGET(w), TRUE );
-	 i++;
+		enable_widget( gwidgets[i].name );
+		 i++;
 	}
 
+	enable_widget_by_pointer(info->audiovolume_knob);		
+	enable_widget_by_pointer(info->speed_knob);		
 	// disable loadconfigfile
 	gtk_widget_set_sensitive( GTK_WIDGET(
 			glade_xml_get_widget_(info->main_window, "button_loadconfigfile") ), FALSE );
@@ -5582,6 +6151,8 @@ static int	add_bank( gint bank_num  )
 	sprintf(str_label, "%d", bank_num );
 	sprintf(frame_label, "Samples %d to %d", (bank_num * NUM_SAMPLES_PER_PAGE), (bank_num * NUM_SAMPLES_PER_PAGE) + NUM_SAMPLES_PER_PAGE  );
 	/* Check image dimensions */
+
+	fprintf(stderr, "%s : %d\n", __FUNCTION__, bank_num );
 	if( info->image_dimensions[0] == 0 && info->image_dimensions[1] == 0 )
 		setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 
@@ -5616,7 +6187,7 @@ static int	add_bank( gint bank_num  )
 	GtkWidget *sb = info->sample_bank_pad;
 	GtkFrame *frame = gtk_frame_new(frame_label);
 	GtkWidget *label = gtk_label_new( str_label );
-	gtk_widget_set_size_request(frame, 100,100 );
+	gtk_widget_set_size_request(frame, 200,200 );
 	gtk_widget_show(frame);
 	info->sample_banks[bank_num]->page_num = gtk_notebook_append_page(GTK_NOTEBOOK(info->sample_bank_pad), frame, label);
 
@@ -5641,9 +6212,9 @@ static int	add_bank( gint bank_num  )
 		}
 	}
 
+
 	return bank_num;
 }
-
 void	free_samplebank(void)
 {
 	int i,j;
@@ -5664,6 +6235,7 @@ void	free_samplebank(void)
 				if(slot->timecode) free(slot->timecode);
 				if(slot->pixbuf) gdk_pixbuf_unref(slot->pixbuf);
 				if(slot->rawdata) free(slot->rawdata);
+				if(slot->ec) del_chain( slot->ec );
 				free(slot);
 			//	if(gslot->title) g_object_unref( gslot->title );
 			//	if(gslot->timecode) g_object_unref(gslot->title);
@@ -5694,11 +6266,6 @@ void	free_samplebank(void)
 	g_source_remove( info->imageA );
 }
 
-static	void	del_bank( gint page )
-{
-	/* Todo: delete entire bank */
-}
-
 void setup_samplebank(gint num_cols, gint num_rows)
 {
 	sample_bank_t **sample_banks = info->sample_banks;
@@ -5716,8 +6283,6 @@ void setup_samplebank(gint num_cols, gint num_rows)
 
 	info->image_dimensions[0] = image_width/2;
 	info->image_dimensions[1] = image_height/2;
-	info->selected_slot = NULL;
-	info->selected_gui_slot = NULL;
 }
 
 /* --------------------------------------------------------------------------------------------------------------------------
@@ -5726,22 +6291,13 @@ void setup_samplebank(gint num_cols, gint num_rows)
  *  with_selection should be TRUE when the actual selection of a sample-bank-slot should also be reseted
  *  (what is for instance necessary when vj reconnected)
    -------------------------------------------------------------------------------------------------------------------------- */ 
-static void reset_samplebank(gboolean with_selection)
-{
-    gint bank_nr;
-    gint slot_nr;
-    sample_bank_t **sample_banks = info->sample_banks;
-	/*
-    for( bank_nr = 0; bank_nr < NUM_PAGES ; bank_nr ++ )
-	for ( slot_nr = 0; slot_nr < NUM_SAMPLES_PER_PAGE ; slot_nr ++ )
-	    if (!info->free_banks[bank_nr*slot_nr]) { set_activation_of_slot_in_samplebank(bank_nr,slot_nr, false); remove_sample_from_sample_banks(bank_nr, slot_nr);
-*/
-    for( bank_nr = 0; bank_nr < NUM_PAGES ; bank_nr ++ )
-	for ( slot_nr = 0; slot_nr < NUM_SAMPLES_PER_PAGE ; slot_nr ++ )
-	{
-		remove_sample_from_sample_banks(bank_nr, slot_nr );
-	}
 
+static	int	bank_exists( int bank_page, int slot_num )
+{
+
+	if(!info->sample_banks[bank_page])
+		return 0;
+	return 1;
 }
 
 static	int	find_bank_by_sample(int sample_id, int sample_type, int *slot )
@@ -5799,7 +6355,7 @@ static	int	find_bank(int page_nr)
 			return info->sample_banks[i]->bank_number;
 		}
 	return -1;
-}
+}/*
 static int 	find_free_bank_slot(void)
 {
 	int i = 0;
@@ -5814,7 +6370,7 @@ static int 	find_free_bank_slot(void)
 				
 		}  
 }
-
+*/
 
 static	int	find_free_bank(void)
 {
@@ -5843,7 +6399,7 @@ image_configure_event (GtkWidget *widget, GdkEventConfigure *event, gpointer dat
   return FALSE;
 }
 */
-/* Redraw the screen from the backing pixmap */
+/* Redraw the screen from the backing pixmapap */
 static gboolean
 image_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 {
@@ -5858,7 +6414,6 @@ image_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 
 	if ( info->sample_banks[bank_nr] == NULL )
 	{
-		fprintf(stderr, "Wow its leaking memory\n");
 		exit(0);
 	}
 
@@ -6027,22 +6582,33 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
 	slot_nr = (gint *)user_data;
 	sample_bank_t **sample_banks = info->sample_banks;
 
+	/* Dont select slot if nothing is there */
+	if( info->sample_banks[ bank_nr ]->slot[ slot_nr ]->sample_id <= 0 )
+		return FALSE;
+
 	if(info->selected_gui_slot != NULL || info->selected_slot != NULL )
 		set_activation_of_slot_in_samplebank( false );
+
+	if( event->type == GDK_2BUTTON_PRESS )
+	{
 
 	info->selected_slot = sample_banks[bank_nr]->slot[slot_nr];	
 	info->selected_gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
 
 	set_activation_of_slot_in_samplebank(true);	
+	multi_vims( VIMS_SET_MODE_AND_GO, "%d %d", info->selected_slot->sample_type, info->selected_slot->sample_id);
+	gtk_widget_grab_focus(widget);
 
-	if(event->type == GDK_2BUTTON_PRESS || event->type == GDK_3BUTTON_PRESS )
+	}
+	else if(event->type == GDK_BUTTON_PRESS )
 	{
-		fprintf(stderr, "Type = %d, ID = %d\n",info->selected_slot->sample_type,
-			info->selected_slot->sample_id );
-		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d", info->selected_slot->sample_type, info->selected_slot->sample_id);
+		if(info->selection_slot)
+			set_selection_of_slot_in_samplebank(false);
+		info->selection_slot = sample_banks[bank_nr]->slot[slot_nr];
+		info->selection_gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
+		set_selection_of_slot_in_samplebank(true );
 	}
 
-	gtk_widget_grab_focus(widget);
 	return FALSE;
 
 }		
@@ -6064,6 +6630,9 @@ static gboolean on_slot_activated_by_key (GtkWidget *widget, GdkEventKey *event,
    -------------------------------------------------------------------------------------------------------------------------- */
 static void set_activation_of_slot_in_samplebank( gboolean activate)
 {
+	if(info->selected_slot->sample_id <= 0 )
+		gtk_frame_set_shadow_type( info->selected_gui_slot->frame, GTK_SHADOW_ETCHED_IN );
+	else
 
 	if (activate)
 		gtk_frame_set_shadow_type(info->selected_gui_slot->frame,GTK_SHADOW_IN);
@@ -6076,20 +6645,57 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
 //		gtk_widget_set_sensitive( GTK_WIDGET(info->selected_gui_slot->edit_button), FALSE );
 }
 
+static	void	set_selection_of_slot_in_samplebank(gboolean active)
+{
+fprintf(stderr, "set selection slot %p, %s\n",
+	info->selection_slot , active ? "YES" : "no");
+
+	if(!info->selection_slot)
+		return;
+	if(info->selection_slot->sample_id <= 0 )
+		return;
+	if(active)
+	{
+		GdkColor color;
+		color.red = 255 * 74;
+		color.green = 255 * 79;
+		color.blue = 117 * 79;
+		gtk_frame_set_shadow_type( info->selection_gui_slot->frame, GTK_SHADOW_ETCHED_OUT );
+		gtk_widget_modify_fg ( info->selection_gui_slot->title,
+			GTK_STATE_NORMAL, &color );
+		gtk_widget_modify_fg ( info->selection_gui_slot->timecode,
+			GTK_STATE_NORMAL, &color );
+
+
+		GtkWidget *frame_label = gtk_frame_get_label_widget( info->selection_gui_slot->frame );
+		gtk_widget_modify_fg( frame_label, GTK_STATE_NORMAL, &color );
+	}
+	else
+	{
+		gtk_frame_set_shadow_type( info->selection_gui_slot->frame, GTK_SHADOW_ETCHED_IN );
+		GdkColor color;
+		color.red = 255 * 255;
+		color.green = 255 * 255;
+		color.blue = 255 * 255;
+		gtk_widget_modify_fg ( info->selection_gui_slot->timecode,
+			GTK_STATE_NORMAL, &color );
+		gtk_widget_modify_fg ( info->selection_gui_slot->title,
+			GTK_STATE_NORMAL, &color );
+		GtkWidget *frame_label = gtk_frame_get_label_widget( info->selection_gui_slot->frame );
+		gtk_widget_modify_fg( frame_label, GTK_STATE_NORMAL, &color);
+	}
+}
 
 static int add_sample_to_sample_banks(int bank_page,sample_slot_t *slot)
 {
-       int page;
-       int slotnr = 0;
-       int failed = 0;
-
 	/* Add the temporary sample */
-      	if(!info->sample_banks[bank_page] )
-		add_bank(bank_page);
-       update_sample_slot_data( bank_page, slot->slot_number, slot->sample_id,slot->sample_type,slot->title,slot->timecode);
- 
-	
+	// FIXME : slot loading
+	int bp = 0; int s = 0;
 
+       verify_bank_capacity( &bp, &s, slot->sample_id, slot->sample_type );
+       update_sample_slot_data( bp, s, slot->sample_id,slot->sample_type,slot->title,slot->timecode);
+
+ 
        return 1;
 }
 
@@ -6097,24 +6703,6 @@ static int add_sample_to_sample_banks(int bank_page,sample_slot_t *slot)
 /* --------------------------------------------------------------------------------------------------------------------------
  *  Removes a selected sample from the specific sample-bank-slot and update the free_slots-GList as well as
    -------------------------------------------------------------------------------------------------------------------------- */
-static void remove_sample_from_sample_banks(gint bank_nr, gint slot_nr)
-{
-	if( info->sample_banks[bank_nr] == NULL )
-		return;
-
-	sample_slot_t *slot = info->sample_banks[bank_nr]->slot[slot_nr];
-	sample_gui_slot_t *gui_slot = info->sample_banks[bank_nr]->gui_slot[slot_nr];
-
-
-	if(slot == info->selected_slot || gui_slot == info->selected_gui_slot )
-	{
-		set_activation_of_slot_in_samplebank( false );
-		gtk_frame_set_label( gui_slot->frame, NULL );
-		info->selected_gui_slot = NULL;
-		info->selected_slot = NULL;
-	}
-
-}
 
 static	void	remove_sample_from_slot()
 {
@@ -6125,40 +6713,41 @@ static	void	remove_sample_from_slot()
 		GTK_NOTEBOOK( info->sample_bank_pad ) ) );
 	if(bank_nr < 0 )
 		return;
-	slot_nr = info->selected_slot->slot_number;
+	if(!info->selection_slot)
+		return;
 
-	if( info->selected_slot->sample_id == info->status_tokens[CURRENT_ID] &&
-		info->selected_slot->sample_type == info->status_tokens[PLAY_MODE] )
+	slot_nr = info->selection_slot->slot_number;
+
+	if( info->selection_slot->sample_id == info->status_tokens[CURRENT_ID] &&
+		info->selection_slot->sample_type == info->status_tokens[PLAY_MODE] )
 	{
 		vj_msg(VEEJAY_MSG_ERROR,
 		 "Cannot delete slot, is playing");
 		return;
 	}
 
-	multi_vims( (info->selected_slot->sample_type == 0 ? VIMS_SAMPLE_DEL :
+	multi_vims( (info->selection_slot->sample_type == 0 ? VIMS_SAMPLE_DEL :
 		     VIMS_STREAM_DELETE ),
 			"%d",
-			info->selected_slot->sample_id );
+			info->selection_slot->sample_id );
 	gint id_len = 0;
 	gint deleted_sample = 0;
 	gchar *deleted_id = recv_vims( 3, &id_len );
-
+	fprintf(stderr, "Deleted sample %d ?  , len %d, ptr =%p \n",
+		info->selection_slot->sample_id, id_len, deleted_id );
 	sscanf( deleted_id, "%d", &deleted_sample );
 	if( deleted_sample )
 	{
-		fprintf(stderr, "Delete from bank %d, slot %d sample %d\n",
-			bank_nr,slot_nr, deleted_sample );
-
 		// decrement history of delete type
-		int *his = info->history_tokens[ info->selected_slot->sample_type ];
+		int *his = info->history_tokens[ (info->status_tokens[PLAY_MODE]) ];
 		
 		his[TOTAL_SLOTS] = his[TOTAL_SLOTS] - 1;
 
 		update_sample_slot_data( bank_nr, slot_nr, 0, -1, NULL, NULL); 	 	
-		set_activation_of_slot_in_samplebank( false );
 
-		info->selected_gui_slot = NULL;
-		info->selected_slot = NULL;
+		set_selection_of_slot_in_samplebank( false );
+		info->selection_gui_slot = NULL;
+		info->selection_slot = NULL;
 	}
 }
 
@@ -6166,12 +6755,12 @@ static	void	remove_sample_from_slot()
 /* --------------------------------------------------------------------------------------------------------------------------
  *  Callback function that is needed for inserting free-slots/banks in the appropriate GLists at the correct postion,
  *  by just comparing their index-values
-   -------------------------------------------------------------------------------------------------------------------------- */
+   ----------------------------------------------------------------------------------------------------------------------
 static gint compare_index(gint *index_1, gint *index_2 )
 {
     return (index_1 - index_2);
 }
-
+*/
 
 /* --------------------------------------------------------------------------------------------------------------------------
  *  Function adds the given infos to the list of effect-sources
@@ -6192,17 +6781,11 @@ static void add_sample_to_effect_sources_list(gint id, gint type, gchar *title, 
 
 /* --------------------------------------------------------------------------------------------------------------------------
  *  Function adds the given infos to Editlist
-   -------------------------------------------------------------------------------------------------------------------------- */ 
+   -------------------------------------------------------------------------------------------------------------------------- 
 static void add_sample_to_editlist(guint row_number, gchar *timeline, gchar *fname, gchar *timecode, gchar *gfourcc)
 {
     GtkTreeIter iter;
     
-    /* this works also to get the entry number for the specific row
-     *
-     * guint row_number=0;     
-     *
-     * row_number = gtk_tree_model_iter_n_children(editlist_model, NULL); */
-/*
     gtk_list_store_append( editlist_store, &iter );
     gtk_list_store_set( editlist_store, &iter,
 	COLUMN_INT, row_number, // <- start timecode?! (timecode of offset)
@@ -6210,9 +6793,9 @@ static void add_sample_to_editlist(guint row_number, gchar *timeline, gchar *fna
 	COLUMN_STRINGA, fname,
 	COLUMN_STRINGB, timecode,
 	COLUMN_STRINGC, gfourcc,-1 );	
-*/	
-}
 
+}
+*/
 
 /*
 	Update a slot, either set from function arguments or clear it
@@ -6224,7 +6807,6 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 	{
 		fprintf(stderr, "Bank page null\n");
 		exit(0);
-		add_bank(page_num);
 	}
 
 	sample_slot_t *slot = info->sample_banks[page_num]->slot[slot_num];
@@ -6238,6 +6820,11 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 	slot->timecode = timecode == NULL ? strdup("") : strdup( timecode );
 	slot->title = title == NULL ? strdup("") : strdup( title );
 	
+	if( sample_id > 0 && sample_type >= 0 )
+	{
+		if(!slot->ec )
+			slot->ec = new_chain();
+	}
 
 	if(gui_slot)
 	{
@@ -6296,4 +6883,48 @@ static void vj_gui_add_sample(gchar *filename, gint mode)
 /* -------------------------------------------------------------------------------------------------------------------------- 
  * Function that is used for the VJ-GUI to apply all changes that are made within the sample/stream-options dialog
  * to the sample/stream that is shown within this dialog (which is the selected slot of the sample bank)
- * -------------------------------------------------------------------------------------------------------------------------- */ 
+ * -------------------------------------------------------------------------------------------------------------------------- */
+
+
+
+/* -------------------------------------------------------------------------------------------------------------------------- 
+ *
+ * Function initialize the knobs to regulate the global speed and the audio volume 
+ *  --------------------------------------------------------------------------------------------------------------------------*/
+void setup_knobs()
+    {		
+    GtkAdjustment *audio_adj;   
+    GtkAdjustment *speed_adj;       
+    char path[MAX_PATH_LEN];
+    bzero(path,MAX_PATH_LEN);
+    get_gd( path, NULL,  "knob.png" );
+    // audio volume 
+    info->audiovolume_knob = (GtkKnob *) gtk_knob_new(NULL, path);
+    gtk_widget_show(GTK_WIDGET(info->audiovolume_knob));
+    gtk_widget_set_sensitive( GTK_WIDGET(info->audiovolume_knob), TRUE);	
+    gtk_container_add (GTK_CONTAINER (glade_xml_get_widget_( info->main_window, "audio_knobframe")), GTK_WIDGET(info->audiovolume_knob));    
+
+    audio_adj = gtk_knob_get_adjustment(info->audiovolume_knob);
+    audio_adj->lower = 0;
+    audio_adj->upper = 10;
+    audio_adj->step_increment = 0.1;    
+// FIXME
+    g_signal_connect( audio_adj, "value_changed", (GCallback) on_audiovolume_knob_value_changed, NULL );
+    update_label_i( "volume_label", (gint)audio_adj->value,0); 
+
+    // speed
+    info->speed_knob = (GtkKnob *) gtk_knob_new(NULL,path);
+    gtk_widget_show(GTK_WIDGET(info->speed_knob));
+    gtk_widget_set_sensitive( GTK_WIDGET(info->speed_knob), TRUE);	
+    gtk_container_add (GTK_CONTAINER (glade_xml_get_widget_( info->main_window, "speed_knobframe")), GTK_WIDGET(info->speed_knob));    
+
+    speed_adj = gtk_knob_get_adjustment(info->speed_knob);
+    speed_adj->lower = 0;
+    speed_adj->upper = 1;
+    speed_adj->step_increment = 1;    
+    speed_adj->page_size = 4;
+    speed_adj->page_increment = 2;    
+    g_signal_connect( speed_adj, "value_changed", (GCallback) on_speed_knob_value_changed, NULL );
+    update_label_i( "speed_label", (gint)speed_adj->value,0);
+    }
+        
