@@ -54,35 +54,38 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	dv_t *dv = (dv_t*) vj_malloc(sizeof(dv_t));
 	if(!dv) return NULL;
 	memset(dv, 0, sizeof(dv_t));
+	dv_decoder_t *decoder = NULL;
 
 	uint8_t *tmp = (uint8_t*) vj_malloc(sizeof(uint8_t) * DV_HEADER_SIZE);
+	memset( tmp, 0, sizeof(uint8_t) * DV_HEADER_SIZE);
 	off_t file_size = 0;
 	int n = 0;
 
-	dv->decoder = dv_decoder_new( 1,0,0);
+	decoder = dv_decoder_new( 1,0,0);
 	dv->fd = open( filename, O_RDONLY );
 	
 	if(!dv->fd)
 	{
+		dv_decoder_free(decoder); 
 		rawdv_free(dv);
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot open '%s'",filename);
 		if(tmp)free(tmp);
-		dv->decoder = dv_decoder_new( 1,0,0);
 		return NULL;
 	}
 	/* fseek sometimes lies about filesize - seek to end (lseek returns file offset from start)*/
 	file_size = lseek( dv->fd, 0, SEEK_END );
 	if( file_size < DV_HEADER_SIZE)
 	{
+		dv_decoder_free(decoder);
 		veejay_msg(VEEJAY_MSG_ERROR, "% is too small! ", filename);
 		rawdv_free(dv);
 		if(tmp) free(tmp);
-		dv_decoder_free( dv->decoder );
 		return NULL;
 	}
 	/* And back to start offset */
 	if( lseek(dv->fd,0, SEEK_SET ) < 0)
 	{
+		dv_decoder_free(decoder);
 		veejay_msg(VEEJAY_MSG_ERROR, "Seek errror");
 		rawdv_free(dv);
 		if(tmp) free(tmp);
@@ -107,52 +110,53 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 		n = mmap_read( dv->mmap_region, 0, DV_HEADER_SIZE, tmp );
 	}
 
-	if( n < 0 )
+	if( n <= 0 )
 	{
+		dv_decoder_free(decoder);
 		rawdv_free(dv);
-		dv_decoder_free( dv->decoder );
 		if(tmp) free(tmp);
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot read from '%s'", filename);
 		return NULL;
 	}
 
-	if( dv_parse_header( dv->decoder, tmp) < 0 )
+	if( dv_parse_header( decoder, tmp) < 0 )
 	{
-		dv_decoder_free( dv->decoder );
+		dv_decoder_free( decoder );
 		rawdv_free(dv);
 		if(tmp) free(tmp);
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot parse header");
 		return NULL;
 	}
-	if(dv->decoder->sampling == e_dv_sample_411)
+	if(decoder->sampling == e_dv_sample_411)
 	{
-		dv_decoder_free( dv->decoder );
+		dv_decoder_free( decoder );
 		rawdv_free(dv);
 		if(tmp) free(tmp);
 		return NULL;
 	}
 
 
-	if(dv_is_PAL( dv->decoder ) )
+	if(dv_is_PAL( decoder ) )
 		dv->chunk_size = DV_PAL_SIZE;
 	else
 		dv->chunk_size = DV_NTSC_SIZE;
 
-	dv->width = dv->decoder->width;
-	dv->height = dv->decoder->height;
-	dv->audio_rate = dv->decoder->audio->frequency;
-	dv->audio_chans = dv->decoder->audio->num_channels;
-	dv->audio_qbytes = dv->decoder->audio->quantization;
-	dv->fps = ( dv_is_PAL( dv->decoder) ? 25.0 : 29.97 );
-	dv->size = dv->decoder->frame_size;
+	dv->width = decoder->width;
+	dv->height = decoder->height;
+	dv->audio_rate = decoder->audio->frequency;
+	dv->audio_chans = decoder->audio->num_channels;
+	dv->audio_qbytes = decoder->audio->quantization;
+	dv->fps = ( dv_is_PAL( decoder) ? 25.0 : 29.97 );
+	dv->size = decoder->frame_size;
 	dv->num_frames = (file_size - DV_HEADER_SIZE) / dv->size;
 	
-	dv->fmt = ( dv->decoder->sampling == e_dv_sample_422 ? 1 : 0);
+	dv->fmt = ( decoder->sampling == e_dv_sample_422 ? 1 : 0);
 	dv->buf = (uint8_t*) vj_malloc(sizeof(uint8_t*) * dv->size);
 	dv->offset = 0;
 
 
-	dv_decoder_free( dv->decoder );
+	dv_decoder_free( decoder );
+
 	if(tmp)
 		free(tmp);
 
@@ -201,8 +205,6 @@ int	rawdv_set_position(dv_t *dv, long nframe)
 
 int	rawdv_read_frame(dv_t *dv, uint8_t *buf )
 {
-	int pitches[3];
-	uint8_t *pixels[3];
 	int n = 0;
 	if(dv->mmap_region == NULL)
 	{

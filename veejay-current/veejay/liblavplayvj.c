@@ -584,7 +584,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 	  {
 		veejay_msg(VEEJAY_MSG_WARNING, "Deactivated %d effect%s", n, (n==1 ? " " : "s" ));
 	  }
-	  veejay_msg(VEEJAY_MSG_INFO, "Playing plain video now");
+	  veejay_msg(VEEJAY_MSG_INFO, "Playing plain video now (set %p) ", info->current_edit_list);
 	  info->edit_list = info->current_edit_list;
 	}
 	if(new_pm == VJ_PLAYBACK_MODE_TAG)
@@ -2420,8 +2420,16 @@ int veejay_main(veejay_t * info)
 
 int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 {
+
+    if(el->is_empty)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "No frames in EDL to copy");
+		return 0;
+	}
+
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
+
     uint64_t k, i;
     uint64_t n1 = (uint64_t) start;
     uint64_t n2 = (uint64_t) end;
@@ -2450,6 +2458,12 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 }
 editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, long end)
 {
+	if( el->is_empty)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "EDL is empty");
+		return NULL;
+	}
+
     uint64_t k, i;
     uint64_t n1 = (uint64_t) start;
     uint64_t n2 = (uint64_t) end;
@@ -2509,6 +2523,11 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 
 int veejay_edit_delete(veejay_t * info, editlist *el, long start, long end)
 {
+	if(el->is_empty)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Nothing in EDL to delete");
+		return 0;
+	}
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     uint64_t i;
@@ -2576,6 +2595,11 @@ int veejay_edit_delete(veejay_t * info, editlist *el, long start, long end)
 
 int veejay_edit_cut(veejay_t * info, editlist *el, long start, long end)
 {
+	if( el->is_empty )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Nothing to cut in EDL");
+		return 0;
+	}
     if (!veejay_edit_copy(info, el,start, end))
 	return 0;
     if (!veejay_edit_delete(info, el,start, end))
@@ -2598,25 +2622,33 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 	(video_playback_setup *) info->settings;
     long i, k;
 
+
     if (!settings->save_list_len || !settings->save_list)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, 
 			    "No frames in the buffer to paste");
 		return 0;
-    }
+	 }
 
-    if (destination < 0 || destination >= el->video_frames)
+	if(el->is_empty)
 	{
-		if(destination < 0)
-			veejay_msg(VEEJAY_MSG_ERROR, 
-				    "Destination cannot be negative");
-		if(destination >= el->video_frames)
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot paste beyond Edit List!");
-		return 0;
-    }
+		destination = 0;
+	}
+	else
+	{
+		if (destination < 0 || destination >= el->video_frames)
+		{
+			if(destination < 0)
+				veejay_msg(VEEJAY_MSG_ERROR, 
+					    "Destination cannot be negative");
+			if(destination >= el->video_frames)
+				veejay_msg(VEEJAY_MSG_ERROR, "Cannot paste beyond Edit List!");
+			return 0;
+    		}
+	}
 
-    el->frame_list = (uint64_t*)realloc(el->frame_list,
-				   (el->video_frames +
+        el->frame_list = (uint64_t*)realloc(el->frame_list,
+				   ((el->is_empty ? 0 :el->video_frames) +
 				    settings->save_list_len) *
 				   sizeof(uint64_t));
 
@@ -2643,7 +2675,8 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 		el->frame_list[k++] = settings->save_list[i];
     }
     el->video_frames += settings->save_list_len;
-
+    if(el->is_empty)
+	el->is_empty = 0;
     veejay_increase_frame(info, 0);
     return 1;
 }
@@ -2660,12 +2693,9 @@ int veejay_edit_move(veejay_t * info,editlist *el, long start, long end,
 		      long destination)
 {
     long dest_real;
-
-	if( info->dummy->active)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Playing dummy video!");
+    if( el->is_empty )
 		return 0;
-	}
+	
     if (destination >= el->video_frames || destination < 0
 		|| start < 0 || end < 0 || start >= el->video_frames
 		|| end >= el->video_frames || end < start)
@@ -2765,79 +2795,45 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 
 int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start,long end, long destination )
 {
-    video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
-    uint64_t n, i;
-    long n_end;
-    n = open_video_file(movie, el, info->preserve_pathnames, info->auto_deinterlace,1,
+	video_playback_setup *settings =
+		(video_playback_setup *) info->settings;
+	uint64_t n, i;
+	long n_end;
+
+	uint64_t c = el->video_frames;
+	if( el->is_empty )
+		c -= 2;
+
+	n = open_video_file(movie, el, info->preserve_pathnames, info->auto_deinterlace,1,
 		info->edit_list->video_norm );
 
-
-    if (n == -1 || n == -2)
-    {
-	veejay_msg(VEEJAY_MSG_ERROR,"Error opening file '%s' ", movie );
-	return 0;
-    }
-
-    if( el->has_video)
+	if (n < 0)
 	{
-		if( start <= 0)
-		{
-			end = el->num_frames[n];
-			start = 0;
-			destination = el->video_frames;
-		}
-		if( end < 0 || start < 0 || start > end || start > el->num_frames[n] || end > el->num_frames[n] || destination < 0
-			|| destination > el->video_frames)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Wrong parameters to add frames %d - %d of file '%s' to position %ld", 
-				start,end,movie,destination);
-			return 0;
-		}
-
-	    el->frame_list = (uint64_t *) realloc( el->frame_list, (el->video_frames + (end-start+1)) * sizeof(uint64_t));
-	       if(el->frame_list==NULL)
-	    {
-			veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to reallocate frame_list");
-			veejay_change_state(info, LAVPLAY_STATE_STOP);
-			return 0;
-	    }
-    }
-	else
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Veejay was started with fake editlist");
-		start = 0;
-		destination = 0;
-		end = el->num_frames[n];
-		el->video_frames = 0;
-		el->frame_list = (uint64_t*) malloc( (end - start + 1)  * sizeof(uint64_t));
+		veejay_msg(VEEJAY_MSG_ERROR,"Error adding file '%s' to EDL", movie );
+		return 0;
 	}
 
-  	if (!el->frame_list)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, 
-			    "Malloc error, you\'re probably out of memory");
-		veejay_change_state(info, LAVPLAY_STATE_STOP);
-	
-		return 0;
-    }
+	int end = el->video_frames;
 
-    n_end = el->video_frames - 1;
-    for (i = start; i <= end; i++)
+	el->frame_list = (uint64_t *) realloc(el->frame_list, (end + el->num_frames[n])*sizeof(uint64_t));
+	if (el->frame_list==NULL)
 	{
-		el->frame_list[el->video_frames] =
-		    el->frame_list[destination + i - start];
-		el->frame_list[destination + i - start] = EL_ENTRY(n, i);
-		el->video_frames++;
-    }
+		veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
+		vj_el_free(el);
+		return NULL;
+	}
+
+	for (i = 0; i < el->num_frames[n]; i++)
+	{
+		el->frame_list[c] = EL_ENTRY(n, i);
+		c++;
+	}
  
-    settings->max_frame_num = el->video_frames - 1;
-    settings->min_frame_num = 1;
+	el->video_frames = c;
 
-    if(el->has_video == 0 )
-    {
-		el->has_video = 1;
-    }
+	settings->max_frame_num = el->video_frames - 1;
+	settings->min_frame_num = 0;
+
 	return 1;
 }
 

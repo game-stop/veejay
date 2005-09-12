@@ -1251,7 +1251,8 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 {
 	char args[150];
 	int net_id=0;
-	
+	int k;
+
 	int msg_len = strlen(msg);
 	char *tmp = NULL;
 	int id = 0;
@@ -1264,8 +1265,8 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 	/* message is at least 5 bytes in length */
 	if( msg == NULL || msg_len < MSG_MIN_LEN)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Message [%s] too small (only %d bytes, need at least %d)",
-			(msg==NULL? "(Empty)": msg), msg_len, MSG_MIN_LEN);
+		veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Message '%s' too small (only %d bytes, need at least %d)",
+			msg, msg_len, MSG_MIN_LEN);
 		return 0;
 	}
 
@@ -1577,10 +1578,12 @@ void vj_event_update_remote(void *ptr)
 			v->uc->current_link = i;
 			char buf[MESSAGE_SIZE];
 			bzero(buf, MESSAGE_SIZE);
-			while( vj_server_retrieve_msg( v->vjs[0], i, buf ) )
+			int n = 0;
+			while( vj_server_retrieve_msg(v->vjs[0],i,buf) != 0 )
 			{
 				vj_event_parse_msg( v, buf );
 				bzero( buf, MESSAGE_SIZE );
+				n++;
 			}
 		}
 		if(res==-1)
@@ -5821,15 +5824,10 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 	int *args = NULL;
 	P_A(args,str,format,ap);
 
-
-	if ( veejay_edit_addmovie(v,v->edit_list,str,start,destination,destination))
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Appended video file %s to EditList",str); 
-	}
+	if ( veejay_edit_addmovie(v,( SAMPLE_PLAYING(v) ? v->edit_list : v->current_edit_list),str,start,destination,destination))
+		veejay_msg(VEEJAY_MSG_INFO, "Added video file %s to EditList",str); 
 	else
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot append file %s to EditList",str);
-	} 
+		veejay_msg(VEEJAY_MSG_INFO, "Unable to add file %s to EditList",str); 
 }
 
 void vj_event_el_add_video_sample(void *ptr, const char format[], va_list ap)
@@ -7013,7 +7011,6 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 	//if(args[0]>0) start_from_tag = args[0];
 
 	n = vj_tag_size()-1;
-	veejay_msg(VEEJAY_MSG_DEBUG, "I have %d streams to describe", n );
 	if (n >= 1 )
 	{
 		char line[300];
@@ -7046,7 +7043,6 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 		}
 		sprintf(_s_print_buf, "%05d%s",strlen(_print_buf),_print_buf);
 	}
-veejay_msg(VEEJAY_MSG_DEBUG, "[%s]", _s_print_buf);
 	SEND_MSG(v,_s_print_buf);
 }
 
@@ -7213,7 +7209,7 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 	int i,n;
 	P_A(args,str,format,ap);
 
-	if(args[0]>0) start_from_sample = args[0];
+//	if(args[0]>0) start_from_sample = args[0];
 
 	bzero( _s_print_buf,SEND_BUF);
 	sprintf(_s_print_buf, "%05d", 0);
@@ -7288,8 +7284,7 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 	P_A(args,str,format,ap);
 
 	bzero(fline,255);
-	sprintf(line, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
-			0,0,0,0,0,0,0,0,0,0,0,0,0,0,0,0);
+	sprintf(line, "%03d", 0);
 
 	if(args[0] == 0) 
 		args[0] = v->uc->sample_id;
@@ -7382,9 +7377,13 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 		}
 	}
 
-
-	FORMAT_MSG(fline,line);
-	SEND_MSG(v, fline);
+	if(!error)
+	{
+		FORMAT_MSG(fline,line);
+		SEND_MSG(v, fline);
+	}
+	else
+		SEND_MSG(v,line);
 }
 
 void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)

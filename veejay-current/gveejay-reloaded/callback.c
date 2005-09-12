@@ -495,7 +495,6 @@ void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 	vj_msg(VEEJAY_MSG_INFO, "Clear Effect from Entry %d",
 		info->uc.selected_chain_entry);
 	vj_kf_delete_parameter( info->uc.selected_chain_entry );
-	//FIXME
 }
 /*
 void	on_button_fx_mixapply_clicked(GtkWidget *w, gpointer user_data)

@@ -46,7 +46,8 @@ static	char*	el_get_codec_name(int codec_id )
 		default:
 			sprintf(name, "Unknown"); break;
 	}
-	return name; 
+	char *res = strdup(name);
+	return res;
 }
 
 static vj_encoder *_encoders[NUM_ENCODERS];
@@ -65,8 +66,11 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 #endif
 			e->codec = avcodec_find_encoder( id );
 			if(!e->codec)
-			 veejay_msg(VEEJAY_MSG_ERROR, "Cannot find Encoder codec %s", 	el_get_codec_name(id ) );
-
+			{
+			 char *descr = el_get_codec_name(id);
+			 veejay_msg(VEEJAY_MSG_ERROR, "Cannot find Encoder codec %s", 	descr );
+			 free(descr);
+			}
 #ifdef __FALLBACK_LIBDV
 		}
 #endif
@@ -200,7 +204,6 @@ int		vj_avcodec_free()
 
 void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h)
 {
-	int len = w* h ;
 	AVPicture pict1,pict2;
 	memset(&pict1,0,sizeof(pict1));
 	memset(&pict2,0,sizeof(pict2));

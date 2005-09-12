@@ -59,6 +59,7 @@ int		_vj_server_free_slot(vj_server *vje);
 int		_vj_server_new_client(vj_server *vje, int socket_fd);
 int		_vj_server_del_client(vj_server *vje, int link_id);
 int		_vj_server_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, int priority );
+int		_vj_server_empty_queue(vj_server *vje, int link_id);
 
 
 
@@ -183,15 +184,13 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		}
 		link[i]->in_use = 0;
 		link[i]->m_queue = (vj_message**) vj_malloc(sizeof( vj_message * ) * VJ_MAX_PENDING_MSG );
-		if(!link[i]->m_queue)
-		{
-			return 0;
-		}
+		memset( link[i]->m_queue, 0, sizeof(vj_message*) * VJ_MAX_PENDING_MSG );
+		if(!link[i]->m_queue)	return 0;
+		memset( link[i]->m_queue, 0, sizeof(vj_message*) * VJ_MAX_PENDING_MSG );
 		for( j = 0; j < VJ_MAX_PENDING_MSG; j ++ )
 		{
-			link[i]->m_queue[j] = (vj_message*) vj_malloc(sizeof(vj_message));
-			link[i]->m_queue[j]->len = 0;
-			link[i]->m_queue[j]->msg = NULL;
+			link[i]->m_queue[j] = (vj_message*) vj_malloc(sizeof(vj_message));	
+			memset(link[i]->m_queue[j], 0, sizeof(vj_message));
 		}
 		link[i]->n_queued = 0;
 		link[i]->n_retrieved = 0;		
@@ -201,7 +200,6 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 	vjs->nr_of_connections = vjs->handle;
 	veejay_msg(VEEJAY_MSG_INFO, "TCP/IP Unicast %s channel ready at port %d",
 	  (vjs->server_type == V_STATUS ? "status" : "command" ),	 port_num );
-
 
 	return 1;
 }
@@ -261,7 +259,7 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 
 		if(!FD_ISSET( Link[link_id]->handle, &(vje->wds) ) )
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Socket not ready not sending");
+		//	veejay_msg(VEEJAY_MSG_ERROR, "Socket not ready not sending");
 			return 0;
 		}
 
@@ -271,7 +269,7 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 			if (n <= 0)
 			{
 				if(n == -1) 
-					veejay_msg(VEEJAY_MSG_ERROR, "unicast: %s", strerror(errno));
+					veejay_msg(VEEJAY_MSG_DEBUG, "Error sending unicast: %s", strerror(errno));
 		   		return 0;
 			}
 			total += n;
@@ -324,12 +322,14 @@ int _vj_server_free_slot(vj_server *vje)
 int _vj_server_new_client(vj_server *vje, int socket_fd)
 {
     int entry = _vj_server_free_slot(vje);
-	vj_link **Link = (vj_link**) vje->link;
+    vj_link **Link = (vj_link**) vje->link;
     if (entry == VJ_MAX_CONNECTIONS)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot take more connections (max %d allowed)", VJ_MAX_CONNECTIONS);
 		return VJ_MAX_CONNECTIONS;
 	}
+    if(Link[entry]->handle || Link[entry]->in_use )
+	veejay_msg(VEEJAY_MSG_ERROR, "New client is overwriten existing (!)");
     Link[entry]->handle = socket_fd;
     Link[entry]->in_use = 1;
     FD_SET( socket_fd, &(vje->fds) );
@@ -341,17 +341,17 @@ int _vj_server_new_client(vj_server *vje, int socket_fd)
 int _vj_server_del_client(vj_server * vje, int link_id)
 {
 	vj_link **Link = (vj_link**) vje->link;
-	if(Link[link_id]->in_use )
+	Link[link_id]->in_use = 0;
+	if(Link[link_id]->handle)
 	{
-		Link[link_id]->in_use = 0;
 		FD_CLR( Link[link_id]->handle, &(vje->fds) );
 		FD_CLR( Link[link_id]->handle, &(vje->wds) );
 		close(Link[link_id]->handle);
 		vje->nr_of_links --;
-		return 1;
-		
-    	}
-    return 0;
+	}
+	_vj_server_empty_queue(vje, link_id);
+	Link[link_id]->handle = 0;
+	return 1;
 }
 
 void	vj_server_close_connection(vj_server *vje, int link_id )
@@ -564,7 +564,6 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 		bzero(net_id,4 );
 
 		char *str_ptr = &s[i];
-
 		str_ptr ++;
 	
 		strncpy( tmp_len,str_ptr, 3 ); // header length   
@@ -580,7 +579,6 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 		{
 			return 0;
 		}
-		
 		if(! priority )
 		{
 			// store message anyway
@@ -606,7 +604,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 				VJ_MAX_PENDING_MSG );	
 			   return num_msg; // cant take more
 		}
-
+	//	i += slen;
 		i += (slen+1); // try next message
 
 	}
@@ -616,43 +614,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 		Link[link_id]->n_queued = num_msg;
 		Link[link_id]->n_retrieved = 0;
 	}
-
 	return num_msg;
-}
-
-
-static	int	_vj_get_n_msg_waiting(char *buf, int buf_len, int *offset )
-{
-	int nmsgs = 0;
-	int i = 0;
-	char *s = buf;
-	while( i < buf_len )
-	{
-		if( s[i] == 'V' && s[i+4] == 'D' )
-		{ // found message
-			char tmp_len[4];
-			int  slen = 0;
-			bzero(tmp_len,4);
-			i++;
-			char *str_ptr = &s[i];
-			strncpy( tmp_len, str_ptr, 3 );
-			if(sscanf(tmp_len,"%03d", &slen)<= 0)
-				return nmsgs;
-			nmsgs++;
-			if(slen > 0)
-				i += slen;
-			if( nmsgs >= VJ_MAX_PENDING_MSG )
-			{
-				*offset = i;
-				return VJ_MAX_PENDING_MSG;
-			}
-		}
-		else
-		{
-			return nmsgs;
-		}
-	}
-	return nmsgs;
 }
 
 
@@ -747,41 +709,9 @@ int	vj_server_update( vj_server *vje, int id )
 		}
 		return nn;
 	}
-	else
-	{
-		// 
-		int skip_bytes = 0;
-		int num_msg_left = _vj_get_n_msg_waiting( msg_buf, bytes_left, &skip_bytes ); // returns position to first pri msg
-		veejay_msg(VEEJAY_MSG_WARNING, "*** HIGH LOAD *** : Remote '%s' is sending messages at a very high rate",
-		 	(char*) ( inet_ntoa( vje->remote.sin_addr ) ) );
-		veejay_msg(VEEJAY_MSG_WARNING, "*** HIGH LOAD *** : Or veejay is running on an extremely low frame rate" );
-		veejay_msg(VEEJAY_MSG_WARNING, "*** HIGH LOAD *** : Filtering out most relevant VIMS selectors" );
-		int done = 0;
-		int result = 0;
-		while(bytes_left > 0 )
-		{
-			int left = _vj_get_n_msg_waiting( msg_buf, bytes_left, &skip_bytes ); // returns position to first pri msg
-			veejay_msg(VEEJAY_MSG_DEBUG, "*** HIGH LOAD *** : filtering out high priority VIMS selectors ( > 255 ) %d - %d",
-				done, left);
-			int chunk_len = bytes_left - skip_bytes;
-			if( done < VJ_MAX_PENDING_MSG )
-			{
-				veejay_msg(VEEJAY_MSG_DEBUG, "*** HIGH LOAD *** : accepting last arriving messages (%d)",
-					done );
-				result += _vj_parse_msg( vje, id, msg_buf + skip_bytes, chunk_len, 0 );
-			}
-			else
-			{
-				result += _vj_parse_msg( vje, id, msg_buf + skip_bytes, chunk_len, 1 );
-			}
-			done += left;
-			bytes_left -= chunk_len;
-		}
-		return result;
-	}  
-
 	return 0;
 }
+
 void vj_server_shutdown(vj_server *vje)
 {
 	int j,i;
@@ -833,14 +763,11 @@ int vj_server_retrieve_msg(vj_server *vje, int id, char *dst )
 	int index = Link[id]->n_retrieved;
 	char *msg;
 	int   len;
-
-	if( index == Link[id]->n_queued )
-	{
+	if( index >= Link[id]->n_queued )
 		return 0; // done
-	}
+
 	msg = Link[id]->m_queue[index]->msg;
 	len = Link[id]->m_queue[index]->len;
-
 	strncpy( dst, msg, len );
 
 	index ++;

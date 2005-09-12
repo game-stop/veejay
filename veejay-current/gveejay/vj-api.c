@@ -1835,7 +1835,7 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 	if( gentry == entry && effect_id <= 0 )
 	{
 		gtk_list_store_set( GTK_LIST_STORE(model), iter, 0 , FALSE, - 1);
-	}	
+	}
 	if( gentry == entry && effect_id > 0)
 	{
 		gchar *descr = _utf8str( _effect_get_description( effect_id ));
@@ -1847,9 +1847,7 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 			FXC_FXSTATUS, toggle, -1 );
 		g_free(descr);
 	}
-
-
-  return FALSE;
+	return FALSE;
 }
 
 static void 	update_globalinfo()
@@ -3237,7 +3235,7 @@ static	void	load_samplelist_info(const char *name)
 		return;
 	}
 
-	has_streams = 1;
+	has_streams = 0;
 	while( offset < fxlen )
 	{
 		char tmp_len[4];
@@ -3258,7 +3256,7 @@ static	void	load_samplelist_info(const char *name)
 			strncpy( line, fxtext + offset, len );
 			// add to tree
 			int values[4];
-
+			has_streams = 1;
 			sscanf( line, "%05d%02d%03d%03d%03d%03d%03d%03d",
 				&values[0], &values[1], &values[2], 
 				&values[3], &values[4], &values[5],

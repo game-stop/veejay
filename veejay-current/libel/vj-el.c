@@ -47,6 +47,8 @@
 #include "rawdv.h"
 #endif
 
+#define DUMMY_FRAMES 2
+
 static struct
 {
 	const char *name;
@@ -168,19 +170,6 @@ static vj_decoder *_el_new_decoder( int id , int width, int height, float fps, i
 	return d;
 }
 
-
-
-static 	void	_el_free_decoder(vj_decoder *d)
-{
-		if(d)
-		{
-			if(d->tmp_buffer) free(d->tmp_buffer);
-			avcodec_close( d->context );
-			free(d);
-			d = NULL;
-		}
-}
-
 static int _el_probe_for_pixel_fmt( lav_file_t *fd )
 {
 	if(!fd) return -1;
@@ -201,15 +190,15 @@ static int _el_probe_for_pixel_fmt( lav_file_t *fd )
 
 int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force, char override_norm)
 {
-    int i, n, nerr;
-    int chroma=0;
-    int _fc;
+	int i, n, nerr;
+	int chroma=0;
+	int _fc;
 	int decoder_id = 0;
 	const char *compr_type;
 	int pix_fmt = -1;
-    char *realname = NULL;	
+	char *realname = NULL;	
 
-    if( filename == NULL ) 
+ 	if( filename == NULL ) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "No files to open!");
 		return -1;
@@ -217,18 +206,18 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Opening file '%s'", filename );
 
-    if (preserve_pathname)
+	if (preserve_pathname)
 		realname = strdup(filename);
-    else
+	else
 		realname = canonicalize_file_name( filename );
 
-    if(realname == NULL )
+	if(realname == NULL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot get full path of '%s'", filename);
 		return -1;
 	}
 
-    for (i = 0; i < el->num_video_files; i++)
+	for (i = 0; i < el->num_video_files; i++)
 	{
 		if (strncmp(realname, el->video_file_list[i], strlen( el->video_file_list[i])) == 0)
 		{
@@ -250,14 +239,6 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		chroma = el->MJPG_chroma;
          
     n = el->num_video_files;
-
-    if(el->has_video == 0)
-    { // in case we have initialized from probing
-		el->video_frames = 0;
-        if(el->frame_list) free(el->frame_list);
-		el->frame_list = NULL;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Cleared frame list ");
-    }
 
     el->num_video_files++;
 
@@ -555,6 +536,13 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	if(realname)
 		free(realname);
 
+	if(el->is_empty)
+	{
+		el->video_frames = el->num_frames[0];
+		el->video_frames -= DUMMY_FRAMES;
+	}
+	el->is_empty = 0;	
+	el->has_video = 1;
     return n;
 }
 
@@ -623,7 +611,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3], int pix_fm
 	int c_i = 0;
 	vj_decoder *d = NULL;
 
-    if( el->has_video == 0 )
+    if( el->has_video == 0 || el->is_empty )
 	{ vj_el_dummy_frame( dst, el, pix_fmt ); return 2; }
 
     if (nframe < 0)
@@ -761,7 +749,7 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
     uint64_t n;	
 	int ns0, ns1;
 
-    if (!el->has_audio)
+    if (!el->has_audio && !el->is_empty)
 	return 0;
 
     if (nframe < 0)
@@ -881,6 +869,7 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 	if(!el) return NULL;
 	el->MJPG_chroma = chroma;
 	el->video_norm = norm;
+	el->is_empty = 1;
 	el->has_audio = 0;
 	el->audio_rate = 0;
 	el->audio_bits = 0;
@@ -890,7 +879,7 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 	el->num_video_files = 0;
 	el->video_width = width;
 	el->video_height = height;
-	el->video_frames = 0;
+	el->video_frames = DUMMY_FRAMES; /* veejay needs at least 2 frames (play and queue next)*/
 	el->video_fps = fps;
 	el->video_inter = LAV_NOT_INTERLACED;
 	el->pixel_format = (chroma == CHROMA420 ? FMT_420 : FMT_422);
@@ -1260,52 +1249,6 @@ void	vj_el_print(editlist *el)
 
 }
 
-editlist *vj_el_probe_from_file( char *filename )
-{
-	editlist *el = vj_malloc(sizeof(editlist));
-	vj_avformat *tmp;
-	if(!el) return NULL;
-	memset(el, 0, sizeof(editlist));
-	el->pixel_format = -1;
-	
- 	
-	tmp = vj_avformat_open_input(filename);
-	if(!tmp)
-	{
-	 veejay_msg(VEEJAY_MSG_ERROR, "Unable to probe %s, is it a video file?", filename);
-	 if(el) free(el);
-	 return NULL;
-	}
-
-	el->video_width  = vj_avformat_get_video_width( tmp );
-	el->video_height = vj_avformat_get_video_height(tmp);
-	el->video_fps	 = vj_avformat_get_video_fps(tmp);
-	el->video_inter  = vj_avformat_get_video_inter(tmp);
-//	el->audio_rate   = vj_avformat_get_audio_rate(tmp);
-//	el->audio_chans  = vj_avformat_get_audio_channels(tmp);
-//	el->audio_bits   = 16;
-//	el->audio_bps    = 4;
-//	el->has_audio	 = (el->audio_rate > 0  ? 1: 0 );
-
-	if(el->video_inter == 25 )
-		el->video_norm = 'p';
-	else
-		el->video_norm = 'n';
-	el->MJPG_chroma	 = CHROMA420;
-
-	veejay_msg(VEEJAY_MSG_DEBUG,"Probed file: %s %dx%d@%2.2f , %s , %d Hz/%d channels/%d bits", filename,
-		el->video_width,el->video_height,el->video_fps,(el->video_norm=='p' ? "PAL" :"NTSC"),
-		el->audio_rate, el->audio_chans, el->audio_bits);
-	vj_avformat_close_input(tmp);
-
-	el->has_video = 0; /* this is a stream */
-	el->video_frames = 2;
-	el->num_video_files = 0;
-	el->frame_list = NULL;
-
-	return el;
-}
-
 MPEG_timecode_t get_timecode(editlist *el, long num_frames)
 {
 	MPEG_timecode_t tc;
@@ -1341,6 +1284,9 @@ int	vj_el_get_file_entry(editlist *el, long *start_pos, long *end_pos, long entr
 
 char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 {
+	if(el->is_empty)
+		return NULL;
+
 	int num_files;
 	int64_t oldfile, oldframe;
 	int64_t index[MAX_EDIT_LIST_FILES];
@@ -1351,7 +1297,6 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	int64_t n2 = el->video_frames-1;
 	/* get which files are actually referenced in the edit list entries */
 	int est_len = 0;
-	int row_num = 0;
    	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
 		index[j] = -1;
 
@@ -1383,7 +1328,6 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	bzero( result, est_len );
 	sprintf(result, "%04d",num_files );
 
-	int te = 0;
 	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
 	{
 		if (index[j] >= 0 && el->video_file_list[j] != NULL)
@@ -1451,7 +1395,12 @@ int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 	int64_t n1 = (uint64_t) _n1;
 	int64_t n2 = (uint64_t) _n2;
 	int64_t i;
-    /* check n1 and n2 for correctness */
+
+	if(el->is_empty)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "No frames in EditList" );
+		return 0;
+	}
 
     	if (n1 < 0)
 		n1 = 0;
@@ -1520,67 +1469,6 @@ int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 	return 1;
 }
 
-editlist *vj_el_new(char *filename, char *norm, int deinterlace) 
-{
-	editlist *el = vj_malloc(sizeof(editlist));
-	uint64_t	index_list[MAX_EDIT_LIST_FILES];
-	uint64_t 	i = 0;
-	uint64_t 	n = 0;
-
-	if(!el) return NULL;
-
-	memset( el, 0, sizeof(editlist) );  
-
-	el->pixel_format = -1;
-	el->has_video = 1; //assume we get it   
-	el->MJPG_chroma = CHROMA420;
-	el->video_norm = (char)norm;
-
-    n = open_video_file(filename, el, 0, deinterlace,0, 'p');
-
-	if(n<0)
-	{
-	veejay_msg(VEEJAY_MSG_DEBUG, "Clean up EDL %p", el);
-		vj_el_free(el);
-		return NULL;
-	}
-
-	el->frame_list = (uint64_t *) realloc(el->frame_list,
-		      (el->video_frames +
-		       el->num_frames[n]) *
-		      sizeof(uint64_t));
-
-	if (el->frame_list==NULL)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
-		vj_el_free(el);
-		return NULL;
-	}
-
-	for (i = 0; i < el->num_frames[n]; i++)
-	{
-		el->frame_list[el->video_frames] = EL_ENTRY(n, i);
-		el->video_frames++;
-	}
-	
-    /* Calculate maximum frame size */
-
-    for (i = 0; i < el->video_frames; i++)
-	{
-		n = el->frame_list[i];
-		if (lav_frame_size(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n)) >
-		    el->max_frame_size)
-		    el->max_frame_size =
-			lav_frame_size(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n));
-   	}
-
-    /* Help for audio positioning */
-    el->last_afile = -1;
-	el->auto_deinter = 0;
-
-	return el;
-}
-
 void	vj_el_frame_cache(int n )
 {
 	if(n > 1  || n < 1000)
@@ -1594,6 +1482,7 @@ editlist	*vj_el_soft_clone(editlist *el)
 	editlist *clone = (editlist*) vj_malloc(sizeof(editlist));
 	if(!clone)
 		return 0;
+	clone->is_empty = el->is_empty;
 	clone->has_video = el->has_video;
 	clone->video_width = el->video_width;
 	clone->video_height = el->video_height;

@@ -35,6 +35,19 @@ int vj_jack_pause();
 
 int vj_jack_resume();
 
+int	vj_jack_play(void *data, int len);
+
+int	vj_jack_set_volume(int volume);
+
+int	vj_jack_pause();
+
+int	vj_jack_resume();
+
+long	vj_jack_get_status(long int *sec, long int *usec);
+
+int	vj_jack_get_space();
+
 int vj_jack_continue(int speed);
+
 #endif
 #endif

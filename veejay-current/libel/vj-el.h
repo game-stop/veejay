@@ -36,7 +36,8 @@
 
 typedef struct 
 {
-	int has_video;
+	int 	has_video;
+	int	is_empty;
 	int	video_width;  
 	int	video_height;
 	int	video_inter;
@@ -70,13 +71,10 @@ typedef struct
 	int		auto_deinter;
 	
 	int		pixel_format;
-	
 } editlist;  
 
 
 editlist *vj_el_init_with_args(char **filenames, int n, int flags, int deinter, int force, char norm);
-
-editlist *vj_el_probe_from_file( char *filename );
 
 void	vj_el_free(editlist *el);
 

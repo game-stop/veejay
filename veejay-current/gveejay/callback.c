@@ -467,6 +467,7 @@ void	on_button_fx_entry_value_changed(GtkWidget *w, gpointer user_data)
 		multi_vims( VIMS_CHAIN_SET_ENTRY, "%d",
 			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w))
 		);
+		info->uc.selected_chain_entry = gtk_spin_button_get_value( GTK_SPIN_BUTTON(w));
 		info->uc.reload_hint[HINT_ENTRY] = 1;	
 	}  	
 				

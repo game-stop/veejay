@@ -71,7 +71,6 @@ static int	picture_prepare_decode( vj_pixbuf_t *picture )
 	if(!picture->image)
 		return 0;
 
-	int i;
 	int scale = 0;
 	picture->raw = (uint8_t*) vj_malloc(sizeof(uint8_t) *
 				   (picture->display_w * picture->display_h * 3));
@@ -130,7 +129,6 @@ void	vj_picture_cleanup( void *pic )
 	vj_pixbuf_t *picture = ( vj_pixbuf_t*) pic;
 	if(picture)
 	{
-		int i;
 		if(picture->raw)
 			free(picture->raw);
 		if( picture->filename )
@@ -367,7 +365,6 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 
 veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int out_w, int out_h, int fmt  )
 {
-	int ret = 0;
 	veejay_image_t *image = (veejay_image_t*) vj_malloc(sizeof(veejay_image_t));
 	if(!image)
 		return NULL;
