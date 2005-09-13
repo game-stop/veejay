@@ -299,6 +299,14 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		}
 	}
 
+	if(lav_video_frames(el->lav_fd[n]) < 2)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to load video files that contain less than 2 frames");
+		if( el->lav_fd[n] ) lav_close(el->lav_fd[n]);
+		if(realname) free(realname);
+		return -1;
+	}
+
     el->num_frames[n] = lav_video_frames(el->lav_fd[n]);
     el->video_file_list[n] = strndup(realname, strlen(realname));
     /* Debug Output */
@@ -1148,8 +1156,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	/* Now, check if we have loaded any file 
            (because we skip the files that fail) */
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Num video files = %d",
-		el->num_video_files);
 
 	if( el->num_video_files == 0 || 
 		el->video_width == 0 || el->video_height == 0 )

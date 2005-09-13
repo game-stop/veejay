@@ -2749,10 +2749,10 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 	// if both, append it to sample's edit list 
 	if(sample_edl && sample)
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Adding video file to sample %d", id );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Adding video file to existing sample %d", id );
 		if(veejay_edit_addmovie_sample( info, movie, id))
-			return 1;
-		return 0;
+			return 0;
+		return -1;
 	}
 
 	// create initial edit list for sample (is currently playing)
@@ -2761,7 +2761,7 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 				info->edit_list->video_norm );
 	// if that fails, bye
 	if(!sample_edl)
-		return 0;
+		return -1;
 
 	sample_edl->pixel_format = info->pixel_format;
 
@@ -2771,7 +2771,7 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot add this video file");
 		if(sample_edl) vj_el_free(sample_edl);
-		return 0;
+		return -1;
 	}
 
 	// the sample is not there yet,create it

@@ -1736,7 +1736,6 @@ static	void	multi_vims(int id, const char format[],...)
 	snprintf(block, sizeof(block)-1, "%03d:%s;",id,tmp);
 	va_end(args);
 	vj_client_send( info->client, V_CMD, block); 
-	if(id != 333) fprintf(stderr, "%s : %d [%s]\n", __FUNCTION__, id, block );
 }
 
 static	void single_vims(int id)
@@ -1746,24 +1745,23 @@ static	void single_vims(int id)
 		return;
 	sprintf(block, "%03d:;",id);
 	vj_client_send( info->client, V_CMD, block );
-	fprintf(stderr, "%s : %d [%s]\n", __FUNCTION__ , id, block );
 }
-
+static int count__ = 0;
 static gchar	*recv_vims(int slen, int *bytes_written)
 {
 	int tmp_len = slen+1;
 	gchar tmp[tmp_len];
 	bzero(tmp,tmp_len);
 
-	fprintf(stderr, "%s : header of %d\n", __FUNCTION__, slen );
 	int ret = vj_client_read( info->client, V_CMD, tmp, slen );
-	int len = ret;
+	int len = 0;
 	sscanf( tmp, "%d", &len );
 	gchar *result = NULL;
 	if( len <= 0 || slen <= 0)
 	{
 		return result;
 	}
+	count__++;
 	result = (gchar*) vj_malloc(sizeof(gchar) * (len + 1) );
 	bzero(result, (len+1));
 	int bytes_left = len;
@@ -1784,7 +1782,6 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 	}
 	return result;
 }
-
 static int recv_vims_binary(int slen, int *bytes_written, guchar *buf)
 {
 	int tmp_len = slen+1;
@@ -2425,10 +2422,7 @@ static  GdkPixbuf	*update_pixmap_kf( int status )
 	GError *error = NULL;
 	GdkPixbuf *toggle = gdk_pixbuf_new_from_file( path , &error);
 	if(error)
-	{
-	fprintf(stderr, "[%s\n" , error->message );
 		return NULL;
-	}
 	return toggle;
 }	
 static  GdkPixbuf	*update_pixmap_entry( int status )
@@ -3339,7 +3333,7 @@ static	void	load_v4l_info()
 {
 	int values[5];
 	int len = 0;
-	multi_vims( VIMS_STREAM_GET_V4L, "%d", info->selected_slot->sample_id );
+	multi_vims( VIMS_STREAM_GET_V4L, "%d", (info->selected_slot == NULL ? 0 : info->selected_slot->sample_id ));
 	gchar *answer = recv_vims(3, &len);
 	if(len > 0 )
 	{
@@ -3401,18 +3395,15 @@ static	gint load_parameter_info(int cv)
 	int	len = 0;
 	int	p[15];
 	int 	i;
-
 	multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, 
 		info->uc.selected_chain_entry );
 
 	gchar *answer = recv_vims(3,&len);
-
-	if(len < 0 )
+	if(len <= 0 || answer == NULL )
 	{
 		if(answer) g_free(answer);
 		return 0;
 	}
-
 	int res = sscanf( answer,
 		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		p+0,p+1,p+2,p+3,p+4,p+5,p+6,p+7,p+8,p+9,p+10,
@@ -3456,6 +3447,9 @@ static	void	load_effectchain_info()
 	gchar *fxtext = recv_vims(3,&fxlen);
 
 	reset_tree( "tree_chain" );
+
+	if( fxlen <= 0 )
+		return;
 
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
 	store = GTK_LIST_STORE(model);
@@ -3845,7 +3839,6 @@ void	on_samplelist_edited(GtkCellRendererText *cell,
 
 		if(info->selected_slot->sample_id == sample_id )
 		{
-			fprintf(stderr, "UNCHECKED CODE: %s\n", __FUNCTION__ );
 			if(info->selected_slot->title )
 				free(info->selected_slot->title );	
 			info->selected_slot->title = strdup( descr );
@@ -3987,14 +3980,8 @@ static	void	select_slot()
 	{
 		int b = 0; int p = 0;
 
-
 		verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID],
 			info->status_tokens[PLAY_MODE] );
-
-
-fprintf(stderr, "SELECT SLOT %d, %d, %d %d\n", b, p, info->status_tokens[CURRENT_ID],
-		info->status_tokens[PLAY_MODE]);
-
 
 		info->selected_slot = info->sample_banks[b]->slot[p];
 		info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
@@ -4081,6 +4068,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 
 	single_vims( VIMS_STREAM_LIST );
 	fxtext = recv_vims(5, &fxlen);
+
 	if( fxlen > 0 && fxtext != NULL)
 	{
 		has_streams = 1;
@@ -4157,7 +4145,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 
 	}
 
-	g_free(fxtext);
+	if(fxtext) g_free(fxtext);
 }
 
 gboolean
@@ -4690,7 +4678,6 @@ static	void	reload_bundles()
 	gint len = 0;
 	single_vims( VIMS_BUNDLE_LIST );
 	gchar *eltext = recv_vims(5,&len); // msg len
-
 	gint 	offset = 0;
 
 	reset_tree("tree_bundles");
@@ -4714,7 +4701,6 @@ static	void	reload_bundles()
 
 		if(n < 4)
 		{
-			fprintf(stderr, "Cant load bundles\n");
 			exit(0);
 		}
 		offset += 14;
@@ -5174,7 +5160,7 @@ static	gboolean	update_imageA( gpointer data )
 	
 	if( info->state == STATE_PLAYING )
 		gveejay_update_image2(
-			glade_xml_get_widget_(info->main_window, "imageA"), 176,144 );
+		glade_xml_get_widget_(info->main_window, "imageA"), 176,144 );
 
 	return TRUE;
 }
@@ -6154,7 +6140,6 @@ static int	add_bank( gint bank_num  )
 	sprintf(frame_label, "Samples %d to %d", (bank_num * NUM_SAMPLES_PER_PAGE), (bank_num * NUM_SAMPLES_PER_PAGE) + NUM_SAMPLES_PER_PAGE  );
 	/* Check image dimensions */
 
-	fprintf(stderr, "%s : %d\n", __FUNCTION__, bank_num );
 	if( info->image_dimensions[0] == 0 && info->image_dimensions[1] == 0 )
 		setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 
@@ -6649,9 +6634,6 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
 
 static	void	set_selection_of_slot_in_samplebank(gboolean active)
 {
-fprintf(stderr, "set selection slot %p, %s\n",
-	info->selection_slot , active ? "YES" : "no");
-
 	if(!info->selection_slot)
 		return;
 	if(info->selection_slot->sample_id <= 0 )
@@ -6676,9 +6658,9 @@ fprintf(stderr, "set selection slot %p, %s\n",
 	{
 		gtk_frame_set_shadow_type( info->selection_gui_slot->frame, GTK_SHADOW_ETCHED_IN );
 		GdkColor color;
-		color.red = 255 * 255;
-		color.green = 255 * 255;
-		color.blue = 255 * 255;
+		color.red = 255 * 128;
+		color.green = 255 * 128;
+		color.blue = 255 * 128;
 		gtk_widget_modify_fg ( info->selection_gui_slot->timecode,
 			GTK_STATE_NORMAL, &color );
 		gtk_widget_modify_fg ( info->selection_gui_slot->title,

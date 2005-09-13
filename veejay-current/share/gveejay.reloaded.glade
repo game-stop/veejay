@@ -9249,6 +9249,60 @@ YV16</property>
 				      <property name="fill">False</property>
 				    </packing>
 				  </child>
+
+				  <child>
+				    <widget class="GtkButton" id="sampleadd">
+				      <property name="visible">True</property>
+				      <property name="tooltip" translatable="yes">Create a new solid colored stream</property>
+				      <property name="can_focus">True</property>
+				      <property name="relief">GTK_RELIEF_NORMAL</property>
+				      <property name="focus_on_click">True</property>
+				      <signal name="clicked" handler="on_sampleadd_clicked" last_modification_time="Tue, 13 Sep 2005 21:46:40 GMT"/>
+
+				      <child>
+					<widget class="GtkImage" id="image536">
+					  <property name="visible">True</property>
+					  <property name="pixbuf">icon_newclip.png</property>
+					  <property name="xalign">0.5</property>
+					  <property name="yalign">0.5</property>
+					  <property name="xpad">0</property>
+					  <property name="ypad">0</property>
+					</widget>
+				      </child>
+				    </widget>
+				    <packing>
+				      <property name="padding">0</property>
+				      <property name="expand">False</property>
+				      <property name="fill">False</property>
+				    </packing>
+				  </child>
+
+				  <child>
+				    <widget class="GtkButton" id="streamnew">
+				      <property name="visible">True</property>
+				      <property name="tooltip" translatable="yes">Create a new solid colored stream</property>
+				      <property name="can_focus">True</property>
+				      <property name="relief">GTK_RELIEF_NORMAL</property>
+				      <property name="focus_on_click">True</property>
+				      <signal name="clicked" handler="on_streamnew_clicked" last_modification_time="Tue, 13 Sep 2005 21:49:05 GMT"/>
+
+				      <child>
+					<widget class="GtkImage" id="image537">
+					  <property name="visible">True</property>
+					  <property name="pixbuf">icon_streamnew.png</property>
+					  <property name="xalign">0.5</property>
+					  <property name="yalign">0.5</property>
+					  <property name="xpad">0</property>
+					  <property name="ypad">0</property>
+					</widget>
+				      </child>
+				    </widget>
+				    <packing>
+				      <property name="padding">0</property>
+				      <property name="expand">False</property>
+				      <property name="fill">False</property>
+				    </packing>
+				  </child>
 				</widget>
 			      </child>
 			    </widget>
@@ -11626,10 +11680,11 @@ YV16</property>
 <widget class="GtkWindow" id="inputstream_window">
   <property name="title" translatable="yes">GVeejay Reloaded - New input stream</property>
   <property name="type">GTK_WINDOW_TOPLEVEL</property>
-  <property name="window_position">GTK_WIN_POS_NONE</property>
+  <property name="window_position">GTK_WIN_POS_CENTER_ON_PARENT</property>
   <property name="modal">False</property>
   <property name="resizable">True</property>
   <property name="destroy_with_parent">False</property>
+  <property name="icon">icon_streamnew.png</property>
   <property name="decorated">True</property>
   <property name="skip_taskbar_hint">False</property>
   <property name="skip_pager_hint">False</property>
@@ -11639,6 +11694,7 @@ YV16</property>
 
   <child>
     <widget class="GtkFrame" id="frame161">
+      <property name="width_request">340</property>
       <property name="visible">True</property>
       <property name="label_xalign">0</property>
       <property name="label_yalign">0.5</property>
@@ -12149,6 +12205,7 @@ YV16</property>
 		      <property name="can_focus">True</property>
 		      <property name="relief">GTK_RELIEF_NORMAL</property>
 		      <property name="focus_on_click">True</property>
+		      <signal name="clicked" handler="on_inputstream_close_clicked" last_modification_time="Tue, 13 Sep 2005 22:06:27 GMT"/>
 
 		      <child>
 			<widget class="GtkAlignment" id="alignment365">

@@ -600,7 +600,23 @@ static struct {
 
 #define FORMAT_MSG(dst,str) sprintf(dst,"%03d%s",strlen(str),str)
 #define APPEND_MSG(dst,str) strncat(dst,str,strlen(str))
-#define SEND_MSG_DEBUG(v,str) veejay_msg(VEEJAY_MSG_INFO, "[%d][%s]",strlen(str),str)
+#define SEND_MSG_DEBUG(v,str) \
+{\
+char *__buf = str;\
+int  __len = strlen(str);\
+int  __done = 0;\
+veejay_msg(VEEJAY_MSG_INFO, "--------------------------------------------------------");\
+for(__done = 0; __len > (__done + 80); __done += 80)\
+{\
+	char *__tmp = strndup( str+__done, 80 );\
+veejay_msg(VEEJAY_MSG_INFO, "[%d][%s]",strlen(str),__tmp);\
+	if(__tmp) free(__tmp);\
+}\
+veejay_msg(VEEJAY_MSG_INFO, "[%s]", str + __done );\
+vj_server_send(v->vjs[0], v->uc->current_link, __buf, strlen(__buf));\
+veejay_msg(VEEJAY_MSG_INFO, "--------------------------------------------------------");\
+}
+
 #define SEND_MSG(v,str)\
 {\
 vj_server_send(v->vjs[0], v->uc->current_link, str, strlen(str));\
@@ -2609,8 +2625,6 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 		}
 	}
 
-	//len ++;
-
 	for( i = VIMS_BUNDLE_START; i < VIMS_BUNDLE_END; i ++ )
 	{
 		if( vj_event_bundle_exists(i))
@@ -2623,16 +2637,13 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 			}
 		}
 	}
-	
-	// token len too small !!
+
 	if(len > 0)
 	{
-	//	char *buf = (char*) vj_malloc(sizeof(char) * (len+5) );
-	
-	//	bzero(buf, len+5 );
 		char *buf = _s_print_buf;
 		bzero(buf, SEND_BUF);
 		sprintf(buf, "%05d", len ); 
+		int rc  = 0;
 		for ( i = 0; i < MAX_SDL_KEY; i ++ )
 		{
 			if( keyboard_event_exists(i))
@@ -2644,13 +2655,15 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 					int arg_len = (ev->arguments == NULL ? 0 : strlen(ev->arguments));
 					char tmp[token_len];
 					bzero(tmp,token_len); 
-	
 					sprintf(tmp, "%04d%03d%03d%04d", id, ev->key_symbol, ev->key_mod, arg_len );
 					strncat(buf,tmp,token_len);
 					if( arg_len > 0 )
 					{
 						strncat( buf, ev->arguments, arg_len );
 					}
+					rc += arg_len;
+					rc += strlen(tmp);
+
 				}
 			}
 		}
@@ -2672,16 +2685,13 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 					sprintf(tmp, "%04d%03d%03d%04d",
 						i,key_id,key_mod, bun_len );
 
-					strncat( buf, tmp, token_len );
+					strncat( buf, tmp, strlen(tmp) );
 					strncat( buf, m->bundle, bun_len );
 				}
 			}
 		}
 
-fprintf(stderr, "Buf = %d\n", len );
-
 		SEND_MSG(v,buf);
-	//	if(buf) free(buf);
 	}	
 	else
 	{
@@ -3277,7 +3287,6 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,"%s %d: Cannot store new sample!",__FILE__,__LINE__);
 			}
-			veejay_msg(VEEJAY_MSG_DEBUG, "New el = %p (from %p)", el, v->edit_list );
 		}
 		else
 		{
@@ -3793,11 +3802,11 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
 			 	veejay_msg(VEEJAY_MSG_ERROR, "adding file");
 				return;
 			}
-
+			// add to new sample
 			int ns = veejay_edit_addmovie_sample(v,avi_file,0 );
-			if(ns)
-				veejay_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s",ns,avi_file);
-			else
+			if(ns > 0)
+				veejay_msg(VEEJAY_MSG_INFO, "Added file '%s' to new sample %d",avi_file, ns);
+			if(ns <= 0 )
 				veejay_msg(VEEJAY_MSG_ERROR, "Cannot add videofile %s to EditList!",avi_file);
 
 			sample_reset_encoder( v->uc->sample_id);
@@ -3806,8 +3815,8 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
 			if(s->sample_record_switch) 
 			{
 				s->sample_record_switch = 0;
-				veejay_set_sample( v, ns );
-				veejay_msg(VEEJAY_MSG_INFO, "Switching to sample %d (recording)", sample_size()-1);
+				if( ns > 0 )
+					veejay_set_sample( v, ns );
 			}
 		}
 		else
@@ -5838,8 +5847,13 @@ void vj_event_el_add_video_sample(void *ptr, const char format[], va_list ap)
 	P_A(args,str,format,ap);
 
 	int new_sample_id = args[0];
-
+	if(new_sample_id == 0 )
+		veejay_msg(VEEJAY_MSG_DEBUG, "CREATING NEW");
+	else
+		veejay_msg(VEEJAY_MSG_DEBUG, "APPENDING TO EXISITING");
 	new_sample_id = veejay_edit_addmovie_sample(v,str,new_sample_id );
+	if(new_sample_id <= 0)
+		new_sample_id = 0;
 	veejay_msg(VEEJAY_MSG_DEBUG , "New sample %d from file %s", new_sample_id, str );
 	vj_event_send_new_id( v,new_sample_id );
 }
@@ -6285,8 +6299,9 @@ void vj_event_tag_rec_stop(void *ptr, const char format[], va_list ap)
 			return;
 		}	
 
-		int ns = veejay_edit_addmovie_sample( v,avi_file, v->uc->sample_id );
-		if(ns)
+		// create new sample 
+		int ns = veejay_edit_addmovie_sample( v,avi_file, 0 );
+		if(ns > 0)
 		{
 			int len = vj_tag_get_encoded_frames(v->uc->sample_id) - 1;
 			veejay_msg(VEEJAY_MSG_INFO,"Added file %s (%d frames) to EditList as sample %d",
@@ -6395,7 +6410,8 @@ void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
 			char avi_file[255];
 
 			if( vj_tag_get_encoded_file(v->uc->sample_id, avi_file)!=0) return;
-			
+		
+			// create new sample	
 			int ns = veejay_edit_addmovie_sample(v,avi_file,0);
 
 			if(ns)
@@ -7282,16 +7298,18 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 	int error = 1;
 	veejay_t *v = (veejay_t*)ptr;
 	P_A(args,str,format,ap);
-
+	bzero(line,255);
 	bzero(fline,255);
 	sprintf(line, "%03d", 0);
 
-	if(args[0] == 0) 
-		args[0] = v->uc->sample_id;
-
-	if(SAMPLE_PLAYING(v))
+	if( SAMPLE_PLAYING(v)  )
 	{
-		if(args[1]==-1) args[1] = sample_get_selected_entry(args[0]);
+		if(args[0] == 0) 
+			args[0] = v->uc->sample_id;
+
+		if(args[1]==-1)
+			args[1] = sample_get_selected_entry(args[0]);
+
 		int effect_id = sample_get_effect_any(args[0], args[1]);
 		
 		if(effect_id > 0)
@@ -7304,13 +7322,9 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 			//int audio_on = sample_get_chain_audio(args[0],args[1]);
 			int num_params = vj_effect_get_num_params(effect_id);
 			for(p = 0 ; p < num_params; p++)
-			{
 				params[p] = sample_get_effect_arg(args[0],args[1],p);
-			}
 			for(p = num_params; p < SAMPLE_MAX_PARAMETERS; p++)
-			{
 				params[p] = 0;
-			}
 
 			sprintf(line, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 				effect_id,
@@ -7336,7 +7350,12 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 	
 	if(STREAM_PLAYING(v))
 	{
-		if(args[1] == -1) args[1] = vj_tag_get_selected_entry(args[0]);
+		if(args[0] == 0) 
+			args[0] = v->uc->sample_id;
+
+		if(args[1] == -1)
+			args[1] = vj_tag_get_selected_entry(args[0]);
+
  		int effect_id = vj_tag_get_effect_any(args[0], args[1]);
 
 		if(effect_id > 0)
@@ -7396,9 +7415,7 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 	P_A(args,str,format,ap);
 
 	if(args[0] == 0) 
-	{
 		args[0] = v->uc->sample_id;
-	}
 
 	bzero( _s_print_buf,SEND_BUF);
 	bzero( _print_buf, SEND_BUF);
@@ -7492,7 +7509,7 @@ void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 	
 	if( el->num_video_files <= 0 )
 	{
-		SEND_MSG( v, "00000000");
+		SEND_MSG( v, "000000");
 		return;
 	}
 

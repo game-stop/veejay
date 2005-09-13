@@ -420,7 +420,7 @@ void	on_button_el_addsample_clicked(GtkWidget *w, gpointer *user_data)
 	
 	int sample_id = 0;
 	int result_len = 0;
-	multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%d %s", info->status_tokens[CURRENT_ID], filename );
+	multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%d %s", 0, filename );
 
 	gchar *result = recv_vims( 3, &result_len );
 	if(result_len > 0 )
@@ -1737,7 +1737,6 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
  	s->ec->effects[i]->parameters[j]->running = 0;
 	set_toggle_button( "curve_togglerun", 0 );
 
-	fprintf(stderr, "Cleared");
 	//set_parameter_key( s->ec->effects[i]->parameters[j], curve );
 }
 
@@ -1868,10 +1867,23 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
 	// set page 1 from notebook panels
 	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
-	if(page == 0)
-		gtk_notebook_next_page( GTK_NOTEBOOK(n) );
-	if(page == 2)
-		gtk_notebook_prev_page( GTK_NOTEBOOK(n) );
+	if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE)
+	{
+		if(page == 0)
+			gtk_notebook_next_page( GTK_NOTEBOOK(n) );
+		if(page == 2)
+			gtk_notebook_prev_page( GTK_NOTEBOOK(n) );
+	}
+	if(info->status_tokens[PLAY_MODE] == MODE_STREAM)
+	{
+		if(page == 0)
+			gtk_notebook_next_page(GTK_NOTEBOOK(n));
+		page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
+
+		if(page == 1)
+			gtk_notebook_next_page(GTK_NOTEBOOK(n));
+
+	}
 }
 
 
@@ -1913,4 +1925,37 @@ void	on_timeline_in_point_changed(GtkWidget *widget, gpointer user_data)
 		else
 			vj_msg(VEEJAY_MSG_INFO,"Set In Point before Out Point !");
 	}
+}
+
+void	on_sampleadd_clicked(GtkWidget *widget, gpointer user_data)
+{
+	gchar *filename = dialog_open_file( "Add videofile as new sample" );
+	if(filename)
+	{
+		int sample_id = 0; // new sample
+		int result_len = 0;
+		multi_vims( VIMS_EDITLIST_ADD_SAMPLE, "%d %s", 0, filename );
+
+		gchar *result = recv_vims( 3, &result_len );
+		if(result_len > 0 )
+		{
+			sscanf( result, "%5d", &sample_id );
+			vj_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s", sample_id, filename);
+			g_free(result);
+		}
+		g_free(filename );
+	}
+}
+
+void	on_streamnew_clicked(GtkWidget *widget, gpointer user_data)
+{
+	// inputstream_window
+	GtkWidget *w = glade_xml_get_widget(info->main_window, "inputstream_window");
+	gtk_widget_show(w);	
+}
+
+void	on_inputstream_close_clicked(GtkWidget *w,  gpointer user_data)
+{
+	GtkWidget *w = glade_xml_get_widget(info->main_window, "inputstream_window");
+	gtk_widget_hide(w);	
 }
