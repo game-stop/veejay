@@ -1073,7 +1073,7 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 			}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		sprintf(info->status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		sprintf(info->status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			(int) info->real_fps,
 			settings->current_frame_num,
 			info->uc->playback_mode,
@@ -1088,6 +1088,7 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 			0,
 			0,
 			0,
+			0,	
 			0,
 			total_slots );
 		break;

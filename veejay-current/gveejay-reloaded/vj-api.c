@@ -78,7 +78,8 @@ static int	TIMEOUT_SECONDS = 0;
 #define SAMPLE_MARKER_END     14
 #define FRAME_NUM	1
 #define TOTAL_FRAMES	6
-#define TOTAL_SLOTS	15
+#define TOTAL_SLOTS	16
+#define CURRENT_ENTRY	15
 #define	MODE_PLAIN	2
 #define MODE_SAMPLE	0
 #define MODE_PATTERN    3
@@ -211,7 +212,6 @@ typedef struct
 	int	selected_vims_id;
 	int	render_record; 
 	int	entry_tokens[STATUS_TOKENS];
-	int	entry_history[STATUS_TOKENS];
 	int	iterator;
 	int	selected_effect_id;
 	int	reload_hint[NUM_HINTS];
@@ -2447,39 +2447,37 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 {
 
 	vj_gui_t *gui = (vj_gui_t*) data;
-	int entry = gui->uc.selected_chain_entry;
+	int entry = info->uc.selected_chain_entry;
 	int effect_id = gui->uc.entry_tokens[ ENTRY_FXID ];
 	gint gentry = 0;
 	gtk_tree_model_get (model, iter,
                         FXC_ID, &gentry, -1);
-
 	if(gentry == entry)
 	{
-	if( effect_id <= 0 )
-	{
-	//	gtk_list_store_set( GTK_LIST_STORE(model), iter, 0 , FALSE, - 1);
-		gtk_list_store_set( GTK_LIST_STORE(model),iter, FXC_ID, entry,
-			FXC_FXID, "", FXC_FXSTATUS, NULL, FXC_KF, NULL , -1);
-	}
-	else
-	{
-		gchar *descr = _utf8str( _effect_get_description( effect_id ));
-		sample_slot_t *s = info->selected_slot;
-		int on = s->ec->effects[entry]->enabled;
-		GdkPixbuf *toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_FXSTATUS] );
-		GdkPixbuf *kf_toggle = update_pixmap_kf( on );
-		gtk_list_store_set( GTK_LIST_STORE(model),iter,
-			FXC_ID, entry,
-			FXC_FXID, descr,
-			FXC_FXSTATUS, toggle,
-			FXC_KF, kf_toggle, -1 );
-		g_free(descr);
-		g_object_unref( kf_toggle );
-		g_object_unref( toggle );
-	}
+		int effect_id = gui->uc.entry_tokens[ ENTRY_FXID ];
+		if( effect_id <= 0 )
+		{
+			gtk_list_store_set( GTK_LIST_STORE(model),iter, FXC_ID, entry, -1 );
+		}
+		else
+		{
+			gchar *descr = _utf8str( _effect_get_description( effect_id ));
+			sample_slot_t *s = info->selected_slot;
+			int on = s->ec->effects[entry]->enabled;
+			GdkPixbuf *toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_FXSTATUS] );
+			GdkPixbuf *kf_toggle = update_pixmap_kf( on );
+			gtk_list_store_set( GTK_LIST_STORE(model),iter,
+				FXC_ID, entry,
+				FXC_FXID, descr,
+				FXC_FXSTATUS, toggle,
+				FXC_KF, kf_toggle, -1 );
+			g_free(descr);
+			g_object_unref( kf_toggle );
+			g_object_unref( toggle );
+		}
 	}
 
-  return FALSE;
+ 	return FALSE;
 }
 
 static	void	update_status_accessibility(int pm)
@@ -2567,7 +2565,6 @@ static void	update_current_slot(int pm)
 {
 	gchar *time = format_time( info->status_tokens[FRAME_NUM] - info->status_tokens[SAMPLE_START]);
 	int *history = info->history_tokens[pm];
-
 	update_label_str( "label_sampleposition", time);
 	g_free(time); 
 	gint update = 0;
@@ -2578,6 +2575,17 @@ static void	update_current_slot(int pm)
 
 	/* Mode changed or ID changed, 
 	   Reload FX Chain, Reload current entry and disable widgets based on stream type */
+	if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ||
+		info->uc.reload_hint[HINT_ENTRY] == 1 )
+	{
+		info->uc.selected_chain_entry = info->status_tokens[CURRENT_ENTRY];
+		info->uc.reload_hint[HINT_ENTRY] = 1;
+		int curve_changed_ = load_parameter_info( );
+
+		if(pm == MODE_SAMPLE && curve_changed_)
+			info->uc.reload_hint[HINT_KF]  = 1;
+	}
+
 	if( pm != info->prev_mode || info->status_tokens[CURRENT_ID] != history[CURRENT_ID] )
 	{
 		int k;
@@ -2826,7 +2834,6 @@ static void 	update_globalinfo()
 			(gdouble) info->status_tokens[TOTAL_FRAMES] , info->status_tokens[FRAME_NUM]);
 
 	}
-
 	if( info->status_tokens[TOTAL_SLOTS] !=
 		history[TOTAL_SLOTS] 
 			|| info->status_tokens[TOTAL_SLOTS] != info->uc.expected_slots )
@@ -2959,7 +2966,6 @@ static void	process_reload_hints(void)
 	int pm = info->status_tokens[PLAY_MODE];
 	int *history = info->history_tokens[pm];
 
-	int	*entry_history = &(info->uc.entry_history[0]);
 	int	*entry_tokens = &(info->uc.entry_tokens[0]);
 
 	if(info->uc.reload_hint[HINT_V4L] == 1 && pm == MODE_STREAM)
@@ -3030,12 +3036,7 @@ static void	process_reload_hints(void)
 		gint np = 0;
 		gint i;
 		/* update effect description */
-		gint curve_changed_ = load_parameter_info( 
-			info->uc.reload_hint[HINT_KF] );
-		/* Update curve if effect ID changed */
-		if(curve_changed_ && pm == MODE_SAMPLE)
-			info->uc.reload_hint[HINT_KF] = 1;
-
+	
 		if( entry_tokens[ENTRY_FXID] == 0)
 		{
 			put_text( "entry_effectname" ,"" );
@@ -3044,6 +3045,7 @@ static void	process_reload_hints(void)
 		else
 		{
 			put_text( "entry_effectname", _effect_get_description( entry_tokens[ENTRY_FXID] ));
+
 			enable_widget( "FXframe");
 
 			set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_FXSTATUS] );
@@ -3155,12 +3157,9 @@ gboolean
       gint name = 0;
 
       gtk_tree_model_get(model, &iter, FXC_ID, &name, -1);
-
       if (!path_currently_selected && name != info->uc.selected_chain_entry)
       {
 	multi_vims( VIMS_CHAIN_SET_ENTRY, "%d", name );
-	info->uc.reload_hint[HINT_ENTRY] = 1;
-     	info->uc.selected_chain_entry = name;
       }
     }
 
@@ -3389,12 +3388,14 @@ static int verify_interpolator( int effect_id, int num_p )
 	return reload;
 }
 
-static	gint load_parameter_info(int cv)
+static	gint load_parameter_info()
 {
 //	int	*p = &(info->uc.entry_tokens[0]);
 	int	len = 0;
 	int	p[15];
 	int 	i;
+	int *d = &(info->uc.entry_tokens[0] );
+		
 	multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, 
 		info->uc.selected_chain_entry );
 
@@ -3402,16 +3403,20 @@ static	gint load_parameter_info(int cv)
 	if(len <= 0 || answer == NULL )
 	{
 		if(answer) g_free(answer);
+		for( i = 0; i < 16; i ++ )
+			d[i] = 0;
+		if(info->uc.selected_rgbkey)
+			disable_widget("rgbkey");
 		return 0;
 	}
 	int res = sscanf( answer,
 		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		p+0,p+1,p+2,p+3,p+4,p+5,p+6,p+7,p+8,p+9,p+10,
 		p+11,p+12,p+13,p+14,p+15);
-
 	if( res <= 0 )
+	{
 		memset( p, 0, 16 ); 
-
+	}
 	info->uc.selected_rgbkey = _effect_get_rgb( p[0] );
 	if(info->uc.selected_rgbkey)
 	{
@@ -3421,13 +3426,12 @@ static	gint load_parameter_info(int cv)
      	else
 	{
 		disable_widget( "rgbkey");
+		info->uc.selected_rgbkey = 0;
 	} 
 	g_free(answer);
 		
 	int result = verify_interpolator( p[0],p[2] );
-
-	int *d = &(info->uc.entry_tokens[0] );
-	for( i = 0; i < 16; i ++ )
+	for( i = 0; i < STATUS_TOKENS; i ++ )
 		d[i] = p[i];
 
 	return result;
@@ -3448,16 +3452,24 @@ static	void	load_effectchain_info()
 
 	reset_tree( "tree_chain" );
 
-	if( fxlen <= 0 )
-		return;
-
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
 	store = GTK_LIST_STORE(model);
 
-	if(fxlen == 5)
+	if(fxlen <= 0 )
 	{
-		offset = fxlen;
+		int i;
+		for( i = 0; i < 20; i ++ )
+		{
+			gtk_list_store_append(store,&iter);
+			gtk_list_store_set(store,&iter, FXC_ID, i ,-1);	
+			gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+		}
+		return;
 	}
+
+	if(fxlen == 5 )
+		offset = fxlen;
+	
 
 	gint last_index =0;
 
@@ -3524,9 +3536,6 @@ static	void	load_effectchain_info()
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	g_free(fxtext);
 
-
-	//TODO
-	
 }
 
 enum 
@@ -3569,7 +3578,6 @@ on_effectmixlist_row_activated(GtkTreeView *treeview,
 	GtkTreeModel *model;
 	GtkTreeIter iter;
 	model = gtk_tree_view_get_model(treeview);
-
 	if(gtk_tree_model_get_iter(model,&iter,path))
 	{
 		gint gid =0;
@@ -3579,7 +3587,7 @@ on_effectmixlist_row_activated(GtkTreeView *treeview,
 		{
 			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
 				0, info->uc.selected_chain_entry,gid );
-			info->uc.reload_hint[HINT_CHAIN] = 1;
+		//	info->uc.reload_hint[HINT_CHAIN] = 1;
 			info->uc.reload_hint[HINT_ENTRY] = 1;
 		}
 
@@ -3607,7 +3615,6 @@ on_effectlist_row_activated(GtkTreeView *treeview,
 				0, info->uc.selected_chain_entry,gid );
 			if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE)
 				vj_kf_delete_parameter(info->uc.selected_chain_entry);
-			info->uc.reload_hint[HINT_CHAIN] = 1;
 			info->uc.reload_hint[HINT_ENTRY] = 1;
 		}
 
@@ -5357,12 +5364,11 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 
 		nb = vj_client_read( gui->client, V_STATUS, gui->status_msg, n_bytes );
 	
-	
 		gui->status_lock = 1;
 		
 		if(nb > 0)
 		{
-			int n = sscanf( gui->status_msg, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+			int n = sscanf( gui->status_msg, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 				gui->status_tokens + 0,
 				gui->status_tokens + 1,
 				gui->status_tokens + 2,
@@ -5378,9 +5384,10 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 				gui->status_tokens + 12,
 				gui->status_tokens + 13,
 				gui->status_tokens + 14,
-				gui->status_tokens + 15 );
+				gui->status_tokens + 15,
+				gui->status_tokens + 16 );
 
-			if( n != 16 )
+			if( n != 17 )
 			{
 				// restore status (to prevent gui from going bezerk)
 				int *history = info->history_tokens[ info->uc.playmode ];
@@ -5389,7 +5396,8 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 				{
 					gui->status_tokens[i] = history[i];
 				}
-				fprintf(stderr, "Warning: using outdated status tokens\n");
+				fprintf(stderr, "Warning: using outdated status tokens %d\n",n);
+				exit(0);
 			}
 
 			update_gui();
@@ -5400,14 +5408,9 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		int pm = info->status_tokens[PLAY_MODE];
 		int *history = info->history_tokens[pm];
 		int i;
-		int *entry_history = &(info->uc.entry_history[0]);
-		int *entry_tokens = &(info->uc.entry_tokens[0]);
 
 		for( i = 0; i < STATUS_TOKENS; i ++ )
-		{
 			history[i] = info->status_tokens[i];
-			entry_history[i] = entry_tokens[i];
-		}
 
 		info->prev_mode = pm;
 
@@ -5856,7 +5859,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		);
 
 
-//	info->logging = g_timeout_add( 600, update_log,(gpointer*) info );
+	info->logging = g_timeout_add( 600, update_log,(gpointer*) info );
 
 	init_cpumeter();
 
@@ -5869,6 +5872,8 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 //	load_samplelist_info(true);
 
 	info->uc.reload_hint[HINT_SLIST] = 1;
+	info->uc.reload_hint[HINT_CHAIN] = 1;
+	info->uc.reload_hint[HINT_ENTRY] = 1;
  
 	int speed = info->status_tokens[SAMPLE_SPEED];
 	if( speed < 0 ) info->play_direction = -1; else info->play_direction=1;

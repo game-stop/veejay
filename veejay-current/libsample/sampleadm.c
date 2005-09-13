@@ -1762,7 +1762,7 @@ int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode,int total_s
 	return -1;
 
 	sprintf(str,
-		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		pfps,
 		frame,
 		mode,
@@ -1778,6 +1778,7 @@ int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode,int total_s
 		sample_size(),
 		sample->marker_start,
 		sample->marker_end,
+		sample->selected_entry,
 		total_slots);
 		
 		

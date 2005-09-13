@@ -2250,7 +2250,7 @@ int vj_tag_sprint_status( int tag_id, int pfps,int frame, int mode,int ts, char 
 	*/
 
 	sprintf(str,
-			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			pfps,
 			frame,
 			mode,
@@ -2266,6 +2266,7 @@ int vj_tag_sprint_status( int tag_id, int pfps,int frame, int mode,int ts, char 
 			vj_tag_size()-1,
 			tag->source_type, // no markers
 			0,
+			tag->selected_entry, 
 			ts);
 		
 
