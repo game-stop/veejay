@@ -137,9 +137,11 @@ void	on_button_054_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		gchar filename[100];
 		sprintf(filename, "frame-%d.%s", info->status_tokens[FRAME_NUM] + 1 , ext);
-		multi_vims( VIMS_SCREENSHOT,"%d %d %s",0,0,filename );
-		vj_msg(VEEJAY_MSG_INFO, "Requested veejay to take screenshot of frame %d",
-			info->status_tokens[FRAME_NUM] + 1 );
+		gint w = get_nums("screenshot_width");
+		gint h = get_nums("screenshot_height");
+		multi_vims( VIMS_SCREENSHOT,"%d %d %s",w,h,filename );
+		vj_msg(VEEJAY_MSG_INFO, "Requested veejay to take screenshot '%s' of frame %d",
+			filename, info->status_tokens[FRAME_NUM] + 1 );
 	}
 }
 void	on_button_200_clicked(GtkWidget *widget, gpointer user_data)
@@ -360,6 +362,7 @@ void	on_button_el_newclip_clicked(GtkWidget *w, gpointer *user)
 			info->selection[0], info->selection[1] );
 		vj_msg(VEEJAY_MSG_INFO, "New sample from EditList %d - %d" ,
 			info->selection[0], info->selection[1] );
+		gveejay_new_slot(MODE_SAMPLE);
 	}
 
 
@@ -488,6 +491,7 @@ void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 	multi_vims( VIMS_CHAIN_ENTRY_CLEAR, "%d %d", 0, 
 		info->uc.selected_chain_entry );
 	info->uc.reload_hint[HINT_ENTRY] = 1;
+	info->uc.reload_hint[HINT_CHAIN] = 1;
 	vj_msg(VEEJAY_MSG_INFO, "Clear Effect from Entry %d",
 		info->uc.selected_chain_entry);
 	vj_kf_delete_parameter( info->uc.selected_chain_entry );
@@ -662,8 +666,8 @@ void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
 	if(info->selection_slot)
 	{
 		multi_vims( VIMS_SET_MODE_AND_GO , "%d %d" ,
-			info->selection_slot->sample_id,		
-			info->selection_slot->sample_type );
+			info->selection_slot->sample_type,		
+			info->selection_slot->sample_id );
 	}
 }
 void	on_button_sample_del_clicked(GtkWidget *widget, gpointer user_data)
@@ -1011,95 +1015,16 @@ void	on_loop_pingpong_clicked(GtkWidget *widget, gpointer user_data)
 			get_loop_value() );
 }
 
-#define atom_marker(name,value) {\
-info->uc.marker.lock=1;\
-update_slider_gvalue(name, value);\
-info->uc.marker.lock=0;\
-}
-
-/* sample marker */
-void	on_slider_m0_value_changed(GtkWidget *widget, gpointer user_data)
-{
-	if(!info->uc.marker.lock && !info->status_lock)
-	{
-		int real_len = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
-		
-		info->uc.marker.start = GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
-		if(info->uc.marker.bind)
-		{
-			info->uc.marker.end = 1.0 - info->uc.marker.start - info->uc.marker.bind_len;
-			if(info->uc.marker.end < 0.0)
-				info->uc.marker.end = 0.0;
-			if(info->uc.marker.end > 1.0)
-				info->uc.marker.end = 1.0;
-		}
-
-		multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0,
-			(gint ) (info->uc.marker.start * real_len), (gint)(info->uc.marker.end * real_len));
-		gchar *dur = format_time( info->uc.marker.end - info->uc.marker.start );
-		update_label_str( "label_markerduration", dur );
-		g_free(dur);
-	}
-	
-}
-void	on_slider_m1_value_changed(GtkWidget *widget, gpointer user_data)
-{
-	if(!info->uc.marker.lock && !info->status_lock)
-	{
-		int real_len = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
-		info->uc.marker.end = GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
-	
-		if(info->uc.marker.bind)
-		{	
-			info->uc.marker.start = 
-					1.0 - info->uc.marker.end - info->uc.marker.bind_len;
-			if( info->uc.marker.start  > 1.0 )
-				info->uc.marker.start = 1.0;
-			if( info->uc.marker.start < 0.0 )
-				info->uc.marker.start = 0.0;
-		}
-
-		multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0,
-			(gint ) (info->uc.marker.start * real_len), (gint)(info->uc.marker.end * real_len));
-		gchar *dur = format_time( info->uc.marker.end - info->uc.marker.start );
-		update_label_str( "label_markerduration", dur );
-		g_free(dur);
-
-	}
-
-}
 void	on_check_marker_bind_clicked(GtkWidget *widget, gpointer user_data)
 {
-	// might need to adjust slider m0,m1
-	if(info->status_lock)
-		return;
-
-	info->uc.marker.bind = is_button_toggled( "check_marker_bind");
-	if(info->uc.marker.bind)
-	{
-		vj_msg(VEEJAY_MSG_INFO, "Marker is bound");
-		GtkWidget *w1 = glade_xml_get_widget_( info->main_window, "slider_m0" );
-		GtkWidget *w2 = glade_xml_get_widget_( info->main_window, "slider_m1" );
-		gdouble start = GTK_ADJUSTMENT(GTK_RANGE(w1)->adjustment)->value;
-		gdouble end   = GTK_ADJUSTMENT(GTK_RANGE(w2)->adjustment)->value;
-		info->uc.marker.bind_len = 1.0 - start - end;
-		if(info->uc.marker.bind_len < 0.0 )
-		{
-			set_toggle_button( "check_marker_bind", 0 );
-		}
-	}
-	else
-	{
-		vj_msg(VEEJAY_MSG_INFO, "Marker is released");
-		info->uc.marker.bind_len = 0;
-	}
+	if(!info->status_lock)
+		timeline_set_bind( info->tl, is_button_toggled("check_marker_bind"));
 }
+
 void	on_button_clearmarker_clicked(GtkWidget *widget, gpointer user_data)
 {
 	multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
 	info->uc.reload_hint[ HINT_MARKER ] = 1;
-	memset( &(info->uc.marker), 0, sizeof( sample_marker_t ));
- 	vj_msg(VEEJAY_MSG_INFO, "Clear Marker");
 }
 
 
@@ -1685,7 +1610,10 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 		return;
 	int i = info->uc.selected_chain_entry;
 	int j = info->uc.selected_parameter_id;
-
+	fprintf(stderr, "KF chain %d, p %d\n",i,j);
+	fprintf(stderr, "Store eff %d, %d - %d\n",
+		info->uc.entry_tokens[ENTRY_FXID], get_nums("curve_spinstart"),
+		get_nums("curve_spinend"));
 	// set parent effect
 	s->ec->effects[i]->parameters[j]->parameter_id = 
 		info->uc.entry_tokens[ENTRY_FXID];
@@ -1700,40 +1628,30 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	if( is_button_toggled( "curve_typefreehand" ))
 		curve_type = GTK_CURVE_TYPE_FREE;
 
+
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
 
-	update_parameter_key( s->ec->effects[i]->parameters[j], curve );
-	reset_curve( s->ec->effects[i]->parameters[j] , curve );
-	set_parameter_key( s->ec->effects[i]->parameters[j], curve );
+	get_points_from_curve(  s->ec->effects[i]->parameters[j], curve );
+	set_points_in_curve(  s->ec->effects[i]->parameters[j], curve );
 
 	s->ec->enabled = is_button_toggled( "curve_toggleentry" );
 }
 
 void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 {
-	sample_slot_t *s = info->selected_slot;
-	if(!s)
-		return;
-
 	gint id = info->status_tokens[ENTRY_FXID];
 	if( id < 0 )
 		id = 0;
 	int i = info->uc.selected_chain_entry;
 	int j = info->uc.selected_parameter_id;
-
+	sample_slot_t *s = info->selected_slot; 
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
-	
-	reset_curve( s->ec->effects[i]->parameters[j], glade_xml_get_widget_(info->main_window, "curve" ));
- 	clear_parameter_values ( s->ec->effects[i]->parameters[j]);
-	
 
-	renew_parameter_key( s->ec->effects[i]->parameters[j], 
-		id, info->status_tokens[SAMPLE_START], info->status_tokens[SAMPLE_END], 0,
-		info->status_tokens[SAMPLE_START], info->status_tokens[SAMPLE_END]);
- 	s->ec->effects[i]->parameters[j]->running = 0;
+	clear_parameter_values ( s->ec->effects[i]->parameters[j]);
+
+	set_points_in_curve( s->ec->effects[i]->parameters[j] , curve );
+
 	set_toggle_button( "curve_togglerun", 0 );
-
-	//set_parameter_key( s->ec->effects[i]->parameters[j], curve );
 }
 
 void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
@@ -1750,10 +1668,8 @@ void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
 		int i = info->uc.selected_chain_entry;
 		int j = info->uc.selected_parameter_id;
 		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_LINEAR;
-		update_parameter_key( s->ec->effects[i]->parameters[j], curve );
-		reset_curve( s->ec->effects[i]->parameters[j] , curve );
-		set_parameter_key( s->ec->effects[i]->parameters[j], curve );
-	
+		get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
+		set_points_in_curve( s->ec->effects[i]->parameters[j],curve );
 	}
 }	
 void	on_curve_typespline_toggled(GtkWidget *widget, gpointer user_data)
@@ -1770,9 +1686,8 @@ void	on_curve_typespline_toggled(GtkWidget *widget, gpointer user_data)
 		int i = info->uc.selected_chain_entry;
 		int j = info->uc.selected_parameter_id;
 		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_SPLINE;
-		update_parameter_key( s->ec->effects[i]->parameters[j], curve );
-		reset_curve( s->ec->effects[i]->parameters[j] , curve );
-		set_parameter_key( s->ec->effects[i]->parameters[j], curve );
+		get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
+		set_points_in_curve( s->ec->effects[i]->parameters[j],curve );
 	}
 }	
 void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
@@ -1789,9 +1704,8 @@ void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 		int i = info->uc.selected_chain_entry;
 		int j = info->uc.selected_parameter_id;
 		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_FREE;
-		update_parameter_key( s->ec->effects[i]->parameters[j], curve );
-		reset_curve( s->ec->effects[i]->parameters[j] , curve );
-		set_parameter_key( s->ec->effects[i]->parameters[j], curve );
+		get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
+		set_points_in_curve( s->ec->effects[i]->parameters[j],curve );
 	}
 }
 
@@ -1802,10 +1716,6 @@ void	on_curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 	int i;
 
 	sample_slot_t *s = info->selected_slot;
-	if(!s)
-		return;
-
-// set enabled/disabled (see interpolate_parameters)
 
 	s->ec->effects[(info->uc.selected_chain_entry)]->enabled = is_button_toggled( "curve_toggleentry" );
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
@@ -1882,6 +1792,12 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 	}
 }
 
+void	on_timeline_bind_toggled( GtkWidget *widget, gpointer user_data)
+{
+	gboolean toggled = timeline_get_bind( TIMELINE_SELECTION(widget)) ;
+fprintf(stderr, "Bind changed to %d\n",(toggled ? 1:0) );
+	set_toggle_button( "check_marker_bind", (toggled ? 1 :0) );
+}
 
 void	on_timeline_value_changed( GtkWidget *widget, gpointer user_data )
 {

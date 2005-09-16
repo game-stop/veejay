@@ -4739,15 +4739,10 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 			int i;
 			num_p   = vj_effect_get_num_params(real_id);
 			
-			veejay_msg(VEEJAY_MSG_DEBUG, "Effect %d , params %d known as %s",
-				real_id, num_p, vj_effect_get_description(real_id));
-
 			if(sample_chain_add( args[0],args[1],args[2])!=-1)
 			{
 				int args_offset = 3;
 				
-				veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d Chain entry %d has effect %s with %d arguments",
-					args[0],args[1],vj_effect_get_description(real_id),num_p);
 				for(i=0; i < num_p; i++)
 				{
 					if(vj_effect_valid_value(real_id,i,args[(i+args_offset)]) )

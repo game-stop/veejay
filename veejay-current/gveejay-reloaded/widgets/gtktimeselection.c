@@ -16,6 +16,12 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
+
+/*
+	Implements a new slider type widget with selection markers
+
+ */
+
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h>
@@ -29,6 +35,7 @@ enum
 	POS_CHANGED,
 	IN_CHANGED,
 	OUT_CHANGED,
+	BIND_CHANGED,
 	SELECTION_CHANGED_SIGNAL,
 	LAST_SIGNAL
 };
@@ -42,6 +49,7 @@ enum
 	IN_POINT = 5,
 	OUT_POINT = 6,
 	SEL = 7,
+	BIND = 8,
 };
 
 typedef enum {
@@ -130,6 +138,7 @@ struct _TimelineSelectionClass
 	void	(*pos_changed) (TimelineSelection *te);
 	void	(*in_point_changed) (TimelineSelection *te);
 	void	(*out_point_changed) (TimelineSelection *te);
+	void	(*bind_toggled) (TimelineSelection *te);
 };
 static	void	set_property	(GObject *object,
 	guint id, GValue *value, GParamSpec *pspec)
@@ -179,6 +188,12 @@ static	void	set_property	(GObject *object,
 			te->has_selection = g_value_get_boolean(value);
 		}
 		break;
+		case BIND:
+		if(te->bind != g_value_get_boolean(value))
+		{
+			te->bind = g_value_get_boolean(value);
+		}	
+		break;
 		default:
 			g_assert(FALSE);	
 		break;
@@ -200,12 +215,12 @@ static void get_property( GObject *object,
 		case IN_POINT: g_value_set_double( value, te->in ); break;
 		case OUT_POINT: g_value_set_double( value, te->out ); break;
 		case SEL: g_value_set_boolean(value, te->has_selection) ; break;
+		case BIND: g_value_set_boolean(value, te->bind ); break;
 	}
 }
 
 static	void	finalize	(GObject *object)
 {
-	TimelineSelection *te = TIMELINE_SELECTION( object );
 	parent_class->finalize( object );
 }
 
@@ -260,6 +275,9 @@ static	void	timeline_class_init( TimelineSelectionClass *class )
 				"Marker", "(in frames) ",FALSE, 
 				G_PARAM_READWRITE ));
 
+	g_object_class_install_property( gobject_class,
+			BIND,
+			g_param_spec_boolean( "bind", "Bind marker", "Bind In/Out points",  FALSE, G_PARAM_READWRITE));
 
 	timeline_signals[ SELECTION_CHANGED_SIGNAL ] =
 		g_signal_new( "selection_changed",
@@ -294,6 +312,14 @@ static	void	timeline_class_init( TimelineSelectionClass *class )
 				g_cclosure_marshal_VOID__VOID,
 				G_TYPE_NONE, 0, NULL);
 
+	timeline_signals[ BIND_CHANGED ] = 
+		g_signal_new( "bind_toggled",
+				G_TYPE_FROM_CLASS(gobject_class),
+				G_SIGNAL_RUN_LAST,
+				G_STRUCT_OFFSET( TimelineSelectionClass, bind_toggled ),
+				NULL,NULL,
+				g_cclosure_marshal_VOID__VOID,
+				G_TYPE_NONE, 0, NULL );
 
 }
 
@@ -364,6 +390,20 @@ gboolean timeline_get_selection( TimelineSelection *te )
 	return result;
 }
 
+gboolean timeline_get_bind( TimelineSelection *te )
+{
+	gboolean result = FALSE;
+	g_object_get( G_OBJECT(te), "bind", &result, NULL );
+	return result;
+}
+
+void	timeline_set_bind(GtkWidget *widget, gboolean active)
+{
+	TimelineSelection *te = TIMELINE_SELECTION(widget);
+	g_object_set( G_OBJECT(te), "bind", active, NULL );
+	g_signal_emit( te->widget, timeline_signals[BIND_CHANGED], 0);
+}
+
 void	timeline_set_out_point( GtkWidget *widget, gdouble pos )
 {
 	TimelineSelection *te = TIMELINE_SELECTION(widget);
@@ -391,7 +431,7 @@ void	timeline_set_length( GtkWidget *widget, gdouble length, gdouble pos)
 {
 	TimelineSelection *te = TIMELINE_SELECTION( widget );
 	g_object_set( G_OBJECT(te), "length", length, NULL );
-	timeline_set_pos( te, pos );	
+	timeline_set_pos( GTK_WIDGET(te->widget), pos );	
 }
 
 void	timeline_set_pos( GtkWidget *widget,gdouble pos)
@@ -412,26 +452,22 @@ gdouble	timeline_get_pos( TimelineSelection *te )
 static	void	move_selection( GtkWidget *widget, gdouble x, gdouble width )
 {
 	TimelineSelection *te = TIMELINE_SELECTION( widget );
-  	gdouble dx1 = width * te->in;
-	gdouble dx2 = width * te->out;
+
+	gdouble dx3  = (0.5 * (te->out - te->in)) * width;
 	
-	if(te->bind)
-	{
-		gdouble dx = x - te->move_x;
-		gdouble rel  = (1.0/width) * dx;
-		gdouble len = te->out - te->in;
-		if(len <= 0 )
-			return;
-		te->in = rel;
-		te->out = te->in + len; 
-		if(te->in < 0.0 ) te->in = 0.0; else if (te->in > 1.0) te->in = 1.0;
-		if(te->out < 0.0 ) te->out = 0.0; else if (te->out > 1.0) te->out = 1.0;
-		timeline_set_out_point(widget, te->in ); 
-		timeline_set_in_point(widget, te->out);
-	}
-	else
-	{
-	}
+	gdouble dx1  = x - dx3;
+	gdouble dx2  = x + dx3;
+
+	te->in = (1.0/width) * dx1;
+	te->out = (1.0/width ) * dx2;
+	
+	if(te->in < 0.0 ) te->in = 0.0; else if (te->in > 1.0) te->in = 1.0;
+	if(te->out < 0.0 ) te->out = 0.0; else if (te->out > 1.0) te->out = 1.0;
+
+	timeline_set_out_point(widget, te->out ); 
+	timeline_set_in_point(widget, te->in );
+	te->move_x = x;
+
 }
 
 static	gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer user_data)
@@ -481,8 +517,8 @@ static	gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer user
 		gint dx = ev->x;
 		gint dy = ev->y;
 		if( POINT_IN_RECT( dx, dy, te->selection ) )
-		{
-			te->bind = (te->bind ? FALSE: TRUE );
+		{	
+			timeline_set_bind( widget,  (te->bind ? FALSE: TRUE ));
 			te->move_x = (gdouble) ev->x;
 		}
 	}
@@ -497,8 +533,8 @@ static gboolean event_release (GtkWidget *widget, GdkEventButton *ev, gpointer u
 	TimelineSelection *te = TIMELINE_SELECTION (widget);
 	te->action = action_none;
 	te->current_location = MOUSE_WIDGET;
-	te->grab_button = 0;
-	te->move_x = 0;
+//	te->grab_button = 0;
+//	te->move_x = 0;
 	return FALSE;
 }
 
@@ -534,7 +570,7 @@ event_motion (GtkWidget *widget, GdkEventMotion *ev, gpointer user_data)
 		}
 	}
 
-	if(te->has_selection && te->bind && te->grab_button == 2 && ev->state & GDK_BUTTON2_MASK)
+	if(te->has_selection && te->bind && te->grab_button == 2 )
 		move_selection( widget, x, width );
 	
 	gtk_widget_queue_draw( widget );

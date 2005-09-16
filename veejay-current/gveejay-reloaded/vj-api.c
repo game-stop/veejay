@@ -193,17 +193,6 @@ enum
 
 typedef struct
 {
-	int bind;
-	gdouble start;
-	gdouble end;
-	int lock;
-	gdouble bind_len;
-	int lower_bound;
-	int upper_bound;
-} sample_marker_t;
-
-typedef struct
-{
 	int	selected_chain_entry;
 	int	selected_el_entry;
 	int	selected_vims_entry;
@@ -231,7 +220,6 @@ typedef struct
 	char	*selected_arg_buf;
 	int	expected_slots;
 	stream_templ_t	strtmpl[2]; // v4l, dv1394
-	sample_marker_t marker;
 	int	selected_parameter_id; // current kf
 } veejay_user_ctrl_t;
 
@@ -448,7 +436,6 @@ static void	vj_kf_delete_parameter(int idx);
 static void	vj_akf_delete(void);
 static void	vj_kf_select_parameter(int id);
 static	int	interpolate_parameters(void);
-static	int	verify_interpolator( int effect_id, int max_p );
 static  int     get_nums(const char *name);
 static  gchar   *get_text(const char *name);
 static	void	put_text(const char *name, char *text);
@@ -586,6 +573,8 @@ static struct
 	{"curve_toggleglobal"},
 	{"curve_table"},
 	{"curve_toggleentry"},
+	{"streamnew"},
+	{"sampleadd"},
 	{NULL} 
 };
 static struct
@@ -728,7 +717,7 @@ GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
 	GtkWidget *widget = glade_xml_get_widget( m , name );
 	if(!widget)
 	{
-		fprintf(stderr,"gveejay fatal: widget %s does not exist\n",name);
+		fprintf(stderr,"gveejay fatal: widget '%s' does not exist\n",name);
 		break_here();
 		exit(0);
 	}
@@ -1858,9 +1847,6 @@ static	void	vj_kf_delete_parameter(int idx)
 	{
 		key_parameter_t *key = 	s->ec->effects[idx]->parameters[i];
   		clear_parameter_values ( key );
-	      
-	 	renew_parameter_key( key, 0,0,0,0,0,0 ); 
-        	key->running = 0;
 	}
 }
 static	void	vj_akf_delete()
@@ -1876,6 +1862,13 @@ static	void	vj_kf_select_parameter(int num)
 	sample_slot_t *s = info->selected_slot;
 	/* Parameter changed !*/
 	info->uc.selected_parameter_id = num;
+
+
+	key_parameter_t *key = s->ec->effects[(info->uc.selected_chain_entry)]->parameters[num];
+	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
+
+	//get_points_from_curve( key, curve );
+//	set_points_in_curve( key, curve );
 
 	if(!info->status_lock)
 	{
@@ -1936,8 +1929,11 @@ static	int	interpolate_parameters(void)
 					//	values[j] = value - ( min * scale );
 						skip = 0;
 						id = p->parameter_id;
+			if(info->uc.selected_chain_entry == i )
+			{
 						sprintf(slider_name, "slider_p%d", j );
 						update_slider_value( slider_name, values[j],0 );
+			}
 					}
 				}
 			}
@@ -2024,7 +2020,7 @@ static  void	update_curve_widget(const char *name)
 	int j = info->uc.selected_parameter_id;
 
 	key_parameter_t *key = s->ec->effects[i]->parameters[j];
-	set_parameter_key( key , curve );
+	set_points_in_curve( key, curve );
 }
 
 static	void	update_curve_accessibility(const char *name)
@@ -2033,10 +2029,6 @@ static	void	update_curve_accessibility(const char *name)
 	sample_slot_t *s = info->selected_slot;
 	if(!s)
 		return;
-	int i;
-
-
-
 	if( info->uc.entry_tokens[ENTRY_FXID] <= 0 || !info->selected_slot)
 	{
 		disable_widget( "curve_table" );
@@ -2580,10 +2572,8 @@ static void	update_current_slot(int pm)
 	{
 		info->uc.selected_chain_entry = info->status_tokens[CURRENT_ENTRY];
 		info->uc.reload_hint[HINT_ENTRY] = 1;
-		int curve_changed_ = load_parameter_info( );
-
-		if(pm == MODE_SAMPLE && curve_changed_)
-			info->uc.reload_hint[HINT_KF]  = 1;
+		load_parameter_info();
+		info->uc.reload_hint[HINT_KF]  = 1;
 	}
 
 	if( pm != info->prev_mode || info->status_tokens[CURRENT_ID] != history[CURRENT_ID] )
@@ -2719,7 +2709,7 @@ static void	update_current_slot(int pm)
 				}
 			}
 		}
-	
+			
 		if( (history[SAMPLE_START] != info->status_tokens[SAMPLE_START] ))
 		{
 			update_spin_value( "spin_samplestart", info->status_tokens[SAMPLE_START] );
@@ -3085,10 +3075,10 @@ static void	process_reload_hints(void)
 			sprintf( button_name, "kf_p%d", i );
 			disable_widget( button_name );
 		}
-			GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
-					info->main_window, "tree_chain") ));
+		GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
+				info->main_window, "tree_chain") ));
 
-  			gtk_tree_model_foreach(
+  		gtk_tree_model_foreach(
                        	model,
 			chain_update_row, (gpointer*) info );
 	}
@@ -3349,44 +3339,6 @@ static	void	load_v4l_info()
 		g_free(answer);
 	}
 }
-//FIXME
-
-static int verify_interpolator( int effect_id, int num_p )
-{
-	int reload = 0;
-	gint i = 0;
-	sample_slot_t *s = info->selected_slot;
-	/* Current selected entry changed Effect ID */
-	if( effect_id != info->uc.entry_tokens[ENTRY_FXID])
-		return 1;
-
-	if(s)
-	{
-		if(!effect_id)
-		{
-			vj_kf_delete_parameter(info->uc.selected_chain_entry);
-			reload = 1; 
-		}
-		else
-		{
-		/* Verify all parameters */
-		for( i = 0; i < num_p; i ++ )
-		{
-			key_parameter_t *k = s->ec->effects[(info->uc.selected_chain_entry)]->parameters[i];
-			k->parameter_id = effect_id;
-			reload = 1;
-		}
-		for( i = num_p; i < MAX_PARAMETERS; i ++ )
-		{
-			key_parameter_t *k = s->ec->effects[(info->uc.selected_chain_entry)]->parameters[i];
-			k->parameter_id = 0;
-			reload = 1;
-		}
-		}
-	}
-
-	return reload;
-}
 
 static	gint load_parameter_info()
 {
@@ -3415,7 +3367,8 @@ static	gint load_parameter_info()
 		p+11,p+12,p+13,p+14,p+15);
 	if( res <= 0 )
 	{
-		memset( p, 0, 16 ); 
+		memset( d, 0, 16 ); 
+		return 0;
 	}
 	info->uc.selected_rgbkey = _effect_get_rgb( p[0] );
 	if(info->uc.selected_rgbkey)
@@ -3430,11 +3383,10 @@ static	gint load_parameter_info()
 	} 
 	g_free(answer);
 		
-	int result = verify_interpolator( p[0],p[2] );
 	for( i = 0; i < STATUS_TOKENS; i ++ )
 		d[i] = p[i];
 
-	return result;
+	return 1;
 }	  
 
 // load effect chain
@@ -5020,9 +4972,13 @@ static	void	load_editlist_info()
 		(norm == 'p' ? "PAL" : "NTSC" ) );
 	update_label_str( "label_el_norm", tmp);
 	update_label_f( "label_el_fps", fps );
+
+	update_spin_value( "screenshot_width", values[1] );
+	update_spin_value( "screenshot_height", values[0] );	
+
 	info->el.fps = fps;
 	info->el.num_files = dum[0];
-		
+fprintf(stderr, "Timer fps %f changed \n", fps );
 	snprintf( tmp, sizeof(tmp)-1, "%s",
 		( values[2] == 0 ? "progressive" : (values[2] == 1 ? "top first" : "bottom first" ) ) );
 	update_label_str( "label_el_inter", tmp );
@@ -5164,11 +5120,11 @@ static	gboolean	update_cpumeter_timeout( gpointer data )
 
 static	gboolean	update_imageA( gpointer data )
 {
-	
 	if( info->state == STATE_PLAYING )
+	{
 		gveejay_update_image2(
-		glade_xml_get_widget_(info->main_window, "imageA"), 176,144 );
-
+			glade_xml_get_widget_(info->main_window, "imageA"), 176,144 );
+	}
 	return TRUE;
 }
 
@@ -5730,7 +5686,8 @@ void 	vj_gui_init(char *glade_file)
 		(GCallback) on_timeline_in_point_changed, NULL );
 	g_signal_connect( info->tl, "out_point_changed",
 		(GCallback) on_timeline_out_point_changed, NULL );
-	
+	g_signal_connect( info->tl, "bind_toggled",
+		(GCallback) on_timeline_bind_toggled, NULL );	
 
 	gtk_widget_show(frame);
 	gtk_container_add( GTK_CONTAINER(frame), info->tl );
@@ -5858,7 +5815,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 			veejay_untick
 		);
 
-
 	info->logging = g_timeout_add( 600, update_log,(gpointer*) info );
 
 	init_cpumeter();
@@ -5916,7 +5872,7 @@ gboolean	is_alive(gpointer data)
 		/* at least 2 seconds before trying to connect !*/
 		if( (timenow.tv_sec - info->alarm.tv_sec) < TIMEOUT_SECONDS ) 
 		{
-			if( (timenow.tv_sec - info->timer.tv_sec) > 1.0)
+			if( (timenow.tv_usec - info->timer.tv_usec) > 1.0)
 			{
 				char	*remote = get_text( "entry_hostname" );
 				int	port	= get_nums( "button_portnum" );
@@ -6212,6 +6168,12 @@ void	free_samplebank(void)
 	int i,j;
 	while( gtk_notebook_get_n_pages(GTK_NOTEBOOK(info->sample_bank_pad) ) > 0 )
 		gtk_notebook_remove_page( GTK_NOTEBOOK(info->sample_bank_pad), -1 );
+
+
+	info->selection_slot = NULL;
+	info->selection_gui_slot = NULL;
+	info->selected_slot = NULL;
+	info->selected_gui_slot = NULL;
 	
 	for( i = 0; i < NUM_BANKS; i ++ )
 	{
@@ -6622,15 +6584,18 @@ static gboolean on_slot_activated_by_key (GtkWidget *widget, GdkEventKey *event,
    -------------------------------------------------------------------------------------------------------------------------- */
 static void set_activation_of_slot_in_samplebank( gboolean activate)
 {
+	if(!info->selected_gui_slot || !info->selected_slot )
+		return;
+
 	if(info->selected_slot->sample_id <= 0 )
 		gtk_frame_set_shadow_type( info->selected_gui_slot->frame, GTK_SHADOW_ETCHED_IN );
 	else
-
-	if (activate)
-		gtk_frame_set_shadow_type(info->selected_gui_slot->frame,GTK_SHADOW_IN);
-	else 
-		gtk_frame_set_shadow_type(info->selected_gui_slot->frame,GTK_SHADOW_ETCHED_IN);
-
+	{
+		if (activate)
+			gtk_frame_set_shadow_type(info->selected_gui_slot->frame,GTK_SHADOW_IN);
+		else 
+			gtk_frame_set_shadow_type(info->selected_gui_slot->frame,GTK_SHADOW_ETCHED_IN);
+	}
 //	if( activate )
 //		 gtk_widget_set_sensitive( GTK_WIDGET(info->selected_gui_slot->edit_button), TRUE  );
 //	else

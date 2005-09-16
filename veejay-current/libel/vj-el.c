@@ -304,6 +304,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to load video files that contain less than 2 frames");
 		if( el->lav_fd[n] ) lav_close(el->lav_fd[n]);
 		if(realname) free(realname);
+		el->num_video_files --;
 		return -1;
 	}
 
@@ -641,8 +642,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3], int pix_fm
 		{	
 			veejay_msg(VEEJAY_MSG_DEBUG, "Cannot find codec for id %d (%d)", decoder_id,
 				c_i);
-			veejay_msg(VEEJAY_MSG_DEBUG, "EL %p, frame %d , decoder %x -> %p", el,nframe, decoder_id,
-					el->lav_fd[N_EL_FILE(n)]);
 			return -1;
 		}
 	}
@@ -907,8 +906,6 @@ void	vj_el_close( editlist *el )
 	{
 		if(!el->ref[i])
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG,
-				"Closing file ref %p", el->lav_fd[i]);
 			if( el->lav_fd[i] ) lav_close( el->lav_fd[i] );
 		}
 		if( el->video_file_list[i]) free(el->video_file_list[i]);
@@ -1035,7 +1032,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	
 					if(index_list[i]< 0)
 					{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Clean up EDL %p", el);
 						vj_el_free(el);
 						return NULL;
 					}
@@ -1181,9 +1177,7 @@ void	vj_el_free(editlist *el)
 			/* close fd if ref counter is zero */
 			if(!el->ref[i] && el->lav_fd[i])
 			{
-	veejay_msg(VEEJAY_MSG_DEBUG, "%s : closing fd %p",
-		__FUNCTION__, el->lav_fd[i]);
-				//lav_close( el->lav_fd[i]);
+				lav_close( el->lav_fd[i]);
 			}
 		}
 		if(el->frame_list) free(el->frame_list);
