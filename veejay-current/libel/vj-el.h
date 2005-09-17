@@ -63,6 +63,8 @@ typedef struct
 	char		*(video_file_list[MAX_EDIT_LIST_FILES]);
 	lav_file_t	*(lav_fd[MAX_EDIT_LIST_FILES]);
 	int		ref[MAX_EDIT_LIST_FILES];
+	int		yuv_taste[MAX_EDIT_LIST_FILES];
+
 	long 		num_frames[MAX_EDIT_LIST_FILES];
 	uint64_t 	*frame_list;
 
@@ -74,7 +76,8 @@ typedef struct
 } editlist;  
 
 
-editlist *vj_el_init_with_args(char **filenames, int n, int flags, int deinter, int force, char norm);
+editlist *vj_el_init_with_args(char **filenames, int n, int flags, int deinter, int force, char norm, int fmt);
+
 
 void	vj_el_free(editlist *el);
 
@@ -84,7 +87,7 @@ int	vj_el_append_video_file(editlist *el, char *filename);
 
 int	vj_el_write_editlist( char *filename, long start, long end, editlist *el );
 
-int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3], int pix_fmt);
+int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3]);
 
 int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst);
 

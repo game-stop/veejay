@@ -214,22 +214,13 @@ int veejay_get_state(veejay_t *info) {
  * veejay_change_state()
  *   change the state
  ******************************************************/
-void breaknow() { }
+static void	veejay_reset_el_buffer( veejay_t *info );
+
 void veejay_change_state(veejay_t * info, int new_state)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     settings->state = new_state;
-    if(settings->state == LAVPLAY_STATE_STOP) { 
-		veejay_msg(VEEJAY_MSG_WARNING, "Stop");
-	}
-    if(settings->state == LAVPLAY_STATE_PLAYING) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Play");
-    }
-    if(settings->state == LAVPLAY_STATE_PAUSED) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Paused");
-	}
-	
 }
 
 void veejay_set_sampling(veejay_t *info, subsample_mode_t m)
@@ -586,6 +577,9 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 	  }
 	  veejay_msg(VEEJAY_MSG_INFO, "Playing plain video now (set %p) ", info->current_edit_list);
 	  info->edit_list = info->current_edit_list;
+	  video_playback_setup *settings = info->settings;
+	  settings->min_frame_num = 0;
+	  settings->max_frame_num = info->edit_list->video_frames-1;
 	}
 	if(new_pm == VJ_PLAYBACK_MODE_TAG)
 	{
@@ -669,7 +663,7 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 		sampleid);
 
 	info->edit_list = info->current_edit_list;
-
+	veejay_reset_el_buffer(info);
 	return;
      }
 
@@ -684,6 +678,8 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 		editlist *edl = 
 			sample_get_editlist( sampleid );
 		info->edit_list = sample_get_editlist( sampleid );
+
+		veejay_reset_el_buffer(info);
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "Sample EDL = %p, PM EDL = %p", info->edit_list, info->current_edit_list );
 	
@@ -2419,6 +2415,19 @@ int veejay_main(veejay_t * info)
  * return value: 1 on succes, 0 on error
  ******************************************************/
 
+static void	veejay_reset_el_buffer( veejay_t *info )
+{
+	
+    video_playback_setup *settings =
+	(video_playback_setup *) info->settings;
+
+    if (settings->save_list)
+	free(settings->save_list);
+
+    settings->save_list = NULL;
+    settings->save_list_len = 0; 
+}
+
 int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 {
 
@@ -2453,7 +2462,9 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
     for (i = n1; i <= n2; i++)
 		settings->save_list[k++] = el->frame_list[i];
   
-	settings->save_list_len = k;
+    settings->save_list_len = k;
+
+    veejay_msg(VEEJAY_MSG_DEBUG, "Copied frames %d - %d to buffer (of size %d)",n1,n2,k );
 
     return 1;
 }
@@ -2484,8 +2495,8 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
     }
 
     /* Copy edl */
-
 	editlist *new_el = vj_el_soft_clone( el );
+ 
 	if(!new_el)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot soft clone EDL");
@@ -2619,12 +2630,11 @@ int veejay_edit_cut(veejay_t * info, editlist *el, long start, long end)
 
 int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 {
-    video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
-    long i, k;
+	video_playback_setup *settings =
+		(video_playback_setup *) info->settings;
+	uint64_t i, k;
 
-
-    if (!settings->save_list_len || !settings->save_list)
+	if (!settings->save_list_len || !settings->save_list)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, 
 			    "No frames in the buffer to paste");
@@ -2652,34 +2662,41 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 				   ((el->is_empty ? 0 :el->video_frames) +
 				    settings->save_list_len) *
 				   sizeof(uint64_t));
-
-    if (!el->frame_list)
+	if (!el->frame_list)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,
 			    "Malloc error, you\'re probably out of memory");
 		veejay_change_state(info, LAVPLAY_STATE_STOP);
 		return 0;
-    }
+    	}
 
-    k = (long)settings->save_list_len;
-
-    for (i = el->video_frames - 1; i >= destination; i--)
+   	k = (uint64_t)settings->save_list_len;
+    	for (i = el->video_frames - 1; i >= destination && i > 0; i--)
 		el->frame_list[i + k] = el->frame_list[i];
-    k = destination;
-    for (i = 0; i < settings->save_list_len; i++)
+    	k = destination;
+	for (i = 0; i < settings->save_list_len; i++)
 	{
 		if (k <= settings->min_frame_num)
 		    settings->min_frame_num++;
 		if (k < settings->max_frame_num)
 		    settings->max_frame_num++;
 
-		el->frame_list[k++] = settings->save_list[i];
-    }
-    el->video_frames += settings->save_list_len;
-    if(el->is_empty)
-	el->is_empty = 0;
-    veejay_increase_frame(info, 0);
-    return 1;
+		el->frame_list[k] = settings->save_list[i];
+		k++;
+	}
+	el->video_frames += settings->save_list_len;
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "K = %lld, NVF = %ld", k, el->video_frames );
+
+	if(el->is_empty)
+		el->is_empty = 0;
+    	veejay_increase_frame(info, 0);
+
+
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"Pasted %lld frames from buffer into position %ld in movie",
+			settings->save_list_len, destination );
+	return 1;
 }
 
 
@@ -2759,12 +2776,10 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 	// create initial edit list for sample (is currently playing)
 	if(!sample_edl) 
 		sample_edl = vj_el_init_with_args( files,1,info->preserve_pathnames,info->auto_deinterlace,0,
-				info->edit_list->video_norm );
+				info->edit_list->video_norm , info->pixel_format);
 	// if that fails, bye
 	if(!sample_edl)
 		return -1;
-
-	sample_edl->pixel_format = info->pixel_format;
 
 	// the editlist dimensions must match (there's more)
 	if( sample_edl->video_width != info->edit_list->video_width ||
@@ -2799,8 +2814,6 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start,
 	video_playback_setup *settings =
 		(video_playback_setup *) info->settings;
 	uint64_t n, i;
-	long n_end;
-
 	uint64_t c = el->video_frames;
 	if( el->is_empty )
 		c -= 2;
@@ -2814,14 +2827,14 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start,
 		return 0;
 	}
 
-	int end = el->video_frames;
+	end = el->video_frames;
 
 	el->frame_list = (uint64_t *) realloc(el->frame_list, (end + el->num_frames[n])*sizeof(uint64_t));
 	if (el->frame_list==NULL)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
 		vj_el_free(el);
-		return NULL;
+		return 0;
 	}
 
 	for (i = 0; i < el->num_frames[n]; i++)
@@ -2916,7 +2929,6 @@ int veejay_save_selection(veejay_t * info, char *filename, long start,
 
 int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
 {
-
 	if( info->edit_list->num_video_files <= 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "EditList has no contents!");
@@ -2956,6 +2968,14 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 {
 	vj_el_frame_cache(info->seek_cache );
     	vj_avformat_init();
+
+	if(force_pix_fmt != -1)
+	{
+		info->pixel_format = (force_pix_fmt == 1 ? FMT_422 : FMT_420);
+		veejay_msg(VEEJAY_MSG_WARNING, "Pixel format forced to YCbCr %s",
+			(info->pixel_format == FMT_422 ? "4:2:2" : "4:2:0"));
+	}
+	
  
 	if(info->auto_deinterlace)
 	{
@@ -3005,7 +3025,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	}
 	else
 	{
-	    	info->current_edit_list = vj_el_init_with_args(files, num_files, info->preserve_pathnames, info->auto_deinterlace, force, override_norm);
+	    	info->current_edit_list = vj_el_init_with_args(files, num_files, info->preserve_pathnames, info->auto_deinterlace, force, override_norm, info->pixel_format);
 	}
 	info->edit_list = info->current_edit_list;
 
@@ -3014,19 +3034,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		return 0;
 	}
 
-	if(force_pix_fmt != -1)
-	{
-		info->pixel_format = (force_pix_fmt == 1 ? FMT_422 : FMT_420);
-		veejay_msg(VEEJAY_MSG_WARNING, "Pixel format forced to YCbCr %s",
-			(info->pixel_format == FMT_422 ? "4:2:2" : "4:2:0"));
-	}
-	else
-	{
-		info->pixel_format = info->current_edit_list->pixel_format;
-		veejay_msg(VEEJAY_MSG_WARNING, "Using pixel format YCbCr %s found in video file ",
-			(info->pixel_format == FMT_422 ? "4:2:2" : "4:2:0"));
-	}	
-	
 
 	vj_avcodec_init(info->current_edit_list ,   info->current_edit_list->pixel_format);
     	if(info->pixel_format == FMT_422 )

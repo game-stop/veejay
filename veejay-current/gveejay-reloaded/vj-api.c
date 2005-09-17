@@ -574,7 +574,11 @@ static struct
 	{"curve_table"},
 	{"curve_toggleentry"},
 	{"streamnew"},
-	{"sampleadd"},
+	{"sampleadd"},	
+	{"open_samples"},
+	{"samplepage"},
+	{"button_clearmarker"},
+	{"check_marker_bind"},
 	{NULL} 
 };
 static struct
@@ -1852,6 +1856,10 @@ static	void	vj_kf_delete_parameter(int idx)
 static	void	vj_akf_delete()
 {
 	sample_slot_t *s = info->selected_slot;
+	if(!s)
+		return;
+	if(s->sample_type != MODE_SAMPLE)	
+		return;
 	int i,j;
 	for(i = 0; i < MAX_CHAIN_LEN; i ++)
 		vj_kf_delete_parameter(i);
@@ -2567,16 +2575,7 @@ static void	update_current_slot(int pm)
 
 	/* Mode changed or ID changed, 
 	   Reload FX Chain, Reload current entry and disable widgets based on stream type */
-	if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ||
-		info->uc.reload_hint[HINT_ENTRY] == 1 )
-	{
-		info->uc.selected_chain_entry = info->status_tokens[CURRENT_ENTRY];
-		info->uc.reload_hint[HINT_ENTRY] = 1;
-		load_parameter_info();
-		info->uc.reload_hint[HINT_KF]  = 1;
-	}
-
-	if( pm != info->prev_mode || info->status_tokens[CURRENT_ID] != history[CURRENT_ID] )
+	if( pm != info->prev_mode || info->status_tokens[PLAY_MODE] != history[PLAY_MODE] || info->status_tokens[CURRENT_ID] != history[CURRENT_ID] )
 	{
 		int k;
 		info->uc.reload_hint[HINT_ENTRY] = 1;
@@ -2584,6 +2583,7 @@ static void	update_current_slot(int pm)
 		update = 1;
 
 		update_record_tab( pm );
+
 	
 		if( info->status_tokens[STREAM_TYPE] == STREAM_WHITE )
 		{
@@ -2609,8 +2609,6 @@ static void	update_current_slot(int pm)
 			v4l_expander_toggle(0);
 		}
 
-		
-
 		if( pm == MODE_PLAIN )
 		{
 			if(info->selected_slot)	 
@@ -2618,7 +2616,20 @@ static void	update_current_slot(int pm)
 			info->selected_slot = NULL;
 			info->selected_gui_slot = NULL;
 		}
+		else
+		{
+			vj_akf_delete();
+		}
 	}
+	if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ||
+		info->uc.reload_hint[HINT_ENTRY] == 1 )
+	{
+		info->uc.selected_chain_entry = info->status_tokens[CURRENT_ENTRY];
+		info->uc.reload_hint[HINT_ENTRY] = 1;
+		load_parameter_info();
+		info->uc.reload_hint[HINT_KF]  = 1;
+	}
+
 	/* Actions for stream */
 	if( pm == MODE_STREAM )
 	{
@@ -2658,7 +2669,7 @@ static void	update_current_slot(int pm)
 			update_spin_range(
 				"spin_sampleend", 0, info->status_tokens[TOTAL_FRAMES], 0 );
 
-		
+					
 		}
 
 		/* Update label and video slider*/
@@ -2802,9 +2813,12 @@ static void 	update_globalinfo()
 
 	info->uc.playmode = pm;
 
+	if(info->prev_mode != pm )
+		memset( history , 0 , sizeof(int) * STATUS_TOKENS );
+
 	update_status_accessibility(pm);
 	if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
-		info->status_tokens[PLAY_MODE] != info->prev_mode )
+		info->status_tokens[PLAY_MODE] != history[PLAY_MODE]  )
 	{
 		if( pm == MODE_SAMPLE || pm == MODE_STREAM )
 		{
@@ -2820,9 +2834,6 @@ static void 	update_globalinfo()
 			timeline_set_selection( info->tl, TRUE );
 		else
 			timeline_set_selection( info->tl, FALSE );
-		timeline_set_length( info->tl,
-			(gdouble) info->status_tokens[TOTAL_FRAMES] , info->status_tokens[FRAME_NUM]);
-
 	}
 	if( info->status_tokens[TOTAL_SLOTS] !=
 		history[TOTAL_SLOTS] 
@@ -2834,11 +2845,16 @@ static void 	update_globalinfo()
 	if( history[TOTAL_FRAMES] != info->status_tokens[TOTAL_FRAMES])
 	{
 		gint tf = info->status_tokens[TOTAL_FRAMES];
+
+		timeline_set_length( info->tl,
+				(gdouble) info->status_tokens[TOTAL_FRAMES] , info->status_tokens[FRAME_NUM]);
+
+
 		if( pm == MODE_PLAIN )
 		{
 			for( i = 0; i < 3; i ++)
 				if(info->selection[i] > tf ) info->selection[i] = tf;
-		
+
 			update_spin_range(
 				"button_el_selstart", 0, tf, info->selection[0]);
 			update_spin_range(
@@ -2846,46 +2862,20 @@ static void 	update_globalinfo()
 			update_spin_range(
 				"button_el_selpaste", 0, tf, info->selection[2]);
 		}	
+		gchar *time = format_selection_time( 1, tf );
 
 		update_spin_range("button_fadedur", 0, tf, 0 );
 		update_label_i( "label_totframes", tf, 1 );
-		gchar *time = format_selection_time( 1, tf );
 		update_label_str( "label_totaltime", time );
+
 		g_free(time);
 	}
 
 	if(info->status_lock )
 	{
-		if( history[TOTAL_FRAMES] != info->status_tokens[TOTAL_FRAMES] )
-		{
-			timeline_set_length( info->tl,
-				(gdouble) info->status_tokens[TOTAL_FRAMES] , info->status_tokens[FRAME_NUM]);
-		}
-		else
 		if( history[FRAME_NUM] != info->status_tokens[FRAME_NUM] )
 			timeline_set_pos( info->tl, (gdouble) info->status_tokens[FRAME_NUM] );
 
-/*
-		if( history[FRAME_NUM] != info->status_tokens[FRAME_NUM])
-		{
-			if(pm == MODE_STREAM)
-			{ // todo: disable videobar on mode change
-				update_slider_value( "videobar", 0, 0 );
-			}
-			if(pm == MODE_PLAIN )
-			{
-				update_slider_value( "videobar", info->status_tokens[FRAME_NUM], 
-					info->status_tokens[TOTAL_FRAMES] ); 
-			}
-			if(pm == MODE_SAMPLE)
-			{
-				gint f = info->status_tokens[FRAME_NUM] - info->status_tokens[SAMPLE_START];
-				gint m = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
-				update_slider_value( "videobar",f,m);
-
-			}
-			
-		} */
 	}
 	if( history[CURRENT_ID] != info->status_tokens[CURRENT_ID] )
 	{
@@ -5246,7 +5236,6 @@ static void	update_gui()
 		info->status_tokens[PLAY_MODE] = MODE_SAMPLE;
 		pm = MODE_SAMPLE;
 	}
-	
 
 	if(pm < 0 || pm > 2)
 	{
@@ -6383,7 +6372,7 @@ image_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 		rowstride = gdk_pixbuf_get_rowstride( slot->pixbuf );
 
 		guchar *pixels = gdk_pixbuf_get_pixels( slot->pixbuf ) + rowstride * event->area.y + event->area.x * 3;
-
+		if(pixels)
 		gdk_draw_rgb_image_dithalign( widget->window,
 						widget->style->black_gc,
 				//		event->area.x, event->area.y,

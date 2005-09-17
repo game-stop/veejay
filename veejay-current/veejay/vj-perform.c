@@ -1675,7 +1675,7 @@ int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 	    {   // not cached, cache it
 		editlist *el = sample_get_editlist( sample_id );
 		if(el)
-			len = vj_el_get_video_frame(el, nframe,helper_frame->data, info->pixel_format); 
+			len = vj_el_get_video_frame(el, nframe,helper_frame->data); 
 		if(len > 0)
 			error = 0;
 	    }
@@ -1721,8 +1721,7 @@ static int vj_perform_get_frame_(veejay_t *info, int s1, long nframe, uint8_t *i
 				//info->edit_list,
 				sample_get_editlist( s1 ),
 				nframe,
-				img,
-				info->pixel_format );
+				img );
 }
 
 /********************************************************************
@@ -2147,7 +2146,7 @@ void vj_perform_plain_fill_buffer(veejay_t * info, int entry)
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
 		ret = vj_perform_get_frame_(info, info->uc->sample_id, settings->current_frame_num,frame );
 	else
-		ret = vj_el_get_video_frame(info->current_edit_list,settings->current_frame_num,frame,info->pixel_format);
+		ret = vj_el_get_video_frame(info->current_edit_list,settings->current_frame_num,frame);
 	
 
     if (ret <= 0 )

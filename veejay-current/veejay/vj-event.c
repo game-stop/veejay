@@ -2957,7 +2957,7 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 {
 	int new_id = 0;
 	veejay_t *v = (veejay_t*) ptr;
-	if(SAMPLE_PLAYING(v) || PLAIN_PLAYING(v)) 
+	if(PLAIN_PLAYING(v)) 
 	{
 		int args[2];
 		char *s = NULL;
@@ -3270,11 +3270,11 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	video_playback_setup *s = v->settings;
-	if(SAMPLE_PLAYING(v) || PLAIN_PLAYING(v))
+	if(PLAIN_PLAYING(v))
 	{
 		v->uc->sample_end = s->current_frame_num;
 		if( v->uc->sample_end > v->uc->sample_start) {
-			editlist *el = veejay_edit_copy_to_new( v, (SAMPLE_PLAYING(v)  ? v->edit_list : v->current_edit_list), v->uc->sample_start,v->uc->sample_end );
+			editlist *el = veejay_edit_copy_to_new( v, v->current_edit_list, v->uc->sample_start,v->uc->sample_end );
 			int start = 0;
 			int end = el->video_frames -1;
 			sample_info *skel = sample_skeleton_new(start,end);
@@ -3296,7 +3296,8 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 	else
 	{
 		p_invalid_mode();
-	}		
+	}
+
 }
  
 void vj_event_goto_end(void *ptr, const char format[], va_list ap)
@@ -5571,19 +5572,12 @@ void vj_event_el_cut(void *ptr, const char format[], va_list ap)
 		}
 	}
 
-	if ( STREAM_PLAYING(v)) 
+	if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot cut frames in this playback mode");
 		return;
 	}
 
-	if( PLAIN_PLAYING(v)) 
-	{
-		if(veejay_edit_cut( v,v->current_edit_list, args[0], args[1] ))
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Cut frames %d-%d into buffer",args[0],args[1]);
-		}
-	}
 }
 
 void vj_event_el_copy(void *ptr, const char format[], va_list ap)
@@ -5602,22 +5596,15 @@ void vj_event_el_copy(void *ptr, const char format[], va_list ap)
 		}	
 		if(veejay_edit_copy( v,el, args[0], args[1] ))
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Copy frames %d-%d from sample %d into buffer",v->uc->sample_id,args[0],args[1]);
+			veejay_msg(VEEJAY_MSG_INFO, "Copy frames %d-%d from sample %d into buffer",args[0],args[1],
+				v->uc->sample_id);
 		}
 
 	}
-	if ( STREAM_PLAYING(v)) 
+	if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot copy frames in this playback mode");
 		return;
-	}
-
-	if( PLAIN_PLAYING(v)) 
-	{
-		if(veejay_edit_copy( v,v->current_edit_list, args[0],args[1] )) 
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Copy frames %d-%d into buffer",args[0],args[1]);
-		}
 	}
 
 }
@@ -5649,19 +5636,12 @@ void vj_event_el_del(void *ptr, const char format[], va_list ap)
 		}
 	}
 
-	if ( STREAM_PLAYING(v)) 
+	if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot delete frames in this playback mode");
 		return;
 	}
 
-	if( PLAIN_PLAYING(v)) 
-	{
-		if(veejay_edit_delete(v,v->current_edit_list, args[0],args[1])) 
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Deleted frames %d-%d into buffer", args[0],args[1]);
-		}
-	}
 }
 
 void vj_event_el_crop(void *ptr, const char format[], va_list ap) 
@@ -5670,7 +5650,7 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if ( STREAM_PLAYING(v)) 
+	if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot delete frames in this playback mode");
 		return;
@@ -5715,39 +5695,6 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid range given to crop ! %d - %d", args[0],args[1] );
 		*/
 	}
-
-	if( PLAIN_PLAYING(v)) 
-	{
-		if( args[0] < 0 || args[0] >= v->current_edit_list->video_frames || args[1] < 0 || args[1] >= v->current_edit_list->video_frames)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Frame number out of bounds");
-			return;
-		}
-
-		if( args[1] <= args[0] )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Crop: start - end (start must be smaller then end)");
-			return;
-		}
-		int s2 =0;
-		int s1 = veejay_edit_delete(v,v->current_edit_list, 0, args[0]);	
-		int res = 0;
-		if(s1)
-		{
-			args[1] -= args[0]; // after deleting the first part, move arg[1]
-			s2 = veejay_edit_delete(v,  v->current_edit_list, args[0], v->current_edit_list->video_frames-1); 
-			if(s2)
-			{
-				veejay_set_frame(v,0);
-				veejay_msg(VEEJAY_MSG_INFO, "Delete frames 0- %d , %d - %d", 0,args[0],args[1],
-					v->current_edit_list->video_frames - 1);
-				res = 1;
-			}
-		}
-		if(!res)
-			veejay_msg(VEEJAY_MSG_ERROR, "Invalid range given to crop ! %d - %d", args[0],args[1] );
-	
-	}
 }
 
 void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
@@ -5756,7 +5703,7 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 	int args[1];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	if ( STREAM_PLAYING(v)) 
+	if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot paste frames in this playback mode");
 		return;
@@ -5782,18 +5729,6 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 		}
 
 	}
-
-
-	if( PLAIN_PLAYING(v)) 
-	{
-		if( args[0] >= 0 && args[0] <= v->current_edit_list->video_frames-1)
-		{		
-			if( veejay_edit_paste( v, v->current_edit_list, args[0] ) ) 
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "Pasted buffer at frame %d",args[0]);
-			}
-		}
-	}
 }
 
 void vj_event_el_save_editlist(void *ptr, const char format[], va_list ap)
@@ -5803,6 +5738,13 @@ void vj_event_el_save_editlist(void *ptr, const char format[], va_list ap)
 	//int *args = NULL;
  	int args[2] = {0,0};
 	P_A(args,str,format,ap);
+
+	if( STREAM_PLAYING(v) || PLAIN_PLAYING(v) )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Wrong playback mode for saving EDL of sample");
+		return;
+	}
+
 	if( veejay_save_all(v, str,args[0],args[1]) )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Saved EditList as %s",str);
@@ -7162,6 +7104,14 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	char *str = NULL;
 	P_A(args,str,format,ap);
 
+	editlist *el = v->edit_list;
+/*
+	uint64_t n = el->frame_list[ (v->settings->current_frame_num) ];
+	int pix_fmt = el->yuv_taste[ N_EL_FILE(n) ];
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Save picture %d vs %d", pix_fmt,
+		v->edit_list->pixel_format );*/
+
 	vj_perform_get_primary_frame( v, frame, 0);
 	veejay_image_t *img = vj_picture_save_to_memory(
 					frame,
@@ -7169,6 +7119,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 					v->edit_list->video_height,
 					args[0],
 					args[1],
+				//	pix_fmt );
 					v->edit_list->pixel_format );
 	 
 	if(img)
@@ -7479,20 +7430,39 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 	bzero(info_msg,sizeof(info_msg));
 	bzero( _s_print_buf,SEND_BUF);
 
+	editlist *el = ( SAMPLE_PLAYING(v) ? sample_get_editlist( v->uc->sample_id ) : 
+				v->current_edit_list );
+
 	snprintf(info_msg,sizeof(info_msg), "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld",
-		v->edit_list->video_width,
-		v->edit_list->video_height,
-		v->edit_list->video_inter,
-		v->edit_list->video_norm,
-		v->edit_list->video_fps,  
-		v->edit_list->has_audio,
-		v->edit_list->audio_bits,
-		v->edit_list->audio_rate,
-		v->edit_list->audio_chans,
-		v->edit_list->num_video_files,
-		v->edit_list->video_frames
+		el->video_width,
+		el->video_height,
+		el->video_inter,
+		el->video_norm,
+		el->video_fps,  
+		el->has_audio,
+		el->audio_bits,
+		el->audio_rate,
+		el->audio_chans,
+		el->num_video_files,
+		el->video_frames
 		);	
 	sprintf( _s_print_buf, "%03d%s",strlen(info_msg), info_msg);
+
+	veejay_msg(VEEJAY_MSG_DEBUG, 
+		"%p ,  %04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld",
+		el,
+		el->video_width,
+		el->video_height,
+		el->video_inter,
+		el->video_norm,
+		el->video_fps,  
+		el->has_audio,
+		el->audio_bits,
+		el->audio_rate,
+		el->audio_chans,
+		el->num_video_files,
+		el->video_frames
+		);	
 
 	SEND_MSG(v,_s_print_buf);
 }
@@ -7500,20 +7470,23 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 {
 	veejay_t *v = (veejay_t*) ptr;
-	editlist *el = v->edit_list;
-	
+	bzero( _s_print_buf, SEND_BUF );
+	int b = 0;
+	int nf = 0;
+	editlist *el = ( SAMPLE_PLAYING(v) ? sample_get_editlist( v->uc->sample_id ) : 
+				v->current_edit_list );
+
 	if( el->num_video_files <= 0 )
 	{
 		SEND_MSG( v, "000000");
 		return;
 	}
 
-	bzero( _s_print_buf, SEND_BUF );
-	int b = 0;
-	int nf = 0;
-	char *msg = (char*) vj_el_write_line_ascii( v->edit_list, &b,&nf );
+
+	char *msg = (char*) vj_el_write_line_ascii( el, &b,&nf );
+veejay_msg(VEEJAY_MSG_DEBUG, "Msg = %p , %d %d ", msg,b,nf );
 	sprintf( _s_print_buf, "%06d%s", b, msg );
-	free(msg);
+	if(msg)free(msg);
 
 	SEND_MSG( v, _s_print_buf );
 }

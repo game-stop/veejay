@@ -2298,7 +2298,7 @@ void ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
  * load samples and effect chain from an xml file. 
  *
  ****************************************************************************************************/
-int sample_read_edl( sample_info *sample )
+int sample_read_edl( sample_info *sample, int fmt )
 {
 	char *files[1];
 	int res = -1;
@@ -2308,7 +2308,7 @@ int sample_read_edl( sample_info *sample )
 		veejay_msg(VEEJAY_MSG_ERROR, "Cleanup old editlist");
 		vj_el_free(sample->edit_list);
 	}
-	sample->edit_list = vj_el_init_with_args( files,1, 1,1,0,'p' );
+	sample->edit_list = vj_el_init_with_args( files,1, 1,1,0,'p',fmt );
 	veejay_msg(VEEJAY_MSG_DEBUG, "Read edl '%s', p = %p ", files[0], sample->edit_list);
 	if(sample->edit_list)
 		res = 1;

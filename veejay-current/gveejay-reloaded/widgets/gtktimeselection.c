@@ -246,13 +246,13 @@ static	void	timeline_class_init( TimelineSelectionClass *class )
 	g_object_class_install_property( gobject_class,
 			POS,
 			g_param_spec_double( "pos",
-				"current position", "current position", 0.0,999999.0, 0.0, 
+				"current position", "current position", 0.0,9999999.0, 0.0, 
 				G_PARAM_READWRITE ));
 
 	g_object_class_install_property( gobject_class,
 			LENGTH,
 			g_param_spec_double( "length",
-				"Length (in frames)", "Length (in frames) ",0.0,999999.0, 1.0, 
+				"Length (in frames)", "Length (in frames) ",0.0,9999999.0, 1.0, 
 				G_PARAM_READWRITE ));
 
 

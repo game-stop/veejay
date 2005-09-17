@@ -328,8 +328,6 @@ int _vj_server_new_client(vj_server *vje, int socket_fd)
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot take more connections (max %d allowed)", VJ_MAX_CONNECTIONS);
 		return VJ_MAX_CONNECTIONS;
 	}
-    if(Link[entry]->handle || Link[entry]->in_use )
-	veejay_msg(VEEJAY_MSG_ERROR, "New client is overwriten existing (!)");
     Link[entry]->handle = socket_fd;
     Link[entry]->in_use = 1;
     FD_SET( socket_fd, &(vje->fds) );
