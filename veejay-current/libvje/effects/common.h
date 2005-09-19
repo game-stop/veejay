@@ -2,6 +2,7 @@
  * Linux VeeJay
  *
  * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright (C) 2001 Matthew J. Marjanovic <maddog@mir.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -98,15 +99,48 @@
  v = (int) (( 255.0 * Ev ) + 128);\
 }
 
+/*
+  http://www.w3.org/Graphics/JPEG/jfif.txt
+  YCbCr (256 levels) can be computed directly from 8-bit RGB as follows:
+  IEC 601
+ */
 
-#define GIMP_rgb2yuv(r,g,b,y,u,v) \
+/* MJPEGtools lavtools/colorspace.c by matthew */
+#define YCBCR_to_IEC601 ( y, u, v ) \
  {\
-	float Ey = (0.299 * (float)r) + (0.587 * (float)g) + (0.114 * (float)b);\
-	float Eu = (-0.169 * (float)r) - (0.331 * (float)g) + (0.500 * (float)b) + 128.0;\
-	float Ev = (0.500 * (float)r) - (0.419 * (float)g) - (0.081 * (float)b) + 128.0;\
-    y = (int) Ey;\
-	u = (int) Eu;\
-	v = (int) Ev;\
+ 	y =  y * 219.0 / 256.0 + 16 ;\
+	u =  (u - 128 ) * 224.0 / 256.0 + 128;\
+	v =  (v - 128 ) * 224.0 / 256.0 + 128;\
+  }
+
+#define IEC601_to_YCBCR( y, u, v ) \
+ {\
+	y = ( y  - 16 ) / 219.0 * 256.0;\
+	u = ( u - 128 ) / 224.0 * 256.0 + 128;\
+	v = ( v - 128 ) / 224.0 * 256.0 + 128;\
+ }
+
+static inline int myround(float n) 
+{
+  if (n >= 0) 
+    return (int)(n + 0.5);
+  else
+    return (int)(n - 0.5);
+}
+/* End colorspace.c */	
+
+
+#define GIMP_rgb2yuv(r,g,b,y,u,v)\
+ {\
+	float Ey = (0.299 * (float)r) + (0.587 * (float)g) + (0.114 * (float) b);\
+	float Eu = (-0.168736 * (float)r) - (0.331264 * (float)g) + (0.500 * (float)b) + 128.0;\
+	float Ev = (0.500 * (float)r) - (0.418688 * (float)g) - (0.081312 * (float)b)+ 128.0;\
+    	y = myround(Ey);\
+	u = myround(Eu);\
+	v = myround(Ev);\
+	if( y > 0xff ) y = 0xff ; else if ( y < 0 ) y = 0;\
+	if( u > 0xff ) u = 0xff ; else if ( u < 0 ) u = 0;\
+	if( v > 0xff ) v = 0xff ; else if ( v < 0 ) v = 0;\
  }
 
 enum 

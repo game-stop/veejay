@@ -44,7 +44,9 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
     vjsdl->mouse_motion = 0;
     vjsdl->use_keyboard = 1;
     vjsdl->pix_format = SDL_YUY2_OVERLAY; // have best quality by default
-    vjsdl->pix_fmt = fmt;
+	// use yuv420 test
+	//vjsdl->pix_format = SDL_YV12_OVERLAY; 
+   vjsdl->pix_fmt = fmt;
     vjsdl->width = width;
     vjsdl->height = height;
     vjsdl->frame_size = width * height;
@@ -269,6 +271,10 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
 	else
 		yuv422_to_yuyv( yuv420, vjsdl->yuv_overlay->pixels[0], vjsdl->width,vjsdl->height);
 
+	// test 420
+//	veejay_memcpy( vjsdl->yuv_overlay->pixels[0], yuv420[0], vjsdl->width * vjsdl->height );
+//	veejay_memcpy( vjsdl->yuv_overlay->pixels[1], yuv420[2], (vjsdl->width*vjsdl->height)/4);
+//	veejay_memcpy( vjsdl->yuv_overlay->pixels[2], yuv420[1], (vjsdl->width*vjsdl->height)/4);
 	if (!vj_sdl_unlock(vjsdl))
 		return 0;
 

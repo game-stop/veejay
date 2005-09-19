@@ -866,7 +866,7 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 		"%d %d",
 		nframes,
 		autoplay );
-	
+fprintf(stderr, "sendvims %d:%d %d;", VIMS_STREAM_REC_START,nframes,autoplay);	
 	gchar *time1 = format_time( nframes );
 	vj_msg(VEEJAY_MSG_INFO, "Record duration: %s", time1); 
 	g_free(time1);

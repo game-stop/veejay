@@ -35,11 +35,12 @@ typedef struct
 	AVCodec *audiocodec;
 	AVFrame *frame;
 	AVCodecContext	*context;
-	int fmt;
+	int out_fmt;
 	int uv_len;
 	int len;
 	int sub_sample;	
 	int super_sample;
+	int encoder_id;
 	int width;
 	int height;
 } vj_encoder;

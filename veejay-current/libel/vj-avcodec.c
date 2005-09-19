@@ -58,7 +58,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 	if(!e) return NULL;
 	memset(e, 0, sizeof(vj_encoder));
 		
-	if(id != -1)
+	if(id != 998 && id != 999 )
 	{
 #ifdef __FALLBACK_LIBDV
 		if(id != CODEC_ID_DVVIDEO)
@@ -76,52 +76,50 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 #endif
 
 	}
-	e->context = avcodec_alloc_context();
-	e->context->width = el->video_width;
- 	e->context->height = el->video_height;
-	e->context->frame_rate = el->video_fps;
-	e->context->frame_rate_base = 1;
-	e->context->qcompress = 0.0;
-	e->context->qblur = 0.0;
-	e->context->flags = CODEC_FLAG_QSCALE;
-	e->context->gop_size = 0;
-	e->context->sub_id = 0;
-	e->context->me_method = 0; // motion estimation algorithm
-	e->context->workaround_bugs = FF_BUG_AUTODETECT;
-	e->context->prediction_method = 0;
-	e->context->dct_algo = FF_DCT_AUTO; //global_quality?
 
-
-	if ( pixel_format == FMT_422)
-	{
-		e->context->pix_fmt = PIX_FMT_YUV422P;
-		e->len = el->video_width * el->video_height;
-		e->uv_len = e->len / 2;
-		e->width = el->video_width;
-		e->height = el->video_height;
-	}
-	if( pixel_format == FMT_420)
-	{
-		e->len = el->video_width * el->video_height;
-		e->uv_len = e->len / 4;
-		if(out_pixel_format == FMT_422)
-			e->sub_sample =1;
-		e->width = el->video_width;
-		e->height = el->video_height;
-		e->context->pix_fmt = PIX_FMT_YUV420P;
-	}
-
-	if( id != -1)
+	if( id != 998 && id != 999 )
 	{
 #ifdef __FALLBACK_LIBDV
 	  if(id != CODEC_ID_DVVIDEO )
+		{
 #endif
+		e->context = avcodec_alloc_context();
+		e->context->width = el->video_width;
+ 		e->context->height = el->video_height;
+		e->context->frame_rate = el->video_fps;
+		e->context->frame_rate_base = 1;
+		e->context->qcompress = 0.0;
+		e->context->qblur = 0.0;
+		e->context->flags = CODEC_FLAG_QSCALE;
+		e->context->gop_size = 0;
+		e->context->sub_id = 0;
+		e->context->me_method = 0; // motion estimation algorithm
+		e->context->workaround_bugs = FF_BUG_AUTODETECT;
+		e->context->prediction_method = 0;
+		e->context->dct_algo = FF_DCT_AUTO; //global_quality?
+		e->context->pix_fmt = (pixel_format == FMT_420 ? PIX_FMT_YUV420P : PIX_FMT_YUV422P );
 		if ( avcodec_open( e->context, e->codec ) < 0 )
 		{
 			if(e) free(e);
 			return NULL;
 		}
-	} 
+
+#ifdef __FALLBACK_LIBDV
+	}
+#endif
+	}
+
+	e->len = el->video_width * el->video_height;
+	if(pixel_format == PIX_FMT_YUV422P)
+		e->uv_len = e->len / 2;
+	else
+		e->uv_len = e->len / 4;
+	e->width = el->video_width;
+	e->height = el->video_height;
+
+	e->out_fmt = pixel_format;
+	e->encoder_id = id;
+
 /*
 	if( el->has_audio )
 	{
@@ -179,10 +177,10 @@ int		vj_avcodec_init(editlist *el, int pixel_format)
 	_encoders[ENCODER_MPEG4] = vj_avcodec_new_encoder( CODEC_ID_MPEG4, el, fmt);
 	if(!_encoders[ENCODER_MPEG4]) return 0;
 
-	_encoders[ENCODER_YUV420] = vj_avcodec_new_encoder( -1, el, FMT_420);
+	_encoders[ENCODER_YUV420] = vj_avcodec_new_encoder( 999, el, fmt);
 	if(!_encoders[ENCODER_YUV420]) return 0;
 
-	_encoders[ENCODER_YUV422] = vj_avcodec_new_encoder( -1, el, FMT_422);
+	_encoders[ENCODER_YUV422] = vj_avcodec_new_encoder( 998, el, fmt);
 	if(!_encoders[ENCODER_YUV422]) return 0;
 
 
@@ -301,7 +299,38 @@ int	yuv420p_to_yuv422p( uint8_t *sY,uint8_t *sCb, uint8_t *sCr, uint8_t *dst[3],
 
 static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst )
 {
-	if(av->sub_sample)
+	if(!av)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "No encoder !!");
+		return 0;
+	}
+	if( (av->encoder_id == 999 && av->out_fmt == PIX_FMT_YUV420P) || (av->encoder_id == 998 && av->out_fmt == PIX_FMT_YUV422P))
+	{
+		/* copy */
+		veejay_memcpy( dst, src[0], av->len );
+		veejay_memcpy( dst+(av->len), src[1], av->uv_len );
+		veejay_memcpy( dst+(av->len+av->uv_len) , src[2], av->uv_len);
+		return ( av->len + av->uv_len + av->uv_len );
+	}
+	/* copy by converting */
+	if( av->encoder_id == 999 && av->out_fmt == PIX_FMT_YUV422P) 
+	{
+		yuv422p_to_yuv420p( src, dst, av->width, av->height);
+		return ( av->len + (av->len/4) + (av->len/4));
+	}
+
+	if( av->encoder_id == 998 && av->out_fmt == PIX_FMT_YUV420P)
+	{
+		uint8_t *d[3];
+		d[0] = dst;
+		d[1] = dst + av->len;
+		d[2] = dst + av->len + (av->len / 2);
+		yuv420p_to_yuv422p2( src[0],src[1],src[2], d, av->width,av->height );
+		return ( av->len + av->len );
+	}
+
+
+/*	if(av->sub_sample)
 	{
 		return(yuv422p_to_yuv420p(src,dst, av->width, av->height ));
 	}
@@ -312,7 +341,10 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 		veejay_memcpy( dst+(av->len+av->uv_len) , src[2], av->uv_len);
 	}
 	return (av->len + av->uv_len + av->uv_len);
+*/
 
+	
+	return 0;
 }
 
 
@@ -323,6 +355,7 @@ int		vj_avcodec_encode_frame( int format, uint8_t *src[3], uint8_t *buf, int buf
 	vj_encoder *av = _encoders[format];
 	int res=0;
 	memset( &pict, 0, sizeof(pict));
+
 	if(format == ENCODER_YUV420) // no compression, just copy
 		return vj_avcodec_copy_frame( _encoders[ENCODER_YUV420],src, buf );
 	if(format == ENCODER_YUV422) // no compression, just copy

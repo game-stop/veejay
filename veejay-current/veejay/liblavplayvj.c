@@ -228,6 +228,7 @@ void veejay_set_sampling(veejay_t *info, subsample_mode_t m)
 	video_playback_setup *settings = (video_playback_setup*) info->settings;
         if(m == SSM_420_JPEG_TR )
 	{
+veejay_msg(VEEJAY_MSG_ERROR,"Pixel format is %d", info->pixel_format);
 		if(info->pixel_format == FMT_420)
 			settings->sample_mode = SSM_420_JPEG_TR;
 		else
@@ -681,8 +682,6 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 
 		veejay_reset_el_buffer(info);
 
-		veejay_msg(VEEJAY_MSG_DEBUG, "Sample EDL = %p, PM EDL = %p", info->edit_list, info->current_edit_list );
-	
 	   	sample_get_short_info( sampleid , &start,&end,&looptype,&speed);
 
  		 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (frames %d - %d) at speed %d",
@@ -721,6 +720,7 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 	}
 
 	int id = vj_tag_new(type, filename, index, info->current_edit_list, info->pixel_format, channel);
+
 	char descr[200];
 	bzero(descr,200);
 	vj_tag_get_by_type(type,descr);
@@ -2969,18 +2969,10 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	vj_el_frame_cache(info->seek_cache );
     	vj_avformat_init();
 
-	if(force_pix_fmt != -1)
-	{
-		info->pixel_format = (force_pix_fmt == 1 ? FMT_422 : FMT_420);
-		veejay_msg(VEEJAY_MSG_WARNING, "Pixel format forced to YCbCr %s",
-			(info->pixel_format == FMT_422 ? "4:2:2" : "4:2:0"));
-	}
-	
  
 	if(info->auto_deinterlace)
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Auto deinterlacing (for playback on monitor / beamer with vga input");
-		veejay_msg(VEEJAY_MSG_DEBUG, "Note that this will effect your recorded video samples");
 	}
 
 	if(num_files<=0 || files == NULL)
@@ -2989,6 +2981,18 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		info->dummy->active = 1;
 	}
 
+	if(force_pix_fmt >= 0)
+	{
+		info->pixel_format = (force_pix_fmt == 1 ? FMT_422 : FMT_420);
+		veejay_msg(VEEJAY_MSG_WARNING, "Pixel format forced to YCbCr %s",
+			(info->pixel_format == FMT_422 ? "4:2:2" : "4:2:0"));
+	
+	}
+	else
+	{
+		info->pixel_format = -1;
+	}
+	//TODO: pass yuv sampling to dummy
 	if( info->dummy->active )
 	{
 		if( !info->dummy->norm )
@@ -3005,11 +3009,8 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 			info->dummy->chroma = CHROMA422;	
 
 		info->current_edit_list = vj_el_dummy( 0, info->auto_deinterlace, info->dummy->chroma,
-				info->dummy->norm, info->dummy->width, info->dummy->height, info->dummy->fps );
-
-		veejay_msg(VEEJAY_MSG_DEBUG, "Dummy: %d x %d, %s %s ",
-			info->dummy->width,info->dummy->height, (info->dummy->norm == 'p' ? "PAL": "NTSC" ),	
-				( force_pix_fmt == 0 ? "4:2:0" : "4:2:2" ));
+				info->dummy->norm, info->dummy->width, info->dummy->height, info->dummy->fps,
+				force_pix_fmt );
 
 		if( info->dummy->arate )
 		{
@@ -3033,9 +3034,12 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	{
 		return 0;
 	}
+	if(info->pixel_format == -1)
+		info->pixel_format = info->edit_list->pixel_format;
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "Initialized with pixel format %d", info->pixel_format );
 
-	vj_avcodec_init(info->current_edit_list ,   info->current_edit_list->pixel_format);
+	vj_avcodec_init(info->current_edit_list ,   info->pixel_format);
     	if(info->pixel_format == FMT_422 )
 	{
 		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame1)) return 0;
@@ -3076,8 +3080,6 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	/* override options */
 	if(ofps<=0.0)
 		ofps = settings->output_fps;
-	if(force_pix_fmt<0)	
-		force_pix_fmt = info->pixel_format;
 
 	settings->output_fps = ofps;
 

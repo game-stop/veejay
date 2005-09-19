@@ -224,6 +224,8 @@ int sample_continue_record( int s1 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Ready recording %d frames", si->encoder_succes_frames);
 
+		si->encoder_total_frames = 0;
+		sample_update(si,s1);
 		return 1;
 	}
 
@@ -241,7 +243,7 @@ int sample_continue_record( int s1 )
 			si->encoder_total_frames,
 			si->encoder_duration);
 
-	
+		si->encoder_total_frames = 0;	
 		sample_update(si,s1);
 		return 2;
 	}
@@ -275,7 +277,6 @@ int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 			veejay_msg(VEEJAY_MSG_ERROR, "writing frame, giving up %s", lav_strerror());
 			return 1;
 	}
-
 
 	si->rec_total_bytes += buf_len;
 

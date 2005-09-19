@@ -106,7 +106,7 @@ void	vj_el_ref(editlist *el, int num);
 
 void	vj_el_unref(editlist *el, int num);
 
-editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int width, int height, float fps);
+editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int width, int height, float fps, int fmt);
 
 int	vj_el_get_file_entry( editlist *el,long *start_pos, long *end_pos, long entry );
 

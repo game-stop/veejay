@@ -1057,7 +1057,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	else
 		if(format==ENCODER_YUV420)
 		{
-			tag->encoder_max_size= ( _tag_info->edit_list->video_width * _tag_info->edit_list->video_height *2);
+			tag->encoder_max_size = (_tag_info->edit_list->video_width * _tag_info->edit_list->video_height  * 2 );
 		}
 		else
 		{
@@ -1135,7 +1135,8 @@ int vj_tag_continue_record( int t1 )
 	if(si->encoder_num_frames >= si->encoder_duration)
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Ready recording %ld frames", si->encoder_succes_frames);
-
+		si->encoder_total_frames  = 0;
+		vj_tag_update(si, t1 );
 		return 1;
 	}
 
@@ -1155,7 +1156,7 @@ int vj_tag_continue_record( int t1 )
 			si->encoder_total_frames,
 			si->encoder_duration);
 
-	
+		si->encoder_total_frames = 0;
 		vj_tag_update(si,t1);
 		return 2;
 	}

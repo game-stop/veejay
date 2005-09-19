@@ -786,7 +786,8 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
       lav_fd->has_audio = (AVI_audio_bits(lav_fd->avi_fd)>0 &&
                            AVI_audio_format(lav_fd->avi_fd)==WAVE_FORMAT_PCM);
       video_comp = AVI_video_compressor(lav_fd->avi_fd);
-      veejay_msg(VEEJAY_MSG_DEBUG, "Video compressor [%s]",video_comp);
+      if(video_comp == NULL || strlen(video_comp) <= 0)
+	{ if(lav_fd) free(lav_fd); return 0;}
    }
    else if( AVI_errno==AVI_ERR_NO_AVI || AVI_errno == AVI_ERR_READ )
    {
@@ -820,13 +821,14 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 #ifdef USE_GDK_PIXBUF
 		}
 #endif	
-	if(ret == 0)
+	if(ret == 0 || video_comp == NULL)
 	{
 		free(lav_fd);
 		internal_error = ERROR_FORMAT; /* Format not recognized */
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to load file '%s'", filename);
 		return 0;
 	}
+	
    }
 
    lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
@@ -838,7 +840,6 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	lav_fd->MJPG_chroma = (output_yuv == 1 ? CHROMA420: CHROMA422 );
 	lav_fd->format = 'x';
 	lav_fd->interlacing = LAV_NOT_INTERLACED;
-	veejay_msg(VEEJAY_MSG_DEBUG, "Playing image");
 	return lav_fd;
    }
 
@@ -846,7 +847,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		lav_fd->MJPG_chroma = CHROMA420;
 		lav_fd->format = 'D';
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Playing MS MPEG4v3 DivX Video. (Every frame must be an intra frame)" );
+		veejay_msg(VEEJAY_MSG_WARNING, "Playing MS MPEG4v3 DivX Video. (Every frame should be an intra frame)" );
 		return lav_fd;
 	} 
 
@@ -855,7 +856,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		lav_fd->MJPG_chroma = CHROMA420;
 		lav_fd->format = 'M';
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Playing MPEG4 Video (Experimental)");
+		veejay_msg(VEEJAY_MSG_WARNING, "Playing MPEG4 Video (Every frame should be an intra frame)");
 		return lav_fd;
 	}
 
@@ -865,7 +866,6 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		lav_fd->MJPG_chroma = CHROMA420;
 		lav_fd->format = 'Y';
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Playing YUV 4:2:0 uncompressed video");
 		return lav_fd; 
 	}
     if (strncasecmp(video_comp,"yv16",4)==0)
@@ -873,14 +873,12 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		lav_fd->MJPG_chroma = CHROMA422;
 		lav_fd->format = 'P';
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Playing YUV 4:2:2 uncompressed video");
 		return lav_fd; 
 	}
     if (strncasecmp(video_comp,"dvsd",4)==0 || strncasecmp(video_comp,"dv",2)==0)
 	{
 		lav_fd->MJPG_chroma = CHROMA422;
 		lav_fd->interlacing = LAV_INTER_BOTTOM_FIRST;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Playing Digital Video");
 		return lav_fd; 
 	}
 
@@ -977,6 +975,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		}
 		else if ( jpg_height == lav_video_height(lav_fd)/2 )
 		{
+	
  	     /* Video is interlaced */
 		  if(lav_fd->format == 'a')
 		  {

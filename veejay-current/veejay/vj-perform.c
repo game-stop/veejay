@@ -2149,13 +2149,7 @@ void vj_perform_plain_fill_buffer(veejay_t * info, int entry)
 		ret = vj_el_get_video_frame(info->current_edit_list,settings->current_frame_num,frame);
 	
 
-    if (ret <= 0 )
-	{
-		veejay_memset(frame[0], 16, helper_frame->len);
-		veejay_memset(frame[1], 128,helper_frame->uv_len);
-		veejay_memset(frame[2], 128,helper_frame->uv_len);
-	}
-    if(ret == 2)
+    if(ret <= 0)
     {
 	veejay_msg(VEEJAY_MSG_WARNING, "There is no plain video to play!");
 	veejay_change_state(info, LAVPLAY_STATE_STOP);
@@ -2169,7 +2163,7 @@ int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[3])
 	int audio_len = 0;
 	//uint8_t buf[16384];
 	long nframe = info->settings->current_frame_num;
-	uint8_t *_audio_buffer;
+	uint8_t *_audio_buffer = NULL;
 	if(last_rendered_frame == nframe) return 0; // skip frame 
 	
 	last_rendered_frame = info->settings->current_frame_num;
@@ -2178,11 +2172,10 @@ int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[3])
 	{
 		_audio_buffer = x_audio_buffer;
 		audio_len = (info->edit_list->audio_rate / info->edit_list->video_fps);
-		return(int)sample_record_frame( info->uc->sample_id,frame,
-				_audio_buffer,audio_len);
-
 	}
-	return 1;
+	return(int)sample_record_frame( info->uc->sample_id,frame,
+			_audio_buffer,audio_len);
+
 }
 	
 int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[3])
@@ -2346,12 +2339,9 @@ void vj_perform_record_sample_frame(veejay_t *info, int entry) {
 	
 	 if( res == 1)
 	 {
-		int len = sample_get_total_frames(info->uc->sample_id);
 		sample_stop_encoder(info->uc->sample_id);
-		n = vj_perform_record_commit_single( info, entry );
+		vj_perform_record_commit_single( info, entry );
 		vj_perform_record_stop(info);
-		if(n) veejay_msg(VEEJAY_MSG_DEBUG, "Added new sample %d of %d frames",n,len);
-
 	 }
 
 	 if( res == -1)
