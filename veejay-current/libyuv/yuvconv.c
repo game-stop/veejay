@@ -164,7 +164,7 @@ static mmx_t mmx_00ffw =   { 0x00ff00ff00ff00ffLL };
                            MOVQ_R2M(mm6, *dst_y);\
                            movd_r2m(mm0, *dst_u);\
                            movd_r2m(mm1, *dst_v);
-
+/* FIXME: corruption
 void	yuv422_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
 {
 	int j,jmax,imax,i;
@@ -190,7 +190,7 @@ void	yuv422_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
 
 	emms();
 }
-
+*/
 
 void	yuy2toyv16(uint8_t *dst_y, uint8_t *dst_u, uint8_t *dst_v, uint8_t *srcI, int w, int h )
 {
@@ -319,6 +319,8 @@ void yuy2toyv16(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
     }
 }
 
+//before:
+#endif
 void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
 {
     int x,y;
@@ -347,7 +349,9 @@ void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
 		}
     }
 }
-#endif
+
+//after
+//#endif
 
 
 /* lav_common - some general utility functionality used by multiple
