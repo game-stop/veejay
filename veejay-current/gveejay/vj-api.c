@@ -2193,7 +2193,6 @@ static void 	update_globalinfo()
 			enable_widget( "button_entry_toggle");
 			set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_FXSTATUS] );
 			np = _effect_get_np( entry_tokens[ENTRY_FXID] );
-	
 			for( i = 0; i < np ; i ++ )
 			{
 				sprintf(slider_name, "slider_p%d",i);
@@ -2667,7 +2666,7 @@ static	void	load_parameter_info()
 			disable_widget("rgbkey");
 		return;
 	}
-	
+
 	int res = sscanf( answer,
 		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		p+0,p+1,p+2,p+3,p+4,p+5,p+6,p+7,p+8,p+9,p+10,
@@ -2696,8 +2695,6 @@ static	void	load_parameter_info()
 				set_page( "fxcontrolpanel", 0 );
 		}
 	}
-	for( i = 0; i < STATUS_TOKENS; i ++ )
-		p[i] = 0;
  
 	if(answer) g_free(answer);
 }
