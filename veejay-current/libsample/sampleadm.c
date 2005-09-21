@@ -128,7 +128,26 @@ int sample_update(sample_info *sample, int s1) {
   return 0;
 }
 
+/* Evil code for edl saving/restoring */
+typedef struct
+{
+	int fmt;
+	int deinterlace;
+	int flags;
+	int force;
+	char norm;
+} sample_setting;
 
+static sample_setting __sample_project_settings;
+
+void	sample_set_project(int fmt, int deinterlace, int flags, int force, char norm )
+{
+	__sample_project_settings.fmt = fmt;
+	__sample_project_settings.deinterlace = deinterlace;
+	__sample_project_settings.flags = flags;
+	__sample_project_settings.force = force;
+	__sample_project_settings.norm = norm;
+} 
 
 /****************************************************************************************************
  *
@@ -149,8 +168,10 @@ void sample_init(int len)
 	     hash_create(HASHCOUNT_T_MAX, int_compare, int_hash))) {
 	}
 	initialized = 1;
+	memset( &__sample_project_settings,0,sizeof(sample_setting));
     }
 }
+
 
 int sample_set_state(int new_state)
 {
@@ -2298,7 +2319,7 @@ void ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
  * load samples and effect chain from an xml file. 
  *
  ****************************************************************************************************/
-int sample_read_edl( sample_info *sample, int fmt )
+int sample_read_edl( sample_info *sample )
 {
 	char *files[1];
 	int res = -1;
@@ -2308,8 +2329,13 @@ int sample_read_edl( sample_info *sample, int fmt )
 		veejay_msg(VEEJAY_MSG_ERROR, "Cleanup old editlist");
 		vj_el_free(sample->edit_list);
 	}
-	sample->edit_list = vj_el_init_with_args( files,1, 1,1,0,'p',fmt );
-	veejay_msg(VEEJAY_MSG_DEBUG, "Read edl '%s', p = %p ", files[0], sample->edit_list);
+	sample->edit_list = vj_el_init_with_args( files,1,
+			__sample_project_settings.flags,
+			__sample_project_settings.deinterlace,
+			__sample_project_settings.force,
+			__sample_project_settings.norm,
+			__sample_project_settings.fmt );
+
 	if(sample->edit_list)
 		res = 1;
 
@@ -2317,6 +2343,32 @@ int sample_read_edl( sample_info *sample, int fmt )
 		free(files[0]);
 
 	return res;
+}
+
+int	is_samplelist(char *filename)
+{
+	xmlDocPtr doc;
+	xmlNodePtr cur;
+   	doc = xmlParseFile(filename);
+   	if (doc == NULL) 
+		return (0);
+    	
+    	cur = xmlDocGetRootElement(doc);
+    	if (cur == NULL)
+	{
+		xmlFreeDoc(doc);
+		return (0);
+	}
+
+    	if (xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLES))
+	{
+		xmlFreeDoc(doc);
+		return (0);
+    	}
+
+   	xmlFreeDoc(doc);
+
+	return 1;
 }
 
 int sample_readFromFile(char *sampleFile)
@@ -2576,10 +2628,10 @@ int sample_writeToFile(char *sampleFile)
     for (i = 1; i < sample_size(); i++) {
 	next_sample = sample_get(i);
 	if (next_sample) {
-	    if(sample_write_edl( next_sample ))
-		veejay_msg(VEEJAY_MSG_DEBUG ,"Saved sample %d EDL '%s'", next_sample->sample_id,
+	    	if(sample_write_edl( next_sample ))
+			veejay_msg(VEEJAY_MSG_DEBUG ,"Saved sample %d EDL '%s'", next_sample->sample_id,
 				next_sample->edit_list_file );	
-
+	      
 	    childnode =
 		xmlNewChild(rootnode, NULL,
 			    (const xmlChar *) XMLTAG_SAMPLE, NULL);

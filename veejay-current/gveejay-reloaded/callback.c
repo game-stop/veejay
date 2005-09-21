@@ -1610,10 +1610,7 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 		return;
 	int i = info->uc.selected_chain_entry;
 	int j = info->uc.selected_parameter_id;
-	fprintf(stderr, "KF chain %d, p %d\n",i,j);
-	fprintf(stderr, "Store eff %d, %d - %d\n",
-		info->uc.entry_tokens[ENTRY_FXID], get_nums("curve_spinstart"),
-		get_nums("curve_spinend"));
+
 	// set parent effect
 	s->ec->effects[i]->parameters[j]->parameter_id = 
 		info->uc.entry_tokens[ENTRY_FXID];

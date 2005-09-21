@@ -1521,6 +1521,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
  	sample_init( (info->current_edit_list->video_width * info->current_edit_list->video_height)  ); 
 
+	sample_set_project( info->pixel_format,
+			    info->auto_deinterlace,
+			    info->preserve_pathnames,
+				0,
+			    info->edit_list->video_norm );
 
 
 	if(!vj_perform_init(info))

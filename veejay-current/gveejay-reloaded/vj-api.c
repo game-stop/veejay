@@ -1869,15 +1869,18 @@ static	void	vj_kf_select_parameter(int num)
 {
 	sample_slot_t *s = info->selected_slot;
 	/* Parameter changed !*/
-	info->uc.selected_parameter_id = num;
 
+	if( num < 0 )
+		/* Reset to default parameter */
+		info->uc.selected_parameter_id = 0;
+	else
+		info->uc.selected_parameter_id = num;
 
+	// Effect chain parameter key
 	key_parameter_t *key = s->ec->effects[(info->uc.selected_chain_entry)]->parameters[num];
 	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
 
-	//get_points_from_curve( key, curve );
-//	set_points_in_curve( key, curve );
-
+	/* If not processing status (if user event) */
 	if(!info->status_lock)
 	{
 		/* Reload KEY  now */
@@ -1885,6 +1888,7 @@ static	void	vj_kf_select_parameter(int num)
 		update_curve_widget( "curve" );
 		update_curve_accessibility("curve");
 	}
+	/* Set parameter name to KF */
 	char name[20];	
 	sprintf(name, "P%d", num);
 	update_label_str( "curve_parameter", name );
@@ -1899,9 +1903,11 @@ static	int	interpolate_parameters(void)
 	int res = 0;
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve" );
 
+	/* If current effect chain is not enabled, return now */
 	if(!s->ec->enabled)
 		return 0;	
-	
+
+	/* Iterate chain for KF */	
 	for( i = 0; i < MAX_CHAIN_LEN; i ++ )
 	{
 		int values[MAX_PARAMETERS];
@@ -1910,11 +1916,13 @@ static	int	interpolate_parameters(void)
 		char slider_name[20];
 		if(s->ec->effects[i]->enabled)
 		{
+			/* Get current values */
 			for( j = 0; j < MAX_PARAMETERS; j ++ )
 			{
 				sprintf(slider_name, "slider_p%d", j );
 				values[j] = get_slider_val ( slider_name );
 			}
+			/* Get keyframed values */
 			for( j = 0; j < MAX_PARAMETERS; j ++ )
 			{
 				key_parameter_t *p = s->ec->effects[i]->parameters[j];
@@ -1938,14 +1946,14 @@ static	int	interpolate_parameters(void)
 						skip = 0;
 						id = p->parameter_id;
 			if(info->uc.selected_chain_entry == i )
-			{
+			{ // Update slider values of current selected chain entry
 						sprintf(slider_name, "slider_p%d", j );
 						update_slider_value( slider_name, values[j],0 );
 			}
 					}
 				}
 			}
-			if(!skip)
+			if(!skip) // Put KF to veejay
 			{ // sample, chain entry, effect_id, arg i .. arg n
 				multi_vims( VIMS_CHAIN_ENTRY_SET_PRESET,
 					"%d %d %d %d %d %d %d %d %d %d %d %d",
@@ -3016,7 +3024,7 @@ static void	process_reload_hints(void)
 		gint np = 0;
 		gint i;
 		/* update effect description */
-	
+		info->uc.reload_hint[HINT_KF] = 1;
 		if( entry_tokens[ENTRY_FXID] == 0)
 		{
 			put_text( "entry_effectname" ,"" );
@@ -3025,11 +3033,8 @@ static void	process_reload_hints(void)
 		else
 		{
 			put_text( "entry_effectname", _effect_get_description( entry_tokens[ENTRY_FXID] ));
-
 			enable_widget( "FXframe");
-
 			set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_FXSTATUS] );
-/* FIXME: Update curve here ?! */
 			np = _effect_get_np( entry_tokens[ENTRY_FXID] );
 			for( i = 0; i < np ; i ++ )
 			{
@@ -3048,7 +3053,7 @@ static void	process_reload_hints(void)
 				sprintf(button_name, "kf_p%d", i );
 				enable_widget( button_name );
 			}
-			vj_kf_select_parameter(0);
+			vj_kf_select_parameter(-1); // reset selected curve
 		}
 		update_spin_value( "button_fx_entry", info->uc.selected_chain_entry);	
 
@@ -5112,6 +5117,7 @@ static	gboolean	update_imageA( gpointer data )
 {
 	if( info->state == STATE_PLAYING )
 	{
+		if( is_button_toggled( "previewtoggle" ))
 		gveejay_update_image2(
 			glade_xml_get_widget_(info->main_window, "imageA"), 176,144 );
 	}
