@@ -842,7 +842,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 
 	
 		len = avcodec_decode_video(d->context, d->frame, &got_picture, d->tmp_buffer, res); 	
-		if(len>0)
+		if(len>0 && got_picture)
 		{
 			AVPicture pict,pict2;
 		//	int dst_pix_fmt = (pix_fmt == FMT_422 ? PIX_FMT_YUV422P : PIX_FMT_YUV420P);
