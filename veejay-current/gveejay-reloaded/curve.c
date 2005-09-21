@@ -119,24 +119,32 @@ int	parameter_for_frame( key_parameter_t *key, gint frame_pos )
 }
 
 /* Get a value for a frame position */
-float	get_parameter_key_value( key_parameter_t *key, gint frame_pos )
+int	get_parameter_key_value( key_parameter_t *key, gint frame_pos, float *result )
 {
-	if( frame_pos <= 0 || frame_pos > 1024 )
-		return 0.0;
+	if( frame_pos < key->start_pos || frame_pos > key->end_pos )
+		return 0;
 	if(!key->vector)
 	{
 		fprintf(stderr, "%s : no vector\n", __FUNCTION__ );
 		exit(0);
 	}
-	return key->vector[ frame_pos ];	
+	*result = key->vector[ frame_pos ];	
+	return 1;
 }
 
 void	get_points_from_curve( key_parameter_t *key, GtkWidget *curve )
 {
+	gtk_curve_get_vector( GTK_CURVE(curve), key->end_pos - key->start_pos, key->vector );
+}
+
+void	curve_timeline_changed( key_parameter_t *key, GtkWidget *curve)
+{
+	int len = key->end_pos - key->start_pos;
 	if(key->vector)
 		free(key->vector);
-	key->vector = (float*) vj_malloc(sizeof(float) * key->end_pos - key->start_pos );
-	gtk_curve_get_vector( GTK_CURVE(curve), key->end_pos - key->start_pos, key->vector );
+	key->vector = NULL;
+
+	key->vector = (float*) vj_malloc(sizeof(float) * len );
 }
 
 void	reset_curve( key_parameter_t *key, GtkWidget *curve )

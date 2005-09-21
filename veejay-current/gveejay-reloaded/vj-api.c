@@ -562,7 +562,6 @@ static struct
 	{"samplerand"},
 	{"freestyle"},
 	{"frame_sampleproperties"},
-	{"frame88"}, 
 	{"frame_samplerecord"},
 	{"frame132"}, // edl
 	{"colorselection"},
@@ -575,7 +574,6 @@ static struct
 	{"curve_toggleentry"},
 	{"streamnew"},
 	{"sampleadd"},	
-	{"open_samples"},
 	{"samplepage"},
 	{"button_clearmarker"},
 	{"check_marker_bind"},
@@ -1932,8 +1930,11 @@ static	int	interpolate_parameters(void)
 					
 					if(_effect_get_minmax( p->parameter_id, &min, &max, j ))
 					{
-						float scale = get_parameter_key_value( p,
-							info->status_tokens[FRAME_NUM] );
+						float scale = 0.0;
+
+						if(get_parameter_key_value( p,
+							info->status_tokens[FRAME_NUM], &scale ) )
+						{
 						float min_value = (float)min;	
 						float max_value = (float)max;
 						float max_range = fabs( min_value ) + fabs( max_value );
@@ -1950,6 +1951,7 @@ static	int	interpolate_parameters(void)
 						sprintf(slider_name, "slider_p%d", j );
 						update_slider_value( slider_name, values[j],0 );
 			}
+						}
 					}
 				}
 			}
@@ -1957,7 +1959,7 @@ static	int	interpolate_parameters(void)
 			{ // sample, chain entry, effect_id, arg i .. arg n
 				multi_vims( VIMS_CHAIN_ENTRY_SET_PRESET,
 					"%d %d %d %d %d %d %d %d %d %d %d %d",
-					0,i,id, values[0],values[1],values[2],values[3],values[3],values[4],values[5],
+					s->sample_id,i,id, values[0],values[1],values[2],values[3],values[3],values[4],values[5],
 						values[6], values[7] );
 				res ++;
 			}
@@ -2518,7 +2520,6 @@ static	void	update_status_accessibility(int pm)
 			if( pm == MODE_SAMPLE )
 			{
 				enable_widget("frame132");
-				enable_widget("frame88");
 				enable_widget("frame_samplerecord");
 				enable_widget("frame_sampleproperties");
 				disable_widget("frame_streamproperties");
@@ -2531,7 +2532,6 @@ static	void	update_status_accessibility(int pm)
 				disable_widget( "frame132");
 				disable_widget( "samplerand" );
 				disable_widget( "freestyle" );
-				disable_widget( "frame88");
 			}
 
 			if( pm == MODE_PLAIN)
@@ -2588,6 +2588,7 @@ static void	update_current_slot(int pm)
 		int k;
 		info->uc.reload_hint[HINT_ENTRY] = 1;
 		info->uc.reload_hint[HINT_CHAIN] = 1;
+		info->uc.reload_hint[HINT_KF] = 1;
 		update = 1;
 
 		update_record_tab( pm );
@@ -2623,10 +2624,6 @@ static void	update_current_slot(int pm)
 				set_activation_of_slot_in_samplebank(false);
 			info->selected_slot = NULL;
 			info->selected_gui_slot = NULL;
-		}
-		else
-		{
-			vj_akf_delete();
 		}
 	}
 	if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ||
@@ -2685,8 +2682,6 @@ static void	update_current_slot(int pm)
 			info->status_tokens[FRAME_NUM] - info->status_tokens[SAMPLE_START] , 1);
 
 
-
-
 		int tf = info->status_tokens[TOTAL_FRAMES];
 		int marker_go = 0;
 		/* Update marker bounds */
@@ -2707,6 +2702,9 @@ static void	update_current_slot(int pm)
 					marker_go = 1;
 				}
 			}
+			gchar *dur = format_time( info->status_tokens[SAMPLE_MARKER_END] - info->status_tokens[SAMPLE_MARKER_START] );
+			update_label_str( "label_markerduration", dur );
+			g_free(dur);
 		}
 
 		if( (history[SAMPLE_MARKER_END] != info->status_tokens[SAMPLE_MARKER_END]) )
@@ -2810,6 +2808,8 @@ static void 	update_globalinfo()
 		info->status_tokens[FRAME_NUM] = 0;
 
 	update_label_i( "label_curframe", info->status_tokens[FRAME_NUM] , 1 );
+	update_label_i( "label_samplepos",
+			info->status_tokens[FRAME_NUM], 1);
 
 	gchar *ctime = format_time( info->status_tokens[FRAME_NUM] );
 	update_label_str( "label_curtime", ctime );
@@ -2913,9 +2913,6 @@ static void 	update_globalinfo()
 		}
 	}
 
-	/* Update current playing sample in dialog window */
-	update_current_slot(pm);
-
 	if( (pm == MODE_SAMPLE || pm == MODE_STREAM ) )
 	{
 		int upd = 0;
@@ -2938,6 +2935,9 @@ static void 	update_globalinfo()
 			}
 
 	}
+	/* Update current playing sample in dialog window */
+	update_current_slot(pm);
+
 
 	if(info->selected_slot && info->selected_gui_slot )
 	{
@@ -2977,8 +2977,6 @@ static void	process_reload_hints(void)
 		info->uc.expected_slots = info->status_tokens[TOTAL_SLOTS];
 	}
 
-	select_slot();
-
 	if( info->uc.reload_hint[HINT_RECORDING] == 1 && pm != MODE_PLAIN)
 	{
 		if(info->status_tokens[STREAM_RECORDING])
@@ -2993,14 +2991,6 @@ static void	process_reload_hints(void)
 	if( info->selected_slot && info->selected_slot->sample_id == info->status_tokens[CURRENT_ID] &&
 			info->selected_slot->sample_type == 0 && pm == MODE_PLAIN)
 	{
-		if(info->uc.reload_hint[HINT_MARKER] == 1 )
-		{
-			int abs_start = info->status_tokens[SAMPLE_START];
-			int abs_end   = info->status_tokens[SAMPLE_END];
-			gchar *dur = format_time( abs_end - abs_start );
-			update_label_str( "label_markerduration", dur );
-			g_free(dur);
-		}
 		if( history[SAMPLE_FX] != info->status_tokens[SAMPLE_FX])
 		{
 			//also for stream (index is equivalent)
@@ -3928,17 +3918,26 @@ void	load_effectlist_info()
 	g_free(fxtext);
 	
 }
-static	void	select_slot()
+static	void	select_slot(int pm)
 {
-	if(!info->selected_slot && info->status_tokens[PLAY_MODE] != MODE_PLAIN)
+	int *history = info->history_tokens[ pm ];
+
+	if(info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
+		pm != history[PLAY_MODE] || ( info->selected_slot == NULL &&
+			pm != MODE_PLAIN) )
 	{
 		int b = 0; int p = 0;
+		info->selected_slot= NULL;
+		info->selected_gui_slot=NULL;
+		if( pm != MODE_PLAIN)
+		{
+			verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID],
+				info->status_tokens[PLAY_MODE] );
 
-		verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID],
-			info->status_tokens[PLAY_MODE] );
-
-		info->selected_slot = info->sample_banks[b]->slot[p];
-		info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
+			info->selected_slot = info->sample_banks[b]->slot[p];
+			info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
+		}
+		
 	}
 }
 /* execute after sample/stream/mixing sources list update
@@ -4100,6 +4099,8 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	}
 
 	if(fxtext) g_free(fxtext);
+
+	select_slot(info->status_tokens[PLAY_MODE]);
 }
 
 gboolean
@@ -4981,7 +4982,7 @@ fprintf(stderr, "Timer fps %f changed \n", fps );
 	update_label_i( "label_el_achans", values[7], 0);
 	update_label_i( "label_el_abits", values[5], 0);
 	
-	if( values[4] == 0 )
+	if( rate == 0 )
 	{
 		disable_widget( "button_5_4");
 		disable_widget_by_pointer(info->audiovolume_knob);	
@@ -5249,6 +5250,7 @@ static void	update_gui()
 		exit(0);
 	}
 
+	select_slot(pm);
 
 	update_globalinfo();
 
@@ -6842,24 +6844,20 @@ static void vj_gui_add_sample(gchar *filename, gint mode)
  *  --------------------------------------------------------------------------------------------------------------------------*/
 void setup_knobs()
     {		
-    GtkAdjustment *audio_adj;   
     GtkAdjustment *speed_adj;       
     char path[MAX_PATH_LEN];
     bzero(path,MAX_PATH_LEN);
     get_gd( path, NULL,  "knob.png" );
     // audio volume 
-    info->audiovolume_knob = (GtkKnob *) gtk_knob_new(NULL, path);
+	GtkAdjustment *adj = GTK_ADJUSTMENT(gtk_adjustment_new( 100.0,0.0,100.0,0.1,1.0,0.0 ));
+
+    info->audiovolume_knob = (GtkKnob *) gtk_knob_new(adj, path);
     gtk_widget_show(GTK_WIDGET(info->audiovolume_knob));
     gtk_widget_set_sensitive( GTK_WIDGET(info->audiovolume_knob), TRUE);	
     gtk_container_add (GTK_CONTAINER (glade_xml_get_widget_( info->main_window, "audio_knobframe")), GTK_WIDGET(info->audiovolume_knob));    
 
-    audio_adj = gtk_knob_get_adjustment(info->audiovolume_knob);
-    audio_adj->lower = 0;
-    audio_adj->upper = 10;
-    audio_adj->step_increment = 0.1;    
-// FIXME
-    g_signal_connect( audio_adj, "value_changed", (GCallback) on_audiovolume_knob_value_changed, NULL );
-    update_label_i( "volume_label", (gint)audio_adj->value,0); 
+    g_signal_connect( adj, "value_changed", (GCallback) on_audiovolume_knob_value_changed, NULL );
+    update_label_i( "volume_label", 100,0); 
 
     // speed
     info->speed_knob = (GtkKnob *) gtk_knob_new(NULL,path);
@@ -6869,10 +6867,10 @@ void setup_knobs()
 
     speed_adj = gtk_knob_get_adjustment(info->speed_knob);
     speed_adj->lower = 0;
-    speed_adj->upper = 1;
+    speed_adj->upper = 12;
     speed_adj->step_increment = 1;    
-    speed_adj->page_size = 4;
-    speed_adj->page_increment = 2;    
+    speed_adj->page_size = 0;
+    speed_adj->page_increment = 1;    
     g_signal_connect( speed_adj, "value_changed", (GCallback) on_speed_knob_value_changed, NULL );
     update_label_i( "speed_label", (gint)speed_adj->value,0);
     }

@@ -1024,7 +1024,9 @@ void	on_check_marker_bind_clicked(GtkWidget *widget, gpointer user_data)
 void	on_button_clearmarker_clicked(GtkWidget *widget, gpointer user_data)
 {
 	multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
-	info->uc.reload_hint[ HINT_MARKER ] = 1;
+	gchar *dur = format_time( 0 );
+	update_label_str( "label_markerduration", dur );
+	g_free(dur);
 }
 
 
@@ -1619,14 +1621,22 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	s->ec->effects[i]->parameters[j]->end_pos =
 		get_nums( "curve_spinend" );
 
+	if( (s->ec->effects[i]->parameters[j]->end_pos - s->ec->effects[i]->parameters[j]->start_pos ) <= 0)
+	{
+		vj_msg(VEEJAY_MSG_ERROR,"KF start position must be smaller then end position");
+		return;
+	}
+
+
+
 	gint curve_type = GTK_CURVE_TYPE_LINEAR;
 	if( is_button_toggled( "curve_typespline" ))
 		curve_type = GTK_CURVE_TYPE_SPLINE;
 	if( is_button_toggled( "curve_typefreehand" ))
 		curve_type = GTK_CURVE_TYPE_FREE;
-
-
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+
+	curve_timeline_changed(s->ec->effects[i]->parameters[j], curve );
 
 	get_points_from_curve(  s->ec->effects[i]->parameters[j], curve );
 	set_points_in_curve(  s->ec->effects[i]->parameters[j], curve );
@@ -1815,9 +1825,16 @@ void	on_timeline_out_point_changed(GtkWidget *widget, gpointer user_data)
 		pos1 *= info->status_tokens[TOTAL_FRAMES];
 		pos2 *= info->status_tokens[TOTAL_FRAMES];
 		if(pos2 > pos1 )
+		{
 			multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0, (gint) pos1, (gint) pos2 );
+			gchar *dur = format_time( pos2 - pos1 );
+			update_label_str( "label_markerduration", dur );
+			g_free(dur);
+		}
 		else
 			vj_msg(VEEJAY_MSG_INFO, "Set Out point after In point !");
+		
+
 	}
 }
 
@@ -1830,7 +1847,12 @@ void	on_timeline_in_point_changed(GtkWidget *widget, gpointer user_data)
 		pos1 *= info->status_tokens[TOTAL_FRAMES];
 		pos2 *= info->status_tokens[TOTAL_FRAMES];
 		if(pos1 < pos2 )
+		{
 			multi_vims( VIMS_SAMPLE_SET_MARKER , "%d %d %d", 0, (gint) pos1, (gint) pos2 );
+			gchar *dur = format_time( pos2 - pos1 );
+			update_label_str( "label_markerduration", dur );
+			g_free(dur);
+		}
 		else
 			vj_msg(VEEJAY_MSG_INFO,"Set In Point before Out Point !");
 	}

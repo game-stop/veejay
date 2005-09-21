@@ -2445,7 +2445,7 @@ int vj_perform_tag_fill_buffer(veejay_t * info, int entry)
    }         
 
 	
-  if (error == 1 && info->video_out != 5)
+  if (error == 1)
   {
 	VJFrame dumb;
 	if( info->pixel_format == FMT_420 )
@@ -2622,7 +2622,10 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 				case VJ_PLAYBACK_MODE_TAG:
 			    	num_samples = vj_tag_get_audio_frame(info->uc->sample_id, a_buf);
 				if(num_samples <= 0)
+				{
+					veejay_memset( a_buf, 0, PERFORM_AUDIO_SIZE );
 					num_samples = (el->audio_rate/el->video_fps);
+				}
 				break;
 			default:
 				veejay_memset( a_buf, 0 , PERFORM_AUDIO_SIZE);

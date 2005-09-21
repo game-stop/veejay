@@ -6429,7 +6429,7 @@ void vj_event_output_y4m_stop(void *ptr, const char format[], va_list ap)
 void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	if(v->edit_list->has_audio)
+/*	if(v->edit_list->has_audio)
 	{
 		if(v->audio != AUDIO_PLAY)
 		{
@@ -6450,12 +6450,17 @@ void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
 	else 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Video has no audio");
-	}
+	}*/
+#ifdef HAVE_JACK
+	if(v->edit_list->has_audio)
+		vj_jack_set_volume( 100 );
+#endif
 }
 
 void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
+	/*
 	if(v->edit_list->has_audio)
 	{
 		if(v->audio == AUDIO_PLAY)
@@ -6471,7 +6476,11 @@ void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 	else
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Video has no audio");
-	}
+	}*/
+#ifdef HAVE_JACK
+	if(v->edit_list->has_audio)
+		vj_jack_set_volume(0);
+#endif
 }
 
 
@@ -7484,7 +7493,6 @@ void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 
 
 	char *msg = (char*) vj_el_write_line_ascii( el, &b,&nf );
-veejay_msg(VEEJAY_MSG_DEBUG, "Msg = %p , %d %d ", msg,b,nf );
 	sprintf( _s_print_buf, "%06d%s", b, msg );
 	if(msg)free(msg);
 

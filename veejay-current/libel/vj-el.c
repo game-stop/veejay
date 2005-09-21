@@ -392,12 +392,21 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
     nerr = 0;
     if (n == 0) {
 	/* First file determines parameters */
-
-		el->video_height = lav_video_height(el->lav_fd[n]);
-		el->video_width = lav_video_width(el->lav_fd[n]);
-		el->video_inter = lav_video_interlacing(el->lav_fd[n]);
-		el->video_fps = lav_frame_rate(el->lav_fd[n]);
+		if(el->is_empty)
+		{	/* Dummy determines parameters */
+			if(el->video_height != lav_video_height(el->lav_fd[n]))
+				nerr++;
+			if(el->video_width != lav_video_width(el->lav_fd[n]))
+				nerr++;
+		}
+		else
+		{
+			el->video_height = lav_video_height(el->lav_fd[n]);
+			el->video_width = lav_video_width(el->lav_fd[n]);
+			el->video_inter = lav_video_interlacing(el->lav_fd[n]);
+			el->video_fps = lav_frame_rate(el->lav_fd[n]);
 #ifdef USE_GDK_PIXBUF
+		}
 		lav_set_project(
 			el->video_width, el->video_height, el->video_fps ,
 				el->pixel_format == FMT_420 ? 1 :0);
@@ -427,18 +436,30 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 			}
 		}
 	
-		el->audio_chans = lav_audio_channels(el->lav_fd[n]);
-		if (el->audio_chans > 2) {
-		    el->num_video_files --;
-		    veejay_msg(VEEJAY_MSG_ERROR, "File %s has %d audio channels - cant play that!",
-		              filename,el->audio_chans);
-		    nerr++;
-		}
+		if(!el->is_empty)
+		{
+			el->audio_chans = lav_audio_channels(el->lav_fd[n]);
+			if (el->audio_chans > 2) {
+		  	  el->num_video_files --;
+		  	  veejay_msg(VEEJAY_MSG_ERROR, "File %s has %d audio channels - cant play that!",
+			              filename,el->audio_chans);
+			    nerr++;
+			}
 	
-		el->has_audio = (el->audio_chans == 0 ? 0: 1);
-		el->audio_bits = lav_audio_bits(el->lav_fd[n]);
-		el->play_rate = el->audio_rate = lav_audio_rate(el->lav_fd[n]);
-		el->audio_bps = (el->audio_bits * el->audio_chans + 7) / 8;
+			el->has_audio = (el->audio_chans == 0 ? 0: 1);
+			el->audio_bits = lav_audio_bits(el->lav_fd[n]);
+			el->play_rate = el->audio_rate = lav_audio_rate(el->lav_fd[n]);
+			el->audio_bps = (el->audio_bits * el->audio_chans + 7) / 8;
+		}
+		else
+		{
+			if(lav_audio_channels(el->lav_fd[n]) != el->audio_chans ||
+			 lav_audio_rate(el->lav_fd[n]) != el->audio_rate ||
+			 lav_audio_bits(el->lav_fd[n]) != el->audio_bits )
+				nerr++;
+			else
+				el->has_audio = 1;
+		}
    	 } else {
 		/* All files after first have to match the paramters of the first */
 	
@@ -449,6 +470,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 				lav_video_height(el->lav_fd[n]), el->video_width,
 				el->video_height);
 		    nerr++;
+
 	}
 	if (el->video_inter != lav_video_interlacing(el->lav_fd[n])) {
 	    if(force)
@@ -878,7 +900,14 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
     uint64_t n;	
 	int ns0, ns1;
 
-    if (!el->has_audio && !el->is_empty)
+	if(el->is_empty)
+	{
+		int ns = el->audio_rate / el->video_fps;
+		memset( dst, 0, sizeof(uint8_t) * ns * el->audio_bps );
+		return 1;
+	}
+
+    if (!el->has_audio)
 	return 0;
 
     if (nframe < 0)

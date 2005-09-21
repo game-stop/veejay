@@ -43,7 +43,7 @@ static veejay_t *info;
 static float override_fps = 0.0;
 static int default_geometry_x = -1;
 static int default_geometry_y = -1;
-static int force_video_file = 0;
+static int force_video_file = 0; // unused
 static int override_pix_fmt = -1;
 static char override_norm = 'p';
 static int auto_loop = 0;
@@ -164,7 +164,7 @@ static void Usage(char *progname)
  	fprintf(stderr,"  -L/--auto-loop   \t\tStart with default sample\n");
 	fprintf(stderr,"  -g/--clip-as-sample	\t\tLoad every video clip as a new sample\n");	
 	fprintf(stderr,"  -n/--no-color     \t\tDont use colored text\n");
-	fprintf(stderr,"  -r/--force	\t\tForce loading of videofiles\n");
+	fprintf(stderr,"  -r/--audiorate	\t\tDummy audio rate\n");
 	fprintf(stderr,"  -m/--sample-mode [01]\t\tSampling mode 1 = best quality (default), 0 = best performance\n");  
 	fprintf(stderr,"  -Y/--ycbcr [01]\t\t0 = YUV 4:2:0 Planar, 1 = YUV 4:2:2 Planar\n");
 
@@ -222,6 +222,11 @@ else\
 {\
 free(v);\
 }\
+}
+static void fatal_dummy_options()
+{
+	fprintf(stderr, "Usage: -d w=[num]:h=[num]:i=[I|P|N]:n=[N|P]:r=[num]:ch=[num]:fps=[num]\n");
+	exit(0);
 }
 
 static int set_option(const char *name, char *value)
@@ -323,13 +328,9 @@ static int set_option(const char *name, char *value)
 	else if(strcmp(name, "zoomheight") == 0 || strcmp(name, "h") == 0) {
 		info->video_output_height = atoi(optarg);
 	}
-	else if(strcmp(name, "audiorate") == 0 )
+	else if(strcmp(name, "audiorate") == 0 || strcmp(name, "r") == 0 )
 	{
 		info->dummy->arate = atoi(optarg);
-	}
-	else if(strcmp(name, "audiochannels") == 0)
-	{
-		info->dummy->achans = atoi(optarg);
 	}
 	else if(strcmp(name, "framerate") == 0 || strcmp(name, "R" ) == 0 ) {
 		info->dummy->fps = atof(optarg);
@@ -340,9 +341,6 @@ static int set_option(const char *name, char *value)
 	else if(strcmp(name,"ycbcr")==0 || strcmp(name,"Y")==0)
 	{
 		override_pix_fmt = atoi(optarg);
-	}
-	else if (strcmp(name,"force")==0 || strcmp(name,"r")==0) {
-	force_video_file = 1;
 	}
 	else if( strcmp(name,"auto-loop")==0 || strcmp(name,"L") == 0)
 	{
@@ -460,7 +458,6 @@ static void check_command_line_options(int argc, char *argv[])
 	{"geometry-y",1,0,0},
 	{"auto-loop",0,0,0},
 	{"fps",1,0,0},
-	{"force",0,0,0},
 	{"no-color",0,0,0},
 	{"version",0,0,0},
 	{"width",1,0,0},
@@ -470,7 +467,6 @@ static void check_command_line_options(int argc, char *argv[])
 	{"norm",1,0,0},
 	{"framerate",1,0,0},
 	{"audiorate",1,0,0},
-	{"audiochannels",1,0,0},
 	{"ycbcr",1,0,0},
 	{"multicast-osc",1,0,0},
 	{"multicast-vims",1,0,0},

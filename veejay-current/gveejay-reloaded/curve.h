@@ -40,8 +40,9 @@ void		 free_parameter_key( key_parameter_t *key );
 int		parameter_for_frame( key_parameter_t *key, gint frame_pos ); 
 void		clear_parameter_values( key_parameter_t *key );
 void		renew_parameter_key( key_parameter_t *key,gint id, gint start, gint end , gint run, gint min,gint max );
-float		get_parameter_key_value( key_parameter_t *key, gint pos);
+int	get_parameter_key_value( key_parameter_t *key, gint pos, float *res);
 void		update_parameter_key( key_parameter_t *key, GtkWidget *c);
 void		set_parameter_key( key_parameter_t *key, GtkWidget *c );
 void		reset_curve( key_parameter_t *key,GtkWidget *c );
+void		curve_timeline_changed( key_parameter_t *key, GtkWidget *curve);
 #endif

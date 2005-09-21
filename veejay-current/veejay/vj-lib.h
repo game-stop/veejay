@@ -109,8 +109,7 @@ typedef struct
 	int height;
 	float fps;
 	int active;
-	int arate;
-	int achans;
+	long arate;
 } dummy_t;
 
 

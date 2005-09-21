@@ -530,7 +530,8 @@ int veejay_init_editlist(veejay_t * info)
 	    veejay_msg(VEEJAY_MSG_INFO, "Started Audio Task");
 	//    stats.audio = 1;
 	} else {
-	    veejay_msg(VEEJAY_MSG_WARNING, "Could not start Audio Task");
+	    veejay_msg(VEEJAY_MSG_WARNING, "Could not start Audio Task, is Jack running ?");
+	    veejay_change_state(info,LAVPLAY_STATE_STOP );
 	}
     }
    if( !el->has_audio )
@@ -572,10 +573,10 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 	  if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
 		n = sample_chain_free( info->uc->sample_id);
 	  info->uc->playback_mode = new_pm;
-	  if(n > 0)
+/*	  if(n > 0)
 	  {
 		veejay_msg(VEEJAY_MSG_WARNING, "Deactivated %d effect%s", n, (n==1 ? " " : "s" ));
-	  }
+	  }*/
 	  veejay_msg(VEEJAY_MSG_INFO, "Playing plain video now (set %p) ", info->current_edit_list);
 	  info->edit_list = info->current_edit_list;
 	  video_playback_setup *settings = info->settings;
@@ -606,13 +607,13 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 			if(sample_id == info->uc->sample_id) return;
 
 			tmp = vj_tag_chain_free(info->uc->sample_id);
-			veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated %d effect%s", tmp,(tmp==1 ? " " : "s"));
+		//	veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated %d effect%s", tmp,(tmp==1 ? " " : "s"));
 		}
 		tmp = vj_tag_chain_malloc( sample_id);
-		if(tmp > 0 )
+	/*	if(tmp > 0 )
 		{
 			veejay_msg(VEEJAY_MSG_WARNING, "Activated %d effect%s", tmp, (tmp==1? " " : "s") );
-		}
+		}*/
 		info->uc->playback_mode = new_pm;
 		veejay_set_sample(info,sample_id);
 	}
@@ -623,21 +624,21 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG)
 		{
 			tmp = vj_tag_chain_free(info->uc->sample_id);
-			veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated %d effect%s", tmp, (tmp==1 ? " " : "s"));
+		//	veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated %d effect%s", tmp, (tmp==1 ? " " : "s"));
 		}
 		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE)	
 		{
 			if(sample_id != info->uc->sample_id)
 			{
 				tmp = sample_chain_free( info->uc->sample_id );
-				veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated %d effect%s", tmp, (tmp==1 ? " " : "s"));
+	//			veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated %d effect%s", tmp, (tmp==1 ? " " : "s"));
 			}
 		}
 		tmp = sample_chain_malloc( sample_id );
-		if(tmp > 0)
+	/*	if(tmp > 0)
 		{
 			veejay_msg(VEEJAY_MSG_WARNING, "Activated %d effect%s", tmp,tmp==0 ? " " : "s" );
-		}
+		}*/
 		info->uc->playback_mode = new_pm;
 		veejay_set_sample(info, sample_id);
 	}
@@ -3012,7 +3013,9 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 			info->dummy->chroma = CHROMA420;
 		else
 			info->dummy->chroma = CHROMA422;	
-
+		if( !info->dummy->arate)
+			info->dummy->arate = 48000;
+	
 		info->current_edit_list = vj_el_dummy( 0, info->auto_deinterlace, info->dummy->chroma,
 				info->dummy->norm, info->dummy->width, info->dummy->height, info->dummy->fps,
 				force_pix_fmt );
@@ -3022,10 +3025,10 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 			editlist *el = info->current_edit_list;
 			el->has_audio = 1;
 			el->play_rate = el->audio_rate = info->dummy->arate;
-			el->audio_chans = info->dummy->achans;
+			el->audio_chans = 2;
 			el->audio_bits = 16;
 			el->audio_bps = 4;
-			veejay_msg(VEEJAY_MSG_DEBUG, "Dummy AUdio: %f KHz, %d channels, %d bps, %d bit audio",
+			veejay_msg(VEEJAY_MSG_DEBUG, "Dummy Audio: %f KHz, %d channels, %d bps, %d bit audio",
 				(float)el->audio_rate/1000.0,el->audio_chans,el->audio_bps,el->audio_bits);
 		}
 	}

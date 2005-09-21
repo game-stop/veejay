@@ -2049,9 +2049,10 @@ int vj_tag_get_audio_frame(int t1, uint8_t *dst_buffer)
 {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return 0;
+
 #ifdef SUPPORT_READ_DV2
 	if(tag->source_type == VJ_TAG_TYPE_DV1394)
-	{
+	{ // this is never tested ...
 		vj_dv_decoder_get_audio( vj_tag_input->dv1394[tag->index], dst_buffer );	
 	}
 #endif
