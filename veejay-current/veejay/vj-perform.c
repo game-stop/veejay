@@ -656,7 +656,7 @@ int vj_perform_init_audio(veejay_t * info)
 
 	if(!info->audio) return 0;
 #ifdef HAVE_JACK
-	for(i=1; i <= MAX_SPEED; i++)
+	for(i=2; i <= MAX_SPEED; i++)
 	{
 		//veejay_msg(VEEJAY_MSG_DEBUG, "Resampler at %d Hz", (info->edit_list->audio_rate * i));
 		int out_rate = info->edit_list->audio_rate * i;
