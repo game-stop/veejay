@@ -68,6 +68,7 @@ static struct
 {
         const char *name;
         int  id;
+	int  pix_fmt;
 } _supported_codecs[] = 
 {
         { "mjpeg" , CODEC_ID_MJPEG  },
@@ -131,9 +132,9 @@ static	int mmap_size = 0;
 
 typedef struct
 {
-        AVCodec *codec;
-        AVFrame *frame;
-        AVCodecContext  *context;
+        AVCodec *codec[2]; // veejay supports only 2 yuv formats internally
+        AVFrame *frame[2];
+        AVCodecContext  *context[2];
         uint8_t *tmp_buffer;
         uint8_t *deinterlace_buffer[3];
         int fmt;
@@ -165,19 +166,27 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
         vj_decoder *d = (vj_decoder*) vj_malloc(sizeof(vj_decoder));
         
         if(!d) return NULL;
-        d->codec = NULL;
+        d->codec[0] = NULL;
+	d->codec[1] = NULL;
 
         if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420)
         {
-                d->codec = avcodec_find_decoder( id );
-                if(!d->codec)
-                        return NULL;
-                d->context = avcodec_alloc_context();
-                d->context->width = width;
-                d->context->height= height;
-                d->context->frame_rate = fps;
-                d->context->pix_fmt = ( pixel_format == 0 ? PIX_FMT_YUV420P : PIX_FMT_YUV422P);
-                d->frame = avcodec_alloc_frame();
+		int i;
+		for( i = 0; i < 2; i ++ )
+		{
+               		d->codec[i] = avcodec_find_decoder( id );
+               		if(!d->codec[i])
+                	        return NULL;
+			d->codec[i] = avcodec_find_decoder( id );
+			if(!d->codec[i])
+				return NULL;
+               		d->context[i] = avcodec_alloc_context();
+               		d->context[i]->width = width;
+              		d->context[i]->height= height;
+                	d->context[i]->frame_rate = fps;
+                	d->context[i]->pix_fmt = ( i == 0 ? PIX_FMT_YUV420P : PIX_FMT_YUV422P);
+               		d->frame[i] = avcodec_alloc_frame();
+		}
         }       
 
 
@@ -200,15 +209,19 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
         memset( d->deinterlace_buffer[1], 0, width * height );
         memset( d->deinterlace_buffer[2], 0, width * height );
 
-        if(d->codec != NULL)
-        {
-                if ( avcodec_open( d->context, d->codec ) < 0 )
+	int i;
+	for(i = 0;i < 2 ; i ++ )
+	{
+       	 if(d->codec[i] != NULL)
+       	 {
+                if ( avcodec_open( d->context[i], d->codec[i] ) < 0 )
                 {
                         veejay_msg(VEEJAY_MSG_ERROR, "Error initializing decoder %d",id); 
                         if(d) free(d);
                         return NULL;
                 }
-        }        
+         }
+ 	}        
         d->ref = 1;
         return d;
 }
@@ -839,9 +852,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 		int len;
 		int got_picture = 0;
 		int inter = lav_video_interlacing(el->lav_fd[N_EL_FILE(n)]);
-
-	
-		len = avcodec_decode_video(d->context, d->frame, &got_picture, d->tmp_buffer, res); 	
+		len = avcodec_decode_video(d->context[in_pix_fmt], d->frame[in_pix_fmt], &got_picture, d->tmp_buffer, res); 	
 		if(len>0 && got_picture)
 		{
 			AVPicture pict,pict2;
@@ -871,7 +882,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 				pict2.linesize[2] = el->video_width >> 1;
 
 				pict2.linesize[0] = el->video_width;
-				res = avpicture_deinterlace( &pict2, (const AVPicture*) d->frame, src_fmt,
+				res = avpicture_deinterlace( &pict2, (const AVPicture*) d->frame[in_pix_fmt], src_fmt,
 					el->video_width, el->video_height);
 
 				img_convert( &pict, dst_fmt, (const AVPicture*) &pict2, src_fmt,
@@ -879,7 +890,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			}
 			else
 			{
-				img_convert( &pict, dst_fmt, (const AVPicture*) d->frame, d->context->pix_fmt,
+				img_convert( &pict, dst_fmt, (const AVPicture*) d->frame[in_pix_fmt], src_fmt,
 						el->video_width, el->video_height );
 			}
 			
