@@ -2573,95 +2573,79 @@ void vj_perform_post_chain(veejay_t *info, VJFrame *frame)
 
 int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 {
-
-	
+	if( info->audio == NO_AUDIO )
+		return 1;
 
 #ifdef HAVE_JACK
-  video_playback_setup *settings = info->settings;
-  long this_frame = settings->current_frame_num;
-  int num_samples = 0;
-  editlist *el = info->edit_list;
+	video_playback_setup *settings = info->settings;
+	long this_frame = settings->current_frame_num;
+	int num_samples = 0;
+
+	editlist *el = info->edit_list;
 	uint8_t *a_buf = top_audio_buffer;
 
-  if(info->edit_list->has_audio == 0 ) return 1;
-
-  if(a_buf == NULL)
-  {
-	veejay_msg(VEEJAY_MSG_DEBUG, "Woops this sucks!");
-	veejay_change_state(info,LAVPLAY_STATE_STOP);
-	return -1;
-  }
-
+	if(el->has_audio == 0 ) return 1;
 
      /* First, get the audio */
-  if (info->audio && el->has_audio)
-  {
-	switch (info->uc->playback_mode)
-	{
-		case VJ_PLAYBACK_MODE_SAMPLE:
-			num_samples = vj_perform_fill_audio_buffers(info,a_buf);
-		    break;
-
-		case VJ_PLAYBACK_MODE_PLAIN:
-		    if (settings->current_playback_speed == 0)
-		    {
-		    	veejay_memset( a_buf, 0, PERFORM_AUDIO_SIZE);
-			num_samples = (el->audio_rate/el->video_fps);
-		    }
-		    else
-		    {
-			num_samples =
-			    vj_el_get_audio_frame(el, this_frame,a_buf );
-
-			if(num_samples < 0)
+	if (info->audio == AUDIO_PLAY && el->has_audio)
+  	{
+		if(settings->audio_mute)
+			veejay_memset( a_buf, 0, num_samples * el->audio_bps);
+		else
+		{
+			switch (info->uc->playback_mode)
 			{
-				veejay_memset(a_buf,0,PERFORM_AUDIO_SIZE);
-				num_samples = (el->audio_rate/el->video_fps);
+				case VJ_PLAYBACK_MODE_SAMPLE:
+				num_samples = vj_perform_fill_audio_buffers(info,a_buf);
+				break;
+
+				case VJ_PLAYBACK_MODE_PLAIN:
+				if (settings->current_playback_speed == 0)
+		    		{
+				    	veejay_memset( a_buf, 0, PERFORM_AUDIO_SIZE);
+					num_samples = (el->audio_rate/el->video_fps);
+		    		}	
+		    		else
+		    		{
+					num_samples =
+			    			vj_el_get_audio_frame(el, this_frame,a_buf );
+					if(num_samples < 0)
+					{
+						veejay_memset(a_buf,0,PERFORM_AUDIO_SIZE);
+						num_samples = (el->audio_rate/el->video_fps);
+					}
+		    		}
+	    	   		if (settings->current_playback_speed < 0)
+					vj_perform_reverse_audio_frame(info, num_samples,a_buf);
+	    	    		break;
+
+				case VJ_PLAYBACK_MODE_TAG:
+			    	num_samples = vj_tag_get_audio_frame(info->uc->sample_id, a_buf);
+				if(num_samples <= 0)
+					num_samples = (el->audio_rate/el->video_fps);
+				break;
+			default:
+				veejay_memset( a_buf, 0 , PERFORM_AUDIO_SIZE);
+	    	    		break;
 			}
-		    }
-	    	    if (settings->current_playback_speed < 0)
-		    {
-			vj_perform_reverse_audio_frame(info, num_samples,a_buf);
-					       
-	    	    }
-	    	    break;
-		case VJ_PLAYBACK_MODE_TAG:
-		    	num_samples = vj_tag_get_audio_frame(info->uc->sample_id, a_buf);
-			if(num_samples <= 0)
-			{
-				num_samples = (el->audio_rate/el->video_fps);
-			}
-			break;
-
-		default:
-			    veejay_memset( a_buf, 0 , PERFORM_AUDIO_SIZE);
-	    	    break;
-	}
-
- 	/* dump audio frame if required */
-        if(info->stream_enabled==1)
-	{
-	    vj_yuv_put_aframe(a_buf, el, num_samples * el->audio_bps);
-	}
-
-	if(settings->audio_mute)
-	{
-		veejay_memset( a_buf, 0, num_samples * el->audio_bps);
-	}
-
-	if(info->audio != AUDIO_PLAY) return 1;
-
-	if( el->play_rate != el->audio_rate && el->play_rate != 0)
-	{
-		veejay_memcpy( x_audio_buffer, a_buf, num_samples * el->audio_bps);
-		int r = audio_resample( resample_jack, (short*)top_audio_buffer,(short*)a_buf, num_samples );
-		vj_jack_play( top_audio_buffer, ( r * el->audio_bps ));
-	}
-	else
-	{
-		vj_jack_play( a_buf, (num_samples * el->audio_bps ));
-	}
-     }
+		}
+ 		/* dump audio frame if required */
+   		if(info->stream_enabled==1)
+		{ // FIXME: does this still work ?
+		    vj_yuv_put_aframe(a_buf, el, num_samples * el->audio_bps);
+		}
+	
+		if( el->play_rate != el->audio_rate && el->play_rate != 0)
+		{
+			veejay_memcpy( x_audio_buffer, a_buf, num_samples * el->audio_bps);
+			int r = audio_resample( resample_jack, (short*)top_audio_buffer,(short*)a_buf, num_samples );
+			vj_jack_play( top_audio_buffer, ( r * el->audio_bps ));
+		}
+		else
+		{
+			vj_jack_play( a_buf, (num_samples * el->audio_bps ));
+		}
+     }	
 
 #endif
      
