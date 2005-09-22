@@ -156,8 +156,8 @@ void	reset_curve( key_parameter_t *key, GtkWidget *curve )
 
 void	set_points_in_curve( key_parameter_t *key, GtkWidget *curve)
 {
-	gtk_curve_reset(GTK_CURVE(curve));
-	gtk_curve_set_range( GTK_CURVE(curve), 0.0, 1.0, 0.0, 1.0 );
+//	gtk_curve_reset(GTK_CURVE(curve));
+//	gtk_curve_set_range( GTK_CURVE(curve), 0.0, 1.0, 0.0, 1.0 );
 	gtk_curve_set_curve_type( GTK_CURVE(curve), key->type );
 
 	if(key->vector)

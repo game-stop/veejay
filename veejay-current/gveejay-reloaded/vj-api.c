@@ -1875,20 +1875,30 @@ static	void	vj_kf_select_parameter(int num)
 		info->uc.selected_parameter_id = num;
 
 	// Effect chain parameter key
-	key_parameter_t *key = s->ec->effects[(info->uc.selected_chain_entry)]->parameters[num];
+	key_parameter_t *key = s->ec->effects[(info->uc.selected_chain_entry)]->parameters[(info->uc.selected_parameter_id)];
 	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
+fprintf(stderr, "select parameter %d, entry %d\n", num,
+		info->uc.selected_chain_entry );
+	if(num >= 0)
+	{
+		update_curve_surroundings();
+		update_curve_widget("curve");
+		update_curve_accessibility("curve");
+	}
 
 	/* If not processing status (if user event) */
-	if(!info->status_lock)
+/*	if(!info->status_lock)
 	{
-		/* Reload KEY  now */
+		fprintf(stderr, "Reloading key %d: %d\n",
+				info->uc.selected_parameter_id,
+				info->uc.selected_chain_entry );
 		update_curve_surroundings();
 		update_curve_widget( "curve" );
 		update_curve_accessibility("curve");
-	}
+	}*/
 	/* Set parameter name to KF */
 	char name[20];	
-	sprintf(name, "P%d", num);
+	sprintf(name, "P%d", info->uc.selected_parameter_id);
 	update_label_str( "curve_parameter", name );
 }
 
@@ -2014,7 +2024,7 @@ static	void	update_curve_surroundings()
 		"curve_typespline",
 		"curve_typefreehand"
 	};
-
+/*
 	// Check me: on the fly redraw of curve !
 	if( key->type == GTK_CURVE_TYPE_LINEAR )
 		set_toggle_button( tog_w[0].name,1 );
@@ -2023,7 +2033,7 @@ static	void	update_curve_surroundings()
 			set_toggle_button( tog_w[1].name ,1);
 		else
 			set_toggle_button( tog_w[2].name ,1);
-
+*/
 	set_toggle_button( "curve_togglerun" , key->running );
 
 }
@@ -2038,6 +2048,7 @@ static  void	update_curve_widget(const char *name)
 	int j = info->uc.selected_parameter_id;
 
 	key_parameter_t *key = s->ec->effects[i]->parameters[j];
+	reset_curve(key,curve);
 	set_points_in_curve( key, curve );
 }
 
@@ -3043,7 +3054,7 @@ static void	process_reload_hints(void)
 				sprintf(button_name, "kf_p%d", i );
 				enable_widget( button_name );
 			}
-			vj_kf_select_parameter(-1); // reset selected curve
+		//	vj_kf_select_parameter(-1); // reset selected curve
 		}
 		update_spin_value( "button_fx_entry", info->uc.selected_chain_entry);	
 
@@ -3069,10 +3080,12 @@ static void	process_reload_hints(void)
 	}
 
 	/* Curve needs update (start/end changed, effect id changed */
-	if ( info->uc.reload_hint[HINT_KF] && pm != MODE_PLAIN )
+	if ( info->uc.reload_hint[HINT_KF]  )
 	{
-		update_curve_surroundings();
-		update_curve_widget( "curve" );
+		//update_curve_surroundings();
+		//update_curve_widget( "curve" );
+fprintf(stderr, "Reloading KF\n");
+		vj_kf_select_parameter( info->uc.selected_parameter_id );
 	}
 
 
@@ -3327,11 +3340,10 @@ static	void	load_v4l_info()
 
 static	gint load_parameter_info()
 {
-//	int	*p = &(info->uc.entry_tokens[0]);
+	int	*st = &(info->uc.entry_tokens[0]);
 	int	len = 0;
-	int	p[15];
+	int	p[16];
 	int 	i;
-	int *d = &(info->uc.entry_tokens[0] );
 		
 	multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, 
 		info->uc.selected_chain_entry );
@@ -3341,7 +3353,7 @@ static	gint load_parameter_info()
 	{
 		if(answer) g_free(answer);
 		for( i = 0; i < 16; i ++ )
-			d[i] = 0;
+			st[i] = 0;
 		if(info->uc.selected_rgbkey)
 			disable_widget("rgbkey");
 		return 0;
@@ -3352,7 +3364,8 @@ static	gint load_parameter_info()
 		p+11,p+12,p+13,p+14,p+15);
 	if( res <= 0 )
 	{
-		memset( d, 0, 16 ); 
+		for( i = 0; i < 16; i ++ )
+			st[i] = 0;
 		return 0;
 	}
 	info->uc.selected_rgbkey = _effect_get_rgb( p[0] );
@@ -3366,11 +3379,11 @@ static	gint load_parameter_info()
 		disable_widget( "rgbkey");
 		info->uc.selected_rgbkey = 0;
 	} 
+
 	g_free(answer);
 		
-	for( i = 0; i < STATUS_TOKENS; i ++ )
-		d[i] = p[i];
-
+	for( i = 0; i < 16; i ++ )
+		st[i] = p[i];
 	return 1;
 }	  
 
@@ -5259,7 +5272,7 @@ static void	update_gui()
 	if( pm == MODE_SAMPLE)
 		interpolate_parameters();
 
-	update_curve_accessibility("curve");
+	//update_curve_accessibility("curve");
 
 }
 

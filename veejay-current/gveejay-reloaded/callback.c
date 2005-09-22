@@ -1642,6 +1642,9 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	set_points_in_curve(  s->ec->effects[i]->parameters[j], curve );
 
 	s->ec->enabled = is_button_toggled( "curve_toggleentry" );
+
+	fprintf(stderr, "Stored vector in %d: %d\n",
+		i,j);
 }
 
 void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
@@ -1675,7 +1678,7 @@ void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
 		int i = info->uc.selected_chain_entry;
 		int j = info->uc.selected_parameter_id;
 		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_LINEAR;
-		get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
+	//	get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
 		set_points_in_curve( s->ec->effects[i]->parameters[j],curve );
 	}
 }	
@@ -1683,17 +1686,23 @@ void	on_curve_typespline_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
 		return;
-
-	if( is_button_toggled("curve_typespline"))
-	{
+	int i = info->uc.selected_chain_entry;
+		int j = info->uc.selected_parameter_id;
 		sample_slot_t *s = info->selected_slot;
 		if(!s)
 			return;
-		GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
-		int i = info->uc.selected_chain_entry;
-		int j = info->uc.selected_parameter_id;
+	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+
+	if( is_button_toggled("curve_typespline"))
+	{
+	//	sample_slot_t *s = info->selected_slot;
+	//	if(!s)
+	//		return;
+	//	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+	//	int i = info->uc.selected_chain_entry;
+	//	int j = info->uc.selected_parameter_id;
 		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_SPLINE;
-		get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
+	//	get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
 		set_points_in_curve( s->ec->effects[i]->parameters[j],curve );
 	}
 }	
@@ -1701,17 +1710,23 @@ void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
 		return;
-
-	if( is_button_toggled("curve_typefreehand"))
-	{
+		int i = info->uc.selected_chain_entry;
+		int j = info->uc.selected_parameter_id;
 		sample_slot_t *s = info->selected_slot;
 		if(!s)
 			return;
-		GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
-		int i = info->uc.selected_chain_entry;
-		int j = info->uc.selected_parameter_id;
+	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+
+	if( is_button_toggled("curve_typefreehand"))
+	{
+	//	sample_slot_t *s = info->selected_slot;
+	//	if(!s)
+	//		return;
+	//	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+	//	int i = info->uc.selected_chain_entry;
+	//	int j = info->uc.selected_parameter_id;
 		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_FREE;
-		get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
+	//	get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
 		set_points_in_curve( s->ec->effects[i]->parameters[j],curve );
 	}
 }
@@ -1736,35 +1751,43 @@ void	on_curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 
 void	on_kf_p0_toggled( GtkWidget *widget, gpointer user_data)
 {
-	kf_changed( 0 );
+	if(is_button_toggled("kf_p0"))
+		kf_changed( 0 );
 }
 void	on_kf_p1_toggled( GtkWidget *widget, gpointer user_data)
 {
-	kf_changed( 1 );
+	if( is_button_toggled("kf_p1"))
+		kf_changed( 1 );
 }
 void	on_kf_p2_toggled( GtkWidget *widget, gpointer user_data)
 {
-	kf_changed( 2 );
+	if( is_button_toggled("kf_p2"))
+		kf_changed( 2 );
 }
 void	on_kf_p3_toggled( GtkWidget *widget, gpointer user_data)
 {
-	kf_changed( 3 );
+	if( is_button_toggled("kf_p3"))
+		kf_changed( 3 );
 }
 void	on_kf_p4_toggled( GtkWidget *widget, gpointer user_data)
 {
-	kf_changed( 4 );
+	if( is_button_toggled("kf_p4"))
+		kf_changed( 4 );
 }
 void	on_kf_p5_toggled( GtkWidget *widget, gpointer user_data)
 {
-	kf_changed( 5 );
+	if( is_button_toggled("kf_p5"))
+		kf_changed( 5 );
 }
 void	on_kf_p6_toggled( GtkWidget *widget, gpointer user_data)
 {
-	kf_changed( 6 );
+	if( is_button_toggled("kf_p6"))
+		kf_changed( 6 );
 }
 void	on_kf_p7_toggled( GtkWidget *widget, gpointer user_data)
 {
-	kf_changed( 7 );
+	if( is_button_toggled("kf_p7"))
+		kf_changed( 7 );
 }
 
 void	on_curve_toggleglobal_toggled(GtkWidget *widget, gpointer user_data)
