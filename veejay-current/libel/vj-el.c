@@ -1702,6 +1702,7 @@ editlist	*vj_el_soft_clone(editlist *el)
 			clone->lav_fd[i] = el->lav_fd[i];
 			clone->ref[i] = 1; // clone starts with ref count of 1
 			clone->num_frames[i] = el->num_frames[i];
+			clone->yuv_taste[i] =el->yuv_taste[i];
 		}
 	}
 
