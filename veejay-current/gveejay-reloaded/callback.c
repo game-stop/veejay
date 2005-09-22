@@ -1639,8 +1639,8 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	curve_timeline_changed(s->ec->effects[i]->parameters[j], curve );
 
 	get_points_from_curve(  s->ec->effects[i]->parameters[j], curve );
+	s->ec->effects[i]->parameters[j]->type = curve_type;
 	set_points_in_curve(  s->ec->effects[i]->parameters[j], curve );
-
 	s->ec->enabled = is_button_toggled( "curve_toggleentry" );
 
 	fprintf(stderr, "Stored vector in %d: %d\n",

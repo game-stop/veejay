@@ -1877,8 +1877,6 @@ static	void	vj_kf_select_parameter(int num)
 	// Effect chain parameter key
 	key_parameter_t *key = s->ec->effects[(info->uc.selected_chain_entry)]->parameters[(info->uc.selected_parameter_id)];
 	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
-fprintf(stderr, "select parameter %d, entry %d\n", num,
-		info->uc.selected_chain_entry );
 	if(num >= 0)
 	{
 		update_curve_surroundings();
@@ -2024,7 +2022,7 @@ static	void	update_curve_surroundings()
 		"curve_typespline",
 		"curve_typefreehand"
 	};
-/*
+
 	// Check me: on the fly redraw of curve !
 	if( key->type == GTK_CURVE_TYPE_LINEAR )
 		set_toggle_button( tog_w[0].name,1 );
@@ -2033,7 +2031,7 @@ static	void	update_curve_surroundings()
 			set_toggle_button( tog_w[1].name ,1);
 		else
 			set_toggle_button( tog_w[2].name ,1);
-*/
+
 	set_toggle_button( "curve_togglerun" , key->running );
 
 }
@@ -3084,7 +3082,6 @@ static void	process_reload_hints(void)
 	{
 		//update_curve_surroundings();
 		//update_curve_widget( "curve" );
-fprintf(stderr, "Reloading KF\n");
 		vj_kf_select_parameter( info->uc.selected_parameter_id );
 	}
 
