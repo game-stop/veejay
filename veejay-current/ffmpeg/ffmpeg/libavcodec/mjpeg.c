@@ -397,6 +397,18 @@ static void jpeg_put_comments(MpegEncContext *s)
         size = strlen(LIBAVCODEC_IDENT)+3;
         ptr[0] = size >> 8;
         ptr[1] = size;
+	     if(  s->avctx->pix_fmt == PIX_FMT_YUV420P
+ 	        ||s->avctx->pix_fmt == PIX_FMT_YUV422P
+ 	        ||s->avctx->pix_fmt == PIX_FMT_YUV444P){
+ 	         put_marker(p, COM);
+ 	         flush_put_bits(p);
+ 	         ptr = pbBufPtr(p);
+ 	         put_bits(p, 16, 0); /* patched later */
+ 	         put_string(p, "CS=ITU601", 1);
+ 	         size = strlen("CS=ITU601")+3;
+ 	         ptr[0] = size >> 8;
+ 	         ptr[1] = size;
+ 	     }
     }
 }
 
@@ -834,6 +846,7 @@ typedef struct MJpegDecodeContext {
     int restart_count;
 
     int buggy_avid;
+    int cs_itu601;
     int interlace_polarity;
 } MJpegDecodeContext;
 
@@ -855,7 +868,7 @@ static int mjpeg_decode_init(AVCodecContext *avctx)
 {
     MJpegDecodeContext *s = avctx->priv_data;
     MpegEncContext s2;
-
+    memset( s,0,sizeof(MJpegDecodeContext) );
     s->avctx = avctx;
 
     /* ugly way to get the idct & scantable FIXME */
@@ -1055,16 +1068,16 @@ static int mjpeg_decode_sof(MJpegDecodeContext *s)
         if(s->rgb){
             s->avctx->pix_fmt = PIX_FMT_RGBA32;
         }else if(s->nb_components==3)
-            s->avctx->pix_fmt = PIX_FMT_YUV444P;
+            s->avctx->pix_fmt = s->cs_itu601 ? PIX_FMT_YUV444P : PIX_FMT_YUVJ444P;
         else
             s->avctx->pix_fmt = PIX_FMT_GRAY8;
         break;
     case 0x21:
-        s->avctx->pix_fmt = PIX_FMT_YUV422P;
+        s->avctx->pix_fmt = s->cs_itu601 ? PIX_FMT_YUV422P : PIX_FMT_YUVJ422P;
         break;
     default:
     case 0x22:
-        s->avctx->pix_fmt = PIX_FMT_YUV420P;
+        s->avctx->pix_fmt = s->cs_itu601 ? PIX_FMT_YUV420P : PIX_FMT_YUVJ420P;
         break;
     }
 
@@ -1652,6 +1665,10 @@ static int mjpeg_decode_com(MJpegDecodeContext *s)
 		//	if (s->first_picture)
 		//	    printf("mjpeg: workarounding buggy AVID\n");
 	    }
+	    else if(!strcmp(cbuf,"CS=ITU601"))	
+	    {
+		s->cs_itu601 = 1;
+	    }
 
 	    av_free(cbuf);
 	}
@@ -2085,7 +2102,7 @@ static int sp5x_decode_frame(AVCodecContext *avctx,
     s->v_max = 2;
     
     s->qscale_table = av_mallocz((s->width+15)/16);
-    avctx->pix_fmt = PIX_FMT_YUV420P;
+    avctx->pix_fmt = s->cs_itu601 ? PIX_FMT_YUV420P : PIX_FMT_YUVJ420;
     s->interlaced = 0;
     
     s->picture.reference = 0;
