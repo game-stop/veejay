@@ -6162,7 +6162,7 @@ static int	add_bank( gint bank_num  )
 			{
 				create_slot( bank_num, slot_nr ,info->image_dimensions[0], info->image_dimensions[1]);
 				sample_gui_slot_t *gui_slot = info->sample_banks[bank_num]->gui_slot[slot_nr];
-	    			gtk_table_attach_defaults ( table, gui_slot->event_box, row, row+1, col, col+1);    
+	    			gtk_table_attach_defaults ( table, gui_slot->event_box, row, row+1, col, col+1);   
 			}
 		}
 	}
@@ -6432,7 +6432,7 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 
 	// to reach clicks on the following GUI-Elements of one slot, they are packed into an event_box
 	gui_slot->event_box = gtk_event_box_new();
-	gtk_event_box_set_visible_window(gui_slot->event_box, FALSE);
+	gtk_event_box_set_visible_window(gui_slot->event_box, TRUE);
 
 
 	GTK_WIDGET_SET_FLAGS(gui_slot->event_box,GTK_CAN_FOCUS);	
