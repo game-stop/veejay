@@ -1546,8 +1546,7 @@ void		gveejay_update_image2( GtkWidget *img,  gint w, gint h )
 	// send 'get image' message
 	multi_vims( VIMS_RGB24_IMAGE, "%d %d", w ,h );
 	// read image from socket, store length of image in bw
-	recv_vims_binary( 5, &bw, info->rawdata );
-
+	recv_vims_binary( 6, &bw, info->rawdata );
 	if(bw<=0 ) { return ; }
 
 	GtkImage *image = GTK_IMAGE(img);
@@ -5130,7 +5129,7 @@ static	gboolean	update_imageA( gpointer data )
 	{
 		if( is_button_toggled( "previewtoggle" ))
 		gveejay_update_image2(
-			glade_xml_get_widget_(info->main_window, "imageA"), 176,144 );
+			glade_xml_get_widget_(info->main_window, "imageA"), 176,144  );
 	}
 	return TRUE;
 }

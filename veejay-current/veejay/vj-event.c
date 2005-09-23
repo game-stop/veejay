@@ -7147,12 +7147,11 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 			h = v->edit_list->video_height;
 		}
 
-
 		unsigned char *msg = gdk_pixbuf_get_pixels( p );
 		unsigned char *con = (unsigned char*) vj_malloc(sizeof(unsigned char)  * 5 + (w * h * 3 ));
-		sprintf(con, "%05d", (w * h * 3));
-		veejay_memcpy( con + 5 , msg , (w * h * 3 ));
-		vj_server_send(v->vjs[0], v->uc->current_link, con, 5 + (w*h*3));
+		sprintf(con, "%06d", (w * h * 3));
+		veejay_memcpy( con + 6 , msg , (w * h * 3 ));
+		vj_server_send(v->vjs[0], v->uc->current_link, con, 6 + (w*h*3));
 		if(con) free(con);
 		if(img->image )
 			gdk_pixbuf_unref( (GdkPixbuf*) img->image );
@@ -7164,8 +7163,8 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	else
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to get image");
-		char empty[5];
-		bzero(empty, 5 );
+		char empty[6];
+		bzero(empty, 6 );
 		SEND_MSG( v, empty );
 	}
 }
