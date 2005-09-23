@@ -1549,6 +1549,8 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf)
 		tmp_buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * n_frames * PERFORM_AUDIO_SIZE);
 		if(!tmp_buf) return 0;
 
+		if(n_frames >= MAX_SPEED) n_frames = MAX_SPEED-1;
+
 		for ( i = 0; i <= n_frames; i ++ )	
 		{
 			alen = vj_el_get_audio_frame(info->edit_list,settings->current_frame_num + i, tmp_buf + blen);
