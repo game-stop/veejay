@@ -5544,7 +5544,6 @@ void	vj_fork_or_connect_veejay(char *configfile)
 					vj_launch_toggle(FALSE);
 					vj_msg(VEEJAY_MSG_INFO,
 						"Spawning Veejay ...!"); 
-					set_toggle_button( "previewtoggle", 1 );
 				}
 				
 			}
