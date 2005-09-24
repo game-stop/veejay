@@ -247,8 +247,8 @@ typedef struct
 	gchar *descr;
 } vims_t;
 
-// Have room for only 500 samples
-#define NUM_BANKS 50   
+// Have room for only 200 samples
+#define NUM_BANKS 20   
 #define NUM_PAGES 10
 #define NUM_SAMPLES_PER_PAGE 12
 #define NUM_SAMPLES_PER_COL 3
@@ -265,7 +265,8 @@ typedef struct
 	GtkLabel *title;
 	GtkLabel *timecode;
 	GtkLabel *hotkey;
-	GtkWidget *edit_button;
+//	GtkWidget *edit_button;
+	GtkTooltips *tips;
 	GtkWidget *image;
 	GtkFrame  *frame;
 	GtkWidget *event_box;
@@ -575,8 +576,8 @@ static struct
 	{"streamnew"},
 	{"sampleadd"},	
 	{"samplepage"},
-	{"button_clearmarker"},
-	{"check_marker_bind"},
+//	{"button_clearmarker"},
+//	{"check_marker_bind"},
 	{NULL} 
 };
 static struct
@@ -1545,9 +1546,10 @@ void		gveejay_update_image2( GtkWidget *img,  gint w, gint h )
 	// veejay sends current frame as image in RGB, 8 bytes per sample 
 	// send 'get image' message
 	multi_vims( VIMS_RGB24_IMAGE, "%d %d", w ,h );
-	// read image from socket, store length of image in bw
 	recv_vims_binary( 6, &bw, info->rawdata );
-	if(bw<=0 ) { return ; }
+
+	// read image from socket, store length of image in bw
+	if(bw<=0 || bw != (w*h*3)) { return ; }
 
 	GtkImage *image = GTK_IMAGE(img);
 
@@ -1746,6 +1748,7 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 	int ret = vj_client_read( info->client, V_CMD, tmp, slen );
 	int len = 0;
 	sscanf( tmp, "%d", &len );
+
 	gchar *result = NULL;
 	if( len <= 0 || slen <= 0)
 	{
@@ -1779,28 +1782,29 @@ static int recv_vims_binary(int slen, int *bytes_written, guchar *buf)
 	bzero(tmp,tmp_len);
 
 	int ret = vj_client_read( info->client, V_CMD, tmp, slen );
-	int len = atoi(tmp);
+//	int len = atoi(tmp);
+	int len = 0;
+	sscanf( tmp, "%6d",&len);
 	gchar *result = NULL;
 	if( len <= 0 || slen == NULL)
 		return 0;
 
-	int bytes_left = len;
+	int bytes_to_recv = len;
+	int bw = 0;
 	*bytes_written = 0;
+	guchar *ptr = buf;
 
-	while( bytes_left > 0)
+	while( bw < len)
 	{
-		int n = vj_client_read( info->client, V_CMD, buf + (*bytes_written), bytes_left );
+		int n = vj_client_read( info->client, V_CMD, ptr, bytes_to_recv );
 		if( n <= 0 )
-		{
-			bytes_left = 0;
-		}
-		if( n > 0 )
-		{
-			*bytes_written +=n;
-			bytes_left -= n;
-		}
+			return 0;
+		bw += n;
+		bytes_to_recv -= n;
+		ptr += bw;
 	}
 
+	*bytes_written = bw;
 	return 1;
 }
 
@@ -2516,7 +2520,7 @@ static	void	update_status_accessibility(int pm)
 				for(i=0; videowidgets[i].name != NULL; i++)
 					disable_widget( videowidgets[i].name);
 				disable_widget_by_pointer(info->speed_knob);
-
+				
 			}
 			else
 			{
@@ -2540,6 +2544,17 @@ static	void	update_status_accessibility(int pm)
 				disable_widget( "frame132");
 				disable_widget( "samplerand" );
 				disable_widget( "freestyle" );
+			}
+
+			if( pm == MODE_PLAIN)
+			{
+				enable_widget( "button_samplestart" );
+				enable_widget( "button_sampleend" );
+			}
+			else
+			{
+				disable_widget( "button_samplestart");
+				disable_widget( "button_sampleend" );
 			}
 
 			if( pm == MODE_PLAIN)
@@ -4967,10 +4982,22 @@ static	void	load_editlist_info()
 	info->el.width = values[0];
 	info->el.height = values[1];
 
-	update_spin_value( "priout_height", values[1] );
-	update_spin_value( "priout_width", values[0] );
+	gint w = values[0];
+	gint h = values[1];
+
+	update_spin_value( "priout_width", w );
+	update_spin_value( "priout_height", h );
+
+	/* setup preview image */
+	if( w > 352 )
+		w = 352;
+	if( h > 288 )
+		h = 288;
 	
-	// lock pri out and update values!
+	update_spin_range( "preview_width", 16, w,
+		(info->run_state == RUN_STATE_REMOTE ? (w/2) : w ) ); 
+	update_spin_range( "preview_height", 16, h,
+		(info->run_state == RUN_STATE_REMOTE ? (h/2) : h ) );	
 
 	update_label_str( "label_el_wh", tmp );
 	snprintf( tmp, sizeof(tmp)-1, "%s",
@@ -5129,7 +5156,7 @@ static	gboolean	update_imageA( gpointer data )
 	{
 		if( is_button_toggled( "previewtoggle" ))
 		gveejay_update_image2(
-			glade_xml_get_widget_(info->main_window, "imageA"), 176,144  );
+			glade_xml_get_widget_(info->main_window, "imageA"), get_nums("preview_width"),get_nums("preview_height")  );
 	}
 	return TRUE;
 }
@@ -5435,7 +5462,7 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	char	config[512];
 	int 	i = 0;
 
-	int arglen = vims_verbosity ? 5 :4 ;
+	int arglen = vims_verbosity ? 6 :5 ;
 
 	args = g_new ( gchar *, arglen );
 
@@ -5460,10 +5487,12 @@ void	vj_fork_or_connect_veejay(char *configfile)
 		args[2] = g_strdup( config );
 	}
 
+	args[3] = g_strdup( "-O5" );
+
 	if(vims_verbosity)
-		args[3] = g_strdup("-v");
+		args[4] = g_strdup("-v");
 	else
-		args[3] = NULL;
+		args[4] = NULL;
 
 	if( info->state == STATE_IDLE )
 	{
@@ -5515,12 +5544,19 @@ void	vj_fork_or_connect_veejay(char *configfile)
 					vj_launch_toggle(FALSE);
 					vj_msg(VEEJAY_MSG_INFO,
 						"Spawning Veejay ...!"); 
+					set_toggle_button( "previewtoggle", 1 );
 				}
 				
 			}
 			else
 			{
 				info->run_state = RUN_STATE_REMOTE;
+				if(is_button_toggled("previewtoggle"))
+				{
+				  /* Keep a watch not to choke the bandwith */
+				  vj_msg(VEEJAY_MSG_INFO, "Disabling preview image");
+				  set_toggle_button( "previewtoggle", 0 );
+				}
 			}
 		}
 		else
@@ -5652,7 +5688,6 @@ void 	vj_gui_init(char *glade_file)
 	// FIXME: Set to max samples / SAMPLES_PER_PAGE , 50 pages for now
 	gui->sample_banks = (sample_bank_t**) vj_malloc(sizeof(sample_bank_t*) * NUM_BANKS );
 	memset( gui->sample_banks, 0 , sizeof(sample_bank_t*) * NUM_BANKS );
-	gui->rawdata =  (guchar*) vj_malloc(sizeof(guchar) * 3 * 256 * 256 );
 			
 	for( i = 0 ; i < 3 ; i ++ )
 	{
@@ -5694,6 +5729,8 @@ void 	vj_gui_init(char *glade_file)
 		(GCallback) on_timeline_out_point_changed, NULL );
 	g_signal_connect( info->tl, "bind_toggled",
 		(GCallback) on_timeline_bind_toggled, NULL );	
+	g_signal_connect( info->tl, "cleared",
+		(GCallback) on_timeline_cleared, NULL );
 
 	gtk_widget_show(frame);
 	gtk_container_add( GTK_CONTAINER(frame), info->tl );
@@ -5723,9 +5760,8 @@ void 	vj_gui_init(char *glade_file)
 	gtk_notebook_set_tab_pos( GTK_NOTEBOOK(info->sample_bank_pad), GTK_POS_BOTTOM );
 	gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET(info->sample_bank_pad), TRUE, TRUE, 0);
 	gtk_widget_show( info->sample_bank_pad );
-
-
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
+
 	setup_knobs();
 	setup_vimslist();
 	setup_effectchain_info();
@@ -5827,6 +5863,12 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	load_editlist_info();
 
+	/* Now setup preview image size */
+	if(info->rawdata)
+		free(info->rawdata);
+	info->rawdata = (guchar*) vj_malloc(sizeof(guchar) * info->el.width * info->el.height * 3);
+	memset(info->rawdata,0,sizeof(guchar) * info->el.width * info->el.height * 3 ); 
+	
 	load_effectlist_info();
 	reload_vimslist();
 	reload_editlist_contents();
@@ -6241,8 +6283,8 @@ void setup_samplebank(gint num_cols, gint num_rows)
 //	info->image_dimensions[0] = 44;
 //	info->image_dimensions[1] = 36;
 
-	info->image_dimensions[0] = image_width/2;
-	info->image_dimensions[1] = image_height/2;
+	info->image_dimensions[0] = image_width * 0.7;
+	info->image_dimensions[1] = image_height * 0.7;
 }
 
 /* --------------------------------------------------------------------------------------------------------------------------
@@ -6483,39 +6525,22 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 		gui_slot->hotkey = GTK_LABEL(gtk_label_new(hotkey));
 	}
 	else
+	{
 		gui_slot->hotkey = GTK_LABEL(gtk_label_new(""));
+	}
 	gtk_misc_set_alignment(GTK_MISC(gui_slot->hotkey), 0.0, 0.0);
 	gtk_misc_set_padding (GTK_MISC(gui_slot->hotkey), 0, 0);	
 	gtk_box_pack_start (GTK_BOX (gui_slot->upper_hbox), GTK_WIDGET(gui_slot->hotkey), FALSE, FALSE, 0);
 	gtk_widget_show(GTK_WIDGET(gui_slot->hotkey));
-//	GtkWidget *label = gtk_label_new( descr );
-//	gtk_box_pack_start( GTK_BOX(gui_slot->upper_hbox), GTK_WIDGET(label), TRUE, TRUE, 0 );
-//	gtk_widget_show(label);
-	/* the edit button */
-
-	/* Todo: add pointer to sample slot to callback function.
-           edit mode needs ID and type  
-	gui_slot->edit_button = GTK_BUTTON( gtk_button_new_with_label("edit"));
-	gtk_box_pack_start( GTK_BOX(gui_slot->upper_hbox), GTK_WIDGET(gui_slot->edit_button), FALSE, FALSE, 0 );
-	g_signal_connect( gui_slot->edit_button, "clicked",
-			G_CALLBACK(open_sample_edit_dialog), 
-			NULL  );
-
-	 gtk_widget_set_sensitive( GTK_WIDGET(gui_slot->edit_button), FALSE );
-	gtk_widget_show(GTK_WIDGET(gui_slot->edit_button));*/  
-
-	/* the upper container that holds title, timecode and so on  */
 	gui_slot->upper_vbox = gtk_vbox_new(false,0);
 	gtk_box_pack_start (GTK_BOX (gui_slot->upper_hbox), gui_slot->upper_vbox, TRUE, TRUE, 0);
 	gtk_widget_show(GTK_WIDGET(gui_slot->upper_vbox));
-	/* the title of the loaded sample (if there is any) */
 	gui_slot->title = GTK_LABEL(gtk_label_new(""));
 	gtk_misc_set_alignment(GTK_MISC(gui_slot->title), 0.00, 0.00);
 	gtk_misc_set_padding (GTK_MISC(gui_slot->title), 0, 0);	
 	gtk_box_pack_start (GTK_BOX (gui_slot->upper_vbox), GTK_WIDGET(gui_slot->title), FALSE, FALSE, 0);
 	gtk_widget_show(GTK_WIDGET(gui_slot->title));	
 	
-	/* the timecode of the loaded sample (if there is any) */
 	gui_slot->timecode = GTK_LABEL(gtk_label_new(""));
 	gtk_misc_set_alignment(GTK_MISC(gui_slot->timecode), 0.0, 0.0);
 	gtk_misc_set_padding (GTK_MISC(gui_slot->timecode), 0,0 );	
@@ -6792,6 +6817,7 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 			gtk_label_set_text( GTK_LABEL( gui_slot->title ), slot->title );
 		if(gui_slot->timecode)
 			gtk_label_set_text( GTK_LABEL( gui_slot->timecode ), slot->timecode );
+
 		if(sample_id > 0 )
 		{
 			gchar frame_title[20];
@@ -6881,6 +6907,6 @@ void setup_knobs()
     speed_adj->page_size = 0;
     speed_adj->page_increment = 1;    
     g_signal_connect( speed_adj, "value_changed", (GCallback) on_speed_knob_value_changed, NULL );
-    update_label_i( "speed_label", (gint)speed_adj->value,0);
+ 
     }
         

@@ -36,6 +36,7 @@ enum
 	IN_CHANGED,
 	OUT_CHANGED,
 	BIND_CHANGED,
+	CLEAR_CHANGED,
 	SELECTION_CHANGED_SIGNAL,
 	LAST_SIGNAL
 };
@@ -50,6 +51,7 @@ enum
 	OUT_POINT = 6,
 	SEL = 7,
 	BIND = 8,
+	CLEARED = 9,
 };
 
 typedef enum {
@@ -100,6 +102,7 @@ struct _TimelineSelection
 	GdkRectangle	stepper;
 	GdkRectangle	selection;	
 	gboolean	has_stepper;
+	gboolean	clear;
 	gdouble		stepper_size;   /* size of triangle */
 	gdouble		stepper_length; /* length from top to bottom */
 	gint		step_size;	/* step frames 1,2,4,8,16, ... */
@@ -139,6 +142,7 @@ struct _TimelineSelectionClass
 	void	(*in_point_changed) (TimelineSelection *te);
 	void	(*out_point_changed) (TimelineSelection *te);
 	void	(*bind_toggled) (TimelineSelection *te);
+	void	(*cleared) (TimelineSelection *te);
 };
 static	void	set_property	(GObject *object,
 	guint id, GValue *value, GParamSpec *pspec)
@@ -194,6 +198,12 @@ static	void	set_property	(GObject *object,
 			te->bind = g_value_get_boolean(value);
 		}	
 		break;
+		case CLEARED:
+		if(te->clear != g_value_get_boolean(value))
+		{
+			te->clear = g_value_get_boolean(value);
+		}
+		break;
 		default:
 			g_assert(FALSE);	
 		break;
@@ -216,6 +226,7 @@ static void get_property( GObject *object,
 		case OUT_POINT: g_value_set_double( value, te->out ); break;
 		case SEL: g_value_set_boolean(value, te->has_selection) ; break;
 		case BIND: g_value_set_boolean(value, te->bind ); break;
+		case CLEARED: g_value_set_boolean(value,te->clear );break;
 	}
 }
 
@@ -279,6 +290,10 @@ static	void	timeline_class_init( TimelineSelectionClass *class )
 			BIND,
 			g_param_spec_boolean( "bind", "Bind marker", "Bind In/Out points",  FALSE, G_PARAM_READWRITE));
 
+	g_object_class_install_property( gobject_class,
+			CLEARED,
+			g_param_spec_boolean( "clear", "Clear marker", "Clear in/out points", FALSE, G_PARAM_READWRITE ));
+
 	timeline_signals[ SELECTION_CHANGED_SIGNAL ] =
 		g_signal_new( "selection_changed",
 				G_TYPE_FROM_CLASS(gobject_class),
@@ -311,6 +326,14 @@ static	void	timeline_class_init( TimelineSelectionClass *class )
 				NULL,NULL,
 				g_cclosure_marshal_VOID__VOID,
 				G_TYPE_NONE, 0, NULL);
+
+	timeline_signals[ CLEAR_CHANGED ] =
+		g_signal_new( "cleared", G_TYPE_FROM_CLASS(gobject_class),
+				G_SIGNAL_RUN_LAST,	
+				G_STRUCT_OFFSET( TimelineSelectionClass, cleared ),
+				NULL,NULL,
+				g_cclosure_marshal_VOID__VOID,
+				G_TYPE_NONE, 0, NULL );
 
 	timeline_signals[ BIND_CHANGED ] = 
 		g_signal_new( "bind_toggled",
@@ -412,6 +435,19 @@ void	timeline_set_out_point( GtkWidget *widget, gdouble pos )
 	gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
 }
 
+void	timeline_clear_points( GtkWidget *widget )
+{
+	gboolean cleared = TRUE;
+	gdouble  pos = 0.0;	
+	gdouble  pos2 = 1.0;
+	TimelineSelection *te = TIMELINE_SELECTION(widget);
+	g_object_set( G_OBJECT(te), "clear", cleared, NULL );
+	g_object_set( G_OBJECT(te), "in", pos, NULL );
+	g_object_set( G_OBJECT(te), "out", pos2,  NULL );
+	g_signal_emit(te->widget, timeline_signals[CLEAR_CHANGED], 0 );
+	gtk_widget_queue_draw(GTK_WIDGET(te->widget) );
+}
+
 void	timeline_set_in_point( GtkWidget *widget, gdouble pos )
 {
 	TimelineSelection *te = TIMELINE_SELECTION(widget);
@@ -477,6 +513,12 @@ static	gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer user
 
 	te->grab_button = ev->button;
 	te->current_location = MOUSE_WIDGET;
+
+	if( ev->type == GDK_2BUTTON_PRESS && te->grab_button == 1 )
+	{
+		timeline_clear_points( widget );
+		return FALSE;
+	}
 
 	if(te->grab_button == 1 && POINT_IN_RECT( ev->x, ev->y, te->stepper ) )
 	{

@@ -117,18 +117,18 @@ int			sock_t_recv_w( vj_sock_t *s, void *dst, int len )
 	if(n==-1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
-		return 0;
+		return -1;
 	}
 	return n;
 }
 
 int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 {
-	int n = recv( s->sock_fd, dst, len , 0  );
+	int n = recv( s->sock_fd, dst, len , MSG_WAITALL  );
 	if(n==-1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
-		return 0;
+		return -1;
 	}
 	return n;
 }

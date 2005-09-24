@@ -38,7 +38,7 @@
 #define VJC_SOCKET 2
 #define VJC_BAD_HOST 3
 
-#define PACKET_LEN 32000
+#define PACKET_LEN (65535*32)
 
 vj_client *vj_client_alloc( int w, int h, int f )
 {

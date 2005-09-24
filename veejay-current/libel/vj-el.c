@@ -226,6 +226,13 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
         return d;
 }
 
+void	vj_el_set_image_output_size(editlist *el)
+{
+	lav_set_project(
+		el->video_width, el->video_height, el->video_fps ,
+			el->pixel_format == FMT_420 ? 1 :0);
+}
+
 int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force,
 		char norm);
 
@@ -420,9 +427,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 			el->video_fps = lav_frame_rate(el->lav_fd[n]);
 #ifdef USE_GDK_PIXBUF
 		}
-		lav_set_project(
-			el->video_width, el->video_height, el->video_fps ,
-				el->pixel_format == FMT_420 ? 1 :0);
+
 #endif
 		lav_video_clipaspect(el->lav_fd[n],
 				       &el->video_sar_width,
@@ -929,11 +934,11 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
 
     n = el->frame_list[nframe];
 
-    if( lav_is_DV( el->lav_fd[N_EL_FILE(n)] ) )
+    /*if( lav_is_DV( el->lav_fd[N_EL_FILE(n)] ) )
     {
 	lav_set_video_position( el->lav_fd[N_EL_FILE(n)] , nframe );
 	return lav_read_audio( el->lav_fd[N_EL_FILE(n)], dst, 0  );
-    }
+    }*/
 
     ns1 = (double) (N_EL_FRAME(n) + 1) * el->audio_rate / el->video_fps;
     ns0 = (double) N_EL_FRAME(n) * el->audio_rate / el->video_fps;

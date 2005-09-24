@@ -55,6 +55,8 @@ void		timeline_set_length	(GtkWidget *widget, gdouble length, gdouble pos);
 void		timeline_set_bind	(GtkWidget *widget, gboolean active); 
 
 
+void		timeline_clear_points( GtkWidget *widget );
+
 
 #ifdef __cplusplus
 }

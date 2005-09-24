@@ -548,6 +548,8 @@ int veejay_init_editlist(veejay_t * info)
 	settings->spas = 0;
    }
 
+	vj_el_set_image_output_size( el );
+
     return 0;
 
 }

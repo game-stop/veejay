@@ -756,6 +756,7 @@ void on_speed_knob_value_changed(GtkAdjustment *adj, gpointer user_data)
 	{
 		gint value = gtk_adjustment_get_value(adj);
 		value *= info->play_direction;
+  		update_label_i( "speed_label", (gint)adj->value,0);
 		multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
 		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
@@ -1014,12 +1015,12 @@ void	on_loop_pingpong_clicked(GtkWidget *widget, gpointer user_data)
 			"%d %d", 0,
 			get_loop_value() );
 }
-
+/*
 void	on_check_marker_bind_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 		timeline_set_bind( info->tl, is_button_toggled("check_marker_bind"));
-}
+}*/
 
 void	on_button_clearmarker_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -1798,6 +1799,26 @@ void	on_curve_toggleglobal_toggled(GtkWidget *widget, gpointer user_data)
 		s->ec->enabled = is_button_toggled( "curve_toggleglobal" );
 	}
 }
+void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
+{
+	GtkWidget *n = glade_xml_get_widget_( info->main_window, "videobook" );
+	// set page 1 from notebook panels
+	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
+	if(page == 1 )
+		gtk_notebook_prev_page(GTK_NOTEBOOK(n) );
+	if(info->selected_slot)	
+	{
+		/* Only if we are not playing it */
+		if(info->status_tokens[PLAY_MODE] != 
+			info->selected_slot->sample_type &&
+		   info->status_tokens[CURRENT_ID] !=
+		        info->selected_slot->sample_id )
+		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d",
+			info->selected_slot->sample_type,
+			info->selected_slot->sample_id );
+	}
+}
+
 void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
@@ -1822,11 +1843,15 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 	}
 }
 
+void	on_timeline_cleared(GtkWidget *widget, gpointer user_data)
+{
+	multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
+}
+
 void	on_timeline_bind_toggled( GtkWidget *widget, gpointer user_data)
 {
 	gboolean toggled = timeline_get_bind( TIMELINE_SELECTION(widget)) ;
-fprintf(stderr, "Bind changed to %d\n",(toggled ? 1:0) );
-	set_toggle_button( "check_marker_bind", (toggled ? 1 :0) );
+//	set_toggle_button( "check_marker_bind", (toggled ? 1 :0) );
 }
 
 void	on_timeline_value_changed( GtkWidget *widget, gpointer user_data )
@@ -1912,4 +1937,17 @@ void	on_inputstream_close_clicked(GtkWidget *w,  gpointer user_data)
 {
 	GtkWidget *w = glade_xml_get_widget(info->main_window, "inputstream_window");
 	gtk_widget_hide(w);	
+}
+
+void 	on_button_sdlclose_clicked(GtkWidget *w, gpointer user_data)
+{
+	multi_vims( VIMS_RESIZE_SDL_SCREEN, "%d %d %d %d",
+			0,0,0,0 );
+
+}
+
+
+void	on_quicklaunch_clicked(GtkWidget *widget, gpointer user_data)
+{
+	vj_fork_or_connect_veejay( config_file );
 }

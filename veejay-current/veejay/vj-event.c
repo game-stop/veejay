@@ -748,7 +748,7 @@ void	vj_event_init(void);
 
 int	vj_has_video(veejay_t *v)
 {
-	if(v->current_edit_list->video_frames >= 1 )
+	if(v->current_edit_list->video_frames >= 1 && !v->current_edit_list->is_empty)
 		return 1;
 	return 0;
 }
@@ -3032,6 +3032,12 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 	int id = 0;
 	int status = args[0];
 
+	if( v->video_out > 1 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "No SDL Video window");
+		return;
+	}
+
 	if( status < 0 || status > 1 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid argument passed to FULLSCREEN");
@@ -3070,7 +3076,21 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 
 	// multiple sdl screen needs fixing
 	const char *title = "Veejay";
-	
+
+	if( w == 0 && h == 0)
+	{
+		/* close sdl window , set dummy driver*/
+		if( v->sdl[id] )
+		{
+			vj_sdl_free( v->sdl[id] );
+			free(v->sdl[id]);
+			v->sdl[id] = NULL;
+			v->video_out = 0;
+			vj_sdl_quit();
+			return;
+		}
+	}
+
 	if( w < 0 || w > 4096 || h < 0 || h > 4096 || x < 0 || y < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid parameters");
@@ -3091,12 +3111,15 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 		v->sdl[id] = vj_sdl_allocate( v->video_output_width,
 					      v->video_output_height,
 					      v->pixel_format );
+		if(v->video_out == 5)
+			v->video_out = 0;
 	}
 
-	vj_sdl_init( v->sdl[id],w, h, title, 1, v->settings->full_screen[id] );
 	if(x > 0 && y > 0 )
 		vj_sdl_set_geometry(v->sdl[id],x,y);
 
+	vj_sdl_init( v->sdl[id],w, h, title, 1, v->settings->full_screen[id] );
+	
 }
 #endif
 

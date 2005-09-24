@@ -2662,17 +2662,7 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 {
 	video_playback_setup *settings = info->settings;
-	//long this_frame = settings->current_frame_num;
-	//int len1 = 0;
-	//int tmplen = 0;
-      
-	if(frame != 0 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Fatal, garanteeing segmentation faults");
-	}
-
 	primary_frame_len[frame] = 0;
-	if(info->video_out==5 && info->render_now == 0) return 1;
 
 	if(settings->offline_record)	
 		vj_perform_record_tag_frame(info,0);
