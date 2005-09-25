@@ -406,7 +406,7 @@ void	on_button_el_savesel_clicked(GtkWidget *w, gpointer *user_data)
 
 void	on_button_el_add_clicked(GtkWidget *w, gpointer *user_data)
 {
-	gchar *filename = dialog_open_file( "Append videofile to EditList" );
+	gchar *filename = dialog_open_file( "Append videofile to EditList",0 );
 	if(filename)
 	{
 		multi_vims( VIMS_EDITLIST_ADD, "%s",
@@ -417,7 +417,7 @@ void	on_button_el_add_clicked(GtkWidget *w, gpointer *user_data)
 }
 void	on_button_el_addsample_clicked(GtkWidget *w, gpointer *user_data)
 {
-	gchar *filename = dialog_open_file( "Append videofile (and create sample)");
+	gchar *filename = dialog_open_file( "Append videofile (and create sample)",0);
 	if( !filename )
 		return;
 	
@@ -687,7 +687,7 @@ void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
 			erase_all = 1;
 	}
 
-	gchar *filename = dialog_open_file( "Open samplelist");
+	gchar *filename = dialog_open_file( "Open samplelist",1);
 	if(filename)
 	{
 		if(erase_all)
@@ -1037,7 +1037,7 @@ void	on_check_audio_mute_clicked(GtkWidget *widget, gpointer user_data)
 }
 void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_open_file("Load samplelist");
+	gchar *filename = dialog_open_file("Load samplelist",1);
 	if( filename )
 	{
 		multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename );
@@ -1241,7 +1241,7 @@ void	on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_loadconfigfile_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Load liveset / configfile");
+	gchar *filename = dialog_open_file( "Load liveset / configfile",2);
 
 	if(!filename)
 		return;
@@ -1283,7 +1283,7 @@ void	on_button_newbundle_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Load Bundles" );
+	gchar *filename = dialog_open_file( "Load Bundles",2 );
 	if(filename)
 	{
 		multi_vims( VIMS_BUNDLE_FILE, "%s", filename );
@@ -1295,7 +1295,7 @@ void	on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data)
 void	on_button_browse_clicked(GtkWidget *widget, gpointer user_data)
 {
 	// open file browser for launcher
-	gchar *filename = dialog_open_file( "Open Videofile or EditList" );
+	gchar *filename = dialog_open_file( "Open Videofile or EditList",0 );
 	if(filename)
 	{
 		put_text( "entry_filename", filename );
@@ -1358,7 +1358,7 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_inputstream_filebrowse_clicked(GtkWidget *w, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Open new input stream" );
+	gchar *filename = dialog_open_file( "Open new input stream",3 );
 	if(filename)
 	{
 		put_text( "inputstream_filename", filename );
@@ -1542,7 +1542,7 @@ void	on_open2_activate( GtkWidget *w, gpointer user_data)
 	switch( info->state )
 	{
 		case STATE_IDLE:
-			filename = dialog_open_file( "Open Action file / Liveset" );
+			filename = dialog_open_file( "Open Action file / Liveset",2 );
 			if(filename)	
 			{
 				if(config_file)
@@ -1553,7 +1553,7 @@ void	on_open2_activate( GtkWidget *w, gpointer user_data)
 			}
 			break;
 		case STATE_PLAYING:
-			filename = dialog_open_file( "Open Samplelist ");
+			filename = dialog_open_file( "Open Samplelist ",1);
 			if(filename)
 			{
 				single_vims( VIMS_SET_PLAIN_MODE );
@@ -1908,7 +1908,7 @@ void	on_timeline_in_point_changed(GtkWidget *widget, gpointer user_data)
 
 void	on_sampleadd_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_open_file( "Add videofile as new sample" );
+	gchar *filename = dialog_open_file( "Add videofile as new sample",0 );
 	if(filename)
 	{
 		int sample_id = 0; // new sample

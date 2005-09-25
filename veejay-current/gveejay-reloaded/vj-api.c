@@ -326,6 +326,7 @@ typedef struct
 	char		status_msg[STATUS_BYTES];
 	int		status_tokens[STATUS_TOKENS]; 	/* current status tokens */
 	int		*history_tokens[3];		/* list last known status tokens */
+	int		status_passed;
 	int		status_lock;
 	int		slider_lock;
    	int		parameter_lock;
@@ -1208,8 +1209,66 @@ gchar *dialog_save_file(const char *title )
 }
 
 
-gchar *dialog_open_file(const char *title)
+static struct
 {
+	const char *descr;
+	const char *filter;
+} content_file_filters[] = {
+	{ "AVI Files (*.avi)", "*.avi", },
+	{ "Digital Video Files (*.dv)", "*.dv" },
+	{ "Edit Decision List Files (*.edl)", "*.edl" },
+	{ "PNG (Portable Network Graphics) (*.png)", "*.png" },
+	{ "JPG (Joint Photographic Experts Group) (*.jpg)", "*.jpg" },
+	{ NULL, NULL },
+	
+};
+
+static void add_file_filters(GtkWidget *dialog, int type )
+{
+	GtkFileFilter *filter = NULL;
+		
+	if(type == 0 )
+	{
+		int i;
+		for( i = 0; content_file_filters[i].descr != NULL ; i ++ )
+		{
+			filter = gtk_file_filter_new();
+			gtk_file_filter_set_name( filter, content_file_filters[i].descr);
+			gtk_file_filter_add_pattern( filter, content_file_filters[i].filter);
+			gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter );
+		}
+	}
+	if(type == 1 )
+	{
+		filter = gtk_file_filter_new();
+		gtk_file_filter_set_name( filter, "Sample List Files (*.sl)");
+		gtk_file_filter_add_pattern( filter, "*.sl");
+		gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);	
+	}
+	if(type == 2 )
+	{
+		filter = gtk_file_filter_new();
+		gtk_file_filter_set_name( filter, "Action Files (*.xml)");
+		gtk_file_filter_add_pattern( filter, "*.xml");
+		gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);	
+	}
+	if(type == 3 )
+	{
+		//ffmpeg 
+	}
+
+	filter = gtk_file_filter_new();
+	gtk_file_filter_set_name( filter, "All Files (*.*)");
+	gtk_file_filter_add_pattern( filter, "*");
+	gtk_file_chooser_add_filter( GTK_FILE_CHOOSER(dialog), filter);	
+}
+
+
+gchar *dialog_open_file(const char *title, int type)
+{
+	static gchar *_file_path = NULL;
+
+
 	GtkWidget *parent_window = glade_xml_get_widget_(
 			info->main_window, "gveejay_window" );
 	GtkWidget *dialog = 
@@ -1219,12 +1278,20 @@ gchar *dialog_open_file(const char *title)
 				GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
 				GTK_STOCK_OPEN, GTK_RESPONSE_ACCEPT,
 				NULL);
+
+	add_file_filters(dialog, type );
 	gchar *file = NULL;
-	
+	if( _file_path )
+	{
+		gtk_file_chooser_set_current_folder_uri(GTK_FILE_CHOOSER(dialog), _file_path);	
+		g_free(_file_path);
+	}
+
 	if( gtk_dialog_run( GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
 	{
 		file = gtk_file_chooser_get_filename(
 				GTK_FILE_CHOOSER(dialog) );
+		_file_path = gtk_file_chooser_get_current_folder_uri(GTK_FILE_CHOOSER(dialog));
 	}
 
 	gtk_widget_destroy(GTK_WIDGET(dialog));
@@ -5152,11 +5219,12 @@ static	gboolean	update_cpumeter_timeout( gpointer data )
 
 static	gboolean	update_imageA( gpointer data )
 {
-	if( info->state == STATE_PLAYING )
+	if( info->state == STATE_PLAYING && info->status_passed >= get_nums("preview_delay") )
 	{
 		if( is_button_toggled( "previewtoggle" ))
 		gveejay_update_image2(
 			glade_xml_get_widget_(info->main_window, "imageA"), get_nums("preview_width"),get_nums("preview_height")  );
+		info->status_passed =0;
 	}
 	return TRUE;
 }
@@ -5253,7 +5321,9 @@ static	void	init_cpumeter()
 {
 	info->cpumeter = g_timeout_add(300,update_cpumeter_timeout,
 			(gpointer*) info );
-	info->imageA = g_timeout_add(100,update_imageA, (gpointer*)info);
+	int ms = (int) ( 1.0 / info->el.fps * 1000 );
+fprintf(stderr, "Setup image preview timer %d\n",ms);
+	info->imageA = g_timeout_add(ms,update_imageA, (gpointer*)info);
 }
 
 
@@ -5407,6 +5477,12 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		{
 			return FALSE;
 		}
+  		// flush rest
+		char tmp[5];
+                while(vj_client_poll( gui->client, V_STATUS ))
+                        nb = vj_client_read( gui->client,V_STATUS,tmp, 1); 
+
+		info->status_passed ++ ;
 	}
  
 	return TRUE;
@@ -5858,9 +5934,9 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	info->logging = g_timeout_add( 600, update_log,(gpointer*) info );
 
+	load_editlist_info();
 	init_cpumeter();
 
-	load_editlist_info();
 
 	/* Now setup preview image size */
 	if(info->rawdata)
