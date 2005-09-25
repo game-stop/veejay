@@ -2682,7 +2682,7 @@ static	void	update_record_tab(int pm)
 
 static void	update_current_slot(int pm)
 {
-	gchar *time = format_time( info->status_tokens[FRAME_NUM] - info->status_tokens[SAMPLE_START]);
+	gchar *time = format_time( info->status_tokens[FRAME_NUM] );
 	int *history = info->history_tokens[pm];
 	update_label_str( "label_sampleposition", time);
 	g_free(time); 
@@ -2921,7 +2921,6 @@ static void 	update_globalinfo()
 	update_label_i( "label_curframe", info->status_tokens[FRAME_NUM] , 1 );
 	update_label_i( "label_samplepos",
 			info->status_tokens[FRAME_NUM], 1);
-
 	gchar *ctime = format_time( info->status_tokens[FRAME_NUM] );
 	update_label_str( "label_curtime", ctime );
 	g_free(ctime);
@@ -5046,7 +5045,7 @@ static	void	reload_editlist_contents()
 // execute after el change:
 static	void	load_editlist_info()
 {
-	int norm;
+	char norm;
 	float fps;
 	int values[10];
 	long rate = 0;
@@ -5060,7 +5059,7 @@ static	void	load_editlist_info()
 		fprintf(stderr, "cannot read VIDEO INFORMATION\n");
 		return;
 	}
-	sscanf( res, "%d %d %d %d %f %d %d %ld %d %ld %ld",
+	int n = sscanf( res, "%d %d %d %c %f %d %d %ld %d %ld %ld",
 		&values[0], &values[1], &values[2], &norm,&fps,
 		&values[4], &values[5], &rate, &values[7],
 		&dum[0], &dum[1]);
@@ -5092,10 +5091,9 @@ static	void	load_editlist_info()
 	update_spin_incr( "priout_width", 16,0 );
 	update_spin_incr( "priout_height", 16, 0 );
 
-fprintf(stderr, "Norm is '%d'\n", norm );
 	update_label_str( "label_el_wh", tmp );
 	snprintf( tmp, sizeof(tmp)-1, "%s",
-		(norm == 0 ? "PAL" : "NTSC" ) );
+		(norm == 'p' ? "PAL" : "NTSC" ) );
 	update_label_str( "label_el_norm", tmp);
 	update_label_f( "label_el_fps", fps );
 
@@ -5104,7 +5102,6 @@ fprintf(stderr, "Norm is '%d'\n", norm );
 
 	info->el.fps = fps;
 	info->el.num_files = dum[0];
-fprintf(stderr, "Timer fps %f changed \n", fps );
 	snprintf( tmp, sizeof(tmp)-1, "%s",
 		( values[2] == 0 ? "progressive" : (values[2] == 1 ? "top first" : "bottom first" ) ) );
 	update_label_str( "label_el_inter", tmp );
@@ -5116,14 +5113,11 @@ fprintf(stderr, "Timer fps %f changed \n", fps );
 	{
 		disable_widget( "button_5_4");
 		disable_widget_by_pointer(info->audiovolume_knob);	
-//		disable_widget( "audiovolume");
 	}
 	else
 	{
 		enable_widget( "button_5_4");
 		enable_widget_by_pointer(info->audiovolume_knob);
-
-	//	enable_widget( "audiovolume");
 	}
 	g_free(res);
 }
@@ -5162,7 +5156,6 @@ static	gchar	*format_time(int pos)
 		mpeg_timecode( &tc, pos,
 			mpeg_framerate_code(
 				mpeg_conform_framerate( info->el.fps )), info->el.fps );
-
 
 	gchar *tmp = g_new( gchar, 20);
 	snprintf(tmp, 20, "%2d:%2.2d:%2.2d:%2.2d",
