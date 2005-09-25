@@ -1951,3 +1951,178 @@ void	on_quicklaunch_clicked(GtkWidget *widget, gpointer user_data)
 {
 	vj_fork_or_connect_veejay( config_file );
 }
+
+static void _update_vs()
+{
+	if( info->config.norm == 0 )
+	{
+		update_spin_value( "vs_size0", 720 );
+		update_spin_value( "vs_size1", 576 );
+		gtk_spin_button_set_value (
+			GTK_SPIN_BUTTON( glade_xml_get_widget_( info->main_window, "vs_fps" ) ), 25.0 );
+	}
+	else
+	{
+		update_spin_value( "vs_size0", 720 );
+		update_spin_value( "vs_size1", 480 );
+		gtk_spin_button_set_value (
+			GTK_SPIN_BUTTON( glade_xml_get_widget_( info->main_window, "vs_fps" ) ), 29.97 );
+	}
+	set_toggle_button( "vs_custom", 0 );
+}
+
+void	on_vs_pal_toggled( GtkWidget *w, gpointer user_data )
+{
+	info->config.norm = is_button_toggled( "vs_pal" ) ? 0 : 1;
+	_update_vs();
+}
+void	on_vs_ntsc_toggled( GtkWidget *w , gpointer user_data)
+{
+	info->config.norm = is_button_toggled( "vs_ntsc" ) ? 1 :0;
+	_update_vs();
+}
+void	on_vs_custom_toggled( GtkWidget *w, gpointer user_data)
+{
+	if(is_button_toggled( "vs_custom" ))
+		enable_widget( "vs_frame");
+	else
+		disable_widget( "vs_frame");
+}
+
+static void _rgroup_audio(void)
+{
+	if(is_button_toggled( "vs_noaudio"))
+		info->config.audio_rate = 0;
+	else
+	{
+		if(is_button_toggled("vs_audio44") )
+			info->config.audio_rate = 48000;
+		else
+			info->config.audio_rate = 44000;
+	}
+}
+
+void	on_vs_audio48_toggled(GtkWidget *w, gpointer user_data)
+{
+	_rgroup_audio();
+}
+
+void	on_vs_audio44_toggled(GtkWidget *w, gpointer user_data)
+{
+	_rgroup_audio();
+}
+void	on_vs_noaudio_toggled(GtkWidget *w, gpointer user_data)
+{
+	_rgroup_audio();
+}
+void	on_vs_avsync_toggled(GtkWidget *w, gpointer user_data)
+{
+	info->config.sync = is_button_toggled( "vs_avsync" );
+}
+void	on_vs_avtimer_toggled(GtkWidget *w, gpointer user_data)
+{
+	info->config.timer = is_button_toggled( "vs_avtimer" );
+}
+void	on_vs_deinter_toggled(GtkWidget *w, gpointer user_data)
+{
+	info->config.deinter = is_button_toggled( "vs_deinter" );
+}
+void	on_vs_yuv420_toggled( GtkWidget *w , gpointer user_data)
+{
+	if( is_button_toggled( "vs_yuv420" )) 
+		info->config.pixel_format = 0;
+}
+void	on_vs_yuv422_toggled( GtkWidget *w, gpointer user_data)
+{
+	if( is_button_toggled("vs_yuv422") )
+		info->config.pixel_format = 1;
+}
+void	on_vs_sample0_toggled( GtkWidget *w , gpointer user_data)
+{
+	if( is_button_toggled("vs_sample0"))
+		info->config.sampling = 1;
+}
+void	on_vs_sample1_toggled( GtkWidget *w, gpointer user_data)
+{
+	if( is_button_toggled("vs_sample1"))
+		info->config.sampling = 0;
+}
+void	on_vs_size0_value_changed(GtkWidget *w, gpointer user_data)
+{
+	info->config.w = get_nums( "vs_size0");
+}
+void	on_vs_size1_value_changed(GtkWidget *w, gpointer user_data)
+{
+	info->config.h = get_nums( "vs_size1");
+}
+void	on_vs_fps_value_changed(GtkWidget *w, gpointer user_data)
+{
+	info->config.fps = get_numd( "vs_fps");
+}
+void	on_vs_close_clicked( GtkWidget *w, gpointer user_data)
+{
+	GtkWidget *vs = glade_xml_get_widget(info->main_window, "vs");
+	gtk_widget_hide(vs);	
+}
+void	on_vs_delete_event( GtkWidget *w, gpointer user_data)
+{
+	GtkWidget *vs = glade_xml_get_widget(info->main_window, "vs");
+	gtk_widget_hide(vs);	
+}
+void	on_configure1_activate( GtkWidget *w, gpointer user_data)
+{
+	GtkWidget *vs = glade_xml_get_widget(info->main_window, "vs");
+/* load options from config */
+
+	update_spin_value( "vs_size0", info->config.w );
+	update_spin_value( "vs_size1", info->config.h );	
+	update_spin_value( "vs_fps",   info->config.fps );
+	
+	set_toggle_button( "vs_avsync", info->config.sync );	
+	set_toggle_button( "vs_avtimer", info->config.timer );
+	set_toggle_button( "vs_deinter", info->config.deinter );
+	if(info->config.pixel_format == 0)
+		set_toggle_button( "vs_yuv420", 1 );
+	else
+		set_toggle_button( "vs_yuv422", 1 );
+
+	if(info->config.sampling == 1 )
+		set_toggle_button( "vs_sample0", 1 );
+	else
+		set_toggle_button( "vs_sample1", 1 );
+	if(info->config.norm == 0 && info->config.w == 720 && info->config.h == 576 )
+		set_toggle_button( "vs_pal", 1 );
+	else
+	{
+		if(info->config.norm == 1 && info->config.w == 720 && info->config.h == 480 )
+			set_toggle_button( "vs_ntsc", 1 );
+		else
+			set_toggle_button( "vs_custom", 1 );
+	}
+	
+	if( is_button_toggled( "vs_custom" ))
+		enable_widget( "vs_frame" );
+	else	
+		disable_widget( "vs_frame" );
+
+	if( info->config.audio_rate == 0 )
+		set_toggle_button( "vs_noaudio" , 1 );
+	else
+	{
+		if( info->config.audio_rate == 44000 )
+			set_toggle_button( "vs_audio44" , 1 );
+		else
+			set_toggle_button( "vs_audio48", 1 );
+	}
+
+	gtk_widget_show(vs);	
+}
+
+void	on_quit_veejay1_activate( GtkWidget *w, gpointer user_data)
+{
+	if( prompt_dialog("Quit veejay", "Close Veejay ? All unsaved work will be lost.") == GTK_RESPONSE_REJECT )
+		return;
+
+	single_vims( 600 );
+
+}

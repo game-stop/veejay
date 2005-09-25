@@ -277,6 +277,20 @@ typedef struct
 
 typedef struct
 {
+	gint w;
+	gint h;
+	gdouble fps;
+	gint pixel_format;
+	gint sampling;
+	gint audio_rate;
+	gint norm;
+	gint sync;
+	gint timer;
+	gint deinter;
+} config_settings_t;
+
+typedef struct
+{
 	GtkFrame *frame;
 	GtkWidget *image;
 	GtkWidget *event_box;
@@ -371,6 +385,7 @@ typedef struct
 	guchar		*rawdata;
 	int		prev_mode;
 	GtkWidget	*tl;
+	config_settings_t	config;
 } vj_gui_t;
 
 enum
@@ -448,6 +463,7 @@ static  void    update_slider_value(const char *name, gint value, gint scale);
 static  void    update_slider_range(const char *name, gint min, gint max, gint value, gint scaled);
 static  void	update_knob_range( GtkWidget *w, gdouble min, gdouble max, gdouble value, gint scaled );
 static	void	update_spin_range(const char *name, gint min, gint max, gint val);
+static	void	update_spin_incr(const char *name, gdouble step, gdouble page);
 static	void	update_knob_value(GtkWidget *w, gdouble value, gdouble scale );
 static	void	update_spin_value(const char *name, gint value);
 static  void    update_label_i(const char *name, int num, int prefix);
@@ -2297,7 +2313,12 @@ static  void	update_knob_range(GtkWidget *w, gdouble min, gdouble max, gdouble v
 	    adj->value = gval;		    
 	}	
 }
-
+static	void	update_spin_incr( const char *name, gdouble step, gdouble page )
+{
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
+	if(!w) return;
+	gtk_spin_button_set_increments(GTK_SPIN_BUTTON(w),step,page );
+}
 
 static	void	update_spin_range(const char *name, gint min, gint max, gint val)
 {
@@ -5025,7 +5046,7 @@ static	void	reload_editlist_contents()
 // execute after el change:
 static	void	load_editlist_info()
 {
-	char norm;
+	int norm;
 	float fps;
 	int values[10];
 	long rate = 0;
@@ -5039,7 +5060,7 @@ static	void	load_editlist_info()
 		fprintf(stderr, "cannot read VIDEO INFORMATION\n");
 		return;
 	}
-	sscanf( res, "%d %d %d %c %f %d %d %ld %d %ld %ld",
+	sscanf( res, "%d %d %d %d %f %d %d %ld %d %ld %ld",
 		&values[0], &values[1], &values[2], &norm,&fps,
 		&values[4], &values[5], &rate, &values[7],
 		&dum[0], &dum[1]);
@@ -5066,9 +5087,15 @@ static	void	load_editlist_info()
 	update_spin_range( "preview_height", 16, h,
 		(info->run_state == RUN_STATE_REMOTE ? (h/2) : h ) );	
 
+	update_spin_incr( "preview_width", 16, 0 );
+	update_spin_incr( "preview_height", 16, 0 );
+	update_spin_incr( "priout_width", 16,0 );
+	update_spin_incr( "priout_height", 16, 0 );
+
+fprintf(stderr, "Norm is '%d'\n", norm );
 	update_label_str( "label_el_wh", tmp );
 	snprintf( tmp, sizeof(tmp)-1, "%s",
-		(norm == 'p' ? "PAL" : "NTSC" ) );
+		(norm == 0 ? "PAL" : "NTSC" ) );
 	update_label_str( "label_el_norm", tmp);
 	update_label_f( "label_el_fps", fps );
 
@@ -5527,6 +5554,7 @@ void	vj_gui_stop_launch()
 	}
 }
 
+
 void	vj_fork_or_connect_veejay(char *configfile)
 {
 	char	*remote = get_text( "entry_hostname" );
@@ -5536,10 +5564,11 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	int	n_args = 0;
 	char	port_str[15];
 	char	config[512];
+	char	tmp[20];
 	int 	i = 0;
 
-	int arglen = vims_verbosity ? 6 :5 ;
-
+	int arglen = vims_verbosity ? 15 :14 ;
+	arglen += (info->config.deinter);
 	args = g_new ( gchar *, arglen );
 
 	args[0] = g_strdup("veejay");
@@ -5564,12 +5593,36 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	}
 
 	args[3] = g_strdup( "-O5" );
+	sprintf(tmp, "-W%d", info->config.w );
+	args[4] = g_strdup( tmp );
+	sprintf(tmp, "-H%d", info->config.h );
+	args[5] = g_strdup( tmp );
+	sprintf(tmp, "-R%g", info->config.fps );
+	args[6] = g_strdup( tmp );
+	sprintf(tmp, "-N%d", info->config.norm );
+	args[7] = g_strdup( tmp );
+	sprintf(tmp, "-Y%d", info->config.pixel_format );
+	args[8] = g_strdup( tmp );
+	sprintf(tmp, "-m%d", info->config.sampling );
+	args[9] = g_strdup( tmp );
+	sprintf(tmp, "-c%d", info->config.sync );
+	args[10] = g_strdup( tmp );
+	sprintf(tmp, "-t%d", info->config.timer  == 0 ? 0 : 2);  
+	args[11] = g_strdup( tmp );
+	sprintf(tmp, "-r%d", info->config.audio_rate );
+	args[12] = g_strdup( tmp );
 
-	if(vims_verbosity)
-		args[4] = g_strdup("-v");
-	else
-		args[4] = NULL;
-
+	args[13] = NULL;
+	args[(arglen-1)] = NULL;
+	if( vims_verbosity )
+		args[13] = g_strdup( "-v" );	
+	if( info->config.deinter )
+	{
+		if(args[13]==NULL)
+			args[13] = g_strdup( "-I"); 
+		else args[14] = g_strdup( "-I" );
+	}
+	
 	if( info->state == STATE_IDLE )
 	{
 		// start local veejay
@@ -5811,8 +5864,16 @@ void 	vj_gui_init(char *glade_file)
 	gtk_container_add( GTK_CONTAINER(frame), info->tl );
 	gtk_widget_show(info->tl);
 
-
-
+	gui->config.w = 352;
+	gui->config.h = 288;
+	gui->config.fps = 25.0;
+	gui->config.sampling = 1;
+	gui->config.pixel_format = 1;
+	gui->config.sync = 1;
+	gui->config.timer = 1;
+	gui->config.deinter = 1;
+	gui->config.norm = 0;
+	gui->config.audio_rate = 0;
 	g_timeout_add_full( G_PRIORITY_DEFAULT_IDLE, 500, is_alive, (gpointer*) info,NULL);
 
 	GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
@@ -5960,6 +6021,12 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	//update_slider_range( "speedslider",0,68, speed, 0);
 
 	update_knob_range(info->speed_knob, 1,13, speed, 0);
+	if( info->run_state == RUN_STATE_LOCAL)
+		set_toggle_button( "previewtoggle", 1 );
+
+	update_label_str( "label_hostnamex",
+		(hostname == NULL ? group_name: hostname ) );
+	update_label_i( "label_portx",port_num,0);
 
 	return 1;
 }
@@ -6087,6 +6154,8 @@ void	vj_gui_disable()
 			glade_xml_get_widget_(info->main_window, "button_loadconfigfile") ), TRUE );
 
 	info->sensitive = 0;
+	set_toggle_button( "previewtoggle", 0 );
+	enable_widget ("vs_box" );
 }
 
 void	vj_gui_enable()
@@ -6105,6 +6174,9 @@ void	vj_gui_enable()
 			glade_xml_get_widget_(info->main_window, "button_loadconfigfile") ), FALSE );
 
 	info->sensitive = 1;
+
+	disable_widget( "vs_box" );
+
 }
 /*
 void	vj_gui_put_image(void)
