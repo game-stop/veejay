@@ -109,6 +109,7 @@ typedef struct {
     int effect_toggle;
     int socket_ready;
     uint8_t *socket_frame;
+    int n_frames;
 } vj_tag;
 
 int 	vj_tag_chain_malloc(int e);
@@ -116,7 +117,8 @@ int 	vj_tag_chain_free(int e);
 int	vj_tag_get_v4l_properties(int t1,
 		int *brightness, int *hue,int *contrast, int *color, int *white );
 int 	vj_tag_init(int w, int h, int pix_fmt);
-
+int	vj_tag_get_n_frames(int t1);
+int	vj_tag_set_n_frames(int t1, int n_frames);
 int 	vj_tag_get_last_tag();
 
 void	vj_tag_free(void);

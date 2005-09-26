@@ -515,6 +515,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->source_type = type;
     tag->index = stream_nr;
     tag->active = 0;
+    tag->n_frames = 50;
     tag->sequence_num = 0;
     tag->encoder_format = 0;
     tag->encoder_active = 0;
@@ -797,6 +798,22 @@ void vj_tag_close_all() {
   
 }
 
+int	vj_tag_get_n_frames(int t1)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if (!tag)
+	return -1;
+    return tag->n_frames;	
+}
+
+int	vj_tag_set_n_frames( int t1, int n )
+{
+  vj_tag *tag = vj_tag_get(t1);
+    if (!tag)
+	return -1;
+  tag->n_frames = n;
+  return ( vj_tag_update(tag, t1)); 
+}
 
 int vj_tag_get_effect(int t1, int position)
 {
@@ -2267,7 +2284,7 @@ int vj_tag_sprint_status( int tag_id, int pfps,int frame, int mode,int ts, char 
 			tag->encoder_succes_frames,
 			vj_tag_size()-1,
 			tag->source_type, // no markers
-			0,
+			tag->n_frames, // no markers
 			tag->selected_entry, 
 			ts);
 		

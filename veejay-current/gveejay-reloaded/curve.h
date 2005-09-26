@@ -12,8 +12,7 @@ typedef struct
 	gfloat	*vector;
 	gint	start_pos;
 	gint	end_pos;	
-	gint	min;
-	gint	max;	
+	gint	curve_len;
 	gint	type;
 } key_parameter_t;
 

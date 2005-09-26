@@ -544,7 +544,9 @@ static struct {
 	{ VIMS_CHAIN_TOGGLE_ALL,		"Toggle Effect Chain on all samples or streams",
 		vj_event_all_samples_chain_toggle,1,	"%d",		{0,0} , VIMS_REQUIRE_ALL_PARAMS  },
 	{ VIMS_SAMPLE_UPDATE,			"Sample: Update starting and ending position by offset",
-		vj_event_sample_rel_start,	3,	"%d %d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},	 
+		vj_event_sample_rel_start,	3,	"%d %d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS	},
+	{ VIMS_STREAM_SET_LENGTH,		"Stream: set ficticious length",
+	vj_event_stream_set_length,	1,	"%d",			{0,0}, VIMS_REQUIRE_ALL_PARAMS  },	 
 #ifdef HAVE_V4L
 	{ VIMS_STREAM_SET_BRIGHTNESS,		"Video4Linux: set v4l brightness value",
 		vj_event_v4l_set_brightness,	2,	"%d %d",	{0,0}, 	VIMS_REQUIRE_ALL_PARAMS },
@@ -4100,6 +4102,21 @@ void vj_event_chain_enable(void *ptr, const char format[], va_list ap)
 	
 }
 
+void	vj_event_stream_set_length( void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[2];
+	char *s = NULL;
+	P_A(args,s,format,ap);
+
+	if(STREAM_PLAYING(v))
+	{
+		if(args[0] > 0 && args[0] < 999999 )
+			vj_tag_set_n_frames(v->uc->sample_id, args[0]);
+		else
+		  veejay_msg(VEEJAY_MSG_ERROR, "Length must be 0 - 999999");
+	}
+}
 
 void vj_event_chain_disable(void *ptr, const char format[], va_list ap) 
 {

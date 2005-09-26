@@ -225,5 +225,5 @@ void	vj_event_sample_rand_stop(	void *ptr, const char format[], va_list ap);
 void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_get_scaled_image(	void *ptr, const char format[], va_list ap);
 void	vj_event_send_sample_options(	void *ptr, const char format[], va_list ap);
-
+void	vj_event_stream_set_length(	void *ptr, const char format[], va_list ap);
 #endif

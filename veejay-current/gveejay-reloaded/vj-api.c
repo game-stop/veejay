@@ -287,6 +287,10 @@ typedef struct
 	gint sync;
 	gint timer;
 	gint deinter;
+	gchar *mcast_osc;
+	gchar *mcast_vims;
+	gint osc;
+	gint vims;
 } config_settings_t;
 
 typedef struct
@@ -386,6 +390,7 @@ typedef struct
 	int		prev_mode;
 	GtkWidget	*tl;
 	config_settings_t	config;
+	int		status_frame;
 } vj_gui_t;
 
 enum
@@ -1224,6 +1229,11 @@ gchar *dialog_save_file(const char *title )
 	return NULL;
 }
 
+static	void	clear_progress_bar( const char *name, gdouble val )
+{
+	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
+	gtk_progress_bar_set_fraction( GTK_PROGRESS_BAR(w), val );
+}
 
 static struct
 {
@@ -1529,13 +1539,34 @@ prompt_dialog(const char *title, char *msg)
 	return n;
 }
 
+void		veejay_quit( )
+{
+        if( prompt_dialog("Quit veejay", "Close Veejay ? All unsaved work will be lost." )
+		 == GTK_RESPONSE_REJECT )
+                return;
+
+	clear_progress_bar( "cpumeter",0.0 );
+	clear_progress_bar( "connecting",0.0 );
+	clear_progress_bar( "samplerecord_progress",0.0 );
+	clear_progress_bar( "streamrecord_progress",0.0 );
+
+	g_source_remove( info->samplerecording );
+	g_source_remove( info->streamrecording );
+	g_source_remove( info->logging );
+	g_source_remove( info->cpumeter );
+	g_source_remove( info->imageA );
+//	g_io_channel_shutdown( info->channel, FALSE, NULL );
+	
+        single_vims( 600 );
+}
+
 gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 {
 	if( prompt_dialog("Quit gveejay", "Are you sure?" ) == GTK_RESPONSE_REJECT)
 		return TRUE;
 
 	if(info->run_state == RUN_STATE_LOCAL)
-		single_vims( VIMS_QUIT );
+		veejay_quit();
 	
 	vj_gui_disconnect();
 	vj_gui_free();
@@ -1942,8 +1973,6 @@ static	void	vj_akf_delete()
 	sample_slot_t *s = info->selected_slot;
 	if(!s)
 		return;
-	if(s->sample_type != MODE_SAMPLE)	
-		return;
 	int i,j;
 	for(i = 0; i < MAX_CHAIN_LEN; i ++)
 		vj_kf_delete_parameter(i);
@@ -1970,21 +1999,34 @@ static	void	vj_kf_select_parameter(int num)
 		update_curve_accessibility("curve");
 	}
 
-	/* If not processing status (if user event) */
-/*	if(!info->status_lock)
-	{
-		fprintf(stderr, "Reloading key %d: %d\n",
-				info->uc.selected_parameter_id,
-				info->uc.selected_chain_entry );
-		update_curve_surroundings();
-		update_curve_widget( "curve" );
-		update_curve_accessibility("curve");
-	}*/
-	/* Set parameter name to KF */
 	char name[20];	
 	sprintf(name, "P%d", info->uc.selected_parameter_id);
 	update_label_str( "curve_parameter", name );
 }
+
+void	curve_len_changed( int len )
+{
+	sample_slot_t *s = info->selected_slot;
+	if(!s)	
+		return 0;
+	int i,j;
+	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+
+	for( i = 0; i < MAX_CHAIN_LEN; i ++ )
+	{
+		for( j = 0; j < MAX_PARAMETERS; j ++ )
+		{
+			key_parameter_t *p = s->ec->effects[i]->parameters[j];
+			if(p->curve_len != len )
+				curve_timeline_preserve( p, len );
+if( info->uc.selected_chain_entry == i )
+{
+	set_points_in_curve( p, curve );
+}
+		}
+	}
+}
+
 
 static	int	interpolate_parameters(void)
 {
@@ -2018,7 +2060,7 @@ static	int	interpolate_parameters(void)
 			for( j = 0; j < MAX_PARAMETERS; j ++ )
 			{
 				key_parameter_t *p = s->ec->effects[i]->parameters[j];
-				if( p->running == 1 && parameter_for_frame(p, info->status_tokens[FRAME_NUM]) )
+				if( p->running == 1 && parameter_for_frame(p, info->status_frame) )
 				{
 					int min,max;
 					
@@ -2027,17 +2069,14 @@ static	int	interpolate_parameters(void)
 						float scale = 0.0;
 
 						if(get_parameter_key_value( p,
-							info->status_tokens[FRAME_NUM], &scale ) )
+							info->status_frame, &scale ) )
 						{
 						float min_value = (float)min;	
 						float max_value = (float)max;
 						float max_range = fabs( min_value ) + fabs( max_value );
 						float value = scale * max_range;
 						value += min_value;
-					//	float min_val = scale * min;
-					//	float min_val = scale * max;
 						values[j] =(int) value;
-					//	values[j] = value - ( min * scale );
 						skip = 0;
 						id = p->parameter_id;
 			if(info->uc.selected_chain_entry == i )
@@ -2070,6 +2109,9 @@ static	void	update_curve_surroundings()
 	int i = info->uc.selected_chain_entry; /* chain entry */
 	int j = info->uc.selected_parameter_id;
 
+	if(!s->ec)
+		return;
+
 	key_parameter_t *key = s->ec->effects[i]->parameters[j];
 
 	/* Restore AKF status */
@@ -2079,27 +2121,41 @@ static	void	update_curve_surroundings()
 	/* Positions changed (sample/marker) */
 	int changed = 0;
 
-	if(key->min != info->status_tokens[SAMPLE_START] )
-	{	key->min = info->status_tokens[SAMPLE_START]; changed = 1; }
-	if(key->max != info->status_tokens[SAMPLE_END] )
-	{	key->max = info->status_tokens[SAMPLE_END]; changed = 1; }
-
-	if(changed)
+	int old_len = key->curve_len;
+	int nl = 0;
+	if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
 	{
-		update_spin_range( "curve_spinstart", key->min, key->max, key->min );
-		update_spin_range( "curve_spinend", key->min,key->max, key->max );
+		nl = info->status_tokens[SAMPLE_END] + 1;
+		if(nl != old_len)
+		{
+			update_spin_range( "curve_spinstart", 
+				info->status_tokens[SAMPLE_START], 
+				info->status_tokens[SAMPLE_END], info->status_tokens[SAMPLE_START] );
+			update_spin_range( "curve_spinend", info->status_tokens[SAMPLE_START],
+				info->status_tokens[SAMPLE_END] ,  info->status_tokens[SAMPLE_END] );
+			curve_len_changed( nl );
+		}
 	}
-
+	else
+	{
+		nl = get_nums("stream_length") + 1 ;
+		if( nl != old_len )
+		{
+			update_spin_range( "curve_spinstart", 0, nl-1, 0 );
+			update_spin_range( "curve_spinend", 0,nl-1, nl-1);
+			curve_len_changed( nl );
+		}
+	}
 	// Set start/end timecodes
-	gchar *start_time = format_time(
-			key->min );
+/*	gchar *start_time = format_time(
+			key->start_pos );
 	gchar *end_time = format_time(
-			key->max );
+			key->end_pos );
 	update_label_str( "curve_starttime", start_time );
 	update_label_str( "curve_endtime", end_time );
 
 	g_free(start_time);
-	g_free(end_time);
+	g_free(end_time);*/
 
 	struct tog_w {
 		const char *name;
@@ -2126,7 +2182,7 @@ static  void	update_curve_widget(const char *name)
 {
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window,name);
 	sample_slot_t *s = info->selected_slot;
-	if(!s)
+	if(!s || !s->ec)
 		return;
 	int i = info->uc.selected_chain_entry; /* chain entry */
 	int j = info->uc.selected_parameter_id;
@@ -2149,7 +2205,7 @@ static	void	update_curve_accessibility(const char *name)
 	}
 	else
 	{
-		if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE)
+		if( info->status_tokens[PLAY_MODE] != MODE_PLAIN)
 		{
 			enable_widget( "curve_table" );
 			enable_widget( "curve" );
@@ -2682,18 +2738,15 @@ static	void	update_record_tab(int pm)
 
 static void	update_current_slot(int pm)
 {
-	gchar *time = format_time( info->status_tokens[FRAME_NUM] );
+	gchar *time = format_time( (pm == MODE_STREAM ? info->status_frame : info->status_tokens[FRAME_NUM]) );
 	int *history = info->history_tokens[pm];
 	update_label_str( "label_sampleposition", time);
 	g_free(time); 
 	gint update = 0;
 
-//	if( pm == MODE_SAMPLE )
-//		if( animate_parameters() )
-//		
-
 	/* Mode changed or ID changed, 
 	   Reload FX Chain, Reload current entry and disable widgets based on stream type */
+
 	if( pm != info->prev_mode || info->status_tokens[PLAY_MODE] != history[PLAY_MODE] || info->status_tokens[CURRENT_ID] != history[CURRENT_ID] )
 	{
 		int k;
@@ -2764,12 +2817,10 @@ static void	update_current_slot(int pm)
 		}
 
 		update_label_str( "label_currentsource", "Stream" );
-		gchar *time = format_time( info->status_tokens[FRAME_NUM]);
+		gchar *time = format_time( info->status_frame );
 	
 		update_label_str( "label_sampleposition", time);
 		g_free(time); 
-//		update_label_str( "label_samplelength", "infinite");
-
 	}
 
 	int marker_go = 0;
@@ -2784,8 +2835,6 @@ static void	update_current_slot(int pm)
 			 	"spin_samplestart", 0, info->status_tokens[TOTAL_FRAMES], 0 );
 			update_spin_range(
 				"spin_sampleend", 0, info->status_tokens[TOTAL_FRAMES], 0 );
-
-					
 		}
 
 		/* Update label and video slider*/
@@ -2915,17 +2964,9 @@ static void	update_current_slot(int pm)
 
 static void 	update_globalinfo()
 {
-	if( info->uc.playmode == MODE_STREAM )
-		info->status_tokens[FRAME_NUM] = 0;
-
-	update_label_i( "label_curframe", info->status_tokens[FRAME_NUM] , 1 );
-	update_label_i( "label_samplepos",
-			info->status_tokens[FRAME_NUM], 1);
-	gchar *ctime = format_time( info->status_tokens[FRAME_NUM] );
-	update_label_str( "label_curtime", ctime );
-	g_free(ctime);
 	int pm = info->status_tokens[PLAY_MODE];
 	int *history = info->history_tokens[pm];
+
 	int stream_changed = 0;
 	gint	i;
 
@@ -2945,7 +2986,7 @@ static void 	update_globalinfo()
 		}
 		if( pm != MODE_STREAM )
 			info->uc.reload_hint[HINT_EL] = 1;
-		if( pm == MODE_SAMPLE )
+		if( pm != MODE_PLAIN )
 			info->uc.reload_hint[HINT_KF] = 1;
 
 		if( pm == MODE_SAMPLE )
@@ -2960,41 +3001,69 @@ static void 	update_globalinfo()
 		info->uc.reload_hint[HINT_SLIST] = 1;
 	}
 
-	if( history[TOTAL_FRAMES] != info->status_tokens[TOTAL_FRAMES])
+	gint total_frames_ = (pm == MODE_STREAM ? info->status_tokens[SAMPLE_MARKER_END] : info->status_tokens[TOTAL_FRAMES] );
+	gint history_frames_ = (pm == MODE_STREAM ? history[SAMPLE_MARKER_END] : history[TOTAL_FRAMES] ); 
+	gint current_frame_ = (pm == MODE_STREAM ? info->status_frame : info->status_tokens[FRAME_NUM] );
+
+	if( total_frames_ != history_frames_ )
 	{
-		gint tf = info->status_tokens[TOTAL_FRAMES];
+		gchar *time = format_time( total_frames_ );
+		if( pm == MODE_STREAM )
+		{
+			update_spin_value( "stream_length", info->status_tokens[SAMPLE_MARKER_END] );
+			update_label_str( "stream_length_label", time );
+		}
 
-		timeline_set_length( info->tl,
-				(gdouble) info->status_tokens[TOTAL_FRAMES] , info->status_tokens[FRAME_NUM]);
-
-
+		update_spin_range("button_fadedur", 0, total_frames_, 0 );
+		update_label_i( "label_totframes", total_frames_, 1 );
 		if( pm == MODE_PLAIN )
 		{
 			for( i = 0; i < 3; i ++)
-				if(info->selection[i] > tf ) info->selection[i] = tf;
-
+				if(info->selection[i] > total_frames_ ) info->selection[i] = total_frames_;
 			update_spin_range(
-				"button_el_selstart", 0, tf, info->selection[0]);
+				"button_el_selstart", 0, total_frames_, info->selection[0]);
 			update_spin_range(
-				"button_el_selend", 0, tf, info->selection[1]);
+				"button_el_selend", 0, total_frames_, info->selection[1]);
 			update_spin_range(
-				"button_el_selpaste", 0, tf, info->selection[2]);
+				"button_el_selpaste", 0, total_frames_, info->selection[2]);
 		}	
-		gchar *time = format_selection_time( 1, tf );
 
-		update_spin_range("button_fadedur", 0, tf, 0 );
-		update_label_i( "label_totframes", tf, 1 );
+		update_label_i( "label_totframes", total_frames_, 1 );
 		update_label_str( "label_totaltime", time );
+		if(pm == MODE_SAMPLE)
+			update_label_str( "label_samplelength", time );
+		else
+			update_label_str( "label_samplelength", "0:00:00:00" );
+		timeline_set_length( info->tl,
+				(gdouble) total_frames_ , current_frame_);
+
+		
+		vj_kf_select_parameter( info->uc.selected_parameter_id );
 
 		g_free(time);
 	}
 
-	if(info->status_lock )
+	if( pm == MODE_STREAM )
 	{
-		if( history[FRAME_NUM] != info->status_tokens[FRAME_NUM] )
-			timeline_set_pos( info->tl, (gdouble) info->status_tokens[FRAME_NUM] );
-
+		info->status_frame ++;
+		if(info->status_frame > info->status_tokens[ SAMPLE_MARKER_END ])
+			info->status_frame = 0;
 	}
+	else info->status_frame = info->status_tokens[FRAME_NUM];
+
+
+	timeline_set_pos( info->tl, (gdouble) info->status_frame );
+	gchar *current_time_ = format_time( info->status_frame );
+	update_label_i(   "label_curframe", info->status_frame ,1 );
+	update_label_str( "label_curtime", current_time_ );
+	g_free(current_time_);
+
+	if( pm == MODE_SAMPLE )
+		update_label_i( "label_samplepos",
+			info->status_frame , 1);
+	else
+		update_label_i( "label_samplepos" , 0 , 1 );
+
 	if( history[CURRENT_ID] != info->status_tokens[CURRENT_ID] )
 	{
 		if(pm == MODE_SAMPLE || pm == MODE_STREAM)
@@ -3153,7 +3222,6 @@ static void	process_reload_hints(void)
 				sprintf(button_name, "kf_p%d", i );
 				enable_widget( button_name );
 			}
-		//	vj_kf_select_parameter(-1); // reset selected curve
 		}
 		update_spin_value( "button_fx_entry", info->uc.selected_chain_entry);	
 
@@ -3180,13 +3248,7 @@ static void	process_reload_hints(void)
 
 	/* Curve needs update (start/end changed, effect id changed */
 	if ( info->uc.reload_hint[HINT_KF]  )
-	{
-		//update_curve_surroundings();
-		//update_curve_widget( "curve" );
 		vj_kf_select_parameter( info->uc.selected_parameter_id );
-	}
-
-
 	
 	memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));	
 }
@@ -3661,7 +3723,7 @@ on_effectlist_row_activated(GtkTreeView *treeview,
 		{
 			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
 				0, info->uc.selected_chain_entry,gid );
-			if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE)
+			if(info->status_tokens[PLAY_MODE] != MODE_PLAIN)
 				vj_kf_delete_parameter(info->uc.selected_chain_entry);
 			info->uc.reload_hint[HINT_ENTRY] = 1;
 		}
@@ -4048,7 +4110,10 @@ static	void	select_slot(int pm)
 			info->selected_slot = info->sample_banks[b]->slot[p];
 			info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
 		}
-		
+		if( pm == MODE_STREAM )
+			info->status_frame =  0;
+		else
+			info->status_frame = info->status_tokens[FRAME_NUM];	
 	}
 }
 /* execute after sample/stream/mixing sources list update
@@ -5149,7 +5214,6 @@ static	void	enable_widget(const char *name)
 static	gchar	*format_time(int pos)
 {
 	MPEG_timecode_t	tc;
-	//int	tf = info->status_tokens[TOTAL_FRAMES];
 	if(pos==0)
 		memset(&tc, 0, sizeof(tc));
 	else
@@ -5382,10 +5446,8 @@ static void	update_gui()
 
 	process_reload_hints();
 
-	if( pm == MODE_SAMPLE)
+	if( pm != MODE_PLAIN)
 		interpolate_parameters();
-
-	//update_curve_accessibility("curve");
 
 }
 
@@ -5562,6 +5624,8 @@ void	vj_fork_or_connect_veejay(char *configfile)
 
 	int arglen = vims_verbosity ? 15 :14 ;
 	arglen += (info->config.deinter);
+	arglen += (info->config.osc);
+	arglen += (info->config.vims);
 	args = g_new ( gchar *, arglen );
 
 	args[0] = g_strdup("veejay");
@@ -5605,17 +5669,39 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	sprintf(tmp, "-r%d", info->config.audio_rate );
 	args[12] = g_strdup( tmp );
 
+
 	args[13] = NULL;
-	args[(arglen-1)] = NULL;
+	int k=13;
+	while( k <= (arglen-1))
+		args[k++] = NULL;
+
 	if( vims_verbosity )
 		args[13] = g_strdup( "-v" );	
+
 	if( info->config.deinter )
 	{
 		if(args[13]==NULL)
 			args[13] = g_strdup( "-I"); 
 		else args[14] = g_strdup( "-I" );
 	}
-	
+	if( info->config.osc)
+	{
+		gchar osc_token[20];
+		sprintf(osc_token , "-M %s", info->config.mcast_osc );
+		int f = 13;
+		while(args[f] != NULL ) f ++;
+		args[f] = g_strdup( osc_token ); 
+	}
+	if( info->config.vims)
+	{
+		gchar vims_token[20];
+		sprintf(vims_token, "-V %s", info->config.mcast_vims );
+		int f = 13;
+		while(args[f] != NULL) f++;
+		args[f] = g_strdup( vims_token );
+	}
+	for(k = 0 ; k < arglen; k ++ )
+	 fprintf(stderr, "%s arg %d = '%s'\n", __FUNCTION__, k, args[k] );	
 	if( info->state == STATE_IDLE )
 	{
 		// start local veejay
@@ -5867,6 +5953,10 @@ void 	vj_gui_init(char *glade_file)
 	gui->config.deinter = 1;
 	gui->config.norm = 0;
 	gui->config.audio_rate = 0;
+	gui->config.osc = 0;
+	gui->config.vims = 0;
+	gui->config.mcast_osc = g_strdup( "224.0.0.32" );
+	gui->config.mcast_vims = g_strdup( "224.0.0.33" );
 	g_timeout_add_full( G_PRIORITY_DEFAULT_IDLE, 500, is_alive, (gpointer*) info,NULL);
 
 	GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
@@ -6067,12 +6157,26 @@ gboolean	is_alive(gpointer data)
 				else
 				{	/* veejay connected */
 					veejay_stop_connecting(gui);
+					gchar hello_world[100];
+					sprintf(hello_world, "Connected with Veejay at %s : %d", remote, port );
+					prompt_dialog( "New Connection", hello_world );
 				}	
 			}
 		}
 		else
 		{
-			vj_gui_stop_launch();	
+			vj_gui_stop_launch();
+			if(info->run_state == RUN_STATE_LOCAL)
+			{
+				prompt_dialog( "Run Error", "Failed to connect to local Veejay - check configuration");
+			}
+			else
+			{
+				gchar hello_world[100];
+				sprintf(hello_world, "Failed to make a connection with %s : %d",get_text("entry_hostname"),
+					get_nums("button_portnum") );
+				prompt_dialog( "Failed connection", hello_world );
+			}
 		}	
 	}
 

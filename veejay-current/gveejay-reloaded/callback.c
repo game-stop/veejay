@@ -188,12 +188,7 @@ void	on_button_sendvims_clicked(GtkWidget *widget, gpointer user_data)
 {
 	gchar *text = get_text("vimsmessage");
 	if(strncasecmp( text, "600:;",5 ) == 0)
-	{
-		vj_msg(VEEJAY_MSG_INFO, "Do you want to quit?");
-		if( prompt_dialog("Quit veejay", "Close Veejay ? All unsaved work will be lost.")
-			== GTK_RESPONSE_REJECT)
-			return;
-	}
+		veejay_quit();
 	vj_msg(VEEJAY_MSG_INFO, "User defined VIMS message sent '%s'",text );
 	msg_vims( text );
 }
@@ -1605,6 +1600,14 @@ void	on_curve_togglerun_toggled(GtkWidget *widget , gpointer user_data)
 	}
 }
 
+void	on_stream_length_value_changed( GtkWidget *widget, gpointer user_data)
+{
+	if(info->status_lock)
+		return;
+
+	multi_vims( VIMS_STREAM_SET_LENGTH, "%d", get_nums("stream_length") );
+}
+
 void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 {
 	// store the values in keyframe
@@ -1643,9 +1646,6 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 //	s->ec->effects[i]->parameters[j]->type = curve_type;
 	set_points_in_curve(  s->ec->effects[i]->parameters[j], curve );
 	s->ec->enabled = is_button_toggled( "curve_toggleentry" );
-
-	fprintf(stderr, "Stored vector in %d: %d\n",
-		i,j);
 }
 
 void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
@@ -2064,6 +2064,42 @@ void	on_vs_close_clicked( GtkWidget *w, gpointer user_data)
 	GtkWidget *vs = glade_xml_get_widget(info->main_window, "vs");
 	gtk_widget_hide(vs);	
 }
+
+void	on_vs_mcastosc_toggle_toggled( GtkWidget *w, gpointer user_data)
+{
+	info->config.osc = is_button_toggled( "vs_mcastosc_toggle" );
+	if(info->config.osc)
+	{
+		if(info->config.mcast_osc)
+			g_free( info->config.mcast_osc );
+		info->config.mcast_osc = get_text( "vs_mcastvims" );
+	}
+
+}
+void	on_vs_mcastvims_toggle_toggled(GtkWidget *w, gpointer user_data)
+{
+	info->config.vims = is_button_toggled( "vs_mcastvims_toggle" );
+	if(info->config.vims)
+	{
+		if(info->config.mcast_vims)
+			g_free( info->config.mcast_vims );
+		info->config.mcast_vims = get_text( "vs_mcastvims" );
+	}
+}
+
+void	on_vs_mcastosc_changed( GtkWidget *w, gpointer user_data)
+{
+//	if(info->config.mcast_osc)
+//		g_free(info->config.mcast_osc);
+//	info->config.mcast_osc = get_text( "vs_mcastosc" );
+}
+void	on_vs_mcastvims_changed( GtkWidget *w, gpointer user_data)
+{
+//	if(info->config.mcast_vims)
+//		g_free(info->config.mcast_vims);
+//	info->config.mcast_vims = get_text( "vs_mcastvims" );
+}
+
 void	on_vs_delete_event( GtkWidget *w, gpointer user_data)
 {
 	GtkWidget *vs = glade_xml_get_widget(info->main_window, "vs");
@@ -2115,14 +2151,49 @@ void	on_configure1_activate( GtkWidget *w, gpointer user_data)
 			set_toggle_button( "vs_audio48", 1 );
 	}
 
+	/* set osc , vims mcast */
+	if(info->config.mcast_osc)
+		put_text( "vs_mcastosc", info->config.mcast_osc );
+	if(info->config.mcast_vims)
+		put_text( "vs_mcastvims", info->config.mcast_vims );
+	set_toggle_button( "vs_mcastosc_toggle", info->config.osc );
+	set_toggle_button( "vs_mcastvims_toggle", info->config.vims );
+
 	gtk_widget_show(vs);	
 }
 
 void	on_quit_veejay1_activate( GtkWidget *w, gpointer user_data)
 {
-	if( prompt_dialog("Quit veejay", "Close Veejay ? All unsaved work will be lost.") == GTK_RESPONSE_REJECT )
-		return;
+	veejay_quit();
+}
 
-	single_vims( 600 );
+void	on_curve_spinend_value_changed(GtkWidget *w, gpointer user_data)
+{
+	int i = info->uc.selected_chain_entry;
+	int j = info->uc.selected_parameter_id;
+	sample_slot_t *s = info->selected_slot; 
 
+	key_parameter_t *key = s->ec->effects[i]->parameters[j];
+	
+	key->end_pos = get_nums( "curve_spinend" );
+
+	gchar *end_time = format_time(
+			key->end_pos );
+	update_label_str( "curve_endtime", end_time );
+	g_free(end_time);
+}
+void	on_curve_spinstart_value_changed(GtkWidget *w, gpointer user_data)
+{
+	int i = info->uc.selected_chain_entry;
+	int j = info->uc.selected_parameter_id;
+	sample_slot_t *s = info->selected_slot; 
+
+	key_parameter_t *key = s->ec->effects[i]->parameters[j];
+	
+	key->start_pos = get_nums( "curve_spinstart" );
+
+	gchar *start_time = format_time(
+			key->start_pos );
+	update_label_str( "curve_endtime", start_time );
+	g_free(start_time);
 }
