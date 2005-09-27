@@ -2197,3 +2197,12 @@ void	on_curve_spinstart_value_changed(GtkWidget *w, gpointer user_data)
 	update_label_str( "curve_endtime", start_time );
 	g_free(start_time);
 }
+
+void	on_veejayevent_enter_notify_event(GtkWidget *w, gpointer user_data)
+{
+	info->key_now = TRUE;
+}
+void	on_veejayevent_leave_notify_event(GtkWidget *w , gpointer user_data)
+{
+	info->key_now = FALSE;
+}

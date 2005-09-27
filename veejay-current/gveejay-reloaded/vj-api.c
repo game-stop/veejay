@@ -247,6 +247,14 @@ typedef struct
 	gchar *descr;
 } vims_t;
 
+typedef struct
+{
+	gint keyval;
+	gint state;
+	gchar *args;
+	gint event_id;
+} vims_keys_t;
+
 // Have room for only 200 samples
 #define NUM_BANKS 20   
 #define NUM_PAGES 10
@@ -254,10 +262,12 @@ typedef struct
 #define NUM_SAMPLES_PER_COL 3
 #define NUM_SAMPLES_PER_ROW 4
 
-
+#define MOD_OFFSET 200
 #define SEQUENCE_LENGTH 10*NUM_SAMPLES_PER_PAGE
 
 static	vims_t	vj_event_list[VIMS_MAX];
+static  vims_keys_t vims_keys_list[VIMS_MAX];
+
 static  int vims_verbosity = 0;
 
 typedef struct
@@ -391,6 +401,9 @@ typedef struct
 	GtkWidget	*tl;
 	config_settings_t	config;
 	int		status_frame;
+	int		key_id;
+	int		preview_ready;
+	gboolean	key_now;
 } vj_gui_t;
 
 enum
@@ -1421,6 +1434,38 @@ gboolean	dialogkey_snooper( GtkWidget *w, GdkEventKey *event, gpointer user_data
 	return FALSE;
 }
 
+gboolean	key_handler( GtkWidget *w, GdkEventKey *event, gpointer user_data)
+{
+	if(!info->key_now)
+		return FALSE;	
+
+	if(event->type != GDK_KEY_PRESS)
+		return FALSE;
+
+	/* translate GDK keys to veejay's SDL set */
+	int gdk_keyval = gdk2sdl_key( event->keyval );
+	int gdk_state  = gdk2sdl_mod( event->state );
+
+	if(gdk_keyval == 0)
+		return FALSE;
+
+	int i;
+	for( i = 0; i <VIMS_MAX; i ++ )
+	 if( vims_keys_list[i].keyval == gdk_keyval && vims_keys_list[i].state == gdk_state )
+	{
+		gchar message[100];
+		if( vims_keys_list[i].args != NULL )
+			sprintf(message, "%03d:%s;", vims_keys_list[i].event_id, vims_keys_list[i].args );
+		else
+			sprintf(message, "%03d:;", vims_keys_list[i].event_id );
+		msg_vims( message );
+//		fprintf(stderr, "Send message '%s'\n", message );
+	}
+
+
+	return FALSE;
+}
+
 
 int
 prompt_keydialog(const char *title, char *msg)
@@ -1504,6 +1549,23 @@ prompt_keydialog(const char *title, char *msg)
 	return n;
 }
 
+void	
+message_dialog( const char *title, char *msg )
+{
+	GtkWidget *mainw = glade_xml_get_widget_(info->main_window, "gveejay_window");
+	GtkWidget *dialog = gtk_dialog_new_with_buttons( title,
+				GTK_WINDOW( mainw ),
+				GTK_DIALOG_DESTROY_WITH_PARENT,
+				GTK_STOCK_OK,
+				GTK_RESPONSE_NONE,
+				NULL);
+	GtkWidget *label = gtk_label_new( msg );
+	g_signal_connect_swapped( dialog, "response",
+			G_CALLBACK(gtk_widget_destroy),dialog);
+	gtk_container_add( GTK_CONTAINER(GTK_DIALOG(dialog)->vbox),
+		label );
+	gtk_widget_show_all(dialog);
+}
 
 
 int
@@ -4821,6 +4883,12 @@ static	void	reload_bundles()
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
 	store = GTK_LIST_STORE(model);
 
+	int k;
+	for( k = 0; k < sizeof(vims_keys_t); k ++ )
+		if( vims_keys_list[k].args ) g_free( vims_keys_list[k].args );
+	memset( &vims_keys_list, 0, sizeof(vims_keys_t));
+
+
 	while( offset < len )
 	{
 		char *message = NULL;
@@ -4854,6 +4922,7 @@ static	void	reload_bundles()
 		bzero(vimsid,5);
 		sprintf(vimsid, "%03d", val[0]);
 
+
 		if( val[0] >= VIMS_BUNDLE_START && val[0] < VIMS_BUNDLE_END )
 		{
 			if( vj_event_list[ val[0] ].event_id != val[0] && vj_event_list[val[0]].event_id != 0)
@@ -4864,17 +4933,24 @@ static	void	reload_bundles()
 					g_free( vj_event_list[ val[0] ].descr  );
 			}
 
-			vj_event_list[ val[0] ].event_id = val[0];
 			vj_event_list[ val[0] ].params   = 0;
 			vj_event_list[ val[0] ].format   = NULL;
 			vj_event_list[ val[0] ].descr    = _utf8str( "custom event (fixme: set bundle title)" );
-		}
+			vj_event_list[ val[0] ].event_id = val[0];
+		}/*
+		else
+		{
+			if( vj_event_list[ val[0] ].event_id != 0 )
+				descr = vj_event_list[ val[0] ].descr;
+			if( vj_event_list[ val[0] ].event_id != 0 )
+				format = vj_event_list[ val[0] ].format;
 
-
-		if( vj_event_list[ val[0] ].event_id != 0 )
-			descr = vj_event_list[ val[0] ].descr;
-		if( vj_event_list[ val[0] ].event_id != 0 )
-			format = vj_event_list[ val[0] ].format;
+		}*/
+	
+		vims_keys_list[ (val[2] * MOD_OFFSET) + val[1] ].keyval = val[1];
+		vims_keys_list[ (val[2] * MOD_OFFSET) + val[1] ].state = val[2];
+		vims_keys_list[ (val[2] * MOD_OFFSET) + val[1] ].args = (content == NULL ? NULL :strdup(message));
+		vims_keys_list[ (val[2] * MOD_OFFSET) + val[1] ].event_id = val[0];	
 
 		gtk_list_store_append( store, &iter );
 
@@ -4932,7 +5008,7 @@ static	void	reload_vimslist()
 		char vimsid[5];
 
 		offset += 12;
-
+		if(val[2] > 0)
 		{
 			format = strndup( eltext + offset, val[2] );	
 			offset += val[2];
@@ -5134,13 +5210,12 @@ static	void	load_editlist_info()
 	info->el.width = values[0];
 	info->el.height = values[1];
 
-	gint w = values[0];
+/*	gint w = values[0];
 	gint h = values[1];
 
 	update_spin_value( "priout_width", w );
 	update_spin_value( "priout_height", h );
 
-	/* setup preview image */
 	if( w > 352 )
 		w = 352;
 	if( h > 288 )
@@ -5155,6 +5230,9 @@ static	void	load_editlist_info()
 	update_spin_incr( "preview_height", 16, 0 );
 	update_spin_incr( "priout_width", 16,0 );
 	update_spin_incr( "priout_height", 16, 0 );
+
+
+*/
 
 	update_label_str( "label_el_wh", tmp );
 	snprintf( tmp, sizeof(tmp)-1, "%s",
@@ -5700,8 +5778,8 @@ void	vj_fork_or_connect_veejay(char *configfile)
 		while(args[f] != NULL) f++;
 		args[f] = g_strdup( vims_token );
 	}
-	for(k = 0 ; k < arglen; k ++ )
-	 fprintf(stderr, "%s arg %d = '%s'\n", __FUNCTION__, k, args[k] );	
+//	for(k = 0 ; k < arglen; k ++ )
+//	 fprintf(stderr, "%s arg %d = '%s'\n", __FUNCTION__, k, args[k] );	
 	if( info->state == STATE_IDLE )
 	{
 		// start local veejay
@@ -5995,7 +6073,6 @@ void 	vj_gui_init(char *glade_file)
 
 	set_toggle_button( "button_252", vims_verbosity );
 
-
 	vj_gui_disable();
 
 }
@@ -6040,6 +6117,46 @@ static	gboolean	update_log(gpointer data)
 	return TRUE;
 }
 
+gboolean	enter_videobook(GtkWidget *w, gpointer user_data)
+{
+	fprintf(stderr, "enter\n");
+	return FALSE;
+}
+gboolean	leave_videobook(GtkWidget *w, gpointer user_data)
+{
+	fprintf(stderr, "leave\n");
+	return FALSE;
+}
+
+void	vj_gui_preview(void)
+{
+	if(info->preview_ready)
+		return;
+
+	gint w = info->el.width;
+	gint h = info->el.height;
+
+	update_spin_value( "priout_width", w );
+	update_spin_value( "priout_height", h );
+
+	if( w > 352 )
+		w = 352;
+	if( h > 288 )
+		h = 288;
+
+	update_spin_range( "preview_width", 16, w,
+		(info->run_state == RUN_STATE_REMOTE ? (w/2) : w ) ); 
+	update_spin_range( "preview_height", 16, h,
+		(info->run_state == RUN_STATE_REMOTE ? (h/2) : h ) );	
+
+	update_spin_incr( "preview_width", 16, 0 );
+	update_spin_incr( "preview_height", 16, 0 );
+	update_spin_incr( "priout_width", 16,0 );
+	update_spin_incr( "priout_height", 16, 0 );
+
+	info->preview_ready = 1;
+
+}
 
 int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 {
@@ -6087,7 +6204,8 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		free(info->rawdata);
 	info->rawdata = (guchar*) vj_malloc(sizeof(guchar) * info->el.width * info->el.height * 3);
 	memset(info->rawdata,0,sizeof(guchar) * info->el.width * info->el.height * 3 ); 
-	
+	memset( &vims_keys_list, 0, sizeof(vims_keys_t));
+
 	load_effectlist_info();
 	reload_vimslist();
 	reload_editlist_contents();
@@ -6110,6 +6228,11 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	update_label_str( "label_hostnamex",
 		(hostname == NULL ? group_name: hostname ) );
 	update_label_i( "label_portx",port_num,0);
+
+
+	info->key_id = gtk_key_snooper_install( key_handler , NULL);
+
+	info->preview_ready = 0;
 
 	return 1;
 }
@@ -6159,7 +6282,7 @@ gboolean	is_alive(gpointer data)
 					veejay_stop_connecting(gui);
 					gchar hello_world[100];
 					sprintf(hello_world, "Connected with Veejay at %s : %d", remote, port );
-					prompt_dialog( "New Connection", hello_world );
+					message_dialog( "New Connection", hello_world );
 				}	
 			}
 		}
@@ -6168,20 +6291,21 @@ gboolean	is_alive(gpointer data)
 			vj_gui_stop_launch();
 			if(info->run_state == RUN_STATE_LOCAL)
 			{
-				prompt_dialog( "Run Error", "Failed to connect to local Veejay - check configuration");
+				message_dialog( "Run Error", "Failed to connect to local Veejay - check configuration");
 			}
 			else
 			{
 				gchar hello_world[100];
 				sprintf(hello_world, "Failed to make a connection with %s : %d",get_text("entry_hostname"),
 					get_nums("button_portnum") );
-				prompt_dialog( "Failed connection", hello_world );
+				message_dialog( "Failed connection", hello_world );
 			}
 		}	
 	}
 
 	if( gui->state == STATE_PLAYING )
 	{
+		vj_gui_preview();
 		if(!gui->sensitive)
 		{
 			vj_gui_enable();
@@ -6212,6 +6336,7 @@ void	vj_gui_disconnect()
 		vj_client_free(info->client);
 		info->client = NULL;
 		info->run_state = 0;
+		gtk_key_snooper_remove( info->key_id );
 
 		vj_msg(VEEJAY_MSG_INFO, "Disconnected - Use Launcher"); 
 	}
@@ -6226,7 +6351,7 @@ void	vj_gui_disconnect()
 	clear_textview_buffer("veejaytext");
 
 	free_samplebank();
-
+	info->preview_ready = 0;
 }
 
 void	vj_launch_toggle(gboolean value)
