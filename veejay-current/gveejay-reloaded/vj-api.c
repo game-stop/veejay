@@ -563,6 +563,9 @@ static struct
 	{ "v4l_white" }
 };
 
+// REFAC 
+static	int	no_preview_ = 1;
+
 static struct
 {
 	const char *name;
@@ -673,14 +676,14 @@ static	int	selected_is_playing()
 	int *history = info->history_tokens[ (info->status_tokens[PLAY_MODE]) ];
 	if(!info->selected_slot)
 	{
-fprintf(stderr, "%s no selected slot\n",__FUNCTION__);
 		return 0;
 	}
 	if(info->selected_slot->sample_id == info->status_tokens[CURRENT_ID]
 		&& info->selected_slot->sample_type == info->status_tokens[PLAY_MODE] &&
 		history[CURRENT_ID] == info->status_tokens[CURRENT_ID])
+	{
 		return 1;
-
+	}
 	return 0;
 }
 
@@ -4154,7 +4157,8 @@ static	void	select_slot(int pm)
 		{
 			int b = 0; int p = 0;
 			/* falsify activation */
-	
+			no_preview_ = 2;
+
 			if(info->selected_slot)
 				set_activation_of_slot_in_samplebank(false);
 			
@@ -4165,7 +4169,12 @@ static	void	select_slot(int pm)
 			info->selected_slot = info->sample_banks[b]->slot[p];
 			info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
 			set_activation_of_slot_in_samplebank(true);
-			
+				
+		}
+		if( info->status_tokens[CURRENT_ID] == history[CURRENT_ID] &&
+			info->status_tokens[PLAY_MODE] == history[PLAY_MODE] )
+		{
+			//no_preview_ = 0;
 		}	
 	}
 	else
@@ -5384,20 +5393,24 @@ static gboolean	refresh_image_horror(gpointer data)
 		return TRUE;
 	if(info->status_tokens[PLAY_MODE] == MODE_PLAIN )
 		return TRUE;
+	if(no_preview_!=0)
+	{
+ 		no_preview_ --;
+
+		return TRUE;
+	}
 	if(selected_is_playing())
 	{
 		if(info->selected_slot->pixbuf)
 			gdk_pixbuf_unref( info->selected_slot->pixbuf );
 		info->selected_slot->pixbuf = NULL;
 	
-
 		if(info->sequence_view->w == 0 || info->sequence_view->h == 0 )
 			return TRUE;
 		int i;
 		for( i = 0; i < info->sequence_view->envelope_size; i ++ )
 		{
 			sequence_gui_slot_t *g = info->sequence_view->gui_slot[i];
-
 			if(g->pixbuf_ref && g->sample_id == info->selected_slot->sample_id && g->sample_type == info->selected_slot->sample_type)
 			{
 				gdk_pixbuf_unref(g->pixbuf_ref);
@@ -5414,10 +5427,14 @@ static	gboolean	update_imageA( gpointer data )
 	  //gtk_main_iteration ();
 	if(info->status_lock)
 		return TRUE;
-
 	if( info->state == STATE_PLAYING ) // && info->status_passed >= get_nums("preview_delay") )
 	{
 		GdkPixbuf *new_pixbuf = NULL;
+
+		if( no_preview_ ) { 
+			no_preview_ --;
+			return TRUE;
+		}
 
 		if(info->status_tokens[PLAY_MODE] == MODE_PLAIN )
 		{
@@ -5425,12 +5442,13 @@ static	gboolean	update_imageA( gpointer data )
 			{
 				gveejay_update_image2( 	glade_xml_get_widget_(info->main_window, "imageA"), get_nums("preview_width"),get_nums("preview_height")  );
 			}
+			if( no_preview_ )return TRUE;
 		}
 		else
-		if(info->selected_slot && info->selected_gui_slot)
+		if(info->selected_slot)
 		{
 			if(info->selected_slot->sample_id == info->status_tokens[CURRENT_ID] &&
-				info->selected_slot->sample_type == info->status_tokens[PLAY_MODE]  )
+				info->selected_slot->sample_type == info->status_tokens[PLAY_MODE]  && selected_is_playing())
 			{
 				if( is_button_toggled( "previewtoggle" ))
 				{
@@ -5466,7 +5484,7 @@ static	gboolean	update_imageA( gpointer data )
 					info->selected_slot->pixbuf = gdk_pixbuf_scale_simple( new_pixbuf, info->image_dimensions[0],
 									info->image_dimensions[1], GDK_INTERP_BILINEAR  );
 
-						
+					
 					gveejay_update_image( info->selected_slot,info->selected_gui_slot, info->image_dimensions[0],	
 						info->image_dimensions[1] );	
 					
@@ -5576,9 +5594,9 @@ static	void	init_cpumeter()
 			(gpointer*) info );
 	int ms = (int) ( 1.0 / info->el.fps * 1000 );
 //fprintf(stderr, "Setup image preview timer %d\n",ms);
-//	info->imageA = g_timeout_add(G_PRIORITY_LOW,update_imageA, (gpointer*)info);
+//	info->imageA = g_timeout_add(G_PRIORITY_HIGH_IDLE,update_imageA, (gpointer*)info);
 	info->imageA =	gtk_idle_add( update_imageA, (gpointer*) info);
-	g_timeout_add(G_PRIORITY_LOW, refresh_image_horror, (gpointer*) info);
+	g_timeout_add(600, refresh_image_horror, (gpointer*) info);
 }
 
 
@@ -6059,8 +6077,6 @@ void 	vj_gui_init(char *glade_file)
 
 	vj_mem_init();
 	
-	
-
 	vj_gui_t *gui = (vj_gui_t*)vj_malloc(sizeof(vj_gui_t));
 	
 	if(!gui)
@@ -6894,7 +6910,6 @@ image_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 {
 	guchar *pixels;
 	int rowstride;
-
 	// ha ha redraw whole page ! 
  	GtkWidget *notepad = info->sample_bank_pad;
 	gint bank_nr = find_bank( gtk_notebook_get_current_page( GTK_NOTEBOOK(notepad)) );
@@ -6916,7 +6931,7 @@ image_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 	if(slot->pixbuf && slot->sample_id > 0)
 	{	
 		rowstride = gdk_pixbuf_get_rowstride( slot->pixbuf );
-
+		g_assert( slot->pixbuf );
 		guchar *pixels = gdk_pixbuf_get_pixels( slot->pixbuf ) + rowstride * event->area.y + event->area.x * 3;
 		if(pixels)
 		gdk_draw_rgb_image_dithalign( widget->window,
@@ -6970,18 +6985,25 @@ image_expose_seq_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 		widget_get_rect_in_screen( g->frame, &result );	
 		info->sequence_view->w = result.width;
 		info->sequence_view->h = result.height;
-		fprintf(stderr, "img W = %d, H = %d\n", result.width,result.height);	
 		return FALSE;
 	}
 
 	if( info->sequence_view->gui_slot[j]->pixbuf_ref )
 	{
 		sequence_gui_slot_t *g = info->sequence_view->gui_slot[j];
+		if(!g->sample_id)
+			return FALSE;
 		if(!g->pixbuf_ref )
-			return;
+			return FALSE;
+
+		g_assert( g->pixbuf_ref );
+	
 		rowstride = gdk_pixbuf_get_rowstride( g->pixbuf_ref );
 
 		guchar *pixels = gdk_pixbuf_get_pixels( g->pixbuf_ref ) + rowstride * event->area.y + event->area.x * 3;
+
+		
+
 		if(pixels)
 		gdk_draw_rgb_image_dithalign( widget->window,
 						widget->style->black_gc,
@@ -6991,9 +7013,7 @@ image_expose_seq_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 						rowstride,
 						event->area.x , event->area.y );
 
-
 	}
-
 	return FALSE;
 
 }
@@ -7018,8 +7038,7 @@ static	void	update_cached_slots(void)
 	{
 		sequence_gui_slot_t *g = info->sequence_view->gui_slot[i];
 		sample_slot_t *s = info->selected_slot;
-
-		if(g->sample_id == info->status_tokens[CURRENT_ID] && g->sample_type == info->status_tokens[PLAY_MODE] && s->pixbuf)
+		if(g->sample_id == info->selected_slot->sample_id && g->sample_type == info->selected_slot->sample_type && s->pixbuf)
 		{
 			if(!g->pixbuf_ref)
 			{
@@ -7050,7 +7069,7 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
 		info->current_sequence_slot = slot_nr;
 		sample_slot_t *s = info->selected_slot;
 		sequence_gui_slot_t *g = info->sequence_view->gui_slot[slot_nr];
-		if(!s->pixbuf)	{ fprintf(stderr, "Slot with id %d is empty?\n", s->sample_id ); return FALSE;}
+	/*	if(!s->pixbuf)	{ fprintf(stderr, "Slot with id %d is empty?\n", s->sample_id ); return FALSE;}
 		if(g->pixbuf_ref)
 			gdk_pixbuf_unref( g->pixbuf_ref );
 	
@@ -7059,7 +7078,7 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
 			info->sequence_view->w,
 			info->sequence_view->h,
 			GDK_INTERP_BILINEAR );
-
+*/
 		g->sample_id = s->sample_id;	
 		g->sample_type = s->sample_type;
 		vj_msg(VEEJAY_MSG_INFO, "Placed %s %d in Memory slot %d",
@@ -7077,7 +7096,6 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
 		}
 		multi_vims(VIMS_SET_MODE_AND_GO, "%d %d", g->sample_type, g->sample_id );
 	}
-	gtk_widget_queue_draw( info->quick_select );
 
 	return FALSE;
 
