@@ -1569,7 +1569,6 @@ void vj_event_update_remote(void *ptr)
 	// see if there is any link interested in status information
 	for( i = 0; i < v->vjs[1]->nr_of_links; i ++ )
 		veejay_pipe_write_status( v, i );
-
 	if( v->settings->use_vims_mcast )
 	{
 		int res = vj_server_update(v->vjs[2],0 );
@@ -1615,7 +1614,7 @@ void vj_event_update_remote(void *ptr)
 	if(!veejay_keep_messages())
 		veejay_reap_messages();
 	
-
+	
 }
 
 void	vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)

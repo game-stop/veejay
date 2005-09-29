@@ -1102,7 +1102,8 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     
     d_len = strlen(info->status_what);
     snprintf(info->status_msg,MESSAGE_SIZE, "V%03dS%s", d_len, info->status_what);
-    res = vj_server_send(info->vjs[1],link_id, info->status_msg, strlen(info->status_msg));
+ 
+   res = vj_server_send(info->vjs[1],link_id, info->status_msg, strlen(info->status_msg));
 
    if( res <= 0) { /* close command socket */
 		_vj_server_del_client(info->vjs[1], link_id );
@@ -2057,12 +2058,21 @@ static void veejay_playback_cycle(veejay_t * info)
 	    info->real_fps = 0;
 #endif
 
+		int sta_poll = vj_server_poll(info->vjs[1]);
+		if(sta_poll>0) vj_server_new_connection( info->vjs[1]);
+		int i;
+		for( i = 0; i < info->vjs[1]->nr_of_links; i ++ )
+			veejay_pipe_write_status( info, i );
+
+
 	    if(skipv && (info->video_out!=4)) continue;
 	    if (!veejay_mjpeg_queue_buf(info, frame, 1)) {
 		veejay_msg(VEEJAY_MSG_ERROR ,"Error queuing a frame");
 		veejay_change_state(info, LAVPLAY_STATE_STOP);
 		goto FINISH;
 	    }
+
+
 	    stats.nqueue++;
 	    n++;
 	}
