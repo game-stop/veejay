@@ -565,6 +565,7 @@ static struct
 
 // REFAC 
 static	int	no_preview_ = 1;
+static int	 no_draw_ = 0;
 
 static struct
 {
@@ -1755,6 +1756,8 @@ GdkPixbuf *		gveejay_update_image2( GtkWidget *img,  gint w, gint h )
 
 		if(image)
 			gtk_image_set_from_pixbuf( image, new_pixbuf );
+
+		no_draw_ = 0;
 
 		return new_pixbuf;
 	}	
@@ -5407,6 +5410,9 @@ static gboolean	refresh_image_horror(gpointer data)
 	
 		if(info->sequence_view->w == 0 || info->sequence_view->h == 0 )
 			return TRUE;
+
+		no_draw_ = 1;
+
 		int i;
 		for( i = 0; i < info->sequence_view->envelope_size; i ++ )
 		{
@@ -6913,6 +6919,8 @@ image_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 	// ha ha redraw whole page ! 
  	GtkWidget *notepad = info->sample_bank_pad;
 	gint bank_nr = find_bank( gtk_notebook_get_current_page( GTK_NOTEBOOK(notepad)) );
+	if(no_draw_)
+		return FALSE;
 	if(bank_nr < 0 )
 		return FALSE;
 
@@ -6934,15 +6942,15 @@ image_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 		g_assert( slot->pixbuf );
 		guchar *pixels = gdk_pixbuf_get_pixels( slot->pixbuf ) + rowstride * event->area.y + event->area.x * 3;
 		if(pixels)
-		gdk_draw_rgb_image_dithalign( widget->window,
-						widget->style->black_gc,
+			gdk_draw_rgb_image_dithalign( widget->window,
+					widget->style->black_gc,
 				//		event->area.x, event->area.y,
-							0,0,info->image_dimensions[0],info->image_dimensions[1],
+						0,0,info->image_dimensions[0],info->image_dimensions[1],
 					//	event->area.width, event->area.height,
-						GDK_RGB_DITHER_NORMAL,
-						pixels,
-						rowstride,
-						event->area.x , event->area.y );
+					GDK_RGB_DITHER_NORMAL,
+					pixels,
+					rowstride,
+					event->area.x , event->area.y );
 	}
 
 
@@ -6978,6 +6986,8 @@ image_expose_seq_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 						rowstride,
 						event->area.x , event->area.y );
 	}*/
+
+
 	if(info->sequence_view->w == 0 || info->sequence_view->h == 0 )
 	{
 		sequence_gui_slot_t *g = info->sequence_view->gui_slot[j];
@@ -6987,6 +6997,9 @@ image_expose_seq_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 		info->sequence_view->h = result.height;
 		return FALSE;
 	}
+
+	if(no_draw_)
+		return FALSE;
 
 	if( info->sequence_view->gui_slot[j]->pixbuf_ref )
 	{
