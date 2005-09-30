@@ -1816,15 +1816,17 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	}
 	if( info->uc->file_as_sample)
 	{
-veejay_msg(VEEJAY_MSG_DEBUG, "FILE AS SAMPLE");
 		long i,n=info->current_edit_list->num_video_files;
-		for(i = 1; i < n; i ++ )
+		for(i = 0; i < n; i ++ )
 		{
 			long start,end;
 			if(vj_el_get_file_entry( info->current_edit_list, &start,&end, i ))
 			{
-				sample_info *skel = sample_skeleton_new( start,end );
-				skel->edit_list = info->current_edit_list;
+				editlist *el = veejay_edit_copy_to_new(
+					info,info->current_edit_list,
+					start,end );
+				sample_info *skel = sample_skeleton_new( 0,el->video_frames-1 );
+				skel->edit_list = el;
 				sample_store(skel);
 			}	
 		}
@@ -2553,7 +2555,7 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 		new_el->frame_list[k++] = el->frame_list[i];
 	veejay_msg(VEEJAY_MSG_DEBUG, "Copied %d frames to new EDL %p from %p", k, new_el,el);
     // set length
-    new_el->video_frames = len;
+    new_el->video_frames = k;
 
 
     return new_el;
