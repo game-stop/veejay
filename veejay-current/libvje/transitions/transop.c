@@ -40,17 +40,17 @@ vj_effect *transop_init(int width, int height)
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
 
-    ve->limits[0][1] = 1;
+    ve->limits[0][1] = 0;
     ve->limits[1][1] = width;
-    ve->limits[0][2] = 1;
+    ve->limits[0][2] = 0;
     ve->limits[1][2] = height;
-    ve->limits[0][3] = 1;
+    ve->limits[0][3] = 0;
     ve->limits[1][3] = height;
-    ve->limits[0][4] = 1;
+    ve->limits[0][4] = 0;
     ve->limits[1][4] = width;
-    ve->limits[0][5] = 1;
+    ve->limits[0][5] = 0;
     ve->limits[1][5] = height;
-    ve->limits[0][6] = 1;
+    ve->limits[0][6] = 0;
     ve->limits[1][6] = width;
     ve->description = "Transition Translate Opacity";
     ve->sub_format = 1;
@@ -77,13 +77,21 @@ void transop_apply( VJFrame *frame, VJFrame *frame2,
     op1 = (opacity > 255) ? 255 : opacity;
     op0 = 255 - op1;
     /* translate yuv2 into yuv1, Luminance */
-    if( (theight + y2) > height ) y2 = (height-theight);
-    if( (twidth + x2) > width) x2 = (width-twidth);
-    for (y = 0; y < theight; y++) {
-	for (x = 0; x < twidth; x++) {
-	    Y[((y2 + y) * width + x2 + x)] = (op0 * Y[((y2 + y) * width + x2 + x)] + op1 * Y2[((y1 + y) * width + x1 + x)]) >> 8;	///235; 
- Cb[((y2 + y) * width + x2 + x)] = (op0 * Cb[((y2 + y) * width + x2 + x)] + op1 * Cb2[((y1 + y) * width + x1 + x)]) >> 8;	
- Cr[((y2 + y) * width + x2 + x)] = (op0 * Cr[((y2 + y) * width + x2 + x)] + op1 * Cr2[((y1 + y) * width + x1 + x)]) >> 8;	
+    if( (theight + y2) >= height ) y2 = height-1;
+    if( (twidth + x2) > width) x2 = width;
+    for (y = 0; y < theight; y++)
+    {
+
+	for (x = 0; x < twidth; x++)
+        {
+	    Y[((y2 + y) * width + x2 + x)] =
+			(op0 * Y[((y2 + y) * width + x2 + x)] + op1 * Y2[((y1 + y) * width + x1 + x)]) >> 8;	///235; 
+
+	    Cb[((y2 + y) * width + x2 + x)] =
+			(op0 * Cb[((y2 + y) * width + x2 + x)] + op1 * Cb2[((y1 + y) * width + x1 + x)]) >> 8;	
+
+	    Cr[((y2 + y) * width + x2 + x)] =
+			(op0 * Cr[((y2 + y) * width + x2 + x)] + op1 * Cr2[((y1 + y) * width + x1 + x)]) >> 8;	
 	}
     }
 
