@@ -30,6 +30,8 @@ static char hostname[255];
 static int gveejay_theme = 1;
 static	int verbosity = 0;
 static int timer = 6;
+static int preview_width = 0;
+static int preview_height = 0;
 
 static void usage(char *progname)
 {
@@ -40,6 +42,7 @@ static void usage(char *progname)
 	printf( "-n/--no-theme\t\tDont load gveejay's GTK theme\n");
 	printf( "-v/--verbose\t\tBe extra verbose (usefull for debugging)\n");
 	printf( "-t/--timeout\t\tSet timeout (default 6 seconds)\n");
+	printf( "-S/--size\t\tSet preview size (widht X height)\n");
         printf( "\n\n");
         exit(-1);
 }
@@ -66,6 +69,15 @@ static int      set_option( const char *name, char *value )
 	{
 		timer = atoi(optarg);
 	}
+	else if (strcmp(name, "s") == 0 || strcmp(name, "size") == 0)
+	{
+		if(sscanf( (char*) optarg, "%dx%d",
+			&preview_width, &preview_height ) != 2 )
+		{
+			fprintf(stderr, "--size parameter requires NxN argument");
+			err++;
+		}
+	}
         else
                 err++;
         return err;
@@ -78,7 +90,7 @@ int main(int argc, char *argv[]) {
 
         if(!argc) usage(argv[0]);
 
-        while( ( n = getopt( argc, argv, "h:p:nv")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:p:nv")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
@@ -98,9 +110,9 @@ int main(int argc, char *argv[]) {
 		
 	vj_gui_set_timeout(timer);
 
-
 	vj_gui_init("gveejay.reloaded.glade");
-
+	vj_gui_set_preview_window( preview_width,preview_height);
+	
 	if(gveejay_theme)
 		vj_gui_style_setup();
 

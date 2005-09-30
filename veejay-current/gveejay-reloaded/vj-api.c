@@ -410,6 +410,9 @@ typedef struct
 	int		status_frame;
 	int		key_id;
 	int		preview_ready;
+	int		preview_size_w;
+	int		preview_size_h;
+
 	gboolean	key_now;	
 } vj_gui_t;
 
@@ -5276,6 +5279,18 @@ static	void	load_editlist_info()
 	g_free(res);
 }
 
+vj_gui_set_preview_window( int w , int h )
+{
+	if( w < 0 || w > 1568 || h < 0 || h > 1024 )
+	{
+		fprintf(stderr, "Please use a sane range for width X height\n");
+		return;
+	}
+	info->preview_size_w = w;
+	info->preview_size_h = h;
+}
+
+
 static	void	disable_widget(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
@@ -5670,7 +5685,6 @@ static	void		veejay_untick(gpointer data)
 static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointer data)
 {
 	vj_gui_t *gui = (vj_gui_t*) data;
-
 	if( (condition&G_IO_ERR) ) {
 		return FALSE; }
 	if( (condition&G_IO_HUP) ) {
@@ -5678,7 +5692,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 	if( (condition&G_IO_NVAL) ) {
 		return FALSE; 
 	}
-	/* read all status and take last immediatly */
+
 	if(gui->state==STATE_PLAYING && (condition & G_IO_IN) )
 	{	//vj_client_poll( gui->client, V_STATUS ))
 //vj_client_poll( gui->client, V_STATUS ))
@@ -6261,6 +6275,11 @@ void	vj_gui_preview(void)
 	gint w = info->el.width;
 	gint h = info->el.height;
 
+	if(info->preview_size_w != 0)
+		w = info->preview_size_w;
+	if(info->preview_size_h != 0)
+		h = info->preview_size_h;
+
 	update_spin_value( "priout_width", w );
 	update_spin_value( "priout_height", h );
 
@@ -6270,9 +6289,9 @@ void	vj_gui_preview(void)
 		h = 288;
 
 	update_spin_range( "preview_width", 16, w,
-		(info->run_state == RUN_STATE_REMOTE ? (w/2) : w ) ); 
+		(info->run_state == RUN_STATE_REMOTE ? ((info->preview_size_w==0 ? w/2: info->preview_size_w)) : w ) ); 
 	update_spin_range( "preview_height", 16, h,
-		(info->run_state == RUN_STATE_REMOTE ? (h/2) : h ) );	
+		(info->run_state == RUN_STATE_REMOTE ? ((info->preview_size_h == 0 ? h/2 : info->preview_size_h)) : h ) );	
 
 	update_spin_incr( "preview_width", 16, 0 );
 	update_spin_incr( "preview_height", 16, 0 );
