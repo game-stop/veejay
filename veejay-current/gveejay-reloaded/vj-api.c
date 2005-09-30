@@ -6311,7 +6311,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	g_io_add_watch_full(
 			info->channel,
-			G_PRIORITY_HIGH,
+			G_PRIORITY_DEFAULT,
 			G_IO_IN| G_IO_ERR | G_IO_NVAL | G_IO_HUP,
 			veejay_tick,
 			(gpointer*) info,
