@@ -110,6 +110,7 @@ typedef struct {
     int socket_ready;
     uint8_t *socket_frame;
     int n_frames;
+	void *private;
 } vj_tag;
 
 int 	vj_tag_chain_malloc(int e);

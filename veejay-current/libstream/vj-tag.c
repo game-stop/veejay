@@ -72,7 +72,13 @@ static int last_added_tag = 0;
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int ty );
 int _vj_tag_new_avformat( vj_tag *tag, int stream_nr, editlist *el);
 int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el);
-
+typedef struct
+{
+	pthread_mutex_t mutex;
+	pthread_t thread;
+	int state;
+	int error;
+} threaded_t;
 
 void	vj_tag_free(void)
 {
@@ -432,6 +438,36 @@ int	vj_tag_get_stream_color(int t1, int *r, int *g, int *b )
 
 	return 1;
 }
+#define THREAD_START 0
+#define THREAD_STOP 1
+
+void	*reader_thread(void *data)
+{
+	vj_tag *tag = (vj_tag*) data;
+	vj_tag_data *v = vj_tag_input->net[tag->index];
+	threaded_t *t = tag->private;
+
+	for( ;; )
+	{
+		pthread_mutex_lock( &(t->mutex) );
+		if( t->state == THREAD_STOP )
+			return NULL;
+
+		int ret = vj_client_read_i ( v, tag->socket_frame );
+	
+		pthread_mutex_unlock( &(t->mutex) );
+
+		if( ret == -1)
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "Lost connection! ");
+			//vj_tag_disable( t1 );
+			t->error = THREAD_STOP;
+		}
+		
+		if( ret == 0 )
+			veejay_msg(VEEJAY_MSG_DEBUG, "Missed frame (using old)");
+	}
+}
 
 // for network, filename /channel is passed as host/port num
 int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
@@ -542,6 +578,11 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->color_g = 0;
     tag->color_b = 0;
     tag->opacity = 0; 
+	tag->private = NULL;
+	if(type == VJ_TAG_TYPE_MCAST )
+	{
+	    tag->private = (threaded_t*) vj_malloc(sizeof(threaded_t));
+	}
     palette = (pix_fmt == FMT_420 ? VIDEO_PALETTE_YUV420P : VIDEO_PALETTE_YUV422P);
     
  
@@ -1580,6 +1621,11 @@ int vj_tag_disable(int t1) {
 			sprintf(mcast_stop, "%03d:;", VIMS_VIDEO_MCAST_STOP );
 			vj_client_send( vj_tag_input->net[tag->index] , V_CMD, 
 				mcast_stop);
+			threaded_t *t = (threaded_t*)tag->private;
+			pthread_mutex_lock( &(t->mutex) );
+			t->state = THREAD_STOP;
+			pthread_mutex_unlock( &(t->mutex) );
+			pthread_join( &(t->thread), (void*) tag );
 		}
 		vj_client_close( vj_tag_input->net[tag->index] );
 		veejay_msg(VEEJAY_MSG_DEBUG, "Disconnected from %s", tag->source_name);
@@ -1635,6 +1681,11 @@ int vj_tag_enable(int t1) {
 			return -1;
 		}
 		veejay_msg(VEEJAY_MSG_DEBUG, "Streaming from %s", tag->source_name );
+				
+		threaded_t *t = (threaded_t*)tag->private;
+		t->error = 0;
+		t->state = THREAD_START;
+		pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
 		
 	}
 	if( tag->source_type == VJ_TAG_TYPE_PICTURE )
@@ -2157,7 +2208,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	
 	case VJ_TAG_TYPE_MCAST:	
 		v = vj_tag_input->net[tag->index];
-
+	/*
 		int ret = vj_client_read_i ( v, tag->socket_frame );
 		veejay_memcpy( buffer[0], tag->socket_frame, v->planes[0] );
 		veejay_memcpy( buffer[1], tag->socket_frame + v->planes[0], v->planes[1] );
@@ -2171,7 +2222,25 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		
 		if( ret == 0 )
 			veejay_msg(VEEJAY_MSG_DEBUG, "Missed frame (using old)");
-	
+	*/
+		threaded_t *t = (threaded_t*) tag->private;
+		pthread_mutex_lock( &(t->mutex) );
+		
+		if( t->state != THREAD_STOP )
+		{
+			veejay_memcpy( buffer[0], tag->socket_frame, v->planes[0] );
+			veejay_memcpy( buffer[1], tag->socket_frame + v->planes[0], v->planes[1] );
+			veejay_memcpy( buffer[2], tag->socket_frame + v->planes[0] + v->planes[1] , v->planes[2] );
+		}
+		pthread_mutex_unlock( &(t->mutex) );
+		
+		if( t->error )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Error in mcast thread");
+			vj_tag_disable(t1);
+		}
+
+	// lock mutex, copy data
 		return 1;
 	break;
 	case VJ_TAG_TYPE_YUV4MPEG:

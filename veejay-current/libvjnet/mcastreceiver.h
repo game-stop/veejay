@@ -29,6 +29,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <libvje/vje.h>
+#include <pthread.h>
 typedef struct
 {
 	char *group;

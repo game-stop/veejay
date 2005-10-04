@@ -33,6 +33,7 @@
 #include <libvjmsg/vj-common.h>
 #include <stdlib.h>
 #include <string.h>
+#include <pthread.h>
 #define VJC_OK 0
 #define VJC_NO_MEM 1
 #define VJC_SOCKET 2

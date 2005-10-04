@@ -33,7 +33,6 @@
 #include <libvje/vje.h>
 #include "packet.h"
 #include "common.h"
-
 static 	void	print_error(char *msg)
 {
 	veejay_msg(VEEJAY_MSG_ERROR,"%s: %s\n", msg,strerror(errno));
@@ -144,7 +143,7 @@ static int	mcast_poll_timeout( mcast_receiver *v, long timeout )
 	struct timeval tv;
 	int n = 0;
 	tv.tv_sec = 0;
-	tv.tv_usec = 10000 + timeout; // 0.05 seconds
+	tv.tv_usec = 80000 + timeout; // 0.05 seconds
 	FD_ZERO( &fds );	
 	FD_SET( v->sock_fd, &fds );
 
