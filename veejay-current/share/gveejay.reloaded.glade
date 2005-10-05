@@ -6926,6 +6926,23 @@ YV16</property>
 	      <property name="spacing">0</property>
 
 	      <child>
+		<widget class="GtkHBox" id="quickselect">
+		  <property name="visible">True</property>
+		  <property name="homogeneous">False</property>
+		  <property name="spacing">0</property>
+
+		  <child>
+		    <placeholder/>
+		  </child>
+		</widget>
+		<packing>
+		  <property name="padding">0</property>
+		  <property name="expand">True</property>
+		  <property name="fill">True</property>
+		</packing>
+	      </child>
+
+	      <child>
 		<widget class="GtkFrame" id="frame189">
 		  <property name="visible">True</property>
 		  <property name="label_xalign">0</property>
@@ -9098,20 +9115,7 @@ YV16</property>
 		      </child>
 
 		      <child>
-			<widget class="GtkHBox" id="quickselect">
-			  <property name="visible">True</property>
-			  <property name="homogeneous">False</property>
-			  <property name="spacing">0</property>
-
-			  <child>
-			    <placeholder/>
-			  </child>
-			</widget>
-			<packing>
-			  <property name="padding">0</property>
-			  <property name="expand">True</property>
-			  <property name="fill">True</property>
-			</packing>
+			<placeholder/>
 		      </child>
 		    </widget>
 		    <packing>
