@@ -84,6 +84,9 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *templ, int cpu
 
 void	yuv_convert_and_scale( void *sws, VJFrame *src, VJFrame *dst );
 
+void	yuv_convert_and_scale_rgb( void *sws, VJFrame *src, VJFrame *dst );
+
+
 int	yuv_sws_get_cpu_flags(void);
 
 void	yuv_free_swscaler(void *sws);

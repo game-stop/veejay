@@ -223,7 +223,6 @@ void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h)
 	return;
 }
 
-
 int	yuv422p_to_yuv420p( uint8_t *src[3], uint8_t *dst, int w, int h)
 {
 

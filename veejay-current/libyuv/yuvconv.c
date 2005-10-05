@@ -566,7 +566,20 @@ void	yuv_free_swscaler(void *sws)
 		if(s) free(s);
 	}
 }
+void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
+{
+	vj_sws *s = (vj_sws*) sws;
+	int src_stride[3] = { src->width,src->uv_width,src->uv_width };
+	int dst_stride[3] = { dst->width*3,0,0 };
 
+	sws_scale( s->sws, src->data, src_stride, 0, src->height,
+		dst->data, dst_stride );
+
+#ifdef 	HAVE_ASM_MMX
+	asm volatile ("emms\n\t");
+#endif
+	
+}
 void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;

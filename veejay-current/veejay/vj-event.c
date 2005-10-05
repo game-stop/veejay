@@ -98,7 +98,14 @@ static hash_t *keyboard_events;
 
 static int _recorder_format = ENCODER_YUV420;
 
-
+static	int	preview_active_ = 0;
+static	int 	cached_image_= 0;
+static	VJFrame	cached_cycle_[2];
+static sws_template preview_template;
+static void	*preview_scaler = NULL;
+static int 	cached_width_ =0;
+static int 	cached_height_ = 0;
+static veejay_image_t *cached_gdkimage_ = NULL;
 
 #define SEND_BUF 125000
 static char _print_buf[SEND_BUF];
@@ -530,11 +537,20 @@ static struct {
 	{ VIMS_BUNDLE_ATTACH_KEY,		"Attach/Detach a Key to VIMS event",
 		vj_event_attach_detach_key,	4,	"%d %d %d %s",	{0,0}, VIMS_ALLOW_ANY 	},
 #endif
+
+#ifdef USE_SWSCALER
+	{ VIMS_RGB24_IMAGE,			"Various: get a (scaled) image from veejay in rgb24",
+		vj_event_get_scaled_image,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS },
+#else
+#ifdef USE_GDK_PIXBUF
+	{ VIMS_RGB24_IMAGE,			"Various: get a (scaled) image from veejay in rgb24",
+		vj_event_get_scaled_image,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS },
+#endif
+#endif
+
 #ifdef USE_GDK_PIXBUF
 	{ VIMS_SCREENSHOT,			"Various: Save image to file",
 		vj_event_screenshot,		3,	"%d %d %s",	{0,0}, VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS  },
-	{ VIMS_RGB24_IMAGE,			"Various: get a (scaled) image from veejay in rgb24",
-		vj_event_get_scaled_image,	2,	"%d %d",	{0,0}, VIMS_REQUIRE_ALL_PARAMS },
 #else
 #ifdef HAVE_JPEG
 	{ VIMS_SCREENSHOT,			"Various: Save file to jpeg",
@@ -1614,6 +1630,8 @@ void vj_event_update_remote(void *ptr)
 	if(!veejay_keep_messages())
 		veejay_reap_messages();
 	
+	cached_image_ = 0;
+	// clear image cache
 	
 }
 
@@ -2585,7 +2603,7 @@ void	vj_event_set_rgb_parameter_type(void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *s = NULL;
 	P_A(args,s,format,ap);
-	if(args[0] >= 0 && args[0] < 3 )
+	if(args[0] >= 0 && args[0] <= 3 )
 	{
 		rgb_parameter_conversion_type_ = args[0];
 		if(args[0] == 0)
@@ -7143,6 +7161,83 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 	SEND_MSG(v , _s_print_buf );
 }
 
+#ifdef USE_SWSCALER
+// Try to use swscaler if enabled, looks like this is faster then GdkPixbuf
+void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list ap 	)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[2];
+	uint8_t *frame[3];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+
+	editlist *el = v->edit_list;
+	int width = args[0];
+	int height = args[1];
+
+	/* Check dimensions */
+	if(width < 0 || height < 0 || width > 1024 || height > 768 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Use smaller width/height settings");	
+		return;
+	}
+
+	/* Reset preview scaler */
+	if( width != cached_width_ || height != cached_height_ )
+	{
+		preview_active_ = 0;
+		if(preview_scaler)
+		{
+			yuv_free_swscaler( preview_scaler );
+			preview_scaler = NULL;
+		}
+		if(cached_cycle_[1].data[0] )
+			free( cached_cycle_[1].data[0] );
+		cached_width_ = width;
+		cached_height_  = height;	
+	}	
+	/* Initialize preview scaler */
+
+	if(!preview_active_) 
+	{
+		memset( &(cached_cycle_[0]) , 0, sizeof(VJFrame) );
+		memset( &(cached_cycle_[1]) , 0, sizeof(VJFrame) );
+		memset( &(preview_template) , 0, sizeof( sws_template));
+		preview_template.flags = 1;
+		vj_get_yuv_template( &(cached_cycle_[0]), el->video_width,el->video_height,v->pixel_format );	
+		vj_get_rgb_template( &(cached_cycle_[1]) , cached_width_, cached_height_ ); // RGB24
+		preview_scaler = (void*)yuv_init_swscaler(
+			&(cached_cycle_[0]),
+			&(cached_cycle_[1]),
+			&(preview_template),
+			yuv_sws_get_cpu_flags()
+		);
+		if(!preview_scaler)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "cannot initialize sws scaler");
+			return;
+		}
+		cached_cycle_[1].data[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * cached_width_ * cached_height_ * 3 );
+		cached_cycle_[1].data[1] = NULL;
+		cached_cycle_[1].data[2] = NULL;
+		preview_active_ = 1;
+	}
+
+	/* If there is no image cached, (scale) and cache it */
+	if(! cached_image_ )
+	{
+		vj_perform_get_primary_frame( v, cached_cycle_[0].data , 0);
+		yuv_convert_and_scale_rgb( preview_scaler, cached_cycle_[0].data, cached_cycle_[1].data );
+		cached_image_ = 1;
+	}
+
+	/* Send cached image to client */
+	char header[7];
+	sprintf(header, "%06d", (cached_width_ * cached_height_ * 3) );
+	vj_server_send(v->vjs[0], v->uc->current_link, header, 6 );
+	vj_server_send(v->vjs[0], v->uc->current_link, cached_cycle_[1].data[0], (cached_width_*cached_height_*3));
+}
+#else
 #ifdef USE_GDK_PIXBUF
 void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 {
@@ -7153,15 +7248,23 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	P_A(args,str,format,ap);
 
 	editlist *el = v->edit_list;
-/*
-	uint64_t n = el->frame_list[ (v->settings->current_frame_num) ];
-	int pix_fmt = el->yuv_taste[ N_EL_FILE(n) ];
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Save picture %d vs %d", pix_fmt,
-		v->edit_list->pixel_format );*/
+	veejay_image_t *img = NULL;
 
-	vj_perform_get_primary_frame( v, frame, 0);
-	veejay_image_t *img = vj_picture_save_to_memory(
+	if( !cached_image_)
+	{
+		if( cached_gdkimage_ )
+		{
+			if( cached_gdkimage_->image )
+				gdk_pixbuf_unref( (GdkPixbuf*) cached_gdkimage_->image );
+			if( cached_gdkimage_->scaled_image )
+				gdk_pixbuf_unref( (GdkPixbuf*) cached_gdkimage_->scaled_image );
+			free( cached_gdkimage_ );
+			cached_gdkimage_ = NULL;
+		}	
+
+		vj_perform_get_primary_frame( v, frame, 0);
+		img = vj_picture_save_to_memory(
 					frame,
 					v->edit_list->video_width,
 					v->edit_list->video_height,
@@ -7170,6 +7273,14 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 				//	pix_fmt );
 					v->edit_list->pixel_format );
 	 
+		cached_image_ = 1;
+		cached_gdkimage_ = img;
+	}
+	else
+	{
+		img = cached_gdkimage_;
+	}
+
 	if(img)
 	{
 		GdkPixbuf *p = NULL;
@@ -7192,12 +7303,12 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 		veejay_memcpy( con + 6 , msg , (w * h * 3 ));
 		vj_server_send(v->vjs[0], v->uc->current_link, con, 6 + (w*h*3));
 		if(con) free(con);
-		if(img->image )
+	/*	if(img->image )
 			gdk_pixbuf_unref( (GdkPixbuf*) img->image );
 		if(img->scaled_image)
 			gdk_pixbuf_unref( (GdkPixbuf*) img->scaled_image );
 		if(img)
-			free(img);
+			free(img); */
 	}
 	else
 	{
@@ -7208,6 +7319,8 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	}
 }
 #endif
+#endif
+
 void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -7217,8 +7330,6 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 	char *str = NULL;
 	int i,n;
 	P_A(args,str,format,ap);
-
-//	if(args[0]>0) start_from_sample = args[0];
 
 	bzero( _s_print_buf,SEND_BUF);
 	sprintf(_s_print_buf, "%05d", 0);

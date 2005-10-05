@@ -34,4 +34,6 @@ int	veejay_create_temp_file(const char *prefix, char *dst);
 
 void	vj_get_yuv_template(VJFrame *src, int w, int h, int fmt);
 
+void	vj_get_rgb_template(VJFrame *src, int w, int h );
+
 #endif

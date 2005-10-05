@@ -173,6 +173,19 @@ int	veejay_create_temp_file(const char *prefix, char *dst)
 	return 1;
 }
 
+void	vj_get_rgb_template(VJFrame *src, int w, int h )
+{
+	src->width = w;
+	src->height = h;
+	src->uv_width = 0;
+	src->uv_height = 0;
+	src->format = IMGFMT_BGR24;
+	src->len = w * h * 3;
+	src->uv_len = 0;
+	src->data[0] = NULL;
+	src->data[1] = NULL;
+	src->data[2] = NULL;
+}
 
 void	vj_get_yuv_template(VJFrame *src, int w, int h, int fmt)
 {
