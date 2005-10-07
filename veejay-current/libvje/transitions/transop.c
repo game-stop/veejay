@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002-2005 Niels Elburg <nelburg@looze.net>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -30,8 +30,8 @@ vj_effect *transop_init(int width, int height)
     ve->limits[0] = (int *) malloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) malloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 150;	/* opacity */
-    ve->defaults[1] = 265;	/* twdith */
-    ve->defaults[2] = 194;	/* theight */
+    ve->defaults[1] = 265;	/* width of view port */
+    ve->defaults[2] = 194;	/* height of viewport */
     ve->defaults[3] = 59;	/* y1 */
     ve->defaults[4] = 58;	/* x1 */
     ve->defaults[5] = 45;	/* y2 */
@@ -55,7 +55,7 @@ vj_effect *transop_init(int width, int height)
     ve->description = "Transition Translate Opacity";
     ve->sub_format = 1;
     ve->extra_frame = 1;
-	ve->has_user = 0;
+    ve->has_user = 0;
     return ve;
 }
 
@@ -65,53 +65,56 @@ void transop_apply( VJFrame *frame, VJFrame *frame2,
 		   int twidth, int theight, int x1, int y1, int x2, int y2,
 		   int width, int height, int opacity)
 {
-    int x, y;
-    unsigned int op0, op1;
-  	uint8_t *Y = frame->data[0];
-	uint8_t *Cb = frame->data[1];
-	uint8_t *Cr = frame->data[2];
-	uint8_t *Y2 = frame2->data[0];
-	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[2];
+	int x, y;
+	unsigned int op0, op1;
+  
+	uint8_t *dY = frame->data[0];
+	uint8_t *dCb = frame->data[1];
+	uint8_t *dCr = frame->data[2];
+	uint8_t *sY = frame2->data[0];
+	uint8_t *sCb = frame2->data[1];
+	uint8_t *sCr = frame2->data[2];
 
-    op1 = (opacity > 255) ? 255 : opacity;
-    op0 = 255 - op1;
-    /* translate yuv2 into yuv1, Luminance */
-    if( (theight + y2) >= height ) y2 = height-1;
-    if( (twidth + x2) > width) x2 = width;
-    for (y = 0; y < theight; y++)
-    {
+	op1 = (opacity > 255) ? 255 : opacity;
+	op0 = 255 - op1;
 
-	for (x = 0; x < twidth; x++)
-        {
-	    Y[((y2 + y) * width + x2 + x)] =
-			(op0 * Y[((y2 + y) * width + x2 + x)] + op1 * Y2[((y1 + y) * width + x1 + x)]) >> 8;	///235; 
+	int view_width = twidth;
+	int view_height = theight;
+	int sy = y1;
+	int sx = x1;
 
-	    Cb[((y2 + y) * width + x2 + x)] =
-			(op0 * Cb[((y2 + y) * width + x2 + x)] + op1 * Cb2[((y1 + y) * width + x1 + x)]) >> 8;	
+	int dy = y2;
+	int dx = x2;
 
-	    Cr[((y2 + y) * width + x2 + x)] =
-			(op0 * Cr[((y2 + y) * width + x2 + x)] + op1 * Cr2[((y1 + y) * width + x1 + x)]) >> 8;	
+	if ( (dx + view_width ) > width )
+		view_width = width - dx;
+	if ( (dy + view_height ) > height )
+		view_height = height - dy;
+
+
+	if ( (sy + view_height) > height )
+		view_height = height - sy;
+	if ( (sx + view_width ) > width )
+		view_width = width - sx;
+	
+
+	for( y = 0 ; y < view_height; y ++ )
+	{
+		for( x = 0 ; x < view_width; x ++ )
+		{
+			dY[ (dy + y ) * width + dx + x ] = 
+				sY[ (sy + y) * width + sx + x ];
+
+			dCb[ (dy + y ) * width + dx + x ] = 
+				sCb[ (sy + y) * width + sx + x ];
+					
+			dCr[ (dy + y ) * width + dx + x ] = 
+				sCr[ (sy + y) * width + sx + x ];
+
+		}
 	}
-    }
+	
 
-	/*	
-    uv_width = width / 2;
-    uvy1 = y1 / 2;
-    uvy2 = y2 / 2;
-    uvx1 = x1 / 2;
-    uvx2 = x2 / 2;
-
-    for (y = 0; y < (theight/2); y++) {
-
-	for (x = 0; x < (twidth/2
-); x++) {
-	    Cb[((uvy2 + y) * uv_width + uvx2 + x)] = (op0 * Cb[((uvy2 + y) * uv_width + uvx2 + x)] + op1 * Cb2[((uvy1 + y) * uv_width + uvx1 + x)]) >> 8;	///235;
-	    Cr[((uvy2 + y) * uv_width + uvx2 + x)] = (op0 * Cr[((uvy2 + y) * uv_width + uvx2 + x)] + op1 * Cr2[((uvy1 + y) * uv_width + uvx1 + x)]) >> 8;	//235; 
-
-
-	}
-    }
-	*/
 }
+
 void transop_free(){}
