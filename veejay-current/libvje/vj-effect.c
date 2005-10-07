@@ -142,7 +142,9 @@
 #include "effects/videowall.h"
 #include "effects/flare.h"
 #include "effects/constantblend.h"
-
+#ifdef USE_SWSCALER
+#include "effects/picinpic.h"
+#endif
 static struct
 {
 	int	(*mem_init)(int width, int height);
@@ -205,6 +207,9 @@ static struct
 } complex_effect_index[] = 
 {
 	{	diff_malloc,		diff_free,			VJ_VIDEO_EFFECT_DIFF },
+#ifdef USE_SWSCALER 
+	{	picinpic_malloc,	picinpic_free,			VJ_VIDEO_EFFECT_PICINPIC },
+#endif
 	{	NULL,			NULL,				0		     },
 };
 
@@ -408,7 +413,12 @@ void vj_effect_initialize(int width, int height)
     vj_effects[36] = tripplicity_init(width,height);
 	vj_effects[37] = videoplay_init(width,height);
 	vj_effects[38] = videowall_init(width,height);
-    vj_effects[39] = dummy_init(width,height);
+#ifdef USE_SWSCALER
+	vj_effects[39] = picinpic_init(width,height);
+        vj_effects[40] = dummy_init(width,height);
+#else
+	vj_effects[39] = dummy_init(width,height);
+#endif
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);

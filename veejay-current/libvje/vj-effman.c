@@ -16,7 +16,7 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  */
-
+#include <config.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -510,6 +510,12 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
 			 arg[0], arg[1], arg[2], arg[3], arg[4], arg[5],
 			 arg[6]);
 	break;
+#ifdef USE_SWSCALER
+	case VJ_VIDEO_EFFECT_PICINPIC:
+	picinpic_apply( vj_effects[entry]->user_data,frames[0], frames[1], frameinfo->width, frameinfo->height,
+			arg[0], arg[1], arg[2], arg[3] );
+	break;
+#endif
       default:
 	break;
     }

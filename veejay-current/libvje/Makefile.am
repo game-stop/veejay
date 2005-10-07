@@ -32,6 +32,6 @@ libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
 			effects/crosspixel.c effects/morphology.c effects/ghost.c effects/blob.c effects/boids.c effects/nervous.c \
 			effects/cartonize.c effects/tripplicity.c effects/neighbours.c effects/neighbours2.c\
 			effects/neighbours3.c effects/neighbours4.c effects/neighbours5.c effects/cutstop.c\
-			effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/videowall.c effects/flare.c effects/constantblend.c 
+			effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/videowall.c effects/flare.c effects/constantblend.c effects/picinpic.c 
 
 

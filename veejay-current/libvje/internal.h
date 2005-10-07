@@ -24,7 +24,6 @@
 #define VJE_NEED_INIT -2
 #define VJE_NO_FRAMES -3
 #define VJE_SUCCESS 0
-
 #include <libvje/vje.h>
 
 enum {
@@ -112,6 +111,9 @@ enum {
     VJ_VIDEO_EFFECT_TRIPPLICITY = 236,
 	VJ_VIDEO_EFFECT_VIDEOPLAY = 237,
 	VJ_VIDEO_EFFECT_VIDEOWALL = 238,
+#ifdef USE_SWSCALER
+	VJ_VIDEO_EFFECT_PICINPIC = 239,
+#endif
   //  VJ_VIDEO_EFFECT_CHANNELMIX = 233,
 };
 
@@ -200,7 +202,11 @@ enum {
 #define VJ_IMAGE_EFFECT_MAX 177
 
 #define VJ_VIDEO_EFFECT_MIN 200
+#ifdef USE_SWSCALER
+#define VJ_VIDEO_EFFECT_MAX 240
+#else
 #define VJ_VIDEO_EFFECT_MAX 239
+#endif
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
 
@@ -515,4 +521,10 @@ extern void videowall_apply(VJFrame *frame,VJFrame *B, int w, int h, int a, int 
 extern void flare_apply(VJFrame *frame, int w, int h, int type, int threshold, int radius );
 
 extern void constantblend_apply(VJFrame *frame , int w, int h, int type, int scale, int y );
+#ifdef USE_SWSCALER
+extern void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
+		   int twidth, int theight, int x1, int y1,
+		   int width, int height);
+#endif
+
 #endif

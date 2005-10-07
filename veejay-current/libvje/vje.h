@@ -19,14 +19,17 @@
 
 #ifndef VJE_H
 #define VJE_H
-
+#include <config.h>
 #include <stdint.h>
 #include <sys/types.h>
 #include <string.h>
 #include <libvjmem/vjmem.h>
 
+#ifdef USE_SWSCALER
+#define MAX_EFFECTS 117
+#else
 #define MAX_EFFECTS 116
-
+#endif
 #define PARAM_WIDTH	    (1<<0x2)
 #define PARAM_HEIGHT	(1<<0x3)
 #define PARAM_FADER  	(1<<0x1)
