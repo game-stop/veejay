@@ -1483,21 +1483,6 @@ void on_video_options_apply_clicked         (GtkButton       *button,
 	}
 }
 
-/* 
- * Handler to apply the settings of the video_settings-dialog AND close the dialog 
- */
-void on_video_options_ok_clicked            (GtkButton       *button,
-	                                     gpointer         user_data)
-{
-    on_video_options_apply_clicked(button,user_data);
-    if(!info->status_lock)
-	{
-	GtkWidget *veejay_settings_window = glade_xml_get_widget(info->main_window, "video_options");
-	gtk_widget_hide(veejay_settings_window);	
-	}
-}
-
-
 /*
  * Handler to show the VIMS_Bundles-dialog
  */ 
