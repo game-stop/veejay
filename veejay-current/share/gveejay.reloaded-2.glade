@@ -12476,6 +12476,7 @@ YV16</property>
   <property name="type_hint">GDK_WINDOW_TYPE_HINT_DIALOG</property>
   <property name="gravity">GDK_GRAVITY_NORTH_WEST</property>
   <property name="focus_on_map">True</property>
+  <signal name="delete_event" handler="on_inputstream_window_delete_event" last_modification_time="Mon, 10 Oct 2005 17:08:03 GMT"/>
 
   <child>
     <widget class="GtkFrame" id="frame161">

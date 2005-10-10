@@ -2085,6 +2085,12 @@ void	on_vs_mcastvims_changed( GtkWidget *w, gpointer user_data)
 //	info->config.mcast_vims = get_text( "vs_mcastvims" );
 }
 
+void	on_inputstream_window_delete_event(GtkWidget *w, gpointer user_data)
+{
+	GtkWidget *vs = glade_xml_get_widget(info->main_window, "inputstream_window");
+	gtk_widget_hide(vs);
+}
+
 void	on_vs_delete_event( GtkWidget *w, gpointer user_data)
 {
 	GtkWidget *vs = glade_xml_get_widget(info->main_window, "vs");
