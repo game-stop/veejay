@@ -36,4 +36,5 @@ void	vj_get_yuv_template(VJFrame *src, int w, int h, int fmt);
 
 void	vj_get_rgb_template(VJFrame *src, int w, int h );
 
+void	vj_get_yuv444_template(VJFrame *src, int w, int h);
 #endif

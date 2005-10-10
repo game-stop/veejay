@@ -214,3 +214,19 @@ void	vj_get_yuv_template(VJFrame *src, int w, int h, int fmt)
 
 }
 
+void	vj_get_yuv444_template(VJFrame *src, int w, int h)
+{
+	src->width = w;
+	src->uv_width = w;
+	src->height = h;
+	src->format = IMGFMT_444P;
+	src->uv_height = h;
+	src->shift_v = 0;
+	src->len = w * h;
+	src->uv_len = src->uv_width * src->uv_height;
+	src->shift_h = 0;
+	src->data[0] = NULL;
+	src->data[1] = NULL;
+	src->data[2] = NULL;
+}
+
