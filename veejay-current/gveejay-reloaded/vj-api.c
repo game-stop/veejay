@@ -412,7 +412,7 @@ typedef struct
 	int		preview_ready;
 	int		preview_size_w;
 	int		preview_size_h;
-
+	GdkColor	*fg_;
 	gboolean	key_now;	
 } vj_gui_t;
 
@@ -724,6 +724,20 @@ static	gchar	*_utf8str(char *c_str)
 
 	return result;
 }
+
+GdkColor	*widget_get_fg(GtkWidget *w )
+{
+	if(!w)		
+		return NULL;
+	GdkColor *c = (GdkColor*)vj_malloc(sizeof(GdkColor));
+	memset(c, 0, sizeof(GdkColor));
+	GtkStyle *s = gtk_widget_get_style( w);
+	c->red   = s->fg[0].red;
+	c->green = s->fg[0].green;
+	c->blue	 = s->fg[0].blue;
+	return c;
+}
+
 // dirty function to get name or channel
 static	int	read_file(const char *filename, int what, void *dst)
 {
@@ -2103,7 +2117,7 @@ if( info->uc.selected_chain_entry == i )
 static	int	interpolate_parameters(void)
 {
 	sample_slot_t *s = info->selected_slot;
-	if(!s)	
+	if(!s || !s->ec)	
 		return 0;
 	int i,j;
 	int res = 0;
@@ -2186,6 +2200,9 @@ static	void	update_curve_surroundings()
 
 	key_parameter_t *key = s->ec->effects[i]->parameters[j];
 
+	if(!key)
+		return;
+
 	/* Restore AKF status */
 	set_toggle_button( "curve_toggleglobal", s->ec->enabled );
 	/* Restore AKF entry toggle */
@@ -2246,7 +2263,15 @@ static	void	update_curve_surroundings()
 		else
 			set_toggle_button( tog_w[2].name ,1);
 
+	if(!key->vector)
+		key->running = 0;
+	if(!key->vector)
+		disable_widget( "curve_togglerun");
+	else
+		enable_widget( "curve_togglerun" );
+	
 	set_toggle_button( "curve_togglerun" , key->running );
+
 
 }
 
@@ -5254,8 +5279,8 @@ static	void	load_editlist_info()
 	update_label_str( "label_el_norm", tmp);
 	update_label_f( "label_el_fps", fps );
 
-	update_spin_value( "screenshot_width", values[1] );
-	update_spin_value( "screenshot_height", values[0] );	
+	update_spin_value( "screenshot_width", info->el.width );
+	update_spin_value( "screenshot_height", info->el.height );	
 
 	info->el.fps = fps;
 	info->el.num_files = dum[0];
@@ -5500,7 +5525,7 @@ static	gboolean	update_imageA( gpointer data )
 						
 				//	}
 					
-					if(!info->selected_slot->pixbuf)
+					if(!info->selected_slot->pixbuf && is_button_toggled("previewtoggle"))
 					{
 					info->selected_slot->pixbuf = gdk_pixbuf_scale_simple( new_pixbuf, info->image_dimensions[0],
 									info->image_dimensions[1], GDK_INTERP_BILINEAR  );
@@ -6722,6 +6747,10 @@ static int	add_bank( gint bank_num  )
 	}
 
 
+	if(!info->fg_)
+	{
+		info->fg_ = widget_get_fg( info->sample_banks[bank_num]->gui_slot[0]->frame );
+	}
 	return bank_num;
 }
 void	free_samplebank(void)
@@ -6955,12 +6984,12 @@ image_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 		return FALSE;
 
 	sample_gui_slot_t *guislot = info->sample_banks[bank_nr]->gui_slot[i];
-	if(slot->pixbuf && slot->sample_id > 0)
+	if(slot->pixbuf != NULL && slot->sample_id > 0 && is_button_toggled("previewtoggle"))
 	{	
 		rowstride = gdk_pixbuf_get_rowstride( slot->pixbuf );
 		g_assert( slot->pixbuf );
 		guchar *pixels = gdk_pixbuf_get_pixels( slot->pixbuf ) + rowstride * event->area.y + event->area.x * 3;
-		if(pixels)
+		if(pixels && rowstride > 0)
 			gdk_draw_rgb_image_dithalign( widget->window,
 					widget->style->black_gc,
 				//		event->area.x, event->area.y,
@@ -7020,7 +7049,7 @@ image_expose_seq_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 	if(no_draw_)
 		return FALSE;
 
-	if( info->sequence_view->gui_slot[j]->pixbuf_ref )
+	if( info->sequence_view->gui_slot[j]->pixbuf_ref && is_button_toggled("previewtoggle"))
 	{
 		sequence_gui_slot_t *g = info->sequence_view->gui_slot[j];
 		if(!g->sample_id)
@@ -7072,7 +7101,7 @@ static	void	update_cached_slots(void)
 		sample_slot_t *s = info->selected_slot;
 		if(g->sample_id == info->selected_slot->sample_id && g->sample_type == info->selected_slot->sample_type && s->pixbuf)
 		{
-			if(!g->pixbuf_ref)
+			if(!g->pixbuf_ref && is_button_toggled("previewtoggle"))
 			{
 				g->pixbuf_ref = gdk_pixbuf_scale_simple(
 				s->pixbuf,
@@ -7335,7 +7364,7 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
 //	info->selected_slot = sample_banks[bank_nr]->slot[slot_nr];	
 //	info->selected_gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
 //	fprintf(stderr, "New slot = %p\n",info->selected_slot);
-//	set_activation_of_slot_in_samplebank(true);	
+//	set_activation_of_slot_in_samplebank(false);	
 	multi_vims( VIMS_SET_MODE_AND_GO, "%d %d", s->sample_type, s->sample_id);
 //	gtk_widget_grab_focus(widget);
 
@@ -7347,6 +7376,7 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
 		info->selection_slot = sample_banks[bank_nr]->slot[slot_nr];
 		info->selection_gui_slot = sample_banks[bank_nr]->gui_slot[slot_nr];
 		set_selection_of_slot_in_samplebank(true );
+	
 	}
 
 	return FALSE;
@@ -7370,19 +7400,38 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
 {
 	if(!info->selected_gui_slot || !info->selected_slot )
 		return;
-
+	GdkColor color;
+	color.red = info->fg_->red;
+	color.green = info->fg_->green;
+	color.blue = info->fg_->blue;
+	
 	if(info->selected_slot->sample_id <= 0 )
+	{
+		fprintf(stderr, "Etch in %p\n", info->selected_gui_slot);
 		gtk_frame_set_shadow_type( info->selected_gui_slot->frame, GTK_SHADOW_ETCHED_IN );
+	}
 	else
 	{
 		if (activate)
 		{
+			color.green = 0xffff;
+			color.red = 0;
+			color.blue =0;
 			gtk_frame_set_shadow_type(info->selected_gui_slot->frame,GTK_SHADOW_IN);
 			gtk_widget_grab_focus(info->selected_gui_slot->frame);
 		}
 		else 
+		{
 			gtk_frame_set_shadow_type(info->selected_gui_slot->frame,GTK_SHADOW_ETCHED_IN);
+		}
 	}
+	gtk_widget_modify_fg ( info->selected_gui_slot->title,
+		GTK_STATE_NORMAL, &color );
+	gtk_widget_modify_fg ( info->selected_gui_slot->timecode,
+		GTK_STATE_NORMAL, &color );
+	gtk_widget_modify_fg ( gtk_frame_get_label_widget( info->selected_gui_slot->frame ),
+		GTK_STATE_NORMAL, &color );
+	
 }
 
 static	void	set_selection_of_slot_in_samplebank(gboolean active)
@@ -7391,36 +7440,31 @@ static	void	set_selection_of_slot_in_samplebank(gboolean active)
 		return;
 	if(info->selection_slot->sample_id <= 0 )
 		return;
+	GdkColor color;
+	color.red = info->fg_->red;
+	color.green = info->fg_->green;
+	color.blue = info->fg_->blue;	
 	if(active)
 	{
-		GdkColor color;
-		color.red = 255 * 74;
-		color.green = 255 * 79;
-		color.blue = 117 * 79;
-		gtk_frame_set_shadow_type( info->selection_gui_slot->frame, GTK_SHADOW_ETCHED_OUT );
-		gtk_widget_modify_fg ( info->selection_gui_slot->title,
-			GTK_STATE_NORMAL, &color );
-		gtk_widget_modify_fg ( info->selection_gui_slot->timecode,
-			GTK_STATE_NORMAL, &color );
-
-
-		GtkWidget *frame_label = gtk_frame_get_label_widget( info->selection_gui_slot->frame );
-		gtk_widget_modify_fg( frame_label, GTK_STATE_NORMAL, &color );
+		color.blue = 0xffff;
+		color.green = 0;
+		color.red =0;
 	}
-	else
+
+	if(info->selected_slot == info->selection_slot)
 	{
-		gtk_frame_set_shadow_type( info->selection_gui_slot->frame, GTK_SHADOW_ETCHED_IN );
-		GdkColor color;
-		color.red = 255 * 128;
-		color.green = 255 * 128;
-		color.blue = 255 * 128;
-		gtk_widget_modify_fg ( info->selection_gui_slot->timecode,
-			GTK_STATE_NORMAL, &color );
-		gtk_widget_modify_fg ( info->selection_gui_slot->title,
-			GTK_STATE_NORMAL, &color );
-		GtkWidget *frame_label = gtk_frame_get_label_widget( info->selection_gui_slot->frame );
-		gtk_widget_modify_fg( frame_label, GTK_STATE_NORMAL, &color);
+		color.green = 0xffff;
+		color.red = 0;	
+		color.blue = 0;
 	}
+	
+	gtk_widget_modify_fg ( info->selection_gui_slot->title,
+		GTK_STATE_NORMAL, &color );
+	gtk_widget_modify_fg ( info->selection_gui_slot->timecode,
+		GTK_STATE_NORMAL, &color );
+	gtk_widget_modify_fg ( gtk_frame_get_label_widget( info->selection_gui_slot->frame ),
+		GTK_STATE_NORMAL, &color );
+
 }
 
 static int add_sample_to_sample_banks(int bank_page,sample_slot_t *slot)
@@ -7573,6 +7617,10 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 			gchar frame_title[20];
 			sprintf(frame_title, "%s-%d", (sample_type == 0 ? "Sample" : "Stream" ), sample_id);
 			gtk_frame_set_label( gui_slot->frame, frame_title );
+		}
+		else
+		{
+			gtk_frame_set_label(gui_slot->frame, NULL );
 		}
 	}
 
