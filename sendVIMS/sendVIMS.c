@@ -155,26 +155,27 @@ pd_msg_t *pd_msg_new(char *msg){
     int i, parsed, size = -1;
     char *body = msg + 5;
     pd_msg_t *m = 0;
-    int s[15]; // 13 status ints
+    int s[18]; // 13 status ints
 	int n = 0;
 
     /* get 15 ints */
-    n = sscanf(body, "%d %d %d %d %d %d %d %d %d %d %d %d %d",
+    n = sscanf(body, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 	       s+0, s+1, s+2, s+3,
 	       s+4, s+5, s+6, s+7,
-	       s+8, s+9, s+10, s+11, s+12);
-	if (n != 15) goto error;
+	       s+8, s+9, s+10, s+11,
+		s+12, s + 13, s + 14, s + 15, s + 16);
+	if (n != 17) goto error;
 
     /* create msg */
     m = malloc(sizeof(*m));
     m->selector = s_veejay; // not used
-    m->argc = 15;
-    for(i=0; i<15; i++) SETFLOAT(m->argv + i, (float)s[i]);
+    m->argc = n;
+    for(i=0; i<n; i++) SETFLOAT(m->argv + i, (float)s[i]);
     return m;
 
   error:
     msg_free(m);
-	post("Parsed only %d out of %d status outlets", n,15 );
+	post("Parsed only %d out of %d status outlets", n,17 );
     return 0;
 
 }
