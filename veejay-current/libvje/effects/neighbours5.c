@@ -38,7 +38,7 @@ vj_effect *neighbours5_init(int w, int h)
     ve->defaults[0] = 6;
     ve->defaults[1] = 5;
     ve->defaults[2] = 1;
-    ve->description = "Artistic Filter (Vertical strokes)";
+    ve->description = "ZArtistic Filter (Vertical strokes)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;

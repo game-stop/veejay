@@ -41,7 +41,7 @@ vj_effect *neighbours4_init(int w, int h)
     ve->defaults[1] = 24;
     ve->defaults[2] = 8;
     ve->defaults[3] = 1;
-    ve->description = "Artistic Filter (Round Brush)";
+    ve->description = "ZArtistic Filter (Round Brush)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;

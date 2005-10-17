@@ -38,7 +38,7 @@ vj_effect *neighbours_init(int w, int h)
     ve->defaults[0] = 4;
     ve->defaults[1] = 4;
     ve->defaults[2] = 0;
-    ve->description = "Artistic Filter (Oilpainting, acc. add )";
+    ve->description = "ZArtistic Filter (Oilpainting, acc. add )";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
