@@ -146,6 +146,7 @@ static void human_friendly_msg( int net_id,char * buffer )
 		sprintf( vims_msg, "%03d:%s;", net_id,buffer+1);
 
 	vj_client_send(sayvims,V_CMD, vims_msg);
+	vj_flush(1);
 }
 static int human_friendly_vims(char *buffer)
 {
@@ -302,6 +303,7 @@ int main(int argc, char *argv[])
 			else
 			{
 				vj_client_send( sayvims,V_CMD, msg[i] );
+				vj_flush(1);
 			}
 			i++;
 		}
@@ -330,6 +332,7 @@ int main(int argc, char *argv[])
 			else
 			{
 				vj_client_send( sayvims, V_CMD, buf );
+				vj_flush( 1 );
 			}
 		}
 	}
