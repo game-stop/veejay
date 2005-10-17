@@ -40,25 +40,38 @@ static vj_client *sayvims = NULL;
 static int colors = 0;
 static int fd_in = 0; // stdin
 static int single_msg = 0;
+static int dump = 0;
 
 /* count played frames (delay) */
 static void vj_flush(int frames) { 
 	int n = 0;
 	char status[100];
-	int bytes = 100;
 	bzero(status,100);
 
 	while(frames>0) {
 		if( vj_client_poll(sayvims, V_STATUS ))
 		{
-			int n = vj_client_read(sayvims,V_STATUS,status,bytes);
-			if( n )
+			char sta_len[6];
+			bzero(sta_len, 6 );
+			int nb = vj_client_read( sayvims, V_STATUS, sta_len, 5 );
+			if(sta_len[0] == 'V' )
 			{
-				frames -- ;
-			}
-			if(n == -1)
-			{
-				exit(0);
+				int bytes = 0;
+				sscanf( sta_len + 1, "%03d", &bytes );
+				if(bytes > 0 )
+				{
+					bzero(status, 100);
+					int n = vj_client_read(sayvims,V_STATUS,status,bytes);
+					if( n )
+					{
+						if(dump) fprintf(stdout , "%s\n", status );
+						frames -- ;
+					}
+					if(n == -1)
+					{
+						exit(0);
+					}
+				}
 			}
 		}
 	}
@@ -73,6 +86,7 @@ static void Usage(char *progname)
 	veejay_msg(VEEJAY_MSG_INFO, " -h\t\tVeejay hostname (localhost)");
 	veejay_msg(VEEJAY_MSG_INFO, " -m\t\tSend single message");
 	veejay_msg(VEEJAY_MSG_INFO, " -c\t\tColored output");
+	veejay_msg(VEEJAY_MSG_INFO, " -d\t\tDump status to stdout");
 	veejay_msg(VEEJAY_MSG_INFO, "Messages to send to veejay must be wrapped in quotes");
 	veejay_msg(VEEJAY_MSG_INFO, "You can send multiple messages by seperating them with a whitespace");  
 	veejay_msg(VEEJAY_MSG_INFO, "Example: %s \"600:;\"",progname);
@@ -110,6 +124,10 @@ static int set_option(const char *name, char *value)
 	else if (strcmp(name, "m") == 0 )
 	{
 		single_msg = 1;
+	}
+	else if(strcmp(name, "d") == 0)
+	{
+		dump = 1;
 	}
 	else err++;
 
@@ -210,7 +228,7 @@ int main(int argc, char *argv[])
 	int err = 0;
 	FILE *infile;
 	// parse commandline parameters
-	while( ( n = getopt(argc,argv, "h:g:p:mic")) != EOF)
+	while( ( n = getopt(argc,argv, "h:g:p:micd")) != EOF)
 	{
 		sprintf(option,"%c",n);
 		err += set_option( option,optarg);
