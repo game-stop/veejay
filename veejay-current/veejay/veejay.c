@@ -545,7 +545,7 @@ static void check_command_line_options(int argc, char *argv[])
 static void print_license()
 {
 	veejay_msg(VEEJAY_MSG_INFO,
-	    "Veejay -<|Alniyat|>- %s Copyright (C) Niels Elburg and others",VERSION);
+	    "Veejay -<|Resume|>- %s Copyright (C) Niels Elburg and others",VERSION);
 	veejay_msg(VEEJAY_MSG_INFO,
 	    "This software is subject to the GNU GENERAL PUBLIC LICENSE");
 
