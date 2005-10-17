@@ -749,7 +749,6 @@ const char  *vj_event_name_by_id(int id);
 void  vj_event_parse_bundle(veejay_t *v, char *msg );
 int	vj_has_video(veejay_t *v);
 void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int arglen);
-
 void    vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod);
 #ifdef HAVE_SDL
 static void vj_event_get_key( int event_id, int *key_id, int *key_mod );
@@ -1172,12 +1171,14 @@ typedef struct
 	void *value;
 } vims_arg_t; 
 
+
+static	vims_arg_t vims_arguments__[16];
+
 void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int arglen)
 {
 	int id = net_list[ net_id ].list_id;
 	
 	int		argument_list[16];
-	vims_arg_t	vims_arguments[16];
 
 	if(id <= 0)
 	{
@@ -1186,7 +1187,7 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 	}
 	
 	memset( argument_list, 0, 16 );
-	memset( vims_arguments,0, 16 );
+	memset( vims_arguments__,0, 16 );
 
 	if( vj_event_list[id].num_params <= 0 )
 	{
@@ -1214,7 +1215,7 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 		for( i = 0; i < arglen; i ++ )
 		{
 			if(f[fmt_offset] == 'd' )
-				vims_arguments[i].value = &(args[i]);
+				vims_arguments__[i].value = &(args[i]);
 			if(f[fmt_offset] == 's' )
 			{
 				if( str_arg == NULL && (flags & VIMS_REQUIRE_ALL_PARAMS))
@@ -1224,7 +1225,7 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 					return;
 				}
 				int len = strlen( str_arg );
-				vims_arguments[i].value = strndup( str_arg, len );
+				vims_arguments__[i].value = (void*) strndup( str_arg, len );
 			}	
 			fmt_offset += 3;
 		}
@@ -1237,9 +1238,9 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 				for(n = arglen; n < vj_event_list[id].num_params; n ++ )
 				{
 					if(n < 2 )
-						vims_arguments[i].value = (void*) &(vj_event_list[id].args[n]);
+						vims_arguments__[i].value = (void*) &(vj_event_list[id].args[n]);
 					else
-						vims_arguments[i].value = &(args[n]);
+						vims_arguments__[i].value = (void*) &(args[n]);
 				} 
 			}
 			if(flags & VIMS_REQUIRE_ALL_PARAMS)
@@ -1252,29 +1253,29 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 
 		vj_event_trigger_function( (void*) v, net_list[net_id].act,
 			vj_event_list[id].num_params, vj_event_list[id].format,
-			vims_arguments[0].value,
-			vims_arguments[1].value,
-			vims_arguments[2].value,
-			vims_arguments[3].value,
-			vims_arguments[4].value,
-			vims_arguments[5].value,
-			vims_arguments[6].value,
-			vims_arguments[7].value,
-			vims_arguments[8].value,
-			vims_arguments[9].value,
-			vims_arguments[10].value,
-			vims_arguments[11].value,
-			vims_arguments[12].value,
-			vims_arguments[13].value,
-			vims_arguments[14].value,
-			vims_arguments[15].value ); 
+			vims_arguments__[0].value,
+			vims_arguments__[1].value,
+			vims_arguments__[2].value,
+			vims_arguments__[3].value,
+			vims_arguments__[4].value,
+			vims_arguments__[5].value,
+			vims_arguments__[6].value,
+			vims_arguments__[7].value,
+			vims_arguments__[8].value,
+			vims_arguments__[9].value,
+			vims_arguments__[10].value,
+			vims_arguments__[11].value,
+			vims_arguments__[12].value,
+			vims_arguments__[13].value,
+			vims_arguments__[14].value,
+			vims_arguments__[15].value ); 
 	
 		fmt_offset =1 ;
 		for( i = 0; i < vj_event_list[id].num_params; i ++ )
 		{
-			if( vims_arguments[i].value != NULL &&
+			if( vims_arguments__[i].value != NULL &&
 				f[fmt_offset] == 's' )
-				free(vims_arguments[i].value);
+				free(vims_arguments__[i].value);
 			fmt_offset += 3;
 		}
 	
