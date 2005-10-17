@@ -1,5 +1,5 @@
 /*
- *  yuv2rawdv - write rawdv data stream from stdin to stdout
+ *  any2yuv - read anything to yuv
  *
  *  (C) Niels Elburg 2003 <nielselburg@yahoo.de>
  *
@@ -41,8 +41,8 @@ static int got_sigint = 0;
 static uint8_t *raw_in[3];		/* decoder buffer */
 static uint8_t *yuv[3];			/* yuv destination buffer */
 
-static int width;
-static int height;
+static int width = 352;
+static int height = 288;
 static int swap = 0;			/* dont swap cb/cr by default */
 static int verbose = 1;			/* level 1 verbosity by default */
 static int PAL=1;			/* use PAL by default */
@@ -76,14 +76,14 @@ static void allocate_mem() {
  
    raw_in[0] = (uint8_t*)malloc(width * height * sizeof(uint8_t) * 3);
    yuv[0] = (uint8_t*)malloc( sizeof(uint8_t) * width * height );   
-   yuv[1] = (uint8_t*)malloc( sizeof(uint8_t) * (width * height)/2 );  
-   yuv[2] = (uint8_t*)malloc( sizeof(uint8_t) * (width * height)/2 );  
+   yuv[1] = (uint8_t*)malloc( sizeof(uint8_t) * (width * height)/4 );  
+   yuv[2] = (uint8_t*)malloc( sizeof(uint8_t) * (width * height)/4 );  
 
    memset(raw_in[0],0,width*height*3);
-   memset(yuv[0],0,width*height);
+   memset(yuv[0],16,width*height);
 
-   memset(yuv[1],0,(width*height)/2);
-   memset(yuv[2],0,(width*height)/2);
+   memset(yuv[1],128,(width*height)/4);
+   memset(yuv[2],128,(width*height)/4);
 }
 
 static void free_mem() {
@@ -180,8 +180,8 @@ int main(int argc, char *argv[] ) {
    /* start processing */
    while ( (!got_sigint) && !error) {
 	  int skip = 0;
-	  res = read( fd_in ,raw,(width*height*3));
-	  if( res != (width*height*3)) {
+	  res = read( fd_in ,raw,(width*height*2));
+	  if( res != (width*height*2)) {
 		if(res <= 0) {
 		  error = 1; /* error */
 		  skip = 1;
@@ -203,7 +203,7 @@ int main(int argc, char *argv[] ) {
 			yuv[0][i] = raw[i];
 			j++;
 		}
-		for(i=0; i < (width*height)/2; i++) {
+		for(i=0; i < (width*height)/4; i++) {
 			yuv[1][i] = raw[j];
 			yuv[2][i] = raw[j++];
 		}	
