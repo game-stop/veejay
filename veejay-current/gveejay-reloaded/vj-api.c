@@ -6205,7 +6205,7 @@ void 	vj_gui_init(char *glade_file)
      * to make sure that all changes implicated by it are already in place and
      * we thus can make our own adjustments.
      */
-	gtk_label_set_text( glade_xml_get_widget_(info->main_window, "buildrevision"), VEEJAY_CODENAME );
+	gtk_label_set_text( glade_xml_get_widget_(info->main_window, "build_revision"), VEEJAY_CODENAME );
 
 	g_signal_connect_after( GTK_OBJECT(mainw), "client_event",
 		GTK_SIGNAL_FUNC( G_CALLBACK(gui_client_event_signal) ), NULL );
