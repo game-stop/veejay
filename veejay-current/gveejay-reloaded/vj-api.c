@@ -6392,7 +6392,8 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	if( speed < 0 ) info->play_direction = -1; else info->play_direction=1;
 	if( speed < 0 ) speed *= -1;
 	//update_slider_range( "speedslider",0,68, speed, 0);
-
+	update_spin_range( "spin_framedelay", 0, 9, 0);
+	
 	update_knob_range(info->speed_knob, 1,13, speed, 0);
 	if( info->run_state == RUN_STATE_LOCAL)
 		set_toggle_button( "previewtoggle", 1 );
@@ -6405,6 +6406,8 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	info->key_id = gtk_key_snooper_install( key_handler , NULL);
 
 	info->preview_ready = 0;
+	
+	
 
 	return 1;
 }

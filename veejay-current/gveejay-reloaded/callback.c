@@ -2197,3 +2197,8 @@ void	on_veejayevent_leave_notify_event(GtkWidget *w , gpointer user_data)
 {
 	info->key_now = FALSE;
 }
+
+void 	on_spin_framedelay_value_changed(GtkWidget *w, gpointer user_data)
+{
+	multi_vims(VIMS_VIDEO_SET_SLOW, "%d", get_nums("spin_framedelay"));
+}
