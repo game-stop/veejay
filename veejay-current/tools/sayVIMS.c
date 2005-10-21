@@ -69,6 +69,7 @@ static void vj_flush(int frames) {
 					}
 					if(n == -1)
 					{
+						
 						exit(0);
 					}
 				}
@@ -302,8 +303,8 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				vj_client_send( sayvims,V_CMD, msg[i] );
-				vj_flush(1);
+				int n = vj_client_send( sayvims,V_CMD, msg[i] );
+//				vj_flush(1);
 			}
 			i++;
 		}
@@ -315,28 +316,32 @@ int main(int argc, char *argv[])
 		infile = fdopen( fd_in, "r" );
 		if(!infile)
 		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot read from STDIN");
 			return 0;
-		}
-		while( fgets(buf, 4096, infile) )
+		}	
+		veejay_msg(VEEJAY_MSG_ERROR, "Reading from STDIN");
+		while( fgets(buf, 100, infile) )
 		{
 			if( buf[0] == '+' )
 			{
 				int wait_ = 1;
 		
-				if(!sscanf( buf+1, "%d", &wait_ ) )
+				if(sscanf( buf+1, "%d", &wait_ ) )
 				{
-					return 0;
+					vj_flush( wait_ );
 				}
-				vj_flush( wait_ );
+				else
+				{
+					veejay_msg(VEEJAY_MSG_ERROR, "Delay not valid: '%s'", wait_ );
+				}
 			}
 			else
 			{
 				vj_client_send( sayvims, V_CMD, buf );
-				vj_flush( 1 );
 			}
 		}
 	}
-	veejay_msg(VEEJAY_MSG_INFO, "closing ...");	
+	veejay_msg(VEEJAY_MSG_INFO, "%s done ", argv[0]);	
 	vj_client_close(sayvims);
 	vj_client_free(sayvims);
         return 0;
