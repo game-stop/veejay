@@ -255,6 +255,8 @@ typedef struct
 	gint event_id;
 } vims_keys_t;
 
+static int skin__ = 0;
+
 // Have room for only 200 samples
 #define NUM_BANKS 20   
 #define NUM_PAGES 10
@@ -6114,7 +6116,10 @@ void	vj_gui_set_debug_level(int level)
 }
 
 
-
+void	set_skin(int skin)
+{
+	skin__ = skin;
+}
 
 void 	vj_gui_init(char *glade_file)
 {
@@ -6205,7 +6210,8 @@ void 	vj_gui_init(char *glade_file)
      * to make sure that all changes implicated by it are already in place and
      * we thus can make our own adjustments.
      */
-	gtk_label_set_text( glade_xml_get_widget_(info->main_window, "build_revision"), VEEJAY_CODENAME );
+	if( !skin__ )
+		gtk_label_set_text( glade_xml_get_widget_(info->main_window, "build_revision"), VEEJAY_CODENAME );
 
 	g_signal_connect_after( GTK_OBJECT(mainw), "client_event",
 		GTK_SIGNAL_FUNC( G_CALLBACK(gui_client_event_signal) ), NULL );

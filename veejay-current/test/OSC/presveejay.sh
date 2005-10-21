@@ -1,6 +1,6 @@
 #!/bin/perl
 
-my $CMD="sendOSC -h localhost 3492";
+my $CMD="./sendOSC -h localhost 3492";
 
 system( "$CMD /clip/new,1,1000" );
 system( "$CMD /clip/select,1");

@@ -124,7 +124,7 @@ int main(int argc, char *argv[]) {
 	vj_gui_set_debug_level( verbosity );
 		
 	vj_gui_set_timeout(timer);
-
+	set_skin( current_skin );
 	vj_gui_init( skins[current_skin].file );
 	vj_gui_set_preview_window( preview_width,preview_height);
 	
