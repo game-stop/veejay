@@ -263,7 +263,7 @@ void	on_button_el_selstart_value_changed(GtkWidget *w, gpointer user_data)
 	gchar *text = format_time( info->selection[0] );
 	update_label_str( "label_el_startpos", text);
 	g_free(text);
-  	el_selection_update();
+	el_selection_update();
 }
 
 void	on_button_el_selend_value_changed(GtkWidget *w, gpointer user_data)
@@ -515,7 +515,7 @@ void	on_button_fx_mixapply_clicked(GtkWidget *w, gpointer user_data)
 #define	slider_changed( arg_num, value ) \
 {\
 if(!info->status_lock && !info->parameter_lock)\
-{\
+	{\
 info->parameter_lock = 1;\
 multi_vims( VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d", 0, info->uc.selected_chain_entry,arg_num, value );\
 if(info->uc.selected_rgbkey) update_rgbkey_from_slider(); \
@@ -546,7 +546,7 @@ vj_kf_select_parameter(arg_num);\
 
 void	on_slider_p0_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 0, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+		slider_changed( 0, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p1_value_changed(GtkWidget *w, gpointer user_data)
 {
@@ -568,7 +568,7 @@ void	on_slider_p4_value_changed(GtkWidget *w, gpointer user_data)
 
 void	on_slider_p5_value_changed(GtkWidget *w, gpointer user_data)
 {
-	slider_changed( 5, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+		slider_changed( 5, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p6_value_changed(GtkWidget *w, gpointer user_data)
 {
@@ -609,7 +609,7 @@ void	on_inc_p3_clicked(GtkWidget *w, gpointer user_data)
 {
 	param_changed( 3, 1 , "slider_p3" );
 }
-void	on_dec_p3_clicked(GtkWidget *w, gpointer user_data)
+	void	on_dec_p3_clicked(GtkWidget *w, gpointer user_data)
 {
 	param_changed( 3, -1, "slider_p3");
 }
@@ -741,7 +741,7 @@ void	on_speedslider_value_changed(GtkWidget *widget, gpointer user_data)
 		value *= info->play_direction;
 	//	multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
 		multi_vims( VIMS_VIDEO_SET_SPEED, "%d", value );
-		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
+			vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
 	}
 }*/
@@ -751,7 +751,7 @@ void on_speed_knob_value_changed(GtkAdjustment *adj, gpointer user_data)
 	{
 		gint value = gtk_adjustment_get_value(adj);
 		value *= info->play_direction;
-  		update_label_i( "speed_label", (gint)adj->value,0);
+		update_label_i( "speed_label", (gint)adj->value,0);
 		multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
 		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
@@ -827,10 +827,10 @@ static gchar	*my_gtk_combo_box_get_active_text(GtkComboBox *combo )
 {
  GtkTreeIter _iter = { 0 };
  gchar *_format = NULL;
- GtkTreeModel *_model=NULL;
+	 GtkTreeModel *_model=NULL;
  g_return_val_if_fail( GTK_IS_COMBO_BOX(combo),NULL);
  _model = gtk_combo_box_get_model(combo);
- g_return_val_if_fail( GTK_IS_LIST_STORE(_model),NULL);
+g_return_val_if_fail( GTK_IS_LIST_STORE(_model),NULL);
  if(gtk_combo_box_get_active_iter(combo,&_iter))
 	gtk_tree_model_get(_model, &_iter,0,&_format,-1);
  return _format;
@@ -1106,7 +1106,7 @@ void	on_new_colorstream_clicked(GtkWidget *widget, gpointer user_data)
 
 	// scale to 0 - 255
 	gint red = current_color.red / 256.0;
-	gint green = current_color.green / 256.0;
+gint green = current_color.green / 256.0;
 	gint blue = current_color.blue / 256.0;
 	multi_vims( VIMS_STREAM_NEW_COLOR, "%d %d %d",
 		red,green,blue );
@@ -1248,7 +1248,7 @@ void	on_button_loadconfigfile_clicked(GtkWidget *widget, gpointer user_data)
 	else
 	{
 		if(config_file)
-			g_free(config_file);
+		g_free(config_file);
 		config_file = g_strdup( filename );
 		config_file_status = 1;	
 		vj_msg(VEEJAY_MSG_INFO, "You can launch Veejay now");
@@ -1349,7 +1349,7 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 	gveejay_new_slot(MODE_STREAM);	
 	if(remote) g_free(remote);
 	if(remote_) g_free(remote_);
-}
+	}
 
 void	on_inputstream_filebrowse_clicked(GtkWidget *w, gpointer user_data)
 {
@@ -1378,7 +1378,7 @@ void	on_inputstream_file_button_clicked(GtkWidget *w, gpointer user_data)
 		return;
 	}
 	if(use_y4m)
-		multi_vims( VIMS_STREAM_NEW_Y4M, "%s", filename );
+			multi_vims( VIMS_STREAM_NEW_Y4M, "%s", filename );
 	if(use_ffmpeg)
 		multi_vims( VIMS_STREAM_NEW_AVFORMAT, "%s", filename );
 #ifdef USE_GDK_PIXBUF
@@ -1411,12 +1411,12 @@ void	on_samplerand_toggled(GtkWidget *widget, gpointer user_data)
  * Handler to open the veejay_connection-dialog via menu
  */
 void on_openConnection_activate             (GtkMenuItem     *menuitem,
-	                                     gpointer         user_data)
+					     gpointer         user_data)
 {
-    if(!info->status_lock)
+	if(!info->status_lock)
 	{
-	GtkWidget *veejay_conncection_window = glade_xml_get_widget(info->main_window, "veejay_connection");
-	gtk_widget_show(veejay_conncection_window);	
+		GtkWidget *veejay_conncection_window = glade_xml_get_widget(info->main_window, "veejay_connection");
+		gtk_widget_show(veejay_conncection_window);	
 	} 
 }
 
@@ -1425,12 +1425,12 @@ void on_openConnection_activate             (GtkMenuItem     *menuitem,
  * Handler to close the veejay_connection-dialog
  */
 void on_veejay_connection_close             (GtkDialog       *dialog,
-	                                     gpointer         user_data)
+						     gpointer         user_data)
 {
-    if(!info->status_lock)
+	if(!info->status_lock)
 	{
-	GtkWidget *veejay_conncection_window = glade_xml_get_widget(info->main_window, "veejay_connection");
-	gtk_widget_hide(veejay_conncection_window);	
+		GtkWidget *veejay_conncection_window = glade_xml_get_widget(info->main_window, "veejay_connection");
+		gtk_widget_hide(veejay_conncection_window);	
 	} 
 }
 
@@ -1439,12 +1439,12 @@ void on_veejay_connection_close             (GtkDialog       *dialog,
  * Handler to show the video_settings-dialog via menu
  */
 void on_VideoSettings_activate              (GtkMenuItem     *menuitem,
-	                                     gpointer         user_data)
+					     gpointer         user_data)
 {
-    if(!info->status_lock)
+	if(!info->status_lock)
 	{
-	GtkWidget *veejay_settings_window = glade_xml_get_widget(info->main_window, "video_options");
-	gtk_widget_show(veejay_settings_window);	
+		GtkWidget *veejay_settings_window = glade_xml_get_widget(info->main_window, "video_options");
+		gtk_widget_show(veejay_settings_window);	
 	} 
 }
 
@@ -1454,12 +1454,12 @@ void on_VideoSettings_activate              (GtkMenuItem     *menuitem,
  * Handler to close the video_settings-dialog 
  */
 void on_video_options_close                 (GtkDialog       *dialog,
-	                                     gpointer         user_data)
+					     gpointer         user_data)
 {
-    if(!info->status_lock)
+	if(!info->status_lock)
 	{
-	GtkWidget *veejay_settings_window = glade_xml_get_widget(info->main_window, "video_options");
-	gtk_widget_hide(veejay_settings_window);	
+		GtkWidget *veejay_settings_window = glade_xml_get_widget(info->main_window, "video_options");
+		gtk_widget_hide(veejay_settings_window);	
 	}
 }
 
@@ -1468,7 +1468,7 @@ void on_video_options_close                 (GtkDialog       *dialog,
  * Handler to apply the settings of the video_settings-dialog 
  */
 void on_video_options_apply_clicked         (GtkButton       *button,
-	                                     gpointer         user_data)
+					     gpointer         user_data)
 {
 	gint width = get_nums( "priout_width" );
 	gint height = get_nums( "priout_height" );
@@ -1487,12 +1487,12 @@ void on_video_options_apply_clicked         (GtkButton       *button,
  * Handler to show the VIMS_Bundles-dialog
  */ 
 void on_vims_bundles_activate               (GtkMenuItem     *menuitem,
-	                                     gpointer         user_data)
+					     gpointer         user_data)
 {
-    if(!info->status_lock)
+	if(!info->status_lock)
 	{
-	GtkWidget *vims_bundles_window = glade_xml_get_widget(info->main_window, "vims_bundles");
-	gtk_widget_show(vims_bundles_window);	
+		GtkWidget *vims_bundles_window = glade_xml_get_widget(info->main_window, "vims_bundles");
+		gtk_widget_show(vims_bundles_window);	
 	} 
 }
 
@@ -1501,12 +1501,12 @@ void on_vims_bundles_activate               (GtkMenuItem     *menuitem,
  * Handler to close the VIMS_Bundles-dialog
  */ 
 void on_vims_bundles_close                  (GtkDialog       *dialog,
-	                                     gpointer         user_data)
+					     gpointer         user_data)
 {
-    if(!info->status_lock)
+	if(!info->status_lock)
 	{
-	GtkWidget *vims_bundles_window = glade_xml_get_widget(info->main_window, "vims_bundles");
-	gtk_widget_hide(vims_bundles_window);	
+		GtkWidget *vims_bundles_window = glade_xml_get_widget(info->main_window, "vims_bundles");
+		gtk_widget_hide(vims_bundles_window);	
 	} 
 }
 
@@ -1526,9 +1526,9 @@ void	on_open2_activate( GtkWidget *w, gpointer user_data)
 			if(filename)	
 			{
 				if(config_file)
-                    		    g_free(config_file);
-               			config_file = g_strdup( filename );
-               			config_file_status = 1; 
+				    g_free(config_file);
+				config_file = g_strdup( filename );
+				config_file_status = 1; 
 				g_free(filename);
 			}
 			break;
@@ -1569,7 +1569,6 @@ void	on_istream_cancel_clicked(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *dialog = glade_xml_get_widget_( info->main_window, "inputdialog" );
 	gtk_widget_hide( dialog );
-
 }
 
 void	on_curve_togglerun_toggled(GtkWidget *widget , gpointer user_data)
@@ -1616,19 +1615,17 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 		return;
 	}
 
-
-
 	gint curve_type = GTK_CURVE_TYPE_LINEAR;
 	if( is_button_toggled( "curve_typespline" ))
 		curve_type = GTK_CURVE_TYPE_SPLINE;
 	if( is_button_toggled( "curve_typefreehand" ))
-		curve_type = GTK_CURVE_TYPE_FREE;
+			curve_type = GTK_CURVE_TYPE_FREE;
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
 
 	curve_timeline_changed(s->ec->effects[i]->parameters[j], curve );
 
 	get_points_from_curve(  s->ec->effects[i]->parameters[j], curve );
-//	s->ec->effects[i]->parameters[j]->type = curve_type;
+	//	s->ec->effects[i]->parameters[j]->type = curve_type;
 	set_points_in_curve(  s->ec->effects[i]->parameters[j], curve );
 	s->ec->enabled = is_button_toggled( "curve_toggleentry" );
 }
@@ -1696,11 +1693,11 @@ void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
 		return;
-		int i = info->uc.selected_chain_entry;
-		int j = info->uc.selected_parameter_id;
-		sample_slot_t *s = info->selected_slot;
-		if(!s)
-			return;
+	int i = info->uc.selected_chain_entry;
+	int j = info->uc.selected_parameter_id;
+	sample_slot_t *s = info->selected_slot;
+	if(!s)
+		return;
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
 
 	if( is_button_toggled("curve_typefreehand"))
@@ -1729,8 +1726,8 @@ void	on_curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
 					info->main_window, "tree_chain") ));
 
- 	gtk_tree_model_foreach(
-                    	model,
+	gtk_tree_model_foreach(
+			model,
 			chain_update_row, (gpointer*) info );
 
 }
@@ -1743,7 +1740,7 @@ void	on_kf_p0_toggled( GtkWidget *widget, gpointer user_data)
 void	on_kf_p1_toggled( GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("kf_p1"))
-		kf_changed( 1 );
+	kf_changed( 1 );
 }
 void	on_kf_p2_toggled( GtkWidget *widget, gpointer user_data)
 {
@@ -1797,7 +1794,7 @@ void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 		if(info->status_tokens[PLAY_MODE] != 
 			info->selected_slot->sample_type &&
 		   info->status_tokens[CURRENT_ID] !=
-		        info->selected_slot->sample_id )
+			info->selected_slot->sample_id )
 		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d",
 			info->selected_slot->sample_type,
 			info->selected_slot->sample_id );
@@ -1807,25 +1804,14 @@ void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
-	// set page 1 from notebook panels
-	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
-	if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE)
-	{
-		if(page == 0)
-			gtk_notebook_next_page( GTK_NOTEBOOK(n) );
-		if(page == 2)
-			gtk_notebook_prev_page( GTK_NOTEBOOK(n) );
-	}
-	if(info->status_tokens[PLAY_MODE] == MODE_STREAM)
-	{
-		if(page == 0)
-			gtk_notebook_next_page(GTK_NOTEBOOK(n));
-		page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
+	if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE) // 1
+		gtk_notebook_set_page( GTK_NOTEBOOK(n) , 1 );
 
-		if(page == 1)
-			gtk_notebook_next_page(GTK_NOTEBOOK(n));
-
-	}
+	if(info->status_tokens[PLAY_MODE] == MODE_STREAM) // 0 
+		gtk_notebook_set_page( GTK_NOTEBOOK(n), 0 );
+	
+	if(info->status_tokens[PLAY_MODE] == MODE_PLAIN ) // 2
+		gtk_notebook_set_page( GTK_NOTEBOOK(n), 2 );	
 }
 
 void	on_timeline_cleared(GtkWidget *widget, gpointer user_data)
@@ -1920,8 +1906,8 @@ void	on_streamnew_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_inputstream_close_clicked(GtkWidget *w,  gpointer user_data)
 {
-	GtkWidget *w = glade_xml_get_widget(info->main_window, "inputstream_window");
-	gtk_widget_hide(w);	
+	GtkWidget *wid = glade_xml_get_widget(info->main_window, "inputstream_window");
+	gtk_widget_hide(wid);	
 }
 
 void 	on_button_sdlclose_clicked(GtkWidget *w, gpointer user_data)
@@ -2202,3 +2188,36 @@ void 	on_spin_framedelay_value_changed(GtkWidget *w, gpointer user_data)
 {
 	multi_vims(VIMS_VIDEO_SET_SLOW, "%d", get_nums("spin_framedelay"));
 }
+
+void	on_mixing_effects_toggled(GtkWidget *w, gpointer user_data)
+{
+	 GtkWidget *n = glade_xml_get_widget_( info->main_window, "effectspanel" );
+	 gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
+         if(page == 1)
+		gtk_notebook_prev_page( GTK_NOTEBOOK(n) );
+       
+}
+
+void	on_image_effects_toggled(GtkWidget *w, gpointer user_data)
+{
+	 GtkWidget *n = glade_xml_get_widget_( info->main_window, "effectspanel" );
+	 gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
+         if(page == 0)
+		gtk_notebook_next_page( GTK_NOTEBOOK(n) );
+
+}
+
+void	on_console1_activate(GtkWidget *w, gpointer user_data)
+{
+	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
+	gtk_notebook_set_page( GTK_NOTEBOOK(n),2 );
+	/*gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
+	
+	if(page == 0)
+		gtk_notebook_next_page( GTK_NOTEBOOK(n) );
+	page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
+	if(page == 1 )
+		gtk_notebook_next_page( GTK_NOTEBOOK(n) );
+	*/
+}
+

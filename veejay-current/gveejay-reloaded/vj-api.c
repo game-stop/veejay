@@ -256,7 +256,7 @@ typedef struct
 } vims_keys_t;
 
 static int skin__ = 0;
-
+static int borked_ = 0;
 // Have room for only 200 samples
 #define NUM_BANKS 20   
 #define NUM_PAGES 10
@@ -1926,6 +1926,8 @@ static	void	multi_vims(int id, const char format[],...)
 	va_list args;
 	if(!info->client)
 		return;
+	if(id == VIMS_SET_MODE_AND_GO)
+		borked_ = 1;
 	va_start(args, format);
 	vsnprintf(tmp, sizeof(tmp)-1, format, args );
 	snprintf(block, sizeof(block)-1, "%03d:%s;",id,tmp);
@@ -2252,9 +2254,10 @@ static	void	update_curve_surroundings()
 	struct tog_w {
 		const char *name;
 	} tog_w[] = {
-		"curve_typelinear",
-		"curve_typespline",
-		"curve_typefreehand"
+		{"curve_typelinear"},
+		{"curve_typespline"},
+		{"curve_typefreehand"},
+		{NULL }
 	};
 
 	// Check me: on the fly redraw of curve !
@@ -4183,6 +4186,7 @@ static	void	select_slot(int pm)
 {
 	int *history = info->history_tokens[ pm ];
 
+
 	if( pm != MODE_PLAIN )
 	{
 		if(info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
@@ -4209,7 +4213,7 @@ static	void	select_slot(int pm)
 			info->status_tokens[PLAY_MODE] == history[PLAY_MODE] )
 		{
 			//no_preview_ = 0;
-		}	
+		}
 	}
 	else
 	{
@@ -4218,6 +4222,12 @@ static	void	select_slot(int pm)
 		info->selected_slot = NULL;
 		info->selected_gui_slot = NULL;
 	}
+	if( borked_ )
+	{
+		on_samplepage_clicked(NULL,NULL);
+		borked_ =0;
+	}
+
 
 }
 /* execute after sample/stream/mixing sources list update
@@ -6390,6 +6400,12 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	reload_bundles();
 //	load_samplelist_info(true);
 
+
+	if( skin__ == 0 )
+	{
+		GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
+		gtk_widget_show( w );
+	}
 	info->uc.reload_hint[HINT_SLIST] = 1;
 	info->uc.reload_hint[HINT_CHAIN] = 1;
 	info->uc.reload_hint[HINT_ENTRY] = 1;
@@ -6460,10 +6476,14 @@ gboolean	is_alive(gpointer data)
 				}
 				else
 				{	/* veejay connected */
+					
 					veejay_stop_connecting(gui);
-					gchar hello_world[100];
-					sprintf(hello_world, "Connected with Veejay at %s : %d", remote, port );
-					message_dialog( "New Connection", hello_world );
+					if( skin__ == 1 )
+					{
+						gchar hello_world[100];
+						sprintf(hello_world, "Connected with Veejay at %s : %d", remote, port );
+						message_dialog( "New Connection", hello_world );
+					}
 				}	
 			}
 		}
@@ -6533,6 +6553,13 @@ void	vj_gui_disconnect()
 
 	free_samplebank();
 	info->preview_ready = 0;
+
+	if( skin__ == 0 )
+	{
+		GtkWidget *w = glade_xml_get_widget_( info->main_window, "gveejay_window");
+		gtk_widget_hide( w ); 
+	}
+	
 }
 
 void	vj_launch_toggle(gboolean value)
@@ -7514,8 +7541,12 @@ static	void	remove_sample_from_slot()
 	if( info->selection_slot->sample_id == info->status_tokens[CURRENT_ID] &&
 		info->selection_slot->sample_type == info->status_tokens[PLAY_MODE] )
 	{
-		vj_msg(VEEJAY_MSG_ERROR,
-		 "Cannot delete slot, is playing");
+		gchar error_msg[100];
+		sprintf(error_msg, "Cannot delete %s %d while playing",
+			(info->selection_slot->sample_type == MODE_SAMPLE ? "Sample" : "Stream" ),
+			info->selection_slot->sample_id );
+		message_dialog( "Error while deleting", error_msg );
+
 		return;
 	}
 
