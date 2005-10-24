@@ -1657,11 +1657,14 @@ void		veejay_quit( )
 
 gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 {
-	if( prompt_dialog("Quit gveejay", "Are you sure?" ) == GTK_RESPONSE_REJECT)
-		return TRUE;
+	if( info->state == STATE_PLAYING)
+	{
+		if( prompt_dialog("Quit gveejay", "Are you sure?" ) == GTK_RESPONSE_REJECT)
+			return TRUE;
 
-	if(info->run_state == RUN_STATE_LOCAL)
-		veejay_quit();
+		if(info->run_state == RUN_STATE_LOCAL)
+			veejay_quit();
+	}
 	
 	vj_gui_disconnect();
 	vj_gui_free();
@@ -1712,8 +1715,12 @@ int		gveejay_new_slot(int mode)
 		if(id > 0 )
 			vj_msg(VEEJAY_MSG_INFO, "Created new %s %d", (mode == MODE_SAMPLE ? "Sample" : "Stream"), id);
 		else
-			vj_msg(VEEJAY_MSG_ERROR, "Failed to create new %s",
+		{
+			char message[100];
+			sprintf(message, "Failed to create new %s",
 				(mode == MODE_SAMPLE ? "Sample" : "Stream" ) );
+			message_dialog( "Error", message );
+		}
 		if( id > 0 )
 		{ /* Add the sample/stream to a sample bank */
 
@@ -1802,7 +1809,7 @@ static  void	vj_msg(int type, const char format[], ...)
 {
 	if( type == VEEJAY_MSG_DEBUG && vims_verbosity == 0 )
 		return;
-
+	
 	char tmp[1024];
 	char buf[1024];
 	char prefix[20];
@@ -6138,6 +6145,8 @@ void 	vj_gui_init(char *glade_file)
 
 	vj_mem_init();
 	
+	glade_init();
+
 	vj_gui_t *gui = (vj_gui_t*)vj_malloc(sizeof(vj_gui_t));
 	
 	if(!gui)
@@ -6213,7 +6222,7 @@ void 	vj_gui_init(char *glade_file)
 	gui->config.vims = 0;
 	gui->config.mcast_osc = g_strdup( "224.0.0.32" );
 	gui->config.mcast_vims = g_strdup( "224.0.0.33" );
-	g_timeout_add_full( G_PRIORITY_DEFAULT_IDLE, 500, is_alive, (gpointer*) info,NULL);
+	g_timeout_add_full( G_PRIORITY_DEFAULT_IDLE, 300, is_alive, (gpointer*) info,NULL);
 
 	GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
     /* Make this run after any internal handling of the client event happened
@@ -6356,8 +6365,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 			vj_client_free(info->client);
 		info->client = NULL;
 		info->run_state = 0;
-		vj_msg(VEEJAY_MSG_INFO, "Cannot establish connection with %s:%d",
-			(hostname == NULL ? group_name: hostname ),port_num);
 		return 0;
 	}
 	vj_msg(VEEJAY_MSG_INFO, "New connection established with Veejay running on %s port %d",
@@ -6368,8 +6375,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	info->channel = g_io_channel_unix_new( vj_client_get_status_fd( info->client, V_STATUS));
 
-
-	
 	info->state = STATE_PLAYING;
 
 	g_io_add_watch_full(
@@ -6404,7 +6409,9 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	if( skin__ == 0 )
 	{
 		GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
+		GtkWidget *w2 = glade_xml_get_widget_(info->main_window, "veejay_connection");
 		gtk_widget_show( w );
+		gtk_widget_hide( w2);
 	}
 	info->uc.reload_hint[HINT_SLIST] = 1;
 	info->uc.reload_hint[HINT_CHAIN] = 1;

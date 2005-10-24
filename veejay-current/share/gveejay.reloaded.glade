@@ -2027,8 +2027,9 @@ YV16</property>
 				      <child>
 					<widget class="GtkColorSelection" id="colorselection">
 					  <property name="visible">True</property>
-					  <property name="has_opacity_control">False</property>
+					  <property name="has_opacity_control">True</property>
 					  <property name="has_palette">True</property>
+					  <signal name="color_changed" handler="on_colorselection_color_changed" last_modification_time="Tue, 25 Oct 2005 00:09:40 GMT"/>
 					</widget>
 					<packing>
 					  <property name="padding">0</property>
@@ -9884,7 +9885,7 @@ YV16</property>
 
 <widget class="GtkDialog" id="veejay_connection">
   <property name="visible">True</property>
-  <property name="title" translatable="yes">Connection to Veejay</property>
+  <property name="title" translatable="yes">GVeejayReloaded Launcher</property>
   <property name="type">GTK_WINDOW_TOPLEVEL</property>
   <property name="window_position">GTK_WIN_POS_CENTER_ON_PARENT</property>
   <property name="modal">False</property>
@@ -9898,6 +9899,9 @@ YV16</property>
   <property name="gravity">GDK_GRAVITY_NORTH_WEST</property>
   <property name="focus_on_map">True</property>
   <property name="has_separator">False</property>
+  <accessibility>
+    <atkproperty name="AtkObject::accessible_name" translatable="yes">GVeejayReloaded Launcher</atkproperty>
+  </accessibility>
   <signal name="close" handler="on_veejay_connection_close" last_modification_time="Sat, 23 Jul 2005 16:04:51 GMT"/>
   <signal name="delete_event" handler="on_veejay_connection_close" last_modification_time="Sat, 23 Jul 2005 18:53:55 GMT"/>
 
@@ -9997,7 +10001,7 @@ YV16</property>
 	      <property name="relief">GTK_RELIEF_HALF</property>
 	      <property name="focus_on_click">True</property>
 	      <property name="response_id">-7</property>
-	      <signal name="clicked" handler="on_veejay_connection_close_clicked" last_modification_time="Mon, 10 Oct 2005 12:17:11 GMT"/>
+	      <signal name="clicked" handler="gveejay_quit" last_modification_time="Mon, 24 Oct 2005 23:20:07 GMT"/>
 	    </widget>
 	  </child>
 	</widget>

@@ -1900,7 +1900,7 @@ gtk_color_selection_init (GtkColorSelection *colorsel)
   gtk_object_sink (GTK_OBJECT (priv->tooltips));
   
   gtk_box_set_spacing (GTK_BOX (colorsel), 4);
-  top_hbox = gtk_hbox_new (FALSE, 8);
+  top_hbox = gtk_vbox_new (FALSE, 8);
   gtk_box_pack_start (GTK_BOX (colorsel), top_hbox, FALSE, FALSE, 0);
   
   vbox = gtk_vbox_new (FALSE, 4);
