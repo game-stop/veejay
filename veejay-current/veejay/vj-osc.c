@@ -263,22 +263,18 @@ static int vj_osc_parse_int_arguments(int arglen, const void *vargs, int *argume
 			// figure out padding length of typed tag  
 			unsigned int pad = 4 + ( num_args + 1 ) / 4 * 4;
 			// parse the arguments
-			veejay_msg(VEEJAY_MSG_DEBUG, "Received typed tag with %d arguments", num_args);
 			for ( i = 0; i < num_args ; i ++ )
 			{
 				arguments[i] = toInt( args + pad + offset );
 				offset += 4;
-				veejay_msg(VEEJAY_MSG_DEBUG, "Arg %d = %d", i, arguments[i] );
 			}
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Received raw packet with %d arguments", num_args);
 		for(i = 0; i < num_args; i ++)
 		{
 			arguments[i] = toInt( args + offset);
 			offset += 4;
-			veejay_msg(VEEJAY_MSG_DEBUG, "Arg %d = %d", i, arguments[i]);
 		}
 
 	}

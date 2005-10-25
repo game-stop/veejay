@@ -1187,7 +1187,7 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 	}
 	
 	memset( argument_list, 0, 16 );
-	memset( vims_arguments__,0, 16 );
+	memset( vims_arguments__,0, sizeof( vims_arguments__) );
 
 	if( vj_event_list[id].num_params <= 0 )
 	{
@@ -5569,8 +5569,8 @@ void vj_event_chain_entry_set_arg_val(void *ptr, const char format[], va_list ap
 			}
 			else
 			{
-				veejay_msg(VEEJAY_MSG_ERROR,"Tried to set invalid parameter value/type: %d %d for effect %d on entry %d",
-		args[2],args[3],effect,args[1]);
+				veejay_msg(VEEJAY_MSG_ERROR, "Parameter %d with value %d invalid for Chain Entry %d of Sample %d",
+					args[2], args[3], args[1], args[0] );
 			}
 		} else { veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist", args[0]); }	
 	}
@@ -5594,8 +5594,8 @@ void vj_event_chain_entry_set_arg_val(void *ptr, const char format[], va_list ap
 				}
 			}
 			else {
-			veejay_msg(VEEJAY_MSG_ERROR, "Tried to set invalid parameter value/type : %d %d",
-				args[2],args[3]);
+				veejay_msg(VEEJAY_MSG_ERROR, "Parameter %d with value %d for Chain Entry %d invalid for Stream %d",
+					args[2],args[3], args[1],args[0]);
 			}
 		}
 		else {
