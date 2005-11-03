@@ -1159,7 +1159,16 @@ void vj_event_print_range(int n1, int n2)
 	}
 }
 
-
+char * vj_event_get_format(int net_id)
+{
+	int id = net_list[ net_id ].list_id;
+	return vj_event_list[id].format;	
+}
+char * vj_event_get_name(int net_id)
+{
+	int id = net_list[ net_id ].list_id;
+	return vj_event_list[id].name;	
+}
 int vj_event_get_num_args(int net_id)
 {
 	int id = net_list[ net_id ].list_id;
@@ -1178,108 +1187,132 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 {
 	int id = net_list[ net_id ].list_id;
 	
-	int		argument_list[16];
-
 	if(id <= 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) VIMS %d is not known", net_id );
 		return;
 	}
-	
-	memset( argument_list, 0, 16 );
-	memset( vims_arguments__,0, sizeof( vims_arguments__) );
 
-	if( vj_event_list[id].num_params <= 0 )
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) %s single fire %d", __FUNCTION__, net_id);
-		_last_known_num_args = 0;
-		vj_event_trigger_function( (void*) v, net_list[net_id].act,
-			vj_event_list[id].num_params, vj_event_list[id].format,
-			&(vj_event_list[id].args[0]), &(vj_event_list[id].args[1]));
-		return;
+	if( arglen <= 0 )
+	{	
+		_last_known_num_args = arglen; 
+
+		vj_event_trigger_function(
+			(void*)v,net_list[net_id].act,
+			arglen,
+			vj_event_list[id].format,
+			&(vj_event_list[id].args[0]),
+			&(vj_event_list[id].args[1])
+		);	
 	}
 	else
 	{
-		// order arguments
-		char *f = (char*) vj_event_list[id].format;
-		int i;
-		int fmt_offset = 1;
-		int flags = vj_event_list[id].flags;
-		if( arglen >  vj_event_list[id].num_params)
+		const char *fmt = vj_event_list[id].format;
+		const int   np  = vj_event_list[id].num_params;
+		int		fmt_offset = 1; // fmt offset
+		int 		i;
+		int		offset = 0;  // arguments offset
+		char		*arguments;
+	
+		if( np <= 0 )
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) %d too many arguments : %d (only %d)",
-				net_id, arglen, vj_event_list[id].num_params );
-			return;
+			veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) %d accepts no arguments", net_id); 
+			if(arguments)
+				free( (void*) arguments);
+			return 0; // Ffree mem
 		}
+	
+		vims_arg_t	vims_arguments[16];
+		memset( vims_arguments, 0, sizeof(vims_arguments) );
+		int flags = vj_event_list[id].flags;
 
 		for( i = 0; i < arglen; i ++ )
 		{
-			if(f[fmt_offset] == 'd' )
-				vims_arguments__[i].value = &(args[i]);
-			if(f[fmt_offset] == 's' )
-			{
-				if( str_arg == NULL && (flags & VIMS_REQUIRE_ALL_PARAMS))
+			int failed_arg = 0;
+			int type = 0;
+
+			if( fmt[fmt_offset] == 's' )
+			{		
+				type = 1;
+				if( (flags & VIMS_LONG_PARAMS) || !(flags & VIMS_LONG_PARAMS) ) /* copy rest of message */
 				{
-					veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) %d requires string",
-						net_id);
-					return;
+					int str_len = 0;
+					vims_arguments[i].value = (void*) strdup( str_arg );
+					str_len = strlen( (char*) vims_arguments[i].value );
+					if(str_len < 1 )
+						failed_arg ++;
 				}
-				int len = strlen( str_arg );
-				vims_arguments__[i].value = (void*) strndup( str_arg, len );
-			}	
-			fmt_offset += 3;
-		}
-		if( arglen < vj_event_list[id].num_params)
-		{
-			if(flags & VIMS_ALLOW_ANY)
-			{
-				int n;
-				veejay_msg(VEEJAY_MSG_WARNING, "(VIMS) %d uses default values", net_id);
-				for(n = arglen; n < vj_event_list[id].num_params; n ++ )
-				{
-					if(n < 2 )
-						vims_arguments__[i].value = (void*) &(vj_event_list[id].args[n]);
-					else
-						vims_arguments__[i].value = (void*) &(args[n]);
-				} 
 			}
-			if(flags & VIMS_REQUIRE_ALL_PARAMS)
+			if( fmt[fmt_offset] == 'd' )
+				vims_arguments[i].value = &(args[i]);	
+		
+			if( flags & VIMS_REQUIRE_ALL_PARAMS && failed_arg > 0)
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) %d requires all parameters",
-					net_id);
-				return;
+				if(type == 0 )
+					veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) %d argument %d is of invalid type",
+						net_id,i);
+				if(type == 2)  
+					veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) %d argument %d must be a number",
+						net_id,i);
+				if(type == 1)
+					veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) %d argument %d must be a string",
+						net_id,i);
+				if(arguments)
+					free( (void*)arguments);
+				// FREE vims_arguments
+				return 0;
 			}
+
+			fmt_offset += 3;	
 		}
 
-		vj_event_trigger_function( (void*) v, net_list[net_id].act,
-			vj_event_list[id].num_params, vj_event_list[id].format,
-			vims_arguments__[0].value,
-			vims_arguments__[1].value,
-			vims_arguments__[2].value,
-			vims_arguments__[3].value,
-			vims_arguments__[4].value,
-			vims_arguments__[5].value,
-			vims_arguments__[6].value,
-			vims_arguments__[7].value,
-			vims_arguments__[8].value,
-			vims_arguments__[9].value,
-			vims_arguments__[10].value,
-			vims_arguments__[11].value,
-			vims_arguments__[12].value,
-			vims_arguments__[13].value,
-			vims_arguments__[14].value,
-			vims_arguments__[15].value ); 
-	
-		fmt_offset =1 ;
-		for( i = 0; i < vj_event_list[id].num_params; i ++ )
+		while( i < np)
 		{
-			if( vims_arguments__[i].value != NULL &&
-				f[fmt_offset] == 's' )
-				free(vims_arguments__[i].value);
+			int zero = 0;
+			if( fmt[fmt_offset] == 'd' )
+				vims_arguments[i].value = (void*) &zero;
+			else
+				vims_arguments[i].value = NULL;
+			i++;
 			fmt_offset += 3;
 		}
+
+
+		_last_known_num_args = np;
+
+		vj_event_trigger_function(
+					(void*)v,
+					net_list[net_id].act,
+					np,
+					vj_event_list[id].format,
+					vims_arguments[0].value,
+					vims_arguments[1].value,
+					vims_arguments[2].value,
+					vims_arguments[3].value,
+					vims_arguments[4].value,
+					vims_arguments[5].value,
+					vims_arguments[6].value,		
+					vims_arguments[7].value,
+					vims_arguments[8].value,
+					vims_arguments[9].value,
+					vims_arguments[10].value,
+					vims_arguments[11].value,
+					vims_arguments[12].value,
+					vims_arguments[13].value,
+					vims_arguments[14].value,
+					vims_arguments[15].value);
+
+		fmt_offset = 1;
+		for ( i = 0; i < np ; i ++ )
+		{
+			if( vims_arguments[i].value &&
+				fmt[fmt_offset] == 's' )
+				free( vims_arguments[i].value );
+			fmt_offset += 3;
+		}
+	}
 	
-	}	
+	
 }
 
 int vj_event_parse_msg(veejay_t *v, char *msg)
@@ -1402,6 +1435,7 @@ int vj_event_parse_msg(veejay_t *v, char *msg)
 		memset( num_array, 0, sizeof(num_array));
 		int flags = vj_event_list[id].flags;
 
+		// FIXME: in for loop below, memory is not always freed (depending on branches)
 		for( i = 0; i < np; i ++ )
 		{
 			int failed_arg = 0;

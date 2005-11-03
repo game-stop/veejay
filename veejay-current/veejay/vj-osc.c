@@ -143,7 +143,6 @@ void vj_osc_cb_tag_record_start(void *context, int arglen, const void *vargs, OS
 void vj_osc_cb_tag_record_stop(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_tag_select(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_add(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
-void vj_osc_cb_chain_preset(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_chain_toggle_all(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_set_parameter0(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_set_parameter1(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
@@ -297,13 +296,16 @@ void *_vj_osc_rt_malloc(int num_bytes) {
 
 #define PNET_F(a,b,c,d)\
 {\
-int arg[4];\
 int arguments[16];\
-memset(arguments,0,16);\
+int num_arg = vj_osc_parse_int_arguments(a,b,arguments+3);\
+if( num_arg < 1 || num_arg > 1 ) {\
+ veejay_msg(VEEJAY_MSG_ERROR, "parameter %d accepts only 1 value\n", d );\
+ } else {\
+arguments[0] = 0;\
 arguments[1] = -1;\
 arguments[2] = d;\
-arguments[3] = arg[0];\
 vj_event_fire_net_event( osc_info, c, NULL, arguments, 4);\
+}\
 }
 
 #define SNET_F(a,b,c)\
@@ -320,10 +322,15 @@ char str[OSC_STRING_SIZE];\
 int  args[16];\
 int __a = 0;\
 int __n = vj_osc_parse_char_arguments(a,b,str);\
+if( __n <= 0 ) { \
+ veejay_msg(VEEJAY_MSG_ERROR, "VIMS '%s' format is '%s'",vj_event_get_name(c), vj_event_get_format(c) );\
+}\
+else {\
 memset( args,0,16 );\
 str[__n] = '\0';\
 __a = vj_osc_parse_int_arguments( a - __n , b + __n, args );\
 vj_event_fire_net_event(osc_info, c, str,args, 2);\
+}\
 }
 
 
@@ -348,26 +355,48 @@ vj_event_fire_net_event( osc_info, c, NULL,arguments, num_arg );\
 int c_a = vj_osc_count_int_arguments(a,b);\
 int num_arg = vj_event_get_num_args(c);\
 int arguments[16];\
-int n_a;\
+int n_a=0;\
 memset(arguments,0,16);\
-if(c_a >= 0 && c != VIMS_CHAIN_ENTRY_SET_PRESET) {\
-if( (num_arg-1) == c_a ) {\
-arguments[0]=0;\
-n_a = vj_osc_parse_int_arguments(a,b,arguments+1);\
-vj_event_fire_net_event( osc_info,c, NULL,arguments,num_arg );\
+if ( c == VIMS_CHAIN_ENTRY_SET_PRESET ) {\
+ arguments[0] = 0;\
+ arguments[1] = -1;\
+ n_a = vj_osc_parse_int_arguments( a, b, arguments + 2 );\
+ if(n_a <= 1) {\
+  veejay_msg(VEEJAY_MSG_ERROR, "VIMS '%s'", vj_event_get_name(c) );\
+  veejay_msg(VEEJAY_MSG_ERROR, "Use <effect_id> <parameter 0> .. <parameter N> [source] [channel]");\
+ } else {\
+	vj_event_fire_net_event( osc_info, c, NULL, arguments, n_a + 2 );\
+ }\
 }\
 else {\
-if ( (num_arg-2) == c_a) {\
-arguments[0]=0;\
-arguments[1]=-1;\
-n_a = vj_osc_parse_int_arguments(a,b,arguments+2);\
-vj_event_fire_net_event( osc_info,c,NULL,arguments,num_arg );\
-}\
-}\
-}\
-if(c_a >= 0 && c == VIMS_CHAIN_ENTRY_SET_PRESET) {\
- vj_osc_parse_int_arguments(a,b,arguments);\
- vj_event_fire_net_event(osc_info,c,NULL,arguments,c_a); } \
+	if(c_a >= 0) {\
+	 if( (num_arg-1) == c_a ){\
+		vj_osc_parse_int_arguments( a, b, arguments + 1 );\
+		veejay_msg(VEEJAY_MSG_DEBUG, "n_a = %d, c_a = %d, num_arg = %d",\
+			n_a, c_a, num_arg );\
+		vj_event_fire_net_event( osc_info,c, NULL,arguments,num_arg );\
+	 }\
+	 else {\
+		if ( (num_arg-2) == c_a) {\
+			arguments[0]=0;\
+			arguments[1]=-1;\
+			vj_osc_parse_int_arguments( a, b, arguments + 2 );\
+	veejay_msg(VEEJAY_MSG_DEBUG, "n_a = %d, c_a = %d, num_arg = %d",\
+		n_a, c_a, num_arg );\
+			vj_event_fire_net_event( osc_info,c,NULL,arguments,num_arg );\
+		}\
+		else {\
+			veejay_msg(VEEJAY_MSG_ERROR, "VIMS '%s' - format '%s'", vj_event_get_name(c), vj_event_get_format(c) );\
+			veejay_msg(VEEJAY_MSG_ERROR, "Number of arguments given dont match format %d,%d",num_arg, c_a);\
+		}\
+	 }\
+	}\
+	else {\
+		veejay_msg(VEEJAY_MSG_ERROR, "I fill in the current sample ( possibly the current chain entry too )");\
+		veejay_msg(VEEJAY_MSG_ERROR, "You need to fill in the remaining arguments of VIMS '%s'",\
+			 vj_event_get_name(c) );\
+	}\
+ }\
 }
 
 // DSNET_F takes default sample (last) if none is given
@@ -659,7 +688,7 @@ void vj_osc_cb_chain_entry_del(void *context, int arglen, const void *vargs, OSC
 void vj_osc_cb_chain_entry_select(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen,vargs,VIMS_CHAIN_SET_ENTRY);
+	NET_F(arglen,vargs,VIMS_CHAIN_SET_ENTRY);
 }
 
 void vj_osc_cb_chain_entry_default(void *context, int arglen, const void *vargs, OSCTimeTag when,
@@ -766,11 +795,6 @@ void	vj_osc_cb_chain_add( void *ctx, int arglen, const void *vargs,
 	OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
 	DNET_F( arglen, vargs, VIMS_CHAIN_ENTRY_SET_EFFECT);
-}
-
-void	vj_osc_cb_chain_preset(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
-{
-	DNET_F(arglen, vargs, VIMS_CHAIN_ENTRY_SET_PRESET );
 }
 
 void vj_osc_cb_set_parameter0(void *context, int arglen, const void *vargs, OSCTimeTag when,
@@ -954,10 +978,6 @@ static struct
 	{ "delete sample <num>",		"del",			vj_osc_cb_sample_del,					1	},
 	{ "select and play sample <num>",
 								"select",		vj_osc_cb_select_sample,				1	},
-	{ "goto sample starting position",
-								"goto_start",	vj_osc_cb_select_start,				1	},
-	{ "goto sample ending position",
-								"goto_end",		vj_osc_cb_select_end,				1	},
 	{ "relative start/end position update <pos1> <pos2>",
 								"jitter",		vj_osc_cb_sample_set_jitter,			13	},
 	{ "set sample new starting position <pos>",
