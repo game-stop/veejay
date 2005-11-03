@@ -42,19 +42,11 @@
 
 /////////////////////////////////////////////////////////////////
 
-
-#ifndef HOST_MALLOC
-#define HOST_MALLOC
-void *livido_malloc_f (size_t size) 				{ return malloc(size); }
-void livido_free_f (void *ptr)					{ free(ptr); }
-void *livido_memset_f (void *s, int c, size_t n)		{ return memset(s, c, n); }
-void *livido_memcpy_f (void *dest, const void *src, size_t n)	{ return memcpy( dest,src,n);} 
-#endif
-
 int livido_has_property (livido_port_t *port, const char *key) {
   if (livido_property_get(port,key,0,NULL)==LIVIDO_ERROR_NOSUCH_PROPERTY) return 0;
   return 1;
 }
+#include "livido.h"
 
 /////////////////////////////////////////////////////////////////
 // property setters
@@ -79,7 +71,7 @@ int livido_set_string_value (livido_port_t *port, const char *key, char *value) 
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_STRING,1,&value);
 }
 
-int livido_set_portptr_value (livido_port_t *port, const char *key, livido_port_t *value) {
+int livido_set_portptr_value (livido_port_t *port, const char *key, void *value) {
   // returns a LIVIDO_ERROR
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_PORTPTR,1,&value);
 }
@@ -139,19 +131,25 @@ char *livido_get_string_value (livido_port_t *port, const char *key, int *error)
     *error=LIVIDO_ERROR_WRONG_ATOM_TYPE;
     return NULL;
   }
-	retval = (char*)malloc( sizeof(char) * livido_property_element_size(port,key, 0));
-  	livido_property_get( port, key, 0,retval );
+  if ((retval=(char *)livido_malloc_f(livido_property_element_size(port,key,0)+1))==NULL) {
+    *error=LIVIDO_ERROR_MEMORY_ALLOCATION;
+    return NULL;
+  }
+  if ((*error=livido_get_value (port,key,&retval))!=LIVIDO_NO_ERROR) {
+    livido_free_f (retval);
+    return NULL;
+  }
   return retval;
 }
 
 void *livido_get_voidptr_value (livido_port_t *port, const char *key, int *error) {
-  livido_port_t *retval=NULL;
+  void *retval=NULL;
   if (livido_has_property(port,key)&&livido_property_atom_type(port,key)!=LIVIDO_ATOM_TYPE_VOIDPTR) {
     *error=LIVIDO_ERROR_WRONG_ATOM_TYPE;
     return retval;
   }
-  livido_property_get( port, key, 0, retval );
-  return (void*)retval;
+  *error=livido_get_value (port,key,&retval);
+  return retval;
 }
 
 livido_port_t *livido_get_portptr_value (livido_port_t *port, const char *key, int *error) {
@@ -354,5 +352,4 @@ int livido_set_voidptr_array (livido_port_t *port, const char *key, int num_elem
 int livido_set_portptr_array (livido_port_t *port, const char *key, int num_elems, livido_port_t **values) {
   return livido_property_set (port,key,LIVIDO_ATOM_TYPE_PORTPTR,num_elems,values);
 }
-
 

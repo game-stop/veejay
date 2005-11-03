@@ -14,13 +14,11 @@
 
 */
 
-# ifndef LIVIDO_ATOM_H_INCLUDED
-# define LIVIDO_ATOM_H_INCLUDED
+# ifndef VEVO_H_INCLUDED
+# define VEVO_H_INCLUDED
 
 #include <stdio.h>
 #include <stdint.h>
-// using kazlib
-#include "hash.h"
 
 #ifndef FALSE
 #define FALSE 0
@@ -29,24 +27,8 @@
 #define TRUE 1
 #endif
 
-/* Mediation layer, provided by this host */
-typedef struct {
-    void *value;
-    size_t size;
-} atom_t;
-
-typedef struct {
-    int atom_type;
-    union {
-	atom_t *atom;
-	atom_t **array;
-    } elements;
-    int num_elements;
-    int flags;
-} livido_storage_t;
-
 #define HAVE_LIVIDO_PORT_T
 typedef struct {
-    hash_t *table;
+    void *table;
 } livido_port_t;
 # endif

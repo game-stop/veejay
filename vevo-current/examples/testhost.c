@@ -1,11 +1,10 @@
-#include "livido.h"
+
 #include <dlfcn.h>
 #include <stdio.h>       
 #include <string.h>
 #include <stdlib.h>
 
-#define HOST_MALLOC
-
+#include "../include/vevo.h"
 #include "../include/livido.h"
 #include "../src/livido-utils.c"
 
@@ -241,13 +240,13 @@ int deep_plugininfo_filters(livido_port_t *port, char *propname)
 	return 0;
 }
 
-
-
 // Implementation of default malloc/free/memset/memcpy
 void *livido_malloc_f (size_t size) 				{ return malloc(size); }
 void livido_free_f (void *ptr)					{ free(ptr); }
 void *livido_memset_f (void *s, int c, size_t n)		{ return memset(s, c, n); }
 void *livido_memcpy_f (void *dest, const void *src, size_t n)	{ return memcpy( dest, src, n); }
+
+
 
 
 int check_property_mandatory (livido_port_t *port, char *propname, char *propdesc)

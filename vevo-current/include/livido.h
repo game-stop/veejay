@@ -40,9 +40,8 @@
 #define __LIVIDO_H__
 
 #ifdef __cplusplus
-extern "C"
-{
-#endif /* __cplusplus */
+extern "C" {
+#endif				/* __cplusplus */
 
 /* for size_t */
 #include <sys/types.h>
@@ -50,7 +49,8 @@ extern "C"
 /* API version * 100 */
 #define LIVIDO_API_VERSION 100
 
-/* Palette types */#
+/* Palette types */
+#
 /* RGB palettes */
 #define LIVIDO_PALETTE_RGB888 1
 #define LIVIDO_PALETTE_RGB24 1
@@ -127,7 +127,7 @@ Only used for SMPTE DV NTSC.]
 
 
 /* Pending: PALETTE YUV888, YUVA888 needed in cinerella */
-#define	LIVIDO_PALETTE_YUV888 521 
+#define	LIVIDO_PALETTE_YUV888 521
 #define LIVIDO_PALETTE_YUVA8888 522
 
 /* Alpha palettes */
@@ -216,13 +216,6 @@ plugin MAY use this flag to tell the host, that changing of this parameter cause
 #define LIVIDO_PORT_TYPE_PARAMETER 7
 #define LIVIDO_PORT_TYPE_GUI 8
 
-/* Memory managment functions for plugin to use (video processing) */
- 
-extern void *livido_malloc_f (size_t size);
-extern void livido_free_f (void *ptr);
-extern void *livido_memset_f (void *s, int c, size_t n);
-extern void *livido_memcpy_f (void *dest, const void *src, size_t n);\
-
 /*
 
 A port is a set of one or more properties
@@ -249,27 +242,39 @@ This host uses the mediation layer, where a new port is defined.
 */
 #ifndef HAVE_LIVIDO_PORT_T
 #define HAVE_LIVIDO_PORT_T
-typedef	void livido_port_t;
+    typedef void livido_port_t;
 #endif
 
-extern void livido_port_free(livido_port_t *port);
-extern livido_port_t *livido_port_new(int port_type);
+    extern void livido_port_free(livido_port_t * port);
+    extern livido_port_t *livido_port_new(int port_type);
 
-extern int livido_property_set(livido_port_t *port, const char *key, int atom_type, int num_elems, void *value);
-extern int livido_property_get(livido_port_t *port, const char *key, int idx,void *value);
+    extern int livido_property_set(livido_port_t * port, const char *key,
+				   int atom_type, int num_elems,
+				   void *value);
+    extern int livido_property_get(livido_port_t * port, const char *key,
+				   int idx, void *value);
 
-extern	int	livido_property_num_elements( livido_port_t *port, const char *key );
-extern	int	livido_property_atom_type( livido_port_t *port, const char *key );
-extern  size_t	livido_property_element_size( livido_port_t *port, const char *key, const int idx );
-extern char	**livido_list_properties( livido_port_t *port );
+    extern int livido_property_num_elements(livido_port_t * port,
+					    const char *key);
+    extern int livido_property_atom_type(livido_port_t * port,
+					 const char *key);
+    extern size_t livido_property_element_size(livido_port_t * port,
+					       const char *key,
+					       const int idx);
+    extern char **livido_list_properties(livido_port_t * port);
 
-typedef livido_port_t *(*livido_setup_f)(void);
-typedef int (*livido_init_f) (livido_port_t *filter_instance);
-typedef int (*livido_process_f) (livido_port_t *filter_instance, double timestamp);
-typedef int (*livido_deinit_f) (livido_port_t *filter_instance);
+    extern void *livido_malloc_f(size_t size);
+    extern void livido_free_f(void *ptr);
+    extern void *livido_memset_f(void *s, int c, size_t n);
+    extern void *livido_memcpy_f(void *dest, const void *src, size_t n);
+
+    typedef livido_port_t *(*livido_setup_f) (void);
+    typedef int (*livido_init_f) (livido_port_t * filter_instance);
+    typedef int (*livido_process_f) (livido_port_t * filter_instance,
+				     double timestamp);
+    typedef int (*livido_deinit_f) (livido_port_t * filter_instance);
 
 #ifdef __cplusplus
 }
-#endif /* __cplusplus */
-
-#endif // #ifndef __LIVIDO_H__
+#endif				/* __cplusplus */
+#endif				// #ifndef __LIVIDO_H__

@@ -20,7 +20,9 @@
 
 #include <stdlib.h>
 #include <stddef.h>
+#ifdef STRICT_CHECKING
 #include <assert.h>
+#endif
 #include <string.h>
 #define HASH_IMPLEMENTATION
 #include "hash.h"
@@ -107,9 +109,10 @@ static int is_power_of_two(hash_val_t arg)
 
 static hash_val_t compute_mask(hashcount_t size)
 {
+#ifdef STRICT_CHECKING
     assert (is_power_of_two(size));
     assert (size >= 2);
-
+#endif
     return size - 1;
 }
 
@@ -156,9 +159,9 @@ static void clear_table(hash_t *hash)
 static void grow_table(hash_t *hash)
 {
     hnode_t **newtable;
-
+#ifdef STRICT_CHECKING
     assert (2 * hash->nchains > hash->nchains);	/* 1 */
-
+#endif
     newtable = realloc(hash->table,
 	    sizeof *newtable * hash->nchains * 2);	/* 4 */
 
@@ -166,9 +169,9 @@ static void grow_table(hash_t *hash)
 	hash_val_t mask = (hash->mask << 1) | 1;	/* 3 */
 	hash_val_t exposed_bit = mask ^ hash->mask;	/* 6 */
 	hash_val_t chain;
-
+#ifdef STRICT_CHECKING
 	assert (mask != hash->mask);
-
+#endif
 	for (chain = 0; chain < hash->nchains; chain++) { /* 7 */
 	    hnode_t *low_chain = 0, *high_chain = 0, *hptr, *next;
 
@@ -194,7 +197,9 @@ static void grow_table(hash_t *hash)
 	hash->lowmark *= 2;
 	hash->highmark *= 2;
     }
+#ifdef STRICT_CHECKING
     assert (hash_verify(hash));
+#endif
 }
 
 /*
@@ -231,8 +236,10 @@ static void shrink_table(hash_t *hash)
 {
     hash_val_t chain, nchains;
     hnode_t **newtable, *low_tail, *low_chain, *high_chain;
-
+#ifdef STRICT_CHECKING
     assert (hash->nchains >= 2);			/* 1 */
+#endif
+
     nchains = hash->nchains / 2;
 
     for (chain = 0; chain < nchains; chain++) {
@@ -244,8 +251,10 @@ static void shrink_table(hash_t *hash)
 	    low_tail->next = high_chain;
 	else if (high_chain != 0)			/* 5 */
 	    hash->table[chain] = high_chain;
+#ifdef STRICT_CHECKING
 	else
 	    assert (hash->table[chain] == NULL);	/* 6 */
+#endif
     }
     newtable = realloc(hash->table,
 	    sizeof *newtable * nchains);		/* 7 */
@@ -255,7 +264,9 @@ static void shrink_table(hash_t *hash)
     hash->nchains = nchains;
     hash->lowmark /= 2;
     hash->highmark /= 2;
+#ifdef STRICT_CHECKING
     assert (hash_verify(hash));
+#endif
 }
 
 
@@ -314,7 +325,9 @@ hash_t *hash_create(hashcount_t maxcount, hash_comp_t compfun,
 	    hash->mask = INIT_MASK;
 	    hash->dynamic = 1;			/* 7 */
 	    clear_table(hash);			/* 8 */
+#ifdef STRICT_CHECKING
 	    assert (hash_verify(hash));
+#endif
 	    return hash;
 	} 
 	free(hash);
@@ -330,9 +343,10 @@ hash_t *hash_create(hashcount_t maxcount, hash_comp_t compfun,
 void hash_set_allocator(hash_t *hash, hnode_alloc_t al,
 	hnode_free_t fr, void *context)
 {
+#ifdef STRICT_CHECING
     assert (hash_count(hash) == 0);
     assert ((al == 0 && fr == 0) || (al != 0 && fr != 0));
-
+#endif
     hash->allocnode = al ? al : hnode_alloc;
     hash->freenode = fr ? fr : hnode_free;
     hash->context = context;
@@ -376,8 +390,10 @@ void hash_free(hash_t *hash)
 
 void hash_destroy(hash_t *hash)
 {
+#ifdef STRICT_CHECKING
     assert (hash_val_t_bit != 0);
     assert (hash_isempty(hash));
+#endif
     free(hash->table);
     free(hash);
 }
@@ -401,9 +417,9 @@ hash_t *hash_init(hash_t *hash, hashcount_t maxcount,
 {
     if (hash_val_t_bit == 0)	/* 1 */
 	compute_bits();
-
+#ifdef STRICT_CHECKING
     assert (is_power_of_two(nchains));
-
+#endif
     hash->table = table;	/* 2 */
     hash->nchains = nchains;
     hash->nodecount = 0;
@@ -413,9 +429,9 @@ hash_t *hash_init(hash_t *hash, hashcount_t maxcount,
     hash->dynamic = 0;		/* 3 */
     hash->mask = compute_mask(nchains);	/* 4 */
     clear_table(hash);		/* 5 */
-
+#ifdef STRICT_CHECKING
     assert (hash_verify(hash));
-
+#endif
     return hash;
 }
 
@@ -482,9 +498,9 @@ hnode_t *hash_scan_next(hscan_t *scan)
     hash_t *hash = scan->table;
     hash_val_t chain = scan->chain + 1;
     hash_val_t nchains = hash->nchains;
-
+#ifdef SRTICT_CHECING
     assert (hash_val_t_bit != 0);	/* 2 */
-
+#endif
     if (next) {			/* 3 */
 	if (next->next) {	/* 4 */
 	    scan->next = next->next;
@@ -518,12 +534,12 @@ hnode_t *hash_scan_next(hscan_t *scan)
 void hash_insert(hash_t *hash, hnode_t *node, const void *key)
 {
     hash_val_t hkey, chain;
-
+#ifdef STRICT_CHECKING
     assert (hash_val_t_bit != 0);
     assert (node->next == NULL);
     assert (hash->nodecount < hash->maxcount);	/* 1 */
     assert (hash_lookup(hash, key) == NULL);	/* 2 */
-
+#endif
     if (hash->dynamic && hash->nodecount >= hash->highmark)	/* 3 */
 	grow_table(hash);
 
@@ -535,8 +551,9 @@ void hash_insert(hash_t *hash, hnode_t *node, const void *key)
     node->next = hash->table[chain];
     hash->table[chain] = node;
     hash->nodecount++;
-
+#ifdef STRICT_CHECKING
     assert (hash_verify(hash));
+#endif
 }
 
 /*
@@ -591,10 +608,10 @@ hnode_t *hash_delete(hash_t *hash, hnode_t *node)
 {
     hash_val_t chain;
     hnode_t *hptr;
-
+#ifdef STRICT_CHECKING
     assert (hash_lookup(hash, node->key) == node);	/* 1 */
     assert (hash_val_t_bit != 0);
-
+#endif
     if (hash->dynamic && hash->nodecount <= hash->lowmark
 	    && hash->nodecount > INIT_SIZE)
 	shrink_table(hash);				/* 2 */
@@ -606,15 +623,21 @@ hnode_t *hash_delete(hash_t *hash, hnode_t *node)
 	hash->table[chain] = node->next;
     } else {
 	while (hptr->next != node) {			/* 5 */
+#ifdef STRICT_CHECKING
 	    assert (hptr != 0);
+#endif
 	    hptr = hptr->next;
 	}
+#ifdef STRICT_CHECKING
 	assert (hptr->next == node);
+#endif
 	hptr->next = node->next;
     }
 	
     hash->nodecount--;
+#ifdef STRICT_CHECKING
     assert (hash_verify(hash));
+#endif
 
     node->next = NULL;					/* 6 */
     return node;
@@ -647,10 +670,10 @@ hnode_t *hash_scan_delete(hash_t *hash, hnode_t *node)
 {
     hash_val_t chain;
     hnode_t *hptr;
-
+#ifdef STRICT_CHECKING
     assert (hash_lookup(hash, node->key) == node);
     assert (hash_val_t_bit != 0);
-
+#endif
     chain = node->hkey & hash->mask;
     hptr = hash->table[chain];
 
@@ -663,7 +686,9 @@ hnode_t *hash_scan_delete(hash_t *hash, hnode_t *node)
     }
 	
     hash->nodecount--;
+#ifdef STRICT_CHECKING
     assert (hash_verify(hash));
+#endif
     node->next = NULL;
 
     return node;

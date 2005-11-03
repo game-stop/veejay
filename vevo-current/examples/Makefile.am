@@ -11,5 +11,5 @@ EXAMPLES_BIN = hosttest
 bin_PROGRAMS = $(EXAMPLES_BIN)  
 
 hosttest_SOURCES = testhost.c 
-hosttest_LDADD = $(LIBVEVO) -ldl
-
+hosttest_LDADD = -lvevo -ldl
+hosttest_LDFLAGS = -export-dynamic

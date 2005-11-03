@@ -1,3 +1,10 @@
+2.2.0
+	- changed typecasting of value to atom / array of atoms
+	- updated livido-utils.c from livido repository
+	- added -DSRTICT_CHECKING to enable/disable assertions for hash
+	  at compile time
+	- cleanup vevo.c
+	- updated vevobench and vevotest
 
 Initial release
 

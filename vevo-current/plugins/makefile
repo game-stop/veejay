@@ -29,6 +29,7 @@ clean:
 %.o: %.c
 	$(CC) $(CFLAGS) -c -o $@ $< 
 %.so: %.o
-	$(LINKER) -E -z now -shared $^ -o $@
+	$(LINKER) -shared $^ -o $@
+#	$(LINKER) -E -z now -shared $^ -o $@
 
 
