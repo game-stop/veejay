@@ -11,7 +11,7 @@ style "default"
   #GtkWidget::default_outside_border = {0, 0, 0, 0} 
   GtkWidget::default_spacing        = 0
   GtkScale::stepper_size = 8
-  GtkRange::through-width = 0
+  GtkRange::through-width = 4
   GtkRange::trough_border = 0
   GtkRange::slider-width = 16
   GtkScale::slider-length = 10
