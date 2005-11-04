@@ -6,7 +6,7 @@ AC_CONFIG_SRCDIR([configure.in])
 
 LIBVEVO_MAJOR_VERSION=2
 LIBVEVO_MINOR_VERSION=2
-LIBVEVO_MICRO_VERSION=0
+LIBVEVO_MICRO_VERSION=1
 LIBVEVO_VERSION=$LIBVEVO_MAJOR_VERSION.$LIBVEVO_MINOR_VERSION.$LIBVEVO_MICRO_VERSION
 PACKAGE_VERSION=LIBVEVO_VERSION
 
@@ -102,7 +102,7 @@ dnl **********************************************************************
 dnl All the conditional stuff for the Makefiles
 dnl
 
-CFLAGS="$CFLAGS"  
+CFLAGS="$CFLAGS"
 
 AC_MSG_CHECKING(what warning flags to pass to the C compiler)
 warnCFLAGS=

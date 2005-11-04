@@ -838,7 +838,7 @@ hashcount_t hash_size(hash_t *hash)
 {
     return hash->nchains;
 }
-/*
+
 static hash_val_t hash_fun_default(const void *key)
 {
     static unsigned long randbox[] = {
@@ -860,8 +860,8 @@ static hash_val_t hash_fun_default(const void *key)
 	acc &= 0xffffffffU;
     }
     return acc;
-}*/
-
+}
+/*
 static	hash_val_t	hash_fun_default( const void *key )
 {
         hash_val_t hash = 0;
@@ -869,7 +869,7 @@ static	hash_val_t	hash_fun_default( const void *key )
         while (*k)
                 hash = hash * 31 + *k++;
         return hash;
-}
+}*/
 
 static int hash_comp_default(const void *key1, const void *key2)
 {
