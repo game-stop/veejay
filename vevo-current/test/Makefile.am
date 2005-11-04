@@ -6,7 +6,7 @@ LIBVEVO = $(top_builddir)/src/libvevo.la
 
 # *********************************************************************
 # The tools themselves
-EXAMPLES_BIN = vevotest vevobench vevoutils 
+EXAMPLES_BIN = vevotest vevobench 
 
 bin_PROGRAMS = $(EXAMPLES_BIN)  
 
@@ -14,6 +14,4 @@ vevotest_SOURCES = vevotest.c
 vevotest_LDADD = $(LIBVEVO) -ldl
 vevobench_SOURCES = vevobenchmark.c 
 vevobench_LDADD = $(LIBVEVO) -ldl
-vevoutils_SOURCES = vevoutilstest.c
-vevoutils_LDADD = $(LIBVEVO) -ldl
 
