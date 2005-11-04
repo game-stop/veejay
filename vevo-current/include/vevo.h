@@ -28,8 +28,5 @@
 #endif
 
 #define HAVE_LIVIDO_PORT_T
-typedef struct {
-    void *table;
-    void *index;
-} livido_port_t;
+typedef void livido_port_t;
 # endif
