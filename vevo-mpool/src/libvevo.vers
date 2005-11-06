@@ -1,0 +1,5 @@
+LIBVEVO_2_2_0
+{
+	global:	livido_*;
+	local: *;
+};
