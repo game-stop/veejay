@@ -30,8 +30,8 @@ int test_fundemental_atoms(livido_port_t * port)
 			&(fundementals[fundemental_index].iv));
     livido_property_set(port, "double_value", LIVIDO_ATOM_TYPE_DOUBLE, 1,
 			&(fundementals[fundemental_index].dv));
- //   livido_property_set(port, "string_value", LIVIDO_ATOM_TYPE_STRING, 1,
-//			&(fundementals[fundemental_index].sv));
+    livido_property_set(port, "string_value", LIVIDO_ATOM_TYPE_STRING, 1,
+			&(fundementals[fundemental_index].sv));
     livido_property_set(port, "bool_value", LIVIDO_ATOM_TYPE_INT, 1,
 			&(fundementals[fundemental_index].bv));
     fundemental_index++;
@@ -44,7 +44,7 @@ long get_work_size(livido_port_t * port)
     long mem_size = 0;
     mem_size += livido_property_element_size(port, "int_value", 0);
     mem_size += livido_property_element_size(port, "double_value", 0);
-  //  mem_size += livido_property_element_size(port, "string_value", 0);
+    mem_size += livido_property_element_size(port, "string_value", 0);
     mem_size += livido_property_element_size(port, "bool_value", 0);
 
     return mem_size;
@@ -61,12 +61,12 @@ void dump_port(livido_port_t * port)
     livido_property_get(port, "int_value", 0, &int_value);
     livido_property_get(port, "double_value", 0, &double_value);
 
-    //string_value =
-//	(char *)
-//	malloc(livido_property_element_size(port, "string_value", 0));
-    //livido_property_get(port, "string_value", 0, &string_value);
+    string_value =
+	(char *)
+	malloc(livido_property_element_size(port, "string_value", 0));
+    livido_property_get(port, "string_value", 0, &string_value);
     livido_property_get(port, "bool_value", 0, &bool_value);
-    //free(string_value);
+    free(string_value);
     stats[1] += 4;
 }
 
@@ -80,13 +80,16 @@ int main(int argc, char *argv[])
     memset(&end, 0, sizeof(struct timeval));
     memset(&tv, 0, sizeof(struct timeval));
 
-    livido_port_t *port = livido_port_new(0);
 
     int max = 100;
     int i = 0;
-
-    if (argc == 2)
+    int type = 0;
+    if (argc >= 2)
 	max = atoi(argv[1]);
+    if (argc >= 3 )
+	type = atoi( argv[2] );
+    livido_port_t *port = livido_port_new(type);
+
     gettimeofday(&start, NULL);
     for (i = 0; i < max; i++)	// get and set 16 properties per cycle
     {
@@ -110,7 +113,7 @@ int main(int argc, char *argv[])
     printf("Bench: %ld Atoms put and get in %4.4f seconds\n", (stats[0] + stats[1]), seconds );
     printf("\t %ld Atoms per second\n", (long)( (float) stats[0]/seconds ));
 
-    if (argc <= 1 || argc > 2)
-	printf("Hint: use vevobench <number> \n");
+    if (argc <= 1 || argc > 3)
+	printf("Hint: use vevobench <number> <0=hash , 1=linked list> \n");
     return 0;
 }

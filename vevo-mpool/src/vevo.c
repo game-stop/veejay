@@ -27,6 +27,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 #define _GNU_SOURCE
+
 #include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -36,15 +37,16 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <include/hash.h>
 
 
+/* If defined, dont expect a major performance improvment. */
 #ifdef VEVO_MEMPOOL
 #include <include/pool.h>
 #endif
-
 
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
 
+/* The storage container, this holds the atoms of a property */
 typedef struct {
     int atom_type;
     union {
@@ -55,21 +57,92 @@ typedef struct {
     int flags;
 } livido_storage_t;
 
-/* For fast indexing of livido keys, define the port index: */
+/* For livido ports use a linked list , especially
+   when a port does not hold a large number of properties
+   a linked list is usually faster.
+   Non livido ports are initialized with a hash, which
+   is efficient for a large number of properties  */
+typedef struct {
+    livido_storage_t *st;
+    int key;
+    void *next;
+} livido_property_t;
+
+/* For fast indexing of livido keys, define the port index
+   The function livido_property_set adds a key to the port index
+   if the property does not exist yet.
+ */
 typedef struct {
     const char *key;
-    int hash_code;
+    int hash_code;		/* vevo uses a integer representation of key, eliminates strcmp  */
     void *next;
 } port_index_t;
 
 /* Now, define our port structure */
 typedef struct {
-    hash_t *table;
-    port_index_t *index;
-    void *pool;
-    int atom_types[70];
+    hash_t *table;		/* hashtable for custom ports */
+    livido_property_t *list;	/* linked list for livido ports */
+    port_index_t *index;	/* key index */
+    void *pool;			/* memory pool (compile option) */
+    int atom_types[70];		/* atom types to vevo types */
 } vevo_port_t;
 
+
+/* Functions for creating new 'properties' */
+static livido_property_t *prop_node_new(int hash_key,
+					livido_storage_t * stor)
+{
+    livido_property_t *p =
+	(livido_property_t *) malloc(sizeof(livido_property_t));
+    p->st = stor;
+    p->key = hash_key;
+    p->next = NULL;
+    return p;
+}
+
+static void prop_node_free(livido_property_t * p)
+{
+    if (p) {
+	free(p);
+    }
+}
+
+
+static livido_property_t *prop_node_append(livido_port_t * p, int key,
+					   livido_storage_t * t)
+{
+    vevo_port_t *port = (vevo_port_t *) p;
+    livido_property_t *node = prop_node_new(key, t);
+    livido_property_t *next;
+    livido_property_t *list = port->list;
+    if (list == NULL)
+	port->list = node;
+    else {
+	while (list != NULL) {
+	    next = list->next;
+	    if (next == NULL) {
+		list->next = node;
+		return node;
+	    }
+	    list = next;
+	}
+    }
+    return node;
+}
+
+static livido_property_t *prop_node_get(livido_port_t * p, int key)
+{
+    vevo_port_t *port = (vevo_port_t *) p;
+    livido_property_t *l = port->list;
+    while (l != NULL) {
+	if (key == l->key)
+	    return l;
+	l = l->next;
+    }
+    return NULL;
+}
+
+/* Functions for new key items */
 static inline port_index_t *port_node_new(const char *key, int hash_key)
 {
     port_index_t *i = (port_index_t *) malloc(sizeof(port_index_t));
@@ -95,6 +168,7 @@ static inline void port_node_free(port_index_t * node)
     }
     node = NULL;
 }
+
 static inline void port_node_append(livido_port_t * p, const char *key,
 				    int hash_key)
 {
@@ -149,17 +223,27 @@ static inline int hash_key_code(const char *key)
 static int livido_property_finalize(livido_port_t * p, const char *key)
 {
     vevo_port_t *port = (vevo_port_t *) p;
-    hnode_t *node = NULL;
     int hash_key = hash_key_code(key);
 
-    if ((node = property_exists(port, hash_key)) != NULL) {
-	livido_storage_t *stor = (livido_storage_t *) hnode_get(node);
-	stor->flags |= LIVIDO_PROPERTY_READONLY;
-	hnode_t *new_node = hnode_create((void *) stor);
-	hnode_put(new_node, (void *) hash_key);
-	hnode_destroy(new_node);
-    }
+    if (!port->table) {
+	livido_property_t *node = NULL;
+	if ((node = prop_node_get(port, hash_key)) != NULL) {
+	    node->st->flags |= LIVIDO_PROPERTY_READONLY;
+	    return LIVIDO_NO_ERROR;
+	}
+    } else {
+	hnode_t *node = NULL;
+	if ((node = property_exists(port, hash_key)) != NULL) {
+	    livido_storage_t *stor = (livido_storage_t *) hnode_get(node);
+	    stor->flags |= LIVIDO_PROPERTY_READONLY;
+	    hnode_t *new_node = hnode_create((void *) stor);
+	    hnode_put(new_node, (void *) hash_key);
+	    hnode_destroy(new_node);
+	    return LIVIDO_NO_ERROR;
+	}
 
+    }
+//fixme: error is wrong
     return LIVIDO_NO_ERROR;
 }
 
@@ -394,6 +478,12 @@ static inline int key_compare(const void *key1, const void *key2)
     return ((int) key1 == (int) key2 ? 0 : 1);
 }
 
+
+/*
+
+	Livido API implementation, public functions follow below
+ */
+
 int livido_property_num_elements(livido_port_t * p, const char *key)
 {
 #ifdef STRICT_CHECKING
@@ -402,13 +492,19 @@ int livido_property_num_elements(livido_port_t * p, const char *key)
 #endif
 
     vevo_port_t *port = (vevo_port_t *) p;
-    hnode_t *node = NULL;
     int hash_key = hash_key_code(key);
 
-    if ((node = property_exists(port, hash_key)) != NULL) {
-	livido_storage_t *stor = (livido_storage_t *) hnode_get(node);
-	if (stor)
-	    return stor->num_elements;
+    if (!port->table) {
+	livido_property_t *node;
+	if ((node = prop_node_get(port, hash_key)) != NULL)
+	    return node->st->num_elements;
+    } else {
+	hnode_t *node = NULL;
+	if ((node = property_exists(port, hash_key)) != NULL) {
+	    livido_storage_t *stor = (livido_storage_t *) hnode_get(node);
+	    if (stor)
+		return stor->num_elements;
+	}
     }
     return -1;
 }
@@ -422,15 +518,25 @@ int livido_property_atom_type(livido_port_t * p, const char *key)
     vevo_port_t *port = (vevo_port_t *) p;
 #ifdef STRICT_CHECKING
     assert(port != NULL);
-    assert(port->table != NULL);
-    assert(hash_verify(port->table) != 0);
 #endif
-    hnode_t *node = NULL;
     int hash_key = hash_key_code(key);
-    if ((node = property_exists(port, hash_key)) != NULL) {
-	livido_storage_t *stor = (livido_storage_t *) hnode_get(node);
-	if (stor)
-	    return stor->atom_type;
+
+    if (!port->table) {
+	livido_property_t *node;
+	if ((node = prop_node_get(port, hash_key)) != NULL)
+	    return node->st->atom_type;
+    } else {
+	hnode_t *node = NULL;
+#ifdef STRICT_CHECKING
+	assert(port->table != NULL);
+	assert(hash_verify(port->table) != 0);
+#endif
+
+	if ((node = property_exists(port, hash_key)) != NULL) {
+	    livido_storage_t *stor = (livido_storage_t *) hnode_get(node);
+	    if (stor)
+		return stor->atom_type;
+	}
     }
     return -1;
 }
@@ -442,32 +548,41 @@ livido_property_element_size(livido_port_t * p, const char *key,
 #ifdef STRICT_CHECKING
     assert(p != NULL);
     assert(key != NULL);
+    assert(idx >= 0);
 #endif
 
     vevo_port_t *port = (vevo_port_t *) p;
-    hnode_t *node = NULL;
     int hash_key = hash_key_code(key);
 
-    if ((node = property_exists(port, hash_key)) != NULL) {
-	livido_storage_t *stor = (livido_storage_t *) hnode_get(node);
-
+    if (!port->table) {
+	livido_property_t *node;
+	if ((node = prop_node_get(port, hash_key)) != NULL) {
 #ifdef STRICT_CHECKING
-	assert(stor != NULL);
+	    if (idx > 0)
+		assert(idx < node->st->num_elements);
 #endif
-	//todo: sum all element sizes for index of -1 
-	if (stor->num_elements == 1) {
-	    return stor->elements.atom->size;
-	} else if (stor->num_elements > 1) {
-
+	    if (node->st->num_elements == 1)
+		return node->st->elements.atom->size;
+	    else if (node->st->num_elements > 1)
+		return node->st->elements.array[idx]->size;
+	    return 0;
+	}
+    } else {
+	hnode_t *node = NULL;
+	if ((node = property_exists(port, hash_key)) != NULL) {
+	    livido_storage_t *stor = (livido_storage_t *) hnode_get(node);
 #ifdef STRICT_CHECKING
-	    assert(idx >= 0);
 	    assert(idx < stor->num_elements);
-	    assert(stor->elements.array[idx] != NULL);
 #endif
-	    return stor->elements.array[idx]->size;
-	} else {
-	    if (stor->num_elements == 0)
-		return 0;
+	    //todo: sum all element sizes for index of -1 
+	    if (stor->num_elements == 1) {
+		return stor->elements.atom->size;
+	    } else if (stor->num_elements > 1) {
+		return stor->elements.array[idx]->size;
+	    } else {
+		if (stor->num_elements == 0)
+		    return 0;
+	    }
 	}
     }
 
@@ -482,11 +597,15 @@ livido_port_t *livido_port_new(int port_type)
     assert(port != NULL);
 #endif
     port->index = NULL;
-    port->table = hash_create(HASHCOUNT_T_MAX, key_compare, int_hash);
+    port->list = NULL;
+    port->table = NULL;
 
-#ifdef STRICT_CHECKING
-    assert(port->table != NULL);
-#endif
+/* If the port type is a Livido port this or that */
+    if (port_type >= 1 && port_type <= 8)
+	port->list = NULL;
+    else
+	port->table = hash_create(HASHCOUNT_T_MAX, key_compare, int_hash);
+
 #ifdef VEVO_MEMPOOL
     port->pool = vevo_new_pool();
 
@@ -501,12 +620,6 @@ livido_port_t *livido_port_new(int port_type)
 #endif
 
     livido_property_set(port, "type", LIVIDO_ATOM_TYPE_INT, 1, &port_type);
-
-#ifdef STRICT_CHECKING
-    int hash_key = hash_key_code("type");
-    assert(property_exists(port, hash_key) != NULL);
-#endif
-
     livido_property_finalize(port, "type");
 
 #ifdef STRICT_CHECKING
@@ -523,27 +636,36 @@ void livido_port_free(livido_port_t * p)
     vevo_port_t *port = (vevo_port_t *) p;
 
     if (port) {
-#ifdef STRICT_CHECKING
-	assert(port->table != NULL);
-#endif
-	if (!hash_isempty((hash_t *) port->table)) {
-	    hscan_t scan;
-	    hash_scan_begin(&scan, (hash_t *) port->table);
-	    hnode_t *node;
+	if (port->table) {
+	    if (!hash_isempty((hash_t *) port->table)) {
+		hscan_t scan;
+		hash_scan_begin(&scan, (hash_t *) port->table);
+		hnode_t *node;
 
-	    while ((node = hash_scan_next(&scan)) != NULL) {
-		livido_storage_t *stor;
-		stor = hnode_get(node);
+		while ((node = hash_scan_next(&scan)) != NULL) {
+		    livido_storage_t *stor;
+		    stor = hnode_get(node);
 #ifdef STRICT_CHECKING
-		assert(stor != NULL);
-		assert(node != NULL);
-		assert((const char *) hnode_getkey(node) != NULL);
+		    assert(stor != NULL);
+		    assert(node != NULL);
+		    assert((const char *) hnode_getkey(node) != NULL);
 #endif
-		livido_free_storage(port->pool, stor);
+		    livido_free_storage(port->pool, stor);
+		}
+		hash_free_nodes((hash_t *) port->table);
+		hash_destroy((hash_t *) port->table);
 	    }
-	    hash_free_nodes((hash_t *) port->table);
-	    hash_destroy((hash_t *) port->table);
+	} else {
+	    livido_property_t *l = port->list;
+	    livido_property_t *n;
+	    while (l != NULL) {
+		n = l->next;
+		livido_free_storage(port->pool, l->st);
+		prop_node_free(l);
+		l = n;
+	    }
 	}
+
 
 	if (port->index) {
 	    port_index_t *l = port->index;
@@ -571,45 +693,74 @@ livido_property_set(livido_port_t * p,
     assert(p != NULL);
 #endif
     vevo_port_t *port = (vevo_port_t *) p;
-    hnode_t *old_node = NULL;
     int hash_key = hash_key_code(key);
-    if ((old_node = property_exists(port, hash_key)) != NULL) {
-	livido_storage_t *oldstor =
-	    (livido_storage_t *) hnode_get(old_node);
-	if (oldstor->atom_type != atom_type)
-	    return LIVIDO_ERROR_WRONG_ATOM_TYPE;
-
-	if (oldstor->flags & LIVIDO_PROPERTY_READONLY)
-	    return LIVIDO_ERROR_PROPERTY_READONLY;
-
-	livido_free_storage(port->pool, oldstor);
-
-	hash_delete((hash_t *) port->table, old_node);
-	hnode_destroy(old_node);
+    int new = 1;
+    void *node = NULL;
+    if (!port->table) {
+	livido_property_t *pnode = NULL;
+	if ((pnode = prop_node_get(port, hash_key)) != NULL) {
+	    if (pnode->st->atom_type != atom_type)
+		return LIVIDO_ERROR_WRONG_ATOM_TYPE;
+	    if (pnode->st->flags & LIVIDO_PROPERTY_READONLY)
+		return LIVIDO_ERROR_PROPERTY_READONLY;
+	    livido_free_storage(port->pool, pnode->st);
+	    new = 0;
+	    node = (void *) pnode;
+	}
     } else {
+	hnode_t *old_node = NULL;
+	if ((old_node = property_exists(port, hash_key)) != NULL) {
+	    livido_storage_t *oldstor =
+		(livido_storage_t *) hnode_get(old_node);
+	    if (oldstor->atom_type != atom_type)
+		return LIVIDO_ERROR_WRONG_ATOM_TYPE;
 
+	    if (oldstor->flags & LIVIDO_PROPERTY_READONLY)
+		return LIVIDO_ERROR_PROPERTY_READONLY;
+
+	    livido_free_storage(port->pool, oldstor);
+
+	    hash_delete((hash_t *) port->table, old_node);
+	    hnode_destroy(old_node);
+	    new = 0;
+	}
+    }
+    livido_storage_t *stor = livido_new_storage(num_elements);
+    storage_put_atom_value(port, src, num_elements, stor, atom_type);
+
+    if (new) {
 #ifdef VEVO_MEMPOOL
 	if (!vevo_pool_verify(port->pool))
 	    return LIVIDO_ERROR_MEMORY_ALLOCATION;
 #endif
 	port_node_append(port, key, hash_key);
+	if (!port->table)
+	    node = (void *) prop_node_append(port, hash_key, stor);
     }
-    livido_storage_t *stor = livido_new_storage(num_elements);
-
 #ifdef STRICT_CHECKING
     assert(stor != NULL);
 #endif
-    storage_put_atom_value(port, src, num_elements, stor, atom_type);
 
-    hnode_t *node = hnode_create(stor);
+    if (!port->table) {
+#ifdef STRICT_CHECKING
+	assert(node != NULL);
+#endif
+	if (!new) {
+	    livido_property_t *current = (livido_property_t *) node;
+	    current->st = stor;
+	}
+    } else {
+	hnode_t *node2 = hnode_create(stor);
 
 #ifdef STRICT_CHECKING
-    assert(node != NULL);
-    assert(!hash_isfull((hash_t *) port->table));
-    assert(!property_exists(port, hash_key));
+	assert(node2 != NULL);
+	assert(!hash_isfull((hash_t *) port->table));
+	assert(!property_exists(port, hash_key));
 #endif
 
-    hash_insert((hash_t *) port->table, node, (const void *) hash_key);
+	hash_insert((hash_t *) port->table, node2,
+		    (const void *) hash_key);
+    }
 
     return LIVIDO_NO_ERROR;
 }
@@ -620,26 +771,29 @@ livido_property_get(livido_port_t * p, const char *key, int idx, void *dst)
 #ifdef STRICT_CHECKING
     assert(p != NULL);
 #endif
-
     vevo_port_t *port = (vevo_port_t *) p;
 
 #ifdef STRICT_CHECKING
-    assert(port->table != NULL);
     assert(key != NULL);
 #endif
-
-    hnode_t *node = NULL;
     int hash_key = hash_key_code(key);
-    if ((node = property_exists(port, hash_key)) != NULL) {
-	if (dst == NULL)
-	    return LIVIDO_NO_ERROR;
-	else {
-	    livido_storage_t *stor = hnode_get(node);
 
-#ifdef STRICT_CHECKING
-	    assert(stor != NULL);
-#endif
-	    return atom_get_value(stor, idx, dst);
+    if (!port->table) {
+	livido_property_t *node = NULL;
+	if ((node = prop_node_get(port, hash_key)) != NULL) {
+	    if (dst == NULL)
+		return LIVIDO_NO_ERROR;
+	    else
+		return atom_get_value(node->st, idx, dst);
+	}
+    } else {
+	hnode_t *node = NULL;
+	if ((node = property_exists(port, hash_key)) != NULL) {
+	    if (dst == NULL)
+		return LIVIDO_NO_ERROR;
+	    else
+		return atom_get_value((livido_storage_t *) hnode_get(node),
+				      idx, dst);
 	}
     }
 
@@ -652,14 +806,21 @@ char **livido_list_properties(livido_port_t * p)
 
 #ifdef STRICT_CHECKING
     assert(port != NULL);
-    assert(port->table != NULL);
-    assert(hash_isempty((hash_t *) port->table) == 0);
 #endif
 
     char **list = NULL;
 
 #ifdef STRICT_CHECKING
-    int nn = 1 + hash_count((hash_t *) port->table);
+    int nn = 1;
+    if (port->table)
+	nn += hash_count((hash_t *) port->table);
+    else {
+	livido_property_t *c = port->list;
+	while (c != NULL) {
+	    c = c->next;
+	    nn++;
+	}
+    }
 #endif
 
     int n = 1;			// null terminated list of keys
