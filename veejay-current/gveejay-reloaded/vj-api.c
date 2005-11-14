@@ -1933,8 +1933,6 @@ static	void	multi_vims(int id, const char format[],...)
 	va_list args;
 	if(!info->client)
 		return;
-	if(id == VIMS_SET_MODE_AND_GO)
-		borked_ = 1;
 	va_start(args, format);
 	vsnprintf(tmp, sizeof(tmp)-1, format, args );
 	snprintf(block, sizeof(block)-1, "%03d:%s;",id,tmp);
@@ -2136,7 +2134,8 @@ static	int	interpolate_parameters(void)
 	/* If current effect chain is not enabled, return now */
 	if(!s->ec->enabled)
 		return 0;	
-
+	char params[255];
+	bzero(params,255);
 	/* Iterate chain for KF */	
 	for( i = 0; i < MAX_CHAIN_LEN; i ++ )
 	{
@@ -2152,6 +2151,7 @@ static	int	interpolate_parameters(void)
 				sprintf(slider_name, "slider_p%d", j );
 				values[j] = get_slider_val ( slider_name );
 			}
+			
 			/* Get keyframed values */
 			for( j = 0; j < MAX_PARAMETERS; j ++ )
 			{
@@ -2163,7 +2163,6 @@ static	int	interpolate_parameters(void)
 					if(_effect_get_minmax( p->parameter_id, &min, &max, j ))
 					{
 						float scale = 0.0;
-
 						if(get_parameter_key_value( p,
 							info->status_frame, &scale ) )
 						{
@@ -2186,10 +2185,20 @@ static	int	interpolate_parameters(void)
 			}
 			if(!skip) // Put KF to veejay
 			{ // sample, chain entry, effect_id, arg i .. arg n
-				multi_vims( VIMS_CHAIN_ENTRY_SET_PRESET,
-					"%d %d %d %d %d %d %d %d %d %d %d %d",
-					s->sample_id,i,id, values[0],values[1],values[2],values[3],values[3],values[4],values[5],
-						values[6], values[7] );
+				int np = _effect_get_np( id );
+				char token[10];
+				sprintf(params, "%03d:%d %d %d ",
+					VIMS_CHAIN_ENTRY_SET_PRESET,s->sample_id,i,id );
+				int k;
+				for(k = 0; k < np; k ++ )
+				{
+					sprintf(token, "%d ", values[k] );
+					strncat( params, token, strlen(token));
+				}
+				int len = strlen( params );
+				params[len-1] = ';';	
+				params[len] = '\0';
+				msg_vims( params );
 				res ++;
 			}
 		}
@@ -2931,9 +2940,9 @@ static void	update_current_slot(int pm)
 		if( history[TOTAL_FRAMES] != info->status_tokens[TOTAL_FRAMES])
 		{
 			update_spin_range(
-			 	"spin_samplestart", 0, info->status_tokens[TOTAL_FRAMES], 0 );
+			 	"spin_samplestart", 0, info->el.num_frames, 0 );
 			update_spin_range(
-				"spin_sampleend", 0, info->status_tokens[TOTAL_FRAMES], 0 );
+				"spin_sampleend", 0, info->el.num_frames , 0 );
 		}
 
 		/* Update label and video slider*/
@@ -3093,6 +3102,8 @@ static void 	update_globalinfo()
 			timeline_set_selection( info->tl, TRUE );
 		else
 			timeline_set_selection( info->tl, FALSE );
+		on_samplepage_clicked(NULL,NULL);
+
 	}
 	if( info->status_tokens[TOTAL_SLOTS] !=
 		history[TOTAL_SLOTS] 
@@ -3202,7 +3213,6 @@ static void 	update_globalinfo()
 			    info->selected_slot->sample_type != pm )
 			{
 				set_activation_of_slot_in_samplebank(false);
-fprintf(stderr, "%s : set selected slot to NULL\n", __FUNCTION__ );
 				info->selected_slot = NULL;
 			}	
 		}
@@ -3215,7 +3225,6 @@ fprintf(stderr, "%s : set selected slot to NULL\n", __FUNCTION__ );
 			set_activation_of_slot_in_samplebank(false);
 			}
 		if(!info->selected_slot)
-		fprintf(stderr, "WARNING: %s no selected slot\n", __FUNCTION__);
 	}
 */
 	/* Update current playing sample in dialog window */
@@ -4229,12 +4238,6 @@ static	void	select_slot(int pm)
 		info->selected_slot = NULL;
 		info->selected_gui_slot = NULL;
 	}
-	if( borked_ )
-	{
-		on_samplepage_clicked(NULL,NULL);
-		borked_ =0;
-	}
-
 
 }
 /* execute after sample/stream/mixing sources list update
@@ -5818,6 +5821,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 			history[i] = info->status_tokens[i];
 
 		info->prev_mode = pm;
+//		on_samplepage_clicked(NULL,NULL);
 
 		if(nb <= 0)
 		{
@@ -7499,7 +7503,6 @@ static	void	set_selection_of_slot_in_samplebank(gboolean active)
 		color.red = 0;	
 		color.blue = 0;
 	}
-fprintf(stderr, "%s:%d\n",__FUNCTION__,__LINE__);	
 	gtk_widget_modify_fg ( info->selection_gui_slot->title,
 		GTK_STATE_NORMAL, &color );
 	gtk_widget_modify_fg ( info->selection_gui_slot->timecode,

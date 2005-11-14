@@ -793,10 +793,6 @@ static	int	vj_event_verify_args( int *fx, int net_id , int arglen, int np, int p
 					max, a_len ); 
 				return 0;
 			} 
-			if( a_len == min && fx_c >= 1 )
-			{
-				veejay_msg(VEEJAY_MSG_WARNING, "Taking default mixing channel and source for Effect %d", fx_id);
-			}
 			if( a_len > min && a_len < max )
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Invalid mixing source given for Effect %d , use <Source Type> <Channel ID>",fx_id);
@@ -4486,10 +4482,10 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 					}
 				}
 
-				if ( vj_effect_get_extra_frame( real_id ) && args[num_p + args_offset])
+				if ( vj_effect_get_extra_frame( real_id ))
 				{
-					int source = args[num_p+4];	
-					int channel_id = args[num_p+3];
+					int source = args[num_p+3];	
+					int channel_id = args[num_p+4];
 					int err = 1;
 					if( (source != VJ_TAG_TYPE_NONE && vj_tag_exists(channel_id))|| (source == VJ_TAG_TYPE_NONE && sample_exists(channel_id)) )
 					{
@@ -4501,11 +4497,6 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 					  veejay_msg(VEEJAY_MSG_INFO, "Updated mixing channel to %s %d",
 						(source == VJ_TAG_TYPE_NONE ? "sample" : "stream" ),
 						channel_id);
-					}
-					else
-					{
-					  veejay_msg(VEEJAY_MSG_ERROR, "updating mixing channel (channel %d is an invalid %s?)",
-					   channel_id, (source == 0 ? "stream" : "sample" ));
 					}
 				}
 			}
@@ -4552,10 +4543,10 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 				v->uc->chain_changed = 1;
 			}
 
-			if( args[ num_p + 3] && vj_effect_get_extra_frame(real_id) )
+			if( vj_effect_get_extra_frame(real_id) )
 			{
-				int channel_id = args[num_p + 3];
-				int source = args[ num_p + 4];
+				int channel_id = args[num_p + 4];
+				int source = args[ num_p + 3];
 				int err = 1;
 
 				if( (source != VJ_TAG_TYPE_NONE && vj_tag_exists(channel_id))|| (source == VJ_TAG_TYPE_NONE && sample_exists(channel_id)) )
@@ -4568,11 +4559,6 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 				{
 					veejay_msg(VEEJAY_MSG_INFO,"Updated mixing channel to %s %d",
 						(source == VJ_TAG_TYPE_NONE ? "sample" : "stream"), channel_id  );
-				}
-				else
-				{
-					  veejay_msg(VEEJAY_MSG_ERROR, "updating mixing channel (channel %d is an invalid %s?)",
-					   channel_id, (source == 0 ? "stream" : "sample" ));
 				}
 			}
 		}
