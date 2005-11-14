@@ -78,10 +78,10 @@ void OSCProblem(char *s, ...) {
 }
 
 void OSCWarning(char *s, ...) {
-    va_list ap;
+ /*   va_list ap;
     fprintf(stderr, "OSC Warning: ");
     va_start(ap, s);
     vfprintf(stderr, s, ap);
     fprintf(stderr, "\n");
-    va_end(ap);
+    va_end(ap);*/
 }

@@ -167,7 +167,12 @@ int	vj_picture_get_width( void *pic )
 
 void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf )
 {
-	vj_pixbuf_t *pic = (vj_pixbuf_t*)
+	vj_pixbuf_t *pic = NULL;
+
+	if(filename == NULL || v_outw <= 0 || v_outh <= 0 )
+		return NULL;
+
+	pic = (vj_pixbuf_t*)
 			    vj_malloc(sizeof(vj_pixbuf_t));
 	if(!pic) return NULL;
 	memset( pic, 0, sizeof( vj_pixbuf_t ));

@@ -409,7 +409,8 @@ int veejay_free(veejay_t * info)
 {
 	video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
-    
+	vj_event_stop();
+ 
 	veejay_reap_messages();
 
 	vj_tag_free();
@@ -1145,9 +1146,7 @@ void veejay_signal_loop(void *arg)
 static void veejay_handle_callbacks(veejay_t *info) {
 
 	/* check for OSC events */
-	if(vj_osc_get_packet(info->osc)) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) Accepted OSC message bundle");
-	}
+	vj_osc_get_packet(info->osc);
 
 	/*  update network */
 	vj_event_update_remote( (void*)info );
@@ -2165,10 +2164,7 @@ static void *veejay_playback_thread(void *data)
 	  if(info->vjs[i]) vj_server_shutdown(info->vjs[i]); 
     }
     if(info->osc) vj_osc_free(info->osc);
-
-    vj_yuv4mpeg_free(info->output_stream); 
-    free(info->output_stream);
-    
+      
 #ifdef HAVE_SDL
     for ( i = 0; i < MAX_SDL_OUT ; i ++ )
 		if( info->sdl[i] )
@@ -2186,6 +2182,9 @@ static void *veejay_playback_thread(void *data)
 		free(info->dfb);
 	}
 #endif
+     vj_yuv4mpeg_free(info->output_stream); 
+    free(info->output_stream);
+
 
     if( info->video_out == 3 )
 	{
@@ -2553,7 +2552,7 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 
     for (i = n1; i <= n2; i++)
 		new_el->frame_list[k++] = el->frame_list[i];
-	veejay_msg(VEEJAY_MSG_DEBUG, "Copied %d frames to new EDL %p from %p", k, new_el,el);
+	veejay_msg(VEEJAY_MSG_DEBUG, "Copied %d frames to EDL", k);
     // set length
     new_el->video_frames = k;
 

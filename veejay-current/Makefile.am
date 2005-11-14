@@ -4,7 +4,7 @@ SUBDIRS = ffmpeg utils bio2jack libOSC libhash libvjmsg libvjmem
 if USE_SWSCALER
 SUBDIRS += libpostproc
 endif
-SUBDIRS += libvje libsample libvjnet libyuv libel libstream liblavjpeg libsamplerec
+SUBDIRS += libvevo libvje libsample libvjnet libyuv libel libstream liblavjpeg libsamplerec
 SUBDIRS += plugins veejay 
 if USE_GVEEJAY
 SUBDIRS += gveejay

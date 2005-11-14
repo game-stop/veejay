@@ -15,6 +15,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_scrdir)/libyuv \
 		-I$(top_srcdir)/liblavjpeg \
 		-I$(top_srcdir)/libsamplerec \
+		-I$(top_srcdir)/libvevo \
 		-I$(top_srcdir)/ffmpeg/ffmpeg/libavcodec \
 		-I$(top_srcdir)/ffmpeg/ffmpeg/libavformat \
 		$(AVIPLAY_CFLAGS) ${XML_CFLAGS} ${GTK_CFLAGS} ${DV_FLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} \
@@ -30,7 +31,7 @@ VEEJAY_ALL_LIB_OPTS = \
 	-export-dynamic 
 
 libveejay_la_SOURCES =  vj-misc.c \
-			vj-plugin.c vj-osc.c vj-event.c vj-pjack.c vj-perform.c \
+			vj-plugin.c vj-osc.c vj-event.c vj-eventman.c vj-pjack.c vj-perform.c \
 			vj-sdl.c vj-dfb.c \
 			liblavplayvj.c
 
@@ -56,6 +57,7 @@ libveejay_la_LDFLAGS +=	-L$(top_builddir)/ffmpeg/ffmpeg/libavcodec -lavcodec \
 			-L$(top_builddir)/libyuv -lyuv \
 			-L$(top_builddir)/liblavjpeg -llavjpeg \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
+			-L$(top_builddir)/libvevo -lvevo \
 			${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} \
 			${XML_LIBS} ${JPEG_LIBS} ${JACK_LIBS} \
 			${LIBDV_LIBS} ${LIBM_LIBS} ${PIXBUF_LIBS}\

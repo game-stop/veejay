@@ -79,7 +79,7 @@ typedef struct vj_osc_t {
 
 
 /* VIMS does the job */
-extern void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int arglen);
+extern void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int arglen, int type);
 
 
 #define OSC_STRING_SIZE 255
@@ -221,7 +221,6 @@ static int vj_osc_count_int_arguments(int arglen, const void *vargs)
 			for ( i = 1; i < arglen ; i ++ )
 			{
 				if( args[i] == 0x69 ) num_args ++;
-				// if next is a zero, we have found all occurences.
 				if( (i+1) < arglen && args[i+1] == 0 ) break;
 			}
 	}
@@ -238,10 +237,15 @@ static int vj_osc_parse_char_arguments(int arglen, const void *vargs, char *dst)
 {
 	const char *args = (const char*)vargs;
 	if(arglen <= 4) return 0;
-	arglen -= 4;
 	if(args[1] == 0x73)
 	{
-		strncpy(dst, args+4, (arglen>OSC_STRING_SIZE ? OSC_STRING_SIZE : arglen));
+		int b = 0;
+		for(b = 0; b < arglen; b++)
+		{
+		 dst[b] = args[b+4];
+		 if(args[b+4] == 0)
+		  break; 
+		}
 		return arglen;
 	}
 	return 0;
@@ -259,14 +263,13 @@ static int vj_osc_parse_int_arguments(int arglen, const void *vargs, int *argume
 
 	if( args[0] == 0x2c )
 	{	// type tag
-			// figure out padding length of typed tag  
-			unsigned int pad = 4 + ( num_args + 1 ) / 4 * 4;
-			// parse the arguments
-			for ( i = 0; i < num_args ; i ++ )
-			{
-				arguments[i] = toInt( args + pad + offset );
-				offset += 4;
-			}
+		// figure out padding length of typed tag  
+		unsigned int pad = 4 + ( num_args + 1 ) / 4 * 4;
+		for ( i = 0; i < num_args ; i ++ )
+		{
+			arguments[i] = toInt( args + pad + offset );
+			offset += 4;
+		}
 	}
 	else
 	{
@@ -294,43 +297,74 @@ void *_vj_osc_rt_malloc(int num_bytes) {
 
 ///////////////////////////////////// CALLBACKS FOR OSC ////////////////////////////////////////
 
-#define PNET_F(a,b,c,d)\
+#define NET_F_prefixed(a,b,c,d)\
 {\
 int arguments[16];\
 int num_arg = vj_osc_parse_int_arguments(a,b,arguments+3);\
-if( num_arg < 1 || num_arg > 1 ) {\
+if( num_arg != 1 ) {\
  veejay_msg(VEEJAY_MSG_ERROR, "parameter %d accepts only 1 value\n", d );\
  } else {\
 arguments[0] = 0;\
 arguments[1] = -1;\
 arguments[2] = d;\
-vj_event_fire_net_event( osc_info, c, NULL, arguments, 4);\
+vj_event_fire_net_event( osc_info, c, NULL, arguments, 4,3);\
 }\
+}\
+
+#define NET_F_prefixed_full(a,b,c)\
+{\
+int arguments[16];\
+int num_arg = vj_osc_parse_int_arguments(a,b,arguments+2);\
+arguments[0] = 0;\
+arguments[1] = -1;\
+vj_event_fire_net_event( osc_info, c, NULL, arguments, num_arg + 2,2);\
+}
+#define NET_F_prefixed_single(a,b,c)\
+{\
+int arguments[16];\
+int num_arg = vj_osc_parse_int_arguments(a,b,arguments+1);\
+arguments[0] = 0;\
+vj_event_fire_net_event( osc_info, c, NULL, arguments, num_arg + 1,1);\
 }
 
-#define SNET_F(a,b,c)\
+#define NET_F_full_str(a,b,c)\
 {\
 char str[OSC_STRING_SIZE];\
 int __n = vj_osc_parse_char_arguments(a,b,str);\
 str[__n] = '\0';\
-vj_event_fire_net_event(osc_info, c, str,NULL, 1);\
+int args[2] = { 0,0};\
+vj_event_fire_net_event(osc_info, c, str,args, __n + 2,2);\
 }
 
-#define SDNET_F( a,b,c )\
+#define NET_F_str(a,b,c)\
+{\
+char str[OSC_STRING_SIZE];\
+int __n = vj_osc_parse_char_arguments(a,b,str);\
+str[__n] = '\0';\
+vj_event_fire_net_event(osc_info, c, str,NULL, 1,0);\
+}
+
+#define NET_F_mixed(a,b,c)\
 {\
 char str[OSC_STRING_SIZE];\
 int  args[16];\
-int __a = 0;\
+int __a = vj_osc_count_int_arguments(a,b);\
 int __n = vj_osc_parse_char_arguments(a,b,str);\
-if( __n <= 0 ) { \
- veejay_msg(VEEJAY_MSG_ERROR, "VIMS '%s' format is '%s'",vj_event_get_name(c), vj_event_get_format(c) );\
-}\
-else {\
 memset( args,0,16 );\
 str[__n] = '\0';\
-__a = vj_osc_parse_int_arguments( a - __n , b + __n, args );\
-vj_event_fire_net_event(osc_info, c, str,args, 2);\
-}\
+vj_osc_parse_int_arguments( a , b , args );\
+vj_event_fire_net_event(osc_info, c, str,args, __a + 1,0);\
+}
+#define NET_F_mixed_str(a,b,c)\
+{\
+char str[OSC_STRING_SIZE];\
+int  args[16];\
+int __n = vj_osc_parse_char_arguments(a,b,str);\
+memset( args,0,16 );\
+args[0] = 0;\
+args[1] = 0;\
+str[__n] = '\0';\
+vj_event_fire_net_event(osc_info, c, str,args, 3,2);\
 }
 
 
@@ -341,7 +375,7 @@ vj_event_fire_net_event(osc_info, c, str,args, 2);\
 int arguments[16];\
 memset( arguments,0,16 ); \
 int num_arg = vj_osc_parse_int_arguments(a,b,arguments);\
-vj_event_fire_net_event( osc_info, c, NULL,arguments, num_arg );\
+vj_event_fire_net_event( osc_info, c, NULL,arguments, num_arg,0 );\
 }
 
 /* DVIMS does some wacky things with arguments,
@@ -350,92 +384,23 @@ vj_event_fire_net_event( osc_info, c, NULL,arguments, num_arg );\
    if there are no arguments no event is fired
 */
 
-#define DNET_F(a,b,c)\
-{\
-int c_a = vj_osc_count_int_arguments(a,b);\
-int num_arg = vj_event_get_num_args(c);\
-int arguments[16];\
-int n_a=0;\
-memset(arguments,0,16);\
-if ( c == VIMS_CHAIN_ENTRY_SET_PRESET ) {\
- arguments[0] = 0;\
- arguments[1] = -1;\
- n_a = vj_osc_parse_int_arguments( a, b, arguments + 2 );\
- if(n_a <= 1) {\
-  veejay_msg(VEEJAY_MSG_ERROR, "VIMS '%s'", vj_event_get_name(c) );\
-  veejay_msg(VEEJAY_MSG_ERROR, "Use <effect_id> <parameter 0> .. <parameter N> [source] [channel]");\
- } else {\
-	vj_event_fire_net_event( osc_info, c, NULL, arguments, n_a + 2 );\
- }\
-}\
-else {\
-	if(c_a >= 0) {\
-	 if( (num_arg-1) == c_a ){\
-		vj_osc_parse_int_arguments( a, b, arguments + 1 );\
-		veejay_msg(VEEJAY_MSG_DEBUG, "n_a = %d, c_a = %d, num_arg = %d",\
-			n_a, c_a, num_arg );\
-		vj_event_fire_net_event( osc_info,c, NULL,arguments,num_arg );\
-	 }\
-	 else {\
-		if ( (num_arg-2) == c_a) {\
-			arguments[0]=0;\
-			arguments[1]=-1;\
-			vj_osc_parse_int_arguments( a, b, arguments + 2 );\
-	veejay_msg(VEEJAY_MSG_DEBUG, "n_a = %d, c_a = %d, num_arg = %d",\
-		n_a, c_a, num_arg );\
-			vj_event_fire_net_event( osc_info,c,NULL,arguments,num_arg );\
-		}\
-		else {\
-			veejay_msg(VEEJAY_MSG_ERROR, "VIMS '%s' - format '%s'", vj_event_get_name(c), vj_event_get_format(c) );\
-			veejay_msg(VEEJAY_MSG_ERROR, "Number of arguments given dont match format %d,%d",num_arg, c_a);\
-		}\
-	 }\
-	}\
-	else {\
-		veejay_msg(VEEJAY_MSG_ERROR, "I fill in the current sample ( possibly the current chain entry too )");\
-		veejay_msg(VEEJAY_MSG_ERROR, "You need to fill in the remaining arguments of VIMS '%s'",\
-			 vj_event_get_name(c) );\
-	}\
- }\
-}
-
-// DSNET_F takes default sample (last) if none is given
-
-#define DSNET_F(a,b,c)\
-{\
-int c_a = vj_osc_count_int_arguments(a,b);\
-int num_arg = vj_event_get_num_args(c);\
-int arguments[16];\
-memset(arguments,0,16);\
-if(c_a == 0) {\
-arguments[0]=-1;\
-vj_event_fire_net_event( osc_info,c, NULL,arguments,num_arg );\
-}\
-else {\
- if( c_a == num_arg ) { \
-vj_osc_parse_int_arguments(a,b,arguments);\
-vj_event_fire_net_event(osc_info,c,NULL,arguments,c_a); }\
-}\
-}
-
-
 
 void vj_osc_cb_el_add_sample(void *context, int arglen, const void *vargs, OSCTimeTag when,
 		NetworkReturnAddressPtr ra)
 {
-	SNET_F(arglen, vargs, VIMS_EDITLIST_ADD_SAMPLE);
+	NET_F_mixed(arglen, vargs, VIMS_EDITLIST_ADD_SAMPLE);
 }
 void vj_osc_cb_el_load(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
-	SNET_F(arglen, vargs, VIMS_EDITLIST_LOAD);
+	NET_F_str(arglen, vargs, VIMS_EDITLIST_LOAD);
 }
 void vj_osc_cb_el_save(void *context, int arglen , const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
-	SNET_F(arglen, vargs, VIMS_EDITLIST_SAVE);
+	NET_F_mixed_str(arglen, vargs, VIMS_EDITLIST_SAVE);
 }
 void vj_osc_cb_el_add(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra )
 {
-	SNET_F(arglen, vargs, VIMS_EDITLIST_ADD );
+	NET_F_str(arglen, vargs, VIMS_EDITLIST_ADD );
 }
 void vj_osc_cb_el_cut(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra )
 {
@@ -593,62 +558,62 @@ void vj_osc_cb_sample_del(void *context, int arglen, const void *vargs, OSCTimeT
 void vj_osc_cb_select_sample(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DSNET_F(arglen, vargs, VIMS_SAMPLE_SELECT);
+	NET_F(arglen, vargs, VIMS_SAMPLE_SELECT);
 }
 void vj_osc_cb_sample_set_jitter(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen, vargs, VIMS_SAMPLE_UPDATE );
+	NET_F_prefixed_single(arglen, vargs, VIMS_SAMPLE_UPDATE );
 }	
 void vj_osc_cb_sample_set_start(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen, vargs, VIMS_SAMPLE_SET_START);
+	NET_F_prefixed_single(arglen, vargs, VIMS_SAMPLE_SET_START);
 }
 
 void vj_osc_cb_sample_set_end(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen, vargs, VIMS_SAMPLE_SET_END);
+	NET_F_prefixed_single(arglen, vargs, VIMS_SAMPLE_SET_END);
 }
 
 void vj_osc_cb_sample_set_dup(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen,vargs,VIMS_SAMPLE_SET_DUP);
+	NET_F_prefixed_single(arglen,vargs,VIMS_SAMPLE_SET_DUP);
 }
 
 void vj_osc_cb_sample_set_speed(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen, vargs,VIMS_SAMPLE_SET_SPEED);
+	NET_F_prefixed_single(arglen, vargs,VIMS_SAMPLE_SET_SPEED);
 }
 
 void vj_osc_cb_sample_set_looptype(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen,vargs,VIMS_SAMPLE_SET_LOOPTYPE);
+	NET_F_prefixed_single(arglen,vargs,VIMS_SAMPLE_SET_LOOPTYPE);
 }
 
 void vj_osc_cb_sample_set_marker(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen, vargs, VIMS_SAMPLE_SET_MARKER);
+	NET_F_prefixed_single(arglen, vargs, VIMS_SAMPLE_SET_MARKER);
 }
 
 void vj_osc_cb_sample_clear_marker(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen, vargs, VIMS_SAMPLE_CLEAR_MARKER);
+	NET_F_prefixed_single(arglen, vargs, VIMS_SAMPLE_CLEAR_MARKER);
 }
 
 void vj_osc_cb_sample_record_start(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	NET_F(arglen,vargs,VIMS_SAMPLE_REC_START);
+	NET_F_prefixed_single(arglen,vargs,VIMS_SAMPLE_REC_START);
 }
 void vj_osc_cb_record_format(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
-	SNET_F(arglen, vargs, VIMS_RECORD_DATAFORMAT );
+	NET_F_str(arglen, vargs, VIMS_RECORD_DATAFORMAT );
 }
 void vj_osc_cb_sample_record_stop(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
@@ -659,30 +624,30 @@ void vj_osc_cb_sample_record_stop(void *context, int arglen, const void *vargs, 
 void	vj_osc_cb_chain_clear( void *ctx, int arglen, const void *vargs,
 	OSCTimeTag when, NetworkReturnAddressPtr ra )
 {
-	DNET_F( arglen, vargs, VIMS_CHAIN_CLEAR );
+	NET_F_prefixed_single( arglen, vargs, VIMS_CHAIN_CLEAR );
 }
 
 void vj_osc_cb_chain_entry_disable_video(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_VIDEO_OFF);
+	NET_F_prefixed_full(arglen,vargs,VIMS_CHAIN_ENTRY_SET_VIDEO_OFF);
 }
 
 void vj_osc_cb_chain_entry_enable_video(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_VIDEO_ON);
+	NET_F_prefixed_full(arglen,vargs,VIMS_CHAIN_ENTRY_SET_VIDEO_ON);
 }
 
 void vj_osc_cb_chain_toggle_all(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen,vargs,VIMS_CHAIN_TOGGLE_ALL);
+	NET_F_prefixed_single(arglen,vargs,VIMS_CHAIN_TOGGLE_ALL);
 }
 
 void vj_osc_cb_chain_entry_del(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_CLEAR);
+	NET_F_prefixed_full(arglen,vargs,VIMS_CHAIN_ENTRY_CLEAR);
 }
 
 void vj_osc_cb_chain_entry_select(void *context, int arglen, const void *vargs, OSCTimeTag when,
@@ -694,70 +659,69 @@ void vj_osc_cb_chain_entry_select(void *context, int arglen, const void *vargs, 
 void vj_osc_cb_chain_entry_default(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_DEFAULTS);
+	NET_F_prefixed_full(arglen,vargs,VIMS_CHAIN_ENTRY_SET_DEFAULTS);
 }
 
 void vj_osc_cb_chain_entry_preset(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_PRESET);
+	NET_F_prefixed_full(arglen,vargs,VIMS_CHAIN_ENTRY_SET_PRESET);
 }
 
 void vj_osc_cb_chain_entry_set(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen, vargs, VIMS_CHAIN_ENTRY_SET_EFFECT);
+	NET_F_prefixed_full(arglen, vargs, VIMS_CHAIN_ENTRY_SET_EFFECT);
 }
 
 void vj_osc_cb_chain_entry_set_arg_val(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL);
+	NET_F_prefixed_full(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL);
 }
 
 
 void vj_osc_cb_chain_entry_channel(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen, vargs, VIMS_CHAIN_ENTRY_SET_CHANNEL);
+	NET_F_prefixed_full(arglen, vargs, VIMS_CHAIN_ENTRY_SET_CHANNEL);
 
 }
 
 void vj_osc_cb_chain_entry_source(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen, vargs, VIMS_CHAIN_ENTRY_SET_SOURCE);
-
+	NET_F_prefixed_full(arglen, vargs, VIMS_CHAIN_ENTRY_SET_SOURCE);
 }
 
 void	vj_osc_cb_chain_manual_fade(void *ctx, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen, vargs, VIMS_CHAIN_MANUAL_FADE );
+	NET_F_prefixed_single(arglen, vargs, VIMS_CHAIN_MANUAL_FADE );
 }
 
 void vj_osc_cb_chain_fade_in(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen, vargs, VIMS_CHAIN_FADE_IN);
+	NET_F_prefixed_single(arglen, vargs, VIMS_CHAIN_FADE_IN);
 }
 
 void vj_osc_cb_chain_fade_out(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen,vargs,VIMS_CHAIN_FADE_OUT);
+	NET_F_prefixed_single(arglen,vargs,VIMS_CHAIN_FADE_OUT);
 }
 
 void vj_osc_cb_chain_enable(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen,vargs,VIMS_CHAIN_ENABLE);
+	NET_F_prefixed_single(arglen,vargs,VIMS_CHAIN_ENABLE);
 }
 
 void vj_osc_cb_chain_disable(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DNET_F(arglen,vargs,VIMS_CHAIN_DISABLE);
+	NET_F_prefixed_single(arglen,vargs,VIMS_CHAIN_DISABLE);
 }
 
 void vj_osc_cb_tag_record_offline_start(void *context, int arglen, const void *vargs, OSCTimeTag when,
@@ -788,68 +752,68 @@ void vj_osc_cb_tag_record_stop(void *context, int arglen, const void *vargs, OSC
 void vj_osc_cb_tag_select(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	DSNET_F(arglen,vargs,VIMS_STREAM_SELECT);
+	NET_F(arglen,vargs,VIMS_STREAM_SELECT);
 }
 
 void	vj_osc_cb_chain_add( void *ctx, int arglen, const void *vargs,
 	OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
-	DNET_F( arglen, vargs, VIMS_CHAIN_ENTRY_SET_EFFECT);
+	NET_F_prefixed_full( arglen, vargs, VIMS_CHAIN_ENTRY_SET_EFFECT);
 }
 
 void vj_osc_cb_set_parameter0(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	PNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,0);
+	NET_F_prefixed(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,0);
 }
 
 void vj_osc_cb_set_parameter1(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	PNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,1);
+	NET_F_prefixed(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,1);
 }
 
 void vj_osc_cb_set_parameter2(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	PNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,2);
+	NET_F_prefixed(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,2);
 }
 
 void vj_osc_cb_set_parameter3(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	PNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,3);
+	NET_F_prefixed(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,3);
 }
 
 void vj_osc_cb_set_parameter4(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	PNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,4);
+	NET_F_prefixed(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,4);
 }
 
 void vj_osc_cb_set_parameter5(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	PNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,5);
+	NET_F_prefixed(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,5);
 }
 
 void vj_osc_cb_set_parameter6(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	PNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,6);
+	NET_F_prefixed(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,6);
 }
 
 void vj_osc_cb_set_parameter7(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	PNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,7);
+	NET_F_prefixed(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,7);
 }
 
 
 void vj_osc_cb_set_parameter8(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	PNET_F(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,8);
+	NET_F_prefixed(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,8);
 }
 #ifdef HAVE_V4L
 void vj_osc_cb_tag_new_v4l(void *context, int arglen, const void *vargs, OSCTimeTag when,
@@ -862,47 +826,47 @@ void vj_osc_cb_tag_new_v4l(void *context, int arglen, const void *vargs, OSCTime
 void vj_osc_cb_tag_new_net(void *context, int arglen, const void *vargs, OSCTimeTag when,
     NetworkReturnAddressPtr ra)
 {
-	SDNET_F(arglen,vargs,VIMS_STREAM_NEW_UNICAST);
+	NET_F_mixed(arglen,vargs,VIMS_STREAM_NEW_UNICAST);
 }
 void vj_osc_cb_tag_new_mcast(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra )
 {
-	SDNET_F(arglen,vargs,VIMS_STREAM_NEW_MCAST);
+	NET_F_mixed(arglen,vargs,VIMS_STREAM_NEW_MCAST);
 }
 void vj_osc_cb_tag_new_avformat(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	SNET_F(arglen,vargs,VIMS_STREAM_NEW_AVFORMAT);
+	NET_F_str(arglen,vargs,VIMS_STREAM_NEW_AVFORMAT);
 }
 
 void vj_osc_cb_tag_new_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	SNET_F(arglen,vargs,VIMS_STREAM_NEW_Y4M);
+	NET_F_str(arglen,vargs,VIMS_STREAM_NEW_Y4M);
 }
 
 void vj_osc_cb_load_samplelist(void *context, int arglen, const void *vargs,
 	OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
-	SNET_F(arglen,vargs,VIMS_SAMPLE_LOAD_SAMPLELIST);
+	NET_F_str(arglen,vargs,VIMS_SAMPLE_LOAD_SAMPLELIST);
 }
 
 void vj_osc_cb_save_samplelist(void *context, int arglen, const void *vargs,
 	OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
-	SNET_F(arglen,vargs,VIMS_SAMPLE_SAVE_SAMPLELIST);
+	NET_F_str(arglen,vargs,VIMS_SAMPLE_SAVE_SAMPLELIST);
 }
 
 void vj_osc_cb_output_start_y4m(void *context, int arglen, const void *vargs,
 	OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
-	SNET_F(arglen,vargs,VIMS_OUTPUT_Y4M_START);
+	NET_F_str(arglen,vargs,VIMS_OUTPUT_Y4M_START);
 }
 
 void vj_osc_cb_output_stop_y4m(void *context, int arglen, const void *vargs,
 	OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
-	SNET_F(arglen,vargs,VIMS_OUTPUT_Y4M_STOP);
+	NET_F(arglen,vargs,VIMS_OUTPUT_Y4M_STOP);
 }
 
 #ifdef HAVE_SDL
@@ -918,7 +882,7 @@ void vj_osc_cb_fullscreen(void *context, int arglen, const void *vargs, OSCTimeT
 #endif
 void vj_osc_cb_screenshot( void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
-	SNET_F(arglen, vargs, VIMS_SCREENSHOT);
+	NET_F_mixed_str(arglen, vargs, VIMS_SCREENSHOT);
 }
 void vj_osc_cb_sampling( void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
@@ -1266,13 +1230,8 @@ void* vj_osc_allocate(int port_id) {
 void vj_osc_dump()
 {
 
-	veejay_msg(VEEJAY_MSG_INFO,"The OSC message space is a subset of VIMS");
-	veejay_msg(VEEJAY_MSG_INFO,"By default, the actions are applied on the current playing");
-	veejay_msg(VEEJAY_MSG_INFO,"video (sample/stream). This can be overriden by setting the");
-	veejay_msg(VEEJAY_MSG_INFO,"stream or sample number as first argument, followed by the arguments");
-	veejay_msg(VEEJAY_MSG_INFO,"required by the message.");
-	veejay_msg(VEEJAY_MSG_INFO,"For Chain commands, ditto, use second argument to identify the chain entry");
-
+	veejay_msg(VEEJAY_MSG_INFO,"Veejay OSC");
+	veejay_msg(VEEJAY_MSG_INFO,"When using strings, set it *always* as the first argument");
 	OSCPrintWholeAddressSpace();
 
 

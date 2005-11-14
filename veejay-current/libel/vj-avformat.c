@@ -62,7 +62,7 @@ static int	vj_avformat_set_video_position( vj_avformat *av, long nframe )
 	return 0;
 }
 
-static void	vj_avformat_err(int err)
+static void	vj_avformat_err(int err, char *arg)
 {
    switch(err)
    {
@@ -76,7 +76,7 @@ static void	vj_avformat_err(int err)
         veejay_msg(VEEJAY_MSG_ERROR, "Unknown format");
         break;
     default:
-        veejay_msg(VEEJAY_MSG_ERROR,"Error while opening file");
+        veejay_msg(VEEJAY_MSG_ERROR,"Error while opening file '%s'",arg);
         break;
    }
 
@@ -190,7 +190,7 @@ vj_avformat *vj_avformat_open_input(const char *filename)
 
 	if(err < 0 )
 	{
-		vj_avformat_err(err);
+		vj_avformat_err(err,filename);
 		free(av);
 		return NULL;
 	}
@@ -198,7 +198,7 @@ vj_avformat *vj_avformat_open_input(const char *filename)
 	err = av_find_stream_info( av->context );
 	if( err < 0 )
 	{
-		vj_avformat_err(err);
+		vj_avformat_err(err,NULL);
 	}
 
 	for(i =0 ; i < av->context->nb_streams; i ++)

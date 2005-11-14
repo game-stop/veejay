@@ -302,6 +302,7 @@ extern int sample_set_selected_entry(int s1, int position);
 
 extern int sample_set_editlist( int s1, editlist *edl );
 extern editlist *sample_get_editlist(int s1 );
+extern int     sample_get_el_position( int sample_id, int *start, int *end );
 
 #ifdef HAVE_XML2
 extern void CreateSample(xmlNodePtr node, sample_info * sample);

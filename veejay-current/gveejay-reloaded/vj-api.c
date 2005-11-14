@@ -1950,7 +1950,7 @@ static	void single_vims(int id)
 	sprintf(block, "%03d:;",id);
 	vj_client_send( info->client, V_CMD, block );
 }
-static int count__ = 0;
+
 static gchar	*recv_vims(int slen, int *bytes_written)
 {
 	int tmp_len = slen+1;
@@ -1960,13 +1960,11 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 	int ret = vj_client_read( info->client, V_CMD, tmp, slen );
 	int len = 0;
 	sscanf( tmp, "%d", &len );
-
 	gchar *result = NULL;
 	if( len <= 0 || slen <= 0)
 	{
 		return result;
 	}
-	count__++;
 	result = (gchar*) vj_malloc(sizeof(gchar) * (len + 1) );
 	bzero(result, (len+1));
 	int bytes_left = len;
@@ -3655,7 +3653,7 @@ static	void	load_effectchain_info()
 	gint offset=0;
 
 	gint fxlen = 0;
-	single_vims( VIMS_CHAIN_LIST );
+	multi_vims( VIMS_CHAIN_LIST,"%d",0 );
 	gchar *fxtext = recv_vims(3,&fxlen);
 
 	reset_tree( "tree_chain" );
@@ -4193,33 +4191,35 @@ static	void	select_slot(int pm)
 {
 	int *history = info->history_tokens[ pm ];
 
-
 	if( pm != MODE_PLAIN )
 	{
 		if(info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
-			pm != history[PLAY_MODE] || info->selected_slot == NULL || info->selected_slot->sample_id !=
+			pm != history[PLAY_MODE] )
+		{
+			if(info->selected_slot)
+			{
+				set_activation_of_slot_in_samplebank(false);
+			info->selected_slot= NULL;
+			info->selected_gui_slot=NULL;
+
+			}
+		}
+		if(info->selected_slot == NULL || info->selected_slot->sample_id !=
 			info->status_tokens[CURRENT_ID] || pm != info->selected_slot->sample_type)
 		{
 			int b = 0; int p = 0;
 			/* falsify activation */
 			no_preview_ = 2;
-
-			if(info->selected_slot)
-				set_activation_of_slot_in_samplebank(false);
 			
-			info->selected_slot= NULL;
-			info->selected_gui_slot=NULL;
-			verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID],
-				info->status_tokens[PLAY_MODE] );
-			info->selected_slot = info->sample_banks[b]->slot[p];
-			info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
-			set_activation_of_slot_in_samplebank(true);
-				
-		}
-		if( info->status_tokens[CURRENT_ID] == history[CURRENT_ID] &&
-			info->status_tokens[PLAY_MODE] == history[PLAY_MODE] )
-		{
-			//no_preview_ = 0;
+			
+			if(info->status_tokens[CURRENT_ID] > 0)
+			{
+				verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID],
+					info->status_tokens[PLAY_MODE] );
+				info->selected_slot = info->sample_banks[b]->slot[p];
+				info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
+				set_activation_of_slot_in_samplebank(true);
+			}	
 		}
 	}
 	else
@@ -4251,10 +4251,9 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	int n_slots = 0;
 	reset_tree( "tree_sources" );
 
-	single_vims( VIMS_SAMPLE_LIST );
+	multi_vims( VIMS_SAMPLE_LIST,"%d", 0 );
 	gint fxlen = 0;
 	gchar *fxtext = recv_vims(5,&fxlen);
-
 	if(fxlen > 0 && fxtext != NULL)
 	{
 		has_samples = 1;
@@ -4316,9 +4315,8 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	if( fxtext ) g_free(fxtext);
 	fxlen = 0;
 
-	single_vims( VIMS_STREAM_LIST );
+	multi_vims( VIMS_STREAM_LIST,"%d",0 );
 	fxtext = recv_vims(5, &fxlen);
-
 	if( fxlen > 0 && fxtext != NULL)
 	{
 		has_streams = 1;
@@ -4396,8 +4394,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	}
 
 	if(fxtext) g_free(fxtext);
-
-	//select_slot(info->status_tokens[PLAY_MODE]);
+	
 }
 
 gboolean
@@ -5492,7 +5489,9 @@ static	gboolean	update_imageA( gpointer data )
 	//while (gtk_events_pending ())
 	  //gtk_main_iteration ();
 	if(info->status_lock)
+	{
 		return TRUE;
+	}
 	if( info->state == STATE_PLAYING ) // && info->status_passed >= get_nums("preview_delay") )
 	{
 		GdkPixbuf *new_pixbuf = NULL;
@@ -5501,7 +5500,6 @@ static	gboolean	update_imageA( gpointer data )
 			no_preview_ --;
 			return TRUE;
 		}
-
 		if(info->status_tokens[PLAY_MODE] == MODE_PLAIN )
 		{
 			if( is_button_toggled( "previewtoggle" ))
@@ -5659,7 +5657,6 @@ static	void	init_cpumeter()
 	info->cpumeter = g_timeout_add(300,update_cpumeter_timeout,
 			(gpointer*) info );
 	int ms = (int) ( 1.0 / info->el.fps * 1000 );
-//fprintf(stderr, "Setup image preview timer %d\n",ms);
 //	info->imageA = g_timeout_add(G_PRIORITY_HIGH_IDLE,update_imageA, (gpointer*)info);
 	info->imageA =	gtk_idle_add( update_imageA, (gpointer*) info);
 	g_timeout_add(600, refresh_image_horror, (gpointer*) info);
@@ -7453,7 +7450,6 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
 	
 	if(info->selected_slot->sample_id <= 0 )
 	{
-		fprintf(stderr, "Etch in %p\n", info->selected_gui_slot);
 		gtk_frame_set_shadow_type( info->selected_gui_slot->frame, GTK_SHADOW_ETCHED_IN );
 	}
 	else
@@ -7475,8 +7471,8 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
 		GTK_STATE_NORMAL, &color );
 	gtk_widget_modify_fg ( info->selected_gui_slot->timecode,
 		GTK_STATE_NORMAL, &color );
-	gtk_widget_modify_fg ( gtk_frame_get_label_widget( info->selected_gui_slot->frame ),
-		GTK_STATE_NORMAL, &color );
+//	gtk_widget_modify_fg ( gtk_frame_get_label_widget( info->selected_gui_slot->frame ),
+//		GTK_STATE_NORMAL, &color );
 	
 }
 
@@ -7503,7 +7499,7 @@ static	void	set_selection_of_slot_in_samplebank(gboolean active)
 		color.red = 0;	
 		color.blue = 0;
 	}
-	
+fprintf(stderr, "%s:%d\n",__FUNCTION__,__LINE__);	
 	gtk_widget_modify_fg ( info->selection_gui_slot->title,
 		GTK_STATE_NORMAL, &color );
 	gtk_widget_modify_fg ( info->selection_gui_slot->timecode,

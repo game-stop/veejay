@@ -280,7 +280,7 @@ int		vj_tag_try_filename(int t1, char *filename);
 int		vj_tag_get_encoded_file(int t1, char *descr);
 void	vj_tag_reset_encoder( int t1 );
 void 	vj_tag_record_init(int w, int h);
-
+void vj_tag_get_method_filename(int t1, char *dst);
 int		vj_tag_get_last_tag(void);
 int		vj_tag_put( vj_tag *tag );
 int 	vj_tag_is_deleted(int id);

@@ -35,6 +35,8 @@ int	vj_vloopback_fill_buffer( void *vloop, uint8_t **image );
 void	vj_vlooopback_close( void *vloop );
 
 int	vj_vloopback_get_mode( void *vloop );
+void     vj_vloopback_close( void *vloop );
+
 
 //void	vj_vloopback_signal_handler( void *vloop, int sig_no );
 

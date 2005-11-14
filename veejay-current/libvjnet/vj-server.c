@@ -40,6 +40,7 @@ typedef struct
 typedef struct {
 	int handle;
 	int in_use;
+	int promote;
 	vj_message **m_queue;
 	int n_queued;
 	int n_retrieved;
@@ -104,6 +105,7 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 			return 0;
 		}
 		link[i]->in_use = 1;
+		link[i]->promote = 0;
 		link[i]->m_queue = (vj_message**) vj_malloc(sizeof( vj_message * ) * VJ_MAX_PENDING_MSG );
 		if(!link[i]->m_queue)
 		{
@@ -183,6 +185,7 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 			return 0;
 		}
 		link[i]->in_use = 0;
+		link[i]->promote = 0;
 		link[i]->m_queue = (vj_message**) vj_malloc(sizeof( vj_message * ) * VJ_MAX_PENDING_MSG );
 		memset( link[i]->m_queue, 0, sizeof(vj_message*) * VJ_MAX_PENDING_MSG );
 		if(!link[i]->m_queue)	return 0;
@@ -356,6 +359,17 @@ void	vj_server_close_connection(vj_server *vje, int link_id )
 {
 	_vj_server_del_client( vje, link_id );
 }
+int	vj_server_client_promoted( vj_server *vje, int link_id)
+{
+	vj_link **Link= (vj_link**) vje->link; 
+	return Link[link_id]->promote;	
+}
+void	vj_server_client_promote( vj_server *vje, int link_id)
+{
+	vj_link **Link= (vj_link**) vje->link; 
+	Link[link_id]->promote = 1;	
+}
+
 
 int vj_server_poll(vj_server * vje)
 {
@@ -586,6 +600,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 			v[num_msg]->len = n_len;
 			num_msg++;
 		}
+
 		if(priority && netid > 255 )
 		{
 			// store high priority only (reduce load) -         
