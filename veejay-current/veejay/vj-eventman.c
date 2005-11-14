@@ -687,6 +687,7 @@ void		vj_init_vevo_events(void)
 				SAMPLE_ID_HELP,
 				0,
 				"Looptype (0=None, 1=Normal, 2=Pingpong)",
+				-1,
 				NULL);
 
 	index_map_[VIMS_RECORD_DATAFORMAT]	=	_new_event(
@@ -757,7 +758,7 @@ void		vj_init_vevo_events(void)
 				"Change playback mode",
 				vj_event_set_play_mode,
 				1,
-				VIMS_REQUIRE_ALL_PARAMS,	
+				VIMS_ALLOW_ANY,	
 				"Playback (2=plain,1=stream,0=sample)",
 				2,
 				NULL );
@@ -887,7 +888,7 @@ void		vj_init_vevo_events(void)
 				"Clear in and out points",
 				vj_event_sample_set_marker_clear,
 				1,
-				VIMS_REQUIRE_ALL_PARAMS,
+				VIMS_ALLOW_ANY,
 				SAMPLE_ID_HELP,
 				0,
 				NULL );
@@ -921,7 +922,7 @@ void		vj_init_vevo_events(void)
 				"Enable effect chain of sample",
 				vj_event_sample_chain_enable,
 				1,
-				VIMS_REQUIRE_ALL_PARAMS,
+				VIMS_ALLOW_ANY,
 				SAMPLE_ID_HELP,
 				0,
 				NULL );
@@ -932,7 +933,7 @@ void		vj_init_vevo_events(void)
 				"Disable effect chain of sample",	
 				vj_event_sample_chain_disable,
 				1,
-				VIMS_REQUIRE_ALL_PARAMS,
+				VIMS_ALLOW_ANY,
 				SAMPLE_ID_HELP,
 				0,	
 				NULL );
@@ -971,7 +972,7 @@ void		vj_init_vevo_events(void)
 				NULL );
 
 	index_map_[VIMS_SAMPLE_DEL_ALL]				=	_new_event(
-				"%d",
+				NULL,
 				VIMS_SAMPLE_DEL_ALL,
 				"Delete all samples (caution!)",
 				vj_event_sample_clear_all,
@@ -1007,7 +1008,7 @@ void		vj_init_vevo_events(void)
 				"Select and play stream",	
 				vj_event_tag_select,
 				1,
-				VIMS_REQUIRE_ALL_PARAMS,
+				VIMS_ALLOW_ANY,
 				"Stream ID >= 1",
 				0,
 				NULL );

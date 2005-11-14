@@ -780,21 +780,26 @@ static	int	vj_event_verify_args( int *fx, int net_id , int arglen, int np, int p
 		{
 			int fx_p = vj_effect_get_num_params( fx_id );
 			int fx_c = vj_effect_get_extra_frame( fx_id );
-			int min = fx_p;
-			int max = fx_p + ( fx_c ? 2 : 0 );
-			int a_len = arglen - prefixed - 1;
+			int min = fx_p + (prefixed > 0 ? 0: 3);
+			int max = min + ( fx_c ? 2 : 0 );
+			int a_len = arglen -( prefixed > 0 ? prefixed - 1: 0 );
 			if( a_len < min || a_len > max )
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Invalid number of Effect parameters given ( %d out of %d)",						a_len,fx_p);
+				if( a_len < min )
+				  veejay_msg(VEEJAY_MSG_ERROR,"Invalid number of parameters for Effect %d (Need %d, only have %d)", fx_id,
+					min, a_len );
+				if( a_len > max )
+				  veejay_msg(VEEJAY_MSG_ERROR,"Invalid number of parameters for Effect %d (At most %d, have %d)",fx_id,
+					max, a_len ); 
 				return 0;
 			} 
 			if( a_len == min && fx_c >= 1 )
 			{
-				veejay_msg(VEEJAY_MSG_WARNING, "Taking default mixing channel and source");
+				veejay_msg(VEEJAY_MSG_WARNING, "Taking default mixing channel and source for Effect %d", fx_id);
 			}
 			if( a_len > min && a_len < max )
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Invalid mixing source given , use <Source Type> <Channel ID>");
+				veejay_msg(VEEJAY_MSG_ERROR, "Invalid mixing source given for Effect %d , use <Source Type> <Channel ID>",fx_id);
 				return 0;
 			}
 		}
@@ -938,6 +943,7 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 {
 	char *head = NULL;
 	int net_id = 0;
+	int np = 0;
 	if( msg == NULL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Empty VIMS, dropped!");
@@ -1010,15 +1016,23 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 	if( net_id >= 400 && net_id < 499 )
 		vj_server_client_promote( v->vjs[0] , v->uc->current_link );
 
+	np = vj_event_vevo_get_num_args( net_id );
+		
 	if ( msg_len <= MSG_MIN_LEN )
 	{
-		vj_event_fire_net_event( v, net_id, NULL, NULL, 0, 0 );
+		int i_args[16];
+		int i = 0;
+		while(  i < np  )
+		{
+			i_args[i] = vj_event_vevo_get_default_value( net_id, i );
+			i++;
+		}
+		vj_event_fire_net_event( v, net_id, NULL, i_args, np, 0 );
 	}
 	else
 	{
 		char *arguments = NULL;
 		char *fmt = vj_event_vevo_get_event_format( net_id );
-		int  np = vj_event_vevo_get_num_args( net_id );
 		int flags = vj_event_vevo_get_flags( net_id );
 		int i = 0;
 		int i_args[16];
@@ -1092,7 +1106,11 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 			   *arguments ++;
 		}
 
-		i ++; 
+		i ++;
+
+		if( flags & VIMS_ALLOW_ANY )
+ 			i = np;
+
 		vj_event_fire_net_event( v, net_id, str, i_args, i, 0 );
 		
 

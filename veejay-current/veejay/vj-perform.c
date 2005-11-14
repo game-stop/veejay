@@ -1809,7 +1809,6 @@ int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 		{
 			if(centry==CACHE_TOP)
 			{
-				veejay_msg(VEEJAY_MSG_DEBUG, "Chain entry %d in primary", chain_entry);
 				veejay_memcpy( helper_frame->data[0], primary_buffer[0]->Y, helper_frame->len);
 				veejay_memcpy( helper_frame->data[1], primary_buffer[0]->Cb, helper_frame->uv_len);
 				veejay_memcpy( helper_frame->data[2], primary_buffer[0]->Cr, helper_frame->uv_len);
@@ -1817,7 +1816,6 @@ int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 			}
 		    	else
 			{
-				veejay_msg(VEEJAY_MSG_DEBUG, "Chain entry %d found in entry %d", chain_entry,centry-CACHE);
 				veejay_memcpy( helper_frame->data[0], frame_buffer[centry-CACHE]->Y, helper_frame->len);
 				veejay_memcpy( helper_frame->data[1], frame_buffer[centry-CACHE]->Cb,helper_frame->uv_len);
 				veejay_memcpy( helper_frame->data[2], frame_buffer[centry-CACHE]->Cr,helper_frame->uv_len);
