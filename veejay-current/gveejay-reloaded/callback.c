@@ -103,9 +103,9 @@ void	on_audiovolume_value_changed(GtkWidget *widget, gpointer user_data)
 void	on_audiovolume_knob_value_changed(GtkAdjustment *adj, gpointer user_data)
 {
 	gdouble val = gtk_adjustment_get_value(adj);
-	multi_vims( VIMS_SET_VOLUME, "%d", (gint) (val * 100.0) );
-	vj_msg(VEEJAY_MSG_INFO,"Set volume to %d", (gint)(val * 100.0)); 
-	update_label_i( "volume_label", (gint)(val*100.0),0);
+	multi_vims( VIMS_SET_VOLUME, "%d", (gint) val );
+	vj_msg(VEEJAY_MSG_INFO,"Set volume to %d", (gint)val ); 
+	update_label_i( "volume_label", (gint)val,0);
 }
 
 void	on_button_001_clicked(GtkWidget *widget, gpointer user_data)
@@ -731,20 +731,19 @@ void	on_spin_sampleend_value_changed( GtkWidget *widget, gpointer user_data)
 		g_free(time1);
 	}
 }
-/*
-void	on_speedslider_value_changed(GtkWidget *widget, gpointer user_data)
+
+void	on_speed_slider_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-	//	gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
-		gint value = (gint) get_slider_val( "speedslider" );
-		value *= info->play_direction;
-	//	multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
+		gint value = (gint) get_slider_val( "speed_slider" );
+	//	value *= info->play_direction;
 		multi_vims( VIMS_VIDEO_SET_SPEED, "%d", value );
 			vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
 	}
-}*/
+}
+
 void on_speed_knob_value_changed(GtkAdjustment *adj, gpointer user_data)
 {
 	if(!info->status_lock)

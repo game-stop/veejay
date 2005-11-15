@@ -226,7 +226,7 @@ int vj_perform_increase_plain_frame(veejay_t * info, long num)
     if (settings->current_frame_num > settings->max_frame_num) {
 	if(!info->continuous)
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Reached end of video - stopping ... ");
+		veejay_msg(VEEJAY_MSG_DEBUG, "Reached end of video - Ending veejay session ... ");
 		veejay_change_state(info, LAVPLAY_STATE_STOP);
 	}
 	settings->current_frame_num = settings->max_frame_num;
@@ -426,11 +426,6 @@ static int	vj_perform_verify_rows(veejay_t *info, int frame)
 		}
 		
 	  } 
-	}
-        if(kilo_bytes > 0)
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG,"(Performer) Acquired %4.2f Kb for processing effect chain",
-			kilo_bytes);
 	}
 	return has_rows;
 }
@@ -658,7 +653,6 @@ int vj_perform_init_audio(veejay_t * info)
 #ifdef HAVE_JACK
 	for(i=2; i <= MAX_SPEED; i++)
 	{
-		//veejay_msg(VEEJAY_MSG_DEBUG, "Resampler at %d Hz", (info->edit_list->audio_rate * i));
 		int out_rate = info->edit_list->audio_rate * i;
 		resample_context[(i-1)] = audio_resample_init(
 					info->edit_list->audio_chans,
@@ -672,8 +666,7 @@ int vj_perform_init_audio(veejay_t * info)
 			resample_context[(i-1)] = NULL;
 			veejay_msg(VEEJAY_MSG_WARNING, "Cannot initialize resampler");
 		}
-		veejay_msg(VEEJAY_MSG_DEBUG, "Speed %d -> %d Hz ", i, out_rate );
-		//(i * info->edit_list->audio_rate));
+		veejay_msg(VEEJAY_MSG_DEBUG, "Speed %d resamples audio to %d Hz ", i, out_rate );
 	}
 #endif
     return 0;
@@ -996,7 +989,7 @@ int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 	{
 		/* frame send error handling */
 		veejay_msg(VEEJAY_MSG_ERROR,
-		  "Error sending frame");
+		  "Error sending frame to remote");
 		/* uncomment below to end veejay session */
 	}
 
@@ -1219,8 +1212,6 @@ void vj_perform_use_cached_ycbcr_frame(int entry, int centry, int width,
 	else
 	{
 		int c = centry - CACHE;
-		if( c == chain_entry )
-			veejay_msg(VEEJAY_MSG_ERROR, "Internal polution error");
 		veejay_memcpy(
 			frame_buffer[chain_entry]->Y,
 		        frame_buffer[c]->Y,helper_frame->len);
@@ -1588,15 +1579,8 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf)
 			vj_el_get_audio_frame(info->edit_list,
 					   settings->current_frame_num,
 					   audio_buf);
-			
-		//	veejay_msg(VEEJAY_MSG_DEBUG, "[%d] samples ", len );
 		}
     }
-
-    /*
-       if(info->sfd) {
-       len = vj_perform_new_audio_slowframe( info, top_audio_buffer, settings->current_frame_num ); 
-       } */
 
     if (len <= 0)
 	{
@@ -1685,7 +1669,6 @@ int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 	    {
 	   	 if(centry == CACHE_TOP)
 	   	 {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Chain %d found in primary", chain_entry);
 			// find in primary buffer
 			veejay_memcpy( helper_frame->data[0], primary_buffer[0]->Y, helper_frame->len);
 			veejay_memcpy( helper_frame->data[1], primary_buffer[0]->Cb, helper_frame->uv_len);
@@ -1694,7 +1677,6 @@ int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Chain %d found in chain %d", chain_entry,centry);
 			veejay_memcpy(helper_frame->data[0], frame_buffer[centry-CACHE]->Y, helper_frame->len);
 			veejay_memcpy(helper_frame->data[1], frame_buffer[centry-CACHE]->Cb,helper_frame->uv_len);
 			veejay_memcpy(helper_frame->data[2], frame_buffer[centry-CACHE]->Cr,helper_frame->uv_len);
@@ -2192,7 +2174,6 @@ int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[3])
 	{
 		if (!vj_tag_get_frame(sample_id, frame, NULL))
 	   	{
-			veejay_msg(VEEJAY_MSG_ERROR, "cannot get frame ?! (skip)" ); 
 			return 0;//skip
 		}
 	}
@@ -2321,7 +2302,7 @@ void vj_perform_record_sample_frame(veejay_t *info, int entry) {
 		// initialize a encoder
 		if(frames_left > 0 )
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "continue, %d frames left to record", frames_left);
+			veejay_msg(VEEJAY_MSG_DEBUG, "Continue, %d frames left to record", frames_left);
 			// todo: add to other editlist .. ?
 			if( sample_init_encoder( info->uc->sample_id, NULL,
 				df, info->edit_list, frames_left)==-1)
@@ -2726,7 +2707,6 @@ int vj_perform_queue_frame(veejay_t * info, int skip_incr, int frame )
 					vj_perform_increase_plain_frame(info,settings->current_playback_speed);
 				break;
 			default:
-				veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode");
 				veejay_change_state(info, LAVPLAY_STATE_STOP);
 				break;
 		}

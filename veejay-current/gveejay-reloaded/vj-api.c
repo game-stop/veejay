@@ -62,7 +62,7 @@
 static int	TIMEOUT_SECONDS = 0;
 #define STATUS_BYTES 	100
 #define STATUS_TOKENS 	19
-#define VEEJAY_CODENAME "Resume build 00"
+#define VEEJAY_CODENAME "Resume build"
 /* Status bytes */
 
 #define ELAPSED_TIME	0
@@ -403,7 +403,7 @@ typedef struct
 	sequence_envelope *sequence_view;
 	gint		current_sequence_slot;
 	GtkKnob		*audiovolume_knob;
-	GtkKnob		*speed_knob;	
+//	GtkKnob		*speed_knob;	
 	int		image_dimensions[2];
 	guchar		*rawdata;
 	int		prev_mode;
@@ -599,7 +599,6 @@ static struct
 	{"button_252"},
 	{"button_251"},
 	{"button_054"}, 
-//	{"speedslider"},
 	{"new_colorstream"},
 //	{"audiovolume"},
 	{"manualopacity"},
@@ -661,6 +660,7 @@ static struct
 	{"manualopacity"},
 	{"loglinear"},
 	{"frame_fxtree"},
+	{"fxbox"},
 	{NULL}
 };
 
@@ -1420,7 +1420,7 @@ void	about_dialog()
 	gtk_window_present( GTK_WINDOW( about ) );
 #else
 	int i;
-	vj_msg( VEEJAY_MSG_INFO, "Gveejay Reloaded %s", VEEJAY_CODENAME );
+	vj_msg( VEEJAY_MSG_INFO, "Gveejay Reloaded %s %d%d%d", VEEJAY_CODENAME,VEEJAY_MAJOR_VERSION,VEEJAY_MINOR_VERSION,VEEJAY_MICRO_VERSION );
 	vj_msg( VEEJAY_MSG_INFO, "%s", license );
 	for(i = 0; artists[i] != NULL ; i ++ )
 		vj_msg_detail( VEEJAY_MSG_INFO, "%s", artists[i] );
@@ -2780,14 +2780,15 @@ static	void	update_status_accessibility(int pm)
 				disable_widget("frame_sampleproperties");
 				for(i=0; videowidgets[i].name != NULL; i++)
 					disable_widget( videowidgets[i].name);
-				disable_widget_by_pointer(info->speed_knob);
-				
+				//disable_widget_by_pointer(info->audio_knob);
+				disable_widget( "speed_slider" );			
 			}
 			else
 			{
 				for(i=0; videowidgets[i].name != NULL; i++)
 					enable_widget( videowidgets[i].name);
-				enable_widget_by_pointer(info->speed_knob);	
+				//enable_widget_by_pointer(info->speed_knob);	
+				enable_widget( "speed_slider" );
 			}
 
 			if( pm == MODE_SAMPLE )
@@ -3032,10 +3033,14 @@ static void	update_current_slot(int pm)
 		if( history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] && !update)
 		{	
 			speed = info->status_tokens[SAMPLE_SPEED];
+			update_slider_value( "speed_slider", speed, 0 );
+			update_label_i( "speed_label", speed,0 );
+
+
 			if( speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
 			if( speed < 0 ) speed *= -1;
 			update_spin_value( "spin_samplespeed", speed);
-			update_knob_value(info->speed_knob, speed, 0);
+	//		update_knob_value(info->speed_knob, speed, 0);
 		}
 
 		if(update)
@@ -3197,10 +3202,12 @@ static void 	update_globalinfo()
 		if( history[SAMPLE_SPEED] != info->status_tokens[SAMPLE_SPEED] )
 		{
 			int plainspeed =  info->status_tokens[SAMPLE_SPEED];
+
+			update_slider_value( "speed_slider", plainspeed, 0);
+	//		update_knob_value( info->speed_knob, plainspeed, 0 );
+			update_label_i( "speed_label", plainspeed, 0 );
 			if( plainspeed < 0 ) info->play_direction = -1; else info->play_direction = 1;
 			if( plainspeed < 0 ) plainspeed *= -1;
-		//	update_slider_value( "speedslider", plainspeed, 0);
-			update_knob_value( info->speed_knob, plainspeed, 0 );
 		}
 	}
 
@@ -5315,11 +5322,13 @@ static	void	load_editlist_info()
 	{
 		disable_widget( "button_5_4");
 		disable_widget_by_pointer(info->audiovolume_knob);	
+		disable_widget( "audio_knobframe");
 	}
 	else
 	{
 		enable_widget( "button_5_4");
 		enable_widget_by_pointer(info->audiovolume_knob);
+		enable_widget( "audio_knobframe");
 	}
 	g_free(res);
 }
@@ -6423,8 +6432,9 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	if( speed < 0 ) speed *= -1;
 	//update_slider_range( "speedslider",0,68, speed, 0);
 	update_spin_range( "spin_framedelay", 0, 9, 0);
-	
-	update_knob_range(info->speed_knob, 1,13, speed, 0);
+	update_slider_range( "speed_slider", -25,25,speed,0);
+	update_label_i( "speed_label", speed,0);
+//	update_knob_range(info->speed_knob, 1,25, speed, 0);
 	if( info->run_state == RUN_STATE_LOCAL)
 		set_toggle_button( "previewtoggle", 1 );
 
@@ -6587,7 +6597,7 @@ void	vj_gui_disable()
 	}
 
 	disable_widget_by_pointer(info->audiovolume_knob);		
-	disable_widget_by_pointer(info->speed_knob);	
+//	disable_widget_by_pointer(info->speed_knob);	
 	gtk_widget_set_sensitive( GTK_WIDGET(
 			glade_xml_get_widget_(info->main_window, "button_loadconfigfile") ), TRUE );
 
@@ -6606,7 +6616,8 @@ void	vj_gui_enable()
 	}
 
 	enable_widget_by_pointer(info->audiovolume_knob);		
-	enable_widget_by_pointer(info->speed_knob);		
+//	enable_widget_by_pointer(info->speed_knob);		
+	enable_widget( "speed_slider");
 	// disable loadconfigfile
 	gtk_widget_set_sensitive( GTK_WIDGET(
 			glade_xml_get_widget_(info->main_window, "button_loadconfigfile") ), FALSE );
@@ -7725,7 +7736,7 @@ static void vj_gui_add_sample(gchar *filename, gint mode)
  * Function initialize the knobs to regulate the global speed and the audio volume 
  *  --------------------------------------------------------------------------------------------------------------------------*/
 void setup_knobs()
-    {		
+{		
     GtkAdjustment *speed_adj;       
     char path[MAX_PATH_LEN];
     bzero(path,MAX_PATH_LEN);
@@ -7742,7 +7753,7 @@ void setup_knobs()
     update_label_i( "volume_label", 100,0); 
 
     // speed
-    info->speed_knob = (GtkKnob *) gtk_knob_new(NULL,path);
+/*    info->speed_knob = (GtkKnob *) gtk_knob_new(NULL,path);
     gtk_widget_show(GTK_WIDGET(info->speed_knob));
     gtk_widget_set_sensitive( GTK_WIDGET(info->speed_knob), TRUE);	
     gtk_container_add (GTK_CONTAINER (glade_xml_get_widget_( info->main_window, "speed_knobframe")), GTK_WIDGET(info->speed_knob));    
@@ -7754,6 +7765,6 @@ void setup_knobs()
     speed_adj->page_size = 0;
     speed_adj->page_increment = 1;    
     g_signal_connect( speed_adj, "value_changed", (GCallback) on_speed_knob_value_changed, NULL );
- 
-    }
+ */
+}
         

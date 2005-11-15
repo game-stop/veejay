@@ -35,7 +35,7 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 int	vj_picture_get_width(void *pic);
 int	vj_picture_get_height(void *pic);
 void	vj_picture_display_formats(void);
-
+char	*vj_picture_get_filename( void *pic );
 void *	vj_picture_prepare_save( const char *filename, char *type, int out_w, int out_h);
 int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt );
 void  vj_picture_display_formats(void);

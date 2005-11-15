@@ -228,6 +228,13 @@ static	void	add_if_writeable( GdkPixbufFormat *data, GSList **list)
 	if(name) g_free(name);
 } 
 
+char	*vj_picture_get_filename( void *pic )
+{
+	vj_pixbuf_out_t *p = (vj_pixbuf_out_t*) pic;
+	if(!p) return NULL;
+	return p->filename;
+}
+
 void *	vj_picture_prepare_save(
 	const char *filename, char *type, int out_w, int out_h)
 {
