@@ -143,6 +143,7 @@ typedef struct
 
 static	vj_decoder *el_codecs[MAX_CODECS];
 
+
 static	_el_get_codec(int id )
 {
 	int i;
@@ -161,13 +162,55 @@ static	int	_el_get_codec_id( const char *fourcc )
 			return _supported_fourcc[i].id;
 	return -1;
 }
+
+static void	_el_free_decoder( vj_decoder *d )
+{
+	if(d)
+	{
+		int i;
+		if(d->tmp_buffer)
+			free( d->tmp_buffer );
+		for( i = 0; i < 3 ; i ++ )
+			if(d->deinterlace_buffer[i]) free(d->deinterlace_buffer[i]);
+
+		for ( i = 0; i < 2 ; i ++ )
+		{
+			if(d->context[i])
+			{	avcodec_close( d->context[i] ); 
+				free( d->context[i] );
+				d->context[i] = NULL;
+			}
+			if(d->frame[i]) av_free(d->frame[i]);
+		}
+		free(d);
+	}
+	d = NULL;
+}
+
+void	vj_el_init()
+{
+	int i;
+	for( i = 0; i < MAX_CODECS ;i ++ )
+		el_codecs[i] = NULL;
+
+}
+
+void	vj_el_deinit()
+{
+	int i;
+	for( i = 0; i < MAX_CODECS ;i ++ )
+	{
+		if( el_codecs[i] )
+			_el_free_decoder( el_codecs[i] );
+	}
+}
+
 vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixel_format)
 {
         vj_decoder *d = (vj_decoder*) vj_malloc(sizeof(vj_decoder));
         
         if(!d) return NULL;
-        d->codec[0] = NULL;
-	d->codec[1] = NULL;
+	memset( d, 0, sizeof(vj_decoder));
 
         if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420)
         {
@@ -1041,6 +1084,7 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 {
 	editlist *el = vj_malloc(sizeof(editlist));
 	if(!el) return NULL;
+	memset( el, 0, sizeof(editlist));
 	el->MJPG_chroma = chroma;
 	el->video_norm = norm;
 	el->is_empty = 1;
@@ -1091,7 +1135,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	,char norm, int out_fmt)
 {
 	editlist *el = vj_malloc(sizeof(editlist));
-
+	memset(el, 0, sizeof(editlist));
 	FILE *fd;
 	char line[1024];
 	uint64_t	index_list[MAX_EDIT_LIST_FILES];
@@ -1101,7 +1145,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	int n2=0;
 	long nl=0;
 	uint64_t n =0;
-
+	bzero(line,1024);
 	if(!el) return NULL;
 #ifdef USE_GDK_PIXBUF
 	vj_picture_init();
@@ -1358,16 +1402,16 @@ void	vj_el_free(editlist *el)
 	{
 		int n = el->num_video_files;
 		int i;
-		for( i = 0; i < n ; i++ )
+		for( i = 0; i < MAX_EDIT_LIST_FILES ; i++ )
 		{
-			if( el->video_file_list[i]) free(el->video_file_list[i]);
+			if( el->video_file_list[i] && el->lav_fd[i])
+				free(el->video_file_list[i]);
 			/* close fd if ref counter is zero */
-			if(!el->ref[i] && el->lav_fd[i])
-			{
+			if(el->lav_fd[i])
 				lav_close( el->lav_fd[i]);
-			}
 		}
-		if(el->frame_list) free(el->frame_list);
+		if(el->frame_list)
+			free(el->frame_list);
 		free(el);   
 		el = NULL;
 	}
@@ -1667,6 +1711,7 @@ void	vj_el_frame_cache(int n )
 editlist	*vj_el_soft_clone(editlist *el)
 {
 	editlist *clone = (editlist*) vj_malloc(sizeof(editlist));
+	memset( clone, 0, sizeof(editlist));
 	if(!clone)
 		return 0;
 	clone->is_empty = el->is_empty;
@@ -1694,13 +1739,17 @@ editlist	*vj_el_soft_clone(editlist *el)
 	clone->auto_deinter = el->auto_deinter;
 	clone->pixel_format = el->pixel_format;
 
-	memset( clone->video_file_list, 0 , sizeof(char*) * MAX_EDIT_LIST_FILES );
-	memset( clone->lav_fd , 0, sizeof(lav_file_t*) * MAX_EDIT_LIST_FILES );
-	memset( clone->num_frames, 0, sizeof(long) * MAX_EDIT_LIST_FILES);
-	memset( clone->yuv_taste, 0, sizeof(int) * MAX_EDIT_LIST_FILES);
+//	memset( clone->video_file_list, 0 , sizeof(char*) * MAX_EDIT_LIST_FILES );
+//	memset( clone->lav_fd , 0, sizeof(lav_file_t*) * MAX_EDIT_LIST_FILES );
+//	memset( clone->num_frames, 0, sizeof(long) * MAX_EDIT_LIST_FILES);
+//	memset( clone->yuv_taste, 0, sizeof(int) * MAX_EDIT_LIST_FILES);
 	int i;
 	for( i = 0; i < MAX_EDIT_LIST_FILES; i ++ )
 	{
+		clone->video_file_list[i] = NULL;
+		clone->lav_fd[i] = NULL;
+		clone->num_frames[i] = 0;
+		clone->yuv_taste[i] = 0;
 		if( el->lav_fd[i] && el->video_file_list[i])
 		{
 			clone->video_file_list[i] = strdup( el->video_file_list[i] );

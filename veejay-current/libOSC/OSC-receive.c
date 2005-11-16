@@ -195,6 +195,7 @@ static void PrintPacketFreeList(void) {
 void	OSCFreeReceiver(void)
 {
 	if( freePackets) free(freePackets);
+	if( globals.TheQueue ) free( globals.TheQueue );
 }
 
 

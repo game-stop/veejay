@@ -36,6 +36,6 @@ int sample_get_num_encoded_files(int sample_id);
 int sample_get_sequenced_file(int sample_id, char *descr, int num);
 int sample_try_filename(int sample_id, char *filename);
 int sample_continue_record( int s1 );
-
+void	sample_record_free();
 
 #endif

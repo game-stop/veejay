@@ -325,6 +325,9 @@ void		vj_event_vevo_dump(void)
 void		vj_event_vevo_free(void)
 {
 	int i;
+	if( !index_map_)
+		return;
+
 	for( i = 0 ; i < MAX_INDEX  ; i ++ )
 	  if( index_map_[i] ) vevo_port_free( index_map_[i] );
 	

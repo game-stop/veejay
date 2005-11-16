@@ -37,6 +37,7 @@
 static void	rawdv_free(dv_t *dv)
 {
 	if(dv->filename) free(dv->filename);
+	if(dv->buf) free(dv->buf);
 	if(dv) free(dv);
 }
 

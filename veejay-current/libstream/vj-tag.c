@@ -59,8 +59,8 @@
 #include <libvjmem/vjmem.h>
 #include <libvje/internal.h>
 
-static veejay_t *_tag_info;
-static hash_t *TagHash;
+static veejay_t *_tag_info = NULL;
+static hash_t *TagHash = NULL;
 static int this_tag_id = 0;
 static vj_tag_data *vj_tag_input;
 static int next_avail_tag = 0;
@@ -79,23 +79,22 @@ typedef struct
 	int state;
 	int error;
 } threaded_t;
-
+static uint8_t *_temp_buffer[3];
+static uint8_t *tag_encoder_buf = NULL; 
+static VJFrame _tmp;
 void	vj_tag_free(void)
 {
-	if(TagHash)
+	int i;
+	for( i = 0; i < 3 ; i ++ )
 	{
-		int i;
-		for( i = 0; i < vj_tag_size()-1; i ++)
-		{
-			vj_tag_del(i);
-		}
-		if(!hash_isempty(TagHash)) hash_free_nodes( TagHash );
+		if( _temp_buffer[i] )
+			free( _temp_buffer[i] );
+		_temp_buffer[i] = NULL;
 	}
 }
 
 
-static uint8_t *tag_encoder_buf = NULL; 
-static VJFrame *_tmp;
+
 
 int vj_tag_get_last_tag() {
 	return last_added_tag;
@@ -169,7 +168,6 @@ static int vj_tag_update(vj_tag *tag, int id) {
   return -1;
 }
 
-static uint8_t *_temp_buffer[3];
 int vj_tag_init(int width, int height, int pix_fmt)
 {
     int i;
@@ -187,9 +185,8 @@ int vj_tag_init(int width, int height, int pix_fmt)
     vj_tag_input->height = height;
     vj_tag_input->depth = 3;
     vj_tag_input->pix_fmt = pix_fmt;
-    _tmp = (VJFrame*)malloc(sizeof(VJFrame));
-    memset( _tmp, 0, sizeof(VJFrame));
-    _tmp->len = width * height;
+    memset( &_tmp, 0, sizeof(VJFrame));
+    _tmp.len = width * height;
 
 
    _temp_buffer[0] = (uint8_t*) malloc(sizeof(uint8_t)*width*height);
@@ -199,15 +196,15 @@ int vj_tag_init(int width, int height, int pix_fmt)
 
     if( pix_fmt == FMT_422 )
 	{
-		_tmp->uv_width = width; 
-		_tmp->uv_height = height/2;
-		_tmp->uv_len = width * (height/2);
+		_tmp.uv_width = width; 
+		_tmp.uv_height = height/2;
+		_tmp.uv_len = width * (height/2);
 	}
 	else
 	{
-		_tmp->uv_width = width / 2;
-		_tmp->uv_height= height / 2;
-		_tmp->uv_len = (width * height)/4;
+		_tmp.uv_width = width / 2;
+		_tmp.uv_height= height / 2;
+		_tmp.uv_len = (width * height)/4;
 	}	
 
     for(i=0; i < SAMPLE_MAX_SAMPLES; i++) {
@@ -2280,12 +2277,12 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	return 1;
 	break;
     case VJ_TAG_TYPE_COLOR:
-		_tmp->len     = len;
-		_tmp->uv_len  = uv_len;
-		_tmp->data[0] = buffer[0];
-		_tmp->data[1] = buffer[1];
-		_tmp->data[2] = buffer[2];
-		dummy_rgb_apply( _tmp, width, height, 
+		_tmp.len     = len;
+		_tmp.uv_len  = uv_len;
+		_tmp.data[0] = buffer[0];
+		_tmp.data[1] = buffer[1];
+		_tmp.data[2] = buffer[2];
+		dummy_rgb_apply( &_tmp, width, height, 
 			tag->color_r,tag->color_g,tag->color_b );
 		break;
     case VJ_TAG_TYPE_NONE:

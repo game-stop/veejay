@@ -407,11 +407,15 @@ int veejay_free(veejay_t * info)
 {
 	video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
-	vj_event_stop();
- 
+
 	veejay_reap_messages();
 
+	vj_el_deinit();	
+
+	vj_event_stop();
+
 	vj_tag_free();
+
 #ifdef USE_SWSCALER
   	if( info->settings->zoom )
 		yuv_free_swscaler( info->video_out_scaler );
@@ -430,12 +434,12 @@ int veejay_free(veejay_t * info)
 	if( info->effect_frame2) free(info->effect_frame2);
 	if( info->effect_info) free( info->effect_info );
 	if( info->dummy ) free(info->dummy );
-    free(info->status_msg);
-    free(info->status_what);
-    free(info->uc);
-    free(settings);
-    free(info);
-
+	free(info->sdl);
+        free(info->status_msg);
+        free(info->status_what);
+        free(info->uc);
+        free(settings);
+        free(info);
     return 1;
 }
 
@@ -488,7 +492,7 @@ void	veejay_auto_loop(veejay_t *info)
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN)
 	{
 		char sam[20];
-		sprintf(sam, "%03d:1 0;", VIMS_SAMPLE_NEW);
+		sprintf(sam, "%03d:0 -1;", VIMS_SAMPLE_NEW);
 		vj_event_parse_msg(info, sam);
 		sprintf(sam, "%03d:-1;", VIMS_SAMPLE_SELECT);
 		vj_event_parse_msg(info,sam);
@@ -1441,7 +1445,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		y = info->uc->geoy;
 	}
 
-
 	vj_event_init();
 
 
@@ -2159,9 +2162,9 @@ static void *veejay_playback_thread(void *data)
     
     vj_perform_free(info);
     vj_effect_shutdown();
-    vj_tag_close_all();
+    vj_tag_free();
     vj_el_free(info->current_edit_list);
-
+    vj_avcodec_free();
     veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
     pthread_exit(NULL);
     return NULL;
@@ -2347,7 +2350,7 @@ veejay_t *veejay_malloc()
 	for( i = 0; i < MAX_SDL_OUT;i++ )
 		info->sdl[i] = NULL;
 #endif
-
+	vj_el_init();
 
     return info;
 }

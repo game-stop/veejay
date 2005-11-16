@@ -205,8 +205,6 @@ static void Usage(char *progname)
 #endif
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
- 
-	exit(1);
 }
 
 #define OUT_OF_RANGE(val) ( val < 0 ? 1 : ( val > 100 ? 1 : 0) )
@@ -223,12 +221,6 @@ else\
 free(v);\
 }\
 }
-static void fatal_dummy_options()
-{
-	fprintf(stderr, "Usage: -d w=[num]:h=[num]:i=[I|P|N]:n=[N|P]:r=[num]:ch=[num]:fps=[num]\n");
-	exit(0);
-}
-
 static int set_option(const char *name, char *value)
 {
     /* return 1 means error, return 0 means okay */
@@ -248,7 +240,7 @@ static int set_option(const char *name, char *value)
 	info->uc->use_timer = atoi(optarg);
 	if (info->uc->use_timer < 0 || info->uc->use_timer > 2) {
 	    printf("Valid timers:\n\t0=none\n\t2=normal\n\t1=rtc\n");
-	    exit(1);
+	    nerr++;
 	}
 	} else if (strcmp(name, "multicast-vims") == 0 || strcmp(name,"V")==0)
 	{
@@ -276,7 +268,7 @@ static int set_option(const char *name, char *value)
 	    info->video_out = atoi(optarg);	/* use SDL */
     } else if (strcmp(name, "F") == 0 || strcmp(name, "features")==0) {
 	CompiledWith();
-        exit(0);
+        nerr++;
     } else if (strcmp(name, "preserve-pathnames") == 0
 	       || strcmp(name, "P") == 0) {
 	info->preserve_pathnames = 1;
@@ -353,7 +345,7 @@ static int set_option(const char *name, char *value)
 		if(info->settings->zoom < 1 || info->settings->zoom > 11)
 		{
 			fprintf(stderr, "Use --zoom [1-11] or -z [1-11]\n");
-			exit(1);
+			nerr++;
 		}
 	}
 	else if (strcmp(name, "lgb") == 0) 	
@@ -405,7 +397,7 @@ static int set_option(const char *name, char *value)
 						 &(info->settings->viewport.right)) < 4)
 		{
 			fprintf(stderr, "Crop requires top:bottom:left:right\n");
-			exit(1);
+			nerr++;
 		}
 		info->settings->crop = 1;
 	}
@@ -428,7 +420,7 @@ static int set_option(const char *name, char *value)
     return nerr;
 }
 
-static void check_command_line_options(int argc, char *argv[])
+static int check_command_line_options(int argc, char *argv[])
 {
     int nerr, n, option_index = 0;
     char option[2];
@@ -484,7 +476,7 @@ static void check_command_line_options(int argc, char *argv[])
 #endif
     if (argc < 2) {
 	Usage(argv[0]);
-	exit(1);
+	return 0;
     }
     
 /* Get options */
@@ -538,8 +530,11 @@ static void check_command_line_options(int argc, char *argv[])
        {
 	vj_el_show_formats();
 	veejay_msg(VEEJAY_MSG_ERROR, "Cannot start veejay");
-	exit(1);
+	nerr++;
        }
+    if(!nerr) 
+	return 1;
+	return 0;
 }
 
 static void print_license()
@@ -590,15 +585,11 @@ int main(int argc, char **argv)
 	return 1;
      settings = (video_playback_setup *) info->settings;
 
-    /* setup SIGPIPE and SIGINT catcher as a thread */
-    sigemptyset(&(settings->signal_set));
-    sigaddset(&(settings->signal_set), SIGINT);
-    sigaddset(&(settings->signal_set), SIGPIPE);
-
-    pthread_sigmask(SIG_BLOCK, &(settings->signal_set), NULL);
-    pthread_create(&(settings->signal_thread), NULL, veejay_signal_loop,
-		   (void *) info); 
-    check_command_line_options(argc, argv);
+    if(!check_command_line_options(argc, argv))
+    {
+	veejay_free(info);
+	return 0;
+    }
 
     print_license();
 
@@ -617,6 +608,14 @@ int main(int argc, char **argv)
 	}
 
     //print_license();
+  /* setup SIGPIPE and SIGINT catcher as a thread */
+    sigemptyset(&(settings->signal_set));
+    sigaddset(&(settings->signal_set), SIGINT);
+    sigaddset(&(settings->signal_set), SIGPIPE);
+
+    pthread_sigmask(SIG_BLOCK, &(settings->signal_set), NULL);
+    pthread_create(&(settings->signal_thread), NULL, veejay_signal_loop,
+		   (void *) info); 
 
 	dont_use = getenv("VEEJAY_SCHEDULE_NORMAL");
 	if(dont_use==NULL || strcmp(dont_use, "0")==0||strcmp(dont_use,"no")==0)

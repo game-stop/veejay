@@ -78,6 +78,7 @@ typedef struct
 
 editlist *vj_el_init_with_args(char **filenames, int n, int flags, int deinter, int force, char norm, int fmt);
 
+void	vj_el_init(); 
 
 void	vj_el_free(editlist *el);
 
@@ -117,5 +118,7 @@ editlist *vj_el_soft_clone(editlist *el);
 int		vj_el_framelist_clone( editlist *src, editlist *dst);
 
 char *vj_el_write_line_ascii( editlist *el, int *bytes_written );
+
+void		vj_el_deinit();
 
 #endif

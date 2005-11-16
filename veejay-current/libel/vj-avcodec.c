@@ -147,9 +147,14 @@ static	void		vj_avcodec_close_encoder( vj_encoder *av )
 {
 	if(av)
 	{
-		if(av->context)	avcodec_close( av->context );
+		if(av->context)
+		{
+			avcodec_close( av->context );
+			free(av->context);	
+		}
 		free(av);
 	}
+	av = NULL;
 }
 
 

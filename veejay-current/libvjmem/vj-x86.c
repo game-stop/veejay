@@ -127,13 +127,16 @@ void vj_mem_init(void)
 
 	find_best_memcpy();	
 }
+void debugger()
+{
+
+}
 
 void *vj_malloc(unsigned int size)
 {
 	if( size == 0 )
 		return NULL;
-	void *ptr;
-
+	void *ptr = NULL;
 #ifdef HAVE_POSIX_MEMALIGN
 	posix_memalign( &ptr, MEM_ALIGNMENT_SIZE, size );
 #else
@@ -144,9 +147,7 @@ void *vj_malloc(unsigned int size)
 #endif
 #endif
 	if(!ptr)
-        {
 		return NULL;
-        }
 
 	return ptr;
 }

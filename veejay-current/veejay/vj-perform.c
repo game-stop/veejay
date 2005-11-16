@@ -677,6 +677,8 @@ void vj_perform_free(veejay_t * info)
     int fblen = SAMPLE_MAX_EFFECTS; // mjpg buf
     int c;
 
+    sample_record_free();
+
     if(info->edit_list->has_audio)
 	    vj_perform_close_audio();
 

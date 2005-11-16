@@ -99,7 +99,7 @@ typedef struct
 	char		*arguments;
 } vj_keyboard_event;
 
-static hash_t *keyboard_events;
+static hash_t *keyboard_events = NULL;
 #endif
 
 static int _recorder_format = ENCODER_YUV420;
@@ -428,6 +428,31 @@ vj_msg_bundle *vj_event_bundle_get(int event_id)
 		}
 	}
 	return NULL;
+}
+
+void			del_all_keyb_events()
+{
+	if(!keyboard_events)
+		return;
+
+	if(!hash_isempty( keyboard_events ))
+	{
+		hscan_t scan;
+		hash_scan_begin( &scan, keyboard_events );
+		hnode_t *node;
+		while( ( node = hash_scan_next(&scan)) != NULL )
+		{
+			vj_keyboard_event *ev = NULL;
+			ev = hnode_get( node );
+			if(ev)
+			{
+				if(ev->arguments) free(ev->arguments);
+				if(ev->vims) free(ev->vims);
+			}	
+		}
+		hash_free_nodes( keyboard_events );
+		hash_destroy( keyboard_events );
+	}
 }
 
 int			del_keyboard_event(int id )
@@ -2039,6 +2064,8 @@ void vj_event_init()
 void	vj_event_stop()
 {
 	// destroy bundlehash, destroy keyboard_events
+	del_all_keyb_events();
+
 	vj_event_vevo_free();
 }
 
@@ -7235,11 +7262,11 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 	veejay_t *v = (veejay_t*)ptr;
 	bzero(info_msg,sizeof(info_msg));
 	bzero( _s_print_buf,SEND_BUF);
-
+	bzero( info_msg, 255 );
 	editlist *el = ( SAMPLE_PLAYING(v) ? sample_get_editlist( v->uc->sample_id ) : 
 				v->current_edit_list );
 
-	snprintf(info_msg,sizeof(info_msg), "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld",
+	snprintf(info_msg,sizeof(info_msg)-1, "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld",
 		el->video_width,
 		el->video_height,
 		el->video_inter,

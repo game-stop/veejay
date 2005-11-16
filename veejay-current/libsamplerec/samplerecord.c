@@ -37,6 +37,13 @@ int sample_record_init(int len)
 	return 1;
 }
 
+void	sample_record_free()
+{
+	if( sample_encoder_buf)
+		free(sample_encoder_buf);
+	sample_encoder_buf = NULL;
+}
+
 int sample_get_encoded_file(int sample_id, char *description)
 {
     sample_info *si;

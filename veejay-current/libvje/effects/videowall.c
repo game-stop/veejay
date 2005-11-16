@@ -71,6 +71,7 @@ static	int prepare_filmstrip(int w, int h)
 	int film_length = n_pics(w,h);
 
 	photo_list = (picture_t**) vj_malloc(sizeof(picture_t*) * film_length  );
+	memset( photo_list, 0, sizeof(picture_t*) * film_length );
 	if(!photo_list)
 		return 0;
 
@@ -82,6 +83,7 @@ static	int prepare_filmstrip(int w, int h)
 	for ( i = 0; i < num_photos; i ++ )
 	{
 		photo_list[i] = vj_malloc(sizeof(picture_t));
+		memset( photo_list[i], 0, sizeof(picture_t));
 		if(!photo_list[i])
 			return 0;
 		photo_list[i]->w = picture_width;

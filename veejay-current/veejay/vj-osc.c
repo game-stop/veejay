@@ -934,7 +934,7 @@ static struct
 	{ "set next frame",			"next_frame",	vj_osc_cb_next_frame,				0	},
 	{ "set next second",		"next_second",	vj_osc_cb_next_second,				0	},
 	{ "set previous second",	"prev_second",	vj_osc_cb_prev_second,				0	},
-	{ "play plain video",		"plain",		vj_osc_cb_plain_mode,				0	},
+	{ "play plain video",		"mode",		vj_osc_cb_plain_mode,				0	},
 	{ "create new sample <pos start> <pos end>",	
 								"new",			vj_osc_cb_new_sample,					1	},
 	{ "copy sample <num> as new sample",
