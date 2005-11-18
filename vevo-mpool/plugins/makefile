@@ -1,6 +1,6 @@
 CC = gcc
 LINKER = ld
-CFLAGS = -I. -I../include  -I ../ -Wall -g $(shell vevo-config --cflags) 
+CFLAGS = -I. -I../include  -I ../ -Wall -g 
 all:
 	# vevo - veejay video objects
 	#
@@ -13,9 +13,9 @@ all:
 	#  export LD_LIBRARY_PATH=`pwd`
 	#  host <plugin.so>
 
-plugins:	fade_plugin.so 
+plugins:	fade_plugin.so example_plugin.so 
 
-
+example.so:	example_plugin.o
 fade.so:	fade_plugin.o
 
 clean:

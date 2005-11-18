@@ -42,6 +42,10 @@
 
 /////////////////////////////////////////////////////////////////
 
+#include <stdio.h>
+#include <stdlib.h>
+#include <include/livido.h>
+
 int livido_has_property (livido_port_t *port, const char *key) {
   if (livido_property_get(port,key,0,NULL)==LIVIDO_ERROR_NOSUCH_PROPERTY) return 0;
   return 1;
@@ -131,12 +135,12 @@ char *livido_get_string_value (livido_port_t *port, const char *key, int *error)
     *error=LIVIDO_ERROR_WRONG_ATOM_TYPE;
     return NULL;
   }
-  if ((retval=(char *)livido_malloc_f(livido_property_element_size(port,key,0)+1))==NULL) {
+  if ((retval=(char *)livido_malloc(livido_property_element_size(port,key,0)+1))==NULL) {
     *error=LIVIDO_ERROR_MEMORY_ALLOCATION;
     return NULL;
   }
   if ((*error=livido_get_value (port,key,&retval))!=LIVIDO_NO_ERROR) {
-    livido_free_f (retval);
+    livido_free (retval);
     return NULL;
   }
   return retval;
@@ -177,14 +181,14 @@ int *livido_get_int_array (livido_port_t *port, const char *key, int *error) {
 
   if ((num_elems=livido_property_num_elements (port,key))==0) return NULL;
 
-  if ((retval=(int *)livido_malloc_f(num_elems*sizeof(int)))==NULL) {
+  if ((retval=(int *)livido_malloc(num_elems*sizeof(int)))==NULL) {
     *error=LIVIDO_ERROR_MEMORY_ALLOCATION;
     return NULL;
   }
 
   for (i=0;i<num_elems;i++) {
     if ((*error=livido_property_get(port, key, i, &retval[i]))!=LIVIDO_NO_ERROR) {
-      livido_free_f (retval);
+      livido_free (retval);
       return NULL;
     }
   }
@@ -202,14 +206,14 @@ double *livido_get_double_array (livido_port_t *port, const char *key, int *erro
   }
   if ((num_elems=livido_property_num_elements (port,key))==0) return NULL;
 
-  if ((retval=(double *)livido_malloc_f(num_elems*sizeof(double)))==NULL) {
+  if ((retval=(double *)livido_malloc(num_elems*sizeof(double)))==NULL) {
     *error=LIVIDO_ERROR_MEMORY_ALLOCATION;
     return NULL;
   }
 
   for (i=0;i<num_elems;i++) {
     if ((*error=livido_property_get(port, key, i, &retval[i]))!=LIVIDO_NO_ERROR) {
-      livido_free_f (retval);
+      livido_free (retval);
       return NULL;
     }
   }
@@ -228,14 +232,14 @@ int *livido_get_boolean_array (livido_port_t *port, const char *key, int *error)
 
   if ((num_elems=livido_property_num_elements (port,key))==0) return NULL;
 
-  if ((retval=(int *)livido_malloc_f(num_elems*sizeof(int)))==NULL) {
+  if ((retval=(int *)livido_malloc(num_elems*sizeof(int)))==NULL) {
     *error=LIVIDO_ERROR_MEMORY_ALLOCATION;
     return NULL;
   }
 
   for (i=0;i<num_elems;i++) {
     if ((*error=livido_property_get(port, key, i, &retval[i]))!=LIVIDO_NO_ERROR) {
-      livido_free_f (retval);
+      livido_free (retval);
       return NULL;
     }
   }
@@ -254,21 +258,21 @@ char **livido_get_string_array (livido_port_t *port, const char *key, int *error
 
   if ((num_elems=livido_property_num_elements (port,key))==0) return NULL;
 
-  if ((retval=(char **)livido_malloc_f(num_elems*sizeof(char *)))==NULL) {
+  if ((retval=(char **)livido_malloc(num_elems*sizeof(char *)))==NULL) {
     *error=LIVIDO_ERROR_MEMORY_ALLOCATION;
     return NULL;
   }
 
   for (i=0;i<num_elems;i++) {
-    if ((retval[i]=(char *)livido_malloc_f(livido_property_element_size(port,key,i)+1))==NULL) {
-      for (--i;i>=0;i--) livido_free_f(retval[i]);
+    if ((retval[i]=(char *)livido_malloc(livido_property_element_size(port,key,i)+1))==NULL) {
+      for (--i;i>=0;i--) livido_free(retval[i]);
       *error=LIVIDO_ERROR_MEMORY_ALLOCATION;
-      livido_free_f (retval);
+      livido_free (retval);
       return NULL;
     }
     if ((*error=livido_property_get(port, key, i, &retval[i]))!=LIVIDO_NO_ERROR) {
-      for (--i;i>=0;i--) livido_free_f(retval[i]);
-      livido_free_f (retval);
+      for (--i;i>=0;i--) livido_free(retval[i]);
+      livido_free (retval);
       return NULL;
     }
   }
@@ -287,14 +291,14 @@ void **livido_get_voidptr_array (livido_port_t *port, const char *key, int *erro
 
   if ((num_elems=livido_property_num_elements (port,key))==0) return NULL;
 
-  if ((retval=(void **)livido_malloc_f(num_elems*sizeof(void *)))==NULL) {
+  if ((retval=(void **)livido_malloc(num_elems*sizeof(void *)))==NULL) {
     *error=LIVIDO_ERROR_MEMORY_ALLOCATION;
     return NULL;
   }
 
   for (i=0;i<num_elems;i++) {
     if ((*error=livido_property_get(port, key, i, &retval[i]))!=LIVIDO_NO_ERROR) {
-      livido_free_f (retval);
+      livido_free (retval);
       return NULL;
     }
   }
@@ -313,14 +317,14 @@ livido_port_t **livido_get_portptr_array (livido_port_t *port, const char *key, 
 
   if ((num_elems=livido_property_num_elements (port,key))==0) return NULL;
 
-  if ((retval=(livido_port_t **)livido_malloc_f(num_elems*sizeof(livido_port_t *)))==NULL) {
+  if ((retval=(livido_port_t **)livido_malloc(num_elems*sizeof(livido_port_t *)))==NULL) {
     *error=LIVIDO_ERROR_MEMORY_ALLOCATION;
     return NULL;
   }
 
   for (i=0;i<num_elems;i++) {
     if ((*error=livido_property_get(port, key, i, &retval[i]))!=LIVIDO_NO_ERROR) {
-      livido_free_f (retval);
+      livido_free (retval);
       return NULL;
     }
   }

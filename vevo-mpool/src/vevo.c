@@ -31,11 +31,9 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <string.h>
 #include <stdlib.h>
 #include <stdarg.h>
-#include <include/lowlevel.h>
-#include <include/vevo.h>
-#include <include/livido.h>
 #include <include/hash.h>
-
+#include <include/lowlevel.h>
+#include <include/libvevo.h>
 
 /* If defined, dont expect a major performance improvment. */
 #ifdef VEVO_MEMPOOL
@@ -220,7 +218,7 @@ static inline int hash_key_code(const char *key)
     return hash;
 }
 
-static int livido_property_finalize(livido_port_t * p, const char *key)
+static int vevo_property_finalize(livido_port_t * p, const char *key)
 {
     vevo_port_t *port = (vevo_port_t *) p;
     int hash_key = hash_key_code(key);
@@ -484,7 +482,7 @@ static inline int key_compare(const void *key1, const void *key2)
 	Livido API implementation, public functions follow below
  */
 
-int livido_property_num_elements(livido_port_t * p, const char *key)
+int vevo_property_num_elements(livido_port_t * p, const char *key)
 {
 #ifdef STRICT_CHECKING
     assert(p != NULL);
@@ -509,7 +507,7 @@ int livido_property_num_elements(livido_port_t * p, const char *key)
     return -1;
 }
 
-int livido_property_atom_type(livido_port_t * p, const char *key)
+int vevo_property_atom_type(livido_port_t * p, const char *key)
 {
 #ifdef STRICT_CHECKING
     assert(p != NULL);
@@ -542,8 +540,8 @@ int livido_property_atom_type(livido_port_t * p, const char *key)
 }
 
 size_t
-livido_property_element_size(livido_port_t * p, const char *key,
-			     const int idx)
+vevo_property_element_size(livido_port_t * p, const char *key,
+			   const int idx)
 {
 #ifdef STRICT_CHECKING
     assert(p != NULL);
@@ -572,7 +570,8 @@ livido_property_element_size(livido_port_t * p, const char *key,
 	if ((node = property_exists(port, hash_key)) != NULL) {
 	    livido_storage_t *stor = (livido_storage_t *) hnode_get(node);
 #ifdef STRICT_CHECKING
-	    assert(idx < stor->num_elements);
+	    if (idx > 0)
+		assert(idx < stor->num_elements);
 #endif
 	    //todo: sum all element sizes for index of -1 
 	    if (stor->num_elements == 1) {
@@ -589,7 +588,7 @@ livido_property_element_size(livido_port_t * p, const char *key,
     return -1;
 }
 
-livido_port_t *livido_port_new(int port_type)
+livido_port_t *vevo_port_new(int port_type)
 {
     vevo_port_t *port = (vevo_port_t *) malloc(sizeof(vevo_port_t));
 
@@ -619,11 +618,11 @@ livido_port_t *livido_port_new(int port_type)
     port->pool = NULL;
 #endif
 
-    livido_property_set(port, "type", LIVIDO_ATOM_TYPE_INT, 1, &port_type);
-    livido_property_finalize(port, "type");
+    vevo_property_set(port, "type", LIVIDO_ATOM_TYPE_INT, 1, &port_type);
+    vevo_property_finalize(port, "type");
 
 #ifdef STRICT_CHECKING
-    assert(livido_property_set
+    assert(vevo_property_set
 	   (port, "type", LIVIDO_ATOM_TYPE_INT, 1, &port_type)
 	   != LIVIDO_PROPERTY_READONLY);
 #endif
@@ -631,7 +630,7 @@ livido_port_t *livido_port_new(int port_type)
     return (livido_port_t *) port;
 }
 
-void livido_port_free(livido_port_t * p)
+void vevo_port_free(livido_port_t * p)
 {
     vevo_port_t *port = (vevo_port_t *) p;
 
@@ -685,9 +684,9 @@ void livido_port_free(livido_port_t * p)
 }
 
 int
-livido_property_set(livido_port_t * p,
-		    const char *key,
-		    int atom_type, int num_elements, void *src)
+vevo_property_set(livido_port_t * p,
+		  const char *key,
+		  int atom_type, int num_elements, void *src)
 {
 #ifdef STRICT_CHECKING
     assert(p != NULL);
@@ -766,7 +765,7 @@ livido_property_set(livido_port_t * p,
 }
 
 int
-livido_property_get(livido_port_t * p, const char *key, int idx, void *dst)
+vevo_property_get(livido_port_t * p, const char *key, int idx, void *dst)
 {
 #ifdef STRICT_CHECKING
     assert(p != NULL);
@@ -800,7 +799,7 @@ livido_property_get(livido_port_t * p, const char *key, int idx, void *dst)
     return LIVIDO_ERROR_NOSUCH_PROPERTY;
 }
 
-char **livido_list_properties(livido_port_t * p)
+char **vevo_list_properties(livido_port_t * p)
 {
     vevo_port_t *port = (vevo_port_t *) p;
 

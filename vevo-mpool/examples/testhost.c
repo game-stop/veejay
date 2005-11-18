@@ -3,11 +3,12 @@
 #include <stdio.h>       
 #include <string.h>
 #include <stdlib.h>
+#include <include/libvevo.h>
+#include <include/livido.h>
 
-#include "../include/vevo.h"
-#include "../include/livido.h"
-#include "../src/livido-utils.c"
 
+//#include "../src/livido-utils.c"
+/*
 int verbose = 1;
 
 int errorcount = 0;
@@ -172,7 +173,7 @@ int deep_filter_api_version(livido_port_t *port, char *propname)
 
 int deep_channel_templates(livido_port_t *port, char *propname)
 {
-	int numtemplates = livido_property_num_elements(port, propname);
+	int numtemplates = vevo_property_num_elements(port, propname);
 	int error;
 	livido_port_t **ports = (livido_port_t **) livido_get_portptr_array (port, propname, &error);
 	for (int i = 0; i < numtemplates; i++)
@@ -186,7 +187,7 @@ int deep_channel_templates(livido_port_t *port, char *propname)
 
 int deep_parameter_templates(livido_port_t *port, char *propname)
 {
-	int numtemplates = livido_property_num_elements(port, propname);
+	int numtemplates = vevo_property_num_elements(port, propname);
 	int error;
 	livido_port_t **ports = (livido_port_t **) livido_get_portptr_array (port, propname, &error);
 	for (int i = 0; i < numtemplates; i++)
@@ -227,7 +228,7 @@ int deep_parameter_templates(livido_port_t *port, char *propname)
 
 int deep_plugininfo_filters(livido_port_t *port, char *propname)
 {
-	int numfilters = livido_property_num_elements(port, propname);
+	int numfilters = vevo_property_num_elements(port, propname);
 	int error;
 	livido_port_t **ports = (livido_port_t **) livido_get_portptr_array (port, propname, &error);
 	for (int i = 0; i < numfilters; i++)
@@ -240,18 +241,9 @@ int deep_plugininfo_filters(livido_port_t *port, char *propname)
 	return 0;
 }
 
-// Implementation of default malloc/free/memset/memcpy
-void *livido_malloc_f (size_t size) 				{ return malloc(size); }
-void livido_free_f (void *ptr)					{ free(ptr); }
-void *livido_memset_f (void *s, int c, size_t n)		{ return memset(s, c, n); }
-void *livido_memcpy_f (void *dest, const void *src, size_t n)	{ return memcpy( dest, src, n); }
-
-
-
-
 int check_property_mandatory (livido_port_t *port, char *propname, char *propdesc)
 {
-	int error =  livido_property_get(port, propname, 0, NULL);
+	int error =  vevo_property_get(port, propname, 0, NULL);
 	if (error) 
 	{
 		printf("ERROR: Missing mandatory property \'\'%s\'\' of port %s, code: %i\n", propname, propdesc, error);
@@ -262,10 +254,10 @@ int check_property_mandatory (livido_port_t *port, char *propname, char *propdes
 }
 int check_property_type (livido_port_t *port, char *propname, int atom_type, char *propdesc)
 {
-	int error =  livido_property_get(port, propname, 0, NULL);
+	int error =  vevo_property_get(port, propname, 0, NULL);
 	if (!error) 
 	{
-		int real_atomtype =  livido_property_atom_type(port, propname);
+		int real_atomtype =  vevo_property_atom_type(port, propname);
 		if (real_atomtype != atom_type) 
 		{
 			printf("ERROR: Type of property %s is %i, must be: %i\n", propdesc, real_atomtype, atom_type);
@@ -288,7 +280,7 @@ int check_property_type_mandatory_one (livido_port_t *port, char *propname, int 
 	int retval = check_property_type_mandatory(port, propname, atom_type, propdesc);
 	if (retval) 
 		return retval;
-	if (livido_property_num_elements(port, propname) != 1)
+	if (vevo_property_num_elements(port, propname) != 1)
 		return -1;
 	return 0;
 }	
@@ -349,7 +341,7 @@ int test_port (livido_port_t *port, property_desc_t *properties, int porttype, c
 	{
 		char *propname = standard_property->name;
 		// check existence
-		int error =  livido_property_get(port, propname, 0, NULL);
+		int error =  vevo_property_get(port, propname, 0, NULL);
 		if (error == LIVIDO_ERROR_NOSUCH_PROPERTY) // we ignore no such element property here, we deal with that later!
 		{
 			// property does not exist
@@ -360,9 +352,9 @@ int test_port (livido_port_t *port, property_desc_t *properties, int porttype, c
 			}
 			continue;
 		}	
-		printf("Property %s, %d\n", propname, error);
+	//	printf("Property %s, %d\n", propname, vevo_property_element_size(port,propname,0));
 		// Property exists, check type
-		int atomtype =  livido_property_atom_type(port, propname);
+		int atomtype =  vevo_property_atom_type(port, propname);
 		if (standard_property->atomtype >= 0 && standard_property->atomtype != atomtype) 
 		{
 			printf("ERROR: Type of property \'\'%s\'\' (of port %s) is %i, must be: %i\n", propname, portdesc, atomtype, standard_property->atomtype);
@@ -370,7 +362,7 @@ int test_port (livido_port_t *port, property_desc_t *properties, int porttype, c
 			continue;
 		}
 		// Property exists and has right type, check if array is properly laid out
-		int numelements = livido_property_num_elements(port, propname);
+		int numelements = vevo_property_num_elements(port, propname);
 		if (standard_property->minc >= 0 && standard_property->minc > numelements)
 		{
 			printf("ERROR: Property \'\'%s\'\' (of port %s) has %i elements, which is less than minimum of %i\n", propname, portdesc, numelements, standard_property->minc);
@@ -392,7 +384,7 @@ int test_port (livido_port_t *port, property_desc_t *properties, int porttype, c
 
 	return 0;	
 }
-
+*/
 int main(int argc, char **argv) 
 {
 
@@ -415,17 +407,43 @@ int main(int argc, char **argv)
 	livido_setup = (livido_setup_f) dlsym(handle, "livido_setup");
 	if (!livido_setup) { printf("FATAL: function livido_setup not found in %s\n", name); return 1; };
 
-	plugin_info = livido_setup();
+        livido_setup_t *setup = (livido_setup_t*) malloc(sizeof(livido_setup_t));
+        setup->livido_port_free_f = vevo_port_free;
+        setup->livido_port_new_f = vevo_port_new;
+        setup->livido_property_get_f = vevo_property_get;
+        setup->livido_property_set_f = vevo_property_set;
+        setup->livido_property_num_elements_f = vevo_property_num_elements;
+        setup->livido_property_atom_type_f = vevo_property_atom_type;
+        setup->livido_property_element_size_f = vevo_property_element_size;
+        setup->livido_list_properties_f = vevo_list_properties;
+        setup->livido_malloc_f = malloc;
+        setup->livido_memset_f = memset;
+        setup->livido_memcpy_f = memcpy;
+        setup->livido_free_f = free;
+
+
+	plugin_info = livido_setup(setup,100);
 	if (!plugin_info) { printf("FATAL: livido_setup() did not return a pointer to livido port, finishing\n"); return 1; };
  	printf("CHECKPOINT: Loading of plugin and running livido_setup() successeful\n");
  	
  	
- 	test_port(plugin_info, port_plugininfo_desc, LIVIDO_PORT_TYPE_PLUGIN_INFO, "returned by livido_setup()");
+// 	test_port(plugin_info, port_plugininfo_desc, LIVIDO_PORT_TYPE_PLUGIN_INFO, "returned by livido_setup()");
+
+
+	char **list = vevo_list_properties( plugin_info );
+	int i = 0;
+	if(list)
+	while( list[i] != NULL )
+	{
+		printf("%s\n", list[i]);
+		free(list[i]);
+		i++;
+	}
 
 
 	dlclose(handle);
 	
-	printf("\nPlugin %s has produced %i errors and %i warnings\n", name, errorcount, warningcount);
+//	printf("\nPlugin %s has produced %i errors and %i warnings\n", name, errorcount, warningcount);
 
 // FIXME: Do the freeing of the all template ports
 	

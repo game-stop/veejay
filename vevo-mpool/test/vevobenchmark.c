@@ -3,8 +3,7 @@
 #include <stdarg.h>
 #include <stdint.h>
 #include <stdio.h>
-#include <include/vevo.h>
-#include <include/livido.h>
+#include <include/libvevo.h>
 #include <sys/time.h>
 static struct {
     int32_t iv;
@@ -26,13 +25,13 @@ static int stats[2] = { 0, 0 };
 
 int test_fundemental_atoms(livido_port_t * port)
 {
-    livido_property_set(port, "int_value", LIVIDO_ATOM_TYPE_INT, 1,
+    vevo_property_set(port, "int_value", LIVIDO_ATOM_TYPE_INT, 1,
 			&(fundementals[fundemental_index].iv));
-    livido_property_set(port, "double_value", LIVIDO_ATOM_TYPE_DOUBLE, 1,
+    vevo_property_set(port, "double_value", LIVIDO_ATOM_TYPE_DOUBLE, 1,
 			&(fundementals[fundemental_index].dv));
-    livido_property_set(port, "string_value", LIVIDO_ATOM_TYPE_STRING, 1,
+    vevo_property_set(port, "string_value", LIVIDO_ATOM_TYPE_STRING, 1,
 			&(fundementals[fundemental_index].sv));
-    livido_property_set(port, "bool_value", LIVIDO_ATOM_TYPE_INT, 1,
+    vevo_property_set(port, "bool_value", LIVIDO_ATOM_TYPE_INT, 1,
 			&(fundementals[fundemental_index].bv));
     fundemental_index++;
     stats[0] += 4;
@@ -42,10 +41,10 @@ int test_fundemental_atoms(livido_port_t * port)
 long get_work_size(livido_port_t * port)
 {
     long mem_size = 0;
-    mem_size += livido_property_element_size(port, "int_value", 0);
-    mem_size += livido_property_element_size(port, "double_value", 0);
-    mem_size += livido_property_element_size(port, "string_value", 0);
-    mem_size += livido_property_element_size(port, "bool_value", 0);
+    mem_size += vevo_property_element_size(port, "int_value", 0);
+    mem_size += vevo_property_element_size(port, "double_value", 0);
+    mem_size += vevo_property_element_size(port, "string_value", 0);
+    mem_size += vevo_property_element_size(port, "bool_value", 0);
 
     return mem_size;
 }
@@ -58,14 +57,14 @@ void dump_port(livido_port_t * port)
     int32_t bool_value = FALSE;
 
 
-    livido_property_get(port, "int_value", 0, &int_value);
-    livido_property_get(port, "double_value", 0, &double_value);
+    vevo_property_get(port, "int_value", 0, &int_value);
+    vevo_property_get(port, "double_value", 0, &double_value);
 
     string_value =
 	(char *)
-	malloc(livido_property_element_size(port, "string_value", 0));
-    livido_property_get(port, "string_value", 0, &string_value);
-    livido_property_get(port, "bool_value", 0, &bool_value);
+	malloc(vevo_property_element_size(port, "string_value", 0));
+    vevo_property_get(port, "string_value", 0, &string_value);
+    vevo_property_get(port, "bool_value", 0, &bool_value);
     free(string_value);
     stats[1] += 4;
 }
@@ -88,7 +87,7 @@ int main(int argc, char *argv[])
 	max = atoi(argv[1]);
     if (argc >= 3 )
 	type = atoi( argv[2] );
-    livido_port_t *port = livido_port_new(type);
+    livido_port_t *port = vevo_port_new(type);
 
     gettimeofday(&start, NULL);
     for (i = 0; i < max; i++)	// get and set 16 properties per cycle
@@ -108,7 +107,7 @@ int main(int argc, char *argv[])
     float seconds = (float) tv.tv_sec;
     seconds += (tv.tv_usec / 1000000.0);
 
-    livido_port_free(port);
+    vevo_port_free(port);
 
     printf("Bench: %ld Atoms put and get in %4.4f seconds\n", (stats[0] + stats[1]), seconds );
     printf("\t %ld Atoms per second\n", (long)( (float) stats[0]/seconds ));

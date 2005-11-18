@@ -1,5 +1,5 @@
 LIBVEVO_2_2_0
 {
-	global:	livido_*;
+	global:	vevo_*;
 	local: *;
 };

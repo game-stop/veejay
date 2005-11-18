@@ -1,8 +1,11 @@
 #include <stddef.h>
-#include "stdio.h"
-#include "../include/livido.h"
+#include <stdio.h>
+#include <include/livido.h>
 
-#include "../src/livido-utils.c"
+LIVIDO_PLUGIN
+
+#include "livido-utils.c"
+
 
 #define num_palettes 5
 
@@ -34,11 +37,15 @@ livido_process_f process_frame(	livido_port_t *my_instance,
 
 
 
-livido_port_t *livido_setup(void)
+livido_port_t *livido_setup(livido_setup_t *list, int vversion)
 {
 	livido_port_t *info;
 	livido_port_t *filter1;
 	livido_port_t *in_chann, *out_chann, *in_param, *out_param;
+
+	LIVIDO_IMPORT( list );
+
+
 	info = livido_port_new(LIVIDO_PORT_TYPE_PLUGIN_INFO);
 	livido_set_string_value(info, "maintainer", "Andraz Tori");
 	livido_set_string_value(info, "version", "1.0");
