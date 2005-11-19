@@ -390,7 +390,6 @@ int main(int argc, char **argv)
 
 	char *name;
 	void *handle;
-	livido_setup_f livido_setup;
 	livido_port_t *plugin_info;
 
 
@@ -404,7 +403,8 @@ int main(int argc, char **argv)
 	handle = dlopen(name, RTLD_NOW);     // We want the whole load _now_
 	if (!handle) { printf("FATAL: dlopen failed on %s because of %s\n", name, dlerror()); return 1; };
 	
-	livido_setup = (livido_setup_f) dlsym(handle, "livido_setup");
+#ifdef FUNCSTRUCT	
+	livido_setup_f livido_setup = (livido_setup_f) dlsym(handle, "livido_setup");
 	if (!livido_setup) { printf("FATAL: function livido_setup not found in %s\n", name); return 1; };
 
         livido_setup_t *setup = (livido_setup_t*) malloc(sizeof(livido_setup_t));
@@ -420,7 +420,26 @@ int main(int argc, char **argv)
         setup->livido_memset_f = memset;
         setup->livido_memcpy_f = memcpy;
         setup->livido_free_f = free;
+#else
+	livido_setup_f livido_setup = (livido_setup_f) dlsym(handle, "livido_setup");
+	if (!livido_setup) { printf("FATAL: function livido_setup not found in %s\n", name); return 1; };
 
+	livido_setup_t setup[] = {
+		{(void*)malloc },
+		{(void*)free},
+		{(void*)memset},
+		{(void*)memcpy},
+		{(void*)vevo_port_new},
+		{(void*)vevo_port_free},
+		{(void*)vevo_property_set},
+		{(void*)vevo_property_get},
+		{(void*)vevo_property_num_elements},
+		{(void*)vevo_property_atom_type},
+		{(void*)vevo_property_element_size},
+		{(void*)vevo_list_properties}
+	};
+
+#endif
 
 	plugin_info = livido_setup(setup,100);
 	if (!plugin_info) { printf("FATAL: livido_setup() did not return a pointer to livido port, finishing\n"); return 1; };

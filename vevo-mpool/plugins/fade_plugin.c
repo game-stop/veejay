@@ -36,8 +36,11 @@ livido_process_f process_frame(	livido_port_t *my_instance,
 }
 
 
-
+#ifdef FUNCSTRUCT
 livido_port_t *livido_setup(livido_setup_t *list, int vversion)
+#else
+livido_port_t *livido_setup(livido_setup_t list[], int vversion)
+#endif
 {
 	livido_port_t *info;
 	livido_port_t *filter1;

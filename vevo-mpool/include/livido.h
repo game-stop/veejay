@@ -121,12 +121,19 @@ LIVIDO_BEGIN_DECLS
 typedef void livido_port_t;
 #endif
 
+//#define FUNCSTRUCT
+/*
+	Uncomment the #define above and recompile all
+ */
+
 
 typedef int (*livido_init_f) (livido_port_t * filter_instance);
 typedef int (*livido_process_f) (livido_port_t * filter_instance,
 				 double timestamp);
 typedef int (*livido_deinit_f) (livido_port_t * filter_instance);
 
+
+#ifdef FUNCSTRUCT
 typedef struct {
     void *(*livido_malloc_f) (size_t size);
     void (*livido_free_f) (void *ptr);
@@ -151,10 +158,31 @@ typedef struct {
     livido_port_t *extensions;	// Extensions, port that holds voidptr to extension functions
 
 } livido_setup_t;
+
 typedef livido_port_t *(*livido_setup_f) (const livido_setup_t * list,
 					  int version);
+#else
 
+typedef void *(*livido_malloc_f) (size_t size);
+typedef void (*livido_free_f) (void *ptr);
+typedef void *(*livido_memset_f) (void *s, int c, size_t n);
+typedef void *(*livido_memcpy_f) (void *dest, const void *src, size_t n);
+typedef livido_port_t *(*livido_port_new_f) (int);
+typedef void (*livido_port_free_f) (livido_port_t * port);
+typedef int (*livido_property_set_f) (livido_port_t *, const char *, int, int,  void *);
+typedef int (*livido_property_get_f) (livido_port_t *, const char *, int,  void *);
+typedef int (*livido_property_num_elements_f) (livido_port_t *, const char *);
+typedef size_t(*livido_property_element_size_f) (livido_port_t *, const char *, const int);
+typedef int (*livido_property_atom_type_f) (livido_port_t *, const char *);
+typedef char **(*livido_list_properties_f) (livido_port_t *);
 
+typedef struct
+{
+	void *f;
+} livido_setup_t;
+typedef livido_port_t *(*livido_setup_f) (const livido_setup_t list[], int );
+
+#endif
 
 #define	LIVIDO_PLUGIN \
 static livido_port_t *(*livido_port_new) (int) = 0;\
@@ -170,6 +198,8 @@ static void (*livido_free) (void *ptr) = 0;\
 static void *(*livido_memset) (void *s, int c, size_t n) = 0;\
 static void *(*livido_memcpy) (void *dest, const void *src, size_t n) = 0;\
 
+
+#ifdef FUNCTSTRUCT
 #define	LIVIDO_IMPORT(list) \
 {\
 	livido_malloc		= list->livido_malloc_f;\
@@ -185,6 +215,26 @@ static void *(*livido_memcpy) (void *dest, const void *src, size_t n) = 0;\
 	livido_property_element_size = list->livido_property_element_size_f;\
 	livido_list_properties	=	list->livido_list_properties_f;\
 }
+#else
+/* Using void* to pass base address of function, needs explicit typecast and host
+   must match ordering */
+#define	LIVIDO_IMPORT(list) \
+{\
+	livido_malloc		= (livido_malloc_f) list[0].f;\
+	livido_free		= (livido_free_f) list[1].f;\
+	livido_memset		= (livido_memset_f) list[2].f;\
+	livido_memcpy		= (livido_memcpy_f) list[3].f;\
+	livido_port_free	= (livido_port_free_f) list[5].f;\
+	livido_port_new		= (livido_port_new_f) list[4].f;\
+	livido_property_set 	= (livido_property_set_f) list[6].f;\
+	livido_property_get	= (livido_property_get_f) list[7].f;\
+	livido_property_num_elements = (livido_property_num_elements_f) list[8].f;\
+	livido_property_atom_type = (livido_property_atom_type_f) list[9].f;\
+	livido_property_element_size = (livido_property_element_size_f) list[10].f;\
+	livido_list_properties = (livido_list_properties_f) list[11].f;\
+}
+
+#endif
 
 LIVIDO_END_DECLS
 #endif				// #ifndef __LIVIDO_H__
