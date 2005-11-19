@@ -806,8 +806,8 @@ static	int	vj_event_verify_args( int *fx, int net_id , int arglen, int np, int p
 			int fx_p = vj_effect_get_num_params( fx_id );
 			int fx_c = vj_effect_get_extra_frame( fx_id );
 			int min = fx_p + (prefixed > 0 ? 0: 3);
-			int max = min + ( fx_c ? 2 : 0 );
-			int a_len = arglen -( prefixed > 0 ? prefixed - 1: 0 );
+			int max = min + ( fx_c ? 2 : 0 ) + prefixed;
+			int a_len = arglen -( prefixed > 0 ? prefixed - 1: 0 );	
 			if( a_len < min || a_len > max )
 			{
 				if( a_len < min )
