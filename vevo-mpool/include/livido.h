@@ -199,7 +199,7 @@ static void *(*livido_memset) (void *s, int c, size_t n) = 0;\
 static void *(*livido_memcpy) (void *dest, const void *src, size_t n) = 0;\
 
 
-#ifdef FUNCTSTRUCT
+#ifdef FUNCSTRUCT
 #define	LIVIDO_IMPORT(list) \
 {\
 	livido_malloc		= list->livido_malloc_f;\
