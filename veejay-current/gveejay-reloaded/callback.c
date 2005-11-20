@@ -653,7 +653,11 @@ void	on_dec_p7_clicked(GtkWidget *w, gpointer user_data)
 
 void	on_button_stoplaunch_clicked(GtkWidget *widget, gpointer user_data)
 {
-	vj_gui_stop_launch();
+	if( info->state == STATE_PLAYING)
+	{
+		vj_gui_disconnect();
+	}
+	printf("state = %d\n", info->state );
 }
 
 void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
@@ -1426,11 +1430,16 @@ void on_openConnection_activate             (GtkMenuItem     *menuitem,
 void on_veejay_connection_close             (GtkDialog       *dialog,
 						     gpointer         user_data)
 {
-	if(!info->status_lock)
+	GtkWidget *w = glade_xml_get_widget(info->main_window, "veejay_connection");
+	gtk_widget_hide(w);
+
+	if(info->state == STATE_PLAYING)
+		vj_gui_disconnect();
+	else
+	if(info->state == STATE_STOPPED)
 	{
-		GtkWidget *veejay_conncection_window = glade_xml_get_widget(info->main_window, "veejay_connection");
-		gtk_widget_hide(veejay_conncection_window);	
-	} 
+		gveejay_quit(NULL,NULL);
+	}
 }
 
 
@@ -1803,6 +1812,8 @@ void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
+	if(skin__ == 0 )
+	{
 	if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE) // 1
 		gtk_notebook_set_page( GTK_NOTEBOOK(n) , 1 );
 
@@ -1811,6 +1822,26 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 	
 	if(info->status_tokens[PLAY_MODE] == MODE_PLAIN ) // 2
 		gtk_notebook_set_page( GTK_NOTEBOOK(n), 2 );	
+	}
+	else
+	{
+		if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE) // 1
+		{
+			enable_widget( "vbox450" ); disable_widget("vbox457");
+			enable_widget("hbox638");
+		}
+		if(info->status_tokens[PLAY_MODE] == MODE_STREAM)
+		{
+			disable_widget("hbox638");
+			disable_widget("vbox450"); enable_widget("vbox457");
+		}
+		if(info->status_tokens[PLAY_MODE] == MODE_PLAIN)
+		{
+			disable_widget("vbox450");
+			disable_widget("vbox457");		
+			enable_widget("hbox638");
+		}
+	}
 }
 
 void	on_timeline_cleared(GtkWidget *widget, gpointer user_data)
@@ -1919,7 +1950,12 @@ void 	on_button_sdlclose_clicked(GtkWidget *w, gpointer user_data)
 
 void	on_quicklaunch_clicked(GtkWidget *widget, gpointer user_data)
 {
-	vj_fork_or_connect_veejay( config_file );
+	if( info->state == STATE_IDLE || info->state == STATE_STOPPED )
+	{ 
+		vj_fork_or_connect_veejay( config_file );
+	//	GtkWidget *w = glade_xml_get_widget(info->main_window, "veejay_connection");
+	//	gtk_widget_show(w);
+	}	
 }
 
 static void _update_vs()
@@ -2218,5 +2254,20 @@ void	on_console1_activate(GtkWidget *w, gpointer user_data)
 	if(page == 1 )
 		gtk_notebook_next_page( GTK_NOTEBOOK(n) );
 	*/
+}
+void	on_entry_hostname_focus_in_event( GtkWidget *w, gpointer user_data)
+{
+	update_label_str( "runlabel", "Connect");
+}
+
+void	on_entry_hostname_focus_out_event( GtkWidget *w, gpointer user_data)
+{
+	update_label_str( "runlabel", "Run" );
+}
+
+
+on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
+{
+	update_label_str( "runlabel", "Run" );
 }
 

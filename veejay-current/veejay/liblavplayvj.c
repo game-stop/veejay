@@ -1105,6 +1105,17 @@ void veejay_signal_loop(void *arg)
 	    veejay_change_state(info, LAVPLAY_STATE_STOP);
 	    break;
 	}
+	if (sig == SIGSEGV  || sig == SIGBUS || sig == SIGILL )
+	{
+		/* save and abort */
+		char tmp_name[100];
+		sprintf(tmp_name, "%s", "veejay-coredump-XXXXXX");
+		mkstemp(tmp_name);
+		vj_event_parse_msg( info, "%03d:%d %s;",VIMS_BUNDLE_SAVE,1,
+			tmp_name);
+		veejay_msg(VEEJAY_MSG_ERROR, "Catched SEGFAULT , save & abort ...");
+		veejay_change_state(info,LAVPLAY_STATE_STOP);
+	}
     }
     pthread_exit(NULL);
 }

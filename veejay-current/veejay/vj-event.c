@@ -3877,6 +3877,9 @@ void vj_event_tag_chain_enable(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
+	if( args[0] == 0 )
+		args[0] = v->uc->sample_id;
+
 	if(vj_tag_exists(args[0]))
 	{
 		vj_tag_set_effect_status(args[0], 1);
@@ -3898,6 +3901,8 @@ void vj_event_tag_chain_disable(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
+	if( args[0] == 0 )
+		args[0] == v->uc->sample_id;
 	if(vj_tag_exists(args[0]))
 	{
 		vj_tag_set_effect_status(args[0], 0);

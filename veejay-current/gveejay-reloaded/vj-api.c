@@ -256,7 +256,6 @@ typedef struct
 } vims_keys_t;
 
 static int skin__ = 0;
-static int borked_ = 0;
 // Have room for only 200 samples
 #define NUM_BANKS 20   
 #define NUM_PAGES 10
@@ -660,7 +659,6 @@ static struct
 	{"manualopacity"},
 	{"loglinear"},
 	{"frame_fxtree"},
-	{"fxbox"},
 	{NULL}
 };
 
@@ -1639,20 +1637,22 @@ void		veejay_quit( )
         if( prompt_dialog("Quit veejay", "Close Veejay ? All unsaved work will be lost." )
 		 == GTK_RESPONSE_REJECT )
                 return;
+       single_vims( 600 );
+
+	vj_gui_disconnect();
 
 	clear_progress_bar( "cpumeter",0.0 );
 	clear_progress_bar( "connecting",0.0 );
 	clear_progress_bar( "samplerecord_progress",0.0 );
 	clear_progress_bar( "streamrecord_progress",0.0 );
 
-	g_source_remove( info->samplerecording );
-	g_source_remove( info->streamrecording );
-	g_source_remove( info->logging );
-	g_source_remove( info->cpumeter );
-	g_source_remove( info->imageA );
+//	g_source_remove( info->samplerecording );
+//	g_source_remove( info->streamrecording );
+//	g_source_remove( info->logging );
+//	g_source_remove( info->cpumeter );
+//	g_source_remove( info->imageA );
 //	g_io_channel_shutdown( info->channel, FALSE, NULL );
 	
-        single_vims( 600 );
 }
 
 gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
@@ -2856,10 +2856,10 @@ static	void	update_record_tab(int pm)
 
 static void	update_current_slot(int pm)
 {
-	gchar *time = format_time( (pm == MODE_STREAM ? info->status_frame : info->status_tokens[FRAME_NUM]) );
+//	gchar *time = format_time( (pm == MODE_STREAM ? info->status_frame : info->status_tokens[FRAME_NUM]) );
 	int *history = info->history_tokens[pm];
-	update_label_str( "label_sampleposition", time);
-	g_free(time); 
+//	update_label_str( "label_sampleposition", time);
+//	g_free(time); 
 	gint update = 0;
 
 	/* Mode changed or ID changed, 
@@ -2927,8 +2927,7 @@ static void	update_current_slot(int pm)
 
 		update_label_str( "label_currentsource", "Stream" );
 		gchar *time = format_time( info->status_frame );
-	
-		update_label_str( "label_sampleposition", time);
+		update_label_str( "label_curtime", time );
 		g_free(time); 
 	}
 
@@ -2938,13 +2937,12 @@ static void	update_current_slot(int pm)
 	if(pm == MODE_SAMPLE )
 	{
 		/* Total frame change, update start,end and */
-		if( history[TOTAL_FRAMES] != info->status_tokens[TOTAL_FRAMES])
-		{
-			update_spin_range(
-			 	"spin_samplestart", 0, info->el.num_frames, 0 );
-			update_spin_range(
-				"spin_sampleend", 0, info->el.num_frames , 0 );
-		}
+//		if( history[TOTAL_FRAMES] != info->status_tokens[TOTAL_FRAMES])
+//		{
+	//HERE	
+//printf("Start / end changed: %d - %d\n", 0 , info->el.num_frames );
+//printf("Current = %d - %d\n", info->status_tokens[SAMPLE_START], info->status_tokens[SAMPLE_END]);
+//		}
 
 		/* Update label and video slider*/
 		update_label_i( "label_sampleposition",
@@ -3260,7 +3258,10 @@ static void	process_reload_hints(void)
 	{
 		load_editlist_info();
 		reload_editlist_contents();
-		vj_msg(VEEJAY_MSG_WARNING, "EditList has changed");
+		update_spin_range(
+		 	"spin_samplestart", 0, info->el.num_frames, info->status_tokens[SAMPLE_START] );
+		update_spin_range(
+			"spin_sampleend", 0, info->el.num_frames , info->status_tokens[SAMPLE_END] );
 	}
 	if( info->uc.reload_hint[HINT_SLIST] == 1 )
 	{
@@ -3626,7 +3627,7 @@ static	gint load_parameter_info()
 		if(answer) g_free(answer);
 		for( i = 0; i < 16; i ++ )
 			st[i] = 0;
-		if(info->uc.selected_rgbkey)
+		if(info->uc.selected_rgbkey && skin__ == 0)
 			disable_widget("rgbkey");
 		return 0;
 	}
@@ -3640,6 +3641,8 @@ static	gint load_parameter_info()
 			st[i] = 0;
 		return 0;
 	}
+	if( skin__ == 0 )
+	{
 	info->uc.selected_rgbkey = _effect_get_rgb( p[0] );
 	if(info->uc.selected_rgbkey)
 	{
@@ -3651,7 +3654,7 @@ static	gint load_parameter_info()
 		disable_widget( "rgbkey");
 		info->uc.selected_rgbkey = 0;
 	} 
-
+	}
 	g_free(answer);
 		
 	for( i = 0; i < 16; i ++ )
@@ -4722,10 +4725,12 @@ on_rgbkey_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 
 static	void	setup_rgbkey()
 {
-	GtkWidget *sel = glade_xml_get_widget_(info->main_window, "rgbkey");
-	g_signal_connect( sel, "color-changed",
-		(GCallback) on_rgbkey_color_changed, NULL );
-
+	if( skin__ == 0 )
+	{
+		GtkWidget *sel = glade_xml_get_widget_(info->main_window, "rgbkey");
+		g_signal_connect( sel, "color-changed",
+			(GCallback) on_rgbkey_color_changed, NULL );
+	}
 }
 
 static	void	setup_vimslist()
@@ -5333,7 +5338,7 @@ static	void	load_editlist_info()
 	g_free(res);
 }
 
-vj_gui_set_preview_window( int w , int h )
+void vj_gui_set_preview_window( int w , int h )
 {
 	if( w < 0 || w > 1568 || h < 0 || h > 1024 )
 	{
@@ -5977,7 +5982,7 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	}
 //	for(k = 0 ; k < arglen; k ++ )
 //	 fprintf(stderr, "%s arg %d = '%s'\n", __FUNCTION__, k, args[k] );	
-	if( info->state == STATE_IDLE )
+	if( info->state == STATE_IDLE || info->state == STATE_STOPPED)
 	{
 		// start local veejay
 		if(strncasecmp(remote, "localhost", strlen(remote)) == 0 || strncasecmp(remote, "127.0.0.1", strlen(remote))==0)
@@ -6158,7 +6163,6 @@ void 	vj_gui_init(char *glade_file)
 	glade_init();
 
 	vj_gui_t *gui = (vj_gui_t*)vj_malloc(sizeof(vj_gui_t));
-	
 	if(!gui)
 	{
 		return;
@@ -6192,7 +6196,7 @@ void 	vj_gui_init(char *glade_file)
 	get_gd( path, NULL, glade_file);
 	gui->client = NULL;
 	gui->main_window = glade_xml_new(path,NULL,NULL);
-	gui->state = STATE_IDLE;
+	gui->state = STATE_STOPPED;
 	if(!gui->main_window)
 	{
 		free(gui);
@@ -6232,7 +6236,7 @@ void 	vj_gui_init(char *glade_file)
 	gui->config.vims = 0;
 	gui->config.mcast_osc = g_strdup( "224.0.0.32" );
 	gui->config.mcast_vims = g_strdup( "224.0.0.33" );
-	g_timeout_add_full( G_PRIORITY_DEFAULT_IDLE, 300, is_alive, (gpointer*) info,NULL);
+	g_timeout_add_full( G_PRIORITY_DEFAULT_IDLE, 200, is_alive, (gpointer*) info,NULL);
 
 	GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
     /* Make this run after any internal handling of the client event happened
@@ -6416,13 +6420,13 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 //	load_samplelist_info(true);
 
 
-	if( skin__ == 0 )
-	{
-		GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
-		GtkWidget *w2 = glade_xml_get_widget_(info->main_window, "veejay_connection");
-		gtk_widget_show( w );
-		gtk_widget_hide( w2);
-	}
+//	if( skin__ == 0 )
+//	{
+	GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
+//	GtkWidget *w2 = glade_xml_get_widget_(info->main_window, "veejay_connection");
+	gtk_widget_show( w );
+//	gtk_widget_hide( w2);
+//}	
 	info->uc.reload_hint[HINT_SLIST] = 1;
 	info->uc.reload_hint[HINT_CHAIN] = 1;
 	info->uc.reload_hint[HINT_ENTRY] = 1;
@@ -6472,9 +6476,13 @@ static	void	veejay_stop_connecting(vj_gui_t *gui)
 gboolean	is_alive(gpointer data)
 {
 	vj_gui_t *gui = (vj_gui_t*) data;
-	
-	if( gui->state == STATE_STOPPED )
-		vj_gui_disconnect();
+	if(gui->state == STATE_IDLE || gui->state == STATE_STOPPED )
+	{
+		if(gui->sensitive)
+			vj_gui_disable();
+		if(!gui->launch_sensitive)
+			vj_launch_toggle(TRUE);
+	}
 
 	if( gui->state == STATE_RECONNECT )
 	{
@@ -6492,17 +6500,6 @@ gboolean	is_alive(gpointer data)
 					gui->state = STATE_RECONNECT;
 					memcpy(&(info->timer),&timenow,sizeof(timenow));
 				}
-				else
-				{	/* veejay connected */
-					
-					veejay_stop_connecting(gui);
-					if( skin__ == 1 )
-					{
-						gchar hello_world[100];
-						sprintf(hello_world, "Connected with Veejay at %s : %d", remote, port );
-						message_dialog( "New Connection", hello_world );
-					}
-				}	
 			}
 		}
 		else
@@ -6510,7 +6507,7 @@ gboolean	is_alive(gpointer data)
 			vj_gui_stop_launch();
 			if(info->run_state == RUN_STATE_LOCAL)
 			{
-				message_dialog( "Run Error", "Failed to connect to local Veejay - check configuration");
+				message_dialog( "Run Error", "Failed to start local Veejay - check configuration");
 			}
 			else
 			{
@@ -6528,16 +6525,10 @@ gboolean	is_alive(gpointer data)
 		if(!gui->sensitive)
 		{
 			vj_gui_enable();
+			veejay_stop_connecting(gui);
 		}
 	}
 
-	if( gui->state == STATE_IDLE )
-	{
-		if(gui->sensitive)
-			vj_gui_disable();
-		if(!gui->launch_sensitive)
-			vj_launch_toggle(TRUE);
-	}
 	return TRUE;
 }
 
@@ -6572,11 +6563,11 @@ void	vj_gui_disconnect()
 	free_samplebank();
 	info->preview_ready = 0;
 
-	if( skin__ == 0 )
-	{
-		GtkWidget *w = glade_xml_get_widget_( info->main_window, "gveejay_window");
-		gtk_widget_hide( w ); 
-	}
+//	if( skin__ == 0 )
+//	{
+//		GtkWidget *w = glade_xml_get_widget_( info->main_window, "gveejay_window");
+//		gtk_widget_hide( w ); 
+//	}
 	
 }
 
@@ -6598,8 +6589,8 @@ void	vj_gui_disable()
 
 	disable_widget_by_pointer(info->audiovolume_knob);		
 //	disable_widget_by_pointer(info->speed_knob);	
-	gtk_widget_set_sensitive( GTK_WIDGET(
-			glade_xml_get_widget_(info->main_window, "button_loadconfigfile") ), TRUE );
+//	gtk_widget_set_sensitive( GTK_WIDGET(
+//			glade_xml_get_widget_(info->main_window, "button_loadconfigfile") ), TRUE );
 
 	info->sensitive = 0;
 	set_toggle_button( "previewtoggle", 0 );
@@ -6619,8 +6610,8 @@ void	vj_gui_enable()
 //	enable_widget_by_pointer(info->speed_knob);		
 	enable_widget( "speed_slider");
 	// disable loadconfigfile
-	gtk_widget_set_sensitive( GTK_WIDGET(
-			glade_xml_get_widget_(info->main_window, "button_loadconfigfile") ), FALSE );
+//	gtk_widget_set_sensitive( GTK_WIDGET(
+//			glade_xml_get_widget_(info->main_window, "button_loadconfigfile") ), FALSE );
 
 	info->sensitive = 1;
 

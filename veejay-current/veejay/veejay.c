@@ -612,6 +612,9 @@ int main(int argc, char **argv)
     sigemptyset(&(settings->signal_set));
     sigaddset(&(settings->signal_set), SIGINT);
     sigaddset(&(settings->signal_set), SIGPIPE);
+    sigaddset(&(settings->signal_set), SIGBUS);
+    sigaddset(&(settings->signal_set), SIGILL);
+    sigaddset(&(settings->signal_set), SIGSEGV);
 
     pthread_sigmask(SIG_BLOCK, &(settings->signal_set), NULL);
     pthread_create(&(settings->signal_thread), NULL, veejay_signal_loop,
