@@ -425,18 +425,18 @@ int main(int argc, char **argv)
 	if (!livido_setup) { printf("FATAL: function livido_setup not found in %s\n", name); return 1; };
 
 	livido_setup_t setup[] = {
-		{(void*)malloc },
-		{(void*)free},
-		{(void*)memset},
-		{(void*)memcpy},
-		{(void*)vevo_port_new},
-		{(void*)vevo_port_free},
-		{(void*)vevo_property_set},
-		{(void*)vevo_property_get},
-		{(void*)vevo_property_num_elements},
-		{(void*)vevo_property_atom_type},
-		{(void*)vevo_property_element_size},
-		{(void*)vevo_list_properties}
+		{(void(*)())malloc },
+		{(void(*)())free},
+		{(void(*)())memset},
+		{(void(*)())memcpy},
+		{(void(*)())vevo_port_new},
+		{(void(*)())vevo_port_free},
+		{(void(*)())vevo_property_set},
+		{(void(*)())vevo_property_get},
+		{(void(*)())vevo_property_num_elements},
+		{(void(*)())vevo_property_atom_type},
+		{(void(*)())vevo_property_element_size},
+		{(void(*)())vevo_list_properties}
 	};
 
 #endif

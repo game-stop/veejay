@@ -178,7 +178,8 @@ typedef char **(*livido_list_properties_f) (livido_port_t *);
 
 typedef struct
 {
-	void *f;
+	void (*f)();
+//	void *f;
 } livido_setup_t;
 typedef livido_port_t *(*livido_setup_f) (const livido_setup_t list[], int );
 
