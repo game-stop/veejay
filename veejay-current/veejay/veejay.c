@@ -50,76 +50,62 @@ static int auto_loop = 0;
 
 static void CompiledWith()
 {
- fprintf(stderr, "Codecs:\n");
- fprintf(stderr, "\tlibdv: ");
-//#ifdef SUPPORT_READ_DV2
-// fprintf(stderr, "YES\n");
-//#else
-// fprintf(stderr, "NO\n");
-//#endif
- fprintf(stderr, "Audio:\n");
- fprintf(stderr, "\tJack : ");
+	veejay_msg(VEEJAY_MSG_INFO,"Compilation flags:");
+#ifdef USE_GDK_PIXBUF
+	veejay_msg(VEEJAY_MSG_INFO,"\tUse GDK Pixbuf");
+#endif
+#ifdef USE_SWSCALER
+	veejay_msg(VEEJAY_MSG_INFO,"\tUse software scaler");
+#endif
 #ifdef HAVE_JACK
- fprintf(stderr, "YES\n");
-#else
- fprintf(stderr, "NO\n");
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Jack audio server");
 #endif
-
- fprintf(stderr, "Video:\n");
- fprintf(stderr, "\tDirectFB: ");
-#ifdef HAVE_DIRECTFB
- fprintf(stderr, "YES\n");
-#else
- fprintf(stderr, "NO\n");
+#ifdef HAVE_V4L
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Video4linux");
 #endif
-
- fprintf(stderr, "\tSDL     : ");
+#ifdef SUPPORT_READ_DV2
+	veejay_msg(VEEJAY_MSG_INFO,"\tSupport for Digital Video enabled");
+#endif
+#ifdef HAVE_XML2
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing XML library for Gnome");
+#endif
+#ifdef SUPPORT_READ_DV2
+	veejay_msg(VEEJAY_MSG_INFO,"\tSupport for Digital Video enabled");
+#endif
 #ifdef HAVE_SDL
- fprintf(stderr, "YES\n");
-#else
- fprintf(stderr, "NO\n");
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Simple Direct Media Layer");
 #endif
-
- fprintf(stderr, "Arch  :\n");
- fprintf(stderr, "\tMMX  : ");
-#ifdef HAVE_ASM_MMX
- fprintf(stderr, "YES\n");
-#else
- fprintf(stderr, "NO\n");
+#ifdef USE_GTKCAIRO
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing GTK Cairo");
 #endif
-
- fprintf(stderr, "\tSSE  : ");
+#ifdef HAVE_DIRECTFB
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing DirectFB");
+#endif
+#ifdef HAVE_FREETYPE
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Freetype");
+#endif
+#ifdef HAVE_X86CPU
+	veejay_msg(VEEJAY_MSG_INFO,"\tCompiled for x86 architecture");
+#endif
+#ifdef HAVE_PPCCPU
+	veejay_msg(VEEJAY_MSG_INFO,"\tCompiled for PPC architecture");
+#endif
 #ifdef HAVE_ASM_SSE
- fprintf(stderr, "YES\n");
-#else
- fprintf(stderr, "NO\n");
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing SSE instruction set");
 #endif
-
-
- fprintf(stderr, "\tCMOV : ");
 #ifdef HAVE_CMOV
- fprintf(stderr, "YES\n");
-#else
- fprintf(stderr, "NO\n");
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing CMOV");
 #endif
-
-
- fprintf(stderr, "\t3DNOW: ");
-#ifdef HAVE_3DNOW
- fprintf(stderr, "YES\n");
-#else
- fprintf(stderr, "NO\n");
+#ifdef HAVE_ASM_SSE2
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing SSE2 instruction set");
 #endif
-
-
- fprintf(stderr, "\tMMX2 : ");
-#ifdef HAVE_ASM_MMX2
- fprintf(stderr, "YES\n");
-#else
- fprintf(stderr, "NO\n");
+#ifdef HAVE_ASM_MMX
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing MMX instruction set");
 #endif
-
-
+#ifdef HAVE_ASM_3DNOW
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing 3Dnow instruction set");
+#endif
+	exit(0);
 }
 
 static void Usage(char *progname)

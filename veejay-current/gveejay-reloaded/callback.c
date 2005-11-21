@@ -28,47 +28,38 @@ static gchar *config_file = NULL;
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_SKIP_SECOND);
-	vj_msg(VEEJAY_MSG_INFO, "Next second"); 
 }
 void	on_button_086_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_PREV_SECOND );
-	vj_msg(VEEJAY_MSG_INFO, "Previous second");
 }
 void	on_button_080_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_PLAY_FORWARD);
-	vj_msg(VEEJAY_MSG_INFO, "Play Forward");
 }
 void	on_button_081_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_PLAY_BACKWARD);
-	vj_msg(VEEJAY_MSG_INFO, "Play Backward");
 }
 void	on_button_082_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_PLAY_STOP );
-	vj_msg(VEEJAY_MSG_INFO, "Stop");
 }
 void	on_button_083_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_SKIP_FRAME );
-	vj_msg(VEEJAY_MSG_INFO, "Next frame");
 }
 void 	on_button_084_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_PREV_FRAME );
-	vj_msg(VEEJAY_MSG_INFO, "Previous frame");
 }
 void	on_button_087_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_GOTO_START );
-	vj_msg(VEEJAY_MSG_INFO, "Goto starting position");
 }
 void	on_button_088_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_GOTO_END);
-	vj_msg(VEEJAY_MSG_INFO, "Goto ending position");
 }
 
 void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
@@ -104,7 +95,6 @@ void	on_audiovolume_knob_value_changed(GtkAdjustment *adj, gpointer user_data)
 {
 	gdouble val = gtk_adjustment_get_value(adj);
 	multi_vims( VIMS_SET_VOLUME, "%d", (gint) val );
-	vj_msg(VEEJAY_MSG_INFO,"Set volume to %d", (gint)val ); 
 	update_label_i( "volume_label", (gint)val,0);
 }
 
@@ -140,7 +130,7 @@ void	on_button_054_clicked(GtkWidget *widget, gpointer user_data)
 		gint w = get_nums("screenshot_width");
 		gint h = get_nums("screenshot_height");
 		multi_vims( VIMS_SCREENSHOT,"%d %d %s",w,h,filename );
-		vj_msg(VEEJAY_MSG_INFO, "Requested veejay to take screenshot '%s' of frame %d",
+		vj_msg(VEEJAY_MSG_INFO, "Requested screenshot '%s' of frame %d",
 			filename, info->status_tokens[FRAME_NUM] + 1 );
 	}
 }
@@ -148,7 +138,7 @@ void	on_button_200_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_EFFECT_SET_BG ); 
 	vj_msg(VEEJAY_MSG_INFO,
-		"Requested veejay to take background mask of frame %d",
+		"Requested background mask of frame %d",
 			info->status_tokens[FRAME_NUM] + 1 );
 }
 void	on_button_5_4_clicked(GtkWidget *widget, gpointer user_data)
@@ -426,9 +416,7 @@ void	on_button_el_addsample_clicked(GtkWidget *w, gpointer *user_data)
 		sscanf( result, "%5d", &sample_id );
 		vj_msg(VEEJAY_MSG_INFO, "Created new sample %d from file %s", sample_id, filename);
 		g_free(result);
-		// force reloading of sample list
 	}
-	
 	g_free(filename );
 }
 void	on_button_el_delfile_clicked(GtkWidget *w, gpointer *user_data)
@@ -491,26 +479,6 @@ void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 		info->uc.selected_chain_entry);
 	vj_kf_delete_parameter( info->uc.selected_chain_entry );
 }
-/*
-void	on_button_fx_mixapply_clicked(GtkWidget *w, gpointer user_data)
-{
-	if(info->uc.selected_mix_sample_id)
-		multi_vims( VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,"%d %d %d %d",
-			0,
-			info->uc.selected_chain_entry,
-			0,
-			info->uc.selected_mix_sample_id
-			);
-
-	if(info->uc.selected_mix_stream_id)
-		multi_vims( VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL, "%d %d %d %d",
-			0,
-			info->uc.selected_chain_entry,
-			1,
-			info->uc.selected_mix_stream_id
-			);
-}
-*/
 
 #define	slider_changed( arg_num, value ) \
 {\

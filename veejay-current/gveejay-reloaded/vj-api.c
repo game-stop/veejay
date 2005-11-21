@@ -1418,8 +1418,8 @@ void	about_dialog()
 	gtk_window_present( GTK_WINDOW( about ) );
 #else
 	int i;
-	vj_msg( VEEJAY_MSG_INFO, "Gveejay Reloaded %s %d%d%d", VEEJAY_CODENAME,VEEJAY_MAJOR_VERSION,VEEJAY_MINOR_VERSION,VEEJAY_MICRO_VERSION );
-	vj_msg( VEEJAY_MSG_INFO, "%s", license );
+	vj_msg_detail( VEEJAY_MSG_INFO, "Gveejay Reloaded %s %d%d%d", VEEJAY_CODENAME,VEEJAY_MAJOR_VERSION,VEEJAY_MINOR_VERSION,VEEJAY_MICRO_VERSION );
+	vj_msg_detail( VEEJAY_MSG_INFO, "%s", license );
 	for(i = 0; artists[i] != NULL ; i ++ )
 		vj_msg_detail( VEEJAY_MSG_INFO, "%s", artists[i] );
 	for(i = 0; authors[i] != NULL ; i ++ )
@@ -1837,7 +1837,10 @@ static  void	vj_msg(int type, const char format[], ...)
 	int nr,nw;
         gchar *text = g_locale_to_utf8( buf, -1, &nr, &nw, NULL);
         text[strlen(text)-1] = '\0';
-        put_text( "lastmessage", text );
+//        put_text( "lastmessage", text );
+
+	GtkWidget *sb = glade_xml_get_widget_( info->main_window, "statusbar");
+	gtk_statusbar_push( GTK_STATUSBAR(sb),0, text ); 
 
 	g_free( text );
 	va_end(args);
@@ -1904,7 +1907,6 @@ static	void	msg_vims(char *message)
 {
 	if(!info->client)
 		return;
-	vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, message );
 	vj_client_send(info->client, V_CMD, message);
 }
 
@@ -3248,7 +3250,6 @@ static void	process_reload_hints(void)
 	if(info->uc.reload_hint[HINT_V4L] == 1 && pm == MODE_STREAM)
 	{
 		load_v4l_info();
-		vj_msg(VEEJAY_MSG_INFO, "Video4Linux color setup available");
 	}
 
 	if( info->uc.reload_hint[HINT_RGBSOLID] == 1 && pm == MODE_STREAM )
@@ -6032,8 +6033,6 @@ void	vj_fork_or_connect_veejay(char *configfile)
 					info->run_state = RUN_STATE_LOCAL;
 					info->state = STATE_RECONNECT;
 					vj_launch_toggle(FALSE);
-					vj_msg(VEEJAY_MSG_INFO,
-						"Spawning Veejay ...!"); 
 				}
 				
 			}
@@ -6043,7 +6042,6 @@ void	vj_fork_or_connect_veejay(char *configfile)
 				if(is_button_toggled("previewtoggle"))
 				{
 				  /* Keep a watch not to choke the bandwith */
-				  vj_msg(VEEJAY_MSG_INFO, "Disabling preview image");
 				  set_toggle_button( "previewtoggle", 0 );
 				}
 			}
@@ -6385,7 +6383,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		info->run_state = 0;
 		return 0;
 	}
-	vj_msg(VEEJAY_MSG_INFO, "New connection established with Veejay running on %s port %d",
+	vj_msg(VEEJAY_MSG_INFO, "New connection with Veejay running on %s port %d",
 		(group_name == NULL ? hostname : group_name), port_num );
 	int k = 0;
 	for( k = 0; k < 3; k ++ )
@@ -7204,7 +7202,7 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
 		sequence_gui_slot_t *g = info->sequence_view->gui_slot[slot_nr];
 		if(g->sample_id <= 0)
 		{
-			vj_msg(VEEJAY_MSG_ERROR, "Memory slot %d empty, place current playing with SHIFT + mouse button1",slot_nr);
+			vj_msg(VEEJAY_MSG_ERROR, "Memory slot %d empty, put with SHIFT + mouse button1",slot_nr);
 			return FALSE;
 
 		}
