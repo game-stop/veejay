@@ -663,19 +663,10 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
       return NULL;
    }
 
-   if( (fstat( AVI->fdes, &s )) != 0 )
-   {
-      AVI_errno = AVI_ERR_OPEN;
-      close( AVI->fdes );
-      free(AVI);
-      return NULL;
-   }
-
    off_t len = lseek( AVI->fdes, 0, SEEK_END );
    if( len <= (HEADERBYTES+16))
    {
 	AVI_errno = AVI_ERR_EMPTY;
-	close(AVI->fdes);
   	free(AVI);
 	return NULL;
    }

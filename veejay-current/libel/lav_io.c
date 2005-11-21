@@ -780,7 +780,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
    if(lav_fd->avi_fd==NULL && AVI_errno == AVI_ERR_EMPTY )
 	{
 		if(lav_fd) free(lav_fd);
-		return 0;
+		return NULL;
 	}
 
    if(lav_fd->avi_fd)

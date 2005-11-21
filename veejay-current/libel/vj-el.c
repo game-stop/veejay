@@ -332,7 +332,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		{
 		    veejay_msg(VEEJAY_MSG_ERROR, "File %s already in editlist", realname);
 		    if(realname) free(realname);
-	      	return i;
+		    return i;
 		}
 	}
 
@@ -356,7 +356,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
     if (el->lav_fd[n] == NULL)
 	{
 		el->num_video_files--;	
-	veejay_msg(VEEJAY_MSG_ERROR,"Error loading '%s' :%s",
+		veejay_msg(VEEJAY_MSG_ERROR,"Error loading '%s' :%s",
 		realname,lav_strerror());
 	 	if(realname) free(realname);
 		return -1;
@@ -368,8 +368,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Input file %s is not in a valid format (%d)",filename,_fc);
 		el->num_video_files --;
-	    if(realname) free(realname);
-		if( el->lav_fd[n] ) lav_close(el->lav_fd[n]);
+	    	if(realname) free(realname);
 		return -1;
 
 	}
@@ -387,7 +386,6 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to determine pixel format");
 		el->num_video_files--;	
-		if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
 		if(realname) free(realname);
 		return -1;
 	}
@@ -398,7 +396,6 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	if(lav_video_frames(el->lav_fd[n]) < 2)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to load video files that contain less than 2 frames");
-		if( el->lav_fd[n] ) lav_close(el->lav_fd[n]);
 		if(realname) free(realname);
 		el->num_video_files --;
 		return -1;
@@ -1177,7 +1174,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	{
 		/* Check if file really exists, is mounted etc... */
 		struct stat fileinfo;
-		if(stat( filename[nf], &fileinfo)!= -1) 
+		if(stat( filename[nf], &fileinfo)== 0) 
 		{	/* Check if filename[nf] is a edit list */
 			fd = fopen(filename[nf], "r");
 			if (fd <= 0)
@@ -1321,22 +1318,18 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 						el->video_frames++;
 					}
 				}
-				else
-				{
-					veejay_msg(VEEJAY_MSG_WARNING,
-						"Cant put %s in EditList", filename[nf] );
-				}
 			}
     		}
-		else
-		{
-			/* file is not there anymore ? */
-			veejay_msg(VEEJAY_MSG_WARNING,
-				"File %s is not acceessible (anymore?)", filename[nf]);
-			vj_el_free(el);
-			return NULL;
-		}
 	}
+
+	if( el->num_video_files == 0 || 
+		el->video_width == 0 || el->video_height == 0 || el->video_frames <= 2)
+	{
+		vj_el_free(el);
+		return NULL;
+	}
+
+	/* do we have anything? */
 
 	/* Calculate maximum frame size */
 
@@ -1344,7 +1337,10 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	{
 		n = el->frame_list[i];
 		if(!el->lav_fd[N_EL_FILE(n)] )
-			{ vj_el_free(el); return NULL; }
+		{
+			vj_el_free(el);
+			return NULL;
+		}
 		if (lav_frame_size(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n)) >
 		    el->max_frame_size)
 		    el->max_frame_size =
@@ -1384,13 +1380,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
            (because we skip the files that fail) */
 
 
-	if( el->num_video_files == 0 || 
-		el->video_width == 0 || el->video_height == 0 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Failed");
-		vj_el_free(el);
-		return NULL;
-	}
 
 	return el;
 }
