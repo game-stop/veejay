@@ -122,10 +122,11 @@ int main(int argc, char *argv[]) {
 
         if( err ) usage(argv[0]);
 
+//	gtk_init(&argc, &argv);
+	gtk_init(NULL,NULL);
+
 	if(gveejay_theme)
 		vj_gui_theme_setup();
-
-	gtk_init(&argc, &argv);
 
 	vj_gui_set_debug_level( verbosity , priority_preview_);
 		

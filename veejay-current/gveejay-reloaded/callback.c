@@ -2223,19 +2223,22 @@ void	on_console1_activate(GtkWidget *w, gpointer user_data)
 		gtk_notebook_next_page( GTK_NOTEBOOK(n) );
 	*/
 }
-void	on_entry_hostname_focus_in_event( GtkWidget *w, gpointer user_data)
+gboolean	on_entry_hostname_focus_in_event( GtkWidget *w, gpointer user_data)
 {
 	update_label_str( "runlabel", "Connect");
+	return FALSE;
 }
 
-void	on_entry_hostname_focus_out_event( GtkWidget *w, gpointer user_data)
+gboolean	on_entry_hostname_focus_out_event( GtkWidget *w, gpointer user_data)
 {
 	update_label_str( "runlabel", "Run" );
+	return FALSE;
 }
 
 
-on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
+gboolean 	on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
 {
 	update_label_str( "runlabel", "Run" );
+	return FALSE;
 }
 

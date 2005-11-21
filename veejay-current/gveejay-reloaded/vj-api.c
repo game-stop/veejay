@@ -4619,7 +4619,7 @@ gboolean
 
     return TRUE; /* allow selection state to change */
   }
-/*
+
 void 
 on_editlist_row_activated(GtkTreeView *treeview,
 		GtkTreePath *path,
@@ -4636,14 +4636,9 @@ on_editlist_row_activated(GtkTreeView *treeview,
 		gtk_tree_model_get(model,&iter, COLUMN_INT, &num, -1);
 		gint frame_num = _el_ref_start_frame( num );
 
-		if(info->uc.playmode != MODE_PLAIN)
-			multi_vims( VIMS_SET_PLAIN_MODE, "%d" ,MODE_PLAIN );
-
 		multi_vims( VIMS_VIDEO_SET_FRAME, "%d", (int) frame_num );
 	}
-
 }
-*/
 
 void
 on_stream_color_changed(GtkColorSelection *colorsel, gpointer user_data)
@@ -4918,8 +4913,8 @@ static	void	setup_editlist_info()
 	setup_tree_text_column( "editlisttree", COLUMN_STRINGB, "Duration");
 	setup_tree_text_column( "editlisttree", COLUMN_STRINGC, "FOURCC");
 
-//	g_signal_connect( editlist_tree, "row-activated",
-//		(GCallback) on_editlist_row_activated, NULL );
+	g_signal_connect( editlist_tree, "row-activated",
+		(GCallback) on_editlist_row_activated, NULL );
 
   	GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(editlist_tree));
     	gtk_tree_selection_set_select_function(selection, view_el_selection_func, NULL, NULL);
@@ -5790,7 +5785,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 				nb = vj_client_read(gui->client, V_STATUS, gui->status_msg, bb );
 		}
 
-		//gui->status_lock = 1;
+		gui->status_lock = 1;
 		if(nb > 0)
 		{
 			int n = sscanf( gui->status_msg, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
@@ -5847,7 +5842,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
   		// flush rest
 		char tmp[5];
                 while(vj_client_poll( gui->client, V_STATUS ))
-                        nb = vj_client_read( gui->client,V_STATUS,tmp, 1); 
+                       nb = vj_client_read( gui->client,V_STATUS,tmp, 1); 
 	}
  
 	return TRUE;
@@ -6465,11 +6460,11 @@ static	void	veejay_stop_connecting(vj_gui_t *gui)
 	if(!gui->sensitive)
 		vj_gui_enable();
 	vj_launch_toggle(TRUE);
-	gtk_progress_bar_set_fraction(
+	/*gtk_progress_bar_set_fraction(
 		GTK_PROGRESS_BAR (glade_xml_get_widget_(info->main_window, "connecting")),0.0);
 	g_source_remove( info->connecting );
 
-	info->connecting = 0;
+	info->connecting = 0;*/
 	
 	veejay_conncection_window = glade_xml_get_widget(info->main_window, "veejay_connection");
 	gtk_widget_hide(veejay_conncection_window);		
@@ -6478,6 +6473,7 @@ static	void	veejay_stop_connecting(vj_gui_t *gui)
 gboolean	is_alive(gpointer data)
 {
 	vj_gui_t *gui = (vj_gui_t*) data;
+
 	if(gui->state == STATE_IDLE || gui->state == STATE_STOPPED )
 	{
 		if(gui->sensitive)
