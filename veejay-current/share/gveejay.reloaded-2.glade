@@ -471,15 +471,69 @@
 	  <child>
 	    <widget class="GtkCheckButton" id="previewtoggle">
 	      <property name="visible">True</property>
-	      <property name="tooltip" translatable="yes">Enable or disable veejay grab</property>
+	      <property name="tooltip" translatable="yes">Enable or disable realtime preview</property>
 	      <property name="can_focus">True</property>
-	      <property name="label" translatable="yes">Preview</property>
+	      <property name="label" translatable="yes"></property>
 	      <property name="use_underline">True</property>
 	      <property name="relief">GTK_RELIEF_NORMAL</property>
 	      <property name="focus_on_click">True</property>
 	      <property name="active">False</property>
 	      <property name="inconsistent">False</property>
 	      <property name="draw_indicator">True</property>
+	    </widget>
+	    <packing>
+	      <property name="padding">0</property>
+	      <property name="expand">False</property>
+	      <property name="fill">False</property>
+	    </packing>
+	  </child>
+
+	  <child>
+	    <widget class="GtkButton" id="previewlarge">
+	      <property name="visible">True</property>
+	      <property name="tooltip" translatable="yes">Large preview</property>
+	      <property name="can_focus">True</property>
+	      <property name="relief">GTK_RELIEF_NORMAL</property>
+	      <property name="focus_on_click">True</property>
+	      <signal name="clicked" handler="on_previewlarge_clicked" last_modification_time="Tue, 22 Nov 2005 05:32:00 GMT"/>
+
+	      <child>
+		<widget class="GtkImage" id="image1235">
+		  <property name="visible">True</property>
+		  <property name="pixbuf">icon_plarge.png</property>
+		  <property name="xalign">0.5</property>
+		  <property name="yalign">0.5</property>
+		  <property name="xpad">0</property>
+		  <property name="ypad">0</property>
+		</widget>
+	      </child>
+	    </widget>
+	    <packing>
+	      <property name="padding">0</property>
+	      <property name="expand">False</property>
+	      <property name="fill">False</property>
+	    </packing>
+	  </child>
+
+	  <child>
+	    <widget class="GtkButton" id="previewsmall">
+	      <property name="visible">True</property>
+	      <property name="tooltip" translatable="yes">Small preview</property>
+	      <property name="can_focus">True</property>
+	      <property name="relief">GTK_RELIEF_NORMAL</property>
+	      <property name="focus_on_click">True</property>
+	      <signal name="clicked" handler="on_previewsmall_clicked" last_modification_time="Tue, 22 Nov 2005 05:30:42 GMT"/>
+
+	      <child>
+		<widget class="GtkImage" id="image1234">
+		  <property name="visible">True</property>
+		  <property name="pixbuf">icon_psmall.png</property>
+		  <property name="xalign">0.5</property>
+		  <property name="yalign">0.5</property>
+		  <property name="xpad">0</property>
+		  <property name="ypad">0</property>
+		</widget>
+	      </child>
 	    </widget>
 	    <packing>
 	      <property name="padding">0</property>
@@ -592,7 +646,7 @@
 				      <child>
 					<widget class="GtkLabel" id="label666">
 					  <property name="visible">True</property>
-					  <property name="label" translatable="yes">Video Effects</property>
+					  <property name="label" translatable="yes">Image Effects</property>
 					  <property name="use_underline">False</property>
 					  <property name="use_markup">False</property>
 					  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -644,7 +698,7 @@
 				      <child>
 					<widget class="GtkLabel" id="label667">
 					  <property name="visible">True</property>
-					  <property name="label" translatable="yes">Image Effects</property>
+					  <property name="label" translatable="yes">Video Effects</property>
 					  <property name="use_underline">False</property>
 					  <property name="use_markup">False</property>
 					  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -11713,9 +11767,10 @@ YV16</property>
 </widget>
 
 <widget class="GtkWindow" id="inputstream_window">
+  <property name="width_request">500</property>
   <property name="title" translatable="yes">GVeejay Reloaded - New input stream</property>
   <property name="type">GTK_WINDOW_TOPLEVEL</property>
-  <property name="window_position">GTK_WIN_POS_CENTER_ON_PARENT</property>
+  <property name="window_position">GTK_WIN_POS_CENTER</property>
   <property name="modal">False</property>
   <property name="resizable">True</property>
   <property name="destroy_with_parent">False</property>
@@ -12009,7 +12064,7 @@ YV16</property>
 		<widget class="GtkExpander" id="expander9">
 		  <property name="visible">True</property>
 		  <property name="can_focus">True</property>
-		  <property name="expanded">False</property>
+		  <property name="expanded">True</property>
 		  <property name="spacing">0</property>
 
 		  <child>

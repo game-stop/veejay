@@ -3193,7 +3193,10 @@ static void 	update_globalinfo()
 		{
 			if( history[CURRENT_ID] == info->status_tokens[CURRENT_ID] )
 				info->uc.reload_hint[HINT_RECORDING] = 1;
-			vj_msg(VEEJAY_MSG_INFO, "Veejay is recording");
+			if( info->status_tokens[STREAM_RECORDING])
+				vj_msg(VEEJAY_MSG_INFO, "Veejay is recording");
+			else
+				vj_msg(VEEJAY_MSG_INFO, "Recording has stopped");
 		}
 	}
 

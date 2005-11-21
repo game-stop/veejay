@@ -2242,3 +2242,25 @@ gboolean 	on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
 	return FALSE;
 }
 
+
+void		on_previewlarge_clicked( GtkWidget *w, gpointer user_data )
+{
+	int w = info->el.width;
+	int h = info->el.height;
+	if( w > 360 ) w = 360;
+	if( h > 288 ) h = 288;
+	update_spin_value( "preview_width", w );
+        update_spin_value( "preview_height",h );
+}
+
+void		on_previewsmall_clicked( GtkWidget *w, gpointer user_data)
+{
+	int w = info->el.width;
+	int h = info->el.height;
+	if( w >= 720) w = w / 4;
+	else w= w / 2;
+	if( h >= 480 ) h = h / 4;
+	else h = h / 2;
+	update_spin_value( "preview_width", w );
+        update_spin_value( "preview_height", h );
+}
