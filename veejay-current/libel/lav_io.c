@@ -776,8 +776,12 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
    lav_fd->avi_fd = AVI_open_input_file(filename,1,mmap_size);
    video_format = 'a'; /* for error messages */
 
-//	if(!lav_fd->avi_fd) { if(lav_fd) free(lav_fd); return 0;}
-
+  // if(!lav_fd->avi_fd) { if(lav_fd) free(lav_fd); return 0;}
+   if(lav_fd->avi_fd==NULL && AVI_errno == AVI_ERR_EMPTY )
+	{
+		if(lav_fd) free(lav_fd);
+		return 0;
+	}
 
    if(lav_fd->avi_fd)
    {
@@ -789,7 +793,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
       if(video_comp == NULL || strlen(video_comp) <= 0)
 	{ if(lav_fd) free(lav_fd); return 0;}
    }
-   else if( AVI_errno==AVI_ERR_NO_AVI || AVI_errno == AVI_ERR_READ )
+   else if( AVI_errno==AVI_ERR_NO_AVI )
    {
 	int ret = 0;
 #ifdef USE_GDK_PIXBUF

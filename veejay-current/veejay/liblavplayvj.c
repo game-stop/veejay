@@ -1444,6 +1444,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 {
 	editlist *el = info->current_edit_list;
 	video_playback_setup *settings = info->settings;
+
+	available_diskspace();
+
 	if(info->video_out<0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "No video output driver selected (see man veejay)");

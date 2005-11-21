@@ -121,6 +121,8 @@ typedef struct
                                       getIndex==0, but an operation has been
                                       performed that needs an index */
 
+#define AVI_ERR_EMPTY	    15	   /* AVI file is empty (only header) */
+
 /* Possible Audio formats */
 
 #define WAVE_FORMAT_UNKNOWN             (0x0000)

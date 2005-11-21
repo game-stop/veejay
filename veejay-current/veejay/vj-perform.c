@@ -2193,6 +2193,7 @@ int vj_perform_record_commit_single(veejay_t *info, int entry)
   {
  	if(sample_get_encoded_file(info->uc->sample_id, filename))
   	{
+// does file exist ?
 		int id = veejay_edit_addmovie_sample(info,filename, 0 );
 		if(id <= 0)
 		{
@@ -2280,13 +2281,14 @@ void vj_perform_record_stop(veejay_t *info)
 void vj_perform_record_sample_frame(veejay_t *info, int entry) {
 	video_playback_setup *settings = info->settings;
 	uint8_t *frame[3];
-	int res = 0;
+	int res = 1;
 	int n = 0;
 	frame[0] = primary_buffer[entry]->Y;
 	frame[1] = primary_buffer[entry]->Cb;
 	frame[2] = primary_buffer[entry]->Cr;
 	
-	res = vj_perform_render_sample_frame(info, frame);
+	if( available_diskspace() )
+		res = vj_perform_render_sample_frame(info, frame);
 
 	if( res == 2)
 	{
@@ -2295,7 +2297,6 @@ void vj_perform_record_sample_frame(veejay_t *info, int entry) {
 		int len = sample_get_total_frames(info->uc->sample_id);
 		long frames_left = sample_get_frames_left(info->uc->sample_id) ;
 		// stop encoder
-		veejay_msg(VEEJAY_MSG_INFO, "Creating new file (reached 2gb AVI limit)");
 		sample_stop_encoder( info->uc->sample_id );
 		// close file, add to editlist
 		n = vj_perform_record_commit_single( info, entry );
@@ -2305,7 +2306,6 @@ void vj_perform_record_sample_frame(veejay_t *info, int entry) {
 		if(frames_left > 0 )
 		{
 			veejay_msg(VEEJAY_MSG_DEBUG, "Continue, %d frames left to record", frames_left);
-			// todo: add to other editlist .. ?
 			if( sample_init_encoder( info->uc->sample_id, NULL,
 				df, info->edit_list, frames_left)==-1)
 			{
@@ -2338,7 +2338,7 @@ void vj_perform_record_sample_frame(veejay_t *info, int entry) {
 void vj_perform_record_tag_frame(veejay_t *info, int entry) {
 	video_playback_setup *settings = info->settings;
 	uint8_t *frame[3];
-	int res = 0;
+	int res = 1;
 	int stream_id = info->uc->sample_id;
 	if( settings->offline_record )
 	  stream_id = settings->offline_tag_id;
@@ -2355,8 +2355,10 @@ void vj_perform_record_tag_frame(veejay_t *info, int entry) {
 		frame[1] = primary_buffer[entry]->Cb;
 		frame[2] = primary_buffer[entry]->Cr;
 	}
-	// not done?! by offline?1	
-	res = vj_perform_render_tag_frame(info, frame);
+
+	if(available_diskspace())
+		res = vj_perform_render_tag_frame(info, frame);
+
 	if( res == 2)
 	{
 		/* auto split file */
@@ -2655,12 +2657,12 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 		    	cached_sample_frames[CACHE_TOP] = info->uc->sample_id;
 		    	if(vj_perform_verify_rows(info,frame))
 		    	{		
-		   	 		vj_perform_sample_complete_buffers(info, frame, skip_incr);
+		   	 	vj_perform_sample_complete_buffers(info, frame, skip_incr);
 		    	}
 		    	if(!skip_incr)
-		  			if(sample_encoder_active(info->uc->sample_id))
+		  		if(sample_encoder_active(info->uc->sample_id))
 		    		{
-						vj_perform_record_sample_frame(info,frame);
+					vj_perform_record_sample_frame(info,frame);
 			    	}	 
 		    return 1;
 		    break;
@@ -2671,15 +2673,15 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 		case VJ_PLAYBACK_MODE_TAG:
 		    	if (vj_perform_tag_fill_buffer(info, frame) == 0)
 		    	{	/* primary frame */
-					if(vj_perform_verify_rows(info,frame))
-					{
-						vj_perform_tag_complete_buffers(info, frame, skip_incr);
-					}
-					if(!skip_incr)
-					if(vj_tag_encoder_active(info->uc->sample_id))
-					{
-						vj_perform_record_tag_frame(info,frame);
-					}
+				if(vj_perform_verify_rows(info,frame))
+				{
+					vj_perform_tag_complete_buffers(info, frame, skip_incr);
+				}
+				if(!skip_incr)
+				if(vj_tag_encoder_active(info->uc->sample_id))
+				{
+					vj_perform_record_tag_frame(info,frame);
+				}
 				return 1;
 		    	}
 			return 1;

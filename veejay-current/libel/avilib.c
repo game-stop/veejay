@@ -32,6 +32,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
+#include <sys/stat.h>
 #include "avilib.h"
 #include "mjpeg_logging.h"
 #include "avcodec.h"
@@ -638,6 +639,7 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
    int auds_strf_seen = 0;
    int num_stream = 0;
    uint8_t data[256];
+   struct stat s;
 
    /* Create avi_t structure */
 
@@ -645,7 +647,7 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
    if(AVI==NULL)
    {
       AVI_errno = AVI_ERR_NO_MEM;
-      return 0;
+      return NULL;
    }
    memset((void *)AVI,0,sizeof(avi_t));
 
@@ -658,8 +660,26 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
    {
       AVI_errno = AVI_ERR_OPEN;
       free(AVI);
-      return 0;
+      return NULL;
    }
+
+   if( (fstat( AVI->fdes, &s )) != 0 )
+   {
+      AVI_errno = AVI_ERR_OPEN;
+      close( AVI->fdes );
+      free(AVI);
+      return NULL;
+   }
+
+   off_t len = lseek( AVI->fdes, 0, SEEK_END );
+   if( len <= (HEADERBYTES+16))
+   {
+	AVI_errno = AVI_ERR_EMPTY;
+	close(AVI->fdes);
+  	free(AVI);
+	return NULL;
+   }
+   lseek(AVI->fdes,0,SEEK_SET);
 
    /* Read first 12 bytes and check that this is an AVI file */
 
@@ -1231,7 +1251,8 @@ const char *(avi_errors[]) =
   /* 11 */ "avilib - AVI file has no MOVI list (corrupted?)",
   /* 12 */ "avilib - AVI file has no video data",
   /* 13 */ "avilib - operation needs an index",
-  /* 14 */ "avilib - Unkown Error"
+  /* 14 */ "avilib - Unkown Error",
+  /* 15 */ "avilib - AVI file is empty"           
 };
 static int num_avi_errors = sizeof(avi_errors)/sizeof(char*);
 
@@ -1269,7 +1290,7 @@ const char *AVI_strerror(void)
       AVI_errno == AVI_ERR_WRITE_INDEX ||
       AVI_errno == AVI_ERR_CLOSE )
    {
-      sprintf(error_string,"%s - %s",avi_errors[aerrno],strerror(errno));
+      sprintf(error_string,"%s",avi_errors[aerrno]);
       return error_string;
    }
    else

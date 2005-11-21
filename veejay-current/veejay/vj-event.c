@@ -3440,6 +3440,12 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		return; 
 	}
 
+	if(args[0] <= 1 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to record less then 2 frames");
+		return;
+	}
+
 	if( sample_init_encoder( v->uc->sample_id, tmp, format_, v->edit_list, args[0]) == 1)
 	{
 		video_playback_setup *s = v->settings;
@@ -5925,6 +5931,12 @@ static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
 	if(_recorder_format == -1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Set a destination format first");
+		return;
+	}
+
+	if(args[0] <= 1 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to record less then 2 frames");
 		return;
 	}
 

@@ -25,6 +25,7 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdint.h>
+#include <sys/statfs.h>
 #include <libvje/vje.h>
 #include <veejay/vj-misc.h>
 #include <veejay/vj-lib.h>
@@ -229,4 +230,24 @@ void	vj_get_yuv444_template(VJFrame *src, int w, int h)
 	src->data[1] = NULL;
 	src->data[2] = NULL;
 }
+int	available_diskspace(void)
+{
+	const char *point = ".";
+	struct statfs s;
+	if(statfs(point,&s) != 0)
+		return 0;
+	uint64_t avail = 0;
+	avail = ((uint64_t) s.f_bavail) * ( (uint64_t) s.f_bsize);
 
+	if( avail <= 0 )
+	{
+		veejay_msg(VEEJAY_MSG_WARNING, "No available diskspace in CWD");
+		return 0;
+	}
+	if( avail <= 1048576)
+	{
+		veejay_msg(VEEJAY_MSG_WARNING, "Almost no available diskspace in CWD");
+		return 0;
+	}
+	return 1;
+}
