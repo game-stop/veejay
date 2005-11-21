@@ -35,7 +35,7 @@
 #include <libvjmsg/vj-common.h>
 #include <libvjmem/vjmem.h>
 #include <veejay/vims.h>
-#include <gveejay/vj-api.h>
+#include <gveejay-reloaded/vj-api.h>
 #include <fcntl.h>
 #include <utils/mpegconsts.h>
 #include <utils/mpegtimecode.h>
@@ -464,7 +464,7 @@ static	vj_gui_t	*info = NULL;
 static	GtkWidget *effect_sources_tree;
 static 	GtkListStore *effect_sources_store;
 static 	GtkTreeModel *effect_sources_model;
-
+static int 		preview_priority_ = 0;
 /* global pointer to the editlist-tree */
 static 	GtkWidget *editlist_tree;
 static	GtkListStore *editlist_store;
@@ -1905,7 +1905,7 @@ static	void	msg_vims(char *message)
 	if(!info->client)
 		return;
 	vj_msg(VEEJAY_MSG_DEBUG, " %s: %s", __FUNCTION__, message );
-	int error = vj_client_send(info->client, V_CMD, message);
+	vj_client_send(info->client, V_CMD, message);
 }
 
 int	get_loop_value()
@@ -5674,8 +5674,10 @@ static	void	init_cpumeter()
 	info->cpumeter = g_timeout_add(300,update_cpumeter_timeout,
 			(gpointer*) info );
 	int ms = (int) ( 1.0 / info->el.fps * 1000 );
-//	info->imageA = g_timeout_add(G_PRIORITY_HIGH_IDLE,update_imageA, (gpointer*)info);
-	info->imageA =	gtk_idle_add( update_imageA, (gpointer*) info);
+	if(preview_priority_)
+		info->imageA = g_timeout_add(G_PRIORITY_HIGH_IDLE,update_imageA, (gpointer*)info);
+	else
+		info->imageA =	gtk_idle_add( update_imageA, (gpointer*) info);
 	g_timeout_add(600, refresh_image_horror, (gpointer*) info);
 }
 
@@ -6138,13 +6140,15 @@ gui_client_event_signal(GtkWidget *widget, GdkEventClient *event,
 	return FALSE;
 }
 
-void	vj_gui_set_debug_level(int level)
+void	vj_gui_set_debug_level(int level, int preview_p )
 {
 	veejay_set_debug_level( level );
 
 	vims_verbosity = level;
 	if(level)
 		veejay_msg(VEEJAY_MSG_INFO, "Be verbose");
+
+	preview_priority_ = preview_p;
 }
 
 

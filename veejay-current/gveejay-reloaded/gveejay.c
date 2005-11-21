@@ -33,6 +33,7 @@ static int timer = 6;
 static int preview_width = 0;
 static int preview_height = 0;
 static int current_skin = 0;
+static int priority_preview_ = 0;
 
 static struct
 {
@@ -54,6 +55,7 @@ static void usage(char *progname)
 	printf( "-t/--timeout\t\tSet timeout (default 6 seconds)\n");
 	printf( "-s/--size\t\tSet preview size (widht X height)\n");
  	printf( "-f/--flavour\t\tSelect another skin to use\n");
+	printf( "-H/--highpriority\t\tHigh priority preview\n");
         printf( "\n\n");
         exit(-1);
 }
@@ -68,6 +70,10 @@ static int      set_option( const char *name, char *value )
         {
                 port_num = atoi(optarg);
         }
+	else if (strcmp(name, "H") == 0 || strcmp(name, "highpriority") == 0 )
+	{
+		priority_preview_ = 1;
+	}
 	else if( strcmp(name, "n") == 0 || strcmp(name, "no-theme") == 0)
 	{
 		gveejay_theme = 0;
@@ -105,7 +111,7 @@ int main(int argc, char *argv[]) {
 
         if(!argc) usage(argv[0]);
 
-        while( ( n = getopt( argc, argv, "s:h:p:nvf:")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:p:nvHf:")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
@@ -121,7 +127,7 @@ int main(int argc, char *argv[]) {
 
 	gtk_init(&argc, &argv);
 
-	vj_gui_set_debug_level( verbosity );
+	vj_gui_set_debug_level( verbosity , priority_preview_);
 		
 	vj_gui_set_timeout(timer);
 	set_skin( current_skin );
