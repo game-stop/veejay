@@ -4,10 +4,8 @@ MAINTAINERCLEANFILES = Makefile.in
 
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem \
 		-I$(top_srcdir)/vjmsg \
-		-I$(top_srcdir)/ffmpeg/ffmpeg/libavcodec \
-		-I$(top_srcdir)/ffmpeg/ffmpeg/libavformat \
 		-I$(top_srcdir)/utils \
-		${PIXBUF_CFLAGS}
+		${FFMPEG_CFLAGS} ${PIXBUF_CFLAGS}
  
 VJEL_LIB_FILE = libel.la
 noinst_LTLIBRARIES = $(VJEL_LIB_FILE)

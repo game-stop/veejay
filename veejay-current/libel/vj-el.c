@@ -226,7 +226,12 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
                		d->context[i] = avcodec_alloc_context();
                		d->context[i]->width = width;
               		d->context[i]->height= height;
-                	d->context[i]->frame_rate = fps;
+#if LIBAVFORMAT_BUILD > 5010
+                	d->context[i]->time_base.den = fps;
+			d->context[i]->time_base.num = 1;
+#else
+			d->context[i]->frame_rate = fps;
+#endif
                 	d->context[i]->pix_fmt = ( i == 0 ? PIX_FMT_YUV420P : PIX_FMT_YUV422P);
                		d->frame[i] = avcodec_alloc_frame();
 		}

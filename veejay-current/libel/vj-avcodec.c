@@ -86,8 +86,12 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 		e->context = avcodec_alloc_context();
 		e->context->width = el->video_width;
  		e->context->height = el->video_height;
+#if LIBAVCODEC_BUILD > 5010
+		e->context->time_base = (AVRational) { 1, el->video_fps };
+#else
 		e->context->frame_rate = el->video_fps;
 		e->context->frame_rate_base = 1;
+#endif
 		e->context->qcompress = 0.0;
 		e->context->qblur = 0.0;
 		e->context->flags = CODEC_FLAG_QSCALE;

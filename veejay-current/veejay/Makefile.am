@@ -16,8 +16,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/liblavjpeg \
 		-I$(top_srcdir)/libsamplerec \
 		-I$(top_srcdir)/libvevo \
-		-I$(top_srcdir)/ffmpeg/ffmpeg/libavcodec \
-		-I$(top_srcdir)/ffmpeg/ffmpeg/libavformat \
+		$(FFMPEG_CFLAGS) \
 		$(AVIPLAY_CFLAGS) ${XML_CFLAGS} ${GTK_CFLAGS} ${DV_FLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} \
 		$(DIRECTFB_CFLAGS) ${SDL_CFLAGS} ${JPEG_CFLAGS} ${PTHREAD_CFLAGS} ${SAMPLERATE_CFLAGS} 
 
@@ -41,9 +40,7 @@ if USE_SWSCALER
 libveejay_la_LDFLAGS += -L$(top_builddir)/libpostproc/ -lpostproc 
 endif
 
-libveejay_la_LDFLAGS +=	-L$(top_builddir)/ffmpeg/ffmpeg/libavcodec -lavcodec \
-			-L$(top_builddir)/ffmpeg/ffmpeg/libavformat -lavformat \
-			-L$(top_builddir)/libOSC / -lOSC \
+libveejay_la_LDFLAGS += -L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libhash / -lhash \
 			-L$(top_builddir)/utils/ -lmjpegutils \
 			-L$(top_builddir)/bio2jack/ -lbio2jack \
@@ -58,6 +55,7 @@ libveejay_la_LDFLAGS +=	-L$(top_builddir)/ffmpeg/ffmpeg/libavcodec -lavcodec \
 			-L$(top_builddir)/liblavjpeg -llavjpeg \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
 			-L$(top_builddir)/libvevo -lvevo \
+			${FFMPEG_LIBS} \
 			${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} \
 			${XML_LIBS} ${JPEG_LIBS} ${JACK_LIBS} \
 			${LIBDV_LIBS} ${LIBM_LIBS} ${PIXBUF_LIBS}\

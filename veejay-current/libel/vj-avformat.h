@@ -22,7 +22,6 @@
 #include <ffmpeg/ffmpeg/libavcodec/avcodec.h>
 #include <ffmpeg/ffmpeg/libavformat/avformat.h>
 
-
 typedef struct vj_avformat_t
 {
 	AVFormatContext *context;

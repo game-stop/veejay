@@ -695,11 +695,24 @@ else
        ARCHFLAGS=`$srcdir/cpuinfo.sh mips`
   fi
 fi
-AC_MSG_RESULT([$ARCHFLAGS])
+
+if test ! -r $srcdir/ffmpeg/ffmpeg/configure.gnu; then
+       AC_MSG_ERROR([FFmpeg tree broken])
+fi
+ffmpeg_include='$(top_srcdir)/ffmpeg/ffmpeg'
+ffmpeg_build='$(top_builddir)/ffmpeg/ffmpeg'
+FFMPEG_CFLAGS="-I${ffmpeg_include}/libavcodec -I${ffmpeg_include}/libavformat"
+FFMPEG_LIBS="-L${ffmpeg_build}/libavcodec -lavcodec -L${ffmpeg_build}/libavformat -lavformat"
+if test -d $srcdir/ffmpeg/ffmpeg/libavutil/ ; then
+	FFMPEG_CFLAGS="$FFMPEG_CFLAGS -I${ffmpeg_include}/libavutil" 
+	FFMPEG_LIBS="$FFMPEG_LIBS -L${ffmpeg_build}/libavutil -lavutil"
+fi
+AC_SUBST( FFMPEG_CFLAGS )
+AC_SUBST( FFMPEG_LIBS )
+
 
 dnl **********************************************************************
 dnl All the conditional stuff for the Makefiles
-
 AM_CONDITIONAL(HAVE_ASM_MMX, test x$have_asm_mmx = xtrue)
 AM_CONDITIONAL(HAVE_X86CPU, test x$have_x86cpu = xtrue)
 AM_CONDITIONAL(HAVE_PPCCPU, test x$have_ppccpu = xtrue)
@@ -781,9 +794,9 @@ AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
 
 if test x$have_ps2 = xtrue ; then
- ac_configure_args="$ac_configure_args --disable-v4l --disable-audio-oss --disable-vhook --disable-ffmpeg --disable-ffserver --disable-zlib --disable-dv1394 --disable-mpeg-audio-hp --disable-network --disable-audio-oss --disable-audiobeos"
+ ffmpeg_ac_configure_args="--disable-v4l --disable-audio-oss --disable-vhook --disable-ffplay --disable-ffserver --disable-zlib --disable-dv1394 --disable-network --disable-audio-oss --disable-audiobeos"
 else
-ac_configure_args="$ac_configure_args --disable-ffserver --disable-ffplay --disable-v4l --disable-audio-oss --disable-vhook --disable-dv1394 --disable-mpeg-audio-hp --disable-network --disable-audio-oss --disable-audio-beos"
+ffmpeg_ac_configure_args="--disable-ffserver --disable-ffplay --disable-v4l --disable-audio-oss --disable-vhook --disable-dv1394 --disable-network --disable-audio-oss --disable-audio-beos"
 fi
 
 AC_MSG_NOTICE([ Gveejay ${use_gveejayreloaded} ${with_gveejayreloaded} ])
@@ -831,12 +844,13 @@ if test x$with_gimp_stuff != xfalse ; then
 	AC_SUBST(GLADE_LIBS)
 fi
 
+
+
 dnl  AC_CONFIG_SUBDIRS(ffmpeg/ffmpeg)
 
 (
 	cd ffmpeg/ffmpeg
-	./configure.gnu $ac_configure_args
-
+	./configure.gnu $ffmpeg_ac_configure_args
 )
 
 
