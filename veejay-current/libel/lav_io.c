@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <fcntl.h>
+#include <sys/stat.h>
 #include <libel/lav_io.h>
 //#include <veejay/vj-lib.h>
 #include <libvjmsg/vj-common.h>
@@ -771,7 +772,23 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
    lav_fd->is_MJPG     = 0;
    lav_fd->MJPG_chroma = CHROMAUNKNOWN;
    lav_fd->mmap_size   = mmap_size;
-   /* open video file, try AVI first */
+
+
+	/* open file, check if file is a file */
+	struct stat s;
+	if( stat(filename, &s ) != 0 )
+	{
+		if(lav_fd) free(lav_fd);
+		return NULL;
+	}
+
+	if(!S_ISREG( s.st_mode) )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "'%s' is not a regular file",filename);
+		if(lav_fd) free(lav_fd);
+		return NULL;
+	}
+
 
    lav_fd->avi_fd = AVI_open_input_file(filename,1,mmap_size);
    video_format = 'a'; /* for error messages */
