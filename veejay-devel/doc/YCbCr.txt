@@ -1,0 +1,12 @@
+
+	Veejay processes nativly in YUV, hence no RGB <-> YUV conversions are used
+
+		YUV 4:2:0 Planar ( 1 Cr and 1 Cb sample per 2x2 Y samples)
+		YUV 4:2:2 Planar ( 1 Cr and 1 Cr sample per 1x2 Y samples)  
+
+	You can customize the sampling method used when sub- and super sampling
+	video data:    
+		OSC: /config/sampling
+		VIMS: 250:;
+
+	Use the triangle filter for best quality, or the box filter for best performance		(default is best quality).	

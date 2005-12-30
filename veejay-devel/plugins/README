@@ -1,0 +1,36 @@
+
+
+This will be replaced by VEVO  very soon !
+Dont use this.
+
+Veejay Plugins
+
+ See dummy.c for a working example
+
+A minimal Veejay Plugin has these functions:
+
+ VJPluginInfo *Info(void *context);
+
+ int Init(void *context) 
+
+ void Process( void *context, void *info, void *picture )
+
+
+
+Optional functions are:
+
+ void Event( void *context, const char *args )
+
+ void Free(void *context)
+
+
+
+
+Veejay calls the plugin's function 'Process' when a new frame is ready,
+the void pointer info should be casted to a VJFrameInfo structure,
+the void pointer picture should be casted to a VJFrame structure.
+The VJFrame structure contains the datafields for the Frame, VJFrameInfo
+structure holds some informative fields for your plugin.
+
+
+

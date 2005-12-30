@@ -1,0 +1,78 @@
+.TH "sayVIMS" 1
+.SH NAME
+sayVIMS - sends VIMS messages to veejay 
+.SH SYNOPSIS
+.B sayVIMS [options] [filename]
+.SH DESCRIPTION
+.B sayVIMS
+is a simple program to send VIMS messages to veejay.
+
+.SH OPTIONS
+The command line options allow to specify its behaviour
+.TP
+.B \-p [3490]
+Veejay port to connect to
+.TP
+.B \-h [localhost]
+Veejay host to connect to
+.TP
+.B \-f [filename]
+Use a filename instead of strings on the commandline
+.TP
+.B \-g [multicast address]
+Multicast address to send to
+.TP
+.B \-i
+Start in interactive mode (use ? to get help)
+.TP
+.B \-c
+Start with colored text (geek feature)
+
+.SH USEFULL EXAMPLES
+.TP
+.B sayVIMS -h localhost -p 3490 "255:;"
+Start sayVIMS and connect to veejay (and tell veejay to quit)
+.TP
+.B sayVIMS -g 224.0.0.50 -p 5000 "255:;"
+Ditto, for multicast.
+.TP
+.SH Message Format
+A message is described as
+.B <selector>:<arguments>;
+.TP
+For example:
+.B 099:1 0;
+.TP
+The selector is a 3 digit number identifying some atomic function in veejay. The colon is used to indicate the start of the list of arguments. The semicolon denotes the end of message.
+.TP
+.SH Passing arguments
+Each of veejay's functions except an ordered argument list ; depending on the 
+In case of messages clips, streams or effect chain some values refer to defaults or current:
+.TP
+.B 0 for current clip/stream
+.TP
+.B -1 for last clip/stream
+.TP
+.B > 0 any clip/stream number
+.TP
+.B -1 for current chain entry
+.TP
+.B >= 0 < 20 any chain entry
+ 
+
+.SH BUGS
+see BUGS in the source package
+.SH AUTHOR
+This man page was written by Niels Elburg.
+If you have questions, remarks or you just want to
+contact the developers, the main mailing list for this
+project is: 
+.I veejay-users@lists.sourceforge.net
+For more info see the website at
+.I http://veejay.sourceforge.net
+.SH HISTORY
+This tool was first named 'sendVIMS' , but it
+confused to much with 'sendVIMS for PD' although
+the latter is derived from this one.
+.SH "SEE ALSO"
+.B veejay yuv2rawdv rawdv2yuv  
