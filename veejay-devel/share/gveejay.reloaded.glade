@@ -10078,7 +10078,7 @@ YV16</property>
 	  <child>
 	    <widget class="GtkLabel" id="build_revision">
 	      <property name="visible">True</property>
-	      <property name="label" translatable="yes">ver.2994</property>
+	      <property name="label" translatable="yes">ver. matthijs</property>
 	      <property name="use_underline">False</property>
 	      <property name="use_markup">False</property>
 	      <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -10102,7 +10102,6 @@ YV16</property>
 
 	  <child>
 	    <widget class="GtkFrame" id="frame208">
-	      <property name="visible">True</property>
 	      <property name="label_xalign">0</property>
 	      <property name="label_yalign">0.5</property>
 	      <property name="shadow_type">GTK_SHADOW_NONE</property>

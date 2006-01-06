@@ -2225,14 +2225,14 @@ gboolean	on_entry_hostname_focus_in_event( GtkWidget *w, gpointer user_data)
 
 gboolean	on_entry_hostname_focus_out_event( GtkWidget *w, gpointer user_data)
 {
-	update_label_str( "runlabel", "Run" );
+//	update_label_str( "runlabel", "Run" );
 	return FALSE;
 }
 
 
 gboolean 	on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
 {
-	update_label_str( "runlabel", "Run" );
+//	update_label_str( "runlabel", "Run" );
 	return FALSE;
 }
 
