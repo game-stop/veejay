@@ -722,7 +722,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 		tag->effect_chain[i]->effect_id = -1;
 		tag->effect_chain[i]->e_flag = 0;
 		tag->effect_chain[i]->frame_trimmer = 0;
-		tag->effect_chain[i]->frame_offset = -1;
+		tag->effect_chain[i]->frame_offset = 0;
 		tag->effect_chain[i]->volume = 0;
 		tag->effect_chain[i]->a_flag = 0;
 		tag->effect_chain[i]->channel = 0;

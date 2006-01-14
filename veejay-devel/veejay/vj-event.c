@@ -4537,7 +4537,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 					}
 				}
 
-				if ( vj_effect_get_extra_frame( real_id ))
+			/*	if ( vj_effect_get_extra_frame( real_id ))
 				{
 					int source = args[num_p+3];	
 					int channel_id = args[num_p+4];
@@ -4553,7 +4553,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 						(source == VJ_TAG_TYPE_NONE ? "sample" : "stream" ),
 						channel_id);
 					}
-				}
+				}*/
 			}
 		}
 	}
@@ -4597,7 +4597,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 				}
 				v->uc->chain_changed = 1;
 			}
-
+/*
 			if( vj_effect_get_extra_frame(real_id) )
 			{
 				int channel_id = args[num_p + 4];
@@ -4615,7 +4615,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 					veejay_msg(VEEJAY_MSG_INFO,"Updated mixing channel to %s %d",
 						(source == VJ_TAG_TYPE_NONE ? "sample" : "stream"), channel_id  );
 				}
-			}
+			}*/
 		}
 	}
 

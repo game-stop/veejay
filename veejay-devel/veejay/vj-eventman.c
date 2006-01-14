@@ -1243,7 +1243,7 @@ void		vj_init_vevo_events(void)
 				VIMS_CHAIN_ENTRY_SET_PRESET,
 				"Preset effect on chain entry",
 				vj_event_chain_entry_preset,
-				13,
+				11,
 				VIMS_REQUIRE_ALL_PARAMS,
 				SAMPLE_STREAM_ID_HELP,
 				0,
@@ -1266,10 +1266,6 @@ void		vj_init_vevo_events(void)
 				"Parameter 6",
 				0,
 				"Parameter 7",
-				0,
-				"Channel ID",
-				0,
-				"Source Type",
 				0,
 				NULL );	
 		

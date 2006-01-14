@@ -1263,7 +1263,6 @@ int vj_perform_get_subframe(veejay_t * info, int sub_sample,
     int offset = sample_get_offset(a, chain_entry);	
     int nset = offset;
     int len_a, len_b;
-     
 	if(sample_get_short_info(b,&sample_b[0],&sample_b[1],&sample_b[2],&sample_b[3])!=0) return -1;
 
 	if(sample_get_short_info(a,&sample_a[0],&sample_a[1],&sample_a[2],&sample_a[3])!=0) return -1;

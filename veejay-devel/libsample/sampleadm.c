@@ -300,7 +300,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 	si->effect_chain[i]->is_rendering = 0;
 	si->effect_chain[i]->effect_id = -1;
 	si->effect_chain[i]->e_flag = 0;
-	si->effect_chain[i]->frame_offset = -1;
+	si->effect_chain[i]->frame_offset = 0;
 	si->effect_chain[i]->frame_trimmer = 0;
 	si->effect_chain[i]->volume = 50;
 	si->effect_chain[i]->a_flag = 0;
@@ -1503,7 +1503,7 @@ int sample_chain_add(int s1, int c, int effect_nr)
     }
     if (vj_effect_get_extra_frame(effect_nr))
    {
-    sample->effect_chain[c]->frame_offset = 0;
+    //sample->effect_chain[c]->frame_offset = 0;
     sample->effect_chain[c]->frame_trimmer = 0;
 
     if(s1 > 1)
@@ -1612,7 +1612,7 @@ int sample_chain_clear(int s1)
 			vj_effect_deactivate( sample->effect_chain[i]->effect_id ); 
 	}
 	sample->effect_chain[i]->effect_id = -1;
-	sample->effect_chain[i]->frame_offset = -1;
+	sample->effect_chain[i]->frame_offset = 0;
 	sample->effect_chain[i]->frame_trimmer = 0;
 	sample->effect_chain[i]->volume = 0;
 	sample->effect_chain[i]->a_flag = 0;
@@ -1703,7 +1703,7 @@ int sample_chain_remove(int s1, int position)
 		vj_effect_deactivate( sample->effect_chain[position]->effect_id);    
     }
     sample->effect_chain[position]->effect_id = -1;
-    sample->effect_chain[position]->frame_offset = -1;
+    sample->effect_chain[position]->frame_offset = 0;
     sample->effect_chain[position]->frame_trimmer = 0;
     sample->effect_chain[position]->volume = 0;
     sample->effect_chain[position]->a_flag = 0;
