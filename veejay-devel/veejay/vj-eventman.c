@@ -1239,7 +1239,7 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 	index_map_[VIMS_CHAIN_ENTRY_SET_PRESET]			=	_new_event(
-				"%d %d %d %d %d %d %d %d %d %d %d %d %d",
+				"%d %d %d %d %d %d %d %d %d %d %d",
 				VIMS_CHAIN_ENTRY_SET_PRESET,
 				"Preset effect on chain entry",
 				vj_event_chain_entry_preset,
