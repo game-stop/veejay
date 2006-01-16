@@ -609,7 +609,7 @@ void vj_osc_cb_sample_clear_marker(void *context, int arglen, const void *vargs,
 void vj_osc_cb_sample_record_start(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
-	NET_F_prefixed_single(arglen,vargs,VIMS_SAMPLE_REC_START);
+	NET_F(arglen,vargs,VIMS_SAMPLE_REC_START);
 }
 void vj_osc_cb_record_format(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
