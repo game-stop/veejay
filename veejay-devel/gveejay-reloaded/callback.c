@@ -2339,11 +2339,52 @@ void	on_mt_sync_incspeed_clicked( GtkWidget *w, gpointer user_data)
 	if( n > 0 ) n += 1;
 	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
 }
-void	on_mt_prev_clicked( GtkWidget *w , gpointer user_data)
+void	on_mt_sync_prev_clicked( GtkWidget *w , gpointer user_data)
 {
 	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PREV_FRAME ,0 );
 }
-void	on_mt_next_clicked( GtkWidget *w, gpointer user_data)
+void	on_mt_sync_next_clicked( GtkWidget *w, gpointer user_data)
 {
 	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SKIP_FRAME, 0 );
+}
+
+void	on_button_fx_cut_clicked( GtkWidget *w, gpointer user_data)
+{
+	DBG_C();
+}
+void	on_delete1_activate(GtkWidget *w, gpointer user_data)
+{
+	DBG_C();
+}
+void	on_new_source1_activate( GtkWidget *w , gpointer data )
+{
+	DBG_C();
+}
+void	on_add_file1_activate(GtkWidget *w, gpointer user_data)
+{
+	DBG_C();
+}
+void	on_colorselection_color_changed( GtkWidget *w, gpointer user_data)
+{
+	DBG_C();
+}
+void	on_button_fx_paste_clicked( GtkWidget *w, gpointer user_data)
+{
+	DBG_C();
+}	
+void	on_button_fx_copy_clicked(GtkWidget *w, gpointer user_data)
+{
+	DBG_C();
+}
+void	on_copy1_activate( GtkWidget *w, gpointer user_data)
+{
+	DBG_C();
+}
+void	on_new_color1_activate(GtkWidget *w , gpointer user_data)
+{
+	DBG_C();
+}
+void	on_delete2_activate( GtkWidget *w, gpointer user_data)
+{
+	DBG_C();
 }

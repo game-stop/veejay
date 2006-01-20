@@ -6199,7 +6199,7 @@ void 	vj_gui_init(char *glade_file)
 	gtk_widget_show( info->sample_bank_pad );
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 
-	create_ref_slots(skin__ == 0 ? MEM_SLOT_SIZE/2: MEM_SLOT_SIZE);
+	create_ref_slots(skin__ == 0 ? MEM_SLOT_SIZE/4: MEM_SLOT_SIZE);
 	
 	setup_knobs();
 	setup_vimslist();
@@ -6316,13 +6316,19 @@ void	vj_gui_preview(void)
 
 
 	GdkRectangle result;
-	widget_get_rect_in_screen( info->quick_select, &result );
+	widget_get_rect_in_screen(
+		glade_xml_get_widget_(info->main_window, "quickselect"),
+		&result
+	);
 	gdouble ratio = (gdouble) h / (gdouble) w;
-	gint image_width = result.width / (skin__ == 0 ? MEM_SLOT_SIZE/2: MEM_SLOT_SIZE);
+	gint image_width = result.width / (skin__ == 0 ? MEM_SLOT_SIZE/4: MEM_SLOT_SIZE);
 	gint image_height = image_width * ratio;
 
 	info->sequence_view->w = image_width;
 	info->sequence_view->h = image_height;
+	gtk_widget_set_size_request(info->quick_select,
+		image_width * (skin__ == 0 ? MEM_SLOT_SIZE/4:MEM_SLOT_SIZE),
+		image_height );
 
 }
 
@@ -6645,14 +6651,16 @@ static void
 widget_get_rect_in_screen (GtkWidget *widget, GdkRectangle *r)
 {
 gint x,y,w,h;
-GdkRectangle extents;
-GdkWindow *window;
-window = gtk_widget_get_parent_window(widget); /* getting parent window */
-gdk_window_get_root_origin(window, &x,&y); /* parent's left-top screen coordinates */
-gdk_drawable_get_size(window, &w,&h); /* parent's width and height */
-gdk_window_get_frame_extents(window, &extents); /* parent's extents (including decorations) */
-r->x = x + (extents.width-w)/2 + widget->allocation.x; /* calculating x (assuming: left border size == right border size) */
-r->y = y + (extents.height-h)-(extents.width-w)/2 + widget->allocation.y; /* calculating y (assuming: left border size == right border size == bottom border size) */
+//GdkRectangle extents;
+//GdkWindow *window;
+//window = GDK_WINDOW(gtk_widget_get_parent_window(widget)); /* getting parent window */
+//gdk_window_get_root_origin(window, &x,&y); /* parent's left-top screen coordinates */
+//gdk_drawable_get_size(window, &w,&h); /* parent's width and height */
+//gdk_window_get_frame_extents(window, &extents); /* parent's extents (including decorations) */
+//r->x = x + (extents.width-w)/2 + widget->allocation.x; /* calculating x (assuming: left border size == right border size) */
+//r->y = y + (extents.height-h)-(extents.width-w)/2 + widget->allocation.y; /* calculating y (assuming: left border size == right border size == bottom border size) */
+r->x = 0;
+r->y = 0;
 r->width = widget->allocation.width;
 r->height = widget->allocation.height;
 }
@@ -6846,17 +6854,21 @@ void setup_samplebank(gint num_cols, gint num_rows)
 
 	// print width of notebook samples
 	GdkRectangle result;
-	widget_get_rect_in_screen( info->sample_bank_pad, &result );
+
+	widget_get_rect_in_screen(
+		glade_xml_get_widget_( info->main_window, "sample_bank_hbox" ),
+		&result
+	);
+	printf("W = %d, H = %d, NC =%d, NR = %d\n", result.width,result.height,num_cols,num_rows );
 //	gint image_width = 44;
 //	gint image_height = 36;
-	gint image_width = result.width / num_cols;
-	gint image_height = result.height / num_rows;
-//printf("IMAGE DIMENSIONS = %d x %d\n", image_width,image_height );
-	info->image_dimensions[0] = 176/2;
-	info->image_dimensions[1] = 144/2;
+	gint image_width = result.width / num_rows;
+	gint image_height = result.height / num_cols;
+//	info->image_dimensions[0] = 176/2;
+//	info->image_dimensions[1] = 144/2;
 
-//	info->image_dimensions[0] = image_width * 0.7;
-//	info->image_dimensions[1] = image_height * 0.7;
+	info->image_dimensions[0] = image_width ;
+	info->image_dimensions[1] = image_height;
 }
 
 /* --------------------------------------------------------------------------------------------------------------------------
@@ -6975,8 +6987,13 @@ image_configure_event (GtkWidget *widget, GdkEventConfigure *event, gpointer dat
 */
 static int compare_pixbuf(GdkPixbuf *a, GdkPixbuf *b)
 {
+	if(!a || !b )
+		return 0;
+
 	guchar *A = gdk_pixbuf_get_pixels( a );
 	guchar *B = gdk_pixbuf_get_pixels( b );
+	if(!A || !B )
+		return 0;
 	gint   aN = gdk_pixbuf_get_width(a ) * gdk_pixbuf_get_height(a);
 	gint   bN = gdk_pixbuf_get_width(b ) * gdk_pixbuf_get_height(b);
 	gint   i;
@@ -7067,15 +7084,16 @@ image_expose_seq_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 	}*/
 
 
-	if(info->sequence_view->w == 0 || info->sequence_view->h == 0 )
-	{
+//	if(info->sequence_view->w == 0 || info->sequence_view->h == 0 )
+//	{
 		sequence_gui_slot_t *g = info->sequence_view->gui_slot[j];
 		GdkRectangle result;
+
 		widget_get_rect_in_screen( g->frame, &result );	
 		info->sequence_view->w = result.width;
 		info->sequence_view->h = result.height;
-		return FALSE;
-	}
+//		return FALSE;
+//	}
 
 	if(no_draw_)
 		return FALSE;
@@ -7200,7 +7218,6 @@ static void create_ref_slots(int envelope_size)
 	gchar frame_label[50];
 	GtkWidget *vbox = glade_xml_get_widget_ (info->main_window, "quickselect");
 	info->quick_select = gtk_frame_new(NULL);
-	gtk_widget_set_size_request(info->quick_select, 400,40 );
 	gtk_box_pack_start( GTK_BOX( vbox ), GTK_WIDGET(info->quick_select), TRUE, TRUE, 0);
 	gtk_widget_show(info->quick_select);
 
