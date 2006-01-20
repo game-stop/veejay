@@ -6224,7 +6224,8 @@ void 	vj_gui_init(char *glade_file)
 			glade_xml_get_widget_( info->main_window, "mt_box" ),
 			glade_xml_get_widget_( info->main_window, "statusbar") ,
 			info->el.width,
-			info->el.height); 
+			info->el.height,
+			(skin__ == 0 ? glade_xml_get_widget_( info->main_window, "imageA") : NULL )); 
 
 	memset( &info->watch, 0, sizeof(watchdog_t));
 	info->watch.state = STATE_STOPPED; //

@@ -2266,11 +2266,15 @@ void		on_multitrack_activate( GtkWidget *w, gpointer user_data)
 {
 	printf("%s\n", __FUNCTION__ );
 	multitrack_open( info->mt );
+	gtk_widget_show( glade_xml_get_widget_( info->main_window , "mtwindow" ));
+
 }
 void		on_multitrack_deactivate( GtkWidget *w, gpointer user_data)
 {
 	printf("%s\n", __FUNCTION__ );
 	multitrack_close( info->mt );
+	gtk_widget_hide( glade_xml_get_widget_( info->main_window , "mtwindow" ));
+
 }
 void	on_mt_new_activate( GtkWidget *w, gpointer user_data)
 {
@@ -2291,3 +2295,55 @@ void	on_mt_sync_start_clicked( GtkWidget *w, gpointer user_data)
 	multitrack_sync_start( info->mt );
 }
 
+void	on_mtwindow_delete_event( GtkWidget *w , gpointer user_data)
+{
+	on_multitrack_deactivate(w, user_data);
+}
+
+void	on_mtwindow_destroy_event( GtkWidget *w, gpointer user_data)
+{
+	on_mtwindow_delete_event( w, user_data );
+}
+
+void	on_mt_sync_stop_clicked( GtkWidget *w , gpointer user_data)
+{
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PLAY_STOP,0 );
+}
+void	on_mt_sync_play_clicked( GtkWidget *w, gpointer user_data)
+{
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PLAY_FORWARD,0 );
+}
+void	on_mt_sync_backward_clicked( GtkWidget *w, gpointer user_data)
+{
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PLAY_BACKWARD,0);
+}
+void	on_mt_sync_gotostart_clicked( GtkWidget *w, gpointer user_data)
+{
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_GOTO_START,0 );
+}
+void	on_mt_sync_gotoend_clicked( GtkWidget *w, gpointer user_data)
+{
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_GOTO_END,0 );
+}
+void	on_mt_sync_decspeed_clicked( GtkWidget *w, gpointer user_data)
+{
+	int n = info->status_tokens[SAMPLE_SPEED];
+	if( n < 0 ) n += 1;
+	if( n > 0 ) n -= 1;
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
+}
+void	on_mt_sync_incspeed_clicked( GtkWidget *w, gpointer user_data)
+{
+	int n = info->status_tokens[SAMPLE_SPEED];
+	if( n < 0 ) n -= 1;
+	if( n > 0 ) n += 1;
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
+}
+void	on_mt_prev_clicked( GtkWidget *w , gpointer user_data)
+{
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PREV_FRAME ,0 );
+}
+void	on_mt_next_clicked( GtkWidget *w, gpointer user_data)
+{
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SKIP_FRAME, 0 );
+}

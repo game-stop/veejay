@@ -97,6 +97,7 @@ typedef struct
 	GtkWidget *scroll;
 	void	  *data;
 	int	  selected;
+	int	  sensitive;
 } multitracker_t;
 
 static  void	(*img_cb)(GdkPixbuf *p);
@@ -147,6 +148,23 @@ void	multitrack_sync_start(void *data)
 	}
 	G_UNLOCK(mt_lock);
 }
+void	multitrack_sync_simple_cmd(void *data, int vims_id, int value)
+{
+	multitracker_t *mt = (multitracker_t*)data;
+	all_priv_t *pt = (all_priv_t*)mt->data;
+	gint i;
+	G_LOCK(mt_lock);
+	for( i = 0;i < MAX_TRACKS; i ++ )
+	{
+		mt_priv_t *p = pt->pt[i];
+		if(p->active)
+			veejay_sequence_send( p->sequence, vims_id, (value > 0 ? "%d": NULL),
+					(value > 0 ? value :NULL));
+	}
+	G_UNLOCK(mt_lock);
+}
+
+
 
 int *	sequence_get_track_status(void *priv)
 {
@@ -624,7 +642,7 @@ void		setup_geometry( int w, int h, int n_tracks )
 	MAX_TRACKS = n_tracks;
 }
 
-void		*multitrack_new( void (*f)(int,char*,int), void (*g)(GdkPixbuf *),GtkWidget *win, GtkWidget *box ,GtkWidget *msg, gint max_w, gint max_h)
+void		*multitrack_new( void (*f)(int,char*,int), void (*g)(GdkPixbuf *),GtkWidget *win, GtkWidget *box ,GtkWidget *msg, gint max_w, gint max_h, GtkWidget *main_preview_area)
 {
 	max_w = 352;
 	max_h = 288;
@@ -637,7 +655,6 @@ void		*multitrack_new( void (*f)(int,char*,int), void (*g)(GdkPixbuf *),GtkWidge
 	mt->main_window = win; 
 	mt->main_box    = box;
 	mt->status_bar = msg; 
-
 	gui_cb = f;
 	img_cb = g;
 
@@ -662,7 +679,7 @@ void		*multitrack_new( void (*f)(int,char*,int), void (*g)(GdkPixbuf *),GtkWidge
 		mt_priv_t *p = (mt_priv_t*) malloc(sizeof( mt_priv_t));
 		memset( p, 0, sizeof(mt_priv_t));
 		p->num = c;
-		p->view = new_sequence_view( p,0,0,0 );
+		p->view = new_sequence_view( p,0,0,0, main_preview_area );
 		p->backlink = (void*) mt;
 		pt->pt[c] = p;
 		gtk_table_attach_defaults( table, p->view->event_box, c, c+1, 0, 1 );
@@ -681,7 +698,7 @@ void		*multitrack_new( void (*f)(int,char*,int), void (*g)(GdkPixbuf *),GtkWidge
 	memset( lt, 0, sizeof(mt_priv_t));
 	lt->num = LAST_TRACK;
 	lt->backlink = (void*) mt;
-	lt->view = new_sequence_view( lt, 0, 0,1 );
+	lt->view = new_sequence_view( lt, 0, 0,1 , main_preview_area);
 	pt->pt[LAST_TRACK] = lt;
 	
 	gtk_container_add( GTK_CONTAINER( mt->main_box ), lt->view->event_box );
@@ -702,20 +719,18 @@ void		*multitrack_new( void (*f)(int,char*,int), void (*g)(GdkPixbuf *),GtkWidge
 
 void		multitrack_open(void *data)
 {
-	// show window only
 	multitracker_t *mt = (multitracker_t*) data;
-//	gtk_widget_show( mt->main_window );
-//	G_LOCK(mt_lock);
-//	G_UNLOCK(mt_lock);
+	G_LOCK(mt_lock);
+	mt->sensitive = 1;
+	G_UNLOCK(mt_lock);
 }
 
 void		multitrack_close( void *data )
 {
 	multitracker_t *mt = (multitracker_t*) data;
-//	G_LOCK(mt_lock);
-//	gtk_widget_hide( mt->main_window );
-//	G_UNLOCK(mt_lock);
-//	}
+	G_LOCK(mt_lock);
+	mt->sensitive = 0;
+	G_UNLOCK(mt_lock);
 }
 
 int		multitrack_add_track( void *data )
@@ -1099,42 +1114,54 @@ static	void	sequence_set_current_frame(GtkWidget *w, gpointer user_data)
 	}
 }
 
-static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint last  )
+static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint last, GtkWidget *main_area  )
 {
 	sequence_view_t *seqv = (sequence_view_t*) malloc(sizeof(sequence_view_t));
 	memset( seqv, 0,sizeof( sequence_view_t ));
-	seqv->event_box = gtk_event_box_new();
-	gtk_event_box_set_visible_window( seqv->event_box, TRUE );
-	GTK_WIDGET_SET_FLAGS( seqv->event_box, GTK_CAN_FOCUS );
-	if( w == 0 && h == 0 )
-	g_signal_connect( G_OBJECT( seqv->event_box ),
-				"button_press_event",
-				G_CALLBACK( seqv_mouse_press_event ),
-				(gpointer*) p );
-	gtk_widget_show( GTK_WIDGET( seqv->event_box ) );
 
-	gchar *track_title = g_new0( gchar, 20 );
-	sprintf(track_title, "Track %d", p->num );
-	seqv->frame = gtk_frame_new( track_title );
-	g_free(track_title);
-	gtk_container_set_border_width( GTK_CONTAINER( seqv->frame) , 1 );
-	gtk_widget_show( GTK_WIDGET( seqv->frame ) );
-	gtk_container_add( GTK_CONTAINER( seqv->event_box), seqv->frame );
-	seqv->main_vbox = gtk_vbox_new(FALSE,0);
-	gtk_container_add( GTK_CONTAINER( seqv->frame ), seqv->main_vbox );
-	gtk_widget_show( GTK_WIDGET( seqv->main_vbox ) );
-	seqv->area = gtk_image_new();
+
+	if(!last || main_area == NULL)
+	{
+		seqv->event_box = gtk_event_box_new();
+		gtk_event_box_set_visible_window( seqv->event_box, TRUE );
+		GTK_WIDGET_SET_FLAGS( seqv->event_box, GTK_CAN_FOCUS );
+		if( w == 0 && h == 0 )
+		g_signal_connect( G_OBJECT( seqv->event_box ),
+					"button_press_event",
+					G_CALLBACK( seqv_mouse_press_event ),
+					(gpointer*) p );
+		gtk_widget_show( GTK_WIDGET( seqv->event_box ) );
+
+
+		gchar *track_title = g_new0( gchar, 20 );
+		sprintf(track_title, "Track %d", p->num );
+		seqv->frame = gtk_frame_new( track_title );
+		g_free(track_title);
+		gtk_container_set_border_width( GTK_CONTAINER( seqv->frame) , 1 );
+		gtk_widget_show( GTK_WIDGET( seqv->frame ) );
+		gtk_container_add( GTK_CONTAINER( seqv->event_box), seqv->frame );
+		seqv->main_vbox = gtk_vbox_new(FALSE,0);
+		gtk_container_add( GTK_CONTAINER( seqv->frame ), seqv->main_vbox );
+		gtk_widget_show( GTK_WIDGET( seqv->main_vbox ) );
+	
+		seqv->area = gtk_image_new();
+	}
+	else	
+		seqv->area = main_area;
+
 	set_logo( seqv->area );
+
 	g_signal_connect( G_OBJECT( seqv->area ), 
 				"expose_event",
 				G_CALLBACK( seqv_image_expose ),	
 				(gpointer*) p );
 
-	gtk_box_pack_start( GTK_BOX(seqv->main_vbox),GTK_WIDGET( seqv->area), FALSE,FALSE,0);
-	gtk_widget_set_size_request( seqv->area, w == 0 ? preview_width_ : w, h == 0 ? preview_height_: h  );
+	if(!last || !main_area)
+	{
+		gtk_box_pack_start( GTK_BOX(seqv->main_vbox),GTK_WIDGET( seqv->area), FALSE,FALSE,0);
+		gtk_widget_set_size_request( seqv->area, w == 0 ? preview_width_ : w, h == 0 ? preview_height_: h  );
+	}
 
-
-	
 	if(!last)
 	{
 		seqv->panel = gtk_frame_new(NULL);
@@ -1226,9 +1253,8 @@ static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint las
 		gtk_widget_show( hbox );
 	
 
+		gtk_widget_set_sensitive(GTK_WIDGET(seqv->panel), FALSE );
 	}
-
-	gtk_widget_set_sensitive(GTK_WIDGET(seqv->panel), FALSE );
 
 	gtk_widget_show( GTK_WIDGET( seqv->area ) );
 
@@ -1264,6 +1290,8 @@ void 	*mt_preview( gpointer user_data )
 
 		int ref = find_sequence( a );
 
+
+		if( mt->sensitive )
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
 			mt_priv_t *p = a->pt[i];
@@ -1289,6 +1317,7 @@ void 	*mt_preview( gpointer user_data )
 
 
 		gdk_threads_enter();
+		if( mt->sensitive )
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
 			mt_priv_t *p = a->pt[i];

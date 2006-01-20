@@ -2,7 +2,7 @@
 #define MULTITRACK_H
 
 
-void		*multitrack_new( void(*f)(int,char*,int), void(*g)(GdkPixbuf *), GtkWidget *win, GtkWidget *box , GtkWidget *msg , gint w, gint h);
+void		*multitrack_new( void(*f)(int,char*,int), void(*g)(GdkPixbuf *), GtkWidget *win, GtkWidget *box , GtkWidget *msg , gint w, gint h, GtkWidget *area);
 
 void		multitrack_open( void *data );
 
@@ -19,4 +19,7 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int w, 
 void		multitrack_restart( void *data );
 
 void		multitrack_sync_start(void *data);
+
+void		multitrack_sync_simple_cmd(void *data, int vims_id, int value);
+
 #endif
