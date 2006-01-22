@@ -7415,7 +7415,7 @@ YV16</property>
 					<widget class="GtkRadioButton" id="kf_p1">
 					  <property name="visible">True</property>
 					  <property name="can_focus">True</property>
-					  <property name="label" translatable="yes">P0</property>
+					  <property name="label" translatable="yes">P1</property>
 					  <property name="use_underline">True</property>
 					  <property name="relief">GTK_RELIEF_HALF</property>
 					  <property name="focus_on_click">True</property>
@@ -7423,7 +7423,7 @@ YV16</property>
 					  <property name="inconsistent">False</property>
 					  <property name="draw_indicator">True</property>
 					  <property name="group">kf_p0</property>
-					  <signal name="toggled" handler="on_kf_p0_toggled" last_modification_time="Mon, 05 Sep 2005 21:51:36 GMT"/>
+					  <signal name="toggled" handler="on_kf_p1_toggled" last_modification_time="Mon, 23 Jan 2006 01:31:11 GMT"/>
 					</widget>
 					<packing>
 					  <property name="left_attach">1</property>
