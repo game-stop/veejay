@@ -6272,7 +6272,8 @@ static	gboolean	update_log(gpointer data)
 		
 		g_free( text );
 	}
-
+	if(buf)
+		free(buf);
 	return TRUE;
 }
 

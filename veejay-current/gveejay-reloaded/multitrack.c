@@ -1325,16 +1325,25 @@ void 	*mt_preview( gpointer user_data )
 			{
 				GtkImage *image = GTK_IMAGE( p->view->area );
 				gtk_image_set_from_pixbuf( image, cache[i] );
-			//	img_cb( cache[i] );
-				gdk_pixbuf_unref(cache[i]);
 			}
 		}
+
 		if(lt->active && cache[LAST_TRACK])
 		{
 			GtkImage *image = GTK_IMAGE( lt->view->area );
 			gtk_image_set_from_pixbuf( image, cache[LAST_TRACK] );
 			img_cb( cache[LAST_TRACK] );
 			gdk_pixbuf_unref( cache[LAST_TRACK] );
+		}
+		//@@ cleanup
+		for( i = 0; i < MAX_TRACKS ; i ++ )
+		{
+			mt_priv_t *p = a->pt[i];
+			if(cache[i])
+			{
+				gdk_pixbuf_unref(cache[i]);
+			}
+			cache[i] = NULL;
 		}
 		gdk_threads_leave();	
 	}

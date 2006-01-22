@@ -1200,32 +1200,37 @@ void vj_event_update_remote(void *ptr)
 		
 	}
 
-	// see if there is anything to read from the command socket
 	for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ )
 	{	
 		if( vj_server_link_used( v->vjs[0], i ) )
 		{
-		int res = vj_server_update(v->vjs[0],i );
-		if(res > 0)
-		{
-			v->uc->current_link = i;
-			char buf[MESSAGE_SIZE];
-			bzero(buf, MESSAGE_SIZE);
-			int n = 0;
-			while( vj_server_retrieve_msg(v->vjs[0],i,buf) != 0 )
+			int res = 1;
+			while( res != 0 )
 			{
-				vj_event_parse_msg( v, buf );
-				bzero( buf, MESSAGE_SIZE );
-				n++;
+				res = vj_server_update( v->vjs[0], i );
+				if(res>0)
+				{
+					v->uc->current_link = i;
+					char buf[MESSAGE_SIZE];
+					bzero(buf, MESSAGE_SIZE);
+					int n = 0;
+					while( vj_server_retrieve_msg(v->vjs[0],i,buf) != 0 )
+					{
+						vj_event_parse_msg( v, buf );
+						bzero( buf, MESSAGE_SIZE );
+						n++;
+					}
+				}	
+				if( res == -1 )
+				{
+					veejay_msg(VEEJAY_MSG_ERROR, "Error updating command socket");
+					_vj_server_del_client( v->vjs[0], i );
+					_vj_server_del_client( v->vjs[1], i );
+					_vj_server_del_client( v->vjs[3], i );
+					break;
+				}
+
 			}
-		}
-		if(res==-1)
-		{
-	veejay_msg(VEEJAY_MSG_ERROR, "Error updating command socket");
-			_vj_server_del_client( v->vjs[0], i );
-			_vj_server_del_client( v->vjs[1], i );
-			_vj_server_del_client( v->vjs[3], i );
-		}
 		}
 	}
 
