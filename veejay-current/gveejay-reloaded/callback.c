@@ -1542,15 +1542,12 @@ void	on_istream_cancel_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_curve_togglerun_toggled(GtkWidget *widget , gpointer user_data)
 {
-	if(!info->status_lock)
-	{
-		int i = info->uc.selected_chain_entry;
-		int j = info->uc.selected_parameter_id;
+	int i = info->uc.selected_chain_entry;
+	int j = info->uc.selected_parameter_id;
 
-		sample_slot_t *s = info->selected_slot;
-		key_parameter_t *k = s->ec->effects[i]->parameters[j];
-		k->running = is_button_toggled( "curve_togglerun");
-	}
+	sample_slot_t *s = info->selected_slot;
+	key_parameter_t *k = s->ec->effects[i]->parameters[j];
+	k->running = is_button_toggled( "curve_togglerun");
 }
 
 void	on_stream_length_value_changed( GtkWidget *widget, gpointer user_data)
@@ -1569,35 +1566,67 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 		return;
 	int i = info->uc.selected_chain_entry;
 	int j = info->uc.selected_parameter_id;
+	int id = info->uc.entry_tokens[ENTRY_FXID];
+//	int end = s->ec->effects[i]->parameters[j]->end_pos;
+//	int start =  s->ec->effects[i]->parameters[j]->start_pos;
+	int end = get_nums( "curve_spinend" );
+	int start = get_nums( "curve_spinstart" );
+	int min = 0;
+	int max = 0;
 
-	// set parent effect
-	s->ec->effects[i]->parameters[j]->parameter_id = 
-		info->uc.entry_tokens[ENTRY_FXID];
-	s->ec->effects[i]->parameters[j]->start_pos = 
-		get_nums( "curve_spinstart" );
-	s->ec->effects[i]->parameters[j]->end_pos =
-		get_nums( "curve_spinend" );
-
-	if( (s->ec->effects[i]->parameters[j]->end_pos - s->ec->effects[i]->parameters[j]->start_pos ) <= 0)
+	if( (end - start) <= 0 || id <= 0 )	
 	{
-		vj_msg(VEEJAY_MSG_ERROR,"KF start position must be smaller then end position");
+		printf("end = %d, start = %d , id = %d\n",end,start,id);
 		return;
 	}
 
-	gint curve_type = GTK_CURVE_TYPE_LINEAR;
+	int curve_type = GTK_CURVE_TYPE_LINEAR;
+
 	if( is_button_toggled( "curve_typespline" ))
 		curve_type = GTK_CURVE_TYPE_SPLINE;
 	if( is_button_toggled( "curve_typefreehand" ))
 			curve_type = GTK_CURVE_TYPE_FREE;
+
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
 
-	curve_timeline_changed(s->ec->effects[i]->parameters[j], curve );
+	_effect_get_minmax( id, &min,&max, j );
 
-	get_points_from_curve(  s->ec->effects[i]->parameters[j], curve );
-	//	s->ec->effects[i]->parameters[j]->type = curve_type;
-	set_points_in_curve(  s->ec->effects[i]->parameters[j], curve );
-	s->ec->enabled = is_button_toggled( "curve_toggleentry" );
+	curve_store_key( s->ec->effects[i]->parameters[j], curve,max,0, id, curve_type);
+
+	s->ec->effects[i]->parameters[j]->running = is_button_toggled( "curve_togglerun" );
+	s->ec->effects[i]->enabled = is_button_toggled( "button_entry_toggle");
+
+	debug_key( s->ec->effects[i]->parameters[j] ); 
 }
+
+void	on_curve_buttontime_clicked(GtkWidget *widget, gpointer user_data )
+{
+	// store the values in keyframe
+	sample_slot_t *s = info->selected_slot;
+	if(!s)
+		return;
+	int i = info->uc.selected_chain_entry;
+	int j = info->uc.selected_parameter_id;
+	int id = info->uc.entry_tokens[ENTRY_FXID];
+	int end = get_nums( "curve_spinend" );
+	int start = get_nums( "curve_spinstart" );
+
+	if( (end - start) <= 0 || id <= 0 )	
+	{
+		printf("end = %d, start = %d , id = %d\n",end,start,id);
+		return;
+	}
+	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+	
+	key_parameter_t *key = s->ec->effects[i]->parameters[j];
+
+	key->start_pos = start;
+	key->end_pos = end;
+	curve_timeline_preserve( key, end - start, curve );
+
+	debug_key( s->ec->effects[i]->parameters[j] ); 
+}
+
 
 void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -1608,19 +1637,17 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 	int j = info->uc.selected_parameter_id;
 	sample_slot_t *s = info->selected_slot; 
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
-
 	clear_parameter_values ( s->ec->effects[i]->parameters[j]);
 
-	set_points_in_curve( s->ec->effects[i]->parameters[j] , curve );
-
+	//set_points_in_curve( s->ec->effects[i]->parameters[j] , curve );
+	reset_curve( s->ec->effects[i]->parameters[j], curve ); 
 	set_toggle_button( "curve_togglerun", 0 );
+	debug_key( s->ec->effects[i]->parameters[j] ); 
+
 }
 
 void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
-
 	if( is_button_toggled("curve_typelinear"))
 	{
 		sample_slot_t *s = info->selected_slot;
@@ -1630,6 +1657,7 @@ void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
 		int i = info->uc.selected_chain_entry;
 		int j = info->uc.selected_parameter_id;
 		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_LINEAR;
+		reset_curve( s->ec->effects[i]->parameters[j], curve );
 	//	get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
 		set_points_in_curve( s->ec->effects[i]->parameters[j],curve );
 	}
@@ -1639,21 +1667,17 @@ void	on_curve_typespline_toggled(GtkWidget *widget, gpointer user_data)
 	if(info->status_lock)
 		return;
 	int i = info->uc.selected_chain_entry;
-		int j = info->uc.selected_parameter_id;
-		sample_slot_t *s = info->selected_slot;
-		if(!s)
-			return;
+	int j = info->uc.selected_parameter_id;
+	sample_slot_t *s = info->selected_slot;
+	if(!s)
+		return;
+
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
 
 	if( is_button_toggled("curve_typespline"))
 	{
-	//	sample_slot_t *s = info->selected_slot;
-	//	if(!s)
-	//		return;
-	//	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
-	//	int i = info->uc.selected_chain_entry;
-	//	int j = info->uc.selected_parameter_id;
 		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_SPLINE;
+		reset_curve( s->ec->effects[i]->parameters[j], curve );
 	//	get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
 		set_points_in_curve( s->ec->effects[i]->parameters[j],curve );
 	}
@@ -1671,13 +1695,10 @@ void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 
 	if( is_button_toggled("curve_typefreehand"))
 	{
-	//	sample_slot_t *s = info->selected_slot;
-	//	if(!s)
-	//		return;
-	//	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
-	//	int i = info->uc.selected_chain_entry;
-	//	int j = info->uc.selected_parameter_id;
+	//reset_curve( s->ec->effects[i]->parameters[j], curve );
 		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_FREE;
+		reset_curve( s->ec->effects[i]->parameters[j], curve );
+		
 	//	get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
 		set_points_in_curve( s->ec->effects[i]->parameters[j],curve );
 	}
@@ -1685,13 +1706,11 @@ void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 
 void	on_curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 {
-	if(info->status_lock)
-		return;
 	int i;
-
+	int k = is_button_toggled( "curve_toggleentry" );
 	sample_slot_t *s = info->selected_slot;
 
-	s->ec->effects[(info->uc.selected_chain_entry)]->enabled = is_button_toggled( "curve_toggleentry" );
+	s->ec->effects[(info->uc.selected_chain_entry)]->enabled = k;
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
 					info->main_window, "tree_chain") ));
 
@@ -1699,6 +1718,8 @@ void	on_curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 			model,
 			chain_update_row, (gpointer*) info );
 
+	if(!k)
+		set_toggle_button( "curve_togglerun", k );
 }
 
 void	on_kf_p0_toggled( GtkWidget *widget, gpointer user_data)
@@ -1744,11 +1765,8 @@ void	on_kf_p7_toggled( GtkWidget *widget, gpointer user_data)
 
 void	on_curve_toggleglobal_toggled(GtkWidget *widget, gpointer user_data)
 {
-	if(!info->status_lock)
-	{
-		sample_slot_t *s = info->selected_slot;
-		s->ec->enabled = is_button_toggled( "curve_toggleglobal" );
-	}
+	sample_slot_t *s = info->selected_slot;
+	s->ec->enabled = is_button_toggled( "curve_toggleglobal" );
 }
 void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -2238,6 +2256,11 @@ gboolean 	on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 {
+	printf("%s:%d\n", __FUNCTION__, __LINE__ );
+	if(!info->status_lock)
+	{
+		multitrack_preview_master( info->mt, is_button_toggled("previewtoggle"));
+	}
 }
 
 void		on_previewlarge_clicked( GtkWidget *w, gpointer user_data )
@@ -2248,6 +2271,30 @@ void		on_previewlarge_clicked( GtkWidget *w, gpointer user_data )
 	if( h > 288 ) h = 288;
 	update_spin_value( "preview_width", w );
         update_spin_value( "preview_height",h );
+}
+
+void		on_previewscale_value_changed( GtkWidget *widget, gpointer user_data)
+{
+	int w = info->el.width;
+	int h = info->el.height;
+
+	if(w == 0 || h == 0 )
+		return;
+
+	double value = GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
+
+	int nw = (w * value);
+	int nh = (h * value);
+
+	if( nw == 0 && nh == 0 )
+	{
+		set_toggle_button( "previewtoggle", 0 );
+	}
+	else
+	{
+		// @@@ MT!
+	//	multitrack_resize( info->mt, nw,nh);	
+	}
 }
 
 void		on_previewsmall_clicked( GtkWidget *w, gpointer user_data)

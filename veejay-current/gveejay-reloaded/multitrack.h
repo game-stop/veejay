@@ -22,4 +22,6 @@ void		multitrack_sync_start(void *data);
 
 void		multitrack_sync_simple_cmd(void *data, int vims_id, int value);
 
+void		multitrack_quit( void *data );
+
 #endif

@@ -38,6 +38,8 @@ key_chain_t	*new_chain(void)
 
 void		del_chain( key_chain_t *chain )
 {
+	printf("%s :%d %p\n",__FUNCTION__ ,__LINE__ , chain);
+	
 	if(chain)
 	{
 		gint i;
@@ -96,7 +98,9 @@ void	free_parameter_key( key_parameter_t *key )
 }
 
 void		del_chain_entry( key_effect_t *ke )
-{	if(ke)
+{
+
+	if(ke)
 	{
 		if(ke->parameters)
 		{
@@ -112,8 +116,30 @@ void		del_chain_entry( key_effect_t *ke )
 	}
 }
 
+void	debug_key( key_parameter_t *key )
+{
+	printf("%p , %d, %d, %d, %d, %d, :\n",
+		key->vector ,
+		key->running ,
+		key->parameter_id,
+		key->curve_len,
+		key->end_pos, 
+		key->start_pos );
+	int j;
+	if(key->vector)
+	for(j = 0 ; j < 100 && j < key->curve_len; j += 5 )
+	{
+		printf("%2.2f ", key->vector[j] );
+	}
+	else
+		printf("vector empty\n");
+	printf("\n");
+
+}
+
 void	clear_parameter_values( key_parameter_t *key )
 {
+	printf("%s :%d\n",__FUNCTION__ ,__LINE__);
 	if(key)
 	{
 		if(key->vector)
@@ -138,16 +164,22 @@ int	parameter_for_frame( key_parameter_t *key, gint frame_pos )
 /* Get a value for a frame position */
 int	get_parameter_key_value( key_parameter_t *key, gint frame_pos, float *result )
 {
+	printf("%d, %d, %d\n", frame_pos,key->start_pos, key->end_pos );
 	if( frame_pos < key->start_pos || frame_pos > key->end_pos )
 		return 0;
 	if(!key->vector)
+	{
+		printf("Borked!\n");
 		return 0;
+	}
 	*result = key->vector[ frame_pos ];	
 	return 1;
 }
 
 void	get_points_from_curve( key_parameter_t *key, GtkWidget *curve )
 {
+	printf("%s :%d\n",__FUNCTION__ ,__LINE__);
+	
 	gtk_curve_get_vector( GTK_CURVE(curve), key->curve_len, key->vector );
 }
 
@@ -160,46 +192,46 @@ static void	set_line( float *v , int len)
 		v[i] = m * i;	
 }
 
+void	curve_store_key( key_parameter_t *key, GtkWidget *curve, int max,int val, int id, int type )
+{
+	if(key->vector)
+		free(key->vector);
+	int new_len = key->end_pos - key->start_pos + 1;
+	key->vector =  vj_malloc(sizeof(float) * new_len );
+	int j;
+	for(j = 0; j < new_len; j ++ )
+		key->vector[j] = 0.0;
+	key->curve_len = new_len-1;
+	gtk_curve_get_vector( GTK_CURVE(curve), key->curve_len, key->vector );
+	key->parameter_id = id;
+	key->type = type;
+
+}
+
 void	curve_timeline_preserve( key_parameter_t *key, int ne, GtkWidget *curve )
 {
 	int len = key->curve_len;
 	int new_len = ne;
+
 	if(len == new_len )
 		return; // no change
-	int empty = 1;
 
-	if( len <= 0 )
+	if( new_len == 0 )
 	{
-		key->vector = vj_malloc(sizeof(float) * new_len );
-		key->curve_len   = new_len;
+		key->curve_len = 0;
+		if(key->vector) free(key->vector);
+		key->vector= NULL;	
 	}
 	else
 	{
 		float *k = vj_malloc(sizeof(float) * new_len );
-		if(key->vector)
-			free(key->vector);
+		int i,j;
+		for( i = 0 ; i < len && i < new_len; i ++ )
+			k[i] = key->vector[i];
+		if(key->vector)free(key->vector);
 		key->vector = k;	
 		key->curve_len   = new_len;
-		if(curve)
-			gtk_curve_get_vector( GTK_CURVE(curve), key->curve_len, key->vector );
-		empty = 0;
-	}
-	if( empty )
-		set_line( key->vector, key->curve_len );
-}
-
-void	curve_timeline_changed( key_parameter_t *key, GtkWidget *curve)
-{
-	int len = 0;
-	if(key->curve_len <= 0)
-		key->curve_len = key->end_pos + 1;
-	len = key->curve_len;
-
-	if(key->vector)
-		free(key->vector);
-	key->vector = NULL;
-
-	key->vector = (float*) vj_malloc(sizeof(float) * len );
+	}	
 }
 
 void	reset_curve( key_parameter_t *key, GtkWidget *curve )
@@ -213,7 +245,7 @@ void	set_points_in_curve( key_parameter_t *key, GtkWidget *curve)
 {
 //	gtk_curve_reset(GTK_CURVE(curve));
 //	gtk_curve_set_range( GTK_CURVE(curve), 0.0, 1.0, 0.0, 1.0 );
-	gtk_curve_set_curve_type( GTK_CURVE(curve), key->type );
+//	gtk_curve_set_curve_type( GTK_CURVE(curve), key->type );
 
 	if(key->vector)
 		gtk_curve_set_vector( GTK_CURVE( curve ), key->curve_len, key->vector );

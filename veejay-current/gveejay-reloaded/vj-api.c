@@ -1644,6 +1644,8 @@ void		veejay_quit( )
 
 gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 {
+	no_preview_ = 0;
+
 	if( info->watch.state == STATE_PLAYING)
 	{
 		if( prompt_dialog("Quit gveejay", "Are you sure?" ) == GTK_RESPONSE_REJECT)
@@ -1652,9 +1654,10 @@ gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 		if(info->run_state == RUN_STATE_LOCAL)
 			veejay_quit();
 	}
-
+	multitrack_quit( info->mt );
+	
 	info->watch.w_state = WATCHDOG_STATE_OFF;
-	g_usleep(20000);
+	g_usleep(40000);
 	vj_gui_free();
 
 	return FALSE;
@@ -2032,97 +2035,59 @@ static	void	vj_akf_delete()
 static	void	vj_kf_select_parameter(int num)
 {
 	sample_slot_t *s = info->selected_slot;
-	/* Parameter changed !*/
+	if(!s)
+		return;
 
-	if( num < 0 )
-		/* Reset to default parameter */
-		info->uc.selected_parameter_id = 0;
-	else
-		info->uc.selected_parameter_id = num;
+	info->uc.selected_parameter_id = num;
 
-	// Effect chain parameter key
 	key_parameter_t *key = s->ec->effects[(info->uc.selected_chain_entry)]->parameters[(info->uc.selected_parameter_id)];
 	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
-	if(num >= 0)
-	{
-		update_curve_surroundings();
-		update_curve_widget("curve");
-		update_curve_accessibility("curve");
-	}
+
+	reset_curve( key, curve );
+
+	update_curve_accessibility("curve");
+	update_curve_widget("curve");
 
 	char name[20];	
 	sprintf(name, "P%d", info->uc.selected_parameter_id);
 	update_label_str( "curve_parameter", name );
 }
 
-void	curve_len_changed( int len )
-{
-	sample_slot_t *s = info->selected_slot;
-	if(!s)	
-		return 0;
-	int i,j;
-	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
-
-	for( i = 0; i < MAX_CHAIN_LEN; i ++ )
-	{
-		for( j = 0; j < MAX_PARAMETERS; j ++ )
-		{
-			key_parameter_t *p = s->ec->effects[i]->parameters[j];
-			if(p->curve_len != len )
-				curve_timeline_preserve( p, len );
-if( info->uc.selected_chain_entry == i )
-{
-	set_points_in_curve( p, curve );
-}
-		}
-	}
-}
-
-
 static	int	interpolate_parameters(void)
 {
 	sample_slot_t *s = info->selected_slot;
-	if(!s || !s->ec)	
+	if(!s || !s->ec)
 		return 0;
 	int i,j;
 	int res = 0;
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve" );
-
-	/* If current effect chain is not enabled, return now */
-	if(!s->ec->enabled)
-		return 0;	
 	char params[255];
 	bzero(params,255);
-	/* Iterate chain for KF */	
+
 	for( i = 0; i < MAX_CHAIN_LEN; i ++ )
 	{
 		int values[MAX_PARAMETERS];
 		int skip = 1;
 		int id = 0;
 		char slider_name[20];
-		if(s->ec->effects[i]->enabled)
+		memset( values, 0, MAX_PARAMETERS * sizeof(int) );
+		for( j = 0; j < MAX_PARAMETERS; j ++ )
 		{
-			/* Get current values */
-			for( j = 0; j < MAX_PARAMETERS; j ++ )
+			key_parameter_t *p = s->ec->effects[i]->parameters[j];
+			if( info->uc.selected_chain_entry == i )
 			{
 				sprintf(slider_name, "slider_p%d", j );
-				values[j] = get_slider_val ( slider_name );
+	      	                values[j] = get_slider_val ( slider_name );
 			}
-			
-			/* Get keyframed values */
-			for( j = 0; j < MAX_PARAMETERS; j ++ )
+			if( p->running == 1 && parameter_for_frame(p, info->status_frame) )
 			{
-				key_parameter_t *p = s->ec->effects[i]->parameters[j];
-				if( p->running == 1 && parameter_for_frame(p, info->status_frame) )
+				int min,max;
+				if(_effect_get_minmax( p->parameter_id, &min, &max, j ))
 				{
-					int min,max;
-					
-					if(_effect_get_minmax( p->parameter_id, &min, &max, j ))
+					float scale = 0.0;
+					if(get_parameter_key_value( p,
+						info->status_frame, &scale ) )
 					{
-						float scale = 0.0;
-						if(get_parameter_key_value( p,
-							info->status_frame, &scale ) )
-						{
 						float min_value = (float)min;	
 						float max_value = (float)max;
 						float max_range = fabs( min_value ) + fabs( max_value );
@@ -2131,15 +2096,17 @@ static	int	interpolate_parameters(void)
 						values[j] =(int) value;
 						skip = 0;
 						id = p->parameter_id;
-			if(info->uc.selected_chain_entry == i )
-			{ // Update slider values of current selected chain entry
-						sprintf(slider_name, "slider_p%d", j );
-						update_slider_value( slider_name, values[j],0 );
-			}
+						if(info->uc.selected_chain_entry == i )
+						{ // Update slider values of current selected chain entry
+							sprintf(slider_name, "slider_p%d", j );
+							info->parameter_lock = 1;
+							update_slider_value( slider_name, values[j],0 );
+							info->parameter_lock = 0;
 						}
 					}
 				}
 			}
+	
 			if(!skip) // Put KF to veejay
 			{ // sample, chain entry, effect_id, arg i .. arg n
 				int np = _effect_get_np( id );
@@ -2163,106 +2130,16 @@ static	int	interpolate_parameters(void)
 	return res;
 }
 
-static	void	update_curve_surroundings()
+static  void	update_curve_widget(const char *name)
 {
+	GtkWidget *curve = glade_xml_get_widget_( info->main_window,name);
 	sample_slot_t *s = info->selected_slot;
 	if(!s)
 		return;
 	int i = info->uc.selected_chain_entry; /* chain entry */
 	int j = info->uc.selected_parameter_id;
 
-	if(!s->ec)
-		return;
-
 	key_parameter_t *key = s->ec->effects[i]->parameters[j];
-
-	if(!key)
-		return;
-
-	/* Restore AKF status */
-	set_toggle_button( "curve_toggleglobal", s->ec->enabled );
-	/* Restore AKF entry toggle */
-	set_toggle_button( "curve_toggleentry", s->ec->effects[i]->enabled  );
-	/* Positions changed (sample/marker) */
-	int changed = 0;
-
-	int old_len = key->curve_len;
-	int nl = 0;
-	if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
-	{
-		nl = info->status_tokens[SAMPLE_END] + 1;
-		if(nl != old_len)
-		{
-			update_spin_range( "curve_spinstart", 
-				info->status_tokens[SAMPLE_START], 
-				info->status_tokens[SAMPLE_END], info->status_tokens[SAMPLE_START] );
-			update_spin_range( "curve_spinend", info->status_tokens[SAMPLE_START],
-				info->status_tokens[SAMPLE_END] ,  info->status_tokens[SAMPLE_END] );
-			curve_len_changed( nl );
-		}
-	}
-	else
-	{
-		nl = get_nums("stream_length") + 1 ;
-		if( nl != old_len )
-		{
-			update_spin_range( "curve_spinstart", 0, nl-1, 0 );
-			update_spin_range( "curve_spinend", 0,nl-1, nl-1);
-			curve_len_changed( nl );
-		}
-	}
-	// Set start/end timecodes
-/*	gchar *start_time = format_time(
-			key->start_pos );
-	gchar *end_time = format_time(
-			key->end_pos );
-	update_label_str( "curve_starttime", start_time );
-	update_label_str( "curve_endtime", end_time );
-
-	g_free(start_time);
-	g_free(end_time);*/
-
-	struct tog_w {
-		const char *name;
-	} tog_w[] = {
-		{"curve_typelinear"},
-		{"curve_typespline"},
-		{"curve_typefreehand"},
-		{NULL }
-	};
-
-	// Check me: on the fly redraw of curve !
-	if( key->type == GTK_CURVE_TYPE_LINEAR )
-		set_toggle_button( tog_w[0].name,1 );
-	else
-		if(key->type == GTK_CURVE_TYPE_SPLINE )
-			set_toggle_button( tog_w[1].name ,1);
-		else
-			set_toggle_button( tog_w[2].name ,1);
-
-	if(!key->vector)
-		key->running = 0;
-	if(!key->vector)
-		disable_widget( "curve_togglerun");
-	else
-		enable_widget( "curve_togglerun" );
-	
-	set_toggle_button( "curve_togglerun" , key->running );
-
-
-}
-
-static  void	update_curve_widget(const char *name)
-{
-	GtkWidget *curve = glade_xml_get_widget_( info->main_window,name);
-	sample_slot_t *s = info->selected_slot;
-	if(!s || !s->ec)
-		return;
-	int i = info->uc.selected_chain_entry; /* chain entry */
-	int j = info->uc.selected_parameter_id;
-
-	key_parameter_t *key = s->ec->effects[i]->parameters[j];
-	reset_curve(key,curve);
 	set_points_in_curve( key, curve );
 }
 
@@ -2272,19 +2149,64 @@ static	void	update_curve_accessibility(const char *name)
 	sample_slot_t *s = info->selected_slot;
 	if(!s)
 		return;
-	if( info->uc.entry_tokens[ENTRY_FXID] <= 0 || !info->selected_slot)
+
+	int i = info->uc.selected_chain_entry; /* chain entry */
+	int j = info->uc.selected_parameter_id;
+	int nl = 0;
+	struct tog_w {
+		const char *name;
+	} tog_w[] = {
+		{"curve_typelinear"},
+		{"curve_typespline"},
+		{"curve_typefreehand"},
+		{NULL }
+	};
+
+
+	if( info->status_tokens[PLAY_MODE] == MODE_PLAIN )
 	{
-		disable_widget( "curve_table" );
+		update_spin_range( "curve_spinstart", 0,0,0);
+		update_spin_range( "curve_spinend", 0,0,0);
 		disable_widget( "curve" );
+		disable_widget( "curve_table" );
 	}
 	else
 	{
-		if( info->status_tokens[PLAY_MODE] != MODE_PLAIN)
+		int k = 0;
+		if( info->uc.entry_tokens[ENTRY_FXID] <= 0 )
+		  for( k = 0; k < 8; k ++ )
+			clear_parameter_values(  s->ec->effects[i]->parameters[k] );
+
+		enable_widget( "curve_table" );
+		enable_widget( "curve" );
+		if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
 		{
-			enable_widget( "curve_table" );
-			enable_widget( "curve" );
+			update_spin_range( "curve_spinstart", 
+				info->status_tokens[SAMPLE_START], 
+				info->status_tokens[SAMPLE_END], info->status_tokens[SAMPLE_START] );
+			update_spin_range( "curve_spinend", info->status_tokens[SAMPLE_START],
+				info->status_tokens[SAMPLE_END] ,  info->status_tokens[SAMPLE_END] );
 		}
-	}		
+		else
+		{
+			nl = get_nums("stream_length") + 1 ;
+			update_spin_range( "curve_spinstart", 0, nl-1, 0 );
+			update_spin_range( "curve_spinend", 0,nl-1, nl-1);
+		}	
+
+	}	
+
+	set_toggle_button( "curve_toggleglobal", s->ec->enabled );
+	set_toggle_button( "curve_toggleentry", s->ec->effects[i]->enabled  );
+/*	if( key->type == GTK_CURVE_TYPE_LINEAR )
+		set_toggle_button( tog_w[0].name,1 );
+	else
+		if(key->type == GTK_CURVE_TYPE_SPLINE )
+			set_toggle_button( tog_w[1].name ,1);
+		else
+			set_toggle_button( tog_w[2].name ,1);
+*/	
+	
 }
 
 static	int	get_nums(const char *name)
@@ -3109,7 +3031,7 @@ static void 	update_globalinfo()
 				(gdouble) total_frames_ , current_frame_);
 
 		
-		vj_kf_select_parameter( info->uc.selected_parameter_id );
+	//	vj_kf_select_parameter( info->uc.selected_parameter_id );
 
 		g_free(time);
 	}
@@ -5633,6 +5555,7 @@ printf("%s Ends %d\n",__FUNCTION__, __LINE__);
 			// is there a more recent message ?
 			char tmp[6];
 			bzero(tmp,6);
+			bzero( gui->status_msg, STATUS_BYTES ); 
 		        nb = vj_client_read( gui->client,V_STATUS,tmp, 5);
 			int bb = 0;
 			sscanf( tmp+1, "%03d", &bb );
@@ -5652,7 +5575,7 @@ printf("%s Ends %d\n",__FUNCTION__, __LINE__);
 				{
 					gui->status_tokens[i] = history[i];
 				}
-			}
+			}	
 			update_gui();
 		}
 		gui->status_lock = 0;
@@ -5991,10 +5914,6 @@ int	vj_gui_cb_locked()
 void	vj_img_cb(GdkPixbuf *img )
 {
 	int i;
-/*	int bank_page = find_bank_by_sample( sample_id, sample_type, &poke_slot );
-			
-	if(bank_page == -1)
-		fprintf(stderr, "BANKS + SLOTS FULL\n");*/
 
 	if( no_preview_ )
 		return;

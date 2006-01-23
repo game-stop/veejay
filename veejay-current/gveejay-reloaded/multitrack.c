@@ -73,6 +73,7 @@ typedef struct
 	char *hostname;
 	int port_num;
 	void *backlink;
+	int preview;
 	int active;
 	int used;
 	gint timeout;
@@ -98,6 +99,7 @@ typedef struct
 	void	  *data;
 	int	  selected;
 	int	  sensitive;
+	int	quit;
 } multitracker_t;
 
 static  void	(*img_cb)(GdkPixbuf *p);
@@ -114,6 +116,17 @@ static  int     preview_height_ = 0;
 static volatile int	MAX_TRACKS = 4;
 static volatile int	LAST_TRACK = 0;
 
+void	multitrack_preview_master(void *data, int status)
+{
+	multitracker_t *mt = (multitracker_t*) data;
+	all_priv_t *pt = (all_priv_t*) mt->data;
+	mt_priv_t *last = pt->pt[LAST_TRACK];
+	if(status == last->preview)
+		return;
+	G_LOCK(mt_lock);
+	last->preview = status;
+	G_UNLOCK(mt_lock);
+}
 
 static	void	status_print(multitracker_t *mt, const char format[], ... )
 {
@@ -733,6 +746,21 @@ void		multitrack_close( void *data )
 	G_UNLOCK(mt_lock);
 }
 
+void		multitrack_quit( void *data )
+{
+	multitracker_t *mt = (multitracker_t*) data;
+	G_LOCK(mt_lock);
+	mt->quit = 1;
+	G_UNLOCK(mt_lock);
+	all_priv_t *a = (all_priv_t*) mt->data;
+	int i;
+	for( i = 0; i <MAX_TRACKS; i ++ )
+	{
+		mt_priv_t *p = a->pt[i];
+		if(p) free_data(p);
+	}
+}
+
 int		multitrack_add_track( void *data )
 {
 	multitracker_t *mt = (multitracker_t*) data;
@@ -995,6 +1023,14 @@ void		multitrack_bind_track( void *data, int id, int bind_this )
 		return;
 	}
 
+	if( strncasecmp( q->hostname, p->hostname, strlen(q->hostname)) == 0 &&
+		q->port_num == p->port_num )
+	{
+		G_UNLOCK(mt_lock);
+		status_print(mt, "Track %d: Cannot bind to myself", bind_this);
+		return;
+	}
+
 	// connect q to p
 	veejay_sequence_send( p->sequence, VIMS_STREAM_NEW_UNICAST, "%d %s", q->port_num,q->hostname );
 
@@ -1043,7 +1079,7 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int wid
 
 void		multitrack_restart(void *data)
 {	
-	printf("\t%s\n",__FUNCTION__);
+	//printf("\t%s\n",__FUNCTION__);
 }
 
 static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gpointer user_data)
@@ -1281,7 +1317,13 @@ void 	*mt_preview( gpointer user_data )
 
 		memset( cache, 0, (MAX_TRACKS+2) * sizeof(GdkPixbuf*));
 
-		if(lt->active)
+		if(mt->quit)
+		{
+			G_UNLOCK(mt_lock);
+			g_thread_exit(NULL);
+		}
+
+		if(lt->active && lt->preview)
 		{
 			cache[LAST_TRACK] = veejay_get_image( lt->sequence, &error );	
 			if( error )
@@ -1306,7 +1348,7 @@ void 	*mt_preview( gpointer user_data )
 		}
 		G_UNLOCK(mt_lock);
 
-		if( ref >= 0 && cache[LAST_TRACK])
+		if( ref >= 0 && cache[LAST_TRACK] && lt->preview)
 		{
 			cache[ref] = gdk_pixbuf_scale_simple(
 					cache[LAST_TRACK],
@@ -1328,13 +1370,19 @@ void 	*mt_preview( gpointer user_data )
 			}
 		}
 
-		if(lt->active && cache[LAST_TRACK])
+		if(mt->quit)
 		{
-			GtkImage *image = GTK_IMAGE( lt->view->area );
-			gtk_image_set_from_pixbuf( image, cache[LAST_TRACK] );
-			img_cb( cache[LAST_TRACK] );
-			gdk_pixbuf_unref( cache[LAST_TRACK] );
+			gdk_threads_leave();
+			g_thread_exit(NULL);
 		}
+		else
+			if(lt->active && cache[LAST_TRACK])
+			{
+				GtkImage *image = GTK_IMAGE( lt->view->area );
+				gtk_image_set_from_pixbuf( image, cache[LAST_TRACK] );
+				img_cb( cache[LAST_TRACK] );
+				gdk_pixbuf_unref( cache[LAST_TRACK] );
+			}
 		//@@ cleanup
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
