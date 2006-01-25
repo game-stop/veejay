@@ -866,13 +866,36 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	gint nframes = info->uc.sample_rec_duration;
 	if(nframes <= 0)
 		return;
-	
+	/*
+	int br=0; int bw=0;
+	gchar *utftext = (gchar*) get_text( "entry_samplename"); 
+
+	if(!utftext)
+		return;
+
+	gchar *text = g_locale_from_utf8( utftext, -1, &br, &bw,NULL);	
+	if(!text || strlen(text) <= 1)
+		return;	
+
+	int i = 0;
+	while( text[i] != '\0' )
+	{
+		if( !isalnum( text[i] ))
+		{
+			vj_msg(VEEJAY_MSG_ERROR, "Only alphanumeric characters allowed");	
+			if( text) free(text);
+			return;
+		}
+	} 
+
+	multi_vims( VIMS_SAMPLE_SET_DESCRIPTION, "%d %s", 0, text );
+	g_free(text);
+	*/
 	if(format != NULL)
 	{
 		multi_vims( VIMS_RECORD_DATAFORMAT,"%s",
 			format );
 	}		
-
 	multi_vims( VIMS_SAMPLE_REC_START,
 		"%d %d",
 		nframes,
@@ -1576,7 +1599,6 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 
 	if( (end - start) <= 0 || id <= 0 )	
 	{
-		printf("end = %d, start = %d , id = %d\n",end,start,id);
 		return;
 	}
 
@@ -1613,7 +1635,6 @@ void	on_curve_buttontime_clicked(GtkWidget *widget, gpointer user_data )
 
 	if( (end - start) <= 0 || id <= 0 )	
 	{
-		printf("end = %d, start = %d , id = %d\n",end,start,id);
 		return;
 	}
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
@@ -1929,7 +1950,6 @@ void 	on_button_sdlclose_clicked(GtkWidget *w, gpointer user_data)
 
 void	on_quicklaunch_clicked(GtkWidget *widget, gpointer user_data)
 {
-printf("State = %d\n", info->watch.state);
 	if( info->watch.state == STATE_STOPPED )
 	{ 
 		vj_fork_or_connect_veejay( config_file );
@@ -2256,7 +2276,6 @@ gboolean 	on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 {
-	printf("%s:%d\n", __FUNCTION__, __LINE__ );
 	if(!info->status_lock)
 	{
 		multitrack_preview_master( info->mt, is_button_toggled("previewtoggle"));
@@ -2311,27 +2330,23 @@ void		on_previewsmall_clicked( GtkWidget *w, gpointer user_data)
 
 void		on_multitrack_activate( GtkWidget *w, gpointer user_data)
 {
-	printf("%s\n", __FUNCTION__ );
 	multitrack_open( info->mt );
 	gtk_widget_show( glade_xml_get_widget_( info->main_window , "mtwindow" ));
 
 }
 void		on_multitrack_deactivate( GtkWidget *w, gpointer user_data)
 {
-	printf("%s\n", __FUNCTION__ );
 	multitrack_close( info->mt );
 	gtk_widget_hide( glade_xml_get_widget_( info->main_window , "mtwindow" ));
 
 }
 void	on_mt_new_activate( GtkWidget *w, gpointer user_data)
 {
-	printf("%s\n",__FUNCTION__ );
 	multitrack_add_track( info->mt );
 }
 
 void	on_mt_delete_activate( GtkWidget *w, gpointer user_data)
 {
-	printf("%s\n", __FUNCTION__ );
 	multitrack_close_track( info->mt );
 }
 

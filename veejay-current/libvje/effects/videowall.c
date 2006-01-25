@@ -20,6 +20,7 @@
 #include "videowall.h"
 #include <stdlib.h>
 #include "common.h"
+static inline	int	gcd(int p, int q ) { if(q==0) return p; else return(gcd(q,p%q)); }
 
 static inline	int	n_pics(int w, int h)
 {
@@ -60,7 +61,7 @@ static int	  frame_delay = 0;
 static int	  *offset_table_x = NULL;
 static int	  *offset_table_y = NULL;
 
-static inline	int	gcd(int p, int q ) { if(q==0) return p; else return(gcd(q,p%q)); }
+
 
 
 static	int prepare_filmstrip(int w, int h)

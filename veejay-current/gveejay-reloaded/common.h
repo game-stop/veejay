@@ -20,7 +20,7 @@
 #define GVRCOMMON_H
 #define STATUS_BYTES 	100
 #define STATUS_TOKENS 	19
-#define VEEJAY_CODENAME "Resume build 2k6 v. beta 1"
+#define VEEJAY_CODENAME "Resume build 2k6 v. beta 2"
 /* Status bytes */
 
 #define ELAPSED_TIME	0

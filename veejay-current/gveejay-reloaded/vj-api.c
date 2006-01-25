@@ -5502,15 +5502,10 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 {
 	vj_gui_t *gui = (vj_gui_t*) data;
 	if( (condition&G_IO_ERR) ) {
-printf("%s Ends %d\n",__FUNCTION__, __LINE__);
 		return FALSE; }
 	if( (condition&G_IO_HUP) ) {
-printf("%s Ends %d\n",__FUNCTION__, __LINE__);
-
 		return FALSE; }
 	if( (condition&G_IO_NVAL) ) {
-printf("%s Ends %d\n",__FUNCTION__, __LINE__);
-
 		return FALSE; 
 	}
 	if(gui->watch.state==STATE_PLAYING && (condition & G_IO_IN)&& gui->watch.p_state == 0 )
@@ -5524,8 +5519,6 @@ printf("%s Ends %d\n",__FUNCTION__, __LINE__);
 		
 		if(sta_len[0] != 'V' || nb <= 0 )
 		{
-printf("%s Ends %d\n",__FUNCTION__, __LINE__);
-
 			gui->status_lock = 0;
 			G_UNLOCK( status_lock__ );
 			return FALSE;
@@ -5534,8 +5527,6 @@ printf("%s Ends %d\n",__FUNCTION__, __LINE__);
 		sscanf( sta_len+1, "%03d", &n_bytes );
 		if( n_bytes == 0 || n_bytes >= STATUS_BYTES )
 		{
-
-printf("%s Ends %d\n",__FUNCTION__, __LINE__);
 			gui->status_lock = 0;
 			G_UNLOCK( status_lock__ );
 			return FALSE;
@@ -5545,7 +5536,6 @@ printf("%s Ends %d\n",__FUNCTION__, __LINE__);
 		nb = vj_client_read( gui->client, V_STATUS, gui->status_msg, n_bytes );
 		if(nb <= 0 )
 		{
-printf("%s Ends %d\n",__FUNCTION__, __LINE__);
 			gui->status_lock = 0;
 			G_UNLOCK( status_lock__ );
 			return FALSE;
@@ -5731,8 +5721,6 @@ void	vj_fork_or_connect_veejay(char *configfile)
 		while(args[f] != NULL) f++;
 		args[f] = g_strdup( vims_token );
 	}
-//	for(k = 0 ; k < arglen; k ++ )
-//	 fprintf(stderr, "%s arg %d = '%s'\n", __FUNCTION__, k, args[k] );	
 	if( info->watch.state == STATE_STOPPED)
 	{
 		// start local veejay
@@ -5842,13 +5830,15 @@ static	void	vj_init_style( const char *name, const char *font )
 	GtkWidget *window = glade_xml_get_widget_(info->main_window, "gveejay_window");
 	GtkWidget *widget = glade_xml_get_widget_(info->main_window, name );
 	gtk_text_view_set_wrap_mode( GTK_TEXT_VIEW(widget), GTK_WRAP_WORD_CHAR );
-
-	GtkStyle *style = gtk_style_copy( gtk_widget_get_style(GTK_WIDGET(window)));
-	PangoFontDescription *desc = pango_font_description_from_string( font );
-	pango_font_description_set_style( desc, PANGO_STYLE_NORMAL );
-	style->font_desc = desc;
-	gtk_widget_set_style( widget, style );
-	gtk_style_ref(style);
+	GdkColor red;
+	gdk_color_parse( "red", &red);
+//	GtkStyle *style = gtk_style_copy( gtk_widget_get_style(GTK_WIDGET(window)));
+//	PangoFontDescription *desc = pango_font_description_from_string( font );
+//	pango_font_description_set_style( desc, PANGO_STYLE_NORMAL );
+//	style->font_desc = desc;
+//	gtk_widget_set_style( widget, style );
+//	gtk_style_ref(style);
+	gtk_widget_modify_bg( widget, GTK_STATE_NORMAL, &red );
 }	
 
 void	vj_gui_style_setup()
@@ -6151,8 +6141,11 @@ void 	vj_gui_init(char *glade_file)
 	memset(&(info->watch.p_time),0,sizeof(struct timeval));
 	info->is_alive = g_timeout_add(G_PRIORITY_HIGH_IDLE,is_alive, (gpointer*)info);
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "veejay_connection" );
+	
 	gtk_widget_show( w );
 }
+
+
 
 static	gboolean	update_log(gpointer data)
 {

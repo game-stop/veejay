@@ -1,7 +1,6 @@
 # Edit these colors and fonts however you like.
 style "default"
 {
-  engine "hcengine" {}
   xthickness = 1
   ythickness = 1
   GtkWidget::shadow_type = GTK_SHADOW_ETCHED_OUT
@@ -18,22 +17,27 @@ style "default"
   
   font_name = "Sans 8"
 
-  fg[NORMAL]        = "#646464" # borders etc.
-  fg[PRELIGHT]      = "#646464"
-  fg[ACTIVE]        = "#646464" # ook borders, van sliders en notebook
-  fg[SELECTED]      = "#646464"
-  fg[INSENSITIVE]   = "#404040"
-  
-  bg[NORMAL]        = "#27282F" # algemene achtergrond kleur
-  bg[PRELIGHT]      = "#aaacc1" # achtergrond geselecteerd widget
-  bg[ACTIVE]        = "#454f60" # niet actieve tabs, achtergrond sliders
-  bg[SELECTED]      = "#5058a0"
-  bg[INSENSITIVE]   = "#27282f" # achtergrond kleur van niet actieve knopjes
+  # foreground color of widgets
 
-  text[NORMAL]      = "#d8d8d8"
-  text[PRELIGHT]    = "#d8d8d8"
-  text[ACTIVE]      = "#FF0000"
-  text[SELECTED]    = "#FF0000"
+  fg[NORMAL]        = "#646464" # normal
+  fg[PRELIGHT]      = "#646464" # mouse on top of widget
+  fg[ACTIVE]        = "#646464" # the widget is pressed or clicked (and active)
+  fg[SELECTED]      = "#646464" # selected  
+  fg[INSENSITIVE]   = "#404040" # greyed out
+  
+  bg[NORMAL]        = "#27282F" # see above 
+  bg[PRELIGHT]      = "#aaacc1" # 
+  bg[ACTIVE]        = "#454f60" # 
+  bg[SELECTED]      = "#5058a0" #
+  bg[INSENSITIVE]   = "#27282f" # 
+
+  # set the color used for foreground of widgets using base for the background
+
+  text[NORMAL]	      ="#171223"
+  text[PRELIGHT]    = "#414174"
+  text[ACTIVE]      = "#141444"
+#  text[SELECTED]    = "#FF0000"
+  text[SELECTED] = "#0b0b46"
   text[INSENSITIVE] = "#404040"
 
   base[NORMAL]      = "#37383f"
@@ -41,78 +45,8 @@ style "default"
   base[ACTIVE]      = "#757f90"
   base[SELECTED]    = "#757ab3"
   base[INSENSITIVE] = "#27282f"
-  
+  bg_pixmap[NORMAL] = "bg.png"
 }
 
-style "text"
-{
-  font_name = "Sans 8"
-
-  fg[NORMAL]        = "#ffffff" # borders etc.
-  fg[PRELIGHT]      = "#ffffff"
-  fg[ACTIVE]        = "#ffffff" # ook borders, van sliders en notebook
-  fg[SELECTED]      = "#ffffff"
-  fg[INSENSITIVE]   = "#ffffff"
-  
-  bg[NORMAL]        = "#27282F" # algemene achtergrond kleur
-  bg[PRELIGHT]      = "#aaacc1" # achtergrond geselecteerd widget
-  bg[ACTIVE]        = "#454f60" # niet actieve tabs, achtergrond sliders
-  bg[SELECTED]      = "#5058a0"
-  bg[INSENSITIVE]   = "#27282f" # achtergrond kleur van niet actieve knopjes
-
-  text[NORMAL]      = "#d8d8d8"
-  text[PRELIGHT]    = "#d8d8d8"
-  text[ACTIVE]      = "#FF0000"
-  text[SELECTED]    = "#FF0000"
-  text[INSENSITIVE] = "#404040"
-
-  base[NORMAL]      = "#37383f"
-  base[PRELIGHT]    = "#aaacc1"
-  base[ACTIVE]      = "#757f90"
-  base[SELECTED]    = "#757ab3"
-  base[INSENSITIVE] = "#27282f"
-  
-}
-
-
-style "buttons"
-{
-  
-  font_name = "Sans 8"
-
-  fg[NORMAL]        = "#888888"
-  fg[PRELIGHT]      = "#888888"
-  fg[ACTIVE]        = "#888888"
-  fg[SELECTED]      = "#888888"
-  fg[INSENSITIVE]   = "#888888"
-  
-  bg[NORMAL]        = "#27282F"
-  bg[PRELIGHT]      = "#aaacc1"
-  bg[ACTIVE]        = "#454f60"
-  bg[SELECTED]      = "#5058a0"
-  bg[INSENSITIVE]   = "#27282f"
-
-  text[NORMAL]      = "#d8d8d8"
-  text[PRELIGHT]    = "#d8d8d8"
-  text[ACTIVE]      = "#FF0000"
-  text[SELECTED]    = "#FF0000"
-  text[INSENSITIVE] = "#404040"
-
-  base[NORMAL]      = "#37383f"
-  base[PRELIGHT]    = "#aaacc1"
-  base[ACTIVE]      = "#757f90"
-  base[SELECTED]    = "#757ab3"
-  base[INSENSITIVE] = "#27282f"
-  
-}
-
-
-
-class "GtkButton" style "buttons"
-class "GtkSpinButton" style "buttons"
-class "GtkToggleButton" style "buttons"
-class "GtkCheckBox" style "buttons"
-
-class "GtkLabel" style "text"
 
 class "GtkWidget" style "default"

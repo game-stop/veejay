@@ -426,7 +426,7 @@ int vj_server_poll(vj_server * vje)
 	return 0;
 }
 
-static	int	_vj_server_empty_queue(vj_server *vje, int link_id)
+int	_vj_server_empty_queue(vj_server *vje, int link_id)
 {
 	// ensure message queue is empty!!
 	vj_link **Link = (vj_link**) vje->link;

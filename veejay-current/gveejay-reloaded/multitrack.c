@@ -1079,7 +1079,6 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int wid
 
 void		multitrack_restart(void *data)
 {	
-	//printf("\t%s\n",__FUNCTION__);
 }
 
 static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gpointer user_data)

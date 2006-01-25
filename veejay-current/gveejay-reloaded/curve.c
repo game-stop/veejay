@@ -38,8 +38,6 @@ key_chain_t	*new_chain(void)
 
 void		del_chain( key_chain_t *chain )
 {
-	printf("%s :%d %p\n",__FUNCTION__ ,__LINE__ , chain);
-	
 	if(chain)
 	{
 		gint i;
@@ -139,7 +137,6 @@ void	debug_key( key_parameter_t *key )
 
 void	clear_parameter_values( key_parameter_t *key )
 {
-	printf("%s :%d\n",__FUNCTION__ ,__LINE__);
 	if(key)
 	{
 		if(key->vector)
@@ -178,8 +175,6 @@ int	get_parameter_key_value( key_parameter_t *key, gint frame_pos, float *result
 
 void	get_points_from_curve( key_parameter_t *key, GtkWidget *curve )
 {
-	printf("%s :%d\n",__FUNCTION__ ,__LINE__);
-	
 	gtk_curve_get_vector( GTK_CURVE(curve), key->curve_len, key->vector );
 }
 

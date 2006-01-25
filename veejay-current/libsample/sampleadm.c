@@ -242,8 +242,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     }
 
     si->sample_id = _new_id();
-
-    snprintf(si->descr,SAMPLE_MAX_DESCR_LEN, "%s", "Untitled");
+    snprintf(si->descr,SAMPLE_MAX_DESCR_LEN, "Sample%04d", si->sample_id);
     si->first_frame = startFrame;
     si->last_frame = endFrame;
     si->edit_list = NULL;	// clone later
@@ -284,7 +283,6 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->selected_entry = 0;
     si->effect_toggle = 1;
     si->offset = 0;
-    sprintf(si->descr, "%s", "Untitled");
     sprintf(tmp_file, "sample_%05d.edl", si->sample_id );
     si->edit_list_file = strdup( tmp_file );
 
@@ -733,7 +731,7 @@ int sample_set_description(int sample_id, char *description)
     if (!si)
 	return -1;
     if (!description || strlen(description) <= 0) {
-	snprintf(si->descr, SAMPLE_MAX_DESCR_LEN, "%s", "Untitled");
+    	snprintf(si->descr, SAMPLE_MAX_DESCR_LEN, "Sample%04d", si->sample_id );
     } else {
 	snprintf(si->descr, SAMPLE_MAX_DESCR_LEN, "%s", description);
     }

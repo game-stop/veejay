@@ -92,7 +92,10 @@ int sample_try_filename(int sample_id, char *filename)
 	{
 		snprintf(si->encoder_base,255,"%s",filename);
 	}
-	sprintf(si->encoder_destination, "%s-%05ld.avi", si->encoder_base,si->sequence_num);
+//	sprintf(si->encoder_destination, "%s-%05ld.avi", si->encoder_base,si->sequence_num);
+
+	
+	sprintf(si->encoder_destination, "%s.avi", si->encoder_base );
 
 	veejay_msg(VEEJAY_MSG_INFO, "Recording to [%s]", si->encoder_destination);
 	return (sample_update(si,sample_id));	

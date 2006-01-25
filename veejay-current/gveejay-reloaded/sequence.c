@@ -364,6 +364,9 @@ void	*veejay_sequence_thread(gpointer data)
 void	veejay_abort_sequence( void *data )
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
+	if(!v)
+		return;
+
 	g_mutex_lock(v->mutex);
 	v->abort = 1;
 	g_mutex_unlock(v->mutex);

@@ -46,87 +46,13 @@
 		    <widget class="GtkMenu" id="menuitem8_menu">
 
 		      <child>
-			<widget class="GtkImageMenuItem" id="open_connection">
-			  <property name="visible">True</property>
-			  <property name="label" translatable="yes">New veejay session</property>
-			  <property name="use_underline">True</property>
-			  <signal name="activate" handler="on_openConnection_activate" last_modification_time="Tue, 19 Jul 2005 19:33:02 GMT"/>
-
-			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2062">
-			      <property name="visible">True</property>
-			      <property name="stock">gtk-execute</property>
-			      <property name="icon_size">1</property>
-			      <property name="xalign">0.5</property>
-			      <property name="yalign">0.5</property>
-			      <property name="xpad">0</property>
-			      <property name="ypad">0</property>
-			    </widget>
-			  </child>
-			</widget>
-		      </child>
-
-		      <child>
-			<widget class="GtkImageMenuItem" id="quick_launch_session1">
-			  <property name="visible">True</property>
-			  <property name="label" translatable="yes">Quick launch session</property>
-			  <property name="use_underline">True</property>
-			  <signal name="activate" handler="on_quicklaunch_clicked" last_modification_time="Sat, 22 Oct 2005 12:10:54 GMT"/>
-
-			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2063">
-			      <property name="visible">True</property>
-			      <property name="pixbuf">icon_connect.png</property>
-			      <property name="xalign">0.5</property>
-			      <property name="yalign">0.5</property>
-			      <property name="xpad">0</property>
-			      <property name="ypad">0</property>
-			    </widget>
-			  </child>
-			</widget>
-		      </child>
-
-		      <child>
-			<widget class="GtkSeparatorMenuItem" id="separator2">
-			  <property name="visible">True</property>
-			</widget>
-		      </child>
-
-		      <child>
-			<widget class="GtkImageMenuItem" id="configure1">
-			  <property name="visible">True</property>
-			  <property name="label" translatable="yes">Configure</property>
-			  <property name="use_underline">True</property>
-			  <signal name="activate" handler="on_configure1_activate" last_modification_time="Sun, 25 Sep 2005 21:18:28 GMT"/>
-
-			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2064">
-			      <property name="visible">True</property>
-			      <property name="stock">gtk-preferences</property>
-			      <property name="icon_size">1</property>
-			      <property name="xalign">0.5</property>
-			      <property name="yalign">0.5</property>
-			      <property name="xpad">0</property>
-			      <property name="ypad">0</property>
-			    </widget>
-			  </child>
-			</widget>
-		      </child>
-
-		      <child>
-			<widget class="GtkSeparatorMenuItem" id="separator3">
-			  <property name="visible">True</property>
-			</widget>
-		      </child>
-
-		      <child>
 			<widget class="GtkImageMenuItem" id="save1">
 			  <property name="visible">True</property>
 			  <property name="label" translatable="yes">_Save</property>
 			  <property name="use_underline">True</property>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2065">
+			    <widget class="GtkImage" id="image2122">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_save.png</property>
 			      <property name="xalign">0.5</property>
@@ -147,7 +73,7 @@
 				  <signal name="activate" handler="on_button_samplelist_save_clickedactivate" last_modification_time="Wed, 19 Oct 2005 12:22:22 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2066">
+				    <widget class="GtkImage" id="image2123">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_saveas.png</property>
 				      <property name="xalign">0.5</property>
@@ -167,7 +93,7 @@
 				  <signal name="activate" handler="on_button_saveconfigfile_clicked" last_modification_time="Wed, 19 Oct 2005 12:23:07 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2067">
+				    <widget class="GtkImage" id="image2124">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_openlist.png</property>
 				      <property name="xalign">0.5</property>
@@ -190,7 +116,7 @@
 			  <property name="use_underline">True</property>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2068">
+			    <widget class="GtkImage" id="image2125">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_open.png</property>
 			      <property name="xalign">0.5</property>
@@ -211,7 +137,7 @@
 				  <signal name="activate" handler="on_button_samplelist_open_clicked" last_modification_time="Wed, 19 Oct 2005 12:21:30 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2069">
+				    <widget class="GtkImage" id="image2126">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_open.png</property>
 				      <property name="xalign">0.5</property>
@@ -231,7 +157,7 @@
 				  <signal name="activate" handler="on_button_loadconfigfile_clicked" last_modification_time="Wed, 19 Oct 2005 12:20:50 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2070">
+				    <widget class="GtkImage" id="image2127">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_openlist.png</property>
 				      <property name="xalign">0.5</property>
@@ -261,29 +187,9 @@
 			  <signal name="activate" handler="on_veejay_connection_close" last_modification_time="Sat, 22 Oct 2005 12:07:11 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2071">
+			    <widget class="GtkImage" id="image2128">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_disconnect.png</property>
-			      <property name="xalign">0.5</property>
-			      <property name="yalign">0.5</property>
-			      <property name="xpad">0</property>
-			      <property name="ypad">0</property>
-			    </widget>
-			  </child>
-			</widget>
-		      </child>
-
-		      <child>
-			<widget class="GtkImageMenuItem" id="quit_veejay1">
-			  <property name="visible">True</property>
-			  <property name="label" translatable="yes">Kill veejay server</property>
-			  <property name="use_underline">True</property>
-			  <signal name="activate" handler="on_quit_veejay1_activate" last_modification_time="Sun, 25 Sep 2005 23:13:02 GMT"/>
-
-			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2072">
-			      <property name="visible">True</property>
-			      <property name="pixbuf">icon_skull.png</property>
 			      <property name="xalign">0.5</property>
 			      <property name="yalign">0.5</property>
 			      <property name="xpad">0</property>
@@ -322,7 +228,7 @@
 			  <property name="use_underline">True</property>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2073">
+			    <widget class="GtkImage" id="image2129">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_loop.png</property>
 			      <property name="xalign">0.5</property>
@@ -343,7 +249,7 @@
 				  <signal name="activate" handler="on_new_from_file1_activate" last_modification_time="Mon, 10 Oct 2005 12:31:19 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2074">
+				    <widget class="GtkImage" id="image2130">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_openlist.png</property>
 				      <property name="xalign">0.5</property>
@@ -358,12 +264,13 @@
 			      <child>
 				<widget class="GtkImageMenuItem" id="add_file1">
 				  <property name="visible">True</property>
-				  <property name="label" translatable="yes">_Add file</property>
+				  <property name="tooltip" translatable="yes">Append a videofile to the sample's EDL</property>
+				  <property name="label" translatable="yes">_Add videofile</property>
 				  <property name="use_underline">True</property>
 				  <signal name="activate" handler="on_add_file1_activate" last_modification_time="Mon, 10 Oct 2005 12:31:19 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2075">
+				    <widget class="GtkImage" id="image2131">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_send.png</property>
 				      <property name="xalign">0.5</property>
@@ -383,7 +290,7 @@
 				  <signal name="activate" handler="on_copy1_activate" last_modification_time="Mon, 10 Oct 2005 12:31:19 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2076">
+				    <widget class="GtkImage" id="image2132">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_copy.png</property>
 				      <property name="xalign">0.5</property>
@@ -403,7 +310,7 @@
 				  <signal name="activate" handler="on_delete1_activate" last_modification_time="Mon, 10 Oct 2005 12:32:20 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2077">
+				    <widget class="GtkImage" id="image2133">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_clear.png</property>
 				      <property name="xalign">0.5</property>
@@ -426,7 +333,7 @@
 			  <property name="use_underline">True</property>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2078">
+			    <widget class="GtkImage" id="image2134">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_stream.png</property>
 			      <property name="xalign">0.5</property>
@@ -442,12 +349,12 @@
 			      <child>
 				<widget class="GtkImageMenuItem" id="new_source1">
 				  <property name="visible">True</property>
-				  <property name="label" translatable="yes">_New source</property>
+				  <property name="label" translatable="yes">_New </property>
 				  <property name="use_underline">True</property>
 				  <signal name="activate" handler="on_new_source1_activate" last_modification_time="Mon, 10 Oct 2005 12:31:19 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2079">
+				    <widget class="GtkImage" id="image2135">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_openlist.png</property>
 				      <property name="xalign">0.5</property>
@@ -462,12 +369,12 @@
 			      <child>
 				<widget class="GtkImageMenuItem" id="new_color1">
 				  <property name="visible">True</property>
-				  <property name="label" translatable="yes">_New color</property>
+				  <property name="label" translatable="yes">_New Solid</property>
 				  <property name="use_underline">True</property>
 				  <signal name="activate" handler="on_new_color1_activate" last_modification_time="Mon, 10 Oct 2005 12:35:25 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2080">
+				    <widget class="GtkImage" id="image2136">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_color.png</property>
 				      <property name="xalign">0.5</property>
@@ -487,7 +394,7 @@
 				  <signal name="activate" handler="on_delete2_activate" last_modification_time="Mon, 10 Oct 2005 12:35:46 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2081">
+				    <widget class="GtkImage" id="image2137">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_clear.png</property>
 				      <property name="xalign">0.5</property>
@@ -512,12 +419,12 @@
 		      <child>
 			<widget class="GtkImageMenuItem" id="video_settings">
 			  <property name="visible">True</property>
-			  <property name="label" translatable="yes">Video settings</property>
+			  <property name="label" translatable="yes">Settings</property>
 			  <property name="use_underline">True</property>
 			  <signal name="activate" handler="on_VideoSettings_activate" last_modification_time="Tue, 19 Jul 2005 19:33:02 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2082">
+			    <widget class="GtkImage" id="image2138">
 			      <property name="visible">True</property>
 			      <property name="stock">gtk-preferences</property>
 			      <property name="icon_size">1</property>
@@ -551,7 +458,7 @@
 			  <signal name="activate" handler="on_console1_activate" last_modification_time="Sat, 22 Oct 2005 11:05:22 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2083">
+			    <widget class="GtkImage" id="image2139">
 			      <property name="visible">True</property>
 			      <property name="stock">gtk-dialog-info</property>
 			      <property name="icon_size">1</property>
@@ -587,9 +494,30 @@
 			  <signal name="activate" handler="on_vims_bundles_activate" last_modification_time="Sat, 23 Jul 2005 18:59:53 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2084">
+			    <widget class="GtkImage" id="image2140">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_bundle.png</property>
+			      <property name="xalign">0.5</property>
+			      <property name="yalign">0.5</property>
+			      <property name="xpad">0</property>
+			      <property name="ypad">0</property>
+			    </widget>
+			  </child>
+			</widget>
+		      </child>
+
+		      <child>
+			<widget class="GtkImageMenuItem" id="configure1">
+			  <property name="visible">True</property>
+			  <property name="label" translatable="yes">Configuration</property>
+			  <property name="use_underline">True</property>
+			  <signal name="activate" handler="on_configure1_activate" last_modification_time="Sun, 25 Sep 2005 21:18:28 GMT"/>
+
+			  <child internal-child="image">
+			    <widget class="GtkImage" id="image2141">
+			      <property name="visible">True</property>
+			      <property name="stock">gtk-preferences</property>
+			      <property name="icon_size">1</property>
 			      <property name="xalign">0.5</property>
 			      <property name="yalign">0.5</property>
 			      <property name="xpad">0</property>
@@ -620,7 +548,7 @@
 			  <signal name="activate" handler="on_about1_activate" last_modification_time="Thu, 15 Sep 2005 22:07:40 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2085">
+			    <widget class="GtkImage" id="image2142">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_question.png</property>
 			      <property name="xalign">0.5</property>
@@ -1193,7 +1121,7 @@
 				  <child>
 				    <widget class="GtkLabel" id="label714">
 				      <property name="visible">True</property>
-				      <property name="label" translatable="yes">Record duration</property>
+				      <property name="label" translatable="yes">Duration</property>
 				      <property name="use_underline">False</property>
 				      <property name="use_markup">False</property>
 				      <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -1334,7 +1262,7 @@
 				  <child>
 				    <widget class="GtkLabel" id="label718">
 				      <property name="visible">True</property>
-				      <property name="label" translatable="yes">Record format</property>
+				      <property name="label" translatable="yes">Format</property>
 				      <property name="use_underline">False</property>
 				      <property name="use_markup">False</property>
 				      <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -1979,7 +1907,7 @@ YV16</property>
 			  <child>
 			    <widget class="GtkLabel" id="label723">
 			      <property name="visible">True</property>
-			      <property name="label" translatable="yes">&lt;b&gt;Hardware controls:&lt;/b&gt;</property>
+			      <property name="label" translatable="yes">&lt;b&gt;V4L&lt;/b&gt;</property>
 			      <property name="use_underline">False</property>
 			      <property name="use_markup">True</property>
 			      <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -2052,7 +1980,7 @@ YV16</property>
 				  <child>
 				    <widget class="GtkLabel" id="label601">
 				      <property name="visible">True</property>
-				      <property name="label" translatable="yes">&lt;b&gt;Solid-stream Color&lt;/b&gt;</property>
+				      <property name="label" translatable="yes">&lt;b&gt;Color wheel&lt;/b&gt;</property>
 				      <property name="use_underline">False</property>
 				      <property name="use_markup">True</property>
 				      <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -2361,7 +2289,7 @@ YV16</property>
 
 					  <child>
 					    <widget class="GtkLabel" id="label707">
-					      <property name="label" translatable="yes">Frame duplication (&quot;delay&quot;) </property>
+					      <property name="label" translatable="yes">Duplication factor</property>
 					      <property name="use_underline">False</property>
 					      <property name="use_markup">False</property>
 					      <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -2417,7 +2345,7 @@ YV16</property>
 
 					  <child>
 					    <widget class="GtkLabel" id="label705">
-					      <property name="label" translatable="yes">Sample name:</property>
+					      <property name="label" translatable="yes">Title:</property>
 					      <property name="use_underline">False</property>
 					      <property name="use_markup">False</property>
 					      <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -2655,7 +2583,7 @@ YV16</property>
 					  <child>
 					    <widget class="GtkLabel" id="label179">
 					      <property name="visible">True</property>
-					      <property name="label" translatable="yes">Loop Types</property>
+					      <property name="label" translatable="yes">Looping</property>
 					      <property name="use_underline">False</property>
 					      <property name="use_markup">True</property>
 					      <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -2747,7 +2675,7 @@ YV16</property>
 				      <child>
 					<widget class="GtkLabel" id="label711">
 					  <property name="visible">True</property>
-					  <property name="label" translatable="yes">Record duration</property>
+					  <property name="label" translatable="yes">Duration</property>
 					  <property name="use_underline">False</property>
 					  <property name="use_markup">False</property>
 					  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -2797,7 +2725,7 @@ YV16</property>
 				      <child>
 					<widget class="GtkLabel" id="label708">
 					  <property name="visible">True</property>
-					  <property name="label" translatable="yes">Record format</property>
+					  <property name="label" translatable="yes">Format</property>
 					  <property name="use_underline">False</property>
 					  <property name="use_markup">False</property>
 					  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -2872,29 +2800,6 @@ YV16</property>
 					      <property name="angle">0</property>
 					    </widget>
 					  </child>
-
-					  <child>
-					    <widget class="GtkLabel" id="label710">
-					      <property name="visible">True</property>
-					      <property name="label" translatable="yes">&lt;b&gt;Timecode:&lt;/b&gt;</property>
-					      <property name="use_underline">False</property>
-					      <property name="use_markup">True</property>
-					      <property name="justify">GTK_JUSTIFY_LEFT</property>
-					      <property name="wrap">False</property>
-					      <property name="selectable">False</property>
-					      <property name="xalign">0.5</property>
-					      <property name="yalign">0.5</property>
-					      <property name="xpad">0</property>
-					      <property name="ypad">0</property>
-					      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
-					      <property name="width_chars">-1</property>
-					      <property name="single_line_mode">False</property>
-					      <property name="angle">0</property>
-					    </widget>
-					    <packing>
-					      <property name="type">label_item</property>
-					    </packing>
-					  </child>
 					</widget>
 					<packing>
 					  <property name="left_attach">2</property>
@@ -2909,7 +2814,7 @@ YV16</property>
 				      <child>
 					<widget class="GtkLabel" id="label709">
 					  <property name="visible">True</property>
-					  <property name="label" translatable="yes">Record duration as</property>
+					  <property name="label" translatable="yes">Unit</property>
 					  <property name="use_underline">False</property>
 					  <property name="use_markup">True</property>
 					  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -3165,7 +3070,7 @@ YV16</property>
 				      <child>
 					<widget class="GtkLabel" id="label712">
 					  <property name="visible">True</property>
-					  <property name="label" translatable="yes">&lt;b&gt;Recording progress&lt;/b&gt;</property>
+					  <property name="label" translatable="yes">&lt;b&gt;Recording&lt;/b&gt;</property>
 					  <property name="use_underline">False</property>
 					  <property name="use_markup">True</property>
 					  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -3313,7 +3218,7 @@ YV16</property>
 				      <child>
 					<widget class="GtkLabel" id="label225">
 					  <property name="visible">True</property>
-					  <property name="label" translatable="yes">Editlist positon</property>
+					  <property name="label" translatable="yes">Positon</property>
 					  <property name="use_underline">False</property>
 					  <property name="use_markup">False</property>
 					  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -3340,7 +3245,7 @@ YV16</property>
 				      <child>
 					<widget class="GtkLabel" id="label226">
 					  <property name="visible">True</property>
-					  <property name="label" translatable="yes">Editlist frames</property>
+					  <property name="label" translatable="yes">Total frames</property>
 					  <property name="use_underline">False</property>
 					  <property name="use_markup">False</property>
 					  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -6539,7 +6444,7 @@ YV16</property>
 		      <child>
 			<widget class="GtkLabel" id="label756">
 			  <property name="visible">True</property>
-			  <property name="label" translatable="yes">Mixing sources</property>
+			  <property name="label" translatable="yes">FX sources</property>
 			  <property name="use_underline">False</property>
 			  <property name="use_markup">False</property>
 			  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -6748,7 +6653,7 @@ YV16</property>
 		      <child>
 			<widget class="GtkLabel" id="label753">
 			  <property name="visible">True</property>
-			  <property name="label" translatable="yes">Effects</property>
+			  <property name="label" translatable="yes">FX List</property>
 			  <property name="use_underline">False</property>
 			  <property name="use_markup">False</property>
 			  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -6801,7 +6706,7 @@ YV16</property>
 		      <child>
 			<widget class="GtkLabel" id="label754">
 			  <property name="visible">True</property>
-			  <property name="label" translatable="yes">Color parameters</property>
+			  <property name="label" translatable="yes">Color wheel</property>
 			  <property name="use_underline">False</property>
 			  <property name="use_markup">False</property>
 			  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -6990,7 +6895,7 @@ YV16</property>
 					      <child>
 						<widget class="GtkLabel" id="label679">
 						  <property name="visible">True</property>
-						  <property name="label" translatable="yes">&lt;b&gt;Keyframe Start&lt;/b&gt;</property>
+						  <property name="label" translatable="yes">&lt;b&gt;Time Start&lt;/b&gt;</property>
 						  <property name="use_underline">False</property>
 						  <property name="use_markup">True</property>
 						  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -7145,7 +7050,7 @@ YV16</property>
 					      <child>
 						<widget class="GtkLabel" id="label684">
 						  <property name="visible">True</property>
-						  <property name="label" translatable="yes">&lt;b&gt;Keyframe End&lt;/b&gt;</property>
+						  <property name="label" translatable="yes">&lt;b&gt;Time End&lt;/b&gt;</property>
 						  <property name="use_underline">False</property>
 						  <property name="use_markup">True</property>
 						  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -7448,7 +7353,7 @@ YV16</property>
 				  <child>
 				    <widget class="GtkLabel" id="label686">
 				      <property name="visible">True</property>
-				      <property name="label" translatable="yes">&lt;b&gt;Keyframe parameter:&lt;/b&gt;</property>
+				      <property name="label" translatable="yes">&lt;b&gt;Animate parameter:&lt;/b&gt;</property>
 				      <property name="use_underline">False</property>
 				      <property name="use_markup">True</property>
 				      <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -7593,7 +7498,7 @@ YV16</property>
 				  <child>
 				    <widget class="GtkLabel" id="label685">
 				      <property name="visible">True</property>
-				      <property name="label" translatable="yes">&lt;b&gt;Drawing method&lt;/b&gt;</property>
+				      <property name="label" translatable="yes">&lt;b&gt;Curve drawing method&lt;/b&gt;</property>
 				      <property name="use_underline">False</property>
 				      <property name="use_markup">True</property>
 				      <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -7786,7 +7691,7 @@ YV16</property>
 		      <child>
 			<widget class="GtkLabel" id="label755">
 			  <property name="visible">True</property>
-			  <property name="label" translatable="yes">Keyframing</property>
+			  <property name="label" translatable="yes">FX animation</property>
 			  <property name="use_underline">False</property>
 			  <property name="use_markup">False</property>
 			  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -8741,7 +8646,7 @@ YV16</property>
 			  <child>
 			    <widget class="GtkLabel" id="label673">
 			      <property name="visible">True</property>
-			      <property name="label" translatable="yes">Sample banks</property>
+			      <property name="label" translatable="yes">Samplebank</property>
 			      <property name="use_underline">False</property>
 			      <property name="use_markup">False</property>
 			      <property name="justify">GTK_JUSTIFY_LEFT</property>
