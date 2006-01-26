@@ -3152,7 +3152,7 @@ static void	process_reload_hints(void)
 	}
 	if( info->uc.reload_hint[HINT_SLIST] == 1 )
 	{
-		load_samplelist_info(true);
+		load_samplelist_info(false);
 		info->uc.expected_slots = info->status_tokens[TOTAL_SLOTS];
 	}
 
@@ -6726,7 +6726,7 @@ void	reset_samplebank(void)
 				sample_gui_slot_t *gslot = info->sample_banks[i]->gui_slot[j];
 				if(slot->title) free(slot->title);
 				if(slot->timecode) free(slot->timecode);
-//				if(slot->pixbuf) gdk_pixbuf_unref( slot->pixbuf );
+				if(slot->pixbuf) gdk_pixbuf_unref( slot->pixbuf );
 				if(slot->ec) del_chain( slot->ec );
 				slot->ec = NULL;
 				slot->title = NULL;
