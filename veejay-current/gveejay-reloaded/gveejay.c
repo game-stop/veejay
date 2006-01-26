@@ -31,8 +31,8 @@ static char hostname[255];
 static int gveejay_theme = 1;
 static	int verbosity = 0;
 static int timer = 6;
-static int preview_width = 0;
-static int preview_height = 0;
+static int col = 0;
+static int row = 0;
 static int current_skin = 0;
 static int n_tracks = 4;
 
@@ -53,8 +53,7 @@ static void usage(char *progname)
         printf( "-p/--port\t\tVeejay port to connect to (defaults to 3490) \n");
 	printf( "-n/--no-theme\t\tDont load gveejay's GTK theme\n");
 	printf( "-v/--verbose\t\tBe extra verbose (usefull for debugging)\n");
-	printf( "-t/--timeout\t\tSet timeout (default 6 seconds)\n");
-	printf( "-s/--size\t\tSet preview size (widht X height)\n");
+	printf( "-s/--size\t\tSet bank resolution (row X columns)\n");
  	printf( "-f/--flavour\t\tSelect another skin to use\n");
         printf( "-X/\t\tSet number of tracks\n");
 	printf( "\n\n");
@@ -90,7 +89,7 @@ static int      set_option( const char *name, char *value )
 	else if (strcmp(name, "s") == 0 || strcmp(name, "size") == 0)
 	{
 		if(sscanf( (char*) optarg, "%dx%d",
-			&preview_width, &preview_height ) != 2 )
+			&row, &col ) != 2 )
 		{
 			fprintf(stderr, "--size parameter requires NxN argument");
 			err++;
@@ -137,8 +136,8 @@ int main(int argc, char *argv[]) {
 		
 	vj_gui_set_timeout(timer);
 	set_skin( current_skin );
+	default_bank_values( &col, &row );
 	vj_gui_init( skins[current_skin].file );
-	vj_gui_set_preview_window( preview_width,preview_height);
 	
 	if(gveejay_theme)
 		vj_gui_style_setup();

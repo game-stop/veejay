@@ -229,11 +229,17 @@ typedef struct
 
 static int skin__ = 0;
 // Have room for only 2 * 120 samples
-#define NUM_BANKS 20   
-#define NUM_PAGES 10
-#define NUM_SAMPLES_PER_PAGE 12
-#define NUM_SAMPLES_PER_COL 2
-#define NUM_SAMPLES_PER_ROW 6
+//#define NUM_BANKS 20   
+//#define NUM_PAGES 10
+//#define NUM_SAMPLES_PER_PAGE 12
+//#define NUM_SAMPLES_PER_COL 2
+//#define NUM_SAMPLES_PER_ROW 6
+
+static	int	NUM_BANKS =	20;
+static	int	NUM_PAGES =	10;
+static 	int	NUM_SAMPLES_PER_PAGE = 12;
+static	int	NUM_SAMPLES_PER_COL = 2;
+static	int	NUM_SAMPLES_PER_ROW = 6;
 
 #define MOD_OFFSET 200
 #define SEQUENCE_LENGTH 1024
@@ -5891,6 +5897,33 @@ int	vj_gui_get_preview_priority(void)
 	return 1;
 }
 
+void	default_bank_values(int *col, int *row )
+{
+	int ret = 0;
+	NUM_BANKS =	20;
+	NUM_PAGES =	10;
+
+	if( *col == 0 && *row == 0 )
+	{
+		if(skin__ == 0)
+		{
+			NUM_SAMPLES_PER_COL = 2;
+			NUM_SAMPLES_PER_ROW = 4;
+		}
+		else
+		{
+			NUM_SAMPLES_PER_COL = 2;
+			NUM_SAMPLES_PER_ROW = 8;
+		}
+	}
+	else
+	{
+		NUM_SAMPLES_PER_ROW = *col;
+		NUM_SAMPLES_PER_COL = *row;
+	}
+	NUM_SAMPLES_PER_PAGE = NUM_SAMPLES_PER_COL * NUM_SAMPLES_PER_ROW;
+}
+
 void	set_skin(int skin)
 {
 	skin__ = skin;
@@ -5942,11 +5975,14 @@ void	vj_img_cb(GdkPixbuf *img )
                              		g->pixbuf_ref = NULL;
                         	}
 			}
-			slot->pixbuf = gdk_pixbuf_scale_simple( img, info->image_dimensions[0],
-				info->image_dimensions[1], GDK_INTERP_BILINEAR );
-			gveejay_update_image(slot, gui_slot, info->image_dimensions[0],
-				info->image_dimensions[1] );
-			update_cached_slots();	
+			if( info->image_dimensions[0] > 0 )
+			{
+				slot->pixbuf = gdk_pixbuf_scale_simple( img, info->image_dimensions[0],
+					info->image_dimensions[1], GDK_INTERP_BILINEAR );
+				gveejay_update_image(slot, gui_slot, info->image_dimensions[0],
+					info->image_dimensions[1] );
+				update_cached_slots();	
+			}
 // selected_gui_slot !
 		}
 	}
@@ -6105,11 +6141,12 @@ void 	vj_gui_init(char *glade_file)
 	info->sample_bank_pad = gtk_notebook_new();
 	gtk_notebook_set_tab_pos( GTK_NOTEBOOK(info->sample_bank_pad), GTK_POS_BOTTOM );
 	gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET(info->sample_bank_pad), TRUE, TRUE, 0);
-	gtk_widget_show( info->sample_bank_pad );
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 
 	create_ref_slots(skin__ == 0 ? MEM_SLOT_SIZE/4: MEM_SLOT_SIZE);
 	
+	gtk_widget_show( info->sample_bank_pad );
+
 	setup_knobs();
 	setup_vimslist();
 	setup_effectchain_info();
@@ -6603,8 +6640,7 @@ static int	add_bank( gint bank_num  )
 	sprintf(frame_label, "Samples %d to %d", (bank_num * NUM_SAMPLES_PER_PAGE), (bank_num * NUM_SAMPLES_PER_PAGE) + NUM_SAMPLES_PER_PAGE  );
 	/* Check image dimensions */
 
-	if( info->image_dimensions[0] == 0 && info->image_dimensions[1] == 0 )
-		setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
+	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 
 	/* Add requested bank num */
 	if(info->sample_banks[bank_num] )
@@ -6637,7 +6673,7 @@ static int	add_bank( gint bank_num  )
 	GtkWidget *sb = info->sample_bank_pad;
 	GtkFrame *frame = gtk_frame_new(frame_label);
 	GtkWidget *label = gtk_label_new( str_label );
-	gtk_widget_set_size_request(frame, 200,200 );
+//	gtk_widget_set_size_request(frame, 200,200 );
 	gtk_widget_show(frame);
 	info->sample_banks[bank_num]->page_num = gtk_notebook_append_page(GTK_NOTEBOOK(info->sample_bank_pad), frame, label);
 
@@ -6767,21 +6803,29 @@ void setup_samplebank(gint num_cols, gint num_rows)
 
 	// print width of notebook samples
 	GdkRectangle result;
-
+	if(info->el.width > 0 && info->el.height > 0 )
+	{
 	widget_get_rect_in_screen(
-		glade_xml_get_widget_( info->main_window, "sample_bank_hbox" ),
+		info->sample_bank_pad,
+	//	glade_xml_get_widget_( info->main_window, "sample_bank_hbox" ),
 		&result
 	);
-	printf("W = %d, H = %d, NC =%d, NR = %d\n", result.width,result.height,num_cols,num_rows );
 //	gint image_width = 44;
 //	gint image_height = 36;
+	result.width -= ( num_rows * 16);	
+	result.height -= ( num_cols * 16);
 	gint image_width = result.width / num_rows;
 	gint image_height = result.height / num_cols;
-//	info->image_dimensions[0] = 176/2;
-//	info->image_dimensions[1] = 144/2;
-
+	float ratio = (float) info->el.height / (float) info->el.width;
+	image_height = image_width * ratio;
 	info->image_dimensions[0] = image_width ;
 	info->image_dimensions[1] = image_height;
+	}
+	else
+	{
+		info->image_dimensions[0] = 0 ;
+		info->image_dimensions[1] = 0;
+	}
 }
 
 /* --------------------------------------------------------------------------------------------------------------------------
@@ -6950,7 +6994,7 @@ image_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 		rowstride = gdk_pixbuf_get_rowstride( slot->pixbuf );
 		g_assert( slot->pixbuf );
 		guchar *pixels = gdk_pixbuf_get_pixels( slot->pixbuf ) + rowstride * event->area.y + event->area.x * 3;
-		if(pixels && rowstride > 0)
+		if(pixels && rowstride > 0 && info->image_dimensions[0] > 0)
 			gdk_draw_rgb_image_dithalign( widget->window,
 					widget->style->black_gc,
 				//		event->area.x, event->area.y,
@@ -7283,10 +7327,10 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 	gtk_box_pack_start (GTK_BOX (gui_slot->upper_hbox), gui_slot->upper_vbox, TRUE, TRUE, 0);
 	gtk_widget_show(GTK_WIDGET(gui_slot->upper_vbox));
 	gui_slot->title = GTK_LABEL(gtk_label_new(""));
-	gtk_misc_set_alignment(GTK_MISC(gui_slot->title), 0.00, 0.00);
-	gtk_misc_set_padding (GTK_MISC(gui_slot->title), 0, 0);	
-	gtk_box_pack_start (GTK_BOX (gui_slot->upper_vbox), GTK_WIDGET(gui_slot->title), FALSE, FALSE, 0);
-	gtk_widget_show(GTK_WIDGET(gui_slot->title));	
+//	gtk_misc_set_alignment(GTK_MISC(gui_slot->title), 0.00, 0.00);
+//	gtk_misc_set_padding (GTK_MISC(gui_slot->title), 0, 0);	
+//	gtk_box_pack_start (GTK_BOX (gui_slot->upper_vbox), GTK_WIDGET(gui_slot->title), FALSE, FALSE, 0);
+//	gtk_widget_show(GTK_WIDGET(gui_slot->title));	
 	
 	gui_slot->timecode = GTK_LABEL(gtk_label_new(""));
 	gtk_misc_set_alignment(GTK_MISC(gui_slot->timecode), 0.0, 0.0);
@@ -7386,12 +7430,12 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
 			gtk_frame_set_shadow_type(info->selected_gui_slot->frame,GTK_SHADOW_ETCHED_IN);
 		}
 	}
-	gtk_widget_modify_fg ( info->selected_gui_slot->title,
-		GTK_STATE_NORMAL, &color );
+//	gtk_widget_modify_fg ( info->selected_gui_slot->title,
+//		GTK_STATE_NORMAL, &color );
 	gtk_widget_modify_fg ( info->selected_gui_slot->timecode,
 		GTK_STATE_NORMAL, &color );
-//	gtk_widget_modify_fg ( gtk_frame_get_label_widget( info->selected_gui_slot->frame ),
-//		GTK_STATE_NORMAL, &color );
+	gtk_widget_modify_fg ( gtk_frame_get_label_widget( info->selected_gui_slot->frame ),
+		GTK_STATE_NORMAL, &color );
 	
 }
 
@@ -7418,8 +7462,8 @@ static	void	set_selection_of_slot_in_samplebank(gboolean active)
 		color.red = 0;	
 		color.blue = 0;
 	}
-	gtk_widget_modify_fg ( info->selection_gui_slot->title,
-		GTK_STATE_NORMAL, &color );
+//	gtk_widget_modify_fg ( info->selection_gui_slot->title,
+//		GTK_STATE_NORMAL, &color );
 	gtk_widget_modify_fg ( info->selection_gui_slot->timecode,
 		GTK_STATE_NORMAL, &color );
 	gtk_widget_modify_fg ( gtk_frame_get_label_widget( info->selection_gui_slot->frame ),
@@ -7571,15 +7615,15 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 
 	if(gui_slot)
 	{
-		if(gui_slot->title)
-			gtk_label_set_text( GTK_LABEL( gui_slot->title ), slot->title );
+//		if(gui_slot->title)
+//			gtk_label_set_text( GTK_LABEL( gui_slot->title ), slot->title );
 		if(gui_slot->timecode)
 			gtk_label_set_text( GTK_LABEL( gui_slot->timecode ), slot->timecode );
 
 		if(sample_id > 0 )
 		{
 			gchar frame_title[20];
-			sprintf(frame_title, "%s-%d", (sample_type == 0 ? "Sample" : "Stream" ), sample_id);
+			sprintf(frame_title, "%s", slot->title );
 			gtk_frame_set_label( gui_slot->frame, frame_title );
 		}
 		else
