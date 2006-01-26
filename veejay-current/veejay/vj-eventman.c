@@ -798,7 +798,7 @@ void		vj_init_vevo_events(void)
 				"Change title of sample",
 				vj_event_sample_set_descr,
 				2,
-				VIMS_REQUIRE_ALL_PARAMS,
+				VIMS_REQUIRE_ALL_PARAMS |  VIMS_LONG_PARAMS,
 				SAMPLE_ID_HELP,
 				0,
 				"Title",

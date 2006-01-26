@@ -866,31 +866,27 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	gint nframes = info->uc.sample_rec_duration;
 	if(nframes <= 0)
 		return;
-	/*
+	
 	int br=0; int bw=0;
 	gchar *utftext = (gchar*) get_text( "entry_samplename"); 
-
-	if(!utftext)
-		return;
-
-	gchar *text = g_locale_from_utf8( utftext, -1, &br, &bw,NULL);	
-	if(!text || strlen(text) <= 1)
-		return;	
-
-	int i = 0;
-	while( text[i] != '\0' )
+	gchar *text = (utftext == NULL ? : g_locale_from_utf8( utftext, -1, &br, &bw,NULL));	
+	if(text != NULL)
 	{
-		if( !isalnum( text[i] ))
+		int i = 0;
+		while( text[i] != '\0' )
 		{
-			vj_msg(VEEJAY_MSG_ERROR, "Only alphanumeric characters allowed");	
-			if( text) free(text);
-			return;
-		}
-	} 
-
-	multi_vims( VIMS_SAMPLE_SET_DESCRIPTION, "%d %s", 0, text );
-	g_free(text);
-	*/
+			if( !isalnum( text[i] ))
+			{
+				vj_msg(VEEJAY_MSG_ERROR, "Only alphanumeric characters allowed");	
+				if( text) free(text);
+				return;
+			}
+			i++;
+		} 
+		multi_vims( VIMS_SAMPLE_SET_DESCRIPTION, "%d %s", 0, text );
+		g_free(text);
+	}
+	
 	if(format != NULL)
 	{
 		multi_vims( VIMS_RECORD_DATAFORMAT,"%s",

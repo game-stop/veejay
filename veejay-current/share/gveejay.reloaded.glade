@@ -2345,6 +2345,7 @@ YV16</property>
 
 					  <child>
 					    <widget class="GtkLabel" id="label705">
+					      <property name="visible">True</property>
 					      <property name="label" translatable="yes">Title:</property>
 					      <property name="use_underline">False</property>
 					      <property name="use_markup">False</property>
@@ -2369,6 +2370,7 @@ YV16</property>
 
 					  <child>
 					    <widget class="GtkEntry" id="entry_samplename">
+					      <property name="visible">True</property>
 					      <property name="can_focus">True</property>
 					      <property name="editable">True</property>
 					      <property name="visibility">True</property>
