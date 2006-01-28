@@ -303,7 +303,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 	si->effect_chain[i]->volume = 50;
 	si->effect_chain[i]->a_flag = 0;
 	si->effect_chain[i]->source_type = 0;
-	si->effect_chain[i]->channel = id;	/* with myself by default */
+	si->effect_chain[i]->channel = ( sample_size()-1 <= 0 ? si->sample_id : sample_size()-1);
 	/* effect parameters initially 0 */
 	for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++) {
 	    si->effect_chain[i]->arg[j] = 0;
@@ -1509,7 +1509,7 @@ int sample_chain_add(int s1, int c, int effect_nr)
     if(!sample_exists(s1)) s1 = s1 + 1;
 
 	if(sample->effect_chain[c]->channel <= 0)
-		sample->effect_chain[c]->channel = s1;
+		sample->effect_chain[c]->channel = sample_size()-1; // follow newest
     if(sample->effect_chain[c]->source_type < 0)
 		sample->effect_chain[c]->source_type = 0;
 
@@ -1615,7 +1615,7 @@ int sample_chain_clear(int s1)
 	sample->effect_chain[i]->volume = 0;
 	sample->effect_chain[i]->a_flag = 0;
 	sample->effect_chain[i]->source_type = 0;
-	sample->effect_chain[i]->channel = s1;
+	sample->effect_chain[i]->channel = s1; // myself
 	for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
 	    sample->effect_chain[i]->arg[j] = 0;
     }

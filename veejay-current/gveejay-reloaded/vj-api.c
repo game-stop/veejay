@@ -6176,7 +6176,9 @@ void 	vj_gui_init(char *glade_file)
 	memset( &info->watch, 0, sizeof(watchdog_t));
 	info->watch.state = STATE_STOPPED; //
 	memset(&(info->watch.p_time),0,sizeof(struct timeval));
-	info->is_alive = g_timeout_add(G_PRIORITY_HIGH_IDLE,is_alive, (gpointer*)info);
+//	info->is_alive = g_timeout_add(G_PRIORITY_HIGH_IDLE,is_alive, (gpointer*)info);
+
+	info->is_alive = g_timeout_add(G_PRIORITY_DEFAULT_IDLE,is_alive, (gpointer*)info);
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "veejay_connection" );
 	
 	gtk_widget_show( w );
@@ -6306,7 +6308,8 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	info->channel = g_io_channel_unix_new( vj_client_get_status_fd( info->client, V_STATUS));
 	g_io_add_watch_full(
 			info->channel,
-			G_PRIORITY_HIGH_IDLE,
+	//		G_PRIORITY_HIGH_IDLE,
+			G_PRIORITY_DEFAULT_IDLE,
 			G_IO_IN| G_IO_ERR | G_IO_NVAL | G_IO_HUP,
 			veejay_tick,
 			(gpointer*) info,

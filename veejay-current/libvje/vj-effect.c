@@ -372,6 +372,11 @@ void vj_effect_deactivate_all()
 void vj_effect_initialize(int width, int height)
 {
     int i = VJ_VIDEO_COUNT;
+    int k;
+
+    for(k=0; k  < MAX_EFFECTS; k++)
+	vj_effects[k] = NULL;
+
     vj_effects[0] = dummy_init(width,height);
     vj_effects[1] = overlaymagic_init( width,height );
     vj_effects[2] = lumamagick_init( width,height );

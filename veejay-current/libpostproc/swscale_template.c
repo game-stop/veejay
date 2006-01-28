@@ -758,7 +758,7 @@
 
 static inline void RENAME(yuv2yuvX)(SwsContext *c, int16_t *lumFilter, int16_t **lumSrc, int lumFilterSize,
 				    int16_t *chrFilter, int16_t **chrSrc, int chrFilterSize,
-				    uint8_t *dest, uint8_t *uDest, uint8_t *vDest, int dstW, int chrDstW)
+				    uint8_t *dest, uint8_t *uDest, uint8_t *vDest, long dstW, long chrDstW)
 {
 #ifdef HAVE_ASM_MMX
 	if(uDest != NULL)
@@ -766,14 +766,16 @@ static inline void RENAME(yuv2yuvX)(SwsContext *c, int16_t *lumFilter, int16_t *
 		asm volatile(
 				YSCALEYUV2YV12X(0, CHR_MMX_FILTER_OFFSET)
 				:: "r" (&c->redDither),
-				"r" (uDest), "m" ((long)chrDstW)
+//				"r" (uDest), "m" ((long)chrDstW)
+				"r" (uDest),  "p" (chrDstW)
 				: "%"REG_a, "%"REG_d, "%"REG_S
 			);
 
 		asm volatile(
 				YSCALEYUV2YV12X(4096, CHR_MMX_FILTER_OFFSET)
 				:: "r" (&c->redDither),
-				"r" (vDest), "m" ((long)chrDstW)
+//				"r" (vDest), "m" ((long)chrDstW)
+				"r" (vDest), "p" (chrDstW)
 				: "%"REG_a, "%"REG_d, "%"REG_S
 			);
 	}
@@ -781,7 +783,8 @@ static inline void RENAME(yuv2yuvX)(SwsContext *c, int16_t *lumFilter, int16_t *
 	asm volatile(
 			YSCALEYUV2YV12X(0, LUM_MMX_FILTER_OFFSET)
 			:: "r" (&c->redDither),
-			   "r" (dest), "m" ((long)dstW)
+//			   "r" (dest), "m" ((long)dstW)
+			"r" (dest), "p" (dstW)
 			: "%"REG_a, "%"REG_d, "%"REG_S
 		);
 #else
@@ -798,7 +801,7 @@ yuv2yuvXinC(lumFilter, lumSrc, lumFilterSize,
 }
 
 static inline void RENAME(yuv2yuv1)(int16_t *lumSrc, int16_t *chrSrc,
-				    uint8_t *dest, uint8_t *uDest, uint8_t *vDest, int dstW, int chrDstW)
+				    uint8_t *dest, uint8_t *uDest, uint8_t *vDest, long dstW, long chrDstW)
 {
 #ifdef HAVE_ASM_MMX
 	if(uDest != NULL)
@@ -806,14 +809,16 @@ static inline void RENAME(yuv2yuv1)(int16_t *lumSrc, int16_t *chrSrc,
 		asm volatile(
 				YSCALEYUV2YV121
 				:: "r" (chrSrc + chrDstW), "r" (uDest + chrDstW),
-				"g" ((long)-chrDstW)
+			//	"g" ((long)-chrDstW)
+				"g" (-chrDstW)
 				: "%"REG_a
 			);
 
 		asm volatile(
 				YSCALEYUV2YV121
 				:: "r" (chrSrc + 2048 + chrDstW), "r" (vDest + chrDstW),
-				"g" ((long)-chrDstW)
+			//	"g" ((long)-chrDstW)
+				"g" (-chrDstW)
 				: "%"REG_a
 			);
 	}
@@ -821,7 +826,8 @@ static inline void RENAME(yuv2yuv1)(int16_t *lumSrc, int16_t *chrSrc,
 	asm volatile(
 		YSCALEYUV2YV121
 		:: "r" (lumSrc + dstW), "r" (dest + dstW),
-		"g" ((long)-dstW)
+//		"g" ((long)-dstW)
+		"g" (-dstW)
 		: "%"REG_a
 	);
 #else
@@ -1481,7 +1487,7 @@ static inline void RENAME(yuv2packed1)(SwsContext *c, uint16_t *buf0, uint16_t *
 
 //FIXME yuy2* can read upto 7 samples to much
 
-static inline void RENAME(yuy2ToY)(uint8_t *dst, uint8_t *src, int width)
+static inline void RENAME(yuy2ToY)(uint8_t *dst, uint8_t *src, long width)
 {
 #ifdef HAVE_ASM_MMX
 	asm volatile(
@@ -1496,7 +1502,8 @@ static inline void RENAME(yuy2ToY)(uint8_t *dst, uint8_t *src, int width)
 		"movq %%mm0, (%2, %%"REG_a")	\n\t"
 		"add $8, %%"REG_a"		\n\t"
 		" js 1b				\n\t"
-		: : "g" ((long)-width), "r" (src+width*2), "r" (dst+width)
+//		: : "g" ((long)-width), "r" (src+width*2), "r" (dst+width)
+		: : "g" (-width), "r" (src+width*2), "r" (dst+width)
 		: "%"REG_a
 	);
 #else
@@ -1506,7 +1513,7 @@ static inline void RENAME(yuy2ToY)(uint8_t *dst, uint8_t *src, int width)
 #endif
 }
 
-static inline void RENAME(yuy2ToUV)(uint8_t *dstU, uint8_t *dstV, uint8_t *src1, uint8_t *src2, int width)
+static inline void RENAME(yuy2ToUV)(uint8_t *dstU, uint8_t *dstV, uint8_t *src1, uint8_t *src2, long width)
 {
 #if defined (HAVE_ASM_MMX2) || defined (HAVE_ASM_3DNOW)
 	asm volatile(
@@ -1531,7 +1538,11 @@ static inline void RENAME(yuy2ToUV)(uint8_t *dstU, uint8_t *dstV, uint8_t *src1,
 		"movd %%mm1, (%3, %%"REG_a")	\n\t"
 		"add $4, %%"REG_a"		\n\t"
 		" js 1b				\n\t"
-		: : "g" ((long)-width), "r" (src1+width*4), "r" (src2+width*4), "r" (dstU+width), "r" (dstV+width)
+//		: : "g" ((long)-width), "r" (src1+width*4), "r" (src2+width*4), "r" (dstU+width), "r" (dstV+width)
+		: : "g" (-width), "r" (src1+width*4), "r" (src2+width*4), "r" (dstU+width), "r" (dstV+width)
+
+
+
 		: "%"REG_a
 	);
 #else
@@ -1545,7 +1556,7 @@ static inline void RENAME(yuy2ToUV)(uint8_t *dstU, uint8_t *dstV, uint8_t *src1,
 }
 
 //this is allmost identical to the previous, end exists only cuz yuy2ToY/UV)(dst, src+1, ...) would have 100% unaligned accesses
-static inline void RENAME(uyvyToY)(uint8_t *dst, uint8_t *src, int width)
+static inline void RENAME(uyvyToY)(uint8_t *dst, uint8_t *src, long width)
 {
 #ifdef HAVE_AMS_MMX
 	asm volatile(
@@ -1559,7 +1570,8 @@ static inline void RENAME(uyvyToY)(uint8_t *dst, uint8_t *src, int width)
 		"movq %%mm0, (%2, %%"REG_a")	\n\t"
 		"add $8, %%"REG_a"		\n\t"
 		" js 1b				\n\t"
-		: : "g" ((long)-width), "r" (src+width*2), "r" (dst+width)
+	//	: : "g" ((long)-width), "r" (src+width*2), "r" (dst+width)
+		: : "g" (-width), "r" (src+width*2), "r" (dst+width)
 		: "%"REG_a
 	);
 #else
@@ -1569,7 +1581,7 @@ static inline void RENAME(uyvyToY)(uint8_t *dst, uint8_t *src, int width)
 #endif
 }
 
-static inline void RENAME(uyvyToUV)(uint8_t *dstU, uint8_t *dstV, uint8_t *src1, uint8_t *src2, int width)
+static inline void RENAME(uyvyToUV)(uint8_t *dstU, uint8_t *dstV, uint8_t *src1, uint8_t *src2, long width)
 {
 #if defined (HAVE_ASM_MMX2) || defined (HAVE_ASM_3DNOW)
 	asm volatile(
@@ -1594,7 +1606,9 @@ static inline void RENAME(uyvyToUV)(uint8_t *dstU, uint8_t *dstV, uint8_t *src1,
 		"movd %%mm1, (%3, %%"REG_a")	\n\t"
 		"add $4, %%"REG_a"		\n\t"
 		" js 1b				\n\t"
-		: : "g" ((long)-width), "r" (src1+width*4), "r" (src2+width*4), "r" (dstU+width), "r" (dstV+width)
+		//: : "g" ((long)-width), "r" (src1+width*4), "r" (src2+width*4), "r" (dstU+width), "r" (dstV+width)
+		: : "g" (-width), "r" (src1+width*4), "r" (src2+width*4), "r" (dstU+width), "r" (dstV+width)
+
 		: "%"REG_a
 	);
 #else
@@ -1646,7 +1660,7 @@ static inline void RENAME(bgr32ToUV)(uint8_t *dstU, uint8_t *dstV, uint8_t *src1
 #endif
 }
 
-static inline void RENAME(bgr24ToY)(uint8_t *dst, uint8_t *src, int width)
+static inline void RENAME(bgr24ToY)(uint8_t *dst, uint8_t *src, long width)
 {
 #ifdef HAVE_ASM_MMX
 	asm volatile(
@@ -1715,7 +1729,7 @@ static inline void RENAME(bgr24ToY)(uint8_t *dst, uint8_t *src, int width)
 		"movq %%mm0, (%1, %%"REG_a")	\n\t"
 		"add $8, %%"REG_a"		\n\t"
 		" js 1b				\n\t"
-		: : "r" (src+width*3), "r" (dst+width), "g" ((long)-width)
+		: : "r" (src+width*3), "r" (dst+width), "g" (-width)
 		: "%"REG_a, "%"REG_b
 	);
 #else
@@ -1731,7 +1745,7 @@ static inline void RENAME(bgr24ToY)(uint8_t *dst, uint8_t *src, int width)
 #endif
 }
 
-static inline void RENAME(bgr24ToUV)(uint8_t *dstU, uint8_t *dstV, uint8_t *src1, uint8_t *src2, int width)
+static inline void RENAME(bgr24ToUV)(uint8_t *dstU, uint8_t *dstV, uint8_t *src1, uint8_t *src2, long width)
 {
 #ifdef HAVE_ASM_MMX
 	asm volatile(
@@ -1880,7 +1894,7 @@ static inline void RENAME(bgr24ToUV)(uint8_t *dstU, uint8_t *dstV, uint8_t *src1
 		"movd %%mm0, (%3, %%"REG_a")	\n\t"
 		"add $4, %%"REG_a"		\n\t"
 		" js 1b				\n\t"
-		: : "r" (src1+width*6), "r" (src2+width*6), "r" (dstU+width), "r" (dstV+width), "g" ((long)-width)
+		: : "r" (src1+width*6), "r" (src2+width*6), "r" (dstU+width), "r" (dstV+width), "g" (-width)
 		: "%"REG_a, "%"REG_b
 	);
 #else
@@ -2033,7 +2047,7 @@ static inline void RENAME(rgb24ToUV)(uint8_t *dstU, uint8_t *dstV, uint8_t *src1
 
 // Bilinear / Bicubic scaling
 static inline void RENAME(hScale)(int16_t *dst, int dstW, uint8_t *src, int srcW, int xInc,
-				  int16_t *filter, int16_t *filterPos, int filterSize)
+				  int16_t *filter, int16_t *filterPos, long filterSize)
 {
 #ifdef HAVE_ASM_MMX
 	assert(filterSize % 4 == 0 && filterSize>0);
@@ -2170,7 +2184,7 @@ static inline void RENAME(hScale)(int16_t *dst, int dstW, uint8_t *src, int srcW
 
 			: "+r" (counter), "+r" (filter)
 			: "m" (filterPos), "m" (dst), "m"(src+filterSize),
-			  "m" (src), "r" ((long)filterSize*2)
+			  "m" (src), "r" (filterSize*2)
 			: "%"REG_b, "%"REG_a, "%"REG_c
 		);
 	}
