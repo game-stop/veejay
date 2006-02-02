@@ -1,0 +1,21 @@
+# Edit these colors and fonts however you like.
+style "default"
+{
+  xthickness = 1
+  ythickness = 1
+  GtkWidget::shadow_type = GTK_SHADOW_ETCHED_OUT
+  #GtkWidget::interior_focus = 0
+  #GtkWidget::focus_padding = 0
+  #GtkWidget::default_border         = {0, 0, 0, 0}
+  #GtkWidget::default_outside_border = {0, 0, 0, 0} 
+  GtkWidget::default_spacing        = 0
+  GtkScale::stepper_size = 8
+  GtkRange::through-width = 4
+  GtkRange::trough_border = 0
+  GtkRange::slider-width = 16
+  GtkScale::slider-length = 10
+  font_name = "Sans 8"
+}
+
+
+class "GtkWidget" style "default"
