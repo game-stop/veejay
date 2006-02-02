@@ -1769,7 +1769,7 @@ void		vj_init_vevo_events(void)
 				NULL,
 				VIMS_BUNDLE_CAPTURE,
 				"Capture Effect Chain to a new Bundle",
-				vj_event_bundled_msg_add,
+				vj_event_quick_bundle,
 				0,
 				VIMS_ALLOW_ANY,
 				NULL );

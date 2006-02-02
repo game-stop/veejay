@@ -2254,65 +2254,58 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 		}
 	}
 
-	if(len > 0)
-	{
-		char *buf = _s_print_buf;
-		bzero(buf, SEND_BUF);
-		sprintf(buf, "%05d", len ); 
-		int rc  = 0;
-		for ( i = 0; i < MAX_SDL_KEY; i ++ )
-		{
-			if( keyboard_event_exists(i))
-			{
-				vj_keyboard_event *ev = get_keyboard_event(i);
-				if( ev )
-				{
-					int id = ev->vims->list_id;
-					int arg_len = (ev->arguments == NULL ? 0 : strlen(ev->arguments));
-					char tmp[token_len];
-					bzero(tmp,token_len); 
-					sprintf(tmp, "%04d%03d%03d%04d", id, ev->key_symbol, ev->key_mod, arg_len );
-					strncat(buf,tmp,token_len);
-					if( arg_len > 0 )
-					{
-						strncat( buf, ev->arguments, arg_len );
-					}
-					rc += arg_len;
-					rc += strlen(tmp);
+	char *buf = _s_print_buf;
+	bzero(buf, SEND_BUF);
+	sprintf(buf, "%05d", len ); 
+	int rc  = 0;
 
+	for ( i = 0; i < MAX_SDL_KEY; i ++ )
+	{
+		if( keyboard_event_exists(i))
+		{
+			vj_keyboard_event *ev = get_keyboard_event(i);
+			if( ev )
+			{
+				int id = ev->vims->list_id;
+				int arg_len = (ev->arguments == NULL ? 0 : strlen(ev->arguments));
+				char tmp[16];
+				bzero(tmp,16); 
+				sprintf(tmp, "%04d%03d%03d%04d", id, ev->key_symbol, ev->key_mod, arg_len );
+				strncat(buf,tmp,16);
+				if( arg_len > 0 )
+				{
+					strncat( buf, ev->arguments, arg_len );
 				}
+				rc += arg_len;
+				rc += strlen(tmp);
+
 			}
 		}
-
-		for( i = VIMS_BUNDLE_START; i < VIMS_BUNDLE_END; i ++ )
-		{
-			if( vj_event_bundle_exists(i))
-			{
-				m = vj_event_bundle_get( i );
-				if(m)
-				{
-					int key_id = 0;
-					int key_mod = 0;
-					int bun_len = strlen(m->bundle);	
-					char tmp[token_len];
-					bzero(tmp,token_len);
-					vj_event_get_key( i, &key_id, &key_mod );
-	
-					sprintf(tmp, "%04d%03d%03d%04d",
-						i,key_id,key_mod, bun_len );
-
-					strncat( buf, tmp, strlen(tmp) );
-					strncat( buf, m->bundle, bun_len );
-				}
-			}
-		}
-		SEND_MSG(v,buf);
-	}	
-	else
-	{
-		char *buf = "00000";
-		SEND_MSG(v,buf);
 	}
+
+	for( i = VIMS_BUNDLE_START; i < VIMS_BUNDLE_END; i ++ )
+	{
+		if( vj_event_bundle_exists(i))
+		{
+			m = vj_event_bundle_get( i );
+			if(m)
+			{
+				int key_id = 0;
+				int key_mod = 0;
+				int bun_len = strlen(m->bundle);	
+				char tmp[16];
+				bzero(tmp,16);
+				vj_event_get_key( i, &key_id, &key_mod );
+
+				sprintf(tmp, "%04d%03d%03d%04d",
+					i,key_id,key_mod, bun_len );
+
+				strncat( buf, tmp, strlen(tmp) );
+				strncat( buf, m->bundle, bun_len );
+			}
+		}
+	}
+	SEND_MSG(v,buf);
 }
 
 void	vj_event_send_vimslist(void *ptr, const char format[], va_list ap)
@@ -5219,21 +5212,13 @@ void vj_event_chain_arg_inc(void *ptr, const char format[], va_list ap)
 			else
 				if( tval < vj_effect_get_min_limit( effect,args[0] ) )
 					tval = vj_effect_get_max_limit( effect,args[0] );
-					
-		   if( vj_effect_valid_value( effect, args[0],tval ) )
-		   {
-			if(sample_set_effect_arg( v->uc->sample_id, c,args[0],(val+args[1]))!=-1 )
+			if(sample_set_effect_arg( v->uc->sample_id, c,args[0],tval)!=-1 )
 			{
-				veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0],(val+args[1]));
+				veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0],tval);
 			}
-		   }
-		   if(sample_set_effect_arg( v->uc->sample_id, c,args[0],tval) )
-		   {
-			veejay_msg(VEEJAY_MSG_INFO,"Set parameter %d value %d",args[0],tval);
-		   }
-				
 		}
 	}
+
 	if(STREAM_PLAYING(v)) 
 	{
 		int c = vj_tag_get_selected_entry(v->uc->sample_id);
@@ -6271,7 +6256,7 @@ void vj_event_effect_inc(void *ptr, const char format[], va_list ap)
 		return;
 	}
 	v->uc->key_effect += args[0];
-	if(v->uc->key_effect >= MAX_EFFECTS) v->uc->key_effect = 1;
+	if(v->uc->key_effect >= vj_effect_max_effects()) v->uc->key_effect = 1;
 
 	real_id = vj_effect_get_real_id(v->uc->key_effect);
 
@@ -6295,7 +6280,7 @@ void vj_event_effect_dec(void *ptr, const char format[], va_list ap)
 	}
 
 	v->uc->key_effect -= args[0];
-	if(v->uc->key_effect <= 0) v->uc->key_effect = MAX_EFFECTS-1;
+	if(v->uc->key_effect <= 0) v->uc->key_effect = vj_effect_max_effects()-1;
 	
 	real_id = vj_effect_get_real_id(v->uc->key_effect);
 	veejay_msg(VEEJAY_MSG_INFO, "Selected %s Effect %s (%d)",
@@ -7471,33 +7456,33 @@ void	vj_event_mcast_stop				(	void *ptr,	const char format[],	va_list ap )
 
 void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)
 {
-	int i;
 	veejay_t *v = (veejay_t*)ptr;
-	char line[300];   
-	char fline[300];
-	bzero( _print_buf, SEND_BUF);
-	bzero( _s_print_buf,SEND_BUF);
+	int i;
+	char *priv_msg = NULL;
+	int   len = 0;
 
-	for(i=1; i < MAX_EFFECTS; i++)
+	for( i = 1; i < vj_effect_max_effects(); i ++ )
+		len += vj_effect_get_summary_len( i );
+
+	priv_msg = (char*) malloc(sizeof(char) * (5 + len + 1000));
+	memset(priv_msg, 0, (5+len+100));
+	sprintf(priv_msg, "%05d", len );
+
+	for(i=1; i < vj_effect_max_effects(); i++)
 	{
+		char line[300];
+		char fline[300];
 		int effect_id = vj_effect_get_real_id(i);
 		bzero(line, 300);
-		if(effect_id > 0 && vj_effect_get_summary(i,line)==1)
+		bzero(fline,300);
+		if(vj_effect_get_summary(i,line))
 		{
-			sprintf(fline, "%03d%s",strlen(line),line);
-			strcat( _print_buf, fline );
-
+			sprintf(fline, "%03d%s", strlen(line), line );
+			strncat( priv_msg, fline, strlen(fline) );
 		}
-		else
-		{
-			fprintf(stderr, "no matching effect for %d\n",i);	
-			fprintf(stderr, "get summary returns with %d",
-				vj_effect_get_summary(i,line));
-		}
-	}	
-	sprintf( _s_print_buf, "%05d%s",strlen(_print_buf), _print_buf);
-
-	SEND_MSG(v,_s_print_buf);
+	}
+	SEND_MSG(v,priv_msg);
+	free(priv_msg);
 }
 
 

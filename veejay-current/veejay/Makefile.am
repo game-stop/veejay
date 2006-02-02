@@ -16,7 +16,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/liblavjpeg \
 		-I$(top_srcdir)/libsamplerec \
 		-I$(top_srcdir)/libvevo \
-		$(FFMPEG_CFLAGS) \
+		$(FFMPEG_CFLAGS)\
 		$(AVIPLAY_CFLAGS) ${XML_CFLAGS} ${GTK_CFLAGS} ${DV_FLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} \
 		$(DIRECTFB_CFLAGS) ${SDL_CFLAGS} ${JPEG_CFLAGS} ${PTHREAD_CFLAGS} ${SAMPLERATE_CFLAGS} 
 

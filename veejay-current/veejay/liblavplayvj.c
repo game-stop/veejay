@@ -827,14 +827,9 @@ static int veejay_screen_update(veejay_t * info )
 		info->uc->hackme = 0;
 
 #ifdef USE_GDK_PIXBUF
-		if(vj_picture_save( info->settings->export_image, frame, 
+		if(!vj_picture_save( info->settings->export_image, frame, 
 				info->video_output_width, info->video_output_height,
 				info->current_edit_list->pixel_format ) )
-		{
-			veejay_msg(VEEJAY_MSG_INFO,
-				"Saved frame %ld to image as '%s'", info->settings->current_frame_num, vj_picture_get_filename( info->settings->export_image ) );
-		}
-		else
 		{
 			veejay_msg(VEEJAY_MSG_ERROR,
 				"Unable to write frame %ld to image as '%s'",
@@ -1648,7 +1643,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	}
 
   	veejay_msg(VEEJAY_MSG_INFO, 
-		"Initialized %d Image- and Video Effects", MAX_EFFECTS);
+		"Initialized %d Image- and Video Effects", vj_effect_max_effects());
     	vj_effect_initialize(info->current_edit_list->video_width, info->current_edit_list->video_height);
    
 	info->plugin_frame = vj_perform_init_plugin_frame(info);

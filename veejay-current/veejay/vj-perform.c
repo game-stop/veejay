@@ -1855,6 +1855,7 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry, co
     	frames[0]->data[0] = primary_buffer[0]->Y;
    	frames[0]->data[1] = primary_buffer[0]->Cb;
     	frames[0]->data[2] = primary_buffer[0]->Cr;
+	frames[0]->format  = info->pixel_format;
 	vjp_kf *setup;
     	setup = info->effect_info;
     	setup->ref = info->uc->sample_id;
@@ -1883,7 +1884,7 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry, co
 			 	frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 		frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
-
+				frames[1]->format = info->pixel_format;
 				// sample B
 	   			if(sub_mode)
 					chroma_supersample(
@@ -1946,6 +1947,7 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry, const 
     	frames[0]->data[0] = primary_buffer[0]->Y;
    	frames[0]->data[1] = primary_buffer[0]->Cb;
     	frames[0]->data[2] = primary_buffer[0]->Cr;
+	frames[0]->format  = info->pixel_format;
 	vjp_kf *setup;
     	setup = info->effect_info;
     	setup->ref = info->uc->sample_id;
@@ -1972,7 +1974,7 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry, const 
 			 	frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 		frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
-
+				frames[1]->format = info->pixel_format;
 				// sample B
 	   			if(sub_mode)
 					chroma_supersample(
