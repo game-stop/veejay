@@ -89,8 +89,7 @@ int main(int argc, char *argv[]) {
 
         if( err ) usage(argv[0]);
 
-	if(gveejay_theme)
-		vj_gui_theme_setup();
+	vj_gui_theme_setup(gveejay_theme);
 
 	gtk_init(&argc, &argv);
 
@@ -101,8 +100,7 @@ int main(int argc, char *argv[]) {
 
 	vj_gui_init("gveejay.glade");
 
-	if(gveejay_theme)
-		vj_gui_style_setup();
+	vj_gui_style_setup();
 
         gtk_main();
 

@@ -4761,11 +4761,14 @@ void	vj_gui_style_setup()
 	vj_init_style( "gveejaytext", "Monospace, 8");
 }
 
-void	vj_gui_theme_setup()
+void	vj_gui_theme_setup(int theme)
 {
 	char path[MAX_PATH_LEN];
-	bzero(path,MAX_PATH_LEN);
-	get_gd(path,NULL, "gveejay.rc");
+	bzero(path,MAX_PATH_LEN);	
+	if(theme)
+		get_gd(path,NULL, "gveejay.rc");
+	else
+		get_gd(path,NULL, "gveejay-default.rc");
 	gtk_rc_parse(path);
 }
 
