@@ -24,6 +24,12 @@
 		* Livido (pending)
  */
 
+/*
+     inspired by http://onsight.id.gu.se/~gabor/
+                 http://www.gephex.org/
+
+ */
+
 #include <string.h>
 #include <dirent.h>
 #include <fcntl.h>
