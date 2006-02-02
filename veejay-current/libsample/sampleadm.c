@@ -1443,25 +1443,12 @@ int sample_chain_add(int s1, int c, int effect_nr)
 		return -1;
     if (c < 0 || c >= SAMPLE_MAX_EFFECTS)
 		return -1;
-	
+
 	if ( effect_nr < VJ_IMAGE_EFFECT_MIN ) return -1;
 
 	if ( effect_nr > VJ_IMAGE_EFFECT_MAX && effect_nr < VJ_VIDEO_EFFECT_MIN )
 		return -1;
 
-	if ( effect_nr > VJ_VIDEO_EFFECT_MAX )
-		return -1;	
-	
-/*
-    if(sample->effect_chain[c]->effect_id != -1 &&
-		sample->effect_chain[c]->effect_id != effect_nr &&
-	  vj_effect_initialized( sample->effect_chain[c]->effect_id ))
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Effect %s must be freed??", vj_effect_get_description(
-			sample->effect_chain[c]->effect_id));
-		vj_effect_deactivate( sample->effect_chain[c]->effect_id );
-	}
-*/
     if( sample->effect_chain[c]->effect_id != -1 && sample->effect_chain[c]->effect_id != effect_nr )
     {
 	//verify if the effect should be discarded
@@ -1484,7 +1471,11 @@ int sample_chain_add(int s1, int c, int effect_nr)
     {
 	veejay_msg(VEEJAY_MSG_DEBUG, "Effect %s must be initialized now",
 		vj_effect_get_description(effect_nr));
-	if(!vj_effect_activate( effect_nr ))	return -1;
+	if(!vj_effect_activate( effect_nr )) 
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cant activate %d", effect_nr);
+		return -1;
+	}
     }
 
     sample->effect_chain[c]->effect_id = effect_nr;
@@ -1516,6 +1507,7 @@ int sample_chain_add(int s1, int c, int effect_nr)
         veejay_msg(VEEJAY_MSG_DEBUG,"Effect %s on entry %d overlaying with sample %d",
 			vj_effect_get_description(sample->effect_chain[c]->effect_id),c,sample->effect_chain[c]->channel);
     }
+veejay_msg(VEEJAY_MSG_DEBUG, "Added FX");
     sample_update(sample,s1);
 
     return c;			/* return position on which it was added */
