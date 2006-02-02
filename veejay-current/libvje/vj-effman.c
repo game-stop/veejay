@@ -27,6 +27,19 @@
 #include <libvje/internal.h>
 extern vj_effect *vj_effects[]; 
 
+void vj_effman_apply_ff_effect(
+	VJFrame **frames,
+	VJFrameInfo *frameinfo,
+	vjp_kf *todo_info,
+	int *arg,
+	int entry,
+	int fx_id)
+
+{
+	plug_control( entry - MAX_EFFECTS, arg );
+	
+	plug_process( frames[0],frames[1], entry - MAX_EFFECTS, frames[0]->format );
+}
 
 void vj_effman_apply_image_effect(
 	VJFrame **frames,
@@ -546,7 +559,7 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 {
 	int entry = vj_effect_real_to_sequence( selector );
 	int n_a   = vj_effect_get_num_params( selector );
-	//if( n_a != num_args ) return VJE_INVALID_ARGS;
+
 	if( !frames || !frames[0] ) return VJE_NO_FRAMES;
 
 	if(!vj_effect_initialized(selector))
@@ -554,13 +567,14 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 		return VJE_NEED_INIT;
 	}
 
-	if( selector > 200 )	
-	{
-		vj_effman_apply_video_effect(frames,frameinfo,kf,arguments, entry,selector);
-	}
+	if( selector >= 500 )
+		vj_effman_apply_ff_effect( frames, frameinfo, kf, arguments, entry, selector );
 	else
-	{
-		vj_effman_apply_image_effect( frames, frameinfo, kf, arguments,entry, selector);
+	{		
+		if( selector > 200 )	
+			vj_effman_apply_video_effect(frames,frameinfo,kf,arguments, entry,selector);
+		else
+			vj_effman_apply_image_effect( frames, frameinfo, kf, arguments,entry, selector);
 	}
 	return VJE_SUCCESS;
 }

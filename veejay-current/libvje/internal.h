@@ -209,7 +209,7 @@ enum {
 #endif
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
-
+#define	VJ_EXT_EFFECT	500
 
 /* luma blend types */
 enum {

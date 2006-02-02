@@ -142,6 +142,9 @@
 #include "effects/videowall.h"
 #include "effects/flare.h"
 #include "effects/constantblend.h"
+
+#include	"plugload.h"
+
 #ifdef USE_SWSCALER
 #include "effects/picinpic.h"
 #endif
@@ -213,12 +216,13 @@ static struct
 	{	NULL,			NULL,				0		     },
 };
 
-vj_effect *vj_effects[MAX_EFFECTS];
+vj_effect *vj_effects[FX_LIMIT];
+int vj_effect_ready[FX_LIMIT];
 
-int vj_effect_ready[MAX_EFFECTS];
-int max_width = 0;
-int max_height =0;
+static int max_width = 0;
+static int max_height =0;
 
+static	int	n_ext_plugs_ = 0;
 
 int	rgb_parameter_conversion_type_ = 0;
 
@@ -244,6 +248,8 @@ static int _get_complex_effect( int effect_id)
 
 static int _no_mem_required(int effect_id)
 {
+	if( effect_id >= VJ_EXT_EFFECT )
+		return 0;
 	if( _get_simple_effect(effect_id) == -1 && _get_complex_effect(effect_id) == -1 )
 		return 1;
 	return 0;
@@ -251,15 +257,26 @@ static int _no_mem_required(int effect_id)
 
 int vj_effect_initialized(int effect_id)
 {
-
+ 
 	int seq = vj_effect_real_to_sequence(effect_id);
 	if( seq < 0 )
-	{
 		return 0;
-	}
 	if( _no_mem_required(effect_id) || vj_effect_ready[seq] == 1 )
 		return 1;
 
+	return 0;
+}
+
+int	vj_effect_activate_ext( int fx_id )
+{
+	if( fx_id > (MAX_EFFECTS + n_ext_plugs_) )
+		return 0;
+	int res = plug_activate( fx_id - MAX_EFFECTS );
+	if(res)
+	{
+		vj_effect_ready[fx_id] = 1;
+		return 1;
+	}
 	return 0;
 }
 
@@ -267,10 +284,12 @@ int vj_effect_initialized(int effect_id)
 int vj_effect_activate(int effect_id)
 {
 	int seq = vj_effect_real_to_sequence(effect_id);
-	if(seq < 0 || seq >= MAX_EFFECTS)
-	{
+
+	if( seq < 0 || seq > (MAX_EFFECTS + n_ext_plugs_ ))
 		return 0;
-	}
+
+	if(seq >= MAX_EFFECTS && seq < (MAX_EFFECTS + n_ext_plugs_))
+		return vj_effect_activate_ext(seq);
 
 	if( _no_mem_required(effect_id) )
 		return 1;
@@ -323,35 +342,44 @@ int vj_effect_activate(int effect_id)
 int vj_effect_deactivate(int effect_id)
 {
 	int seq = vj_effect_real_to_sequence(effect_id);
+
 	if(seq < 0 || seq >= MAX_EFFECTS)
-	{
-		return 0;
-	}
+		if( seq > n_ext_plugs_ + MAX_EFFECTS) return 0;
+
 	if( vj_effect_ready[seq] == 0 )
 	{
 		return 1;
 	}
 	if( vj_effect_ready[seq] == 1 )
 	{
-		int index = _get_simple_effect(effect_id);
-		if(index==-1)
+		if( seq >= MAX_EFFECTS && seq < (n_ext_plugs_ + MAX_EFFECTS))
 		{
-			index = _get_complex_effect(effect_id);
-			if(index == -1)
-			{
-				return 0;
-			}
-			complex_effect_index[index].free( vj_effects[seq]->user_data );
+			plug_deactivate( seq - MAX_EFFECTS );
 			vj_effect_ready[seq] = 0;
-			veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated complex effect %s",
+			return 1;
+		}
+		else
+		{
+			int index = _get_simple_effect(effect_id);
+			if(index==-1)
+			{
+				index = _get_complex_effect(effect_id);
+				if(index == -1)
+				{
+					return 0;
+				}
+				complex_effect_index[index].free( vj_effects[seq]->user_data );
+				vj_effect_ready[seq] = 0;
+				veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated complex effect %s",
+					vj_effects[seq]->description);
+				return 1;
+			}
+			simple_effect_index[index].free(  );
+			vj_effect_ready[seq] = 0;
+			veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated simple effect %s",
 				vj_effects[seq]->description);
 			return 1;
 		}
-		simple_effect_index[index].free(  );
-		vj_effect_ready[seq] = 0;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated simple effect %s",
-			vj_effects[seq]->description);
-		return 1;
 	}
 	return 0;
 }
@@ -359,7 +387,7 @@ int vj_effect_deactivate(int effect_id)
 void vj_effect_deactivate_all()
 {
 	int i;
-	for(i = 0 ; i < MAX_EFFECTS; i++)
+	for(i = 0 ; i < MAX_EFFECTS + n_ext_plugs_; i++)
 	{
 		int effect_id = vj_effect_get_real_id( i );
 		if( effect_id > 100)
@@ -373,6 +401,12 @@ void vj_effect_initialize(int width, int height)
 {
     int i = VJ_VIDEO_COUNT;
     int k;
+
+
+    n_ext_plugs_ = plug_detect_plugins();
+
+    if( n_ext_plugs_  > 0 )
+	plug_init( width,height );
 
     for(k=0; k  < MAX_EFFECTS; k++)
 	vj_effects[k] = NULL;
@@ -503,7 +537,7 @@ void vj_effect_initialize(int width, int height)
 	max_width = width;
 	max_height = height;
 
-    for(i=0; i  < MAX_EFFECTS; i++)
+        for(i=0; i  < MAX_EFFECTS; i++)
 	{
 		if(vj_effects[i])
 		{
@@ -516,6 +550,14 @@ void vj_effect_initialize(int width, int height)
 		}
 	}
 
+// 	initialize ff 
+	int p = 0;
+	int p_stop = MAX_EFFECTS + n_ext_plugs_;
+	for( p = MAX_EFFECTS; p < p_stop; p ++ )
+	{
+		vj_effects[p] = plug_get_plugin( (p-MAX_EFFECTS) );
+	}
+	veejay_msg(VEEJAY_MSG_INFO, "Found %d effects", p_stop ); 
 }
 
 void vj_effect_free(vj_effect *ve) {
@@ -535,7 +577,11 @@ void vj_effect_shutdown() {
 	 vj_effect_free(vj_effects[i]);
 	}
     }
+    int p_stop = n_ext_plugs_ + MAX_EFFECTS;
+    for( i = MAX_EFFECTS; i < p_stop; i ++ )
+	vj_effect_free( vj_effects[i] );
 
+    plug_free();
 	
 }
 
@@ -547,42 +593,45 @@ void vj_effect_dump() {
 	veejay_msg(VEEJAY_MSG_INFO, "Use the channel/source commands to select another sample/stream");
 	veejay_msg(VEEJAY_MSG_INFO, "to mix with.");
 	veejay_msg(VEEJAY_MSG_INFO, "\n [effect num] [effect name] [arg 0 , min/max ] [ arg 1, min/max ] ...");
-	for(i=0; i < MAX_EFFECTS; i++) 
+	for(i=0; i < vj_effect_max_effects(); i++) 
 	{
 		if(vj_effects[i])
 		{
 			printf("\t%d\t\t\t%s\t\t", vj_effect_get_real_id(i), vj_effects[i]->description);
-		
-		
-		if(vj_effects[i]->num_params > 0)
-		{
-			int j=0;
-			for(j=0; j < vj_effects[i]->num_params; j++)
+			if(vj_effects[i]->num_params > 0)
 			{
-				printf("\n\t\t\t\t\t\t\t%d\t%d - %d\n", j, vj_effects[i]->limits[0][j],vj_effects[i]->limits[1][j]);
+				int j=0;
+				for(j=0; j < vj_effects[i]->num_params; j++)
+					printf("\n\t\t\t\t\t\t\t%d\t%d - %d\n", j, vj_effects[i]->limits[0][j],vj_effects[i]->limits[1][j]);
 			}
-		}
-		else
-		{
-			printf("\n");
-		}
+			else
+				printf("\n");
 		}
 
 	}
-
 }
 
 /* figure out the position in the array, returns index of vj_effects array given an effect ID */
 int vj_effect_real_to_sequence(int effect_id)
 {
-    if (effect_id > VJ_IMAGE_EFFECT_MIN && effect_id < VJ_IMAGE_EFFECT_MAX) {
-	effect_id -= VJ_IMAGE_EFFECT_MIN;
-	effect_id += VJ_VIDEO_COUNT;
+    if( effect_id >= VJ_EXT_EFFECT )
+    {
+	int n = effect_id;
+	effect_id -= VJ_EXT_EFFECT;
+	effect_id += MAX_EFFECTS;
 	return effect_id;
-    } else if (effect_id > VJ_VIDEO_EFFECT_MIN &&
+    }
+    else
+    {
+	if (effect_id > VJ_IMAGE_EFFECT_MIN && effect_id < VJ_IMAGE_EFFECT_MAX) {
+		effect_id -= VJ_IMAGE_EFFECT_MIN;
+		effect_id += VJ_VIDEO_COUNT;
+		return effect_id;
+	} else if (effect_id > VJ_VIDEO_EFFECT_MIN &&
 	       effect_id < VJ_VIDEO_EFFECT_MAX) {
-	effect_id -= VJ_VIDEO_EFFECT_MIN;
-	return effect_id;
+			effect_id -= VJ_VIDEO_EFFECT_MIN;
+			return effect_id;
+    		}
     }
     return -1;
 }
@@ -590,15 +639,30 @@ int vj_effect_real_to_sequence(int effect_id)
 
 int vj_effect_get_real_id(int effect_id)
 {
-    if (effect_id > 0 && effect_id < VJ_VIDEO_COUNT) {	/* video effect */
-	effect_id += VJ_VIDEO_EFFECT_MIN;
-	return effect_id;
-    } else if (effect_id >= VJ_VIDEO_COUNT) {	/* image effect */
-	effect_id -= VJ_VIDEO_COUNT;	/* substract video count */
-	effect_id += VJ_IMAGE_EFFECT_MIN;
-	return effect_id;
-    }
-    return 0;
+	if (effect_id > 0 && effect_id < VJ_VIDEO_COUNT)
+	{	/* video effect */
+		effect_id += VJ_VIDEO_EFFECT_MIN;
+		return effect_id;
+	}
+	else
+	{
+		if (effect_id >= VJ_VIDEO_COUNT && effect_id < MAX_EFFECTS)
+		{	/* image effect */
+			effect_id -= VJ_VIDEO_COUNT;	/* substract video count */
+			effect_id += VJ_IMAGE_EFFECT_MIN;
+			return effect_id;
+    		}
+    		else 
+		{
+			if( effect_id >= MAX_EFFECTS && effect_id <= vj_effect_max_effects())
+			{
+				effect_id -= MAX_EFFECTS;
+				effect_id += VJ_EXT_EFFECT;
+				return effect_id;
+			}
+		}
+	}
+	return 0;
 }
 
 int	vj_effect_get_by_name(char *name)
@@ -606,7 +670,7 @@ int	vj_effect_get_by_name(char *name)
 	int i;
 	if(!name) return 0;
 
-	for ( i = 0; i < MAX_EFFECTS ; i ++ )
+	for ( i = 0; i < vj_effect_max_effects(); i ++ )
 	{
 		if( vj_effects[i]->description )
 		{
@@ -614,6 +678,7 @@ int	vj_effect_get_by_name(char *name)
 			  return (int) vj_effect_get_real_id( i );
 		}
 	}
+
 	return 0;
 }
 
@@ -707,6 +772,23 @@ int vj_effect_get_help(int entry)
 	return 0;
 }
 
+int vj_effect_get_summary_len(int entry)
+{
+	if( !vj_effects[entry] )
+		return 0;
+
+	int p = vj_effects[entry]->num_params;
+	int len = strlen( vj_effects[entry]->description );
+	len += 3;
+	len += 3;
+	len += 1;
+	len += 1;
+	len += 2;
+	len += 3;
+	len += ( p * 18 );
+	return len;
+}
+
 int vj_effect_get_summary(int entry, char *dst)
 {
 	int p = vj_effects[entry]->num_params;
@@ -715,7 +797,7 @@ int vj_effect_get_summary(int entry, char *dst)
 
 	if(!vj_effects[entry])
 		return 0;
-	
+
 	sprintf(dst,"%03d%s%03d%1d%1d%02d",
 		strlen( vj_effects[entry]->description),
 		vj_effects[entry]->description,
@@ -736,6 +818,11 @@ int vj_effect_get_summary(int entry, char *dst)
 		strncat( dst, tmp,strlen(tmp) );
 	}
 	return 1;
+}
+
+int	vj_effect_max_effects()
+{
+	return MAX_EFFECTS + n_ext_plugs_;
 }
 
 int vj_effect_get_subformat(int effect_id)
@@ -817,11 +904,11 @@ int	vj_effect_has_rgbkey(int effect_id)
 
 int vj_effect_is_valid(int effect_id)
 {
-    if (effect_id > VJ_IMAGE_EFFECT_MIN && effect_id < VJ_IMAGE_EFFECT_MAX) {
-	return 1;
-    } else if (effect_id > VJ_VIDEO_EFFECT_MIN
-	       && effect_id < VJ_VIDEO_EFFECT_MAX) {
-	return 1;
-    }
-    return 0;
+	if( effect_id >= VJ_EXT_EFFECT && effect_id < VJ_EXT_EFFECT + n_ext_plugs_)
+		return 1;
+	if( effect_id > VJ_IMAGE_EFFECT_MIN && effect_id < VJ_IMAGE_EFFECT_MAX )
+		return 1;
+	if( effect_id > VJ_VIDEO_EFFECT_MIN && effect_id < VJ_VIDEO_EFFECT_MAX )
+		return 1;
+	return 0;
 }

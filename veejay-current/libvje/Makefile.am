@@ -1,11 +1,11 @@
 # Makefile for veejay
 
-INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg 
+INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg ${FFMPEG_CFLAGS} $(GLIB_CFLAGS)  
 
 VJE_LIB_FILE = libvje.la
 noinst_LTLIBRARIES = $(VJE_LIB_FILE)
 
-libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
+libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			effects/diff.c effects/fibdownscale.c effects/killchroma.c \
 			effects/lumamagick.c\
 		        effects/mirrors.c effects/negation.c effects/overclock.c effects/dissolve.c effects/opacity.c effects/posterize.c \

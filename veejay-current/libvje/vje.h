@@ -25,6 +25,8 @@
 #include <string.h>
 #include <libvjmem/vjmem.h>
 
+#define FX_LIMIT	1024
+
 #ifdef USE_SWSCALER
 #define MAX_EFFECTS 117
 #else
