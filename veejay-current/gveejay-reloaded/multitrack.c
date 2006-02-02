@@ -1332,7 +1332,7 @@ void 	*mt_preview( gpointer user_data )
 		int ref = find_sequence( a );
 
 
-		if( mt->sensitive )
+		if( mt->sensitive && lt->preview )
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
 			mt_priv_t *p = a->pt[i];

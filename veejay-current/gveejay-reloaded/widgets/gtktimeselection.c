@@ -346,6 +346,12 @@ static	void	timeline_class_init( TimelineSelectionClass *class )
 
 }
 
+static	int	default_theme_ = 1;
+
+void	timeline_theme_colors( int inverse )
+{
+	default_theme_ = inverse;
+}
 
 static	void	timeline_init( TimelineSelection *te )
 {
@@ -361,7 +367,7 @@ static	void	timeline_init( TimelineSelection *te )
 	te->grab_button = 0;
 	te->has_stepper = TRUE;
 	te->has_selection = FALSE;
-	te->stepper_size = 8; // 8 x 8 pixels
+	te->stepper_size = 10; // 8 x 8 pixels
 	te->stepper_length = 0;
 	te->frame_height = 8;
 	te->font_line = 10;	
@@ -741,7 +747,8 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 			sprintf(text, "%d",  (gint)te->frame_num );
 			cairo_text_path( cr, text );
 			cairo_set_font_size( cr, 0.2 );
-			cairo_set_source_rgba( cr, 1.0,1.0,1.0,0.7 );
+			double v = ( default_theme_  ? 1.0 : 0.0 );
+			cairo_set_source_rgba( cr, v,v,v,0.7 );
 			cairo_fill(cr);	
 		}
 	//	cairo_rectangle_round(cr, x1, 0.1 * height , frame_width, 0.2 * height, 10 );
@@ -752,12 +759,13 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 	{
 		gdouble in = te->in * width;
 		gdouble out = te->out * width;
-
+		gdouble v = (default_theme_ ? 1.0: 0.0);
+			
 		/* If user is editing in_point */
 		if( te->grab_button == 1 && te->current_location != MOUSE_STEPPER )
 		{
 			gdouble f = te->in * te->num_video_frames;
-			cairo_set_source_rgba( cr, 0.0, 1.0,1.0,0.3 );
+			cairo_set_source_rgba( cr, 0.0, v,v,0.3 );
 			cairo_move_to( cr, in, 0.0 );
 			cairo_rel_line_to( cr, 0.0 , te->stepper_length );
 			cairo_stroke(cr);
@@ -770,14 +778,14 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 			sprintf(text, "%d",(gint) f );
 			cairo_text_path( cr, text );
 			cairo_set_font_size( cr, 0.2 );
-			cairo_set_source_rgba( cr, 1.0,1.0,1.0,0.7 );
+			cairo_set_source_rgba( cr, v,v,v,0.7 );
 			cairo_fill(cr);	
 
 		}
 		if( te->grab_button == 3 && te->current_location != MOUSE_STEPPER )
 		{
 			gdouble f = te->out * te->num_video_frames;
-			cairo_set_source_rgba( cr, 0.0, 1.0,1.0,0.3 );
+			cairo_set_source_rgba( cr, 0.0, v,v,0.3 );
 			cairo_move_to( cr, out , 0.0 );
 			cairo_rel_line_to( cr, 0.0 , te->stepper_length );
 			cairo_stroke(cr);
@@ -790,12 +798,12 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 			sprintf(text, "%d", (gint) f );
 			cairo_text_path( cr, text );
 			cairo_set_font_size( cr, 0.2 );
-			cairo_set_source_rgba( cr, 1.0,1.0,1.0,0.7 );
+			cairo_set_source_rgba( cr, v,v,v,0.7 );
 			cairo_fill(cr);	
 
 		}
 
-		cairo_set_source_rgba( cr, 1.0, 1.0, 1.0, 0.3 );
+		cairo_set_source_rgba( cr, v, v, v, 0.3 );
 		cairo_rectangle_round(cr, in,
 			0.095 * height,
 			(out - in),

@@ -129,8 +129,7 @@ int main(int argc, char *argv[]) {
         }
 	gtk_init(NULL,NULL);
 
-	if(gveejay_theme)
-		vj_gui_theme_setup();
+	vj_gui_theme_setup(gveejay_theme);
 
 	vj_gui_set_debug_level( verbosity , n_tracks);
 		
@@ -139,8 +138,7 @@ int main(int argc, char *argv[]) {
 	default_bank_values( &col, &row );
 	vj_gui_init( skins[current_skin].file );
 	
-	if(gveejay_theme)
-		vj_gui_style_setup();
+	vj_gui_style_setup();
 
         gtk_main();
 

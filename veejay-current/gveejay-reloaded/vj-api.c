@@ -54,6 +54,9 @@
 #include <gveejay-reloaded/multitrack.h>
 #include <gveejay-reloaded/common.h>
 #include <gveejay-reloaded/utils.h>
+#include <libvevo/vevo.h>
+#include <libvevo/livido.h>
+#include <veejay/vevo.h>
 //if gtk2_6 is not defined, 2.4 is assumed.
 #ifdef GTK_CHECK_VERSION
 #if GTK_MINOR_VERSION >= 6
@@ -251,6 +254,10 @@ static	vims_t	vj_event_list[VIMS_MAX];
 static  vims_keys_t vims_keys_list[VIMS_MAX];
 
 static  int vims_verbosity = 0;
+typedef   livido_port_t vevo_port_t;
+
+static	vevo_port_t *fx_list_ = NULL;
+static  vevo_port_t *fx_clipboard_ = NULL;
 
 typedef struct
 {
@@ -2202,8 +2209,11 @@ static	void	update_curve_accessibility(const char *name)
 
 	}	
 
-	set_toggle_button( "curve_toggleglobal", s->ec->enabled );
-	set_toggle_button( "curve_toggleentry", s->ec->effects[i]->enabled  );
+	if(s->ec)
+	{
+		set_toggle_button( "curve_toggleglobal", s->ec->enabled );
+		set_toggle_button( "curve_toggleentry", s->ec->effects[i]->enabled  );
+	}
 /*	if( key->type == GTK_CURVE_TYPE_LINEAR )
 		set_toggle_button( tog_w[0].name,1 );
 	else
@@ -2441,7 +2451,7 @@ static	void	update_label_i(const char *name, int num, int prefix)
 	if(!label) return;
 	char	str[20];
 	if(prefix)
-		g_snprintf( str,20, "%011d", num );
+		g_snprintf( str,20, "%09d", num );
 	else
 		g_snprintf( str,20, "%d",    num );
 	gchar *utf8_value = _utf8str( str );
@@ -2464,9 +2474,9 @@ static	void	update_label_str(const char *name, gchar *text)
 {
 	GtkWidget *label = glade_xml_get_widget_(
 				info->main_window, name);
-	if(!label) return;
+	if(!label ||!text) return;
 	gchar *utf8_text = _utf8str( text );
-
+	if(!utf8_text) return;
 	gtk_label_set_text( GTK_LABEL(label), utf8_text);
 	g_free(utf8_text);
 }	
@@ -3498,11 +3508,130 @@ static	void	load_v4l_info()
 	}
 }
 
+static void online_update(int keyp, int value)
+{
+	char mkey[5];
+	sprintf( mkey, "i%d", info->uc.selected_chain_entry );
+	vevo_port_t *cur = NULL;
+	vevo_property_get( fx_clipboard_, mkey, 0, &cur );
+	if(!cur)
+		return;
+	char key[5];
+	sprintf(key, "parameter%d", keyp);
+	vevo_property_set( cur, key, LIVIDO_ATOM_TYPE_INT,1,&value );
+}
+
+static void update_clipboard(int fxid, int np, int *args)
+{
+	int i;
+	char mkey[5];
+	sprintf( mkey, "i%d", info->uc.selected_chain_entry );
+	vevo_port_t *cur = NULL;
+	vevo_property_get( fx_clipboard_, mkey, 0, &cur );
+
+	if( !cur )
+	{
+		cur = vevo_port_new( 400 );
+		vevo_property_set( fx_clipboard_, mkey, LIVIDO_ATOM_TYPE_VOIDPTR,1,&cur);
+	}
+
+	int id = fxid;
+	int nn = np;
+
+	vevo_property_set( cur, "fxid",LIVIDO_ATOM_TYPE_INT, 1, &id );
+
+	for( i =  0; i < nn; i ++ )
+	{
+		char pname[5];
+		sprintf(pname, "parameter%d",i);
+		int value = args[i];
+		vevo_property_set(cur, pname, LIVIDO_ATOM_TYPE_INT,1, &value );
+	}
+
+	vevo_property_set( cur, "num_param", LIVIDO_ATOM_TYPE_INT,1, &i );
+}
+
+static void clone_clipboard_entry(void)
+{
+	char mkey[5];
+	sprintf( mkey, "i%d", info->uc.selected_chain_entry );
+	vevo_port_t *cur = NULL;
+	vevo_port_t *buf = NULL;
+	int fxid = 0;
+	int np = 0;
+	int values[16];
+	int i;
+
+	vevo_property_get( fx_clipboard_, mkey, 0, &cur );
+	if( !cur )
+		return;
+
+ 	vevo_property_get( cur, "fxid", 0, &fxid );
+ 	vevo_property_get( cur, "num_param", 0, &np );
+
+	vevo_property_get( fx_clipboard_, "buffer", 0, &buf );
+	if( !buf )
+	{
+		buf = vevo_port_new( 500 );
+		vevo_property_set( fx_clipboard_, "buffer", LIVIDO_ATOM_TYPE_VOIDPTR,1,&buf);
+	}
+
+	vevo_property_set( buf, "fxid", LIVIDO_ATOM_TYPE_INT,1,&fxid );
+	vevo_property_set( buf, "num_param", LIVIDO_ATOM_TYPE_INT, 1, &np );
+
+	for( i =  0; i < np; i ++ )
+	{
+		char pname[5];
+		sprintf(pname, "parameter%d",i);
+		int value = 0;
+		vevo_property_get(cur, pname,0, &value);
+		vevo_property_set(buf, pname, LIVIDO_ATOM_TYPE_INT,1, &value );
+	}
+}
+
+static	void	preset_from_clipboard(char *mkey)
+{
+	vevo_port_t *cur = NULL;
+	vevo_property_get( fx_clipboard_, mkey, 0, &cur );
+	
+	if(!cur)
+		return;
+
+	int fxid = 0;
+	int np = 0;
+	int i;
+	char msg[100];
+
+	vevo_property_get( cur, "fxid", 0, &fxid );
+	vevo_property_get( cur, "num_param", 0, &np );
+
+	sprintf( msg, "%03d:%d %d %d ", VIMS_CHAIN_ENTRY_SET_PRESET,0, 
+			info->uc.selected_chain_entry, fxid );
+
+	for( i =  0; i < np; i ++ )
+	{
+		char pname[5];
+		sprintf(pname, "parameter%d",i);
+		int value = 0;
+		vevo_property_get(cur, pname,0, &value);
+		char token[10];
+		sprintf(token, "%d ", value);
+		strcat(msg,token);
+	}
+
+	int len = strlen(msg);
+	msg[len-1] = ';';
+	msg[len]   = '\0';
+	msg_vims( msg );
+	info->uc.reload_hint[HINT_ENTRY] = 1;
+}
+
 static	gint load_parameter_info()
 {
 	int	*st = &(info->uc.entry_tokens[0]);
 	int	len = 0;
 	int	p[16];
+	int	*q = &p[3];
 	int 	i;
 		
 	multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, 
@@ -3528,24 +3657,29 @@ static	gint load_parameter_info()
 			st[i] = 0;
 		return 0;
 	}
+
 	if( skin__ == 0 )
 	{
-	info->uc.selected_rgbkey = _effect_get_rgb( p[0] );
-	if(info->uc.selected_rgbkey)
-	{
-		enable_widget( "rgbkey");
-		update_rgbkey();
-	}  
-     	else
-	{
-		disable_widget( "rgbkey");
-		info->uc.selected_rgbkey = 0;
-	} 
+		info->uc.selected_rgbkey = _effect_get_rgb( p[0] );
+		if(info->uc.selected_rgbkey)
+		{
+			enable_widget( "rgbkey");
+			update_rgbkey();
+		}  
+	     	else
+		{
+			disable_widget( "rgbkey");
+			info->uc.selected_rgbkey = 0;
+		}	 
 	}
-	g_free(answer);
 		
 	for( i = 0; i < 16; i ++ )
 		st[i] = p[i];
+
+	update_clipboard( p[0],p[2], q);
+
+	g_free(answer);
+
 	return 1;
 }	  
 
@@ -3652,8 +3786,8 @@ static	void	load_effectchain_info()
 
 enum 
 {
-	FX_ID = 0,
-	FX_STRING = 1,
+//	FX_ID = 0,
+	FX_STRING = 0,
 	FX_NUM,
 };
 
@@ -3668,14 +3802,17 @@ gboolean
 
     if (gtk_tree_model_get_iter(model, &iter, path))
     {
-      gint name;
-
-      gtk_tree_model_get(model, &iter, FX_ID, &name, -1);
+  //    gint name;
+      gchar *name = NULL;
+      gtk_tree_model_get(model, &iter, FX_STRING, &name, -1);
 
       if (!path_currently_selected)
       {
-	info->uc.selected_effect_id = name;
+	int value = 0;
+	vevo_property_get( fx_list_, name, 0, &value );
+	if(value) info->uc.selected_effect_id = value;
       }
+      g_free(name);
 
     }
 
@@ -3693,18 +3830,17 @@ on_effectmixlist_row_activated(GtkTreeView *treeview,
 	if(gtk_tree_model_get_iter(model,&iter,path))
 	{
 		gint gid =0;
-		gtk_tree_model_get(model,&iter, FX_ID, &gid, -1);
+		gchar *name = NULL;
+		gtk_tree_model_get(model,&iter, FX_STRING, &name, -1); // FX_ID
 
-		if(gid)
+		if(vevo_property_get( fx_list_, name, 0,&gid ) == 0 )
 		{
 			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
 				0, info->uc.selected_chain_entry,gid );
-		//	info->uc.reload_hint[HINT_CHAIN] = 1;
 			info->uc.reload_hint[HINT_ENTRY] = 1;
 		}
-
+		g_free(name);
 	}
-
 }
 void
 on_effectlist_row_activated(GtkTreeView *treeview,
@@ -3719,9 +3855,10 @@ on_effectlist_row_activated(GtkTreeView *treeview,
 	if(gtk_tree_model_get_iter(model,&iter,path))
 	{
 		gint gid =0;
-		gtk_tree_model_get(model,&iter, FX_ID, &gid, -1);
+		gchar *name = NULL;
+		gtk_tree_model_get(model,&iter, FX_STRING, &name, -1);
 
-		if(gid)
+		if(vevo_property_get( fx_list_, name, 0, &gid ) == 0 )
 		{
 			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
 				0, info->uc.selected_chain_entry,gid );
@@ -3729,7 +3866,7 @@ on_effectlist_row_activated(GtkTreeView *treeview,
 				vj_kf_delete_parameter(info->uc.selected_chain_entry);
 			info->uc.reload_hint[HINT_ENTRY] = 1;
 		}
-
+		g_free(name);
 	}
 
 }
@@ -3805,8 +3942,11 @@ void	setup_effectlist_info()
 	trees[0] = glade_xml_get_widget_( info->main_window, "tree_effectlist");
 	trees[1] = glade_xml_get_widget_( info->main_window, "tree_effectmixlist");
 	GtkListStore *stores[2];
-	stores[0] = gtk_list_store_new( 2, G_TYPE_INT, G_TYPE_STRING );
-	stores[1] = gtk_list_store_new( 2, G_TYPE_INT, G_TYPE_STRING );
+	stores[0] = gtk_list_store_new( 1, G_TYPE_STRING );
+	stores[1] = gtk_list_store_new( 1, G_TYPE_STRING );
+
+
+	fx_list_ = vevo_port_new( 200 );
 
 	for(i = 0; i < 2; i ++ )
 	{
@@ -3817,16 +3957,18 @@ void	setup_effectlist_info()
 
 		gtk_tree_sortable_set_sort_column_id( 
 			sortable, FX_STRING, GTK_SORT_ASCENDING);
-	
+
+		gtk_tree_view_set_headers_visible( GTK_TREE_VIEW(trees[i]), FALSE );
 
 		gtk_tree_view_set_model( GTK_TREE_VIEW(trees[i]), GTK_TREE_MODEL(stores[i]));
 		g_object_unref( G_OBJECT( stores[i] ));
 	}
 
-	setup_tree_text_column( "tree_effectlist", FX_ID, "id" );
+
+//	setup_tree_text_column( "tree_effectlist", FX_ID, "id" );
 	setup_tree_text_column( "tree_effectlist", FX_STRING, "effect" );
 
-	setup_tree_text_column( "tree_effectmixlist", FX_ID, "id" );
+//	setup_tree_text_column( "tree_effectmixlist", FX_ID, "id" );
 	setup_tree_text_column( "tree_effectmixlist", FX_STRING, "effect" );
 
 	g_signal_connect( trees[0], "row-activated",
@@ -3999,6 +4141,9 @@ void	setup_samplelist_info()
 {
 	effect_sources_tree = glade_xml_get_widget_( info->main_window, "tree_sources");
 	effect_sources_store = gtk_list_store_new( 3, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING );
+
+	gtk_tree_view_set_headers_visible( GTK_TREE_VIEW(effect_sources_tree), FALSE );
+
 	gtk_tree_view_set_model( GTK_TREE_VIEW(effect_sources_tree), GTK_TREE_MODEL(effect_sources_store));
 	g_object_unref( G_OBJECT( effect_sources_store ));	
 	effect_sources_model = gtk_tree_view_get_model( GTK_TREE_VIEW(effect_sources_tree ));	
@@ -4033,7 +4178,6 @@ void	load_effectlist_info()
 	gint fxlen = 0;
 	single_vims( VIMS_EFFECT_LIST );
 	gchar *fxtext = recv_vims(5,&fxlen);
-
 	_effect_reset();
  	reset_tree( "tree_effectlist");
 //	store = gtk_list_store_new( 3, G_TYPE_INT,GDK_TYPE_PIXBUF , G_TYPE_STRING );
@@ -4042,13 +4186,11 @@ void	load_effectlist_info()
 
 	GtkTreeModel *model2 = gtk_tree_view_get_model( GTK_TREE_VIEW(tree2));
 	store2 = GTK_LIST_STORE(model2);
-
 	while( offset < fxlen )
 	{
 		char tmp_len[4];
 		bzero(tmp_len, 4);
 		strncpy(tmp_len, fxtext + offset, 3 );
-
 		int  len = atoi(tmp_len);
 		offset += 3;
 		if(len > 0)
@@ -4074,12 +4216,17 @@ void	load_effectlist_info()
 			if( _effect_get_mix(ec->id) > 0 )
 			{
 				gtk_list_store_append( store2, &iter );
-				gtk_list_store_set( store2, &iter, FX_ID,(guint) ec->id, FX_STRING, name, -1 );
+	//			gtk_list_store_set( store2, &iter, FX_ID,(guint) ec->id, FX_STRING, name, -1 );
+				gtk_list_store_set( store2, &iter, FX_STRING, name, -1 );
+				vevo_property_set( fx_list_, name, LIVIDO_ATOM_TYPE_INT, 1, &(ec->id));
 			}
 			else
 			{
 				gtk_list_store_append( store, &iter );
-				gtk_list_store_set( store, &iter, FX_ID,(guint) ec->id, FX_STRING, name, -1 );
+			//	gtk_list_store_set( store, &iter, FX_ID,(guint) ec->id, FX_STRING, name, -1 );
+				gtk_list_store_set( store, &iter, FX_STRING, name, -1 );
+				vevo_property_set( fx_list_, name, LIVIDO_ATOM_TYPE_INT, 1, &(ec->id));
+
 			}
 
 		}
@@ -5828,6 +5975,9 @@ void	vj_gui_free()
 	}
 	info = NULL;
 
+	vevo_port_free( fx_clipboard_ );
+	vevo_port_free( fx_list_ );
+
 	gtk_main_quit();
 }
 
@@ -5854,11 +6004,14 @@ void	vj_gui_style_setup()
 	vj_init_style( "veejaytext", "Monospace, 8" );
 }
 
-void	vj_gui_theme_setup()
+void	vj_gui_theme_setup(int default_theme)
 {
 	char path[MAX_PATH_LEN];
 	bzero(path,MAX_PATH_LEN);
-	get_gd(path,NULL, "gveejay.rc");
+	if(!default_theme)
+		get_gd(path,NULL, "gveejay-default.rc");
+	else
+		get_gd(path,NULL, "gveejay.rc");
 	gtk_rc_parse(path);
 }
 
@@ -5927,6 +6080,7 @@ void	default_bank_values(int *col, int *row )
 void	set_skin(int skin)
 {
 	skin__ = skin;
+	timeline_theme_colors( skin ? 1: 0 );
 }
 
 int	vj_gui_cb_locked()
@@ -6146,6 +6300,8 @@ void 	vj_gui_init(char *glade_file)
 	create_ref_slots(skin__ == 0 ? MEM_SLOT_SIZE/4: MEM_SLOT_SIZE);
 	
 	gtk_widget_show( info->sample_bank_pad );
+
+	fx_clipboard_ = vevo_port_new( 300 );
 
 	setup_knobs();
 	setup_vimslist();
