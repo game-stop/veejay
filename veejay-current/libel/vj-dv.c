@@ -69,17 +69,11 @@ vj_dv_encoder *vj_dv_init_encoder(void * edl, int pixel_format)
     	e->fmt = pixel_format;
 
     	e->dv_video =
-	(uint8_t *) vj_malloc(sizeof(uint8_t) * 3 *
+	(uint8_t *) vj_malloc(sizeof(uint8_t) * 
 			   (e->encoder->isPAL ?
 			    	DV_PAL_SIZE : DV_NTSC_SIZE));
-	if(!e->dv_video)
-	{
-		if(e) free(e);
-		return NULL;
-	}
-
 	memset( e->dv_video, 0 ,
-		(3 * e->encoder->isPAL ? DV_PAL_SIZE: DV_NTSC_SIZE ) );
+		(e->encoder->isPAL ? DV_PAL_SIZE: DV_NTSC_SIZE ) );
 	return e;
 }
 
@@ -133,12 +127,14 @@ int vj_dv_encode_frame(vj_dv_encoder *encoder, uint8_t *input_buf[3], uint8_t *o
 
 void vj_dv_free_encoder(vj_dv_encoder *e)
 {
-	if(e->encoder)
-		dv_encoder_free( e->encoder);
-	if(e->dv_video)
-		free(e->dv_video);
 	if(e)
+	{
+		if(e->encoder)
+			dv_encoder_free( e->encoder);
+		if(e->dv_video)
+			free(e->dv_video);
 		free(e);
+	}
 }
 
 void vj_dv_free_decoder(vj_dv_decoder *d) {

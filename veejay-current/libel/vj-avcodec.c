@@ -27,7 +27,7 @@
 #ifdef SUPPORT_READ_DV2
 #define __FALLBACK_LIBDV
 #include <libel/vj-dv.h>
-static vj_dv_encoder *dv_encoder;
+static vj_dv_encoder *dv_encoder = NULL;
 #endif
 
 static int out_pixel_format = FMT_420; 
@@ -175,6 +175,11 @@ int		vj_avcodec_init(editlist *el, int pixel_format)
 
 #ifdef __FALLBACK_LIBDV
 	dv_encoder = vj_dv_init_encoder( (void*)el , out_pixel_format);
+	if(!dv_encoder)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize quasar DV codec");
+		return 0;
+	}
 #else
 	_encoders[ENCODER_DVVIDEO] = vj_avcodec_new_encoder( CODEC_ID_DVVIDEO, el, fmt );
 	if(!_encoders[ENCODER_DVVIDEO]) return 0;
@@ -208,7 +213,28 @@ int		vj_avcodec_free()
 #endif
 	return 1;
 }
+void	yuv422p_to_yuv420p3( uint8_t *src, uint8_t *dst[3], int w, int h)
+{
+	AVPicture pict1,pict2;
+	memset(&pict1,0,sizeof(pict1));
+	memset(&pict2,0,sizeof(pict2));
 
+	pict1.data[0] = src;
+	pict1.data[1] = src+(w*h);
+	pict1.data[2] = src+(w*h)+((w*h)/2);
+	pict1.linesize[0] = w;
+	pict1.linesize[1] = w >> 1;
+	pict1.linesize[2] = w >> 1;
+	pict2.data[0] = dst[0];
+	pict2.data[1] = dst[1];
+	pict2.data[2] = dst[2];
+	pict2.linesize[0] = w;
+	pict2.linesize[1] = w >> 1;
+	pict2.linesize[2] = w >> 1;	
+
+	img_convert( &pict2, PIX_FMT_YUV420P, &pict1, PIX_FMT_YUV422P, w, h );
+	return;
+}
 void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h)
 {
 	AVPicture pict1,pict2;

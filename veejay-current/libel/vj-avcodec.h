@@ -64,5 +64,6 @@ void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h );
 
 int		yuv420p_to_yuv422p2( uint8_t *sY,uint8_t *sCb, uint8_t *sCr, uint8_t *dst[3], int w, int h );
 
+void	yuv422p_to_yuv420p3( uint8_t *src, uint8_t *dst[3], int w, int h);
 
 #endif

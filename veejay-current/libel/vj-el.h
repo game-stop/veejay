@@ -72,13 +72,20 @@ typedef struct
 	long 		last_apos;
 	int		auto_deinter;
 	
-	int		pixel_format;
+	int		pixel_format;	
+	void		*cache;
 } editlist;  
 
 
 editlist *vj_el_init_with_args(char **filenames, int n, int flags, int deinter, int force, char norm, int fmt);
 
+int	vj_el_cache_size();
+
+void	vj_el_prepare(void); // reset cache
+
 void	vj_el_init(); 
+
+void	vj_el_init_chunk(int n);
 
 void	vj_el_free(editlist *el);
 
