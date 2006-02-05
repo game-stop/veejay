@@ -620,15 +620,17 @@ livido_port_t *livido_port_new(int port_type)
     port->pool = NULL;
 #endif
 
+    if(port_type <= 1024)
+    {
     livido_property_set(port, "type", LIVIDO_ATOM_TYPE_INT, 1, &port_type);
     livido_property_finalize(port, "type");
-
+	
 #ifdef STRICT_CHECKING
     assert(livido_property_set
 	   (port, "type", LIVIDO_ATOM_TYPE_INT, 1, &port_type)
 	   != LIVIDO_PROPERTY_READONLY);
 #endif
-
+    }
     return (livido_port_t *) port;
 }
 
@@ -682,7 +684,7 @@ void livido_port_free(livido_port_t * p)
 #endif
 	free(port);
     }
-    port = NULL;
+    p = port = NULL;
 }
 
 int
@@ -801,7 +803,6 @@ livido_property_get(livido_port_t * p, const char *key, int idx, void *dst)
 
     return LIVIDO_ERROR_NOSUCH_PROPERTY;
 }
-
 char **livido_list_properties(livido_port_t * p)
 {
     __vevo_port_t *port = (__vevo_port_t *) p;

@@ -27,6 +27,7 @@ typedef struct livido_port_t void
 #include <libvevo/livido.h>
 
 // rename functions
+
 #define vevo_port_free	livido_port_free
 #define	vevo_port_new	livido_port_new
 #define vevo_property_set livido_property_set
@@ -35,6 +36,7 @@ typedef struct livido_port_t void
 #define vevo_property_num_elements livido_property_num_elements
 #define vevo_property_atom_type livido_property_atom_type
 #define vevo_list_properties livido_list_properties
+
 void 	*vj_event_vevo_get_event_function( int id );
 char	*vj_event_vevo_get_event_name( int id );
 char	*vj_event_vevo_get_event_format( int id );

@@ -47,6 +47,8 @@ static int force_video_file = 0; // unused
 static int override_pix_fmt = -1;
 static char override_norm = 'p';
 static int auto_loop = 0;
+static int n_slots_ = 8;
+static int max_mem_ = 0;
 
 static void CompiledWith()
 {
@@ -151,7 +153,8 @@ static void Usage(char *progname)
 	fprintf(stderr,"  -g/--clip-as-sample	\t\tLoad every video clip as a new sample\n");	
 	fprintf(stderr,"  -n/--no-color     \t\tDont use colored text\n");
 	fprintf(stderr,"  -r/--audiorate	\t\tDummy audio rate\n");
-	fprintf(stderr,"  -m/--sample-mode [01]\t\tSampling mode 1 = best quality (default), 0 = best performance\n");  
+	fprintf(stderr,"  -m/--memory	\t\tMaximum memory to use for cache (0=disable)\n");  
+	fprintf(stderr,"  -j/--max_cache \t\tDivide cache memory over N samples (fairly distributed)\n");
 	fprintf(stderr,"  -Y/--ycbcr [01]\t\t0 = YUV 4:2:0 Planar, 1 = YUV 4:2:2 Planar\n");
 
 	fprintf(stderr,"  -d/--dummy	\t\tDummy playback\n");
@@ -239,9 +242,16 @@ static int set_option(const char *name, char *value)
 		check_val(optarg,name);
 		info->settings->use_mcast = 1;
 		info->settings->group_name = strdup( optarg );
-	} else if (strcmp(name, "sample-mode" ) == 0 || strcmp(name, "m" ) == 0)
+	}
+	else if (strcmp(name, "max_cache" )== 0 || strcmp(name, "j" ) == 0 )
 	{
-		veejay_set_sampling( info,atoi(optarg));
+		n_slots_ = atoi( optarg );
+		if(n_slots_ < 0 ) n_slots_ = 0; else if (n_slots_ > 100) n_slots_ = 100;
+	}
+	else if (strcmp(name, "memory" ) == 0 || strcmp(name, "m" ) == 0)
+	{
+		max_mem_ =  atoi(optarg);
+		if(max_mem_ < 0 ) max_mem_ = 0; else if (max_mem_ > 100) max_mem_ = 100;
     } else if (strcmp(name, "synchronization") == 0
 	       || strcmp(name, "c") == 0) {
 	info->sync_correction = atoi(optarg);
@@ -457,6 +467,8 @@ static int check_command_line_options(int argc, char *argv[])
 	{"chs",1,0,0},
 	{"cvs",1,0,0},
 	{"quit",0,0,0},
+	{"memory",1,0,0},
+	{"max_cache",1,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -470,12 +482,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:V:s:c:t:l:p:m:x:y:nLFPY:ugr:vdibIjf:N:H:W:R:M:V:z:qw:h:C:",
+			"o:G:O:a:H:V:s:c:t:j:l:p:m:x:y:nLFPY:ugr:vdibIjf:N:H:W:R:M:V:z:qw:h:C:",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   "o:G:s:O:a:c:t:l:t:x:y:m:p:nLFPY:vudgibr:Ijf:N:H:W:R:M:V:z:qw:h:C:")) != EOF)
+		   "o:G:s:O:a:c:t:l:t:x:y:m:j:p:nLFPY:vudgibr:Ijf:N:H:W:R:M:V:z:qw:h:C:")) != EOF)
 #endif
     {
 	switch (n) {
@@ -565,7 +577,7 @@ int main(int argc, char **argv)
 	fflush(stdout);
     vj_mem_init();
 
-    info = veejay_malloc();
+     info = veejay_malloc();
     /* start with initing */
     if (!info)
 	return 1;
@@ -578,6 +590,8 @@ int main(int argc, char **argv)
     }
 
     print_license();
+   prepare_cache_line( max_mem_, n_slots_ );
+
 
    
 

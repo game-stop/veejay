@@ -402,7 +402,6 @@ void vj_effect_initialize(int width, int height)
     int i = VJ_VIDEO_COUNT;
     int k;
 
-
     n_ext_plugs_ = plug_detect_plugins();
 
     if( n_ext_plugs_  > 0 )
@@ -431,7 +430,6 @@ void vj_effect_initialize(int width, int height)
     vj_effects[17] = fadecolor_init(width,height);
     vj_effects[18] = fadecolorrgb_init(width,height);
     vj_effects[19] = whiteframe_init(width,height);
-    //vj_effects[20] = diffimg_init(width,height);
     vj_effects[20] = simplemask_init(width,height);
     vj_effects[21] = opacitythreshold_init(width,height);
     vj_effects[22] = opacityadv_init(width,height);
@@ -446,12 +444,11 @@ void vj_effect_initialize(int width, int height)
     vj_effects[31] = bar_init(width,height);
     vj_effects[32] = vbar_init(width,height);
     vj_effects[33] = lumamask_init(width,height);
-//    vj_effects[33] = channelmix_init(width, int height);
     vj_effects[34] = binaryoverlay_init(width,height);
     vj_effects[35] = dissolve_init(width,height);
     vj_effects[36] = tripplicity_init(width,height);
-	vj_effects[37] = videoplay_init(width,height);
-	vj_effects[38] = videowall_init(width,height);
+    vj_effects[37] = videoplay_init(width,height);
+    vj_effects[38] = videowall_init(width,height);
 #ifdef USE_SWSCALER
 	vj_effects[39] = picinpic_init(width,height);
         vj_effects[40] = dummy_init(width,height);
@@ -542,21 +539,18 @@ void vj_effect_initialize(int width, int height)
 		if(vj_effects[i])
 		{
 			if(i!=3) vj_effects[i]->static_bg = 0;
-			if(i!=(VJ_VIDEO_COUNT+58)) vj_effects[i]->has_help = 0; 
-		
-			/* bah really need to clean this up:  */
+			vj_effects[i]->has_help = 0; 
 			if(vj_effects[i]->rgb_conv != 1)
 				vj_effects[i]->rgb_conv = 0;
 		}
 	}
 
-// 	initialize ff 
+//@ initialize external plugins
 	int p = 0;
 	int p_stop = MAX_EFFECTS + n_ext_plugs_;
+
 	for( p = MAX_EFFECTS; p < p_stop; p ++ )
-	{
 		vj_effects[p] = plug_get_plugin( (p-MAX_EFFECTS) );
-	}
 	veejay_msg(VEEJAY_MSG_INFO, "Found %d effects", p_stop ); 
 }
 
@@ -571,18 +565,12 @@ void vj_effect_free(vj_effect *ve) {
 void vj_effect_shutdown() {
     int i;
     vj_effect_deactivate_all(); 
-
-    for(i=0; i < MAX_EFFECTS; i++) { 
+    plug_free();
+    for(i=0; i < vj_effect_max_effects(); i++) { 
 	if(vj_effects[i]) {
 	 vj_effect_free(vj_effects[i]);
 	}
     }
-    int p_stop = n_ext_plugs_ + MAX_EFFECTS;
-    for( i = MAX_EFFECTS; i < p_stop; i ++ )
-	vj_effect_free( vj_effects[i] );
-
-    plug_free();
-	
 }
 
 void vj_effect_dump() {

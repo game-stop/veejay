@@ -63,13 +63,12 @@ int		neighbours5_malloc(int w, int h )
 	return 1;
 }
 
-int		neighbours5_free(void)
+void		neighbours5_free(void)
 {
 	if(tmp_buf[0]) free(tmp_buf[0]);
 	if(tmp_buf[1]) free(tmp_buf[1]);
 	if(chromacity[0]) free(chromacity[0]);
 	if(chromacity[1]) free(chromacity[1]);
-	return 1;
 }
 
 typedef struct

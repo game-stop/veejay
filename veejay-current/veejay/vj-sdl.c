@@ -213,7 +213,7 @@ int vj_sdl_init(vj_sdl * vjsdl, int scaled_width, int scaled_height, const char 
 		sbuffer += vjsdl->screen->pitch;
     	}
 
-    	SDL_WM_SetCaption(caption, "0000000");
+    	//SDL_WM_SetCaption(caption, "0000000");
     	if (!vj_sdl_unlock(vjsdl))
 		return 0;
 

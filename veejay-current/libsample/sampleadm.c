@@ -39,6 +39,10 @@
 #include <libsample/sampleadm.h>
 #include <libvjmsg/vj-common.h>
 #include <libvje/vje.h>
+#include <libvevo/vevo.h>
+#include <libvevo/livido.h>
+#include <veejay/vevo.h>
+#include <assert.h>
 //#include <veejay/vj-lib.h>
 //#include <veejay/vj-el.h>
 //todo: change this into enum
@@ -67,7 +71,7 @@ static hash_t *SampleHash;	/* hash of sample information structs */
 static int avail_num[SAMPLE_MAX_SAMPLES];	/* an array of freed sample id's */
 
 static int sampleadm_state = SAMPLE_PEEK;	/* default state */
-
+static int slots_consumed_ = 0;
 
 
 
@@ -139,7 +143,7 @@ typedef struct
 } sample_setting;
 
 static sample_setting __sample_project_settings;
-
+static void *chain_cache_ = NULL;
 void	sample_set_project(int fmt, int deinterlace, int flags, int force, char norm )
 {
 	__sample_project_settings.fmt = fmt;
@@ -169,9 +173,26 @@ void sample_init(int len)
 	}
 	initialized = 1;
 	memset( &__sample_project_settings,0,sizeof(sample_setting));
+
+        chain_cache_ = vevo_port_new( 2000 ); //@ fx cache lines
+
     }
 }
 
+void	sample_free()
+{
+	vevo_port_free( chain_cache_ );
+	hscan_t scan;
+	hash_scan_begin( &scan, (hash_t*) SampleHash );
+	hnode_t *node;
+	while( (node = hash_scan_next(&scan)) != NULL )
+	{
+		sample_info *info = (sample_info*) node;
+		sample_del( info->sample_id);
+	}
+	hash_free_nodes( SampleHash );
+	hash_destroy( SampleHash );
+}
 
 int sample_set_state(int new_state)
 {
@@ -1728,6 +1749,104 @@ editlist *sample_get_editlist(int s1)
 	return sample->edit_list;
 }
 
+//@ uncache edl
+void	sample_uncache( int s1 )
+{
+	char key[5];
+	sprintf(key, "s%d",s1);
+	assert( sample_exists(s1) != 0);
+	editlist *bedl = sample_get_editlist(s1);
+	vj_el_clear_cache( bedl );
+	int in_active = 0;
+	vevo_property_set( chain_cache_, key, LIVIDO_ATOM_TYPE_INT, 1, &in_active );
+	slots_consumed_ --;
+}
+//@ cache edl
+void	sample_cache( int s1 )
+{
+	char key[5];
+	sprintf(key, "s%d",s1);
+	assert( sample_exists(s1) != 0);
+	editlist *bedl = sample_get_editlist(s1);
+	assert( bedl != NULL );
+	vj_el_setup_cache( bedl );
+	vevo_property_set( chain_cache_, key, LIVIDO_ATOM_TYPE_INT, 1, &s1 );
+	slots_consumed_ ++;
+}
+//@ is sample k in fx chain ?
+int	sample_cached(sample_info *s, int b_sample )
+{
+	int i = 0;
+	for( i = 0; i < SAMPLE_MAX_EFFECTS ;i++ )
+	  if( s->effect_chain[i]->source_type == 0 && s->effect_chain[i]->channel == b_sample)
+		return 1;
+        return 0;
+}
+
+//@ is sample k in chain cache and active?
+int	sample_inlined( sample_info *s, int b_sample )
+{
+	char key[5];
+	sprintf(key, "s%d",b_sample);
+	assert( b_sample > 0 );
+
+	int value = 0;
+	vevo_property_get( chain_cache_, key, 0,&value );
+
+	if( value == b_sample )
+		return 1;
+	return 0;
+}
+
+int	sample_cache_frames(int s1, int max_n)
+{
+	sample_info *sample = sample_get(s1);
+	int i;
+	assert( sample != NULL );
+
+	//@ if top sample is not cached, cache it now
+	if( !sample_inlined( sample, s1 ))
+	{
+		sample_cache(s1);
+		if( slots_consumed_ >= max_n )
+			return 1;
+	}
+
+	//@ cache fx chain
+  	for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
+  	{
+		int type = sample->effect_chain[i]->source_type;
+		int b_sample = sample->effect_chain[i]->channel;
+		
+		if ( type == 0 && !sample_inlined( sample, b_sample ))
+		{
+			sample_cache( b_sample );	
+			if( slots_consumed_ >= max_n )
+				break;
+		}
+	}	
+
+	//@ reset caches that are not used
+	char **props = vevo_list_properties( chain_cache_ );
+	if(!props)
+		return 1;
+
+	i = 0;
+	while( props[i] != NULL )
+	{
+		int b_sample = 0;
+		vevo_property_get( chain_cache_, props[i], LIVIDO_ATOM_TYPE_INT, 0, &b_sample);
+		//@ is b_sample in fx chain ?
+		if( b_sample > 0 && !sample_cached( sample, b_sample ))
+			sample_uncache( b_sample );
+		free(props[i]);
+		i++;
+	}
+	free(props);
+
+	return 1;
+}
+
 int	sample_set_editlist(int s1, editlist *edl)
 {
 	char tmp_file[1024];
@@ -1765,7 +1884,7 @@ int sample_apply_loop_dec(int s1, double fps) {
 /* print sample status information into an allocated string str*/
 //int sample_chain_sprint_status(int s1, int entry, int changed, int r_changed,char *str,
 //			       int frame)
-int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode,int total_slots, char *str )
+int	sample_chain_sprint_status( int s1,int cache,int pfps, int frame, int mode,int total_slots, char *str )
 {
     sample_info *sample;
     sample = sample_get(s1);
@@ -1773,7 +1892,7 @@ int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode,int total_s
 	return -1;
 
 	sprintf(str,
-		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		pfps,
 		frame,
 		mode,
@@ -1790,7 +1909,8 @@ int	sample_chain_sprint_status( int s1,int pfps, int frame, int mode,int total_s
 		sample->marker_start,
 		sample->marker_end,
 		sample->selected_entry,
-		total_slots);
+		total_slots,
+		cache);
 		
 		
  

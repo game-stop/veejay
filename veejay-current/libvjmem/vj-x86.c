@@ -127,10 +127,6 @@ void vj_mem_init(void)
 
 	find_best_memcpy();	
 }
-void debugger()
-{
-
-}
 
 void *vj_malloc(unsigned int size)
 {

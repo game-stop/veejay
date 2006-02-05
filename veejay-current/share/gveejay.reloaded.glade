@@ -588,6 +588,23 @@
 	  </child>
 
 	  <child>
+	    <widget class="GtkProgressBar" id="cachemeter">
+	      <property name="visible">True</property>
+	      <property name="tooltip" translatable="yes">Cache memory used</property>
+	      <property name="orientation">GTK_PROGRESS_RIGHT_TO_LEFT</property>
+	      <property name="fraction">2.23517412912e-10</property>
+	      <property name="pulse_step">0.00999999977648</property>
+	      <property name="text" translatable="yes">Cache filled</property>
+	      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
+	    </widget>
+	    <packing>
+	      <property name="padding">0</property>
+	      <property name="expand">False</property>
+	      <property name="fill">False</property>
+	    </packing>
+	  </child>
+
+	  <child>
 	    <widget class="GtkHBox" id="hbox225">
 	      <property name="visible">True</property>
 	      <property name="homogeneous">True</property>
@@ -818,7 +835,7 @@
 	    <packing>
 	      <property name="padding">0</property>
 	      <property name="expand">False</property>
-	      <property name="fill">False</property>
+	      <property name="fill">True</property>
 	    </packing>
 	  </child>
 	</widget>
@@ -2375,7 +2392,7 @@ YV16</property>
 					      <property name="editable">True</property>
 					      <property name="visibility">True</property>
 					      <property name="max_length">0</property>
-					      <property name="text" translatable="yes"></property>
+					      <property name="text" translatable="yes">Untitled</property>
 					      <property name="has_frame">True</property>
 					      <property name="invisible_char">*</property>
 					      <property name="activates_default">False</property>

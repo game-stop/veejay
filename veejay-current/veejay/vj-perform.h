@@ -75,12 +75,10 @@ int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 int vj_perform_tag_fill_buffer(veejay_t * info, int entry);
 
 
-void vj_perform_plain_fill_buffer(veejay_t * info, int entry);
+void vj_perform_plain_fill_buffer(veejay_t * info, int entry, int skip);
 
 
 int vj_perform_tag_complete_buffers(veejay_t * info, int entry, const int skip);
-
-void vj_perform_plain_fill_buffer(veejay_t * info, int entry);
 
 int vj_perform_tag_fill_buffer(veejay_t * info, int entry);
 

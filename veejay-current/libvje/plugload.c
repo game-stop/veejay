@@ -54,6 +54,7 @@
 #include <libvje/specs/frei0r.h>
 
 #define V_BITS 32
+#include <assert.h>
 
 typedef   livido_port_t vevo_port_t;
 typedef f0r_instance_t (*f0r_construct_f)(unsigned int width, unsigned int height);
@@ -107,6 +108,24 @@ static	int	select_f( const struct dirent *d )
 static	int	init_param_livido( void *port, int p, int hint )
 {
 	return 0;
+}
+
+static	void	free_parameters( void *port )
+{
+	int i;
+	int n = 0;
+	assert( port != NULL );
+	vevo_property_get( port, "n_params", 0, &n );
+
+	for ( i = 0; i < n ; i ++ )
+	{
+		char key[10];
+		void *param = NULL;
+		sprintf(key, "p%d", i );
+		vevo_property_get(port, key,0, param );
+		if( param )
+			vevo_port_free( param );
+	}
 }
 
 static	int	init_param_fr( void *port, int p, int hint)
@@ -239,7 +258,7 @@ static	void* 	deal_with_fr( void *handle, char *name)
 	void	*f0r_construct	= dlsym( handle, "f0r_construct" );
 	void	*f0r_destruct	= dlsym( handle, "f0r_destruct" );
 	void	*processf	= dlsym( handle, "f0r_update" );
-	void	*processm	= dlsym( handle, "f0r_update2" );
+//	void	*processm	= dlsym( handle, "f0r_update2" );
 	void	*set_params	= dlsym( handle, "f0r_set_param_value" );
 
 
@@ -251,7 +270,7 @@ static	void* 	deal_with_fr( void *handle, char *name)
 	vevo_property_set( port, "construct", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_construct );
 	vevo_property_set( port, "destruct", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_destruct );
 	vevo_property_set( port, "process", VEVO_ATOM_TYPE_VOIDPTR, 1, &processf);
-	vevo_property_set( port, "process_mix", VEVO_ATOM_TYPE_VOIDPTR, 1, &processm);
+//	vevo_property_set( port, "process_mix", VEVO_ATOM_TYPE_VOIDPTR, 1, &processm);
 	vevo_property_set( port, "set_params", VEVO_ATOM_TYPE_VOIDPTR,1,&set_params);	
 
     	f0r_plugin_info_t finfo;
@@ -261,7 +280,13 @@ static	void* 	deal_with_fr( void *handle, char *name)
 	memset( &pinfo,0,sizeof(f0r_param_info_t));
 
 
-	(*f0r_init)();
+	if( (*f0r_init)() == 0)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"\tBorked frei0r plugin '%s': ", name);
+		vevo_port_free( port );
+		return NULL;
+	}
+
 	(*f0r_info)(&finfo);
 
 	if( finfo.frei0r_version != FREI0R_MAJOR_VERSION )
@@ -271,8 +296,9 @@ static	void* 	deal_with_fr( void *handle, char *name)
 		return NULL;	
 	}
 	int extra = 0;
-	if( finfo.plugin_type == F0R_PLUGIN_TYPE_MIXER2 )
-		extra = 1;
+//@ fixme
+//	if( finfo.plugin_type == F0R_PLUGIN_TYPE_MIXER2 )
+//		extra = 1;
 	
 	int n_params = finfo.num_params;
 	int r_params = 0;
@@ -291,6 +317,7 @@ static	void* 	deal_with_fr( void *handle, char *name)
 	vevo_property_set( port, "f0r_p", VEVO_ATOM_TYPE_INT,1, &n_params );
 	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &plug_name );
 	vevo_property_set( port, "mixer", VEVO_ATOM_TYPE_INT,1, &extra );
+	free(plug_name);
 	return port;
 }
 
@@ -328,7 +355,8 @@ static	void*	deal_with_ff( void *handle, char *name )
 	if ( (q(FF_INITIALISE, NULL, 0 )).ivalue == FF_FAIL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot call init()");
-		vevo_port_free(port);
+		vevo_port_free(port);	
+		if(plugin_name) free(plugin_name);
 		return NULL;
 	}
 
@@ -337,6 +365,7 @@ static	void*	deal_with_ff( void *handle, char *name )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot get number of parameters");
 		vevo_port_free(port);
+		if(plugin_name) free(plugin_name);
 		return NULL;
 	}
 
@@ -382,7 +411,7 @@ static	void*	deal_with_ff( void *handle, char *name )
 		snprintf(key,20, "p%d", p );
 		vevo_property_set( port, key, VEVO_ATOM_TYPE_VOIDPTR, 1, &parameter );
 	}
-
+	free(plugin_name);
 	return port;
 }
 
@@ -390,6 +419,7 @@ static	int	instantiate_plugin( void *plugin, int w , int h )
 {
 
 	int type = 0;
+	assert( plugin != NULL );
 	vevo_property_get( plugin, "type", 0, &type);
 	if( type == VEVO_FF_PORT )
 	{	
@@ -437,6 +467,7 @@ static	void	deinstantiate_plugin( void *plugin )
 		return;
 
 	int type = 0;
+	assert( plugin != NULL);
 	vevo_property_get( plugin, "type", 0, &type);
 
 	if( type == VEVO_FF_PORT )
@@ -472,10 +503,16 @@ static	void	deinstantiate_plugin( void *plugin )
 static	void	add_to_plugin_list( const char *path )
 {
 	int i;
-	char fullname[PATH_MAX];
-	struct	dirent	**files;
+	char fullname[PATH_MAX+1];
+	struct	dirent	**files = NULL;
 	struct stat sbuf;
-	int	res = stat( path, &sbuf );
+	int	res = 0;
+
+	if(!path) return;
+
+
+	memset( &sbuf,0 ,sizeof(struct stat));
+	res = stat( path, &sbuf );
 
 	if( res != 0 )
 	{
@@ -494,8 +531,8 @@ static	void	add_to_plugin_list( const char *path )
 		veejay_msg(VEEJAY_MSG_ERROR, "Not a directory : '%s'", path );
 		return;
 	}
-
 	int n_files = scandir( path, &files, select_f, alphasort );
+veejay_msg(VEEJAY_MSG_DEBUG, "%d: '%s' ",n_files, path );
 	if( n_files <= 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "No FF plugins found in %s", path );
@@ -511,7 +548,8 @@ static	void	add_to_plugin_list( const char *path )
 			veejay_msg(VEEJAY_MSG_ERROR, "'%s' marked as bad", name);
 			continue; 
 		}
-		snprintf(fullname, PATH_MAX, "%s/%s", path,name );
+		bzero(fullname , PATH_MAX+1);
+		sprintf(fullname, "%s/%s", path,name );
 
 		void *handle = dlopen(fullname, RTLD_NOW );
 
@@ -546,6 +584,7 @@ static	void	add_to_plugin_list( const char *path )
 		if(dlsym( handle, "livido_setup" ))
 		{
 			void *plugin = deal_with_livido( handle , name );
+veejay_msg(VEEJAY_MSG_DEBUG, "Load livido plugin '%s'",name);
 			if( plugin )
 			{
 				index_map_[index_] = plugin;
@@ -557,6 +596,10 @@ static	void	add_to_plugin_list( const char *path )
 		}
 
 	}
+
+	for( i = 0; i < n_files; i ++ )
+		free( files[i] );
+	free(files);
 }
 
 static	void	free_plugin(void *plugin)
@@ -566,6 +609,10 @@ static	void	free_plugin(void *plugin)
 
 	int type = 0;
 	vevo_property_get( plugin, "type", 0, &type);
+
+	free_parameters(plugin);
+
+
 	if( type == VEVO_FF_PORT )
 	{		
 		void *base = NULL;
@@ -575,6 +622,7 @@ static	void	free_plugin(void *plugin)
 	}
 	else if ( type == VEVO_FR_PORT )
 	{
+		//@@ clear parameters
 		f0r_deinit_f base;
 		vevo_property_get( plugin, "deinit", 0, &base);
 		(*base)();
@@ -599,6 +647,8 @@ static	void	free_plugins()
 		deinstantiate_plugin( index_map_[i] );
 		free_plugin( index_map_[i]);
 	}
+	free( index_map_ );
+	index_ = 0;
 }
 
 #define CONFIG_FILE_LEN 65535
@@ -669,7 +719,7 @@ static	void	process_mix_plugin( void *plugin, void *buffera , void *bufferb, voi
 	}
 }
 
-static	void	process_plugin( void *plugin, void *buffer , void *out_buffer)
+static	void	process_plug_plugin( void *plugin, void *buffer , void *out_buffer)
 {
 	int type = 0;
 	vevo_property_get( plugin, "type", 0, &type);
@@ -780,12 +830,10 @@ vj_effect	*plug_get_plugin( int n )
 		vje->defaults = (int*) malloc(sizeof(int) * vje->num_params );
 		vje->limits[0] = (int*) malloc(sizeof(int) * vje->num_params );
 		vje->limits[1] = (int*) malloc(sizeof(int) * vje->num_params );
-		vje->flags = (int*) malloc(sizeof(int) * vje->num_params );
 
 		memset( vje->defaults,0,sizeof(int) * vje->num_params );
 		memset( vje->limits[0],0,sizeof(int) * vje->num_params );
 		memset( vje->limits[1],0, sizeof(int) * vje->num_params );
-		memset( vje->flags, 0,sizeof(int) * vje->num_params );
 
 		int k = 0;
 		int valid_p = 0;
@@ -858,6 +906,7 @@ void	plug_control( int fx_id, int *args )
 			sprintf(key, "p%d", p );
 			void *param = NULL;
 			vevo_property_get( port, key, 0, &param );
+			if( param ) continue;
 
 			int n = vevo_property_element_size( param, "value", p );
 

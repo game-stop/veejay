@@ -95,13 +95,18 @@ Bezerk mode, if enabled it allows you to change input channels on the fly (witho
 .TP
 .B \-g/--clip-as-sample
 Load every file on the commandline as a new sample
- 
+.TP
+.B \-q/--quit
+Quit at end of video 
 .TP
 .B \-n/--no-color
 Dont use colored text.
 .TP
-.B \-m/--sample-mode [01]
-Specify which super sampling algorithm to use , 0 = best quality (default) , 1 = best performance  
+.B \-m/--memory [0-100]
+Frame cache size in percentage of total system RAM 
+.TP
+.B \-j/--max_cache [0-100]
+Maximum number of samples to cache 
 .TP
 .B \-F/--features
 Show compiled in options

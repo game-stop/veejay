@@ -870,7 +870,7 @@ void	vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 			{
 				if( strlen((char*)vims_arguments[i].value) <= 0 )
 				{
-					veejay_msg(VEEJAY_MSG_ERROR, "Argument %d is not a string: '%s'" );
+					veejay_msg(VEEJAY_MSG_ERROR, "Argument %d is not a string!",i );
 					if(fmt)free(fmt);
 					return;
 				}
@@ -2000,8 +2000,14 @@ void	vj_event_init_network_events()
 	int net_id = 0;
 	for( i = 0; i <= 600; i ++ )
 	{
-		net_list[ net_id ].act = (vj_event) vj_event_vevo_get_event_function( i );
-		net_list[ net_id ].list_id = i;
+		net_list[ net_id ].act =
+			(vj_event) vj_event_vevo_get_event_function( i );
+
+		if( net_list[ net_id ].act )
+		{
+			net_list[net_id].list_id = i;
+			net_id ++;
+		}
 	}	
 	veejay_msg(VEEJAY_MSG_DEBUG, "Registered %d VIMS events", net_id );
 }
@@ -6706,10 +6712,14 @@ void vj_event_print_info(void *ptr, const char format[], va_list ap)
 		args[0] = v->uc->sample_id;
 	}
 
+	veejay_msg(VEEJAY_MSG_INFO, "%d / %d Mb used in cache",
+		get_total_mem(),
+		vj_el_cache_size() );
+
 	vj_event_print_plain_info(v,args[0]);
 
 	if( SAMPLE_PLAYING(v) && sample_exists(args[0])  )
-	{
+	{	
 		vj_event_print_sample_info( v, args[0] );
 	}
 	if( STREAM_PLAYING(v) && vj_tag_exists(args[0]) )

@@ -232,7 +232,7 @@ int 	vj_tag_enable(int t1);
 
 int 	vj_tag_disable(int t1);
 
-int		vj_tag_sprint_status(int tag_id, int r, int f, int m, int t,char *str );
+int		vj_tag_sprint_status(int tag_id, int cache,int r, int f, int m, int t,char *str );
 
 //int vj_tag_init_encoder(int t1, char *filename, int format,
 //	int w, int h, double fps, long seconds, int autoplay);

@@ -250,7 +250,8 @@ static vevo_port_t	*_new_event(
 void *		vj_event_vevo_get_event_function( int id )
 {
 	void *func = NULL;
-	vevo_property_get( index_map_[id] , "function", 0, &func );
+	if( index_map_[id] )
+		vevo_property_get( index_map_[id] , "function", 0, &func );
 	return func;
 }
 
@@ -276,6 +277,15 @@ char	*vj_event_vevo_get_event_format( int id )
 	}
 	return fmt;
 }
+
+int	vj_event_exists( int id )
+{
+	if( index_map_[id])
+		return 1;
+	return 0;	
+}
+
+
 int	vj_event_vevo_get_default_value(int id, int p)
 {
 	int n =0;

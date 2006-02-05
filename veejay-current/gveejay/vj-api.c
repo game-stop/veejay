@@ -39,8 +39,8 @@
 #endif
 
 static int	TIMEOUT_SECONDS = 0;
-#define STATUS_BYTES 	100
-#define STATUS_TOKENS 	18
+#define STATUS_BYTES 	150
+#define STATUS_TOKENS 	20
 
 /* Status bytes */
 
@@ -4515,7 +4515,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		gui->status_lock = 1;
 		if(nb > 0)
 		{
-			int n = sscanf( gui->status_msg, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+			int n = sscanf( gui->status_msg, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 				gui->status_tokens + 0,
 				gui->status_tokens + 1,
 				gui->status_tokens + 2,
@@ -4532,9 +4532,10 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 				gui->status_tokens + 13,
 				gui->status_tokens + 14,
 				gui->status_tokens + 15,
-				gui->status_tokens + 16 );
+				gui->status_tokens + 16,
+				gui->status_tokens + 17 );
 
-			if( n != 17 )
+			if( n != 18 )
 			{
 				fprintf(stderr, "Cant read status: %d\n",n);
 				exit(0);

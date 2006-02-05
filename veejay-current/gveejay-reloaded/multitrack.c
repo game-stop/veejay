@@ -472,7 +472,7 @@ static	void	update_widgets(int *status, mt_priv_t *p, int pm)
 {
 	int *h = p->history[pm];
 	gdk_threads_enter();
-
+	
 	playmode_sensitivity( p, pm );
 
 	if( pm == MODE_SAMPLE || pm == MODE_PLAIN )
@@ -487,6 +487,7 @@ static	void	update_widgets(int *status, mt_priv_t *p, int pm)
 
 	if( h[TOTAL_SLOTS] != status[TOTAL_SLOTS])
 	{
+veejay_msg(VEEJAY_MSG_DEBUG, "%d vs %d", h[TOTAL_SLOTS], status[TOTAL_SLOTS]);
 		if(update_track_list( p ))
 			update_track_view( MAX_TRACKS, get_track_tree( p->view->tracks ), (void*)p );
 	}
@@ -498,10 +499,10 @@ static gboolean	update_sequence_widgets( gpointer data )
 {
 	mt_priv_t *p = (mt_priv_t*) data;
 	char status[100];
-	int  array[18];
+	int  array[20];
 	veejay_get_status( p->sequence, status );
 	int n = status_to_arr( status, array );
-	if( n != 17 )
+	if( n != 18 )
 	{
 		printf("status error\n");	
 	}
@@ -694,6 +695,7 @@ void		*multitrack_new( void (*f)(int,char*,int), void (*g)(GdkPixbuf *),GtkWidge
 		p->num = c;
 		p->view = new_sequence_view( p,0,0,0, main_preview_area );
 		p->backlink = (void*) mt;
+		p->tracks[c] = NULL;
 		pt->pt[c] = p;
 		gtk_table_attach_defaults( table, p->view->event_box, c, c+1, 0, 1 );
 	}
@@ -713,7 +715,6 @@ void		*multitrack_new( void (*f)(int,char*,int), void (*g)(GdkPixbuf *),GtkWidge
 	lt->backlink = (void*) mt;
 	lt->view = new_sequence_view( lt, 0, 0,1 , main_preview_area);
 	pt->pt[LAST_TRACK] = lt;
-	
 	gtk_container_add( GTK_CONTAINER( mt->main_box ), lt->view->event_box );
 	mt->data = (void*) pt;
 

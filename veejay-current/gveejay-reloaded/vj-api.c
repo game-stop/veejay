@@ -380,6 +380,7 @@ typedef struct
 	gint		streamrecording;
 	gint		samplerecording;
 	gint		cpumeter;
+	gint		cachemeter;
 	gint		image_w;
 	gint		image_h;
 	//GThread		*imageA;
@@ -1650,6 +1651,7 @@ void		veejay_quit( )
        single_vims( 600 );
 
 	clear_progress_bar( "cpumeter",0.0 );
+	clear_progress_bar( "cachemeter", 0.0);
 	clear_progress_bar( "connecting",0.0 );
 	clear_progress_bar( "samplerecord_progress",0.0 );
 	clear_progress_bar( "streamrecord_progress",0.0 );
@@ -5493,6 +5495,27 @@ static	gboolean	update_cpumeter_timeout( gpointer data )
 
 	return TRUE;
 }
+static	gboolean	update_cachemeter_timeout( gpointer data )
+{
+	GtkWidget *w = glade_xml_get_widget_(
+			info->main_window, "cachemeter");
+	gint	   v = info->status_tokens[TOTAL_MEM];
+	gdouble ms   = v > 0 ? (double) v / 1000.0 : 0.0; 
+	if(ms < 0)
+		ms = 0.0;
+	else if(ms > 1.0 )ms = 1.0;
+	GdkColor color;
+
+	color.red = 0x0000;
+	color.green = 0xffff;
+	color.blue = 0x0000;
+	if(gdk_colormap_alloc_color(info->color_map,
+			&color, TRUE, TRUE))
+		set_color_fg( "cachemeter", &color);
+	gtk_progress_bar_set_fraction( GTK_PROGRESS_BAR(w), ms );
+
+	return TRUE;
+}
 
 static	gboolean	update_sample_record_timeout(gpointer data)
 {
@@ -5586,7 +5609,8 @@ static	void	init_cpumeter()
 {
 	info->cpumeter = g_timeout_add(300,update_cpumeter_timeout,
 			(gpointer*) info );
-	int ms = (int) ( 1.0 / info->el.fps * 1000 );
+	info->cachemeter = g_timeout_add(300,update_cachemeter_timeout,
+			(gpointer*) info );
 }
 
 
@@ -5709,12 +5733,12 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if(nb > 0)
 		{
 			int n = status_to_arr( gui->status_msg, gui->status_tokens );
-			if( n != 17 )
+			if( n != 18 )
 			{
 				// restore status (to prevent gui from going bezerk)
 				int *history = info->history_tokens[ info->uc.playmode ];
 				int i;
-				for(i = 0; i <= 17; i ++ )
+				for(i = 0; i <= 18; i ++ )
 				{
 					gui->status_tokens[i] = history[i];
 				}
@@ -6604,7 +6628,7 @@ void	vj_gui_disconnect()
 
 	g_source_remove( info->logging );
 	g_source_remove( info->cpumeter );
-
+	g_source_remove( info->cachemeter );
 	g_io_channel_shutdown(info->channel, FALSE, NULL);
 	g_io_channel_unref(info->channel);
 	gtk_key_snooper_remove( info->key_id );

@@ -18,8 +18,8 @@
  */
 #ifndef GVRCOMMON_H
 #define GVRCOMMON_H
-#define STATUS_BYTES 	100
-#define STATUS_TOKENS 	19
+#define STATUS_BYTES 	150
+#define STATUS_TOKENS 	20
 #define VEEJAY_CODENAME "Resume build 2k6 v. beta 2"
 /* Status bytes */
 
@@ -37,6 +37,7 @@
 #define FRAME_NUM	1
 #define TOTAL_FRAMES	6
 #define TOTAL_SLOTS	16
+#define TOTAL_MEM	17
 #define CURRENT_ENTRY	15
 #define	MODE_PLAIN	2
 #define MODE_SAMPLE	0

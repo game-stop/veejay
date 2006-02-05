@@ -24,6 +24,7 @@
 vj_effect *transline_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) malloc(sizeof(vj_effect));
+    memset(ve,0,sizeof(vj_effect));
     ve->num_params = 4;
     ve->defaults = (int *) malloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) malloc(sizeof(int) * ve->num_params);	/* min */
@@ -32,7 +33,7 @@ vj_effect *transline_init(int width, int height)
     ve->defaults[1] = 10;	/* line width */
     ve->defaults[2] = 3;	/* distance */
     ve->defaults[3] = 0;	/* type */
-
+    
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
 

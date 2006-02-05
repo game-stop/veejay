@@ -63,13 +63,12 @@ int		neighbours_malloc(int w, int h )
 	return 1;
 }
 
-int		neighbours_free(void)
+void		neighbours_free(void)
 {
 	if(tmp_buf[0]) free(tmp_buf[0]);
 	if(tmp_buf[1]) free(tmp_buf[1]);
 	if(chromacity[0]) free(chromacity[0]);
 	if(chromacity[1]) free(chromacity[1]);
-	return 1;
 }
 
 static inline uint8_t evaluate_pixel(

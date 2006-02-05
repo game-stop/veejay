@@ -2133,7 +2133,7 @@ int vj_perform_tag_complete_buffers(veejay_t * info, int entry, const int skip_i
  *
  */
 
-void vj_perform_plain_fill_buffer(veejay_t * info, int entry)
+void vj_perform_plain_fill_buffer(veejay_t * info, int entry, int skip)
 {
     video_playback_setup *settings = (video_playback_setup*)  info->settings;
     uint8_t *frame[3];
@@ -2141,18 +2141,19 @@ void vj_perform_plain_fill_buffer(veejay_t * info, int entry)
     frame[0] = primary_buffer[0]->Y;
     frame[1] = primary_buffer[0]->Cb;
     frame[2] = primary_buffer[0]->Cr;
-
-
-
+  
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+	{
+		sample_cache_frames( info->uc->sample_id, get_num_slots() );
 		ret = vj_perform_get_frame_(info, info->uc->sample_id, settings->current_frame_num,frame );
+	}
 	else
+	{
 		ret = vj_el_get_video_frame(info->current_edit_list,settings->current_frame_num,frame);
-	
+	}
 
     if(ret <= 0)
     {
-	veejay_msg(VEEJAY_MSG_WARNING, "There is no plain video to play!");
 	veejay_change_state(info, LAVPLAY_STATE_STOP);
     }
 }
@@ -2667,10 +2668,9 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 	if(settings->offline_record)	
 		vj_perform_record_tag_frame(info,0);
 
-
 	switch (info->uc->playback_mode) {
 		case VJ_PLAYBACK_MODE_SAMPLE:
-		    	vj_perform_plain_fill_buffer(info, frame);	/* primary frame */
+		    	vj_perform_plain_fill_buffer(info, frame, skip_incr);	/* primary frame */
 		    	cached_sample_frames[CACHE_TOP] = info->uc->sample_id;
 		    	if(vj_perform_verify_rows(info,frame))
 		    	{		
@@ -2684,7 +2684,7 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 		    return 1;
 		    break;
 		case VJ_PLAYBACK_MODE_PLAIN:
-		    vj_perform_plain_fill_buffer(info, frame);
+		    vj_perform_plain_fill_buffer(info, frame, skip_incr);
 		    return 1;
  		    break;
 		case VJ_PLAYBACK_MODE_TAG:

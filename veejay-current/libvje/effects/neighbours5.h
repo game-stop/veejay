@@ -26,6 +26,6 @@
 
 vj_effect *neighbours5_init(int w, int h);
 int neighbours5_malloc(int w, int h);
-int neighbours5_free(void);
+void neighbours5_free(void);
 void neighbours5_apply( VJFrame *frame, int width, int height, int radius,int brush_size, int level);
 #endif

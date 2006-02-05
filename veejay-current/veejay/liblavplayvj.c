@@ -205,6 +205,21 @@ struct mjpeg_params
 #ifdef HAVE_SDL
 extern void vj_event_single_fire(void *ptr, SDL_Event event, int pressed);
 #endif
+static int	total_mem_mb_ = 0;
+static int 	chunk_size_ = 0;
+static int	n_cache_slots_ = 0;
+int	get_num_slots(void)
+{
+	return n_cache_slots_;
+}
+int	get_total_mem(void)
+{
+	return total_mem_mb_;
+}
+int	get_chunk_size(void)
+{
+	return chunk_size_;
+}
 
 int veejay_get_state(veejay_t *info) {
 	video_playback_setup *settings = (video_playback_setup*)info->settings;
@@ -409,10 +424,11 @@ int veejay_free(veejay_t * info)
 	(video_playback_setup *) info->settings;
 
 	veejay_reap_messages();
+	vj_event_stop();
 
 	vj_el_deinit();	
 
-	vj_event_stop();
+	sample_free();
 
 	vj_tag_free();
 
@@ -618,10 +634,11 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 	}
 }
 
-
 void veejay_set_sample(veejay_t * info, int sampleid)
 {
     int start,end,speed,looptype;
+
+
     if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
     {
 	if(!vj_tag_exists(sampleid))
@@ -629,6 +646,7 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 		   veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist", sampleid);
 	     	   return;
         }
+
 	info->last_tag_id = sampleid;
 	info->uc->sample_id = sampleid;
 
@@ -639,6 +657,7 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 		sampleid);
 
 	info->edit_list = info->current_edit_list;
+	
 	veejay_reset_el_buffer(info);
 	return;
      }
@@ -651,8 +670,6 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 			return;
 		}
 
-		editlist *edl = 
-			sample_get_editlist( sampleid );
 		info->edit_list = sample_get_editlist( sampleid );
 
 		veejay_reset_el_buffer(info);
@@ -1024,6 +1041,12 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 
 }
 
+int	veejay_mem_used( void )
+{
+	double v = (1.0 /  (double) chunk_size_) * (double) vj_el_cache_size();
+	return (int) (v * 1000.0);
+}
+
 
 void veejay_pipe_write_status(veejay_t * info, int link_id)
 {
@@ -1033,21 +1056,23 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     int res = 0;
     int pm = info->uc->playback_mode;
     int total_slots = (sample_size() - 1 ) + (vj_tag_true_size() -1 );
-    if(total_slots < 0)
+    int cache_used = veejay_mem_used();
+
+   if(total_slots < 0)
 	total_slots = 0;
     switch (info->uc->playback_mode) {
     	case VJ_PLAYBACK_MODE_SAMPLE:
-			if( info->settings->randplayer.mode ==
-				RANDMODE_SAMPLE)
-				pm = VJ_PLAYBACK_MODE_PATTERN;
-			if( sample_chain_sprint_status
-				(info->uc->sample_id, info->real_fps,settings->current_frame_num, pm, total_slots,info->status_what ) != 0)
-				{
-					veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
-				}
+		if( info->settings->randplayer.mode ==
+			RANDMODE_SAMPLE)
+			pm = VJ_PLAYBACK_MODE_PATTERN;
+		if( sample_chain_sprint_status
+			(info->uc->sample_id,cache_used,info->real_fps,settings->current_frame_num, pm, total_slots,info->status_what ) != 0)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
+		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		sprintf(info->status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		sprintf(info->status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			(int) info->real_fps,
 			settings->current_frame_num,
 			info->uc->playback_mode,
@@ -1064,10 +1089,11 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 			0,
 			0,	
 			0,
-			total_slots );
+			total_slots,
+			cache_used );
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
-		if( vj_tag_sprint_status( info->uc->sample_id, (int) info->real_fps,
+		if( vj_tag_sprint_status( info->uc->sample_id,cache_used, (int) info->real_fps,
 			settings->current_frame_num, info->uc->playback_mode,total_slots, info->status_what ) != 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
@@ -2019,15 +2045,11 @@ static void veejay_playback_cycle(veejay_t * info)
 	    settings->buffer_entry[frame] = settings->current_frame_num;
 //		el->frame_list[settings->current_frame_num];
 	    if (!skipa) 
-        {
-			vj_perform_queue_audio_frame(info,frame);
-	    }
+		vj_perform_queue_audio_frame(info,frame);
 
 	    if (!skipv)
-        { 
-				vj_perform_queue_video_frame(info,frame,skipi);
-	   	}
-	    
+			vj_perform_queue_video_frame(info,frame,skipi);
+  
 	    vj_perform_queue_frame(info,skipi,frame);
 #ifdef HAVE_SDL	
 	    te = SDL_GetTicks();
@@ -2271,6 +2293,52 @@ int vj_server_setup(veejay_t * info)
  *
  * return value: a pointer to an allocated veejay_t
  ******************************************************/
+int	prepare_cache_line(int perc, int n_slots)
+{
+	int total = 0; 
+	int avail  = 0;
+	int buffer = 0;
+	int cache = 0;
+	char line[128];
+	FILE *file = fopen( "/proc/meminfo","r");
+	if(!file)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cant open proc, memory size cannot be determined");
+		veejay_msg(VEEJAY_MSG_ERROR, "Cache disabled");
+		return 1;
+	}
+
+	fgets( line,128, file );
+	fgets( line,128, file );
+	fclose( file );
+	sscanf( line, "%*s %i %i %i %i", &total,&avail,&buffer,&cache );
+	int max_memory = 0;
+	if( perc > 0)
+	{
+		float	k = (float) perc / 100.0;
+		int	threshold = avail / (1024 * 1024);
+		max_memory = (int)( k * threshold );
+	}
+	if( n_slots <= 0)
+	 n_slots = 1;
+	int chunk_size = (max_memory <= 0 ? 0: max_memory / n_slots ); 
+	chunk_size_ = chunk_size;
+	n_cache_slots_ = n_slots;
+	total_mem_mb_ = total / (1024 * 1024);
+	if(chunk_size > 0 )
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "%d Mb total system RAM , %d Mb total available", total_mem_mb_,
+				avail / (1024*1024) );
+		veejay_msg(VEEJAY_MSG_INFO, "Reserved %d percent of available RAM for cache", perc );
+		veejay_msg(VEEJAY_MSG_INFO, "Cache line size is %d Mb (Total is %d)", chunk_size, max_memory);
+		vj_el_init_chunk( chunk_size );
+	}
+	else
+		veejay_msg(VEEJAY_MSG_INFO, "Memory cache disabled");
+
+	return 1;
+}
+
 
 veejay_t *veejay_malloc()
 {
@@ -2278,7 +2346,7 @@ veejay_t *veejay_malloc()
     veejay_t *info;
     int i;
 
-    info = (veejay_t *) vj_malloc(sizeof(veejay_t));
+      info = (veejay_t *) vj_malloc(sizeof(veejay_t));
     if (!info)
 		return NULL;
 	memset(info,0,sizeof(veejay_t));
@@ -2375,8 +2443,7 @@ veejay_t *veejay_malloc()
 	for( i = 0; i < MAX_SDL_OUT;i++ )
 		info->sdl[i] = NULL;
 #endif
-	vj_el_init();
-
+    vj_el_init();
     return info;
 }
 
@@ -2439,7 +2506,8 @@ static void	veejay_reset_el_buffer( veejay_t *info )
 	free(settings->save_list);
 
     settings->save_list = NULL;
-    settings->save_list_len = 0; 
+    settings->save_list_len = 0;
+
 }
 
 int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
