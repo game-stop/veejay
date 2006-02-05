@@ -4748,6 +4748,7 @@ on_rgbkey_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 			"slider_p2", green, 0 );
 		update_slider_value(
 			"slider_p3", blue, 0 );	
+	
 		info->parameter_lock = 0;
 	}
 

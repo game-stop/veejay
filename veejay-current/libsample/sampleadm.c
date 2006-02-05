@@ -1818,7 +1818,7 @@ int	sample_cache_frames(int s1, int max_n)
 		int type = sample->effect_chain[i]->source_type;
 		int b_sample = sample->effect_chain[i]->channel;
 		
-		if ( type == 0 && !sample_inlined( sample, b_sample ))
+		if ( b_sample > 0 && type == 0 && !sample_inlined( sample, b_sample ))
 		{
 			sample_cache( b_sample );	
 			if( slots_consumed_ >= max_n )

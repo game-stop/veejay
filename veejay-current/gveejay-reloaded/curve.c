@@ -114,27 +114,6 @@ void		del_chain_entry( key_effect_t *ke )
 	}
 }
 
-void	debug_key( key_parameter_t *key )
-{
-	printf("%p , %d, %d, %d, %d, %d, :\n",
-		key->vector ,
-		key->running ,
-		key->parameter_id,
-		key->curve_len,
-		key->end_pos, 
-		key->start_pos );
-	int j;
-	if(key->vector)
-	for(j = 0 ; j < 100 && j < key->curve_len; j += 5 )
-	{
-		printf("%2.2f ", key->vector[j] );
-	}
-	else
-		printf("vector empty\n");
-	printf("\n");
-
-}
-
 void	clear_parameter_values( key_parameter_t *key )
 {
 	if(key)
@@ -161,12 +140,10 @@ int	parameter_for_frame( key_parameter_t *key, gint frame_pos )
 /* Get a value for a frame position */
 int	get_parameter_key_value( key_parameter_t *key, gint frame_pos, float *result )
 {
-	printf("%d, %d, %d\n", frame_pos,key->start_pos, key->end_pos );
 	if( frame_pos < key->start_pos || frame_pos > key->end_pos )
 		return 0;
 	if(!key->vector)
 	{
-		printf("Borked!\n");
 		return 0;
 	}
 	*result = key->vector[ frame_pos ];	

@@ -134,10 +134,6 @@ Returns¿:	TRUE to stop further processing of event, FALSE to continue.
 
 gboolean	key_snooper(GtkWidget *w, GdkEventKey *event, gpointer user_data)
 {
-	printf(" %d, %d, %d\n",
-		event->type,
-		event->keyval,
-		event->state );
 	return FALSE;
 }
 // gtk_key_snooper_install

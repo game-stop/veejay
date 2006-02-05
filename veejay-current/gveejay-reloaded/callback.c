@@ -485,11 +485,11 @@ void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 
 #define	slider_changed( arg_num, value ) \
 {\
+online_update( arg_num, value );\
 if(!info->status_lock && !info->parameter_lock)\
 	{\
 info->parameter_lock = 1;\
 multi_vims( VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d", 0, info->uc.selected_chain_entry,arg_num, value );\
-online_update( arg_num, value );\
 if(info->uc.selected_rgbkey) update_rgbkey_from_slider(); \
 info->parameter_lock = 0;\
 }\
@@ -497,12 +497,12 @@ info->parameter_lock = 0;\
 
 #define	param_changed( arg_num, fraction, name ) \
 {\
+online_update( arg_num, (get_slider_val(name) + fraction) );\
 if(!info->status_lock && !info->parameter_lock)\
 {\
 info->parameter_lock = 1;\
 multi_vims( VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d", 0, info->uc.selected_chain_entry,arg_num, (get_slider_val(name) + fraction) );\
 update_slider_value( name, (get_slider_val(name) + fraction), 0 );\
-online_update( arg_num, (get_slider_val(name) + fraction) );\
 if(info->uc.selected_rgbkey) update_rgbkey_from_slider(); \
 info->parameter_lock = 0;\
 }\
@@ -1616,7 +1616,7 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	s->ec->effects[i]->parameters[j]->running = is_button_toggled( "curve_togglerun" );
 	s->ec->effects[i]->enabled = is_button_toggled( "button_entry_toggle");
 
-	debug_key( s->ec->effects[i]->parameters[j] ); 
+	//debug_key( s->ec->effects[i]->parameters[j] ); 
 }
 
 void	on_curve_buttontime_clicked(GtkWidget *widget, gpointer user_data )
@@ -1643,7 +1643,7 @@ void	on_curve_buttontime_clicked(GtkWidget *widget, gpointer user_data )
 	key->end_pos = end;
 	curve_timeline_preserve( key, end - start, curve );
 
-	debug_key( s->ec->effects[i]->parameters[j] ); 
+	//debug_key( s->ec->effects[i]->parameters[j] ); 
 }
 
 
@@ -1661,7 +1661,7 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 	//set_points_in_curve( s->ec->effects[i]->parameters[j] , curve );
 	reset_curve( s->ec->effects[i]->parameters[j], curve ); 
 	set_toggle_button( "curve_togglerun", 0 );
-	debug_key( s->ec->effects[i]->parameters[j] ); 
+	//debug_key( s->ec->effects[i]->parameters[j] ); 
 
 }
 
