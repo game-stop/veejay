@@ -1202,6 +1202,8 @@ static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint las
 	{
 		seqv->panel = gtk_frame_new(NULL);
 		seqv->toggle = gtk_toggle_button_new_with_label( "preview" );
+		gtk_toggle_button_set_active(
+			GTK_TOGGLE_BUTTON(seqv->toggle), FALSE );
 		g_signal_connect( G_OBJECT( seqv->toggle ), "toggled", G_CALLBACK(sequence_preview_cb),
 				(gpointer*)p );
 		//gtk_widget_set_sensitive( GTK_WIDGET(seqv->toggle), FALSE );

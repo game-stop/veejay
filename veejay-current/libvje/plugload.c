@@ -110,12 +110,9 @@ static	int	init_param_livido( void *port, int p, int hint )
 	return 0;
 }
 
-static	void	free_parameters( void *port )
+static	void	free_parameters( void *port, int n )
 {
 	int i;
-	int n = 0;
-	assert( port != NULL );
-	vevo_property_get( port, "n_params", 0, &n );
 
 	for ( i = 0; i < n ; i ++ )
 	{
@@ -610,8 +607,7 @@ static	void	free_plugin(void *plugin)
 	int type = 0;
 	vevo_property_get( plugin, "type", 0, &type);
 
-	free_parameters(plugin);
-
+	int n = 0;
 
 	if( type == VEVO_FF_PORT )
 	{		
@@ -619,6 +615,7 @@ static	void	free_plugin(void *plugin)
 		vevo_property_get( plugin, "base", 0, &base);
 		plugMainType *q = (plugMainType*) base; 
 		q( FF_DEINITIALISE, NULL, 0 );
+		vevo_property_get( plugin, "n_params", 0, &n );
 	}
 	else if ( type == VEVO_FR_PORT )
 	{
@@ -626,11 +623,15 @@ static	void	free_plugin(void *plugin)
 		f0r_deinit_f base;
 		vevo_property_get( plugin, "deinit", 0, &base);
 		(*base)();
+		vevo_property_get( plugin, "f0r_p", 0, &n );
 	}
 	else if ( type == VEVO_LIVIDO_PORT )
 	{
 
 	}
+
+	free_parameters(plugin,n);
+
 
 	void *handle = NULL;
 	vevo_property_get( plugin, "handle", 0 , &handle );

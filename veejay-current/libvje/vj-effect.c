@@ -559,7 +559,7 @@ void vj_effect_free(vj_effect *ve) {
   if(ve->limits[1]) free(ve->limits[1]);
   if(ve->defaults) free(ve->defaults);
  // if(ve->vjed) free(ve->vjed);
-  free(ve);
+    free(ve);
 }
 
 void vj_effect_shutdown() {
@@ -568,7 +568,10 @@ void vj_effect_shutdown() {
     plug_free();
     for(i=0; i < vj_effect_max_effects(); i++) { 
 	if(vj_effects[i]) {
-	 vj_effect_free(vj_effects[i]);
+	 if( i >= MAX_EFFECTS )
+	  if(vj_effects[i]->description) free(vj_effects[i]->description);
+	  vj_effect_free(vj_effects[i]);
+
 	}
     }
 }

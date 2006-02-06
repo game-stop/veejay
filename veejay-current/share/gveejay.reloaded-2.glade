@@ -4034,6 +4034,111 @@
 	  </child>
 
 	  <child>
+	    <widget class="GtkProgressBar" id="cachemeter">
+	      <property name="visible">True</property>
+	      <property name="orientation">GTK_PROGRESS_LEFT_TO_RIGHT</property>
+	      <property name="fraction">0</property>
+	      <property name="pulse_step">0.00999999977648</property>
+	      <property name="text" translatable="yes">Cache filled</property>
+	      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
+	    </widget>
+	    <packing>
+	      <property name="padding">0</property>
+	      <property name="expand">False</property>
+	      <property name="fill">False</property>
+	    </packing>
+	  </child>
+
+	  <child>
+	    <widget class="GtkCheckButton" id="previewtoggle">
+	      <property name="visible">True</property>
+	      <property name="tooltip" translatable="yes">Enable or disable realtime preview</property>
+	      <property name="can_focus">True</property>
+	      <property name="label" translatable="yes"></property>
+	      <property name="use_underline">True</property>
+	      <property name="relief">GTK_RELIEF_NORMAL</property>
+	      <property name="focus_on_click">True</property>
+	      <property name="active">False</property>
+	      <property name="inconsistent">False</property>
+	      <property name="draw_indicator">True</property>
+	      <signal name="toggled" handler="on_previewtoggle_toggled" last_modification_time="Wed, 23 Nov 2005 07:08:38 GMT"/>
+	    </widget>
+	    <packing>
+	      <property name="padding">0</property>
+	      <property name="expand">False</property>
+	      <property name="fill">False</property>
+	    </packing>
+	  </child>
+
+	  <child>
+	    <widget class="GtkButton" id="previewlarge">
+	      <property name="visible">True</property>
+	      <property name="tooltip" translatable="yes">Large preview</property>
+	      <property name="can_focus">True</property>
+	      <property name="relief">GTK_RELIEF_NORMAL</property>
+	      <property name="focus_on_click">True</property>
+	      <signal name="clicked" handler="on_previewlarge_clicked" last_modification_time="Tue, 22 Nov 2005 05:32:00 GMT"/>
+
+	      <child>
+		<widget class="GtkImage" id="image1235">
+		  <property name="visible">True</property>
+		  <property name="pixbuf">icon_plarge.png</property>
+		  <property name="xalign">0.5</property>
+		  <property name="yalign">0.5</property>
+		  <property name="xpad">0</property>
+		  <property name="ypad">0</property>
+		</widget>
+	      </child>
+	    </widget>
+	    <packing>
+	      <property name="padding">0</property>
+	      <property name="expand">False</property>
+	      <property name="fill">False</property>
+	    </packing>
+	  </child>
+
+	  <child>
+	    <widget class="GtkAlignment" id="alignment421">
+	      <property name="visible">True</property>
+	      <property name="xalign">0.5</property>
+	      <property name="yalign">0.5</property>
+	      <property name="xscale">1</property>
+	      <property name="yscale">1</property>
+	      <property name="top_padding">0</property>
+	      <property name="bottom_padding">0</property>
+	      <property name="left_padding">0</property>
+	      <property name="right_padding">0</property>
+
+	      <child>
+		<widget class="GtkButton" id="previewsmall">
+		  <property name="visible">True</property>
+		  <property name="tooltip" translatable="yes">Small preview</property>
+		  <property name="can_focus">True</property>
+		  <property name="relief">GTK_RELIEF_NORMAL</property>
+		  <property name="focus_on_click">True</property>
+		  <signal name="clicked" handler="on_previewsmall_clicked" last_modification_time="Tue, 22 Nov 2005 05:30:42 GMT"/>
+
+		  <child>
+		    <widget class="GtkImage" id="image1234">
+		      <property name="visible">True</property>
+		      <property name="pixbuf">icon_psmall.png</property>
+		      <property name="xalign">0.5</property>
+		      <property name="yalign">0.5</property>
+		      <property name="xpad">0</property>
+		      <property name="ypad">0</property>
+		    </widget>
+		  </child>
+		</widget>
+	      </child>
+	    </widget>
+	    <packing>
+	      <property name="padding">0</property>
+	      <property name="expand">False</property>
+	      <property name="fill">False</property>
+	    </packing>
+	  </child>
+
+	  <child>
 	    <widget class="GtkHBox" id="hbox225">
 	      <property name="visible">True</property>
 	      <property name="homogeneous">True</property>
@@ -4290,82 +4395,7 @@
 	    <packing>
 	      <property name="padding">0</property>
 	      <property name="expand">False</property>
-	      <property name="fill">False</property>
-	    </packing>
-	  </child>
-
-	  <child>
-	    <widget class="GtkCheckButton" id="previewtoggle">
-	      <property name="visible">True</property>
-	      <property name="tooltip" translatable="yes">Enable or disable realtime preview</property>
-	      <property name="can_focus">True</property>
-	      <property name="label" translatable="yes"></property>
-	      <property name="use_underline">True</property>
-	      <property name="relief">GTK_RELIEF_NORMAL</property>
-	      <property name="focus_on_click">True</property>
-	      <property name="active">False</property>
-	      <property name="inconsistent">False</property>
-	      <property name="draw_indicator">True</property>
-	      <signal name="toggled" handler="on_previewtoggle_toggled" last_modification_time="Wed, 23 Nov 2005 07:08:38 GMT"/>
-	    </widget>
-	    <packing>
-	      <property name="padding">0</property>
-	      <property name="expand">False</property>
-	      <property name="fill">False</property>
-	    </packing>
-	  </child>
-
-	  <child>
-	    <widget class="GtkButton" id="previewlarge">
-	      <property name="visible">True</property>
-	      <property name="tooltip" translatable="yes">Large preview</property>
-	      <property name="can_focus">True</property>
-	      <property name="relief">GTK_RELIEF_NORMAL</property>
-	      <property name="focus_on_click">True</property>
-	      <signal name="clicked" handler="on_previewlarge_clicked" last_modification_time="Tue, 22 Nov 2005 05:32:00 GMT"/>
-
-	      <child>
-		<widget class="GtkImage" id="image1235">
-		  <property name="visible">True</property>
-		  <property name="pixbuf">icon_plarge.png</property>
-		  <property name="xalign">0.5</property>
-		  <property name="yalign">0.5</property>
-		  <property name="xpad">0</property>
-		  <property name="ypad">0</property>
-		</widget>
-	      </child>
-	    </widget>
-	    <packing>
-	      <property name="padding">0</property>
-	      <property name="expand">False</property>
-	      <property name="fill">False</property>
-	    </packing>
-	  </child>
-
-	  <child>
-	    <widget class="GtkButton" id="previewsmall">
-	      <property name="visible">True</property>
-	      <property name="tooltip" translatable="yes">Small preview</property>
-	      <property name="can_focus">True</property>
-	      <property name="relief">GTK_RELIEF_NORMAL</property>
-	      <property name="focus_on_click">True</property>
-	      <signal name="clicked" handler="on_previewsmall_clicked" last_modification_time="Tue, 22 Nov 2005 05:30:42 GMT"/>
-
-	      <child>
-		<widget class="GtkImage" id="image1234">
-		  <property name="visible">True</property>
-		  <property name="pixbuf">icon_psmall.png</property>
-		  <property name="xalign">0.5</property>
-		  <property name="yalign">0.5</property>
-		  <property name="xpad">0</property>
-		  <property name="ypad">0</property>
-		</widget>
-	      </child>
-	    </widget>
-	    <packing>
-	      <property name="padding">0</property>
-	      <property name="expand">False</property>
-	      <property name="fill">False</property>
+	      <property name="fill">True</property>
 	    </packing>
 	  </child>
 	</widget>
