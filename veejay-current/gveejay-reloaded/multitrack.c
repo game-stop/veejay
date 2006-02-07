@@ -824,7 +824,7 @@ int		multitrack_add_track( void *data )
 			store_data( mt->data, track, hostname, port_num );
 			G_UNLOCK(mt_lock);
 			mt_priv_t *p = pt->pt[track];
-			gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( p->view->toggle ), 1 );
+		//	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( p->view->toggle ), 1 );
 			status_print( mt, "Track %d: Connection established with '%s' port %d\n",
 				track, hostname, port_num );
 			gtk_widget_set_sensitive( GTK_WIDGET(p->view->panel),TRUE);
@@ -869,7 +869,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 
 
 	multitrack_set_current( data, hostname, port_num , preview_width_*2, preview_height_*2);
-	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( a->pt[track]->view->toggle ), 1 );
+//	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( a->pt[track]->view->toggle ), 1 );
 	status_print( mt, "Track %d: Connection established with '%s' port %d\n",
 		track, hostname, port_num );
 	gtk_widget_set_sensitive( GTK_WIDGET(a->pt[track]->view->panel),TRUE);
