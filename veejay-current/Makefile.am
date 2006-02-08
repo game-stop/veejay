@@ -5,7 +5,7 @@ if USE_SWSCALER
 SUBDIRS += libpostproc
 endif
 SUBDIRS += libvevo libvje libsample libvjnet libyuv libel libstream liblavjpeg libsamplerec
-SUBDIRS += plugins veejay 
+SUBDIRS += veejay 
 if USE_GVEEJAY
 SUBDIRS += gveejay
 endif

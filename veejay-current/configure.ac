@@ -883,7 +883,6 @@ liblavjpeg/Makefile
 libsamplerec/Makefile
 utils/Makefile
 bio2jack/Makefile
-plugins/Makefile
 veejay/Makefile
 gveejay/Makefile
 gveejay-reloaded/Makefile
