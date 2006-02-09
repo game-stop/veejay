@@ -121,10 +121,19 @@ void	multitrack_preview_master(void *data, int status)
 	multitracker_t *mt = (multitracker_t*) data;
 	all_priv_t *pt = (all_priv_t*) mt->data;
 	mt_priv_t *last = pt->pt[LAST_TRACK];
+
 	if(status == last->preview)
 		return;
 	G_LOCK(mt_lock);
 	last->preview = status;
+	int n = find_track( mt, last->hostname, last->port_num );
+	if ( n >= 0 )
+	{
+		mt_priv_t *p = pt->pt[ n ];
+		gtk_toggle_button_set_active( 	
+			GTK_TOGGLE_BUTTON( p->view->toggle ), status );
+	}
+	
 	G_UNLOCK(mt_lock);
 }
 

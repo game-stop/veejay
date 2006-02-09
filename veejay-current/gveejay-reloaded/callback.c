@@ -2274,10 +2274,7 @@ gboolean 	on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 {
-	if(!info->status_lock)
-	{
-		multitrack_preview_master( info->mt, is_button_toggled("previewtoggle"));
-	}
+	multitrack_preview_master( info->mt, is_button_toggled("previewtoggle"));
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 }
 

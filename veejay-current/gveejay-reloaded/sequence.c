@@ -401,8 +401,8 @@ void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_he
 		return NULL;
 	}
 
-	v->data_status[0] = DATA_DONE;
-	v->data_status[1] = DATA_DONE;
+	v->data_status[0] = DATA_READY;
+	v->data_status[1] = DATA_READY;
 	v->time_out = 1000000 * 3; // 3 second timeout
 	v->frame_num = 0;
 	v->abort = 0;
