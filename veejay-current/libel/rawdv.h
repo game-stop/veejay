@@ -44,6 +44,7 @@ typedef struct
 	mmap_region_t *mmap_region;
 } dv_t;
 
+int	rawdv_sampling(dv_t *dv);
 int	rawdv_close(dv_t *dv);
 dv_t	*rawdv_open_input_file(const char *filename, int mmap_size);
 int	rawdv_set_position(dv_t *dv, long nframe);

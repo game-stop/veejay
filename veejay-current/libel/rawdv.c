@@ -49,6 +49,17 @@ int	rawdv_close(dv_t *dv)
 	return 1;
 }
 
+int	rawdv_sampling(dv_t *dv)
+{
+	switch(dv->fmt)
+	{
+		case e_dv_sample_411: return 4;
+		case e_dv_sample_422: return 2;
+		case e_dv_sample_420: return 1;
+	}
+	return 3;
+}
+
 #define DV_HEADER_SIZE 120000
 dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 {
@@ -128,13 +139,13 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot parse header");
 		return NULL;
 	}
-	if(decoder->sampling == e_dv_sample_411)
+/*	if(decoder->sampling == e_dv_sample_411)
 	{
 		dv_decoder_free( decoder );
 		rawdv_free(dv);
 		if(tmp) free(tmp);
 		return NULL;
-	}
+	}*/
 
 
 	if(dv_is_PAL( decoder ) )
@@ -150,8 +161,8 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	dv->fps = ( dv_is_PAL( decoder) ? 25.0 : 29.97 );
 	dv->size = decoder->frame_size;
 	dv->num_frames = (file_size - DV_HEADER_SIZE) / dv->size;
-	
-	dv->fmt = ( decoder->sampling == e_dv_sample_422 ? 1 : 0);
+	dv->fmt = decoder->sampling;	
+//	dv->fmt = ( decoder->sampling == e_dv_sample_422 ? 1 : 0);
 	dv->buf = (uint8_t*) vj_malloc(sizeof(uint8_t*) * dv->size);
 	dv->offset = 0;
 

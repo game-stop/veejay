@@ -832,11 +832,19 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		lav_fd->dv_fd = rawdv_open_input_file(filename,mmap_size);
 	  	if(lav_fd->dv_fd > 0)
 		{
-			lav_fd->format = 'b'; 
-			lav_fd->has_audio = 0;
-			//(rawdv_audio_bits(lav_fd->dv_fd) > 0 ? 1:0);
-			video_comp = rawdv_video_compressor( lav_fd->dv_fd );
-			ret = 1;
+			lav_fd->MJPG_chroma = rawdv_sampling( lav_fd->dv_fd );
+			if ( lav_fd->MJPG_chroma == -1 )
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Dont know how to treat this file");
+				ret = 0;
+			}
+			else
+			{
+				video_comp = rawdv_video_compressor( lav_fd->dv_fd );
+				lav_fd->format = 'b'; 
+				lav_fd->has_audio = 0;
+				ret = 1;
+			}
 	    	}
 #endif
 #ifdef USE_GDK_PIXBUF
@@ -898,7 +906,14 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	}
     if (strncasecmp(video_comp,"dvsd",4)==0 || strncasecmp(video_comp,"dv",2)==0)
 	{
-		lav_fd->MJPG_chroma = CHROMA422;
+	//veejay_msg(VEEJAY_MSG_DEBUG,"!! Guessing sampling type");
+	//	lav_fd->MJPG_chroma = CHROMA422;
+		int gw = lav_video_height( lav_fd );
+		if( gw == 480 )
+			 lav_fd->MJPG_chroma = CHROMA411;
+		else
+			lav_fd->MJPG_chroma = CHROMA422;
+
 		lav_fd->interlacing = LAV_INTER_BOTTOM_FIRST;
 		return lav_fd; 
 	}
