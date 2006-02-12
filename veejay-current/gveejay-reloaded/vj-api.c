@@ -1655,6 +1655,8 @@ void		veejay_quit( )
 	clear_progress_bar( "connecting",0.0 );
 	clear_progress_bar( "samplerecord_progress",0.0 );
 	clear_progress_bar( "streamrecord_progress",0.0 );
+
+	exit(0);
 }
 
 static	int	running_g_ = 1;
