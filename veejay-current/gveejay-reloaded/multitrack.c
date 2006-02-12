@@ -116,6 +116,11 @@ static  int     preview_height_ = 0;
 static volatile int	MAX_TRACKS = 4;
 static volatile int	LAST_TRACK = 0;
 
+
+static	GdkPixbuf	*logo_img_ = NULL;
+static	float		logo_step_ = 0.1;
+static	float		logo_value_ = 1.0;
+
 void	multitrack_preview_master(void *data, int status)
 {
 	multitracker_t *mt = (multitracker_t*) data;
@@ -423,7 +428,7 @@ static	gboolean	update_track_list( mt_priv_t *p )
 		}
 
 		if( !buf )
-			return TRUE;
+			return FALSE;
 
 		i = 0;	
 		while( i < len )
@@ -481,7 +486,7 @@ static	void	update_widgets(int *status, mt_priv_t *p, int pm)
 {
 	int *h = p->history[pm];
 	gdk_threads_enter();
-	
+	mt_update_gui(status);	
 	playmode_sensitivity( p, pm );
 
 	if( pm == MODE_SAMPLE || pm == MODE_PLAIN )
@@ -493,10 +498,8 @@ static	void	update_widgets(int *status, mt_priv_t *p, int pm)
 		if( h[SAMPLE_SPEED] != status[SAMPLE_SPEED] )
 			update_speed( p, status[SAMPLE_SPEED] );
 	}
-
 	if( h[TOTAL_SLOTS] != status[TOTAL_SLOTS])
 	{
-veejay_msg(VEEJAY_MSG_DEBUG, "%d vs %d", h[TOTAL_SLOTS], status[TOTAL_SLOTS]);
 		if(update_track_list( p ))
 			update_track_view( MAX_TRACKS, get_track_tree( p->view->tracks ), (void*)p );
 	}
@@ -513,7 +516,7 @@ static gboolean	update_sequence_widgets( gpointer data )
 	int n = status_to_arr( status, array );
 	if( n != 18 )
 	{
-		printf("status error\n");	
+		assert(n == 18);	
 	}
 	p->status_lock = 1;
 
@@ -522,6 +525,7 @@ static gboolean	update_sequence_widgets( gpointer data )
 	for( i  =  0; i < 18; i ++ )
 		p->status_cache[i] = array[i];
 
+	
 	update_widgets(array, p, pm);
 
 	int *his = p->history[ pm ];	
@@ -588,15 +592,22 @@ static	void	delete_data( void *data, int index )
 	}
 	
 }
+
+static	GdkPixbuf	*load_logo_image( )
+{
+	char path[1024];
+	bzero(path,1024);
+	get_gd(path,NULL, "veejay-logo.png");
+	return gdk_pixbuf_new_from_file( path,NULL );
+}
+
 static	void	set_logo(GtkWidget *area)
 {
 	char path[1024];
 	bzero(path,1024);
 	get_gd(path,NULL, "veejay-logo.png");
-	GdkPixbuf *buf = gdk_pixbuf_new_from_file( path,NULL );
-	GdkPixbuf *buf2 = gdk_pixbuf_scale_simple( buf,preview_width_,preview_height_, GDK_INTERP_BILINEAR );
+	GdkPixbuf *buf2 = gdk_pixbuf_scale_simple( logo_img_,preview_width_,preview_height_, GDK_INTERP_BILINEAR );
 	gtk_image_set_from_pixbuf( GTK_IMAGE(area), buf2 );
-	gdk_pixbuf_unref( buf );
 	gdk_pixbuf_unref( buf2 );
 }
 
@@ -671,6 +682,8 @@ void		*multitrack_new( void (*f)(int,char*,int), void (*g)(GdkPixbuf *),GtkWidge
 	max_h = 288;
 	multitracker_t *mt = NULL;
 	all_priv_t *pt = NULL;
+
+	logo_img_ = load_logo_image();
 
 	mt = (multitracker_t*) malloc(sizeof(multitracker_t));
 	memset( mt, 0, sizeof(multitracker_t));
@@ -1310,6 +1323,22 @@ static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint las
 
 	return seqv;
 }
+
+GdkPixbuf 	*dummy_image()
+{
+	GdkPixbuf *src = logo_img_;
+	GdkPixbuf *dst = gdk_pixbuf_copy(logo_img_);
+
+	float 	val = logo_value_;
+	if( val > 2.0 || val <= 0.0)
+		logo_step_ *= -1;
+	val += logo_step_;
+	logo_value_ = val;
+
+	gdk_pixbuf_saturate_and_pixelate(src,dst, val, FALSE );
+	g_usleep( 100000 );
+	return dst; 
+}
 			
 
 void 	*mt_preview( gpointer user_data )
@@ -1321,7 +1350,7 @@ void 	*mt_preview( gpointer user_data )
 
 	for( ;; )
 	{
-
+restart:
 		G_LOCK(mt_lock);
 		mt_priv_t *lt = a->pt[LAST_TRACK];
 		gint error = 0;
@@ -1334,21 +1363,59 @@ void 	*mt_preview( gpointer user_data )
 			g_thread_exit(NULL);
 		}
 
-		if(lt->active && lt->preview)
+		if(!lt->preview )
+		{
+			cache[LAST_TRACK] = dummy_image();
+		}
+		else
 		{
 			cache[LAST_TRACK] = veejay_get_image( lt->sequence, &error );	
 			if( error )
 				delete_data( mt->data, LAST_TRACK ); 
 		}
+/*
+		if(lt->active && lt->preview && vj_gui_yield())
+		{
+fprintf(stderr, "Get Image\n");
+			cache[LAST_TRACK] = veejay_get_image( lt->sequence, &error );	
+			if( error )
+				delete_data( mt->data, LAST_TRACK ); 
+	char path[1024];
+			bzero(path,1024);
+			get_gd(path,NULL, "veejay-logo.png");
+fprintf(stderr, "Simulate image\n");
+			GdkPixbuf *src = gdk_pixbuf_new_from_file( path,NULL );
+			GdkPixbuf *dst = gdk_pixbuf_new_from_file( path,NULL );
 
+			gdk_pixbuf_saturate_and_pixelate(src,dst, drand48() * 2.0, TRUE );
+			gdk_pixbuf_unref( src);
+			cache[LAST_TRACK] = dst;
+			g_usleep(50000);
+
+		}
+		else
+		{
+			char path[1024];
+			bzero(path,1024);
+			get_gd(path,NULL, "veejay-logo.png");
+fprintf(stderr, "Simulate image\n");
+			GdkPixbuf *src = gdk_pixbuf_new_from_file( path,NULL );
+			GdkPixbuf *dst = gdk_pixbuf_new_from_file( path,NULL );
+
+			gdk_pixbuf_saturate_and_pixelate(src,dst, drand48() * 2.0, TRUE );
+			gdk_pixbuf_unref( src);
+			cache[LAST_TRACK] = dst;
+			g_usleep(50000);
+		}*/
+	
 		int ref = find_sequence( a );
 
 
-		if( mt->sensitive && lt->preview )
+		if( mt->sensitive )//&& lt->preview )
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
 			mt_priv_t *p = a->pt[i];
-			if( p->active && ref != i)
+			if( p->active && ref != i && p->preview)
 			{
 				cache[i] = veejay_get_image(
 						p->sequence, 
@@ -1359,7 +1426,7 @@ void 	*mt_preview( gpointer user_data )
 		}
 		G_UNLOCK(mt_lock);
 
-		if( ref >= 0 && cache[LAST_TRACK] && lt->preview)
+		if( ref >= 0 && cache[LAST_TRACK] )// && lt->preview)
 		{
 			cache[ref] = gdk_pixbuf_scale_simple(
 					cache[LAST_TRACK],

@@ -720,8 +720,8 @@ void	on_samplelist_edited(GtkCellRendererText *cell,
 */
 static	gchar	*_utf8str(char *c_str)
 {
-	gint	bytes_read;
-	gint 	bytes_written;
+	gint	bytes_read = 0;
+	gint 	bytes_written = 0;
 	GError	*error = NULL;
 	if(!c_str)
 		return NULL;
@@ -1657,9 +1657,25 @@ void		veejay_quit( )
 	clear_progress_bar( "streamrecord_progress",0.0 );
 }
 
+static	int	running_g_ = 1;
+
+gboolean	gveejay_running()
+{
+	if(!running_g_)
+		return FALSE;
+	return TRUE;
+}
+
 gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 {
+	char *text = get_text( "entry_hostname" );
+	if(strncasecmp(text, "localhost", 8 ) == 0 )
+		veejay_quit();
+
+
 	no_preview_ = 0;
+	if(!running_g_)
+		return FALSE;
 
 	if( info->watch.state == STATE_PLAYING)
 	{
@@ -1672,8 +1688,10 @@ gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 	multitrack_quit( info->mt );
 	
 	info->watch.w_state = WATCHDOG_STATE_OFF;
-	g_usleep(40000);
-	vj_gui_free();
+//	g_usleep(40000);
+//	vj_gui_free();
+
+	running_g_ = 0;
 
 	return FALSE;
 }
@@ -2970,7 +2988,7 @@ static void	update_current_slot(int pm)
 	}
 
 }
-
+#include <assert.h>
 static void 	update_globalinfo()
 {
 	int pm = info->status_tokens[PLAY_MODE];
@@ -2980,6 +2998,8 @@ static void 	update_globalinfo()
 	gint	i;
 
 	info->uc.playmode = pm;
+
+	assert( info->el.fps > 0 );
 
 	update_status_accessibility(pm);
 	if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
@@ -3016,6 +3036,8 @@ static void 	update_globalinfo()
 
 	if( total_frames_ != history_frames_ )
 	{
+//fprintf(stderr, "%d - %f\n",total_frames_, info->el.fps );
+
 		gchar *time = format_time( total_frames_, info->el.fps );
 		if( pm == MODE_STREAM )
 		{
@@ -5170,14 +5192,14 @@ static	void	reload_editlist_contents()
 	gchar *eltext = recv_vims(6,&len); // msg len
 	gint 	offset = 0;
 	gint	num_files=0;
-
 	reset_tree("editlisttree");
 	_el_ref_reset();
 	_el_entry_reset();
 
 	if( eltext == NULL || len < 0 )
+	{
 		return;
-
+	}
 	char	str_nf[4];
 
 	strncpy( str_nf, eltext , sizeof(str_nf));
@@ -5655,6 +5677,45 @@ static void	update_gui()
 
 
 }
+void	mt_update_gui(int *status_tokens)
+{
+	int n = 0;
+	for( n = 0 ; n < 19; n ++ )
+		info->status_tokens[n] = status_tokens[n];
+	info->status_lock = 1;
+
+	int pm = info->status_tokens[PLAY_MODE];
+	assert( pm >= 0 && pm <= 2 );
+
+	if( pm == MODE_SAMPLE && info->uc.randplayer )
+	{
+		info->uc.randplayer = 0;
+		set_toggle_button( "samplerand", 0 );
+	}
+	if( pm == MODE_PATTERN )
+	{
+		if(!info->uc.randplayer )
+		{
+			info->uc.randplayer = 1;
+			enable_widget( "freestyle" );
+			enable_widget( "samplerand" );
+			set_toggle_button( "samplerand", 1 );
+		}
+		status_tokens[PLAY_MODE] = MODE_SAMPLE;
+		pm = MODE_SAMPLE;
+	}
+
+	select_slot(pm);
+
+	update_globalinfo();
+
+	process_reload_hints();
+
+	if( pm != MODE_PLAIN)
+		interpolate_parameters();
+
+	info->status_lock = 0;
+}
 
 void	get_gd(char *buf, char *suf, const char *filename)
 {
@@ -5734,6 +5795,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if(nb > 0)
 		{
 			int n = status_to_arr( gui->status_msg, gui->status_tokens );
+			assert(n == 18);
 			if( n != 18 )
 			{
 				// restore status (to prevent gui from going bezerk)
@@ -5743,8 +5805,8 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 				{
 					gui->status_tokens[i] = history[i];
 				}
-			}	
-			update_gui();
+			}
+			//update_gui();
 		}
 		gui->status_lock = 0;
 
@@ -6002,8 +6064,6 @@ void	vj_gui_free()
 
 	vevo_port_free( fx_clipboard_ );
 	vevo_port_free( fx_list_ );
-
-	gtk_main_quit();
 }
 
 static	void	vj_init_style( const char *name, const char *font )
@@ -6216,7 +6276,34 @@ void	interrupt_cb()
    info->watch.state == STATE_STOPPED; 
 }
 
-void 	vj_gui_init(char *glade_file)
+//@ reloaded options !
+//@ cleanup, total mess!
+void	vj_gui_setup_defaults( vj_gui_t *gui )
+{
+	gui->config.w = 352;
+	gui->config.h = 288;
+	gui->config.fps = 25.0;
+	gui->config.sampling = 1;
+	gui->config.pixel_format = 1;
+	gui->config.sync = 1;
+	gui->config.timer = 1;
+	gui->config.deinter = 1;
+	gui->config.norm = 0;
+	gui->config.audio_rate = 0;
+	gui->config.osc = 0;
+	gui->config.vims = 0;
+	gui->config.mcast_osc = g_strdup( "224.0.0.32" );
+	gui->config.mcast_vims = g_strdup( "224.0.0.33" );
+}
+
+int	vj_gui_yield()
+{
+ 	if( is_button_toggled("previewtoggle"))
+		return 1;
+	return 0;
+}
+
+void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 {
 	char path[MAX_PATH_LEN];
 	int i;
@@ -6284,20 +6371,7 @@ void 	vj_gui_init(char *glade_file)
 	gtk_container_add( GTK_CONTAINER(frame), info->tl );
 	gtk_widget_show(info->tl);
 
-	gui->config.w = 352;
-	gui->config.h = 288;
-	gui->config.fps = 25.0;
-	gui->config.sampling = 1;
-	gui->config.pixel_format = 1;
-	gui->config.sync = 1;
-	gui->config.timer = 1;
-	gui->config.deinter = 1;
-	gui->config.norm = 0;
-	gui->config.audio_rate = 0;
-	gui->config.osc = 0;
-	gui->config.vims = 0;
-	gui->config.mcast_osc = g_strdup( "224.0.0.32" );
-	gui->config.mcast_vims = g_strdup( "224.0.0.33" );
+
 	GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
     /* Make this run after any internal handling of the client event happened
      * to make sure that all changes implicated by it are already in place and
@@ -6310,7 +6384,7 @@ void 	vj_gui_init(char *glade_file)
 		GTK_SIGNAL_FUNC( G_CALLBACK(gui_client_event_signal) ), NULL );
 
 	g_signal_connect( GTK_OBJECT(mainw), "destroy",
-			G_CALLBACK( gtk_main_quit ),
+			G_CALLBACK( gveejay_quit ),
 			NULL );
 	g_signal_connect( GTK_OBJECT(mainw), "delete-event",
 			G_CALLBACK( gveejay_quit ),
@@ -6322,11 +6396,15 @@ void 	vj_gui_init(char *glade_file)
 	gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET(info->sample_bank_pad), TRUE, TRUE, 0);
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 
+//@ FIXME: to setup_defaults
 	create_ref_slots(skin__ == 0 ? MEM_SLOT_SIZE/4: MEM_SLOT_SIZE);
 	
 	gtk_widget_show( info->sample_bank_pad );
 
 	fx_clipboard_ = vevo_port_new( 300 );
+
+	vj_gui_setup_defaults(gui);
+
 
 	setup_knobs();
 	setup_vimslist();
@@ -6341,6 +6419,8 @@ void 	vj_gui_init(char *glade_file)
 
 
 	set_toggle_button( "button_252", vims_verbosity );
+
+//@ after connect:
 
 	setup_geometry( info->el.width, info->el.height, num_tracks_ );
 
@@ -6357,12 +6437,22 @@ void 	vj_gui_init(char *glade_file)
 	memset( &info->watch, 0, sizeof(watchdog_t));
 	info->watch.state = STATE_STOPPED; //
 	memset(&(info->watch.p_time),0,sizeof(struct timeval));
-//	info->is_alive = g_timeout_add(G_PRIORITY_HIGH_IDLE,is_alive, (gpointer*)info);
+	info->is_alive = g_timeout_add(G_PRIORITY_HIGH_IDLE,is_alive, (gpointer*)info);
 
-	info->is_alive = g_timeout_add(G_PRIORITY_DEFAULT_IDLE,is_alive, (gpointer*)info);
+	//info->is_alive = g_timeout_add(G_PRIORITY_LOW,is_alive, (gpointer*)info);
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "veejay_connection" );
-	
-	gtk_widget_show( w );
+	if( launcher )
+	{
+		gtk_widget_hide( w );
+	printf(" '%s' , %d\n" , hostname, port_num );
+		put_text( "entry_hostname", hostname );
+		update_spin_value( "button_portnum", port_num ); 
+		gui->watch.state = STATE_CONNECT; 
+	}
+	else
+	{
+		gtk_widget_show( w );
+	}
 }
 
 
@@ -6564,7 +6654,7 @@ static	long	elapsed_time( struct timeval *tv1, struct timeval *tv2 )
 	return ms; 
 }
 // timeout function to start/reconnect
-static gboolean		is_alive( void *data )
+gboolean		is_alive( void *data )
 {
 	vj_gui_t *gui = (vj_gui_t*) data;
 	if( gui->watch.state == STATE_PLAYING && gui->watch.p_state == 0)
@@ -6611,7 +6701,7 @@ static gboolean		is_alive( void *data )
 			info->watch.state = STATE_PLAYING;
 			info->key_id = gtk_key_snooper_install( key_handler , NULL);
 			init_cpumeter();
-			info->logging = g_timeout_add( 600, update_log,(gpointer*) info );
+			info->logging = g_timeout_add( G_PRIORITY_LOW, update_log,(gpointer*) info );
 			veejay_stop_connecting(gui);
 			info->watch.state = STATE_PLAYING;
 			if(info->watch.p_state == 0)
@@ -7173,7 +7263,8 @@ image_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 		return FALSE;
 
 	sample_gui_slot_t *guislot = info->sample_banks[bank_nr]->gui_slot[i];
-	if(slot->pixbuf != NULL && slot->sample_id > 0 && is_button_toggled("previewtoggle"))
+	if(slot->pixbuf != NULL && slot->sample_id > 0 
+		 && is_button_toggled("previewtoggle"))
 	{	
 		rowstride = gdk_pixbuf_get_rowstride( slot->pixbuf );
 		g_assert( slot->pixbuf );
@@ -7239,7 +7330,8 @@ image_expose_seq_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 	if(no_draw_)
 		return FALSE;
 
-	if( info->sequence_view->gui_slot[j]->pixbuf_ref && is_button_toggled("previewtoggle"))
+	if( info->sequence_view->gui_slot[j]->pixbuf_ref  
+		&& is_button_toggled("previewtoggle"))
 	{
 		sequence_gui_slot_t *g = info->sequence_view->gui_slot[j];
 		if(!g->sample_id)
@@ -7292,7 +7384,8 @@ static	void	update_cached_slots(void)
 		sample_slot_t *s = info->selected_slot;
 		if(g->sample_id == info->selected_slot->sample_id && g->sample_type == info->selected_slot->sample_type && s->pixbuf)
 		{
-			if(!g->pixbuf_ref && is_button_toggled("previewtoggle"))
+			if(!g->pixbuf_ref
+				&& is_button_toggled("previewtoggle"))
 			{
 				g->pixbuf_ref = gdk_pixbuf_scale_simple(
 				s->pixbuf,

@@ -48,17 +48,15 @@ int	status_to_arr( char *status, int *array )
 char   *format_time(int pos, float fps)
 {
         MPEG_timecode_t tc;
-        if(pos==0)
-                memset(&tc, 0, sizeof(tc));
-        else
-                mpeg_timecode( &tc, pos,
-                        mpeg_framerate_code(
-                                mpeg_conform_framerate( fps ) ), fps );
+	memset(&tc, 0,sizeof(MPEG_timecode_t));
+	char *tmp = (char*) malloc( 20 );
+	y4m_ratio_t ratio = mpeg_conform_framerate( fps );
+	int n = mpeg_framerate_code( ratio );
 
-        char *tmp = (char*) malloc( 20 );
-        snprintf(tmp, 20, "%2d:%2.2d:%2.2d:%2.2d",
-                tc.h, tc.m, tc.s, tc.f );
+	mpeg_timecode(&tc, pos, n, fps );
 
+     	snprintf(tmp, 20, "%2d:%2.2d:%2.2d:%2.2d",
+       	        tc.h, tc.m, tc.s, tc.f );
         return tmp;
 }
 

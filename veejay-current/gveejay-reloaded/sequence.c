@@ -355,7 +355,8 @@ void	*veejay_sequence_thread(gpointer data)
 				return NULL;
 			}
 		}	
-		//g_usleep(5000);
+		else
+			g_usleep(25000);
 
 	}
 	return NULL;	
@@ -470,6 +471,7 @@ int main(int argc, char *argv[])
 		{
 			printf("grabbed frame 4490\n");
 		}
+		g_usleep( 10000 );
 	}
 	veejay_sequence_free( v );
 	veejay_sequence_free( v2 );

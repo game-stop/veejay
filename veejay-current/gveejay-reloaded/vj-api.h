@@ -20,7 +20,7 @@
 #ifndef VJAPI_H
 #define VJAPI_H
 
-void	vj_gui_init(char *glade_file);
+void	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num);
 int	vj_gui_reconnect( char *host, char *group, int port);
 void	vj_gui_free();
 void	vj_fork_or_connect_veejay();

@@ -25,7 +25,6 @@
 #include <glib.h>
 #include <glade/glade.h>
 #include "vj-api.h"
-
 static int port_num	= 3490;
 static char hostname[255];
 static int gveejay_theme = 1;
@@ -35,7 +34,7 @@ static int col = 0;
 static int row = 0;
 static int current_skin = 0;
 static int n_tracks = 4;
-
+static int launcher = 0;
 static struct
 {
 	char *file;
@@ -65,10 +64,12 @@ static int      set_option( const char *name, char *value )
         if( strcmp(name, "h") == 0 || strcmp(name, "hostname") == 0 )
         {
                 strcpy( hostname, optarg );
+		launcher = 1;
         }
         else if( strcmp(name, "p") == 0 || strcmp(name ,"port") == 0 )
         {
                 port_num = atoi(optarg);
+		launcher = 1;
         }
 	else if (strcmp(name, "X") == 0 )
 	{
@@ -111,6 +112,8 @@ int main(int argc, char *argv[]) {
 
         if(!argc) usage(argv[0]);
 
+	sprintf(hostname, "localhost");
+
         while( ( n = getopt( argc, argv, "s:h:p:nvHf:X:")) != EOF )
         {
                 sprintf(option, "%c", n );
@@ -136,11 +139,23 @@ int main(int argc, char *argv[]) {
 	vj_gui_set_timeout(timer);
 	set_skin( current_skin );
 	default_bank_values( &col, &row );
-	vj_gui_init( skins[current_skin].file );
+	vj_gui_init( skins[current_skin].file, launcher, hostname, port_num );
 	
 	vj_gui_style_setup();
 
-        gtk_main();
+	while(gveejay_running())
+	{
+		if( gtk_events_pending() )
+			gtk_main_iteration();
+		else 
+		{
+			g_thread_yield();
+			g_usleep( 20000 );
+		}
+	}
+	vj_gui_free();
+
+//        gtk_main();
 
         return 0;  
 }
