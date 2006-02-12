@@ -102,11 +102,11 @@ void	set_defaults()
 //	gtk_combo_box_append_text( GTK_COMBO_BOX( glade_xml_get_widget( main_window, "theme" ) ), "Default" );
 //	gtk_combo_box_set_active(  GTK_COMBO_BOX( glade_xml_get_widget( main_window, "theme" ) ) , 1 );
 
+	gtk_combo_box_append_text( GTK_COMBO_BOX( glade_xml_get_widget( main_window, "video_out" ) ), "HeadLess");
 
 #ifdef HAVE_SDL
 	gtk_combo_box_append_text( GTK_COMBO_BOX( glade_xml_get_widget( main_window, "video_out" ) ), "SDL" );
 #endif
-	gtk_combo_box_append_text( GTK_COMBO_BOX( glade_xml_get_widget( main_window, "video_out" ) ), "HeadLess");
 	gtk_combo_box_set_active( GTK_COMBO_BOX( glade_xml_get_widget( main_window, "video_out" ) ) , 0 );
 #ifdef HAVE_DIRECTFB
 	gtk_combo_box_append_text( GTK_COMBO_BOX( glade_xml_get_widget( main_window, "video_out" ) ), "DirectFB" );
@@ -210,6 +210,8 @@ static	void	run_gveejay_now()
 			NULL,
 			&error );
 	gint p = 0;
+	fprintf(stderr, "%s PID %d\n", args[0], pid );
+
 	exit(0);
 }
 
@@ -398,6 +400,8 @@ printf("'%s'\n", args[p]);
 		fprintf(stderr, "Failed to start veejay\n");
 		return;
 	}
+
+fprintf(stderr,"veejay PID %d\n", pid );
 
 	run_gveejay();
 
