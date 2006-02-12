@@ -3085,7 +3085,6 @@ static void 	update_globalinfo()
 	}
 	else info->status_frame = info->status_tokens[FRAME_NUM];
 
-
 	timeline_set_pos( info->tl, (gdouble) info->status_frame );
 	gchar *current_time_ = format_time( info->status_frame,info->el.fps );
 	update_label_i(   "label_curframe", info->status_frame ,1 );
@@ -5677,45 +5676,6 @@ static void	update_gui()
 
 
 }
-void	mt_update_gui(int *status_tokens)
-{
-	int n = 0;
-	for( n = 0 ; n < 19; n ++ )
-		info->status_tokens[n] = status_tokens[n];
-	info->status_lock = 1;
-
-	int pm = info->status_tokens[PLAY_MODE];
-	assert( pm >= 0 && pm <= 2 );
-
-	if( pm == MODE_SAMPLE && info->uc.randplayer )
-	{
-		info->uc.randplayer = 0;
-		set_toggle_button( "samplerand", 0 );
-	}
-	if( pm == MODE_PATTERN )
-	{
-		if(!info->uc.randplayer )
-		{
-			info->uc.randplayer = 1;
-			enable_widget( "freestyle" );
-			enable_widget( "samplerand" );
-			set_toggle_button( "samplerand", 1 );
-		}
-		status_tokens[PLAY_MODE] = MODE_SAMPLE;
-		pm = MODE_SAMPLE;
-	}
-
-	select_slot(pm);
-
-	update_globalinfo();
-
-	process_reload_hints();
-
-	if( pm != MODE_PLAIN)
-		interpolate_parameters();
-
-	info->status_lock = 0;
-}
 
 void	get_gd(char *buf, char *suf, const char *filename)
 {
@@ -5806,7 +5766,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 					gui->status_tokens[i] = history[i];
 				}
 			}
-			//update_gui();
+			update_gui();
 		}
 		gui->status_lock = 0;
 
