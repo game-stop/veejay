@@ -592,7 +592,7 @@
 	      <property name="visible">True</property>
 	      <property name="tooltip" translatable="yes">Cache memory used</property>
 	      <property name="orientation">GTK_PROGRESS_RIGHT_TO_LEFT</property>
-	      <property name="fraction">2.23517412912e-10</property>
+	      <property name="fraction">0</property>
 	      <property name="pulse_step">0.00999999977648</property>
 	      <property name="text" translatable="yes">Cache filled</property>
 	      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
@@ -7820,15 +7820,25 @@ YV16</property>
 		      <property name="shadow_type">GTK_SHADOW_NONE</property>
 
 		      <child>
-			<widget class="GtkImage" id="imageA">
-			  <property name="width_request">352</property>
-			  <property name="height_request">288</property>
+			<widget class="GtkEventBox" id="veejayevent">
 			  <property name="visible">True</property>
-			  <property name="pixbuf">veejay-logo.png</property>
-			  <property name="xalign">0.5</property>
-			  <property name="yalign">0.5</property>
-			  <property name="xpad">0</property>
-			  <property name="ypad">0</property>
+			  <property name="visible_window">True</property>
+			  <property name="above_child">False</property>
+			  <signal name="enter_notify_event" handler="on_veejayevent_enter_notify_event" last_modification_time="Sat, 11 Feb 2006 18:04:51 GMT"/>
+			  <signal name="leave_notify_event" handler="on_veejayevent_leave_notify_event" last_modification_time="Sat, 11 Feb 2006 18:05:01 GMT"/>
+
+			  <child>
+			    <widget class="GtkImage" id="imageA">
+			      <property name="width_request">352</property>
+			      <property name="height_request">288</property>
+			      <property name="visible">True</property>
+			      <property name="pixbuf">veejay-logo.png</property>
+			      <property name="xalign">0.5</property>
+			      <property name="yalign">0.5</property>
+			      <property name="xpad">0</property>
+			      <property name="ypad">0</property>
+			    </widget>
+			  </child>
 			</widget>
 		      </child>
 		    </widget>
@@ -9993,7 +10003,6 @@ YV16</property>
 </widget>
 
 <widget class="GtkDialog" id="veejay_connection">
-  <property name="visible">True</property>
   <property name="title" translatable="yes">GVeejayReloaded Launcher</property>
   <property name="type">GTK_WINDOW_TOPLEVEL</property>
   <property name="window_position">GTK_WIN_POS_CENTER_ALWAYS</property>
