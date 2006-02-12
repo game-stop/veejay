@@ -886,6 +886,7 @@ bio2jack/Makefile
 veejay/Makefile
 gveejay/Makefile
 gveejay-reloaded/Makefile
+veejay-launch/Makefile
 man/Makefile
 tools/Makefile
 gveejay-paths.sh

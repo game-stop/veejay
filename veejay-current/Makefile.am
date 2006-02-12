@@ -11,6 +11,7 @@ SUBDIRS += gveejay
 endif
 if USE_GVEEJAYRELOADED
 SUBDIRS += gveejay-reloaded
+SUBDIRS += veejay-launch
 endif
 
 SUBDIRS += tools
