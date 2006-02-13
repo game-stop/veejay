@@ -1396,7 +1396,7 @@ fprintf(stderr, "Simulate image\n");
 			gdk_pixbuf_saturate_and_pixelate(src,dst, drand48() * 2.0, TRUE );
 			gdk_pixbuf_unref( src);
 			cache[LAST_TRACK] = dst;
-			g_usleep(50000);
+			//g_usleep(50000);
 
 		}
 		else
@@ -1411,7 +1411,7 @@ fprintf(stderr, "Simulate image\n");
 			gdk_pixbuf_saturate_and_pixelate(src,dst, drand48() * 2.0, TRUE );
 			gdk_pixbuf_unref( src);
 			cache[LAST_TRACK] = dst;
-			g_usleep(50000);
+			//g_usleep(50000);
 		}*/
 	
 		int ref = find_sequence( a );
