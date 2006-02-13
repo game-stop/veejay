@@ -367,10 +367,10 @@ static	void	timeline_init( TimelineSelection *te )
 	te->grab_button = 0;
 	te->has_stepper = TRUE;
 	te->has_selection = FALSE;
-	te->stepper_size = 10; // 8 x 8 pixels
+	te->stepper_size = 12; // 8 x 8 pixels
 	te->stepper_length = 0;
-	te->frame_height = 8;
-	te->font_line = 10;	
+	te->frame_height = 10;
+	te->font_line = 12;	
 	te->move_x = 0;
 }	
 
@@ -719,7 +719,7 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 /* Draw stepper */
 	if( te->has_stepper )
 	{
-		cairo_set_source_rgba( cr, 1.0,0.0,0.0,0.6 );
+		cairo_set_source_rgba( cr, 1.0,0.0,0.0,1.0);
 		double x1 = marker_width * te->frame_num;
 		double x2 = x1 + frame_width;
 		te->stepper.x = x1;
@@ -736,7 +736,7 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 		cairo_move_to(cr, x1, te->stepper_size   );
 		cairo_rel_line_to( cr, 0.0, te->stepper_length );
 		cairo_stroke(cr);
-
+		//cairo_fill_preserve(cr);
 		if( te->grab_button == 1 && te->current_location == MOUSE_STEPPER )
 		{
 			cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL,
@@ -751,8 +751,7 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 			cairo_set_source_rgba( cr, v,v,v,0.7 );
 			cairo_fill(cr);	
 		}
-	//	cairo_rectangle_round(cr, x1, 0.1 * height , frame_width, 0.2 * height, 10 );
-	//	cairo_fill_preserve(cr);
+		//cairo_fill_preserve(cr);
 	}
 /* Draw selection */
 	if( te->has_selection )
