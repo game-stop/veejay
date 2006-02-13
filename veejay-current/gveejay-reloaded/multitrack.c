@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
+#include <config.h>
 #include <libvjnet/vj-client.h>
 #include <libvjmsg/vj-common.h>
 #include <veejay/vims.h>
@@ -30,7 +30,9 @@
 
 #define SEQ_BUTTON_CLOSE 0
 #define SEQ_BUTTON_RULE  1
+#ifdef STRICT_CHECKING
 #include <assert.h>
+#endif
 #include <gveejay-reloaded/multitrack.h>
 #include <gveejay-reloaded/common.h>
 #include <gveejay-reloaded/utils.h>
@@ -514,10 +516,9 @@ static gboolean	update_sequence_widgets( gpointer data )
 	int  array[20];
 	veejay_get_status( p->sequence, status );
 	int n = status_to_arr( status, array );
-	if( n != 18 )
-	{
-		assert(n == 18);	
-	}
+#ifdef STRICT_CHECKING
+	assert( n == 18 );
+#endif
 	p->status_lock = 1;
 
 	int pm = array[PLAY_MODE];
@@ -1088,7 +1089,9 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int wid
 			free(last_track->hostname);
 		last_track->hostname = strdup(hostname);
 		last_track->port_num = port_num;
+#ifdef STRICT_CHECKING
 		assert( last_track->sequence != NULL );
+#endif
 		veejay_configure_sequence( last_track->sequence, 352, 288 );
 		gtk_widget_set_size_request( GTK_WIDGET( last_track->view->area ), width,height );
 	}
@@ -1327,6 +1330,9 @@ static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint las
 GdkPixbuf 	*dummy_image()
 {
 	GdkPixbuf *src = logo_img_;
+#ifdef STRICT_CHECKING
+	assert( logo_img_ != NULL );
+#endif
 	GdkPixbuf *dst = gdk_pixbuf_copy(logo_img_);
 
 	float 	val = logo_value_;
@@ -1453,22 +1459,20 @@ fprintf(stderr, "Simulate image\n");
 			gdk_threads_leave();
 			g_thread_exit(NULL);
 		}
-		else
-			if(lt->active && cache[LAST_TRACK])
-			{
-				GtkImage *image = GTK_IMAGE( lt->view->area );
-				gtk_image_set_from_pixbuf( image, cache[LAST_TRACK] );
-				img_cb( cache[LAST_TRACK] );
-				gdk_pixbuf_unref( cache[LAST_TRACK] );
-			}
-		//@@ cleanup
+
+		if(lt->active && cache[LAST_TRACK])
+		{
+			GtkImage *image = GTK_IMAGE( lt->view->area );
+			gtk_image_set_from_pixbuf( image, cache[LAST_TRACK] );
+			img_cb( cache[LAST_TRACK] );
+			gdk_pixbuf_unref( cache[LAST_TRACK] );
+		}
+
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
 			mt_priv_t *p = a->pt[i];
 			if(cache[i])
-			{
 				gdk_pixbuf_unref(cache[i]);
-			}
 			cache[i] = NULL;
 		}
 		gdk_threads_leave();	

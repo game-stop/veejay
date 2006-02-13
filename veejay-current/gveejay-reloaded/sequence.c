@@ -1,4 +1,3 @@
-#include <assert.h>
 #include <veejay/vims.h>
 #include <libvjnet/vj-client.h>
 #include <libvjmsg/vj-common.h>
@@ -192,8 +191,6 @@ static int	veejay_process_status( veejay_sequence_t *v )
 {
 	gchar status_len[6];
 	bzero( status_len, 6 );
-
-
 	gint nb = vj_client_read( v->fd, V_STATUS, status_len, 5 );
 	if( status_len[0] == 'V' )
 	{
@@ -213,10 +210,8 @@ static int	veejay_process_status( veejay_sequence_t *v )
 			return 1;
 		}
 	}
-	assert(0);
 	return 0;
 }
-
 
 static	int	veejay_get_image_data(veejay_sequence_t *v )
 {
@@ -239,7 +234,6 @@ void		veejay_get_status( void *data, guchar *dst )
 	memcpy( dst, v->serialized, 100);
 	g_mutex_unlock(v->serialize );
 }
-
 
 GdkPixbuf	*veejay_get_image( void *data, gint *error)
 {
@@ -333,7 +327,6 @@ static	int	veejay_process_data( veejay_sequence_t *v )
 
 	return ret;
 }
-
 
 void	*veejay_sequence_thread(gpointer data)
 {
@@ -445,35 +438,3 @@ void	veejay_sequence_free( void *data )
 	v = NULL;
 }
 
-/*
-int main(int argc, char *argv[])
-{
-
-	if(!g_thread_supported())
-	{
-		g_thread_init(NULL);
-	}
-
-	void *v = veejay_sequence_init( 3490, "localhost",512,512 );
-	if(!v)
-		return 0;
-	void *v2 = veejay_sequence_init( 4490, "localhost",512,512 );
-	if(!v2)
-		return 0;
-
-	while(1)	
-	{
-		if( veejay_get_image(v,NULL) > 0 )
-		{
-			printf("grabbed frame 3490\n");
-		}
-		if( veejay_get_image(v2,NULL) > 0)
-		{
-			printf("grabbed frame 4490\n");
-		}
-		g_usleep( 10000 );
-	}
-	veejay_sequence_free( v );
-	veejay_sequence_free( v2 );
-	return 1;
-}*/

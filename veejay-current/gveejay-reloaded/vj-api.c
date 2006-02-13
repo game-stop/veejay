@@ -64,6 +64,9 @@
 #endif  
 #endif
 
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 
 static int	TIMEOUT_SECONDS = 0;
 
@@ -246,8 +249,6 @@ static	int	NUM_SAMPLES_PER_ROW = 6;
 
 #define MOD_OFFSET 200
 #define SEQUENCE_LENGTH 1024
-
-
 #define MEM_SLOT_SIZE 32
 
 static	vims_t	vj_event_list[VIMS_MAX];
@@ -415,7 +416,6 @@ typedef struct
 	int		key_id;
 	int		preview_size_w;
 	int		preview_size_h;
-	int		is_alive;
 	GdkColor	*fg_;
 	gboolean	key_now;	
 	void		*mt;
@@ -480,7 +480,7 @@ static  GtkTreeModel *editlist_model;
 
 /* global pointer to the actual selected slot in the sample_bank */
 
-static	gboolean	is_alive( void *data );
+gboolean	is_alive( void );
 static	int	get_slider_val(const char *name);
 static  void    vj_msg(int type, const char format[], ...);
 static  void    vj_msg_detail(int type, const char format[], ...);
@@ -534,7 +534,6 @@ static  GdkPixbuf *	update_pixmap_entry( int status );
 static gboolean
 chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
              gpointer data);
-//void	vj_gui_stop_launch();
 void	get_gd(char *buf, char *suf, const char *filename);
 static	void	update_cached_slots(void);
 int	resize_primary_ratio_y();
@@ -548,7 +547,6 @@ static	void	reload_bundles();
 static	void	update_rgbkey_from_slider();
 void	vj_launch_toggle(gboolean value);
 static	gchar	*get_textview_buffer(const char *name);
-
 static void 	  create_slot(gint bank_nr, gint slot_nr, gint w, gint h);
 static void 	  setup_samplebank(gint c, gint r);
 static int 	  add_sample_to_sample_banks( int bank_page,sample_slot_t *slot );
@@ -579,7 +577,6 @@ static struct
 	{ "v4l_white" }
 };
 
-// REFAC 
 static	int	no_preview_ = 0;
 static int	no_draw_ = 0;
 
@@ -596,12 +593,10 @@ static struct
 	{"button_082"},
 	{"button_080"},
 	{"button_085"},
-//	{"button_036"},
 	{"button_084"},
 	{"button_083"},
 	{"button_084"},
 	{"button_088"},
-//	{"videobar"},
 	{"button_samplestart"},
 	{"button_sampleend"},
 	{"button_fadeout"},
@@ -613,7 +608,6 @@ static struct
 	{"button_251"},
 	{"button_054"}, 
 	{"new_colorstream"},
-//	{"audiovolume"},
 	{"manualopacity"},
 	{"button_fadedur"},
 	{"vimsmessage"},
@@ -639,8 +633,6 @@ static struct
 	{"streamnew"},
 	{"sampleadd"},	
 	{"samplepage"},
-//	{"button_clearmarker"},
-//	{"check_marker_bind"},
 	{NULL} 
 };
 static struct
@@ -658,10 +650,8 @@ static struct
 	{"button_083"},
 	{"button_084"},
 	{"button_088"},
-//	{"videobar"},
 	{"button_samplestart"},
 	{"button_sampleend"},
-//	{"speedslider"},
 	{NULL}
 };
 
@@ -705,19 +695,6 @@ static	int	selected_is_playing()
 	return 0;
 }
 
-/*
-
-	todo:
-	* generalize tree view usage (cleans up a lot of code)
-	
-
- */
-/*
-void	on_samplelist_edited(GtkCellRendererText *cell,
-		gchar *path_string,
-		gchar *new_text,
-		gpointer user_data);
-*/
 static	gchar	*_utf8str(char *c_str)
 {
 	gint	bytes_read = 0;
@@ -789,20 +766,12 @@ static	int	read_file(const char *filename, int what, void *dst)
 	return 0;
 }
 
-static  void break_here(void)
-{
-
-}
-
 GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
 {
 	GtkWidget *widget = glade_xml_get_widget( m , name );
-	if(!widget)
-	{
-		fprintf(stderr,"gveejay fatal: widget '%s' does not exist\n",name);
-		break_here();
-		exit(0);
-	}
+#ifdef STRICT_CHECKING
+	assert( widget != NULL );
+#endif
 	return widget;		
 }
 
@@ -2098,7 +2067,7 @@ static	int	interpolate_parameters(void)
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve" );
 	char params[255];
 	bzero(params,255);
-
+	info->parameter_lock = 1;
 	for( i = 0; i < MAX_CHAIN_LEN; i ++ )
 	{
 		int values[MAX_PARAMETERS];
@@ -2162,6 +2131,8 @@ static	int	interpolate_parameters(void)
 			}
 		}
 	}
+	info->parameter_lock = 0;
+	
 	return res;
 }
 
@@ -2990,7 +2961,7 @@ static void	update_current_slot(int pm)
 	}
 
 }
-#include <assert.h>
+
 static void 	update_globalinfo()
 {
 	int pm = info->status_tokens[PLAY_MODE];
@@ -3000,9 +2971,9 @@ static void 	update_globalinfo()
 	gint	i;
 
 	info->uc.playmode = pm;
-
+#ifdef STRICT_CHECKING
 	assert( info->el.fps > 0 );
-
+#endif
 	update_status_accessibility(pm);
 	if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
 		info->status_tokens[PLAY_MODE] != history[PLAY_MODE]  )
@@ -5660,13 +5631,9 @@ static void	update_gui()
 		info->status_tokens[PLAY_MODE] = MODE_SAMPLE;
 		pm = MODE_SAMPLE;
 	}
-
-	if(pm < 0 || pm > 2)
-	{
-		fprintf(stderr, "Cannot deal with veejay\n");
-		exit(0);
-	}
-
+#ifdef STRICT_CHECKING
+	assert( pm >= 0 && pm <= 2 );
+#endif
 	select_slot(pm);
 
 	update_globalinfo();
@@ -5675,7 +5642,6 @@ static void	update_gui()
 
 	if( pm != MODE_PLAIN)
 		interpolate_parameters();
-
 
 }
 
@@ -5757,18 +5723,22 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if(nb > 0)
 		{
 			int n = status_to_arr( gui->status_msg, gui->status_tokens );
+#ifdef STRICT_CHECKING
 			assert(n == 18);
+#endif
 			if( n != 18 )
 			{
 				// restore status (to prevent gui from going bezerk)
 				int *history = info->history_tokens[ info->uc.playmode ];
 				int i;
 				for(i = 0; i <= 18; i ++ )
-				{
 					gui->status_tokens[i] = history[i];
-				}
 			}
+
+			// context switch
+			gdk_threads_enter();
 			update_gui();
+			gdk_threads_leave();
 		}
 		gui->status_lock = 0;
 
@@ -6399,9 +6369,6 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	memset( &info->watch, 0, sizeof(watchdog_t));
 	info->watch.state = STATE_STOPPED; //
 	memset(&(info->watch.p_time),0,sizeof(struct timeval));
-	info->is_alive = g_timeout_add(G_PRIORITY_HIGH_IDLE,is_alive, (gpointer*)info);
-
-	//info->is_alive = g_timeout_add(G_PRIORITY_LOW,is_alive, (gpointer*)info);
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "veejay_connection" );
 	if( launcher )
 	{
@@ -6615,9 +6582,13 @@ static	long	elapsed_time( struct timeval *tv1, struct timeval *tv2 )
 	ms = sec * 1000000 + (tv1->tv_usec - tv2->tv_usec);
 	return ms; 
 }
-// timeout function to start/reconnect
-gboolean		is_alive( void *data )
+
+
+gboolean		is_alive( void )
 {
+
+	void *data = info;
+	
 	vj_gui_t *gui = (vj_gui_t*) data;
 	if( gui->watch.state == STATE_PLAYING && gui->watch.p_state == 0)
 		return TRUE;
@@ -7229,7 +7200,9 @@ image_expose_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 		 && is_button_toggled("previewtoggle"))
 	{	
 		rowstride = gdk_pixbuf_get_rowstride( slot->pixbuf );
-		g_assert( slot->pixbuf );
+#ifdef STRICT_CHECKING
+		assert( slot->pixbuf != NULL );
+#endif
 		guchar *pixels = gdk_pixbuf_get_pixels( slot->pixbuf ) + rowstride * event->area.y + event->area.x * 3;
 		if(pixels && rowstride > 0 && info->image_dimensions[0] > 0)
 			gdk_draw_rgb_image_dithalign( widget->window,
@@ -7300,9 +7273,9 @@ image_expose_seq_event (GtkWidget *widget, GdkEventExpose *event, gpointer data)
 			return FALSE;
 		if(!g->pixbuf_ref )
 			return FALSE;
-
-		g_assert( g->pixbuf_ref );
-	
+#ifdef STRICT_CHECKING
+		assert( g->pixbuf_ref );
+#endif
 		rowstride = gdk_pixbuf_get_rowstride( g->pixbuf_ref );
 
 		guchar *pixels = gdk_pixbuf_get_pixels( g->pixbuf_ref ) + rowstride * event->area.y + event->area.x * 3;

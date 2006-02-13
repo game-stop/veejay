@@ -112,6 +112,7 @@ int main(int argc, char *argv[]) {
 
         if(!argc) usage(argv[0]);
 
+	// default host to connect to
 	sprintf(hostname, "localhost");
 
         while( ( n = getopt( argc, argv, "s:h:p:nvHf:X:")) != EOF )
@@ -124,23 +125,28 @@ int main(int argc, char *argv[]) {
                 err ++;
 
         if( err ) usage(argv[0]);
+
 	if( !g_thread_supported() )
 	{
 	     g_thread_init(NULL);
 	     gdk_threads_init();                   // Called to initialize internal mutex "gdk_threads_mutex".
-     	     printf("g_thread supported\n");
         }
-	gtk_init(NULL,NULL);
 
+	int g_nargs = 1;
+	char **g_args = (char**) malloc(sizeof(char*) * 2 );
+	g_args[0] = strdup("--sync");
+	g_args[1] = NULL;
+
+	gtk_init( &g_nargs, &g_args );
+	
 	vj_gui_theme_setup(gveejay_theme);
-
 	vj_gui_set_debug_level( verbosity , n_tracks);
-		
 	vj_gui_set_timeout(timer);
 	set_skin( current_skin );
+
 	default_bank_values( &col, &row );
-	vj_gui_init( skins[current_skin].file, launcher, hostname, port_num );
 	
+	vj_gui_init( skins[current_skin].file, launcher, hostname, port_num );
 	vj_gui_style_setup();
 
 	while(gveejay_running())
@@ -150,14 +156,13 @@ int main(int argc, char *argv[]) {
 		else 
 		{
 			g_thread_yield();
-			g_usleep( 20000 );
+			g_usleep( 1000 );
 		}
+		is_alive();
 	}
 	vj_gui_free();
 
-//        gtk_main();
-
-        return 0;  
+	return 0;  
 }
 
 
