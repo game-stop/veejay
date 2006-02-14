@@ -965,7 +965,7 @@ int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 		return 1; 
 	}
 
-	info->settings->links[ info->uc->current_link ] = 1;
+//	info->settings->links[ info->uc->current_link ] = 1;
 
 	if(!mcast && __global_frame)
 		return 1; // 
@@ -999,6 +999,17 @@ int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 	{
 	}
 */
+
+	// mcast frame sender = info->vjs[2] ??
+	if(vj_server_send_frame( info->vjs[2], 0, socket_buffer, __socket_len,
+				helper_frame, info->effect_frame_info, info->real_fps )<=0)
+	{
+		/* frame send error handling */
+		veejay_msg(VEEJAY_MSG_ERROR,
+		  "Error sending frame to remote");
+		/* uncomment below to end veejay session */
+	}
+
 	return 1;
 }
 void	vj_perform_send_frame_now( veejay_t *info,int k )
