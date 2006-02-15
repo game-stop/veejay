@@ -29,8 +29,10 @@ typedef struct
 	GMutex *serialize;
 	guchar *serialized[100];
 } veejay_sequence_t;
+void	veejay_sequence_free( void *data );
 
   // 3 second timeout
+//@ Check if this works!
 static	int	veejay_ipc_send( veejay_sequence_t *v,
 		int vims_id, const char format[], ... )
 {
@@ -349,7 +351,7 @@ void	*veejay_sequence_thread(gpointer data)
 			}
 		}	
 		else
-			g_usleep(1000);
+				g_usleep(1000);
 
 	}
 	return NULL;	

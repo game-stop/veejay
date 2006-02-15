@@ -2278,7 +2278,7 @@ void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 }
 
-void		on_previewlarge_clicked( GtkWidget *w, gpointer user_data )
+void		on_previewlarge_clicked( GtkWidget *widget, gpointer user_data )
 {
 	int w = info->el.width;
 	int h = info->el.height;
@@ -2312,7 +2312,7 @@ void		on_previewscale_value_changed( GtkWidget *widget, gpointer user_data)
 	}
 }
 
-void		on_previewsmall_clicked( GtkWidget *w, gpointer user_data)
+void		on_previewsmall_clicked( GtkWidget *widget, gpointer user_data)
 {
 	int w = info->el.width;
 	int h = info->el.height;

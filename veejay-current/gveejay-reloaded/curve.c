@@ -20,6 +20,7 @@
 #include <libvjmem/vjmem.h>
 #include <stdlib.h>
 #include "curve.h"
+static key_parameter_t        *new_parameter_key();
 
 key_chain_t	*new_chain(void)
 {
@@ -69,7 +70,7 @@ key_effect_t	*new_chain_entry(void)
 	return ke;
 }
 
-key_parameter_t	*new_parameter_key()
+static key_parameter_t	*new_parameter_key()
 {
 	gint i = 0;
 	key_parameter_t *key = vj_malloc(sizeof(key_parameter_t));

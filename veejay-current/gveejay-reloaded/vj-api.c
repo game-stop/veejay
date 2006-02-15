@@ -562,6 +562,22 @@ static void 	  set_activation_of_slot_in_samplebank(gboolean activate);
 int		gveejay_new_slot(int stream);
 static	int	selected_is_playing();
 
+
+static void    set_selection_of_slot_in_samplebank(gboolean active);
+static void    remove_sample_from_slot();
+static void create_ref_slots(int envelope_size);
+void setup_knobs();
+void   free_samplebank(void);
+void   reset_samplebank(void);
+void   verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_type );
+static void clone_clipboard_entry(void);
+static void widget_get_rect_in_screen (GtkWidget *widget, GdkRectangle *r);
+static void    preset_from_clipboard(char *mkey);
+static void online_update(int keyp, int value);
+static  void   update_curve_widget(const char *name);
+static void    update_curve_accessibility(const char *name);
+
+
 void	interrupt_cb();
 
 static struct

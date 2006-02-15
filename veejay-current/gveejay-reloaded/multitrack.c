@@ -110,7 +110,9 @@ static	int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len, 
 static	void	add_buttons( mt_priv_t *p, sequence_view_t *seqv , GtkWidget *w);
 static	void	add_buttons2( mt_priv_t *p, sequence_view_t *seqv , GtkWidget *w);
 static int	num_tracks_active( multitracker_t * mt );
-void 	*mt_preview( gpointer user_data );
+void 		*mt_preview( gpointer user_data );
+static	void	set_logo(GtkWidget *area);
+static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint last, GtkWidget *main_area  );
 
 static	int	preview_width_ = 0;
 static  int     preview_height_ = 0;
@@ -396,9 +398,10 @@ static	void	update_timeline( mt_priv_t *p, gint total, gint current )
 	timeline_set_length( GTK_WIDGET(p->view->timeline_),
 			(gdouble) total,
 			(gdouble) current );
-	char *total = format_time( total,25.0f );
-	gtk_label_set_text( p->view->labels_[1], total );
-	g_free(total);
+//@ READ FPS FROM EDL !!!! FIXME
+	char *tot = format_time( total,25.0f );
+	gtk_label_set_text( p->view->labels_[1], tot );
+	g_free(tot);
 }
 static	void	update_pos( mt_priv_t *p, gint current )
 {
