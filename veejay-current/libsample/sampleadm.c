@@ -182,6 +182,8 @@ void sample_init(int len)
 void	sample_free()
 {
 	vevo_port_free( chain_cache_ );
+	if(!SampleHash)
+		return;
 	hscan_t scan;
 	hash_scan_begin( &scan, (hash_t*) SampleHash );
 	hnode_t *node;
