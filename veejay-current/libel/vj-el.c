@@ -46,6 +46,7 @@
 
 #ifdef SUPPORT_READ_DV2
 #include "rawdv.h"
+#include "vj-dv.h"
 #endif
 #define MAX_CODECS 12
 #define CODEC_ID_YUV420 999
@@ -147,6 +148,10 @@ typedef struct
         int ref;
 	void *sampler;
 } vj_decoder;
+
+#ifdef SUPPORT_READ_DV2
+static	vj_dv_decoder *dv_decoder_ = NULL;
+#endif
 
 static	vj_decoder *el_codecs[MAX_CODECS];
 
@@ -253,9 +258,13 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
         if(!d)
 	  return NULL;
 	memset( d, 0, sizeof(vj_decoder));
-
-        if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420)
+#ifdef SUPPORT_READ_DV2
+        if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 && id != CODEC_ID_DVVIDEO)
         {
+#else
+	if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420)
+        {
+#endif		
 		int i;
 	/*	for( i = 0; i < 2; i ++ )
 		{
@@ -302,6 +311,12 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 	else
 	{
 		d->sampler = subsample_init( width );
+#ifdef SUPPORT_READ_DV2
+		if( id == CODEC_ID_DVVIDEO )
+		{
+			dv_decoder_ = vj_dv_decoder_init( 1, width, height, pixel_format );
+		}
+#endif		
 	}       
 
 
@@ -897,6 +912,14 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			}
 			return 1;
 			break;
+		case CODEC_ID_DVVIDEO:
+#ifdef SUPPORT_READ_DV2
+			return vj_dv_decode_frame( dv_decoder_,  data, dst[0], dst[1], dst[2], el->video_width,el->video_height, out_pix_fmt);
+#else
+			return 0;
+#endif			
+			break;
+			
 		default:
 			inter = lav_video_interlacing(el->lav_fd[N_EL_FILE(n)]);
 			len = avcodec_decode_video(
