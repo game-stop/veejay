@@ -1,6 +1,8 @@
 # Makefile for veejay
 
-INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg ${FFMPEG_CFLAGS} $(GLIB_CFLAGS)  
+INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg ${FFMPEG_CFLAGS} $(GLIB_CFLAGS)   
+
+AM_CFLAGS = $(CFLAGS) -freg-struct-return
 
 VJE_LIB_FILE = libvje.la
 noinst_LTLIBRARIES = $(VJE_LIB_FILE)

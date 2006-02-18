@@ -32,7 +32,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <assert.h>
-#include <utils/mjpeg_types.h>
+#include <mjpegtools/mjpeg_types.h>
 
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-common.h>

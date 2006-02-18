@@ -4,7 +4,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-DG_LOG_DOMAIN=\"veejay\" -DVEEJAY_VERSION=\"$(VERSION)\" \
-     		-I /usr/X11R6/include -I$(top_srcdir)/libOSC -I$(top_srcdir)/utils \
+     		-I /usr/X11R6/include -I$(top_srcdir)/libOSC \
 		-I$(top_srcdir)/libhash \
 		-I$(top_srcdir)/libvje \
 		-I$(top_srcdir)/libvjmem \
@@ -18,7 +18,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/libvevo \
 		$(FFMPEG_CFLAGS)\
 		$(AVIPLAY_CFLAGS) ${XML_CFLAGS} ${GTK_CFLAGS} ${DV_FLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} \
-		$(DIRECTFB_CFLAGS) ${SDL_CFLAGS} ${JPEG_CFLAGS} ${PTHREAD_CFLAGS} ${SAMPLERATE_CFLAGS} 
+		$(DIRECTFB_CFLAGS) ${SDL_CFLAGS} ${JPEG_CFLAGS} ${PTHREAD_CFLAGS} ${SAMPLERATE_CFLAGS} ${MJPEGTOOLS_CFLAGS} 
 
 VEEJAY_LIB_FILE = libveejay.la
 
@@ -40,9 +40,8 @@ if USE_SWSCALER
 libveejay_la_LDFLAGS += -L$(top_builddir)/libpostproc/ -lpostproc 
 endif
 
-libveejay_la_LDFLAGS += -L$(top_builddir)/libOSC / -lOSC \
+libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libhash / -lhash \
-			-L$(top_builddir)/utils/ -lmjpegutils \
 			-L$(top_builddir)/bio2jack/ -lbio2jack \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
 			-L$(top_builddir)/libvjmem/ -lvjmem \
@@ -54,11 +53,12 @@ libveejay_la_LDFLAGS += -L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libyuv -lyuv \
 			-L$(top_builddir)/liblavjpeg -llavjpeg \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
-			-L$(top_builddir)/libvevo -lvevo \
-			${FFMPEG_LIBS} \
+			-L$(top_builddir)/libvevo -lvevo 
+
+libveejay_la_LDFLAGS +=	${FFMPEG_LIBS} \
 			${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} \
 			${XML_LIBS} ${JPEG_LIBS} ${JACK_LIBS} \
-			${LIBDV_LIBS} ${LIBM_LIBS} ${PIXBUF_LIBS}\
+			${LIBDV_LIBS} ${LIBM_LIBS} ${PIXBUF_LIBS} ${MJPEGTOOLS_LIBS}\
 			-DDYNAMIC -O3 -Wall -rdynamic 
 
 

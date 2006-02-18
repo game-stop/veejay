@@ -17,7 +17,7 @@
 #ifndef AVILIB_H
 #define AVILIB_H
 
-#include <utils/mjpeg_types.h>
+#include <mjpegtools/mjpeg_types.h>
 #include <libel/vj-mmap.h>
 
 typedef struct

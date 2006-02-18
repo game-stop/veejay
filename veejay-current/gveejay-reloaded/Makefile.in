@@ -62,7 +62,6 @@ gveejayreloaded_OBJECTS = $(am_gveejayreloaded_OBJECTS)
 gveejayreloaded_DEPENDENCIES = $(top_builddir)/libvjmem/libvjmem.la \
 	$(top_builddir)/libvjmsg/libvjmsg.la \
 	$(top_builddir)/libvjnet/libvjnet.la \
-	$(top_builddir)/utils/libmjpegutils.a \
 	$(top_builddir)/libvevo/libvevo.la \
 	$(top_builddir)/libhash/libhash.la
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
@@ -198,6 +197,8 @@ MAINT = @MAINT@
 MAINTAINER_MODE_FALSE = @MAINTAINER_MODE_FALSE@
 MAINTAINER_MODE_TRUE = @MAINTAINER_MODE_TRUE@
 MAKEINFO = @MAKEINFO@
+MJPEGTOOLS_CFLAGS = @MJPEGTOOLS_CFLAGS@
+MJPEGTOOLS_LIBS = @MJPEGTOOLS_LIBS@
 OBJEXT = @OBJEXT@
 PACKAGE = @PACKAGE@
 PACKAGE_BUGREPORT = @PACKAGE_BUGREPORT@
@@ -282,13 +283,13 @@ target_cpu = @target_cpu@
 target_os = @target_os@
 target_vendor = @target_vendor@
 MAINTAINERCLEANFILES = Makefile.in
-INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/utils -I$(top_srcdir)/gveejay-reloaded -I$(top_srcdir)/libcom $(GTK_CFLAGS) \
-		$(GLIB_CFLAGS) $(GLADE_CFLAGS) $(GTKCAIRO_CFLAGS) -DGNOMELOCALEDIR=\""$(datadir)/locale"\" -DGVEEJAY_DATADIR=\""$(gveejay_datadir)"\"
+INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/gveejay-reloaded -I$(top_srcdir)/libcom $(GTK_CFLAGS) \
+		$(MJPEGTOOLS_CFLAGS) $(GLIB_CFLAGS) $(GLADE_CFLAGS) $(GTKCAIRO_CFLAGS) -DGNOMELOCALEDIR=\""$(datadir)/locale"\" -DGVEEJAY_DATADIR=\""$(gveejay_datadir)"\"
 
 GVEEJAY_BIN = gveejayreloaded 
 gveejayreloaded_SOURCES = widgets/gtkcolorsel.c widgets/gtkknob.c widgets/cellrendererspin.c widgets/gtktimeselection.c curve.c utils.c tracksources.c gveejay.c keyboard.c sequence.c multitrack.c vj-api.c ${gveejay_headers}
-gveejayreloaded_LDADD = $(top_builddir)/libvjmem/libvjmem.la $(top_builddir)/libvjmsg/libvjmsg.la $(top_builddir)/libvjnet/libvjnet.la $(top_builddir)/utils/libmjpegutils.a $(top_builddir)/libvevo/libvevo.la $(top_builddir)/libhash/libhash.la 
-gveejayreloaded_LDFLAGS = $(GTK_LIBS) $(GLIB_LIBS) $(GLADE_LIBS) $(GTKCAIRO_LIBS) -lgthread-2.0 -export-dynamic 
+gveejayreloaded_LDADD = $(top_builddir)/libvjmem/libvjmem.la $(top_builddir)/libvjmsg/libvjmsg.la $(top_builddir)/libvjnet/libvjnet.la $(top_builddir)/libvevo/libvevo.la $(top_builddir)/libhash/libhash.la 
+gveejayreloaded_LDFLAGS = $(MJPEGTOOLS_LIBS) $(GTK_LIBS) $(GLIB_LIBS) $(GLADE_LIBS) $(GTKCAIRO_LIBS) -lgthread-2.0 -export-dynamic 
 all: all-am
 
 .SUFFIXES:

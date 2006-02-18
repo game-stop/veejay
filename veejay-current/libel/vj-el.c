@@ -34,8 +34,8 @@
 #include <libel/vj-avcodec.h>
 #include <libel/elcache.h>
 #include <limits.h>
-#include <utils/mpegconsts.h>
-#include <utils/mpegtimecode.h>
+#include <mjpegtools/mpegconsts.h>
+#include <mjpegtools/mpegtimecode.h>
 #include <libvjmem/vjmem.h>
 #include "avcodec.h"
 #include <math.h>

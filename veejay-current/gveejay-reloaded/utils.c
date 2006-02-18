@@ -18,8 +18,8 @@
  */
 
 #include <stdio.h>
-#include <utils/mpegconsts.h>
-#include <utils/mpegtimecode.h>
+#include <mjpegtools/mpegconsts.h>
+#include <mjpegtools/mpegtimecode.h>
 
 int	status_to_arr( char *status, int *array )
 {

@@ -24,6 +24,10 @@
 #include <veejay/vevo.h>
 #include <libvjmsg/vj-common.h>
 
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
+
 #define MAX_INDEX 1024
 
 #define	VEVO_ATOM_TYPE_STRING	LIVIDO_ATOM_TYPE_STRING
@@ -193,10 +197,19 @@ static vevo_port_t	*_new_event(
 {
 	int n = 0;
 	int it = 1;
-	char param_name[10];
+	char param_name[16];
 	char descr_name[255];
-	vevo_port_t *p = (void*) vevo_port_new( VEVO_EVENT_PORT );
 
+#ifdef STRICT_CHECKING
+	assert( name != NULL );
+	assert( function != NULL );
+	assert( vims_id > 0 );
+#endif
+
+	vevo_port_t *p = (void*) vevo_port_new( VEVO_EVENT_PORT );
+#ifdef STRICT_CHECKING
+	assert( p != NULL );
+#endif
 	if( format )
 		vevo_property_set( p, "format", VEVO_ATOM_TYPE_STRING, 1, &format );
 	else
@@ -210,25 +223,41 @@ static vevo_port_t	*_new_event(
 
 	va_list ap;
 	va_start(ap, flags);
-	while( n < n_arg )
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_DEBUG,
+	  "VIMS %03d: '%s' '%s' %d arguments", vims_id, name, format, n_arg );
+#endif
+
+	for( n = 0; n < n_arg ; n ++)
 	{
 		int dd   = 0;
 		char *ds = NULL;
+		bzero( param_name, 16 );
+		bzero( descr_name, 255 );
+
 
 		sprintf(param_name, "argument_%d", n );
-		char *descr = (char*) strdup( va_arg( ap, const char*) );
+		const char *arg = va_arg( ap, const char*);
+#ifdef STRICT_CHECKING
+		if(!arg) veejay_msg(VEEJAY_MSG_DEBUG, "\t%s - %d = '%s' of format %c (%s)",param_name, n, arg, format[it],format );
+		assert( arg != NULL );
+#endif
+		char *descr = (char*) strdup( arg );
 		sprintf(descr_name, "help_%d", n );
-		if ( format[it] == 's' )
-			ds = va_arg( ap, char*);
-		if ( format[it] == 'd' )
-			dd = va_arg( ap, int );
 		
-		if( ds == NULL && format[it] == 's')
-			vevo_property_set( p, param_name, VEVO_ATOM_TYPE_STRING, 0 , NULL );
-		else if (ds == NULL)
+		if (format[it] == 'd')
+		{
+			dd = va_arg( ap, int );
 			vevo_property_set( p, param_name, VEVO_ATOM_TYPE_INT,1, &dd );
+		}
 		else
-			vevo_property_set( p, param_name, VEVO_ATOM_TYPE_STRING,1, &ds );
+		{
+			ds = va_arg( ap, char*);
+			if(!ds)
+			 vevo_property_set( p, param_name, VEVO_ATOM_TYPE_STRING, 0, NULL );
+			else
+			 vevo_property_set( p, param_name, VEVO_ATOM_TYPE_STRING,1, &ds );
+		}
 
 		vevo_property_set( p, descr_name, VEVO_ATOM_TYPE_STRING, 1,&descr );
 
@@ -238,8 +267,6 @@ static vevo_port_t	*_new_event(
 			free( ds);
 		if( descr )
 			free( descr );
-
-		n++;
 	}
 
 	va_end(ap);
@@ -511,7 +538,7 @@ void		vj_init_vevo_events(void)
 				vj_event_chain_entry_channel_dec,
 				1,
 				VIMS_ALLOW_ANY,
-				"Increment value",
+				"Decrement value",
 				1,
 				NULL );
 

@@ -1,18 +1,6 @@
 #!/bin/bash
 # this no brain script tries to get ffmpeg from cvs
 # and it tries to "patch" the build files 
-if [ -d "ffmpeg" ]
-then
-	echo "FFmpeg build tree found"
-	exit 0
-fi
-
-if [ ! -d "ffmpeg" ]
-then
-	echo "FFmpeg build tree not found"
-	mkdir ffmpeg
-	cd ffmpeg
-fi
 
 MAKEFILE_TEMPL="SUBDIRS =\n\
 DIST_SUBDIRS = ffmpeg\n\
@@ -25,6 +13,9 @@ all-local:\n\
 
 if [ ! -d "ffmpeg" ] 
 then
+	mkdir ffmpeg
+	cd ffmpeg
+
 	echo "Trying to get FFmpeg from cvs"
  	if cvs -d:pserver:anonymous@mplayerhq.hu:/cvsroot/ffmpeg co ffmpeg
 	then

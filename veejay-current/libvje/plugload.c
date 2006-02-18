@@ -499,14 +499,14 @@ static	void	deinstantiate_plugin( void *plugin )
 
 static	void	add_to_plugin_list( const char *path )
 {
+	if(!path)
+		return;
+
 	int i;
 	char fullname[PATH_MAX+1];
 	struct	dirent	**files = NULL;
 	struct stat sbuf;
 	int	res = 0;
-
-	if(!path) return;
-
 
 	memset( &sbuf,0 ,sizeof(struct stat));
 	res = stat( path, &sbuf );
@@ -679,6 +679,8 @@ static	void	scan_plugins()
 		int j;
 		int k = 0;
 		char value[PATH_MAX];
+	
+		bzero( value, PATH_MAX );
 		for( j=0; j < len; j ++ )
 		{	
 			if(data[j] == '\0' )

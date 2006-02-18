@@ -133,6 +133,9 @@ static livido_property_t *prop_node_append(livido_port_t * p, int key,
 static livido_property_t *prop_node_get(livido_port_t * p, int key)
 {
     __vevo_port_t *port = (__vevo_port_t *) p;
+#ifdef STRICT_CHECKING
+	assert( port != NULL );
+#endif
     livido_property_t *l = port->list;
     while (l != NULL) {
 	if (key == l->key)
@@ -699,6 +702,9 @@ livido_property_set(livido_port_t * p,
     int hash_key = hash_key_code(key);
     int new = 1;
     void *node = NULL;
+#ifdef STRICT_CHECKING
+	assert( port != NULL );
+#endif
     if (!port->table) {
 	livido_property_t *pnode = NULL;
 	if ((pnode = prop_node_get(port, hash_key)) != NULL) {

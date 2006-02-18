@@ -202,25 +202,7 @@ static inline void * __memcpy(void * to, const void * from, size_t n)
 #ifdef HAVE_ASM_MMX
 void * mmx_memset(void *what, int v, size_t len )
 {
-	uint8_t val[8];
-	uint8_t *to = (uint8_t*)what;
-	void *retval = what;
-	int i;
-	for(i = 0; i < 8; i++) val[i] = v;
-	movq_m2r(val, mm0);
-	for( i = 0; i < (len/8); i += 8)
-	{
-		movq_r2m( mm0, *to );
-		*(to) += 8;
-	}
-	while(i < len)
-	  {
-		*(to)++ = val[0];
-		i++;
-	  }
-	emms();
-
-	return retval;
+	return memset( what,v,len );
 }
 
 void * mmx_memcpy(void * to, const void * from, size_t len)
@@ -228,8 +210,9 @@ void * mmx_memcpy(void * to, const void * from, size_t len)
      void *retval;
      size_t i;
      retval = to;
-
-     if (len >= MMX1_MIN_LEN) {
+     const unsigned char *f = from; 
+     unsigned char *t = to; 
+    if (len >= MMX1_MIN_LEN) {
           register unsigned long int delta;
           /* Align destinition to MMREG_SIZE -boundary */
           delta = ((unsigned long int)to)&(MMX_MMREG_SIZE-1);
@@ -259,8 +242,8 @@ void * mmx_memcpy(void * to, const void * from, size_t len)
                                     "movq %%mm6, 48(%1)\n"
                                     "movq %%mm7, 56(%1)\n"
                                     :: "r" (from), "r" (to) : "memory");
-               ((const unsigned char *)from)+=64;
-               ((unsigned char *)to)+=64;
+               (f)+=64;
+               (t)+=64;
           }
           __asm__ __volatile__ ("emms":::"memory");
      }
@@ -377,7 +360,8 @@ static void * sse_memcpy(void * to, const void * from, size_t len)
      void *retval;
      size_t i;
      retval = to;
-
+	const unsigned char *f = from;
+	unsigned char *t = to;
      __asm__ __volatile__ (
           "   prefetchnta (%0)\n"
 	  "   prefetchnta 32(%0)\n"
@@ -416,8 +400,8 @@ static void * sse_memcpy(void * to, const void * from, size_t len)
                         "movntps %%xmm2, 32(%1)\n"
                         "movntps %%xmm3, 48(%1)\n"
                      :: "r" (from), "r" (to) : "memory");
-                    ((const unsigned char *)from)+=64;
-                    ((unsigned char *)to)+=64;
+                    (f)+=64;
+                    (t)+=64;
                }
           else
                
@@ -439,8 +423,8 @@ static void * sse_memcpy(void * to, const void * from, size_t len)
                      "movntps %%xmm2, 32(%1)\n"
                      "movntps %%xmm3, 48(%1)\n"
                      :: "r" (from), "r" (to) : "memory");
-                    ((const unsigned char *)from)+=64;
-                    ((unsigned char *)to)+=64;
+                    (f)+=64;
+                    (t)+=64;
                }
           // since movntq is weakly-ordered, a "sfence"
           //  is needed to become ordered again. 

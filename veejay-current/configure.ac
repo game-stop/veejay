@@ -300,6 +300,19 @@ if test x$with_libdv != xno ; then
                     [have_libdv=false])
 fi
 
+dnl *********************************************************************
+dnl Check for mjpegtools
+dnl   (creates MJPEGYTOOLS_CFLAGS, 
+dnl *********************************************************************
+have_mjpegtools=false
+PKG_CHECK_MODULES(MJPEGTOOLS, [mjpegtools >= 1.6 ],
+                    [
+ 		     AC_SUBST( MJPEGTOOLS_CFLAGS )
+		     AC_SUBST( MJPEGTOOLS_LIBS )
+		     have_mjpegtools=true
+                     AC_DEFINE(HAVE_MJPEGTOOLS, 1, [MJPEGTools installed])],
+                    [have_mjpegtoools=false])
+
 dnl ********************************************************************
 dnl Check to see if __progname is provided by the system
 dnl ********************************************************************
@@ -330,7 +343,7 @@ dnl ********************************************************************
 have_glib=false
 AM_PATH_GLIB(2.0,[
             have_glib=true
-            AC_DEFINE(HAVE_GLIB,, [Glib library present])],gthread,)
+            AC_DEFINE(HAVE_GLIB,, [Glib library present])],,)
 dnl ********************************************************************
 dnl Check for the SDL library (for software playback)
 dnl   (defines SDL_CFLAGS and SDL_LIBS)
@@ -414,7 +427,7 @@ fi
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
- debugCFLAGS="-g"
+ debugCFLAGS="-g -DSTRICT_CHECKING "
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
@@ -465,7 +478,7 @@ case $host_cpu in
     dnl If the host is pentium, align on double word boundary
     case $host_cpu in
 	i686)
-		CFLAGS="$CFLAGS -malign-double -mfpmath=sse -freg-struct-return"
+		CFLAGS="$CFLAGS -malign-double -mfpmath=sse" 
 		;;
 	*)
 		;;
@@ -701,9 +714,30 @@ else
   fi
 fi
 
-if test ! -r $srcdir/ffmpeg/ffmpeg/configure.gnu; then
-       AC_MSG_ERROR([FFmpeg tree broken])
+AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
+                    [Defined if building against uninstalled FFmpeg source])
+
+if test -d $srcdir/ffmpeg; then
+	AC_MSG_NOTICE([Found local ffmpeg tree])
+else
+	AC_MSG_NOTICE([Grab FFmpeg from cvs])
+	sh ffmpeg-configure.in
 fi
+
+if test x$have_ps2 = xtrue ; then
+ ffmpeg_ac_configure_args="--disable-v4l --disable-audio-oss --disable-vhook --disable-ffplay --disable-ffserver --disable-zlib --disable-dv1394 --disable-network --disable-audio-oss --disable-audiobeos"
+else
+ffmpeg_ac_configure_args="--disable-ffserver --disable-ffplay --disable-v4l --disable-audio-oss --disable-vhook --disable-dv1394 --disable-network --disable-audio-oss --disable-audio-beos"
+fi
+
+AC_MSG_NOTICE([Running FFMpeg configure ${ffmpeg_ac_configure_args}])
+
+(
+	cd ffmpeg/ffmpeg
+	./configure.gnu $ffmpeg_ac_configure_args
+)
+
+
 ffmpeg_include='$(top_srcdir)/ffmpeg/ffmpeg'
 ffmpeg_build='$(top_builddir)/ffmpeg/ffmpeg'
 FFMPEG_CFLAGS="-I${ffmpeg_include}/libavcodec -I${ffmpeg_include}/libavformat"
@@ -781,9 +815,9 @@ AC_MSG_RESULT($warnCXXFLAGS)
 
 if test "x$cflags_set" != "xyes" ; then
   if test "x$enable_debug" = "xyes" ; then
-  	CFLAGS="-g -Wall-Wunused"
+  	CFLAGS="$debugCFLAGS $warnCFLAGS"
   else
- 	CFLAGS="$CFLAGS $warnCFLAGS $debugCFLAGS"
+ 	CFLAGS="$CFLAGS $warnCFLAGS"
   fi
   CXXFLAGS="$CXXFLAGS $warnCXXFLAGS"
   cflags_set=yes
@@ -795,14 +829,6 @@ if test x"$with_extra_cflags" != "x"; then
    CXXFLAGS="$CXXFLAGS $with_extra_cflags"
 fi
 
-AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
-                    [Defined if building against uninstalled FFmpeg source])
-
-if test x$have_ps2 = xtrue ; then
- ffmpeg_ac_configure_args="--disable-v4l --disable-audio-oss --disable-vhook --disable-ffplay --disable-ffserver --disable-zlib --disable-dv1394 --disable-network --disable-audio-oss --disable-audiobeos"
-else
-ffmpeg_ac_configure_args="--disable-ffserver --disable-ffplay --disable-v4l --disable-audio-oss --disable-vhook --disable-dv1394 --disable-network --disable-audio-oss --disable-audio-beos"
-fi
 
 AC_MSG_NOTICE([ Gveejay ${use_gveejayreloaded} ${with_gveejayreloaded} ])
 
@@ -849,16 +875,6 @@ if test x$with_gimp_stuff != xfalse ; then
 	AC_SUBST(GLADE_LIBS)
 fi
 
-
-
-dnl  AC_CONFIG_SUBDIRS(ffmpeg/ffmpeg)
-
-(
-	cd ffmpeg/ffmpeg
-	./configure.gnu $ffmpeg_ac_configure_args
-)
-
-
 AC_DEFINE(VEEJAY,,[Building veejay])
 
 dnl **********************************************************************
@@ -881,7 +897,6 @@ libel/Makefile
 libstream/Makefile
 liblavjpeg/Makefile
 libsamplerec/Makefile
-utils/Makefile
 bio2jack/Makefile
 veejay/Makefile
 gveejay/Makefile
@@ -936,6 +951,8 @@ fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
+AC_MSG_NOTICE([  - MJPEGTools			 : ${have_mjpegtools}])
+
 
 AC_MSG_NOTICE([ Optional dependencies])
 
@@ -955,24 +972,3 @@ AC_MSG_NOTICE([  - freetype support              : ${have_freetype}])
 AC_MSG_NOTICE([  - GVeejay UI                    : ${use_gveejay}])
 AC_MSG_NOTICE([  - GVeejay Reloaded UI           : ${use_gveejayreloaded}])
 AC_MSG_NOTICE([  - Swscaler support              : ${use_swscaler}])
-
-if test "$GCC" = yes ; then
-	AC_MSG_NOTICE([])
-	ac_gcc_version=`echo __GNUC__ | $CC -E - | grep -v ^\#`
-	ac_gcc_minor_version=`echo __GNUC_MINOR__ | $CC -E - | grep -v ^\#`
-
-	dnl wierd things happen with 3.4 
-	dnl the compile flag --without-pic somehow affects the compile error
-	dnl when gcc fails to find sufficient free registers in the postproc
-	dnl library when compiling inline MMX asm. 
-	dnl Also, depending on your luck, the -O2 (optimization) might be  
-	dnl able to "optimize" so there are sufficient free registers 
-	dnl compiler bug ??? who knows. Apperently its not in gcc 4.0 
-	if test "$ac_gcc_version" = 3 -a "$ac_gcc_minor_version" = 4 ; then
-		if test x$with_pic != xno ; then
-			AC_MSG_NOTICE([*** Buggy compiler ? If build fails, try without --without-pic])
-		fi
-	fi
-fi
-
-

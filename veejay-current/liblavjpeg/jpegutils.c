@@ -33,7 +33,7 @@
 #include <jerror.h>
 #include <assert.h>
 
-#include <utils/mjpeg_logging.h>
+#include <mjpegtools/mjpeg_logging.h>
 
 #include "jpegutils.h"
 #include <libel/lav_io.h>

@@ -1,6 +1,6 @@
 # Process with automake to produce Makefile.in
 
-SUBDIRS = ffmpeg utils bio2jack libOSC libhash libvjmsg libvjmem 
+SUBDIRS = ffmpeg bio2jack libOSC libhash libvjmsg libvjmem 
 if USE_SWSCALER
 SUBDIRS += libpostproc
 endif
@@ -17,7 +17,7 @@ endif
 SUBDIRS += tools
 SUBDIRS += man
 
-#SUBDIRS    = ffmpeg utils bio2jack libOSC libhash libvjmsg libvjmem libpostproc libvje libsample libvjnet libyuv libel libstream liblavjpeg libsamplerec plugins veejay gveejay tools man 
+#SUBDIRS    = ffmpeg bio2jack libOSC libhash libvjmsg libvjmem libpostproc libvje libsample libvjnet libyuv libel libstream liblavjpeg libsamplerec plugins veejay gveejay tools man 
 
 #bin_SCRIPTS = veejay-config
 

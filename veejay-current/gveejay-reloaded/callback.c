@@ -16,7 +16,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
- 
+#include <ctype.h>
 #include <veejay/vj-global.h>
 #include <gveejay-reloaded/vj-api.h>
 #include <gveejay-reloaded/utils.h>
@@ -221,7 +221,6 @@ void	on_button_fadein_clicked(GtkWidget *w, gpointer user_data)
 
 void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 {
-	gdouble min_val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->lower;
 	gdouble max_val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->upper;
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
 	
@@ -869,9 +868,9 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	if(nframes <= 0)
 		return;
 	
-	int br=0; int bw=0;
+	gsize br=0; gsize bw=0;
 	gchar *utftext = (gchar*) get_text( "entry_samplename"); 
-	gchar *text = (utftext == NULL ? : g_locale_from_utf8( utftext, -1, &br, &bw,NULL));	
+	gchar *text = (utftext != NULL ? g_locale_from_utf8( utftext, -1, &br, &bw,NULL) : NULL);	
 	if(text != NULL)
 	{
 		int i = 0;
@@ -1551,7 +1550,7 @@ void	on_about1_activate(GtkWidget *widget, gpointer user_data)
 void	on_new_input_stream1_activate(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *dialog = glade_xml_get_widget_( info->main_window, "inputdialog" );
-	gint result = gtk_dialog_run( GTK_DIALOG( dialog ));
+	gtk_dialog_run( GTK_DIALOG( dialog ));
 	gtk_widget_hide( dialog );
 }
 
@@ -1579,21 +1578,50 @@ void	on_stream_length_value_changed( GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_STREAM_SET_LENGTH, "%d", get_nums("stream_length") );
 }
 
-void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
+static int	on_curve_buttontime_clicked()
 {
 	// store the values in keyframe
 	sample_slot_t *s = info->selected_slot;
 	if(!s)
-		return;
+		return 0;
 	int i = info->uc.selected_chain_entry;
 	int j = info->uc.selected_parameter_id;
 	int id = info->uc.entry_tokens[ENTRY_FXID];
+	int end = get_nums( "curve_spinend" );
+	int start = get_nums( "curve_spinstart" );
+
+	if( (end - start) <= 0 || id <= 0 )	
+	{
+		return 0;
+	}
+	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+	
+	key_parameter_t *key = s->ec->effects[i]->parameters[j];
+
+	key->start_pos = start;
+	key->end_pos = end;
+	curve_timeline_preserve( key, end - start, curve );
+	return 1;
+}
+
+
+void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
+{
+	if(!on_curve_buttontime_clicked())
+		return;
+	sample_slot_t *s = info->selected_slot;
+
+	int i = info->uc.selected_chain_entry;
+	int j = info->uc.selected_parameter_id;
+	int id = info->uc.entry_tokens[ENTRY_FXID];
+
 //	int end = s->ec->effects[i]->parameters[j]->end_pos;
 //	int start =  s->ec->effects[i]->parameters[j]->start_pos;
 	int end = get_nums( "curve_spinend" );
 	int start = get_nums( "curve_spinstart" );
 	int min = 0;
 	int max = 0;
+
 
 	if( (end - start) <= 0 || id <= 0 )	
 	{
@@ -1618,34 +1646,6 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 
 	//debug_key( s->ec->effects[i]->parameters[j] ); 
 }
-
-void	on_curve_buttontime_clicked(GtkWidget *widget, gpointer user_data )
-{
-	// store the values in keyframe
-	sample_slot_t *s = info->selected_slot;
-	if(!s)
-		return;
-	int i = info->uc.selected_chain_entry;
-	int j = info->uc.selected_parameter_id;
-	int id = info->uc.entry_tokens[ENTRY_FXID];
-	int end = get_nums( "curve_spinend" );
-	int start = get_nums( "curve_spinstart" );
-
-	if( (end - start) <= 0 || id <= 0 )	
-	{
-		return;
-	}
-	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
-	
-	key_parameter_t *key = s->ec->effects[i]->parameters[j];
-
-	key->start_pos = start;
-	key->end_pos = end;
-	curve_timeline_preserve( key, end - start, curve );
-
-	//debug_key( s->ec->effects[i]->parameters[j] ); 
-}
-
 
 void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -1725,7 +1725,6 @@ void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 
 void	on_curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 {
-	int i;
 	int k = is_button_toggled( "curve_toggleentry" );
 	sample_slot_t *s = info->selected_slot;
 
@@ -1849,7 +1848,7 @@ void	on_timeline_cleared(GtkWidget *widget, gpointer user_data)
 
 void	on_timeline_bind_toggled( GtkWidget *widget, gpointer user_data)
 {
-	gboolean toggled = timeline_get_bind( TIMELINE_SELECTION(widget)) ;
+//	gboolean toggled = timeline_get_bind( TIMELINE_SELECTION(widget)) ;
 //	set_toggle_button( "check_marker_bind", (toggled ? 1 :0) );
 }
 

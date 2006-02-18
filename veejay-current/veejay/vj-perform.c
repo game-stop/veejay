@@ -32,8 +32,8 @@
 #include <math.h>
 #include <libel/vj-avcodec.h>
 #include <veejay/vj-event.h>
-#include <utils/mpegconsts.h>
-#include <utils/mpegtimecode.h>
+#include <mjpegtools/mpegconsts.h>
+#include <mjpegtools/mpegtimecode.h>
 //#ifdef SUPPORT_READ_DV2
 //#include "vj-dv.h"
 //#endif

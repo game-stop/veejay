@@ -132,12 +132,7 @@ int main(int argc, char *argv[]) {
 	     gdk_threads_init();                   // Called to initialize internal mutex "gdk_threads_mutex".
         }
 
-	int g_nargs = 1;
-	char **g_args = (char**) malloc(sizeof(char*) * 2 );
-	g_args[0] = strdup("--sync");
-	g_args[1] = NULL;
-
-	gtk_init( &g_nargs, &g_args );
+	gtk_init( NULL,NULL );
 	
 	vj_gui_theme_setup(gveejay_theme);
 	vj_gui_set_debug_level( verbosity , n_tracks);

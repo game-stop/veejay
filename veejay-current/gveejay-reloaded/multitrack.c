@@ -113,6 +113,7 @@ static int	num_tracks_active( multitracker_t * mt );
 void 		*mt_preview( gpointer user_data );
 static	void	set_logo(GtkWidget *area);
 static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint last, GtkWidget *main_area  );
+static int	find_track( multitracker_t *mt, const char *host, int port );
 
 static	int	preview_width_ = 0;
 static  int     preview_height_ = 0;

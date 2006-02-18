@@ -19,7 +19,7 @@
 #ifndef VJ_YUV4MPEG_H
 #define VJ_YUV4MPEG_H
 #include <libel/vj-el.h>
-#include <utils/mpegconsts.h>
+#include <mjpegtools/mpegconsts.h>
 
 typedef struct {
     y4m_stream_info_t streaminfo;

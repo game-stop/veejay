@@ -28,9 +28,5 @@ void	vj_gui_enable(void);
 void	vj_gui_disable(void);
 void	vj_gui_disconnect(void);
 void	vj_gui_set_debug_level(int level, int preview_p);
-void 	vj_gui_add_sample(gchar *filename, gint mode);
-void 	vj_gui_add_stream(gint vims_stream_command, gchar *filename, gint mode);
-void 	vj_gui_show_sample_options();
-void 	vj_gui_change_slot_option(gint vims_command, int *value[], gchar *vims_msg);
 
 #endif 

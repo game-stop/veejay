@@ -37,7 +37,7 @@
 
 #include <veejay/lav_common.h>
 #include <veejay/jpegutils.h>
-#include <utils/mpegconsts.h>
+#include <mjpegtools/mpegconsts.h>
 
 static uint8_t jpeg_data[MAX_JPEG_LEN];
 

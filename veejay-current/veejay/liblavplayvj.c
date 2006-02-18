@@ -182,7 +182,7 @@ struct mjpeg_params
 //#include "vj-common.h"
 #include <libstream/vj-tag.h>
 #include "libveejay.h"
-#include <utils/mjpeg_types.h>
+#include <mjpegtools/mjpeg_types.h>
 #include "vj-perform.h"
 #include <libvjnet/vj-server.h>
 #include "mjpeg_types.h"
