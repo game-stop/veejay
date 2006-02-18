@@ -117,6 +117,9 @@
 /* Compiling for MIPS CPU */
 #undef HAVE_MIPS
 
+/* mjpegtools is present */
+#undef HAVE_MJPEGTOOLS
+
 /* Define to 1 if you have the `mmap' function. */
 #undef HAVE_MMAP
 
