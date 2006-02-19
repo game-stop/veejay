@@ -2706,7 +2706,7 @@ static void	update_current_slot(int pm)
 //	update_label_str( "label_sampleposition", time);
 //	g_free(time); 
 	gint update = 0;
-
+	gint hm = info->prev_mode;
 	/* Mode changed or ID changed, 
 	   Reload FX Chain, Reload current entry and disable widgets based on stream type */
 
@@ -2754,7 +2754,7 @@ static void	update_current_slot(int pm)
 	}
 
 	/* Actions for stream */
-	if( pm == MODE_STREAM )
+	if( pm != hm && pm == MODE_STREAM )
 	{
 		// pop up stream notepad
 		
@@ -2777,7 +2777,7 @@ static void	update_current_slot(int pm)
 	}
 
 	/* Actions for sample */
-	if(pm == MODE_SAMPLE )
+	if(hm != pm && pm == MODE_SAMPLE )
 	{
 		/* Total frame change, update start,end and */
 //		if( history[TOTAL_FRAMES] != info->status_tokens[TOTAL_FRAMES])
@@ -2946,9 +2946,10 @@ static void 	update_globalinfo()
 			timeline_set_selection( info->tl, TRUE );
 		else
 			timeline_set_selection( info->tl, FALSE );
-		on_samplepage_clicked(NULL,NULL);
-
 	}
+	
+	on_samplepage_clicked(NULL,NULL);
+
 	if( info->status_tokens[TOTAL_SLOTS] !=
 		history[TOTAL_SLOTS] 
 			|| info->status_tokens[TOTAL_SLOTS] != info->uc.expected_slots )
@@ -5560,13 +5561,14 @@ static void	update_gui()
 {
 
 	int pm = info->status_tokens[PLAY_MODE];
+	int hm = info->prev_mode;
 
-	if( pm == MODE_SAMPLE && info->uc.randplayer )
+	if( pm == MODE_SAMPLE && info->uc.randplayer && hm != pm )
 	{
 		info->uc.randplayer = 0;
 		set_toggle_button( "samplerand", 0 );
 	}
-	if( pm == MODE_PATTERN )
+	if( pm == MODE_PATTERN && hm != pm)
 	{
 		if(!info->uc.randplayer )
 		{
@@ -6453,7 +6455,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	g_io_add_watch_full(
 			info->channel,
 	//		G_PRIORITY_HIGH_IDLE,
-			G_PRIORITY_DEFAULT_IDLE,
+			G_PRIORITY_LOW,
 			G_IO_IN| G_IO_ERR | G_IO_NVAL | G_IO_HUP,
 			veejay_tick,
 			(gpointer*) info,

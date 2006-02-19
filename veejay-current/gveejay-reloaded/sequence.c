@@ -351,7 +351,7 @@ void	*veejay_sequence_thread(gpointer data)
 			}
 		}	
 		else
-				g_usleep(1000);
+				g_usleep(20000);
 
 	}
 	return NULL;	
