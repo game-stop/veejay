@@ -5883,7 +5883,10 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 	if(strncasecmp(str,"dvvideo",7)==0||strncasecmp(str,"dvsd",4)==0)
 	{
 		_recorder_format = ENCODER_DVVIDEO;
-		veejay_msg(VEEJAY_MSG_INFO,"Recorder writes in DVVIDEO format");
+		if(vj_el_is_dv(v->edit_list))
+			veejay_msg(VEEJAY_MSG_INFO,"Recorder writes in DVVIDEO format");
+		else
+			veejay_msg(VEEJAY_MSG_ERROR, "Not working in a valid DV resolution");
 		return;
 	}
 	if(strncasecmp(str,"mjpeg",5)== 0 || strncasecmp(str,"mjpg",4)==0 ||

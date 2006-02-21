@@ -215,6 +215,12 @@ void	vj_el_init()
 
 }
 
+int	vj_el_is_dv(editlist *el)
+{
+	return is_dv_resolution(el->video_width, el->video_height);
+}
+
+
 void	vj_el_prepare()
 {
 //	reset_cache( el->cache );

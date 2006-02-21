@@ -34,6 +34,15 @@
 #define DV_NTSC_SIZE 120000
 #define DV_AUDIO_MAX_SAMPLES 1944
 
+int	is_dv_resolution(int w, int h)
+{
+	if( h == NTSC_H && w == NTSC_W )
+		return 1;
+	if( h == PAL_H && w == PAL_W )
+		return 1;
+	return 0;
+}
+
 /* init the dv decoder and decode buffer*/
 vj_dv_decoder *vj_dv_decoder_init(int quality, int width, int height, int pixel_format)
 {
