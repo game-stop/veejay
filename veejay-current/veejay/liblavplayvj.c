@@ -1103,7 +1103,6 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     
     d_len = strlen(info->status_what);
     snprintf(info->status_msg,MESSAGE_SIZE, "V%03dS%s", d_len, info->status_what);
-	veejay_msg(0, "%s", info->status_msg); 
    res = vj_server_send(info->vjs[1],link_id, info->status_msg, strlen(info->status_msg));
 
    if( res <= 0) { /* close command socket */
