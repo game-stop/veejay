@@ -1001,7 +1001,7 @@ int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 */
 
 	// mcast frame sender = info->vjs[2] ??
-	if(vj_server_send_frame( info->vjs[2], 0, socket_buffer, __socket_len,
+	if(vj_server_send_frame( info->vjs[id], 0, socket_buffer, __socket_len,
 				helper_frame, info->effect_frame_info, info->real_fps )<=0)
 	{
 		/* frame send error handling */

@@ -1056,8 +1056,8 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     int res = 0;
     int pm = info->uc->playback_mode;
     int total_slots = (sample_size() - 1 ) + (vj_tag_true_size() -1 );
-    int cache_used = veejay_mem_used();
-
+    //int cache_used = veejay_mem_used();
+	int cache_used = 0;
    if(total_slots < 0)
 	total_slots = 0;
     switch (info->uc->playback_mode) {
@@ -1103,7 +1103,7 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     
     d_len = strlen(info->status_what);
     snprintf(info->status_msg,MESSAGE_SIZE, "V%03dS%s", d_len, info->status_what);
- 
+	veejay_msg(0, "%s", info->status_msg); 
    res = vj_server_send(info->vjs[1],link_id, info->status_msg, strlen(info->status_msg));
 
    if( res <= 0) { /* close command socket */
@@ -1112,7 +1112,6 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 		_vj_server_del_client(info->vjs[0], link_id );
 		_vj_server_del_client(info->vjs[3], link_id );
 	}
-
     if (info->uc->chain_changed == 1)
 		info->uc->chain_changed = 0;
     if (info->uc->render_changed == 1)
