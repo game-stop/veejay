@@ -592,7 +592,7 @@ static struct
 static	int	no_preview_ = 0;
 static int	no_draw_ = 0;
 
-G_LOCK_DEFINE( status_lock__ );
+//G_LOCK_DEFINE( status_lock__ );
 
 static struct
 {
@@ -2919,15 +2919,16 @@ static void	update_current_slot(int pm)
 static void 	update_globalinfo()
 {
 	int pm = info->status_tokens[PLAY_MODE];
-	int *history = info->history_tokens[pm];
+
+	int *history = info->history_tokens[info->uc.playmode];
 
 	gint	i;
 
-	info->uc.playmode = pm;
 #ifdef STRICT_CHECKING
 	assert( info->el.fps > 0 );
 #endif
 	update_status_accessibility(pm);
+
 	if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
 		info->status_tokens[PLAY_MODE] != history[PLAY_MODE]  )
 	{
@@ -3082,6 +3083,7 @@ static void 	update_globalinfo()
 */
 	/* Update current playing sample in dialog window */
 	update_current_slot(pm);
+	info->uc.playmode = pm;
 
 }	
 
@@ -5627,7 +5629,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 	}
 	if(gui->watch.state==STATE_PLAYING && (condition & G_IO_IN)&& gui->watch.p_state == 0 )
 	{
-		G_LOCK( status_lock__ );
+//		G_LOCK( status_lock__ );
 		gui->status_lock = 1;
 		int nb = 0;
 		unsigned char sta_len[6];
@@ -5637,7 +5639,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if(sta_len[0] != 'V' || nb <= 0 )
 		{
 			gui->status_lock = 0;
-			G_UNLOCK( status_lock__ );
+//			G_UNLOCK( status_lock__ );
 			return FALSE;
 		}
 		int n_bytes = 0;
@@ -5645,7 +5647,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if( n_bytes == 0 || n_bytes >= STATUS_BYTES )
 		{
 			gui->status_lock = 0;
-			G_UNLOCK( status_lock__ );
+//			G_UNLOCK( status_lock__ );
 			return FALSE;
 		}
 		bzero( gui->status_msg, STATUS_BYTES ); 
@@ -5654,7 +5656,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if(nb <= 0 )
 		{
 			gui->status_lock = 0;
-			G_UNLOCK( status_lock__ );
+//			G_UNLOCK( status_lock__ );
 			return FALSE;
  		}
                 while(vj_client_poll( gui->client, V_STATUS ))
@@ -5687,7 +5689,9 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 
 			// context switch
 			gdk_threads_enter();
+
 			update_gui();
+
 			gdk_threads_leave();
 		}
 		gui->status_lock = 0;
@@ -5705,7 +5709,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
                 while(vj_client_poll( gui->client, V_STATUS ))
                        nb = vj_client_read( gui->client,V_STATUS,tmp, 1); 
 		
-		G_UNLOCK( status_lock__ );
+//		G_UNLOCK( status_lock__ );
 	}
 	return TRUE;
 }
@@ -6053,6 +6057,8 @@ int	vj_gui_cb_locked()
 	return info->watch.p_state;
 }
 
+
+
 void	vj_img_cb(GdkPixbuf *img )
 {
 	if( no_preview_ )
@@ -6061,8 +6067,8 @@ void	vj_img_cb(GdkPixbuf *img )
 	if( !info->selected_slot || !info->selected_gui_slot )
 		return;
 
-	if( !G_TRYLOCK( status_lock__ ) )
-		return;
+//	if( !G_TRYLOCK( status_lock__ ) )
+//		return;
 
 	int sample_id = info->status_tokens[ CURRENT_ID ];
 	int sample_type = info->status_tokens[ PLAY_MODE ]; 
@@ -6096,6 +6102,7 @@ void	vj_img_cb(GdkPixbuf *img )
 			{
 				slot->pixbuf = gdk_pixbuf_scale_simple( img, info->image_dimensions[0],
 					info->image_dimensions[1], GDK_INTERP_BILINEAR );
+			
 				gveejay_update_image(slot, gui_slot, info->image_dimensions[0],
 					info->image_dimensions[1] );
 				update_cached_slots();	
@@ -6104,7 +6111,7 @@ void	vj_img_cb(GdkPixbuf *img )
 		}
 	}
 
-	G_UNLOCK( status_lock__ );
+//	G_UNLOCK( status_lock__ );
 
 /*
 	if(selected_is_playing())
@@ -6400,9 +6407,9 @@ void	vj_gui_preview(void)
 		h = 288;
 
 	update_spin_range( "preview_width", 16, w,
-		(info->run_state == RUN_STATE_REMOTE ? ((info->preview_size_w==0 ? w/2: info->preview_size_w)) : w ) ); 
+		(info->run_state == RUN_STATE_REMOTE ? ((info->preview_size_w==0 ? w/3: info->preview_size_w)) : w ) ); 
 	update_spin_range( "preview_height", 16, h,
-		(info->run_state == RUN_STATE_REMOTE ? ((info->preview_size_h == 0 ? h/2 : info->preview_size_h)) : h ) );	
+		(info->run_state == RUN_STATE_REMOTE ? ((info->preview_size_h == 0 ? h/3 : info->preview_size_h)) : h ) );	
 
 	update_spin_incr( "preview_width", 16, 0 );
 	update_spin_incr( "preview_height", 16, 0 );
@@ -6524,7 +6531,7 @@ gboolean		is_alive( void )
 
 	if(gui->watch.w_state == WATCHDOG_STATE_OFF )
 	{
-	//	multitrack_restart( gui->mt );
+		multitrack_restart( gui->mt );
 		vj_gui_disconnect();
 		return TRUE;
 	}

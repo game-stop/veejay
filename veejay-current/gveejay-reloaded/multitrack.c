@@ -104,7 +104,7 @@ typedef struct
 	int	quit;
 } multitracker_t;
 
-static  void	(*img_cb)(GdkPixbuf *p);
+static  void	(*img_cb)(GdkPixbuf *p, GdkPixbuf *b);
 static	void	(*gui_cb)(int, char*, int);
 static	int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len, int *port_num);
 static	void	add_buttons( mt_priv_t *p, sequence_view_t *seqv , GtkWidget *w);
@@ -1096,7 +1096,7 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int wid
 #ifdef STRICT_CHECKING
 		assert( last_track->sequence != NULL );
 #endif
-		veejay_configure_sequence( last_track->sequence, 352, 288 );
+		veejay_configure_sequence( last_track->sequence, 176, 144 );
 		gtk_widget_set_size_request( GTK_WIDGET( last_track->view->area ), width,height );
 	}
 	else
@@ -1446,32 +1446,39 @@ fprintf(stderr, "Simulate image\n");
 		}
 
 
-		gdk_threads_enter();
-		if( mt->sensitive )
-		for( i = 0; i < MAX_TRACKS ; i ++ )
-		{
-			mt_priv_t *p = a->pt[i];
-			if(cache[i])
-			{
-				GtkImage *image = GTK_IMAGE( p->view->area );
-				gtk_image_set_from_pixbuf( image, cache[i] );
-			}
-		}
-
 		if(mt->quit)
 		{
-			gdk_threads_leave();
 			g_thread_exit(NULL);
 		}
+
+		GdkPixbuf *ir = NULL;
+		if(lt->active && cache[LAST_TRACK])
+		{
+			ir = gdk_pixbuf_scale_simple( cache[LAST_TRACK],
+					352,288,GDK_INTERP_BILINEAR );
+		}
+		gdk_threads_enter();
+
+		if( mt->sensitive )
+			for( i = 0; i < MAX_TRACKS ; i ++ )
+			{
+				mt_priv_t *p = a->pt[i];
+				if(cache[i])
+				{
+					GtkImage *image = GTK_IMAGE( p->view->area );
+					gtk_image_set_from_pixbuf( image, cache[i] );
+				}
+			}
 
 		if(lt->active && cache[LAST_TRACK])
 		{
 			GtkImage *image = GTK_IMAGE( lt->view->area );
-			gtk_image_set_from_pixbuf( image, cache[LAST_TRACK] );
-			img_cb( cache[LAST_TRACK] );
+			gtk_image_set_from_pixbuf( image, ir );
+			gdk_pixbuf_unref( ir );
+			img_cb( cache[LAST_TRACK], ir );
 			gdk_pixbuf_unref( cache[LAST_TRACK] );
 		}
-
+		
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
 			mt_priv_t *p = a->pt[i];
@@ -1480,6 +1487,8 @@ fprintf(stderr, "Simulate image\n");
 			cache[i] = NULL;
 		}
 		gdk_threads_leave();	
+
+		g_usleep(250000);
 	}
 }
 

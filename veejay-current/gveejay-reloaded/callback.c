@@ -1811,14 +1811,8 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
 	if(skin__ == 0 )
 	{
-	if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE) // 1
-		gtk_notebook_set_page( GTK_NOTEBOOK(n) , 1 );
-
-	if(info->status_tokens[PLAY_MODE] == MODE_STREAM) // 0 
-		gtk_notebook_set_page( GTK_NOTEBOOK(n), 0 );
-	
-	if(info->status_tokens[PLAY_MODE] == MODE_PLAIN ) // 2
-		gtk_notebook_set_page( GTK_NOTEBOOK(n), 2 );	
+		if( info->uc.playmode != info->status_tokens[PLAY_MODE])
+		gtk_notebook_set_page( GTK_NOTEBOOK(n), info->status_tokens[PLAY_MODE]);
 	}
 	else
 	{
@@ -2307,7 +2301,7 @@ void		on_previewscale_value_changed( GtkWidget *widget, gpointer user_data)
 	else
 	{
 		// @@@ MT!
-	//	multitrack_resize( info->mt, nw,nh);	
+//		multitrack_resize( info->mt, nw,nh);	
 	}
 }
 
@@ -2316,9 +2310,9 @@ void		on_previewsmall_clicked( GtkWidget *widget, gpointer user_data)
 	int w = info->el.width;
 	int h = info->el.height;
 	if( w >= 720) w = w / 4;
-	else w= w / 2;
+	else w= w / 3;
 	if( h >= 480 ) h = h / 4;
-	else h = h / 2;
+	else h = h / 3;
 	update_spin_value( "preview_width", w );
         update_spin_value( "preview_height", h );
 }
@@ -2368,19 +2362,19 @@ void	on_mt_sync_stop_clicked( GtkWidget *w , gpointer user_data)
 }
 void	on_mt_sync_play_clicked( GtkWidget *w, gpointer user_data)
 {
-	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PLAY_FORWARD,0 );
+	//multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PLAY_FORWARD,0 );
 }
 void	on_mt_sync_backward_clicked( GtkWidget *w, gpointer user_data)
 {
-	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PLAY_BACKWARD,0);
+	//multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PLAY_BACKWARD,0);
 }
 void	on_mt_sync_gotostart_clicked( GtkWidget *w, gpointer user_data)
 {
-	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_GOTO_START,0 );
+	//multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_GOTO_START,0 );
 }
 void	on_mt_sync_gotoend_clicked( GtkWidget *w, gpointer user_data)
 {
-	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_GOTO_END,0 );
+	//multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_GOTO_END,0 );
 }
 void	on_mt_sync_decspeed_clicked( GtkWidget *w, gpointer user_data)
 {
@@ -2388,6 +2382,7 @@ void	on_mt_sync_decspeed_clicked( GtkWidget *w, gpointer user_data)
 	if( n < 0 ) n += 1;
 	if( n > 0 ) n -= 1;
 	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
+
 }
 void	on_mt_sync_incspeed_clicked( GtkWidget *w, gpointer user_data)
 {
