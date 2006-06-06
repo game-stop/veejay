@@ -855,11 +855,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
             	{
 		    res = lav_read_frame(el->lav_fd[N_EL_FILE(n)], d->tmp_buffer);
 		    if(res > 0 && el->cache)
-			if(!cache_frame( el->cache, d->tmp_buffer, res, nframe, decoder_id ))
-			{
-				veejay_msg(VEEJAY_MSG_ERROR,"Unable to cache frame, reset cache");
-				reset_cache(el->cache);
-			}
+			cache_frame( el->cache, d->tmp_buffer, res, nframe, decoder_id );
 		}
 	}
 

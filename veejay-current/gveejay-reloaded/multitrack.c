@@ -520,6 +520,8 @@ static gboolean	update_sequence_widgets( gpointer data )
 	int  array[20];
 	veejay_get_status( p->sequence, status );
 	int n = status_to_arr( status, array );
+	if( n<= 0 )
+		return TRUE;
 #ifdef STRICT_CHECKING
 	assert( n == 18 );
 #endif
@@ -611,6 +613,7 @@ static	void	set_logo(GtkWidget *area)
 	char path[1024];
 	bzero(path,1024);
 	get_gd(path,NULL, "veejay-logo.png");
+	printf("scale logo\n");
 	GdkPixbuf *buf2 = gdk_pixbuf_scale_simple( logo_img_,preview_width_,preview_height_, GDK_INTERP_BILINEAR );
 	gtk_image_set_from_pixbuf( GTK_IMAGE(area), buf2 );
 	gdk_pixbuf_unref( buf2 );
@@ -1069,6 +1072,14 @@ void		multitrack_bind_track( void *data, int id, int bind_this )
 
 }
 
+void		multitrack_set_preview_speed( void *data , double value )
+{
+	multitracker_t *mt = (multitracker_t*) data;
+	all_priv_t *a = (all_priv_t*) mt->data;
+	mt_priv_t *lt = a->pt[LAST_TRACK];
+	if(lt->active)
+		veejay_sequence_preview_delay( lt->sequence, value );
+}
 
 // set_current opens Main preview
 void		multitrack_set_current( void *data, char *hostname, int port_num , int width, int height)
@@ -1096,7 +1107,8 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int wid
 #ifdef STRICT_CHECKING
 		assert( last_track->sequence != NULL );
 #endif
-		veejay_configure_sequence( last_track->sequence, 176, 144 );
+		veejay_configure_sequence( last_track->sequence, 112, 96 );
+
 		gtk_widget_set_size_request( GTK_WIDGET( last_track->view->area ), width,height );
 	}
 	else
@@ -1360,25 +1372,26 @@ void 	*mt_preview( gpointer user_data )
 
 	for( ;; )
 	{
-restart:
-		G_LOCK(mt_lock);
+//restart:
+
 		mt_priv_t *lt = a->pt[LAST_TRACK];
 		gint error = 0;
 
 		memset( cache, 0, (MAX_TRACKS+2) * sizeof(GdkPixbuf*));
 
 		if(mt->quit)
-		{
-			G_UNLOCK(mt_lock);
 			g_thread_exit(NULL);
-		}
-
+	
 		if(!lt->preview )
 		{
 			cache[LAST_TRACK] = dummy_image();
+#ifdef STRICT_CHECKING
+			assert( cache[LAST_TRACK] != NULL );
+#endif
 		}
 		else
 		{
+			retry:
 			cache[LAST_TRACK] = veejay_get_image( lt->sequence, &error );	
 			if( error )
 				delete_data( mt->data, LAST_TRACK ); 
@@ -1417,11 +1430,12 @@ fprintf(stderr, "Simulate image\n");
 			cache[LAST_TRACK] = dst;
 			//g_usleep(50000);
 		}*/
-	
+
+		G_LOCK( mt_lock );	
 		int ref = find_sequence( a );
+		G_UNLOCK( mt_lock);
 
-
-		if( mt->sensitive )//&& lt->preview )
+		if( mt->sensitive ) //&& lt->preview )
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
 			mt_priv_t *p = a->pt[i];
@@ -1434,31 +1448,42 @@ fprintf(stderr, "Simulate image\n");
 					cache[i] = 0;
 			}
 		}
-		G_UNLOCK(mt_lock);
-
-		if( ref >= 0 && cache[LAST_TRACK] )// && lt->preview)
+		if( ref >= 0  && lt->preview && cache[LAST_TRACK] ) //&& lt->active)
 		{
 			cache[ref] = gdk_pixbuf_scale_simple(
 					cache[LAST_TRACK],
 					preview_width_,
 					preview_height_,
-					GDK_INTERP_BILINEAR );
+					GDK_INTERP_NEAREST );
 		}
 
-
-		if(mt->quit)
-		{
-			g_thread_exit(NULL);
-		}
 
 		GdkPixbuf *ir = NULL;
 		if(lt->active && cache[LAST_TRACK])
 		{
 			ir = gdk_pixbuf_scale_simple( cache[LAST_TRACK],
-					352,288,GDK_INTERP_BILINEAR );
+					352,288,GDK_INTERP_NEAREST );
 		}
-		gdk_threads_enter();
 
+		//@ NOW Lock buffer and copy cache !!]
+/*		atomic_copy( ir, cache[LAST_TRACK] );
+
+		if(ir)
+			gdk_pixbuf_unref( ir );
+		if(cache[LAST_TRACK])
+			gdk_pixbuf_unref( cache[LAST_TRACK] );
+
+		for( i = 0; i < MAX_TRACKS ; i ++ )
+		{
+			mt_priv_t *p = a->pt[i];
+			if(cache[i])
+				gdk_pixbuf_unref(cache[i]);
+			cache[i] = NULL;
+		}*/
+
+		
+		
+		gdk_threads_enter();
 		if( mt->sensitive )
 			for( i = 0; i < MAX_TRACKS ; i ++ )
 			{
@@ -1467,28 +1492,31 @@ fprintf(stderr, "Simulate image\n");
 				{
 					GtkImage *image = GTK_IMAGE( p->view->area );
 					gtk_image_set_from_pixbuf( image, cache[i] );
+					gtk_widget_queue_draw( image );
 				}
 			}
 
-		if(lt->active && cache[LAST_TRACK])
+		if(lt->active && ir)
 		{
 			GtkImage *image = GTK_IMAGE( lt->view->area );
 			gtk_image_set_from_pixbuf( image, ir );
-			gdk_pixbuf_unref( ir );
 			img_cb( cache[LAST_TRACK], ir );
-			gdk_pixbuf_unref( cache[LAST_TRACK] );
 		}
-		
+		gdk_threads_leave();	
+
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
 			mt_priv_t *p = a->pt[i];
 			if(cache[i])
 				gdk_pixbuf_unref(cache[i]);
-			cache[i] = NULL;
 		}
-		gdk_threads_leave();	
+		if(ir)
+			gdk_pixbuf_unref(ir);
+		if(cache[LAST_TRACK])
+			gdk_pixbuf_unref(cache[LAST_TRACK]);
 
-		g_usleep(250000);
+		
+		
 	}
 }
 

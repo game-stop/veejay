@@ -57,14 +57,14 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 		uint8_t p =  
 			255 - ( abs ( (255 - abs((255-a)-a))  -    (255-abs((255-b)-b))) );
 		p = (abs(abs(p-b) - b));
-		if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
+	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
 		return p;
 	}
 
 	static uint8_t _pcf_lghtn(uint8_t a, uint8_t b, int t_max)
 	{
 		uint8_t p = (a > b ? a : b );
-		if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
+	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
 		return p;
 	}
 
@@ -79,7 +79,7 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 	{
 		uint8_t p = ( (b < a) ? b : a);
 		p = ( 255 - abs( (255-p) - b ) );
-		if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
+	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
 		return p;
 	}
 
@@ -87,7 +87,7 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 	{
 		int p = ( (b > a) ? b : a);
 		p = ( 255 - ((255 - b) * (255 - b)) / p);
-		if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
+	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
 		return (uint8_t)p;
 	}
 
@@ -96,7 +96,7 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 		int p = 255 - ((255-a) * (255-a)) / a;
 		int q = 255 - ((255-b) * (255-b)) / b;
 		p = ( 255 - ((255-p) * (255 - a)) / q);
-		if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
+	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
 		return (uint8_t)p;
 	}
 
@@ -106,7 +106,7 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 			255 - ( abs ( (255 - abs((255-a)-a))  -    (255-abs((255-b)-b))) );
 		p = (abs(abs(p-b) - b));
 		p = p + b - (( p * b ) >> 8);
-		if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
+	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
 	
 		return p;
 	}
@@ -171,7 +171,7 @@ void pencilsketch_apply(
 	for(i=0; i < len; i++)
 	{
 		y = Y[i];
-		if( y < 16 ) y = 16; else if (y > 235) y = 235;
+	//	if( y < 16 ) y = 16; else if (y > 235) y = 235;
 		yb = y;
 
 		/* substract user defined mask from image */
@@ -185,7 +185,7 @@ void pencilsketch_apply(
 			m = m + d;
 			/* a magical forumula to combine the pixel with the original*/
 			y = ((((y << 1) - (255 - m))>>1) + Y[i])>>1;
-			if(y < 16) y = 16; else if (y>240) y = 240;
+		//	if(y < 16) y = 16; else if (y>240) y = 240;
 			/* apply blend operation on masked pixel */
 			Y[i] = _pff(y,yb,threshold_max);
 		}

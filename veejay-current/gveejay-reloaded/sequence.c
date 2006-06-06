@@ -3,11 +3,12 @@
 #include <libvjmsg/vj-common.h>
 #include <glib.h>
 #include <gdk/gdk.h>
+#include <sys/time.h>
 #define DATA_ERROR 0
 #define DATA_DONE 1
 #define RETRIEVING_DATA 2
 #define DATA_READY 3
-
+#define MAX_BUF 2
 typedef struct
 {
 	GThread *thread;
@@ -16,19 +17,29 @@ typedef struct
 	gint active;
 	vj_client *fd;
 	gchar status_buffer[100];
-	guchar *data_buffers[2];
-	int	data_status[2];
+	guchar *data_buffers[MAX_BUF];
+	int	data_status[MAX_BUF];
 	gint	frame_num;
+	gint	wframe_num;
 	gint	preview;
 	gint	width;
 	gint	height;
 	gint	abort;
+	unsigned long preview_delay;
 	glong	time_out; // in microseconds
 	GCond  *cond;
 	GMutex *mutex;
 	GMutex *serialize;
 	guchar *serialized[100];
 } veejay_sequence_t;
+
+static unsigned long vj_get_timer()
+{
+    struct timeval tv;
+    gettimeofday(&tv, 0);
+    return ((long) (tv.tv_sec * 1000000) + tv.tv_usec);
+}
+
 void	veejay_sequence_free( void *data );
 
   // 3 second timeout
@@ -247,8 +258,11 @@ GdkPixbuf	*veejay_get_image( void *data, gint *error)
 	g_get_current_time( &time_val );
 	g_time_val_add( &time_val, v->time_out );
 
-	while( v->data_status[v->frame_num] == RETRIEVING_DATA )
+//	while( v->data_status[v->frame_num] == RETRIEVING_DATA )
+	while( v->data_status[v->frame_num] != DATA_READY )
+
 	{
+		//@ sleeping for new frames!
 		if(!g_cond_timed_wait( v->cond, v->mutex, &time_val ))
 		{	// timeout !
 			v->data_status[v->frame_num] = DATA_ERROR;
@@ -256,7 +270,10 @@ GdkPixbuf	*veejay_get_image( void *data, gint *error)
 			*error = 1;
 			return NULL;
 		}
+		if( v->abort )
+			return NULL;
 	}
+
 	if( v->data_status[v->frame_num] == DATA_READY )
 	{
 		*error = 0;
@@ -271,6 +288,7 @@ GdkPixbuf	*veejay_get_image( void *data, gint *error)
 				NULL,
 				NULL );
 		v->data_status[v->frame_num] = DATA_DONE;
+		v->frame_num = (v->frame_num+1)%MAX_BUF;
 		g_mutex_unlock( v->mutex );
 		return res;
 	}
@@ -286,14 +304,15 @@ void		veejay_configure_sequence( void *data, gint w, gint h )
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
 	g_mutex_lock( v->mutex );
 
+	
 	while( v->data_status[v->frame_num] == RETRIEVING_DATA )
 		g_cond_wait( v->cond, v->mutex );
 
-	if( v->data_status[v->frame_num] == DATA_READY || v->data_status[v->frame_num] == DATA_DONE )
-	{
+//	if( v->data_status[v->frame_num] == DATA_READY || v->data_status[v->frame_num] == DATA_DONE )
+//	{
 		v->width = w;
 		v->height = h;
-	}
+//	}
 
 	g_mutex_unlock( v->mutex );	
 }
@@ -310,19 +329,19 @@ static	int	veejay_process_data( veejay_sequence_t *v )
 		return 1;
 	}
 
-	if(v->data_status[v->frame_num] == DATA_READY)
+	if(v->data_status[v->wframe_num] == DATA_READY||v->data_status[v->wframe_num]==DATA_ERROR)
+		v->data_status[v->wframe_num] = DATA_DONE;
+	if(v->data_status[v->wframe_num] == DATA_DONE )
 	{
-		v->data_status[v->frame_num] = DATA_DONE;
-	}
-	if(v->data_status[v->frame_num] == DATA_DONE )
-	{
-		v->data_status[v->frame_num] = RETRIEVING_DATA;
+		v->data_status[v->wframe_num] = RETRIEVING_DATA;
 		ret = veejay_get_image_data( v );
 		if(ret)
-			v->data_status[v->frame_num] = DATA_READY;
+		{
+			v->data_status[v->wframe_num] = DATA_READY;
+			v->wframe_num = (v->wframe_num+1) % MAX_BUF;
+		}
 		else
-			v->data_status[v->frame_num] = DATA_ERROR;
-	
+			v->data_status[v->wframe_num] = DATA_ERROR;
 		g_cond_signal( v->cond );  
 	}
 	g_mutex_unlock( v->mutex );
@@ -334,8 +353,11 @@ void	*veejay_sequence_thread(gpointer data)
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
 
+	unsigned long tn = vj_get_timer() + v->preview_delay;
 	for ( ;; )
 	{
+		unsigned long time_now = vj_get_timer();
+		
 		if( v->abort )
 			return NULL;
 
@@ -343,16 +365,20 @@ void	*veejay_sequence_thread(gpointer data)
 		{
 			if( veejay_process_status( v ) == 0 )
 			{
+				printf("Abort, status error\n");
 				return NULL;
 			}
-			if ( veejay_process_data( v ) == 0 )
+			if( time_now > tn )
 			{
-				return NULL;
+				if ( veejay_process_data( v ) == 0 )
+				{
+					printf("Abort, data error\n");
+					return NULL;
+				}
+				tn = time_now + v->preview_delay; 
 			}
 		}	
-		else
-				g_usleep(20000);
-
+		g_usleep(20000);
 	}
 	return NULL;	
 }
@@ -378,16 +404,29 @@ void	veejay_toggle_image_loader( void *data, gint state )
 	g_mutex_unlock(v->mutex);
 }
 
+void	veejay_sequence_preview_delay( void *data, double value )
+{
+	veejay_sequence_t *v = (veejay_sequence_t*) data;
+	g_mutex_lock(v->mutex);
+	gint max = 4 * 100000;
+	v->preview_delay = (unsigned long)( value * (double) max);
+	g_mutex_unlock(v->mutex);
+}
+
 void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_height)
 {	
+	int k = 0;
 	GError *err = NULL;
 	veejay_sequence_t *v = (veejay_sequence_t*) malloc(sizeof( veejay_sequence_t ));
 	memset( v, 0, sizeof(veejay_sequence_t));
 
 	v->hostname = strdup( hostname );
 	v->port_num = port;
-	v->data_buffers[0] = (guchar*) malloc(sizeof(guchar) * max_width * max_height * 3 );
-	v->data_buffers[1] = (guchar*) malloc(sizeof(guchar) * max_width * max_height * 3 );
+	for( k = 0; k < MAX_BUF; k ++ )
+	{
+		v->data_buffers[k] = (guchar*) malloc(sizeof(guchar) * max_width * max_height * 3 );
+		v->data_status[k] = DATA_ERROR;
+	}
 	v->fd = vj_client_alloc(0,0,0);
 	if(!vj_client_connect( v->fd, v->hostname, NULL,v->port_num ) )
 	{
@@ -397,11 +436,11 @@ void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_he
 		return NULL;
 	}
 
-	v->data_status[0] = DATA_READY;
-	v->data_status[1] = DATA_READY;
-	v->time_out = 1000000 * 3; // 3 second timeout
+	v->time_out = 4500000; // Micro seconds
 	v->frame_num = 0;
+	v->wframe_num = 0;
 	v->abort = 0;
+	v->preview_delay = 40000;
 	v->mutex = g_mutex_new();
 	v->serialize = g_mutex_new();
 	v->cond = g_cond_new();
@@ -423,7 +462,7 @@ void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_he
 void	veejay_sequence_free( void *data )
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
-	
+	int k;	
 	g_thread_join( v->thread );
 	g_cond_free( v->cond );
 	g_mutex_free( v->mutex );
@@ -431,10 +470,8 @@ void	veejay_sequence_free( void *data )
 
 	if( v->hostname )
 		free(v->hostname );
-	if( v->data_buffers[0] )
-		free( v->data_buffers[0] );
-	if( v->data_buffers[1] )
-		free( v->data_buffers[1] );
+	for( k = 0; k < MAX_BUF; k ++ )
+		free( v->data_buffers[k] );
 
 	free(v);
 	v = NULL;

@@ -31,14 +31,14 @@ vj_effect *cartonize_init(int w, int h)
     ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 255;
-	ve->limits[0][1] = 1;
+	ve->limits[0][1] = 0;
 	ve->limits[1][1] = 255;
-	ve->limits[0][2] = 1;
+	ve->limits[0][2] = 0;
 	ve->limits[1][2] = 255;
 
     ve->defaults[0] = 64;
-	ve->defaults[1] = 128;
-	ve->defaults[2] = 196;
+	ve->defaults[1] = 0;
+	ve->defaults[2] = 0;
 
     ve->description = "Cartoon";
     ve->sub_format = 0;
@@ -67,19 +67,25 @@ void cartonize_apply( VJFrame *frame, int width, int height, int b1, int b2, int
 	for( i = 0 ; i < len ; i ++ )	
 	{
 		tmp = Y[i];
-		if(tmp < 16 ) tmp = 16; else if(tmp > 235 ) tmp = 235;
+	//	if(tmp < 16 ) tmp = 16; else if(tmp > 235 ) tmp = 235;
 		Y[i] = (tmp / base) * base; // loose fractional part
 	}
+
+	if(b2 > 0)
 	for( i = 0; i < uv_len; i ++ )
 	{
 		p = Cb[i] - 128;
-		if( p < -127 ) p = -127;
-		if( p > 127  ) p = 127;
+		//if( p < -127 ) p = -127;
+	//	if( p > 127  ) p = 127;
 		Cb[i] = (p / ubase) * ubase + 128;
-		
+	}
+
+	if(b3> 0 )
+	for( i = 0; i < uv_len; i ++ )
+	{
 		p = Cr[i] - 128;
-		if( p < -127 ) p = -127;
-		if( p > 127 ) p = 127;
+		//if( p < -127 ) p = -127;
+	//	if( p > 127 ) p = 127;
 		Cr[i] = (p / vbase) * vbase + 128;
 	}
 

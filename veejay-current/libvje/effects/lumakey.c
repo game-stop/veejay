@@ -82,12 +82,12 @@ void lumakey_simple(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 	       }
 	     */
 	    if (a1 >= threshold && a1 <= threshold2) {
-		Y = (op0 * a1 + op1 * a2) / 255;
-		Cb = (op0 * yuv1[1][x + y] + op1 * yuv2[1][x + y]) / 255;
-		Cr = (op0 * yuv1[2][x + y] + op1 * yuv2[2][x + y]) / 255;
-		yuv1[0][x + y] = Y < 16 ? 16 : Y > 235 ? 235 : Y;
-		yuv1[1][x + y] = Cb < 16 ? 16 : Cb > 240 ? 240 : Cb;
-		yuv1[2][x + y] = Cr < 16 ? 16 : Cr > 240 ? 240 : Cr;
+		Y = (op0 * a1 + op1 * a2) >> 8;
+		Cb = (op0 * yuv1[1][x + y] + op1 * yuv2[1][x + y]) >> 1;
+		Cr = (op0 * yuv1[2][x + y] + op1 * yuv2[2][x + y]) >> 1;
+		yuv1[0][x + y] = Y; 	// < 16 ? 16 : Y > 235 ? 235 : Y;
+		yuv1[1][x + y] = Cb; 	//  < 16 ? 16 : Cb > 240 ? 240 : Cb;
+		yuv1[2][x + y] = Cr; 	//  < 16 ? 16 : Cr > 240 ? 240 : Cr;
 	    }
 
 	}
@@ -127,13 +127,13 @@ void lumakey_smooth(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 	a1 = yuv1[0][x];
 	a2 = yuv2[0][x];
 	if (a1 >= threshold && a1 <= threshold2) {
-	    Y = (op0 * a1 + op1 * a2) / 255;
-	    Cb = (op0 * yuv1[1][x] + op1 * yuv2[1][x]) / 255;
-	    Cr = (op0 * yuv1[2][x] + op1 * yuv2[2][x]) / 255;
+	    Y = (op0 * a1 + op1 * a2) >> 8;
+	    Cb = (op0 * yuv1[1][x] + op1 * yuv2[1][x]) >> 8;
+	    Cr = (op0 * yuv1[2][x] + op1 * yuv2[2][x]) >> 8;
 
-	    yuv1[0][x] = Y < 16 ? 16 : Y > 235 ? 235 : Y;
-	    yuv1[1][x] = Cb < 16 ? 16 : Cb > 240 ? 240 : Cb;
-	    yuv1[2][x] = Cr < 16 ? 16 : Cr > 240 ? 240 : Cr;
+	    yuv1[0][x] = Y; 	//< 16 ? 16 : Y > 235 ? 235 : Y;
+	    yuv1[1][x] = Cb; 	// < 16 ? 16 : Cb > 240 ? 240 : Cb;
+	    yuv1[2][x] = Cr;	// < 16 ? 16 : Cr > 240 ? 240 : Cr;
 	}
     }
 
@@ -142,9 +142,9 @@ void lumakey_smooth(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 	a1 = yuv1[0][y];
 	a2 = yuv2[0][y];
 	if (a1 >= threshold && a1 <= threshold2) {
-	    Y = (op0 * a1 + op1 * a2) / 255;
-	    Cb = (op0 * yuv1[1][y] + op1 * yuv2[1][y]) / 255;
-	    Cr = (op0 * yuv1[2][y] + op1 * yuv2[2][y]) / 255;
+	    Y = (op0 * a1 + op1 * a2)  >> 8;
+	    Cb = (op0 * yuv1[1][y] + op1 * yuv2[1][y]) >> 8;
+	    Cr = (op0 * yuv1[2][y] + op1 * yuv2[2][y]) >> 8;
 	}
 	/* rest of pixels in column */
 	for (x = 1; x < width - 1; x++) {
@@ -176,32 +176,24 @@ void lumakey_smooth(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 			 yuv2[0][y + width + x + 1] +
 			 yuv2[0][y + width + x - 1]
 		    ) / 9;
-		if (p1 < 16)
-		    p1 = 16;
-		else if (p1 > 235)
-		    p1 = 235;
-		if (p2 < 16)
-		    p2 = 16;
-		else if (p2 > 235)
-		    p2 = 235;
 
-		yuv1[0][x + y] = (op0 * p1 + op1 * p2) / 255;
+		yuv1[0][x + y] = (op0 * p1 + op1 * p2)  >> 8;
 		yuv1[1][x + y] =
-		    (op0 * yuv1[1][x + y] + op1 * yuv2[1][x + y]) / 255;
+		    (op0 * yuv1[1][x + y] + op1 * yuv2[1][x + y])  >> 8;
 		yuv1[2][x + y] =
-		    (op0 * yuv1[2][x + y] + op1 * yuv2[2][x + y]) / 255;
+		    (op0 * yuv1[2][x + y] + op1 * yuv2[2][x + y])  >> 8;
 
 	    } else {
 		if (a1 >= threshold && a1 <= threshold2) {
-		    Y = (op0 * a1 + op1 * a2) / 255;
+		    Y = (op0 * a1 + op1 * a2)  >> 8;
 		    Cb = (op0 * yuv1[1][x + y] +
-			  op1 * yuv2[1][x + y]) / 255;
+			  op1 * yuv2[1][x + y])  >> 8;
 		    Cr = (op0 * yuv1[2][x + y] +
-			  op1 * yuv2[2][x + y]) / 255;
+			  op1 * yuv2[2][x + y])  >> 8;
 
-		    yuv1[0][x + y] = Y < 16 ? 16 : Y > 235 ? 235 : Y;
-		    yuv1[1][x + y] = Cb < 16 ? 16 : Cb > 240 ? 240 : Cb;
-		    yuv1[2][x + y] = Cr < 16 ? 16 : Cr > 240 ? 240 : Cr;
+		    yuv1[0][x + y] = Y; 	// < 16 ? 16 : Y > 235 ? 235 : Y;
+		    yuv1[1][x + y] = Cb; 	// < 16 ? 16 : Cb > 240 ? 240 : Cb;
+		    yuv1[2][x + y] = Cr; 	// < 16 ? 16 : Cr > 240 ? 240 : Cr;
 		}
 	    }
 	}
@@ -211,13 +203,13 @@ void lumakey_smooth(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 	a1 = yuv1[0][x];
 	a2 = yuv2[0][x];
 	if (a1 >= threshold && a1 <= threshold2) {
-	    Y = (op0 * a1 + op1 * a2) / 255;
-	    Cb = (op0 * yuv1[1][x] + op1 * yuv2[1][x]) / 255;
-	    Cr = (op0 * yuv1[2][x] + op1 * yuv2[2][x]) / 255;
+	    Y = (op0 * a1 + op1 * a2) >> 8;
+	    Cb = (op0 * yuv1[1][x] + op1 * yuv2[1][x]) >> 8;
+	    Cr = (op0 * yuv1[2][x] + op1 * yuv2[2][x]) >> 8;
 
-	    yuv1[0][x] = Y < 16 ? 16 : Y > 235 ? 235 : Y;
-	    yuv1[1][x] = Cb < 16 ? 16 : Cb > 240 ? 240 : Cb;
-	    yuv1[2][x] = Cr < 16 ? 16 : Cr > 240 ? 240 : Cr;
+	    yuv1[0][x] = Y; 	// < 16 ? 16 : Y > 235 ? 235 : Y;
+	    yuv1[1][x] = Cb;	// < 16 ? 16 : Cb > 240 ? 240 : Cb;
+	    yuv1[2][x] = Cr;	// < 16 ? 16 : Cr > 240 ? 240 : Cr;
 	}
     }
 
@@ -249,13 +241,13 @@ void lumakey_smooth_white(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 	a1 = yuv1[0][x];
 	a2 = yuv2[0][x];
 	if (a1 >= threshold && a1 <= threshold2) {
-	    Y = (op0 * a1 + op1 * a2) / 255;
-	    Cb = (op0 * yuv1[1][x] + op1 * yuv2[1][x]) / 255;
-	    Cr = (op0 * yuv1[2][x] + op1 * yuv2[2][x]) / 255;
+	    Y = (op0 * a1 + op1 * a2) >> 8;
+	    Cb = (op0 * yuv1[1][x] + op1 * yuv2[1][x])  >> 8;
+	    Cr = (op0 * yuv1[2][x] + op1 * yuv2[2][x])  >> 8;
 
-	    yuv1[0][x] = Y < 16 ? 16 : Y > 235 ? 235 : Y;
-	    yuv1[1][x] = Cb < 16 ? 16 : Cb > 240 ? 240 : Cb;
-	    yuv1[2][x] = Cr < 16 ? 16 : Cr > 240 ? 240 : Cr;
+	    yuv1[0][x] = Y;	// < 16 ? 16 : Y > 235 ? 235 : Y;
+	    yuv1[1][x] = Cb;	// < 16 ? 16 : Cb > 240 ? 240 : Cb;
+	    yuv1[2][x] = Cr;	// < 16 ? 16 : Cr > 240 ? 240 : Cr;
 	}
     }
 
@@ -264,9 +256,9 @@ void lumakey_smooth_white(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 	a1 = yuv1[0][y];
 	a2 = yuv2[0][y];
 	if (a1 >= threshold && a1 <= threshold2) {
-	    Y = (op0 * a1 + op1 * a2) / 255;
-	    Cb = (op0 * yuv1[1][y] + op1 * yuv2[1][y]) / 255;
-	    Cr = (op0 * yuv1[2][y] + op1 * yuv2[2][y]) / 255;
+	    Y = (op0 * a1 + op1 * a2)  >> 8;
+	    Cb = (op0 * yuv1[1][y] + op1 * yuv2[1][y]) >> 8;
+	    Cr = (op0 * yuv1[2][y] + op1 * yuv2[2][y])  >> 8;
 	}
 	/* rest of pixels in column */
 	/* rest of pixels in column */
@@ -282,15 +274,15 @@ void lumakey_smooth_white(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 		yuv1[2][x + y] = 128;
 	    } else {
 		if (a1 >= threshold && a1 <= threshold2) {
-		    Y = (op0 * a1 + op1 * a2) / 255;
+		    Y = (op0 * a1 + op1 * a2) >> 8;
 		    Cb = (op0 * yuv1[1][x + y] +
-			  op1 * yuv2[1][x + y]) / 255;
+			  op1 * yuv2[1][x + y])  >> 8;
 		    Cr = (op0 * yuv1[2][x + y] +
-			  op1 * yuv2[2][x + y]) / 255;
+			  op1 * yuv2[2][x + y])  >> 8;
 
-		    yuv1[0][x + y] = Y < 16 ? 16 : Y > 235 ? 235 : Y;
-		    yuv1[1][x + y] = Cb < 16 ? 16 : Cb > 240 ? 240 : Cb;
-		    yuv1[2][x + y] = Cr < 16 ? 16 : Cr > 240 ? 240 : Cr;
+		    yuv1[0][x + y] = Y;		// < 16 ? 16 : Y > 235 ? 235 : Y;
+		    yuv1[1][x + y] = Cb;	// < 16 ? 16 : Cb > 240 ? 240 : Cb;
+		    yuv1[2][x + y] = Cr;	// < 16 ? 16 : Cr > 240 ? 240 : Cr;
 		}
 	    }
 	}
@@ -300,13 +292,13 @@ void lumakey_smooth_white(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 	a1 = yuv1[0][x];
 	a2 = yuv2[0][x];
 	if (a1 >= threshold && a1 <= threshold2) {
-	    Y = (op0 * a1 + op1 * a2) / 255;
-	    Cb = (op0 * yuv1[1][x] + op1 * yuv2[1][x]) / 255;
-	    Cr = (op0 * yuv1[2][x] + op1 * yuv2[2][x]) / 255;
+	    Y = (op0 * a1 + op1 * a2)  >> 8;
+	    Cb = (op0 * yuv1[1][x] + op1 * yuv2[1][x])  >> 8;
+	    Cr = (op0 * yuv1[2][x] + op1 * yuv2[2][x])  >> 8;
 
-	    yuv1[0][x] = Y < 16 ? 16 : Y > 235 ? 235 : Y;
-	    yuv1[1][x] = Cb < 16 ? 16 : Cb > 240 ? 240 : Cb;
-	    yuv1[2][x] = Cr < 16 ? 16 : Cr > 240 ? 240 : Cr;
+	    yuv1[0][x] = Y;	// < 16 ? 16 : Y > 235 ? 235 : Y;
+	    yuv1[1][x] = Cb;	// < 16 ? 16 : Cb > 240 ? 240 : Cb;
+	    yuv1[2][x] = Cr;	// < 16 ? 16 : Cr > 240 ? 240 : Cr;
 	}
     }
 }

@@ -102,8 +102,8 @@ void flare_exclusive(VJFrame *frame, VJFrame *frame2, int width, int height, int
 		a = Y[i];
 		b = Y2[i];
 
-		if(a < 16) a = 16; else if(a > 235) a = 235;
-		if(b < 16) b = 16; else if(b > 235) b = 235;
+	//	if(a < 16) a = 16; else if(a > 235) a = 235;
+	//	if(b < 16) b = 16; else if(b > 235) b = 235;
 
 		a *= o1;
 		b *= o2;
@@ -189,7 +189,7 @@ void flare_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
 		a = Y[i];
 		b = Y2[i];
 		if ( a < 16 ) a = 16;
-		if ( b < 16 ) b = 16;
+//		if ( b < 16 ) b = 16;
 		c = 255 - (( op_a - b) * (op_a - b)) / a;
 		if ( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
 		Y[i] = c;
@@ -197,7 +197,7 @@ void flare_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
 		a = Cb[i];
 		b = Cb2[i];
 		if ( a < 16) a = 16;
-		if ( b < 16) b = 16;
+//		if ( b < 16) b = 16;
 		c = 255 - (( 255 - b) * ( 255 - b )) / a;
 		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
 		Cb[i] = c;
@@ -205,7 +205,7 @@ void flare_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
 		a = Cr[i];
 		b = Cr2[i];
 		if ( a < 16 ) a = 16;
-		if ( b < 16 ) b = 16;
+//		if ( b < 16 ) b = 16;
 		c = 255 - ((255 -b ) * (255 - b)) /a ;
 		if ( c < 16 ) c = 16; else if ( c > 235) c = 235;
 		Cr[i] = c;

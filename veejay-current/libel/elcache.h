@@ -21,7 +21,7 @@
 #define ELCACHE_H
 
 uint8_t *get_cached_frame( void *cache, long frame_num, int *buf_len, int *decoder_id );
-int	cache_frame( void *cache, uint8_t *linbuf, int buflen, long frame_num , int decoder_id);
+void	cache_frame( void *cache, uint8_t *linbuf, int buflen, long frame_num , int decoder_id);
 void	free_cache(void *cache);
 void	*init_cache( unsigned int n_slots );
 

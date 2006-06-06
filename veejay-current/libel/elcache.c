@@ -159,7 +159,7 @@ void	free_cache(void *cache)
 	free(v);
 }
 
-int	cache_frame( void *cache, uint8_t *linbuf, int buflen, long frame_num , int decoder_id)
+void	cache_frame( void *cache, uint8_t *linbuf, int buflen, long frame_num , int decoder_id)
 {
 	cache_t *v = (cache_t*) cache;
 #ifdef STRICT_CHECKING
@@ -167,7 +167,10 @@ int	cache_frame( void *cache, uint8_t *linbuf, int buflen, long frame_num , int 
 	assert( linbuf != NULL );
 	assert( buflen > 0 );
 	assert( frame_num >= 0 );
-#endif
+#else
+	if( buflen <= 0 )
+		return 0;
+#endif	
 	int slot_num = cache_free_slot( cache );
 	if( slot_num == -1 )
 		slot_num = cache_find_slot( v, frame_num );
@@ -176,8 +179,6 @@ int	cache_frame( void *cache, uint8_t *linbuf, int buflen, long frame_num , int 
 	assert(slot_num >= 0 );
 #endif
 	cache_claim_slot(v, slot_num, linbuf, frame_num, buflen, decoder_id);
-
-	return 1;
 } 
 
 uint8_t *get_cached_frame( void *cache, long frame_num, int *buf_len, int *decoder_id )

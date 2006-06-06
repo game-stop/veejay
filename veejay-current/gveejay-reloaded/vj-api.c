@@ -396,7 +396,7 @@ typedef struct
 	int		run_state;
 	int		play_direction;
 	int		load_image_slot;
-	GtkWidget	*sample_bank_pad;	
+	GtkNotebook	*sample_bank_pad;	
 	GtkWidget	*quick_select;
 	sample_bank_t	**sample_banks;
 	sample_slot_t	*selected_slot;
@@ -420,6 +420,7 @@ typedef struct
 	gboolean	key_now;	
 	void		*mt;
 	watchdog_t	watch;
+	int		vims_line;
 } vj_gui_t;
 
 enum
@@ -572,7 +573,7 @@ static void    preset_from_clipboard(char *mkey);
 static void online_update(int keyp, int value);
 static  void   update_curve_widget(const char *name);
 static void    update_curve_accessibility(const char *name);
-
+static void	vj_preview_draw(void);
 
 void	interrupt_cb();
 
@@ -593,6 +594,8 @@ static	int	no_preview_ = 0;
 static int	no_draw_ = 0;
 
 //G_LOCK_DEFINE( status_lock__ );
+
+G_LOCK_DEFINE(preview_buffer__);
 
 static struct
 {
@@ -633,7 +636,7 @@ static struct
 	{"freestyle"},
 	{"frame_sampleproperties"},
 	{"frame_samplerecord"},
-	{"frame132"}, // edl
+	{"expander10"}, // edl
 	{"colorselection"},
 	{"frame_streamproperties"},
 	{"frame_streamrecord"},
@@ -782,6 +785,8 @@ GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
 {
 	GtkWidget *widget = glade_xml_get_widget( m , name );
 #ifdef STRICT_CHECKING
+	if(widget == NULL )
+		printf("Fatal: %s\n",name);
 	assert( widget != NULL );
 #endif
 	return widget;		
@@ -1262,6 +1267,26 @@ gchar *dialog_save_file(const char *title )
 
 	gtk_widget_destroy(dialog);
 	return NULL;
+}
+
+static GdkPixbuf *preview_pixbuf__[2];
+void	atomic_copy( GdkPixbuf *img, GdkPixbuf *small_img )
+{
+	G_LOCK( preview_buffer__ );
+	if(preview_pixbuf__[0])
+		gdk_pixbuf_unref( preview_pixbuf__[0] );
+	if(preview_pixbuf__[1])
+		gdk_pixbuf_unref( preview_pixbuf__[1] );
+	printf("In: %p, In : %p\n", img, small_img );
+	preview_pixbuf__[0] = (img ? gdk_pixbuf_copy( img ): NULL);
+	preview_pixbuf__[1] = (small_img ? gdk_pixbuf_copy( small_img ): NULL);
+	
+	G_UNLOCK( preview_buffer__ );
+}
+static	void	atomic_init(void)
+{
+	preview_pixbuf__[0] = NULL;
+	preview_pixbuf__[1] = NULL;
 }
 
 static	void	clear_progress_bar( const char *name, gdouble val )
@@ -2366,18 +2391,15 @@ static	int	get_maxs(const char *name)
 static	void	update_spin_value(const char *name, gint value )
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
-	if(w)
-	{
-		gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble) value );
-	}
+	if(!w) return;
+	gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble) value );
 }
 
 static  void	update_slider_range(const char *name, gint min, gint max, gint value, gint scaled)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
+	if(!w) return;
 	GtkRange *range = GTK_RANGE(w);
-	if(!w)
-		return;
 	if(!scaled)
 	{
 		gtk_range_set_range(range, (gdouble) min, (gdouble) max );
@@ -2638,7 +2660,7 @@ static	void	update_status_accessibility(int pm)
 
 			if( pm == MODE_SAMPLE )
 			{
-				enable_widget("frame132");
+				enable_widget("expander10");
 				enable_widget("frame_samplerecord");
 				enable_widget("frame_sampleproperties");
 				disable_widget("frame_streamproperties");
@@ -2648,7 +2670,7 @@ static	void	update_status_accessibility(int pm)
 			}
 			else
 			{
-				disable_widget( "frame132");
+				disable_widget( "expander10");
 				disable_widget( "samplerand" );
 				disable_widget( "freestyle" );
 			}
@@ -2796,6 +2818,7 @@ static void	update_current_slot(int pm)
 		/* Update marker bounds */
 		if( (history[SAMPLE_MARKER_START] != info->status_tokens[SAMPLE_MARKER_START]) )
 		{
+			update = 1;
 			gint nm =  info->status_tokens[SAMPLE_MARKER_START];
 			if(nm >= 0)
 			{
@@ -2835,6 +2858,7 @@ static void	update_current_slot(int pm)
 					marker_go = 1;
 				}
 			}
+			update = 1;
 		}
 			
 		if( (history[SAMPLE_START] != info->status_tokens[SAMPLE_START] ))
@@ -2910,11 +2934,67 @@ static void	update_current_slot(int pm)
 		
 			gint n_frames = sample_calctime();
 			time = format_time( n_frames, info->el.fps );
+	
+			timeline_set_length( info->tl,
+				(gdouble) n_frames , info->status_tokens[FRAME_NUM]- info->status_tokens[SAMPLE_START] );
 
+
+			
 		}
 	}
 
 }
+
+static void
+on_vims_messenger       (void)
+{
+        GtkTextIter start, end;
+        GtkTextBuffer* buffer;
+        GtkTextView* t= NULL;
+        gchar *str = NULL;
+        // static gint line = 0; make this global (...)
+        static int wait = 0;
+        t =
+		GTK_TEXT_VIEW(GTK_WIDGET(glade_xml_get_widget(info->main_window,"vims_messenger_textview")));
+      
+	buffer = gtk_text_view_get_buffer(t);
+
+        if(info->vims_line >= gtk_text_buffer_get_line_count(buffer)){
+                info->vims_line = 0;
+                if(!is_button_toggled( "vims_messenger_loop"))
+		{
+                        set_toggle_button( "vims_messenger_play", 0 );
+			return; 
+	 	}
+	}
+
+        if(is_button_toggled( "vims_messenger_play" )){
+                if(wait){
+                        wait--;
+                }
+                else{
+                        gtk_text_buffer_get_iter_at_line(buffer, &start, info->vims_line);
+                        end = start;
+                
+                        gtk_text_iter_forward_sentence_end(&end);
+                        str = gtk_text_buffer_get_text (buffer, &start, &end, TRUE);
+                       
+                        if(str[0] == '+'){
+                                str[0] = ' ';
+                                g_strstrip(str);
+                                wait = atoi(str);                
+                        }
+                        else{
+                                vj_msg(VEEJAY_MSG_INFO, "User defined VIMS message sent '%s'",str );
+                                msg_vims( str );
+                                printf("\nSent VIMS: %s", str);
+                        }
+                        info->vims_line++;
+                }
+        }
+}
+
+
 
 static void 	update_globalinfo()
 {
@@ -5337,26 +5417,25 @@ void vj_gui_set_preview_window( int w , int h )
 static	void	disable_widget(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
-	if(w)
-	{
-		 gtk_widget_set_sensitive( GTK_WIDGET(w), FALSE );
-	}
+	if(!w) return ;
+	gtk_widget_set_sensitive( GTK_WIDGET(w), FALSE );
 }
+
 static	void	disable_widget_by_pointer(GtkWidget *w)
 {
+	if(!w) return;
         gtk_widget_set_sensitive( GTK_WIDGET(w), FALSE );
 }
 static	void	enable_widget_by_pointer(GtkWidget *w)
 {
-        gtk_widget_set_sensitive( GTK_WIDGET(w), TRUE );
+	if(!w) return;
+	gtk_widget_set_sensitive( GTK_WIDGET(w), TRUE );
 }
 static	void	enable_widget(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
-	if(w)
-	{
-		gtk_widget_set_sensitive( GTK_WIDGET(w), TRUE );
-	}
+	if(!w) return;
+	gtk_widget_set_sensitive( GTK_WIDGET(w), TRUE );
 }/*
 static	gchar	*format_time(int pos)
 {
@@ -5561,7 +5640,6 @@ static	void	init_cpumeter()
 
 static void	update_gui()
 {
-
 	int pm = info->status_tokens[PLAY_MODE];
 	int hm = info->prev_mode;
 
@@ -5594,6 +5672,10 @@ static void	update_gui()
 	if( pm != MODE_PLAIN)
 		interpolate_parameters();
 
+	//vj_preview_draw();
+
+
+	on_vims_messenger();
 }
 
 void	get_gd(char *buf, char *suf, const char *filename)
@@ -5686,13 +5768,15 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 				for(i = 0; i <= 18; i ++ )
 					gui->status_tokens[i] = history[i];
 			}
+	//vj_preview_draw();
+
 
 			// context switch
-			gdk_threads_enter();
+	//		gdk_threads_enter();
 
 			update_gui();
 
-			gdk_threads_leave();
+	//		gdk_threads_leave();
 		}
 		gui->status_lock = 0;
 
@@ -6029,7 +6113,7 @@ void	default_bank_values(int *col, int *row )
 	{
 		if(skin__ == 0)
 		{
-			NUM_SAMPLES_PER_COL = 2;
+			NUM_SAMPLES_PER_COL = 3;
 			NUM_SAMPLES_PER_ROW = 4;
 		}
 		else
@@ -6057,6 +6141,66 @@ int	vj_gui_cb_locked()
 	return info->watch.p_state;
 }
 
+static void	vj_preview_draw(void)
+{
+
+	if( no_preview_ )
+		return;
+
+	if( !info->selected_slot || !info->selected_gui_slot )
+		return;
+	
+	G_LOCK( preview_buffer__ );
+	
+	int sample_id = info->status_tokens[ CURRENT_ID ];
+	int sample_type = info->status_tokens[ PLAY_MODE ]; 
+	
+	GtkWidget *imgA = glade_xml_get_widget_ (info->main_window, "imageA" );
+	if(imgA)
+	{	gtk_image_set_from_pixbuf( imgA, preview_pixbuf__[0] );
+		gtk_widget_queue_draw( imgA );
+	}
+	if( sample_type == MODE_SAMPLE || MODE_STREAM )
+	{
+		int poke_slot = -1;	
+		int bank_num = -1;
+		bank_num = find_bank_by_sample( sample_id, sample_type, &poke_slot );
+		if( bank_num >= 0 && sample_id == info->selected_slot->sample_id && sample_type ==
+			info->selected_slot->sample_type )
+		{
+			sample_slot_t *slot = info->sample_banks[bank_num]->slot[poke_slot];
+			sample_gui_slot_t *gui_slot = info->sample_banks[bank_num]->gui_slot[poke_slot];
+			int i;
+			if(slot->pixbuf)
+			{
+				gdk_pixbuf_unref( slot->pixbuf );
+				slot->pixbuf = NULL;
+			}
+			for( i = 0; i < info->sequence_view->envelope_size; i ++ )
+			{
+				sequence_gui_slot_t *g = info->sequence_view->gui_slot[i];
+                	        if(g->pixbuf_ref && g->sample_id == sample_id && g->sample_type == sample_type)
+                        	{
+                               		gdk_pixbuf_unref(g->pixbuf_ref);
+                             		g->pixbuf_ref = NULL;
+                        	}
+			}
+			if( info->image_dimensions[0] > 0 )
+			{
+			//	slot->pixbuf = gdk_pixbuf_scale_simple( preview_pixbuf__[1], info->image_dimensions[0],
+			//		info->image_dimensions[1], GDK_INTERP_BILINEAR );
+			
+			//	gveejay_update_image(slot, gui_slot, info->image_dimensions[0],
+			//		info->image_dimensions[1] );
+			//	update_cached_slots();	
+			}
+// selected_gui_slot !
+		}
+	}
+	G_UNLOCK( preview_buffer__ );
+
+	update_cached_slots();	
+}
 
 
 void	vj_img_cb(GdkPixbuf *img )
@@ -6101,18 +6245,20 @@ void	vj_img_cb(GdkPixbuf *img )
 			if( info->image_dimensions[0] > 0 )
 			{
 				slot->pixbuf = gdk_pixbuf_scale_simple( img, info->image_dimensions[0],
-					info->image_dimensions[1], GDK_INTERP_BILINEAR );
+					info->image_dimensions[1], GDK_INTERP_NEAREST);
 			
 				gveejay_update_image(slot, gui_slot, info->image_dimensions[0],
 					info->image_dimensions[1] );
-				update_cached_slots();	
+			//	update_cached_slots();	
 			}
 // selected_gui_slot !
 		}
 	}
+	update_cached_slots();
 
 //	G_UNLOCK( status_lock__ );
 
+// IN COMMENT BELOW:
 /*
 	if(selected_is_playing())
 	{
@@ -6135,7 +6281,7 @@ void	vj_img_cb(GdkPixbuf *img )
 		gveejay_update_image(info->selected_slot,info->selected_gui_slot, info->image_dimensions[0],
                                                 info->image_dimensions[1] );
 		update_cached_slots();
-	}*/
+	} END COMMENT BELOW*/
 }
 
 int	gveejay_busy(void)
@@ -6193,6 +6339,8 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	char path[MAX_PATH_LEN];
 	int i;
 
+	atomic_init();
+	
 	vj_mem_init();
 	
 	glade_init();
@@ -6278,6 +6426,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
     	GtkWidget *box = glade_xml_get_widget_( info->main_window, "sample_bank_hbox" );
 	info->sample_bank_pad = gtk_notebook_new();
 	gtk_notebook_set_tab_pos( GTK_NOTEBOOK(info->sample_bank_pad), GTK_POS_BOTTOM );
+	gtk_notebook_set_show_tabs( GTK_NOTEBOOK( info->sample_bank_pad ), FALSE );
 	gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET(info->sample_bank_pad), TRUE, TRUE, 0);
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 
@@ -6291,7 +6440,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	vj_gui_setup_defaults(gui);
 
 
-	setup_knobs();
+	//setup_knobs();
 	setup_vimslist();
 	setup_effectchain_info();
 	setup_effectlist_info();
@@ -6509,6 +6658,7 @@ static	void	veejay_stop_connecting(vj_gui_t *gui)
 
 	if(!gui->sensitive)
 		vj_gui_enable();
+
 	vj_launch_toggle(TRUE);
 	/*gtk_progress_bar_set_fraction(
 		GTK_PROGRESS_BAR (glade_xml_get_widget_(info->main_window, "connecting")),0.0);
@@ -6613,6 +6763,7 @@ void	vj_gui_disconnect()
 void	vj_launch_toggle(gboolean value)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "button_veejay" );
+	if(!w) return;
 	gtk_widget_set_sensitive( GTK_WIDGET(w), value );
 	info->launch_sensitive = ( value == TRUE ? 1 : 0);
 }
@@ -7219,7 +7370,7 @@ static	void	update_cached_slots(void)
 				s->pixbuf,
 				info->sequence_view->w,
 				info->sequence_view->h,
-				GDK_INTERP_BILINEAR );
+				GDK_INTERP_NEAREST );
 			}
 		}
 	}

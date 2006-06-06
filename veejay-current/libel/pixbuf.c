@@ -412,7 +412,7 @@ veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int o
 	{
 		image->scaled_image = (void*)gdk_pixbuf_scale_simple(
 				(GdkPixbuf*) image->image, out_w, out_h,
-			 GDK_INTERP_BILINEAR );
+			 GDK_INTERP_NEAREST );
 	}
 
 	return image;

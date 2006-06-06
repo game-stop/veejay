@@ -1,5 +1,6 @@
 /* gveejay - Linux VeeJay - GVeejay GTK+-2/Glade User Interface
  *           (C) 2002-2005 Niels Elburg <nelburg@looze.net> 
+ *           (C)      2006 Matthijs van Henten <cola@looze.net>
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -1809,6 +1810,11 @@ void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 {
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
+
+	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
+        if( page == MODE_PLAIN )
+		return;
+	
 	if(skin__ == 0 )
 	{
 		if( info->uc.playmode != info->status_tokens[PLAY_MODE])
@@ -2236,16 +2242,16 @@ void	on_image_effects_toggled(GtkWidget *w, gpointer user_data)
 void	on_console1_activate(GtkWidget *w, gpointer user_data)
 {
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
-	gtk_notebook_set_page( GTK_NOTEBOOK(n),2 );
-	/*gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
-	
-	if(page == 0)
-		gtk_notebook_next_page( GTK_NOTEBOOK(n) );
-	page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
-	if(page == 1 )
-		gtk_notebook_next_page( GTK_NOTEBOOK(n) );
-	*/
+	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK( n ) );
+
+	if( page == MODE_PLAIN )
+		gtk_notebook_set_page( GTK_NOTEBOOK(n),
+				info->status_tokens[PLAY_MODE] );
+	else
+		gtk_notebook_set_page( GTK_NOTEBOOK(n),
+				MODE_PLAIN );
 }
+
 gboolean	on_entry_hostname_focus_in_event( GtkWidget *w, gpointer user_data)
 {
 	update_label_str( "runlabel", "Connect");
@@ -2279,6 +2285,16 @@ void		on_previewlarge_clicked( GtkWidget *widget, gpointer user_data )
 	if( h > 288 ) h = 288;
 	update_spin_value( "preview_width", w );
         update_spin_value( "preview_height",h );
+}
+
+void		on_previewspeed_value_changed( GtkWidget *widget, gpointer user_data)
+{
+	double val = 	       GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
+	double fps = (val * 100.0) / (double)info->el.fps ;
+	
+	multitrack_set_preview_speed( info->mt , fps );
+	
+	//sprintf(speed,"%2.2f "
 }
 
 void		on_previewscale_value_changed( GtkWidget *widget, gpointer user_data)
@@ -2448,3 +2464,90 @@ void	on_delete2_activate( GtkWidget *w, gpointer user_data)
 {
 	DBG_C();
 }
+
+
+
+void
+on_spin_samplebank_select_value_changed
+                                        (GtkSpinButton   *spinbutton,
+                                        gpointer         user_data)
+{
+        GtkNotebook *samplebank = GTK_NOTEBOOK( info->sample_bank_pad );
+       // glade_xml_get_widget_( info->main_window, "notebook_sample_bank"));
+
+        gint max_page = gtk_notebook_get_n_pages(samplebank);
+        
+        gint page = gtk_spin_button_get_value_as_int(spinbutton);
+
+        if(page >= max_page){ /* @mvh I know this is not pretty but why make it difficult */
+                 page = 0; 
+                 gtk_spin_button_set_value(spinbutton, page);
+        }//if
+        gtk_notebook_set_current_page(samplebank, page);        
+}
+void
+on_button_samplebank_prev_clicked      (GtkButton       *button,
+                                        gpointer         user_data)
+{
+	GtkNotebook *samplebank = GTK_NOTEBOOK( info->sample_bank_pad );
+	gtk_notebook_prev_page(samplebank);        
+}
+
+
+void
+on_button_samplebank_next_clicked      (GtkButton       *button,
+                                        gpointer         user_data)
+{
+	GtkNotebook *samplebank = GTK_NOTEBOOK( info->sample_bank_pad );
+    	gtk_notebook_next_page(samplebank);        
+}
+
+void
+on_vims_messenger_rewind_clicked( GtkButton *togglebutton, gpointer user_data)
+{
+	info->vims_line = 0;
+}
+
+void
+on_vims_messenger_clear_clicked( GtkButton *togglebutton, gpointer user_data)
+{
+	clear_textview_buffer( "vims_messenger_textview");
+}
+
+void
+on_vims_messenger_single_clicked( void )
+{
+	GtkTextView *t= GTK_TEXT_VIEW(GTK_WIDGET(
+				glade_xml_get_widget(
+					info->main_window,
+					"vims_messenger_textview"))
+			);
+  
+	GtkTextBuffer* buffer =  gtk_text_view_get_buffer(t);
+  	int lc = gtk_text_buffer_get_line_count(buffer);
+	
+	if(info->vims_line > lc )
+		info->vims_line = 0;
+	
+	while(info->vims_line < lc )
+	{
+		GtkTextIter start, end;
+       		gtk_text_buffer_get_iter_at_line(buffer, &start, info->vims_line);
+  
+ 	 	end = start;
+                
+	        gtk_text_iter_forward_sentence_end(&end);
+       		gchar *str = gtk_text_buffer_get_text (buffer, &start, &end, TRUE);
+
+		info->vims_line++;
+
+	        if(str[0] != '+')
+		{
+       		 	vj_msg(VEEJAY_MSG_INFO, "User defined VIMS message sent '%s'",str );
+                	msg_vims( str );
+			break;
+        	}
+	}
+}
+
+

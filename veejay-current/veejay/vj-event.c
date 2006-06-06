@@ -7043,11 +7043,18 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 		}
 
 		unsigned char *msg = gdk_pixbuf_get_pixels( p );
-		unsigned char *con = (unsigned char*) vj_malloc(sizeof(unsigned char)  * 6 + (w * h * 3 ));
-		sprintf(con, "%06d", (w * h * 3));
-		veejay_memcpy( con + 6 , msg , (w * h * 3 ));
-		vj_server_send(v->vjs[0], v->uc->current_link, con, 6 + (w*h*3));
-		if(con) free(con);
+	//	unsigned char *con = (unsigned char*) vj_malloc(sizeof(unsigned char)  * 6 + (w * h * 3 ));
+	//	sprintf(con, "%06d", (w * h * 3));
+	//	veejay_memcpy( con + 6 , msg , (w * h * 3 ));
+	//	vj_server_send(v->vjs[0], v->uc->current_link, con, 6 + (w*h*3));
+	//	if(con) free(con);
+		char header[7];
+		sprintf( header, "%06d", (w*h*3));
+		vj_server_send( v->vjs[0], v->uc->current_link,
+					header, 6 );
+		vj_server_send( v->vjs[0], v->uc->current_link,
+					msg, (w*h*3));	
+		
 	/*	if(img->image )
 			gdk_pixbuf_unref( (GdkPixbuf*) img->image );
 		if(img->scaled_image)

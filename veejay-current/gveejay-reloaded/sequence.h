@@ -34,3 +34,5 @@ void	veejay_get_status( void *data, guchar *dst );
 gchar	*veejay_sequence_get_track_list( void *data, int slen, int *bytes_written );
 
 void	veejay_abort_sequence( void *data );
+
+void	veejay_sequence_preview_delay( void *data, double value );

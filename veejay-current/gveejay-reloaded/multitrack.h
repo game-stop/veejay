@@ -24,4 +24,5 @@ void		multitrack_sync_simple_cmd(void *data, int vims_id, int value);
 
 void		multitrack_quit( void *data );
 
+void		multitrack_set_preview_speed( void *data , double value );
 #endif
