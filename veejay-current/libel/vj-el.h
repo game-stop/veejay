@@ -20,7 +20,7 @@
 #define VJ_MLT_EL_H
 #include <config.h>
 #include <veejay/vj-global.h>
-#include <libel/vj-avformat.h>
+//#include <libel/vj-avformat.h>
 #include <libel/lav_io.h>
 #include <libvje/vje.h>
 

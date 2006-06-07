@@ -144,7 +144,8 @@ typedef struct
         AVCodecContext  *context;
         uint8_t *tmp_buffer;
         uint8_t *deinterlace_buffer[3];
-        int fmt;
+	VJFrame *img;
+	int fmt;
         int ref;
 	void *sampler;
 } vj_decoder;
@@ -200,6 +201,36 @@ static void	_el_free_decoder( vj_decoder *d )
 	}
 	d = NULL;
 }
+
+#define LARGE_NUM (256*256*256*64)
+static int get_buffer(AVCodecContext *context, AVFrame *av_frame){
+	vj_decoder *this = (vj_decoder *)context->opaque;
+	int width  = context->width;
+	int height = context->height;
+	VJFrame *img = this->img;	
+	avcodec_align_dimensions(context, &width, &height);
+
+	av_frame->opaque = img;
+
+	av_frame->data[0]= img->data[0];
+	av_frame->data[1]= img->data[1];
+	av_frame->data[2]= img->data[2];
+
+	av_frame->linesize[0] = img->width;
+	av_frame->linesize[1] = img->uv_width;
+	av_frame->linesize[2] = img->uv_width;
+
+	av_frame->age = LARGE_NUM;
+
+	av_frame->type= FF_BUFFER_TYPE_USER;
+
+	return 0;
+}
+static void release_buffer(struct AVCodecContext *context, AVFrame *av_frame){
+ VJFrame *img = (VJFrame*)av_frame->opaque;
+  av_frame->opaque = NULL;
+}
+
 
 static int mem_chunk_ = 0;
 void	vj_el_init_chunk(int size)
@@ -258,7 +289,7 @@ int	vj_el_cache_size()
 	return cache_avail_mb();
 }
 
-vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixel_format)
+vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixel_format, int out_fmt)
 {
         vj_decoder *d = (vj_decoder*) vj_malloc(sizeof(vj_decoder));
         if(!d)
@@ -300,19 +331,29 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 		d->context = avcodec_alloc_context();
 		d->context->width = width;
 		d->context->height = height;
-#if LIBAVFORMAT_BUILD > 5010
                 d->context->time_base.den = fps;
 		d->context->time_base.num = 1;
-#else
-		d->context->frame_rate = fps;
-#endif
+		d->context->opaque = d;
+		d->context->palctrl = NULL;
 		d->frame = avcodec_alloc_frame();
+		d->img = (VJFrame*) vj_malloc(sizeof(VJFrame));
+		memset(d->img,0,sizeof(VJFrame));
+		d->img->width = width;	
 		if ( avcodec_open( d->context, d->codec ) < 0 )
        		{
       		        veejay_msg(VEEJAY_MSG_ERROR, "Error initializing decoder %d",id); 
        		       return NULL;
       		}
-
+		if( out_fmt == pixel_format )
+		{
+			if( d->codec->capabilities & CODEC_CAP_DR1)
+			{
+				d->context->get_buffer = get_buffer;
+				d->context->release_buffer = release_buffer;
+			}
+			veejay_msg(VEEJAY_MSG_INFO,
+					"Direct rendering to frame buffer is enabled");
+		}
         }
 	else
 	{
@@ -707,7 +748,7 @@ veejay_msg(VEEJAY_MSG_DEBUG, "%s : %d", __FUNCTION__, pix_fmt );
 		if( el_codecs[c_i] == NULL )
 		{
 		//	el_codecs[c_i] = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps, pix_fmt );
-			el_codecs[c_i] = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps, el->yuv_taste[ n ] );
+			el_codecs[c_i] = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps, el->yuv_taste[ n ],el->pixel_format );
 			if(!el_codecs[c_i])
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,"Cannot initialize %s codec", compr_type);
@@ -861,7 +902,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 
 	int len = el->video_width * el->video_height;
 	int uv_len = (el->video_width >> 1) * (el->video_height >> (out_pix_fmt == FMT_420 ? 1:0)); 
-
+	int uv_w = el->video_width / 2;
 	if( decoder_id == 0xffff )
 	{
 		uint8_t *p = (in_cache == NULL ? lav_get_frame_ptr( el->lav_fd[N_EL_FILE(n)]) : in_cache);
@@ -882,6 +923,8 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 	int inter = 0;
 	int got_picture = 0;
 
+	
+	
 	switch( decoder_id )
 	{
 		case CODEC_ID_YUV420:
@@ -924,6 +967,12 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			
 		default:
 			inter = lav_video_interlacing(el->lav_fd[N_EL_FILE(n)]);
+			d->img->width = el->video_width;
+			d->img->uv_width = el->video_width / 2;
+			d->img->data[0] = dst[0];
+			d->img->data[1] = dst[1];
+			d->img->data[2] = dst[2];
+			
 			len = avcodec_decode_video(
 				d->context,
 				d->frame,
@@ -963,6 +1012,8 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			pict.linesize[1] = el->video_width / 2;
 			pict.linesize[2] = el->video_width / 2;
 
+			if(!d->frame->opaque)
+			{
 			if( el->auto_deinter && inter != LAV_NOT_INTERLACED)
 			{
 				pict2.data[0] = d->deinterlace_buffer[0];
@@ -987,7 +1038,16 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 				img_convert( &pict, dst_fmt, (const AVPicture*) d->frame, src_fmt,
 					el->video_width, el->video_height );
 			}
-		
+			}
+			else
+			{
+				//VJFrame *dst = d->frame->opaque;
+				
+				dst[0] = 
+					d->frame->data[0];
+				dst[1] = d->frame->data[1];
+				dst[2] = d->frame->data[2];
+			}
 			return 1;
 			break;
 	}
