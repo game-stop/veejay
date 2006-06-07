@@ -35,6 +35,8 @@ static int row = 0;
 static int current_skin = 0;
 static int n_tracks = 4;
 static int launcher = 0;
+static int pw = 112;
+static int ph = 96;
 static struct
 {
 	char *file;
@@ -55,6 +57,7 @@ static void usage(char *progname)
 	printf( "-s/--size\t\tSet bank resolution (row X columns)\n");
  	printf( "-f/--flavour\t\tSelect another skin to use\n");
         printf( "-X/\t\tSet number of tracks\n");
+	printf( "-P/--preview\t\tSet main preview geometry (default to 112x96)" );
 	printf( "\n\n");
         exit(-1);
 }
@@ -96,6 +99,15 @@ static int      set_option( const char *name, char *value )
 			err++;
 		}
 	}
+	else if (strcmp(name, "P") == 0 || strcmp(name, "preview") == 0)
+	{
+		if(sscanf( (char*) optarg, "%dx%d",
+			&pw, &ph ) != 2 )
+		{
+			fprintf(stderr, "--preview parameter requires NxN argument");
+			err++;
+		}
+	}
 	else if (strcmp(name, "f" ) == 0 || strcmp(name, "flavour" ) == 0)
 	{
 		current_skin = atoi(optarg);
@@ -115,7 +127,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	sprintf(hostname, "localhost");
 
-        while( ( n = getopt( argc, argv, "s:h:p:nvHf:X:")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:pP::nvHf:X:")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
@@ -135,7 +147,7 @@ int main(int argc, char *argv[]) {
 	gtk_init( NULL,NULL );
 	
 	vj_gui_theme_setup(gveejay_theme);
-	vj_gui_set_debug_level( verbosity , n_tracks);
+	vj_gui_set_debug_level( verbosity , n_tracks,pw,ph);
 	vj_gui_set_timeout(timer);
 	set_skin( current_skin );
 

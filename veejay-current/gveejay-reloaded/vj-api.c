@@ -474,6 +474,8 @@ static	GtkWidget *effect_sources_tree;
 static 	GtkListStore *effect_sources_store;
 static 	GtkTreeModel *effect_sources_model;
 static int 		num_tracks_ = 0;
+static int		default_preview_width_ = 0;
+static int		default_preview_height_ = 0;
 /* global pointer to the editlist-tree */
 static 	GtkWidget *editlist_tree;
 static	GtkListStore *editlist_store;
@@ -6089,7 +6091,7 @@ gui_client_event_signal(GtkWidget *widget, GdkEventClient *event,
 	return FALSE;
 }
 
-void	vj_gui_set_debug_level(int level, int preview_p )
+void	vj_gui_set_debug_level(int level, int preview_p, int pw, int ph )
 {
 	veejay_set_debug_level( level );
 
@@ -6098,6 +6100,8 @@ void	vj_gui_set_debug_level(int level, int preview_p )
 		veejay_msg(VEEJAY_MSG_INFO, "Be verbose");
 
 	num_tracks_ = preview_p;
+	default_preview_width_ = pw;
+	default_preview_height_ = ph;
 }
 int	vj_gui_get_preview_priority(void)
 {
@@ -6456,7 +6460,8 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 
 //@ after connect:
 
-	setup_geometry( info->el.width, info->el.height, num_tracks_ );
+	setup_geometry( info->el.width, info->el.height, num_tracks_, default_preview_width_,
+		     default_preview_height_ );
 
 	gui->mt = multitrack_new(
 			(void(*)(int,char*,int)) vj_gui_cb,

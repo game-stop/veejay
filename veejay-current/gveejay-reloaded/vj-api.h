@@ -27,6 +27,6 @@ void	vj_fork_or_connect_veejay();
 void	vj_gui_enable(void);
 void	vj_gui_disable(void);
 void	vj_gui_disconnect(void);
-void	vj_gui_set_debug_level(int level, int preview_p);
+void	vj_gui_set_debug_level(int level, int preview_p, int pw, int ph);
 
 #endif 

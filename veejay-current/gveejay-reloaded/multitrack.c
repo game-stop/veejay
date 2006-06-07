@@ -120,7 +120,8 @@ static  int     preview_height_ = 0;
 
 static volatile int	MAX_TRACKS = 4;
 static volatile int	LAST_TRACK = 0;
-
+static volatile int     sta_w = 112;
+static volatile int     sta_h = 96;
 
 static	GdkPixbuf	*logo_img_ = NULL;
 static	float		logo_step_ = 0.1;
@@ -613,7 +614,6 @@ static	void	set_logo(GtkWidget *area)
 	char path[1024];
 	bzero(path,1024);
 	get_gd(path,NULL, "veejay-logo.png");
-	printf("scale logo\n");
 	GdkPixbuf *buf2 = gdk_pixbuf_scale_simple( logo_img_,preview_width_,preview_height_, GDK_INTERP_BILINEAR );
 	gtk_image_set_from_pixbuf( GTK_IMAGE(area), buf2 );
 	gdk_pixbuf_unref( buf2 );
@@ -678,10 +678,12 @@ static		int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len,
 	return res;
 }
 
-void		setup_geometry( int w, int h, int n_tracks )
+void		setup_geometry( int w, int h, int n_tracks,int pw, int ph )
 {
 	LAST_TRACK = n_tracks + 1;
 	MAX_TRACKS = n_tracks;
+	sta_w = pw;
+	sta_h = ph;
 }
 
 void		*multitrack_new( void (*f)(int,char*,int), void (*g)(GdkPixbuf *),GtkWidget *win, GtkWidget *box ,GtkWidget *msg, gint max_w, gint max_h, GtkWidget *main_preview_area)
@@ -1107,7 +1109,7 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int wid
 #ifdef STRICT_CHECKING
 		assert( last_track->sequence != NULL );
 #endif
-		veejay_configure_sequence( last_track->sequence, 112, 96 );
+		veejay_configure_sequence( last_track->sequence, sta_w, sta_h );
 
 		gtk_widget_set_size_request( GTK_WIDGET( last_track->view->area ), width,height );
 	}
@@ -1373,15 +1375,17 @@ void 	*mt_preview( gpointer user_data )
 	for( ;; )
 	{
 //restart:
-
+		G_LOCK( mt_lock );
 		mt_priv_t *lt = a->pt[LAST_TRACK];
 		gint error = 0;
 
 		memset( cache, 0, (MAX_TRACKS+2) * sizeof(GdkPixbuf*));
 
 		if(mt->quit)
+		{
+			G_UNLOCK( mt_lock );
 			g_thread_exit(NULL);
-	
+		}
 		if(!lt->preview )
 		{
 			cache[LAST_TRACK] = dummy_image();
@@ -1431,9 +1435,7 @@ fprintf(stderr, "Simulate image\n");
 			//g_usleep(50000);
 		}*/
 
-		G_LOCK( mt_lock );	
 		int ref = find_sequence( a );
-		G_UNLOCK( mt_lock);
 
 		if( mt->sensitive ) //&& lt->preview )
 		for( i = 0; i < MAX_TRACKS ; i ++ )
@@ -1448,6 +1450,9 @@ fprintf(stderr, "Simulate image\n");
 					cache[i] = 0;
 			}
 		}
+
+		G_UNLOCK(mt_lock );
+		
 		if( ref >= 0  && lt->preview && cache[LAST_TRACK] ) //&& lt->active)
 		{
 			cache[ref] = gdk_pixbuf_scale_simple(
@@ -1516,7 +1521,7 @@ fprintf(stderr, "Simulate image\n");
 			gdk_pixbuf_unref(cache[LAST_TRACK]);
 
 		
-		
+		g_usleep( 30000 );	
 	}
 }
 
