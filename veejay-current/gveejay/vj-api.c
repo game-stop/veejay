@@ -18,8 +18,8 @@
 #include <veejay/vims.h>
 #include <gveejay/vj-api.h>
 #include <fcntl.h>
-#include <mjpegtools/mpegconsts.h>
-#include <mjpegtools/mpegtimecode.h>
+#include "mpegconsts.h"
+#include "mpegtimecode.h"
 #include <gtk/gtk.h>
 #include <gdk/gdkx.h>
 #include <sys/types.h>

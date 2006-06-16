@@ -3,7 +3,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
 INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/gveejay -I$(top_srcdir)/libcom $(GTK_CFLAGS) \
-		$(MJPEGTOOLS_CFLAGS) $(GLIB_CFLAGS) $(GLADE_CFLAGS) -DGNOMELOCALEDIR=\""$(datadir)/locale"\" -DGVEEJAY_DATADIR=\""$(gveejay_datadir)"\"
+		${MJPEGTOOLS_CFLAGS} $(GLIB_CFLAGS) $(GLADE_CFLAGS) -DGNOMELOCALEDIR=\""$(datadir)/locale"\" -DGVEEJAY_DATADIR=\""$(gveejay_datadir)"\"
 
 GVEEJAY_BIN=gveejay
 bin_PROGRAMS = $(GVEEJAY_BIN) 

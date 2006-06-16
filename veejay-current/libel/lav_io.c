@@ -68,7 +68,10 @@ void	lav_set_project(int w, int h, float f, int fmt)
 	output_fps = f;
 	output_yuv = fmt;
 }
-
+#else
+void	lav_set_project(int w, int h, float f, int fmt)
+{
+}
 #endif
 
 #define M_SOF0  0xC0
@@ -691,6 +694,11 @@ uint8_t *lav_get_frame_ptr( lav_file_t *lav_file )
 		return vj_picture_get( lav_file->picture );
 	return NULL;
 }
+#else
+uint8_t *lav_get_frame_ptr( lav_file_t *lav_file)
+{
+	return NULL;
+}
 #endif
 
 int lav_is_DV(lav_file_t *lav_file)
@@ -863,7 +871,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
    lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
 
    if(lav_fd->bps==0) lav_fd->bps=1; /* make it save since we will divide by that value */
-
+#ifdef USE_GDK_PIXBUF
    if(strncasecmp(video_comp, "PICT",4) == 0 )
    {
 	lav_fd->MJPG_chroma = (output_yuv == 1 ? CHROMA420: CHROMA422 );
@@ -871,7 +879,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	lav_fd->interlacing = LAV_NOT_INTERLACED;
 	return lav_fd;
    }
-
+#endif
    if(strncasecmp(video_comp, "div3",4)==0) {
 		lav_fd->MJPG_chroma = CHROMA420;
 		lav_fd->format = 'D';

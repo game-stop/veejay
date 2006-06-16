@@ -602,10 +602,7 @@ veejay_msg(VEEJAY_MSG_DEBUG, "%s : %d", __FUNCTION__, pix_fmt );
 			el->video_width = lav_video_width(el->lav_fd[n]);
 			el->video_inter = lav_video_interlacing(el->lav_fd[n]);
 			el->video_fps = lav_frame_rate(el->lav_fd[n]);
-#ifdef USE_GDK_PIXBUF
 		}
-
-#endif
 		lav_video_clipaspect(el->lav_fd[n],
 				       &el->video_sar_width,
 				       &el->video_sar_height);

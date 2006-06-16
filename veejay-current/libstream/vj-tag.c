@@ -1694,6 +1694,7 @@ int vj_tag_disable(int t1) {
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "Disconnected from %s", tag->source_name);
 	}
+#ifdef USE_GDK_PIXBUF
 	if(tag->source_type == VJ_TAG_TYPE_PICTURE )
 	{
 		vj_picture *pic = vj_tag_input->picture[tag->index];
@@ -1703,6 +1704,7 @@ int vj_tag_disable(int t1) {
 		}
 		vj_tag_input->picture[tag->index] = pic;
 	}
+#endif
 	tag->active = 0;
 	if(!vj_tag_update(tag,t1)) return -1;
 	return 1;
@@ -1757,6 +1759,7 @@ int vj_tag_enable(int t1) {
 		pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
 		
 	}
+#ifdef USE_GDK_PIXBUF
 	if( tag->source_type == VJ_TAG_TYPE_PICTURE )
 	{
 		vj_picture *p = vj_tag_input->picture[ tag->index ];
@@ -1770,7 +1773,7 @@ int vj_tag_enable(int t1) {
 		vj_tag_input->picture[tag->index] = p;
 		veejay_msg(VEEJAY_MSG_DEBUG, "Streaming from picture '%s'", tag->source_name );
 	}
-
+#endif
 	tag->active = 1;
 	if(!vj_tag_update(tag,t1)) return -1;
 	return 1;

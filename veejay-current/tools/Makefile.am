@@ -23,9 +23,11 @@ any2yuv_LDADD =  $(MJPEGTOOLS_LIBS) @LIBGETOPT_LIB@
 sayVIMS_SOURCES = sayVIMS.c
 sayVIMS_LDFLAGS = $(LAV_ALL_LIB_OPTS)
 sayVIMS_LDADD = $(VJLIBS) @LIBGETOPT_LIB@
+if USE_GDK_PIXBUF
 tracktest_SOURCES = sequenc.c 
 tracktest_LDFLAGS = $(LAV_ALL_LIB_OPTS) $(GLIB_LIBS) -lgthread-2.0
 tracktest_LDADD   = $(VJLIBS) @LIBGETOPT_LIB@ 
+endif
 
 YUV2RAWDV_BIN = yuv2rawdv rawdv2yuv any2yuv sayVIMS tracktest
 

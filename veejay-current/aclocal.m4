@@ -6358,33 +6358,17 @@ if test -n "$PKG_CONFIG"; then
 fi[]dnl
 ])# PKG_PROG_PKG_CONFIG
 
-# PKG_CHECK_EXISTS(MODULES, [ACTION-IF-FOUND], [ACTION-IF-NOT-FOUND])
-#
-# Check to see whether a particular set of modules exists.  Similar
-# to PKG_CHECK_MODULES(), but does not set variables or print errors.
-#
-#
-# Similar to PKG_CHECK_MODULES, make sure that the first instance of
-# this or PKG_CHECK_MODULES is called, or make sure to call
-# PKG_CHECK_EXISTS manually
-# --------------------------------------------------------------
-AC_DEFUN([PKG_CHECK_EXISTS],
-[AC_REQUIRE([PKG_PROG_PKG_CONFIG])dnl
-if test -n "$PKG_CONFIG" && \
-    AC_RUN_LOG([$PKG_CONFIG --exists --print-errors "$1"]); then
-  m4_ifval([$2], [$2], [:])
-m4_ifvaln([$3], [else
-  $3])dnl
-fi])
-
-
 # _PKG_CONFIG([VARIABLE], [COMMAND], [MODULES])
 # ---------------------------------------------
 m4_define([_PKG_CONFIG],
-[if test -n "$PKG_CONFIG"; then
-        PKG_CHECK_EXISTS([$3],
-                         [pkg_cv_[]$1=`$PKG_CONFIG --[]$2 "$3" 2>/dev/null`],
-			 [pkg_failed=yes])
+[if test "x$ac_cv_env_[]$1[]_set" = "xset"; then
+	pkg_cv_[]$1=$ac_cv_env_[]$1[]_value
+elif test -n "$PKG_CONFIG"; then
+	if AC_RUN_LOG([$PKG_CONFIG --exists "$3" >/dev/null 2>&1]); then
+		pkg_cv_[]$1=`$PKG_CONFIG --[]$2 "$3" 2>/dev/null`
+	else
+		pkg_failed=yes
+	fi
 else
 	pkg_failed=untried
 fi[]dnl
@@ -6396,7 +6380,7 @@ fi[]dnl
 #
 # Note that if there is a possibility the first call to
 # PKG_CHECK_MODULES might not happen, you should be sure to include an
-# explicit call to PKG_PROG_PKG_CONFIG in your configure.ac
+# explicit call to PKG_PROG_PKG_CONFIG in your configure.in
 #
 #
 # --------------------------------------------------------------
@@ -6406,10 +6390,10 @@ AC_ARG_VAR([$1][_CFLAGS], [C compiler flags for $1, overriding pkg-config])dnl
 AC_ARG_VAR([$1][_LIBS], [linker flags for $1, overriding pkg-config])dnl
 
 pkg_failed=no
-AC_MSG_CHECKING([for $1])
-
-_PKG_CONFIG([$1][_CFLAGS], [cflags], [$2])
-_PKG_CONFIG([$1][_LIBS], [libs], [$2])
+AC_CACHE_CHECK([for $1][_CFLAGS], [pkg_cv_][$1][_CFLAGS],
+	[_PKG_CONFIG([$1][_CFLAGS], [cflags], [$2])])
+AC_CACHE_CHECK([for $1][_LIBS], [pkg_cv_][$1][_LIBS],
+	[_PKG_CONFIG([$1][_LIBS], [libs], [$2])])
 
 if test $pkg_failed = yes; then
 	$1[]_PKG_ERRORS=`$PKG_CONFIG --errors-to-stdout --print-errors "$2"`
@@ -6440,7 +6424,6 @@ To get pkg-config, see <http://www.freedesktop.org/software/pkgconfig>.])],
 else
 	$1[]_CFLAGS=$pkg_cv_[]$1[]_CFLAGS
 	$1[]_LIBS=$pkg_cv_[]$1[]_LIBS
-        AC_MSG_RESULT([yes])
 	ifelse([$3], , :, [$3])
 fi[]dnl
 ])# PKG_CHECK_MODULES

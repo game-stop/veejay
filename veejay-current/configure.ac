@@ -55,6 +55,12 @@ AC_ARG_WITH(extra-cflags,
 AC_ARG_WITH(libdv,
             AC_HELP_STRING([--without-libdv], [Do not use libdv.]),
             [], [with_libdv=yes])
+
+AC_ARG_WITH(pixbuf,
+            AC_HELP_STRING([--without-pixbuf], [Do not use GDK pixbuf]),
+            [], [with_pixbuf=yes])
+
+	    
 AC_ARG_WITH(directfb,
 	     AC_HELP_STRING([--without-directfb], [Do not use DirectFB.]),
 	 	[], [with_directfb=yes])
@@ -220,6 +226,23 @@ if test "$ac_cv_lib_dl_dlopen" = "yes"; then
 fi
 
 
+dnl *********************************************************************
+dnl Check for mjpegtools
+dnl   (creates MJPEGYTOOLS_CFLAGS, 
+dnl *********************************************************************
+have_mjpegtools=false
+PKG_CHECK_MODULES(MJPEGTOOLS, [mjpegtools >= 1.6 ],
+                    [
+ 		     AC_SUBST( MJPEGTOOLS_CFLAGS )
+		     AC_SUBST( MJPEGTOOLS_LIBS )
+		     have_mjpegtools=true
+                     AC_DEFINE(HAVE_MJPEGTOOLS, 1, [MJPEGTools installed])],
+                    [have_mjpegtools=false])
+
+if test x$have_mjpegtools != xtrue ; then
+	AC_MSG_ERROR([Cannot find mjpegtools. Did you set PKG_CONFIG_PATH variable?])
+fi
+
 dnl
 dnl Check if we want to link with libjpeg (used for making a screenshot)
 
@@ -300,18 +323,7 @@ if test x$with_libdv != xno ; then
                     [have_libdv=false])
 fi
 
-dnl *********************************************************************
-dnl Check for mjpegtools
-dnl   (creates MJPEGYTOOLS_CFLAGS, 
-dnl *********************************************************************
-have_mjpegtools=false
-PKG_CHECK_MODULES(MJPEGTOOLS, [mjpegtools >= 1.6 ],
-                    [
- 		     AC_SUBST( MJPEGTOOLS_CFLAGS )
-		     AC_SUBST( MJPEGTOOLS_LIBS )
-		     have_mjpegtools=true
-                     AC_DEFINE(HAVE_MJPEGTOOLS, 1, [MJPEGTools installed])],
-                    [have_mjpegtoools=false])
+
 
 dnl ********************************************************************
 dnl Check to see if __progname is provided by the system
