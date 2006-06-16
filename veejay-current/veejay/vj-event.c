@@ -113,7 +113,10 @@ static void	*preview_scaler = NULL;
 static int 	cached_width_ =0;
 static int 	cached_height_ = 0;
 #endif
+
+#ifdef USE_GDK_PIXBUF
 static veejay_image_t *cached_gdkimage_ = NULL;
+#endif
 
 #define SEND_BUF 125000
 static char _print_buf[SEND_BUF];

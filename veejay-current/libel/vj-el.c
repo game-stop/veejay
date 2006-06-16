@@ -26,6 +26,7 @@
 */
 #include <config.h>
 #include <string.h>
+#include <stdio.h>
 #include <libvjmsg/vj-common.h>
 #include <veejay/vj-global.h>
 #include <libel/lav_io.h>
@@ -331,8 +332,8 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 		d->context = avcodec_alloc_context();
 		d->context->width = width;
 		d->context->height = height;
-                d->context->time_base.den = fps;
-		d->context->time_base.num = 1;
+//                d->context->time_base.den = fps;
+//		d->context->time_base.num = 1;
 		d->context->opaque = d;
 		d->context->palctrl = NULL;
 		d->frame = avcodec_alloc_frame();
