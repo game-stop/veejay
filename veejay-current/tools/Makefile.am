@@ -24,7 +24,7 @@ sayVIMS_SOURCES = sayVIMS.c
 sayVIMS_LDFLAGS = $(LAV_ALL_LIB_OPTS)
 sayVIMS_LDADD = $(VJLIBS) @LIBGETOPT_LIB@
 
-YUV2RAWDV_BIN = yuv2rawdv rawdv2yuv any2yuv sayVIMS tracktest
+YUV2RAWDV_BIN = yuv2rawdv rawdv2yuv any2yuv sayVIMS
 
 bin_PROGRAMS = \
 	$(YUV2RAWDV_BIN)
