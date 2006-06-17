@@ -249,7 +249,11 @@ void	vj_el_init()
 
 int	vj_el_is_dv(editlist *el)
 {
+#ifdef SUPPORT_READ_DV2
 	return is_dv_resolution(el->video_width, el->video_height);
+#else
+	return 0;
+#endif
 }
 
 
