@@ -30,6 +30,9 @@
 static vj_dv_encoder *dv_encoder = NULL;
 #endif
 
+#define YUV420_ONLY_CODEC(id) ( ( id == CODEC_ID_MJPEG || id == CODEC_ID_MJPEGB || id == CODEC_ID_MSMPEG4V3 || id == CODEC_ID_MPEG4) ? 1: 0)
+
+
 static int out_pixel_format = FMT_420; 
 
 
@@ -57,7 +60,20 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 	vj_encoder *e = (vj_encoder*) vj_malloc(sizeof(vj_encoder));
 	if(!e) return NULL;
 	memset(e, 0, sizeof(vj_encoder));
-		
+	
+	if( YUV420_ONLY_CODEC(id ))
+	{
+		e->data[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) *
+				el->video_width * el->video_height );
+		e->data[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) *
+				el->video_width * el->video_height /2 );
+		e->data[2] = (uint8_t*) vj_malloc(sizeof(uint8_t) *
+				el->video_width * el->video_height /2);
+		memset( e->data[0], 0, 	el->video_width * el->video_height );
+		memset( e->data[1], 0, 	el->video_width * el->video_height/2 );
+		memset( e->data[2], 0,		el->video_width * el->video_height/2 );
+	}
+	
 	if(id != 998 && id != 999 )
 	{
 #ifdef __FALLBACK_LIBDV
@@ -84,6 +100,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 		{
 #endif
 		e->context = avcodec_alloc_context();
+		e->context->bit_rate = 2750 * 1024;
 		e->context->width = el->video_width;
  		e->context->height = el->video_height;
 #if LIBAVCODEC_BUILD > 5010
@@ -94,6 +111,8 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 #endif
 		e->context->qcompress = 0.0;
 		e->context->qblur = 0.0;
+		e->context->max_b_frames = 0;
+		e->context->strict_std_compliance = FF_COMPLIANCE_EXPERIMENTAL;
 		e->context->flags = CODEC_FLAG_QSCALE;
 		e->context->gop_size = 0;
 		e->context->sub_id = 0;
@@ -101,10 +120,23 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 		e->context->workaround_bugs = FF_BUG_AUTODETECT;
 		e->context->prediction_method = 0;
 		e->context->dct_algo = FF_DCT_AUTO; //global_quality?
+#if LIBAVCODEC_BUILD > 5010
+		if( YUV420_ONLY_CODEC(id) )
+		e->context->pix_fmt = PIX_FMT_YUV420P;
+		else
+			e->context->pix_fmt = (pixel_format == FMT_420 ? PIX_FMT_YUVJ420P : PIX_FMT_YUVJ422P );
+		//@@ mjpeg encoder requires 4:2:0 planar ? wow
+		//(pixel_format == FMT_420 ? 
+		//		PIX_FMT_YUVJ420P : PIX_FMT_YUVJ422P );
+#else
 		e->context->pix_fmt = (pixel_format == FMT_420 ? PIX_FMT_YUV420P : PIX_FMT_YUV422P );
+#endif
 		if ( avcodec_open( e->context, e->codec ) < 0 )
 		{
+			char *descr = el_get_codec_name( id );
+			veejay_msg(VEEJAY_MSG_DEBUG, "Cannot open codec '%s'" , descr );
 			if(e) free(e);
+			if(descr) free(descr);
 			return NULL;
 		}
 
@@ -156,6 +188,12 @@ static	void		vj_avcodec_close_encoder( vj_encoder *av )
 			avcodec_close( av->context );
 			free(av->context);	
 		}
+		if(av->data[0])
+			free(av->data[0]);
+		if(av->data[1])
+			free(av->data[1]);
+		if(av->data[2])
+			free(av->data[2]);
 		free(av);
 	}
 	av = NULL;
@@ -172,6 +210,7 @@ int		vj_avcodec_init(editlist *el, int pixel_format)
 
 	_encoders[ENCODER_MJPEG] = vj_avcodec_new_encoder( CODEC_ID_MJPEG, el, fmt );
 	if(!_encoders[ENCODER_MJPEG]) return 0;
+
 
 #ifdef __FALLBACK_LIBDV
 	dv_encoder = vj_dv_init_encoder( (void*)el , out_pixel_format);
@@ -256,6 +295,27 @@ void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h)
 
 	img_convert( &pict2, PIX_FMT_YUV420P, &pict1, PIX_FMT_YUV422P, w, h );
 	return;
+}
+static void	yuv422p3_to_yuv420p3( uint8_t *src[3], uint8_t *dst[3], int w, int h)
+{
+	AVPicture pict1,pict2;
+	memset(&pict1,0,sizeof(pict1));
+	memset(&pict2,0,sizeof(pict2));
+
+	pict1.data[0] = src[0];
+	pict1.data[1] = src[1];
+	pict1.data[2] = src[2];
+	pict1.linesize[0] = w;
+	pict1.linesize[1] = w >> 1;
+	pict1.linesize[2] = w >> 1;
+	pict2.data[0] = dst[0];
+	pict2.data[1] = dst[1];
+	pict2.data[2] = dst[2];
+	pict2.linesize[0] = w;
+	pict2.linesize[1] = w >> 1;
+	pict2.linesize[2] = w >> 1;	
+
+	img_convert( &pict2, PIX_FMT_YUV420P, &pict1, PIX_FMT_YUV422P, w, h );
 }
 
 int	yuv422p_to_yuv420p( uint8_t *src[3], uint8_t *dst, int w, int h)
@@ -383,7 +443,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 
 
 
-int		vj_avcodec_encode_frame( int format, uint8_t *src[3], uint8_t *buf, int buf_len)
+int		vj_avcodec_encode_frame( int nframe,int format, uint8_t *src[3], uint8_t *buf, int buf_len)
 {
 	AVFrame pict;
 	vj_encoder *av = _encoders[format];
@@ -402,22 +462,28 @@ int		vj_avcodec_encode_frame( int format, uint8_t *src[3], uint8_t *buf, int buf
 #endif
 
 	pict.quality = 1;
-	pict.data[0] = src[0];
-	pict.data[1] = src[1];
-	pict.data[2] = src[2];
-
-	if( out_pixel_format == FMT_422 )
+	pict.pts = (int64_t)( (int64_t)nframe );
+	if(av->context->pix_fmt == PIX_FMT_YUV420P && out_pixel_format == FMT_422 )
 	{
+		pict.data[0] = av->data[0];
+		pict.data[1] = av->data[1];
+		pict.data[2] = av->data[2];
 		pict.linesize[0] = av->context->width;
-		pict.linesize[1] = av->context->width;
-		pict.linesize[2] = av->context->width;
+		pict.linesize[1] = av->context->width /2;
+		pict.linesize[2] = av->context->width /2;
+		yuv422p3_to_yuv420p3( src, av->data, av->context->width,av->context->height );
 	}
 	else
 	{
+		int uv_width = ( out_pixel_format == FMT_420 ? av->context->width / 2 : av->context->width);
+		pict.data[0] = src[0];
+		pict.data[1] = src[1];
+		pict.data[2] = src[2];
 		pict.linesize[0] = av->context->width;
-		pict.linesize[1] = av->context->width >> 1;
-		pict.linesize[2] = av->context->width >> 1;
+		pict.linesize[1] = uv_width;
+		pict.linesize[2] = uv_width;
 	}
+	
 	res = avcodec_encode_video( av->context, buf, buf_len, &pict );
 
 	return res;

@@ -3087,7 +3087,11 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	if(info->pixel_format == -1)
 		info->pixel_format = info->edit_list->pixel_format;
 
-	vj_avcodec_init(info->current_edit_list ,   info->pixel_format);
+	if(!vj_avcodec_init(info->current_edit_list ,   info->pixel_format))
+	{
+	veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize encoders!");
+	veejay_change_state( info, LAVPLAY_STATE_STOP );
+	}
     	if(info->pixel_format == FMT_422 )
 	{
 		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame1)) return 0;

@@ -275,7 +275,8 @@ int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
    // si->encoder_format has one of ENCODER_*
 
 
-   buf_len =  vj_avcodec_encode_frame( si->encoder_format, buffer, sample_encoder_buf, si->encoder_max_size);
+   buf_len =  vj_avcodec_encode_frame( si->encoder_total_frames ++,
+		si->encoder_format, buffer, sample_encoder_buf, si->encoder_max_size);
    if(buf_len <= 0) 
    {
 
@@ -302,7 +303,6 @@ int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 	/* write OK */
 	si->encoder_succes_frames ++;
 	si->encoder_num_frames ++;
-	si->encoder_total_frames ++;
 
 	sample_update(si,s1);
 

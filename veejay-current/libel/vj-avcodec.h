@@ -43,11 +43,12 @@ typedef struct
 	int encoder_id;
 	int width;
 	int height;
+	uint8_t *data[3];
 } vj_encoder;
 
 int		vj_avcodec_init(editlist *el, int pix);
 
-int		vj_avcodec_encode_frame( int format, uint8_t *src[3], uint8_t *dst, int dst_len);
+int		vj_avcodec_encode_frame(int nframe, int format, uint8_t *src[3], uint8_t *dst, int dst_len);
 
 int		vj_avcodec_free();
 

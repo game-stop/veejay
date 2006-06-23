@@ -2154,7 +2154,7 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 		tag->encoder_height, buffer[0], buffer[1], buffer[2]);
 		*/
 
-   buf_len =	vj_avcodec_encode_frame( tag->encoder_format, buffer, tag_encoder_buf, tag->encoder_max_size);
+   buf_len =	vj_avcodec_encode_frame( tag->encoder_total_frames ++, tag->encoder_format, buffer, tag_encoder_buf, tag->encoder_max_size);
    if(buf_len <= 0 )
 	{
 		return -1;
@@ -2178,7 +2178,6 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 	/* write OK */
 	tag->encoder_succes_frames ++;
 	tag->encoder_num_frames ++;
-	tag->encoder_total_frames ++;
 
 	vj_tag_update(tag,t1);
 
