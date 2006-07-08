@@ -1,0 +1,8 @@
+
+libplugger
+
+a convenience library for veejay to load plugins
+
+
+#define WITHOUT_FREEFRAME
+#define WITHOUT_FREIOR
