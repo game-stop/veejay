@@ -55,7 +55,6 @@ void 	vj_event_play_reverse			(	void *ptr,	const char format[], 	va_list ap	);
 void 	vj_event_play_speed			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_play_stop			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_prev_second			(	void *ptr, 	const char format[], 	va_list ap	);
-void 	vj_event_sample_clear_all			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_sample_copy			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_sample_del			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_sample_load_list			(	void *ptr, 	const char format[], 	va_list ap	); 
@@ -70,28 +69,13 @@ void 	vj_event_set_frame			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_set_screen_size		(	void *ptr, 	const char format[], 	va_list ap	);
 #endif
 void	vj_event_send_sample_list			(	void *ptr,	const char format[],	va_list ap	);
-void	vj_event_send_log			(	void *ptr,	const char format[],	va_list ap	);
-void	vj_event_send_frame			(	void *ptr,	const char fomrat[],	va_list ap 	);
 void 	vj_event_sample_new			(	void *ptr,	const char format[],	va_list ap	);
-void 	vj_event_do_bundled_msg			(	void *ptr, 	const char format[], 	va_list ap	);
-void 	vj_event_bundled_msg_del		(	void *ptr, 	const char format[], 	va_list ap	);
-void	vj_event_bundled_msg_add		(	void *ptr, 	const char format[], 	va_list ap	);
-void	vj_event_read_file			(	void *ptr,	const char format[],	va_list ap	);
-void	vj_event_screenshot			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_quit				(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_set_volume			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_debug_level			( 	void *ptr,	const char format[],	va_list ap	);
 
 void	vj_event_bezerk				(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_fullscreen			( void *ptr, const char format[],	va_list ap );
-
-void	vj_event_send_vimslist		(	void *ptr,	const char format[],	va_list ap	);	
-void	vj_event_send_bundles	(void *ptr, const char format[], va_list ap);
-
-void	vj_event_mcast_start(	void *ptr,	const char format[], va_list ap);
-void	vj_event_mcast_stop( void *ptr,		const char format[], va_list ap);
-
-void	vj_event_get_scaled_image(	void *ptr, const char format[], va_list ap);
 
 void	vj_event_chain_entry_set_active( void *ptr, const char format[], va_list ap );
 void 	vj_event_chain_entry_set(void *ptr, const char format[], va_list ap);

@@ -111,7 +111,7 @@ typedef struct
 	int	audio_bps;
 	int	play_rate;
 
-	long 	video_frames; 
+	uint64_t 	video_frames; 
 
 	long	num_video_files;
 
@@ -2024,7 +2024,7 @@ void	vj_el_frame_cache(int n )
 	}
 }
 
-uint64_t	*vj_el_edit_copy( void *edl, long start, long end, uint64_t *len )
+uint64_t	*vj_el_edit_copy( void *edl, uint64_t start, uint64_t end, uint64_t *len )
 {
 	editlist *el = (editlist*) edl;
 	uint64_t *res = NULL;
@@ -2051,7 +2051,7 @@ uint64_t	*vj_el_edit_copy( void *edl, long start, long end, uint64_t *len )
 	return res;
 }
 
-int		vj_el_edit_del( void *edl, long start, long end )
+int		vj_el_edit_del( void *edl, uint64_t start, uint64_t end )
 {
 	editlist *el = (editlist*) edl;
 
@@ -2072,7 +2072,7 @@ int		vj_el_edit_del( void *edl, long start, long end )
 	return 1;
 }
 
-int		vj_el_edit_paste( void *edl, long destination, uint64_t *frame_list, uint64_t len)
+int		vj_el_edit_paste( void *edl, uint64_t destination, uint64_t *frame_list, uint64_t len)
 {
 	editlist *el = (editlist*) edl;
 
@@ -2091,7 +2091,7 @@ int		vj_el_edit_paste( void *edl, long destination, uint64_t *frame_list, uint64
 	return 1;
 }
 
-int		vj_el_get_num_frames(void *edl)
+uint64_t		vj_el_get_num_frames(void *edl)
 {
 	editlist *el = (editlist*) edl;
 	return el->video_frames - 1;

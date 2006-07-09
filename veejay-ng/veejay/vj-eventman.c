@@ -96,7 +96,7 @@ static	void		dump_event_stderr(vevo_port_t *event)
 	
 	if(fmt) free(fmt);
 	free(name);
-	
+	veejay_msg(VEEJAY_MSG_INFO," ");	
 }
 
 int	vj_event_vevo_list_size(void)
@@ -383,135 +383,162 @@ void		vj_init_vevo_events(void)
 				NULL );
 
 	
-	index_map_[VIMS_VIDEO_PLAY_FORWARD] = _new_event(  
-				NULL,
-				VIMS_VIDEO_PLAY_FORWARD,
+	index_map_[VIMS_SAMPLE_PLAY_FORWARD] = _new_event(  
+				"%d",
+				VIMS_SAMPLE_PLAY_FORWARD,
 				"Play forward",
 				vj_event_play_forward,
-				0,
-				VIMS_ALLOW_ANY,
-				NULL );
-
-	index_map_[VIMS_VIDEO_PLAY_BACKWARD]	= 	_new_event(
-				NULL,
-				 VIMS_VIDEO_PLAY_BACKWARD,
-				"Play backward",
-				vj_event_play_reverse,
-				0,
-				VIMS_ALLOW_ANY,
-				NULL );
-
-	index_map_[VIMS_VIDEO_PLAY_STOP]	=	_new_event(
-				NULL,
-				VIMS_VIDEO_PLAY_STOP,
-				"Play stop",
-				vj_event_play_stop,
-				0,	
-				VIMS_ALLOW_ANY,
-				NULL );
-
-	index_map_[VIMS_VIDEO_SKIP_FRAME]	=	_new_event(
-				"%d",
-				VIMS_VIDEO_SKIP_FRAME,
-				"Skip N frames forward",
-				vj_event_inc_frame,
 				1,
 				VIMS_ALLOW_ANY,
+				SAMPLE_ID_HELP,
+				0,
+				NULL );
+
+	index_map_[VIMS_SAMPLE_PLAY_BACKWARD]	= 	_new_event(
+				"%d",
+				 VIMS_SAMPLE_PLAY_BACKWARD,
+				"Play backward",
+				vj_event_play_reverse,
+				1,
+				VIMS_ALLOW_ANY,
+				SAMPLE_ID_HELP,
+				0,
+				NULL );
+
+	index_map_[VIMS_SAMPLE_PLAY_STOP]	=	_new_event(
+				"%d",
+				VIMS_SAMPLE_PLAY_STOP,
+				"Play stop",
+				vj_event_play_stop,
+				1,	
+				VIMS_ALLOW_ANY,
+				SAMPLE_ID_HELP,
+				0,
+				NULL );
+
+	index_map_[VIMS_SAMPLE_SKIP_FRAME]	=	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_SKIP_FRAME,
+				"Skip N frames forward",
+				vj_event_inc_frame,
+				2,
+				VIMS_ALLOW_ANY,
+				SAMPLE_ID_HELP,
+				0,
 				"Number of frames", // param label
 				1,		 // default
 				NULL );
 	
-	index_map_[VIMS_VIDEO_PREV_FRAME]	=	_new_event(
-				"%d",
-				VIMS_VIDEO_PREV_FRAME,
+	index_map_[VIMS_SAMPLE_PREV_FRAME]	=	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_PREV_FRAME,
 				"Skip N frames backward",
 				vj_event_dec_frame,
-				1,
+				2,
 				VIMS_ALLOW_ANY,
+				SAMPLE_ID_HELP,
+				0,
 				"Number of frames",
 				1,
 				NULL );
 
-	index_map_[VIMS_VIDEO_SKIP_SECOND]	=	_new_event(
-				"%d",
-				VIMS_VIDEO_SKIP_SECOND,
+	index_map_[VIMS_SAMPLE_SKIP_SECOND]	=	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_SKIP_SECOND,
 				"Skip N seconds forward",
 				vj_event_next_second,
-				1,
+				2,
 				VIMS_ALLOW_ANY,
+				SAMPLE_ID_HELP,
+				0,
 				"Number of seconds",
 				1,
 				NULL );
 
-	index_map_[VIMS_VIDEO_PREV_SECOND]	=	_new_event(
-				"%d",
-				VIMS_VIDEO_PREV_SECOND,
+	index_map_[VIMS_SAMPLE_PREV_SECOND]	=	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_PREV_SECOND,
 				"Skip N seconds backward",
 				vj_event_prev_second,
-				1,
+				2,
 				VIMS_ALLOW_ANY,
+				SAMPLE_ID_HELP,
+				0,
 				"Number of seconds",
 				1,
 				NULL );
 
-	index_map_[VIMS_VIDEO_GOTO_START]	=	_new_event(
-				NULL,
-				VIMS_VIDEO_GOTO_START,
+	index_map_[VIMS_SAMPLE_GOTO_START]	=	_new_event(
+				"%d",
+				VIMS_SAMPLE_GOTO_START,
 				"Go to starting position",
 				vj_event_goto_start,
-				0,
-				VIMS_ALLOW_ANY,
-				NULL );
-
-	index_map_[VIMS_VIDEO_GOTO_END]		=	_new_event(	
-				NULL,
-				VIMS_VIDEO_GOTO_END,
-				"Go to ending position",
-				vj_event_goto_end,
-				0,
-				VIMS_ALLOW_ANY,		
-				NULL );
-	
-	index_map_[VIMS_VIDEO_SET_SPEED] 	= 	_new_event(
-				"%d",
-				VIMS_VIDEO_SET_SPEED,
-				"Change trickplay speed",
-				vj_event_play_speed,
 				1,
 				VIMS_ALLOW_ANY,
+				SAMPLE_ID_HELP,
+				0,
+				NULL );
+
+	index_map_[VIMS_SAMPLE_GOTO_END]		=	_new_event(	
+				"%d",
+				VIMS_SAMPLE_GOTO_END,
+				"Go to ending position",
+				vj_event_goto_end,
+				1,
+				VIMS_ALLOW_ANY,		
+				SAMPLE_ID_HELP,
+				0,
+				NULL );
+	
+	index_map_[VIMS_SAMPLE_SET_SPEED] 	= 	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_SET_SPEED,
+				"Change trickplay speed",
+				vj_event_play_speed,
+				2,
+				VIMS_ALLOW_ANY,
+				SAMPLE_ID_HELP,
+				0,
 				"Frame step",	
 				1,	
 				NULL );
 
-	index_map_[VIMS_VIDEO_SET_FRAME]	= 	_new_event(
-				"%d",
-				VIMS_VIDEO_SET_FRAME,
+	index_map_[VIMS_SAMPLE_SET_FRAME]	= 	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_SET_FRAME,
 				"Set current frame number",
 				vj_event_set_frame,
-				1,
+				2,
 				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
 				"Frame number",
 				0,
 				NULL );
 
 #ifdef HAVE_XML2
-	index_map_[VIMS_SAMPLE_LOAD_SAMPLELIST]		=	_new_event(
-				"%s",
-				VIMS_SAMPLE_LOAD_SAMPLELIST,
+	index_map_[VIMS_SAMPLE_LOAD]		=	_new_event(
+				"%d %s",
+				VIMS_SAMPLE_LOAD,
 				"Load samples from file",
 				vj_event_sample_load_list,
-				1,
+				2,
 				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
 				"Filename",
 				NULL,
 				NULL );
-	index_map_[VIMS_SAMPLE_SAVE_SAMPLELIST]		=	_new_event(
-				"%s",
-				VIMS_SAMPLE_SAVE_SAMPLELIST,
+	
+	index_map_[VIMS_SAMPLE_SAVE]		=	_new_event(
+				"%d %s",
+				VIMS_SAMPLE_SAVE,
 				"Save samples to file",
 				vj_event_sample_save_list,
-				1,
+				2,
 				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
 				"Filename",
 				NULL,
 				NULL );
@@ -527,15 +554,6 @@ void		vj_init_vevo_events(void)
 				VIMS_REQUIRE_ALL_PARAMS,
 				"Sample ID >= 1",
 				0,
-				NULL );
-
-	index_map_[VIMS_SAMPLE_DEL_ALL]				=	_new_event(
-				NULL,
-				VIMS_SAMPLE_DEL_ALL,
-				"Delete all samples (caution!)",
-				vj_event_sample_clear_all,
-				0,
-				VIMS_ALLOW_ANY,
 				NULL );
 
 	index_map_[VIMS_SAMPLE_COPY]				=	_new_event(
@@ -560,9 +578,9 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
-	index_map_[VIMS_CHAIN_CLEAR]				=	_new_event(
+	index_map_[VIMS_SAMPLE_CHAIN_CLEAR]				=	_new_event(
 				"%d",	
-				VIMS_CHAIN_CLEAR,
+				VIMS_SAMPLE_CHAIN_CLEAR,
 				"Reset Effect Chain",
 				vj_event_chain_clear,
 				1,
@@ -571,9 +589,9 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
-	index_map_[VIMS_CHAIN_ENTRY_SET_ACTIVE]			=	_new_event(
+	index_map_[VIMS_SAMPLE_CHAIN_ENTRY_SET_ACTIVE]			=	_new_event(
 				"%d %d %d",
-				VIMS_CHAIN_ENTRY_SET_ACTIVE,
+				VIMS_SAMPLE_CHAIN_ENTRY_SET_ACTIVE,
 				"Activate or deactivate processing of a fx slot",
 				vj_event_chain_entry_set_active,
 				3,
@@ -586,9 +604,9 @@ void		vj_init_vevo_events(void)
 				1,
 				NULL );
 
-	index_map_[VIMS_CHAIN_ENTRY_SET_FX]			=	_new_event(
+	index_map_[VIMS_SAMPLE_CHAIN_ENTRY_SET_FX]			=	_new_event(
 				"%d %d %s",
-				VIMS_CHAIN_ENTRY_SET_FX,
+				VIMS_SAMPLE_CHAIN_ENTRY_SET_FX,
 				"Put an Effect on a Entry",
 				vj_event_chain_entry_set,
 				3,
@@ -601,9 +619,9 @@ void		vj_init_vevo_events(void)
 				NULL,
 				NULL );
 
-	index_map_[VIMS_CHAIN_ENTRY_CLEAR]			=	_new_event(
+	index_map_[VIMS_SAMPLE_CHAIN_ENTRY_CLEAR]			=	_new_event(
 				"%d %d",
-				VIMS_CHAIN_ENTRY_CLEAR,
+				VIMS_SAMPLE_CHAIN_ENTRY_CLEAR,
 				"Clear an entry",
 				vj_event_chain_entry_clear,
 				2,
@@ -614,9 +632,9 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 	
-	index_map_[VIMS_CHAIN_ENTRY_SET_INPUT]			=	_new_event(
+	index_map_[VIMS_SAMPLE_CHAIN_ENTRY_SET_INPUT]			=	_new_event(
 				"%d %d %d %d",
-				VIMS_CHAIN_ENTRY_SET_INPUT,
+				VIMS_SAMPLE_CHAIN_ENTRY_SET_INPUT,
 				"Set Input Channel",
 				vj_event_chain_entry_set_input,
 				4,
@@ -631,9 +649,9 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 				
-	index_map_[VIMS_CHAIN_ENTRY_SET_VALUE]			=	_new_event(
+	index_map_[VIMS_SAMPLE_CHAIN_ENTRY_SET_VALUE]			=	_new_event(
 				"%d %d %d %s",
-				VIMS_CHAIN_ENTRY_SET_VALUE,
+				VIMS_SAMPLE_CHAIN_ENTRY_SET_VALUE,
 				"Set Input parameter value",
 				vj_event_chain_entry_set_parameter_value,
 				4,
@@ -648,9 +666,9 @@ void		vj_init_vevo_events(void)
 				NULL,
 				NULL );		
 
-	index_map_[VIMS_CHAIN_ENTRY_SET_ALPHA]			=	_new_event(
+	index_map_[VIMS_SAMPLE_CHAIN_ENTRY_SET_ALPHA]			=	_new_event(
 				"%d %d %d",
-				VIMS_CHAIN_ENTRY_SET_ALPHA,
+				VIMS_SAMPLE_CHAIN_ENTRY_SET_ALPHA,
 				"Set opacity of an entry",
 				vj_event_chain_entry_set_alpha,
 				3,
@@ -663,110 +681,68 @@ void		vj_init_vevo_events(void)
 				256,
 				NULL );
 		
-	
-#ifdef USE_DISPLAY
-	index_map_[VIMS_RESIZE_SCREEN]			=	_new_event(
-				"%d %d %d %d",
-				VIMS_RESIZE_SCREEN,
-				"(OUT) Resize video display",
-				vj_event_set_screen_size,
-				4,
-				VIMS_REQUIRE_ALL_PARAMS,
-				"Width",
-				0,
-				"Height",
-				0,
-				"X offset",
-				0,
-				"Y offset",
-				0,
-				NULL );
-#endif
-	index_map_[VIMS_EDITLIST_PASTE_AT]			=	_new_event(
-				"%d",
-				VIMS_EDITLIST_PASTE_AT,
+	index_map_[VIMS_SAMPLE_EDL_PASTE_AT]			=	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_EDL_PASTE_AT,
 				"Paste frames from buffer at frame into edit descision list",
 				vj_event_el_paste_at,
-				1,
+				2,
 				VIMS_REQUIRE_ALL_PARAMS,
-				"EDL position",
+				SAMPLE_ID_HELP,
+				0,
+				"Position to insert frames",
 				0,
 				NULL );
-	index_map_[VIMS_EDITLIST_CUT]				=	_new_event(
-				"%d %d",
-				VIMS_EDITLIST_CUT,
+	
+	index_map_[VIMS_SAMPLE_EDL_CUT]				=	_new_event(
+				"%d %d %d",
+				VIMS_SAMPLE_EDL_CUT,
 				"Cut frames from edit descision list to buffer",
 				vj_event_el_cut,
-				2,
-				VIMS_REQUIRE_ALL_PARAMS,	
-				"EDL start position",
+				3,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,	
+				"Starting position",
 				0,
-				"EDL end position",
+				"Ending position",
 				0,
 				NULL );
-	index_map_[VIMS_EDITLIST_COPY]				=	_new_event(
-				"%d %d",
-				VIMS_EDITLIST_COPY,
+	
+	index_map_[VIMS_SAMPLE_EDL_COPY]				=	_new_event(
+				"%d %d %d",
+				VIMS_SAMPLE_EDL_COPY,
 				"Copy frames from edit descision list to buffer",
 				vj_event_el_copy,
-				2,
+				3,
 				VIMS_REQUIRE_ALL_PARAMS,
-				"EDL start position",
+				SAMPLE_ID_HELP,
 				0,
-				"EDL end position",
+				"Starting position",
+				0,
+				"Ending position",
 				0,
 				NULL );
-	index_map_[VIMS_EDITLIST_CROP]				=	_new_event(
+	
+	index_map_[VIMS_SAMPLE_EDL_DEL]				=	_new_event(
 				"%d %d",
-				VIMS_EDITLIST_CROP,
-				"Crop frames from edit descision list to buffer",
-				vj_event_el_crop,
-				2,
-				VIMS_REQUIRE_ALL_PARAMS,
-				"EDL start position",
-				0,
-				"EDL end position",
-				0,
-				NULL );
-	index_map_[VIMS_EDITLIST_DEL]				=	_new_event(
-				"%d %d",
-				VIMS_EDITLIST_DEL,
+				VIMS_SAMPLE_EDL_DEL,
 				"Delete frames from editlist (no undo!)",
 				vj_event_el_del,
-				2,	
+				3,	
 				VIMS_REQUIRE_ALL_PARAMS,
-				"EDL start position",
+				SAMPLE_ID_HELP,
 				0,
-				"EDL end position",
+				"Starting position",
+				0,
+				"Ending position",
 				0,
 				NULL );
-	index_map_[VIMS_EDITLIST_SAVE]				=	_new_event(
-				"%d %d %s",
-				VIMS_EDITLIST_SAVE,
-				"Save (selection of) edit descision list to new file",
-				vj_event_el_save_editlist,
-				3,
-				VIMS_LONG_PARAMS | VIMS_ALLOW_ANY,
-				"EDL start position (0=start position)",
-				0,
-				"EDL end position (0=end position)",
-				0,
-				"Filename",
-				NULL,
-				NULL );
-	index_map_[VIMS_EDITLIST_LOAD]				=	_new_event(
+	
+	
+	index_map_[VIMS_SAMPLE_EDL_ADD]				=	_new_event(
 				"%s",
-				VIMS_EDITLIST_LOAD,
-				"Load edit descision list from file",
-				vj_event_el_load_editlist,
-				1,
-				VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS,
-				"Filename",
-				NULL,
-				NULL );
-	index_map_[VIMS_EDITLIST_ADD]				=	_new_event(
-				"%s",
-				VIMS_EDITLIST_ADD,
+				VIMS_SAMPLE_EDL_ADD,
 				"Add video file to edit descision list",
 				vj_event_el_add_video,
 				1,
@@ -774,166 +750,7 @@ void		vj_init_vevo_events(void)
 				"Filename",
 				NULL,
 				NULL );
-	index_map_[VIMS_SAMPLE_LIST]				=	_new_event(
-				"%d",
-				VIMS_SAMPLE_LIST,
-				"GUI: Get a list of all samples (unadvised!)",
-				vj_event_send_sample_list,
-				1,
-				VIMS_ALLOW_ANY,
-				"sample offset",
-				0,
-				NULL );
-/*	index_map_[VIMS_BUNDLE]					=	_new_event(
-				"%d",
-				VIMS_BUNDLE,
-				"Execute VIMS bundle", 
-				vj_event_do_bundled_msg,
-				1,
-				VIMS_REQUIRE_ALL_PARAMS,
-				"Bundle ID",
-				0,
-				NULL );*/
-/*
-#ifdef HAVE_XML2
-	index_map_[VIMS_BUNDLE_FILE]				=	_new_event(	
-				"%s",
-				VIMS_BUNDLE_FILE,
-				"Veejay load action file",
-				vj_event_read_file,
-				1,
-				VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS,
-				"Filename",
-				NULL ,
-				NULL );
-#endif
-	index_map_[VIMS_BUNDLE_DEL]				=	_new_event(
-				"%d",
-				VIMS_BUNDLE_DEL,
-				"Delete a VIMS bundle",
-				vj_event_bundled_msg_del,
-				1,
-				VIMS_REQUIRE_ALL_PARAMS,
-				"Bundle ID",
-				0,
-				NULL );
-	index_map_[VIMS_BUNDLE_LIST]				=	_new_event(
-				NULL,
-				VIMS_BUNDLE_LIST,
-				"GUI: Get all bundles",
-				vj_event_send_bundles,
-				0,
-				VIMS_ALLOW_ANY,
-				NULL );
-	index_map_[VIMS_VIMS_LIST]				=	_new_event(
-				NULL,
-				VIMS_VIMS_LIST,
-				"GUI: Get all VIMS events",	
-				vj_event_send_vimslist,
-				0,
-				VIMS_ALLOW_ANY,
-				NULL );
-	index_map_[VIMS_BUNDLE_ADD]				=	_new_event(
-				"%d %s",	
-				VIMS_BUNDLE_ADD,
-				"Add a new bundle to the event list",
-				vj_event_bundled_msg_add,
-				2,
-				VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS,
-				"Bundle ID (0=new, 1=overwrite existing)",
-				0,
-				"VIMS text",
-				0,
-				NULL );
-	index_map_[VIMS_BUNDLE_CAPTURE]				=	_new_event(
-				NULL,
-				VIMS_BUNDLE_CAPTURE,
-				"Capture Effect Chain to a new Bundle",
-				vj_event_quick_bundle,
-				0,
-				VIMS_ALLOW_ANY,
-				NULL );*/
-	index_map_[VIMS_LOG]					=	_new_event(
-				NULL,
-				VIMS_LOG,
-				"GUI: Get console output",
-				vj_event_send_log,
-				0,
-				VIMS_ALLOW_ANY,
-				NULL );
-	/*
-#ifdef USE_DISPLAY
-	index_map_[VIMS_BUNDLE_ATTACH_KEY]			=	_new_event(
-				"%d %d %d %s",
-				VIMS_BUNDLE_ATTACH_KEY,
-				"Attach/Detach a Key to VIMS Event",
-				vj_event_attach_detach_key,
-				4,
-				VIMS_ALLOW_ANY,
-				"VIMS ID",
-				0,
-				"XK Key symbol",
-				0,
-				"XK Key modifier (0=none,1=alt,2=ctrl,3=shift)",
-				0,
-				"VIMS message",
-				NULL,
-				NULL );
 
-#endif
-*/
-#ifdef USE_GDK_PIXBUF
-		index_map_[VIMS_RGB24_IMAGE]				=	_new_event(
-				"%d %d",	
-				VIMS_REQUIRE_ALL_PARAMS,
-				"GUI: Get preview image (raw RGB24)",
-				vj_event_get_scaled_image,
-				2,
-				VIMS_REQUIRE_ALL_PARAMS,
-				"Width",
-				0,
-				"Height",
-				0,
-				NULL );
-	index_map_[VIMS_SCREENSHOT]				=	_new_event(
-				"%d %d %s",
-				VIMS_SCREENSHOT,
-				"Save output frame to file",
-				vj_event_screenshot,
-				3,
-				VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS,
-				"Width",
-				0,
-				"Height",
-				0,
-				"Filename",
-				NULL,
-				NULL );
-#else
-#ifdef HAVE_JPEG
-	index_map_[VIMS_SCREENSHOT]				=	_new_event(
-				"%d %d %s",
-				VIMS_SCREENSHOT,
-				"Save output frame to file",
-				vj_event_screenshot,
-				3,
-				VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS,
-				"Width",
-				0,
-				"Height",
-				0,
-				"Filename",
-				NULL,
-#endif
-#endif
-	index_map_[VIMS_QUIT]				=	_new_event(
-				NULL,
-				VIMS_QUIT,
-				"Quit Veejay (caution!)",
-				vj_event_quit,
-				0,
-				VIMS_ALLOW_ANY,
-				NULL );
 	index_map_[VIMS_SET_VOLUME]			=	_new_event(
 				"%d",
 				VIMS_SET_VOLUME,
@@ -960,32 +777,24 @@ void		vj_init_vevo_events(void)
 				0,
 				VIMS_ALLOW_ANY,
 				NULL );
-	/*index_map_[VIMS_VIDEO_MCAST_START]		=	_new_event(
-				NULL,	
-				VIMS_VIDEO_MCAST_START,
-				"Start built-in UDP mcast server (YUV planar)",
-				vj_event_mcast_start,
+	
+#ifdef USE_DISPLAY
+	index_map_[VIMS_RESIZE_SCREEN]			=	_new_event(
+				"%d %d %d %d",
+				VIMS_RESIZE_SCREEN,
+				"(OUT) Resize video display",
+				vj_event_set_screen_size,
+				4,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Width",
 				0,
-				VIMS_ALLOW_ANY,
-				NULL );
-	index_map_[VIMS_VIDEO_MCAST_STOP]		=	_new_event(
-				NULL,
-				VIMS_VIDEO_MCAST_STOP,
-				"Stop built-in UDP mcast server",
-				vj_event_mcast_stop,
+				"Height",
 				0,
-				VIMS_ALLOW_ANY ,
-				NULL );
-	*/
-	index_map_[VIMS_GET_FRAME]			=	_new_event(
-				NULL,
-				VIMS_GET_FRAME,
-				"TCP: Send a frame to a connected veejay client",
-				vj_event_send_frame,
+				"X offset",
 				0,
-				VIMS_ALLOW_ANY,
+				"Y offset",
+				0,
 				NULL );
-#ifdef HAVE_SDL
 	index_map_[VIMS_FULLSCREEN]			=	_new_event(
 				"%d",
 				VIMS_FULLSCREEN,
@@ -996,8 +805,16 @@ void		vj_init_vevo_events(void)
 				"On = 1, Off=0",
 				1,
 				NULL );
-#endif
 
+#endif
+	index_map_[VIMS_QUIT]				=	_new_event(
+				NULL,
+				VIMS_QUIT,
+				"Quit Veejay (caution!)",
+				vj_event_quit,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
 
 }
 

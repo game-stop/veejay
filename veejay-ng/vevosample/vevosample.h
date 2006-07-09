@@ -114,4 +114,11 @@ void	*sample_get_fx_port_channels_ptr( int id, int fx_entry );
 
 int		sample_get_key_ptr( void *sample );
 
+int	sample_edl_delete( void *current_sample, uint64_t start, uint64_t end );
+
+int	sample_edl_paste_from_buffer( void *current_sample, uint64_t insert_at );
+
+int	sample_edl_cut_to_buffer( void *current_sample, uint64_t start_pos, uint64_t end_pos );
+
+
 #endif

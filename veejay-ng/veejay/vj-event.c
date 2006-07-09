@@ -53,8 +53,6 @@ static int _last_known_num_args = 0;
 /* define the function pointer to any event */
 typedef void (*vj_event)(void *ptr, const char format[], va_list ap);
 
-void vj_event_create_effect_bundle(veejay_t * v,char *buf, int key_id, int key_mod );
-
 /* struct for runtime initialization of event handlers */
 typedef struct {
 	int list_id;			// VIMS id
@@ -934,16 +932,7 @@ void	vj_event_lvd_parse_set_entry( veejay_t *v, const char *format[], va_list ap
 	//@ -> atom types of fx_values and fx_chain
 }
 
-void	vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)
-{
-	char bundle[4096];
-	bzero(bundle,4096);
-	vj_event_create_effect_bundle(v, bundle, key_num, key_mod );
-}
-
-
 //@ FIXME
-
 void vj_event_none(void *ptr, const char format[], va_list ap)
 {
 	veejay_msg(VEEJAY_MSG_INFO, "No event attached on this key");
@@ -1429,10 +1418,6 @@ void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
 {
 }
 
-void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
-{
-} 
-
 void vj_event_chain_clear(void *ptr, const char format[], va_list ap)
 {
 	int args[2];
@@ -1616,30 +1601,72 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 
 void vj_event_el_cut(void *ptr, const char format[], va_list ap)
 {
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char s[256];
+	P_A(args, s, format, ap);
+
+	void *sample = which_sample( v, args );
+	if( sample )
+	{
+		if(sample_edl_cut_to_buffer( sample, (uint64_t) args[1], (uint64_t) args[2] ))
+			veejay_msg(VEEJAY_MSG_INFO, "Cut frames %d - %d to buffer",args[1],args[2]);
+		else
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to cut frames %d - %d",args[1],args[2]);
+	}
 }
 
 void vj_event_el_copy(void *ptr, const char format[], va_list ap)
 {
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char s[256];
+	P_A(args, s, format, ap);
+
+	void *sample = which_sample( v, args );
+	if(sample)
+	{
+		if( sample_edl_copy( sample, (uint64_t) args[1],(uint64_t)args[2] ))
+			veejay_msg(VEEJAY_MSG_INFO, "Copied frames %d - %d to buffer", args[1],args[2]);
+		else
+			veejay_msg(VEEJAY_MSG_INFO, "Unable to copy frames %d - %d",args[1],args[2]);
+	}
 }
 
 void vj_event_el_del(void *ptr, const char format[], va_list ap)
 {
-}
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char s[256];
+	P_A(args, s, format, ap);
 
-void vj_event_el_crop(void *ptr, const char format[], va_list ap) 
-{
+	void *sample = which_sample( v, args );
+	if(sample)
+	{
+		if( sample_edl_delete( sample, (uint64_t) args[1],(uint64_t)args[2] ))
+			veejay_msg(VEEJAY_MSG_INFO, "Copied frames %d - %d to buffer", args[1],args[2]);
+		else
+			veejay_msg(VEEJAY_MSG_INFO, "Unable to copy frames %d - %d",args[1],args[2]);
+	}
+
 }
 
 void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 {
-}
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char s[256];
+	P_A(args, s, format, ap);
 
-void vj_event_el_save_editlist(void *ptr, const char format[], va_list ap)
-{
-}
+	void *sample = which_sample( v, args );
+	if(sample)
+	{
+		if( sample_edl_paste_from_buffer( sample, (uint64_t) args[1] ) )
+			veejay_msg( VEEJAY_MSG_INFO, "Pasted frames from buffer to position %d", args[1] );
+		else
+			veejay_msg(VEEJAY_MSG_INFO, "Unable to paste frames at position %d", args[1]);
 
-void vj_event_el_load_editlist(void *ptr, const char format[], va_list ap)
-{
+	}
 }
 
 
@@ -1647,225 +1674,4 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 {
 }
 
-void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_mod )
-{
-}
-
-#ifdef USE_GDK_PIXBUF
-void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
-{
-	/* send performer preview buffer ! */
-
-}
-#endif
-
-void	vj_event_send_sample			(	void *ptr,	const char format[],	va_list ap)
-{
-	// @ send sample info
-}
-
-void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
-{
-	veejay_t *v = (veejay_t*)ptr;
-
-	//@ send list of samples (primary keys)
-}
-
-void	vj_event_send_log			(	void *ptr,	const char format[],	va_list ap 	)
-{
-	veejay_t *v = (veejay_t*) ptr;
-	int num_lines = 0;
-	int str_len = 0;
-	char *messages = NULL;
-	bzero( _s_print_buf,SEND_BUF);
-
-	messages = veejay_pop_messages( &num_lines, &str_len );
-
-	if(str_len == 0 || num_lines == 0 )
-		sprintf(_s_print_buf, "%06d", 0);
-	else
-		sprintf(_s_print_buf, "%06d%s", str_len, messages );
-	if(messages)
-		free(messages);	
-
-	SEND_LOG_MSG( v, _s_print_buf );
-}
-
-void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
-{
-	veejay_t *v = (veejay_t*) ptr;
-}
-
-
-void	vj_event_mcast_start				(	void *ptr,	const char format[],	va_list ap )
-{
-	veejay_t *v = (veejay_t*) ptr;
-/*	if(!v->settings->use_vims_mcast)
-		veejay_msg(VEEJAY_MSG_ERROR, "start veejay in multicast mode (see -V commandline option)");	
-	else
-	{
-		v->settings->mcast_frame_sender = 1;
-		veejay_msg(VEEJAY_MSG_INFO, "Veejay started mcast frame sender");
-	}*/	
-}
-
-
-void	vj_event_mcast_stop				(	void *ptr,	const char format[],	va_list ap )
-{
-	/*veejay_t *v = (veejay_t*) ptr;
-	if(!v->settings->use_vims_mcast)
-		veejay_msg(VEEJAY_MSG_ERROR, "start veejay in multicast mode (see -V commandline option)");	
-	else
-	{
-		v->settings->mcast_frame_sender = 0;
-		veejay_msg(VEEJAY_MSG_INFO, "Veejay stopped mcast frame sender");
-	}*/	
-}
-/*
-int vj_event_load_bundles(char *bundle_file)
-{
-	FILE *fd;
-	char *event_name, *event_msg;
-	char buf[65535];
-	int event_id=0;
-	if(!bundle_file) return -1;
-	fd = fopen(bundle_file, "r");
-	bzero(buf,65535);
-	if(!fd) return -1;
-	while(fgets(buf,4096,fd))
-	{
-		buf[strlen(buf)-1] = 0;
-		event_name = strtok(buf, "|");
-		event_msg = strtok(NULL, "|");
-		if(event_msg!=NULL && event_name!=NULL) {
-			//veejay_msg(VEEJAY_MSG_INFO, "Event: %s , Msg [%s]",event_name,event_msg);
-			event_id = atoi( event_name );
-			if(event_id && event_msg)
-			{
-				vj_msg_bundle *m = vj_event_bundle_new( event_msg, event_id );
-				if(m != NULL) 
-				{
-					if( vj_event_bundle_store(m) ) 
-					{
-						veejay_msg(VEEJAY_MSG_INFO, "(VIMS) Registered a bundle as event %03d",event_id);
-					}
-				}
-			}
-		}
-	}
-	fclose(fd);
-	return 1;
-}
-
-void vj_event_do_bundled_msg(void *ptr, const char format[], va_list ap)
-{
-	veejay_t *v = (veejay_t*) ptr;
-	int args[1];
-	char s[1024];	
-	vj_msg_bundle *m;
-	P_A( args, s , format, ap);
-	//veejay_msg(VEEJAY_MSG_INFO, "Parsing message bundle as event");
-	m = vj_event_bundle_get(args[0]);
-	if(m)
-	{
-		vj_event_parse_bundle( v, m->bundle );
-	}	
-	else
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Requested event %d does not exist. ",args[0]);
-	}
-}*/
-
-/*
-void vj_event_bundled_msg_del(void *ptr, const char format[], va_list ap)
-{
-	
-	int args[1];	
-	char *s = NULL;
-	P_A(args,s,format,ap);
-	if ( vj_event_bundle_del( args[0] ) == 0)
-	{
-		veejay_msg(VEEJAY_MSG_INFO,"Bundle %d deleted from event system",args[0]);
-	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Bundle is %d is not known",args[0]);
-	}
-}
-
-
-
-
-void vj_event_bundled_msg_add(void *ptr, const char format[], va_list ap)
-{
-	
-	int args[2] = {0,0};
-	char s[1024];
-	bzero(s, 1024);
-	P_A(args,s,format,ap);
-
-	if(args[0] == 0)
-	{
-		args[0] = vj_event_suggest_bundle_id();
-		veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) suggested new Event id %d", args[0]);
-	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "(VIMS) requested to add/replace %d", args[0]);
-	}
-
-	if(args[0] < VIMS_BUNDLE_START|| args[0] > VIMS_BUNDLE_END )
-	{
-		// invalid bundle
-		veejay_msg(VEEJAY_MSG_ERROR, "Customized events range from %d-%d", VIMS_BUNDLE_START, VIMS_BUNDLE_END);
-		return;
-	}
-	// allocate new
-	veejay_strrep( s, '_', ' ');
-	vj_msg_bundle *m = vj_event_bundle_new(s, args[0]);
-	if(!m)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Error adding bundle ?!");
-		return;
-	}
-
-	// bye existing bundle
-	if( vj_event_bundle_exists(args[0]))
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG,"(VIMS) Bundle exists - replace ");
-		vj_event_bundle_del( args[0] );
-	}
-
-	if( vj_event_bundle_store(m)) 
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "(VIMS) Registered Bundle %d in VIMS",args[0]);
-	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Error in Bundle %d '%s'",args[0],s );
-	}
-}*/
-
-#ifdef USE_GDK_PIXBUF
-void vj_event_screenshot(void *ptr, const char format[], va_list ap)
-{
-}
-#else
-#ifdef HAVE_JPEG
-void vj_event_screenshot(void *ptr, const char format[], va_list ap)
-{
-	int args[4];
-	char filename[1024];
-	bzero(filename,1024);
-	P_A(args, filename, format, ap );
-	veejay_t *v = (veejay_t*) ptr;
-
-}
-#endif
-#endif
-
-void		vj_event_quick_bundle( void *ptr, const char format[], va_list ap)
-{
-	vj_event_commit_bundle( (veejay_t*) ptr,0,0);
-}
 

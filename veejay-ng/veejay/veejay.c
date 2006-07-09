@@ -71,6 +71,7 @@ static int n_chans_ = 0;
 static int bits_ = 0;
 static int display_ = 0;
 static int itu601_ = 0;
+static int dump_ = 0;
 
 static void Usage(char *progname)
 {
@@ -94,6 +95,7 @@ static void Usage(char *progname)
 	fprintf(stderr, " -p/--port\t\t\n");
 	fprintf(stderr, " -d/--display [num] 1=SDL, 2=OpenGL\t\t\n");
 	fprintf(stderr, " -u/--itu601 [0|1]\n");
+	fprintf(stderr, " -l/--list\n");
 			
 }
 
@@ -155,6 +157,8 @@ static int set_option(const char *name, char *value)
 		info->port_offset = atoi(value);
 	} else if(strcmp(name, "itu601") == 0 || strcmp(name,"u") == 0 ){
 		info->itu601 = atoi(value);
+	} else if(strcmp(name, "list") == 0 || strcmp(name,"l") == 0 ) {
+		dump_ = 1;
 	} else
 		nerr++;	
 	
@@ -188,6 +192,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"display",1,0,0},
 	{"port",1,0,0},
 	{"itu601",1,0,0},
+	{"list",0,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -201,12 +206,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"vs:c:a:t:b:f:w:h:n:i:m:j:p:P:r:n:B:d:u:",
+			"lvs:c:a:t:b:f:w:h:n:i:m:j:p:P:r:n:B:d:u:",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   "vs:c:a:t:b:f:w:h:n:i:m:j:p:P:r:n:B:d:u:")) != EOF)
+		   "lvs:c:a:t:b:f:w:h:n:i:m:j:p:P:r:n:B:d:u:")) != EOF)
 #endif
     {
 	switch (n) {
@@ -388,7 +393,15 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-    if(!veejay_main(info))
+    	if( dump_ )
+	{
+		vj_event_vevo_dump();
+		veejay_quit(info);
+		veejay_free(info);
+		return 0;
+	}
+   
+	if(!veejay_main(info))
 	{
 	    veejay_msg(VEEJAY_MSG_ERROR, "Cannot start main playback cycle");
 		return 1;

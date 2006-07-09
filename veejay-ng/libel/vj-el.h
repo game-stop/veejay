@@ -72,7 +72,7 @@ int		vj_el_framelist_clone( void *src, void *dst);
 char *vj_el_write_line_ascii( void *el, int *bytes_written );
 
 void		vj_el_deinit();
-
+uint64_t	vj_el_get_num_frames( void *edl);
 char		vj_el_get_norm( void *edl );
 float		vj_el_get_fps(void *edl);
 int		vj_el_get_width( void *edl );
@@ -83,5 +83,8 @@ int		vj_el_get_audio_bps( void *edl );
 int		vj_el_get_audio_chans( void *edl );
 
 int	vj_el_match( void *sv, void *edl);
+uint64_t        *vj_el_edit_copy( void *edl, uint64_t start, uint64_t end, uint64_t *len );
+int             vj_el_edit_del( void *edl, uint64_t start, uint64_t end );
+int             vj_el_edit_paste( void *edl, uint64_t destination, uint64_t *frame_list, uint64_t len);
 
 #endif

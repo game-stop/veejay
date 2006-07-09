@@ -1276,6 +1276,150 @@ int	sample_append_file( const char *filename, long n1, long n2, long n3 )
 	return 1;
 }
 
+int	sample_edl_copy( void *current_sample, uint64_t start, uint64_t end )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) current_sample;
+	uint64_t n = vj_el_get_num_frames( srd->data );
+	if( start < 0 || start >= n || end < 0 || end >= n )
+	{
+		veejay_msg(0, "Invalid start or end position");
+		return 0;
+	}
+
+	uint64_t len = 0;
+	void  *frames = (void*) vj_el_edit_copy( srd->data,start,end,&len );
+	
+	if(!frames || len <= 0 )
+	{
+		veejay_msg(0, "EDL is empty");
+	}
+	
+	void *prevlist = NULL;
+	if( vevo_property_get( srd->info_port, "edl_buffer", 0, &prevlist ) == VEVO_NO_ERROR )
+	{
+		free(prevlist);	
+	}
+	
+	int error = vevo_property_set( srd->info_port, "edl_buffer", VEVO_ATOM_TYPE_VOIDPTR,1,&frames );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+
+	error = vevo_property_set( srd->info_port, "edl_buffer_len", VEVO_ATOM_TYPE_UINT64,1,&len );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	veejay_msg(2, "Copied frames %ld - %ld to buffer", start,end);
+	return 1;
+}
+
+int	sample_edl_delete( void *current_sample, uint64_t start, uint64_t end )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) current_sample;
+	uint64_t n = vj_el_get_num_frames( srd->data );
+	if( start < 0 || start >= n || end < 0 || end >= n )
+	{
+		veejay_msg(0, "Invalid start or end position");
+		return 0;
+	}
+	int success = vj_el_edit_del( srd->data, start, end );
+	if(success)
+	{
+		veejay_msg(0, "Deleted frames %ld - %ld from EDL",start,end);
+		sampleinfo_t *sit = srd->info;
+		n = vj_el_get_num_frames(srd->data);
+		if( sit->start_pos > n )
+			sit->start_pos = 0;
+		if( sit->end_pos > n )
+			sit->end_pos = n;
+		return 1;
+	}
+	return 0;
+}
+
+int	sample_edl_paste_from_buffer( void *current_sample, uint64_t insert_at )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) current_sample;
+
+	void *prevlist = NULL;
+	if( vevo_property_get( srd->info_port, "edl_buffer", 0, &prevlist ) != VEVO_NO_ERROR )
+	{
+		veejay_msg(0, "Nothing in buffer to paste");
+		return 0;
+	}
+
+	if( insert_at < 0 || insert_at >= vj_el_get_num_frames( srd->data ) )
+	{
+		veejay_msg(0, "Cannot paste beyond last frame of EDL");
+		return 0;
+	}
+
+	uint64_t *fl = (uint64_t*) prevlist;
+	uint64_t len = 0;
+
+	int error = vevo_property_get( srd->info_port, "edl_buffer_len", 0, &len );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	int n = vj_el_edit_paste( srd->data, insert_at, fl, len );
+	
+	if( n <= 0 )
+	{
+		veejay_msg(0, "Cannot paste buffer at position %ld", insert_at );
+		return 0;
+	}
+	
+	veejay_msg(1, "Pasted %ld frames from buffer to position %ld", len, insert_at );
+	
+	return 1;
+}
+
+int	sample_edl_cut_to_buffer( void *current_sample, uint64_t start_pos, uint64_t end_pos )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) current_sample;
+	sampleinfo_t *sit = srd->info;
+
+
+	if(srd->type != VJ_TAG_TYPE_NONE )
+	{
+		veejay_msg(0, "This sample has no EDL");
+		return 0;
+	}
+	
+	uint64_t len = 0;
+	void  *frames = (void*) vj_el_edit_copy( srd->data,start_pos,end_pos,&len );
+	
+	if(!frames || len <= 0 )
+	{
+		veejay_msg(0, "EDL is empty");
+	}
+	
+	void *prevlist = NULL;
+	if( vevo_property_get( srd->info_port, "edl_buffer", 0, &prevlist ) == VEVO_NO_ERROR )
+	{
+		free(prevlist);	
+	}
+	
+	int error = vevo_property_set( srd->info_port, "edl_buffer", VEVO_ATOM_TYPE_VOIDPTR,1,&frames );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+
+	error = vevo_property_set( srd->info_port, "edl_buffer_len", VEVO_ATOM_TYPE_UINT64,1,&len );
+	
+	int n = vj_el_edit_del( srd->data, start_pos,end_pos );
+
+	uint64_t	last = vj_el_get_num_frames( srd->data );
+
+	if( sit->start_pos > last )
+		sit->start_pos = 0;
+	if( sit->end_pos > last )
+		sit->end_pos = last;
+	
+	return 1;	
+}
+
+
 
 void	sample_increase_frame( void *current_sample )
 {
@@ -1859,12 +2003,6 @@ void	sample_process_fx_chain( void *srd )
 		}
 	}
 }
-
-static void		edl_copy( void *sample, uint64_t start, uint64_t end )
-{
-
-}
-
 
 static void	sample_get_position_info(void *port , uint64_t *start, uint64_t *end, int *loop, int *speed)
 {
