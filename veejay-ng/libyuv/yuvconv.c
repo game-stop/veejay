@@ -652,11 +652,11 @@ static void yuv444_444_1plane(
 {
 	/* YUV 4:2:2 Planar to 4:4:4 Packed: Y, V, U */
 	unsigned int x;
-	uint8_t * restrict yp = frame->data[0];
-	uint8_t * restrict up = frame->data[2];
-	uint8_t * restrict vp = frame->data[1];
+	uint8_t *yp = frame->data[0];
+	uint8_t *up = frame->data[2];
+	uint8_t *vp = frame->data[1];
 	int len = frame->len / 4;
-	int * restrict dst = dst_buffer;
+	int *dst = dst_buffer;
 /*	uint8_t *dst = dst_buffer;
 	for( x = 0 ; x < frame->len ; x ++ )
 	{
