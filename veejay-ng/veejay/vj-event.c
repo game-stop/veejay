@@ -555,7 +555,11 @@ void	vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 	{
 		if( vims_arguments[i].value &&
 			fmt[fmt_offset] == 's' )
-			free( vims_arguments[i].value );
+			if( vims_arguments[i].value)
+			{
+				free( vims_arguments[i].value );
+				vims_arguments[i].value = NULL;
+			}
 		fmt_offset += 3;
 	}
 	if(fmt)
@@ -920,9 +924,6 @@ void vj_event_update_remote(void *ptr)
 		}
 	}
 
-	if(!veejay_keep_messages())
-		veejay_reap_messages();
-	
 }
 
 
@@ -936,31 +937,6 @@ void	vj_event_lvd_parse_set_entry( veejay_t *v, const char *format[], va_list ap
 void vj_event_none(void *ptr, const char format[], va_list ap)
 {
 	veejay_msg(VEEJAY_MSG_INFO, "No event attached on this key");
-}
-
-static	void	vj_event_send_new_id(veejay_t * v, int new_id)
-{
-
-	if( vj_server_client_promoted( v->command_socket, v->current_link ))
-	{
-		char result[6];
-		if(new_id < 0 ) new_id = 0;
-		bzero(result,6);
-		bzero( _s_print_buf,SEND_BUF);
-
-		sprintf( result, "%05d",new_id );
-		sprintf(_s_print_buf, "%03d%s",5, result);	
-		SEND_MSG( v,_s_print_buf );
-	}
-}
-
-void	vj_event_read_file( void *ptr, 	const char format[], va_list ap )
-{
-	char file_name[512];
-	int args[1];
-
-//	P_A(args,file_name,format,ap);
-
 }
 
 void	vj_event_init_network_events()
@@ -1044,16 +1020,6 @@ void vj_event_debug_level(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_INFO, "Not displaying debug information");
 }
 
-void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
-{
-}
-
-void	vj_event_send_vimslist(void *ptr, const char format[], va_list ap)
-{
-}
-
-
-
 void vj_event_sample_select(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -1081,23 +1047,23 @@ void vj_event_sample_select(void *ptr, const char format[], va_list ap)
 
 void	vj_event_set_volume(void *ptr, const char format[], va_list ap)
 {
-	int args[1];	
+	int args[2];	
 	char *s = NULL;
+	veejay_t *v = (veejay_t*) ptr;
 	P_A(args,s,format,ap)
-	if(args[0] >= 0 && args[0] <= 100)
+
+	void *sample = which_sample( v,args );
+	if(sample)
 	{
 #ifdef HAVE_JACK
-		if(vj_jack_set_volume(args[0])) //@ TODO: audio
+		if(vj_jack_set_volume(args[1])) //@ TODO: audio
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Volume set to %d", args[0]);
+			veejay_msg(VEEJAY_MSG_INFO, "Volume set to %d", args[1]);
+			sample_set_property_ptr( v->current_sample, "volume", VEVO_ATOM_TYPE_INT, &(args[1]));
 		}
 #else
-		veejay_msg(VEEJAY_MSG_ERROR, "Audio support not compiled in");
+		veejay_msg(VEEJAY_MSG_ERROR, "Audio support not compiled in. Cannot change audio volume.");
 #endif
-	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Use a value between 0-100 for audio volume");
 	}
 }
 
@@ -1118,7 +1084,7 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 	else
 	{
 		void *sample = sample_new( args[0] );
-		if(sample_open( sample, token,1, v->video_info))
+		if(sample_open( sample, token,args[1], v->video_info))
 		{
 			new_id = samplebank_add_sample( sample );
 		 	veejay_msg(VEEJAY_MSG_INFO,"Created new %s from %s as Sample %d",
@@ -1196,177 +1162,276 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 void vj_event_play_stop(void *ptr, const char format[], va_list ap) 
 {
 	veejay_t *v = (veejay_t*) ptr;
-	int speed = sample_get_speed( v->current_sample );
-	if(speed != 0)
+	int args[2];	
+	char *s = NULL;
+	P_A(args,s,format,ap)
+
+	void *sample = which_sample( v,args );
+	if(sample)
 	{
-		speed = 0;
-		sample_set_property_ptr(
-				v->current_sample, "speed", VEVO_ATOM_TYPE_INT, &speed );
+		int speed = sample_get_speed( sample );
+		if(speed != 0)
+		{
+			speed = 0;
+			sample_set_property_ptr(
+					v->current_sample, "speed", VEVO_ATOM_TYPE_INT, &speed );
+		}
+
 	}
-}
+}	
 
 
 void vj_event_play_reverse(void *ptr,const char format[],va_list ap) 
 {
 	veejay_t *v = (veejay_t*) ptr;
-	int speed = sample_get_speed( v->current_sample );
-	if(speed >= 0)
+		
+	int args[2];	
+	char *s = NULL;
+	P_A(args,s,format,ap)
+
+	void *sample = which_sample( v,args );
+	if(sample)
 	{
-		if(speed == 0)
-			speed = 1;
-		speed *= -1;
-		sample_set_property_ptr(
+		int speed = sample_get_speed( v->current_sample );
+		if(speed >= 0)
+		{
+			if(speed == 0)
+				speed = 1;
+			speed *= -1;
+			sample_set_property_ptr(
 				v->current_sample, "speed", VEVO_ATOM_TYPE_INT, &speed );
+		}
 	}
 }
 
 void vj_event_play_forward(void *ptr, const char format[],va_list ap) 
 {
 	veejay_t *v = (veejay_t*) ptr;
-	int speed = sample_get_speed( v->current_sample );
-	if(speed <= 0)
+		
+	int args[2];	
+	char *s = NULL;
+	P_A(args,s,format,ap)
+	void *sample = which_sample( v,args );
+	if(sample)
 	{
-		if(speed == 0)
-			speed = -1;
-		speed *= -1;
-		sample_set_property_ptr(
-				v->current_sample, "speed", VEVO_ATOM_TYPE_INT, &speed );
+		int speed = sample_get_speed( v->current_sample );
+		if(speed <= 0)
+		{
+			if(speed == 0)
+				speed = -1;
+			speed *= -1;
+			sample_set_property_ptr(
+					v->current_sample, "speed", VEVO_ATOM_TYPE_INT, &speed );
+		}
 	}
 }
 
 void vj_event_play_speed(void *ptr, const char format[], va_list ap)
 {
-	int args[5];
 	veejay_t *v = (veejay_t*) ptr;
+		
+	int args[2];	
 	char *s = NULL;
-	P_A(args,s,format,ap);
-
-	int speed = sample_get_speed( v->current_sample );
-	if(speed != args[0])
+	P_A(args,s,format,ap)
+	void *sample = which_sample( v,args );
+	if(sample)
 	{
-		if( sample_valid_speed( v->current_sample, args[0] ))
+		if( sample_valid_speed( v->current_sample, args[1] ))
 		{
 			sample_set_property_ptr(
-					v->current_sample, "speed", VEVO_ATOM_TYPE_INT, &(args[0]) );
-			veejay_msg(VEEJAY_MSG_INFO, "Playback speed changed to %d", args[0]);
+				v->current_sample, "speed", VEVO_ATOM_TYPE_INT, &(args[1]) );
+			int frame_repeat = (args[1] == 1 || args[1] == -1 ? 0 :
+				sample_get_repeat( v->current_sample ) );
+			sample_set_property_ptr(
+				v->current_sample, "repeat", VEVO_ATOM_TYPE_INT,&frame_repeat );
+			veejay_msg(VEEJAY_MSG_INFO, "Playback speed changed to %d (repeat is %d)", args[1],
+					frame_repeat);
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Playback speed %d bounces beyond sample boundaries", args[0]);
+			veejay_msg(VEEJAY_MSG_ERROR, "Playback speed %d bounces beyond sample boundaries", args[1]);
 		}
 	}
 }
 
-void vj_event_set_frame(void *ptr, const char format[], va_list ap)
+void vj_event_play_repeat(void *ptr, const char format[], va_list ap)
 {
-	uint64_t args[2];
+	int args[5];
 	veejay_t *v = (veejay_t*) ptr;
 	char *s = NULL;
-
-//	P_A(args,s,format,ap);
-
-	uint64_t pos = sample_get_current_pos( v->current_sample );
-	if(pos != args[0])
+	P_A(args,s,format,ap);
+	
+	void *sample = which_sample(v,args);
+	
+	if(sample)
 	{
-		if( sample_valid_pos( v->current_sample, args[0] ))
+		int speed = (sample_get_speed(v->current_sample) < 0 ? -1 : 1 );
+			
+		sample_set_property_ptr( v->current_sample,
+				"speed", VEVO_ATOM_TYPE_INT, &speed);
+		sample_set_property_ptr( v->current_sample,
+				"repeat", VEVO_ATOM_TYPE_INT, &(args[1]) );
+		veejay_msg(VEEJAY_MSG_ERROR, "Playback repeat set to %d", args[1]);
+	}
+}
+
+
+
+void vj_event_set_frame(void *ptr, const char format[], va_list ap)
+{
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args,s,format,ap);
+	
+	void *sample = which_sample(v,args);
+	
+	if(sample)
+	{
+		uint64_t pos = sample_get_current_pos( v->current_sample );
+		if(pos != args[1])
 		{
-			uint64_t new_pos = (uint64_t) args[0];
-			sample_set_property_ptr(
-					v->current_sample, "current_pos", VEVO_ATOM_TYPE_UINT64, &new_pos );
-			veejay_msg(VEEJAY_MSG_INFO, "Position changed to %d", args[0]);
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Position %d outside sample boundaries", args[0]);
+			if( sample_valid_pos( v->current_sample, args[1] ))
+			{
+				uint64_t new_pos = (uint64_t) args[1];
+				sample_set_property_ptr(
+						v->current_sample, "current_pos", VEVO_ATOM_TYPE_UINT64, &new_pos );
+				veejay_msg(VEEJAY_MSG_INFO, "Position changed to %d", args[1]);
+			}
+			else
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Position %d outside sample boundaries", args[1]);
+			}
 		}
 	}
-	
 
 }
 
 void vj_event_inc_frame(void *ptr, const char format[], va_list ap)
 {
+	int args[2];
 	veejay_t *v = (veejay_t*) ptr;
-	uint64_t pos = sample_get_current_pos( v->current_sample );
-	pos += 1;
-
-	if( sample_valid_pos( v->current_sample, pos ))
+	char *s = NULL;
+	P_A(args,s,format,ap);
+	
+	void *sample = which_sample(v,args);
+	
+	if(sample)
 	{
-		sample_set_property_ptr(
-				v->current_sample, "current_pos", VEVO_ATOM_TYPE_UINT64, &pos );
-		veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld",pos);
+		uint64_t pos = sample_get_current_pos( v->current_sample );
+		pos += args[1];
+		if( sample_valid_pos( v->current_sample, pos ))
+		{
+			sample_set_property_ptr(
+					v->current_sample, "current_pos", VEVO_ATOM_TYPE_UINT64, &pos );
+			veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld",pos);
+		}
 	}
 }
 
 void vj_event_dec_frame(void *ptr, const char format[], va_list ap)
 {
+	int args[2];
 	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args,s,format,ap);
 	
-	uint64_t pos = sample_get_current_pos( v->current_sample );
-	pos -= 1;
-
-	if( sample_valid_pos( v->current_sample, pos ))
+	void *sample = which_sample(v,args);
+	
+	if(sample)
 	{
-		sample_set_property_ptr(
-				v->current_sample, "current_pos", VEVO_ATOM_TYPE_UINT64, &pos );
-		veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld", pos);
+		uint64_t pos = sample_get_current_pos( v->current_sample );
+		pos -= args[1];
+		if( sample_valid_pos( v->current_sample, pos ))
+		{
+			sample_set_property_ptr(
+					v->current_sample, "current_pos", VEVO_ATOM_TYPE_UINT64, &pos );
+			veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld", pos);
+		}
 	}
 }
 
 void vj_event_prev_second(void *ptr, const char format[], va_list ap)
 {
- 	veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args,s,format,ap);
 	
- 	sample_video_info_t *svit = (sample_video_info_t*) v->video_info;
-	uint64_t pos = sample_get_current_pos( v->current_sample );
+	void *sample = which_sample(v,args);
 	
-	pos += svit->fps;
-	if( sample_valid_pos( v->current_sample, pos ))
+	if(sample)
 	{
-		sample_set_property_ptr(
-				v->current_sample, "current_pos", VEVO_ATOM_TYPE_UINT64, &pos );
-		veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld", pos);
+ 		sample_video_info_t *svit = (sample_video_info_t*) v->video_info;
+		uint64_t pos = sample_get_current_pos( v->current_sample );
+	
+		pos += (args[1] * svit->fps);
+		if( sample_valid_pos( v->current_sample, pos ))
+		{
+			sample_set_property_ptr(
+					v->current_sample, "current_pos", VEVO_ATOM_TYPE_UINT64, &pos );
+			veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld", pos);
+		}
 	}
+	
 }
 
 void vj_event_next_second(void *ptr, const char format[], va_list ap)
 {
+	int args[2];
 	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args,s,format,ap);
 	
-        sample_video_info_t *svit = (sample_video_info_t*) v->video_info;
-	uint64_t pos = sample_get_current_pos( v->current_sample );
+	void *sample = which_sample(v,args);
 	
-	pos -= svit->fps;
-	if( sample_valid_pos( v->current_sample, pos ))
+	if(sample)
 	{
-		sample_set_property_ptr(
-				v->current_sample, "current_pos", VEVO_ATOM_TYPE_UINT64, &pos );
-		veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld", pos);
+		sample_video_info_t *svit = (sample_video_info_t*) v->video_info;
+		uint64_t pos = sample_get_current_pos( v->current_sample );
+	
+		pos -= (args[1] * svit->fps);
+		if( sample_valid_pos( v->current_sample, pos ))
+		{
+			sample_set_property_ptr(
+					v->current_sample, "current_pos", VEVO_ATOM_TYPE_UINT64, &pos );
+			veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld", pos);
+		}
 	}
 }
 
 void vj_event_goto_end(void *ptr, const char format[], va_list ap)
 {
+	int args[2];
 	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args,s,format,ap);
 	
-	sample_video_info_t *svit = (sample_video_info_t*) v->video_info;
-	uint64_t pos = sample_get_end_pos( v->current_sample );
-	
-	sample_set_property_ptr(
+	void *sample = which_sample(v,args);
+	if(sample)
+	{	
+		uint64_t pos = sample_get_end_pos( v->current_sample );
+		sample_set_property_ptr(
 			v->current_sample, "current_pos", VEVO_ATOM_TYPE_UINT64, &pos );
-	veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld", pos);
+		veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld", pos);
+	}
 }
 
 void vj_event_goto_start(void *ptr, const char format[], va_list ap)
 {
+	int args[2];
 	veejay_t *v = (veejay_t*) ptr;
-			
-	sample_video_info_t *svit = (sample_video_info_t*) v->video_info;
-	uint64_t pos = sample_get_start_pos( v->current_sample );
+	char *s = NULL;
+	P_A(args,s,format,ap);
 	
-	sample_set_property_ptr(
+	void *sample = which_sample(v,args);
+	if(sample)
+	{	
+		uint64_t pos = sample_get_start_pos( v->current_sample );
+		sample_set_property_ptr(
 			v->current_sample, "current_pos", VEVO_ATOM_TYPE_UINT64, &pos );
-	veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld", pos);
+		veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld", pos);
+	}
 }
 
 void vj_event_set_property(void *ptr, const char format[], va_list ap)
@@ -1386,16 +1451,6 @@ void vj_event_get_property_value(void *ptr, const char format[], va_list ap)
 	P_A(args, s, format, ap);
 
 }
-
-#ifdef HAVE_XML2
-void vj_event_sample_save_list(void *ptr, const char format[], va_list ap)
-{
-}
-
-void vj_event_sample_load_list(void *ptr, const char format[], va_list ap)
-{
-}
-#endif
 
 void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 {

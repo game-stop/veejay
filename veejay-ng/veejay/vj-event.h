@@ -53,14 +53,11 @@ void 	vj_event_none				(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_play_forward			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_play_reverse			(	void *ptr,	const char format[], 	va_list ap	); 
 void 	vj_event_play_speed			(	void *ptr, 	const char format[], 	va_list ap	);
+void vj_event_play_repeat(void *ptr, const char format[], va_list ap);
 void 	vj_event_play_stop			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_prev_second			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_sample_copy			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_sample_del			(	void *ptr, 	const char format[], 	va_list ap	);
-void 	vj_event_sample_load_list			(	void *ptr, 	const char format[], 	va_list ap	); 
-#ifdef HAVE_XML2
-void 	vj_event_sample_save_list			(	void *ptr, 	const char format[], 	va_list ap	); 
-#endif
 void	vj_event_sample_select			(	void *ptr, 	const char format[],	va_list ap	);
 void 	vj_event_set_property			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_get_property			(	void *ptr, 	const char format[], 	va_list ap	);
@@ -68,7 +65,6 @@ void 	vj_event_set_frame			(	void *ptr, 	const char format[], 	va_list ap	);
 #ifdef USE_DISPLAY
 void 	vj_event_set_screen_size		(	void *ptr, 	const char format[], 	va_list ap	);
 #endif
-void	vj_event_send_sample_list			(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_sample_new			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_quit				(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_set_volume			(	void *ptr,	const char format[],	va_list ap	);

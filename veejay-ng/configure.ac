@@ -337,19 +337,54 @@ AM_PATH_GLIB(2.0,[
 dnl *********************************************************************
 dnl Check for the Jack Audio connection kit
 dnl
-
+have_samplerate=false
 have_jack=false
-dnl dnl if test x$with_jack != xno ; then
-dnl  PKG_CHECK_MODULES(JACK, jack >= 0.98.1 , have_jack=true, have_jack=false)
-dnl  if test x$have_jack = xtrue ; then
-dnl    AC_SUBST(JACK_LIBS)
-dnl    AC_SUBST(JACK_CFLAGS)
-dnl    AC_DEFINE(HAVE_JACK,,[Compiling with support for Jack])
-dnl  else
-dnl    AC_MSG_WARN([Jack >= 0.981.1 is required, get it at http://jackit.sourceforge.net]);
-dnl  fi
-dnlfi
+if test x$with_jack != xno ; then
+ PKG_CHECK_MODULES(JACK, jack >= 0.98.1 , have_jack=true, have_jack=false)
+ if test x$have_jack = xtrue ; then
+    AC_SUBST(JACK_LIBS)
+    AC_SUBST(JACK_CFLAGS)
+    AC_DEFINE(HAVE_JACK,,[Compiling with support for Jack])
+  else
+    AC_MSG_WARN([Jack >= 0.981.1 is required, get it at http://jackit.sourceforge.net]);
+  fi
 
+dnl **** Check for libsamplerate necessary for bio2jack ****
+PKG_CHECK_MODULES(SAMPLERATE, samplerate >= 0.0.15,
+            ac_cv_samplerate=1, ac_cv_samplerate=0)
+
+AC_DEFINE_UNQUOTED([HAVE_SAMPLERATE],${ac_cv_samplerate},
+            [Set to 1 if you have libsamplerate.])
+
+dnl Make sure libsamplerate is found, we can't compile without it
+if test "${ac_cv_samplerate}" = 0
+then
+  AC_MSG_ERROR([Could not find libsamplerate, see that you have libsamplerate-dev or libsamplerate0-dev installed.])
+else
+have_samplerate=true
+fi
+
+AC_SUBST(SAMPLERATE_CFLAGS)
+AC_SUBST(SAMPLERATE_LIBS)
+
+
+fi
+have_unicap=false
+PKG_CHECK_MODULES( UNICAP, libunicap >= 1.14.1,
+		ac_cv_unicap=1, ac_cv_unicap=0)
+
+AC_DEFINE_UNQUOTED([HAVE_UNICAP], ${ac_cv_unicap},
+	[ Set to 1 if you have unicap.])
+
+if test "${ac_cv_unicap}" = 0
+then
+  AC_MSG_ERROR([Could not find libunicap, see that you have libunicap-dev installed.])
+else
+have_unicap=true
+fi
+
+AC_SUBST(UNICAP_CFLAGS)
+AC_SUBST(UNICAP_LIBS)
 
 
 dnl ********************************************************************
@@ -702,14 +737,14 @@ fi
 AC_MSG_RESULT($warnCFLAGS)
 AC_MSG_RESULT($warnCXXFLAGS)
 
-CFLAGS="$ARCHFLAGS $CFLAGS -std=c99"
+CFLAGS="$ARCHFLAGS $CFLAGS"
 CXXFLAGS="$ARCHFLAGS $CXXFLAGS"
 
 if test "x$cflags_set" != "xyes" ; then
   if test "x$enable_debug" = "xyes" ; then
-  	CFLAGS="$debugCFLAGS $warnCFLAGS -std=c99"
+  	CFLAGS="$debugCFLAGS $warnCFLAGS"
   else
- 	CFLAGS="$CFLAGS $warnCFLAGS -std=c99"
+ 	CFLAGS="$CFLAGS $warnCFLAGS"
   fi
   CXXFLAGS="$CXXFLAGS $warnCXXFLAGS"
   cflags_set=yes
@@ -737,6 +772,7 @@ libvjmem/Makefile
 libplugger/Makefile
 libvjnet/Makefile
 libyuv/Makefile
+libvjaudio/Makefile
 libel/Makefile
 bio2jack/Makefile
 vevosample/Makefile
@@ -797,7 +833,9 @@ AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - MJPEGTools                    : ${have_mjpegtools}])
 AC_MSG_NOTICE([  - SDL Video			 : ${have_sdl}])
 AC_MSG_NOTICE([ Optional dependencies])
-
+AC_MSG_NOTICE([  - unicap			 : ${have_unicap}])
+AC_MSG_NOTICE([  - Jack				 : ${have_jack}])
+AC_MSG_NOTICE([  - Samplerate			 : ${have_samplerate}])
 AC_MSG_NOTICE([  - video4linux                   : ${have_v4l}])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - Jack                          : ${have_jack}])

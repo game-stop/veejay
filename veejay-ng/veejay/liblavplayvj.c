@@ -132,26 +132,24 @@ const	char	*veejay_get_fmt_(int fmt)
  */
 void	veejay_load_video_settings( veejay_t *info, int id )
 {
+	
 	info->current_sample = find_sample(id);
 #ifdef STRICT_CHECKING
 	assert( info->current_sample != NULL );
 #endif
+	sample_video_info_t *svit = info->video_info;
 	video_playback_setup *settings =
 		(video_playback_setup*) info->settings;
-	/*settings->min_frame_num = sample_get_start_pos( info->current_sample );
-	settings->max_frame_num = sample_get_end_pos( info->current_sample );
-	settings->current_frame_num = sample_get_current_pos( info->current_sample );
-	settings->previous_frame_num = 1;*/
+	settings->spvf = 1.0 / svit->fps;
 	settings->msec_per_frame = 1000 / settings->spvf;
-	settings->spas = 0.0;
-	
-	if( sample_has_audio( info->current_sample ))
-	{
-/*		int res = performer_audio_start( info );
-		if(res)
-			settings->spas = 1.0 / (double) sample_get_audio_rate( info->current_sample );	
-*/
-	}
+
+	if(!svit->has_audio)
+		settings->spas = 0.0;
+	else
+		settings->spas = 1.0 / svit->rate;
+	veejay_msg(0, "\tSeconds per video frame = %g",settings->spvf );
+	veejay_msg(0, "\tSeconds per audio sample = %g",settings->spas);
+	veejay_msg(0, "\tRate = %ld", (long) svit->rate );
 }
 
 //! Wait until Software Playback thread has finished
@@ -182,8 +180,6 @@ void veejay_free(veejay_t * info)
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
 
-    veejay_reap_messages();
-    
 //    if(info->display)
 //	x_display_close( info->display );
  
@@ -230,7 +226,7 @@ void veejay_quit(veejay_t * info)
  \return Error code
  */
 int veejay_init_project_from_args( veejay_t *info, int w, int h, float fps, int inter, int norm, int fmt,
-		int audio, int rate, int n_chan, int bits, int display )
+		int audio, int rate, int n_chan, int bps, int display )
 {
 	sample_video_info_t *svit = (sample_video_info_t*) vj_malloc(sizeof( sample_video_info_t ));
 	memset( svit,0,sizeof(sample_video_info_t));
@@ -248,7 +244,14 @@ int veejay_init_project_from_args( veejay_t *info, int w, int h, float fps, int 
 	svit->has_audio = (audio ? 1: 0 );
 	svit->chans = n_chan;
 	svit->rate = rate;
-	svit->bits = bits;
+	svit->bits = 16;
+	svit->bps = bps;
+	
+	veejay_msg(2, "Project settings:");
+	veejay_msg(2, "\tvideo settings: %d x %d, @%2.2f in %s", svit->w,svit->h,svit->fps, (svit->norm ? "NTSC" :"PAL") );
+	veejay_msg(2, "\taudio settings: %ld Hz, %d bits, %d channels, %d bps",
+			svit->rate, svit->bits,svit->chans, svit->bps );
+	
 	info->video_info = (void*) svit;
 #ifdef STRICT_CHECKING
 	assert( info->video_info != NULL );
@@ -262,7 +265,8 @@ int veejay_init_project_from_args( veejay_t *info, int w, int h, float fps, int 
 		veejay_msg(0, "Error initializing EDL cache");
 		return -1;
 	}
-
+	plug_sys_init( svit->fmt,svit->w,svit->h);
+//	plug_sys_set_palette( svit->fmt );
 	return 1;
 }
 
@@ -710,6 +714,28 @@ static	void	veejay_setup_timer(veejay_t *info)
     	}    
 }
 
+int		veejay_load_devices( veejay_t *info )
+{
+	sample_video_info_t *vid_info = info->video_info;
+	
+	int n = vevo_num_devices();
+	int i;
+	for( i = 0; i < n ; i ++ )
+	{
+		void *sample = sample_new( VJ_TAG_TYPE_CAPTURE );
+		if( sample_open( sample, NULL, 0, vid_info ) <= 0 )
+		{
+			if(sample) sample_delete_ptr( sample );
+		}
+		else
+		{
+			samplebank_add_sample( sample );
+		}
+	}
+
+	return 1;
+}
+
 int		veejay_load_samples( veejay_t *info, const char **argv, int n_arg )
 {
 	sample_video_info_t *vid_info = info->video_info;
@@ -719,6 +745,8 @@ int		veejay_load_samples( veejay_t *info, const char **argv, int n_arg )
 	{
 		veejay_msg(2, "No input files given, starting with dummy video");
 		void *sample = sample_new( VJ_TAG_TYPE_COLOR );
+		if( sample_open(sample, NULL, 0, vid_info ) <= 0 )
+			return 0;
 		id = samplebank_add_sample( sample );
 		veejay_load_video_settings(info, id );	
 		return 1;
@@ -894,6 +922,8 @@ void	veejay_playback_status( veejay_t *info )
 	}
 	//sample_sprintf_port( info->current_sample);
 }
+
+
 /******************************************************
  * veejay_playback_cycle()
  *   the playback cycle
@@ -916,8 +946,27 @@ static void veejay_playback_cycle(veejay_t * info)
     long ts, te;
 
     sample_video_info_t *vid_info = (sample_video_info_t*) info->video_info;
-    performer_queue_audio_frame( info );
-    performer_queue_video_frame( info, 0 );
+
+    if( sample_has_audio( info->current_sample ))
+	{
+		
+		long rate = performer_audio_start(info);
+		if( rate > 0 )
+		{
+			vid_info->audio = 1;
+			vid_info->has_audio = 1;
+			settings->spas = 1.0 / (double) rate;
+			stats.audio =1;
+		}
+		else
+		{
+			info->audio = NO_AUDIO;
+			vid_info->audio = 0;
+			stats.audio = 0;
+		}
+	}
+
+    performer_queue_audio_frame( info, 0 );
 
     if (performer_queue_frame(info, 0) != 0)
     {
@@ -929,27 +978,12 @@ static void veejay_playback_cycle(veejay_t * info)
     stats.norm = vid_info->norm;
     nvcorr = 0;
     
-    if(vid_info->has_audio && vid_info->audio == AUDIO_PLAY)
-    {
-	    stats.audio = 1;
-
-//   if (el->has_audio && info->audio == AUDIO_PLAY) {
-//	if (vj_perform_audio_start(info)) {
-//	    stats.audio = 1;
-//	} else {
-//	    veejay_msg(VEEJAY_MSG_ERROR, "Could not start Audio Task");
-//	}
-  //  }
- /* Queue the buffers read, this triggers video playback */
-  
-    }
-  
     frame_number[0] = sample_get_current_pos( info->current_sample );
-    //settings->current_frame_num;
+
     veejay_mjpeg_queue_buf(info, 0, 1);
     
     stats.nqueue = 1;
-
+	int last_id = sample_get_key_ptr( info->current_sample);
     while (settings->state != VEEJAY_STATE_STOP)
     {
 	first_free = stats.nsync;
@@ -985,23 +1019,23 @@ static void veejay_playback_cycle(veejay_t * info)
 	} while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (1 - 1));
 
 #ifdef HAVE_JACK
-	if ( el->has_audio && info->audio==AUDIO_PLAY ) {
-	    //audio_get_output_status(&audio_tmstmp, &(stats.num_asamps),
-		//			    &(stats.num_aerr));
+	if (stats.audio ) {
 	   struct timeval audio_tmstmp;	
 	   long int sec=0;
 	   long int usec=0;
 	   long num_audio_bytes_written = vj_jack_get_status( &sec,&usec);
 	   audio_tmstmp.tv_sec = sec;
 	   audio_tmstmp.tv_usec = usec;
-	   if (audio_tmstmp.tv_sec)
+	  if (audio_tmstmp.tv_sec)
           {
-             tdiff1 = settings->spvf * (stats.nsync - nvcorr) -
-                settings->spas * num_audio_bytes_written;
-             tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) +
+     		  tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) +
                 (bs.timestamp.tv_usec - audio_tmstmp.tv_usec) * 1.e-6;
-          }
 
+	      tdiff1 = settings->spvf * (stats.nsync - nvcorr) -
+                settings->spas * num_audio_bytes_written;
+
+ 	  }
+	
 	}
 #endif
 	stats.tdiff = tdiff1 - tdiff2;
@@ -1011,7 +1045,6 @@ static void veejay_playback_cycle(veejay_t * info)
 	    skipv = 0;
 	    skipa = 0;
 	    skipi = 0;
- 
 	    if (info->sync_correction) {
 		if (stats.tdiff > settings->spvf) {
 		    /* Video is ahead audio */
@@ -1039,22 +1072,27 @@ static void veejay_playback_cycle(veejay_t * info)
 	    /* Read one frame, break if EOF is reached */
 	    // actually measure duration of render in ms */
 	    frame = n % 1;
-
 	    frame_number[frame] = sample_get_current_pos( info->current_sample );
+
 	    settings->buffer_entry[frame] = 
 		    sample_get_current_pos( info->current_sample );
-
+	  
 	    sample_cache_data( info->current_sample );
 	    
-	    if (!skipa) 
-			performer_queue_audio_frame(info);
-
-	    if (!skipv)
-			performer_queue_video_frame(info,skipi);
-  
+	    vj_jack_continue( sample_get_speed(info->current_sample) );
+		     
+	    performer_queue_audio_frame(info,skipa);	    
+		
 	    performer_queue_frame(info,skipi);
-
+	
 	    sample_save_cache_data( info->current_sample );
+	    int cur_id = sample_get_key_ptr( info->current_sample);
+	    if( cur_id != last_id )
+	    {
+		last_id = cur_id;
+		performer_audio_restart(info);
+	    }	
+		//@ and restart performer on sample switch!
 	    
 	    if(skipv) continue;
 	    
@@ -1067,16 +1105,14 @@ static void veejay_playback_cycle(veejay_t * info)
 	    stats.nqueue++;
 	    n++;
 	}
-	if (vid_info->has_audio && (vid_info->audio==AUDIO_PLAY))
+	if (vid_info->has_audio)
 	    stats.audio = settings->audio_mute ? 0 : 1;
 	stats.stats_changed = 0;
     }
 
   FINISH:
 
-   // if (vid_info->audio==AUDIO_PLAY)
-//	vj_perform_audio_stop(info);
-	veejay_msg(0, "TODO: audio stop");
+	performer_audio_stop(info);
 }
 
 /******************************************************

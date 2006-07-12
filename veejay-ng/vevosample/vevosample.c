@@ -25,8 +25,6 @@
  *     -# Edit Descision Lists
  *     -# MJPEG avi file(s)
  *     -# YUV4MPEG stream
- *     -# DV1394 Digital Camera
- *     -# V4L Video4Linux 
  *     -# Source generator (solid color)
  */
 #ifdef STRICT_CHECKING
@@ -49,13 +47,8 @@
 #include	<vevosample/vevosample.h>
 #include	<libplugger/plugload.h>
 #include	<libvjnet/vj-client.h>
-#include	<vevosample/v4lutils.h>
-#ifdef HAVE_DV1394
-#include	<vevosample/vj-dv1394.h>
-#endif
-#include	<vevosample/vj-v4lvideo.h>
-#include	<vevosample/vj-vloopback.h>
 #include	<vevosample/vj-yuv4mpeg.h>
+#include	<libvjaudio/audio.h>
 #ifdef USE_GDK_PIXBUF
 #include	<libel/pixbuf.h>
 #endif
@@ -83,7 +76,7 @@ static	int	num_samples_ = 0;				/* total count of samples */
 static	int	free_slots_[SAMPLE_LIMIT];				/* deleted sample id's */
 
 static	void	*sample_bank_ = NULL;				/* root of samplebank */
-
+static	void	*unicap_data_ = NULL;
 
 //! \typedef sampleinfo_t Sample A/V Information structure
 typedef struct
@@ -92,13 +85,20 @@ typedef struct
 	uint64_t	end_pos;	//!< Ending position 
 	int		looptype;	//!< Looptype
 	int		speed;		//!< Playback speed
+	int		repeat;	
 	uint64_t	in_point;	//!< In point (overrides start_pos)
 	uint64_t	out_point;	//!< Out point (overrides end_pos)
 	uint64_t	current_pos;	//!< Current position
 	int		marker_lock;	//!< Keep in-out point length constant
 	int		rel_pos;	//!< Relative position
 	int		has_audio;	//!< Audio available
+	int		repeat_count;
 	int		type;		//!< Type of Sample
+	uint64_t	rate;		//!< AudioRate
+	double		fps;		//!< Frame rate of Sample
+	int		bps;
+	int		bits;
+	int		channels;
 } sampleinfo_t;
 
 //! \typedef sample_runtime_data Sample Runtime Data structure
@@ -153,6 +153,7 @@ static struct
 	{	"start_pos",	VEVO_ATOM_TYPE_UINT64	},	/* Starting position */
 	{	"end_pos",	VEVO_ATOM_TYPE_UINT64	},	/* Ending position */
 	{	"speed",	VEVO_ATOM_TYPE_INT	},	/* Trickplay, speed */
+	{	"repeat",	VEVO_ATOM_TYPE_INT	},
 	{	"current_pos",  VEVO_ATOM_TYPE_UINT64	},	/* Current position */
 	{	"fps",		VEVO_ATOM_TYPE_DOUBLE	},	/* video fps */
 	{	"looptype",	VEVO_ATOM_TYPE_INT	},	/* Loop type , normal, pingpong or none */
@@ -232,7 +233,7 @@ static	struct
 {
 	const char *name;
 	int atom_type;
-} stream_v4l_list[] = {
+} stream_capture_list[] = {
 	{	"device",	VEVO_ATOM_TYPE_STRING	},
 	{	"channel",	VEVO_ATOM_TYPE_INT	},
 	{	NULL,		0			}
@@ -255,16 +256,6 @@ static	struct
 } stream_mcast_list[] = {
 	{	"hostname",	VEVO_ATOM_TYPE_STRING	},
 	{	"port",		VEVO_ATOM_TYPE_INT	},
-	{	NULL,		0			}
-};
-
-static	struct
-{
-	const char *name;
-	int	atom_type;
-} stream_dv1394_list[] = {
-	{	"device",	VEVO_ATOM_TYPE_STRING	},
-	{	"channel",	VEVO_ATOM_TYPE_INT	},
 	{	NULL,		0			}
 };
 
@@ -830,6 +821,11 @@ void	 sample_get_property( int id, const char *key, void *dst )
 	if(info)
 		vevo_property_get( info->info_port, key, 0, dst );	
 }
+void	 sample_get_property_ptr( void *ptr, const char *key, void *dst )
+{
+	sample_runtime_data *info = (sample_runtime_data*) ptr;
+	vevo_property_get( info->info_port, key, 0, dst );	
+}
 
 static int	sample_new_ext(void *info )
 {
@@ -858,9 +854,9 @@ static int	sample_new_stream(void *info, int type )
 			for(i = 0 ; stream_color_list[i].name != NULL ; i ++ )
 				vevo_property_set( info, stream_color_list[i].name, stream_color_list[i].atom_type, 1, &v );
 			break;
-		case	VJ_TAG_TYPE_V4L:
-			for( i = 0 ; stream_v4l_list[i].name != NULL; i ++ )
-				vevo_property_set( info, stream_v4l_list[i].name, stream_v4l_list[i].atom_type, 0, NULL );
+		case	VJ_TAG_TYPE_CAPTURE:
+			for( i = 0 ; stream_capture_list[i].name != NULL; i ++ )
+				vevo_property_set( info, stream_capture_list[i].name, stream_capture_list[i].atom_type, 0, NULL );
 			break;
 		case	VJ_TAG_TYPE_YUV4MPEG:
 			for( i = 0; stream_file_list[i].name != NULL; i ++ )
@@ -874,12 +870,6 @@ static int	sample_new_stream(void *info, int type )
 			for( i = 0; stream_mcast_list[i].name != NULL; i ++ )
 				vevo_property_set( info, stream_mcast_list[i].name, stream_mcast_list[i].atom_type,0,NULL);
 			break;
-#ifdef HAVE_DV1394
-		case	VJ_TAG_TYPE_DV1394:
-			for( i = 0; stream_dv1394_list[i].name != NULL; i ++ )
-				vevo_property_set( info, stream_dv1394_list[i].name, stream_dv1394_list[i].atom_type,0,NULL);
-			break;
-#endif
 		default:
 #ifdef STRICT_CHECKING
 			assert(0);
@@ -900,7 +890,7 @@ const	char	*sample_describe_type( int type )
 		case	VJ_TAG_TYPE_COLOR:
 			return "Solid Color stream";
 			break;
-		case	VJ_TAG_TYPE_V4L:
+		case	VJ_TAG_TYPE_CAPTURE:
 			return "Video4Linux stream";
 			break;
 		case	VJ_TAG_TYPE_YUV4MPEG:
@@ -915,10 +905,6 @@ const	char	*sample_describe_type( int type )
 		case 	VJ_TAG_TYPE_NONE:
 			return "AVI Sample";
 			break;
-#ifdef HAVE_DV1394
-		case	VJ_TAG_TYPE_DV1394:
-			break;
-#endif
 		default:
 			break;	
 	}
@@ -1072,12 +1058,22 @@ void	*sample_new( int type )
 	return res;
 }
 
+int	vevo_num_devices()
+{
+	return vj_unicap_num_capture_devices( unicap_data_ );
+}
+
 void	samplebank_init()
 {
 	sample_bank_ = (void*) vevo_port_new( VEVO_SAMPLE_BANK_PORT );
 #ifdef STRICT_CHECKING
 	veejay_msg(2,"VEVO Sampler initialized. (max=%d)", SAMPLE_LIMIT );
 #endif
+
+	unicap_data_ = (void*) vj_unicap_init();
+#ifdef STRICT_CHECKING
+	assert( unicap_data_ != NULL );
+#endif	
 }
 
 void	samplebank_free()
@@ -1106,7 +1102,8 @@ void	samplebank_free()
 	port_frees_ ++;
 #endif*/
 	num_samples_ = 0;
-	veejay_msg(2, "Shutting down VEVO Sampler");
+
+	vj_unicap_deinit( unicap_data_ );
 }
 
 
@@ -1160,12 +1157,14 @@ int	sample_open( void *sample, const char *token, int extra_token , sample_video
 {
 //	void *info = find_sample(id);
 	int	res = 0;
+	int	n_samples = 0;
 	int 	my_palette = 0;
 	if(!sample)
 		return 0;
 
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
-
+	sampleinfo_t *sit = srd->info;
+			
 	switch(srd->type)
 	{
 		case VJ_TAG_TYPE_NONE:
@@ -1189,27 +1188,47 @@ int	sample_open( void *sample, const char *token, int extra_token , sample_video
 			//	return 0;
 			}
 			vj_el_setup_cache( srd->data );
-			sampleinfo_t *sit = srd->info;
 			sit->end_pos = vj_el_get_num_frames(srd->data);
 			sit->looptype = 1;
 			sit->speed = 1;
+			sit->repeat = 0;
+			sit->fps = (double) vj_el_get_fps(srd->data);
+			sit->has_audio = vj_el_get_audio_rate( srd->data ) > 0 ? 1:0;
+			sit->rate = (uint64_t) vj_el_get_audio_rate( srd->data );
+			sit->bits = vj_el_get_audio_bits( srd->data );
+			sit->bps = vj_el_get_audio_bps( srd->data );
+			sit->channels = vj_el_get_audio_chans( srd->data );
+			n_samples = sit->rate / sit->fps;
 			sample_set_property_ptr( sample, "end_pos", VEVO_ATOM_TYPE_INT, &(sit->end_pos));
 			sample_set_property_ptr( sample, "looptype",VEVO_ATOM_TYPE_INT, &(sit->looptype));
 			sample_set_property_ptr( sample, "speed", VEVO_ATOM_TYPE_INT,&(sit->speed));
+			sample_set_property_ptr( sample, "fps", VEVO_ATOM_TYPE_DOUBLE,&(sit->fps) );
+			sample_set_property_ptr( sample, "has_audio", VEVO_ATOM_TYPE_INT, &(sit->has_audio) );
+			sample_set_property_ptr( sample, "rate", VEVO_ATOM_TYPE_UINT64, &(sit->rate));
+			sample_set_property_ptr( sample, "repeat", VEVO_ATOM_TYPE_INT, &(sit->repeat));
+			sample_set_property_ptr( sample, "bps", VEVO_ATOM_TYPE_INT, &(sit->bps));
+			sample_set_property_ptr( sample, "bits", VEVO_ATOM_TYPE_INT, &(sit->bits));
+			sample_set_property_ptr( sample, "channels", VEVO_ATOM_TYPE_INT,&(sit->channels));
+			sample_set_property_ptr( sample, "audio_spas", VEVO_ATOM_TYPE_INT, &n_samples);
+			
 			break;
 
-		case VJ_TAG_TYPE_V4L:
-			srd->data = (void*) vj_v4lvideo_alloc();
-			res = vj_v4lvideo_init(
-				(v4l_video*) srd->data,
-				token,
-				extra_token,
-				project_settings->norm, // NOTE: THIS IS PROBABLY CHAR
-				0,
-				project_settings->w,
-				project_settings->h,
-				project_settings->fmt ); // NOTE THIS SHOULD BE PALETTE, convert to V4L palette in v4l componenet!
-			//	my_palette );
+		case VJ_TAG_TYPE_CAPTURE:
+			srd->data = vj_unicap_new_device( unicap_data_,
+						extra_token );
+			if(!vj_unicap_configure_device( srd->data,
+						project_settings->fmt,
+						project_settings->w,
+						project_settings->h ))
+			{
+				veejay_msg(0, "Unable to configure device %d", extra_token);
+				vj_unicap_free_device( srd->data );
+				return NULL;
+			}
+			res=1;
+			sit->speed = 1;
+			sample_set_property_ptr( sample, "speed", VEVO_ATOM_TYPE_INT,&(sit->speed));
+			
 			break;
 		case VJ_TAG_TYPE_NET:
 			srd->data = (void*) vj_client_alloc( project_settings->w,project_settings->h, project_settings->fmt );
@@ -1226,11 +1245,6 @@ int	sample_open( void *sample, const char *token, int extra_token , sample_video
 			if(!res)
 				vj_yuv4mpeg_free( srd->data );
 			break;
-#ifdef HAVE_DV1394
-		case VJ_TAG_TYPE_DV1394:
-	//		srd->data = (void*) vj_dv1394_init( (void*)el, extra_token,1 ); // DV1394 componenet like YUV and V4L comp.
-			break;
-#endif
 #ifdef USE_GDK_PIXBUF
 		case VJ_TAG_TYPE_PICTURE:
 			if( vj_picture_probe ( token )  )
@@ -1239,6 +1253,35 @@ int	sample_open( void *sample, const char *token, int extra_token , sample_video
 			break;
 #endif
 		case VJ_TAG_TYPE_COLOR:
+			sit->fps = (double) project_settings->fps;
+			sit->has_audio = project_settings->has_audio;
+			sit->rate = (uint64_t) project_settings->rate;
+			sit->bits = project_settings->bits;
+			sit->bps = project_settings->bps;
+			sit->channels = project_settings->chans;
+			srd->data = vj_audio_init( 16384 * 100, sit->channels, 0 );
+			sit->speed = 1;
+			sit->end_pos = 32;
+			sit->looptype = 1;
+
+			double freq = 200.94;
+			double amp = 5.0;
+			n_samples = vj_audio_gen_tone( srd->data, 0.04 , sit->rate,freq,amp );
+			veejay_msg(2, "Generated tone of %d samples. Freq %2.2f. Amplitude %2.2f", n_samples,freq,amp);
+
+
+			uint64_t rate = (uint64_t) project_settings->rate;
+			sample_set_property_ptr( sample, "rate", VEVO_ATOM_TYPE_UINT64, &(sit->rate));
+			sample_set_property_ptr( sample, "has_audio", VEVO_ATOM_TYPE_INT, &(sit->has_audio ));
+			sample_set_property_ptr( sample, "bps", VEVO_ATOM_TYPE_INT, &(sit->bps));
+			sample_set_property_ptr( sample, "bits", VEVO_ATOM_TYPE_INT, &(sit->bits));
+			sample_set_property_ptr( sample, "channels", VEVO_ATOM_TYPE_INT,&(sit->channels));
+			sample_set_property_ptr( sample, "audio_spas", VEVO_ATOM_TYPE_INT, &n_samples);
+			sample_set_property_ptr( sample, "speed", VEVO_ATOM_TYPE_INT, &(sit->speed));
+			sample_set_property_ptr( sample, "end_pos", VEVO_ATOM_TYPE_INT, &(sit->end_pos));
+			sample_set_property_ptr( sample, "looptype",VEVO_ATOM_TYPE_INT, &(sit->looptype));
+
+			res = 1;
 			break;
 	}
 	return res;
@@ -1276,9 +1319,27 @@ int	sample_append_file( const char *filename, long n1, long n2, long n3 )
 	return 1;
 }
 
+int	sample_get_audio_properties( void *current_sample, int *bits, int *bps, int *num_chans, long *rate )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) current_sample;
+	sampleinfo_t *sit = srd->info;
+		
+	*rate = (long) sit->rate;
+	*bits  = sit->bits;
+	*bps   = sit->bps;
+	*num_chans = sit->channels;
+	return 1;
+}
+
 int	sample_edl_copy( void *current_sample, uint64_t start, uint64_t end )
 {
 	sample_runtime_data *srd = (sample_runtime_data*) current_sample;
+	if(srd->type != VJ_TAG_TYPE_NONE )
+	{
+		veejay_msg(0, "This sample has no EDL");
+		return 0;
+	}
+
 	uint64_t n = vj_el_get_num_frames( srd->data );
 	if( start < 0 || start >= n || end < 0 || end >= n )
 	{
@@ -1316,6 +1377,12 @@ int	sample_edl_copy( void *current_sample, uint64_t start, uint64_t end )
 int	sample_edl_delete( void *current_sample, uint64_t start, uint64_t end )
 {
 	sample_runtime_data *srd = (sample_runtime_data*) current_sample;
+	if(srd->type != VJ_TAG_TYPE_NONE )
+	{
+		veejay_msg(0, "This sample has no EDL");
+		return 0;
+	}
+
 	uint64_t n = vj_el_get_num_frames( srd->data );
 	if( start < 0 || start >= n || end < 0 || end >= n )
 	{
@@ -1340,6 +1407,11 @@ int	sample_edl_delete( void *current_sample, uint64_t start, uint64_t end )
 int	sample_edl_paste_from_buffer( void *current_sample, uint64_t insert_at )
 {
 	sample_runtime_data *srd = (sample_runtime_data*) current_sample;
+	if(srd->type != VJ_TAG_TYPE_NONE )
+	{
+		veejay_msg(0, "This sample has no EDL");
+		return 0;
+	}
 
 	void *prevlist = NULL;
 	if( vevo_property_get( srd->info_port, "edl_buffer", 0, &prevlist ) != VEVO_NO_ERROR )
@@ -1432,8 +1504,16 @@ void	sample_increase_frame( void *current_sample )
 		return;
 	}
 
-	uint64_t cf = sit->current_pos + sit->speed;
 
+	
+	uint64_t cf = sit->current_pos;
+	if(sit->repeat_count > 0)
+		sit->repeat_count --;
+	else	
+	{
+		cf += sit->speed;
+		sit->repeat_count = sit->repeat;
+	}
 	sit->current_pos = cf;	
 
 	if(sit->speed >= 0 )	
@@ -1541,7 +1621,41 @@ static	void	sample_produce_frame( sample_runtime_data *srd, VJFrame *slot )
 	memset( slot->data[1], u, slot->uv_len );
 	memset( slot->data[2], v, slot->uv_len );	
 }
+int	sample_get_audio_frame( void *current_sample, void *buffer, int n_packets )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) current_sample;
+	sampleinfo_t *sit = srd->info;
+	int tmp = 0;	
+	int error = 0;
+#ifdef STRICT_CHECKING
+	assert( srd->info );
+#endif
+	long frame_num = srd->info->current_pos;
+	void *ptr = NULL;
 
+	switch(srd->type)
+	{
+		case VJ_TAG_TYPE_NONE:
+#ifdef STRICT_CHECKING
+			assert( srd->data != NULL );
+#endif
+			return vj_el_get_audio_frame ( srd->data, frame_num,buffer, n_packets);
+			break;
+		case VJ_TAG_TYPE_COLOR:
+			
+				error = vevo_property_get( srd->info_port, "audio_spas",0,&tmp);
+#ifdef STRICT_CHECKING
+				assert( error == VEVO_NO_ERROR );
+#endif
+				return vj_audio_noise_pack( srd->data, buffer , tmp, sit->bps, n_packets );
+			break;
+
+		default:
+			
+			break;
+	}
+	return 0;
+}
 int	sample_get_frame( void *current_sample , VJFrame *slot )
 {
 	sample_runtime_data *srd = (sample_runtime_data*) current_sample;
@@ -1562,7 +1676,9 @@ int	sample_get_frame( void *current_sample , VJFrame *slot )
 #endif
 			vj_el_get_video_frame ( srd->data, frame_num,slot);
 			break;
-		case VJ_TAG_TYPE_V4L:
+		case VJ_TAG_TYPE_CAPTURE:
+			vj_unicap_grab_frame( srd->data, (void*) slot );
+
 			break;
 		case VJ_TAG_TYPE_NET:
 			break;
@@ -1594,17 +1710,12 @@ static	void	sample_close( sample_runtime_data *srd )
 		case VJ_TAG_TYPE_NONE:
 			vj_el_free( srd->data );
 			break;
-		case VJ_TAG_TYPE_V4L:
-			vj_v4l_video_grab_stop( srd->data );
+		case VJ_TAG_TYPE_CAPTURE:
+			vj_unicap_free_device( srd->data );
 			break;
 		case VJ_TAG_TYPE_YUV4MPEG:
 			vj_yuv_stream_stop_read( srd->data );
 			break;
-#ifdef HAVE_DV1394
-		case VJ_TAG_TYPE_DV1394:
-			vj_dv1394_close( srd->data );
-			break;
-#endif
 #ifdef USE_GDK_PIXBUF
 		case VJ_TAG_TYPE_PICTURE:
 			//vj_picture_cleanup( 
@@ -1810,12 +1921,12 @@ static int	sample_identify_xml_token( int sample_type, const unsigned char *name
 			if( strcasecmp( (const char*) name, stream_property_list[i].name ) == 0 )
 				return stream_property_list[i].atom_type;
 		}
-		if( sample_type == VJ_TAG_TYPE_V4L )
+		if( sample_type == VJ_TAG_TYPE_CAPTURE )
 		{
-			for( i = 0; stream_v4l_list[i].name != NULL ; i ++ )
+			for( i = 0; stream_capture_list[i].name != NULL ; i ++ )
 			{
-				if( strcasecmp( (const char*) name, stream_v4l_list[i].name ) == 0 )
-					return stream_v4l_list[i].atom_type;
+				if( strcasecmp( (const char*) name, stream_capture_list[i].name ) == 0 )
+					return stream_capture_list[i].atom_type;
 			}
 		}
 		if( sample_type == VJ_TAG_TYPE_NET )
@@ -1834,16 +1945,6 @@ static int	sample_identify_xml_token( int sample_type, const unsigned char *name
 					return stream_mcast_list[i].atom_type;
 			}
 		}
-#ifdef HAVE_DV1394
-		if( sample_type == VJ_TAG_TYPE_DV1394 )
-		{
-			for( i = 0; stream_dv1394_list[i].name != NULL ; i ++ )
-			{
-				if( strcasecmp( (const char*) name, stream_dv1394_list[i].name ) == 0 )
-					return stream_dv1394_list[i].atom_type;
-			}
-		}
-#endif
 		if( sample_type == VJ_TAG_TYPE_COLOR )
 		{
 			for( i = 0; stream_color_list[i].name != NULL ; i ++ )
@@ -2011,12 +2112,6 @@ static void	sample_get_position_info(void *port , uint64_t *start, uint64_t *end
 	vevo_property_get( port, "looptype",0, loop );
 	vevo_property_get( port, "speed",0,speed );
 }
-static	void	sample_get_position_loop(void *port, int start, int end)
-{
-	double fps = 0.0;
-	vevo_property_get( port, "fps",0,&fps );
-	
-}
 void	sample_cache_data( void *info )
 {
 #ifdef STRICT_CHECKING
@@ -2032,7 +2127,10 @@ void	sample_cache_data( void *info )
 	vevo_property_get( srd->info_port, "current_pos",0,&(sit->current_pos));
 	vevo_property_get( srd->info_port, "in_point",0,&(sit->in_point));
 	vevo_property_get( srd->info_port, "out_point",0,&(sit->out_point));
-
+	vevo_property_get( srd->info_port, "fps",0,&(sit->fps));
+	vevo_property_get( srd->info_port, "has_audio",0,&(sit->has_audio));
+	vevo_property_get( srd->info_port, "rate",0,&(sit->rate));
+	vevo_property_get( srd->info_port, "repeat",0,&(sit->repeat));
 //	veejay_msg(0, "start %d - end %d - speed %d - loop %d - position %d -  in %d - out %d",
 //			sit->start_pos,sit->end_pos,sit->speed,sit->looptype,sit->current_pos,
 //			sit->in_point, sit->out_point );
@@ -2056,8 +2154,10 @@ void		sample_save_cache_data( void *info)
 	vevo_property_set( srd->info_port, "current_pos", VEVO_ATOM_TYPE_UINT64,1,&(sit->current_pos));
 	vevo_property_set( srd->info_port, "in_point",VEVO_ATOM_TYPE_UINT64,1,&(sit->in_point));
 	vevo_property_set( srd->info_port, "out_point",VEVO_ATOM_TYPE_UINT64,1,&(sit->out_point));
-
-
+	vevo_property_set( srd->info_port, "fps", VEVO_ATOM_TYPE_DOUBLE,1,&(sit->fps));
+	vevo_property_set( srd->info_port, "has_audio", VEVO_ATOM_TYPE_INT,1,&(sit->has_audio));
+	vevo_property_set( srd->info_port, "rate", VEVO_ATOM_TYPE_UINT64,1,&(sit->rate));
+	vevo_property_set( srd->info_port, "repeat",VEVO_ATOM_TYPE_INT,1,&(sit->repeat));
 }
 
 int	sample_valid_speed(void *sample, int new_speed)
@@ -2077,6 +2177,21 @@ int	sample_valid_pos(void *sample, uint64_t pos)
 		return 1;
 	return 0;
 }
+
+uint64_t	sample_get_audio_rate( void *sample )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	sampleinfo_t *sit = srd->info;
+	return sit->rate;
+}
+
+double		sample_get_fps( void *sample )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	sampleinfo_t *sit = srd->info;
+	return sit->fps;
+}
+
 uint64_t	sample_get_start_pos( void *sample )
 {
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
@@ -2094,6 +2209,18 @@ int	sample_get_speed( void *sample )
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
 	sampleinfo_t *sit = srd->info;
 	return sit->speed;
+}
+int	sample_get_repeat( void *sample )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	sampleinfo_t *sit = srd->info;
+	return sit->repeat;
+}
+int	sample_get_repeat_count( void *sample )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	sampleinfo_t *sit = srd->info;
+	return sit->repeat_count;
 }
 uint64_t	sample_get_current_pos( void *sample )
 {

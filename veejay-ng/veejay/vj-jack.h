@@ -21,9 +21,8 @@
 
 #include <config.h>
 #ifdef HAVE_JACK
-#include <libel/vj-el.h>
 
-int vj_jack_init(editlist *el);
+int vj_jack_init(int bps, int chans, long rate);
 
 int vj_jack_update_buffer( uint8_t *buff, int bps, int num_channels, int buf_len);
 

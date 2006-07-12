@@ -34,11 +34,14 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
-#define PERFORM_AS 16384
+#define PERFORM_AUDIO_SIZE 16384
 #define PERFORM_FX 20
 #define PERFORM_NS 10
 
-
+#ifdef HAVE_JACK
+#include <veejay/vj-bjack.h>
+#include <libvjaudio/audio.h>
+#endif
 #include <ffmpeg/avutil.h>
 /** \defgroup performer Performer
  *
@@ -75,8 +78,6 @@
 //! \typedef performer_t Performer runtime data
 typedef struct
 {
-//	ReSampleContext *audio_resampler[PERFORM_NS];
-//	ReSampleContext *jack_resampler;
 	uint8_t **frame_buffer;			//<<! Linear buffer, locked in RAM
 	VJFrame **ref_buffer;			//<<! Chunks, pointers to frame_buffer
 	VJFrame *out_buffers[2];		//<<! Temporary output buffer if a Plugin requires one
@@ -87,8 +88,9 @@ typedef struct
 	VJFrame *display;
 	void	*in_frames;			//<<! Port, list of frames needed for this cycle
 	void	*out_frames;			//<<! Port, list of output frames accumulated
-	uint8_t *audio_buffers[PERFORM_FX];	//<<! Linear buffer, locked in RAM
-	uint8_t *tmp_buffers;			//<<! Audio processing buffers, locked in RAM
+	uint8_t *audio_buffer;
+	AFrame **audio_buffers;		//<<! Linear buffer, locked in RAM
+	void	*resampler;
 	void 	*sampler;			//<<! YUV sampler
 	int	sample_mode;
 	int	n_fb;				//<<! Maximum number of Chunks
@@ -176,31 +178,28 @@ void	*performer_init( veejay_t *info, const int max_fb )
 	p->n_fb = max_fb;
 	p->ref_buffer = (VJFrame**) vj_malloc(sizeof(VJFrame*) * p->n_fb);
 	p->fx_buffer  = (VJFrame**) vj_malloc(sizeof(VJFrame*) * SAMPLE_CHAIN_LEN );
+#ifdef HAVE_JACK
+	p->audio_buffers = (AFrame**) vj_malloc(sizeof(AFrame*) * 3);
+	p->audio_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * PERFORM_AUDIO_SIZE * 32 *3);
+	memset( p->audio_buffer, 0, sizeof(uint8_t) * PERFORM_AUDIO_SIZE * 32*3 );
+#endif
 	p->frame_buffer = (uint8_t**) vj_malloc(sizeof(uint8_t*) * p->n_fb );
 	p->sampler = subsample_init( svit->w );
-	p->audio_buffers[0] =
-		(uint8_t*) vj_malloc(sizeof(uint8_t) * 2 * PERFORM_AS );
-	memset( p->audio_buffers[0],0, sizeof(uint8_t) * 2 * PERFORM_AS );
 	
-	p->tmp_buffers =
-		(uint8_t*) vj_malloc(sizeof(uint8_t) * 10 * PERFORM_AS );
-	memset( p->tmp_buffers, 0, sizeof(uint8_t) * 10 * PERFORM_AS );
-
-	/*#ifdef HAVE_JACK
-	for( i = 2; i < PERFORM_NS; i ++ )
-	{
-		int rate = info->current_edit_list->audio_rate * i;
-		p->audio_resampler[(i-1)] =
-			audio_resample_init(
-				info->current_edit_list->audio_chans,
-				info->current_edit_list->audio_chans,
-				info->current_edit_list->audio_rate,
-				rate );
-	}
-#endif*/
-
 	size_t tot_len = (size_t) ( svit->w * svit->h * (p->n_fb+5+SAMPLE_CHAIN_LEN)) * sizeof(uint8_t);
 	int error=0;
+
+	size_t audio_offset = 0;
+#ifdef HAVE_JACK
+	for( i = 0; i < 3; i ++ )
+	{
+		p->audio_buffers[i] = (AFrame*) vj_malloc(sizeof(AFrame));
+		memset( p->audio_buffers[i], 0, sizeof(AFrame) );
+		p->audio_buffers[i]->data = p->audio_buffer + audio_offset;
+		audio_offset += (PERFORM_AUDIO_SIZE * 32);
+	}
+#endif
+	
 	for( i = 0; i < 4; i ++ )
 	{
 		p->frame_buffer[i] = (uint8_t*) vj_malloc( tot_len );
@@ -237,6 +236,7 @@ void	*performer_init( veejay_t *info, const int max_fb )
 				p->frame_buffer[3] + offset );
 		offset += (size_t) ( svit->w * svit->h * sizeof(uint8_t));
 	}	
+	
 	p->out_buffers[0] = performer_alloc_frame(
 			info,
 			p->frame_buffer[0] + offset,
@@ -289,6 +289,8 @@ void	*performer_init( veejay_t *info, const int max_fb )
 	char type[100];
 #ifdef HAVE_JACK
 	sprintf(type, "Audio and Video");
+	vj_jack_initialize();
+
 #else
 	sprintf(type, "Video Only");
 #endif
@@ -315,12 +317,100 @@ void	*performer_init( veejay_t *info, const int max_fb )
 			p->sample_mode = SSM_444;
 			break;
 	}
+	
 	veejay_msg(2,"\tProcessing in      :\t%s", nfmat );
 	
-	plug_sys_init( svit->fmt,svit->w,svit->h);
-//	plug_sys_set_palette( svit->fmt );
+
 
 	return (void*) p;
+}
+
+long	performer_audio_start( veejay_t *info )
+{
+#ifdef HAVE_JACK
+	int bps = 0;
+	int chans = 0;
+	long rate = 0;
+	int bits = 0;
+	int error = 0;
+	if(sample_get_audio_properties( 
+			info->current_sample,
+			&bits,
+			&bps,
+			&chans,
+			&rate )<= 0 )
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Sample without Audio");
+		info->audio = NO_AUDIO;
+		return 0;
+	}
+
+	performer_t *p =  info->performer;
+	
+#ifdef STRICT_CHECKING
+	assert( bps > 0 );
+	assert( chans > 0 );
+	assert( rate > 0 );
+	assert( bits > 0 );
+#endif
+	int res = vj_jack_init( bits, chans, rate );
+	if( res <= 0 )
+	{
+		veejay_msg(VEEJAY_MSG_WARNING,
+				"Unable to connect to Jack. Not playing Audio");
+		info->audio = NO_AUDIO;
+	}
+	else
+	{
+		info->audio = AUDIO_PLAY;
+		p->resampler =	vj_audio_init( PERFORM_AUDIO_SIZE * 32 , chans,1 );
+
+	}
+
+	return rate;
+#else
+	return 0;
+#endif
+}
+
+void	performer_audio_continue( veejay_t *info )
+{
+	performer_t *p = info->performer;
+
+	int speed = sample_get_speed( info->current_sample );
+
+	vj_jack_continue( speed );
+}
+
+
+int	performer_audio_stop( veejay_t *info )
+{
+	int i;
+#ifdef HAVE_JACK
+	performer_t *p = info->performer;
+	vj_jack_stop();
+	if(info->audio == AUDIO_PLAY )
+	{
+		vj_audio_free( p->resampler );
+		for( i = 0; i < 3; i ++ )
+		{
+			memset( p->audio_buffers[i]->data, 0, sizeof(uint8_t) * PERFORM_AUDIO_SIZE * 32 );
+		}
+	}
+#endif	
+	info->audio = NO_AUDIO;
+	return 1;
+}
+void	performer_audio_restart( veejay_t *info )
+{
+	int i;
+#ifdef HAVE_JACK
+	performer_t *p = info->performer;
+	for( i = 0; i < 3; i ++ )
+	{
+		memset( p->audio_buffers[i]->data, 0, sizeof(uint8_t) * PERFORM_AUDIO_SIZE * 32 );
+	}
+#endif	
 }
 
 //! Destroy Performer
@@ -333,8 +423,6 @@ void	performer_destroy( veejay_t *info )
 	subsample_free( p->sampler );
   	if(p->in_frames)
                 vevo_port_free( p->in_frames );
-	free( p->audio_buffers[0] );
-	free( p->tmp_buffers );
 	int i;
 	for( i = 0; i < 4; i ++ )
 	{
@@ -345,7 +433,12 @@ void	performer_destroy( veejay_t *info )
 		free( p->ref_buffer[i]);
 	for( i = 0; i < SAMPLE_CHAIN_LEN; i ++ )
 		free( p->fx_buffer[i]);
-
+#ifdef HAVE_JACK
+	free( p->audio_buffer );
+	for( i = 0; i < 3; i ++ )
+		free( p->audio_buffers[i]);
+	free( p->audio_buffers );
+#endif
 	free( p->preview_col );
 	free( p->preview_bw  );
 	free( p->step_buffer );
@@ -371,84 +464,115 @@ void	*performer_get_output_frame( veejay_t *info )
 //	return res;		
 }
 
-//! Reverse all samples in an audio frame
-/**!
- \param info Veejay Object
- \param len Length of audio buffer
- \param buf Pointer to audio buffer
- */
-static	void	performer_reverse_audio_frame( veejay_t *info,int len, uint8_t *buf )
-{
-    int i;
-    //int bps = info->edit_list->audio_bps;
-	int bps = 4;
-    uint8_t sample[bps];
-    int x=len*bps;
-    for( i = 0; i < x/2 ; i += bps )
-    {
-	veejay_memcpy(sample,buf+i,bps);	
-	veejay_memcpy(buf+i ,buf+(x-i-bps),bps);
-	veejay_memcpy(buf+(x-i-bps), sample,bps);
-    }
-}
-
-//! Fill audio buffer with a frame or mute the buffer
-/**!
- \param p Performer Object
- \param info Veejay Object
- \return Length of audio buffer
- */
-static	int	performer_fill_audio_buffer( performer_t *p, veejay_t *info )
-{
-	int speed = sample_get_speed( info->current_sample );
-	int len = 0;
-	if( speed == 0 )
-	{
-	/*	len = info->current_edit_list->audio_rate /
-			info->current_edit_list->video_fps *
-			info->current_edit_list->audio_bps;
-	        veejay_memset( p->audio_buffers[0],
-					0, len );*/
-	
-	}
-	return len;
-}
-
 //! Queue sufficient audio samples for immediate playback
 /**!
  \param info Veejay Object
  \return Error code
  */
-int	performer_queue_audio_frame( veejay_t *info )
+#ifdef HAVE_JACK
+static	uint8_t *performer_fetch_audio_frames( veejay_t *info, int *gen_samples )
 {
-#ifdef HAVE_JACk
-	video_playback_setup *settings = info->settings;
-	long cur_frame	= settings->current_frame_num;
-
 	performer_t *p = info->performer;
+	AFrame *f = p->audio_buffers[0];
+	AFrame *k = p->audio_buffers[1];
+	AFrame *q = p->audio_buffers[2];
+	int n_samples = f->samples;
 
-	if( info->audio == AUDIO_PLAY && el->has_audio)
+	int speed = sample_get_speed(info->current_sample);
+	int res = 0;
+	int has_audio = sample_has_audio( info->current_sample);	
+	if(!has_audio)
 	{
-		if( settings->audio_mute )
-			veejay_memset( p->audio_buffers[0],
-					0, PERFORM_AS );
-					
-		else
+		n_samples = 0;
+	}
+	if( n_samples == 0 )
+	{
+		sample_get_property_ptr(info->current_sample, "audio_spas", &n_samples );
+		if(!has_audio)
 		{
-			performer_fill_audio_buffers( p, info );
+			veejay_msg(0, "%s: Not playing audio, faking samples to 1764");
+			*gen_samples = 1764;
+			memset( f->data,0 , PERFORM_AUDIO_SIZE);
+			return f->data;
 		}
+	}
+		
+	if( speed == 0 )
+	{
+		memset( f->data,0,PERFORM_AUDIO_SIZE );
+	}
+	else
+	{
+		res = sample_get_audio_frame( info->current_sample,f, abs(speed) );
+	}
 
-		if( el->play_rate != el->audio_rate && el->play_rate > 0 )
-		{
-		//	veejay_memcpy( x_audio_buffer, a_buf, num_samples * el->audio_bps);
-		//	int r = audio_resample( resample_jack, (short*)top_audio_buffer,(short*)a_buf, num_samples );
-		//	vj_jack_play( top_audio_buffer, ( r * el->audio_bps ));	
-		}
-		else
-			vj_jack_play( a_buf, (num_samples * el->audio_bps ));
+	uint8_t *out = (speed == 1 || speed == -1 ? f->data : k->data );
+	uint8_t *in  = f->data;
+		
+	if( speed < 0 )
+	{
+		vj_audio_sample_reverse( in, q->data, n_samples, f->bps );
+		in = q->data;
+		out = q->data;
+	}
+
+	int slow = sample_get_repeat( info->current_sample );
+	if( (speed > 1 || speed < -1 || slow) && has_audio)
+	{
+		n_samples = vj_audio_resample_data( p->resampler,
+				in,
+				k->data,
+				f->bps,
+				f->num_chans,
+				abs(speed),
+				slow,
+				f->samples,
+				n_samples );
+		out = k->data;
+	}
+	*gen_samples = n_samples;
+	
+	return out;
+}
+#endif
+
+int	performer_queue_audio_frame( veejay_t *info, int skipa )
+{
+	static uint8_t *buffer_ = NULL;
+	static int	j_samples_ = 0;
+	static int	samples_played_ =0;
+#ifdef HAVE_JACK
+	video_playback_setup *settings = info->settings;
+	sample_video_info_t *svit = (sample_video_info_t*) info->video_info;
+	
+	performer_t *p = info->performer;
+	AFrame *f = p->audio_buffers[0];
+	AFrame *k = p->audio_buffers[1];
+	AFrame *q = p->audio_buffers[2];
+	int res = 0;
+	int n_samples_ = 0;
+	if(info->audio != AUDIO_PLAY)
+		return 1;
+
+	int frame_repeat = sample_get_repeat_count( info->current_sample );
+	int nf		 = sample_get_repeat( info->current_sample );
+	if( frame_repeat == 0 && !skipa)
+	{
+		buffer_ =	performer_fetch_audio_frames( info,  &n_samples_ );
+		j_samples_ = (nf>0 ? n_samples_ / (nf+1) : n_samples_);
+		samples_played_ = 0;
 	}
 	
-	
+	if(nf == 0)
+	{
+		if(!skipa) vj_jack_play( buffer_, f->bps * n_samples_ );
+	}
+
+	if( nf > 0)
+	{
+		if(!skipa) vj_jack_play( buffer_ + (samples_played_ * f->bps), f->bps * j_samples_ );
+		samples_played_ += j_samples_;
+	}
 #endif	
 	return 1;
 }
@@ -459,20 +583,6 @@ int	performer_queue_audio_frame( veejay_t *info )
  \param skip_incr Skip Increment
  \return Error code
  */
-int	performer_queue_video_frame( veejay_t *info , int skip_incr )
-{
-#ifdef STRICT_CHECKING
-	assert( info->current_sample != NULL );
-#endif
-	performer_t *p = (performer_t*) info->performer;
-/*
-	int res = sample_get_frame(
-			info->current_sample,
-			p->ref_buffer[0] );
-	video_playback_setup *settings = info->settings;*/
-//	return res;
-	return 1;
-}
 
 //! Fetch all video frames needed for this run. 
 /**
@@ -726,7 +836,7 @@ static	int	performer_render_entry( veejay_t *info, void *sample, performer_t *p,
 	
 	error = sample_process_fx( sample, i );
 #ifdef STRICT_CHECKING
-	error == VEVO_NO_ERROR;
+	assert(error == VEVO_NO_ERROR);
 #endif
 
 //	subsample_ycbcr_clamp_itu601_copy( out, p->ref_buffer[i] );

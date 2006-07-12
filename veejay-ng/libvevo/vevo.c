@@ -2280,6 +2280,7 @@ int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key
 
 		if( p == NULL )
 		{
+			free(format);
 			return 0;
 		}
 		if( arg[0] != ':' ) 
@@ -2340,6 +2341,7 @@ int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key
 
 	if( error == VEVO_NO_ERROR )
 		done = 1;
+	free(format);
 	return done;
 }
 

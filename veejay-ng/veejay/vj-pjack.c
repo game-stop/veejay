@@ -43,17 +43,31 @@ int vj_jack_initialize()
 }
 static int _vj_jack_start(int *dri)
 {
-	int err = JACK_Open(dri, bits_per_sample,&audio_rate,audio_channels);
-	if(err == ERR_RATE_MISMATCH)
+	const char *port_name = NULL;
+	unsigned long port_flags = JackPortIsPhysical;
+	unsigned int port_count=0;
+	int err = JACK_OpenEx(dri, bits_per_sample,&audio_rate,0,audio_channels, &port_name, port_count, port_flags);
+	switch(err)
 	{
-		veejay_msg(2,
-			"(Jack) Sample rate mismatch (Retrying)");
-
-		err = JACK_Open(dri, bits_per_sample,&audio_rate,
-			audio_channels);
-
-	}
-
+		case ERR_TOO_MANY_OUTPUT_CHANNELS:
+		veejay_msg(0, "(JACK) Too many output channels");
+		break;
+		case ERR_PORT_NAME_OUTPUT_CHANNEL_MISMATCH:
+		veejay_msg(0, "(JACK) Mismatched output channel port name");
+		break;
+		case ERR_BYTES_PER_OUTPUT_FRAME_INVALID:
+		veejay_msg(0, "(JACK) Bytes per output frame invalid");
+		break;
+		case ERR_RATE_MISMATCH:
+		veejay_msg(0, "(JACK) Audio rate mismatch");
+		break;
+		case ERR_OPENING_JACK:
+		veejay_msg(0, "Is the device already used?");
+		break;
+		case ERR_SUCCESS:
+		veejay_msg(2, "Successfully connected to Jackd");
+		break;
+	}		
 	if(err != ERR_SUCCESS)
 	{
 		return 0;
@@ -62,55 +76,37 @@ static int _vj_jack_start(int *dri)
 	return 1;
 }
 
-int vj_jack_init(editlist *el)
+int vj_jack_init(int bits_ps, int audio_chans, int rate)
 {
 	int err;
-	int v_rate = el->audio_rate;
 	int i = 0;
 	int ret = 0;
-	JACK_Init();
-
-	bits_per_sample = 16;
-	audio_channels = el->audio_chans;
-	audio_rate = el->audio_rate;
-
-
-	if( !_vj_jack_start(&driver) )
-		return ret;
 
 	audio_bps = audio_rate * audio_channels;
-
+	audio_rate = rate;
+	audio_channels = audio_chans;
+	bits_per_sample = bits_ps;
 	buffer_len = vj_jack_get_space();
+	if( !_vj_jack_start(&driver) )
+		return 0;
 
-	veejay_msg(2,"Jack:  %d Hz/ %d Channels %d Bit ", audio_rate, audio_channels,bits_per_sample);
 
-	ret = 1;
-
-	if( v_rate != audio_rate )
-	{
-		el->play_rate = audio_rate;               	
-		ret = 2;
-	}
-
-	//JACK_SetState( driver, PLAYING);
-	return ret;
+	veejay_msg(2,"Sample has Audio,  %d Hz/ %d Channels %d Bit ", audio_rate, audio_channels,bits_per_sample);
+	return 1;
 }
 
-int	vj_jack_continue(int speed)
+void	vj_jack_continue(int speed)
 {
 	if(speed==0)
 	{
-		if(JACK_GetState(driver) == PAUSED) return 1;
+		if(JACK_GetState(driver) == PAUSED) return;
 		JACK_SetState(driver, PAUSED );
-		return 1;
 	}
-
+	else
 	if( JACK_GetState(driver) == PAUSED )
 	{
 		JACK_SetState(driver, PLAYING);
-		return 1;
 	}
-	return 0;
 }
 
 
@@ -129,6 +125,7 @@ int	vj_jack_stop()
 
 int	vj_jack_reset()
 {
+	veejay_msg(0, "%s: RESET",__FUNCTION__ );
 	JACK_Reset(driver);
 	buffer_len = 0;
 	return 1;
@@ -172,6 +169,7 @@ long	vj_jack_get_status(long int *sec, long int *usec)
 {
 //JACK_GetPosition(int deviceID, enum pos_enum position, int type);
 
-	return JACK_OutputStatus( driver, sec, usec);
+	return JACK_OutputStatus( driver , sec, usec ) + JACK_GetJackOutputLatency( driver ) + (JACK_GetJackBufferedBytes(driver) * 2);
+
 }
 #endif

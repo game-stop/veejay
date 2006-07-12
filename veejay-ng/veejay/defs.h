@@ -36,6 +36,16 @@ typedef struct VJFrame_t
 	double	fps;
 } VJFrame;
 
+typedef struct AFrame_t
+{
+	long	rate;
+	uint8_t *data;
+	int	bits;
+	int	bps;
+	int	samples;
+	int	num_chans;
+} AFrame;
+
 #define	FMT_420	0
 #define	FMT_422	1	
 #define FMT_444	2

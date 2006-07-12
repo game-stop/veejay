@@ -33,15 +33,13 @@ void	vj_el_init_chunk(int n);
 
 void	vj_el_free(void *el);
 
-int	vj_el_get_audio_frame_at(void *el, uint32_t nframe, uint8_t *dst, int speed );
-
 int	vj_el_append_video_file(void *el, char *filename);
 
 int	vj_el_write_void( char *filename, long start, long end, void *el );
 
 int	vj_el_get_video_frame(void *el, long nframe, void *frame);
 
-int	vj_el_get_audio_frame(void *el, uint32_t nframe, uint8_t *dst);
+int	vj_el_get_audio_frame(void *el, uint32_t nframe, void *av,int n);
 
 int	vj_el_get_file_fourcc(void *el, int num, char *buf);
 

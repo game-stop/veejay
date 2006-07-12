@@ -1,7 +1,7 @@
 # Process with automake to produce Makefile.in
 
 SUBDIRS = bio2jack libOSC libhash libvjmsg libvjmem 
-SUBDIRS += libvevo libplugger libvjnet libyuv libel vevosample veejay
+SUBDIRS += libvevo libplugger libvjnet libyuv libel libvjaudio vevosample veejay
 SUBDIRS += man
 
 #SUBDIRS    = ffmpeg bio2jack libOSC libhash libvjmsg libvjmem libpostproc libvje libsample libvjnet libyuv libel libstream liblavjpeg libsamplerec plugins veejay gveejay tools man 

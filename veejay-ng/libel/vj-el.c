@@ -1113,18 +1113,22 @@ void	vj_el_set_itu601( void *edl , int status )
 	}
 }
 
-int	vj_el_get_audio_frame(void *edl, uint32_t nframe, uint8_t *dst)
+
+int	vj_el_get_audio_frame(void *edl, uint32_t nframe, void *dav, int n_packets)
 {
+	AFrame *av = (AFrame*) dav;
 	editlist *el = (editlist*) edl;
     long pos, asize;
     int ret = 0;
     uint64_t n;	
-	int ns0, ns1;
+    uint64_t n2;
+	unsigned long ns0, ns1, nswap;
 
 	if(el->is_empty)
 	{
-		int ns = el->audio_rate / el->video_fps;
-		memset( dst, 0, sizeof(uint8_t) * ns * el->audio_bps );
+		int ns = el->audio_rate / el->video_fps * n_packets;
+		memset( av->data, 0, sizeof(uint8_t) * ns * el->audio_bps );
+		av->samples = ns;
 		return 1;
 	}
 
@@ -1139,76 +1143,37 @@ int	vj_el_get_audio_frame(void *edl, uint32_t nframe, uint8_t *dst)
 
     n = el->frame_list[nframe];
 
+    n2 = n + n_packets;
+
     /*if( lav_is_DV( el->lav_fd[N_EL_FILE(n)] ) )
     {
 	lav_set_video_position( el->lav_fd[N_EL_FILE(n)] , nframe );
 	return lav_read_audio( el->lav_fd[N_EL_FILE(n)], dst, 0  );
     }*/
 
-    ns1 = (double) (N_EL_FRAME(n) + 1) * el->audio_rate / el->video_fps;
+	av->rate = el->audio_rate;
+	av->bits = el->audio_bits;
+	av->bps  = el->audio_bps;
+	av->num_chans = el->audio_chans;
+    
+    ns1 = (double) N_EL_FRAME(n2) * el->audio_rate / el->video_fps;
     ns0 = (double) N_EL_FRAME(n) * el->audio_rate / el->video_fps;
 
-    //asize = el->audio_rate / el->video_fps;
-    pos = nframe * asize;
-
     ret = lav_set_audio_position(el->lav_fd[N_EL_FILE(n)], ns0);
-
     if (ret < 0)
+    {
+	    veejay_msg(0, "Error seeking to %d",ns0 );
 		return -1;
-
-    //mlt need int16_t
-    ret = lav_read_audio(el->lav_fd[N_EL_FILE(n)], dst, (ns1 - ns0));
-    if (ret < 0)
-		return -1;
-
-    return (ns1 - ns0);
-
-}
-
-
-int	vj_el_get_audio_frame_at(void *edl, uint32_t nframe, uint8_t *dst, int num )
-{
-	editlist *el = (editlist*) edl;
-	// get audio from current frame + n frames
-    long pos, asize;
-    int ret = 0;
-    uint64_t n;	
-    int ns0, ns1;
-
-    if (!el->has_audio)
-	return 0;
-
-    if  (!el->has_video)
-	{
-		int size = el->audio_rate / el->video_fps * el->audio_bps;
-		memset(dst,0,size);
-		return size;
 	}
-
-    if (nframe < 0)
-		nframe = 0;
-
-    if (nframe > el->video_frames)
-		nframe = el->video_frames - num;
-
-    n = el->frame_list[nframe];
-
-    ns1 = (double) (N_EL_FRAME(n) + num) * el->audio_rate / el->video_fps;
-    ns0 = (double) N_EL_FRAME(n) * el->audio_rate / el->video_fps;
-
-    //asize = el->audio_rate / el->video_fps;
-    pos = nframe * asize;
-    ret = lav_set_audio_position(el->lav_fd[N_EL_FILE(n)], ns0);
-
-    if (ret < 0)
-		return -1;
-
     //mlt need int16_t
-    ret = lav_read_audio(el->lav_fd[N_EL_FILE(n)], dst, (ns1 - ns0));
+    ret = lav_read_audio(el->lav_fd[N_EL_FILE(n)], av->data, (ns1 - ns0));
     if (ret < 0)
+    {
+	    veejay_msg(0, "Unable to read audio data %ld ",ns1-ns0);
 		return -1;
-
-    return (ns1 - ns0);
+    }
+    av->samples = ns1 - ns0;
+    return av->samples;
 
 }
 
@@ -2122,6 +2087,11 @@ int		vj_el_get_audio_bps( void *edl )
 {
 	editlist *el = (editlist*) edl;
 	return el->audio_bps;
+}
+int		vj_el_get_audio_bits( void *edl )
+{
+	editlist *el = (editlist*) edl;
+	return el->audio_bits;
 }
 int		vj_el_get_audio_chans( void *edl )
 {

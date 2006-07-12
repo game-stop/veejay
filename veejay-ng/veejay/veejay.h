@@ -112,7 +112,7 @@ typedef struct
 	int			continuous;
 	int			verbose;
 	int			preview_size;
-	
+	int			audio;	
 	void			*display;
 
 	void			*status_socket;

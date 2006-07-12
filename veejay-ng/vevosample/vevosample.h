@@ -38,7 +38,7 @@ typedef	struct
 	int type;
 } sample_video_info_t;
 
-
+int	vevo_num_devices();
 void	samplebank_init();
 void	samplebank_free();
 int	samplebank_size();
@@ -82,6 +82,9 @@ void	sample_save_cache_data( void *sample );
 int	sample_fx_set_in_channel( void *info, int fx_entry, int seq_num, const int sample_id );
 
 
+int	sample_edl_get_audio_properties( void *current_sample, int *bits, int *bps, int *num_chans, long *rate );
+
+int	sample_get_audio_frame( void *current_sample, void *buffer , int n);
 
 uint64_t	sample_get_start_pos( void *sample );
 uint64_t	sample_get_end_pos( void *sample );

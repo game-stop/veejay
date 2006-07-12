@@ -445,7 +445,7 @@ static	int	init_ports_from_template( livido_port_t *filter_instance, livido_port
 #ifdef STRICT_CHECKING
 		assert( error == LIVIDO_NO_ERROR );
 #endif
-                in_channels[i] = livido_port_new( id );
+                in_channels[i] = livido_port_new( id ); //@ is this ever freed?!
 		livido_property_set( in_channels[i], "parent_template",LIVIDO_ATOM_TYPE_PORTPTR,1, &ptr);
 		livido_property_soft_reference( in_channels[i], "parent_template" );
 ;

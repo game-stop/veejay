@@ -1,5 +1,5 @@
-/* veejay - Linux VeeJay
- * 	     (C) 2002-2004 Niels Elburg <nelburg@looze.net> 
+/* veejay - Linux VeeJay Unicap interface
+ * 	     (C) 2002-2006 Niels Elburg <nelburg@looze.net> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -17,30 +17,20 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-#ifndef VJDV1394
-#define VJDV1394
+void	*vj_unicap_init(void);
+#ifndef VJUNICAP_H
+#define VJUNICAP_H
+void	vj_unicap_deinit(void *dud );
+int	vj_unicap_num_capture_devices( void *dud );
 
 
-typedef struct
-{
-	int handle; 
-	int map_size;
-	uint8_t *map;
-	int width;
-	int height;
-	int channel;
-	int norm;
-	int avail;
-	int done;
-	int index;
-	int quality;
-	void *decoder;
-} vj_dv1394;
 
-vj_dv1394*	vj_dv1394_init(void *el, int channel_nr, int quality);
-
-void		vj_dv1394_close( vj_dv1394 *v );
-
-int		vj_dv1394_read_frame( vj_dv1394 *v, uint8_t *frame[3] , uint8_t *audio, int fmt );
+void	*vj_unicap_new_device( void *ud, int device_id );
+int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h );
+int	vj_unicap_start_capture( void *vut, void *slot );
+int	vj_unicap_grab_frame( void *vut, void *slot );
+int	vj_unicap_stop_capture( void *vut );
+void	vj_unicap_free_device( void *vut );
 
 #endif
+

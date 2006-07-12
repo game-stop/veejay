@@ -68,10 +68,11 @@ static int bezerk_ = 0;
 static int fmt_ = 0;
 static int rate_ = 0;
 static int n_chans_ = 0;
-static int bits_ = 0;
+static int bps_ = 0;
 static int display_ = 0;
 static int itu601_ = 0;
 static int dump_ = 0;
+static int devices_ = 0;
 
 static void Usage(char *progname)
 {
@@ -82,6 +83,9 @@ static void Usage(char *progname)
 	fprintf(stderr, " -s/--skip\t\t\n");
 	fprintf(stderr, " -c/--synchronization\t\t\n");
 	fprintf(stderr, " -a/--audio\t\t\n");
+	fprintf(stderr, " -r/--audio-rate\t\t\n");
+	fprintf(stderr, " -n/--audio-channels\t\t\n");
+	fprintf(stderr, " -B/--audio-bps\n");
 	fprintf(stderr, " -t/--timer\t\t\n");
 	fprintf(stderr, " -b/--bezerk\t\t\n");
 	fprintf(stderr, " -f/--fps\t\t\n");
@@ -96,6 +100,7 @@ static void Usage(char *progname)
 	fprintf(stderr, " -d/--display [num] 1=SDL, 2=OpenGL\t\t\n");
 	fprintf(stderr, " -u/--itu601 [0|1]\n");
 	fprintf(stderr, " -l/--list\n");
+	fprintf(stderr, " -A/--alldevices\n");
 			
 }
 
@@ -145,12 +150,12 @@ static int set_option(const char *name, char *value)
 		n_slots_ = atoi(value);
 	} else if(strcmp(name, "pixelformat") == 0 || strcmp(name, "P" ) == 0 ) {
 		fmt_ = atoi(value);
-	} else if(strcmp(name, "audiorate" ) == 0 || strcmp(name, "r" ) == 0 ) {
+	} else if(strcmp(name, "audio-rate" ) == 0 || strcmp(name, "r" ) == 0 ) {
 		rate_ = atoi(value);
-	} else if(strcmp(name, "audiochans" ) == 0 || strcmp(name, "n" ) == 0 ) {
+	} else if(strcmp(name, "audio-channels" ) == 0 || strcmp(name, "N" ) == 0 ) {
 		n_chans_ = atoi(value);
-	} else if(strcmp(name, "audiobits" ) == 0 || strcmp(name, "B" ) == 0 ) {
-		bits_ = atoi(value);
+	} else if(strcmp(name, "audio-bps" ) == 0 || strcmp(name, "B" ) == 0 ) {
+		bps_ = atoi(value);
 	} else if(strcmp(name, "display") == 0 || strcmp(name, "d") == 0 ) {
 		display_ = atoi(value);
 	} else if(strcmp(name, "port") == 0 || strcmp(name, "p") == 0 ) {
@@ -159,6 +164,8 @@ static int set_option(const char *name, char *value)
 		info->itu601 = atoi(value);
 	} else if(strcmp(name, "list") == 0 || strcmp(name,"l") == 0 ) {
 		dump_ = 1;
+	} else if(strcmp(name, "alldevices") == 0 ||strcmp(name,"A")== 0 ) {
+		devices_ = 1;
 	} else
 		nerr++;	
 	
@@ -186,13 +193,14 @@ static int check_command_line_options(int argc, char *argv[])
 	{"memory",1,0,0},
 	{"max_cache",1,0,0},
 	{"pixelformat",1,0,0},
-	{"audiorate",1,0,0},
-	{"audiochans",1,0,0},
-	{"audiobits",1,0,0},
+	{"audio-rate",1,0,0},
+	{"audio-channels",1,0,0},
+	{"audio-bps",1,0,0},
 	{"display",1,0,0},
 	{"port",1,0,0},
 	{"itu601",1,0,0},
 	{"list",0,0,0},
+	{"alldevices",0,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -206,12 +214,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"lvs:c:a:t:b:f:w:h:n:i:m:j:p:P:r:n:B:d:u:",
+			"lvs:c:a:t:b:f:w:h:n:i:m:j:p:P:r:n:B:d:u:N:A",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   "lvs:c:a:t:b:f:w:h:n:i:m:j:p:P:r:n:B:d:u:")) != EOF)
+		   "lvs:c:a:t:b:f:w:h:n:i:m:j:p:P:r:n:B:d:u:N:A")) != EOF)
 #endif
     {
 	switch (n) {
@@ -340,18 +348,20 @@ int main(int argc, char **argv)
     info->sync_skip_frames = skip_;
     info->timer = timer_;
     info->continuous = 1;
-    if(!veejay_init_project_from_args( info, width_, height_ , fps_,inter_,norm_,fmt_,audio_,rate_,n_chans_,bits_, display_ ))
+    if(!veejay_init_project_from_args( info, width_, height_ , fps_,inter_,norm_,fmt_,audio_,rate_,n_chans_,bps_, display_ ))
     {
 	veejay_msg(0, "Invalid project settings");
 	return 0;
     }
 
+	if(devices_)
+		veejay_load_devices( info);
+    
     if(!veejay_load_samples( info, argv + optind, argc - optind ) )
     {
 	veejay_msg(0, "Project setting do not match input file(s)");
 	return 0;
     }
-
     
       //print_license();
   /* setup SIGPIPE and SIGINT catcher as a thread */

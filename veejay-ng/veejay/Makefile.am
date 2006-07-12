@@ -49,6 +49,7 @@ libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libel -lel \
 			-L$(top_builddir)/libyuv -lyuv \
 			-L$(top_builddir)/libvevo -lvevo \
+			-L$(top_builddir)/libvjaudio -lvjaudio \
 			-L$(top_builddir)/vevosample -lvevosample 
 
 #libveejay_la_LDFLAGS +=	${FFMPEG_LIBS} \
@@ -68,4 +69,4 @@ bin_PROGRAMS = $(VEEJAY_BIN)
 veejay_SOURCES	= veejay.c  
 veejay_LDADD 	= libveejay.la @LIBGETOPT_LIB@ ${FFMPEG_AVCODEC_LIBS} ${FFMPEG_AVFORMAT_LIBS} \
 			${PTHREAD_LIBS} ${XML_LIBS} ${LIBDV_LIBS} ${GL_LIBS} \
-			${MJPEGTOOLS_LIBS} ${LIBM_LIBS}  ${SDL_LIBS}
+			${MJPEGTOOLS_LIBS} ${UNICAP_LIBS} ${LIBM_LIBS}  ${SDL_LIBS}

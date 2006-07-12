@@ -81,6 +81,9 @@
 /* Define to 1 if you have the <inttypes.h> header file. */
 #undef HAVE_INTTYPES_H
 
+/* Compiling with support for Jack */
+#undef HAVE_JACK
+
 /* Define to 1 if you have the `dl' library (-ldl). */
 #undef HAVE_LIBDL
 
@@ -134,6 +137,9 @@
 
 /* Using pthread stack size */
 #undef HAVE_PTHREADSTACKSIZE
+
+/* Set to 1 if you have libsamplerate. */
+#undef HAVE_SAMPLERATE
 
 /* Define to 1 if you have the `sched_get_priority_max' function. */
 #undef HAVE_SCHED_GET_PRIORITY_MAX

@@ -370,13 +370,15 @@ void		vj_init_vevo_events(void)
 
 
 	index_map_[VIMS_SAMPLE_NEW] 		=	_new_event(
-				"%d %s",
+				"%d %d %s",
 				VIMS_SAMPLE_NEW,
 				"Create a new sample",
 				vj_event_sample_new,
-				2,
+				3,
 				VIMS_REQUIRE_ALL_PARAMS,
 				"Type",
+				0,
+				"Number",
 				0,
 				"Token",
 				NULL,
@@ -503,6 +505,19 @@ void		vj_init_vevo_events(void)
 				1,	
 				NULL );
 
+	index_map_[VIMS_SAMPLE_SET_SLOW] 	= 	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_SET_SLOW,
+				"Change repeat speed",
+				vj_event_play_repeat,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				"Frame repeat",	
+				0,	
+				NULL );
+
 	index_map_[VIMS_SAMPLE_SET_FRAME]	= 	_new_event(
 				"%d %d",
 				VIMS_SAMPLE_SET_FRAME,
@@ -516,35 +531,6 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
-#ifdef HAVE_XML2
-	index_map_[VIMS_SAMPLE_LOAD]		=	_new_event(
-				"%d %s",
-				VIMS_SAMPLE_LOAD,
-				"Load samples from file",
-				vj_event_sample_load_list,
-				2,
-				VIMS_REQUIRE_ALL_PARAMS,
-				SAMPLE_ID_HELP,
-				0,
-				"Filename",
-				NULL,
-				NULL );
-	
-	index_map_[VIMS_SAMPLE_SAVE]		=	_new_event(
-				"%d %s",
-				VIMS_SAMPLE_SAVE,
-				"Save samples to file",
-				vj_event_sample_save_list,
-				2,
-				VIMS_REQUIRE_ALL_PARAMS,
-				SAMPLE_ID_HELP,
-				0,
-				"Filename",
-				NULL,
-				NULL );
-#endif
-
-	
 	index_map_[VIMS_SAMPLE_DEL]				=	_new_event(
 				"%d",
 				VIMS_SAMPLE_DEL,
@@ -751,13 +737,15 @@ void		vj_init_vevo_events(void)
 				NULL,
 				NULL );
 
-	index_map_[VIMS_SET_VOLUME]			=	_new_event(
-				"%d",
-				VIMS_SET_VOLUME,
+	index_map_[VIMS_SAMPLE_SET_VOLUME]			=	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_SET_VOLUME,
 				"Set audio volume",
 				vj_event_set_volume,
-				1,
+				2,
 				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
 				"Volume 0-100",
 				0,
 				NULL );

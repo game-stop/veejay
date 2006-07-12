@@ -43,16 +43,6 @@ static int _color_level = 0;
 static int _no_msg = 0;
 
 #define MAX_LINES 100 
-typedef struct
-{
-	char *msg[MAX_LINES];
-	int	r_index;
-	int	w_index;
-} vj_msg_hist;
-
-static	vj_msg_hist	_message_history;
-static	int		_message_his_status = 0;
-
 void veejay_set_debug_level(int level)
 {
 	if(level)
@@ -108,12 +98,6 @@ void veejay_msg(int type, const char format[], ...)
     bzero(buf,256);
     vsnprintf(buf, sizeof(buf) - 1, format, args);
  
-    if(!_message_his_status)
-    {
-	memset( &_message_history , 0 , sizeof(vj_msg_hist));
-	_message_his_status = 1;
-    }
-
     if(_color_level)
     {
 	  switch (type) {
@@ -138,14 +122,6 @@ void veejay_msg(int type, const char format[], ...)
 	     else
 	     fprintf(out,"%s%s%s", TXT_GRE, buf, TXT_END );
  
-	if( _message_history.w_index < MAX_LINES )
-	{
-		if(type == 3)
-			sprintf(sline, "%s", buf );
-		else
-			sprintf( sline, "%s\n", buf );	
-		_message_history.msg[_message_history.w_index ++ ] = strdup(sline);
-	}
      }
      else
      {
@@ -171,67 +147,8 @@ void veejay_msg(int type, const char format[], ...)
 	     else
 	     fprintf(out,"%s", buf );
 
-	  if( _message_history.w_index < MAX_LINES )
-	  {
-		if(type == 3 )
-			sprintf(sline, "%s", buf );
-		else
-			sprintf(sline, "%s\n", buf );
-		_message_history.msg[_message_history.w_index ++ ] = strdup(sline);
-	  }
      }
      va_end(args);
-}
-
-char *veejay_pop_messages(int *num_lines, int *total_len)
-{
-	char *res = NULL;
-	if( _message_his_status == 0 )
-		return res;
-	if( _message_history.w_index == 0 )
-		return res;
-	int i;
-	int len = 0;
-	for( i = 0; i < _message_history.w_index ; i ++ )
-		len += strlen( _message_history.msg[i] );
-	if(len <= 0)
-		return res;
-
-	res = (char*) malloc(sizeof(char) * (len+1) );
-	if(!res)
-		return NULL;
-	bzero(res, len );
-	*num_lines = i;
-
-	for( i = 0; i < _message_history.w_index ; i ++ )
-	{
-		if( strlen(_message_history.msg[i]) > 0 )
-		strcat( res, _message_history.msg[i] );
-	}
-	*total_len = len;
-	_message_history.r_index ++;
-	return res;
-}
-
-int	veejay_keep_messages(void)
-{
-	if( _message_history.r_index )
-		return 0;
-	return 1;
-}
-
-void	veejay_reap_messages(void)
-{
-	int i;
-	for( i = 0; i < _message_history.w_index ; i ++ )
-	{
-		if( _message_history.msg[i] ) 
-			free(_message_history.msg[i] );
-	}
-
-	_message_his_status = 0;
-	_message_history.w_index = 0;
-
 }
 
 int	veejay_get_file_ext( char *file, char *dst, int dlen)

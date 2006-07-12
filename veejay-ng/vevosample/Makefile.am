@@ -15,7 +15,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/libvevo \
 		$(FFMPEG_AVCODEC_CFLAGS) $(FFMPEG_AVFORMAT_CFLAGS) \
 		${XML_CFLAGS} ${DV_FLAGS} ${GTK_CFLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} \
-		${PTHREAD_CFLAGS} ${MJPEGTOOLS_CFLAGS} 
+		${PTHREAD_CFLAGS} ${MJPEGTOOLS_CFLAGS} ${UNICAP_CFLAGS} 
 
 VEVOSAMPLE_LIB_FILE = libvevosample.la
 
@@ -26,7 +26,7 @@ VEVOSAMPLE_ALL_LIB_OPTS = \
 	-release $(LT_RELEASE) \
 	-export-dynamic
 
-libvevosample_la_SOURCES = v4lutils.c vj-v4lvideo.c vj-yuv4mpeg.c vj-vloopback.c vevosample.c
+libvevosample_la_SOURCES = vj-unicap.c vj-yuv4mpeg.c vevosample.c
 libvevosample_la_LIBADD = \
 	-L$(top_builddir)/libhash -lhash \
 	-L$(top_builddir)/libvjmsg -lvjmsg \
