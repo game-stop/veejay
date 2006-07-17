@@ -1860,7 +1860,7 @@ static	char	*vevo_format_inline_property( vevo_port_t *port, int n_elem, int typ
 	return res;
 }
 
-static char	*vevo_format_property( vevo_port_t *port, const char *key )
+char	*vevo_format_property( vevo_port_t *port, const char *key )
 {
 	char *res = NULL;
 	char token[5];
@@ -1891,7 +1891,10 @@ static char	*vevo_format_property( vevo_port_t *port, const char *key )
 		case VEVO_ATOM_TYPE_VOIDPTR:
 		case VEVO_ATOM_TYPE_PORTPTR:
 			token[0] = 'p';
-			break;			
+			break;	
+		default:
+			token[0] = 'g';
+			break;		
 	}
 	
 	if( token[0])
@@ -1907,7 +1910,7 @@ static char	*vevo_format_property( vevo_port_t *port, const char *key )
 
 }
 
-static	const char *vevo_split_token_( const char *s, const char delim, char *buf, int buf_len )
+const char *vevo_split_token_( const char *s, const char delim, char *buf, int buf_len )
 {
 	const char *c = s;
 	int n = 0;
@@ -1925,7 +1928,7 @@ static	const char *vevo_split_token_( const char *s, const char delim, char *buf
 	return NULL;
 }
 
-static	char *vevo_scan_token_( const char *s )
+char *vevo_scan_token_( const char *s )
 {
 	const char *c = s;
 	int   n = 0;
@@ -1951,7 +1954,7 @@ static	char *vevo_scan_token_( const char *s )
 	return res;
 }
 
-static	const char *vevo_split_token_q( const char *s, const char delim, char *buf, int buf_len )
+const char *vevo_split_token_q( const char *s, const char delim, char *buf, int buf_len )
 {
 	const char *c = s;
 	int n = 0;
@@ -2017,8 +2020,6 @@ int	vevo_sscanf_property( vevo_port_t *port, const char *s)
 {
 	int done = 0;
 	char key[PROPERTY_KEY_SIZE];
-//@ what if series of key=value is passed?	
-
 	bzero(key, PROPERTY_KEY_SIZE );	
 	const char *value = vevo_split_token_(s, '=', key, PROPERTY_KEY_SIZE );
 	if(value==NULL)
@@ -2026,10 +2027,14 @@ int	vevo_sscanf_property( vevo_port_t *port, const char *s)
 
 	char *format = vevo_format_property( port, key );
 	int  atom    = vevo_property_atom_type( port, key );
-	
+
 	if( format == NULL )
 		return done;
-
+	if(atom==-1)
+		atom = VEVO_ATOM_TYPE_DOUBLE;
+	//@ if a property does not exist, DOUBLE is assumed
+	//@ DOUBLE is valid for all sample's of type capture.
+	
 	uint64_t i64_val[MAX_ELEMENTS];
 	int32_t	 i32_val[MAX_ELEMENTS];
 	double   dbl_val[MAX_ELEMENTS];
@@ -2103,6 +2108,9 @@ int	vevo_sscanf_property( vevo_port_t *port, const char *s)
 	}	
 	
 	int error = 0;
+
+	//veejay_msg(0, "Set: '%s' : %d, %g", key,n, dbl_val[0] );
+	
 	if( n == 0 )
 		error = vevo_property_set( port, key, atom, 0, NULL );
 	else

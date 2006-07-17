@@ -44,6 +44,8 @@ typedef struct
 	int	 deviceID;
 	int	 sizes[3];
 	int	active;
+	int	deinterlace;
+	int	rgb;
 	void	*sampler;
 } vj_unicap_t;
 
@@ -59,58 +61,6 @@ typedef struct
 	void	*device_list;
 	int	 num_devices;
 } unicap_driver_t;
-
-static	void	*vj_unicap_convert_property( unicap_property_t *property, void *device_port)
-{
-/*	void *port = vevo_port_new( VEVO_ANONYMOUS_PORT );
-	int error = vevo_property_set( device_port, property->identifier,VEVO_ATOM_TYPE_PORTPTR,1,&port );
-#ifdef STRICT_CHECKING
-	assert ( error == VEVO_NO_ERROR );
-#endif
-
-	if( property->type == UNICAP_PROPERTY_TYPE_RANGE )
-	{
-		double value = (double) property->range.min;
-		error = vevo_property_set( port, "min", VEVO_ATOM_TYPE_DOUBLE,1,&value );
-#ifdef STRICT_CHECKING
-		assert ( error == VEVO_NO_ERROR );
-#endif
-		value = (double) property->range.max;
-		error = vevo_property_set( port, "max", VEVO_ATOM_TYPE_DOUBLE,1,&value );
-#ifdef STRICT_CHECKING
-		assert ( error == VEVO_NO_ERROR );
-#endif
-		value = (double) property->range.value;
-		error = vevo_property_set( port, "value", VEVO_ATOM_TYPE_DOUBLE,1,&value );
-	}
-
-	if( property->type == UNICAP_PROPERTY_TYPE_MENU )
-	{
-		//used for source and norm
-		int n = property->menu.menu_item_count ;
-		int j;
-		for( j = 0; j < n ; j ++ )
-		{
-			char key[64];
-			sprintf(key, "%d",j);
-			error = vevo_property_set( port, key, VEVO_ATOM_TYPE_STRING,1,&(property->menu.menu_items[j]));
-#ifdef STRICT_CHECKING
-			assert ( error == VEVO_NO_ERROR );
-#endif
-			if( !strcmp( property->menu.menu_items[i], property->menu_item ))
-			{
-				error = vevo_property_set( port, "selected", VEVO_ATOM_TYPE_INT,1,&j );
-#ifdef STRICT_CHECKING
-			assert ( error == VEVO_NO_ERROR );
-#endif
-
-			}
-		}
-	}
-	return port;*/
-	return NULL;
-
-}
 
 static int	vj_unicap_scan_enumerate_devices(void *unicap)
 {
@@ -173,13 +123,6 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 #ifdef STRICT_CHECKING
 		assert( error ==  VEVO_NO_ERROR );
 #endif
-
-		for( j = 0; SUCCESS( unicap_enumerate_properties( ud->handle, NULL, &property, j ) ); j++ )
-		{
-			unicap_get_property( ud->handle, &property );
-			void *props = vj_unicap_convert_property( &property, device_port);
-		}
-		
 		unicap_close( ud->handle );
 	}
 	return i;
@@ -203,7 +146,7 @@ void	vj_unicap_deinit(void *dud )
 	free(ud);
 	dud = NULL;
 }
-
+/*
 int	vj_unicap_set_property( void *ud, char *key, int atom_type, void *val )
 {
 	unicap_property_t property;
@@ -219,8 +162,9 @@ int	vj_unicap_set_property( void *ud, char *key, int atom_type, void *val )
 					&property_spec, &property, i ) ); i ++ )
 	{
 		unicap_get_property( vut->handle, &property);
+
 		if( strcmp(property.identifier, key) == 0 )
-		{
+		{	
 			if(atom_type == VEVO_ATOM_TYPE_STRING)
 			{
 				char *str = (char*) val;
@@ -240,15 +184,62 @@ int	vj_unicap_set_property( void *ud, char *key, int atom_type, void *val )
 	}
 	return 1;
 }
-
-int	vj_unicap_get_property( void *ud, char *key,int atom_type, void *dst )
+*/
+int	vj_unicap_select_value( void *ud, char *key, int atom_type, void *val )
 {
 	unicap_property_t property;
         unicap_property_t property_spec;
 	int i;
-	if(atom_type != VEVO_ATOM_TYPE_STRING && atom_type != VEVO_ATOM_TYPE_DOUBLE )
-		return 0;
-	
+	unicap_void_property( &property_spec );
+	vj_unicap_t *vut = (vj_unicap_t*) ud;
+	for( i = 0; SUCCESS( unicap_enumerate_properties( vut->handle,
+					&property_spec, &property, i ) ); i ++ )
+	{
+		unicap_get_property( vut->handle, &property);
+		if( strcmp( property.identifier, key ) == 0 )
+		{
+			
+		if( property.type == UNICAP_PROPERTY_TYPE_MENU )
+		{
+			int n = property.menu.menu_item_count;
+#ifdef STRICT_CHECKING
+			assert( atom_type == VEVO_ATOM_TYPE_DOUBLE );
+#endif
+			int idx = (int) *( (double*) val );
+			veejay_msg(0, "To menu item %d",idx);
+			strcpy( property.menu_item, property.menu.menu_items[idx] );
+
+			unicap_set_property( vut->handle, &property );
+
+			
+			veejay_msg(0,"changed menu item %d to %s", n, property.menu_item );
+			return 1;
+		}
+		if( property.type == UNICAP_PROPERTY_TYPE_RANGE )
+		{
+#ifdef STRICT_CHECKING
+			assert( atom_type == VEVO_ATOM_TYPE_DOUBLE) ;
+#endif
+			double fval = (double) *( (double*) val);
+			if(fval < property.range.min)
+				 fval = property.range.min;
+			 else if(fval > property.range.max) 
+				 fval = property.range.max;
+			 property.value = (double) *((double*) val);
+			 unicap_set_property( vut->handle, &property );
+			veejay_msg(0, "Changed range value to %f", property.value );
+			return 1;
+		}
+		}
+	}
+	return 0;
+}
+
+int	vj_unicap_get_range( void *ud, char *key, double *min , double *max )
+{
+	unicap_property_t property;
+        unicap_property_t property_spec;
+	int i;
 	unicap_void_property( &property_spec );
 	vj_unicap_t *vut = (vj_unicap_t*) ud;
 
@@ -256,27 +247,101 @@ int	vj_unicap_get_property( void *ud, char *key,int atom_type, void *dst )
 					&property_spec, &property, i ) ); i ++ )
 	{
 		unicap_get_property( vut->handle, &property);
-		if( strcmp(property.identifier, key) == 0 )
+
+		if( strcmp( property.identifier, key ) == 0 )
+			continue;
+		
+		if( property.type == UNICAP_PROPERTY_TYPE_MENU )
 		{
-			if(atom_type == VEVO_ATOM_TYPE_STRING)
-			{
-				char *d = (char*) dst;
-				d = strdup( (char*)property.menu_item );
-			}
-			else
-			{	
-				if(atom_type == VEVO_ATOM_TYPE_DOUBLE)
-				{
-					memcpy(dst, &property.value, sizeof(double));
-				}
-			}
-			break;
+			*min = 0.0;
+			*max = (double) property.menu.menu_item_count;
+			return 1;
+		}
+		if( property.type == UNICAP_PROPERTY_TYPE_RANGE )
+		{
+			*min = property.range.min;
+			*max = property.range.max;
+			return 1;
 		}
 	}
-	return 1;
+	return 0;
+}
+
+char	**vj_unicap_get_list( void *ud )
+{
+	unicap_property_t property;
+        unicap_property_t property_spec;
+	int i;
+	unicap_void_property( &property_spec );
+	vj_unicap_t *vut = (vj_unicap_t*) ud;
+
+	for( i = 0; SUCCESS( unicap_enumerate_properties( vut->handle,
+					&property_spec, &property, i ) ); i ++ )
+	{
+	}
+
+	int n = i;
+
+	char **res = (char**) malloc(sizeof(char*) * (n+1) );
+	memset(res, 0,sizeof(char*) * (n+1));
+	
+	for( i = 0;i < n; i ++ )
+	{
+		if( SUCCESS( unicap_enumerate_properties(vut->handle,
+						&property_spec,&property,i ) ) )
+		{
+			res[i] = strdup( property.identifier );
+		}
+	}
+	return res;
 }
 
 
+int	vj_unicap_get_value( void *ud, char *key, int atom_type, void *value )
+{
+	unicap_property_t property;
+        unicap_property_t property_spec;
+	int i;
+	unicap_void_property( &property_spec );
+	vj_unicap_t *vut = (vj_unicap_t*) ud;
+
+	for( i = 0; SUCCESS( unicap_enumerate_properties( vut->handle,
+					&property_spec, &property, i ) ); i ++ )
+	{
+		unicap_get_property( vut->handle, &property);
+
+		if( strcmp( property.identifier, key ) != 0 )
+			continue;
+		
+		if( property.type == UNICAP_PROPERTY_TYPE_MENU )
+		{
+#ifdef STRICT_CHECKING
+			assert( atom_type == VEVO_ATOM_TYPE_DOUBLE );
+#endif
+			int n = property.menu.menu_item_count;
+			int j;
+			for( j =0; j < n; j ++ )
+			{
+				if( strcmp( property.menu_item, property.menu.menu_items[j] ) == 0 )
+				{
+					double *dval = value;
+					*dval = (double) j;
+					return 1;	
+				}
+			}
+		}
+		if( property.type == UNICAP_PROPERTY_TYPE_RANGE )
+		{
+#ifdef STRICT_CHECKING
+			assert( atom_type == VEVO_ATOM_TYPE_DOUBLE );
+#endif
+			double *dval = value;
+			*dval = property.value;
+			return 1;
+		}
+	}
+	return 0;
+}
 
 int	vj_unicap_num_capture_devices( void *dud )
 {
@@ -339,7 +404,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 	switch(pixel_format)
 	{
 		case FMT_420:
-			fourcc = get_fourcc( "420P" );
+			fourcc = get_fourcc( "YU12" );
 			vut->sizes[1] = (w*h)/4;
 			vut->sizes[2] = vut->sizes[1];
 			break;
@@ -355,6 +420,11 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 			vut->sizes[2] = vut->sizes[1];
 			vut->sampler = subsample_init( w );
 			break;
+#ifdef STRICT_CHECKING
+		default:
+			assert(0);
+			break;
+#endif
 	}	
 	
 	int i;
@@ -369,20 +439,37 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 
 	if( !SUCCESS( unicap_set_format( vut->handle, &(vut->format) ) ) )
 	{
-		veejay_msg(0,"Failed to set pixel format");
-		return 0;
+		unsigned int rgb_fourcc = get_fourcc( "RGB4" );
+		unicap_format_t rgb_spec, rgb_format;
+		for( i = 0;
+	         	SUCCESS( unicap_enumerate_formats( vut->handle, &rgb_spec, &rgb_format, i ) ); i ++ )
+		{
+			if( rgb_fourcc == rgb_format.fourcc )
+			{
+				vut->rgb = 1;
+				break;
+			}
+		}
+		if(!vut->rgb)
+			return 0;
+		else
+			if( !SUCCESS( unicap_set_format( vut->handle, &rgb_format ) ) )
+				return 0;
+	}
+	else
+	{
+		vut->deinterlace = 1;
 	}
 
+	veejay_msg(0, "Selected '%s'", vut->format.identifier );
+	
+/*
 	char *comp = "Composite1";
 	if(vj_unicap_set_property( vut, "video source", VEVO_ATOM_TYPE_STRING, &comp ) )
 	{
 		veejay_msg(2, "Changed channel to Composite1");
-	}
+	}*/
 	
-	veejay_msg(0, "Capture video in %d x %d, format is %s", vut->format.size.width,
-					    vut->format.size.height,
-		 			vut->format.identifier );
-//	memset( &(vut->buffer), 0x0, sizeof( unicap_data_buffer_t ) );
 	vut->buffer.data = vj_malloc( w * h * 8 );
 	vut->buffer.buffer_size = (sizeof(unsigned char) * 4 * w * h );
 	
@@ -424,14 +511,33 @@ int	vj_unicap_grab_frame( void *vut, void *slot )
 		veejay_msg(0,"Failed to wait for buffer on device: %s\n", v->device.identifier );
 		return 0;
 	}
-	veejay_memcpy( f->data[0], v->buffer.data, v->sizes[0] );
-	veejay_memcpy( f->data[1], v->buffer.data + v->sizes[0], v->sizes[1] );
-	veejay_memcpy( f->data[2], v->buffer.data + v->sizes[0] +v->sizes[1] , v->sizes[2]);
+//	veejay_memcpy( f->data[0], v->buffer.data, v->sizes[0] );
+//	veejay_memcpy( f->data[1], v->buffer.data + v->sizes[0], v->sizes[1] );
+//	veejay_memcpy( f->data[2], v->buffer.data + v->sizes[0] +v->sizes[1] , v->sizes[2]);
 
-	if( v->sampler )
+	if( v->deinterlace )
 	{
-		chroma_supersample( SSM_422_444, v->sampler, f->data, f->width,f->height );
+		yuv_deinterlace( f, v->buffer.data,v->buffer.data+v->sizes[0],v->buffer.data+v->sizes[0]+
+			v->sizes[1] );
+		if( v->sampler )
+			chroma_supersample( SSM_422_444, v->sampler, f->data, f->width,f->height );
 	}
+	else
+	{
+		if(!v->rgb)
+		{
+			veejay_memcpy( f->data[0], v->buffer.data, v->sizes[0] );
+			veejay_memcpy( f->data[1], v->buffer.data + v->sizes[0], v->sizes[1] );
+			veejay_memcpy( f->data[2], v->buffer.data + v->sizes[0] +v->sizes[1] , v->sizes[2]);
+		if( v->sampler )
+				chroma_supersample( SSM_422_444, v->sampler, f->data, f->width,f->height );
+
+		}
+		else
+		{
+			util_convertsrc( v->buffer, f->width,f->height,f->pixfmt, f->data );
+		}
+	}	
 	
 //	f->data[0] = v->buffer->data;
 //	f->data[1] = v->buffer->data + v->sizes[0];

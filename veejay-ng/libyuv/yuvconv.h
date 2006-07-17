@@ -91,6 +91,7 @@ void	yuv_convert_and_scale( void *sws, VJFrame *src, VJFrame *dst );
 
 void	yuv_convert_and_scale_rgb( void *sws, VJFrame *src, VJFrame *dst );
 
+void	yuv_deinterlace( VJFrame *A, uint8_t *Y,uint8_t *U, uint8_t *V );
 
 int	yuv_sws_get_cpu_flags(void);
 

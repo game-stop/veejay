@@ -640,7 +640,6 @@ static	void	vj_event_parse_port( veejay_t *v, char *msg )
 	if( port_str[len-1] == ';' )
 		port_str[len-1] = '\0';
 
-
 	if( strncasecmp(port_name, "sample#",5 ) == 0 )
 	{
 		sample_sscanf_port( v->current_sample, port_str );
@@ -667,8 +666,6 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 
 	veejay_chomp_str( msg, &msg_len );
 	msg_len --;
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "VIMS: Parse message '%s'", msg );
 
 	if( msg_len < MSG_MIN_LEN )
 	{

@@ -220,22 +220,8 @@ static	struct
 	const char *name;
 	int atom_type;
 } stream_property_list[] = {
-	{	"width",	VEVO_ATOM_TYPE_STRING	},
-	{	"height",	VEVO_ATOM_TYPE_INT	},
-	{	"palette",	VEVO_ATOM_TYPE_INT	},
 	{	"active",	VEVO_ATOM_TYPE_INT	},
-	{	"format",	VEVO_ATOM_TYPE_INT	},
 	{	"data",		VEVO_ATOM_TYPE_VOIDPTR	},
-	{	NULL,		0			}
-};
-
-static	struct
-{
-	const char *name;
-	int atom_type;
-} stream_capture_list[] = {
-	{	"device",	VEVO_ATOM_TYPE_STRING	},
-	{	"channel",	VEVO_ATOM_TYPE_INT	},
 	{	NULL,		0			}
 };
 
@@ -804,13 +790,20 @@ void	*sample_get_fx_port( int id, int fx_entry )
 void	 sample_set_property_ptr( void *ptr, const char *key, int atom_type, void *value )
 {
 	sample_runtime_data *info = (sample_runtime_data*) ptr;
-	if(info)
-		vevo_property_set( info->info_port, key, atom_type,1, value );	
+	if( info->type == VJ_TAG_TYPE_CAPTURE)
+	{
+		vj_unicap_select_value( info->data,key, atom_type,value ); 		
+	}
+	vevo_property_set( info->info_port, key, atom_type,1, value );	
 }
 
 void	 sample_set_property( int id, const char *key, int atom_type, void *value )
 {
 	sample_runtime_data *info = (sample_runtime_data*) find_sample( id );
+	if( info->type == VJ_TAG_TYPE_CAPTURE)
+	{
+		vj_unicap_select_value( info->data,key, atom_type,value ); 		
+	}
 	if(info)
 		vevo_property_set( info->info_port, key, atom_type,1, value );	
 }
@@ -824,6 +817,9 @@ void	 sample_get_property( int id, const char *key, void *dst )
 void	 sample_get_property_ptr( void *ptr, const char *key, void *dst )
 {
 	sample_runtime_data *info = (sample_runtime_data*) ptr;
+#ifdef STRICT_CHECKING
+	assert( info != NULL );
+#endif
 	vevo_property_get( info->info_port, key, 0, dst );	
 }
 
@@ -855,8 +851,6 @@ static int	sample_new_stream(void *info, int type )
 				vevo_property_set( info, stream_color_list[i].name, stream_color_list[i].atom_type, 1, &v );
 			break;
 		case	VJ_TAG_TYPE_CAPTURE:
-			for( i = 0 ; stream_capture_list[i].name != NULL; i ++ )
-				vevo_property_set( info, stream_capture_list[i].name, stream_capture_list[i].atom_type, 0, NULL );
 			break;
 		case	VJ_TAG_TYPE_YUV4MPEG:
 			for( i = 0; stream_file_list[i].name != NULL; i ++ )
@@ -1151,6 +1145,24 @@ void	*sample_last(void)
 	return found;
 }
 
+static	void	sample_collect_unicap_properties( void *sample )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	char **props = vj_unicap_get_list( srd->data );
+	int i;
+	for( i = 0; props[i] != NULL ; i ++ )
+	{
+		double dvalue = 0.0;
+		int n = vj_unicap_get_value( srd->data, props[i], VEVO_ATOM_TYPE_DOUBLE, &dvalue );
+
+		veejay_msg(0, "Add property '%s', default is %g", props[i], dvalue);
+		
+		vevo_property_set( srd->info_port, props[i], VEVO_ATOM_TYPE_DOUBLE,1,&dvalue );
+
+		free( props[i] );
+	}
+}
+
 //@ what pixelformat are we supposed to play,
 /// what pixel format is file openened in ?
 int	sample_open( void *sample, const char *token, int extra_token , sample_video_info_t *project_settings )
@@ -1228,7 +1240,8 @@ int	sample_open( void *sample, const char *token, int extra_token , sample_video
 			res=1;
 			sit->speed = 1;
 			sample_set_property_ptr( sample, "speed", VEVO_ATOM_TYPE_INT,&(sit->speed));
-			
+			sample_collect_unicap_properties( sample );
+
 			break;
 		case VJ_TAG_TYPE_NET:
 			srd->data = (void*) vj_client_alloc( project_settings->w,project_settings->h, project_settings->fmt );
@@ -1921,14 +1934,6 @@ static int	sample_identify_xml_token( int sample_type, const unsigned char *name
 			if( strcasecmp( (const char*) name, stream_property_list[i].name ) == 0 )
 				return stream_property_list[i].atom_type;
 		}
-		if( sample_type == VJ_TAG_TYPE_CAPTURE )
-		{
-			for( i = 0; stream_capture_list[i].name != NULL ; i ++ )
-			{
-				if( strcasecmp( (const char*) name, stream_capture_list[i].name ) == 0 )
-					return stream_capture_list[i].atom_type;
-			}
-		}
 		if( sample_type == VJ_TAG_TYPE_NET )
 		{
 			for( i = 0; stream_socket_list[i].name != NULL ; i ++ )
@@ -2279,12 +2284,141 @@ int	sample_fx_sscanf_port( void *sample, const char *s, const char *id )
 	//@ fx_instance must be valid
 	return 1;
 }
+#define PROPERTY_KEY_SIZE 64
+#define MAX_ELEMENTS 16
+static 	int	sample_sscanf_property(	sample_runtime_data *srd ,vevo_port_t *port, const char *s)
+{
+	int done = 0;
+	char key[PROPERTY_KEY_SIZE];
+	bzero(key, PROPERTY_KEY_SIZE );	
+	const char *value = vevo_split_token_(s, '=', key, PROPERTY_KEY_SIZE );
+	if(value==NULL)
+		return 0;
 
+	char *format = vevo_format_property( port, key );
+	int  atom    = vevo_property_atom_type( port, key );
+
+	if( format == NULL )
+		return done;
+	if(atom==-1)
+		atom = VEVO_ATOM_TYPE_DOUBLE;
+	//@ if a property does not exist, DOUBLE is assumed
+	//@ DOUBLE is valid for all sample's of type capture.
+	
+	uint64_t i64_val[MAX_ELEMENTS];
+	int32_t	 i32_val[MAX_ELEMENTS];
+	double   dbl_val[MAX_ELEMENTS];
+	char     *str_val[MAX_ELEMENTS];
+	
+	int	 cur_elem = 0;
+	int	 n = 0;
+	
+	const char 	*p = value;
+	char	*fmt = format;
+	while( *fmt != '\0' )
+	{
+		char arg[256];
+		bzero(arg,256);
+		
+		if( *fmt == 's' )
+			p = vevo_split_token_q( p, ':', arg, 1024 );
+		else
+			p = vevo_split_token_( p, ':', arg, 1024 );
+
+		if( p == NULL )
+			return 0;
+		
+		if( arg[0] != ':' ) 
+		{
+			switch(*fmt)
+			{
+				case 'd':
+					n = sscanf( arg, "%d", &(i32_val[cur_elem]));
+					break;
+				case 'D':
+					n = sscanf( arg, "%lld", &(i64_val[cur_elem]));
+					break;
+				case 'g':
+					n = sscanf( arg, "%lf", &(dbl_val[cur_elem]));
+					break;
+				case 's':
+					str_val[cur_elem] = strdup( arg );
+					n = 1;
+					break;
+				default:
+					n = 0;
+					break;
+			}
+		}
+		else
+		{
+			n = 0;
+		}
+		
+		*fmt++;
+		cur_elem ++;
+	}
+
+	void *ptr = NULL;
+	if( n > 0 )
+	switch( *format )
+	{
+		case 'd':
+			ptr = &(i32_val[0]);
+			break;
+		case 'D':
+			ptr = &(i64_val[0]);
+			break;
+		case 'g':
+			ptr = &(dbl_val[0]);
+			break;
+		case 's':
+			ptr = &(str_val[0]);
+			break;
+	}	
+	
+	int error = 0;
+
+	//veejay_msg(0, "Set: '%s' : %d, %g", key,n, dbl_val[0] );
+	if( n == 0 )
+		error = vevo_property_set( port, key, atom, 0, NULL );
+	else
+	{
+		sample_set_property_ptr( srd, key, atom, ptr );
+		error = VEVO_NO_ERROR;
+	}
+	if( error == VEVO_NO_ERROR )
+		done = 1;
+	return done;
+}
 
 int	sample_sscanf_port( void *sample, const char *s )
 {
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
-	return vevo_sscanf_port( srd->info_port, s );
+	const char *ptr = s;
+	int   len = strlen(s);
+	int   i = 0;
+	while( len > 0 )
+	{
+		char *token = vevo_scan_token_(ptr);
+		int token_len;
+		if( token )
+		{
+			token_len = strlen(token);
+			if(sample_sscanf_property(srd,srd->info_port, token ))
+				i++;
+		}
+		else
+		{
+			token_len = len;
+			if(sample_sscanf_property( srd,srd->info_port, ptr ))
+				i++;
+		}
+		len -= token_len;
+		ptr += token_len;
+	}
+	return 1;
+	//	return vevo_sscanf_port( srd->info_port, s );
 }	
 	
 
@@ -2313,3 +2447,4 @@ char 	*sample_sprintf_port( void *sample )
 
 	return buf;	
 }
+

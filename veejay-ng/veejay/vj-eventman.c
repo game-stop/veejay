@@ -589,6 +589,16 @@ void		vj_init_vevo_events(void)
 				"0=off,1=on",
 				1,
 				NULL );
+		index_map_[VIMS_SET_PORT] =	_new_event(
+				"%s",
+				VIMS_SET_PORT,
+				"Set properties",
+				vj_event_none,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"formatted text",
+				NULL,
+				NULL );
 
 	index_map_[VIMS_SAMPLE_CHAIN_ENTRY_SET_FX]			=	_new_event(
 				"%d %d %s",

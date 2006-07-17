@@ -21,6 +21,7 @@
 #include <unistd.h>
 #include <libyuv/yuvconv.h>
 #include <libvjmsg/vj-common.h>
+#include <ffmpeg/avcodec.h>
 /* this routine is the same as frame_YUV422_to_YUV420P , unpack
  * libdv's 4:2:2-packed into 4:2:0 planar 
  * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)
@@ -970,4 +971,22 @@ void	yuv_blend_opacity( VJFrame *A, VJFrame *B, uint8_t alpha )
 	yuv_1plane_blend_opacity( A->data[0], B->data[0], alpha, A->len );
 	yuv_1plane_blend_opacity( A->data[1], B->data[1], alpha, A->uv_len );
 	yuv_1plane_blend_opacity( A->data[2], B->data[2], alpha, A->uv_len );
+}
+
+void	yuv_deinterlace( VJFrame *A, uint8_t *Y,uint8_t *U, uint8_t *V )
+{
+	AVPicture p,q;
+	p.data[0] = A->data[0];
+	p.data[1] = A->data[1];
+	p.data[2] = A->data[3];
+	p.linesize[0] = A->width;
+	p.linesize[1] = A->uv_width;
+	p.linesize[2] = A->uv_width;
+	q.data[0] = Y;
+	q.data[1] = U;
+	q.data[2] = V;
+	q.linesize[0] = A->width;
+	q.linesize[1] = A->uv_width;
+	q.linesize[2] = A->uv_width;
+	avpicture_deinterlace( &p,&q, A->pixfmt, A->width,A->height );
 }
