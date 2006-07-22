@@ -723,7 +723,7 @@ int		veejay_load_devices( veejay_t *info )
 	for( i = 0; i < n ; i ++ )
 	{
 		void *sample = sample_new( VJ_TAG_TYPE_CAPTURE );
-		if( sample_open( sample, NULL, 0, vid_info ) <= 0 )
+		if( sample_open( sample, NULL, i, vid_info ) <= 0 )
 		{
 			if(sample) sample_delete_ptr( sample );
 		}

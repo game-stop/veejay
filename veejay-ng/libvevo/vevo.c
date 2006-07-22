@@ -1846,6 +1846,9 @@ static	char	*vevo_format_inline_property( vevo_port_t *port, int n_elem, int typ
 		case VEVO_ATOM_TYPE_STRING:
 			token[0] = 's';
 			break;
+		case VEVO_ATOM_TYPE_DOUBLE:
+			token[0] = 'g';
+			break;
 
 	}
 		
@@ -2273,7 +2276,6 @@ int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key
 	
 	int	 cur_elem = 0;
 	int	 n = 0;
-	veejay_msg(0, "%s", __FUNCTION__);	
 	const char 	*p = s;
 	char	*fmt = format;
 	while( *fmt != '\0' )
@@ -2288,6 +2290,7 @@ int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key
 
 		if( p == NULL )
 		{
+			veejay_msg(0,"Invalid value. Use 'value:' ");
 			free(format);
 			return 0;
 		}
@@ -2301,6 +2304,9 @@ int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key
 					break;
 				case 'D':
 					n = sscanf( arg, "%lld", &(i64_val[cur_elem]));
+#ifdef STRICT_CHECKING
+					assert( n == 1 );
+#endif
 					break;
 				case 'g':
 					n = sscanf( arg, "%lf", &(dbl_val[cur_elem]));
@@ -2328,6 +2334,7 @@ int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key
 	switch( *format )
 	{
 		case 'd':
+		case 'b':
 			ptr = &(i32_val[0]);
 			break;
 		case 'D':
@@ -2345,8 +2352,13 @@ int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key
 	if( n == 0 )
 		error = vevo_property_set( port, key, type, 0, NULL );
 	else
+	{
+#ifdef STRICT_CHECKING
+		assert( port != NULL );
+		assert( ptr != NULL );
+#endif
 		error = vevo_property_set( port, key, type, cur_elem, ptr );
-
+	}
 	if( error == VEVO_NO_ERROR )
 		done = 1;
 	free(format);

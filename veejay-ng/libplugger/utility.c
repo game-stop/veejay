@@ -239,7 +239,6 @@ void	util_convertsrc( void *indata, int w, int h, int out_pix_fmt, uint8_t **dat
 	assert( w > 0 );
 	assert( h > 0 );
 #endif
-
 	p2.data[0] = indata;
 	p2.linesize[0] = w * 4;
 
@@ -250,7 +249,6 @@ void	util_convertsrc( void *indata, int w, int h, int out_pix_fmt, uint8_t **dat
 	p1.linesize[1] = w >> shiftv;
 	p1.linesize[2] = w >> shiftv; 
 //@ fixme YUV444 sampled ! reuse functions of move them here !
-
 	if(img_convert( &p1, out_pix_fmt,&p2, PIX_FMT_RGBA32,w,h ))
 	{
 #ifdef STRICT_CHECKING

@@ -287,15 +287,6 @@ static	int	livido_scan_parameters( void *plugin, void *plugger_port )
 	return vj_np;
 }
 
-/*
- *
- *
- *nt	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key, int n_elem, int type)
-{
-
-
- */
-
 static	int	init_parameter_port(livido_port_t *ptr, livido_port_t *in_param )
 {
 	int kind = 0;
@@ -873,6 +864,7 @@ void*	deal_with_livido( void *handle, const char *name )
 #endif
 	char *clone_name = (char*) malloc( strlen(plugin_name) + 4);
 	sprintf(clone_name, "LVD%s", plugin_name );
+	veejay_msg(0, "Livido plugin '%s'", plugin_name );
 
 	vevo_property_set( port, "num_params", VEVO_ATOM_TYPE_INT, 1, &n_params );
 	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &clone_name );

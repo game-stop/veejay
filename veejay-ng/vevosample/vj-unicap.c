@@ -428,40 +428,90 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 	}	
 	
 	int i;
+	int found_native = 0;
 	for( i = 0;  SUCCESS( unicap_enumerate_formats( vut->handle, &(vut->format_spec), &(vut->format), i ) ); i ++ )
 	{
 		if( fourcc == vut->format.fourcc )
-			break;
+		{
+	   	  found_native = 1;
+		  break;
+		}
 	}
 
-	vut->format.size.width = w;
-	vut->format.size.height = h;
+	if( found_native )
+	{
+		vut->format.size.width = w;
+		vut->format.size.height = h;
 
-	if( !SUCCESS( unicap_set_format( vut->handle, &(vut->format) ) ) )
+		veejay_msg(2, "Capture device supports '%s'", vut->format.identifier );
+		if (!SUCCESS(unicap_set_format( vut->handle, &(vut->format) )))
+		{
+			veejay_msg(0, "Unable to set video size %d x %d in format %s",
+					w,h,vut->format.identifier );
+			return 0;
+		}
+		vut->deinterlace = 1;
+	}
+	else
 	{
 		unsigned int rgb_fourcc = get_fourcc( "RGB4" );
 		unicap_format_t rgb_spec, rgb_format;
+		unicap_void_format( &rgb_spec);
+		veejay_msg(1, "Unable to select native pixel format, trying RGB32");
+		
 		for( i = 0;
 	         	SUCCESS( unicap_enumerate_formats( vut->handle, &rgb_spec, &rgb_format, i ) ); i ++ )
 		{
 			if( rgb_fourcc == rgb_format.fourcc )
 			{
+				veejay_msg(0, "Camera can capture in RGB32");
 				vut->rgb = 1;
+				rgb_format.size.width = w;
+				rgb_format.size.height = h;
 				break;
 			}
 		}
+		
 		if(!vut->rgb)
+		{
+			veejay_msg(0, "No matching formats found. Camera not supported.");
 			return 0;
+		}
 		else
 			if( !SUCCESS( unicap_set_format( vut->handle, &rgb_format ) ) )
+			{
+				veejay_msg(0, "Cannot set size %d x %d or format %s", w,h,rgb_format.identifier);
 				return 0;
-	}
-	else
-	{
-		vut->deinterlace = 1;
+			}
 	}
 
-	veejay_msg(0, "Selected '%s'", vut->format.identifier );
+	unicap_format_t test;
+	memset(&test, 0,sizeof(unicap_format_t));
+	if(! SUCCESS( unicap_get_format( vut->handle, &test ) ) )
+	{
+		veejay_msg(0, "Failed to get video format");
+	}
+
+	veejay_msg(0, "Capture video from '%s' in %d x %d pixels, %d bpp using %s",
+		 vut->device.identifier,
+		 test.size.width,
+		 test.size.height,
+		 test.bpp,
+		 test.identifier );
+
+	if ( test.size.width != w || test.size.height != h ) 
+	{
+		veejay_msg(0, "Video size mismatch, retrying...");
+		vut->format.size.width = w;
+		vut->format.size.height = h;
+		if( !SUCCESS( unicap_set_format( vut->handle, &(vut->format) ) ) )
+		{
+			veejay_msg(0, "Cannot set size %d x %d or format %s", w,h,vut->format.identifier);
+			return 0;
+		}
+		veejay_msg(2, "Capture size set to %d x %d (%s)", w,h,vut->format.identifier);
+		
+	}
 	
 /*
 	char *comp = "Composite1";
@@ -470,9 +520,8 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 		veejay_msg(2, "Changed channel to Composite1");
 	}*/
 	
-	vut->buffer.data = vj_malloc( w * h * 8 );
-	vut->buffer.buffer_size = (sizeof(unsigned char) * 4 * w * h );
-	
+	vut->buffer.data = vj_malloc( test.size.width * test.size.height * 4 );
+	vut->buffer.buffer_size = (sizeof(unsigned char) * 4 * test.size.width * test.size.height );
 	return 1;
 }
 
@@ -511,9 +560,6 @@ int	vj_unicap_grab_frame( void *vut, void *slot )
 		veejay_msg(0,"Failed to wait for buffer on device: %s\n", v->device.identifier );
 		return 0;
 	}
-//	veejay_memcpy( f->data[0], v->buffer.data, v->sizes[0] );
-//	veejay_memcpy( f->data[1], v->buffer.data + v->sizes[0], v->sizes[1] );
-//	veejay_memcpy( f->data[2], v->buffer.data + v->sizes[0] +v->sizes[1] , v->sizes[2]);
 
 	if( v->deinterlace )
 	{
@@ -529,19 +575,16 @@ int	vj_unicap_grab_frame( void *vut, void *slot )
 			veejay_memcpy( f->data[0], v->buffer.data, v->sizes[0] );
 			veejay_memcpy( f->data[1], v->buffer.data + v->sizes[0], v->sizes[1] );
 			veejay_memcpy( f->data[2], v->buffer.data + v->sizes[0] +v->sizes[1] , v->sizes[2]);
-		if( v->sampler )
+			if( v->sampler )
 				chroma_supersample( SSM_422_444, v->sampler, f->data, f->width,f->height );
 
 		}
 		else
 		{
-			util_convertsrc( v->buffer, f->width,f->height,f->pixfmt, f->data );
+			util_convertsrc( v->buffer.data, f->width,f->height,f->pixfmt, f->data );
 		}
 	}	
 	
-//	f->data[0] = v->buffer->data;
-//	f->data[1] = v->buffer->data + v->sizes[0];
-//	f->data[2] = v->buffer->data + v->sizes[1];
 	return 1;
 }
 
