@@ -17,7 +17,8 @@ then
 	cd ffmpeg
 
 	echo "Trying to get FFmpeg from cvs"
- 	if cvs -d:pserver:anonymous@mplayerhq.hu:/cvsroot/ffmpeg co ffmpeg
+ 	if svn checkout svn://svn.mplayerhq.hu/ffmpeg/trunk ffmpeg
+ #	if cvs -d:pserver:anonymous@mplayerhq.hu:/cvsroot/ffmpeg co ffmpeg
 	then
 	# dump Makefile.am
 		echo -e $MAKEFILE_TEMPL > Makefile.am
