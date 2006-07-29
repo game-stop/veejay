@@ -287,7 +287,8 @@ static void * mmx2_memcpy(void * to, const void * from, size_t len)
      void *retval;
      size_t i;
      retval = to;
-
+	unsigned char *t = (unsigned char*) to;
+	unsigned char *f = (unsigned char*) from;
      /* PREFETCH has effect even for MOVSB instruction ;) */
      __asm__ __volatile__ (
          "   prefetchnta (%0)\n"
@@ -333,9 +334,10 @@ static void * mmx2_memcpy(void * to, const void * from, size_t len)
             "movntq %%mm5, 40(%1)\n"
             "movntq %%mm6, 48(%1)\n"
             "movntq %%mm7, 56(%1)\n"
-            :: "r" (from), "r" (to) : "memory");
-            ((const unsigned char *)from)+=64;
-            ((unsigned char *)to)+=64;
+            :: "r" (f), "r" (t) : "memory");
+
+	       f+=64;
+               t+=64;
           }
           /* since movntq is weakly-ordered, a "sfence"
           * is needed to become ordered again. */
