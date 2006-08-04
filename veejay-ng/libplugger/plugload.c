@@ -25,6 +25,7 @@
  *   -# Frei0r plugins
  *   -# FreeFrame plugins
  */
+
 #include <config.h>
 #include <string.h>
 #include <dirent.h>
@@ -64,25 +65,6 @@ static	int	n_fr_ = 0;
 static  int	n_lvd_ = 0;
 static	int	base_fmt_ = -1;
 
-/*
- * port of plugins by name
- *
- * by name: get a value of a parameter, set a value of a parameter
- *
- *          get parameter description
- *	    get plugin name etc
- *
- *	    this will make libvje obsolete
- *	    this will make the fx chain structure in libsample obsolete
- *	    this will change vj performer
- *	    this will change vj event
- *
- *
- *	    merge vevo-sample to sampleadm and merge with libstream
- *	    before continuing.
- *	    
- */
-
 static	int	select_f( const struct dirent *d )
 {
 	return ( strstr( d->d_name, ".so" ) != NULL );
@@ -107,25 +89,27 @@ static	void *instantiate_plugin( void *plugin, int w , int h )
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
-	/*
-	if( type == VEVO_FF_PORT )
-	{	
-		return freeframe_plug_init( plugin,w,h );
-	}
-	else if( type == VEVO_FR_PORT )
-	{
-		return frei0r_plug_init( plugin,w,h);
-	}
-	*/
-	if ( type == VEVO_PLUG_LIVIDO )
-		return livido_plug_init(plugin,w,h);
 
+	switch( type )
+	{
+		case VEVO_PLUG_LIVIDO:
+			return livido_plug_init( plugin,w,h );
+			break;
+		case VEVO_PLUG_FF:
+			return freeframe_plug_init( plugin,w,h);
+			break;
+		case VEVO_PLUG_FR:
+			return frei0r_plug_init( plugin,w,h );
+			break;
+		default:
 #ifdef STRICT_CHECKING
-	assert( type == VEVO_PLUG_LIVIDO );
+			assert(0);
 #endif
-	
+			break;
+	}
 	return NULL;
-}//@ warning: if init fails, plugin data should be freed (failed plugin)
+}
+
 
 static	void	deinstantiate_plugin( void *instance )
 {
@@ -134,10 +118,11 @@ static	void	deinstantiate_plugin( void *instance )
 #endif
 	generic_deinit_f	gin;
 	int error = vevo_property_get( instance, "HOST_plugin_deinit_f", 0, &gin );
+
 #ifdef STRICT_CHECKING
-	assert( error == 0 );
+	assert( error == VEVO_NO_ERROR );
 #endif
-	(*gin)( instance );
+	(*gin)(instance);
 }
 
 static	void	add_to_plugin_list( const char *path )
@@ -270,39 +255,13 @@ static	void	free_plugin(void *plugin)
 			__FUNCTION__,name,plugin,type );
 	free(name);
 
-	int n = 0;
-
-//		freeframe_plug_free( plugin );		
-//		frei0r_plug_free( plugin );
-//		livido_plug_free( plugin );
-	
-
-//	free_parameters(plugin,n);
-
 	void *handle = NULL;
 	error = vevo_property_get( plugin, "handle", 0 , &handle );
 #ifdef STRICT_CHECKING
 	assert( error == 0 );
 #endif
 	if( handle ) dlclose( handle );
-//	vevo_port_free( plugin );
-/*
-//	livido_port_rrfree( plugin );
-	switch(type)
-	{
-		case VEVO_PLUG_LIVIDO: 	livido_plug_free( plugin ); break;
-		case VEVO_PLUG_FR:break;
-		case VEVO_PLUG_FF:break;
-	}
-	*/
-
-//	livido_port_rrfree( plugin );
-	if( type == VEVO_PLUG_LIVIDO )
-	{
-//@FIXME
-	//	livido_port_free( plugin );
-		vevo_port_recursive_free( plugin );
-	}
+	vevo_port_recursive_free( plugin );
 
 }
 
@@ -349,19 +308,6 @@ static	int	scan_plugins()
 			add_to_plugin_list( pch );
 			pch = strtok( NULL, "\n");
 		}
-
-/*
-		for( j=0; j < len; j ++ )
-		{	
-			if(data[j] == '\0' )
-				break;
-			if( data[j] == '\n' )
-			 { add_to_plugin_list( value ); bzero(value,PATH_MAX); k =0;}
-
-			if( isascii( data[j] ) && data[j] != '\n')
-			  { value[k] = data[j]; if( k < PATH_MAX) k ++; }
-		
-		}*/
 	}
 	return 1;
 }
@@ -460,10 +406,30 @@ void	plug_clone_from_parameters(void *instance, void *fx_values)
 	generic_reverse_clone_parameter_f	grc;
 	int error = vevo_property_get( instance, "HOST_plugin_param_reverse_f", 0, &grc );
 #ifdef STRICT_CHECKING
-	assert( error == 0 );
+	assert( error == VEVO_NO_ERROR );
 #endif
-	(*grc)( instance ,0, fx_values );
 	
+	(*grc)( instance ,0, fx_values );
+}
+
+void	plug_clone_from_output_parameters( void *instance, void *fx_values )
+{
+#ifdef STRICT_CHECKING
+	assert( instance != NULL );
+#endif
+	int type = 0;
+	int error = vevo_property_get( instance, "HOST_plugin_type", 0, &type);
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	switch( type )
+	{
+		case VEVO_PLUG_LIVIDO:
+			livido_plug_read_output_parameters( instance, fx_values );
+			break;
+		default:
+			break;
+	}
 }
 
 void	plug_clone_parameters( void *instance, void *fx_values )
@@ -474,7 +440,7 @@ void	plug_clone_parameters( void *instance, void *fx_values )
 	generic_clone_parameter_f	gcc;
 	int error = vevo_property_get( instance, "HOST_plugin_param_clone_f", 0, &gcc );
 #ifdef STRICT_CHECKING
-	assert( error == 0 );
+	assert( error == VEVO_NO_ERROR );
 #endif
 	(*gcc)( instance, 0, fx_values );
 }
@@ -486,10 +452,14 @@ void	plug_set_parameter( void *instance, int seq_num,int n_elements,void *value 
 #endif
 	generic_push_parameter_f	gpp;
 	int error = vevo_property_get( instance, "HOST_plugin_param_f", 0, &gpp );
+	if( error == VEVO_NO_ERROR)
+		(*gpp)( instance, seq_num, value );
 #ifdef STRICT_CHECKING
-	assert( error == 0 );
-#endif
-	(*gpp)( instance, seq_num, value );
+	else
+	{
+		assert(0);
+	}
+#endif	
 }
 
 void	plug_get_defaults( void *instance, void *fx_values )
@@ -500,9 +470,10 @@ void	plug_get_defaults( void *instance, void *fx_values )
 	generic_default_values_f	gdv;
 	int error = vevo_property_get( instance, "HOST_plugin_defaults_f", 0, &gdv );
 #ifdef STRICT_CHECKING
-	assert( error == 0 );
+	assert( error == VEVO_NO_ERROR );
 #endif
 	(*gdv)( instance, fx_values );
+
 }
 void	plug_set_defaults( void *instance, void *fx_values )
 {
@@ -511,11 +482,13 @@ void	plug_set_defaults( void *instance, void *fx_values )
 #endif
 	generic_clone_parameter_f	gcp;	
 	int error = vevo_property_get( instance, "HOST_plugin_param_clone_f", 0, &gcp );
+
 #ifdef STRICT_CHECKING
-	assert( error == 0 );
+	assert( error == VEVO_NO_ERROR);
 #endif
 	(*gcp)( instance, 0,fx_values );
 }
+
 void	plug_deactivate( void *instance )
 {
 	deinstantiate_plugin( instance );	
@@ -586,86 +559,11 @@ int	plug_get_num_parameters( int fx_id )
 	return res;
 }	
 
-/*
-void	plug_control( int fx_id, void *instance, int *args )
-{
-	vevo_port_t *port = index_map_[ fx_id ];
-#ifdef STRICT_CHECKING
-	assert ( port != NULL );
-#endif		
-	int type = 0;
-	int error= 0;
-	error = vevo_property_get( port, "type", 0, &type);
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif	
-	if( type == VEVO_FF_PORT )
-	{
-		freeframe_plug_control( port, args );	
-	}
-	else if ( type == VEVO_FR_PORT )
-	{
-		frei0r_plug_control( port, args );
-	}
-	else if ( type == VEVO_LIVIDO_PORT )
-	{
-	//	livido_plug_control( port, args );
-		livido_set_parameters_scaled( port, args );  
-	}
-}*/
-
 void	plug_sys_set_palette( int pref_palette )
 {
 	base_fmt_ = pref_palette;
 	livido_set_pref_palette( base_fmt_ );
 }
-
-/*
-static void	plug_process_mix( VJFrame *frame, VJFrame *frame_b,int fx_id )
-{
-	void	*plugin = index_map_[fx_id];
-#ifdef STRICT_CHECKING	
-	assert( plugin != NULL );
-	assert( frame != NULL );
-	assert( frame_b != NULL );
-#endif
-	util_convertrgba32( frame->data, base_width_, base_height_, base_format_, frame->shift_v, buffer_ );
-
-	util_convertrgba32( frame_b->data,base_width_,base_height_, base_format_, frame_b->shift_v, buffer_b_ );	
-
-	process_mix_plugin( plugin, buffer_, buffer_b_, buffer2_ );
-#ifdef STRICT_CHECKING
-	assert( buffer2_ != NULL);
-#endif
-
-#ifdef STRICT_CHECKING
-	if( base_fmt_ == 0 )
-	{
-		assert( (frame->width * frame->height) == frame->len );
-		assert( (frame->uv_width * frame->uv_height) == frame->uv_len );
-
-		assert( (frame->width / 2 ) == frame->uv_width );
-	        assert( (frame->height /2 ) == frame->uv_height );	
-		
-		assert( frame->shift_v == 1 );
-		assert( frame->shift_h == 1 );
-
-	}
-	if( base_fmt_ == 1 )
-	{
-		assert( (frame->width * frame->height) == frame->len );
-		assert( (frame->uv_width * frame->uv_height) == frame->uv_len );
-		assert( frame->width /2  == frame->uv_width );
-	        assert( (frame->height ) == frame->uv_height );	
-		assert( frame->shift_v == 0 );
-		assert( frame->shift_h == 1 );
-		
-	}
-	assert( base_fmt_ == 0 || base_fmt_ == 1 );
-#endif
-	
-	util_convertsrc( buffer2_, base_width_, base_height_, base_format_, frame->data );
-}*/
 
 void	plug_push_frame( void *instance, int out, int seq_num, void *frame_info )
 {
@@ -681,6 +579,8 @@ void	plug_push_frame( void *instance, int out, int seq_num, void *frame_info )
 	(*gpu)( instance, (out ? "out_channels" : "in_channels" ), seq_num, frame );
 }
 
+
+
 void	plug_process( void *instance )
 {
 #ifdef STRICT_CHECKING
@@ -691,30 +591,6 @@ void	plug_process( void *instance )
 #ifdef STRICT_CHECKING
 	assert( error == 0 );
 #endif
-	
 	(*gpf)( instance,0.0 );
-	
-	/*
-	// it is frei0r or freeframe mixing plugin
-	int is_mix = 0;
-	error = vevo_property_get( plugin, "mixer", 0, &is_mix );
-#ifdef HAVE_STRICT_
-	assert( error == LIVIDO_NO_ERROR );
-#endif
-	if( is_mix ) 
-	{
-		plug_process_mix( frame, b, fx_id );
-		return;
-	}
-
-	util_convertrgba32( frame->data, base_width_, base_height_, base_format_, frame->shift_v, buffer_ );
-
-	void *res_frame = process_plug_plugin( plugin, buffer_, buffer2_ );
-#ifdef STRICT_CHECKING
-	assert( res_frame != NULL );
-#endif
-
-	util_convertsrc( res_frame, base_width_, base_height_, base_format_, frame->data );
-	*/
 }
 

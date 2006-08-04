@@ -764,7 +764,6 @@ dnl Output a Makefile or two and the lib/header descriptor script
 dnl
 AC_CONFIG_FILES([
 Makefile
-libOSC/Makefile
 libhash/Makefile
 libvjmsg/Makefile
 libvevo/Makefile

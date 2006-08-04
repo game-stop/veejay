@@ -494,7 +494,6 @@ char *get_memcpy_descr( void )
 {
 	int i = 1;
 	int best = 1;
-	unsigned long long t=0;
 	for (i=1; memcpy_method[i].name; i++)
 	{
 		if( memcpy_method[i].time <= memcpy_method[best].time )
@@ -513,8 +512,8 @@ void find_best_memcpy()
      char *buf1, *buf2;
      int i, j, best = 0;
 
-	veejay_memcpy = memcpy;
-	veejay_memset = memset;
+	veejay_memcpy = (void*) memcpy;
+	veejay_memset = (void*) memset;
 	return;
 
      if (!(buf1 = (char*) malloc( BUFSIZE * 2000 * sizeof(char) )))
@@ -560,7 +559,7 @@ void find_best_memcpy()
      }
 
      if (best) {
-         veejay_memset = memset_method[best].function;
+         veejay_memset = (void*) memset_method[best].function;
      }
 
 

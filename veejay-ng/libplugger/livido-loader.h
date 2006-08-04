@@ -34,5 +34,6 @@ void	livido_set_parameters_scaled( void *plugin, int *args );
 
 void	livido_exit( void );
 
+void	livido_plug_read_output_parameters( void *instance, void *fx_values );
 
 #endif

@@ -4,7 +4,7 @@ MAINTAINERCLEANFILES = Makefile.in
 
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-DG_LOG_DOMAIN=\"veejay\" -DVEEJAY_VERSION=\"$(VERSION)\" \
-     		-I /usr/X11R6/include -I$(top_srcdir)/libOSC \
+     		-I /usr/X11R6/include \
 		-I$(top_srcdir)/libhash \
 		-I$(top_srcdir)/libvje \
 		-I$(top_srcdir)/libplugger \
@@ -39,8 +39,7 @@ libveejay_la_SOURCES =  vj-misc.c \
 
 libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS )
 
-libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
-			-L$(top_builddir)/libhash / -lhash \
+libveejay_la_LIBADD = -L$(top_builddir)/libhash / -lhash \
 			-L$(top_builddir)/bio2jack/ -lbio2jack \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
 			-L$(top_builddir)/libvjmem/ -lvjmem \

@@ -23,6 +23,9 @@
 #include <config.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
+#include <strings.h>
+
 #include "vj-common.h"
 
 #define TXT_RED		"\033[0;31m"

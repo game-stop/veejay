@@ -177,6 +177,7 @@ static	struct
 	{	"fx_alpha",	VEVO_ATOM_TYPE_INT	},	/* alpha */
 	{	"fx_instance",	VEVO_ATOM_TYPE_VOIDPTR	},	/* plugin instance point */
 	{	"fx_values",	VEVO_ATOM_TYPE_PORTPTR	},	/* port of p0 .. pN, containing copy of fx parameter values */
+	{	"fx_out_values", VEVO_ATOM_TYPE_PORTPTR },	/* output parmaters, p0 ... pN */
 	{	"fx_channels",	VEVO_ATOM_TYPE_PORTPTR	},	/* contains list of sample pointers to use as input channels */
 };
 
@@ -689,24 +690,36 @@ int	sample_process_fx( void *sample, int fx_entry )
 	unsigned int i,k;
 	void *fx_instance = NULL;
 	void *fx_values = NULL;
-
+	void *fx_out_values = NULL;
+	
 	void *port = sample_get_fx_port_ptr( sample,fx_entry );
 #ifdef STRICT_CHECKING
 	assert( port != NULL );
 #endif		
 	int error = vevo_property_get( port, "fx_instance", 0, &fx_instance );
 #ifdef STRICT_CHECKING
-	assert( error == 0 );
+	assert( error == VEVO_NO_ERROR );
 #endif
 	plug_process( fx_instance );
 
 	error = vevo_property_get( port, "fx_values", 0, &fx_values );
 #ifdef STRICT_CHECKING
-	assert( error == 0 );			
+	assert( error == VEVO_NO_ERROR );			
 #endif
+
+	error = vevo_property_get( port, "fx_out_values",0,&fx_out_values );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );			
+#endif
+
+	
 	//update internal parameter values
 	plug_clone_from_parameters( fx_instance, fx_values );
 
+	//get the output parameters,if any
+	
+	plug_clone_from_output_parameters( fx_instance, fx_out_values );
+	
 	return VEVO_NO_ERROR;
 }
 
@@ -968,8 +981,13 @@ static	void	sample_new_fx_chain_entry( void *sample, int id )
 #endif
 	void *fx_values = vevo_port_new( VEVO_FX_VALUES_PORT );
 	void *fx_channels = vevo_port_new( VEVO_ANONYMOUS_PORT );
-
+	void *fx_out_values = vevo_port_new( VEVO_FX_VALUES_PORT );
+	
 	error = vevo_property_set( port, "fx_values", VEVO_ATOM_TYPE_PORTPTR,1,&fx_values);
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	error = vevo_property_set( port, "fx_out_values", VEVO_ATOM_TYPE_PORTPTR,1,&fx_out_values);
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
@@ -977,7 +995,6 @@ static	void	sample_new_fx_chain_entry( void *sample, int id )
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
-
 	error = vevo_property_set( port, "fx_instance", VEVO_ATOM_TYPE_PORTPTR,0,NULL );
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );

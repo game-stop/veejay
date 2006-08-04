@@ -1,12 +1,9 @@
 # Process with automake to produce Makefile.in
 
-SUBDIRS = bio2jack libOSC libhash libvjmsg libvjmem 
+SUBDIRS = bio2jack libhash libvjmsg libvjmem 
 SUBDIRS += libvevo libplugger libvjnet libyuv libel libvjaudio vevosample veejay
 SUBDIRS += man
 
-#SUBDIRS    = ffmpeg bio2jack libOSC libhash libvjmsg libvjmem libpostproc libvje libsample libvjnet libyuv libel libstream liblavjpeg libsamplerec plugins veejay gveejay tools man 
-
-#bin_SCRIPTS = veejay-config
 
 #
 # Add any non autoconf'd files here, extra readmes and other misc 

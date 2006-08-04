@@ -512,7 +512,7 @@ void	*livido_plug_init(void *plugin,int w, int h )
 	int num_out_params = init_ports_from_template(
 				filter_instance, filter_templ,
 				LIVIDO_PORT_TYPE_PARAMETER,
-				"in_parameter_templates", "in_parameters",
+				"out_parameter_templates", "out_parameters",
 				w,h,0 );
 
 	if( num_out_params < 0 )
@@ -520,6 +520,7 @@ void	*livido_plug_init(void *plugin,int w, int h )
 	
 #ifdef STRICT_CHECKING
 	assert( num_in_params >= 0 );
+	assert( num_out_params >= 0 );
 	assert( num_in_channels >= 0 );
 	assert( num_out_channels >= 0 );
 #endif
@@ -710,6 +711,26 @@ void	livido_plug_retrieve_values( void *instance, void *fx_values )
 		clone_prop_vevo( param_templ, fx_values, "default", vkey );
 	}
 }
+
+void	livido_plug_read_output_parameters( void *instance, void *fx_values )
+{
+	int np = vevo_property_num_elements( instance, "out_parameters" );
+	int i;
+	for( i = 0; i < np ; i ++ )
+	{
+		char	vkey[10];
+		void *param = NULL;
+		void *param_templ = NULL;
+
+		int error = vevo_property_get( instance, "out_parameters", i, &param );
+#ifdef STRICT_CHECKING
+		assert( error == VEVO_NO_ERROR );
+#endif
+		sprintf(vkey, "p%02d", i );
+		clone_prop_vevo( param, fx_values, "value", vkey );
+	}
+}
+
 
 int	livido_set_parameter_from_string( void *instance, int p, const char *str, void *fx_values )
 {

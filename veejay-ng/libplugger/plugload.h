@@ -20,7 +20,8 @@
  */
 
 /*
-	video plugin loader library to wrap up all kinds of standards
+	veejay plugin loader
+        *	library to wrap up all kinds of "plugin standards"
  */
 
 void	plug_sys_free(void);
@@ -30,14 +31,13 @@ int	plug_sys_detect_plugins(void);
 char	*plug_get_name( int fx_id );
 int	plug_get_fx_id_by_name( const char *name );
 int	plug_get_num_input_channels( int fx_id );
-int		plug_set_param_from_str( void *plugin , int p, const char *str, void *fx_values );
-//@ initialize plugin
+int	plug_set_param_from_str( void *plugin , int p, const char *str, void *fx_values );
 void	*plug_activate( int fx_id );
 void	plug_deactivate( void *instance );
 void	plug_push_frame( void *instance, int out, int seq_num, void *frame );
 void	plug_process( void *instance );
 void	plug_get_defaults( void *instance, void *fx_values );
 void	plug_set_parameter( void *instance, int seq_num, int n_elements,void *value );
-int	plug_inplace( void *instance );
+void	plug_clone_from_output_parameters( void *instance, void *fx_values );
 
 #endif

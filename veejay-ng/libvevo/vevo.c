@@ -88,6 +88,7 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <libhash/hash.h>
 #include <veejay/portdef.h>
 #include <libvjmem/vjmem.h>
+#include <libvjmsg/vj-common.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif

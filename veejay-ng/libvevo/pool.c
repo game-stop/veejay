@@ -169,7 +169,6 @@ void	vevo_pool_free( void *p, void *ptr, unsigned int k )
 	if( n == ROUNDS_PER_MAG )
 	{ 
 		space_t *l = space;
-		space_t *n = NULL;
 		while( l != NULL )
 		{
 			if( l->rounds < ROUNDS_PER_MAG )
@@ -266,7 +265,6 @@ void	vevo_pool_slice_free( void *p, void *ptr )
 	if( n == ROUNDS_PER_MAG )
 	{ 
 		space_t *l = space;
-		space_t *n = NULL;
 		while( l != NULL )
 		{
 			if( l->rounds < ROUNDS_PER_MAG )

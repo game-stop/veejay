@@ -2,11 +2,23 @@
 #define FREEFRAME_LOADER
 void* 	deal_with_ff( void *handle, char *name );
  
-int	freeframe_plug_init( void *plugin , int w, int h );
-void	freeframe_plug_deinit( void *plugin );
+
+int	freeframe_plug_process( void *plugin, double timecode );
+
+
+void	freeframe_push_channel( void *instance, const char *key,int n, VJFrame *frame );
+
+
 void	freeframe_plug_free( void *plugin );
-int	freeframe_plug_process( void *plugin, void *in );
-void	freeframe_plug_process_ext( void *plugin, void *in0, void *in1, void *out);
-void	freeframe_plug_control( void *plugin, int *args );
+
+void	freeframe_plug_deinit( void *plugin );
+
+
+int	freeframe_plug_init( void *plugin, int w, int h );
+
+void	freeframe_plug_retrieve_current_values( void *instance, void *fx_values );
+
+void	freeframe_plug_retrieve_default_values( void *instance, void *fx_values );
+
 
 #endif

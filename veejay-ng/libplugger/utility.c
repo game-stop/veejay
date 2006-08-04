@@ -108,7 +108,78 @@ int		auto_scale_int( void *port, const char *key, int n, int *dst)
 	return LIVIDO_NO_ERROR;
 }
 
-void		clone_prop_vevo( void *port, void *to_port, const char *key, const char *as_key )
+void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as_key )
+{
+	int	num = vevo_property_num_elements( port, key );
+	int	type= vevo_property_atom_type( port, key );
+	int 	i;
+	
+	if( num <= 0 )
+		return;
+
+	int itmp[num];
+	double dtemp[num];
+	char *stmp[num];
+	
+	int error;
+	
+	switch( type )
+	{
+		case VEVO_ATOM_TYPE_INT:
+		case VEVO_ATOM_TYPE_BOOL:
+			for( i= 0; i < num; i ++ )
+			{
+				error = vevo_property_get( port,key,i, &(itmp[i]) );
+#ifdef STRICT_CHECKING
+				assert( error == VEVO_NO_ERROR );
+#endif
+			}
+			error = vevo_property_set( to_port, as_key, type, num, &itmp );
+#ifdef STRICT_CHECKING
+			assert( error == VEVO_NO_ERROR );
+#endif
+			break;
+		case VEVO_ATOM_TYPE_DOUBLE:
+			for( i = 0; i < num ; i++ )
+			{
+				error = vevo_property_get( port, key, i, &(itmp[i]));
+#ifdef STRICT_CHECKING
+				assert( error == VEVO_NO_ERROR );
+#endif
+			}
+			error = vevo_property_set( to_port, as_key, type, num, &itmp );
+#ifdef STRICT_CHECKING
+			assert( error == VEVO_NO_ERROR );
+#endif
+		case VEVO_ATOM_TYPE_STRING:
+			for( i = 0; i < num; i ++)
+			{
+				size_t len = vevo_property_element_size( port,key,i);
+				stmp[i] = NULL;
+				if( len > 0 ) continue;
+				stmp[i] = (char*) malloc(sizeof(char) * len );
+				error = vevo_property_get( port, key, i, &(stmp[i]) );
+#ifdef STRICT_CHECKING
+				assert( error == VEVO_NO_ERROR );
+#endif
+			}
+			error = vevo_property_set( to_port, as_key, type, num, &stmp );
+#ifdef STRICT_CHECKING
+			assert( error == VEVO_NO_ERROR );
+#endif
+			break;
+		default:
+			veejay_msg(0, "Internal error. Cannot clone this type of atom");
+#ifdef STRICT_CHECKING
+			assert(0);
+#endif
+			break;
+
+	}
+}
+
+
+void		clone_prop_vevo2( void *port, void *to_port, const char *key, const char *as_key )
 {
 	int n = vevo_property_atom_type( port ,key);
 #ifdef STRICT_CHECKING
