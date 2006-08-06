@@ -336,8 +336,8 @@ static void * mmx2_memcpy(void * to, const void * from, size_t len)
             "movntq %%mm7, 56(%1)\n"
             :: "r" (f), "r" (t) : "memory");
 
-	       f+=64;
-               t+=64;
+	       ((unsigned char*)f)+=64;
+               ((unsigned char*)t)+=64;
           }
           /* since movntq is weakly-ordered, a "sfence"
           * is needed to become ordered again. */
@@ -401,9 +401,9 @@ static void * sse_memcpy(void * to, const void * from, size_t len)
                         "movntps %%xmm1, 16(%1)\n"
                         "movntps %%xmm2, 32(%1)\n"
                         "movntps %%xmm3, 48(%1)\n"
-                     :: "r" (from), "r" (to) : "memory");
-                    (f)+=64;
-                    (t)+=64;
+                     :: "r" (f), "r" (t) : "memory");
+                    f+=64;
+                    t+=64;
                }
           else
                
@@ -424,9 +424,9 @@ static void * sse_memcpy(void * to, const void * from, size_t len)
                      "movntps %%xmm1, 16(%1)\n"
                      "movntps %%xmm2, 32(%1)\n"
                      "movntps %%xmm3, 48(%1)\n"
-                     :: "r" (from), "r" (to) : "memory");
-                    (f)+=64;
-                    (t)+=64;
+                     :: "r" (f), "r" (t) : "memory");
+                    f+=64;
+                    t+=64;
                }
           // since movntq is weakly-ordered, a "sfence"
           //  is needed to become ordered again. 
