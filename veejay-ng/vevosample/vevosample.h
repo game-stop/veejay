@@ -123,5 +123,12 @@ int	sample_edl_paste_from_buffer( void *current_sample, uint64_t insert_at );
 
 int	sample_edl_cut_to_buffer( void *current_sample, uint64_t start_pos, uint64_t end_pos );
 
+int	sample_configure_recorder( void *sample, int format, const char *filename, char *timecode, sample_video_info_t *ps );
+
+int	sample_start_recorder( void *sample, sample_video_info_t *ps );
+	
+int	sample_stop_recorder( void *sample );
+	
+int	sample_record_frame( void *sample, VJFrame *frame, uint8_t *audio_buffer, int a_len );
 
 #endif

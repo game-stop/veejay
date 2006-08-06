@@ -71,4 +71,11 @@ typedef struct AFrame_t
 #define PREVIEW_GREYSCALE	1
 #define PREVIEW_COLOR		2
 
+#define	ENCODER_MJPEG		0
+#define ENCODER_YUV420		1	
+#define ENCODER_YUV422		2
+#define ENCODER_MPEG4		3	
+#define ENCODER_DIVX		4
+#define ENCODER_DVVIDEO		5
+
 #endif

@@ -127,6 +127,7 @@ typedef struct
 	  pthread_mutex_t display_mutex;
 
 	int			itu601;
+	char			message[256];
 } veejay_t;
 
 #endif

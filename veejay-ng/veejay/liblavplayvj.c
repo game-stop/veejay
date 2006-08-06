@@ -901,15 +901,19 @@ int veejay_init(veejay_t * info)
 
 void	veejay_playback_status( veejay_t *info )
 {
-	char status[100];
+	char status_message[300];
 
-	sprintf( status, "V%03dS%s", 3, "1 0");
+	int len = strlen( info->message );
+	
+	sprintf( status_message, "V%03dS%s", len, info->message);
 
+	veejay_msg(0, "Status: '%s'", info->message );
+	
 	int res = vj_server_send(
 			info->status_socket,
 			info->current_link,
-			status,
-			strlen(status)
+			status_message,
+			strlen(status_message)
 			);
 
 	if( res <= 0 )
@@ -1086,12 +1090,18 @@ static void veejay_playback_cycle(veejay_t * info)
 	    performer_queue_frame(info,skipi);
 	
 	    sample_save_cache_data( info->current_sample );
+	
+	    performer_save_frame( info );
+
 	    int cur_id = sample_get_key_ptr( info->current_sample);
 	    if( cur_id != last_id )
 	    {
 		last_id = cur_id;
 		performer_audio_restart(info);
 	    }	
+
+	    sample_format_status( info->current_sample, info->message );
+	
 		//@ and restart performer on sample switch!
 	    
 	    if(skipv) continue;

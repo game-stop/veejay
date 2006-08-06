@@ -536,6 +536,20 @@ static	uint8_t *performer_fetch_audio_frames( veejay_t *info, int *gen_samples )
 }
 #endif
 
+void	performer_save_frame( veejay_t *info )
+{
+	performer_t *p = (performer_t*) info->performer;
+
+	if(sample_is_recording( info->current_sample ))
+		sample_record_frame(
+			info->current_sample,
+			p->display,
+			NULL,
+			0 );
+			
+}
+
+
 int	performer_queue_audio_frame( veejay_t *info, int skipa )
 {
 	static uint8_t *buffer_ = NULL;
