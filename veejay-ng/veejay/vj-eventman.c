@@ -676,6 +676,81 @@ void		vj_init_vevo_events(void)
 				"Opacity value",
 				256,
 				NULL );
+
+
+	index_map_[VIMS_SAMPLE_DETACH_OUT_PARAMETER]	= _new_event(
+				"%d %d %d",
+				VIMS_SAMPLE_DETACH_OUT_PARAMETER,
+				"Detach output parameter",
+				vj_event_sample_detach_out_parameter,
+				3,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				SAMPLE_FX_ENTRY_HELP,
+				0,
+				"Output parameter",
+				-1,
+				NULL );
+
+	index_map_[VIMS_SAMPLE_ATTACH_OUT_PARAMETER] = _new_event(
+				"%d %d %d %d %d",
+				VIMS_SAMPLE_ATTACH_OUT_PARAMETER,
+				"Attach output parameter",
+				vj_event_sample_attach_out_parameter,
+				5,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				SAMPLE_FX_ENTRY_HELP,
+				0,
+				"Output parameter",
+				-1,
+				SAMPLE_FX_ENTRY_HELP,
+				0,
+				"Input parameter",
+				-1,
+				NULL );
+
+	index_map_[VIMS_SAMPLE_CONFIGURE_RECORDER]	 = _new_event(
+				"%d %d %d %s",
+				VIMS_SAMPLE_CONFIGURE_RECORDER,
+				"Configure sample recorder",
+				vj_event_sample_configure_recorder,
+				4,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				"Dataformat",
+				0,
+				"Number of frames",
+				0,
+				"Filename",
+				NULL,
+				NULL );
+
+	index_map_ [ VIMS_SAMPLE_START_RECORDER ] = _new_event(
+				"%d",
+				VIMS_SAMPLE_START_RECORDER,
+				"Start recording from sample",
+				vj_event_sample_start_recorder,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				NULL );
+
+	index_map_[ VIMS_SAMPLE_STOP_RECORDER ] = _new_event(
+				"%d",
+				VIMS_SAMPLE_STOP_RECORDER,
+				"Stop recording from sample",
+				vj_event_sample_stop_recorder,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				NULL );
+			
 		
 	index_map_[VIMS_SAMPLE_EDL_PASTE_AT]			=	_new_event(
 				"%d %d",

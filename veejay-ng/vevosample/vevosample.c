@@ -129,6 +129,15 @@ typedef	struct
 	sampleinfo_t *info;
 } sample_runtime_data;
 
+
+
+typedef struct
+{
+	int p[32];
+	int e[32];
+} bind_t;
+
+
 /* forward */
 static	void	sample_fx_clean_up( void *port );
 static	void	*sample_get_fx_port_values_ptr( int id, int fx_entry );
@@ -734,6 +743,10 @@ int	sample_process_fx( void *sample, int fx_entry )
 	//get the output parameters,if any
 	
 	plug_clone_from_output_parameters( fx_instance, fx_out_values );
+
+
+	sample_apply_bind( sample, port );
+
 	
 	return VEVO_NO_ERROR;
 }
@@ -2525,7 +2538,7 @@ static	long	sample_tc_to_frames( const char *tc, float fps )
 	return res;
 }
 
-int	sample_configure_recorder( void *sample, int format, const char *filename, char *timecode, 
+int	sample_configure_recorder( void *sample, int format, const char *filename, int nframes, 
 		 sample_video_info_t *ps)
 {
 	char	fmt = 'Y'; //default uncompressed format
@@ -2537,7 +2550,7 @@ int	sample_configure_recorder( void *sample, int format, const char *filename, c
 	if( sit->rec )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Please stop the recorder first");
-		return 0;
+		return 1;
 	}
 	
 	switch( format )
@@ -2571,18 +2584,18 @@ int	sample_configure_recorder( void *sample, int format, const char *filename, c
 		break;
 		default:
 			veejay_msg(VEEJAY_MSG_ERROR, "Unknown recording format");
-			return 0;
+			return 1;
 			break;
 	}
 
-	if(timecode != NULL)
-		rec->tf = sample_tc_to_frames( timecode, ps->fps);
+	if(nframes > 0)
+		rec->tf = nframes; //sample_tc_to_frames( timecode, ps->fps);
 	else
 		rec->tf = (long) (ps->fps * 60);
 	
 	rec->format = fmt;
 	
-	int error = vevo_property_set( sample, "filename", VEVO_ATOM_TYPE_STRING,1, &filename );
+	int error = vevo_property_set( srd->info_port, "filename", VEVO_ATOM_TYPE_STRING,1, &filename );
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
@@ -2591,14 +2604,14 @@ int	sample_configure_recorder( void *sample, int format, const char *filename, c
 	if(!rec->buf)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate buffer for recorder");
-		return 0;
+		return 1;
 	}	
 			
 	memset( rec->buf,0, max_size );
 	rec->con = 1;
 	rec->max_size = max_size;
 
-	return 1;	
+	return VEVO_NO_ERROR;	
 }
 
 int	sample_start_recorder( void *sample , sample_video_info_t *ps)
@@ -2609,15 +2622,15 @@ int	sample_start_recorder( void *sample , sample_video_info_t *ps)
 	if(!rec->con)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "You must configure the recorder first");
-		return 0;
+		return 1;
 	}
 	if(rec->rec)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "The recorder is already active");
-		return 0;
+		return 1;
 	}
 	
-	char *destination = get_str_vevo( sample,"filename");
+	char *destination = get_str_vevo( srd->info_port,"filename");
 #ifdef STRICT_CHECKING
 	assert( destination != NULL );
 	assert( rec->tf > 0 );
@@ -2633,14 +2646,13 @@ int	sample_start_recorder( void *sample , sample_video_info_t *ps)
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to record to '%s'. Please (re)configure recorder", destination );
 		free(rec->buf);
 		memset( rec, 0  , sizeof( samplerecord_t ));	
-		return 0;
+		return 1;
 	}
 	
 	rec->nf = 0;
 	rec->rec = 1;
 
-	return 1;
-
+	return VEVO_NO_ERROR;
 }
 
 int	sample_is_recording( void *sample )
@@ -2658,7 +2670,7 @@ int	sample_stop_recorder( void *sample )
 	samplerecord_t *rec = srd->record;
 	sampleinfo_t   *sit = srd->info;
 	if(!rec->rec)
-		return 0;
+		return 1;
 
 
 	lav_close( (lav_file_t*) rec->fd );
@@ -2670,7 +2682,7 @@ int	sample_stop_recorder( void *sample )
 	rec->max_size = 0;
 	sit->rec      = 0.0;
 	
-	return 0;	
+	return VEVO_NO_ERROR;	
 }
 
 
@@ -2679,7 +2691,7 @@ int	sample_record_frame( void *sample, VJFrame *frame, uint8_t *audio_buffer, in
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
 	samplerecord_t *rec = srd->record;
 	sampleinfo_t   *sit = srd->info;
-	
+
 	int compr_len = vj_avcodec_encode_frame(
 			rec->nf++,
 			rec->format,
@@ -2722,6 +2734,122 @@ int	sample_record_frame( void *sample, VJFrame *frame, uint8_t *audio_buffer, in
 	return 1;
 }
 
+int	sample_reset_bind( void *sample, void *src_entry )
+{
+	void *bptr = NULL;
+	int error = vevo_property_get( src_entry, "bind",0,&bptr );
+	if( error != VEVO_NO_ERROR )
+		return 0;
+	bind_t *bt = (bind_t*) bptr;
+	free(bt);
+	
+	error = vevo_property_set( src_entry, "bind", VEVO_ATOM_TYPE_VOIDPTR,0,NULL );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	return 1;	
+}
 
+int	sample_del_bind( void *sample, void *src_entry, int pi )
+{
+	void *bptr = NULL;
+	int error = vevo_property_get( src_entry, "bind",0,&bptr );
+#ifdef STRICT_CHECKING
+	assert( pi >= 0 && pi < 32 );
+#endif
+	if( error != VEVO_NO_ERROR )
+		return 1;
+	bind_t *bt = (bind_t*) bptr;
+	bt->p[pi] = -1;
+	bt->e[pi] = -1;
+	error = vevo_property_set( src_entry, "bind", VEVO_ATOM_TYPE_VOIDPTR,1,&bptr );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	return VEVO_NO_ERROR;	
+}
+
+int	sample_new_bind( void *sample, void *src_entry, int entry, int pi, int pj )
+{
+	void *bptr = NULL;
+	int error = vevo_property_get( src_entry, "bind",0,&bptr );
+#ifdef STRICT_CHECKING
+	assert( pi >= 0 && pi < 32 );
+	assert( entry >= 0 && entry <= 19);
+#endif
+	
+	if(error == VEVO_NO_ERROR )
+	{
+		bind_t *bt = (bind_t*) bptr;
+		bt->p[pi] = pj;
+		bt->e[pi] = entry;
+	}
+	else
+	{
+		bind_t *bt = (bind_t*) vj_malloc(sizeof(bind_t));
+		int i;
+		for ( i = 0; i < 32; i ++ )
+		{
+			bt->p[i] = -1;
+			bt->e[i] = -1;
+		}
+		bt->p[pi] = pj;
+		bt->e[pi] = entry;
+		bptr = (void*) bt;
+	}
+	
+	error = vevo_property_set( src_entry, "bind", VEVO_ATOM_TYPE_VOIDPTR,1,&bptr );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+
+	return VEVO_NO_ERROR;	
+}
+
+int	sample_apply_bind( void *sample, void *current_entry )
+{
+	char key[64];
+	char dkey[64];
+	void *bptr = NULL;
+	int error = vevo_property_get( current_entry, "bind",0,&bptr );
+	void *fx_out_values = NULL;
+	void *fx_values = NULL;
+	if( error != VEVO_NO_ERROR )
+		return 0;
+
+	bind_t *bt = (bind_t*)bptr;
+	int i;
+	for ( i = 0; i < 32 ; i ++ )
+	{
+		if( bt->p[i] >= 0 )
+		{
+			sprintf(key, "p%02d", i );
+			sprintf(dkey, "p%02d", bt->p[i] );
+	
+			int dentry = bt->e[i];
+			void *dst_entry = sample_get_fx_port_ptr( sample,dentry );
+#ifdef STRICT_CHECKING
+			assert( dst_entry != NULL );
+#endif
+			error = vevo_property_get( current_entry, "fx_out_values",0,&fx_out_values );
+#ifdef STRICT_CHECKING
+			assert( error == VEVO_NO_ERROR );			
+#endif
+			error = vevo_property_get( dst_entry, "fx_values",0,&fx_values );
+#ifdef STRICT_CHECKING
+			assert( error == VEVO_NO_ERROR );			
+#endif
+
+			//@ todo: is atom type compatible ?
+			clone_prop_vevo(
+				fx_out_values,
+				fx_values,
+				key,
+				dkey );
+		}
+	}
+
+	return 0;
+}
 
 

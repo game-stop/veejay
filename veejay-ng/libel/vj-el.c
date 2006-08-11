@@ -396,7 +396,6 @@ void	vj_el_init()
 #ifdef USE_GDK_PIXBUF
 	vj_picture_init();
 #endif
-	avcodec_register_all();
 }
 
 int	vj_el_is_dv(editlist *el)

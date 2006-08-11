@@ -246,7 +246,16 @@ int veejay_init_project_from_args( veejay_t *info, int w, int h, float fps, int 
 	svit->rate = rate;
 	svit->bits = 16;
 	svit->bps = bps;
+
+	avcodec_register_all();
+
 	
+	int n = vj_avcodec_init( w,h,(double)fps,fmt,norm);
+	
+#ifdef STRICT_CHECKING
+	assert( n == 1 );
+#endif	
+
 	veejay_msg(2, "Project settings:");
 	veejay_msg(2, "\tvideo settings: %d x %d, @%2.2f in %s", svit->w,svit->h,svit->fps, (svit->norm ? "NTSC" :"PAL") );
 	veejay_msg(2, "\taudio settings: %ld Hz, %d bits, %d channels, %d bps",
@@ -265,6 +274,7 @@ int veejay_init_project_from_args( veejay_t *info, int w, int h, float fps, int 
 		veejay_msg(0, "Error initializing EDL cache");
 		return -1;
 	}
+
 	plug_sys_init( svit->fmt,svit->w,svit->h);
 //	plug_sys_set_palette( svit->fmt );
 	return 1;
@@ -788,7 +798,7 @@ int veejay_init(veejay_t * info)
 	assert( settings != NULL );
 #endif
 	veejay_setup_timer( info );
-	
+
 	info->performer = performer_init( info, 32 );
 
 	veejay_msg(VEEJAY_MSG_INFO, "Loading plugins");

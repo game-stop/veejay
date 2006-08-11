@@ -84,7 +84,6 @@ void veejay_msg(int type, const char format[], ...)
 {
     char prefix[10];
     static char buf[256];
-    static char sline[270];
     va_list args;
     int line = 0;
 

@@ -234,11 +234,22 @@ static	int	livido_scan_parameters( void *plugin, void *plugger_port )
 			clone_prop_vevo( param, vje_port, "default", "default" );
 			clone_prop_vevo( param, vje_port, "min", "min" );
 			clone_prop_vevo( param, vje_port, "max", "max" );
-			double a = 0;
-			double b = 0;
-			vevo_property_get( vje_port,"value" ,0, &a );
-			vevo_property_get( param,"default" ,0, &b );
+			double a = 0.0;
+			double b = 0.0;
+			error = vevo_property_get( vje_port,"value" ,0, &a );
 #ifdef STRICT_CHECKING
+			assert( error == VEVO_NO_ERROR );
+#endif
+			error = vevo_property_get( param,"default" ,0, &b );
+#ifdef STRICT_CHECKING
+			assert( error == VEVO_NO_ERROR );
+#endif
+#ifdef STRICT_CHECKING
+			if( a != b )
+			{
+				veejay_msg(0,
+					"value is '%g', should be %g",a,b);
+			}
 			assert( a == b );
 #endif			
 		} else if (strcasecmp(kind, "INDEX") == 0 ) {

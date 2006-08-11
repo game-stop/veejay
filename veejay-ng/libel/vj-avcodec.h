@@ -19,34 +19,7 @@
 #ifndef VJ_AVCODEC_H
 #define VJ_AVCODEC_H
 
-//@ todo: encapsulate
-#include <ffmpeg/avcodec.h>
-
-#define ENCODER_MJPEG 0
-#define ENCODER_DVVIDEO 1
-#define ENCODER_DIVX 2
-#define ENCODER_MPEG4 3
-#define ENCODER_YUV420 4
-#define ENCODER_YUV422 5
-#define NUM_ENCODERS 6
-
-typedef struct
-{
-	AVCodec *codec;
-	AVCodec *audiocodec;
-	AVFrame *frame;
-	AVCodecContext	*context;
-	int out_fmt;
-	int uv_len;
-	int len;
-	int sub_sample;	
-	int super_sample;
-	int encoder_id;
-	int width;
-	int height;
-} vj_encoder;
-
-int		vj_avcodec_init(void *el);
+int		vj_avcodec_init(int w, int h , double fps, int fmt, int norm);
 
 int		vj_avcodec_encode_frame( int format, uint8_t *src[3], uint8_t *dst, int dst_len);
 

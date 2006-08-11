@@ -1703,6 +1703,62 @@ void vj_event_el_del(void *ptr, const char format[], va_list ap)
 
 }
 
+void	vj_event_sample_detach_out_parameter( void *ptr, const char format[] , va_list ap )
+{
+	int args[5];
+	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args, s, format, ap);
+
+	void *sample = which_sample( v, args );
+	
+	if(sample)
+	{
+		void *src_entry = sample_get_fx_port_ptr( sample,args[1] );
+		if(src_entry == NULL )
+		{
+			veejay_msg(0,"Invalid fx entry");
+			return;
+		}
+
+		int error = sample_del_bind( sample, src_entry, args[2] );
+		if( error == VEVO_NO_ERROR )
+		{
+			veejay_msg(0, "Detached output parameter %d on entry %d", args[2],args[1] );
+		}
+	}
+
+}
+
+void	vj_event_sample_attach_out_parameter( void *ptr, const char format[],
+		va_list ap)
+{
+	int args[5];
+	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args, s, format, ap);
+
+	void *sample = which_sample( v, args );
+	if(sample)
+	{
+		void *src_entry = sample_get_fx_port_ptr( sample,args[1] );
+		if(src_entry == NULL )
+		{
+			veejay_msg(0,"Invalid fx entry");
+			return;
+		}
+
+		int error = sample_new_bind( sample, src_entry, args[2],
+				args[3],args[4] );
+		if( error == VEVO_NO_ERROR )
+		{
+			veejay_msg(0, "Pushing out parameters on entry %d parameter %d -> Entry %d parameter %d",
+						args[1],args[3],args[2],args[4]);
+		}
+	}
+	
+}
+
 void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 {
 	int args[2];
@@ -1726,4 +1782,58 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 {
 }
 
+void	vj_event_sample_configure_recorder( void *ptr, const char format[], va_list ap )
+{
+	int args[4];
+	veejay_t *v = (veejay_t*) ptr;
+	char s[256];
+	P_A(args, s, format, ap);
+	
+	void *sample = which_sample( v, args );
+	if(sample)
+	{
+		int error = sample_configure_recorder( sample, args[1], s, args[2],	
+				v->video_info );
+		if( error )
+			veejay_msg(0, "Unable to configure the recorder");
+		else
+			veejay_msg(0, "Recorder ready");
+	}
 
+}
+
+void	vj_event_sample_start_recorder( void *ptr, const char format[], va_list ap )
+{
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args, s, format, ap);
+	
+	void *sample = which_sample( v, args );
+	if(sample)
+	{
+		int error = sample_start_recorder( sample,v->video_info );
+		if( error )
+			veejay_msg(0, "Unable to start sample recorder");
+		else
+			veejay_msg(2, "Started sample recorder");
+	}
+}
+
+void	vj_event_sample_stop_recorder( void *ptr, const char format[], va_list ap )
+{
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args, s, format, ap);
+	
+	void *sample = which_sample( v, args );
+	if(sample)
+	{
+		int error = sample_stop_recorder( sample );
+		if ( error )
+			veejay_msg(0, "Unable to stop sample recorder");
+		else
+			veejay_msg(2, "Stopped sample recorder. File is written");
+	}
+}

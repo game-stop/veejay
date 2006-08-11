@@ -42,6 +42,10 @@
 #define DV_NTSC_SIZE 120000
 #define DV_AUDIO_MAX_SAMPLES 1944
 
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
+
 int	is_dv_resolution(int w, int h)
 {
 	if( h == NTSC_H && w == NTSC_W )
@@ -72,13 +76,13 @@ vj_dv_decoder *vj_dv_decoder_init(int quality, int width, int height, int pixel_
 }
 
 /* init the dv encoder and encode buffer */
-vj_dv_encoder *vj_dv_init_encoder(void * edl, int pixel_format)
+vj_dv_encoder *vj_dv_init_encoder(int w, int h, int norm, int pixel_format)
 {
 	vj_dv_encoder *e = (vj_dv_encoder*) vj_malloc(sizeof(vj_dv_encoder));
 	if(!e) return NULL;
 	e->encoder = dv_encoder_new(0,0,0);
-	e->encoder->isPAL = (vj_el_get_norm(edl) == 'p' ? 1 : 0);
-	e->encoder->is16x9 = (vj_el_get_width(edl) / vj_el_get_height(edl) >= 1.777 ? 1: 0);
+	e->encoder->isPAL = (norm == 0 ? 1: 0);
+	e->encoder->is16x9 = (((float)w / h >= 1.777) ? 1: 0);
 	e->encoder->vlc_encode_passes = 3;
     	e->encoder->static_qno = 0;
     	e->encoder->force_dct = DV_DCT_AUTO;

@@ -117,11 +117,12 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 	if( num <= 0 )
 		return;
 
-	int itmp[num];
-	double dtemp[num];
-	char *stmp[num];
+	int itmp[8];
+	double dtemp[8];
+	char *stmp[8];
 	
 	int error;
+	void *ptr = NULL;
 	
 	switch( type )
 	{
@@ -142,15 +143,16 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 		case VEVO_ATOM_TYPE_DOUBLE:
 			for( i = 0; i < num ; i++ )
 			{
-				error = vevo_property_get( port, key, i, &(itmp[i]));
+				error = vevo_property_get( port, key, i, &(dtemp[i]));
 #ifdef STRICT_CHECKING
 				assert( error == VEVO_NO_ERROR );
 #endif
 			}
-			error = vevo_property_set( to_port, as_key, type, num, &itmp );
+			error = vevo_property_set( to_port, as_key, type, num, &dtemp );
 #ifdef STRICT_CHECKING
 			assert( error == VEVO_NO_ERROR );
 #endif
+			break;
 		case VEVO_ATOM_TYPE_STRING:
 			for( i = 0; i < num; i ++)
 			{

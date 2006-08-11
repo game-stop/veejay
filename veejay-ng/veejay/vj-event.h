@@ -80,4 +80,12 @@ void    vj_event_chain_entry_set_parameter_value( void *ptr, const char format[]
 void    vj_event_chain_entry_set_input( void *ptr, const char format[], va_list ap );
 void	vj_event_chain_entry_set_alpha( void *ptr, const char format[], va_list ap);
 
+void	vj_event_sample_attach_out_parameter( void *ptr, const char format[], va_list ap );
+void	vj_event_sample_detach_out_parameter( void *ptr, const char format[], va_list ap );
+
+void	vj_event_sample_configure_recorder( void *ptr, const char format[], va_list ap );
+void	vj_event_sample_start_recorder( void *ptr, const char format[], va_list ap );
+void	vj_event_sample_stop_recorder( void *ptr, const char format[], va_list ap );
+
+
 #endif

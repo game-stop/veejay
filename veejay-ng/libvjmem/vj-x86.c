@@ -20,6 +20,7 @@
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include <sys/time.h>
+#include <unistd.h>
 
 
 /** \defgroup memman Fast memory copy and aligned memory allocation 

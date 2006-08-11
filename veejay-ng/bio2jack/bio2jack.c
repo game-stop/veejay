@@ -577,8 +577,8 @@ JACK_callback(nframes_t nframes, void *arg)
          (&drv->callback_buffer2, &drv->callback_buffer2_size,
           jackBytesAvailable))
       {
-        ERR("allocated %lu bytes, need %lu bytes\n",
-            drv->callback_buffer2_size, jackBytesAvailable);
+        ERR("allocated %lu bytes, need %d bytes\n",
+            drv->callback_buffer2_size, (int)jackBytesAvailable);
         return -1;
       }
 
