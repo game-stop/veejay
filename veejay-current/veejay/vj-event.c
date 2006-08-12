@@ -5667,11 +5667,21 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 	int args[2];
 
 	P_A(args,str,format,ap);
+
+	if( strncasecmp( str, "localhost" ) == 0 )
+	{
+		if( args[0] == v->uc->port )
+		{	
+			veejay_msg(0, "Try another port number, I am listening on this one.");
+			return;
+		}
+	}
+	
 	int id = veejay_create_tag(v, VJ_TAG_TYPE_NET, str, v->nstreams, 0,args[0]);
 	vj_event_send_new_id( v, id);
 
 	if(id <= 0)
-		veejay_msg(VEEJAY_MSG_ERROR, "create new Network stream");
+		veejay_msg(VEEJAY_MSG_ERROR, "Failed to create unicast stream");
 }
 
 void vj_event_tag_new_mcast(void *ptr, const char format[], va_list ap)

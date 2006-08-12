@@ -464,6 +464,7 @@ void	*reader_thread(void *data)
 		if( t->state == THREAD_STOP )
 		{
 			pthread_mutex_unlock( &(t->mutex));
+			t->error = 1;
 			return NULL;
 		}
 	
@@ -485,6 +486,7 @@ void	*reader_thread(void *data)
 						if( ret <= 0 )
 						{
 							pthread_mutex_unlock( &(t->mutex));
+							veejay_msg(0, "Failed to send frame request to remote");
 							return NULL;
 						}
 						have_sent = 1;
@@ -495,8 +497,8 @@ void	*reader_thread(void *data)
 						ret = vj_client_read_i ( v, tag->socket_frame );
 						if(ret>0)
 							have_sent = 0;
-						if( ret == -1 )
-						 t->error = THREAD_STOP;
+						if( ret <= 0 )
+						 t->state = THREAD_STOP;
 					}
 				}
 			}
@@ -508,10 +510,10 @@ void	*reader_thread(void *data)
 
 		pthread_mutex_unlock( &(t->mutex) );
 
-		if( ret == -1)
+		if( ret <= 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Stream %d lost connection! ",tag->id);
-			t->error = THREAD_STOP;
+			t->state = THREAD_STOP;
 		}
 	}
 }
@@ -1727,14 +1729,13 @@ int vj_tag_enable(int t1) {
 		int success = vj_client_connect( vj_tag_input->net[tag->index], tag->source_name,NULL,tag->video_channel);
 		if( success == 0 )
 			return -1;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Connected to %s, port %d",
+		veejay_msg(VEEJAY_MSG_INFO, "Connected to %s, port %d",
 			tag->source_name, tag->video_channel );
 		//vj_client_flush( vj_tag_input->net[tag->index] );
 		threaded_t *t = (threaded_t*)tag->private;
 		t->error = 0;
 		t->state = THREAD_START;
 		pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
-		veejay_msg(VEEJAY_MSG_DEBUG, "Thread started");
 	}
 	if( tag->source_type == VJ_TAG_TYPE_MCAST )
 	{
