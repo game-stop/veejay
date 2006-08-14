@@ -342,7 +342,14 @@ int main(int argc, char **argv)
 	veejay_free(info);
 	return 0;
     }
-   
+  
+    	if( dump_ )
+	{
+		vj_init_vevo_events();
+		vj_event_vevo_dump();
+		return 0;
+	}
+ 
 
     info->sync_correction = synchronization_;
     info->sync_skip_frames = skip_;
@@ -388,7 +395,6 @@ int main(int argc, char **argv)
 
 	smp_check();
 
-
 	char *mem_func = get_memcpy_descr();
 	if(mem_func)
 	{
@@ -396,21 +402,13 @@ int main(int argc, char **argv)
 		free(mem_func);
 	}
 
-
-    if(veejay_init( info ) < 0 )
+    
+      	if(veejay_init( info ) < 0 )
 	{	
 		veejay_msg(VEEJAY_MSG_ERROR, "Initializing veejay");
 		return 0;
 	}
 
-    	if( dump_ )
-	{
-		vj_event_vevo_dump();
-		veejay_quit(info);
-		veejay_free(info);
-		return 0;
-	}
-   
 	if(!veejay_main(info))
 	{
 	    veejay_msg(VEEJAY_MSG_ERROR, "Cannot start main playback cycle");

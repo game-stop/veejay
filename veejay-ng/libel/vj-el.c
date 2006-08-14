@@ -569,13 +569,6 @@ int 	vj_el_scan_video_frame(void *edl)
 	}
 
 	uint8_t *data = vj_malloc( sizeof(uint8_t*) * el->video_width * el->video_height * 4 );
-	
-
-	if(lav_filetype( el->lav_fd[N_EL_FILE(n)] ) == 'x')
-        {
-		veejay_msg(VEEJAY_MSG_ERROR, "What is this?");
-		return 0;
-	}
 
     	res = lav_read_frame(el->lav_fd[N_EL_FILE(n)], data);
 	if( res <= 0 )

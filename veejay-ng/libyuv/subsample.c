@@ -73,6 +73,7 @@ typedef struct
 	uint8_t *buf;
         uint8_t *YUV_to_YCbCr[2];
 	int     jyuv;
+	uint8_t *planes[4];
 } yuv_sampler_t;
 
 static uint8_t *sample_buffer = NULL;
@@ -94,6 +95,29 @@ void *subsample_init(int len)
 	return (void*) s;
 }
 
+void *subsample_init_copy(int w, int h)
+{
+	void *ret = NULL;
+	int len = w;
+	yuv_sampler_t *s = (yuv_sampler_t*) vj_malloc(sizeof(yuv_sampler_t) );
+	if(!s)
+		return ret;
+	memset( s, 0 , sizeof( yuv_sampler_t ));
+	s->buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
+	s->YUV_to_YCbCr[0] = NULL;
+	s->YUV_to_YCbCr[1] = NULL;
+	if(!s->buf)
+		return ret;
+
+	s->planes[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * w * h );
+	s->planes[1] = (uint8_t*) vj_malloc( sizeof(uint8_t) * w * h );
+	s->planes[2] = (uint8_t*) vj_malloc( sizeof(uint8_t) * w * h );
+	
+	return (void*) s;
+}
+
+
+
 void	subsample_free(void *data)
 {
 	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
@@ -105,6 +129,12 @@ void	subsample_free(void *data)
 		if(sampler->YUV_to_YCbCr[1])
 			free(sampler->YUV_to_YCbCr[1]);
 		free(sampler);
+		if(sampler->planes[0])
+			free(sampler->planes[0]);
+		if(sampler->planes[1])
+			free(sampler->planes[1]);
+		if(sampler->planes[2])
+			free(sampler->planes[2]);
 	}
 	sampler = NULL;
 }
@@ -936,6 +966,46 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
 
 
 
+void chroma_subsample_copy(subsample_mode_t mode, void *data, VJFrame *frame,
+		      int width, int height, uint8_t *res[])
+{
+  yuv_sampler_t *sampler = (yuv_sampler_t*) data;
+ 
+  veejay_memcpy( sampler->planes[1], frame->data[1], frame->uv_len );
+  veejay_memcpy( sampler->planes[2], frame->data[2], frame->uv_len );    
+  
+  switch (mode) {
+  case SSM_420_JPEG_BOX:
+  case SSM_420_JPEG_TR: 
+    ss_444_to_420jpeg(sampler->planes[1], width, height);
+    ss_444_to_420jpeg(sampler->planes[2], width, height);
+#ifdef HAVE_ASM_MMX
+	emms();
+#endif
+    break;
+  case SSM_420_MPEG2:
+    ss_444_to_420mpeg2(sampler->planes[1], width, height);
+    ss_444_to_420mpeg2(sampler->planes[2], width, height);
+    break;
+  case SSM_422_444:
+    ss_444_to_422(data,sampler->planes[1],width,height);
+    ss_444_to_422(data,sampler->planes[2],width,height);
+#ifdef HAVE_ASM_MMX
+	emms();
+#endif
+    break;
+  case SSM_420_422:
+    ss_422_to_420(sampler->planes[1],width,height);
+    ss_422_to_420(sampler->planes[2],width,height);
+    break;
+  default:
+    break;
+  }
+
+    res[0] = frame->data[0];
+    res[1] = sampler->planes[1];
+    res[2] = sampler->planes[2];    
+}
 
 void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
 		      int width, int height)

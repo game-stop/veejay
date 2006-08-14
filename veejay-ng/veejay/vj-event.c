@@ -1796,8 +1796,6 @@ void	vj_event_sample_configure_recorder( void *ptr, const char format[], va_list
 				v->video_info );
 		if( error )
 			veejay_msg(0, "Unable to configure the recorder");
-		else
-			veejay_msg(0, "Recorder ready");
 	}
 
 }

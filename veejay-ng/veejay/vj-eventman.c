@@ -718,7 +718,7 @@ void		vj_init_vevo_events(void)
 				"Configure sample recorder",
 				vj_event_sample_configure_recorder,
 				4,
-				VIMS_REQUIRE_ALL_PARAMS,
+				VIMS_LONG_PARAMS|VIMS_REQUIRE_ALL_PARAMS,
 				SAMPLE_ID_HELP,
 				0,
 				"Dataformat",

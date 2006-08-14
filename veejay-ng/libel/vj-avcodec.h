@@ -19,11 +19,10 @@
 #ifndef VJ_AVCODEC_H
 #define VJ_AVCODEC_H
 
-int		vj_avcodec_init(int w, int h , double fps, int fmt, int norm);
 
-int		vj_avcodec_encode_frame( int format, uint8_t *src[3], uint8_t *dst, int dst_len);
+void	*vj_avcodec_new_encoder( int id, int w, int h, int pixel_format, double dfps);
 
-int		vj_avcodec_free();
+int		vj_avcodec_encode_frame( void *codec, int format, void *dsrc, uint8_t *buf, int buf_len, uint64_t nframe);
 
 /* color space conversion routines, should go somewhere else someday
    together with subsample.c/colorspace.c into some lib

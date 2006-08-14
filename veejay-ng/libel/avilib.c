@@ -762,6 +762,8 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
             AVI->video_strn = num_stream;
             vids_strh_seen = 1;
 
+		veejay_msg(0, "Try '%s'", AVI->compressor );
+	    
 		/* setup FFMPEG codec */
 	    	if( strncasecmp("mjpg", AVI->compressor, 4) == 0)
 			AVI->ffmpeg_codec_id = CODEC_ID_MJPEG;
@@ -778,6 +780,11 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
 		if( strncasecmp("div3", AVI->compressor,4) == 0)
 			AVI->ffmpeg_codec_id = CODEC_ID_MSMPEG4V3;
 
+		if( strncasecmp("ljpg", AVI->compressor,4 ) == 0 )
+			AVI->ffmpeg_codec_id = CODEC_ID_LJPEG;
+		if( strncasecmp("hfyu", AVI->compressor,4 ) == 0 )
+			AVI->ffmpeg_codec_id = CODEC_ID_HUFFYUV;
+		
 		/* non standard follow */
 		if( strncasecmp("iyuv", AVI->compressor,4) == 0)
 			AVI->ffmpeg_codec_id = 997;

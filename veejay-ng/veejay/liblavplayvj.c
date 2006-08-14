@@ -247,15 +247,9 @@ int veejay_init_project_from_args( veejay_t *info, int w, int h, float fps, int 
 	svit->bits = 16;
 	svit->bps = bps;
 
+	avcodec_init();
 	avcodec_register_all();
-
 	
-	int n = vj_avcodec_init( w,h,(double)fps,fmt,norm);
-	
-#ifdef STRICT_CHECKING
-	assert( n == 1 );
-#endif	
-
 	veejay_msg(2, "Project settings:");
 	veejay_msg(2, "\tvideo settings: %d x %d, @%2.2f in %s", svit->w,svit->h,svit->fps, (svit->norm ? "NTSC" :"PAL") );
 	veejay_msg(2, "\taudio settings: %ld Hz, %d bits, %d channels, %d bps",
@@ -694,7 +688,6 @@ int veejay_close(veejay_t * info)
 
 void	veejay_deinit(veejay_t *info)
 {
-	vj_avcodec_free();
 	vj_server_shutdown(info->status_socket);
 	vj_server_shutdown(info->command_socket);
 	vj_server_shutdown(info->frame_socket);

@@ -108,11 +108,13 @@ typedef struct
 	int	rec;
 	int	con;
 	int	max_size;
-	char	format;
+	int	format;
+	char	aformat;
 	void	*fd;
 	long 	tf;
 	long	nf;
 	uint8_t *buf;
+	void    *codec;
 } samplerecord_t;
 
 //! \typedef sample_runtime_data Sample Runtime Data structure
@@ -2543,23 +2545,38 @@ int	sample_configure_recorder( void *sample, int format, const char *filename, i
 {
 	char	fmt = 'Y'; //default uncompressed format
 	int	max_size = 0;
+	char	*codec;
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
 	sampleinfo_t *sit = srd->info;
 	samplerecord_t *rec = srd->record;
 
+	if( !filename )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "No filename given");
+		return -1;
+	}
+	if( nframes <= 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "No frames to record");
+		return -1;
+	}
+
+	
 	if( sit->rec )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Please stop the recorder first");
 		return 1;
 	}
 	
+	
+	
 	switch( format )
 	{
+		//@ todo: not all encoders here, mod lav_io.c
 		case ENCODER_DVVIDEO:
 			fmt = 'd';
 			if( ps->w == 720 && (ps->h == 480 || ps->h == 576 ) )
 				max_size = ( ps->h == 480 ? 120000: 144000 );
-			
 			break;	
 		case ENCODER_MJPEG:
 			fmt = 'a';
@@ -2567,11 +2584,15 @@ int	sample_configure_recorder( void *sample, int format, const char *filename, i
 			break;		
 		case ENCODER_YUV420:
 			fmt = 'Y';
-			max_size = 2 * ps->h * ps->w;
+			max_size = ( ps->h * ps->w ) + (ps->h * ps->w / 2 );
 			break;
 		case ENCODER_YUV422:
 			fmt = 'P';
-			max_size = 3 * ps->h * ps->w;
+			max_size = 2 * (ps->h * ps->w);
+			break;
+		case ENCODER_YUV444:
+			fmt = 'Q';
+			max_size = 3 * (ps->h * ps->w);
 			break;
 		case ENCODER_MPEG4:
 			fmt = 'M';
@@ -2579,21 +2600,35 @@ int	sample_configure_recorder( void *sample, int format, const char *filename, i
 			break;
 		case ENCODER_DIVX:
 			fmt = 'D';
-			max_size = 65545 * 4;
+			max_size = 65535 * 4;
 			break;
-		break;
+		case ENCODER_LOSSLESS:
+			fmt = 'L';
+			max_size = 65535 * 4;
+			break;
+		case ENCODER_MJPEGB:
+			fmt = 'A';
+			max_size = 65535 * 4;
+			break;
+		case ENCODER_HUFFYUV:
+			fmt = 'H';
+			max_size = 65535 * 4;
+			break;
 		default:
 			veejay_msg(VEEJAY_MSG_ERROR, "Unknown recording format");
 			return 1;
 			break;
 	}
 
+	codec = get_codec_name( format );
+
+	rec->format = format;
+	rec->aformat = fmt;
+	
 	if(nframes > 0)
 		rec->tf = nframes; //sample_tc_to_frames( timecode, ps->fps);
 	else
 		rec->tf = (long) (ps->fps * 60);
-	
-	rec->format = fmt;
 	
 	int error = vevo_property_set( srd->info_port, "filename", VEVO_ATOM_TYPE_STRING,1, &filename );
 #ifdef STRICT_CHECKING
@@ -2601,15 +2636,20 @@ int	sample_configure_recorder( void *sample, int format, const char *filename, i
 #endif
 
 	rec->buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * max_size );
-	if(!rec->buf)
+
+	if(!rec->buf )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate buffer for recorder");
 		return 1;
 	}	
-			
+		
 	memset( rec->buf,0, max_size );
+
+	
 	rec->con = 1;
 	rec->max_size = max_size;
+
+	veejay_msg(VEEJAY_MSG_INFO, "Record to %s (%d frames) in %s", filename, rec->tf, codec );
 
 	return VEVO_NO_ERROR;	
 }
@@ -2635,9 +2675,21 @@ int	sample_start_recorder( void *sample , sample_video_info_t *ps)
 	assert( destination != NULL );
 	assert( rec->tf > 0 );
 #endif	
+
+	rec->codec = vj_avcodec_new_encoder(
+			rec->format, ps->w,ps->h,ps->fmt, (double)ps->fps );
+
+	if(!rec->codec)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize '%s' codec",
+				get_codec_name( rec->format ) );
+		free(rec->buf);
+		memset( rec, 0  , sizeof( samplerecord_t ));	
+		return -1;
+	}
 	
 	rec->fd = (void*)
-		lav_open_output_file( destination, rec->format,
+		lav_open_output_file( destination, rec->aformat,
 				ps->w, ps->h, ps->inter, ps->fps,
 				ps->bps, ps->chans, ps->rate );
 
@@ -2672,6 +2724,7 @@ int	sample_stop_recorder( void *sample )
 	if(!rec->rec)
 		return 1;
 
+	vj_avcodec_close_encoder( rec->codec );
 
 	lav_close( (lav_file_t*) rec->fd );
 	if( rec->buf )
@@ -2681,7 +2734,7 @@ int	sample_stop_recorder( void *sample )
 	
 	rec->max_size = 0;
 	sit->rec      = 0.0;
-	
+
 	return VEVO_NO_ERROR;	
 }
 
@@ -2692,21 +2745,24 @@ int	sample_record_frame( void *sample, VJFrame *frame, uint8_t *audio_buffer, in
 	samplerecord_t *rec = srd->record;
 	sampleinfo_t   *sit = srd->info;
 
+	
 	int compr_len = vj_avcodec_encode_frame(
-			rec->nf++,
+			rec->codec,
 			rec->format,
-			frame->data,
+			(void*)frame,
 			rec->buf,
-			rec->max_size );
+			rec->max_size,
+		        (uint64_t) rec->nf 	);
 
 	if( compr_len <= 0 )
 	{
+		veejay_msg(0, "Cannot encode frame %d", rec->nf );
 		return sample_stop_recorder( sample );
 	}
 
-	int n = lav_write_audio( (lav_file_t*) rec->fd, rec->buf, compr_len );
+	int n = lav_write_frame( (lav_file_t*) rec->fd, rec->buf, compr_len,1 );
 
-	if( n <= 0 )
+	if( n < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Writing video frame");
 		return sample_stop_recorder(sample);
@@ -2722,6 +2778,8 @@ int	sample_record_frame( void *sample, VJFrame *frame, uint8_t *audio_buffer, in
 		}
 	}
 
+	rec->nf ++;
+	
 	if( rec->nf >= rec->tf )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Done recording");
