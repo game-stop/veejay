@@ -131,4 +131,7 @@ int	sample_stop_recorder( void *sample );
 	
 int	sample_record_frame( void *sample, VJFrame *frame, uint8_t *audio_buffer, int a_len );
 
+char *	sample_get_recorded_file( void *sample );
+
+
 #endif

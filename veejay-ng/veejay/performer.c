@@ -541,11 +541,26 @@ void	performer_save_frame( veejay_t *info )
 	performer_t *p = (performer_t*) info->performer;
 
 	if(sample_is_recording( info->current_sample ))
-		sample_record_frame(
+		if(sample_record_frame(
 			info->current_sample,
 			p->display,
 			NULL,
-			0 );
+			0 )==2)
+		{
+			char *file = sample_get_recorded_file( info->current_sample );
+			//@ open and add to samplelist	
+			void *sample = sample_new( 0 );
+			if( sample_open( sample, file ,0, info->video_info ) <= 0 )
+			{
+				veejay_msg(0, "Unable to add recorded file '%s' to samplebank", file );
+			}
+			else
+			{
+				int id = samplebank_add_sample(sample);
+				veejay_msg(0, "Added '%s' to samplebank as Sample %d", file, id );
+			}
+			free(file);
+		}
 			
 }
 

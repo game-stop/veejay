@@ -2693,6 +2693,7 @@ int	sample_start_recorder( void *sample , sample_video_info_t *ps)
 				ps->w, ps->h, ps->inter, ps->fps,
 				ps->bps, ps->chans, ps->rate );
 
+	
 	if(!rec->fd )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to record to '%s'. Please (re)configure recorder", destination );
@@ -2704,6 +2705,8 @@ int	sample_start_recorder( void *sample , sample_video_info_t *ps)
 	rec->nf = 0;
 	rec->rec = 1;
 
+	free(destination);
+	
 	return VEVO_NO_ERROR;
 }
 
@@ -2714,6 +2717,13 @@ int	sample_is_recording( void *sample )
 	if( rec->rec )
 		return 1;
 	return 0;
+}
+
+char *	sample_get_recorded_file( void *sample )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	char *destination = get_str_vevo( srd->info_port,"filename");
+	return destination;
 }
 
 int	sample_stop_recorder( void *sample )
@@ -2784,7 +2794,7 @@ int	sample_record_frame( void *sample, VJFrame *frame, uint8_t *audio_buffer, in
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Done recording");
 		sample_stop_recorder(sample);
-		return 1;
+		return 2;
 	}
 
 	sit->rec = (double) (1.0/rec->tf) * rec->nf;
