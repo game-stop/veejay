@@ -483,7 +483,7 @@ static void *veejay_software_playback_thread(void *arg)
 		}
 #endif	
 		//@ Handle callbacks HERE
-		vj_event_update_remote( info );
+//		vj_event_update_remote( info );
 
 
 		settings->currently_processed_entry = 
@@ -1023,6 +1023,9 @@ static void veejay_playback_cycle(veejay_t * info)
 	    gettimeofday(&time_now, 0);
 	    stats.tdiff = time_now.tv_sec - bs.timestamp.tv_sec +
 		(time_now.tv_usec - bs.timestamp.tv_usec)*1.e-6;
+
+	vj_event_update_remote( info );
+
 	} while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (1 - 1));
 
 #ifdef HAVE_JACK

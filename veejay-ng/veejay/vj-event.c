@@ -1782,6 +1782,118 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 {
 }
 
+void	vj_event_performer_configure_preview( void *ptr, const char format[], va_list ap )
+{
+	int args[3];
+	char *s = NULL;
+	veejay_t *v = (veejay_t*) ptr;
+	P_A(args, s, format, ap);
+
+	int n = performer_setup_preview( v,
+				         v->performer,
+					 args[0],
+					 args[1]);
+	if( n )
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Preview image configured");
+	}
+}
+
+void	vj_event_performer_get_preview_image( void *ptr, const char format[], va_list ap )
+{
+	//write preview image to socket
+}
+
+void	vj_event_samplebank_list( void *ptr, const char format[], va_list ap )
+{
+	/* sample id, sample type */
+	char *data = samplebank_sprint_list();
+	veejay_msg(0,"list: '%s'", data );
+	free(data);
+}
+void	vj_event_samplebank_add ( void *ptr, const char format[], va_list ap )
+{
+	int args[3];
+	char s[1024];
+	veejay_t *v = (veejay_t*) ptr;
+	P_A(args, s, format, ap);
+
+	void *sample = sample_new( args[0] );
+	if( sample_open( sample, s, args[1], v->video_info ) <= 0 )
+	{
+		veejay_msg(0, "Unable to open '%s' as new sample", s);
+	}
+	else
+	{
+		int id =  samplebank_add_sample(sample);
+		veejay_msg(0, "Added '%s' as new sample %d", s, id );
+	}
+}
+void	vj_event_samplebank_del ( void *ptr, const char format[], va_list ap )
+{
+	int args[3];
+	char *s = NULL;
+	veejay_t *v = (veejay_t*) ptr;
+	P_A(args, s, format, ap);
+
+	int current_playing = sample_get_key_ptr( v->current_sample );
+	
+	if( args[0] == current_playing || args[0] == 0)
+	{
+		veejay_msg(0, "Cannot delete current playing sample");
+		return;
+	}
+	
+	if( sample_delete( args[0] ) )
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Deleted sample %d", args[0] );
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Sample %d does not exist",args[0]);
+	}
+}
+
+void	vj_event_fx_list	( void *ptr, const char format[], va_list ap )
+{
+	char *data = list_plugins();
+	veejay_msg(0,"list: '%s'", data );
+	free(data);
+
+}
+void	vj_event_fx_info	( void *ptr, const char format[], va_list ap )
+{
+
+	int args[3];
+	char plug_name[1024];
+	veejay_t *v = (veejay_t*) ptr;
+	P_A(args, plug_name, format, ap);
+	int i;
+	int fx_id = 
+		plug_get_fx_id_by_name( plug_name );
+
+	if( fx_id < 0 )
+	{
+		veejay_msg(0, "Plugin '%s' not loaded", plug_name);
+		return;
+	}
+
+	char *str = plug_describe( fx_id );
+
+	printf( "\n\n%s\n\n", str );
+
+	free(str);
+	
+}
+void	vj_event_sample_fx_details(void *ptr, const char format[], va_list ap)
+{
+}
+void	vj_event_sample_fx_chain( void *ptr, const char format[], va_list ap )
+{
+}
+
+
+
 void	vj_event_sample_configure_recorder( void *ptr, const char format[], va_list ap )
 {
 	int args[4];

@@ -46,7 +46,7 @@
 /** \defgroup performer Performer
  *
  * The performer is the central pool of audio and video frames.
- * During initialization, the performer will allocate 4 linear
+ * During initialization, the performer will allocate a series of linear
  * buffers, each buffer represents a plane. All buffers have
  * the same size. The performer tries to lock this memory to
  * be resident in RAM, but continious if it fails.
@@ -68,11 +68,6 @@
  * the resulting output frame will be displayed. The current frame
  * is stored as input channel for the next entry to process.
  *  
- * If a plugin procesess data inplace, the linear buffer
- * will be updated immediatly.
- * If a plugin produces an output frame, it will be copied 
- * to the start of the linear buffer. 
- *  
  */
 
 //! \typedef performer_t Performer runtime data
@@ -85,22 +80,22 @@ typedef struct
 	VJFrame **fx_buffer;			//<<! Chunks, pointer to resulting fx
 	VJFrame *preview_bw;			//<<! Grayscale preview 
 	VJFrame *preview_col;			//<<! Color preview
-	VJFrame *display;
+	VJFrame *display;			//<<! Pointer to last rendered frame
 	void	*in_frames;			//<<! Port, list of frames needed for this cycle
 	void	*out_frames;			//<<! Port, list of output frames accumulated
-	uint8_t *audio_buffer;
-	AFrame **audio_buffers;		//<<! Linear buffer, locked in RAM
-	void	*resampler;
+	uint8_t *audio_buffer;			//<<! Buffer used for audio data
+	AFrame **audio_buffers;			//<<! Linear buffer, locked in RAM
+	void	*resampler;			//<<! On the fly audio resampling
 	void 	*sampler;			//<<! YUV sampler
-	int	sample_mode;
+	int	sample_mode;			//<<! YUV sample mode
 	int	n_fb;				//<<! Maximum number of Chunks
 	int	n_fetched;			//<<! Total Chunks consumed
-	int	last;
+	int	last;				//<<! Last rendered entry
 	int	dlast;
 } performer_t;
 
 
-//! Allocate a new Chunk
+//! Allocate a new Chunk depending on output pixel format
 /**!
  \param info Veejay Object
  \param p0 Pointer to Plane 0
@@ -158,7 +153,7 @@ static	VJFrame	*performer_alloc_frame( veejay_t *info, uint8_t *p0, uint8_t *p1,
 	return f;
 }
 
-//! Initialize Performer. 
+//! Initialize Performer. Initialize memory for audio and video rendering
 /**!
   \param info Veejay Object
   \param max_fx Maximum Chunks
@@ -324,7 +319,11 @@ void	*performer_init( veejay_t *info, const int max_fb )
 
 	return (void*) p;
 }
-
+//! Start audio task
+/**!
+ \param info Veejay Object
+ \return Error code or audio rate
+ */
 long	performer_audio_start( veejay_t *info )
 {
 #ifdef HAVE_JACK
@@ -372,7 +371,10 @@ long	performer_audio_start( veejay_t *info )
 	return 0;
 #endif
 }
-
+//! Continue playing audio
+/**!
+ \param info Veejay Object
+ */
 void	performer_audio_continue( veejay_t *info )
 {
 	performer_t *p = info->performer;
@@ -382,7 +384,11 @@ void	performer_audio_continue( veejay_t *info )
 	vj_jack_continue( speed );
 }
 
-
+//! Stop playing audio
+/**!
+ \param info Veejay Object
+ \return Error code
+ */
 int	performer_audio_stop( veejay_t *info )
 {
 	int i;
@@ -401,6 +407,10 @@ int	performer_audio_stop( veejay_t *info )
 	info->audio = NO_AUDIO;
 	return 1;
 }
+//! Reset audio buffers
+/**!
+ \param info Veejay Object
+ */
 void	performer_audio_restart( veejay_t *info )
 {
 	int i;
@@ -535,7 +545,10 @@ static	uint8_t *performer_fetch_audio_frames( veejay_t *info, int *gen_samples )
 	return out;
 }
 #endif
-
+//! Record and encode video 
+/**!
+ \param info Veejay Object
+ */
 void	performer_save_frame( veejay_t *info )
 {
 	performer_t *p = (performer_t*) info->performer;
@@ -564,7 +577,12 @@ void	performer_save_frame( veejay_t *info )
 			
 }
 
-
+//! Grab audio frames
+/**!
+ \param info Veejay Object
+ \param skipa Skip audio frames
+ \return Error code
+ */
 int	performer_queue_audio_frame( veejay_t *info, int skipa )
 {
 	static uint8_t *buffer_ = NULL;
@@ -605,13 +623,6 @@ int	performer_queue_audio_frame( veejay_t *info, int skipa )
 #endif	
 	return 1;
 }
-
-//! Queue frame of current playing Sample
-/**!
- \param info Veejay Object
- \param skip_incr Skip Increment
- \return Error code
- */
 
 //! Fetch all video frames needed for this run. 
 /**
@@ -657,6 +668,7 @@ static int	performer_fetch_frames( veejay_t *info, void *samples_needed)
 	free(fetch_list);
 	return n_fetched;
 }
+
 
 static	void	performer_down_scale_plane1x2( uint8_t *src_plane, unsigned int len, uint8_t *dst_plane)
 {
@@ -729,6 +741,14 @@ static	void	performer_preview_frame_color( VJFrame *src, VJFrame *dst, int reduc
 			break;	
 	}
 }
+//! Configure preview image properties 
+/**
+ \param info veejay_t
+ \param p performer_t
+ \param reduce Reduce width x height
+ \param preview_mode Preview mode
+ \return Error code
+ */
 
 int		performer_setup_preview( veejay_t *info, performer_t *p, int reduce, int preview_mode )
 {
@@ -753,8 +773,10 @@ int		performer_setup_preview( veejay_t *info, performer_t *p, int reduce, int pr
      }
      
      if( reduce < PREVIEW_50 || reduce > PREVIEW_125 )
+     {
+	     veejay_msg(VEEJAY_MSG_ERROR, "Wrong reduce value");
 	     return 0;
-     
+     }
      settings->preview	    = preview_mode;
      info->preview_size     = reduce;
      

@@ -712,6 +712,29 @@ void		vj_init_vevo_events(void)
 				-1,
 				NULL );
 
+	index_map_[VIMS_PERFORMER_SETUP_PREVIEW]	= _new_event(
+				"%d %d",
+				VIMS_PERFORMER_SETUP_PREVIEW,
+				"Configure preview image",
+				vj_event_performer_configure_preview,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Preview mode",
+				0,
+				"Recude",
+				0,
+				NULL );
+
+	index_map_[VIMS_PERFORMER_GET_PREVIEW] 		= _new_event(
+				NULL,
+				VIMS_PERFORMER_GET_PREVIEW,
+				"Get preview image",
+				vj_event_performer_get_preview_image,
+				0,
+				VIMS_REQUIRE_ALL_PARAMS,
+				NULL,
+				NULL );
+	
 	index_map_[VIMS_SAMPLE_CONFIGURE_RECORDER]	 = _new_event(
 				"%d %d %d %s",
 				VIMS_SAMPLE_CONFIGURE_RECORDER,
@@ -729,6 +752,86 @@ void		vj_init_vevo_events(void)
 				NULL,
 				NULL );
 
+	index_map_ [ VIMS_SAMPLEBANK_LIST ] = _new_event(
+				NULL,
+				VIMS_SAMPLEBANK_LIST,
+				"List samples in samplebank",
+				vj_event_samplebank_list,
+				0,
+				VIMS_REQUIRE_ALL_PARAMS,
+				NULL,
+				NULL );
+
+	index_map_ [ VIMS_SAMPLEBANK_ADD ] = _new_event(
+				"%d %d %s",
+				VIMS_SAMPLEBANK_ADD,
+				"Add file to samplebank",
+				vj_event_samplebank_add,
+				3,
+				VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS,
+				"Type of sample",
+				0,
+				"Extra token",
+				0,
+				"Filename",
+				NULL,
+				NULL );
+
+	index_map_[ VIMS_SAMPLEBANK_DEL ] = _new_event(
+				"%d",
+				VIMS_SAMPLEBANK_DEL,
+				"Delete sample from samplebank",
+				vj_event_samplebank_del,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Sample ID",
+				0,
+				NULL );
+	
+	index_map_ [ VIMS_FX_LIST ] = _new_event(
+				NULL,
+				VIMS_FX_LIST,
+				"List all loaded plugins",
+				vj_event_fx_list,
+				0,
+				VIMS_REQUIRE_ALL_PARAMS,
+				NULL,
+				NULL );
+
+	index_map_[ VIMS_FX_DETAILS ] = _new_event(
+				"%s",
+				VIMS_FX_DETAILS,
+				"Get plugin information",
+				vj_event_fx_info,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Plugin name",
+				NULL,
+				NULL );	
+	index_map_[ VIMS_FX_CURRENT_DETAILS ] = _new_event(
+				"%d %d",
+				VIMS_FX_DETAILS,
+				"Get fx information on sample entry",
+				vj_event_sample_fx_details,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				SAMPLE_FX_ENTRY_HELP,
+				0,
+				NULL );	
+
+	index_map_[ VIMS_FX_CHAIN ] = _new_event(
+				"%d",
+				VIMS_FX_CHAIN,
+				"Get fx chain of sample",
+				vj_event_sample_fx_chain,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				NULL );
+	
 	index_map_ [ VIMS_SAMPLE_START_RECORDER ] = _new_event(
 				"%d",
 				VIMS_SAMPLE_START_RECORDER,

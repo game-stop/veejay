@@ -87,5 +87,14 @@ void	vj_event_sample_configure_recorder( void *ptr, const char format[], va_list
 void	vj_event_sample_start_recorder( void *ptr, const char format[], va_list ap );
 void	vj_event_sample_stop_recorder( void *ptr, const char format[], va_list ap );
 
+void	vj_event_performer_configure_preview( void *ptr, const char format[], va_list ap);
+void	vj_event_performer_get_preview_image( void *ptr, const char format[], va_list ap);
 
+void	vj_event_samplebank_list( void *ptr, const char format[], va_list ap );
+void	vj_event_samplebank_add ( void *ptr, const char format[], va_list ap );
+void	vj_event_samplebank_del ( void *ptr, const char format[], va_list ap );
+void	vj_event_fx_list	( void *ptr, const char format[], va_list ap );
+void	vj_event_fx_info	( void *ptr, const char format[], va_list ap );
+void	vj_event_sample_fx_details(void *ptr, const char format[], va_list ap);
+void	vj_event_sample_fx_chain( void *ptr, const char format[], va_list ap);
 #endif

@@ -1122,6 +1122,37 @@ void	samplebank_init()
 #endif	
 }
 
+char	*samplebank_sprint_list()
+{
+	char *res = NULL;
+	int len   = 0;
+	char **props = (char**) vevo_list_properties( sample_bank_ );
+	if(!props)
+		return NULL;
+
+	int i = 0;
+	for( i = 0; props[i] != NULL ; i ++ )
+	{
+		if(props[i][0] == 's')
+			len += strlen( props[i] ) + 1;
+	}
+
+	res = (char*) malloc(sizeof(char) * len );
+	memset(res,0,len);
+	
+	char *p = res;
+	for( i = 0; props[i] != NULL ; i ++ )
+	{
+		if(props[i][0] == 's' )
+		{
+			sprintf(p, "%s:", props[i]);
+			p += strlen( props[i] ) + 1;
+		}		
+	}
+
+	return res;
+}
+
 void	samplebank_free()
 {
 	int i = 0;

@@ -265,6 +265,39 @@ static	void	free_plugin(void *plugin)
 
 }
 
+char		*list_plugins()
+{
+	int i = 0;
+	int len = 0;
+	char *res = NULL;
+	for ( i = 0; i < index_; i ++ )
+	{
+		char *name = plug_get_name( i );
+		if(name)
+		{
+			len += strlen(name) + 1;
+			free(name);
+		}
+	}
+
+	if(len <= 0 )
+		return NULL;
+
+	res = (char*) malloc( len );
+	memset( res,0,len );
+	char *p = res;
+	for ( i = 0; i < index_; i ++ )
+	{
+		char *name = plug_get_name(i);
+		if(name)
+		{
+			sprintf(p, "%s:",name );
+			p += strlen(name) + 1;
+		}
+	}
+	return res;
+}
+
 static	void	free_plugins()
 {
 	int i;
@@ -492,6 +525,158 @@ void	plug_set_defaults( void *instance, void *fx_values )
 void	plug_deactivate( void *instance )
 {
 	deinstantiate_plugin( instance );	
+}
+
+static	int	linear_len( char **items )
+{
+	int i = 0;
+	int len = 0;
+	for( i = 0; items[i] != NULL ; i ++ )
+		len += strlen(items[i]);
+	return len;
+}
+
+static	int	memory_needed_for_port( void *port, const char *key )
+{
+	void *subport = NULL;
+	int error = vevo_property_get( port , key, 0, &subport );
+	if( error != VEVO_NO_ERROR )
+		return 0;
+	char **items = vevo_sprintf_port( subport );
+	
+	int len = linear_len(items);
+	int k   = 0;
+	for( k = 0; items[k] != NULL; k ++ )
+		free(items[k]);
+	free(items);
+
+	return len;
+}
+
+static	char *	flatten_port( void *port, const char *key )
+{
+	int len = memory_needed_for_port( port, key );
+	if( len <= 0 )
+		return NULL;
+	
+	char *res = (char*) malloc( len );
+	void *subport = NULL;
+
+	int error = vevo_property_get( port , key, 0, &subport );
+	if( error != VEVO_NO_ERROR )
+		return 0;
+	
+	memset(res,0,len);
+	char **items = vevo_sprintf_port( subport );
+	int k   = 0;
+	for( k = 0; items[k] != NULL; k ++ )
+	{
+		strncat(res, items[k],strlen(items[k]));
+		free(items[k]);
+	}
+	free(items);
+	return res;
+}
+
+char	*plug_describe( int fx_id )
+{
+	void *plug = index_map_[fx_id];
+	if(!plug)
+		return NULL;
+	void *instance = NULL;
+	void *filter = NULL;
+	int pi = 0;
+	int po = 0;
+	int ci = 0;
+	int co = 0;
+	char *res = NULL;
+	char key[64];
+	int i;
+	int len = 0;
+	int error = 0;
+
+	error = vevo_property_get( plug, "num_inputs", 0, &ci );
+	error = vevo_property_get( plug, "num_params", 0, &pi );
+	error = vevo_property_get( plug, "num_out_params",0,&po );
+	error = vevo_property_get( plug, "num_outputs",0,&co );
+	error = vevo_property_get( plug, "instance", 0,&instance );
+	
+	error = vevo_property_get( instance, "filters",0,&filter );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	//@ cannot handle multiple filters yet
+	char *maintainer = get_str_vevo( instance, "maintainer");
+	char *version    = get_str_vevo( instance, "version" );
+	char *description = get_str_vevo( filter, "description" );
+	char *name	 = get_str_vevo(  filter, "name");
+	char *author     = get_str_vevo(  filter, "author" );
+	char *license    = get_str_vevo(  filter, "license" );
+	char **in_params = NULL;
+	char **out_params = NULL;
+	if( pi > 0 )
+	{
+		in_params = (char*) malloc(sizeof(char*) * pi );
+	
+		for( i = 0; i < pi; i ++ )
+		{
+			sprintf(key, "p%02d",i);
+			in_params[i] = flatten_port( plug , key );
+			len += strlen(in_params[i])+1;
+		}
+	}
+	if( po > 0 )
+	{
+		out_params = (char*) malloc(sizeof(char*) * pi );
+	
+		for( i = 0; i < pi; i ++ )
+		{
+			sprintf(key, "q%02d",i);
+			out_params[i] = flatten_port( plug , key );
+			len += strlen(out_params[i])+1;
+		}
+	}
+
+
+	len += strlen( maintainer ) + 12;
+	len += strlen( version ) + 9;
+	len += strlen( description ) + 13;
+	len += strlen( name ) +6;
+	len += strlen( author )+8;
+	len += strlen( license )+9;
+
+	res = (char*) malloc(sizeof(char) * len + 150 );
+	memset(res,0,len);
+
+	sprintf( res,
+			"name=%s:description=%s:author=%s:maintainer=%s:license=%s:version=%s:",
+				name,description,author,maintainer,license,version );
+
+	char *p = res + strlen(res);
+	
+	for( i = 0; i < pi ; i ++ )
+	{
+		sprintf(p, "p%02d=[%s]:", i, in_params[i] );
+		p += strlen(in_params[i]) + 7;
+		free(in_params[i]);
+	}
+	for( i = 0; i < po ; i ++ )
+	{
+		sprintf(p, "q%02d=[%s]:", i, out_params[i] );
+		p += strlen( out_params[i] ) + 7;
+		free(out_params[i]);
+	}
+
+	free(in_params);
+	free(out_params);
+	free(maintainer);
+	free(version);
+	free(description);
+	free(name);
+	free(author);
+	free(license);
+
+	return res;	
 }
 
 void	*plug_activate( int fx_id )

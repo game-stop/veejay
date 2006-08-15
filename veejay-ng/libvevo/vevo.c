@@ -1893,6 +1893,8 @@ char	*vevo_format_property( vevo_port_t *port, const char *key )
 			token[0] = 's';
 			break;
 		case VEVO_ATOM_TYPE_VOIDPTR:
+			token[0] = 'x';
+			break;
 		case VEVO_ATOM_TYPE_PORTPTR:
 			token[0] = 'p';
 			break;	
@@ -2185,11 +2187,13 @@ char  *vevo_sprintf_property( vevo_port_t *port, const char *key  )
 	int 	nerr  = 0;
 	int	size = PROP_MAX_LEN;	
 
+	void	*vport = NULL;
+	
 	sprintf(res, "%s=", key );
 	
 	while( *format && nerr == 0)
 	{
-		char 	tmp[256];
+		char 	tmp[1024];
 		bzero(tmp,256);
 		switch(*format)
 		{
@@ -2238,8 +2242,40 @@ char  *vevo_sprintf_property( vevo_port_t *port, const char *key  )
 				}
 				str_val = NULL;
 				break;
+			case 'x':
+				break;
 			case 'p':
-				tmp[0] = ':';
+				{
+					int num = 0;
+					if(n_elems == 0 )
+					{
+						error = vevo_property_get(port,key,0,&vport );
+						if(error == VEVO_NO_ERROR )
+						num  = vevo_num_properties(vport);
+					}
+
+					if( num > 0 )
+					{
+						char **pstr = vevo_sprintf_port( vport );
+						if(pstr)
+						{
+							int k;
+
+							sprintf(tmp, "[%s",key);	
+							
+						        for( k = 0; pstr[k] != NULL; k ++ )
+						        {
+							       strncat(tmp, pstr[k], strlen(pstr[k]));
+							       free(pstr[k]);
+						        }
+							free(pstr);
+
+							int n = strlen(tmp);
+							tmp[n] =']';
+							tmp[n+1] = ':';
+						}
+					}
+				}
 				break;
 		}
 		*format++;

@@ -776,6 +776,7 @@ libel/Makefile
 bio2jack/Makefile
 vevosample/Makefile
 veejay/Makefile
+tools/Makefile
 man/Makefile
 veejay-config
 veejay.pc
