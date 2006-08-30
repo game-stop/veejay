@@ -119,6 +119,7 @@ typedef struct
 	void			*command_socket;
 	void			*frame_socket;
 	void			*mcast_socket;
+	void			*osc_server;
 
 	int			current_link;
 	int			port_offset;

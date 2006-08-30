@@ -19,7 +19,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/libvevo \
 		$(FFMPEG_CFLAGS)\
 		${XML_CFLAGS} ${DV_FLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} \
-		${PTHREAD_CFLAGS} ${MJPEGTOOLS_CFLAGS} ${GL_CFLAGS} ${SDL_CFLAGS} 
+		${PTHREAD_CFLAGS} ${MJPEGTOOLS_CFLAGS} ${GL_CFLAGS} ${SDL_CFLAGS} ${LIBLO_CFLAGS} 
 
 VEEJAY_LIB_FILE = libveejay.la
 
@@ -35,6 +35,8 @@ libveejay_la_SOURCES =  vj-misc.c \
 			gl.c vj-sdl.c \
 			vj-eventman.c \
 			vj-event.c \
+			oscsend.c \
+			oscservit.c \
 			liblavplayvj.c
 
 libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS )
@@ -68,4 +70,4 @@ bin_PROGRAMS = $(VEEJAY_BIN)
 veejay_SOURCES	= veejay.c  
 veejay_LDADD 	= libveejay.la @LIBGETOPT_LIB@ ${FFMPEG_AVCODEC_LIBS} ${FFMPEG_AVFORMAT_LIBS} \
 			${PTHREAD_LIBS} ${XML_LIBS} ${LIBDV_LIBS} ${GL_LIBS} \
-			${MJPEGTOOLS_LIBS} ${UNICAP_LIBS} ${LIBM_LIBS}  ${SDL_LIBS}
+			${MJPEGTOOLS_LIBS} ${UNICAP_LIBS} ${LIBM_LIBS}  ${SDL_LIBS} ${LIBLO_LIBS}

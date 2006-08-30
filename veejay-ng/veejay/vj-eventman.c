@@ -55,6 +55,7 @@ char	*vj_event_vevo_help_vims( int id, int n );
 int	vj_event_vevo_get_default_value(int id, int p);
 void 	vj_event_vevo_free(void);
 
+
 static	void		dump_event_stderr(vevo_port_t *event)
 {
 	char *fmt = NULL;
@@ -209,7 +210,6 @@ static vevo_port_t	*_new_event(
 	vevo_property_set( p, "arguments", VEVO_ATOM_TYPE_INT, 1, &n_arg );
 	vevo_property_set( p, "flags",	VEVO_ATOM_TYPE_INT, 1, &flags );
 	vevo_property_set( p, "vims_id", VEVO_ATOM_TYPE_INT, 1, &vims_id );
-
 	va_list ap;
 	va_start(ap, flags);
 #ifdef STRICT_CHECKING
@@ -228,7 +228,7 @@ static vevo_port_t	*_new_event(
 		sprintf(param_name, "argument_%d", n );
 		const char *arg = va_arg( ap, const char*);
 #ifdef STRICT_CHECKING
-		if(!arg) veejay_msg(VEEJAY_MSG_DEBUG, "\t%s - %d = '%s' of format %c (%s)",param_name, n, arg, format[it],format );
+		if(!arg) veejay_msg(0, "\t%s - %d = '%s' of format %c (%s)",param_name, n, arg, format[it],format );
 		assert( arg != NULL );
 #endif
 		char *descr = (char*) strdup( arg );
@@ -693,6 +693,36 @@ void		vj_init_vevo_events(void)
 				-1,
 				NULL );
 
+	index_map_[VIMS_SAMPLE_BIND_OUTP_OSC] = _new_event(
+			"%d %d %s",
+			VIMS_SAMPLE_BIND_OUTP_OSC,
+			"Bind OSC path to fx output parameters",
+			vj_event_sample_bind_outp_osc,
+			3,
+			VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS,
+			SAMPLE_ID_HELP,
+			0,
+			SAMPLE_FX_ENTRY_HELP,
+			0,
+			"OSC path",
+			NULL,
+			NULL );
+
+	index_map_[VIMS_SAMPLE_RELEASE_OUTP_OSC] = _new_event(
+			"%d %d",
+			VIMS_SAMPLE_RELEASE_OUTP_OSC,
+			"Release OSC path from fx output parameters",
+			vj_event_sample_release_outp_osc,
+			2,
+			VIMS_REQUIRE_ALL_PARAMS,
+			SAMPLE_ID_HELP,
+			0,
+			SAMPLE_FX_ENTRY_HELP,
+			0,
+			NULL );
+
+			
+	
 	index_map_[VIMS_SAMPLE_ATTACH_OUT_PARAMETER] = _new_event(
 				"%d %d %d %d %d",
 				VIMS_SAMPLE_ATTACH_OUT_PARAMETER,
@@ -711,6 +741,34 @@ void		vj_init_vevo_events(void)
 				"Input parameter",
 				-1,
 				NULL );
+
+	index_map_[VIMS_SAMPLE_OSC_START] = _new_event(
+				"%d %d %s",
+				VIMS_SAMPLE_OSC_START,
+				"Start new OSC sender",
+				vj_event_sample_start_osc_sender,
+				3,
+				VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				"Port number",
+				0,
+				"Address",
+				NULL,
+				NULL );
+
+	index_map_[VIMS_SAMPLE_OSC_STOP] = _new_event(
+				"%d",
+				VIMS_SAMPLE_OSC_STOP,
+				"Stop OSC sender",
+				vj_event_sample_stop_osc_sender,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				NULL );
+				
+	
 
 	index_map_[VIMS_PERFORMER_SETUP_PREVIEW]	= _new_event(
 				"%d %d",

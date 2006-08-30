@@ -129,6 +129,7 @@ typedef	struct
 	int	type;						/* type of sample */
 	samplerecord_t *record;
 	sampleinfo_t *info;
+	void	*osc;
 } sample_runtime_data;
 
 
@@ -205,6 +206,7 @@ static	struct
 	{	"fx_values",	VEVO_ATOM_TYPE_PORTPTR	},	/* port of p0 .. pN, containing copy of fx parameter values */
 	{	"fx_out_values", VEVO_ATOM_TYPE_PORTPTR },	/* output parmaters, p0 ... pN */
 	{	"fx_channels",	VEVO_ATOM_TYPE_PORTPTR	},	/* contains list of sample pointers to use as input channels */
+	{	"fx_osc",	VEVO_ATOM_TYPE_STRING   },	/* osc message string (output)*/
 };
 
 /**
@@ -746,10 +748,12 @@ int	sample_process_fx( void *sample, int fx_entry )
 	
 	plug_clone_from_output_parameters( fx_instance, fx_out_values );
 
-
 	sample_apply_bind( sample, port );
 
-	
+	//@ send osc message if needed
+	sample_send_osc_path( sample, port );
+
+
 	return VEVO_NO_ERROR;
 }
 
@@ -1014,7 +1018,7 @@ static	void	sample_new_fx_chain_entry( void *sample, int id )
 #endif
 	void *fx_values = vevo_port_new( VEVO_FX_VALUES_PORT );
 	void *fx_channels = vevo_port_new( VEVO_ANONYMOUS_PORT );
-	void *fx_out_values = vevo_port_new( VEVO_FX_VALUES_PORT );
+	void *fx_out_values = vevo_port_new( VEVO_ANONYMOUS_PORT );
 	
 	error = vevo_property_set( port, "fx_values", VEVO_ATOM_TYPE_PORTPTR,1,&fx_values);
 #ifdef STRICT_CHECKING
@@ -2403,6 +2407,11 @@ static 	int	sample_sscanf_property(	sample_runtime_data *srd ,vevo_port_t *port,
 	char *format = vevo_format_property( port, key );
 	int  atom    = vevo_property_atom_type( port, key );
 
+#ifdef STRICT_CHECKING
+	int n_elem   = vevo_property_num_elements( port , key);
+	assert( n_elem == 1 ); // function not OK for arrays of atoms
+#endif
+	
 	if( format == NULL )
 		return done;
 	if(atom==-1)
@@ -2951,4 +2960,93 @@ int	sample_apply_bind( void *sample, void *current_entry )
 	return 0;
 }
 
+int	sample_new_osc_sender(void *sample, const char *addr, const char *port )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	if(srd->osc)
+	{
+		veejay_msg(0, "There is already an OSC sender active");
+		return 1;
+	}
+	
+	void *osc_client = veejay_new_osc_sender( addr, port );
+	if(!osc_client)
+	{
+		veejay_msg(0, "Unable to start OSC sender");
+		return 1;
+	}
+
+	srd->osc = osc_client;
+
+	veejay_msg(VEEJAY_MSG_INFO,
+			"OSC address '%s' port '%s', Sender active",
+				addr,port );
+	
+	return VEVO_NO_ERROR;
+}
+
+void	sample_close_osc_sender( void *sample )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	if(srd->osc)
+	{
+		veejay_free_osc_sender( srd->osc );
+		srd->osc = NULL;
+		veejay_msg(VEEJAY_MSG_INFO,
+				"OSC sender inactive");
+	}
+}
+
+void	sample_add_osc_path( void *sample, const char *path, int fx_entry_id )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	
+	//@ add osc path to entry
+	void *port = sample_get_fx_port_ptr( sample,fx_entry_id );
+
+	int error = vevo_property_set( port, "fx_osc", VEVO_ATOM_TYPE_STRING,1,&path );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+}
+
+void	sample_del_osc_path( void *sample, int fx_entry_id )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	
+	//@ add osc path to entry
+	void *port = sample_get_fx_port_ptr( sample,fx_entry_id );
+
+	int error = vevo_property_set( srd->info_port, "fx_osc", VEVO_ATOM_TYPE_STRING,0,NULL );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+}
+
+void	sample_send_osc_path( void *sample, void *fx_entry )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	
+	char *osc_path = get_str_vevo( fx_entry, "fx_osc" );
+	if(!osc_path)
+	{
+		return;
+	}
+	
+	void *fx_out_values = NULL;
+	
+	int	error = vevo_property_get( fx_entry, "fx_out_values",0,&fx_out_values );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );			
+#endif
+
+	if( osc_path )
+	{
+		veejay_vevo_send_osc( srd->osc, 
+				 osc_path,
+			         fx_out_values );
+
+		free(osc_path);
+	}
+}
 

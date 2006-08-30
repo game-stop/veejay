@@ -69,32 +69,30 @@ void 	vj_event_sample_new			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_quit				(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_set_volume			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_debug_level			( 	void *ptr,	const char format[],	va_list ap	);
-
 void	vj_event_bezerk				(	void *ptr,	const char format[],	va_list ap	);
-void	vj_event_fullscreen			( void *ptr, const char format[],	va_list ap );
-
-void	vj_event_chain_entry_set_active( void *ptr, const char format[], va_list ap );
-void 	vj_event_chain_entry_set(void *ptr, const char format[], va_list ap);
-void	vj_event_chain_entry_clear( void *ptr, const char format[], va_list ap );
-void    vj_event_chain_entry_set_parameter_value( void *ptr, const char format[], va_list ap );
-void    vj_event_chain_entry_set_input( void *ptr, const char format[], va_list ap );
-void	vj_event_chain_entry_set_alpha( void *ptr, const char format[], va_list ap);
-
-void	vj_event_sample_attach_out_parameter( void *ptr, const char format[], va_list ap );
-void	vj_event_sample_detach_out_parameter( void *ptr, const char format[], va_list ap );
-
-void	vj_event_sample_configure_recorder( void *ptr, const char format[], va_list ap );
-void	vj_event_sample_start_recorder( void *ptr, const char format[], va_list ap );
-void	vj_event_sample_stop_recorder( void *ptr, const char format[], va_list ap );
-
-void	vj_event_performer_configure_preview( void *ptr, const char format[], va_list ap);
-void	vj_event_performer_get_preview_image( void *ptr, const char format[], va_list ap);
-
-void	vj_event_samplebank_list( void *ptr, const char format[], va_list ap );
-void	vj_event_samplebank_add ( void *ptr, const char format[], va_list ap );
-void	vj_event_samplebank_del ( void *ptr, const char format[], va_list ap );
-void	vj_event_fx_list	( void *ptr, const char format[], va_list ap );
-void	vj_event_fx_info	( void *ptr, const char format[], va_list ap );
-void	vj_event_sample_fx_details(void *ptr, const char format[], va_list ap);
-void	vj_event_sample_fx_chain( void *ptr, const char format[], va_list ap);
+void	vj_event_fullscreen			( 	void *ptr, 	const char format[],	va_list ap	);
+void	vj_event_chain_entry_set_active		( 	void *ptr, 	const char format[], 	va_list ap	);
+void 	vj_event_chain_entry_set		(	void *ptr, 	const char format[], 	va_list ap	);
+void	vj_event_chain_entry_clear		( 	void *ptr, 	const char format[], 	va_list ap 	);
+void    vj_event_chain_entry_set_parameter_value( 	void *ptr, 	const char format[], 	va_list ap 	);
+void    vj_event_chain_entry_set_input		( 	void *ptr, 	const char format[], 	va_list ap 	);
+void	vj_event_chain_entry_set_alpha		( 	void *ptr, 	const char format[], 	va_list ap	);
+void	vj_event_sample_attach_out_parameter	( 	void *ptr, 	const char format[], 	va_list ap 	);
+void	vj_event_sample_detach_out_parameter	( 	void *ptr, 	const char format[], 	va_list ap 	);
+void	vj_event_sample_configure_recorder	( 	void *ptr, 	const char format[], 	va_list ap	);
+void	vj_event_sample_start_recorder		(	void *ptr, 	const char format[], 	va_list ap 	);
+void	vj_event_sample_stop_recorder		( 	void *ptr, 	const char format[], 	va_list ap 	);
+void	vj_event_performer_configure_preview	( 	void *ptr, 	const char format[],	va_list ap	);
+void	vj_event_performer_get_preview_image	( 	void *ptr, 	const char format[], 	va_list ap	);
+void	vj_event_samplebank_list		( 	void *ptr, 	const char format[], 	va_list ap	);
+void	vj_event_samplebank_add 		( 	void *ptr, 	const char format[], 	va_list ap	);
+void	vj_event_samplebank_del 		( 	void *ptr,	const char format[], 	va_list ap	);
+void	vj_event_fx_list			( 	void *ptr, 	const char format[], 	va_list ap	);
+void	vj_event_fx_info			( 	void *ptr, 	const char format[], 	va_list ap 	);
+void	vj_event_sample_fx_details		(	void *ptr, 	const char format[], 	va_list ap	);
+void	vj_event_sample_fx_chain		( 	void *ptr, 	const char format[], 	va_list ap	);
+void 	vj_event_sample_bind_outp_osc		(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_sample_release_outp_osc	(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_sample_start_osc_sender	(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_sample_stop_osc_sender		(	void *ptr,	const char format[],	va_list ap	);
 #endif

@@ -1915,6 +1915,49 @@ char	*vevo_format_property( vevo_port_t *port, const char *key )
 	return res;
 
 }
+char	*vevo_format_kind( vevo_port_t *port, const char *key )
+{
+	char *res = NULL;
+	char token[5];
+	int	atom_type = vevo_property_atom_type( port, key );
+
+	bzero(token,5);
+	
+	switch( atom_type )
+	{
+		case VEVO_ATOM_TYPE_INT:
+		case VEVO_ATOM_TYPE_BOOL:
+			token[0] = 'd';
+		       break;
+	        case VEVO_ATOM_TYPE_UINT64:
+			token[0] = 'D';
+	 	       break;
+       	 	case VEVO_ATOM_TYPE_DOUBLE:
+			token[0] = 'g';
+ 			break;
+		case VEVO_ATOM_TYPE_STRING:
+			token[0] = 's';
+			break;
+		case VEVO_ATOM_TYPE_VOIDPTR:
+			token[0] = 'x';
+			break;
+		case VEVO_ATOM_TYPE_PORTPTR:
+			token[0] = 'p';
+			break;	
+		default:
+			token[0] = 'g';
+			break;		
+	}
+	
+	if( token[0])
+	{
+		res = strdup( token );
+	}
+	
+	return res;
+
+}
+
 
 const char *vevo_split_token_( const char *s, const char delim, char *buf, int buf_len )
 {

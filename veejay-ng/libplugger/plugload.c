@@ -450,19 +450,13 @@ void	plug_clone_from_output_parameters( void *instance, void *fx_values )
 #ifdef STRICT_CHECKING
 	assert( instance != NULL );
 #endif
-	int type = 0;
-	int error = vevo_property_get( instance, "HOST_plugin_type", 0, &type);
+	generic_reverse_clone_out_parameter_f	grc;
+	int error = vevo_property_get( instance, "HOST_plugin_out_param_reverse_f", 0, &grc );
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
-	switch( type )
-	{
-		case VEVO_PLUG_LIVIDO:
-			livido_plug_read_output_parameters( instance, fx_values );
-			break;
-		default:
-			break;
-	}
+	(*grc)(instance,fx_values);	
+///			livido_plug_read_output_parameters( instance, fx_values );
 }
 
 void	plug_clone_parameters( void *instance, void *fx_values )

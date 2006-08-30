@@ -406,7 +406,7 @@ void veejay_signal_loop(void *arg)
  \param arg info Veejay Object
  \return Error Code
  */
-static int gl_ready_ = 0;
+//static int gl_ready_ = 0;
 int	veejay_push_results( veejay_t *info )
 {
 	sample_video_info_t *vid_info = info->video_info;
@@ -424,6 +424,7 @@ int	veejay_push_results( veejay_t *info )
 		vj_sdl_update_yuv_overlay( info->sdl_display, ref );
 		break;
 	}
+	performer_clean_output_frame( info );
 
 	return 1;
 }
@@ -691,6 +692,7 @@ void	veejay_deinit(veejay_t *info)
 	vj_server_shutdown(info->status_socket);
 	vj_server_shutdown(info->command_socket);
 	vj_server_shutdown(info->frame_socket);
+	veejay_free_osc_server(info->osc_server );
 	vj_event_stop();
 	samplebank_free();
 	plug_sys_free();
@@ -1175,6 +1177,10 @@ int vj_server_setup(veejay_t * info)
 	info->frame_socket = vj_server_alloc(port, NULL, V_MSG );
 	if(!info->frame_socket)
 		return 0;
+
+	const char port_str[50];
+	sprintf(port_str, "%d",port );
+	info->osc_server = veejay_new_osc_server( (void*)info, port_str );
 
 //	info->mcast_socket =
 //			vj_server_alloc(port, info->settings->vims_group_name, V_CMD );

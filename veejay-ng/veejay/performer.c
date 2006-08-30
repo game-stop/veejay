@@ -474,6 +474,15 @@ void	*performer_get_output_frame( veejay_t *info )
 //	return res;		
 }
 
+
+void	performer_clean_output_frame( veejay_t *info )
+{
+	performer_t *p = (performer_t*) info->performer;
+	memset( p->display->data[0],0,p->display->len );
+	memset( p->display->data[1],128,p->display->uv_len );
+	memset( p->display->data[2],128,p->display->uv_len );
+}
+
 //! Queue sufficient audio samples for immediate playback
 /**!
  \param info Veejay Object

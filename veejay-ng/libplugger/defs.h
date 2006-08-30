@@ -15,6 +15,8 @@ typedef	  void	(*generic_default_values_f)(void *instance, void *fx_values);
 typedef	  void	(*generic_push_parameter_f)(void *instance, int seq_num, void *value );
 typedef	  void  (*generic_clone_parameter_f)(void *instance, int seq_num, void *fx_values );
 typedef	  void	(*generic_reverse_clone_parameter_f)(void *instance, int seq_num, void *fxvalues );
+typedef	  void	(*generic_reverse_clone_out_parameter_f)(void *instance, void *fxvalues );
+
 typedef	  void	(*generic_deinit_f)(void *instance);
 typedef	  void	(*generic_init_f)(void *instance, int w, int h );
 

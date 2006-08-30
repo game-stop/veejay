@@ -113,7 +113,32 @@ vj_server_send(v->frame_socket, v->current_link,str,strlen(str));\
 }
 
 /* some macros for commonly used checks */
-
+#define P_Ag(a,b,c,d,g)\
+{\
+int __z = 0;\
+int __y = 0;\
+unsigned char *__tmpstr = NULL;\
+if(a!=NULL){\
+unsigned int __rp;\
+unsigned int __rplen = (sizeof(a) / sizeof(int) );\
+for(__rp = 0; __rp < __rplen; __rp++) { a[__rp] = 0; g[__rp] = 0; }\
+}\
+while(*c) { \
+if( (__z+__y) > _last_known_num_args )  break; \
+switch(*c++) {\
+ case 's':\
+__tmpstr = (char*)va_arg(d,char*);\
+if(__tmpstr != NULL) {\
+	sprintf( b,"%s",__tmpstr);\
+	}\
+__z++ ;\
+ break;\
+ case 'd': a[__z] = *( va_arg(d, int*)); __z++ ;\
+ break; }\
+ case 'g': g[__y] = *( va_arg(d, double*)); __y++;\
+ break; }\
+ }\
+}
 
 #define P_A(a,b,c,d)\
 {\
@@ -205,7 +230,7 @@ void vj_event_print_sample_info(veejay_t *v, int id);
 //vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id);
 void vj_event_trigger_function(void *ptr, vj_event f, int max_args, const char format[], ...); 
 //void  vj_event_parse_bundle(veejay_t *v, char *msg );
-void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int arglen, int type);
+void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int arglen, int type, double *gargs, int ng);
 void    vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod);
 
 #ifdef HAVE_XML2
@@ -468,7 +493,7 @@ static	int	vj_event_verify_args( int *fx, int net_id , int arglen, int np, int p
 	return 1;
 }
 
-void	vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int arglen, int prefixed)
+void	vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int iarglen, int prefixed, double *gargs, int garglen)
 {
 	int np = vj_event_vevo_get_num_args(net_id);
 	char *fmt = vj_event_vevo_get_event_format( net_id );
@@ -477,26 +502,23 @@ void	vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 	vims_arg_t	vims_arguments[16];
 	memset( vims_arguments, 0, sizeof(vims_arguments) );
 
-	if(!vj_event_verify_args(args , net_id, arglen, np, prefixed, fmt ))
-	{
-		if(fmt) free(fmt);
-		return;
-	}
-
 	if( np == 0 )
 	{
 		vj_event_vevo_inline_fire( (void*) v, net_id,NULL,NULL );
-		//vj_event_vevo_inline_fire_default( (void*) v, net_id, fmt );
-		//if(fmt) free(fmt);
 		return;
 	}
 	
 	int i=0;
+	int arglen = iarglen + garglen;
 	while( i < arglen )
 	{
 		if( fmt[fmt_offset] == 'd' )
 		{
 			vims_arguments[i].value = (void*) &(args[i]);
+		}
+		if( fmt[fmt_offset] == 'g' )
+		{	
+			vims_arguments[i].value = (void*) &(gargs[i]);
 		}
 		if( fmt[fmt_offset] == 's' )
 		{
@@ -567,6 +589,18 @@ void	vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 
 }
 
+static		int	inline_str_to_dbl(const char *msg, double *val)
+{
+	char longest_num[16];
+	int str_len = 0;
+	if( sscanf( msg , "%g", val ) <= 0 )
+		return 0;
+	bzero( longest_num, 16 );
+	sprintf(longest_num, "%d", *val );
+
+	str_len = strlen( longest_num ); 
+	return str_len;
+}
 static		int	inline_str_to_int(const char *msg, int *val)
 {
 	char longest_num[16];
@@ -734,7 +768,7 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 			i_args[i] = vj_event_vevo_get_default_value( net_id, i );
 			i++;
 		}
-		vj_event_fire_net_event( v, net_id, NULL, i_args, np, 0 );
+		vj_event_fire_net_event( v, net_id, NULL, i_args, np, 0, NULL,0 );
 	}
 	else
 	{
@@ -742,7 +776,11 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 		char *fmt = vj_event_vevo_get_event_format( net_id );
 		int flags = vj_event_vevo_get_flags( net_id );
 		int i = 0;
+		int ng = 0;
+		int ni = 0;
+		int ns = 0;
 		int i_args[16];
+		double g_args[16];
 		char *str = NULL;
 		int fmt_offset = 1;
 		char *arg_str = NULL;
@@ -776,12 +814,13 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 			
 			if( fmt[fmt_offset] == 'd' )
 			{
-				int il = inline_str_to_int( arguments, &i_args[i] );	
+				int il = inline_str_to_int( arguments, &i_args[ni] );	
 				if( il > 0 )
 				{
 					failed_arg = 0;
 					arguments += il;
 				}
+				ni ++;
 			}
 			if( fmt[fmt_offset] == 's' && str == NULL)
 			{
@@ -791,8 +830,18 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 					failed_arg = 0;
 					arguments += strlen(str);
 				}
+				ns ++;
 			}
-			
+			if( fmt[fmt_offset] == 'g' )
+			{
+				int il = inline_str_to_dbl( arguments, &g_args[ng]);
+				if( il > 0 )
+				{
+					failed_arg = 0;
+					arguments += il;
+				}
+				ng ++;
+			}
 			if( failed_arg )
 			{
 				char *name = vj_event_vevo_get_event_name( net_id );
@@ -817,7 +866,7 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 		if( flags & VIMS_ALLOW_ANY )
  			i = np;
 
-		vj_event_fire_net_event( v, net_id, str, i_args, i, 0 );
+		vj_event_fire_net_event( v, net_id, str, i_args, ni + ns, 0, g_args,ng );
 		
 
 		if(fmt) free(fmt);
@@ -1553,6 +1602,8 @@ void 	vj_event_chain_entry_set_input( void *ptr, const char format[], va_list ap
 			veejay_msg(VEEJAY_MSG_ERROR, "Error setting input channel");
 	}
 }
+
+
 void 	vj_event_chain_entry_set_parameter_value( void *ptr, const char format[], va_list ap )
 {
 	int args[4];
@@ -1579,7 +1630,6 @@ void 	vj_event_chain_entry_set_parameter_value( void *ptr, const char format[], 
 			veejay_msg(VEEJAY_MSG_ERROR, "Error parsing parameter value");	
 	}
 }
-
 
 void	vj_event_chain_entry_set_active( void *ptr, const char format[], va_list ap )
 {
@@ -1947,3 +1997,64 @@ void	vj_event_sample_stop_recorder( void *ptr, const char format[], va_list ap )
 			veejay_msg(2, "Stopped sample recorder. File is written");
 	}
 }
+
+void	vj_event_sample_bind_outp_osc( void *ptr, const char format[], va_list ap )
+{
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char s[1024]; 
+	P_A(args, s, format, ap);
+
+	void *sample = which_sample( v, args );
+	if(sample)
+	{
+		sample_add_osc_path( sample, s, args[1] );
+	}	
+	
+}
+
+void	vj_event_sample_release_outp_osc( void *ptr, const char format[], va_list ap)
+{
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args, s, format, ap);
+
+	void *sample = which_sample( v, args );
+	if(sample)
+	{
+		sample_del_osc_path( sample, args[1] );
+	}	
+}
+
+void	vj_event_sample_start_osc_sender( void *ptr, const char format[], va_list ap )
+{
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char s[1024];
+	char port[50];
+	
+	P_A(args, s, format, ap);
+	sprintf(port,"%d", args[1]);
+
+	void *sample = which_sample( v, args );
+	if(sample)
+	{
+		sample_new_osc_sender( sample, s, port );
+	}	
+}
+
+void	vj_event_sample_stop_osc_sender( void *ptr, const char format[], va_list ap )
+{
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args, s, format, ap);
+
+	void *sample = which_sample( v, args );
+	if(sample)
+	{
+		sample_close_osc_sender( sample );
+	}
+}
+

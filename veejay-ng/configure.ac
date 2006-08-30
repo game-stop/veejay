@@ -298,6 +298,25 @@ if test x$have_mjpegtools != xtrue ; then
  AC_MSG_ERROR([The MJPEGTools not found. Get it from http://mjpeg.sourceforge.net])
 fi
 
+dnl *********************************************************************
+dnl Check for liblo
+dnl *********************************************************************
+have_liblo=false
+PKG_CHECK_MODULES( LIBLO, [liblo >= 0.23 ],
+	[
+		AC_SUBST( LIBLO_CFLAGS )
+		AC_SUBST( LIBLO_LIBS )
+		have_liblo=true
+		AC_DEFINE( HAVE_LIBLO, 1, [liblo installed])],
+		[have_liblo=false])
+
+if test x$have_liblo != xtrue ; then
+ AC_MSG_ERROR([Liblo-0.23 (Leightweight OSC implementation) not found. Get it from http://www.ecs.soton.ac.uk/~njh/liblo/])
+fi
+
+
+
+
 dnl ********************************************************************
 dnl Check to see if __progname is provided by the system
 dnl ********************************************************************
@@ -832,6 +851,7 @@ AC_MSG_NOTICE([ Required dependencies:])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - MJPEGTools                    : ${have_mjpegtools}])
 AC_MSG_NOTICE([  - SDL Video			 : ${have_sdl}])
+AC_MSG_NOTICE([  - Leightweight OSC		 : ${have_liblo}])
 AC_MSG_NOTICE([ Optional dependencies])
 AC_MSG_NOTICE([  - unicap			 : ${have_unicap}])
 AC_MSG_NOTICE([  - Jack				 : ${have_jack}])

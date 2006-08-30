@@ -87,6 +87,9 @@
 /* Define to 1 if you have the `dl' library (-ldl). */
 #undef HAVE_LIBDL
 
+/* liblo installed */
+#undef HAVE_LIBLO
+
 /* Compiling with pthread library */
 #undef HAVE_LIBPTHREAD
 
