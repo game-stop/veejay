@@ -654,6 +654,8 @@ static int	performer_fetch_frames( veejay_t *info, void *samples_needed)
 		void *value = NULL;
 		int error = vevo_property_get( samples_needed,fetch_list[k],0, &Sk);
 #ifdef STRICT_CHECKING
+		if( error != VEVO_NO_ERROR )
+			veejay_msg(0, "Error fetching '%s' , error code %d", fetch_list[k], error );
 		assert( error == VEVO_NO_ERROR );
 #endif
 		value = (void*) p->ref_buffer[ n_fetched ];
@@ -860,7 +862,6 @@ static	int	performer_push_in_frames( void *sample, performer_t *p, int i )
 	return tmp1;
 }
 
-
 static	int	performer_render_entry( veejay_t *info, void *sample, performer_t *p, int i)
 {
 	int opacity = sample_get_fx_alpha( sample, i );
@@ -950,11 +951,20 @@ int	performer_queue_frame( veejay_t *info, int skip_incr )
 #ifdef STRICT_CHECKING
 	assert( info->current_sample != NULL );
 #endif
+
+#ifdef STRICT_CHECKING
+	void *queue_list = vevo_port_new( VEVO_ANONYMOUS_PORT, __FUNCTION__ , __LINE__ );
+	assert( queue_list != NULL );
+#else
 	void *queue_list =
 		vevo_port_new( VEVO_ANONYMOUS_PORT );//ll
-
+#endif
 	int i;
 	int error = 0;
+
+
+	pthread_mutex_lock( &(info->vevo_mutex));
+	
 	if(!skip_incr)
 	{
 		char key[64];
@@ -965,7 +975,8 @@ int	performer_queue_frame( veejay_t *info, int skip_incr )
 		assert( error == VEVO_NO_ERROR );
 #endif
 	}
-	
+
+	//@ lock
 	for( i = 0; i < SAMPLE_CHAIN_LEN; i ++ )
 	{ 
 		if( sample_process_entry( info->current_sample, i ))
@@ -977,12 +988,19 @@ int	performer_queue_frame( veejay_t *info, int skip_incr )
 #endif
 		}
 	}
+#ifdef STRICT_CHECKING
+	p->in_frames = vevo_port_new( VEVO_ANONYMOUS_PORT, __FUNCTION__ , __LINE__ );
+#else
 	/* Build reference list */
 	p->in_frames = vevo_port_new( VEVO_ANONYMOUS_PORT );
-
+#endif
 	performer_fetch_frames( info, queue_list  );
 	
 	performer_render_frame(info, p);
+
+	pthread_mutex_unlock( &(info->vevo_mutex));
+
+	//@ unlock
 
 	vevo_port_free( queue_list );
 	vevo_port_free( p->in_frames );

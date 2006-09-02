@@ -33,10 +33,9 @@ VEEJAY_ALL_LIB_OPTS = \
 libveejay_la_SOURCES =  vj-misc.c \
 			vj-pjack.c performer.c \
 			gl.c vj-sdl.c \
-			vj-eventman.c \
-			vj-event.c \
 			oscsend.c \
 			oscservit.c \
+			oscevents.c \
 			liblavplayvj.c
 
 libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS )

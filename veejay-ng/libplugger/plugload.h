@@ -39,5 +39,7 @@ void	plug_process( void *instance );
 void	plug_get_defaults( void *instance, void *fx_values );
 void	plug_set_parameter( void *instance, int seq_num, int n_elements,void *value );
 void	plug_clone_from_output_parameters( void *instance, void *fx_values );
-
+char	*plug_get_osc_format(void *fx_instance, int p);
+void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_id, int sample_id );
+void	plug_clear_namespace( void *fx_instance, void *data );
 #endif

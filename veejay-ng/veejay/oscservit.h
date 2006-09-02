@@ -20,4 +20,43 @@
  */
 void	*veejay_new_osc_server( void *data, const char *port );
 void	veejay_free_osc_server( void *dosc );
+
+void	veejay_osc_del_methods( void *user_data, void *osc_space,void *vevo_port, void *fx_instance );
+
+int	plugin_new_event(
+		void *userdata,
+		void *osc_space,
+		void *instance,
+		const char *base,
+		const char *key,
+		const char *fmt,
+		const char **args,
+		const char *descr,
+		void *func,
+		int extra_token);
+
+int	veejay_new_event(
+		void *userdata,
+		void *osc_space,
+		void *instance,
+		const char *base,
+		const char *key,
+		const char *fmt,
+		const char **args,
+		const char *descr,
+		void *func,
+		int extra_token);
+
+
+int	vevosample_new_event(
+		void *userdata,
+		void *osc_space,
+		void *instance,
+		const char *base,
+		const char *key,
+		const char *fmt,
+		const char **args,
+		const char *descr,
+		void *func,
+		int extra_token);
 #endif

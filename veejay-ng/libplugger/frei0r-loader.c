@@ -14,7 +14,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <veejay/portdef.h>
-#ifdef HAVE_STRICT
+#ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
 /** \defgroup freior Freior Host
@@ -44,7 +44,11 @@ typedef void (*f0r_set_param_value_f)(f0r_instance_t *instance, f0r_param_t *par
 
 static	int	init_param_fr( void *port, int p, int hint)
 {
+#ifdef STRICT_CHECKING
+	void *parameter = vevo_port_new( VEVO_FR_PARAM_PORT, __FUNCTION__,__LINE__ );
+#else
 	void *parameter = vevo_port_new( VEVO_FR_PARAM_PORT );
+#endif
 	int min = 0;
 	int max = 100;
 	int dv = 50;
@@ -94,7 +98,11 @@ static	int	init_param_fr( void *port, int p, int hint)
 }
 void* 	deal_with_fr( void *handle, char *name)
 {
+#ifdef STRICT_CHECKING
+	void *port = vevo_port_new( VEVO_FR_PORT, __FUNCTION__,__LINE__ );
+#else
 	void *port = vevo_port_new( VEVO_FR_PORT );
+#endif
 	char *plugin_name = NULL;
 	f0r_init_f	f0r_init	= dlsym( handle, "f0r_init" );
 	if( f0r_init == NULL )

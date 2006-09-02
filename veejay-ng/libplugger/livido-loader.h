@@ -36,4 +36,13 @@ void	livido_exit( void );
 
 void	livido_plug_read_output_parameters( void *instance, void *fx_values );
 
+char	*livido_describe_parameter_format( void *instance, int p );
+
+int	livido_plug_build_namespace( void *plugin_template , int entry_id, void *fx_instance , void *data, int sam);
+
+char	*livido_describe_parameter_format_osc( void *instance, int p );
+
+void	livido_plug_free_namespace( void *fx_instance , void *data );
+
+void	*livido_get_name_space( void *instance );
 #endif

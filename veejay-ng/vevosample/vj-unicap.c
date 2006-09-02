@@ -86,9 +86,13 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 		
 		unicap_reenumerate_properties( ud->handle, &property_count );
 		unicap_reenumerate_formats( ud->handle, &format_count );
-		void	*device_port = vevo_port_new( VEVO_ANONYMOUS_PORT );
-
 		char *device_name = strdup( ud->device.identifier );
+
+#ifdef STRICT_CHECKING
+		void	*device_port = vevo_port_new( VEVO_ANONYMOUS_PORT, device_name, i );
+#else
+		void	*device_port = vevo_port_new( VEVO_ANONYMOUS_PORT );
+#endif
 		char *device_location = strdup( ud->device.device );
 		
 		int error = vevo_property_set( device_port,
@@ -132,8 +136,11 @@ void	*vj_unicap_init(void)
 {
 	unicap_driver_t *ud = (unicap_driver_t*) vj_malloc(sizeof(unicap_driver_t));
 	memset( ud,0,sizeof(unicap_driver_t));
+#ifdef STRICT_CHECKING
+	ud->device_list = vevo_port_new( VEVO_ANONYMOUS_PORT, __FUNCTION__, __LINE__ );
+#else
 	ud->device_list = vevo_port_new( VEVO_ANONYMOUS_PORT );
-
+#endif
 	ud->num_devices = vj_unicap_scan_enumerate_devices( (void*) ud );
 	veejay_msg(2, "Found %d capture devices on this system", ud->num_devices);
 	return ud;

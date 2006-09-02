@@ -73,7 +73,7 @@
 #include <veejay/veejay.h>
 #include <veejay/performer.h>
 #include <libel/lav_io.h>
-#include <libvjnet/vj-server.h>
+//#include <libvjnet/vj-server.h>
 #include <libvevo/libvevo.h>
 #include <vevosample/vevosample.h>
 #include <vevosample/defs.h>
@@ -103,6 +103,60 @@ int veejay_get_state(veejay_t *info) {
 	video_playback_setup *settings = (video_playback_setup*)info->settings;
 	return settings->state;
 }
+
+sample_video_info_t	*veejay_get_ps(void *data)
+{
+	veejay_t *v = (veejay_t*) data;
+	return v->video_info;
+}
+int	veejay_osc_verify_format( void *vevo_port, char const *types )
+{
+	char *format = get_str_vevo( vevo_port, "format" );
+	int n = strlen(types);
+	if(!format)
+	{
+		if( (n ==0 || types == NULL) && format == NULL )
+			return 1;
+		return 0;
+	}
+	if( strcasecmp( types,format ) == 0 )
+	{
+		free(format);
+		return 1;
+	}
+	free(format);
+	return 0;
+}
+
+int		veejay_osc_property_calls_event( void *instance, const char *path, char *types, void **argv[] )
+{
+	veejay_t *v = (veejay_t*) instance;
+	void *vevo_port = v->osc_namespace;
+
+	int atom_type = vevo_property_atom_type( vevo_port, path );
+	if( atom_type == VEVO_ATOM_TYPE_PORTPTR )
+	{
+		void *port = NULL;
+		int error = vevo_property_get( vevo_port, path,0,&port );
+	
+		if(error == VEVO_NO_ERROR )
+		{
+			vevo_event_f f;
+			if( veejay_osc_verify_format( port, types ) )
+			{
+				error = vevo_property_get( port, "func",0,&f );
+				if( error == VEVO_NO_ERROR )
+				{
+					(*f)( instance,path, types, argv );
+					return 1;
+				}
+			}
+		}
+	}
+
+	return 0;
+}
+
 //! Change Veejay state
 /**!
  \param info Veejay Object
@@ -541,7 +595,7 @@ int veejay_open(veejay_t * info)
 	memset( &(settings->lastframe_completion), 0, sizeof(struct timeval));
 	pthread_mutex_init(&(settings->valid_mutex), NULL);
 	pthread_mutex_init(&(settings->syncinfo_mutex), NULL);
-	pthread_mutex_init( &(info->display_mutex), 0 );
+	pthread_mutex_init( &(info->vevo_mutex), 0 );
 
 	/* Invalidate all buffers, and initialize the conditions */
 	settings->valid[0] = 0;
@@ -689,12 +743,20 @@ int veejay_close(veejay_t * info)
 
 void	veejay_deinit(veejay_t *info)
 {
-	vj_server_shutdown(info->status_socket);
-	vj_server_shutdown(info->command_socket);
-	vj_server_shutdown(info->frame_socket);
-	veejay_free_osc_server(info->osc_server );
-	vj_event_stop();
+	//vj_event_stop();
 	samplebank_free();
+        
+        veejay_osc_del_methods( info,info->osc_namespace,info ,info);
+
+	vevo_port_recursive_free( info->osc_namespace );
+
+
+	
+//	vj_server_shutdown(info->status_socket);
+//	vj_server_shutdown(info->command_socket);
+//	vj_server_shutdown(info->frame_socket);
+	veejay_free_osc_server(info->osc_server );
+	
 	plug_sys_free();
 	performer_destroy(info);
     	vj_el_deinit();		
@@ -734,7 +796,8 @@ int		veejay_load_devices( veejay_t *info )
 		}
 		else
 		{
-			samplebank_add_sample( sample );
+			int id = samplebank_add_sample( sample );
+			sample_set_user_data( sample,info, id );
 		}
 	}
 
@@ -752,7 +815,10 @@ int		veejay_load_samples( veejay_t *info, const char **argv, int n_arg )
 		void *sample = sample_new( VJ_TAG_TYPE_COLOR );
 		if( sample_open(sample, NULL, 0, vid_info ) <= 0 )
 			return 0;
+		//sample_set_user_data(sample,info);
 		id = samplebank_add_sample( sample );
+		sample_set_user_data(sample,info, id);
+		
 		veejay_load_video_settings(info, id );	
 		return 1;
 	}
@@ -769,6 +835,8 @@ int		veejay_load_samples( veejay_t *info, const char **argv, int n_arg )
 		else
 		{
 			id = samplebank_add_sample( sample );
+			sample_set_user_data(sample,info,id);
+
 			veejay_msg(0, "Loaded '%s' to sample %d", argv[n], id );
 		}	
 	}
@@ -801,7 +869,7 @@ int veejay_init(veejay_t * info)
 	veejay_msg(VEEJAY_MSG_INFO, "\tPlugin(s) loaded:   %d", n);
 //	veejay_msg(VEEJAY_MSG_INFO,"Loaded %d Plugins",n);
 	
-	vj_event_init();
+/*	vj_event_init();
 
 	if(!vj_server_setup(info))
     	{
@@ -812,7 +880,7 @@ int veejay_init(veejay_t * info)
 	{	
 		veejay_msg(VEEJAY_MSG_INFO, "TCP/UDP service (port range %d-%d)",
 				info->port_offset, info->port_offset+5);
-	}
+	}*/
 
 
 	vj_el_set_itu601_preference( info->itu601 );
@@ -906,7 +974,7 @@ int veejay_init(veejay_t * info)
 
 void	veejay_playback_status( veejay_t *info )
 {
-	char status_message[300];
+/*	char status_message[300];
 
 	int len = strlen( info->message );
 	
@@ -929,7 +997,7 @@ void	veejay_playback_status( veejay_t *info )
 		_vj_server_del_client( info->command_socket,info->current_link );
 		_vj_server_del_client( info->frame_socket, info->current_link );
 	}
-	//sample_sprintf_port( info->current_sample);
+	//sample_sprintf_port( info->current_sample);*/
 }
 
 
@@ -992,7 +1060,7 @@ static void veejay_playback_cycle(veejay_t * info)
     veejay_mjpeg_queue_buf(info, 0, 1);
     
     stats.nqueue = 1;
-	int last_id = sample_get_key_ptr( info->current_sample);
+    int last_id = sample_get_key_ptr( info->current_sample);
     while (settings->state != VEEJAY_STATE_STOP)
     {
 	first_free = stats.nsync;
@@ -1026,7 +1094,7 @@ static void veejay_playback_cycle(veejay_t * info)
 	    stats.tdiff = time_now.tv_sec - bs.timestamp.tv_sec +
 		(time_now.tv_usec - bs.timestamp.tv_usec)*1.e-6;
 
-	vj_event_update_remote( info );
+	//vj_event_update_remote( info );
 
 	} while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (1 - 1));
 
@@ -1165,7 +1233,7 @@ int vj_server_setup(veejay_t * info)
 {
 	int port = info->port_offset;
 
-	info->command_socket = vj_server_alloc(port, NULL, V_CMD);
+	/*info->command_socket = vj_server_alloc(port, NULL, V_CMD);
 
 	if(!info->command_socket)
 		return 0;
@@ -1177,16 +1245,64 @@ int vj_server_setup(veejay_t * info)
 	info->frame_socket = vj_server_alloc(port, NULL, V_MSG );
 	if(!info->frame_socket)
 		return 0;
-
+*/
 	const char port_str[50];
 	sprintf(port_str, "%d",port );
 	info->osc_server = veejay_new_osc_server( (void*)info, port_str );
-
+#ifdef STRICT_CHECKING
+	info->osc_namespace = vevo_port_new( VEVO_ANONYMOUS_PORT, __FUNCTION__, __LINE__ );
+#else
+	info->osc_namespace = vevo_port_new( VEVO_ANONYMOUS_PORT );
+#endif
+	veejay_osc_namespace_events( (void*) info, "/veejay");
+	
 //	info->mcast_socket =
 //			vj_server_alloc(port, info->settings->vims_group_name, V_CMD );
 //	GoMultiCast( info->settings->group_name );
 
 	return 1;
+}
+#define VALID_RESOLUTION(w,h,x,y) (( (w >=64 && w<=2048) && (h >= 64 && h <= 2048) && (x >= 0 && x <2048) && (y>=0 && y <2048)) ? 1: 0 )
+
+
+void	veejay_resize_screen( void *info, int x, int y, int w, int h )
+{
+	veejay_t *v = (veejay_t*) info;
+	if(!VALID_RESOLUTION(w,h,x,y))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Invalid dimensions for video window. Width and Height must be >= 64 and <= 2048");
+                return;
+
+	}
+	if( v->use_display == 2)
+        {
+                veejay_msg(VEEJAY_MSG_INFO, "OpenGL video window is %gx%g+%gx%g",
+                                w,h,x,y );
+                x_display_resize( w,h,x,y ); 
+        }
+        if( v->use_display == 1 )
+        {
+                 if(vj_sdl_resize_window(v->display,w,h,x,y))
+                         veejay_msg(VEEJAY_MSG_INFO, "SDL video window is %dx%d+%dx%d",
+                                        w,h,x,y); 
+        }
+}
+
+void	veejay_fullscreen(void *info, int value)
+{
+	veejay_t *v = (veejay_t*) info;
+ 	if( v->use_display == 2 )
+        {
+                if(x_display_set_fullscreen( v->display, value ))
+                        veejay_msg(VEEJAY_MSG_INFO,"OpenGL display window Fullscreen %s",
+                                        value == 0 ? "disabled" : "enabled");
+        }
+        if( v->use_display == 1 )
+        {
+                if(vj_sdl_set_fullscreen( v->display, value ))
+                        veejay_msg(VEEJAY_MSG_INFO,"SDL display window fullsceen %s",
+                                        value == 0 ? "disabled" : "enabled");
+        }       
 }
 
 /******************************************************
@@ -1219,10 +1335,24 @@ veejay_t *veejay_malloc()
 	info->settings->currently_processed_entry = -1;
 	info->settings->first_frame = 1;
 	info->settings->state = VEEJAY_STATE_STOP;
-	info->port_offset = VJ_PORT;
+	info->port_offset = 3490;// VJ_PORT;
 
 	samplebank_init();
 	available_diskspace();	
+
+	//vj_event_init();
+
+	if(!vj_server_setup(info))
+    	{
+	    veejay_msg(0, "Cannot setup service");
+	    return -1;
+    	}
+	else
+	{	
+		veejay_msg(VEEJAY_MSG_INFO, "TCP/UDP service (port range %d-%d)",
+				info->port_offset, info->port_offset+5);
+	}
+
 	return info;
 }
 

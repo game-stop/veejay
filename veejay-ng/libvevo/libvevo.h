@@ -46,8 +46,11 @@ int 	vevo_property_atom_type( vevo_port_t *p, const char *key);
 
 size_t vevo_property_element_size( vevo_port_t * p, const char *key, const int idx);
 
+#ifdef STRICT_CHECKING
+vevo_port_t *vevo_port_new( int port_type, const char *func, int line_no );
+#else
 vevo_port_t *vevo_port_new(int port_type);
-
+#endif
 int 	vevo_property_soft_reference(vevo_port_t * p, const char *key);
 
 void	vevo_strict_init();
@@ -86,6 +89,7 @@ int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key
 #define VEVO_ATOM_TYPE_STRING	4
 #define VEVO_ATOM_TYPE_BOOL	3
 #define VEVO_ATOM_TYPE_PORTPTR	66
+#define VEVO_ATOM_TYPE_HIDDEN   50
 #define VEVO_ATOM_TYPE_UINT64	5
 
 #define VEVO_NO_ERROR 0
@@ -98,10 +102,12 @@ int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key
 #define VEVO_ERROR_HARDWARE 7
 #define VEVO_ERROR_PROPERTY_EMPTY 8
 
+
 #define VEVO_PORT_POOL			1041
 #define VEVO_ANONYMOUS_PORT		-1
 
-#define VEVO_PROPERTY_READONLY (1<<0)
-#define VEVO_PROPERTY_SOFTREF  (2<<0)
+#define VEVO_PROPERTY_READONLY (1<<1)
+#define VEVO_PROPERTY_SOFTREF  (1<<2)
+#define	VEVO_PROPERTY_PROTECTED (1<<10)
 
 #endif 

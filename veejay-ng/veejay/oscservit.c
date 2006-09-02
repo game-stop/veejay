@@ -31,91 +31,46 @@
 #include <veejay/vims.h>
 #include <veejay/veejay.h>
 #include <lo/lo.h>
-
-
+#include <ctype.h>
+#include <vevosample/vevosample.h>
 //@ client side implementation
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
 
 #include <veejay/oscservit.h>
-
+typedef struct {
+	int seq;
+	void *caller;
+	void *instance;
+} plugin_data_t;
 typedef struct
 {
 	lo_server_thread	st;
-	void		   *events;
+//	void		   *events;
 } osc_recv_t;
-
-static struct
-{
-	const char *path;
-	int	    id;
-} osc_paths_[] = {
-	{	"/sample/new",			VIMS_SAMPLE_NEW },
-	{	"/sample/select",		VIMS_SAMPLE_SELECT },
-	{	"/sample/del",			VIMS_SAMPLE_DEL },
-	{	"/sample/set/properties",	VIMS_SAMPLE_SET_PROPERTIES },
-	{	"/load/samplelist",		VIMS_SAMPLE_LOAD },
-	{	"/save/samplelist",		VIMS_SAMPLE_SAVE },
-	{	"/sample/rec/start",		VIMS_SAMPLE_START_RECORDER },
-	{	"/sample/rec/stop",		VIMS_SAMPLE_STOP_RECORDER },
-	{	"/sample/rec/configure",	VIMS_SAMPLE_CONFIGURE_RECORDER },
-	{	"/sample/set/volume",		VIMS_SAMPLE_SET_VOLUME },
-	{	"/sample/fxc/active",		VIMS_SAMPLE_CHAIN_ACTIVE },
-	{	"/sample/edl/paste_at",		VIMS_SAMPLE_EDL_PASTE_AT },
-	{	"/sample/edl/copy",		VIMS_SAMPLE_EDL_COPY },
-	{	"/sample/edl/del",		VIMS_SAMPLE_EDL_DEL },
-	{	"/sample/edl/crop",		VIMS_SAMPLE_EDL_CROP },
-	{	"/sample/edl/cut",		VIMS_SAMPLE_EDL_CUT },
-	{ 	"/sample/edl/append",		VIMS_SAMPLE_EDL_ADD },
-	{	"/sample/edl/export",		VIMS_SAMPLE_EDL_EXPORT },
-	{	"/sample/edl/load",		VIMS_SAMPLE_EDL_LOAD },
-	{	"/sample/edl/save",		VIMS_SAMPLE_EDL_SAVE },
-	{	"/sample/chain/clear",		VIMS_SAMPLE_CHAIN_CLEAR },
-	{	"/sample/chain/entry/select",	VIMS_SAMPLE_CHAIN_SET_ENTRY },
-	{	"/sample/chain/entry/set",	VIMS_SAMPLE_CHAIN_ENTRY_SET_FX },
-	{	"/sample/chain/entry/preset",	VIMS_SAMPLE_CHAIN_ENTRY_SET_PRESET },
-	{	"/sample/chain/entry/active",	VIMS_SAMPLE_CHAIN_ENTRY_SET_ACTIVE },
-	{	"/sample/chain/entry/value",	VIMS_SAMPLE_CHAIN_ENTRY_SET_VALUE },
-	{	"/sample/chain/entry/channel",	VIMS_SAMPLE_CHAIN_ENTRY_SET_INPUT },
-	{	"/sample/chain/entry/alpha",	VIMS_SAMPLE_CHAIN_ENTRY_SET_ALPHA },
-	{	"/sample/chain/entry/clear",	VIMS_SAMPLE_CHAIN_ENTRY_CLEAR },
-	{	"/sample/chain/entry/state",	VIMS_SAMPLE_CHAIN_ENTRY_SET_STATE },
-	{	"/sample/chain/entry/bind",	VIMS_SAMPLE_ATTACH_OUT_PARAMETER },
-	{	"/sample/chain/entry/release",	VIMS_SAMPLE_DETACH_OUT_PARAMETER },
-	{	"/sample/chain/entry/register_osc_path", VIMS_SAMPLE_BIND_OUTP_OSC },
-	{	"/sample/chain/entry/unregister_osc_path",VIMS_SAMPLE_RELEASE_OUTP_OSC },
-	{	"/sample/register_osc_client",	VIMS_SAMPLE_OSC_START },
-	{	"/sample/unregister_osc_client", VIMS_SAMPLE_OSC_STOP },
-	{	"/samplebank/add",		VIMS_SAMPLEBANK_ADD },
-	{	"/samplebank/del",		VIMS_SAMPLEBANK_DEL },
-	{	"/play",			VIMS_SAMPLE_PLAY_FORWARD },
-	{	"/reverse",			VIMS_SAMPLE_PLAY_BACKWARD },
-	{	"/pause",			VIMS_SAMPLE_PLAY_STOP },
-	{	"/skip",			VIMS_SAMPLE_SKIP_FRAME },
-	{	"/prev",			VIMS_SAMPLE_PREV_FRAME },
-	{	"/up",				VIMS_SAMPLE_SKIP_SECOND },
-	{	"/down",			VIMS_SAMPLE_PREV_SECOND },
-	{	"/start",			VIMS_SAMPLE_GOTO_START },
-	{	"/end",				VIMS_SAMPLE_GOTO_END },
-	{	"/frame",			VIMS_SAMPLE_SET_FRAME },
-	{	"/speed",			VIMS_SAMPLE_SET_SPEED },
-	{	"/slow",			VIMS_SAMPLE_SET_SLOW },
-	
-	{	"/fullscreen",			VIMS_FULLSCREEN },
-	{	"/audio",			VIMS_AUDIO_SET_ACTIVE },
-	{	"/resize",			VIMS_RESIZE_SCREEN },
-	
-	{	NULL,	0	}
-	
-};
 
 void	error_handler( int num, const char *msg, const char *path )
 {
 	veejay_msg(0,"Liblo server error %d in path %s: %s",num,path,msg );
 }
+static	char	*osc_create_path( const char *base, const char *path )
+{
+	int n = strlen(base) + strlen(path) + 2;
+	char *res = (char*) malloc(n);
+	bzero(res,n);
+	sprintf(res,"%s/%s", base,path);
+	return res;
+}
 
-typedef void (*osc_event)(void *ptr, const char format[], va_list ap);
+static	char	*osc_fx_pair_str( const char *base, const char *key )
+{
+	int n = strlen(base) + strlen(key) + 2;
+	char *res = (char*) malloc(n);
+	bzero(res,n);
+	snprintf( res,n, "%s/%s", base,key);
+	return res;
+}
 
 
 static char	*vevo_str_to_liblo( const char *format )
@@ -136,119 +91,417 @@ static char	*vevo_str_to_liblo( const char *format )
 	return res;
 }
 
-int	generic_handler( const char *path, const char *types,
+static	char	make_valid_char_( const char c )
+{
+	const char *invalid = " #*,?[]{}";
+	int k = 0;
+	char o = '_';
+	char r = c;
+	for( k = 0; k < 8 ; k ++ )
+	{
+		if ( c == invalid[k] || isspace((unsigned char)c))
+			return o;
+		char l = tolower(c);
+		if(l)
+			r = l;
+	}
+	return r;
+}
+
+char	*veejay_valid_osc_name( const char *in )
+{
+	int n = strlen( in );
+	int k;
+	char *res = strdup( in );
+	for( k = 0; k < n ; k ++ )
+	{
+		res[k] = make_valid_char_( in[k] );
+	}
+	return res;
+}
+
+void	veejay_osc_del_methods( void *user_data, void *osc_space,void *vevo_port, void *fx_instance )
+{
+	veejay_t *info = (veejay_t*) user_data;
+	osc_recv_t *s = (osc_recv_t*) info->osc_server;
+
+	char **keys = vevo_list_properties( osc_space );
+	int i;
+	int error;
+	for( i = 0; keys[i] != NULL ; i ++ )
+	{
+		void *event_port = NULL;
+		error = vevo_property_get( osc_space, keys[i],0,&event_port );
+#ifdef STRICT_CHECKING
+		assert( error == VEVO_NO_ERROR );
+#endif
+		
+		void *ptr = NULL;
+		error = vevo_property_get( event_port, "userdata",0, &ptr );
+		
+#ifdef STRICT_CHECKING
+		assert(error == VEVO_NO_ERROR );
+		assert( ptr != NULL );
+#endif
+	
+		char *types = get_str_vevo( event_port, "format" );
+		
+		lo_server_thread_del_method( s->st, keys[i], types );
+		
+		free(keys[i]);
+		if(types)
+			free(types);
+		free(ptr);
+	}
+	free(keys);
+
+}
+
+
+
+//@ plugin handler!
+int	osc_plugin_handler( const char *path, const char *types,
 		lo_arg **argv, int argc, void *data, void *user_data )
 {
-	int vims_id = 0;
-	int args[16];
-	double gargs[16];
-	char *str[16];
-	int i;
-	int n = 0;
-	int s = 0;
-	int g = 0;
-	veejay_t *info = (veejay_t*) user_data;
-	osc_recv_t *st = (osc_recv_t*) info->osc_server;
+	plugin_data_t *pd = (plugin_data_t*) user_data;
+	veejay_t *info    = pd->caller;
 
-	int error = vevo_property_get( st->events, path,0, &vims_id );
-
-	memset(str, 0, sizeof(str));
-	
-	if( vims_id == 0 || error != VEVO_NO_ERROR)
+	pthread_mutex_lock( &(info->vevo_mutex) );
+	char *required_format = plug_get_osc_format( pd->instance, pd->seq );
+	if( strcmp( required_format , types ) != 0 )
 	{
-		veejay_msg(0, "OSC path '%s' does not exist", path );
+		veejay_msg(0, "Plugin Path %s wrong format '%s' , need '%s'",
+				path,types, required_format );
+		pthread_mutex_unlock( &(info->vevo_mutex) );
+			
+		return 1;
+	}
+
+	int n_elem = strlen(required_format);
+#ifdef STRICT_CHECKING
+	assert( n_elem == argc );
+#endif
+	int k;
+	if( types[0] == 'i' )
+	{
+		int32_t *elements = (int32_t*) malloc(sizeof(int32_t) * n_elem );
+		for( k = 0; k < n_elem; k ++ )
+			elements[k] =  argv[k]->i32;
+		plug_set_parameter( pd->instance, pd->seq, n_elem, (void*)elements );	
+		free(elements);
+	}
+	else if( types[0] == 'd' )
+	{
+		double *elements = (double*) malloc(sizeof(double) * n_elem );
+		for( k = 0; k < n_elem; k ++ )
+			elements[k] =  argv[k]->d;
+		plug_set_parameter( pd->instance, pd->seq, n_elem, (void*) elements );
+		free(elements);
+	}
+	else if( types[0] == 's' )
+	{
+		char *strs = malloc(sizeof(char*) * n_elem );
+		for( k = 0; k < n_elem; k ++ )
+			strs[k] = strdup( (char*) &argv[k]->s );
+		plug_set_parameter( pd->instance,pd->seq, n_elem, (void*) strs );
+	}
+
+	pthread_mutex_unlock( &(info->vevo_mutex));
+	
+	return 0;
+}
+int	osc_veejay_handler( const char *path, const char *types,
+		lo_arg **argv, int argc, void *data, void *user_data )
+{
+	plugin_data_t *pd = (plugin_data_t*) user_data;
+	veejay_t *info    = pd->caller;
+	pthread_mutex_lock( &(info->vevo_mutex) );
+	// format of KEY in path!!	
+	
+	if( veejay_osc_property_calls_event( pd->instance,
+				      path,
+				      types,
+				      argv ))
+	{
+		pthread_mutex_unlock( &(info->vevo_mutex));
 		return 0;
 	}
+
+	pthread_mutex_unlock( &(info->vevo_mutex));
+	return 1;
+}
+
+int	osc_sample_handler( const char *path, const char *types,
+		lo_arg **argv, int argc, void *data, void *user_data )
+{
+	plugin_data_t *pd = (plugin_data_t*) user_data;
+	veejay_t *info    = pd->caller;
+	pthread_mutex_lock( &(info->vevo_mutex) );
+	if( sample_osc_property_calls_event( pd->instance,
+				      path,
+				      types,
+				      argv ))
+	{
+		pthread_mutex_unlock( &(info->vevo_mutex) );
+
+		return 0;
+	}
+
+	char *required_format = sample_property_format_osc( pd->instance, path );
+	if(required_format == NULL )
+	{
+		veejay_msg(0, "Invalid path '%s'", path);
+		pthread_mutex_unlock( &(info->vevo_mutex) );
+
+		return 1;
+	}
+	if( strcmp( required_format , types ) != 0 )
+	{
+		veejay_msg(0, "Sample Path %s wrong format '%s' , need '%s'",
+				path,types, required_format );
+		pthread_mutex_unlock( &(info->vevo_mutex) );
 	
-	int vims_args = vj_event_vevo_get_num_args( vims_id );
-
-	char *format = vj_event_vevo_get_event_format( vims_id );
-
-	for( i = 0; i < argc ; i ++ )
-	{
-		switch(types[i])
-		{
-			case 'i':
-				args[n++] = argv[i]->i32;
-				break;
-
-			case 's':
-				str[s++] = strdup( (char*) &argv[i]->s );
-				break;
-
-			case 'd':
-				gargs[g++] = argv[i]->d;
-				break;
-
-			default:
-				veejay_msg(0, "Skipping unknown argument type '%c' ",
-						types[i]);
-				break;
-				
-		}
+		return 1;
 	}
 
-	if( vims_args != (n + s) )
+	int n_elem = strlen(required_format);
+#ifdef STRICT_CHECKING
+	assert( n_elem == argc );
+#endif
+	int k;
+	if( types[0] == 'i' )
 	{
-		char *name = vj_event_vevo_get_event_name( vims_id );
-		char *loarg = vevo_str_to_liblo(format);
-		veejay_msg(0, "Wrong number of arguments for VIMS %d (%s)", vims_id, name);
-		veejay_msg(0, "FORMAT is '%s' but I received '%s'", loarg, types );
-		free(name);
-		if(loarg) free(loarg);
+		int32_t *elements = (int32_t*) malloc(sizeof(int32_t) * n_elem );
+		for( k = 0; k < n_elem; k ++ )
+			elements[k] =  argv[k]->i32;
+		sample_set_property_from_path( pd->instance, path, (void*)elements );
+		free(elements);
 	}
-	else
+	else if( types[0] == 'd' )
 	{
-		vj_event_fire_net_event( info,
-			 vims_id,
-			 str[0],
-			 args,
-			 n + s,
-			 0,
-			 gargs,
-			 g );
+		double *elements = (double*) malloc(sizeof(double) * n_elem );
+		for( k = 0; k < n_elem; k ++ )
+			elements[k] =  argv[k]->d;
+		sample_set_property_from_path( pd->instance, path, (void*)elements );
+
+		free(elements);
 	}
-	if(format) 
-		free(format);
+	else if( types[0] == 's' )
+	{
+		char **strs = malloc(sizeof(char*) * n_elem );
+		for( k = 0; k < n_elem; k ++ )
+			strs[k] = strdup( (char*) &argv[k]->s );
+		sample_set_property_from_path( pd->instance, path, (void*)strs );
+	}
+	else if( types[0] == 'h' )
+	{
+		uint64_t *elements = malloc(sizeof(uint64_t) * n_elem );
+		for( k = 0; k < n_elem; k ++ )
+			elements[k] = argv[k]->h;
+		sample_set_property_from_path( pd->instance, path, (void*) elements );
+	} 
+
+	free(required_format);
 	
-	for( i = 0; i < 16 ; i ++ )
-	 if( str[i] ) 
-	  free(str[i]);	 
+	pthread_mutex_unlock( &(info->vevo_mutex));
 	
 	return 0;
 }
 
+void	veejay_osc_add_sample_generic_events(void *user_data, void *osc_port, void *vevo_port, const char *base, int fx)
+{
+	veejay_t *info = (veejay_t*) user_data;
+	osc_recv_t *s = (osc_recv_t*) info->osc_server;
+	osc_add_sample_generic_events( s->st, user_data,osc_port,vevo_port,base,fx );
+}
+
+void	veejay_osc_add_sample_nonstream_events(void *user_data, void *osc_port, void *vevo_port, const char *base)
+{
+	veejay_t *info = (veejay_t*) user_data;
+	osc_recv_t *s = (osc_recv_t*) info->osc_server;
+	osc_add_sample_nonstream_events( s->st, user_data,osc_port,vevo_port,base );
+}
+
+void	veejay_osc_namespace_events(void *user_data, const char *base)
+{
+	veejay_t *info = (veejay_t*) user_data;
+	osc_recv_t *s = (osc_recv_t*) info->osc_server;
+	osc_add_veejay_events( s->st, user_data, info->osc_namespace,base );
+}
 
 void	*veejay_new_osc_server( void *data, const char *port )
 {
 	osc_recv_t *s = (osc_recv_t*) vj_malloc(sizeof( osc_recv_t));
 	s->st = lo_server_thread_new( port, error_handler );
-
-	s->events = vevo_port_new( VEVO_ANONYMOUS_PORT );
-
-	int i;
-	for( i =0; osc_paths_[i].path != NULL ; i ++ )
-	{
-		int error = 
-			vevo_property_set( s->events, osc_paths_[i].path, VEVO_ATOM_TYPE_INT,1,
-						      &(osc_paths_[i].id) );
-		lo_server_thread_add_method(
-				s->st, 
-				NULL,
-				NULL,
-				generic_handler,
-				data );
-		veejay_msg(0, "Added '%s", osc_paths_[i].path );
-	}
 	lo_server_thread_start( s->st );
+
 	veejay_msg( 0, "OSC server ready at UDP port %d", lo_server_thread_get_port(s->st) );	
 	return (void*) s;
 }
+
+static int	servit_new_event(
+		void *userdata,
+		void *osc_space,
+		void *instance,
+		const char *base,
+		const char *key,
+		const char *fmt,
+		const char **args,
+		const char *descr,
+		vevo_event_f *func,
+		int extra_token,
+	        lo_method_handler method )
+{
+	veejay_t *info = (veejay_t*) userdata;
+	osc_recv_t *s = (osc_recv_t*) info->osc_server;
+#ifdef STRICT_CHECKING
+	void *p = (void*) vevo_port_new( VEVO_ANONYMOUS_PORT,__FUNCTION__,__LINE__ );
+#else
+	void *p = (void*) vevo_port_new( VEVO_ANONYMOUS_PORT );
+#endif
+	int error;
+	
+	if( func )
+	{
+		error = vevo_property_set( p, "func", VEVO_ATOM_TYPE_VOIDPTR,1,&func );
+#ifdef STRICT_CHECKING
+		assert( error == VEVO_NO_ERROR );
+#endif
+	}
+
+	if( fmt == NULL )
+		error = vevo_property_set( p, "format", VEVO_ATOM_TYPE_STRING,0,NULL );
+	else
+		error = vevo_property_set( p, "format", VEVO_ATOM_TYPE_STRING,1, &fmt );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+
+	if( descr == NULL )
+		error = vevo_property_set(p, "description",VEVO_ATOM_TYPE_STRING,0, NULL );
+	else
+		error = vevo_property_set(p, "description", VEVO_ATOM_TYPE_STRING,1, &descr );
+	
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+
+	if( args )
+	{
+		int i;
+		for( i = 0;i < 4; i ++ )
+		{
+			if(args[i])
+			{
+				char index[10];
+				sprintf(index,"help_%d",i);
+				error = vevo_property_set( p, index, VEVO_ATOM_TYPE_STRING,1,&(args[i]) );
+#ifdef 	STRICT_CHECKING
+				assert( error == VEVO_NO_ERROR );
+#endif
+			}
+		}
+	}
+
+	plugin_data_t *pd = (plugin_data_t*) malloc(sizeof(plugin_data_t));
+	pd->seq = extra_token;
+	pd->caller = userdata;
+	pd->instance = instance;
+	error = vevo_property_set( p,
+				"userdata",
+				VEVO_ATOM_TYPE_VOIDPTR,
+				1,
+				&pd );
+
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+
+	char *tmp_path = NULL;
+	if( base)
+		tmp_path = osc_create_path( base, key );     
+	else
+		tmp_path = strdup(key);
+
+	char *my_path  = veejay_valid_osc_name( tmp_path );
+	
+	error = vevo_property_set( osc_space,
+				   my_path,
+				   VEVO_ATOM_TYPE_PORTPTR,
+				   1,
+				   &p );
+
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+
+	lo_server_thread_add_method(
+				s->st,
+				my_path,
+				fmt,
+				method,
+				(void*) pd );
+
+	free(my_path);
+	free(tmp_path);
+	
+	return VEVO_NO_ERROR;
+}
+
+int	vevosample_new_event(
+		void *userdata,
+		void *osc_space,
+		void *instance,
+		const char *base,
+		const char *key,
+		const char *fmt,
+		const char **args,
+		const char *descr,
+		vevo_event_f *func,
+		int extra_token)
+{
+	      return servit_new_event( userdata,osc_space,instance,base,key,fmt,args,descr,func,extra_token,
+			      osc_sample_handler ); 
+}
+
+int	veejay_new_event(
+		void *userdata,
+		void *osc_space,
+		void *instance,
+		const char *base,
+		const char *key,
+		const char *fmt,
+		const char **args,
+		const char *descr,
+		vevo_event_f *func,
+		int extra_token)
+{
+	      return servit_new_event( userdata,osc_space,instance,base,key,fmt,args,descr,func,extra_token,
+			      osc_veejay_handler ); 
+}
+
+int	plugin_new_event(
+		void *userdata,
+		void *osc_space,
+		void *instance,
+		const char *base,
+		const char *key,
+		const char *fmt,
+		const char **args,
+		const char *descr,
+		vevo_event_f *func,
+		int extra_token)
+{
+	      return servit_new_event( userdata,osc_space,instance,base,key,fmt,args,descr,func,extra_token,
+			      osc_plugin_handler ); 
+}
+
 void	veejay_free_osc_server( void *dosc )
 {
 	osc_recv_t *s = (osc_recv_t*) dosc;
 	lo_server_thread_stop( s->st );
-	vevo_port_free( s->events );
+	lo_server_thread_free( s->st );
+//	vevo_port_free( s->events );
 	free(s);
 	s = NULL;
 }

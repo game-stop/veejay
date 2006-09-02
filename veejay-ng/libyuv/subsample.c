@@ -128,13 +128,13 @@ void	subsample_free(void *data)
 			free(sampler->YUV_to_YCbCr[0]);
 		if(sampler->YUV_to_YCbCr[1])
 			free(sampler->YUV_to_YCbCr[1]);
-		free(sampler);
 		if(sampler->planes[0])
 			free(sampler->planes[0]);
 		if(sampler->planes[1])
 			free(sampler->planes[1]);
 		if(sampler->planes[2])
 			free(sampler->planes[2]);
+		free(sampler);
 	}
 	sampler = NULL;
 }

@@ -79,6 +79,12 @@ int		plug_set_param_from_str( void *plugin , int p, const char *str, void *value
 	return livido_set_parameter_from_string( plugin, p, str, values );
 }
 
+char		*plug_describe_param( void *plugin, int p )
+{
+	return livido_describe_parameter_format( plugin,p );
+}
+
+
 static	void *instantiate_plugin( void *plugin, int w , int h )
 {
 	int type = 0;
@@ -182,7 +188,7 @@ static	void	add_to_plugin_list( const char *path )
 			continue;
 		}
 
-		veejay_msg(0, "\tOpened plugin '%s' in '%s'", name,path );
+	//	veejay_msg(0, "\tOpened plugin '%s' in '%s'", name,path );
 		
 		if(dlsym( handle, "plugMain" ))
 		{
@@ -195,10 +201,7 @@ static	void	add_to_plugin_list( const char *path )
 			}
 			else
 				dlclose( handle );	
-		}
-	
-		if(dlsym( handle, "f0r_construct" ))
-		{
+		} else if(dlsym( handle, "f0r_construct" )) {
 			void *plugin = deal_with_fr( handle, name );
 			if( plugin )
 			{
@@ -208,26 +211,18 @@ static	void	add_to_plugin_list( const char *path )
 			}
 			else
 				dlclose( handle );
-		}
-
-		if(dlsym( handle, "livido_setup" ))
-		{
+		} else if(dlsym( handle, "livido_setup" )) {
 			void *plugin = deal_with_livido( handle , name );
 			if( plugin )
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Load livido plugin '%s' to slot %d",name, index_);
-			
 				index_map_[index_] = plugin;
 				index_ ++;
 				n_lvd_ ++;
 			}
 			else
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Failed to load '%s'",name );
 				dlclose(handle);
-			}
-
-		}
+		} else
+			dlclose(handle);
 
 	}
 
@@ -242,27 +237,17 @@ static	void	free_plugin(void *plugin)
 #ifdef STRICT_CHECKING
 	assert( plugin != NULL );
 #endif
-	
-	int type = 0;
-	int error = vevo_property_get( plugin, "HOST_plugin_type", 0, &type);
-#ifdef STRICT_CHECKING
-	assert( error == 0 );
-#endif
-
-	char *name = get_str_vevo( plugin, "name" );
-	
-	veejay_msg(0, "%s: Free plugin '%s' %p, Type %x",
-			__FUNCTION__,name,plugin,type );
-	free(name);
-
 	void *handle = NULL;
-	error = vevo_property_get( plugin, "handle", 0 , &handle );
+	int error = vevo_property_get( plugin, "handle", 0 , &handle );
 #ifdef STRICT_CHECKING
 	assert( error == 0 );
 #endif
-	if( handle ) dlclose( handle );
+
 	vevo_port_recursive_free( plugin );
 
+	if( handle ) dlclose( handle );
+
+	plugin = NULL;
 }
 
 char		*list_plugins()
@@ -301,12 +286,14 @@ char		*list_plugins()
 static	void	free_plugins()
 {
 	int i;
-	vevo_port_recursive_free( illegal_plugins_ );
-	
 	for( i = 0; i < index_ ; i ++ )
 		free_plugin( index_map_[i]);
+
+	vevo_port_recursive_free( illegal_plugins_ );
+	
 	free( index_map_ );
 	index_ = 0;
+	index_map_ = NULL;
 }
 
 #define CONFIG_FILE_LEN 65535
@@ -337,7 +324,6 @@ static	int	scan_plugins()
 		char *pch = strtok( data, "\n" );
 		while( pch != NULL )
 		{
-			veejay_msg(0, "Add '%s'",pch );
 			add_to_plugin_list( pch );
 			pch = strtok( NULL, "\n");
 		}
@@ -393,8 +379,11 @@ void	plug_sys_init( int fmt, int w, int h )
 int	plug_sys_detect_plugins(void)
 {
 	index_map_ = (vevo_port_t**) malloc(sizeof(vevo_port_t*) * 256 );
-	
+#ifdef STRICT_CHECKING
+	illegal_plugins_ = vevo_port_new( VEVO_ILLEGAL, __FUNCTION__, __LINE__ );
+#else
 	illegal_plugins_ = vevo_port_new( VEVO_ILLEGAL );
+#endif
 #ifdef STRICT_CHECKING
 	assert( illegal_plugins_ != NULL );
 #endif	
@@ -427,7 +416,8 @@ int	plug_sys_detect_plugins(void)
 		n_lvd_, n_lvd_ == 1 ? "plugin" :"plugins" );
 	veejay_msg(VEEJAY_MSG_INFO, "-------------------------------------------------------------------------------------------");
 	
-
+	plug_print_all();
+	
 	return index_;
 }
 
@@ -683,12 +673,76 @@ void	*plug_activate( int fx_id )
 	return instantiate_plugin( index_map_[fx_id], base_width_,base_height_);
 }
 
+void	plug_clear_namespace( void *fx_instance, void *data )
+{
+	livido_plug_free_namespace( fx_instance , data );
+}
+
+void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_id , int sample_id)
+{
+	void *plugin = index_map_[fx_id];
+	int type = 0;
+#ifdef STRICT_CHECKING
+	assert( plugin != NULL );
+#endif
+	int error = vevo_property_get( plugin, "HOST_plugin_type", 0, &type);
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	switch( type )
+	{
+		case VEVO_PLUG_LIVIDO:
+			livido_plug_build_namespace( plugin, entry_id, fx_instance, data, sample_id );
+			break;
+		case VEVO_PLUG_FF:
+			break;
+		case VEVO_PLUG_FR:
+			break;
+		default:
+#ifdef STRICT_CHECKING
+			assert(0);
+#endif
+			break;
+	}
+
+
+
+}
+
+
+void	plug_print_all()
+{
+	int n;
+	for(n = 0; n < index_ ; n ++ )
+	{
+		char *fx_name = plug_get_name(n);
+		if(fx_name)
+		{
+			veejay_msg(VEEJAY_MSG_INFO, "\t'FX %s loaded", fx_name ); 
+			free(fx_name);
+		}
+	}
+		
+}
+
 char	*plug_get_name( int fx_id )
 {
 	if(!index_map_[fx_id] )
 		return NULL;
 	char *name = get_str_vevo( index_map_[fx_id], "name" );
 	return name;
+}
+
+char	*plug_get_osc_format(void *fx_instance, int seq_num)
+{
+/*	void *param_templ = NULL;
+	int error = vevo_property_get( fx_instance, "parent_template",0,&param_templ);
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif*/
+	
+	char *required_format = livido_describe_parameter_format_osc( fx_instance,seq_num );
+	return required_format;
 }
 
 int	plug_get_fx_id_by_name( const char *name )
@@ -773,3 +827,8 @@ void	plug_process( void *instance )
 	(*gpf)( instance,0.0 );
 }
 
+
+void	*plug_get_name_space( void *instance )
+{
+	return livido_get_name_space(instance);
+}

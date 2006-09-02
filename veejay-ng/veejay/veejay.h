@@ -115,17 +115,17 @@ typedef struct
 	int			audio;	
 	void			*display;
 
-	void			*status_socket;
-	void			*command_socket;
-	void			*frame_socket;
-	void			*mcast_socket;
+//	void			*status_socket;
+//	void			*command_socket;
+//	void			*frame_socket;
+//	void			*mcast_socket;
 	void			*osc_server;
-
+	void			*osc_namespace;
 	int			current_link;
 	int			port_offset;
 	int			use_display;
 	void			*sdl_display;
-	  pthread_mutex_t display_mutex;
+	pthread_mutex_t 	vevo_mutex;
 
 	int			itu601;
 	char			message[256];

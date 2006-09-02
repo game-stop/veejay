@@ -345,8 +345,8 @@ int main(int argc, char **argv)
   
     	if( dump_ )
 	{
-		vj_init_vevo_events();
-		vj_event_vevo_dump();
+	//	vj_init_vevo_events();
+	//	vj_event_vevo_dump();
 		return 0;
 	}
  
