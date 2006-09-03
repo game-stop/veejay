@@ -113,8 +113,8 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 
 	p[0] *= w[0];
 	p[1] *= h[0];
-	p[2] = p[2] * 0.01;
-	p[3] = p[3] * 0.01;
+	p[2] = p[2] * 0.001;
+	p[3] = p[3] * 0.001;
 
 	if( mm->last[0] != p[2] )
 	{
@@ -126,7 +126,7 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	{
 		mm->last[1] = p[3];
 		for( y = 0; y < h[0]; y ++ )
-			fast_sin( mm->y[x], (double)(y * p[3]));
+			fast_sin( mm->y[y], (double)(y * p[3]));
 	}
 	
 	for( x = 0; x < w[0]; x ++ )
@@ -237,7 +237,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_string_value(port, "kind", "NUMBER" );
 		livido_set_double_value( port, "min", 0.0 );
 		livido_set_double_value( port, "max", 360.0 );
-		livido_set_double_value( port, "default", 2.2 );
+		livido_set_double_value( port, "default", 1.2 );
 		livido_set_string_value( port, "description" ,"DegreeX");
 
 	in_params[3] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );

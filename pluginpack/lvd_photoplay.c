@@ -98,7 +98,12 @@ static void     take_photo( photoplay_t *p, uint8_t *plane, uint8_t *dst_plane, 
         int dst_x, dst_y;
         int box_width = p->photo_list[index]->w;
         int box_height = p->photo_list[index]->h;
-
+#ifdef STRICT_CHECKING
+	assert( box_width > 0 );
+	assert( box_height > 0 );
+	assert( w > 0 );
+	assert( h > 0 );
+#endif
         int step_x = w / box_width;
         int step_y = h / box_height;
 
@@ -191,7 +196,7 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	int	p1 = lvd_extract_param_index( my_instance, "in_parameters", 0 );
 	int	p2 = lvd_extract_param_index( my_instance, "in_parameters", 1 );
 	int	p3 = lvd_extract_param_index( my_instance, "in_parameters", 2 );
-		
+	
 	int error = lvd_extract_channel_values( my_instance, "in_channels", 0, &w[0], &h[0], A, &palette[0] );
 	if( error != LIVIDO_NO_ERROR )
 		return LIVIDO_ERROR_HARDWARE; //@ error codes in livido flanky

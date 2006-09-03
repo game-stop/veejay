@@ -155,7 +155,21 @@ static	int	lvd_extract_param_index( livido_port_t *instance, const char *pname, 
 	return pn;	
 }
 
+static	int	lvd_extract_param_boolean( livido_port_t *instance, const char *pname, int n )
+{
+	int pn = 0;
+	livido_port_t *c = NULL;
+	int error = livido_property_get( instance, pname,n, &c );
+#ifdef STRICT_CHECKING
+	assert( error == LIVIDO_NO_ERROR );
+#endif
 
+	error = livido_property_get( c, "value", 0, &pn );
+#ifdef STRICT_CHECKING
+	assert( error == LIVIDO_NO_ERROR );
+#endif
+	return pn;	
+}
 
 static	void	lvd_extract_dimensions( livido_port_t *instance,const char *name, int *w, int *h )
 {
