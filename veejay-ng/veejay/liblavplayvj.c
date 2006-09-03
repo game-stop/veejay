@@ -109,6 +109,13 @@ sample_video_info_t	*veejay_get_ps(void *data)
 	veejay_t *v = (veejay_t*) data;
 	return v->video_info;
 }
+
+int	veejay_get_port(void *data)
+{
+	veejay_t *v = (veejay_t*) data;
+	return v->port_offset;
+}
+
 int	veejay_osc_verify_format( void *vevo_port, char const *types )
 {
 	char *format = get_str_vevo( vevo_port, "format" );

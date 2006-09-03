@@ -431,7 +431,7 @@ void	plug_clone_from_parameters(void *instance, void *fx_values)
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
-	
+	// copy parameters from plugin to fx_values	
 	(*grc)( instance ,0, fx_values );
 }
 

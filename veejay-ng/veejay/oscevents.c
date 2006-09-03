@@ -462,6 +462,12 @@ void	osc_sample_print( void *sample,const char *path,  const char *types, void *
 }
 
 
+void	osc_sample_khagan( void *sample,const char *path,  const char *types, void **dargv)
+{
+	sample_produce_khagan_file( sample );
+}
+
+
 static struct
 {
 	const char *name;
@@ -512,6 +518,7 @@ static struct
 	{	"rec/stop",	NULL,	{ NULL,NULL,NULL,NULL },"Stop recording from sample",
 													osc_sample_record_stop },
 	{	"print",	NULL,	{ NULL,NULL,NULL,NULL },"Print OSC namespace",			osc_sample_print	},
+	{	"khagan",	NULL,	{ NULL,NULL,NULL,NULL },"Write XML file for khagan",		osc_sample_khagan },
 	{ 	NULL,	NULL,		{ NULL,NULL,NULL,NULL },NULL,					NULL },
 	
 };
@@ -584,7 +591,7 @@ static void		osc_fx_generic_event(
 			args,
 			descr,
 			func,
-			0
+			-1
 	);
 }
 void		osc_add_sample_generic_events( lo_server_thread *st, void *user_data, void *osc_port, void *vevo_port, const char *base, int chain_len )
@@ -602,7 +609,7 @@ void		osc_add_sample_generic_events( lo_server_thread *st, void *user_data, void
 			sample_generic_events_[i].args,
 			sample_generic_events_[i].descr,
 			sample_generic_events_[i].func,
-			0 );
+			-1 );
 	}
 
 	for( i =0; i < chain_len ; i ++ )
@@ -623,7 +630,7 @@ void		osc_add_sample_generic_events( lo_server_thread *st, void *user_data, void
 				fx_events_[k].args,
 				fx_events_[k].descr,
 				fx_events_[k].func,
-			        0
+			        -1
 			);
 		}		
 	}

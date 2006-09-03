@@ -166,32 +166,114 @@ static	int	configure_channel( void *instance, const char *name, int channel_id, 
 void	livido_plug_parameter_set_text( void *parameter, void *value )
 {
 	veejay_msg(0,"%s: value = '%s'", __FUNCTION__, *((char*) value ));
-	vevo_property_set( parameter, "value", LIVIDO_ATOM_TYPE_STRING, 1, value );
+	char *new_val = *( (char*) value );
+	int   len     = (new_val == NULL ? 0 : strlen( new_val ));
+	if( len > 0 )
+	{
+		int error = vevo_property_set( parameter, "value", LIVIDO_ATOM_TYPE_STRING, 1, value );
+#ifdef STRICT_CHECKING
+		assert( error == VEVO_NO_ERROR );
+#endif
+	}
 }
+
 void	livido_plug_parameter_set_number( void *parameter, void *value )
 {
-	veejay_msg(0,"%s: value = '%g'", __FUNCTION__, (double) *((double*) value ));
-	vevo_property_set( parameter, "value", LIVIDO_ATOM_TYPE_DOUBLE, 1, value );
+	double range[2];
+	void *templ = NULL;
+	int error = vevo_property_get( parameter, "parent_template",0, &templ );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	error = vevo_property_get( templ, "min", 0 , &(range[0]) );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	error = vevo_property_get( templ, "max", 0, &(range[1]) );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	double new_val = *((double*) value);
+	if( new_val >= range[0] && new_val <= range[1] )
+	{
+		error = vevo_property_set( parameter, "value", VEVO_ATOM_TYPE_DOUBLE, 1, value );
+#ifdef STRICT_CHECKING
+		assert( error == VEVO_NO_ERROR );
+#endif
+	}
+	else
+	{
+		char *name = get_str_vevo(templ, "name");
+		veejay_msg(0, "Parameter '%s' value %g out of range %g - %g", name,new_val, range[0],range[1]);
+		free(name);
+	}
 }
 void	livido_plug_parameter_set_index( void *parameter, void *value)
 {
-	veejay_msg(0,"%s: value = '%d'", __FUNCTION__, *((int*) value ));
-	vevo_property_set( parameter, "value", VEVO_ATOM_TYPE_INT, 1, value );
+	int range[2];
+	void *templ = NULL;
+	int error = vevo_property_get( parameter, "parent_template",0, &templ );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	error = vevo_property_get( templ, "min", 0 , &(range[0]) );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	error = vevo_property_get( templ, "max", 0, &(range[1]) );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	int new_val = *((int*) value);
+	if( new_val >= range[0] && new_val <= range[1] )
+	{
+		error = vevo_property_set( parameter, "value", VEVO_ATOM_TYPE_INT, 1, value );
+#ifdef STRICT_CHECKING
+		assert( error == VEVO_NO_ERROR );
+#endif
+	}
+	else
+	{
+		char *name = get_str_vevo(templ, "name");
+		veejay_msg(0, "Parameter '%s' value %d out of range %d - %d", name,new_val, range[0],range[1]);
+		free(name);
+	}
 }
 void	livido_plug_parameter_set_bool( void *parameter, void *value )
 {	
-	veejay_msg(0,"%s: value = '%d'", __FUNCTION__, *((int*) value ));
-	vevo_property_set( parameter, "value", VEVO_ATOM_TYPE_BOOL, 1, value );
+	int range[2];
+	void *templ = NULL;
+	int error; 
+	int new_val = *((int*) value);
+
+	if( new_val >= 0 && new_val <= 1 )
+	{
+		error = vevo_property_set( parameter, "value", VEVO_ATOM_TYPE_BOOL, 1, value );
+#ifdef STRICT_CHECKING
+		assert( error == VEVO_NO_ERROR );
+#endif
+	}
+	else
+	{
+		int error = vevo_property_get( parameter, "parent_template",0, &templ );
+#ifdef STRICT_CHECKING
+		assert( error == VEVO_NO_ERROR );
+#endif
+		char *name = get_str_vevo(templ, "name");
+		veejay_msg(0, "Parameter '%s' value %d out of range %d - %d", name,new_val, range[0],range[1]);
+		free(name);
+	}
 }
+
 void	livido_plug_parameter_set_color( void *parameter,void *value )
 {
 	veejay_msg(0,"%s: array", __FUNCTION__);
-	vevo_property_set( parameter, "value", VEVO_ATOM_TYPE_DOUBLE, 4, value );
+//	vevo_property_set( parameter, "value", VEVO_ATOM_TYPE_DOUBLE, 4, value );
 }
 void	livido_plug_parameter_set_coord( void *parameter, void *value )
 {
 	veejay_msg(0,"%s: array", __FUNCTION__);
-	vevo_property_set( parameter, "value", LIVIDO_ATOM_TYPE_DOUBLE, 2, value );
+//	vevo_property_set( parameter, "value", LIVIDO_ATOM_TYPE_DOUBLE, 2, value );
 }
 
 static	int	livido_pname_to_host_kind( const char *str )
@@ -691,7 +773,17 @@ int	livido_plug_build_namespace( void *plugin_template , int entry_id, void *fx_
 			
 
 		plugin_new_event(
-				data, osc_namespace, fx_instance, base, param_name, format, NULL, descrip, NULL, entry_id );
+				data,
+				osc_namespace,
+				fx_instance,
+				base,
+				param_name,
+			        format,
+				NULL,
+				descrip,
+			       	NULL,
+				i,
+			       	param_templ	);
 		
 		free(param_name);
 		free(format);
@@ -1107,6 +1199,7 @@ void	livido_reverse_clone_parameter( void *instance, int seq, void *fx_value_por
 {
 	int vj_np = vevo_property_num_elements( instance, "in_parameters" );
 	int i;
+
 	for( i = 0; i < vj_np; i ++ )
 	{
 		char	vkey[10];
@@ -1116,7 +1209,7 @@ void	livido_reverse_clone_parameter( void *instance, int seq, void *fx_value_por
 		assert( error == LIVIDO_NO_ERROR );
 #endif
 		sprintf(vkey, "p%02d", i );
-		clone_prop_vevo( fx_value_port, param,vkey, "value"  );
+		clone_prop_vevo( param, fx_value_port, vkey, "value"  );
 	}
 }
 
@@ -1134,6 +1227,7 @@ void	livido_clone_parameter( void *instance, int seq, void *fx_value_port )
 #endif
 		sprintf(vkey, "p%02d", i );
 		clone_prop_vevo( fx_value_port, param,vkey, "value"  );
+	//	clone_prop_vevo( param, fx_value_port, vkey, "value" );
 	}
 
 	
@@ -1144,6 +1238,7 @@ void	livido_set_parameter( void *instance, int seq, void *value )
 	void *param = NULL;
 	void *param_templ = NULL;
 	int error = vevo_property_get( instance, "in_parameters", seq, &param);
+
 	if( error == LIVIDO_NO_ERROR )
 	{
 		livido_set_parameter_f pctrl;
@@ -1151,7 +1246,9 @@ void	livido_set_parameter( void *instance, int seq, void *value )
 #ifdef STRICT_CHECKING
 		assert( error == 0 );
 #endif
-		(*pctrl)( instance, value );
+		(*pctrl)( param, value );
+
+		//@FIXME
 	}
 }
 

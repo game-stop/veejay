@@ -953,8 +953,6 @@ int	sample_process_fx( void *sample, int fx_entry )
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
-	plug_process( fx_instance );
-
 	error = vevo_property_get( port, "fx_values", 0, &fx_values );
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );			
@@ -965,9 +963,11 @@ int	sample_process_fx( void *sample, int fx_entry )
 	assert( error == VEVO_NO_ERROR );			
 #endif
 
-	
 	//update internal parameter values
 	plug_clone_from_parameters( fx_instance, fx_values );
+
+	
+	plug_process( fx_instance );
 
 	//get the output parameters,if any
 	
@@ -1612,7 +1612,7 @@ void	sample_init_namespace( void *data, void *sample , int id )
 					for( q = 0; ns_entries[q] != NULL ; q ++ ) 
 					{
 						char *fmt = sample_property_format_osc( port, ns_entries[q] );
-						vevosample_new_event( data, osc_namespace, sample,NULL, ns_entries[q], fmt, NULL,NULL, NULL,0 );
+						vevosample_new_event( data, osc_namespace, sample,NULL, ns_entries[q], fmt, NULL,NULL, NULL,-1 );
 						
 						if(fmt)	free(fmt);
 						free(ns_entries[q]);
@@ -3691,5 +3691,222 @@ void	sample_send_osc_path( void *sample, void *fx_entry )
 
 		free(osc_path);
 	}
+}
+
+static	char 	*osc_path_to_khagan_path( const char *str )
+{
+	int n = strlen( str ) + 5;
+	char *res = (char*) malloc( n );
+	char arg = '%';
+	snprintf(res,n, "%s %c", str ,arg);
+        return res;	
+}
+int	khagan_write_property( void *port, const char *key, xmlNodePtr node )
+{
+	int atom_type = vevo_property_atom_type( port, key );
+	int n_elem    = vevo_property_num_elements( port , key );
+	int error;
+	if( n_elem == 0 || n_elem > 1 )
+	{
+		veejay_msg(0, "Khagan doesnt do list values ??");
+		return 1;
+	}	
+
+	if( atom_type == VEVO_ATOM_TYPE_INT || atom_type == VEVO_ATOM_TYPE_BOOL )
+	{
+		int ival = 0;
+		error = vevo_property_get( port, key, 0, &ival );
+#ifdef STRICT_CHECKING
+		assert( error == VEVO_NO_ERROR );
+#endif
+		int_as_value( node, ival, key );
+		return 0;
+	}
+	else if ( atom_type == VEVO_ATOM_TYPE_DOUBLE )
+	{
+		double gval = 0.0;
+		error = vevo_property_get( port, key,0, &gval );
+#ifdef STRICT_CHECKING
+		assert( error == VEVO_NO_ERROR );
+#endif
+		double_as_value( node, gval, key );
+		return 0;
+	}
+	else if ( atom_type == VEVO_ATOM_TYPE_STRING )
+	{
+		char *str = get_str_vevo( port, key );
+		if( str )
+		{
+			cstr_as_value( node, str, key );
+			free(str);
+		}
+		return 0;
+	}
+
+	return 1;
+}
+
+int	khagan_write_property_as( void *port, const char *key, xmlNodePtr node, const char *as_key )
+{
+	int atom_type = vevo_property_atom_type( port, key );
+	int n_elem    = vevo_property_num_elements( port , key );
+	int error;
+	if( n_elem == 0 || n_elem > 1 )
+	{
+		veejay_msg(0, "Khagan doesnt do list values ??");
+		return 1;
+	}	
+
+	if( atom_type == VEVO_ATOM_TYPE_INT || atom_type == VEVO_ATOM_TYPE_BOOL )
+	{
+		int ival = 0;
+		error = vevo_property_get( port, key, 0, &ival );
+#ifdef STRICT_CHECKING
+		assert( error == VEVO_NO_ERROR );
+#endif
+		int_as_value( node, ival, as_key );
+		return 0;
+	}
+	else if ( atom_type == VEVO_ATOM_TYPE_DOUBLE )
+	{
+		double gval = 0.0;
+		error = vevo_property_get( port, key,0, &gval );
+#ifdef STRICT_CHECKING
+		assert( error == VEVO_NO_ERROR );
+#endif
+		double_as_value( node, gval, as_key );
+		return 0;
+	}
+	else if ( atom_type == VEVO_ATOM_TYPE_STRING )
+	{
+		char *str = get_str_vevo( port, key );
+		if( str )
+		{
+			cstr_as_value( node, str, as_key );
+			free(str);
+		}
+		return 0;
+	}
+
+	return 1;
+}
+
+/*
+ * Khagan, OSC live interface builder. 
+ *
+ *
+ */
+static void	sample_produce_khagan_widget(void *osc_port,int port_num, xmlNodePtr rootnode, int n)
+{
+	//sample_runtime_data *srd = (sample_runtime_data*) sample;
+	
+	char **list = vevo_list_properties ( osc_port );
+	int i;
+
+	int v_splits = n - 1;
+	
+	xmlNodePtr nodes[ v_splits ];
+	xmlNodePtr cur_node = rootnode;
+	int n_widgets = 0;
+	
+	for( i = 0; list[i] != NULL ; i ++ )
+	{
+		void *osc = NULL;
+		int error = vevo_property_get( osc_port, list[i],0,&osc );
+
+		void *template = NULL;
+		error = vevo_property_get( osc, "parent",0,&template );
+		if( error == VEVO_NO_ERROR )
+		{
+			if( n_widgets < v_splits )
+			{
+				nodes[n_widgets] = 
+					xmlNewChild( cur_node, NULL, (const xmlChar*) "vsplit", NULL );
+			}
+			else
+				nodes[n_widgets] = cur_node;
+
+			xmlNodePtr node = 
+				xmlNewChild( nodes[n_widgets] , NULL, (const xmlChar*) "widget", NULL );
+
+			
+			char *description = get_str_vevo( template, "description");
+			char *khagan_path = osc_path_to_khagan_path( list[i] );
+			
+			cstr_as_value( node, "PhatKnob", "name" );
+			
+			khagan_write_property_as( template, "default", node, "value" );
+			khagan_write_property( template, "min"  , node );
+			khagan_write_property( template, "max"  , node );
+			cstr_as_value( node, khagan_path, "osc_path" );
+			int_as_value( node, port_num, "port" );
+			cstr_as_value( node, description, "label" );
+			cstr_as_value( node, "False", "is_log" );
+			
+			free(description);	
+			free(khagan_path);
+	
+			cur_node = nodes[n_widgets];
+
+			n_widgets ++;
+			
+		}
+		else
+			veejay_msg(0, "%s has no parent", list[i]);
+		free(list[i]);
+	}
+	free(list);
+}
+	
+
+void	sample_produce_khagan_file( void *sample )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	int port_num = veejay_get_port( srd->user_data );	
+	int error;
+	int k;
+	const char *encoding = "UTF-8";
+	xmlNodePtr rootnode;
+
+	xmlDocPtr doc = xmlNewDoc( "1.0" );
+	rootnode = xmlNewDocNode( doc, NULL, (const xmlChar*) "gui", NULL );
+
+	xmlDocSetRootElement( doc, rootnode );
+
+	
+	for( k =0; k < SAMPLE_CHAIN_LEN; k ++ )
+	{
+		void *fxp = sample_get_fx_port_ptr( srd, k );
+		void *fxi = NULL;
+		error = vevo_property_get( fxp, "fx_instance",0,&fxi );
+		
+		if( error == VEVO_NO_ERROR )
+		{
+			void *osc_port = plug_get_name_space( fxi );
+			int n = vevo_property_num_elements( fxi, "in_parameters" );
+
+			if( osc_port )
+				sample_produce_khagan_widget( osc_port, port_num, rootnode ,n);
+		}
+	}
+
+	int id = 0;
+	error = vevo_property_get( srd->info_port, "primary_key", 0, &id );
+	char filename[256];
+	char sfilename[256];
+	sprintf(sfilename, "Fsample_%d.kh", id );
+
+	sprintf(filename, "sample_%d.kh", id );
+//	 void xmlDocDump(FILE *f, xmlDocPtr doc);
+
+	FILE *res = fopen( filename  , "w" );
+	if(!res)
+		veejay_msg(0, "Cannot write to %s",filename);
+	else
+		xmlDocDump( res, doc );
+	fclose(res);
+
+	int ret = xmlSaveFormatFileEnc( sfilename, doc, encoding , 1 );
+	xmlFreeDoc( doc );
 }
 

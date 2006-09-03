@@ -33,7 +33,8 @@ int	plugin_new_event(
 		const char **args,
 		const char *descr,
 		void *func,
-		int extra_token);
+		int extra_token,
+		void *ptempl);
 
 int	veejay_new_event(
 		void *userdata,
