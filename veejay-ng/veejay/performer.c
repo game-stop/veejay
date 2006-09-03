@@ -660,13 +660,8 @@ static int	performer_fetch_frames( veejay_t *info, void *samples_needed)
 #endif
 		value = (void*) p->ref_buffer[ n_fetched ];
 		error = sample_get_frame( Sk, value  );
-		if(error)
+		if(error == VEVO_NO_ERROR )
 		{ // Error recovery
-			assert( error == VEVO_NO_ERROR );
-		}
-		else
-		{
-			//FIXME: Getting Frame twice!!
 			VJFrame *f = (VJFrame*) value;
 			sample_increase_frame( Sk );
 			sprintf(key,"%p", Sk );

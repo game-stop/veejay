@@ -41,6 +41,9 @@
 #include <libplugger/utility.h>
 #include <ffmpeg/avcodec.h>
 #include <libyuv/yuvconv.h>
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 #define	ERROR_MSG_LEN 100
 #define XA_INIT(m,x) XA##x = XInternAtom(m, #x, False)
 
