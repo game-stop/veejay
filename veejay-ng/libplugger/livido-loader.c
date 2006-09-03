@@ -1339,7 +1339,7 @@ void*	deal_with_livido( void *handle, const char *name )
 #ifdef STRICT_CHECKING
 	assert( plugin_name != NULL );
 #endif
-	char *clone_name = (char*) malloc( strlen(plugin_name) + 4);
+	char *clone_name = (char*) vj_malloc( strlen(plugin_name) + 4);
 	sprintf(clone_name, "LVD%s", plugin_name );
 
 	vevo_property_set( port, "num_params", VEVO_ATOM_TYPE_INT, 1, &n_params );

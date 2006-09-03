@@ -268,7 +268,7 @@ char		*list_plugins()
 	if(len <= 0 )
 		return NULL;
 
-	res = (char*) malloc( len );
+	res = (char*) vj_malloc( len );
 	memset( res,0,len );
 	char *p = res;
 	for ( i = 0; i < index_; i ++ )
@@ -344,11 +344,11 @@ void	plug_sys_free(void)
 
 void	plug_sys_init( int fmt, int w, int h )
 {
-	buffer_ = (void*) malloc( w * h * 4);
+	buffer_ = (void*) vj_malloc( w * h * 4);
 	memset( buffer_, 0, w * h * 4);
-	buffer2_ = (void*) malloc( w * h * 4);
+	buffer2_ = (void*) vj_malloc( w * h * 4);
 	memset( buffer2_, 0, w * h  * 4);
-	buffer_b_ = (void*) malloc( w * h * 4);
+	buffer_b_ = (void*) vj_malloc( w * h * 4);
 	memset( buffer_b_, 0, w * h  * 4);
 	
 	base_width_ = w;
@@ -378,7 +378,7 @@ void	plug_sys_init( int fmt, int w, int h )
 
 int	plug_sys_detect_plugins(void)
 {
-	index_map_ = (vevo_port_t**) malloc(sizeof(vevo_port_t*) * 256 );
+	index_map_ = (vevo_port_t**) vj_malloc(sizeof(vevo_port_t*) * 256 );
 #ifdef STRICT_CHECKING
 	illegal_plugins_ = vevo_port_new( VEVO_ILLEGAL, __FUNCTION__, __LINE__ );
 #else
@@ -543,7 +543,7 @@ static	char *	flatten_port( void *port, const char *key )
 	if( len <= 0 )
 		return NULL;
 	
-	char *res = (char*) malloc( len );
+	char *res = (char*) vj_malloc( len );
 	void *subport = NULL;
 
 	int error = vevo_property_get( port , key, 0, &subport );
@@ -600,7 +600,7 @@ char	*plug_describe( int fx_id )
 	char **out_params = NULL;
 	if( pi > 0 )
 	{
-		in_params = (char*) malloc(sizeof(char*) * pi );
+		in_params = (char*) vj_malloc(sizeof(char*) * pi );
 	
 		for( i = 0; i < pi; i ++ )
 		{
@@ -611,7 +611,7 @@ char	*plug_describe( int fx_id )
 	}
 	if( po > 0 )
 	{
-		out_params = (char*) malloc(sizeof(char*) * pi );
+		out_params = (char*) vj_malloc(sizeof(char*) * pi );
 	
 		for( i = 0; i < pi; i ++ )
 		{
@@ -629,7 +629,7 @@ char	*plug_describe( int fx_id )
 	len += strlen( author )+8;
 	len += strlen( license )+9;
 
-	res = (char*) malloc(sizeof(char) * len + 150 );
+	res = (char*) vj_malloc(sizeof(char) * len + 150 );
 	memset(res,0,len);
 
 	sprintf( res,

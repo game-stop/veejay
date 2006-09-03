@@ -289,7 +289,7 @@ char	**vj_unicap_get_list( void *ud )
 
 	int n = i;
 
-	char **res = (char**) malloc(sizeof(char*) * (n+1) );
+	char **res = (char**) vj_malloc(sizeof(char*) * (n+1) );
 	memset(res, 0,sizeof(char*) * (n+1));
 	
 	for( i = 0;i < n; i ++ )

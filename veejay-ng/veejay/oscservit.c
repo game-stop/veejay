@@ -33,6 +33,7 @@
 #include <lo/lo.h>
 #include <ctype.h>
 #include <vevosample/vevosample.h>
+#include <libvjmem/vjmem.h>
 //@ client side implementation
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -57,7 +58,7 @@ void	error_handler( int num, const char *msg, const char *path )
 static	char	*osc_create_path( const char *base, const char *path )
 {
 	int n = strlen(base) + strlen(path) + 2;
-	char *res = (char*) malloc(n);
+	char *res = (char*) vj_malloc(n);
 	bzero(res,n);
 	sprintf(res,"%s/%s", base,path);
 	return res;
@@ -66,7 +67,7 @@ static	char	*osc_create_path( const char *base, const char *path )
 static	char	*osc_fx_pair_str( const char *base, const char *key )
 {
 	int n = strlen(base) + strlen(key) + 2;
-	char *res = (char*) malloc(n);
+	char *res = (char*) vj_malloc(n);
 	bzero(res,n);
 	snprintf( res,n, "%s/%s", base,key);
 	return res;
@@ -79,7 +80,7 @@ static char	*vevo_str_to_liblo( const char *format )
 	if( n <= 0 )
 		return NULL;
 	
-	char *res = (char*) malloc( n );
+	char *res = (char*) vj_malloc( n );
 	int k = 0;
 	bzero(res,n );
 	while(*format)
@@ -181,7 +182,6 @@ int	osc_plugin_handler( const char *path, const char *types,
 		pthread_mutex_unlock( &(info->vevo_mutex) );
 		return 0;
 	}
-	veejay_msg(0, "Seq = %d", pd->seq );
 	int n_elem = strlen(required_format);
 #ifdef STRICT_CHECKING
 	assert( n_elem == argc );
@@ -189,7 +189,7 @@ int	osc_plugin_handler( const char *path, const char *types,
 	int k;
 	if( types[0] == 'i' )
 	{
-		int32_t *elements = (int32_t*) malloc(sizeof(int32_t) * n_elem );
+		int32_t *elements = (int32_t*) vj_malloc(sizeof(int32_t) * n_elem );
 		for( k = 0; k < n_elem; k ++ )
 			elements[k] =  argv[k]->i32;
 		plug_set_parameter( pd->instance, pd->seq, n_elem, (void*)elements );	
@@ -199,7 +199,7 @@ int	osc_plugin_handler( const char *path, const char *types,
 	}
 	else if( types[0] == 'd' )
 	{
-		double *elements = (double*) malloc(sizeof(double) * n_elem );
+		double *elements = (double*) vj_malloc(sizeof(double) * n_elem );
 		for( k = 0; k < n_elem; k ++ )
 			elements[k] =  argv[k]->d;
 		plug_set_parameter( pd->instance, pd->seq, n_elem, (void*) elements );
@@ -209,7 +209,7 @@ int	osc_plugin_handler( const char *path, const char *types,
 	}
 	else if( types[0] == 's' )
 	{
-		char **strs = malloc(sizeof(char*) * n_elem );
+		char **strs = vj_malloc(sizeof(char*) * n_elem );
 		for( k = 0; k < n_elem; k ++ )
 			strs[k] = strdup( (char*) &argv[k]->s );
 		plug_set_parameter( pd->instance,pd->seq, n_elem, (void*) strs );
@@ -285,7 +285,7 @@ int	osc_sample_handler( const char *path, const char *types,
 	
 	if( types[0] == 'i' )
 	{
-		int32_t *elements = (int32_t*) malloc(sizeof(int32_t) * n_elem );
+		int32_t *elements = (int32_t*) vj_malloc(sizeof(int32_t) * n_elem );
 		for( k = 0; k < n_elem; k ++ )
 			elements[k] =  argv[k]->i32;
 		sample_set_property_from_path( pd->instance, path, (void*)elements );
@@ -295,7 +295,7 @@ int	osc_sample_handler( const char *path, const char *types,
 	}
 	else if( types[0] == 'd' )
 	{
-		double *elements = (double*) malloc(sizeof(double) * n_elem );
+		double *elements = (double*) vj_malloc(sizeof(double) * n_elem );
 		for( k = 0; k < n_elem; k ++ )
 			elements[k] =  argv[k]->d;
 		sample_set_property_from_path( pd->instance, path, (void*)elements );
@@ -306,7 +306,7 @@ int	osc_sample_handler( const char *path, const char *types,
 	}
 	else if( types[0] == 's' )
 	{
-		char **strs = malloc(sizeof(char*) * n_elem );
+		char **strs = vj_malloc(sizeof(char*) * n_elem );
 		for( k = 0; k < n_elem; k ++ )
 			strs[k] = strdup( (char*) &argv[k]->s );
 		sample_set_property_from_path( pd->instance, path, (void*)strs );
@@ -317,7 +317,7 @@ int	osc_sample_handler( const char *path, const char *types,
 	}
 	else if( types[0] == 'h' )
 	{
-		uint64_t *elements = malloc(sizeof(uint64_t) * n_elem );
+		uint64_t *elements = vj_malloc(sizeof(uint64_t) * n_elem );
 		for( k = 0; k < n_elem; k ++ )
 			elements[k] = argv[k]->h;
 		sample_set_property_from_path( pd->instance, path, (void*) elements );
@@ -448,7 +448,7 @@ static int	servit_new_event(
 		}
 	}
 
-	plugin_data_t *pd = (plugin_data_t*) malloc(sizeof(plugin_data_t));
+	plugin_data_t *pd = (plugin_data_t*) vj_malloc(sizeof(plugin_data_t));
 	pd->seq = extra_token;
 	pd->caller = userdata;
 	pd->instance = instance;

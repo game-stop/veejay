@@ -864,16 +864,15 @@ static	int	performer_push_in_frames( void *sample, performer_t *p, int i )
 
 static	int	performer_render_entry( veejay_t *info, void *sample, performer_t *p, int i)
 {
-	int opacity = sample_get_fx_alpha( sample, i );
+	double opacity = sample_get_fx_alpha( sample, i );
 	char key[64];
 	int error = 0;
 	sprintf(key, "%p",sample);
 		
 	VJFrame *A = NULL;
 	VJFrame *pass1 = p->fx_buffer[i];
-	
 	//@ Keep backup of original frame
-	if( opacity < 256 )
+	if( opacity > 0.0 )
 	{
 		VJFrame *A = NULL;
 		error = vevo_property_get( p->in_frames, key, 0, &A );
@@ -902,9 +901,9 @@ static	int	performer_render_entry( veejay_t *info, void *sample, performer_t *p,
 
 //	subsample_ycbcr_clamp_itu601_copy( out, p->ref_buffer[i] );
 
-	if( opacity < 256 )
+	if( opacity > 0.0 )
 	{
-		yuv_blend_opacity( pass1, p->out_buffers[idx], opacity );
+		yuv_blend_opacity( pass1, p->out_buffers[idx],(uint8_t) (opacity * 0xff) );
 	}
 
 

@@ -56,8 +56,8 @@ void		sample_fx_get_parameter( int id, int fx_enty,int param_id,int idx, void *d
 void		sample_toggle_process_entry( void *data, int fx_entry, int v );
 int		sample_fx_set_active( int id, int fx_entry, int switch_value);
 int		sample_fx_set_channel( int id, int fx_entry, int n_input, int channel_id );
-int		sample_get_fx_alpha( void *data, int fx_entry );
-void		sample_set_fx_alpha( void *data, int fx_entry, int v );
+double		sample_get_fx_alpha( void *data, int fx_entry );
+void		sample_set_fx_alpha( void *data, int fx_entry, double v );
 void		sample_set_itu601( void *current_sample, int status );
 int		sample_fx_set( void *info, int fx_entry, const int new_fx );
 void		sample_process_fx_chain( void *srd );

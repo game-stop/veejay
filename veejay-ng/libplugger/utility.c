@@ -42,7 +42,7 @@ char		*get_str_vevo( void *port, const char *key )
 	size_t len = vevo_property_element_size( port, key, 0 );
 	char *ret = NULL;
 	if(len<=0) return NULL;
-	ret = (char*) malloc(sizeof(char) * len );
+	ret = (char*) vj_malloc(sizeof(char) * len );
 	vevo_property_get( port, key, 0, &ret );
 	return ret;
 }
@@ -51,7 +51,7 @@ char		*alloc_str_vevo( void *port, const char *key )
 	size_t len = vevo_property_element_size( port, key, 0 );
 	char *ret = NULL;
 	if(len<=0) return NULL;
-	ret = (char*) malloc(sizeof(char) * len );
+	ret = (char*) vj_malloc(sizeof(char) * len );
 	return ret;
 }
 
@@ -64,7 +64,7 @@ double		*get_dbl_arr_vevo( void *port, const char *key )
 	if( num <= 0 )
 		return NULL;
 
-	res = (double*) malloc(sizeof(double) * num );
+	res = (double*) vj_malloc(sizeof(double) * num );
 
 	int 	i;
 	for( i = 0; i < num ; i++ )
@@ -159,7 +159,7 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 				size_t len = vevo_property_element_size( port,key,i);
 				stmp[i] = NULL;
 				if( len > 0 ) continue;
-				stmp[i] = (char*) malloc(sizeof(char) * len );
+				stmp[i] = (char*) vj_malloc(sizeof(char) * len );
 				error = vevo_property_get( port, key, i, &(stmp[i]) );
 #ifdef STRICT_CHECKING
 				assert( error == VEVO_NO_ERROR );

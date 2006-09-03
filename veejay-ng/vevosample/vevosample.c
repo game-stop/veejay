@@ -222,7 +222,7 @@ static	struct
 } fx_entry_list_[] =
 {
 	{	"fx_status",	VEVO_ATOM_TYPE_INT	},	/* fx status */
-	{	"fx_alpha",	VEVO_ATOM_TYPE_INT	},	/* alpha */
+	{	"fx_alpha",	VEVO_ATOM_TYPE_DOUBLE	},	/* alpha */
 	{	"fx_instance",	VEVO_ATOM_TYPE_VOIDPTR	},	/* plugin instance point */
 	{	"fx_values",	VEVO_ATOM_TYPE_PORTPTR	},	/* port of p0 .. pN, containing copy of fx parameter values */
 	{	"fx_out_values", VEVO_ATOM_TYPE_PORTPTR },	/* output parmaters, p0 ... pN */
@@ -821,28 +821,27 @@ int	sample_process_entry( void *data, int fx_entry )
 
 	return fx_status;
 }
-int	sample_get_fx_alpha( void *data, int fx_entry )
+double	sample_get_fx_alpha( void *data, int fx_entry )
 {
 	void *port = sample_get_fx_port_ptr( data,fx_entry );
 #ifdef STRICT_CHECKING
 	assert( port != NULL );
 #endif	
-	int fx_alpha=0;
+	double fx_alpha=0.0;
 	int error = vevo_property_get( port, "fx_alpha",0,&fx_alpha);
 
 	if( error != VEVO_NO_ERROR )
-		return 256;
+		return 0.0;
 
 	return fx_alpha;
 }
-void	sample_set_fx_alpha( void *data, int fx_entry, int v )
+void	sample_set_fx_alpha( void *data, int fx_entry, double v )
 {
 	void *port = sample_get_fx_port_ptr( data,fx_entry );
 #ifdef STRICT_CHECKING
 	assert( port != NULL );
 #endif	
-	int fx_alpha = v;
-	int error = vevo_property_set( port, "fx_alpha",VEVO_ATOM_TYPE_INT,1,&fx_alpha);
+	int error = vevo_property_set( port, "fx_alpha",VEVO_ATOM_TYPE_DOUBLE,1,&v);
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
@@ -1446,7 +1445,7 @@ int	sample_fx_chain_entry_clear(void *info, int id )
 void	*sample_new( int type )
 {
 	int i;
-	sample_runtime_data *rtdata = (sample_runtime_data*) malloc(sizeof( sample_runtime_data ) );
+	sample_runtime_data *rtdata = (sample_runtime_data*) vj_malloc(sizeof( sample_runtime_data ) );
 	memset( rtdata,0,sizeof(sample_runtime_data));
 	sampleinfo_t *sit = (sampleinfo_t*) vj_malloc(sizeof(sampleinfo_t));
 	memset( sit,0,sizeof(sampleinfo_t));
@@ -1528,7 +1527,7 @@ char	*sample_property_format_osc( void *sample, const char *path )
 				atom_type = vevo_property_atom_type( port , key );
 				n_elem = vevo_property_num_elements( port , key );
 					if(n_elem == 0 ) n_elem = 1;
-				fmt = (char*) malloc( n_elem + 1);
+				fmt = (char*) vj_malloc( n_elem + 1);
 				bzero(fmt,n_elem+1);
 			}
 			if(pk)
@@ -1547,7 +1546,7 @@ char	*sample_property_format_osc( void *sample, const char *path )
 
 		if(!fmt)
 		{
-			fmt = (char*) malloc( n_elem + 1 );
+			fmt = (char*) vj_malloc( n_elem + 1 );
 			bzero(fmt,n_elem+1);
 		}
 
@@ -1681,7 +1680,7 @@ char	*samplebank_sprint_list()
 			len += strlen( props[i] ) + 1;
 	}
 
-	res = (char*) malloc(sizeof(char) * len );
+	res = (char*) vj_malloc(sizeof(char) * len );
 	memset(res,0,len);
 	
 	char *p = res;
@@ -2399,7 +2398,7 @@ static char            *clone_str( void *port, const char *key )
         size_t len = vevo_property_element_size( port, key, 0 );
         char *ret = NULL;
         if(len<=0) return NULL;
-        ret = (char*) malloc(sizeof(char) * len );
+        ret = (char*) vj_malloc(sizeof(char) * len );
         vevo_property_get( port, key, 0, &ret );
         return ret;
 }
@@ -2739,11 +2738,11 @@ static	int	sample_parse_param( void *fx_instance, int num, const char format[], 
 	switch(format[0])
 	{
 		case 'd':
-		 	i = (int32_t*) malloc( sizeof(int32_t) * n_elems );
+		 	i = (int32_t*) vj_malloc( sizeof(int32_t) * n_elems );
 			p = &i;
 			break;
 		case 'g':
-			g = (double*) malloc(sizeof(double) * n_elems );
+			g = (double*) vj_malloc(sizeof(double) * n_elems );
 			p = &g;
 			break;
 		case 's':
@@ -3866,14 +3865,9 @@ void	sample_produce_khagan_file( void *sample )
 	int error;
 	int k;
 	const char *encoding = "UTF-8";
-	xmlNodePtr rootnode;
+	int id = 0;
+	error = vevo_property_get( srd->info_port, "primary_key", 0, &id );
 
-	xmlDocPtr doc = xmlNewDoc( "1.0" );
-	rootnode = xmlNewDocNode( doc, NULL, (const xmlChar*) "gui", NULL );
-
-	xmlDocSetRootElement( doc, rootnode );
-
-	
 	for( k =0; k < SAMPLE_CHAIN_LEN; k ++ )
 	{
 		void *fxp = sample_get_fx_port_ptr( srd, k );
@@ -3882,31 +3876,28 @@ void	sample_produce_khagan_file( void *sample )
 		
 		if( error == VEVO_NO_ERROR )
 		{
+			xmlNodePtr rootnode;
+			xmlDocPtr doc = xmlNewDoc( "1.0" );
+			rootnode = xmlNewDocNode( doc, NULL, (const xmlChar*) "gui", NULL );
+			xmlDocSetRootElement( doc, rootnode );
 			void *osc_port = plug_get_name_space( fxi );
 			int n = vevo_property_num_elements( fxi, "in_parameters" );
 
 			if( osc_port )
 				sample_produce_khagan_widget( osc_port, port_num, rootnode ,n);
+		
+
+			char filename[256];
+			sprintf(filename, "sample_%d_fx_%d.kh", id,k );
+			FILE *res = fopen( filename  , "w" );
+			if(!res)
+				veejay_msg(0, "Cannot write to %s",filename);
+			else
+				xmlDocDump( res, doc );
+			fclose(res);
+
+			xmlFreeDoc( doc );
 		}
 	}
-
-	int id = 0;
-	error = vevo_property_get( srd->info_port, "primary_key", 0, &id );
-	char filename[256];
-	char sfilename[256];
-	sprintf(sfilename, "Fsample_%d.kh", id );
-
-	sprintf(filename, "sample_%d.kh", id );
-//	 void xmlDocDump(FILE *f, xmlDocPtr doc);
-
-	FILE *res = fopen( filename  , "w" );
-	if(!res)
-		veejay_msg(0, "Cannot write to %s",filename);
-	else
-		xmlDocDump( res, doc );
-	fclose(res);
-
-	int ret = xmlSaveFormatFileEnc( sfilename, doc, encoding , 1 );
-	xmlFreeDoc( doc );
 }
 

@@ -752,7 +752,7 @@ static	int	x_display_init_gl( display_ctx *ctx, int w, int h )
 
 void	*x_display_init(void)
 {
-	display_ctx *ctx = (display_ctx*) malloc(sizeof(display_ctx));
+	display_ctx *ctx = (display_ctx*) vj_malloc(sizeof(display_ctx));
 	memset(ctx, 0,sizeof(display_ctx));
    
 	XSetErrorHandler( x11_err_ );

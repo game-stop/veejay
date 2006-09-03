@@ -35,7 +35,7 @@
 
 vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
 {
-    vj_sdl *vjsdl = (vj_sdl *) malloc(sizeof(vj_sdl));
+    vj_sdl *vjsdl = (vj_sdl *) vj_malloc(sizeof(vj_sdl));
     if (!vjsdl)
 	return NULL;
     vjsdl->flags[0] = 0;

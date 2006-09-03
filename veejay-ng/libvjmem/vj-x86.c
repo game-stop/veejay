@@ -21,7 +21,9 @@
 #include <libvjmem/vjmem.h>
 #include <sys/time.h>
 #include <unistd.h>
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 
 /** \defgroup memman Fast memory copy and aligned memory allocation 
  */
@@ -136,6 +138,12 @@ void *vj_malloc(unsigned int size)
 	if( size == 0 )
 		return NULL;
 	void *ptr = NULL;
+
+#ifdef STRICT_CHECKING
+	assert( size > 0 );
+	assert( MEM_ALIGNMENT_SIZE > 0 );
+#endif
+	
 #ifdef HAVE_POSIX_MEMALIGN
 	posix_memalign( &ptr, MEM_ALIGNMENT_SIZE, size );
 #else

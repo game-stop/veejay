@@ -28,6 +28,7 @@
 #include <string.h>
 /* see vj-v4lvideo for details about structure */
 #include <mjpegtools/mpegconsts.h>
+#include <libvjmem/vjmem.h>
 
 typedef struct {
     y4m_stream_info_t streaminfo;
@@ -46,7 +47,7 @@ int bytecount = 0;
 
 void *vj_yuv4mpeg_alloc(float fps, int w, int h, int sar_w, int sar_h)
 {
-    vj_yuv *yuv4mpeg = (void *) malloc(sizeof(vj_yuv));
+    vj_yuv *yuv4mpeg = (void *) vj_malloc(sizeof(vj_yuv));
     if(!yuv4mpeg) return NULL;
     yuv4mpeg->sar = y4m_sar_UNKNOWN;
     yuv4mpeg->dar = y4m_dar_4_3;
