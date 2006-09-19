@@ -5668,7 +5668,7 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 
 	P_A(args,str,format,ap);
 
-	if( strncasecmp( str, "localhost" ) == 0 )
+	if( strncasecmp( str, "localhost",9 ) == 0 )
 	{
 		if( args[0] == v->uc->port )
 		{	
