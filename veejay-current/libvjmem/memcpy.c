@@ -336,8 +336,8 @@ static void * mmx2_memcpy(void * to, const void * from, size_t len)
             "movntq %%mm7, 56(%1)\n"
             :: "r" (f), "r" (t) : "memory");
 
-	       ((unsigned char*)f)+=64;
-               ((unsigned char*)t)+=64;
+	       f+=64;
+               t+=64;
           }
           /* since movntq is weakly-ordered, a "sfence"
           * is needed to become ordered again. */

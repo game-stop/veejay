@@ -595,7 +595,6 @@ static struct
 static	int	no_preview_ = 0;
 static int	no_draw_ = 0;
 
-//G_LOCK_DEFINE( status_lock__ );
 
 G_LOCK_DEFINE(preview_buffer__);
 
@@ -1271,24 +1270,10 @@ gchar *dialog_save_file(const char *title )
 	return NULL;
 }
 
-static GdkPixbuf *preview_pixbuf__[2];
-void	atomic_copy( GdkPixbuf *img, GdkPixbuf *small_img )
-{
-	G_LOCK( preview_buffer__ );
-	if(preview_pixbuf__[0])
-		gdk_pixbuf_unref( preview_pixbuf__[0] );
-	if(preview_pixbuf__[1])
-		gdk_pixbuf_unref( preview_pixbuf__[1] );
-	printf("In: %p, In : %p\n", img, small_img );
-	preview_pixbuf__[0] = (img ? gdk_pixbuf_copy( img ): NULL);
-	preview_pixbuf__[1] = (small_img ? gdk_pixbuf_copy( small_img ): NULL);
-	
-	G_UNLOCK( preview_buffer__ );
-}
 static	void	atomic_init(void)
 {
-	preview_pixbuf__[0] = NULL;
-	preview_pixbuf__[1] = NULL;
+//	preview_pixbuf__[0] = NULL;
+//	preview_pixbuf__[1] = NULL;
 }
 
 static	void	clear_progress_bar( const char *name, gdouble val )
@@ -5713,7 +5698,6 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 	}
 	if(gui->watch.state==STATE_PLAYING && (condition & G_IO_IN)&& gui->watch.p_state == 0 )
 	{
-//		G_LOCK( status_lock__ );
 		gui->status_lock = 1;
 		int nb = 0;
 		unsigned char sta_len[6];
@@ -5723,7 +5707,6 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if(sta_len[0] != 'V' || nb <= 0 )
 		{
 			gui->status_lock = 0;
-//			G_UNLOCK( status_lock__ );
 			return FALSE;
 		}
 		int n_bytes = 0;
@@ -5731,7 +5714,6 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if( n_bytes == 0 || n_bytes >= STATUS_BYTES )
 		{
 			gui->status_lock = 0;
-//			G_UNLOCK( status_lock__ );
 			return FALSE;
 		}
 		bzero( gui->status_msg, STATUS_BYTES ); 
@@ -5740,7 +5722,6 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if(nb <= 0 )
 		{
 			gui->status_lock = 0;
-//			G_UNLOCK( status_lock__ );
 			return FALSE;
  		}
                 while(vj_client_poll( gui->client, V_STATUS ))
@@ -5770,15 +5751,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 				for(i = 0; i <= 18; i ++ )
 					gui->status_tokens[i] = history[i];
 			}
-	//vj_preview_draw();
-
-
-			// context switch
-	//		gdk_threads_enter();
-
 			update_gui();
-
-	//		gdk_threads_leave();
 		}
 		gui->status_lock = 0;
 
@@ -5790,12 +5763,9 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 			history[i] = info->status_tokens[i];
 
 		info->prev_mode = pm;
-		// flush rest
 		char tmp[5];
                 while(vj_client_poll( gui->client, V_STATUS ))
                        nb = vj_client_read( gui->client,V_STATUS,tmp, 1); 
-		
-//		G_UNLOCK( status_lock__ );
 	}
 	return TRUE;
 }
@@ -6144,7 +6114,7 @@ int	vj_gui_cb_locked()
 {
 	return info->watch.p_state;
 }
-
+/*
 static void	vj_preview_draw(void)
 {
 
@@ -6205,7 +6175,7 @@ static void	vj_preview_draw(void)
 
 	update_cached_slots();	
 }
-
+*/
 
 void	vj_img_cb(GdkPixbuf *img )
 {
@@ -7690,6 +7660,7 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
 	}
 //	gtk_widget_modify_fg ( info->selected_gui_slot->title,
 //		GTK_STATE_NORMAL, &color );
+
 	gtk_widget_modify_fg ( info->selected_gui_slot->timecode,
 		GTK_STATE_NORMAL, &color );
 	gtk_widget_modify_fg ( gtk_frame_get_label_widget( info->selected_gui_slot->frame ),

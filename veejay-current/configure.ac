@@ -737,9 +737,9 @@ else
 fi
 
 if test x$have_ps2 = xtrue ; then
- ffmpeg_ac_configure_args="--disable-v4l --disable-audio-oss --disable-vhook --disable-ffplay --disable-ffserver --disable-zlib --disable-dv1394 --disable-network --disable-audio-oss --disable-audiobeos"
+ ffmpeg_ac_configure_args="--disable-v4l --disable-audio-oss --disable-vhook --disable-ffplay --disable-ffserver --disable-zlib --disable-dv1394 --disable-network --disable-audio-oss --disable-audiobeos  --extra-cflags=-fPIC"
 else
-ffmpeg_ac_configure_args="--disable-ffserver --disable-ffplay --disable-v4l --disable-audio-oss --disable-vhook --disable-dv1394 --disable-network --disable-audio-oss --disable-audio-beos"
+ffmpeg_ac_configure_args="--disable-ffserver --disable-ffplay --disable-v4l --disable-audio-oss --disable-vhook --disable-dv1394 --disable-network --disable-audio-oss --disable-audio-beos  --extra-cflags=-fPIC"
 fi
 
 AC_MSG_NOTICE([Running FFMpeg configure ${ffmpeg_ac_configure_args}])

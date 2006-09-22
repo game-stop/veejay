@@ -129,13 +129,17 @@ static	float		logo_value_ = 1.0;
 
 void	multitrack_preview_master(void *data, int status)
 {
+	G_LOCK( mt_lock);
 	multitracker_t *mt = (multitracker_t*) data;
 	all_priv_t *pt = (all_priv_t*) mt->data;
 	mt_priv_t *last = pt->pt[LAST_TRACK];
 
 	if(status == last->preview)
+	{
+		G_UNLOCK( mt_lock );
 		return;
-	G_LOCK(mt_lock);
+	}
+
 	last->preview = status;
 	int n = find_track( mt, last->hostname, last->port_num );
 	if ( n >= 0 )
@@ -492,7 +496,7 @@ static	void	playmode_sensitivity( mt_priv_t *p, gint pm )
 static	void	update_widgets(int *status, mt_priv_t *p, int pm)
 {
 	int *h = p->history[pm];
-	gdk_threads_enter();
+//	gdk_threads_enter();
 //	mt_update_gui(status);	
 	playmode_sensitivity( p, pm );
 
@@ -511,7 +515,7 @@ static	void	update_widgets(int *status, mt_priv_t *p, int pm)
 			update_track_view( MAX_TRACKS, get_track_tree( p->view->tracks ), (void*)p );
 	}
 	
-	gdk_threads_leave();
+//	gdk_threads_leave();
 }
 
 static gboolean	update_sequence_widgets( gpointer data )
@@ -797,74 +801,78 @@ void		multitrack_quit( void *data )
 int		multitrack_add_track( void *data )
 {
 	multitracker_t *mt = (multitracker_t*) data;
-	if(mt)
+	if(!mt)
+		return 0;
+	int res = 0;
+	// open input dialog, query hostname and postnum etc
+	char *hostname = g_new0(char , 100 );
+	int   port_num = 0;
+	if( mt_new_connection_dialog( mt, hostname, 100, &port_num ) == GTK_RESPONSE_ACCEPT )
 	{
-		// open input dialog, query hostname and postnum etc
-		char *hostname = g_new0(char , 100 );
-		int   port_num = 0;
-		if( mt_new_connection_dialog( mt, hostname, 100, &port_num ) == GTK_RESPONSE_ACCEPT )
-		{
-			all_priv_t *pt = (all_priv_t*)mt->data;
-			int track = free_slot( mt->data );
-			if( track == -1 )
-			{	
-				status_print(mt, "No free Tracks available!");
-				g_free(hostname);	
-				return 0;
-			}
+		G_LOCK(mt_lock);
+		all_priv_t *pt = (all_priv_t*)mt->data;
+		int track = free_slot( mt->data );
+		if( track == -1 )
+		{	
+			status_print(mt, "No free Tracks available!");
+			g_free(hostname);
+			G_UNLOCK(mt_lock);	
+			return 0;
+		}
 
-			int i;
-			int found = 0;
-			for( i = 0; i < MAX_TRACKS ; i ++ )
+		int i;
+		int found = 0;
+		for( i = 0; i < MAX_TRACKS ; i ++ )
+		{
+			mt_priv_t *p = pt->pt[i];
+			if(p->active)
 			{
-				mt_priv_t *p = pt->pt[i];
-				if(p->active)
+				if(strncasecmp(hostname,p->hostname,strlen(hostname)) == 0 && port_num == p->port_num )
 				{
-					if(strncasecmp(hostname,p->hostname,strlen(hostname)) == 0 && port_num == p->port_num )
-					{
-						found = 1;	
-						break;	
-					}
+					found = 1;	
+					break;	
 				}
 			}
-			void *seq = NULL;
-			if(found)
-			{
-				status_print( mt, "Track %d: '%s' '%d' already in Track %d\n",
-					track, hostname,port_num, i );
-				g_free(hostname);
-				return 0;
-			}
-			seq = veejay_sequence_init( port_num, hostname, preview_width_*2, preview_height_*2  );
-			if(seq == NULL )
-			{
-				status_print( mt, "Error while connecting to '%s' : '%d'", hostname, port_num );
-				g_free(hostname);
-				pt->pt[track]->sequence = NULL;
-				pt->pt[track]->active = 0;
-				pt->pt[track]->used = 0;
-				return 0;
-			}
-			pt->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) pt->pt[track] );
-	
-			veejay_configure_sequence( seq, preview_width_, preview_height_ );
-
-			G_LOCK(mt_lock);
-			pt->pt[track]->sequence = seq;
-			pt->pt[track]->active = 1;	
-			pt->pt[track]->used = 1;
-			store_data( mt->data, track, hostname, port_num );
-			G_UNLOCK(mt_lock);
-			mt_priv_t *p = pt->pt[track];
-		//	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( p->view->toggle ), 1 );
-			status_print( mt, "Track %d: Connection established with '%s' port %d\n",
-				track, hostname, port_num );
-			gtk_widget_set_sensitive( GTK_WIDGET(p->view->panel),TRUE);
 		}
-		g_free(hostname);
-		return 1;
+
+		void *seq = NULL;
+		if(found)
+		{
+			status_print( mt, "Track %d: '%s' '%d' already in Track %d\n",
+				track, hostname,port_num, i );
+			g_free(hostname);
+			G_UNLOCK( mt_lock );
+			return 0;
+		}
+		seq = veejay_sequence_init( port_num, hostname, preview_width_*2, preview_height_*2  );
+		if(seq == NULL )
+		{
+			status_print( mt, "Error while connecting to '%s' : '%d'", hostname, port_num );
+			g_free(hostname);
+			pt->pt[track]->sequence = NULL;
+			pt->pt[track]->active = 0;
+			pt->pt[track]->used = 0;
+			G_UNLOCK( mt_lock );
+			return 0;
+		}
+		pt->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) pt->pt[track] );
+	
+		veejay_configure_sequence( seq, preview_width_, preview_height_ );
+
+		pt->pt[track]->sequence = seq;
+		pt->pt[track]->active = 1;	
+		pt->pt[track]->used = 1;
+		store_data( mt->data, track, hostname, port_num );
+		mt_priv_t *p = pt->pt[track];
+		//	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( p->view->toggle ), 1 );
+		status_print( mt, "Track %d: Connection established with '%s' port %d\n",
+				track, hostname, port_num );
+		gtk_widget_set_sensitive( GTK_WIDGET(p->view->panel),TRUE);
+		res = 1;
 	}
-	return 0;
+	g_free(hostname);
+	G_UNLOCK(mt_lock);
+	return res;
 }
 
 void		multitrack_close_track( void *data )
@@ -889,7 +897,9 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 		a->pt[track]->active = 0;
 		a->pt[track]->used = 0;
 		G_UNLOCK(mt_lock);
+		return 0;
 	}
+	
 	a->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) a->pt[track] );
 	veejay_configure_sequence( seq, preview_width_, preview_height_ );
 
@@ -1395,7 +1405,6 @@ void 	*mt_preview( gpointer user_data )
 		}
 		else
 		{
-			retry:
 			cache[LAST_TRACK] = veejay_get_image( lt->sequence, &error );	
 			if( error )
 				delete_data( mt->data, LAST_TRACK ); 
