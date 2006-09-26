@@ -416,6 +416,7 @@ typedef struct
 	int		key_id;
 	int		preview_size_w;
 	int		preview_size_h;
+	int		preview_active;
 	GdkColor	*fg_;
 	gboolean	key_now;	
 	void		*mt;
@@ -596,7 +597,7 @@ static	int	no_preview_ = 0;
 static int	no_draw_ = 0;
 
 
-G_LOCK_DEFINE(preview_buffer__);
+//G_LOCK_DEFINE(preview_buffer__);
 
 static struct
 {
@@ -1674,7 +1675,7 @@ gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 		if( prompt_dialog("Quit gveejay", "Are you sure?" ) == GTK_RESPONSE_REJECT)
 			return TRUE;
 	}
-	multitrack_quit( info->mt );
+//	multitrack_quit( info->mt );
 	
 	info->watch.w_state = WATCHDOG_STATE_OFF;
 //	g_usleep(40000);
@@ -3805,6 +3806,8 @@ static	void	load_effectchain_info()
 
 }
 
+static int preview_ = 0;
+
 enum 
 {
 //	FX_ID = 0,
@@ -5596,6 +5599,13 @@ static	gboolean	update_stream_record_timeout(gpointer data)
 	}
 	return TRUE;
 }
+
+static gboolean update_preview( gpointer data )
+{
+	vj_gui_put_image();
+	return TRUE;
+}
+
 static gboolean	update_progress_timeout(gpointer data)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, "connecting");
@@ -5702,6 +5712,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		int nb = 0;
 		unsigned char sta_len[6];
 		bzero(sta_len,6);
+
 		nb = vj_client_read( gui->client, V_STATUS, sta_len, 5 );
 		
 		if(sta_len[0] != 'V' || nb <= 0 )
@@ -5766,6 +5777,11 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		char tmp[5];
                 while(vj_client_poll( gui->client, V_STATUS ))
                        nb = vj_client_read( gui->client,V_STATUS,tmp, 1); 
+
+		vj_gui_put_image();
+
+
+
 	}
 	return TRUE;
 }
@@ -6433,7 +6449,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	setup_geometry( info->el.width, info->el.height, num_tracks_, default_preview_width_,
 		     default_preview_height_ );
 
-	gui->mt = multitrack_new(
+	/*gui->mt = multitrack_new(
 			(void(*)(int,char*,int)) vj_gui_cb,
 			(void(*)(GdkPixbuf *)) vj_img_cb, 
 			glade_xml_get_widget_( info->main_window, "gveejay_window" ),
@@ -6442,7 +6458,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 			info->el.width,
 			info->el.height,
 			(skin__ == 0 ? glade_xml_get_widget_( info->main_window, "imageA") : NULL )); 
-
+	*/
 	memset( &info->watch, 0, sizeof(watchdog_t));
 	info->watch.state = STATE_STOPPED; //
 	memset(&(info->watch.p_time),0,sizeof(struct timeval));
@@ -6502,6 +6518,9 @@ static	gboolean	update_log(gpointer data)
 	}
 	if(buf)
 		free(buf);
+
+
+
 	return TRUE;
 }
 
@@ -6592,6 +6611,9 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 			(gpointer*) info,
 			NULL 
 		);
+
+//	preview_ =  g_timeout_add( 100 , update_preview, (gpointer*) info );
+	
 	load_editlist_info();
 	if(info->rawdata)
 		free(info->rawdata);
@@ -6656,7 +6678,7 @@ gboolean		is_alive( void )
 
 	if(gui->watch.w_state == WATCHDOG_STATE_OFF )
 	{
-		multitrack_restart( gui->mt );
+	//	multitrack_restart( gui->mt );
 		vj_gui_disconnect();
 		return TRUE;
 	}
@@ -6697,8 +6719,8 @@ gboolean		is_alive( void )
 			info->logging = g_timeout_add( G_PRIORITY_LOW, update_log,(gpointer*) info );
 			veejay_stop_connecting(gui);
 			info->watch.state = STATE_PLAYING;
-			if(info->watch.p_state == 0)
-				multrack_audoadd( info->mt, remote, port );
+		//	if(info->watch.p_state == 0)
+		//		multrack_audoadd( info->mt, remote, port );
 			info->watch.p_state = 0; 
 		}
 	}
@@ -6785,34 +6807,43 @@ void	vj_gui_enable()
 	disable_widget( "vs_box" );
 
 }
-/*
+
 void	vj_gui_put_image(void)
 {
-	GtkWidget *pixbuf_widget = glade_xml_get_widget_( info->main_window, "//imageA" );
+	if(!info->preview_active )
+		return;
+	
+	GtkWidget *pixbuf_widget = glade_xml_get_widget_( info->main_window, "imageA" );
 	GdkPixbuf *pixbuf = NULL;
-	gint w = 100;
-	gint h = 100;
+
+//	gint w = info->preview_size_w;
+//	gint h = info->preview_size_h;
+	gint w = default_preview_width_;
+	gint h = default_preview_height_;
+//	gint w = 176;
+//	gint h = 144;
 	gint row_strides = 3 * w;
 	gint bw = 0;
-
+	
 	// veejay sends current frame as image in RGB, 8 bytes per sample 
 	// send 'get image' message
 	multi_vims( VIMS_RGB24_IMAGE, "%d %d", w ,h );
 	// read image from socket, store length of image in bw
-	gchar *rawdata = recv_vims( 5, &bw );
+	gchar *rawdata = recv_vims( 6, &bw );
 
 	if(bw<=0 ) { if (rawdata) free(rawdata); return ; }
 
-	GdkPixbuf *old_image = gtk_image_get_pixbuf( pixbuf_widget );
 	// create a new picture from memory
 	pixbuf = gdk_pixbuf_new_from_data( rawdata,GDK_COLORSPACE_RGB, FALSE,8,w,h,row_strides,NULL,NULL );
 	// set picture
 	gtk_image_set_from_pixbuf(pixbuf_widget,pixbuf);
 	// free ?
-	//@ gdk_pixbuf_unref(pixbuf);
+//	gdk_pixbuf_unref(pixbuf);
+	gtk_widget_queue_draw( pixbuf_widget );
+
 	g_free(rawdata);
 }
-*/
+
 
 /* --------------------------------------------------------------------------------------------------------------------------
  * Returns infos to a given sample/stream... use as follows
@@ -7931,10 +7962,10 @@ void setup_knobs()
 
 void	veejay_release_track(int id, int release_this)
 {
-	multitrack_release_track( info->mt, id, release_this );
+//	multitrack_release_track( info->mt, id, release_this );
 }
 
 void	veejay_bind_track( int id, int bind_this )
 {
-	multitrack_bind_track(info->mt, id, bind_this ); 
+//	multitrack_bind_track(info->mt, id, bind_this ); 
 }

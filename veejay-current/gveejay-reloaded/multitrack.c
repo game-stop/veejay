@@ -530,7 +530,7 @@ static gboolean	update_sequence_widgets( gpointer data )
 #ifdef STRICT_CHECKING
 	assert( n == 18 );
 #endif
-	p->status_lock = 1;
+/*	p->status_lock = 1;
 
 	int pm = array[PLAY_MODE];
 	int i;
@@ -538,12 +538,12 @@ static gboolean	update_sequence_widgets( gpointer data )
 		p->status_cache[i] = array[i];
 
 	
-	update_widgets(array, p, pm);
+//	update_widgets(array, p, pm);
 
 	int *his = p->history[ pm ];	
 	for( i  =  0; i < 18; i ++ )
 		his[i] = array[i];
-	p->status_lock = 0;
+	p->status_lock = 0;*/
 	return TRUE;
 }
 
@@ -855,7 +855,7 @@ int		multitrack_add_track( void *data )
 			G_UNLOCK( mt_lock );
 			return 0;
 		}
-		pt->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) pt->pt[track] );
+	//	pt->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) pt->pt[track] );
 	
 		veejay_configure_sequence( seq, preview_width_, preview_height_ );
 
@@ -900,7 +900,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 		return 0;
 	}
 	
-	a->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) a->pt[track] );
+//	a->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) a->pt[track] );
 	veejay_configure_sequence( seq, preview_width_, preview_height_ );
 
 	a->pt[track]->sequence = seq;
