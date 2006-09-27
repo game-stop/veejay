@@ -435,10 +435,6 @@ PKG_CHECK_MODULES(GLADE, [$libglade_modules])
 AC_SUBST(GLADE_CFLAGS)
 AC_SUBST(GLADE_LIBS)
 
-dnl get the genmarshal command for the *.list files 
-GLIB_GENMARSHAL=`pkg-config --variable=glib_genmarshal glib-2.0` 
-AC_SUBST(GLIB_GENMARSHAL)
-
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
