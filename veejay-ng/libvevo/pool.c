@@ -36,14 +36,19 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *	The stack size is limited to ROUNDS_PER_MAG
  *	When the stack is full, a new magazine is allocated and added to the linked list
  *	of magazines.	
+ *
+ *	This is basically how the slab allocator works in a linux kernel
 */
+#include <config.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include "pool.h"
 
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 
 //! \typedef space_t structure
 /*! The space_t structure is a linked list of spaces.
@@ -79,7 +84,10 @@ static space_t	*alloc_space( size_t bs )
 	int k;
 	void *p;
 	space_t *s;
-	s = (space_t*) malloc(sizeof(space_t));
+	s = (space_t*) vj_malloc(sizeof(space_t));
+#ifdef STRICT_CHECKING
+	assert( s != NULL );
+#endif
 	s->area = vj_malloc(bs * ROUNDS_PER_MAG);
 	s->mag  = vj_malloc( sizeof(void*) * (ROUNDS_PER_MAG + 1) );
 	p = s->area;
@@ -104,9 +112,12 @@ static space_t	*alloc_space( size_t bs )
 void	*vevo_pool_init(size_t prop_size,size_t stor_size, size_t atom_size, size_t index_size)
 {
 	unsigned int Msize = Mend + 1;
-	pool_t *p = (pool_t*) malloc(sizeof(pool_t));
+	pool_t *p = (pool_t*) vj_malloc(sizeof(pool_t));
+#ifdef STRICT_CHECKING
+	assert( p != NULL );
+#endif
 	p->space = NULL;
-	p->spaces = (space_t**) malloc(sizeof(space_t*) * Msize );
+	p->spaces = (space_t**) vj_malloc(sizeof(space_t*) * Msize );
 	p->spaces[M4b] = alloc_space( sizeof(int32_t) );
 	p->spaces[M8b] = alloc_space( sizeof(double) );
 	p->spaces[Mpb] = alloc_space( sizeof(void*) );

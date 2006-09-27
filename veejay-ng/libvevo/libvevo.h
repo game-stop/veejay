@@ -40,6 +40,12 @@ typedef void vevo_port_t;
 #define TRUE 1
 #endif
 
+#ifdef STRICT_CHECKING
+#define vpn(type) vevo_port_new( type, __FUNCTION__ , __LINE__ )
+#else
+#define vpn(type) vevo_port_new( type )
+#endif
+
 int	vevo_property_num_elements( vevo_port_t *p, const char *key);
 
 int 	vevo_property_atom_type( vevo_port_t *p, const char *key);
@@ -82,6 +88,10 @@ int	vevo_sscanf_port( vevo_port_t *port, const char *s );
 int	vevo_special_union_ports( void *port_a, void *port_b );
 
 int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key, int n_elem, int type);
+
+char	*vevo_sprintf_property_value( vevo_port_t *port, const char *key);
+
+char            *vevo_property_get_string( void *port, const char *key );
 
 #define	VEVO_ATOM_TYPE_VOIDPTR	65
 #define VEVO_ATOM_TYPE_INT	1

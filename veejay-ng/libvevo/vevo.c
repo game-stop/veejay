@@ -75,6 +75,10 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  *        -# Ports that have never been freed
  *        -# Ports that have not been allocated by vevo
  *        -# Ports that have already been freed
+ *        
+ * This library is not complete, it contains some loose ends:
+ *   - sscanf/ printf
+ *   - vevo_num_properties
  *         
 */
 
@@ -141,7 +145,7 @@ typedef struct {
  */
 typedef struct {
     vevo_storage_t *st; 
-    uint32_t key;
+    uint64_t key;
     void *next;
 } vevo_property_t;
 
@@ -153,7 +157,7 @@ typedef struct {
  */
 typedef struct {
     const char *key;
-    uint32_t hash_code;		/* vevo uses a integer representation of key, eliminates strcmp  */
+    uint64_t hash_code;		/* vevo uses a integer representation of key, eliminates strcmp  */
     void *next;
 } port_index_t;
 
@@ -191,13 +195,14 @@ static int vevo_property_is_soft_referenced(vevo_port_t * p, const char *key );
 static void vevo_port_recurse_free( vevo_port_t *sorted_port, vevo_port_t *p );
 
 
+
 //! Construct a new vevo_property_t
 /*!
  \param port port
  \param hash_key hash value
  \param stor vevo_storage_t
  */
-static vevo_property_t *prop_node_new(__vevo_port_t *port, uint32_t hash_key,
+static vevo_property_t *prop_node_new(__vevo_port_t *port, uint64_t hash_key,
 					vevo_storage_t * stor)
 {
     vevo_property_t *p =
@@ -228,7 +233,7 @@ static void prop_node_free(__vevo_port_t *port,vevo_property_t * p)
  \param key hash value
  \param t vevo_storage_t
  */
-static vevo_property_t *prop_node_append(vevo_port_t * p, uint32_t key,
+static vevo_property_t *prop_node_append(vevo_port_t * p, uint64_t key,
 					   vevo_storage_t * t)
 {
     __vevo_port_t *port = (__vevo_port_t *) p;
@@ -255,7 +260,7 @@ static vevo_property_t *prop_node_append(vevo_port_t * p, uint32_t key,
  \param port
  \param key hash value
  */
-static vevo_property_t *prop_node_get(vevo_port_t * p, uint32_t key)
+static vevo_property_t *prop_node_get(vevo_port_t * p, uint64_t key)
 {
     __vevo_port_t *port = (__vevo_port_t *) p;
 #ifdef STRICT_CHECKING
@@ -277,7 +282,7 @@ static vevo_property_t *prop_node_get(vevo_port_t * p, uint32_t key)
  \param hash_key calculated hash value
  \return port_index_t new mmemonic
  */
-static port_index_t *port_node_new(__vevo_port_t *port,const char *key, uint32_t hash_key)
+static port_index_t *port_node_new(__vevo_port_t *port,const char *key, uint64_t hash_key)
 {
  //   port_index_t *i = (port_index_t *) vevo_malloc(sizeof(port_index_t));
 	port_index_t *i = (port_index_t *) vevo_pool_alloc_node(
@@ -304,7 +309,7 @@ static void port_node_free(__vevo_port_t *port,port_index_t * node)
 	if (node->key)
     		free((void *) node->key);
 //	free(node);
-	vevo_pool_free_node( port->pool,(void*)node->key );
+	vevo_pool_free_node( port->pool,(void*)node );
     }
     node = NULL;
 }
@@ -316,7 +321,7 @@ static void port_node_free(__vevo_port_t *port,port_index_t * node)
  \param hash_key calculated hash value
  */
 static void port_node_append(vevo_port_t * p, const char *key,
-				    uint32_t hash_key)
+				    uint64_t hash_key)
 {
 #ifdef STRICT_CHECKING
     assert(p != NULL);
@@ -381,9 +386,9 @@ storage_put_atom_value(__vevo_port_t * port, void *src, int n,
  \param str string
  \return calculated hash value
  */
-static inline uint32_t hash_key_code( const char *str )   	
+static inline uint64_t hash_key_code( const char *str )   	
 {
-        uint32_t hash = 5381;
+        uint64_t hash = 5381;
         int c;
 
         while ((c = *str++))
@@ -401,7 +406,7 @@ static inline uint32_t hash_key_code( const char *str )
 int vevo_property_soft_reference(vevo_port_t * p, const char *key)
 {
     __vevo_port_t *port = (__vevo_port_t *) p;
-    uint32_t hash_key = hash_key_code(key);
+    uint64_t hash_key = hash_key_code(key);
     if (!port->table) {
 	vevo_property_t *node = NULL;
 	if ((node = prop_node_get(port, hash_key)) != NULL) {
@@ -432,7 +437,7 @@ int vevo_property_soft_reference(vevo_port_t * p, const char *key)
 static int vevo_property_finalize(vevo_port_t * p, const char *key)
 {
     __vevo_port_t *port = (__vevo_port_t *) p;
-    uint32_t hash_key = hash_key_code(key);
+    uint64_t hash_key = hash_key_code(key);
     if (!port->table) {
 	vevo_property_t *node = NULL;
 	if ((node = prop_node_get(port, hash_key)) != NULL) {
@@ -457,7 +462,7 @@ static int vevo_property_exists( vevo_port_t *p, const char *key)
 {
 	__vevo_port_t *port = (__vevo_port_t *) p;
 
-    	uint32_t hash_key = hash_key_code(key);
+    	uint64_t hash_key = hash_key_code(key);
 	if (!port->table) {
 		vevo_property_t *node = NULL;
 		if ((node = prop_node_get(port, hash_key)) != NULL) 
@@ -483,7 +488,7 @@ static	void	vevo_port_add_property( vevo_port_t *p,int finalize, const char *key
 {
 	__vevo_port_t *port = (__vevo_port_t *) p;
 
-	uint32_t hash_key = hash_key_code(key);
+	uint64_t hash_key = hash_key_code(key);
 	vevo_storage_t *stor = vevo_new_storage(p);
 	storage_put_atom_value(port, src, num_elements, stor, atom_type);
 	if(finalize)
@@ -527,7 +532,6 @@ static int atom_get_value(vevo_storage_t * t, int idx, void *dst)
 {
 #ifdef STRICT_CHECKING
     assert(t != NULL);
-    assert(dst != NULL);
 #endif
     atom_t *atom = NULL;
 
@@ -563,6 +567,9 @@ static int atom_get_value(vevo_storage_t * t, int idx, void *dst)
     if (atom->size <= 0)
 	return VEVO_NO_ERROR;
   
+    if( dst == NULL )
+	    return VEVO_NO_ERROR;
+    
     if (t->atom_type != VEVO_ATOM_TYPE_STRING) {
 #ifdef STRICT_CHECKING
 	assert( atom->size > 0 );
@@ -839,7 +846,7 @@ static hash_val_t int_hash(const void *key)
  */
 static int key_compare(const void *key1, const void *key2)
 {
-    return ((const uint32_t) key1 == (const uint32_t) key2 ? 0 : 1);
+    return ((const uint64_t) key1 == (const uint64_t) key2 ? 0 : 1);
 }
 
 //! Get the number of elements in an Atom
@@ -857,7 +864,7 @@ int vevo_property_num_elements(vevo_port_t * p, const char *key)
     if(!p) return -1;
 
     __vevo_port_t *port = (__vevo_port_t *) p;
-    uint32_t hash_key = hash_key_code(key);
+    uint64_t hash_key = hash_key_code(key);
 
     if (!port->table) {
 	vevo_property_t *node;
@@ -890,7 +897,7 @@ int vevo_property_atom_type(vevo_port_t * p, const char *key)
 #ifdef STRICT_CHECKING
     assert(port != NULL);
 #endif
-    uint32_t hash_key = hash_key_code(key);
+    uint64_t hash_key = hash_key_code(key);
 
     if (!port->table) {
 	vevo_property_t *node;
@@ -929,7 +936,7 @@ vevo_property_element_size(vevo_port_t * p, const char *key,
     assert(idx >= 0);
 #endif
     __vevo_port_t *port = (__vevo_port_t *) p;
-    uint32_t hash_key = hash_key_code(key);
+    uint64_t hash_key = hash_key_code(key);
 #ifdef STRICT_CHECKING
     assert( port );
 #endif
@@ -1210,7 +1217,7 @@ vevo_property_is_soft_referenced(vevo_port_t * p,
     assert( key != NULL );
 #endif
     __vevo_port_t *port = (__vevo_port_t *) p;
-    uint32_t hash_key = hash_key_code(key);
+    uint64_t hash_key = hash_key_code(key);
 #ifdef STRICT_CHECKING
     assert( port != NULL );
 #endif
@@ -1254,7 +1261,7 @@ vevo_property_set(vevo_port_t * p,
   	  assert( vevo_atom_size(atom_type) > 0 );
 #endif
     __vevo_port_t *port = (__vevo_port_t *) p;
-    uint32_t hash_key = hash_key_code(key);
+    uint64_t hash_key = hash_key_code(key);
     int new = 1;
     void *node = NULL;
 #ifdef STRICT_CHECKING
@@ -1296,6 +1303,7 @@ vevo_property_set(vevo_port_t * p,
 	}
     }
     vevo_storage_t *stor = vevo_new_storage(port);
+    
     storage_put_atom_value(port, src, num_elements, stor, atom_type);
 
     if (new) {
@@ -1348,22 +1356,22 @@ vevo_property_get(vevo_port_t * p, const char *key, int idx, void *dst)
     assert( idx >= 0 );
 #endif
     __vevo_port_t *port = (__vevo_port_t *) p;
-    uint32_t hash_key = hash_key_code(key);
+    uint64_t hash_key = hash_key_code(key);
 
     if (!port->table) {
 	vevo_property_t *node = NULL;
 	if ((node = prop_node_get(port, hash_key)) != NULL) {
-	    if (dst == NULL)
-		return VEVO_NO_ERROR;
-	    else
+	   // if (dst == NULL)
+	//	return VEVO_NO_ERROR;
+	  //  else
 		return atom_get_value(node->st, idx, dst);
 	}
     } else {
 	hnode_t *node = NULL;
 	if ((node = property_exists(port, hash_key)) != NULL) {
-	    if (dst == NULL)
-		return VEVO_NO_ERROR;
-	    else
+	   // if (dst == NULL)
+	//	return VEVO_NO_ERROR;
+	  //  else
 		return atom_get_value((vevo_storage_t *) hnode_get(node),
 				      idx, dst);
 	}
@@ -1538,7 +1546,7 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 	while((node=hash_scan_next(&scan)) != NULL)
 	{
 		s = hnode_get(node);
-		if( s->atom_type == atype || atype == 0)
+		if( s && s->atom_type == atype || atype == 0)
 		{
 			int type = 0;
 			int ec = atom_get_value(s, 0, &type);
@@ -1696,13 +1704,16 @@ int	vevo_special_union_ports( void *port_a, void *port_b )
    __vevo_port_t *B = (__vevo_port_t *) port_b;
 
    if(!A || !B )
-  	return 1;
+  	return 0;
 
 	// port_a contains only slots
    
    char **Ea = vevo_list_properties( port_a );
    int i;
    int error;
+   if(!Ea)
+	   return 0;
+  
    for( i = 0; Ea[i] != NULL; i ++ )
    {
 	void *value = NULL;
@@ -1736,9 +1747,8 @@ int	vevo_special_union_ports( void *port_a, void *port_b )
  */
 void	vevo_port_recursive_free( vevo_port_t *port )
 {
-#ifdef STRICT_CHECKING
-	assert( port != NULL );
-#endif
+	if(!port)
+		return;
 	void *sor = vevo_port_register( NULL,NULL );
 #ifdef STRICT_CHECKING
 	assert( sor != NULL );
@@ -1782,6 +1792,10 @@ void	vevo_port_recursive_free( vevo_port_t *port )
 
 char	**vevo_port_deepen_namespace( void *port, char *path)
 {
+#ifdef STRICT_CHECKING
+	assert( port != NULL );
+	assert( path != NULL );
+#endif
 	char **top_level = vevo_list_properties(port);
 	int k;
 	int error;
@@ -1830,29 +1844,39 @@ char	**vevo_port_recurse_namespace( vevo_port_t *port, const char *base )
 	for( k = 0; top_level[k] != NULL ; k ++ )
 	{
 		int atom_type = vevo_property_atom_type( port, top_level[k] );
-		if( atom_type != VEVO_ATOM_TYPE_VOIDPTR )
+		if( atom_type == VEVO_ATOM_TYPE_PORTPTR )
 		{
-			if( atom_type == VEVO_ATOM_TYPE_PORTPTR )
+			void *p = NULL;
+			int error = vevo_property_get( port, top_level[k],0,&p );
+			if( error == VEVO_NO_ERROR )
 			{
-				void *p = NULL;
-				int error = vevo_property_get( port, top_level[k],0,&p );
-				if( error == VEVO_NO_ERROR )
-					num += vevo_num_properties(p);
-			}	
+#ifdef STRICT_CHECKING
+				assert( p != NULL );
+#endif
+				num += vevo_num_properties(p);
+			}
+		}	
+		else if (atom_type != VEVO_ATOM_TYPE_VOIDPTR)
 			num++;
-		}
 	}
 	
 #ifdef STRICT_CHECKING
 	assert( num > 0 );
 #endif
 	
-	char **namespace = (char**) malloc(sizeof(char*) * (num+1) );
+	char **namespace = (char**) vj_malloc(sizeof(char*) * (num+1) );
+#ifdef STRICT_CHECKING
+	assert( namespace != NULL );
+#endif
 	memset(namespace, 0,sizeof(char*) * (num+1));
+
 	int    methods = 0;
 	int	error;
 	for( k = 0; top_level[k] != NULL ; k ++ )
 	{
+#ifdef STRICT_CHECKING
+		assert( methods <= num );
+#endif
 		int atom_type = vevo_property_atom_type( port, top_level[k] );
 		char path[256];
 
@@ -1886,11 +1910,9 @@ char	**vevo_port_recurse_namespace( vevo_port_t *port, const char *base )
 		{
 			strcat( path, "/" );
 			strcat( path, top_level[k] );
+			namespace[ methods ] = strdup( path );
+			methods ++;
 		}
-
-		namespace[ methods ] = strdup( path );
-		methods ++;
-
 		free(top_level[k]);
 	}
 	free(top_level);
@@ -2395,6 +2417,59 @@ char	**vevo_sprintf_port( vevo_port_t *port )
  \return A new character string 
  */
 
+char	*vevo_sprintf_property_value( vevo_port_t *port, const char *key)
+{
+	char tmp[512];
+	int n = vevo_property_num_elements( port, key );
+	if( n <= 0 )
+		return NULL;
+	int i;
+	int size = 0;
+	int atom = vevo_property_atom_type( port , key );
+
+	bzero(tmp,512);
+	
+	if(atom == VEVO_ATOM_TYPE_INT || atom == VEVO_ATOM_TYPE_BOOL)
+	{
+		int *a = (int*) malloc(sizeof(int) * n );
+		for( i = 0; i < n ; i ++ )
+			if( vevo_property_get( port, key, i, &(a[i]) ) != VEVO_NO_ERROR)
+			{
+				free(a);
+				return NULL;
+			}
+			else
+			{
+				char val[16];
+				sprintf(val, "%4d", a[i]);
+				strcat( tmp, val );
+				strcat( tmp, " ");
+			}
+		free(a);
+	} else if (atom == VEVO_ATOM_TYPE_DOUBLE )
+	{
+		double *a = (double*) malloc(sizeof(double) * n );
+		for( i = 0; i < n; i ++ )
+			if( vevo_property_get( port, key, i , &(a[i])) != VEVO_NO_ERROR)
+			{
+				free(a);
+				return NULL;
+			}
+			else
+			{
+				char val[16];
+				sprintf(val, "%04.2g", a[i]);
+				strcat( tmp, val );
+				strcat( tmp, " " );
+			}
+		free(a);
+	} else
+		return NULL;
+	
+	return strdup( tmp );
+}
+
+
 #define PROP_MAX_LEN 1024
 #define PROP_ARG_LEN 256
 char  *vevo_sprintf_property( vevo_port_t *port, const char *key  )
@@ -2626,5 +2701,67 @@ int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key
 		done = 1;
 	free(format);
 	return done;
+}
+
+char            *vevo_property_get_string( void *port, const char *key )
+{
+        size_t len = vevo_property_element_size( port, key, 0 );
+        char *ret = NULL;
+        if(len<=0) return NULL;
+
+	if( vevo_property_get( port, key,0,NULL ) != VEVO_NO_ERROR )
+		return NULL;
+	
+#ifdef STRICT_CHECKING
+	assert( vevo_property_atom_type( port, key ) == VEVO_ATOM_TYPE_STRING );
+#endif
+        ret = (char*) vj_malloc(sizeof(char) * len );
+        vevo_property_get( port, key, 0, &ret );
+        return ret;
+}
+
+
+int
+vevo_property_del(vevo_port_t * p,
+		    const char *key )
+{
+#ifdef STRICT_CHECKING
+    assert(p != NULL);
+	//@ no self referencing
+    assert( key != NULL );
+#endif
+    __vevo_port_t *port = (__vevo_port_t *) p;
+    uint64_t hash_key = hash_key_code(key);
+    void *node = NULL;
+    if (!port->table) {
+	    veejay_msg(0, "Is LIst");
+	vevo_property_t *pnode = NULL;
+	if ((pnode = prop_node_get(port, hash_key)) != NULL) {
+	    vevo_free_storage(port,pnode->st);
+	    prop_node_free(port,pnode);
+	    //node = (void *) pnode;
+	}
+    } else {
+	    veejay_msg(0, "Is Hash");
+	hnode_t *old_node = NULL;
+	if ((old_node = property_exists(port, hash_key)) != NULL) {
+	    vevo_storage_t *oldstor =
+		(vevo_storage_t *) hnode_get(old_node);
+	    vevo_free_storage(port,oldstor);
+	    hash_delete((hash_t *) port->table, old_node);
+	    hnode_destroy(old_node);
+	}
+    }
+
+    port_index_t *l = port->index;
+    port_index_t *n = NULL;
+     while (l != NULL) {
+	n = l->next;
+	if( l->key == hash_key )
+		port_node_free(port,l);
+	l = n;
+     }
+
+    return VEVO_NO_ERROR;
 }
 
