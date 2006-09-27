@@ -26,7 +26,7 @@ VEVOSAMPLE_ALL_LIB_OPTS = \
 	-release $(LT_RELEASE) \
 	-export-dynamic
 
-libvevosample_la_SOURCES = vj-unicap.c vj-yuv4mpeg.c vevosample.c
+libvevosample_la_SOURCES = vj-unicap.c vj-yuv4mpeg.c uifactory.c vevosample.c
 libvevosample_la_LIBADD = \
 	-L$(top_builddir)/libhash -lhash \
 	-L$(top_builddir)/libvjmsg -lvjmsg \

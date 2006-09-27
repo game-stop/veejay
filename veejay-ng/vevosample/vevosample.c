@@ -27,6 +27,9 @@
  *     -# YUV4MPEG stream
  *     -# Source generator (solid color)
  */
+
+
+
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -46,10 +49,14 @@
 #include	<veejay/defs.h>
 #include	<vevosample/defs.h>
 #include	<vevosample/vevosample.h>
+#include	<vevosample/ldefs.h>
 #include	<libplugger/plugload.h>
 #include	<libvjnet/vj-client.h>
 #include	<vevosample/vj-yuv4mpeg.h>
+#include	<libplugger/defs.h>
+#include	<libplugger/ldefs.h>
 #include	<libvjaudio/audio.h>
+#include	<veejay/oscsend.h>
 #ifdef USE_GDK_PIXBUF
 #include	<libel/pixbuf.h>
 #endif
@@ -79,67 +86,9 @@ static	int	free_slots_[SAMPLE_LIMIT];				/* deleted sample id's */
 static	void	*sample_bank_ = NULL;				/* root of samplebank */
 static	void	*unicap_data_ = NULL;
 
-//! \typedef sampleinfo_t Sample A/V Information structure
-typedef struct
-{
-	uint64_t	start_pos;	//!< Starting position 
-	uint64_t	end_pos;	//!< Ending position 
-	int		looptype;	//!< Looptype
-	int		speed;		//!< Playback speed
-	int		repeat;	
-	uint64_t	in_point;	//!< In point (overrides start_pos)
-	uint64_t	out_point;	//!< Out point (overrides end_pos)
-	uint64_t	current_pos;	//!< Current position
-	int		marker_lock;	//!< Keep in-out point length constant
-	int		rel_pos;	//!< Relative position
-	int		has_audio;	//!< Audio available
-	int		repeat_count;
-	int		type;		//!< Type of Sample
-	uint64_t	rate;		//!< AudioRate
-	double		fps;		//!< Frame rate of Sample
-	int		bps;
-	int		bits;
-	int		channels;
-	double		rec;		//!< Rec. percentage done
-} sampleinfo_t;
-
-typedef struct
-{
-	int	rec;
-	int	con;
-	int	max_size;
-	int	format;
-	char	aformat;
-	void	*fd;
-	long 	tf;
-	long	nf;
-	uint8_t *buf;
-	void    *codec;
-} samplerecord_t;
-
-//! \typedef sample_runtime_data Sample Runtime Data structure
-typedef	struct
-{
-	void	*data;						/* private data, depends on stream type */
-	void	*info_port;					/* collection of sample properties */
-	int	width;						/* processing information */
-	int	height;
-	int	format;
-	int	palette;
-	int	type;						/* type of sample */
-	samplerecord_t *record;
-	sampleinfo_t *info;
-	void	*osc;
-	void	*user_data;
-} sample_runtime_data;
+static	void	*ui_register_ = NULL;
 
 
-
-typedef struct
-{
-	int p[32];
-	int e[32];
-} bind_t;
 
 
 /* forward */
@@ -149,6 +98,10 @@ static	void	sample_expand_properties( void *sample, const char *key, xmlNodePtr 
 static	void	sample_expand_port( void *port, xmlNodePtr node );
 static  void	sample_close( sample_runtime_data *srd );
 static	void	sample_new_fx_chain(void *sample);
+char     *sample_translate_property( void *sample, char *name ) ;
+static char     *sample_reverse_translate_property( void *sample, char *name ) ;
+static void		sample_ui_close_all( void *sample );
+	
 /*
  *	1. cache sample properties to sampleinfo
  *      2. do events
@@ -160,6 +113,7 @@ static	void	sample_new_fx_chain(void *sample);
  */
 
 
+
 /*
  * to reduce vevo set/get , cache each step */
 
@@ -169,17 +123,17 @@ static	struct
 	const char *name;
 } protected_properties[] = 
 {
-	"type",
-	"audio_spas",
-	"bits",
-	"rate",
-	"has_audio",
-	"channels",
-	"fx_osc",
-	"primary_key",
-	"fps",
-	"bps",
-	NULL
+ 	{	"type"		},	
+	{	"audio_spas"	},
+	{ 	"bits"		},
+	{	"rate"		},
+	{	"has_audio"	},
+	{	"channels"	},
+	{	"fx_osc"	},
+	{	"primary_key"	},
+	{	"fps"		},
+	{	"bps"		},
+	{	NULL		}
 };
 
 
@@ -215,21 +169,6 @@ static struct
 	{	NULL,		0			}
 };
 
-static	struct
-{
-	const char *name;
-	int	atom_type;
-} fx_entry_list_[] =
-{
-	{	"fx_status",	VEVO_ATOM_TYPE_INT	},	/* fx status */
-	{	"fx_alpha",	VEVO_ATOM_TYPE_DOUBLE	},	/* alpha */
-	{	"fx_instance",	VEVO_ATOM_TYPE_VOIDPTR	},	/* plugin instance point */
-	{	"fx_values",	VEVO_ATOM_TYPE_PORTPTR	},	/* port of p0 .. pN, containing copy of fx parameter values */
-	{	"fx_out_values", VEVO_ATOM_TYPE_PORTPTR },	/* output parmaters, p0 ... pN */
-	{	"fx_channels",	VEVO_ATOM_TYPE_PORTPTR	},	/* contains list of sample pointers to use as input channels */
-	{	"fx_osc",	VEVO_ATOM_TYPE_STRING   },	/* osc message string (output)*/
-};
-
 /**
  * elements common in all types of samples
  */
@@ -240,7 +179,6 @@ static struct
 } common_property_list[] = 
 {
 	{	"title",	VEVO_ATOM_TYPE_STRING	},	/* Title of this sample */
-	{	"fx_status",	VEVO_ATOM_TYPE_INT	},	/* FX chain enabled/disabled */
 	{	"primary_key",	VEVO_ATOM_TYPE_INT	},	/* Primary key of this sample */
 	{	NULL,		0			}
 };
@@ -329,14 +267,14 @@ static	struct
 
 void	*find_sample(int id)
 {
+	if( id < 0 || id > SAMPLE_LIMIT )
+		return NULL;
+	
 	char key[20];
 	void *info = NULL;
 	int error;
-#ifdef STRICT_CHECKING
-	assert( id > 0 && id < SAMPLE_LIMIT );
-#endif
+
 	sprintf(key, "sample%04x", id );
-	
 	error = vevo_property_get( sample_bank_, key, 0,  &info );
 
 	if(error != VEVO_NO_ERROR)
@@ -394,8 +332,6 @@ static	void	free_slot(int key)
 
 static	int	sample_property_is_protected( void *sample , const char *key )
 {
-	sample_runtime_data *srd = (sample_runtime_data*) sample;
-
 	int i;
 	for( i = 0; protected_properties[i].name != NULL ;i ++ )
 	{
@@ -403,6 +339,12 @@ static	int	sample_property_is_protected( void *sample , const char *key )
 			return 1;
 	}
 	return 0;
+}
+
+int		sample_get_run_id( void *info )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) info;
+	return srd->primary_key;
 }
 
 int		sample_get_key_ptr( void *info )
@@ -426,11 +368,17 @@ void	sample_delete_ptr( void *info )
 	sample_runtime_data *srd = (sample_runtime_data*) info;
 	//@ FIXME: get default channel configuratioe_data *srd = (sample_runtime_data*) info;
 #ifdef STRICT_CHECKING
-	if( info == NULL )
-		trap_vevo_sample();
 	assert( info != NULL );
 	assert( srd->info_port != NULL );
 #endif
+
+	sample_ui_close_all( info );
+	
+	void *sender = veejay_get_osc_sender( srd->user_data );
+	if(sender)
+		veejay_ui_bundle_add( sender, "/destroy/sample",
+				"ix", srd->primary_key );
+	
 	int pk = 0;
 	int error = vevo_property_get( srd->info_port, "primary_key", 0, &pk );
 
@@ -442,11 +390,14 @@ void	sample_delete_ptr( void *info )
 	
 	veejay_osc_del_methods( srd->user_data, osc_space,srd->info_port ,srd);
 
-	sample_fx_clean_up( srd->info_port, srd->user_data );
+//	sample_fx_clean_up( info, srd->user_data );
+
+	sample_fx_chain_reset( info );
 	
 	sample_close( srd );
 	
 	vevo_port_recursive_free( srd->info_port );
+	vevo_port_free( srd->fmt_port );
 	
 	free_slot( pk );
 	free(srd->info);
@@ -455,13 +406,11 @@ void	sample_delete_ptr( void *info )
 
 	if( error == VEVO_NO_ERROR )
 	{
-	
-	char pri_key[20];
-	sprintf(pri_key, "sample%04x", pk );
-	error = vevo_property_set( sample_bank_, pri_key, VEVO_ATOM_TYPE_VOIDPTR, 0, NULL );
-
+		char pri_key[20];
+		sprintf(pri_key, "sample%04x", pk );
+		error = vevo_property_set( sample_bank_, pri_key, VEVO_ATOM_TYPE_VOIDPTR, 0, NULL );
 #ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
+		assert( error == VEVO_NO_ERROR );
 #endif
 	}
 }
@@ -470,111 +419,118 @@ void	sample_fx_chain_reset( void *sample )
 {
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
 
-	sample_fx_clean_up( srd->info_port,srd->user_data );
+	sample_fx_clean_up( sample,srd->user_data );
 
-	sample_new_fx_chain ( srd->info_port );
+	sample_new_fx_chain ( sample );
 }
 
 void	sample_fx_set_parameter( int id, int fx_entry, int param_id,int n_elem, void *value )
 {
-	void *port = sample_get_fx_port( id, fx_entry );
-	int fx_id = 0;
-	void *fx_instance = NULL;
-	int error = vevo_property_get( port, "fx_instance", 0, &fx_instance );
+	fx_slot_t *port = (fx_slot_t*) sample_get_fx_port( id, fx_entry );
 #ifdef STRICT_CHECKING
-	assert( error == 0 );
+	assert( port->fx_instance != NULL );
 #endif
-	plug_set_parameter( fx_instance, param_id, n_elem,value );	
+	plug_set_parameter( port->fx_instance, param_id, n_elem,value );	
 }
 
+//@ can optimize sprintf(pley, .. )
 void	sample_fx_get_parameter( int id, int fx_entry, int param_id, int idx, void *dst)
 {
 	void *fx_values = sample_get_fx_port_values_ptr( id, fx_entry );
 	char pkey[KEY_LEN];
 	sprintf(pkey, "p%02d", param_id );	
 	vevo_property_get( fx_values, pkey, idx, dst );	
+	//@FIXME
 }
+
+void	sample_flush_bundle(void *info, const char * key )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) info;
+	void *sender = veejay_get_osc_sender_by_uri( srd->user_data , key );
+	if(sender)
+	{
+		veejay_bundle_send( sender );
+		veejay_bundle_destroy( sender );
+	}
+}
+
+static	void	sample_notify_parameter( void *sample, void *parameter, void *value )
+{
+	char *osc_path = vevo_property_get_string( parameter, "HOST_osc_path" );
+#ifdef STRICT_CHECKING
+	assert( osc_path != NULL );
+#endif
+	char *osc_types = vevo_property_get_string( parameter, "HOST_osc_types");
+	
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	int fx_entry = sample_extract_fx_entry_from_path( sample, osc_path );
+	void *sender = veejay_get_osc_sender( srd->user_data );
+
+	if( fx_entry >= 0 && fx_entry < SAMPLE_CHAIN_LEN && sender)
+	{
+		fx_slot_t *slot = sample_get_fx_port_ptr( sample, fx_entry );
+		veejay_bundle_plugin_add( sender, slot->frame, osc_path, osc_types, value );
+	}
+}
+
 
 int	sample_fx_set( void *info, int fx_entry, const int new_fx )
 {
- 	void *port = sample_get_fx_port_ptr( info,fx_entry );
-	void *fx_values = NULL;
-	void *fx_channels = NULL;
+ 	fx_slot_t *slot = (fx_slot_t*) sample_get_fx_port_ptr( info,fx_entry );
+#ifdef STRICT_CHECKING
+	assert(slot!=NULL);
+#endif
 	sample_runtime_data *srd = (sample_runtime_data*) info;
 		
-	//int cur_fx_id  = 0;
-	int error;
-#ifdef STRICT_CHECKING
-	assert( port != NULL );
-#endif
-	void *fxi = NULL;	
-	error = vevo_property_get( port, "fx_instance", 0, &fxi );
-	if( error == VEVO_NO_ERROR )
+	if( slot->fx_instance )
 	{
 		veejay_msg(0, "FX entry %d is used. Please select another",
 				fx_entry);
 		return 0;
 	}
-
-	error = vevo_property_set( port, "fx_id", VEVO_ATOM_TYPE_INT,1, &new_fx );	
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	void *fx_instance = plug_activate( new_fx );
-	if(!fx_instance)
+	
+	slot->fx_instance = plug_activate( new_fx );
+	if(!slot->fx_instance)
 	{
 		veejay_msg(0, "Unable to initialize plugin %d", new_fx );
 		return 0;
 	}
-	error = vevo_property_set( port, "fx_instance", VEVO_ATOM_TYPE_PORTPTR,
-			1, &fx_instance );
-#ifdef STRICT_CHECKING
-	if(error != VEVO_NO_ERROR)
-		veejay_msg(0, "Error code %d",error);
-	assert( error == VEVO_NO_ERROR );
-#endif
 
-	error = vevo_property_get( port, "fx_values", 0, &fx_values );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif	
-	error = vevo_property_get( port, "fx_channels", 0, &fx_channels );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
+	slot->fx_id = new_fx;
+	slot->id    = fx_entry;
+	char tmp[128];
+	sprintf( tmp, "Sample%dFX%d", srd->primary_key, fx_entry );
+	slot->frame = strdup( tmp );
 
-	int n_channels = vevo_property_num_elements( fx_instance, "in_channels" );
-
-	error = vevo_property_set( fx_channels, "n_in_channels", VEVO_ATOM_TYPE_INT,1, &n_channels );
-
-	int o_channels = vevo_property_num_elements( fx_instance, "out_channels" );
-
-	error = vevo_property_set( fx_channels, "n_out_channels",VEVO_ATOM_TYPE_INT,1, &o_channels );
-	
-	plug_get_defaults( fx_instance, fx_values );
-
-	plug_set_defaults( fx_instance, fx_values );
+	plug_get_defaults( slot->fx_instance, slot->in_values );
+	plug_set_defaults( slot->fx_instance, slot->in_values );
 
 	int i;
+	int n_channels = vevo_property_num_elements( slot->fx_instance, "in_channels" );
+
+	if( n_channels <= 0)
+	{
+		veejay_msg(0, "Veejay cannot handle generator plugins yet");
+		return 0;
+	}
+	
 	for(i=0; i < n_channels; i ++ )
 		sample_fx_set_in_channel(info,fx_entry,i, sample_get_key_ptr(info));
 
-	
-	veejay_msg(0, "Entry %d Plug %d has %d Inputs, %d Outputs",fx_entry, new_fx,n_channels,o_channels );
-
-	//@ setup OSC namespace
 	int pk = 0;
 	vevo_property_get( srd->info_port, "primary_key", 0, &pk );
 
-	plug_build_name_space( new_fx, fx_instance, srd->user_data, fx_entry ,pk);
-//@ FIXME: get default channel configuration	
-//	plug_get_channels( fx_instance, fx_channels );	
+	plug_build_name_space( new_fx, slot->fx_instance, srd->user_data, fx_entry ,pk,
+			sample_notify_parameter, info );
+
+	vevosample_ui_construct_fx_window( info, fx_entry );
+	
 	return 1;
 }
 
 int	sample_osc_verify_format( void *vevo_port, char const *types )
 {
-	char *format = get_str_vevo( vevo_port, "format" );
+	char *format = vevo_property_get_string( vevo_port, "format" );
 	int   n = strlen(types);
 	if(!format)
 	{
@@ -593,8 +549,7 @@ int	sample_osc_verify_format( void *vevo_port, char const *types )
 static void 	sample_osc_print( void *osc_port )
 {
 	char **osc_events = vevo_list_properties ( osc_port );
-	int i,k,n=0;
-
+	int i;
 	for( i = 0; osc_events[i] != NULL ; i ++ )
 	{
 		void *osc_info = NULL;
@@ -603,7 +558,6 @@ static void 	sample_osc_print( void *osc_port )
 		assert( error == VEVO_NO_ERROR );
 #endif
 		char *format = get_str_vevo( osc_info, "format" );
-
 		veejay_msg(VEEJAY_MSG_INFO, "OSC PATH %s",osc_events[i] );
 		char *descr = get_str_vevo( osc_info, "description" );
 		if(descr)
@@ -641,30 +595,28 @@ static void 	sample_osc_print( void *osc_port )
 void	sample_osc_namespace(void *sample)
 {
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
-
+	int k;
 	void *osc_namespace = NULL;
 	int error = vevo_property_get( srd->info_port, "HOST_osc",0, &osc_namespace);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
+
+	if( error != VEVO_NO_ERROR) //@ plug has no namespace
+		return;
+	
 	veejay_msg(VEEJAY_MSG_INFO,"OSC namespace:");
 
 	sample_osc_print( osc_namespace );
 	
-veejay_msg(VEEJAY_MSG_INFO,"FX:");
-	int k;
+	veejay_msg(VEEJAY_MSG_INFO,"FX:");
 	for( k = 0; k < SAMPLE_CHAIN_LEN ; k ++ )
 	{
-		void *port = sample_get_fx_port_ptr( srd, k );
-		void *fx_instance = NULL;
-		error = vevo_property_get( port, "fx_instance", 0, &fx_instance );
-		if( error == VEVO_NO_ERROR )
+		fx_slot_t *slot = sample_get_fx_port_ptr( srd, k );
+		if(slot->fx_instance)
 		{
-			void *space = plug_get_name_space( fx_instance );
+			void *space = plug_get_name_space( slot->fx_instance );
 			if(space) sample_osc_print( space );
 		}
 	}
-veejay_msg(VEEJAY_MSG_INFO,"End of OSC namespace");
+	veejay_msg(VEEJAY_MSG_INFO,"End of OSC namespace");
 }
 
 
@@ -694,7 +646,7 @@ int	sample_extract_fx_entry_from_path(void *sample, const char *path )
 }
 
 
-int		sample_osc_property_calls_event( void *sample, const char *path, char *types, void **argv[] )
+int		sample_osc_property_calls_event( void *sample, const char *path, char *types, void **argv[], void *raw )
 {
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
 	void *vevo_port = srd->info_port;
@@ -706,7 +658,6 @@ int		sample_osc_property_calls_event( void *sample, const char *path, char *type
 	int atom_type = vevo_property_atom_type( osc_port, path );
 	if( atom_type == VEVO_ATOM_TYPE_PORTPTR )
 	{
-	//	veejay_msg(0, "path %s is PORTPTR", path );
 		void *port = NULL;
 		error = vevo_property_get( osc_port, path,0,&port );
 #ifdef STRICT_CHECKING
@@ -715,23 +666,12 @@ int		sample_osc_property_calls_event( void *sample, const char *path, char *type
 		if(error == VEVO_NO_ERROR )
 		{
 			vevo_event_f f;
-//veejay_msg(0, "verify '%s' : %p, types %s, instance=%p", path,port, types,sample);
-
-
-		//	char *format = get_str_vevo( port, "format" );
-//veejay_msg(0, "format is %s", format);
-
-
-
-
-
-
 			if( sample_osc_verify_format( port, types ) )
 			{
 				error = vevo_property_get( port, "func",0,&f );
 				if( error == VEVO_NO_ERROR )
 				{
-					(*f)( sample, path,types, argv );
+					(*f)( sample, path,types, argv, raw);
 					return 1;
 				}
 			}
@@ -741,20 +681,11 @@ int		sample_osc_property_calls_event( void *sample, const char *path, char *type
 }
 int	sample_fx_set_in_channel( void *info, int fx_entry, int seq_num, const int sample_id )
 {
-	void *port = sample_get_fx_port_ptr( info, fx_entry );
-	void *fx_channels = NULL;
-	void *fx_instance = NULL;
-	char key[64];
-	int error = vevo_property_get( port, "fx_channels",0, &fx_channels );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
+	fx_slot_t *slot = sample_get_fx_port_ptr( info, fx_entry );
+	int       max_in = 0;
+	void      *inputs = sample_scan_in_channels( info, fx_entry, &max_in );
+	char	  key[20];
 
-	int max_in = 0;
-	error = vevo_property_get( fx_channels, "n_in_channels", 0, &max_in );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 	if (seq_num < 0 || seq_num >= max_in )
 	{
 		veejay_msg(0, "FX has at most %d input channel(s)",
@@ -768,252 +699,123 @@ int	sample_fx_set_in_channel( void *info, int fx_entry, int seq_num, const int s
 #ifdef STRICT_CHECKING
 	assert( sample != NULL );
 #endif
-	error = vevo_property_set( fx_channels, key, VEVO_ATOM_TYPE_VOIDPTR, 1, &sample );
+	int error = vevo_property_set( inputs, key, VEVO_ATOM_TYPE_VOIDPTR, 1, &sample );
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
+
+	veejay_msg(0, "Set input channel %d, sample %s", seq_num, key );
+	
 	return 1;
 }
 
 int	sample_fx_push_in_channel( void *info, int fx_entry, int seq_num, void *frame_info )
 {
-	void *port = sample_get_fx_port_ptr( info,fx_entry );
+	fx_slot_t *slot = sample_get_fx_port_ptr( info,fx_entry );
 #ifdef STRICT_CHECKING
-	assert( port != NULL );
+	assert( slot != NULL );
 #endif
-	void *fx_instance = NULL;
-
-	int error = vevo_property_get( port, "fx_instance", 0, &fx_instance );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	plug_push_frame( fx_instance, 0,seq_num, frame_info );
+	plug_push_frame( slot->fx_instance, 0,seq_num, frame_info );
 	return 1;
 }
 
 int	sample_fx_push_out_channel( void *info, int fx_entry, int seq_num, void *frame_info )
 {
-	void *port = sample_get_fx_port_ptr( info,fx_entry );
+	fx_slot_t *slot = sample_get_fx_port_ptr( info,fx_entry );
 #ifdef STRICT_CHECKING
-	assert( port != NULL );
+	assert( slot != NULL );
 #endif	
-	void *fx_instance = NULL;
-
-	int error = vevo_property_get( port, "fx_instance", 0, &fx_instance );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	plug_push_frame( fx_instance, 1,seq_num, frame_info );
-
+	plug_push_frame( slot->fx_instance, 1,seq_num, frame_info );
 	return 1;
 }
-int	sample_process_entry( void *data, int fx_entry )
-{
-	void *port = sample_get_fx_port_ptr( data,fx_entry );
-#ifdef STRICT_CHECKING
-	assert( port != NULL );
-#endif	
-	int fx_status;
-	int error = vevo_property_get( port, "fx_status",0,&fx_status);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
 
-	return fx_status;
-}
 double	sample_get_fx_alpha( void *data, int fx_entry )
 {
-	void *port = sample_get_fx_port_ptr( data,fx_entry );
-#ifdef STRICT_CHECKING
-	assert( port != NULL );
-#endif	
-	double fx_alpha=0.0;
-	int error = vevo_property_get( port, "fx_alpha",0,&fx_alpha);
-
-	if( error != VEVO_NO_ERROR )
-		return 0.0;
-
-	return fx_alpha;
+	fx_slot_t *slot = sample_get_fx_port_ptr( data,fx_entry );
+	return slot->alpha;
 }
 void	sample_set_fx_alpha( void *data, int fx_entry, double v )
 {
-	void *port = sample_get_fx_port_ptr( data,fx_entry );
+	sample_runtime_data *srd = (sample_runtime_data*) data;
+
+	fx_slot_t *slot = sample_get_fx_port_ptr( data,fx_entry );
 #ifdef STRICT_CHECKING
-	assert( port != NULL );
-#endif	
-	int error = vevo_property_set( port, "fx_alpha",VEVO_ATOM_TYPE_DOUBLE,1,&v);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
+	assert( slot != NULL );
 #endif
+	if( v > 1.0 ) v = 1.0; else if (v < 0.0 ) v = 0.0;
+	if( v != slot->alpha )
+	{
+		void *sender = veejay_get_osc_sender( srd->user_data );
+		if(sender)
+			veejay_bundle_sample_fx_add(sender, srd->primary_key,fx_entry, "alpha", "d", v );
+
+	}
+	slot->alpha = v;
 }
 
-
-void	sample_toggle_process_entry( void *data, int fx_entry, int v )
+int	sample_get_fx_status( void *data, int fx_entry )
 {
-	void *port = sample_get_fx_port_ptr( data,fx_entry );
-#ifdef STRICT_CHECKING
-	assert( port != NULL );
-#endif	
-	int fx_status = v;
-	int error = 0;
-	void *fxi = NULL;
-	error = vevo_property_get( port, "fx_instance",
-			0, &fxi );
-	if( error != VEVO_NO_ERROR )
-	{
-		veejay_msg(0,"Nothing to enable on entry %d",fx_entry);
+	fx_slot_t *slot = sample_get_fx_port_ptr( data,fx_entry );
+	return slot->active;
+}
+void	sample_set_fx_status( void *data, int fx_entry, int status )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) data;
+	if( fx_entry < 0 || fx_entry > SAMPLE_CHAIN_LEN )
 		return;
-	}
-
-	error = vevo_property_set( port, "fx_status",VEVO_ATOM_TYPE_INT,1,&fx_status);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-}
-void	*sample_scan_in_channels( void *data, int fx_entry )
-{
-	void *port = sample_get_fx_port_ptr( data,fx_entry );
-#ifdef STRICT_CHECKING
-	assert( port != NULL );
-#endif	
-	int n = sample_fx_num_in_channels( port );
-	if( n <= 0 )
-		return NULL;
-//FIXME: fx_channels contains slot[d] with value sample ptr,
-////     quque list expects sample[d] with value sample ptr	
-	void *fx_channels = NULL;
-	int error = vevo_property_get( port, "fx_channels",0,  &fx_channels);
-#ifdef STRICT_CHECKING
-	assert( error == 0 );
-#endif
-	return fx_channels;
-}
-/*void	*sample_scan_in_channels( void *data, int fx_entry )
-{
-#ifdef STRICT_CHECKING
-	assert( data != NULL);
-#endif
-	sample_runtime_data *info = (sample_runtime_data*) data;
-#ifdef STRICT_CHECKING
-	assert( info != NULL );
-	assert( info->info_port != NULL );
-#endif
-	void *port = sample_get_fx_port_ptr( info,fx_entry );
-
-	int n = sample_fx_num_in_channels( port );
-
-	if( n <= 0 )
-		return NULL;
 	
-	void *fx_channels = NULL;
-	int error = vevo_property_get( port, "fx_channels",0,  &fx_channels);
-#ifdef STRICT_CHECKING
-	assert( error == 0 );
-#endif
-	veejay_msg(0, "Entry %d has port fx_channels: %p", fx_entry,fx_channels );
-	char **list = vevo_list_properties( fx_channels );
-	int k = 0;
-	for ( k = 0; list[k] != NULL ; k ++ )
+	fx_slot_t *slot = sample_get_fx_port_ptr( data,fx_entry );
+	if(status && !slot->fx_instance)
 	{
-		veejay_msg(0, "\t'%s'", list[k]);
-		free(list[k]);
-	}
-	free(list);
+		veejay_msg(0, "Nothing to enable in FX slot %d", status);
+		return;
+	}	
+	slot->active = status;
+	void *sender = veejay_get_osc_sender( srd->user_data );
+	if(sender)
+		veejay_bundle_sample_fx_add(sender, srd->primary_key, fx_entry, "status", "i", status );
 
-	
-	return fx_channels;
-}*/
+}
 
-int	sample_scan_out_channels( void *data, int fx_entry )
+int	sample_scan_out_channels( void *sample, int i )
 {
-	void *port = sample_get_fx_port_ptr( data,fx_entry );
-	if(!port)
-		return NULL;
+	fx_slot_t *slot = sample_get_fx_port_ptr( sample,i );
 #ifdef STRICT_CHECKING
-	assert( port != NULL );
-#endif	
-	return sample_fx_num_out_channels( port );
+	assert( slot != NULL );
+	assert( slot->fx_instance != NULL );
+#endif
+	return vevo_property_num_elements( slot->fx_instance, "out_channels" );
+}
+
+void	*sample_scan_in_channels( void *sample, int i , int *num)
+{
+	fx_slot_t *slot = sample_get_fx_port_ptr( sample,i );
+#ifdef STRICT_CHECKING
+	assert( slot != NULL );
+	assert( slot->fx_instance != NULL );
+#endif
+	*num = vevo_property_num_elements( slot->fx_instance, "in_channels" );
+	
+	//return vevo_property_num_elements( slot->fx_instance, "in_channels" );
+	return slot->in_channels;
 }
 
 // frame buffer passed by performer
 int	sample_process_fx( void *sample, int fx_entry )
 {
-	unsigned int i,k;
-	void *fx_instance = NULL;
-	void *fx_values = NULL;
-	void *fx_out_values = NULL;
-	
-	void *port = sample_get_fx_port_ptr( sample,fx_entry );
-	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	fx_slot_t *slot = sample_get_fx_port_ptr( sample,fx_entry );
 #ifdef STRICT_CHECKING
-	assert( port != NULL );
+	assert( slot != NULL );
 #endif		
-	int error = vevo_property_get( port, "fx_instance", 0, &fx_instance );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	error = vevo_property_get( port, "fx_values", 0, &fx_values );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );			
-#endif
+	plug_clone_from_parameters( slot->fx_instance, slot->in_values );
 
-	error = vevo_property_get( port, "fx_out_values",0,&fx_out_values );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );			
-#endif
+	plug_process( slot->fx_instance );
 
-	//update internal parameter values
-	plug_clone_from_parameters( fx_instance, fx_values );
-
+	plug_clone_from_output_parameters( slot->fx_instance, slot->out_values );
+		
+	if(slot->bind)	sample_apply_bind( sample, slot , fx_entry );
 	
-	plug_process( fx_instance );
-
-	//get the output parameters,if any
-	
-	plug_clone_from_output_parameters( fx_instance, fx_out_values );
-
-	sample_apply_bind( sample, port );
-
-	if(srd->osc)
-	//@ send osc message if needed
-		sample_send_osc_path( sample, port );
-
-
 	return VEVO_NO_ERROR;
-}
-
-
-
-
-int	sample_fx_num_in_channels( void *port )
-{
-	void *fx_channels = NULL;
-	int error = vevo_property_get( port, "fx_channels",0, &fx_channels );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	int n_channels = 0;
-	error = vevo_property_get( fx_channels, "n_in_channels", 0, &n_channels );
-	if( error != VEVO_NO_ERROR )
-		n_channels = 0;
-
-	return n_channels;
-}
-int	sample_fx_num_out_channels( void *port )
-{
-	void *fx_channels = NULL;
-	int error = vevo_property_get( port, "fx_channels",0, &fx_channels );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	int n_channels = 0;
-	vevo_property_get( fx_channels, "n_out_channels", 0, &n_channels );
-	return n_channels;
-}
-
-int	sample_fx_set_by_name( int id, int fx_entry, const char *name )
-{
-	return 0;
 }
 
 void	*sample_get_fx_port_ptr( void *data, int fx_entry )
@@ -1023,11 +825,14 @@ void	*sample_get_fx_port_ptr( void *data, int fx_entry )
 	char fx[KEY_LEN];
 	sprintf(fx, "fx_%x", fx_entry );
 #ifdef STRICT_CHECKING
+	assert( info != NULL );
 	assert( info->info_port != NULL );
 #endif
 	int error = vevo_property_get( info->info_port, fx, 0, &port );
 
 #ifdef STRICT_CHECKING
+	if(error != 0 )
+		veejay_msg(0,"%s: Entry %d returns error code %d", __FUNCTION__,fx_entry, error );
 	assert( error == 0 );
 	assert( port != NULL );
 #endif
@@ -1036,38 +841,48 @@ void	*sample_get_fx_port_ptr( void *data, int fx_entry )
 
 int	sample_get_fx_id( void *data , int fx_entry )
 {
-	void *port = sample_get_fx_port_ptr( data, fx_entry );
-	int fx_id = -1;
-	int error = vevo_property_get( port, "fx_id",0, &fx_id );	
-	return fx_id;
+	fx_slot_t *slot = sample_get_fx_port_ptr( data, fx_entry );
+	return slot->fx_id;
+}
+
+int	sample_has_fx( void *sample, int fx_entry )
+{
+	fx_slot_t *slot = (fx_slot_t*) sample_get_fx_port_ptr( sample, fx_entry );
+	if(!slot)
+		return 0;
+	
+	if(slot->fx_instance)
+		return 1;
+	return 0;
 }
 
 static	void	*sample_get_fx_port_values_ptr( int id, int fx_entry )
 {
-	void *port = sample_get_fx_port( id, fx_entry );
-	void *fx_values = NULL;
-	int error = vevo_property_get( port, "fx_values", 0, &fx_values );
-	return fx_values;	
+	fx_slot_t *slot = sample_get_fx_port( id, fx_entry );
+	return slot->in_values;
 }
 
 void	*sample_get_fx_port_channels_ptr( int id, int fx_entry )
 {
-	void *port = sample_get_fx_port( id, fx_entry );
-	void *fx_values = NULL;
-	int error = vevo_property_get( port, "fx_channels", 0, &fx_values );
-	return fx_values;	
+	fx_slot_t *slot = sample_get_fx_port( id, fx_entry );
+	return slot->in_channels;
 }	
 
 void	*sample_get_fx_port( int id, int fx_entry )
 {
 	return sample_get_fx_port_ptr( find_sample(id),fx_entry );
 }
+
 int	 sample_set_property_ptr( void *ptr, const char *key, int atom_type, void *value )
 {
 	sample_runtime_data *info = (sample_runtime_data*) ptr;
 	if( info->type == VJ_TAG_TYPE_CAPTURE)
 	{
-		vj_unicap_select_value( info->data,key, atom_type,value ); 		
+		char *rkey = sample_translate_property( ptr, key );
+		if(rkey)
+		{	vj_unicap_select_value( info->data,rkey, atom_type,value ); 		
+			free(rkey);
+		}
 		return VEVO_NO_ERROR;
 	}
 	return vevo_property_set( info->info_port, key, atom_type,1, value );	
@@ -1078,10 +893,28 @@ void	 sample_set_property( int id, const char *key, int atom_type, void *value )
 	sample_runtime_data *info = (sample_runtime_data*) find_sample( id );
 	if( info->type == VJ_TAG_TYPE_CAPTURE)
 	{
-		vj_unicap_select_value( info->data,key, atom_type,value ); 		
+		char *rkey = sample_translate_property( info, key );
+		if(rkey)
+		{
+			vj_unicap_select_value( info->data,rkey, atom_type,value ); 
+			void *sender = veejay_get_osc_sender( info->user_data );
+			if(sender) //@ att , unicap class deals just with doubles for now
+				veejay_bundle_sample_add_atom(sender, info->primary_key, rkey, "d",VEVO_ATOM_TYPE_DOUBLE, value );
+		
+			free(rkey);
+		}
 	}
 	if(info)
-		vevo_property_set( info->info_port, key, atom_type,1, value );	
+		if(vevo_property_set( info->info_port, key, atom_type,1, value ) == VEVO_NO_ERROR )
+		{
+			void *sender = veejay_get_osc_sender( info->user_data );
+			if(sender)
+			{
+				char *format = vevo_property_get_string( info->fmt_port, key );
+				veejay_bundle_sample_add_atom( sender, info->primary_key, key, format, atom_type,value );
+				free(format);
+			}
+		}	
 }
 
 static	char	*strip_key( const char *path)
@@ -1130,7 +963,7 @@ static	char	*strip_port( const char *path)
 	return port;
 }
 
-void	sample_set_property_from_path( void *sample, const char *path, void *value )
+void	sample_set_property_from_path( void *sample, const char *path,int elements, void *value )
 {
 	sample_runtime_data *info = (sample_runtime_data*) sample;
 	int len = strlen(path);
@@ -1141,11 +974,23 @@ void	sample_set_property_from_path( void *sample, const char *path, void *value 
 		if( path[i] == '/' )
 			n++;
 
+	veejay_msg(0, "Change '%s'", path );
+	
 	char *key = strip_key( path );
 	if(!key)
 	{
 		veejay_msg(0, "Error getting key from path '%s'", path );
 		return;
+	}
+
+	if( info->type == VJ_TAG_TYPE_CAPTURE && vevo_property_get(info->info_port,key,0,NULL) != VEVO_NO_ERROR )
+	{
+		char *my_key = sample_reverse_translate_property(sample, key );
+		if(my_key)
+		{
+			free(key);
+			key = my_key;
+		}
 	}
 	//@ TYPE CAPTURE !
 	int atom_type = vevo_property_atom_type( info->info_port, key );
@@ -1161,8 +1006,17 @@ void	sample_set_property_from_path( void *sample, const char *path, void *value 
 			{
 				error = vevo_property_set( port,key, atom_type,1, value );	
 				if( error == VEVO_NO_ERROR )
+				{
 					veejay_msg(VEEJAY_MSG_INFO,
-					"OSC path '%s' sets property '%s' %d", path, key,atom_type );
+						"OSC path '%s' sets property '%s' %d", path, key,atom_type );
+					void *sender = veejay_get_osc_sender( info->user_data );
+					if(sender)
+					{
+						char *format = vevo_property_get_string( info->fmt_port, key );
+						veejay_bundle_add_atom( sender, path, format, atom_type,value );
+						free(format);
+					}
+				}
 				if(pk) free(pk);
 				return;
 			}
@@ -1188,17 +1042,24 @@ void	sample_set_property_from_path( void *sample, const char *path, void *value 
 	
 	if( info->type == VJ_TAG_TYPE_CAPTURE)
 	{
-		veejay_msg(0,"Warning 'key %s' may not be valid", key );
-		//@ can make translation map in unicap -> key -> key pairs
 		vj_unicap_select_value( info->data,key, VEVO_ATOM_TYPE_DOUBLE,value ); 		
 	}
 
 	if(info)
-		error = vevo_property_set( info->info_port,key, atom_type,1, value );	
+		error = vevo_property_set( info->info_port,key, atom_type,elements, value );	
 	if( error == VEVO_NO_ERROR )
+	{
 		veejay_msg(VEEJAY_MSG_INFO,
 			"OSC path '%s' sets property '%s' %d", path, key,atom_type );
-	
+		void *sender = veejay_get_osc_sender( info->user_data );
+		if(sender)
+		{
+			char *format = vevo_property_get_string( info->fmt_port, key );
+			veejay_bundle_add_atom( sender, path, format, atom_type,value );
+			free(format);
+		}
+	}
+		
 	free(key);
 }
 
@@ -1216,7 +1077,20 @@ void	sample_set_user_data( void *sample, void *data, int id )
 	sample_runtime_data *info = (sample_runtime_data*) sample;
 	info->user_data = data;
 	sample_init_namespace( data, sample, id );
-	
+	void *sender = veejay_get_osc_sender( data );
+	if(sender)
+	{
+		char name[64];
+		sprintf(name, "Sample %d",id );
+		veejay_ui_bundle_add( sender, "/update/sample",
+				"isx", id, name );
+	}			
+}
+
+void	*sample_get_user_data( void *sample )
+{
+	sample_runtime_data *info = (sample_runtime_data*) sample;
+	return (void*) info->user_data;
 }
 
 void	 sample_get_property_ptr( void *ptr, const char *key, void *dst )
@@ -1312,47 +1186,81 @@ const	char	*sample_describe_type( int type )
 	return NULL;
 }
 
+static	void	sample_ui_close( void *sample )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	void *sender = veejay_get_osc_sender( srd->user_data );
+	if(sender)
+	{
+		char name[128];
+		sprintf(name, "Sample%d", srd->primary_key );
+		veejay_ui_bundle_add( sender, "/destroy/window", "sx", name );
+	}
+}
+
+static	void	sample_ui_fx_close( void *sample, int fx_entry , void *user_data)
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	fx_slot_t *slot = sample_get_fx_port_ptr( srd, fx_entry );
+
+	void *sender = veejay_get_osc_sender( user_data );
+	if(sender)
+	{
+		veejay_msg(0, "Close '%s'", slot->window);
+		veejay_ui_bundle_add( sender, "/destroy/window", "sx", slot->window );
+	}
+}
+
+static void		sample_ui_close_all( void *sample )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	int i;
+//	for( i = 0; i < SAMPLE_CHAIN_LEN ; i ++ )
+//	{
+//		sample_ui_fx_close( sample, i, srd->user_data );
+//	}	
+
+	sample_ui_close(sample);	
+}
+
+
 static	void	sample_fx_entry_clean_up( void *sample, int id, void *user_data )
 {
-	char entry_key[KEY_LEN];
-	void *entry_port = NULL;
-
-	sprintf(entry_key, "fx_%x", id );
-	int error = vevo_property_get( sample, entry_key,0, &entry_port );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	void *instance = NULL;
-	error = vevo_property_get( entry_port, "fx_instance",0,&instance );
-	if(error == VEVO_NO_ERROR )
-	{
-		// delete OSC space
-		plug_clear_namespace( instance, user_data );
-		
-		plug_deactivate( instance );
-	}
-	void *fxv = NULL;
-	error = vevo_property_get( entry_port, "fx_values",0,&fxv );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	void *fxc = NULL;
-	error = vevo_property_get(entry_port, "fx_channels",0,&fxc );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-
-//	vevo_port_free( fxv );
-//	vevo_port_free( fxc );
-//	vevo_port_free( entry_port );
-
-	vevo_port_recursive_free( entry_port );
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	fx_slot_t *slot = sample_get_fx_port_ptr( srd, id );
 	
-	error = vevo_property_set( sample, entry_key, VEVO_ATOM_TYPE_PORTPTR, 0, NULL );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
+	if(slot->window)
+		sample_ui_fx_close( sample, id, user_data );
+	else
+		veejay_msg(0, "FX slot %d has no window, sample %d", id,
+			 sample_get_key_ptr(sample) );
+	if(slot->window)
+		free(slot->window);
+	if(slot->frame)
+		free(slot->frame);
+	
+	if( slot->fx_instance )
+	{
+		plug_clear_namespace( slot->fx_instance, user_data );
+		plug_deactivate( slot->fx_instance );
+	}
 
+	vevo_port_free( slot->in_values );
+	vevo_port_free( slot->out_values );
+	vevo_port_free( slot->out_channels );
+	
+	if( slot->bind )
+	{
+		sample_reset_bind ( sample, slot );	
+	}
+
+	free(slot);
+
+	//@ set fx port ptr to NULL
+	char fx[KEY_LEN];
+	sprintf(fx, "fx_%x", id );
+	vevo_property_set( srd->info_port, fx, VEVO_ATOM_TYPE_PORTPTR,0,NULL );
+	
 }
 
 static	void	sample_fx_clean_up( void *sample, void *user_data )
@@ -1368,50 +1276,19 @@ static	void	sample_fx_clean_up( void *sample, void *user_data )
 
 static	void	sample_new_fx_chain_entry( void *sample, int id )
 {
-#ifdef STRICT_CHECKING
-	void *port = vevo_port_new( VEVO_FX_ENTRY_PORT,__FUNCTION__,__LINE__ );
-#else
-	void *port = vevo_port_new( VEVO_FX_ENTRY_PORT );
-#endif
-	char entry_key[KEY_LEN];
-
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	
+	char entry_key[64];
+	fx_slot_t *slot = (fx_slot_t*) vj_malloc(sizeof(fx_slot_t));
+	memset( slot,0,sizeof(fx_slot_t));
+		
 	sprintf(entry_key, "fx_%x", id );
-	int dstatus = 0;	
-	int error = vevo_property_set( port, "fx_status", VEVO_ATOM_TYPE_INT,1,&dstatus );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	double alpha = 0.0;
-	error = vevo_property_set( port, "fx_alpha", VEVO_ATOM_TYPE_DOUBLE,1,&alpha );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-#ifdef STRICT_CHECKING
-	void *fx_values = vevo_port_new( VEVO_FX_VALUES_PORT, __FUNCTION__,__LINE__ );
-	void *fx_channels = vevo_port_new( VEVO_ANONYMOUS_PORT, __FUNCTION__,__LINE__ );
-	void *fx_out_values = vevo_port_new( VEVO_ANONYMOUS_PORT, __FUNCTION__,__LINE__ );
-#else
-	void *fx_values = vevo_port_new( VEVO_FX_VALUES_PORT );
-	void *fx_channels = vevo_port_new( VEVO_ANONYMOUS_PORT );
-	void *fx_out_values = vevo_port_new( VEVO_ANONYMOUS_PORT );
-#endif	
-	error = vevo_property_set( port, "fx_values", VEVO_ATOM_TYPE_PORTPTR,1,&fx_values);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	error = vevo_property_set( port, "fx_out_values", VEVO_ATOM_TYPE_PORTPTR,1,&fx_out_values);
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	error = vevo_property_set( port, "fx_channels",VEVO_ATOM_TYPE_PORTPTR,1,&fx_channels );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	error = vevo_property_set( port, "fx_instance", VEVO_ATOM_TYPE_PORTPTR,0,NULL );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	error =	vevo_property_set( sample, entry_key, VEVO_ATOM_TYPE_PORTPTR,1, &port );
+	slot->in_values = vpn( VEVO_FX_VALUES_PORT );
+	slot->in_channels = vpn( VEVO_ANONYMOUS_PORT );
+	slot->out_values = vpn( VEVO_ANONYMOUS_PORT );
+	slot->out_channels = vpn( VEVO_ANONYMOUS_PORT );
+
+	int error =	vevo_property_set( srd->info_port, entry_key, VEVO_ATOM_TYPE_PORTPTR,1, &slot );
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
@@ -1435,10 +1312,12 @@ int	sample_fx_chain_entry_clear(void *info, int id )
 	
 	if( id >= 0 && id < SAMPLE_CHAIN_LEN )
 	{
-		sample_fx_entry_clean_up( sample->info_port, id,sample->user_data );
-		sample_new_fx_chain_entry( sample->info_port, id );
+		sample_fx_entry_clean_up( info, id,sample->user_data );
+		sample_new_fx_chain_entry( info, id );
 		return 1;
 	}
+	else
+		veejay_msg(0, "Invalid FX slot: %d",id);
 	return 0;
 }
 
@@ -1453,11 +1332,8 @@ void	*sample_new( int type )
 	rtdata->record = (samplerecord_t*) vj_malloc(sizeof(samplerecord_t));
 	memset(rtdata->record,0,sizeof(samplerecord_t));
 	rtdata->type	  = type;
-#ifdef STRICT_CHECKING
-	rtdata->info_port = (void*) vevo_port_new( VEVO_SAMPLE_PORT , __FUNCTION__ , __LINE__ );
-#else
-	rtdata->info_port = (void*) vevo_port_new( VEVO_SAMPLE_PORT );
-#endif
+	rtdata->info_port = (void*) vpn( VEVO_SAMPLE_PORT );
+	rtdata->fmt_port  =(void*) vpn( VEVO_ANONYMOUS_PORT );
 	for(i = 0 ; common_property_list[i].name != NULL ; i ++ )
 		vevo_property_set(
 			rtdata->info_port,
@@ -1481,7 +1357,7 @@ void	*sample_new( int type )
 	}
 
 	
-	sample_new_fx_chain( rtdata->info_port );
+	sample_new_fx_chain( rtdata );
 
 	return res;
 }
@@ -1498,11 +1374,20 @@ char	*sample_property_format_osc( void *sample, const char *path )
 	if(n==2||n==3)
 	{
 		char *key = strip_key(path);
+		char *rkey = NULL;
+		char *fmt = NULL;
 		if( key == NULL )
 			return NULL;
-		char *fmt = NULL;
-	//	char *fmt = (char*) malloc( n + 1 );
-	//	bzero(fmt,n + 1);
+
+		if( srd->type == VJ_TAG_TYPE_CAPTURE && vevo_property_get( srd->info_port, key,0,NULL ) != VEVO_NO_ERROR )
+		{
+			char *tmpkey = sample_reverse_translate_property(sample, key );
+			if(tmpkey)
+			{
+				free(key);
+				key = tmpkey;
+			}
+		}
 		
 		if( sample_property_is_protected( srd->info_port ,key)==1 )
 		{
@@ -1569,6 +1454,7 @@ char	*sample_property_format_osc( void *sample, const char *path )
 				return NULL;
 			}
 		}
+		veejay_msg(0, "++ '%s' has format '%s'", key,fmt );
 		free(key);
 		return fmt;
 	}
@@ -1585,16 +1471,19 @@ void	sample_init_namespace( void *data, void *sample , int id )
 	char	**namespace = vevo_port_recurse_namespace( rtdata->info_port, name );
 	int n = 0;
 	int k;
-#ifdef STRICT_CHECKING
-	void *osc_namespace = vevo_port_new( VEVO_ANONYMOUS_PORT, __FUNCTION__ , __LINE__ );
-#else
-	void *osc_namespace = vevo_port_new(VEVO_ANONYMOUS_PORT);
-#endif
+	
+	if(!namespace)
+	{
+		veejay_msg(0, "Sample %d has no OSC namespace",id);
+		return;
+	}
+	
+	
+	void *osc_namespace = vpn(VEVO_ANONYMOUS_PORT);
 	for ( k = 0; namespace[k] != NULL ; k ++ )
 	{
-	//	sample_set_property_from_path( void *sample, const char *path, void *value );
-
 		char *format = sample_property_format_osc( sample, namespace[k] );
+		
 		if(format == NULL )
 		{
 			if( vevo_property_atom_type( rtdata->info_port, namespace[k] ) == VEVO_ATOM_TYPE_PORTPTR )
@@ -1612,29 +1501,37 @@ void	sample_init_namespace( void *data, void *sample , int id )
 					{
 						char *fmt = sample_property_format_osc( port, ns_entries[q] );
 						vevosample_new_event( data, osc_namespace, sample,NULL, ns_entries[q], fmt, NULL,NULL, NULL,-1 );
-						
+						if(fmt)
+						{
+							error = vevo_property_set( rtdata->fmt_port, ns_entries[q], 
+									VEVO_ATOM_TYPE_STRING,1,&fmt );
+						}
 						if(fmt)	free(fmt);
 						free(ns_entries[q]);
 					}	
 					free(ns_entries);
 				}
 			}
-			
 		}	
 		else
 		{
 			vevosample_new_event( data, osc_namespace, sample, NULL, namespace[k], format,NULL, NULL,NULL, 0 );
+			vevo_property_set( rtdata->fmt_port, namespace[k], VEVO_ATOM_TYPE_STRING,1,&format );
+
 			free(format);
+
 		}
 		free(namespace[k]);
 	}
 	free(namespace);
 
 
+	///FIXME
 	if(rtdata->type == VJ_TAG_TYPE_NONE )
 		veejay_osc_add_sample_nonstream_events(data,osc_namespace,rtdata,name);
 	veejay_osc_add_sample_generic_events( data,osc_namespace,rtdata,name, SAMPLE_CHAIN_LEN );
 
+	
 	error = vevo_property_set(
 			rtdata->info_port, "HOST_osc",VEVO_ATOM_TYPE_PORTPTR,1,&osc_namespace);
 #ifdef STRICT_CHECKING
@@ -1650,11 +1547,7 @@ int	vevo_num_devices()
 
 void	samplebank_init()
 {
-#ifdef STRICT_CHECKING
-	sample_bank_ = (void*) vevo_port_new( VEVO_SAMPLE_BANK_PORT, __FUNCTION__, __LINE__ );
-#else
-	sample_bank_ = (void*) vevo_port_new( VEVO_SAMPLE_BANK_PORT );
-#endif
+	sample_bank_ = (void*) vpn( VEVO_SAMPLE_BANK_PORT );
 #ifdef STRICT_CHECKING
 	veejay_msg(2,"VEVO Sampler initialized. (max=%d)", SAMPLE_LIMIT );
 #endif
@@ -1662,7 +1555,9 @@ void	samplebank_init()
 	unicap_data_ = (void*) vj_unicap_init();
 #ifdef STRICT_CHECKING
 	assert( unicap_data_ != NULL );
-#endif	
+#endif
+	ui_register_ = 	(void*) vpn( VEVO_SAMPLE_BANK_PORT );
+
 }
 
 char	*samplebank_sprint_list()
@@ -1695,6 +1590,153 @@ char	*samplebank_sprint_list()
 
 	return res;
 }
+typedef struct
+{
+	struct timeval t;
+} ui_alarm_t;
+static	void	*alarm_init(void)
+{
+	ui_alarm_t *uia = (ui_alarm_t*) vj_malloc(sizeof(ui_alarm_t));
+	gettimeofday( &(uia->t),NULL);
+	return (void*) uia;
+}
+
+void	samplebank_tick_ui_client( char *uri )
+{
+	void *alarm = alarm_init();
+	void *old_alarm = NULL;
+	int error = vevo_property_get( ui_register_, uri, 0,&old_alarm );
+	if( old_alarm )
+		free( old_alarm );
+	
+	error = vevo_property_set( ui_register_,
+				uri, VEVO_ATOM_TYPE_VOIDPTR, 1, &alarm );
+}
+
+int	samplebank_flush_ui_client( char *uri, struct timeval *now )
+{
+	void *alarm = NULL;
+	if(vevo_property_get( ui_register_, uri, 0,&alarm )==VEVO_NO_ERROR)
+	{
+		ui_alarm_t *uia = (ui_alarm_t*) alarm;
+		if( now->tv_sec > (uia->t.tv_sec + 3))
+		{
+			veejay_msg(0, "'%s' timeout", uri);
+			free(alarm);
+			vevo_property_set( ui_register_, uri,VEVO_ATOM_TYPE_VOIDPTR,0,NULL);
+			return 0;
+		}
+	}
+	return 1;
+}
+
+void	samplebank_flush_osc(void *info, void *clients)
+{
+	struct timeval now;
+	char **ccl 	= vevo_list_properties( clients );
+	if(!ccl)
+		return;
+	char **props = (char**) vevo_list_properties( sample_bank_ );
+	if(!props)
+		return;
+	int i,k;
+	
+	gettimeofday(&now,NULL);
+	for( k = 0; ccl[k] != NULL ; k ++ )
+	{
+		if(!samplebank_flush_ui_client( ccl[k], &now ))
+		{
+			veejay_msg(0, "URI '%s' is not alive anymore?", ccl[k]);
+			void *sender = NULL;
+			if( vevo_property_get(clients, ccl[k],0,&sender) == VEVO_NO_ERROR )
+			{
+				veejay_free_osc_sender(sender);
+				vevo_property_set( clients, ccl[k], VEVO_ATOM_TYPE_VOIDPTR,0,NULL );
+			}
+		}
+		free(ccl[k]);
+	}
+	free(ccl);
+
+	char **cl 	= vevo_list_properties( clients );
+	if(!cl)
+		return;
+
+	for( i = 0; props[i] != NULL;i ++ )
+	{
+		if( props[i][0] == 's' ) 
+		{
+			void *info = find_sample_by_key( props[i] );
+			if(info)
+			{
+				for( k = 0; cl[k] != NULL ; k ++ )
+					sample_flush_bundle(info, cl[k] );
+			}
+		}
+		free(props[i]);
+	}
+	free(props);
+	
+	for( k = 0; cl[k] != NULL ; k ++ )
+		free( cl[k] );
+	free( cl );
+
+}
+
+//waste 
+int	samplebank_guess_row_sequence( void *osc, int id )
+{
+	char **props = (char**) vevo_list_properties( sample_bank_ );
+	if(!props)
+		return 0;
+	int i;
+	for( i = 0; props[i] != NULL;i ++ )
+	{
+		if( props[i][0] == 's' ) 
+		{
+			void *info = find_sample_by_key( props[i] );
+			sample_runtime_data *s = (sample_runtime_data*) info;
+			if(s && s->primary_key == id )
+				return i;
+		}
+		free(props[i]);
+	}
+	free(props);
+	return 0; // take the first
+}
+
+void	samplefx_push_pulldown_items( void *osc, void *msg)
+{
+	int i;
+	for( i = 0; i < SAMPLE_CHAIN_LEN; i ++ )
+	{
+		char name[32];
+		sprintf(name,"fx %d", i );
+		veejay_message_add_argument( osc,msg, "s", name );
+	}
+}
+
+void	samplebank_push_pulldown_items( void *osc, void *msg )
+{
+	char **props = (char**) vevo_list_properties( sample_bank_ );
+	if(!props)
+		return;
+	int i;
+	veejay_message_add_argument( osc, msg, "s", "none" );
+	for( i = 0; props[i] != NULL;i ++ )
+	{
+		if( props[i][0] == 's' ) 
+		{
+			void *info = find_sample_by_key( props[i] );
+			if(info)
+			{
+				veejay_message_add_argument( osc, msg, "s", props[i] );
+			}	
+		}
+		free(props[i]);
+	}
+	free(props);
+}
 
 void	samplebank_free()
 {
@@ -1711,6 +1753,7 @@ void	samplebank_free()
 		if( props[i][0] == 's' ) 
 		{
 			void *info = find_sample_by_key( props[i] );
+	veejay_msg(0, "Sample '%s' -> %p", props[i], info );
 			if( info )
 			 sample_delete_ptr( info );
 		}
@@ -1726,6 +1769,37 @@ void	samplebank_free()
 	vj_unicap_deinit( unicap_data_ );
 }
 
+
+void	samplebank_send_all_samples(void *sender)
+{
+	char **items = vevo_list_properties( sample_bank_ );
+	if(!items )
+	{
+		veejay_msg(0, "Samplebank empty");
+		return;
+	}
+	int i;
+	for( i = 0 ; items[i] != NULL ; i ++ )
+	{
+		void *sample = NULL;
+		int error = vevo_property_get( sample_bank_ , items[i],0,&sample );
+		if(items[i][0] == 's' )
+		{
+		if( error == VEVO_NO_ERROR )
+		{
+			sample_runtime_data *dd = (sample_runtime_data*) sample;
+			veejay_ui_bundle_add( sender, "/update/sample",
+				"isx", dd->primary_key, items[i] );
+			veejay_msg(0,"\t /update/sample %d", dd->primary_key );
+		}
+		else
+			veejay_msg(0, "\tError in '%s'", items[i]);
+		}
+		free(items[i]);
+	}
+		
+	free(items);
+}
 
 int	samplebank_add_sample( void *sample )
 {
@@ -1758,6 +1832,10 @@ int	samplebank_add_sample( void *sample )
 	assert( error == VEVO_NO_ERROR );
 #endif
 	num_samples_ += 1;
+	srd->primary_key = pk;
+	
+
+	
 	return pk;
 }
 
@@ -1779,6 +1857,23 @@ void	*sample_last(void)
 	return found;
 }
 
+
+// "Video source" --> "video_source"
+char		*sample_translate_property( void *sample, char *name )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	char *result =vevo_property_get_string( srd->mapping, name );
+	return result;
+}
+
+// "video_source" --> "Video source"
+static char		*sample_reverse_translate_property( void *sample, char *name )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	char *result =vevo_property_get_string( srd->rmapping, name );
+	return result;
+}
+
 static	void	sample_collect_unicap_properties( void *sample )
 {
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
@@ -1789,11 +1884,14 @@ static	void	sample_collect_unicap_properties( void *sample )
 		double dvalue = 0.0;
 		int n = vj_unicap_get_value( srd->data, props[i], VEVO_ATOM_TYPE_DOUBLE, &dvalue );
 
-		veejay_msg(0, "Add property '%s', default is %g", props[i], dvalue);
+		char *realname = veejay_valid_osc_name( props[i] );
 		
 		vevo_property_set( srd->info_port, props[i], VEVO_ATOM_TYPE_DOUBLE,1,&dvalue );
+		vevo_property_set( srd->mapping,   props[i], VEVO_ATOM_TYPE_STRING,1,&realname);
+		vevo_property_set( srd->rmapping,   realname, VEVO_ATOM_TYPE_STRING,1,&(props[i]));
 
 		free( props[i] );
+		free( realname );
 	}
 }
 
@@ -1862,6 +1960,8 @@ int	sample_open( void *sample, const char *token, int extra_token , sample_video
 		case VJ_TAG_TYPE_CAPTURE:
 			srd->data = vj_unicap_new_device( unicap_data_,
 						extra_token );
+			srd->mapping = vpn( VEVO_ANONYMOUS_PORT );
+			srd->rmapping = vpn( VEVO_ANONYMOUS_PORT );
 			if(!vj_unicap_configure_device( srd->data,
 						project_settings->fmt,
 						project_settings->w,
@@ -1936,33 +2036,6 @@ int	sample_open( void *sample, const char *token, int extra_token , sample_video
 
 int	sample_append_file( const char *filename, long n1, long n2, long n3 )
 {
-	/*end = el->video_frames;
-
- *
- *	// create initial edit list for sample (is currently playing)
-	if(!sample_edl) 
-		sample_edl = vj_el_init_with_args( files,1,info->preserve_pathnames,info->auto_deinterlace,0,
-				info->edit_list->video_norm , info->pixel_format);
-	// i
- 	el->frame_list = (uint64_t *) realloc(el->frame_list, (end + el->num_frames[n])*sizeof(uint64_t));
-	if (el->frame_list==NULL)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
-		vj_el_free(el);
-		return 0;
-	}
-
-	for (i = 0; i < el->num_frames[n]; i++)
-	{
-		el->frame_list[c] = EL_ENTRY(n, i);
-		c++;
-	}
- 
-	el->video_frames = c;
-//@ set min and max frame num anew
-//@ update start/end positions
-	
-	*/
 	return 1;
 }
 
@@ -2150,8 +2223,6 @@ void	sample_increase_frame( void *current_sample )
 		sit->current_pos ++;
 		return;
 	}
-
-
 	
 	uint64_t cf = sit->current_pos;
 	if(sit->repeat_count > 0)
@@ -2218,6 +2289,12 @@ void	sample_increase_frame( void *current_sample )
 	assert( sit->current_pos >= sit->start_pos );
 	assert( sit->current_pos <= sit->end_pos );
 #endif	
+	void *sender = veejay_get_osc_sender( srd->user_data );
+	if(sender)
+	{
+		veejay_bundle_sample_add( sender, srd->primary_key, "current_pos", "h", sit->current_pos );
+	}
+
 }
 
 void	sample_set_itu601( void *current_sample, int status )
@@ -2313,9 +2390,6 @@ int	sample_get_frame( void *current_sample , void *dslot )
 	long frame_num = srd->info->current_pos;
 	void *ptr = NULL;
 
-
-	//srd->type !!
-	//@ assign function pointer at sample_open to kill this switch statement
 	switch(srd->type)
 	{
 		case VJ_TAG_TYPE_NONE:
@@ -2342,9 +2416,6 @@ int	sample_get_frame( void *current_sample , void *dslot )
 			break;
 #endif
 	}
-
-
-
 	return VEVO_NO_ERROR;
 }
 
@@ -2366,7 +2437,6 @@ static	void	sample_close( sample_runtime_data *srd )
 			break;
 #ifdef USE_GDK_PIXBUF
 		case VJ_TAG_TYPE_PICTURE:
-			//vj_picture_cleanup( 
 			break;
 #endif
 		case VJ_TAG_TYPE_NET:
@@ -2412,8 +2482,6 @@ static	void	sample_write_property( void *port, const char *key, xmlNodePtr node 
 	char *str_val = NULL;
 	int error = 0;
 
-printf("%s: %p, %s type = %d\n", __FUNCTION__, port, key, atom_type );
-	
 	switch( atom_type )
 	{
 		case VEVO_ATOM_TYPE_INT:
@@ -2687,40 +2755,21 @@ int	sample_xml_load( const char *filename, void *samplebank )
 
 int	sample_set_param_from_str( void *srd, int fx_entry,int p, const char *str )
 {
-	void *port = sample_get_fx_port_ptr( srd, fx_entry );
-	if(port)
-	{
-		void *fx_instance = NULL;
-		int error = vevo_property_get( port, "fx_instance",0,&fx_instance );
-		void *fx_values = NULL;
-		
-veejay_msg(0, "Entry %d, Param %d, '%s'",fx_entry,p,str);
-		
-		if(error == VEVO_NO_ERROR)
-		{
-			void *fx_values = NULL;
-			error = vevo_property_get( port, "fx_values",0,&fx_values );
-			return plug_set_param_from_str( fx_instance, p, str,fx_values );
-		}
-		else
-			veejay_msg(0 ,"No fx instance on entry %d", fx_entry );
-	}
+	fx_slot_t *slot = sample_get_fx_port_ptr( srd, fx_entry );
+
+	if(slot->fx_instance)
+		return plug_set_param_from_str( slot->fx_instance, p, str,slot->in_values );
 	else
-		veejay_msg(0, "Entry %d is invalid",fx_entry);
+		veejay_msg(0, "No FX in slot %d",fx_entry);
+
 	return 0;
 }
 
-
 char	*sample_describe_param( void *srd, int fx_entry, int p )
 {
-	void *port = sample_get_fx_port_ptr( srd, fx_entry );
-	if(port)
-	{
-		void *fx_instance = NULL;
-		int error = vevo_property_get( port, "fx_instance",0,&fx_instance );
-
-		return plug_describe_param( fx_instance, p );
-	}
+	fx_slot_t *slot = sample_get_fx_port_ptr( srd, fx_entry );
+	if(slot->fx_instance)
+		return plug_describe_param( slot->fx_instance, p );
 	return NULL;
 }
 
@@ -2771,10 +2820,9 @@ static	int	sample_parse_param( void *fx_instance, int num, const char format[], 
 		}
 		*format++;
 	}
-
+veejay_msg(0, "Change parameter");
 	plug_set_parameter( fx_instance, num,n_elems, p );
 
-	
 	if( i ) free( i );
 	if( g ) free( g );
 	if( s ) free( s );
@@ -2787,53 +2835,24 @@ int	sample_set_param( void *srd, int fx_entry, int p, const char format[] , ... 
 	va_list ap;
 	int n = 0;
 
-	void *port = sample_get_fx_port_ptr( srd, fx_entry );
-	if(!port)
-		return n;
-
-	void *fx_instance = NULL;
-	int error = vevo_property_get( port, "fx_instance",0,&fx_instance );
-	if( error != VEVO_NO_ERROR )
+	fx_slot_t *slot = sample_get_fx_port_ptr( srd, fx_entry );
+	if(!slot->fx_instance)
 		return n;
 
 	va_start( ap, format );
-	n = sample_parse_param( fx_instance, p , format, ap );
+	n = sample_parse_param( slot->fx_instance, p , format, ap );
 	va_end(ap);
 	
 	return n;
 }
+
 void	sample_process_fx_chain( void *srd )
 {
 	int k = 0;
-	
 	for( k = 0; k < SAMPLE_CHAIN_LEN; k ++ )
 	{
-		void *port = sample_get_fx_port_ptr( srd, k );
-		void *fx_instance = NULL;
-	/*	int fx_status = 0;
-
-		int error = vevo_property_get( port, "fx_status", 0, &fx_status);		
-#ifdef STRICT_CHECKING
-		assert( error == 0 );
-#endif
-
-//@TODO: Alpha fading
-
-		if( fx_status )
-		{*/
-			int error = vevo_property_get( port, "fx_instance", 0, &fx_instance );
-#ifdef STRICT_CHECKING
-			assert( error == 0 );
-#endif
-			plug_process( fx_instance );
-
-			void *fx_values = NULL;
-			error = vevo_property_get( port, "fx_values", 0, &fx_values );
-#ifdef STRICT_CHECKING
-			assert( error == 0 );			
-#endif
-			plug_clone_from_parameters( fx_instance, fx_values );
-	//	}
+		fx_slot_t *slot = sample_get_fx_port_ptr( srd, k );
+		plug_process( slot->fx_instance );
 	}
 }
 
@@ -2863,9 +2882,6 @@ void	sample_cache_data( void *info )
 	vevo_property_get( srd->info_port, "has_audio",0,&(sit->has_audio));
 	vevo_property_get( srd->info_port, "rate",0,&(sit->rate));
 	vevo_property_get( srd->info_port, "repeat",0,&(sit->repeat));
-//	veejay_msg(0, "start %d - end %d - speed %d - loop %d - position %d -  in %d - out %d",
-//			sit->start_pos,sit->end_pos,sit->speed,sit->looptype,sit->current_pos,
-//			sit->in_point, sit->out_point );
 }
 
 void		sample_save_cache_data( void *info)
@@ -2876,9 +2892,6 @@ void		sample_save_cache_data( void *info)
 
 	sample_runtime_data *srd = (sample_runtime_data*) info;
 	sampleinfo_t *sit = srd->info;
-//	veejay_msg(0, "SAVE: start %d - end %d - speed %d - loop -  %d position %d -in - %d -out %d",
-///			sit->start_pos,sit->end_pos,sit->speed,sit->looptype,sit->current_pos,
-//			sit->in_point, sit->out_point );
 	vevo_property_set( srd->info_port, "start_pos",VEVO_ATOM_TYPE_UINT64,1,&(sit->start_pos ));
 	vevo_property_set( srd->info_port, "end_pos", VEVO_ATOM_TYPE_UINT64,1,&(sit->end_pos));
 	vevo_property_set( srd->info_port, "speed", VEVO_ATOM_TYPE_INT,1,&(sit->speed ));
@@ -3037,6 +3050,9 @@ int	sample_fx_sscanf_port( void *sample, const char *s, const char *id )
 #define MAX_ELEMENTS 16
 static 	int	sample_sscanf_property(	sample_runtime_data *srd ,vevo_port_t *port, const char *s)
 {
+#ifdef STRICT_CHECKING
+	assert(0);
+#endif
 	int done = 0;
 	char key[PROPERTY_KEY_SIZE];
 	bzero(key, PROPERTY_KEY_SIZE );	
@@ -3148,6 +3164,9 @@ static 	int	sample_sscanf_property(	sample_runtime_data *srd ,vevo_port_t *port,
 
 int	sample_sscanf_port( void *sample, const char *s )
 {
+#ifdef STRICT_CHECKING
+	assert(0);
+#endif
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
 	const char *ptr = s;
 	int   len = strlen(s);
@@ -3179,6 +3198,9 @@ int	sample_sscanf_port( void *sample, const char *s )
 
 char 	*sample_sprintf_port( void *sample )
 {
+#ifdef STRICT_CHECKING
+	assert(0);
+#endif
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
 	int k;
 	int size = 0;
@@ -3246,8 +3268,6 @@ int	sample_configure_recorder( void *sample, int format, const char *filename, i
 		veejay_msg(VEEJAY_MSG_ERROR, "Please stop the recorder first");
 		return 1;
 	}
-	
-	
 	
 	switch( format )
 	{
@@ -3485,419 +3505,284 @@ int	sample_record_frame( void *sample, void *dframe, uint8_t *audio_buffer, int 
 
 int	sample_reset_bind( void *sample, void *src_entry )
 {
-	void *bptr = NULL;
-	int error = vevo_property_get( src_entry, "bind",0,&bptr );
-	if( error != VEVO_NO_ERROR )
-		return 0;
-	bind_t *bt = (bind_t*) bptr;
-	free(bt);
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	fx_slot_t *slot = (fx_slot_t*) src_entry;
 	
-	error = vevo_property_set( src_entry, "bind", VEVO_ATOM_TYPE_VOIDPTR,0,NULL );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
+	if(slot->bind)
+	{
+		int i = 0;
+		char **items = vevo_list_properties( slot->bind );
+		for( i = 0; items[i] != NULL ; i ++ )
+		{
+			void *p = NULL;
+			if(vevo_property_get(slot->bind, items[i],0,&p) == VEVO_NO_ERROR )
+				free(p);
+		}
+		vevo_port_free( slot->bind );
+		slot->bind = NULL;
+	}
+	
 	return 1;	
 }
-
-int	sample_del_bind( void *sample, void *src_entry, int pi )
+int	sample_del_bind_occ( void *sample, void *src_entry, int n_out_p, int k_entry )
 {
-	void *bptr = NULL;
-	int error = vevo_property_get( src_entry, "bind",0,&bptr );
-#ifdef STRICT_CHECKING
-	assert( pi >= 0 && pi < 32 );
-#endif
-	if( error != VEVO_NO_ERROR )
-		return 1;
-	bind_t *bt = (bind_t*) bptr;
-	bt->p[pi] = -1;
-	bt->e[pi] = -1;
-	error = vevo_property_set( src_entry, "bind", VEVO_ATOM_TYPE_VOIDPTR,1,&bptr );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	return VEVO_NO_ERROR;	
-}
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	fx_slot_t *slot = (fx_slot_t*) src_entry;
+	if(!slot->bind)
+		return 0;
+	char **items = slot->bind;
+	if(!items)
+		return 0;
+	char name[64];
+	void *sender = veejay_get_osc_sender( srd->user_data );
+	sprintf(name,"SampleBind%dFX%02dOP%d", srd->primary_key, k_entry, n_out_p );
+	if(sender)
+		veejay_ui_bundle_add( sender, "/destroy/window", "sx", name );
+		
 
-int	sample_new_bind( void *sample, void *src_entry, int entry, int pi, int pj )
-{
-	void *bptr = NULL;
-	int error = vevo_property_get( src_entry, "bind",0,&bptr );
-#ifdef STRICT_CHECKING
-	assert( pi >= 0 && pi < 32 );
-	assert( entry >= 0 && entry <= 19);
-#endif
-	
-	if(error == VEVO_NO_ERROR )
+	int i;
+	for( i = 0; items[i] != NULL ; i ++ )
 	{
-		bind_t *bt = (bind_t*) bptr;
-		bt->p[pi] = pj;
-		bt->e[pi] = entry;
-	}
-	else
-	{
-		bind_t *bt = (bind_t*) vj_malloc(sizeof(bind_t));
-		int i;
-		for ( i = 0; i < 32; i ++ )
+		int dummy = 0;
+		int dd=0;
+		int this_p = -1;
+		sscanf( items[i], "bp%d_%d_%d", &this_p,&dd,&dummy);	
+
+		if( this_p == n_out_p && vevo_property_get(slot->bind,items[i],0,NULL) == VEVO_NO_ERROR)
 		{
-			bt->p[i] = -1;
-			bt->e[i] = -1;
+			void *bp = NULL;
+			int error = vevo_property_get( slot->bind, items[i],0,&bp );
+			if( error == VEVO_NO_ERROR )
+			{
+				free(bp);
+				vevo_property_set( slot->bind, items[i], VEVO_ATOM_TYPE_VOIDPTR,0,NULL );
+				bp = NULL;
+			}
 		}
-		bt->p[pi] = pj;
-		bt->e[pi] = entry;
-		bptr = (void*) bt;
+		free(items[i]);
 	}
-	
-	error = vevo_property_set( src_entry, "bind", VEVO_ATOM_TYPE_VOIDPTR,1,&bptr );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-
+	free(items);
 	return VEVO_NO_ERROR;	
 }
 
-int	sample_apply_bind( void *sample, void *current_entry )
+int	sample_del_bind( void *sample, void *src_entry, int k_entry, int n_out_p, int fx_right, int in_p )
 {
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	fx_slot_t *slot = (fx_slot_t*) src_entry;
+	if(!slot->bind)
+		return 0;
+	char key[64];
+	void *bp = NULL;
+	sprintf(key, "bp%02d_%02d_%02d", n_out_p, fx_right, in_p );
+	char name[64];
+	sprintf(name,"SampleBind%dFX%02dOP%d", srd->primary_key, k_entry, n_out_p );
+
+	int error = vevo_property_get( slot->bind, key,0,&bp );
+	if( error == VEVO_NO_ERROR )
+	{
+		free(bp);
+		error = vevo_property_set( slot->bind, key, VEVO_ATOM_TYPE_VOIDPTR,0,NULL );
+		bp = NULL;
+	}
+	
+	vevosample_ui_get_bind_list( srd, name );
+
+	
+	return VEVO_NO_ERROR;	
+}
+
+void	*sample_new_bind_parameter( void *fx_a, void *fx_b, int n_out_p, int n_in_p, int n_in_entry )
+{
+	bind_parameter_t *bt = (bind_parameter_t*) vj_malloc(sizeof( bind_parameter_t));
+	memset(bt,0,sizeof(bind_parameter_t));
+	int dummy = 0;
+#ifdef STRICT_CHECKING
+	assert( fx_a != NULL );
+	assert( fx_b != NULL );
+	assert( n_out_p >= 0 && n_in_p >= 0 && n_in_entry >= 0 && n_in_entry < SAMPLE_CHAIN_LEN );
+#endif
+	if( plug_parameter_get_range_dbl( fx_a, "out_parameters", n_out_p, &(bt->min[0]), &(bt->max[0]) , &dummy ) != VEVO_NO_ERROR )
+	{
+		veejay_msg(0, "Can only bind parameters of type INDEX or NUMBER");
+		free(bt);
+		return NULL;
+	}	
+	if( plug_parameter_get_range_dbl( fx_b, "in_parameters", n_in_p, &(bt->min[1]), &(bt->max[1]), &(bt->kind) ) != VEVO_NO_ERROR )
+	{
+		veejay_msg(0, "Can only bind parameters of type INDEX or NUMBER");
+		free(bt);
+		return NULL;
+	}
+	bt->p[0] = n_out_p;
+	bt->p[1] = n_in_p;
+	bt->entry = n_in_entry;
+
+	veejay_msg(0, "New bind %d %d %d", n_out_p,n_in_p, n_in_entry );
+	
+	return (void*) bt;
+
+}
+
+int	sample_new_bind( void *sample, void *src_entry,int n_out_p,  int dst_entry, int n_in_p )
+{
+	void *fx_a = NULL;
+	void *fx_b = NULL;
+	int error = 0;
+	char bind_key[64];
+	char param_key[64];
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+
+	fx_slot_t *dst_slot = sample_get_fx_port_ptr( srd, dst_entry );
+	fx_slot_t *src_slot = (fx_slot_t*) src_entry;
+
+	if(!src_slot->fx_instance || !dst_slot->fx_instance )
+	{
+		veejay_msg(0, "There must be a plugin in both FX slots");
+		return 1;
+	}
+
+	sprintf( param_key, "bp%02d_%02d_%02d",n_out_p, dst_entry, n_in_p);
+
+	if(!src_slot->bind)
+		src_slot->bind = vpn( VEVO_ANONYMOUS_PORT );
+
+	if( vevo_property_get( src_slot->bind, param_key, 0, NULL ) == VEVO_NO_ERROR )
+	{
+		veejay_msg(0, "There is a bind from this output parameter to Entry %d, input %d",
+				dst_entry,n_in_p );
+		return 1;
+	}
+
+	void *inp = sample_new_bind_parameter( 
+			src_slot->fx_instance,
+			dst_slot->fx_instance,
+			n_out_p,
+			n_in_p,
+			dst_entry
+		);
+	
+	if(!inp)
+	{
+		veejay_msg(0, "Error while binding parameter");
+		return 1;
+	}
+	
+	error = vevo_property_set( src_slot->bind, param_key, VEVO_ATOM_TYPE_VOIDPTR,1,&inp );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	return VEVO_NO_ERROR;	
+}
+
+int	sample_apply_bind( void *sample, void *current_entry, int k_entry )
+{
+	sample_runtime_data *srd = (sample_runtime_data*) sample;
+	fx_slot_t *slot = (fx_slot_t*) current_entry;
+#ifdef STRICT_CHECKING
+	assert( slot->bind != NULL );
+#endif
+	char **items = vevo_list_properties( slot->bind );
+	if(! items )
+	{
+		veejay_msg(0, "BIND empty for sample %d",
+				srd->primary_key );
+		return 1;
+	}
 	char key[64];
 	char dkey[64];
-	void *bptr = NULL;
-	int error = vevo_property_get( current_entry, "bind",0,&bptr );
-	void *fx_out_values = NULL;
-	void *fx_values = NULL;
-	if( error != VEVO_NO_ERROR )
-		return 0;
-
-	bind_t *bt = (bind_t*)bptr;
+	char dwin[32];
+	sprintf(dwin , "Sample%dFX%d", srd->primary_key, k_entry );
 	int i;
-	for ( i = 0; i < 32 ; i ++ )
+
+	for( i = 0; items[i] != NULL ; i ++ ) 
 	{
-		if( bt->p[i] >= 0 )
+		void *bp = NULL;
+		int error = vevo_property_get( slot->bind, items[i],0,&bp );
+
+veejay_msg(0,"\t apply bind '%s' : error %d", items[i], error );
+		if( error == VEVO_NO_ERROR )
 		{
-			sprintf(key, "p%02d", i );
-			sprintf(dkey, "p%02d", bt->p[i] );
-	
-			int dentry = bt->e[i];
-			void *dst_entry = sample_get_fx_port_ptr( sample,dentry );
-#ifdef STRICT_CHECKING
-			assert( dst_entry != NULL );
-#endif
-			error = vevo_property_get( current_entry, "fx_out_values",0,&fx_out_values );
-#ifdef STRICT_CHECKING
-			assert( error == VEVO_NO_ERROR );			
-#endif
-			error = vevo_property_get( dst_entry, "fx_values",0,&fx_values );
-#ifdef STRICT_CHECKING
-			assert( error == VEVO_NO_ERROR );			
-#endif
+		bind_parameter_t *bpt = (bind_parameter_t*) bp;
 
-			//@ todo: is atom type compatible ?
-			clone_prop_vevo(
-				fx_out_values,
-				fx_values,
-				key,
-				dkey );
+		void *fx_b = NULL;
+		fx_slot_t *dst_slot = sample_get_fx_port_ptr( srd, bpt->entry );
+
+		if(dst_slot->active && slot->active)
+		{
+			double weight = 0.0;
+			int    iw = 0;
+			double value=0.0;
+			char *path = plug_get_osc_path_parameter( dst_slot->fx_instance, bpt->p[1] );
+			char *fmt  = plug_get_osc_format( dst_slot->fx_instance, bpt->p[1]);
+			char pkey[8];
+			sprintf(pkey, "p%02d",bpt->p[0]);
+			void *sender = veejay_get_osc_sender( srd->user_data );
+
+			char *output_pname[128];
+			char *output_pval = vevo_sprintf_property_value( slot->out_values, pkey );
+
+			sprintf(output_pname, "o%02d", bpt->p[0]);
+			if(bpt->kind == HOST_PARAM_INDEX)
+			{
+				if( vevo_property_get( slot->out_values, pkey,0,&value ) == VEVO_NO_ERROR )
+				{
+					weight = 1.0 / (bpt->max[1] - bpt->min[1]);
+					iw = (int) ( value * weight );
+					plug_set_parameter( dst_slot->fx_instance, bpt->p[1], 1, &iw );
+					if(path && sender)
+						veejay_bundle_add( sender, path, fmt, iw );
+					if(sender)
+						veejay_xbundle_add( sender,dwin , output_pname,"s", (output_pval==NULL ? " " : output_pval) );
+				}
+			}
+			else if(bpt->kind == HOST_PARAM_NUMBER)
+			{
+				if( vevo_property_get( slot->out_values, pkey,0,&value ) == VEVO_NO_ERROR )
+				{
+					double norm = (1.0 / (bpt->max[0] - bpt->min[0])) * value;
+					double gv = (bpt->max[1] - bpt->min[1]) * norm + bpt->min[1];
+					plug_set_parameter( dst_slot->fx_instance, bpt->p[1], 1, &gv );
+					if(path && sender)
+						veejay_bundle_add( sender, path, fmt, gv );
+					if(sender)
+						veejay_xbundle_add( sender, dwin, output_pname,"s",(output_pval==NULL ? " " : output_pval));
+				}
+			}
+			else 
+			{
+				veejay_msg(0, "Kind is not compatible: %d", bpt->kind );
+			}
+			if(path) free(path);
+			if(fmt)  free(fmt);
+			if(output_pval) free(output_pval);
 		}
+		}
+		free( items[i] );
 	}
-
+	free(items);
 	return 0;
 }
 
-int	sample_new_osc_sender(void *sample, const char *addr, const char *port )
+void	*sample_clone_from( void *info, void *sample,  sample_video_info_t *project_settings  )
 {
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
-	if(srd->osc)
-	{
-		veejay_msg(0, "There is already an OSC sender active");
-		return 1;
-	}
+	int type = srd->type;
+	char **list = vj_el_get_file_list( srd->data );
 	
-	void *osc_client = veejay_new_osc_sender( addr, port );
-	if(!osc_client)
+	void *new_sample = sample_new( type );
+
+	int i = 0;
+
+	if( sample_open( new_sample, list[i], 0, project_settings ) )
 	{
-		veejay_msg(0, "Unable to start OSC sender");
-		return 1;
+		veejay_msg(0, "Opened '%s' ",list[i]);
+		int new_id = samplebank_add_sample( new_sample );
+		sample_set_user_data( new_sample, info, new_id );
 	}
 
-	srd->osc = osc_client;
-
-	veejay_msg(VEEJAY_MSG_INFO,
-			"OSC address '%s' port '%s', Sender active",
-				addr,port );
-	
-	return VEVO_NO_ERROR;
-}
-
-void	sample_close_osc_sender( void *sample )
-{
-	sample_runtime_data *srd = (sample_runtime_data*) sample;
-	if(srd->osc)
-	{
-		veejay_free_osc_sender( srd->osc );
-		srd->osc = NULL;
-		veejay_msg(VEEJAY_MSG_INFO,
-				"OSC sender inactive");
-	}
-}
-
-void	sample_add_osc_path( void *sample, const char *path, int fx_entry_id )
-{
-	sample_runtime_data *srd = (sample_runtime_data*) sample;
-	
-	//@ add osc path to entry
-	void *port = sample_get_fx_port_ptr( sample,fx_entry_id );
-
-	int error = vevo_property_set( port, "fx_osc", VEVO_ATOM_TYPE_STRING,1,&path );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-}
-
-void	sample_del_osc_path( void *sample, int fx_entry_id )
-{
-	sample_runtime_data *srd = (sample_runtime_data*) sample;
-	
-	//@ add osc path to entry
-	void *port = sample_get_fx_port_ptr( sample,fx_entry_id );
-
-	int error = vevo_property_set( srd->info_port, "fx_osc", VEVO_ATOM_TYPE_STRING,0,NULL );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-}
-
-void	sample_send_osc_path( void *sample, void *fx_entry )
-{
-	sample_runtime_data *srd = (sample_runtime_data*) sample;
-	
-	char *osc_path = get_str_vevo( fx_entry, "fx_osc" );
-	if(!osc_path)
-	{
-		return;
-	}
-	
-	void *fx_out_values = NULL;
-	
-	int	error = vevo_property_get( fx_entry, "fx_out_values",0,&fx_out_values );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-	assert( srd->osc != NULL );
-#endif
-
-	if( osc_path )
-	{
-		veejay_vevo_send_osc( srd->osc, 
-				 osc_path,
-			         fx_out_values );
-
-		free(osc_path);
-	}
-}
-
-static	char 	*osc_path_to_khagan_path( const char *str )
-{
-	int n = strlen( str ) + 5;
-	char *res = (char*) malloc( n );
-	char arg = '%';
-	snprintf(res,n, "%s %c", str ,arg);
-        return res;	
-}
-int	khagan_write_property( void *port, const char *key, xmlNodePtr node )
-{
-	int atom_type = vevo_property_atom_type( port, key );
-	int n_elem    = vevo_property_num_elements( port , key );
-	int error;
-	if( n_elem == 0 || n_elem > 1 )
-	{
-		veejay_msg(0, "Khagan doesnt do list values ??");
-		return 1;
-	}	
-
-	if( atom_type == VEVO_ATOM_TYPE_INT || atom_type == VEVO_ATOM_TYPE_BOOL )
-	{
-		int ival = 0;
-		error = vevo_property_get( port, key, 0, &ival );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
-		int_as_value( node, ival, key );
-		return 0;
-	}
-	else if ( atom_type == VEVO_ATOM_TYPE_DOUBLE )
-	{
-		double gval = 0.0;
-		error = vevo_property_get( port, key,0, &gval );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
-		double_as_value( node, gval, key );
-		return 0;
-	}
-	else if ( atom_type == VEVO_ATOM_TYPE_STRING )
-	{
-		char *str = get_str_vevo( port, key );
-		if( str )
-		{
-			cstr_as_value( node, str, key );
-			free(str);
-		}
-		return 0;
-	}
-
-	return 1;
-}
-
-int	khagan_write_property_as( void *port, const char *key, xmlNodePtr node, const char *as_key )
-{
-	int atom_type = vevo_property_atom_type( port, key );
-	int n_elem    = vevo_property_num_elements( port , key );
-	int error;
-	if( n_elem == 0 || n_elem > 1 )
-	{
-		veejay_msg(0, "Khagan doesnt do list values ??");
-		return 1;
-	}	
-
-	if( atom_type == VEVO_ATOM_TYPE_INT || atom_type == VEVO_ATOM_TYPE_BOOL )
-	{
-		int ival = 0;
-		error = vevo_property_get( port, key, 0, &ival );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
-		int_as_value( node, ival, as_key );
-		return 0;
-	}
-	else if ( atom_type == VEVO_ATOM_TYPE_DOUBLE )
-	{
-		double gval = 0.0;
-		error = vevo_property_get( port, key,0, &gval );
-#ifdef STRICT_CHECKING
-		assert( error == VEVO_NO_ERROR );
-#endif
-		double_as_value( node, gval, as_key );
-		return 0;
-	}
-	else if ( atom_type == VEVO_ATOM_TYPE_STRING )
-	{
-		char *str = get_str_vevo( port, key );
-		if( str )
-		{
-			cstr_as_value( node, str, as_key );
-			free(str);
-		}
-		return 0;
-	}
-
-	return 1;
-}
-
-/*
- * Khagan, OSC live interface builder. 
- *
- *
- */
-static void	sample_produce_khagan_widget(void *osc_port,int port_num, xmlNodePtr rootnode, int n)
-{
-	//sample_runtime_data *srd = (sample_runtime_data*) sample;
-	
-	char **list = vevo_list_properties ( osc_port );
-	int i;
-
-	int v_splits = n - 1;
-	
-	xmlNodePtr nodes[ v_splits ];
-	xmlNodePtr cur_node = rootnode;
-	int n_widgets = 0;
-	
 	for( i = 0; list[i] != NULL ; i ++ )
-	{
-		void *osc = NULL;
-		int error = vevo_property_get( osc_port, list[i],0,&osc );
-
-		void *template = NULL;
-		error = vevo_property_get( osc, "parent",0,&template );
-		if( error == VEVO_NO_ERROR )
-		{
-			if( n_widgets < v_splits )
-			{
-				nodes[n_widgets] = 
-					xmlNewChild( cur_node, NULL, (const xmlChar*) "vsplit", NULL );
-			}
-			else
-				nodes[n_widgets] = cur_node;
-
-			xmlNodePtr node = 
-				xmlNewChild( nodes[n_widgets] , NULL, (const xmlChar*) "widget", NULL );
-
-			
-			char *description = get_str_vevo( template, "description");
-			char *khagan_path = osc_path_to_khagan_path( list[i] );
-			
-			cstr_as_value( node, "PhatKnob", "name" );
-			
-			khagan_write_property_as( template, "default", node, "value" );
-			khagan_write_property( template, "min"  , node );
-			khagan_write_property( template, "max"  , node );
-			cstr_as_value( node, khagan_path, "osc_path" );
-			int_as_value( node, port_num, "port" );
-			cstr_as_value( node, description, "label" );
-			cstr_as_value( node, "False", "is_log" );
-			
-			free(description);	
-			free(khagan_path);
-	
-			cur_node = nodes[n_widgets];
-
-			n_widgets ++;
-			
-		}
-		else
-			veejay_msg(0, "%s has no parent", list[i]);
 		free(list[i]);
-	}
 	free(list);
-}
-	
-
-void	sample_produce_khagan_file( void *sample )
-{
-	sample_runtime_data *srd = (sample_runtime_data*) sample;
-	int port_num = veejay_get_port( srd->user_data );	
-	int error;
-	int k;
-	const char *encoding = "UTF-8";
-	int id = 0;
-	error = vevo_property_get( srd->info_port, "primary_key", 0, &id );
-
-	for( k =0; k < SAMPLE_CHAIN_LEN; k ++ )
-	{
-		void *fxp = sample_get_fx_port_ptr( srd, k );
-		void *fxi = NULL;
-		error = vevo_property_get( fxp, "fx_instance",0,&fxi );
-		
-		if( error == VEVO_NO_ERROR )
-		{
-			xmlNodePtr rootnode;
-			xmlDocPtr doc = xmlNewDoc( "1.0" );
-			rootnode = xmlNewDocNode( doc, NULL, (const xmlChar*) "gui", NULL );
-			xmlDocSetRootElement( doc, rootnode );
-			void *osc_port = plug_get_name_space( fxi );
-			int n = vevo_property_num_elements( fxi, "in_parameters" );
-
-			if( osc_port )
-				sample_produce_khagan_widget( osc_port, port_num, rootnode ,n);
-		
-
-			char filename[256];
-			sprintf(filename, "sample_%d_fx_%d.kh", id,k );
-			FILE *res = fopen( filename  , "w" );
-			if(!res)
-				veejay_msg(0, "Cannot write to %s",filename);
-			else
-				xmlDocDump( res, doc );
-			fclose(res);
-
-			xmlFreeDoc( doc );
-		}
-	}
+	return new_sample;
 }
 

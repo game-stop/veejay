@@ -32,5 +32,7 @@ int	vj_unicap_grab_frame( void *vut, void *slot );
 int	vj_unicap_stop_capture( void *vut );
 void	vj_unicap_free_device( void *vut );
 
+void	*vj_unicap_get_devices(void *in);
+
 #endif
 

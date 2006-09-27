@@ -53,11 +53,12 @@ int		sample_open( void *sample, const char *token, int extra_token, sample_video
 int		sample_get_frame( void *current_sample, void *slot );
 void		sample_fx_set_parameter( int id, int fx_entry, int param_id,int n, void *data );
 void		sample_fx_get_parameter( int id, int fx_enty,int param_id,int idx, void *dst );
-void		sample_toggle_process_entry( void *data, int fx_entry, int v );
 int		sample_fx_set_active( int id, int fx_entry, int switch_value);
 int		sample_fx_set_channel( int id, int fx_entry, int n_input, int channel_id );
 double		sample_get_fx_alpha( void *data, int fx_entry );
 void		sample_set_fx_alpha( void *data, int fx_entry, double v );
+int		sample_get_fx_status( void *data, int fx_entry );
+void		sample_set_fx_status( void *data, int fx_entry, int status );
 void		sample_set_itu601( void *current_sample, int status );
 int		sample_fx_set( void *info, int fx_entry, const int new_fx );
 void		sample_process_fx_chain( void *srd );
@@ -89,7 +90,7 @@ char 		*sample_sprintf_port( void *sample );
 int		sample_fx_push_in_channel( void *info, int fx_entry, int seq_num, void *frame_info );
 int		sample_fx_push_out_channel(void *info, int fx_entry, int seq_num, void *frame_info );
 int		sample_scan_out_channels( void *data, int fx_entry );
-void		*sample_scan_in_channels( void *data, int fx_entry );
+void		*sample_scan_in_channels( void *data, int fx_entry, int *num );
 void		*sample_get_fx_port_ptr( void *data, int fx_entry );
 void		*sample_get_fx_port_channels_ptr( int id, int fx_entry );
 int		sample_get_key_ptr( void *sample );
@@ -109,17 +110,17 @@ void		sample_send_osc_path( void *sample, void *fx_entry );
 char		*sample_describe_param( void *srd, int fx_entry, int p );
 int		sample_set_param( void *srd, int fx_entry, int p, const char format[] , ... );
 void		sample_set_user_data( void *sample, void *data, int id );
-void		sample_set_property_from_path( void *sample, const char *path, void *value );
+void		sample_set_property_from_path( void *sample, const char *path,int elements, void *value );
 char		*sample_property_format_osc( void *sample, const char *path );
 void		sample_init_namespace( void *data, void *sample , int id );
-int		sample_osc_property_calls_event( void *sample, const char *path, char *types, void **argv[] );
+int		sample_osc_property_calls_event( void *sample, const char *path, char *types, void **argv[] , void *data);
 
-typedef void (*vevo_event_f)(void *ptr, const char *path,const char *types, void **argv);
+typedef void (*vevo_event_f)(void *ptr, const char *path,const char *types, void **argv, void *raw);
 int	sample_osc_new_sample_event( void *sample,
 			       const char *key,
 			       const char *fmt,
 			       const char **args,
 			       vevo_event_f *func );
 int	sample_osc_verify_format( void *vevo_port, char const *types );
-
+void    *sample_clone_from( void *info, void *sample,  sample_video_info_t *project_settings  );  
 #endif
