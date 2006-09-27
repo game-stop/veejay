@@ -9,6 +9,7 @@
 #include <libvjmem/vjmem.h>
 #include <libvevo/libvevo.h>
 #include <libplugger/defs.h>
+#include <libplugger/ldefs.h>
 #include <libyuv/yuvconv.h>
 #include <veejay/portdef.h>
 #include <ffmpeg/avcodec.h>
@@ -47,11 +48,7 @@ static	int	freeframe_signature_ = VEVO_PLUG_FF;
 
 void*	deal_with_ff( void *handle, char *name )
 {
-#ifdef STRICT_CHECKING
-	void *port = vevo_port_new( VEVO_FF_PORT , __FUNCTION__, __LINE__ );
-#else
-	void *port = vevo_port_new( VEVO_FF_PORT );
-#endif
+	void *port = vpn( VEVO_FF_PORT );
 	char *plugin_name = NULL;
 	plugMainType *q = (plugMainType*) dlsym( handle, "plugMain" );
 
@@ -139,11 +136,7 @@ void*	deal_with_ff( void *handle, char *name )
 	
 		if(kind)
 			continue;	
-#ifdef STRICT_CHECKING
-		void *parameter = vevo_port_new( VEVO_FF_PARAM_PORT, __FUNCTION__,__LINE__ );
-#else	
-		void *parameter = vevo_port_new( VEVO_FF_PARAM_PORT );
-#endif
+		void *parameter = vpn( VEVO_FF_PARAM_PORT );
 		double ivalue = (double)q( FF_GETPARAMETERDEFAULT, (LPVOID) p, 0).fvalue;
 		
 		vevo_property_set( parameter, "default", VEVO_ATOM_TYPE_DOUBLE,1 ,&ivalue );
@@ -338,11 +331,7 @@ int	freeframe_plug_init( void *plugin, int w, int h )
 	int num_channels = 0;
 	int i;
 	vevo_property_get( plugin, "num_inputs", 0, &num_channels );
-#ifdef STRICT_CHECKING
-	void *buf = vevo_port_new( VEVO_ANONYMOUS_PORT, __FUNCTION__, __LINE__ );
-#else
-	void *buf = vevo_port_new( VEVO_ANONYMOUS_PORT );
-#endif
+	void *buf = vpn( VEVO_ANONYMOUS_PORT );
 	error = vevo_property_set( instance, "HOST_buffers",
 				VEVO_ATOM_TYPE_PORTPTR,1,&buf);
 #ifdef STRICT_CHECKING

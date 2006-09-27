@@ -27,6 +27,7 @@
 #include <libvjmem/vjmem.h>
 #include <libvevo/libvevo.h>
 #include <libplugger/defs.h>
+#include <libplugger/ldefs.h>
 #include <libplugger/specs/livido.h>
 #include <libyuv/yuvconv.h>
 #include <ffmpeg/avcodec.h>
@@ -116,7 +117,7 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 	
 	if( num <= 0 )
 		return;
-
+	
 	int itmp[8];
 	double dtemp[8];
 	char *stmp[8];
@@ -152,6 +153,7 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 #ifdef STRICT_CHECKING
 			assert( error == VEVO_NO_ERROR );
 #endif
+		//	veejay_msg(0, "\t\tValue is %g ", dtemp[0] );
 			break;
 		case VEVO_ATOM_TYPE_STRING:
 			for( i = 0; i < num; i ++)
@@ -178,6 +180,7 @@ void clone_prop_vevo( void *port, void *to_port, const char *key, const char *as
 			break;
 
 	}
+
 }
 
 

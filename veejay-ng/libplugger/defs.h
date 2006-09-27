@@ -15,9 +15,10 @@ typedef	  void	(*generic_default_values_f)(void *instance, void *fx_values);
 typedef	  void	(*generic_push_parameter_f)(void *instance, int seq_num, void *value );
 typedef	  void  (*generic_clone_parameter_f)(void *instance, int seq_num, void *fx_values );
 typedef	  void	(*generic_reverse_clone_parameter_f)(void *instance, int seq_num, void *fxvalues );
-typedef	  void	(*generic_reverse_clone_out_parameter_f)(void *instance, void *fxvalues );
+typedef	  int	(*generic_reverse_clone_out_parameter_f)(void *instance, void *fxvalues );
 typedef	  void	(*generic_deinit_f)(void *instance);
 typedef	  void	(*generic_init_f)(void *instance, int w, int h );
+typedef	  void  (*generic_osc_cb_f)(void *userdata, void *param, void *value );
 
 extern	int livido_property_num_elements(livido_port_t * p, const char *key);
 extern	int livido_property_atom_type(livido_port_t * p, const char *key);
@@ -29,16 +30,11 @@ extern 	int livido_property_get(livido_port_t * p, const char *key, int idx, voi
 extern	char **livido_list_properties(livido_port_t * p);
 
 
-#define	HOST_PARAM_NUMBER	1
-#define HOST_PARAM_INDEX	2
-#define	HOST_PARAM_SWITCH	6
-#define HOST_PARAM_COORD	3
-#define HOST_PARAM_COLOR	4	
-#define	HOST_PARAM_TEXT		5
+
 
 
 #define livido_port_free	vevo_port_free
-#define livido_port_new		vevo_port_new
+#define livido_port_new		vpn
 #define livido_property_set	vevo_property_set
 #define livido_property_get	vevo_property_get
 #define	livido_property_element_size vevo_property_element_size

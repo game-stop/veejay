@@ -23,7 +23,6 @@
 	veejay plugin loader
         *	library to wrap up all kinds of "plugin standards"
  */
-
 void	plug_sys_free(void);
 void	plug_sys_init( int fmt, int w, int h );
 void	plug_sys_set_palette( int palette );
@@ -38,8 +37,12 @@ void	plug_push_frame( void *instance, int out, int seq_num, void *frame );
 void	plug_process( void *instance );
 void	plug_get_defaults( void *instance, void *fx_values );
 void	plug_set_parameter( void *instance, int seq_num, int n_elements,void *value );
-void	plug_clone_from_output_parameters( void *instance, void *fx_values );
+int	plug_clone_from_output_parameters( void *instance, void *fx_values );
 char	*plug_get_osc_format(void *fx_instance, int p);
-void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_id, int sample_id );
+//@ see generic_osc_cb_f in defs.h
+void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_id, int sample_id,
+	       void(*cb)(void *ud, void *p, void *v), void *cb_data	);
+char 	*plug_get_osc_path_parameter(void *instance, int k);
+
 void	plug_clear_namespace( void *fx_instance, void *data );
 #endif

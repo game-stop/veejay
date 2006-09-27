@@ -37,6 +37,7 @@
 #include <veejay/portdef.h>
 #include <libvevo/libvevo.h>
 #include <libplugger/defs.h>
+#include <libplugger/ldefs.h>
 #include <libplugger/specs/livido.h>
 #include <libyuv/yuvconv.h>
 #include <ffmpeg/avcodec.h>
@@ -379,11 +380,7 @@ void	plug_sys_init( int fmt, int w, int h )
 int	plug_sys_detect_plugins(void)
 {
 	index_map_ = (vevo_port_t**) vj_malloc(sizeof(vevo_port_t*) * 256 );
-#ifdef STRICT_CHECKING
-	illegal_plugins_ = vevo_port_new( VEVO_ILLEGAL, __FUNCTION__, __LINE__ );
-#else
-	illegal_plugins_ = vevo_port_new( VEVO_ILLEGAL );
-#endif
+	illegal_plugins_ = vpn( VEVO_ILLEGAL );
 #ifdef STRICT_CHECKING
 	assert( illegal_plugins_ != NULL );
 #endif	
@@ -435,7 +432,7 @@ void	plug_clone_from_parameters(void *instance, void *fx_values)
 	(*grc)( instance ,0, fx_values );
 }
 
-void	plug_clone_from_output_parameters( void *instance, void *fx_values )
+int	plug_clone_from_output_parameters( void *instance, void *fx_values )
 {
 #ifdef STRICT_CHECKING
 	assert( instance != NULL );
@@ -445,8 +442,8 @@ void	plug_clone_from_output_parameters( void *instance, void *fx_values )
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
 #endif
-	(*grc)(instance,fx_values);	
-///			livido_plug_read_output_parameters( instance, fx_values );
+	int n = (*grc)(instance,fx_values);	
+	return n;
 }
 
 void	plug_clone_parameters( void *instance, void *fx_values )
@@ -678,7 +675,8 @@ void	plug_clear_namespace( void *fx_instance, void *data )
 	livido_plug_free_namespace( fx_instance , data );
 }
 
-void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_id , int sample_id)
+void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_id , int sample_id,
+		generic_osc_cb_f cbf, void *cb_data)
 {
 	void *plugin = index_map_[fx_id];
 	int type = 0;
@@ -692,7 +690,7 @@ void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_
 	switch( type )
 	{
 		case VEVO_PLUG_LIVIDO:
-			livido_plug_build_namespace( plugin, entry_id, fx_instance, data, sample_id );
+			livido_plug_build_namespace( plugin, entry_id, fx_instance, data, sample_id, cbf, cb_data );
 			break;
 		case VEVO_PLUG_FF:
 			break;
@@ -723,6 +721,24 @@ void	plug_print_all()
 		}
 	}
 		
+}
+
+void plug_concatenate_all(void *osc, void *msg)
+{
+	int len = 1;
+	int n;
+	int fx = 0;
+	veejay_message_add_argument( osc, msg, "s", "none");
+	for(n = 0; n < index_ ; n ++ )
+	{
+		char *fx_name = plug_get_name(n);
+		if(fx_name)
+		{
+			veejay_message_add_argument( osc, msg, "s", fx_name );
+			free(fx_name);
+		}
+	}
+
 }
 
 char	*plug_get_name( int fx_id )
@@ -831,4 +847,32 @@ void	plug_process( void *instance )
 void	*plug_get_name_space( void *instance )
 {
 	return livido_get_name_space(instance);
+}
+
+char 	*plug_get_osc_path_parameter(void *instance, int k)
+{
+	void *p = NULL;
+	if( vevo_property_get( instance, "in_parameters",k,&p ) == VEVO_NO_ERROR )
+		return vevo_property_get_string( p, "HOST_osc_path" );
+	return NULL;
+}
+
+int	plug_parameter_get_range_dbl( void *fx_instance,const char *key, int k, double *min, double *max , int *kind )
+{
+	return livido_plug_parameter_get_range_dbl( fx_instance,key, k, min,max ,kind);
+}
+
+int plug_get_index_parameter_as_dbl( void *fx_instance,const char *key, int k , double *res)
+{
+	return livido_plug_get_index_parameter_as_dbl( fx_instance, key, k,res );
+}
+
+int	plug_get_number_parameter_as_dbl( void *fx_instance, const char *key, int k , double *res)
+{
+	return livido_plug_get_number_parameter_as_dbl( fx_instance,key, k,res );
+}
+
+int	plug_get_coord_parameter_as_dbl( void *fx_instance,const char *key, int k, double *res_x, double *res_y )
+{
+	return	livido_plug_get_coord_parameter_as_dbl( fx_instance, key,k,res_x,res_y );
 }

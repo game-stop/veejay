@@ -34,11 +34,12 @@ void	livido_set_parameters_scaled( void *plugin, int *args );
 
 void	livido_exit( void );
 
-void	livido_plug_read_output_parameters( void *instance, void *fx_values );
+int	livido_plug_read_output_parameters( void *instance, void *fx_values );
 
 char	*livido_describe_parameter_format( void *instance, int p );
 
-int	livido_plug_build_namespace( void *plugin_template , int entry_id, void *fx_instance , void *data, int sam);
+int	livido_plug_build_namespace( void *plugin_template , int entry_id, void *fx_instance , void *data, int sam,
+		generic_osc_cb_f cbf, void *cb_data);
 
 char	*livido_describe_parameter_format_osc( void *instance, int p );
 
