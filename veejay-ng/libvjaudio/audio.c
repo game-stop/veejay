@@ -212,6 +212,8 @@ int	vj_audio_resample_data( void *dar,
 	audio_resample_t *ar = (audio_resample_t*) dar;
 #ifdef STRICT_CHECKING
 	assert( ar->resampler == 1 );
+	assert( bps == 4 );
+	assert( channels == 2 );
 #endif
 	SRC_DATA *d = &(ar->data);
 
@@ -219,7 +221,7 @@ int	vj_audio_resample_data( void *dar,
 
 	d->data_in = ar->in;
 	d->data_out = ar->out;
-	d->input_frames = in_samples / channels;
+//	d->input_frames = in_samples / channels;
 	if(slow)
 	{	
 		d->output_frames = d->input_frames * (slow+1);
@@ -227,7 +229,12 @@ int	vj_audio_resample_data( void *dar,
 	}
 	else
 	{
-		d->output_frames = d->input_frames / factor;	
+//		d->output_frames = d->input_frames / factor;	
+//		d->output_frames = d->input_frames;
+	//	d->src_ratio = d->output_frames / (double) d->input_frames;
+//		d->src_ratio = 2.0;
+		d->input_frames = (in_samples / channels) * factor;
+		d->output_frames = (in_samples / channels);
 		d->src_ratio = d->output_frames / (double) d->input_frames;
 	}
 	d->end_of_input = 0;
@@ -237,14 +244,20 @@ int	vj_audio_resample_data( void *dar,
 		src_set_ratio( ar->state, d->src_ratio );
 		ar->last_ratio = d->src_ratio;
 	}
+	veejay_msg( 0,"ratio is %g or %g, output frames = %d in %d", (double) ar->last_ratio,
+		 (double) d->input_frames / d->output_frames, d->output_frames, d->input_frames );
 
 	if( src_process( ar->state,d ) != 0 )
+	{
+		veejay_msg(0, "failed to resmample");
 		return 0;
+	}
+	int gen_out_samples = d->output_frames * channels;
 
-	int gen_out_samples = d->output_frames_gen * channels;
-	
 	float_to_uint8_t( ar->out, output, gen_out_samples, bps );
 
 	return gen_out_samples;
+
+	
 }
 #endif
