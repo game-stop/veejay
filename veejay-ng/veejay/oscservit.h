@@ -20,6 +20,8 @@
  */
 void	*veejay_new_osc_server( void *data, const char *port );
 void	veejay_free_osc_server( void *dosc );
+char	*veejay_osc_server_get_addr( void *data );
+int	 veejay_osc_server_get_port( void *data );
 
 void	veejay_osc_del_methods( void *user_data, void *osc_space,void *vevo_port, void *fx_instance );
 

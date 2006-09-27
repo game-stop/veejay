@@ -978,7 +978,7 @@ void	yuv_deinterlace( VJFrame *A, uint8_t *Y,uint8_t *U, uint8_t *V )
 	AVPicture p,q;
 	p.data[0] = A->data[0];
 	p.data[1] = A->data[1];
-	p.data[2] = A->data[3];
+	p.data[2] = A->data[2];
 	p.linesize[0] = A->width;
 	p.linesize[1] = A->uv_width;
 	p.linesize[2] = A->uv_width;

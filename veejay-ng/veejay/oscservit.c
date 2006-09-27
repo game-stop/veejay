@@ -10,7 +10,7 @@
  * (at your option) any later version.
  *
  * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
+a/. * but WITHOUT ANY WARRANTY; without even the implied warranty of
  * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
  * GNU General Public License for more details.
  *
@@ -48,6 +48,8 @@ typedef struct {
 typedef struct
 {
 	lo_server_thread	st;
+	char			*url;
+	int			port;
 //	void		   *events;
 } osc_recv_t;
 
@@ -166,6 +168,13 @@ int	osc_rest_handler( const char *path, const char *types,
 
 }
 
+char	*osc_get_uri(void *data)
+{
+	lo_address a = lo_message_get_source(data);
+	char *uri = lo_address_get_url(a);
+	return uri;
+}
+
 //@ plugin handler!
 int	osc_plugin_handler( const char *path, const char *types,
 		lo_arg **argv, int argc, void *data, void *user_data )
@@ -173,13 +182,22 @@ int	osc_plugin_handler( const char *path, const char *types,
 	plugin_data_t *pd = (plugin_data_t*) user_data;
 	veejay_t *info    = pd->caller;
 
-	pthread_mutex_lock( &(info->vevo_mutex) );
+	veejay_lock(info,__FUNCTION__);
+	char *uri = osc_get_uri( data );
+free(uri);
+
+	veejay_msg(0, "%s: client '%s', %s" , __FUNCTION__,  uri,path );
+
+//	char *uri = osc_get_uri( data );
+//	veejay_set_current_client( info, uri );
+//	free(uri);
+
 	char *required_format = plug_get_osc_format( pd->instance, pd->seq );
 	if( strcmp( required_format , types ) != 0 )
 	{
 		veejay_msg(0, "Plugin Path %s wrong format '%s' , need '%s'",
 				path,types, required_format );
-		pthread_mutex_unlock( &(info->vevo_mutex) );
+		veejay_unlock(info,__FUNCTION__ );
 		return 0;
 	}
 	int n_elem = strlen(required_format);
@@ -194,7 +212,7 @@ int	osc_plugin_handler( const char *path, const char *types,
 			elements[k] =  argv[k]->i32;
 		plug_set_parameter( pd->instance, pd->seq, n_elem, (void*)elements );	
 		free(elements);
-		pthread_mutex_unlock( &(info->vevo_mutex) );
+		veejay_unlock( info ,__FUNCTION__ );
 		return 0;
 	}
 	else if( types[0] == 'd' )
@@ -204,7 +222,8 @@ int	osc_plugin_handler( const char *path, const char *types,
 			elements[k] =  argv[k]->d;
 		plug_set_parameter( pd->instance, pd->seq, n_elem, (void*) elements );
 		free(elements);
-		pthread_mutex_unlock( &(info->vevo_mutex) );
+		veejay_unlock( info ,__FUNCTION__ );
+
 		return 0;
 	}
 	else if( types[0] == 's' )
@@ -215,11 +234,13 @@ int	osc_plugin_handler( const char *path, const char *types,
 		plug_set_parameter( pd->instance,pd->seq, n_elem, (void*) strs );
 		for( k = 0; k < n_elem; k ++ )
 			if(strs[k]) free(strs[k]);
-		pthread_mutex_unlock( &(info->vevo_mutex) );
+		veejay_unlock( info ,__FUNCTION__ );
+
 		return 0;
 	} 
 
-	pthread_mutex_unlock( &(info->vevo_mutex));
+	veejay_unlock( info ,__FUNCTION__ );
+
 	return 1; //@ try another method
 }
 
@@ -228,19 +249,30 @@ int	osc_veejay_handler( const char *path, const char *types,
 {
 	plugin_data_t *pd = (plugin_data_t*) user_data;
 	veejay_t *info    = pd->caller;
-	pthread_mutex_lock( &(info->vevo_mutex) );
+	veejay_lock( info ,__FUNCTION__ );
+
+
+	char *uri = osc_get_uri( data );
+	veejay_set_current_client( info, uri );
+
+	veejay_msg(0, "%s: client '%s', %s" , __FUNCTION__,  uri,path );
 	// format of KEY in path!!	
-	
+		free(uri);
+
+
 	if( veejay_osc_property_calls_event( pd->instance,
 				      path,
 				      types,
-				      argv ))
+				      argv,
+			       	      data	))
 	{
-		pthread_mutex_unlock( &(info->vevo_mutex));
+		veejay_unlock( info ,__FUNCTION__ );
+
 		return 0;
 	}
 
-	pthread_mutex_unlock( &(info->vevo_mutex));
+	veejay_unlock( info ,__FUNCTION__ );
+
 	return 1; //@ try another method
 }
 
@@ -249,29 +281,44 @@ int	osc_sample_handler( const char *path, const char *types,
 {
 	plugin_data_t *pd = (plugin_data_t*) user_data;
 	veejay_t *info    = pd->caller;
-	pthread_mutex_lock( &(info->vevo_mutex) );
+	veejay_lock( info ,__FUNCTION__ );
+	char *uri = osc_get_uri( data );
+	veejay_set_current_client( info, uri );
+	veejay_msg(0, "%s: client '%s', path %s" , __FUNCTION__,  uri ,path);
+	// format of KEY in path!!	
+		free(uri);
+
+
 	if( sample_osc_property_calls_event( pd->instance,
 				      path,
 				      types,
-				      argv ))
+				      argv,
+			      	      data	))
 	{
-		pthread_mutex_unlock( &(info->vevo_mutex) );
+		veejay_unlock( info ,__FUNCTION__ );
+
 		return 0;
 	}
 
+	veejay_msg(0, "%s: %s continues", __FUNCTION__, path );
+	
 	char *required_format = sample_property_format_osc( pd->instance, path );
 	if(required_format == NULL )
 	{
 		veejay_msg(0, "Plugin Path %s wrong format '%s' , need '%s'",
 				path,types, required_format );
-		pthread_mutex_unlock( &(info->vevo_mutex) );
+		veejay_unlock( info ,__FUNCTION__ );
+
+
 		return 0;
 	}
 	if( strcmp( required_format , types ) != 0 )
 	{
 		veejay_msg(0, "Sample Path %s wrong format '%s' , need '%s'",
 				path,types, required_format );
-		pthread_mutex_unlock( &(info->vevo_mutex) );
+		veejay_unlock( info ,__FUNCTION__ );
+
+
 		return 0;
 	}
 
@@ -288,9 +335,11 @@ int	osc_sample_handler( const char *path, const char *types,
 		int32_t *elements = (int32_t*) vj_malloc(sizeof(int32_t) * n_elem );
 		for( k = 0; k < n_elem; k ++ )
 			elements[k] =  argv[k]->i32;
-		sample_set_property_from_path( pd->instance, path, (void*)elements );
+		sample_set_property_from_path( pd->instance, path,n_elem, (void*)elements );
 		free(elements);
-		pthread_mutex_unlock(&(info->vevo_mutex));
+		veejay_unlock( info ,__FUNCTION__ );
+
+
 		return 0;
 	}
 	else if( types[0] == 'd' )
@@ -298,9 +347,11 @@ int	osc_sample_handler( const char *path, const char *types,
 		double *elements = (double*) vj_malloc(sizeof(double) * n_elem );
 		for( k = 0; k < n_elem; k ++ )
 			elements[k] =  argv[k]->d;
-		sample_set_property_from_path( pd->instance, path, (void*)elements );
+		sample_set_property_from_path( pd->instance, path,n_elem, (void*)elements );
 		free(elements);
-		pthread_mutex_unlock(&(info->vevo_mutex));
+		veejay_unlock( info ,__FUNCTION__ );
+
+
 		return 0;
 
 	}
@@ -309,10 +360,12 @@ int	osc_sample_handler( const char *path, const char *types,
 		char **strs = vj_malloc(sizeof(char*) * n_elem );
 		for( k = 0; k < n_elem; k ++ )
 			strs[k] = strdup( (char*) &argv[k]->s );
-		sample_set_property_from_path( pd->instance, path, (void*)strs );
+		sample_set_property_from_path( pd->instance, path, n_elem, (void*)strs );
 		for( k = 0; k < n_elem; k ++ )
 			if(strs[k]) free(strs[k]);
-		pthread_mutex_unlock(&(info->vevo_mutex));
+		veejay_unlock( info ,__FUNCTION__ );
+
+
 		return 0;
 	}
 	else if( types[0] == 'h' )
@@ -320,14 +373,16 @@ int	osc_sample_handler( const char *path, const char *types,
 		uint64_t *elements = vj_malloc(sizeof(uint64_t) * n_elem );
 		for( k = 0; k < n_elem; k ++ )
 			elements[k] = argv[k]->h;
-		sample_set_property_from_path( pd->instance, path, (void*) elements );
-		pthread_mutex_unlock(&(info->vevo_mutex));
+		sample_set_property_from_path( pd->instance, path, n_elem,(void*) elements );
+		veejay_unlock( info ,__FUNCTION__ );
+
+
 		return 0;
 
 	} 
 
-	
-	pthread_mutex_unlock( &(info->vevo_mutex));
+	veejay_unlock( info ,__FUNCTION__ );
+
 	
 	return 1;
 }
@@ -359,12 +414,26 @@ void	*veejay_new_osc_server( void *data, const char *port )
 	s->st = lo_server_thread_new( port, error_handler );
 	lo_server_thread_start( s->st );
 
-//	lo_server_thread_add_method( s->st, NULL,NULL, osc_rest_handler,NULL );
+	s->url = lo_server_thread_get_url( s->st );
+	s->port = lo_server_thread_get_port( s->st );
 
-	
-	veejay_msg( 0, "OSC server ready at UDP port %d", lo_server_thread_get_port(s->st) );	
+	veejay_msg( 0, "OSC server '%s' ready",s->url );
+
 	return (void*) s;
 }
+
+char	*veejay_osc_server_get_addr( void *data )
+{
+	osc_recv_t *s  = (osc_recv_t*) data;
+	return s->url;
+}
+
+int	veejay_osc_server_get_port( void *data )
+{
+	osc_recv_t *s	= (osc_recv_t*) data;
+	return s->port;
+}
+
 
 static int	servit_new_event(
 		void *userdata,
@@ -547,6 +616,7 @@ void	veejay_free_osc_server( void *dosc )
 	osc_recv_t *s = (osc_recv_t*) dosc;
 	lo_server_thread_stop( s->st );
 	lo_server_thread_free( s->st );
+	free(s->url);
 //	vevo_port_free( s->events );
 	free(s);
 	s = NULL;

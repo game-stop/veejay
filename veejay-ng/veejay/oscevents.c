@@ -30,18 +30,19 @@
 #include <libvevo/libvevo.h>
 #include <veejay/defs.h>
 #include <veejay/veejay.h>
+#include <veejay/libveejay.h>
 #include <libplugger/plugload.h>
 #include <vevosample/vevosample.h>
+#include <vevosample/uifactory.h>
 #include <lo/lo.h>
 #include <ctype.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
 
-void	osc_sample_edl_paste_at( void *ptr,const char *path, const char *types, void **dargv )
+void	osc_sample_edl_paste_at( void *ptr,const char *path, const char *types, void **dargv, void *raw )
 {
 	lo_arg **argv = (lo_arg**) dargv;
-
 	if(sample_edl_paste_from_buffer( ptr, (uint64_t) argv[0]->h ))
 		veejay_msg( VEEJAY_MSG_INFO, "Pasted frames from buffer to position %lld",
 				argv[0]->h );
@@ -49,37 +50,34 @@ void	osc_sample_edl_paste_at( void *ptr,const char *path, const char *types, voi
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to paste frames at position %lld",
 				argv[0]->h );
 }
-void	osc_sample_edl_cut( void *sample,const char *path,  const char *types, void **dargv )
+void	osc_sample_edl_cut( void *sample,const char *path,  const char *types, void **dargv, void *raw )
 {
 	lo_arg **argv = (lo_arg**) dargv;
-
 	if(sample_edl_cut_to_buffer( sample, (uint64_t) argv[0]->h, (uint64_t) argv[1]->h ))
 		veejay_msg(VEEJAY_MSG_INFO, "Cut frames %lld - %lld to buffer",argv[0]->h,argv[1]->h);
 	else
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to cut frames %lld - %lld",argv[0]->h,argv[1]->h);
 }
 
-void	osc_sample_edl_copy(void *sample,const char *path,  const char *types, void **dargv )
+void	osc_sample_edl_copy(void *sample,const char *path,  const char *types, void **dargv, void *raw )
 {
 	lo_arg **argv = (lo_arg**) dargv;
-
 	if( sample_edl_copy( sample, (uint64_t) argv[0]->h,(uint64_t) argv[1]->h ))
 		veejay_msg(VEEJAY_MSG_INFO, "Copied frames %lld - %lld to buffer",argv[0]->h,argv[1]->h);
 
 	else
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to copy frames %lld - %lld",argv[0]->h,argv[1]->h);
 }
-void	osc_sample_edl_del(void *sample,const char *path,  const char *types, void **dargv )
+void	osc_sample_edl_del(void *sample,const char *path,  const char *types, void **dargv, void *raw )
 {
 	lo_arg **argv = (lo_arg**) dargv;
-
 	if( sample_edl_delete( sample, (uint64_t) argv[0]->h,(uint64_t) argv[1]->h ))
 		veejay_msg(VEEJAY_MSG_INFO, "Deleted frames %lld - %lld to buffer",argv[0]->h,argv[1]->h);
 
 	else
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to delete frames %lld - %lld",argv[0]->h,argv[1]->h);
 }
-void	osc_sample_play_forward(void *sample,const char *path,  const char *types, void **dargv )
+void	osc_sample_play_forward(void *sample,const char *path,  const char *types, void **dargv, void *raw )
 {
 	lo_arg **argv = (lo_arg**) dargv;
 	int speed = sample_get_speed( sample );
@@ -92,7 +90,7 @@ void	osc_sample_play_forward(void *sample,const char *path,  const char *types, 
             sample_set_property_ptr( sample, "speed", VEVO_ATOM_TYPE_INT,&speed);
         }
 }
-void	osc_sample_play_reverse(void *sample,const char *path,  const char *types, void **dargv )
+void	osc_sample_play_reverse(void *sample,const char *path,  const char *types, void **dargv, void *raw )
 {
 	lo_arg **argv = (lo_arg**) dargv;
 	int speed = sample_get_speed( sample );
@@ -105,7 +103,7 @@ void	osc_sample_play_reverse(void *sample,const char *path,  const char *types, 
             sample_set_property_ptr( sample, "speed", VEVO_ATOM_TYPE_INT,&speed);
         }
 }
-void	osc_sample_play_pause(void *sample,const char *path,  const char *types, void **dargv )
+void	osc_sample_play_pause(void *sample,const char *path,  const char *types, void **dargv, void *raw )
 {
 	lo_arg **argv = (lo_arg**) dargv;
 	int speed = sample_get_speed( sample );
@@ -116,7 +114,7 @@ void	osc_sample_play_pause(void *sample,const char *path,  const char *types, vo
         }
 }
 
-void	osc_sample_set_frame(void *sample,const char *path,  const char *types, void **dargv )
+void	osc_sample_set_frame(void *sample,const char *path,  const char *types, void **dargv, void *raw )
 {
 	lo_arg **argv = (lo_arg**) dargv;
 	uint64_t pos = sample_get_current_pos( sample );
@@ -135,7 +133,7 @@ void	osc_sample_set_frame(void *sample,const char *path,  const char *types, voi
                 }
 	}
 }
-void	osc_sample_set_next_frame(void *sample,const char *path,  const char *types, void **dargv )
+void	osc_sample_set_next_frame(void *sample,const char *path,  const char *types, void **dargv, void *raw )
 {
 	lo_arg **argv = (lo_arg**) dargv;
 	uint64_t pos = sample_get_current_pos( sample );
@@ -155,7 +153,7 @@ void	osc_sample_set_next_frame(void *sample,const char *path,  const char *types
 	}
 }
 
-void	osc_sample_set_prev_frame(void *sample,const char *path,  const char *types, void **dargv )
+void	osc_sample_set_prev_frame(void *sample,const char *path,  const char *types, void **dargv, void *raw )
 {
 	lo_arg **argv = (lo_arg**) dargv;
 	uint64_t pos = sample_get_current_pos( sample );
@@ -175,26 +173,25 @@ void	osc_sample_set_prev_frame(void *sample,const char *path,  const char *types
 	}
 }
 
-void	osc_sample_goto_start(void *sample, const char *path, const char *types, void **dargv )
+void	osc_sample_goto_start(void *sample, const char *path, const char *types, void **dargv, void *raw )
 {
 	uint64_t pos = sample_get_start_pos( sample );
                 sample_set_property_ptr( sample, "current_pos",
 				VEVO_ATOM_TYPE_UINT64, &pos );
-        veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld", pos);
 }
-void	osc_sample_goto_end(void *sample, const char *path, const char *types, void **dargv )
+void	osc_sample_goto_end(void *sample, const char *path, const char *types, void **dargv , void *raw)
 {
 	uint64_t pos = sample_get_end_pos( sample );
                 sample_set_property_ptr( sample, "current_pos",
 				VEVO_ATOM_TYPE_UINT64, &pos );
-        veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld", pos);
+   //     veejay_msg(VEEJAY_MSG_INFO, "Position changed to %lld", pos);
 }
-void	osc_sample_reset_fx(void *sample,const char *path,  const char *types, void **dargv )
+void	osc_sample_reset_fx(void *sample,const char *path,  const char *types, void **dargv, void *raw )
 {
 	sample_fx_chain_reset( sample );
 }
 
-void	osc_sample_reset_fx_entry( void *sample,const char *path,  const char *types, void **dargv)
+void	osc_sample_reset_fx_entry( void *sample,const char *path,  const char *types, void **dargv, void *raw)
 {
 	int fx_id = sample_extract_fx_entry_from_path(sample, path );
 	if( fx_id < 0 )
@@ -205,10 +202,9 @@ void	osc_sample_reset_fx_entry( void *sample,const char *path,  const char *type
 	 if(sample_fx_chain_entry_clear( sample, fx_id ) )
                 veejay_msg(VEEJAY_MSG_INFO, "Cleared FX slot %d",fx_id );
 }
-void	osc_sample_alpha_fx_entry( void *sample,const char *path,  const char *types, void **dargv)
+void	osc_sample_alpha_fx_entry( void *sample,const char *path,  const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
-
 	int fx_id = sample_extract_fx_entry_from_path(sample, path );
 	if( fx_id < 0 )
 	{
@@ -219,11 +215,16 @@ void	osc_sample_alpha_fx_entry( void *sample,const char *path,  const char *type
 	double alpha = argv[0]->d;
 	sample_set_fx_alpha( sample, fx_id, alpha );
 }
-
-void	osc_sample_channel_fx_entry( void *sample,const char *path,  const char *types, void **dargv)
+void	osc_sample_status_fx_entry( void *sample,const char *path,  const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
+	int fx_id = sample_extract_fx_entry_from_path(sample, path );
+	sample_set_fx_status( sample, fx_id, argv[0]->i );
+}
 
+void	osc_sample_channel_fx_entry( void *sample,const char *path,  const char *types, void **dargv, void *raw)
+{
+	lo_arg **argv = (lo_arg**) dargv;
 	int fx_id = sample_extract_fx_entry_from_path(sample, path );
 	if( fx_id < 0 )
 	{
@@ -241,10 +242,9 @@ void	osc_sample_channel_fx_entry( void *sample,const char *path,  const char *ty
                         veejay_msg(VEEJAY_MSG_ERROR, "Input channel %d set to sample %d", seq, id );
 	}
 }
-void	osc_sample_set_fx_entry( void *sample,const char *path,  const char *types, void **dargv)
+void	osc_sample_set_fx_entry( void *sample,const char *path,  const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
-
 	int fx_id = sample_extract_fx_entry_from_path(sample, path );
 	if( fx_id < 0 )
 	{
@@ -264,10 +264,9 @@ void	osc_sample_set_fx_entry( void *sample,const char *path,  const char *types,
                                                 s,fx_id);
 	}
 }
-void 	osc_sample_bind_fx_entry( void *sample, const char *path, const char *types, void **dargv)
+void 	osc_sample_bind_fx_entry( void *sample, const char *path, const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
-
 	int fx_id = sample_extract_fx_entry_from_path(sample, path );
 	if( fx_id < 0 )
 	{
@@ -288,10 +287,10 @@ void 	osc_sample_bind_fx_entry( void *sample, const char *path, const char *type
                                                 fx_id,argv[0]->i,argv[1]->i,argv[2]->i);
        }
 }
-void 	osc_sample_release_fx_entry( void *sample, const char *path, const char *types, void **dargv)
+
+void 	osc_sample_del_bind( void *sample, const char *path, const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
-
 	int fx_id = sample_extract_fx_entry_from_path(sample, path );
 	if( fx_id < 0 )
 	{
@@ -304,13 +303,41 @@ void 	osc_sample_release_fx_entry( void *sample, const char *path, const char *t
                 veejay_msg(0,"Invalid fx entry");
                 return;
         }
- 	int error = sample_del_bind( sample, src_entry, argv[0]->i );
+	veejay_msg(0, "sample_del_bind on FX %d, Parameter %d, RFX %d, RIP %d",
+			fx_id,  argv[0]->i, argv[1]->i, argv[2]->i);
+ 	int error = sample_del_bind( sample, src_entry, fx_id, argv[0]->i,argv[1]->i, argv[2]->i );
         if( error == VEVO_NO_ERROR )
         {
             veejay_msg(0, "Detached output parameter %d on entry %d", argv[0]->i,fx_id );
         }
 }
-void 	osc_sample_bind_osc_fx_entry( void *sample, const char *path, const char *types, void **dargv)
+
+void 	osc_sample_release_fx_entry( void *sample, const char *path, const char *types, void **dargv, void *raw)
+{
+	lo_arg **argv = (lo_arg**) dargv;
+	int fx_id = sample_extract_fx_entry_from_path(sample, path );
+	if( fx_id < 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Outside chain boundary");
+		return;
+	}
+        void *src_entry = sample_get_fx_port_ptr( sample,fx_id );
+        if(src_entry == NULL )
+        {
+                veejay_msg(0,"Invalid fx entry");
+                return;
+        }
+
+//@ delete entire port!
+	
+ 	int error = sample_del_bind_occ( sample, src_entry,argv[0]->i,fx_id);
+        if( error == VEVO_NO_ERROR )
+        {
+            veejay_msg(0, "Detached output parameter %d on entry %d", argv[0]->i,fx_id );
+        }
+}
+
+/*void 	osc_sample_bind_osc_fx_entry( void *sample, const char *path, const char *types, void **dargv)
 {
 	lo_arg **argv = (lo_arg**) dargv;
 
@@ -345,57 +372,182 @@ void	osc_sample_parameter_sender_start( void *sample,const char *path,  const ch
 void	osc_sample_parameter_sender_stop( void *sample,const char *path,  const char *types, void **dargv)
 {
 	sample_close_osc_sender( sample );
-}
+}*/
 
-void	osc_sample_config_record(void *sample,const char *path,  const char *types, void **dargv)
+void	osc_sample_config_record(void *sample,const char *path,  const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
-
 	int error = sample_configure_recorder( sample,
 			argv[0]->i, (char*) &(argv[2]->s), argv[1]->i );
         if( error )
                veejay_msg(0, "Unable to configure the recorder");
 }
-void	osc_sample_record_start(void *sample,const char *path,  const char *types, void **dargv)
+void	osc_sample_record_start(void *sample,const char *path,  const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
-
 	int error = sample_start_recorder( sample );
         if( error )
                veejay_msg(0, "Unable to start the sample recorder");
 }
-void	osc_sample_record_stop(void *sample,const char *path,  const char *types, void **dargv)
+void	osc_sample_record_stop(void *sample,const char *path,  const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
-
 	int error = sample_stop_recorder( sample );
         if( error )
                veejay_msg(0, "Unable to stop the sample recorder");
 }
 
-void	osc_veejay_quit(void *info,const char *path,  const char *types, void **dargv)
+void	osc_veejay_ui_create_sample( void *info,const char *path,  const char *types, void **dargv, void *raw)
+{
+	lo_arg **argv = (lo_arg**) dargv;
+	int id = argv[0]->i;
+	veejay_t *v = (veejay_t*) info;
+	if( id == 0 )
+		id = sample_get_key_ptr(v->current_sample);
+	
+	veejay_create_sample_ui( info, id );
+}
+
+void	osc_veejay_ui_init( void *info,const char *path,  const char *types, void **dargv, void *raw)
+{
+	lo_arg **argv = (lo_arg**) dargv;
+	char *uri = osc_get_uri( raw );
+#ifdef STRICT_CHECKING
+	assert( uri != NULL );
+#endif	
+	veejay_add_client( info,  uri );
+
+	veejay_init_ui( info, uri );
+
+	free(uri);
+}
+void	osc_veejay_setup_preview( void *info, const char *path, const char *types, void **dargv, void *raw )
+{
+	lo_arg **argv = (lo_arg**) dargv;
+
+	veejay_t *v = (veejay_t*) info;
+	if( performer_setup_preview( v, argv[0]->i, argv[1]->i ) )
+		veejay_msg(0, "Configured preview , reduce by factor %d, mode %d",argv[0]->i,argv[1]->i );
+}
+void	osc_veejay_ui_tick( void *info, const char *path, const char *types, void **dargv, void *raw )
+{
+	char *uri = osc_get_uri( raw );
+
+	samplebank_tick_ui_client( uri );
+
+	free(uri);
+
+}
+void	osc_veejay_ui_blreq_window( void *info, const char *path, const char *types, void **dargv, void *raw )
+{
+	veejay_t *v = (veejay_t*) info;
+	lo_arg **argv = (lo_arg**) dargv;
+	void *sample = find_sample( argv[0]->i );
+	if(!sample)
+	{
+		veejay_msg(0,"sample %d does not exist",argv[0]->i);
+		return;
+	}
+	vevosample_ui_get_bind_list( sample, (char*) &argv[1]->s );
+}
+
+
+void	osc_veejay_ui_ipreq_window( void *info, const char *path, const char *types, void **dargv, void *raw )
+{
+	veejay_t *v = (veejay_t*) info;
+	lo_arg **argv = (lo_arg**) dargv;
+	void *sample = find_sample( argv[0]->i );
+	if(!sample)
+	{
+		veejay_msg(0,"sample %d does not exist",argv[0]->i);
+		return;
+	}
+	if( sample_has_fx( sample, argv[1]->i ))
+	{
+		vevosample_ui_get_input_parameter_list( sample, argv[1]->i, (char*) &argv[2]->s );
+
+	}
+}
+
+void	osc_veejay_ui_bindreq_window( void *info, const char *path, const char *types, void **dargv, void *raw )
+{
+	veejay_t *v = (veejay_t*) info;
+	lo_arg **argv = (lo_arg**) dargv;
+	void *sample = find_sample( argv[0]->i );
+	if(!sample)
+	{
+		veejay_msg(0,"sample %d does not exist",argv[0]->i);
+		return;
+	}
+	if( sample_has_fx( sample, argv[1]->i ))
+	{
+		vevosample_ui_construct_fx_bind_window( sample, argv[1]->i, argv[2]->i );
+	}
+	else
+		veejay_msg(0, "FX %d on sample %d not active", argv[0]->i,
+				argv[1]->i);
+}
+
+void	osc_veejay_clone_sample( void *info, const char *path, const char *types, void **dargv, void *raw )
+{
+	veejay_t *v = (veejay_t*) info;
+	lo_arg **argv = (lo_arg**) dargv;
+	void *sample = find_sample( argv[0]->i );
+	if(!sample)
+	{
+		veejay_msg(0,"sample %d does not exist",argv[0]->i);
+		return;
+	}
+
+	if( sample_clone_from( v, sample, v->video_info ))
+	{
+		veejay_msg(0, "Cloned sample %d" );
+	}
+
+}
+		
+void	osc_veejay_ui_request_window( void *info, const char *path, const char *types, void **dargv, void *raw )
+{
+	veejay_t *v = (veejay_t*) info;
+	lo_arg **argv = (lo_arg**) dargv;
+	void *sample = find_sample( argv[0]->i );
+	if(!sample)
+	{
+		veejay_msg(0,"sample %d does not exist",argv[0]->i);
+		return;
+	}
+	if( sample_has_fx( sample, argv[1]->i ))
+	{
+		vevosample_ui_construct_fx_window( sample, argv[1]->i );
+		veejay_msg(0,"constructed fx panel");
+	}
+	else
+		veejay_msg(0, "FX %d on sample %d not active", argv[0]->i,
+				argv[1]->i);
+}
+
+void	osc_veejay_quit(void *info,const char *path,  const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
 	veejay_change_state( info, VEEJAY_STATE_STOP );
 }
-void	osc_veejay_resize(void *info,const char *path,  const char *types, void **dargv)
+void	osc_veejay_resize(void *info,const char *path,  const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
 	veejay_resize_screen( info, argv[0]->i,argv[1]->i,argv[2]->i,argv[3]->i);
 }
-void	osc_veejay_fullscreen(void *info,const char *path,  const char *types, void **dargv)
+void	osc_veejay_fullscreen(void *info,const char *path,  const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
 	veejay_fullscreen( info, argv[0]->i );
 }
-void	osc_veejay_select( void *info,const char *path,  const char *types, void **dargv)
+void	osc_veejay_select( void *info,const char *path,  const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
 	int id = argv[0]->i;
 	veejay_t *v = (veejay_t*) info;
 	void *sample = v->current_sample;
 	void *res    = sample;
-	
 	if( id > 0 )
 	{
 		res = find_sample( id );
@@ -411,17 +563,20 @@ void	osc_veejay_select( void *info,const char *path,  const char *types, void **
         }
         else
         {
-             sample_save_cache_data( v->current_sample );
+	     veejay_msg(VEEJAY_MSG_INFO, "Play sample %d", id );
+            // sample_save_cache_data( v->current_sample );
              v->current_sample = res;
         }       
 }
-void	osc_veejay_new_sample(void *info,const char *path,  const char *types, void **dargv)
+void	osc_veejay_new_sample(void *info,const char *path,  const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
 	int    type  = argv[0]->i;
 	int    token = argv[1]->i;
 	char   *str  = &(argv[2]->s);
 	veejay_t *v  = (veejay_t*) info;
+
+	
 	void *sample = sample_new( type );
 	if(!sample)
 	{
@@ -443,12 +598,14 @@ void	osc_veejay_new_sample(void *info,const char *path,  const char *types, void
         }       
 }
 
-void	osc_veejay_del_sample(void *info,const char *path,  const char *types, void **dargv)
+void	osc_veejay_del_sample(void *info,const char *path,  const char *types, void **dargv, void *raw)
 {
 	lo_arg **argv = (lo_arg**) dargv;
 	int    id     = argv[0]->i;
 	veejay_t *v   = (veejay_t*) info;
+
 	void   *sample = find_sample(id);
+
 	if(sample == v->current_sample)
 		veejay_msg(0, "Cannot delete current playing sample");
 	else
@@ -456,16 +613,16 @@ void	osc_veejay_del_sample(void *info,const char *path,  const char *types, void
 			veejay_msg(0, "Deleted sample %d", id );
 }
 
-void	osc_sample_print( void *sample,const char *path,  const char *types, void **dargv)
+void	osc_sample_print( void *sample,const char *path,  const char *types, void **dargv, void *raw)
 {
 	sample_osc_namespace( sample );
 }
 
-
+/*
 void	osc_sample_khagan( void *sample,const char *path,  const char *types, void **dargv)
 {
 	sample_produce_khagan_file( sample );
-}
+}*/
 
 
 static struct
@@ -478,6 +635,7 @@ static struct
 } fx_events_[] = {
 	{	"clear",	NULL, {NULL,NULL,NULL,NULL },	"Delete plugin"	,		osc_sample_reset_fx_entry },
 	{	"alpha",	"d",  {"Alpha value 0.0 - 1.0",NULL,NULL,NULL }, "Opacity",	osc_sample_alpha_fx_entry },
+	{	"status",	"i",  {"On=1, Off=0",NULL,NULL,NULL }, "Status",		osc_sample_status_fx_entry },
 	{	"input_channel","ii", {"Input Channel", "Sample ID", NULL,NULL}, "Set a plugin's input channel",
 												osc_sample_channel_fx_entry },
 	{	"set",		"s",  {"FX plugin name", NULL,NULL,NULL }, "Initialize a plugin",
@@ -487,12 +645,16 @@ static struct
 			 	       "Input Parameter ID",
 				       NULL }, "Bind output parameter to some input parameter",
 											osc_sample_bind_fx_entry },
-	{	"release",	NULL, { NULL,NULL,NULL }, "Release bind between output and input parameter",
+	{	"release",	"i", { NULL,NULL,NULL }, "Release bind between output and input parameter",
 											osc_sample_release_fx_entry },
-	{	"bind_osc",	"s",  { "OSC message", NULL,NULL,NULL }, "Bind an OSC Path to an output parameter",
+	{	"unbind",	"iii", { "Output parameter ID",
+					"Bind to FX entry",
+					"Input Parameter ID",NULL }, "Release a single bind",
+											osc_sample_del_bind },
+	/*{	"bind_osc",	"s",  { "OSC message", NULL,NULL,NULL }, "Bind an OSC Path to an output parameter",
 											osc_sample_bind_osc_fx_entry },
 	{	"release_osc",	NULL, { NULL,NULL,NULL,NULL},	"Release OSC Path",
-											osc_sample_release_osc_fx_entry },
+											osc_sample_release_osc_fx_entry }, */
 	{	NULL,		NULL, { NULL,NULL,NULL,NULL},	NULL,				NULL	}
 };
 
@@ -506,11 +668,11 @@ static struct
 } sample_generic_events_[] =
 {
 	{	"reset_fx",	NULL,	{ NULL,NULL,NULL,NULL }, "Delete all plugins",			osc_sample_reset_fx },
-	{	"register_param_sender","ss", { "Address" , "Port Number",NULL,NULL },
+/*	{	"register_param_sender","ss", { "Address" , "Port Number",NULL,NULL },
 	      							 "Initialize a new OSC sender",
 							 						osc_sample_parameter_sender_start },
 	{ 	"unregister_param_sender", NULL, { NULL, NULL,NULL,NULL },"Close OSC sender",
-													osc_sample_parameter_sender_stop },
+													osc_sample_parameter_sender_stop },*/
 	{	"rec/config",	"iis", { "Format", "Frames", "Filename" , NULL },"Configure sample recorder",
 													osc_sample_config_record },
 	{	"rec/start",	NULL,	{ NULL,NULL,NULL,NULL },"Start recording from sample",
@@ -518,7 +680,7 @@ static struct
 	{	"rec/stop",	NULL,	{ NULL,NULL,NULL,NULL },"Stop recording from sample",
 													osc_sample_record_stop },
 	{	"print",	NULL,	{ NULL,NULL,NULL,NULL },"Print OSC namespace",			osc_sample_print	},
-	{	"khagan",	NULL,	{ NULL,NULL,NULL,NULL },"Write XML file for khagan",		osc_sample_khagan },
+//	{	"khagan",	NULL,	{ NULL,NULL,NULL,NULL },"Write XML file for khagan",		osc_sample_khagan },
 	{ 	NULL,	NULL,		{ NULL,NULL,NULL,NULL },NULL,					NULL },
 	
 };
@@ -564,7 +726,16 @@ static struct
 	{	"select", "i",		{ "Sample ID", NULL,NULL,NULL },"Select a sample",		osc_veejay_select },
 	{	"new"	, "iis",	{ "Sample Type", "Numeric value", "Filename" , NULL }, "Create a new sample", osc_veejay_new_sample },
 	{	"del"	, "i",		{ "Sample ID", NULL, NULL, NULL },"Delete sample",		osc_veejay_del_sample },
-	{ 	NULL,	NULL,		{ NULL,NULL,NULL,NULL },			NULL },
+	{	"ui"	, NULL,		{ NULL,NULL , NULL,NULL}, "Remote is UI ",	osc_veejay_ui_init },
+	{	"show"  , "i",		{ "Sample ID", NULL, NULL, NULL }, "View a sample",		osc_veejay_ui_create_sample },
+	{	"request", "ii",	{ "Sample ID" , "FX Id",NULL,NULL }, "Request fx panel",	osc_veejay_ui_request_window },
+	{	"bindreq", "iii",	{ "Sample ID" , "FX Id","Parameter ID",NULL }, "Request a bind panel",	osc_veejay_ui_bindreq_window },
+	{	"ipreq", "iis",		{ "Sample ID" , "FX Id","Window Name",NULL }, "Request a parameter list",osc_veejay_ui_ipreq_window },
+	{	"blreq", "is",		{ "Sample ID" , "Window Name",NULL,NULL }, "Request a bind list",osc_veejay_ui_blreq_window },
+	{	"tick", NULL,		{ NULL,NULL,NULL,NULL },		"UI is still alive",	osc_veejay_ui_tick },
+	{	"previewconfig","ii",	{ "Reduce Factor", "Preview Mode",NULL,NULL }, "Configure preview", osc_veejay_setup_preview },
+	{	"clone",	"i",  { "Sample ID", NULL, NULL,NULL }, "Clone sample", osc_veejay_clone_sample },
+	{ 	NULL,	NULL,		{ NULL,NULL,NULL,NULL },		NULL,	NULL },
 
 };
 

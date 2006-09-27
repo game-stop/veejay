@@ -420,6 +420,25 @@ AM_PATH_XML2(2.5.4, [
 	fi
 fi
 
+glib_modules="glib-2.0 >= 2.4"
+PKG_CHECK_MODULES(GLIB, [$glib_modules])
+AC_SUBST(GLIB_CFLAGS)
+AC_SUBST(GLIB_LIBS)
+
+gtk_modules="gtk+-2.0 >= 2.4"
+PKG_CHECK_MODULES(GTK, [$gtk_modules])
+AC_SUBST(GTK_CFLAGS)
+AC_SUBST(GTK_LIBS)
+
+libglade_modules="libglade-2.0 >= 2.2.0"
+PKG_CHECK_MODULES(GLADE, [$libglade_modules])
+AC_SUBST(GLADE_CFLAGS)
+AC_SUBST(GLADE_LIBS)
+
+dnl get the genmarshal command for the *.list files 
+GLIB_GENMARSHAL=`pkg-config --variable=glib_genmarshal glib-2.0` 
+AC_SUBST(GLIB_GENMARSHAL)
+
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
@@ -796,6 +815,7 @@ bio2jack/Makefile
 vevosample/Makefile
 veejay/Makefile
 tools/Makefile
+ui/Makefile
 man/Makefile
 veejay-config
 veejay.pc

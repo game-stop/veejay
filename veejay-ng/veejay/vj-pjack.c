@@ -31,7 +31,6 @@ static int bits_per_sample = 0;
 static unsigned long audio_rate = 0;
 static int audio_channels = 0;
 static int audio_bps = 0;
-static int buffer_len = 0;
 static unsigned long v_rate = 0;
 
 extern void veejay_msg(int type, const char format[], ...);
@@ -46,6 +45,10 @@ static int _vj_jack_start(int *dri)
 	const char *port_name = NULL;
 	unsigned long port_flags = JackPortIsPhysical;
 	unsigned int port_count=0;
+
+veejay_msg(0, "Opening JACK %d bps, %d rate, %d channels",
+		bits_per_sample, audio_rate, audio_channels );
+	
 	int err = JACK_OpenEx(dri, bits_per_sample,&audio_rate,0,audio_channels, &port_name, port_count, port_flags);
 	switch(err)
 	{
@@ -86,7 +89,6 @@ int vj_jack_init(int bits_ps, int audio_chans, int rate)
 	audio_rate = rate;
 	audio_channels = audio_chans;
 	bits_per_sample = bits_ps;
-	buffer_len = vj_jack_get_space();
 	if( !_vj_jack_start(&driver) )
 		return 0;
 
@@ -127,7 +129,6 @@ int	vj_jack_reset()
 {
 	veejay_msg(0, "%s: RESET",__FUNCTION__ );
 	JACK_Reset(driver);
-	buffer_len = 0;
 	return 1;
 }
 
@@ -138,7 +139,9 @@ int	vj_jack_c_play(void *data, int len, int entry)
 
 int	vj_jack_play(void *data, int len)
 {
-	return  JACK_Write(driver,data,len);
+	int res;
+	res = JACK_Write(driver,data,len);
+	veejay_msg(0, "\tWrote %d/%d bytes to jack",res,len);
 }
 
 int	vj_jack_set_volume(int volume)
@@ -160,16 +163,11 @@ int	vj_jack_resume()
 	return 1;
 }
 
-int	vj_jack_get_space()
-{
-	return JACK_GetBytesFreeSpace(driver);
-}
-
 long	vj_jack_get_status(long int *sec, long int *usec)
 {
 //JACK_GetPosition(int deviceID, enum pos_enum position, int type);
 
-	return JACK_OutputStatus( driver , sec, usec ) + JACK_GetJackOutputLatency( driver ) + (JACK_GetJackBufferedBytes(driver) * 2);
+	return JACK_OutputStatus( driver , sec, usec ); + JACK_GetJackOutputLatency( driver ) + (JACK_GetJackBufferedBytes(driver) * 2);
 
 }
 #endif

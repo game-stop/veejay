@@ -2,7 +2,7 @@
 
 SUBDIRS = bio2jack libhash libvjmsg libvjmem 
 SUBDIRS += libvevo libplugger libvjnet libyuv libel libvjaudio vevosample veejay
-SUBDIRS += tools man
+SUBDIRS += tools ui man
 
 
 #

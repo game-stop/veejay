@@ -52,4 +52,12 @@ int vj_server_setup(veejay_t *info);
 
 int veejay_init_project_from_args( veejay_t *info, int w, int h, float fps, int inter, int norm, int fmt,
 		int audio, int rate, int n_chan, int bits, int display );
+
+
+
+void	veejay_lock( veejay_t *info, const char *f );
+
+void	veejay_unlock( veejay_t *info, const char *f );
+
+
 #endif

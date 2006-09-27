@@ -121,6 +121,8 @@ typedef struct
 //	void			*mcast_socket;
 	void			*osc_server;
 	void			*osc_namespace;
+	void			*clients;
+	char			*current_client;
 	int			current_link;
 	int			port_offset;
 	int			use_display;

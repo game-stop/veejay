@@ -238,7 +238,7 @@ static int check_command_line_options(int argc, char *argv[])
 	}
 	
     }
-    if (optind > argc)
+    if (optind > argc || argc <= 1)
 	nerr++;
 
     if (nerr)
@@ -409,6 +409,8 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
+	veejay_msg(VEEJAY_MSG_INFO, "Entering veejay");
+	
 	if(!veejay_main(info))
 	{
 	    veejay_msg(VEEJAY_MSG_ERROR, "Cannot start main playback cycle");

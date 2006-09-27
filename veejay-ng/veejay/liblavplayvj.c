@@ -77,6 +77,7 @@
 #include <libvevo/libvevo.h>
 #include <vevosample/vevosample.h>
 #include <vevosample/defs.h>
+#include <vevosample/uifactory.h>
 #include <libplugger/plugload.h>
 #include <veejay/libveejay.h>
 #include <veejay/gl.h>
@@ -135,7 +136,7 @@ int	veejay_osc_verify_format( void *vevo_port, char const *types )
 	return 0;
 }
 
-int		veejay_osc_property_calls_event( void *instance, const char *path, char *types, void **argv[] )
+int		veejay_osc_property_calls_event( void *instance, const char *path, char *types, void **argv[], void *raw )
 {
 	veejay_t *v = (veejay_t*) instance;
 	void *vevo_port = v->osc_namespace;
@@ -154,7 +155,7 @@ int		veejay_osc_property_calls_event( void *instance, const char *path, char *ty
 				error = vevo_property_get( port, "func",0,&f );
 				if( error == VEVO_NO_ERROR )
 				{
-					(*f)( instance,path, types, argv );
+					(*f)( instance,path, types, argv,raw );
 					return 1;
 				}
 			}
@@ -472,8 +473,6 @@ int	veejay_push_results( veejay_t *info )
 {
 	sample_video_info_t *vid_info = info->video_info;
 
-	// must lock!
-	
 	VJFrame *ref = performer_get_output_frame( info );
 
 	switch( info->use_display )
@@ -489,6 +488,26 @@ int	veejay_push_results( veejay_t *info )
 
 	return 1;
 }
+
+
+void	veejay_lock( veejay_t *info , const char *f)
+{
+//	veejay_msg(0, "%s locks", f);
+	int n = pthread_mutex_lock( &(info->vevo_mutex) );
+#ifdef STRICT_CHECKING
+	assert( n == 0 );
+#endif
+}
+
+void	veejay_unlock( veejay_t *info, const char *f )
+{
+	int n = pthread_mutex_unlock( &(info->vevo_mutex) );
+#ifdef STRICT_CHECKING
+	assert(n == 0 );
+#endif
+//	veejay_msg(0, "%s unlocks",f);
+}
+
 
 //! Veejay Software Playback thread
 /**!
@@ -602,8 +621,6 @@ int veejay_open(veejay_t * info)
 	memset( &(settings->lastframe_completion), 0, sizeof(struct timeval));
 	pthread_mutex_init(&(settings->valid_mutex), NULL);
 	pthread_mutex_init(&(settings->syncinfo_mutex), NULL);
-	pthread_mutex_init( &(info->vevo_mutex), 0 );
-
 	/* Invalidate all buffers, and initialize the conditions */
 	settings->valid[0] = 0;
 	settings->buffer_entry[0] = 0;
@@ -750,22 +767,36 @@ int veejay_close(veejay_t * info)
 
 void	veejay_deinit(veejay_t *info)
 {
-	//vj_event_stop();
-	samplebank_free();
+	char **items = vevo_list_properties( info->clients );
+	int i;
+	if(items!=NULL)
+	{
+		for( i = 0; items[i] != NULL ; i ++ )
+		{
+			void *s = NULL;
+			if(vevo_property_get(info->clients, items[i],0,&s)==VEVO_NO_ERROR)
+				veejay_free_osc_sender( s );
+			free(items[i]);		
+		}
+		free(items);
+	}
+	
         
         veejay_osc_del_methods( info,info->osc_namespace,info ,info);
+	//vj_event_stop();
+	samplebank_free();
 
 	vevo_port_recursive_free( info->osc_namespace );
 
-
+	vevo_port_free( info->clients );
 	
 //	vj_server_shutdown(info->status_socket);
 //	vj_server_shutdown(info->command_socket);
 //	vj_server_shutdown(info->frame_socket);
-	veejay_free_osc_server(info->osc_server );
 	
 	plug_sys_free();
-	performer_destroy(info);
+	if(info->performer)
+		performer_destroy(info);
     	vj_el_deinit();		
 }
 
@@ -874,69 +905,13 @@ int veejay_init(veejay_t * info)
 	veejay_msg(VEEJAY_MSG_INFO, "Loading plugins");
 	int n = plug_sys_detect_plugins();
 	veejay_msg(VEEJAY_MSG_INFO, "\tPlugin(s) loaded:   %d", n);
-//	veejay_msg(VEEJAY_MSG_INFO,"Loaded %d Plugins",n);
-	
-/*	vj_event_init();
 
-	if(!vj_server_setup(info))
-    	{
-	    veejay_msg(0, "Cannot setup service");
-	    return -1;
-    	}
-	else
-	{	
-		veejay_msg(VEEJAY_MSG_INFO, "TCP/UDP service (port range %d-%d)",
-				info->port_offset, info->port_offset+5);
-	}*/
-
-
+	if(info->itu601)
+		veejay_msg(VEEJAY_MSG_INFO, "\tKeep video data in ITU601");
 	vj_el_set_itu601_preference( info->itu601 );
 
-
-	//load_video_settings
-	//
-	//
-/*	if(sample_fx_set( id, 0,5 ))
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Loaded effect 2");
-		sample_fx_set_in_channel(id,0,0,id );
-		//sample_set_fx_alpha( sample, 0,100 );
-		sample_toggle_process_entry( sample, 0, 1 );
-	}*/
-/*	if(sample_fx_set( id, 1,2 ))
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Loaded effect 2");
-		sample_fx_set_in_channel(id,1,0,id );
-		//sample_set_fx_alpha( sample, 0,100 );
-		sample_toggle_process_entry( sample, 1, 1 );
-	}*/
-
-
-	//sample_cache_data( info->current_sample );
-
-	/*	
-	if(info->current_edit_list->has_audio) {
-		if (vj_perform_init_audio(info) == 0)
-			veejay_msg(VEEJAY_MSG_INFO, "Initialized Audio Task");
-		else
-			veejay_msg(VEEJAY_MSG_ERROR, 
-				"Unable to initialize Audio Task");
-	}
-
-	int fmt = 0;
-	veejay_msg(VEEJAY_MSG_DEBUG, "PF == %d", info->pixel_format);
-	if( info->pixel_format == 0 )
-		fmt = PIX_FMT_YUV420P;
-	else
-		fmt = PIX_FMT_YUV422P;
-	if( !vj_server_setup(info) )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Setting up server");
-		return -1;
-	}
-*/
-
 //	pthread_mutex_init( &(info->display_mutex), 0 );
+
 	if(info->use_display==1)
 	{
 		info->sdl_display = vj_sdl_allocate(
@@ -945,13 +920,6 @@ int veejay_init(veejay_t * info)
 				vid_info->fmt );
 		vj_sdl_init( info->sdl_display, 352,288, "Veejay", 1, 0 );
 	}
-
-    /* After we have fired up the audio and video threads system (which
-     * are assisted if we're installed setuid root, we want to set the
-     * effective user id to the real user id
-     */
-
-    
 
 	if (seteuid(getuid()) < 0)
 	{
@@ -963,19 +931,21 @@ int veejay_init(veejay_t * info)
        
 	if (!veejay_set_playback_rate(info, vid_info->fps,
 				 vid_info->norm )) {
+		veejay_msg(VEEJAY_MSG_ERROR,
+				"Cannot set video playback rate");
 		return -1;
 	}
 
-	veejay_change_state( info, VEEJAY_STATE_PLAYING );  
-
-
-	
 	if(veejay_open(info) != 1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, 
 	    		"Unable to initialize the threading system");
 		return -1;   
       	}
+
+	veejay_change_state( info, VEEJAY_STATE_PLAYING );  
+
+	
 	return 0;
 }
 
@@ -1236,6 +1206,133 @@ static void *veejay_playback_thread(void *data)
     return NULL;
 }
 
+
+void	veejay_create_sample_ui( veejay_t *info, int id )
+{
+	void *sample = find_sample(id);
+	if(sample)
+	{
+		char *window = vevosample_construct_ui( sample );
+		vevosample_construct_ui_fx_chain( sample );
+		free(window);
+	}
+}
+
+void	veejay_add_client( veejay_t *info, char *uri )
+{
+	char server_port_name[10];
+#ifdef STRICT_CHECKING
+	assert( uri != NULL );
+#endif
+	char *server 	 = veejay_osc_server_get_addr( info->osc_server );
+	int   server_port= veejay_osc_server_get_port( info->osc_server );	
+
+	sprintf( server_port_name, "%d", server_port );
+	
+	veejay_msg(0, "Veejay server '%s' communicates with %s" ,server,uri );
+
+	void *ui = veejay_new_osc_sender_uri( uri );
+	veejay_send_osc( ui, "/veejay", "sx", server );
+	int error = vevo_property_set( info->clients, uri, VEVO_ATOM_TYPE_VOIDPTR,1,&ui );
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR );
+#endif
+	samplebank_send_all_samples( ui );
+
+	samplebank_tick_ui_client( uri );
+}
+
+void	*veejay_get_osc_sender(veejay_t * info )
+{
+	void *sender = NULL;
+	if(!info->current_client)
+		return NULL;
+#ifdef STRICT_CHECKING
+	assert( info->current_client != NULL );
+	assert( info->clients != NULL );
+#endif
+	int error = vevo_property_get( info->clients, info->current_client, 0, &sender );
+	if( error == VEVO_NO_ERROR )
+		return sender;
+	return NULL;
+}
+
+void	*veejay_get_osc_sender_by_uri( veejay_t *info , const char *uri )
+{
+	void *sender = NULL;
+	int error = vevo_property_get( info->clients, uri, 0, &sender );
+	if( error == VEVO_NO_ERROR )
+		return sender;
+	return NULL;
+
+}
+
+void	veejay_set_current_client( veejay_t *info, char *uri )
+{
+	if(info->current_client)
+		free(info->current_client);
+	info->current_client = strdup(uri);
+//	veejay_msg(0, "current client is '%s'", info->current_client );
+}
+
+void	veejay_init_ui(veejay_t * info , const char *uri)
+{
+#ifdef STRICT_CHECKING
+	assert( info->current_sample != NULL );
+#endif
+	char veejaystr[100];
+	sprintf(veejaystr, "Veejay-NG %s", VERSION );
+//veejay_msg(0, "%s : %s", __FUNCTION__, uri );
+//	veejay_set_current_client( info,uri );
+	void *sender = veejay_get_osc_sender( info );
+#ifdef STRICT_CHECKING
+	assert( sender != NULL );
+#endif
+
+/*	char *window = vevosample_construct_ui(info->current_sample );
+	vevosample_construct_ui_fx_all( info->current_sample );
+	free(window);*/
+	veejay_osc_set_window( sender , "MainWindow" );
+
+	veejay_ui_bundle_add( sender, 
+			"/create/window","ssx", "MainWindow", veejaystr );
+	veejay_ui_bundle_add( sender,
+			"/create/frame", "sssx", "MainWindow", "VeejayPanel",
+			" " );
+
+	double row = (double) samplebank_guess_row_sequence( info->current_sample );
+
+/*	void *msg = veejay_message_new_pulldown( sender,
+			"MainWindow","VeejayPanel","combobox_playlist","Play",
+			"/veejay/select",
+			row, "Click a sample to play" );
+	
+	samplebank_push_pulldown_items( sender, msg );
+
+	veejay_message_pulldown_done( sender, msg );
+
+	void *msg2 = veejay_message_new_pulldown( sender,
+			"MainWindow","VeejayPanel","combobox_editlist","Edit",
+			"/veejay/show",
+		        0.0, "Click a sample to edit"	);
+	
+	samplebank_push_pulldown_items( sender, msg2 );
+	veejay_message_pulldown_done( sender, msg2 );*/
+
+	
+	char tmp[128];
+	sprintf(tmp, "%s", "/veejay/fullscreen" );
+	vevosample_ui_new_switch( info->current_sample, "MainWindow" , "VeejayPanel","Check", "Fullscreen",0, tmp, "Toggle between window and fullscreen" );
+	sprintf(tmp, "%s","/veejay/quit");
+	vevosample_ui_new_button( info->current_sample,"MainWindow" , "VeejayPanel", "Quit Veejay", tmp, "Request veejay to stop processing" );
+	
+	
+	veejay_ui_bundle_add( sender,
+			"/show/window", "sx", "MainWindow" );
+//	samplebank_send_all_samples( sender );
+
+}
+
 int vj_server_setup(veejay_t * info)
 {
 	int port = info->port_offset;
@@ -1256,12 +1353,9 @@ int vj_server_setup(veejay_t * info)
 	const char port_str[50];
 	sprintf(port_str, "%d",port );
 	info->osc_server = veejay_new_osc_server( (void*)info, port_str );
-#ifdef STRICT_CHECKING
-	info->osc_namespace = vevo_port_new( VEVO_ANONYMOUS_PORT, __FUNCTION__, __LINE__ );
-#else
-	info->osc_namespace = vevo_port_new( VEVO_ANONYMOUS_PORT );
-#endif
+	info->osc_namespace = vpn( VEVO_ANONYMOUS_PORT );
 	veejay_osc_namespace_events( (void*) info, "/veejay");
+	
 	
 //	info->mcast_socket =
 //			vj_server_alloc(port, info->settings->vims_group_name, V_CMD );
@@ -1343,6 +1437,7 @@ veejay_t *veejay_malloc()
 	info->settings->first_frame = 1;
 	info->settings->state = VEEJAY_STATE_STOP;
 	info->port_offset = 3490;// VJ_PORT;
+	info->clients = vpn( VEVO_ANONYMOUS_PORT);
 
 	samplebank_init();
 	available_diskspace();	
@@ -1383,6 +1478,7 @@ int veejay_main(veejay_t * info)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
+	veejay_msg(VEEJAY_MSG_INFO, "Flushing buffers");
 
     /* Flush the Linux File buffers to disk */
     sync();
@@ -1392,6 +1488,8 @@ int veejay_main(veejay_t * info)
 	ret = pthread_attr_setdetachstate( &(settings->qtattr),
 			PTHREAD_CREATE_DETACHED );*/
 	
+	pthread_mutex_init( &(info->vevo_mutex), NULL );
+
 
     /* fork ourselves to return control to the main app */
     if (pthread_create(&(settings->playback_thread), NULL, //&(settings->qtattr),

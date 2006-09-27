@@ -64,27 +64,16 @@ Example FX
 
 For this to work, you need to grab pluginpack from the repository
 and edit the ~.veejay/plugins file to include the path to the installed
-plugins
+plugins. 
 
 
 sayOSC localhost 3490 s /sample_1/fx_0/set LVDPhotoplay
 sayOSC localhost 3490 i /sample_1/fx_0/fx_status 1
 
 
-If you need a GUI, you can use Khagan
-http://khagan.berlios.de/
-Veejay dumps .kh files in the directory where you started it.
+If you need a GUI, you can use 'veejayui'
 
-$ sayOSC localhost 3490 /sample_1/khagan
-$ khagan
-   File -> Open -> sample_1.kh
-
-Otherwise,
-
-See the updated namespace:
-sayOSC localhost 3490 0 /sample_1/print
-
-sayOSC localhost 3490 i /sample_1/fx_0/photoplay/square_size 23
+veejayui localhost
 
 
 CONTACT / FEEDBACK & HELP
@@ -95,14 +84,5 @@ Niels Elburg <nelburg@looze.net>
 Please use the mailinglist on 
   http://veejay.sourceforge.net
 
-BUG REPORTS / BLEEDING EDGE SOURCE CODE
-=======================================
-
-Please use the ticket system !
-
-http://veejay.dyne.org
-
-
-ENJOY! And let us know about your performances/installations with veejay! 
 
 

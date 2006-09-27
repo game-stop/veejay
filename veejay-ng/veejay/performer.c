@@ -31,6 +31,7 @@
 #include <libvjmsg/vj-common.h>
 #include <vevosample/vevosample.h>
 #include <libyuv/yuvconv.h>
+#include <lo/lo.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -352,6 +353,8 @@ long	performer_audio_start( veejay_t *info )
 	assert( rate > 0 );
 	assert( bits > 0 );
 #endif
+
+	
 	int res = vj_jack_init( bits, chans, rate );
 	if( res <= 0 )
 	{
@@ -363,7 +366,12 @@ long	performer_audio_start( veejay_t *info )
 	{
 		info->audio = AUDIO_PLAY;
 		p->resampler =	vj_audio_init( PERFORM_AUDIO_SIZE * 32 , chans,1 );
-
+		veejay_msg(0, "Playing Audio %d, %d channels, %d bits, %d bps",
+				rate,chans,bits,bps );
+#ifdef STRICT_CHECKING
+		veejay_msg(0, "Audio support is broken");
+		assert(0);
+#endif
 	}
 
 	return rate;
@@ -430,7 +438,11 @@ void	performer_audio_restart( veejay_t *info )
 void	performer_destroy( veejay_t *info )
 {
 	performer_t *p = (performer_t*) info->performer;
-	subsample_free( p->sampler );
+#ifdef STRICT_CHECKING
+	assert( p != NULL );
+#endif
+	if(p->sampler)
+		subsample_free( p->sampler );
   	if(p->in_frames)
                 vevo_port_free( p->in_frames );
 	int i;
@@ -504,12 +516,15 @@ static	uint8_t *performer_fetch_audio_frames( veejay_t *info, int *gen_samples )
 	{
 		n_samples = 0;
 	}
+
+	veejay_msg("%s: has_audio=%d, n_samples=%d, speed=%d",__FUNCTION__,has_audio,n_samples, speed );
+	
 	if( n_samples == 0 )
 	{
 		sample_get_property_ptr(info->current_sample, "audio_spas", &n_samples );
 		if(!has_audio)
 		{
-			veejay_msg(0, "%s: Not playing audio, faking samples to 1764");
+			veejay_msg(0, "%s: Not playing audio, faking samples to 1764", __FUNCTION__);
 			*gen_samples = 1764;
 			memset( f->data,0 , PERFORM_AUDIO_SIZE);
 			return f->data;
@@ -523,11 +538,26 @@ static	uint8_t *performer_fetch_audio_frames( veejay_t *info, int *gen_samples )
 	else
 	{
 		res = sample_get_audio_frame( info->current_sample,f, abs(speed) );
+		veejay_msg(0, "\tsample_get_audio_frame: %d result to buf %p", res, f->data);
+#ifdef STRICT_CHECKING
+		assert( f->rate == 44100 );
+		assert( f->num_chans = 2 );
+		assert( f->bps = 4 );
+		assert( f->bits = 16 );
+#endif
 	}
 
 	uint8_t *out = (speed == 1 || speed == -1 ? f->data : k->data );
+
+	k->rate = f->rate;
+	k->num_chans = f->num_chans;
+	k->bps = f->bps;
+	k->bits = f->bits;
+	
 	uint8_t *in  = f->data;
 		
+	veejay_msg(0, "\tOut buffer is %p, inbuffer is %p", out, in);
+
 	if( speed < 0 )
 	{
 		vj_audio_sample_reverse( in, q->data, n_samples, f->bps );
@@ -538,6 +568,12 @@ static	uint8_t *performer_fetch_audio_frames( veejay_t *info, int *gen_samples )
 	int slow = sample_get_repeat( info->current_sample );
 	if( (speed > 1 || speed < -1 || slow) && has_audio)
 	{
+		int b_samples = n_samples;
+
+		veejay_msg(0, "\tInput buffer: %x,%x,%x,%x,%x",
+				f->data[0],f->data[1],f->data[2],f->data[3],f->data[4]);
+		
+		
 		n_samples = vj_audio_resample_data( p->resampler,
 				in,
 				k->data,
@@ -545,9 +581,16 @@ static	uint8_t *performer_fetch_audio_frames( veejay_t *info, int *gen_samples )
 				f->num_chans,
 				abs(speed),
 				slow,
-				f->samples,
+				res,
 				n_samples );
 		out = k->data;
+			veejay_msg(0, "\tOutput buffer: %x,%x,%x,%x,%x",
+				out[0],out[1],out[2],out[3],out[4]);
+		
+		
+
+		veejay_msg(0, "\tn_samples: %d, f->bps=%d, f->chans=%d, f->samples=%d, n_samples=%d",
+				n_samples, f->bps, f->num_chans, f->samples, b_samples );
 	}
 	*gen_samples = n_samples;
 	
@@ -594,6 +637,10 @@ void	performer_save_frame( veejay_t *info )
  */
 int	performer_queue_audio_frame( veejay_t *info, int skipa )
 {
+	if(info->audio != AUDIO_PLAY || skipa)
+		return 1;
+
+	
 	static uint8_t *buffer_ = NULL;
 	static int	j_samples_ = 0;
 	static int	samples_played_ =0;
@@ -607,26 +654,28 @@ int	performer_queue_audio_frame( veejay_t *info, int skipa )
 	AFrame *q = p->audio_buffers[2];
 	int res = 0;
 	int n_samples_ = 0;
-	if(info->audio != AUDIO_PLAY)
-		return 1;
-
 	int frame_repeat = sample_get_repeat_count( info->current_sample );
 	int nf		 = sample_get_repeat( info->current_sample );
-	if( frame_repeat == 0 && !skipa)
+	if( frame_repeat == 0 )
 	{
 		buffer_ =	performer_fetch_audio_frames( info,  &n_samples_ );
 		j_samples_ = (nf>0 ? n_samples_ / (nf+1) : n_samples_);
 		samples_played_ = 0;
 	}
+
+	veejay_msg(0, "\tSkipa=%d,nf=%d,j_samples=%d, n_samples_=%d,samples_played=%d",
+			skipa,nf,j_samples_, n_samples_, samples_played_ );
+	
 	
 	if(nf == 0)
 	{
-		if(!skipa) vj_jack_play( buffer_, f->bps * n_samples_ );
+		veejay_msg(0,"\tplaying %d samples, %d bytes, buffer %p", n_samples_, f->bps * n_samples_, buffer_ );
+		vj_jack_play( buffer_, f->bps * n_samples_ );
 	}
 
 	if( nf > 0)
 	{
-		if(!skipa) vj_jack_play( buffer_ + (samples_played_ * f->bps), f->bps * j_samples_ );
+		vj_jack_play( buffer_ + (samples_played_ * f->bps), f->bps * j_samples_ );
 		samples_played_ += j_samples_;
 	}
 #endif	
@@ -667,6 +716,7 @@ static int	performer_fetch_frames( veejay_t *info, void *samples_needed)
 			sprintf(key,"%p", Sk );
 			vevo_property_set( p->in_frames, key, VEVO_ATOM_TYPE_VOIDPTR, 1, &value );
 		}
+		
 		n_fetched++;
 		
 		free(fetch_list[k]);
@@ -709,12 +759,15 @@ static	void	performer_preview_frame_greyscale( VJFrame *src, VJFrame *dst, int r
 	{
 		case PREVIEW_50:
 			performer_down_scale_plane1x2( src->data[0], src->len, dst->data[0]);
+			dst->len = src->len / 2;
 			break;
 		case PREVIEW_25:
 			performer_down_scale_plane1x4( src->data[0], src->len, dst->data[0]);
+			dst->len = src->len / 4;
 			break;
 		case PREVIEW_125:
 			performer_down_scale_plane1x8( src->data[0], src->len, dst->data[0]);
+			dst->len = src->len / 8;
 			break;
 		default:
 			break;	
@@ -729,17 +782,22 @@ static	void	performer_preview_frame_color( VJFrame *src, VJFrame *dst, int reduc
 			performer_down_scale_plane1x2( src->data[0], src->len, dst->data[0]);
 			performer_down_scale_plane1x2( src->data[1], src->uv_len, dst->data[1]);
 			performer_down_scale_plane1x2( src->data[2], src->uv_len, dst->data[2]);
+			dst->len = src->len / 2;
+			dst->uv_len = src->uv_len / 2;
 			break;
 		case PREVIEW_25:
 			performer_down_scale_plane1x4( src->data[0], src->len, dst->data[0]);
 			performer_down_scale_plane1x4( src->data[1], src->uv_len, dst->data[1]);
 			performer_down_scale_plane1x4( src->data[2], src->uv_len, dst->data[2]);
-
+			dst->len = src->len / 4;
+			dst->uv_len = src->uv_len / 4;
 			break;
 		case PREVIEW_125:
 			performer_down_scale_plane1x8( src->data[0], src->len, dst->data[0]);
 			performer_down_scale_plane1x8( src->data[1], src->uv_len, dst->data[1]);
 			performer_down_scale_plane1x8( src->data[2], src->uv_len, dst->data[2]);
+			dst->len = src->len / 8;
+			dst->uv_len = src->uv_len / 8;
 
 			break;
 		default:
@@ -756,11 +814,12 @@ static	void	performer_preview_frame_color( VJFrame *src, VJFrame *dst, int reduc
  \return Error code
  */
 
-int		performer_setup_preview( veejay_t *info, performer_t *p, int reduce, int preview_mode )
+int		performer_setup_preview( veejay_t *info,int reduce, int preview_mode )
 {
      //@ use LZO for fast compression
      video_playback_setup *settings = info->settings;
-	
+     performer_t *p = info->performer;
+
      switch( preview_mode )
      {
 		case PREVIEW_NONE:
@@ -808,25 +867,17 @@ static	int	performer_push_out_frames( void *sample, performer_t *p, int i )
 
 static	int	performer_push_in_frames( void *sample, performer_t *p, int i )
 {
-	int ni = 0;
+	int ni = 0,k;
 	int error = 0;
+	int n_channels = 0;
+	void *channels = sample_scan_in_channels( sample, i,&n_channels );
+	if(!channels || n_channels <= 0)
+		return 0;
 
-//	void *channels = sample_get_fx_port_channels_ptr( sample,i );
-	void *channels = sample_scan_in_channels( sample, i );
-#ifdef STRICT_CHECKING
-	assert( channels != NULL );
-#endif
 	char **list = vevo_list_properties( channels );
 	if( list == NULL )
 		return 0;
 
-	int tmp1 = 0, tmp2= 0;
-	error = vevo_property_get( channels , "n_in_channels" , 0, &tmp1 );
-#ifdef STRICT_CHECKING
-			assert(error == VEVO_NO_ERROR);
-#endif
-
-	int k;
 	for( k = 0; list[k] != NULL ; k ++ )		
 	{
 		char key[64];
@@ -854,11 +905,14 @@ static	int	performer_push_in_frames( void *sample, performer_t *p, int i )
 	}
 	free(list);
 	
-	return tmp1;
+	return n_channels;
 }
 
 static	int	performer_render_entry( veejay_t *info, void *sample, performer_t *p, int i)
 {
+#ifdef STRICT_CHECKING
+	assert( sample != NULL );
+#endif
 	double opacity = sample_get_fx_alpha( sample, i );
 	char key[64];
 	int error = 0;
@@ -922,16 +976,53 @@ static	int	performer_render_entry( veejay_t *info, void *sample, performer_t *p,
 static void	performer_render_frame( veejay_t *info, int i )
 {
 	void *cs = info->current_sample;
+#ifdef STRICT_CHECKING
+	assert( cs != NULL );
+#endif
 	performer_t *p = (performer_t*) info->performer;
 	p->display = p->ref_buffer[0];
 	for( i = 0; i < SAMPLE_CHAIN_LEN; i ++ )
 	{ 
-		if( sample_process_entry( cs, i ))
+		if( sample_get_fx_status( cs, i ))
 		{
 			if(performer_render_entry( info, cs,p, i ))
 				p->display = p->out_buffers[p->last];
 		}
 	}
+}
+
+static	void	performer_render_preview( veejay_t *info )
+{
+	performer_t *p = (performer_t*) info->performer;
+ 	video_playback_setup *settings = info->settings;
+	int n_planes = 0;
+	lo_blob planes[3];
+
+	void *sender = veejay_get_osc_sender( info );
+	if(!sender)
+		return;
+	
+	switch(settings->preview )
+	{
+		case PREVIEW_NONE:
+			return;
+		case PREVIEW_GREYSCALE:
+			performer_preview_frame_greyscale(
+				p->display, p->preview_bw, info->preview_size );
+			planes[0] = lo_blob_new( p->preview_bw->len, p->preview_bw->data[0] );
+			veejay_bundle_add_blob( sender, "/update/preview", planes[0] );
+			break;
+		case PREVIEW_COLOR:
+			performer_preview_frame_color( p->display, p->preview_col, info->preview_size );
+			planes[0] = lo_blob_new( p->preview_col->len, p->preview_col->data[0] );
+			planes[1] = lo_blob_new( p->preview_col->uv_len, p->preview_col->data[1] );
+			planes[2] = lo_blob_new( p->preview_col->uv_len, p->preview_col->data[2] );
+			veejay_bundle_add_blobs( sender, "/update/preview", planes[0],planes[1],planes[2]);
+			break;
+	}
+
+	
+
 }
 
 //! Build a list of frames to fetch and fetch it
@@ -941,29 +1032,24 @@ static void	performer_render_frame( veejay_t *info, int i )
  */
 int	performer_queue_frame( veejay_t *info, int skip_incr )
 {
+	video_playback_setup *settings = info->settings;
+
 	performer_t *p = (info->performer);
 #ifdef STRICT_CHECKING
 	assert( info->current_sample != NULL );
 #endif
-
-#ifdef STRICT_CHECKING
-	void *queue_list = vevo_port_new( VEVO_ANONYMOUS_PORT, __FUNCTION__ , __LINE__ );
-	assert( queue_list != NULL );
-#else
+	veejay_lock( info,__FUNCTION__ );
+	
 	void *queue_list =
-		vevo_port_new( VEVO_ANONYMOUS_PORT );//ll
-#endif
+		vpn( VEVO_ANONYMOUS_PORT );//ll
 	int i;
 	int error = 0;
+	int dummy = 0;
 
-
-	pthread_mutex_lock( &(info->vevo_mutex));
-	
 	if(!skip_incr)
 	{
 		char key[64];
 		sprintf(key, "%p", info->current_sample );
-	//	sprintf(key, "slot0", info->current_sample );
 		error = vevo_property_set( queue_list, key, VEVO_ATOM_TYPE_VOIDPTR,1,&(info->current_sample));
 #ifdef STRICT_CHECKING
 		assert( error == VEVO_NO_ERROR );
@@ -973,33 +1059,36 @@ int	performer_queue_frame( veejay_t *info, int skip_incr )
 	//@ lock
 	for( i = 0; i < SAMPLE_CHAIN_LEN; i ++ )
 	{ 
-		if( sample_process_entry( info->current_sample, i ))
+		if( sample_get_fx_status( info->current_sample, i ))
 		{
-			void *channels = sample_scan_in_channels( info->current_sample, i );
-			error = vevo_special_union_ports( channels, queue_list );
+			void *channels = sample_scan_in_channels( info->current_sample, i , &dummy);
+			if(channels)
+			{
+				error = vevo_special_union_ports( channels, queue_list );
 #ifdef STRICT_CHECKING
-			assert( error == VEVO_NO_ERROR );
+				if( error != VEVO_NO_ERROR )
+					veejay_msg(0,"Internal error while intersecting ports: %d", error );
+				assert( error == VEVO_NO_ERROR );
 #endif
+			}
 		}
 	}
-#ifdef STRICT_CHECKING
-	p->in_frames = vevo_port_new( VEVO_ANONYMOUS_PORT, __FUNCTION__ , __LINE__ );
-#else
 	/* Build reference list */
-	p->in_frames = vevo_port_new( VEVO_ANONYMOUS_PORT );
-#endif
+	p->in_frames = vpn( VEVO_ANONYMOUS_PORT );
 	performer_fetch_frames( info, queue_list  );
 	
 	performer_render_frame(info, p);
-
-	pthread_mutex_unlock( &(info->vevo_mutex));
-
-	//@ unlock
+	
+	performer_render_preview( info );	
+	
+	samplebank_flush_osc(info, info->clients);
 
 	vevo_port_free( queue_list );
 	vevo_port_free( p->in_frames );
+
 	p->in_frames = NULL;
-	
+
+	veejay_unlock( info, __FUNCTION__);
 	return 0;
 }
 
