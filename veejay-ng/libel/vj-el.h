@@ -85,4 +85,6 @@ uint64_t        *vj_el_edit_copy( void *edl, uint64_t start, uint64_t end, uint6
 int             vj_el_edit_del( void *edl, uint64_t start, uint64_t end );
 int             vj_el_edit_paste( void *edl, uint64_t destination, uint64_t *frame_list, uint64_t len);
 
+char		**vj_el_get_file_list(void *edl);
+
 #endif

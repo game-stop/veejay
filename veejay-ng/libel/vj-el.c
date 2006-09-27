@@ -1165,6 +1165,8 @@ int	vj_el_get_audio_frame(void *edl, uint32_t nframe, void *dav, int n_packets)
 		return -1;
     }
     av->samples = ns1 - ns0;
+    veejay_msg(0,"\tr=%d,bits=%d,bps=%d,chans=%d,samples=%d",
+		    av->rate,av->bits,av->bps,av->num_chans, av->samples );
     return av->samples;
 
 }
@@ -2102,3 +2104,18 @@ float	vj_el_get_fps(void *edl)
 	editlist *el = (editlist*) edl;
 	return el->video_fps;
 }
+
+char	**vj_el_get_file_list( void *edl )
+{
+	editlist *el = (editlist*) edl;
+	if( el->num_video_files <= 0 )
+		return NULL;
+	char **res   = (char**) malloc(sizeof(char*) * 
+			(el->num_video_files+1) );
+	int i;
+	for( i = 0; i < el->num_video_files ; i ++ )
+		res[i] = strdup( el->video_file_list[i] );
+	res[el->num_video_files] = NULL;
+	return res;
+}	
+
