@@ -76,7 +76,8 @@ int			veejay_sequence_send( void *data , int vims_id, const char format[], ... )
 {
 	
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
-
+	if(!v) return 0;
+	
 	g_mutex_lock( v->mutex );
 	gint ret = 0;
 	gchar	block[255];	
@@ -104,6 +105,7 @@ int			veejay_sequence_send( void *data , int vims_id, const char format[], ... )
 gchar			*veejay_sequence_get_track_list( void *data, int slen, int *bytes_written )
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
+	if(!v) return NULL;
 	g_mutex_lock( v->mutex );
 	
 	char message[10];
@@ -251,6 +253,8 @@ void		veejay_get_status( void *data, guchar *dst )
 GdkPixbuf	*veejay_get_image( void *data, gint *error)
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
+	if(!v) return NULL;
+
 	gint ret = 0;
 	g_mutex_lock( v->mutex );
 	GTimeVal time_val;
@@ -302,6 +306,7 @@ GdkPixbuf	*veejay_get_image( void *data, gint *error)
 void		veejay_configure_sequence( void *data, gint w, gint h )
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
+	if(!v) return;
 	g_mutex_lock( v->mutex );
 
 	
@@ -352,6 +357,7 @@ static	int	veejay_process_data( veejay_sequence_t *v )
 void	*veejay_sequence_thread(gpointer data)
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
+	if(!v) return;
 
 	unsigned long tn = vj_get_timer() + v->preview_delay;
 	for ( ;; )
@@ -386,8 +392,7 @@ void	*veejay_sequence_thread(gpointer data)
 void	veejay_abort_sequence( void *data )
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
-	if(!v)
-		return;
+	if(!v)	return;
 
 	g_mutex_lock(v->mutex);
 	v->abort = 1;
@@ -399,6 +404,7 @@ void	veejay_abort_sequence( void *data )
 void	veejay_toggle_image_loader( void *data, gint state )
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
+	if(!v) return;
 	g_mutex_lock(v->mutex);
 	v->preview = state;
 	g_mutex_unlock(v->mutex);
@@ -407,6 +413,8 @@ void	veejay_toggle_image_loader( void *data, gint state )
 void	veejay_sequence_preview_delay( void *data, double value )
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
+	if(!v) return;
+
 	g_mutex_lock(v->mutex);
 	gint max = 4 * 100000;
 	v->preview_delay = (unsigned long)( value * (double) max);

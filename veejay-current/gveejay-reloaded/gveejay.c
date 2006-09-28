@@ -116,6 +116,7 @@ static int      set_option( const char *name, char *value )
                 err++;
         return err;
 }
+static volatile gulong g_trap_free_size = 0;
 
 int main(int argc, char *argv[]) {
         char option[2];
@@ -138,6 +139,8 @@ int main(int argc, char *argv[]) {
 
         if( err ) usage(argv[0]);
 
+//	g_mem_set_vtable( glib_mem_profiler_table );
+	
 	if( !g_thread_supported() )
 	{
 	     g_thread_init(NULL);
@@ -145,7 +148,8 @@ int main(int argc, char *argv[]) {
         }
 
 	gtk_init( NULL,NULL );
-	
+
+
 	vj_gui_theme_setup(gveejay_theme);
 	vj_gui_set_debug_level( verbosity , n_tracks,pw,ph);
 	vj_gui_set_timeout(timer);

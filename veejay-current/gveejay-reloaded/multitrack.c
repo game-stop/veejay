@@ -104,7 +104,7 @@ typedef struct
 	int	quit;
 } multitracker_t;
 
-static  void	(*img_cb)(GdkPixbuf *p, GdkPixbuf *b);
+static  void	(*img_cb)(GdkPixbuf *p, GdkPixbuf *b, GtkImage *img);
 static	void	(*gui_cb)(int, char*, int);
 static	int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len, int *port_num);
 static	void	add_buttons( mt_priv_t *p, sequence_view_t *seqv , GtkWidget *w);
@@ -530,7 +530,7 @@ static gboolean	update_sequence_widgets( gpointer data )
 #ifdef STRICT_CHECKING
 	assert( n == 18 );
 #endif
-/*	p->status_lock = 1;
+	p->status_lock = 1;
 
 	int pm = array[PLAY_MODE];
 	int i;
@@ -538,12 +538,12 @@ static gboolean	update_sequence_widgets( gpointer data )
 		p->status_cache[i] = array[i];
 
 	
-//	update_widgets(array, p, pm);
+	update_widgets(array, p, pm);
 
 	int *his = p->history[ pm ];	
 	for( i  =  0; i < 18; i ++ )
 		his[i] = array[i];
-	p->status_lock = 0;*/
+	p->status_lock = 0;
 	return TRUE;
 }
 
@@ -690,7 +690,15 @@ void		setup_geometry( int w, int h, int n_tracks,int pw, int ph )
 	sta_h = ph;
 }
 
-void		*multitrack_new( void (*f)(int,char*,int), void (*g)(GdkPixbuf *),GtkWidget *win, GtkWidget *box ,GtkWidget *msg, gint max_w, gint max_h, GtkWidget *main_preview_area)
+void		*multitrack_new(
+		void (*f)(int,char*,int),
+		void (*g)(GdkPixbuf *, GdkPixbuf *, GtkImage *),
+		GtkWidget *win,
+		GtkWidget *box,
+		GtkWidget *msg,
+		gint max_w,
+		gint max_h,
+		GtkWidget *main_preview_area)
 {
 	max_w = 352;
 	max_h = 288;
@@ -698,7 +706,7 @@ void		*multitrack_new( void (*f)(int,char*,int), void (*g)(GdkPixbuf *),GtkWidge
 	all_priv_t *pt = NULL;
 
 	logo_img_ = load_logo_image();
-
+	
 	mt = (multitracker_t*) malloc(sizeof(multitracker_t));
 	memset( mt, 0, sizeof(multitracker_t));
 
@@ -855,7 +863,7 @@ int		multitrack_add_track( void *data )
 			G_UNLOCK( mt_lock );
 			return 0;
 		}
-	//	pt->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) pt->pt[track] );
+		pt->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) pt->pt[track] );
 	
 		veejay_configure_sequence( seq, preview_width_, preview_height_ );
 
@@ -900,7 +908,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 		return 0;
 	}
 	
-//	a->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) a->pt[track] );
+	a->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) a->pt[track] );
 	veejay_configure_sequence( seq, preview_width_, preview_height_ );
 
 	a->pt[track]->sequence = seq;
@@ -1361,7 +1369,7 @@ GdkPixbuf 	*dummy_image()
 #ifdef STRICT_CHECKING
 	assert( logo_img_ != NULL );
 #endif
-	GdkPixbuf *dst = gdk_pixbuf_copy(logo_img_);
+	GdkPixbuf *dst = gdk_pixbuf_copy(src);
 
 	float 	val = logo_value_;
 	if( val > 2.0 || val <= 0.0)
@@ -1370,6 +1378,7 @@ GdkPixbuf 	*dummy_image()
 	logo_value_ = val;
 
 	gdk_pixbuf_saturate_and_pixelate(src,dst, val, FALSE );
+
 	g_usleep( 100000 );
 	return dst; 
 }
@@ -1384,20 +1393,19 @@ void 	*mt_preview( gpointer user_data )
 
 	for( ;; )
 	{
-//restart:
 		G_LOCK( mt_lock );
 		mt_priv_t *lt = a->pt[LAST_TRACK];
 		gint error = 0;
-
 		memset( cache, 0, (MAX_TRACKS+2) * sizeof(GdkPixbuf*));
-
 		if(mt->quit)
 		{
+			veejay_msg(0, "Stopping multitrack");
 			G_UNLOCK( mt_lock );
 			g_thread_exit(NULL);
 		}
 		if(!lt->preview )
 		{
+		//	cache[LAST_TRACK] = load_logo_image();
 			cache[LAST_TRACK] = dummy_image();
 #ifdef STRICT_CHECKING
 			assert( cache[LAST_TRACK] != NULL );
@@ -1407,46 +1415,15 @@ void 	*mt_preview( gpointer user_data )
 		{
 			cache[LAST_TRACK] = veejay_get_image( lt->sequence, &error );	
 			if( error )
+			{
 				delete_data( mt->data, LAST_TRACK ); 
+				cache[LAST_TRACK] = NULL;
+			}
 		}
-/*
-		if(lt->active && lt->preview && vj_gui_yield())
-		{
-fprintf(stderr, "Get Image\n");
-			cache[LAST_TRACK] = veejay_get_image( lt->sequence, &error );	
-			if( error )
-				delete_data( mt->data, LAST_TRACK ); 
-	char path[1024];
-			bzero(path,1024);
-			get_gd(path,NULL, "veejay-logo.png");
-fprintf(stderr, "Simulate image\n");
-			GdkPixbuf *src = gdk_pixbuf_new_from_file( path,NULL );
-			GdkPixbuf *dst = gdk_pixbuf_new_from_file( path,NULL );
-
-			gdk_pixbuf_saturate_and_pixelate(src,dst, drand48() * 2.0, TRUE );
-			gdk_pixbuf_unref( src);
-			cache[LAST_TRACK] = dst;
-			//g_usleep(50000);
-
-		}
-		else
-		{
-			char path[1024];
-			bzero(path,1024);
-			get_gd(path,NULL, "veejay-logo.png");
-fprintf(stderr, "Simulate image\n");
-			GdkPixbuf *src = gdk_pixbuf_new_from_file( path,NULL );
-			GdkPixbuf *dst = gdk_pixbuf_new_from_file( path,NULL );
-
-			gdk_pixbuf_saturate_and_pixelate(src,dst, drand48() * 2.0, TRUE );
-			gdk_pixbuf_unref( src);
-			cache[LAST_TRACK] = dst;
-			//g_usleep(50000);
-		}*/
 
 		int ref = find_sequence( a );
 
-		if( mt->sensitive ) //&& lt->preview )
+		if( mt->sensitive ) 
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
 			mt_priv_t *p = a->pt[i];
@@ -1460,9 +1437,9 @@ fprintf(stderr, "Simulate image\n");
 			}
 		}
 
-		G_UNLOCK(mt_lock );
+		//@ scale image
 		
-		if( ref >= 0  && lt->preview && cache[LAST_TRACK] ) //&& lt->active)
+		if( ref >= 0  && lt->preview && cache[LAST_TRACK] ) 
 		{
 			cache[ref] = gdk_pixbuf_scale_simple(
 					cache[LAST_TRACK],
@@ -1478,25 +1455,9 @@ fprintf(stderr, "Simulate image\n");
 			ir = gdk_pixbuf_scale_simple( cache[LAST_TRACK],
 					352,288,GDK_INTERP_NEAREST );
 		}
-
-		//@ NOW Lock buffer and copy cache !!]
-/*		atomic_copy( ir, cache[LAST_TRACK] );
-
-		if(ir)
-			gdk_pixbuf_unref( ir );
-		if(cache[LAST_TRACK])
-			gdk_pixbuf_unref( cache[LAST_TRACK] );
-
-		for( i = 0; i < MAX_TRACKS ; i ++ )
-		{
-			mt_priv_t *p = a->pt[i];
-			if(cache[i])
-				gdk_pixbuf_unref(cache[i]);
-			cache[i] = NULL;
-		}*/
-
+		G_UNLOCK(mt_lock );
 		
-		
+		//@ update gtk
 		gdk_threads_enter();
 		if( mt->sensitive )
 			for( i = 0; i < MAX_TRACKS ; i ++ )
@@ -1505,6 +1466,7 @@ fprintf(stderr, "Simulate image\n");
 				if(cache[i])
 				{
 					GtkImage *image = GTK_IMAGE( p->view->area );
+					gtk_image_clear( image );
 					gtk_image_set_from_pixbuf( image, cache[i] );
 					gtk_widget_queue_draw( image );
 				}
@@ -1512,25 +1474,27 @@ fprintf(stderr, "Simulate image\n");
 
 		if(lt->active && ir)
 		{
-			GtkImage *image = GTK_IMAGE( lt->view->area );
-			gtk_image_set_from_pixbuf( image, ir );
-			img_cb( cache[LAST_TRACK], ir );
+		//	GtkImage *image = GTK_IMAGE( lt->view->area );
+			img_cb( cache[LAST_TRACK], ir, GTK_IMAGE( lt->view->area ) );
 		}
-		gdk_threads_leave();	
 
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
 			mt_priv_t *p = a->pt[i];
 			if(cache[i])
 				gdk_pixbuf_unref(cache[i]);
+			cache[i] = NULL;
 		}
-		if(ir)
-			gdk_pixbuf_unref(ir);
 		if(cache[LAST_TRACK])
+		{
 			gdk_pixbuf_unref(cache[LAST_TRACK]);
-
-		
-		g_usleep( 30000 );	
+			cache[LAST_TRACK] = NULL;
+		}
+		gdk_threads_leave();
+		//@ clear our buffer
+		if( ir ) 
+			gdk_pixbuf_unref(ir);	
+		ir = NULL;
 	}
 }
 

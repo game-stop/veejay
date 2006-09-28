@@ -2,7 +2,15 @@
 #define MULTITRACK_H
 
 
-void		*multitrack_new( void(*f)(int,char*,int), void(*g)(GdkPixbuf *), GtkWidget *win, GtkWidget *box , GtkWidget *msg , gint w, gint h, GtkWidget *area);
+void		*multitrack_new(
+		void(*f)(int,char*,int), 
+		void(*g)(GdkPixbuf *, GdkPixbuf *, GtkImage *),
+		GtkWidget *win,
+		GtkWidget *box,
+		GtkWidget *msg,
+		gint w,
+		gint h,
+		GtkWidget *area);
 
 void		multitrack_open( void *data );
 

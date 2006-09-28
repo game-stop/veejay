@@ -104,6 +104,7 @@ struct _TimelineSelection
 	gboolean	has_stepper;
 	gboolean	clear;
 	gdouble		stepper_size;   /* size of triangle */
+	gdouble		stepper_draw_size;
 	gdouble		stepper_length; /* length from top to bottom */
 	gint		step_size;	/* step frames 1,2,4,8,16, ... */
 	gdouble		frame_width;
@@ -367,7 +368,8 @@ static	void	timeline_init( TimelineSelection *te )
 	te->grab_button = 0;
 	te->has_stepper = TRUE;
 	te->has_selection = FALSE;
-	te->stepper_size = 12; // 8 x 8 pixels
+	te->stepper_size = 16; // 8 x 8 pixels
+	te->stepper_draw_size = 12;
 	te->stepper_length = 0;
 	te->frame_height = 10;
 	te->font_line = 12;	
@@ -728,12 +730,12 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 		te->stepper.height = te->stepper_size;
 
 	//	cairo_set_line_width( cr, 0.16 );
-		cairo_move_to( cr, x1 - te->stepper_size, 0.0 * height );
-		cairo_rel_line_to( cr, te->stepper_size, te->stepper_size  );
-		cairo_rel_line_to( cr, te->stepper_size, -te->stepper_size  );
-		cairo_rel_line_to( cr, -2.0 * te->stepper_size, 0 );
+		cairo_move_to( cr, x1 - te->stepper_draw_size, 0.0 * height );
+		cairo_rel_line_to( cr, te->stepper_draw_size, te->stepper_draw_size  );
+		cairo_rel_line_to( cr, te->stepper_draw_size, -te->stepper_draw_size  );
+		cairo_rel_line_to( cr, -2.0 * te->stepper_draw_size, 0 );
 		cairo_set_line_join( cr, CAIRO_LINE_JOIN_MITER);
-		cairo_move_to(cr, x1, te->stepper_size   );
+		cairo_move_to(cr, x1, te->stepper_draw_size   );
 		cairo_rel_line_to( cr, 0.0, te->stepper_length );
 		cairo_stroke(cr);
 		//cairo_fill_preserve(cr);
