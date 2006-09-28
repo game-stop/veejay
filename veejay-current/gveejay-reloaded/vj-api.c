@@ -5756,7 +5756,9 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 					gui->status_tokens[i] = history[i];
 			}
 		//	printf ( "[%s]\n", gui->status_msg );
+			gdk_threads_enter();
 			update_gui();
+			gdk_threads_leave();
 		}
 		gui->status_lock = 0;
 
