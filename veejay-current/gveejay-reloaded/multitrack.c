@@ -1,4 +1,4 @@
-/* Gveejay Reloaded - graphical interface for VeeJay
+3/* Gveejay Reloaded - graphical interface for VeeJay
  * 	     (C) 2002-2005 Niels Elburg <nelburg@looze.net> 
  *
  *
@@ -30,6 +30,7 @@
 
 #define SEQ_BUTTON_CLOSE 0
 #define SEQ_BUTTON_RULE  1
+
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -118,14 +119,41 @@ static int	find_track( multitracker_t *mt, const char *host, int port );
 static	int	preview_width_ = 0;
 static  int     preview_height_ = 0;
 
+static	int	mpreview_width_ = 0;
+static  int	mpreview_height_ = 0;
+
 static volatile int	MAX_TRACKS = 4;
 static volatile int	LAST_TRACK = 0;
-static volatile int     sta_w = 112;
-static volatile int     sta_h = 96;
+static int     sta_w = 112;
+static int     sta_h = 96;
 
 static	GdkPixbuf	*logo_img_ = NULL;
 static	float		logo_step_ = 0.1;
 static	float		logo_value_ = 1.0;
+
+static	void	gtk_image_set_from_pixbuf__( GtkImage *w, GdkPixbuf *p, const char *f, int l )
+{
+	veejay_msg(0, "%s called by %s: %d" , __FUNCTION__, f, l );
+	gtk_image_set_from_pixbuf(w, p);
+}
+
+
+static	void	gtk_widget_set_sensitive__( GtkWidget *w, gboolean state, const char *f, int l )
+{
+	veejay_msg(0, "%s called by %s: %d", __FUNCTION__, f, l );
+#ifdef STRICT_CHECKING
+	assert( GTK_IS_WIDGET(w) );
+#endif
+	gtk_widget_set_sensitive(w, state );
+}
+
+#ifdef STRICT_CHECKING
+#define gtk_image_set_from_pixbuf_(w,p) gtk_image_set_from_pixbuf__( w,p, __FUNCTION__,__LINE__ );
+#define gtk_widget_set_sensitive_( w,p ) gtk_widget_set_sensitive__( w,p,__FUNCTION__,__LINE__ )
+#else
+#define gtk_image_set_from_pixbuf_(w,p) gtk_image_set_from_pixbuf(w,p)
+#define gtk_widget_set_sensitive_( w,p ) gtk_widget_set_sensitive(w,p)
+#endif
 
 void	multitrack_preview_master(void *data, int status)
 {
@@ -146,7 +174,7 @@ void	multitrack_preview_master(void *data, int status)
 	{
 		mt_priv_t *p = pt->pt[ n ];
 		gtk_toggle_button_set_active( 	
-			GTK_TOGGLE_BUTTON( p->view->toggle ), status );
+			GTK_TOGGLE_BUTTON( p->view->toggle ), status == 0 ? FALSE: TRUE);
 	}
 	
 	G_UNLOCK(mt_lock);
@@ -374,7 +402,7 @@ static	void	add_buttons( mt_priv_t *p, sequence_view_t *seqv , GtkWidget *w)
 		gtk_widget_show( seqv->buttons[i] );
 
 	}
-//	gtk_widget_set_sensitive( w, FALSE );
+//	gtk_widget_set_sensitive_( w, FALSE );
 }
 static	void	add_buttons2( mt_priv_t *p, sequence_view_t *seqv , GtkWidget *w)
 {
@@ -396,7 +424,7 @@ static	void	add_buttons2( mt_priv_t *p, sequence_view_t *seqv , GtkWidget *w)
 		gtk_widget_show( seqv->buttons2[i] );
 
 	}
-//	gtk_widget_set_sensitive( w, FALSE );
+//	gtk_widget_set_sensitive_( w, FALSE );
 }
 
 static	void	update_timeline( mt_priv_t *p, gint total, gint current )
@@ -471,25 +499,25 @@ static	void	playmode_sensitivity( mt_priv_t *p, gint pm )
 {
 	if( pm == MODE_STREAM )
 	{
-		gtk_widget_set_sensitive( GTK_WIDGET( p->view->button_box2 ), FALSE );
-		gtk_widget_set_sensitive( GTK_WIDGET( p->view->button_box ), FALSE );
-		gtk_widget_set_sensitive( GTK_WIDGET( p->view->sliders_[0] ), FALSE );
-		gtk_widget_set_sensitive( GTK_WIDGET( p->view->timeline_ ), FALSE );
-		gtk_widget_set_sensitive( GTK_WIDGET( p->view->sliders_[1] ), TRUE );
+		gtk_widget_set_sensitive_( GTK_WIDGET( p->view->button_box2 ), FALSE );
+		gtk_widget_set_sensitive_( GTK_WIDGET( p->view->button_box ), FALSE );
+		gtk_widget_set_sensitive_( GTK_WIDGET( p->view->sliders_[0] ), FALSE );
+		gtk_widget_set_sensitive_( GTK_WIDGET( p->view->timeline_ ), FALSE );
+		gtk_widget_set_sensitive_( GTK_WIDGET( p->view->sliders_[1] ), TRUE );
 	}
 	else
 	{
 		if( pm == MODE_SAMPLE || pm == MODE_PLAIN )
 		{
-			gtk_widget_set_sensitive( GTK_WIDGET( p->view->button_box2 ), TRUE );
-			gtk_widget_set_sensitive( GTK_WIDGET( p->view->button_box ), TRUE );
-			gtk_widget_set_sensitive( GTK_WIDGET( p->view->sliders_[0] ), TRUE );
-			gtk_widget_set_sensitive( GTK_WIDGET( p->view->timeline_ ), TRUE );
+			gtk_widget_set_sensitive_( GTK_WIDGET( p->view->button_box2 ), TRUE );
+			gtk_widget_set_sensitive_( GTK_WIDGET( p->view->button_box ), TRUE );
+			gtk_widget_set_sensitive_( GTK_WIDGET( p->view->sliders_[0] ), TRUE );
+			gtk_widget_set_sensitive_( GTK_WIDGET( p->view->timeline_ ), TRUE );
 		}
 		if( pm == MODE_SAMPLE )
-			gtk_widget_set_sensitive( GTK_WIDGET( p->view->sliders_[1] ), TRUE );
+			gtk_widget_set_sensitive_( GTK_WIDGET( p->view->sliders_[1] ), TRUE );
 		else
-			gtk_widget_set_sensitive( GTK_WIDGET( p->view->sliders_[1] ), FALSE );
+			gtk_widget_set_sensitive_( GTK_WIDGET( p->view->sliders_[1] ), FALSE );
 	}
 }
 
@@ -597,9 +625,9 @@ static	void	delete_data( void *data, int index )
 
 	if(p->used)
 	{
-//		gtk_widget_set_sensitive( GTK_WIDGET(p->view->toggle), FALSE );
-		gtk_widget_set_sensitive( GTK_WIDGET(p->view->panel),FALSE);
-		set_logo( p->view->area );
+//		gtk_widget_set_sensitive_( GTK_WIDGET(p->view->toggle), FALSE );
+		gtk_widget_set_sensitive_( GTK_WIDGET(p->view->panel),FALSE);
+		if(index!=LAST_TRACK) set_logo( p->view->area );
 		free_data( p );
 	}
 	
@@ -615,11 +643,8 @@ static	GdkPixbuf	*load_logo_image( )
 
 static	void	set_logo(GtkWidget *area)
 {
-	char path[1024];
-	bzero(path,1024);
-	get_gd(path,NULL, "veejay-logo.png");
 	GdkPixbuf *buf2 = gdk_pixbuf_scale_simple( logo_img_,preview_width_,preview_height_, GDK_INTERP_BILINEAR );
-	gtk_image_set_from_pixbuf( GTK_IMAGE(area), buf2 );
+	gtk_image_set_from_pixbuf_( GTK_IMAGE(area), buf2 );
 	gdk_pixbuf_unref( buf2 );
 }
 
@@ -690,6 +715,14 @@ void		setup_geometry( int w, int h, int n_tracks,int pw, int ph )
 	sta_h = ph;
 }
 
+void		multitrack_configure_preview(int w, int h, int hw, int hh )
+{
+	preview_width_ = w;
+	preview_height_ = h;
+	mpreview_width_ = hw;
+	mpreview_height_ = hh;
+}
+
 void		*multitrack_new(
 		void (*f)(int,char*,int),
 		void (*g)(GdkPixbuf *, GdkPixbuf *, GtkImage *),
@@ -700,8 +733,6 @@ void		*multitrack_new(
 		gint max_h,
 		GtkWidget *main_preview_area)
 {
-	max_w = 352;
-	max_h = 288;
 	multitracker_t *mt = NULL;
 	all_priv_t *pt = NULL;
 
@@ -719,12 +750,16 @@ void		*multitrack_new(
 	pt = (all_priv_t*) malloc(sizeof(all_priv_t));
 	memset(pt,0,sizeof(pt));
 
-	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
-	preview_width_ = max_w / 2;
-	preview_height_ = max_h / 2;
-	gdouble mw = preview_width_ * 5;
+#ifdef STRICT_CHECKING
+	assert( preview_width_ != 0 );
+	assert( preview_height_ !=  0 );
+	assert( max_w > 0 && max_w < 1024 );
+	assert( max_h > 0 && max_h < 1024 );
+#endif
 	
-	gtk_widget_set_size_request(mt->scroll,(int)mw,max_h*1.2);
+	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
+	
+	gtk_widget_set_size_request(mt->scroll,max_w*5,max_h*1.2);
 	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),2);
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(mt->scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_ALWAYS );
 	GtkWidget *table = gtk_table_new( 1, MAX_TRACKS, FALSE );
@@ -852,7 +887,7 @@ int		multitrack_add_track( void *data )
 			G_UNLOCK( mt_lock );
 			return 0;
 		}
-		seq = veejay_sequence_init( port_num, hostname, preview_width_*2, preview_height_*2  );
+		seq = veejay_sequence_init( port_num, hostname, mpreview_width_, mpreview_height_  );
 		if(seq == NULL )
 		{
 			status_print( mt, "Error while connecting to '%s' : '%d'", hostname, port_num );
@@ -875,7 +910,7 @@ int		multitrack_add_track( void *data )
 		//	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( p->view->toggle ), 1 );
 		status_print( mt, "Track %d: Connection established with '%s' port %d\n",
 				track, hostname, port_num );
-		gtk_widget_set_sensitive( GTK_WIDGET(p->view->panel),TRUE);
+		gtk_widget_set_sensitive_( GTK_WIDGET(p->view->panel),TRUE);
 		res = 1;
 	}
 	g_free(hostname);
@@ -895,7 +930,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 	all_priv_t *a = (all_priv_t*)mt->data;
 	G_LOCK(mt_lock);
 	int track = free_slot( mt->data );
-	void *seq = veejay_sequence_init( port_num, hostname, preview_width_*2, preview_height_*2  );
+	void *seq = veejay_sequence_init( port_num, hostname, mpreview_width_, mpreview_height_  );
 			
 	if(seq == NULL )
 	{
@@ -918,12 +953,12 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 	store_data( mt->data, track, hostname, port_num );
 
 
-	multitrack_set_current( data, hostname, port_num , preview_width_*2, preview_height_*2);
+	multitrack_set_current( data, hostname, port_num , mpreview_width_, mpreview_height_);
 //	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( a->pt[track]->view->toggle ), 1 );
 	status_print( mt, "Track %d: Connection established with '%s' port %d\n",
 		track, hostname, port_num );
-	gtk_widget_set_sensitive( GTK_WIDGET(a->pt[track]->view->panel),TRUE);
-//	gtk_widget_set_sensitive( GTK_WIDGET(a->pt[track]->view->toggle),TRUE);
+	gtk_widget_set_sensitive_( GTK_WIDGET(a->pt[track]->view->panel),TRUE);
+//	gtk_widget_set_sensitive_( GTK_WIDGET(a->pt[track]->view->toggle),TRUE);
 
 	G_UNLOCK(mt_lock);
 	return track;
@@ -931,7 +966,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 
 int		multitrack_autoload( void *data, char *hostname, int port_num )
 {
-	multitrack_set_current( data, hostname, port_num , preview_width_*2, preview_height_*2);
+	multitrack_set_current( data, hostname, port_num , mpreview_width_, mpreview_height_);
 
 	return 1;
 }
@@ -1167,7 +1202,7 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 		mt->selected = p->num;
 		gui_cb( 0, strdup(p->hostname), p->port_num );
 G_LOCK(mt_lock);
-	multitrack_set_current( (void*) mt,  p->hostname, p->port_num ,preview_width_*2,preview_height_*2 );
+	multitrack_set_current( (void*) mt,  p->hostname, p->port_num ,mpreview_width_,mpreview_height_ );
 /*
 		all_priv_t *a = (all_priv_t*) mt->data;
 		mt_priv_t *last_track = a->pt[LAST_TRACK];
@@ -1191,7 +1226,7 @@ G_UNLOCK(mt_lock);
 static void sequence_preview_cb(GtkWidget *widget, gpointer user_data)
 {
     mt_priv_t *p = (mt_priv_t*) user_data;
-	veejay_toggle_image_loader( p->sequence,
+    veejay_toggle_image_loader( p->sequence,
     	gtk_toggle_button_get_active (GTK_TOGGLE_BUTTON (widget))); 
 }
 
@@ -1240,18 +1275,17 @@ static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint las
 		seqv->main_vbox = gtk_vbox_new(FALSE,0);
 		gtk_container_add( GTK_CONTAINER( seqv->frame ), seqv->main_vbox );
 		gtk_widget_show( GTK_WIDGET( seqv->main_vbox ) );
-	
 		seqv->area = gtk_image_new();
+		set_logo( seqv->area );
 	}
 	else	
 		seqv->area = main_area;
 
-	set_logo( seqv->area );
 
-	g_signal_connect( G_OBJECT( seqv->area ), 
+/*	g_signal_connect( G_OBJECT( seqv->area ), 
 				"expose_event",
 				G_CALLBACK( seqv_image_expose ),	
-				(gpointer*) p );
+				(gpointer*) p );*/
 
 	if(!last || !main_area)
 	{
@@ -1267,8 +1301,6 @@ static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint las
 			GTK_TOGGLE_BUTTON(seqv->toggle), FALSE );
 		g_signal_connect( G_OBJECT( seqv->toggle ), "toggled", G_CALLBACK(sequence_preview_cb),
 				(gpointer*)p );
-		//gtk_widget_set_sensitive( GTK_WIDGET(seqv->toggle), FALSE );
-		//gtk_container_add( GTK_CONTAINER( seqv->main_vbox ), seqv->toggle );
 		gtk_box_pack_start( GTK_BOX(seqv->main_vbox), seqv->toggle,FALSE,FALSE, 0 );
 		gtk_widget_show( seqv->toggle );
 
@@ -1352,10 +1384,11 @@ static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint las
 		gtk_widget_show( hbox );
 	
 
-		gtk_widget_set_sensitive(GTK_WIDGET(seqv->panel), FALSE );
-	}
+		gtk_widget_set_sensitive_(GTK_WIDGET(seqv->panel), FALSE );
+	
 
-	gtk_widget_show( GTK_WIDGET( seqv->area ) );
+		gtk_widget_show( GTK_WIDGET( seqv->area ) );
+	}
 
 	seqv->dim[0] = w;
 	seqv->dim[1] = h;
@@ -1371,7 +1404,7 @@ GdkPixbuf 	*dummy_image()
 #endif
 	GdkPixbuf *dst = gdk_pixbuf_copy(src);
 
-	float 	val = logo_value_;
+/*	float 	val = logo_value_;
 	if( val > 2.0 || val <= 0.0)
 		logo_step_ *= -1;
 	val += logo_step_;
@@ -1379,7 +1412,8 @@ GdkPixbuf 	*dummy_image()
 
 	gdk_pixbuf_saturate_and_pixelate(src,dst, val, FALSE );
 
-	g_usleep( 100000 );
+	g_usleep( 100000 );*/
+	g_usleep( 500000 );
 	return dst; 
 }
 			
@@ -1399,13 +1433,11 @@ void 	*mt_preview( gpointer user_data )
 		memset( cache, 0, (MAX_TRACKS+2) * sizeof(GdkPixbuf*));
 		if(mt->quit)
 		{
-			veejay_msg(0, "Stopping multitrack");
 			G_UNLOCK( mt_lock );
 			g_thread_exit(NULL);
 		}
 		if(!lt->preview )
 		{
-		//	cache[LAST_TRACK] = load_logo_image();
 			cache[LAST_TRACK] = dummy_image();
 #ifdef STRICT_CHECKING
 			assert( cache[LAST_TRACK] != NULL );
@@ -1423,7 +1455,7 @@ void 	*mt_preview( gpointer user_data )
 
 		int ref = find_sequence( a );
 
-		if( mt->sensitive ) 
+		if( mt->sensitive && lt->preview) 
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
 			mt_priv_t *p = a->pt[i];
@@ -1450,51 +1482,57 @@ void 	*mt_preview( gpointer user_data )
 
 
 		GdkPixbuf *ir = NULL;
-		if(lt->active && cache[LAST_TRACK])
+		if(lt->active && cache[LAST_TRACK] && lt->preview)
 		{
 			ir = gdk_pixbuf_scale_simple( cache[LAST_TRACK],
 					352,288,GDK_INTERP_NEAREST );
 		}
 		G_UNLOCK(mt_lock );
 		
-		//@ update gtk
-		gdk_threads_enter();
-		if( mt->sensitive )
+		if(lt->preview)
+		{
+			gdk_threads_enter();
+			if( mt->sensitive )
 			for( i = 0; i < MAX_TRACKS ; i ++ )
 			{
 				mt_priv_t *p = a->pt[i];
 				if(cache[i])
 				{
 					GtkImage *image = GTK_IMAGE( p->view->area );
-					gtk_image_clear( image );
-					gtk_image_set_from_pixbuf( image, cache[i] );
-					gtk_widget_queue_draw( image );
+					gtk_image_set_from_pixbuf_( image, cache[i] );
+				//	gtk_widget_queue_draw( image );
 				}
 			}
 
-		if(lt->active && ir)
-		{
-		//	GtkImage *image = GTK_IMAGE( lt->view->area );
-			img_cb( cache[LAST_TRACK], ir, GTK_IMAGE( lt->view->area ) );
-		}
+			if(lt->active && ir)
+			{
+				gtk_image_set_from_pixbuf_( GTK_IMAGE(lt->view->area), ir );
+				img_cb( cache[LAST_TRACK], ir, GTK_IMAGE( lt->view->area ) );
+		//	gtk_widget_queue_draw(GTK_IMAGE( lt->view->area ));
+			}
 
-		for( i = 0; i < MAX_TRACKS ; i ++ )
-		{
-			mt_priv_t *p = a->pt[i];
-			if(cache[i])
-				gdk_pixbuf_unref(cache[i]);
-			cache[i] = NULL;
+			for( i = 0; i < MAX_TRACKS ; i ++ )
+			{
+				mt_priv_t *p = a->pt[i];
+				if(cache[i])
+					gdk_pixbuf_unref(cache[i]);
+				cache[i] = NULL;
+					
+			}
+			if(cache[LAST_TRACK])
+			{
+				gdk_pixbuf_unref(cache[LAST_TRACK]);
+				cache[LAST_TRACK] = NULL;
+			}
+			if( ir ) 
+			{
+				gdk_pixbuf_unref(ir);	
+			}
+			ir = NULL;
+			gdk_threads_leave();
 		}
-		if(cache[LAST_TRACK])
-		{
-			gdk_pixbuf_unref(cache[LAST_TRACK]);
-			cache[LAST_TRACK] = NULL;
-		}
-		gdk_threads_leave();
+		g_usleep(34000);
 		//@ clear our buffer
-		if( ir ) 
-			gdk_pixbuf_unref(ir);	
-		ir = NULL;
 	}
 }
 

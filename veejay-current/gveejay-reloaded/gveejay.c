@@ -139,8 +139,6 @@ int main(int argc, char *argv[]) {
 
         if( err ) usage(argv[0]);
 
-//	g_mem_set_vtable( glib_mem_profiler_table );
-	
 	if( !g_thread_supported() )
 	{
 	     g_thread_init(NULL);
@@ -148,7 +146,11 @@ int main(int argc, char *argv[]) {
         }
 
 	gtk_init( NULL,NULL );
-
+	glade_init();
+	
+//	g_mem_set_vtable( glib_mem_profiler_table );
+	
+	vj_mem_init();
 
 	vj_gui_theme_setup(gveejay_theme);
 	vj_gui_set_debug_level( verbosity , n_tracks,pw,ph);
@@ -156,6 +158,8 @@ int main(int argc, char *argv[]) {
 	set_skin( current_skin );
 
 	default_bank_values( &col, &row );
+	
+	veejay_msg(0, "Opening skin: %s", skins[current_skin].file );
 	
 	vj_gui_init( skins[current_skin].file, launcher, hostname, port_num );
 	vj_gui_style_setup();

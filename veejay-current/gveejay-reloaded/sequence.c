@@ -328,7 +328,7 @@ static	int	veejay_process_data( veejay_sequence_t *v )
 	gint ret = 0;
 	g_mutex_lock( v->mutex );
 
-	if( v->width <= 0 || v->height <= 0 || v->preview == 0 )
+	if( v->width <= 0 || v->height <= 0 || v->preview == 0)
 	{
 		g_mutex_unlock( v->mutex );
 		return 1;
@@ -371,8 +371,8 @@ void	*veejay_sequence_thread(gpointer data)
 		{
 			if( veejay_process_status( v ) == 0 )
 			{
-				printf("Abort, status error\n");
-				return NULL;
+				//printf("Abort, status error\n");
+			//	return NULL;
 			}
 			if( time_now > tn )
 			{
@@ -385,6 +385,7 @@ void	*veejay_sequence_thread(gpointer data)
 			}
 		}	
 		g_usleep(20000);
+		
 	}
 	return NULL;	
 }
@@ -408,6 +409,13 @@ void	veejay_toggle_image_loader( void *data, gint state )
 	g_mutex_lock(v->mutex);
 	v->preview = state;
 	g_mutex_unlock(v->mutex);
+}
+
+int	veejay_sequence_active_preview( void *data )
+{
+	veejay_sequence_t *v = (veejay_sequence_t*) data;
+	if(!v) return 0;
+	return v->preview;
 }
 
 void	veejay_sequence_preview_delay( void *data, double value )

@@ -28,7 +28,6 @@ static int config_file_status = 0;
 static gchar *config_file = NULL;
 
 
-
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_SKIP_SECOND);
@@ -86,9 +85,6 @@ void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
 		}
 		multi_vims( VIMS_VIDEO_SET_FRAME, "%d", val );
 	}
-		//vj_gui_put_image();
-
-	
 }
 /*
 void	on_audiovolume_value_changed(GtkWidget *widget, gpointer user_data)
@@ -2276,8 +2272,7 @@ gboolean 	on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 {
-	info->preview_active = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(w));
-//	multitrack_preview_master( info->mt, is_button_toggled("previewtoggle"));
+	multitrack_preview_master( info->mt, is_button_toggled("previewtoggle"));
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 }
 
@@ -2296,7 +2291,7 @@ void		on_previewspeed_value_changed( GtkWidget *widget, gpointer user_data)
 	double val = 	       GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
 	double fps = (val * 100.0) / (double)info->el.fps ;
 	
-//	multitrack_set_preview_speed( info->mt , fps );
+	multitrack_set_preview_speed( info->mt , fps );
 	
 	//sprintf(speed,"%2.2f "
 }
@@ -2324,6 +2319,13 @@ void		on_previewscale_value_changed( GtkWidget *widget, gpointer user_data)
 //		multitrack_resize( info->mt, nw,nh);	
 	}
 }
+void		on_preview_width_value_changed( GtkWidget *w, gpointer user_data)
+{
+
+}
+void		on_preview_height_value_changed( GtkWidget *w, gpointer user_data)
+{
+}
 
 void		on_previewsmall_clicked( GtkWidget *widget, gpointer user_data)
 {
@@ -2339,46 +2341,46 @@ void		on_previewsmall_clicked( GtkWidget *widget, gpointer user_data)
 
 void		on_multitrack_activate( GtkWidget *w, gpointer user_data)
 {
-//	multitrack_open( info->mt );
-//	gtk_widget_show( glade_xml_get_widget_( info->main_window , "mtwindow" ));
+	multitrack_open( info->mt );
+	gtk_widget_show( glade_xml_get_widget_( info->main_window , "mtwindow" ));
 
 }
 void		on_multitrack_deactivate( GtkWidget *w, gpointer user_data)
 {
-//	multitrack_close( info->mt );
-//	gtk_widget_hide( glade_xml_get_widget_( info->main_window , "mtwindow" ));
+	multitrack_close( info->mt );
+	gtk_widget_hide( glade_xml_get_widget_( info->main_window , "mtwindow" ));
 
 }
 void	on_mt_new_activate( GtkWidget *w, gpointer user_data)
 {
-//	multitrack_add_track( info->mt );
+	multitrack_add_track( info->mt );
 }
 
 void	on_mt_delete_activate( GtkWidget *w, gpointer user_data)
 {
-//	multitrack_close_track( info->mt );
+	multitrack_close_track( info->mt );
 }
 
 
 
 void	on_mt_sync_start_clicked( GtkWidget *w, gpointer user_data)
 {
-//	multitrack_sync_start( info->mt );
+	multitrack_sync_start( info->mt );
 }
 
 void	on_mtwindow_delete_event( GtkWidget *w , gpointer user_data)
 {
-//	on_multitrack_deactivate(w, user_data);
+	on_multitrack_deactivate(w, user_data);
 }
 
 void	on_mtwindow_destroy_event( GtkWidget *w, gpointer user_data)
 {
-//	on_mtwindow_delete_event( w, user_data );
+	on_mtwindow_delete_event( w, user_data );
 }
 
 void	on_mt_sync_stop_clicked( GtkWidget *w , gpointer user_data)
 {
-//	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PLAY_STOP,0 );
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PLAY_STOP,0 );
 }
 void	on_mt_sync_play_clicked( GtkWidget *w, gpointer user_data)
 {
@@ -2398,26 +2400,26 @@ void	on_mt_sync_gotoend_clicked( GtkWidget *w, gpointer user_data)
 }
 void	on_mt_sync_decspeed_clicked( GtkWidget *w, gpointer user_data)
 {
-////	int n = info->status_tokens[SAMPLE_SPEED];
-//	if( n < 0 ) n += 1;
-//	if( n > 0 ) n -= 1;
-//	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
+	int n = info->status_tokens[SAMPLE_SPEED];
+	if( n < 0 ) n += 1;
+	if( n > 0 ) n -= 1;
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
 
 }
 void	on_mt_sync_incspeed_clicked( GtkWidget *w, gpointer user_data)
 {
-//	int n = info->status_tokens[SAMPLE_SPEED];
-//	if( n < 0 ) n -= 1;
-//	if( n > 0 ) n += 1;
-//	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
+	int n = info->status_tokens[SAMPLE_SPEED];
+	if( n < 0 ) n -= 1;
+	if( n > 0 ) n += 1;
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
 }
 void	on_mt_sync_prev_clicked( GtkWidget *w , gpointer user_data)
 {
-//	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PREV_FRAME ,0 );
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PREV_FRAME ,0 );
 }
 void	on_mt_sync_next_clicked( GtkWidget *w, gpointer user_data)
 {
-//	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SKIP_FRAME, 0 );
+	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SKIP_FRAME, 0 );
 }
 
 void	on_delete1_activate(GtkWidget *w, gpointer user_data)
@@ -2469,15 +2471,12 @@ void	on_delete2_activate( GtkWidget *w, gpointer user_data)
 	DBG_C();
 }
 
-
-
 void
 on_spin_samplebank_select_value_changed
                                         (GtkSpinButton   *spinbutton,
                                         gpointer         user_data)
 {
         GtkNotebook *samplebank = GTK_NOTEBOOK( info->sample_bank_pad );
-       // glade_xml_get_widget_( info->main_window, "notebook_sample_bank"));
 
         gint max_page = gtk_notebook_get_n_pages(samplebank);
         
