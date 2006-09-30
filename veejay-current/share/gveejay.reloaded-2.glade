@@ -17,6 +17,7 @@
   <property name="type_hint">GDK_WINDOW_TYPE_HINT_NORMAL</property>
   <property name="gravity">GDK_GRAVITY_NORTH_WEST</property>
   <property name="focus_on_map">True</property>
+  <property name="urgency_hint">False</property>
   <property name="has_separator">False</property>
   <accessibility>
     <atkproperty name="AtkObject::accessible_name" translatable="yes">GVeejayReloaded Launcher</atkproperty>
@@ -357,6 +358,7 @@
   <property name="type_hint">GDK_WINDOW_TYPE_HINT_DIALOG</property>
   <property name="gravity">GDK_GRAVITY_NORTH_WEST</property>
   <property name="focus_on_map">True</property>
+  <property name="urgency_hint">False</property>
   <property name="has_separator">True</property>
   <signal name="close" handler="on_vims_bundles_close" last_modification_time="Sat, 23 Jul 2005 19:06:53 GMT"/>
   <signal name="delete_event" handler="on_vims_bundles_close" last_modification_time="Sat, 23 Jul 2005 19:07:04 GMT"/>
@@ -1017,6 +1019,151 @@
 		      <property name="fill">True</property>
 		    </packing>
 		  </child>
+
+		  <child>
+		    <widget class="GtkHBox" id="hbox765">
+		      <property name="visible">True</property>
+		      <property name="homogeneous">False</property>
+		      <property name="spacing">0</property>
+
+		      <child>
+			<widget class="GtkVBox" id="vbox542">
+			  <property name="visible">True</property>
+			  <property name="homogeneous">False</property>
+			  <property name="spacing">0</property>
+
+			  <child>
+			    <widget class="GtkScrolledWindow" id="scrolledwindow43">
+			      <property name="visible">True</property>
+			      <property name="can_focus">True</property>
+			      <property name="hscrollbar_policy">GTK_POLICY_ALWAYS</property>
+			      <property name="vscrollbar_policy">GTK_POLICY_ALWAYS</property>
+			      <property name="shadow_type">GTK_SHADOW_IN</property>
+			      <property name="window_placement">GTK_CORNER_TOP_LEFT</property>
+
+			      <child>
+				<widget class="GtkTextView" id="vims_messenger_textview">
+				  <property name="visible">True</property>
+				  <property name="can_focus">True</property>
+				  <property name="editable">True</property>
+				  <property name="overwrite">False</property>
+				  <property name="accepts_tab">True</property>
+				  <property name="justification">GTK_JUSTIFY_LEFT</property>
+				  <property name="wrap_mode">GTK_WRAP_NONE</property>
+				  <property name="cursor_visible">True</property>
+				  <property name="pixels_above_lines">0</property>
+				  <property name="pixels_below_lines">0</property>
+				  <property name="pixels_inside_wrap">0</property>
+				  <property name="left_margin">0</property>
+				  <property name="right_margin">0</property>
+				  <property name="indent">0</property>
+				  <property name="text" translatable="yes"></property>
+				</widget>
+			      </child>
+			    </widget>
+			    <packing>
+			      <property name="padding">0</property>
+			      <property name="expand">True</property>
+			      <property name="fill">True</property>
+			    </packing>
+			  </child>
+			</widget>
+			<packing>
+			  <property name="padding">0</property>
+			  <property name="expand">True</property>
+			  <property name="fill">True</property>
+			</packing>
+		      </child>
+
+		      <child>
+			<widget class="GtkVBox" id="vbox543">
+			  <property name="visible">True</property>
+			  <property name="homogeneous">False</property>
+			  <property name="spacing">0</property>
+
+			  <child>
+			    <widget class="GtkVButtonBox" id="vbuttonbox2">
+			      <property name="visible">True</property>
+			      <property name="layout_style">GTK_BUTTONBOX_DEFAULT_STYLE</property>
+			      <property name="spacing">0</property>
+
+			      <child>
+				<widget class="GtkButton" id="vims_messenger_clear">
+				  <property name="visible">True</property>
+				  <property name="can_default">True</property>
+				  <property name="can_focus">True</property>
+				  <property name="label" translatable="yes">clear</property>
+				  <property name="use_underline">True</property>
+				  <property name="relief">GTK_RELIEF_NORMAL</property>
+				  <property name="focus_on_click">True</property>
+				  <signal name="clicked" handler="on_vims_messenger_clear_clicked" last_modification_time="Sat, 30 Sep 2006 17:53:41 GMT"/>
+				</widget>
+			      </child>
+
+			      <child>
+				<widget class="GtkButton" id="vims_messenger_rewind">
+				  <property name="visible">True</property>
+				  <property name="can_default">True</property>
+				  <property name="can_focus">True</property>
+				  <property name="label" translatable="yes">to start</property>
+				  <property name="use_underline">True</property>
+				  <property name="relief">GTK_RELIEF_NORMAL</property>
+				  <property name="focus_on_click">True</property>
+				  <signal name="clicked" handler="on_vims_messenger_rewind_clicked" last_modification_time="Sat, 30 Sep 2006 17:55:47 GMT"/>
+				</widget>
+			      </child>
+
+			      <child>
+				<widget class="GtkButton" id="vims_messenger_single">
+				  <property name="visible">True</property>
+				  <property name="can_default">True</property>
+				  <property name="can_focus">True</property>
+				  <property name="label" translatable="yes">play vims</property>
+				  <property name="use_underline">True</property>
+				  <property name="relief">GTK_RELIEF_NORMAL</property>
+				  <property name="focus_on_click">True</property>
+				  <signal name="activate" handler="on_vims_messenger_single_activate" last_modification_time="Sat, 30 Sep 2006 17:55:39 GMT"/>
+				</widget>
+			      </child>
+			    </widget>
+			    <packing>
+			      <property name="padding">0</property>
+			      <property name="expand">True</property>
+			      <property name="fill">True</property>
+			    </packing>
+			  </child>
+
+			  <child>
+			    <widget class="GtkToggleButton" id="vims_messenger_play">
+			      <property name="visible">True</property>
+			      <property name="can_focus">True</property>
+			      <property name="label" translatable="yes">repeat</property>
+			      <property name="use_underline">True</property>
+			      <property name="relief">GTK_RELIEF_NORMAL</property>
+			      <property name="focus_on_click">True</property>
+			      <property name="active">False</property>
+			      <property name="inconsistent">False</property>
+			    </widget>
+			    <packing>
+			      <property name="padding">0</property>
+			      <property name="expand">False</property>
+			      <property name="fill">False</property>
+			    </packing>
+			  </child>
+			</widget>
+			<packing>
+			  <property name="padding">0</property>
+			  <property name="expand">False</property>
+			  <property name="fill">False</property>
+			</packing>
+		      </child>
+		    </widget>
+		    <packing>
+		      <property name="padding">0</property>
+		      <property name="expand">True</property>
+		      <property name="fill">True</property>
+		    </packing>
+		  </child>
 		</widget>
 	      </child>
 
@@ -1073,6 +1220,7 @@
   <property name="type_hint">GDK_WINDOW_TYPE_HINT_DIALOG</property>
   <property name="gravity">GDK_GRAVITY_NORTH_WEST</property>
   <property name="focus_on_map">True</property>
+  <property name="urgency_hint">False</property>
   <property name="has_separator">True</property>
   <signal name="close" handler="on_video_options_close" last_modification_time="Sat, 23 Jul 2005 16:25:01 GMT"/>
   <signal name="delete_event" handler="on_video_options_close" last_modification_time="Sat, 23 Jul 2005 18:51:08 GMT"/>
@@ -2061,13 +2209,14 @@
   <property name="modal">False</property>
   <property name="resizable">True</property>
   <property name="destroy_with_parent">False</property>
-  <property name="icon">icon_streamnew.png</property>
+  <property name="icon">icon_stream.png</property>
   <property name="decorated">True</property>
   <property name="skip_taskbar_hint">False</property>
   <property name="skip_pager_hint">False</property>
   <property name="type_hint">GDK_WINDOW_TYPE_HINT_DIALOG</property>
   <property name="gravity">GDK_GRAVITY_NORTH_WEST</property>
   <property name="focus_on_map">True</property>
+  <property name="urgency_hint">False</property>
   <signal name="delete_event" handler="on_inputstream_window_delete_event" last_modification_time="Mon, 10 Oct 2005 17:08:03 GMT"/>
 
   <child>
@@ -2705,13 +2854,14 @@
   <property name="default_height">360</property>
   <property name="resizable">True</property>
   <property name="destroy_with_parent">False</property>
-  <property name="icon">launch.png</property>
+  <property name="icon">icon_launch.png</property>
   <property name="decorated">True</property>
   <property name="skip_taskbar_hint">False</property>
   <property name="skip_pager_hint">False</property>
   <property name="type_hint">GDK_WINDOW_TYPE_HINT_DIALOG</property>
   <property name="gravity">GDK_GRAVITY_NORTH_WEST</property>
   <property name="focus_on_map">True</property>
+  <property name="urgency_hint">False</property>
   <signal name="delete_event" handler="on_vs_delete_event" last_modification_time="Sun, 25 Sep 2005 21:47:33 GMT"/>
 
   <child>
@@ -3785,6 +3935,7 @@
   <property name="type_hint">GDK_WINDOW_TYPE_HINT_NORMAL</property>
   <property name="gravity">GDK_GRAVITY_NORTH_WEST</property>
   <property name="focus_on_map">True</property>
+  <property name="urgency_hint">False</property>
 
   <child>
     <widget class="GtkVBox" id="vbox526">
@@ -3801,6 +3952,8 @@
 	  <child>
 	    <widget class="GtkMenuBar" id="menubar1">
 	      <property name="visible">True</property>
+	      <property name="pack_direction">GTK_PACK_DIRECTION_LTR</property>
+	      <property name="child_pack_direction">GTK_PACK_DIRECTION_LTR</property>
 
 	      <child>
 		<widget class="GtkMenuItem" id="menuitem8">
@@ -9514,7 +9667,7 @@ YV16</property>
 		  </child>
 
 		  <child>
-		    <widget class="GtkFrame" id="frame132">
+		    <widget class="GtkFrame" id="expander10">
 		      <property name="visible">True</property>
 		      <property name="label_xalign">0</property>
 		      <property name="label_yalign">0.5</property>
@@ -12929,7 +13082,7 @@ YV16</property>
 			  <child>
 			    <widget class="GtkImage" id="image536">
 			      <property name="visible">True</property>
-			      <property name="pixbuf">icon_newclip.png</property>
+			      <property name="pixbuf">icon_new.png</property>
 			      <property name="xalign">0.5</property>
 			      <property name="yalign">0.5</property>
 			      <property name="xpad">0</property>
@@ -12956,7 +13109,7 @@ YV16</property>
 			  <child>
 			    <widget class="GtkImage" id="image537">
 			      <property name="visible">True</property>
-			      <property name="pixbuf">icon_streamnew.png</property>
+			      <property name="pixbuf">icon_stream.png</property>
 			      <property name="xalign">0.5</property>
 			      <property name="yalign">0.5</property>
 			      <property name="xpad">0</property>
@@ -13106,6 +13259,7 @@ YV16</property>
   <property name="type_hint">GDK_WINDOW_TYPE_HINT_NORMAL</property>
   <property name="gravity">GDK_GRAVITY_NORTH_WEST</property>
   <property name="focus_on_map">True</property>
+  <property name="urgency_hint">False</property>
   <property name="has_separator">False</property>
   <signal name="close" handler="on_veejay_connection_close" last_modification_time="Sat, 23 Jul 2005 16:04:51 GMT"/>
   <signal name="delete_event" handler="on_veejay_connection_close" last_modification_time="Sat, 23 Jul 2005 18:53:55 GMT"/>

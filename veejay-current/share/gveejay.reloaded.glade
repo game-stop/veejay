@@ -834,7 +834,8 @@
 	  <child>
 	    <widget class="GtkNotebook" id="panels">
 	      <property name="visible">True</property>
-	      <property name="show_tabs">False</property>
+	      <property name="can_focus">True</property>
+	      <property name="show_tabs">True</property>
 	      <property name="show_border">False</property>
 	      <property name="tab_pos">GTK_POS_TOP</property>
 	      <property name="scrollable">False</property>
@@ -4380,46 +4381,17 @@ YV16</property>
 					<widget class="GtkToggleButton" id="vims_messenger_play">
 					  <property name="visible">True</property>
 					  <property name="can_focus">True</property>
-					  <property name="relief">GTK_RELIEF_NORMAL</property>
-					  <property name="focus_on_click">True</property>
-					  <property name="active">False</property>
-					  <property name="inconsistent">False</property>
-					  <signal name="toggled" handler="on_vims_messenger_play_toggled" last_modification_time="Tue, 30 May 2006 09:33:38 GMT"/>
-
-					  <child>
-					    <widget class="GtkImage" id="image2326">
-					      <property name="visible">True</property>
-					      <property name="pixbuf">button_play.png</property>
-					      <property name="xalign">0.5</property>
-					      <property name="yalign">0.5</property>
-					      <property name="xpad">0</property>
-					      <property name="ypad">0</property>
-					    </widget>
-					  </child>
-					</widget>
-					<packing>
-					  <property name="padding">0</property>
-					  <property name="expand">False</property>
-					  <property name="fill">False</property>
-					</packing>
-				      </child>
-
-				      <child>
-					<widget class="GtkCheckButton" id="vims_messenger_loop">
-					  <property name="visible">True</property>
-					  <property name="can_focus">True</property>
-					  <property name="label" translatable="yes">Loop messages</property>
+					  <property name="label" translatable="yes">repeat</property>
 					  <property name="use_underline">True</property>
 					  <property name="relief">GTK_RELIEF_NORMAL</property>
 					  <property name="focus_on_click">True</property>
 					  <property name="active">False</property>
 					  <property name="inconsistent">False</property>
-					  <property name="draw_indicator">True</property>
-					  <signal name="toggled" handler="on_vims_messenger_loop_toggled" last_modification_time="Tue, 30 May 2006 09:34:10 GMT"/>
+					  <signal name="toggled" handler="on_vims_messenger_play_toggled" last_modification_time="Sat, 30 Sep 2006 18:08:31 GMT"/>
 					</widget>
 					<packing>
 					  <property name="padding">0</property>
-					  <property name="expand">True</property>
+					  <property name="expand">False</property>
 					  <property name="fill">False</property>
 					</packing>
 				      </child>
@@ -7636,8 +7608,6 @@ YV16</property>
 
 		      <child>
 			<widget class="GtkImage" id="imageA">
-			  <property name="width_request">352</property>
-			  <property name="height_request">288</property>
 			  <property name="visible">True</property>
 			  <property name="pixbuf">veejay-logo.png</property>
 			  <property name="xalign">0.5</property>
@@ -11203,7 +11173,7 @@ YV16</property>
 		      <property name="snap_to_ticks">False</property>
 		      <property name="wrap">False</property>
 		      <property name="adjustment">176 1 800 1 10 10</property>
-		      <signal name="value_changed" handler="on_priout_width_value_changed" last_modification_time="Wed, 06 Apr 2005 09:11:02 GMT"/>
+		      <signal name="value_changed" handler="on_preview_width_value_changed" last_modification_time="Sat, 30 Sep 2006 21:56:01 GMT"/>
 		    </widget>
 		    <packing>
 		      <property name="left_attach">1</property>
@@ -11226,7 +11196,7 @@ YV16</property>
 		      <property name="snap_to_ticks">False</property>
 		      <property name="wrap">False</property>
 		      <property name="adjustment">144 1 800 1 10 10</property>
-		      <signal name="value_changed" handler="on_priout_height_value_changed" last_modification_time="Wed, 06 Apr 2005 09:11:07 GMT"/>
+		      <signal name="value_changed" handler="on_preview_height_value_changed" last_modification_time="Sat, 30 Sep 2006 21:56:08 GMT"/>
 		    </widget>
 		    <packing>
 		      <property name="left_attach">1</property>
