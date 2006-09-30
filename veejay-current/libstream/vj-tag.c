@@ -16,17 +16,6 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  */
-/* a tag describes everything we can do with streaming video,
-   from yuv4mpeg, vloopback or v4l
-   this is one of veejay's most important components.
-   and it needs to be refactorized
-    (vj-v4lvideo, vj-avcodec, vj-avformat, vj-yuv4mpeg, vj-rgb)
- 
-   TODO:(2005)
-   refactor this pile of junk (merge with libsample),
-   
-      
- */
 #include <config.h>
 #include <string.h>
 #include <libstream/vj-tag.h>
@@ -58,6 +47,7 @@
 #include <veejay/vj-misc.h>
 #include <libvjmem/vjmem.h>
 #include <libvje/internal.h>
+#include <libstream/vj-net.h>
 
 static veejay_t *_tag_info = NULL;
 static hash_t *TagHash = NULL;
@@ -72,13 +62,7 @@ static int last_added_tag = 0;
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int ty );
 int _vj_tag_new_avformat( vj_tag *tag, int stream_nr, editlist *el);
 int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el);
-typedef struct
-{
-	pthread_mutex_t mutex;
-	pthread_t thread;
-	int state;
-	int error;
-} threaded_t;
+
 static uint8_t *_temp_buffer[3];
 static uint8_t *tag_encoder_buf = NULL; 
 static VJFrame _tmp;
@@ -246,8 +230,6 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 	v = vj_tag_input->net[stream_nr];
 	if(!v) return 0;
 
-
-
 	char tmp[255];
 	bzero(tmp,255);
 	snprintf(tmp,sizeof(tmp)-1, "%s %d", host, port );
@@ -280,12 +262,10 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 		tag->socket_ready = 1;
 	}
 
-	if( type == VJ_TAG_TYPE_MCAST )
-	{
-		/*  connect and send message ! */
-		veejay_msg(VEEJAY_MSG_INFO,
-		  "You can stop the Server by sending VIMS 023");
-	}
+	net_thread_remote( tag->private, v );
+
+
+	
 	return 1;
 }
 #ifdef HAVE_V4L
@@ -447,77 +427,6 @@ int	vj_tag_get_stream_color(int t1, int *r, int *g, int *b )
 
 	return 1;
 }
-#define THREAD_START 0
-#define THREAD_STOP 1
-
-void	*reader_thread(void *data)
-{
-	vj_tag *tag = (vj_tag*) data;
-	vj_tag_data *v = vj_tag_input->net[tag->index];
-	threaded_t *t = tag->private;
-
-	int have_sent =0;
-
-	for( ;; )
-	{
-		pthread_mutex_lock( &(t->mutex) );
-		if( t->state == THREAD_STOP )
-		{
-			pthread_mutex_unlock( &(t->mutex));
-			t->error = 1;
-			return NULL;
-		}
-	
-		int ret = 0;
-		if( tag->active == 1 )
-		{
-			if( tag->source_type == VJ_TAG_TYPE_NET )
-			{
-			
-				if( vj_client_poll( vj_tag_input->net[tag->index], V_STATUS ) )
-				{
-					vj_client_flush	( vj_tag_input->net[tag->index], V_STATUS);
-					if(!have_sent)
-					{
-						char buf[16];
-						sprintf(buf, "%03d:;", VIMS_GET_FRAME);
-						
-						ret =  vj_client_send( vj_tag_input->net[tag->index], V_CMD, buf );
-						if( ret <= 0 )
-						{
-							pthread_mutex_unlock( &(t->mutex));
-							veejay_msg(0, "Failed to send frame request to remote");
-							return NULL;
-						}
-						have_sent = 1;
-					}
-
-					if(have_sent)
-					{
-						ret = vj_client_read_i ( v, tag->socket_frame );
-						if(ret>0)
-							have_sent = 0;
-						if( ret <= 0 )
-						 t->state = THREAD_STOP;
-					}
-				}
-			}
-			else
-			{
-				ret = vj_client_read_i ( v, tag->socket_frame );
-			}
-		}
-
-		pthread_mutex_unlock( &(t->mutex) );
-
-		if( ret <= 0)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Stream %d lost connection! ",tag->id);
-			t->state = THREAD_STOP;
-		}
-	}
-}
-
 // for network, filename /channel is passed as host/port num
 int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	        int pix_fmt, int channel )
@@ -540,26 +449,8 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     /* see if we are already using the source */
     if( type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST )
     {
-	for (i = 1; i < n; i++)
-	{	
-		if (vj_tag_exists(i) )
-		{
-		    vj_tag_get_source_name(i, sourcename);
-		    if (strcmp(sourcename, filename) == 0)
-		    {
-			vj_tag *tt = vj_tag_get( i );
-			if( tt->source_type == VJ_TAG_TYPE_NET || tt->source_type == VJ_TAG_TYPE_MCAST )
-			{
-				if( tt->video_channel == channel )
-				{
-					veejay_msg(VEEJAY_MSG_WARNING, "Already streaming from %s:%p in stream %d",
-						filename,channel, tt->id);
-					return -1;
-				}
-			}
-	    	    }
-		}
-    	}
+	    if(net_already_opened( filename,n, channel ))
+		    return -1;
     }
     tag = (vj_tag *) vj_malloc(sizeof(vj_tag));
 	if(!tag)
@@ -629,10 +520,10 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->color_b = 0;
     tag->opacity = 0; 
 	tag->private = NULL;
+
 	if(type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_NET)
-	{
-	    tag->private = (threaded_t*) vj_malloc(sizeof(threaded_t));
-	}
+	    tag->private = net_threader();
+	
     palette = (pix_fmt == FMT_420 ? VIDEO_PALETTE_YUV420P : VIDEO_PALETTE_YUV422P);
     
  
@@ -851,13 +742,13 @@ int vj_tag_del(int id)
 		break;
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
-		veejay_msg(VEEJAY_MSG_INFO, "Closing Network Stream");
-		if(tag->socket_frame) free(tag->socket_frame);
+		net_thread_exit(tag);	
 		if(vj_tag_input->net[tag->index])
 		{
 			vj_client_close( vj_tag_input->net[tag->index] );
 			vj_tag_input->net[tag->index] = NULL;
 		}
+
 		break;
     }
 
@@ -1671,30 +1562,7 @@ int vj_tag_disable(int t1) {
 	}
 	if(tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST)
 	{
-		if(tag->source_type == VJ_TAG_TYPE_MCAST)
-		{
-			char mcast_stop[6];
-			sprintf(mcast_stop, "%03d:;", VIMS_VIDEO_MCAST_STOP );
-			vj_client_send( vj_tag_input->net[tag->index] , V_CMD, 
-				mcast_stop);
-		}
-		if(tag->source_type == VJ_TAG_TYPE_NET)
-		{
-			char mcast_stop[6];
-			sprintf(mcast_stop, "%03d:;", VIMS_CLOSE );
-			vj_client_send( vj_tag_input->net[tag->index] , V_CMD, 
-				mcast_stop);
-
-		}
-		threaded_t *t = (threaded_t*)tag->private;
-		pthread_mutex_lock( &(t->mutex) );
-		t->state = THREAD_STOP;
-		pthread_mutex_unlock( &(t->mutex) );
-		pthread_join( &(t->thread), (void*) tag );
-		
-		vj_client_close( vj_tag_input->net[tag->index] );
-
-		veejay_msg(VEEJAY_MSG_DEBUG, "Disconnected from %s", tag->source_name);
+		net_thread_stop( vj_tag_input->net[tag->index], tag );
 	}
 #ifdef USE_GDK_PIXBUF
 	if(tag->source_type == VJ_TAG_TYPE_PICTURE )
@@ -1723,42 +1591,14 @@ int vj_tag_enable(int t1) {
 		veejay_msg(VEEJAY_MSG_INFO, "Already active");
 		return 1;
 	}
-	if(tag->source_type == VJ_TAG_TYPE_NET )
+	if(tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST )
 	{
-		//vj_tag_input->net[tag->index] = 
-		int success = vj_client_connect( vj_tag_input->net[tag->index], tag->source_name,NULL,tag->video_channel);
-		if( success == 0 )
-			return -1;
-		veejay_msg(VEEJAY_MSG_INFO, "Connected to %s, port %d",
-			tag->source_name, tag->video_channel );
-		//vj_client_flush( vj_tag_input->net[tag->index] );
-		threaded_t *t = (threaded_t*)tag->private;
-		t->error = 0;
-		t->state = THREAD_START;
-		pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
-	}
-	if( tag->source_type == VJ_TAG_TYPE_MCAST )
-	{
-		char start_mcast[6];
-		sprintf(start_mcast, "%03d:;", VIMS_VIDEO_MCAST_START);
-		int success = vj_client_connect( vj_tag_input->net[tag->index], NULL, tag->source_name, tag->video_channel );
-		
-		veejay_msg(VEEJAY_MSG_DEBUG, "Sending 'start mcast'");
-		vj_client_send(
-			vj_tag_input->net[tag->index], V_CMD, start_mcast);
-
-		if( success == 0  )
+		if(!net_thread_start(vj_tag_input->net[tag->index], tag))
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Canot connect to %s, %d", tag->source_name, tag->video_channel );
-			return -1;
+			veejay_msg(VEEJAY_MSG_ERROR,
+					"Unable to start thread");
+			return 1;
 		}
-		veejay_msg(VEEJAY_MSG_DEBUG, "Streaming from %s", tag->source_name );
-				
-		threaded_t *t = (threaded_t*)tag->private;
-		t->error = 0;
-		t->state = THREAD_START;
-		pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
-		
 	}
 #ifdef USE_GDK_PIXBUF
 	if( tag->source_type == VJ_TAG_TYPE_PICTURE )
@@ -2271,33 +2111,11 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	break;
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
-	//	vj_client_flush	( vj_tag_input->net[tag->index],1);
-	//	sprintf(buf, "%03d:;", VIMS_GET_FRAME);
-	//	if( vj_client_send( vj_tag_input->net[tag->index], V_CMD, buf ) <= 0 )
-	//	{
-	//		veejay_msg(VEEJAY_MSG_DEBUG, "Lost connection! ");
-	//		vj_tag_disable( t1 );
-	//	}	
-		if( !tag->active )
-			vj_tag_enable( t1 );
-		v = vj_tag_input->net[tag->index];
-		threaded_t *t = (threaded_t*) tag->private;
-		pthread_mutex_lock( &(t->mutex) );
-		
-		if( t->state != THREAD_STOP )
+		if(!net_thread_get_frame( tag,buffer, vj_tag_input->net[tag->index] ))
 		{
-			veejay_memcpy( buffer[0], tag->socket_frame, v->planes[0] );
-			veejay_memcpy( buffer[1], tag->socket_frame + v->planes[0], v->planes[1] );
-			veejay_memcpy( buffer[2], tag->socket_frame + v->planes[0] + v->planes[1] , v->planes[2] );
+			veejay_msg(VEEJAY_MSG_ERROR, "Error reading frame from stream");
+			vj_tag_set_active(t1,0);
 		}
-		pthread_mutex_unlock( &(t->mutex) );
-		
-		if( t->error )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error in reader thread, disabling ...");
-			vj_tag_disable(t1);
-		}
-
 		return 1;
 		break;
 	case VJ_TAG_TYPE_YUV4MPEG:
