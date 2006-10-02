@@ -44,6 +44,7 @@
 #include <libvjaudio/audio.h>
 #endif
 #include <ffmpeg/avutil.h>
+#include <ffmpeg/avcodec.h>
 /** \defgroup performer Performer
  *
  * The performer is the central pool of audio and video frames.
