@@ -35,7 +35,7 @@
 #include <sys/stat.h>
 #include "avilib.h"
 #include "mjpeg_logging.h"
-#include "avcodec.h"
+#include <ffmpeg/avcodec.h>
 /* There is an experimental kernel patch available at 
  *   http://www.tech9.net/rml/linux/
  * that adds the O_STREAMING flag for open().  Files opened this way will

@@ -40,7 +40,7 @@
 #include <libvevo/vevo.h>
 #include <veejay/vevo.h>
 #include <libyuv/yuvconv.h>
-#include "avcodec.h"
+#include <ffmpeg/avcodec.h>
 #include <libvevo/livido.h>
 #include <stdlib.h>
 #include <sys/types.h>

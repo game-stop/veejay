@@ -55,7 +55,7 @@ libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
 			-L$(top_builddir)/libvevo -lvevo 
 
-libveejay_la_LDFLAGS +=	${FFMPEG_LIBS} \
+libveejay_la_LDFLAGS +=	${FFMPEG_AVFORMAT_LIBS} ${FFMPEG_AVCODEC_LIBS} \
 			${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} \
 			${XML_LIBS} ${JPEG_LIBS} ${JACK_LIBS} \
 			${LIBDV_LIBS} ${LIBM_LIBS} ${PIXBUF_LIBS} ${MJPEGTOOLS_LIBS}\
@@ -67,13 +67,8 @@ libveejay_la_LDFLAGS +=	${FFMPEG_LIBS} \
 # The tools themselves
 VEEJAY_BIN = veejay
 
-VJ_LIBS = \
-	-L$(top_builddir)/libvjnet -lvjnet \
-	-L$(top_builddir)/libyuv -lyuv \
-	-L$(top_builddir)/ffmpeg/ffmpeg/libavcodec -lavcodec 
-
 if USE_SWSCALER
-VJ_LIBS += -L$(top_builddir)/libpostproc -lpostproc
+	VJ_LIBS += -L$(top_builddir)/libpostproc -lpostproc
 endif
 
 bin_PROGRAMS = $(VEEJAY_BIN)  
@@ -81,5 +76,5 @@ bin_PROGRAMS = $(VEEJAY_BIN)
 veejay_headers = vims.h
 
 veejay_SOURCES	= veejay.c ${veejay_headers} 
-veejay_LDADD 	= libveejay.la $(VJ_LIBS) @LIBGETOPT_LIB@ 
+veejay_LDADD 	= libveejay.la @LIBGETOPT_LIB@ 
 

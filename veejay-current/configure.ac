@@ -79,15 +79,16 @@ AC_ARG_WITH(xml2,
 
 AC_ARG_WITH(gveejayreloaded,
 		AC_HELP_STRING([--without-gveejayreloaded], [Do not build GVeejay Reloaded]),
-		[], [with_gveejayreloaded=yes])
+		[with_gveejayreloaded=no], [with_gveejayreloaded=yes])
 
 AC_ARG_WITH(gveejay,
 		AC_HELP_STRING([--without-gveejay], [Do not build GVeejay]),
-		[], [with_gveejay=yes])
+		[with_gveejay=no]], [with_gveejay=yes])
+
 AC_ARG_WITH(swscaler,
-		AC_HELP_STRING([--without-swscaler], [Build without Swscaler support]),
-		[],
-		[with_swscaler=yes])
+		AC_HELP_STRING([--with-swscaler], [Build without Swscaler support]),
+		[with_swscaler=yes],
+		[with_swscaler=no])
 AC_ARG_WITH(freetype2,
 		AC_HELP_STRING([--without-freetype2], [Do not use the freetype library]),
 		[], [with_freetype2=yes])
@@ -580,7 +581,6 @@ then
 
 	if test $ac_cv_flag_mmx = yes; then
        		AC_DEFINE(HAVE_ASM_MMX,,[Compiling in MMX support])
-    	  	AC_DEFINE(HAVE_MMX,,[Compiling in MMX support in ffmpeg])
        		have_asm_mmx=true
 	fi
 
@@ -729,37 +729,31 @@ fi
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
 
-if test -d $srcdir/ffmpeg; then
-	AC_MSG_NOTICE([Found local ffmpeg tree])
-else
-	AC_MSG_NOTICE([Grab FFmpeg from cvs])
-	sh ffmpeg-configure.in
+  PKG_CHECK_MODULES(FFMPEG_AVCODEC, [libavcodec],
+                    [
+ 		     AC_SUBST( FFMPEG_AVCODEC_CFLAGS )
+		     AC_SUBST( FFMPEG_AVCODEC_LIBS )
+		     have_avcodec=true
+                     AC_DEFINE(HAVE_AVCODEC, 1, [use avcodec])],
+                    [have_avcodec=false])
+
+
+  PKG_CHECK_MODULES(FFMPEG_AVCODEC, [libavformat],
+                    [
+ 		     AC_SUBST( FFMPEG_AVFORMAT_CFLAGS )
+		     AC_SUBST( FFMPEG_AVFORMAT_LIBS )
+		     have_avformat=true
+                     AC_DEFINE(HAVE_AVFORMAT, 1, [use avformat])],
+                    [have_avformat=false])
+
+if test x$have_avcodec != xtrue ; then
+ AC_MSG_ERROR([ FFmpeg AVCodec not found. Get it from http://ffmpeg.sourceforge.net ] )
+fi
+if test x$have_avformat != xtrue ; then
+ AC_MSG_ERROR([ FFmpeg AVFormat not found. Get it from http://ffmpeg.sourceforge.net ] )
 fi
 
-if test x$have_ps2 = xtrue ; then
- ffmpeg_ac_configure_args="--disable-v4l --disable-audio-oss --disable-vhook --disable-ffplay --disable-ffserver --disable-zlib --disable-dv1394 --disable-network --disable-audio-oss --disable-audiobeos  --extra-cflags=-fPIC"
-else
-ffmpeg_ac_configure_args="--disable-ffserver --disable-ffplay --disable-v4l --disable-audio-oss --disable-vhook --disable-dv1394 --disable-network --disable-audio-oss --disable-audio-beos  --extra-cflags=-fPIC"
-fi
 
-AC_MSG_NOTICE([Running FFMpeg configure ${ffmpeg_ac_configure_args}])
-
-(
-	cd ffmpeg/ffmpeg
-	./configure.gnu $ffmpeg_ac_configure_args
-)
-
-
-ffmpeg_include='$(top_srcdir)/ffmpeg/ffmpeg'
-ffmpeg_build='$(top_builddir)/ffmpeg/ffmpeg'
-FFMPEG_CFLAGS="-I${ffmpeg_include}/libavcodec -I${ffmpeg_include}/libavformat"
-FFMPEG_LIBS="-L${ffmpeg_build}/libavcodec -lavcodec -L${ffmpeg_build}/libavformat -lavformat"
-if test -d $srcdir/ffmpeg/ffmpeg/libavutil/ ; then
-	FFMPEG_CFLAGS="$FFMPEG_CFLAGS -I${ffmpeg_include}/libavutil" 
-	FFMPEG_LIBS="$FFMPEG_LIBS -L${ffmpeg_build}/libavutil -lavutil"
-fi
-AC_SUBST( FFMPEG_CFLAGS )
-AC_SUBST( FFMPEG_LIBS )
 
 
 dnl **********************************************************************
@@ -894,7 +888,6 @@ dnl Output a Makefile or two and the lib/header descriptor script
 dnl
 AC_CONFIG_FILES([
 Makefile
-ffmpeg/Makefile
 libOSC/Makefile
 libpostproc/Makefile
 libhash/Makefile
@@ -976,6 +969,8 @@ fi
 AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
 AC_MSG_NOTICE([  - AVI MJPEG playback/recording  : true (always)])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
+AC_MSG_NOTICE([  - FFmpeg AVFormat               : ${have_avformat} ])
+AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 AC_MSG_NOTICE([  - jack                          : ${have_jack}])

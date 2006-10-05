@@ -19,8 +19,8 @@
 #ifndef VJ_AV_FORMAT_H
 #define VJ_AV_FORMAT_H
 #include <libyuv/yuvconv.h>
-#include <ffmpeg/ffmpeg/libavcodec/avcodec.h>
-#include <ffmpeg/ffmpeg/libavformat/avformat.h>
+#include <ffmpeg/avcodec.h>
+#include <ffmpeg/avformat.h>
 
 typedef struct vj_avformat_t
 {

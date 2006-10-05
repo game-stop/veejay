@@ -38,7 +38,7 @@
 #include <mjpegtools/mpegconsts.h>
 #include <mjpegtools/mpegtimecode.h>
 #include <libvjmem/vjmem.h>
-#include "avcodec.h"
+#include <ffmpeg/avcodec.h>
 #include <math.h>
 #include <stdlib.h>
 #include <sys/types.h>

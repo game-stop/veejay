@@ -24,7 +24,7 @@
 #include <string.h>
 #include <libvjmsg/vj-common.h>
 #include <libvjmem/vjmem.h>
-#include "avcodec.h"
+#include <ffmpeg/avcodec.h>
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include <libvje/effects/common.h>
 #include <libyuv/yuvconv.h>
