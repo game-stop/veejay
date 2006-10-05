@@ -63,9 +63,7 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 
 	static uint8_t _pcf_lghtn(uint8_t a, uint8_t b, int t_max)
 	{
-		uint8_t p = (a > b ? a : b );
-	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
-		return p;
+		return (a > b ? a : b );
 	}
 
 	static uint8_t _pcf_dneg2(uint8_t a,uint8_t b, int t_max)
@@ -86,6 +84,8 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 	static uint8_t _pcf_max(uint8_t a,uint8_t b, int t_max)
 	{
 		int p = ( (b > a) ? b : a);
+		if( p <= 0 )
+			return 0;
 		p = ( 255 - ((255 - b) * (255 - b)) / p);
 	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
 		return (uint8_t)p;
@@ -93,6 +93,8 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 
 	static uint8_t _pcf_pq(uint8_t a,uint8_t b, int t_max)
 	{
+		if(a <= 0 ) a=16;
+		if(b <= 0 ) b=16;
 		int p = 255 - ((255-a) * (255-a)) / a;
 		int q = 255 - ((255-b) * (255-b)) / b;
 		p = ( 255 - ((255-p) * (255 - a)) / q);
