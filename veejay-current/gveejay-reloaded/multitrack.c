@@ -1,4 +1,4 @@
-3/* Gveejay Reloaded - graphical interface for VeeJay
+/* Gveejay Reloaded - graphical interface for VeeJay
  * 	     (C) 2002-2005 Niels Elburg <nelburg@looze.net> 
  *
  *
