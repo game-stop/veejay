@@ -1,6 +1,6 @@
 # Process with automake to produce Makefile.in
 
-SUBDIRS = ffmpeg bio2jack libOSC libhash libvjmsg libvjmem 
+SUBDIRS = bio2jack libOSC libhash libvjmsg libvjmem 
 if USE_SWSCALER
 SUBDIRS += libpostproc
 endif
