@@ -63,7 +63,6 @@
   #define HAVE_GTK2_6 1
 #endif  
 #endif
-
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -469,16 +468,16 @@ static	vj_gui_t	*info = NULL;
 /* global pointer to the sample-bank */
 
 /* global pointer to the effects-source-list */
-static	GtkWidget *effect_sources_tree;
-static 	GtkListStore *effect_sources_store;
-static 	GtkTreeModel *effect_sources_model;
+static	GtkWidget *effect_sources_tree = NULL;
+static 	GtkListStore *effect_sources_store = NULL;
+static 	GtkTreeModel *effect_sources_model = NULL;
 static int 		num_tracks_ = 0;
 static int		default_preview_width_ = 0;
 static int		default_preview_height_ = 0;
 /* global pointer to the editlist-tree */
-static 	GtkWidget *editlist_tree;
-static	GtkListStore *editlist_store;
-static  GtkTreeModel *editlist_model;	
+static 	GtkWidget *editlist_tree = NULL;
+static	GtkListStore *editlist_store = NULL;
+static  GtkTreeModel *editlist_model = NULL;	
 
 /* global pointer to the actual selected slot in the sample_bank */
 
@@ -607,21 +606,22 @@ static void 	unlock_preview__()
 
 static	void	lock_preview_(const char *f, int line)
 {
-	veejay_msg(0, "%s called by %s: %d (%dx%d)",__FUNCTION__,f,line,
-			default_preview_width_,default_preview_height_);
+//	veejay_msg(0, "%s called by %s: %d (%dx%d)",__FUNCTION__,f,line,
+//			default_preview_width_,default_preview_height_);
 	lock_preview__();
 }
 static void 	unlock_preview_(const char *f, int line)
 {
-	veejay_msg(0, "%s called by %s: %d (%dx%d)", __FUNCTION__, f, line,
-		 	default_preview_width_, default_preview_height_ );
+//	veejay_msg(0, "%s called by %s: %d (%dx%d)", __FUNCTION__, f, line,
+//		 	default_preview_width_, default_preview_height_ );
 	unlock_preview__();
 }
 
 static	void	gtk_image_set_from_pixbuf__( GtkImage *w, GdkPixbuf *p, const char *f, int l )
 {
-	veejay_msg(0, "%s called by %s: %d" , __FUNCTION__, f, l );
 #ifdef STRICT_CHECKING
+	veejay_msg(0, "%s called by %s: %d" , __FUNCTION__, f, l );
+
 	assert( GTK_IS_IMAGE(w) );
 #endif
 	gtk_image_set_from_pixbuf(w, p);
@@ -629,8 +629,9 @@ static	void	gtk_image_set_from_pixbuf__( GtkImage *w, GdkPixbuf *p, const char *
 
 static	void	gtk_widget_set_sensitive___( GtkWidget *w, gboolean state, const char *f, int l )
 {
-	veejay_msg(0, "%s called by %s: %d", __FUNCTION__, f, l );
 #ifdef STRICT_CHECKING
+	veejay_msg(0, "%s called by %s: %d", __FUNCTION__, f, l );
+
 	assert( GTK_IS_WIDGET(w) );
 #endif
 	gtk_widget_set_sensitive(w, state );
@@ -1815,6 +1816,8 @@ int		gveejay_new_slot(int mode)
 					 info->status_tokens[TOTAL_SLOTS] + 1;
 				}
 			}
+
+
 		}
 	}
 
@@ -2051,6 +2054,9 @@ static	int	get_slider_val(const char *name)
 static	void	vj_kf_delete_parameter(int idx)
 {
 	sample_slot_t *s = info->selected_slot;
+	if(!s || !s->ec )
+		return;
+
 	int i;
 	for( i = 0;i < MAX_PARAMETERS; i ++ )
 	{
@@ -2061,7 +2067,7 @@ static	void	vj_kf_delete_parameter(int idx)
 static	void	vj_akf_delete()
 {
 	sample_slot_t *s = info->selected_slot;
-	if(!s)
+	if(!s || !s->ec)
 		return;
 	int i;
 	for(i = 0; i < MAX_CHAIN_LEN; i ++)
@@ -2071,11 +2077,16 @@ static	void	vj_akf_delete()
 static	void	vj_kf_select_parameter(int num)
 {
 	sample_slot_t *s = info->selected_slot;
-	if(!s)
+	if(!s || !s->ec)
 		return;
 
 	info->uc.selected_parameter_id = num;
-
+#ifdef STRICT_CHECKING
+	assert( s->ec );
+	assert( s->ec->effects );
+	assert( s->ec->effects[(info->uc.selected_chain_entry)] );
+	assert( s->ec->effects[(info->uc.selected_chain_entry)]->parameters );
+#endif
 	key_parameter_t *key = s->ec->effects[(info->uc.selected_chain_entry)]->parameters[(info->uc.selected_parameter_id)];
 	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
 
@@ -2169,7 +2180,7 @@ static  void	update_curve_widget(const char *name)
 {
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window,name);
 	sample_slot_t *s = info->selected_slot;
-	if(!s)
+	if(!s || !s->ec)
 		return;
 	int i = info->uc.selected_chain_entry; /* chain entry */
 	int j = info->uc.selected_parameter_id;
@@ -2182,7 +2193,7 @@ static	void	update_curve_accessibility(const char *name)
 {
 	
 	sample_slot_t *s = info->selected_slot;
-	if(!s)
+	if(!s || !s->ec)
 		return;
 
 	int i = info->uc.selected_chain_entry; /* chain entry */
@@ -2637,6 +2648,10 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 	gint gentry = 0;
 	gtk_tree_model_get (model, iter,
                         FXC_ID, &gentry, -1);
+	sample_slot_t *s = info->selected_slot;
+	if(!s || !s->ec )
+		return FALSE;
+	
 	if(gentry == entry)
 	{
 		int effect_id = gui->uc.entry_tokens[ ENTRY_FXID ];
@@ -2647,7 +2662,6 @@ chain_update_row(GtkTreeModel * model, GtkTreePath * path, GtkTreeIter * iter,
 		else
 		{
 			gchar *descr = _utf8str( _effect_get_description( effect_id ));
-			sample_slot_t *s = info->selected_slot;
 			int on = s->ec->effects[entry]->enabled;
 			GdkPixbuf *toggle = update_pixmap_entry( gui->uc.entry_tokens[ENTRY_FXSTATUS] );
 			GdkPixbuf *kf_toggle = update_pixmap_kf( on );
@@ -3798,7 +3812,8 @@ static	void	load_effectchain_info()
 			gchar *utf8_name = _utf8str( name );
 			sample_slot_t *s = info->selected_slot;
 			int on = 0;
-			if(s) on = s->ec->effects[last_index]->enabled;
+			if(s && s->ec) 
+				on = s->ec->effects[last_index]->enabled;
 
 			gtk_list_store_append( store, &iter );
 		/*	gtk_list_store_set( store, &iter,
@@ -4335,7 +4350,7 @@ static	void	select_slot__( int pm )
 
 static	void	select_slot_(int pm, const char *f, int line)
 {
-	veejay_msg(0, "%s called by %s %d", __FUNCTION__,f,line);
+//	veejay_msg(0, "%s called by %s %d", __FUNCTION__,f,line);
 	select_slot__(pm);
 }
 
@@ -4352,9 +4367,12 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	int has_samples = 0;
 	int has_streams = 0;
 	int n_slots = 0;
-	reset_tree( "tree_sources" );
-	if( with_reset_slotselection ) reset_samplebank();
 
+	if( with_reset_slotselection )
+	{
+		reset_tree( "tree_sources" );
+		reset_samplebank();
+	}
 	multi_vims( VIMS_SAMPLE_LIST,"%d", 0 );
 	gint fxlen = 0;
 	gchar *fxtext = recv_vims(5,&fxlen);
@@ -4384,13 +4402,6 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				gchar *timecode = format_selection_time( 0,(values[2]-values[1]) );
 
 				int int_id = values[0];
-
-				/* If sample is not already loaded/present in sample bank, skip bank update.
-				   GVeejay cannot know about external sample list updates; If new samples are
-		                   created or exiting ones deleted from external, 
-                                   Loading the entire list will be necessary to scan for updated slots.
-		                   The sample itself is updated automatically on edit() or play()
-				 */
 				int poke_slot= 0; int bank_page = 0;
 				verify_bank_capacity( &bank_page , &poke_slot, int_id, 0);
 				if(bank_page >= 0 )
@@ -4467,11 +4478,6 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				gchar *gsource = _utf8str( descr );
 				gchar *gtype = _utf8str( source );
 
-				// add to effect-sources-lists tree
-			//	add_sample_to_effect_sources_list(values[0], values[1], gtype, gsource);				
-					
-				// add to sample_banks
-			//	add_sample_to_sample_banks(values[0], values[1], gtype, gsource);							
 				int bank_page = 0; int poke_slot = 0;
 				int full = verify_bank_capacity( &bank_page , &poke_slot, values[0], 1);
 				if(bank_page >= 0 && full == 0 )
@@ -4496,8 +4502,6 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	}
 
 	if(fxtext) g_free(fxtext);
-	
-//	select_slot(info->status_tokens[PLAY_MODE]);
 }
 
 gboolean
@@ -5129,6 +5133,7 @@ printf("Unexpected exit %d\n",__LINE__);
 	/* entry, start frame, end frame */ 
 
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+
 	g_free( eltext );
 
 }
@@ -6821,6 +6826,7 @@ static int	add_bank( gint bank_num  )
 		slot[j]->slot_number = j;
 		slot[j]->sample_id = -1;
 		slot[j]->sample_type = -1;
+		slot[j]->ec = new_chain();
 	}
 
 	info->sample_banks[bank_num]->slot = slot;
@@ -7668,12 +7674,10 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
     	slot->sample_type = sample_type;
 	slot->timecode = timecode == NULL ? strdup("") : strdup( timecode );
 	slot->title = title == NULL ? strdup("") : strdup( title );
+	// add sample/stream to sources
+	if(sample_id > 0)
+		add_sample_to_effect_sources_list(sample_id, sample_type, title, timecode);
 	
-	if( sample_id > 0 && sample_type >= 0 )
-	{
-		if(!slot->ec )
-			slot->ec = new_chain();
-	}
 
 	if(gui_slot)
 	{
@@ -7702,10 +7706,6 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 			slot->pixbuf = NULL;
 		}
 	}
-
-	// add sample/stream to sources
-	if(sample_id > 0)
-		add_sample_to_effect_sources_list(sample_id, sample_type, title, timecode);
 
 	unlock_preview();
 }
