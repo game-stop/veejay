@@ -377,17 +377,19 @@ void	subsample_ycbcr_clamp_itu601_copy(VJFrame *frame, VJFrame *dst_frame)
         __asm__ __volatile__ ("emms":::"memory");
 #endif
 }
-
+/*
 #ifdef HAVE_ASM_MMX
 void	subsample_clear_plane( uint8_t bval, uint8_t *plane, uint32_t plane_len )
 {
 	unsigned int k = 0;
 	unsigned int align = (plane_len/64);
 
+	double val = (double) bval;
 
 	__asm__ __volatile__ (
 			"pxor	%%mm0,	%%mm0\n"
-		:: );
+			"movq	%%mm0,	(%0)\n"
+		:: "r" (val) );
 	
 	for( k = 0; k < align ; k ++ )
 	{
@@ -413,15 +415,14 @@ void	subsample_clear_plane( uint8_t bval, uint8_t *plane, uint32_t plane_len )
 	}
 	__asm__ __volatile__ ("sfence":::"memory");
         __asm__ __volatile__ ("emms":::"memory");
-
-}
-#else
+}*/
+//#else
 void	subsample_clear_plane( uint8_t bval, uint8_t *plane, uint32_t plane_len )
 {
 	memset( plane, bval, plane_len );
 }
 
-#endif
+//#endif
 
 /*************************************************************************
  * Chroma Subsampling
@@ -889,7 +890,6 @@ static void tr_422_to_444(uint8_t *buffer, int width, int height)
 	const int mmx_stride = stride / 8;
 #endif
 	int x,y;
-
 	for( y = height-1; y > 0 ; y -- )
 	{
 		uint8_t *dst = buffer + (y * width);

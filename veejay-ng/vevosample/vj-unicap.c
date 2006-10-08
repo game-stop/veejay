@@ -581,7 +581,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 
 			return 0;
 		}
-		vut->deinterlace = 1;
+//		vut->deinterlace = 1;
 	}
 	else
 	{
@@ -674,6 +674,14 @@ int	vj_unicap_start_capture( void *vut, void *slot )
       		veejay_msg( 0, "Failed to start capture on device: %s\n", v->device.identifier );
 		return 0;
      	}
+	if( !SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer) ) ) )
+   	{
+		veejay_msg( 0, "Failed to queue a buffer on device: %s\n", v->device.identifier );
+	//	unicap_unlock_properties( v->handle );
+
+		return 0;
+	}
+
 	v->active = 1;
 	return 1;
 }
@@ -694,17 +702,24 @@ int	vj_unicap_grab_frame( void *vut, void *slot )
 		}
 	}
 	
-   	if( !SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer) ) ) )
+   /*	if( !SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer) ) ) )
    	{
 		veejay_msg( 0, "Failed to queue a buffer on device: %s\n", v->device.identifier );
 		unicap_unlock_properties( v->handle );
 
 		return 0;
-	}
+	}*/
 		
 	if( !SUCCESS( unicap_wait_buffer( v->handle, &(v->returned_buffer )) ) )
 	{
 		veejay_msg(0,"Failed to wait for buffer on device: %s\n", v->device.identifier );
+		unicap_unlock_properties( v->handle );
+
+		return 0;
+	}
+	if( !SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer) ) ) )
+   	{
+		veejay_msg( 0, "Failed to queue a buffer on device: %s\n", v->device.identifier );
 		unicap_unlock_properties( v->handle );
 
 		return 0;

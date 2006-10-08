@@ -265,6 +265,8 @@ static	struct
 };
 
 
+
+
 void	*find_sample(int id)
 {
 	if( id < 0 || id > SAMPLE_LIMIT )
@@ -3613,9 +3615,9 @@ void	*sample_new_bind_parameter( void *fx_a, void *fx_b, int n_out_p, int n_in_p
 		free(bt);
 		return NULL;
 	}
-	bt->p[0] = n_out_p;
-	bt->p[1] = n_in_p;
-	bt->entry = n_in_entry;
+	bt->p[BIND_OUT_P] = n_out_p;
+	bt->p[BIND_IN_P] = n_in_p;
+	bt->p[BIND_ENTRY] = n_in_entry;
 
 	veejay_msg(0, "New bind %d %d %d", n_out_p,n_in_p, n_in_entry );
 	
@@ -3632,6 +3634,7 @@ int	sample_new_bind( void *sample, void *src_entry,int n_out_p,  int dst_entry, 
 	char param_key[64];
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
 
+	veejay_msg(0, "Out = %d, In = %d, Entry = %d", n_out_p, n_in_p, dst_entry );
 	fx_slot_t *dst_slot = sample_get_fx_port_ptr( srd, dst_entry );
 	fx_slot_t *src_slot = (fx_slot_t*) src_entry;
 
@@ -3698,65 +3701,87 @@ int	sample_apply_bind( void *sample, void *current_entry, int k_entry )
 	{
 		void *bp = NULL;
 		int error = vevo_property_get( slot->bind, items[i],0,&bp );
-
-veejay_msg(0,"\t apply bind '%s' : error %d", items[i], error );
 		if( error == VEVO_NO_ERROR )
 		{
-		bind_parameter_t *bpt = (bind_parameter_t*) bp;
 
-		void *fx_b = NULL;
-		fx_slot_t *dst_slot = sample_get_fx_port_ptr( srd, bpt->entry );
+			bind_parameter_t *bpt = (bind_parameter_t*) bp;
 
-		if(dst_slot->active && slot->active)
-		{
-			double weight = 0.0;
-			int    iw = 0;
-			double value=0.0;
-			char *path = plug_get_osc_path_parameter( dst_slot->fx_instance, bpt->p[1] );
-			char *fmt  = plug_get_osc_format( dst_slot->fx_instance, bpt->p[1]);
-			char pkey[8];
-			sprintf(pkey, "p%02d",bpt->p[0]);
-			void *sender = veejay_get_osc_sender( srd->user_data );
+			void *fx_b = NULL;
+			fx_slot_t *dst_slot = sample_get_fx_port_ptr( srd, bpt->p[BIND_ENTRY] );
 
-			char *output_pname[128];
-			char *output_pval = vevo_sprintf_property_value( slot->out_values, pkey );
-
-			sprintf(output_pname, "o%02d", bpt->p[0]);
-			if(bpt->kind == HOST_PARAM_INDEX)
+			if(dst_slot->active && slot->active)
 			{
-				if( vevo_property_get( slot->out_values, pkey,0,&value ) == VEVO_NO_ERROR )
+				double weight = 0.0;
+				int    iw = 0;
+				double value=0.0;
+				char *path = plug_get_osc_path_parameter( dst_slot->fx_instance, bpt->p[BIND_IN_P] );
+				char *fmt  = plug_get_osc_format( dst_slot->fx_instance, bpt->p[BIND_IN_P]);
+				char pkey[8];
+				sprintf(pkey, "p%02d",bpt->p[BIND_OUT_P]);
+				void *sender = veejay_get_osc_sender( srd->user_data );
+
+				char *output_pname[128];
+				char *output_pval = vevo_sprintf_property_value( slot->out_values, pkey );
+
+				sprintf(output_pname, "o%02d", bpt->p[BIND_OUT_P]);
+				if(bpt->kind == HOST_PARAM_INDEX)
 				{
-					weight = 1.0 / (bpt->max[1] - bpt->min[1]);
-					iw = (int) ( value * weight );
-					plug_set_parameter( dst_slot->fx_instance, bpt->p[1], 1, &iw );
-					if(path && sender)
-						veejay_bundle_add( sender, path, fmt, iw );
-					if(sender)
-						veejay_xbundle_add( sender,dwin , output_pname,"s", (output_pval==NULL ? " " : output_pval) );
+					if( vevo_property_get( slot->out_values, pkey,0,&value ) == VEVO_NO_ERROR )
+					{
+						weight = 1.0 / (bpt->max[1] - bpt->min[1]);
+						iw = (int) ( value * weight );
+						plug_set_parameter( dst_slot->fx_instance, bpt->p[BIND_IN_P], 1, &iw );
+						if(path && sender)
+							veejay_bundle_add( sender, path, fmt, iw );
+						if(sender)
+							veejay_xbundle_add( sender,dwin , output_pname,"s", (output_pval==NULL ? " " : output_pval) );
+					}
 				}
-			}
-			else if(bpt->kind == HOST_PARAM_NUMBER)
-			{
-				if( vevo_property_get( slot->out_values, pkey,0,&value ) == VEVO_NO_ERROR )
+				else if(bpt->kind == HOST_PARAM_NUMBER)
 				{
-					double norm = (1.0 / (bpt->max[0] - bpt->min[0])) * value;
-					double gv = (bpt->max[1] - bpt->min[1]) * norm + bpt->min[1];
-					plug_set_parameter( dst_slot->fx_instance, bpt->p[1], 1, &gv );
-					if(path && sender)
-						veejay_bundle_add( sender, path, fmt, gv );
-					if(sender)
-						veejay_xbundle_add( sender, dwin, output_pname,"s",(output_pval==NULL ? " " : output_pval));
+					int err = vevo_property_get( slot->out_values, pkey,0,&value );
+				        if( err	== VEVO_NO_ERROR )
+					{
+						double norm = (1.0 / (bpt->max[0] - bpt->min[0])) * value;
+						double gv = (bpt->max[1] - bpt->min[1]) * norm + bpt->min[1];
+						plug_set_parameter( dst_slot->fx_instance, bpt->p[BIND_IN_P], 1, &gv );
+	
+						if(path && sender)
+							veejay_bundle_add( sender, path, fmt, gv );
+						if(sender)
+							veejay_xbundle_add( sender, dwin, output_pname,"s",(output_pval==NULL ? " " : output_pval));
+					}
+#ifdef STRICT_CHECKING
+					else
+					{
+						veejay_msg(0, "key is '%s' , error code %d", pkey,err );
+						char **items = vevo_list_properties( slot->out_values );
+						if(!items) veejay_msg(0,"\tThere are no items!");
+						else
+						{
+							int l;
+							for(l =0; items[l] != NULL;l++ )
+							{
+								veejay_msg(0,"have item '%s'", items[l]);
+								free(items[l]);
+							}
+							free(items[l]);
+						}
+					}
+
+#endif	
 				}
+				if(path) free(path);
+				if(fmt)  free(fmt);
+				if(output_pval) free(output_pval);
+
 			}
 			else 
 			{
 				veejay_msg(0, "Kind is not compatible: %d", bpt->kind );
 			}
-			if(path) free(path);
-			if(fmt)  free(fmt);
-			if(output_pval) free(output_pval);
 		}
-		}
+		
 		free( items[i] );
 	}
 	free(items);

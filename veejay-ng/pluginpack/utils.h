@@ -92,6 +92,15 @@ static int max_power(int w)
         return i;
 }
 
+static uint8_t _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
+{
+        register int x;
+        for(x = 0; x < 9; x ++ )
+                if((kernel[x] * img[x]) > 0 )
+                        return 0xff;
+        return 0;
+}
+
 static	int	lvd_is_yuv444( int palette )
 {
 	if( palette == LIVIDO_PALETTE_YUV444P )
@@ -120,6 +129,36 @@ static	int	lvd_uv_plane_len( int palette, int w, int h )
 
 	}
 	return 0;
+}
+
+static	int	lvd_uv_dimensions( int palette, int w, int h, int *uw, int *uh )
+{
+	switch(palette)
+	{	
+		case LIVIDO_PALETTE_YUV422P:
+			*uw = w;
+		        *uh = h/2;
+			return 1;
+			break;
+		case LIVIDO_PALETTE_YUV420P:
+			*uw = w/2;
+			*uh = h/2;
+			return 1;
+			break;
+		case LIVIDO_PALETTE_YUV444P:
+			*uw = w;
+			*uh = h;
+			return 1;
+			break;
+		default:
+#ifdef STRICT_CHECKING
+			assert(0);
+#endif
+			break;
+
+	}
+	return 0;
+
 }
 
 static	double	lvd_extract_param_number( livido_port_t *instance, const char *pname, int n )

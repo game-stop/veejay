@@ -665,6 +665,53 @@ GtkWidget	*director_get_sample_pad(void)
 	return SamplePad_;
 }
 
+
+
+void	on_about_clicked(GtkWidget *w, gpointer user_data)
+{
+    const gchar *authors[] = { 
+      "Niels Elburg <nelburg@looze.net>",
+      NULL 
+    };
+
+	const gchar *license = 
+	{
+		"Veejay-NG\thttp://veejay.dyne.org\n\n"\
+		"This program is Free Software; You can redistribute it and/or modify\n"\
+		"under the terms of the GNU General Public License as published by\n" \
+		"the Free Software Foundation; either version 2, or (at your option)\n"\
+		"any later version.\n\n"\
+		"This program is distributed in the hope it will be useful,\n"\
+		"but WITHOUT ANY WARRANTY; without even the implied warranty of\n"\
+		"MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n"\
+		"See the GNU General Public License for more details.\n\n"\
+		"For more information , see also: http://www.gnu.org\n"
+	};
+
+	char path[1024];
+	bzero(path,1024);
+	//get_gd( path, NULL,  "veejay-logo.png" );
+//	sprintf(path,"/usr/local/share/veejay/veejay-logo.png");
+//	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file
+//		( path, NULL );
+	GtkWidget *about = g_object_new(
+		GTK_TYPE_ABOUT_DIALOG,
+		"name", "Veejay-NG Live User Interface",
+		"version", VERSION,
+		"copyright", "(C) 2004 - 2006 N. Elburg",
+		"comments", "A graphical interface for Veejay-NG",
+		"authors", authors,
+		"license", license,
+		NULL,NULL,NULL );
+		//"logo", pixbuf, NULL );
+	//g_object_unref(pixbuf);
+
+	g_signal_connect( about , "response", G_CALLBACK( gtk_widget_destroy),NULL);
+	gtk_window_present( GTK_WINDOW( about ) );
+
+}
+
+
 void		director_construct_local_widgets(  )
 {
 	GtkWidget *win = gtk_window_new( GTK_WINDOW_TOPLEVEL );
@@ -718,7 +765,11 @@ void		director_construct_local_widgets(  )
 	gtk_box_pack_end_( mbox, but, FALSE,FALSE, 0);
 	but = gtk_button_new_with_label( "Save Samples" );
 	gtk_box_pack_end_( mbox, but, FALSE,FALSE, 0);
-	
+	but = gtk_button_new_with_label( "About" );
+	g_signal_connect( but, "clicked", (GCallback) on_about_clicked, win );
+
+	gtk_box_pack_end_( mbox, but, FALSE,FALSE, 0);
+
 	gtk_box_pack_end_( hbox, frame, TRUE,TRUE, 0 );
 	gtk_widget_show(frame);
 	gtk_widget_show( bbox );	

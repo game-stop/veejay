@@ -351,7 +351,7 @@ veejay_msg(0, "UI Factory: There are %d input channels", n );
 					parameter, "value " );
 			
 			veejay_ui_bundle_add( osc_send, "/create/label",
-				"ssssx", window,fx_frame,param_id, (parameter_value==NULL ? "inf" : parameter_value) ); //@ updated by apply_bind !!!
+				"ssssx", window,fx_frame,param_id, (parameter_value==NULL ? "   " : parameter_value) ); //@ updated by apply_bind !!!
 			if(parameter_value)
 				free(parameter_value);
 			free(parameter_name );
@@ -494,13 +494,17 @@ void	vevosample_ui_get_bind_list( void *sample, const char *window )
 	for( i = 0; items[i] != NULL ; i ++ )
 	{
 		int n[3];
-		sscanf( items[i], "bp%d_%d_%d", &n[0],&n[1],&n[2] );
-		fx_slot_t *rel = (fx_slot_t*) sample_get_fx_port_ptr( srd, n[1]);
+#ifdef STRICT_CHECKING
+		assert( sscanf( items[i], "bp%d_%d_%d",&n[BIND_OUT_P],&n[BIND_ENTRY],&n[BIND_IN_P] ) == 3 );
+#else
+		sscanf( items[i], "bp%d_%d_%d", &n[BIND_OUT_P],&n[BIND_ENTRY],&n[BIND_IN_P] );
+#endif
+		fx_slot_t *rel = (fx_slot_t*) sample_get_fx_port_ptr( srd, n[BIND_ENTRY]);
 #ifdef STRICT_CHECKING
 		assert( rel->fx_instance != NULL );
 #endif
 
-		if( n[0] == p_num && vevo_property_get(sl->bind, items[i],0,NULL) == VEVO_NO_ERROR )
+		if( n[BIND_OUT_P] == p_num && vevo_property_get(sl->bind, items[i],0,NULL) == VEVO_NO_ERROR )
 		{
 			veejay_msg(0, "'%s' is a valid bind",items[i]);
 			void *filter_template = NULL;
@@ -510,10 +514,10 @@ void	vevosample_ui_get_bind_list( void *sample, const char *window )
 #endif
 			char *fxname = vevo_property_get_string( filter_template, "name" );
 
-			char *pname = _get_in_parameter_name( rel->fx_instance, n[2] );
+			char *pname = _get_in_parameter_name( rel->fx_instance, n[BIND_IN_P] );
 			char list_item[128];
 			snprintf(list_item, 128, "fx_%d '%s' p%d '%s'",
-					n[1], fxname,n[2], pname );
+					n[BIND_ENTRY], fxname,n[BIND_IN_P], pname );
 
 			veejay_message_add_argument( osc_send, msg, "s", list_item );
 
@@ -564,13 +568,13 @@ static	void	vevosample_ui_construct_bind_list( void *sample, int k, int p_num, v
 	for( i = 0; items[i] != NULL ; i ++ )
 	{
 		int n[3];
-		sscanf( items[i], "bp%d_%d_%d", &n[0],&n[1],&n[2] );
-		fx_slot_t *rel = (fx_slot_t*) sample_get_fx_port_ptr( srd, n[1]);
+		sscanf( items[i], "bp%d_%d_%d", &n[BIND_OUT_P],&n[BIND_ENTRY],&n[BIND_IN_P] );
+		fx_slot_t *rel = (fx_slot_t*) sample_get_fx_port_ptr( srd, n[BIND_ENTRY]);
 #ifdef STRICT_CHECKING
 		assert( rel->fx_instance != NULL );
 #endif
 
-		if( n[0] == p_num && vevo_property_get( slot->bind, items[i],0,NULL) == VEVO_NO_ERROR)
+		if( n[BIND_OUT_P] == p_num && vevo_property_get( slot->bind, items[i],0,NULL) == VEVO_NO_ERROR)
 		{
 			void *filter_template = NULL;
 			int error = vevo_property_get( rel->fx_instance, "filter_templ",0 ,&filter_template );
@@ -579,10 +583,10 @@ static	void	vevosample_ui_construct_bind_list( void *sample, int k, int p_num, v
 #endif
 			char *fxname = vevo_property_get_string( filter_template, "name" );
 
-			char *pname = _get_in_parameter_name( rel->fx_instance, n[2] );
+			char *pname = _get_in_parameter_name( rel->fx_instance, n[BIND_IN_P] );
 			char list_item[128];
 			snprintf(list_item, 128, "fx_%d '%s' p%d '%s'",
-					n[1], fxname, n[2],pname );
+					n[BIND_ENTRY], fxname, n[BIND_IN_P],pname );
 
 			veejay_message_add_argument( osc_send, msg, "s", list_item );
 

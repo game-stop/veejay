@@ -95,8 +95,9 @@ typedef struct
 	int	last;				//<<! Last rendered entry
 	int	dlast;
 } performer_t;
-
-
+#ifdef STRICT_CHECKING
+static	int	performer_verify_frame( VJFrame *f );
+#endif
 //! Allocate a new Chunk depending on output pixel format
 /**!
  \param info Veejay Object
@@ -152,6 +153,11 @@ static	VJFrame	*performer_alloc_frame( veejay_t *info, uint8_t *p0, uint8_t *p1,
 	f->data[1] = p1;
 	f->data[2] = p2;
 	f->data[3] = p3;
+
+#ifdef STRICT_CHECKING
+	assert( performer_verify_frame( f) );
+#endif
+	
 	return f;
 }
 
@@ -491,7 +497,7 @@ void	*performer_get_output_frame( veejay_t *info )
 void	performer_clean_output_frame( veejay_t *info )
 {
 	performer_t *p = (performer_t*) info->performer;
-	memset( p->display->data[0],0,p->display->len );
+	memset( p->display->data[0],16,p->display->len );
 	memset( p->display->data[1],128,p->display->uv_len );
 	memset( p->display->data[2],128,p->display->uv_len );
 }
@@ -909,6 +915,39 @@ static	int	performer_push_in_frames( void *sample, performer_t *p, int i )
 	return n_channels;
 }
 
+#ifdef STRICT_CHECKING
+static	int	performer_verify_frame( VJFrame *f )
+{
+	int i;
+	int u = f->uv_len - f->uv_width;
+	int un = f->uv_len;
+	int y = f->len - f->width;
+	int yn = f->len;
+	int fu = 0;
+	int fy = 0;
+	long avg = 0;
+	int avg_;
+	for( i = u; i < un; i ++ )
+	{
+		if( f->data[1][i] < 16 )
+			fu ++;
+		if( f->data[2][i] < 16 )
+			fu ++;
+	}
+	for( i = y; i < yn; i ++ )
+	{
+		if( f->data[0][i] < 16)
+		{	fy ++; avg += f->data[0][i]; avg_ ++; }
+	}
+	if( fu > 0 || fy > 0 )
+	{
+		veejay_msg(0, "Last line fail count: %d,%d, Y average = %d", fu,fy, ( avg > 0 ? avg  / avg_ :0 ));
+		return 0;
+	}
+	return 1;
+}
+#endif
+
 static	int	performer_render_entry( veejay_t *info, void *sample, performer_t *p, int i)
 {
 #ifdef STRICT_CHECKING
@@ -982,6 +1021,9 @@ static void	performer_render_frame( veejay_t *info, int i )
 #endif
 	performer_t *p = (performer_t*) info->performer;
 	p->display = p->ref_buffer[0];
+#ifdef STRICT_CHECKING
+	assert( performer_verify_frame(p->fx_buffer[0]) );
+#endif
 	for( i = 0; i < SAMPLE_CHAIN_LEN; i ++ )
 	{ 
 		if( sample_get_fx_status( cs, i ))

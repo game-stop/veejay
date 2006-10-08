@@ -446,7 +446,14 @@ static	int	livido_scan_out_parameters( void *plugin , void *plugger_port)
 		sprintf(key, "p%02d", n );
 
 		int ikind = 0;
-		char *kind = get_str_vevo( param, "kind" );
+		char *kind = vevo_property_get_string( param, "kind" );
+		//get_str_vevo( param, "kind" );
+
+#ifdef STRICT_CHECKING
+		if( kind == NULL )
+			veejay_msg(0, "\tParameter %d of %d has no property kind", n,NP );
+		assert( kind != NULL );
+#endif
 
 
 		ikind = livido_pname_to_host_kind(kind);

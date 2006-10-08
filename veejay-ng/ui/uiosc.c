@@ -543,8 +543,8 @@ void	osc_new_label(const char *path, const char *types,
 
 	char *window_name = &argv[0]->s;
 	char *panel_name = &argv[1]->s;
-	char *label      = &argv[2]->s;
-	char *label_name = &argv[3]->s;
+	char *label_name      = &argv[2]->s;
+	char *label = &argv[3]->s;
 
 	int  widget_type = LABEL;
 	if( vevo_property_get(info->tree, window_name,0,&stats ) == VEVO_NO_ERROR )
@@ -555,7 +555,7 @@ void	osc_new_label(const char *path, const char *types,
 			veejay_msg(0,"Widget '%s' is not in register!\n", panel_name);
 			return;
 		}
-		builder_new_label_object( stats, container, label_name, label );	
+		builder_new_label_object( stats, container, label, label_name );	
 	//	builder_register_widget(
 	//		stats, window_name, window );
 	}

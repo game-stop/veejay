@@ -1,7 +1,9 @@
 #ifndef LOCALDEFS
 #define LOCALDEFS
 #include <stdint.h>
-
+#define	BIND_OUT_P 0
+#define BIND_IN_P 1
+#define BIND_ENTRY  2
 //! \typedef sampleinfo_t Sample A/V Information structure
 typedef struct
 {
@@ -50,8 +52,7 @@ typedef struct
 {
 	double min[2];
 	double max[2];
-	int    p[2];
-	int    entry;	
+	int    p[3];
 	int    kind;
 } bind_parameter_t;
 
