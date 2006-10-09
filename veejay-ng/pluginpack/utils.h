@@ -16,6 +16,27 @@
 #define fast_sin(d,x) d = sin(x)
 #define fast_cos(d,x) d = cos(x)					       
 #endif	       
+static inline int myround(float n) 
+{
+  if (n >= 0) 
+    return (int)(n + 0.5);
+  else
+    return (int)(n - 0.5);
+}
+
+#define _rgb2yuv(r,g,b,y,u,v)\
+ {\
+        float Ey = (0.299 * (float)r) + (0.587 * (float)g) + (0.114 * (float) b);\
+        float Eu = (-0.168736 * (float)r) - (0.331264 * (float)g) + (0.500 * (float)b) + 128.0;\
+        float Ev = (0.500 * (float)r) - (0.418688 * (float)g) - (0.081312 * (float)b)+ 128.0;\
+        y = myround(Ey);\
+        u = myround(Eu);\
+        v = myround(Ev);\
+        if( y > 0xff ) y = 0xff ; else if ( y < 0 ) y = 0;\
+        if( u > 0xff ) u = 0xff ; else if ( u < 0 ) u = 0;\
+        if( v > 0xff ) v = 0xff ; else if ( v < 0 ) v = 0;\
+ }
+
 
 #ifdef USE_MATRIX_PLACEMENT
 typedef struct
@@ -100,7 +121,15 @@ static uint8_t _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
                         return 0xff;
         return 0;
 }
-
+static uint8_t _erode_kernel3x3( uint8_t *kernel, uint8_t img[9])
+{
+        register int x;
+        /* consider all background pixels (0) in input image */ 
+        for(x = 0; x < 9; x ++ )
+                if(kernel[x] && img[x] == 0 )
+                        return 0;
+        return 0xff;
+}
 static	int	lvd_is_yuv444( int palette )
 {
 	if( palette == LIVIDO_PALETTE_YUV444P )
