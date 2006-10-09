@@ -12,9 +12,14 @@
 #ifdef ARCH_X86
 #define fast_sin(d,x) asm("fsin" : "=t" (d) : "0" (x))
 #define fast_cos(d,x) asm("fcos" : "=t" (d) : "0" (x))
+#define fast_sqrt(res,x) asm ("fsqrt" : "=t" (res) : "0" (x)) 
+#define sin_cos(si, co, x) asm ("fsincos" : "=t" (co), "=u" (si) : "0" (x))
 #else
 #define fast_sin(d,x) d = sin(x)
-#define fast_cos(d,x) d = cos(x)					       
+#define fast_cos(d,x) d = cos(x)
+#define fast_sqrt( res,x ) res = sqrt(x)
+#define sin_cos(si, co, x)     si = sin(x); co = cos(x)
+									
 #endif	       
 static inline int myround(float n) 
 {
