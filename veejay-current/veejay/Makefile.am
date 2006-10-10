@@ -16,7 +16,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/liblavjpeg \
 		-I$(top_srcdir)/libsamplerec \
 		-I$(top_srcdir)/libvevo \
-		$(FFMPEG_CFLAGS)\
+		$(FFMPEG_AVCODEC_CFLAGS) $(FFMPEG_AVFORMAT_CFLAGS)\
 		$(AVIPLAY_CFLAGS) ${XML_CFLAGS} ${GTK_CFLAGS} ${DV_FLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} \
 		$(DIRECTFB_CFLAGS) ${SDL_CFLAGS} ${JPEG_CFLAGS} ${PTHREAD_CFLAGS} ${SAMPLERATE_CFLAGS} ${MJPEGTOOLS_CFLAGS} 
 
@@ -55,9 +55,9 @@ libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
 			-L$(top_builddir)/libvevo -lvevo 
 
-libveejay_la_LDFLAGS +=	${FFMPEG_AVFORMAT_LIBS} ${FFMPEG_AVCODEC_LIBS} \
-			${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} \
+libveejay_la_LDFLAGS +=	${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} \
 			${XML_LIBS} ${JPEG_LIBS} ${JACK_LIBS} \
+		 	${FFMPEG_AVFORMAT_LIBS} ${FFMPEG_AVCODEC_LIBS} \
 			${LIBDV_LIBS} ${LIBM_LIBS} ${PIXBUF_LIBS} ${MJPEGTOOLS_LIBS}\
 			-DDYNAMIC -O3 -Wall -rdynamic 
 

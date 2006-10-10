@@ -729,7 +729,7 @@ fi
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
 
-  PKG_CHECK_MODULES(FFMPEG_AVCODEC, [libavcodec],
+PKG_CHECK_MODULES(FFMPEG_AVCODEC, [libavcodec],
                     [
  		     AC_SUBST( FFMPEG_AVCODEC_CFLAGS )
 		     AC_SUBST( FFMPEG_AVCODEC_LIBS )
@@ -738,7 +738,7 @@ AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [have_avcodec=false])
 
 
-  PKG_CHECK_MODULES(FFMPEG_AVCODEC, [libavformat],
+PKG_CHECK_MODULES(FFMPEG_AVFORMAT, [libavformat],
                     [
  		     AC_SUBST( FFMPEG_AVFORMAT_CFLAGS )
 		     AC_SUBST( FFMPEG_AVFORMAT_LIBS )
