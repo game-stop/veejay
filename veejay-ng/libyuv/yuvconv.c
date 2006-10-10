@@ -329,7 +329,7 @@ void yuy2toyv16(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 //before:
 #endif
 
-#ifdef HAVE_MMX
+#ifdef HAVE_ASM_MMX
 void	yuv422_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
 {
 	int j,jmax,imax,i;
@@ -355,6 +355,8 @@ void	yuv422_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
 
 	emms();
 }
+#endif
+/*
 void	yuv444_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
 {
 	int j,jmax,imax,i;
@@ -374,15 +376,16 @@ void	yuv444_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
 			PLANAR_TO_YUY2
 			dst += 16;
 			src_y += 8;
-			src_u += 4;
+			src_u += 4;			src_y += 8;
+			
 			src_v += 4;
 		}
 	}
 
 	emms();
 }
-#else
-
+*/
+#ifndef HAVE_ASM_MMX
 void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
 {
     int x,y;
@@ -411,13 +414,17 @@ void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
 		}
     }
 }
-
+#endif
 //after
 //#endif
-void yuv444_to_yuyv(uint8_t *data[3], uint8_t *pixels, int w, int h)
+
+void yuv444_to_yuyv(void *sampler, uint8_t *data[3], uint8_t *pixels, int w, int h)
 {
 	int x,y;
-	for(y = 0; y < h; y ++ )
+	chroma_subsample( SSM_422_444, sampler, data, w, h );
+	yuv422_to_yuyv( data, pixels, w,h);
+
+	/*for(y = 0; y < h; y ++ )
 	{
 		uint8_t *Y = data[0] + y * w;
 		uint8_t *U = data[1] + y * w;
@@ -438,10 +445,9 @@ void yuv444_to_yuyv(uint8_t *data[3], uint8_t *pixels, int w, int h)
 			U+=2;
 			V+=2;
 		}
-	}
+	}*/
 }
 
-#endif
 
 
 

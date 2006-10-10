@@ -43,6 +43,7 @@ typedef struct vj_sdl_t {
     char last_error[255];
     int  custom_geo[2];
     int	fs;
+    void *sampler;
 } vj_sdl;
 
 vj_sdl *vj_sdl_allocate(int width, int height, int pixel_format);

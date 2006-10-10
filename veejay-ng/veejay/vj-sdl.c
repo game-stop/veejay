@@ -50,7 +50,10 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
     vjsdl->custom_geo[0] = -1;
     vjsdl->custom_geo[1] = -1;
     vjsdl->show_cursor = 0;
-    vjsdl->fs = 0;
+    vjsdl->fs = 0; 
+    vjsdl->sampler = NULL;
+    if(fmt == FMT_444)
+	    vjsdl->sampler = subsample_init( width );
     return vjsdl;
 }
 
@@ -267,7 +270,7 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, void *data)
 			yuv422_to_yuyv( frame->data, vjsdl->yuv_overlay->pixels[0], frame->width,frame->height);
 		break;
 		case FMT_444:
-			yuv444_to_yuyv( frame->data, vjsdl->yuv_overlay->pixels[0], frame->width, frame->height);
+			yuv444_to_yuyv( vjsdl->sampler, frame->data, vjsdl->yuv_overlay->pixels[0], frame->width, frame->height);
 		break;
 		default:
 			return 0;
