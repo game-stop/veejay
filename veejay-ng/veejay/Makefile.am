@@ -3,7 +3,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
-		-DG_LOG_DOMAIN=\"veejay\" -DVEEJAY_VERSION=\"$(VERSION)\" \
+		-DG_LOG_DOMAIN=\"veejayng\" -DVEEJAY_VERSION=\"$(VERSION)\" \
      		-I /usr/X11R6/include \
 		-I$(top_srcdir)/libhash \
 		-I$(top_srcdir)/libvje \
@@ -21,7 +21,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		${XML_CFLAGS} ${DV_FLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} \
 		${PTHREAD_CFLAGS} ${MJPEGTOOLS_CFLAGS} ${GL_CFLAGS} ${SDL_CFLAGS} ${LIBLO_CFLAGS} 
 
-VEEJAY_LIB_FILE = libveejay.la
+VEEJAY_LIB_FILE = libveejayng.la
 
 lib_LTLIBRARIES = $(VEEJAY_LIB_FILE) 
 
@@ -30,7 +30,7 @@ VEEJAY_ALL_LIB_OPTS = \
 	-release $(LT_RELEASE) \
 	-export-dynamic 
 
-libveejay_la_SOURCES =  vj-misc.c \
+libveejayng_la_SOURCES =  vj-misc.c \
 			vj-pjack.c performer.c \
 			gl.c vj-sdl.c \
 			oscsend.c \
@@ -38,9 +38,9 @@ libveejay_la_SOURCES =  vj-misc.c \
 			oscevents.c \
 			liblavplayvj.c
 
-libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS )
+libveejayng_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS )
 
-libveejay_la_LIBADD = -L$(top_builddir)/libhash / -lhash \
+libveejayng_la_LIBADD = -L$(top_builddir)/libhash / -lhash \
 			-L$(top_builddir)/bio2jack/ -lbio2jack \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
 			-L$(top_builddir)/libvjmem/ -lvjmem \
@@ -62,11 +62,11 @@ libveejay_la_LIBADD = -L$(top_builddir)/libhash / -lhash \
 
 # *********************************************************************
 # The tools themselves
-VEEJAY_BIN = veejay
+VEEJAY_BIN = veejayng
 
 bin_PROGRAMS = $(VEEJAY_BIN)  
 
-veejay_SOURCES	= veejay.c  
-veejay_LDADD 	= libveejay.la @LIBGETOPT_LIB@ ${FFMPEG_AVCODEC_LIBS} ${FFMPEG_AVFORMAT_LIBS} \
+veejayng_SOURCES	= veejay.c  
+veejayng_LDADD 	= libveejayng.la @LIBGETOPT_LIB@ ${FFMPEG_AVCODEC_LIBS} ${FFMPEG_AVFORMAT_LIBS} \
 			${PTHREAD_LIBS} ${XML_LIBS} ${LIBDV_LIBS} ${GL_LIBS} \
 			${MJPEGTOOLS_LIBS} ${UNICAP_LIBS} ${LIBM_LIBS}  ${SDL_LIBS} ${LIBLO_LIBS}
