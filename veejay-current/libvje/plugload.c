@@ -578,7 +578,7 @@ veejay_msg(VEEJAY_MSG_DEBUG, "%d: '%s' ",n_files, path );
 				dlclose( handle );
 		}
 
-		if(dlsym( handle, "livido_setup" ))
+	/*	if(dlsym( handle, "livido_setup" ))
 		{
 			void *plugin = deal_with_livido( handle , name );
 veejay_msg(VEEJAY_MSG_DEBUG, "Load livido plugin '%s'",name);
@@ -591,6 +591,8 @@ veejay_msg(VEEJAY_MSG_DEBUG, "Load livido plugin '%s'",name);
 			else
 				dlclose(handle);
 		}
+		//@FIXME: backport livido from veejay-ng
+		*/
 
 	}
 

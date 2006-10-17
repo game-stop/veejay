@@ -678,8 +678,10 @@ uint8_t bl_pix_multiply_Y(uint8_t y1, uint8_t y2)
 uint8_t bl_pix_divide_Y(uint8_t y1, uint8_t y2)
 {
 	int c = y1 * y2;
-	if( c < 16 ) return 16;
-	return ( c / (0xff-y2) );
+	int b = 0xff - y2;
+	if( b < 16 || c < 16 )
+		return 16;
+	return ( c / b );
 }
 
 uint8_t bl_pix_additive_Y(uint8_t y1, uint8_t y2)

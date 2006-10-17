@@ -26,7 +26,7 @@
 
 vj_effect *slidingdoor_init(int width, int height);
 void slidingdoor_apply( VJFrame *frame, VJFrame *frame2, int width,
-		       int height, int n, int size);
+		       int height, int size);
 
 
 #endif

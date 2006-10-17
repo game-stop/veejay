@@ -4367,10 +4367,11 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	int has_samples = 0;
 	int has_streams = 0;
 	int n_slots = 0;
+	reset_tree( "tree_sources" );
 
 	if( with_reset_slotselection )
 	{
-		reset_tree( "tree_sources" );
+	//	reset_tree( "tree_sources" );
 		reset_samplebank();
 	}
 	multi_vims( VIMS_SAMPLE_LIST,"%d", 0 );

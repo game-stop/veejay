@@ -312,7 +312,7 @@ extern void smuck_apply( VJFrame *frame, VJFrame *frame2, int width,
 extern void colorfade_apply( VJFrame *frame, int width, int height,
 			    int op, int color);
 extern void slidingdoor_apply( VJFrame *frame, VJFrame *frame2,
-			      int width, int height, int n, int size);
+			      int width, int height, int size);
 extern void transop_apply(VJFrame *frame, VJFrame *frame2, int twidth,
 			  int theight, int x1, int y1, int x2, int y2,
 			  int width, int height, int opacity);

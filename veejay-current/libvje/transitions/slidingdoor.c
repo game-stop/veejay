@@ -25,26 +25,21 @@
 vj_effect *slidingdoor_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) malloc(sizeof(vj_effect));
-    ve->num_params = 3;
+    ve->num_params = 2;
     ve->defaults = (int *) malloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) malloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) malloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 1; /* hori or verti */
-    ve->defaults[1] = 1; /* initial size */
-    ve->defaults[2] = 1; /* auto or not auto */
+    ve->defaults[0] = 1; /* initial size */
+    ve->defaults[1] = 1; /* auto or not auto */
     //ve->defaults[3] = 25; /* max frames */
 
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = height / 16;
+    ve->limits[0][0] = 1;
+    ve->limits[1][0] = height / 16;
 
     ve->sub_format = 1;
 
-    ve->limits[0][0] = 0;
-    ve->limits[1][0] = 1;
-    ve->limits[0][2] = 0;
-    ve->limits[1][2] = 1;
-    //ve->limits[0][3] = 1;
-    //ve->limits[1][3] = (25 * 120);
+    ve->limits[0][1] = 0;
+    ve->limits[1][1] = 1;
 
     ve->description = "Transition Sliding Door";
     ve->extra_frame = 1;
@@ -55,22 +50,23 @@ vj_effect *slidingdoor_init(int width, int height)
 
 
 void slidingdoor_apply( VJFrame *frame, VJFrame *frame2, int width,
-		       int height, int n, int size)
+		       int height, int size)
 {
-
-	if( n== 0)
-	{
-		frameborder_yuvdata( frame->data[0],frame->data[1],frame->data[2],
-							   frame2->data[0],frame2->data[1],frame2->data[2],
-							   width,height, size*16, size*16, 0, 0, frame->shift_h, frame->shift_v );
-	}
-	else
-	{
-		frameborder_yuvdata( frame->data[0],frame->data[1],frame->data[2],
-							   frame2->data[0],frame2->data[1],frame2->data[2],
-							   width,height, 0,0, size*16,size*16, frame->shift_h, frame->shift_v );
-
-	}
+/*
+	frameborder_yuvdata(
+		frame->data[0],
+		frame->data[1],
+		frame->data[2],
+		frame2->data[0],
+		frame2->data[1],
+		frame2->data[2],
+		width,height,
+		size*16,
+		size*16,
+		0,
+		0,
+		frame->shift_h,
+		frame->shift_v );*/
 
 }
 void slidingdoor_free(){}
