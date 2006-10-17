@@ -38,6 +38,8 @@ AC_SUBST(LT_AGE)
 dnl **********************************************************************
 dnl Options
 AC_ARG_ENABLE(assertions,
+	[ --enable-mpool,	Use memory pool])
+AC_ARG_ENABLE(assertions,
 	[ --enable-assertions,	Turn on runtime assertion checking.])
 AC_ARG_ENABLE(compile-warnings,     
   [  --enable-compile-warnings,        Turn on compiler warnings.])
@@ -129,6 +131,10 @@ if test "x$enable_assertions" != "xno"; then
  fi
 fi
 
+if test "x$enable_mpool" != "xno"; then
+	AC_DEFINE(HAVE_MEMPOOL,,[memory pool])
+fi
+
 AC_MSG_RESULT($warnCFLAGS)
 if test "x$cflags_set" != "xyes" ; then
   CFLAGS="$CFLAGS $warnCFLAGS"
@@ -139,7 +145,6 @@ AC_CONFIG_FILES([
 Makefile
 src/Makefile
 include/Makefile
-examples/Makefile
 test/Makefile
 vevo-config
 ])

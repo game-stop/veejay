@@ -1,6 +1,6 @@
 # Process with automake to produce Makefile.in
 
-SUBDIRS    = src include test examples 
+SUBDIRS    = src include test  
 
 bin_SCRIPTS = vevo-config
 

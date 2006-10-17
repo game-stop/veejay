@@ -25,44 +25,12 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
-# ifndef VEVO_H_INCLUDED
-# define VEVO_H_INCLUDED
-
-#include <stdio.h>
-#include <stdint.h>
-
-#ifndef FALSE
-#define FALSE 0
+#ifndef VEVO_LOW_LEVEL_H
+#define VEVO_LOW_LEVEL_H
+/* Mediation layer structures, provided by this host */
+typedef struct {
+    int type;
+    void *value;
+    size_t size;
+} atom_t;
 #endif
-#ifndef TRUE
-#define TRUE 1
-#endif
-
-#define HAVE_VEVO_PORT_T
-typedef void livido_port_t;
-
-
-///# sed s/LIVIDO/VEVO
-#define VEVO_PROPERTY_READONLY (1<<0)
-
-#define VEVO_NO_ERROR 0
-#define VEVO_ERROR_MEMORY_ALLOCATION 1
-#define VEVO_ERROR_PROPERTY_READONLY 2
-#define VEVO_ERROR_NOSUCH_ELEMENT 3
-#define VEVO_ERROR_NOSUCH_PROPERTY 4
-#define VEVO_ERROR_WRONG_ATOM_TYPE 5
-#define VEVO_ERROR_TOO_MANY_INSTANCES 6
-#define VEVO_ERROR_HARDWARE 7
-#define VEVO_ATOM_TYPE_INT 1
-#define VEVO_ATOM_TYPE_DOUBLE 2
-#define VEVO_ATOM_TYPE_BOOLEAN 3
-#define VEVO_ATOM_TYPE_STRING 4
-#define VEVO_ATOM_TYPE_VOIDPTR 65
-#define VEVO_ATOM_TYPE_PORTPTR 66
-
-
-# endif
-
-
-

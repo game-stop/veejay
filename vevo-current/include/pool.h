@@ -26,43 +26,28 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-# ifndef VEVO_H_INCLUDED
-# define VEVO_H_INCLUDED
-
-#include <stdio.h>
-#include <stdint.h>
-
-#ifndef FALSE
-#define FALSE 0
+#ifndef VEVO_POOL_H
+#define VEVO_POOL_H
+#ifdef VEVO_MEMPOOL
+/* Have 160 atoms and 160 atom slots available ,
+   uses aprox. 4Kb of memory.
+   Use a value that is a multiple of 4
+ */
+#ifndef VEVO_MEM_LIMIT
+#define VEVO_MEM_LIMIT 2048
 #endif
-#ifndef TRUE
-#define TRUE 1
 #endif
 
-#define HAVE_VEVO_PORT_T
-typedef void livido_port_t;
+#define ATOM_INT 0
+#define ATOM_PTR 1
+#define ATOM_DBL 2
+#define ATOM_ATOM 3
 
+void *vevo_new_pool(void);
+void vevo_free_pool(void *v);
 
-///# sed s/LIVIDO/VEVO
-#define VEVO_PROPERTY_READONLY (1<<0)
+void *vevo_malloc(void *v, int vevo_type);
+int vevo_pool_verify(void *v);
+void vevo_free(void *v, void *ptr, int vevo_type);
 
-#define VEVO_NO_ERROR 0
-#define VEVO_ERROR_MEMORY_ALLOCATION 1
-#define VEVO_ERROR_PROPERTY_READONLY 2
-#define VEVO_ERROR_NOSUCH_ELEMENT 3
-#define VEVO_ERROR_NOSUCH_PROPERTY 4
-#define VEVO_ERROR_WRONG_ATOM_TYPE 5
-#define VEVO_ERROR_TOO_MANY_INSTANCES 6
-#define VEVO_ERROR_HARDWARE 7
-#define VEVO_ATOM_TYPE_INT 1
-#define VEVO_ATOM_TYPE_DOUBLE 2
-#define VEVO_ATOM_TYPE_BOOLEAN 3
-#define VEVO_ATOM_TYPE_STRING 4
-#define VEVO_ATOM_TYPE_VOIDPTR 65
-#define VEVO_ATOM_TYPE_PORTPTR 66
-
-
-# endif
-
-
-
+#endif
