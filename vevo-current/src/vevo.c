@@ -35,6 +35,8 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <include/vevo.h>
 #include <include/hash.h>
 
+
+/* If defined, dont expect a major performance improvment. */
 #ifdef VEVO_MEMPOOL
 #include <include/pool.h>
 #endif
@@ -97,13 +99,41 @@ static livido_property_t *prop_node_new(int hash_key,
     return p;
 }
 
+//copied from Mplayer:
+/* for small memory blocks (<256 bytes) this version is faster */
+#define small_memcpy(to,from,n)\
+{\
+register unsigned long int dummy;\
+__asm__ __volatile__(\
+  "rep; movsb"\
+  :"=&D"(to), "=&S"(from), "=&c"(dummy)\
+  :"0" (to), "1" (from),"2" (n)\
+  : "memory");\
+}
+
+static inline	void	smemcpy( void *to, const void *from, size_t len )
+{
+	if(len<0xff)
+	{
+		small_memcpy(to,from,len);
+	}
+	else
+	{
+		register unsigned int i; //@ 1 byte at a time
+		unsigned char *t = (unsigned char*) to;
+		const unsigned char *f = (const unsigned char*) from;
+		for( i = 0; i < len; i ++ )
+			t[i] = f[i];
+	}	
+}
+
+
 static void prop_node_free(livido_property_t * p)
 {
     if (p) {
 	free(p);
     }
 }
-
 
 static livido_property_t *prop_node_append(livido_port_t * p, int key,
 					   livido_storage_t * t)
@@ -204,7 +234,7 @@ for (i = 0; i < d->num_elements; i++)\
 
 #define array_load__(value) {\
 for( i = 0; i < t->num_elements ; i ++ )\
- memcpy( &value[i], t->elements.array[i]->value, t->elements.array[i]->size ); }
+ smemcpy( &value[i], t->elements.array[i]->value, t->elements.array[i]->size ); }
 
 
 /* fast key hashing */
@@ -268,11 +298,11 @@ static int atom_get_value(livido_storage_t * t, int idx, void *dst)
 	return VEVO_NO_ERROR;
 
     if (t->atom_type != VEVO_ATOM_TYPE_STRING) {
-	memcpy(dst, atom->value, atom->size);
+	smemcpy(dst, atom->value, atom->size);
     } else {
 	char **ptr = (char **) dst;
 	char *p = *ptr;
-	memcpy(p, atom->value, (atom->size - 1));
+	smemcpy(p, atom->value, (atom->size - 1));
 	p[atom->size - 1] = '\0';
     }
 
@@ -366,7 +396,7 @@ static atom_t *livido_put_atom(__vevo_port_t * port, void *dst,
 	atom_size = strlen(*s) + 1;
 	atom = livido_new_atom(port, atom_type, atom_size);
 	if (atom_size > 0)
-	    memcpy(atom->value, *s, (atom_size - 1));
+	    smemcpy(atom->value, *s, (atom_size - 1));
     } else {
 
 #ifdef STRICT_CHECKING
@@ -382,7 +412,7 @@ static atom_t *livido_put_atom(__vevo_port_t * port, void *dst,
 	if (!atom)
 	    return NULL;
 #endif
-	memcpy(atom->value, dst, atom_size);
+	smemcpy(atom->value, dst, atom_size);
     }
     return atom;
 }
@@ -573,7 +603,8 @@ livido_property_element_size(livido_port_t * p, const char *key,
 	if ((node = property_exists(port, hash_key)) != NULL) {
 	    livido_storage_t *stor = (livido_storage_t *) hnode_get(node);
 #ifdef STRICT_CHECKING
-	    assert(idx < stor->num_elements);
+		if(idx > 0 )
+	    		assert(idx < stor->num_elements);
 #endif
 	    //todo: sum all element sizes for index of -1 
 	    if (stor->num_elements == 1) {

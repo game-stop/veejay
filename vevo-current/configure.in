@@ -132,7 +132,7 @@ if test "x$enable_assertions" != "xno"; then
 fi
 
 if test "x$enable_mpool" != "xno"; then
-	AC_DEFINE(HAVE_MEMPOOL,,[memory pool])
+	AC_DEFINE(VEVO_MEMPOOL,,[memory pool])
 fi
 
 AC_MSG_RESULT($warnCFLAGS)
