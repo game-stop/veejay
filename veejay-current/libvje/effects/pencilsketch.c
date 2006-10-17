@@ -97,6 +97,7 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 		if(b <= 0 ) b=16;
 		int p = 255 - ((255-a) * (255-a)) / a;
 		int q = 255 - ((255-b) * (255-b)) / b;
+		if(q <= 0 ) q=16;
 		p = ( 255 - ((255-p) * (255 - a)) / q);
 	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
 		return (uint8_t)p;
