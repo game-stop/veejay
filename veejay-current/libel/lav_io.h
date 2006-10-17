@@ -65,6 +65,7 @@ typedef struct
 #ifdef SUPPORT_READ_DV2
    dv_t		*dv_fd;
 #endif
+	void	*qt_fd;
    int         jpeg_fd;
    char        *jpeg_filename;
 #ifdef USE_GDK_PIXBUF

@@ -324,6 +324,16 @@ if test x$with_libdv != xno ; then
                     [have_libdv=false])
 fi
 
+have_libquicktime=false
+if test x$with_libquicktime != xno ; then
+  PKG_CHECK_MODULES(LIBQUICKTIME, [libquicktime > 0.9.7],
+                    [have_libquicktime=true
+                     AC_DEFINE(HAVE_LIBQUICKTIME, 1, [libquicktime > 0.9.7 prese
+nt])],
+                    [have_libquicktime=false])
+fi
+AM_CONDITIONAL(HAVE_LIBQUICKTIME, test x$have_libquicktime = xtrue)
+
 
 
 dnl ********************************************************************
@@ -969,6 +979,7 @@ fi
 AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
 AC_MSG_NOTICE([  - AVI MJPEG playback/recording  : true (always)])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
+AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - FFmpeg AVFormat               : ${have_avformat} ])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])

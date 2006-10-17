@@ -49,7 +49,7 @@
 #include "rawdv.h"
 #include "vj-dv.h"
 #endif
-#define MAX_CODECS 12
+#define MAX_CODECS 32
 #define CODEC_ID_YUV420 999
 #define CODEC_ID_YUV422 998
 
@@ -94,6 +94,8 @@ static struct
         { "divx"   ,CODEC_ID_MSMPEG4V3 },
         { "i420",   CODEC_ID_YUV420 },
         { "i422",   CODEC_ID_YUV422 },
+	{ "svq1",	CODEC_ID_SVQ1 },
+	{ "rpza",	CODEC_ID_RPZA },
         { NULL  , 0 },
 };
 
@@ -130,6 +132,8 @@ static struct
 	{ "pict",	0xffff	}, /* invalid fourcc */
 	{ "hfyu",	CODEC_ID_HUFFYUV},
 	{ "cyuv",	CODEC_ID_CYUV   },
+	{ "svq1",	CODEC_ID_SVQ1	},
+	{ "rpza",	CODEC_ID_RPZA	},
 #if LIBAVCODEC_BUILD > 4680
 	{ "spsx",	CODEC_ID_SP5X	},
 #endif
@@ -164,7 +168,9 @@ static	_el_get_codec(int id )
 	for( i = 0; _supported_codecs[i].name != NULL ; i ++ )
 	{
 		if( _supported_codecs[i].id == id )
+		{
 			return i;
+		}
 	}
 	return -1;
 }
@@ -300,6 +306,10 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
         if(!d)
 	  return NULL;
 	memset( d, 0, sizeof(vj_decoder));
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "\tCodec %x (%d) , %d x %d at %f, in=%d, out=%d",
+			id,id,width,height,fps,pixel_format,out_fmt);
+	
 #ifdef SUPPORT_READ_DV2
         if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 && id != CODEC_ID_DVVIDEO)
         {
@@ -371,8 +381,6 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 #endif		
 	}       
 
-
-
         d->tmp_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height * 4 );
         if(!d->tmp_buffer)
 	{
@@ -424,18 +432,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 //@@ should identify sampling format, 411,420,444
 static int _el_probe_for_pixel_fmt( lav_file_t *fd )
 {
-	switch( fd->MJPG_chroma )
-	{
-		case CHROMA411:
-			return FMT_411;
-		case CHROMA420:
-			return FMT_420;
-		case CHROMA422:
-			return FMT_422;
-		case CHROMA444:
-			return FMT_444;
-	}
-	return FMT_444;
+	return lav_video_cmodel( fd );
 }
 
 int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force, char override_norm)
@@ -532,7 +529,6 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	}
 
 	el->yuv_taste[n] = pix_fmt;
-veejay_msg(VEEJAY_MSG_DEBUG, "%s : %d", __FUNCTION__, pix_fmt );
 
 	if(lav_video_frames(el->lav_fd[n]) < 2)
 	{
@@ -732,10 +728,9 @@ veejay_msg(VEEJAY_MSG_DEBUG, "%s : %d", __FUNCTION__, pix_fmt );
 		if(el->video_file_list[n]) free(el->video_file_list[n]);
 		return -1;
 	}
-
+	veejay_msg(0, "video compressor %s", compr_type );
      // initialze a decoder if needed
 	decoder_id = _el_get_codec_id( compr_type );
-
 	if(decoder_id > 0 && decoder_id != 0xffff)
 	{
 		int c_i = _el_get_codec(decoder_id);
@@ -759,10 +754,14 @@ veejay_msg(VEEJAY_MSG_DEBUG, "%s : %d", __FUNCTION__, pix_fmt );
 				if( el->video_file_list[n]) free(el->video_file_list[n]);
 				return -1;
 			}
+			else
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "\tDecoder %s initialized in slot %d", compr_type, c_i);
+			}
 		}
 	}
 
-	if(decoder_id == 0)	
+	if(decoder_id <= 0)	
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Dont know how to handle %s (fmt %d) %x", compr_type, pix_fmt,decoder_id);
 		if(realname) free(realname);
@@ -880,22 +879,28 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 		{
 			veejay_msg(VEEJAY_MSG_ERROR,"Error setting video position: %s",
 				  lav_strerror());
+			return -1;
  		}
 	}
 
 	c_i = _el_get_codec( decoder_id );
-        if(c_i >= 0 && c_i < MAX_CODECS)
+        if(c_i >= 0 && c_i < MAX_CODECS && el_codecs[c_i] != NULL)
                 d = el_codecs[c_i];
 	else
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Choked on decoder" );
+		veejay_msg(VEEJAY_MSG_ERROR, "Choked on decoder %x (%d), slot %d",decoder_id,decoder_id, c_i );
 		return -1;
 	}
 
 	if(!in_cache )
 	{
+		if( d == NULL )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Codec not initlaized");
+			return -1;
+		}
 		if(lav_filetype( el->lav_fd[N_EL_FILE(n)] ) != 'x')
-            	{
+		{
 		    res = lav_read_frame(el->lav_fd[N_EL_FILE(n)], d->tmp_buffer);
 		    if(res > 0 && el->cache)
 			cache_frame( el->cache, d->tmp_buffer, res, nframe, decoder_id );
@@ -982,10 +987,10 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 				data,
 				res
 			);
-			if( len <= 0 )
+			if( len <= 0 || !got_picture)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,
-				 "Frame %ld broken, fix your videofiles",
+				 "Frame %ld broken or video file is not made of pure I-frames, fix your videofiles",
 					nframe);
 				return 0;
 			}
@@ -995,6 +1000,8 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 //@ sampling
 
 
+			int src_fmt = in_pix_fmt;
+		/*	
 			int src_fmt = PIX_FMT_YUV444P;
 //			int src_fmt = ( in_pix_fmt == FMT_420 ? PIX_FMT_YUV420P: PIX_FMT_YUV422P );
 			switch(in_pix_fmt)
@@ -1002,10 +1009,9 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			  case FMT_420: src_fmt = PIX_FMT_YUV420P; break;
 			  case FMT_411: src_fmt = PIX_FMT_YUV411P; break;
 		          case FMT_422: src_fmt = PIX_FMT_YUV422P; break;
-		        }
+		        }*/
 
 			int dst_fmt = ( out_pix_fmt== FMT_420 ? PIX_FMT_YUV420P: PIX_FMT_YUV422P) ;
-		
 			pict.data[0] = dst[0];
 			pict.data[1] = dst[1];
 			pict.data[2] = dst[2];
@@ -1014,6 +1020,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			pict.linesize[1] = el->video_width / 2;
 			pict.linesize[2] = el->video_width / 2;
 
+			
 			if(!d->frame->opaque)
 			{
 			if( el->auto_deinter && inter != LAV_NOT_INTERLACED)
@@ -1023,7 +1030,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 				pict2.data[2] = d->deinterlace_buffer[2];
 				pict2.linesize[1] = el->video_width >> 1;
 				pict2.linesize[2] = el->video_width >> 1;
-
 				pict2.linesize[0] = el->video_width;
 				avpicture_deinterlace(
 					&pict2,
@@ -1043,10 +1049,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			}
 			else
 			{
-				//VJFrame *dst = d->frame->opaque;
-				
-				dst[0] = 
-					d->frame->data[0];
+				dst[0] = d->frame->data[0];
 				dst[1] = d->frame->data[1];
 				dst[2] = d->frame->data[2];
 			}
@@ -1099,13 +1102,17 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
     ret = lav_set_audio_position(el->lav_fd[N_EL_FILE(n)], ns0);
 
     if (ret < 0)
+    {
+	    veejay_msg(0,"Unable to seek to frame position %ld", ns0);
 		return -1;
-
+	}
     //mlt need int16_t
     ret = lav_read_audio(el->lav_fd[N_EL_FILE(n)], dst, (ns1 - ns0));
     if (ret < 0)
+    {
+	    veejay_msg(0,"Unable to read audio data");
 		return -1;
-
+	}
     return (ns1 - ns0);
 
 }

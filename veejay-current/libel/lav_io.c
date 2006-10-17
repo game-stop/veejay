@@ -35,6 +35,15 @@
 #ifdef USE_GDK_PIXBUF
 #include <libel/pixbuf.h>
 #endif
+#include <ffmpeg/avcodec.h>
+#ifdef HAVE_LIBQUICKTIME
+#include <quicktime.h>
+#include <lqt.h>
+#include <lqt/colormodels.h>
+#define QUICKTIME_MJPG_TAG 0x6d6a7067
+#endif
+
+
 extern int AVI_errno;
 static int _lav_io_default_chroma = CHROMAUNKNOWN;
 static char video_format=' ';
@@ -54,6 +63,8 @@ static unsigned long jpeg_data_offset    = 0;
 static unsigned long jpeg_padded_len     = 0;
 static unsigned long jpeg_app0_offset    = 0;
 static unsigned long jpeg_app1_offset    = 0;
+
+uint16_t reorder_16(uint16_t todo, int big_endian);
 
 #ifdef USE_GDK_PIXBUF
 static int 		output_scale_width = 0;
@@ -85,6 +96,20 @@ void	lav_set_project(int w, int h, float f, int fmt)
 #define M_APP1  0xE1
 
 
+#ifdef HAVE_LIBQUICKTIME
+/*
+   put_int4:
+   Put a 4 byte integer value into a character array as big endian number
+*/
+
+static void put_int4(unsigned char *buf, int val)
+{
+	buf[0] = (val >> 24);
+	buf[1] = (val >> 16);
+	buf[2] = (val >> 8 );
+	buf[3] = (val      );
+}
+#endif
 
 //#ifdef SUPPORT_READ_DV2
 //static int check_DV2_input(lav_file_t *lav_fd);
@@ -343,6 +368,27 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 		  AVI_set_video(lav_fd->avi_fd,width,height,fps, "dvsd");
 		  if(asize) AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
 		  return lav_fd;
+      case 'q':
+#ifdef HAVE_LIBQUICKTIME
+         /* open quicktime output file */
+
+         /* since the documentation says that the file should be empty,
+            we try to remove it first */
+
+         remove(filename);
+
+         lav_fd->qt_fd = quicktime_open(filename, 0, 1);
+         if(!lav_fd->qt_fd) { free(lav_fd); return 0; }
+         quicktime_set_video(lav_fd->qt_fd, 1, width, height, fps,
+                             (interlaced ? QUICKTIME_MJPA : QUICKTIME_JPEG));
+         if (asize)
+	    quicktime_set_audio(lav_fd->qt_fd, achans, arate, asize, QUICKTIME_TWOS);
+         return lav_fd;
+#else
+	 internal_error = ERROR_FORMAT;
+	 return 0;
+#endif
+		  
 	}
 	if(lav_fd) free(lav_fd);
 	return NULL;
@@ -365,6 +411,11 @@ int lav_close(lav_file_t *lav_file)
 			ret = 1;
 			break;
 #endif
+#ifdef HAVE_LIBQUICKTIME
+      case 'q':
+         ret = quicktime_close( lav_file->qt_fd );
+         break;
+#endif			
 		default:
 			ret = AVI_close(lav_file->avi_fd);
 			break;
@@ -391,8 +442,49 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
     if(video_format == 'x')
 	return -1;
 #endif
-   if(lav_file->interlacing!=LAV_NOT_INTERLACED && (lav_file->format == 'a' || lav_file->format=='A'))
+   if(lav_file->interlacing!=LAV_NOT_INTERLACED)
    {
+	switch( lav_file->format )
+	{
+		case 'a':
+		case 'A':			
+         	   jpgdata = buff;
+        	   jpglen  = size;
+
+      	      /* Loop over both fields */
+
+          	  for(n=0;n<2;n++)
+         	  {
+          		/* For first field scan entire field, for second field
+        	          scan the JPEG header, put in AVI1 + polarity.
+        	          Be generous on errors */
+
+       		        res = scan_jpeg(jpgdata, size, n);
+       	       		 if (res)
+			 {
+				 internal_error=ERROR_JPEG;
+				 return -1;
+			 }
+
+         	      if(!jpeg_app0_offset) continue;
+
+         	      /* APP0 marker should be at least 14+2 bytes */
+         	      if(get_int2(jpgdata+jpeg_app0_offset+2) < 16 ) continue;
+
+			jpgdata[jpeg_app0_offset+4] = 'A';
+			jpgdata[jpeg_app0_offset+5] = 'V';
+			jpgdata[jpeg_app0_offset+6] = 'I';
+			jpgdata[jpeg_app0_offset+7] = '1';
+			jpgdata[jpeg_app0_offset+8] = lav_file->format=='a' ? n+1 : 2-n;
+
+	               /* Update pointer and len for second field */
+	               jpgdata += jpeg_padded_len;
+	               jpglen  -= jpeg_padded_len;
+		}
+		break;
+#ifdef HAVE_LIBQUICKTIME
+         case 'q':
+
             jpgdata = buff;
             jpglen  = size;
 
@@ -400,53 +492,104 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
 
             for(n=0;n<2;n++)
             {
-               /* For first field scan entire field, for second field
-                  scan the JPEG header, put in AVI1 + polarity.
-                  Be generous on errors */
+               /* Scan the entire JPEG field data - APP1 marker MUST be present */
+               res = scan_jpeg(jpgdata,jpglen,0);
+               if(res || !jpeg_app1_offset) { internal_error=ERROR_JPEG; return -1; }
 
-               res = scan_jpeg(jpgdata, size, n);
-               if (res) { internal_error=ERROR_JPEG; return -1; }
+               /* Length of APP1 marker must be at least 40 + 2 bytes */
+               if ( get_int2(jpgdata+jpeg_app1_offset+2) < 42)
+               { internal_error=ERROR_JPEG; return -1; }
 
-               if(!jpeg_app0_offset) continue;
-
-               /* APP0 marker should be at least 14+2 bytes */
-               if(get_int2(jpgdata+jpeg_app0_offset+2) < 16 ) continue;
-
-               jpgdata[jpeg_app0_offset+4] = 'A';
-               jpgdata[jpeg_app0_offset+5] = 'V';
-               jpgdata[jpeg_app0_offset+6] = 'I';
-               jpgdata[jpeg_app0_offset+7] = '1';
-               jpgdata[jpeg_app0_offset+8] = lav_file->format=='a' ? n+1 : 2-n;
+               /* Fill in data */
+               put_int4(jpgdata+jpeg_app1_offset+ 4,0);
+               put_int4(jpgdata+jpeg_app1_offset+ 8,QUICKTIME_MJPG_TAG);
+               put_int4(jpgdata+jpeg_app1_offset+12,jpeg_field_size);
+               put_int4(jpgdata+jpeg_app1_offset+16,jpeg_padded_len);
+               put_int4(jpgdata+jpeg_app1_offset+20,n==0?jpeg_padded_len:0);
+               put_int4(jpgdata+jpeg_app1_offset+24,jpeg_quant_offset);
+               put_int4(jpgdata+jpeg_app1_offset+28,jpeg_huffman_offset);
+               put_int4(jpgdata+jpeg_app1_offset+32,jpeg_image_offset);
+               put_int4(jpgdata+jpeg_app1_offset+36,jpeg_scan_offset);
+               put_int4(jpgdata+jpeg_app1_offset+40,jpeg_data_offset);
 
                /* Update pointer and len for second field */
                jpgdata += jpeg_padded_len;
                jpglen  -= jpeg_padded_len;
-			}
+            }
+            break;
+#endif
+	
 	}
-
+   }
    res = 0; /* Silence gcc */
    for(n=0;n<count;n++)
    {
+	  switch(lav_file->format)
+	  {
+		case 'a':
+		case 'A':
       if(n==0)
            res = AVI_write_frame( lav_file->avi_fd, buff, size );
       else
            res = AVI_dup_frame( lav_file->avi_fd );
+		break;
+		
+#ifdef HAVE_LIBQUICKTIME
+         case 'q':
+            res = quicktime_write_frame( lav_file->qt_fd, buff, size, 0 );
+            break;
+#endif
+	 default:
+	    res = -1;
+	    break;
+
+	  }
    }
    return res;
 }
 
 int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
 {
-   video_format = lav_file->format; internal_error = 0; /* for error messages */
+	int res;
+#ifdef HAVE_LIBQUICKTIME
+   int i, j;
+   int16_t *qt_audio = (int16_t *)buff, **qt_audion;
+   int channels = lav_audio_channels(lav_file);
+
+   qt_audion = malloc(channels * sizeof (int16_t **));
+   for (i = 0; i < channels; i++)
+	qt_audion[i] = (int16_t *)malloc(samps * lav_file->bps);
+#endif
+	switch(lav_file->format )
+	{
+#ifdef HAVE_LIBQUICKTIME
+      case 'q':
+	/* Deinterleave the audio into the two channels. */
+	for (i = 0; i < samps; i++)
+	    {
+	    for (j = 0; j < channels; j++)
+		qt_audion[j][i] = qt_audio[(channels*i) + j];
+	    }
+	res = lqt_encode_audio_track(lav_file->qt_fd, qt_audion, NULL,samps,0);
+	for (j = 0; j < channels; j++)
+	    free(qt_audion[j]);
+	free(qt_audion);
+	return res;
+        break;
+#endif
 #ifdef SUPPORT_READ_DV2
-   if(video_format == 'b')
-	return 0;
+	case 'b':
+		return 0;
 #endif
 #ifdef USE_GDK_PIXBUF
-   if(video_format == 'x')
-	return 0;
+   	case 'x':
+		return 0;
 #endif
-   return AVI_write_audio( lav_file->avi_fd, buff, samps*lav_file->bps);
+	case 'a':
+	case 'A':
+  		 return AVI_write_audio( lav_file->avi_fd, buff, samps*lav_file->bps);
+	}
+	return 0;
 }
 
 
@@ -454,57 +597,97 @@ int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
 long lav_video_frames(lav_file_t *lav_file)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+   switch(lav_file->format)
+   {
+	case 'A':
+	case 'a':
+		return AVI_video_frames( lav_file->avi_fd );
 #ifdef SUPPORT_READ_DV2
-   if(video_format == 'b')
-	return rawdv_video_frames(lav_file->dv_fd);
+	case 'b':
+		return rawdv_video_frames(lav_file->dv_fd);
 #endif
 #ifdef USE_GDK_PIXBUF
-   if(video_format == 'x')
-	return 2;
+	case 'x':
+		return 2;
 #endif
-   return AVI_video_frames(lav_file->avi_fd);
+#ifdef HAVE_LIBQUICKTIME
+      case 'q':
+         return quicktime_video_length(lav_file->qt_fd,0);
+#endif
+   }
+   return -1;
 }
 
 int lav_video_width(lav_file_t *lav_file)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+	switch(lav_file->format)
+	{
+		case 'a':
+		case 'A':
+			return AVI_video_width(lav_file->avi_fd);
 #ifdef SUPPORT_READ_DV2
-	if(video_format=='b')
-		return rawdv_width(lav_file->dv_fd);
+		case 'b':
+			return rawdv_width(lav_file->dv_fd);
 #endif
 #ifdef USE_GDK_PIXBUF
- 	if(video_format=='x')
-		return (output_scale_width == 0 ? vj_picture_get_width( lav_file->picture ) : output_scale_width);
+		case 'x':
+			return (output_scale_width == 0 ? vj_picture_get_width( lav_file->picture ) : output_scale_width);
 #endif
-   return AVI_video_width(lav_file->avi_fd);
+#ifdef HAVE_LIBQUICKTIME
+      		case 'q':
+        		return quicktime_video_width(lav_file->qt_fd,0);
+#endif			
+	}
+	return -1;
 }
 
 int lav_video_height(lav_file_t *lav_file)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+   switch( lav_file->format )
+   {
+		case 'a':
+		case 'A':
+		    return AVI_video_height(lav_file->avi_fd);
 #ifdef SUPPORT_READ_DV2
-	if(video_format == 'b')
-		return rawdv_height( lav_file->dv_fd );
+		case 'b':
+	  	 return rawdv_height( lav_file->dv_fd );
 #endif
-#ifdef USE_GDK_PIXBUF
-	if(video_format == 'x')
-		return (output_scale_height == 0 ? vj_picture_get_height( lav_file->picture ) : output_scale_height);
+#ifdef USE_GDK_PIXBUF	
+		case 'x':
+			return (output_scale_height == 0 ? vj_picture_get_height( lav_file->picture ) : output_scale_height);
 #endif
-   return AVI_video_height(lav_file->avi_fd);
+#ifdef HAVE_LIBQUICKTIME
+      case 'q':
+         return quicktime_video_height(lav_file->qt_fd,0);
+#endif
+   }
+	return -1;
 }
 
 double lav_frame_rate(lav_file_t *lav_file)
 {
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+   switch(lav_file->format)
+   {
+		case 'a':
+		case 'A':
+				return AVI_frame_rate(lav_file->avi_fd);
 #ifdef SUPPORT_READ_DV2
-	if(video_format == 'b')
-		return rawdv_fps(lav_file->dv_fd);
+		case 'b':
+   		   return rawdv_fps(lav_file->dv_fd);
 #endif
 #ifdef USE_GDK_PIXBUF
-	if(video_format == 'x')
-		return output_fps;
+		case 'x':
+   		   return output_fps;
 #endif
-   return AVI_frame_rate(lav_file->avi_fd);
+#ifdef HAVE_LIBQUICKTIME
+      case 'q':
+         return quicktime_frame_rate(lav_file->qt_fd,0);
+#endif	   
+	}
+   return -1;
 }
 
 int lav_video_interlacing(lav_file_t *lav_file)
@@ -536,6 +719,78 @@ int lav_video_MJPG_chroma(lav_file_t *lav_file)
 {
 	return lav_file->MJPG_chroma;
 }
+
+int	lav_is_yuv_planar( int pix_fmt )
+{
+	switch(pix_fmt){
+		case PIX_FMT_YUVJ420P:
+		case PIX_FMT_YUVJ422P:
+		case PIX_FMT_YUVJ444P:
+		case PIX_FMT_YUV420P:
+		case PIX_FMT_YUV422P:
+		case PIX_FMT_YUV444P:
+			return 1;
+	}
+	return 0;
+}
+
+int lav_video_cmodel( lav_file_t *lav_file)
+{
+#ifdef HAVE_LIBQUICKTIME
+	if( lav_file->qt_fd )
+	{
+	int cm = lqt_get_cmodel( lav_file->qt_fd,0 );
+//	veejay_msg(0, "QT color model %d",cm);
+	switch(cm)
+	{
+		//@ seems not to work
+	//	case BC_RGB888:
+	//		return PIX_FMT_RGB24;
+	//	case BC_BGR888:
+	//		return PIX_FMT_BGR24;
+		case BC_YUV422P:
+			return PIX_FMT_YUV422P;
+		case BC_YUV422:
+			return PIX_FMT_YUV422;
+		case BC_YUV420P:
+			return PIX_FMT_YUV420P;
+	//	case BC_YUVJ422P:
+	//		return PIX_FMT_YUVJ422P;
+	//	case BC_YUVJ420P:
+	//		return PIX_FMT_YUVJ420P;
+		default:
+			return -1;
+	}
+	}
+#endif
+	switch(lav_file->MJPG_chroma)
+	{
+		case CHROMA411:
+			return PIX_FMT_YUV411P;
+		case CHROMA420:
+			return PIX_FMT_YUV420P;
+		case CHROMA422:
+			return PIX_FMT_YUV422P;
+		case CHROMA444:
+			return PIX_FMT_YUV444P;
+		default:
+			return -1;
+	}
+
+	return -1;
+}
+
+int	lav_video_is_qt( lav_file_t *lav_file)
+{
+#ifdef HAVE_LIBQUICK_TIME
+	if( lav_file->qt_fd)
+		return 1;
+#endif
+	return 0;
+}
+
+		
+
 int lav_video_compressor_type(lav_file_t *lav_file)
 {
 #ifdef SUPPORT_READ_DV2
@@ -545,6 +800,36 @@ int lav_video_compressor_type(lav_file_t *lav_file)
 #ifdef USE_GDK_PIXBUF
 	if(lav_file->format == 'x')
 		return 0xffff;
+#endif
+#ifdef HAVE_LIBQUICKTIME
+	if(lav_file->format == 'q')
+	{
+		const char *compressor = quicktime_video_compressor(lav_file->qt_fd,0);
+		//@ prrff
+		if( (strncasecmp("mjpg", compressor, 4) == 0 ||  strncasecmp("jpeg", compressor, 4) == 0) ||
+			strncasecmp("mjpa", compressor, 4) == 0) {
+			return CODEC_ID_MJPEG;
+		} else 	if( (strncasecmp("dvsd", compressor, 4) == 0) || strncasecmp("dv", compressor,2) == 0 ) {
+			return CODEC_ID_DVVIDEO;
+		} else if( strncasecmp("mp4v",compressor,4) == 0) {
+			return CODEC_ID_MPEG4;
+		} else if( strncasecmp("div3", compressor,4) == 0) {
+			return CODEC_ID_MSMPEG4V3;
+		} else if( strncasecmp("iyuv", compressor,4) == 0 || strncasecmp( "i420",compressor,4)==0) {
+			return 999;
+		} else if( strncasecmp("yv16", compressor,4) == 0) {
+			return 999;
+		} else if (strncasecmp("svq1",compressor,4) == 0 ) {
+			return CODEC_ID_SVQ1;
+		} else if (strncasecmp("rpza", compressor,4) == 0 ) {
+			return CODEC_ID_RPZA;
+		}
+		else 
+			return -1;
+			
+	
+	}
+			//		return quicktime_video_compressor(lav_file->qt_fd,0);
 #endif
 	return AVI_video_compressor_type( lav_file->avi_fd );
 }
@@ -566,6 +851,10 @@ const char *lav_video_compressor(lav_file_t *lav_file)
 	return tmp;
    }
 #endif
+#ifdef HAVE_LIBQUICKTIME
+	if(lav_file->format == 'q')
+		return quicktime_video_compressor(lav_file->qt_fd,0);
+#endif
    return AVI_video_compressor(lav_file->avi_fd);
 }
 
@@ -580,6 +869,10 @@ int lav_audio_channels(lav_file_t *lav_file)
 #ifdef USE_GDK_PIXBUF
    if(video_format == 'x')
 	return 0;
+#endif
+#ifdef HAVE_LIBQUICKTIME
+    if(video_format == 'q')
+         return quicktime_track_channels(lav_file->qt_fd,0);
 #endif
    return AVI_audio_channels(lav_file->avi_fd);
 }
@@ -596,6 +889,10 @@ int lav_audio_bits(lav_file_t *lav_file)
 	if(video_format == 'x' )
 		return 0;
 #endif
+#ifdef HAVE_LIBQUICKTIME
+      if(video_format == 'q')
+         return quicktime_audio_bits(lav_file->qt_fd,0);
+#endif	
    return (AVI_audio_bits(lav_file->avi_fd));
 }
 
@@ -611,6 +908,10 @@ long lav_audio_rate(lav_file_t *lav_file)
 	if(video_format == 'x')
 		return 0;
 #endif
+#ifdef HAVE_LIBQUICKTIME
+	if( video_format == 'q')
+		return quicktime_sample_rate(lav_file->qt_fd,0);
+#endif	
    return (AVI_audio_rate(lav_file->avi_fd));
 }
 
@@ -626,6 +927,10 @@ long lav_audio_clips(lav_file_t *lav_file)
 	if(video_format == 'x')
 		return 0;
 #endif
+#ifdef HAVE_LIBQUICKTIME
+	if(video_format == 'q')
+		return quicktime_audio_length(lav_file->qt_fd,0);
+#endif	
    return (AVI_audio_bytes(lav_file->avi_fd)/lav_file->bps);
 }
 
@@ -640,6 +945,10 @@ long lav_frame_size(lav_file_t *lav_file, long frame)
 	if(video_format == 'x')
 		return 1;
 #endif
+#ifdef HAVE_LIBQUICKTIME
+	if( video_format == 'q')
+		return quicktime_frame_size(lav_file->qt_fd,frame,0);
+#endif	
    return (AVI_frame_size(lav_file->avi_fd,frame));
 }
 
@@ -653,6 +962,9 @@ int lav_seek_start(lav_file_t *lav_file)
 #ifdef USE_GDK_PIXBUF
    if(video_format == 'x')
 	return 1;
+#endif
+#ifdef HAVE_LIBQUICKTIME
+  return quicktime_seek_start(lav_file->qt_fd);
 #endif
    return (AVI_seek_start(lav_file->avi_fd));
 }
@@ -668,6 +980,10 @@ int lav_set_video_position(lav_file_t *lav_file, long frame)
    if(video_format == 'x')
 	return 1;
 #endif
+#ifdef HAVE_LIBQUICKTIME
+	if(video_format == 'q')
+  		return quicktime_set_video_position(lav_file->qt_fd,frame,0);
+#endif   
    return (AVI_set_video_position(lav_file->avi_fd,frame));
 }
 
@@ -684,6 +1000,10 @@ int lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf)
 	if(lav_file->format == 'x')
 	return -1;
 #endif
+#ifdef HAVE_LIBQUICKTIME
+	if(lav_file->format == 'q')
+		return quicktime_read_frame(lav_file->qt_fd,vidbuf,0);
+#endif	
    return (AVI_read_frame(lav_file->avi_fd,vidbuf));
 }
 
@@ -722,11 +1042,16 @@ int lav_set_audio_position(lav_file_t *lav_file, long clip)
    if(video_format == 'x')
 	return 0;
 #endif
+#ifdef HAVE_LIBQUICKTIME
+	if(video_format =='q')
+		quicktime_set_audio_position(lav_file->qt_fd,clip,0);
+#endif
    return (AVI_set_audio_position(lav_file->avi_fd,clip*lav_file->bps));
 }
 
 long lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps)
 {
+   
    if(!lav_file->has_audio)
    {
       internal_error = ERROR_NOAUDIO;
@@ -741,6 +1066,53 @@ long lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps)
 	return 0;
 #endif
    video_format = lav_file->format; internal_error = 0; /* for error messages */
+#ifdef HAVE_LIBQUICKTIME
+	if( video_format == 'q')
+	{
+  		int64_t last_pos, start_pos;
+		int res, i, j;
+		int16_t *qt_audio = (int16_t *)audbuf, **qt_audion;
+		int channels = lav_audio_channels(lav_file);
+		uint8_t b0, b1;
+		qt_audion = malloc(channels * sizeof (int16_t **));
+		for (i = 0; i < channels; i++)
+			qt_audion[i] = (int16_t *)malloc(samps * lav_file->bps);
+
+		start_pos = quicktime_audio_position(lav_file->qt_fd, 0);
+		lqt_decode_audio_track(lav_file->qt_fd, qt_audion, NULL, samps, 0);
+		last_pos = lqt_last_audio_position(lav_file->qt_fd, 0);
+		res = last_pos - start_pos;
+		if (res <= 0)
+		   goto out;
+		/* Interleave the channels of audio into the one buffer provided */
+		for (i =0; i < res; i++)
+		    {
+			    for (j = 0; j < channels; j++)
+				qt_audio[(channels*i) + j] = qt_audion[j][i];
+		    }
+
+       	if (lav_detect_endian())
+           {
+           i= 0;
+           while (i < (2*res) )
+                 {
+                 b0 = 0;
+                 b1 = 0; 
+                 b0 = (qt_audio[i] & 0x00FF);
+                 b1 =  (qt_audio[i] & 0xFF00) >> 8;
+                 qt_audio[i] = (b0 <<8) + b1;
+                 i = i +1;
+                 } 
+            }
+out:
+	for (j = 0; j < channels; j++)
+            free(qt_audion[j]);
+	free(qt_audion);
+        return(res);
+	
+		
+	}
+#endif
    return (AVI_read_audio(lav_file->avi_fd,audbuf,samps*lav_file->bps)/lav_file->bps);
 }
 
@@ -764,6 +1136,9 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 
    /* Set lav_fd */
 
+#ifdef	HAVE_LIBQUICKTIME
+   char *audio_comp;
+#endif
    lav_fd->avi_fd      = 0;
 #ifdef SUPPORT_READ_DV2
    lav_fd->dv_fd	= 0;
@@ -799,14 +1174,13 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 
 
    lav_fd->avi_fd = AVI_open_input_file(filename,1,mmap_size);
-   video_format = 'a'; /* for error messages */
 
   // if(!lav_fd->avi_fd) { if(lav_fd) free(lav_fd); return 0;}
-   if(lav_fd->avi_fd==NULL && AVI_errno == AVI_ERR_EMPTY )
+ /*  if(lav_fd->avi_fd==NULL && AVI_errno == AVI_ERR_EMPTY )
 	{
 		if(lav_fd) free(lav_fd);
 		return NULL;
-	}
+	}*/
 
    if(lav_fd->avi_fd)
    {
@@ -821,43 +1195,114 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
    else if( AVI_errno==AVI_ERR_NO_AVI )
    {
 	int ret = 0;
-#ifdef USE_GDK_PIXBUF
-		lav_fd->picture = vj_picture_open( (const char*) filename,
-				output_scale_width, output_scale_height, output_yuv );
-		if(lav_fd->picture)
+    	int alt = 0;
+#ifdef HAVE_LIBQUICKTIME
+		if(quicktime_check_sig(filename))
 		{
-			lav_fd->format = 'x';
-			lav_fd->has_audio = 0;
-			video_comp = strdup( "PICT" );
-			ret = 1;
+			quicktime_pasp_t pasp;
+			int nfields, detail;
+			lav_fd->qt_fd = quicktime_open(filename,1,0);
+			video_format = 'q'; /* for error messages */
+			if (!lav_fd->qt_fd)
+		    	{
+				veejay_msg(VEEJAY_MSG_ERROR, "Unable to open quicktime file");
+			   	free(lav_fd);
+	    			return 0;
+	    		}
+			lav_fd->avi_fd = NULL;
+			lav_fd->format = 'q';
+	 		video_comp = quicktime_video_compressor(lav_fd->qt_fd,0);
+
+	  		/* We want at least one video track */
+	  		if (quicktime_video_tracks(lav_fd->qt_fd) < 1)
+	     		{
+				veejay_msg(VEEJAY_MSG_ERROR, "At least one video track required");
+	     			lav_close(lav_fd);
+	     			internal_error = ERROR_FORMAT;
+	     			return 0;
+	     		}
+		/*
+ 		* If the quicktime file has the sample aspect atom then use it to set
+ 		* the sar values in the lav_fd structure.  Hardwired (like everywhere else)
+		* to only look at track 0.
+		*/
+	 
+		 if (lqt_get_pasp(lav_fd->qt_fd, 0, &pasp) != 0)
+	     {
+	   	 	lav_fd->sar_w = pasp.hSpacing;
+	   		lav_fd->sar_h = pasp.vSpacing;
+	     }
+		/*
+ 		 * If a 'fiel' atom is present (not guaranteed) then use it to set the
+ 		 * interlacing type.
+		 */
+	  	
+		 if (lqt_get_fiel(lav_fd->qt_fd, 0, &nfields, &detail) != 0)
+	     {
+	     	if (nfields == 2)
+	        {
+				if (detail == 14 || detail == 6)
+		   			lav_fd->interlacing = LAV_INTER_BOTTOM_FIRST;
+				else if (detail == 9 || detail == 1)
+		   			lav_fd->interlacing = LAV_INTER_TOP_FIRST;
+				else
+		   			mjpeg_warn("unknown 'detail' in 'fiel' atom: %d", detail);
+	        }
+	     	else
+	        	lav_fd->interlacing = LAV_NOT_INTERLACED;
+	     }
+	  	/* Check for audio tracks */
+	 	 lav_fd->has_audio = 0;
+	 	 if (quicktime_audio_tracks(lav_fd->qt_fd))
+	     {
+	  	   audio_comp = quicktime_audio_compressor(lav_fd->qt_fd,0);
+	  	   if (strncasecmp(audio_comp, QUICKTIME_TWOS,4)==0)
+			lav_fd->has_audio = 1;
+	     }
+		 alt = 1;
+		ret = 1;
 		}
-		else
+#endif
+#ifdef USE_GDK_PIXBUF
+		if(!alt)
 		{
+				lav_fd->picture = vj_picture_open( (const char*) filename,
+					output_scale_width, output_scale_height, output_yuv );
+				if(lav_fd->picture)
+				{
+					lav_fd->format = 'x';
+					lav_fd->has_audio = 0;
+					video_comp = strdup( "PICT" );
+					ret = 1;
+					alt = 1;
+				}
+		}
 #endif
 
 #ifdef SUPPORT_READ_DV2
-		ret = 0;
-		lav_fd->dv_fd = rawdv_open_input_file(filename,mmap_size);
-	  	if(lav_fd->dv_fd > 0)
+		if(!alt)
 		{
-			lav_fd->MJPG_chroma = rawdv_sampling( lav_fd->dv_fd );
-			if ( lav_fd->MJPG_chroma == -1 )
+			ret = 0;
+			lav_fd->dv_fd = rawdv_open_input_file(filename,mmap_size);
+	  		if(lav_fd->dv_fd > 0)
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Dont know how to treat this file");
-				ret = 0;
-			}
-			else
-			{
-				video_comp = rawdv_video_compressor( lav_fd->dv_fd );
-				lav_fd->format = 'b'; 
-				lav_fd->has_audio = 0;
-				ret = 1;
-			}
-	    	}
-#endif
-#ifdef USE_GDK_PIXBUF
+				lav_fd->MJPG_chroma = rawdv_sampling( lav_fd->dv_fd );
+				if ( lav_fd->MJPG_chroma == -1 )
+				{
+					veejay_msg(VEEJAY_MSG_ERROR, "Dont know how to treat this file");
+					ret = 0;
+				}
+				else
+				{
+					video_comp = rawdv_video_compressor( lav_fd->dv_fd );
+					lav_fd->format = 'b'; 
+					lav_fd->has_audio = 0;
+					ret = 1;
+					veejay_msg(VEEJAY_MSG_DEBUG, "RAW DV file");
+				}
+	    		}
 		}
-#endif	
+#endif
 	if(ret == 0 || video_comp == NULL)
 	{
 		free(lav_fd);
@@ -868,9 +1313,12 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	
    }
 
+   veejay_msg(0, "AVI_errno = %d", AVI_errno );
+   
    lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
 
    if(lav_fd->bps==0) lav_fd->bps=1; /* make it save since we will divide by that value */
+
 #ifdef USE_GDK_PIXBUF
    if(strncasecmp(video_comp, "PICT",4) == 0 )
    {
@@ -880,7 +1328,39 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	return lav_fd;
    }
 #endif
-   if(strncasecmp(video_comp, "div3",4)==0) {
+   
+#ifdef HAVE_LIBQUICKTIME
+	if( lav_fd->qt_fd )
+	{
+	/*	if(strncasecmp( video_comp, "svq1", 4 ) == 0 )
+		{
+			
+			lav_fd->MJPG_chroma = CHROMA422;
+			return lav_fd;
+		}*/
+
+		int cmodel     = lqt_get_cmodel( lav_fd->qt_fd,0 );
+		veejay_msg( VEEJAY_MSG_DEBUG, "Colormodel is %s",
+				lqt_colormodel_to_string(cmodel) );
+		if(cmodel == BC_YUV420P )
+			lav_fd->MJPG_chroma = CHROMA420;
+		else if(cmodel == BC_YUV422P )
+			lav_fd->MJPG_chroma = CHROMA422;
+		else if(cmodel == BC_RGB888 ) {
+			lav_fd->MJPG_chroma = CHROMA422;
+		}
+		else
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Unsupported color model %s", 
+					lqt_colormodel_to_string( cmodel ));
+			return NULL;
+		}
+		return lav_fd;
+	}
+#endif
+   
+   if(strncasecmp(video_comp, "div3",4)==0)
+   {
 		lav_fd->MJPG_chroma = CHROMA420;
 		lav_fd->format = 'D';
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
@@ -914,8 +1394,6 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	}
     if (strncasecmp(video_comp,"dvsd",4)==0 || strncasecmp(video_comp,"dv",2)==0)
 	{
-	//veejay_msg(VEEJAY_MSG_DEBUG,"!! Guessing sampling type");
-	//	lav_fd->MJPG_chroma = CHROMA422;
 		int gw = lav_video_height( lav_fd );
 		if( gw == 480 )
 			 lav_fd->MJPG_chroma = CHROMA411;
@@ -1059,7 +1537,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	}
 
 	ierr = ERROR_FORMAT;
-
+	veejay_msg(VEEJAY_MSG_ERROR, "Unrecognized format '%s'", video_comp);
 
 ERREXIT:
    lav_close(lav_fd);
@@ -1202,6 +1680,11 @@ int lav_fileno(lav_file_t *lav_file)
 	  case 'M':
           res = AVI_fileno( lav_file->avi_fd );
          break;
+#ifdef HAVE_LIBQUICKTIME
+      case 'q':
+		res = lqt_fileno((quicktime_t *)lav_file->qt_fd);
+		break;
+#endif		 
       default:
          res = -1;
    }
@@ -1209,6 +1692,39 @@ int lav_fileno(lav_file_t *lav_file)
    return res;
 }
 
+/* We need this to reorder the 32 bit values for big endian systems */
+uint32_t reorder_32(uint32_t todo, int big_endian)
+{
+  unsigned char b0, b1, b2, b3;
+  unsigned long reversed; 
+
+  if( big_endian )
+    {
+    b0 = (todo & 0x000000FF);
+    b1 = (todo & 0x0000FF00) >> 8;
+    b2 = (todo & 0x00FF0000) >> 16;
+    b3 = (todo & 0xFF000000) >> 24;
+
+    reversed = (b0 << 24) + (b1 << 16) + (b2 << 8) +b3;
+    return reversed;
+    }
+  return todo;
+}
+int lav_detect_endian (void)
+{
+    unsigned int fred;
+    char     *pfred;
+
+  fred = 2 | (1 << (sizeof(int)*8-8));
+  pfred = (char *)&fred;
+
+  if  (*pfred == 1)
+      return 1;
+  else if(*pfred == 2)
+      return 0;
+  else
+      return -1;
+}
 
 
 

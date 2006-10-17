@@ -2165,6 +2165,7 @@ void vj_perform_plain_fill_buffer(veejay_t * info, int entry, int skip)
 
     if(ret <= 0)
     {
+	    veejay_msg(0, "getting video frame. Stop veejay");
 	veejay_change_state(info, LAVPLAY_STATE_STOP);
     }
 }
