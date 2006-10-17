@@ -326,7 +326,7 @@ fi
 
 have_libquicktime=false
 if test x$with_libquicktime != xno ; then
-  PKG_CHECK_MODULES(LIBQUICKTIME, [libquicktime > 0.9.7],
+  PKG_CHECK_MODULES(LIBQUICKTIME, [libquicktime >= 0.9.7],
                     [have_libquicktime=true
                      AC_DEFINE(HAVE_LIBQUICKTIME, 1, [libquicktime > 0.9.7 prese
 nt])],

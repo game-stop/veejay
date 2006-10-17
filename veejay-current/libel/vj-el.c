@@ -806,6 +806,10 @@ void		vj_el_show_formats(void)
 			"\t[div3] MS MPEG4v3 Divx Video");
 		veejay_msg(VEEJAY_MSG_INFO,
 			"\t[mp4v] MPEG4 Video (ffmpeg experimental)");  		
+#ifdef HAVE_LIBQUICKTIME
+		veejay_msg(VEEJAY_MSG_INFO,
+			"\t[qt|mov] Quicktime Video (mjpeg,mjpa,.., only yuv planar)");
+#endif	
 #ifdef USE_GDK_PIXBUF
 		veejay_msg(VEEJAY_MSG_INFO,
 			"Image types supported:");

@@ -736,33 +736,6 @@ int	lav_is_yuv_planar( int pix_fmt )
 
 int lav_video_cmodel( lav_file_t *lav_file)
 {
-#ifdef HAVE_LIBQUICKTIME
-	if( lav_file->qt_fd )
-	{
-	int cm = lqt_get_cmodel( lav_file->qt_fd,0 );
-//	veejay_msg(0, "QT color model %d",cm);
-	switch(cm)
-	{
-		//@ seems not to work
-	//	case BC_RGB888:
-	//		return PIX_FMT_RGB24;
-	//	case BC_BGR888:
-	//		return PIX_FMT_BGR24;
-		case BC_YUV422P:
-			return PIX_FMT_YUV422P;
-		case BC_YUV422:
-			return PIX_FMT_YUV422;
-		case BC_YUV420P:
-			return PIX_FMT_YUV420P;
-	//	case BC_YUVJ422P:
-	//		return PIX_FMT_YUVJ422P;
-	//	case BC_YUVJ420P:
-	//		return PIX_FMT_YUVJ420P;
-		default:
-			return -1;
-	}
-	}
-#endif
 	switch(lav_file->MJPG_chroma)
 	{
 		case CHROMA411:
@@ -1313,8 +1286,6 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	
    }
 
-   veejay_msg(0, "AVI_errno = %d", AVI_errno );
-   
    lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
 
    if(lav_fd->bps==0) lav_fd->bps=1; /* make it save since we will divide by that value */
@@ -1329,40 +1300,9 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
    }
 #endif
    
-#ifdef HAVE_LIBQUICKTIME
-	if( lav_fd->qt_fd )
-	{
-	/*	if(strncasecmp( video_comp, "svq1", 4 ) == 0 )
-		{
-			
-			lav_fd->MJPG_chroma = CHROMA422;
-			return lav_fd;
-		}*/
-
-		int cmodel     = lqt_get_cmodel( lav_fd->qt_fd,0 );
-		veejay_msg( VEEJAY_MSG_DEBUG, "Colormodel is %s",
-				lqt_colormodel_to_string(cmodel) );
-		if(cmodel == BC_YUV420P )
-			lav_fd->MJPG_chroma = CHROMA420;
-		else if(cmodel == BC_YUV422P )
-			lav_fd->MJPG_chroma = CHROMA422;
-		else if(cmodel == BC_RGB888 ) {
-			lav_fd->MJPG_chroma = CHROMA422;
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Unsupported color model %s", 
-					lqt_colormodel_to_string( cmodel ));
-			return NULL;
-		}
-		return lav_fd;
-	}
-#endif
-   
    if(strncasecmp(video_comp, "div3",4)==0)
    {
 		lav_fd->MJPG_chroma = CHROMA420;
-		lav_fd->format = 'D';
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
 		veejay_msg(VEEJAY_MSG_WARNING, "Playing MS MPEG4v3 DivX Video. (Every frame should be an intra frame)" );
 		return lav_fd;
@@ -1371,7 +1311,6 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	if(strncasecmp(video_comp,"mp4v",4)==0)
 	{
 		lav_fd->MJPG_chroma = CHROMA420;
-		lav_fd->format = 'M';
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
 		veejay_msg(VEEJAY_MSG_WARNING, "Playing MPEG4 Video (Every frame should be an intra frame)");
 		return lav_fd;
@@ -1408,7 +1347,6 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		strncasecmp(video_comp, "jpeg", 4) == 0)
 	{
 		lav_fd->MJPG_chroma = CHROMA420;
-		lav_fd->format = 'a';
 		lav_fd->interlacing = LAV_INTER_UNKNOWN;
 		lav_fd->is_MJPG = 1;
 	//	return lav_fd;
@@ -1682,7 +1620,12 @@ int lav_fileno(lav_file_t *lav_file)
          break;
 #ifdef HAVE_LIBQUICKTIME
       case 'q':
-		res = lqt_fileno((quicktime_t *)lav_file->qt_fd);
+//		res = lqt_fileno((quicktime_t *)lav_file->qt_fd);
+//	
+	 {
+		 quicktime_t *q = lav_file->qt_fd;
+		 res = (int)fileno( (quicktime_t*) q->stream );
+	 }
 		break;
 #endif		 
       default:
