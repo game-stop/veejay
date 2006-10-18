@@ -209,6 +209,7 @@ int		vj_avcodec_init(editlist *el, int pixel_format)
 	if(out_pixel_format == FMT_422) fmt = PIX_FMT_YUV422P;
 
 	_encoders[ENCODER_MJPEG] = vj_avcodec_new_encoder( CODEC_ID_MJPEG, el, fmt );
+	_encoders[ENCODER_QUICKTIME_MJPEG] = vj_avcodec_new_encoder(CODEC_ID_MJPEG,el,fmt );
 	if(!_encoders[ENCODER_MJPEG]) return 0;
 
 
@@ -457,7 +458,7 @@ int		vj_avcodec_encode_frame( int nframe,int format, uint8_t *src[3], uint8_t *b
 
 
 #ifdef __FALLBACK_LIBDV
-	if(format == ENCODER_DVVIDEO )
+	if(format == ENCODER_DVVIDEO || format == ENCODER_QUICKTIME_DV )
 		return vj_dv_encode_frame( dv_encoder,src, buf );
 #endif
 
@@ -483,7 +484,7 @@ int		vj_avcodec_encode_frame( int nframe,int format, uint8_t *src[3], uint8_t *b
 		pict.linesize[1] = uv_width;
 		pict.linesize[2] = uv_width;
 	}
-	
+
 	res = avcodec_encode_video( av->context, buf, buf_len, &pict );
 
 	return res;

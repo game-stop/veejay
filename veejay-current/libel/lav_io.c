@@ -1155,6 +1155,13 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		return NULL;
 	}*/
 
+   if( lav_fd->avi_fd && AVI_errno == AVI_ERR_EMPTY )
+   {
+	   	veejay_msg(VEEJAY_MSG_ERROR, "Empty AVI file");
+		if(lav_fd) free(lav_fd);
+		return NULL;
+   }
+   
    if(lav_fd->avi_fd)
    {
       /* It is an AVI file */

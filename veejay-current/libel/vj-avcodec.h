@@ -28,7 +28,9 @@
 #define ENCODER_MPEG4 3
 #define ENCODER_YUV420 4
 #define ENCODER_YUV422 5
-#define NUM_ENCODERS 6
+#define ENCODER_QUICKTIME_DV 6
+#define ENCODER_QUICKTIME_MJPEG 7
+#define NUM_ENCODERS 8
 
 typedef struct
 {

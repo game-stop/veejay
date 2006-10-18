@@ -115,6 +115,10 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 		case ENCODER_YUV422: sprintf(descr, "YUV 4:2:2 Planar"); cformat='P'; break;
 		case ENCODER_MPEG4: sprintf(descr, "MPEG4"); cformat='M'; break;
 		case ENCODER_DIVX: sprintf(descr, "DIVX"); cformat='D'; break;
+		case ENCODER_QUICKTIME_DV:
+		case ENCODER_QUICKTIME_MJPEG:
+			   sprintf(descr, "Quicktime"); cformat = 'q'; break;
+		
 		default:
 		   veejay_msg(VEEJAY_MSG_ERROR, "Unsupported video codec");
 		   return -1;

@@ -102,7 +102,7 @@ typedef struct
 static hash_t *keyboard_events = NULL;
 #endif
 
-static int _recorder_format = ENCODER_YUV420;
+static int _recorder_format = ENCODER_MJPEG;
 static	int 	cached_image_= 0;
 
 #ifdef USE_SWSCALER
@@ -5906,9 +5906,22 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		strncasecmp(str, "jpeg",4)==0)
 	{
 		_recorder_format = ENCODER_MJPEG;
-		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in MJPEG format");
+		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in MJPEG AVI format");
 		return;
 	}
+	if(strncasecmp(str,"quicktime-dv", 12 ) == 0 )
+	{
+		_recorder_format = ENCODER_QUICKTIME_DV;
+		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in QT DV format");
+		return;
+	}
+	if(strncasecmp(str, "quicktime-mjpeg", 15 ) == 0 )
+	{
+		_recorder_format = ENCODER_QUICKTIME_MJPEG;
+		veejay_msg( VEEJAY_MSG_INFO, "Recorder writes in QT mjpeg format");
+		return;
+	}	
+	
 	if(strncasecmp(str,"i420",4)==0 || strncasecmp(str,"yv12",4)==0 )
 	{
 		_recorder_format = ENCODER_YUV420;
