@@ -1053,8 +1053,8 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 				res
 			);
 
-			veejay_msg(0, "bytes remain: %d, decoded %d, pixfmt %d , %d",
-				res,len, d->context->pix_fmt, in_pix_fmt);
+//			veejay_msg(0, "bytes remain: %d, decoded %d, pixfmt %d , %d",
+//				res,len, d->context->pix_fmt, in_pix_fmt);
 			
 			if(!got_picture)
 			{
@@ -1072,8 +1072,8 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 
 //@ sampling
 
-
-			int src_fmt = in_pix_fmt;
+			int src_fmt = d->context->pix_fmt;
+//			int src_fmt = in_pix_fmt;
 			int dst_fmt = ( out_pix_fmt== FMT_420 ? PIX_FMT_YUV420P: PIX_FMT_YUV422P) ;
 
 			pict.data[0] = dst[0];
