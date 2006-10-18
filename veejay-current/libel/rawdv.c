@@ -166,7 +166,11 @@ dv_t	*rawdv_open_input_file(const char *filename, int mmap_size)
 	dv->buf = (uint8_t*) vj_malloc(sizeof(uint8_t*) * dv->size);
 	dv->offset = 0;
 
-
+	veejay_msg(VEEJAY_MSG_DEBUG,
+			"DV properties %d x %d, %f, %d frames, %d sampling",
+			dv->width,dv->height, dv->fps, dv->num_frames,
+			dv->fmt );
+	
 	dv_decoder_free( decoder );
 
 	if(tmp)

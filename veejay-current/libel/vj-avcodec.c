@@ -151,14 +151,14 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 	}
 
 	e->len = el->video_width * el->video_height;
-	if(pixel_format == PIX_FMT_YUV422P)
+	if(el->pixel_format == FMT_422)
 		e->uv_len = e->len / 2;
 	else
 		e->uv_len = e->len / 4;
 	e->width = el->video_width;
 	e->height = el->video_height;
 
-	e->out_fmt = pixel_format;
+	e->out_fmt = el->pixel_format;
 	e->encoder_id = id;
 
 /*
@@ -279,7 +279,7 @@ int		vj_avcodec_init(editlist *el, int pixel_format)
 	if(!el) return 0;
 	out_pixel_format = pixel_format;
 
-	av_log_set_level( AV_LOG_INFO );
+	//av_log_set_level( AV_LOG_INFO );
 	
 	return 1;
 }
@@ -434,7 +434,8 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 		veejay_msg(VEEJAY_MSG_ERROR, "No encoder !!");
 		return 0;
 	}
-	if( (av->encoder_id == 999 && av->out_fmt == PIX_FMT_YUV420P) || (av->encoder_id == 998 && av->out_fmt == PIX_FMT_YUV422P))
+
+	if( (av->encoder_id == 999 && av->out_fmt == FMT_420) || (av->encoder_id == 998 && av->out_fmt == FMT_422))
 	{
 		/* copy */
 		veejay_memcpy( dst, src[0], av->len );
@@ -443,13 +444,13 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 		return ( av->len + av->uv_len + av->uv_len );
 	}
 	/* copy by converting */
-	if( av->encoder_id == 999 && av->out_fmt == PIX_FMT_YUV422P) 
+	if( av->encoder_id == 999 && av->out_fmt == FMT_422) 
 	{
 		yuv422p_to_yuv420p( src, dst, av->width, av->height);
 		return ( av->len + (av->len/4) + (av->len/4));
 	}
 
-	if( av->encoder_id == 998 && av->out_fmt == PIX_FMT_YUV420P)
+	if( av->encoder_id == 998 && av->out_fmt == FMT_420)
 	{
 		uint8_t *d[3];
 		d[0] = dst;
@@ -458,20 +459,6 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 		yuv420p_to_yuv422p2( src[0],src[1],src[2], d, av->width,av->height );
 		return ( av->len + av->len );
 	}
-
-
-/*	if(av->sub_sample)
-	{
-		return(yuv422p_to_yuv420p(src,dst, av->width, av->height ));
-	}
-	else
-	{
-		veejay_memcpy( dst, src[0], av->len );
-		veejay_memcpy( dst+(av->len), src[1], av->uv_len );
-		veejay_memcpy( dst+(av->len+av->uv_len) , src[2], av->uv_len);
-	}
-	return (av->len + av->uv_len + av->uv_len);
-*/
 
 	
 	return 0;

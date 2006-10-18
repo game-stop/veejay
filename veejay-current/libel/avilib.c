@@ -759,28 +759,9 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
             AVI->video_strn = num_stream;
             vids_strh_seen = 1;
 
-		/* setup FFMPEG codec */
-	    	if( strncasecmp("mjpg", AVI->compressor, 4) == 0)
-			AVI->ffmpeg_codec_id = CODEC_ID_MJPEG;
-		if( strncasecmp("jpeg", AVI->compressor, 4) == 0)
-			AVI->ffmpeg_codec_id = CODEC_ID_MJPEG;
-		if( strncasecmp("mjpa", AVI->compressor, 4) == 0)
-			AVI->ffmpeg_codec_id = CODEC_ID_MJPEG;
-		if( strncasecmp("dvsd", AVI->compressor, 4) == 0)
-			AVI->ffmpeg_codec_id = CODEC_ID_DVVIDEO;
-		if( strncasecmp("dv", AVI->compressor, 2) == 0)
-			AVI->ffmpeg_codec_id = CODEC_ID_DVVIDEO;
-		if( strncasecmp("mp4v",AVI->compressor,4) == 0)
-			AVI->ffmpeg_codec_id = CODEC_ID_MPEG4;
-		if( strncasecmp("div3", AVI->compressor,4) == 0)
-			AVI->ffmpeg_codec_id = CODEC_ID_MSMPEG4V3;
-		if( strncasecmp("iyuv", AVI->compressor,4) == 0)
-			AVI->ffmpeg_codec_id = 999;
-		if( strncasecmp("i420", AVI->compressor,4) == 0)
-			AVI->ffmpeg_codec_id = 999;
-		if( strncasecmp("yv16", AVI->compressor,4) == 0)
-			AVI->ffmpeg_codec_id = 998;
 
+	    AVI->ffmpeg_codec_id =
+		    vj_el_get_decoder_from_fourcc( AVI->compressor );
             lasttag = 1; /* vids */
          }
          else if (strncasecmp ((char*)hdrl_data+i,"auds",4) ==0 && ! auds_strh_seen)

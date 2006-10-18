@@ -49,7 +49,7 @@
 #include "rawdv.h"
 #include "vj-dv.h"
 #endif
-#define MAX_CODECS 32
+#define MAX_CODECS 40
 #define CODEC_ID_YUV420 999
 #define CODEC_ID_YUV422 998
 
@@ -76,27 +76,56 @@ static struct
 {
         const char *name;
         int  id;
-	int  pix_fmt;
 } _supported_codecs[] = 
 {
         { "mjpeg" , CODEC_ID_MJPEG  },
 	{ "mjpegb", CODEC_ID_MJPEGB },
-#if LIBAVCODEC_BUILD > 4680
-	{ "sp5x",   CODEC_ID_SP5X }, /* sunplus motion jpeg video */
-#endif
-#if LIBAVCODEC_BUILD >= 4685
-	{ "theora", CODEC_ID_THEORA },
-#endif
-	{ "huffyuv", CODEC_ID_HUFFYUV },
-	{ "cyuv",	CODEC_ID_CYUV },
-        { "dv"    , CODEC_ID_DVVIDEO },
         { "msmpeg4",CODEC_ID_MPEG4 },
         { "divx"   ,CODEC_ID_MSMPEG4V3 },
         { "i420",   CODEC_ID_YUV420 },
         { "i422",   CODEC_ID_YUV422 },
-	{ "svq1",	CODEC_ID_SVQ1 },
-	{ "rpza",	CODEC_ID_RPZA },
-        { NULL  , 0 },
+	{ "mjpg",	CODEC_ID_MJPEG	},
+	{ "mjpb",	CODEC_ID_MJPEGB },
+	{ "dmb1",	CODEC_ID_MJPEG	},
+	{ "jpeg",	CODEC_ID_MJPEG	},
+	{ "mjpa",	CODEC_ID_MJPEG  },
+	{ "jfif",	CODEC_ID_MJPEG  },
+	{ "png",	CODEC_ID_PNG	},
+	{ "mpng",	CODEC_ID_PNG	},
+#if LIBAVCODEC_BUILD > 4680
+	{ "sp5x",   	CODEC_ID_SP5X }, /* sunplus motion jpeg video */
+#endif
+	{ "jpgl",	CODEC_ID_MJPEG  },
+	{ "dvsd",	CODEC_ID_DVVIDEO},
+	{ "dvcp",	CODEC_ID_DVVIDEO},
+	{ "dv",		CODEC_ID_DVVIDEO},
+	{ "dvhd",	CODEC_ID_DVVIDEO},
+	{ "dvp",	CODEC_ID_DVVIDEO},
+	{ "mp4v",	CODEC_ID_MPEG4  },
+	{ "xvid",	CODEC_ID_MPEG4	},
+	{ "divx",	CODEC_ID_MPEG4  },
+	{ "dxsd",	CODEC_ID_MPEG4	},
+	{ "mp4s",	CODEC_ID_MPEG4	},
+	{ "m4s2",	CODEC_ID_MPEG4	},	
+	{ "avc1",	CODEC_ID_H264	},
+	{ "h264",	CODEC_ID_H264	},
+	{ "x264",	CODEC_ID_H264 	},
+	{ "davc",	CODEC_ID_H264 	},
+	{ "div3",	CODEC_ID_MSMPEG4V3 },
+	{ "mp43",	CODEC_ID_MSMPEG4V3 },
+	{ "mp42",	CODEC_ID_MSMPEG4V2 },
+	{ "mpg4",	CODEC_ID_MSMPEG4V1 },
+	{ "yuv",	CODEC_ID_YUV420 },
+	{ "iyuv",	CODEC_ID_YUV420 },
+	{ "i420",	CODEC_ID_YUV420 },
+	{ "yv16",	CODEC_ID_YUV422 },
+	{ "pict",	0xffff	}, 
+	{ "hfyu",	CODEC_ID_HUFFYUV},
+	{ "cyuv",	CODEC_ID_CYUV   },
+	{ "svq1",	CODEC_ID_SVQ1	},
+	{ "svq3",	CODEC_ID_SVQ3	},
+	{ "rpza",	CODEC_ID_RPZA	},
+	{ NULL  , 0 },
 };
 
 static struct
@@ -107,9 +136,15 @@ static struct
 {
 	{ "mjpg",	CODEC_ID_MJPEG	},
 	{ "mjpb",	CODEC_ID_MJPEGB },
+	{ "dmb1",	CODEC_ID_MJPEG	},
 	{ "jpeg",	CODEC_ID_MJPEG	},
 	{ "mjpa",	CODEC_ID_MJPEG  },
 	{ "jfif",	CODEC_ID_MJPEG  },
+	{ "png",	CODEC_ID_PNG	},
+	{ "mpng",	CODEC_ID_PNG	},
+#if LIBAVCODEC_BUILD > 4680
+	{ "sp5x",   	CODEC_ID_SP5X }, /* sunplus motion jpeg video */
+#endif
 	{ "jpgl",	CODEC_ID_MJPEG  },
 	{ "dvsd",	CODEC_ID_DVVIDEO},
 	{ "dv",		CODEC_ID_DVVIDEO},
@@ -121,6 +156,10 @@ static struct
 	{ "dxsd",	CODEC_ID_MPEG4	},
 	{ "mp4s",	CODEC_ID_MPEG4	},
 	{ "m4s2",	CODEC_ID_MPEG4	},	
+	{ "avc1",	CODEC_ID_H264	},
+	{ "h264",	CODEC_ID_H264	},
+	{ "x264",	CODEC_ID_H264 	},
+	{ "davc",	CODEC_ID_H264 	},
 	{ "div3",	CODEC_ID_MSMPEG4V3 },
 	{ "mp43",	CODEC_ID_MSMPEG4V3 },
 	{ "mp42",	CODEC_ID_MSMPEG4V2 },
@@ -133,10 +172,8 @@ static struct
 	{ "hfyu",	CODEC_ID_HUFFYUV},
 	{ "cyuv",	CODEC_ID_CYUV   },
 	{ "svq1",	CODEC_ID_SVQ1	},
+	{ "svq3",	CODEC_ID_SVQ3	},
 	{ "rpza",	CODEC_ID_RPZA	},
-#if LIBAVCODEC_BUILD > 4680
-	{ "spsx",	CODEC_ID_SP5X	},
-#endif
 	{ NULL, 0 }
 };
 
@@ -181,6 +218,11 @@ static	int	_el_get_codec_id( const char *fourcc )
 		if( strncasecmp( fourcc, _supported_fourcc[i].name, strlen(_supported_fourcc[i].name) ) == 0 )
 			return _supported_fourcc[i].id;
 	return -1;
+}
+
+int		vj_el_get_decoder_from_fourcc( const char *fourcc )
+{
+	return _el_get_codec_id( fourcc );
 }
 
 static void	_el_free_decoder( vj_decoder *d )
@@ -1010,11 +1052,19 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 				data,
 				res
 			);
-			if( len <= 0 || !got_picture)
+
+			veejay_msg(0, "bytes remain: %d, decoded %d, pixfmt %d , %d",
+				res,len, d->context->pix_fmt, in_pix_fmt);
+			
+			if(!got_picture)
 			{
-				veejay_msg(VEEJAY_MSG_ERROR,
-				 "Frame %ld broken or video file is not made of pure I-frames, fix your videofiles",
-					nframe);
+				veejay_msg(0, "Unable to get whole picture");
+				return 0;
+			}
+		
+			if( len <= 0 )
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "reading frame");
 				return 0;
 			}
 	
@@ -1024,16 +1074,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 
 
 			int src_fmt = in_pix_fmt;
-		/*	
-			int src_fmt = PIX_FMT_YUV444P;
-//			int src_fmt = ( in_pix_fmt == FMT_420 ? PIX_FMT_YUV420P: PIX_FMT_YUV422P );
-			switch(in_pix_fmt)
-			{
-			  case FMT_420: src_fmt = PIX_FMT_YUV420P; break;
-			  case FMT_411: src_fmt = PIX_FMT_YUV411P; break;
-		          case FMT_422: src_fmt = PIX_FMT_YUV422P; break;
-		        }*/
-
 			int dst_fmt = ( out_pix_fmt== FMT_420 ? PIX_FMT_YUV420P: PIX_FMT_YUV422P) ;
 
 			pict.data[0] = dst[0];

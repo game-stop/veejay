@@ -418,7 +418,17 @@ lav_file_t *lav_open_output_file(char *filename, char format,
                              (interlaced ? QUICKTIME_MJPA : QUICKTIME_JPEG));
         	if (asize)
 		    quicktime_set_audio(lav_fd->qt_fd, achans, arate, asize, QUICKTIME_TWOS);
-        	return lav_fd;
+
+		int has_kf = quicktime_has_keyframes( lav_fd->qt_fd, 0 );
+		char *copyright = quicktime_get_copyright( lav_fd->qt_fd );
+		char *name      = quicktime_get_name( lav_fd->qt_fd );
+		char *info      = quicktime_get_info( lav_fd->qt_fd );
+		
+		veejay_msg(VEEJAY_MSG_DEBUG,
+				"(C) %s by %s, %s, has keyframes = %d", copyright,name,info,has_kf );
+				
+
+		return lav_fd;
 #else
 		internal_error = ERROR_FORMAT;
 		return NULL;
@@ -836,29 +846,7 @@ int lav_video_compressor_type(lav_file_t *lav_file)
 	if(lav_file->format == 'q')
 	{
 		const char *compressor = quicktime_video_compressor(lav_file->qt_fd,0);
-		//@ prrff
-		if( (strncasecmp("mjpg", compressor, 4) == 0 ||  strncasecmp("jpeg", compressor, 4) == 0) ||
-			strncasecmp("mjpa", compressor, 4) == 0) {
-			return CODEC_ID_MJPEG;
-		} else 	if( (strncasecmp("dvsd", compressor, 4) == 0) || strncasecmp("dv", compressor,2) == 0 ) {
-			return CODEC_ID_DVVIDEO;
-		} else if( strncasecmp("mp4v",compressor,4) == 0) {
-			return CODEC_ID_MPEG4;
-		} else if( strncasecmp("div3", compressor,4) == 0) {
-			return CODEC_ID_MSMPEG4V3;
-		} else if( strncasecmp("iyuv", compressor,4) == 0 || strncasecmp( "i420",compressor,4)==0) {
-			return 999;
-		} else if( strncasecmp("yv16", compressor,4) == 0) {
-			return 999;
-		} else if (strncasecmp("svq1",compressor,4) == 0 ) {
-			return CODEC_ID_SVQ1;
-		} else if (strncasecmp("rpza", compressor,4) == 0 ) {
-			return CODEC_ID_RPZA;
-		}
-		else 
-			return -1;
-			
-	
+		return	vj_el_get_decoder_from_fourcc( compressor );
 	}
 			//		return quicktime_video_compressor(lav_file->qt_fd,0);
 #endif
@@ -1216,12 +1204,17 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
    	}
 	else if ( lav_fd->avi_fd && AVI_errno == 0 )
    	{
+		veejay_msg(VEEJAY_MSG_DEBUG,
+				"\tFile is AVI" );
 		ret =1;
    	}
    
+	int alt = 0;
+	
   	if(lav_fd->avi_fd)
    	{
 		ret = 1;
+		alt = 1;
 		lav_fd->format = 'a';
 		lav_fd->has_audio = (AVI_audio_bits(lav_fd->avi_fd)>0 &&
                            AVI_audio_format(lav_fd->avi_fd)==WAVE_FORMAT_PCM);
@@ -1232,10 +1225,10 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	       		if(lav_fd) free(lav_fd);
 	       		return 0;
 		}
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tFOURCC is %s", video_comp );
    	}
    	else if( AVI_errno==AVI_ERR_NO_AVI || !lav_fd->avi_fd)
    	{
-    		int alt = 0;
 #ifdef HAVE_LIBQUICKTIME
 		if(quicktime_check_sig(filename))
 		{
@@ -1254,7 +1247,8 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 			lav_fd->avi_fd = NULL;
 			lav_fd->format = 'q';
 	 		video_comp = quicktime_video_compressor(lav_fd->qt_fd,0);
-
+			veejay_msg(VEEJAY_MSG_DEBUG,"\tFile has fourcc '%s'",
+					video_comp );
 	  		/* We want at least one video track */
 	  		if (quicktime_video_tracks(lav_fd->qt_fd) < 1)
 	     		{
@@ -1322,6 +1316,8 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 				video_comp = strdup( "PICT" );
 				ret = 1;
 				alt = 1;
+				veejay_msg(VEEJAY_MSG_DEBUG,
+						"\tLoaded image file");
 			}
 			else
 				veejay_msg(VEEJAY_MSG_DEBUG,
@@ -1348,6 +1344,10 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 					lav_fd->format = 'b'; 
 					lav_fd->has_audio = 0;
 					ret = 1;
+					alt = 1;
+					veejay_msg(VEEJAY_MSG_DEBUG,
+							"RAW DV file '%s'",
+							video_comp );
 				}
 	    		}
 			else
@@ -1356,7 +1356,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 #endif
    	}
 
-	if(ret == 0 || video_comp == NULL)
+	if(ret == 0 || video_comp == NULL || alt == 0)
 	{
 		free(lav_fd);
 		internal_error = ERROR_FORMAT; /* Format not recognized */
@@ -1367,51 +1367,79 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
    lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
 
    if(lav_fd->bps==0) lav_fd->bps=1; /* make it save since we will divide by that value */
-
+   
    
 #ifdef USE_GDK_PIXBUF
-   if(strncasecmp(video_comp, "PICT",4) == 0 )
-   {
-	lav_fd->MJPG_chroma = (output_yuv == 1 ? CHROMA420: CHROMA422 );
-	lav_fd->format = 'x';
-	lav_fd->interlacing = LAV_NOT_INTERLACED;
-	return lav_fd;
-   }
+	if(strncasecmp(video_comp, "PICT",4) == 0 )
+	{
+		lav_fd->MJPG_chroma = (output_yuv == 1 ? CHROMA420: CHROMA422 );
+		lav_fd->format = 'x';
+		lav_fd->interlacing = LAV_NOT_INTERLACED;
+		return lav_fd;
+	}
 #endif
    
-   if(strncasecmp(video_comp, "div3",4)==0)
-   {
+
+	if(	strncasecmp(video_comp, "div3",4)==0 ||
+		strncasecmp(video_comp, "mp43",4)==0 ||
+  		strncasecmp(video_comp, "mp42",4)==0 )
+	{
 		lav_fd->MJPG_chroma = CHROMA420;
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
 		veejay_msg(VEEJAY_MSG_WARNING, "Playing MS MPEG4v3 DivX Video. (Every frame should be an intra frame)" );
 		return lav_fd;
 	} 
 
-	if(strncasecmp(video_comp,"mp4v",4)==0)
+	if(	strncasecmp(video_comp,"mp4v",4 )==0 ||
+		strncasecmp(video_comp,"divx",4 ) == 0 ||
+		strncasecmp(video_comp,"xvid",4 ) == 0 ||
+		strncasecmp(video_comp,"dxsd",4 ) == 0 ||
+		strncasecmp(video_comp,"mp4s",4 ) == 0 ||
+		strncasecmp(video_comp,"m4s2",4 ) == 0 )
 	{
+		lav_fd->format = 'D';
 		lav_fd->MJPG_chroma = CHROMA420;
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
 		veejay_msg(VEEJAY_MSG_WARNING, "Playing MPEG4 Video (Every frame should be an intra frame)");
 		return lav_fd;
 	}
-
-    /* Check compressor, no further action if not Motion JPEG/DV */
-    if (strncasecmp(video_comp,"iyuv",4)==0)
+	
+    	if (	strncasecmp(video_comp,"iyuv",4)==0 ||
+		strncasecmp(video_comp,"i420",4)==0)
 	{
 		lav_fd->MJPG_chroma = CHROMA420;
 		lav_fd->format = 'Y';
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
 		return lav_fd; 
 	}
-    if (strncasecmp(video_comp,"yv16",4)==0)
+	
+    	if (	strncasecmp(video_comp,"yv16",4)==0 ||
+		strncasecmp(video_comp,"i422",4)==0 ||
+		strncasecmp(video_comp,"hfyu",4)==0)
 	{
 		lav_fd->MJPG_chroma = CHROMA422;
 		lav_fd->format = 'P';
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
 		return lav_fd; 
 	}
-    if (strncasecmp(video_comp,"dvsd",4)==0 || strncasecmp(video_comp,"dv",2)==0)
+
+	if( 	strncasecmp(video_comp, "avc1", 4 ) == 0 ||
+		strncasecmp(video_comp, "h264", 4 ) == 0 ||
+		strncasecmp(video_comp, "x264", 4 ) == 0 ||
+		strncasecmp(video_comp, "davc", 4 ) == 0 )
 	{
+		lav_fd->MJPG_chroma = CHROMA420;
+		lav_fd->interlacing = LAV_NOT_INTERLACED;
+		return lav_fd;
+	}
+	
+	if (	strncasecmp(video_comp,"dvsd",4)==0 ||
+		strncasecmp(video_comp,"dvcp",4) ==0 ||
+		strncasecmp(video_comp,"dxsd",4) == 0 ||
+		strncasecmp(video_comp, "dvp",3) == 0 ||
+		strncasecmp(video_comp, "dvhd",4) == 0 ||
+		strncasecmp(video_comp, "dv",2 ) == 0)
+	{ 
 		int gw = lav_video_height( lav_fd );
 		if( gw == 480 )
 			 lav_fd->MJPG_chroma = CHROMA411;
@@ -1422,13 +1450,36 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		return lav_fd; 
 	}
 
-	if (strncasecmp(video_comp, "mjpg", 4) == 0 || strncasecmp(video_comp,"mjpa",4)==0 ||
-		strncasecmp(video_comp, "jpeg", 4) == 0)
+	if(	strncasecmp(video_comp, "png", 3 ) == 0 ||
+		strncasecmp(video_comp, "mpng",4) == 0 )
+	{
+		lav_fd->MJPG_chroma = CHROMA420;
+		lav_fd->interlacing = LAV_INTER_UNKNOWN;
+		return lav_fd;
+	}
+
+	if(	strncasecmp(video_comp, "svq1", 4 ) == 0 ||
+		strncasecmp(video_comp, "svq3", 4 ) == 0 ||
+		strncasecmp(video_comp, "rpza", 4 ) == 0 ||
+		strncasecmp(video_comp, "cyuv", 4 ) == 0 )
+	{
+		lav_fd->MJPG_chroma = CHROMA420;
+		lav_fd->interlacing = LAV_INTER_UNKNOWN;
+		return lav_fd;
+	}
+	
+	if (	strncasecmp(video_comp,"mjpg", 4) == 0 ||
+		strncasecmp(video_comp,"mjpa", 4) == 0 ||
+		strncasecmp(video_comp,"jpeg", 4) == 0 ||
+		strncasecmp(video_comp,"mjpb" ,4) == 0 ||
+		strncasecmp(video_comp,"sp5x", 4) == 0 ||
+		strncasecmp(video_comp,"jpgl", 4) == 0 ||
+		strncasecmp(video_comp , "jfif", 4 ) == 0 ||
+		strncasecmp(video_comp, "dmb1", 4)==0 )
 	{
 		lav_fd->MJPG_chroma = CHROMA420;
 		lav_fd->interlacing = LAV_INTER_UNKNOWN;
 		lav_fd->is_MJPG = 1;
-	//	return lav_fd;
 	
 		/* Make some checks on the video source, we read the first frame for that */
 
