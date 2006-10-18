@@ -63,14 +63,17 @@ int sample_get_num_encoded_files(int sample_id)
 	return si->sequence_num;
 }
 
-int sample_get_sequenced_file(int sample_id, char *descr, int num)
+int sample_get_sequenced_file(int sample_id, char *descr, int num, char *ext)
 {
     sample_info *si;
     si = sample_get(sample_id);
     if (!si)
 	return -1;
-    sprintf(descr, "%s-%05d.avi", si->encoder_destination,
-				   num);
+
+    	
+    
+    sprintf(descr, "%s-%05d.%s", si->encoder_destination,
+				   num, ext);
     return 1;
 
 }
@@ -83,7 +86,7 @@ int sample_get_encoder_format(int sample_id)
 	return si->encoder_format;
 }
 
-int sample_try_filename(int sample_id, char *filename)
+int sample_try_filename(int sample_id, char *filename, int format)
 {
 	sample_info *si= sample_get(sample_id);
 	if(!si) return 0;
@@ -94,8 +97,21 @@ int sample_try_filename(int sample_id, char *filename)
 	}
 //	sprintf(si->encoder_destination, "%s-%05ld.avi", si->encoder_base,si->sequence_num);
 
-	
-	sprintf(si->encoder_destination, "%s.avi", si->encoder_base );
+	char ext[5];
+	switch(format)
+	{
+		case ENCODER_DVVIDEO:
+			sprintf(ext,"dv");
+			break;
+		case ENCODER_QUICKTIME_MJPEG:
+		case ENCODER_QUICKTIME_DV:
+			sprintf(ext,"mov");
+			break;
+		default:
+			sprintf(ext,"avi");
+			break;
+	}
+	sprintf(si->encoder_destination, "%s.%s", si->encoder_base , ext);
 
 	veejay_msg(VEEJAY_MSG_INFO, "Recording to [%s]", si->encoder_destination);
 	return (sample_update(si,sample_id));	
@@ -196,7 +212,7 @@ int sample_init_encoder(int sample_id, char *filename, int format, editlist *el,
 
 	sample_info *si;
 
-	if(! sample_try_filename( sample_id, filename ) )
+	if(! sample_try_filename( sample_id, filename,format ) )
 	{
 		return -1;
 	}  
@@ -206,8 +222,9 @@ int sample_init_encoder(int sample_id, char *filename, int format, editlist *el,
 	{
 		 return -1; 
 	}
-	if(format < 0 || format > 5)
+	if(format < 0 || format > 7)
 	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid format!");
 		return -1;
 	}
 	if(nframes <= 0) return -1;

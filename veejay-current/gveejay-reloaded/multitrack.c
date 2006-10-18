@@ -526,6 +526,7 @@ static	void	update_widgets(int *status, mt_priv_t *p, int pm)
 	int *h = p->history[pm];
 //	gdk_threads_enter();
 //	mt_update_gui(status);	
+	if( h[PLAY_MODE] != pm )
 	playmode_sensitivity( p, pm );
 
 	if( pm == MODE_SAMPLE || pm == MODE_PLAIN )

@@ -970,16 +970,16 @@ int	vj_tag_get_encoder_format(int t1)
 	return tag->encoder_format;
 }
 
-int	vj_tag_get_sequenced_file(int t1, char *descr, int num)
+int	vj_tag_get_sequenced_file(int t1, char *descr, int num, char *ext)
 {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return -1;
-	sprintf(descr, "%s-%05d.avi", tag->encoder_destination,num );
+	sprintf(descr, "%s-%05d.%s", tag->encoder_destination,num,ext );
 	return 1;
 }
 
 
-int	vj_tag_try_filename(int t1, char *filename)
+int	vj_tag_try_filename(int t1, char *filename, int format)
 {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) 
@@ -990,7 +990,22 @@ int	vj_tag_try_filename(int t1, char *filename)
 	{
 		snprintf(tag->encoder_base, 255, "%s", filename);
 	}
-	sprintf(tag->encoder_destination, "%s-%03d.avi", tag->encoder_base, (int)tag->sequence_num);
+	char ext[5];
+	switch(format)
+	{
+		case ENCODER_QUICKTIME_DV:
+		case ENCODER_QUICKTIME_MJPEG:
+			sprintf(ext, "mov");
+			break;
+		case ENCODER_DVVIDEO:
+			sprintf(ext,"dv");
+			break;
+		default:
+			sprintf(ext,"avi");
+			break;
+	}	
+	
+	sprintf(tag->encoder_destination, "%s-%03d.%s", tag->encoder_base, (int)tag->sequence_num, ext);
 	return (vj_tag_update(tag,t1));
 }
 
@@ -1116,7 +1131,7 @@ int vj_tag_init_encoder(int t1, char *filename, int format, long nframes ) {
   return 0;
   }
 
-  if(!vj_tag_try_filename( t1,filename))
+  if(!vj_tag_try_filename( t1,filename,format))
   {
 	return 0;
   }

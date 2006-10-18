@@ -33,8 +33,8 @@ int sample_get_frames_left(int s1);
 int sample_reset_autosplit(int s1);
 int sample_get_total_frames( int s1 );
 int sample_get_num_encoded_files(int sample_id);
-int sample_get_sequenced_file(int sample_id, char *descr, int num);
-int sample_try_filename(int sample_id, char *filename);
+int sample_get_sequenced_file(int sample_id, char *descr, int num, char *ext);
+int sample_try_filename(int sample_id, char *filename, int format);
 int sample_continue_record( int s1 );
 void	sample_record_free();
 
