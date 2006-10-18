@@ -46,8 +46,8 @@
 #include <stdio.h>
 #include <math.h>
 
-static short reflect_aSin[1024];
-static int reflection_map[1024][256];
+static short reflect_aSin[2048];
+static int reflection_map[2048][256];
 static int sin_index = 0;
 static int sin_index2 = 20;
 static uint8_t *reflection_buffer;
