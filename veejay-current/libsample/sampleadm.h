@@ -152,6 +152,7 @@ typedef struct sample_info_t {
     unsigned long encoder_total_frames;
     char *encoder_destination;
     int encoder_format;
+    void *encoder;
 //    lav_file_t *encoder_file;
 	void		*encoder_file;
     long encoder_duration; /* in seconds */

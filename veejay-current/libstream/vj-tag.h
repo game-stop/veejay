@@ -90,6 +90,7 @@ typedef struct {
     char encoder_destination[256];
     char descr[TAG_MAX_DESCR_LEN];
     int encoder_format;
+    void *encoder;
     lav_file_t *encoder_file;
     long encoder_duration; /* in seconds */
     long encoder_num_frames;

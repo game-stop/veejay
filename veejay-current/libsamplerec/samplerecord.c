@@ -145,7 +145,7 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 		el->video_width,el->video_height,el->video_inter,
 		el->video_fps,0,0,0);
 	if(si->encoder_file)
-	veejay_msg(VEEJAY_MSG_INFO, "Encoding to %s file [%s] %dx%d@%2.2f %d/%d/%d %s >%09d<",
+	veejay_msg(VEEJAY_MSG_INFO, "Encoding to %s file [%s] %dx%d@%2.2f %d/%d/%d %s >%09d< f=%d",
 	    descr,
 	    si->encoder_destination, 
 	    el->video_width,
@@ -155,13 +155,25 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 	    el->audio_chans,
 	    el->audio_rate,
 		(el->video_inter == 1 ? "Deinterlaced" : "Interlaced"),
-		( si->encoder_duration - si->encoder_total_frames)
-	);
+		( si->encoder_duration - si->encoder_total_frames),
+		cformat );
+	
 
 	if(!si->encoder_file)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Cannot write to %s (%s)",si->encoder_destination,
 		lav_strerror());
+		return -1;
+	}
+
+	si->encoder = vj_avcodec_start( el, format );
+	if(!si->encoder)
+	{
+		char *codecname = vj_avcodec_get_codec_name(format);
+		
+		veejay_msg(VEEJAY_MSG_ERROR,"Cannot initialize '%s'",
+				codecname );
+		free(codecname);
 		return -1;
 	}
 
@@ -203,6 +215,7 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 	si->encoder_width = el->video_width;
 	si->encoder_height = el->video_height;
 
+	
 	sample_update(si,sample_id);
 	return 0;
 }
@@ -296,7 +309,7 @@ int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
    // si->encoder_format has one of ENCODER_*
 
 
-   buf_len =  vj_avcodec_encode_frame( si->encoder_total_frames ++,
+   buf_len =  vj_avcodec_encode_frame(si->encoder, si->encoder_total_frames ++,
 		si->encoder_format, buffer, sample_encoder_buf, si->encoder_max_size);
    if(buf_len <= 0) 
    {
@@ -337,9 +350,14 @@ int sample_stop_encoder(int s1) {
    if(!si) return -1;
    if(si->encoder_active) {
      lav_close((lav_file_t*)si->encoder_file);
+
+	vj_avcodec_stop( si->encoder, si->encoder_format );
+     
      veejay_msg(VEEJAY_MSG_INFO, "Stopped sample encoder [%s]",si->encoder_destination);
      si->encoder_active = 0;
+     si->encoder_file = NULL;
      sample_update(si,s1);	
+    
      //sample_reset_encoder(s1);
      return 1; 
   }

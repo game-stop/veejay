@@ -677,8 +677,9 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
    if( read(AVI->fdes,data,12) != 12 ) ERR_EXIT(AVI_ERR_READ)
 
    if( strncasecmp((char*)data  ,"RIFF",4) !=0 ||
-       strncasecmp((char*)data+8,"AVI ",4) !=0 ) ERR_EXIT(AVI_ERR_NO_AVI)
-
+       strncasecmp((char*)data+8,"AVI ",4) !=0 ) {
+	   ERR_EXIT(AVI_ERR_NO_AVI)
+	}
    /* Go through the AVI file and extract the header list,
       the start position of the 'movi' list and an optionally
       present idx1 tag */

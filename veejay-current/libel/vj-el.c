@@ -500,8 +500,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
     if (el->lav_fd[n] == NULL)
 	{
 		el->num_video_files--;	
-		veejay_msg(VEEJAY_MSG_ERROR,"Error loading '%s' :%s",
-		realname,lav_strerror());
+		veejay_msg(VEEJAY_MSG_ERROR,"Error loading '%s'", realname);
+	        veejay_msg(VEEJAY_MSG_ERROR,"%s",lav_strerror());
 	 	if(realname) free(realname);
 		return -1;
 	}
@@ -734,7 +734,6 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		if(el->video_file_list[n]) free(el->video_file_list[n]);
 		return -1;
 	}
-	veejay_msg(0, "video compressor %s", compr_type );
      // initialze a decoder if needed
 	decoder_id = _el_get_codec_id( compr_type );
 	if(decoder_id > 0 && decoder_id != 0xffff)

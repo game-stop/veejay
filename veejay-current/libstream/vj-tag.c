@@ -922,7 +922,10 @@ int vj_tag_stop_encoder(int t1) {
 	 return -1;
    }
    if(tag->encoder_active) {
-	lav_close(tag->encoder_file);
+
+	       lav_close(tag->encoder_file);
+	       vj_avcodec_stop( tag->encoder, tag->encoder_format );
+   
 	/* free memory now, it is not needed anymore */
 	/* clean up internal variables */
  	tag->encoder_active = 0;
@@ -1017,29 +1020,14 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	char cformat = 'Y';
 	int sample_id = tag->id;
 
-	if(format == ENCODER_DVVIDEO)
-	{
-		int ok = 0;
-		if ( (_tag_info->edit_list->video_height ==  480) && (_tag_info->edit_list->video_width == 720 ) )
-		{
-			ok  = 1;
-		}
-		if ( (_tag_info->edit_list->video_height = 576) && (_tag_info->edit_list->video_width == 720) )
-		{
-			ok = 1;
-		}
-		if(!ok)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Video dimensions must match DV geometry!");
-			return 0;
-		}
-	}
-
-	// format
 	switch(format)
 	{
-		case ENCODER_DVVIDEO: sprintf(descr,"DV2"); cformat='d'; break;
-		case ENCODER_MJPEG: sprintf(descr, "MJPEG"); cformat='a'; break;
+		case ENCODER_DVVIDEO:
+		case ENCODER_QUICKTIME_DV:
+			sprintf(descr,"DV2"); cformat='d'; break;
+		case ENCODER_MJPEG:
+		case ENCODER_QUICKTIME_MJPEG:
+			sprintf(descr, "MJPEG"); cformat='a'; break;
 		case ENCODER_YUV420: sprintf(descr, "YUV 4:2:0 YV12"); cformat='Y'; break;
 		case ENCODER_YUV422: sprintf(descr, "YUV 4:2:2 Planar"); cformat='P'; break;
 		case ENCODER_MPEG4: sprintf(descr, "MPEG4"); cformat='M'; break;
@@ -1048,6 +1036,16 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		   veejay_msg(VEEJAY_MSG_ERROR, "Unsupported video codec");
 		   return 0;
                 break;
+	}
+	
+	tag->encoder =  vj_avcodec_start( _tag_info->edit_list , format );
+	if(!tag->encoder)
+	{
+		char *codecname = vj_avcodec_get_codec_name( format );
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize %s",
+				codecname );
+		free(codecname);
+		return 0;
 	}
 
 	tag->encoder_file = lav_open_output_file(
@@ -2010,7 +2008,7 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 		tag->encoder_height, buffer[0], buffer[1], buffer[2]);
 		*/
 
-   buf_len =	vj_avcodec_encode_frame( tag->encoder_total_frames ++, tag->encoder_format, buffer, tag_encoder_buf, tag->encoder_max_size);
+   buf_len =	vj_avcodec_encode_frame( tag->encoder, tag->encoder_total_frames ++, tag->encoder_format, buffer, tag_encoder_buf, tag->encoder_max_size);
    if(buf_len <= 0 )
 	{
 		return -1;

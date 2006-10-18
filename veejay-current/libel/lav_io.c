@@ -310,7 +310,7 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 {
    lav_file_t *lav_fd = (lav_file_t*) malloc(sizeof(lav_file_t));
 
-   if(lav_fd==0) { internal_error=ERROR_MALLOC; return 0; }
+   if(lav_fd==0) { internal_error=ERROR_MALLOC; return NULL; }
 
    /* Set lav_fd */
 
@@ -325,68 +325,103 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 
    switch(format)
    {
-      case 'a':
-      case 'A':
-         /* Open AVI output file */
-
-         lav_fd->avi_fd = AVI_open_output_file(filename);
-         if(!lav_fd->avi_fd) { free(lav_fd); return 0; }
-         AVI_set_video(lav_fd->avi_fd, width, height, fps, "MJPG");
-         if (asize) AVI_set_audio(lav_fd->avi_fd, achans, arate, asize, WAVE_FORMAT_PCM);
-         return lav_fd;
-		 break;
-     case 'Y':
-		  lav_fd->avi_fd = AVI_open_output_file(filename);
-		  if(!lav_fd->avi_fd) { free(lav_fd); return 0; }
-		  AVI_set_video(lav_fd->avi_fd, width,height,fps, "iyuv");
-		  if(asize) AVI_set_audio(lav_fd->avi_fd, achans,arate,asize,WAVE_FORMAT_PCM);
+	case 'a':
+	case 'A':
+        	 /* Open AVI output file */
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI MJPEG");
+        	lav_fd->avi_fd = AVI_open_output_file(filename);
+         	if(!lav_fd->avi_fd)
+		{
+			free(lav_fd);
+			return NULL;
+		}
+         	AVI_set_video(lav_fd->avi_fd, width, height, fps, "MJPG");
+       	  	if (asize)
+			AVI_set_audio(lav_fd->avi_fd, achans, arate, asize, WAVE_FORMAT_PCM);
+      		return lav_fd;
+     	case 'Y':
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tWriting output file in AVI IYUV");
+		lav_fd->avi_fd = AVI_open_output_file(filename);
+		if(!lav_fd->avi_fd) 
+		{
+			free(lav_fd);
+			return NULL;
+		}
+		AVI_set_video(lav_fd->avi_fd, width,height,fps, "iyuv");
+		if(asize)
+			AVI_set_audio(lav_fd->avi_fd, achans,arate,asize,WAVE_FORMAT_PCM);
+		return lav_fd;
+     	case 'P':
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI yv16");
+		lav_fd->avi_fd = AVI_open_output_file(filename);
+		if(!lav_fd->avi_fd)
+		{
+			free(lav_fd);
+			return NULL;
+		}
+		AVI_set_video(lav_fd->avi_fd, width,height,fps, "yv16");
+		if(asize) 
+			AVI_set_audio(lav_fd->avi_fd, achans,arate,asize,WAVE_FORMAT_PCM);
+		return lav_fd;
+   	case 'D':
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI div3");
+		lav_fd->avi_fd = AVI_open_output_file(filename);
+		if(!lav_fd->avi_fd)
+		{
+			free(lav_fd);
+			return NULL;
+		}
+		AVI_set_video(lav_fd->avi_fd,width,height,fps, "div3");
+		if(asize)
+		       AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
+		return lav_fd;
+   	case 'M':
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI mp4v");
+		lav_fd->avi_fd = AVI_open_output_file(filename);
+		if(!lav_fd->avi_fd)
+		{
+			free(lav_fd);
+			return NULL;
+		}
+		AVI_set_video(lav_fd->avi_fd,width,height,fps, "mp4v");
+		if(asize) 
+			AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
+ 		return lav_fd;
+   	case 'b':
+   	case 'd':
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI dvsd");
+		lav_fd->avi_fd = AVI_open_output_file(filename);
+		if(!lav_fd->avi_fd)
+		{
+			free(lav_fd);
+			return NULL;
+		}
+		AVI_set_video(lav_fd->avi_fd,width,height,fps, "dvsd");
+		if(asize) AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
 		  return lav_fd;
-		  break;
-     case 'P':
-		  lav_fd->avi_fd = AVI_open_output_file(filename);
-		  if(!lav_fd->avi_fd) { free(lav_fd); return 0; }
-		  AVI_set_video(lav_fd->avi_fd, width,height,fps, "yv16");
-		  if(asize) AVI_set_audio(lav_fd->avi_fd, achans,arate,asize,WAVE_FORMAT_PCM);
-		  return lav_fd;
-		  break;
-   case 'D':
-		  lav_fd->avi_fd = AVI_open_output_file(filename);
-		  if(!lav_fd->avi_fd) { free(lav_fd); return 0; }
-		  AVI_set_video(lav_fd->avi_fd,width,height,fps, "div3");
-		  if(asize) AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
-		  return lav_fd;
-   case 'M':
-		  lav_fd->avi_fd = AVI_open_output_file(filename);
-		  if(!lav_fd->avi_fd) { free(lav_fd); return 0; }
-		  AVI_set_video(lav_fd->avi_fd,width,height,fps, "mp4v");
-		  if(asize) AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
- 		  return lav_fd;
-   case 'b':
-   case 'd':
-		  lav_fd->avi_fd = AVI_open_output_file(filename);
-		  if(!lav_fd->avi_fd) { free(lav_fd); return 0; }
-		  AVI_set_video(lav_fd->avi_fd,width,height,fps, "dvsd");
-		  if(asize) AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
-		  return lav_fd;
-      case 'q':
+      	case 'q':
 #ifdef HAVE_LIBQUICKTIME
-         /* open quicktime output file */
+   	      /* open quicktime output file */
 
-         /* since the documentation says that the file should be empty,
-            we try to remove it first */
+        	 /* since the documentation says that the file should be empty,
+            		we try to remove it first */
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in Quicktime MJPA/JPEG");
+        	remove(filename);
 
-         remove(filename);
-
-         lav_fd->qt_fd = quicktime_open(filename, 0, 1);
-         if(!lav_fd->qt_fd) { free(lav_fd); return 0; }
-         quicktime_set_video(lav_fd->qt_fd, 1, width, height, fps,
+         	lav_fd->qt_fd = quicktime_open(filename, 0, 1);
+      	 	if(!lav_fd->qt_fd)
+		{
+			free(lav_fd);
+			return NULL;
+		}
+        	quicktime_set_video(lav_fd->qt_fd, 1, width, height, fps,
                              (interlaced ? QUICKTIME_MJPA : QUICKTIME_JPEG));
-         if (asize)
-	    quicktime_set_audio(lav_fd->qt_fd, achans, arate, asize, QUICKTIME_TWOS);
-         return lav_fd;
+        	if (asize)
+		    quicktime_set_audio(lav_fd->qt_fd, achans, arate, asize, QUICKTIME_TWOS);
+        	return lav_fd;
 #else
-	 internal_error = ERROR_FORMAT;
-	 return 0;
+		internal_error = ERROR_FORMAT;
+		return NULL;
 #endif
 		  
 	}
@@ -401,22 +436,27 @@ int lav_close(lav_file_t *lav_file)
 	switch(video_format)
 	{
 #ifdef SUPPORT_READ_DV2
+		case 'd':
 		case 'b':
+			veejay_msg(VEEJAY_MSG_DEBUG,"\tClosing raw dv file");
 			ret = rawdv_close(lav_file->dv_fd);
 			break;
 #endif
 #ifdef USE_GDK_PIXBUF
 		case 'x':
+			veejay_msg(VEEJAY_MSG_DEBUG,"\tClosing image file");
 			vj_picture_cleanup( lav_file->picture );
 			ret = 1;
 			break;
 #endif
 #ifdef HAVE_LIBQUICKTIME
-      case 'q':
-         ret = quicktime_close( lav_file->qt_fd );
-         break;
+      		case 'q':
+			veejay_msg(VEEJAY_MSG_DEBUG, "\tClosing Quicktime file");
+       			ret = quicktime_close( lav_file->qt_fd );
+		        break;
 #endif			
 		default:
+			veejay_msg(VEEJAY_MSG_DEBUG, "\tClosing AVI file");
 			ret = AVI_close(lav_file->avi_fd);
 			break;
 	}
@@ -1121,7 +1161,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
    int jpg_height, jpg_width, ncomps, hf[3], vf[3];
    int ierr;
 
-   lav_file_t *lav_fd = (lav_file_t*) malloc(sizeof(lav_file_t));
+   lav_file_t *lav_fd = (lav_file_t*) vj_malloc(sizeof(lav_file_t));
 
    if(lav_fd==0) { internal_error=ERROR_MALLOC; return 0; }
 
@@ -1147,12 +1187,14 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
    lav_fd->MJPG_chroma = CHROMAUNKNOWN;
    lav_fd->mmap_size   = mmap_size;
 
-int ret = 0;
+	int ret = 0;
+
 	/* open file, check if file is a file */
 	struct stat s;
 	if( stat(filename, &s ) != 0 )
 	{
 		if(lav_fd) free(lav_fd);
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid file '%s'. Proper permissions?",filename);
 		return NULL;
 	}
 
@@ -1164,38 +1206,36 @@ int ret = 0;
 	}
 
 
-   lav_fd->avi_fd = AVI_open_input_file(filename,1,mmap_size);
+	lav_fd->avi_fd = AVI_open_input_file(filename,1,mmap_size);
 
-  // if(!lav_fd->avi_fd) { if(lav_fd) free(lav_fd); return 0;}
- /*  if(lav_fd->avi_fd==NULL && AVI_errno == AVI_ERR_EMPTY )
-	{
-		if(lav_fd) free(lav_fd);
-		return NULL;
-	}*/
-
-   if( lav_fd->avi_fd && AVI_errno == AVI_ERR_EMPTY )
-   {
+	if( lav_fd->avi_fd && AVI_errno == AVI_ERR_EMPTY )
+   	{
 	   	veejay_msg(VEEJAY_MSG_ERROR, "Empty AVI file");
 		if(lav_fd) free(lav_fd);
 		return NULL;
-   } else if ( lav_fd->avi_fd && AVI_errno == 0 )
-   {
-	   ret =1;
-   }
+   	}
+	else if ( lav_fd->avi_fd && AVI_errno == 0 )
+   	{
+		ret =1;
+   	}
    
-   if(lav_fd->avi_fd)
-   {
-      /* It is an AVI file */
-      lav_fd->format = 'a';
-      lav_fd->has_audio = (AVI_audio_bits(lav_fd->avi_fd)>0 &&
+  	if(lav_fd->avi_fd)
+   	{
+		ret = 1;
+		lav_fd->format = 'a';
+		lav_fd->has_audio = (AVI_audio_bits(lav_fd->avi_fd)>0 &&
                            AVI_audio_format(lav_fd->avi_fd)==WAVE_FORMAT_PCM);
-      video_comp = AVI_video_compressor(lav_fd->avi_fd);
-      if(video_comp == NULL || strlen(video_comp) <= 0)
-	{ if(lav_fd) free(lav_fd); return 0;}
-   }
-   else if( AVI_errno==AVI_ERR_NO_AVI || !lav_fd->avi_fd)
-   {
-    	int alt = 0;
+		video_comp = AVI_video_compressor(lav_fd->avi_fd);
+		if(video_comp == NULL || strlen(video_comp) <= 0)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to read FOURCC from AVI");
+	       		if(lav_fd) free(lav_fd);
+	       		return 0;
+		}
+   	}
+   	else if( AVI_errno==AVI_ERR_NO_AVI || !lav_fd->avi_fd)
+   	{
+    		int alt = 0;
 #ifdef HAVE_LIBQUICKTIME
 		if(quicktime_check_sig(filename))
 		{
@@ -1209,6 +1249,8 @@ int ret = 0;
 			   	free(lav_fd);
 	    			return 0;
 	    		}
+			else
+				veejay_msg(VEEJAY_MSG_DEBUG, "\tOpening Quicktime file");
 			lav_fd->avi_fd = NULL;
 			lav_fd->format = 'q';
 	 		video_comp = quicktime_video_compressor(lav_fd->qt_fd,0);
@@ -1221,61 +1263,69 @@ int ret = 0;
 	     			internal_error = ERROR_FORMAT;
 	     			return 0;
 	     		}
-		/*
- 		* If the quicktime file has the sample aspect atom then use it to set
- 		* the sar values in the lav_fd structure.  Hardwired (like everywhere else)
-		* to only look at track 0.
-		*/
+			/*
+ 			* If the quicktime file has the sample aspect atom then use it to set
+ 			* the sar values in the lav_fd structure.  Hardwired (like everywhere else)
+			* to only look at track 0.
+			*/
 	 
-		 if (lqt_get_pasp(lav_fd->qt_fd, 0, &pasp) != 0)
-	     {
-	   	 	lav_fd->sar_w = pasp.hSpacing;
-	   		lav_fd->sar_h = pasp.vSpacing;
-	     }
-		/*
- 		 * If a 'fiel' atom is present (not guaranteed) then use it to set the
- 		 * interlacing type.
-		 */
+		 	if (lqt_get_pasp(lav_fd->qt_fd, 0, &pasp) != 0)
+	     		{
+	   	 		lav_fd->sar_w = pasp.hSpacing;
+	   			lav_fd->sar_h = pasp.vSpacing;
+	     		}
+			/*
+ 			 * If a 'fiel' atom is present (not guaranteed) then use it to set the
+ 			 * interlacing type.
+			 */
 	  	
-		 if (lqt_get_fiel(lav_fd->qt_fd, 0, &nfields, &detail) != 0)
-	     {
-	     	if (nfields == 2)
-	        {
-				if (detail == 14 || detail == 6)
-		   			lav_fd->interlacing = LAV_INTER_BOTTOM_FIRST;
-				else if (detail == 9 || detail == 1)
-		   			lav_fd->interlacing = LAV_INTER_TOP_FIRST;
+			if (lqt_get_fiel(lav_fd->qt_fd, 0, &nfields, &detail) != 0)
+		     	{
+	     			if (nfields == 2)
+	       			{
+					if (detail == 14 || detail == 6)
+		   				lav_fd->interlacing = LAV_INTER_BOTTOM_FIRST;
+					else if (detail == 9 || detail == 1)
+		   				lav_fd->interlacing = LAV_INTER_TOP_FIRST;
+					else
+		   				veejay_msg(VEEJAY_MSG_DEBUG, "Unknown 'detail' in 'fiel' atom: %d", detail);
+	       			}
+	     			else
+	     			   	lav_fd->interlacing = LAV_NOT_INTERLACED;
+	    		 }
+	 	 	/* Check for audio tracks */
+	 		lav_fd->has_audio = 0;
+	 		if (quicktime_audio_tracks(lav_fd->qt_fd))
+	     		{
+	  	   		audio_comp = quicktime_audio_compressor(lav_fd->qt_fd,0);
+	  	   		if (strncasecmp(audio_comp, QUICKTIME_TWOS,4)==0)
+					lav_fd->has_audio = 1;
 				else
-		   			mjpeg_warn("unknown 'detail' in 'fiel' atom: %d", detail);
-	        }
-	     	else
-	        	lav_fd->interlacing = LAV_NOT_INTERLACED;
-	     }
-	  	/* Check for audio tracks */
-	 	 lav_fd->has_audio = 0;
-	 	 if (quicktime_audio_tracks(lav_fd->qt_fd))
-	     {
-	  	   audio_comp = quicktime_audio_compressor(lav_fd->qt_fd,0);
-	  	   if (strncasecmp(audio_comp, QUICKTIME_TWOS,4)==0)
-			lav_fd->has_audio = 1;
-	     }
-		 alt = 1;
-		ret = 1;
+					veejay_msg(VEEJAY_MSG_WARNING, "Audio compressor '%s' not supported",
+							audio_comp );
+	     		}
+		 	alt = 1;
+			ret = 1;
 		}
+		else
+			veejay_msg(VEEJAY_MSG_DEBUG, "\tNot a Quicktime file");
 #endif
 #ifdef USE_GDK_PIXBUF
 		if(!alt)
 		{
-				lav_fd->picture = vj_picture_open( (const char*) filename,
-					output_scale_width, output_scale_height, output_yuv );
-				if(lav_fd->picture)
-				{
-					lav_fd->format = 'x';
-					lav_fd->has_audio = 0;
-					video_comp = strdup( "PICT" );
-					ret = 1;
-					alt = 1;
-				}
+			lav_fd->picture = vj_picture_open( (const char*) filename,
+				output_scale_width, output_scale_height, output_yuv );
+			if(lav_fd->picture)
+			{
+				lav_fd->format = 'x';
+				lav_fd->has_audio = 0;
+				video_comp = strdup( "PICT" );
+				ret = 1;
+				alt = 1;
+			}
+			else
+				veejay_msg(VEEJAY_MSG_DEBUG,
+						"\tNot a Image file");
 		}
 #endif
 
@@ -1298,17 +1348,19 @@ int ret = 0;
 					lav_fd->format = 'b'; 
 					lav_fd->has_audio = 0;
 					ret = 1;
-					veejay_msg(VEEJAY_MSG_DEBUG, "RAW DV file");
 				}
 	    		}
+			else
+				veejay_msg(VEEJAY_MSG_DEBUG, "\tNot a raw dv file");
 		}
 #endif
-   }
+   	}
+
 	if(ret == 0 || video_comp == NULL)
 	{
 		free(lav_fd);
 		internal_error = ERROR_FORMAT; /* Format not recognized */
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to load file '%s'", filename);
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to load file '%s', code=%x, video=%s", filename,ret,video_comp);
 		return 0;
 	}
 	
@@ -1508,6 +1560,7 @@ ERREXIT:
    lav_close(lav_fd);
    if(frame) free(frame);
    internal_error = ierr;
+	veejay_msg(VEEJAY_MSG_ERROR, "%s", lav_strerror());
    return 0;
 }
 
