@@ -1147,7 +1147,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
    lav_fd->MJPG_chroma = CHROMAUNKNOWN;
    lav_fd->mmap_size   = mmap_size;
 
-
+int ret = 0;
 	/* open file, check if file is a file */
 	struct stat s;
 	if( stat(filename, &s ) != 0 )
@@ -1178,6 +1178,9 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	   	veejay_msg(VEEJAY_MSG_ERROR, "Empty AVI file");
 		if(lav_fd) free(lav_fd);
 		return NULL;
+   } else if ( lav_fd->avi_fd && AVI_errno == 0 )
+   {
+	   ret =1;
    }
    
    if(lav_fd->avi_fd)
@@ -1190,9 +1193,8 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
       if(video_comp == NULL || strlen(video_comp) <= 0)
 	{ if(lav_fd) free(lav_fd); return 0;}
    }
-   else if( AVI_errno==AVI_ERR_NO_AVI )
+   else if( AVI_errno==AVI_ERR_NO_AVI || !lav_fd->avi_fd)
    {
-	int ret = 0;
     	int alt = 0;
 #ifdef HAVE_LIBQUICKTIME
 		if(quicktime_check_sig(filename))
@@ -1301,6 +1303,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	    		}
 		}
 #endif
+   }
 	if(ret == 0 || video_comp == NULL)
 	{
 		free(lav_fd);
@@ -1309,12 +1312,11 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		return 0;
 	}
 	
-   }
-
    lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
 
    if(lav_fd->bps==0) lav_fd->bps=1; /* make it save since we will divide by that value */
 
+   
 #ifdef USE_GDK_PIXBUF
    if(strncasecmp(video_comp, "PICT",4) == 0 )
    {
