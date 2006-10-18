@@ -25,23 +25,22 @@
 vj_effect *slidingdoor_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) malloc(sizeof(vj_effect));
-    ve->num_params = 2;
+    ve->num_params = 0;
     ve->defaults = (int *) malloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) malloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) malloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 1; /* initial size */
-    ve->defaults[1] = 1; /* auto or not auto */
-    //ve->defaults[3] = 25; /* max frames */
+ /*   ve->defaults[0] = 1; 
+    ve->defaults[1] = 1;
 
     ve->limits[0][0] = 1;
     ve->limits[1][0] = height / 16;
-
+*/
     ve->sub_format = 1;
 
-    ve->limits[0][1] = 0;
+  /*  ve->limits[0][1] = 0;
     ve->limits[1][1] = 1;
-
-    ve->description = "Transition Sliding Door";
+*/
+    ve->description = "AlphaLuma Overlay";
     ve->extra_frame = 1;
 	ve->has_user = 0;
     return ve;
@@ -52,6 +51,26 @@ vj_effect *slidingdoor_init(int width, int height)
 void slidingdoor_apply( VJFrame *frame, VJFrame *frame2, int width,
 		       int height, int size)
 {
+
+	//@ alpha luma
+	unsigned int i;
+	const int len = frame->len;
+	uint8_t *Y = frame->data[0];
+	const uint8_t *Y2 = frame2->data[0];
+     	uint8_t *Cb= frame->data[1];
+        uint8_t *Cr= frame->data[2];
+        const uint8_t *Cb2= frame2->data[1];
+        const uint8_t *Cr2= frame2->data[2];
+
+
+	for( i = 0; i < len ; i ++ )
+	{
+		unsigned int op0 = Y2[i];
+		unsigned int op1 = 255 - op0;
+		Y[i] = (op0 * Y[i] + op1 * Y2[i]) >> 8;
+		Cb[i] = (op0 * Cb[i] + op1 * Cb2[i]) >> 8;
+		Cr[i] = (op0 * Cr[i] + op1 * Cr2[i]) >> 8;
+	}
 /*
 	frameborder_yuvdata(
 		frame->data[0],
