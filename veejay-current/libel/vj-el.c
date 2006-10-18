@@ -238,19 +238,19 @@ static void release_buffer(struct AVCodecContext *context, AVFrame *av_frame){
   av_frame->opaque = NULL;
 }
 
-
+static int el_pixel_format_ = 1;
 static int mem_chunk_ = 0;
 void	vj_el_init_chunk(int size)
 {
 //@@ chunk size per editlist
 	mem_chunk_ = 1024 * 1024 * size;
 }
-void	vj_el_init()
+void	vj_el_init(int pf)
 {
 	int i;
 	for( i = 0; i < MAX_CODECS ;i ++ )
 		el_codecs[i] = NULL;
-
+	el_pixel_format_ =pf;
 }
 
 int	vj_el_is_dv(editlist *el)
@@ -359,6 +359,9 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
       		        veejay_msg(VEEJAY_MSG_ERROR, "Error initializing decoder %d",id); 
        		       return NULL;
       		}
+
+		
+		
 		if( out_fmt == pixel_format )
 		{
 			if( d->codec->capabilities & CODEC_CAP_DR1)
@@ -372,6 +375,7 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
         }
 	else
 	{
+		veejay_msg(VEEJAY_MSG_INFO,"Sub/Super sampling to output pixel format");
 		d->sampler = subsample_init( width );
 #ifdef SUPPORT_READ_DV2
 		if( id == CODEC_ID_DVVIDEO )
@@ -745,7 +749,21 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		if( el_codecs[c_i] == NULL )
 		{
 		//	el_codecs[c_i] = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps, pix_fmt );
-			el_codecs[c_i] = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps, el->yuv_taste[ n ],el->pixel_format );
+			int ff_pf = 0;
+			switch( el_pixel_format_)
+			{
+				case FMT_420:
+					ff_pf = PIX_FMT_YUV420P;
+					break;
+				case FMT_422:
+					ff_pf = PIX_FMT_YUV422P;
+					break;
+				default:
+					break;
+			}
+			veejay_msg(VEEJAY_MSG_DEBUG, "Decoder '%s' -> %d, pix fmt in = %d, out = %d",
+					compr_type, decoder_id, el->yuv_taste[n], ff_pf );
+			el_codecs[c_i] = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps, el->yuv_taste[ n ],ff_pf );
 			if(!el_codecs[c_i])
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,"Cannot initialize %s codec", compr_type);
@@ -1016,6 +1034,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 		        }*/
 
 			int dst_fmt = ( out_pix_fmt== FMT_420 ? PIX_FMT_YUV420P: PIX_FMT_YUV422P) ;
+
 			pict.data[0] = dst[0];
 			pict.data[1] = dst[1];
 			pict.data[2] = dst[2];
@@ -1027,29 +1046,29 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			
 			if(!d->frame->opaque)
 			{
-			if( el->auto_deinter && inter != LAV_NOT_INTERLACED)
-			{
-				pict2.data[0] = d->deinterlace_buffer[0];
-				pict2.data[1] = d->deinterlace_buffer[1];
-				pict2.data[2] = d->deinterlace_buffer[2];
-				pict2.linesize[1] = el->video_width >> 1;
-				pict2.linesize[2] = el->video_width >> 1;
-				pict2.linesize[0] = el->video_width;
-				avpicture_deinterlace(
-					&pict2,
-					(const AVPicture*) d->frame,
-					src_fmt,
-					el->video_width,
-					el->video_height);
+				if( el->auto_deinter && inter != LAV_NOT_INTERLACED)
+				{
+					pict2.data[0] = d->deinterlace_buffer[0];
+					pict2.data[1] = d->deinterlace_buffer[1];
+					pict2.data[2] = d->deinterlace_buffer[2];
+					pict2.linesize[1] = el->video_width >> 1;
+					pict2.linesize[2] = el->video_width >> 1;
+					pict2.linesize[0] = el->video_width;
+					avpicture_deinterlace(
+						&pict2,
+						(const AVPicture*) d->frame,
+						src_fmt,
+						el->video_width,
+						el->video_height);
 
-				img_convert( &pict, dst_fmt, (const AVPicture*) &pict2, src_fmt,
-					el->video_width,el->video_height);
-			}
-			else
-			{
-				img_convert( &pict, dst_fmt, (const AVPicture*) d->frame, src_fmt,
-					el->video_width, el->video_height );
-			}
+					img_convert( &pict, dst_fmt, (const AVPicture*) &pict2, src_fmt,
+						el->video_width,el->video_height);
+				}
+				else
+				{
+					img_convert( &pict, dst_fmt, (const AVPicture*) d->frame, src_fmt,
+						el->video_width, el->video_height );
+				}
 			}
 			else
 			{
@@ -1253,8 +1272,7 @@ void	vj_el_close( editlist *el )
 	free(el);
 }
 
-editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int deinterlace, int force
-	,char norm, int out_fmt)
+editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int deinterlace, int force	,char norm , int fmt)
 {
 	editlist *el = vj_malloc(sizeof(editlist));
 	memset(el, 0, sizeof(editlist));
@@ -1475,18 +1493,8 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
    	}
 
 	/* Pick a pixel format */
-	if(out_fmt == -1)
-	{
-		int lowest = FMT_420;
-		for( i = 0 ; i < el->num_video_files; i ++ )
-		{
-			if( lav_video_MJPG_chroma( el->lav_fd[ i ] ) == CHROMA422 )
-				lowest = FMT_422;
-		}	
-		out_fmt = lowest;
-	}
 	
-	el->pixel_format = out_fmt;
+	el->pixel_format = el_pixel_format_;
 
 	/* Help for audio positioning */
 

@@ -21,6 +21,7 @@
 #include <libel/vj-el.h>
 #include <libvjmsg/vj-common.h>
 #include <libvjmem/vjmem.h>
+#include <stdint.h>
 #include <string.h>
 #include <libyuv/yuvconv.h>
 
@@ -29,12 +30,13 @@
 #include <libel/vj-dv.h>
 static vj_dv_encoder *dv_encoder = NULL;
 #endif
-
+#include <ffmpeg/avcodec.h>
 #define YUV420_ONLY_CODEC(id) ( ( id == CODEC_ID_MJPEG || id == CODEC_ID_MJPEGB || id == CODEC_ID_MSMPEG4V3 || id == CODEC_ID_MPEG4) ? 1: 0)
 
 
 static int out_pixel_format = FMT_420; 
 
+static void	yuv422p3_to_yuv420p3( uint8_t *src[3], uint8_t *dst[3], int w, int h);
 
 static	char*	el_get_codec_name(int codec_id )
 {
@@ -131,15 +133,20 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 #else
 		e->context->pix_fmt = (pixel_format == FMT_420 ? PIX_FMT_YUV420P : PIX_FMT_YUV422P );
 #endif
+		char *descr = el_get_codec_name( id );
+
 		if ( avcodec_open( e->context, e->codec ) < 0 )
 		{
-			char *descr = el_get_codec_name( id );
 			veejay_msg(VEEJAY_MSG_DEBUG, "Cannot open codec '%s'" , descr );
 			if(e) free(e);
 			if(descr) free(descr);
 			return NULL;
 		}
-
+		else
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "\tOpened decoder %s", descr );
+			free(descr);
+		}
 #ifdef __FALLBACK_LIBDV
 	}
 #endif
@@ -210,32 +217,58 @@ int		vj_avcodec_init(editlist *el, int pixel_format)
 
 	_encoders[ENCODER_MJPEG] = vj_avcodec_new_encoder( CODEC_ID_MJPEG, el, fmt );
 	_encoders[ENCODER_QUICKTIME_MJPEG] = vj_avcodec_new_encoder(CODEC_ID_MJPEG,el,fmt );
-	if(!_encoders[ENCODER_MJPEG]) return 0;
+	if(!_encoders[ENCODER_MJPEG]) 
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tNo support for MJPEG !");
+		return 0;
+	}
 
 
 #ifdef __FALLBACK_LIBDV
-	dv_encoder = vj_dv_init_encoder( (void*)el , out_pixel_format);
-	if(!dv_encoder)
+	if( is_dv_resolution( el->video_width, el->video_height))
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize quasar DV codec");
-		return 0;
+		dv_encoder = vj_dv_init_encoder( (void*)el , out_pixel_format);
+		if(!dv_encoder)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize quasar DV codec");
+		}
+		//_encoders[ENCODER_DVVIDEO] = vj_avcodec_new_encoder( CODEC_ID_DVVIDEO, el, fmt );
+	
+		//if(!_encoders[ENCODER_DVVIDEO]) return 0;
 	}
-#else
-	_encoders[ENCODER_DVVIDEO] = vj_avcodec_new_encoder( CODEC_ID_DVVIDEO, el, fmt );
-	if(!_encoders[ENCODER_DVVIDEO]) return 0;
+	else
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, 
+				"\tNo support for scaling to full PAL/NTSC DV");
+	}
 #endif
 
 	_encoders[ENCODER_DIVX] = vj_avcodec_new_encoder( CODEC_ID_MSMPEG4V3 , el, fmt);
-	if(!_encoders[ENCODER_DIVX]) return 0;
+	if(!_encoders[ENCODER_DIVX])
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG,
+				"\tNo support for encoding to divx");
+	}
 
 	_encoders[ENCODER_MPEG4] = vj_avcodec_new_encoder( CODEC_ID_MPEG4, el, fmt);
-	if(!_encoders[ENCODER_MPEG4]) return 0;
-
+	if(!_encoders[ENCODER_MPEG4])
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG,
+				"\tNo support for encoding to mpeg4");
+	}
 	_encoders[ENCODER_YUV420] = vj_avcodec_new_encoder( 999, el, fmt);
-	if(!_encoders[ENCODER_YUV420]) return 0;
+	if(!_encoders[ENCODER_YUV420]) 
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG,
+				"\tNo support for encoding to raw yuv 420 planar");
+	}
 
 	_encoders[ENCODER_YUV422] = vj_avcodec_new_encoder( 998, el, fmt);
-	if(!_encoders[ENCODER_YUV422]) return 0;
+	if(!_encoders[ENCODER_YUV422]) 
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG,
+				"\tNo support for encoding to raw yuv 422 planar");
+	}
 
 
 	return 1;
@@ -461,7 +494,8 @@ int		vj_avcodec_encode_frame( int nframe,int format, uint8_t *src[3], uint8_t *b
 	if(format == ENCODER_DVVIDEO || format == ENCODER_QUICKTIME_DV )
 		return vj_dv_encode_frame( dv_encoder,src, buf );
 #endif
-
+	
+	
 	pict.quality = 1;
 	pict.pts = (int64_t)( (int64_t)nframe );
 	if(av->context->pix_fmt == PIX_FMT_YUV420P && out_pixel_format == FMT_422 )
@@ -489,22 +523,12 @@ int		vj_avcodec_encode_frame( int nframe,int format, uint8_t *src[3], uint8_t *b
 
 	return res;
 }
-/*
-static	int	vj_avcodec_copy_audio_frame( uint8_t *src, uint8_t *buf, int len)
-{
-	veejay_memcpy( buf, src, len );
-	return len;
-}
 
 int		vj_avcodec_encode_audio( int format, uint8_t *src, uint8_t *dst, int len, int nsamples )
 {
-	if(format == ENCODER_YUV420)
-		return vj_avcodec_copy_audio_frame;
-	if(format == ENCODER_YUV422)
-		return vj_avcodec_copy_audio_frame;
+	if(format == ENCODER_YUV420 || ENCODER_YUV422 == format)
+		return 0;
 	vj_encoder *av = _encoders[format];
-
-	int len = avcodec_encode_audio( av->context, src, len, nsamples );
-	return len;
+	int ret = avcodec_encode_audio( av->context, src, len, nsamples );
+	return ret;
 }
-*/

@@ -2441,7 +2441,6 @@ veejay_t *veejay_malloc()
 	for( i = 0; i < MAX_SDL_OUT;i++ )
 		info->sdl[i] = NULL;
 #endif
-    vj_el_init();
     return info;
 }
 
@@ -3015,7 +3014,9 @@ int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
 static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, int force_pix_fmt, int force , char override_norm)
 {
 	vj_el_frame_cache(info->seek_cache );
-    	vj_avformat_init();
+
+
+	vj_avformat_init();
 
  
 	if(info->auto_deinterlace)
@@ -3035,10 +3036,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		veejay_msg(VEEJAY_MSG_WARNING, "Pixel format forced to YCbCr %s",
 			(info->pixel_format == FMT_422 ? "4:2:2" : "4:2:0"));
 	
-	}
-	else
-	{
-		info->pixel_format = -1;
 	}
 	//TODO: pass yuv sampling to dummy
 	if( info->dummy->active )
@@ -3060,7 +3057,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	
 		info->current_edit_list = vj_el_dummy( 0, info->auto_deinterlace, info->dummy->chroma,
 				info->dummy->norm, info->dummy->width, info->dummy->height, info->dummy->fps,
-				force_pix_fmt );
+				info->pixel_format );
 
 		if( info->dummy->arate )
 		{
@@ -3084,8 +3081,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	{
 		return 0;
 	}
-	if(info->pixel_format == -1)
-		info->pixel_format = info->edit_list->pixel_format;
 
 	if(!vj_avcodec_init(info->current_edit_list ,   info->pixel_format))
 	{
@@ -3131,6 +3126,8 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
    	video_playback_setup *settings =
 		(video_playback_setup *) info->settings;
 
+	vj_el_init( force_pix_fmt );
+	
 	/* override options */
 	if(ofps<=0.0)
 		ofps = settings->output_fps;

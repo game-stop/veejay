@@ -528,6 +528,10 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
 	  {
 		case 'a':
 		case 'A':
+		case 'M':
+		case 'P':
+		case 'D':
+		case 'Y':	
       if(n==0)
            res = AVI_write_frame( lav_file->avi_fd, buff, size );
       else
@@ -599,6 +603,10 @@ long lav_video_frames(lav_file_t *lav_file)
    video_format = lav_file->format; internal_error = 0; /* for error messages */
    switch(lav_file->format)
    {
+	  	case 'P':
+		case 'Y':
+		case 'D':
+		case 'M':
 	case 'A':
 	case 'a':
 		return AVI_video_frames( lav_file->avi_fd );
@@ -625,6 +633,10 @@ int lav_video_width(lav_file_t *lav_file)
 	{
 		case 'a':
 		case 'A':
+		case 'P':
+		case 'M':
+		case 'D':
+		case 'Y':
 			return AVI_video_width(lav_file->avi_fd);
 #ifdef SUPPORT_READ_DV2
 		case 'b':
@@ -649,6 +661,10 @@ int lav_video_height(lav_file_t *lav_file)
    {
 		case 'a':
 		case 'A':
+		case 'P':
+		case 'M':
+		case 'D':
+		case 'Y':
 		    return AVI_video_height(lav_file->avi_fd);
 #ifdef SUPPORT_READ_DV2
 		case 'b':
@@ -671,9 +687,9 @@ double lav_frame_rate(lav_file_t *lav_file)
    video_format = lav_file->format; internal_error = 0; /* for error messages */
    switch(lav_file->format)
    {
-		case 'a':
-		case 'A':
-				return AVI_frame_rate(lav_file->avi_fd);
+//		case 'a':
+//		case 'A':
+//				return AVI_frame_rate(lav_file->avi_fd);
 #ifdef SUPPORT_READ_DV2
 		case 'b':
    		   return rawdv_fps(lav_file->dv_fd);
@@ -686,7 +702,9 @@ double lav_frame_rate(lav_file_t *lav_file)
       case 'q':
          return quicktime_frame_rate(lav_file->qt_fd,0);
 #endif	   
-	}
+	default:
+	 return AVI_frame_rate( lav_file->avi_fd);
+   }
    return -1;
 }
 
@@ -1538,6 +1556,7 @@ const char *lav_strerror(void)
       case 'A':
       case 'Y':
       case 'M':
+      case 'P':
       case 'D':
          return AVI_strerror();
       default:

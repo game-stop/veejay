@@ -54,6 +54,6 @@ int vj_dv_decode_frame(vj_dv_decoder *d,uint8_t * in, uint8_t * Y,
 int vj_dv_encode_frame(vj_dv_encoder *e,uint8_t * in[3], uint8_t * out);
 void vj_dv_free_encoder(vj_dv_encoder *e);
 void vj_dv_free_decoder(vj_dv_decoder *d); 
-
+int	is_dv_resolution( int w, int h );
 #endif
 #endif
