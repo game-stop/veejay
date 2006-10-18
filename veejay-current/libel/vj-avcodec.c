@@ -498,6 +498,9 @@ int		vj_avcodec_encode_frame( int nframe,int format, uint8_t *src[3], uint8_t *b
 	
 	pict.quality = 1;
 	pict.pts = (int64_t)( (int64_t)nframe );
+
+//	veejay_msg(0, "%d -- %d", av->context->pix_fmt, out_pixel_format );
+	
 	if(av->context->pix_fmt == PIX_FMT_YUV420P && out_pixel_format == FMT_422 )
 	{
 		pict.data[0] = av->data[0];

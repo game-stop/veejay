@@ -364,13 +364,15 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 		
 		if( out_fmt == pixel_format )
 		{
-			if( d->codec->capabilities & CODEC_CAP_DR1)
+			if( d->codec->capabilities & CODEC_CAP_DR1 && out_fmt ==
+					PIX_FMT_YUV420P)
 			{
 				d->context->get_buffer = get_buffer;
 				d->context->release_buffer = release_buffer;
-			}
-			veejay_msg(VEEJAY_MSG_INFO,
+			
+				veejay_msg(VEEJAY_MSG_INFO,
 					"Direct rendering to frame buffer is enabled");
+			}
 		}
         }
 	else
