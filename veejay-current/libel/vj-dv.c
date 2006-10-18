@@ -181,36 +181,104 @@ void	   vj_dv_decoder_get_audio(vj_dv_decoder *d, uint8_t *audio_buf)
 
 
 }
+/*
+ * Unpack libdv's 4:2:2-packed into our 4:2:0-planar or 4:2:2-planar,
+ *  treating each interlaced field independently
+ *
+ */
+static inline void frame_YUV422_to_planar(uint8_t **output, uint8_t *input,
+			    int width, int height, int chroma422)
+{
+    int i, j, w2;
+    uint8_t *y, *cb, *cr;
+
+    w2 = width/2;
+    y = output[0];
+    cb = output[1];
+    cr = output[2];
+
+    for (i=0; i<height;) {
+	/* process two scanlines (one from each field, interleaved) */
+        /* ...top-field scanline */
+        for (j=0; j<w2; j++) {
+            /* packed YUV 422 is: Y[i] U[i] Y[i+1] V[i] */
+            *(y++) =  *(input++);
+            *(cb++) = *(input++);
+            *(y++) =  *(input++);
+            *(cr++) = *(input++);
+        }
+	i++;
+        /* ...bottom-field scanline */
+        for (j=0; j<w2; j++) {
+            /* packed YUV 422 is: Y[i] U[i] Y[i+1] V[i] */
+            *(y++) =  *(input++);
+            *(cb++) = *(input++);
+            *(y++) =  *(input++);
+            *(cr++) = *(input++);
+        }
+	i++;
+	if (chroma422)
+	  continue;
+	/* process next two scanlines (one from each field, interleaved) */
+        /* ...top-field scanline */
+	for (j=0; j<w2; j++) {
+	  /* skip every second line for U and V */
+	  *(y++) = *(input++);
+	  input++;
+	  *(y++) = *(input++);
+	  input++;
+	}
+	i++;
+        /* ...bottom-field scanline */
+	for (j=0; j<w2; j++) {
+	  /* skip every second line for U and V */
+	  *(y++) = *(input++);
+	  input++;
+	  *(y++) = *(input++);
+	  input++;
+	}
+	i++;
+    }
+}
 
 int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 		       uint8_t * Cb, uint8_t * Cr, int width, int height, int fmt)
 {
 
-    int pitches[3];
-
-    if (!input_buf)
+	int pitches[3];
+   	if (!input_buf)
 		return 0;
 
-    if (dv_parse_header(d->decoder, input_buf) < 0)
+	if (dv_parse_header(d->decoder, input_buf) < 0)
 	{
+		veejay_msg(0, "Unable to read DV header");
 		return 0;
 	}
-    if (!((d->decoder->num_dif_seqs == 10)
-	  || (d->decoder->num_dif_seqs == 12)))
-	return 0;
 
-    /*
-       switch(vj_dv_decoder->sampling) {
-       case e_dv_sample_411:fprintf(stderr,"sample 411\n"); break;
-       case e_dv_sample_422:fprintf(stderr,"sample 422\n");break;
-       case e_dv_sample_420:fprintf(stderr,"sample 420\n");break;
-       default: fprintf(stderr,"unknown\n");break;
-       }
-     */
-/*
-    if (d->decoder->sampling == e_dv_sample_411 ||
-		d->decoder->sampling == e_dv_sample_422 ||
-		d->decoder->sampling == e_dv_sample_420)
+	if( d->decoder->system == e_dv_system_none )
+	{
+		veejay_msg(0, "No valid PAL or NTSC video frame detected");
+		return 0;
+	}
+
+	if( d->decoder->system == e_dv_system_625_50 )
+	{
+		d->yuy2 = 0;
+	}
+	else
+	{
+		d->yuy2 = 1;
+	}
+
+      	if (!((d->decoder->num_dif_seqs == 10)
+	  || (d->decoder->num_dif_seqs == 12)))
+	{
+		veejay_msg(0, "Dont know how to handle %d dif seqs",
+				d->decoder->num_dif_seqs );
+		return 0;
+	}
+       
+    	if (d->decoder->sampling == e_dv_sample_411 || d->decoder->sampling == e_dv_sample_422)
 	{
 		pitches[0] = width * 2;
 		pitches[1] = 0;
@@ -220,52 +288,32 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 		dv_decode_full_frame(d->decoder, input_buf,
 				     e_dv_color_yuv, pixels, pitches);
 
-		if(fmt == FMT_420)
-			yuy2toyv12(Y, Cb, Cr, d->dv_video, width, height);
-		else
-			yuy2toyv16(Y, Cb, Cr, d->dv_video, width, height);
+		frame_YUV422_to_planar( pixels, pixels[0], width, height, fmt );
 
 		return 1;
-    }
-*/
-	pitches[0] = width * 2;
-	pitches[1] = 0;
-	pitches[2] = 0;
-
+    	}
 
 	if( d->decoder->sampling == e_dv_sample_420 )
-	{
-		uint8_t *pixels[3];
-		pixels[0] = d->dv_video;
-		pixels[1] = d->dv_video + (width * height);
-		pixels[2] = d->dv_video + (width * height * 5)/4;
-		dv_decode_full_frame( d->decoder, input_buf, e_dv_color_yuv,
-				pixels,pitches);
-		if(fmt==FMT_422)
-			yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
-		else
-			yuy2toyv12( Y,Cb,Cr, d->dv_video, width, height );
-
-		return 1;
-	}
-
-	if( d->decoder->sampling == e_dv_sample_422 )
 	{	
 		uint8_t *pixels[3];
-		pixels[0] = d->dv_video;
-		pixels[1] = d->dv_video + (width * height);
-		pixels[2] = d->dv_video + (width * height) + (width * height/2);
-		dv_decode_full_frame( d->decoder, input_buf, e_dv_color_yuv,
-				pixels,pitches);
+                pixels[0] = d->dv_video;
+                pixels[1] = d->dv_video + (width * height);
+                pixels[2] = d->dv_video + (width * height * 5)/4;
+ 		pitches[0] = width * 2;
+		pitches[1] = 0;
+		pitches[2] = 0;
 
-		if(fmt==FMT_422)
-			yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
-		else
-			yuy2toyv12( Y,Cb,Cr, d->dv_video, width, height );
+		dv_decode_full_frame( d->decoder, input_buf, e_dv_color_yuv, pixels,pitches);
+
+	  	if(fmt==FMT_422)
+                       yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
+               else
+                       yuy2toyv12( Y,Cb,Cr, d->dv_video, width, height );
+
 		return 1;
 	}
 
-    return 0;
+   	return 0;
 }
 
 #endif

@@ -26,6 +26,7 @@ typedef struct
 	dv_decoder_t	*decoder;
 	uint8_t		*dv_video;
 	int		fmt;
+	int		yuy2;
 	int		audio;
 	int16_t		**audio_buffers;
 } vj_dv_decoder;

@@ -349,47 +349,31 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 	  return NULL;
 	memset( d, 0, sizeof(vj_decoder));
 
+	int found = 0;
+	
 	veejay_msg(VEEJAY_MSG_DEBUG, "\tCodec %x (%d) , %d x %d at %f, in=%d, out=%d",
 			id,id,width,height,fps,pixel_format,out_fmt);
-	
+
+
 #ifdef SUPPORT_READ_DV2
-        if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 && id != CODEC_ID_DVVIDEO)
-        {
-#else
-	if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420)
-        {
+	if( id == CODEC_ID_DVVIDEO )
+	{
+		dv_decoder_ = vj_dv_decoder_init(
+				1, width, height, pixel_format );
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tRAW DV %d x %d, pf %d",
+				width,height,pixel_format);
+		found = 1;
+		
+	}
 #endif		
+	
+	if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 && !found)
+        {
 		int i;
-	/*	for( i = 0; i < 2; i ++ )
-		{
-               		d->codec[i] = avcodec_find_decoder( id );
-               		if(!d->codec[i])
-                	{ free(d);        return NULL; }
-			d->codec[i] = avcodec_find_decoder( id );
-			if(!d->codec[i])
-			{ free(d);	  return NULL; }
-               		d->context[i] = avcodec_alloc_context();
-               		d->context[i]->width = width;
-              		d->context[i]->height= height;
-#if LIBAVFORMAT_BUILD > 5010
-                	d->context[i]->time_base.den = fps;
-			d->context[i]->time_base.num = 1;
-#else
-			d->context[i]->frame_rate = fps;
-#endif
-
-//@@@ sampling !
-
-                	d->context[i]->pix_fmt = ( i == 0 ? PIX_FMT_YUV420P : PIX_FMT_YUV422P);
-               		d->frame[i] = avcodec_alloc_frame();
-		}*/
-
 		d->codec = avcodec_find_decoder( id );
 		d->context = avcodec_alloc_context();
 		d->context->width = width;
 		d->context->height = height;
-//                d->context->time_base.den = fps;
-//		d->context->time_base.num = 1;
 		d->context->opaque = d;
 		d->context->palctrl = NULL;
 		d->frame = avcodec_alloc_frame();
@@ -421,12 +405,7 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 	{
 		veejay_msg(VEEJAY_MSG_INFO,"Sub/Super sampling to output pixel format");
 		d->sampler = subsample_init( width );
-#ifdef SUPPORT_READ_DV2
-		if( id == CODEC_ID_DVVIDEO )
-		{
-			dv_decoder_ = vj_dv_decoder_init( 1, width, height, pixel_format );
-		}
-#endif		
+
 	}       
 
         d->tmp_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height * 4 );
@@ -450,20 +429,7 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
         memset( d->deinterlace_buffer[2], 0, width * height );
 
 	int i;
-/*	for(i = 0;i < 2 ; i ++ )
-	{
-       	 if(d->codec[i] != NULL)
-       	 {
-                if ( avcodec_open( d->context[i], d->codec[i] ) < 0 )
-                {
-                        veejay_msg(VEEJAY_MSG_ERROR, "Error initializing decoder %d",id); 
-	//@@!!
-                        return NULL;
-                }
-         }
- 	}*/
-        
-       d->ref = 1;
+        d->ref = 1;
         return d;
 }
 
