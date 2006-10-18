@@ -5441,6 +5441,7 @@ static	void	enable_widget_by_pointer(GtkWidget *w)
 static	void	enable_widget(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
+	veejay_msg(0, "%s :   %s", __FUNCTION__, name );
 	if(!w) return;
 	gtk_widget_set_sensitive_( GTK_WIDGET(w), TRUE );
 }/*
