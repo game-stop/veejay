@@ -1062,8 +1062,6 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     int pm = info->uc->playback_mode;
     int total_slots = (sample_size() - 1 ) + (vj_tag_true_size() -1 );
 
-veejay_msg(0, "Slots =%d",total_slots);
-    
     //int cache_used = veejay_mem_used();
 	int cache_used = 0;
    if(total_slots < 0)

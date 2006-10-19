@@ -585,7 +585,9 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 	{
 		veejay_msg(2, "Changed channel to Composite1");
 	}*/
-	
+	veejay_msg(2,"Using %d bytes for device buffer",
+			test.size.width * test.size.height * 4 );
+			
 	vut->buffer.data = vj_malloc( test.size.width * test.size.height * 4 );
 	vut->buffer.buffer_size = (sizeof(unsigned char) * 4 * test.size.width * test.size.height );
 	unicap_unlock_properties( vut->handle );
