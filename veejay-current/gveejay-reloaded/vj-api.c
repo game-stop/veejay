@@ -55,7 +55,6 @@
 #include <gveejay-reloaded/common.h>
 #include <gveejay-reloaded/utils.h>
 #include <libvevo/vevo.h>
-#include <libvevo/livido.h>
 #include <veejay/vevo.h>
 //if gtk2_6 is not defined, 2.4 is assumed.
 #ifdef GTK_CHECK_VERSION
@@ -254,7 +253,7 @@ static	vims_t	vj_event_list[VIMS_MAX];
 static  vims_keys_t vims_keys_list[VIMS_MAX];
 
 static  int vims_verbosity = 0;
-typedef   livido_port_t vevo_port_t;
+#define   livido_port_t vevo_port_t
 
 static	vevo_port_t *fx_list_ = NULL;
 static  vevo_port_t *fx_clipboard_ = NULL;
@@ -3594,7 +3593,7 @@ static void update_clipboard(int fxid, int np, int *args)
 
 	if( !cur )
 	{
-		cur = (vevo_port_t*) vevo_port_new( 400 );
+		cur = (vevo_port_t*) vpn( 400 );
 		vevo_property_set( fx_clipboard_, mkey, LIVIDO_ATOM_TYPE_VOIDPTR,1,&cur);
 	}
 
@@ -3634,7 +3633,7 @@ static void clone_clipboard_entry(void)
 	vevo_property_get( fx_clipboard_, "buffer", 0, &buf );
 	if( !buf )
 	{
-		buf = (vevo_port_t*) vevo_port_new( 500 );
+		buf = (vevo_port_t*) vpn( 500 );
 		vevo_property_set( fx_clipboard_, "buffer", LIVIDO_ATOM_TYPE_VOIDPTR,1,&buf);
 	}
 
@@ -4009,7 +4008,7 @@ void	setup_effectlist_info()
 	stores[1] = gtk_list_store_new( 1, G_TYPE_STRING );
 
 
-	fx_list_ = (vevo_port_t*) vevo_port_new( 200 );
+	fx_list_ = (vevo_port_t*) vpn( 200 );
 
 	for(i = 0; i < 2; i ++ )
 	{
@@ -6295,7 +6294,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	
 	gtk_widget_show( info->sample_bank_pad );
 
-	fx_clipboard_ = vevo_port_new( 300 );
+	fx_clipboard_ = vpn( 300 );
 
 	info->elref = NULL;
 	info->effect_info = NULL;

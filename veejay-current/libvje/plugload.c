@@ -38,16 +38,12 @@
 #include <libvjmsg/vj-common.h>
 #include <libvjmem/vjmem.h>
 #include <libvevo/vevo.h>
-#include <veejay/vevo.h>
 #include <libyuv/yuvconv.h>
 #include <ffmpeg/avcodec.h>
-#include <libvevo/livido.h>
+#include <libvevo/vevo.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#define VEVO_ATOM_TYPE_STRING   LIVIDO_ATOM_TYPE_STRING
-#define VEVO_ATOM_TYPE_INT      LIVIDO_ATOM_TYPE_INT
-#define VEVO_ATOM_TYPE_VOIDPTR  LIVIDO_ATOM_TYPE_VOIDPTR
 
 #define LINUX 1 
 #include <libvje/specs/FreeFrame.h>
@@ -56,7 +52,7 @@
 #define V_BITS 32
 #include <assert.h>
 
-typedef   livido_port_t vevo_port_t;
+#define   livido_port_t vevo_port_t
 typedef f0r_instance_t (*f0r_construct_f)(unsigned int width, unsigned int height);
 typedef void (*f0r_destruct_f)(f0r_instance_t instance);
 typedef void (*f0r_deinit_f)(void);
@@ -127,7 +123,7 @@ static	void	free_parameters( void *port, int n )
 
 static	int	init_param_fr( void *port, int p, int hint)
 {
-	void *parameter = vevo_port_new( VEVO_FR_PARAM_PORT );
+	void *parameter = vpn( VEVO_FR_PARAM_PORT );
 	int min = 0;
 	int max = 100;
 	int dv = 50;
@@ -217,7 +213,7 @@ static	void*	deal_with_livido( void *handle, char *name )
 
 static	void* 	deal_with_fr( void *handle, char *name)
 {
-	void *port = vevo_port_new( VEVO_FR_PORT );
+	void *port = vpn( VEVO_FR_PORT );
 	char *plugin_name = NULL;
 	
 	f0r_init_f	f0r_init	= dlsym( handle, "f0r_init" );
@@ -320,7 +316,7 @@ static	void* 	deal_with_fr( void *handle, char *name)
 
 static	void*	deal_with_ff( void *handle, char *name )
 {
-	void *port = vevo_port_new( VEVO_FF_PORT );
+	void *port = vpn( VEVO_FF_PORT );
 	char *plugin_name = NULL;
 	plugMainType *q = (plugMainType*) dlsym( handle, "plugMain" );
 
@@ -376,7 +372,7 @@ static	void*	deal_with_ff( void *handle, char *name )
 	int p;
 	for( p=  0; p < n_params; p ++ )
 	{
-		void *parameter = vevo_port_new( VEVO_FF_PARAM_PORT );
+		void *parameter = vpn( VEVO_FF_PARAM_PORT );
 		
 		int type = q( FF_GETPARAMETERTYPE, (LPVOID) p, 0 ).ivalue;
 		// name, kind, flags, description, min,max,default,transition
@@ -519,7 +515,7 @@ static	void	add_to_plugin_list( const char *path )
 	
 	if( S_ISREG( sbuf.st_mode ) )
 	{
-		vevo_property_set( illegal_plugins_, path, 0, NULL );
+		vevo_property_set( illegal_plugins_, path, VEVO_ATOM_TYPE_STRING, 0, NULL );
 		return;
 	}
 
@@ -782,7 +778,7 @@ int	plug_detect_plugins(void)
 	index_map_ = (vevo_port_t**) malloc(sizeof(vevo_port_t*) * 256 );
 	memset( index_map_ , 0, sizeof( vevo_port_t*) * 256 );
 	
-	illegal_plugins_ = vevo_port_new( VEVO_ILLEGAL );
+	illegal_plugins_ = vpn( VEVO_ILLEGAL );
 
 	scan_plugins();
 	//@ display copyright notice in binary form
@@ -856,7 +852,7 @@ vj_effect	*plug_get_plugin( int n )
 				valid_p ++;
 			}
 		}		
-		vevo_property_set( port, "n_params",0,&valid_p);
+		vevo_property_set( port, "n_params",VEVO_ATOM_TYPE_INT, 1,&valid_p);
 		vje->num_params = valid_p;
 	}
 

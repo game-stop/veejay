@@ -24,6 +24,7 @@
 #include <gtk/gtk.h>
 #include <glib.h>
 #include <glade/glade.h>
+#include <libvevo/vevo.h>
 #include "vj-api.h"
 static int port_num	= 3490;
 static char hostname[255];
@@ -152,6 +153,8 @@ int main(int argc, char *argv[]) {
 	
 	vj_mem_init();
 
+	vevo_strict_init();
+	
 	vj_gui_theme_setup(gveejay_theme);
 	vj_gui_set_debug_level( verbosity , n_tracks,pw,ph);
 	vj_gui_set_timeout(timer);

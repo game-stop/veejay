@@ -40,8 +40,6 @@
 #include <libvjmsg/vj-common.h>
 #include <libvje/vje.h>
 #include <libvevo/vevo.h>
-#include <libvevo/livido.h>
-#include <veejay/vevo.h>
 #include <assert.h>
 //#include <veejay/vj-lib.h>
 //#include <veejay/vj-el.h>
@@ -174,7 +172,7 @@ void sample_init(int len)
 	initialized = 1;
 	memset( &__sample_project_settings,0,sizeof(sample_setting));
 
-        chain_cache_ = vevo_port_new( 2000 ); //@ fx cache lines
+        chain_cache_ = vpn( 2000 ); //@ fx cache lines
 
     }
 }
@@ -1837,7 +1835,7 @@ int	sample_cache_frames(int s1, int max_n)
 	while( props[i] != NULL )
 	{
 		int b_sample = 0;
-		vevo_property_get( chain_cache_, props[i], LIVIDO_ATOM_TYPE_INT, 0, &b_sample);
+		vevo_property_get( chain_cache_, props[i], 0, &b_sample);
 		//@ is b_sample in fx chain ?
 		if( b_sample > 0 && !sample_cached( sample, b_sample ))
 			sample_uncache( b_sample );

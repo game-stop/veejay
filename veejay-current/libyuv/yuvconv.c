@@ -24,12 +24,16 @@
 #include <libpostproc/swscale.h>
 #endif
 #include <libvjmsg/vj-common.h>
+#include <ffmpeg/avcodec.h>
+#include <ffmpeg/avutil.h>
 /* this routine is the same as frame_YUV422_to_YUV420P , unpack
  * libdv's 4:2:2-packed into 4:2:0 planar 
  * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)
  */
 
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 
 /* convert 4:2:0 to yuv 4:2:2 packed */
 void yuv422p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
@@ -613,3 +617,91 @@ int	yuv_sws_get_cpu_flags(void)
 	return cpu_flags;
 }
 #endif
+
+void    util_convertrgba32( uint8_t **data, int w, int h,int in_pix_fmt,int shiftv, void *out_buffer )
+{
+        AVPicture p1,p2;
+        memset( &p1, 0, sizeof(p1));
+        memset( &p2, 0, sizeof(p2));
+#ifdef STRICT_CHECING
+        assert( data != NULL );
+        assert( w > 0 );
+        assert( h > 0 );
+        assert( out_buffer != NULL );
+#endif
+
+        p1.data[0] = out_buffer;
+        p1.linesize[0] = w * 4;
+
+        p2.data[0] = data[0];
+        p2.data[1] = data[1];
+        p2.data[2] = data[2];
+        p2.linesize[0] = w;
+        p2.linesize[1] = w >> shiftv;
+        p2.linesize[2] = w >> shiftv; 
+
+        // dest pix, dest format, informat, w , h 
+        if(img_convert( &p1, PIX_FMT_RGBA32,&p2, in_pix_fmt,w,h ))
+        {
+#ifdef STRICT_CHECKING
+                veejay_msg(0, "Image conversion failed in %s", __FUNCTION__ );
+                assert(0);
+#endif
+        }
+}       
+
+
+void    util_convertsrc( void *indata, int w, int h, int out_pix_fmt, uint8_t **data)
+{
+        AVPicture p1,p2;
+        memset( &p1, 0, sizeof(p1));
+        memset( &p2, 0, sizeof(p2));
+
+        int shiftv = ( out_pix_fmt == 0 ? 1 : 0);
+#ifdef STRICT_CHECING
+        assert( data != NULL );
+        assert( w > 0 );
+        assert( h > 0 );
+#endif
+        p2.data[0] = indata;
+        p2.linesize[0] = w * 4;
+
+        p1.data[0] = data[0];
+        p1.data[1] = data[1];
+        p1.data[2] = data[2];
+        p1.linesize[0] = w;
+        p1.linesize[1] = w >> shiftv;
+        p1.linesize[2] = w >> shiftv; 
+//@ fixme YUV444 sampled ! reuse functions of move them here !
+        if(img_convert( &p1, out_pix_fmt,&p2, PIX_FMT_RGBA32,w,h ))
+        {
+#ifdef STRICT_CHECKING
+                veejay_msg(0, "Image conversion failed in %s", __FUNCTION__ );
+                assert(0);
+#endif
+        }
+
+}
+
+void	yuv_deinterlace(
+		uint8_t *data[3],
+		const int width,
+		const int height,
+		int fmt,
+		uint8_t *Y,uint8_t *U, uint8_t *V )
+{
+	AVPicture p,q;
+	p.data[0] = data[0];
+	p.data[1] = data[1];
+	p.data[2] = data[2];
+	p.linesize[0] = width;
+	p.linesize[1] = width/2;
+	p.linesize[2] = width/2;
+	q.data[0] = Y;
+	q.data[1] = U;
+	q.data[2] = V;
+	q.linesize[0] = width;
+	q.linesize[1] = width/2;
+	q.linesize[2] = width/2;
+	avpicture_deinterlace( &p,&q, (fmt==0 ? PIX_FMT_YUV420P : PIX_FMT_YUV422P ), width, height );
+}

@@ -31,11 +31,12 @@
 #include <libvjmsg/vj-common.h>
 #include <libvjmem/vjmem.h>
 #include <libvevo/vevo.h>
-#include <libvevo/livido.h>
 #include <veejay/vevo.h>
 #include <gtk/gtkversion.h>
 #include <gdk/gdk.h>
+#ifdef STRICT_CHECKING
 #include <assert.h>
+#endif
 static int default_port_num	= 3490;
 static int verbosity = 0;
 
@@ -162,16 +163,16 @@ void	init()
 {
 	gtk_init(NULL,NULL);
 
-	options_ = vevo_port_new( 5005 );
-	files_   = vevo_port_new( 5006 );
-	gui_	 = vevo_port_new( 5007 );
+	options_ = vpn( 5005 );
+	files_   = vpn( 5006 );
+	gui_	 = vpn( 5007 );
 	glade_init();
 }
 
 void	refresh_files()
 {
 	vevo_port_free( files_ );
-	files_ = vevo_port_new( 5006 );
+	files_ = vpn( 5006 );
 }
 
 static	void	run_gveejay_now()
@@ -415,6 +416,9 @@ int main(int argc, char *argv[]) {
 	     g_thread_init(NULL);
 	     gdk_threads_init();
         }
+
+	vj_mem_init();
+	vevo_strict_init();
 
 	init();
 	theme(0);

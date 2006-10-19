@@ -147,9 +147,25 @@ use_swscaler=false
 if test x$with_swscaler != xno ; then
 	use_swscaler=true;
 	AC_SUBST( USE_SWSCALER )
-	AC_DEFINE( USE_SWSCALER,1, [use swscaler])
+	AC_DEFINE(USE_SWSCALER,1, [use swscaler])
 fi
 
+have_gl=false
+AC_CHECK_HEADERS(GL/gl.h ,,
+                [AC_MSG_ERROR([Cannot find OpenGL headers]) ])
+GL_LIBS=""
+GL_CFLAGS="$GL_INC_PATH"
+AC_CHECK_LIB([GL], [main], have_gl=true)
+if test x$have_gl = xtrue ; then
+        GL_LIBS="$GL_LIB_PATH -lGL"
+	AC_SUBST( USE_GL )
+	AC_DEFINE(USE_GL,1,[use gl])
+else
+        AC_MSG_ERROR([Cannot find openGL library])
+fi
+
+AC_SUBST( GL_LIBS )
+AC_SUBST( GL_CFLAGS )
 
 dnl *********************************************************************
 dnl Test whether we're linux or not. If so, define HAVE_V4L and build the
@@ -377,6 +393,27 @@ AM_PATH_SDL(1.2.3,[
             have_sdl=true
             AC_DEFINE(HAVE_SDL,, [SDL library present])],,)
 fi
+
+
+have_unicap=false
+PKG_CHECK_MODULES( UNICAP, libunicap >= 1.14.1,
+                ac_cv_unicap=1, ac_cv_unicap=0)
+
+AC_DEFINE_UNQUOTED([HAVE_UNICAP], ${ac_cv_unicap},
+        [ Set to 1 if you have unicap.])
+
+if test "${ac_cv_unicap}" = 0
+then
+  AC_MSG_ERROR([Could not find libunicap, see that you have libunicap-dev installed.])
+else
+have_unicap=true
+AC_SUBST(USE_UNICAP)
+AC_DEFINE(USE_UNICAP,,[define if unicap])
+fi
+
+AC_SUBST(UNICAP_CFLAGS)
+AC_SUBST(UNICAP_LIBS)
+
 
 dnl *********************************************************************
 dnl Check for the DirectFB library (for Matrox G550 Tvout)
@@ -790,6 +827,8 @@ AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
 AM_CONDITIONAL(USE_SWSCALER, test x$use_swscaler = xtrue)
+AM_CONDITIONAL(USE_GL, test x$have_gl = xtrue)
+AM_CONDITIONAL(USE_UNICAP,test x$have_unicap = xtrue)
 AM_CONDITIONAL(USE_GVEEJAY,
 			test x$use_gveejay = xtrue )
 AM_CONDITIONAL(USE_GVEEJAYRELOADED,
@@ -977,11 +1016,13 @@ if test x$have_sdl != xtrue ; then
 AC_MSG_NOTICE([      There will be NO video window ])
 fi
 AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
+AC_MSG_NOTICE([  - OpenGL support		 : ${have_gl}])
 AC_MSG_NOTICE([  - AVI MJPEG playback/recording  : true (always)])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - FFmpeg AVFormat               : ${have_avformat} ])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
+AC_MSG_NOTICE([  - Unicap Imaging		 : ${have_unicap} ])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 AC_MSG_NOTICE([  - jack                          : ${have_jack}])
