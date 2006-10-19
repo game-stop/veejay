@@ -399,7 +399,8 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 		AVI_set_video(lav_fd->avi_fd,width,height,fps, "dvsd");
 		if(asize) AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
 		  return lav_fd;
-      	case 'q':
+	case 'q':
+	case 'Q':
 #ifdef HAVE_LIBQUICKTIME
    	      /* open quicktime output file */
 
@@ -411,11 +412,16 @@ lav_file_t *lav_open_output_file(char *filename, char format,
          	lav_fd->qt_fd = quicktime_open(filename, 0, 1);
       	 	if(!lav_fd->qt_fd)
 		{
+			veejay_msg(VEEJAY_MSG_ERROR, "\tCannot open '%s' for writing", filename);
 			free(lav_fd);
 			return NULL;
 		}
+		if(format=='q')
         	quicktime_set_video(lav_fd->qt_fd, 1, width, height, fps,
                              (interlaced ? QUICKTIME_MJPA : QUICKTIME_JPEG));
+		else
+		quicktime_set_video(lav_fd->qt_fd,1, width,height,fps,
+				QUICKTIME_DV );
         	if (asize)
 		    quicktime_set_audio(lav_fd->qt_fd, achans, arate, asize, QUICKTIME_TWOS);
 
@@ -430,6 +436,7 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 
 		return lav_fd;
 #else
+		veejay_msg(0,"Quicktime not included in build process. Abort");
 		internal_error = ERROR_FORMAT;
 		return NULL;
 #endif

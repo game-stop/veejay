@@ -132,6 +132,8 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 		case ENCODER_MPEG4: sprintf(descr, "MPEG4"); cformat='M'; break;
 		case ENCODER_DIVX: sprintf(descr, "DIVX"); cformat='D'; break;
 		case ENCODER_QUICKTIME_DV:
+			   sprintf(descr, "Quicktime"); cformat = 'Q'; break;
+
 		case ENCODER_QUICKTIME_MJPEG:
 			   sprintf(descr, "Quicktime"); cformat = 'q'; break;
 		
@@ -144,8 +146,8 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 	si->encoder_file = (void*)lav_open_output_file(si->encoder_destination,cformat,
 		el->video_width,el->video_height,el->video_inter,
 		el->video_fps,0,0,0);
-	if(si->encoder_file)
-	veejay_msg(VEEJAY_MSG_INFO, "Encoding to %s file [%s] %dx%d@%2.2f %d/%d/%d %s >%09d< f=%d",
+//	if(si->encoder_file)
+	veejay_msg(VEEJAY_MSG_INFO, "Encoding to %s file [%s] %dx%d@%2.2f %d/%d/%d %s >%09d< f=%c",
 	    descr,
 	    si->encoder_destination, 
 	    el->video_width,
