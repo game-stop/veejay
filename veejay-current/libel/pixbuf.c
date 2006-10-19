@@ -391,8 +391,8 @@ veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int o
 	pict1.data[1] = frame[1];
 	pict1.data[2] = frame[2];
         pict1.linesize[0] = w;
-	pict1.linesize[1] = w >> 1;
-	pict1.linesize[2] = w >> 1;
+	pict1.linesize[1] = (fmt == 2 ? w : w >> 1);
+	pict1.linesize[2] = (fmt == 2 ? w  : w>> 1);
 
 	image->image = (void*)gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, w, h );
 	if(!image->image)
@@ -404,9 +404,12 @@ veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int o
 	pict2.data[0] =  (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );;
         pict2.linesize[0] = w * 3;
 
-	img_convert( &pict2, PIX_FMT_RGB24, &pict1, (fmt == 0 ? PIX_FMT_YUV420P:
-                                                                         PIX_FMT_YUV422P),
-				w, 	h );
+	int pf = PIX_FMT_YUV444P;
+	if(fmt == 0 )
+		pf = PIX_FMT_YUV420P;
+	else if (fmt == 1 )
+		pf = PIX_FMT_YUV422P;
+	img_convert( &pict2, PIX_FMT_RGB24, &pict1, pf,	w, 	h );
 
 	if( out_w != w || out_h != h )
 	{

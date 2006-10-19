@@ -997,7 +997,8 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			break;
 		case CODEC_ID_DVVIDEO:
 #ifdef SUPPORT_READ_DV2
-			return vj_dv_decode_frame( dv_decoder_,  data, dst[0], dst[1], dst[2], el->video_width,el->video_height, out_pix_fmt);
+			return vj_dv_decode_frame( dv_decoder_,  data, dst[0], dst[1], dst[2], el->video_width,el->video_height,
+					out_pix_fmt);
 #else
 			return 0;
 #endif			

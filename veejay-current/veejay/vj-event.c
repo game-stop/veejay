@@ -6985,7 +6985,8 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list ap 	)
 		memset( &(cached_cycle_[1]) , 0, sizeof(VJFrame) );
 		memset( &(preview_template) , 0, sizeof( sws_template));
 		preview_template.flags = 1;
-		vj_get_yuv_template( &(cached_cycle_[0]), el->video_width,el->video_height,v->pixel_format );	
+	//	veejay_msg(0, "%d %d", el->pixel_format, v->pixel_format);
+		vj_get_yuv_template( &(cached_cycle_[0]), el->video_width,el->video_height,el->pixel_format );	
 		vj_get_rgb_template( &(cached_cycle_[1]) , cached_width_, cached_height_ ); // RGB24
 		preview_scaler = (void*)yuv_init_swscaler(
 			&(cached_cycle_[0]),
@@ -7041,16 +7042,17 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 			free( cached_gdkimage_ );
 			cached_gdkimage_ = NULL;
 		}	
-
 		vj_perform_get_primary_frame( v, frame, 0);
+	//	vj_perform_get_primary_frame_420p( v, frame );
 		img = vj_picture_save_to_memory(
 					frame,
 					v->edit_list->video_width,
 					v->edit_list->video_height,
 					args[0],
 					args[1],
+				(v->video_out==4 ? 2 :	v->edit_list->pixel_format) );
 				//	pix_fmt );
-					v->edit_list->pixel_format );
+				//	v->edit_list->pixel_format );
 	 
 		cached_image_ = 1;
 		cached_gdkimage_ = img;

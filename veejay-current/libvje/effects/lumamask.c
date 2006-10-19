@@ -34,7 +34,7 @@
 #include <config.h>
 #include <stdlib.h>
 
-static uint8_t *buf[3];
+static uint8_t *buf[3] = { NULL,NULL,NULL };
 
 vj_effect *lumamask_init(int width, int height)
 {
@@ -43,9 +43,9 @@ vj_effect *lumamask_init(int width, int height)
     ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
+    ve->limits[0][0] = 1;
     ve->limits[1][0] = width;
-    ve->limits[0][1] = 0;
+    ve->limits[0][1] = 1;
     ve->limits[1][1] = height;
     ve->defaults[0] = width/20; 
     ve->defaults[1] = height/10;
@@ -118,4 +118,7 @@ void lumamask_free()
   if(buf[0]) free(buf[0]);
   if(buf[1]) free(buf[1]);
   if(buf[2]) free(buf[2]);
+  buf[0] = NULL;
+  buf[1] = NULL;
+  buf[2] = NULL;
 }
