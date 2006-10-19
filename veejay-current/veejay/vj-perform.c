@@ -330,18 +330,18 @@ int vj_perform_increase_sample_frame(veejay_t * info, long num)
 static int vj_perform_alloc_row(veejay_t *info, int frame, int c, int frame_len)
 {
 	frame_buffer[c]->Y =
-	    (uint8_t *) vj_malloc(sizeof(uint8_t) * helper_frame->len);
+	    (uint8_t *) vj_malloc(sizeof(uint8_t) * (helper_frame->len/16)*16);
 	if(!frame_buffer[c]->Y) return 0;
-	veejay_memset( frame_buffer[c]->Y , 16, helper_frame->len );
+	veejay_memset( frame_buffer[c]->Y , 16, (helper_frame->len/16)*16 );
 	frame_buffer[c]->Cb =
-	    (uint8_t *) vj_malloc(sizeof(uint8_t) * helper_frame->len);
+	    (uint8_t *) vj_malloc(sizeof(uint8_t) * (helper_frame->len/16)*16);
 	if(!frame_buffer[c]->Cb) return 0;
-	veejay_memset( frame_buffer[c]->Cb, 128, helper_frame->len );
+	veejay_memset( frame_buffer[c]->Cb, 128, (helper_frame->len/16)*16 );
 	frame_buffer[c]->Cr =
-	    (uint8_t *) vj_malloc(sizeof(uint8_t) * helper_frame->len);
+	    (uint8_t *) vj_malloc(sizeof(uint8_t) * (helper_frame->len/16)*16);
 	if(!frame_buffer[c]->Cr) return 0;
-	veejay_memset( frame_buffer[c]->Cr, 128, helper_frame->len );
-	return (3 * helper_frame->len);
+	veejay_memset( frame_buffer[c]->Cr, 128, (helper_frame->len/16)*16 );
+	return (3 * (( helper_frame->len/16)*16));
 }
 
 static void vj_perform_free_row(int frame,int c)
