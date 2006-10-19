@@ -652,7 +652,7 @@ int main(int argc, char **argv)
 		default_geometry_x,
 		default_geometry_y,
 		NULL,
-		1)<0)
+		0)<0)
 	{	
 		veejay_msg(VEEJAY_MSG_ERROR, "Initializing veejay");
 		return 0;
