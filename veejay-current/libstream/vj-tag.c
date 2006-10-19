@@ -1108,12 +1108,10 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 
 	switch(format)
 	{
-		case ENCODER_DVVIDEO:
-		case ENCODER_QUICKTIME_DV:
-			sprintf(descr,"DV2"); cformat='d'; break;
-		case ENCODER_MJPEG:
-		case ENCODER_QUICKTIME_MJPEG:
-			sprintf(descr, "MJPEG"); cformat='a'; break;
+		case ENCODER_QUICKTIME_DV:sprintf(descr,"DV2"); cformat='Q'; break;
+		case ENCODER_QUICKTIME_MJPEG:	sprintf(descr, "MJPEG"); cformat='q'; break;
+		case ENCODER_DVVIDEO: sprintf(descr, "DV2"); cformat='b';break;
+		case ENCODER_MJPEG: sprintf(descr,"MJPEG"); cformat='a'; break;
 		case ENCODER_YUV420: sprintf(descr, "YUV 4:2:0 YV12"); cformat='Y'; break;
 		case ENCODER_YUV422: sprintf(descr, "YUV 4:2:2 Planar"); cformat='P'; break;
 		case ENCODER_MPEG4: sprintf(descr, "MPEG4"); cformat='M'; break;
