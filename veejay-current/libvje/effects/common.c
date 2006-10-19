@@ -1228,12 +1228,15 @@ uint8_t _pf_min(uint8_t a, uint8_t b)
 uint8_t _pf_max(uint8_t a,uint8_t b)
 {
 	uint8_t p = ( (b > a) ? b : a);
+	if( p<=16) p = 16;
 	return ( 255 - ((255 - b) * (255 - b)) / p);
 		
 }
 
 uint8_t _pf_pq(uint8_t a,uint8_t b)
 {
+	if( a <= 16) a = 16;
+	if( b <= 16) b = 16;
 	int p = 255 - ((255-a) * (255-a)) / a;
 	int q = 255 - ((255-b) * (255-b)) / b;
 	
