@@ -125,7 +125,7 @@ static void Usage(char *progname)
     fprintf(stderr,
 	    "  -O/--output\t\t\tSDL(0) , DirectFB(1), SDL and DirectFB(2), YUV4MPEG stream (3)\n");
 #else
-    fprintf(stderr, "  -O/--output\t\t\tSDL(0), (3) yuv4mpeg (4) SHM (broken) (5) no visual\n");
+    fprintf(stderr, "  -O/--output\t\t\tSDL(0), (3) yuv4mpeg (4) OpenGL (5) no visual\n");
 #endif
     	fprintf(stderr,
 	    "  -o/--outstream <filename>\twhere to write the yuv4mpeg stream (use with -O3)\n");
@@ -576,7 +576,7 @@ int main(int argc, char **argv)
 
 	fflush(stdout);
     vj_mem_init();
-
+	vevo_strict_init();
      info = veejay_malloc();
     /* start with initing */
     if (!info)

@@ -50,8 +50,11 @@ typedef struct
 #endif
 
 typedef struct {
+#ifdef USE_UNICAP
+	void	*unicap[VJ_TAG_MAX_STREAM_IN];
+#endif
 #ifdef HAVE_V4L
-    v4l_video *v4l[VJ_TAG_MAX_V4L];
+    v4l_video *v4l[VJ_TAG_MAX_STREAM_IN];
 #endif
     vj_yuv *stream[VJ_TAG_MAX_STREAM_IN];
     vj_avformat *avformat[VJ_TAG_MAX_STREAM_IN];

@@ -81,7 +81,7 @@ static struct ycbcr_frame **video_output_buffer; /* scaled video output */
 static int	video_output_buffer_convert = 0;
 static struct ycbcr_frame **frame_buffer;	/* chain */
 static struct ycbcr_frame **primary_buffer;	/* normal */
-
+static int	current_sampling_fmt_ = -1; //invalid
 #define CACHE_TOP 0
 #define CACHE 1
 #define CACHE_SIZE (SAMPLE_MAX_EFFECTS+CACHE)
@@ -2035,6 +2035,10 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry, const 
 	return result;
 }
 
+int	vj_perform_get_sampling()
+{
+	return current_sampling_fmt_;
+}
 
 int vj_perform_sample_complete_buffers(veejay_t * info, int entry, const int skip_incr)
 {
@@ -2071,12 +2075,30 @@ int vj_perform_sample_complete_buffers(veejay_t * info, int entry, const int ski
 
 	if(super_sampled)
 	{ // should be subsampled
+#ifdef USE_GL
+		//@ if we use GL driver, do not subsample here
+		if(info->video_out == 4 )
+		{
+			current_sampling_fmt_ = 2;
+		}
+		else
+#endif
+		
 		chroma_subsample(
 			settings->sample_mode,
 			effect_sampler,
 			frames[0]->data,frameinfo->width,
 			frameinfo->height );
 	}
+#ifdef USE_GL
+	else
+	{
+		if(info->video_out==4)
+		{
+			current_sampling_fmt_ = info->current_edit_list->pixel_format;
+		}
+	}
+#endif
 
     	if (chain_fade)
 		vj_perform_post_chain(info,frames[0]);
@@ -2126,12 +2148,26 @@ int vj_perform_tag_complete_buffers(veejay_t * info, int entry, const int skip_i
 
 	if(super_sampled)
 	{ // should be subsampled
+#ifdef USE_GL
+		//@ if we use GL driver, do not subsample here
+		if(info->video_out == 4 )
+		{
+			current_sampling_fmt_ = 2;
+		}
+		else
+#endif
 		chroma_subsample(
 			settings->sample_mode,
 			effect_sampler,
 			frames[0]->data,frameinfo->width,
 			frameinfo->height );
 	}
+#ifdef USE_GL
+	else
+	{
+		current_sampling_fmt_ = info->current_edit_list->pixel_format;
+	}
+#endif
 
     	if (chain_fade)
 		vj_perform_post_chain(info,frames[0]);

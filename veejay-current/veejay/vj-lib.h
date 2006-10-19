@@ -261,6 +261,9 @@ typedef struct {
     //vj_ladspa_instance *vli;
     //int vli_enabled;
     int video_out;
+#ifdef USE_GL
+    void	*gl;
+#endif
 #ifdef HAVE_SDL
     vj_sdl **sdl;		/* array of SDL windows */
 #endif

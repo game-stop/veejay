@@ -48,6 +48,10 @@
 #include <libvjmem/vjmem.h>
 #include <libvje/internal.h>
 #include <libstream/vj-net.h>
+#ifdef USE_UNICAP
+#include <libstream/vj-unicap.h>
+#include <libvevo/libvevo.h>
+#endif
 
 static veejay_t *_tag_info = NULL;
 static hash_t *TagHash = NULL;
@@ -56,7 +60,9 @@ static vj_tag_data *vj_tag_input;
 static int next_avail_tag = 0;
 static int avail_tag[SAMPLE_MAX_SAMPLES];
 static int last_added_tag = 0;
-
+#ifdef USE_UNICAP
+static void *unicap_data_= NULL;
+#endif
 //forward decl
 
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int ty );
@@ -158,6 +164,11 @@ static int vj_tag_update(vj_tag *tag, int id) {
   return -1;
 }
 
+int	vj_tag_num_devices()
+{
+	return vj_unicap_num_capture_devices( unicap_data_ );
+}
+
 int vj_tag_init(int width, int height, int pix_fmt)
 {
     int i;
@@ -178,6 +189,12 @@ int vj_tag_init(int width, int height, int pix_fmt)
     memset( &_tmp, 0, sizeof(VJFrame));
     _tmp.len = width * height;
 
+#ifdef USE_UNICAP
+	unicap_data_= (void*) vj_unicap_init();
+	veejay_msg(0,
+			"Found %d capture devices", vj_unicap_num_capture_devices( unicap_data_ ));
+
+#endif
 
    _temp_buffer[0] = (uint8_t*) malloc(sizeof(uint8_t)*width*height);
    _temp_buffer[1] = (uint8_t*) malloc(sizeof(uint8_t)*width*height);
@@ -268,11 +285,65 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 	
 	return 1;
 }
+
+#ifdef USE_UNICAP
+int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
+		    int norm, int palette, int freq, int channel)
+{
+  	if (stream_nr < 0 || stream_nr > vj_tag_num_devices())
+	{
+		return 0;
+	}
+    	vj_tag_input->unicap[stream_nr] = 
+	   vj_unicap_new_device( unicap_data_, stream_nr );
+    	if(!vj_tag_input->unicap[stream_nr] )
+    	{
+	    veejay_msg(0,"Unable to open device %d", channel);
+	    return 0;
+    	}
+	
+	if(!vj_unicap_configure_device(   vj_tag_input->unicap[stream_nr] ,
+			   palette, width,height))
+	{
+		veejay_msg(0,"Unable to configure device %d",channel);
+	   	vj_unicap_free_device( vj_tag_input->unicap[stream_nr] );
+	   	return 0;
+   	}
+	else
+		veejay_msg(VEEJAY_MSG_DEBUG, "Configured device %d", channel);
+
+
+	char **props = vj_unicap_get_list(
+			 vj_tag_input->unicap[stream_nr]  );
+	int i;
+	double v = 0.0;
+	for( i = 0; props[i] != NULL ; i ++ )
+	{
+		if(strncasecmp("video norm", props[i],10 ) == 0 )
+		{
+			veejay_msg(VEEJAY_MSG_WARNING, "not exporting support norm list dynamically");
+		}
+		else if (strncasecmp( "video source", props[i], 12 ) == 0 )
+		{
+			v = (double) channel;
+			vj_unicap_select_value( vj_tag_input->unicap[tag->index],
+				props[i], VEVO_ATOM_TYPE_DOUBLE, &v);
+
+		}	
+		free(props[i]);
+	}
+	free(props);
+	
+	//set channel
+	
+	return 1;
+}
+#endif
 #ifdef HAVE_V4L
 int _vj_tag_new_v4l(vj_tag * tag, int stream_nr, int width, int height,
 		    int norm, int palette, int freq, int channel)
 {
-    if (stream_nr < 0 || stream_nr > VJ_TAG_MAX_V4L)
+   if (stream_nr < 0 || stream_nr > VJ_TAG_MAX_V4L)
 		return 0;
 
     vj_tag_input->v4l[stream_nr] = vj_v4lvideo_alloc();
@@ -528,6 +599,13 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     
  
     switch (type) {
+#ifdef USE_UNICAP
+	    case VJ_TAG_TYPE_V4L:
+		if (!_vj_tag_new_unicap
+		    (tag, stream_nr, w, h, el->video_norm, pix_fmt,0,channel ))
+			    return -1;
+	break;
+#else	    
 #ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
 //	sprintf(tag->source_name, "/dev/%s/%d", filename,channel);
@@ -537,6 +615,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	    (tag, stream_nr, w, h, el->video_norm, palette,0,channel ) != 1)
 	    return -1;
 	break;
+#endif
 #endif
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
@@ -702,6 +781,12 @@ int vj_tag_del(int id)
 
     /* stop streaming in first */
     switch(tag->source_type) {
+#ifdef USE_UNICAP
+  case VJ_TAG_TYPE_V4L: 
+		veejay_msg(VEEJAY_MSG_INFO, "Closing unicap device");
+	   	vj_unicap_free_device(  vj_tag_input->unicap[tag->index] );
+		break;
+#else
 #ifdef HAVE_V4L
      case VJ_TAG_TYPE_V4L: 
 		veejay_msg(VEEJAY_MSG_INFO, "Closing video4linux device %s (Stream %d)",
@@ -709,6 +794,7 @@ int vj_tag_del(int id)
 		vj_v4l_video_grab_stop(vj_tag_input->v4l[tag->index]);
 //		vj_v4lvideo_free(vj_tag_input->v4l[tag->index]);
 	break;
+#endif
 #endif
      case VJ_TAG_TYPE_YUV4MPEG: 
 		veejay_msg(VEEJAY_MSG_INFO,"Closing yuv4mpeg file %s (Stream %d)",
@@ -1183,7 +1269,6 @@ int vj_tag_continue_record( int t1 )
 	return 0;
 
 }
-#ifdef HAVE_V4L
 int vj_tag_set_brightness(int t1, int value)
 {
 	vj_tag *tag = vj_tag_get(t1);
@@ -1200,8 +1285,16 @@ int vj_tag_set_brightness(int t1, int value)
 	}
 	else	
 	{
+#ifdef USE_UNICAP
+		double val = (double) value;
+		vj_unicap_select_value( vj_tag_input->unicap[tag->index],
+				"Brightness", VEVO_ATOM_TYPE_DOUBLE, &val);
+#else
+#ifdef HAVE_V4L
 		v4l_video *v4l = vj_tag_input->v4l[tag->index];
 		v4lsetpicture( v4l->device, value, -1,-1,-1,-1 );
+#endif
+#endif
 	}
 	return 1;
 }
@@ -1223,8 +1316,17 @@ int vj_tag_set_white(int t1, int value)
 	}
 	else
 	{
+#ifdef USE_UNICAP
+		double val = (double) value;
+		vj_unicap_select_value( vj_tag_input->unicap[tag->index],
+				"Saturation", VEVO_ATOM_TYPE_DOUBLE, &val);
+#else
+#ifdef HAVE_V4L
+
 		v4l_video *v4l = vj_tag_input->v4l[tag->index];
 		v4lsetpicture( v4l->device, -1,-1,-1,-1,value );
+#endif
+#endif
 	}
 	return 1;
 }
@@ -1246,8 +1348,16 @@ int vj_tag_set_hue(int t1, int value)
 	}
 	else
 	{
+#ifdef USE_UNICAP
+		double val = (double) value;
+		vj_unicap_select_value( vj_tag_input->unicap[tag->index],
+				"Hue", VEVO_ATOM_TYPE_DOUBLE, &val);
+#else
+#ifdef HAVE_V4L
 		v4l_video *v4l = vj_tag_input->v4l[tag->index];
 		v4lsetpicture( v4l->device, -1,value,-1,-1,-1 );
+#endif
+#endif
 	}
 	return 1;
 }
@@ -1268,8 +1378,16 @@ int vj_tag_set_contrast(int t1,int value)
 	}
 	else
 	{
+#ifdef USE_UNICAP
+		double val = (double) value;
+		vj_unicap_select_value( vj_tag_input->unicap[tag->index],
+			"Contrast", VEVO_ATOM_TYPE_DOUBLE, &val);
+#else
+#ifdef HAVE_V4L
 		v4l_video *v4l = vj_tag_input->v4l[tag->index];
 		v4lsetpicture( v4l->device, -1,-1,-1,value,-1 );
+#endif
+#endif
 	}
 	return 1;
 }
@@ -1290,9 +1408,17 @@ int vj_tag_set_color(int t1, int value)
 	}
 	else
 	{
+#ifdef USE_UNICAP
+		double val = (double) value;
+		vj_unicap_select_value( vj_tag_input->unicap[tag->index],
+			"Color", VEVO_ATOM_TYPE_DOUBLE, &val);
+#else
+#ifdef HAVE_V4L
 		v4l_video *v4l = vj_tag_input->v4l[tag->index];
 		v4lsetpicture( v4l->device, -1,-1,value,-1,-1 );
 		veejay_msg(VEEJAY_MSG_INFO, "Color is now %d", v4lgetbrightness(v4l->device));
+#endif
+#endif
 	}
 	return 1;
 }
@@ -1307,7 +1433,30 @@ int	vj_tag_get_v4l_properties(int t1,
 	{
 		return -1;
 	}
-
+#ifdef USE_UNICAP
+    	char **props = vj_unicap_get_list( vj_tag_input->unicap[tag->index] );
+        int i;
+        for( i = 0; props[i] != NULL ; i ++ )
+        {
+                double dvalue = 0.0;
+                int n = vj_unicap_get_value( vj_tag_input->unicap[tag->index] ,
+				props[i], VEVO_ATOM_TYPE_DOUBLE, &dvalue );
+		if(strncasecmp( props[i], "brightness",8) == 0 ) {
+			*brightness = (int) dvalue;
+		} else if(strncasecmp( props[i], "hue",3 ) == 0 ) {
+			*hue = (int) dvalue;
+		} else if( strncasecmp( props[i], "contrast", 8) == 0 ){
+			*contrast = (int) dvalue;
+		} else if (strncasecmp( props[i], "white", 5 ) == 0 ){
+			*white = (int) dvalue;
+		} else if (strncasecmp( props[i], "color",5 ) == 0 ){
+			*color = (int) dvalue;
+		}
+		free(props[i]);
+	}
+	free(props);
+#else
+#ifdef HAVE_V4L
 	v4l_video *v4l = vj_tag_input->v4l[tag->index];	
 	v4ldevice *vd = v4l->device;
 
@@ -1321,10 +1470,11 @@ int	vj_tag_get_v4l_properties(int t1,
 		*color	    = vd->picture.colour;
 		return 1;
 	}
+#endif
+#endif
 	return 0;
 }
 
-#endif
 
 int vj_tag_get_effect_any(int t1, int position) {
 	vj_tag *tag = vj_tag_get(t1);
@@ -1655,6 +1805,10 @@ int vj_tag_set_active(int t1, int active)
     if(active == tag->active) return 1;
  
     switch (tag->source_type) {
+#ifdef USE_UNICAP
+	tag->active = 1;
+	break;
+#else
 #ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:	/* (d)activate double buffered grabbing of v4l device */
 	if (active == 1) {
@@ -1672,6 +1826,7 @@ int vj_tag_set_active(int t1, int active)
 	    tag->active = 0;
 	}
 	break;
+#endif
 #endif
 	case VJ_TAG_TYPE_YUV4MPEG:
 	     if(active==0)
@@ -1879,11 +2034,9 @@ void	vj_tag_get_by_type(int type, char *description )
 	sprintf(description, "%s", "GdkPixbuf");
 	break;
 #endif
-#ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
 	sprintf(description, "%s", "Video4Linux");
 	break;
-#endif
 #ifdef SUPPORT_READ_DV2
 	case VJ_TAG_TYPE_DV1394:
 	sprintf(description, "%s", "DV1394");
@@ -2077,6 +2230,12 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
     if( vj_tag_input->pix_fmt == FMT_422) uv_len = uv_len / 2;
 
     switch (tag->source_type) {
+#ifdef USE_UNICAP
+	case VJ_TAG_TYPE_V4L:
+		vj_unicap_grab_frame( vj_tag_input->unicap[tag->index], buffer,
+			       width,height, vj_tag_input->pix_fmt	);
+		break;
+#else
 #ifdef HAVE_V4L
     case VJ_TAG_TYPE_V4L:
 	if (vj_v4l_video_sync_frame(vj_tag_input->v4l[tag->index]) != 0)
@@ -2101,6 +2260,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	    return -1;
 
 	break;
+#endif
 #endif
 #ifdef USE_GDK_PIXBUF
 	case VJ_TAG_TYPE_PICTURE:

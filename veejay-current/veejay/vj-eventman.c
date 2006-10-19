@@ -18,7 +18,6 @@
  */
 #include <string.h>
 #include <libvevo/vevo.h>
-#include <libvevo/livido.h>
 #include <veejay/vj-event.h>
 #include <veejay/vims.h>
 #include <veejay/vevo.h>
@@ -30,16 +29,11 @@
 
 #define MAX_INDEX 1024
 
-#define	VEVO_ATOM_TYPE_STRING	LIVIDO_ATOM_TYPE_STRING
-#define VEVO_ATOM_TYPE_INT	LIVIDO_ATOM_TYPE_INT
-#define	VEVO_ATOM_TYPE_VOIDPTR	LIVIDO_ATOM_TYPE_VOIDPTR
 #define VIMS_REQUIRE_ALL_PARAMS (1<<0)			/* all params needed */
 #define VIMS_DONT_PARSE_PARAMS (1<<1)		/* dont parse arguments */
 #define VIMS_LONG_PARAMS (1<<3)				/* long string arguments (bundle, plugin) */
 #define VIMS_ALLOW_ANY (1<<4)				/* use defaults when optional arguments are not given */	
-typedef	livido_port_t vevo_port_t;
-
-#define	VEVO_EVENT_PORT		9
+#define	livido_port_t vevo_port_t
 
 #define	SAMPLE_ID_HELP	"Sample ID (0=current playing, -1=last created, > 0 = Sample ID)"
 #define	STREAM_ID_HELP	"Stream ID (-1=last created, > 0 = Stream ID)"
@@ -206,7 +200,7 @@ static vevo_port_t	*_new_event(
 	assert( vims_id > 0 );
 #endif
 
-	vevo_port_t *p = (void*) vevo_port_new( VEVO_EVENT_PORT );
+	vevo_port_t *p = (void*) vpn( VEVO_EVENT_PORT );
 #ifdef STRICT_CHECKING
 	assert( p != NULL );
 #endif
@@ -330,14 +324,14 @@ int	vj_event_vevo_get_num_args(int id)
 int		vj_event_vevo_get_flags( int id )
 {
 	int flags = 0;
-	livido_property_get( index_map_[id], "flags", 0, &flags );
+	vevo_property_get( index_map_[id], "flags", 0, &flags );
 	return flags;
 }
 
 int		vj_event_vevo_get_vims_id( int id )
 {
 	int vims_id = 0;
-	livido_property_get( index_map_[id], "vims_id", 0, &vims_id );
+	vevo_property_get( index_map_[id], "vims_id", 0, &vims_id );
 	return vims_id;
 }
 

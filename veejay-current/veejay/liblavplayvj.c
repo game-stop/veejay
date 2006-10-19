@@ -88,6 +88,11 @@
 #include <veejay/vj-OSC.h>
 
 #include <veejay/vims.h>
+
+#ifdef USE_GL
+#include <veejay/gl.h>
+#endif
+
 // following struct copied from ../utils/videodev.h
 
 /* This is identical with the mgavideo internal params struct, 
@@ -957,12 +962,12 @@ static int veejay_screen_update(veejay_t * info )
 	     }
 	     break;
 	case 4:
-		// fixme: audio in shared memory reader/writer
-		produce( 
-			info->segment,
-			frame,
-			info->current_edit_list->video_width*info->current_edit_list->video_height);	
-
+#ifdef USE_GL
+	        k = vj_perform_get_sampling();
+		if( k < 0 ) k = info->current_edit_list->pixel_format;
+		x_display_push( info->gl, frame , info->current_edit_list->video_width,
+				 info->current_edit_list->video_height, k);
+#endif
 		break;
 	case 5:
 		break;	
@@ -1056,6 +1061,9 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     int res = 0;
     int pm = info->uc->playback_mode;
     int total_slots = (sample_size() - 1 ) + (vj_tag_true_size() -1 );
+
+veejay_msg(0, "Slots =%d",total_slots);
+    
     //int cache_used = veejay_mem_used();
 	int cache_used = 0;
    if(total_slots < 0)
@@ -1698,6 +1706,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		veejay_finish_action_file(info,info->action_file);
 		settings->action_scheduler.state = 0; 
 	}
+
 	if( !vj_server_setup(info) )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Setting up server");
@@ -1707,16 +1716,13 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
     /* now setup the output driver */
     switch (info->video_out) {
  		case 4:
-		info->segment = new_segment( info->video_output_width * info->video_output_height * 3);
-		if(!info->segment)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize shared memory");
-			return -1;
-		}
-		attach_segment(info->segment, 1);
-		veejay_msg(VEEJAY_MSG_DEBUG , "Shared memory key = %d, Semaphore = %d",
-			get_segment_id(info->segment), get_semaphore_id(info->segment));
-		break;
+#ifdef USE_GL
+		info->gl = (void*) x_display_init();
+		x_display_open(info->gl, info->current_edit_list->video_width,
+			       		info->current_edit_list->video_height );
+
+#endif
+			break;
 #ifdef HAVE_SDL
     case 0:
 
@@ -1797,10 +1803,23 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		return -1;
 	break;
     }
-
-
-
-
+	if(def_tags )
+	{
+		int n = vj_tag_num_devices();
+		int i = 0;
+		int first_id = 0;
+		for( i = 0; i < n ; i ++ )
+		{
+		   int id =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, "bogus", i, el->pixel_format, 1 );
+		   if( id> 0)
+		   {
+		   	   veejay_msg(VEEJAY_MSG_INFO, "Capture device available as stream %d", id );
+			   first_id = id;
+		   }
+		}
+		if( first_id > 0 ) veejay_change_playback_mode(info,VJ_PLAYBACK_MODE_TAG,first_id);
+	}
+	else
 	if(info->dummy->active)
 	{
 	 	int dummy_id;
@@ -1821,6 +1840,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 			return -1;
 		}
 	}
+	else
 	if( info->uc->file_as_sample)
 	{
 		long i,n=info->current_edit_list->num_video_files;
@@ -1849,6 +1869,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		    "Can't set effective user-id: %s", sys_errlist[errno]);
 	return -1;
     }
+
 
     veejay_change_state( info, LAVPLAY_STATE_PLAYING );  
 
@@ -2088,7 +2109,7 @@ static void veejay_playback_cycle(veejay_t * info)
 //		if( vj_server_link_used( info->vjs[1], i ))
 //		{ veejay_msg(VEEJAY_MSG_DEBUG, "sent sta");	veejay_pipe_write_status( info, i );}
 
-	    if(skipv && (info->video_out!=4)) continue;
+	    if(skipv ) continue;
 	    if (!veejay_mjpeg_queue_buf(info, frame, 1)) {
 		veejay_msg(VEEJAY_MSG_ERROR ,"Error queuing a frame");
 		veejay_change_state(info, LAVPLAY_STATE_STOP);
@@ -2201,9 +2222,8 @@ static void *veejay_playback_thread(void *data)
 	}
 	if( info->video_out == 4 )
 	{
-		del_segment(info->segment);
-		veejay_msg(VEEJAY_MSG_DEBUG,  "Deleted shared memory");
-    }
+		x_display_close( info->gl );
+    	}
     
     vj_perform_free(info);
     vj_effect_shutdown();
