@@ -105,7 +105,7 @@ typedef struct
 	int	quit;
 } multitracker_t;
 
-static  void	(*img_cb)(GdkPixbuf *p, GdkPixbuf *b, GtkImage *img);
+static  int	(*img_cb)(GdkPixbuf *p, GdkPixbuf *b, GtkImage *img);
 static	void	(*gui_cb)(int, char*, int);
 static	int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len, int *port_num);
 static	void	add_buttons( mt_priv_t *p, sequence_view_t *seqv , GtkWidget *w);
@@ -726,7 +726,7 @@ void		multitrack_configure_preview(int w, int h, int hw, int hh )
 
 void		*multitrack_new(
 		void (*f)(int,char*,int),
-		void (*g)(GdkPixbuf *, GdkPixbuf *, GtkImage *),
+		int (*g)(GdkPixbuf *, GdkPixbuf *, GtkImage *),
 		GtkWidget *win,
 		GtkWidget *box,
 		GtkWidget *msg,
@@ -1425,7 +1425,7 @@ void 	*mt_preview( gpointer user_data )
 	all_priv_t *a = (all_priv_t*) mt->data;
 	gint i = 0;
 	GdkPixbuf *cache[MAX_TRACKS+2];
-
+	long sleepy = 34000;
 	for( ;; )
 	{
 		G_LOCK( mt_lock );
@@ -1508,7 +1508,7 @@ void 	*mt_preview( gpointer user_data )
 			if(lt->active && ir)
 			{
 				gtk_image_set_from_pixbuf_( GTK_IMAGE(lt->view->area), ir );
-				img_cb( cache[LAST_TRACK], ir, GTK_IMAGE( lt->view->area ) );
+				sleepy = img_cb( cache[LAST_TRACK], ir, GTK_IMAGE( lt->view->area ) );
 		//	gtk_widget_queue_draw(GTK_IMAGE( lt->view->area ));
 			}
 
@@ -1532,7 +1532,7 @@ void 	*mt_preview( gpointer user_data )
 			ir = NULL;
 			gdk_threads_leave();
 		}
-		g_usleep(34000);
+		g_usleep(sleepy);
 		//@ clear our buffer
 	}
 }

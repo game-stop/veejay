@@ -6093,7 +6093,7 @@ int	vj_gui_cb_locked()
 	return info->watch.p_state;
 }
 
-void	vj_img_cb(GdkPixbuf *img, GdkPixbuf *ir, GtkImage *image )
+int	vj_img_cb(GdkPixbuf *img, GdkPixbuf *ir, GtkImage *image )
 {
 #ifdef STRICT_CHECKING
 	assert( img != NULL );
@@ -6103,16 +6103,17 @@ void	vj_img_cb(GdkPixbuf *img, GdkPixbuf *ir, GtkImage *image )
 #endif
 	lock_preview();
 
-	
+	int ms = info->status_tokens[ ELAPSED_TIME ];
+	ms *= 1000;
+
 	if( no_preview_ ||  !info->selected_slot || !info->selected_gui_slot )
 	{
 		unlock_preview();
-		return;
+		return ms;
 	}
 
 	int sample_id = info->status_tokens[ CURRENT_ID ];
 	int sample_type = info->status_tokens[ PLAY_MODE ]; 
-	
 	if( sample_type == MODE_SAMPLE || sample_type == MODE_STREAM )
 	{
 		int poke_slot = -1;	
@@ -6152,6 +6153,7 @@ void	vj_img_cb(GdkPixbuf *img, GdkPixbuf *ir, GtkImage *image )
 	gtk_widget_queue_draw( image );
 	
 	unlock_preview();
+	return ms;
 }
 
 int	gveejay_busy(void)
