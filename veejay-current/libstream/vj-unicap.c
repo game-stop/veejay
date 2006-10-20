@@ -177,9 +177,6 @@ char **vj_unicap_get_devices(void *unicap)
 		free( device_location );
 		free( device_name );
 		
-#ifdef STRICT_CHECKING
-		assert( error ==  VEVO_NO_ERROR );
-#endif
 		unicap_unlock_properties( ud->handle );
 
 		unicap_close( ud->handle );
