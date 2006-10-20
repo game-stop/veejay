@@ -131,6 +131,64 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 	return i;
 }
 
+
+char **vj_unicap_get_devices(void *unicap)
+{
+	int i;
+	unicap_driver_t *ud = (unicap_driver_t*) unicap;
+	char **result = NULL;
+	for( i = 0; SUCCESS( unicap_enumerate_devices( NULL, &(ud->device), i ) ); i++ )
+	{
+	}
+	if( i <= 0 )
+			return NULL;
+
+	result = (char**) malloc(sizeof(char*) * (i+1));
+	result[i] = NULL;
+	
+	for( i = 0; SUCCESS( unicap_enumerate_devices( NULL, &(ud->device), i ) ); i++ )
+	{
+		char tmp[1024];
+		unicap_property_t property;
+		unicap_format_t format;
+		int property_count = 0;
+		int format_count = 0;
+		int j;
+
+		if( !SUCCESS( unicap_open( &(ud->handle), &(ud->device) ) ) )
+		{
+			veejay_msg(0, "Failed to open: %s\n", &(ud->device.identifier) );
+			continue;
+		}
+		unicap_lock_properties( ud->handle );
+
+	
+		
+		unicap_reenumerate_properties( ud->handle, &property_count );
+		unicap_reenumerate_formats( ud->handle, &format_count );
+		char *device_name = strdup( ud->device.identifier );
+		char *device_location = strdup( ud->device.device );
+		
+
+	    sprintf(tmp, "%03d%s%03d%s", strlen( device_name ), device_name,strlen( device_location ),
+						device_location );
+		result[i] = strndup( tmp, 1024 );	
+		
+		free( device_location );
+		free( device_name );
+		
+#ifdef STRICT_CHECKING
+		assert( error ==  VEVO_NO_ERROR );
+#endif
+		unicap_unlock_properties( ud->handle );
+
+		unicap_close( ud->handle );
+	}
+	return result;
+}
+
+
+
 void	*vj_unicap_init(void)
 {
 	unicap_driver_t *ud = (unicap_driver_t*) vj_malloc(sizeof(unicap_driver_t));
@@ -139,13 +197,6 @@ void	*vj_unicap_init(void)
 	ud->num_devices = vj_unicap_scan_enumerate_devices( (void*) ud );
 	veejay_msg(2, "Found %d capture devices on this system", ud->num_devices);
 	return ud;
-}
-
-void	*vj_unicap_get_devices(void *in)
-{
-	unicap_driver_t *ud = (unicap_driver_t*) in;
-	return ud->device_list;
-	
 }
 
 void	vj_unicap_deinit(void *dud )

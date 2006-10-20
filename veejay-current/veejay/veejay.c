@@ -121,22 +121,40 @@ static void Usage(char *progname)
     fprintf(stderr,
 	    "  -t/--timer num\t\tspecify timer to use (none:0,normal:2,rtc:1) default is 1\n");
 
-#ifdef HAVE_DIRECTFB
-    fprintf(stderr,
-	    "  -O/--output\t\t\tSDL(0) , DirectFB(1), SDL and DirectFB(2), YUV4MPEG stream (3)\n");
-#else
-    fprintf(stderr, "  -O/--output\t\t\tSDL(0), (3) yuv4mpeg (4) OpenGL (5) no visual\n");
+	fprintf(stderr,
+		"  -O/--output\t\tOutput video");
+#ifdef HAVE_SDL
+	fprintf(stderr,
+		"\t\t0 = SDL\t\n");
 #endif
-    	fprintf(stderr,
+#ifdef HAVE_DIRECTFB
+	fprintf(stderr,
+		"\t\t1 = DirectDB\t\n");
+#ifdef HAVE_SDL
+	fprintf(stderr,
+		"\t\t2 = SDL and DirectDB secundary head (TV-Out) clone mode\n");
+#endif
+#endif
+	fprintf(stderr,
+		"\t\t3 = YUV4MPEG stream (use with -o/--outstream <filename>)\n");
+#ifdef USE_GL
+	fprintf(stderr,
+		"\t\t4 = OpenGL (requires openGL extension ARB fragment program)\n");
+#endif
+	fprintf(stderr,
+		"\t\t5 = Head less (no video output)\n");	
+		
+    fprintf(stderr,
 	    "  -o/--outstream <filename>\twhere to write the yuv4mpeg stream (use with -O3)\n");
-    	fprintf(stderr,
+    fprintf(stderr,
 	    "  -c/--synchronization [01]\tSync correction off/on (default on)\n");
-    	fprintf(stderr, "  -f/--fps num\t\t\tOverride default framerate (default read from file)\n");
-    	fprintf(stderr,
+    fprintf(stderr,
+		"  -f/--fps num\t\t\tOverride default framerate (default: read from first loaded file)\n");
+    fprintf(stderr,
 	    "  -P/--preserve-pathnames\tDo not 'canonicalise' pathnames in editlists\n");
-    	fprintf(stderr,
+    fprintf(stderr,
 	    "  -a/--audio [01]\t\tEnable (1) or disable (0) audio (default 1)\n");
-    	fprintf(stderr,
+    fprintf(stderr,
 	    "  -s/--size NxN\t\t\twidth X height for SDL video window\n");
 	fprintf(stderr,
 	    "  -l/--action-file <filename>\tLoad an Configuartion/Action File (none at default)\n");
@@ -144,53 +162,96 @@ static void Usage(char *progname)
 	    "  -u/--dump-events  \t\tDump event information to screen\n");
 	fprintf(stderr,
 	    "  -I/--deinterlace\t\tDeinterlace video if it is interlaced\n");    
-	fprintf(stderr,"  -x/--geometryx <num> \t\tTop left x offset for SDL video window\n");
-	fprintf(stderr,"  -y/--geometryy <num> \t\tTop left y offset for SDL video window\n");
- 	fprintf(stderr,"  -F/--features  \t\tList of compiled features\n");
-	fprintf(stderr,"  -v/--verbose  \t\tEnable debugging output (default off)\n");
-	fprintf(stderr,"  -b/--bezerk    \t\tBezerk (default off)   \n");
- 	fprintf(stderr,"  -L/--auto-loop   \t\tStart with default sample\n");
-	fprintf(stderr,"  -g/--clip-as-sample	\t\tLoad every video clip as a new sample\n");	
-	fprintf(stderr,"  -n/--no-color     \t\tDont use colored text\n");
-	fprintf(stderr,"  -r/--audiorate	\t\tDummy audio rate\n");
-	fprintf(stderr,"  -m/--memory	\t\tMaximum memory to use for cache (0=disable)\n");  
-	fprintf(stderr,"  -j/--max_cache \t\tDivide cache memory over N samples (fairly distributed)\n");
-	fprintf(stderr,"  -Y/--ycbcr [01]\t\t0 = YUV 4:2:0 Planar, 1 = YUV 4:2:2 Planar\n");
+	fprintf(stderr,
+		"  -x/--geometryx <num> \t\tTop left x offset for SDL video window\n");
+	fprintf(stderr,
+		"  -y/--geometryy <num> \t\tTop left y offset for SDL video window\n");
+ 	fprintf(stderr,
+		"  -F/--features  \t\tList of compiled features\n");
+	fprintf(stderr,
+		"  -v/--verbose  \t\tEnable debugging output (default off)\n");
+	fprintf(stderr,
+		"  -b/--bezerk    \t\tBezerk (default off)   \n");
+ 	fprintf(stderr,
+		"  -L/--auto-loop   \t\tStart with default sample\n");
+	fprintf(stderr,
+		"  -g/--clip-as-sample\t\tLoad every video clip as a new sample\n");	
+	fprintf(stderr,
+		"  -n/--no-color     \t\tDont use colored text\n");
+	fprintf(stderr,
+		"  -r/--audiorate\t\tDummy audio rate\n");
+	fprintf(stderr,
+		"  -m/--memory	\t\tMaximum memory to use for cache (0=disable)\n");  
+	fprintf(stderr,
+		"  -j/--max_cache \t\tDivide cache memory over N samples (fairly distributed)\n");
+	fprintf(stderr,
+		"  -Y/--ycbcr [01]\t\t0 = YUV 4:2:0 Planar, 1 = YUV 4:2:2 Planar\n");
+	fprintf(stderr,
+		"  -d/--dummy	\t\tDummy playback\n");
+	fprintf(stderr,
+		"  -W/--width <num>\t\tdummy width\n");
+	fprintf(stderr,
+		"  -H/--height <num>\t\tdummy height\n");
 
-	fprintf(stderr,"  -d/--dummy	\t\tDummy playback\n");
-	fprintf(stderr,"  -W/--width <num>\t\tdummy width\n");
-	fprintf(stderr,"  -H/--height <num>\t\tdummy height\n");
-
-	fprintf(stderr,"  -N/--norm [0=PAL, 1=NTSC (defaults to PAL)]\t\tdummy norm , PAL or NTSC\n");
-	fprintf(stderr,"  -R/--framerate <num>\t\tdummy frame rate\n");
-	fprintf(stderr,"  -M/--multicast-osc \t\tmulticast OSC\n");
-	fprintf(stderr,"  -V/--multicast-vims \t\tmulticast VIMS\n");
-	fprintf(stderr,"     --map-from-file <num>\tmap N frames to memory\n");
+	fprintf(stderr,
+		"  -N/--norm [0=PAL, 1=NTSC (defaults to PAL)]\t\tdummy norm , PAL or NTSC\n");
+	fprintf(stderr,
+		"  -R/--framerate <num>\t\tdummy frame rate\n");
+	fprintf(stderr,
+		"  -M/--multicast-osc \t\tmulticast OSC\n");
+	fprintf(stderr,
+		"  -V/--multicast-vims \t\tmulticast VIMS\n");
+	fprintf(stderr,
+		"     --map-from-file <num>\tmap N frames to memory\n");
 #ifdef USE_SWSCALER
-	fprintf(stderr,"  -z/--zoom [1-11]\n");
-	fprintf(stderr,"\t\t\t\tsoftware scaler type (also use -W, -H ). \n");
-	fprintf(stderr,"\t\t\t\tAvailable types are:\n");         
-	fprintf(stderr,"\t\t\t\t1\tFast bilinear (default)\n");
-	fprintf(stderr,"\t\t\t\t2\tBilinear\n");
-	fprintf(stderr,"\t\t\t\t3\tBicubic (good quality)\n");
-	fprintf(stderr,"\t\t\t\t4\tExperimental\n");
-	fprintf(stderr,"\t\t\t\t5\tNearest Neighbour (bad quality)\n");
-	fprintf(stderr,"\t\t\t\t6\tArea\n");
-	fprintf(stderr,"\t\t\t\t7\tLuma bicubic / chroma bilinear\n");
-	fprintf(stderr,"\t\t\t\t9\tGauss\n");
-	fprintf(stderr,"\t\t\t\t9\tsincR\n");
-	fprintf(stderr,"\t\t\t\t10\tLanczos\n");
-	fprintf(stderr,"\t\t\t\t11\tNatural bicubic spline\n");
-	fprintf(stderr,"\n\t\t\t\tsoftware scaler options:\n");
-	fprintf(stderr,"\t\t\t\t--lgb=<0-100>\tGaussian blur filter (luma)\n");
-	fprintf(stderr,"\t\t\t\t--cgb=<0-100>\tGuassian blur filter (chroma)\n");
-	fprintf(stderr,"\t\t\t\t--ls=<0-100>\tSharpen filter (luma)\n");
-	fprintf(stderr,"\t\t\t\t--cs=<0-100>\tSharpen filter (chroma)\n");
-	fprintf(stderr,"\t\t\t\t--chs=<h>\tChroma horizontal shifting\n");
-	fprintf(stderr,"\t\t\t\t--cvs=<v>\tChroma vertical shifting\n");
-	fprintf(stderr,"\t\t\t\t-w/--zoomwidth \n");
-	fprintf(stderr,"\t\t\t\t-h/--zoomheight \n");
-	fprintf(stderr,"\t\t\t\t-C/--zoomcrop [top:bottom:left:right] (crop source before scaling)\n");
+	fprintf(stderr,
+		"  -z/--zoom [1-11]\n");
+	fprintf(stderr,
+		"\t\t\t\tsoftware scaler type (also use -W, -H ). \n");
+	fprintf(stderr,
+		"\t\t\t\tAvailable types are:\n");         
+	fprintf(stderr,
+		"\t\t\t\t1\tFast bilinear (default)\n");
+	fprintf(stderr,
+		"\t\t\t\t2\tBilinear\n");
+	fprintf(stderr,
+		"\t\t\t\t3\tBicubic (good quality)\n");
+	fprintf(stderr,
+		"\t\t\t\t4\tExperimental\n");
+	fprintf(stderr,
+		"\t\t\t\t5\tNearest Neighbour (bad quality)\n");
+	fprintf(stderr,
+		"\t\t\t\t6\tArea\n");
+	fprintf(stderr,
+		"\t\t\t\t7\tLuma bicubic / chroma bilinear\n");
+	fprintf(stderr,
+		"\t\t\t\t9\tGauss\n");
+	fprintf(stderr,
+		"\t\t\t\t9\tsincR\n");
+	fprintf(stderr,
+		"\t\t\t\t10\tLanczos\n");
+	fprintf(stderr,
+		"\t\t\t\t11\tNatural bicubic spline\n");
+	fprintf(stderr,
+		"\n\t\t\t\tsoftware scaler options:\n");
+	fprintf(stderr,
+		"\t\t\t\t--lgb=<0-100>\tGaussian blur filter (luma)\n");
+	fprintf(stderr,
+		"\t\t\t\t--cgb=<0-100>\tGuassian blur filter (chroma)\n");
+	fprintf(stderr,
+		"\t\t\t\t--ls=<0-100>\tSharpen filter (luma)\n");
+	fprintf(stderr,
+		"\t\t\t\t--cs=<0-100>\tSharpen filter (chroma)\n");
+	fprintf(stderr,
+		"\t\t\t\t--chs=<h>\tChroma horizontal shifting\n");
+	fprintf(stderr,
+		"\t\t\t\t--cvs=<v>\tChroma vertical shifting\n");
+	fprintf(stderr,
+		"\t\t\t\t-w/--zoomwidth \n");
+	fprintf(stderr,
+		"\t\t\t\t-h/--zoomheight \n");
+	fprintf(stderr,
+		"\t\t\t\t-C/--zoomcrop [top:bottom:left:right] (crop source before scaling)\n");
 #endif
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
@@ -565,37 +626,37 @@ static void smp_check()
 			n_cpu, c_cpu);
 	}
 }
-
+static void donothing(int sig)
+{
+	veejay_msg(VEEJAY_MSG_INFO,"Received signal %x ",sig);
+}
 int main(int argc, char **argv)
 {
-    video_playback_setup *settings;
-    char *dont_use; 
-    
-    struct sched_param schp;
-    /*EditList *editlist = info->editlist; */
-
+	video_playback_setup *settings;
+	char *dont_use; 
+    	sigset_t allsignals;
+    	struct sigaction action;
+	struct sched_param schp;
+	int i;
 	fflush(stdout);
-    vj_mem_init();
+	vj_mem_init();
 	vevo_strict_init();
-     info = veejay_malloc();
-    /* start with initing */
-    if (!info)
-	return 1;
-     settings = (video_playback_setup *) info->settings;
 
-    if(!check_command_line_options(argc, argv))
-    {
-	veejay_free(info);
-	return 0;
-    }
+	info = veejay_malloc();
+	if (!info)
+		return 1;
 
-    print_license();
-   prepare_cache_line( max_mem_, n_slots_ );
+   	settings = (video_playback_setup *) info->settings;
 
+	veejay_check_homedir( info );
+     
+	if(!check_command_line_options(argc, argv))
+    	{
+		veejay_free(info);
+		return 0;
+    	}
 
-   
-
-    if(info->dump)
+        if(info->dump)
  	{
 		veejay_set_colors(0);
 		vj_event_init();
@@ -607,38 +668,42 @@ int main(int argc, char **argv)
 		return 0;
 	}
 
-    //print_license();
-  /* setup SIGPIPE and SIGINT catcher as a thread */
-    sigemptyset(&(settings->signal_set));
-    sigaddset(&(settings->signal_set), SIGINT);
-    sigaddset(&(settings->signal_set), SIGPIPE);
-    sigaddset(&(settings->signal_set), SIGBUS);
-    sigaddset(&(settings->signal_set), SIGILL);
-    sigaddset(&(settings->signal_set), SIGSEGV);
+	print_license();
+	prepare_cache_line( max_mem_, n_slots_ );
 
-    pthread_sigmask(SIG_BLOCK, &(settings->signal_set), NULL);
-    pthread_create(&(settings->signal_thread), NULL, veejay_signal_loop,
-		   (void *) info); 
+
+    	sigemptyset(&(settings->signal_set));
+	sigaddset(&(settings->signal_set), SIGINT);
+	sigaddset(&(settings->signal_set), SIGPIPE);
+	sigaddset(&(settings->signal_set), SIGILL);
+	sigaddset(&(settings->signal_set), SIGSEGV);
+	sigaddset(&(settings->signal_set), SIGFPE );
+	sigaddset(&(settings->signal_set), SIGPIPE );
+	sigaddset(&(settings->signal_set), SIGTERM );
+	sigaddset(&(settings->signal_set), SIGABRT);
+	sigaddset(&(settings->signal_set), SIGSTKFLT );
+	sigaddset(&(settings->signal_set), SIGPWR );
+
+	pthread_sigmask(SIG_BLOCK, &(settings->signal_set), NULL);
 
 	dont_use = getenv("VEEJAY_SCHEDULE_NORMAL");
 	if(dont_use==NULL || strcmp(dont_use, "0")==0||strcmp(dont_use,"no")==0)
 	{
- 	 mymemset_generic(&schp, 0, sizeof(schp));
-    	schp.sched_priority = sched_get_priority_max(SCHED_FIFO);
-   	 if (sched_setscheduler(0, SCHED_FIFO, &schp) != 0)
-	 {
-		veejay_msg(VEEJAY_MSG_ERROR,
-			    "Cannot set real-time playback thread scheduling (not root?)");
-   	 }
-	 else
-	 {
-		veejay_msg(VEEJAY_MSG_WARNING,
-		    "Using First In-First Out II scheduling");
-	 }
+ 		memset(&schp, 0, sizeof(schp));
+		schp.sched_priority = sched_get_priority_max(SCHED_FIFO);
+   	 	if (sched_setscheduler(0, SCHED_FIFO, &schp) != 0)
+	 	{
+			veejay_msg(VEEJAY_MSG_WARNING,
+				    "Cannot set real-time playback thread scheduling (not root?)");
+   	 	}
+	 	else
+	 	{
+			veejay_msg(VEEJAY_MSG_INFO,
+		    		"Using First In-First Out II scheduling");
+	 	}
 	}
 
 	smp_check();
-
 
 	char *mem_func = get_memcpy_descr();
 	if(mem_func)
@@ -647,7 +712,7 @@ int main(int argc, char **argv)
 		free(mem_func);
 	}
 
-    if(veejay_init(
+	if(veejay_init(
 		info,
 		default_geometry_x,
 		default_geometry_y,
@@ -661,27 +726,44 @@ int main(int argc, char **argv)
 	if(auto_loop)
 		veejay_auto_loop(info);
 
-    if(!veejay_main(info))
+    	if(!veejay_main(info))
 	{
 	    veejay_msg(VEEJAY_MSG_ERROR, "Cannot start main playback cycle");
 		return 1;
 	}
 
-	//veejay_set_frame(info, 0);
+
+	sigfillset( &allsignals );
+	action.sa_handler = donothing;
+	action.sa_mask = allsignals;
+	action.sa_flags = SA_RESTART | SA_RESETHAND;
+	for( i = 1; i < NSIG; i ++ )
+		if( sigismember( &(settings->signal_set), i ))
+			sigaction( i, &action, 0 );
+	
 	veejay_msg(VEEJAY_MSG_DEBUG, "Starting playback");
 	veejay_change_state(info, LAVPLAY_STATE_PLAYING);
 	veejay_set_frame(info, 0);
-
 	veejay_set_speed(info, 1);
-	  
-    while (veejay_get_state(info) != LAVPLAY_STATE_STOP) 
-    {
-       usleep(400000);
-    }
+	
 
-    veejay_quit(info);
-    veejay_busy(info);		/* wait for all the nice goodies to shut down */
-    veejay_free(info);
+	int sig;
+	
+   	while (veejay_get_state(info) != LAVPLAY_STATE_STOP) 
+    	{
+		sigwait( &(settings->signal_set), &sig );
+		veejay_msg(VEEJAY_MSG_ERROR, "Veejay caught signal %x", sig );
+		veejay_handle_signal( info, sig );	
+       		//usleep(400000);
+    	}
+	if(sig != SIGSEGV)
+	{
+		sigprocmask( SIG_UNBLOCK, &(settings->signal_set), 0 );
+	}
+	
+	veejay_quit(info);
+	veejay_busy(info);		/* wait for all the nice goodies to shut down */
+	veejay_free(info);
 
-    return 0;
+	return 0;
 }

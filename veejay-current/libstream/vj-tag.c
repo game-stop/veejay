@@ -169,6 +169,32 @@ int	vj_tag_num_devices()
 	return vj_unicap_num_capture_devices( unicap_data_ );
 }
 
+char *vj_tag_scan_devices( void )
+{
+	const char *default_str = "000000";
+	char *n = NULL;
+	char **device_list = vj_unicap_get_devices(unicap_data_);
+	if(!device_list)
+	{
+			return strdup(default_str);
+	}
+	int i;
+    int len = 6;
+	for( i = 0; device_list[i] != NULL ;i++ )
+			len += strlen( device_list[i] );
+	
+	n = (char*) malloc(sizeof(char) * len );
+	memset( n, 0, len );
+
+	sprintf(n, "%06d",len-6);	
+	for( i = 0; device_list[i] != NULL ;i++ )
+	{
+		strcat( n, device_list[i] );
+	}
+
+	return n;	
+}
+
 int vj_tag_init(int width, int height, int pix_fmt)
 {
     int i;
@@ -191,11 +217,7 @@ int vj_tag_init(int width, int height, int pix_fmt)
 
 #ifdef USE_UNICAP
 	unicap_data_= (void*) vj_unicap_init();
-	veejay_msg(0,
-			"Found %d capture devices", vj_unicap_num_capture_devices( unicap_data_ ));
-
 #endif
-
    _temp_buffer[0] = (uint8_t*) malloc(sizeof(uint8_t)*width*height);
    _temp_buffer[1] = (uint8_t*) malloc(sizeof(uint8_t)*width*height);
    _temp_buffer[2] = (uint8_t*) malloc(sizeof(uint8_t)*width*height);
@@ -295,7 +317,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
 		return 0;
 	}
     	vj_tag_input->unicap[stream_nr] = 
-	   vj_unicap_new_device( unicap_data_, stream_nr );
+	   vj_unicap_new_device( unicap_data_, freq );
     	if(!vj_tag_input->unicap[stream_nr] )
     	{
 	    veejay_msg(0,"Unable to open device %d", channel);
@@ -500,7 +522,7 @@ int	vj_tag_get_stream_color(int t1, int *r, int *g, int *b )
 }
 // for network, filename /channel is passed as host/port num
 int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
-	        int pix_fmt, int channel )
+	        int pix_fmt, int channel , int extra)
 {
     int i, j;
     int palette;
@@ -602,20 +624,9 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 #ifdef USE_UNICAP
 	    case VJ_TAG_TYPE_V4L:
 		if (!_vj_tag_new_unicap
-		    (tag, stream_nr, w, h, el->video_norm, pix_fmt,0,channel ))
+		    (tag, stream_nr, w, h, el->video_norm, pix_fmt,extra,channel ))
 			    return -1;
 	break;
-#else	    
-#ifdef HAVE_V4L
-    case VJ_TAG_TYPE_V4L:
-//	sprintf(tag->source_name, "/dev/%s/%d", filename,channel);
-//	sprintf(tag->source_name, "/dev/%s", filename,channel);
-	sprintf(tag->source_name, "/dev/%s",filename);
-	if (_vj_tag_new_v4l
-	    (tag, stream_nr, w, h, el->video_norm, palette,0,channel ) != 1)
-	    return -1;
-	break;
-#endif
 #endif
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
@@ -2776,4 +2787,5 @@ void tagCreateStreamFX(xmlNodePtr node, vj_tag *tag)
 
    tagCreateEffects(childnode, tag->effect_chain);
 }
+
 #endif

@@ -35,6 +35,7 @@ enum {
 	VIMS_LOG				=	412,
 	VIMS_SAMPLE_INFO			=	413,
 	VIMS_SAMPLE_OPTIONS			=	414,
+	VIMS_DEVICE_LIST			=	415,
 	VIMS_TRACK_LIST				=	5,
 /* general controls */
 	VIMS_SET_VOLUME				=	300,

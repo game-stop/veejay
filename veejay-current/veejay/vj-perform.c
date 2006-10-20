@@ -103,6 +103,10 @@ static VJFrame *helper_frame;
 static int vj_perform_record_buffer_init();
 static void vj_perform_record_buffer_free();
 
+
+static	uint8_t *backstore__ = NULL;
+static	int backsize__  = 0;
+
 static ReSampleContext *resample_context[MAX_SPEED];
 static ReSampleContext *resample_jack;
 
@@ -329,38 +333,27 @@ int vj_perform_increase_sample_frame(veejay_t * info, long num)
 
 static int vj_perform_alloc_row(veejay_t *info, int frame, int c, int frame_len)
 {
-	frame_buffer[c]->Y =
-	    (uint8_t *) vj_malloc(sizeof(uint8_t) * (helper_frame->len/16)*16);
-	if(!frame_buffer[c]->Y) return 0;
-	veejay_memset( frame_buffer[c]->Y , 16, (helper_frame->len/16)*16 );
-	frame_buffer[c]->Cb =
-	    (uint8_t *) vj_malloc(sizeof(uint8_t) * (helper_frame->len/16)*16);
-	if(!frame_buffer[c]->Cb) return 0;
-	veejay_memset( frame_buffer[c]->Cb, 128, (helper_frame->len/16)*16 );
-	frame_buffer[c]->Cr =
-	    (uint8_t *) vj_malloc(sizeof(uint8_t) * (helper_frame->len/16)*16);
-	if(!frame_buffer[c]->Cr) return 0;
-	veejay_memset( frame_buffer[c]->Cr, 128, (helper_frame->len/16)*16 );
-	return (3 * (( helper_frame->len/16)*16));
+	uint8_t *buf = vj_malloc(sizeof(uint8_t) * (helper_frame->len * 3));
+	frame_buffer[c]->Y = buf;
+	frame_buffer[c]->Cb = buf + helper_frame->len;
+	frame_buffer[c]->Cr = buf + helper_frame->len + helper_frame->len;
+
+	return (helper_frame->len * 3 );
+	
 }
 
 static void vj_perform_free_row(int frame,int c)
 {
-//	int c = frame * CHAIN_BUFFER_SIZE + cc;
-	if(frame_buffer[c]->Y) free(frame_buffer[c]->Y);
-	if(frame_buffer[c]->Cb) free(frame_buffer[c]->Cb);
-	if(frame_buffer[c]->Cr) free(frame_buffer[c]->Cr);
+	if(frame_buffer[c]->Y) free( frame_buffer[c]->Y );
 	frame_buffer[c]->Y = NULL;
 	frame_buffer[c]->Cb = NULL;
 	frame_buffer[c]->Cr = NULL;
-//	also, update cache if appropriate
 	cached_sample_frames[c+CACHE] = 0;
 	cached_tag_frames[c+CACHE] = 0;
 }
 
 static int	vj_perform_row_used(int frame, int c)
 {
-//	int c = frame * CHAIN_BUFFER_SIZE + cc;
 	if(frame_buffer[c]->Y != NULL ) return 1;
 	return 0;
 }
@@ -497,6 +490,14 @@ int vj_perform_init(veejay_t * info)
     frame_buffer = (struct ycbcr_frame **) vj_malloc(sizeof(struct ycbcr_frame *) * SAMPLE_MAX_EFFECTS);
     if(!frame_buffer) return 0;
 
+	if( info->video_out == 4)
+	{
+		backstore__ = (uint8_t*)
+			vj_malloc(sizeof( uint8_t ) * w * h * 2 );
+		backsize__ = w * h;
+	}
+
+    
     record_buffer = (struct ycbcr_frame*) vj_malloc(sizeof(struct ycbcr_frame) );
     if(!record_buffer) return 0;
     record_buffer->Y = NULL;
@@ -2040,6 +2041,22 @@ int	vj_perform_get_sampling()
 	return current_sampling_fmt_;
 }
 
+void	vj_perform_get_backstore( uint8_t **frame )
+{
+	frame[0] = primary_buffer[0]->Y;
+	if( current_sampling_fmt_ == 2 )
+	{
+		frame[1] = backstore__;
+		frame[2] = backstore__ + backsize__;
+	}
+	else
+	{
+		frame[1] = primary_buffer[0]->Cb;
+		frame[2] = primary_buffer[0]->Cr;
+	}
+}
+
+
 int vj_perform_sample_complete_buffers(veejay_t * info, int entry, const int skip_incr)
 {
 	int chain_entry;
@@ -2076,29 +2093,23 @@ int vj_perform_sample_complete_buffers(veejay_t * info, int entry, const int ski
 	if(super_sampled)
 	{ // should be subsampled
 #ifdef USE_GL
-		//@ if we use GL driver, do not subsample here
 		if(info->video_out == 4 )
 		{
+			veejay_memcpy( backstore__, 
+					frames[0]->data[1],
+					backsize__ );
+			veejay_memcpy( backstore__ + backsize__,
+					frames[0]->data[2],
+					backsize__ );
 			current_sampling_fmt_ = 2;
 		}
-		else
 #endif
-		
 		chroma_subsample(
 			settings->sample_mode,
 			effect_sampler,
 			frames[0]->data,frameinfo->width,
 			frameinfo->height );
 	}
-#ifdef USE_GL
-	else
-	{
-		if(info->video_out==4)
-		{
-			current_sampling_fmt_ = info->current_edit_list->pixel_format;
-		}
-	}
-#endif
 
     	if (chain_fade)
 		vj_perform_post_chain(info,frames[0]);
@@ -2188,7 +2199,7 @@ void vj_perform_plain_fill_buffer(veejay_t * info, int entry, int skip)
     frame[0] = primary_buffer[0]->Y;
     frame[1] = primary_buffer[0]->Cb;
     frame[2] = primary_buffer[0]->Cr;
-  
+
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
 	{
 		sample_cache_frames( info->uc->sample_id, get_num_slots() );
@@ -2202,7 +2213,7 @@ void vj_perform_plain_fill_buffer(veejay_t * info, int entry, int skip)
     if(ret <= 0)
     {
 	    veejay_msg(0, "getting video frame. Stop veejay");
-	veejay_change_state(info, LAVPLAY_STATE_STOP);
+		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
     }
 }
 
@@ -2715,6 +2726,8 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 
 	if(settings->offline_record)	
 		vj_perform_record_tag_frame(info,0);
+
+	current_sampling_fmt_ = -1;
 
 	switch (info->uc->playback_mode) {
 		case VJ_PLAYBACK_MODE_SAMPLE:

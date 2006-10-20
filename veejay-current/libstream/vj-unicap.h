@@ -24,15 +24,13 @@ void	vj_unicap_deinit(void *dud );
 int	vj_unicap_num_capture_devices( void *dud );
 
 
-
+char **vj_unicap_get_devices(void *unicap);
 void	*vj_unicap_new_device( void *ud, int device_id );
 int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h );
 int	vj_unicap_start_capture( void *vut );
 int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int w, const int h, const int pf );
 int	vj_unicap_stop_capture( void *vut );
 void	vj_unicap_free_device( void *vut );
-
-void	*vj_unicap_get_devices(void *in);
 
 #endif
 

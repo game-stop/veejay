@@ -301,6 +301,7 @@ typedef struct {
 	int bes_height;
 	char *status_what;
 	char *status_msg;
+	char *homedir;
 } veejay_t;
 
 typedef struct {

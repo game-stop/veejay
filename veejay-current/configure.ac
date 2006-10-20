@@ -34,11 +34,15 @@ dnl Options
 
 dnl kill CFLAGS
 CFLAGS="-std=c99"
-
+AC_ARG_ENABLE(strict,
+		AC_HELP_STRING([--enable-strict],
+			     [Compile in paranoia assertion checking]))
 AC_ARG_ENABLE(debug,
 		AC_HELP_STRING([--enable-debug],
 			     [Compile in debugging information]))
-
+AC_ARG_ENABLE(profile,
+		AC_HELP_STRING([--enable-profiling],
+			     [Compile in profiling information]))
 AC_ARG_ENABLE(compile-warnings,     
               AC_HELP_STRING([--enable-compile-warnings],
                              [Turn on compiler warnings.]))
@@ -487,12 +491,25 @@ fi
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
- debugCFLAGS="-g -DSTRICT_CHECKING "
+ debugCFLAGS="-g"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
 fi
-
+if test "x$enable_profiling" = "xyes" ; then
+ debugCFLAGS="$debugCFLAGS -fprofile-arcs -ftest-coverage"
+ DEBUGLIBS="-lgcov"
+ AC_SUBST( DEBUGLIBS )
+ AC_MSG_RESULT([yes])
+else
+ AC_MSG_RESULT([no])
+fi
+if test "x$enable_strict" = "xyes" ; then
+ debugCFLAGS="$debugCFLAGS -DSTRICT_CHECKING"
+ AC_MSG_RESULT([yes])
+else
+ AC_MSG_RESULT([no])
+fi
 
 dnl ********************************************************************
 dnl Test for MMX support if an IA32 platform.  If on a PPC then look for
@@ -1011,17 +1028,14 @@ AC_MSG_NOTICE([ Optional dependencies])
 
 AC_MSG_NOTICE([  - video4linux                   : ${have_v4l}])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
-if test x$have_sdl != xtrue ; then
-AC_MSG_NOTICE([      There will be NO video window ])
-fi
 AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
-AC_MSG_NOTICE([  - OpenGL support		 : ${have_gl}])
+AC_MSG_NOTICE([  - OpenGL support                : ${have_gl}])
 AC_MSG_NOTICE([  - AVI MJPEG playback/recording  : true (always)])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - FFmpeg AVFormat               : ${have_avformat} ])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
-AC_MSG_NOTICE([  - Unicap Imaging		 : ${have_unicap} ])
+AC_MSG_NOTICE([  - Unicap Imaging                : ${have_unicap} ])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 AC_MSG_NOTICE([  - jack                          : ${have_jack}])

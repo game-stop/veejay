@@ -135,7 +135,7 @@ int	vj_tag_get_stream_color(int t1, int *r, int *g, int *b );
    stream_nr indicates which stream to take of the same type
  */
 int 	vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
-	        int pix_fmt, int channel);
+	        int pix_fmt, int channel, int extra);
 
 /* return 1 if tag exists , 0 otherwise*/
 int 	vj_tag_exists(int id);

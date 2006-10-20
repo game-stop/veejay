@@ -38,6 +38,7 @@
 #include <mjpegtools/mpegconsts.h>
 #include <mjpegtools/mpegtimecode.h>
 #include <libvjmem/vjmem.h>
+#include <libyuv/yuvconv.h>
 #include <ffmpeg/avcodec.h>
 #include <math.h>
 #include <stdlib.h>
@@ -58,7 +59,9 @@
 //@@ !
 #define FMT_411 2
 #define FMT_444 3
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 static struct
 {
 	const char *name;
@@ -198,8 +201,7 @@ static	vj_dv_decoder *dv_decoder_ = NULL;
 
 static	vj_decoder *el_codecs[MAX_CODECS];
 
-
-static	_el_get_codec(int id )
+static	int _el_get_codec(int id )
 {
 	int i;
 	for( i = 0; _supported_codecs[i].name != NULL ; i ++ )
@@ -770,20 +772,14 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 				default:
 					break;
 			}
-			veejay_msg(VEEJAY_MSG_DEBUG, "Decoder '%s' -> %d, pix fmt in = %d, out = %d",
-					compr_type, decoder_id, el->yuv_taste[n], ff_pf );
 			el_codecs[c_i] = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps, el->yuv_taste[ n ],ff_pf );
 			if(!el_codecs[c_i])
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,"Cannot initialize %s codec", compr_type);
 				if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
-			    if(realname) free(realname);
+			    	if(realname) free(realname);
 				if( el->video_file_list[n]) free(el->video_file_list[n]);
 				return -1;
-			}
-			else
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "\tDecoder %s initialized in slot %d", compr_type, c_i);
 			}
 		}
 	}
@@ -814,35 +810,30 @@ void		vj_el_show_formats(void)
 {
 #ifdef SUPPORT_READ_DV2
 		veejay_msg(VEEJAY_MSG_INFO,
-			"Video formats: AVI and  RAW DV");
-		veejay_msg(VEEJAY_MSG_INFO, 
-			"\t[dvsd|dv] DV Video (Quasar DV codec)");
+			"Video containers: AVI (up to 2gb), RAW DV and Quicktime");
 #else
 		veejay_msg(VEEJAY_MSG_INFO,
-			"Video format: AVI");	
+			"Video containers: AVI (up to 2gb) and  Quicktime");
 #endif
 		veejay_msg(VEEJAY_MSG_INFO,
-			"\t[yv16] Planer YUV 4:2:2");
+			"Video fourcc (preferred): mjpg, mjpb, mjpa, dv, dvsd,sp5x,dmb1,dvcp,dvhd, yv16,i420");
 		veejay_msg(VEEJAY_MSG_INFO,
-			"\t[iyuv] Planer YUV 4:2:0");
+			"Video codecs (preferred): YV16, I420, Motion Jpeg or Digital Video");
 		veejay_msg(VEEJAY_MSG_INFO,
-			"\t[mjpg|mjpa] Motion JPEG");
+			"If the video file is made up out of only I-frames (whole images), you can also decode:");
 		veejay_msg(VEEJAY_MSG_INFO,
-			"Limited support for:");
+			" mpg4,mp4v,svq3,svq1,rpza,hfyu,mp42,mpg43,davc,div3,x264,h264,avc1,m4s2,divx,xvid");
 		veejay_msg(VEEJAY_MSG_INFO,
-			"\t[div3] MS MPEG4v3 Divx Video");
-		veejay_msg(VEEJAY_MSG_INFO,
-			"\t[mp4v] MPEG4 Video (ffmpeg experimental)");  		
-#ifdef HAVE_LIBQUICKTIME
-		veejay_msg(VEEJAY_MSG_INFO,
-			"\t[qt|mov] Quicktime Video (mjpeg,mjpa,.., only yuv planar)");
-#endif	
+			"Use veejay's internal format YV16 to reduce CPU usage");
+		
 #ifdef USE_GDK_PIXBUF
 		veejay_msg(VEEJAY_MSG_INFO,
 			"Image types supported:");
 		vj_picture_display_formats();
 #endif
 
+
+		
 }
 
 
@@ -923,6 +914,10 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 		return -1;
 	}
 
+//	veejay_msg(0, "File '%s' : YUV %d, Codec %x",
+//			el->video_file_list[N_EL_FILE(n)], el->yuv_taste[ N_EL_FILE(n) ], decoder_id );
+	
+	
 	if(!in_cache )
 	{
 		if( d == NULL )
@@ -961,7 +956,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 	int inter = 0;
 	int got_picture = 0;
 
-	
 	
 	switch( decoder_id )
 	{
@@ -1012,7 +1006,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			d->img->data[1] = dst[1];
 			d->img->data[2] = dst[2];
 			
-			len = avcodec_decode_video(
+			int decode_len = avcodec_decode_video(
 				d->context,
 				d->frame,
 				&got_picture,
@@ -1020,27 +1014,21 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 				res
 			);
 
-//			veejay_msg(0, "bytes remain: %d, decoded %d, pixfmt %d , %d",
-//				res,len, d->context->pix_fmt, in_pix_fmt);
-			
 			if(!got_picture)
 			{
-				veejay_msg(0, "Unable to get whole picture");
+				veejay_msg(0, "Cannot decode frame ,unable to get whole picture");
 				return 0;
 			}
 		
-			if( len <= 0 )
+			if( decode_len <= 0 )
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "reading frame");
+				veejay_msg(VEEJAY_MSG_ERROR, "Cannot decode frame");
 				return 0;
 			}
-	
+
 			AVPicture pict,pict2;
 
-//@ sampling
-
 			int src_fmt = d->context->pix_fmt;
-//			int src_fmt = in_pix_fmt;
 			int dst_fmt = ( out_pix_fmt== FMT_420 ? PIX_FMT_YUV420P: PIX_FMT_YUV422P) ;
 
 			pict.data[0] = dst[0];
@@ -1074,8 +1062,21 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 				}
 				else
 				{
-					img_convert( &pict, dst_fmt, (const AVPicture*) d->frame, src_fmt,
-						el->video_width, el->video_height );
+					int hj = (src_fmt == dst_fmt ? 1: 0 );
+					switch(hj)
+					{
+						case 1:
+							veejay_memcpy( dst[0], d->frame->data[0], len );
+							veejay_memcpy( dst[1], d->frame->data[1], uv_len);
+							veejay_memcpy( dst[2], d->frame->data[2], uv_len );
+							break;
+						case 0:
+							img_convert( &pict, dst_fmt, (const AVPicture*) d->frame, src_fmt,
+								el->video_width, el->video_height );
+						break;
+							default:
+							break;
+					}
 				}
 			}
 			else
@@ -1087,6 +1088,12 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			return 1;
 			break;
 	}
+
+#ifdef HAVE_MMX
+	// some codecs is broken, and doesn't restore MMX state :(
+	// it happens usually with broken/damaged files.
+//	__asm __volatile ("emms;":::"memory");
+#endif
 
 
 	veejay_msg(VEEJAY_MSG_WARNING, "Error decoding frame %ld - %d ", nframe,len);

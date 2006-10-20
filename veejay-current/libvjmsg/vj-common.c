@@ -140,7 +140,7 @@ void veejay_msg(int type, const char format[], ...)
 			sprintf(sline, "%s", buf );
 		else
 			sprintf( sline, "%s\n", buf );	
-		_message_history.msg[_message_history.w_index ++ ] = strdup(sline);
+		_message_history.msg[_message_history.w_index ++ ] = strndup(sline,200);
 	}
      }
      else
@@ -222,7 +222,10 @@ void	veejay_reap_messages(void)
 	for( i = 0; i < _message_history.w_index ; i ++ )
 	{
 		if( _message_history.msg[i] ) 
+		{
 			free(_message_history.msg[i] );
+			_message_history.msg[i] = NULL;
+		}
 	}
 
 	_message_his_status = 0;

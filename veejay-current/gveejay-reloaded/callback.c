@@ -1927,7 +1927,9 @@ void	on_streamnew_clicked(GtkWidget *widget, gpointer user_data)
 {
 	// inputstream_window
 	GtkWidget *w = glade_xml_get_widget(info->main_window, "inputstream_window");
-	gtk_widget_show(w);	
+	scan_devices( "tree_v4ldevices" );
+	gtk_widget_show(w);
+	
 }
 
 void	on_inputstream_close_clicked(GtkWidget *w,  gpointer user_data)

@@ -35,7 +35,7 @@ libveejay_la_SOURCES =  vj-misc.c \
 			vj-sdl.c vj-dfb.c gl.c \
 			liblavplayvj.c 
 
-libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS )
+libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS ) $(DEBUGLIBS)
 
 if USE_SWSCALER
 libveejay_la_LDFLAGS += -L$(top_builddir)/libpostproc/ -lpostproc 

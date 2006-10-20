@@ -445,7 +445,7 @@ enum
 	V4L_NUM=0,
 	V4L_NAME=1,
 	V4L_SPINBOX=2,
-	V4L_BUTTON=3,
+	V4L_LOCATION=3,
 };
 
 enum
@@ -572,6 +572,7 @@ static void online_update(int keyp, int value);
 static  void   update_curve_widget(const char *name);
 static void    update_curve_accessibility(const char *name);
 static void	vj_preview_draw(void);
+static	void	reset_tree(const char *name);
 
 void	interrupt_cb();
 
@@ -852,7 +853,7 @@ GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
 	return widget;		
 }
 
-
+/*
 static void scan_devices( const char *name)
 {
 	struct stat	v4ldir;
@@ -920,25 +921,89 @@ static void scan_devices( const char *name)
 				continue;
 			if( S_ISREG( v4lfile.st_mode ) )
 			{
-				/* add device*/
 			}
 		
 		}
 		
 	}
 
-/*	TODO:
-		Put DV 1394 device here too !!
-		har har must do cleanup
-		refactor all gtk tree related code into a more generic
-		function set
-*/ 
-//	const char *dvpath = "/proc/bus/ieee1394/dv";
-
-
 
 	gtk_tree_view_set_model(GTK_TREE_VIEW(tree), model );
+}*/
+
+static void scan_devices( const char *name)
+{
+	struct stat	v4ldir;
+	int	n;
+	GtkWidget *tree = glade_xml_get_widget_(info->main_window,name);
+	GtkListStore *store;
+	GtkTreeIter iter;
+
+	reset_tree(name);
+    gint len = 0;
+	single_vims( VIMS_DEVICE_LIST );
+	veejay_msg(0, "waiting for devicelist");
+	gchar *text = recv_vims(6,&len);
+	veejay_msg(0, "received [%s], %d", text,len);
+	if(len <= 0|| !text )
+			return;
+	GtkTreeModel *model = gtk_tree_view_get_model
+		(GTK_TREE_VIEW(tree));
+	store = GTK_LIST_STORE(model);
+
+	gint offset =0;
+	gint i = 0;
+	while( offset < len )
+	{
+		gdouble  id    = (gdouble) i;
+		gchar *name = NULL;
+		gdouble gchannel = 1.0;
+		gchar *loca = NULL;
+		
+		gint name_len=0;
+		gint loc_len=0;
+		veejay_msg(0, "test[%s]", text);
+		if(!sscanf( text, "%03d", &name_len ))
+		{
+				free(text);
+				return;
+		}
+		name = strndup( text + offset + 3, name_len );
+		offset += name_len;
+		offset += 3;
+		veejay_msg(0, "test[%s]", text + offset);
+		if(!sscanf( text + offset, "%03d", &loc_len ))
+		{
+				free(text);
+				return;
+		}
+		loca = strndup( text + offset +3 , loc_len );
+		offset += loc_len;
+		offset += 3;
+		
+			
+		gchar *thename = _utf8str( name );
+		gchar *theloca = _utf8str( loca );
+		
+		gtk_list_store_append( store, &iter);
+		gtk_list_store_set(
+				store, &iter,
+					V4L_NUM, i,
+				 	V4L_NAME, thename, 
+					V4L_SPINBOX, gchannel,
+				    V4L_LOCATION, theloca,
+					-1);
+		
+		g_free(thename);
+		g_free(theloca);
+
+		free(loca);
+		free(name);
+		i ++;
+	}
+	gtk_tree_view_set_model(GTK_TREE_VIEW(tree), model );
 }
+
 
 void	on_devicelist_row_activated(GtkTreeView *treeview, 
 		GtkTreePath *path,
@@ -951,32 +1016,34 @@ void	on_devicelist_row_activated(GtkTreeView *treeview,
 	model = gtk_tree_view_get_model(treeview);
 	if(gtk_tree_model_get_iter(model,&iter,path))
 	{
-		gint num = 0;
-		gtk_tree_model_get(model,&iter, V4L_NUM, &num, -1);
-		if( num == info->uc.strtmpl[V4L_DEVICE].dev )
-		{
-			multi_vims( VIMS_STREAM_NEW_V4L,"%d %d",
-				info->uc.strtmpl[V4L_DEVICE].dev,
-				info->uc.strtmpl[V4L_DEVICE].channel );
-			gveejay_new_slot(MODE_STREAM);
-		}
+		gint channel =	info->uc.strtmpl[0].channel;
+		gint	num = info->uc.strtmpl[0].dev;
+		
+		multi_vims( VIMS_STREAM_NEW_V4L,"%d %d",
+				num,
+				channel
+				);
+		gveejay_new_slot(MODE_STREAM);
 	}
 }
 
 static void	setup_v4l_devices()
 {
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_v4ldevices");
-	GtkListStore *store = gtk_list_store_new( 3, G_TYPE_INT, G_TYPE_STRING, G_TYPE_FLOAT );
+	GtkListStore *store = gtk_list_store_new( 4, G_TYPE_INT, G_TYPE_STRING, G_TYPE_FLOAT,
+				   G_TYPE_STRING	);
 
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	g_object_unref( G_OBJECT( store ));
-	setup_tree_text_column( "tree_v4ldevices", V4L_NUM, "num" );
-	setup_tree_text_column( "tree_v4ldevices", V4L_NAME, "Device name");
+	setup_tree_text_column( "tree_v4ldevices", V4L_NUM, "Num" );
+	setup_tree_text_column( "tree_v4ldevices", V4L_NAME, "Device Name");
 	setup_tree_spin_column( "tree_v4ldevices", V4L_SPINBOX, "Channel");
+	setup_tree_text_column( "tree_v4ldevices", V4L_LOCATION, "Location");
+
 	g_signal_connect( tree, "row-activated",
 		(GCallback) on_devicelist_row_activated, NULL );
 
-	scan_devices( "tree_v4ldevices" );
+	//scan_devices( "tree_v4ldevices" );
 	
 
 }

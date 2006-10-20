@@ -1241,6 +1241,22 @@ void vj_event_update_remote(void *ptr)
 		veejay_reap_messages();
 	
 	cached_image_ = 0;
+	if( cached_gdkimage_ )
+	{
+		if( cached_gdkimage_->image )
+		{
+			gdk_pixbuf_unref( (GdkPixbuf*) cached_gdkimage_->image );
+			cached_gdkimage_->image = NULL;
+		}
+		if( cached_gdkimage_->scaled_image )
+		{
+			gdk_pixbuf_unref( (GdkPixbuf*) cached_gdkimage_->scaled_image );
+			cached_gdkimage_->scaled_image = NULL;
+		}
+		free( cached_gdkimage_ );
+		cached_gdkimage_ = NULL;
+	}	
+
 	// clear image cache
 	
 }
@@ -2325,6 +2341,14 @@ void	vj_event_send_vimslist(void *ptr, const char format[], va_list ap)
 	if(buf) free(buf);
 }
 
+void	vj_event_send_devicelist( void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+
+	char *buf = vj_tag_scan_devices();
+	SEND_MSG( v, buf );
+	free(buf);
+}
 
 
 void vj_event_sample_select(void *ptr, const char format[], va_list ap)
@@ -2815,7 +2839,6 @@ void vj_event_set_frame(void *ptr, const char format[], va_list ap)
 		if(args[0] == -1 )
 			args[0] = v->edit_list->video_frames - 1;
 		veejay_set_frame(v, args[0]);
-		veejay_msg(VEEJAY_MSG_INFO, "Video frame %d set",s->current_frame_num);
 	}
 	else
 	{
@@ -5652,7 +5675,7 @@ void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 
 	sprintf(filename, "video%d", args[0]);
 
-	int id = veejay_create_tag(v, VJ_TAG_TYPE_V4L, filename, v->nstreams,0,args[1]);
+	int id = veejay_create_tag(v, VJ_TAG_TYPE_V4L, filename, v->nstreams,args[0],args[1]);
 	vj_event_send_new_id( v, id );
 
 	if( id <= 0 )
@@ -5714,7 +5737,7 @@ void vj_event_tag_new_color(void *ptr, const char format[], va_list ap)
 		CLAMPVAL( args[i] );
 
 	
-	int id =  vj_tag_new( VJ_TAG_TYPE_COLOR, NULL, -1, v->edit_list,v->pixel_format, -1 );
+	int id =  vj_tag_new( VJ_TAG_TYPE_COLOR, NULL, -1, v->edit_list,v->pixel_format, -1,0 );
 	if(id > 0)
 	{
 		vj_tag_set_stream_color( id, args[0],args[1],args[2] );
@@ -7033,15 +7056,6 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 
 	if( !cached_image_)
 	{
-		if( cached_gdkimage_ )
-		{
-			if( cached_gdkimage_->image )
-				gdk_pixbuf_unref( (GdkPixbuf*) cached_gdkimage_->image );
-			if( cached_gdkimage_->scaled_image )
-				gdk_pixbuf_unref( (GdkPixbuf*) cached_gdkimage_->scaled_image );
-			free( cached_gdkimage_ );
-			cached_gdkimage_ = NULL;
-		}	
 		vj_perform_get_primary_frame( v, frame, 0);
 	//	vj_perform_get_primary_frame_420p( v, frame );
 		img = vj_picture_save_to_memory(
@@ -7097,6 +7111,15 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 			gdk_pixbuf_unref( (GdkPixbuf*) img->scaled_image );
 		if(img)
 			free(img); */
+	/*	if( cached_gdkimage_ )
+		{
+			if( cached_gdkimage_->image )
+				gdk_pixbuf_unref( (GdkPixbuf*) cached_gdkimage_->image );
+			if( cached_gdkimage_->scaled_image )
+				gdk_pixbuf_unref( (GdkPixbuf*) cached_gdkimage_->scaled_image );
+			free( cached_gdkimage_ );
+			cached_gdkimage_ = NULL;
+		}*/	
 	}
 	else
 	{

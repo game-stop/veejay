@@ -1776,6 +1776,15 @@ void		vj_init_vevo_events(void)
 				0,
 				VIMS_ALLOW_ANY,
 				NULL );
+	index_map_[VIMS_DEVICE_LIST]				=	_new_event(
+				NULL,
+				VIMS_DEVICE_LIST,
+				"GUI: Get all devices and their locations",	
+				vj_event_send_devicelist,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
 	index_map_[VIMS_VIMS_LIST]				=	_new_event(
 				NULL,
 				VIMS_VIMS_LIST,
