@@ -41,8 +41,8 @@ vj_effect *constantblend_init(int w, int h)
     ve->limits[1][0] = 31;
     ve->limits[0][1] = 0;  // scale from 0.0 to 5.0 (only luma)
     ve->limits[1][1] = 500;
-    ve->limits[0][2] = 16;
-    ve->limits[1][2] = 235;
+    ve->limits[0][2] = pixel_Y_lo_;
+    ve->limits[1][2] = pixel_Y_hi_;
     ve->defaults[0] = 1;   // blend type (additive)
     ve->defaults[1] = 110; // scale before blend
     ve->defaults[2] = 16;  // constant Y
@@ -67,9 +67,7 @@ void constantblend_apply( VJFrame *frame, int width, int height,
 
 	for (i = 0; i < len; i++)
 	{
-		// keep black real black ? how ?
 		int tmp_val =(int)( ((float) *(Y)) * s);
-		if(tmp_val > 235) tmp_val = 235; else if(tmp_val < 16) tmp_val = 16;
 		*(Y)++ = blend_y( (uint8_t) ( (uint8_t) tmp_val ) , y ); 
    	}
 

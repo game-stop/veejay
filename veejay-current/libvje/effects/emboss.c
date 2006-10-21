@@ -21,6 +21,7 @@
 #include "emboss.h"
 #include <stdlib.h>
 #include <stdio.h>
+#include "common.h"
 vj_effect *emboss_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
@@ -57,9 +58,9 @@ void simpleedge_framedata(VJFrame *frame, int width, int height)
 	    c3 = Y[(y + 1) * width + (x + 1)];
 	    if (b2 > a1 && b2 > a2 && b2 > a3 &&
 		b2 > b1 && b2 > b3 && b3 > c1 && b2 > c2 && b2 > c2)
-		Y[y * width + x] = 235;
+		Y[y * width + x] = pixel_Y_hi_;
 	    else
-		Y[y * width + x] = 16;
+		Y[y * width + x] = pixel_Y_lo_;
 	}
     }
 }
@@ -100,8 +101,7 @@ void another_try_edge(VJFrame *frame, int w, int h) {
 		   (Y[r+c] * -8) + (Y[r+c+1] * -1) +
 		   (Y[r+c+w] * -1) + (Y[r+c+w-1] * -1) +
 	           (Y[r+c+w+1] * -1))/9;
-	if(p>240) p = 240; else if ( p < 16 ) p = 16;
-	Y[r+c] = p;
+	Y[r+c] = CLAMP_Y(p);
     }
   }
 }
@@ -129,9 +129,7 @@ void lines_white_balance_framedata(VJFrame *frame, int width, int height)
 		   Y[r + 1 + c - 1] -
 		   Y[r + 1 + c] - Y[r + 1 + c + 1]
 		) / 9;
-	    if (val < 16 || val > 235)
-		val = 235;
-	    Y[c + r] = val;
+	    Y[c + r] = CLAMP_Y(val);
 	}
     }
 }
@@ -157,9 +155,7 @@ void white_emboss_framedata(VJFrame *frame, int width, int height)
 		   Y[r + 1 + c - 1] -
 		   Y[r + 1 + c] - Y[r + 1 + c + 1]
 		) / 9;
-	    if (val < 16 || val > 235)
-		val = 235;
-	    Y[c + r] = val;
+	    Y[c + r] = CLAMP_Y(val);
 
 	}
     }
@@ -200,9 +196,7 @@ void gray_emboss_framedata(VJFrame *frame, int width, int height)
 		   Y[r + 1 + c - 1] -
 		   Y[r + 1 + c] - Y[r + 1 + c + 1]
 		) / 9;
-	    if (val < 16 || val > 235)
-		val = 16;
-	    Y[r + c] = val;
+	    Y[r + c] = CLAMP_Y(val);
 	}
     }
 
@@ -230,9 +224,7 @@ void aggressive_emboss_framedata(VJFrame *frame, int width, int height)
 		   Y[r + 1 + c - 1] +
 		   Y[r + 1 + c] + Y[r + 1 + c + 1]
 		) / 9;
-	    if (val < 16 || val > 235)
-		val = 16;
-	    Y[c + r] = val;
+	    Y[c + r] = CLAMP_Y(val);
 	}
     }
 

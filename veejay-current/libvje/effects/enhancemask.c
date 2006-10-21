@@ -20,7 +20,7 @@
 
 
 #include "enhancemask.h"
-
+#include "common.h"
 vj_effect *enhancemask_init(int width, int height)
 {
     vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
@@ -83,8 +83,8 @@ void enhancemask_apply(VJFrame *frame, int width, int height, int *s ) {
 	d /= 100;
 	m = m + d;
 //	a = Y[r];
-	if( m > 240) m = 240;
-	if( m < 16) m = 16;
+	if( m > pixel_Y_hi_) m = pixel_Y_hi_;
+	if( m < pixel_Y_lo_) m = pixel_Y_lo_;
 //	Y[r] = (m * op0 + a * op1) / 255;
 	Y[r] = m;
 	}
@@ -94,8 +94,8 @@ void enhancemask_apply(VJFrame *frame, int width, int height, int *s ) {
 	d *= s[0];
 	d /= 100;
 	m = m + d;
-	if( m > 240) m = 240;
-	if( m < 16) m = 16;
+	if( m > pixel_Y_hi_) m = pixel_Y_hi_;
+	if( m < pixel_Y_lo_) m = pixel_Y_lo_;
 	Y[r] = m;
    }
 

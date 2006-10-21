@@ -191,24 +191,14 @@ void rgbkeysmooth_apply(VJFrame *frame, VJFrame *frame2, int width,
 	    }
 
 	    val = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-	    if (val < 16)
-		val = 16;
-	    else if (val > 235)
-		val = 235;
+	    val = CLAMP_Y(val);
 	    Y[pos] = ((val*op0)+(fg_y[pos]*op1) )>>8 ;
-
+	
 	    val = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
-	    if (val < 16)
-		val = 16;
-	    else if (val > 240)
-		val = 240;
+	    val = CLAMP_UV(val);
 	    Cb[pos] = ((val*op0) + (fg_cb[pos]*op1) )>>8;
-
 	    val = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
-	    if (val < 16)
-		val = 16;
-	    else if (val > 240)
-		val = 240;
+	    val = CLAMP_UV(val);
 	    Cr[pos] = ((val*op0) + (fg_cr[pos]*op1) )>>8;
 		
 	}

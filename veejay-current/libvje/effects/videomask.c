@@ -22,7 +22,7 @@
 #include "../../config.h"
 #include <stdlib.h>
 #include "../subsample.h"
-
+#include "common.h"
 
 vj_effect *videomask_init(int w,int h)
 {
@@ -49,8 +49,8 @@ void videomask_apply(VJFrame *frame, VJFrame *frame2, int width,
     unsigned int i, op0, op1;
     const int len = frame->len;
 	const int uv_len = frame->uv_len;
-    const uint8_t pure_white_y  = 235;
-    const uint8_t pure_white_c  = 240;
+    const uint8_t pure_white_y  = pixel_Y_hi_;
+    const uint8_t pure_white_c  = pixel_U_hi_;
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];

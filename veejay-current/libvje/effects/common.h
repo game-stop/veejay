@@ -33,6 +33,17 @@
 #define func_additive(a,b) ( a + (2 * b) - 235 )
 #define func_substractive(a,b) ( a + (b - 235) )
 
+
+extern int  pixel_Y_hi_;
+extern int  pixel_U_hi_;
+extern int  pixel_Y_lo_;
+extern int  pixel_U_lo_;
+
+#define CLAMP_Y( a ) ( a < pixel_Y_lo_ ? pixel_Y_lo_ : (a > pixel_Y_hi_ ? pixel_Y_hi_ : a ) )
+#define CLAMP_UV( a )( a < pixel_U_lo_ ? pixel_U_lo_ : (a > pixel_U_hi_ ? pixel_U_hi_ : a ) )
+
+extern void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t lo);
+
 #ifdef HAVE_MMX
 #define MMX_load8byte_mm7(data)__asm__("\n\t movq %0,%%mm7\n":	"=m" (data):)
 #endif

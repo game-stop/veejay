@@ -74,12 +74,10 @@ uint8_t blend_func1(uint8_t a, uint8_t b) {
 
 uint8_t blend_func2(uint8_t a, uint8_t b) {
 	uint8_t val;
-	if(a < 16) a = 16;
-	if(b < 16) b = 16;
+	if(a < pixel_Y_lo_) a =  pixel_Y_lo_;
+	if(b <  pixel_Y_lo_) b =  pixel_Y_lo_;
 	val = 255 -  ((255-b) * (255-b))/a;
-	if(val < 16)val=16;
-	if(val > 235) val=235;
-	return val;
+	return CLAMP_Y(val);
 }
 
 uint8_t blend_func3(uint8_t a , uint8_t b) {
@@ -89,28 +87,23 @@ uint8_t blend_func3(uint8_t a , uint8_t b) {
 
 uint8_t blend_func4(uint8_t a, uint8_t b) {
 	uint8_t val;
-	if(b > 235) b = 235;
+	if(b > pixel_Y_hi_) b = pixel_Y_hi_;
 	val = (a * a) / ( 255 - b );
-	if(val < 16) val = a;
-	if(val > 235) val = a;
-	return val;
+	return CLAMP_Y(val);
 }
 
 uint8_t blend_func5(uint8_t a, uint8_t b) {
 	uint8_t val;
 	int c = 255 - b;
-	if(c<16)c=16;
+	if( c  < pixel_Y_lo_ )
+		c = pixel_Y_lo_;
 	val = b / c;
-	if(val > 235) val = 235;
-	if(val < 16) val = 16;
-	return val;
+	return CLAMP_Y(val);
 }
 
 uint8_t blend_func6(uint8_t a, uint8_t b) {
-	uint8_t val = a + (2 * (b)) - 235;
-	if(val < 16) val = 16;
-	if(val > 235) val = 235;
-	return val;
+	uint8_t val = a + (2 * (b)) - 255;
+	return CLAMP_Y(val);
 }
 
 uint8_t blend_func7(uint8_t a, uint8_t b) {
@@ -121,8 +114,7 @@ uint8_t blend_func8(uint8_t a, uint8_t b) {
 	int c;
 	if(b < 128) c = (a * b) >> 7;
 	else c = 255 - ((255-b)*(255-a)>>7);
-	if(c<16)c=16;
-	return (uint8_t) c;
+	return CLAMP_Y(c);
 }
 
 
@@ -166,7 +158,7 @@ void keyselect_apply( VJFrame *frame, VJFrame *frame2, int width,
     uint8_t *Y2 = frame2->data[0];
  	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-	int	iy=16,iu=128,iv=128;
+	int	iy=pixel_Y_lo_,iu=128,iv=128;
 	_rgb2yuv( r,g,b, iy,iu,iv );
 	_y = (float) iy;
 	aa = (float) iu;

@@ -214,25 +214,13 @@ void rgbkey_apply1(VJFrame *frame, VJFrame *frame2, int width,
 	    }
 
 	    val = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-	    if (val < 16)
-		val = 16;
-	    else if (val > 235)
-		val = 235;
-	    Y[pos] = val;
+	    Y[pos] = CLAMP_Y(val);
 
 	    val = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
-	    if (val < 16)
-		val = 16;
-	    else if (val > 240)
-		val = 240;
-	    Cb[pos] = val;
+	    Cb[pos] = CLAMP_UV(val);
 
 	    val = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
-	    if (val < 16)
-		val = 16;
-	    else if (val > 240)
-		val = 240;
-	    Cr[pos] = val;
+	    Cr[pos] = CLAMP_UV(val);
 		
 	}
     }
@@ -360,25 +348,13 @@ void rgbkey_apply2(VJFrame *frame, VJFrame *frame2, int width,
 	    }
 
 	    val = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-	    if (val < 16)
-		val = 16;
-	    else if (val > 235)
-		val = 235;
-	    Y[pos] = val;
+	    Y[pos] = CLAMP_Y(val);
 
 	    val = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
-	    if (val < 16)
-		val = 16;
-	    else if (val > 240)
-		val = 240;
-	    Cb[pos] = val;
+	    Cb[pos] = CLAMP_UV(val);
 
 	    val = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
-	    if (val < 16)
-		val = 16;
-	    else if (val > 240)
-		val = 240;
-	    Cr[pos] = val;
+	    Cr[pos] = CLAMP_UV(val);
 	}
     }
 }

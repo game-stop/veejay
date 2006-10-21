@@ -98,7 +98,7 @@ typedef struct vj_effect_t {
 } vj_effect;
 
 // initialize library
-extern void vj_effect_initialize(int width, int height);
+extern void vj_effect_initialize(int width, int height, int range);
 extern void vj_effect_shutdown();
 
 // convert effect number to internal num

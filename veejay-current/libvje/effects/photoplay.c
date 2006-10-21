@@ -77,7 +77,7 @@ static	int prepare_filmstrip(int film_length, int w, int h)
 			photo_list[i]->data[j] = vj_malloc(sizeof(uint8_t) * picture_width * picture_height );
 			if(!photo_list[i]->data[j])
 				return 0;
-			memset(photo_list[i]->data[j], (j==0 ? 16 : 128), picture_width *picture_height );
+			memset(photo_list[i]->data[j], (j==0 ? pixel_Y_lo_ : 128), picture_width *picture_height );
 		}
 	//	val+= inc;
 	}
@@ -154,7 +154,7 @@ static void	take_photo( uint8_t *plane, uint8_t *dst_plane, int w, int h, int in
 			if(sum > 0)
 			  dst_plane[(dst_y*box_width)+dst_x] = sum / (step_y*step_x);
 			else
-			  dst_plane[(dst_y*box_width)+dst_x] = 16;
+			  dst_plane[(dst_y*box_width)+dst_x] = pixel_Y_lo_;
 
 			dst_x++;
 		}

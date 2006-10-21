@@ -19,7 +19,7 @@
  */
 
 #include "contrast.h"
-
+#include "common.h"
 vj_effect *contrast_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
@@ -59,19 +59,15 @@ void contrast_cb_apply(VJFrame *frame, int width,int height, int *s) {
 		cb *= s[2];
 		cb = (cb + 50)/100;
 		cb += 128;
-		if(cb > 235) cb = 235;
-		if(cb < 16) cb = 16;
 
 		cr = Cr[r];
 		cr -= 128;
 		cr *= s[2];
 		cr = (cr + 50)/100;
 		cr += 128;
-		if(cr > 235) cr = 235;
-		if(cr < 16) cr = 16;
 
-		Cb[r] = cb;
-		Cr[r] = cr;
+		Cb[r] = CLAMP_UV(cb);
+		Cr[r] = CLAMP_UV(cr);
 	}
 }
 
@@ -87,9 +83,7 @@ void contrast_y_apply(VJFrame *frame, int width, int height, int *s) {
 	m *= s[1];
 	m = (m + 50)/100;
 	m += 128;
-	if ( m > 240) m = 240;
-	if ( m < 16) m = 16;
-	Y[r] = m;
+	Y[r] = CLAMP_Y(m);
     }
 
 }

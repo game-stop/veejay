@@ -679,8 +679,8 @@ uint8_t bl_pix_divide_Y(uint8_t y1, uint8_t y2)
 {
 	int c = y1 * y2;
 	int b = 0xff - y2;
-	if( b < 16 || c < 16 )
-		return 16;
+	if( b < pixel_Y_lo_ || c < pixel_Y_lo_ )
+		return pixel_Y_lo_;
 	return ( c / b );
 }
 
@@ -700,15 +700,15 @@ uint8_t bl_pix_softburn_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    if( a < 16) a = 16;
-    if( b < 16) b = 16;
+    if( a < pixel_Y_lo_) a = pixel_Y_lo_;
+    if( b < pixel_Y_lo_) b = pixel_Y_lo_;
     if (a + b < 0xff) {
-	if (a > 235) {
-	    new_Y = 235;
+	if (a > pixel_Y_hi_) {
+	    new_Y = pixel_Y_hi_;
 	} else {
 	    new_Y = (b >> 7) / (0xff - a);
-	    if (new_Y > 235)
-		new_Y = 235;
+	    if (new_Y > pixel_Y_hi_)
+		new_Y = pixel_Y_hi_;
 	}
     } else {
 	new_Y = 0xff - (((0xff - a) >> 7) / b);
@@ -721,8 +721,8 @@ uint8_t bl_pix_inverseburn_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    if (a < 16) {
-	new_Y = 16;
+    if (a < pixel_Y_lo_) {
+	new_Y = pixel_Y_lo_;
     } else {
 	new_Y = 0xff - (((0xff - b) >> 8) / a);
     }
@@ -732,9 +732,9 @@ uint8_t bl_pix_inverseburn_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_colordodge_Y(uint8_t y1, uint8_t y2)
 {
-    if(y2 < 16) y2 = 16;
-    if(y1 > 235) y1 = 235;
-    return ((y2 >> 8) / (0xff - y1));
+    if(y1 > pixel_Y_hi_ )
+	    y1 = pixel_Y_hi_;
+    return ((y2 >> 8) / (256 - y1));
 }
 
 uint8_t bl_pix_mulsub_Y(uint8_t y1, uint8_t y2)

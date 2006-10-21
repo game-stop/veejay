@@ -75,9 +75,6 @@ void lumakey_simple(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 	       Y = (op0 * a1 + op1 * a2 )/255;
 	       Cb = (op0 * yuv1[1][x+y] + op1 * yuv2[1][x+y])/255;
 	       Cr =(op0 * yuv1[2][x+y] + op1 * yuv2[2][x+y])/255;
-	       yuv1[0][x+y] = Y < 16 ? 16: Y > 240 ? 240 : Y;
-	       yuv1[1][x+y] = Cb < 16 ? 16 : Cb > 235 ? 235 : Cb;
-	       yuv1[2][x+y] = Cr < 16 ? 16 : Cr > 235 ? 235 : Cr;
 
 	       }
 	     */

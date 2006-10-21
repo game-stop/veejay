@@ -28,6 +28,7 @@
 #include <stdlib.h>
 #include "chromamagick.h"
 #include <math.h>
+#include "common.h"
 // fixme: mode 8 and 9 corrupt (green/purple cbcr)
 
 vj_effect *chromamagick_init(int w, int h)
@@ -92,15 +93,8 @@ void chromamagic_addsubselectlum(VJFrame *frame, VJFrame *frame2,
     for (i = 0; i < len; i++) {
 	a = (Y[i] * op_a) >> 8;
 	b = (Y2[i] * op_b) >> 8;
-	if (b < 16)
-	    b = 16;
-	if (b > 235)
-	    b = 235;
-	if (a < 16)
-	    a = 16;
-	if (a > 235)
-	    a = 235;
-
+	a = CLAMP_Y(a);
+	b = CLAMP_Y(b);	
 	if (b < a) {
 	    c = (a + b) >> 1;
 	    Y[i] = c;
@@ -228,14 +222,11 @@ void chromamagic_selectdiffneg(VJFrame *frame, VJFrame *frame2,
 	b = (Y2[i] * op_b) >> 8;
 	if (a > b) {
 	    c = 255 - abs(255 - a - b);
-	    if( c < 16 ) c = 16; else if ( c > 240) c = 240;
-	    Y[i] = c;
+	    Y[i] = CLAMP_Y(c);
 	    c = ((Cb[i] * op_a) + (Cb2[i]*op_b) )>>8;
-	    if( c < 16 ) c = 16; else if ( c > 235) c = 235;
-	    Cb[i] = c;
+	    Cb[i] = CLAMP_UV(c);
 	    c = ((Cr[i] * op_a) + (Cr2[i]*op_b) )>>8;
-	    if( c < 16) c = 16; else if ( c > 235) c = 235;
-	    Cr[i] = c;
+	    Cr[i] = CLAMP_UV(c);
 	}
     }
 }
@@ -258,12 +249,12 @@ void chromamagic_selectunfreeze(VJFrame *frame, VJFrame *frame2,
 	a = (Y[i] * op_a) >> 8;
 	b = (Y2[i] * op_b) >> 8;
 	if (a > b) {
-	    if (a < 16)
-		c = 16;
+	    if (a < pixel_Y_lo_)
+		c = pixel_Y_lo_;
 	    else
-		c = 255 - ((255 - b) * (255 - b)) / a;
-	    if (c < 16)
-		c = 16;
+		c = 255 - ((256 - b) * (256 - b)) / a;
+	    if (c < pixel_Y_lo_)
+		c = pixel_Y_lo_;
 	    Y[i] = c;
 	    Cb[i] = (Cb[i] + Cb2[i]) >> 1;
 	    Cr[i] = (Cr[i] + Cr2[i]) >> 1;
@@ -289,20 +280,9 @@ void chromamagic_addlum(VJFrame *frame, VJFrame *frame2, int width,
     for (i = 0; i < len; i++) {
 	a = (Y[i] * op_a) >> 8;
 	b = (Y2[i] * op_b) >> 8;
-	if (b < 16)
-	    b = 16;
-	if (b > 235)
-	    b = 235;
-	if (a < 16)
-	    a = 16;
-	if (a > 235)
-	    a = 235;
-	c = (a * a) / (255 - b);
-	if (c > 235)
-	    c = 235;
-	if (c < 16)
-	    c = 16;
-	Y[i] = c;
+	a = CLAMP_Y(a);
+	c = (a * a) / (256- b);
+	Y[i] = CLAMP_Y(c);
 	Cb[i] = (Cb[i] + Cb2[i]) >> 1;
 	Cr[i] = (Cr[i] + Cr2[i]) >> 1;
     }
@@ -326,9 +306,8 @@ void chromamagic_exclusive(VJFrame *frame, VJFrame *frame2, int width, int heigh
 	a = Y[i];
 	b = Y2[i];
 
-
-	if(a < 16) a = 16; else if(a > 235) a = 235;
-	if(b < 16) b = 16; else if(b > 235) b = 235;
+	a = CLAMP_Y(a);
+	b = CLAMP_Y(b);
 
 	a *= o1;
 	b *= o2;
@@ -336,23 +315,20 @@ void chromamagic_exclusive(VJFrame *frame, VJFrame *frame2, int width, int heigh
 	b = b >> 8;	
 
 	c = (a+b) - ((a * b) >> 8);
-	if( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-	Y[i] = c;
+	Y[i] = CLAMP_Y(c);
 
 	a = Cb[i]-128;
 	b = Cb2[i]-128;
 	c = (a + b) - (( a * b) >> 8);
 	c += 128;
-	if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-	Cb[i] = c;
+	Cb[i] = CLAMP_UV(c);
 
 
 	a = Cr[i]-128;
 	b = Cr2[i]-128;
 	c = (a + b) - ((a*b) >> 8);
 	c += 128;
-	if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-	Cr[i] = c;
+	Cr[i] = CLAMP_UV(c);
     }
 }
 
@@ -372,9 +348,6 @@ void chromamagic_diffnegate(VJFrame *frame, VJFrame *frame2, int width, int heig
 	const unsigned int o2 = 255 - o1;
 #define MAGIC_THRESHOLD 40
 	for(i=0; i < len; i++) {
-		//a = (( 255 - Y[i]) * o1) >> 7; /* negation */
-	//	b = (Y2[i] * o2) >> 7;
-	//	d = abs( a - b );
 		a = Y[i];
 		b = Y2[i];
 		d = abs( a - b );
@@ -383,31 +356,18 @@ void chromamagic_diffnegate(VJFrame *frame, VJFrame *frame2, int width, int heig
 			a = Y[i] * o1;
 			b = Cb2[i] * o2;
 			c = 255 - ( (a + b) >>8 );
-			if( c < 16 ) c = 16; else if ( c > 240) c = 240;	
-			Y[i] = c;
-
-	//		a = (( 255 - Cb[i]) * o1) >> 7;	
-	//		b = (Cb2[i] * o2) >> 7;
-	//		c = 255 - abs(a - b);
-	//		if ( c < 16) c = 16; else if ( c > 235 ) c = 235;
-	//		Cb[i] = c;
-
+			Y[i] = CLAMP_Y(c);
 
 			a = (Cb[i]-128) * o1;
 			b = (Cb2[i]-128) * o2;
 			c = 255 - ( 128 + (( a + b ) >> 8 ));
-			Cb[i] = c;
+			Cb[i] = CLAMP_UV(c);
 
 
 			a = (Cr[i]-128) * o1;
 			b = (Cr2[i]-128) * o2;
 			c = 255 - ( 128 + (( a + b ) >> 8 ));
-
-	//	a = (( 255 - Cr[i]) * o1) >> 7;
-	//	b = (Cr2[i] * o2) >> 7;
-	//	c = 255 - abs( a- b);
-			if ( c < 16) c = 16; else if ( c > 235) c = 235;
-			Cr[i] = c;
+			Cr[i] = CLAMP_UV(c);
 		
 		}
 	}
@@ -432,24 +392,19 @@ void chromamagic_additive(VJFrame *frame, VJFrame *frame2, int width,
 		a = (Y[i]*o1) >> 7;
 		b = (Y2[i]*o2) >> 7;
 		c = a + (( 2 * b ) - 255);
-		if( c < 16) c = 16; else if ( c > 235 ) c = 235;
-		
-		Y[i] = c;
+		Y[i] =  CLAMP_Y(c);
 
 		a = Cb[i];
 		b = Cb2[i];
 
 		c = a + ( ( 2 * b ) - 255 );
-		if ( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-		Cb[i] = c ;
+		Cb[i] = CLAMP_UV(c) ;
 
 		a = Cr[i] ;
 		b = Cr2[i] ;
 
 		c = a + ( ( 2 * b ) - 255 );
-		if ( c < 16 ) c = 16; else if ( c > 240 ) c  = 240;
-
-		Cr[i] = c ;
+		Cr[i] = CLAMP_UV(c) ;
 	
 	}
 
@@ -474,25 +429,22 @@ void chromamagic_basecolor(VJFrame *frame, VJFrame *frame2,
 	b = o1 - Y2[i];
 	c = a * b >> 8;
 	d = c + a * ((255 - (((255 - a) * (255 - b)) >> 8) - c) >> 8);	//8
-	if ( d < 16 ) d = 16; else if ( d > 240 ) d = 240;
-	Y[i] = d;
+	
+	Y[i] = CLAMP_Y(d);
 
 	a = Cb[i]-128;
 	b = Cb2[i]-128;
 	c = a * b >> 8;
 	d = c + a * ((255 - (((255-a) * (255-b)) >> 8) -c) >> 8);
 	d += 128;
-	if ( d < 16 ) d = 16; else if ( d > 235 ) d = 235;
-	Cb[i] = d;	
+	Cb[i] = CLAMP_UV(d);	
 
 	a = Cr[i]-128;
 	b = Cr2[i]-128;
 	c = a * b >> 8;
 	d = c + a * ((255 - (((255-a) * (255-b)) >> 8) -c ) >> 8);
 	d += 128;
-	if ( d < 16 ) d = 16; else if ( d > 235 ) d = 235;
-	Cr[i] = d;
-	
+	Cr[i] = CLAMP_UV(d);
 
     }
 }
@@ -516,28 +468,26 @@ void chromamagic_freeze(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 	for(i=0; i < len; i++) {
 		a = Y[i];
 		b = Y2[i];
-		if ( a < 16 ) a = 16;
-		if ( b < 16 ) b = 16;
+		if ( a < pixel_Y_lo_ ) a = pixel_Y_lo_;
+		if ( b < pixel_Y_lo_ ) b = pixel_Y_lo_;
 		c = 255 - ((op_a -a ) * (op_a - a)) / b;
-		if ( c < 16) c = 16; else if ( c > 240 ) c = 240;
-
-		Y[i] = c;
+		
+		Y[i] = CLAMP_Y(c);
 
 		a = Cb[i];
 		b = Cb2[i];
-		if ( a < 16 ) a = 16;
-		if ( b < 16 ) b = 16;
-		c = 255 - ((255-a) * (255 - a)) / b;
-		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Cb[i] = c;
+		if ( a < pixel_U_lo_ ) a = pixel_U_lo_;
+		if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
+		c = 255 - ((256-a) * (256 - a)) / b;
+		Cb[i] = CLAMP_UV(c);
 
 		a = Cr[i];
 		b = Cr2[i];
-		if ( a < 16 ) a = 16;
-		if ( b < 16 ) b = 16;
-		c = 255 - (( 255 - a ) * ( 255 - a )) / b;
-		if ( c < 16 ) c = 16; else if ( c> 235 ) c = 235;
-		Cr[i] = c;
+		if ( a < pixel_U_lo_ ) a = pixel_U_lo_;
+		if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
+
+		c = 255 - (( 256 - a ) * ( 256 - a )) / b;
+		Cr[i] = CLAMP_UV(c);
 	}
 
 }
@@ -557,28 +507,24 @@ void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op
 	for(i=0; i < len; i++) {
 		a = Y[i];
 		b = Y2[i];
-		if ( a < 16 ) a = 16;
-		if ( b < 16 ) b = 16;
+		if ( a < pixel_Y_lo_ ) a = pixel_Y_lo_;
+		if ( b < pixel_Y_lo_ ) b = pixel_Y_lo_;
 		c = 255 - (( op_a - b) * (op_a - b)) / a;
-		if ( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-		Y[i] = c;
+		Y[i] = CLAMP_Y(c);
 		
 		a = Cb[i];
 		b = Cb2[i];
-		if ( a < 16) a = 16;
-		if ( b < 16) b = 16;
-		c = 255 - (( 255 - b) * ( 255 - b )) / a;
-		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Cb[i] = c;
+		if ( a < pixel_U_lo_ ) a = pixel_U_lo_;
+		if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
+		c = 255 - (( 256 - b) * ( 256 - b )) / a;
+		Cb[i] = CLAMP_UV(c);
 		
 		a = Cr[i];
 		b = Cr2[i];
-		if ( a < 16 ) a = 16;
-		if ( b < 16 ) b = 16;
-		c = 255 - ((255 -b ) * (255 - b)) /a ;
-		if ( c < 16 ) c = 16; else if ( c > 235) c = 235;
-		Cr[i] = c;
-
+		if ( a < pixel_U_lo_ ) a = pixel_U_lo_;
+		if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
+		c = 255 - ((256 -b ) * (256 - b)) /a ;
+		Cr[i] = CLAMP_UV(c);
 	}
 }
 
@@ -604,24 +550,21 @@ void chromamagic_hardlight( VJFrame *frame, VJFrame *frame2, int w, int h, int o
 		else {
 			c = 255 - (( op_a - b) * ( op_a - a ) >> 8);
 		}
-		if ( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-		Y[i] = c;
+		Y[i] =CLAMP_Y( c);
 
 		a = Cb[i]-128;
 		b = Cb2[i]-128;
 		if ( b < 128 ) c = ( a * b ) >> 8;
-		else c = 255 - (( 255 - b) * ( 255 - a) >> 8);
+		else c = 255 - (( 256 - b) * ( 256 - a) >> 8);
 		c += 128;
-		if ( c < 16) c = 16; else if ( c > 235 ) c = 235;
-		Cb[i] = c;
+		Cb[i] = CLAMP_UV(c);
 
 		a = Cr[i]-128;
 		b = Cr2[i]-128;
 		if ( b < 128) c = ( a * b ) >> 8;
-		else c = 255 - (( 255 - b) * ( 255 - a) >> 8 );
+		else c = 255 - (( 256 - b) * ( 256 - a) >> 8 );
 		c += 128;
-		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Cr[i] = c;		
+		Cr[i] = CLAMP_UV(c);		
 
 	}
 }
@@ -644,22 +587,19 @@ void chromamagic_multiply( VJFrame *frame, VJFrame *frame2, int w, int h,int op_
 		a = (Y[i] * o1) >> 8;
 		b = (Y2[i] * o2) >> 8;
 		c = (a * b) >> 8;
-		if ( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-		Y[i] = c;
+		Y[i] = CLAMP_Y(c);
 
 		a = Cb[i]-128;
 		b = Cb2[i]-128;
 		c = ( a * b ) >> 8;
 		c += 128;
-		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Cb[i] = c;
+		Cb[i] = CLAMP_UV(c);
 
 		a = Cr[i] - 128;
 		b = Cr2[i] - 128;
 		c = ( a * b ) >> 8;
 		c += 128;
-		if ( c < 16 ) c = 16; else if ( c> 235) c = 235;
-		Cr[i] = c;
+		Cr[i] = CLAMP_UV(c);
 
 	}
 }
@@ -681,25 +621,22 @@ void chromamagic_divide(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a 
 	for(i=0; i < len; i++) {
 		a = Y[i] * Y[i];
 		b = o1 - Y2[i];
-		if ( b < 16 ) b = 16;
+		if ( b < pixel_Y_lo_ ) b = pixel_Y_lo_;
 		c = a / b;
-		if ( c < 16 ) c = 16; else if (c > 240) c = 240;
-		Y[i] = c;
+		Y[i] = CLAMP_Y(c);
 
 	
 		a = Cb[i] * Cb2[i];
 		b = 255 - Cb2[i];
-		if ( b < 16 ) b = 16;
+		if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
 		c = a / b;
-		if ( c < 16) c= 16; else if ( c > 235) c = 235;
-		Cb[i] = c;
+		Cb[i] = CLAMP_UV(c);
 
 		a = Cr[i] * Cr[i];;
 		b = 255 - Cr2[i];
-		if ( b < 16 ) b = 16;
+		if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
 		c = ( a / b );
-		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Cr[i] = c;
+		Cr[i] = CLAMP_UV(c);
 	}
 }
 
@@ -723,23 +660,18 @@ void chromamagic_substract(VJFrame *frame, VJFrame *frame2, int w, int h, int op
 		b = Y2[i];
 
 		c = a - ((b * o1) >> 8);
-		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Y[i] = c;
+		Y[i] = CLAMP_Y(c);
 
 		a = Cb[i];
 		b = Cb2[i];
 		c = (((a * o2) + (b * o1))>>8);
-
-		if ( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-
+		CLAMP_UV(c);
 		Cb[i] = c;
 
 		a = Cr[i];
 		b = Cr2[i];
 		c = (((a * o2) + (b * o1)) >> 8); 
-
-		if ( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-
+		CLAMP_UV(c);
 		Cr[i] = c;
 	}
 
@@ -763,23 +695,19 @@ void chromamagic_add(VJFrame *frame, VJFrame *frame2, int width,
 		a = Y[i];
 		b = Y2[i];
 		c = a + (( 2 * b ) - op_a);
-		if( c < 16) c = 16; else if ( c > 240 ) c = 240;
-		
-		Y[i] = c;
+		Y[i] = CLAMP_Y(c);
 
 		a = Cb[i]-128;
 		b = Cb2[i]-128;
 		c = a + ( 2 * b );
 		c += 128;
-		if( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Cb[i] = c;
+		Cb[i] = CLAMP_UV(c);
 
 		a = Cr[i]-128;
 		b = Cr2[i]-128;
 		c = a + ( 2 * b );
 		c += 128;	
-		if( c < 16 ) c = 16; else if ( c > 235) c = 235;
-		Cr[i] = c;
+		Cr[i] = CLAMP_UV(c);
 	}
 }
 
@@ -798,20 +726,17 @@ void chromamagic_screen(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 		a = Y[i];
 		b = Y2[i];
 		c = 255 - ( (op_a-a) * (op_a-b) >> 8);
-		if( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-		Y[i] = c;
+		Y[i] = CLAMP_Y(c);
 		a = Cb[i]-128;
 		b = Cb2[i]-128;
-		c = 255 - ( ( 255-a) * (255 - b) >> 8);
+		c = 255 - ( ( 256-a) * (256 - b) >> 8);
 		c += 128;
-		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Cb[i] = c;
+		Cb[i] = CLAMP_UV(c);
 		a = Cr[i]-128;
 		b = Cr2[i]-128;
-		c = 255 - ( ( 255 -a) * (255 - b)>>8);
+		c = 255 - ( ( 256 -a) * (256 - b)>>8);
 		c += 128;
-		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Cr[i] = c;
+		Cr[i] = CLAMP_UV(c);
 	}
 }
 
@@ -832,22 +757,19 @@ void chromamagic_difference(VJFrame *frame, VJFrame *frame2, int w, int h, int o
 		a = (Y[i] * o1)>>7;
 		b = (Y2[i] * o2)>>7;
 		c = abs ( a - b );
-		if( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-		Y[i] = c;
+		Y[i] = CLAMP_Y(c);
 
 		a = (Cb[i]-128);
 		b = (Cb2[i]-128);
 		c = abs ( a - b );
 		c += 128;
-		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Cb[i] = c;		
+		Cb[i] = CLAMP_UV(c);		
 
 		a = (Cr[i]-128);
 		b = (Cr2[i]-128);
 		c = abs( a - b );
 		c += 128;
-		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Cr[i] = c;
+		Cr[i] = CLAMP_UV(c);
 	}
 }
 
@@ -871,26 +793,21 @@ void chromamagic_softlightmode(VJFrame *frame,VJFrame *frame2,
 		if ( a < op_a ) {
 		c = (a * b) >> 8;
 		d = (c + a * ( 255 - ( (255-a)*(255-b) >> 8) - c)) >> 8;
-		if ( d < 16 ) d = 16; else if ( d > 240) d = 240;
-	
-		/* deal with chroma red/blue in a magical way
-		   range gets narrowed. 
-		*/
+		Y[i] = CLAMP_Y(d);
+		
 		a = abs(Cb[i]-128);
 		b = abs(Cb2[i]-128);
 		c = (a * b);
 		d = (c + a * ( 255 - ( (a * b) >> 7) - c)) >> 7;
 		d += 128;
-		if ( d < 16) d = 16; else if ( d > 235 ) d = 235;
-		Cb[i] = d;
+		Cb[i] = CLAMP_UV(d);
 
 		a = abs(Cr[i]-128);
 		b = abs(Cr2[i]-128);
 		c = (a * b) >> 7;
 		d = (c + a * ( 255 - ( (a * b) >> 7) -c)) >> 7;
 		d += 128;
-		if( d < 16) d= 16; else if ( d > 235 ) d= 235;
-		Cr[i] = d;
+		Cr[i] = CLAMP_UV(d);
 		}
 	}
 }
@@ -912,27 +829,24 @@ void chromamagic_dodge(VJFrame *frame, VJFrame *frame2, int w, int h,
 		b = Y2[i];
 		if( a >= op_a) c = a;
 		else {
-			if( b > 240 ) b = 240;
-			if( a < 16) a = 16;
-			c = (a << 8) / ( 255 - b );
-			if ( c < 16 ) c = 16; else if (c > 240 ) c = 240;
-			Y[i] = c;
+			if( b > pixel_Y_hi_ ) b = pixel_Y_hi_ - 5;
+			if( a < pixel_Y_lo_) a = pixel_Y_lo_;
+			c = (a << 8) / ( 256 - b );
+			Y[i] = CLAMP_Y(c);
 
 			a = Cb[i] - 128;
 			b = Cb2[i] - 128;
 			if ( b > 127 ) b = 127;
 			c = ( a << 7 ) / ( 128 - b );
 			c += 128;
-			if ( c < 16 ) c = 16; else if ( c > 235) c = 235;
-			Cb[i] = c;
+			Cb[i] = CLAMP_UV(c);
 
 			a = Cr[i] - 128;
 			b = Cr2[i] - 128;
 			if ( b > 127 ) b = 127;
 			c = ( a << 7 ) / ( 128 - b);
 			c += 128;
-			if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-			Cr[i] = c;
+			Cr[i] = CLAMP_UV(c);
 		}
 	}	
 }
@@ -1011,35 +925,32 @@ void chromamagic_reflect(VJFrame *frame, VJFrame *frame2,
 
 		if ( b > op_a ) c = b;
 		else {
-			if ( b > 240 ) b = 240;
-			if ( a < 16 ) a = 16;
-			c = (a * a) / ( 255 - b );
-			if ( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-			Y[i] = c;
+			if ( b > pixel_Y_hi_ ) b = pixel_Y_hi_ -5;
+			if ( a < pixel_Y_lo_ ) a = pixel_Y_lo_;
+			c = (a * a) / ( 256 - b );
+			Y[i] = CLAMP_Y(c);
 
 			a = Cb[i];
 			b = Cb2[i];
-			if ( a < 16 ) a = 16;
-			if ( b < 16 ) b = 16;
+			if ( a < pixel_U_lo_) a = pixel_U_lo_;
+			if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
 			a -= 128;
 			b -= 128;
 			if ( b == 128 ) b = 127;
 			c = ( a * a ) / ( 128 - b);
 			c += 128;
-			if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-			Cb[i] = c;
+			Cb[i] = CLAMP_UV(c);
 
 			a = Cr[i];
 			b = Cr2[i];
-			if ( a < 16 ) a = 16; 
-			if ( b < 16 ) b = 16;
+			if ( a < pixel_U_lo_ ) a = pixel_U_lo_; 
+			if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
 			a -= 128;
 			b -= 128;
 			if ( b == 128) b = 127;
 			c = ( a * a ) / ( 128 - b);
 			c += 128;
-			if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-			Cr[i] = c;
+			Cr[i] = CLAMP_UV(c);
 
 		}
 	}

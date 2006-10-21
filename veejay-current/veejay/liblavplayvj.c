@@ -268,14 +268,14 @@ void veejay_set_sampling(veejay_t *info, subsample_mode_t m)
 	video_playback_setup *settings = (video_playback_setup*) info->settings;
         if(m == SSM_420_JPEG_TR )
 	{
-		if(info->pixel_format == FMT_420)
+		if(info->pixel_format == FMT_420 || info->pixel_format == FMT_420F)
 			settings->sample_mode = SSM_420_JPEG_TR;
 		else
 			settings->sample_mode = SSM_422_444;
 	}
 	else
 	{
-		if(info->pixel_format == FMT_420)
+		if(info->pixel_format == FMT_420 || info->pixel_format == FMT_420F)
 			settings->sample_mode = SSM_420_JPEG_BOX;
 		else
 			settings->sample_mode = SSM_422_444;
@@ -1564,7 +1564,7 @@ static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
  ******************************************************/
 
 
-int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
+int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_range)
 {
 	editlist *el = info->current_edit_list;
 	video_playback_setup *settings = info->settings;
@@ -1760,7 +1760,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
   	veejay_msg(VEEJAY_MSG_INFO, 
 		"Initialized %d Image- and Video Effects", vj_effect_max_effects());
-    	vj_effect_initialize(info->current_edit_list->video_width, info->current_edit_list->video_height);
+    	vj_effect_initialize(info->current_edit_list->video_width, info->current_edit_list->video_height,
+						full_range);
    
 	info->plugin_frame = vj_perform_init_plugin_frame(info);
 	info->plugin_frame_info = vj_perform_init_plugin_frame_info(info);
@@ -3127,10 +3128,10 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 
 	if(force_pix_fmt >= 0)
 	{
-		info->pixel_format = (force_pix_fmt == 1 ? FMT_422 : FMT_420);
-		veejay_msg(VEEJAY_MSG_WARNING, "Pixel format forced to YCbCr %s",
-			(info->pixel_format == FMT_422 ? "4:2:2" : "4:2:0"));
-	
+			info->pixel_format = force_pix_fmt;
+			veejay_msg(VEEJAY_MSG_INFO, "Processing video in pixel format %s %s",
+						(force_pix_fmt >1  ? "JPEG YUV" : "YCbCr" ),
+			((info->pixel_format == FMT_422 || info->pixel_format == FMT_422F) ? "4:2:2" : "4:2:0"));
 	}
 	//TODO: pass yuv sampling to dummy
 	if( info->dummy->active )
@@ -3152,7 +3153,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	
 		info->current_edit_list = vj_el_dummy( 0, info->auto_deinterlace, info->dummy->chroma,
 				info->dummy->norm, info->dummy->width, info->dummy->height, info->dummy->fps,
-				info->pixel_format );
+				force_pix_fmt );
 
 		if( info->dummy->arate )
 		{
@@ -3168,7 +3169,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	}
 	else
 	{
-	    	info->current_edit_list = vj_el_init_with_args(files, num_files, info->preserve_pathnames, info->auto_deinterlace, force, override_norm, info->pixel_format);
+	    	info->current_edit_list = vj_el_init_with_args(files, num_files, info->preserve_pathnames, info->auto_deinterlace, force, override_norm, force_pix_fmt);
 	}
 	info->edit_list = info->current_edit_list;
 
@@ -3177,13 +3178,13 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		return 0;
 	}
 
-	if(!vj_avcodec_init(info->current_edit_list ,   info->pixel_format))
+	if(!vj_avcodec_init(info->current_edit_list , force_pix_fmt))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize encoders!");
 		return 0;
 	}
 	
-    if(info->pixel_format == FMT_422 )
+    if(info->pixel_format == FMT_422  || info->pixel_format == FMT_422F)
 	{
 		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame1)) return 0;
 		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame2)) return 0;

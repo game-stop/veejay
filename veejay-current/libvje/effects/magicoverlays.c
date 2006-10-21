@@ -22,7 +22,7 @@
 #include <libvje/internal.h>
 #include <stdlib.h>
 
-
+#include "common.h"
 vj_effect *overlaymagic_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
@@ -61,31 +61,19 @@ void _overlaymagic_adddistorted(VJFrame *frame, VJFrame *frame2,
 	a = Y[i];
 	b = Y2[i];
 	c = a + b;
-	if (c > 240)
-	    c = 240;
-	if (c < 16)
-	    c = 16;
-	Y[i] = c;
+	Y[i] = CLAMP_Y(c);
     }
 
     for (i = 0; i < uv_len; i++) {
 	a = Cb[i];
 	b = Cb2[i];
 	c = a + b;
-	if (c > 235)
-	    c = 235;
-	if (c < 16)
-	    c = 16;
-	Cb[i] = c;
+	Cb[i] = CLAMP_UV(c);
 
 	a = Cr[i];
 	b = Cr2[i];
 	c = a + b;
-	if (c > 235)
-	    c = 235;
-	if (c < 16)
-	    c = 16;
-	Cr[i] = c;
+	Cr[i] = CLAMP_UV(c);
     }
 }
 
@@ -217,7 +205,7 @@ void _overlaymagic_divide(VJFrame *frame, VJFrame *frame2, int width,
 	b = Y[i] * Y[i];
 	c = 255 - Y2[i];
 	if (c == 0)
-	    c = 16;
+	    c = pixel_Y_lo_;
 	a = b / c;
 	Y[i] = a;
     }
@@ -234,9 +222,7 @@ void _overlaymagic_additive(VJFrame *frame, VJFrame *frame2,
     int a;
 	while(len--) { 
 		a = Y[len] + (2 * Y2[len]) - 255;
-//		a = Y[len] + (2 * (Y2[len]-128)&255);
-		if(a < 16) a  = 16; else if (a > 235) a = 235;
-		Y[len] = a;
+		Y[len] = CLAMP_Y(a);
 	}
 }
 
@@ -270,14 +256,14 @@ void _overlaymagic_softburn(VJFrame *frame, VJFrame *frame2,
 	a = Y[i];
 	b = Y2[i];
 
-	if (a + b < 240) {
-	    if (a == 235)
+	if (a + b < pixel_Y_hi_) {
+	    if (a == pixel_Y_hi_)
 		c = a;
 	    else
-		c = (b >> 7) / (255 - a);
+		c = (b >> 7) / (256 - a);
 	} else {
-	    if (b < 16)
-		b = 16;
+	    if (b < pixel_Y_lo_)
+		b = pixel_Y_lo_;
 	    c = 255 - (((255 - a) >> 7) / b);
 	}
 	Y[i] = c;
@@ -296,15 +282,11 @@ void _overlaymagic_inverseburn(VJFrame *frame, VJFrame *frame2,
     for (i = 0; i < len; i++) {
 	a = Y[i];
 	b = Y2[i];
-	if (a < 16)
-	    c = 16;
+	if (a < pixel_Y_lo_)
+	    c = pixel_Y_lo_;
 	else
 	    c = 255 - (((255 - b) >> 8) / a);
-	if (c < 16)
-	    c = 16;
-	if (c > 235)
-	    c = 235;
-	Y[i] = c;
+	Y[i] = CLAMP_Y(c);
     }
 }
 
@@ -321,13 +303,13 @@ void _overlaymagic_colordodge(VJFrame *frame, VJFrame *frame2,
     for (i = 0; i < len; i++) {
 	a = Y[i];
 	b = Y2[i];
-	if (a >= 235)
-	    c = 235;
+	if (a >= pixel_Y_hi_)
+	    c = pixel_Y_hi_;
 	else
 	    c = (b >> 8) / (256 - a);
 
-	if (c > 235)
-	    c = 235;
+	if (c > pixel_Y_hi_)
+	    c = pixel_Y_hi_;
 	Y[i] = c;
     }
 }
@@ -344,8 +326,8 @@ void _overlaymagic_mulsub(VJFrame *frame, VJFrame *frame2, int width,
     for (i = 0; i < len; i++) {
 	a = Y[i];
 	b = 255 - Y2[i];
-	if (b < 16)
-	    b = 16;
+	if (b < pixel_Y_lo_)
+	    b = pixel_Y_lo_;
 	c = a / b;
 	Y[i] = c;
     }
@@ -429,16 +411,14 @@ void _overlaymagic_exclusive(VJFrame *frame, VJFrame *frame2,
 	b = Cb2[i]-128;
 	c = a +b - (( a * b ) >> 8);
 	c += 128;
-	if ( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-	Cb[i] = c;
+	Cb[i] = CLAMP_UV(c);
 	
 
 	a = Cr[i] - 128;
 	b = Cr2[i] - 128;
 	c = a + b - (( a * b) >> 8);
 	c += 128;
-	if ( c < 16) c = 16; else if ( c > 240 ) c = 240;
-	Cr[i] = c;
+	Cr[i] = CLAMP_UV(c);
 	}
 }
 
@@ -454,10 +434,10 @@ void _overlaymagic_basecolor(VJFrame *frame, VJFrame *frame2,
     for (i = 0; i < len; i++) {
 	a = Y[i];
 	b = Y2[i];
-	if (a < 16)
-	    a = 16;
-	if (b < 16)
-	    b = 16;
+	if (a < pixel_Y_lo_)
+	    a = pixel_Y_lo_;
+	if (b < pixel_Y_lo_)
+	    b = pixel_Y_lo_;
 	c = a * b >> 7;
 	d = c + a * ((255 - (((255 - a) * (255 - b)) >> 7) - c) >> 7);	//8
 	Y[i] = d;
@@ -477,10 +457,10 @@ void _overlaymagic_freeze(VJFrame *frame, VJFrame *frame2, int width,
 	a = Y[i];
 	b = Y2[i];
 
-	if (b < 16)
-	    c = a; //16
+	if (b < pixel_Y_lo_)
+	    c = a;
 	else
-	    c = 255 - ((255 - a) * (255 - a)) / b;
+	    c = 255 - ((256 - a) * (256 - a)) / b;
 	Y[i] = c;
     }
 }
@@ -498,8 +478,8 @@ void _overlaymagic_unfreeze(VJFrame *frame, VJFrame *frame2,
 	a = Y[i];
 	b = Y2[i];
 
-	if (a < 16)
-	    c = 16;
+	if (a < pixel_Y_lo_)
+	    c = pixel_Y_lo_;
 	else
 	    c = 255 - ((255 - b) * (255 - b)) / a;
 	Y[i] = c;
@@ -786,12 +766,12 @@ void _overlaymagic_addtest4(VJFrame *frame, VJFrame *frame2,
 	a = Y[i];
 	b = Y2[i];
 	b = b - 255;
-	if (a < 16)
-	    a = 16;
-	if (b < 16)
+	if (a < pixel_Y_lo_)
+	    a = pixel_Y_lo_;
+	if (b < pixel_Y_lo_)
 	    b = Y2[i];
-	if (b < 16)
-	    b = 16;
+	if (b < pixel_Y_lo_)
+	    b = pixel_Y_lo_;
 	c = (a * a) / b;
 
 	Y[i] = c;
@@ -812,30 +792,30 @@ void _overlaymagic_try
 	a = Y[i];
 	b = Y[i];
 
-	if (b < 16)
-	    p = 16;
+	if (b < pixel_Y_lo_)
+	    p = pixel_Y_lo_;
 	else
-	    p = 255 - ((255 - a) * (255 - a)) / b;
-	if (p < 16)
-	    p = 16;
+	    p = 255 - ((256 - a) * (256 - a)) / b;
+	if (p < pixel_Y_lo_)
+	    p = pixel_Y_lo_;
 
 	/* calc q */
 	a = Y2[i];
 	b = Y2[i];
-	if (b < 16)
-	    q = 16;
+	if (b < pixel_Y_lo_)
+	    q = pixel_Y_lo_;
 	else
-	    q = 255 - ((255 - a) * (255 - a)) / b;
-	if (b < 16)
-	    q = 16;
+	    q = 255 - ((256 - a) * (256 - a)) / b;
+	if (b < pixel_Y_lo_)
+	    q = pixel_Y_lo_;
 
 	/* calc pixel */
-	if (q < 16)
-	    q = 16;
+	if (q < pixel_Y_lo_)
+	    q = pixel_Y_lo_;
 	else
-	    q = 255 - ((255 - p) * (255 - a)) / q;
-	if (q < 16)
-	    q = 16;
+	    q = 255 - ((256 - p) * (256 - a)) / q;
+	if (q < pixel_Y_lo_)
+	    q = pixel_Y_lo_;
 
 
 	Y[i] = q;

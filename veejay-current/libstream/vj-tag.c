@@ -223,7 +223,7 @@ int vj_tag_init(int width, int height, int pix_fmt)
    _temp_buffer[2] = (uint8_t*) malloc(sizeof(uint8_t)*width*height);
 		
 
-    if( pix_fmt == FMT_422 )
+    if( pix_fmt == FMT_422 || pix_fmt == FMT_422F )
 	{
 		_tmp.uv_width = width; 
 		_tmp.uv_height = height/2;
@@ -617,7 +617,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	if(type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_NET)
 	    tag->private = net_threader();
 	
-    palette = (pix_fmt == FMT_420 ? VIDEO_PALETTE_YUV420P : VIDEO_PALETTE_YUV422P);
+    palette = ( (pix_fmt == FMT_420||pix_fmt == FMT_420F) ? VIDEO_PALETTE_YUV420P : VIDEO_PALETTE_YUV422P);
     
  
     switch (type) {
@@ -1778,7 +1778,7 @@ int vj_tag_enable(int t1) {
 		vj_picture *p = vj_tag_input->picture[ tag->index ];
 		p->pic = vj_picture_open( tag->source_name, 
 			vj_tag_input->width, vj_tag_input->height,
-			vj_tag_input->pix_fmt == FMT_420 ? 1:0);
+			vj_tag_input->pix_fmt );
 
 		if(!p->pic)
 			return -1;
@@ -2235,8 +2235,10 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	vj_client *v;
 	if(!tag) return -1;  
 
-    if( vj_tag_input->pix_fmt == FMT_420) uv_len = uv_len / 4;
-    if( vj_tag_input->pix_fmt == FMT_422) uv_len = uv_len / 2;
+    if( vj_tag_input->pix_fmt == FMT_420|| vj_tag_input->pix_fmt == FMT_420F)
+	    uv_len = uv_len / 4;
+    else
+	    uv_len = uv_len / 2;
 
     switch (tag->source_type) {
 #ifdef USE_UNICAP
@@ -2302,7 +2304,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		break;
 	case VJ_TAG_TYPE_YUV4MPEG:
 	// only for 4:2:0 , must convert to 4:2:2
-	if( vj_tag_input->pix_fmt == FMT_420)
+	if( vj_tag_input->pix_fmt == FMT_420 || vj_tag_input->pix_fmt == FMT_420F)
 	{
 		if (vj_yuv_get_frame(vj_tag_input->stream[tag->index], buffer) != 0)
 	    	{

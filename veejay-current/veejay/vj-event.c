@@ -5957,7 +5957,7 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 	{
 		_recorder_format = ENCODER_YUV420;
 		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in uncompressed YV12/I420 (see swapping)");
-		if(v->pixel_format == FMT_422)
+		if(v->pixel_format == FMT_422 || v->pixel_format == FMT_422F )
 		{
 			veejay_msg(VEEJAY_MSG_WARNING, "Using 2x2 -> 1x1 and 1x1 -> 2x2 conversion");
 		}

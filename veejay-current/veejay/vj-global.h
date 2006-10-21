@@ -74,6 +74,7 @@ enum {
 
 #define FMT_420	0
 #define FMT_422 1
-
+#define FMT_420F 2
+#define FMT_422F 3
 #endif
 #define MAX_EDIT_LIST_FILES 4096

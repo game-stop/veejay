@@ -993,10 +993,11 @@ void	plug_process_mix( VJFrame *frame, VJFrame *frame_b,int fx_id, int src_fmt )
 	int srcf = 0;
 	if( src_fmt == 1 )
 		srcf = PIX_FMT_YUV422P;
-	else if( src_fmt == 2 )
-		srcf = PIX_FMT_YUV444P;
-		else
-			srcf = PIX_FMT_YUV420P;
+	else if( src_fmt == 0 )
+		srcf = PIX_FMT_YUV420P;
+		else if ( src_fmt == 2 )
+			srcf = PIX_FMT_YUVJ420P;
+		   else srcf = PIX_FMT_YUVJ422P;
 
 	img_convert( &p1, PIX_FMT_RGBA32,
 		     &p2, srcf,
@@ -1066,10 +1067,11 @@ void	plug_process( VJFrame *frame,VJFrame *b, int fx_id, int src_fmt )
 	int srcf = 0;
 	if( src_fmt == 1 )
 		srcf = PIX_FMT_YUV422P;
-	else if( src_fmt == 2 )
-		srcf = PIX_FMT_YUV444P;
-		else
-			srcf = PIX_FMT_YUV420P;
+	else if( src_fmt == 0 )
+		srcf = PIX_FMT_YUV420P;
+		else if( src_fmt == 2 )
+			srcf = PIX_FMT_YUVJ420P;
+	else srcf = PIX_FMT_YUVJ422P;
 
 	img_convert( &p1, PIX_FMT_RGBA32,
 		     &p2, srcf,

@@ -94,14 +94,6 @@ void opacity_by_threshold_(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 	for (x = 0; x < width; x++) {
 	    a1 = yuv1[0][x + y];
 	    a2 = yuv2[0][x + y];
-	    if (a1 < 16)
-		a1 = 16;
-	    else if (a1 > 235)
-		a1 = 235;
-	    if (a2 < 16)
-		a2 = 16;
-	    else if (a2 > 235)
-		a2 = 235;
 	    if (a2 > threshold && a2 < threshold2) {
 		yuv1[0][x + y] = (op0 * a1 + op1 * a2) >> 8;
 		yuv1[1][x + y] =

@@ -74,8 +74,8 @@ vj_effect *uvcorrect_init(int w, int h)
     ve->defaults[2] = 128;  
     ve->defaults[3] = 10; 
     ve->defaults[4] = 10; 
-    ve->defaults[5] = 16; 
-    ve->defaults[6] = 240;
+    ve->defaults[5] = pixel_U_lo_; 
+    ve->defaults[6] = pixel_U_hi_;
     ve->description = "U/V Correction";
 
     ve->sub_format = 0;

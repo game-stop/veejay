@@ -19,6 +19,7 @@
  */
 
 #include "crosspixel.h"
+#include "common.h"
 #include <stdlib.h>
 
 static uint8_t *cross_pixels[3];
@@ -83,7 +84,7 @@ void crosspixel_apply(VJFrame *frame, int w, int h, int t,int v) {
     memcpy( cross_pixels[2], Cr, uv_len);
 
     if(t==0) {
-	    memset(Y, 16, len);
+	    memset(Y, pixel_Y_lo_, len);
 	    memset(Cb, 128, uv_len);
 	    memset(Cr, 128, uv_len);
     }

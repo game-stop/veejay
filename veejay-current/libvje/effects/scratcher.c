@@ -67,7 +67,7 @@ int scratcher_malloc(int w, int h)
     frame[0] =
 	(uint8_t *) vj_malloc(w * h * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
 	if(!frame[0]) return 0;
-    memset( frame[0], 16, w * h * MAX_SCRATCH_FRAMES );
+    memset( frame[0], pixel_Y_lo_, w * h * MAX_SCRATCH_FRAMES );
     frame[1] =
 	(uint8_t *) vj_malloc( ((w * h)/4) * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
 	if(!frame[1]) return 0;

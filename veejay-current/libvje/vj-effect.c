@@ -148,6 +148,20 @@
 #ifdef USE_SWSCALER
 #include "effects/picinpic.h"
 #endif
+
+int  pixel_Y_hi_ = 235;
+int  pixel_U_hi_ = 240;
+int  pixel_Y_lo_ = 16;
+int  pixel_U_lo_ = 16;
+
+void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t lo)
+{
+	pixel_Y_hi_ = Yhi;
+	pixel_U_hi_ = Uhi;
+	pixel_U_lo_ = lo;
+	pixel_Y_lo_ = lo;
+}
+
 static struct
 {
 	int	(*mem_init)(int width, int height);
@@ -397,11 +411,16 @@ void vj_effect_deactivate_all()
 	}	
 }
 
-void vj_effect_initialize(int width, int height)
+void vj_effect_initialize(int width, int height, int full_range)
 {
     int i = VJ_VIDEO_COUNT;
     int k;
 
+    if( full_range )
+    {
+	    set_pixel_range( 255, 255,0 );
+    }
+    
     n_ext_plugs_ = plug_detect_plugins();
 
     if( n_ext_plugs_  > 0 )

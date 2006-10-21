@@ -84,7 +84,7 @@ void complexinvert_apply(VJFrame *frame, int width,
     uint8_t *Y2 = frame->data[0];
  	uint8_t *Cb2= frame->data[1];
 	uint8_t *Cr2= frame->data[2];
-	int	iy=16,iu=128,iv=128;
+	int	iy=pixel_Y_lo_,iu=128,iv=128;
 	_rgb2yuv( r,g,b, iy,iu,iv );
 	_y = (float) iy;
 	aa = (float) iu;
@@ -170,28 +170,15 @@ void complexinvert_apply(VJFrame *frame, int width,
 				kbg = 255;
 	    	}
 
-	   		val = 255 - ((Y[pos] + (kbg * bg_y[pos])) >> 8);
-	    	if (val < 16)
-				val = 16;
-	    	else if (val > 235)
-				val = 235;
-	    	Y[pos] = val;
+
+		val = 255 - ((Y[pos] + (kbg * bg_y[pos])) >> 8);
+		Y[pos] = CLAMP_Y(val);
 
 	    	val = 255 - ((Cb[pos] + (kbg * bg_cb[pos])) >> 8);
-	    	if (val < 16)
-				val = 16;
-	    	else if (val > 240)
-				val = 240;
-	   		Cb[pos] = val;
+		Cb[pos] = CLAMP_UV(val);
 
-	   		val = 255 - ( (Cr[pos] + (kbg * bg_cr[pos])) >> 8);
-	   		if (val < 16)
-				val = 16;
-		    else if (val > 240)
-				val = 240;
-	   		Cr[pos] = val;
-
-
+   		val = 255 - ( (Cr[pos] + (kbg * bg_cr[pos])) >> 8);
+		Cr[pos] = CLAMP_UV(val);
 	    }
 	}
 }

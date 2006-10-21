@@ -155,11 +155,9 @@ void chromapalette_apply(VJFrame *frame, int width, int height, int angle, int r
 				if( _chroma_key( Cb[i] , Cr[i], colorKeycb,colorKeycr, accept_angle))
 				{
 					U =  128+(int)( (float) (color_cb - Y[i]) * cb_mul );
-					if(U < 16) U = 16; else if ( U > 240 ) U = 240;
+					Cb[i] = CLAMP_UV( U );
 					V =  128+(int)( (float) (color_cr - Y[i]) * cr_mul );
-					if(V < 16) V = 16; else if ( V > 240 ) V = 240;
-					Cb[i] = U;
-					Cr[i] = V;
+					Cr[i] = CLAMP_UV( V );
 				}
 		}
 	}
@@ -170,8 +168,7 @@ void chromapalette_apply(VJFrame *frame, int width, int height, int angle, int r
 				if( _chroma_key( Cb[i], Cr[i], colorKeycb, colorKeycr, accept_angle))
 				{
 					V = 128+(int)( (float) (color_cr - Y[i]) * cr_mul );
-					if( V < 16 ) V = 16; else if ( V > 240 ) V = 240;
-					Cr[i] = V;
+					Cr[i] = CLAMP_UV( V );
 				}
 		}
 	}
@@ -182,8 +179,7 @@ void chromapalette_apply(VJFrame *frame, int width, int height, int angle, int r
 			if( _chroma_key( Cb[i] , Cr[i], colorKeycb,colorKeycr, accept_angle))
 			{
 				U = 128 + (int)( (float) (color_cb - Y[i]) * cb_mul );
-				if( U < 16 ) U = 16; else if ( U > 240 ) U = 240;
-				Cb[i] = U;
+				Cb[i] = CLAMP_UV(U);
 			}
 		}
 	}

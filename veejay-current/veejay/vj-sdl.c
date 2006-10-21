@@ -266,7 +266,7 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
 	if (!yuv420[0] || !yuv420[1] || !yuv420[2])
 		return 0;
 
-	if(vjsdl->pix_fmt == FMT_420)
+	if(vjsdl->pix_fmt == FMT_420 || vjsdl->pix_fmt == FMT_420F)
 		yuv420p_to_yuv422( yuv420, vjsdl->yuv_overlay->pixels[0],vjsdl->width,vjsdl->height);
 	else
 		yuv422_to_yuyv( yuv420, vjsdl->yuv_overlay->pixels[0], vjsdl->width,vjsdl->height);

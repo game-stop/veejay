@@ -30,7 +30,7 @@
 #include <math.h>
 #include <stdio.h>
 #include <stdint.h>
-
+#include "common.h"
 static uint8_t *ripple_data[3];
 
 static int stat;
@@ -102,7 +102,7 @@ int water_malloc(int width, int height)
 {
 	ripple_data[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height);
 	if(!ripple_data[0]) return 0;
-	memset( ripple_data[0], 16, width*height);
+	memset( ripple_data[0], pixel_Y_lo_, width*height);
 
 
 	map_h = height / 2 + 1;

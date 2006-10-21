@@ -45,6 +45,7 @@ static int default_geometry_x = -1;
 static int default_geometry_y = -1;
 static int force_video_file = 0; // unused
 static int override_pix_fmt = 1;
+static int full_range = 0;
 static char override_norm = 'p';
 static int auto_loop = 0;
 static int n_slots_ = 8;
@@ -185,7 +186,16 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -j/--max_cache \t\tDivide cache memory over N samples (fairly distributed)\n");
 	fprintf(stderr,
-		"  -Y/--ycbcr [01]\t\t0 = YUV 4:2:0 Planar, 1 = YUV 4:2:2 Planar\n");
+		"  -Y/--ycbcr [01]\t\tInternal processing format");
+	fprintf(stderr,
+		"\t\t 0 = YUV 4:2:0 Planar\n");
+	fprintf(stderr,
+		"\t\t 1 = YUV 4:2:2 Planar (default)\n");
+	fprintf(stderr,
+		"\t\t 2 = YUV 4:2:0 Planar full range\n");
+	fprintf(stderr,
+		"\t\t 3 = YUV 4:2:2 Planar full range\n");
+
 	fprintf(stderr,
 		"  -d/--dummy	\t\tDummy playback\n");
 	fprintf(stderr,
@@ -390,6 +400,12 @@ static int set_option(const char *name, char *value)
 	else if(strcmp(name,"ycbcr")==0 || strcmp(name,"Y")==0)
 	{
 		override_pix_fmt = atoi(optarg);
+		if(override_pix_fmt > 1 )
+		{
+			full_range = 1;
+		}
+		if( override_pix_fmt < 0 || override_pix_fmt > 3 )
+			override_pix_fmt = 1;
 	}
 	else if( strcmp(name,"auto-loop")==0 || strcmp(name,"L") == 0)
 	{
@@ -660,7 +676,7 @@ int main(int argc, char **argv)
  	{
 		veejay_set_colors(0);
 		vj_event_init();
-		vj_effect_initialize(720,576);
+		vj_effect_initialize(720,576,0);
 		vj_osc_allocate(VJ_PORT+2);	
 		vj_event_dump();
 		vj_effect_dump();
@@ -717,7 +733,8 @@ int main(int argc, char **argv)
 		default_geometry_x,
 		default_geometry_y,
 		NULL,
-		0)<0)
+		0,
+		full_range)<0)
 	{	
 		veejay_msg(VEEJAY_MSG_ERROR, "Initializing veejay");
 		return 0;

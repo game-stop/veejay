@@ -180,7 +180,7 @@ void fisheye_apply(VJFrame *frame, int w, int h, int v )
 	{
 		if(cached_coords[i] == -1)
 		{
-			Y[i] = 16;		
+			Y[i] = pixel_Y_lo_;		
 			Cb[i] = 128;
 			Cr[i] = 128;
 		}

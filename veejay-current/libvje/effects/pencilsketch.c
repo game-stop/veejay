@@ -28,8 +28,8 @@ vj_effect *pencilsketch_init(int w, int h)
     ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);
     ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);
     ve->defaults[0] = 0;/* type */
-    ve->defaults[1] = 16;	/* min */
-    ve->defaults[2] = 235;	/* max */
+    ve->defaults[1] = pixel_Y_lo_;	/* min */
+    ve->defaults[2] = pixel_Y_hi_;	/* max */
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 8;
     ve->limits[0][1] = 0;
@@ -57,7 +57,6 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 		uint8_t p =  
 			255 - ( abs ( (255 - abs((255-a)-a))  -    (255-abs((255-b)-b))) );
 		p = (abs(abs(p-b) - b));
-	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
 		return p;
 	}
 
@@ -69,7 +68,6 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 	static uint8_t _pcf_dneg2(uint8_t a,uint8_t b, int t_max)
 	{
 		uint8_t p = ( 255 - abs ( (255-a)- b )  );
-		if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
 		return p;
 	}
 
@@ -77,29 +75,24 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 	{
 		uint8_t p = ( (b < a) ? b : a);
 		p = ( 255 - abs( (255-p) - b ) );
-	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
 		return p;
 	}
 
 	static uint8_t _pcf_max(uint8_t a,uint8_t b, int t_max)
 	{
-		int p = ( (b > a) ? b : a);
-		if( p <= 0 )
-			return 0;
-		p = ( 255 - ((255 - b) * (255 - b)) / p);
-	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
+		int p =  ( (b > a) ? b : a);
+		p = CLAMP_Y(p);
+		p = ( 255 - ((256 - b) * (256 - b)) / p);
 		return (uint8_t)p;
 	}
 
 	static uint8_t _pcf_pq(uint8_t a,uint8_t b, int t_max)
 	{
-		if(a <= 0 ) a=16;
-		if(b <= 0 ) b=16;
-		int p = 255 - ((255-a) * (255-a)) / a;
-		int q = 255 - ((255-b) * (255-b)) / b;
-		if(q <= 0 ) q=16;
-		p = ( 255 - ((255-p) * (255 - a)) / q);
-	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
+		a = CLAMP_Y(a);
+		b = CLAMP_Y(b);
+		int p = 255 - ((256-a) * (256-a)) / a;
+		int q = 255 - ((256-b) * (256-b)) / b;
+		p = ( 255 - ((256-p) * (256 - a)) / q);
 		return (uint8_t)p;
 	}
 
@@ -109,8 +102,6 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 			255 - ( abs ( (255 - abs((255-a)-a))  -    (255-abs((255-b)-b))) );
 		p = (abs(abs(p-b) - b));
 		p = p + b - (( p * b ) >> 8);
-	//	if( p >= 16 || p <= t_max) p = 16 ; else p = 240;
-	
 		return p;
 	}
 	static uint8_t _pcbcr_color(uint8_t a,uint8_t b)
@@ -122,7 +113,7 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 
 	static uint8_t _pcf_none(uint8_t a, uint8_t b, int t_max)
 	{
-		if( a >= 16 || a <= t_max) a = 16 ; else a = 240;
+		if( a > pixel_Y_lo_ || a <= t_max) a = pixel_Y_lo_ ; else a = pixel_Y_hi_;
 		return a;
 	}
 
@@ -174,7 +165,6 @@ void pencilsketch_apply(
 	for(i=0; i < len; i++)
 	{
 		y = Y[i];
-	//	if( y < 16 ) y = 16; else if (y > 235) y = 235;
 		yb = y;
 
 		/* substract user defined mask from image */
@@ -194,7 +184,7 @@ void pencilsketch_apply(
 		}
 		else
 		{
-			Y[i] = 240;
+			Y[i] = pixel_Y_hi_;
 		}
 	}
 

@@ -252,11 +252,11 @@ void diff_apply(void *ed, VJFrame *frame,
 			{
 				if(dst[i] != 0xff)
 				{
-					Y[i] = 16;
+					Y[i] = pixel_Y_lo_;
 				}
 				else
 				{
-					Y[i] = 235;
+					Y[i] = pixel_Y_hi_;
 				}
 			}
 			Cr[i] = 128;

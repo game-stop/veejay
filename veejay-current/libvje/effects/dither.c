@@ -65,8 +65,6 @@ void dither_apply(VJFrame *frame, int width, int height, int size,
 	    /* Luminance , dither image. Do
 	       this for U and V too, see what happens hehe */
 	    v = ((long) Y[((h_ * width) + w_)] + d);
-	    if (v > 255)
-		v = 216;
 	    Y[(h_ * width) + w_] = (uint8_t) ((v >> 7) << 7);
 	}
     }

@@ -102,31 +102,24 @@ void flare_exclusive(VJFrame *frame, VJFrame *frame2, int width, int height, int
 		a = Y[i];
 		b = Y2[i];
 
-	//	if(a < 16) a = 16; else if(a > 235) a = 235;
-	//	if(b < 16) b = 16; else if(b > 235) b = 235;
-
 		a *= o1;
 		b *= o2;
 		a = a >> 8;
 		b = b >> 8;	
-
 		c = (a+b) - ((a * b) >> 8);
-		if( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-		Y[i] = c;
+		Y[i] = CLAMP_Y(c);
 	
 		a = Cb[i]-128;
 		b = Cb2[i]-128;
 		c = (a + b) - (( a * b) >> 8);
 		c += 128;
-		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Cb[i] = c;
+		Cb[i] = CLAMP_UV(c);
 
 		a = Cr[i]-128;
 		b = Cr2[i]-128;
 		c = (a + b) - ((a*b) >> 8);
 		c += 128;
-		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Cr[i] = c;
+		Cr[i] = CLAMP_UV(c);
     	}
 }
 
@@ -151,24 +144,19 @@ void flare_additive(VJFrame *frame, VJFrame *frame2, int width,
 		a = (Y[i]*o1) >> 7;
 		b = (Y2[i]*o2) >> 7;
 		c = a + (( 2 * b ) - 255);
-		if( c < 16) c = 16; else if ( c > 235 ) c = 235;
-		
-		Y[i] = c;
+		Y[i] = CLAMP_Y(c);	
 
 		a = Cb[i];
 		b = Cb2[i];
 
 		c = a + ( ( 2 * b ) - 255 );
-		if ( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-		Cb[i] = c ;
+		Cb[i] = CLAMP_UV(c);
 
 		a = Cr[i] ;
 		b = Cr2[i] ;
 
 		c = a + ( ( 2 * b ) - 255 );
-		if ( c < 16 ) c = 16; else if ( c > 240 ) c  = 240;
-
-		Cr[i] = c ;
+		Cr[i] = CLAMP_UV(c);
 	}
 }
 
@@ -188,27 +176,21 @@ void flare_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
 	{
 		a = Y[i];
 		b = Y2[i];
-		if ( a < 16 ) a = 16;
-//		if ( b < 16 ) b = 16;
+		if ( a < 1 ) a = 1;
 		c = 255 - (( op_a - b) * (op_a - b)) / a;
-		if ( c < 16 ) c = 16; else if ( c > 240 ) c = 240;
-		Y[i] = c;
+		Y[i] = CLAMP_Y(c);
 		
 		a = Cb[i];
 		b = Cb2[i];
-		if ( a < 16) a = 16;
-//		if ( b < 16) b = 16;
+		if ( a < 1) a = 1;
 		c = 255 - (( 255 - b) * ( 255 - b )) / a;
-		if ( c < 16 ) c = 16; else if ( c > 235 ) c = 235;
-		Cb[i] = c;
+		Cb[i] = CLAMP_UV(c);
 		
 		a = Cr[i];
 		b = Cr2[i];
-		if ( a < 16 ) a = 16;
-//		if ( b < 16 ) b = 16;
+		if ( a < 1 ) a = 1;
 		c = 255 - ((255 -b ) * (255 - b)) /a ;
-		if ( c < 16 ) c = 16; else if ( c > 235) c = 235;
-		Cr[i] = c;
+		Cr[i] = CLAMP_UV(c);
 	}
 }
 

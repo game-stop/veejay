@@ -20,7 +20,7 @@
 
 #include "average.h"
 #include <stdlib.h>
-
+#include "common.h"
 vj_effect *average_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
@@ -52,19 +52,16 @@ void average_apply(VJFrame *frame, int width, int height, int val)
     for (i = 0; i < len; i++) {
 	a = Y[i];
 	b = ((val-1) * a + a)/val;
-	if(b < 16) b = 16; else if (b > 240) b = 240;
-	Y[i] = b;
+	Y[i] = CLAMP_Y(b);
     }
 
     for (i = 0; i < uv_len; i++) {
 	a = Cb[i];
 	b = ((val-1) * a + a)/val;
-	if(b < 16) b = 16; else if (b > 235) b = 235;
-	Cb[i] = b;
+	Cb[i] = CLAMP_UV(b);
 	a = Cr[i];
 	b = ((val-1) * a + a )/val;
-	if(b < 16) b = 16; else if (b > 235) b = 235;
-	Cr[i] = b;
+	Cr[i] = CLAMP_UV(b);
     }
 }
 void average_free(){}

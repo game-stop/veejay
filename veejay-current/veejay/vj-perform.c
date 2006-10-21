@@ -811,7 +811,7 @@ VJFrame *vj_perform_init_plugin_frame(veejay_t *info)
 	editlist *el = info->edit_list;
 	VJFrame *frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
 	if(!frame) return 0;
-	if(info->pixel_format == FMT_422)
+	if(info->pixel_format == FMT_422 || info->pixel_format == FMT_422F)
 		vj_el_init_422_frame( el, frame );
 	else
 		vj_el_init_420_frame( el, frame ); 
@@ -1028,7 +1028,7 @@ void	vj_perform_send_frame_now( veejay_t *info,int k )
 
 void	vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, int h )
 {
-	if(info->pixel_format == FMT_422)
+	if(info->pixel_format == FMT_422 || info->pixel_format == FMT_422F)
 	{
 		frame[0] = video_output_buffer[1]->Y;
 		frame[1] = video_output_buffer[1]->Cb;
@@ -1040,7 +1040,7 @@ void	vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, i
 		src_frame[2] = video_output_buffer[0]->Cr;
 
 		yuv422p_to_yuv420p2(
-				src_frame, frame,w, h );
+				src_frame, frame,w, h, info->pixel_format );
 	}
 	else
 	{
@@ -1073,7 +1073,7 @@ void	vj_perform_unlock_primary_frame( void )
 void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )   
 {
 	editlist *el = info->edit_list;
-	if(info->pixel_format==FMT_422)
+	if(info->pixel_format==FMT_422 || info->pixel_format == FMT_422F)
 	{
 		if( video_output_buffer_convert == 0 )
 		{
@@ -1081,7 +1081,7 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
 			 pframe[0] = primary_buffer[0]->Y;
 			 pframe[1] = primary_buffer[0]->Cb;
 			 pframe[2] = primary_buffer[0]->Cr;
-			 yuv422p_to_yuv420p2( pframe,temp_buffer, el->video_width, el->video_height);
+			 yuv422p_to_yuv420p2( pframe,temp_buffer, el->video_width, el->video_height, info->pixel_format);
 	//		ss_422_to_420( primary_buffer[0]->Cb,
 	//			el->video_width/2,
 	//			el->video_height );
@@ -2510,7 +2510,7 @@ int vj_perform_tag_fill_buffer(veejay_t * info, int entry)
   if (error == 1)
   {
 	VJFrame dumb;
-	if( info->pixel_format == FMT_420 )
+	if( info->pixel_format == FMT_422 || info->pixel_format == FMT_422F )
 		vj_el_init_422_frame( info->edit_list, &dumb );
 	else
 		vj_el_init_420_frame( info->edit_list, &dumb );
