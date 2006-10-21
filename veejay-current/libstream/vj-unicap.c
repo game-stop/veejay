@@ -271,7 +271,7 @@ int	vj_unicap_select_value( void *ud, int key, double attr )
 	unicap_void_property( &property );
 	vj_unicap_t *vut = (vj_unicap_t*) ud;
 
-	if(! vut->ctrl[i] )
+	if(! vut->ctrl[key] )
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Capture device %s has no property %x",
 				vut->device.identifier, key );
@@ -510,7 +510,7 @@ static inline int	get_shift_size(int fmt)
 			return 1;
 		case FMT_422:
 		case FMT_422F:
-			return 0;
+			return 1;
 		default:
 			break;
 	}

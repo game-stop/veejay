@@ -580,7 +580,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 		sprintf(tag->source_name, "%s", filename );
 
 		if (!_vj_tag_new_unicap
-		    (tag, stream_nr, w, h, el->video_norm, pix_fmt,extra,channel ))
+		    (tag, stream_nr, w, h,el->video_norm, pix_fmt, extra,channel ))
 			    return -1;
 		
 		break;
