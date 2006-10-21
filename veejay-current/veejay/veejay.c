@@ -63,9 +63,7 @@ static void CompiledWith()
 #ifdef HAVE_JACK
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Jack audio server");
 #endif
-#ifdef HAVE_V4L
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Video4linux");
-#endif
 #ifdef SUPPORT_READ_DV2
 	veejay_msg(VEEJAY_MSG_INFO,"\tSupport for Digital Video enabled");
 #endif
@@ -78,14 +76,11 @@ static void CompiledWith()
 #ifdef HAVE_SDL
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Simple Direct Media Layer");
 #endif
-#ifdef USE_GTKCAIRO
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing GTK Cairo");
+#ifdef USE_GL
+	veejay_msg( VEEJAY_MSG_INFO,  "\tUsing  openGL ");
 #endif
 #ifdef HAVE_DIRECTFB
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing DirectFB");
-#endif
-#ifdef HAVE_FREETYPE
-	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Freetype");
 #endif
 #ifdef HAVE_X86CPU
 	veejay_msg(VEEJAY_MSG_INFO,"\tCompiled for x86 architecture");
@@ -694,7 +689,6 @@ int main(int argc, char **argv)
 	sigaddset(&(settings->signal_set), SIGILL);
 	sigaddset(&(settings->signal_set), SIGSEGV);
 	sigaddset(&(settings->signal_set), SIGFPE );
-	sigaddset(&(settings->signal_set), SIGPIPE );
 	sigaddset(&(settings->signal_set), SIGTERM );
 	sigaddset(&(settings->signal_set), SIGABRT);
 	sigaddset(&(settings->signal_set), SIGSTKFLT );

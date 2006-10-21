@@ -583,10 +583,12 @@ static struct
 {
 	{ "v4l_expander" },
 	{ "v4l_brightness" },
-	{ "v4l_hue"  },
 	{ "v4l_contrast" },
+	{ "v4l_hue"  },
+	{ "v4l_saturation" },
 	{ "v4l_color" },
-	{ "v4l_white" }
+	{ "v4l_white" },
+	NULL,
 };
 
 static	int	no_preview_ = 0;
@@ -2868,13 +2870,13 @@ static void	update_current_slot(int pm)
 		if( info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX )
 		{
 			info->uc.reload_hint[HINT_V4L] = 1;
-			for(k = 0; k < 5; k ++ )
+			for(k = 1; capt_card_set[k].name != NULL; k ++ )
 				enable_widget( capt_card_set[k].name );
 			v4l_expander_toggle(1);
 		}
 		else
 		{ /* not v4l, disable capt card */
-			for(k = 0; k < 5; k ++ )
+			for(k = 1; k < capt_card_set[k].name != NULL ; k ++ )
 				disable_widget( capt_card_set[k].name );
 
 			v4l_expander_toggle(0);
@@ -3617,20 +3619,20 @@ static void	setup_effectchain_info( void )
 
 static	void	load_v4l_info()
 {
-	int values[5];
+	int values[6];
 	int len = 0;
 	multi_vims( VIMS_STREAM_GET_V4L, "%d", (info->selected_slot == NULL ? 0 : info->selected_slot->sample_id ));
 	gchar *answer = recv_vims(3, &len);
 	if(len > 0 )
 	{
-		int res = sscanf( answer, "%05d%05d%05d%05d%05d", 
-			&values[0],&values[1],&values[2],&values[3],&values[4]);
-		if(res == 5)
+		int res = sscanf( answer, "%05d%05d%05d%05d%05d%05d", 
+			&values[0],&values[1],&values[2],&values[3],&values[4],&values[5]);
+		if(res == 6)
 		{
 			int i;
-			for(i = 0; i < 5; i ++ )
+			for(i = 1; i < 7; i ++ )
 			{
-				update_slider_gvalue( capt_card_set[i].name, (gdouble)values[i]/65535.0 );
+				update_slider_gvalue( capt_card_set[i].name, (gdouble)values[i-1]/65535.0 );
 			}	
 		}	
 		g_free(answer);

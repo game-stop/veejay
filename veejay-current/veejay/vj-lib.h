@@ -25,10 +25,7 @@
 #include <libvjnet/vj-server.h>
 #include <libvjnet/vj-client.h>
 #include <libyuv/yuvconv.h>
-#ifdef HAVE_V4L
-#include <libstream/vj-v4lvideo.h>
 #include <libstream/vj-vloopback.h>
-#endif
 #include <libstream/vj-yuv4mpeg.h>
 #include <veejay/vj-sdl.h>
 #include <libel/lav_io.h>
@@ -269,10 +266,8 @@ typedef struct {
 #endif
     vj_yuv *output_stream;	/* output stream for dumping video */
     vj_yuv *render_stream;
-#ifdef HAVE_V4L
     void *vloopback; // vloopback output
-#endif  
-   video_segment *segment;   // delete these FIXME 
+    video_segment *segment;   // delete these FIXME 
     video_segment *client;
     void *video_out_scaler;
     int render_now;	        /* write RGB */

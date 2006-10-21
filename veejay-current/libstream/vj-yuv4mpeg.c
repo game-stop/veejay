@@ -25,7 +25,6 @@
 #include <libvjmsg/vj-common.h>
 #include <libstream/vj-yuv4mpeg.h>
 #include <string.h>
-/* see vj-v4lvideo for details about structure */
 
 /* the audio routines are placed here 
    because its a feature i need. needs to be removed or put elsewhere.

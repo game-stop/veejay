@@ -36,9 +36,6 @@
 #include <config.h>
 #include <libsample/sampleadm.h>
 #include <libstream/vj-yuv4mpeg.h>
-#ifdef HAVE_V4L
-#include <libstream/vj-v4lvideo.h>
-#endif
 #include <libvjnet/vj-client.h>
 #include <libel/vj-avformat.h>
 #include <libstream/vj-dv1394.h>
@@ -50,12 +47,7 @@ typedef struct
 #endif
 
 typedef struct {
-#ifdef USE_UNICAP
 	void	*unicap[VJ_TAG_MAX_STREAM_IN];
-#endif
-#ifdef HAVE_V4L
-    v4l_video *v4l[VJ_TAG_MAX_STREAM_IN];
-#endif
     vj_yuv *stream[VJ_TAG_MAX_STREAM_IN];
     vj_avformat *avformat[VJ_TAG_MAX_STREAM_IN];
 	vj_client *net[VJ_TAG_MAX_STREAM_IN];
@@ -120,8 +112,7 @@ typedef struct {
 
 int 	vj_tag_chain_malloc(int e);
 int 	vj_tag_chain_free(int e);
-int	vj_tag_get_v4l_properties(int t1,
-		int *brightness, int *hue,int *contrast, int *color, int *white );
+int	vj_tag_get_v4l_properties(int t1,int *brightness, int *contrast, int *hue,int *saturation,int *color, int *white );
 int 	vj_tag_init(int w, int h, int pix_fmt);
 int	vj_tag_get_n_frames(int t1);
 int	vj_tag_set_n_frames(int t1, int n_frames);
@@ -151,9 +142,6 @@ int 	vj_tag_get_effect(int t1, int position);
 int 	vj_tag_size();
 
 vj_tag 	*vj_tag_get(int id);
-#ifdef HAVE_V4L
-int 	_vj_tag_new_v4l(vj_tag *t, int nr , int w , int h, int n, int p, int f, int chan);
-#endif
 /* always return effect (-1 = empty) */
 int 	vj_tag_get_effect_any(int t1, int position);
 
@@ -247,6 +235,7 @@ int 	vj_tag_set_contrast(int t1, int value);
 int 	vj_tag_set_color(int t1, int value);
 int 	vj_tag_set_hue(int t1, int value);
 int	vj_tag_set_white(int t1, int value);
+int	vj_tag_set_saturation(int t1, int value);
 void 	vj_tag_set_veejay_t(void *info);
 
 int 	vj_tag_set_manual_fader(int t1, int value );

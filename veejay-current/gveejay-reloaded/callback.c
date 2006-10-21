@@ -795,7 +795,15 @@ void	on_v4l_color_value_changed(GtkWidget *widget, gpointer user_data)
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) );
 	}
 }
-
+void	on_v4l_saturation_value_changed(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+	{
+		multi_vims( VIMS_STREAM_SET_SATURATION, "%d %d",
+			info->selected_slot->sample_id,
+			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) );
+	}
+}
 #ifndef HAVE_GTK2_6
 static gchar	*my_gtk_combo_box_get_active_text(GtkComboBox *combo )
 {

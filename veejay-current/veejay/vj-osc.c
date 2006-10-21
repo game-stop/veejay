@@ -153,9 +153,7 @@ void vj_osc_cb_set_parameter5(void *context, int arglen, const void *vargs, OSCT
 void vj_osc_cb_set_parameter6(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_set_parameter7(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_set_parameter8(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
-#ifdef HAVE_V4L
 void vj_osc_cb_tag_new_v4l(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
-#endif
 void vj_osc_cb_tag_new_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 
 void vj_osc_cb_tag_new_net(void *context, int arglen, const void *vargs, OSCTimeTag when,NetworkReturnAddressPtr ra );
@@ -815,13 +813,11 @@ void vj_osc_cb_set_parameter8(void *context, int arglen, const void *vargs, OSCT
 {
 	NET_F_prefixed(arglen,vargs,VIMS_CHAIN_ENTRY_SET_ARG_VAL,8);
 }
-#ifdef HAVE_V4L
 void vj_osc_cb_tag_new_v4l(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
 {
 	NET_F(arglen,vargs,VIMS_STREAM_NEW_V4L);
 }
-#endif
 
 void vj_osc_cb_tag_new_net(void *context, int arglen, const void *vargs, OSCTimeTag when,
     NetworkReturnAddressPtr ra)
@@ -965,10 +961,8 @@ static struct
 								"format",		vj_osc_cb_record_format,			14	},
 	{ "stream select and play <num>",
 								"select",		vj_osc_cb_tag_select,				2	},
-#ifdef HAVE_V4L
 	{ "new video4linux input stream <device num> <channel num>",
 								"v4l",			vj_osc_cb_tag_new_v4l,				19	},
-#endif
 	{ "new yuv4mpeg input stream <filename>",
 								"y4m",			vj_osc_cb_tag_new_y4m,				19	},
 	{ "new ffmpeg input stream <filename>",

@@ -16,21 +16,33 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
+#ifndef  VJUNICAPHH
+#define  VJUNICAPHH
 void	*vj_unicap_init(void);
-#ifndef VJUNICAP_H
-#define VJUNICAP_H
 void	vj_unicap_deinit(void *dud );
 int	vj_unicap_num_capture_devices( void *dud );
-
-
 char **vj_unicap_get_devices(void *unicap);
 void	*vj_unicap_new_device( void *ud, int device_id );
 int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h );
 int	vj_unicap_start_capture( void *vut );
-int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int w, const int h, const int pf );
+int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int w, const int h );
 int	vj_unicap_stop_capture( void *vut );
 void	vj_unicap_free_device( void *vut );
 
+int	vj_unicap_select_value( void *ud, int key, double );
+
+#define	UNICAP_BRIGHTNESS	0
+#define	UNICAP_COLOR		1
+#define UNICAP_SATURATION	2
+#define UNICAP_HUE		3
+#define UNICAP_CONTRAST		4
+#define	UNICAP_SOURCE0		5
+#define UNICAP_SOURCE1		6
+#define UNICAP_SOURCE2		7
+#define UNICAP_SOURCE3		8
+#define UNICAP_SOURCE4		9
+#define UNICAP_PAL		10
+#define UNICAP_NTSC		11
+#define UNICAP_WHITE		12
 #endif
 

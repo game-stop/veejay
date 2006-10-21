@@ -40,9 +40,7 @@
 #include <veejay/vims.h>
 #include <veejay/vj-event.h>
 #include <libstream/vj-tag.h>
-#ifdef HAVE_V4L
 #include <libstream/vj-vloopback.h>
-#endif
 #include <veejay/vj-plugin.h>
 
 #ifdef USE_GDK_PIXBUF
@@ -5759,7 +5757,6 @@ void vj_event_tag_new_y4m(void *ptr, const char format[], va_list ap)
 	if( id <= 0 )
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Yuv4mpeg stream");
 }
-#ifdef HAVE_V4L
 void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -5794,13 +5791,12 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 
 	if(vj_tag_exists(args[0]))
 	{
-		int values[5];
-		memset(values,0,sizeof(values));
-		if(vj_tag_get_v4l_properties( args[0], &values[0], &values[1], &values[2], &values[3],
-				&values[4]))
+		int values[6];
+		memset(values,0,6*sizeof(int));
+		if(vj_tag_get_v4l_properties( args[0], &values[0], &values[1], &values[2], &values[3],	&values[4], &values[5]))
 		{
-			sprintf(message, "%05d%05d%05d%05d%05d",
-				values[0],values[1],values[2],values[3],values[4] );
+			sprintf(message, "%05d%05d%05d%05d%05d%05d",
+				values[0],values[1],values[2],values[3],values[4],values[5] );
 		}
 	}
 	FORMAT_MSG(send_msg, message);
@@ -5844,6 +5840,23 @@ void vj_event_v4l_set_white(void *ptr, const char format[], va_list ap)
 	}
 
 }
+void vj_event_v4l_set_saturation(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+	if(args[0]==0) args[0] = v->uc->sample_id;
+	if(args[0]==-1)args[0] = vj_tag_size()-1;
+	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
+	{
+		if(vj_tag_set_saturation(args[0],args[1]))
+		{
+			veejay_msg(VEEJAY_MSG_INFO,"Set saturation to %d",args[1]);
+		}
+	}
+
+}
 void vj_event_v4l_set_color(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -5878,7 +5891,6 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 	}
 
 }
-#endif
 
 void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 {
@@ -7811,7 +7823,6 @@ void		vj_event_quick_bundle( void *ptr, const char format[], va_list ap)
 }
 
 
-#ifdef HAVE_V4L
 void	vj_event_vloopback_start(void *ptr, const char format[], va_list ap)
 {
 	int args[2];
@@ -7874,8 +7885,6 @@ void	vj_event_vloopback_stop( void *ptr, const char format[], va_list ap )
 	veejay_t *v = (veejay_t*) ptr;
 	vj_vloopback_close( v->vloopback );
 }
-#endif
-
 
 /* 
  * Function that returns the options for a special sample (markers, looptype, speed ...) or
@@ -7976,15 +7985,17 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 			int contrast = 0;
 			int color = 0;
 			int white = 0;
+			int sat = 0;
 			int effects_on = 0;
 			
-			vj_tag_get_v4l_properties(id,&brightness,&hue, &contrast, &color, &white );			
+			vj_tag_get_v4l_properties(id,&brightness,&hue,&sat, &contrast, &color, &white );			
 			effects_on = si->effect_toggle;
 			
 			sprintf( options,
-		        "%05d%05d%05d%05d%05d%01d",
+		        "%05d%05d%05d%05d%05d%05d%01d",
 			    brightness,
 			    hue,
+			    sat,
 			    contrast,
 			    color,
 			    white,

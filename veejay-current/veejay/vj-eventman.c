@@ -1057,7 +1057,6 @@ void		vj_init_vevo_events(void)
 				"Stream ID >= 1",
 				0,
 				NULL );
-#ifdef HAVE_V4L
 	index_map_[VIMS_STREAM_NEW_V4L]				=	_new_event(
 				"%d %d",
 				VIMS_STREAM_NEW_V4L,
@@ -1070,7 +1069,6 @@ void		vj_init_vevo_events(void)
 				"Channel Number (0=TV,1=composite,2=svideo)",
 				0,
 				NULL );
-#endif
 #ifdef SUPPORT_READ_DV2
 	index_map_[VIMS_STREAM_NEW_DV1394]			=	_new_event(
 				"%d",
@@ -1973,7 +1971,6 @@ void		vj_init_vevo_events(void)
 				"Number of frames",
 				0,
 				NULL);
-#ifdef HAVE_V4L
 	index_map_[VIMS_STREAM_SET_BRIGHTNESS]			=	_new_event(
 				"%d %d",
 				VIMS_STREAM_SET_BRIGHTNESS,
@@ -2024,7 +2021,18 @@ void		vj_init_vevo_events(void)
 				"Value 0-65535",	
 				0,
 				NULL );
-
+	index_map_[VIMS_STREAM_SET_SATURATION]			=	_new_event(
+				"%d %d",
+				VIMS_STREAM_SET_WHITE,
+				"Set saturation value for Video4linux stream",
+				vj_event_v4l_set_saturation,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				STREAM_ID_HELP,
+				0,
+				"Value 0-65535",	
+				0,
+				NULL );
 	index_map_[VIMS_STREAM_SET_WHITE]			=	_new_event(
 				"%d %d",
 				VIMS_STREAM_SET_WHITE,
@@ -2047,7 +2055,6 @@ void		vj_init_vevo_events(void)
 				STREAM_ID_HELP,
 				0,
 				NULL );
-#endif
 	index_map_[VIMS_VLOOPBACK_START]		=	_new_event(
 				"%d",
 				VIMS_VLOOPBACK_START,
