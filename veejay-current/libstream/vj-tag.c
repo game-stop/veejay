@@ -623,10 +623,13 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     switch (type) {
 #ifdef USE_UNICAP
 	    case VJ_TAG_TYPE_V4L:
+		sprintf(tag->source_name, "%s", filename );
+
 		if (!_vj_tag_new_unicap
 		    (tag, stream_nr, w, h, el->video_norm, pix_fmt,extra,channel ))
 			    return -1;
-	break;
+		
+		break;
 #endif
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
@@ -1787,6 +1790,11 @@ int vj_tag_enable(int t1) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "Streaming from picture '%s'", tag->source_name );
 	}
 #endif
+	if( tag->source_type == VJ_TAG_TYPE_V4L )
+	{
+	    vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
+	}
+
 	tag->active = 1;
 	if(!vj_tag_update(tag,t1)) return -1;
 	return 1;
@@ -1811,32 +1819,22 @@ int vj_tag_set_active(int t1, int active)
     if (!tag)
 	return -1;
 
-    if(active == tag->active) return 1;
- 
+    if(active == tag->active)
+    {
+	    veejay_msg(0, "Tag already %s", active ? "On" : "Off" );
+	    return 1;
+ 	}
+    veejay_msg(0, "%s: %d, active=%d", __FUNCTION__, tag->source_type, active );
     switch (tag->source_type) {
+	   case VJ_TAG_TYPE_V4L:
 #ifdef USE_UNICAP
-	tag->active = 1;
-	break;
-#else
-#ifdef HAVE_V4L
-    case VJ_TAG_TYPE_V4L:	/* (d)activate double buffered grabbing of v4l device */
-	if (active == 1) {
-	    if (vj_v4l_video_grab_start(vj_tag_input->v4l[tag->index]) ==
-		0) {
+		if(active)
+		    vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
+		else
+		    vj_unicap_stop_capture( vj_tag_input->unicap[ tag->index] );
 		tag->active = active;
-
-	    } else {
-		veejay_msg(VEEJAY_MSG_ERROR,
-			   "Error trying to activate continuous grabbing\n");
-		tag->active = 0;
-	    }
-	} else {
-	    vj_v4l_video_grab_stop(vj_tag_input->v4l[tag->index]);
-	    tag->active = 0;
-	}
-	break;
 #endif
-#endif
+		break;
 	case VJ_TAG_TYPE_YUV4MPEG:
 	     if(active==0)
 		{
@@ -2245,6 +2243,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	case VJ_TAG_TYPE_V4L:
 		vj_unicap_grab_frame( vj_tag_input->unicap[tag->index], buffer,
 			       width,height, vj_tag_input->pix_fmt	);
+		return 1;
 		break;
 #else
 #ifdef HAVE_V4L

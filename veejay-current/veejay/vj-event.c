@@ -5664,7 +5664,6 @@ void	vj_event_tag_new_dv1394(void *ptr, const char format[], va_list ap)
 }
 #endif
 
-#ifdef HAVE_V4L
 void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -5681,7 +5680,6 @@ void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 	if( id <= 0 )
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new Video4Linux stream ");
 }
-#endif
 void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;

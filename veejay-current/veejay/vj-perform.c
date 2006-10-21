@@ -1651,7 +1651,7 @@ int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 	centry = vj_perform_tag_is_cached(chain_entry, entry, sample_id);
 	if (centry == -1)
 	{	/* not cached */
-		if( (type == VJ_TAG_TYPE_NET||type==VJ_TAG_TYPE_MCAST||type==VJ_TAG_TYPE_PICTURE) && vj_tag_get_active(sample_id)==0)
+		if( (type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_NET||type==VJ_TAG_TYPE_MCAST||type==VJ_TAG_TYPE_PICTURE) && vj_tag_get_active(sample_id)==0)
 			vj_tag_set_active(sample_id, 1);
 
 	  	if (vj_tag_get_active(sample_id) == 1 )
@@ -1776,7 +1776,7 @@ int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 	centry = vj_perform_tag_is_cached(chain_entry, entry, sample_id); // is it cached?
 	if (centry == -1)
 	{ // no it is not
-		if( (type == VJ_TAG_TYPE_NET||type==VJ_TAG_TYPE_MCAST||type==VJ_TAG_TYPE_PICTURE) && vj_tag_get_active(sample_id)==0)
+		if( (type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_NET||type==VJ_TAG_TYPE_MCAST||type==VJ_TAG_TYPE_PICTURE) && vj_tag_get_active(sample_id)==0)
 			vj_tag_set_active(sample_id, 1 );
 
 		if (vj_tag_get_active(sample_id) == 1)
@@ -2490,7 +2490,7 @@ int vj_perform_tag_fill_buffer(veejay_t * info, int entry)
 	type = vj_tag_get_type( info->uc->sample_id );
 	active = vj_tag_get_active(info->uc->sample_id );
 
-	if( (type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_PICTURE ) && active == 0)
+	if( (type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_PICTURE ) && active == 0)
 	{	
 		vj_tag_enable( info->uc->sample_id );	
 	}

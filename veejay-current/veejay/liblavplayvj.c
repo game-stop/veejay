@@ -603,7 +603,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 	{
 		int cur_id = info->uc->sample_id;
 		int type = vj_tag_get_type( cur_id );
-		if( (type == VJ_TAG_TYPE_NET||type==VJ_TAG_TYPE_PICTURE) && cur_id != sample_id )
+		if( (type == VJ_TAG_TYPE_NET||type==VJ_TAG_TYPE_PICTURE||type==VJ_TAG_TYPE_V4L) && cur_id != sample_id )
 		{
 			vj_tag_disable(cur_id);
 		}	
@@ -628,7 +628,8 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		int tmp=0;
 		// new mode is stream, see if sample_id is a network stream (if so, connect!)
 		if( vj_tag_get_type( sample_id ) == VJ_TAG_TYPE_NET ||
-			vj_tag_get_type( sample_id) == VJ_TAG_TYPE_MCAST )
+			vj_tag_get_type( sample_id) == VJ_TAG_TYPE_MCAST ||
+			vj_tag_get_type( sample_id) == VJ_TAG_TYPE_V4L )
 		{
 			if(vj_tag_enable( sample_id )<= 0 )
 			{
@@ -686,6 +687,8 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 
  	veejay_msg(VEEJAY_MSG_INFO, "Playing Stream %d",
 		sampleid);
+	
+	vj_tag_set_active( sampleid, 1 );
 
 	info->edit_list = info->current_edit_list;
 	
@@ -750,9 +753,6 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 	if(id > 0 )
 	{
 		info->nstreams++;
-		if(type == VJ_TAG_TYPE_V4L 
-			 || type == VJ_TAG_TYPE_MCAST || type== VJ_TAG_TYPE_NET)
-			vj_tag_set_active( id, 1 );
 		veejay_msg(VEEJAY_MSG_INFO, "New Input Stream '%s' with ID %d created",descr, id );
 		return id;
 	}
