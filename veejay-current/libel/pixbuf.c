@@ -113,8 +113,7 @@ static int	picture_prepare_decode( vj_pixbuf_t *picture )
 	pict2.linesize[1] = picture->display_w >> 1;
 	pict2.linesize[2] = picture->display_w >> 1;
 
-	img_convert( &pict2, 
-		(picture->fmt == 1 ? PIX_FMT_YUV420P: PIX_FMT_YUV422P ),
+	img_convert( &pict2, get_ffmpeg_pixfmt( picture->fmt ),
 		&pict1,
 		PIX_FMT_RGB24,
 		picture->display_w, picture->display_h );
@@ -180,6 +179,7 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 	pic->filename = strdup( filename );
 	pic->display_w = v_outw;
 	pic->display_h = v_outh;
+	pic->fmt = v_outf;
 	pic->image = open_pixbuf( filename );
 	if(!pic->image)
 	{
@@ -338,9 +338,7 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 	pict2.data[0] =  (uint8_t*) gdk_pixbuf_get_pixels( img_ );;
         pict2.linesize[0] = w * 3;
 
-	img_convert( &pict2, PIX_FMT_RGB24, &pict1, (fmt == 0 ? PIX_FMT_YUV420P:
-                                                                         PIX_FMT_YUV422P),
-				w, 	h );
+	img_convert( &pict2, PIX_FMT_RGB24, &pict1, get_ffmpeg_pixfmt(fmt),w, 	h );
 
 	GdkPixbuf *save = NULL;
 	if( pic->out_w != w || pic->out_h != h )
@@ -404,11 +402,7 @@ veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int o
 	pict2.data[0] =  (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );;
         pict2.linesize[0] = w * 3;
 
-	int pf = PIX_FMT_YUV444P;
-	if(fmt == 0 )
-		pf = PIX_FMT_YUV420P;
-	else if (fmt == 1 )
-		pf = PIX_FMT_YUV422P;
+	int pf = get_ffmpeg_pixfmt( pf );
 	img_convert( &pict2, PIX_FMT_RGB24, &pict1, pf,	w, 	h );
 
 	if( out_w != w || out_h != h )

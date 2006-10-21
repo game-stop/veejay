@@ -110,7 +110,7 @@ int vj_dv_encode_frame(vj_dv_encoder *encoder, uint8_t *input_buf[3], uint8_t *o
 		w = NTSC_W;
     }
 
-	if( encoder->fmt == FMT_420)
+	if( encoder->fmt == FMT_420 || encoder->fmt == FMT_420F)
 	{	
 		pixels[1] = (uint8_t *) encoder->dv_video + (w * h);
 		pixels[2] = (uint8_t *) encoder->dv_video + (w * h * 5) / 4;
@@ -241,6 +241,25 @@ static inline void frame_YUV422_to_planar(uint8_t **output, uint8_t *input,
     }
 }
 
+int	vj_dv_scan_frame( vj_dv_decoder *d, uint8_t * input_buf )
+{
+	if (dv_parse_header(d->decoder, input_buf) < 0)
+	{
+		veejay_msg(0, "Unable to read DV header");
+		return -1;
+	}
+	if( d->decoder->system == e_dv_system_none )
+	{
+		veejay_msg(0, "No valid PAL or NTSC video frame detected");
+		return -1;
+	}
+	if (d->decoder->sampling == e_dv_sample_411 || d->decoder->sampling == e_dv_sample_422)
+		return 1;
+	if( d->decoder->sampling == e_dv_sample_420 )
+		return 0;
+	return -1;
+}
+
 int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 		       uint8_t * Cb, uint8_t * Cr, int width, int height, int fmt)
 {
@@ -305,7 +324,7 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 
 		dv_decode_full_frame( d->decoder, input_buf, e_dv_color_yuv, pixels,pitches);
 
-	  	if(fmt==FMT_422)
+	  	if(fmt==FMT_422 || fmt == FMT_422F)
                        yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
                else
                        yuy2toyv12( Y,Cb,Cr, d->dv_video, width, height );

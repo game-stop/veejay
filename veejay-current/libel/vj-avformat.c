@@ -413,21 +413,13 @@ int	vj_avformat_get_video_frame( vj_avformat *av, uint8_t *yuv420[3], long nfram
 	if(got_picture) 
 	{
 		AVPicture pict;
-		int dst_fmt = (fmt==FMT_420 ? PIX_FMT_YUV420P : PIX_FMT_YUV422P);
+		int dst_fmt = get_ffmpeg_pixfmt(fmt);
 		pict.data[0] = yuv420[0];
 		pict.data[1] = yuv420[1];
 		pict.data[2] = yuv420[2];
 		pict.linesize[0] = av->cct->width;
-//		if( fmt == FMT_420)
-//		{
-			pict.linesize[1] = av->cct->width >> 1;
-			pict.linesize[2] = av->cct->width >> 1;
-//		}
-//		else
-//		{
-//			pict.linesize[1] = av->cct->width;
-//			pict.linesize[2] = av->cct->width;
-//		}
+		pict.linesize[1] = av->cct->width >> 1;
+		pict.linesize[2] = av->cct->width >> 1;
 		img_convert( 	&pict, 
 				dst_fmt,
 				(const AVPicture*) &frame,	

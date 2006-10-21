@@ -35,7 +35,7 @@
 
 static int out_pixel_format = FMT_420; 
 
-static void	yuv422p3_to_yuv420p3( uint8_t *src[3], uint8_t *dst[3], int w, int h);
+static void	yuv422p3_to_yuv420p3( uint8_t *src[3], uint8_t *dst[3], int w, int h, int fmt);
 
 char*	vj_avcodec_get_codec_name(int codec_id )
 {
@@ -120,17 +120,22 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 		e->context->workaround_bugs = FF_BUG_AUTODETECT;
 		e->context->prediction_method = 0;
 		e->context->dct_algo = FF_DCT_AUTO; //global_quality?
-#if LIBAVCODEC_BUILD > 5010
-		if( YUV420_ONLY_CODEC(id) )
-		e->context->pix_fmt = PIX_FMT_YUV420P;
-		else
-			e->context->pix_fmt = (pixel_format == FMT_420 ? PIX_FMT_YUVJ420P : PIX_FMT_YUVJ422P );
-		//@@ mjpeg encoder requires 4:2:0 planar ? wow
-		//(pixel_format == FMT_420 ? 
-		//		PIX_FMT_YUVJ420P : PIX_FMT_YUVJ422P );
-#else
-		e->context->pix_fmt = (pixel_format == FMT_420 ? PIX_FMT_YUV420P : PIX_FMT_YUV422P );
-#endif
+
+		switch(pixel_format)
+		{
+			case FMT_420:
+				e->context->pix_fmt = PIX_FMT_YUV420P;
+				break;
+			case FMT_420F:
+				e->context->pix_fmt = PIX_FMT_YUVJ420P;
+				break;
+			case FMT_422F:
+				e->context->pix_fmt = PIX_FMT_YUVJ422P;
+				break;
+			default:
+				e->context->pix_fmt = PIX_FMT_YUV422P;
+				break;
+		}
 		char *descr = vj_avcodec_get_codec_name( id );
 
 		if ( avcodec_open( e->context, e->codec ) < 0 )
@@ -151,7 +156,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 	}
 
 	e->len = el->video_width * el->video_height;
-	if(el->pixel_format == FMT_422)
+	if(el->pixel_format == FMT_422 || el->pixel_format == FMT_422F)
 		e->uv_len = e->len / 2;
 	else
 		e->uv_len = e->len / 4;
@@ -310,7 +315,7 @@ void	yuv422p_to_yuv420p3( uint8_t *src, uint8_t *dst[3], int w, int h)
 	img_convert( &pict2, PIX_FMT_YUV420P, &pict1, PIX_FMT_YUV422P, w, h );
 	return;
 }
-void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h)
+void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h, int fmt)
 {
 	AVPicture pict1,pict2;
 	memset(&pict1,0,sizeof(pict1));
@@ -329,10 +334,10 @@ void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h)
 	pict2.linesize[1] = w >> 1;
 	pict2.linesize[2] = w >> 1;	
 
-	img_convert( &pict2, PIX_FMT_YUV420P, &pict1, PIX_FMT_YUV422P, w, h );
+	img_convert( &pict2, PIX_FMT_YUV420P, &pict1, (fmt == FMT_422 ?PIX_FMT_YUV422P: PIX_FMT_YUVJ422P), w, h );
 	return;
 }
-static void	yuv422p3_to_yuv420p3( uint8_t *src[3], uint8_t *dst[3], int w, int h)
+static void	yuv422p3_to_yuv420p3( uint8_t *src[3], uint8_t *dst[3], int w, int h, int fmt)
 {
 	AVPicture pict1,pict2;
 	memset(&pict1,0,sizeof(pict1));
@@ -351,7 +356,7 @@ static void	yuv422p3_to_yuv420p3( uint8_t *src[3], uint8_t *dst[3], int w, int h
 	pict2.linesize[1] = w >> 1;
 	pict2.linesize[2] = w >> 1;	
 
-	img_convert( &pict2, PIX_FMT_YUV420P, &pict1, PIX_FMT_YUV422P, w, h );
+	img_convert( &pict2, PIX_FMT_YUV420P, &pict1, (fmt == FMT_422 ? PIX_FMT_YUV422P:PIX_FMT_YUVJ422P), w, h );
 }
 
 int	yuv422p_to_yuv420p( uint8_t *src[3], uint8_t *dst, int w, int h)
@@ -435,7 +440,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 		return 0;
 	}
 
-	if( (av->encoder_id == 999 && av->out_fmt == FMT_420) || (av->encoder_id == 998 && av->out_fmt == FMT_422))
+	if( (av->encoder_id == 999 && (av->out_fmt == FMT_420 ||av->out_fmt == FMT_420F)) || (av->encoder_id == 998 && (av->out_fmt == FMT_422||av->out_fmt == FMT_422F)))
 	{
 		/* copy */
 		veejay_memcpy( dst, src[0], av->len );
@@ -444,13 +449,13 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 		return ( av->len + av->uv_len + av->uv_len );
 	}
 	/* copy by converting */
-	if( av->encoder_id == 999 && av->out_fmt == FMT_422) 
+	if( av->encoder_id == 999 &&  (av->out_fmt == FMT_422 || av->out_fmt==FMT_422F)) 
 	{
 		yuv422p_to_yuv420p( src, dst, av->width, av->height);
 		return ( av->len + (av->len/4) + (av->len/4));
 	}
 
-	if( av->encoder_id == 998 && av->out_fmt == FMT_420)
+	if( av->encoder_id == 998 && (av->out_fmt == FMT_420||av->out_fmt==FMT_420F))
 	{
 		uint8_t *d[3];
 		d[0] = dst;
@@ -485,7 +490,7 @@ int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[
 	pict.quality = 1;
 	pict.pts = (int64_t)( (int64_t)nframe );
 
-	if(av->context->pix_fmt == PIX_FMT_YUV420P && out_pixel_format == FMT_422 )
+	if(av->context->pix_fmt == PIX_FMT_YUV420P && (out_pixel_format == FMT_422||out_pixel_format == FMT_422F) )
 	{
 		pict.data[0] = av->data[0];
 		pict.data[1] = av->data[1];
@@ -493,11 +498,11 @@ int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[
 		pict.linesize[0] = av->context->width;
 		pict.linesize[1] = av->context->width /2;
 		pict.linesize[2] = av->context->width /2;
-		yuv422p3_to_yuv420p3( src, av->data, av->context->width,av->context->height );
+		yuv422p3_to_yuv420p3( src, av->data, av->context->width,av->context->height, out_pixel_format );
 	}
 	else
 	{
-		int uv_width = ( out_pixel_format == FMT_420 ? av->context->width / 2 : av->context->width);
+		int uv_width = (( out_pixel_format == FMT_420||out_pixel_format == FMT_420F) ? av->context->width / 2 : av->context->width);
 		pict.data[0] = src[0];
 		pict.data[1] = src[1];
 		pict.data[2] = src[2];

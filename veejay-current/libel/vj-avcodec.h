@@ -64,7 +64,7 @@ void	yuv_planar_to_rgb24(uint8_t *src[3], int fmt, uint8_t *dst, int w, int h );
 // from yuv 4:2:0 planar to yuv 4:2:2 planar
 int		yuv420p_to_yuv422p( uint8_t *Y, uint8_t *Cb, uint8_t *Cr, uint8_t *dst[3], int w, int h );
 
-void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h );
+void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h, int f );
 
 int		yuv420p_to_yuv422p2( uint8_t *sY,uint8_t *sCb, uint8_t *sCr, uint8_t *dst[3], int w, int h );
 
