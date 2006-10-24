@@ -96,7 +96,7 @@ void  	yuv_crop(VJFrame *src, VJFrame *dst, VJRectangle *rect );
 VJFrame	*yuv_allocate_crop_image( VJFrame *src, VJRectangle *rect );
 
 
-void    util_convertsrc( void *indata, int w, int h, int out_pix_fmt, int shift, uint8_t **data);
+void    util_convertsrc( void *indata, int w, int h, int out_pix_fmt, int shift, uint8_t **data, int rgb);
 
 void    util_convertrgba32( uint8_t **data, int w, int h,int in_pix_fmt,int shiftv, void *out_buffer );
 

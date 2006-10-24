@@ -86,6 +86,9 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 	gboolean valid;
 	
 	int *tmp = sequence_get_track_status( user_data );
+	if(!tmp)
+		return;
+	
 	int index = 0;
 	valid = gtk_tree_model_get_iter_first( GTK_TREE_MODEL( store ), &iter );
 	while(valid)
@@ -95,6 +98,7 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 		valid = gtk_tree_model_iter_next( GTK_TREE_MODEL(store), &iter );
 	}
 	free(tmp);
+
 	gtk_tree_view_set_model( GTK_TREE_VIEW( view ), model );	
 	g_object_unref( model );
 

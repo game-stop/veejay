@@ -20,6 +20,7 @@
 #include <stdint.h>
 #include <unistd.h>
 #include <libyuv/yuvconv.h>
+#include <veejay/vj-global.h>
 #ifdef USE_SWSCALER
 #include <libpostproc/swscale.h>
 #endif
@@ -652,7 +653,7 @@ void    util_convertrgba32( uint8_t **data, int w, int h,int in_pix_fmt,int shif
 }       
 
 
-void    util_convertsrc( void *indata, int w, int h, int out_pix_fmt, int shift, uint8_t **data)
+void    util_convertsrc( void *indata, int w, int h, int out_pix_fmt, int shift, uint8_t **data, int rgb)
 {
         AVPicture p1,p2;
         memset( &p1, 0, sizeof(p1));
@@ -672,7 +673,8 @@ void    util_convertsrc( void *indata, int w, int h, int out_pix_fmt, int shift,
         p1.linesize[1] = w >> shift;
         p1.linesize[2] = w >> shift; 
        
-       	if(img_convert( &p1, out_pix_fmt,&p2, PIX_FMT_RGBA32,w,h ))
+	int in_fmt = (rgb == FMT_RGB24 ? PIX_FMT_RGB24 : PIX_FMT_RGBA32 );
+       	if(img_convert( &p1, out_pix_fmt,&p2, in_fmt,w,h ))
         {
 #ifdef STRICT_CHECKING
                 veejay_msg(0, "Image conversion failed in %s", __FUNCTION__ );

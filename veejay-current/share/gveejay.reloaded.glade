@@ -71,7 +71,7 @@
 				  <property name="visible">True</property>
 				  <property name="label" translatable="yes">Save samplelist</property>
 				  <property name="use_underline">True</property>
-				  <signal name="activate" handler="on_button_samplelist_save_clickedactivate" last_modification_time="Wed, 19 Oct 2005 12:22:22 GMT"/>
+				  <signal name="activate" handler="on_button_samplelist_save_clicked" last_modification_time="Wed, 19 Oct 2005 12:22:22 GMT"/>
 
 				  <child internal-child="image">
 				    <widget class="GtkImage" id="image2303">
@@ -834,8 +834,7 @@
 	  <child>
 	    <widget class="GtkNotebook" id="panels">
 	      <property name="visible">True</property>
-	      <property name="can_focus">True</property>
-	      <property name="show_tabs">True</property>
+	      <property name="show_tabs">False</property>
 	      <property name="show_border">False</property>
 	      <property name="tab_pos">GTK_POS_TOP</property>
 	      <property name="scrollable">False</property>
@@ -4441,7 +4440,6 @@ Quicktime-MJPEG</property>
 					  <property name="focus_on_click">True</property>
 					  <property name="active">False</property>
 					  <property name="inconsistent">False</property>
-					  <signal name="toggled" handler="on_vims_messenger_play_toggled" last_modification_time="Sat, 30 Sep 2006 18:08:31 GMT"/>
 					</widget>
 					<packing>
 					  <property name="padding">0</property>
@@ -7506,7 +7504,7 @@ Quicktime-MJPEG</property>
 					      <property name="can_focus">True</property>
 					      <property name="relief">GTK_RELIEF_NORMAL</property>
 					      <property name="focus_on_click">True</property>
-					      <signal name="clicked" handler="on_buttontime_clicked" last_modification_time="Mon, 23 Jan 2006 23:09:43 GMT"/>
+					      <signal name="clicked" handler="on_curve_buttontime_clicked" last_modification_time="Mon, 23 Jan 2006 23:09:43 GMT"/>
 
 					      <child>
 						<widget class="GtkImage" id="image2144">

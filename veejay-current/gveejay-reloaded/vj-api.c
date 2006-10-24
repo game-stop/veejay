@@ -3146,9 +3146,10 @@ static void 	update_globalinfo()
 			timeline_set_selection( info->tl, FALSE );
 
 		select_slot( info->status_tokens[PLAY_MODE] );
-	}
 	
-	on_samplepage_clicked(NULL,NULL);
+	
+		on_samplepage_clicked(NULL,NULL);
+	}
 
 	if( info->status_tokens[TOTAL_SLOTS] !=
 		history[TOTAL_SLOTS] 
@@ -6389,15 +6390,16 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 
 //@ after connect:
 
-	setup_geometry( info->el.width, info->el.height, num_tracks_, default_preview_width_,
-		     default_preview_height_ );
+	int pw = 360;
+	int ph = 288;
+	
+	setup_geometry( pw,ph, num_tracks_, pw/2,ph/2  );
 	GtkWidget *img_wid = (skin__ == 0 ? glade_xml_get_widget_( info->main_window, "imageA") : NULL );
 
-
-	multitrack_configure_preview( default_preview_width_,
-				      default_preview_height_,
-			      	      360,
-				      288 );	      
+	multitrack_configure_preview( pw/2,
+				      ph/2,
+			      	      pw,
+				      ph );	      
 
 	gui->mt = multitrack_new(
 			(void(*)(int,char*,int)) vj_gui_cb,
@@ -6405,13 +6407,12 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 			glade_xml_get_widget_( info->main_window, "gveejay_window" ),
 			glade_xml_get_widget_( info->main_window, "mt_box" ),
 			glade_xml_get_widget_( info->main_window, "statusbar") ,
-			360,
-			288,
+			pw,
+			ph,
 			img_wid);
 
 	veejay_msg(VEEJAY_MSG_INFO, "Configure preview size %d x %d, maximum %d x %d",
-			default_preview_width_, default_preview_height_,
-		 	360,288 );
+			pw,ph,pw,ph );
 	
 	memset( &info->watch, 0, sizeof(watchdog_t));
 	info->watch.state = STATE_STOPPED; //

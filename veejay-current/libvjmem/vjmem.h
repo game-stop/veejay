@@ -19,4 +19,7 @@ extern char *get_memcpy_descr( void );
 
 extern void *vj_malloc(unsigned int size);
 
+extern	void *vj_callc(unsigned int size );
+
+
 #endif

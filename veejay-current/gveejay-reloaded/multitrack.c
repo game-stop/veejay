@@ -760,7 +760,7 @@ void		*multitrack_new(
 	
 	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
 	
-	gtk_widget_set_size_request(mt->scroll,max_w*5,max_h*1.2);
+	gtk_widget_set_size_request(mt->scroll,50 + max_w*MAX_TRACKS,20 +max_h);
 	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),2);
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(mt->scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_ALWAYS );
 	GtkWidget *table = gtk_table_new( 1, MAX_TRACKS, FALSE );

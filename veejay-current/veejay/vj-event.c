@@ -2948,6 +2948,11 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 			int start = 0;
 			int end = el->video_frames -1;
 			sample_info *skel = sample_skeleton_new(start,end);
+			if(!skel)
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new sample!");
+				return;
+			}	
 			skel->edit_list = el;
 			if(sample_store(skel)==0) {
 				veejay_msg(VEEJAY_MSG_INFO,"Created new sample [%d]", skel->sample_id);
@@ -7074,7 +7079,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 					v->edit_list->video_height,
 					args[0],
 					args[1],
-				(v->video_out==4 ? 2 :	v->edit_list->pixel_format) );
+			(v->video_out == 4 ? 4 : v->edit_list->pixel_format ));
 				//	pix_fmt );
 				//	v->edit_list->pixel_format );
 	 

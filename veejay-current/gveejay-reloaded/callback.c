@@ -1586,7 +1586,7 @@ void	on_stream_length_value_changed( GtkWidget *widget, gpointer user_data)
 	multi_vims( VIMS_STREAM_SET_LENGTH, "%d", get_nums("stream_length") );
 }
 
-static int	on_curve_buttontime_clicked()
+int	on_curve_buttontime_clicked()
 {
 	// store the values in keyframe
 	sample_slot_t *s = info->selected_slot;
@@ -1819,13 +1819,27 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
 
 	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
-        if( page == MODE_PLAIN )
-		return;
+	
+	
 	
 	if(skin__ == 0 )
 	{
 		if( info->uc.playmode != info->status_tokens[PLAY_MODE])
-		gtk_notebook_set_page( GTK_NOTEBOOK(n), info->status_tokens[PLAY_MODE]);
+		{
+			if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE)	
+				gtk_notebook_set_page(
+						GTK_NOTEBOOK(n),
+						0 );
+			if(info->status_tokens[PLAY_MODE] == MODE_STREAM)	
+				gtk_notebook_set_page(
+						GTK_NOTEBOOK(n),
+						1 );
+			if(info->status_tokens[PLAY_MODE] == MODE_PLAIN)	
+				gtk_notebook_set_page(
+						GTK_NOTEBOOK(n),
+						2 );
+
+		}	
 	}
 	else
 	{

@@ -77,56 +77,62 @@ static struct
 {
         const char *name;
         int  id;
+	int	pf;
 } _supported_codecs[] = 
 {
-        { "mjpeg" , CODEC_ID_MJPEG  },
-	{ "mjpegb", CODEC_ID_MJPEGB },
-        { "msmpeg4",CODEC_ID_MPEG4 },
-        { "divx"   ,CODEC_ID_MSMPEG4V3 },
-        { "i420",   CODEC_ID_YUV420 },
-        { "i422",   CODEC_ID_YUV422 },
-	{ "mjpg",	CODEC_ID_MJPEG	},
-	{ "mjpb",	CODEC_ID_MJPEGB },
-	{ "dmb1",	CODEC_ID_MJPEG	},
-	{ "jpeg",	CODEC_ID_MJPEG	},
-	{ "mjpa",	CODEC_ID_MJPEG  },
-	{ "jfif",	CODEC_ID_MJPEG  },
-	{ "png",	CODEC_ID_PNG	},
-	{ "mpng",	CODEC_ID_PNG	},
+        { "mjpg" , CODEC_ID_MJPEG ,		0 },
+	{ "mjpg" , CODEC_ID_MJPEG , 		1 },
+	{ "mjpb", CODEC_ID_MJPEGB,		0 },
+	{ "mjpb", CODEC_ID_MJPEGB,		1 },
+        { "msmpeg4",CODEC_ID_MPEG4,		-1},
+        { "divx"   ,CODEC_ID_MSMPEG4V3,		-1 },
+        { "i420",   CODEC_ID_YUV420,		-1 },
+        { "i422",   CODEC_ID_YUV422,		-1 },
+	{ "dmb1",	CODEC_ID_MJPEG,		0  },
+	{ "dmb1",	CODEC_ID_MJPEG,		1 },
+	{ "jpeg",	CODEC_ID_MJPEG,		0 },
+	{ "jpeg",	CODEC_ID_MJPEG,		1 },
+	{ "mjpa",	CODEC_ID_MJPEG,		0  },
+	{ "mjpb",	CODEC_ID_MJPEG,		1 },
+	{ "jfif",	CODEC_ID_MJPEG,		0  },
+	{ "jfif",	CODEC_ID_MJPEG,		1 },
+	{ "png",	CODEC_ID_PNG,		-1 },
+	{ "mpng",	CODEC_ID_PNG, 		-1 },
 #if LIBAVCODEC_BUILD > 4680
-	{ "sp5x",   	CODEC_ID_SP5X }, /* sunplus motion jpeg video */
+	{ "sp5x",   	CODEC_ID_SP5X,		-1 }, /* sunplus motion jpeg video */
 #endif
-	{ "jpgl",	CODEC_ID_MJPEG  },
-	{ "dvsd",	CODEC_ID_DVVIDEO},
-	{ "dvcp",	CODEC_ID_DVVIDEO},
-	{ "dv",		CODEC_ID_DVVIDEO},
-	{ "dvhd",	CODEC_ID_DVVIDEO},
-	{ "dvp",	CODEC_ID_DVVIDEO},
-	{ "mp4v",	CODEC_ID_MPEG4  },
-	{ "xvid",	CODEC_ID_MPEG4	},
-	{ "divx",	CODEC_ID_MPEG4  },
-	{ "dxsd",	CODEC_ID_MPEG4	},
-	{ "mp4s",	CODEC_ID_MPEG4	},
-	{ "m4s2",	CODEC_ID_MPEG4	},	
-	{ "avc1",	CODEC_ID_H264	},
-	{ "h264",	CODEC_ID_H264	},
-	{ "x264",	CODEC_ID_H264 	},
-	{ "davc",	CODEC_ID_H264 	},
-	{ "div3",	CODEC_ID_MSMPEG4V3 },
-	{ "mp43",	CODEC_ID_MSMPEG4V3 },
-	{ "mp42",	CODEC_ID_MSMPEG4V2 },
-	{ "mpg4",	CODEC_ID_MSMPEG4V1 },
-	{ "yuv",	CODEC_ID_YUV420 },
-	{ "iyuv",	CODEC_ID_YUV420 },
-	{ "i420",	CODEC_ID_YUV420 },
-	{ "yv16",	CODEC_ID_YUV422 },
-	{ "pict",	0xffff	}, 
-	{ "hfyu",	CODEC_ID_HUFFYUV},
-	{ "cyuv",	CODEC_ID_CYUV   },
-	{ "svq1",	CODEC_ID_SVQ1	},
-	{ "svq3",	CODEC_ID_SVQ3	},
-	{ "rpza",	CODEC_ID_RPZA	},
-	{ NULL  , 0 },
+	{ "jpgl",	CODEC_ID_MJPEG, 	0},
+	{ "jpgl",	CODEC_ID_MJPEG,		1},
+	{ "dvsd",	CODEC_ID_DVVIDEO,	-1},
+	{ "dvcp",	CODEC_ID_DVVIDEO,	-1},
+	{ "dv",		CODEC_ID_DVVIDEO,	-1},
+	{ "dvhd",	CODEC_ID_DVVIDEO,	-1},
+	{ "dvp",	CODEC_ID_DVVIDEO,	-1},
+	{ "mp4v",	CODEC_ID_MPEG4,		-1},
+	{ "xvid",	CODEC_ID_MPEG4,		-1},
+	{ "divx",	CODEC_ID_MPEG4,		-1},
+	{ "dxsd",	CODEC_ID_MPEG4,		-1},
+	{ "mp4s",	CODEC_ID_MPEG4,		-1},
+	{ "m4s2",	CODEC_ID_MPEG4,		-1},	
+	{ "avc1",	CODEC_ID_H264,		-1},
+	{ "h264",	CODEC_ID_H264,		-1},
+	{ "x264",	CODEC_ID_H264,		-1},
+	{ "davc",	CODEC_ID_H264,		-1},
+	{ "div3",	CODEC_ID_MSMPEG4V3,	-1},
+	{ "mp43",	CODEC_ID_MSMPEG4V3,	-1},
+	{ "mp42",	CODEC_ID_MSMPEG4V2,	-1},
+	{ "mpg4",	CODEC_ID_MSMPEG4V1,	-1},
+	{ "yuv",	CODEC_ID_YUV420,	-1},
+	{ "iyuv",	CODEC_ID_YUV420,	-1},
+	{ "i420",	CODEC_ID_YUV420,	-1},
+	{ "yv16",	CODEC_ID_YUV422,	-1},
+	{ "pict",	0xffff,			-1}, 
+	{ "hfyu",	CODEC_ID_HUFFYUV,	-1},
+	{ "cyuv",	CODEC_ID_CYUV,		-1},
+	{ "svq1",	CODEC_ID_SVQ1,		-1},
+	{ "svq3",	CODEC_ID_SVQ3,		-1},
+	{ "rpza",	CODEC_ID_RPZA,		-1},
+	{ NULL  , 0,				-1},
 };
 
 static struct
@@ -199,14 +205,20 @@ static	vj_dv_decoder *dv_decoder_ = NULL;
 
 static	vj_decoder *el_codecs[MAX_CODECS];
 
-static	int _el_get_codec(int id )
+static	int _el_get_codec(int id, int in_pix_fmt )
 {
 	int i;
 	for( i = 0; _supported_codecs[i].name != NULL ; i ++ )
 	{
-		if( _supported_codecs[i].id == id )
+		if( _supported_codecs[i].id == id)
 		{
-			return i;
+			if( _supported_codecs[i].pf == -1) {
+				return i;
+			} else if ( _supported_codecs[i].pf == 0 && (in_pix_fmt == FMT_420F || in_pix_fmt == FMT_420)) {
+				return i;
+			} else if ( _supported_codecs[i].pf == 1 && (in_pix_fmt == FMT_422F || in_pix_fmt == FMT_422)) {
+				return i;		
+			}	
 		}
 	}
 	return -1;
@@ -244,7 +256,8 @@ static void	_el_free_decoder( vj_decoder *d )
 			free( d->context );
 			d->context = NULL;
 		}
-		if(d->frame) av_free(d->frame);
+		if(d->frame) 
+			free(d->frame);
 		
 		free(d);
 	}
@@ -344,10 +357,9 @@ int	vj_el_cache_size()
 
 vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixel_format, int out_fmt)
 {
-        vj_decoder *d = (vj_decoder*) vj_malloc(sizeof(vj_decoder));
+        vj_decoder *d = (vj_decoder*) vj_calloc(sizeof(vj_decoder));
         if(!d)
 	  return NULL;
-	memset( d, 0, sizeof(vj_decoder));
 
 	int found = 0;
 	
@@ -370,16 +382,13 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 		d->context->opaque = d;
 		d->context->palctrl = NULL;
 		d->frame = avcodec_alloc_frame();
-		d->img = (VJFrame*) vj_malloc(sizeof(VJFrame));
-		memset(d->img,0,sizeof(VJFrame));
+		d->img = (VJFrame*) vj_calloc(sizeof(VJFrame));
 		d->img->width = width;	
 		if ( avcodec_open( d->context, d->codec ) < 0 )
        		{
       		        veejay_msg(VEEJAY_MSG_ERROR, "Error initializing decoder %d",id); 
        		       return NULL;
       		}
-
-		
 		
 		if( out_fmt == pixel_format )
 		{
@@ -388,7 +397,6 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 			{
 				d->context->get_buffer = get_buffer;
 				d->context->release_buffer = release_buffer;
-			
 				veejay_msg(VEEJAY_MSG_DEBUG,
 					"\tDirect rendering to frame buffer is enabled");
 			}
@@ -474,8 +482,28 @@ int	get_ffmpeg_pixfmt( int pf )
 			return PIX_FMT_YUVJ420P;
 		case FMT_422F:
 			return PIX_FMT_YUVJ422P;
+		case 4:
+			return PIX_FMT_YUV444P;
+		
 	}
 	return PIX_FMT_YUV422P;
+}
+int       get_ffmpeg_shift_size(int fmt)
+{
+        switch(fmt)
+        {
+                case FMT_420:
+                case FMT_420F:
+                        return 1;
+                case FMT_422:
+                case FMT_422F:
+                        return 0;
+		case 4:
+			return 0;
+                default:
+                        break;
+        }
+        return 0;
 }
 
 
@@ -776,7 +804,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	decoder_id = _el_get_codec_id( compr_type );
 	if(decoder_id > 0 && decoder_id != 0xffff)
 	{
-		int c_i = _el_get_codec(decoder_id);
+		int c_i = _el_get_codec(decoder_id, el->yuv_taste[n] );
 		if(c_i == -1)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unsupported codec %s",compr_type);
@@ -922,7 +950,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
  		}
 	}
 
-	c_i = _el_get_codec( decoder_id );
+	c_i = _el_get_codec( decoder_id , in_pix_fmt);
         if(c_i >= 0 && c_i < MAX_CODECS && el_codecs[c_i] != NULL)
                 d = el_codecs[c_i];
 	else

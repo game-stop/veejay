@@ -85,9 +85,9 @@ AC_ARG_WITH(gveejayreloaded,
 		AC_HELP_STRING([--without-gveejayreloaded], [Do not build GVeejay Reloaded]),
 		[with_gveejayreloaded=no], [with_gveejayreloaded=yes])
 
-AC_ARG_WITH(gveejay,
-		AC_HELP_STRING([--without-gveejay], [Do not build GVeejay]),
-		[with_gveejay=no]], [with_gveejay=yes])
+dnl AC_ARG_WITH(gveejay,
+dnl		AC_HELP_STRING([--without-gveejay], [Do not build GVeejay]),
+dnl		[with_gveejay=no]], [with_gveejay=yes])
 
 AC_ARG_WITH(swscaler,
 		AC_HELP_STRING([--with-swscaler], [Build without Swscaler support]),
@@ -178,7 +178,7 @@ have_v4l=false
 have_linux=false
 have_darwin=false
 use_gveejayreloaded=false
-use_gveejay=false
+dnl use_gveejay=false
 case $host in
   *-*-linux*)
 	AC_CHECK_HEADER(linux/version.h,
@@ -186,9 +186,9 @@ case $host in
 		if test x$with_gveejayreloaded != xno ; then
 			 use_gveejayreloaded=true
 		fi
-		if test x$with_gveejay != xno ; then
-			 use_gveejay=true
-		fi
+dnl		if test x$with_gveejay != xno ; then
+dnl			 use_gveejay=true
+dnl		fi
 	         AC_DEFINE(HAVE_LINUX,,[Linux platform])
 		],
 		[AC_MSG_ERROR([version.h not found - please install the linux kernel headers])
@@ -846,8 +846,8 @@ AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
 AM_CONDITIONAL(USE_SWSCALER, test x$use_swscaler = xtrue)
 AM_CONDITIONAL(USE_GL, test x$have_gl = xtrue)
 AM_CONDITIONAL(USE_UNICAP,test x$have_unicap = xtrue)
-AM_CONDITIONAL(USE_GVEEJAY,
-			test x$use_gveejay = xtrue )
+dnl AM_CONDITIONAL(USE_GVEEJAY,
+dnl 			test x$use_gveejay = xtrue )
 AM_CONDITIONAL(USE_GVEEJAYRELOADED,
 			test x$use_gveejayreloaded = xtrue )
 dnl *********************************************************************
@@ -902,7 +902,7 @@ if test x"$with_extra_cflags" != "x"; then
 fi
 
 
-AC_MSG_NOTICE([ Gveejay ${use_gveejayreloaded} ${with_gveejayreloaded} ])
+AC_MSG_NOTICE([ Gveejay Reloaded ${use_gveejayreloaded} ${with_gveejayreloaded} ])
 
 
 if test x$use_gveejayreloaded != xfalse ; then
@@ -923,7 +923,7 @@ fi
 
 
 with_gimp_stuff=false
-if test x$use_gveejay != xfalse ; then with_gimp_stuff=true ; fi
+dnl if test x$use_gveejay != xfalse ; then with_gimp_stuff=true ; fi
 if test x$use_gveejayreloaded != xfalse ; then with_gimp_stuff=true ; fi
 
 if test x$with_gimp_stuff != xfalse ; then
@@ -1041,6 +1041,6 @@ AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 AC_MSG_NOTICE([  - jack                          : ${have_jack}])
 AC_MSG_NOTICE([  - xml c library for gnome       : ${have_xml2}])
 AC_MSG_NOTICE([  - freetype support              : ${have_freetype}])
-AC_MSG_NOTICE([  - GVeejay UI                    : ${use_gveejay}])
+dnl AC_MSG_NOTICE([  - GVeejay UI                    : ${use_gveejay}])
 AC_MSG_NOTICE([  - GVeejay Reloaded UI           : ${use_gveejayreloaded}])
 AC_MSG_NOTICE([  - Swscaler support              : ${use_swscaler}])

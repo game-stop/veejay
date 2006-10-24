@@ -1029,8 +1029,18 @@ int lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf)
 #ifdef HAVE_LIBQUICKTIME
 	if(lav_file->format == 'q')
 		return quicktime_read_frame(lav_file->qt_fd,vidbuf,0);
-#endif	
-   return (AVI_read_frame(lav_file->avi_fd,vidbuf));
+#endif
+   int kf = 1;	
+   int ret = (AVI_read_frame(lav_file->avi_fd,vidbuf,&kf));
+
+   if(!kf)
+   {
+	veejay_msg(0, "Requested frame is not a keyframe");
+	return 0;
+   }
+
+   return ret;
+
 }
 
 #ifdef USE_GDK_PIXBUF

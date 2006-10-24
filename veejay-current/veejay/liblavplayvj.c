@@ -1938,8 +1938,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 					info,info->current_edit_list,
 					start,end );
 				sample_info *skel = sample_skeleton_new( 0,el->video_frames-1 );
-				skel->edit_list = el;
-				sample_store(skel);
+				if(skel)
+				{
+					skel->edit_list = el;
+					sample_store(skel);
+				}
 			}	
 		}
 	}
@@ -2967,11 +2970,18 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 	if(!sample)
 	{
 		sample = sample_skeleton_new( 0, sample_edl->video_frames - 1 );
+		if(sample)
+		{
 		sample_store(sample);
 		sample_set_editlist( sample->sample_id , sample_edl );
 		veejay_msg(VEEJAY_MSG_INFO,
 			"Created new sample %d from file %s",sample->sample_id,
 				files[0]);
+		}
+		else
+			veejay_msg(VEEJAY_MSG_ERROR,
+			"Failed to create new sample from file '%s'",
+			 files[0]);
 
 	}
 

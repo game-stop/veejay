@@ -148,6 +148,14 @@ void *vj_malloc(unsigned int size)
 	return ptr;
 }
 
+void	*vj_calloc( size_t size )
+{
+	void *ptr = vj_malloc( size );
+	if(ptr)
+		memset( ptr, 0, size );
+	return ptr;	
+}
+
 
 
 

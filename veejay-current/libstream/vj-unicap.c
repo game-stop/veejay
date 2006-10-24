@@ -73,6 +73,8 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 	unicap_driver_t *ud = (unicap_driver_t*) unicap;
 	char key[64];
 
+	unicap_void_device(&(ud->device));
+	
 	for( i = 0; SUCCESS( unicap_enumerate_devices( NULL, &(ud->device), i ) ); i++ )
 	{
 		unicap_property_t property;
@@ -88,7 +90,7 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 		}
 		unicap_lock_properties( ud->handle );
 
-	
+		unicap_void_property(&property);	
 		
 		unicap_reenumerate_properties( ud->handle, &property_count );
 		unicap_reenumerate_formats( ud->handle, &format_count );
@@ -121,8 +123,6 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 						&device_location );
 
 		
-		veejay_msg(2, "\t'%s' at device %s",device_name, device_location ); 
-	
 		free( device_location );
 		free( device_name );
 		
@@ -581,6 +581,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 	}
 	else
 	{
+		unsigned int rgb24_fourcc = get_fourcc( "RGB3" );
 		unsigned int rgb_fourcc = get_fourcc( "RGB4" );
 		unicap_format_t rgb_spec, rgb_format;
 		unicap_void_format( &rgb_spec);
@@ -589,7 +590,15 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 		for( i = 0;
 	         	SUCCESS( unicap_enumerate_formats( vut->handle, &rgb_spec, &rgb_format, i ) ); i ++ )
 		{
-			if( rgb_fourcc == rgb_format.fourcc )
+			//@ try rgb24 first, its has less bandwidth
+			if( rgb24_fourcc == rgb_format.fourcc )
+			{
+				veejay_msg(0, "Camera can capture in RGB24" );
+				vut->rgb = 2;
+				rgb_format.size.width = w;
+				rgb_format.size.height = h;
+				break;
+			} else 	if( rgb_fourcc == rgb_format.fourcc )
 			{
 				veejay_msg(0, "Camera can capture in RGB32");
 				vut->rgb = 1;
@@ -611,7 +620,6 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 			{
 				veejay_msg(0, "Cannot set size %d x %d or format %s", w,h,rgb_format.identifier);
 				unicap_unlock_properties( vut->handle );
-
 				return 0;
 			}
 	}
@@ -788,7 +796,7 @@ int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const 
 		}
 		else
 		{
-			util_convertsrc( v->buffer.data, width,height,v->pixfmt,v->shift, buffer );
+			util_convertsrc( v->buffer.data, width,height,v->pixfmt,v->shift, buffer, v->rgb );
 		}
 	}	
 	unicap_unlock_properties( v->handle );
