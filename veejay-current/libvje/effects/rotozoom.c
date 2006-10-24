@@ -38,11 +38,11 @@ vj_effect *rotozoom_init(int width, int height)
 {
     int i, j;
 
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 0;
     ve->defaults[1] = 1;
     ve->defaults[2] = 1;
@@ -129,20 +129,21 @@ int rotozoom_malloc(int width, int height)
 {
 
 
-   rotobuffer[0] = (uint8_t *) vj_malloc(sizeof(uint8_t) * width * height );
-   if(!rotobuffer[0]) return 0;
-    rotobuffer[1] = (uint8_t *) vj_malloc(sizeof(uint8_t) * width * height );
-   if(!rotobuffer[1]) return 0;
-    rotobuffer[2] = (uint8_t *) vj_malloc(sizeof(uint8_t) * width * height );
-   if(!rotobuffer[2]) return 0;
+   rotobuffer[0] = (uint8_t *) vj_calloc(sizeof(uint8_t) * width * height * 3);
+	if(!rotobuffer[0])
+		return 0;
+	rotobuffer[1] = rotobuffer[0] + (width * height);
+	rotobuffer[2] = rotobuffer[1] + (width * height);
    return 1;
 
 }
 
 void rotozoom_free() {
-  if(rotobuffer[0]) free(rotobuffer[0]);
-  if(rotobuffer[1]) free(rotobuffer[1]);
-  if(rotobuffer[2]) free(rotobuffer[2]);
+	if(rotobuffer[0])
+		free(rotobuffer[0]);
+	rotobuffer[0] = NULL;
+	rotobuffer[1] = NULL;
+	rotobuffer[2] = NULL;
 }
 
 /* rotozoomer, from the demo effects collection, works in supersampled YCbCr space.

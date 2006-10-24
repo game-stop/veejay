@@ -30,11 +30,11 @@ static int nreverse = 0;
 
 vj_effect *scratcher_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
     ve->limits[0][1] = 1;
@@ -55,28 +55,30 @@ vj_effect *scratcher_init(int w, int h)
 //FIXME private
 
 void scratcher_free() {
-   if(frame[0]) free(frame[0]);
-   if(frame[1]) free(frame[1]);
-   if(frame[2]) free(frame[2]);
-
+   if(frame[0])
+	  free(frame[0]);
+	frame[0] = NULL;
+	frame[1] = NULL;
+	frame[2] = NULL;
 }
 
 int scratcher_malloc(int w, int h)
 {
 	/* need memory for bounce mode ... */
     frame[0] =
-	(uint8_t *) vj_malloc(w * h * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
+	(uint8_t *) vj_malloc(w * h * 2 * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
 	if(!frame[0]) return 0;
+	
     memset( frame[0], pixel_Y_lo_, w * h * MAX_SCRATCH_FRAMES );
+
     frame[1] =
-	(uint8_t *) vj_malloc( ((w * h)/4) * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
-	if(!frame[1]) return 0;
-	memset( frame[1], 128, ((w * h) / 4 ) * MAX_SCRATCH_FRAMES);
+	    frame[0] + ( w * h * MAX_SCRATCH_FRAMES );
     frame[2] =
-	(uint8_t *) vj_malloc( ((w * h)/4) * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
-	if(!frame[2]) return 0;
-	memset( frame[2], 128, ((w * h)/4) * MAX_SCRATCH_FRAMES);
-	return 1;
+	    frame[1] + ( ((w*h)/4) * MAX_SCRATCH_FRAMES );
+
+    memset( frame[1], 128, ((w * h)/4 ) * MAX_SCRATCH_FRAMES);
+    memset( frame[2], 128, ((w * h)/4) * MAX_SCRATCH_FRAMES);
+    return 1;
 }
 
 

@@ -54,11 +54,11 @@ static uint8_t *reflection_buffer;
 
 vj_effect *reflection_init(int width,int height)
 {
-      vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+      vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 2;
     ve->defaults[1] = 5;
     ve->defaults[2] = 1;
@@ -107,6 +107,7 @@ int reflection_malloc(int width, int height)
 
 void reflection_free() {
   if(reflection_buffer) free(reflection_buffer);
+  reflection_buffer = NULL;
 }
 
 

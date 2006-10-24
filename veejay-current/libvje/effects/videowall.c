@@ -29,12 +29,12 @@ static inline	int	n_pics(int w, int h)
 
 vj_effect *videowall_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
 
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0; // selector
     ve->limits[1][0] = n_pics(w,h);
     ve->limits[0][1] = 0;
@@ -71,8 +71,7 @@ static	int prepare_filmstrip(int w, int h)
 	int picture_height = gcd(w,h);
 	int film_length = n_pics(w,h);
 
-	photo_list = (picture_t**) vj_malloc(sizeof(picture_t*) * film_length  );
-	memset( photo_list, 0, sizeof(picture_t*) * film_length );
+	photo_list = (picture_t**) vj_calloc(sizeof(picture_t*) * film_length  );
 	if(!photo_list)
 		return 0;
 
@@ -83,34 +82,27 @@ static	int prepare_filmstrip(int w, int h)
 
 	for ( i = 0; i < num_photos; i ++ )
 	{
-		photo_list[i] = vj_malloc(sizeof(picture_t));
-		memset( photo_list[i], 0, sizeof(picture_t));
+		photo_list[i] = vj_calloc(sizeof(picture_t));
 		if(!photo_list[i])
 			return 0;
 		photo_list[i]->w = picture_width;
 		photo_list[i]->h = picture_height;
 		for( j = 0; j < 3; j ++ )
 		{
-			photo_list[i]->data[j] = vj_malloc(sizeof(uint8_t) * picture_width * picture_height );
+			photo_list[i]->data[j] = vj_calloc(sizeof(uint8_t) * picture_width * picture_height );
 			if(!photo_list[i]->data[j])
 				return 0;
-			memset(photo_list[i]->data[j], (j==0 ? inc : 128), picture_width *picture_height );
 		}
 		val+= inc;
 	}
 	frame_counter = 0;
 
-	offset_table_x = (int*) vj_malloc(sizeof(int) * film_length);
+	offset_table_x = (int*) vj_calloc(sizeof(int) * film_length);
 	if(!offset_table_x)
 		return 0;
-	offset_table_y = (int*) vj_malloc(sizeof(int) * film_length);
+	offset_table_y = (int*) vj_calloc(sizeof(int) * film_length);
 	if(!offset_table_y)
 		return 0;
-	for( i =0 ; i < film_length; i ++)
-	{
-		offset_table_x[i] = 0;
-		offset_table_y[i] = 0;
-	}
 
 	return 1;
 }

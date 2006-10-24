@@ -46,12 +46,12 @@ static uint8_t *chrominance;
 
 vj_effect *uvcorrect_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 7;
 
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
 	//angle,r,g,b,cbc,crc
 
     ve->limits[0][0] = 1;
@@ -83,7 +83,7 @@ vj_effect *uvcorrect_init(int w, int h)
     ve->has_help = 1;
 	ve->has_user = 0;
 // FIXME: private
-    //chrominance = (uint8_t*) vj_malloc (sizeof(uint8_t) * 512 * 256 );
+    //chrominance = (uint8_t*) vj_calloc (sizeof(uint8_t) * 512 * 256 );
     
     return ve;
 }

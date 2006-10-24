@@ -29,11 +29,11 @@ static int mtrace_counter = 0;
 
 vj_effect *mtracer_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 30;
     ve->limits[0][1] = 1;
@@ -49,18 +49,16 @@ vj_effect *mtracer_init(int w, int h)
 // FIXME private
 void mtracer_free() {
   if(mtrace_buffer[0]) free(mtrace_buffer[0]);
-  if(mtrace_buffer[1]) free(mtrace_buffer[1]);
-  if(mtrace_buffer[2]) free(mtrace_buffer[2]);
+  mtrace_buffer[0] = NULL;
+  mtrace_buffer[1] = NULL;
 }
 
 int mtracer_malloc(int w, int h)
 {
-   mtrace_buffer[0] = (uint8_t *) vj_malloc(w * h * sizeof(uint8_t));
+   mtrace_buffer[0] = (uint8_t *) vj_malloc(w * h * 3 * sizeof(uint8_t));
 	if(!mtrace_buffer[0]) return 0;
-    mtrace_buffer[1] = (uint8_t *) vj_malloc(w * h * sizeof(uint8_t));
-	if(!mtrace_buffer[1]) return 0;
-    mtrace_buffer[2] = (uint8_t *) vj_malloc(w * h * sizeof(uint8_t));
-   	if(!mtrace_buffer[2]) return 0;
+	mtrace_buffer[1] = mtrace_buffer[0] + (w*h);
+	mtrace_buffer[2] = mtrace_buffer[1] + (w*h);
 	return 1;
 }
 

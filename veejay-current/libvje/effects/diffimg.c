@@ -24,11 +24,11 @@
 
 vj_effect *diffimg_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults[0] = 6;/* type */
     ve->defaults[1] = 15;	/* min */
     ve->defaults[2] = 235;	/* max */

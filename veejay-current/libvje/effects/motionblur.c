@@ -25,11 +25,11 @@
 static uint8_t *previous_frame[3];
 vj_effect *motionblur_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 15;
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 1000; /* time in frames */
@@ -42,20 +42,19 @@ vj_effect *motionblur_init(int width, int height)
 
 int motionblur_malloc(int width, int height)
 {
-	previous_frame[0] = (uint8_t*) vj_malloc( width * height * sizeof(uint8_t));
+	previous_frame[0] = (uint8_t*) vj_calloc( width * height * 3 * sizeof(uint8_t));
 	if(!previous_frame[0]) return 0;
-	previous_frame[1] = (uint8_t*) vj_malloc( width * height * sizeof(uint8_t));
-	if(!previous_frame[1]) return 0;
-	previous_frame[2] = (uint8_t*) vj_malloc( width * height * sizeof(uint8_t));
-   	if(!previous_frame[2]) return 0;
-
+	previous_frame[1] = previous_frame[0] + (width * height);
+	previous_frame[2] = previous_frame[1] + (width  * height);
 	return 1;
 }
 
 void motionblur_free() {
-   if(previous_frame[0]) free(previous_frame[0]);
-   if(previous_frame[1]) free(previous_frame[1]);
-   if(previous_frame[2]) free(previous_frame[2]);
+   if(previous_frame[0])
+	   free(previous_frame[0]);
+	previous_frame[0] = NULL;
+	previous_frame[1] = NULL;
+	previous_frame[2] = NULL;
 }
 
 

@@ -24,12 +24,12 @@
 
 vj_effect *videoplay_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
 
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 2; // divider
     ve->limits[1][0] = max_power(w);
     ve->limits[0][1] = 1;
@@ -57,7 +57,7 @@ static	int prepare_filmstrip(int film_length, int w, int h)
 	int picture_width = w / sqrt(film_length);
 	int picture_height = h / sqrt(film_length);
 
-	video_list = (picture_t**) vj_malloc(sizeof(picture_t*) * (film_length + 1) );
+	video_list = (picture_t**) vj_calloc(sizeof(picture_t*) * (film_length + 1) );
 	if(!video_list)
 		return 0;
 
@@ -68,14 +68,14 @@ static	int prepare_filmstrip(int film_length, int w, int h)
 
 	for ( i = 0; i < num_videos; i ++ )
 	{
-		video_list[i] = vj_malloc(sizeof(picture_t));
+		video_list[i] = vj_calloc(sizeof(picture_t));
 		if(!video_list[i])
 			return 0;
 		video_list[i]->w = picture_width;
 		video_list[i]->h = picture_height;
 		for( j = 0; j < 3; j ++ )
 		{
-			video_list[i]->data[j] = vj_malloc(sizeof(uint8_t) * picture_width * picture_height );
+			video_list[i]->data[j] = vj_calloc(sizeof(uint8_t) * picture_width * picture_height );
 			if(!video_list[i]->data[j])
 				return 0;
 			memset(video_list[i]->data[j], (j==0 ? pixel_Y_lo_ : 128), picture_width *picture_height );

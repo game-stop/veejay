@@ -32,11 +32,11 @@ static unsigned int last[2] = {0,0};
 
 vj_effect *magicmirror_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
 
     ve->defaults[0] = 76;
     ve->defaults[1] = 3;
@@ -64,32 +64,24 @@ vj_effect *magicmirror_init(int w, int h)
 int magicmirror_malloc(int w, int h)
 {
 	unsigned int i;	
-	magicmirrorbuf[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * w * h );
+	magicmirrorbuf[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * w * h * 3);
 	if(!magicmirrorbuf[0]) return 0;
-	magicmirrorbuf[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * w * h );
-	if(!magicmirrorbuf[1]) return 0;
-	magicmirrorbuf[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * w * h );
-	if(!magicmirrorbuf[2]) return 0;
-
-	funhouse_x = (double*)vj_malloc(sizeof(double) * w );
+	magicmirrorbuf[1] = magicmirrorbuf[0] + (w*h);
+	magicmirrorbuf[2] = magicmirrorbuf[1] + (w*h);
+	
+	funhouse_x = (double*)vj_calloc(sizeof(double) * w );
 	if(!funhouse_x) return 0;
 
-	cache_x = (unsigned int *)vj_malloc(sizeof(unsigned int)*w);
+	cache_x = (unsigned int *)vj_calloc(sizeof(unsigned int)*w);
 	if(!cache_x) return 0;
 
-	funhouse_y = (double*)vj_malloc(sizeof(double) * h );
+	funhouse_y = (double*)vj_calloc(sizeof(double) * h );
 	if(!funhouse_y) return 0;
 
-	cache_y = (unsigned int*)vj_malloc(sizeof(unsigned int)*h);
+	cache_y = (unsigned int*)vj_calloc(sizeof(unsigned int)*h);
 	if(!cache_y) return 0;
 	memset(cache_x,0,w);
 	memset(cache_y,0,h);
-
-	for ( i = 0; i < h ; i ++ )
-		funhouse_y[i] = 0.0;
-
-	for ( i = 0; i < w; i ++ )
-		funhouse_x[i] = 0.0;
 
 	memset(magicmirrorbuf[0],16,w*h);
 	memset(magicmirrorbuf[1],128,w*h);
@@ -100,12 +92,17 @@ int magicmirror_malloc(int w, int h)
 void magicmirror_free()
 {
 	if(magicmirrorbuf[0]) free(magicmirrorbuf[0]);
-	if(magicmirrorbuf[1]) free(magicmirrorbuf[1]);
-	if(magicmirrorbuf[2]) free(magicmirrorbuf[2]);
 	if(funhouse_x) free(funhouse_x);
 	if(funhouse_y) free(funhouse_y);
 	if(cache_x) free(cache_x);
 	if(cache_y) free(cache_y);
+	magicmirrorbuf[0] = NULL;
+	magicmirrorbuf[1] = NULL;
+	magicmirrorbuf[2] = NULL;
+	cache_x = NULL;
+	cache_y  = NULL;
+	funhouse_x = NULL;
+	funhouse_y = NULL;
 }
 
 void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int n )

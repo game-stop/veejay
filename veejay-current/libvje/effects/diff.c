@@ -34,11 +34,11 @@ typedef struct
 vj_effect *diff_init(int width, int height)
 {
     //int i,j;
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 9;
     ve->limits[0][1] = 0;	/* threshold min */
@@ -65,14 +65,12 @@ int diff_malloc(void **d, int width, int height)
 {
 	int i;
 	diff_data *my;
-	*d = (void*) vj_malloc(sizeof(diff_data));
+	*d = (void*) vj_calloc(sizeof(diff_data));
 	my = (diff_data*) *d;
-	my->static_bg[0] = (uint8_t*) vj_malloc(sizeof(uint8_t)* width * height);
-	memset( my->static_bg[0], 0 , (width*height));
-	my->data = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height );
-	memset(my->data, 0, width * height);
+	my->static_bg[0] = (uint8_t*) vj_calloc(sizeof(uint8_t)* width * height);
+	my->data = (uint8_t*) vj_calloc(sizeof(uint8_t) * width * height );
 	for(i=0; i < 256; i ++) 
-		my->sqrt_table[i] = (double*)vj_malloc(sizeof(double)* 256);
+		my->sqrt_table[i] = (double*)vj_calloc(sizeof(double)* 256);
 	
 	my->has_bg = 0;
 	return 1;

@@ -33,12 +33,12 @@ static uint8_t *bathroom_frame[3];
 
 vj_effect *bathroom_init(int width,int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
 
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 1;
     ve->limits[0][1] = 1;
@@ -56,20 +56,20 @@ vj_effect *bathroom_init(int width,int height)
 
 int bathroom_malloc(int width, int height)
 {
-    bathroom_frame[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height);
+    bathroom_frame[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height * 3);
     if(!bathroom_frame[0]) return 0;
-    bathroom_frame[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height);
-    if(!bathroom_frame[1]) return 0;
-    bathroom_frame[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height);
-    if(!bathroom_frame[2]) return 0;
-
+  
+    bathroom_frame[1] = bathroom_frame[0] + (width * height );
+    bathroom_frame[2] = bathroom_frame[1] + (width * height );
     return 1;
 }
 
 void bathroom_free() {
- if(bathroom_frame[0]) free(bathroom_frame[0]);
- if(bathroom_frame[1]) free(bathroom_frame[1]);
- if(bathroom_frame[2]) free(bathroom_frame[2]);
+ if(bathroom_frame[0])
+	 free(bathroom_frame[0]);
+ bathroom_frame[0] = NULL;
+ bathroom_frame[1] = NULL;
+ bathroom_frame[2] = NULL;
 }
 
 void bathroom_verti_apply(VJFrame *frame, int width, int height, int val)

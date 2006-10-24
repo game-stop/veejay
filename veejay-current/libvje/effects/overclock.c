@@ -25,12 +25,12 @@
 
 vj_effect *overclock_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
 
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 2;
     ve->limits[1][0] = (h/8);
     ve->limits[0][1] = 1;
@@ -104,20 +104,14 @@ static inline void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int powe
 int overclock_malloc(int w, int h)
 {
 	const int len = w* h;
-	oc_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
+	oc_buf[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * len );
 	if(oc_buf[0]==NULL) return 0;
-//	oc_buf[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * uv_len);
-//	if(oc_buf[1]==NULL) return 0;
-//	oc_buf[2] = (uint8_t*) vj_malloc(sizeof(uint8_t) * uv_len);
-//	if(oc_buf[2]==NULL) return 0;
 	return 1;
 }
 
 void overclock_free()
 {
 	if(oc_buf[0]) free( oc_buf[0] );
-	if(oc_buf[1]) free( oc_buf[1] );
-	if(oc_buf[2]) free( oc_buf[2] );
 }
 
 void overclock_apply(VJFrame *frame, int width, int height, int n, int radius )

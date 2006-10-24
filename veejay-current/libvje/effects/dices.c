@@ -50,11 +50,11 @@ typedef enum _dice_dir {
 vj_effect *dices_init(int width, int height)
 {
 
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 4;
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 5;
@@ -62,7 +62,7 @@ vj_effect *dices_init(int width, int height)
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
-    g_dicemap = (uint8_t *) vj_malloc(sizeof(uint8_t) * width * height);
+    g_dicemap = (uint8_t *) vj_calloc(sizeof(uint8_t) * width * height);
     dice_create_map(width, height);
     return ve;
 }
@@ -76,7 +76,9 @@ int	dices_malloc(int width, int height)
 }
 
 void dices_free() {
-   if(g_dicemap) free(g_dicemap);
+   if(g_dicemap) 
+	   free(g_dicemap);
+   g_dicemap  = NULL;
 }
 
 unsigned int dices_fastrand_val;
@@ -164,6 +166,16 @@ void dices_apply( void* data, VJFrame *frame, int width, int height,
 			Cr[di] = Cr[i];
 			i++;
 		    }
+		}
+		break;
+	     case Up:
+		for( dy = 0; dy < g_cube_size ; dy ++ )
+		{
+			i =  base + dy * width;
+			for( dx  =  0; dx  < g_cube_size   ; dx ++ )
+			{
+				Y[di]  = Y[i]; Cb[di] =  Cb[i]; Cr[di]  =  Cr[i]; i ++;
+			}
 		}
 		break;
 	    }

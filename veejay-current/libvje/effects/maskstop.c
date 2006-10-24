@@ -33,11 +33,11 @@ static unsigned int frq_mask;
 
 vj_effect *maskstop_init(int width , int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 0; // negate mask
     ve->defaults[1] = 0; // swap mask/frame
     ve->defaults[2] = 80;   // hold frame freq
@@ -69,19 +69,19 @@ vj_effect *maskstop_init(int width , int height)
 int	maskstop_malloc(int width, int height)
 {
 	int i;
-	for( i = 0; i < 6; i ++ )
-	{
-		vvmaskstop_buffer[i] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height ); 
-		if(!vvmaskstop_buffer[i]) return 0;
-	}
+	vvmaskstop_buffer[0] =  (uint8_t*) vj_malloc( sizeof(uint8_t)  * width * height  * 6 );
+	for( i = 1; i < 6; i ++ )
+		vvmaskstop_buffer[i] = vvmaskstop_buffer[(i-1)] + (width * height);
 
 	return 1;
 }
 
 void maskstop_free() {
+	if(vvmaskstop_buffer[0])
+		free(vvmaskstop_buffer[0]);
 	int i;
-	for(i = 0; i < 6; i ++ )
-		if(vvmaskstop_buffer[i]) free(vvmaskstop_buffer[i]);
+	for(i = 0 ;i < 6  ; i++)
+		vvmaskstop_buffer[i] = NULL;
 }
 
 

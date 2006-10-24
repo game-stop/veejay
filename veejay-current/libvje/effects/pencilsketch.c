@@ -22,11 +22,11 @@
  
 vj_effect *pencilsketch_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults[0] = 0;/* type */
     ve->defaults[1] = pixel_Y_lo_;	/* min */
     ve->defaults[2] = pixel_Y_hi_;	/* max */

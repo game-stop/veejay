@@ -23,7 +23,7 @@
 
 vj_effect *whiteframe_init(int w,int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 0;
     ve->defaults = NULL;	/* default values */
     ve->limits[0] = NULL;	/* min */

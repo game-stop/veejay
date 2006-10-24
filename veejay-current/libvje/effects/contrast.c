@@ -22,11 +22,11 @@
 #include "common.h"
 vj_effect *contrast_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults[0] = 2;	/* type */
     ve->defaults[1] = 125;
     ve->defaults[2] = 200;

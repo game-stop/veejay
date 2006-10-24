@@ -24,11 +24,11 @@
 
 vj_effect *transcarot_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 6;
-    ve->defaults = (int *) malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 180;	/* opacity */
     ve->defaults[1] = 0;	/* type */
     ve->defaults[2] = 100;	/* point sizse */

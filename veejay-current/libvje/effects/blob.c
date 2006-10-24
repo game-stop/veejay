@@ -78,11 +78,11 @@ static int		blob_type_	 = 1;
 
 vj_effect *blob_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 360;  // radius
     ve->limits[0][1] = 1; 
@@ -122,12 +122,11 @@ int	blob_malloc(int w, int h)
 	blob_ = (uint8_t**) vj_malloc(sizeof(uint8_t*) * blob_dradius_ );
 	for(i = 0; i < blob_dradius_ ; i ++ )
 	{
-		blob_[i] = (uint8_t*) vj_malloc(sizeof(uint8_t) * blob_dradius_ );
+		blob_[i] = (uint8_t*) vj_calloc(sizeof(uint8_t) * blob_dradius_ );
 		if(!blob_[i]) return 0;
-		memset( blob_[i], 0 , blob_dradius_ );
 	}
 
-	blobs_ = (blob_t*) vj_malloc(sizeof(blob_t) * blob_num_ );
+	blobs_ = (blob_t*) vj_calloc(sizeof(blob_t) * blob_num_ );
 	if(!blobs_ ) return 0;
 
 	blob_image_ = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );

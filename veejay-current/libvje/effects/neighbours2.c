@@ -23,12 +23,12 @@
 
 vj_effect *neighbours2_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
 
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 2;
     ve->limits[1][0] = 16;	/* brush size (shape is rectangle)*/
     ve->limits[0][1] = 1;
@@ -55,20 +55,25 @@ static uint8_t  *chromacity[2];
 
 int		neighbours2_malloc(int w, int h )
 {
-	tmp_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
+	tmp_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 2);
 	if(!tmp_buf[0] ) return 0;
-	tmp_buf[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
-	chromacity[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
-	chromacity[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
+	tmp_buf[1] = tmp_buf[0] + (w*h);
+	chromacity[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h *2);
+	if(!chromacity[0]) return 0;
+	chromacity[1] = chromacity[0] + (w*h);
 	return 1;
 }
 
 void		neighbours2_free(void)
 {
-	if(tmp_buf[0]) free(tmp_buf[0]);
-	if(tmp_buf[1]) free(tmp_buf[1]);
-	if(chromacity[0]) free(chromacity[0]);
-	if(chromacity[1]) free(chromacity[1]);
+	if(tmp_buf[0])
+		free(tmp_buf[0]);
+	if(chromacity[0])
+		free(chromacity[0]);
+	tmp_buf[0] = NULL;
+	tmp_buf[1] = NULL;
+	chromacity[0] = NULL;
+	chromacity[1] = NULL;
 }
 
 typedef struct

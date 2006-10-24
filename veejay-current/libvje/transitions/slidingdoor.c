@@ -24,11 +24,11 @@
 
 vj_effect *slidingdoor_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 0;
-    ve->defaults = (int *) malloc(sizeof(int) * 1);	/* default values */
-    ve->limits[0] = (int *) malloc(sizeof(int) * 1);	/* min */
-    ve->limits[1] = (int *) malloc(sizeof(int) * 1);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * 1);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * 1);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * 1);	/* max */
  /*   ve->defaults[0] = 1; 
     ve->defaults[1] = 1;
 

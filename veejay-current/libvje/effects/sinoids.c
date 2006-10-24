@@ -30,11 +30,11 @@ static uint8_t *sinoid_frame[3];
 
 vj_effect *sinoids_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 1;
     ve->defaults[1] = 70;
     ve->limits[0][0] = 0;
@@ -51,31 +51,33 @@ vj_effect *sinoids_init(int width, int height)
 int sinoids_malloc(int width, int height)
 {
 	int i = 0;
-   sinoids_X = (int*) vj_malloc(sizeof(int) * width);
+   sinoids_X = (int*) vj_calloc(sizeof(int) * width);
   if(!sinoids_X) return 0;
-    sinoid_frame[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * height * width);
-  if(!sinoid_frame[0]) return 0; 
-   sinoid_frame[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * height * width);
-  if(!sinoid_frame[1]) return 0;
-    sinoid_frame[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * height * width);
-  if(!sinoid_frame[2]) return 0;
 
+  sinoid_frame[0] = (uint8_t*)vj_calloc(sizeof(uint8_t) * 3 * height * width);
+
+  if(!sinoid_frame[0]) return 0;
+
+  sinoid_frame[1] = sinoid_frame[0] + (width * height);
+  sinoid_frame[2] = sinoid_frame[1] + (width * height);
+
+    
   for(i=0; i < width; i++ ) {
-	//double si;
-	//fast_sin( si, (  ((double)i/(double)width)*2*3.1415926));
 	sinoids_X[i] = (int) ( sin( ((double)i/(double)width) * 2 * 3.1415926) * 1);
-	//sinoids_X[i] = (int) si; 
 	sinoids_X[i] *= 4;
 	}
+  
   return 1;
 
 }
 
 void sinoids_free() {
 	if(sinoids_X) free(sinoids_X);
-	if(sinoid_frame[0]) free(sinoid_frame[0]);
-  	if(sinoid_frame[1]) free(sinoid_frame[1]);
-	if(sinoid_frame[2]) free(sinoid_frame[2]);
+	if(sinoid_frame[0])
+		free(sinoid_frame[0]);
+	sinoid_frame[0] = NULL;
+	sinoid_frame[1] = NULL;
+	sinoid_frame[2] = NULL;
 }
 
 void sinoids_recalc(int width, int z) {

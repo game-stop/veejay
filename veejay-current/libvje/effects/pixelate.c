@@ -25,7 +25,7 @@ static uint8_t values[512];
 
 vj_effect *pixelate_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     int i;
     int nvalues=0;
     for(i=1; i < width; i++)
@@ -39,9 +39,9 @@ vj_effect *pixelate_init(int width, int height)
 
     ve->num_params = 1;
 
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 1;
     ve->limits[1][0] = nvalues-2;
     ve->defaults[0] = 8;

@@ -38,11 +38,11 @@ static uint8_t *buf[3] = { NULL,NULL,NULL };
 
 vj_effect *lumamask_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 1;
     ve->limits[1][0] = width;
     ve->limits[0][1] = 1;
@@ -60,12 +60,10 @@ vj_effect *lumamask_init(int width, int height)
 
 int lumamask_malloc(int width, int height)
 {
-   buf[0] = (uint8_t*)vj_malloc(sizeof(uint8_t)*width*height);
+   buf[0] = (uint8_t*)vj_calloc(sizeof(uint8_t)*width*height*3);
    if(!buf[0]) return 0;
-   buf[1] = (uint8_t*)vj_malloc(sizeof(uint8_t)*width*height);
-   if(!buf[1]) return 0;
-   buf[2] = (uint8_t*)vj_malloc(sizeof(uint8_t)*width*height);
-   if(!buf[2]) return 0;
+   buf[1] = buf[0] + (width *height);
+   buf[2] = buf[1] + (width *height);
    return 1;
 }
 
@@ -116,8 +114,6 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
 void lumamask_free()
 {
   if(buf[0]) free(buf[0]);
-  if(buf[1]) free(buf[1]);
-  if(buf[2]) free(buf[2]);
   buf[0] = NULL;
   buf[1] = NULL;
   buf[2] = NULL;

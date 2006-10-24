@@ -32,11 +32,11 @@ static VJFrame *_tmp;
 
 vj_effect *chromascratcher_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 25; /* uses the chromamagick effect for scratchign */
     ve->limits[0][1] = 0;
@@ -62,27 +62,24 @@ vj_effect *chromascratcher_init(int w, int h)
 int	chromascratcher_malloc(int w, int h)
 {
     cframe[0] =
-	(uint8_t *) vj_malloc(w * h * sizeof(uint8_t) * 25 );
+	(uint8_t *) vj_malloc(w * h * sizeof(uint8_t) * 25 * 3 );
     if(!cframe[0]) return 0;			   
-    memset( cframe[0], 16, w * h * 25);
-    cframe[1] =
-	(uint8_t *) vj_malloc(w * h * sizeof(uint8_t) * 25 );
-    if(!cframe[1]) return 0;			   
-    memset( cframe[1], 128, w * h * 25);
-    cframe[2] =
-	(uint8_t *) vj_malloc(w * h * sizeof(uint8_t) * 25);
-    if(!cframe[2]) return 0;			   
-    memset( cframe[2], 128, w * h * 25);
+    _tmp = (VJFrame*) vj_calloc(sizeof(VJFrame));
 
-    _tmp = (VJFrame*) vj_malloc(sizeof(VJFrame));
+    cframe[1] = cframe[0] + ( w * h * 25 );
+    cframe[2] = cframe[1] + ( w * h * 25 );
+
     return 1;
 }
 
 void chromascratcher_free() {
-   if(cframe[0]) free(cframe[0]);
-   if(cframe[1]) free(cframe[1]);
-   if(cframe[2]) free(cframe[2]);	
+   if(cframe[0])
+	   free(cframe[0]);
    if(_tmp) free(_tmp);
+   cframe[0] = NULL;
+   cframe[1] = NULL;
+   cframe[2] = NULL;
+   _tmp = NULL;
 }
 
 void chromastore_frame(uint8_t * yuv1[3], int w, int h, int n,

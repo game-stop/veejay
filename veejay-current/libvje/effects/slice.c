@@ -30,12 +30,12 @@ void slice_recalc(int width, int height, int val);
 
 vj_effect *slice_init(int width,int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
 
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 2;
     ve->limits[1][0] = 128;
     ve->limits[0][1] = 0;
@@ -52,12 +52,11 @@ vj_effect *slice_init(int width,int height)
 
 int 	slice_malloc(int width, int height)
 {
-    slice_frame[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height);
-    if(!slice_frame[0]) return 0;
-    slice_frame[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height);
-    if(!slice_frame[1]) return 0; 
-    slice_frame[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height);
-    if(!slice_frame[2]) return 0;
+    slice_frame[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height * 3);
+    if(!slice_frame[0])
+	    return 0;
+    slice_frame[1] = slice_frame[0] + (width * height);
+    slice_frame[2] = slice_frame[1] + (width * height);
     slice_xshift = (int*) vj_malloc(sizeof(int) * height);
     if(!slice_xshift) return 0;
     slice_yshift = (int*) vj_malloc(sizeof(int) * width);
@@ -69,11 +68,17 @@ int 	slice_malloc(int width, int height)
 
 
 void slice_free() {
- if(slice_frame[0]) free(slice_frame[0]);
- if(slice_frame[1]) free(slice_frame[1]);
- if(slice_frame[2]) free(slice_frame[2]);
- if(slice_xshift) free(slice_xshift);
- if(slice_yshift) free(slice_yshift);
+ if(slice_frame[0])
+	 free(slice_frame[0]);
+ slice_frame[0] = NULL;
+ slice_frame[1] = NULL;
+ slice_frame[2] = NULL;
+ if(slice_xshift)
+	 free(slice_xshift);
+ if(slice_yshift)
+	 free(slice_yshift);
+ slice_yshift = NULL;
+ slice_xshift = NULL;
 }
 
 /* much like the bathroom window, width height indicate block size within frame */

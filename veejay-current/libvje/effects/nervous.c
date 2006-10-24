@@ -35,12 +35,12 @@ static int		frames_elapsed;
 
 vj_effect *nervous_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
 
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
     ve->limits[1][0] = N_MAX;
     ve->defaults[0] = N_MAX;
@@ -53,12 +53,11 @@ vj_effect *nervous_init(int w, int h)
 
 int	nervous_malloc(int w, int h )
 {
-	nervous_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * N_MAX);
+	nervous_buf[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h * N_MAX * 3);
+
 	if(!nervous_buf[0]) return 0;
-	nervous_buf[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * N_MAX);
-	if(!nervous_buf[1]) return 0;
-	nervous_buf[2] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * N_MAX);
-	if(!nervous_buf[2]) return 0;
+	nervous_buf[1] = nervous_buf[0] + (w*h);
+	nervous_buf[2] = nervous_buf[1] + (w*h);
 	frames_elapsed = 0;
 	return 1;
 }
@@ -66,8 +65,6 @@ int	nervous_malloc(int w, int h )
 void	nervous_free(void)
 {
 	if( nervous_buf[0] ) free(nervous_buf[0]);
-	if( nervous_buf[1] ) free(nervous_buf[1]);
-	if( nervous_buf[2] ) free(nervous_buf[2]);
 	nervous_buf[0] = NULL;
 	nervous_buf[1] = NULL;
 	 nervous_buf[2] = NULL;

@@ -19,11 +19,11 @@
 static uint8_t *split_fixme[3];
 vj_effect *split_init(int width,int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 8;
     ve->defaults[1] = 1;
 
@@ -41,11 +41,11 @@ vj_effect *split_init(int width,int height)
 }
 int	split_malloc(int width, int height)
 {
-  split_fixme[0] = (uint8_t *) vj_malloc(sizeof(uint8_t) * width * height + 1);
+  split_fixme[0] = (uint8_t *) vj_calloc(sizeof(uint8_t) * width * height + 1);
   if(!split_fixme[0]) return 0;
-    split_fixme[1] = (uint8_t *) vj_malloc(sizeof(uint8_t) * width * height );
+    split_fixme[1] = (uint8_t *) vj_calloc(sizeof(uint8_t) * width * height );
   if(!split_fixme[1]) return 0; 
-   split_fixme[2] = (uint8_t *) vj_malloc(sizeof(uint8_t) * width * height);
+   split_fixme[2] = (uint8_t *) vj_calloc(sizeof(uint8_t) * width * height);
   if(!split_fixme[2]) return 0;
    return 1;
 

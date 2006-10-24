@@ -24,12 +24,12 @@
 #include <math.h>
 vj_effect *fisheye_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
 
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = -1000;
     ve->limits[1][0] = 1000;
     ve->defaults[0] = 1;
@@ -55,21 +55,18 @@ int	fisheye_malloc(int w, int h)
 	int w2=w/2;
 	int p =0;
 
-	buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h  );
-	if(!buf[0]) return -1;
-	buf[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
-	if(!buf[1]) return -1;
+	buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h  *  3  );
+	if(!buf[0]) return 0;
+	buf[1] = buf[0] + (w*h);
+	buf[2] = buf[1] + (w*h);
 
-	buf[2] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
-	if(!buf[2]) return -1;
+	polar_map = (double*) vj_calloc(sizeof(double) * w* h );
+	if(!polar_map) return 0;
+	fish_angle = (double*) vj_calloc(sizeof(double) * w* h );
+	if(!fish_angle) return 0;
 
-	polar_map = (double*) vj_malloc(sizeof(double) * w* h );
-	if(!polar_map) return -1;
-	fish_angle = (double*) vj_malloc(sizeof(double) * w* h );
-	if(!fish_angle) return -1;
-
-	cached_coords = (int*) vj_malloc(sizeof(int) * w * h);
-	if(!cached_coords) return -1;
+	cached_coords = (int*) vj_calloc(sizeof(int) * w * h);
+	if(!cached_coords) return 0;
 
 	for(y=(-1 *h2); y < (h-h2); y++)
 	{
@@ -89,10 +86,12 @@ int	fisheye_malloc(int w, int h)
 
 void	fisheye_free()
 {
-	if(buf[0])	free(buf[0]);
-	if(buf[1])	free(buf[1]);
-	if(buf[2])	free(buf[2]);
-
+	if(buf[0])
+		free(buf[0]);
+	buf[0] =  NULL;
+	buf[1] =  NULL;
+	buf[2] =  NULL;
+	
 	if(polar_map) 	free(polar_map);
 	if(fish_angle)	free(fish_angle);
 	if(cached_coords) free(cached_coords);

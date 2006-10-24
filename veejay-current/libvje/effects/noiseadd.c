@@ -24,11 +24,11 @@ static uint8_t *Yb_frame;
 
 vj_effect *noiseadd_init(int width , int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults[0] = 0;	/* type */
     ve->defaults[1] = 1000;
     ve->limits[0][0] = 0;
@@ -47,14 +47,14 @@ vj_effect *noiseadd_init(int width , int height)
 int noiseadd_malloc(int width, int height)
 {
   
-  Yb_frame = (uint8_t *) vj_malloc( sizeof(uint8_t) * width * height);
-  memset(Yb_frame, 0, width*height);
+  Yb_frame = (uint8_t *) vj_calloc( sizeof(uint8_t) * width * height);
   if(!Yb_frame) return 0;
   return 1;
 }
 
 void noiseadd_free() {
   if(Yb_frame) free(Yb_frame);
+  Yb_frame = NULL;
 }
 
 void noiseblur1x3_maskapply(uint8_t *src[3], int width, int height, int coeef ) {

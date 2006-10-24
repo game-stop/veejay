@@ -25,11 +25,11 @@ static uint8_t *Yb_frame;
 
 vj_effect *noisepencil_init(int width , int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults[0] = 0;	/* type */
     ve->defaults[1] = 1000;
     ve->defaults[2] = 68;
@@ -63,6 +63,7 @@ int  noisepencil_malloc(int width,int height)
 
 void noisepencil_free() {
   if(Yb_frame) free(Yb_frame);
+  Yb_frame = NULL;
 }
 
 void noisepencil_1_apply(uint8_t *src[3], int width, int height, int coeef, int min_t, int max_t ) {

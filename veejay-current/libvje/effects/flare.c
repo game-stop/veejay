@@ -33,11 +33,11 @@
 
 vj_effect *flare_init(int w, int h)
 {
-	vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+	vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
 	ve->num_params = 3;
-	ve->defaults =  (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-	ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-	ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+	ve->defaults =  (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+	ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+	ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
 	ve->defaults[0] = 3;
 	ve->defaults[1] = 25;
 	ve->defaults[2] = 100;
@@ -59,15 +59,11 @@ static uint8_t *flare_buf[3];
 
 int	flare_malloc(int w, int h)
 {
-	flare_buf[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * w * h );
+	flare_buf[0] = (uint8_t*)vj_calloc(sizeof(uint8_t) * w * h * 3 );
 	if(!flare_buf[0])
 		return 0;
-	flare_buf[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * w * h );
-	if(!flare_buf[1])
-		return 0;
-	flare_buf[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * w * h );
-	if(!flare_buf[2])
-		return 0;
+	flare_buf[1] = flare_buf[0] + (w*h);
+	flare_buf[2] = flare_buf[1] + (w*h);
 	return 1;
 }
 
@@ -75,9 +71,7 @@ void	flare_free(void)
 {
 	if(flare_buf[0]) free(flare_buf[0]);
 	flare_buf[0] = NULL;
-	if(flare_buf[1]) free(flare_buf[1]);
 	flare_buf[1] = NULL;
-	if(flare_buf[2]) free(flare_buf[2]);
 	flare_buf[2] = NULL;
 }
 

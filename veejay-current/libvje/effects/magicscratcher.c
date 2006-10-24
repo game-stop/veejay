@@ -28,11 +28,11 @@ static int m_reverse = 0;
 vj_effect *magicscratcher_init(int w, int h)
 {
 
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 9;
     ve->limits[0][1] = 1;
@@ -52,7 +52,7 @@ vj_effect *magicscratcher_init(int w, int h)
 int magicscratcher_malloc(int w, int h)
 {
    mframe =
-	(uint8_t *) vj_malloc(w * h * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
+	(uint8_t *) vj_calloc(w * h * sizeof(uint8_t) * MAX_SCRATCH_FRAMES);
    memset(mframe, 0, w * h * MAX_SCRATCH_FRAMES );
    if(!mframe) return 0;
    return 1;

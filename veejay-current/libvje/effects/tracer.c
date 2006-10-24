@@ -26,11 +26,11 @@ static int trace_counter = 0;
 
 vj_effect *tracer_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 255;
     ve->limits[0][1] = 1;
@@ -46,19 +46,20 @@ vj_effect *tracer_init(int w, int h)
 
 int 	tracer_malloc(int w, int h)
 {
-   trace_buffer[0] = (uint8_t *) vj_malloc(w * h * sizeof(uint8_t));
-   if(!trace_buffer[0]) return 0;
-    trace_buffer[1] = (uint8_t *) vj_malloc( ((w * h)) * sizeof(uint8_t));
-   if(!trace_buffer[1]) return 0;
-    trace_buffer[2] = (uint8_t *) vj_malloc( ((w * h)) * sizeof(uint8_t));
-    if(!trace_buffer[2]) return 0;
-	return 1;
+	trace_buffer[0] = (uint8_t *) vj_malloc(w * h * 3* sizeof(uint8_t));
+	if(!trace_buffer[0]) return 0;
+	trace_buffer[1] = trace_buffer[0] + ( w * h );
+	trace_buffer[2] = trace_buffer[1] + ( w * h );
+
+   return 1;
 }
 
 void tracer_free() {
- if(trace_buffer[0]) free(trace_buffer[0]);
- if(trace_buffer[1]) free(trace_buffer[1]);
- if(trace_buffer[2]) free(trace_buffer[2]);
+	if(trace_buffer[0])
+	 free(trace_buffer[0]);
+	trace_buffer[0] = NULL;
+	trace_buffer[1] = NULL;
+	trace_buffer[2] = NULL;
 }
 
 void tracer_apply(VJFrame *frame, VJFrame *frame2,

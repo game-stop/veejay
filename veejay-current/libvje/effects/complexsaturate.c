@@ -29,17 +29,17 @@
 vj_effect *complexsaturation_init(int w, int h)
 {
     vj_effect *ve;
-    ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 7;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 300;	/* angle */
     ve->defaults[1] = 255;	/* r */
     ve->defaults[2] = 0;	/* g */
     ve->defaults[3] = 0;	/* b */
-    ve->defaults[4] = -46;	/* v_adjust */
-    ve->defaults[5] = 26000;	/* degrees */
+    ve->defaults[4] = 50;	/* v_adjust */
+    ve->defaults[5] = 50;	/* degrees */
     ve->defaults[6] = 2400;	/* noise suppression */	
     ve->limits[0][0] = 5;
     ve->limits[1][0] = 900;
@@ -53,11 +53,11 @@ vj_effect *complexsaturation_init(int w, int h)
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 255;
 
-    ve->limits[0][4] = -300;
-    ve->limits[1][4] = 300;
+    ve->limits[0][4] = 0;
+    ve->limits[1][4] = 360;
 
-    ve->limits[0][5] = 1;
-    ve->limits[1][5] = 36000;
+    ve->limits[0][5] = 0;
+    ve->limits[1][5] = 256;
 
     ve->limits[0][6] = 0;
     ve->limits[1][6] = 3500;
@@ -74,8 +74,13 @@ void complexsaturation_apply(VJFrame *frame, int width,
 		   int b, int adjust_v, int adjust_degrees, int i_noise)
 {
 	double dsaturation,dcolor;
-	double degrees = adjust_degrees * 0.01;
-	double dsat = adjust_v * 0.01;
+//	double degrees = adjust_degrees * 0.01;
+//	double dsat = adjust_v * 0.01;
+
+
+	float	hue	= (adjust_degrees/180.0)*M_PI;
+	float	sat	= (adjust_v * 0.01);
+
 	uint8_t *fg_y, *fg_cb, *fg_cr;
 	uint8_t *bg_y, *bg_cb, *bg_cr;
   	int accept_angle_tg, accept_angle_ctg, one_over_kc;
@@ -120,7 +125,8 @@ void complexsaturation_apply(VJFrame *frame, int width,
     bg_y = frame->data[0];
     bg_cb = frame->data[1];
     bg_cr = frame->data[2];
-
+	const int s = (int) rint( sin(hue) * (1<<16) * sat );
+	const int c = (int) rint( cos(hue) * (1<<16) * sat );
 	for (pos = 0; pos < frame->len; pos++)
 	{
 		short xx, yy;
@@ -191,7 +197,7 @@ void complexsaturation_apply(VJFrame *frame, int width,
 		int _cr = Cr[pos] - 128;
 		if( _cb != 0 && _cr != 0)
 		{
-			double co=0.0,si=0.0;
+		/*	double co=0.0,si=0.0;
 			//fast_sqrt( dsaturation, (double) (_cb * cr + _cr * _cr) );
 			dsaturation = ccolor_sqrt( (double) _cb, (double) _cr);
 			dcolor = ccolor_sine( _cb, dsaturation);
@@ -202,7 +208,21 @@ void complexsaturation_apply(VJFrame *frame, int width,
 			dsaturation *= dsat;
 			sin_cos( co, si , dcolor );
 			Cb[pos] = si * dsaturation + 128;
-			Cr[pos] = co * dsaturation + 128;
+				const int u = Cb[i] - 128;
+		const int v = Cr[i] - 128;
+		int new_u = (c * u - s * v + (1<<15) + (128<<16)) >> 16;
+		int new_v = (s * u + c * v + (1<<15) + (128<<16)) >> 16;
+		if( new_u & 768 ) new_u = (-new_u) >> 31;
+		if( new_v & 768 ) new_v = (-new_v) >> 31;
+Cr[pos] = co * dsaturation + 128;*/
+			const int u = Cb[pos] - 128;
+			const int v = Cr[pos] - 128;
+			int new_u = (c * u - s * v + (1<<15) + (128<<16)) >> 16;
+			int new_v = (s * u + c * v + (1<<15) + (128<<16)) >> 16;
+			if( new_u & 768 ) new_u = (-new_u) >> 31;
+			if( new_v & 768 ) new_v = (-new_v) >> 31;
+			Cb[pos] = new_u;
+			Cr[pos] = new_v;
 		}
     	}
 

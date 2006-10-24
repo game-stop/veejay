@@ -32,11 +32,11 @@ static unsigned int frq_cnt;
 
 vj_effect *cutstop_init(int width , int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 40; // treshold
     ve->defaults[1] = 50; // hold frame freq
     ve->defaults[2] = 0;   // cut mode
@@ -66,19 +66,18 @@ vj_effect *cutstop_init(int width , int height)
 
 int	cutstop_malloc(int width, int height)
 {
-    vvcutstop_buffer[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height ); 
-	if(!vvcutstop_buffer[0]) return 0;
-    vvcutstop_buffer[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height );
-	if(!vvcutstop_buffer[1]) return 0;
-    vvcutstop_buffer[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height );
-	if(!vvcutstop_buffer[2]) return 0;
+	vvcutstop_buffer[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height * 3); 
+	vvcutstop_buffer[1] = vvcutstop_buffer[0] + (width  * height );
+	vvcutstop_buffer[2] = vvcutstop_buffer[1] + (width  * height );
 	return 1;
 }
 
 void cutstop_free() {
-  if(vvcutstop_buffer[0]) free(vvcutstop_buffer[0]);
-  if(vvcutstop_buffer[1]) free(vvcutstop_buffer[1]);
-  if(vvcutstop_buffer[2]) free(vvcutstop_buffer[2]);
+	if(vvcutstop_buffer[0]) 
+	  free(vvcutstop_buffer[0]);
+	vvcutstop_buffer[0] = NULL;
+	vvcutstop_buffer[1] = NULL;
+	vvcutstop_buffer[2] = NULL;
 }
 
 

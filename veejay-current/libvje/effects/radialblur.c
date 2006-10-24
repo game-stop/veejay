@@ -51,11 +51,11 @@ static uint8_t *radial_src[3];
 
 vj_effect *radialblur_init(int w,int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 15;
     ve->defaults[1] = 0;
     ve->defaults[2] = 2;
@@ -75,12 +75,10 @@ vj_effect *radialblur_init(int w,int h)
 
 int	radialblur_malloc(int w, int h)
 {
-	radial_src[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
+	radial_src[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h * 3 );
 	if(!radial_src[0]) return 0;
-	radial_src[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * ((w*h)));
-	if(!radial_src[1]) return 0;
-	radial_src[2] = (uint8_t*) vj_malloc(sizeof(uint8_t) * ((w*h)));
-	if(!radial_src[2]) return 0;
+	radial_src[1] = radial_src[0] + (w * h);
+	radial_src[2] = radial_src[1] + (w * h);
 	return 1;
 }
 
@@ -146,9 +144,8 @@ void radialblur_apply(VJFrame *frame, int width, int height, int radius, int pow
 
 void radialblur_free()
 {
-	if( radial_src[0] ) free(radial_src[0]);
-	if( radial_src[1] ) free(radial_src[1]);
-	if( radial_src[2] ) free(radial_src[2]);
+	if( radial_src[0] )
+		free(radial_src[0]);
 	radial_src[0] = NULL;
 	radial_src[1] = NULL;
 	radial_src[2] = NULL;

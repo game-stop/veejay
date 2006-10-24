@@ -25,18 +25,25 @@
 #include "common.h"
 vj_effect *coloradjust_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = -235;
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
+   /* ve->limits[0][0] = -235;
     ve->limits[1][0] = 235;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 36000;
     ve->defaults[0] = 116;
-    ve->defaults[1] = 4500;
-    ve->description = "Saturation";
+    ve->defaults[1] = 4500;*/
+    ve->limits[0][0] = 0;
+    ve->limits[1][0] = 360;
+    ve->limits[0][1] = 0;
+    ve->limits[1][1] = 256;
+    ve->defaults[0] = 50;
+    ve->defaults[1] = 50;
+
+    ve->description = "Hue and Saturation";
     ve->extra_frame = 0;
     ve->sub_format = 0;
 	ve->has_user = 0;
@@ -74,8 +81,31 @@ void coloradjust_apply(VJFrame *frame, int width, int height, int val,
 	const int len = frame->uv_len;
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
+//@ Hue, Saturation, copied from AVIDEMUX!
+//@ the commented out version is the same as the optimized version (?)  
+//
 
-    int cb, cr;
+	float hue = (float) ( (val/180.0) * M_PI);
+	float sat = (float) ( _degrees * 0.01 );
+	
+	const int s = (int) rint( sin(hue) * (1<<16) * sat );
+	const int c = (int) rint( cos(hue) * (1<<16) * sat );
+	
+	for( i = 0 ; i < len ;i ++ )
+	{
+		const int u = Cb[i] - 128;
+		const int v = Cr[i] - 128;
+		int new_u = (c * u - s * v + (1<<15) + (128<<16)) >> 16;
+		int new_v = (s * u + c * v + (1<<15) + (128<<16)) >> 16;
+		if( new_u & 768 ) new_u = (-new_u) >> 31;
+		if( new_v & 768 ) new_v = (-new_v) >> 31;
+
+		Cb[i] = new_u;
+		Cr[i] = new_v;
+	}
+
+	
+ /*   int cb, cr;
     double dsaturation, dcolor;
     const double degrees = (_degrees / 100.0);
     double co, si;
@@ -99,6 +129,6 @@ void coloradjust_apply(VJFrame *frame, int width, int height, int val,
 			Cr[i] = co * dsaturation + 128;
 		}
     }
-
+*/
 }
 void coloradjust_free(){}

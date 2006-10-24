@@ -47,11 +47,11 @@ static int ripple_attn = 0;
 // FIXME private
 vj_effect *ripple_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 3600;
     ve->limits[0][1] = 1;
@@ -73,16 +73,16 @@ int	ripple_malloc(int width, int height)
    int i;
     ripple_table = (double*) vj_malloc(sizeof(double) * width * height + 16);
     if(!ripple_table) return 0;
-    ripple_data[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height + 16);
+    ripple_data[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * (width * height * 3) + 64);
     if(!ripple_data[0]) return 0; 
-    ripple_data[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height + 16);
-    if(!ripple_data[1]) return 0;
-    ripple_data[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height + 16);
-    if(!ripple_data[2]) return 0; 
+    ripple_data[1] = ripple_data[0] + (width * height);
+    ripple_data[2] = ripple_data[1] + (width * height);
+ 
     ripple_sin = (double*) vj_malloc(sizeof(double) * RIPPLE_DEGREES);
     if(!ripple_sin) return 0;
     ripple_cos = (double*) vj_malloc(sizeof(double) * RIPPLE_DEGREES);
     if(!ripple_cos) return 0;
+    
     for(i=0; i < RIPPLE_DEGREES; i++) {
  	ripple_sin[i] = sin ((M_PI * i) / RIPPLE_VAL);
 	ripple_cos[i] = sin ((M_PI * i) / RIPPLE_VAL);
@@ -96,9 +96,14 @@ void ripple_free() {
 	if(ripple_table) free(ripple_table);
 	if(ripple_sin) free(ripple_sin);
 	if(ripple_cos) free(ripple_cos);
-	if(ripple_data[0]) free(ripple_data[0]);
-	if(ripple_data[1]) free(ripple_data[1]);
-	if(ripple_data[2]) free(ripple_data[2]);
+	if(ripple_data[0])
+	       	free(ripple_data[0]);
+	ripple_data[0] = NULL;
+	ripple_data[1] = NULL;
+	ripple_data[2] = NULL;
+	ripple_sin = NULL;
+	ripple_cos = NULL;
+	ripple_table = NULL;
 }
 
 

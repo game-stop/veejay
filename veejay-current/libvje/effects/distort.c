@@ -31,19 +31,19 @@ static int plasma_pos2 = 0;
 
 vj_effect *distortion_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     int i;
     float rad;
-    plasma_table = (int *) vj_malloc(sizeof(int) * 512);
+    plasma_table = (int *) vj_calloc(sizeof(int) * 512);
     for (i = 0; i < 512; i++) {
 	rad = ((float) i * 0.703125) * 0.0174532;
 	plasma_table[i] = sin(rad) * (1024);
     }
 
     ve->num_params = 2;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 5;
     ve->defaults[1] = 3;
     ve->limits[0][0] = 0;

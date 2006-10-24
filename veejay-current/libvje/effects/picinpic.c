@@ -44,11 +44,11 @@ typedef struct
 
 vj_effect *picinpic_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 4;
-    ve->defaults = (int *) malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 64;	/* width of view port */
     ve->defaults[1] = 64;	/* height of viewport */
     ve->defaults[2] = 64;	/* x1 */
@@ -76,12 +76,10 @@ int	picinpic_malloc(void **d, int w, int h)
 {
 	int i;
 	pic_t *my;
-	*d = (void*) vj_malloc(sizeof(pic_t));
+	*d = (void*) vj_calloc(sizeof(pic_t));
 	my = (pic_t*) *d;
 
 	my->scaler = NULL;
-	memset( &(my->frame), 0, sizeof(VJFrame));
-	memset( &(my->template), 0, sizeof(sws_template) );
 	my->template.flags = 1;
 	my->w = 0;
 	my->h = 0;
@@ -143,9 +141,9 @@ void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2, int width
 			&(picture->template),
 			yuv_sws_get_cpu_flags()
 		);
-		picture->frame.data[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
-		picture->frame.data[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
-		picture->frame.data[2] = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
+		picture->frame.data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * len );
+		picture->frame.data[1] = (uint8_t*) vj_calloc(sizeof(uint8_t) * len );
+		picture->frame.data[2] = (uint8_t*) vj_calloc(sizeof(uint8_t) * len );
 
 		picture->w = view_width;
 		picture->h = view_height;

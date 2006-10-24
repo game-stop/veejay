@@ -76,11 +76,11 @@ static void setTable()
 
 vj_effect *water_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 3600;
     ve->limits[0][1] = 1;
@@ -104,20 +104,16 @@ int water_malloc(int width, int height)
 	if(!ripple_data[0]) return 0;
 	memset( ripple_data[0], pixel_Y_lo_, width*height);
 
-
 	map_h = height / 2 + 1;
 	map_w = width / 2 + 1;
-	map = (int*) vj_malloc (sizeof(int) * map_h * map_w * 3);
+	map = (int*) vj_calloc (sizeof(int) * map_h * map_w * 3);
 	if(!map) return 0;
-	vtable = (signed char*) vj_malloc( sizeof(signed char) * map_w * map_h * 2);
+	vtable = (signed char*) vj_calloc( sizeof(signed char) * map_w * map_h * 2);
 	if(!vtable) return 0;
 	map3 = map + map_w * map_h * 2;
 	setTable();
-	memset(map, 0, map_h*map_w*3*sizeof(int));
-	memset(vtable, 0, map_h*map_w*2*sizeof(signed char));
 	map1 = map;
 	map2 = map + map_h*map_w;
-
 	stat = 1;
 
 	return 1;

@@ -30,11 +30,11 @@ static int			 diff_period;
 
 vj_effect *ghost_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 16; 
     ve->limits[1][0] = 255;  // opacity
     ve->defaults[0] = 134;
@@ -58,8 +58,7 @@ int	ghost_malloc(int w, int h)
 			return 0;
 		memset( ghost_buf[i], (i ==0 ? 0: 128), len );
 	}
-	diff_map = (uint8_t*) vj_malloc( sizeof(uint8_t) * len);
-	memset( diff_map , 0, len );
+	diff_map = (uint8_t*) vj_calloc( sizeof(uint8_t) * len);
 	diff_period = 0;
 
 	return 1;

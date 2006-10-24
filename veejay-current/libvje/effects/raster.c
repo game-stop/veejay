@@ -25,12 +25,12 @@
 
 vj_effect *raster_init(int w, int h)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 1;
 
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 4;
     ve->limits[1][0] = h/4;
     ve->defaults[0] = 4;
@@ -95,7 +95,7 @@ void raster_apply(VJFrame *frame, int w, int h, int v )
 
 	if(!buf)
 	{
-		buf = (uint8_t*)vj_malloc(sizeof(uint8_t) * w * h );
+		buf = (uint8_t*)vj_calloc(sizeof(uint8_t) * w * h );
 		if(!buf)return;
 	}
 	memcpy(buf, Y,(w*h));

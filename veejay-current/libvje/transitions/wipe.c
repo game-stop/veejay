@@ -24,11 +24,11 @@
 
 vj_effect *wipe_init(int w,int h)
 {
-    vj_effect *ve = (vj_effect *) malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 2;
-    ve->defaults = (int *) malloc(sizeof(int) * ve->num_params);
-    ve->limits[0] = (int *) malloc(sizeof(int) * ve->num_params);
-    ve->limits[1] = (int *) malloc(sizeof(int) * ve->num_params);
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);
     ve->defaults[0] = 150;
     ve->defaults[1] = 0;
 

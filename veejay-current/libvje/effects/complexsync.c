@@ -25,12 +25,12 @@ static uint8_t *c_outofsync_buffer[3];
 
 vj_effect *complexsync_init(int width, int height)
 {
-    vj_effect *ve = (vj_effect *) vj_malloc(sizeof(vj_effect));
+    vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
 
-    ve->defaults = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* default values */
-    ve->limits[0] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* min */
-    ve->limits[1] = (int *) vj_malloc(sizeof(int) * ve->num_params);	/* max */
+    ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
+    ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
+    ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 1;
     ve->limits[1][0] = height-1;
     ve->limits[0][1] = 0;
@@ -49,23 +49,19 @@ vj_effect *complexsync_init(int width, int height)
 
 int complexsync_malloc(int width, int height)
 {
-   c_outofsync_buffer[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height );
-   memset( c_outofsync_buffer[0], 16, (width*height));
-   if(!c_outofsync_buffer[0]) return 0;
-    c_outofsync_buffer[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * (width * height) );
-   memset( c_outofsync_buffer[1], 128, (width*height));
-   if(!c_outofsync_buffer[1]) return 0;
-    c_outofsync_buffer[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * (width * height) );
-    memset( c_outofsync_buffer[2], 128, (width*height));
-   if(!c_outofsync_buffer[2]) return 0;
+   c_outofsync_buffer[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height * 3 );
+   c_outofsync_buffer[1] = c_outofsync_buffer[0]  + (width * height );
+   c_outofsync_buffer[2] = c_outofsync_buffer[1] + ( width * height );
    return 1;
 
 }
 
 void complexsync_free() {
-   if(c_outofsync_buffer[0]) free(c_outofsync_buffer[0]);
-   if(c_outofsync_buffer[1]) free(c_outofsync_buffer[1]);
-   if(c_outofsync_buffer[2]) free(c_outofsync_buffer[2]);
+	if(c_outofsync_buffer[0])
+	   free(c_outofsync_buffer[0]);
+   	c_outofsync_buffer[0] = NULL;
+	c_outofsync_buffer[1] = NULL;
+	c_outofsync_buffer[2] = NULL;
 }
 void complexsync_apply(VJFrame *frame, VJFrame *frame2, int width, int height, int val)
 {
