@@ -257,7 +257,7 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 		vj_link **Link = (vj_link**) vje->link;
 		if (len <= 0 || Link[link_id]->in_use==0)
 		{
-veejay_msg(VEEJAY_MSG_ERROR, "Nothing to send or link %d is inactive", link_id);
+			veejay_msg(VEEJAY_MSG_ERROR, "Nothing to send or link %d is inactive", link_id);
 			return 0;
 		}
 

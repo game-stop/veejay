@@ -251,7 +251,7 @@ static	int	NUM_SAMPLES_PER_ROW = 6;
 
 static	vims_t	vj_event_list[VIMS_MAX];
 static  vims_keys_t vims_keys_list[VIMS_MAX];
-
+static	int	preview_change_ = 0;
 static  int vims_verbosity = 0;
 #define   livido_port_t vevo_port_t
 
@@ -1098,6 +1098,10 @@ int   _effect_get_mix(int effect_id)
 	return 0;
 }
 
+int	get_skin()
+{
+	return skin__;
+}
 
 
 int	_effect_get_rgb(int effect_id)
@@ -1819,6 +1823,7 @@ static	void	free_slot( sample_slot_t *slot )
 			del_chain( slot->ec );
 		free(slot);
 	}
+	slot = NULL;
 }
 
 /* Allocate some memory and create a temporary slot */
@@ -2887,6 +2892,8 @@ static void	update_current_slot(int pm)
 		info->uc.reload_hint[HINT_ENTRY] == 1 )
 	{
 		info->uc.selected_chain_entry = info->status_tokens[CURRENT_ENTRY];
+		if(info->uc.selected_chain_entry < 0 || info->uc.selected_chain_entry > 19 )
+			info->uc.selected_chain_entry = 0;
 		info->uc.reload_hint[HINT_ENTRY] = 1;
 		load_parameter_info();
 		info->uc.reload_hint[HINT_KF]  = 1;
@@ -3291,6 +3298,8 @@ static void	process_reload_hints(void)
 	}
 	if( info->uc.reload_hint[HINT_SLIST] == 1 )
 	{
+		veejay_msg(0, "reload sample list");
+		//load_samplelist_info(TRUE);
 		load_samplelist_info(FALSE);
 		info->uc.expected_slots = info->status_tokens[TOTAL_SLOTS];
 	}
@@ -4522,8 +4531,10 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				bzero( source, 255 ); 
 				strncpy( line, fxtext + offset, len );
 	
-				int values[4];
-	
+				int values[10];
+
+				memset(values,0, 10 * sizeof(int));
+				
 				sscanf( line, "%05d%02d%03d%03d%03d%03d%03d%03d",
 					&values[0], &values[1], &values[2], 
 					&values[3], &values[4], &values[5],
@@ -4550,7 +4561,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 
 				int bank_page = 0; int poke_slot = 0;
 				int full = verify_bank_capacity( &bank_page , &poke_slot, values[0], 1);
-				if(bank_page >= 0 && full == 0 )
+				if(bank_page >= 0)
 				{			
 					if( info->sample_banks[bank_page]->slot[poke_slot] <= 0 )
 					{				
@@ -6729,6 +6740,7 @@ void	vj_gui_disable()
 	info->sensitive = 0;
 	enable_widget ("vs_box" );
 
+	preview_change_ = is_button_toggled( "previewtoggle");
 	set_toggle_button( "previewtoggle", 0 );
 }	
 
@@ -6753,6 +6765,7 @@ void	vj_gui_enable()
 	info->sensitive = 1;
 
 	disable_widget( "vs_box" );
+   	 set_toggle_button( "previewtoggle", preview_change_ );
 
 }
 /*
@@ -7015,8 +7028,12 @@ void	free_samplebank(void)
 			//	if(gslot->frame ) g_object_unref( gslot->frame );
 				if(gslot)
 					free(gslot);
+				info->sample_banks[i]->slot[j] = NULL;
+				info->sample_banks[i]->gui_slot[j] = NULL;
 			}			
 			free(info->sample_banks[i]);
+			info->sample_banks[i] = NULL;
+
 		}
 	}
 	memset( info->sample_banks, 0, sizeof(sample_bank_t*) * NUM_BANKS );

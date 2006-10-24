@@ -955,7 +955,6 @@ static int __global_frame = 0;
 static int __socket_len = 0;
 int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 {
-
 //	if(!info->settings->use_vims_mcast)
 //		return 1;
 
@@ -965,7 +964,6 @@ int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 		/* dont send frames if nobody is interested */
 		return 1; 
 	}
-
 //	info->settings->links[ info->uc->current_link ] = 1;
 
 	if(!mcast && __global_frame)
@@ -1002,7 +1000,7 @@ int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 */
 
 	// mcast frame sender = info->vjs[2] ??
-	if(vj_server_send_frame( info->vjs[id], 0, socket_buffer, __socket_len,
+	if(vj_server_send_frame( info->vjs[id], info->uc->current_link, socket_buffer, __socket_len,
 				helper_frame, info->effect_frame_info, info->real_fps )<=0)
 	{
 		/* frame send error handling */

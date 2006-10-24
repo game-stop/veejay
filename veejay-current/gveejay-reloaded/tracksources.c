@@ -79,34 +79,58 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 	GtkTreeView *view = GTK_TREE_VIEW(widget);
 	GtkTreeModel *model = gtk_tree_view_get_model( view );
 	GtkListStore *store = GTK_LIST_STORE( model );
-	g_object_ref( model );
-	gtk_tree_view_set_model( GTK_TREE_VIEW( view ) , NULL );
-
 	GtkTreeIter *iter;
-	gboolean valid;
-	
-	int *tmp = sequence_get_track_status( user_data );
-	if(!tmp)
+
+	gtk_list_store_clear( GTK_LIST_STORE( model ) );
+
+	if(!widget)
+	{
+		veejay_msg(0, "%s: %d tracks, widget invalid!", __FUNCTION__,
+				n_tracks );
 		return;
-	
-	int index = 0;
+	}
+	gboolean valid;
+	int i;
+	int *tmp = sequence_get_track_status( user_data );
+
+/*	int index = 0;
 	valid = gtk_tree_model_get_iter_first( GTK_TREE_MODEL( store ), &iter );
 	while(valid)
 	{
 		gtk_list_store_set( store, &iter, 1, tmp[index], -1 );
 		index ++;
 		valid = gtk_tree_model_iter_next( GTK_TREE_MODEL(store), &iter );
+
+	}*/
+	for( i = 0; i < n_tracks; i ++ )
+	{
+		int id = sequence_get_track_id( user_data );
+		if(id != i)
+		{
+			char name[12];
+			sprintf(name,"Track %d", i);
+			gtk_list_store_append( store, &iter );
+			gtk_list_store_set(
+				store, &iter,
+				0, name,
+				1, tmp[i],
+				-1 );
+		}
 	}
+		
+	
 	free(tmp);
 
-	gtk_tree_view_set_model( GTK_TREE_VIEW( view ), model );	
-	g_object_unref( model );
+	gtk_tree_view_set_model( GTK_TREE_VIEW( widget ), model );	
+//	g_object_unref( model );
 
 }
 
 GtkWidget	*get_track_tree( void *data)
 {
 	track_view_t *t = (track_view_t*) data;
+	veejay_msg(0 , "%s: get track tree %d, tree:%p",__FUNCTION__,
+			t->track_id,t->view );
 	return t->view;
 }
 
@@ -174,6 +198,9 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data)
 	my_view->track_id = track_id;
 	my_view->view = view;
 
+	g_assert( GTK_IS_TREE_VIEW( view ) );
+	veejay_msg(0, "CREATED TRACK %d TREE %p", track_id, view );
+	
 	model = GTK_TREE_MODEL( store );
 	gtk_tree_view_set_model ( GTK_TREE_VIEW( view ), model );
 	g_signal_connect( wrenderer, "toggled",

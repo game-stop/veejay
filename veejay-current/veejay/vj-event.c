@@ -7079,7 +7079,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 					v->edit_list->video_height,
 					args[0],
 					args[1],
-			(v->video_out == 4 ? 4 : v->edit_list->pixel_format ));
+			(v->video_out == 4 ? 4 : v->pixel_format ));
 				//	pix_fmt );
 				//	v->edit_list->pixel_format );
 	 

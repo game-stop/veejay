@@ -267,8 +267,11 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 //	if(!vj_client_test(host,port))
 //		return 0;
 
+
+	
 	v->planes[0] = w * h;
-	if( p == VIDEO_PALETTE_YUV420P )
+	int fmt=  vj_tag_input->pix_fmt;
+	if( fmt == FMT_420 || fmt == FMT_420F )
 	{
 		v->planes[1] = v->planes[0] / 4;
 		v->planes[2] = v->planes[0] / 4;
@@ -278,7 +281,6 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 		v->planes[1] = v->planes[0] / 2;	
 		v->planes[2] = v->planes[0] / 2;
 	}
-
 	if( tag->socket_ready == 0 )
 	{
 		tag->socket_frame = (uint8_t*) vj_malloc(sizeof(uint8_t) * v->planes[0] * 4);
@@ -292,8 +294,6 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 	}
 
 	net_thread_remote( tag->private, v );
-
-
 	
 	return 1;
 }
@@ -2253,8 +2253,6 @@ int vj_tag_sprint_status( int tag_id,int cache, int pfps,int frame, int mode,int
 			tag->selected_entry, 
 			ts,
 			cache);
-		
-
     return 0;
 }
 

@@ -76,7 +76,7 @@ int			veejay_sequence_send( void *data , int vims_id, const char format[], ... )
 {
 	
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
-	if(!v) return 0;
+	if(!v || !v->active) return 0;
 	
 	g_mutex_lock( v->mutex );
 	gint ret = 0;
@@ -105,7 +105,7 @@ int			veejay_sequence_send( void *data , int vims_id, const char format[], ... )
 gchar			*veejay_sequence_get_track_list( void *data, int slen, int *bytes_written )
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
-	if(!v) return NULL;
+	if(!v || !v->active) return NULL;
 	g_mutex_lock( v->mutex );
 	
 	char message[10];
@@ -230,6 +230,9 @@ static int	veejay_process_status( veejay_sequence_t *v )
 
 static	int	veejay_get_image_data(veejay_sequence_t *v )
 {
+	if(!v->active )
+		return 0;
+	
 	gint res = veejay_ipc_send( v, VIMS_RGB24_IMAGE, "%d %d", v->width,v->height );
 	if( res <= 0 )
 		return 0;
@@ -244,6 +247,8 @@ static	int	veejay_get_image_data(veejay_sequence_t *v )
 void		veejay_get_status( void *data, guchar *dst )
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
+	if(!v->active)
+		return;
 	bzero(dst,100);
 	g_mutex_lock( v->serialize );
 	memcpy( dst, v->serialized, 100);
@@ -253,7 +258,7 @@ void		veejay_get_status( void *data, guchar *dst )
 GdkPixbuf	*veejay_get_image( void *data, gint *error)
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
-	if(!v) return NULL;
+	if(!v || !v->active) return NULL;
 
 	gint ret = 0;
 	g_mutex_lock( v->mutex );
@@ -318,7 +323,6 @@ void		veejay_configure_sequence( void *data, gint w, gint h )
 		v->width = w;
 		v->height = h;
 //	}
-
 	g_mutex_unlock( v->mutex );	
 }
 
@@ -328,7 +332,9 @@ static	int	veejay_process_data( veejay_sequence_t *v )
 	gint ret = 0;
 	g_mutex_lock( v->mutex );
 
-	if( v->width <= 0 || v->height <= 0 || v->preview == 0)
+//	veejay_msg(0, "%s: %p , %d x %d (%d)", __FUNCTION__,v, v->width,v->height,v->preview);
+	
+	if( v->width <= 0 || v->height <= 0 || v->preview == 0 || v->active == 0)
 	{
 		g_mutex_unlock( v->mutex );
 		return 1;
@@ -358,33 +364,37 @@ void	*veejay_sequence_thread(gpointer data)
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
 	if(!v) return;
-
+	unsigned long time_now = 0;
 	unsigned long tn = vj_get_timer() + v->preview_delay;
 	for ( ;; )
 	{
-		unsigned long time_now = vj_get_timer();
+		time_now = vj_get_timer();
 		
 		if( v->abort )
+		{
+			veejay_msg(0, "Thread aborted");
 			return NULL;
-
+		}
 		if( vj_client_poll( v->fd, V_STATUS ))
 		{
 			if( veejay_process_status( v ) == 0 )
 			{
-				//printf("Abort, status error\n");
-			//	return NULL;
+				veejay_msg(0, "Error reading status from track");
+				v->active = 0;
+				return NULL;
 			}
-			if( time_now > tn )
+		}
+		if( time_now > tn )
+		{
+			if ( veejay_process_data( v ) == 0 )
 			{
-				if ( veejay_process_data( v ) == 0 )
-				{
-					printf("Abort, data error\n");
-					return NULL;
-				}
-				tn = time_now + v->preview_delay; 
+				veejay_msg(0, "Abort, data error");
+				v->active = 0;
+				return NULL;
 			}
-		}	
-		g_usleep(20000);
+			tn = time_now + v->preview_delay; 
+		}
+		g_usleep(10000);
 		
 	}
 	return NULL;	
@@ -393,7 +403,7 @@ void	*veejay_sequence_thread(gpointer data)
 void	veejay_abort_sequence( void *data )
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
-	if(!v)	return;
+	if(!v || !v->active)	return;
 
 	g_mutex_lock(v->mutex);
 	v->abort = 1;
@@ -406,6 +416,8 @@ void	veejay_toggle_image_loader( void *data, gint state )
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
 	if(!v) return;
+	if(!v->active)
+		return;
 	g_mutex_lock(v->mutex);
 	v->preview = state;
 	g_mutex_unlock(v->mutex);
@@ -459,6 +471,7 @@ void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_he
 	v->preview_delay = 40000;
 	v->mutex = g_mutex_new();
 	v->serialize = g_mutex_new();
+	v->active = 1;
 	v->cond = g_cond_new();
 	v->thread = g_thread_create(
 			(GThreadFunc) veejay_sequence_thread,
@@ -471,7 +484,8 @@ void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_he
 		if(v) free(v);
 		return NULL;
 	}
-	
+	veejay_msg(2, "New connection with %s, %d (max %d x %d), lock %p",
+			hostname,port,max_width,max_height, v->serialize );
 	return v;
 }
 

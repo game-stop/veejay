@@ -196,6 +196,7 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst )
 //		veejay_msg(VEEJAY_MSG_DEBUG, "Frame not ready");
 //		return 0;
 //	}
+
 	if( v->c[0]->type == VSOCK_C )
 		plen = sock_t_recv_w( v->c[0]->fd, line, 11 );	
 
@@ -212,7 +213,7 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst )
 	}
 	if( v->cur_width != p[0] || v->cur_height != p[1] || v->cur_fmt != p[2])
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Frame contents invalid");
+		veejay_msg(VEEJAY_MSG_ERROR, "Frame contents invalid (video dimension or internal format did not match)");
 		return -1;
 	}
 	if( v->c[0]->type == VSOCK_C) 

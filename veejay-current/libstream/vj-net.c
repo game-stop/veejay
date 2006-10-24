@@ -30,15 +30,16 @@
 
 typedef struct
 {
-	pthread_mutex_t mutex;
-	pthread_t thread;
+//	pthread_mutex_t mutex;
+//	pthread_t thread;
 	vj_client      *remote;
 	int state;
 	int error;
 } threaded_t;
-
+/*
 #define STOP 0
 #define PLAY 1
+
 static void lock_(threaded_t *t, const char *f, int line)
 {
 //	veejay_msg(0,"lock thread by %s, line %d",f,line);
@@ -49,11 +50,11 @@ static void unlock_(threaded_t *t, const char *f, int line)
 {
 //	veejay_msg(0,"unlock thread by %s, line %d",f,line);
 	pthread_mutex_unlock( &(t->mutex ));
-}
+}*/
 
 #define lock( t ) lock_( t, __FUNCTION__, __LINE__ )
 #define unlock( t ) unlock_( t, __FUNCTION__ , __LINE__ )
-
+/*
 void	*reader_thread(void *data)
 {
 	vj_tag *tag = (vj_tag*) data;
@@ -81,7 +82,6 @@ void	*reader_thread(void *data)
 				vj_client_flush	( v, V_STATUS);
 			}	
 			ret =  vj_client_send( v, V_CMD, buf );
-			
 			if( ret <= 0 )
 				error = 1;
 		}
@@ -95,19 +95,23 @@ void	*reader_thread(void *data)
 		
 		if( error )
 		{
+			veejay_msg(VEEJAY_MSG_ERROR,
+					"Error retrieving frame from remote veejay,");
 			t->error = THREAD_STOP;
-			t->state = 0;
+			t->state = STOP;
 		}
 		unlock(t);
+		g_sleep( 25000 );
 	}
-}
+	return NULL;
+}*/
 
 
 
 void	*net_threader( )
 {
-	threaded_t *t = (threaded_t*) vj_malloc(sizeof(threaded_t));
-	pthread_mutex_init( &(t->mutex), NULL );
+	threaded_t *t = (threaded_t*) vj_calloc(sizeof(threaded_t));
+//	pthread_mutex_init( &(t->mutex), NULL );
 	return (void*) t;
 }
 
@@ -119,22 +123,22 @@ void	net_thread_remote( void *p, void *r )
 
 void	net_thread_exit(vj_tag *tag)
 {
-	threaded_t *t = tag->private;
+/*	threaded_t *t = tag->private;
 
 	lock(t);
-
+*/
 	if(tag->socket_frame)
 		free(tag->socket_frame);
 
-	unlock(t);
+/*	unlock(t);
 
 	pthread_mutex_destroy( &(t->mutex));
-	
+*/	
 }
 
 int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3], vj_client *v )
 {
-	threaded_t *t = (threaded_t*) tag->private;
+/*	threaded_t *t = (threaded_t*) tag->private;
 	lock(t);
 	if( t->state == 0 || t->error  )
 	{
@@ -147,7 +151,28 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3], vj_client *v )
 	veejay_memcpy( buffer[2], tag->socket_frame + v->planes[0] + v->planes[1] , v->planes[2] );
 	
 	unlock(t);
-	return 1;
+	return 1;*/
+	char buf[16];
+	sprintf(buf, "%03d:;", VIMS_GET_FRAME);
+
+
+	if( vj_client_poll(v, V_STATUS ) )
+	{
+		vj_client_flush	( v, V_STATUS);
+	}	
+	int ret =  vj_client_send( v, V_CMD, buf );
+	if( ret <= 0 )
+		return 0;
+	
+	ret = vj_client_read_i ( v, tag->socket_frame );
+	if( ret <= 0 )
+		return 0;
+
+	veejay_memcpy( buffer[0], tag->socket_frame, v->planes[0] );
+	veejay_memcpy( buffer[1], tag->socket_frame + v->planes[0], v->planes[1] );
+	veejay_memcpy( buffer[2], tag->socket_frame + v->planes[0] + v->planes[1] , v->planes[2] );
+	
+	return ret;
 }
 
 int	net_thread_start(vj_client *v, vj_tag *tag)
@@ -163,13 +188,14 @@ int	net_thread_start(vj_client *v, vj_tag *tag)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to establish connection with %s on port %d",
 				tag->source_name, tag->video_channel );
+		return 0;
 	}
 
-	threaded_t *t = (threaded_t*)tag->private;
+/*	threaded_t *t = (threaded_t*)tag->private;
 
 	t->error = 0;
 	t->state = 1;
-
+*/
 	if( tag->source_type == VJ_TAG_TYPE_MCAST )
 	{
 		char start_mcast[6];
@@ -187,16 +213,16 @@ int	net_thread_start(vj_client *v, vj_tag *tag)
 			return 0;
 		}	
 	}
-	int p_err = pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
+/*	int p_err = pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
 	if( p_err ==0)
 
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Created new %s stream",
-				tag->source_type == VJ_TAG_TYPE_MCAST ? 
-				"multicast" : "unicast");
-		return 1;
-	}
-	return 0;		
+	{*/
+	veejay_msg(VEEJAY_MSG_INFO, "Created new %s stream",
+			tag->source_type == VJ_TAG_TYPE_MCAST ? 
+			"multicast" : "unicast");
+	return 1;
+//	}
+//	return 0;		
 }
 
 void	net_thread_stop(vj_client *v , vj_tag *tag)
@@ -204,7 +230,7 @@ void	net_thread_stop(vj_client *v , vj_tag *tag)
 	char mcast_stop[6];
 	threaded_t *t = (threaded_t*)tag->private;
 	int ret = 0;
-	lock(t);
+//	lock(t);
 	
 	if(tag->source_type == VJ_TAG_TYPE_MCAST)
 	{
@@ -217,10 +243,10 @@ void	net_thread_stop(vj_client *v , vj_tag *tag)
 		ret = vj_client_send( v, V_CMD, 	mcast_stop);
 	}
 	
-	t->state = STOP;
+//	t->state = STOP;
 
-	unlock(t);
-	pthread_join( &(t->thread), (void*) tag );
+//	unlock(t);
+//	pthread_join( &(t->thread), (void*) tag );
 		
 	vj_client_close( v );
 

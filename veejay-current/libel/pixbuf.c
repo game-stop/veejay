@@ -29,6 +29,7 @@
 #include <libvje/effects/common.h>
 #include <libyuv/yuvconv.h>
 #include <libel/pixbuf.h>
+#include <veejay/vj-global.h>
 typedef struct
 {
 	char *filename;
@@ -372,6 +373,21 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 	
 	return ret;
 }
+static inline int       get_shift_size(int fmt)
+{
+        switch(fmt)
+        {
+                case FMT_420:
+                case FMT_420F:
+                        return 1;
+                case FMT_422:
+                case FMT_422F:
+                        return 1;
+                default:
+                        break;
+        }
+        return 0;
+}
 
 veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int out_w, int out_h, int fmt  )
 {
@@ -389,8 +405,8 @@ veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int o
 	pict1.data[1] = frame[1];
 	pict1.data[2] = frame[2];
         pict1.linesize[0] = w;
-	pict1.linesize[1] = w >> get_ffmpeg_shift_size(fmt);
-	pict1.linesize[2] = w >> get_ffmpeg_shift_size(fmt);
+	pict1.linesize[1] = w >> get_shift_size(fmt);
+	pict1.linesize[2] = w >> get_shift_size(fmt);
 
 	image->image = (void*)gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, w, h );
 	if(!image->image)
