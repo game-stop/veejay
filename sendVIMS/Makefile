@@ -2,7 +2,7 @@ all: pd_linux
 
 include Makefile.defs
 
-VERSION = 0.1.3
+VERSION = 0.1.4
 
 
 .SUFFIXES: .pd_linux

@@ -5,10 +5,13 @@
 print "// selector.h\n";
 print "// generated from vims.h\n";
 while (<>){
-    if (m/NET_(\S+)\s*=\s*(\d+)\s*,/) {
+    if (m/VIMS_(\S+)\s*=\s*(\d+)\s*,/) {
 	$id = $2;        # numeric id
 	$tag = lc $1;    # convert to lower case
 	$tag =~ s/_/\./g; # pd-ify
-	print "SELECTOR(\"" . $tag . "\", " . $id . ");\n";
+
+	$nid = int( $id );
+	
+	print "SELECTOR(\"" . $tag . "\", " . $id . ");\n" if $nid <= 400 or $nid >= 500;
     }
 }

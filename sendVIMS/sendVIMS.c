@@ -48,7 +48,7 @@
 static t_symbol *s_disconnect = 0;
 static t_symbol *s_veejay = 0;
 
-static t_symbol *selector[600];
+static t_symbol *selector[602];
 
 /* DATA STRUCTURES */
 
@@ -128,7 +128,7 @@ int selector_map(t_symbol *s){
     }
 
     // check the stuff from selectors.h
-    for (i=0; i<600; i++){
+    for (i=0; i<602; i++){
 	if (s == selector[i]) return i;
     }
 
@@ -214,18 +214,28 @@ vj_msg_t *vj_msg_new(t_symbol *selector, int argc, t_atom *argv){
 
     // map selector
     c += sprintf(c, "%03d:", selector_map(selector));
-
+    
     // print args
     while (argc){
-	switch(argv->a_type){
-	case A_SYMBOL: c += sprintf(c, "%s ", argv->a_w.w_symbol->s_name); break;
-	case A_FLOAT:  c += sprintf(c, "%d ", (int)argv->a_w.w_float); break;
-	default:
-	    goto error;
-	}
-	argc--,argv++;
+		switch(argv->a_type){
+		case A_SYMBOL:
+				c += sprintf(c, "%s", argv->a_w.w_symbol->s_name);
+				if(argc > 1)
+						c += sprintf(c, "%s", " ");
+				
+				break;
+		case A_FLOAT:
+				c += sprintf(c, "%d", (int)argv->a_w.w_float);
+				if(argc > 1)
+						c += sprintf(c, "%s", " ");
+
+				break;
+		default:
+		    goto error;
+		}
+		argc--,argv++;
     }
-    sprintf(c, ";");
+	c += sprintf(c, ";");
     sprintf(m->msg, "V%03d", strlen(body)); // fill header
     m->msg[4] = 'D';
     return m;
@@ -355,7 +365,7 @@ static void sendVIMS_flush(sendVIMS_t *x, int frames) {
 	    sendVIMS_disconnect_from_thread(x);
 	    return;
 	}
-	sendVIMS_pq_write(x, m); // write it to queue
+    	sendVIMS_pq_write(x, m); // write it to queue
     }
 }
 
@@ -533,8 +543,8 @@ static void post_selectors(void){
 
 void sendVIMS_setup(void){
     post("sendVIMS: version " VERSION);
-    post("sendVIMS: (c) 2004 Niels Elburg & Tom Schouten");
-
+    post("sendVIMS: (c) 2004-2006 Niels Elburg & Tom Schouten");
+    post("sendVIMS: assuming veejay-0.9.8");
 
     s_disconnect = gensym("disconnect");
     s_veejay     = gensym("veejay");
