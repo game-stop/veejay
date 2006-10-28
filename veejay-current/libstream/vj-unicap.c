@@ -590,15 +590,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 		for( i = 0;
 	         	SUCCESS( unicap_enumerate_formats( vut->handle, &rgb_spec, &rgb_format, i ) ); i ++ )
 		{
-			//@ try rgb24 first, its has less bandwidth
-			if( rgb24_fourcc == rgb_format.fourcc )
-			{
-				veejay_msg(0, "Camera can capture in RGB24" );
-				vut->rgb = 2;
-				rgb_format.size.width = w;
-				rgb_format.size.height = h;
-				break;
-			} else 	if( rgb_fourcc == rgb_format.fourcc )
+			if( rgb_fourcc == rgb_format.fourcc )
 			{
 				veejay_msg(0, "Camera can capture in RGB32");
 				vut->rgb = 1;
