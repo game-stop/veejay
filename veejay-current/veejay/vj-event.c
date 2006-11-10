@@ -2636,26 +2636,21 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 		return;
 	}
 
-	if( status < 0 || status > 1 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid argument passed to FULLSCREEN");
-		return;
-	}
-	
-	if( status != v->settings->full_screen[id] )
-	{
-		v->settings->full_screen[id] = status;
+	int go_fs = v->sdl[id]->fs == 1 ? 0:1 ;
+	v->settings->full_screen = go_fs;
 
-		vj_sdl_free(v->sdl[id]);
-		vj_sdl_init(v->sdl[id],
-			v->edit_list->video_width,
-			v->edit_list->video_height,
-			caption,
-			1,
-			v->settings->full_screen[id]
+	vj_sdl_free(v->sdl[id]);
+	vj_sdl_init(
+		v->settings->ncpu,
+		v->sdl[id],
+		v->edit_list->video_width,
+		v->edit_list->video_height,
+		caption,
+		1,
+		go_fs
 		);
-	}
-	veejay_msg(VEEJAY_MSG_INFO,"Video screen is %s", (v->settings->full_screen[id] ? "full screen" : "windowed"));
+	veejay_msg(VEEJAY_MSG_INFO,"Video screen is %s",
+			(v->settings->full_screen ? "full screen" : "windowed"));
 	
 }
 
@@ -2715,7 +2710,14 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 	if(x > 0 && y > 0 )
 		vj_sdl_set_geometry(v->sdl[id],x,y);
 
-	if(vj_sdl_init( v->sdl[id],w, h, title, 1, v->settings->full_screen[id] ))
+	if(vj_sdl_init( v->settings->ncpu,
+			v->sdl[id],
+			w,
+			h,
+			title,
+			1,
+			v->settings->full_screen )
+		)
 		veejay_msg(VEEJAY_MSG_INFO, "Opened SDL Video Window of size %d x %d", w, h );
 	else
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open SDL Video Window");

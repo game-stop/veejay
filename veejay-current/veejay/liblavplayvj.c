@@ -1819,8 +1819,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		if( x != -1 && y != -1 )
 			vj_sdl_set_geometry(info->sdl[0],x,y);
 
-		if (!vj_sdl_init(info->sdl[0], info->bes_width, info->bes_height, "Veejay",1,
-			info->settings->full_screen[0]))
+		if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height, "Veejay",1,
+			info->settings->full_screen))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Error initializing SDL");
 		    return -1;
@@ -1846,8 +1846,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	    	(vj_sdl *) vj_sdl_allocate(info->video_output_width,
 				      info->video_output_height, info->pixel_format);
 
-		if (!vj_sdl_init(info->sdl[0], info->bes_width, info->bes_height,"Veejay",1,
-			info->settings->full_screen[0]))
+		if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height,"Veejay",1,
+			info->settings->full_screen))
 	   	 return -1;
 #endif
 		info->dfb =
@@ -2442,6 +2442,22 @@ int	prepare_cache_line(int perc, int n_slots)
 	return 1;
 }
 
+int smp_check()
+{
+	int n_cpu = get_nprocs();
+	int c_cpu = get_nprocs_conf();
+	
+	if(n_cpu == c_cpu)
+	{
+		if(c_cpu>1) veejay_msg(VEEJAY_MSG_INFO, "Running on Multiple procesors");
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_WARNING, "You have %d CPU's but your system is configured for only %d",
+			n_cpu, c_cpu);
+	}
+	return n_cpu;
+}
 
 veejay_t *veejay_malloc()
 {
@@ -2546,6 +2562,10 @@ veejay_t *veejay_malloc()
 	for( i = 0; i < MAX_SDL_OUT;i++ )
 		info->sdl[i] = NULL;
 #endif
+
+
+	info->settings->ncpu = smp_check();
+	
     return info;
 }
 

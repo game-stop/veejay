@@ -66,7 +66,7 @@ void vj_sdl_set_geometry(vj_sdl* sdl, int w, int h)
 }
 
 
-int vj_sdl_init(vj_sdl * vjsdl, int scaled_width, int scaled_height, const char *caption, int show, int fs)
+int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, const char *caption, int show, int fs)
 {
 	uint8_t *sbuffer;
 	char name[100];
@@ -95,17 +95,19 @@ int vj_sdl_init(vj_sdl * vjsdl, int scaled_width, int scaled_height, const char 
 		hw_on = val ? atoi(val): 0;	
 	}
 
+	int extra_flags = (ncpu > 1  ? SDL_ASYNCBLIT : 0 );
+
 	if( hw_on == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Setting up for software emulation");
-		vjsdl->flags[0] = SDL_SWSURFACE | SDL_ASYNCBLIT | SDL_ANYFORMAT;
-		vjsdl->flags[1] = SDL_SWSURFACE | SDL_FULLSCREEN | SDL_ASYNCBLIT |SDL_ANYFORMAT;
+		vjsdl->flags[0] = SDL_SWSURFACE | SDL_ANYFORMAT | extra_flags;
+		vjsdl->flags[1] = SDL_SWSURFACE | SDL_FULLSCREEN | SDL_ANYFORMAT | extra_flags;
 	}
 	else
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Setting up for Hardware Acceleration");
-		vjsdl->flags[0] = SDL_HWSURFACE | SDL_ASYNCBLIT | SDL_DOUBLEBUF;
-		vjsdl->flags[1] = SDL_HWSURFACE | SDL_ASYNCBLIT | SDL_FULLSCREEN | SDL_DOUBLEBUF;
+		vjsdl->flags[0] = SDL_HWSURFACE | SDL_DOUBLEBUF | extra_flags;
+		vjsdl->flags[1] = SDL_HWSURFACE | SDL_FULLSCREEN | SDL_DOUBLEBUF | extra_flags;
 	}
 
 
@@ -227,6 +229,9 @@ int vj_sdl_init(vj_sdl * vjsdl, int scaled_width, int scaled_height, const char 
     		SDL_UpdateRect(vjsdl->screen, 0, 0, vjsdl->rectangle.w,
 			vjsdl->rectangle.h);
 	}
+
+
+	vjsdl->fs = fs;
 
  	return 1;
 }

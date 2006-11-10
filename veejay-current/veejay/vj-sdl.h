@@ -42,13 +42,17 @@ typedef struct vj_sdl_t {
     int frame_size;
     char last_error[255];
     int  custom_geo[2];
+
+    int fs;
     int pix_fmt;
 } vj_sdl;
+
+
 
 vj_sdl *vj_sdl_allocate(int width, int height, int pixel_format);
 void vj_sdl_set_geometry(vj_sdl *sdl, int w, int h);
 void vj_sdl_show(vj_sdl *vjsdl);
-int vj_sdl_init(vj_sdl * vjsdl, int scaled_width, int scaled_height,const char *caption, int show, int fs);
+int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height,const char *caption, int show, int fs);
 int vj_sdl_lock(vj_sdl * vjsdl);
 int vj_sdl_unlock(vj_sdl * vjsdl);
 int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420);

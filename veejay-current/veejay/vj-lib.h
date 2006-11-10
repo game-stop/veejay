@@ -157,7 +157,7 @@ typedef struct {
     int sample_record;
     int sample_record_id;
     int sample_record_switch;
-	int full_screen[2];
+    int full_screen;
     int tag_record_switch;
     int tag_record;
     int dct_method;
@@ -178,6 +178,7 @@ typedef struct {
 	vj_rand_player randplayer;
 	void	*export_image;
 	int	links[16];
+	int	ncpu;
 } video_playback_setup;
 
 

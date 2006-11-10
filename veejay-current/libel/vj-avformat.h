@@ -26,7 +26,7 @@ typedef struct vj_avformat_t
 {
 	AVFormatContext *context;
 	AVInputFormat 	*av_input_format;
-	AVImageFormat	*image_format;
+//	AVImageFormat	*image_format;
 	AVFormatParameters *av_format_par;
 	AVStream	*stream;
 	AVStream	*audio_stream;

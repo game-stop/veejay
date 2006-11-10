@@ -622,21 +622,6 @@ static void print_license()
 	    "The license must be included in the (source) package (COPYING)");
 }
 
-static void smp_check()
-{
-	int n_cpu = get_nprocs();
-	int c_cpu = get_nprocs_conf();
-	
-	if(n_cpu == c_cpu)
-	{
-		if(c_cpu>1) veejay_msg(VEEJAY_MSG_INFO, "Running on Multiple procesors");
-	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "You have %d CPU's but your system is configured for only %d",
-			n_cpu, c_cpu);
-	}
-}
 static void donothing(int sig)
 {
 	veejay_msg(VEEJAY_MSG_INFO,"Received signal %x ",sig);
@@ -712,8 +697,6 @@ int main(int argc, char **argv)
 		    		"Using First In-First Out II scheduling");
 	 	}
 	}
-
-	smp_check();
 
 	char *mem_func = get_memcpy_descr();
 	if(mem_func)
