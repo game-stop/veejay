@@ -150,26 +150,62 @@ static struct
 {
         const char *name;
         int  id;
-	int  pix_fmt;
+	int	pf;
 } _supported_codecs[] = 
 {
-        { "mjpeg" , CODEC_ID_MJPEG  },
-	{ "mjpegb", CODEC_ID_MJPEGB },
+        { "mjpg" , CODEC_ID_MJPEG ,		0 },
+	{ "mjpg" , CODEC_ID_MJPEG , 		1 },
+	{ "mjpb", CODEC_ID_MJPEGB,		0 },
+	{ "mjpb", CODEC_ID_MJPEGB,		1 },
+        { "msmpeg4",CODEC_ID_MPEG4,		-1},
+        { "divx"   ,CODEC_ID_MSMPEG4V3,		-1 },
+        { "i420",   CODEC_ID_YUV420,		-1 },
+        { "i422",   CODEC_ID_YUV422,		-1 },
+	{ "dmb1",	CODEC_ID_MJPEG,		0  },
+	{ "dmb1",	CODEC_ID_MJPEG,		1 },
+	{ "jpeg",	CODEC_ID_MJPEG,		0 },
+	{ "jpeg",	CODEC_ID_MJPEG,		1 },
+	{ "mjpa",	CODEC_ID_MJPEG,		0  },
+	{ "mjpb",	CODEC_ID_MJPEG,		1 },
+	{ "jfif",	CODEC_ID_MJPEG,		0  },
+	{ "jfif",	CODEC_ID_MJPEG,		1 },
+	{ "png",	CODEC_ID_PNG,		-1 },
+	{ "mpng",	CODEC_ID_PNG, 		-1 },
 #if LIBAVCODEC_BUILD > 4680
-	{ "sp5x",   CODEC_ID_SP5X }, /* sunplus motion jpeg video */
+	{ "sp5x",   	CODEC_ID_SP5X,		-1 }, /* sunplus motion jpeg video */
 #endif
-#if LIBAVCODEC_BUILD >= 4685
-	{ "theora", CODEC_ID_THEORA },
-#endif
-	{ "huffyuv", CODEC_ID_HUFFYUV },
-	{ "cyuv",	CODEC_ID_CYUV },
-        { "dv"    , CODEC_ID_DVVIDEO },
-        { "msmpeg4",CODEC_ID_MPEG4 },
-        { "divx"   ,CODEC_ID_MSMPEG4V3 },
-        { "i420",   CODEC_ID_YUV420 },
-        { "i422",   CODEC_ID_YUV422 },
-	{ "i444",   CODEC_ID_YUV444 },
-        { NULL  , 0 },
+	{ "jpgl",	CODEC_ID_MJPEG, 	0},
+	{ "jpgl",	CODEC_ID_MJPEG,		1},
+	{ "dvsd",	CODEC_ID_DVVIDEO,	-1},
+	{ "dvcp",	CODEC_ID_DVVIDEO,	-1},
+	{ "dv",		CODEC_ID_DVVIDEO,	-1},
+	{ "dvhd",	CODEC_ID_DVVIDEO,	-1},
+	{ "dvp",	CODEC_ID_DVVIDEO,	-1},
+	{ "mp4v",	CODEC_ID_MPEG4,		-1},
+	{ "xvid",	CODEC_ID_MPEG4,		-1},
+	{ "divx",	CODEC_ID_MPEG4,		-1},
+	{ "dxsd",	CODEC_ID_MPEG4,		-1},
+	{ "mp4s",	CODEC_ID_MPEG4,		-1},
+	{ "m4s2",	CODEC_ID_MPEG4,		-1},	
+	{ "avc1",	CODEC_ID_H264,		-1},
+	{ "h264",	CODEC_ID_H264,		-1},
+	{ "x264",	CODEC_ID_H264,		-1},
+	{ "davc",	CODEC_ID_H264,		-1},
+	{ "div3",	CODEC_ID_MSMPEG4V3,	-1},
+	{ "mp43",	CODEC_ID_MSMPEG4V3,	-1},
+	{ "mp42",	CODEC_ID_MSMPEG4V2,	-1},
+	{ "mpg4",	CODEC_ID_MSMPEG4V1,	-1},
+	{ "yuv",	CODEC_ID_YUV420,	-1},
+	{ "iyuv",	CODEC_ID_YUV420,	-1},
+	{ "i420",	CODEC_ID_YUV420,	-1},
+	{ "yv16",	CODEC_ID_YUV422,	-1},
+	{ "pict",	0xffff,			-1}, 
+	{ "hfyu",	CODEC_ID_HUFFYUV,	-1},
+	{ "cyuv",	CODEC_ID_CYUV,		-1},
+	{ "svq1",	CODEC_ID_SVQ1,		-1},
+	{ "svq3",	CODEC_ID_SVQ3,		-1},
+	{ "rpza",	CODEC_ID_RPZA,		-1},
+	{ NULL  , 0,				-1},
 };
 
 static struct
@@ -180,9 +216,15 @@ static struct
 {
 	{ "mjpg",	CODEC_ID_MJPEG	},
 	{ "mjpb",	CODEC_ID_MJPEGB },
+	{ "dmb1",	CODEC_ID_MJPEG	},
 	{ "jpeg",	CODEC_ID_MJPEG	},
 	{ "mjpa",	CODEC_ID_MJPEG  },
 	{ "jfif",	CODEC_ID_MJPEG  },
+	{ "png",	CODEC_ID_PNG	},
+	{ "mpng",	CODEC_ID_PNG	},
+#if LIBAVCODEC_BUILD > 4680
+	{ "sp5x",   	CODEC_ID_SP5X }, /* sunplus motion jpeg video */
+#endif
 	{ "jpgl",	CODEC_ID_MJPEG  },
 	{ "dvsd",	CODEC_ID_DVVIDEO},
 	{ "dv",		CODEC_ID_DVVIDEO},
@@ -194,6 +236,10 @@ static struct
 	{ "dxsd",	CODEC_ID_MPEG4	},
 	{ "mp4s",	CODEC_ID_MPEG4	},
 	{ "m4s2",	CODEC_ID_MPEG4	},	
+	{ "avc1",	CODEC_ID_H264	},
+	{ "h264",	CODEC_ID_H264	},
+	{ "x264",	CODEC_ID_H264 	},
+	{ "davc",	CODEC_ID_H264 	},
 	{ "div3",	CODEC_ID_MSMPEG4V3 },
 	{ "mp43",	CODEC_ID_MSMPEG4V3 },
 	{ "mp42",	CODEC_ID_MSMPEG4V2 },
@@ -202,12 +248,12 @@ static struct
 	{ "iyuv",	CODEC_ID_YUV420 },
 	{ "i420",	CODEC_ID_YUV420 },
 	{ "yv16",	CODEC_ID_YUV422 },
-	{ "i444",	CODEC_ID_YUV444 },
+	{ "pict",	0xffff	}, /* invalid fourcc */
 	{ "hfyu",	CODEC_ID_HUFFYUV},
 	{ "cyuv",	CODEC_ID_CYUV   },
-#if LIBAVCODEC_BUILD > 4680
-	{ "spsx",	CODEC_ID_SP5X	},
-#endif
+	{ "svq1",	CODEC_ID_SVQ1	},
+	{ "svq3",	CODEC_ID_SVQ3	},
+	{ "rpza",	CODEC_ID_RPZA	},
 	{ NULL, 0 }
 };
 
@@ -232,6 +278,7 @@ static	vj_dv_decoder *dv_decoder_ = NULL;
 #endif
 
 static	int	itu601_clamp_ = 0;
+static  int	el_pixel_format_ = 0;
 
 static	vj_decoder *el_codecs[MAX_CODECS];
 struct pixmap_name_struct {
@@ -312,14 +359,21 @@ static void release_buffer(struct AVCodecContext *context, AVFrame *av_frame){
 #endif
   av_frame->opaque = NULL;
 }
-
-static	int _el_get_codec(int id )
+static	int _el_get_codec(int id, int in_pix_fmt )
 {
 	int i;
 	for( i = 0; _supported_codecs[i].name != NULL ; i ++ )
 	{
-		if( _supported_codecs[i].id == id )
-			return i;
+		if( _supported_codecs[i].id == id)
+		{
+			if( _supported_codecs[i].pf == -1) {
+				return i;
+			} else if ( _supported_codecs[i].pf == 0 && (in_pix_fmt == FMT_420F || in_pix_fmt == FMT_420)) {
+				return i;
+			} else if ( _supported_codecs[i].pf == 1 && (in_pix_fmt == FMT_422F || in_pix_fmt == FMT_422)) {
+				return i;		
+			}	
+		}
 	}
 	return -1;
 }
@@ -347,8 +401,8 @@ static void	_el_free_decoder( vj_decoder *d )
 		if(d->sampler )
 			subsample_free( d->sampler );
 
-		for( i = 0; i < 3 ; i ++ )
-			if(d->deinterlace_buffer[i]) free(d->deinterlace_buffer[i]);
+		if(d->deinterlace_buffer[0])
+			free(d->deinterlace_buffer[0]);
 
 		if(d->context)
 		{
@@ -388,7 +442,7 @@ int	vj_el_match( void *sv, void *edl)
 	return 1;	
 }
 
-void	vj_el_init()
+void	vj_el_init( int pf )
 {
 	int i;
 	for( i = 0; i < MAX_CODECS ;i ++ )
@@ -396,6 +450,7 @@ void	vj_el_init()
 #ifdef USE_GDK_PIXBUF
 	vj_picture_init();
 #endif
+	el_pixel_format_ = pf;
 }
 
 int	vj_el_is_dv(editlist *el)
@@ -448,14 +503,22 @@ int	vj_el_cache_size()
 	return cache_avail_mb();
 }
 
-vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int dri)
+vj_decoder *_el_new_decoder( int id , int width, int height, float fps,int pixel_format, int out_fmt)
 {
         vj_decoder *d = (vj_decoder*) vj_malloc(sizeof(vj_decoder));
         if(!d)
 	  return NULL;
 	memset( d, 0, sizeof(vj_decoder));
+	int found = 0;
+	
+	if( id == CODEC_ID_DVVIDEO )
+	{
+		dv_decoder_ = vj_dv_decoder_init(
+				1, width, height, pixel_format );
+		found = 1;
+	}
 
-	if( id < CODEC_ID_YUV_PLANAR)
+	if( id < CODEC_ID_YUV_PLANAR && !found)
         {
 		d->codec = avcodec_find_decoder( id );
 		if(!d->codec)
@@ -479,18 +542,20 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int dri)
        		       return NULL;
       		}
 		
-		if(dri)
-		{
-			if( d->codec->capabilities & CODEC_CAP_DR1)
-			{
-				d->context->get_buffer = get_buffer;
-				d->context->release_buffer = release_buffer;
-			}
-		}
+	//	if(dri)
+	//	{
+	//		if( d->codec->capabilities & CODEC_CAP_DR1)
+	//		{
+	//			d->context->get_buffer = get_buffer;
+	//			d->context->release_buffer = release_buffer;
+	//		}
+	//	}
 			
         }
+	else
+	{
 	d->sampler = subsample_init( width );
-	       
+	}      
 
         d->tmp_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height * 4 );
         if(!d->tmp_buffer)
@@ -501,16 +566,14 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int dri)
         d->fmt = id;
         memset( d->tmp_buffer, 0, width * height * 4 );
 
-        d->deinterlace_buffer[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height);
+        d->deinterlace_buffer[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height * 3);
         if(!d->deinterlace_buffer[0]) { if(d) free(d); return NULL; }
-        d->deinterlace_buffer[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height);
-        if(!d->deinterlace_buffer[1]) { if(d) free(d); return NULL; }
-        d->deinterlace_buffer[2] = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height);
-        if(!d->deinterlace_buffer[2]) { if(d) free(d); return NULL; }
 
-        memset( d->deinterlace_buffer[0], 0, width * height );
-        memset( d->deinterlace_buffer[1], 0, width * height );
-        memset( d->deinterlace_buffer[2], 0, width * height );
+		d->deinterlace_buffer[1] = d->deinterlace_buffer[0] + (width * height );
+		d->deinterlace_buffer[2] = d->deinterlace_buffer[0] + (2 * width * height );
+		
+        memset( d->deinterlace_buffer[0], 0, width * height * 3 );
+
         
        	d->ref = 1;
         return d;
@@ -525,113 +588,177 @@ void	vj_el_set_image_output_size(editlist *el)
 
 int open_video_file(const char *filename, editlist * el );
 
-//@@ should identify sampling format, 411,420,444
-static int _el_probe_for_pixel_fmt( lav_file_t *fd )
+
+int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 {
-	switch( fd->MJPG_chroma )
+	int in_pix_fmt  = 0;
+
+	int res = lav_set_video_position( lav,  0);
+	if( res < 0 )
 	{
-		case CHROMA411:
-			return FMT_411;
-		case CHROMA420:
-			return FMT_420;
-		case CHROMA422:
-			return FMT_422;
-		case CHROMA444:
-			return FMT_444;
-	}
-	return FMT_444;
-}
-
-int 	vj_el_scan_video_frame(void *edl)
-{
-	editlist *el = (editlist*) edl;
-	int nframe = 0;
-	uint64_t n = 0;
-
-	if(! el->lav_fd || !el->lav_fd[N_EL_FILE(n)])
-		return 0;
-	
-	int decoder_id = lav_video_compressor_type( el->lav_fd[N_EL_FILE(n)] );
-
-	if(decoder_id <= 0 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to identify codec");
-		return 0;
+		veejay_msg(VEEJAY_MSG_ERROR, "Error setting frame 0: %s", lav_strerror());
+		return -1;
 	}
 	
-	int res = lav_set_video_position(el->lav_fd[N_EL_FILE(n)], N_EL_FRAME(n));
-	
-	if (res < 0)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Error setting video position: %s",
-			  lav_strerror());
- 		return 0;
-	}
+   	int decoder_id = lav_video_compressor_type( lav );
 
-	uint8_t *data = vj_malloc( sizeof(uint8_t*) * el->video_width * el->video_height * 4 );
+	vj_decoder *d = _el_new_decoder(
+					decoder_id,
+					lav_video_width( lav),
+					lav_video_height( lav),
+				   	(float) lav_frame_rate( lav ),
+					0,
+					out_pix_fmt );
 
-    	res = lav_read_frame(el->lav_fd[N_EL_FILE(n)], data);
-	if( res <= 0 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot read frame 0");
-		return 0;
-	}	
-	
-	int c_i = _el_get_codec(decoder_id);
-	if(c_i == -1)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unsupported codec");
-		return 0;
-	}
-	vj_decoder *d = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps,0);
 	if(!d)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Unable to initialize codec %d",decoder_id);
-		return 0;
+		veejay_msg(VEEJAY_MSG_ERROR, "Choked on decoder %x", decoder_id);
+		return -1;
 	}
-	if( decoder_id < CODEC_ID_YUV_PLANAR )
+
+	if(lav_filetype( lav ) == 'x')
 	{
-		int	got_picture = 1;
-		int len = avcodec_decode_video(
-			d->context,
-			d->frame,
-			&got_picture,
-			data,
-			res
-		);
-		if( len <= 0 )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot decode frame 0");
+			_el_free_decoder( d );
+			veejay_msg(VEEJAY_MSG_INFO,"\tFile is an image");
+			return out_pix_fmt;
+	}
+	res = lav_read_frame( lav, d->tmp_buffer);
+
+	if( res <= 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Error reading frame: %s", lav_strerror());
+		_el_free_decoder( d );
+		return -1;
+	}
+	
+	int got_picture = 0;
+	int ret = -1;
+	int len = 0;
+	switch( decoder_id )
+	{
+		case CODEC_ID_YUV420:
+				if( out_pix_fmt == FMT_422 ) {
+						ret = FMT_420;
+				} else if( out_pix_fmt == FMT_420 ) {
+						ret = FMT_420;
+				} else if( out_pix_fmt == FMT_422F ) {
+						ret = FMT_420F;
+				} else
+					   	ret = FMT_420F;
+				break;
+		case CODEC_ID_YUV422:
+			 	if( out_pix_fmt == FMT_422 ) {
+						ret = FMT_422;
+				} else if( out_pix_fmt == FMT_420 ) {
+						ret = FMT_422;
+				} else if( out_pix_fmt == FMT_420F ) {
+						ret = FMT_422F;
+				} else 
+						ret = FMT_422F;
+				break;
+		case CODEC_ID_DVVIDEO:
+				ret = vj_dv_scan_frame( dv_decoder_, d->tmp_buffer );
+				break;
+		default:
+
+				len = avcodec_decode_video(
+					d->context,
+					d->frame,
+					&got_picture,
+					d->tmp_buffer,
+					res
+				);
+
+				if(!got_picture || len <= 0 )
+				{
+					veejay_msg(VEEJAY_MSG_ERROR, "Unable to get whole picture");
+					ret = -1;
+				}
+				else
+				switch( d->context->pix_fmt )
+				{
+						case PIX_FMT_YUV420P: ret = FMT_420; break;
+						case PIX_FMT_YUV422P: ret = FMT_422; break;
+						case PIX_FMT_YUVJ420P:ret = FMT_420F;break;
+						case PIX_FMT_YUVJ422P:ret = FMT_422F;break;
+						default:
+								ret= d->context->pix_fmt;
+								break;
+				}
+			
+				break;	
+
+	}
+
+	_el_free_decoder( d );
+	
+	return ret;  
+}
+
+
+static int _el_probe_for_pixel_fmt( lav_file_t *fd )
+{
+//	int old = lav_video_cmodel( fd );
+
+	int new = test_video_frame( fd, el_pixel_format_ );
+
+	switch(new)
+	{
+		case FMT_420:
+				veejay_msg(VEEJAY_MSG_DEBUG,"\tPixel format: YUV Planar 4:2:0 [16-235][16-240]");
+				break;
+		case FMT_422:
+				veejay_msg(VEEJAY_MSG_DEBUG,"\tPixel format: YUV Planar 4:2:2 [16-235][16-240]");
+				break;
+		case FMT_420F:
+				veejay_msg(VEEJAY_MSG_DEBUG,"\tPixel format: YUV Planar 4:2:0 [JPEG full range]");
+				break;
+		case FMT_422F:
+				veejay_msg(VEEJAY_MSG_DEBUG,"\tPixel format: YUV Planar 4:2:2 [JPEG full range]");
+				break;
+		default:
+				veejay_msg(VEEJAY_MSG_DEBUG,"\tPixel format: %x (unknown)", new );
+				break;
+
+	}
+	
+	return new;
+}
+
+int	get_ffmpeg_pixfmt( int pf )
+{
+	switch( pf )
+	{
+		case FMT_420:
+			return PIX_FMT_YUV420P;
+		case FMT_422:
+			return PIX_FMT_YUV422P;
+		case FMT_420F:
+			return PIX_FMT_YUVJ420P;
+		case FMT_422F:
+			return PIX_FMT_YUVJ422P;
+		case 4:
+			return PIX_FMT_YUV444P;
+		
+	}
+	return PIX_FMT_YUV422P;
+}
+int       get_ffmpeg_shift_size(int fmt)
+{
+        switch(fmt)
+        {
+                case FMT_420:
+                case FMT_420F:
+                        return 1;
+                case FMT_422:
+                case FMT_422F:
+                        return 0;
+		case 4:
 			return 0;
-		}
- 		 
-		 
-		el->yuv_taste[ N_EL_FILE(n) ] = d->context->pix_fmt;
-	}
-	else
-	{
-		switch(decoder_id)
-		{
-			case CODEC_ID_YUV420:
-				el->yuv_taste[ N_EL_FILE(n) ] = PIX_FMT_YUV420P;
-				break;
-			case CODEC_ID_YUV422:
-				el->yuv_taste[ N_EL_FILE(n) ] = PIX_FMT_YUV422P;
-				break;
-			case CODEC_ID_YUV444:
-				el->yuv_taste[ N_EL_FILE(n) ] = PIX_FMT_YUV444P;
-				break;
-	
-		}
-	}
-
-	veejay_msg(VEEJAY_MSG_INFO, "\tPixel format:     %s", pixfmt_name( el->yuv_taste[N_EL_FILE(n)] ));
-	
-	_el_free_decoder(d);	
-
-	free(data);
-	
-	return 1;  
+                default:
+                        break;
+        }
+        return 0;
 }
 
 //@ realname is full path , or preserved path.
@@ -644,6 +771,9 @@ int open_video_file(const char *realname, editlist * el )
 	const char *compr_type;
 	int pix_fmt = -1;
 
+	if( realname == NULL ) 
+		return -1;
+	
 	for (i = 0; i < el->num_video_files; i++)
 	{
 		if( el->video_file_list[i] && strncmp(realname, el->video_file_list[i], strlen( el->video_file_list[i])) == 0)
@@ -683,6 +813,18 @@ int open_video_file(const char *realname, editlist * el )
 		el->num_video_files --;
 		return -1;
 	}
+
+	pix_fmt = _el_probe_for_pixel_fmt( el->lav_fd[n] );
+
+	if(pix_fmt < 0)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to determine pixel format");
+		el->num_video_files--;	
+		if(realname) free(realname);
+		return -1;
+	}
+
+	el->yuv_taste[n] = pix_fmt;
 
     	if(chroma == CHROMAUNKNOWN)
 	{ /* set chroma */
@@ -810,6 +952,45 @@ int open_video_file(const char *realname, editlist * el )
 		if(el->video_file_list[n]) free(el->video_file_list[n]);
 		return -1;
 	}
+	  // initialze a decoder if needed
+	decoder_id = _el_get_codec_id( compr_type );
+	if(decoder_id > 0 && decoder_id != 0xffff)
+	{
+		int c_i = _el_get_codec(decoder_id, el->yuv_taste[n] );
+		if(c_i == -1)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Unsupported codec %s",compr_type);
+			if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
+			if( realname ) free(realname );
+			if( el->video_file_list[n]) free(el->video_file_list[n]);
+			return -1;
+		}
+		if( el_codecs[c_i] == NULL )
+		{
+		//	el_codecs[c_i] = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps, pix_fmt );
+			int ff_pf = get_ffmpeg_pixfmt( el_pixel_format_ );
+			el_codecs[c_i] = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps, el->yuv_taste[ n ],ff_pf );
+			if(!el_codecs[c_i])
+			{
+				veejay_msg(VEEJAY_MSG_ERROR,"Cannot initialize %s codec", compr_type);
+				if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
+			    	if(realname) free(realname);
+				if( el->video_file_list[n]) free(el->video_file_list[n]);
+				return -1;
+			}
+		}
+	}
+
+	if(decoder_id <= 0)	
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Dont know how to handle %s (fmt %d) %x", compr_type, pix_fmt,decoder_id);
+		if(realname) free(realname);
+		if( el->video_file_list[n]) free( el->video_file_list[n] );
+		if( el->lav_fd[n] ) lav_close( el->lav_fd[n]);
+		return -1;
+	}
+
+
 
 /*
 	if(el->is_empty)
@@ -824,34 +1005,31 @@ void		vj_el_show_formats(void)
 {
 #ifdef SUPPORT_READ_DV2
 		veejay_msg(VEEJAY_MSG_INFO,
-			"Video formats: AVI and  RAW DV");
-		veejay_msg(VEEJAY_MSG_INFO, 
-			"\t[dvsd|dv] DV Video (Quasar DV codec)");
+			"Video containers: AVI (up to 2gb), RAW DV and Quicktime");
 #else
 		veejay_msg(VEEJAY_MSG_INFO,
-			"Video format: AVI");	
+			"Video containers: AVI (up to 2gb) and  Quicktime");
 #endif
 		veejay_msg(VEEJAY_MSG_INFO,
-			"\t[yv16] Planer YUV 4:2:2");
+			"Video fourcc (preferred): mjpg, mjpb, mjpa, dv, dvsd,sp5x,dmb1,dvcp,dvhd, yv16,i420");
 		veejay_msg(VEEJAY_MSG_INFO,
-			"\t[iyuv] Planer YUV 4:2:0");
+			"Video codecs (preferred): YV16, I420, Motion Jpeg or Digital Video");
 		veejay_msg(VEEJAY_MSG_INFO,
-			"\t[mjpg|mjpa] Motion JPEG");
+			"If the video file is made up out of only I-frames (whole images), you can also decode:");
 		veejay_msg(VEEJAY_MSG_INFO,
-			"Limited support for:");
+			" mpg4,mp4v,svq3,svq1,rpza,hfyu,mp42,mpg43,davc,div3,x264,h264,avc1,m4s2,divx,xvid");
 		veejay_msg(VEEJAY_MSG_INFO,
-			"\t[div3] MS MPEG4v3 Divx Video");
-		veejay_msg(VEEJAY_MSG_INFO,
-			"\t[mp4v] MPEG4 Video (ffmpeg experimental)");  		
+			"Use veejay's internal format YV16 to reduce CPU usage");
+		
 #ifdef USE_GDK_PIXBUF
 		veejay_msg(VEEJAY_MSG_INFO,
 			"Image types supported:");
 		vj_picture_display_formats();
 #endif
 
+
+		
 }
-
-
 static int	vj_el_dummy_frame( uint8_t *dst[3], editlist *el ,int pix_fmt)
 {
 	const int uv_len = (el->video_width * el->video_height) / ( (pix_fmt==FMT_422 ? 2 : 4));
@@ -941,63 +1119,32 @@ int	vj_el_get_video_frame(void *edl, long nframe, void *fdst)
 			veejay_msg(VEEJAY_MSG_ERROR,"Error setting video position: %s",
 				  lav_strerror());
  		}
-		if(decoder_id > 0 )
-		{
-			c_i = _el_get_codec(decoder_id);
-			if(c_i == -1)
-			{
-				veejay_msg(VEEJAY_MSG_ERROR ,"Unknown codec!");
-				return -1;
-			}
-		
-			if( el_codecs[c_i] == NULL )
-			{
-				int dri = vj_el_can_use_dri(el, n, dst);
-				el_codecs[c_i] = _el_new_decoder( decoder_id, el->video_width, el->video_height, el->video_fps,dri);
-				if(!el_codecs[c_i])
-				{
-					veejay_msg(VEEJAY_MSG_ERROR,"Failed to initialize codec");
-					return -1;
-				}
-			}
-			el_codecs[c_i]->img = dst;
-			
-		}
-
-		if(decoder_id == 0)	
-		{
-			veejay_msg(0, "Unable to find decoder. Abort");
-			return -1;
-		}
-
-		if(decoder_id == 0xffff)
-		{
-			//@ decode images from pixbuf.c . vj_get_picture must be modified to support dst->format
-			//@ need file to test first
-		}
 	}
 
-	c_i = _el_get_codec( decoder_id );
-        if(c_i >= 0 && c_i < MAX_CODECS)
+	
+	int in_pix_fmt = el->yuv_taste[N_EL_FILE(n)];
+	c_i = _el_get_codec( decoder_id , in_pix_fmt);
+        if(c_i >= 0 && c_i < MAX_CODECS && el_codecs[c_i] != NULL)
                 d = el_codecs[c_i];
 	else
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Choked on decoder" );
+		veejay_msg(VEEJAY_MSG_ERROR, "Choked on decoder %x (%d), slot %d",decoder_id,decoder_id, c_i );
 		return -1;
 	}
 
-	//@ edl cache only keeps raw buffers to reduce disk access
 	if(!in_cache )
 	{
 		if(lav_filetype( el->lav_fd[N_EL_FILE(n)] ) != 'x')
-            	{
+		{
 		    res = lav_read_frame(el->lav_fd[N_EL_FILE(n)], d->tmp_buffer);
 		    if( res <= 0 )
 		    {
-			    veejay_msg(VEEJAY_MSG_WARNING, "Error while getting frame %ld ", nframe);
-			return 0;  
+			veejay_msg(VEEJAY_MSG_WARNING, "Error while getting frame %ld ", nframe);
+                        return 0;  
 		    }
-		    cache_frame( el->cache, d->tmp_buffer, res, nframe, decoder_id );
+		    if(el->cache)
+			cache_frame( el->cache, d->tmp_buffer, res, nframe, decoder_id );
+			    
 		}
 	}
 
@@ -1006,89 +1153,85 @@ int	vj_el_get_video_frame(void *edl, long nframe, void *fdst)
 	int inter = 0;
 	int got_picture = 0;
 
-	//@ problem while getting frames: Format of FRAME may change any time.
-	
-	//@ start to deliver in YUV planar performer needs
-	if(decoder_id > CODEC_ID_YUV_PLANAR )
+	if( decoder_id > CODEC_ID_YUV_PLANAR )
 	{
 		yuv_1plane_to_planar( (decoder_id - CODEC_ID_YUV_PLANAR - 1),
-					data,
-					dst,
-					d->sampler );
+                                       data,
+                                       dst,
+                                       d->sampler );
 		return 1;
 	}
 	else
 	{
 		inter = lav_video_interlacing(el->lav_fd[N_EL_FILE(n)]);
-		int src_fmt = d->context->pix_fmt;
-		int dst_fmt = dst->pixfmt;
-		AVPicture pict,pict2;
-		memset(&pict,0,sizeof(AVPicture));
-		pict.data[0] = dst->data[0];
-		pict.data[1] = dst->data[1];
-		pict.data[2] = dst->data[2];
-		pict.linesize[0] = dst->width;
-		pict.linesize[1] = dst->width >> dst->shift_v;
-		pict.linesize[2] = dst->width >> dst->shift_v;
+                int src_fmt = d->context->pix_fmt;
+                int dst_fmt = dst->pixfmt;
+   		AVPicture pict,pict2;
+                memset(&pict,0,sizeof(AVPicture));
+                pict.data[0] = dst->data[0];
+                pict.data[1] = dst->data[1];
+                pict.data[2] = dst->data[2];
+                pict.linesize[0] = dst->width;
+                pict.linesize[1] = dst->width >> dst->shift_v;
+                pict.linesize[2] = dst->width >> dst->shift_v;
 
-		AVFrame test_f;
-		memset(&test_f,0,sizeof(AVFrame));
-		len = avcodec_decode_video(
-			d->context,
-			d->frame,
-			&got_picture,
-			data,
-			res
-		);
+                AVFrame test_f;
+                memset(&test_f,0,sizeof(AVFrame));
+                len = avcodec_decode_video(
+                        d->context,
+                        d->frame,
+                        &got_picture,
+                        data,
+                        res
+                );
 
-		if( len <= 0 )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR,
-			 "Frame %ld broken, fix your videofiles",
-				nframe);
-			return 0;
+                if( len <= 0 )
+                {
+                        veejay_msg(VEEJAY_MSG_ERROR,
+                         "Frame %ld broken, fix your videofiles",
+                                nframe);
+                        return 0;
 		}
-		if( !d->frame->opaque )	//@ indirect
-		{
-			if( el->auto_deinter && inter != LAV_NOT_INTERLACED)
-			{
-				pict2.data[0] = d->deinterlace_buffer[0];
-				pict2.data[1] = d->deinterlace_buffer[1];
-				pict2.data[2] = d->deinterlace_buffer[2];
-				pict2.linesize[1] = el->video_width >> 1;
-				pict2.linesize[2] = el->video_width >> 1;
-				pict2.linesize[0] = el->video_width;
-				avpicture_deinterlace(
-					&pict2,
-					(const AVPicture*) d->frame,
-					src_fmt,
-					el->video_width,
-					el->video_height);
-				img_convert( &pict, dst_fmt, (const AVPicture*) &pict2, src_fmt,
-					el->video_width,el->video_height);
-			}
-			else
-			{
-				__builtin_prefetch( pict.data[0],1,3 );
-				__builtin_prefetch( pict.data[1],1,3 );
-				__builtin_prefetch( pict.data[2],1,3 );
-				__builtin_prefetch( d->frame->data[0],0,3);
+		 if( !d->frame->opaque ) //@ indirect
+                {
+                        if( el->auto_deinter && inter != LAV_NOT_INTERLACED)
+                        {
+                                pict2.data[0] = d->deinterlace_buffer[0];
+                                pict2.data[1] = d->deinterlace_buffer[1];
+                                pict2.data[2] = d->deinterlace_buffer[2];
+                                pict2.linesize[1] = el->video_width >> 1;
+                                pict2.linesize[2] = el->video_width >> 1;
+                                pict2.linesize[0] = el->video_width;
+                                avpicture_deinterlace(
+                                        &pict2,
+                                        (const AVPicture*) d->frame,
+                                        src_fmt,
+                                        el->video_width,
+                                        el->video_height);
+                                img_convert( &pict, dst_fmt, (const AVPicture*) &pict2, src_fmt,
+                                        el->video_width,el->video_height);
+                        }
+                        else
+                        {
+                                __builtin_prefetch( pict.data[0],1,3 );
+                                __builtin_prefetch( pict.data[1],1,3 );
+                                __builtin_prefetch( pict.data[2],1,3 );
+                                __builtin_prefetch( d->frame->data[0],0,3);
 
-				img_convert( &pict, dst_fmt, (const AVPicture*) d->frame, src_fmt,
-					el->video_width, el->video_height );
-			}
-		}
-		else
-		{
-			//@ dri
-			dst = d->frame->opaque;
-			if(el->itu601)
-				subsample_ycbcr_itu601(d->sampler,dst);
-		}
-		return 1;
+                                img_convert( &pict, dst_fmt, (const AVPicture*) d->frame, src_fmt,
+                                        el->video_width, el->video_height );
+                        }
+                }
+                else
+                {
+                        //@ dri
+                        dst = d->frame->opaque;
+                        if(el->itu601)
+                                subsample_ycbcr_itu601(d->sampler,dst);
+                }
+
 	}
 
-	veejay_msg(VEEJAY_MSG_WARNING, "Error decoding frame %ld - %d ", nframe,len);
 	return 0;  
 }
 
@@ -1583,27 +1726,19 @@ void *vj_el_open_video_file(const char *filename )
 		 	n = open_video_file(filename, el );
 			if(n >= 0 )
 			{
-				if(!vj_el_scan_video_frame(el))
+				el->frame_list = (uint64_t *) realloc(el->frame_list,
+			      (el->video_frames +
+				       el->num_frames[n]) *
+				      sizeof(uint64_t));
+				if (el->frame_list==NULL)
 				{
-					veejay_msg(0, "Failed to scan video file '%s'",filename);
+					veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
+					return NULL;
 				}
-				else
-				{	
-					el->frame_list = (uint64_t *) realloc(el->frame_list,
-				      (el->video_frames +
-					       el->num_frames[n]) *
-					      sizeof(uint64_t));
-					if (el->frame_list==NULL)
-					{
-						veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
-						return NULL;
-					}
-	 				for (i = 0; i < el->num_frames[n]; i++)
-					{
-						el->frame_list[el->video_frames] = EL_ENTRY(n, i);
-						el->video_frames++;
-					}
-			
+	 			for (i = 0; i < el->num_frames[n]; i++)
+				{
+					el->frame_list[el->video_frames] = EL_ENTRY(n, i);
+					el->video_frames++;
 				}
 			}
 		}

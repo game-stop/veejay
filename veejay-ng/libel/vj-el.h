@@ -27,7 +27,7 @@ int	vj_el_cache_size();
 
 void	vj_el_prepare(void); // reset cache
 
-void	vj_el_init(); 
+void	vj_el_init(int pf); 
 
 void	vj_el_init_chunk(int n);
 

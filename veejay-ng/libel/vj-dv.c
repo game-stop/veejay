@@ -75,6 +75,24 @@ vj_dv_decoder *vj_dv_decoder_init(int quality, int width, int height, int pixel_
 	return d;
 }
 
+int	vj_dv_scan_frame( vj_dv_decoder *d, uint8_t * input_buf )
+{
+	if (dv_parse_header(d->decoder, input_buf) < 0)
+	{
+		veejay_msg(0, "Unable to read DV header");
+		return -1;
+	}
+	if( d->decoder->system == e_dv_system_none )
+	{
+		veejay_msg(0, "No valid PAL or NTSC video frame detected");
+		return -1;
+	}
+	if (d->decoder->sampling == e_dv_sample_411 || d->decoder->sampling == e_dv_sample_422)
+		return 1;
+	if( d->decoder->sampling == e_dv_sample_420 )
+		return 0;
+	return -1;
+}
 /* init the dv encoder and encode buffer */
 vj_dv_encoder *vj_dv_init_encoder(int w, int h, int norm, int pixel_format)
 {
