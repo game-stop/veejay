@@ -1135,9 +1135,9 @@ static void veejay_playback_cycle(veejay_t * info)
 		    sample_get_current_pos( info->current_sample );
 	  
 	    sample_cache_data( info->current_sample );
-	    
+#ifdef HAVE_JACK
 	    vj_jack_continue( sample_get_speed(info->current_sample) );
-		     
+#endif     
 	    performer_queue_audio_frame(info,skipa);	    
 		
 	    performer_queue_frame(info,skipi);

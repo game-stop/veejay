@@ -392,11 +392,13 @@ long	performer_audio_start( veejay_t *info )
  */
 void	performer_audio_continue( veejay_t *info )
 {
+#ifdef HAVE_JACK
 	performer_t *p = info->performer;
 
 	int speed = sample_get_speed( info->current_sample );
 
 	vj_jack_continue( speed );
+#endif
 }
 
 //! Stop playing audio

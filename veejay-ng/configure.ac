@@ -375,13 +375,13 @@ dnl
 have_samplerate=false
 have_jack=false
 if test x$with_jack != xno ; then
- PKG_CHECK_MODULES(JACK, jack >= 0.98.1 , have_jack=true, have_jack=false)
+ PKG_CHECK_MODULES(JACK, jack >= 0.100.0 , have_jack=true, have_jack=false)
  if test x$have_jack = xtrue ; then
     AC_SUBST(JACK_LIBS)
     AC_SUBST(JACK_CFLAGS)
     AC_DEFINE(HAVE_JACK,,[Compiling with support for Jack])
   else
-    AC_MSG_WARN([Jack >= 0.981.1 is required, get it at http://jackit.sourceforge.net]);
+    AC_MSG_WARN([Jack >= 0.100.0 is required, get it at http://jackit.sourceforge.net]);
   fi
 
 dnl **** Check for libsamplerate necessary for bio2jack ****

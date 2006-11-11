@@ -391,6 +391,12 @@ void		vj_el_set_itu601_preference( int status )
 	itu601_clamp_ = status;
 }
 
+int             vj_el_get_decoder_from_fourcc( const char *fourcc )
+{
+        return _el_get_codec_id( fourcc );
+}
+
+
 static void	_el_free_decoder( vj_decoder *d )
 {
 	if(d)

@@ -19,6 +19,8 @@
 /* NOTE: All functions that take a jack_driver_t* do NOT lock the device, in order to get a */
 /*       jack_driver_t* you must call getDriver() which will pthread_mutex_lock() */
 
+#include <config.h>
+#ifdef HAVE_JACK
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -2662,3 +2664,4 @@ unsigned long JACK_OutputStatus(int deviceID,long int *sec, long int *usec)
 	*usec = (long int) this->previousTime.tv_usec;
 	return this->num_ticks * this->chunk_size;
 }
+#endif
