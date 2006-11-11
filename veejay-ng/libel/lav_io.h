@@ -30,7 +30,7 @@
 // play with mlt here, avformat producer/several consumers (we can write to)
 // for normalized output (720x576/480) , dv1394 capture and playback
 
-#include <mjpegtools/yuv4mpeg.h>
+#include <yuv4mpeg.h>
 
 #define LAV_INTER_UNKNOWN       Y4M_UNKNOWN
 #define LAV_NOT_INTERLACED      Y4M_ILACE_NONE
@@ -65,6 +65,7 @@ typedef struct
 #ifdef SUPPORT_READ_DV2
    dv_t		*dv_fd;
 #endif
+	void	*qt_fd;
    int         jpeg_fd;
    char        *jpeg_filename;
 #ifdef USE_GDK_PIXBUF

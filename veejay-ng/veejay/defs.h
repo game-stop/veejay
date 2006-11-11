@@ -50,6 +50,9 @@ typedef struct AFrame_t
 #define	FMT_422	1	
 #define FMT_444	2
 #define FMT_411 3
+#define	FMT_420F	10
+#define	FMT_422F	11	
+#define FMT_444F	12
 
 #define	NO_AUDIO 0
 #define AUDIO_PLAY 1

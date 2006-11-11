@@ -282,6 +282,22 @@ if test x$with_libdv != xno ; then
 fi
 
 dnl *********************************************************************
+dnl Check for quicktime
+dnl   (creates LIBQUICKTIME_CFLAGS, LIBQUICKTIME_LIBS; defines HAVE_LIBQUICKTIME)
+dnl *********************************************************************
+
+have_libquicktime=false
+if test x$with_libquicktime != xno ; then
+  PKG_CHECK_MODULES(LIBQUICKTIME, [libquicktime >= 0.9.7],
+                    [have_libquicktime=true
+                     AC_DEFINE(HAVE_LIBQUICKTIME, 1, [libquicktime > 0.9.7 prese
+nt])],
+                    [have_libquicktime=false])
+fi
+AM_CONDITIONAL(HAVE_LIBQUICKTIME, test x$have_libquicktime = xtrue)
+
+
+dnl *********************************************************************
 dnl Check for mjpegtools
 dnl   (creates MJPEGYTOOLS_CFLAGS, 
 dnl *********************************************************************
@@ -866,6 +882,7 @@ AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - MJPEGTools                    : ${have_mjpegtools}])
+AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - SDL Video			 : ${have_sdl}])
 AC_MSG_NOTICE([  - Leightweight OSC		 : ${have_liblo}])
 AC_MSG_NOTICE([ Optional dependencies])

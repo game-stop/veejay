@@ -316,14 +316,14 @@ int veejay_init_project_from_args( veejay_t *info, int w, int h, float fps, int 
 	veejay_msg(2, "\tvideo settings: %d x %d, @%2.2f in %s", svit->w,svit->h,svit->fps, (svit->norm ? "NTSC" :"PAL") );
 	veejay_msg(2, "\taudio settings: %ld Hz, %d bits, %d channels, %d bps",
 			svit->rate, svit->bits,svit->chans, svit->bps );
+	veejay_msg(2, "\toutput pixel format: %d", fmt);
 	
 	info->video_info = (void*) svit;
 #ifdef STRICT_CHECKING
 	assert( info->video_info != NULL );
 #endif
 	info->use_display = display;
-
-	vj_el_init();
+	vj_el_init(fmt);
 
 	if(prepare_cache_line( 10, 3 ))
 	{
@@ -1244,6 +1244,8 @@ void	veejay_add_client( veejay_t *info, char *uri )
 
 void	*veejay_get_osc_sender(veejay_t * info )
 {
+	if(!info)
+		return NULL;
 	void *sender = NULL;
 	if(!info->current_client)
 		return NULL;

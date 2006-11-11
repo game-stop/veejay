@@ -348,7 +348,6 @@ int		sample_get_run_id( void *info )
 	sample_runtime_data *srd = (sample_runtime_data*) info;
 	return srd->primary_key;
 }
-
 int		sample_get_key_ptr( void *info )
 {
 	if(!info)
@@ -368,6 +367,7 @@ int		sample_get_key_ptr( void *info )
 void	sample_delete_ptr( void *info )
 {
 	sample_runtime_data *srd = (sample_runtime_data*) info;
+
 	//@ FIXME: get default channel configuratioe_data *srd = (sample_runtime_data*) info;
 #ifdef STRICT_CHECKING
 	assert( info != NULL );
@@ -386,16 +386,11 @@ void	sample_delete_ptr( void *info )
 
 	void *osc_space = NULL;
 	error = vevo_property_get( srd->info_port, "HOST_osc",0,&osc_space );
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	
-	veejay_osc_del_methods( srd->user_data, osc_space,srd->info_port ,srd);
+	if( error == VEVO_NO_ERROR )
+		veejay_osc_del_methods( srd->user_data, osc_space,srd->info_port ,srd);
 
-//	sample_fx_clean_up( info, srd->user_data );
+	sample_fx_clean_up( info, srd->user_data );
 
-	sample_fx_chain_reset( info );
-	
 	sample_close( srd );
 	
 	vevo_port_recursive_free( srd->info_port );
@@ -1221,8 +1216,8 @@ static void		sample_ui_close_all( void *sample )
 //	{
 //		sample_ui_fx_close( sample, i, srd->user_data );
 //	}	
-
-	sample_ui_close(sample);	
+	if(srd->data)
+		sample_ui_close(sample);	
 }
 
 
@@ -1230,14 +1225,14 @@ static	void	sample_fx_entry_clean_up( void *sample, int id, void *user_data )
 {
 	sample_runtime_data *srd = (sample_runtime_data*) sample;
 	fx_slot_t *slot = sample_get_fx_port_ptr( srd, id );
-	
+#ifdef STRICT_CHECKING
+	assert( srd->info_port != NULL );
+#endif	
 	if(slot->window)
+	{
 		sample_ui_fx_close( sample, id, user_data );
-	else
-		veejay_msg(0, "FX slot %d has no window, sample %d", id,
-			 sample_get_key_ptr(sample) );
-	if(slot->window)
 		free(slot->window);
+	}
 	if(slot->frame)
 		free(slot->frame);
 	
@@ -1247,14 +1242,15 @@ static	void	sample_fx_entry_clean_up( void *sample, int id, void *user_data )
 		plug_deactivate( slot->fx_instance );
 	}
 
-	vevo_port_free( slot->in_values );
-	vevo_port_free( slot->out_values );
-	vevo_port_free( slot->out_channels );
+	if( slot->in_values )
+		vevo_port_free( slot->in_values );
+	if( slot->out_values)
+		vevo_port_free( slot->out_values );
+	if( slot->out_channels)
+		vevo_port_free( slot->out_channels );
 	
 	if( slot->bind )
-	{
 		sample_reset_bind ( sample, slot );	
-	}
 
 	free(slot);
 
