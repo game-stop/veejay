@@ -16,7 +16,7 @@ enum {
 	VIMS_FXLIST_DEC				=	2,
 	VIMS_FXLIST_ADD				=	3,	
 	VIMS_PRINT_INFO				=	4,
-
+	VIMS_PREVIEW_BW				=	8,
 		
 /* query information */
 	VIMS_VIDEO_INFORMATION			=	400,

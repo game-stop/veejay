@@ -430,6 +430,50 @@ veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int o
 
 	return image;
 }
+veejay_image_t *vj_picture_save_bw_to_memory( uint8_t **frame, int w, int h , int out_w, int out_h, int fmt  )
+{
+	veejay_image_t *image = (veejay_image_t*) vj_malloc(sizeof(veejay_image_t));
+	if(!image)
+		return NULL;
+
+	memset(image, 0,sizeof(veejay_image_t));
+
+	AVPicture pict1,pict2;
+	memset(&pict1,0,sizeof(pict1));
+        memset(&pict2,0,sizeof(pict2));
+
+	pict1.data[0] = frame[0];
+	pict1.data[1] = NULL;//frame[1];
+	pict1.data[2] = NULL;//frame[2];
+        pict1.linesize[0] = w;
+	pict1.linesize[1] = 0;//w >> get_shift_size(fmt);
+	pict1.linesize[2] = 0;//w >> get_shift_size(fmt);
+
+	image->image = (void*)gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, w, h );
+	if(!image->image)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cant allocate buffer for RGB");
+		return NULL;
+	}
+
+	pict2.data[0] =  (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );;
+        pict2.linesize[0] = w * 3;
+
+	img_convert( &pict2, PIX_FMT_RGB24, &pict1, PIX_FMT_GRAY8, w, h );
+	
+//	int pf = get_ffmpeg_pixfmt( fmt );
+//	img_convert( &pict2, PIX_FMT_RGB24, &pict1, pf,	w, 	h );
+
+	if( out_w != w || out_h != h )
+	{
+		image->scaled_image = (void*)gdk_pixbuf_scale_simple(
+				(GdkPixbuf*) image->image, out_w, out_h,
+			 GDK_INTERP_NEAREST );
+	}
+
+	return image;
+}
+
 
 
 #endif

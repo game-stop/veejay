@@ -599,6 +599,16 @@ int veejay_init_editlist(veejay_t * info)
 void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 {
 	// if current is stream and playing network stream, close connection
+	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
+	{
+		int cur_id = info->uc->sample_id;
+		if( new_pm != info->uc->playback_mode ||
+				( new_pm == VJ_PLAYBACK_MODE_SAMPLE && sample_id != cur_id ) )
+		{
+			sample_stop_playing( cur_id );
+		}
+	}
+
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
 	{
 		int cur_id = info->uc->sample_id;
@@ -705,8 +715,10 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 		}
 
 		info->edit_list = sample_get_editlist( sampleid );
-
+		if( info->uc->sample_id != sampleid)
+		  sample_stop_playing(sampleid);//@pfff	
 		veejay_reset_el_buffer(info);
+		sample_start_playing( sampleid );
 
 	   	sample_get_short_info( sampleid , &start,&end,&looptype,&speed);
 
@@ -1075,12 +1087,6 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 
 }
 
-int	veejay_mem_used( void )
-{
-	double v = (1.0 /  (double) chunk_size_) * (double) vj_el_cache_size();
-	return (int) (v * 1000.0);
-}
-
 
 void veejay_pipe_write_status(veejay_t * info, int link_id)
 {
@@ -1090,13 +1096,13 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     int res = 0;
     int pm = info->uc->playback_mode;
     int total_slots = (sample_size() - 1 ) + (vj_tag_true_size() -1 );
-
-    //int cache_used = veejay_mem_used();
 	int cache_used = 0;
    if(total_slots < 0)
 	total_slots = 0;
     switch (info->uc->playback_mode) {
     	case VJ_PLAYBACK_MODE_SAMPLE:
+		cache_used = sample_cache_used(0);
+
 		if( info->settings->randplayer.mode ==
 			RANDMODE_SAMPLE)
 			pm = VJ_PLAYBACK_MODE_PATTERN;
@@ -2411,29 +2417,31 @@ int	prepare_cache_line(int perc, int n_slots)
 		return 1;
 	}
 
-	fgets( line,128, file );
+	fgets(line, 128, file );
+	sscanf( line, "%*s %i", &total );
+	fclose(file);
+/*	fgets( line,128, file );
 	fgets( line,128, file );
 	fclose( file );
 	sscanf( line, "%*s %i %i %i %i", &total,&avail,&buffer,&cache );
-	int max_memory = 0;
-	if( perc > 0)
-	{
-		float	k = (float) perc / 100.0;
-		int	threshold = avail / (1024 * 1024);
-		max_memory = (int)( k * threshold );
-	}
+*/
+	double p = (double) perc * 0.01;
+	int max_memory = (p * total);
 	if( n_slots <= 0)
 	 n_slots = 1;
+
 	int chunk_size = (max_memory <= 0 ? 0: max_memory / n_slots ); 
+
 	chunk_size_ = chunk_size;
 	n_cache_slots_ = n_slots;
-	total_mem_mb_ = total / (1024 * 1024);
+
+	total_mem_mb_ = total / 1024;
 	if(chunk_size > 0 )
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "%d Mb total system RAM , %d Mb total available", total_mem_mb_,
-				avail / (1024*1024) );
-		veejay_msg(VEEJAY_MSG_INFO, "Reserved %d percent of available RAM for cache", perc );
-		veejay_msg(VEEJAY_MSG_INFO, "Cache line size is %d Mb (Total is %d)", chunk_size, max_memory);
+		veejay_msg(VEEJAY_MSG_INFO, "%d Kb total system RAM , Consuming up to %2.2f Mb",
+				total, (float)max_memory / 1024.0 );
+		veejay_msg(VEEJAY_MSG_INFO, "Cache line size is %d Mb per Sample",
+				chunk_size);
 		vj_el_init_chunk( chunk_size );
 	}
 	else

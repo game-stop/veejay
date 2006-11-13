@@ -723,7 +723,15 @@ void		vj_init_vevo_events(void)
 				"Looptype (0=None, 1=Normal, 2=Pingpong)",
 				-1,
 				NULL);
-
+	index_map_[VIMS_PREVIEW_BW]	=	_new_event(
+				NULL,
+				VIMS_PREVIEW_BW,
+				"Toggle grayscale preview on/off (default=off)",
+				vj_event_toggle_bw,	
+				0,
+				VIMS_ALLOW_ANY,
+				NULL,
+				NULL );	
 	index_map_[VIMS_RECORD_DATAFORMAT]	=	_new_event(
 				"%s",
 				VIMS_RECORD_DATAFORMAT,

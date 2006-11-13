@@ -298,7 +298,7 @@ static int mem_chunk_ = 0;
 void	vj_el_init_chunk(int size)
 {
 //@@ chunk size per editlist
-	mem_chunk_ = 1024 * 1024 * size;
+	mem_chunk_ = 1024 * size;
 }
 void	vj_el_init(int pf)
 {
@@ -325,7 +325,7 @@ void	vj_el_prepare()
 
 //@ iterateovers over sample fx chain
 void	vj_el_setup_cache( editlist *el )
-{	
+{
 	if(!el->cache)
 	{
 		int n_slots = mem_chunk_ / el->max_frame_size;

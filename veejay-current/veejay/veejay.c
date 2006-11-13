@@ -48,8 +48,8 @@ static int override_pix_fmt = 1;
 static int full_range = 0;
 static char override_norm = 'p';
 static int auto_loop = 0;
-static int n_slots_ = 8;
-static int max_mem_ = 0;
+static int n_slots_ = 4;
+static int max_mem_ = 30;
 
 static void CompiledWith()
 {
@@ -177,9 +177,9 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -r/--audiorate\t\tDummy audio rate\n");
 	fprintf(stderr,
-		"  -m/--memory	\t\tMaximum memory to use for cache (0=disable)\n");  
+		"  -m/--memory	\t\tMaximum memory to use for cache (0=disable, default=30%)\n");  
 	fprintf(stderr,
-		"  -j/--max_cache \t\tDivide cache memory over N samples (fairly distributed)\n");
+		"  -j/--max_cache \t\tDivide cache memory over N samples (default=4)\n");
 	fprintf(stderr,
 		"  -Y/--ycbcr [01]\t\tInternal processing format");
 	fprintf(stderr,

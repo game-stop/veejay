@@ -59,7 +59,7 @@
 #define MSG_MIN_LEN	  4 /* stripped ';' */
 
 
-
+static int use_bw_preview_ = 0;
 static int _last_known_num_args = 0;
 static hash_t *BundleHash = NULL;
 
@@ -2651,7 +2651,6 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 		);
 	veejay_msg(VEEJAY_MSG_INFO,"Video screen is %s",
 			(v->settings->full_screen ? "full screen" : "windowed"));
-	
 }
 
 void vj_event_set_screen_size(void *ptr, const char format[], va_list ap) 
@@ -5952,6 +5951,7 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in MJPEG AVI format");
 		return;
 	}
+#ifdef HAVE_LIBQUICKTIME
 	if(strncasecmp(str,"quicktime-dv", 12 ) == 0 )
 	{
 		if( vj_el_is_dv( v->edit_list ))
@@ -5969,7 +5969,7 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		veejay_msg( VEEJAY_MSG_INFO, "Recorder writes in QT mjpeg format");
 		return;
 	}	
-	
+#endif
 	if(strncasecmp(str,"i420",4)==0 || strncasecmp(str,"yv12",4)==0 )
 	{
 		_recorder_format = ENCODER_YUV420;
@@ -7075,6 +7075,15 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	{
 		vj_perform_get_primary_frame( v, frame, 0);
 	//	vj_perform_get_primary_frame_420p( v, frame );
+		if( use_bw_preview_ )
+		img = vj_picture_save_bw_to_memory(
+					frame,
+					v->edit_list->video_width,
+					v->edit_list->video_height,
+					args[0],
+					args[1],
+			(v->video_out == 4 ? 4 : v->pixel_format ));
+		else
 		img = vj_picture_save_to_memory(
 					frame,
 					v->edit_list->video_width,
@@ -7082,6 +7091,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 					args[0],
 					args[1],
 			(v->video_out == 4 ? 4 : v->pixel_format ));
+
 				//	pix_fmt );
 				//	v->edit_list->pixel_format );
 	 
@@ -7148,6 +7158,14 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 }
 #endif
 #endif
+
+void	vj_event_toggle_bw( void *ptr, const char format[], va_list ap )
+{
+	if( use_bw_preview_ )
+		use_bw_preview_ = 0;
+	else
+		use_bw_preview_ = 1;
+}
 
 void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 {

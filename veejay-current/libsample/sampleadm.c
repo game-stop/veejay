@@ -833,6 +833,7 @@ int sample_del(int sample_id)
     int i;
     int j;
 
+    vj_el_clear_cache( si->edit_list );
     for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
     {
 		if (si->effect_chain[i])
@@ -1168,8 +1169,77 @@ int sample_set_chain_channel(int s1, int position, int input)
 	return -1;
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    sample->effect_chain[position]->channel = input;
-    return ( sample_update(sample,s1));
+ 
+    
+ 
+    //sample->effect_chain[position]->channel = input;
+    int src_type =  sample->effect_chain[position]->source_type;
+    // now, reset cache and setup
+   	 if( src_type == 0 )
+   	 {
+		sample_info *new = sample_get( input );
+
+		if( sample->effect_chain[position]->channel != input )
+		{
+		    sample_info *old = sample_get( sample->effect_chain[position]->channel );
+		    if(old)
+			    vj_el_clear_cache( old->edit_list );
+	    	
+			if(new)
+				vj_el_setup_cache( new->edit_list );
+		}
+	 }
+	sample->effect_chain[position]->channel = input;
+
+    	return ( sample_update(sample,s1));
+}
+
+int	sample_stop_playing(int s1)
+{
+	sample_info *sample = sample_get(s1);
+	if (!sample)
+		return -1;
+	int i;
+	vj_el_clear_cache( sample->edit_list );
+	for( i = 0; i < SAMPLE_MAX_EFFECTS;i++ )
+	{
+		int src_type =  sample->effect_chain[i]->source_type;
+		int id       =   sample->effect_chain[i]->channel;
+		if( src_type == 0 && id > 0 )
+		{
+			sample_info *second = sample_get( id );
+	       		if(second)
+				vj_el_clear_cache( second->edit_list );
+	    	}
+    	}
+	return 1;
+}
+
+int	sample_cache_used( int s1 )
+{
+	return cache_avail_mb();
+}
+
+int	sample_start_playing(int s1)
+{
+	sample_info *sample = sample_get(s1);
+	if (!sample)
+	return -1;
+   	int i; 
+	vj_el_setup_cache( sample->edit_list );
+	for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ )
+	{
+		int src_type =  sample->effect_chain[i]->source_type;
+		int id       =   sample->effect_chain[i]->channel;
+		if( src_type == 0 && id > 0 )
+		{
+			sample_info *second = sample_get( id );
+	       		if(second)
+				vj_el_setup_cache( second->edit_list );
+	    	}
+    	}
+
+	return 1;
 }
 
 int sample_is_deleted(int s1)
@@ -1190,7 +1260,19 @@ int sample_set_chain_source(int s1, int position, int input)
 	return -1;
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 	return -1;
-    sample->effect_chain[position]->source_type = input;
+
+	if( sample->effect_chain[position]->source_type == 0 &&
+		    sample->effect_chain[position]->channel > 0 )
+	{
+	    sample_info *second = sample_get( sample->effect_chain[position]->channel );
+	    if(second)
+		vj_el_clear_cache( second->edit_list );
+	    sample_info *new = sample_get( input );
+	    if(new)
+	  	vj_el_setup_cache( new->edit_list );
+	}
+
+       	sample->effect_chain[position]->source_type = input;
     return (sample_update(sample,s1));
 }
 
@@ -1627,6 +1709,14 @@ int sample_chain_clear(int s1)
 	sample->effect_chain[i]->frame_trimmer = 0;
 	sample->effect_chain[i]->volume = 0;
 	sample->effect_chain[i]->a_flag = 0;
+	int src_type = sample->effect_chain[i]->source_type;
+	int id       = sample->effect_chain[i]->channel;
+	if( src_type == 0 && id > 0 )
+	{
+		sample_info *old = sample_get( id );
+		if(old)
+			vj_el_clear_cache(old->edit_list);
+	}
 	sample->effect_chain[i]->source_type = 0;
 	sample->effect_chain[i]->channel = s1; // myself
 	for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
@@ -1718,6 +1808,15 @@ int sample_chain_remove(int s1, int position)
     sample->effect_chain[position]->frame_trimmer = 0;
     sample->effect_chain[position]->volume = 0;
     sample->effect_chain[position]->a_flag = 0;
+ 	int src_type = sample->effect_chain[position]->source_type;
+	int id       = sample->effect_chain[position]->channel;
+	if( src_type == 0 && id > 0 )
+	{
+		sample_info *old = sample_get( id );
+		if(old)
+			vj_el_clear_cache(old->edit_list);
+	}
+
     sample->effect_chain[position]->source_type = 0;
     sample->effect_chain[position]->channel = 0;
     for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
@@ -1749,30 +1848,6 @@ editlist *sample_get_editlist(int s1)
 	return sample->edit_list;
 }
 
-//@ uncache edl
-void	sample_uncache( int s1 )
-{
-	char key[5];
-	sprintf(key, "s%d",s1);
-	assert( sample_exists(s1) != 0);
-	editlist *bedl = sample_get_editlist(s1);
-	vj_el_clear_cache( bedl );
-	int in_active = 0;
-	vevo_property_set( chain_cache_, key, LIVIDO_ATOM_TYPE_INT, 1, &in_active );
-	slots_consumed_ --;
-}
-//@ cache edl
-void	sample_cache( int s1 )
-{
-	char key[5];
-	sprintf(key, "s%d",s1);
-	assert( sample_exists(s1) != 0);
-	editlist *bedl = sample_get_editlist(s1);
-	assert( bedl != NULL );
-	vj_el_setup_cache( bedl );
-	vevo_property_set( chain_cache_, key, LIVIDO_ATOM_TYPE_INT, 1, &s1 );
-	slots_consumed_ ++;
-}
 //@ is sample k in fx chain ?
 int	sample_cached(sample_info *s, int b_sample )
 {
@@ -1781,70 +1856,6 @@ int	sample_cached(sample_info *s, int b_sample )
 	  if( s->effect_chain[i]->source_type == 0 && s->effect_chain[i]->channel == b_sample)
 		return 1;
         return 0;
-}
-
-//@ is sample k in chain cache and active?
-int	sample_inlined( sample_info *s, int b_sample )
-{
-	char key[5];
-	sprintf(key, "s%d",b_sample);
-	assert( b_sample > 0 );
-
-	int value = 0;
-	vevo_property_get( chain_cache_, key, 0,&value );
-
-	if( value == b_sample )
-		return 1;
-	return 0;
-}
-
-int	sample_cache_frames(int s1, int max_n)
-{
-	sample_info *sample = sample_get(s1);
-	int i;
-	assert( sample != NULL );
-
-	//@ if top sample is not cached, cache it now
-	if( !sample_inlined( sample, s1 ))
-	{
-		sample_cache(s1);
-		if( slots_consumed_ >= max_n )
-			return 1;
-	}
-
-	//@ cache fx chain
-  	for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
-  	{
-		int type = sample->effect_chain[i]->source_type;
-		int b_sample = sample->effect_chain[i]->channel;
-		
-		if ( b_sample > 0 && type == 0 && !sample_inlined( sample, b_sample ))
-		{
-			sample_cache( b_sample );	
-			if( slots_consumed_ >= max_n )
-				break;
-		}
-	}	
-
-	//@ reset caches that are not used
-	char **props = vevo_list_properties( chain_cache_ );
-	if(!props)
-		return 1;
-
-	i = 0;
-	while( props[i] != NULL )
-	{
-		int b_sample = 0;
-		vevo_property_get( chain_cache_, props[i], 0, &b_sample);
-		//@ is b_sample in fx chain ?
-		if( b_sample > 0 && !sample_cached( sample, b_sample ))
-			sample_uncache( b_sample );
-		free(props[i]);
-		i++;
-	}
-	free(props);
-
-	return 1;
 }
 
 int	sample_set_editlist(int s1, editlist *edl)

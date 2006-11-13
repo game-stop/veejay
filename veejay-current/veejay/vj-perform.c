@@ -2200,7 +2200,6 @@ void vj_perform_plain_fill_buffer(veejay_t * info, int entry, int skip)
 
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
 	{
-		sample_cache_frames( info->uc->sample_id, get_num_slots() );
 		ret = vj_perform_get_frame_(info, info->uc->sample_id, settings->current_frame_num,frame );
 	}
 	else

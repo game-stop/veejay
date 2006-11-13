@@ -228,4 +228,7 @@ void	vj_event_send_sample_options(	void *ptr, const char format[], va_list ap);
 void	vj_event_stream_set_length(	void *ptr, const char format[], va_list ap);
 void vj_event_linkclose(void *ptr, const char format[], va_list ap);
 void	vj_event_send_track_list( void *ptr, const char format[], va_list ap);
+
+void	vj_event_toggle_bw( void *ptr, const char format[], va_list ap );
+
 #endif

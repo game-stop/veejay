@@ -1771,7 +1771,6 @@ void		veejay_quit( )
        single_vims( 600 );
 
 	clear_progress_bar( "cpumeter",0.0 );
-	clear_progress_bar( "cachemeter", 0.0);
 	clear_progress_bar( "connecting",0.0 );
 	clear_progress_bar( "samplerecord_progress",0.0 );
 	clear_progress_bar( "streamrecord_progress",0.0 );
@@ -3179,7 +3178,6 @@ static void 	update_globalinfo()
 			update_spin_value( "stream_length", info->status_tokens[SAMPLE_MARKER_END] );
 			update_label_str( "stream_length_label", time );
 		}
-
 		update_spin_range("button_fadedur", 0, total_frames_, 0 );
 		update_label_i( "label_totframes", total_frames_, 1 );
 		if( pm == MODE_PLAIN )
@@ -3205,7 +3203,8 @@ static void 	update_globalinfo()
 		timeline_set_length( info->tl,
 				(gdouble) total_frames_ , current_frame_);
 
-		
+		if( pm != MODE_STREAM )
+		 info->uc.reload_hint[HINT_EL] = 1;
 	//	vj_kf_select_parameter( info->uc.selected_parameter_id );
 
 		g_free(time);
@@ -3296,6 +3295,8 @@ static void	process_reload_hints(void)
 		update_spin_range(
 			"spin_sampleend", 0, info->el.num_frames , info->status_tokens[SAMPLE_END] );
 	}
+
+
 	if( info->uc.reload_hint[HINT_SLIST] == 1 )
 	{
 		veejay_msg(0, "reload sample list");
@@ -5521,7 +5522,6 @@ static	void	enable_widget_by_pointer(GtkWidget *w)
 static	void	enable_widget(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
-	veejay_msg(0, "%s :   %s", __FUNCTION__, name );
 	if(!w) return;
 	gtk_widget_set_sensitive_( GTK_WIDGET(w), TRUE );
 }/*
@@ -5616,23 +5616,13 @@ static	gboolean	update_cpumeter_timeout( gpointer data )
 }
 static	gboolean	update_cachemeter_timeout( gpointer data )
 {
+	char text[32];
 	GtkWidget *w = glade_xml_get_widget_(
 			info->main_window, "cachemeter");
 	gint	   v = info->status_tokens[TOTAL_MEM];
-	gdouble ms   = v > 0 ? (double) v / 1000.0 : 0.0; 
-	if(ms < 0)
-		ms = 0.0;
-	else if(ms > 1.0 )ms = 1.0;
-	GdkColor color;
-
-	color.red = 0x0000;
-	color.green = 0xffff;
-	color.blue = 0x0000;
-	if(gdk_colormap_alloc_color(info->color_map,
-			&color, TRUE, TRUE))
-		set_color_fg( "cachemeter", &color);
-	gtk_progress_bar_set_fraction( GTK_PROGRESS_BAR(w), ms );
-
+	sprintf(text,"%d MB cached",v);
+	update_label_str( "cachemeter", text );	
+	
 	return TRUE;
 }
 

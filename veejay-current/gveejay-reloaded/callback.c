@@ -1428,7 +1428,15 @@ void on_openConnection_activate             (GtkMenuItem     *menuitem,
 void on_veejay_connection_close             (GtkDialog       *dialog,
 						     gpointer         user_data)
 {
-	gveejay_quit(NULL,NULL);
+	if( info->watch.state == STATE_PLAYING)
+	{	
+		info->watch.state = STATE_DISCONNECT;
+
+		GtkWidget *w = glade_xml_get_widget_(info->main_window, "veejay_connection" );
+		gtk_widget_show( w );
+	}
+
+	//gveejay_quit(NULL,NULL);
 }
 
 
@@ -2292,6 +2300,11 @@ gboolean 	on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
 {
 //	update_label_str( "runlabel", "Run" );
 	return FALSE;
+}
+
+void		on_previewbw_toggled( GtkWidget *w , gpointer user_data)
+{
+	single_vims( VIMS_PREVIEW_BW );
 }
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
