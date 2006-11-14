@@ -33,7 +33,7 @@
 #include "effects/killchroma.h"
 #include "effects/mirrors.h"
 #include "effects/mirrors2.h"
-#include "effects/negation.h"
+#include "effects/colormap.h"
 #include "effects/dices.h"
 #include "effects/emboss.h"
 #include "effects/flip.h"
@@ -101,6 +101,7 @@
 #include "effects/ripple.h"
 #include "effects/rippletv.h"
 #include "effects/bathroom.h"
+#include "effects/goom.h"
 #include "effects/slice.h"
 #include "effects/zoom.h"
 #include "effects/deinterlace.h"
@@ -212,6 +213,7 @@ static struct
 {	videoplay_malloc,		videoplay_free,		VJ_VIDEO_EFFECT_VIDEOPLAY	},
 {	videowall_malloc,		videowall_free,		VJ_VIDEO_EFFECT_VIDEOWALL	},
 {	flare_malloc,			flare_free,		VJ_IMAGE_EFFECT_FLARE		},
+{	goomfx_malloc,			goomfx_free,		VJ_IMAGE_EFFECT_GOOM		},
 {	NULL			,	NULL			,0				},
 };
 
@@ -550,6 +552,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 74] = photoplay_init(width,height);
 	vj_effects[i + 75] = flare_init(width,height );
 	vj_effects[i + 76] = constantblend_init(width,height);
+	vj_effects[i + 77] = colormap_init(width,height);
+	vj_effects[i + 78] = goomfx_init(width,height);
 	max_width = width;
 	max_height = height;
 

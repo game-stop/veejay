@@ -114,6 +114,8 @@ dnl Checks for programs.
 AC_PROG_AWK
 AC_PROG_CC
 AM_PROG_CC_STDC
+AC_PROG_YACC
+AM_PROG_LEX
 AC_PROG_CXX
 AC_PROG_INSTALL
 AC_PROG_LN_S
@@ -825,6 +827,8 @@ dnl All the conditional stuff for the Makefiles
 AM_CONDITIONAL(HAVE_ASM_MMX, test x$have_asm_mmx = xtrue)
 AM_CONDITIONAL(HAVE_X86CPU, test x$have_x86cpu = xtrue)
 AM_CONDITIONAL(HAVE_PPCCPU, test x$have_ppccpu = xtrue)
+AM_CONDITIONAL(ARCH_PPC, test x$have_ppccpu = xtrue)
+AM_CONDITIONAL(ARCH_X86, test x$have_x86cpu = xtrue)
 AM_CONDITIONAL(HAVE_ALTIVEC, test x$have_altivec = xtrue)
 AM_CONDITIONAL(HAVE_ASM_MMX2, test x$have_asm_mmx2 = xtrue)
 AM_CONDITIONAL(HAVE_ASM_SSE, test x$have_asm_sse = xtrue)
@@ -960,6 +964,7 @@ libhash/Makefile
 libvjmsg/Makefile
 libvevo/Makefile
 libvjmem/Makefile
+libgoom/Makefile
 libvje/Makefile
 libsample/Makefile
 libvjnet/Makefile

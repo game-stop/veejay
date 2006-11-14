@@ -195,11 +195,13 @@ enum {
 	VJ_IMAGE_EFFECT_PHOTOPLAY = 174,
 	VJ_IMAGE_EFFECT_FLARE = 175,
 	VJ_IMAGE_EFFECT_CONSTANTBLEND = 176,
+	VJ_IMAGE_EFFECT_COLORMAP = 177,
+	VJ_IMAGE_EFFECT_GOOM = 178,
 	VJ_IMAGE_EFFECT_DUMMY = 100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 177
+#define VJ_IMAGE_EFFECT_MAX 179
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #ifdef USE_SWSCALER
@@ -274,6 +276,8 @@ extern void mirrors2_apply( VJFrame *frame, int width, int height,
 			   int type);
 extern void negation_apply( VJFrame *frame, int width, int height,
 			   int val);
+extern void colormap_apply( VJFrame *frame, int width, int height,
+			   int r, int g, int b);
 extern void opacity_apply(VJFrame *frame, VJFrame *frame2, int width,
 			  int height, int opacity);
 extern void opacityadv_apply(VJFrame *frame, VJFrame *frame2, int w,
@@ -517,6 +521,9 @@ extern void photoplay_apply(VJFrame *frame, int w, int h, int a, int b, int c);
 extern void videoplay_apply(VJFrame *frame,VJFrame *B, int w, int h, int a, int b, int c);
 
 extern void videowall_apply(VJFrame *frame,VJFrame *B, int w, int h, int a, int b, int c, int d);
+
+extern void goom_apply(VJFrame *frame, int w, int h, int val );
+
 
 extern void flare_apply(VJFrame *frame, int w, int h, int type, int threshold, int radius );
 

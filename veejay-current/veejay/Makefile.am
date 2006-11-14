@@ -54,7 +54,8 @@ libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libyuv -lyuv \
 			-L$(top_builddir)/liblavjpeg -llavjpeg \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
-			-L$(top_builddir)/libvevo -lvevo 
+			-L$(top_builddir)/libvevo -lvevo \
+			-L$(top_builddir)/libgoom -lgoom2 
 
 libveejay_la_LDFLAGS +=	${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} \
 			${XML_LIBS} ${JPEG_LIBS} ${JACK_LIBS} ${UNICAP_LIBS} \

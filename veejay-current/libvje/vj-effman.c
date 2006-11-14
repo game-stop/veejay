@@ -235,6 +235,9 @@ void vj_effman_apply_image_effect(
      case VJ_IMAGE_EFFECT_NEGATION:
 	negation_apply(frames[0], frameinfo->width, frameinfo->height, arg[0]);
 	break;
+	case VJ_IMAGE_EFFECT_COLORMAP:
+	colormap_apply(frames[0], frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
+	break;
      case VJ_IMAGE_EFFECT_POSTERIZE:
 	posterize_apply(frames[0], frameinfo->width, frameinfo->height, arg[0],
 			arg[1],arg[2]);
@@ -312,6 +315,9 @@ void vj_effman_apply_image_effect(
 	break;
      case VJ_IMAGE_EFFECT_BATHROOM:
 	bathroom_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
+	break;
+	case VJ_IMAGE_EFFECT_GOOM:
+	goomfx_apply( frames[0], frameinfo->width,frameinfo->height,arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_ZOOM:
 	zoom_apply(frames[0], frameinfo->width, frameinfo->height,arg[0],arg[1],arg[2]);
