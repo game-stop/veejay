@@ -591,11 +591,10 @@ static void tr_422_to_444(uint8_t *buffer, int width, int height)
 	}
 	*/
 	const int stride = width/2;
-	const int stride = width;
-	const int len = stride * h; 
+//	const int stride = width;
 	int x,y;
 
-	for( y = h-1; y > 0 ; y -- )
+	for( y = height-1; y > 0 ; y -- )
 	{
 		uint8_t *dst = buffer + (y * width);
 		uint8_t *src = buffer + (y * stride);
