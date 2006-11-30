@@ -65,7 +65,9 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #endif
-
+#ifdef HAVE_FREETYPE
+#include <veejay/vj-font.h>
+#endif
 #include <libvjnet/vj-client.h>
 #include <veejay/vj-misc.h>
 #ifdef HAVE_SYS_SOUNDCARD_H
@@ -266,37 +268,6 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 void veejay_set_sampling(veejay_t *info, subsample_mode_t m)
 {
 	video_playback_setup *settings = (video_playback_setup*) info->settings;
-        if(m == SSM_420_JPEG_TR )
-	{
-		if(info->pixel_format == FMT_420 || info->pixel_format == FMT_420F)
-			settings->sample_mode = SSM_420_JPEG_TR;
-		else
-			settings->sample_mode = SSM_422_444;
-	}
-	else
-	{
-		if(info->pixel_format == FMT_420 || info->pixel_format == FMT_420F)
-			settings->sample_mode = SSM_420_JPEG_BOX;
-		else
-			settings->sample_mode = SSM_422_444;
-	}
-	switch(settings->sample_mode)
-	{
-		case SSM_420_JPEG_BOX:
-		veejay_msg(VEEJAY_MSG_DEBUG, "Using box filter 4:2:0 -> 4:4:4");
-		break;
-		case SSM_420_JPEG_TR:
-		veejay_msg(VEEJAY_MSG_DEBUG, "Using triangle filter 4:2:0 -> 4:4:4");
-		break;
-		case SSM_422_444:
-		veejay_msg(VEEJAY_MSG_WARNING, "Using box filter for 4:2:2 -> 4:4:4");
-		break;
-		case SSM_UNKNOWN:
-		case SSM_420_MPEG2:
-		case SSM_420_422:
-		case SSM_COUNT:
-		break;
-	}
 }
 
 int veejay_set_framedup(veejay_t *info, int n) {
@@ -632,6 +603,15 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 	  video_playback_setup *settings = info->settings;
 	  settings->min_frame_num = 0;
 	  settings->max_frame_num = info->edit_list->video_frames-1;
+#ifdef HAVE_FREETYPE
+	  if(info->font)
+	  {
+		  void *dict = vj_font_get_plain_dict( info->font );
+		  vj_font_set_constraints_and_dict( info->font, settings->min_frame_num,
+				  settings->max_frame_num, info->edit_list->video_fps, dict );
+	  }
+#endif
+	  
 	}
 	if(new_pm == VJ_PLAYBACK_MODE_TAG)
 	{
@@ -703,11 +683,26 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 	info->edit_list = info->current_edit_list;
 	
 	veejay_reset_el_buffer(info);
+#ifdef HAVE_FREETYPE
+	  if(info->font)
+	  {
+		    video_playback_setup *settings = info->settings;
+
+		  void *dict = vj_tag_get_dict( sampleid );
+		  vj_font_set_constraints_and_dict( info->font, settings->min_frame_num,
+				  settings->max_frame_num, info->edit_list->video_fps, dict );
+		  veejay_msg(VEEJAY_MSG_DEBUG, "Subtitling tag %d: %ld - %ld", sampleid,
+				  settings->min_frame_num, settings->max_frame_num );
+	  }
+#endif
+
 	return;
      }
 
      if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
      {
+	       video_playback_setup *settings = info->settings;
+
 		if(!sample_exists(sampleid))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist", sampleid);
@@ -721,6 +716,29 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 		sample_start_playing( sampleid );
 
 	   	sample_get_short_info( sampleid , &start,&end,&looptype,&speed);
+ /* Set min/max options so that it runs like it should */
+	 	settings->min_frame_num = 0;
+	 	settings->max_frame_num = info->edit_list->video_frames - 1;
+
+#ifdef HAVE_FREETYPE
+		if(info->font)
+		{
+			video_playback_setup *settings = info->settings;
+
+			void *dict = sample_get_dict( sampleid );
+			vj_font_set_constraints_and_dict(
+				info->font,
+				settings->min_frame_num,
+				settings->max_frame_num,
+				info->edit_list->video_fps,
+				dict
+				);
+
+			veejay_msg(VEEJAY_MSG_DEBUG, "Subtitling Sample %d: %ld - %ld", sampleid,
+				  settings->min_frame_num, settings->max_frame_num );
+
+		  }
+#endif
 
  		 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d",
 			sampleid );
@@ -878,7 +896,7 @@ static int veejay_screen_update(veejay_t * info )
 #endif
 
 	vj_perform_get_primary_frame(info,frame,0);
-	
+
 
 #ifdef HAVE_JPEG
 #ifdef USE_GDK_PIXBUF 
@@ -1636,7 +1654,27 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 				0,
 			    info->edit_list->video_norm );
 
+	if(info->pixel_format == FMT_422  || info->pixel_format == FMT_422F)
+	{
+		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame1)) return 0;
+		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame2)) return 0;
+		info->settings->sample_mode = SSM_422_444;
+		veejay_msg(VEEJAY_MSG_INFO, "Internal YUV format is 4:2:2 Planar");
+	}
+	else 
+	{
+		if(!vj_el_init_420_frame( info->current_edit_list, info->effect_frame1)) return 0;
+		if(!vj_el_init_420_frame( info->current_edit_list, info->effect_frame2)) return 0;
+		info->settings->sample_mode = SSM_420_JPEG_TR;
+		veejay_msg(VEEJAY_MSG_INFO, "Internal YUV format is 4:2:0 Planar");
+	}
 
+	
+#ifdef HAVE_FREETYPE
+	info->font = vj_font_init( info->current_edit_list->video_width,
+				   info->current_edit_list->video_height,
+				   info->current_edit_list->video_fps );
+#endif
 	if(!vj_perform_init(info))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Veejay Performer");
@@ -1751,10 +1789,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		info->bes_width = info->video_output_width;
 	if(!info->bes_height)
 		info->bes_height = info->video_output_height;		
-	
 
-
-	plugins_allocate();
+	//plugins_allocate();
 
 	if(info->current_edit_list->has_audio) {
 		if (vj_perform_init_audio(info) == 0)
@@ -1952,7 +1988,14 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 			}	
 		}
 	}
-
+#ifdef HAVE_FREETYPE
+	  if(info->font)
+	  {
+		  void *dict = vj_font_get_plain_dict( info->font );
+		  vj_font_set_constraints_and_dict( info->font, settings->min_frame_num,
+				  settings->max_frame_num, info->edit_list->video_fps, dict );
+	  }
+#endif
     /* After we have fired up the audio and video threads system (which
      * are assisted if we're installed setuid root, we want to set the
      * effective user id to the real user id
@@ -3207,7 +3250,15 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	}
 	else
 	{
-	    	info->current_edit_list = vj_el_init_with_args(files, num_files, info->preserve_pathnames, info->auto_deinterlace, force, override_norm, force_pix_fmt);
+	    	info->current_edit_list = 
+			vj_el_init_with_args(
+					files,
+					num_files,
+					info->preserve_pathnames,
+					info->auto_deinterlace,
+				       	force,
+					override_norm,
+					force_pix_fmt);
 	}
 	info->edit_list = info->current_edit_list;
 
@@ -3222,20 +3273,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		return 0;
 	}
 	
-    if(info->pixel_format == FMT_422  || info->pixel_format == FMT_422F)
-	{
-		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame1)) return 0;
-		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame2)) return 0;
-		info->settings->sample_mode = SSM_422_444;
-		veejay_msg(VEEJAY_MSG_INFO, "Internal YUV format is 4:2:2 Planar");
-	}
-	else 
-	{
-		if(!vj_el_init_420_frame( info->current_edit_list, info->effect_frame1)) return 0;
-		if(!vj_el_init_420_frame( info->current_edit_list, info->effect_frame2)) return 0;
-		info->settings->sample_mode = SSM_420_JPEG_TR;
-		veejay_msg(VEEJAY_MSG_INFO, "Internal YUV format is 4:2:0 Planar");
-	}
 
 	info->effect_frame_info->width = info->current_edit_list->video_width;
 	info->effect_frame_info->height= info->current_edit_list->video_height;

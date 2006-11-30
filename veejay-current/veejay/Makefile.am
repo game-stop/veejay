@@ -16,7 +16,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/liblavjpeg \
 		-I$(top_srcdir)/libsamplerec \
 		-I$(top_srcdir)/libvevo \
-		$(FFMPEG_AVCODEC_CFLAGS) $(FFMPEG_AVFORMAT_CFLAGS) $(LIBQUICKTIME_CFLAGS) \
+		$(FFMPEG_AVCODEC_CFLAGS) $(FFMPEG_AVFORMAT_CFLAGS) $(LIBQUICKTIME_CFLAGS) ${FT_CFLAGS} \
 		$(AVIPLAY_CFLAGS) ${XML_CFLAGS} ${GTK_CFLAGS} ${DV_FLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} ${GL_CFLAGS} \
 		$(DIRECTFB_CFLAGS) ${SDL_CFLAGS} ${JPEG_CFLAGS} ${PTHREAD_CFLAGS} ${SAMPLERATE_CFLAGS} ${MJPEGTOOLS_CFLAGS}
  
@@ -33,7 +33,7 @@ VEEJAY_ALL_LIB_OPTS = \
 libveejay_la_SOURCES =  vj-misc.c \
 			vj-plugin.c vj-osc.c vj-event.c vj-eventman.c vj-pjack.c vj-perform.c \
 			vj-sdl.c vj-dfb.c gl.c \
-			liblavplayvj.c 
+			vj-font.c liblavplayvj.c 
 
 libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS ) $(DEBUGLIBS)
 
@@ -57,7 +57,7 @@ libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libvevo -lvevo \
 			-L$(top_builddir)/libgoom -lgoom2 
 
-libveejay_la_LDFLAGS +=	${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} \
+libveejay_la_LDFLAGS +=	${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} ${FT_LDFLAGS} ${FT_LIBS} \
 			${XML_LIBS} ${JPEG_LIBS} ${JACK_LIBS} ${UNICAP_LIBS} \
 		 	${FFMPEG_AVFORMAT_LIBS} ${FFMPEG_AVCODEC_LIBS} \
 			${LIBDV_LIBS} ${LIBM_LIBS} ${PIXBUF_LIBS} ${GL_LIBS} ${MJPEGTOOLS_LIBS} ${LIBQUICKTIME_LIBS} \

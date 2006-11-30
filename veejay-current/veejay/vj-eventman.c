@@ -951,7 +951,7 @@ void		vj_init_vevo_events(void)
 				"Save samples to file",
 				vj_event_sample_save_list,
 				1,
-				VIMS_REQUIRE_ALL_PARAMS,
+				VIMS_REQUIRE_ALL_PARAMS|VIMS_LONG_PARAMS,
 				"Filename",
 				NULL,
 				NULL );
@@ -2184,7 +2184,166 @@ void		vj_init_vevo_events(void)
 				NULL );
 #endif
 
+#ifdef HAVE_FREETYPE
 
+	index_map_[ VIMS_FONT_COL ]			=	_new_event(
+				"%d %d %d %d %d",
+				VIMS_FONT_COL,
+				"Set font color",
+				vj_event_font_set_color,
+				5,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Red",
+				0,
+				"Green",
+				0,
+				"Blue",
+				0,
+				"Alpha",
+				0,
+				"0=Transparent 1=BG 2=FG",
+				0,
+				NULL );
+
+	index_map_[ VIMS_FONT_POS ]			=	_new_event(
+				"%d %d",
+				VIMS_FONT_POS,
+				"Set font position",
+				vj_event_font_set_position,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"X position",
+				0,
+				"Y position",
+				0,
+				NULL );
+
+	index_map_[ VIMS_FONT_SIZE_FONT ] 		=	_new_event(
+				"%d %d",
+				VIMS_FONT_SIZE_FONT,
+				"Set font type and font size",
+				vj_event_font_set_size_and_font,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Font type",
+				0,
+				"Font size",
+				0,
+				NULL );
+
+	index_map_[ VIMS_SRT_ADD ]			= 	_new_event(
+				"%d %d %d %d %d %s",
+				VIMS_SRT_ADD,
+				"Add a subtitle sequence",
+				vj_event_add_subtitle,
+				6,
+				VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS,
+				"Subtitle sequence (0=new)",
+				0,
+				"Start position",
+				0,
+				"End position",
+				0,
+				"X position",
+				0,
+				"Y position",
+				0,
+				"Text",
+				NULL,
+				NULL );
+
+	index_map_[ VIMS_SRT_SELECT ]			=	_new_event(
+				"%d",
+				VIMS_SRT_SELECT,
+				"Select a subtitle sequence",
+				vj_event_select_subtitle,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Subtitle sequence",
+				0,
+				NULL );
+	
+	index_map_[ VIMS_SRT_DEL ]			=	_new_event(
+				"%d",
+				VIMS_SRT_DEL,
+				"Delete a subtitle sequence",
+				vj_event_del_subtitle,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Subtitle sequence",
+				0,
+				NULL );
+
+	index_map_[ VIMS_SRT_UPDATE ]			=	_new_event(
+				"%d %d %d %s",
+				VIMS_SRT_UPDATE,
+				"Update a subtitle sequence",
+				vj_event_upd_subtitle,
+				4,
+				VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
+				"Subtitle sequence",
+				0,
+				"Start position",
+				0,
+				"End position",
+				0,
+				"Text",
+				NULL,
+				NULL );
+
+	index_map_[ VIMS_SRT_SAVE ]			=	_new_event(
+				"%s",
+				VIMS_SRT_SAVE,
+				"Export subtitles to SRT",
+				vj_event_save_srt,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
+				"Filename",	
+				NULL,
+				NULL );			
+	index_map_[ VIMS_SRT_LOAD ]			=	_new_event(
+				"%s",
+				VIMS_SRT_LOAD,
+				"Import subtitles from SRT",
+				vj_event_load_srt,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
+				"Filename",	
+				NULL,
+				NULL );	
+
+	index_map_[VIMS_FONT_LIST]			=	_new_event(
+				NULL,
+				VIMS_FONT_LIST,
+				"GUI: Get list of loaded fonts",
+				vj_event_get_font_list,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+	
+	index_map_[VIMS_SRT_LIST]			=	_new_event(
+				NULL,
+				VIMS_FONT_LIST,
+				"GUI: Get list of loaded subtitle sequences",
+				vj_event_get_srt_list,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
+	index_map_[VIMS_SRT_INFO]			=	_new_event(
+				"%d",
+				VIMS_SRT_INFO,
+				"GUI: Get subtitle sequence",
+				vj_event_get_srt_info,
+				1,
+				VIMS_ALLOW_ANY,
+				"Subtitle sequence",
+				1,
+				NULL );
+
+
+	
+#endif
 }
 
 

@@ -977,8 +977,6 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 	veejay_chomp_str( msg, &msg_len );
 	msg_len --;
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "VIMS: Parse message '%s'", msg );
-
 	if( msg_len < MSG_MIN_LEN )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "VIMS Message too small, dropped!");
@@ -999,6 +997,12 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 		veejay_msg(VEEJAY_MSG_ERROR, "Error parsing VIMS selector");
 		return 0;
 	}
+
+	if( net_id != 412 )
+		veejay_msg(VEEJAY_MSG_DEBUG, "VIMS: Parse message '%s'", msg );
+
+
+	
 	if( head ) free(head );
 	
 	if( net_id <= 0 || net_id >= VIMS_MAX )
@@ -3377,7 +3381,6 @@ void	vj_event_tag_set_descr( void *ptr, const char format[], va_list ap)
 	else
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot change title of stream %d to '%s'", args[0], str );
 }
-
 
 void vj_event_sample_set_descr(void *ptr, const char format[], va_list ap)
 {
@@ -8048,4 +8051,283 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 
 	SEND_MSG(v , _s_print_buf );
 }
+#ifdef HAVE_FREETYPE
+void	vj_event_get_srt_list(	void *ptr,	const char format[],	va_list	ap	)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	char *str = NULL;
+	int len = 0;
 
+	char **list = vj_font_get_sequences( v->font );
+	int i;
+
+	if(!list)
+	{
+		SEND_MSG(v, "000000" );
+		return;
+	}
+	
+	for(i = 0; list[i] != NULL ; i ++ )
+	{
+		int k = strlen(list[i]);
+		if(k>0)
+			len += (k+1);
+	}	
+	if(len <= 0)
+	{
+		SEND_MSG(v, "000000" );
+		return;
+	}
+
+	str = vj_calloc( len + 20 );
+	char *p = str;
+	sprintf(p, "%06d", len );
+	p += 6;
+	for(i = 0; list[i] != NULL ; i ++ )
+	{
+		sprintf(p, "%s ", list[i]);
+		p += strlen(list[i]) + 1;
+		free(list[i]);
+	}
+	free(list);
+		
+	
+	SEND_MSG(v , str );
+	free(str);
+}
+
+void	vj_event_get_font_list(	void *ptr,	const char format[],	va_list	ap	)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	char *str = NULL;
+	int len = 0;
+
+	char **list = vj_font_get_all_fonts( v->font );
+	int i;
+
+	if(!list)
+	{
+		SEND_MSG(v, "000000" );
+		return;
+	}
+	
+	for(i = 0; list[i] != NULL ; i ++ )
+	{
+		int k = strlen(list[i]);
+		if(k>0)
+			len += (k+3);
+	}	
+	if(len <= 0)
+	{
+		SEND_MSG(v, "000000" );
+		return;
+	}
+
+	str = vj_calloc( len + 20 );
+	char *p = str;
+	sprintf(p, "%06d", len );
+	p += 6;
+	for(i = 0; list[i] != NULL ; i ++ )
+	{
+		int k = strlen(list[i]);
+		sprintf(p, "%03d%s", k,list[i]);
+		p += (k + 3);
+		free(list[i]);
+	}
+	free(list);
+		
+	
+	SEND_MSG(v , str );
+	free(str);
+
+}
+void	vj_event_get_srt_info(	void *ptr,	const char format[],	va_list	ap	)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[2] = {0,0};
+	char *str = NULL;
+	P_A(args,str,format,ap);
+
+	if(! vj_font_srt_sequence_exists( v->font, args[0] ) )
+	{
+		SEND_MSG(v, "000000");
+		return;
+	}
+	
+	char *sequence = vj_font_get_sequence( v->font,args[0] );
+
+	if(!sequence)
+	{
+		SEND_MSG(v, "000000");
+		return;
+
+	}
+	
+	int len = strlen( sequence );
+	str = vj_calloc( len+20 );
+	sprintf(str,"%06d%s",len,sequence);
+	free(sequence);	
+	
+	SEND_MSG(v , str );
+}
+
+void	vj_event_save_srt(	void *ptr,	const char format[],	va_list	ap	)
+{
+	char file_name[512];
+	int args[1];
+	veejay_t *v = (veejay_t*)ptr;
+
+	P_A(args,file_name,format,ap);
+
+	if( vj_font_save_srt( v->font, file_name ) )
+		veejay_msg(VEEJAY_MSG_INFO, "Saved SRT file '%s'", file_name );
+	else
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to save SRT file '%s'", file_name );	
+}
+void	vj_event_load_srt(	void *ptr,	const char format[],	va_list	ap	)
+{
+	char file_name[512];
+	int args[1];
+	veejay_t *v = (veejay_t*)ptr;
+
+	P_A(args,file_name,format,ap);
+
+	if( vj_font_load_srt( v->font, file_name ) )
+		veejay_msg(VEEJAY_MSG_INFO, "Loaded SRT file '%s'", file_name );
+	else
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open SRT file '%s'", file_name );	
+}
+
+void	vj_event_select_subtitle(	void *ptr,	const char format[],	va_list	ap	)
+{
+	int args[6];
+	veejay_t *v = (veejay_t*)ptr;
+
+	if(!v->font)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "No font renderer active");
+		return;
+	}
+	
+	P_A(args,NULL,format,ap);
+
+	vj_font_set_current( v->font, args[0] );
+}
+
+void	vj_event_add_subtitle(	void *ptr,	const char format[],	va_list	ap	)
+{
+	char text[2048];
+	int args[6];
+	veejay_t *v = (veejay_t*)ptr;
+
+	if(!v->font)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "No font renderer active");
+		return;
+	}
+	
+	bzero(text,2048);
+	P_A(args,text,format,ap);
+
+	int len = strlen( text );
+	if ( len <= 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "No text given");
+		return;
+	}
+	
+	if( args[3] < 0 || args[4] < 0 ||
+			args[3] >= v->current_edit_list->video_width ||
+			args[4] >= v->current_edit_list->video_height )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,
+				"Invalid XY position");
+		return;
+	}
+	
+	vj_font_new_text( v->font, text, args[1], args[2], args[0] );
+	
+	vj_font_set_position( v->font, args[3] ,args[4] );
+	
+}
+void	vj_event_upd_subtitle(	void *ptr,	const char format[],	va_list	ap	)
+{
+	int args[5];
+	char text[2048];
+
+	veejay_t *v = (veejay_t*)ptr;
+	args[0]=0;
+	P_A(args,text,format,ap);
+	
+	if( !vj_font_srt_sequence_exists(v->font, args[0] ) )
+	{
+		veejay_msg(0, "SRT sequence %d does not exist", args[0]);
+		return;
+	}
+
+	vj_font_update_text( v->font, args[1],args[2], args[0], text );
+
+
+}
+void	vj_event_del_subtitle(	void *ptr,	const char format[],	va_list	ap	)
+{
+	int args[5];
+	veejay_t *v = (veejay_t*)ptr;
+	P_A(args,NULL,format,ap);
+
+	if( !vj_font_srt_sequence_exists(v->font, args[0] ) )
+	{
+		veejay_msg(0, "SRT sequence %d does not exist", args[0]);
+		return;
+	}
+
+	vj_font_del_text( v->font, args[0] );
+
+}
+
+void	vj_event_font_set_position(	void *ptr,	const char format[],	va_list	ap	)
+{
+	int args[5];
+	veejay_t *v = (veejay_t*)ptr;
+	P_A(args,NULL,format,ap);
+	vj_font_set_position( v->font, args[0] ,args[1] );
+}
+void	vj_event_font_set_color(	void *ptr,	const char format[],	va_list	ap	)
+{
+	int args[6];
+	veejay_t *v = (veejay_t*)ptr;
+	P_A(args,NULL,format,ap);
+	switch( args[4] )
+	{
+		case 0:
+			vj_font_set_outline_and_border(
+				v->font, args[0],args[1]  );
+			                //outline, //use_bg
+			break;
+		case 1:
+			vj_font_set_fgcolor( v->font,
+					args[0],args[1],args[2],args[3] );
+			break;
+		case 2:
+			vj_font_set_bgcolor( v->font,
+					args[0],args[1],args[2],args[3] );
+			break;
+		case 3:
+			vj_font_set_lncolor( v->font,
+					args[0],args[1],args[2],args[3] );
+			break;
+		default:
+			veejay_msg(0, "Invalid mode. Use 0=outline/border 1=FG,2=BG,3=LN" );
+			break;
+	}
+}
+void	vj_event_font_set_size_and_font(	void *ptr,	const char format[],	va_list	ap	)
+{
+	int args[5];
+	veejay_t *v = (veejay_t*)ptr;
+	P_A(args,NULL,format,ap);
+	vj_font_set_size_and_font(v->font, args[0],args[1]);
+}
+
+
+#endif

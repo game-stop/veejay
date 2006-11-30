@@ -47,13 +47,6 @@ int vj_perform_pattern_decode_buffers(veejay_t * info, int entry);
 
 int vj_perform_pattern_render_buffers(veejay_t * info, int entry);
 
-void vj_perform_pre_chain(veejay_t *info, VJFrame *frame) ;
-
-void vj_perform_post_chain(veejay_t *info, VJFrame *frame );
-
-int vj_perform_tag_is_cached(int chain_entry, int entry, int tag_id);
-int vj_perform_sample_is_cached(int nframe, int chain_entry);
-
 void vj_perform_clear_frame_info(int entry);
 
 void vj_perform_clear_cache(void);
@@ -64,9 +57,6 @@ int vj_perform_increase_plain_frame(veejay_t * info, long num);
 int vj_perform_tag_fill_buffer(veejay_t * info, int entry);
 
 int vj_perform_increase_tag_frame(veejay_t * info, long num);
-void vj_perform_use_cached_ycbcr_frame(int entry, int centry, int width,
-				       int height, int chain_entry);
-
 
 int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 				   int type, int chain_entry, int entry, const int a);
@@ -78,19 +68,13 @@ int vj_perform_tag_fill_buffer(veejay_t * info, int entry);
 void vj_perform_plain_fill_buffer(veejay_t * info, int entry, int skip);
 
 
-int vj_perform_tag_complete_buffers(veejay_t * info, int entry, const int skip);
+int vj_perform_tag_complete_buffers(veejay_t * info, int entry, const int skip, int *h);
 
 int vj_perform_tag_fill_buffer(veejay_t * info, int entry);
 
 int vj_perform_increase_sample_frame(veejay_t * info, long num);
 
-int vj_perform_sample_complete_buffers(veejay_t * info, int entry, int skip_incr);
-
-void vj_perform_use_cached_ycbcr_frame(int entry, int centry, int width,
-				       int height, int chain_entry);
-
-
-int vj_perform_sample_complete_buffers(veejay_t * info, int entry, int skip_incr);
+int vj_perform_sample_complete_buffers(veejay_t * info, int entry, int skip_incr, int *h);
 
 void vj_perform_use_cached_encoded_frame(veejay_t * info, int entry,
 					 int centry, int chain_entry);
@@ -98,8 +82,6 @@ void vj_perform_use_cached_encoded_frame(veejay_t * info, int entry,
 int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 				   int type, int chain_entry, int entry, const int skip_incr);
 
-
-int vj_perform_sample_complete_buffers(veejay_t * info, int entry, const int skip_incr);
 
 int vj_perform_decode_tag_secundary(veejay_t * info, int entry,
 				    int chain_entry, int type,

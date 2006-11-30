@@ -231,4 +231,19 @@ void	vj_event_send_track_list( void *ptr, const char format[], va_list ap);
 
 void	vj_event_toggle_bw( void *ptr, const char format[], va_list ap );
 
+#ifdef HAVE_FREETYPE
+void	vj_event_get_srt_list(	void *ptr,	const char format[],	va_list	ap	);
+void	vj_event_get_font_list(	void *ptr,	const char format[],	va_list	ap	);
+void	vj_event_get_srt_info(	void *ptr,	const char format[],	va_list	ap	);
+void	vj_event_save_srt(	void *ptr,	const char format[],	va_list	ap	);
+void	vj_event_load_srt(	void *ptr,	const char format[],	va_list	ap	);
+void	vj_event_add_subtitle(	void *ptr,	const char format[],	va_list	ap	);
+void	vj_event_upd_subtitle(	void *ptr,	const char format[],	va_list	ap	);
+void	vj_event_del_subtitle(	void *ptr,	const char format[],	va_list	ap	);
+void	vj_event_font_set_position(void *ptr,	const char format[],	va_list	ap	);
+void	vj_event_font_set_color(void *ptr,	const char format[],	va_list	ap	);
+void	vj_event_font_set_size_and_font(void *ptr,const char format[],	va_list	ap	);
+void	vj_event_select_subtitle( void *ptr, const char format[],  va_list ap	);
+#endif
+
 #endif

@@ -215,9 +215,11 @@ static void    yuv_planar_to_packed_444yvu( uint8_t *data[3], const int w, const
         switch(format)
         {
                 case 0:
+		case 2:
                         yuv420_444_1plane(data,w,h,dst_buffer);
                         break;
                 case 1:
+		case 3:
                         yuv422_444_1plane(data,w,h,dst_buffer);
                         break;
 		default:
