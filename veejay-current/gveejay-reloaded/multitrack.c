@@ -1500,6 +1500,9 @@ void 	*mt_preview( gpointer user_data )
 	all_priv_t *a = (all_priv_t*) mt->data;
 	gint i = 0;
 	GdkPixbuf *cache[MAX_TRACKS+2];
+	
+	GdkPixbuf *nopreview = dummy_image();
+	
 	long sleepy = 34000;
 	for( ;; )
 	{
@@ -1512,9 +1515,10 @@ void 	*mt_preview( gpointer user_data )
 			G_UNLOCK( mt_lock );
 			g_thread_exit(NULL);
 		}
+
 		if(!lt->preview )
 		{
-			cache[LAST_TRACK] = dummy_image();
+			cache[LAST_TRACK] = nopreview;
 #ifdef STRICT_CHECKING
 			assert( cache[LAST_TRACK] != NULL );
 #endif
@@ -1610,6 +1614,8 @@ void 	*mt_preview( gpointer user_data )
 		g_usleep(sleepy);
 		//@ clear our buffer
 	}
+	gdk_pixbuf_unref( nopreview );
+
 }
 
 

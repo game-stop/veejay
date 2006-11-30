@@ -573,7 +573,10 @@ static  void   update_curve_widget(const char *name);
 static void    update_curve_accessibility(const char *name);
 static void	vj_preview_draw(void);
 static	void	reset_tree(const char *name);
+static	void	reload_srt();
+static	void	reload_fontlist();
 
+static	void set_textview_buffer(const char *name, gchar *utf8text);
 void	interrupt_cb();
 
 static struct
@@ -2760,6 +2763,7 @@ static	void	update_status_accessibility(int pm)
 		/* If mode changed, enable/disable widgets etc first */
 		if( info->status_tokens[PLAY_MODE] != info->prev_mode )
 		{
+			printf("mode change! %d, %d", info->prev_mode, pm);
 			if( pm == MODE_STREAM )
 			{
 				enable_widget("frame_streamproperties");
@@ -2813,7 +2817,10 @@ static	void	update_status_accessibility(int pm)
 			else
 				for( i = 0; plainwidgets[i].name != NULL ; i ++ )
 					enable_widget( plainwidgets[i].name );
+
+			info->uc.reload_hint[HINT_HISTORY] = 1;
 		}
+
 	}
 }
 
@@ -2886,6 +2893,7 @@ static void	update_current_slot(int pm)
 			v4l_expander_toggle(0);
 		}
 
+		info->uc.reload_hint[HINT_HISTORY] = 1;
 	}
 	if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ||
 		info->uc.reload_hint[HINT_ENTRY] == 1 )
@@ -3022,7 +3030,7 @@ static void	update_current_slot(int pm)
 		{	
 			speed = info->status_tokens[SAMPLE_SPEED];
 			update_slider_value( "speed_slider", speed, 0 );
-			update_label_i( "speed_label", speed,0 );
+//			update_label_i( "speed_label", speed,0 );
 
 
 			if( speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
@@ -3062,11 +3070,17 @@ static void	update_current_slot(int pm)
 				(gdouble) n_frames , info->status_tokens[FRAME_NUM]- info->status_tokens[SAMPLE_START] );
 
 
+
+			//@ update font panel
 			
+			update_spin_range( "spin_text_start", 0, n_frames ,0);
+			update_spin_range( "spin_text_end", 0, n_frames,n_frames );
+
 		}
 	}
 
 }
+
 
 static void
 on_vims_messenger       (void)
@@ -3117,7 +3131,12 @@ on_vims_messenger       (void)
         }
 }
 
+static int total_frames_ = 0;
 
+int	get_total_frames()
+{
+	return total_frames_;
+}
 
 static void 	update_globalinfo()
 {
@@ -3164,7 +3183,7 @@ static void 	update_globalinfo()
 		info->uc.reload_hint[HINT_SLIST] = 1;
 	}
 
-	gint total_frames_ = (pm == MODE_STREAM ? info->status_tokens[SAMPLE_MARKER_END] : info->status_tokens[TOTAL_FRAMES] );
+	total_frames_ = (pm == MODE_STREAM ? info->status_tokens[SAMPLE_MARKER_END] : info->status_tokens[TOTAL_FRAMES] );
 	gint history_frames_ = (pm == MODE_STREAM ? history[SAMPLE_MARKER_END] : history[TOTAL_FRAMES] ); 
 	gint current_frame_ = (pm == MODE_STREAM ? info->status_frame : info->status_tokens[FRAME_NUM] );
 
@@ -3258,7 +3277,7 @@ static void 	update_globalinfo()
 
 			update_slider_value( "speed_slider", plainspeed, 0);
 	//		update_knob_value( info->speed_knob, plainspeed, 0 );
-			update_label_i( "speed_label", plainspeed, 0 );
+//			update_label_i( "speed_label", plainspeed, 0 );
 			if( plainspeed < 0 ) info->play_direction = -1; else info->play_direction = 1;
 			if( plainspeed < 0 ) plainspeed *= -1;
 		}
@@ -3401,6 +3420,13 @@ static void	process_reload_hints(void)
 	/* Curve needs update (start/end changed, effect id changed */
 	if ( info->uc.reload_hint[HINT_KF]  )
 		vj_kf_select_parameter( info->uc.selected_parameter_id );
+	
+	if( info->uc.reload_hint[HINT_HISTORY] )
+	{
+		//@ load srt list
+		reload_srt();
+	}
+
 	
 	memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));	
 }
@@ -5297,7 +5323,118 @@ static	void	reload_vimslist()
 	g_free( eltext );
 
 }
+static void remove_all (GtkComboBox *combo_box)
+{
+	GtkTreeModel* model = gtk_combo_box_get_model (combo_box);
+	gtk_list_store_clear (GTK_LIST_STORE(model));
+	
+}
 
+void	reload_current_srt( int selected )
+{
+//	multi_vims( VIMS_SRT_INFO, "%d" , selected );
+}
+
+static	char *tokenize_on_space( char *q )
+{
+	int n = 0;
+	char *r = NULL;
+	char *p = q;
+	while( *p != '\0' && !isblank( *p ) && *p != ' ' && *p != 20)
+	{
+		*p++;
+		n++;
+	}
+	if( n <= 0 )
+		return NULL;
+	r = vj_calloc( n+1 );
+	strncpy( r, q, n );
+	return r;
+}
+
+static int have_srt_ = 0;
+static	void	init_srt_editor()
+{
+	reload_fontlist();
+
+	update_spin_range( "spin_text_x", 0, info->el.width-1 , 0 );
+	update_spin_range( "spin_text_y", 0, info->el.height-1, 0 );
+
+	update_spin_range( "spin_text_size", 10, 500, 40 );
+	update_spin_range( "spin_text_start", 0, total_frames_, 0 );
+
+	// clear text view
+	
+//	disable_widget( "srtframe");
+}
+
+
+static	void	reload_fontlist()
+{
+	GtkWidget *box = glade_xml_get_widget( info->main_window, "combobox_fonts");
+	remove_all( GTK_COMBO_BOX( box ) );
+	single_vims( VIMS_FONT_LIST );
+	gint len = 0;
+	gchar *srts = recv_vims(6,&len );
+	gint i = 0;
+	gchar *p = srts;
+
+	while( i < len )
+	{
+		char tmp[4];
+		bzero(tmp,4);
+		strncpy(tmp, p, 3 );
+		int slen = atoi(tmp);
+		p += 3;
+		gchar *seq_str = strndup( p, slen );
+		gtk_combo_box_append_text( GTK_COMBO_BOX(box),	seq_str );
+		p += slen;
+		free(seq_str);
+		i += (slen + 3);
+	}
+	gtk_combo_box_set_active( GTK_COMBO_BOX(box), 0 );
+
+	free(srts);
+
+}
+
+static	void	reload_srt()
+{
+	if(!have_srt_)
+	{
+		init_srt_editor();
+		have_srt_ = 1;
+	}
+
+	GtkWidget *box = glade_xml_get_widget( info->main_window, "combobox_textsrt");
+	remove_all( GTK_COMBO_BOX( box ) );
+
+	
+	single_vims( VIMS_SRT_LIST );
+	gint len = 0;
+	gchar *srts = recv_vims(6,&len );
+	gint i = 0;
+	gchar *p = srts;
+	gchar *token = NULL;
+	veejay_msg(0, "%s", srts );
+	while(  i < len )
+	{
+		token = tokenize_on_space( p );
+		if(!token)
+		 break;
+		if(token)
+		{
+			gtk_combo_box_append_text( GTK_COMBO_BOX(box),token );
+			i += strlen(token) + 1;
+			free(token);
+		}
+		else
+			i++;
+		p = srts + i;
+	}
+//	gtk_combo_box_set_active( GTK_COMBO_BOX(box), 0 );
+	free(srts);	
+}
 
 static	void	reload_editlist_contents()
 {
@@ -6386,6 +6523,33 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	setup_rgbkey();
 	setup_bundles();
 
+	text_defaults();
+
+	GtkWidget *fgb = glade_xml_get_widget( 
+			  info->main_window, "boxtext" );
+	GtkWidget *bgb = glade_xml_get_widget(
+			  info->main_window, "boxbg" );
+	GtkWidget *rb = glade_xml_get_widget(
+			  info->main_window, "boxred" );
+	GtkWidget *gb = glade_xml_get_widget(
+			  info->main_window, "boxgreen" );
+	GtkWidget *bb = glade_xml_get_widget(
+			  info->main_window, "boxblue" );
+	GtkWidget *lnb = glade_xml_get_widget(
+				info->main_window,"boxln" );
+	g_signal_connect( G_OBJECT( bgb ), "expose_event",
+			G_CALLBACK( boxbg_expose_event ), NULL);
+	g_signal_connect( G_OBJECT( fgb ), "expose_event",
+			G_CALLBACK( boxfg_expose_event ), NULL);
+	g_signal_connect( G_OBJECT( lnb ), "expose_event",
+			G_CALLBACK( boxln_expose_event ), NULL);
+	g_signal_connect( G_OBJECT( rb ), "expose_event",
+			G_CALLBACK( boxred_expose_event ), NULL);
+	g_signal_connect( G_OBJECT( gb ), "expose_event",
+			G_CALLBACK( boxgreen_expose_event ), NULL);
+	g_signal_connect( G_OBJECT( bb ), "expose_event",
+			G_CALLBACK( boxblue_expose_event ), NULL);
+
 
 	set_toggle_button( "button_252", vims_verbosity );
 
@@ -6574,6 +6738,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	reload_editlist_contents();
 	reload_bundles();
 
+
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
 	gtk_widget_show( w );
 
@@ -6587,12 +6752,14 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	update_spin_range( "spin_framedelay", 0, 9, 0);
 	update_slider_range( "speed_slider", -25,25,speed,0);
-	update_label_i( "speed_label", speed,0);
+//	update_label_i( "speed_label", speed,0);
 
 	update_label_str( "label_hostnamex",
 		(hostname == NULL ? group_name: hostname ) );
 	update_label_i( "label_portx",port_num,0);
 
+	//init_srt_editor();
+	
 	vj_gui_preview();
 
 	return 1;

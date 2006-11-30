@@ -26,7 +26,25 @@
 
 static int config_file_status = 0;
 static gchar *config_file = NULL;
+static int srt_locked_ = 0;
+static int srt_seq_ = 0;
 
+static int bg_[4];
+static int fg_[4];
+static int ln_[4];
+
+void	text_defaults()
+{
+	bg_[0] = 255; bg_[1] = 255; bg_[2] = 255; bg_[3] = 0;
+	fg_[0] = 0;   fg_[1] = 0;   fg_[2] = 0;   fg_[3] = 0;
+	ln_[0] = 200; ln_[1] = 255; ln_[1] = 255; ln_[3] = 0;
+	srt_seq_ = 0;
+		veejay_msg(0, "FG: %d,%d,%d,%d BG: %d,%d,%d,%d LN: %d,%d,%d,%d",
+			fg_[0],fg_[1],fg_[2],fg_[3],
+			bg_[0],bg_[1],bg_[2],bg_[3],
+			ln_[0],ln_[1],ln_[2],ln_[3] );
+
+}
 
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -2507,7 +2525,7 @@ void	on_delete2_activate( GtkWidget *w, gpointer user_data)
 {
 	DBG_C();
 }
-
+static	void	refresh_srt_info( void );
 void
 on_spin_samplebank_select_value_changed
                                         (GtkSpinButton   *spinbutton,
@@ -2591,3 +2609,792 @@ on_vims_messenger_single_clicked( void )
 }
 
 
+void	on_button_text_new_clicked( GtkWidget *w, gpointer data )
+{
+	gint x = get_nums( "spin_text_x" );
+	gint y = get_nums( "spin_text_y" );
+
+	gint s1 = 0;
+	gint s2 = get_total_frames();
+	
+	//gchar *text = get_textview_buffer( "textview_text" );
+	
+	clear_textview_buffer( "textview_text" );
+
+	gchar *text = strdup("  ");
+	
+	multi_vims( VIMS_SRT_ADD, "%d %d %d %d %d %s",
+		0,s1,s2,x,y,text );
+
+	gint font = gtk_combo_box_get_active( GTK_COMBO_BOX( w ) );
+	gint size = get_nums( "spin_text_size" );
+	gint use_border = is_button_toggled( "use_bg" );
+	gint outline = is_button_toggled( "use_outline");
+
+	veejay_msg(0, "%d - %d , %d x %d, '%s'", s1,s2,x,y , text );
+	veejay_msg(0, "Font: %d, Size: %d", font, size );
+	veejay_msg(0, "FG: %d,%d,%d,%d BG: %d,%d,%d,%d LN: %d,%d,%d,%d",
+			fg_[0],fg_[1],fg_[2],fg_[3],
+			bg_[0],bg_[1],bg_[2],bg_[3],
+			ln_[0],ln_[1],ln_[2],ln_[3] );
+	
+	multi_vims( VIMS_FONT_SIZE_FONT, "%d %d", font , size );
+	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", fg_[0],fg_[1],fg_[2],fg_[3], 1 );	
+	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", bg_[0],bg_[1],bg_[2],bg_[3], 2 );
+	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", ln_[0],ln_[1],ln_[2],ln_[3], 3 );
+	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", use_border, outline,0,0,0 );	
+	
+	free(text);
+	
+	info->uc.reload_hint[HINT_HISTORY] = 1;
+}
+void	on_button_text_del_clicked( GtkWidget *w, gpointer data )
+{
+	multi_vims( VIMS_SRT_DEL, "%d", srt_seq_ );
+	info->uc.reload_hint[HINT_HISTORY] = 1;
+
+}
+
+
+void	on_spin_text_start_value_changed( GtkWidget *w, gpointer data )
+{
+	if(srt_locked_)
+		return;
+	gint start = get_nums( "spin_text_end");
+	char *text = format_time( start, info->el.fps );
+	update_label_str( "labeltextstart", text );
+	free(text);	
+}
+void	on_spin_text_end_value_changed( GtkWidget *w, gpointer data )
+{
+	if(srt_locked_)
+		return;
+	gint end = get_nums( "spin_text_end" );
+	char *text = format_time( end, info->el.fps );
+	update_label_str( "labeltextend", text );
+	free(text);
+}
+void	on_spin_text_x_value_changed( GtkWidget *w, gpointer data )
+{
+	if( srt_locked_)
+		return;
+
+	gint x = get_nums( "spin_text_x" );
+	gint y = get_nums( "spin_text_y");
+	multi_vims( VIMS_FONT_POS,"%d %d", x,y );
+
+}
+void	on_spin_text_y_value_changed( GtkWidget *w, gpointer data )
+{
+	if( srt_locked_)
+		return;
+
+	gint x = get_nums( "spin_text_x" );
+	gint y = get_nums( "spin_text_y");
+	multi_vims( VIMS_FONT_POS,"%d %d", x,y );
+}
+void	on_button_srt_save_clicked( GtkWidget *w, gpointer data )
+{
+	gchar *filename = dialog_save_file("Save SRT file");
+	if( filename )
+	{
+		multi_vims( VIMS_SRT_SAVE, "%s", filename );
+		g_free(filename);
+	}
+}
+void	on_button_srt_load_clicked( GtkWidget *w, gpointer data )
+{
+	gchar *filename = dialog_open_file("Load SRT file",4);
+	if( filename )
+	{
+		multi_vims( VIMS_SRT_LOAD, "%s", filename );
+		g_free(filename);
+	}
+}
+
+
+void	on_combobox_fonts_changed( GtkWidget *w, gpointer data )
+{
+	if(srt_locked_)
+		return;
+	gint font = gtk_combo_box_get_active( GTK_COMBO_BOX( w ) );
+	gint size = get_nums( "spin_text_size" );
+
+	multi_vims( VIMS_FONT_SIZE_FONT, "%d %d", font , size );
+}
+void	on_spin_text_size_value_changed( GtkWidget *w, gpointer data )
+{
+	if( srt_locked_)
+		return;
+	GtkWidget *ww = glade_xml_get_widget( info->main_window,
+			"combobox_fonts" );
+	gint font = gtk_combo_box_get_active( GTK_COMBO_BOX( ww ) );
+	gint size = get_nums( "spin_text_size" );
+
+	multi_vims( VIMS_FONT_SIZE_FONT, "%d %d", font , size );
+}
+
+void	on_button_text_update_clicked(GtkWidget *w, gpointer data)
+{
+	gint s1 = get_nums( "spin_text_start" );
+	gint s2 = get_nums( "spin_text_end" );
+	gchar *text = get_textview_buffer( "textview_text" );
+	if(text)
+		multi_vims( VIMS_SRT_UPDATE, "%d %d %d %s", srt_seq_, s1,s2,text );
+}
+
+static	int str_to_tc( char *tc )
+{
+	int res = 0;
+	float fps = info->el.fps;
+	int parts[4] = { 0,0,0,0};
+	int n = sscanf( tc, "%2d:%2d:%2d,%d",&parts[0],&parts[1],&parts[2],&parts[3]);
+
+	res = (int) parts[3];
+	res += (int) ( fps * parts[2] );
+	res += (int) ( fps * 60 * parts[1] );
+	res += (int) ( fps * 1440 * parts[0] );
+
+	return res;
+}
+
+static	void change_box_color_rgb( GtkWidget *box, int r, int g, int b,int a, int fill )
+{
+	GdkGC *gc = gdk_gc_new( box->window );
+	GdkColor col;
+
+	memset( &col,0, sizeof( GdkColor ) );
+	col.red = 255.0 * r;
+	col.green = 255.0 * g;
+	col.blue = 255.0 * b;
+
+	if(fill)
+	{
+		update_slider_value( "textcolorred", r ,0);
+		update_slider_value( "textcolorgreen",g,0 );
+		update_slider_value( "textcolorblue",b,0);
+		update_slider_value( "textcoloralpha",a,0);
+	}
+	gdk_color_alloc( gtk_widget_get_colormap( box ), &col );
+	
+	gdk_gc_set_foreground( gc, &col );
+	
+	gdk_draw_rectangle( 
+			box->window,
+			gc,
+			TRUE,
+			0,
+			0,
+			24,
+			24 );
+
+	gdk_gc_unref( gc );
+
+}
+
+void	on_combobox_textsrt_changed( GtkWidget *w, gpointer data)
+{
+	if(srt_locked_)
+		return;
+
+	gchar *k = gtk_combo_box_get_active_text( GTK_COMBO_BOX(w) );
+	int sid  = atoi(k);
+	printf("Selected '%d'\n", sid);
+	
+//	srt_seq_  = 1 + gtk_combo_box_get_active( GTK_COMBO_BOX( w ) );
+	gint len = 0;
+
+	multi_vims( VIMS_SRT_SELECT, "%d", sid );
+	multi_vims( VIMS_SRT_INFO, "%d", sid );
+
+	gchar *text = recv_vims( 6,&len );
+	gint seq_id = 0;
+	gint tc1l=0;
+	gint tc2l=0;
+	char tc1[20];
+	char tc2[20];
+	char tmp[1000];
+	gint tlen=0;
+	bzero(tmp,1000);
+	bzero(tc1,20);
+	bzero(tc2,20);
+	gint ln[4];
+	gint fg[4];
+	gint bg[4];
+	gint use_bg = 0;
+	gint outline = 0;
+	gint size = 0;
+	gint font = 0;
+	gint x =0;
+	gint y = 0;
+	
+	clear_textview_buffer( "textview_text" );
+	int s1=0,s2=0;
+	int n = 0;
+	if(text && len > 0 )
+	{
+		sscanf( text,"%5d%2d%9d%9d", &seq_id ,&tc1l,&s1,&s2 );
+		strncpy( tc1, text+7+18,tc1l );	
+		sscanf( text+7+18+tc1l,"%2d", &tc2l );
+		strncpy( tc2, text+7+18+tc1l + 2, tc2l );
+		sscanf( text+7+18+tc1l+2+tc2l, "%3d", &tlen );
+		strncpy( tmp, text + 7 + 18 + tc1l + 2 + tc2l + 3, tlen );
+		n = sscanf( text+7+18 + tc1l+2+tc2l+3+tlen,"%04d%04d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d",
+				&x,&y, &font, &size, &bg[0],&bg[1],&bg[2],&fg[0],&fg[1],&fg[2],&use_bg,&outline,&ln[0],&ln[1],
+		     			&ln[2],&bg[3],&fg[3],&ln[3] );
+	}
+
+	veejay_msg(0, "tokens: %d, %s",n,text );
+
+	update_spin_range( "spin_text_start",0, get_total_frames(),s1);
+	update_spin_range( "spin_text_end",0, get_total_frames(),s2);
+	
+	
+	veejay_msg(0, "x=%d,y=%d, font=%d,size=%d,bg=[%d,%d,%d,%d]",
+			x,y,font,size,bg[0],bg[1],bg[2],bg[3] );
+	veejay_msg(0, "fg=[%d,%d,%d,%d], ln=[%d,%d,%d,%d]",
+			fg[0],fg[1],fg[2],fg[3],ln[0],ln[1],ln[2],ln[3] );
+	
+	srt_locked_ = 1;
+	srt_seq_ = seq_id;
+
+	set_textview_buffer( "textview_text", tmp );
+	
+	update_spin_value( "spin_text_start" ,s1);
+	update_spin_value( "spin_text_end", s2 );
+	
+	change_box_color_rgb(
+			 glade_xml_get_widget(info->main_window, "boxbg" ),
+			 bg[0],bg[1],bg[2],bg[3], (is_button_toggled( "textcolorbg" ) ? 1 : 0 ) );
+	
+	change_box_color_rgb(
+			 glade_xml_get_widget(info->main_window, "boxtext" ),
+			 fg[0],fg[1],fg[2],fg[3], (is_button_toggled( "textcolorfg" ) ? 1: 0) );
+
+
+	change_box_color_rgb(
+			glade_xml_get_widget( info->main_window, "boxln" ),
+			ln[0],ln[1],ln[2],ln[3], (is_button_toggled( "textcolorln" ) ? 1: 0) );
+	
+	memcpy( bg_, bg, sizeof(bg_));
+	memcpy( fg_, fg, sizeof(fg_));
+	memcpy( ln_, ln, sizeof(ln_));
+
+	set_toggle_button( "use_bg", use_bg );
+	set_toggle_button( "use_outline", outline);
+	update_spin_value( "spin_text_size", size );
+	update_spin_value( "spin_text_x", x );
+	update_spin_value( "spin_text_y", y );	
+
+	if(is_button_toggled( "textcolorfg") )
+	{
+		update_slider_value( "textcolorred", fg_[0],0 );
+		update_slider_value( "textcolorblue",fg_[2],0 );
+		update_slider_value( "textcolorgreen",fg_[1],0);
+		update_slider_value( "textcoloralpha", fg_[3],0);
+	}
+	else if( is_button_toggled( "textcolorbg") )
+	{
+		update_slider_value( "textcolorred", bg_[0],0 );
+		update_slider_value( "textcolorblue",bg_[2],0 );
+		update_slider_value( "textcolorgreen",bg_[1],0);
+		update_slider_value( "textcoloralpha",bg_[3],0);
+	}
+	else if ( is_button_toggled( "textcolorln" ))
+	{
+		update_slider_value( "textcolorred", ln_[0],0 );
+		update_slider_value( "textcolorblue",ln_[2],0 );
+		update_slider_value( "textcolorgreen",ln_[1],0);
+		update_slider_value( "textcoloralpha", ln_[3],0);
+	}
+	GtkWidget *combo = glade_xml_get_widget( info->main_window, "combobox_fonts" );
+        gtk_combo_box_set_active( GTK_COMBO_BOX( combo ), font );
+
+	
+	glade_xml_get_widget( info->main_window, "combobox_textsrt" );
+        gtk_combo_box_set_active( GTK_COMBO_BOX( combo ), seq_id-1 );
+
+
+	srt_locked_ = 0;
+	
+	if(text) free(text);
+}
+
+
+static	void change_box_color( GtkWidget *box, double val, int plane, int fill )
+{
+	GdkGC *gc = gdk_gc_new( box->window );
+	GdkColor col;
+
+	memset( &col,0, sizeof( GdkColor ) );
+	double v = (1.0 / 255.0) * val;
+
+	int r = get_slider_val( "textcolorred" );
+	int b =  get_slider_val( "textcolorgreen" );
+	int g =  get_slider_val( "textcolorblue" );
+	int a = get_slider_val("textcoloralpha" );
+	
+	if(plane==0)
+	{
+		col.red = 65535.0 * v;
+		switch(fill)
+		{
+			case 0:	fg_[0] = r; break;
+			case 1: bg_[0] = r; break;
+			case 2: ln_[0] = r; break;
+		}
+	}
+	if(plane==1)
+	{
+		col.green = 65536 * v;
+		switch(fill)
+		{
+			case 0:	fg_[1] = g; break;
+			case 1: bg_[1] = g; break;
+			case 2: ln_[1] = g; break;
+		}
+	}
+	if(plane==2)
+	{
+		col.blue = 65536 * v;
+		switch(fill)
+		{
+			case 0:	fg_[2] = b; break;
+			case 1: bg_[2] = b; break;
+			case 2: ln_[2] = b; break;
+		}
+
+	}
+	if(plane==-1)
+	{
+		col.red = 255.0 * r;
+		col.green = 255.0 * g;
+		col.blue = 255.0 * b;
+		switch(fill)
+		{
+			case 0:	fg_[0] = r; fg_[1] = g; fg_[2] = b; fg_[3] = a; break;
+			case 1: bg_[0] = r; bg_[1] = g; bg_[2] = b; bg_[3] = a; break;
+			case 2: ln_[0] = r; ln_[1] = g; ln_[2] = b; ln_[3] = a; break;
+		}
+
+	}
+
+	
+	gdk_color_alloc( gtk_widget_get_colormap( box ), &col );
+	
+	gdk_gc_set_foreground( gc, &col );
+	
+	gdk_draw_rectangle( 
+			box->window,
+			gc,
+			TRUE,
+			0,
+			0,
+			24,
+			24 );
+
+	gdk_gc_unref( gc );
+
+}
+
+static	void	colbox( const char *name1,const char *name2, int plane )
+{	
+	int fg = is_button_toggled("textcolorfg");
+	int bg = is_button_toggled("textcolorbg");
+	int ln = is_button_toggled("textcolorln");
+
+	int v  = get_slider_val( name2 );
+	change_box_color(
+			glade_xml_get_widget( info->main_window,name1 ) ,
+			v, 
+			plane,
+			-1 ); //green
+
+	if(fg)
+		change_box_color(
+				glade_xml_get_widget( info->main_window, "boxtext" ),
+				0.0,
+				-1,
+			        0	);
+	if(bg)
+		change_box_color(
+				glade_xml_get_widget( info->main_window, "boxbg" ),
+				0.0,
+				-1,
+			        1	);
+
+	if(ln)
+		change_box_color(
+				glade_xml_get_widget( info->main_window, "boxln" ),
+				0.0,
+				-1,
+			        2	);
+
+}
+	
+void	on_textcoloralpha_value_changed(GtkWidget *w, gpointer data )
+{
+	if(srt_locked_)
+		return;
+	int fg = is_button_toggled("textcolorfg");
+	int bg = is_button_toggled("textcolorbg");
+	int ln = is_button_toggled("textcolorln");
+	gint r = get_slider_val( "textcolorred" );
+	gint g = get_slider_val( "textcolorgreen" );
+	gint b = get_slider_val( "textcolorblue" );
+	gint a = get_slider_val( "textcoloralpha" );
+	
+	int m = 0;
+	if( fg )
+	{
+		fg_[3] = a;
+		m = 1;
+	}	
+	if( bg )
+	{
+		bg_[3] = a;
+		m = 2;
+	}
+	if( ln )
+	{
+		ln_[3] = a;
+		m = 3;
+	}
+		
+	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", r,g,b,a, m );	
+}
+
+void	on_textcolorred_value_changed(GtkWidget *w , gpointer data )
+{
+	if(srt_locked_)
+		return;
+	colbox( "boxred", "textcolorred", 0 );
+}
+
+
+void	on_textcolorgreen_value_changed(GtkWidget *w , gpointer data )
+{
+	if(srt_locked_)
+		return;
+
+	colbox( "boxgreen", "textcolorgreen", 1 );
+
+}
+
+void	on_textcolorblue_value_changed(GtkWidget *w , gpointer data )
+{
+	if(srt_locked_)
+		return;
+
+	colbox( "boxblue", "textcolorblue", 2  );	
+	
+}
+
+void	on_textcolorfg_toggled( GtkWidget *w, gpointer data )
+{
+	if( is_button_toggled( "textcolorfg" ) )
+	{
+		srt_locked_ = 1;
+		update_slider_value( "textcolorred", fg_[0],0 );
+		update_slider_value( "textcolorgreen", fg_[1],0 );
+		update_slider_value( "textcolorblue", fg_[2],0);
+		update_slider_value( "textcoloralpha", fg_[3],0);
+		srt_locked_ = 0;
+	}
+}
+void	on_textcolorbg_toggled( GtkWidget *w, gpointer data )
+{
+	if( is_button_toggled( "textcolorbg" ) )
+	{
+		srt_locked_ = 1;
+
+		update_slider_value( "textcolorred", bg_[0],0 );
+		update_slider_value( "textcolorgreen", bg_[1],0 );
+		update_slider_value( "textcolorblue", bg_[2],0);
+		update_slider_value( "textcoloralpha", bg_[3],0);
+		
+		srt_locked_ = 0;
+
+	}
+}
+void	on_textcolorln_toggled( GtkWidget *w, gpointer data )
+{
+	if( is_button_toggled( "textcolorln" ) )
+	{
+			srt_locked_ = 1;
+
+		update_slider_value( "textcolorred", ln_[0],0 );
+		update_slider_value( "textcolorgreen", ln_[1],0 );
+		update_slider_value( "textcolorblue", ln_[2],0);
+		update_slider_value( "textcoloralpha", ln_[3],0);
+			srt_locked_ = 0;
+
+	}
+}
+
+void	on_use_bg_toggled( GtkWidget *w , gpointer data)
+{
+	if(srt_locked_)
+		return;
+
+	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", 
+			is_button_toggled("use_outline"),
+			is_button_toggled("use_bg"),
+			0,
+			0,
+			0 );
+}	
+
+void	on_use_outline_toggled( GtkWidget *w, gpointer data)
+{
+	if(srt_locked_)
+		return;
+
+	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", 
+			is_button_toggled("use_outline"),
+			is_button_toggled("use_bg"),
+			0,
+			0,
+			0 );
+
+}
+
+void	on_buttonfg_clicked( GtkWidget *w, gpointer data )
+{
+	gint r = get_slider_val( "textcolorred" );
+	gint g = get_slider_val( "textcolorgreen" );
+	gint b = get_slider_val( "textcolorblue" );
+	gint a = get_slider_val( "textcoloralpha");
+	fg_[0] = r;
+	fg_[1] = g;
+	fg_[2] = b;
+	fg_[3] = a;
+	
+	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", r,g,b,a, 1 );
+}
+void	on_buttonbg_clicked( GtkWidget *w, gpointer data )
+{
+	gint r = get_slider_val( "textcolorred" );
+	gint g = get_slider_val( "textcolorgreen" );
+	gint b = get_slider_val( "textcolorblue" );
+	gint a = get_slider_val( "textcoloralpha" );
+	
+	bg_[0] = r;
+	bg_[1] = g;
+	bg_[2] = b;
+	bg_[3] = a;
+	
+	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", r,g,b,a, 2 );	
+}
+void	on_buttonln_clicked( GtkWidget *w, gpointer data )
+{
+	gint r = get_slider_val( "textcolorred" );
+	gint g = get_slider_val( "textcolorgreen" );
+	gint b = get_slider_val( "textcolorblue" );
+	gint a = get_slider_val( "textcoloralpha" );
+	
+	ln_[0] = r;
+	ln_[1] = g;
+	ln_[2] = b;
+	ln_[3] = a;
+	
+	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", r,g,b,a, 3 );	
+}
+
+gboolean	boxfg_expose_event(GtkWidget *w,
+		GdkEventExpose *event, gpointer data )
+{
+	gdk_window_clear_area( w->window,
+			event->area.x, event->area.y,
+			event->area.width,event->area.height );
+
+	
+	GdkGC *gc = gdk_gc_new( w->window );
+	GdkColor col;
+
+	memset( &col,0, sizeof( GdkColor ) );
+	col.red = 255.0 * fg_[0];
+	col.green = 255.0 * fg_[1];
+	col.blue = 255.0 * fg_[2];
+
+	gdk_color_alloc( gtk_widget_get_colormap( w ), &col );
+	
+	gdk_gc_set_foreground( gc, &col );
+	
+	gdk_draw_rectangle( 
+			w->window,
+			gc,
+			TRUE,
+			0,
+			0,
+			24,
+			24 );
+
+	gdk_gc_unref( gc );
+
+	return TRUE;
+}
+
+gboolean	boxbg_expose_event(GtkWidget *w,
+		GdkEventExpose *event, gpointer data )
+{
+	gdk_window_clear_area( w->window,
+			event->area.x, event->area.y,
+			event->area.width,event->area.height );
+
+	
+	GdkGC *gc = gdk_gc_new( w->window );
+	GdkColor col;
+
+	memset( &col,0, sizeof( GdkColor ) );
+	col.red = 255.0 * bg_[0];
+	col.green = 255.0 * bg_[1];
+	col.blue = 255.0 * bg_[2];
+
+	gdk_color_alloc( gtk_widget_get_colormap( w ), &col );
+	
+	gdk_gc_set_foreground( gc, &col );
+	
+	gdk_draw_rectangle( 
+			w->window,
+			gc,
+			TRUE,
+			0,
+			0,
+			24,
+			24 );
+
+	gdk_gc_unref( gc );
+
+	return TRUE;
+}
+
+gboolean	boxln_expose_event(GtkWidget *w,
+		GdkEventExpose *event, gpointer data )
+{
+	gdk_window_clear_area( w->window,
+			event->area.x, event->area.y,
+			event->area.width,event->area.height );
+
+	
+	GdkGC *gc = gdk_gc_new( w->window );
+	GdkColor col;
+
+	memset( &col,0, sizeof( GdkColor ) );
+	col.red = 255.0 * ln_[0];
+	col.green = 255.0 * ln_[1];
+	col.blue = 255.0 * ln_[2];
+
+	gdk_color_alloc( gtk_widget_get_colormap( w ), &col );
+	
+	gdk_gc_set_foreground( gc, &col );
+	
+	gdk_draw_rectangle( 
+			w->window,
+			gc,
+			TRUE,
+			0,
+			0,
+			24,
+			24 );
+
+	gdk_gc_unref( gc );
+
+	return TRUE;
+}
+
+gboolean	boxred_expose_event(GtkWidget *w,
+		GdkEventExpose *event, gpointer data )
+{
+	gdk_window_clear_area( w->window,
+			event->area.x, event->area.y,
+			event->area.width,event->area.height );
+
+	
+	GdkGC *gc = gdk_gc_new( w->window );
+	GdkColor col;
+
+	memset( &col,0, sizeof( GdkColor ) );
+	col.red = 255 * get_slider_val( "textcolorred" );
+
+	gdk_color_alloc( gtk_widget_get_colormap( w ), &col );
+	
+	gdk_gc_set_foreground( gc, &col );
+	
+	gdk_draw_rectangle( 
+			w->window,
+			gc,
+			TRUE,
+			0,
+			0,
+			24,
+			24 );
+
+	gdk_gc_unref( gc );
+
+	return TRUE;
+}
+
+
+gboolean	boxgreen_expose_event(GtkWidget *w,
+		GdkEventExpose *event, gpointer data )
+{
+	gdk_window_clear_area( w->window,
+			event->area.x, event->area.y,
+			event->area.width,event->area.height );
+
+	
+	GdkGC *gc = gdk_gc_new( w->window );
+	GdkColor col;
+
+	memset( &col,0, sizeof( GdkColor ) );
+	col.green = 255 * get_slider_val( "textcolorgreen" );
+
+	gdk_color_alloc( gtk_widget_get_colormap( w ), &col );
+	
+	gdk_gc_set_foreground( gc, &col );
+	
+	gdk_draw_rectangle( 
+			w->window,
+			gc,
+			TRUE,
+			0,
+			0,
+			24,
+			24 );
+
+	gdk_gc_unref( gc );
+
+	return TRUE;
+}
+gboolean	boxblue_expose_event(GtkWidget *w,
+		GdkEventExpose *event, gpointer data )
+{
+	gdk_window_clear_area( w->window,
+			event->area.x, event->area.y,
+			event->area.width,event->area.height );
+
+	
+	GdkGC *gc = gdk_gc_new( w->window );
+	GdkColor col;
+
+	memset( &col,0, sizeof( GdkColor ) );
+	col.blue = 255 * get_slider_val( "textcolorblue" );
+
+	gdk_color_alloc( gtk_widget_get_colormap( w ), &col );
+	
+	gdk_gc_set_foreground( gc, &col );
+	
+	gdk_draw_rectangle( 
+			w->window,
+			gc,
+			TRUE,
+			0,
+			0,
+			24,
+			24 );
+
+	gdk_gc_unref( gc );
+
+	return TRUE;
+}
