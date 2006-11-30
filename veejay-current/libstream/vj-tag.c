@@ -293,7 +293,7 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 		tag->socket_ready = 1;
 	}
 
-	net_thread_remote( tag->private, v );
+	net_thread_remote( tag->priv, v );
 	
 	return 1;
 }
@@ -443,6 +443,16 @@ int	_vj_tag_new_dv1394(vj_tag *tag, int stream_nr, int channel,int quality, edit
 }
 #endif
 
+void	*vj_tag_get_dict( int t1 )
+{
+#ifdef HAVE_FREETYPE
+	vj_tag *tag = vj_tag_get(t1);
+	if(tag)
+		return tag->dict;
+#endif
+	return NULL;
+}
+
 int	vj_tag_set_stream_color(int t1, int r, int g, int b)
 {
     vj_tag *tag = vj_tag_get(t1);
@@ -567,10 +577,10 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->color_g = 0;
     tag->color_b = 0;
     tag->opacity = 0; 
-	tag->private = NULL;
+	tag->priv = NULL;
 
 	if(type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_NET)
-	    tag->private = net_threader();
+	    tag->priv = net_threader();
 	
     palette = ( (pix_fmt == FMT_420||pix_fmt == FMT_420F) ? VIDEO_PALETTE_YUV420P : VIDEO_PALETTE_YUV422P);
     
@@ -676,7 +686,9 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 		return -1;
     last_added_tag = tag->id; 
 
-
+#ifdef HAVE_FREETYPE
+    tag->dict = vpn(VEVO_ANONYMOUS_PORT );
+#endif
    return (int)(tag->id);
 }
 
@@ -740,6 +752,10 @@ int vj_tag_del(int id)
     vj_tag *tag;
     int i;
     tag = vj_tag_get(id);
+   
+#ifdef HAVE_TRUETYPE
+	vj_font_dictionary_destroy(tag->dict);
+#endif
     
     if (!tag)
 	return 0;

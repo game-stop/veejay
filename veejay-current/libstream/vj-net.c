@@ -58,7 +58,7 @@ static void unlock_(threaded_t *t, const char *f, int line)
 void	*reader_thread(void *data)
 {
 	vj_tag *tag = (vj_tag*) data;
-	threaded_t *t = tag->private;
+	threaded_t *t = tag->priv;
 	vj_client *v = t->remote;
 	int ret = 0;
 	int error = 0;
@@ -123,10 +123,6 @@ void	net_thread_remote( void *p, void *r )
 
 void	net_thread_exit(vj_tag *tag)
 {
-/*	threaded_t *t = tag->private;
-
-	lock(t);
-*/
 	if(tag->socket_frame)
 		free(tag->socket_frame);
 
@@ -138,7 +134,7 @@ void	net_thread_exit(vj_tag *tag)
 
 int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3], vj_client *v )
 {
-/*	threaded_t *t = (threaded_t*) tag->private;
+/*	threaded_t *t = (threaded_t*) tag->priv;
 	lock(t);
 	if( t->state == 0 || t->error  )
 	{
@@ -191,7 +187,7 @@ int	net_thread_start(vj_client *v, vj_tag *tag)
 		return 0;
 	}
 
-/*	threaded_t *t = (threaded_t*)tag->private;
+/*	threaded_t *t = (threaded_t*)tag->priv;
 
 	t->error = 0;
 	t->state = 1;
@@ -228,7 +224,7 @@ int	net_thread_start(vj_client *v, vj_tag *tag)
 void	net_thread_stop(vj_client *v , vj_tag *tag)
 {
 	char mcast_stop[6];
-	threaded_t *t = (threaded_t*)tag->private;
+	threaded_t *t = (threaded_t*)tag->priv;
 	int ret = 0;
 //	lock(t);
 	

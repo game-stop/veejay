@@ -637,7 +637,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		    break;
 		}
 
-	 if( deinter == 1 && ( (lav_video_interlacing(el->lav_fd[n]) == LAV_INTER_TOP_FIRST ) || (lav_video_interlacing(el->lav_fd[n])==LAV_INTER_BOTTOM_FIRST)))
+	 if( deinter == 1 && (lav_video_interlacing(el->lav_fd[n]) != LAV_NOT_INTERLACED))
 		el->auto_deinter = 1;
 
     	veejay_msg(VEEJAY_MSG_DEBUG,"\tInterlacing:      %s", int_msg);
@@ -1070,7 +1070,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			AVPicture pict,pict2;
 			int dst_fmt = get_ffmpeg_pixfmt( el_pixel_format_ );
 			int src_fmt = d->context->pix_fmt;
-
+	
 			pict.data[0] = dst[0];
 			pict.data[1] = dst[1];
 			pict.data[2] = dst[2];
@@ -1316,6 +1316,9 @@ int	vj_el_init_420_frame(editlist *el, VJFrame *frame)
 	frame->len = el->video_width * el->video_height;
 	frame->shift_v = 1;
 	frame->shift_h = 1;
+	frame->width = el->video_width;
+	frame->height = el->video_height;
+	frame->ssm = 0;
 	return 1;
 }
 
@@ -1332,6 +1335,9 @@ int	vj_el_init_422_frame(editlist *el, VJFrame *frame)
 	frame->len = el->video_width * el->video_height;
 	frame->shift_v = 0;
 	frame->shift_h = 1;
+	frame->width = el->video_width;
+	frame->height = el->video_height;
+	frame->ssm = 0;
 	return 1;
 }
 

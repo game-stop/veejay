@@ -558,9 +558,10 @@ static void tr_422_to_444(uint8_t *buffer, int width, int height)
 {
 	/* YUV 4:2:2 Planar to 4:4:4 Planar */
 
-	const int stride = width/2;
+	/*const int stride = width/2;
 	const int len = stride * height; 
 #ifdef HAVE_ASM_MMX
+	//@ mmx sampler buggy :(
 	const int mmx_stride = stride / 8;
 #endif
 	int x,y;
@@ -587,6 +588,23 @@ static void tr_422_to_444(uint8_t *buffer, int width, int height)
 			dst+=2; // increment dst
 		}
 #endif
+	}
+	*/
+	const int stride = width/2;
+	const int stride = width;
+	const int len = stride * h; 
+	int x,y;
+
+	for( y = h-1; y > 0 ; y -- )
+	{
+		uint8_t *dst = buffer + (y * width);
+		uint8_t *src = buffer + (y * stride);
+		for(x=0; x < stride; x++) // for 1 row
+		{
+			dst[0] = src[x]; //put to dst
+			dst[1] = src[x];
+			dst+=2; // increment dst
+		}
 	}
 }
 
@@ -685,8 +703,8 @@ void chroma_supersample(subsample_mode_t mode,void *data, uint8_t *ycbcr[],
 
   switch (mode) {
   case SSM_420_JPEG_BOX:
-    ss_420jpeg_to_444(ycbcr[1], width, height);
-    ss_420jpeg_to_444(ycbcr[2], width, height);
+      	ss_420jpeg_to_444(ycbcr[1], width, height);
+    	ss_420jpeg_to_444(ycbcr[2], width, height);
 #ifdef HAVE_ASM_MMX
 	emms();
 #endif
@@ -698,9 +716,9 @@ void chroma_supersample(subsample_mode_t mode,void *data, uint8_t *ycbcr[],
   case SSM_422_444:
     tr_422_to_444(ycbcr[2],width,height);
     tr_422_to_444(ycbcr[1],width,height);
-#ifdef HAVE_ASM_MMX
-	emms();
-#endif
+//#ifdef HAVE_ASM_MMX
+//	emms();
+//#endif
     break;
   case SSM_420_422:
     ss_420_to_422( ycbcr[1], width, height );

@@ -167,6 +167,7 @@ typedef struct sample_info_t {
     int offset;
     editlist *edit_list;
     char     *edit_list_file;
+    void	*dict;
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
@@ -304,6 +305,8 @@ extern int sample_set_selected_entry(int s1, int position);
 extern int sample_set_editlist( int s1, editlist *edl );
 extern editlist *sample_get_editlist(int s1 );
 extern int     sample_get_el_position( int sample_id, int *start, int *end );
+
+extern	void	*sample_get_dict( int sample_id );
 
 #ifdef HAVE_XML2
 extern void CreateSample(xmlNodePtr node, sample_info * sample);

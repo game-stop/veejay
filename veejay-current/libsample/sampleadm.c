@@ -150,6 +150,15 @@ void	sample_set_project(int fmt, int deinterlace, int flags, int force, char nor
 	__sample_project_settings.force = force;
 	__sample_project_settings.norm = norm;
 } 
+void	*sample_get_dict( int sample_id )
+{
+#ifdef HAVE_FREETYPE
+	sample_info *si = sample_get(sample_id);
+	if(si)
+		return si->dict;
+#endif
+	return NULL;
+}
 
 /****************************************************************************************************
  *
@@ -331,6 +340,9 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 	}
 
     }
+#ifdef HAVE_FREETYPE
+    si->dict = vpn( VEVO_ANONYMOUS_PORT );
+#endif
     return si;
 }
 
@@ -827,7 +839,9 @@ int sample_del(int sample_id)
     si = sample_get(sample_id);
     if (!si)
 	return -1;
-
+#ifdef HAVE_FREETYPE
+	vj_font_dictionary_destroy( si->dict );
+#endif
     sample_node = hash_lookup(SampleHash, (void *) si->sample_id);
     if (sample_node) {
     int i;

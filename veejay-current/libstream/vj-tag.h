@@ -106,9 +106,12 @@ typedef struct {
     int socket_ready;
     uint8_t *socket_frame;
     int n_frames;
-    void *private;
+    void *priv;
     void *extra;
+    void *dict;
 } vj_tag;
+
+void	*vj_tag_get_dict( int id );
 
 int 	vj_tag_chain_malloc(int e);
 int 	vj_tag_chain_free(int e);

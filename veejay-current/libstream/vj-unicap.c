@@ -91,6 +91,7 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 		unicap_lock_properties( ud->handle );
 
 		unicap_void_property(&property);	
+		unicap_void_format( &format );
 		
 		unicap_reenumerate_properties( ud->handle, &property_count );
 		unicap_reenumerate_formats( ud->handle, &format_count );
@@ -142,6 +143,7 @@ char **vj_unicap_get_devices(void *unicap)
 	int i;
 	unicap_driver_t *ud = (unicap_driver_t*) unicap;
 	char **result = NULL;
+	unicap_void_device( &(ud->device) );
 	for( i = 0; SUCCESS( unicap_enumerate_devices( NULL, &(ud->device), i ) ); i++ )
 	{
 	}
@@ -167,6 +169,8 @@ char **vj_unicap_get_devices(void *unicap)
 		}
 		unicap_lock_properties( ud->handle );
 
+		unicap_void_property( &property );
+		unicap_void_format( &format );
 	
 		
 		unicap_reenumerate_properties( ud->handle, &property_count );
@@ -222,6 +226,8 @@ int	vj_unicap_property_is_menu( void *ud, char *key )
 	for( i = 0; SUCCESS( unicap_enumerate_properties( vut->handle,
 					&property_spec, &property, i ) ); i ++ )
 	{
+		unicap_void_property( &property );
+
 		unicap_get_property( vut->handle, &property);
 		if( strcmp( property.identifier, key ) == 0 )
 		{
