@@ -33,7 +33,7 @@ void	*vj_font_get_plain_dict( void *font );
 void	vj_font_set_constraints_and_dict( void *font, long lo, long hi, float fps, void *dict );
 void	vj_font_dictionary_destroy(void *dict);
 int	vj_font_clear_text( void *font );
-void	vj_font_new_text( void *font, char *text, uint64_t s1,uint64_t s2, int seq);
+int	vj_font_new_text( void *font, char *text, uint64_t s1,uint64_t s2, int seq);
 void	vj_font_del_text( void *font, int seq );
 char 	**vj_font_get_all_fonts( void *font );
 void	vj_font_set_lncolor( void *font, int r, int g, int b, int a );

@@ -89,8 +89,7 @@ morph_func	_morphology_function(int i)
 {
 	if( i == 0 )
 		return _dilate_kernel3x3;
-	if( i == 1 )
-		return _erode_kernel3x3;
+	return _erode_kernel3x3;
 }
 
 
@@ -104,7 +103,7 @@ void morphology_apply( VJFrame *frame, int width, int height, int threshold, int
     uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
-	uint8_t kernels[4][9] ={
+	uint8_t kernels[8][9] ={
 		 { 1,1,1, 1,1,1 ,1,1,1 },//0
 		 { 0,1,0, 1,1,1, 0,1,0 },//1
 		 { 0,0,0, 1,1,1, 0,0,0 },//2

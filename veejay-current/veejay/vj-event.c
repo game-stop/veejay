@@ -2127,13 +2127,6 @@ void vj_event_quit(void *ptr, const char format[], va_list ap)
 
 void  vj_event_sample_mode(void *ptr,	const char format[],	va_list ap)
 {
-	veejay_t *v = (veejay_t *) ptr;
-	if(v->settings->sample_mode == SSM_420_JPEG_BOX)
-		veejay_set_sampling( v, SSM_420_JPEG_TR );
-	else
-		veejay_set_sampling( v, SSM_420_JPEG_BOX );
-	veejay_msg(VEEJAY_MSG_WARNING, "Sampling of 2x2 -> 1x1 is set to [%s]",
-		(v->settings->sample_mode == SSM_420_JPEG_BOX ? "lame box filter" : "triangle linear filter")); 
 }
 
 void vj_event_bezerk(void *ptr, const char format[], va_list ap)
@@ -8245,10 +8238,13 @@ void	vj_event_add_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 		return;
 	}
 	
-	vj_font_new_text( v->font, text, args[1], args[2], args[0] );
+	int id = vj_font_new_text( v->font, text, args[1], args[2], args[0] );
 	
 	vj_font_set_position( v->font, args[3] ,args[4] );
-	
+
+	char newslot[50];
+	sprintf(newslot, "%05d%05d", 5,id );
+	SEND_MSG(v,newslot);	
 }
 void	vj_event_upd_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 {

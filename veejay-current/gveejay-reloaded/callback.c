@@ -33,6 +33,9 @@ static int bg_[4];
 static int fg_[4];
 static int ln_[4];
 
+
+static	void change_box_color_rgb( GtkWidget *box, int r, int g, int b,int a, int fill );
+
 void	text_defaults()
 {
 	bg_[0] = 255; bg_[1] = 255; bg_[2] = 255; bg_[3] = 0;
@@ -2608,6 +2611,125 @@ on_vims_messenger_single_clicked( void )
 	}
 }
 
+static	void	srt_load_subtitle(int sid)
+{
+	gint len = 0;
+	gint seq_id = 0;
+	gint tc1l=0;
+	gint tc2l=0;
+	char tc1[20];
+	char tc2[20];
+	char tmp[1000];
+	gint tlen=0;
+	gint ln[4];
+	gint fg[4];
+	gint bg[4];
+	gint use_bg = 0;
+	gint outline = 0;
+	gint size = 0;
+	gint font = 0;
+	gint x =0;
+	gint y = 0;
+
+	//multi_vims( VIMS_SRT_SELECT, "%d", sid );
+	veejay_msg(0, "Loading subtitle '%d'", sid );
+	multi_vims( VIMS_SRT_INFO, "%d", sid );
+	gchar *text = recv_vims( 6,&len );
+
+	veejay_msg(0, "raw text: '%s'", text);
+	
+	bzero(tmp,1000);
+	bzero(tc1,20);
+	bzero(tc2,20);
+
+	clear_textview_buffer( "textview_text" );
+	int s1=0,s2=0;
+	int n = 0;
+	if(text && len > 0 )
+	{
+		sscanf( text,"%5d%9d%9d%2d", &seq_id ,&s1,&s2,&tc1l );
+		strncpy( tc1, text+7+18,tc1l );	
+		sscanf( text+7+18+tc1l,"%2d", &tc2l );
+		strncpy( tc2, text+7+18+tc1l + 2, tc2l );
+		sscanf( text+7+18+tc1l+2+tc2l, "%3d", &tlen );
+		strncpy( tmp, text + 7 + 18 + tc1l + 2 + tc2l + 3, tlen );
+		n = sscanf( text+7+18 + tc1l+2+tc2l+3+tlen,"%04d%04d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d",
+			&x,&y, &font, &size, &bg[0],&bg[1],&bg[2],&fg[0],&fg[1],&fg[2],&use_bg,&outline,&ln[0],&ln[1],
+			&ln[2],&bg[3],&fg[3],&ln[3] );
+	}
+
+	srt_locked_ = 1;
+	
+	update_spin_range( "spin_text_start",0, get_total_frames(),s1);
+	update_spin_range( "spin_text_end",0, get_total_frames(),s2);
+
+
+	veejay_msg(0, "x=%d,y=%d, font=%d,size=%d,bg=[%d,%d,%d,%d]",
+		x,y,font,size,bg[0],bg[1],bg[2],bg[3] );
+	veejay_msg(0, "fg=[%d,%d,%d,%d], ln=[%d,%d,%d,%d]",
+		fg[0],fg[1],fg[2],fg[3],ln[0],ln[1],ln[2],ln[3] );
+
+	set_textview_buffer( "textview_text", tmp );
+
+	update_spin_value( "spin_text_start" ,s1);
+	update_spin_value( "spin_text_end", s2 );
+
+	change_box_color_rgb(
+		 glade_xml_get_widget(info->main_window, "boxbg" ),
+		 bg[0],bg[1],bg[2],bg[3], (is_button_toggled( "textcolorbg" ) ? 1 : 0 ) );
+
+	change_box_color_rgb(
+		 glade_xml_get_widget(info->main_window, "boxtext" ),
+		 fg[0],fg[1],fg[2],fg[3], (is_button_toggled( "textcolorfg" ) ? 1: 0) );
+
+
+	change_box_color_rgb(
+		glade_xml_get_widget( info->main_window, "boxln" ),
+		ln[0],ln[1],ln[2],ln[3], (is_button_toggled( "textcolorln" ) ? 1: 0) );
+
+	memcpy( bg_, bg, sizeof(bg_));
+	memcpy( fg_, fg, sizeof(fg_));
+	memcpy( ln_, ln, sizeof(ln_));
+
+	set_toggle_button( "use_bg", use_bg );
+	set_toggle_button( "use_outline", outline);
+	update_spin_value( "spin_text_size", size );
+	update_spin_value( "spin_text_x", x );
+	update_spin_value( "spin_text_y", y );	
+
+	if(is_button_toggled( "textcolorfg") )
+	{
+		update_slider_value( "textcolorred", fg_[0],0 );
+		update_slider_value( "textcolorblue",fg_[2],0 );
+		update_slider_value( "textcolorgreen",fg_[1],0);
+		update_slider_value( "textcoloralpha", fg_[3],0);
+	}
+	else if( is_button_toggled( "textcolorbg") )
+	{
+		update_slider_value( "textcolorred", bg_[0],0 );
+		update_slider_value( "textcolorblue",bg_[2],0 );
+		update_slider_value( "textcolorgreen",bg_[1],0);
+		update_slider_value( "textcoloralpha",bg_[3],0);
+	}
+	else if ( is_button_toggled( "textcolorln" ))
+	{
+		update_slider_value( "textcolorred", ln_[0],0 );
+		update_slider_value( "textcolorblue",ln_[2],0 );
+		update_slider_value( "textcolorgreen",ln_[1],0);
+		update_slider_value( "textcoloralpha", ln_[3],0);
+	}
+	GtkWidget *combo = glade_xml_get_widget( info->main_window, "combobox_fonts" );
+	gtk_combo_box_set_active( GTK_COMBO_BOX( combo ), font );
+
+
+//	glade_xml_get_widget( info->main_window, "combobox_textsrt" );
+//      gtk_combo_box_set_active( GTK_COMBO_BOX( combo ), seq_id-1 );
+
+
+	srt_locked_ = 0;
+
+	if(text) free(text);
+}
 
 void	on_button_text_new_clicked( GtkWidget *w, gpointer data )
 {
@@ -2626,7 +2748,18 @@ void	on_button_text_new_clicked( GtkWidget *w, gpointer data )
 	multi_vims( VIMS_SRT_ADD, "%d %d %d %d %d %s",
 		0,s1,s2,x,y,text );
 
-	gint font = gtk_combo_box_get_active( GTK_COMBO_BOX( w ) );
+	int tmp = 0;
+	gchar *new_srt_id = recv_vims( 5, &tmp );
+	
+	if(tmp>0)
+	{
+		int id = 0;
+		sscanf( new_srt_id, "%d", &id );
+		g_free(new_srt_id);
+		srt_seq_ = id;
+	}
+	
+/*	gint font = gtk_combo_box_get_active( GTK_COMBO_BOX( w ) );
 	gint size = get_nums( "spin_text_size" );
 	gint use_border = is_button_toggled( "use_bg" );
 	gint outline = is_button_toggled( "use_outline");
@@ -2643,8 +2776,10 @@ void	on_button_text_new_clicked( GtkWidget *w, gpointer data )
 	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", bg_[0],bg_[1],bg_[2],bg_[3], 2 );
 	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", ln_[0],ln_[1],ln_[2],ln_[3], 3 );
 	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", use_border, outline,0,0,0 );	
-	
+*/	
 	free(text);
+	veejay_msg(0, "New SRT: %d",srt_seq_);
+	srt_load_subtitle( srt_seq_ );
 	
 	info->uc.reload_hint[HINT_HISTORY] = 1;
 }
@@ -2739,6 +2874,7 @@ void	on_button_text_update_clicked(GtkWidget *w, gpointer data)
 	gint s1 = get_nums( "spin_text_start" );
 	gint s2 = get_nums( "spin_text_end" );
 	gchar *text = get_textview_buffer( "textview_text" );
+	veejay_msg(0, "srt_seq = %d",srt_seq_ );
 	if(text)
 		multi_vims( VIMS_SRT_UPDATE, "%d %d %d %s", srt_seq_, s1,s2,text );
 }
@@ -2799,125 +2935,12 @@ void	on_combobox_textsrt_changed( GtkWidget *w, gpointer data)
 
 	gchar *k = gtk_combo_box_get_active_text( GTK_COMBO_BOX(w) );
 	int sid  = atoi(k);
-	printf("Selected '%d'\n", sid);
-	
-//	srt_seq_  = 1 + gtk_combo_box_get_active( GTK_COMBO_BOX( w ) );
-	gint len = 0;
-
-	multi_vims( VIMS_SRT_SELECT, "%d", sid );
-	multi_vims( VIMS_SRT_INFO, "%d", sid );
-
-	gchar *text = recv_vims( 6,&len );
-	gint seq_id = 0;
-	gint tc1l=0;
-	gint tc2l=0;
-	char tc1[20];
-	char tc2[20];
-	char tmp[1000];
-	gint tlen=0;
-	bzero(tmp,1000);
-	bzero(tc1,20);
-	bzero(tc2,20);
-	gint ln[4];
-	gint fg[4];
-	gint bg[4];
-	gint use_bg = 0;
-	gint outline = 0;
-	gint size = 0;
-	gint font = 0;
-	gint x =0;
-	gint y = 0;
-	
-	clear_textview_buffer( "textview_text" );
-	int s1=0,s2=0;
-	int n = 0;
-	if(text && len > 0 )
+	if( sid > 0)
 	{
-		sscanf( text,"%5d%2d%9d%9d", &seq_id ,&tc1l,&s1,&s2 );
-		strncpy( tc1, text+7+18,tc1l );	
-		sscanf( text+7+18+tc1l,"%2d", &tc2l );
-		strncpy( tc2, text+7+18+tc1l + 2, tc2l );
-		sscanf( text+7+18+tc1l+2+tc2l, "%3d", &tlen );
-		strncpy( tmp, text + 7 + 18 + tc1l + 2 + tc2l + 3, tlen );
-		n = sscanf( text+7+18 + tc1l+2+tc2l+3+tlen,"%04d%04d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d",
-				&x,&y, &font, &size, &bg[0],&bg[1],&bg[2],&fg[0],&fg[1],&fg[2],&use_bg,&outline,&ln[0],&ln[1],
-		     			&ln[2],&bg[3],&fg[3],&ln[3] );
+		multi_vims( VIMS_SRT_SELECT, "%d", sid );
+		srt_seq_ = sid;
+		srt_load_subtitle(sid);
 	}
-
-	veejay_msg(0, "tokens: %d, %s",n,text );
-
-	update_spin_range( "spin_text_start",0, get_total_frames(),s1);
-	update_spin_range( "spin_text_end",0, get_total_frames(),s2);
-	
-	
-	veejay_msg(0, "x=%d,y=%d, font=%d,size=%d,bg=[%d,%d,%d,%d]",
-			x,y,font,size,bg[0],bg[1],bg[2],bg[3] );
-	veejay_msg(0, "fg=[%d,%d,%d,%d], ln=[%d,%d,%d,%d]",
-			fg[0],fg[1],fg[2],fg[3],ln[0],ln[1],ln[2],ln[3] );
-	
-	srt_locked_ = 1;
-	srt_seq_ = seq_id;
-
-	set_textview_buffer( "textview_text", tmp );
-	
-	update_spin_value( "spin_text_start" ,s1);
-	update_spin_value( "spin_text_end", s2 );
-	
-	change_box_color_rgb(
-			 glade_xml_get_widget(info->main_window, "boxbg" ),
-			 bg[0],bg[1],bg[2],bg[3], (is_button_toggled( "textcolorbg" ) ? 1 : 0 ) );
-	
-	change_box_color_rgb(
-			 glade_xml_get_widget(info->main_window, "boxtext" ),
-			 fg[0],fg[1],fg[2],fg[3], (is_button_toggled( "textcolorfg" ) ? 1: 0) );
-
-
-	change_box_color_rgb(
-			glade_xml_get_widget( info->main_window, "boxln" ),
-			ln[0],ln[1],ln[2],ln[3], (is_button_toggled( "textcolorln" ) ? 1: 0) );
-	
-	memcpy( bg_, bg, sizeof(bg_));
-	memcpy( fg_, fg, sizeof(fg_));
-	memcpy( ln_, ln, sizeof(ln_));
-
-	set_toggle_button( "use_bg", use_bg );
-	set_toggle_button( "use_outline", outline);
-	update_spin_value( "spin_text_size", size );
-	update_spin_value( "spin_text_x", x );
-	update_spin_value( "spin_text_y", y );	
-
-	if(is_button_toggled( "textcolorfg") )
-	{
-		update_slider_value( "textcolorred", fg_[0],0 );
-		update_slider_value( "textcolorblue",fg_[2],0 );
-		update_slider_value( "textcolorgreen",fg_[1],0);
-		update_slider_value( "textcoloralpha", fg_[3],0);
-	}
-	else if( is_button_toggled( "textcolorbg") )
-	{
-		update_slider_value( "textcolorred", bg_[0],0 );
-		update_slider_value( "textcolorblue",bg_[2],0 );
-		update_slider_value( "textcolorgreen",bg_[1],0);
-		update_slider_value( "textcoloralpha",bg_[3],0);
-	}
-	else if ( is_button_toggled( "textcolorln" ))
-	{
-		update_slider_value( "textcolorred", ln_[0],0 );
-		update_slider_value( "textcolorblue",ln_[2],0 );
-		update_slider_value( "textcolorgreen",ln_[1],0);
-		update_slider_value( "textcoloralpha", ln_[3],0);
-	}
-	GtkWidget *combo = glade_xml_get_widget( info->main_window, "combobox_fonts" );
-        gtk_combo_box_set_active( GTK_COMBO_BOX( combo ), font );
-
-	
-	glade_xml_get_widget( info->main_window, "combobox_textsrt" );
-        gtk_combo_box_set_active( GTK_COMBO_BOX( combo ), seq_id-1 );
-
-
-	srt_locked_ = 0;
-	
-	if(text) free(text);
 }
 
 

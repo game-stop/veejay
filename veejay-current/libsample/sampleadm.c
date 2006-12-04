@@ -253,7 +253,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 	char tmp_file[20];
 
     sample_info *si;
-    int i, j, n, id = 0;
+    int i, j;
 
     if (!initialized) {
     	return NULL;
@@ -719,7 +719,6 @@ int sample_set_marker_start(int sample_id, int marker)
 int sample_set_marker(int sample_id, int start, int end)
 {
     sample_info *si = sample_get(sample_id);
-    int tmp;
     if(!si) return -1;
     
     if( start < si->first_frame )

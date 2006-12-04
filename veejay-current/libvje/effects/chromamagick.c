@@ -650,7 +650,7 @@ void chromamagic_substract(VJFrame *frame, VJFrame *frame2, int w, int h, int op
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
-	int a ,b, c;
+	int a ,b;
 	const unsigned int o1 = op_a;
 	const unsigned int o2 = 255 - op_a;
 
@@ -659,20 +659,15 @@ void chromamagic_substract(VJFrame *frame, VJFrame *frame2, int w, int h, int op
 		a = Y[i];
 		b = Y2[i];
 
-		c = a - ((b * o1) >> 8);
-		Y[i] = CLAMP_Y(c);
+		Y[i] = a - ((b * o1) >> 8);
 
 		a = Cb[i];
 		b = Cb2[i];
-		c = (((a * o2) + (b * o1))>>8);
-		CLAMP_UV(c);
-		Cb[i] = c;
+		Cb[i] = (((a * o2) + (b * o1))>>8);
 
 		a = Cr[i];
 		b = Cr2[i];
-		c = (((a * o2) + (b * o1)) >> 8); 
-		CLAMP_UV(c);
-		Cr[i] = c;
+		Cr[i] = (((a * o2) + (b * o1)) >> 8); 
 	}
 
 }

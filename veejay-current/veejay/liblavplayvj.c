@@ -265,10 +265,6 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 		(video_playback_setup *) info->settings;
 	    settings->state = new_state;
 }
-void veejay_set_sampling(veejay_t *info, subsample_mode_t m)
-{
-	video_playback_setup *settings = (video_playback_setup*) info->settings;
-}
 
 int veejay_set_framedup(veejay_t *info, int n) {
 	video_playback_setup *settings = (video_playback_setup*) settings;
@@ -348,10 +344,6 @@ int veejay_set_speed(veejay_t * info, int speed)
     if(info->audio == AUDIO_PLAY )
 		vj_jack_continue( settings->current_playback_speed );
 #endif
-
-/*    if( settings->current_playback_speed != 0 &&
-	settings->state != LAVPLAY_STATE_PLAYING)
-	veejay_change_state( info, LAVPLAY_STATE_PLAYING );*/
 
     return 1;
 }

@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-static uint8_t *zoom_buffer[3];
+//static uint8_t *zoom_buffer[3];
 
 vj_effect *zoom_init(int width , int height)
 {

@@ -2149,13 +2149,13 @@ int vj_perform_sample_complete_buffers(veejay_t * info, int entry, const int ski
    	if(chain_fade)
 		vj_perform_pre_chain( info, frames[0] );
 
-	int is_444;
 	for(chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
 	{
 		vj_perform_render_chain_entry(	
 				info, chain_entry, skip_incr,0);
 	}
 	*hint444 = frames[0]->ssm;
+	return 1;
 }
 
 

@@ -625,8 +625,6 @@ static void 	unlock_preview_(const char *f, int line)
 static	void	gtk_image_set_from_pixbuf__( GtkImage *w, GdkPixbuf *p, const char *f, int l )
 {
 #ifdef STRICT_CHECKING
-	veejay_msg(0, "%s called by %s: %d" , __FUNCTION__, f, l );
-
 	assert( GTK_IS_IMAGE(w) );
 #endif
 	gtk_image_set_from_pixbuf(w, p);
@@ -635,8 +633,6 @@ static	void	gtk_image_set_from_pixbuf__( GtkImage *w, GdkPixbuf *p, const char *
 static	void	gtk_widget_set_sensitive___( GtkWidget *w, gboolean state, const char *f, int l )
 {
 #ifdef STRICT_CHECKING
-	veejay_msg(0, "%s called by %s: %d", __FUNCTION__, f, l );
-
 	assert( GTK_IS_WIDGET(w) );
 #endif
 	gtk_widget_set_sensitive(w, state );
@@ -5416,6 +5412,11 @@ static	void	reload_srt()
 	gint i = 0;
 	gchar *p = srts;
 	gchar *token = NULL;
+
+	if( len == 0 )
+		disable_widget( "SRTframe");	
+	else
+		enable_widget( "SRTframe");
 	veejay_msg(0, "%s", srts );
 	while(  i < len )
 	{
@@ -6697,21 +6698,31 @@ void	vj_gui_preview(void)
 
 int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 {
-	if(info->client)
-			vj_client_free(info->client);
+//	if(info->client)
+//			vj_client_free(info->client);
 		
-	info->client = vj_client_alloc(0,0,0);
+//	info->client = vj_client_alloc(0,0,0);
+
+	if(info->client )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Must disconnect first");
+		return 0;
+	}
+	
+	if(!info->client)
+		info->client = vj_client_alloc(0,0,0);
+	
 	if(!vj_client_connect( info->client, hostname, group_name, port_num ) )
 	{
 		if(info->client)
 			vj_client_free(info->client);
 		info->client = NULL;
-		printf("UNVERIFIED ERROR: Unable to connect %s:%d\n",hostname,port_num);
-		exit(0);
 		return 0;
 	}
+	
 	vj_msg(VEEJAY_MSG_INFO, "New connection with Veejay running on %s port %d",
 		(group_name == NULL ? hostname : group_name), port_num );
+	
 	int k = 0;
 	for( k = 0; k < 3; k ++ )
 		memset( info->history_tokens[k] , 0, (sizeof(int) * STATUS_TOKENS) );
@@ -6726,9 +6737,9 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 			(gpointer*) info,
 			NULL 
 		);
+
 	load_editlist_info();
-	if(info->rawdata)
-		free(info->rawdata);
+
 	info->rawdata = (guchar*) vj_malloc(sizeof(guchar) * info->el.width * info->el.height * 3);
 	memset(info->rawdata,0,sizeof(guchar) * info->el.width * info->el.height * 3 ); 
 	memset( &vims_keys_list, 0, sizeof(vims_keys_t));
@@ -6860,6 +6871,9 @@ void	vj_gui_disconnect()
 	{
 		vj_client_close(info->client);
 		vj_client_free(info->client);
+		if(info->rawdata)
+			free(info->rawdata);
+		info->rawdata = NULL;
 		info->client = NULL;
 	}
 	/* reset all trees */

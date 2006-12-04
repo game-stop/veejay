@@ -739,7 +739,7 @@ uint8_t bl_pix_colordodge_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_mulsub_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
+    uint8_t a, b;
     a = y1;
     b = (0xff - y2);
     if( a < 16 )
@@ -751,15 +751,9 @@ uint8_t bl_pix_mulsub_Y(uint8_t y1, uint8_t y2)
 
 uint8_t bl_pix_lighten_Y(uint8_t y1, uint8_t y2)
 {
-    uint8_t a, b, new_Y;
-    a = y1;
-    b = y2;
-    if (a > b) {
-	new_Y = a;
-    } else {
-	new_Y = b;
-    }
-    return new_Y;
+    if (y1 > y2) 
+	return y1;
+    return y2;
 }
 
 uint8_t bl_pix_difference_Y(uint8_t y1, uint8_t y2)

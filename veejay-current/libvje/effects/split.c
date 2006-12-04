@@ -349,7 +349,6 @@ void split_corner_framedata_ul(VJFrame *frame, VJFrame *frame2,
     unsigned int h_len = height / 2;
     unsigned int x, y;
     unsigned int y1;
-    const int uv_height = frame->uv_height;
     const int uv_width = frame->uv_width;
     const int uv_wlen = frame->uv_width / 2;
     const int uv_hlen = frame->uv_height / 2;
@@ -383,9 +382,7 @@ void split_corner_framedata_ur(VJFrame *frame, VJFrame *frame2,
     unsigned int h_len = height / 2;
     unsigned int x, y;
     unsigned int y1;
-    const int uv_height = frame->uv_height;
     const int uv_width = frame->uv_width;
-    const int uv_len = uv_height * uv_width;
     const int uv_wlen = frame->uv_width / 2;
     const int uv_hlen = frame->uv_height / 2;
   	uint8_t *Y = frame->data[0];

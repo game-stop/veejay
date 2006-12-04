@@ -73,7 +73,7 @@ int accept_tpixel(uint8_t fg_cb, uint8_t fg_cr, int cb, int cr,
     short xx, yy;
     /* convert foreground to xz coordinates where x direction is
        defined by key color */
-    uint8_t val;
+    int val;
 
     xx = ((fg_cb * cb) + (fg_cr * cr)) >> 7;
 
@@ -124,7 +124,7 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
     //float noise_level = 350.0;
     unsigned int pos;
     int matrix[5];
-    uint8_t val, tmp1;
+    int val, tmp1;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
@@ -258,13 +258,13 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
 		    kbg = 255;
 		}
 
-		val = Y[pos] + (kbg * bg_y[pos]) >> 8;
+		val = (Y[pos] + (kbg * bg_y[pos])) >> 8;
 		Y[pos] = CLAMP_Y(val);
 
-		val = Cb[pos] + (kbg * bg_cb[pos]) >> 8;
+		val = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
 		Cb[pos] = CLAMP_UV(val);
 
-		val = Cr[pos] + (kbg * bg_cr[pos]) >> 8;
+		val = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
 		Cr[pos] = CLAMP_UV(val);
 	    }
 	}

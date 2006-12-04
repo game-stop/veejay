@@ -73,7 +73,6 @@ void complexsaturation_apply(VJFrame *frame, int width,
 		   int height, int i_angle, int r, int g,
 		   int b, int adjust_v, int adjust_degrees, int i_noise)
 {
-	double dsaturation,dcolor;
 //	double degrees = adjust_degrees * 0.01;
 //	double dsat = adjust_v * 0.01;
 
@@ -95,9 +94,6 @@ void complexsaturation_apply(VJFrame *frame, int width,
     uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame->data[0];
- 	uint8_t *Cb2= frame->data[1];
-	uint8_t *Cr2= frame->data[2];
 	int	iy=pixel_Y_lo_,iu=128,iv=128;
 	_rgb2yuv( r,g,b, iy,iu,iv );
 	_y = (float) iy;

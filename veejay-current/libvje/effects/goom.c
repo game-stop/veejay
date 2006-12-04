@@ -31,14 +31,17 @@ static  int last_= 0;
 vj_effect *goomfx_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
+    ve->num_params = 2;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 2500;
-    ve->defaults[0] = 25;
+    ve->limits[1][0] = 10;
+    ve->limits[0][1] = 100;
+    ve->limits[1][1] = 5000;
+    ve->defaults[0] = 2;
+    ve->defaults[1] = 2500;
     ve->description = "Goom";
     ve->sub_format = 0;
     ve->extra_frame = 0;
@@ -64,20 +67,13 @@ void goomfx_free()
 	goom_ = NULL;
 }
 
-void goomfx_apply( VJFrame *frame, int width, int height, int val)
+void goomfx_apply( VJFrame *frame, int width, int height, int val, int val2)
 {
     unsigned int i;
-    int len = (width * height);
-    int uv_len = frame->uv_len;
-
     uint8_t *Y = frame->data[0];
-    uint8_t *Cb = frame->data[1];
-    uint8_t *Cr = frame->data[2];
-
-    float fps = (float) val;
-
     int chunks = frame->len / 1024;
     int16_t data[2][1024];
+    float fps = (float)val2 * 0.01f;
     int j;
 
 	if( last_ >= chunks )
@@ -92,8 +88,8 @@ void goomfx_apply( VJFrame *frame, int width, int height, int val)
 	    
     	goom_update( goom_, 
 		    data,
-		    0,
-		    -1,
+		    val,
+		    fps,
 		    NULL,
 		    NULL );
     

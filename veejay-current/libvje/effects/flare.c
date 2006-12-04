@@ -219,15 +219,9 @@ void	flare_simple( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a )
 {
 	unsigned int i;
  	unsigned int len = w* h;
-	int uv_len = frame->uv_len;
 	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
 	uint8_t *Y2 = frame2->data[0];
- 	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
 
-	int a, b, c, d;
 	const uint8_t solid = 255 - op_a;
 	uint8_t premul;
 	for (i = 0; i < len; i++)

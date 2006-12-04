@@ -1513,7 +1513,7 @@ void 	*mt_preview( gpointer user_data )
 		if(mt->quit)
 		{
 			G_UNLOCK( mt_lock );
-			g_thread_exit(NULL);
+			break;	
 		}
 
 		if(!lt->preview )
@@ -1614,8 +1614,9 @@ void 	*mt_preview( gpointer user_data )
 		g_usleep(sleepy);
 		//@ clear our buffer
 	}
+	
 	gdk_pixbuf_unref( nopreview );
-
+	g_thread_exit(NULL);
 }
 
 

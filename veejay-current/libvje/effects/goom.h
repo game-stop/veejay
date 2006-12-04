@@ -25,7 +25,7 @@
 #include <stdint.h>
 
 vj_effect *goomfx_init(int w, int h);
-void goomfx_apply( VJFrame *frame, int width, int height, int val);
+void goomfx_apply( VJFrame *frame, int width, int height, int val, int val2);
 int goomfx_malloc(int w, int h);
 void goomfx_free();
 #endif

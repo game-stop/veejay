@@ -220,9 +220,8 @@ void blob_apply(VJFrame *frame,
 	uint8_t *srcY = frame->data[0];
 	uint8_t *srcCb= frame->data[1];
 	uint8_t *srcCr= frame->data[2];
-	int i,j,k;
+	int i,k;
 	int s;
-	int op_a, op_b;
 	double max = speed / 10.0;
 	blob_func f = blob_render();
 

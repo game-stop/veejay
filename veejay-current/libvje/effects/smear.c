@@ -101,9 +101,9 @@ static void _smear_apply_y_avg(VJFrame *frame, int width, int height, int val)
 		{
 			if(j >= height) j = height-1;
 			i = j * width + x;
-			Y[y*width+x] = Y[i]+Y[y*width+x]>>1; 
-			Cb[y*width+x] = ((Cb[i]-128)+(Cb[y*width+x]-128)>>1)+128;
-			Cr[y*width+x] = ((Cr[i]-128)+(Cr[y*width+x]-128)>>1)+128;
+			Y[y*width+x] = (Y[i]+Y[y*width+x])>>1; 
+			Cb[y*width+x] = (((Cb[i]-128)+(Cb[y*width+x]-128))>>1)+128;
+			Cr[y*width+x] = (((Cr[i]-128)+(Cr[y*width+x]-128))>>1)+128;
 		}
 	}
      }

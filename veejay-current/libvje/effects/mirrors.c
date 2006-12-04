@@ -86,7 +86,6 @@ void _mirrors_v( uint8_t *yuv[3], int width, int height, int factor, int swap)
 }
 void _mirrors_h( uint8_t *yuv[3], int width, int height, int factor, int swap)
 {
-	unsigned int len = width * height;
 	unsigned int line_height = height / ( factor + 1);
 
 	unsigned int nr = height / line_height;

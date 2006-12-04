@@ -72,7 +72,7 @@ void enhancemask_apply(VJFrame *frame, int width, int height, int *s ) {
    /* The sharpen comes from yuvdenoiser, we like grainy video so 512 is allowed.  */ 
       
 
-   register int d,e,m;
+   register int d,m;
 //   unsigned int op0,op1;
   // op0 = (s[1] > 255) ? 255 : s[1];
   // op1 = 255 - op1;

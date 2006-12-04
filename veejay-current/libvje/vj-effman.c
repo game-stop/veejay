@@ -317,7 +317,7 @@ void vj_effman_apply_image_effect(
 	bathroom_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
 	break;
 	case VJ_IMAGE_EFFECT_GOOM:
-	goomfx_apply( frames[0], frameinfo->width,frameinfo->height,arg[0]);
+	goomfx_apply( frames[0], frameinfo->width,frameinfo->height,arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_ZOOM:
 	zoom_apply(frames[0], frameinfo->width, frameinfo->height,arg[0],arg[1],arg[2]);

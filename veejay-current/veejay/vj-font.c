@@ -704,7 +704,7 @@ char    *vj_font_get_sequence( void *font, int seq )
 	return strdup(tmp);
 }
 
-void    vj_font_new_text( void *font, char *text, long lo,long hi, int seq)
+int	vj_font_new_text( void *font, char *text, long lo,long hi, int seq)
 {
 	vj_font_t *ff = (vj_font_t*) font;
 	
@@ -725,6 +725,7 @@ void    vj_font_new_text( void *font, char *text, long lo,long hi, int seq)
 
 	font_unlock(ff);
 
+	return seq;
 }
 void    vj_font_del_text( void *font, int seq )
 {
@@ -1207,7 +1208,15 @@ static int	configure(vj_font_t *f, int size, int font)
 	}
 
 	if( f->face )
+	{
+		for( c = 0; c < 256 ; c ++)
+		{
+			if( f->glyphs[c] )
+				FT_Done_Glyph( f->glyphs[c] );
+		}
 		FT_Done_Face( f->face );
+	}
+
 	if ( (error = FT_New_Face( f->library, f->font, 0, &(f->face) )) != 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Cannot load face: %s (error #%d)\n ", f->font, error);
@@ -1310,14 +1319,16 @@ static	int	get_default_font( vj_font_t *f )
 	} default_fonts[] = {
 		"Bitstream Vera Sans (Roman)",
 		"Bitstream Vera Serif (Roman)",
+		"New (Regular)",
+		"New",
 		NULL,	
 	};
 	int i,j;
-	for( i = 0; i < f->index; i ++ )
+	for( i = 0; i < f->font_index; i ++ )
 	{
 		for( j = 0; default_fonts[i].name != NULL ; j ++ )
 		{	
-			if( strcasecmp( default_fonts[i].name, f->font_list ) == 0 )
+			if( strcasecmp( default_fonts[i].name, f->font_list[i] ) == 0 )
 				return i;
 		}
 	}
@@ -1386,7 +1397,6 @@ void	*vj_font_init( int w, int h, float fps )
 		return NULL;
 	}
 
-	f->current_font = -1;
 	int df = get_default_font( f );
 	
 	veejay_msg(0, "Loaded %d fonts, size = %d", f->font_index,f->current_size );
@@ -1789,7 +1799,7 @@ int	vj_font_norender(void *ctx, long position)
 	vj_font_t *f = (vj_font_t *) ctx;
 
 	if( position < 0 || position >= f->index_len )
-		return;
+		return 0;
 
 	if(!f->dictionary || !f->index )
 		return 0;

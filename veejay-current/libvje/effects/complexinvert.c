@@ -81,9 +81,6 @@ void complexinvert_apply(VJFrame *frame, int width,
     uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame->data[0];
- 	uint8_t *Cb2= frame->data[1];
-	uint8_t *Cr2= frame->data[2];
 	int	iy=pixel_Y_lo_,iu=128,iv=128;
 	_rgb2yuv( r,g,b, iy,iu,iv );
 	_y = (float) iy;

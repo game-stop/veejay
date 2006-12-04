@@ -55,8 +55,6 @@ void colormap_apply( VJFrame *frame, int width, int height, int r, int g, int b)
 {
     unsigned int i;
     int len = (width * height);
-    int uv_len = frame->uv_len;
-
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];

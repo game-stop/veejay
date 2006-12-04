@@ -62,7 +62,7 @@ void color_apply(VJFrame *frame, int width, int height,
 	const unsigned int cr_b = opacity_b * 58;
 	const unsigned int cr_c = opacity_c * 114;
 
-	uint8_t p1,p2,q1,q2;
+	int p1,p2,q1,q2;
 
 	const int uv_len = frame->uv_len;
 	uint8_t *Cb = frame->data[1];

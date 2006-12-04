@@ -111,8 +111,6 @@ void noisepencil_2_apply(uint8_t *src[3], int width, int height, int coeef , int
 
     int r, c;
     double k = (coeef/1000.0);
-    uint8_t d;
-    uint8_t b;
     int len = (width*height)-width;
     uint8_t tmp;
 
