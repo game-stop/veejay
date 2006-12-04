@@ -2631,13 +2631,9 @@ static	void	srt_load_subtitle(int sid)
 	gint x =0;
 	gint y = 0;
 
-	//multi_vims( VIMS_SRT_SELECT, "%d", sid );
-	veejay_msg(0, "Loading subtitle '%d'", sid );
 	multi_vims( VIMS_SRT_INFO, "%d", sid );
 	gchar *text = recv_vims( 6,&len );
 
-	veejay_msg(0, "raw text: '%s'", text);
-	
 	bzero(tmp,1000);
 	bzero(tc1,20);
 	bzero(tc2,20);
@@ -2778,7 +2774,6 @@ void	on_button_text_new_clicked( GtkWidget *w, gpointer data )
 	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", use_border, outline,0,0,0 );	
 */	
 	free(text);
-	veejay_msg(0, "New SRT: %d",srt_seq_);
 	srt_load_subtitle( srt_seq_ );
 	
 	info->uc.reload_hint[HINT_HISTORY] = 1;

@@ -1202,10 +1202,7 @@ static int	configure(vj_font_t *f, int size, int font)
 	f->current_font = font;
 	f->font = select_font( f , font );
 	if(f->font == NULL )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "No font configured");
 		return 0;
-	}
 
 	if( f->face )
 	{
@@ -1326,10 +1323,13 @@ static	int	get_default_font( vj_font_t *f )
 	int i,j;
 	for( i = 0; i < f->font_index; i ++ )
 	{
-		for( j = 0; default_fonts[i].name != NULL ; j ++ )
+		for( j = 0; default_fonts[j].name != NULL ; j ++ )
 		{	
-			if( strcasecmp( default_fonts[i].name, f->font_list[i] ) == 0 )
-				return i;
+			if( f->font_list[i])
+			{
+				if( strcasecmp( default_fonts[j].name, f->font_list[i] ) == 0 )
+					return i;
+			}
 		}
 	}
 	return 0;
