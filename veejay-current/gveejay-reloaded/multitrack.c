@@ -138,14 +138,12 @@ static	void	update_pos( mt_priv_t *p, gint total, gint current );
 
 static	void	gtk_image_set_from_pixbuf__( GtkImage *w, GdkPixbuf *p, const char *f, int l )
 {
-	veejay_msg(0, "%s called by %s: %d" , __FUNCTION__, f, l );
 	gtk_image_set_from_pixbuf(w, p);
 }
 
 
 static	void	gtk_widget_set_sensitive__( GtkWidget *w, gboolean state, const char *f, int l )
 {
-	veejay_msg(0, "%s called by %s: %d", __FUNCTION__, f, l );
 #ifdef STRICT_CHECKING
 	assert( GTK_IS_WIDGET(w) );
 #endif
@@ -270,8 +268,6 @@ int *	sequence_get_track_status(void *priv)
 					int  port_num = 0;
 					char *str = p->tracks[j];
 					int  tag_id = 0;
-					veejay_msg(0, "%s\t'%s' : '%s' :%d",
-							__FUNCTION__,str,q->hostname,q->port_num );
 					if(sscanf(str, "%s %d %d", hostname, &port_num, &tag_id ))
 					{
 						if(strncasecmp( hostname, q->hostname,strlen(hostname)) == 0 && port_num ==
@@ -778,12 +774,8 @@ void		*multitrack_new(
 
 	GtkRequisition req;
 	gtk_widget_size_request( mt->main_window, &req );
-	veejay_msg(0, "%dx%d", req.width,req.height);
-	
-	if(get_skin() == 0 )
-		gtk_widget_set_size_request(mt->scroll,max_w + 30, req.height);
-	else
-		gtk_widget_set_size_request(mt->scroll, max_w * MAX_TRACKS / 2 , max_h/2 );
+	gtk_widget_set_size_request(mt->scroll,preview_width_ + 30, req.height);
+
 	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),2);
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(mt->scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_ALWAYS );
 	GtkWidget *table = gtk_table_new( 1, MAX_TRACKS, FALSE );
@@ -945,8 +937,6 @@ int		multitrack_add_track( void *data )
 			G_UNLOCK( mt_lock );
 			return 0;
 		}
-		veejay_msg(0, "Configure sequence %d x %d, init with %d x %d ",preview_width_,preview_height_,
-				mpreview_width_, mpreview_height_);	
 		veejay_configure_sequence( seq, preview_width_, preview_height_ );
 		pt->pt[track]->sequence = seq;
 		pt->pt[track]->active = 1;	
@@ -1195,7 +1185,7 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int wid
 	if( last_track->active )
 	{
 		// make sure to reset width/height back to small
-		veejay_configure_sequence( last_track->sequence, preview_width_, preview_height_ );
+		veejay_configure_sequence( last_track->sequence, mpreview_width_, mpreview_height_ );
 	}
 		
 	int id = find_track( mt, hostname, port_num );
@@ -1211,9 +1201,8 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int wid
 #ifdef STRICT_CHECKING
 		assert( last_track->sequence != NULL );
 #endif
-		veejay_configure_sequence( last_track->sequence, sta_w, sta_h );
-
-		gtk_widget_set_size_request( GTK_WIDGET( last_track->view->area ), sta_w,sta_h );
+		veejay_configure_sequence( last_track->sequence, preview_width_, preview_height_ );
+		gtk_widget_set_size_request( GTK_WIDGET( last_track->view->area ), 360,290 );
 	}
 	else
 	{

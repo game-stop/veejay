@@ -363,7 +363,7 @@ static	int	veejay_process_data( veejay_sequence_t *v )
 void	*veejay_sequence_thread(gpointer data)
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
-	if(!v) return;
+	if(!v) return NULL;
 	unsigned long time_now = 0;
 	unsigned long tn = vj_get_timer() + v->preview_delay;
 	for ( ;; )

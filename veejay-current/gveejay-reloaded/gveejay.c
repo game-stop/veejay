@@ -150,7 +150,6 @@ int main(int argc, char *argv[]) {
 	
 	vj_gui_theme_setup(gveejay_theme);
 	vj_gui_set_debug_level( verbosity , n_tracks,pw,ph);
-	veejay_msg(1, "Preview size is %d x %d",pw,ph );
 	vj_gui_set_timeout(timer);
 	set_skin( 0 );
 

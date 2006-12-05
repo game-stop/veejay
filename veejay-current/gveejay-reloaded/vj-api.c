@@ -607,14 +607,10 @@ static void 	unlock_preview__()
 
 static	void	lock_preview_(const char *f, int line)
 {
-//	veejay_msg(0, "%s called by %s: %d (%dx%d)",__FUNCTION__,f,line,
-//			default_preview_width_,default_preview_height_);
 	lock_preview__();
 }
 static void 	unlock_preview_(const char *f, int line)
 {
-//	veejay_msg(0, "%s called by %s: %d (%dx%d)", __FUNCTION__, f, line,
-//		 	default_preview_width_, default_preview_height_ );
 	unlock_preview__();
 }
 
@@ -843,8 +839,6 @@ GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
 		return NULL;
 	}
 #ifdef STRICT_CHECKING
-	if(widget == NULL )
-		printf("Fatal: %s\n",name);
 	assert( widget != NULL );
 #endif
 	return widget;		
@@ -939,9 +933,7 @@ static void scan_devices( const char *name)
 	reset_tree(name);
     gint len = 0;
 	single_vims( VIMS_DEVICE_LIST );
-	veejay_msg(0, "waiting for devicelist");
 	gchar *text = recv_vims(6,&len);
-	veejay_msg(0, "received [%s], %d", text,len);
 	if(len <= 0|| !text )
 			return;
 	GtkTreeModel *model = gtk_tree_view_get_model
@@ -959,7 +951,6 @@ static void scan_devices( const char *name)
 		
 		gint name_len=0;
 		gint loc_len=0;
-		veejay_msg(0, "test[%s]", text);
 		if(!sscanf( text, "%03d", &name_len ))
 		{
 				free(text);
@@ -968,7 +959,6 @@ static void scan_devices( const char *name)
 		name = strndup( text + offset + 3, name_len );
 		offset += name_len;
 		offset += 3;
-		veejay_msg(0, "test[%s]", text + offset);
 		if(!sscanf( text + offset, "%03d", &loc_len ))
 		{
 				free(text);
@@ -1576,8 +1566,6 @@ gboolean	dialogkey_snooper( GtkWidget *w, GdkEventKey *event, gpointer user_data
 		gchar *text = gdkkey_by_id( event->keyval );
 		gchar *mod  = gdkmod_by_id( event->state );
 
-veejay_msg(0, "%d : %d, %p, %p", event->keyval, event->state ,text,mod);
-		
 		if( mod != NULL && text != NULL)
 		{
 			if(strlen(mod) < 2 )
@@ -3312,7 +3300,6 @@ static void	process_reload_hints(void)
 
 	if( info->uc.reload_hint[HINT_SLIST] == 1 )
 	{
-		veejay_msg(0, "reload sample list");
 		//load_samplelist_info(TRUE);
 		load_samplelist_info(FALSE);
 		info->uc.expected_slots = info->status_tokens[TOTAL_SLOTS];
@@ -4331,7 +4318,6 @@ static	void	select_slot__( int pm )
 
 static	void	select_slot_(int pm, const char *f, int line)
 {
-//	veejay_msg(0, "%s called by %s %d", __FUNCTION__,f,line);
 	select_slot__(pm);
 }
 
@@ -5297,7 +5283,6 @@ static	void	reload_srt()
 		disable_widget( "SRTframe");	
 	else
 		enable_widget( "SRTframe");
-	veejay_msg(0, "%s", srts );
 	while(  i < len )
 	{
 		token = tokenize_on_space( p );
@@ -6137,7 +6122,6 @@ void	vj_gui_set_debug_level(int level, int preview_p, int pw, int ph )
 	num_tracks_ = preview_p;
 	default_preview_width_ = pw;
 	default_preview_height_ = ph;
-	veejay_msg(VEEJAY_MSG_INFO, "Preview size %d x %d",pw ,ph);
 }
 int	vj_gui_get_preview_priority(void)
 {
@@ -6371,7 +6355,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	g_signal_connect( GTK_OBJECT(mainw), "delete-event",
 			G_CALLBACK( gveejay_quit ),
 			NULL );
-;
+
     	GtkWidget *box = glade_xml_get_widget_( info->main_window, "sample_bank_hbox" );
 	info->sample_bank_pad = gtk_notebook_new();
 	gtk_notebook_set_tab_pos( GTK_NOTEBOOK(info->sample_bank_pad), GTK_POS_BOTTOM );
@@ -6443,8 +6427,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 				      ph,
 			      	      pw,
 				      ph );	     
-       veejay_msg(0, "multitrack_configure_preview: %d x %d",pw,ph);	
-
+	
 	gui->mt = multitrack_new(
 			(void(*)(int,char*,int)) vj_gui_cb,
 			(void(*)(GdkPixbuf *)) vj_img_cb, 
@@ -6455,9 +6438,6 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 			ph,
 			img_wid);
 
-	veejay_msg(VEEJAY_MSG_INFO, "Configure preview size %d x %d, maximum %d x %d",
-			pw,ph,pw,ph );
-	
 	memset( &info->watch, 0, sizeof(watchdog_t));
 	info->watch.state = STATE_STOPPED; //
 	memset(&(info->watch.p_time),0,sizeof(struct timeval));
