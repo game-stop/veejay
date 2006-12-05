@@ -103,6 +103,7 @@ typedef struct
 	GLuint  prog;
 	int	raw_line_len;
 	uint8_t *ref_data;
+	void	*userdata;
 } display_ctx;
 static Atom XA_NET_WM_PID;
 static Atom XA_NET_WM_STATE;
@@ -726,6 +727,12 @@ void x_fullscreen(display_ctx *ctx, int action)
         }
 }
 
+int		x_display_get_fs( void *dctx )
+{
+	display_ctx *ctx = (display_ctx*) dctx;
+	return ctx->fs_state;
+}
+
 int		x_display_set_fullscreen( void *dctx, int status )
 {
 	display_ctx *ctx = (display_ctx*) dctx;
@@ -763,26 +770,12 @@ static	int	x_display_event_update( display_ctx *ctx , int *dw, int *dh )
 				break;
 			case KeyPress:
 				{
+					uint16_t mod;
+					mod = Event.xkey.state;
 					KeySym key_sym = XKeycodeToKeysym( ctx->display,
 							Event.xkey.keycode,0);
-					switch(key_sym)
-					{
-						case XK_F:
-						case XK_f:
-				 		  if( ctx->fs_state )
-				   		  {
-						    x_fullscreen(ctx,_NET_WM_STATE_REMOVE );
-						    ctx->fs_state = 0;
-	 			   		   }
-				  		   else
-				   	   	   {	
-					  	    x_fullscreen(ctx,_NET_WM_STATE_ADD);
-					   	     ctx->fs_state = 1;
-						   }
-						   break;
-				    		case XK_Escape:
-						   break;
-   				   	}
+
+					vj_event_single_gl_fire( ctx->userdata, mod, key_sym );
 				}
 				break;
 			default:
@@ -798,8 +791,6 @@ static	int	x_display_init_gl( display_ctx *ctx, int w, int h )
 	
 	ctx->texture[0] = x_pwr_two ( w );
 	ctx->texture[1] = x_pwr_two ( h );
-
-	
 	
 	if(initTextures(ctx,w,h)<0)
 		return 0;
@@ -845,7 +836,7 @@ static	int	x_display_init_gl( display_ctx *ctx, int w, int h )
 }
 
 
-void	*x_display_init(void)
+void	*x_display_init(void *ptr)
 {
 	display_ctx *ctx = (display_ctx*) vj_malloc(sizeof(display_ctx));
 	memset(ctx, 0,sizeof(display_ctx));
@@ -854,6 +845,7 @@ void	*x_display_init(void)
 
 	ctx->name = XDisplayName(":0.0");
 	ctx->display = XOpenDisplay( ctx->name );
+	ctx->userdata = ptr;
 	if(!ctx->display)
 	{
 		veejay_msg(0, "Error opening the X11 display %s", ctx->name );
@@ -974,6 +966,7 @@ void	x_display_open(void *dctx, int w, int h)
 
 	XSelectInput( ctx->display, ctx->win, event_mask );
 
+
 	XSetStandardProperties( ctx->display, ctx->win,
 		"veejay", "veejay", None, NULL,0, &hint );
 
@@ -1064,6 +1057,16 @@ int	x_display_hw_accel( void *dctx )
 	return 0;
 }
 
+void	x_display_event( void *dctx, int w, int h )
+{
+	int dw = w;
+	int dh = h;
+	display_ctx *ctx = (display_ctx*) dctx;
+	
+	if(x_display_event_update( ctx,&dw,&dh ))
+		resize( dw,dh, w,h);
+}
+
 int	x_display_push(void *dctx, uint8_t **data, int width, int height, int out )
 {
 	display_ctx *ctx = (display_ctx*) dctx;
@@ -1101,10 +1104,6 @@ int	x_display_push(void *dctx, uint8_t **data, int width, int height, int out )
 
 	flip_page(ctx);
 
-	int dw = width;
-	int dh = height;
-	if(x_display_event_update( ctx,&dw,&dh ))
-		resize( dw,dh, width,height);
 	return 1;
 }
 #endif

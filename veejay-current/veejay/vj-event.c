@@ -206,6 +206,7 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_t,		VIMS_MOD_NONE,	"5 -1"	},
 	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_u,		VIMS_MOD_NONE,	"6 -1"	},
 	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_o,		VIMS_MOD_NONE,	"7 -1"	},
+	{ VIMS_OSD,				SDLK_o,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_SELECT_BANK,			SDLK_1,		VIMS_MOD_NONE,	"1"	},
 	{ VIMS_SELECT_BANK,			SDLK_2,		VIMS_MOD_NONE,	"2"	},
 	{ VIMS_SELECT_BANK,			SDLK_3,		VIMS_MOD_NONE,	"3"	},
@@ -1321,8 +1322,112 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 		vj_event_parse_msg( (veejay_t*) ptr, msg );
 	}
 }
-#endif
 
+#endif
+#ifdef USE_GL
+void vj_event_single_gl_fire(void *ptr , int mod, int key)
+{
+	int vims_mod = 0;
+	//@pffffff
+	switch( key )
+	{
+		case 0xff0d: key = SDLK_RETURN; break;
+		case 0xff1b: key = SDLK_ESCAPE; break;
+		case 0xffbe: key = SDLK_F1; break;
+		case 0xffbf: key = SDLK_F2; break;
+		case 0xffc0: key = SDLK_F3; break;
+		case 0xffc1: key = SDLK_F4; break;
+		case 0xffc2: key = SDLK_F5; break;
+		case 0xffc3: key = SDLK_F6; break;
+		case 0xffc4: key = SDLK_F7; break;
+		case 0xffc5: key = SDLK_F8; break;
+		case 0xffc6: key = SDLK_F9; break;
+		case 0xffc7: key = SDLK_F10; break;
+	  	case 0xffc8: key = SDLK_F11; break;
+		case 0xffc9: key = SDLK_F12; break;
+   		case 0xff63: key = SDLK_INSERT; break;
+		case 0xff50: key = SDLK_HOME; break;
+		case 0xff55: key = SDLK_PAGEUP; break;
+		case 0xff56: key = SDLK_PAGEDOWN; break;
+		case 0xff57: key = SDLK_END; break; 	     
+		case 0xffff: key = SDLK_DELETE;break;
+		case 0xff08: key = SDLK_BACKSPACE;break;
+		case 0xff52: key = SDLK_UP; break;
+		case 0xff53: key = SDLK_RIGHT; break;
+		case 0xff54: key = SDLK_DOWN; break;
+		case 0xff51: key = SDLK_LEFT; break;
+		case 0xffaa: key = SDLK_KP_MULTIPLY; break;
+		case 0xffb0: key = SDLK_KP0; break;
+		case 0xffb1: case 0xff9c: key = SDLK_KP1; break;
+		case 0xffb2: case 0xff99: key = SDLK_KP2; break;
+		case 0xffb3: case 0xff9b: key = SDLK_KP3; break;
+		case 0xffb4: case 0xff96: key = SDLK_KP4; break;
+		case 0xffb5: case 0xff9d: key = SDLK_KP5; break;
+		case 0xffb6: case 0xff98: key = SDLK_KP6; break;
+		case 0xffb7: case 0xff95: key = SDLK_KP7; break;
+		case 0xffb8: case 0xff97: key = SDLK_KP8; break;
+		case 0xffb9: case 0xff8a: key = SDLK_KP9; break;
+		case 0xffab: key = SDLK_KP_PLUS; break;
+		case 0xffad: key = SDLK_KP_MINUS; break;
+		case 0xff8d: key = SDLK_KP_ENTER; break;
+		case 0xffaf: key = SDLK_KP_DIVIDE; break;
+		case 0xff9e: key = SDLK_KP_PERIOD; break;
+		default:
+			if( key > (256+128))
+				veejay_msg(0, "\tUnknown key pressed %x, mod = %d", key, mod );
+			break;
+		     
+	}
+
+	switch( mod )
+	{
+		case 1:
+			vims_mod = VIMS_MOD_SHIFT; break;
+		case 4:
+			vims_mod = VIMS_MOD_CTRL; break;
+		case 8:
+			vims_mod = VIMS_MOD_ALT; break;
+	}
+	
+
+	int vims_key = key;
+	int index = vims_mod * SDLK_LAST + vims_key;
+
+	vj_keyboard_event *ev = get_keyboard_event( index );
+	if(!ev )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Keyboard event %d unknown", index );
+		return;
+	}
+
+	// event_id is here VIMS list entry!
+	int event_id = ev->vims->list_id;
+
+	if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
+	{
+		vj_msg_bundle *bun = vj_event_bundle_get(event_id );
+		if(!bun)
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "Requested BUNDLE %d does not exist", event_id);
+			return;
+		}
+		vj_event_parse_bundle( (veejay_t*) ptr, bun->bundle );
+	}
+	else
+	{
+		char msg[100];
+		if( ev->arg_len > 0 )
+		{
+			sprintf(msg,"%03d:%s;", event_id, ev->arguments );
+		}
+		else
+			sprintf(msg,"%03d:;", event_id );
+		vj_event_parse_msg( (veejay_t*) ptr, msg );
+	}
+}
+
+
+#endif
 void vj_event_none(void *ptr, const char format[], va_list ap)
 {
 	veejay_msg(VEEJAY_MSG_DEBUG, "No event attached on this key");
@@ -2613,11 +2718,10 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 	vj_event_send_new_id( v, new_id);
 
 }
-#ifdef HAVE_SDL
+
 void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	const char *caption = "Veejay";
 	int args[2];
 	char *s = NULL;
 	P_A(args,s,format,ap);
@@ -2627,34 +2731,55 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 	int id = 0;
 	int status = args[0];
 
-	if( v->video_out > 1 )
+	switch(v->video_out)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "No SDL Video window");
-		return;
+		case 4:
+#ifdef USE_GL
+		{
+			int go_fs = x_display_get_fs( v->gl ) == 1 ? 0:1;
+			x_display_set_fullscreen( v->gl, go_fs );
+			v->settings->full_screen = go_fs;
+		}
+#endif
+			break;
+		case 1:	
+#ifdef HAVE_SDL
+		{
+			int go_fs = v->sdl[id]->fs == 1 ? 0:1 ;
+			char *caption = veejay_title();
+			v->settings->full_screen = go_fs;
+			vj_sdl_free(v->sdl[id]);
+			vj_sdl_init(
+				v->settings->ncpu,
+				v->sdl[id],
+				v->edit_list->video_width,
+				v->edit_list->video_height,
+				caption,
+				1,
+				go_fs
+			);
+			free(caption);
+		}
+#endif
+		break;
+		default:
+		break;
 	}
-
-	int go_fs = v->sdl[id]->fs == 1 ? 0:1 ;
-	v->settings->full_screen = go_fs;
-
-	vj_sdl_free(v->sdl[id]);
-	vj_sdl_init(
-		v->settings->ncpu,
-		v->sdl[id],
-		v->edit_list->video_width,
-		v->edit_list->video_height,
-		caption,
-		1,
-		go_fs
-		);
 	veejay_msg(VEEJAY_MSG_INFO,"Video screen is %s",
-			(v->settings->full_screen ? "full screen" : "windowed"));
+		(v->settings->full_screen ? "full screen" : "windowed"));
 }
+
 
 void vj_event_set_screen_size(void *ptr, const char format[], va_list ap) 
 {
+	static int my_display = 0;
 	int args[5];
 	veejay_t *v = (veejay_t*) ptr;
 	char *s = NULL;
+
+	if( my_display == 0 )
+		my_display = v->video_out;
+	
 	P_A(args,s,format,ap);
 
 	int id = 0;
@@ -2666,60 +2791,74 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 	// multiple sdl screen needs fixing
 	const char *title = "Veejay";
 
-	if( w == 0 && h == 0)
-	{
-		/* close sdl window , set dummy driver*/
-		if( v->sdl[id] )
-		{
-			vj_sdl_free( v->sdl[id] );
-			free(v->sdl[id]);
-			v->sdl[id] = NULL;
-			v->video_out = 0;
-			vj_sdl_quit();
-			veejay_msg(VEEJAY_MSG_INFO, "Closed SDL Video window");
-			return;
-		}
-	}
-
 	if( w < 0 || w > 4096 || h < 0 || h > 4096 || x < 0 || y < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid arguments '%d %d %d %d'", w,h,x,y );
 		return;
 	}
 
-	if( v->sdl[id] )
+	if( v->video_out == 4 )
 	{
-		vj_sdl_free( v->sdl[id] );
-		free(v->sdl[id]);
-		v->sdl[id] = NULL;
+#ifdef USE_GL
+		if( w > 0 && h > 0 )
+			x_display_resize(w,h,w,h);	
+#endif
 	}
-
-	if(v->sdl[id]==NULL)	
+	else if( v->video_out == 0 )
 	{
-		v->sdl[id] = vj_sdl_allocate( v->video_output_width,
+#ifdef HAVE_SDL
+		if( w == 0 && h == 0)
+		{
+			/* close sdl window , set dummy driver*/
+			if( v->sdl[id] )
+			{
+				vj_sdl_free( v->sdl[id] );
+				free(v->sdl[id]);
+				v->sdl[id] = NULL;
+				v->video_out = 5;
+				vj_sdl_quit();
+				veejay_msg(VEEJAY_MSG_INFO, "Closed SDL Video window");
+				return;
+			}
+		}
+
+		if( v->sdl[id] && x > 0 && y > 0 )
+			vj_sdl_set_geometry(v->sdl[id],x,y);
+#endif
+	}
+	else if (v->video_out == 5 )
+	{
+		switch(my_display) {
+			case 0:
+#ifdef HAVE_SDL
+				if(v->sdl[id]==NULL)	
+				{
+					v->sdl[id] = vj_sdl_allocate( v->video_output_width,
 					      v->video_output_height,
 					      v->pixel_format );
-		if(v->video_out == 5)
-			v->video_out = 0;
-	}
-
-	if(x > 0 && y > 0 )
-		vj_sdl_set_geometry(v->sdl[id],x,y);
-
-	if(vj_sdl_init( v->settings->ncpu,
-			v->sdl[id],
-			w,
-			h,
-			title,
-			1,
-			v->settings->full_screen )
-		)
-		veejay_msg(VEEJAY_MSG_INFO, "Opened SDL Video Window of size %d x %d", w, h );
-	else
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open SDL Video Window");
-	
-}
+				}
+				if(vj_sdl_init( v->settings->ncpu,
+					v->sdl[id],
+					w,
+					h,
+					title,
+					1,
+					v->settings->full_screen )
+				) {
+					veejay_msg(VEEJAY_MSG_INFO, "Opened SDL Video Window of size %d x %d", w, h );
+				}
+				else
+				{
+					v->video_out = 0;
+				}	
 #endif
+				break;
+			default:
+				break;
+
+		}
+	}
+}
 
 void vj_event_play_stop(void *ptr, const char format[], va_list ap) 
 {
@@ -5893,6 +6032,16 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 	}
 
 }
+
+void	vj_event_toggle_osd( void *ptr, const char format, va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	if(v->use_osd == 0 )
+		v->use_osd = 1;
+	else
+		v->use_osd = 0;
+}
+
 
 void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 {

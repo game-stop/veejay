@@ -299,6 +299,8 @@ typedef struct {
 	char *status_msg;
 	char *homedir;
 	void *font;
+	void *osd;
+	int  use_osd;
 } veejay_t;
 
 typedef struct {

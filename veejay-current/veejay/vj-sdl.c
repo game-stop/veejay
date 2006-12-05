@@ -215,8 +215,11 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 		sbuffer += vjsdl->screen->pitch;
     	}
 
-    	//SDL_WM_SetCaption(caption, "0000000");
-    	if (!vj_sdl_unlock(vjsdl))
+	char *title = veejay_title();
+    	SDL_WM_SetCaption(caption, title);
+   	free(title);
+
+	if (!vj_sdl_unlock(vjsdl))
 		return 0;
 
 

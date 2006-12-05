@@ -39,6 +39,7 @@
 #include <mjpegtools/mpegtimecode.h>
 #include <libvjmem/vjmem.h>
 #include <pthread.h>
+#include <veejay/vj-lib.h>
 
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -63,6 +64,7 @@ typedef struct
 	int size;
 	int font;
 	char *key;
+	char *time;
 	uint8_t bg[3];
 	uint8_t fg[3];
 	uint8_t ln[3];
@@ -118,7 +120,8 @@ typedef struct {
 	float		fps;
 	void	*dictionary;
 	void	*plain;
-
+	int	time;
+	char	*add;
 	pthread_mutex_t	mutex;
 } vj_font_t;
 
@@ -1276,6 +1279,45 @@ void	*vj_font_get_plain_dict( void *font )
 	return f->plain;
 }
 
+void	vj_font_customize_osd( void *font,void *uc )
+{
+	vj_font_t *f = (vj_font_t*) font;
+	veejay_t *v = (veejay_t*) uc;
+	video_playback_setup *settings =v->settings;
+	
+#ifdef STRICT_CHECKING
+	assert(f->time == 1 );
+#endif
+
+	char buf[256];
+
+	switch( v->uc->playback_mode )
+	{
+		case VJ_PLAYBACK_MODE_SAMPLE:
+			sprintf(buf, "Sample %d|%d cache=%dMb cost=%2.2fms",
+					v->uc->sample_id,
+					sample_size()-1,
+					sample_cache_used(0),
+					(float)	v->real_fps );
+			break;
+		case VJ_PLAYBACK_MODE_TAG:
+			sprintf(buf, "Stream %d|%d cost=%2.2fms",
+					v->uc->sample_id,
+					vj_tag_size(),
+					(float)v->real_fps);
+			break;
+		default:
+			if(f->add) { free(f->add); f->add = NULL; }
+			return;
+			break;
+	}
+	
+	
+	if(f->add)
+		free(f->add);
+	f->add = strdup( buf );
+}
+
 void	vj_font_set_constraints_and_dict( void *font, long lo, long hi, float fps, void *dict )
 {
 	vj_font_t *f = (vj_font_t*) font;
@@ -1335,7 +1377,7 @@ static	int	get_default_font( vj_font_t *f )
 	return 0;
 }
 
-void	*vj_font_init( int w, int h, float fps )
+void	*vj_font_init( int w, int h, float fps, int is_osd )
 {
 	int error=0;
 	vj_font_t *f = (vj_font_t*) vj_calloc(sizeof(vj_font_t));
@@ -1359,7 +1401,7 @@ void	*vj_font_init( int w, int h, float fps )
 	f->bg = 0;
 	f->outline = 0;
 	f->text_height = 0;
-	f->current_size = 40;
+	f->current_size = (is_osd ? 10: 40);
 	f->fps  = fps;
 	f->index = NULL;
 	f->font_table = (char**) vj_calloc(sizeof(char*) * MAX_FONTS );
@@ -1376,15 +1418,12 @@ void	*vj_font_init( int w, int h, float fps )
 		return NULL;
 	}
 	
-
-	
 	find_fonts(f,"/usr/X11R6/lib/X11/fonts/TTF");
 	find_fonts(f,"/usr/X11R6/lib/X11/fonts/Type1");
 	find_fonts(f,"/usr/X11R6/lib/X11/truetype");
 	find_fonts(f,"/usr/X11R6/lib/X11/TrueType");
 	find_fonts(f,"/usr/share/fonts/truetype");
 	find_fonts(f,"~/veejay-fonts");
-
 	
 	qsort( f->font_table, f->index, sizeof(char*), compare_strings );
 	qsort( f->font_list,  f->index, sizeof(char*), compare_strings );
@@ -1412,6 +1451,8 @@ void	*vj_font_init( int w, int h, float fps )
 		return NULL;
 	}
 
+	f->time = is_osd;
+	
 	print_fonts(f);
 
 	pthread_mutex_init( &(f->mutex), NULL );
@@ -1794,10 +1835,130 @@ static void vj_font_text_render(vj_font_t *f, srt_seq_t *seq, void *_picture )
 
 }
 
+
+static void vj_font_text_osd_render(vj_font_t *f, long posi, void *_picture )
+{
+	FT_Face face = f->face;
+	FT_GlyphSlot  slot = face->glyph;
+	FT_Vector pos[MAXSIZE_TEXT];  
+	FT_Vector delta;
+	char osd_text[256];
+  	unsigned char *tmp_text = vj_font_pos_to_timecode( f, posi );
+
+	int size = strlen(osd_text);
+	if( f->add )
+		sprintf(osd_text, "%s %s", tmp_text, f->add );
+	else
+		sprintf(osd_text, "%s", tmp_text );
+	
+	unsigned char c;
+	int x = 0, y = 0, i=0;
+	int str_w, str_w_max;
+
+	VJFrame *picture = (VJFrame*) _picture;
+	int width = picture->width;
+	int height = picture->height;
+	int x1,y1;
+	str_w = str_w_max = 0;
+
+	x = 0; 
+	y = picture->height - f->current_size - 4;
+	x1 = x;
+	y1 = y;	
+	
+	char *text = osd_text;
+
+	for (i=0; i < size; i++)
+	{
+		c = text[i];
+		if ( (f->use_kerning) && (i > 0) && (f->glyphs_index[c]) )
+		{
+			FT_Get_Kerning(
+				f->face, 
+				f->glyphs_index[c],
+				f->glyphs_index[c],
+				ft_kerning_default, 
+				&delta
+				);
+	 
+			x += delta.x >> 6;
+		}
+    
+	        if( isblank( c ) || c == 20 )
+		{
+			f->advance[c] = f->current_size;
+			if( (x + f->current_size) >= width )
+			{
+				str_w = width = f->x - 1;
+				y += f->text_height;
+				x = f->x;
+			}
+		}
+		else
+		if (( (x + f->advance[ c ]) >= width ) || ( c == '\n' ))
+		{
+			str_w = width - f->x - 1;
+			y += f->text_height;
+			x = f->x;
+		}
+
+		pos[i].x = x + f->bitmap_left[c];
+      		pos[i].y = y - f->bitmap_top[c] + f->baseline;
+      		x += f->advance[c];
+
+		if (str_w > str_w_max)
+			str_w_max = str_w;
+	}
+	
+	if ( str_w_max + f->x >= width )
+		str_w_max = width - f->x - 1;
+	if ( y >= height )
+		y = height - 1 - 2*f->y;
+
+	if( str_w_max == 0 )
+		str_w_max = x1 + (x - x1);
+	
+	int bw = str_w_max;
+	int bh = y - y1;
+	if(bh <= 0 )
+		bh = y1	+ f->current_size + 4;
+	
+	draw_transparent_box(
+			picture,
+			x1,
+			y1,
+			picture->width,
+			bh,
+			f->bgcolor,
+			80 );
+	
+ 	for (i=0; i < size; i++)
+    	{
+		c = text[i];
+		if (  ((c == '_') && (text == f->text) ) || /* skip '_' (consider as space) 
+					     IF text was specified in cmd line 
+					     (which doesn't like neasted quotes)  */
+	 		 ( c == '\n' )) /* Skip new line char, just go to new line */
+			continue;
+
+		draw_glyph( f,picture, &(f->bitmaps[ c ]),
+				pos[i].x,pos[i].y,width, height,
+				f->fgcolor,f->lncolor,f->outline );
+	    	
+      		x += slot->advance.x >> 6;
+    	}
+
+	free(tmp_text);
+}
+
+
 int	vj_font_norender(void *ctx, long position)
 {
 	vj_font_t *f = (vj_font_t *) ctx;
 
+	if(f->time)
+		return 1;
+	
 	if( position < 0 || position >= f->index_len )
 		return 0;
 
@@ -1815,6 +1976,12 @@ int	vj_font_norender(void *ctx, long position)
 void vj_font_render(void *ctx, void *_picture, long position)
 {
 	vj_font_t *f = (vj_font_t *) ctx;
+
+	if(f->time)
+	{
+		vj_font_text_osd_render( f, position, _picture );
+		return;
+	}
 
 	if( position < 0 || position >= f->index_len )
 		return;

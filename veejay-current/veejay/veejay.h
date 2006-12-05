@@ -24,4 +24,3 @@
 
 #define MIN_EFFECTS 1
 #define MAX_REALTIME_EFFECTS 10
-#define VEEJAY_VERSION 0.4.1

@@ -813,7 +813,7 @@ void	vj_perform_update_plugin_frame(VJFrame *frame)
 	frame->data[1] = (uint8_t*) primary_buffer[0]->Cb;
 	frame->data[2] = (uint8_t*) primary_buffer[0]->Cr;
 }
-
+#ifdef HAVE_FREETYPE
 VJFrame *vj_perform_init_plugin_frame(veejay_t *info)
 {
 	editlist *el = info->edit_list;
@@ -834,7 +834,7 @@ VJFrame *vj_perform_init_plugin_frame(veejay_t *info)
 			 frame->height );
 	return frame;
 }
-
+#endif
 VJFrameInfo *vj_perform_init_plugin_frame_info(veejay_t *info)
 {
 	editlist *el = info->edit_list;
@@ -1125,7 +1125,7 @@ int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
 	int err = 0;
 	int args[16];
 
-	memset( args, 0 , 16 );
+	veejay_memset( args, 0 , 16 );
 
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
 	{
@@ -2801,6 +2801,27 @@ static	int	vj_perform_render_font( veejay_t *info, video_playback_setup *setting
 	
 		vj_font_render( info->font, font_frame , settings->current_frame_num );
 	}
+
+	if( info->use_osd)
+	{
+		if(vj_font_norender( info->osd, settings->current_frame_num ))
+		{
+			if( !frame->ssm )
+			{
+				chroma_supersample(
+					settings->sample_mode,
+					effect_sampler,
+					frame->data,
+					frameinfo->width,
+					frameinfo->height
+				       	);
+				frame->ssm = 1;
+			}
+			vj_font_customize_osd(info->osd, info );
+			vj_font_render( info->osd, font_frame , settings->current_frame_num );
+		}
+	}
+
 #endif
 
 #ifdef USE_GL

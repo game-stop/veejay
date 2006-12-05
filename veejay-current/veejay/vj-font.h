@@ -22,7 +22,7 @@
  *
  */
 
-void	*vj_font_init(int s_w, int s_h, float fps);
+void	*vj_font_init(int s_w, int s_h, float fps, int osd);
 int	vj_font_srt_sequence_exists( void *font, int id );
 void vj_font_render(void *ctx, void *_picture, long nframe);
 void	vj_font_destroy(void *ctx);

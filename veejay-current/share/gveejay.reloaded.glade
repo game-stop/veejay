@@ -40,11 +40,179 @@
 	      <child>
 		<widget class="GtkMenuItem" id="menuitem8">
 		  <property name="visible">True</property>
-		  <property name="label" translatable="yes">_Veejay</property>
+		  <property name="label" translatable="yes">_GVeejay</property>
 		  <property name="use_underline">True</property>
 
 		  <child>
 		    <widget class="GtkMenu" id="menuitem8_menu">
+
+		      <child>
+			<widget class="GtkImageMenuItem" id="sample1">
+			  <property name="visible">True</property>
+			  <property name="label" translatable="yes">New Sample</property>
+			  <property name="use_underline">True</property>
+
+			  <child internal-child="image">
+			    <widget class="GtkImage" id="image2384">
+			      <property name="visible">True</property>
+			      <property name="pixbuf">button_loop.png</property>
+			      <property name="xalign">0.5</property>
+			      <property name="yalign">0.5</property>
+			      <property name="xpad">0</property>
+			      <property name="ypad">0</property>
+			    </widget>
+			  </child>
+
+			  <child>
+			    <widget class="GtkMenu" id="sample1_menu">
+
+			      <child>
+				<widget class="GtkImageMenuItem" id="new_from_file1">
+				  <property name="visible">True</property>
+				  <property name="label" translatable="yes">_New from file</property>
+				  <property name="use_underline">True</property>
+				  <signal name="activate" handler="on_sampleadd_clicked" last_modification_time="Tue, 21 Feb 2006 22:53:15 GMT"/>
+
+				  <child internal-child="image">
+				    <widget class="GtkImage" id="image2385">
+				      <property name="visible">True</property>
+				      <property name="pixbuf">icon_openlist.png</property>
+				      <property name="xalign">0.5</property>
+				      <property name="yalign">0.5</property>
+				      <property name="xpad">0</property>
+				      <property name="ypad">0</property>
+				    </widget>
+				  </child>
+				</widget>
+			      </child>
+
+			      <child>
+				<widget class="GtkImageMenuItem" id="copy1">
+				  <property name="visible">True</property>
+				  <property name="label" translatable="yes">_Copy</property>
+				  <property name="use_underline">True</property>
+				  <signal name="activate" handler="on_button_clipcopy_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:58 GMT"/>
+
+				  <child internal-child="image">
+				    <widget class="GtkImage" id="image2386">
+				      <property name="visible">True</property>
+				      <property name="pixbuf">icon_copy.png</property>
+				      <property name="xalign">0.5</property>
+				      <property name="yalign">0.5</property>
+				      <property name="xpad">0</property>
+				      <property name="ypad">0</property>
+				    </widget>
+				  </child>
+				</widget>
+			      </child>
+
+			      <child>
+				<widget class="GtkImageMenuItem" id="delete1">
+				  <property name="visible">True</property>
+				  <property name="label" translatable="yes">_Delete</property>
+				  <property name="use_underline">True</property>
+				  <signal name="activate" handler="on_button_sample_del_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:35 GMT"/>
+
+				  <child internal-child="image">
+				    <widget class="GtkImage" id="image2387">
+				      <property name="visible">True</property>
+				      <property name="pixbuf">icon_clear.png</property>
+				      <property name="xalign">0.5</property>
+				      <property name="yalign">0.5</property>
+				      <property name="xpad">0</property>
+				      <property name="ypad">0</property>
+				    </widget>
+				  </child>
+				</widget>
+			      </child>
+			    </widget>
+			  </child>
+			</widget>
+		      </child>
+
+		      <child>
+			<widget class="GtkImageMenuItem" id="stream1">
+			  <property name="visible">True</property>
+			  <property name="label" translatable="yes">New Stream</property>
+			  <property name="use_underline">True</property>
+
+			  <child internal-child="image">
+			    <widget class="GtkImage" id="image2388">
+			      <property name="visible">True</property>
+			      <property name="pixbuf">icon_stream.png</property>
+			      <property name="xalign">0.5</property>
+			      <property name="yalign">0.5</property>
+			      <property name="xpad">0</property>
+			      <property name="ypad">0</property>
+			    </widget>
+			  </child>
+
+			  <child>
+			    <widget class="GtkMenu" id="stream1_menu">
+
+			      <child>
+				<widget class="GtkImageMenuItem" id="new_source1">
+				  <property name="visible">True</property>
+				  <property name="label" translatable="yes">_New </property>
+				  <property name="use_underline">True</property>
+				  <signal name="activate" handler="on_streamnew_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:05 GMT"/>
+
+				  <child internal-child="image">
+				    <widget class="GtkImage" id="image2389">
+				      <property name="visible">True</property>
+				      <property name="pixbuf">icon_openlist.png</property>
+				      <property name="xalign">0.5</property>
+				      <property name="yalign">0.5</property>
+				      <property name="xpad">0</property>
+				      <property name="ypad">0</property>
+				    </widget>
+				  </child>
+				</widget>
+			      </child>
+
+			      <child>
+				<widget class="GtkImageMenuItem" id="new_color1">
+				  <property name="visible">True</property>
+				  <property name="label" translatable="yes">_New Solid</property>
+				  <property name="use_underline">True</property>
+				  <signal name="activate" handler="on_new_colorstream_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:05 GMT"/>
+
+				  <child internal-child="image">
+				    <widget class="GtkImage" id="image2390">
+				      <property name="visible">True</property>
+				      <property name="pixbuf">icon_color.png</property>
+				      <property name="xalign">0.5</property>
+				      <property name="yalign">0.5</property>
+				      <property name="xpad">0</property>
+				      <property name="ypad">0</property>
+				    </widget>
+				  </child>
+				</widget>
+			      </child>
+
+			      <child>
+				<widget class="GtkImageMenuItem" id="delete2">
+				  <property name="visible">True</property>
+				  <property name="label" translatable="yes">_Delete</property>
+				  <property name="use_underline">True</property>
+				  <signal name="activate" handler="on_button_sample_del_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:28 GMT"/>
+
+				  <child internal-child="image">
+				    <widget class="GtkImage" id="image2391">
+				      <property name="visible">True</property>
+				      <property name="pixbuf">icon_clear.png</property>
+				      <property name="xalign">0.5</property>
+				      <property name="yalign">0.5</property>
+				      <property name="xpad">0</property>
+				      <property name="ypad">0</property>
+				    </widget>
+				  </child>
+				</widget>
+			      </child>
+			    </widget>
+			  </child>
+			</widget>
+		      </child>
 
 		      <child>
 			<widget class="GtkImageMenuItem" id="save1">
@@ -53,7 +221,7 @@
 			  <property name="use_underline">True</property>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2302">
+			    <widget class="GtkImage" id="image2392">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_save.png</property>
 			      <property name="xalign">0.5</property>
@@ -74,7 +242,7 @@
 				  <signal name="activate" handler="on_button_samplelist_save_clicked" last_modification_time="Wed, 19 Oct 2005 12:22:22 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2303">
+				    <widget class="GtkImage" id="image2393">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_saveas.png</property>
 				      <property name="xalign">0.5</property>
@@ -94,7 +262,7 @@
 				  <signal name="activate" handler="on_button_saveconfigfile_clicked" last_modification_time="Wed, 19 Oct 2005 12:23:07 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2304">
+				    <widget class="GtkImage" id="image2394">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_openlist.png</property>
 				      <property name="xalign">0.5</property>
@@ -117,7 +285,7 @@
 			  <property name="use_underline">True</property>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2305">
+			    <widget class="GtkImage" id="image2395">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_open.png</property>
 			      <property name="xalign">0.5</property>
@@ -138,7 +306,7 @@
 				  <signal name="activate" handler="on_button_samplelist_open_clicked" last_modification_time="Wed, 19 Oct 2005 12:21:30 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2306">
+				    <widget class="GtkImage" id="image2396">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_open.png</property>
 				      <property name="xalign">0.5</property>
@@ -158,7 +326,7 @@
 				  <signal name="activate" handler="on_button_loadconfigfile_clicked" last_modification_time="Wed, 19 Oct 2005 12:20:50 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2307">
+				    <widget class="GtkImage" id="image2397">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_openlist.png</property>
 				      <property name="xalign">0.5</property>
@@ -188,7 +356,7 @@
 			  <signal name="activate" handler="on_veejay_connection_close" last_modification_time="Sat, 22 Oct 2005 12:07:11 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2308">
+			    <widget class="GtkImage" id="image2398">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_disconnect.png</property>
 			      <property name="xalign">0.5</property>
@@ -214,210 +382,8 @@
 	      </child>
 
 	      <child>
-		<widget class="GtkMenuItem" id="video1">
+		<widget class="GtkSeparatorMenuItem" id="separator6">
 		  <property name="visible">True</property>
-		  <property name="label" translatable="yes">_Video</property>
-		  <property name="use_underline">True</property>
-
-		  <child>
-		    <widget class="GtkMenu" id="video1_menu">
-
-		      <child>
-			<widget class="GtkImageMenuItem" id="sample1">
-			  <property name="visible">True</property>
-			  <property name="label" translatable="yes">Sample</property>
-			  <property name="use_underline">True</property>
-
-			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2309">
-			      <property name="visible">True</property>
-			      <property name="pixbuf">button_loop.png</property>
-			      <property name="xalign">0.5</property>
-			      <property name="yalign">0.5</property>
-			      <property name="xpad">0</property>
-			      <property name="ypad">0</property>
-			    </widget>
-			  </child>
-
-			  <child>
-			    <widget class="GtkMenu" id="sample1_menu">
-
-			      <child>
-				<widget class="GtkImageMenuItem" id="new_from_file1">
-				  <property name="visible">True</property>
-				  <property name="label" translatable="yes">_New from file</property>
-				  <property name="use_underline">True</property>
-				  <signal name="activate" handler="on_sampleadd_clicked" last_modification_time="Tue, 21 Feb 2006 22:53:15 GMT"/>
-
-				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2310">
-				      <property name="visible">True</property>
-				      <property name="pixbuf">icon_openlist.png</property>
-				      <property name="xalign">0.5</property>
-				      <property name="yalign">0.5</property>
-				      <property name="xpad">0</property>
-				      <property name="ypad">0</property>
-				    </widget>
-				  </child>
-				</widget>
-			      </child>
-
-			      <child>
-				<widget class="GtkImageMenuItem" id="copy1">
-				  <property name="visible">True</property>
-				  <property name="label" translatable="yes">_Copy</property>
-				  <property name="use_underline">True</property>
-				  <signal name="activate" handler="on_button_clipcopy_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:58 GMT"/>
-
-				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2311">
-				      <property name="visible">True</property>
-				      <property name="pixbuf">icon_copy.png</property>
-				      <property name="xalign">0.5</property>
-				      <property name="yalign">0.5</property>
-				      <property name="xpad">0</property>
-				      <property name="ypad">0</property>
-				    </widget>
-				  </child>
-				</widget>
-			      </child>
-
-			      <child>
-				<widget class="GtkImageMenuItem" id="delete1">
-				  <property name="visible">True</property>
-				  <property name="label" translatable="yes">_Delete</property>
-				  <property name="use_underline">True</property>
-				  <signal name="activate" handler="on_button_sample_del_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:35 GMT"/>
-
-				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2312">
-				      <property name="visible">True</property>
-				      <property name="pixbuf">icon_clear.png</property>
-				      <property name="xalign">0.5</property>
-				      <property name="yalign">0.5</property>
-				      <property name="xpad">0</property>
-				      <property name="ypad">0</property>
-				    </widget>
-				  </child>
-				</widget>
-			      </child>
-			    </widget>
-			  </child>
-			</widget>
-		      </child>
-
-		      <child>
-			<widget class="GtkImageMenuItem" id="stream1">
-			  <property name="visible">True</property>
-			  <property name="label" translatable="yes">Stream</property>
-			  <property name="use_underline">True</property>
-
-			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2313">
-			      <property name="visible">True</property>
-			      <property name="pixbuf">icon_stream.png</property>
-			      <property name="xalign">0.5</property>
-			      <property name="yalign">0.5</property>
-			      <property name="xpad">0</property>
-			      <property name="ypad">0</property>
-			    </widget>
-			  </child>
-
-			  <child>
-			    <widget class="GtkMenu" id="stream1_menu">
-
-			      <child>
-				<widget class="GtkImageMenuItem" id="new_source1">
-				  <property name="visible">True</property>
-				  <property name="label" translatable="yes">_New </property>
-				  <property name="use_underline">True</property>
-				  <signal name="activate" handler="on_streamnew_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:05 GMT"/>
-
-				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2314">
-				      <property name="visible">True</property>
-				      <property name="pixbuf">icon_openlist.png</property>
-				      <property name="xalign">0.5</property>
-				      <property name="yalign">0.5</property>
-				      <property name="xpad">0</property>
-				      <property name="ypad">0</property>
-				    </widget>
-				  </child>
-				</widget>
-			      </child>
-
-			      <child>
-				<widget class="GtkImageMenuItem" id="new_color1">
-				  <property name="visible">True</property>
-				  <property name="label" translatable="yes">_New Solid</property>
-				  <property name="use_underline">True</property>
-				  <signal name="activate" handler="on_new_colorstream_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:05 GMT"/>
-
-				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2315">
-				      <property name="visible">True</property>
-				      <property name="pixbuf">icon_color.png</property>
-				      <property name="xalign">0.5</property>
-				      <property name="yalign">0.5</property>
-				      <property name="xpad">0</property>
-				      <property name="ypad">0</property>
-				    </widget>
-				  </child>
-				</widget>
-			      </child>
-
-			      <child>
-				<widget class="GtkImageMenuItem" id="delete2">
-				  <property name="visible">True</property>
-				  <property name="label" translatable="yes">_Delete</property>
-				  <property name="use_underline">True</property>
-				  <signal name="activate" handler="on_button_sample_del_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:28 GMT"/>
-
-				  <child internal-child="image">
-				    <widget class="GtkImage" id="image2316">
-				      <property name="visible">True</property>
-				      <property name="pixbuf">icon_clear.png</property>
-				      <property name="xalign">0.5</property>
-				      <property name="yalign">0.5</property>
-				      <property name="xpad">0</property>
-				      <property name="ypad">0</property>
-				    </widget>
-				  </child>
-				</widget>
-			      </child>
-			    </widget>
-			  </child>
-			</widget>
-		      </child>
-
-		      <child>
-			<widget class="GtkSeparatorMenuItem" id="separator6">
-			  <property name="visible">True</property>
-			</widget>
-		      </child>
-
-		      <child>
-			<widget class="GtkImageMenuItem" id="video_settings">
-			  <property name="visible">True</property>
-			  <property name="label" translatable="yes">Settings</property>
-			  <property name="use_underline">True</property>
-			  <signal name="activate" handler="on_VideoSettings_activate" last_modification_time="Tue, 19 Jul 2005 19:33:02 GMT"/>
-
-			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2317">
-			      <property name="visible">True</property>
-			      <property name="stock">gtk-preferences</property>
-			      <property name="icon_size">1</property>
-			      <property name="xalign">0.5</property>
-			      <property name="yalign">0.5</property>
-			      <property name="xpad">0</property>
-			      <property name="ypad">0</property>
-			    </widget>
-			  </child>
-			</widget>
-		      </child>
-		    </widget>
-		  </child>
 		</widget>
 	      </child>
 
@@ -431,6 +397,27 @@
 		    <widget class="GtkMenu" id="vims1_menu">
 
 		      <child>
+			<widget class="GtkImageMenuItem" id="video_settings">
+			  <property name="visible">True</property>
+			  <property name="label" translatable="yes">Settings</property>
+			  <property name="use_underline">True</property>
+			  <signal name="activate" handler="on_VideoSettings_activate" last_modification_time="Tue, 19 Jul 2005 19:33:02 GMT"/>
+
+			  <child internal-child="image">
+			    <widget class="GtkImage" id="image2399">
+			      <property name="visible">True</property>
+			      <property name="stock">gtk-preferences</property>
+			      <property name="icon_size">1</property>
+			      <property name="xalign">0.5</property>
+			      <property name="yalign">0.5</property>
+			      <property name="xpad">0</property>
+			      <property name="ypad">0</property>
+			    </widget>
+			  </child>
+			</widget>
+		      </child>
+
+		      <child>
 			<widget class="GtkImageMenuItem" id="console1">
 			  <property name="visible">True</property>
 			  <property name="label" translatable="yes">Console</property>
@@ -438,7 +425,7 @@
 			  <signal name="activate" handler="on_console1_activate" last_modification_time="Sat, 22 Oct 2005 11:05:22 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2318">
+			    <widget class="GtkImage" id="image2400">
 			      <property name="visible">True</property>
 			      <property name="stock">gtk-dialog-info</property>
 			      <property name="icon_size">1</property>
@@ -474,7 +461,7 @@
 			  <signal name="activate" handler="on_vims_bundles_activate" last_modification_time="Sat, 23 Jul 2005 18:59:53 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2319">
+			    <widget class="GtkImage" id="image2401">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_bundle.png</property>
 			      <property name="xalign">0.5</property>
@@ -494,7 +481,7 @@
 			  <signal name="activate" handler="on_configure1_activate" last_modification_time="Sun, 25 Sep 2005 21:18:28 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2320">
+			    <widget class="GtkImage" id="image2402">
 			      <property name="visible">True</property>
 			      <property name="stock">gtk-preferences</property>
 			      <property name="icon_size">1</property>
@@ -528,7 +515,7 @@
 			  <signal name="activate" handler="on_about1_activate" last_modification_time="Thu, 15 Sep 2005 22:07:40 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image2321">
+			    <widget class="GtkImage" id="image2403">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_question.png</property>
 			      <property name="xalign">0.5</property>
@@ -819,6 +806,33 @@
 		  <property name="padding">0</property>
 		  <property name="expand">False</property>
 		  <property name="fill">False</property>
+		</packing>
+	      </child>
+
+	      <child>
+		<widget class="GtkButton" id="osdbutton">
+		  <property name="visible">True</property>
+		  <property name="tooltip" translatable="yes">Display OSD status</property>
+		  <property name="can_focus">True</property>
+		  <property name="relief">GTK_RELIEF_NORMAL</property>
+		  <property name="focus_on_click">True</property>
+		  <signal name="clicked" handler="on_osdbutton_clicked" last_modification_time="Tue, 05 Dec 2006 15:54:10 GMT"/>
+
+		  <child>
+		    <widget class="GtkImage" id="image2404">
+		      <property name="visible">True</property>
+		      <property name="pixbuf">icon_plus.png</property>
+		      <property name="xalign">0.5</property>
+		      <property name="yalign">0.5</property>
+		      <property name="xpad">0</property>
+		      <property name="ypad">0</property>
+		    </widget>
+		  </child>
+		</widget>
+		<packing>
+		  <property name="padding">0</property>
+		  <property name="expand">True</property>
+		  <property name="fill">True</property>
 		</packing>
 	      </child>
 	    </widget>

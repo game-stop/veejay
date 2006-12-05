@@ -21,7 +21,7 @@
  */
 
 //extern void veejay_gl_init( int fs, int w, int h, int x, int y);
-void	*x_display_init(void);
+void	*x_display_init(void *ptr);
 void	x_display_close(void *dctx);
 int		x_display_set_fullscreen( void *dctx, int status );
 

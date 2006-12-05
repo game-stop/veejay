@@ -214,6 +214,7 @@ enum {
 	VIMS_SRT_SAVE			=	396,
 	VIMS_SRT_LOAD			=	397,
 	VIMS_SRT_SELECT			=	398,
+	VIMS_OSD			=	399,
 #endif
 
 	

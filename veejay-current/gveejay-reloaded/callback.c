@@ -3416,3 +3416,9 @@ gboolean	boxblue_expose_event(GtkWidget *w,
 
 	return TRUE;
 }
+
+
+void	on_osdbutton_clicked(GtkWidget *w, gpointer data )
+{
+	single_vims(VIMS_OSD);
+}

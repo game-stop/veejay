@@ -20,6 +20,8 @@
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include <sys/time.h>
+#include <stdlib.h>
+#include <string.h>
 
 extern void find_best_memcpy(void);
 
@@ -124,8 +126,9 @@ void vj_mem_init(void)
 #endif
 	if(MEM_ALIGNMENT_SIZE == 0)
 		MEM_ALIGNMENT_SIZE = getpagesize();
-
+	
 	find_best_memcpy();	
+	find_best_memset();
 }
 
 void *vj_malloc(unsigned int size)

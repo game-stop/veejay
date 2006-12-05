@@ -1334,18 +1334,22 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 
 	veejay_handle_callbacks(info);
 #ifdef HAVE_SDL
-    SDL_Event event;
-	while(SDL_PollEvent(&event) == 1) 
+	if( info->video_out == 0 )
 	{
-			
-		if( event.type == SDL_KEYDOWN)
+		SDL_Event event;
+		while(SDL_PollEvent(&event) == 1) 
 		{
-			vj_event_single_fire( (void*) info, event, 0);
+			if( event.type == SDL_KEYDOWN)
+				vj_event_single_fire( (void*) info, event, 0);
 		}
-		
 	}
 #endif
+#ifdef USE_GL
+	if(info->video_out == 4 )
+		x_display_event( info->gl, info->current_edit_list->video_width, info->current_edit_list->video_height );
+#endif
 
+	
 //#endif
 	pthread_mutex_lock(&(settings->valid_mutex));
 
@@ -1370,6 +1374,14 @@ static void *veejay_mjpeg_playback_thread(void *arg)
     veejay_msg(VEEJAY_MSG_DEBUG, 
 		"Veejay was told to exit");
     return NULL;
+}
+
+
+char	veejay_title( )
+{
+	char tmp[64];
+	sprintf(tmp, "Veejay %s", VERSION );
+	return strdup(tmp);
 }
 
 
@@ -1665,7 +1677,14 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 #ifdef HAVE_FREETYPE
 	info->font = vj_font_init( info->current_edit_list->video_width,
 				   info->current_edit_list->video_height,
-				   info->current_edit_list->video_fps );
+				   info->current_edit_list->video_fps,0 );
+
+	
+	info->osd = vj_font_init( info->current_edit_list->video_width,
+				   info->current_edit_list->video_height,
+				   info->current_edit_list->video_fps,1 );
+
+	
 #endif
 	if(!vj_perform_init(info))
 	{
@@ -1836,7 +1855,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
     switch (info->video_out) {
  		case 4:
 #ifdef USE_GL
-		info->gl = (void*) x_display_init();
+		info->gl = (void*) x_display_init(info);
 		x_display_open(info->gl, info->current_edit_list->video_width,
 			       		info->current_edit_list->video_height );
 
@@ -2353,7 +2372,10 @@ static void *veejay_playback_thread(void *data)
 	{
 		x_display_close( info->gl );
     	}
-    
+#ifdef HAVE_FREETYPE
+	vj_font_destroy( info->font );
+	vj_font_destroy( info->osd );
+#endif
     veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
 	vj_perform_free(info);
 
