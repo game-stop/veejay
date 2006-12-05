@@ -6433,16 +6433,17 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 
 //@ after connect:
 
-	int pw = 360;
-	int ph = 288;
+	int pw = default_preview_width_ == 0 ? 352/2: default_preview_width_;
+	int ph = default_preview_height_ == 0 ? 288/2: default_preview_height_;
 	
-	setup_geometry( pw,ph, num_tracks_, pw/2,ph/2  );
+	setup_geometry( pw,ph, num_tracks_, pw,ph  );
 	GtkWidget *img_wid = (skin__ == 0 ? glade_xml_get_widget_( info->main_window, "imageA") : NULL );
 
-	multitrack_configure_preview( pw/2,
-				      ph/2,
+	multitrack_configure_preview( pw,
+				      ph,
 			      	      pw,
-				      ph );	      
+				      ph );	     
+       veejay_msg(0, "multitrack_configure_preview: %d x %d",pw,ph);	
 
 	gui->mt = multitrack_new(
 			(void(*)(int,char*,int)) vj_gui_cb,

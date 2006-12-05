@@ -781,7 +781,7 @@ void		*multitrack_new(
 	veejay_msg(0, "%dx%d", req.width,req.height);
 	
 	if(get_skin() == 0 )
-		gtk_widget_set_size_request(mt->scroll,max_w/2 + 30, req.height);
+		gtk_widget_set_size_request(mt->scroll,max_w + 30, req.height);
 	else
 		gtk_widget_set_size_request(mt->scroll, max_w * MAX_TRACKS / 2 , max_h/2 );
 	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),2);
@@ -1213,7 +1213,7 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int wid
 #endif
 		veejay_configure_sequence( last_track->sequence, sta_w, sta_h );
 
-		gtk_widget_set_size_request( GTK_WIDGET( last_track->view->area ), width,height );
+		gtk_widget_set_size_request( GTK_WIDGET( last_track->view->area ), sta_w,sta_h );
 	}
 	else
 	{

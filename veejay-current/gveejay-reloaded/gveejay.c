@@ -33,7 +33,6 @@ static	int verbosity = 0;
 static int timer = 6;
 static int col = 0;
 static int row = 0;
-static int current_skin = 0;
 static int n_tracks = 2;
 static int launcher = 0;
 static int pw = 112;
@@ -43,7 +42,6 @@ static struct
 	char *file;
 } skins[] = {
  {	"gveejay.reloaded.glade" },
- {	"gveejay.reloaded-2.glade" },
  {	NULL 	}
 };
 
@@ -56,7 +54,6 @@ static void usage(char *progname)
 	printf( "-n/--no-theme\t\tDont load gveejay's GTK theme\n");
 	printf( "-v/--verbose\t\tBe extra verbose (usefull for debugging)\n");
 	printf( "-s/--size\t\tSet bank resolution (row X columns)\n");
- 	printf( "-f/--flavour\t\tSelect another skin to use\n");
         printf( "-X/\t\tSet number of tracks\n");
 	printf( "-P/--preview\t\tSet main preview geometry (default to 112x96)" );
 	printf( "\n\n");
@@ -109,10 +106,6 @@ static int      set_option( const char *name, char *value )
 			err++;
 		}
 	}
-	else if (strcmp(name, "f" ) == 0 || strcmp(name, "flavour" ) == 0)
-	{
-		current_skin = atoi(optarg);
-	}
         else
                 err++;
         return err;
@@ -157,14 +150,13 @@ int main(int argc, char *argv[]) {
 	
 	vj_gui_theme_setup(gveejay_theme);
 	vj_gui_set_debug_level( verbosity , n_tracks,pw,ph);
+	veejay_msg(1, "Preview size is %d x %d",pw,ph );
 	vj_gui_set_timeout(timer);
-	set_skin( current_skin );
+	set_skin( 0 );
 
 	default_bank_values( &col, &row );
 	
-	veejay_msg(0, "Opening skin: %s", skins[current_skin].file );
-	
-	vj_gui_init( skins[current_skin].file, launcher, hostname, port_num );
+	vj_gui_init( skins[0].file, launcher, hostname, port_num );
 	vj_gui_style_setup();
 
 	while(gveejay_running())
