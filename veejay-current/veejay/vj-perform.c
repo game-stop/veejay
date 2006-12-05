@@ -2817,7 +2817,7 @@ static	int	vj_perform_render_font( veejay_t *info, video_playback_setup *setting
 				       	);
 				frame->ssm = 1;
 			}
-			vj_font_customize_osd(info->osd, info );
+			vj_font_customize_osd(info->osd, info, info->use_osd );
 			vj_font_render( info->osd, font_frame , settings->current_frame_num );
 		}
 	}

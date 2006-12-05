@@ -244,7 +244,8 @@ void	vj_event_font_set_position(void *ptr,	const char format[],	va_list	ap	);
 void	vj_event_font_set_color(void *ptr,	const char format[],	va_list	ap	);
 void	vj_event_font_set_size_and_font(void *ptr,const char format[],	va_list	ap	);
 void	vj_event_select_subtitle( void *ptr, const char format[],  va_list ap	);
-void	vj_event_toggle_osd( void *ptr, const char format, va_list ap );
+void	vj_event_toggle_osd( void *ptr, const char format[], va_list ap );
+void	vj_event_toggle_copyright( void *ptr, const char format[], va_list ap );
 #endif
 
 #endif

@@ -699,7 +699,6 @@ void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
 void chroma_supersample(subsample_mode_t mode,void *data, uint8_t *ycbcr[],
 			int width, int height)
 {
-
   switch (mode) {
   case SSM_420_JPEG_BOX:
       	ss_420jpeg_to_444(ycbcr[1], width, height);

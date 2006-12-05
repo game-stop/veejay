@@ -2231,6 +2231,16 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
+	index_map_[ VIMS_COPYRIGHT ] 			= _new_event(
+				NULL,
+				VIMS_OSD,
+				"Print copyright",
+				vj_event_toggle_copyright,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL
+				);
+
 	index_map_[ VIMS_OSD ] 			= _new_event(
 				NULL,
 				VIMS_OSD,

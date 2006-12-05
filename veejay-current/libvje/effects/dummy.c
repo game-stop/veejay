@@ -63,9 +63,9 @@ void dummy_apply( VJFrame *frame, int width, int height, int color)
     colorCb = bl_pix_get_color_cb(color);
     colorCr = bl_pix_get_color_cr(color);
   
-    memset( Y, colorY, len);
-    memset( Cb,colorCb,uv_len);
-    memset( Cr,colorCr,uv_len);
+    veejay_memset( Y, colorY, len);
+    veejay_memset( Cb,colorCb,uv_len);
+    veejay_memset( Cr,colorCr,uv_len);
 }
 
 void dummy_rgb_apply( VJFrame *frame, int width, int height, int r,int g, int b)
@@ -81,8 +81,8 @@ void dummy_rgb_apply( VJFrame *frame, int width, int height, int r,int g, int b)
  
 	_rgb2yuv(r,g,b,colorY,colorCb,colorCr);
   
- 	memset( Y, colorY, len);
-    	memset( Cb,colorCb,uv_len);
-   	memset( Cr,colorCr,uv_len);
+ 	veejay_memset( Y, colorY, len);
+    	veejay_memset( Cb,colorCb,uv_len);
+   	veejay_memset( Cr,colorCr,uv_len);
 }
 void dummy_free(){}

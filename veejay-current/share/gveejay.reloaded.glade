@@ -589,7 +589,6 @@
 
 	      <child>
 		<widget class="GtkButton" id="quicklaunch">
-		  <property name="visible">True</property>
 		  <property name="tooltip" translatable="yes">localhost:3490</property>
 		  <property name="can_focus">True</property>
 		  <property name="relief">GTK_RELIEF_HALF</property>
@@ -616,7 +615,6 @@
 
 	      <child>
 		<widget class="GtkButton" id="disconnect2">
-		  <property name="visible">True</property>
 		  <property name="tooltip" translatable="yes">Disconnect</property>
 		  <property name="can_focus">True</property>
 		  <property name="relief">GTK_RELIEF_HALF</property>

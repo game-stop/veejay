@@ -499,7 +499,7 @@ static	void	add_to_plugin_list( const char *path )
 		return;
 
 	int i;
-	char fullname[PATH_MAX+1];
+	char fullname[PATH_MAX];
 	struct	dirent	**files = NULL;
 	struct stat sbuf;
 	int	res = 0;
@@ -525,7 +525,6 @@ static	void	add_to_plugin_list( const char *path )
 		return;
 	}
 	int n_files = scandir( path, &files, select_f, alphasort );
-veejay_msg(VEEJAY_MSG_DEBUG, "%d: '%s' ",n_files, path );
 	if( n_files <= 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "No FF plugins found in %s", path );
@@ -541,7 +540,7 @@ veejay_msg(VEEJAY_MSG_DEBUG, "%d: '%s' ",n_files, path );
 			veejay_msg(VEEJAY_MSG_ERROR, "'%s' marked as bad", name);
 			continue; 
 		}
-		bzero(fullname , PATH_MAX+1);
+		bzero(fullname , PATH_MAX);
 		sprintf(fullname, "%s/%s", path,name );
 
 		void *handle = dlopen(fullname, RTLD_NOW );

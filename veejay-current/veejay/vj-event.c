@@ -207,6 +207,7 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_u,		VIMS_MOD_NONE,	"6 -1"	},
 	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_o,		VIMS_MOD_NONE,	"7 -1"	},
 	{ VIMS_OSD,				SDLK_o,		VIMS_MOD_CTRL,  NULL	},
+	{ VIMS_COPYRIGHT,			SDLK_c,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_SELECT_BANK,			SDLK_1,		VIMS_MOD_NONE,	"1"	},
 	{ VIMS_SELECT_BANK,			SDLK_2,		VIMS_MOD_NONE,	"2"	},
 	{ VIMS_SELECT_BANK,			SDLK_3,		VIMS_MOD_NONE,	"3"	},
@@ -6033,7 +6034,7 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 
 }
 
-void	vj_event_toggle_osd( void *ptr, const char format, va_list ap )
+void	vj_event_toggle_osd( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
 	if(v->use_osd == 0 )
@@ -6041,7 +6042,17 @@ void	vj_event_toggle_osd( void *ptr, const char format, va_list ap )
 	else
 		v->use_osd = 0;
 }
-
+void	vj_event_toggle_copyright( void *ptr, const char format[], va_list ap )
+{
+	static int old_osd = -1;
+	veejay_t *v = (veejay_t*) ptr;
+	if( old_osd == -1 )
+		old_osd = v->use_osd;
+	if(v->use_osd == 0 || v->use_osd == 1)
+		v->use_osd = 2;
+	else
+		v->use_osd = (old_osd==-1?0: old_osd);
+}
 
 void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 {

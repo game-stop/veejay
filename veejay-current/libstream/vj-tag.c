@@ -2117,9 +2117,9 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	if(!tag) return -1;  
 
     if( vj_tag_input->pix_fmt == FMT_420|| vj_tag_input->pix_fmt == FMT_420F)
-	    uv_len = uv_len / 4;
+	    uv_len = len / 4;
     else
-	    uv_len = uv_len / 2;
+	    uv_len = len / 2;
 
     switch (tag->source_type) {
 	case VJ_TAG_TYPE_V4L:

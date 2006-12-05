@@ -1002,6 +1002,8 @@ static int	test_font( vj_font_t *f , const char *font, int id)
 	if( n2 <= 2 )
 	{
 		FT_Done_Face(face);
+		free(name1);
+		free(name2);
 		return 0;
 	}
 	
@@ -1174,8 +1176,16 @@ void	vj_font_destroy(void *ctx)
 		free(f->index);
 	}
 
-	if(f->face)
+	if( f->face )
+	{
+		int c;
+		for( c = 0; c < 256 ; c ++)
+		{
+			if( f->glyphs[c] )
+				FT_Done_Glyph( f->glyphs[c] );
+		}
 		FT_Done_Face( f->face );
+	}
 
 	if(f->plain)
 		vj_font_dictionary_destroy( f->plain );
@@ -1279,16 +1289,31 @@ void	*vj_font_get_plain_dict( void *font )
 	return f->plain;
 }
 
-void	vj_font_customize_osd( void *font,void *uc )
+void	vj_font_print_credits(void *font, char *text)
+{
+	vj_font_t *f = (vj_font_t*) font;
+	
+	static const char *intro = 
+		"A visual instrument for GNU/Linux\n";
+	static const char *license =
+		"This program is licensed as\n     Free Software (GNU/GPL version 2)\n\nFor more information see:\nhttp://veejay.dyne.org\nhttp://www.sourceforge.net/projects/veejay\nhttp://www.gnu.org";
+	static const char *copyr =
+		"(C) 2002-2006 Copyright N.Elburg et all\n";
+		
+		
+	//@ create text to print
+	sprintf(text, "This is Veejay version %s\n%s\n%s\n%s",VERSION,intro,copyr,license);
+	
+	
+}
+
+
+void	vj_font_customize_osd( void *font,void *uc, int type )
 {
 	vj_font_t *f = (vj_font_t*) font;
 	veejay_t *v = (veejay_t*) uc;
 	video_playback_setup *settings =v->settings;
 	
-#ifdef STRICT_CHECKING
-	assert(f->time == 1 );
-#endif
-
 	char buf[256];
 
 	switch( v->uc->playback_mode )
@@ -1316,6 +1341,7 @@ void	vj_font_customize_osd( void *font,void *uc )
 	if(f->add)
 		free(f->add);
 	f->add = strdup( buf );
+	f->time = type;
 }
 
 void	vj_font_set_constraints_and_dict( void *font, long lo, long hi, float fps, void *dict )
@@ -1842,15 +1868,7 @@ static void vj_font_text_osd_render(vj_font_t *f, long posi, void *_picture )
 	FT_GlyphSlot  slot = face->glyph;
 	FT_Vector pos[MAXSIZE_TEXT];  
 	FT_Vector delta;
-	char osd_text[256];
-  	unsigned char *tmp_text = vj_font_pos_to_timecode( f, posi );
-
-	int size = strlen(osd_text);
-	if( f->add )
-		sprintf(osd_text, "%s %s", tmp_text, f->add );
-	else
-		sprintf(osd_text, "%s", tmp_text );
-	
+	char osd_text[1024];
 	unsigned char c;
 	int x = 0, y = 0, i=0;
 	int str_w, str_w_max;
@@ -1861,8 +1879,27 @@ static void vj_font_text_osd_render(vj_font_t *f, long posi, void *_picture )
 	int x1,y1;
 	str_w = str_w_max = 0;
 
-	x = 0; 
-	y = picture->height - f->current_size - 4;
+	int size = 0;
+	if(f->time == 2 )
+	{
+		vj_font_print_credits(f,osd_text);
+		size = strlen(osd_text);
+
+	}
+	else
+	{
+		unsigned char *tmp_text = vj_font_pos_to_timecode( f, posi );
+
+		if( f->add )
+			sprintf(osd_text, "%s %s", tmp_text, f->add );
+		else
+			sprintf(osd_text, "%s", tmp_text );
+		size = strlen( osd_text );
+		free(tmp_text);
+
+		y = picture->height - f->current_size - 4;
+	}
+
 	x1 = x;
 	y1 = y;	
 	
@@ -1947,8 +1984,6 @@ static void vj_font_text_osd_render(vj_font_t *f, long posi, void *_picture )
 	    	
       		x += slot->advance.x >> 6;
     	}
-
-	free(tmp_text);
 }
 
 

@@ -478,7 +478,10 @@ void chromamagic_freeze(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 		b = Cb2[i];
 		if ( a < pixel_U_lo_ ) a = pixel_U_lo_;
 		if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
-		c = 255 - ((256-a) * (256 - a)) / b;
+		if(b)
+			c = 255 - ((256-a) * (256 - a)) / b;
+		else
+			c = 255 - a;
 		Cb[i] = CLAMP_UV(c);
 
 		a = Cr[i];
@@ -486,7 +489,10 @@ void chromamagic_freeze(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 		if ( a < pixel_U_lo_ ) a = pixel_U_lo_;
 		if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
 
+		if(b)
 		c = 255 - (( 256 - a ) * ( 256 - a )) / b;
+		else
+			c= 255 -a;
 		Cr[i] = CLAMP_UV(c);
 	}
 

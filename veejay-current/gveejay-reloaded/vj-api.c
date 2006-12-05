@@ -256,7 +256,6 @@ static  int vims_verbosity = 0;
 #define   livido_port_t vevo_port_t
 
 static	vevo_port_t *fx_list_ = NULL;
-static  vevo_port_t *fx_clipboard_ = NULL;
 
 typedef struct
 {
@@ -565,10 +564,7 @@ void setup_knobs();
 void   free_samplebank(void);
 void   reset_samplebank(void);
 int   verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_type );
-static void clone_clipboard_entry(void);
 static void widget_get_rect_in_screen (GtkWidget *widget, GdkRectangle *r);
-static void    preset_from_clipboard(char *mkey);
-static void online_update(int keyp, int value);
 static  void   update_curve_widget(const char *name);
 static void    update_curve_accessibility(const char *name);
 static void	vj_preview_draw(void);
@@ -1580,7 +1576,9 @@ gboolean	dialogkey_snooper( GtkWidget *w, GdkEventKey *event, gpointer user_data
 		gchar *text = gdkkey_by_id( event->keyval );
 		gchar *mod  = gdkmod_by_id( event->state );
 
-		if( mod != NULL )
+veejay_msg(0, "%d : %d, %p, %p", event->keyval, event->state ,text,mod);
+		
+		if( mod != NULL && text != NULL)
 		{
 			if(strlen(mod) < 2 )
 				sprintf(tmp, "%s", text );
@@ -3672,123 +3670,6 @@ static	void	load_v4l_info()
 	}
 }
 
-static void online_update(int keyp, int value)
-{
-	char mkey[16];
-	sprintf( mkey, "i%d", info->uc.selected_chain_entry );
-	vevo_port_t *cur = NULL;
-	vevo_property_get( fx_clipboard_, mkey, 0, &cur );
-	if(!cur)
-		return;
-	char key[16];
-	sprintf(key, "parameter%d", keyp);
-	vevo_property_set( cur, key, LIVIDO_ATOM_TYPE_INT,1,&value );
-}
-
-static void update_clipboard(int fxid, int np, int *args)
-{
-	int i;
-	char mkey[5];
-	sprintf( mkey, "i%d", info->uc.selected_chain_entry );
-	vevo_port_t *cur = NULL;
-	vevo_property_get( fx_clipboard_, mkey, 0, &cur );
-
-	if( !cur )
-	{
-		cur = (vevo_port_t*) vpn( 400 );
-		vevo_property_set( fx_clipboard_, mkey, LIVIDO_ATOM_TYPE_VOIDPTR,1,&cur);
-	}
-
-	int id = fxid;
-	int nn = np;
-
-	vevo_property_set( cur, "fxid",LIVIDO_ATOM_TYPE_INT, 1, &id );
-
-	for( i =  0; i < nn; i ++ )
-	{
-		char pname[16];
-		sprintf(pname, "parameter%d",i);
-		int value = args[i];
-		vevo_property_set(cur, pname, LIVIDO_ATOM_TYPE_INT,1, &value );
-	}
-
-	vevo_property_set( cur, "num_param", LIVIDO_ATOM_TYPE_INT,1, &i );
-}
-
-static void clone_clipboard_entry(void)
-{
-	char mkey[5];
-	sprintf( mkey, "i%d", info->uc.selected_chain_entry );
-	vevo_port_t *cur = NULL;
-	vevo_port_t *buf = NULL;
-	int fxid = 0;
-	int np = 0;
-	int i;
-
-	vevo_property_get( fx_clipboard_, mkey, 0, &cur );
-	if( !cur )
-		return;
-
- 	vevo_property_get( cur, "fxid", 0, &fxid );
- 	vevo_property_get( cur, "num_param", 0, &np );
-
-	vevo_property_get( fx_clipboard_, "buffer", 0, &buf );
-	if( !buf )
-	{
-		buf = (vevo_port_t*) vpn( 500 );
-		vevo_property_set( fx_clipboard_, "buffer", LIVIDO_ATOM_TYPE_VOIDPTR,1,&buf);
-	}
-
-	vevo_property_set( buf, "fxid", LIVIDO_ATOM_TYPE_INT,1,&fxid );
-	vevo_property_set( buf, "num_param", LIVIDO_ATOM_TYPE_INT, 1, &np );
-
-	for( i =  0; i < np; i ++ )
-	{
-		char pname[5];
-		sprintf(pname, "parameter%d",i);
-		int value = 0;
-		vevo_property_get(cur, pname,0, &value);
-		vevo_property_set(buf, pname, LIVIDO_ATOM_TYPE_INT,1, &value );
-	}
-}
-
-static	void	preset_from_clipboard(char *mkey)
-{
-	vevo_port_t *cur = NULL;
-	vevo_property_get( fx_clipboard_, mkey, 0, &cur );
-	
-	if(!cur)
-		return;
-
-	int fxid = 0;
-	int np = 0;
-	int i;
-	char msg[100];
-
-	vevo_property_get( cur, "fxid", 0, &fxid );
-	vevo_property_get( cur, "num_param", 0, &np );
-
-	sprintf( msg, "%03d:%d %d %d ", VIMS_CHAIN_ENTRY_SET_PRESET,0, 
-			info->uc.selected_chain_entry, fxid );
-
-	for( i =  0; i < np; i ++ )
-	{
-		char pname[5];
-		sprintf(pname, "parameter%d",i);
-		int value = 0;
-		vevo_property_get(cur, pname,0, &value);
-		char token[10];
-		sprintf(token, "%d ", value);
-		strcat(msg,token);
-	}
-
-	int len = strlen(msg);
-	msg[len-1] = ';';
-	msg[len]   = '\0';
-	msg_vims( msg );
-	info->uc.reload_hint[HINT_ENTRY] = 1;
-}
-
 static	gint load_parameter_info()
 {
 	int	*st = &(info->uc.entry_tokens[0]);
@@ -3839,12 +3720,11 @@ static	gint load_parameter_info()
 	for( i = 0; i < 16; i ++ )
 		st[i] = p[i];
 
-	update_clipboard( p[0],p[2], q);
-
 	g_free(answer);
 
 	return 1;
 }	  
+
 
 // load effect chain
 static	void	load_effectchain_info()
@@ -6190,7 +6070,6 @@ void	vj_gui_free()
 	}
 	info = NULL;
 
-	vevo_port_free( fx_clipboard_ );
 	vevo_port_free( fx_list_ );
 }
 
@@ -6504,8 +6383,6 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	create_ref_slots(skin__ == 0 ? MEM_SLOT_SIZE/4: MEM_SLOT_SIZE);
 	
 	gtk_widget_show( info->sample_bank_pad );
-
-	fx_clipboard_ = vpn( 300 );
 
 	info->elref = NULL;
 	info->effect_info = NULL;

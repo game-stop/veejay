@@ -505,7 +505,6 @@ void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 
 #define	slider_changed( arg_num, value ) \
 {\
-online_update( arg_num, value );\
 if(!info->status_lock && !info->parameter_lock)\
 	{\
 info->parameter_lock = 1;\
@@ -517,7 +516,6 @@ info->parameter_lock = 0;\
 
 #define	param_changed( arg_num, fraction, name ) \
 {\
-online_update( arg_num, (get_slider_val(name) + fraction) );\
 if(!info->status_lock && !info->parameter_lock)\
 {\
 info->parameter_lock = 1;\
@@ -2496,25 +2494,88 @@ void	on_colorselection_color_changed( GtkWidget *w, gpointer user_data)
 {
 	DBG_C();
 }
+static 
+gchar *get_clipboard_fx_buffer()
+{
+	int	len = 0;
+	int	p[16];
+	int 	i;
+	for(i=0; i <16;i++)
+		p[i] = 0;	
+	multi_vims( VIMS_CHAIN_GET_ENTRY, "%d %d", 0, 
+		info->uc.selected_chain_entry );
+
+	gchar *answer = recv_vims(3,&len);
+	if(len <= 0 || answer == NULL )
+	{
+		if(answer) g_free(answer);
+		return NULL;
+	}
+
+	i = sscanf( answer, "%d %d %d %d %d %d %d %d %d %d %d",
+			&p[0], //fx id
+			&p[1], //2 video
+			&p[2], //n params
+			&p[3], //p0
+			&p[4], //p1
+			&p[5], //p2
+			&p[6], //p3
+			&p[7],//p4
+			&p[8],//p5
+			&p[9],//p6
+			&p[10] //p7
+			);	
+	
+	char preset[512];
+	bzero(preset,512);
+	sprintf(preset, "%d", p[0]);
+	veejay_msg(0, "%s", answer);
+	for(i=0;  i < p[2] ;i++)
+	{
+		char tmp[10];
+		sprintf(tmp, " %d", p[3+i] );
+		strcat( preset,tmp);
+	}
+	g_free(answer);
+	return strdup(preset);
+}	 
+
+static	*last_fx_buf = NULL;
 void	on_button_fx_cut_clicked( GtkWidget *w, gpointer user_data)
 {
-	DBG_C();
+	if(last_fx_buf)
+		free(last_fx_buf);
+	
+	last_fx_buf = get_clipboard_fx_buffer();
 
-	clone_clipboard_entry();
 	on_button_fx_del_clicked( NULL,NULL );
 }
 
 void	on_button_fx_paste_clicked( GtkWidget *w, gpointer user_data)
 {
-	DBG_C();
+	int i = info->uc.selected_chain_entry;
+	sample_slot_t *s = info->selected_slot;
 
-	preset_from_clipboard( "buffer" );
+	if( last_fx_buf && s)
+	{
+		char msg[256];
+		sprintf( msg, "%03d:%d %d %s;",
+			VIMS_CHAIN_ENTRY_SET_PRESET,
+			s->sample_id,
+			i,
+			last_fx_buf );
+		msg_vims(msg);
+		info->uc.reload_hint[HINT_ENTRY]=1;
+	}
+	
+	
 }	
 void	on_button_fx_copy_clicked(GtkWidget *w, gpointer user_data)
 {
-	DBG_C();
-
-	clone_clipboard_entry();
+	if(last_fx_buf)
+		free(last_fx_buf);
+	
+	last_fx_buf = get_clipboard_fx_buffer();
 }
 void	on_copy1_activate( GtkWidget *w, gpointer user_data)
 {
