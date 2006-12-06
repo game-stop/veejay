@@ -62,13 +62,13 @@ static int simple_frame_duplicator;
 
 static int performer_framelen = 0;
 
-struct ycbcr_frame {
+typedef struct {
     uint8_t *Y;
     uint8_t *Cb;
     uint8_t *Cr;
     uint8_t *alpha;
     int	     ssm;
-};
+} ycbcr_frame;
 
 typedef struct {
 	int	fader_active;
@@ -85,10 +85,10 @@ static void 	*effect_sampler = NULL;
 static void	*crop_sampler = NULL;
 static VJFrame *crop_frame = NULL;
 #endif
-static struct ycbcr_frame **video_output_buffer; /* scaled video output */
+static ycbcr_frame **video_output_buffer; /* scaled video output */
 static int	video_output_buffer_convert = 0;
-static struct ycbcr_frame **frame_buffer;	/* chain */
-static struct ycbcr_frame **primary_buffer;	/* normal */
+static ycbcr_frame **frame_buffer;	/* chain */
+static ycbcr_frame **primary_buffer;	/* normal */
 static int	current_sampling_fmt_ = -1; //invalid
 #define CACHE_TOP 0
 #define CACHE 1
@@ -103,7 +103,7 @@ static uint8_t *tmp_audio_buffer;
 static uint8_t *x_audio_buffer;
 static uint8_t *temp_buffer[3];
 static uint8_t *socket_buffer;
-struct ycbcr_frame *record_buffer;	// needed for recording invisible streams
+static ycbcr_frame *record_buffer;	// needed for recording invisible streams
 static	short	*priv_audio[2];
 static VJFrame *helper_frame;
 #ifdef HAVE_FREETYPE
@@ -149,10 +149,6 @@ static int vj_perform_get_subtagframe(veejay_t * info, int sub_sample, int chain
 static int vj_perform_get_subframe(veejay_t * info, int sub_sample,int chain_entyr );
 static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chain_entry );
 static void vj_perform_reverse_audio_frame(veejay_t * info, int len, uint8_t *buf );
-
-
-
-
 
 static int vj_perform_tag_is_cached(int chain_entry, int tag_id)
 {
@@ -202,8 +198,8 @@ void vj_perform_clear_frame_info(int entry)
 
 static void vj_perform_clear_cache()
 {
-    veejay_memset(cached_tag_frames, 0 , CACHE_SIZE);
-    veejay_memset(cached_sample_frames, 0, CACHE_SIZE);
+    veejay_memset(cached_tag_frames, 0 , sizeof(cached_tag_frames));
+    veejay_memset(cached_sample_frames, 0, sizeof(cached_sample_frames));
 }
 
 /********************************************************************
@@ -511,7 +507,7 @@ int vj_perform_init(veejay_t * info)
     int c;
     // buffer used to store encoded frames (for plain and sample mode)
     performer_framelen = frame_len *2;
-    frame_buffer = (struct ycbcr_frame **) vj_malloc(sizeof(struct ycbcr_frame *) * SAMPLE_MAX_EFFECTS);
+    frame_buffer = (ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame*) * SAMPLE_MAX_EFFECTS);
     if(!frame_buffer) return 0;
 
 	if( info->video_out == 4)
@@ -522,16 +518,16 @@ int vj_perform_init(veejay_t * info)
 	}
 
     
-    record_buffer = (struct ycbcr_frame*) vj_malloc(sizeof(struct ycbcr_frame) );
+    record_buffer = (ycbcr_frame*) vj_malloc(sizeof(ycbcr_frame) );
     if(!record_buffer) return 0;
     record_buffer->Y = NULL;
     record_buffer->Cb = NULL;
     record_buffer->Cr = NULL;
     // storing resulting frames
     primary_buffer =
-	(struct ycbcr_frame **) vj_malloc(sizeof(struct ycbcr_frame **) * 2); 
+	(ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * 2); 
     if(!primary_buffer) return 0;
-    primary_buffer[0] = (struct ycbcr_frame*) vj_malloc(sizeof(struct ycbcr_frame));
+    primary_buffer[0] = (ycbcr_frame*) vj_malloc(sizeof(ycbcr_frame));
     if(!primary_buffer[0]) return 0;
     primary_buffer[0]->Y = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
     if(!primary_buffer[0]->Y) return 0;
@@ -544,13 +540,13 @@ int vj_perform_init(veejay_t * info)
     veejay_memset(primary_buffer[0]->Cr,128, frame_len);
     video_output_buffer_convert = 0;
     video_output_buffer =
-	(struct ycbcr_frame**) vj_malloc(sizeof(struct ycbcr_frame**) * 2 );
+	(ycbcr_frame**) vj_malloc(sizeof(ycbcr_frame*) * 2 );
     if(!video_output_buffer)
 	return 0;
 
     for(c=0; c < 2; c ++ )
 	{
-	    video_output_buffer[c] = (struct ycbcr_frame*) vj_malloc(sizeof(struct ycbcr_frame));
+	    video_output_buffer[c] = (ycbcr_frame*) vj_malloc(sizeof(ycbcr_frame));
 	    video_output_buffer[c]->Y = NULL;
 	    video_output_buffer[c]->Cb = NULL;
 	    video_output_buffer[c]->Cr = NULL; 
@@ -575,20 +571,16 @@ int vj_perform_init(veejay_t * info)
 
     /* allocate space for frame_buffer, the place we render effects  in */
     for (c = 0; c < SAMPLE_MAX_EFFECTS; c++) {
-	frame_buffer[c] = (struct ycbcr_frame *) vj_malloc(sizeof(struct ycbcr_frame));
+	frame_buffer[c] = (ycbcr_frame *) vj_malloc(sizeof(ycbcr_frame));
         if(!frame_buffer[c]) return 0;
-
-	frame_buffer[c]->Y = NULL;
-	frame_buffer[c]->Cb = NULL;
-	frame_buffer[c]->Cr = NULL;
-	frame_buffer[c]->ssm = 0;
+	veejay_memset( frame_buffer[c],0, sizeof(ycbcr_frame));
     }
     // clear the cache information
 	vj_perform_clear_cache();
-	memset( frame_info[0],0,SAMPLE_MAX_EFFECTS);
+	veejay_memset( frame_info[0],0,SAMPLE_MAX_EFFECTS);
 
-    helper_frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
-    memcpy(helper_frame, info->effect_frame1, sizeof(VJFrame));
+	    helper_frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
+	    veejay_memcpy(helper_frame, info->effect_frame1, sizeof(VJFrame));
  
     vj_perform_record_buffer_init();
 #ifdef HAVE_FREETYPE
@@ -909,7 +901,7 @@ int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop )
 	if(crop)
 	{
 		VJFrame src;
-		memset( &src, 0, sizeof(VJFrame));
+		veejay_memset( &src, 0, sizeof(VJFrame));
 
 		vj_get_yuv_template( &src,
 				info->edit_list->video_width,
@@ -973,13 +965,13 @@ void vj_perform_init_output_frame( veejay_t *info, uint8_t **frame,
 
 	video_output_buffer[i]->Y = (uint8_t*)
 			vj_malloc(sizeof(uint8_t) * dst_w * dst_h );
-	memset( video_output_buffer[i]->Y, 16, dst_w * dst_h );
+	veejay_memset( video_output_buffer[i]->Y, 16, dst_w * dst_h );
 	video_output_buffer[i]->Cb = (uint8_t*)
 			vj_malloc(sizeof(uint8_t) * dst_w * dst_h );
-	memset( video_output_buffer[i]->Cb, 128, dst_w * dst_h );
+	veejay_memset( video_output_buffer[i]->Cb, 128, dst_w * dst_h );
 	video_output_buffer[i]->Cr = (uint8_t*)
 			vj_malloc(sizeof(uint8_t) * dst_w * dst_h );
-	memset( video_output_buffer[i]->Cr, 128, dst_w * dst_h );
+	veejay_memset( video_output_buffer[i]->Cr, 128, dst_w * dst_h );
 
 	}
 	frame[0] = video_output_buffer[0]->Y;
@@ -1300,7 +1292,6 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,
     int sample_b[4];
 
     int offset = sample_get_offset(a, chain_entry);	
-    int nset = offset;
     int len_a, len_b;
 	if(sample_get_short_info(b,&sample_b[0],&sample_b[1],&sample_b[2],&sample_b[3])!=0) return -1;
 
@@ -1338,7 +1329,7 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,
 			}
 		}
 		sample_set_offset(a,chain_entry,offset);
-		return (sample_b[0] + nset);
+		return (sample_b[0] + offset);
 	}
 	else
 	{	/* sub sample plays reverse */
@@ -1369,7 +1360,7 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,
 		}
 		sample_set_offset(a, chain_entry, offset);
 	
-		return (sample_b[1] + nset);
+		return (sample_b[1] + offset);
 	}
 	return 0;
 }
@@ -1881,9 +1872,8 @@ static int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
  * returns 0 on success 
  */
 
-static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry, int sampled)
+static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 {
-	int result = sampled;
 	VJFrame *frames[2];
 	VJFrameInfo *frameinfo;
 	video_playback_setup *settings = info->settings;
@@ -1985,7 +1975,7 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry, in
 	return 0;
 }
 
-static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry, int sampled)
+static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 {
 	int result = 0;
 	VJFrame *frames[2];
@@ -2143,8 +2133,7 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int entry, int *h
 
 	for(chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
 	{
-		vj_perform_render_chain_entry(	
-				info, chain_entry, 0);
+		vj_perform_render_chain_entry(info, chain_entry);
 	}
 	*hint444 = frames[0]->ssm;
 	return 1;
@@ -2183,8 +2172,7 @@ static int vj_perform_tag_complete_buffers(veejay_t * info, int entry, int *hint
 
 	for(chain_entry = 0; chain_entry < SAMPLE_MAX_EFFECTS; chain_entry++)
 	{
-		vj_perform_tag_render_chain_entry(	
-				info, chain_entry, 0);
+		vj_perform_tag_render_chain_entry( info, chain_entry);
 	}
 
 	*hint444 = frames[0]->ssm;
