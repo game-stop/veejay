@@ -93,9 +93,6 @@ AC_ARG_WITH(swscaler,
 		AC_HELP_STRING([--with-swscaler], [Build without Swscaler support]),
 		[with_swscaler=yes],
 		[with_swscaler=no])
-AC_ARG_WITH(freetype2,
-		AC_HELP_STRING([--without-freetype2], [Do not use the freetype library]),
-		[], [with_freetype2=yes])
 AC_ARG_WITH(jpeg,
 		AC_HELP_STRING([--without-jpeg], [Do not JPEG support]),
 		[],	[with_libjpeg=yes])
@@ -467,7 +464,6 @@ AM_PATH_XML2(2.5.4, [
 fi
 
 have_freetype=false
-if test x$with_freetype2 != xno; then
 AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
 if test $FREETYPE_CONFIG = yes; then
   FT_CFLAGS="`freetype-config --cflags`"
@@ -487,8 +483,9 @@ if test $FREETYPE_CONFIG = yes; then
   AC_SUBST(FT_LDFLAGS)
   AC_SUBST(FT_CFLAGS)
   have_freetype=true
+else
+ AC_MSG_ERROR([Cannot find the freetype-config program])
 fi  
-fi
 
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""

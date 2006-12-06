@@ -1202,6 +1202,7 @@ void vj_event_update_remote(void *ptr)
 					v->uc->current_link = i;
 					char buf[MESSAGE_SIZE];
 					int n = 0;
+					veejay_memset( buf,0,MESSAGE_SIZE);
 					while( vj_server_retrieve_msg(v->vjs[0],i,buf) != 0 )
 					{
 						vj_event_parse_msg( v, buf );

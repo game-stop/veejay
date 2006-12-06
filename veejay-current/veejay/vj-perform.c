@@ -1955,7 +1955,7 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry, in
 					frameinfo->height );
 				frames[0]->ssm = 1;
 			}
-			else if(!sub_mode && frames[1]->ssm == 1)
+			else if(!sub_mode && frames[0]->ssm == 1)
                         {
                                 chroma_subsample(
                                         settings->sample_mode,
