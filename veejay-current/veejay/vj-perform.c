@@ -984,7 +984,15 @@ void vj_perform_init_output_frame( veejay_t *info, uint8_t **frame,
 
 static int __global_frame = 0; 
 static int __socket_len = 0;
+static int __send_frame = 0;
+
+
 int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
+{
+	__send_frame = (mcast ? 2: 1 );
+}
+
+int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast)
 {
 //	if(!info->settings->use_vims_mcast)
 //		return 1;
@@ -995,40 +1003,33 @@ int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 		/* dont send frames if nobody is interested */
 		return 1; 
 	}
-//	info->settings->links[ info->uc->current_link ] = 1;
 
 	if(!mcast && __global_frame)
 		return 1; // 
 
-	int w = info->edit_list->video_width;
-	int h = info->edit_list->video_height;
-	int len = 0;
-	int total_len = helper_frame->len + helper_frame->uv_len + helper_frame->uv_len;
+	const int len = info->effect_frame1->width * info->effect_frame1->height;
+	const int uv_len = info->effect_frame1->uv_width * info->effect_frame1->uv_height;
+	const int total_len = (2*uv_len) + len;
+	int hlen =0;
 
 	if( !mcast )
 	{
 		/* peer to peer connection */
 		unsigned char info_line[12];
-		sprintf(info_line, "%04d %04d %1d", w,h, info->edit_list->pixel_format );
-		len = strlen(info_line );
-		veejay_memcpy( socket_buffer, info_line, len );
+		sprintf(info_line, "%04d %04d %1d", info->effect_frame1->width,
+				info->effect_frame1->height, info->edit_list->pixel_format );
+		hlen = strlen(info_line );
+		veejay_memcpy( socket_buffer, info_line, hlen );
 	}
-	veejay_memcpy( socket_buffer + len, primary_buffer[0]->Y, helper_frame->len );
-	veejay_memcpy( socket_buffer + len + helper_frame->len,
-					    primary_buffer[0]->Cb, helper_frame->uv_len );
-	veejay_memcpy( socket_buffer + len + helper_frame->len + helper_frame->uv_len ,
-					    primary_buffer[0]->Cr, helper_frame->uv_len );
+
+	veejay_memcpy( socket_buffer + hlen, primary_buffer[0]->Y, len );
+	veejay_memcpy( socket_buffer + hlen + len,primary_buffer[0]->Cb, uv_len );
+	veejay_memcpy( socket_buffer + hlen + len + uv_len, primary_buffer[0]->Cr, uv_len );
 
 	if(!mcast) __global_frame = 1;
 	int id = (mcast ? 2: 0);
 	
-	__socket_len = len + total_len;
-/*
-	if(vj_server_send_frame( info->vjs[id], info->uc->current_link, socket_buffer, len +total_len,
-				helper_frame, info->effect_frame_info, info->real_fps )<=0)
-	{
-	}
-*/
+	__socket_len = hlen + total_len;
 
 	// mcast frame sender = info->vjs[2] ??
 	if(vj_server_send_frame( info->vjs[id], info->uc->current_link, socket_buffer, __socket_len,
@@ -1037,7 +1038,6 @@ int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 		/* frame send error handling */
 		veejay_msg(VEEJAY_MSG_ERROR,
 		  "Error sending frame to remote");
-		/* uncomment below to end veejay session */
 	}
 
 	return 1;
@@ -2835,6 +2835,14 @@ static	int	vj_perform_render_font( veejay_t *info, video_playback_setup *setting
 			);
 		frame->ssm = 0;
 	}
+
+	if( __send_frame )
+	{
+		vj_perform_send_primary_frame_s2(info, __send_frame == 2 ? 2 : 0);
+		__send_frame = 0;
+	}
+
+	
 	return ds;
 }
 int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
