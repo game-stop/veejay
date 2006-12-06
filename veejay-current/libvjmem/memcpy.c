@@ -652,7 +652,6 @@ void find_best_memcpy()
 
      if (best) {
           veejay_memcpy = memcpy_method[best].function;
-	  veejay_msg(VEEJAY_MSG_INFO, "Using %s", memcpy_method[best].name );
      }
 
      free( buf1 );
@@ -700,7 +699,6 @@ void find_best_memset()
 
      if (best) {
           veejay_memset = memset_method[best].function;
-	  veejay_msg(VEEJAY_MSG_INFO, "Using %s", memset_method[best].name);
      }
 
      free( buf1 );

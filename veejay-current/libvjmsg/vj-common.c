@@ -19,6 +19,7 @@
 #include <config.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <libvjmem/vjmem.h>
 #include "vj-common.h"
 
 #define TXT_RED		"\033[0;31m"
@@ -101,12 +102,11 @@ void veejay_msg(int type, const char format[], ...)
 
     // parse arguments
     va_start(args, format);
-    bzero(buf,256);
     vsnprintf(buf, sizeof(buf) - 1, format, args);
  
     if(!_message_his_status)
     {
-	memset( &_message_history , 0 , sizeof(vj_msg_hist));
+	veejay_memset( &_message_history , 0 , sizeof(vj_msg_hist));
 	_message_his_status = 1;
     }
 
@@ -193,7 +193,7 @@ char *veejay_pop_messages(int *num_lines, int *total_len)
 	if(len <= 0)
 		return res;
 
-	res = (char*) malloc(sizeof(char) * (len+1) );
+	res = (char*) vj_malloc(sizeof(char) * (len+1) );
 	if(!res)
 		return NULL;
 	bzero(res, len );

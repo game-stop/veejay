@@ -416,7 +416,7 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
                 return NULL;
 	}
         d->fmt = id;
-        memset( d->tmp_buffer, 0, width * height * 4 );
+        veejay_memset( d->tmp_buffer, 0, width * height * 4 );
 
         d->deinterlace_buffer[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height * 3);
         if(!d->deinterlace_buffer[0]) { if(d) free(d); return NULL; }
@@ -424,7 +424,7 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 		d->deinterlace_buffer[1] = d->deinterlace_buffer[0] + (width * height );
 		d->deinterlace_buffer[2] = d->deinterlace_buffer[0] + (2 * width * height );
 		
-        memset( d->deinterlace_buffer[0], 0, width * height * 3 );
+        veejay_memset( d->deinterlace_buffer[0], 0, width * height * 3 );
 
 	int i;
         d->ref = 1;
@@ -886,9 +886,9 @@ static int	vj_el_dummy_frame( uint8_t *dst[3], editlist *el ,int pix_fmt)
 {
 	const int uv_len = (el->video_width * el->video_height) / ( ( (pix_fmt==FMT_422||pix_fmt==FMT_422F) ? 2 : 4));
 	const int len = el->video_width * el->video_height;
-	memset( dst[0], 16, len );
-	memset( dst[1],128, uv_len );
-	memset( dst[2],128, uv_len );
+	veejay_memset( dst[0], 16, len );
+	veejay_memset( dst[1],128, uv_len );
+	veejay_memset( dst[2],128, uv_len );
 	return 1;
 }
 
@@ -1259,7 +1259,7 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
 	if(el->is_empty)
 	{
 		int ns = el->audio_rate / el->video_fps;
-		memset( dst, 0, sizeof(uint8_t) * ns * el->audio_bps );
+		veejay_memset( dst, 0, sizeof(uint8_t) * ns * el->audio_bps );
 		return 1;
 	}
 
@@ -1355,7 +1355,7 @@ int	vj_el_get_audio_frame_at(editlist *el, uint32_t nframe, uint8_t *dst, int nu
     if  (!el->has_video)
 	{
 		int size = el->audio_rate / el->video_fps * el->audio_bps;
-		memset(dst,0,size);
+		veejay_memset(dst,0,size);
 		return size;
 	}
 
@@ -1391,7 +1391,7 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 {
 	editlist *el = vj_malloc(sizeof(editlist));
 	if(!el) return NULL;
-	memset( el, 0, sizeof(editlist));
+	veejay_memset( el, 0, sizeof(editlist));
 	el->MJPG_chroma = chroma;
 	el->video_norm = norm;
 	el->is_empty = 1;
@@ -1446,7 +1446,7 @@ void	vj_el_close( editlist *el )
 editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int deinterlace, int force	,char norm , int fmt)
 {
 	editlist *el = vj_malloc(sizeof(editlist));
-	memset(el, 0, sizeof(editlist));
+	veejay_memset(el, 0, sizeof(editlist));
 	FILE *fd;
 	char line[1024];
 	uint64_t	index_list[MAX_EDIT_LIST_FILES];
@@ -1461,7 +1461,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 #ifdef USE_GDK_PIXBUF
 	vj_picture_init();
 #endif
-	memset( el, 0, sizeof(editlist) );  
+	veejay_memset( el, 0, sizeof(editlist) );  
 
 	el->has_video = 1; //assume we get it   
 	el->MJPG_chroma = CHROMA420;
@@ -1769,7 +1769,7 @@ void	vj_el_print(editlist *el)
 MPEG_timecode_t get_timecode(editlist *el, long num_frames)
 {
 	MPEG_timecode_t tc;
-	memset(&tc,0,sizeof(tc));
+	veejay_memset(&tc,0,sizeof(tc));
 	mpeg_timecode(&tc, num_frames,
 			mpeg_framerate_code( mpeg_conform_framerate( el->video_fps )),
 			el->video_fps );
@@ -1997,7 +1997,7 @@ void	vj_el_frame_cache(int n )
 editlist	*vj_el_soft_clone(editlist *el)
 {
 	editlist *clone = (editlist*) vj_malloc(sizeof(editlist));
-	memset( clone, 0, sizeof(editlist));
+	veejay_memset( clone, 0, sizeof(editlist));
 	if(!clone)
 		return 0;
 	clone->is_empty = el->is_empty;

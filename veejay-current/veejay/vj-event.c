@@ -1158,34 +1158,16 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 void vj_event_update_remote(void *ptr)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	int cmd_poll = 0;	// command port
-	int sta_poll = 0;	// status port
-	int new_link = -1;
-	int sta_link = -1;
-	int msg_link = -1;
-	int msg_poll = 0;
 	int i;
-	cmd_poll = vj_server_poll(v->vjs[0]);
-	sta_poll = vj_server_poll(v->vjs[1]);
-	msg_poll = vj_server_poll(v->vjs[3]);
-	// accept connection command socket    
 
-	if( cmd_poll > 0)
-	{
-		new_link = vj_server_new_connection ( v->vjs[0] );
-	}
-	// accept connection on status socket
-	if( sta_poll > 0) 
-	{
-		sta_link = vj_server_new_connection ( v->vjs[1] );
-	}
-	if( msg_poll > 0)
-	{
-		msg_link = vj_server_new_connection( v->vjs[3] );
-	}
-
-	// see if there is any link interested in status information
+	if( vj_server_poll( v->vjs[0] ) )
+		vj_server_new_connection( v->vjs[0] );
 	
+	if( vj_server_poll( v->vjs[1] ) )
+		vj_server_new_connection( v->vjs[1] );
+	if( vj_server_poll( v->vjs[3] ) )
+		vj_server_new_connection( v->vjs[3] );
+
 	for( i = 0; i <  VJ_MAX_CONNECTIONS; i ++ )
 		if( vj_server_link_used( v->vjs[1], i ))
 			veejay_pipe_write_status( v, i );
@@ -1201,7 +1183,7 @@ void vj_event_update_remote(void *ptr)
 			while( vj_server_retrieve_msg( v->vjs[2], 0, buf ) )
 			{
 				vj_event_parse_msg( v, buf );
-				bzero( buf, MESSAGE_SIZE );
+				veejay_memset( buf, 0, MESSAGE_SIZE );
 			}
 		}
 		
@@ -1219,12 +1201,11 @@ void vj_event_update_remote(void *ptr)
 				{
 					v->uc->current_link = i;
 					char buf[MESSAGE_SIZE];
-					bzero(buf, MESSAGE_SIZE);
 					int n = 0;
 					while( vj_server_retrieve_msg(v->vjs[0],i,buf) != 0 )
 					{
 						vj_event_parse_msg( v, buf );
-						bzero( buf, MESSAGE_SIZE );
+						veejay_memset( buf,0, MESSAGE_SIZE );
 						n++;
 					}
 				}	
@@ -1236,7 +1217,6 @@ void vj_event_update_remote(void *ptr)
 					_vj_server_del_client( v->vjs[3], i );
 					break;
 				}
-
 			}
 		}
 	}
@@ -1260,9 +1240,7 @@ void vj_event_update_remote(void *ptr)
 		free( cached_gdkimage_ );
 		cached_gdkimage_ = NULL;
 	}	
-
 	// clear image cache
-	
 }
 
 void	vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)

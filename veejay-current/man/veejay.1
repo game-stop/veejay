@@ -9,7 +9,7 @@ Veejay is a visual instrument and realtime video sampler. It allos you
 to "play" the video like you would play a Piano and it allows you to
 record the resulting video directly to disk for immediate playback (video sampling).
 
-Thus, Veejay can be operated live by using the keyboard (which is 100% user definable)
+Veejay can be operated live by using the keyboard (which is 100% user definable)
 and remotely over network (both unicast and multicast) using an inhouse message
 system that allows mapping of various protocols on top of it, including OSC.
 
@@ -22,9 +22,8 @@ performances and/or video installations.
 .TP
 MJPEG (either jpeg 4:2:0 or jpeg 4:2:2), YUV 4:2:0 i420/yv12 AVI, Quasar DV codec (only I-frames), MPEG4 (only I-frames)
 .TP
-.SH Supported video output drivers
-.TP
-Matrox G400/G440/G550 users can specify an (optional) output driver that uses the DirectFB library. It enables the CRTC2 (secondary head) , displaying video independently of the first head through the TV-Out. 
+.SH Supported video containers
+AVI , QuickTime 
 .TP
 .SH Audio
 .TP
@@ -56,7 +55,7 @@ write video in YCbCr (YUV 4:2:0) format to specified file. Use this with -O3.
 If you use 'stdout' here, veejay will be silent and write yuv4mpeg streams to STDOUT
 .TP
 .B \-O/--output [012345]
-specify video output 0 = SDL (default) 1 = DirectFB 2 = SDL and DirectFB 3 = YUV4MPEG stream , 4 = System V SHM, 5 = Silent (no visual output)
+specify video output 0 = SDL (default) 1 = DirectFB 2 = SDL and DirectFB 3 = YUV4MPEG stream , 4 = Open GL (required ARB fragment shader), 5 = Silent (no visual output)
 .TP
 .B \-s/--size NxN
 Scaled video dimensions for SDL video output
@@ -111,12 +110,12 @@ Maximum number of samples to cache
 .B \-F/--features
 Show compiled in options
 .TP
-.B \-Y/--ycbcr [01]
-Specify veejay to use either YUV 4:2:0 (0) or YUV 4:2:2 (1). By default,
-veejay will try to autodetect the pixel format used. 
+.B \-Y/--ycbcr [0123]
+Specify veejay to use either YUV 4:2:0 (0) , YUV 4:2:2 (1), YUV 4:2:0 JPEG (2), YUV 4:2:2 JPEG(3).
+By default, veejay will try to select the best format.
 .TP
 .B \-d/--dummy
-Start veejay with no video files (dummy mode). By default it will play black video.
+Start veejay with no video files (dummy mode). By default it will play black video (Stream 1 [F1])
 .TP
 .B \-W/--width
 Specify width of dummy video.
@@ -143,74 +142,6 @@ of frames to be cached in memory from file (only valid for rawDV and AVI)
 Use smaller values for better performance (mapping several hundreds of
 megabytes can become a problem)
 .TP
-.TP
-.B \-w/--zoomwidth <0-4096>
-For use with \-z/--zoom, specify output width
-.TP
-.B \-h/--zoomheight <0-4096>
-For use with \-z/--zoom, specify output height
-.TP
-.B \-C/--zoomcrop top:bottom:left:right
-For use with \-z/--zoom, crops the input image before scaling.
-Set in pixels.
-.TP
-.B \--lgb=<0-100>
-For use with \-z/--zoom, use Gaussian blur filter (luma)
-.TP
-.B \--cgb=<0-100>
-For use with \-z/--zoom, use Gaussian blur filter (chroma)
-.TP
-.B \--ls=<0-100>
-For use with \-z/--zoom, use Sharpen filter (luma)
-.TP
-.B \--cs=<0-100>
-For use with \-z/--zoom, use Sharpen filter (chroma)
-.TP
-.B \--chs=<h>
-For use with \-z/--zoom, Chroma horizontal shifting 
-.TP
-.B \--cvs=<v>
-For use with \-z/--zoom, Chroma vertical shifting
-.B \-z/--zoom <num>
-Use the software scaler (this affects output video). (Also see \-w and \-h)
-Available modes are:
-.RS
-.TP
-.B 1
-Fast Bilinear (default)
-.TP
-.B 2
-Bilinear
-.TP
-.B 3
-Bicubic (good quality)
-.TP
-.B 4
-Experimental
-.TP
-.B 5
-Nearest Neighbour (bad quality)
-.TP
-.B 6
-Area
-.TP
-.B 7
-Luma bicubic / chroma bilinear 
-.TP
-.B 8
-Gauss
-.TP
-.B 9
-sincR
-.TP
-.B 10
-Lanczos
-.TP
-.B 11
-Natural bicubic spline
-.TP
-
-
 .SH EXAMPLES
 .TP
 .B veejay -u |less
@@ -227,6 +158,9 @@ and using PAL.
 .B veejay movie1.avi -V 224.0.0.50 -p 5000 -n -v -L
 Startup veejay, using multicast protocol on port 5000 , with autolooping
 and no colored verbose output
+.TP
+.B veejay -O4 ~/my_video1.avi
+Startup veejay with openGL video window
 .TP
 .SH INTERFACE COMMANDS (STDIN)
 When you are running veejay with a SDL window you can use keybindings for
@@ -431,6 +365,10 @@ Decrease parameter 7 of selected effect
 .TP
 .B [i]
 Increase parameter 7 of selected effect
+.TP
+.TP
+.B CTRL + O
+OSD status (timecode , current sample, cost and cache)
 .TP
 .B ALT + B 
 Take a snapshot of a video frame and put it in a seperate

@@ -901,7 +901,10 @@ int sample_get_effect(int s1, int position)
 
 int sample_get_effect_any(int s1, int position) {
 	sample_info *sample = sample_get(s1);
-	if(position >= SAMPLE_MAX_EFFECTS || position < 0 ) return -1;
+#ifdef STRICT_CHECKING
+	assert( position >= 0 && position < SAMPLE_MAX_EFFECTS );
+#endif
+	//	if(position >= SAMPLE_MAX_EFFECTS || position < 0 ) return -1;
 	if(sample) {
 		return sample->effect_chain[position]->effect_id;
 	}
@@ -1062,6 +1065,18 @@ int sample_get_effect_status(int s1)
 	sample_info *sample = sample_get(s1);
 	if(sample) return sample->effect_toggle;
 	return 0;
+}
+
+int	sample_var( int s1, int *type, int *fader, int *fx, int *rec, int *active )
+{
+	sample_info *si = sample_get(s1);
+	if(!si) return 0;
+	*type  = 0;
+    	*fader = si->fader_active;
+	*fx    = si->effect_toggle;
+	*rec   = si->encoder_active;
+	*active= 1;
+	return 1;
 }
 
 /****************************************************************************************************

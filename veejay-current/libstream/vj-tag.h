@@ -59,6 +59,7 @@ typedef struct {
     int height;
     int depth;
     int pix_fmt;
+    int uv_len;
 } vj_tag_data;
 
 typedef struct {

@@ -24,6 +24,7 @@
 #include <sys/ioctl.h>
 #include <libvjmsg/vj-common.h>
 #include <libvjnet/vj-server.h>
+#include <libvjmem/vjmem.h>
 #include <string.h>
 
 
@@ -157,7 +158,7 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		port_num = port_offset + VJ_MSG_PORT;
 
 	vjs->myself.sin_port = htons(port_num);
-	memset(&(vjs->myself.sin_zero), 0, 8);
+	veejay_memset(&(vjs->myself.sin_zero), 0, 8);
 	if (bind(vjs->handle, (struct sockaddr *) &(vjs->myself), sizeof(vjs->myself) ) == -1 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
@@ -187,13 +188,13 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		link[i]->in_use = 0;
 		link[i]->promote = 0;
 		link[i]->m_queue = (vj_message**) vj_malloc(sizeof( vj_message * ) * VJ_MAX_PENDING_MSG );
-		memset( link[i]->m_queue, 0, sizeof(vj_message*) * VJ_MAX_PENDING_MSG );
+		veejay_memset( link[i]->m_queue, 0, sizeof(vj_message*) * VJ_MAX_PENDING_MSG );
 		if(!link[i]->m_queue)	return 0;
-		memset( link[i]->m_queue, 0, sizeof(vj_message*) * VJ_MAX_PENDING_MSG );
+		veejay_memset( link[i]->m_queue, 0, sizeof(vj_message*) * VJ_MAX_PENDING_MSG );
 		for( j = 0; j < VJ_MAX_PENDING_MSG; j ++ )
 		{
 			link[i]->m_queue[j] = (vj_message*) vj_malloc(sizeof(vj_message));	
-			memset(link[i]->m_queue[j], 0, sizeof(vj_message));
+			veejay_memset(link[i]->m_queue[j], 0, sizeof(vj_message));
 		}
 		link[i]->n_queued = 0;
 		link[i]->n_retrieved = 0;		
@@ -213,7 +214,7 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
 	if (!vjs)
 		return NULL;
 
-	memset( vjs, 0, sizeof(vjs) );
+	veejay_memset( vjs, 0, sizeof(vjs) );
 
 	vjs->recv_buf = (char*) malloc(sizeof(char) * 16384 );
 	if(!vjs->recv_buf)
@@ -388,7 +389,7 @@ int vj_server_poll(vj_server * vje)
 		return mcast_poll( proto[0]->r );
 	}
 
-	memset( &t, 0, sizeof(t));
+	veejay_memset( &t, 0, sizeof(t));
 
 	FD_ZERO( &(vje->fds) );
     	FD_ZERO( &(vje->wds) );
