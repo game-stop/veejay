@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <nelburg@looze.net>
+ * Copyright(C)2006 Niels Elburg <nelburg@looze.net>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,12 +18,12 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include <config.h>
-#include "morphology.h"
+#include "colmorphology.h"
 #include <stdlib.h>
-
+#include "common.h"
 typedef uint8_t (*morph_func)(uint8_t *kernel, uint8_t mt[9] );
 
-vj_effect *morphology_init(int w, int h)
+vj_effect *colmorphology_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
     ve->num_params = 3;
@@ -33,31 +33,34 @@ vj_effect *morphology_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;  // threshold
     ve->limits[1][0] = 255;
+    
 	ve->limits[0][1] = 0; // morpology operator (dilate,erode, ... )
 	ve->limits[1][1] = 8;
 	ve->limits[0][2] = 0;
 	ve->limits[1][2] = 1; // passes
+	
     ve->defaults[0] = 140;
-	ve->defaults[1] = 0;
-	ve->defaults[2] = 0;
-    ve->description = "Morphology (experimental)";
-    ve->sub_format = 0;
+    ve->defaults[1] = 0;
+    ve->defaults[2] = 0;
+
+    ve->description = "Colored Morphology";
+    ve->sub_format = 1;
     ve->extra_frame = 0;
-	ve->has_user = 0;
+    ve->has_user = 0;
     return ve;
 }
 
 
 static uint8_t *binary_img;
 
-int		morphology_malloc(int w, int h )
+int		colmorphology_malloc(int w, int h )
 {
 	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
 	if(!binary_img) return 0;
 	return 1;
 }
 
-void		morphology_free(void)
+void		colmorphology_free(void)
 {
 	if(binary_img)
 		free(binary_img);
@@ -85,7 +88,7 @@ static uint8_t _erode_kernel3x3( uint8_t *kernel, uint8_t img[9])
 	return 235;
 }
 
-morph_func	_morphology_function(int i)
+static morph_func	_morphology_function(int i)
 {
 	if( i == 0 )
 		return _dilate_kernel3x3;
@@ -93,14 +96,13 @@ morph_func	_morphology_function(int i)
 }
 
 
-void morphology_apply( VJFrame *frame, int width, int height, int threshold, int type, int passes )
+void colmorphology_apply( VJFrame *frame, int width, int height, int threshold, int type, int passes )
 {
-    unsigned int i,x,y;
-    int len = (width * height);
+	unsigned int i,x,y;
+	int len = (width * height);
 	int c = 0,t=0,k=0;
-    int uv_len = frame->uv_len;
 	uint8_t pixel;
-    uint8_t *Y = frame->data[0];
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 	uint8_t kernels[8][9] ={
@@ -116,18 +118,11 @@ void morphology_apply( VJFrame *frame, int width, int height, int threshold, int
 
 	morph_func	p = _morphology_function(passes);
 
-	/* threshold image  --> binary img
-		0 = bg
-	      255 = fg
-	 */
 	for( i = 0; i < len; i ++ )
 	{
 		binary_img[i] = (  Y[i] < threshold ? 0: 0xff );
 		t++;
 	}
-
-	veejay_memset( Cb, 128, uv_len );
-	veejay_memset( Cr, 128, uv_len );	
 
 	len -= width;
 
