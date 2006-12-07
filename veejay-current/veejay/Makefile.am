@@ -32,7 +32,7 @@ VEEJAY_ALL_LIB_OPTS = \
 
 libveejay_la_SOURCES =  vj-misc.c \
 			vj-plugin.c vj-osc.c vj-event.c vj-eventman.c vj-pjack.c vj-perform.c \
-			vj-sdl.c vj-dfb.c gl.c \
+			x11misc.c vj-sdl.c vj-dfb.c gl.c \
 			vj-font.c liblavplayvj.c 
 
 libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS ) $(DEBUGLIBS)

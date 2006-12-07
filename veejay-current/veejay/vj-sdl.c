@@ -24,6 +24,7 @@
 #include <config.h>
 #ifdef HAVE_SDL
 #include <veejay/vj-sdl.h>
+#include <SDL/SDL_syswm.h>
 #include <veejay/vj-lib.h>
 #include <libvjmsg/vj-common.h>
 #include <veejay/vj-global.h>
@@ -55,6 +56,7 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
     vjsdl->custom_geo[0] = -1;
     vjsdl->custom_geo[1] = -1;
     vjsdl->show_cursor = 0;
+    vjsdl->display = NULL;
     return vjsdl;
 }
 
@@ -73,6 +75,8 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	int i = 0;
 	const int bpp = 24;
 	const SDL_VideoInfo *info = NULL;
+	SDL_SysWMinfo  wminfo;
+
 	if (!vjsdl)
 		return 0;
 
@@ -189,6 +193,17 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
     	}
 
 	SDL_VideoDriverName( name, 100 );
+
+	vjsdl->display = NULL;
+	if(SDL_GetWMInfo(&wminfo))
+	{
+		if( wminfo.subsystem == SDL_SYSWM_X11 )
+			vjsdl->display = wminfo.info.x11.display;
+	}
+
+	if( vjsdl->display )
+		x11_disable_screensaver( vjsdl->display );
+	
 	veejay_msg(VEEJAY_MSG_DEBUG, "Using Video Driver %s", name );
 
 	veejay_msg(VEEJAY_MSG_INFO, "Initialized %s SDL video overlay (%dx%d), %s",
@@ -216,7 +231,7 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
     	}
 
 	char *title = veejay_title();
-    	SDL_WM_SetCaption(caption, title);
+    	SDL_WM_SetCaption(title, NULL);
    	free(title);
 
 	if (!vj_sdl_unlock(vjsdl))

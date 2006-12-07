@@ -127,6 +127,7 @@
 #include "effects/cartonize.h"
 #include "effects/nervous.h"
 #include "effects/morphology.h"
+#include "effects/colmorphology.h"
 #include "effects/blob.h"
 #include "effects/ghost.h"
 #include "effects/boids.h"
@@ -199,7 +200,8 @@ static struct
 {	overclock_malloc, 		overclock_free,		VJ_IMAGE_EFFECT_OVERCLOCK	},
 {	nervous_malloc,			nervous_free,		VJ_IMAGE_EFFECT_NERVOUS		},
 {	morphology_malloc,		morphology_free,	VJ_IMAGE_EFFECT_MORPHOLOGY	},
-{	blob_malloc,			blob_free,		VJ_IMAGE_EFFECT_VIDBLOB },
+{	colmorphology_malloc,		colmorphology_free,	VJ_IMAGE_EFFECT_COLMORPH	},
+{	blob_malloc,			blob_free,		VJ_IMAGE_EFFECT_VIDBLOB 	},
 {	boids_malloc,			boids_free,		VJ_IMAGE_EFFECT_VIDBOIDS 	},
 {	ghost_malloc,			ghost_free,		VJ_IMAGE_EFFECT_GHOST		},
 {	neighbours_malloc,		neighbours_free,	VJ_IMAGE_EFFECT_NEIGHBOUR	},
@@ -554,6 +556,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 76] = constantblend_init(width,height);
 	vj_effects[i + 77] = colormap_init(width,height);
 	vj_effects[i + 78] = goomfx_init(width,height);
+	vj_effects[i + 79] = colmorphology_init(width,height);
 	max_width = width;
 	max_height = height;
 

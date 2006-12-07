@@ -1,8 +1,5 @@
-
-#ifndef VJGL
-#define VJGL
 /* veejay - Linux VeeJay
- *           (C) 2002-2004 Niels Elburg <nelburg@looze.net> 
+ * 	     (C) 2002-2006 Niels Elburg <nelburg@looze.net> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -19,13 +16,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
-//extern void veejay_gl_init( int fs, int w, int h, int x, int y);
-void	*x_display_init(void *ptr);
-void	x_display_close(void *dctx);
-int		x_display_set_fullscreen( void *dctx, int status );
-
-int	x_display_push(void *dctx, uint8_t **data, int width, int height, int out );
-void	x_display_resize( int x, int y, int w, int h );
-void	*x_get_display(void *ptr);
+#ifndef X11MISC
+#define X11MISC
+void	x11_enable_screensaver( void *display );
+void	x11_disable_screensaver( void *display );
+void	x11_misc_init();
+void	x11_misc_set_border( void *display, void *window, int status );
 #endif
+

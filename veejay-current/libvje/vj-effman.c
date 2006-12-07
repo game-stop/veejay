@@ -226,6 +226,9 @@ void vj_effman_apply_image_effect(
 		morphology_apply( frames[0], frameinfo->width,frameinfo->height,
 			arg[0],arg[1],arg[2] );
 		break;
+	case VJ_IMAGE_EFFECT_COLMORPH:
+		colmorphology_apply( frames[0], frameinfo->width, frameinfo->height,arg[0],arg[1],arg[2]);
+		break;
 	case VJ_IMAGE_EFFECT_NERVOUS:
 		nervous_apply( frames[0], frameinfo->width, frameinfo->height,
 			arg[0]); break;

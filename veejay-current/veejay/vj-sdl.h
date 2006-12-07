@@ -23,7 +23,7 @@
 #ifdef HAVE_SDL
 #include <SDL/SDL.h>
 #include <stdint.h>
-
+#include <veejay/x11misc.h>
 
 typedef struct vj_sdl_t {
     SDL_Surface *screen;
@@ -42,9 +42,9 @@ typedef struct vj_sdl_t {
     int frame_size;
     char last_error[255];
     int  custom_geo[2];
-
     int fs;
     int pix_fmt;
+    void *display;
 } vj_sdl;
 
 

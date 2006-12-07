@@ -170,6 +170,12 @@ fi
 AC_SUBST( GL_LIBS )
 AC_SUBST( GL_CFLAGS )
 
+
+dnl e_xdpms=no
+dnl ACCHECK_HEADER(X11/extensions/dpms.h,
+dnl	AC_DEFINE( HAVE_XDPMS, 1, [If we have xpdms] ) have_xdpms=yes,,
+dnl	[])
+
 dnl *********************************************************************
 dnl Test whether we're linux or not. If so, define HAVE_V4L and build the
 dnl video4linux/hardware dependent tools. Else, undefine HAVE_V4L

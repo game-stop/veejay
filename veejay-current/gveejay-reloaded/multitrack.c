@@ -772,9 +772,13 @@ void		*multitrack_new(
 	
 	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
 
+	int minw = preview_width_ + 50;
+	if(minw < 240)
+		minw = 240;
+
 	GtkRequisition req;
 	gtk_widget_size_request( mt->main_window, &req );
-	gtk_widget_set_size_request(mt->scroll,preview_width_ + 30, req.height);
+	gtk_widget_set_size_request(mt->scroll,minw, req.height-100);
 
 	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),2);
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(mt->scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_ALWAYS );

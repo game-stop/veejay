@@ -37,6 +37,7 @@
 #include <X11/keysym.h>
 #include <GL/glx.h>
 #include <X11/Xatom.h>
+#include <veejay/x11misc.h>
 #include <ffmpeg/avcodec.h>
 #include <libyuv/yuvconv.h>
 #ifdef STRICT_CHECKING
@@ -244,22 +245,7 @@ static	int	x11_err_( Display *display, XErrorEvent *event )
 
 static 	void	x11_screen_saver_disable( Display *display )
 {
-	int interval, prefer_blank, allow_exp;
-#ifdef HAVE_XDPMS
-	int x;
-	if( DPMSQueryExtension( display, &x, &x ) )
-	{
-		BOOL onoff;
-		CARD16 state;
-		DPMSInfo( display, &state, &onoff );
-		if(onoff)
-		{
-			veejay_msg(1, "Disable DPMS");
-			Status stat = DPMSDisable( display );
-			veejay_msg(1, "DPMS status = %d", stat);
-		}
-	}
-#endif
+	x11_disable_screensaver( display );
 }
 static 	void	resize(int x, int y, int w, int h )
 {
@@ -891,6 +877,11 @@ void	*x_display_init(void *ptr)
 	return ctx;	
 }
 
+void	*x_get_display(void *ptr)
+{
+	display_ctx *ctx = (display_ctx*) ptr;
+	return (void*)ctx->display;
+}
 
 void	x_display_close(void *dctx)
 {
@@ -966,9 +957,10 @@ void	x_display_open(void *dctx, int w, int h)
 
 	XSelectInput( ctx->display, ctx->win, event_mask );
 
-
+	char *title = veejay_title();
 	XSetStandardProperties( ctx->display, ctx->win,
-		"veejay", "veejay", None, NULL,0, &hint );
+		title, title, None, NULL,0, &hint );
+	free(title);
 
 	XMapWindow( ctx->display , ctx->win );
 	do

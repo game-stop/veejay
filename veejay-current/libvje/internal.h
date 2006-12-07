@@ -197,11 +197,12 @@ enum {
 	VJ_IMAGE_EFFECT_CONSTANTBLEND = 176,
 	VJ_IMAGE_EFFECT_COLORMAP = 177,
 	VJ_IMAGE_EFFECT_GOOM = 178,
+	VJ_IMAGE_EFFECT_COLMORPH = 179,
 	VJ_IMAGE_EFFECT_DUMMY = 100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 179
+#define VJ_IMAGE_EFFECT_MAX 180
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #ifdef USE_SWSCALER
@@ -497,6 +498,8 @@ extern void diff_prepare(void *data, uint8_t *map[3], int w, int h);
 extern void	cartonize_apply( VJFrame *frame, int w, int h, int b1, int b2, int b3 );
 
 extern void 	morphology_apply( VJFrame *frame, int w, int h, int t, int v, int p);
+
+extern void 	colmorphology_apply( VJFrame *frame, int w, int h, int t, int v, int p);
 
 extern void		blob_apply( VJFrame *frame, int w, int h, int p0,int p1, int p2, int p3);
 

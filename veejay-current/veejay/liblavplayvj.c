@@ -68,6 +68,7 @@
 #ifdef HAVE_FREETYPE
 #include <veejay/vj-font.h>
 #endif
+#include <veejay/x11misc.h>
 #include <libvjnet/vj-client.h>
 #include <veejay/vj-misc.h>
 #ifdef HAVE_SYS_SOUNDCARD_H
@@ -1377,7 +1378,7 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 }
 
 
-char	veejay_title( )
+char	*veejay_title( )
 {
 	char tmp[64];
 	sprintf(tmp, "Veejay %s", VERSION );
@@ -2345,6 +2346,8 @@ static void *veejay_playback_thread(void *data)
     for ( i = 0; i < MAX_SDL_OUT ; i ++ )
 		if( info->sdl[i] )
 		{
+			 if(info->sdl[i]->display)
+				 x11_enable_screensaver( info->sdl[i]->display);
 			 vj_sdl_free(info->sdl[i]);
 			 free(info->sdl[i]);
 		}
@@ -2370,6 +2373,7 @@ static void *veejay_playback_thread(void *data)
 	}
 	if( info->video_out == 4 )
 	{
+		x11_enable_screensaver( x_get_display(info->gl) );
 		x_display_close( info->gl );
     	}
 #ifdef HAVE_FREETYPE
