@@ -19,7 +19,7 @@
 #ifndef GVRCOMMON_H
 #define GVRCOMMON_H
 #define STATUS_BYTES 	150
-#define STATUS_TOKENS 	20
+#define STATUS_TOKENS 	22
 #define VEEJAY_CODENAME VERSION
 /* Status bytes */
 
@@ -38,6 +38,8 @@
 #define TOTAL_FRAMES	6
 #define TOTAL_SLOTS	16
 #define TOTAL_MEM	17
+#define SEQ_ACT		18
+#define SEQ_CUR		19
 #define CURRENT_ENTRY	15
 #define	MODE_PLAIN	2
 #define MODE_SAMPLE	0

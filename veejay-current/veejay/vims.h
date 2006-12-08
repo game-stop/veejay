@@ -38,7 +38,8 @@ enum {
 	VIMS_SRT_LIST				=	417,
 	VIMS_SRT_INFO				=	418,
 	VIMS_TRACK_LIST				=	5,
-/* general controls */
+	VIMS_SEQUENCE_LIST			=	419,
+	/* general controls */
 	VIMS_SET_VOLUME				=	300,
 	VIMS_FULLSCREEN				=	301,
 	VIMS_SUSPEND				=	254,
@@ -170,7 +171,12 @@ enum {
 
 
 	VIMS_STREAM_SET_LENGTH			=	212,
-/* effect chain */
+
+	VIMS_SEQUENCE_STATUS			=	340,
+	VIMS_SEQUENCE_ADD			=	341,
+	VIMS_SEQUENCE_DEL			=	342,
+// VIMS_SEQUENCE_LIST	
+	/* effect chain */
 	VIMS_CHAIN_ENTRY_CHANNEL_INC			=	350,
 	VIMS_CHAIN_ENTRY_CHANNEL_DEC			=	351,
 	VIMS_CHAIN_TOGGLE_ALL			=	352,

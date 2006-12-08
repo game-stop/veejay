@@ -2253,7 +2253,7 @@ int vj_tag_sprint_status( int tag_id,int cache, int pfps,int frame, int mode,int
 	*/
 
 	sprintf(str,
-			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			pfps,
 			frame,
 			mode,
@@ -2271,7 +2271,9 @@ int vj_tag_sprint_status( int tag_id,int cache, int pfps,int frame, int mode,int
 			tag->n_frames, // no markers
 			tag->selected_entry, 
 			ts,
-			cache);
+			cache,
+			0,
+			0);
     return 0;
 }
 

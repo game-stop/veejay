@@ -3881,6 +3881,11 @@ void vj_event_sample_del(void *ptr, const char format[], va_list ap)
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Deleted sample %d", args[0]);
 		deleted_sample = args[0];
+		int i;
+		for( i = 0; i < MAX_SEQUENCES ; i ++ )
+			if( v->seq->samples[i] == deleted_sample )
+				v->seq->samples[i] = 0;
+
 		sample_verify_delete( args[0] , 0 );
 	}
 	else
@@ -8463,6 +8468,122 @@ void	vj_event_font_set_size_and_font(	void *ptr,	const char format[],	va_list	ap
 	P_A(args,NULL,format,ap);
 	vj_font_set_size_and_font(v->font, args[0],args[1]);
 }
-
-
 #endif
+
+void	vj_event_sequencer_add_sample(		void *ptr,	const char format[],	va_list ap )
+{
+	int args[5];
+	veejay_t *v = (veejay_t*)ptr;
+	P_A(args,NULL,format,ap);
+
+	int seq = args[0];
+	int id = args[1];
+
+	if( seq < 0 || seq > 1023 )
+	{
+		veejay_msg( VEEJAY_MSG_ERROR,"Slot not within bounds");
+		return;
+	}
+	
+	if( sample_exists(id ))
+	{
+		if( v->seq->size >= MAX_SEQUENCES)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Sequence bank is full. Cannot add more samples");
+			return;
+		}
+		v->seq->samples[ seq ] = id;
+		v->seq->size ++;
+		veejay_msg(VEEJAY_MSG_INFO, "Added sample %d to slot %d/%d",
+				id, seq,MAX_SEQUENCES );
+		v->seq->active ++;
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist. It cannot be added to the sequencer",id);
+	}	
+
+}
+
+void	vj_event_sequencer_del_sample(		void *ptr, 	const char format[], 	va_list ap )
+{
+	int args[5];
+	veejay_t *v = (veejay_t*)ptr;
+	P_A(args,NULL,format,ap);
+
+	int seq_it = args[0];
+	
+	if( seq_it < 0 || seq_it >= MAX_SEQUENCES )
+	{
+		veejay_msg( VEEJAY_MSG_ERROR, "Sequence slot %d is not used, nothing deleted",seq_it );
+		return;
+	}	
+
+	if( v->seq->samples[ seq_it ] )
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Deleted sequence %d (Sample %d)", seq_it,
+				v->seq->samples[ seq_it ] );
+		v->seq->samples[ seq_it ] = 0;
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Sequence slot %d already empty", seq_it );
+	}
+
+}
+
+void	vj_event_get_sample_sequences( 		void *ptr, 	const char format[],	va_list ap )
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int i;
+
+	if( v->seq->size <= 0 )
+	{
+		SEND_MSG(v,"000000");
+		return;
+	}
+	
+	veejay_memset( _s_print_buf, 0, SEND_BUF );
+
+	sprintf(_s_print_buf, "%06d%04d%04d%04d",
+			( 12 + (4*MAX_SEQUENCES)),
+			v->seq->current,MAX_SEQUENCES, v->seq->active );
+	
+	for( i =0; i < MAX_SEQUENCES ;i ++ )
+	{
+		char tmp[32];
+		sprintf(tmp, "%04d", v->seq->samples[i]);
+		strcat(_s_print_buf, tmp );
+	}
+
+	SEND_MSG(v, _s_print_buf );
+	
+}
+
+void	vj_event_sample_sequencer_active(	void *ptr, 	const char format[],	va_list ap )
+{
+	int args[5];
+	veejay_t *v = (veejay_t*)ptr;
+	P_A(args,NULL,format,ap);
+
+	if( v->seq->size == 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Sequencer list is empty. Please add samples first");
+		return;
+	}
+
+//	v->seq->active = args[0];
+
+	if( args[0] == 0 && v->seq->active > 0 )
+	{
+		v->seq->active = 0;
+		veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer disabled");
+	}
+	else if (args[1] == 1 && !v->seq->active )
+	{
+		v->seq->active = 1;
+		veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer enabled");
+	}
+}
+
+

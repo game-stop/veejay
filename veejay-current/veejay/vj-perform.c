@@ -264,6 +264,54 @@ static int vj_perform_increase_plain_frame(veejay_t * info, long num)
     return 0;
 }
 
+
+static	int	vj_perform_valid_sequence( veejay_t *info )
+{
+	int cur = info->seq->current + 1;
+	int cycle = 0;
+	while( info->seq->samples[ cur ] == 0 )
+	{
+		cur ++;
+		if( cur >= info->seq->size && !cycle)
+		{
+			cur = 0;
+			cycle = 1;
+		}
+		else if ( cur >= info->seq->size && cycle )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "No valid sequence to play. Sequence Play disabled");
+			info->seq->active = 0;
+			return -1;
+		}
+	}
+	return cur;
+}
+
+static	int	vj_perform_try_sequence( veejay_t *info )
+{
+	int cycle = 0;
+	if(! info->seq->active )
+		return 0;
+	
+	if( sample_get_loop_dec( info->uc->sample_id ) >= 1 )
+	{
+		int n = vj_perform_valid_sequence( info );
+		if( n >= 0 )
+		{
+			info->seq->current = n;
+			sample_set_loop_dec( info->uc->sample_id, 0 ); //reset loop
+		
+			veejay_msg(0, "Sequence play selects sample %d", info->seq->samples[info->seq->current]);
+		
+			veejay_set_sample( info, info->seq->samples[ info->seq->current ] );
+			return 1;
+		}
+		return 0;
+	}		
+
+	return 0;
+}
+
 /********************************************************************
  * int vj_perform_increase_sample_frame(...)
  *
@@ -294,16 +342,31 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 	    switch (looptype) {
 		    case 2:
 			info->uc->direction = -1;
-			sample_apply_loop_dec( info->uc->sample_id, info->edit_list->video_fps);
-			veejay_set_frame(info, end);
-			veejay_set_speed(info, (-1 * speed));
+			if(!vj_perform_try_sequence( info ) )
+			{
+				sample_apply_loop_dec( info->uc->sample_id, info->edit_list->video_fps);
+				veejay_set_frame(info, end);
+				veejay_set_speed(info, (-1 * speed));
+			}
 			break;
 		    case 1:
-			if(sample_get_loop_dec(info->uc->sample_id)) {
-		 	  sample_apply_loop_dec( info->uc->sample_id, info->edit_list->video_fps);
-			  start = sample_get_startFrame(info->uc->sample_id);
+		//	if(sample_get_loop_dec(info->uc->sample_id)) {
+		 //	  sample_apply_loop_dec( info->uc->sample_id, info->edit_list->video_fps);
+		//	  start = sample_get_startFrame(info->uc->sample_id);
+		//	}
+			if(! info->seq->active )
+				veejay_set_frame(info, start);
+			else
+			{
+				int n = vj_perform_valid_sequence( info );
+				if( n >= 0 )
+				{
+					info->seq->current = n;
+					veejay_set_sample( info, info->seq->samples[ info->seq->current ] );
+				}
+				else
+					veejay_set_frame(info,start);
 			}
-			veejay_set_frame(info, start);
 			break;
 		    default:
 			veejay_set_frame(info, end);
@@ -315,17 +378,29 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 	    switch (looptype) {
 	    case 2:
 		info->uc->direction = 1;
-		if(sample_get_loop_dec(info->uc->sample_id)) {
-		  sample_apply_loop_dec( info->uc->sample_id, info->edit_list->video_fps);
-		  start = sample_get_startFrame(info->uc->sample_id);
+		if(!vj_perform_try_sequence(info) )
+		{
+		  	sample_apply_loop_dec( info->uc->sample_id, info->edit_list->video_fps);
+			veejay_set_frame(info, start);
+			veejay_set_speed(info, (-1 * speed));
 		}
-		veejay_set_frame(info, start);
-		veejay_set_speed(info, (-1 * speed));
 		break;
 
 	    case 1:
-	  	sample_apply_loop_dec( info->uc->sample_id, info->edit_list->video_fps);
-		veejay_set_frame(info, end);
+	  	//sample_apply_loop_dec( info->uc->sample_id, info->edit_list->video_fps);
+		if(!info->seq->active)
+			veejay_set_frame(info, end);
+		else
+		{
+			int n = vj_perform_valid_sequence( info );
+			if( n >= 0 )
+			{
+				info->seq->current = n;
+				veejay_set_sample( info, info->seq->samples[ info->seq->current ] );
+			}
+			else
+				veejay_set_frame(info,end);
+		}
 		break;
 	    default:
 		veejay_set_frame(info, start);
@@ -990,6 +1065,7 @@ static int __send_frame = 0;
 int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
 {
 	__send_frame = (mcast ? 2: 1 );
+	return 1;
 }
 
 int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast)

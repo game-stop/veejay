@@ -1853,13 +1853,10 @@ int sample_chain_remove(int s1, int position)
     return (sample_update(sample,s1));
 }
 
-int sample_set_loop_dec(int s1, int active, int periods) {
+int sample_set_loop_dec(int s1, int active) {
     sample_info *sample = sample_get(s1);
     if(!sample) return -1;
-    if(periods <=0) return -1;
-    if(periods > 25) return -1;
     sample->loop_dec = active;
-    sample->loop_periods = periods;
     return (sample_update(sample,s1));
 }
 
@@ -1904,7 +1901,7 @@ int sample_apply_loop_dec(int s1, double fps) {
     sample_info *sample = sample_get(s1);
     int inc = (int) fps;
     if(!sample) return -1;
-    if(sample->loop_dec==1) {
+/*    if(sample->loop_dec==1) {
 	if( (sample->first_frame + inc) >= sample->last_frame) {
 		sample->first_frame = sample->last_frame-1;
 		sample->loop_dec = 0;
@@ -1915,15 +1912,18 @@ int sample_apply_loop_dec(int s1, double fps) {
 	veejay_msg(VEEJAY_MSG_DEBUG, "New starting postions are %ld - %ld",
 		sample->first_frame, sample->last_frame);
 	return ( sample_update(sample, s1));
-    }
-    return -1;
+    }*/
+
+	sample->loop_dec ++;
+    
+    return 1;
 }
 
 
 /* print sample status information into an allocated string str*/
 //int sample_chain_sprint_status(int s1, int entry, int changed, int r_changed,char *str,
 //			       int frame)
-int	sample_chain_sprint_status( int s1,int cache,int pfps, int frame, int mode,int total_slots, char *str )
+int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int frame, int mode,int total_slots, char *str )
 {
     sample_info *sample;
     sample = sample_get(s1);
@@ -1931,7 +1931,7 @@ int	sample_chain_sprint_status( int s1,int cache,int pfps, int frame, int mode,i
 	return -1;
 
 	sprintf(str,
-		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		pfps,
 		frame,
 		mode,
@@ -1949,7 +1949,9 @@ int	sample_chain_sprint_status( int s1,int cache,int pfps, int frame, int mode,i
 		sample->marker_end,
 		sample->selected_entry,
 		total_slots,
-		cache);
+		cache,
+		sa,
+		ca);
 		
 		
  

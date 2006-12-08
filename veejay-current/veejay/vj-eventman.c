@@ -2362,6 +2362,50 @@ void		vj_init_vevo_events(void)
 				NULL );
 
 
+	index_map_[ VIMS_SEQUENCE_LIST ]		=	_new_event(
+				NULL,
+				VIMS_SRT_INFO,
+				"GUI: Get list of sample sequences",
+				vj_event_get_sample_sequences,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
+	index_map_[ VIMS_SEQUENCE_STATUS ]		=	_new_event(
+				"%d",
+				VIMS_SEQUENCE_STATUS,
+				"Set sequence play on or off",
+				vj_event_sample_sequencer_active,
+				1,
+				VIMS_ALLOW_ANY,
+				"Status 0=off,1=on",
+				0,
+				NULL );
+
+	index_map_[ VIMS_SEQUENCE_ADD ]			=	_new_event(
+				"%d %d",
+				VIMS_SEQUENCE_ADD,
+				"Add a sample to the sequence",
+				vj_event_sequencer_add_sample,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Seq ID",
+				0,
+				"Sample ID",
+				0,
+				NULL );
+
+	index_map_[ VIMS_SEQUENCE_DEL ]			=	_new_event(
+				"%d",
+				VIMS_SEQUENCE_DEL,
+				"Del sample from sequence slot",
+				vj_event_sequencer_del_sample,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Seq ID",
+				0,
+				NULL );
+
 	
 #endif
 }

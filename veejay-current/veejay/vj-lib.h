@@ -109,6 +109,14 @@ typedef struct
 	long arate;
 } dummy_t;
 
+typedef struct
+{
+	int   active;
+	int   current;
+	int   size;
+	int	*samples;
+} sequencer_t;
+
 
 typedef struct {
     pthread_t software_playback_thread;	/* the thread for software playback */
@@ -301,6 +309,7 @@ typedef struct {
 	void *font;
 	void *osd;
 	int  use_osd;
+	sequencer_t *seq;
 } veejay_t;
 
 typedef struct {

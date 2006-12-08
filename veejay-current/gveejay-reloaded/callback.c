@@ -1849,44 +1849,21 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 	
 	
 	
-	if(skin__ == 0 )
+	if( info->uc.playmode != info->status_tokens[PLAY_MODE])
 	{
-		if( info->uc.playmode != info->status_tokens[PLAY_MODE])
-		{
-			if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE)	
-				gtk_notebook_set_page(
-						GTK_NOTEBOOK(n),
-						0 );
-			if(info->status_tokens[PLAY_MODE] == MODE_STREAM)	
-				gtk_notebook_set_page(
-						GTK_NOTEBOOK(n),
-						1 );
-			if(info->status_tokens[PLAY_MODE] == MODE_PLAIN)	
-				gtk_notebook_set_page(
-						GTK_NOTEBOOK(n),
-						2 );
-
-		}	
-	}
-	else
-	{
-		if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE) // 1
-		{
-		//	enable_widget( "vbox450" ); disable_widget("vbox457");
-			enable_widget("videonav"); // nav buttons
-		}
-		if(info->status_tokens[PLAY_MODE] == MODE_STREAM)
-		{
-			disable_widget("videonav");
-		//	disable_widget("vbox450"); enable_widget("vbox457");
-		}
-		if(info->status_tokens[PLAY_MODE] == MODE_PLAIN)
-		{
-		//	disable_widget("vbox450");
-		//	disable_widget("vbox457");		
-			enable_widget("videonav");
-		}
-	}
+		if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE)	
+			gtk_notebook_set_page(
+					GTK_NOTEBOOK(n),
+					0 );
+		if(info->status_tokens[PLAY_MODE] == MODE_STREAM)	
+			gtk_notebook_set_page(
+					GTK_NOTEBOOK(n),
+					1 );
+		if(info->status_tokens[PLAY_MODE] == MODE_PLAIN)	
+			gtk_notebook_set_page(
+					GTK_NOTEBOOK(n),
+					2 );
+	}	
 }
 
 void	on_timeline_cleared(GtkWidget *widget, gpointer user_data)
@@ -3482,4 +3459,11 @@ gboolean	boxblue_expose_event(GtkWidget *w,
 void	on_osdbutton_clicked(GtkWidget *w, gpointer data )
 {
 	single_vims(VIMS_OSD);
+}
+
+void	on_seqactive_toggled( GtkWidget *w, gpointer data )
+{
+	if(info->status_lock)
+		return;
+	multi_vims( VIMS_SEQUENCE_STATUS, "%d" , is_button_toggled("seqactive" ) ? 1 : 0 );
 }

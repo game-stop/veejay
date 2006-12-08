@@ -84,8 +84,8 @@ typedef struct
 	int used;
 	gint timeout;
 	int status_lock;
-	int history[4][18];
-	int status_cache[18];
+	int history[4][20];
+	int status_cache[20];
 	char *tracks[__MAX_TRACKS];
 } mt_priv_t;
 
@@ -567,19 +567,19 @@ static gboolean	update_sequence_widgets( gpointer data )
 		return TRUE;
 	}
 #ifdef STRICT_CHECKING
-	assert( n == 18 );
+	assert( n == 20 );
 #endif
 
 	int pm = array[PLAY_MODE];
 	int i;
-	for( i  =  0; i < 18; i ++ )
+	for( i  =  0; i < 20; i ++ )
 		p->status_cache[i] = array[i];
 
 	
 	update_widgets(array, p, pm);
 
 	int *his = p->history[ pm ];	
-	for( i  =  0; i < 18; i ++ )
+	for( i  =  0; i < 20; i ++ )
 		his[i] = array[i];
 	p->status_lock = 0;
 	return TRUE;

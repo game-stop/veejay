@@ -270,7 +270,7 @@ extern int sample_set_chain_channel(int s1, int position, int channel);
 
 //int sample_chain_replace(int s1, int position, int effect_id);
 
-extern int sample_chain_sprint_status(int s1,int cache, int r, int f, int m, int t, char *s ); 
+extern int sample_chain_sprint_status(int s1,int cache,int sa,int ca, int r, int f, int m, int t, char *s ); 
 
 extern int sample_set_render_entry(int s1, int entry);
 extern int sample_get_render_entry(int s1);
@@ -281,7 +281,7 @@ extern int sample_get_description(int sample_id, char *description);
 extern int sample_entry_is_rendering(int sample_id, int entry);
 extern int sample_entry_set_is_rendering(int sample_id, int entry, int value);
 extern int sample_get_loop_dec(int s1);
-extern int sample_set_loop_dec(int s1, int active, int periods);
+extern int sample_set_loop_dec(int s1, int active);
 extern int sample_apply_loop_dec(int s1, double fps); 
 
 extern int	sample_set_manual_fader(int s1, int value );

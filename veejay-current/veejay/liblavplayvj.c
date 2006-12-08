@@ -1118,13 +1118,13 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 			RANDMODE_SAMPLE)
 			pm = VJ_PLAYBACK_MODE_PATTERN;
 		if( sample_chain_sprint_status
-			(info->uc->sample_id,cache_used,info->real_fps,settings->current_frame_num, pm, total_slots,info->status_what ) != 0)
+			(info->uc->sample_id,cache_used,info->seq->active,info->seq->current,info->real_fps,settings->current_frame_num, pm, total_slots,info->status_what ) != 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		sprintf(info->status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		sprintf(info->status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			(int) info->real_fps,
 			settings->current_frame_num,
 			info->uc->playback_mode,
@@ -1142,7 +1142,9 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 			0,	
 			0,
 			total_slots,
-			cache_used );
+			cache_used,
+		      	0,
+		        0 );
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
 		if( vj_tag_sprint_status( info->uc->sample_id,cache_used, (int) info->real_fps,
@@ -2534,51 +2536,40 @@ veejay_t *veejay_malloc()
     veejay_t *info;
     int i;
 
-      info = (veejay_t *) vj_malloc(sizeof(veejay_t));
+      info = (veejay_t *) vj_calloc(sizeof(veejay_t));
     if (!info)
 		return NULL;
-	memset(info,0,sizeof(veejay_t));
 
-    info->settings = (video_playback_setup *) vj_malloc(sizeof(video_playback_setup));
+    info->settings = (video_playback_setup *) vj_calloc(sizeof(video_playback_setup));
     if (!(info->settings)) 
 		return NULL;
-   	memset( info->settings, 0, sizeof(video_playback_setup));
-	memset( &(info->settings->action_scheduler), 0, sizeof(vj_schedule_t));
-	memset( &(info->settings->viewport ), 0, sizeof(VJRectangle)); 
+    veejay_memset( &(info->settings->action_scheduler), 0, sizeof(vj_schedule_t));
+    veejay_memset( &(info->settings->viewport ), 0, sizeof(VJRectangle)); 
 
-    info->status_what = (char*) vj_malloc(sizeof(char) * MESSAGE_SIZE );
-    info->status_msg = (char*) vj_malloc(sizeof(char) * MESSAGE_SIZE+5);
-    bzero(info->status_what,MESSAGE_SIZE);
-    bzero(info->status_what,MESSAGE_SIZE);
+    info->status_what = (char*) vj_calloc(sizeof(char) * MESSAGE_SIZE );
+    info->status_msg = (char*) vj_calloc(sizeof(char) * MESSAGE_SIZE+5);
 
-	info->uc = (user_control *) vj_malloc(sizeof(user_control));
+	info->uc = (user_control *) vj_calloc(sizeof(user_control));
     if (!(info->uc)) 
 		return NULL;
-	memset( info->uc, 0, sizeof(user_control));
 
-    info->effect_frame1 = (VJFrame*) vj_malloc(sizeof(VJFrame));
+    info->effect_frame1 = (VJFrame*) vj_calloc(sizeof(VJFrame));
 	if(!info->effect_frame1)
 		return NULL;
-	memset( info->effect_frame1, 0, sizeof(VJFrame));
 
-    info->effect_frame2 = (VJFrame*) vj_malloc(sizeof(VJFrame));
+    info->effect_frame2 = (VJFrame*) vj_calloc(sizeof(VJFrame));
 	if(!info->effect_frame2)
 		return NULL;
-	memset( info->effect_frame2, 0, sizeof(VJFrame));
 
-
-    info->effect_frame_info = (VJFrameInfo*) vj_malloc(sizeof(VJFrameInfo));
+    info->effect_frame_info = (VJFrameInfo*) vj_calloc(sizeof(VJFrameInfo));
 	if(!info->effect_frame_info)
 		return NULL;
-	memset( info->effect_frame_info, 0, sizeof(VJFrameInfo));
 
-
-    info->effect_info = (vjp_kf*) vj_malloc(sizeof(vjp_kf));
+    info->effect_info = (vjp_kf*) vj_calloc(sizeof(vjp_kf));
 	if(!info->effect_info) 
 		return NULL;   
-	memset( info->effect_info, 0, sizeof(vjp_kf)); 
 
-	info->dummy = (dummy_t*) vj_malloc(sizeof(dummy_t));
+	info->dummy = (dummy_t*) vj_calloc(sizeof(dummy_t));
     if(!info->dummy)
 		return NULL;
 	memset( info->dummy, 0, sizeof(dummy_t));
@@ -2587,6 +2578,12 @@ veejay_t *veejay_malloc()
 	memset(&(info->settings->sws_templ), 0, sizeof(sws_template));
 #endif
 
+	info->seq = (sequencer_t*) vj_calloc(sizeof( sequencer_t) );
+	if(!info->seq)
+		return NULL;
+	
+	info->seq->samples = (int*) vj_calloc(sizeof(int) * MAX_SEQUENCES );
+	
     info->audio = AUDIO_PLAY;
     info->continuous = 1;
     info->sync_correction = 1;

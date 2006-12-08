@@ -252,8 +252,7 @@ int main(int argc, char *argv[])
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot connect to %s", host_name);
 		exit(1);
 	}
-	veejay_msg(VEEJAY_MSG_INFO,
-		"Connected to %s", host_name );			
+
 	if(interactive)
 	{
 		fcntl( 0, F_SETFL, O_NONBLOCK);
@@ -304,7 +303,7 @@ int main(int argc, char *argv[])
 			else
 			{
 				int n = vj_client_send( sayvims,V_CMD, msg[i] );
-//				vj_flush(1);
+				vj_flush(1);
 			}
 			i++;
 		}
@@ -341,7 +340,6 @@ int main(int argc, char *argv[])
 			}
 		}
 	}
-	veejay_msg(VEEJAY_MSG_INFO, "%s done ", argv[0]);	
 	vj_client_close(sayvims);
 	vj_client_free(sayvims);
         return 0;
