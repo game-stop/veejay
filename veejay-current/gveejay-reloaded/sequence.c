@@ -16,8 +16,8 @@ typedef struct
 	gint port_num;
 	gint active;
 	vj_client *fd;
-	gchar status_buffer[100];
-	guchar *data_buffers[MAX_BUF];
+	unsigned char status_buffer[100];
+	unsigned char *data_buffers[MAX_BUF];
 	int	data_status[MAX_BUF];
 	gint	frame_num;
 	gint	wframe_num;
@@ -104,21 +104,21 @@ int			veejay_sequence_send( void *data , int vims_id, const char format[], ... )
 	return ret;
 }
 
-gchar			*veejay_sequence_get_track_list( void *data, int slen, int *bytes_written )
+unsigned char		*veejay_sequence_get_track_list( void *data, int slen, int *bytes_written )
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
 	if(!v || !v->active) return NULL;
 	g_mutex_lock( v->mutex );
 	
-	char message[10];
+	unsigned char message[10];
 	int tmp_len = slen + 1;
-	gchar tmp[tmp_len];
-   	bzero(tmp,tmp_len);
+	unsigned char *tmp = vj_calloc( tmp_len );
  
 	sprintf(message, "%03d:;", VIMS_TRACK_LIST );
 	int ret = vj_client_send( v->fd, V_CMD, message );
 	if( ret <= 0)
 	{
+		free(tmp);
 		g_mutex_unlock(v->mutex);
 		return NULL;
 	}	
@@ -126,22 +126,23 @@ gchar			*veejay_sequence_get_track_list( void *data, int slen, int *bytes_writte
         ret = vj_client_read( v->fd, V_CMD, tmp, slen );
 	if( ret <= 0 )
 	{
+		free(tmp);
 		g_mutex_unlock(v->mutex);
 		return NULL;
 	}
 
         int len = 0;
         sscanf( tmp, "%d", &len );
-        gchar *result = NULL;
+        unsigned char *result = NULL;
 
         if( len <= 0 || slen <= 0)
         {
+		free(tmp);
 		g_mutex_unlock( v->mutex );
 	        return result;
 	}
 
-        result = (gchar*) malloc(sizeof(gchar) * (len + 1) );
-        bzero(result, (len+1));
+        result = (gchar*) vj_calloc(sizeof(gchar) * (len + 1) );
         int bytes_left = len;
         *bytes_written = 0;
 
@@ -158,6 +159,7 @@ gchar			*veejay_sequence_get_track_list( void *data, int slen, int *bytes_writte
                         bytes_left -= n;
                 }
         }
+	free(tmp);
 	g_mutex_unlock( v->mutex );
         return result;
 }
@@ -165,25 +167,34 @@ gchar			*veejay_sequence_get_track_list( void *data, int slen, int *bytes_writte
 static	int	veejay_ipc_recv( veejay_sequence_t *v, gint header_len, gint *payload, guchar *buffer )
 {
 	gint tmp_len = header_len + 1;
-	gchar tmp[tmp_len];
+	unsigned char *tmp = vj_calloc( tmp_len );
 	gint len = 0;
 	bzero( tmp, tmp_len );
 
 	gint n = vj_client_read( v->fd, V_CMD, tmp, header_len );
 
 	if( n<= 0 )
+	{
+		free(tmp);
 		return 0;
+	}
 
 	if( sscanf( tmp, "%6d", &len )<=0)
+	{
+		free(tmp);
 		return 0;
+	}
 	
 	if( len <= 0 )
+	{
+		free(tmp);
 		return 0;
+	}
 
 	
 	gint bw = 0;
 	gint bytes_read = len;
-	guchar *buf_ptr = buffer;
+	unsigned char *buf_ptr = buffer;
 
 	*payload = 0;
 
@@ -191,8 +202,10 @@ static	int	veejay_ipc_recv( veejay_sequence_t *v, gint header_len, gint *payload
 	{
 		n = vj_client_read( v->fd, V_CMD, buf_ptr, bytes_read );
 		if ( n <= 0 )
+		{
+			free(tmp);
 			return 0;
-
+		}
 		bw += n;
 
 		bytes_read -= n;
@@ -201,13 +214,14 @@ static	int	veejay_ipc_recv( veejay_sequence_t *v, gint header_len, gint *payload
 
 	*payload = bw;
   
+	free(tmp);
 	return 1;
 }
 
 static int	veejay_process_status( veejay_sequence_t *v )
 {
-	gchar status_len[6];
-	bzero( status_len, 6 );
+	unsigned char status_len[6];
+	veejay_memset( status_len, 0, sizeof(status_len) );
 	gint nb = vj_client_read( v->fd, V_STATUS, status_len, 5 );
 	if( status_len[0] == 'V' )
 	{
@@ -215,7 +229,7 @@ static int	veejay_process_status( veejay_sequence_t *v )
 		sscanf( status_len + 1, "%03d", &bytes );
 		if( bytes > 0 )
 		{
-			bzero( v->status_buffer, 100 );
+			veejay_memset( v->status_buffer,0, sizeof(v->status_buffer));
 			gint n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
 			if( n <= 0 )
 				return 0;
@@ -276,14 +290,16 @@ GdkPixbuf	*veejay_get_image( void *data, gint *error)
 		//@ sleeping for new frames!
 		if(!g_cond_timed_wait( v->cond, v->mutex, &time_val ))
 		{	// timeout !
-		//	v->data_status[v->frame_num] = DATA_ERROR;
+			v->data_status[v->frame_num] = DATA_ERROR;
 			g_mutex_unlock(v->mutex);
-		//	*error = 1;
+			*error = 1;
 			return NULL;
 		}
 		if( v->abort )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Abort image preview thread");
+			g_mutex_unlock(v->mutex);
+
 			return NULL;
 		}
 	}
@@ -325,8 +341,12 @@ void		veejay_configure_sequence( void *data, gint w, gint h , float fps)
 
 	v->width = w;
 	v->height = h;
-	v->fps = fps;
+	if(fps>0.0)
+		v->fps = fps;
 
+	veejay_msg(VEEJAY_MSG_INFO, "Configured %d x %d @ %2.2f",
+			w,h,fps );
+	
 	g_mutex_unlock( v->mutex );	
 }
 
@@ -368,10 +388,11 @@ void	*veejay_sequence_thread(gpointer data)
 	if(!v) return NULL;
 	unsigned long time_now = 0;
 	unsigned long tn = vj_get_timer() + v->preview_delay;
-	glong spf = (1.0 / v->fps) * 1000.0;
-
+	
 	for ( ;; )
-	{
+	{	
+		glong spf = (glong)(((float)1.0 / v->fps) * 1000);
+
 		time_now = vj_get_timer();
 		
 		if( v->abort )
@@ -402,8 +423,7 @@ void	*veejay_sequence_thread(gpointer data)
 		
 		glong ms_passed = v->sta[0];
 	        if( (spf - ms_passed) > 0 )
-			g_usleep( (spf-ms_passed)* 1000 );
-			
+			g_usleep( (spf-ms_passed)*1000);
 	}
 	return NULL;	
 }
@@ -453,14 +473,13 @@ void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_he
 {	
 	int k = 0;
 	GError *err = NULL;
-	veejay_sequence_t *v = (veejay_sequence_t*) malloc(sizeof( veejay_sequence_t ));
-	memset( v, 0, sizeof(veejay_sequence_t));
+	veejay_sequence_t *v = (veejay_sequence_t*) vj_calloc(sizeof( veejay_sequence_t ));
 
 	v->hostname = strdup( hostname );
 	v->port_num = port;
 	for( k = 0; k < MAX_BUF; k ++ )
 	{
-		v->data_buffers[k] = (guchar*) malloc(sizeof(guchar) * max_width * max_height * 3 );
+		v->data_buffers[k] = (guchar*) vj_calloc(sizeof(guchar) * max_width * max_height * 3 );
 		v->data_status[k] = DATA_ERROR;
 	}
 	v->fd = vj_client_alloc(0,0,0);
@@ -480,6 +499,7 @@ void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_he
 	v->mutex = g_mutex_new();
 	v->serialize = g_mutex_new();
 	v->active = 1;
+	v->fps = 25.0;
 	v->cond = g_cond_new();
 	v->thread = g_thread_create(
 			(GThreadFunc) veejay_sequence_thread,

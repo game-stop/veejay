@@ -21,7 +21,7 @@ GdkPixbuf	*veejay_get_image( void *data , gint *error);
 
 void	*veejay_sequence_init(int port, char *hostname, gint w, gint h, gfloat fps);
 
-void	veejay_configure_sequence( void *data, gint w, gint h );
+void	veejay_configure_sequence( void *data, gint w, gint h, float fps );
 
 void	veejay_sequence_free( void *data );
 
@@ -31,7 +31,7 @@ void	veejay_toggle_image_loader( void *data, gint state );
 
 void	veejay_get_status( void *data, guchar *dst );
 
-gchar	*veejay_sequence_get_track_list( void *data, int slen, int *bytes_written );
+unsigned char	*veejay_sequence_get_track_list( void *data, int slen, int *bytes_written );
 
 void	veejay_abort_sequence( void *data );
 

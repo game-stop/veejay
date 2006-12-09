@@ -5496,7 +5496,7 @@ static	void	reload_editlist_contents()
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 		
 	g_free( eltext );
-
+	
 }
 
 // execute after el change:
@@ -5510,6 +5510,7 @@ static	void	load_editlist_info()
 	memset(values, 0, sizeof(values));
 	single_vims( VIMS_VIDEO_INFORMATION );
 	int len = 0;
+	float oldfps = info->el.fps;
 	gchar *res = recv_vims(3,&len);
 	if( len <= 0 || res==NULL)
 	{
@@ -5556,6 +5557,11 @@ static	void	load_editlist_info()
 		enable_widget_by_pointer(GTK_WIDGET(info->audiovolume_knob));
 		enable_widget( "audio_knobframe");
 	}
+
+	if(oldfps != info->el.fps )
+		multitrack_set_framerate( info->mt,info->el.fps );
+
+	
 	g_free(res);
 }
 
@@ -6660,8 +6666,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	reload_editlist_contents();
 	reload_bundles();
 
-	multitrack_set_framerate( info->el.fps );
-	
+
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
 	gtk_widget_show( w );
 
@@ -6760,7 +6765,11 @@ gboolean		is_alive( void )
 			veejay_stop_connecting(gui);
 			info->watch.state = STATE_PLAYING;
 			if(info->watch.p_state == 0)
+			{
 				multrack_audoadd( info->mt, remote, port );
+
+			}
+
 			info->watch.p_state = 0; 
 		}
 	}

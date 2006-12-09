@@ -124,7 +124,6 @@ static  int     preview_height_ = 0;
 
 static	int	mpreview_width_ = 0;
 static  int	mpreview_height_ = 0;
-static  float	fps_ = 25.0;
 
 static volatile int	MAX_TRACKS = 4;
 static volatile int	LAST_TRACK = 0;
@@ -460,10 +459,10 @@ static	gboolean	update_track_list( mt_priv_t *p )
 	if(p->active)
 	{	
 		int len = 0;
-		gchar *buf = veejay_sequence_get_track_list( p->sequence, 5, &len );
+		unsigned char *buf = veejay_sequence_get_track_list( p->sequence, 5, &len );
 		int i = 0;
 		int it = 0;
-		char *ptr = buf;
+		unsigned char *ptr = buf;
 	// clear existing buffer
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
@@ -479,7 +478,7 @@ static	gboolean	update_track_list( mt_priv_t *p )
 		while( i < len )
 		{
 			int dlen = 0;
-			char tmp_len[4];
+			unsigned char tmp_len[4];
 			bzero( tmp_len, 4 );
 			strncpy( tmp_len, ptr , 3 );
 			sscanf( tmp_len , "%d", &dlen );
@@ -726,18 +725,29 @@ void		setup_geometry( int w, int h, int n_tracks,int pw, int ph )
 	sta_h = ph;
 }
 
-void		multitrack_set_framerate( float fps )
+void		multitrack_set_framerate( void *data, float fps )
 {
-	fps_ = fps;
+	multitracker_t *mt = (multitracker_t*) data;
+	all_priv_t *a = (all_priv_t*)mt->data;
+
+	G_LOCK(mt_lock);
+
+	mt_priv_t *last_track = a->pt[LAST_TRACK];
+#ifdef STRICT_CHECKING
+	assert( fps > 0.0 )
+#endif
+       	veejay_configure_sequence( last_track->sequence, mpreview_width_, mpreview_height_ , fps);
+
+	G_UNLOCK(mt_lock);
+
 }
 
-void		multitrack_configure_preview(int w, int h, int hw, int hh, float fps )
+void		multitrack_configure_preview(int w, int h, int hw, int hh )
 {
 	preview_width_ = w;
 	preview_height_ = h;
 	mpreview_width_ = hw;
 	mpreview_height_ = hh;
-	fps_ = fps;
 }
 
 void		*multitrack_new(
@@ -937,7 +947,7 @@ int		multitrack_add_track( void *data )
 			G_UNLOCK( mt_lock );
 			return 0;
 		}
-		seq = veejay_sequence_init( port_num, hostname, mpreview_width_, mpreview_height_, fps_  );
+		seq = veejay_sequence_init( port_num, hostname, mpreview_width_, mpreview_height_, 0.0  );
 		if(seq == NULL )
 		{
 			status_print( mt, "Error while connecting to '%s' : '%d'", hostname, port_num );
@@ -948,7 +958,7 @@ int		multitrack_add_track( void *data )
 			G_UNLOCK( mt_lock );
 			return 0;
 		}
-		veejay_configure_sequence( seq, preview_width_, preview_height_ );
+		veejay_configure_sequence( seq, preview_width_, preview_height_ ,0.0);
 		pt->pt[track]->sequence = seq;
 		pt->pt[track]->active = 1;	
 		pt->pt[track]->used = 1;
@@ -980,7 +990,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 	all_priv_t *a = (all_priv_t*)mt->data;
 	G_LOCK(mt_lock);
 	int track = free_slot( mt->data );
-	void *seq = veejay_sequence_init( port_num, hostname, mpreview_width_, mpreview_height_ , fps_ );
+	void *seq = veejay_sequence_init( port_num, hostname, mpreview_width_, mpreview_height_ , 0.0 );
 			
 	if(seq == NULL )
 	{
@@ -994,7 +1004,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 	}
 	
 	a->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) a->pt[track] );
-	veejay_configure_sequence( seq, preview_width_, preview_height_ );
+	veejay_configure_sequence( seq, preview_width_, preview_height_, 0.0 );
 
 	a->pt[track]->sequence = seq;
 	a->pt[track]->active = 1;	
@@ -1196,7 +1206,7 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int wid
 	if( last_track->active )
 	{
 		// make sure to reset width/height back to small
-		veejay_configure_sequence( last_track->sequence, mpreview_width_, mpreview_height_ );
+		veejay_configure_sequence( last_track->sequence, mpreview_width_, mpreview_height_ , 0.0);
 	}
 		
 	int id = find_track( mt, hostname, port_num );
@@ -1212,7 +1222,7 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int wid
 #ifdef STRICT_CHECKING
 		assert( last_track->sequence != NULL );
 #endif
-		veejay_configure_sequence( last_track->sequence, preview_width_, preview_height_ );
+		veejay_configure_sequence( last_track->sequence, preview_width_, preview_height_ , 0.0);
 		gtk_widget_set_size_request( GTK_WIDGET( last_track->view->area ), 360,290 );
 	}
 	else
