@@ -1542,7 +1542,7 @@ void 	*mt_preview( gpointer user_data )
 	
 	long sleepy = 34000;
 	char	tmp_key[32];
-	void *p = vevo_port_new( VEVO_ANONYMOUS_PORT );
+	void *pixp = vevo_port_new( VEVO_ANONYMOUS_PORT );
 	
 	GdkPixbuf *ir = NULL;
 	for( ;; )
@@ -1585,19 +1585,19 @@ void 	*mt_preview( gpointer user_data )
 
 		*/
 
-		char **refs = vevo_list_properties( p );
+		char **refs = vevo_list_properties( pixp );
 		if(refs)
 		{
 			for( i = 0; refs[i] != NULL ; i ++ )
 			{
 				GdkPixbuf *buf = NULL;
-				if( vevo_property_get( p, refs[i], 0, &buf ) == VEVO_NO_ERROR )
+				if( vevo_property_get( pixp, refs[i], 0, &buf ) == VEVO_NO_ERROR )
 					gdk_pixbuf_unref(buf);
 				free(refs[i]);	
 			}
 			free(refs);
-			vevo_port_free( p ); //@FIXME: should remove property
-			p = vevo_port_new( VEVO_ANONYMOUS_PORT );
+			vevo_port_free( pixp ); //@FIXME: should remove property
+			pixp = vevo_port_new( VEVO_ANONYMOUS_PORT );
 		}
 			
 		
@@ -1621,7 +1621,7 @@ void 	*mt_preview( gpointer user_data )
 			else
 			{
 				sprintf(tmp_key, "%d", LAST_TRACK );
-				vevo_property_set( p, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &(cache[LAST_TRACK] ) );
+				vevo_property_set( pixp, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &(cache[LAST_TRACK] ) );
 			}
 		}
 
@@ -1645,7 +1645,7 @@ void 	*mt_preview( gpointer user_data )
 				else
 				{
 					sprintf(tmp_key, "%d", i );
-					vevo_property_set( p, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &(cache[i] ) );
+					vevo_property_set( pixp, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &(cache[i] ) );
 				}
 			}
 		}
@@ -1660,7 +1660,7 @@ void 	*mt_preview( gpointer user_data )
 				cache[LAST_TRACK],
 				w,h,GDK_INTERP_NEAREST );
 			sprintf(tmp_key, "%d", ref );
-			vevo_property_set( p, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &(cache[ref] ) );
+			vevo_property_set( pixp, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &(cache[ref] ) );
 			
 		}
 
@@ -1674,7 +1674,7 @@ void 	*mt_preview( gpointer user_data )
 			ir = gdk_pixbuf_scale_simple( cache[LAST_TRACK],
 					w,h,GDK_INTERP_NEAREST );
 			sprintf(tmp_key, "%p", ir );
-			vevo_property_set( p, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &ir );
+			vevo_property_set( pixp, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &ir );
 		}
 
 		G_UNLOCK(mt_lock );
