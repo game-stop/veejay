@@ -23,6 +23,7 @@ typedef struct
 	gint	wframe_num;
 	gint	preview;
 	gint	width;
+	float  fps;
 	gint	height;
 	gint	abort;
 	unsigned long preview_delay;
@@ -31,6 +32,7 @@ typedef struct
 	GMutex *mutex;
 	GMutex *serialize;
 	guchar *serialized[100];
+	int	sta[22];
 } veejay_sequence_t;
 
 static unsigned long vj_get_timer()
@@ -218,7 +220,8 @@ static int	veejay_process_status( veejay_sequence_t *v )
 			if( n <= 0 )
 				return 0;
 			g_mutex_lock( v->serialize );
-			memcpy( v->serialized, v->status_buffer, bytes );
+			veejay_memcpy( v->serialized, v->status_buffer, bytes );
+			status_to_arr( v->status_buffer, v->sta );
 			if( bytes < 100 ) 
 				memset( v->serialized + bytes, 0, (100-bytes));
 			g_mutex_unlock( v->serialize );
@@ -231,7 +234,7 @@ static int	veejay_process_status( veejay_sequence_t *v )
 static	int	veejay_get_image_data(veejay_sequence_t *v )
 {
 	if(!v->active )
-		return 0;
+		return 1;
 	
 	gint res = veejay_ipc_send( v, VIMS_RGB24_IMAGE, "%d %d", v->width,v->height );
 	if( res <= 0 )
@@ -249,9 +252,8 @@ void		veejay_get_status( void *data, guchar *dst )
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
 	if(!v->active)
 		return;
-	bzero(dst,100);
 	g_mutex_lock( v->serialize );
-	memcpy( dst, v->serialized, 100);
+	veejay_memcpy( dst, v->serialized, 100);
 	g_mutex_unlock(v->serialize );
 }
 
@@ -274,13 +276,16 @@ GdkPixbuf	*veejay_get_image( void *data, gint *error)
 		//@ sleeping for new frames!
 		if(!g_cond_timed_wait( v->cond, v->mutex, &time_val ))
 		{	// timeout !
-			v->data_status[v->frame_num] = DATA_ERROR;
+		//	v->data_status[v->frame_num] = DATA_ERROR;
 			g_mutex_unlock(v->mutex);
-			*error = 1;
+		//	*error = 1;
 			return NULL;
 		}
 		if( v->abort )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Abort image preview thread");
 			return NULL;
+		}
 	}
 
 	if( v->data_status[v->frame_num] == DATA_READY )
@@ -308,7 +313,7 @@ GdkPixbuf	*veejay_get_image( void *data, gint *error)
 	return NULL;
 } 
 
-void		veejay_configure_sequence( void *data, gint w, gint h )
+void		veejay_configure_sequence( void *data, gint w, gint h , float fps)
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
 	if(!v) return;
@@ -318,11 +323,10 @@ void		veejay_configure_sequence( void *data, gint w, gint h )
 	while( v->data_status[v->frame_num] == RETRIEVING_DATA )
 		g_cond_wait( v->cond, v->mutex );
 
-//	if( v->data_status[v->frame_num] == DATA_READY || v->data_status[v->frame_num] == DATA_DONE )
-//	{
-		v->width = w;
-		v->height = h;
-//	}
+	v->width = w;
+	v->height = h;
+	v->fps = fps;
+
 	g_mutex_unlock( v->mutex );	
 }
 
@@ -332,8 +336,6 @@ static	int	veejay_process_data( veejay_sequence_t *v )
 	gint ret = 0;
 	g_mutex_lock( v->mutex );
 
-//	veejay_msg(0, "%s: %p , %d x %d (%d)", __FUNCTION__,v, v->width,v->height,v->preview);
-	
 	if( v->width <= 0 || v->height <= 0 || v->preview == 0 || v->active == 0)
 	{
 		g_mutex_unlock( v->mutex );
@@ -366,6 +368,8 @@ void	*veejay_sequence_thread(gpointer data)
 	if(!v) return NULL;
 	unsigned long time_now = 0;
 	unsigned long tn = vj_get_timer() + v->preview_delay;
+	glong spf = (1.0 / v->fps) * 1000.0;
+
 	for ( ;; )
 	{
 		time_now = vj_get_timer();
@@ -384,7 +388,8 @@ void	*veejay_sequence_thread(gpointer data)
 				return NULL;
 			}
 		}
-		if( time_now > tn )
+		
+		if( time_now > tn && v->sta[0] < 250)
 		{
 			if ( veejay_process_data( v ) == 0 )
 			{
@@ -394,8 +399,11 @@ void	*veejay_sequence_thread(gpointer data)
 			}
 			tn = time_now + v->preview_delay; 
 		}
-		g_usleep(10000);
 		
+		glong ms_passed = v->sta[0];
+	        if( (spf - ms_passed) > 0 )
+			g_usleep( (spf-ms_passed)* 1000 );
+			
 	}
 	return NULL;	
 }

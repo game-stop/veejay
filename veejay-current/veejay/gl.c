@@ -838,6 +838,8 @@ void	*x_display_init(void *ptr)
 		return NULL;
 	}
 	XA_INIT(ctx->display,_NET_WM_PID);
+
+	x11_info( ctx->display );
 	
 	ctx->screen = DefaultScreen( ctx->display );
 	ctx->root_win = RootWindow( ctx->display, ctx->screen );
@@ -963,6 +965,9 @@ void	x_display_open(void *dctx, int w, int h)
 	free(title);
 
 	XMapWindow( ctx->display , ctx->win );
+
+	x11_move( ctx->display, ctx->win );
+	
 	do
 	{
 		XNextEvent( ctx->display, &event );	

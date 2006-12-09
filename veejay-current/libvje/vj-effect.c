@@ -144,7 +144,7 @@
 #include "effects/videowall.h"
 #include "effects/flare.h"
 #include "effects/constantblend.h"
-
+#include "effects/colflash.h"
 #include	"plugload.h"
 
 #ifdef USE_SWSCALER
@@ -557,6 +557,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 77] = colormap_init(width,height);
 	vj_effects[i + 78] = goomfx_init(width,height);
 	vj_effects[i + 79] = colmorphology_init(width,height);
+	vj_effects[i + 80] = colflash_init(width,height);
 	max_width = width;
 	max_height = height;
 

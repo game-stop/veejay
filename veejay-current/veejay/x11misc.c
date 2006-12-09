@@ -23,6 +23,10 @@
 #include <X11/Xlib.h>
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
+#include <libvjmsg/vj-common.h>
+#ifdef HAVE_XINERAMA
+#include <X11/extensions/Xinerama.h>
+#endif
 
 #define DECO (1L << 1)
 
@@ -87,3 +91,65 @@ void	x11_misc_set_border( void *display, void *window, int status )
 {
 	
 }
+
+static	int	xinerama_screen_ = -1;
+static	int	xinerama_x_ = 0;
+static	int	xinerama_y_ = 0;
+static  int	xinerama_user_selected_ = 0;
+static	int	screen_w_ = 0;
+static	int	screen_h_ = 0;
+
+void	x11_move( void *display, void *window )
+{
+	Display *d = (Display*) display;
+	Window  *w = (Window*) window;
+#ifdef HAVE_XINERAMA
+	if( XineramaIsActive( d ) )
+	{
+		XMoveWindow( d, w, xinerama_x_, xinerama_y_ );
+	}
+#endif
+}
+
+void	x11_user_select( int n )
+{
+	xinerama_user_selected_ = n;
+}
+
+void	x11_info(void *display)
+{
+	Display *d = (Display*) display;
+#ifdef HAVE_XINERAMA
+
+	int dis1,dis2;
+	
+	if( XineramaIsActive( d ) &&
+	    XineramaQueryExtension( d, &dis1,&dis2) )
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "\tUsing XFree Xinerama extension");
+		
+		int n = 0;
+		XineramaScreenInfo *screens =
+			XineramaQueryScreens( d, &n );
+		
+		if( xinerama_user_selected_ < 0 ||
+		    xinerama_user_selected_ >= n )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "\tRequested screen number invalid");
+			xinerama_user_selected_ = 0;
+		}
+				
+
+		xinerama_x_ = screens[ xinerama_user_selected_ ].x_org;
+		xinerama_y_ = screens[ xinerama_user_selected_ ].y_org;
+		screen_w_   = screens[ xinerama_user_selected_ ].width;
+		screen_h_   = screens[ xinerama_user_selected_ ].height;
+
+		veejay_msg(VEEJAY_MSG_INFO, "\tUsing screen %d : %dx%d+%dx%d", 
+				xinerama_user_selected_, screen_w_, screen_h_, xinerama_x_, xinerama_y_ );
+
+		XFree( screens );
+	}
+#endif
+}
+

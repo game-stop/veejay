@@ -1351,10 +1351,10 @@ void vj_event_single_gl_fire(void *ptr , int mod, int key)
 		case 0xffad: key = SDLK_KP_MINUS; break;
 		case 0xff8d: key = SDLK_KP_ENTER; break;
 		case 0xffaf: key = SDLK_KP_DIVIDE; break;
-		case 0xff9e: key = SDLK_KP_PERIOD; break;
+		case 0xff9e: case 0xff9f: key = SDLK_KP_PERIOD; break;
 		default:
 			if( key > (256+128))
-				veejay_msg(0, "\tUnknown key pressed %x, mod = %d", key, mod );
+				veejay_msg(VEEJAY_MSG_DEBUG, "\tUnknown key pressed %x, mod = %d", key, mod );
 			break;
 		     
 	}
@@ -3619,6 +3619,11 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		if(args[1])
 			s->sample_record_switch = 1;
 		result = 1;
+		if(v->use_osd)
+		{
+			veejay_msg(VEEJAY_MSG_INFO,"Turned off OSD, recording now");
+			v->use_osd = 0;
+		}
 		veejay_msg(VEEJAY_MSG_INFO, "Sample recording started , record %d frames and %s",
 				args[0], (args[1] == 1 ? "play new sample" : "dont play new sample" ));
 	}
@@ -6179,6 +6184,12 @@ static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
 		return;
 	} 
 
+	if(v->use_osd)
+	{
+		veejay_msg(VEEJAY_MSG_INFO,"Turned off OSD, recording now");
+		v->use_osd = 0;
+	}
+	
 	if(args[1]==0) 
 		v->settings->tag_record_switch = 0;
 	else
@@ -8496,7 +8507,6 @@ void	vj_event_sequencer_add_sample(		void *ptr,	const char format[],	va_list ap 
 		v->seq->size ++;
 		veejay_msg(VEEJAY_MSG_INFO, "Added sample %d to slot %d/%d",
 				id, seq,MAX_SEQUENCES );
-		v->seq->active ++;
 	}
 	else
 	{
@@ -8572,14 +8582,12 @@ void	vj_event_sample_sequencer_active(	void *ptr, 	const char format[],	va_list 
 		return;
 	}
 
-//	v->seq->active = args[0];
-
-	if( args[0] == 0 && v->seq->active > 0 )
+	if( args[0] == 0 )
 	{
 		v->seq->active = 0;
 		veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer disabled");
 	}
-	else if (args[1] == 1 && !v->seq->active )
+	else if (args[1] == 1 )
 	{
 		v->seq->active = 1;
 		veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer enabled");

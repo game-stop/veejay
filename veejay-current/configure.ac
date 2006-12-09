@@ -170,6 +170,20 @@ fi
 AC_SUBST( GL_LIBS )
 AC_SUBST( GL_CFLAGS )
 
+dnl Check for Xinerama
+use_xinerama=no
+AC_CHECK_LIB( Xinerama, XineramaQueryExtension,
+	[ AC_CHECK_HEADER(X11/extensions/Xinerama.h,
+	   [
+		AC_DEFINE( HAVE_XINERAMA,1,[Use Xinerama] )
+        	use_xinerama=yes,
+	   ],
+	   use_xinerama=no,
+	   [#include <X11/Xlib.h>])],
+	   use_xinerama=no, -lXext)
+AC_MSG_CHECKING( for Xinerama support on XFree86 )
+AC_MSG_RESULT($use_xinerama)	
+
 
 dnl e_xdpms=no
 dnl ACCHECK_HEADER(X11/extensions/dpms.h,

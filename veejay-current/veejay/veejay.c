@@ -34,6 +34,7 @@
 #include <libvje/vje.h>
 #include <libvjmsg/vj-common.h>
 #include <veejay/vj-global.h>
+#include <veejay/x11misc.h>
 #include <sys/mman.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
@@ -113,32 +114,32 @@ static void Usage(char *progname)
     fprintf(stderr, "where options are:\n");
 
     fprintf(stderr,
-	    "  -p/--portoffset\t\t\tTCP port to accept/send messages (default: 3490)\n");
+	    "  -p/--portoffset\t\tTCP port to accept/send messages (default: 3490)\n");
     fprintf(stderr,
 	    "  -t/--timer num\t\tspecify timer to use (none:0,normal:2,rtc:1) default is 1\n");
 
 	fprintf(stderr,
-		"  -O/--output\t\tOutput video");
+		"  -O/--output [012345]\t\tOutput video\n");
 #ifdef HAVE_SDL
 	fprintf(stderr,
-		"\t\t0 = SDL\t\n");
+		"\t\t\t\t0 = SDL (default)\t\n");
 #endif
 #ifdef HAVE_DIRECTFB
 	fprintf(stderr,
-		"\t\t1 = DirectDB\t\n");
+		"\t\t\t\t1 = DirectDB\t\n");
 #ifdef HAVE_SDL
 	fprintf(stderr,
-		"\t\t2 = SDL and DirectDB secundary head (TV-Out) clone mode\n");
+		"\t\t\t\t2 = SDL and DirectDB secundary head (TV-Out) clone mode\n");
 #endif
 #endif
 	fprintf(stderr,
-		"\t\t3 = YUV4MPEG stream (use with -o/--outstream <filename>)\n");
+		"\t\t\t\t3 = YUV4MPEG stream (use with -o/--outstream <filename>)\n");
 #ifdef USE_GL
 	fprintf(stderr,
-		"\t\t4 = OpenGL (requires openGL extension ARB fragment program)\n");
+		"\t\t\t\t4 = OpenGL (requires openGL extension ARB fragment program)\n");
 #endif
 	fprintf(stderr,
-		"\t\t5 = Head less (no video output)\n");	
+		"\t\t\t\t5 = Head less (no video output)\n");	
 		
     fprintf(stderr,
 	    "  -o/--outstream <filename>\twhere to write the yuv4mpeg stream (use with -O3)\n");
@@ -150,9 +151,17 @@ static void Usage(char *progname)
 	    "  -P/--preserve-pathnames\tDo not 'canonicalise' pathnames in editlists\n");
     fprintf(stderr,
 	    "  -a/--audio [01]\t\tEnable (1) or disable (0) audio (default 1)\n");
+#ifdef HAVE_SDL
     fprintf(stderr,
 	    "  -s/--size NxN\t\t\twidth X height for SDL video window\n");
-	fprintf(stderr,
+#endif
+#ifdef HAVE_XINERAMA
+#ifdef USE_GL
+    fprintf(stderr,
+            "  -X/--Xinerama N\t\tSelect xinerama screen [0-n] (Use with -O4)\n");
+#endif
+#endif
+    fprintf(stderr,
 	    "  -l/--action-file <filename>\tLoad an Configuartion/Action File (none at default)\n");
 	fprintf(stderr,
 	    "  -u/--dump-events  \t\tDump event information to screen\n");
@@ -181,15 +190,15 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -j/--max_cache \t\tDivide cache memory over N samples (default=4)\n");
 	fprintf(stderr,
-		"  -Y/--ycbcr [01]\t\tInternal processing format");
+		"  -Y/--ycbcr [0123]\t\tInternal processing format\n");
 	fprintf(stderr,
-		"\t\t 0 = YUV 4:2:0 Planar\n");
+		"\t\t\t\t 0 = YUV 4:2:0 Planar\n");
 	fprintf(stderr,
-		"\t\t 1 = YUV 4:2:2 Planar (default)\n");
+		"\t\t\t\t 1 = YUV 4:2:2 Planar (default)\n");
 	fprintf(stderr,
-		"\t\t 2 = YUV 4:2:0 Planar full range\n");
+		"\t\t\t\t 2 = YUV 4:2:0 Planar full range\n");
 	fprintf(stderr,
-		"\t\t 3 = YUV 4:2:2 Planar full range\n");
+		"\t\t\t\t 3 = YUV 4:2:2 Planar full range\n");
 
 	fprintf(stderr,
 		"  -d/--dummy	\t\tDummy playback\n");
@@ -199,7 +208,7 @@ static void Usage(char *progname)
 		"  -H/--height <num>\t\tdummy height\n");
 
 	fprintf(stderr,
-		"  -N/--norm [0=PAL, 1=NTSC (defaults to PAL)]\t\tdummy norm , PAL or NTSC\n");
+		"  -N/--norm [0=PAL, 1=NTSC (defaults to PAL)]\n");
 	fprintf(stderr,
 		"  -R/--framerate <num>\t\tdummy frame rate\n");
 	fprintf(stderr,
@@ -343,6 +352,11 @@ static int set_option(const char *name, char *value)
 	    nerr++;
 	}
      }
+#ifdef HAVE_XINERAMA
+    else if (strcmp(name, "Xinerama") == 0 || strcmp(name, "X") == 0 ) {
+	x11_user_select( atoi(optarg) );
+    }
+#endif
     else if (strcmp(name, "outstream") == 0 || strcmp(name, "o") == 0) {
 	check_val(optarg,name);
 	snprintf(info->stream_outname,256,"%s", (char*) optarg);
@@ -501,6 +515,9 @@ static int check_command_line_options(int argc, char *argv[])
 	{"preserve-pathnames", 0, 0, 0},	/* -P/--preserve-pathnames    */
 	{"audio", 1, 0, 0},	/* -a/--audio num       */
 	{"size", 1, 0, 0},	/* -S/--size            */
+#ifdef HAVE_XINERAMA
+	{"Xinerama",1,0,0},	/* -X/--Xinerama	*/
+#endif
 	{"graphics-driver", 1, 0, 0},
 	{"timer", 1, 0, 0},	/* timer */
 	{"dump-events",0,0,0},
@@ -644,8 +661,6 @@ int main(int argc, char **argv)
 
    	settings = (video_playback_setup *) info->settings;
 
-	veejay_check_homedir( info );
-     
 	if(!check_command_line_options(argc, argv))
     	{
 		veejay_free(info);
@@ -666,6 +681,8 @@ int main(int argc, char **argv)
 
 	print_license();
 	prepare_cache_line( max_mem_, n_slots_ );
+	veejay_check_homedir( info );
+     
 
 
     	sigemptyset(&(settings->signal_set));

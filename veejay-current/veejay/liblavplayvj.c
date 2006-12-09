@@ -2518,15 +2518,6 @@ int smp_check()
 	int n_cpu = get_nprocs();
 	int c_cpu = get_nprocs_conf();
 	
-	if(n_cpu == c_cpu)
-	{
-		if(c_cpu>1) veejay_msg(VEEJAY_MSG_INFO, "Running on Multiple procesors");
-	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "You have %d CPU's but your system is configured for only %d",
-			n_cpu, c_cpu);
-	}
 	return n_cpu;
 }
 

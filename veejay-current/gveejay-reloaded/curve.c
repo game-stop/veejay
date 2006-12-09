@@ -52,6 +52,7 @@ void		del_chain( key_chain_t *chain )
 	}
 }
 
+
 key_effect_t	*new_chain_entry(void)
 {
 	gint i;
@@ -181,6 +182,25 @@ void	curve_store_key( key_parameter_t *key, GtkWidget *curve, int max,int val, i
 
 }
 
+void	curve_store_key2( key_parameter_t *key, GtkWidget *curve, int max,int val, int id, int type,
+	       int start, int end	)
+{
+	if(key->vector)
+		free(key->vector);
+	int new_len = end - start + 1;
+	key->vector =  vj_malloc(sizeof(float) * new_len );
+	int j;
+	for(j = 0; j < new_len; j ++ )
+		key->vector[j] = 0.0;
+	key->curve_len = new_len-1;
+	key->start_pos = start;
+	key->end_pos = end;
+	gtk_curve_get_vector( GTK_CURVE(curve), key->curve_len, key->vector );
+	key->parameter_id = id;
+	key->type = type;
+
+}
+
 void	curve_timeline_preserve( key_parameter_t *key, int ne, GtkWidget *curve )
 {
 	int len = key->curve_len;
@@ -211,7 +231,8 @@ void	reset_curve( key_parameter_t *key, GtkWidget *curve )
 {
 	gtk_curve_reset(GTK_CURVE(curve));
 	gtk_curve_set_range( GTK_CURVE(curve), 0.0, 1.0, 0.0, 1.0 );
-	gtk_curve_set_curve_type( GTK_CURVE(curve), key->type );
+	if(key)
+		gtk_curve_set_curve_type( GTK_CURVE(curve), key->type );
 }
 
 void	set_points_in_curve( key_parameter_t *key, GtkWidget *curve)

@@ -529,6 +529,7 @@ info->parameter_lock = 0;\
 
 #define kf_changed( arg_num ) \
 {\
+info->uc.selected_parameter_id = arg_num;\
 if(!info->status_lock)\
 {\
 vj_kf_select_parameter(arg_num);\
@@ -1674,7 +1675,8 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 
 	_effect_get_minmax( id, &min,&max, j );
 
-	curve_store_key( s->ec->effects[i]->parameters[j], curve,max,0, id, curve_type);
+	curve_store_key2( s->ec->effects[i]->parameters[j], curve,max,0, id, curve_type,
+			get_nums( "curve_spinstart" ), get_nums( "curve_spinend" ) );
 
 	s->ec->effects[i]->parameters[j]->running = is_button_toggled( "curve_togglerun" );
 	s->ec->effects[i]->enabled = is_button_toggled( "button_entry_toggle");

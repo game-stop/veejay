@@ -124,6 +124,7 @@ static  int     preview_height_ = 0;
 
 static	int	mpreview_width_ = 0;
 static  int	mpreview_height_ = 0;
+static  float	fps_ = 25.0;
 
 static volatile int	MAX_TRACKS = 4;
 static volatile int	LAST_TRACK = 0;
@@ -725,12 +726,18 @@ void		setup_geometry( int w, int h, int n_tracks,int pw, int ph )
 	sta_h = ph;
 }
 
-void		multitrack_configure_preview(int w, int h, int hw, int hh )
+void		multitrack_set_framerate( float fps )
+{
+	fps_ = fps;
+}
+
+void		multitrack_configure_preview(int w, int h, int hw, int hh, float fps )
 {
 	preview_width_ = w;
 	preview_height_ = h;
 	mpreview_width_ = hw;
 	mpreview_height_ = hh;
+	fps_ = fps;
 }
 
 void		*multitrack_new(
@@ -930,7 +937,7 @@ int		multitrack_add_track( void *data )
 			G_UNLOCK( mt_lock );
 			return 0;
 		}
-		seq = veejay_sequence_init( port_num, hostname, mpreview_width_, mpreview_height_  );
+		seq = veejay_sequence_init( port_num, hostname, mpreview_width_, mpreview_height_, fps_  );
 		if(seq == NULL )
 		{
 			status_print( mt, "Error while connecting to '%s' : '%d'", hostname, port_num );
@@ -973,7 +980,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 	all_priv_t *a = (all_priv_t*)mt->data;
 	G_LOCK(mt_lock);
 	int track = free_slot( mt->data );
-	void *seq = veejay_sequence_init( port_num, hostname, mpreview_width_, mpreview_height_  );
+	void *seq = veejay_sequence_init( port_num, hostname, mpreview_width_, mpreview_height_ , fps_ );
 			
 	if(seq == NULL )
 	{

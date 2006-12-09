@@ -1,5 +1,7 @@
 # Makefile for veejay
 
+MAINTAINERCLEANFILES=Makefile.in
+
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/libgoom -I$(top_srcdir)/vjmsg ${FFMPEG_CFLAGS} $(GLIB_CFLAGS)   
 
 AM_CFLAGS = $(CFLAGS) -freg-struct-return
@@ -14,7 +16,7 @@ libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			effects/dither.c effects/dices.c effects/emboss.c effects/flip.c \
 			effects/revtv.c effects/softblur.c effects/zoom.c effects/split.c effects/widthmirror.c \
 			effects/frameborder.c effects/dummy.c effects/rawman.c effects/rawval.c \
-			effects/smuck.c effects/transform.c effects/borders.c \
+			effects/smuck.c effects/transform.c effects/borders.c effects/colflash.c \
 			effects/rgbkey.c effects/solarize.c effects/mirrors2.c \
 			effects/whiteframe.c effects/deinterlace.c effects/lumakey.c \
 			effects/coloradjust.c effects/gamma.c effects/reflection.c effects/rotozoom.c \

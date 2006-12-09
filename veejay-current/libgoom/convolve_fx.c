@@ -15,8 +15,8 @@
 
 typedef char Motif[CONV_MOTIF_W][CONV_MOTIF_W];
 
-#include "motif_goom1.h"
-#include "motif_goom2.h"
+//#include "motif_goom1.h"
+//#include "motif_goom2.h"
 
 #define NB_THETA 512
 
@@ -100,7 +100,7 @@ static void convolve_init(VisualFX *_this, PluginInfo *info) {
   data->theta = 0;
   data->ftheta = 0.0;
   data->visibility = 1.0;
-  set_motif(data, CONV_MOTIF2);
+  //set_motif(data, CONV_MOTIF2);
   data->inverse_motif = 0;
 
   _this->params = &data->params;
@@ -290,7 +290,7 @@ static void convolve_apply(VisualFX *_this, Pixel *src, Pixel *dest, PluginInfo 
     if (data->visibility < 0.0) data->visibility = 0.0;
     data->factor_p.change_listener(&data->factor_p);
   }
-
+/*
   if (data->visibility < 0.01) {
     switch (goom_irand(info->gRandom, 300))
     {
@@ -299,7 +299,7 @@ static void convolve_apply(VisualFX *_this, Pixel *src, Pixel *dest, PluginInfo 
       case 2:
         set_motif(data, CONV_MOTIF2); data->inverse_motif = 0; break;
     }
-  }
+  }*/
 
   if ((ff > 0.98f) && (ff < 1.02f))
     memcpy(dest, src, info->screen.size * sizeof(Pixel));

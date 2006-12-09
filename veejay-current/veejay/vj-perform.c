@@ -437,7 +437,12 @@ static int vj_perform_alloc_row(veejay_t *info, int frame, int c, int frame_len)
 	frame_buffer[c]->Y = buf;
 	frame_buffer[c]->Cb = buf + helper_frame->len;
 	frame_buffer[c]->Cr = buf + helper_frame->len + helper_frame->len;
-	frame_buffer[c]->ssm = 0;
+
+	frame_buffer[c]->ssm = info->effect_frame1->ssm;
+
+	//veejay_memset( frame_buffer[c]->Y, 16, helper_frame->len );
+	//veejay_memset( frame_buffer[c]->Cb, 128, helper_frame->len/2);
+	//veejay_memset( frame_buffer[c]->Cr,128,helper_frame->len/2);
 	return (helper_frame->len * 3 );
 	
 }

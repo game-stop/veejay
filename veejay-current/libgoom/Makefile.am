@@ -1,7 +1,7 @@
-# libgoom2
+# libgoom
 
 MAINTAINERCLEANFILES=Makefile.in
-INCLUDES = -I$(top_srcdir)
+INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/libgoom
 
 if ARCH_PPC 
 PPC_FILES=ppc_zoom_ultimate.s ppc_drawings.s
@@ -9,11 +9,11 @@ else
 PPC_FILES=
 endif
 
-noinst_LIBRARIES = libgoom2.a
+LIBGOOM = libgoom.a
+noinst_LIBRARIES = $(LIBGOOM)
 
 #goom2_library_include_HEADERS = goom.h goom_plugin_info.h goom_typedefs.h goom_graphic.h goom_config_param.h goom_visual_fx.h goom_filters.h goom_tools.h goomsl.h goomsl_hash.h goomsl_heap.h goom_tools.h goom_config.h
-libgoom2_a_SOURCES = \
-	goomsl_yacc.y goomsl_lex.l goomsl.c goomsl_hash.c goomsl_heap.c \
+libgoom_a_SOURCES = goomsl_yacc.y goomsl_lex.l goomsl.c goomsl_hash.c goomsl_heap.c \
 	goom_tools.c $(PPC_FILES) \
 	config_param.c convolve_fx.c filters.c \
 	flying_stars_fx.c gfontlib.c gfontrle.c \

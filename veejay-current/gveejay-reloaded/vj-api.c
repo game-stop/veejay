@@ -791,8 +791,7 @@ GdkColor	*widget_get_fg(GtkWidget *w )
 {
 	if(!w)		
 		return NULL;
-	GdkColor *c = (GdkColor*)vj_malloc(sizeof(GdkColor));
-	memset(c, 0, sizeof(GdkColor));
+	GdkColor *c = (GdkColor*)vj_calloc(sizeof(GdkColor));
 	GtkStyle *s = gtk_widget_get_style( w);
 	c->red   = s->fg[0].red;
 	c->green = s->fg[0].green;
@@ -1520,7 +1519,7 @@ void	about_dialog()
 		"name", "GVeejay Reloaded",
 		"version", VERSION,
 		"copyright", "(C) 2004 - 2005 N. Elburg et all.",
-		"comments", "Another graphical interface for Veejay",
+		"comments", "The graphical interface for Veejay",
 		"authors", authors,
 		"artists", artists,
 		"license", license,
@@ -1808,8 +1807,7 @@ static	void	free_slot( sample_slot_t *slot )
 /* Allocate some memory and create a temporary slot */
 sample_slot_t 	*create_temporary_slot( gint slot_id, gint id, gint type, gchar *title, gchar *timecode )
 {
-	sample_slot_t *slot = (sample_slot_t*) vj_malloc(sizeof(sample_slot_t));
-	memset(slot, 0, sizeof(sample_slot_t));
+	sample_slot_t *slot = (sample_slot_t*) vj_calloc(sizeof(sample_slot_t));
 	if(id>0)
 	{
 		slot->sample_id = id;
@@ -2152,6 +2150,18 @@ static	void	vj_kf_select_parameter(int num)
 	update_label_str( "curve_parameter", name );
 }
 
+static	void	vj_kf_refresh()
+{
+	GtkWidget *curve = glade_xml_get_widget_(info->main_window, "curve");
+
+
+	reset_curve( NULL, curve );
+
+	update_curve_accessibility("curve");
+	update_curve_widget("curve");
+
+}
+
 static	int	interpolate_parameters(void)
 {
 	sample_slot_t *s = info->selected_slot;
@@ -2253,8 +2263,8 @@ static	void	update_curve_accessibility(const char *name)
 
 	if( info->status_tokens[PLAY_MODE] == MODE_PLAIN )
 	{
-		update_spin_range( "curve_spinstart", 0,0,0);
-		update_spin_range( "curve_spinend", 0,0,0);
+//		update_spin_range( "curve_spinstart", 0,0,0);
+//		update_spin_range( "curve_spinend", 0,0,0);
 		disable_widget( "curve" );
 		disable_widget( "curve_table" );
 	}
@@ -2273,13 +2283,13 @@ static	void	update_curve_accessibility(const char *name)
 				info->status_tokens[SAMPLE_START], 
 				info->status_tokens[SAMPLE_END], info->status_tokens[SAMPLE_START] );
 			update_spin_range( "curve_spinend", info->status_tokens[SAMPLE_START],
-				info->status_tokens[SAMPLE_END] ,  info->status_tokens[SAMPLE_END] );
+				info->status_tokens[SAMPLE_END] ,  info->status_tokens[SAMPLE_END]-1 );
 		}
 		else
 		{
 			nl = get_nums("stream_length") + 1 ;
-			update_spin_range( "curve_spinstart", 0, nl-1, 0 );
-			update_spin_range( "curve_spinend", 0,nl-1, nl-1);
+			update_spin_range( "curve_spinstart", 0, nl, 0 );
+			update_spin_range( "curve_spinend", 0,nl, nl-1);
 		}	
 
 	}	
@@ -3164,7 +3174,7 @@ static void 	update_globalinfo()
 	{
 		info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 	
-		if(!info->status_tokens[SEQ_ACT] )
+		if(info->status_tokens[SEQ_ACT]== 0 )
 			set_toggle_button( "seqactive" , 0 );
 		else
 			set_toggle_button( "seqactive", 1 );
@@ -3420,7 +3430,8 @@ static void	process_reload_hints(void)
 
 	/* Curve needs update (start/end changed, effect id changed */
 	if ( info->uc.reload_hint[HINT_KF]  )
-		vj_kf_select_parameter( info->uc.selected_parameter_id );
+		vj_kf_refresh();
+//		vj_kf_select_parameter( info->uc.selected_parameter_id );
 	
 	if( info->uc.reload_hint[HINT_HISTORY] )
 	{
@@ -6332,30 +6343,28 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	char path[MAX_PATH_LEN];
 	int i;
 
-	vj_gui_t *gui = (vj_gui_t*)vj_malloc(sizeof(vj_gui_t));
+	vj_gui_t *gui = (vj_gui_t*)vj_calloc(sizeof(vj_gui_t));
 	if(!gui)
 	{
 		return;
 	}
-	memset( gui, 0, sizeof(vj_gui_t));
-	memset( gui->status_tokens, 0, STATUS_TOKENS );
-	memset( gui->sample, 0, 2 );
-	memset( gui->selection, 0, 3 );
-	memset( &(gui->uc), 0, sizeof(veejay_user_ctrl_t));
+	veejay_memset( gui->status_tokens, 0, STATUS_TOKENS );
+	veejay_memset( gui->sample, 0, 2 );
+	veejay_memset( gui->selection, 0, 3 );
+	veejay_memset( &(gui->uc), 0, sizeof(veejay_user_ctrl_t));
 	gui->prev_mode = -1; 
-	memset( &(gui->el), 0, sizeof(veejay_el_t));
-	gui->sample_banks = (sample_bank_t**) vj_malloc(sizeof(sample_bank_t*) * NUM_BANKS );
-	memset( gui->sample_banks, 0 , sizeof(sample_bank_t*) * NUM_BANKS );
+	veejay_memset( &(gui->el), 0, sizeof(veejay_el_t));
+	gui->sample_banks = (sample_bank_t**) vj_calloc(sizeof(sample_bank_t*) * NUM_BANKS );
 			
 	for( i = 0 ; i < 3 ; i ++ )
 	{
-		gui->history_tokens[i] = (int*) vj_malloc(sizeof(int) * STATUS_TOKENS);
-		memset( gui->history_tokens[i], 0xffff, sizeof(int) *STATUS_TOKENS);
+		gui->history_tokens[i] = (int*) vj_calloc(sizeof(int) * STATUS_TOKENS);
+		veejay_memset( gui->history_tokens[i], 0xffff, sizeof(int) *STATUS_TOKENS);
 	}
 
 	gui->uc.reload_force_avoid = FALSE;
 
-	memset( vj_event_list, 0, sizeof(vj_event_list));
+	veejay_memset( vj_event_list, 0, sizeof(vj_event_list));
 
 	get_gd( path, NULL, glade_file);
 
@@ -6476,7 +6485,8 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	multitrack_configure_preview( pw,
 				      ph,
 			      	      pw,
-				      ph );	     
+				      ph,
+		       		      25.0	);	     
 	
 	gui->mt = multitrack_new(
 			(void(*)(int,char*,int)) vj_gui_cb,
@@ -6642,16 +6652,16 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	load_editlist_info();
 
-	info->rawdata = (guchar*) vj_malloc(sizeof(guchar) * info->el.width * info->el.height * 3);
-	memset(info->rawdata,0,sizeof(guchar) * info->el.width * info->el.height * 3 ); 
-	memset( &vims_keys_list, 0, sizeof(vims_keys_t));
+	info->rawdata = (guchar*) vj_calloc(sizeof(guchar) * info->el.width * info->el.height * 3);
+	veejay_memset( &vims_keys_list, 0, sizeof(vims_keys_t));
 
 	load_effectlist_info();
 	reload_vimslist();
 	reload_editlist_contents();
 	reload_bundles();
 
-
+	multitrack_set_framerate( info->el.fps );
+	
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
 	gtk_widget_show( w );
 
@@ -6881,8 +6891,7 @@ void	vj_gui_put_image(void)
   -------------------------------------------------------------------------------------------------------------------------- */
 sample_slot_t *vj_gui_get_sample_info(gint which_one, gint mode )
 {
-	sample_slot_t *tmp_slot = (sample_slot_t*) vj_malloc(sizeof(sample_slot_t));
-	memset( tmp_slot, 0, sizeof(sample_slot_t));
+	sample_slot_t *tmp_slot = (sample_slot_t*) vj_calloc(sizeof(sample_slot_t));
 
 	multi_vims( VIMS_SAMPLE_INFO, "%d %d", which_one, mode ); 
 
@@ -6969,20 +6978,17 @@ static int	add_bank( gint bank_num  )
 		exit(0);
 	}
 
-	info->sample_banks[bank_num] = (sample_bank_t*) vj_malloc(sizeof(sample_bank_t));
-	memset(info->sample_banks[bank_num],0,sizeof(sample_bank_t));
+	info->sample_banks[bank_num] = (sample_bank_t*) vj_calloc(sizeof(sample_bank_t));
 	info->sample_banks[bank_num]->bank_number = bank_num;
-	sample_slot_t **slot = (sample_slot_t**) vj_malloc(sizeof(sample_slot_t*) * NUM_SAMPLES_PER_PAGE);
-	sample_gui_slot_t **gui_slot = (sample_gui_slot_t**) vj_malloc(sizeof(sample_gui_slot_t*) * NUM_SAMPLES_PER_PAGE );
+	sample_slot_t **slot = (sample_slot_t**) vj_calloc(sizeof(sample_slot_t*) * NUM_SAMPLES_PER_PAGE);
+	sample_gui_slot_t **gui_slot = (sample_gui_slot_t**) vj_calloc(sizeof(sample_gui_slot_t*) * NUM_SAMPLES_PER_PAGE );
 
 	int j;
 	for(j = 0;j < NUM_SAMPLES_PER_PAGE; j ++ ) 
 	{
-		slot[j] = (sample_slot_t*) vj_malloc(sizeof(sample_slot_t) );	
-		gui_slot[j] = (sample_gui_slot_t*) vj_malloc(sizeof(sample_gui_slot_t));
-		memset(slot[j], 0 , sizeof(sample_slot_t) );	
-		memset(gui_slot[j], 0, sizeof(sample_gui_slot_t));
-		slot[j]->rawdata = (guchar*) vj_malloc(sizeof(guchar) * 3 * 256 * 256 );
+		slot[j] = (sample_slot_t*) vj_calloc(sizeof(sample_slot_t) );	
+		gui_slot[j] = (sample_gui_slot_t*) vj_calloc(sizeof(sample_gui_slot_t));
+		slot[j]->rawdata = (guchar*) vj_calloc(sizeof(guchar) * 3 * 256 * 256 );
 		slot[j]->slot_number = j;
 		slot[j]->sample_id = -1;
 		slot[j]->sample_type = -1;
@@ -7393,8 +7399,9 @@ static gboolean on_sequencerslot_activated_by_mouse(GtkWidget *widget, GdkEventB
 		if( info->selection_slot )
 			id = info->selection_slot->sample_id;
 		multi_vims( VIMS_SEQUENCE_ADD, "%d %d", slot_nr, id );
-		veejay_msg(0, "Sequence %d, Sample %d",slot_nr, id );
+		info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 	}
+	
 
 	return FALSE;
 
@@ -7518,10 +7525,8 @@ static void create_ref_slots(int envelope_size)
 	info->quick_select = gtk_frame_new(NULL);
 	gtk_box_pack_start( GTK_BOX( vbox ), GTK_WIDGET(info->quick_select), TRUE, TRUE, 0);
 	gtk_widget_show(info->quick_select);
-	info->sequence_view = (sequence_envelope*) vj_malloc(sizeof(sequence_envelope) );
-	memset( info->sequence_view, 0, sizeof( sequence_envelope ) );
-	info->sequence_view->gui_slot = (sequence_gui_slot_t**) vj_malloc(sizeof(sequence_gui_slot_t*) * envelope_size );
-	memset( info->sequence_view->gui_slot, 0, sizeof( sequence_gui_slot_t*) * envelope_size );
+	info->sequence_view = (sequence_envelope*) vj_calloc(sizeof(sequence_envelope) );
+	info->sequence_view->gui_slot = (sequence_gui_slot_t**) vj_calloc(sizeof(sequence_gui_slot_t*) * envelope_size );
 	sprintf(frame_label, "Last played" );
 	GtkWidget *table = gtk_table_new( 1, envelope_size, TRUE );	
 	gtk_container_add( GTK_CONTAINER(info->quick_select), table );
@@ -7531,8 +7536,7 @@ static void create_ref_slots(int envelope_size)
 	gint row=0;
 	for( row = 0; row < envelope_size; row ++ )
 	{
-		sequence_gui_slot_t *gui_slot = (sequence_gui_slot_t*)vj_malloc(sizeof(sequence_gui_slot_t));
-		memset(gui_slot, 0, sizeof(sequence_gui_slot_t));
+		sequence_gui_slot_t *gui_slot = (sequence_gui_slot_t*)vj_calloc(sizeof(sequence_gui_slot_t));
 		info->sequence_view->gui_slot[row] = gui_slot;
 		gui_slot->event_box = gtk_event_box_new();
 		gtk_event_box_set_visible_window(gui_slot->event_box, TRUE);

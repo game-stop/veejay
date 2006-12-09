@@ -602,48 +602,13 @@ guint32 *goom_update (PluginInfo *goomInfo, gint16 data[2][512],
         goomInfo->tentacles_fx.apply(&goomInfo->tentacles_fx, goomInfo->p1, goomInfo->p2, goomInfo);
         goomInfo->star_fx.apply (&goomInfo->star_fx,goomInfo->p2,goomInfo->p1,goomInfo);
         
+
+
+
         /*
          * Affichage de texte
-         */
-        {
-            /*char title[1024];*/
-            char text[64];
-            
-            /*
-             * Le message
-             */
-            update_message (goomInfo, message);
-            
-            if (fps > 0) {
-                sprintf (text, "%2.0f fps", fps);
-                goom_draw_text (goomInfo->p1,goomInfo->screen.width,goomInfo->screen.height,
-                                10, 24, text, 1, 0);
-            }
-            
-            /*
-             * Le titre
-             */
-            if (songTitle != NULL) {
-                strncpy (goomInfo->update.titleText, songTitle, 1023);
-                goomInfo->update.titleText[1023]=0;
-                goomInfo->update.timeOfTitleDisplay = 200;
-            }
-            
-            if (goomInfo->update.timeOfTitleDisplay) {
-                goom_draw_text (goomInfo->p1,goomInfo->screen.width,goomInfo->screen.height,
-                                goomInfo->screen.width / 2, goomInfo->screen.height / 2 + 7, goomInfo->update.titleText,
-                                ((float) (190 - goomInfo->update.timeOfTitleDisplay) / 10.0f), 1);
-                goomInfo->update.timeOfTitleDisplay--;
-                if (goomInfo->update.timeOfTitleDisplay < 4)
-                    goom_draw_text (goomInfo->p2,goomInfo->screen.width,goomInfo->screen.height,
-                                    goomInfo->screen.width / 2, goomInfo->screen.height / 2 + 7, goomInfo->update.titleText,
-                                    ((float) (190 - goomInfo->update.timeOfTitleDisplay) / 10.0f), 1);
-            }
-        }
-        
-        /*
-         * Gestion du Scope
-         */
+         * @ deleted.
+	 */
         
         /*
          * arret demande
@@ -842,6 +807,9 @@ void update_message (PluginInfo *goomInfo, char *message) {
         goomInfo->update_message.affiche = goomInfo->screen.height + goomInfo->update_message.numberOfLinesInMessage * 25 + 105;
         goomInfo->update_message.longueur = strlen(goomInfo->update_message.message);
     }
+    if( goomInfo->update_message.affiche)
+	    goomInfo->update_message.affiche--;
+    /*
     if (goomInfo->update_message.affiche) {
         int i = 0;
         char *msg = malloc(goomInfo->update_message.longueur + 1);
@@ -882,5 +850,6 @@ void update_message (PluginInfo *goomInfo, char *message) {
         goomInfo->update_message.affiche --;
         free (msg);
     }
+    */
 }
 

@@ -14,9 +14,9 @@
 
 @SET_MAKE@
 
-# libgoom2
+# libgoom
 
-SOURCES = $(libgoom2_a_SOURCES)
+SOURCES = $(libgoom_a_SOURCES)
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -53,9 +53,9 @@ CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
 LIBRARIES = $(noinst_LIBRARIES)
 ARFLAGS = cru
-libgoom2_a_AR = $(AR) $(ARFLAGS)
-libgoom2_a_LIBADD =
-am__libgoom2_a_SOURCES_DIST = goomsl_yacc.y goomsl_lex.l goomsl.c \
+libgoom_a_AR = $(AR) $(ARFLAGS)
+libgoom_a_LIBADD =
+am__libgoom_a_SOURCES_DIST = goomsl_yacc.y goomsl_lex.l goomsl.c \
 	goomsl_hash.c goomsl_heap.c goom_tools.c ppc_zoom_ultimate.s \
 	ppc_drawings.s config_param.c convolve_fx.c filters.c \
 	flying_stars_fx.c gfontlib.c gfontrle.c goom_core.c graphic.c \
@@ -63,7 +63,7 @@ am__libgoom2_a_SOURCES_DIST = goomsl_yacc.y goomsl_lex.l goomsl.c \
 	plugin_info.c v3d.c drawmethods.c cpu_info.c
 @ARCH_PPC_TRUE@am__objects_1 = ppc_zoom_ultimate.$(OBJEXT) \
 @ARCH_PPC_TRUE@	ppc_drawings.$(OBJEXT)
-am_libgoom2_a_OBJECTS = goomsl_yacc.$(OBJEXT) goomsl_lex.$(OBJEXT) \
+am_libgoom_a_OBJECTS = goomsl_yacc.$(OBJEXT) goomsl_lex.$(OBJEXT) \
 	goomsl.$(OBJEXT) goomsl_hash.$(OBJEXT) goomsl_heap.$(OBJEXT) \
 	goom_tools.$(OBJEXT) $(am__objects_1) config_param.$(OBJEXT) \
 	convolve_fx.$(OBJEXT) filters.$(OBJEXT) \
@@ -73,7 +73,7 @@ am_libgoom2_a_OBJECTS = goomsl_yacc.$(OBJEXT) goomsl_lex.$(OBJEXT) \
 	sound_tester.$(OBJEXT) surf3d.$(OBJEXT) tentacle3d.$(OBJEXT) \
 	plugin_info.$(OBJEXT) v3d.$(OBJEXT) drawmethods.$(OBJEXT) \
 	cpu_info.$(OBJEXT)
-libgoom2_a_OBJECTS = $(am_libgoom2_a_OBJECTS)
+libgoom_a_OBJECTS = $(am_libgoom_a_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
@@ -93,8 +93,8 @@ LTCCASCOMPILE = $(LIBTOOL) --mode=compile $(CCAS) $(AM_CCASFLAGS) \
 YACCCOMPILE = $(YACC) $(YFLAGS) $(AM_YFLAGS)
 LTYACCCOMPILE = $(LIBTOOL) --mode=compile $(YACC) $(YFLAGS) \
 	$(AM_YFLAGS)
-SOURCES = $(libgoom2_a_SOURCES)
-DIST_SOURCES = $(am__libgoom2_a_SOURCES_DIST)
+SOURCES = $(libgoom_a_SOURCES)
+DIST_SOURCES = $(am__libgoom_a_SOURCES_DIST)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -324,14 +324,14 @@ target_cpu = @target_cpu@
 target_os = @target_os@
 target_vendor = @target_vendor@
 MAINTAINERCLEANFILES = Makefile.in
-INCLUDES = -I$(top_srcdir)
+INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/libgoom
 @ARCH_PPC_FALSE@PPC_FILES = 
 @ARCH_PPC_TRUE@PPC_FILES = ppc_zoom_ultimate.s ppc_drawings.s
-noinst_LIBRARIES = libgoom2.a
+LIBGOOM = libgoom.a
+noinst_LIBRARIES = $(LIBGOOM)
 
 #goom2_library_include_HEADERS = goom.h goom_plugin_info.h goom_typedefs.h goom_graphic.h goom_config_param.h goom_visual_fx.h goom_filters.h goom_tools.h goomsl.h goomsl_hash.h goomsl_heap.h goom_tools.h goom_config.h
-libgoom2_a_SOURCES = \
-	goomsl_yacc.y goomsl_lex.l goomsl.c goomsl_hash.c goomsl_heap.c \
+libgoom_a_SOURCES = goomsl_yacc.y goomsl_lex.l goomsl.c goomsl_hash.c goomsl_heap.c \
 	goom_tools.c $(PPC_FILES) \
 	config_param.c convolve_fx.c filters.c \
 	flying_stars_fx.c gfontlib.c gfontrle.c \
@@ -377,10 +377,10 @@ $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 
 clean-noinstLIBRARIES:
 	-test -z "$(noinst_LIBRARIES)" || rm -f $(noinst_LIBRARIES)
-libgoom2.a: $(libgoom2_a_OBJECTS) $(libgoom2_a_DEPENDENCIES) 
-	-rm -f libgoom2.a
-	$(libgoom2_a_AR) libgoom2.a $(libgoom2_a_OBJECTS) $(libgoom2_a_LIBADD)
-	$(RANLIB) libgoom2.a
+libgoom.a: $(libgoom_a_OBJECTS) $(libgoom_a_DEPENDENCIES) 
+	-rm -f libgoom.a
+	$(libgoom_a_AR) libgoom.a $(libgoom_a_OBJECTS) $(libgoom_a_LIBADD)
+	$(RANLIB) libgoom.a
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
