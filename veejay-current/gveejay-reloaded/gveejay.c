@@ -35,8 +35,8 @@ static int col = 0;
 static int row = 0;
 static int n_tracks = 2;
 static int launcher = 0;
-static int pw = 112;
-static int ph = 96;
+static int pw = 176;
+static int ph = 144;
 static struct
 {
 	char *file;

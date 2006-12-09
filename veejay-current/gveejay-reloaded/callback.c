@@ -22,7 +22,6 @@
 #include <gveejay-reloaded/vj-api.h>
 #include <gveejay-reloaded/utils.h>
 #include <gveejay-reloaded/widgets/gtktimeselection.h>
-#define DBG_C() { 	vj_msg_detail(VEEJAY_MSG_DEBUG, "Implement %s", __FUNCTION__ ); }  
 
 static int config_file_status = 0;
 static gchar *config_file = NULL;
@@ -985,7 +984,6 @@ void	on_sample_mulframes_clicked(GtkWidget *w, gpointer user_data)
 
 void	on_spin_mudplay_value_changed(GtkWidget *widget, gpointer user_data)
 {
-	DBG_C();	
 }
 void	on_check_samplefx_clicked(GtkWidget *widget , gpointer user_data)
 {
@@ -1049,7 +1047,6 @@ void	on_button_clearmarker_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_check_audio_mute_clicked(GtkWidget *widget, gpointer user_data)
 {
-	DBG_C();
 }
 void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -2459,19 +2456,15 @@ void	on_mt_sync_next_clicked( GtkWidget *w, gpointer user_data)
 
 void	on_delete1_activate(GtkWidget *w, gpointer user_data)
 {
-	DBG_C();
 }
 void	on_new_source1_activate( GtkWidget *w , gpointer data )
 {
-	DBG_C();
 }
 void	on_add_file1_activate(GtkWidget *w, gpointer user_data)
 {
-	DBG_C();
 }
 void	on_colorselection_color_changed( GtkWidget *w, gpointer user_data)
 {
-	DBG_C();
 }
 static 
 gchar *get_clipboard_fx_buffer()
@@ -2558,15 +2551,12 @@ void	on_button_fx_copy_clicked(GtkWidget *w, gpointer user_data)
 }
 void	on_copy1_activate( GtkWidget *w, gpointer user_data)
 {
-	DBG_C();
 }
 void	on_new_color1_activate(GtkWidget *w , gpointer user_data)
 {
-	DBG_C();
 }
 void	on_delete2_activate( GtkWidget *w, gpointer user_data)
 {
-	DBG_C();
 }
 static	void	refresh_srt_info( void );
 void
@@ -3468,4 +3458,20 @@ void	on_seqactive_toggled( GtkWidget *w, gpointer data )
 	if(info->status_lock)
 		return;
 	multi_vims( VIMS_SEQUENCE_STATUS, "%d" , is_button_toggled("seqactive" ) ? 1 : 0 );
+}
+void	on_bq_button_clicked( GtkWidget *w, gpointer data )
+{
+	info->quality = 2;
+	multitrack_set_hlq( info->mt, info->el.fps,  info->el.ratio, 2 );
+}
+
+void	on_hqbutton_clicked( GtkWidget *w, gpointer data )
+{
+	info->quality = 1;
+	multitrack_set_hlq( info->mt, info->el.fps,  info->el.ratio, 1 );
+}
+void	on_lqbutton_clicked( GtkWidget *w, gpointer data )
+{
+	info->quality = 0;
+	multitrack_set_hlq( info->mt, info->el.fps,  info->el.ratio, 0 );
 }

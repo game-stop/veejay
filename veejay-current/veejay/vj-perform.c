@@ -272,12 +272,12 @@ static	int	vj_perform_valid_sequence( veejay_t *info )
 	while( info->seq->samples[ cur ] == 0 )
 	{
 		cur ++;
-		if( cur >= info->seq->size && !cycle)
+		if( cur >= MAX_SEQUENCES && !cycle)
 		{
 			cur = 0;
 			cycle = 1;
 		}
-		else if ( cur >= info->seq->size && cycle )
+		else if ( cur >= MAX_SEQUENCES && cycle )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "No valid sequence to play. Sequence Play disabled");
 			info->seq->active = 0;

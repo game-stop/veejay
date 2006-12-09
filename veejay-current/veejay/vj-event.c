@@ -1000,7 +1000,7 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 		return 0;
 	}
 
-	if( net_id != 412 )
+	if( net_id != 412 ) //&& net_id != 333)
 		veejay_msg(VEEJAY_MSG_DEBUG, "VIMS: Parse message '%s'", msg );
 
 

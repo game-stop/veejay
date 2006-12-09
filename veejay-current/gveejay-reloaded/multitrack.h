@@ -12,6 +12,8 @@ void		*multitrack_new(
 		gint h,
 		GtkWidget *area);
 
+void		multitrack_set_hlq( void *data, float fps,float ratio, int quality );
+
 void		multitrack_open( void *data );
 
 void		multitrack_close( void *data );

@@ -169,7 +169,6 @@ static	int	veejay_ipc_recv( veejay_sequence_t *v, gint header_len, gint *payload
 	gint tmp_len = header_len + 1;
 	unsigned char *tmp = vj_calloc( tmp_len );
 	gint len = 0;
-	bzero( tmp, tmp_len );
 
 	gint n = vj_client_read( v->fd, V_CMD, tmp, header_len );
 
