@@ -30,7 +30,7 @@ typedef struct
 	glong	time_out; // in microseconds
 	GCond  *cond;
 	GMutex *mutex;
-	GMutex *serialize;
+//	GMutex *serialize;
 	guchar *serialized[100];
 	int	sta[22];
 } veejay_sequence_t;
@@ -176,18 +176,21 @@ static	int	veejay_ipc_recv( veejay_sequence_t *v, gint header_len, gint *payload
 	if( n<= 0 )
 	{
 		free(tmp);
+		veejay_msg(0,"Error reading header of %d bytes: %d", header_len,n );
 		return 0;
 	}
 
 	if( sscanf( tmp, "%6d", &len )<=0)
 	{
 		free(tmp);
+		veejay_msg(0, "Error reading header contents");
 		return 0;
 	}
 	
 	if( len <= 0 )
 	{
 		free(tmp);
+		veejay_msg(0, "Frame is empty");
 		return 0;
 	}
 
@@ -203,6 +206,7 @@ static	int	veejay_ipc_recv( veejay_sequence_t *v, gint header_len, gint *payload
 		n = vj_client_read( v->fd, V_CMD, buf_ptr, bytes_read );
 		if ( n <= 0 )
 		{
+			veejay_msg(0, "Recv %d out of %d bytes", bw,len);
 			free(tmp);
 			return 0;
 		}
@@ -232,13 +236,14 @@ static int	veejay_process_status( veejay_sequence_t *v )
 			veejay_memset( v->status_buffer,0, sizeof(v->status_buffer));
 			gint n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
 			if( n <= 0 )
+			{
+				veejay_msg(0, "Error reading statusline");
 				return 0;
-			g_mutex_lock( v->serialize );
+			}
+//			g_mutex_lock( v->serialize );
 			veejay_memcpy( v->serialized, v->status_buffer, bytes );
 			status_to_arr( v->status_buffer, v->sta );
-			if( bytes < 100 ) 
-				memset( v->serialized + bytes, 0, (100-bytes));
-			g_mutex_unlock( v->serialize );
+	//		g_mutex_unlock( v->serialize );
 			return 1;
 		}
 	}
@@ -252,12 +257,18 @@ static	int	veejay_get_image_data(veejay_sequence_t *v )
 	
 	gint res = veejay_ipc_send( v, VIMS_RGB24_IMAGE, "%d %d", v->width,v->height );
 	if( res <= 0 )
+	{
+		veejay_msg(0, "Error sending VIMS_RGB24_IMAGE");	
 		return 0;
+	}
 	gint bw = 0;
 
 	res = veejay_ipc_recv( v, 6, &bw, v->data_buffers[v->frame_num] );
 	if( res <= 0 )
+	{
+		veejay_msg(0, "Error receiving RGB24 image");
 		return 0;
+	}
 	return bw;
 }
 
@@ -266,9 +277,9 @@ void		veejay_get_status( void *data, guchar *dst )
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
 	if(!v->active)
 		return;
-	g_mutex_lock( v->serialize );
+	g_mutex_lock( v->mutex );
 	veejay_memcpy( dst, v->serialized, 100);
-	g_mutex_unlock(v->serialize );
+	g_mutex_unlock(v->mutex );
 }
 
 GdkPixbuf	*veejay_get_image( void *data, gint *error)
@@ -497,7 +508,7 @@ void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_he
 	v->abort = 0;
 	v->preview_delay = 40000;
 	v->mutex = g_mutex_new();
-	v->serialize = g_mutex_new();
+//	v->serialize = g_mutex_new();
 	v->active = 1;
 	v->fps = 25.0;
 	v->cond = g_cond_new();
@@ -513,7 +524,7 @@ void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_he
 		return NULL;
 	}
 	veejay_msg(2, "New connection with %s, %d (max %d x %d), lock %p",
-			hostname,port,max_width,max_height, v->serialize );
+			hostname,port,max_width,max_height, v->mutex );
 	return v;
 }
 

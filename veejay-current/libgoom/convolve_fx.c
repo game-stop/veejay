@@ -15,8 +15,8 @@
 
 typedef char Motif[CONV_MOTIF_W][CONV_MOTIF_W];
 
-//#include "motif_goom1.h"
-//#include "motif_goom2.h"
+#include "motif_goom1.h"
+#include "motif_goom2.h"
 
 #define NB_THETA 512
 
@@ -100,7 +100,7 @@ static void convolve_init(VisualFX *_this, PluginInfo *info) {
   data->theta = 0;
   data->ftheta = 0.0;
   data->visibility = 1.0;
-  //set_motif(data, CONV_MOTIF2);
+  set_motif(data, CONV_MOTIF2);
   data->inverse_motif = 0;
 
   _this->params = &data->params;
@@ -141,7 +141,6 @@ static void create_output_with_brightness(VisualFX *_this, Pixel *src, Pixel *de
     for (i=0;i<16;++i)
       ifftab[i] = (double)iff / (1.0 + data->visibility * (15.0 - i) / 15.0);
   }
-
   for (y=info->screen.height;y--;) {
     int xtex,ytex;
 
@@ -150,19 +149,18 @@ static void create_output_with_brightness(VisualFX *_this, Pixel *src, Pixel *de
 
     ytex = yprime + yi + CONV_MOTIF_W * 0x10000 / 2;
     yprime += c;
-
 #ifdef HAVE_MMX
     __asm__ __volatile__
-      ("\n\t pxor  %%mm7,  %%mm7"  /* mm7 = 0   */
+      ("\n\t pxor  %%mm7,  %%mm7"  
        "\n\t movd %[xtex],  %%mm2"
        "\n\t movd %[ytex],  %%mm3"
-       "\n\t punpckldq %%mm3, %%mm2" /* mm2 = [ ytex | xtex ] */
+       "\n\t punpckldq %%mm3, %%mm2"
        "\n\t movd %[c],     %%mm4"
        "\n\t movd %[s],     %%mm6"
        "\n\t pxor  %%mm5,   %%mm5"
        "\n\t psubd %%mm6,   %%mm5"
-       "\n\t punpckldq %%mm5, %%mm4" /* mm4 = [ -s | c ]      */
-       "\n\t movd %[motif], %%mm6"   /* mm6 = motif           */
+       "\n\t punpckldq %%mm5, %%mm4"
+       "\n\t movd %[motif], %%mm6"  
 
        ::[xtex]"g"(xtex) ,[ytex]"g"(ytex)
         , [c]"g"(c), [s]"g"(s)
@@ -172,27 +170,27 @@ static void create_output_with_brightness(VisualFX *_this, Pixel *src, Pixel *de
     {
       __asm__ __volatile__
         (
-         "\n\t movd  %[src], %%mm0"  /* mm0 = src */
-         "\n\t paddd %%mm4, %%mm2"   /* [ ytex | xtex ] += [ -s | s ] */
-         "\n\t movd  %%esi, %%mm5"   /* save esi into mm5 */
+         "\n\t movd  %[src], %%mm0" 
+	 "\n\t paddd %%mm4, %%mm2"
+         "\n\t movd  %%esi, %%mm5"  
          "\n\t movq  %%mm2, %%mm3"
-         "\n\t psrld  $16,  %%mm3"   /* mm3 = [ (ytex>>16) | (xtex>>16) ] */
-         "\n\t movd  %%mm3, %%eax"   /* eax = xtex' */
+         "\n\t psrld  $16,  %%mm3"
+         "\n\t movd  %%mm3, %%eax"
 
          "\n\t psrlq $25,   %%mm3"
-         "\n\t movd  %%mm3, %%ecx"   /* ecx = ytex' << 7 */
+         "\n\t movd  %%mm3, %%ecx"
 
          "\n\t andl  $127, %%eax"
          "\n\t andl  $16256, %%ecx"
          
          "\n\t addl  %%ecx, %%eax"
-         "\n\t movd  %%mm6, %%esi"   /* esi = motif */
+         "\n\t movd  %%mm6, %%esi"
          "\n\t xorl  %%ecx, %%ecx"
          "\n\t movb  (%%eax,%%esi), %%cl"
 
          "\n\t movl  %[ifftab], %%eax"
-         "\n\t movd  %%mm5, %%esi"    /* restore esi from mm5 */
-         "\n\t movd  (%%eax,%%ecx,4), %%mm1" /* mm1 = [0|0|0|iff2] */
+         "\n\t movd  %%mm5, %%esi"
+         "\n\t movd  (%%eax,%%ecx,4), %%mm1" 
 
          "\n\t punpcklwd %%mm1, %%mm1"
          "\n\t punpcklbw %%mm7, %%mm0"
@@ -227,25 +225,15 @@ static void create_output_with_brightness(VisualFX *_this, Pixel *src, Pixel *de
       f2 = ((f0 >> G_OFFSET) & 0xFF) * iff2 >> 8;
       f3 = ((f0 >> B_OFFSET) & 0xFF) * iff2 >> 8;
       dest[i].val = (sat(f1) << R_OFFSET) | (sat(f2) << G_OFFSET) | (sat(f3) << B_OFFSET);
-/*
-      f0 = (src[i].cop[0] * iff2) >> 8;
-      f1 = (src[i].cop[1] * iff2) >> 8;
-      f2 = (src[i].cop[2] * iff2) >> 8;
-      f3 = (src[i].cop[3] * iff2) >> 8;
 
-      dest[i].cop[0] = (f0 & 0xffffff00) ? 0xff : (unsigned char)f0;
-      dest[i].cop[1] = (f1 & 0xffffff00) ? 0xff : (unsigned char)f1;
-      dest[i].cop[2] = (f2 & 0xffffff00) ? 0xff : (unsigned char)f2;
-      dest[i].cop[3] = (f3 & 0xffffff00) ? 0xff : (unsigned char)f3;
-*/
       i++;
     }
 #endif 
+  
   }
 #ifdef HAVE_MMX
   __asm__ __volatile__ ("\n\t emms");
 #endif
-    
   compute_tables(_this, info);
 }
 
@@ -290,7 +278,7 @@ static void convolve_apply(VisualFX *_this, Pixel *src, Pixel *dest, PluginInfo 
     if (data->visibility < 0.0) data->visibility = 0.0;
     data->factor_p.change_listener(&data->factor_p);
   }
-/*
+
   if (data->visibility < 0.01) {
     switch (goom_irand(info->gRandom, 300))
     {
@@ -299,7 +287,7 @@ static void convolve_apply(VisualFX *_this, Pixel *src, Pixel *dest, PluginInfo 
       case 2:
         set_motif(data, CONV_MOTIF2); data->inverse_motif = 0; break;
     }
-  }*/
+  }
 
   if ((ff > 0.98f) && (ff < 1.02f))
     memcpy(dest, src, info->screen.size * sizeof(Pixel));

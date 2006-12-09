@@ -122,7 +122,6 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 		link[i]->n_retrieved = 0;
 	}
 	v->link = (void**) link;
-//	v->nr_of_links = 1;
 	veejay_msg(VEEJAY_MSG_INFO, "UDP multicast frame sender ready at port %d (group '%s')",
 	  	 v->ports[0], group_name );
 	veejay_msg(VEEJAY_MSG_INFO, "UDP multicast command receiver ready at port %d (group '%s')",
@@ -200,7 +199,6 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		link[i]->n_retrieved = 0;		
 	}
 	vjs->link = (void**) link;
-	vjs->nr_of_links = 0;
 	vjs->nr_of_connections = vjs->handle;
 	veejay_msg(VEEJAY_MSG_INFO, "TCP/IP Unicast %s channel ready at port %d",
 	  (vjs->server_type == V_STATUS ? "status" : "command" ),	 port_num );
@@ -251,8 +249,10 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
     int n;
 
 	if(len <= 0 || buf == NULL)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Nothing to send?!");
 		return 0;
-
+	}
 	if( !vje->use_mcast)
 	{
 		vj_link **Link = (vj_link**) vje->link;
@@ -262,11 +262,11 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 			return 0;
 		}
 
-		if(!FD_ISSET( Link[link_id]->handle, &(vje->wds) ) )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Link %d not ready for sending", link_id);
-			return 0;
-		}
+//		if(!FD_ISSET( Link[link_id]->handle, &(vje->wds) ) )
+//		{
+//			veejay_msg(VEEJAY_MSG_ERROR, "Link %d not ready for sending", link_id);
+//			return 0;
+//		}
 
 		while (total < len)
 		{
@@ -338,9 +338,6 @@ int _vj_server_new_client(vj_server *vje, int socket_fd)
     Link[entry]->in_use = 1;
     FD_SET( socket_fd, &(vje->fds) );
 	FD_SET( socket_fd, &(vje->wds) );
-//    vje->nr_of_links ++;
-veejay_msg(VEEJAY_MSG_DEBUG,"New connection %d, it %d, total %d/%d",
-		socket_fd, entry, vje->nr_of_links, VJ_MAX_CONNECTIONS);
     return entry;
 }
 
@@ -354,7 +351,6 @@ veejay_msg(VEEJAY_MSG_DEBUG, "Close connection %d, it %d", Link[link_id]->handle
 		FD_CLR( Link[link_id]->handle, &(vje->fds) );
 		FD_CLR( Link[link_id]->handle, &(vje->wds) );
 		close(Link[link_id]->handle);
-//		vje->nr_of_links --;
 	}
 	_vj_server_empty_queue(vje, link_id);
 	Link[link_id]->handle = 0;

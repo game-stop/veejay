@@ -1209,7 +1209,7 @@ int		_el_get_nframes( int pos )
 
 el_ref *_el_ref_new( int row_num,int nl, long n1, long n2, int tf)
 {
-	el_ref *el = g_new( el_ref , 1 );
+	el_ref *el = vj_malloc(sizeof(el_ref));
 	el->id = row_num;
 	el->nl = nl;
 	el->n1 = n1;
@@ -3051,7 +3051,7 @@ static void	update_current_slot(int pm)
 			info->uc.reload_hint[HINT_HISTORY] = 1;
 		
 			gint n_frames = sample_calctime();
-			time = format_time( n_frames, info->el.fps );
+		//	time = format_time( n_frames, info->el.fps );
 	
 			timeline_set_length( info->tl,
 				(gdouble) n_frames , info->status_tokens[FRAME_NUM]- info->status_tokens[SAMPLE_START] );
@@ -4299,7 +4299,7 @@ void	load_effectlist_info()
 
 static	void	select_slot__( int pm )
 {
-	lock_preview();
+	//lock_preview();
 
 	int *history = info->history_tokens[ pm ];
 	if( pm != MODE_PLAIN )
@@ -4339,7 +4339,7 @@ static	void	select_slot__( int pm )
 		info->selected_slot = NULL;
 		info->selected_gui_slot = NULL;
 	}
-	unlock_preview();
+//	unlock_preview();
 
 }
 
@@ -5367,6 +5367,21 @@ static	void	reload_srt()
 //	gtk_combo_box_set_active( GTK_COMBO_BOX(box), 0 );
 	free(srts);	
 }
+void	_edl_reset(void)
+{
+	if( info->elref != NULL)
+	{
+		int n = g_list_length(info->elref);
+		int i;
+		for( i = 0; i <=n ; i ++ )
+		{
+			void *ptr = g_list_nth_data( info->elref , i );
+			if(ptr)
+				free(ptr);
+		}
+		g_list_free( info->elref );
+	}
+}
 
 static	void	reload_editlist_contents()
 {
@@ -5384,6 +5399,8 @@ static	void	reload_editlist_contents()
 	_el_ref_reset();
 	_el_entry_reset();
 
+	_edl_reset();
+	
 	if( eltext == NULL || len < 0 )
 	{
 		return;
@@ -5865,6 +5882,9 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 	if(gui->watch.state==STATE_PLAYING && (condition & G_IO_IN)&& gui->watch.p_state == 0 )
 	{
 		gui->status_lock = 1;
+
+	//	lock_preview();
+		
 		int nb = 0;
 		unsigned char sta_len[6];
 		bzero(sta_len,6);
@@ -5873,6 +5893,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if(sta_len[0] != 'V' || nb <= 0 )
 		{
 			gui->status_lock = 0;
+		//	unlock_preview();
 			return FALSE;
 		}
 		int n_bytes = 0;
@@ -5880,6 +5901,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if( n_bytes == 0 || n_bytes >= STATUS_BYTES )
 		{
 			gui->status_lock = 0;
+		//	unlock_preview();
 			return FALSE;
 		}
 		veejay_memset( gui->status_msg,0, STATUS_BYTES ); 
@@ -5888,6 +5910,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if(nb <= 0 )
 		{
 			gui->status_lock = 0;
+		//	unlock_preview();
 			return FALSE;
  		}
                 while(vj_client_poll( gui->client, V_STATUS ))
@@ -5919,10 +5942,16 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 			}
 
 //			veejay_msg(0, "tokens: '%d' (%s)", n, gui->status_msg );
-			
+			//	lock_preview();
+
 			gdk_threads_enter();
+			lock_preview();
+
+
 			update_gui();
 			gdk_threads_leave();
+			unlock_preview();
+
 		}
 		gui->status_lock = 0;
 
@@ -5938,6 +5967,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
                 while(vj_client_poll( gui->client, V_STATUS ))
                        nb = vj_client_read( gui->client,V_STATUS,tmp, 1); 
 	}
+//	unlock_preview();
 	return TRUE;
 }
 
@@ -6528,11 +6558,15 @@ static	gboolean	update_log(gpointer data)
 	if(info->watch.state != STATE_PLAYING && info->watch.p_state == 0)
 		return TRUE;
 	gint len = 0;
+		lock_preview();
+
 	single_vims( VIMS_LOG );
 	gchar *buf = recv_log_vims(6, &len );
 	if(len <= 0)
+	{
+		unlock_preview();
 		return TRUE;
-	
+	}
 	GtkWidget *view = glade_xml_get_widget_( info->main_window, "veejaytext");
 	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
 	GtkTextIter iter,enditer;
@@ -6560,9 +6594,10 @@ static	gboolean	update_log(gpointer data)
 	
 	g_free( text );
 	g_free(buf);
+	unlock_preview();
 
-	g_usleep( 20000 );
-	
+	//g_usleep( 20000 );
+
 	return TRUE;
 }
 
@@ -7046,7 +7081,7 @@ static int	add_bank( gint bank_num  )
 
 void	reset_samplebank(void)
 {
-	lock_preview();
+	//lock_preview();
 	info->selection_slot = NULL;
 	info->selection_gui_slot = NULL;
 	info->selected_slot = NULL;
@@ -7076,7 +7111,7 @@ void	reset_samplebank(void)
 			}
 		}
 	}
-	unlock_preview();
+//	unlock_preview();
 }
 		
 void	free_samplebank(void)
@@ -7929,7 +7964,7 @@ static void add_sample_to_editlist(guint row_number, gchar *timeline, gchar *fna
 static void update_sample_slot_data(int page_num, int slot_num, int sample_id, gint sample_type, gchar *title, gchar *timecode)
 {
 	//@! 
-	lock_preview();
+//	lock_preview();
 	
 	sample_slot_t *slot = info->sample_banks[page_num]->slot[slot_num];
 	sample_gui_slot_t *gui_slot = info->sample_banks[page_num]->gui_slot[slot_num];
@@ -7974,7 +8009,7 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 		}
 	}
 
-	unlock_preview();
+//	unlock_preview();
 }
 
 

@@ -1309,6 +1309,7 @@ void vj_event_single_gl_fire(void *ptr , int mod, int key)
 {
 	int vims_mod = 0;
 	//@pffffff
+	veejay_msg(0, "%x", key );
 	switch( key )
 	{
 		case 0xff0d: key = SDLK_RETURN; break;
@@ -1346,7 +1347,7 @@ void vj_event_single_gl_fire(void *ptr , int mod, int key)
 		case 0xffb6: case 0xff98: key = SDLK_KP6; break;
 		case 0xffb7: case 0xff95: key = SDLK_KP7; break;
 		case 0xffb8: case 0xff97: key = SDLK_KP8; break;
-		case 0xffb9: case 0xff8a: key = SDLK_KP9; break;
+		case 0xffb9: case 0xff9a: key = SDLK_KP9; break;
 		case 0xffab: key = SDLK_KP_PLUS; break;
 		case 0xffad: key = SDLK_KP_MINUS; break;
 		case 0xff8d: key = SDLK_KP_ENTER; break;
@@ -8587,7 +8588,7 @@ void	vj_event_sample_sequencer_active(	void *ptr, 	const char format[],	va_list 
 		v->seq->active = 0;
 		veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer disabled");
 	}
-	else if (args[1] == 1 )
+	else 
 	{
 		v->seq->active = 1;
 		veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer enabled");

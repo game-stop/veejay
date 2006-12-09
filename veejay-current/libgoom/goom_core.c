@@ -74,6 +74,7 @@ PluginInfo *goom_init (guint32 resx, guint32 resy)
     goomInfo->tentacles_fx = tentacle_fx_create();
     goomInfo->tentacles_fx.init(&goomInfo->tentacles_fx, goomInfo);
     
+    
     goomInfo->convolve_fx = convolve_create();
     goomInfo->convolve_fx.init(&goomInfo->convolve_fx, goomInfo);
     

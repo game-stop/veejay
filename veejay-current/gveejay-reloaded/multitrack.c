@@ -25,6 +25,7 @@
 #include <gdk/gdkx.h>
 #include <glib.h>
 #include <gdk/gdk.h>
+#include <libvevo/libvevo.h>
 #include "sequence.h"
 #include "tracksources.h"
 
@@ -1514,6 +1515,10 @@ void 	*mt_preview( gpointer user_data )
 	GdkPixbuf *nopreview = dummy_image();
 	
 	long sleepy = 34000;
+	char	tmp_key[32];
+	void *p = vevo_port_new( VEVO_ANONYMOUS_PORT );
+	
+	GdkPixbuf *ir = NULL;
 	for( ;; )
 	{
 		G_LOCK( mt_lock );
@@ -1525,6 +1530,51 @@ void 	*mt_preview( gpointer user_data )
 			G_UNLOCK( mt_lock );
 			break;	
 		}
+		int ref = find_sequence( a );
+
+
+	/*	for( i = 0; i < MAX_TRACKS ; i ++ )
+		{
+			mt_priv_t *p = a->pt[i];
+			if(cache[i])
+				gdk_pixbuf_unref(cache[i]);
+			cache[i] = NULL;
+				
+		}
+		if(cache[LAST_TRACK])
+		{
+			gdk_pixbuf_unref(cache[LAST_TRACK]);
+			cache[LAST_TRACK] = NULL;
+		}
+		if( ir ) 
+		{
+			gdk_pixbuf_unref(ir);	
+			ir = NULL;
+		}
+		
+		if(ref >= 0 )
+		{
+			gdk_pixbuf_unref( cache[ref] );
+		}
+
+		*/
+
+		char **refs = vevo_list_properties( p );
+		if(refs)
+		{
+			for( i = 0; refs[i] != NULL ; i ++ )
+			{
+				GdkPixbuf *buf = NULL;
+				if( vevo_property_get( p, refs[i], 0, &buf ) == VEVO_NO_ERROR )
+					gdk_pixbuf_unref(buf);
+				free(refs[i]);	
+			}
+			free(refs);
+			vevo_port_free( p ); //@FIXME: should remove property
+			p = vevo_port_new( VEVO_ANONYMOUS_PORT );
+		}
+			
+		
 
 		if(!lt->preview )
 		{
@@ -1541,9 +1591,14 @@ void 	*mt_preview( gpointer user_data )
 				delete_data( mt->data, LAST_TRACK ); 
 				cache[LAST_TRACK] = NULL;
 			}
+			sprintf(tmp_key, "%d", LAST_TRACK );
+			vevo_property_set( p, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &(cache[LAST_TRACK] ) );
 		}
 
-		int ref = find_sequence( a );
+	//	if(ref >= 0 )
+	//	{
+	///		gdk_pixbuf_unref( cache[ref] );
+	//	}
 
 		if( mt->sensitive) 
 		{
@@ -1557,6 +1612,11 @@ void 	*mt_preview( gpointer user_data )
 						&error );
 				if( error )
 					cache[i] = 0;
+				else
+				{
+					sprintf(tmp_key, "%d", i );
+					vevo_property_set( p, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &(cache[i] ) );
+				}
 			}
 		}
 		}
@@ -1564,20 +1624,25 @@ void 	*mt_preview( gpointer user_data )
 		
 		if( ref >= 0  && lt->preview && cache[LAST_TRACK] ) 
 		{
-			cache[ref] = gdk_pixbuf_scale_simple(
+			cache[ref] = gdk_pixbuf_scale_simple( //@ leaking memory
 					cache[LAST_TRACK],
 					preview_width_,
 					preview_height_,
 					GDK_INTERP_NEAREST );
+			sprintf(tmp_key, "%d", ref );
+			vevo_property_set( p, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &(cache[ref] ) );
 		}
 
 
-		GdkPixbuf *ir = NULL;
+	//	GdkPixbuf *ir = NULL;
 		if(lt->active && cache[LAST_TRACK] && lt->preview)
 		{
 			ir = gdk_pixbuf_scale_simple( cache[LAST_TRACK],
 					352,288,GDK_INTERP_NEAREST );
+			sprintf(tmp_key, "%p", ir );
+			vevo_property_set( p, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &ir );
 		}
+
 		G_UNLOCK(mt_lock );
 		
 		if(lt->preview)
@@ -1587,7 +1652,7 @@ void 	*mt_preview( gpointer user_data )
 			for( i = 0; i < MAX_TRACKS ; i ++ )
 			{
 				mt_priv_t *p = a->pt[i];
-				if(cache[i])
+				if(cache[i] && i != ref)
 				{
 					GtkImage *image = GTK_IMAGE( p->view->area );
 					gtk_image_set_from_pixbuf_( image, cache[i] );
@@ -1601,7 +1666,7 @@ void 	*mt_preview( gpointer user_data )
 		//	gtk_widget_queue_draw(GTK_IMAGE( lt->view->area ));
 			}
 
-			for( i = 0; i < MAX_TRACKS ; i ++ )
+		/*	for( i = 0; i < MAX_TRACKS ; i ++ )
 			{
 				mt_priv_t *p = a->pt[i];
 				if(cache[i])
@@ -1618,9 +1683,10 @@ void 	*mt_preview( gpointer user_data )
 			{
 				gdk_pixbuf_unref(ir);	
 			}
-			ir = NULL;
+			ir = NULL;*/
 			gdk_threads_leave();
 		}
+
 		g_usleep(sleepy);
 		//@ clear our buffer
 	}
