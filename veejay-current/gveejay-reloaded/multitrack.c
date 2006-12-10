@@ -534,10 +534,8 @@ static	void	playmode_sensitivity( mt_priv_t *p, gint pm )
 static	void	update_widgets(int *status, mt_priv_t *p, int pm)
 {
 	int *h = p->history[pm];
-//	gdk_threads_enter();
-//	mt_update_gui(status);	
 	if( h[PLAY_MODE] != pm )
-	playmode_sensitivity( p, pm );
+		playmode_sensitivity( p, pm );
 
 	if( pm == MODE_SAMPLE || pm == MODE_PLAIN )
 	{
@@ -551,8 +549,6 @@ static	void	update_widgets(int *status, mt_priv_t *p, int pm)
 		if(update_track_list( p ))
 			update_track_view( MAX_TRACKS, get_track_tree( p->view->tracks ), (void*)p );
 	}
-	
-//	gdk_threads_leave();
 }
 
 static gboolean	update_sequence_widgets( gpointer data )
@@ -569,6 +565,7 @@ static gboolean	update_sequence_widgets( gpointer data )
 	if( n<= 0 )
 	{
 		p->status_lock = 0;
+		veejay_msg(0, "error reading status");
 		return TRUE;
 	}
 #ifdef STRICT_CHECKING
@@ -580,7 +577,6 @@ static gboolean	update_sequence_widgets( gpointer data )
 	for( i  =  0; i < 20; i ++ )
 		p->status_cache[i] = array[i];
 
-	
 	update_widgets(array, p, pm);
 
 	int *his = p->history[ pm ];	
@@ -811,12 +807,12 @@ void		*multitrack_new(
 	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
 
 	int minw = 240;
+//	GtkWidget *pan = glade_xml_get_widget( win, "panels");
+//	GtkRequisition req;
+//	gtk_widget_size_request( pan, &req );
+	gtk_widget_set_size_request(mt->scroll,450, 300);
 
-	GtkRequisition req;
-	gtk_widget_size_request( mt->main_window, &req );
-	gtk_widget_set_size_request(mt->scroll,minw, req.height-100);
-
-	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),2);
+	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),1);
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(mt->scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_ALWAYS );
 	GtkWidget *table = gtk_table_new( 1, MAX_TRACKS, FALSE );
 	gtk_box_pack_start( GTK_BOX( mt->main_box ), mt->scroll , FALSE,FALSE, 0 );
@@ -832,8 +828,8 @@ void		*multitrack_new(
 		p->backlink = (void*) mt;
 		p->tracks[c] = NULL;
 		pt->pt[c] = p;
-//		gtk_table_attach_defaults( table, p->view->event_box, c, c+1, 0, 1 );
-		gtk_table_attach_defaults( table, p->view->event_box, 0, 1, c, c+1 );
+		gtk_table_attach_defaults( table, p->view->event_box, c, c+1, 0, 1 );
+	//	gtk_table_attach_defaults( table, p->view->event_box, 0, 1, c, c+1 );
 		
 		restore__[c] = 0;
 
@@ -990,8 +986,8 @@ int		multitrack_add_track( void *data )
 		//	gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( p->view->toggle ), 1 );
 		status_print( mt, "Track %d: Connection established with '%s' port %d\n",
 				track, hostname, port_num );
-		pt->pt[track]->timeout = 
-			gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) pt->pt[track] );
+	//	pt->pt[track]->timeout = 
+	//		gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) pt->pt[track] );
 		
 		gtk_widget_set_sensitive_( GTK_WIDGET(p->view->panel),TRUE);
 		res = 1;
@@ -1026,7 +1022,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num, float ratio )
 		return 0;
 	}
 	
-	a->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) a->pt[track] );
+//	a->pt[track]->timeout = gtk_timeout_add( 300, update_sequence_widgets, (gpointer*) a->pt[track] );
 
 //	veejay_configure_sequence( seq, 176, 176 / ratio, 0.0 );
 
@@ -1230,7 +1226,6 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int wid
 	if( last_track->active && mpreview_width_ > 0 && mpreview_height_ > 0)
 	{
 		// make sure to reset width/height back to small
-		veejay_msg(0, "set current %d x %d", mpreview_width_, mpreview_height_);	
 		veejay_configure_sequence( last_track->sequence, mpreview_width_, mpreview_height_ , 0.0);
 	}
 		
@@ -1291,7 +1286,7 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 	if(event->type == GDK_2BUTTON_PRESS)
 	{
 		mt->selected = p->num;
-G_LOCK(mt_lock);
+/*G_LOCK(mt_lock);
 		int tmp[MAX_TRACKS],i;
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
@@ -1299,11 +1294,13 @@ G_LOCK(mt_lock);
 			tmp[i] = p->preview;
 			p->preview = 0;
 		}
-G_UNLOCK(mt_lock);
+G_UNLOCK(mt_lock);*/
 
 		
 		gui_cb( 0, strdup(p->hostname), p->port_num );
-G_LOCK(mt_lock);
+
+
+//G_LOCK(mt_lock);
 		
 		multitrack_set_current( (void*) mt,  p->hostname, p->port_num ,mpreview_width_,mpreview_height_ );
 /*
@@ -1314,12 +1311,14 @@ G_LOCK(mt_lock);
 		last_track->sequence = p->sequence;
 		assert( last_track->sequence != NULL );
 		veejay_configure_sequence( last_track->sequence, 352, 288 );*/
+/*G_LOCK(mt_lock);
+
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
 			mt_priv_t *p = a->pt[i];
 			p->preview = tmp[i];
 		}
-G_UNLOCK(mt_lock);
+G_UNLOCK(mt_lock);*/
 	}
 	
 	if( event->type == GDK_BUTTON_PRESS )
@@ -1436,7 +1435,7 @@ static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint las
 	//	seqv->timeline_ = timeline_new();
 		seqv->timeline_ = gtk_hscale_new_with_range( 0.0,1.0,0.1 );
 		gtk_scale_set_draw_value( seqv->timeline_, FALSE );
-		gtk_widget_set_size_request( seqv->panel,preview_width_ ,14);
+		gtk_widget_set_size_request( seqv->panel,preview_width_ ,180);
 		gtk_widget_show( seqv->panel );
 		gtk_box_pack_start( GTK_BOX( box ), seqv->timeline_, FALSE,FALSE, 0 );
 		//gtk_container_add( GTK_CONTAINER(seqv->panel), box );
@@ -1545,6 +1544,7 @@ void 	*mt_preview( gpointer user_data )
 	void *pixp = vevo_port_new( VEVO_ANONYMOUS_PORT );
 	
 	GdkPixbuf *ir = NULL;
+
 	for( ;; )
 	{
 		G_LOCK( mt_lock );
@@ -1557,7 +1557,6 @@ void 	*mt_preview( gpointer user_data )
 			break;	
 		}
 		int ref = find_sequence( a );
-
 
 	/*	for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
@@ -1682,10 +1681,13 @@ void 	*mt_preview( gpointer user_data )
 		if(lt->preview)
 		{
 			gdk_threads_enter();
+			
 			if( mt->sensitive )
 			for( i = 0; i < MAX_TRACKS ; i ++ )
 			{
 				mt_priv_t *p = a->pt[i];
+				update_sequence_widgets(p);
+
 				if(cache[i])// && i != ref)
 				{
 					GtkImage *image = GTK_IMAGE( p->view->area );
@@ -1718,6 +1720,7 @@ void 	*mt_preview( gpointer user_data )
 				gdk_pixbuf_unref(ir);	
 			}
 			ir = NULL;*/
+			//update_sequence_widgets(NULL);
 			gdk_threads_leave();
 		}
 

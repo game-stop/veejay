@@ -2373,14 +2373,14 @@ void		on_previewsmall_clicked( GtkWidget *widget, gpointer user_data)
 
 void		on_multitrack_activate( GtkWidget *w, gpointer user_data)
 {
-	multitrack_open( info->mt );
-	gtk_widget_show( glade_xml_get_widget_( info->main_window , "mtwindow" ));
+//	multitrack_open( info->mt );
+//	gtk_widget_show( glade_xml_get_widget_( info->main_window , "mtwindow" ));
 
 }
 void		on_multitrack_deactivate( GtkWidget *w, gpointer user_data)
 {
-	multitrack_close( info->mt );
-	gtk_widget_hide( glade_xml_get_widget_( info->main_window , "mtwindow" ));
+//	multitrack_close( info->mt );
+//	gtk_widget_hide( glade_xml_get_widget_( info->main_window , "mtwindow" ));
 
 }
 void	on_mt_new_activate( GtkWidget *w, gpointer user_data)

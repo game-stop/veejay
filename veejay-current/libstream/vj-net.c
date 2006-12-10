@@ -30,15 +30,13 @@
 
 typedef struct
 {
-//	pthread_mutex_t mutex;
-//	pthread_t thread;
+	pthread_mutex_t mutex;
+	pthread_t thread;
 	vj_client      *remote;
 	int state;
 	int error;
+	int grab;
 } threaded_t;
-/*
-#define STOP 0
-#define PLAY 1
 
 static void lock_(threaded_t *t, const char *f, int line)
 {
@@ -50,29 +48,30 @@ static void unlock_(threaded_t *t, const char *f, int line)
 {
 //	veejay_msg(0,"unlock thread by %s, line %d",f,line);
 	pthread_mutex_unlock( &(t->mutex ));
-}*/
+}
 
 #define lock( t ) lock_( t, __FUNCTION__, __LINE__ )
 #define unlock( t ) unlock_( t, __FUNCTION__ , __LINE__ )
-/*
+
+
 void	*reader_thread(void *data)
 {
 	vj_tag *tag = (vj_tag*) data;
 	threaded_t *t = tag->priv;
 	vj_client *v = t->remote;
 	int ret = 0;
-	int error = 0;
-	int have_sent =0;
 	char buf[16];
 	sprintf(buf, "%03d:;", VIMS_GET_FRAME);
-
+	
 	for( ;; )
 	{
-		lock(t);
-		if( t->state == STOP )
+		int retrieve = 0;
+		int error    = 0;
+
+		if( t->state == 0 )
 		{
-			unlock(t);
-			return NULL;
+			error = 1;
+			t->grab = 0;
 		}
 		
 		if( tag->source_type == VJ_TAG_TYPE_NET )
@@ -81,94 +80,69 @@ void	*reader_thread(void *data)
 			{
 				vj_client_flush	( v, V_STATUS);
 			}	
+		}
+
+
+		lock(t);
+		
+		if( t->grab )
+		{
 			ret =  vj_client_send( v, V_CMD, buf );
 			if( ret <= 0 )
 				error = 1;
+			else
+				retrieve = 1;
+			t->grab = 0;
 		}
 		
-		if(!error)
+		if(!error && retrieve)
 		{
 			ret = vj_client_read_i ( v, tag->socket_frame );
 			if( ret <= 0 )
 				error = 1;
 		}
-		
+		unlock(t);
+
 		if( error )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR,
-					"Error retrieving frame from remote veejay,");
-			t->error = THREAD_STOP;
-			t->state = STOP;
+					"Closing connection with remote veejay,");
+			t->state = 0;
+			pthread_exit( &(t->thread));
+			return NULL;
 		}
-		unlock(t);
-		g_sleep( 25000 );
 	}
 	return NULL;
-}*/
+}
 
 
 
 void	*net_threader( )
 {
 	threaded_t *t = (threaded_t*) vj_calloc(sizeof(threaded_t));
-//	pthread_mutex_init( &(t->mutex), NULL );
 	return (void*) t;
 }
 
-void	net_thread_remote( void *p, void *r )
+int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 {
-	threaded_t *t = (threaded_t*) p;
-	t->remote = r;
-}
-
-void	net_thread_exit(vj_tag *tag)
-{
-	if(tag->socket_frame)
-		free(tag->socket_frame);
-
-/*	unlock(t);
-
-	pthread_mutex_destroy( &(t->mutex));
-*/	
-}
-
-int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3], vj_client *v )
-{
-/*	threaded_t *t = (threaded_t*) tag->priv;
+	threaded_t *t = (threaded_t*) tag->priv;
+	vj_client *v = t->remote;
 	lock(t);
 	if( t->state == 0 || t->error  )
 	{
 		unlock(t);
 		return 0;
 	}
+	const uint8_t *buf = tag->socket_frame;
 	
-	veejay_memcpy( buffer[0], tag->socket_frame, v->planes[0] );
-	veejay_memcpy( buffer[1], tag->socket_frame + v->planes[0], v->planes[1] );
-	veejay_memcpy( buffer[2], tag->socket_frame + v->planes[0] + v->planes[1] , v->planes[2] );
+	veejay_memcpy( buffer[0], buf, v->planes[0] );
+	veejay_memcpy( buffer[1], buf+ v->planes[0], v->planes[1] );
+	veejay_memcpy( buffer[2], buf+ v->planes[0] + v->planes[1] , v->planes[2] );
+	
+	t->grab = 1;
 	
 	unlock(t);
-	return 1;*/
-	char buf[16];
-	sprintf(buf, "%03d:;", VIMS_GET_FRAME);
-
-
-	if( vj_client_poll(v, V_STATUS ) )
-	{
-		vj_client_flush	( v, V_STATUS);
-	}	
-	int ret =  vj_client_send( v, V_CMD, buf );
-	if( ret <= 0 )
-		return 0;
-	
-	ret = vj_client_read_i ( v, tag->socket_frame );
-	if( ret <= 0 )
-		return 0;
-
-	veejay_memcpy( buffer[0], tag->socket_frame, v->planes[0] );
-	veejay_memcpy( buffer[1], tag->socket_frame + v->planes[0], v->planes[1] );
-	veejay_memcpy( buffer[2], tag->socket_frame + v->planes[0] + v->planes[1] , v->planes[2] );
-	
-	return ret;
+	return 1;
 }
 
 int	net_thread_start(vj_client *v, vj_tag *tag)
@@ -186,12 +160,18 @@ int	net_thread_start(vj_client *v, vj_tag *tag)
 				tag->source_name, tag->video_channel );
 		return 0;
 	}
+	else
+		veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name,
+				tag->video_channel);
+	
+	threaded_t *t = (threaded_t*)tag->priv;
 
-/*	threaded_t *t = (threaded_t*)tag->priv;
+	pthread_mutex_init( &(t->mutex), NULL );
 
 	t->error = 0;
 	t->state = 1;
-*/
+	t->remote = v;
+	t->grab = 1;
 	if( tag->source_type == VJ_TAG_TYPE_MCAST )
 	{
 		char start_mcast[6];
@@ -205,46 +185,45 @@ int	net_thread_start(vj_client *v, vj_tag *tag)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to send to %s port %d",
 					tag->source_name, tag->video_channel );
-			vj_client_close( v );
 			return 0;
 		}	
 	}
-/*	int p_err = pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
+	int p_err = pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
 	if( p_err ==0)
 
-	{*/
-	veejay_msg(VEEJAY_MSG_INFO, "Created new %s stream",
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Created new %s threaded stream",
 			tag->source_type == VJ_TAG_TYPE_MCAST ? 
 			"multicast" : "unicast");
-	return 1;
-//	}
-//	return 0;		
+		return 1;
+	}
+
+	return 0;		
 }
 
-void	net_thread_stop(vj_client *v , vj_tag *tag)
+void	net_thread_stop(vj_tag *tag)
 {
 	char mcast_stop[6];
 	threaded_t *t = (threaded_t*)tag->priv;
 	int ret = 0;
-//	lock(t);
+	lock(t);
 	
 	if(tag->source_type == VJ_TAG_TYPE_MCAST)
 	{
 		sprintf(mcast_stop, "%03d:;", VIMS_VIDEO_MCAST_STOP );
-		ret = vj_client_send( v , V_CMD, mcast_stop);
+		ret = vj_client_send( t->remote , V_CMD, mcast_stop);
 	}
 	if(tag->source_type == VJ_TAG_TYPE_NET)
 	{
 		sprintf(mcast_stop, "%03d:;", VIMS_CLOSE );
-		ret = vj_client_send( v, V_CMD, 	mcast_stop);
+		ret = vj_client_send( t->remote, V_CMD, mcast_stop);
 	}
 	
-//	t->state = STOP;
+	t->state = 0;
 
-//	unlock(t);
-//	pthread_join( &(t->thread), (void*) tag );
-		
-	vj_client_close( v );
+	unlock(t);
+	
+	pthread_mutex_destroy( &(t->mutex));
 
 	veejay_msg(VEEJAY_MSG_INFO, "Disconnected from %s", tag->source_name);
 }

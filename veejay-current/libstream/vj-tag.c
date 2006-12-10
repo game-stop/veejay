@@ -297,8 +297,6 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 		tag->socket_ready = 1;
 	}
 
-	net_thread_remote( tag->priv, v );
-	
 	return 1;
 }
 
@@ -802,13 +800,12 @@ int vj_tag_del(int id)
 		break;
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
-		net_thread_exit(tag);	
+		net_thread_stop(tag);	
 		if(vj_tag_input->net[tag->index])
 		{
 			vj_client_close( vj_tag_input->net[tag->index] );
 			vj_tag_input->net[tag->index] = NULL;
 		}
-
 		break;
     }
 
@@ -1627,7 +1624,7 @@ int vj_tag_disable(int t1) {
 	}
 	if(tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST)
 	{
-		net_thread_stop( vj_tag_input->net[tag->index], tag );
+		net_thread_stop( tag );
 	}
 #ifdef USE_GDK_PIXBUF
 	if(tag->source_type == VJ_TAG_TYPE_PICTURE )
@@ -2160,7 +2157,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
-		if(!net_thread_get_frame( tag,buffer, vj_tag_input->net[tag->index] ))
+		if(!net_thread_get_frame( tag,buffer ))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Error reading frame from stream");
 			vj_tag_set_active(t1,0);

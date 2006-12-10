@@ -1000,7 +1000,7 @@ int	vj_event_parse_msg( veejay_t * v, char *msg )
 		return 0;
 	}
 
-	if( net_id != 412 ) //&& net_id != 333)
+	if( net_id != 412 && net_id != 333)
 		veejay_msg(VEEJAY_MSG_DEBUG, "VIMS: Parse message '%s'", msg );
 
 
@@ -7691,7 +7691,7 @@ void	vj_event_send_devices			(	void *ptr,	const char format[],	va_list ap	)
 void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	vj_perform_send_primary_frame_s( v,0 );
+	vj_perform_send_primary_frame_s2( v,0 );
 }
 
 

@@ -341,8 +341,6 @@ typedef struct
 	sample_gui_slot_t **gui_slot;
 } sample_bank_t;
 
-#define WATCHDOG_STATE_ON 0  // disconnected
-#define WATCHDOG_STATE_OFF 1  // connected
 typedef struct
 {
 	char	*hostname;
@@ -1784,7 +1782,7 @@ gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 	}
 	multitrack_quit( info->mt );
 	
-	info->watch.w_state = WATCHDOG_STATE_OFF;
+	info->watch.w_state = STATE_DISCONNECT;
 //	g_usleep(40000);
 //	vj_gui_free();
 
@@ -5665,43 +5663,36 @@ static	void		set_color_fg(const char *name, GdkColor *col)
 
 static	gboolean	update_cpumeter_timeout( gpointer data )
 {
-	GtkWidget *w = glade_xml_get_widget_(
-			info->main_window, "cpumeter");
 	gdouble ms   = (gdouble)info->status_tokens[ELAPSED_TIME]; 
-	gdouble max  = ((1.0/info->el.fps)*1000);
-	gdouble frac =  1.0 / max;
-	gdouble invert = 0.0;
+	gdouble lim  = (1.0f/info->el.fps)*1000.0;
 
-	invert = 1.0 - (frac * (ms > max ? max : ms));
-	if(invert < 0.0)
-		invert = 0.0;
+
+//@ fps ?
+//  40 =max, in=20, fps=(40/20)*info->el.fps
 	
-
-	if(ms > max)
+	char text[65];
+	if( ms < lim )
 	{
-		frac = 1.0;
-		// set progres bar red
-		GdkColor color;
-		color.red = 0xffff;
-		color.green = 0x0000;
-		color.blue = 0x0000;
-//		if(gdk_colormap_alloc_color(info->color_map,
-//			&color, TRUE, TRUE ))
-		set_color_fg( "cpumeter", &color );
+		sprintf(text, "Running realtime", ( lim / ms ) * info->el.fps );
 	}
 	else
 	{
-		GdkColor color;
-		color.red = 0x0000;
-		color.green = 0xffff;
-		color.blue = 0x0000;
-//		if(gdk_colormap_alloc_color(info->color_map,
-//			&color, TRUE, TRUE))
-		set_color_fg( "cpumeter", &color);
-		// progress bar green
+		sprintf(text, "%2.2f FPS", ( 1.0 / ms ) * 1000.0 );
 	}
+	update_label_str( "cpumeter", text );	
+	
+	/*	gdouble max  = ((1.0/info->el.fps)*1000);
+	gdouble frac =  1.0 / max;
+	gdouble invert = 0.0;
 
-	gtk_progress_bar_set_fraction( GTK_PROGRESS_BAR(w), invert );
+	gdouble v = frac * ms;
+	if( v > 1.0 )
+		invert = 0.0;
+	else if ( v >= 0.0 )
+		invert = 1.0 - v;	
+	
+
+	gtk_progress_bar_set_fraction( GTK_PROGRESS_BAR(w), invert );*/
 
 	return TRUE;
 }
@@ -5800,10 +5791,10 @@ static	void	init_recorder(int total_frames, gint mode)
 
 static	void	init_cpumeter()
 {
-	info->cpumeter = g_timeout_add(300,update_cpumeter_timeout,
-			(gpointer*) info );
-	info->cachemeter = g_timeout_add(300,update_cachemeter_timeout,
-			(gpointer*) info );
+//	info->cpumeter = g_timeout_add(300,update_cpumeter_timeout,
+//			(gpointer*) info );
+//	info->cachemeter = g_timeout_add(300,update_cachemeter_timeout,
+//			(gpointer*) info );
 }
 
 
@@ -5846,6 +5837,9 @@ static void	update_gui()
 	on_vims_messenger();
 
 	//update_log(NULL);
+	//
+	update_cpumeter_timeout(NULL);
+	update_cachemeter_timeout(NULL);
 
 }
 
@@ -6336,9 +6330,10 @@ void	vj_gui_cb(int state, char *hostname, int port_num)
 {
 //	info->watch.hostname = strdup(hostname);
 //	info->watch.port_num = port_num;
-	info->watch.state = STATE_DISCONNECT;
-	info->watch.p_state = STATE_RECONNECT;
-	info->run_state = RUN_STATE_REMOTE;
+//	info->watch.state = STATE_DISCONNECT;
+	info->watch.state = STATE_RECONNECT;
+	info->watch.p_state = 1;
+	//	info->run_state = RUN_STATE_REMOTE;
 	put_text( "entry_hostname", hostname );
 	update_spin_value( "button_portnum", port_num );
 }
@@ -6537,6 +6532,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 			pw,
 			ph,
 			img_wid);
+	multitrack_open( info->mt );
 
 	memset( &info->watch, 0, sizeof(watchdog_t));
 	info->watch.state = STATE_STOPPED; //
@@ -6696,16 +6692,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	reload_bundles();
 
 	info->channel = g_io_channel_unix_new( vj_client_get_status_fd( info->client, V_STATUS));
-	g_io_add_watch_full(
-			info->channel,
-		//	G_PRIORITY_HIGH_IDLE,
-			G_PRIORITY_LOW,
-			G_IO_IN| G_IO_ERR | G_IO_NVAL | G_IO_HUP,
-			veejay_tick,
-			(gpointer*) info,
-			NULL 
-		);
-
+//	init_cpumeter();
 
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
 	gtk_widget_show( w );
@@ -6730,6 +6717,16 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	//init_srt_editor();
 	
 	vj_gui_preview();
+	g_io_add_watch_full(
+			info->channel,
+		//	G_PRIORITY_HIGH_IDLE,
+			G_PRIORITY_LOW,
+			G_IO_IN| G_IO_ERR | G_IO_NVAL | G_IO_HUP,
+			veejay_tick,
+			(gpointer*) info,
+			NULL 
+		);
+
 
 	
 	return 1;
@@ -6755,20 +6752,19 @@ static	void	veejay_stop_connecting(vj_gui_t *gui)
 
 gboolean		is_alive( void )
 {
-
 	void *data = info;
-	
 	vj_gui_t *gui = (vj_gui_t*) data;
+
 	if( gui->watch.state == STATE_PLAYING && gui->watch.p_state == 0)
 		return TRUE;
 
-	if(gui->watch.w_state == WATCHDOG_STATE_OFF )
+	if( gui->watch.state == STATE_RECONNECT )
 	{
-		multitrack_restart( gui->mt );
+		veejay_msg(0, "DISCONNECT");
 		vj_gui_disconnect();
-		return TRUE;
+		gui->watch.state = STATE_CONNECT;
 	}
-
+	
 	if(gui->watch.state == STATE_DISCONNECT )
 	{
 		gui->watch.state = STATE_STOPPED;
@@ -6782,8 +6778,8 @@ gboolean		is_alive( void )
 		 	vj_gui_disable(); 
 		if(!gui->launch_sensitive)
 			vj_launch_toggle(TRUE);
-		if( gui->watch.p_state == STATE_RECONNECT )
-			gui->watch.state = STATE_CONNECT;
+//		if( gui->watch.p_state == STATE_RECONNECT )
+//			gui->watch.state = STATE_CONNECT;
 	}
 
 	if( gui->watch.state == STATE_CONNECT )
@@ -6793,6 +6789,7 @@ gboolean		is_alive( void )
 		remote = get_text( "entry_hostname" );
 		port	= get_nums( "button_portnum" );
 
+		veejay_msg(0, "Connecting to %s: %d", remote,port );
 		if(!vj_gui_reconnect( remote, NULL, port ))
 		{
 			info->watch.state = STATE_STOPPED;
@@ -6801,18 +6798,21 @@ gboolean		is_alive( void )
 		{
 			info->watch.state = STATE_PLAYING;
 			info->key_id = gtk_key_snooper_install( key_handler , NULL);
-			init_cpumeter();
+		//	init_cpumeter();
 		//	info->logging = g_timeout_add( G_PRIORITY_LOW, update_log,(gpointer*) info );
 			veejay_stop_connecting(gui);
-			info->watch.state = STATE_PLAYING;
+		//	info->watch.state = STATE_PLAYING;
 			if(info->watch.p_state == 0)
 			{
+				veejay_msg(0, "Audoadd");
 				multrack_audoadd( info->mt, remote, port,
 					       info->el.ratio	);
 
 			}
-
+			veejay_msg(0, "Stopped connecting");
 			info->watch.p_state = 0; 
+			info->watch.state = STATE_PLAYING;
+
 		}
 	}
 
@@ -6823,8 +6823,8 @@ gboolean		is_alive( void )
 void	vj_gui_disconnect()
 {
 //	g_source_remove( info->logging );
-	g_source_remove( info->cpumeter );
-	g_source_remove( info->cachemeter );
+//	g_source_remove( info->cpumeter );
+//	g_source_remove( info->cachemeter );
 	g_io_channel_shutdown(info->channel, FALSE, NULL);
 	g_io_channel_unref(info->channel);
 	gtk_key_snooper_remove( info->key_id );
@@ -6845,7 +6845,10 @@ void	vj_gui_disconnect()
 	reset_tree("tree_chain");
 	reset_tree("tree_sources");
 	reset_tree("editlisttree");
-	
+
+	_effect_reset();
+	_edl_reset();
+
 	/* clear console text */
 //	clear_textview_buffer("veejaytext");
 }
