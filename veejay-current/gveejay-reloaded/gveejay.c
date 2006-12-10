@@ -160,14 +160,15 @@ int main(int argc, char *argv[]) {
 
 	while(gveejay_running())
 	{
+		is_alive();
 		if( gtk_events_pending() )
 			gtk_main_iteration();
 		else 
 		{
 			g_thread_yield();
-			g_usleep( 1000 );
+			//g_usleep( 1000 );
+			g_usleep(5000);
 		}
-		is_alive();
 	}
 	vj_gui_free();
 

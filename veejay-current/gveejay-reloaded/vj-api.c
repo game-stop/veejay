@@ -2298,6 +2298,7 @@ static	void	update_curve_accessibility(const char *name)
 	if(s->ec)
 	{
 		set_toggle_button( "curve_toggleglobal", s->ec->enabled );
+		if(s->ec->effects[i])
 		set_toggle_button( "curve_toggleentry", s->ec->effects[i]->enabled  );
 	}
 /*	if( key->type == GTK_CURVE_TYPE_LINEAR )

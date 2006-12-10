@@ -344,7 +344,6 @@ void		veejay_configure_sequence( void *data, gint w, gint h , float fps)
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
 	if(!v) return;
 	g_mutex_lock( v->mutex );
-
 	
 	while( v->data_status[v->frame_num] == RETRIEVING_DATA )
 		g_cond_wait( v->cond, v->mutex );
@@ -433,7 +432,11 @@ void	*veejay_sequence_thread(gpointer data)
 		
 		glong ms_passed = v->sta[0];
 	        if( (spf - ms_passed) > 0 )
+		{
+			//veejay_msg(0,"%s: sleep %ld", __FUNCTION__, (spf-ms_passed)*1000);
 			g_usleep( (spf-ms_passed)*1000);
+		}
+		veejay_msg(0, "preview_d = %d", v->preview_delay );
 	}
 	return NULL;	
 }
