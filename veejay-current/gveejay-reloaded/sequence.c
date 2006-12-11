@@ -402,7 +402,7 @@ void	*veejay_sequence_thread(gpointer data)
 	{	
 		glong spf = (glong)(((float)1.0 / v->fps) * 1000);
 
-		time_now = vj_get_timer();
+	//	time_now = vj_get_timer();
 		
 		if( v->abort )
 		{
@@ -419,24 +419,24 @@ void	*veejay_sequence_thread(gpointer data)
 			}
 		}
 		
-		if( time_now > tn && v->sta[0] < 250)
-		{
-			if ( veejay_process_data( v ) == 0 )
+	//	if( time_now > tn && v->sta[0] < 250)
+	//	{
+			if( v->preview )
 			{
-				veejay_msg(0, "Abort, data error");
-				v->active = 0;
-				return NULL;
+				veejay_msg(0, "%s: process_data", __FUNCTION__ );
+				if ( veejay_process_data( v ) == 0 )
+				{
+					veejay_msg(0, "Abort, data error");
+					v->active = 0;
+					return NULL;
+				}
 			}
-			tn = time_now + v->preview_delay; 
-		}
+	//		tn = time_now + v->preview_delay; 
+	//	}
 		
 		glong ms_passed = v->sta[0];
 	        if( (spf - ms_passed) > 0 )
-		{
-			//veejay_msg(0,"%s: sleep %ld", __FUNCTION__, (spf-ms_passed)*1000);
 			g_usleep( (spf-ms_passed)*1000);
-		}
-		veejay_msg(0, "preview_d = %d", v->preview_delay );
 	}
 	return NULL;	
 }

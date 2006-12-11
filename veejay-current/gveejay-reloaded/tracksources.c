@@ -102,11 +102,14 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 		valid = gtk_tree_model_iter_next( GTK_TREE_MODEL(store), &iter );
 
 	}*/
+
+	int id = sequence_get_track_id( user_data );
+	veejay_msg(0, "track %d list track source", id );	
 	for( i = 0; i < n_tracks; i ++ )
 	{
-		int id = sequence_get_track_id( user_data );
 		if(id != i)
 		{
+			veejay_msg(0, "Append track %d",  i );
 			char name[12];
 			sprintf(name,"Track %d", i);
 			gtk_list_store_append( store, &iter );
@@ -183,13 +186,16 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data)
 	int i;
 	for( i = 0; i < ref_tracks ; i ++ )
 	{
-		char str[10];
-		sprintf(str,"Track %d",i);
-		gtk_list_store_append( store, &iter );
-		gtk_list_store_set( store, &iter,
-			0,  str,
-			1,  0,
-			-1);
+		if( i != track_id )
+		{
+			char str[16];
+			sprintf(str,"Track %d",i);
+			gtk_list_store_append( store, &iter );
+			gtk_list_store_set( store, &iter,
+				0,  str,
+				1,  0,
+				-1);
+		}
 	}		
 
 	GtkTreeSelection *selection;

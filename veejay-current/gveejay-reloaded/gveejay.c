@@ -167,7 +167,7 @@ int main(int argc, char *argv[]) {
 		{
 			g_thread_yield();
 			//g_usleep( 1000 );
-			g_usleep(5000);
+			g_usleep(1000 * vj_gui_sleep_time());
 		}
 	}
 	vj_gui_free();

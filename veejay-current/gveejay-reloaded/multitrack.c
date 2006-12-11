@@ -49,6 +49,7 @@ extern int	_Xdebug;
 static float	ratio_ = 1.0;
 static int	video_wid_ = 0;
 static int	video_hei_ = 0;
+static float	fps_ = 1.0;
 
 #define __MAX_TRACKS 64
 typedef struct
@@ -449,7 +450,7 @@ static	void	update_pos( mt_priv_t *p, gint total, gint current )
    	gtk_adjustment_set_value(
                 GTK_ADJUSTMENT(GTK_RANGE(p->view->timeline_)->adjustment), 1.0 / (gdouble) total * current );     
 
-	char *now = format_time( current ,25.0f);
+	char *now = format_time( current , fps_);
 	gtk_label_set_text( p->view->labels_[0], now );
 	g_free(now);
 }
@@ -536,6 +537,12 @@ static	void	update_widgets(int *status, mt_priv_t *p, int pm)
 	if( h[PLAY_MODE] != pm )
 		playmode_sensitivity( p, pm );
 
+	if( pm == MODE_STREAM )
+	{
+		update_pos( p, status[TOTAL_FRAMES], 0 );
+		update_speed( p, 1 );
+	}
+	else
 	if( pm == MODE_SAMPLE || pm == MODE_PLAIN )
 	{
 		if( h[FRAME_NUM] != status[FRAME_NUM] )
@@ -543,6 +550,7 @@ static	void	update_widgets(int *status, mt_priv_t *p, int pm)
 		if( h[SAMPLE_SPEED] != status[SAMPLE_SPEED] )
 			update_speed( p, status[SAMPLE_SPEED] );
 	}
+
 	if( h[TOTAL_SLOTS] != status[TOTAL_SLOTS])
 	{
 		if(update_track_list( p ))
@@ -612,10 +620,6 @@ static	void	free_data( mt_priv_t *p  )
 	void 		*b = p->backlink;
 	int		 n = p->num;
 	
-	if( p->timeout )
-		g_source_remove( p->timeout );
-	p->timeout = 0;
-
 	veejay_abort_sequence( p->sequence );
 
 	if( p->hostname )
@@ -736,7 +740,8 @@ void		multitrack_set_hlq( void *data, float fps,float ratio, int quality )
 
 	ratio_ = ratio;
 	preview_quality_ = quality;
-
+	fps_ = fps;
+	
 	switch( quality )
 	{
 		case 0:
@@ -748,7 +753,7 @@ void		multitrack_set_hlq( void *data, float fps,float ratio, int quality )
 		preview_height_ = ( (float)preview_width_ / ratio_ );
 		break;
 		default:
-		preview_width_ = 128;
+		preview_width_ = 100;
 		preview_height_ = ((float) preview_width_ / ratio_ );
 		break;
 	}
@@ -820,8 +825,7 @@ void		*multitrack_new(
 	int c = 0;
 	for( c = 0; c < MAX_TRACKS; c ++ ) 
 	{
-		mt_priv_t *p = (mt_priv_t*) malloc(sizeof( mt_priv_t));
-		memset( p, 0, sizeof(mt_priv_t));
+		mt_priv_t *p = (mt_priv_t*) vj_calloc(sizeof( mt_priv_t));
 		p->num = c;
 		p->view = new_sequence_view( p,0,0,0, main_preview_area );
 		p->backlink = (void*) mt;
@@ -1227,7 +1231,7 @@ void		multitrack_set_current( void *data, char *hostname, int port_num , int wid
 #endif
 		if( mpreview_width_ > 0 && mpreview_height_ > 0 )
 			veejay_configure_sequence( last_track->sequence, mpreview_width_, mpreview_height_ , 0.0);
-		gtk_widget_set_size_request( GTK_WIDGET( last_track->view->area ), 360,290 );
+	//	gtk_widget_set_size_request( GTK_WIDGET( last_track->view->area ), 360,290 );
 	}
 	else
 	{
@@ -1279,14 +1283,20 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 		}
 G_UNLOCK(mt_lock);*/
 
-		
+
+		vj_gui_disable();		
+	
 		gui_cb( 0, strdup(p->hostname), p->port_num );
 
 
 //G_LOCK(mt_lock);
 		
 		multitrack_set_current( (void*) mt,  p->hostname, p->port_num ,mpreview_width_,mpreview_height_ );
-/*
+
+		
+		vj_gui_enable();
+
+		/*
 		all_priv_t *a = (all_priv_t*) mt->data;
 		mt_priv_t *last_track = a->pt[LAST_TRACK];
 		last_track->used = 1;
@@ -1384,7 +1394,6 @@ static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint las
 
 	if(!last || !main_area)
 	{
-		veejay_msg(0, "Configure mt window size %d x %d, %d x %d", w,h, preview_width_, preview_height_);
 		gtk_box_pack_start( GTK_BOX(seqv->main_vbox),GTK_WIDGET( seqv->area), FALSE,FALSE,0);
 		gtk_widget_set_size_request( seqv->area, 176,176  );
 	}
@@ -1422,6 +1431,8 @@ static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint las
 		seqv->timeline_ = gtk_hscale_new_with_range( 0.0,1.0,0.1 );
 		gtk_scale_set_draw_value( seqv->timeline_, FALSE );
 		gtk_widget_set_size_request( seqv->panel,preview_width_ ,180);
+		gtk_adjustment_set_value(
+        	        GTK_ADJUSTMENT(GTK_RANGE(seqv->timeline_)->adjustment), 0.0 );
 		gtk_widget_show( seqv->panel );
 		gtk_box_pack_start( GTK_BOX( box ), seqv->timeline_, FALSE,FALSE, 0 );
 		//gtk_container_add( GTK_CONTAINER(seqv->panel), box );
@@ -1451,6 +1462,12 @@ static sequence_view_t *new_sequence_view( mt_priv_t *p,gint w, gint h, gint las
 		GtkWidget *hhbox = gtk_hbox_new(FALSE,0);
 		seqv->sliders_[0] = gtk_vscale_new_with_range( -12.0,12.0,1.0 );
 		seqv->sliders_[1] = gtk_vscale_new_with_range( 0.0, 1.0, 0.01 );
+		gtk_adjustment_set_value(
+			GTK_ADJUSTMENT(GTK_RANGE(seqv->sliders_[0])->adjustment), 1.0 );
+		gtk_adjustment_set_value(
+        	        GTK_ADJUSTMENT(GTK_RANGE(seqv->sliders_[1])->adjustment), 0.0 );
+				
+		
 		gtk_scale_set_digits( GTK_SCALE(seqv->sliders_[1]), 2 );
 		g_signal_connect( G_OBJECT( seqv->sliders_[0] ), "value_changed", G_CALLBACK( seq_speed ),
 					(gpointer*)p );		
@@ -1524,16 +1541,17 @@ void 	*mt_preview( gpointer user_data )
 	GdkPixbuf *cache[MAX_TRACKS+2];
 	
 	GdkPixbuf *nopreview = dummy_image();
-	
+	GdkPixbuf *logo      = gdk_pixbuf_scale_simple( nopreview,176,176 , GDK_INTERP_NEAREST);
 	long sleepy = 34000;
 	char	tmp_key[32];
 	void *pixp = vevo_port_new( VEVO_ANONYMOUS_PORT );
-	int  logo_done = 0;
-	
+	int  logos[32];
+	int	logo_done=0;	
 	GdkPixbuf *ir = NULL;
-
+	veejay_memset(logos,0, sizeof(logos));
 	for( ;; )
 	{
+		int scale_track_0 = -1;
 		G_LOCK( mt_lock );
 		mt_priv_t *lt = a->pt[LAST_TRACK];
 		gint error = 0;
@@ -1565,7 +1583,6 @@ void 	*mt_preview( gpointer user_data )
 		//@ preview off
 		if(!lt->preview )
 		{
-		//	veejay_msg(0, "display main track logo %p", nopreview);
 			cache[LAST_TRACK] = nopreview;
 			ir = nopreview;
 #ifdef STRICT_CHECKING
@@ -1574,13 +1591,11 @@ void 	*mt_preview( gpointer user_data )
 		}
 		else
 		{
-		//	veejay_msg(0, "display main track image");
 			cache[LAST_TRACK] = veejay_get_image( lt->sequence, &error );	
 			if( error )
 			{
 			//	delete_data( mt->data, LAST_TRACK ); 
 				cache[LAST_TRACK] = NULL;
-			//	veejay_msg(0, "Error while retrieving image");
 			}
 			else
 			{
@@ -1601,25 +1616,42 @@ void 	*mt_preview( gpointer user_data )
 				mt_priv_t *p = a->pt[i];
 				if( p->active && ref != i  || (ref ==i && lt->preview == 0 ))
 				{
-			///		veejay_msg(0, "get track image %d",i);
-					cache[i] = veejay_get_image(
+					if( p->preview )
+					{
+						cache[i] = veejay_get_image(
 						p->sequence, 
 						&error );
-					if( error )
-						cache[i] = NULL;
+						if( error )
+							cache[i] = NULL;
+						else
+						{
+							sprintf(tmp_key, "%d", i );
+							vevo_property_set( pixp, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &(cache[i] ) );
+						}
+						logos[i] = 0;
+					}
 					else
 					{
-						sprintf(tmp_key, "%d", i );
-						vevo_property_set( pixp, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &(cache[i] ) );
+						if(logos[i] == 0)
+						{
+							cache[i] = logo;
+							error = 0;
+							logos[i] = 1;
+						}
 					}
+				}
+				else if ( p->active && p->preview && ref == i  )
+				{
+					scale_track_0 = i;
+					cache[i] = cache[LAST_TRACK];
 				}
 			}
 		}
 		//@ scale image
 		//FIXME
-		if( ref >= 0  && lt->preview && cache[LAST_TRACK] ) 
+	/*	if( ref >= 0  && lt->preview && cache[LAST_TRACK] ) 
 		{
-	//		veejay_msg(0, "\tpreview on, scale %d cache",ref);
+			veejay_msg(0, "\tpreview on, scale %d cache",ref);
 			gint w = mpreview_width_ == 0 ? 352/4 : mpreview_width_;
 			gint h = (gint)( (float) w / ratio_ );
 			cache[ref] = gdk_pixbuf_scale_simple( //@ leaking memory
@@ -1627,13 +1659,12 @@ void 	*mt_preview( gpointer user_data )
 				w,h,GDK_INTERP_NEAREST );
 			sprintf(tmp_key, "%d", ref );
 			vevo_property_set( pixp, tmp_key, VEVO_ATOM_TYPE_VOIDPTR,1, &(cache[ref] ) );
-		}
+		}*/
 
 
 	//	GdkPixbuf *ir = NULL;
 		if(lt->active && cache[LAST_TRACK] && lt->preview)
 		{
-		//	veejay_msg(0,"\t preview on, scale MAIN track");
 			gint w = 352;
 			gint h = (gint)((float)w / ratio_);
 			//@ratio
@@ -1644,50 +1675,74 @@ void 	*mt_preview( gpointer user_data )
 		}
 
 		G_UNLOCK(mt_lock );
-		
-		gdk_threads_enter();
+	
 
+		//@ if there is no work, do not do threads_enter
+		int have_work = 0;
 		for( i = 0; i < MAX_TRACKS ; i ++ )
 		{
-			mt_priv_t *p = a->pt[i];
-			update_sequence_widgets(p);
-	
-			if(cache[i])
+			if(logos[i] <= 1 && cache[i] )
 			{
-		//		veejay_msg(0,"\tset pixbuf %p, %d", p->view->area, cache[i]);
-				GtkImage *image = GTK_IMAGE( p->view->area );
-				gtk_image_set_from_pixbuf_( image, cache[i] );
+				have_work ++;
+				break;
 			}
 		}
+		if( lt->active && ir && logo_done == 0 )
+			have_work ++;
+		if( lt->active && ir && ir != nopreview )
+			have_work ++;
 
-		if(lt->active && ir )
+		if( have_work )
 		{
-			if( ir == nopreview )
+			gdk_threads_enter();
+
+			for( i = 0; i < MAX_TRACKS ; i ++ )
 			{
-				if( logo_done==0 )
+				mt_priv_t *p = a->pt[i];
+				update_sequence_widgets(p);
+	
+				if(cache[i] && logos[i] <= 1 || scale_track_0 == i)
 				{
-		//			veejay_msg(0, "\tset MAIN LOGO %p", ir );
-					gtk_image_set_from_pixbuf_( GTK_IMAGE(lt->view->area), ir );
-					logo_done = 1;
+					GtkImage *image = GTK_IMAGE( p->view->area );
+					gtk_image_set_from_pixbuf_( image, cache[i] );
+					if(logos[i] )
+						logos[i] ++;
 				}
 			}
-			else
-			{
-		//		veejay_msg(0, "\tset MAIN picture %p", ir );
-				gtk_image_set_from_pixbuf_( GTK_IMAGE(lt->view->area), ir );
-		
-				sleepy = img_cb( cache[LAST_TRACK], ir, GTK_IMAGE( lt->view->area ) );
-				gtk_widget_queue_draw(GTK_IMAGE( lt->view->area ));
-
-				logo_done = 0;
-			}
-		}
 	
-		gdk_threads_leave();
-		if(sleepy >= 1000)
-			g_usleep(sleepy);
+			if(lt->active && ir )
+			{
+				if( ir == nopreview )
+				{
+					if( logo_done==0 )
+					{
+						gtk_image_set_from_pixbuf_( GTK_IMAGE(lt->view->area), ir );
+						logo_done = 1;
+					}
+				}
+				else
+				{
+					gtk_image_set_from_pixbuf_( GTK_IMAGE(lt->view->area), ir );
+		
+					sleepy = img_cb( cache[LAST_TRACK], ir, GTK_IMAGE( lt->view->area ) );
+					gtk_widget_queue_draw(GTK_IMAGE( lt->view->area ));
+
+					logo_done = 0;
+				}
+			}
+			gdk_threads_leave();
+		}
+
+
+		if( have_work == 0 )
+			g_usleep( 3 * sleepy );
 		else
-			g_usleep(40000);
+		{
+			if(sleepy >= 1000)
+				g_usleep(sleepy);
+			else
+				g_usleep( vj_gui_sleep_time() );
+		}
 		//@ clear our buffer
 	}
 	

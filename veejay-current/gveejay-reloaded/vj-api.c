@@ -5562,7 +5562,7 @@ static	void	load_editlist_info()
 	update_label_i( "label_el_achans", values[7], 0);
 	update_label_i( "label_el_abits", values[5], 0);
 	
-	if( rate == 0 )
+/*	if( rate == 0 )
 	{
 		disable_widget( "button_5_4");
 		disable_widget_by_pointer(GTK_WIDGET(info->audiovolume_knob));	
@@ -5573,7 +5573,7 @@ static	void	load_editlist_info()
 		enable_widget( "button_5_4");
 		enable_widget_by_pointer(GTK_WIDGET(info->audiovolume_knob));
 		enable_widget( "audio_knobframe");
-	}
+	}*/
 	info->el.ratio = (float)info->el.width / (float) info->el.height;
 
 
@@ -6257,6 +6257,20 @@ int	vj_gui_cb_locked()
 	return info->watch.p_state;
 }
 
+int	vj_gui_sleep_time( void )
+{
+	float f =  (float) info->status_tokens[ELAPSED_TIME];
+	float t =  info->el.fps;
+
+	if( t <= 0.0 || t>= 200.0 )
+		t = 25.0;
+	float n = (1.0 / t) * 1000.0f;
+	
+	if( f < n )
+		return (int)( n - f );
+	return (int) n;
+}
+
 int	vj_img_cb(GdkPixbuf *img, GdkPixbuf *ir, GtkImage *image )
 {
 #ifdef STRICT_CHECKING
@@ -6597,20 +6611,10 @@ static	gboolean	update_log(gpointer data)
 	return TRUE;
 }
 */
-gboolean	enter_videobook(GtkWidget *w, gpointer user_data)
-{
-	fprintf(stderr, "enter\n");
-	return FALSE;
-}
-gboolean	leave_videobook(GtkWidget *w, gpointer user_data)
-{
-	fprintf(stderr, "leave\n");
-	return FALSE;
-}
 
 void	vj_gui_preview(void)
 {
-
+	//FIXME: cleanup
 	gint w = info->el.width;
 	gint h = info->el.height;
 
@@ -6674,15 +6678,13 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	
 	int k = 0;
 	for( k = 0; k < 3; k ++ )
-		memset( info->history_tokens[k] , 0, (sizeof(int) * STATUS_TOKENS) );
+		veejay_memset( info->history_tokens[k] , 0, (sizeof(int) * STATUS_TOKENS) );
 
+	veejay_memset( info->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
+	veejay_memset( info->status_msg, 0, STATUS_BYTES );	
 
 	load_editlist_info();
-//	if(oldfps != info->el.fps )
-//	{
-		multitrack_set_hlq( info->mt,info->el.fps,info->el.ratio, info->quality );
-//		oldfps = info->el.fps;
-//	}
+	multitrack_set_hlq( info->mt,info->el.fps,info->el.ratio, info->quality );
 
 	info->rawdata = (guchar*) vj_calloc(sizeof(guchar) * info->el.width * info->el.height * 3);
 	veejay_memset( &vims_keys_list, 0, sizeof(vims_keys_t));
@@ -6693,7 +6695,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	reload_bundles();
 
 	info->channel = g_io_channel_unix_new( vj_client_get_status_fd( info->client, V_STATUS));
-//	init_cpumeter();
 
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
 	gtk_widget_show( w );
@@ -6704,23 +6705,18 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	info->uc.reload_hint[HINT_SEQ_ACT] = 1;
        	
 	int speed = info->status_tokens[SAMPLE_SPEED];
-	if( speed < 0 ) info->play_direction = -1; else info->play_direction=1;
+	if( speed < 0 ) 
+		info->play_direction = -1; else info->play_direction=1;
 	if( speed < 0 ) speed *= -1;
 
 	update_spin_range( "spin_framedelay", 0, 9, 0);
 	update_slider_range( "speed_slider", -25,25,speed,0);
-//	update_label_i( "speed_label", speed,0);
-
-	update_label_str( "label_hostnamex",
-		(hostname == NULL ? group_name: hostname ) );
+	update_label_str( "label_hostnamex", (hostname == NULL ? group_name: hostname ) );
 	update_label_i( "label_portx",port_num,0);
 
-	//init_srt_editor();
-	
 	vj_gui_preview();
 	g_io_add_watch_full(
 			info->channel,
-		//	G_PRIORITY_HIGH_IDLE,
 			G_PRIORITY_LOW,
 			G_IO_IN| G_IO_ERR | G_IO_NVAL | G_IO_HUP,
 			veejay_tick,
@@ -6846,9 +6842,6 @@ void	vj_gui_disconnect()
 	reset_tree("tree_chain");
 	reset_tree("tree_sources");
 	reset_tree("editlisttree");
-
-	_effect_reset();
-	_edl_reset();
 
 	/* clear console text */
 //	clear_textview_buffer("veejaytext");
