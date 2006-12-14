@@ -136,6 +136,8 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 
 		case ENCODER_QUICKTIME_MJPEG:
 			   sprintf(descr, "Quicktime"); cformat = 'q'; break;
+		case ENCODER_LZO:
+			   sprintf(descr, "LZO YUV"); cformat = 'L'; break;
 		
 		default:
 		   veejay_msg(VEEJAY_MSG_ERROR, "Unsupported video codec");
@@ -199,19 +201,17 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 	if(format==ENCODER_DVVIDEO)
 		si->encoder_max_size = ( el->video_height == 480 ? 120000: 144000);
 	else
-		if(format==ENCODER_YUV420)
+		switch(format)
 		{
-			si->encoder_max_size=(el->video_height * el->video_width * 2);
-		}
-		else {
-		 if(format == ENCODER_YUV422)
-		 {
-			si->encoder_max_size = (el->video_width * el->video_height * 2);
-		}
-		else
-		{
+			case ENCODER_YUV420:
+			 si->encoder_max_size=(el->video_height * el->video_width * 2);break;
+			case ENCODER_YUV422:
+			si->encoder_max_size = (el->video_width * el->video_height * 2);break;
+			case ENCODER_LZO:
+			si->encoder_max_size = (el->video_width * el->video_height * 3 ); break;
+			default:
 			si->encoder_max_size = ( 4 * 65535 );
-		}
+			break;
 		}
 	
 	si->encoder_width = el->video_width;
@@ -237,7 +237,7 @@ int sample_init_encoder(int sample_id, char *filename, int format, editlist *el,
 	{
 		 return -1; 
 	}
-	if(format < 0 || format > 7)
+	if(format < 0 || format > 8)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid format!");
 		return -1;
