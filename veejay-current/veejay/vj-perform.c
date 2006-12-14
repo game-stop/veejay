@@ -1721,14 +1721,12 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 
 	if (centry == -1)
 	{
-		if( (	type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_NET ||
-			type==VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_PICTURE) 
-			
-				&& vj_tag_get_active(sample_id)==0
-				
-			)
-			vj_tag_set_active(sample_id, 1);
-
+		if(! vj_tag_get_active( sample_id ) )
+		{
+			// active stream if neccesaary
+			vj_tag_set_active(sample_id, 1 );
+		}
+		
 	  	if (vj_tag_get_active(sample_id) == 1 )
 		{
 			int res =  vj_tag_get_frame(sample_id, fb, audio_buffer[chain_entry]);
@@ -1867,10 +1865,11 @@ static int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 	centry = vj_perform_tag_is_cached(chain_entry, sample_id); // is it cached?
 	if (centry == -1)
 	{
-		if(	(type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_NET ||
-			 type==VJ_TAG_TYPE_MCAST || type==VJ_TAG_TYPE_PICTURE ) && 
-				vj_tag_get_active(sample_id)==0)
+		if(! vj_tag_get_active( sample_id ) )
+		{
+			// active stream if neccesaary
 			vj_tag_set_active(sample_id, 1 );
+		}
 
 		if (vj_tag_get_active(sample_id) == 1)
 		{ 
@@ -1939,8 +1938,7 @@ static int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
     }
 
     if (error == 1)
-	dummy_apply(helper_frame, width, height, 1);
-
+	veejay_msg(0,"Unable to retrieve source for FX entry %d", chain_entry );
     return 0;
 }
 

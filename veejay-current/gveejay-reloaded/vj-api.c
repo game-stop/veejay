@@ -377,7 +377,7 @@ typedef struct
 //	gint		logging;
 	gint		streamrecording;
 	gint		samplerecording;
-	gint		cpumeter;
+//	gint		cpumeter;
 	gint		cachemeter;
 	gint		image_w;
 	gint		image_h;
@@ -1752,7 +1752,7 @@ void		veejay_quit( )
                 return;
        single_vims( 600 );
 
-	clear_progress_bar( "cpumeter",0.0 );
+//	clear_progress_bar( "cpumeter",0.0 );
 	clear_progress_bar( "connecting",0.0 );
 	clear_progress_bar( "samplerecord_progress",0.0 );
 	clear_progress_bar( "streamrecord_progress",0.0 );

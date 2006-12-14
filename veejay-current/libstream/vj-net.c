@@ -130,6 +130,7 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 	lock(t);
 	if( t->state == 0 || t->error  )
 	{
+		veejay_msg(0, "Connection closed with remote host");
 		unlock(t);
 		return 0;
 	}

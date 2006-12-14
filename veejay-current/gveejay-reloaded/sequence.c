@@ -27,6 +27,7 @@ typedef struct
 	gint	height;
 	gint	abort;
 	unsigned long preview_delay;
+	unsigned long user_delay;
 	glong	time_out; // in microseconds
 	GCond  *cond;
 	GMutex *mutex;
@@ -239,10 +240,8 @@ static int	veejay_process_status( veejay_sequence_t *v )
 				veejay_msg(0, "Error reading statusline");
 				return 0;
 			}
-//			g_mutex_lock( v->serialize );
 			veejay_memcpy( v->serialized, v->status_buffer, bytes );
 			status_to_arr( v->status_buffer, v->sta );
-	//		g_mutex_unlock( v->serialize );
 			return 1;
 		}
 	}
@@ -396,20 +395,24 @@ void	*veejay_sequence_thread(gpointer data)
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
 	if(!v) return NULL;
 	unsigned long time_now = 0;
+
+	v->preview_delay = ( 1.0/ v->fps ) * 1000;
+
 	unsigned long tn = vj_get_timer() + v->preview_delay;
-	
+
 	for ( ;; )
 	{	
 		glong spf = (glong)(((float)1.0 / v->fps) * 1000);
 
-	//	time_now = vj_get_timer();
+		time_now = vj_get_timer();
 		
 		if( v->abort )
 		{
 			veejay_msg(0, "Thread aborted");
 			return NULL;
 		}
-		if( vj_client_poll( v->fd, V_STATUS ))
+		
+		while( vj_client_poll( v->fd, V_STATUS ))
 		{
 			if( veejay_process_status( v ) == 0 )
 			{
@@ -419,11 +422,10 @@ void	*veejay_sequence_thread(gpointer data)
 			}
 		}
 		
-	//	if( time_now > tn && v->sta[0] < 250)
-	//	{
+		if( time_now > tn && v->sta[0] < (v->fps * 5))
+		{
 			if( v->preview )
 			{
-				veejay_msg(0, "%s: process_data", __FUNCTION__ );
 				if ( veejay_process_data( v ) == 0 )
 				{
 					veejay_msg(0, "Abort, data error");
@@ -431,8 +433,8 @@ void	*veejay_sequence_thread(gpointer data)
 					return NULL;
 				}
 			}
-	//		tn = time_now + v->preview_delay; 
-	//	}
+			tn = time_now + v->preview_delay; 
+		}
 		
 		glong ms_passed = v->sta[0];
 	        if( (spf - ms_passed) > 0 )
@@ -475,11 +477,14 @@ void	veejay_sequence_preview_delay( void *data, double value )
 {
 	veejay_sequence_t *v = (veejay_sequence_t*) data;
 	if(!v) return;
-
+/*	double f = 1.0 / fps_;
+	double ms = f * 1000.0;
+	
 	g_mutex_lock(v->mutex);
-	gint max = 4 * 100000;
+	// value 0.0 - 1.0
+	v->user_delay = value;
 	v->preview_delay = (unsigned long)( value * (double) max);
-	g_mutex_unlock(v->mutex);
+	g_mutex_unlock(v->mutex);*/
 }
 
 void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_height)
@@ -508,7 +513,7 @@ void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_he
 	v->frame_num = 0;
 	v->wframe_num = 0;
 	v->abort = 0;
-	v->preview_delay = 40000;
+	//v->preview_delay = 4000000;
 	v->mutex = g_mutex_new();
 //	v->serialize = g_mutex_new();
 	v->active = 1;

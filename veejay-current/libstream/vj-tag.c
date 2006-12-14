@@ -268,11 +268,6 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 	snprintf(tmp,sizeof(tmp)-1, "%s %d", host, port );
 	tag->extra = (void*) strdup(tmp);
 
-//	if(!vj_client_test(host,port))
-//		return 0;
-
-
-	
 	v->planes[0] = w * h;
 	int fmt=  vj_tag_input->pix_fmt;
 	if( fmt == FMT_420 || fmt == FMT_420F )
@@ -293,7 +288,7 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 			veejay_msg(VEEJAY_MSG_ERROR, "Insufficient error to allocate memory for Network Stream");
 			return 0;
 		}
-		memset(tag->socket_frame, 0 , (v->planes[0] * 4 ));
+		veejay_memset(tag->socket_frame, 0 , (v->planes[0] * 4 ));
 		tag->socket_ready = 1;
 	}
 
@@ -2159,10 +2154,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
 		if(!net_thread_get_frame( tag,buffer ))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error reading frame from stream");
-			vj_tag_set_active(t1,0);
-		}
+			return 0;
 		return 1;
 		break;
 	case VJ_TAG_TYPE_YUV4MPEG:
