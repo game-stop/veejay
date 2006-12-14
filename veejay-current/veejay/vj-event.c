@@ -6057,6 +6057,13 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot change data format while recording to disk");
 		return;
 	}
+	if(strncasecmp(str, "mlzo",4) == 0 )
+	{
+		_recorder_format = ENCODER_LZO;
+		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in LZO YUV 4:2:2 Planar");
+		return;
+	}
+
 
 	if(strncasecmp(str, "yv16",4) == 0 || strncasecmp(str,"y422",4)==0)
 	{
