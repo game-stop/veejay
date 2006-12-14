@@ -40,20 +40,20 @@
 #include <libvjmem/vjmem.h>
 #include <libyuv/yuvconv.h>
 #include <ffmpeg/avcodec.h>
+#include <libel/lzo.h>
 #include <math.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-
 #ifdef SUPPORT_READ_DV2
 #include "rawdv.h"
 #include "vj-dv.h"
 #endif
-#define MAX_CODECS 40
+#define MAX_CODECS 50
 #define CODEC_ID_YUV420 999
 #define CODEC_ID_YUV422 998
-
+#define CODEC_ID_YUVLZO 900
 #define DUMMY_FRAMES 2
 
 //@@ !
@@ -126,6 +126,7 @@ static struct
 	{ "iyuv",	CODEC_ID_YUV420,	-1},
 	{ "i420",	CODEC_ID_YUV420,	-1},
 	{ "yv16",	CODEC_ID_YUV422,	-1},
+	{ "mlzo",	CODEC_ID_YUVLZO,	-1},
 	{ "pict",	0xffff,			-1}, 
 	{ "hfyu",	CODEC_ID_HUFFYUV,	-1},
 	{ "cyuv",	CODEC_ID_CYUV,		-1},
@@ -174,6 +175,7 @@ static struct
 	{ "yuv",	CODEC_ID_YUV420 },
 	{ "iyuv",	CODEC_ID_YUV420 },
 	{ "i420",	CODEC_ID_YUV420 },
+	{ "mlzo",	CODEC_ID_YUVLZO },
 	{ "yv16",	CODEC_ID_YUV422 },
 	{ "pict",	0xffff	}, /* invalid fourcc */
 	{ "hfyu",	CODEC_ID_HUFFYUV},
@@ -202,6 +204,8 @@ typedef struct
 #ifdef SUPPORT_READ_DV2
 static	vj_dv_decoder *dv_decoder_ = NULL;
 #endif
+
+static	void		*lzo_decoder_ = NULL;
 
 static	vj_decoder *el_codecs[MAX_CODECS];
 
@@ -372,7 +376,7 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 	}
 #endif		
 	
-	if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 && !found)
+	if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 && !found && id != CODEC_ID_YUVLZO)
         {
 		int i;
 		d->codec = avcodec_find_decoder( id );
@@ -406,6 +410,10 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG,"\tResampling YUV planar to preferred pixel format");
 		d->sampler = subsample_init( width );
+		if( id == CODEC_ID_YUVLZO )
+		{
+			lzo_decoder_ = lzo_new();
+		}
 
 	}       
 
@@ -1038,7 +1046,15 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			return 0;
 #endif			
 			break;
-			
+		case CODEC_ID_YUVLZO:
+
+			inter = lzo_decompress( lzo_decoder_, data,res, dst );
+			if( inter == 0 )
+				return 0;
+
+			return inter;
+
+			break;			
 		default:
 			inter = lav_video_interlacing(el->lav_fd[N_EL_FILE(n)]);
 			d->img->width = el->video_width;
@@ -1210,6 +1226,9 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 				break;
 		case CODEC_ID_DVVIDEO:
 				ret = vj_dv_scan_frame( dv_decoder_, d->tmp_buffer );
+				break;
+		case CODEC_ID_YUVLZO:
+				ret = FMT_422;
 				break;
 		default:
 

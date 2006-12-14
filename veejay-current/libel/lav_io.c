@@ -40,6 +40,7 @@
 #include <quicktime.h>
 #include <lqt.h>
 #include <lqt/colormodels.h>
+#include <libel/lzo.h>
 #define QUICKTIME_MJPG_TAG 0x6d6a7067
 #endif
 
@@ -290,6 +291,7 @@ int lav_query_polarity(char format)
       case 'd': return LAV_INTER_BOTTOM_FIRST;  // DV, interlaced 
       case 'j': return LAV_INTER_TOP_FIRST;
       case 'q': return LAV_INTER_TOP_FIRST;
+      case 'L': return LAV_NOT_INTERLACED;
       case 'm': return LAV_INTER_TOP_FIRST;
       case 'x': return LAV_NOT_INTERLACED; // picture is always not interlaced
       default:  return LAV_INTER_TOP_FIRST;
@@ -339,6 +341,18 @@ lav_file_t *lav_open_output_file(char *filename, char format,
        	  	if (asize)
 			AVI_set_audio(lav_fd->avi_fd, achans, arate, asize, WAVE_FORMAT_PCM);
       		return lav_fd;
+	case 'L':
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tWriting output file in AVI LZO");
+		lav_fd->avi_fd=AVI_open_output_file(filename);
+		if(!lav_fd->avi_fd) 
+		{
+			free(lav_fd);
+			return NULL;
+		}
+		AVI_set_video(lav_fd->avi_fd, width,height,fps, "mlzo");
+		if(asize)
+			AVI_set_audio(lav_fd->avi_fd, achans,arate,asize,WAVE_FORMAT_PCM);
+		return lav_fd;
      	case 'Y':
 		veejay_msg(VEEJAY_MSG_DEBUG,"\tWriting output file in AVI IYUV");
 		lav_fd->avi_fd = AVI_open_output_file(filename);
@@ -588,7 +602,8 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
 		case 'M':
 		case 'P':
 		case 'D':
-		case 'Y':	
+		case 'Y':
+		case 'L':	
       if(n==0)
            res = AVI_write_frame( lav_file->avi_fd, buff, size );
       else
@@ -648,6 +663,7 @@ int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
 #endif
 	case 'a':
 	case 'A':
+	case 'L':
   		 return AVI_write_audio( lav_file->avi_fd, buff, samps*lav_file->bps);
 	}
 	return 0;
@@ -664,6 +680,7 @@ long lav_video_frames(lav_file_t *lav_file)
 		case 'Y':
 		case 'D':
 		case 'M':
+		case 'L':
 	case 'A':
 	case 'a':
 		return AVI_video_frames( lav_file->avi_fd );
@@ -692,6 +709,7 @@ int lav_video_width(lav_file_t *lav_file)
 		case 'A':
 		case 'P':
 		case 'M':
+		case 'L':
 		case 'D':
 		case 'Y':
 			return AVI_video_width(lav_file->avi_fd);
@@ -720,6 +738,7 @@ int lav_video_height(lav_file_t *lav_file)
 		case 'A':
 		case 'P':
 		case 'M':
+		case 'L':
 		case 'D':
 		case 'Y':
 		    return AVI_video_height(lav_file->avi_fd);
@@ -877,6 +896,10 @@ const char *lav_video_compressor(lav_file_t *lav_file)
 	return tmp;
    }
 #endif
+   if( video_format == 'L' )
+   {
+	   return (strdup("mlzo"));
+   }
 #ifdef HAVE_LIBQUICKTIME
 	if(lav_file->format == 'q')
 		return quicktime_video_compressor(lav_file->qt_fd,0);
@@ -1449,6 +1472,13 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
 		return lav_fd;
 	}
+
+	if(	strncasecmp( video_comp, "mlzo", 4 ) == 0 )
+	{
+		lav_fd->MJPG_chroma = CHROMA422;
+		lav_fd->interlacing = LAV_NOT_INTERLACED;
+		return lav_fd;
+	}
 	
 	if (	strncasecmp(video_comp,"dvsd",4)==0 ||
 		strncasecmp(video_comp,"dvcp",4) ==0 ||
@@ -1680,6 +1710,7 @@ const char *lav_strerror(void)
       case 'Y':
       case 'M':
       case 'P':
+      case 'L':
       case 'D':
          return AVI_strerror();
       default:

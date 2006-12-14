@@ -30,7 +30,8 @@
 #define ENCODER_YUV422 5
 #define ENCODER_QUICKTIME_DV 6
 #define ENCODER_QUICKTIME_MJPEG 7
-#define NUM_ENCODERS 8
+#define ENCODER_LZO 8
+#define NUM_ENCODERS 9
 
 typedef struct
 {
@@ -47,6 +48,7 @@ typedef struct
 	int width;
 	int height;
 	uint8_t *data[3];
+	void *lzo;
 } vj_encoder;
 
 int		vj_avcodec_init(editlist *el, int pix);

@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <libyuv/yuvconv.h>
-
+#include <libel/lzo.h>
 #ifdef SUPPORT_READ_DV2
 #define __FALLBACK_LIBDV
 #include <libel/vj-dv.h>
@@ -48,6 +48,7 @@ char*	vj_avcodec_get_codec_name(int codec_id )
 		case CODEC_ID_DVVIDEO: sprintf(name, "DVVideo"); break;
 		case 999 : sprintf(name, "RAW YUV 4:2:0 Planar"); break;
 		case 998 : sprintf(name, "RAW YUV 4:2:2 Planar"); break;
+		case 900 : sprintf(name, "LZO YUV 4:2:2 Planar"); break;
 		default:
 			sprintf(name, "Unknown"); break;
 	}
@@ -73,8 +74,13 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 		memset( e->data[1], 0, 	el->video_width * el->video_height/2 );
 		memset( e->data[2], 0,		el->video_width * el->video_height/2 );
 	}
+
+	if( id == 900 )
+	{
+		e->lzo = lzo_new();
+	}
 	
-	if(id != 998 && id != 999 )
+	if(id != 998 && id != 999 && id != 900)
 	{
 #ifdef __FALLBACK_LIBDV
 		if(id != CODEC_ID_DVVIDEO)
@@ -93,7 +99,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 
 	}
 
-	if( id != 998 && id != 999 )
+	if( id != 998 && id != 999 && id!= 900)
 	{
 #ifdef __FALLBACK_LIBDV
 	  if(id != CODEC_ID_DVVIDEO )
@@ -156,6 +162,8 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 	}
 
 	e->len = el->video_width * el->video_height;
+	veejay_msg(0, "PIXEL FORMAT %d", el->pixel_format );
+
 	if(el->pixel_format == FMT_422 || el->pixel_format == FMT_422F)
 		e->uv_len = e->len / 2;
 	else
@@ -205,6 +213,9 @@ static	void		vj_avcodec_close_encoder( vj_encoder *av )
 		if(av->data[2])
 			free(av->data[2]);
 		free(av);
+
+		if(av->lzo)
+			lzo_free(av->lzo);
 	}
 	av = NULL;
 }
@@ -227,6 +238,8 @@ static int		vj_avcodec_find_codec( int encoder )
 			return CODEC_ID_MPEG4;
 		case ENCODER_DIVX:
 			return CODEC_ID_MSMPEG4V3;
+		case ENCODER_LZO:
+			return 900;
 			break;
 		default:
 			return 0;
@@ -243,6 +256,10 @@ int		vj_avcodec_stop( void *encoder , int fmt)
 	{
 		vj_dv_free_encoder(encoder);
 		encoder = NULL;
+		return 1;
+	}
+	if( fmt == 900 )
+	{
 		return 1;
 	}
 	vj_encoder *env = (vj_encoder*) encoder;
@@ -432,6 +449,51 @@ int	yuv420p_to_yuv422p( uint8_t *sY,uint8_t *sCb, uint8_t *sCr, uint8_t *dst[3],
 	return (len + uv_len + uv_len);
 }
 
+static void long2str(unsigned char *dst, int32_t n)
+{
+   dst[0] = (n    )&0xff;
+   dst[1] = (n>> 8)&0xff;
+   dst[2] = (n>>16)&0xff;
+   dst[3] = (n>>24)&0xff;
+}
+
+
+static	int	vj_avcodec_lzo( vj_encoder  *av, uint8_t *src[3], uint8_t *dst , int buf_len )
+{
+	uint8_t *dstI = dst + (3 * 4);
+	int size1 = 0, size2=0,size3=0;
+	int i;
+	
+	i = lzo_compress( av->lzo, src[0], dstI, &size1 , av->len);
+	if( i == 0 )
+	{
+		veejay_msg(0,"\tunable to compress Y plane");
+		return 0;
+	}
+	dstI += size1;
+
+	i = lzo_compress( av->lzo, src[1], dstI, &size2 , av->uv_len );
+	if( i == 0 )
+	{
+		veejay_msg(0,"\tunable to compress U plane");
+		return 0;
+	}
+	
+	dstI += size2;
+	i = lzo_compress( av->lzo, src[2], dstI, &size3 , av->uv_len );
+	if( i == 0 )
+	{
+		veejay_msg(0,"\tunable to compress V plane");
+		return 0;
+	}
+		
+	
+	long2str( dst, size1 );
+	long2str( dst+4,size2);
+	long2str( dst+8,size3);
+	
+	return (size1 + size2 + size3 + 12);
+}
 static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst )
 {
 	if(!av)
@@ -477,6 +539,9 @@ int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[
 	int res=0;
 	memset( &pict, 0, sizeof(pict));
 
+	if(format == ENCODER_LZO )
+		return vj_avcodec_lzo( encoder, src, buf, buf_len );
+	
 	if(format == ENCODER_YUV420 || format == ENCODER_YUV422) // no compression, just copy
 		return vj_avcodec_copy_frame( encoder,src, buf );
 
