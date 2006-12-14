@@ -1087,6 +1087,8 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		case ENCODER_YUV422: sprintf(descr, "YUV 4:2:2 Planar"); cformat='P'; break;
 		case ENCODER_MPEG4: sprintf(descr, "MPEG4"); cformat='M'; break;
 		case ENCODER_DIVX: sprintf(descr, "DIVX"); cformat='D'; break;
+		case ENCODER_LZO:  sprintf(descr, "LZO YUV"); cformat = 'L'; break;
+	
 		default:
 		   veejay_msg(VEEJAY_MSG_ERROR, "Unsupported video codec");
 		   return 0;
@@ -1128,18 +1130,17 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	if(format==ENCODER_DVVIDEO)
 		tag->encoder_max_size = ( _tag_info->edit_list->video_height == 480 ? 120000: 144000);
 	else
-		if(format==ENCODER_YUV420)
+		switch(format)
 		{
-			tag->encoder_max_size = (_tag_info->edit_list->video_width * _tag_info->edit_list->video_height  * 2 );
-		}
-		else
-		{
-			if(format == ENCODER_YUV422)
-			{
-				tag->encoder_max_size = (_tag_info->edit_list->video_width * _tag_info->edit_list->video_height * 2);
-			}
-			else
-				tag->encoder_max_size = ( 4 * 65535 );
+			case ENCODER_YUV420:
+			tag->encoder_max_size = (_tag_info->edit_list->video_width * _tag_info->edit_list->video_height  * 2 );break;
+			case ENCODER_YUV422:
+			tag->encoder_max_size = (_tag_info->edit_list->video_width * _tag_info->edit_list->video_height * 2); break;
+			case ENCODER_LZO:
+			tag->encoder_max_size = (_tag_info->edit_list->video_width * _tag_info->edit_list->video_height * 3); break;
+			default:
+			tag->encoder_max_size = ( 4 * 65535 );
+			break;
 		}
 
 	if(tag->encoder_total_frames == 0)
