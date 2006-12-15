@@ -33,7 +33,9 @@ typedef struct
 	pthread_mutex_t mutex;
 	pthread_t thread;
 	vj_client      *remote;
+	void *lzo;
 	int state;
+	int have_frame;
 	int error;
 	int grab;
 } threaded_t;
@@ -100,6 +102,7 @@ void	*reader_thread(void *data)
 			ret = vj_client_read_i ( v, tag->socket_frame );
 			if( ret <= 0 )
 				error = 1;
+			t->have_frame = ret;
 		}
 		unlock(t);
 
@@ -127,6 +130,8 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 {
 	threaded_t *t = (threaded_t*) tag->priv;
 	vj_client *v = t->remote;
+	const uint8_t *buf = tag->socket_frame;
+	
 	lock(t);
 	if( t->state == 0 || t->error  )
 	{
@@ -134,12 +139,21 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 		unlock(t);
 		return 0;
 	}
-	const uint8_t *buf = tag->socket_frame;
-	
+	if(t->have_frame)
+	{
+		lzo_decompress( t->lzo, buf, 0, buffer );
+	}
+	else
+	{
+		veejay_memset( buffer[0], 16, v->planes[0]);
+		veejay_memset( buffer[1], 128,v->planes[1]);
+		veejay_memset( buffer[2], 128,v->planes[2]);
+	}
+		/*
 	veejay_memcpy( buffer[0], buf, v->planes[0] );
 	veejay_memcpy( buffer[1], buf+ v->planes[0], v->planes[1] );
 	veejay_memcpy( buffer[2], buf+ v->planes[0] + v->planes[1] , v->planes[2] );
-	
+	*/
 	t->grab = 1;
 	
 	unlock(t);
@@ -168,7 +182,8 @@ int	net_thread_start(vj_client *v, vj_tag *tag)
 	threaded_t *t = (threaded_t*)tag->priv;
 
 	pthread_mutex_init( &(t->mutex), NULL );
-
+	t->lzo = lzo_new();
+	t->have_frame = 0;
 	t->error = 0;
 	t->state = 1;
 	t->remote = v;
@@ -221,6 +236,7 @@ void	net_thread_stop(vj_tag *tag)
 	}
 	
 	t->state = 0;
+	lzo_free(t->lzo);
 
 	unlock(t);
 	

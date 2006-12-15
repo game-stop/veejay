@@ -79,7 +79,7 @@ typedef struct {
 } varcache_t;
 
 static	varcache_t	pvar_;
-
+static	void		*lzo_;
 static void 	*effect_sampler = NULL;
 #ifdef USE_SWSCALER
 static void	*crop_sampler = NULL;
@@ -607,17 +607,20 @@ int vj_perform_init(veejay_t * info)
     primary_buffer =
 	(ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * 2); 
     if(!primary_buffer) return 0;
-    primary_buffer[0] = (ycbcr_frame*) vj_malloc(sizeof(ycbcr_frame));
-    if(!primary_buffer[0]) return 0;
-    primary_buffer[0]->Y = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
-    if(!primary_buffer[0]->Y) return 0;
-    veejay_memset(primary_buffer[0]->Y, 16, frame_len);
-    primary_buffer[0]->Cb = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
-    if(!primary_buffer[0]->Cb) return 0;
-    veejay_memset(primary_buffer[0]->Cb, 128, frame_len);
-    primary_buffer[0]->Cr = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
-    if(!primary_buffer[0]->Cr) return 0;
-    veejay_memset(primary_buffer[0]->Cr,128, frame_len);
+    for( c =0; c < 2 ; c ++ )
+    {
+   	 primary_buffer[c] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
+ 	 if(!primary_buffer[c]) return 0;
+  	 primary_buffer[c]->Y = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
+    	 if(!primary_buffer[c]->Y) return 0;
+    	veejay_memset(primary_buffer[c]->Y, 16, frame_len);
+    	primary_buffer[c]->Cb = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
+    	if(!primary_buffer[c]->Cb) return 0;
+    	veejay_memset(primary_buffer[c]->Cb, 128, frame_len);
+	primary_buffer[c]->Cr = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
+   	if(!primary_buffer[c]->Cr) return 0;
+    	veejay_memset(primary_buffer[c]->Cr,128, frame_len);
+    }
     video_output_buffer_convert = 0;
     video_output_buffer =
 	(ycbcr_frame**) vj_malloc(sizeof(ycbcr_frame*) * 2 );
@@ -673,6 +676,8 @@ int vj_perform_init(veejay_t * info)
 	vj_picture_init();
 #endif
 
+	lzo_ = lzo_new();
+	
 	veejay_memset( &pvar_, 0, sizeof( varcache_t));
 	
     return 1;
@@ -1067,10 +1072,43 @@ static int __socket_len = 0;
 static int __send_frame = 0;
 
 
-int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
+//int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast)
+//{
+//	__send_frame = (mcast ? 2: 1 );
+//	return 1;
+//}
+static void long2str(unsigned char *dst, int32_t n)
 {
-	__send_frame = (mcast ? 2: 1 );
-	return 1;
+   dst[0] = (n    )&0xff;
+   dst[1] = (n>> 8)&0xff;
+   dst[2] = (n>>16)&0xff;
+   dst[3] = (n>>24)&0xff;
+}
+
+static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst )
+{
+	const int len = info->effect_frame1->width * info->effect_frame1->height;
+	const int uv_len = info->effect_frame1->uv_width * info->effect_frame1->uv_height;
+	uint8_t *dstI = dst + (3*4);
+	int size1=0,size2=0,size3=0;
+	int i = lzo_compress( lzo_ , primary_buffer[1]->Y, dstI, &size1, len );
+	if( i == 0 )
+		return;
+	dstI += size1;
+	i = lzo_compress( lzo_, primary_buffer[1]->Cb, dstI, &size2, uv_len );
+	if( i == 0 )
+		return;
+	dstI += size2;
+	i = lzo_compress( lzo_, primary_buffer[1]->Cr, dstI, &size3, uv_len );
+	if( i == 0 )
+		return;
+	
+	long2str( dst,size1);
+	long2str( dst+4, size2 );
+	long2str( dst+8, size3 );
+	
+	return (size1+size2+size3+12);
+	
 }
 
 int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast)
@@ -1090,28 +1128,31 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast)
 
 	const int len = info->effect_frame1->width * info->effect_frame1->height;
 	const int uv_len = info->effect_frame1->uv_width * info->effect_frame1->uv_height;
-	const int total_len = (2*uv_len) + len;
+//	const int total_len = (2*uv_len) + len;
 	int hlen =0;
+	int compr_len = vj_perform_compress_frame( info, socket_buffer+20  );
 
 	if( !mcast )
 	{
 		/* peer to peer connection */
 		unsigned char info_line[12];
-		sprintf(info_line, "%04d %04d %1d", info->effect_frame1->width,
-				info->effect_frame1->height, info->edit_list->pixel_format );
+		sprintf(info_line, "%04d %04d %1d %08d", info->effect_frame1->width,
+				info->effect_frame1->height, info->edit_list->pixel_format,
+		      		compr_len );
 		hlen = strlen(info_line );
 		veejay_memcpy( socket_buffer, info_line, hlen );
 	}
 
+/*
+
 	veejay_memcpy( socket_buffer + hlen, primary_buffer[0]->Y, len );
 	veejay_memcpy( socket_buffer + hlen + len,primary_buffer[0]->Cb, uv_len );
 	veejay_memcpy( socket_buffer + hlen + len + uv_len, primary_buffer[0]->Cr, uv_len );
-
+*/
 	if(!mcast) __global_frame = 1;
 	int id = (mcast ? 2: 0);
 	
-	__socket_len = hlen + total_len;
-
+	__socket_len = hlen + compr_len;
 	// mcast frame sender = info->vjs[2] ??
 	if(vj_server_send_frame( info->vjs[id], info->uc->current_link, socket_buffer, __socket_len,
 				helper_frame, info->effect_frame_info, info->real_fps )<=0)
@@ -1119,8 +1160,11 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast)
 		/* frame send error handling */
 		veejay_msg(VEEJAY_MSG_ERROR,
 		  "Error sending frame to remote");
+		__send_frame=0;
 	}
 
+	__send_frame = 1;
+	
 	return 1;
 }
 void	vj_perform_send_frame_now( veejay_t *info,int k )
@@ -2917,7 +2961,10 @@ static	int	vj_perform_render_font( veejay_t *info, video_playback_setup *setting
 
 	if( __send_frame )
 	{
-		vj_perform_send_primary_frame_s2(info, __send_frame == 2 ? 2 : 0);
+		veejay_memcpy( primary_buffer[1]->Y, primary_buffer[0]->Y, frame->len );
+		veejay_memcpy( primary_buffer[1]->Cb,primary_buffer[0]->Cb,frame->uv_len);
+		veejay_memcpy( primary_buffer[1]->Cr,primary_buffer[0]->Cr,frame->uv_len);
+//		vj_perform_send_primary_frame_s2(info, __send_frame == 2 ? 2 : 0);
 		__send_frame = 0;
 	}
 

@@ -180,17 +180,20 @@ int	vj_client_poll( vj_client *v, int sock_type )
 
 int	vj_client_read_i( vj_client *v, uint8_t *dst )
 {
-	int len = v->planes[0] + v->planes[1] + v->planes[2];
-	char line[12];
-	int p[3] = { 0,0,0 };
+//	int len = v->planes[0] + v->planes[1] + v->planes[2];
+//	char line[32];
+	char line[32];
+	int p[4] = {0, 0,0,0 };
 	int n = 0;
 	int plen = 0;
 	if( v->c[0]->type == VMCAST_C )
 	{
-		return mcast_recv_frame( v->c[0]->r, dst, len );
+		veejay_msg(0, "FIXME: mcast sender");
+		return 0;
+//		return mcast_recv_frame( v->c[0]->r, dst, 0 );
 	}
-
-	bzero(line,12);
+	veejay_memset( line,0, sizeof(line));
+//	bzero(line,12);
 //	if( vj_client_poll( v, V_CMD ) <= 0 )
 //	{
 //		veejay_msg(VEEJAY_MSG_DEBUG, "Frame not ready");
@@ -198,15 +201,15 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst )
 //	}
 
 	if( v->c[0]->type == VSOCK_C )
-		plen = sock_t_recv_w( v->c[0]->fd, line, 11 );	
+		plen = sock_t_recv_w( v->c[0]->fd, line, 20 );	
 
 	if( plen <= 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Frame header error");
 		return -1;
 	}
-	n = sscanf( line, "%d %d %d", p + 0 , p + 1, p + 2 );
-	if( n != 3)
+	n = sscanf( line, "%d %d %d %d", p + 0 , p + 1, p + 2, p + 3 );
+	if( n != 4)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Frame header invalid %s",line);
 		return -1;
@@ -217,7 +220,7 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst )
 		return -1;
 	}
 	if( v->c[0]->type == VSOCK_C) 
-		n = sock_t_recv_w( v->c[0]->fd, dst, len );
+		n = sock_t_recv_w( v->c[0]->fd, dst, p[3] );
 	if(n > 0 )
 		plen += n;
 

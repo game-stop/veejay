@@ -1212,11 +1212,9 @@ void vj_event_update_remote(void *ptr)
 				}	
 				if( res == -1 )
 				{
-					veejay_msg(VEEJAY_MSG_ERROR, "Error updating command socket");
 					_vj_server_del_client( v->vjs[0], i );
 					_vj_server_del_client( v->vjs[1], i );
 					_vj_server_del_client( v->vjs[3], i );
-					break;
 				}
 			}
 		}
@@ -7698,7 +7696,7 @@ void	vj_event_send_devices			(	void *ptr,	const char format[],	va_list ap	)
 void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	vj_perform_send_primary_frame_s( v,0 );
+	vj_perform_send_primary_frame_s2( v,0 );
 }
 
 

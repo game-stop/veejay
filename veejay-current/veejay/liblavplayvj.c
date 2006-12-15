@@ -941,7 +941,7 @@ static int veejay_screen_update(veejay_t * info )
 #endif
 
 	// also put frame to socket
-	int k;
+	/*int k;
 	for( k = 0; k < 16; k ++ )
 	{
 		if(info->settings->links[k])
@@ -949,7 +949,7 @@ static int veejay_screen_update(veejay_t * info )
 			vj_perform_send_frame_now( info, k );
 			info->settings->links[k] = 0;
 		}	
-	}
+	}*/
 
 	vj_perform_update_plugin_frame( info->plugin_frame );
 
@@ -958,8 +958,9 @@ static int veejay_screen_update(veejay_t * info )
 
 	// send a frame to all participants when using mcast
 	// (activated after sending VIMS MCAST SENDER START/STOP)
+
 	if( info->settings->use_vims_mcast)
-		vj_perform_send_primary_frame_s(info, 1);
+		vj_perform_send_primary_frame_s2(info, 1);
 
 	//todo: this sucks, have it modular.( video out drivers )
 
@@ -1160,7 +1161,6 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
    res = vj_server_send(info->vjs[1],link_id, info->status_msg, strlen(info->status_msg));
 
    if( res <= 0) { /* close command socket */
-	veejay_msg(VEEJAY_MSG_DEBUG, "Close link %d, cannot send status :%d\n", link_id,res );
 		_vj_server_del_client(info->vjs[1], link_id );
 		_vj_server_del_client(info->vjs[0], link_id );
 		_vj_server_del_client(info->vjs[3], link_id );
