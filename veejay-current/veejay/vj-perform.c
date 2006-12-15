@@ -2951,14 +2951,14 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 				  );
 
 			
-			vj_perform_plain_fill_buffer(info, frame);	/* primary frame */
-		    	cached_sample_frames[0] = info->uc->sample_id;
+			vj_perform_plain_fill_buffer(info, frame);
+		   
+			cached_sample_frames[0] = info->uc->sample_id;
 			
 			if(vj_perform_verify_rows(info,frame))
 		   	 	vj_perform_sample_complete_buffers(info, frame, &is444);
 			vj_perform_render_font( info, settings, is444 );
 			
-		  //	if(sample_encoder_active(info->uc->sample_id))
 			if( pvar_.enc_active )
 				vj_perform_record_sample_frame(info,frame);
 
@@ -2988,7 +2988,6 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 				if(vj_perform_verify_rows(info,frame))
 					vj_perform_tag_complete_buffers(info, frame, &is444);
 				vj_perform_render_font(info,settings,is444);
-			//	if(vj_tag_encoder_active(info->uc->sample_id))
 				if( pvar_.enc_active )	
 					vj_perform_record_tag_frame(info,frame);
 			 }

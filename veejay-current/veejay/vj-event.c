@@ -7698,7 +7698,7 @@ void	vj_event_send_devices			(	void *ptr,	const char format[],	va_list ap	)
 void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	vj_perform_send_primary_frame_s2( v,0 );
+	vj_perform_send_primary_frame_s( v,0 );
 }
 
 

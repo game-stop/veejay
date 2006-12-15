@@ -93,8 +93,6 @@ void chromamagic_addsubselectlum(VJFrame *frame, VJFrame *frame2,
     for (i = 0; i < len; i++) {
 	a = (Y[i] * op_a) >> 8;
 	b = (Y2[i] * op_b) >> 8;
-	a = CLAMP_Y(a);
-	b = CLAMP_Y(b);	
 	if (b < a) {
 	    c = (a + b) >> 1;
 	    Y[i] = c;
@@ -221,12 +219,9 @@ void chromamagic_selectdiffneg(VJFrame *frame, VJFrame *frame2,
 	a = (Y[i] * op_a) >> 8;
 	b = (Y2[i] * op_b) >> 8;
 	if (a > b) {
-	    c = 255 - abs(255 - a - b);
-	    Y[i] = CLAMP_Y(c);
-	    c = ((Cb[i] * op_a) + (Cb2[i]*op_b) )>>8;
-	    Cb[i] = CLAMP_UV(c);
-	    c = ((Cr[i] * op_a) + (Cr2[i]*op_b) )>>8;
-	    Cr[i] = CLAMP_UV(c);
+	    Y[i] = 255 - abs(255 - a - b);
+	    Cb[i] = ((Cb[i] * op_a) + (Cb2[i]*op_b) )>>8;
+	    Cr[i] = ((Cr[i] * op_a) + (Cr2[i]*op_b) )>>8;
 	}
     }
 }
@@ -280,9 +275,7 @@ void chromamagic_addlum(VJFrame *frame, VJFrame *frame2, int width,
     for (i = 0; i < len; i++) {
 	a = (Y[i] * op_a) >> 8;
 	b = (Y2[i] * op_b) >> 8;
-	a = CLAMP_Y(a);
-	c = (a * a) / (256- b);
-	Y[i] = CLAMP_Y(c);
+	Y[i] = (a * a) / (256- b);
 	Cb[i] = (Cb[i] + Cb2[i]) >> 1;
 	Cr[i] = (Cr[i] + Cr2[i]) >> 1;
     }
@@ -306,16 +299,12 @@ void chromamagic_exclusive(VJFrame *frame, VJFrame *frame2, int width, int heigh
 	a = Y[i];
 	b = Y2[i];
 
-	a = CLAMP_Y(a);
-	b = CLAMP_Y(b);
-
 	a *= o1;
 	b *= o2;
 	a = a >> 8;
 	b = b >> 8;	
 
-	c = (a+b) - ((a * b) >> 8);
-	Y[i] = CLAMP_Y(c);
+	Y[i] = (a+b) - ((a * b) >> 8);
 
 	a = Cb[i]-128;
 	b = Cb2[i]-128;
@@ -355,19 +344,16 @@ void chromamagic_diffnegate(VJFrame *frame, VJFrame *frame2, int width, int heig
 		{
 			a = Y[i] * o1;
 			b = Cb2[i] * o2;
-			c = 255 - ( (a + b) >>8 );
-			Y[i] = CLAMP_Y(c);
+			Y[i] = 255 - ( (a + b) >>8 );
 
 			a = (Cb[i]-128) * o1;
 			b = (Cb2[i]-128) * o2;
-			c = 255 - ( 128 + (( a + b ) >> 8 ));
-			Cb[i] = CLAMP_UV(c);
+			Cb[i] = 255 - ( 128 + (( a + b ) >> 8 ));
 
 
 			a = (Cr[i]-128) * o1;
 			b = (Cr2[i]-128) * o2;
-			c = 255 - ( 128 + (( a + b ) >> 8 ));
-			Cr[i] = CLAMP_UV(c);
+			Cr[i] = 255 - ( 128 + (( a + b ) >> 8 ));
 		
 		}
 	}
@@ -391,21 +377,17 @@ void chromamagic_additive(VJFrame *frame, VJFrame *frame2, int width,
 	for(i=0; i < len; i++) {
 		a = (Y[i]*o1) >> 7;
 		b = (Y2[i]*o2) >> 7;
-		c = a + (( 2 * b ) - 255);
-		Y[i] =  CLAMP_Y(c);
+		Y[i] = a + (( 2 * b ) - 255);
 
 		a = Cb[i];
 		b = Cb2[i];
 
-		c = a + ( ( 2 * b ) - 255 );
-		Cb[i] = CLAMP_UV(c) ;
+		Cb[i] = a + ( ( 2 * b ) - 255 );
 
 		a = Cr[i] ;
 		b = Cr2[i] ;
 
-		c = a + ( ( 2 * b ) - 255 );
-		Cr[i] = CLAMP_UV(c) ;
-	
+		Cr[i] = a + ( ( 2 * b ) - 255 );
 	}
 
 }
@@ -428,9 +410,8 @@ void chromamagic_basecolor(VJFrame *frame, VJFrame *frame2,
 	a = o1 - Y[i];
 	b = o1 - Y2[i];
 	c = a * b >> 8;
-	d = c + a * ((255 - (((255 - a) * (255 - b)) >> 8) - c) >> 8);	//8
+	Y[i] = c + a * ((255 - (((255 - a) * (255 - b)) >> 8) - c) >> 8);	//8
 	
-	Y[i] = CLAMP_Y(d);
 
 	a = Cb[i]-128;
 	b = Cb2[i]-128;
@@ -515,22 +496,19 @@ void chromamagic_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op
 		b = Y2[i];
 		if ( a < pixel_Y_lo_ ) a = pixel_Y_lo_;
 		if ( b < pixel_Y_lo_ ) b = pixel_Y_lo_;
-		c = 255 - (( op_a - b) * (op_a - b)) / a;
-		Y[i] = CLAMP_Y(c);
+		Y[i] = 255 - (( op_a - b) * (op_a - b)) / a;
 		
 		a = Cb[i];
 		b = Cb2[i];
 		if ( a < pixel_U_lo_ ) a = pixel_U_lo_;
 		if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
-		c = 255 - (( 256 - b) * ( 256 - b )) / a;
-		Cb[i] = CLAMP_UV(c);
+		Cb[i] = 255 - (( 256 - b) * ( 256 - b )) / a;
 		
 		a = Cr[i];
 		b = Cr2[i];
 		if ( a < pixel_U_lo_ ) a = pixel_U_lo_;
 		if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
-		c = 255 - ((256 -b ) * (256 - b)) /a ;
-		Cr[i] = CLAMP_UV(c);
+		Cr[i] = 255 - ((256 -b ) * (256 - b)) /a ;
 	}
 }
 
@@ -592,8 +570,7 @@ void chromamagic_multiply( VJFrame *frame, VJFrame *frame2, int w, int h,int op_
 	for( i=0; i < len; i++) {
 		a = (Y[i] * o1) >> 8;
 		b = (Y2[i] * o2) >> 8;
-		c = (a * b) >> 8;
-		Y[i] = CLAMP_Y(c);
+		Y[i] = (a * b) >> 8;
 
 		a = Cb[i]-128;
 		b = Cb2[i]-128;
@@ -628,21 +605,18 @@ void chromamagic_divide(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a 
 		a = Y[i] * Y[i];
 		b = o1 - Y2[i];
 		if ( b < pixel_Y_lo_ ) b = pixel_Y_lo_;
-		c = a / b;
-		Y[i] = CLAMP_Y(c);
+		Y[i] = a / b;
 
 	
 		a = Cb[i] * Cb2[i];
 		b = 255 - Cb2[i];
 		if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
-		c = a / b;
-		Cb[i] = CLAMP_UV(c);
+		Cb[i] = a / b;
 
 		a = Cr[i] * Cr[i];;
 		b = 255 - Cr2[i];
 		if ( b < pixel_U_lo_ ) b = pixel_U_lo_;
-		c = ( a / b );
-		Cr[i] = CLAMP_UV(c);
+		Cr[i] = ( a / b );
 	}
 }
 
@@ -695,8 +669,7 @@ void chromamagic_add(VJFrame *frame, VJFrame *frame2, int width,
 	for(i=0; i < len; i++) {
 		a = Y[i];
 		b = Y2[i];
-		c = a + (( 2 * b ) - op_a);
-		Y[i] = CLAMP_Y(c);
+		Y[i] = a + (( 2 * b ) - op_a);
 
 		a = Cb[i]-128;
 		b = Cb2[i]-128;
@@ -726,8 +699,7 @@ void chromamagic_screen(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 	for(i=0; i < len; i++) {
 		a = Y[i];
 		b = Y2[i];
-		c = 255 - ( (op_a-a) * (op_a-b) >> 8);
-		Y[i] = CLAMP_Y(c);
+		Y[i] = 255 - ( (op_a-a) * (op_a-b) >> 8);
 		a = Cb[i]-128;
 		b = Cb2[i]-128;
 		c = 255 - ( ( 256-a) * (256 - b) >> 8);
@@ -757,8 +729,7 @@ void chromamagic_difference(VJFrame *frame, VJFrame *frame2, int w, int h, int o
 	for(i=0; i < len; i++) {
 		a = (Y[i] * o1)>>7;
 		b = (Y2[i] * o2)>>7;
-		c = abs ( a - b );
-		Y[i] = CLAMP_Y(c);
+		Y[i] = abs ( a - b );
 
 		a = (Cb[i]-128);
 		b = (Cb2[i]-128);
@@ -793,8 +764,7 @@ void chromamagic_softlightmode(VJFrame *frame,VJFrame *frame2,
 		b = Y2[i];
 		if ( a < op_a ) {
 		c = (a * b) >> 8;
-		d = (c + a * ( 255 - ( (255-a)*(255-b) >> 8) - c)) >> 8;
-		Y[i] = CLAMP_Y(d);
+		Y[i] = (c + a * ( 255 - ( (255-a)*(255-b) >> 8) - c)) >> 8;
 		
 		a = abs(Cb[i]-128);
 		b = abs(Cb2[i]-128);
@@ -832,8 +802,7 @@ void chromamagic_dodge(VJFrame *frame, VJFrame *frame2, int w, int h,
 		else {
 			if( b > pixel_Y_hi_ ) b = pixel_Y_hi_ - 5;
 			if( a < pixel_Y_lo_) a = pixel_Y_lo_;
-			c = (a << 8) / ( 256 - b );
-			Y[i] = CLAMP_Y(c);
+			Y[i] = (a << 8) / ( 256 - b );
 
 			a = Cb[i] - 128;
 			b = Cb2[i] - 128;
@@ -928,8 +897,7 @@ void chromamagic_reflect(VJFrame *frame, VJFrame *frame2,
 		else {
 			if ( b > pixel_Y_hi_ ) b = pixel_Y_hi_ -5;
 			if ( a < pixel_Y_lo_ ) a = pixel_Y_lo_;
-			c = (a * a) / ( 256 - b );
-			Y[i] = CLAMP_Y(c);
+			Y[i] = (a * a) / ( 256 - b );
 
 			a = Cb[i];
 			b = Cb2[i];

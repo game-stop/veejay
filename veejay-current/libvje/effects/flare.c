@@ -100,8 +100,8 @@ void flare_exclusive(VJFrame *frame, VJFrame *frame2, int width, int height, int
 		b *= o2;
 		a = a >> 8;
 		b = b >> 8;	
-		c = (a+b) - ((a * b) >> 8);
-		Y[i] = CLAMP_Y(c);
+		Y[i] = (a+b) - ((a * b) >> 8);
+		// CLAMP_Y(c);
 	
 		a = Cb[i]-128;
 		b = Cb2[i]-128;
@@ -137,20 +137,17 @@ void flare_additive(VJFrame *frame, VJFrame *frame2, int width,
 	{
 		a = (Y[i]*o1) >> 7;
 		b = (Y2[i]*o2) >> 7;
-		c = a + (( 2 * b ) - 255);
-		Y[i] = CLAMP_Y(c);	
+		Y[i] = a + (( 2 * b ) - 255);
 
 		a = Cb[i];
 		b = Cb2[i];
 
-		c = a + ( ( 2 * b ) - 255 );
-		Cb[i] = CLAMP_UV(c);
+		Cb[i] = a + ( ( 2 * b ) - 255 );
 
 		a = Cr[i] ;
 		b = Cr2[i] ;
 
-		c = a + ( ( 2 * b ) - 255 );
-		Cr[i] = CLAMP_UV(c);
+		Cr[i] = a + ( ( 2 * b ) - 255 );
 	}
 }
 
@@ -171,20 +168,20 @@ void flare_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
 		a = Y[i];
 		b = Y2[i];
 		if ( a < 1 ) a = 1;
-		c = 255 - (( op_a - b) * (op_a - b)) / a;
-		Y[i] = CLAMP_Y(c);
+		Y[i] = 255 - (( op_a - b) * (op_a - b)) / a;
+		//Y[i] = CLAMP_Y(c);
 		
 		a = Cb[i];
 		b = Cb2[i];
 		if ( a < 1) a = 1;
-		c = 255 - (( 255 - b) * ( 255 - b )) / a;
-		Cb[i] = CLAMP_UV(c);
+		Cb[i] = 255 - (( 255 - b) * ( 255 - b )) / a;
+		//Cb[i] = CLAMP_UV(c);
 		
 		a = Cr[i];
 		b = Cr2[i];
 		if ( a < 1 ) a = 1;
-		c = 255 - ((255 -b ) * (255 - b)) /a ;
-		Cr[i] = CLAMP_UV(c);
+		Cr[i] = 255 - ((255 -b ) * (255 - b)) /a ;
+		//Cr[i] = CLAMP_UV(c);
 	}
 }
 
