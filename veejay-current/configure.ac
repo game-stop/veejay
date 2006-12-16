@@ -980,6 +980,7 @@ libpostproc/Makefile
 libhash/Makefile
 libvjmsg/Makefile
 libvevo/Makefile
+liblzo/Makefile
 libvjmem/Makefile
 libgoom/Makefile
 libvje/Makefile

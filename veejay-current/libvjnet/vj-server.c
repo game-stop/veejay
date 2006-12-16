@@ -179,22 +179,15 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 	for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ )
 	{
 		int j;
-		link[i] = (vj_link*) vj_malloc(sizeof(vj_link));
+		link[i] = (vj_link*) vj_calloc(sizeof(vj_link));
 		if(!link[i])
-		{
 			return 0;
-		}
 		link[i]->in_use = 0;
 		link[i]->promote = 0;
-		link[i]->m_queue = (vj_message**) vj_malloc(sizeof( vj_message * ) * VJ_MAX_PENDING_MSG );
-		veejay_memset( link[i]->m_queue, 0, sizeof(vj_message*) * VJ_MAX_PENDING_MSG );
+		link[i]->m_queue = (vj_message**) vj_calloc(sizeof( vj_message * ) * VJ_MAX_PENDING_MSG );
 		if(!link[i]->m_queue)	return 0;
-		veejay_memset( link[i]->m_queue, 0, sizeof(vj_message*) * VJ_MAX_PENDING_MSG );
 		for( j = 0; j < VJ_MAX_PENDING_MSG; j ++ )
-		{
-			link[i]->m_queue[j] = (vj_message*) vj_malloc(sizeof(vj_message));	
-			veejay_memset(link[i]->m_queue[j], 0, sizeof(vj_message));
-		}
+			link[i]->m_queue[j] = (vj_message*) vj_calloc(sizeof(vj_message));	
 		link[i]->n_queued = 0;
 		link[i]->n_retrieved = 0;		
 	}
@@ -207,20 +200,17 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 }
 vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
 {
-	vj_server *vjs = (vj_server *) vj_malloc(sizeof(struct vj_server_t));
+	vj_server *vjs = (vj_server *) vj_calloc(sizeof(struct vj_server_t));
 	
 	if (!vjs)
 		return NULL;
 
-	veejay_memset( vjs, 0, sizeof(vjs) );
-
-	vjs->recv_buf = (char*) malloc(sizeof(char) * 16384 );
+	vjs->recv_buf = (char*) vj_calloc(sizeof(char) * 16384 );
 	if(!vjs->recv_buf)
 	{
 		if(vjs) free(vjs);
 		return NULL;
 	}	
-	bzero( vjs->recv_buf, 16384 );
 
 	vjs->server_type = type;
 
@@ -274,7 +264,9 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 			if (n <= 0)
 			{
 				//if(n == -1) 
-				veejay_msg(VEEJAY_MSG_DEBUG, "Connection closed: %s", strerror(errno));
+				veejay_msg(VEEJAY_MSG_DEBUG, "Connection with %s closed: %s", 
+						 (char*) (inet_ntoa( vje->remote.sin_addr )),
+						strerror(errno));
 		   		return -1;
 			}
 	
@@ -345,7 +337,6 @@ int _vj_server_del_client(vj_server * vje, int link_id)
 {
 	vj_link **Link = (vj_link**) vje->link;
 	Link[link_id]->in_use = 0;
-veejay_msg(VEEJAY_MSG_DEBUG, "Close connection %d, it %d", Link[link_id]->handle, link_id );
 	if(Link[link_id]->handle)
 	{
 		FD_CLR( Link[link_id]->handle, &(vje->fds) );
@@ -493,7 +484,7 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 		if( slen > buf_len )
 		{
 			char msg[256];
-			bzero(msg,256);
+			veejay_memset(msg,0,256);
 			snprintf(msg, 256,"VIMS (v) Remote %s is sending corrupted packets", (char*) (inet_ntoa( vje->remote.sin_addr ) ) );
 			_vj_malfunction( NULL, buf, buf_len, i + 1 );
 			vj_server_close_connection( vje, link_id );
@@ -504,7 +495,7 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 		if ( slen > 999 )
 		{
 			char msg[256];
-			bzero(msg,256);
+			veejay_memset(msg,0,256);
 			snprintf(msg, 256, "VIMS (v) Remote %s is acting very suspiciously", (char* )( inet_ntoa( vje->remote.sin_addr ) ));
 			_vj_malfunction( msg, buf, buf_len, i + 1);  
 			vj_server_close_connection( vje, link_id );
@@ -650,15 +641,15 @@ int	vj_server_new_connection(vj_server *vje)
 		}	
 
 		char *host = inet_ntoa( vje->remote.sin_addr ); 
-		veejay_msg(VEEJAY_MSG_DEBUG, "Connection with %s", host);		
-			
+		veejay_msg(VEEJAY_MSG_INFO, "Connection with %s", host);		
+		if( vje->nr_of_connections < fd )
+			vje->nr_of_connections = fd;
 
-		if( vje->nr_of_connections < fd ) vje->nr_of_connections = fd;
-
-		//fcntl( fd, F_SETFL, O_NONBLOCK );
 		n = _vj_server_new_client(vje, fd); 
-		if( n == VJ_MAX_CONNECTIONS )
+		if( n >= VJ_MAX_CONNECTIONS )
 		{
+			veejay_msg(VEEJAY_MSG_ERROR,
+					"No more connections allowed");
 			close(fd);
 			return -1;
 		}
@@ -671,7 +662,7 @@ int	vj_server_update( vj_server *vje, int id )
 {
 	int sock_fd = vje->handle;
 	int n = 0;
-	// ensure all is empty
+
 	_vj_server_empty_queue(vje, id);
 
  	if(!vj_server_poll(vje))
@@ -686,8 +677,8 @@ int	vj_server_update( vj_server *vje, int id )
 			return 0;
 	}
 	// clear recv_buf
-	bzero( vje->recv_buf, 16384);
-
+	veejay_memset( vje->recv_buf, 0, 16384 );
+	
 	if(!vje->use_mcast)
 	{
 		n = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
@@ -713,6 +704,8 @@ int	vj_server_update( vj_server *vje, int id )
 
 	if(n_msg == 0 )
 	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Invalid instruction '%s'",
+				msg_buf );
 		return 0;
 	}
 

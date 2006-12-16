@@ -4,7 +4,7 @@ SUBDIRS = bio2jack libOSC libhash libvjmsg libvjmem
 if USE_SWSCALER
 SUBDIRS += libpostproc
 endif
-SUBDIRS += libvevo libgoom libvje libsample libvjnet libyuv libel libstream liblavjpeg libsamplerec
+SUBDIRS += libvevo liblzo libgoom libvje libsample libvjnet libyuv libel libstream liblavjpeg libsamplerec
 SUBDIRS += veejay 
 #if USE_GVEEJAY
 #SUBDIRS += gveejay

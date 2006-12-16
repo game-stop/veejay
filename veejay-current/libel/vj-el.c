@@ -40,7 +40,7 @@
 #include <libvjmem/vjmem.h>
 #include <libyuv/yuvconv.h>
 #include <ffmpeg/avcodec.h>
-#include <libel/lzo.h>
+#include <liblzo/lzo.h>
 #include <math.h>
 #include <stdlib.h>
 #include <sys/types.h>

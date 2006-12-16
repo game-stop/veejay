@@ -40,7 +40,7 @@
 #include <quicktime.h>
 #include <lqt.h>
 #include <lqt/colormodels.h>
-#include <libel/lzo.h>
+#include <liblzo/lzo.h>
 #define QUICKTIME_MJPG_TAG 0x6d6a7067
 #endif
 

@@ -24,7 +24,7 @@
 #include <stdint.h>
 #include <string.h>
 #include <libyuv/yuvconv.h>
-#include <libel/lzo.h>
+#include <liblzo/lzo.h>
 #ifdef SUPPORT_READ_DV2
 #define __FALLBACK_LIBDV
 #include <libel/vj-dv.h>

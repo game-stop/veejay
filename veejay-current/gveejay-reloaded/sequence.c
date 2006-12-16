@@ -4,6 +4,8 @@
 #include <glib.h>
 #include <gdk/gdk.h>
 #include <sys/time.h>
+#include <liblzo/lzo.h>
+
 #define DATA_ERROR 0
 #define DATA_DONE 1
 #define RETRIEVING_DATA 2
@@ -18,6 +20,7 @@ typedef struct
 	vj_client *fd;
 	unsigned char status_buffer[100];
 	unsigned char *data_buffers[MAX_BUF];
+	uint8_t *compr_buffers[MAX_BUF];
 	int	data_status[MAX_BUF];
 	gint	frame_num;
 	gint	wframe_num;
@@ -34,6 +37,7 @@ typedef struct
 //	GMutex *serialize;
 	guchar *serialized[100];
 	int	sta[22];
+	void 	*lzo;
 } veejay_sequence_t;
 
 static unsigned long vj_get_timer()
@@ -260,13 +264,24 @@ static	int	veejay_get_image_data(veejay_sequence_t *v )
 		return 0;
 	}
 	gint bw = 0;
-
+/*
 	res = veejay_ipc_recv( v, 6, &bw, v->data_buffers[v->frame_num] );
 	if( res <= 0 )
 	{
 		veejay_msg(0, "Error receiving RGB24 image");
 		return 0;
+	}*/
+
+	res = veejay_ipc_recv( v, 6, &bw, v->compr_buffers[v->frame_num] );
+	if( res <= 0 )
+	{
+		veejay_msg(0, "Error receiving compressed RGB image");
+		return 0;
 	}
+
+	bw = lzo_decompress2( v->lzo, v->compr_buffers[v->frame_num], bw, v->data_buffers[v->frame_num]);
+
+	
 	return bw;
 }
 
@@ -498,8 +513,12 @@ void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_he
 	for( k = 0; k < MAX_BUF; k ++ )
 	{
 		v->data_buffers[k] = (guchar*) vj_calloc(sizeof(guchar) * max_width * max_height * 3 );
+		v->compr_buffers[k] = (guchar*) vj_calloc(sizeof(guchar) * max_width * max_height*3);
 		v->data_status[k] = DATA_ERROR;
 	}
+
+
+	
 	v->fd = vj_client_alloc(0,0,0);
 	if(!vj_client_connect( v->fd, v->hostname, NULL,v->port_num ) )
 	{
@@ -509,6 +528,7 @@ void	*veejay_sequence_init(int port, char *hostname, gint max_width, gint max_he
 		return NULL;
 	}
 
+	v->lzo = lzo_new();
 	v->time_out = 4500000; // Micro seconds
 	v->frame_num = 0;
 	v->wframe_num = 0;
@@ -547,8 +567,10 @@ void	veejay_sequence_free( void *data )
 	if( v->hostname )
 		free(v->hostname );
 	for( k = 0; k < MAX_BUF; k ++ )
+	{
 		free( v->data_buffers[k] );
-
+		free( v->compr_buffers[k] );
+	}
 	free(v);
 	v = NULL;
 }

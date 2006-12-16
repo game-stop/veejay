@@ -7178,9 +7178,9 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list ap 	)
 
 	if(!preview_active_) 
 	{
-		memset( &(cached_cycle_[0]) , 0, sizeof(VJFrame) );
-		memset( &(cached_cycle_[1]) , 0, sizeof(VJFrame) );
-		memset( &(preview_template) , 0, sizeof( sws_template));
+		veejay_memset( &(cached_cycle_[0]) , 0, sizeof(VJFrame) );
+		veejay_memset( &(cached_cycle_[1]) , 0, sizeof(VJFrame) );
+		veejay_memset( &(preview_template) , 0, sizeof( sws_template));
 		preview_template.flags = 1;
 	//	veejay_msg(0, "%d %d", el->pixel_format, v->pixel_format);
 		vj_get_yuv_template( &(cached_cycle_[0]), el->video_width,el->video_height,el->pixel_format );	
@@ -7218,6 +7218,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list ap 	)
 }
 #else
 #ifdef USE_GDK_PIXBUF
+static void *lzo_ = NULL;
 void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -7228,30 +7229,29 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 
 	veejay_image_t *img = NULL;
 
+	if(!lzo_)
+		lzo_ = lzo_new();
+	
 	if( !cached_image_)
 	{
 		vj_perform_get_primary_frame( v, frame, 0);
-	//	vj_perform_get_primary_frame_420p( v, frame );
 		if( use_bw_preview_ )
-		img = vj_picture_save_bw_to_memory(
+			img = vj_picture_save_bw_to_memory(
 					frame,
 					v->edit_list->video_width,
 					v->edit_list->video_height,
 					args[0],
 					args[1],
-			(v->video_out == 4 ? 4 : v->pixel_format ));
+				(v->video_out == 4 ? 4 : v->pixel_format ));
 		else
-		img = vj_picture_save_to_memory(
+			img = vj_picture_save_to_memory(
 					frame,
 					v->edit_list->video_width,
 					v->edit_list->video_height,
 					args[0],
 					args[1],
-			(v->video_out == 4 ? 4 : v->pixel_format ));
+				(v->video_out == 4 ? 4 : v->pixel_format ));
 
-				//	pix_fmt );
-				//	v->edit_list->pixel_format );
-	 
 		cached_image_ = 1;
 		cached_gdkimage_ = img;
 	}
@@ -7276,41 +7276,40 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 			h = v->edit_list->video_height;
 		}
 
+		uint8_t *tmpbuf = vj_malloc( (w * h * 3) + 1024 );
+		
 		unsigned char *msg = gdk_pixbuf_get_pixels( p );
-	//	unsigned char *con = (unsigned char*) vj_malloc(sizeof(unsigned char)  * 6 + (w * h * 3 ));
-	//	sprintf(con, "%06d", (w * h * 3));
-	//	veejay_memcpy( con + 6 , msg , (w * h * 3 ));
-	//	vj_server_send(v->vjs[0], v->uc->current_link, con, 6 + (w*h*3));
-	//	if(con) free(con);
-		char header[7];
+
+		int size1 = 0;
+		if ( lzo_compress( lzo_, msg, tmpbuf, &size1, (w*h*3)) == 0)
+		{
+			veejay_msg(0, "Unable to compress preview image");
+			SEND_MSG( v, "000000" );
+		}
+		else
+		{
+			char header[7];
+			sprintf(header, "%06d", size1);
+			vj_server_send( v->vjs[0], v->uc->current_link, header, 6 );
+			vj_server_send( v->vjs[0], v->uc->current_link, tmpbuf, size1 );
+		}
+		
+		free(tmpbuf);
+	/*	char header[7];
 		sprintf( header, "%06d", (w*h*3));
 		vj_server_send( v->vjs[0], v->uc->current_link,
 					header, 6 );
+
 		vj_server_send( v->vjs[0], v->uc->current_link,
-					msg, (w*h*3));	
+					msg, (w*h*3));	*/
+
 		
-	/*	if(img->image )
-			gdk_pixbuf_unref( (GdkPixbuf*) img->image );
-		if(img->scaled_image)
-			gdk_pixbuf_unref( (GdkPixbuf*) img->scaled_image );
-		if(img)
-			free(img); */
-	/*	if( cached_gdkimage_ )
-		{
-			if( cached_gdkimage_->image )
-				gdk_pixbuf_unref( (GdkPixbuf*) cached_gdkimage_->image );
-			if( cached_gdkimage_->scaled_image )
-				gdk_pixbuf_unref( (GdkPixbuf*) cached_gdkimage_->scaled_image );
-			free( cached_gdkimage_ );
-			cached_gdkimage_ = NULL;
-		}*/	
+		
 	}
 	else
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to get image");
-		char empty[6];
-		bzero(empty, 6 );
-		SEND_MSG( v, empty );
+		SEND_MSG( v, "000000" );
 	}
 }
 #endif
