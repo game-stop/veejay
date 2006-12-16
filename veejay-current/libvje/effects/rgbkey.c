@@ -199,29 +199,18 @@ void rgbkey_apply1(VJFrame *frame, VJFrame *frame2, int width,
 
 	    // convert suppressed fg back to cbcr 
 		// cb,cr are signed, go back to unsigned !
-	    val = ((x1 * (cb-128)) - (y1 * (cr-128))) >> 7;
-
-	    Cb[pos] = val;
-
-	    val = ((x1 * (cr-128)) - (y1 * (cb-128))) >> 7;
-	    Cr[pos] = val;
+	    Cb[pos] = ((x1 * (cb-128)) - (y1 * (cr-128))) >> 7;
+	    Cr[pos] = ((x1 * (cr-128)) - (y1 * (cb-128))) >> 7;
 
 	    // deal with noise 
-
 	    val = (yy * yy) + (kg * kg);
 	    if (val < (noise_level * noise_level)) {
 		kbg = 255;
 	    }
 
-	    val = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-	    Y[pos] = CLAMP_Y(val);
-
-	    val = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
-	    Cb[pos] = CLAMP_UV(val);
-
-	    val = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
-	    Cr[pos] = CLAMP_UV(val);
-		
+	    Y[pos] = (Y[pos] + (kbg * bg_y[pos])) >> 8;
+	    Cb[pos] = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
+	    Cr[pos] = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
 	}
     }
 }
@@ -332,12 +321,8 @@ void rgbkey_apply2(VJFrame *frame, VJFrame *frame2, int width,
 
 	    /* convert suppressed fg back to cbcr */
 
-	    val = ((x1 * (cb-128)) - (y1 * (cr-128))) >> 7;
-
-	    Cb[pos] = val;
-
-	    val = ((x1 * (cr-128)) - (y1 * (cb-128))) >> 7;
-	    Cr[pos] = val;
+	    Cb[pos] = ((x1 * (cb-128)) - (y1 * (cr-128))) >> 7;
+	    Cr[pos] = ((x1 * (cr-128)) - (y1 * (cb-128))) >> 7;
 
 	    /* deal with noise */
 
@@ -347,14 +332,9 @@ void rgbkey_apply2(VJFrame *frame, VJFrame *frame2, int width,
 		kbg = 255;
 	    }
 
-	    val = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-	    Y[pos] = CLAMP_Y(val);
-
-	    val = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
-	    Cb[pos] = CLAMP_UV(val);
-
-	    val = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
-	    Cr[pos] = CLAMP_UV(val);
+	    Y[pos] = (Y[pos] + (kbg * bg_y[pos])) >> 8;
+	    Cb[pos] = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
+	    Cr[pos] = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
 	}
     }
 }

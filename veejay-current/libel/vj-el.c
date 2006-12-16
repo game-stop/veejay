@@ -1860,8 +1860,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
  
 	
 	est_len = nnf * 1024;
-	result = (char*) vj_malloc(sizeof(char) * est_len );
-	bzero( result, est_len );
+	result = (char*) vj_calloc(sizeof(char) * est_len );
 	sprintf(result, "%04d",nnf );
 
 	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
@@ -1870,8 +1869,6 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 		{
 			char filename[400];
 			char fourcc[6];
-			bzero(filename,400);
-			bzero(fourcc,6);
 			sprintf(fourcc, "%s", "????");
 			vj_el_get_file_fourcc( el, j, fourcc );
 			sprintf(filename ,"%03d%s%04d%010ld%02d%s",
@@ -1889,7 +1886,6 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	}
 
 	char first[33];
-	bzero(first,33);
 	sprintf(first, "%016lld%016lld",oldfile, oldframe);
 	strncat( result, first, strlen(first) );
 
@@ -1900,8 +1896,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 			N_EL_FRAME(n) != oldframe + 1 )	
 		{
 			int len = 20 + (16 * 3 ) + strlen( el->video_file_list[ index[N_EL_FILE(n)] ] );
-			char *tmp = (char*) vj_malloc(sizeof(char) * len );
-			bzero(tmp,len);	
+			char *tmp = (char*) vj_calloc(sizeof(char) * len );
 			sprintf( tmp, "%016lld%016lld%016lld",
 				 oldframe,
 				 index[N_EL_FILE(n)],

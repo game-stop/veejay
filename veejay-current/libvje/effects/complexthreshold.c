@@ -239,18 +239,12 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
 		val = (tmp1 * kfgy_scale) >> 4;
 		if (val > 0xff)
 		    val = 0xff;
-		val = fg_y[pos] - val;
 
-		Y[pos] = val;
-
+		Y[pos] = fg_y[pos] - val;
 		/* convert suppressed fg back to cbcr */
+		Cb[pos] = ((x1 * cb) - (y1 * cr)) >> 7;
+		Cr[pos] = ((x1 * cr) - (y1 * cb)) >> 7;
 
-		val = ((x1 * cb) - (y1 * cr)) >> 7;
-
-		Cb[pos] = val;
-
-		val = ((x1 * cr) - (y1 * cb)) >> 7;
-		Cr[pos] = val;
 		val = (yy * yy) + (kg * kg);
 		if (val > 0xff)
 		    val = 0xff;
@@ -258,14 +252,14 @@ void complexthreshold_apply(VJFrame *frame, VJFrame *frame2, int width,
 		    kbg = 255;
 		}
 
-		val = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-		Y[pos] = CLAMP_Y(val);
+		Y[pos] = (Y[pos] + (kbg * bg_y[pos])) >> 8;
+	//	Y[pos] = CLAMP_Y(val);
 
-		val = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
-		Cb[pos] = CLAMP_UV(val);
+		Cb[pos] = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
+	//	Cb[pos] = CLAMP_UV(val);
 
-		val = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
-		Cr[pos] = CLAMP_UV(val);
+		Cr[pos] = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
+	//	Cr[pos] = CLAMP_UV(val);
 	    }
 	}
     }

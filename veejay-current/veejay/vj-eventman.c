@@ -217,18 +217,13 @@ static vevo_port_t	*_new_event(
 
 	va_list ap;
 	va_start(ap, flags);
-#ifdef STRICT_CHECKING
 	veejay_msg(VEEJAY_MSG_DEBUG,
 	  "VIMS %03d: '%s' '%s' %d arguments", vims_id, name, format, n_arg );
-#endif
 
 	for( n = 0; n < n_arg ; n ++)
 	{
 		int dd   = 0;
 		char *ds = NULL;
-		bzero( param_name, 16 );
-		bzero( descr_name, 255 );
-
 
 		sprintf(param_name, "argument_%d", n );
 		const char *arg = va_arg( ap, const char*);

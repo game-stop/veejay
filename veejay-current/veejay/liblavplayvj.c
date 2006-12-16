@@ -771,7 +771,7 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 	int id = vj_tag_new(type, filename, index, info->current_edit_list, info->pixel_format, channel, palette);
 
 	char descr[200];
-	bzero(descr,200);
+	veejay_memset(descr,0,200);
 	vj_tag_get_by_type(type,descr);
 	if(id > 0 )
 	{
@@ -2596,8 +2596,8 @@ veejay_t *veejay_malloc()
     info->uc->sample_end = -1;
     info->net = 1;
 
-    bzero(info->action_file,256); 
-    bzero(info->stream_outname,256);
+    veejay_memset(info->action_file,0,256); 
+    veejay_memset(info->stream_outname,0,256);
 
     for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++)
 		info->effect_info->tmp[i] = 0;
