@@ -20,11 +20,11 @@
 #include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <libel/lzoconf.h>
+#include <liblzo/lzoconf.h>
 #include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-common.h>
-#include <libel/minilzo.h>
+#include <liblzo/minilzo.h>
 
 typedef struct
 {
