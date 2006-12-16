@@ -44,6 +44,7 @@ endif
 
 libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libhash / -lhash \
+			-L$(top_builddir)/liblzo / -lminilzo \
 			-L$(top_builddir)/bio2jack/ -lbio2jack \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
 			-L$(top_builddir)/libvjmem/ -lvjmem \
@@ -56,7 +57,6 @@ libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/liblavjpeg -llavjpeg \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
 			-L$(top_builddir)/libvevo -lvevo \
-			-L$(top_builddir)/liblzo -llzo \
 			-L$(top_builddir)/libgoom -lgoom 
 
 libveejay_la_LDFLAGS +=	${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} ${FT_LDFLAGS} ${FT_LIBS} \
@@ -78,5 +78,5 @@ bin_PROGRAMS = $(VEEJAY_BIN)
 veejay_headers = vims.h
 
 veejay_SOURCES	= veejay.c ${veejay_headers} 
-veejay_LDADD 	= libveejay.la @LIBGETOPT_LIB@ 
+veejay_LDADD 	= libveejay.la @LIBGETOPT_LIB@
 
