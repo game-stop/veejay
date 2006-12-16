@@ -1092,33 +1092,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	
 	tag->encoder =  vj_avcodec_start( _tag_info->edit_list , format );
 	if(!tag->encoder)
-	{
-		char *codecname = vj_avcodec_get_codec_name( format );
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize %s",
-				codecname );
-		free(codecname);
 		return 0;
-	}
-
-	tag->encoder_file = lav_open_output_file(
-			tag->encoder_destination,
-			cformat,
-			_tag_info->edit_list->video_width,
-			_tag_info->edit_list->video_height,
-			_tag_info->edit_list->video_inter,
-			_tag_info->edit_list->video_fps,
-			0,
-			0,
-			0
-		);
-
-
-	if(!tag->encoder_file)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Cannot write to %s (%s)",tag->encoder_destination,
-		lav_strerror());
-		return 0;
-	}
 
 	tag->encoder_active = 1;
 	tag->encoder_format = format;
@@ -1148,7 +1122,36 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		tag->encoder_duration = tag->encoder_duration - tag->encoder_num_frames;
 	}
 
-	veejay_msg(VEEJAY_MSG_INFO, "Encoding to %s file [%s] %ldx%ld@%2.2f %d/%d/%d >%09ld<",
+	if( sufficient_space( tag->encoder_max_size, tag->encoder_num_frames ) == 0 )
+	{
+		vj_avcodec_close_encoder(tag->encoder );
+		tag->encoder_active = 0;
+		return 0;
+	}
+
+	
+	tag->encoder_file = lav_open_output_file(
+			tag->encoder_destination,
+			cformat,
+			_tag_info->edit_list->video_width,
+			_tag_info->edit_list->video_height,
+			_tag_info->edit_list->video_inter,
+			_tag_info->edit_list->video_fps,
+			0,
+			0,
+			0
+		);
+
+
+	if(!tag->encoder_file)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Cannot write to %s (%s)",tag->encoder_destination,
+		lav_strerror());
+		vj_avcodec_close_encoder( tag->encoder );
+		return 0;
+	}
+	else
+		veejay_msg(VEEJAY_MSG_INFO, "Recording to %s file [%s] %ldx%ld@%2.2f %d/%d/%d >%09ld<",
 		    descr,
 		    tag->encoder_destination, 
 		    _tag_info->edit_list->video_width,
@@ -1165,7 +1168,6 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	tag->encoder_height = _tag_info->edit_list->video_height;
 	
 	return vj_tag_update(tag,sample_id);
-//	return 1;
 }
 
 

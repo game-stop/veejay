@@ -145,41 +145,9 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
                 break;
 	}
 
-	si->encoder_file = (void*)lav_open_output_file(si->encoder_destination,cformat,
-		el->video_width,el->video_height,el->video_inter,
-		el->video_fps,0,0,0);
-//	if(si->encoder_file)
-	veejay_msg(VEEJAY_MSG_INFO, "Encoding to %s file [%s] %dx%d@%2.2f %d/%d/%d %s >%09d< f=%c",
-	    descr,
-	    si->encoder_destination, 
-	    el->video_width,
-	    el->video_height,
-	    (float) el->video_fps,
-	    el->audio_bits,
-	    el->audio_chans,
-	    el->audio_rate,
-		(el->video_inter == 1 ? "Deinterlaced" : "Interlaced"),
-		( si->encoder_duration - si->encoder_total_frames),
-		cformat );
-	
-
-	if(!si->encoder_file)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Cannot write to %s (%s)",si->encoder_destination,
-		lav_strerror());
-		return -1;
-	}
-
 	si->encoder = vj_avcodec_start( el, format );
 	if(!si->encoder)
-	{
-		char *codecname = vj_avcodec_get_codec_name(format);
-		
-		veejay_msg(VEEJAY_MSG_ERROR,"Cannot initialize '%s'",
-				codecname );
-		free(codecname);
 		return -1;
-	}
 
 
 	si->encoder_active = 1;
@@ -217,7 +185,43 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 	si->encoder_width = el->video_width;
 	si->encoder_height = el->video_height;
 
+
+	if( sufficient_space( si->encoder_max_size, nframes ) == 0 )
+	{
+		vj_avcodec_close_encoder( si->encoder );
+		si->encoder = NULL;
+		si->encoder_active = 0;
+		return -1;
+	}
+
+	si->encoder_file = (void*)lav_open_output_file(si->encoder_destination,cformat,
+			el->video_width,el->video_height,el->video_inter,
+			el->video_fps,0,0,0);
+		
+	if(!si->encoder_file)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Cannot write to %s (%s)",si->encoder_destination,
+		lav_strerror());
+		vj_avcodec_close_encoder( si->encoder );
+		si->encoder = NULL;
+		return -1;
+	}
+
 	
+	veejay_msg(VEEJAY_MSG_INFO, "Encoding to %s file [%s] %dx%d@%2.2f %d/%d/%d %s >%09d< f=%c",
+	    descr,
+	    si->encoder_destination, 
+	    el->video_width,
+	    el->video_height,
+	    (float) el->video_fps,
+	    el->audio_bits,
+	    el->audio_chans,
+	    el->audio_rate,
+		(el->video_inter == 1 ? "Deinterlaced" : "Interlaced"),
+		( si->encoder_duration - si->encoder_total_frames),
+		cformat );
+	
+
 	sample_update(si,sample_id);
 	return 0;
 }

@@ -578,6 +578,7 @@ int unlock_mem( uint8_t *addr, size_t size)
 	return ( munlock(addr,size) );
 }
 */
+static	char ppm_path[1024];
 
 int vj_perform_init(veejay_t * info)
 {
@@ -626,6 +627,8 @@ int vj_perform_init(veejay_t * info)
 	(ycbcr_frame**) vj_malloc(sizeof(ycbcr_frame*) * 2 );
     if(!video_output_buffer)
 	return 0;
+
+    veejay_memset( ppm_path,0,sizeof(ppm_path));
 
     for(c=0; c < 2; c ++ )
 	{
@@ -3147,3 +3150,80 @@ int	vj_perform_rand_update(veejay_t *info)
 	}
 	return 0;	
 }
+
+
+int	vj_perform_register_ppm_dir( veejay_t *info , const char *path )
+{
+	switch(info->uc->playback_mode)
+	{
+		case VJ_PLAYBACK_MODE_PLAIN:
+			sprintf(ppm_path, "%s/plain-video/", path); break;
+		case VJ_PLAYBACK_MODE_SAMPLE:
+			sprintf(ppm_path, "%s/sample-%04d",path, info->uc->sample_id ); break;
+		case VJ_PLAYBACK_MODE_TAG:
+			sprintf(ppm_path, "%s/stream-%04d",path, info->uc->sample_id ); break;
+		default:
+			break;
+	}
+
+	int n = mkdir ( ppm_path, 0777 );
+	if( n == -1)
+	{
+		veejay_msg(0, "Unable to create directory '%s'", ppm_path );
+		return 0;
+	}
+	
+	return 1;
+}
+
+
+int	vj_perform_dump_ppm( veejay_t *info)
+{
+	char filename[256];
+	char buf[100];
+	sprintf(filename, "%s/frame-%06d.ppm", ppm_path, info->settings->current_frame_num );
+		
+	FILE *fd = fopen( filename, "wb" );
+	if(!fd)
+	{
+		veejay_msg(0, "Cannot open '%s' for writing");
+		return NULL;
+	}
+
+	
+	uint8_t *ppm_buf = vj_malloc(
+			info->effect_frame1->width *
+			info->effect_frame2->height * 3 );
+
+	sprintf(buf, "P6 %d %d 255\n",
+			info->effect_frame1->width,
+			info->effect_frame2->height );
+	
+	AVPicture p1,p2;
+	veejay_memset( &p1,0,sizeof(AVPicture));
+	veejay_memset( &p2,0,sizeof(AVPicture));
+
+	p2.data[0] = ppm_buf;
+	p2.linesize[0] = info->effect_frame1->width * 3;
+	p1.data[0] = primary_buffer[0]->Y;
+	p1.data[1] = primary_buffer[1]->Cb;
+	p1.data[2] = primary_buffer[2]->Cr;
+	p1.linesize[0] = info->effect_frame1->width;
+	p1.linesize[1] = info->effect_frame1->width >> info->effect_frame1->shift_v;
+	p1.linesize[2] = info->effect_frame1->width >> info->effect_frame1->shift_v;
+	
+	int in_pix = get_ffmpeg_pixfmt( info->pixel_format );
+	
+	if(!img_convert( &p1, PIX_FMT_RGB24, &p2, in_pix,
+				info->effect_frame1->width,
+				info->effect_frame2->height ))
+	{
+		fwrite( buf,     strlen(buf), 1 , fd );
+		fwrite( ppm_buf, info->effect_frame1->width * info->effect_frame1->height * 3,1,fd );
+	}
+
+	fclose( fd );
+	free( ppm_buf );
+	
+}
+

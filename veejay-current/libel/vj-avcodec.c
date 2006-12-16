@@ -162,7 +162,6 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 	}
 
 	e->len = el->video_width * el->video_height;
-	veejay_msg(0, "PIXEL FORMAT %d", el->pixel_format );
 
 	if(el->pixel_format == FMT_422 || el->pixel_format == FMT_422F)
 		e->uv_len = e->len / 2;
@@ -197,7 +196,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 	return e;
 }
 
-static	void		vj_avcodec_close_encoder( vj_encoder *av )
+void		vj_avcodec_close_encoder( vj_encoder *av )
 {
 	if(av)
 	{
@@ -220,7 +219,7 @@ static	void		vj_avcodec_close_encoder( vj_encoder *av )
 	av = NULL;
 }
 
-static int		vj_avcodec_find_codec( int encoder )
+int		vj_avcodec_find_codec( int encoder )
 {
 	switch( encoder)
 	{
@@ -240,8 +239,8 @@ static int		vj_avcodec_find_codec( int encoder )
 			return CODEC_ID_MSMPEG4V3;
 		case ENCODER_LZO:
 			return 900;
-			break;
 		default:
+			veejay_msg(VEEJAY_MSG_DEBUG, "Unknown format %d selected", encoder );
 			return 0;
 	}
 	return 0;

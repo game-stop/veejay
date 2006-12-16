@@ -251,3 +251,28 @@ int	available_diskspace(void)
 	}
 	return 1;
 }
+
+
+int	sufficient_space(int max_size, int nframes)
+{
+	const char *point = ".";
+	struct statfs s;
+	veejay_memset(&s, 0, sizeof(struct statfs));
+	if(statfs(point,&s) != 0)
+		return 0;
+
+	long needed = (max_size * nframes) + 2048;
+	long avail  = s.f_bfree;
+	
+	if(needed > avail )
+	{
+		double shortage = (double)(needed-avail)/1048576.0;
+		veejay_msg(VEEJAY_MSG_ERROR,
+				"Insufficient diskspace, I need an additional amount of %2.2g Mb", shortage);
+		return 0;
+	}
+	veejay_msg(VEEJAY_MSG_INFO, "%2.2f MB available, need %2.2g",
+			(float)(avail)/1048576.0, (float)(needed)/1048576.0);
+	return 1;
+}
+

@@ -2185,13 +2185,6 @@ void vj_event_init()
 	vj_event_init_keyboard_defaults();
 }
 
-void	vj_event_stop()
-{
-	// destroy bundlehash, destroy keyboard_events
-	del_all_keyb_events();
-
-	vj_event_vevo_free();
-}
 void vj_event_linkclose(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -8592,3 +8585,14 @@ void	vj_event_sample_sequencer_active(	void *ptr, 	const char format[],	va_list 
 }
 
 
+
+
+void	vj_event_stop()
+{
+	// destroy bundlehash, destroy keyboard_events
+	del_all_keyb_events();
+
+	vj_event_vevo_free();
+
+	lzo_free( lzo_ );
+}
