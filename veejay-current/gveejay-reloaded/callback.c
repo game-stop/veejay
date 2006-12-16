@@ -2689,7 +2689,6 @@ static	void	srt_load_subtitle(int sid)
 	update_spin_range( "spin_text_start",0, get_total_frames(),s1);
 	update_spin_range( "spin_text_end",0, get_total_frames(),s2);
 
-
 	veejay_msg(0, "x=%d,y=%d, font=%d,size=%d,bg=[%d,%d,%d,%d]",
 		x,y,font,size,bg[0],bg[1],bg[2],bg[3] );
 	veejay_msg(0, "fg=[%d,%d,%d,%d], ln=[%d,%d,%d,%d]",
@@ -2804,7 +2803,7 @@ void	on_button_text_new_clicked( GtkWidget *w, gpointer data )
 	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", use_border, outline,0,0,0 );	
 */	
 	free(text);
-	srt_load_subtitle( srt_seq_ );
+//	srt_load_subtitle( srt_seq_ );
 	
 	info->uc.reload_hint[HINT_HISTORY] = 1;
 }

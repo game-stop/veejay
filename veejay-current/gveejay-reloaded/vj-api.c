@@ -5321,7 +5321,7 @@ static	void	reload_fontlist()
 		free(seq_str);
 		i += (slen + 3);
 	}
-	gtk_combo_box_set_active( GTK_COMBO_BOX(box), 0 );
+//	gtk_combo_box_set_active( GTK_COMBO_BOX(box), 0 );
 
 	free(srts);
 

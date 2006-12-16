@@ -1564,6 +1564,17 @@ void		vj_init_vevo_events(void)
 				0,
 				VIMS_ALLOW_ANY ,
 				NULL );
+
+	index_map_[VIMS_AUDIO_ENABLE]				=	_new_event(
+				NULL,
+				VIMS_AUDIO_DISABLE,
+				"Enable audio playback",
+				vj_event_enable_audio,
+				0,
+				VIMS_ALLOW_ANY ,
+				NULL );
+
+	
 	index_map_[VIMS_EDITLIST_PASTE_AT]			=	_new_event(
 				"%d",
 				VIMS_EDITLIST_PASTE_AT,
