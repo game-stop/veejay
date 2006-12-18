@@ -64,7 +64,37 @@ void vj_sdl_set_geometry(vj_sdl* sdl, int w, int h)
 {
 	sdl->custom_geo[0] = w;
 	sdl->custom_geo[1] = h;
+	if (sdl->custom_geo[0] != -1 && sdl->custom_geo[1]!=-1)
+       	{
+        	char exp_str[100];
+		sprintf(exp_str, "SDL_VIDEO_WINDOW_POS=%d,%d",sdl->custom_geo[0],
+			sdl->custom_geo[1]);
+	 	if(putenv(exp_str)==0)
+			veejay_msg(VEEJAY_MSG_DEBUG,"SDL geometry %d , %d",
+				sdl->custom_geo[0],sdl->custom_geo[1]);
+	}
 
+}
+
+void vj_sdl_resize( vj_sdl *vjsdl , int scaled_width, int scaled_height, int fs )
+{
+	if (scaled_width)
+		vjsdl->sw_scale_width = scaled_width;
+	if (scaled_height)
+		vjsdl->sw_scale_height = scaled_height;
+
+	int my_bpp = SDL_VideoModeOK( vjsdl->sw_scale_width, vjsdl->sw_scale_height,24,	
+				vjsdl->flags[fs] );
+	if(!my_bpp)
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Requested depth not supported");
+		return;
+	}
+
+	vjsdl->screen = SDL_SetVideoMode( vjsdl->sw_scale_width, vjsdl->sw_scale_height,my_bpp,
+				vjsdl->flags[fs]);
+	veejay_msg(VEEJAY_MSG_INFO, "Changed video window to size %d x %d",
+			scaled_width,scaled_height);
 }
 
 
@@ -147,7 +177,7 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 			( info->blit_sw ? "Yes" : "No" ) );
 	veejay_msg(VEEJAY_MSG_DEBUG, " Video memory: %dKB ", info->video_mem );
 	veejay_msg(VEEJAY_MSG_DEBUG, " Preferred depth: %d bits/pixel", info->vfmt->BitsPerPixel);
-
+ 
 	int my_bpp = SDL_VideoModeOK( vjsdl->sw_scale_width, vjsdl->sw_scale_height,bpp,	
 				vjsdl->flags[fs] );
 	if(!my_bpp)

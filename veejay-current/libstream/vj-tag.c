@@ -1624,6 +1624,10 @@ int vj_tag_disable(int t1) {
 	{
 		net_thread_stop( tag );
 	}
+	if(tag->source_type == VJ_TAG_TYPE_V4L )
+	{
+		vj_unicap_stop_capture( vj_tag_input->unicap[ tag->index] );
+	}
 #ifdef USE_GDK_PIXBUF
 	if(tag->source_type == VJ_TAG_TYPE_PICTURE )
 	{
@@ -1705,11 +1709,8 @@ int vj_tag_set_active(int t1, int active)
 	return -1;
 
     if(active == tag->active)
-    {
-	    veejay_msg(0, "Tag already %s", active ? "On" : "Off" );
 	    return 1;
- 	}
-    veejay_msg(0, "%s: %d, active=%d", __FUNCTION__, tag->source_type, active );
+ 	
     switch (tag->source_type) {
 	   case VJ_TAG_TYPE_V4L:
 		if(active)

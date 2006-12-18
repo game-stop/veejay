@@ -576,11 +576,8 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
 	{
 		int cur_id = info->uc->sample_id;
-		int type = vj_tag_get_type( cur_id );
-		if( (type == VJ_TAG_TYPE_NET||type==VJ_TAG_TYPE_PICTURE||type==VJ_TAG_TYPE_V4L) && cur_id != sample_id )
-		{
+		if( cur_id != sample_id )
 			vj_tag_disable(cur_id);
-		}	
 	}
 
 	if(new_pm == VJ_PLAYBACK_MODE_PLAIN )

@@ -2745,14 +2745,10 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 
 void vj_event_set_screen_size(void *ptr, const char format[], va_list ap) 
 {
-	static int my_display = 0;
 	int args[5];
 	veejay_t *v = (veejay_t*) ptr;
 	char *s = NULL;
 
-	if( my_display == 0 )
-		my_display = v->video_out;
-	
 	P_A(args,s,format,ap);
 
 	int id = 0;
@@ -2761,75 +2757,81 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
         int x  = args[2];
         int y  = args[3];
 
-	// multiple sdl screen needs fixing
-	const char *title = "Veejay";
-
 	if( w < 0 || w > 4096 || h < 0 || h > 4096 || x < 0 || y < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid arguments '%d %d %d %d'", w,h,x,y );
 		return;
 	}
 
-	if( v->video_out == 4 )
+	if( w == 0 && h == 0 )
 	{
-#ifdef USE_GL
-		if( w > 0 && h > 0 )
-			x_display_resize(w,h,w,h);	
-#endif
-	}
-	else if( v->video_out == 0 )
-	{
-#ifdef HAVE_SDL
-		if( w == 0 && h == 0)
+		switch( v->video_out )
 		{
-			/* close sdl window , set dummy driver*/
-			if( v->sdl[id] )
-			{
-				vj_sdl_free( v->sdl[id] );
-				free(v->sdl[id]);
-				v->sdl[id] = NULL;
-				v->video_out = 5;
-				vj_sdl_quit();
-				veejay_msg(VEEJAY_MSG_INFO, "Closed SDL Video window");
-				return;
-			}
-		}
-
-		if( v->sdl[id] && x > 0 && y > 0 )
-			vj_sdl_set_geometry(v->sdl[id],x,y);
-#endif
-	}
-	else if (v->video_out == 5 )
-	{
-		switch(my_display) {
 			case 0:
-#ifdef HAVE_SDL
-				if(v->sdl[id]==NULL)	
+				if( v->sdl[id] )
 				{
-					v->sdl[id] = vj_sdl_allocate( v->video_output_width,
-					      v->video_output_height,
-					      v->pixel_format );
+					vj_sdl_free( v->sdl[id] );
+					free(v->sdl[id]);
+					v->sdl[id] = NULL;
+					v->video_out = 5;
+					vj_sdl_quit();
+					veejay_msg(VEEJAY_MSG_INFO, "Closed SDL window");
+					return;
 				}
-				if(vj_sdl_init( v->settings->ncpu,
-					v->sdl[id],
-					w,
-					h,
-					title,
-					1,
-					v->settings->full_screen )
-				) {
+				break;
+			case 4:
+				veejay_msg(VEEJAY_MSG_INFO, "Not yet implemented!");
+				return;
+				break;
+			case 5:
+				break;
+		}
+	}
+	else
+	{
+		char *title = veejay_title();
+		
+		switch( v->video_out )
+		{
+			case 5:
+				if(!v->sdl[id] )
+				{
+					v->sdl[id] = vj_sdl_allocate( 
+						v->video_output_width,
+					 	v->video_output_height,
+					 	v->pixel_format );
+					veejay_msg(VEEJAY_MSG_INFO, "Allocated SDL window");
+				
+					if(vj_sdl_init( v->settings->ncpu,
+						v->sdl[id],
+						w,
+						h,
+						title,
+						1,
+						v->settings->full_screen )
+					) {
 					veejay_msg(VEEJAY_MSG_INFO, "Opened SDL Video Window of size %d x %d", w, h );
-				}
-				else
-				{
 					v->video_out = 0;
-				}	
+					}
+				}
+			case 0:
+				
+				if( x > 0 && y > 0 )
+					vj_sdl_set_geometry(v->sdl[id],x,y);
+		
+				if( w > 0 && h > 0 )
+					vj_sdl_resize( v->sdl[id], w, h, v->settings->full_screen );
+				
+				break;
+		
+			case 4:
+#ifdef USE_GL
+				if( w > 0 && h > 0 )
+					x_display_resize(w,h,w,h);	
 #endif
 				break;
-			default:
-				break;
-
 		}
+		free(title);
 	}
 }
 

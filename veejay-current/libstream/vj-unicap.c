@@ -33,6 +33,11 @@
 #include <assert.h>
 #endif
 
+/* Using pthreads
+ *  the unicap_wait_buffer blocks until a frame is filled by the capture device.
+ *  In practice, it will block up to 40 ms when playing PAL at 25 fps. Meanwhile,
+ *  we must continue rendering.
+ */
 typedef struct
 {
 	unicap_handle_t handle;
@@ -40,7 +45,10 @@ typedef struct
 	unicap_format_t format_spec;
 	unicap_format_t format;
 	unicap_data_buffer_t buffer;
-	unicap_data_buffer_t *returned_buffer;
+	pthread_mutex_t	mutex;
+	pthread_t	thread;
+	uint8_t		*priv_buf;
+	int		state;
 	int	 deviceID;
 	int	 sizes[3];
 	int	active;
@@ -48,10 +56,11 @@ typedef struct
 	int	rgb;
 	int	pixfmt;
 	int	shift;
+	int	width;
+	int	height;
 	void	*sampler;
 	char 	*ctrl[16];
 	int	 option[16];
-
 } vj_unicap_t;
 
 
@@ -62,10 +71,24 @@ typedef struct
 	unicap_format_t format_spec;
 	unicap_format_t format;
 	unicap_data_buffer_t buffer;
-	unicap_data_buffer_t *returned_buffer;
 	void	*device_list;
 	int	 num_devices;
 } unicap_driver_t;
+
+static void	*unicap_reader_thread(void *data);
+
+
+static void lock_(vj_unicap_t *t)
+{
+        pthread_mutex_lock( &(t->mutex ));
+}
+
+static void unlock_(vj_unicap_t *t)
+{
+        pthread_mutex_unlock( &(t->mutex ));
+}
+
+
 
 static int	vj_unicap_scan_enumerate_devices(void *unicap)
 {
@@ -483,6 +506,8 @@ void	*vj_unicap_new_device( void *dud, int device_id )
 	memset(vut->ctrl, 0 , sizeof(char*) *16 );
 	memset(vut->option,0, sizeof(int) * 16 );
 	vut->deviceID = device_id;
+	unicap_void_format( &(vut->format));
+
 
 	if( !SUCCESS( unicap_enumerate_devices( NULL, &(vut->device), device_id ) ) )
 	{
@@ -496,6 +521,9 @@ void	*vj_unicap_new_device( void *dud, int device_id )
 		veejay_msg(0, "Failed to open capture device '%s'\n", vut->device.identifier );
 	}
 	veejay_msg(2, "Using device '%s'", vut->device.identifier);
+
+	unicap_lock_stream( &(vut->handle) );
+	
 	return (void*) vut;
 }
 static unsigned int
@@ -560,10 +588,12 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 	int i;
 	int j;
 	int found_native = 0;
-	for( i = 0;  SUCCESS( unicap_enumerate_formats( vut->handle, &(vut->format_spec), &(vut->format), i ) ); i ++ )
+
+	for( i = 0;  SUCCESS( unicap_enumerate_formats( vut->handle, NULL, &(vut->format), i ) ); i ++ )
 	{
 		if( fourcc == vut->format.fourcc )
 		{
+			veejay_msg(0, "Found native colorspace");
 	   	  found_native = 1;
 		  break;
 		}
@@ -574,7 +604,6 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 		vut->format.size.width = w;
 		vut->format.size.height = h;
 
-		veejay_msg(2, "Capture device supports '%s'", vut->format.identifier );
 		if (!SUCCESS(unicap_set_format( vut->handle, &(vut->format) )))
 		{
 			veejay_msg(0, "Unable to set video size %d x %d in format %s",
@@ -591,14 +620,14 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 		unsigned int rgb_fourcc = get_fourcc( "RGB4" );
 		unicap_format_t rgb_spec, rgb_format;
 		unicap_void_format( &rgb_spec);
-		veejay_msg(1, "Unable to select native pixel format, trying RGB32");
+		veejay_msg(2, "Capture device has no support for YUV");
 		
 		for( i = 0;
 	         	SUCCESS( unicap_enumerate_formats( vut->handle, &rgb_spec, &rgb_format, i ) ); i ++ )
 		{
 			if( rgb_fourcc == rgb_format.fourcc )
 			{
-				veejay_msg(0, "Camera can capture in RGB32");
+				veejay_msg(0, "Capture device supports RGBA, software conversion RGBA -> YUV enabled");
 				vut->rgb = 1;
 				rgb_format.size.width = w;
 				rgb_format.size.height = h;
@@ -608,63 +637,48 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 		
 		if(!vut->rgb)
 		{
-			veejay_msg(0, "No matching formats found. Camera not supported.");
+			veejay_msg(0, "No matching formats found. Capture device not supported.");
 			unicap_unlock_properties( vut->handle );
-
 			return 0;
 		}
 		else
 			if( !SUCCESS( unicap_set_format( vut->handle, &rgb_format ) ) )
 			{
-				veejay_msg(0, "Cannot set size %d x %d or format %s", w,h,rgb_format.identifier);
 				unicap_unlock_properties( vut->handle );
 				return 0;
 			}
 	}
 
 	unicap_format_t test;
-	memset(&test, 0,sizeof(unicap_format_t));
-	if(! SUCCESS( unicap_get_format( vut->handle, &test ) ) )
-	{
-		veejay_msg(0, "Failed to get video format");
-	}
-
-	veejay_msg(0, "Capture video from '%s' in %d x %d pixels, %d bpp using %s",
-		 vut->device.identifier,
-		 test.size.width,
-		 test.size.height,
-		 test.bpp,
-		 test.identifier );
+	unicap_void_format( &test);
 
 	if ( test.size.width != w || test.size.height != h ) 
 	{
-		veejay_msg(0, "Video size mismatch, retrying...");
 		vut->format.size.width = w;
 		vut->format.size.height = h;
 		if( !SUCCESS( unicap_set_format( vut->handle, &(vut->format) ) ) )
 		{
-			veejay_msg(0, "Cannot set size %d x %d or format %s", w,h,vut->format.identifier);
 			unicap_unlock_properties( vut->handle );
-
 			return 0;
 		}
-		veejay_msg(2, "Capture size set to %d x %d (%s)", w,h,vut->format.identifier);
-		
 	}
 	
-/*
-	char *comp = "Composite1";
-	if(vj_unicap_set_property( vut, "video source", VEVO_ATOM_TYPE_STRING, &comp ) )
-	{
-		veejay_msg(2, "Changed channel to Composite1");
-	}*/
-	veejay_msg(2,"Using %d bytes for device buffer",
-			test.size.width * test.size.height * 4 );
-			
-	vut->buffer.data = vj_malloc( test.size.width * test.size.height * 4 );
-	vut->buffer.buffer_size = (sizeof(unsigned char) * 4 * test.size.width * test.size.height );
 
+	veejay_memset(&(vut->buffer), 0, sizeof( unicap_data_buffer_t ) );
+	
+	vut->buffer.data = vj_malloc( w * h * 4 );
 
+	veejay_memset( vut->buffer.data , 0, vut->sizes[0]);
+	veejay_memset( vut->buffer.data + vut->sizes[0], 128, vut->sizes[1] );
+	veejay_memset( vut->buffer.data + vut->sizes[0] + vut->sizes[1] , 128, vut->sizes[2] );
+	
+	vut->buffer.buffer_size = (sizeof(unsigned char) * 4 * w * h );
+
+	vut->width = w;
+	vut->height = h;
+	
+	veejay_msg(2, "Capture device is using colorspace %s", vut->format.identifier );
+	
 	char **properties = vj_unicap_get_list( vut );
 	if(!properties)
 	{
@@ -706,7 +720,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 			{
 				veejay_msg(VEEJAY_MSG_DEBUG, "Norm = '%s' -> %d",
 						p.menu.menu_items[j], j );
-				if(  strncasecmp( p.menu.menu_items[j], "pal", 3  ) == 0 )
+				if(  strcasecmp( p.menu.menu_items[j], "pal"  ) == 0 )
 				{
 					vut->ctrl[UNICAP_PAL] = strdup(properties[i]);
 					vut->option[UNICAP_PAL] = j;
@@ -729,7 +743,45 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 	return 1;
 }
 
-int	vj_unicap_start_capture( void *vut )
+int		vj_unicap_start_capture( void *vut )
+{
+	vj_unicap_t *v = (vj_unicap_t*) vut;
+
+	v->state = 1;
+	v->priv_buf = (uint8_t*) vj_calloc( v->width * v->height * 4 );
+	veejay_memset( v->priv_buf , 0, v->sizes[0]);
+	veejay_memset( v->priv_buf + v->sizes[0], 128, v->sizes[1] );
+	veejay_memset( v->priv_buf + v->sizes[0] + v->sizes[1] , 128, v->sizes[2] );
+		
+	pthread_mutex_init( &(v->mutex), NULL );
+	
+	int err = pthread_create( &(v->thread), NULL,
+			unicap_reader_thread, vut );
+	if( err == 0 )
+		return 1;
+	v->state = 0;
+	veejay_msg(VEEJAY_MSG_ERROR,
+			"Unable to start capture thread");
+	return 0;
+}
+
+int		vj_unicap_stop_capture( void *vut )
+{
+	vj_unicap_t *v = (vj_unicap_t*) vut;
+
+
+	lock_(vut);
+	v->state = 0;
+	unlock_(vut);
+
+	pthread_mutex_destroy( &(v->mutex) );
+	return 1;
+}
+
+
+
+
+static int	vj_unicap_start_capture_( void *vut )
 {
 	vj_unicap_t *v = (vj_unicap_t*) vut;
 
@@ -738,6 +790,7 @@ int	vj_unicap_start_capture( void *vut )
       		veejay_msg( 0, "Failed to start capture on device: %s\n", v->device.identifier );
 		return 0;
      	}
+
 	if( !SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer)))) 
 	{
 		veejay_msg(0, "Failed to queue buffer on device");
@@ -748,7 +801,7 @@ int	vj_unicap_start_capture( void *vut )
 			v->device.identifier );
 	return 1;
 }
-
+/*
 int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const int height )
 {
 	vj_unicap_t *v = (vj_unicap_t*) vut;
@@ -756,17 +809,17 @@ int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const 
 
 	if(!v->active)
 		veejay_msg(VEEJAY_MSG_ERROR, "Capture not started!");
-  	
-	if( !SUCCESS( unicap_wait_buffer( v->handle, &(v->returned_buffer )) )) 
+ 
+	int buffers_ready = 0;
+	
+	if( !SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer)))) 
 	{
-		veejay_msg(0,"Failed to wait for buffer on device: %s\n", v->device.identifier );
-		unicap_unlock_properties( v->handle );
+		veejay_msg(0, "Failed to queue buffer on device");
 		return 0;
 	}
-	
-	if( !SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer) ) ) )
-   	{
-		veejay_msg( 0, "Failed to queue a buffer on device: %s\n", v->device.identifier );
+	if( !SUCCESS( unicap_wait_buffer( v->handle, &(v->buffer )) )) 
+	{
+		veejay_msg(0,"Failed to wait for buffer on device: %s\n", v->device.identifier );
 		unicap_unlock_properties( v->handle );
 		return 0;
 	}
@@ -797,12 +850,100 @@ int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const 
 			util_convertsrc( v->buffer.data, width,height,v->pixfmt,v->shift, buffer, v->rgb );
 		}
 	}	
+	
 	unicap_unlock_properties( v->handle );
+	return 1;
+}
+*/
+int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const int height )
+{
+	vj_unicap_t *v = (vj_unicap_t*) vut;
+	
+	lock_(vut);
+	
+	uint8_t *src[3] = {
+		v->priv_buf,
+		v->priv_buf + v->sizes[0],
+		v->priv_buf + v->sizes[0] + v->sizes[1] 
+	};
+	
+	veejay_memcpy( buffer[0], src[0], v->sizes[0] );
+	veejay_memcpy( buffer[1], src[1], v->sizes[1] );
+	veejay_memcpy( buffer[2], src[2], v->sizes[2]);
+
+	unlock_(vut);
+	
+	return 1;
+}
+
+int	vj_unicap_grab_a_frame( void *vut )
+{
+	vj_unicap_t *v = (vj_unicap_t*) vut;
+//	unicap_lock_properties( v->handle );
+
+	uint8_t *buffer[3] = 
+	{
+		v->priv_buf,
+		v->priv_buf + v->sizes[0],
+		v->priv_buf + v->sizes[0] + v->sizes[1] 
+	};
+	
+	if(!v->active)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Capture not started!");
+ 		return 0;
+	}
+		
+	if( !SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer)))) 
+	{
+		veejay_msg(0, "Failed to queue buffer on device");
+		return 0;
+	}
+	
+	if( !SUCCESS( unicap_wait_buffer( v->handle, &(v->buffer )) )) 
+	{
+		veejay_msg(0,"Failed to wait for buffer on device: %s\n", v->device.identifier );
+		unicap_unlock_properties( v->handle );
+		return 0;
+	}
+
+	lock_(vut);
+
+	if( v->deinterlace )
+	{
+		yuv_deinterlace(
+			buffer,
+			v->width,
+			v->height,
+			v->pixfmt,
+			v->shift,
+			v->buffer.data,
+			v->buffer.data + v->sizes[0],
+			v->buffer.data +v->sizes[0] + v->sizes[1]
+		);
+	}
+	else
+	{
+		if(!v->rgb)
+		{
+			veejay_memcpy( buffer[0], v->buffer.data, v->sizes[0] );
+			veejay_memcpy( buffer[1], v->buffer.data + v->sizes[0], v->sizes[1] );
+			veejay_memcpy( buffer[2], v->buffer.data + v->sizes[0] +v->sizes[1] , v->sizes[2]);
+		}
+		else
+		{
+			util_convertsrc( v->buffer.data,v->width,v->height,v->pixfmt,v->shift, buffer, v->rgb );
+		}
+	}	
+
+	unlock_(vut);
+	
+//	unicap_unlock_properties( v->handle );
 	return 1;
 }
 
 
-int	vj_unicap_stop_capture( void *vut )
+static int	vj_unicap_stop_capture_( void *vut )
 {
 	vj_unicap_t *v = (vj_unicap_t*) vut;
    	 
@@ -817,10 +958,38 @@ int	vj_unicap_stop_capture( void *vut )
 	return 1;
 }
 
+
+static void	*unicap_reader_thread(void *data)
+{
+	vj_unicap_t *v = (vj_unicap_t*) data;
+
+	if(! vj_unicap_start_capture_( data ) )
+		return NULL;
+
+
+
+	for( ;; )
+	{
+		if( v->state == 0 )
+			break;
+
+		vj_unicap_grab_a_frame( data );
+
+
+	}
+
+	vj_unicap_stop_capture_( data );
+	free(v->priv_buf);
+
+	return NULL;
+}
+
 void	vj_unicap_free_device( void *vut )
 {
 	vj_unicap_t *v = (vj_unicap_t*) vut;
    
+	unicap_unlock_stream( &(v->handle));
+	
 	if( v->active )
 		vj_unicap_stop_capture( vut );
 	
@@ -835,6 +1004,10 @@ void	vj_unicap_free_device( void *vut )
 		if(v->ctrl[i])
 			free(v->ctrl[i]);
 	}
+
+	free(v->buffer.data);
+
+
 	free( v );
 	v = NULL;
 }
