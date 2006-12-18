@@ -46,7 +46,7 @@ vj_effect *tracer_init(int w, int h)
 
 int 	tracer_malloc(int w, int h)
 {
-	trace_buffer[0] = (uint8_t *) vj_malloc(w * h * 3* sizeof(uint8_t));
+	trace_buffer[0] = (uint8_t *) vj_yuvalloc(w ,  h );
 	if(!trace_buffer[0]) return 0;
 	trace_buffer[1] = trace_buffer[0] + ( w * h );
 	trace_buffer[2] = trace_buffer[1] + ( w * h );

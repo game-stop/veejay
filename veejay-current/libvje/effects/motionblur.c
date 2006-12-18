@@ -42,7 +42,7 @@ vj_effect *motionblur_init(int width, int height)
 
 int motionblur_malloc(int width, int height)
 {
-	previous_frame[0] = (uint8_t*) vj_calloc( width * height * 3 * sizeof(uint8_t));
+	previous_frame[0] = (uint8_t*) vj_yuvalloc( width , height );
 	if(!previous_frame[0]) return 0;
 	previous_frame[1] = previous_frame[0] + (width * height);
 	previous_frame[2] = previous_frame[1] + (width  * height);

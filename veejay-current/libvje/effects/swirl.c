@@ -55,7 +55,7 @@ int swirl_malloc(int w, int h)
 	int w2=w/2;
 	int p = 0;
 
-	buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 3);
+	buf[0] = (uint8_t*) vj_yuvalloc( w , h );
 	if(!buf[0]) return 0;
 	buf[1] = buf[0] + (w * h);
 	buf[2] = buf[1] + (w * h);

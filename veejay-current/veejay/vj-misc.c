@@ -268,10 +268,10 @@ int	sufficient_space(int max_size, int nframes)
 	{
 		double shortage = (double)(needed-avail)/1048576.0;
 		veejay_msg(VEEJAY_MSG_ERROR,
-				"Insufficient diskspace, I need an additional amount of %2.2g Mb", shortage);
-		return 0;
+				"Insufficient diskspace, I need an additional amount of %5.3g Mb", shortage);
+		return 1;
 	}
-	veejay_msg(VEEJAY_MSG_INFO, "%2.2f MB available, need %2.2g",
+	veejay_msg(VEEJAY_MSG_INFO, "%2.2f MB available, need %5.3g",
 			(float)(avail)/1048576.0, (float)(needed)/1048576.0);
 	return 1;
 }

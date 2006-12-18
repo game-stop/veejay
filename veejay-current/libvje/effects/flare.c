@@ -59,7 +59,7 @@ static uint8_t *flare_buf[3];
 
 int	flare_malloc(int w, int h)
 {
-	flare_buf[0] = (uint8_t*)vj_calloc(sizeof(uint8_t) * w * h * 3 );
+	flare_buf[0] = (uint8_t*)vj_yuvalloc(w,h);
 	if(!flare_buf[0])
 		return 0;
 	flare_buf[1] = flare_buf[0] + (w*h);

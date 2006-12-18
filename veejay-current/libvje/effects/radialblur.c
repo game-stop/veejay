@@ -75,7 +75,7 @@ vj_effect *radialblur_init(int w,int h)
 
 int	radialblur_malloc(int w, int h)
 {
-	radial_src[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h * 3 );
+	radial_src[0] = (uint8_t*) vj_yuvalloc(w,h);
 	if(!radial_src[0]) return 0;
 	radial_src[1] = radial_src[0] + (w * h);
 	radial_src[2] = radial_src[1] + (w * h);

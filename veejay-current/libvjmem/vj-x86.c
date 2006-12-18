@@ -155,10 +155,20 @@ void	*vj_calloc( size_t size )
 {
 	void *ptr = vj_malloc( size );
 	if(ptr)
-		memset( ptr, 0, size );
+		veejay_memset( ptr, 0, size );
 	return ptr;	
 }
 
+
+void *vj_yuvalloc( unsigned int w, unsigned int h )
+{
+	size_t len = (w * h * 3);
+	void *ptr = vj_malloc( len );
+
+	veejay_memset( ptr, 0, (w*h));
+	veejay_memset( ptr + (w*h), 128, (w*h)*2);
+	return ptr;
+}
 
 
 

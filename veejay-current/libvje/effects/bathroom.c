@@ -56,7 +56,7 @@ vj_effect *bathroom_init(int width,int height)
 
 int bathroom_malloc(int width, int height)
 {
-    bathroom_frame[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height * 3);
+    bathroom_frame[0] = (uint8_t*)vj_yuvalloc( width, height );
     if(!bathroom_frame[0]) return 0;
   
     bathroom_frame[1] = bathroom_frame[0] + (width * height );

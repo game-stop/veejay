@@ -21,5 +21,6 @@ extern void *vj_malloc(unsigned int size);
 
 extern	void *vj_calloc(unsigned int size );
 
+extern void *vj_yuvalloc( unsigned int w, unsigned int h );
 
 #endif

@@ -49,7 +49,7 @@ vj_effect *complexsync_init(int width, int height)
 
 int complexsync_malloc(int width, int height)
 {
-   c_outofsync_buffer[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height * 3 );
+   c_outofsync_buffer[0] = (uint8_t*)vj_yuvalloc(width ,height );
    c_outofsync_buffer[1] = c_outofsync_buffer[0]  + (width * height );
    c_outofsync_buffer[2] = c_outofsync_buffer[1] + ( width * height );
    return 1;

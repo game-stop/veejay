@@ -69,6 +69,10 @@ int	chromascratcher_malloc(int w, int h)
     cframe[1] = cframe[0] + ( w * h * 25 );
     cframe[2] = cframe[1] + ( w * h * 25 );
 
+	veejay_memset( cframe[0], 0,  (w*h*25));
+	veejay_memset( cframe[1], 128,(w*h*25));
+	veejay_memset( cframe[2], 128,(w*h*25));
+    
     return 1;
 }
 

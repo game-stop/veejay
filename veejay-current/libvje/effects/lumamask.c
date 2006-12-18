@@ -60,7 +60,7 @@ vj_effect *lumamask_init(int width, int height)
 
 int lumamask_malloc(int width, int height)
 {
-   buf[0] = (uint8_t*)vj_calloc(sizeof(uint8_t)*width*height*3);
+   buf[0] = (uint8_t*)vj_yuvalloc(width,height);
    if(!buf[0]) return 0;
    buf[1] = buf[0] + (width *height);
    buf[2] = buf[1] + (width *height);

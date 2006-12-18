@@ -54,10 +54,8 @@ int sinoids_malloc(int width, int height)
    sinoids_X = (int*) vj_calloc(sizeof(int) * width);
   if(!sinoids_X) return 0;
 
-  sinoid_frame[0] = (uint8_t*)vj_calloc(sizeof(uint8_t) * 3 * height * width);
-
+  sinoid_frame[0] = (uint8_t*)vj_yuvalloc(width,height);
   if(!sinoid_frame[0]) return 0;
-
   sinoid_frame[1] = sinoid_frame[0] + (width * height);
   sinoid_frame[2] = sinoid_frame[1] + (width * height);
 

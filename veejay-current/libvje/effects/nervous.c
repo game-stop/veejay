@@ -53,12 +53,17 @@ vj_effect *nervous_init(int w, int h)
 
 int	nervous_malloc(int w, int h )
 {
-	nervous_buf[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h * N_MAX * 3);
+	nervous_buf[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * N_MAX * 3);
 
 	if(!nervous_buf[0]) return 0;
-	nervous_buf[1] = nervous_buf[0] + (w*h);
-	nervous_buf[2] = nervous_buf[1] + (w*h);
+	nervous_buf[1] = nervous_buf[0] + (w*h*N_MAX);
+	nervous_buf[2] = nervous_buf[1] + (w*h*N_MAX);
 	frames_elapsed = 0;
+
+	veejay_memset( nervous_buf[0], 0, (w*h) * N_MAX );
+	veejay_memset( nervous_buf[1], 128, (w*h) * N_MAX );
+	veejay_memset( nervous_buf[2], 128, (w*h) * N_MAX );
+	
 	return 1;
 }
 

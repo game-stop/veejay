@@ -73,11 +73,11 @@ int	ripple_malloc(int width, int height)
    int i;
     ripple_table = (double*) vj_malloc(sizeof(double) * width * height + 16);
     if(!ripple_table) return 0;
-    ripple_data[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * (width * height * 3) + 64);
+    ripple_data[0] = (uint8_t*)vj_yuvalloc(width,height );
     if(!ripple_data[0]) return 0; 
     ripple_data[1] = ripple_data[0] + (width * height);
     ripple_data[2] = ripple_data[1] + (width * height);
- 
+
     ripple_sin = (double*) vj_malloc(sizeof(double) * RIPPLE_DEGREES);
     if(!ripple_sin) return 0;
     ripple_cos = (double*) vj_malloc(sizeof(double) * RIPPLE_DEGREES);

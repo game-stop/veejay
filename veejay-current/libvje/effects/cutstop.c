@@ -66,7 +66,7 @@ vj_effect *cutstop_init(int width , int height)
 
 int	cutstop_malloc(int width, int height)
 {
-	vvcutstop_buffer[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height * 3); 
+	vvcutstop_buffer[0] = (uint8_t*)vj_yuvalloc(width,height);
 	vvcutstop_buffer[1] = vvcutstop_buffer[0] + (width  * height );
 	vvcutstop_buffer[2] = vvcutstop_buffer[1] + (width  * height );
 	return 1;

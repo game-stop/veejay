@@ -852,9 +852,10 @@ int sample_del(int sample_id)
 		if (si->effect_chain[i])
 			free(si->effect_chain[i]);
     }
-veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d EDL %p", sample_id, si->edit_list );
-    if(si->edit_list)
-	vj_el_free(si->edit_list);
+  
+    // better not do this
+  //  if(si->edit_list)
+//	vj_el_free(si->edit_list);
     if (si)
       free(si);
     /* store freed sample_id */

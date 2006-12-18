@@ -63,7 +63,7 @@ vj_effect *magicmirror_init(int w, int h)
 
 int magicmirror_malloc(int w, int h)
 {
-	magicmirrorbuf[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * w * h * 3);
+	magicmirrorbuf[0] = (uint8_t*)vj_yuvalloc(w,h);
 	if(!magicmirrorbuf[0]) return 0;
 	magicmirrorbuf[1] = magicmirrorbuf[0] + (w*h);
 	magicmirrorbuf[2] = magicmirrorbuf[1] + (w*h);
@@ -79,12 +79,9 @@ int magicmirror_malloc(int w, int h)
 
 	cache_y = (unsigned int*)vj_calloc(sizeof(unsigned int)*h);
 	if(!cache_y) return 0;
-	memset(cache_x,0,w);
-	memset(cache_y,0,h);
+	veejay_memset(cache_x,0,w);
+	veejay_memset(cache_y,0,h);
 
-	memset(magicmirrorbuf[0],16,w*h);
-	memset(magicmirrorbuf[1],128,w*h);
-	memset(magicmirrorbuf[2],128,w*h);
 	return 1;
 }
 

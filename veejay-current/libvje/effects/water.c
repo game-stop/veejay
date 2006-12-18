@@ -102,7 +102,7 @@ int water_malloc(int width, int height)
 {
 	ripple_data[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height);
 	if(!ripple_data[0]) return 0;
-	memset( ripple_data[0], pixel_Y_lo_, width*height);
+	veejay_memset( ripple_data[0], pixel_Y_lo_, width*height);
 
 	map_h = height / 2 + 1;
 	map_w = width / 2 + 1;
@@ -235,7 +235,7 @@ void	water_apply(VJFrame *frame, int width, int height, int fresh_rate, int loop
 	if(last_fresh_rate != fresh_rate)
 	{
 		last_fresh_rate = fresh_rate;
-		memset( map, 0, (map_h*map_w*2*sizeof(int)));
+		veejay_memset( map, 0, (map_h*map_w*2*sizeof(int)));
 	}
 
 

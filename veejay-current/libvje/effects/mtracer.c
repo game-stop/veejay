@@ -55,7 +55,7 @@ void mtracer_free() {
 
 int mtracer_malloc(int w, int h)
 {
-   mtrace_buffer[0] = (uint8_t *) vj_malloc(w * h * 3 * sizeof(uint8_t));
+   mtrace_buffer[0] = (uint8_t *) vj_yuvalloc(w,h );
 	if(!mtrace_buffer[0]) return 0;
 	mtrace_buffer[1] = mtrace_buffer[0] + (w*h);
 	mtrace_buffer[2] = mtrace_buffer[1] + (w*h);

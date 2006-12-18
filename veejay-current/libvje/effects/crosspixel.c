@@ -48,7 +48,7 @@ vj_effect *crosspixel_init(int w, int h)
 
 int crosspixel_malloc(int w, int h)
 {
-   cross_pixels[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * w * h * 3);
+   cross_pixels[0] = (uint8_t*)vj_yuvalloc(w,h );
    cross_pixels[1] =  cross_pixels[0] + (w * h );
    cross_pixels[2] =  cross_pixels[1] + (w *  h);   
     return 1;

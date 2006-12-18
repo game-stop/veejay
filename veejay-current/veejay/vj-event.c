@@ -1941,6 +1941,7 @@ static	void	vj_event_send_new_id(veejay_t * v, int new_id)
 
 void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 {
+	veejay_t *v = (veejay_t*) ptr;
 	char file_name[512];
 	char live_set[512];
 	int args[2] = {0,0};
@@ -1959,7 +1960,8 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 		char tmp_buf[1024];
 		veejay_memset(tmp_buf,0,1024);
 		childnode = xmlNewChild( rootnode, NULL, (const xmlChar*) XML_CONFIG_SETTINGS, NULL );
-		vj_event_format_xml_settings( (veejay_t*) ptr, childnode );
+
+	//	vj_event_format_xml_settings( v, childnode );
 
 		if( sample_size() > 1 )	
 		{	

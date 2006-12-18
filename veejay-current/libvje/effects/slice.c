@@ -52,7 +52,7 @@ vj_effect *slice_init(int width,int height)
 
 int 	slice_malloc(int width, int height)
 {
-    slice_frame[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height * 3);
+    slice_frame[0] = (uint8_t*)vj_yuvalloc(width,height);
     if(!slice_frame[0])
 	    return 0;
     slice_frame[1] = slice_frame[0] + (width * height);
