@@ -6540,6 +6540,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 			glade_xml_get_widget_( info->main_window, "gveejay_window" ),
 			glade_xml_get_widget_( info->main_window, "mt_box" ),
 			glade_xml_get_widget_( info->main_window, "statusbar") ,
+			glade_xml_get_widget_( info->main_window, "previewtoggle"),
 			pw,
 			ph,
 			img_wid);

@@ -66,7 +66,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v );
 static	int	track_find(  veejay_preview_t *vp );
 static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v );
 static	void	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v );
-static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_num );
+static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_num, int *at );
 static	int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v );
 
 void	*gvr_preview_init(int max_tracks)
@@ -353,7 +353,7 @@ static	void	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
 	}
 }
 
-static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_num )
+static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_num, int *at_track )
 {
 	int i;
 
@@ -363,7 +363,11 @@ static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_nu
 		{	
 			veejay_track_t *v = vp->tracks[i];
 			if( strcasecmp( hostname, v->hostname ) == 0 && v->port_num == port_num )
+			{
+				if( at_track )
+					*at_track = i;
 				return 1;
+			}
 		}
 	}
 	return 0;
@@ -415,18 +419,27 @@ int		gvr_track_get_portnum( void *preview, int num)
 	return 0;
 }
 
-int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *new_track )
+int		gvr_track_already_open( void *preview, const char *hostname,
+	int port )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 
-	if(track_exists( vp, hostname, port_num ) )
-		return 0;
-	
+	if(track_exists( vp, hostname, port, NULL ) )
+		return 1;
+	return 0;
+}
+
+int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *new_track )
+{
+	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	int track_num = track_find( vp );
 
 	if(track_num == -1)
 		return 0;
 
+	if(track_exists( vp, hostname, port_num, new_track ) )
+		return 0;
+	
 	vj_client *fd = vj_client_alloc(0,0,0);
 	if(!vj_client_connect( fd, hostname, NULL, port_num ) )
 	{
@@ -450,8 +463,6 @@ int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *
 	g_mutex_lock( vp->mutex );
 	vp->tracks[ track_num ] = vt;
 	g_mutex_unlock( vp->mutex );
-
-	*new_track = track_num;
 
 	return 1;
 }
@@ -625,6 +636,13 @@ int		gvr_track_configure( void *preview, int track_num, int w, int h )
 		w,h);
 	return 1;	
 }
+
+int		gvr_get_preview_status( void *preview, int track_num )
+{
+	veejay_preview_t *vp = (veejay_preview_t*) preview;
+	return vp->tracks[track_num]->preview;
+}
+
 
 int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 {

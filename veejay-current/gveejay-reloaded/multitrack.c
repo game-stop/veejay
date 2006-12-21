@@ -85,6 +85,9 @@ typedef struct
 	int	  height;
 	int	  master_track;
 	GdkPixbuf	*logo;
+	GtkWidget	*preview_toggle;
+	int	  pw;
+	int  	  ph;
 } multitracker_t;
 
 static volatile int	MAX_TRACKS = 4;
@@ -480,6 +483,19 @@ static gboolean	update_sequence_widgets( gpointer data )
 	return TRUE;
 }*/
 
+static	void	sequence_preview_size(multitracker_t *mt, int track_num)
+{
+	float ratio = mt->width / (float)mt->height;
+	int w = 80;
+	int h = ( (int)( (float)w/ratio ))/16*16;
+
+	if(!gvr_track_configure( mt->preview, track_num,w,h ) )
+	{
+		veejay_msg(0, "Unable to configure preview %d x %d",w , h );
+	}
+
+}
+
 static void sequence_preview_cb(GtkWidget *widget, gpointer user_data)
 {
 	sequence_view_t *v = (sequence_view_t*) user_data;
@@ -491,16 +507,7 @@ static void sequence_preview_cb(GtkWidget *widget, gpointer user_data)
 
 	gvr_track_toggle_preview( mt->preview, v->num,status );
 
-	float ratio = mt->width / (float)mt->height;
-	int w = 80;
-	int h = ( (int)( (float)w/ratio ))/16*16;
-
-	if(!gvr_track_configure( mt->preview, v->num,w,h ) )
-	{
-		veejay_msg(0, "Unable to configure preview %d x %d",w , h );
-		status = 0;
-	}
-
+	sequence_preview_size( mt, v->num );
 
 	if( !status )
 	{
@@ -762,6 +769,7 @@ void		*multitrack_new(
 		GtkWidget *win,
 		GtkWidget *box,
 		GtkWidget *msg,
+		GtkWidget *preview_toggle,
 		gint max_w,
 		gint max_h,
 		GtkWidget *main_preview_area)
@@ -775,7 +783,7 @@ void		*multitrack_new(
 	mt->main_box    = box;
 	mt->status_bar  = msg;
  	mt->logo = load_logo_image();
-
+	mt->preview_toggle = preview_toggle;
 	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
 	gtk_widget_set_size_request(mt->scroll,450, 300);
 	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),1);
@@ -863,17 +871,57 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 	int track = 0;
 
 	if(!gvr_track_connect( mt->preview, hostname, port_num, &track ) )
-		return -1;
+	{
+		if(!gvr_track_already_open( mt->preview, hostname,port_num))
+			return -1;
+	}
+
+	if(mt->pw > 0 && mt->ph > 0 )
+	{
+ 		 /* re-configure current master track for preview-size */
+		sequence_preview_size( mt, mt->master_track );
+
+		/* configure master preview size */
+		if(!gvr_track_configure( mt->preview, track, mt->pw,mt->ph ) )
+		{
+			veejay_msg(0, "Unable to configure preview %d x %d",mt->pw , mt->ph );
+		}
+
+
+		int preview = gvr_get_preview_status( mt->preview, mt->master_track );
+
+		/* set status of preview toggle button in trackview */
+		if( track == 0 )
+		{
+			mt->view[track]->status_lock=1;
+			gtk_toggle_button_set_active(
+				GTK_TOGGLE_BUTTON( mt->preview_toggle), (preview ? TRUE: FALSE ) );
+			mt->view[track]->status_lock=0;
+		}
+		else
+		{
+			mt->view[track]->status_lock=1;
+			gtk_toggle_button_set_active(
+				GTK_TOGGLE_BUTTON( mt->view[track]->toggle ), (preview ? TRUE: FALSE ) );
+			mt->view[track]->status_lock=0;
+
+		}
+	}
 
 	mt->master_track = track;
 
-	veejay_msg(VEEJAY_MSG_INFO, "Master is Track %d, Veejay Host %s: %d",
-		mt->master_track, hostname, port_num );	
 
 	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
 
 
 	return track;
+}
+
+int		multitrack_locked( void *data)
+{
+	multitracker_t *mt = (multitracker_t*) data;
+
+	return mt->view[mt->master_track]->status_lock;
 }
 
 void		multitrack_configure( void *data, float fps, int video_width, int video_height )
@@ -925,6 +973,9 @@ void		multitrack_set_quality( void *data , int quality )
 	{
 		veejay_msg(0, "Unable to configure preview %d x %d",w , h );
 	}
+
+	mt->pw = w;
+	mt->ph = h;
 }
 
 void		multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget *img )

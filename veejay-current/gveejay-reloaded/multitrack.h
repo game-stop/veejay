@@ -7,6 +7,7 @@ void            *multitrack_new(
                 GtkWidget *win,
                 GtkWidget *box,
                 GtkWidget *msg,
+		GtkWidget *button,
                 gint max_w,
                 gint max_h,
                 GtkWidget *main_preview_area);
