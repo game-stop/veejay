@@ -12,10 +12,13 @@
         x10x0x10x0         x10x0x10x0x10x   10x0x10x0x10x0  x10x  10x0    0x0x        0x10      0x0x
           0x0x10           x10x0x10x0x10x   10x0x10x0x10x0    0x010x0     0x0x        0x10      0x0x    
 
-                                                                     CODENAME: End of the Line beta X
+                                                                     CODENAME: classic
 	
-       2006, December 30
-       ================= 
+									0.9.9
+
+
+       2006/2007  - release date Dec. 21, 2006
+       =======================================
  
  			 :: 	   Veejay, a visual instrument for GNU            ::
 	                                 http://veejay.dyne.org 
@@ -27,6 +30,11 @@ Install
 =======
 
 See file 'INSTALL'
+
+See doc/Howto_Compile.html
+See doc/Howto_Compile_on_Ubuntu.html
+
+
 
 
 Running

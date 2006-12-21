@@ -316,6 +316,7 @@ void	on_button_el_cut_clicked(GtkWidget *w, gpointer *user_data)
 			time1, time2 );
 		g_free(time1);
 		g_free(time2);
+		info->uc.reload_hint[HINT_EL] = 1;
 	}
 }
 void	on_button_el_del_clicked(GtkWidget *w, gpointer *user_data)
@@ -390,6 +391,8 @@ void	on_button_el_pasteat_clicked(GtkWidget *w, gpointer *user_data)
 	vj_msg(VEEJAY_MSG_INFO, "Paste contents from buffer to frame %d (timecode %s)",
 		info->selection[2], time1);
 	g_free(time1);
+	info->uc.reload_hint[HINT_EL] = 1;
+
 }
 void	on_button_el_save_clicked(GtkWidget *w, gpointer *user_data)
 {
