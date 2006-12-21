@@ -28,6 +28,8 @@
 #include "vj-api.h"
 static int port_num	= 3490;
 static char hostname[255];
+static char datadir_str[1024];
+static int datadir =0;
 static int gveejay_theme = 1;
 static	int verbosity = 0;
 static int timer = 6;
@@ -56,6 +58,7 @@ static void usage(char *progname)
 	printf( "-s/--size\t\tSet bank resolution (row X columns)\n");
         printf( "-X/\t\tSet number of tracks\n");
 	printf( "-P/--preview\t\tSet main preview geometry (default to 112x96)" );
+	printf( "-d/--datadir\t\tDirectory to gveejay.reloaded.glade file" );
 	printf( "\n\n");
         exit(-1);
 }
@@ -75,6 +78,11 @@ static int      set_option( const char *name, char *value )
 	else if (strcmp(name, "X") == 0 )
 	{
 		n_tracks = atoi(optarg); 
+	}
+	else if (strcmp(name, "d") == 0 || strcmp(name, "datadir") == 0 )
+	{
+		strcpy( datadir_str, optarg );
+		datadir=1;
 	}
 	else if( strcmp(name, "n") == 0 || strcmp(name, "no-theme") == 0)
 	{
@@ -122,7 +130,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	sprintf(hostname, "localhost");
 
-        while( ( n = getopt( argc, argv, "s:h:pP::nvHf:X:")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:pP::nvHf:X:d:")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
@@ -148,6 +156,9 @@ int main(int argc, char *argv[]) {
 
 	vevo_strict_init();
 	
+	if( datadir )
+		set_gd( datadir_str );
+
 	vj_gui_theme_setup(gveejay_theme);
 	vj_gui_set_debug_level( verbosity , n_tracks,pw,ph);
 	vj_gui_set_timeout(timer);

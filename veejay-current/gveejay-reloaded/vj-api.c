@@ -69,7 +69,7 @@
 #endif
 
 static int	TIMEOUT_SECONDS = 0;
-
+static	char 	*custom_path_ = NULL;
 /* Stream type identifiers */
 
 void	vj_gui_set_timeout(int timer)
@@ -5817,15 +5817,30 @@ static void	update_gui()
 
 }
 
+void	set_gd( char *buf )
+{
+	if(custom_path_)
+		free(custom_path_);
+	custom_path_ = strdup( buf );
+}
+
 void	get_gd(char *buf, char *suf, const char *filename)
 {
+	char *str = NULL;
+
+	if( !custom_path_ )
+		str = strdup(GVEEJAY_DATADIR);
+	else
+		str = strdup( custom_path_ );
 
 	if(filename !=NULL && suf != NULL)
-		sprintf(buf, "%s/%s/%s", GVEEJAY_DATADIR,suf, filename );
+		sprintf(buf, "%s/%s/%s", str,suf, filename );
 	if(filename !=NULL && suf==NULL)
-		sprintf(buf, "%s/%s", GVEEJAY_DATADIR, filename);
+		sprintf(buf, "%s/%s", str, filename);
 	if(filename == NULL && suf != NULL)
-		sprintf(buf, "%s/%s/" , GVEEJAY_DATADIR, suf);
+		sprintf(buf, "%s/%s/" , str, suf);
+
+	free(str);
 }
 /*
 static	void		veejay_untick(gpointer data)
