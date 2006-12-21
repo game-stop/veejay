@@ -5497,12 +5497,21 @@ void vj_event_el_cut(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL (is this possible?)");
 			return;
 		}	
+		if( args[0] < 0 || args[0] >= el->video_frames || args[1] < 0 || args[1] >= el->video_frames)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Frame number out of bounds");
+			return;
+		}
 
 		if(veejay_edit_cut( v,el, args[0], args[1] ))
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Cut frames %d-%d from sample %d into buffer",args[0],args[1],
 				v->uc->sample_id);
 		}
+
+		sample_set_startframe( v->uc->sample_id, 0 );
+		sample_set_endframe(   v->uc->sample_id,
+						el->video_frames-1 );
 	}
 
 	if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
@@ -5526,12 +5535,22 @@ void vj_event_el_copy(void *ptr, const char format[], va_list ap)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL (is this possible?)");
 			return;
-		}	
+		}
+		if( args[0] < 0 || args[0] >= el->video_frames || args[1] < 0 || args[1] >= el->video_frames)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Frame number out of bounds");
+			return;
+		}
+	
 		if(veejay_edit_copy( v,el, args[0], args[1] ))
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Copy frames %d-%d from sample %d into buffer",args[0],args[1],
 				v->uc->sample_id);
 		}
+
+		sample_set_startframe( v->uc->sample_id, 0 );
+		sample_set_endframe(   v->uc->sample_id,
+					el->video_frames-1 );
 
 	}
 	if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
@@ -5551,21 +5570,26 @@ void vj_event_el_del(void *ptr, const char format[], va_list ap)
 	if ( SAMPLE_PLAYING(v))
 	{
 		editlist *el = sample_get_editlist( v->uc->sample_id );
-		int end = sample_get_endFrame(v->uc->sample_id);
+
 		if(!el)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL (is this possible?)");
 			return;
 		}	
+		if( args[0] < 0 || args[0] >= el->video_frames || args[1] < 0 || args[1] >= el->video_frames)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Frame number out of bounds");
+			return;
+		}
+
 		if(veejay_edit_delete( v,el, args[0], args[1] ))
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Deleted frames %d-%d from sample %d into buffer",v->uc->sample_id,args[0],args[1]);
 		}
-		if(end > (el->video_frames -1) )
-		{
-			end = el->video_frames -1;
-			sample_set_endframe(v->uc->sample_id, end );
-		}
+		sample_set_startframe( v->uc->sample_id, 0 );
+		sample_set_endframe(   v->uc->sample_id,
+						el->video_frames-1 );
+
 	}
 
 	if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
@@ -5590,7 +5614,7 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 
 	if(SAMPLE_PLAYING(v))
 	{
-	/*	editlist *el = sample_get_editlist( v->uc->sample_id);
+		editlist *el = sample_get_editlist( v->uc->sample_id);
 		if(!el)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL");
@@ -5621,11 +5645,16 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 				veejay_msg(VEEJAY_MSG_INFO, "Delete frames 0- %d , %d - %d from sample %d", 0,args[0],args[1],
 					el->video_frames - 1, v->uc->sample_id);
 				res = 1;
+				sample_set_startframe( v->uc->sample_id, 0 );
+				sample_set_endframe(   v->uc->sample_id,
+						el->video_frames-1 );
+
 			}
+
 		}
 		if(!res)
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid range given to crop ! %d - %d", args[0],args[1] );
-		*/
+		
 	}
 }
 
@@ -5656,8 +5685,10 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Pasted buffer at frame %d",args[0]);
 			}
-			int end = (el->video_frames - length) + sample_get_endFrame(v->uc->sample_id);
-			sample_set_endframe( v->uc->sample_id, end );
+		sample_set_startframe( v->uc->sample_id, 0 );
+		sample_set_endframe(   v->uc->sample_id,
+						el->video_frames-1 );
+
 		}
 
 	}
