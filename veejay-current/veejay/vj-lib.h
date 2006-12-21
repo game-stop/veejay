@@ -310,6 +310,7 @@ typedef struct {
 	void *osd;
 	int  use_osd;
 	sequencer_t *seq;
+	int  no_caching;
 } veejay_t;
 
 typedef struct {

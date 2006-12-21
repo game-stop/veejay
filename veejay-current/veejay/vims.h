@@ -70,6 +70,7 @@ enum {
 	VIMS_SET_MODE_AND_GO			=	328,
 	VIMS_RGB_PARAMETER_TYPE			=	329,
 	VIMS_SCREENSHOT				=	330,
+	VIMS_NO_CACHING				=	331,
 	VIMS_RGB24_IMAGE			=	333,
 
 /* video controls */

@@ -2218,6 +2218,26 @@ void vj_event_bezerk(void *ptr, const char format[], va_list ap)
 	else
 		veejay_msg(VEEJAY_MSG_INFO,"Bezerk Off :Sample-restart when changing input channels"); 
 }
+void vj_event_no_caching(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	if(v->no_caching)
+		v->no_caching = 0;
+	else
+		v->no_caching = 1;
+
+	if(v->no_caching==1)
+	{
+		vj_el_break_cache( v->current_edit_list );
+		veejay_msg(VEEJAY_MSG_INFO,"Sample FX Cache disabled: Grabbing all samples on FX chain");
+		
+	}
+	else
+	{
+		vj_el_setup_cache( v->current_edit_list );
+		veejay_msg(VEEJAY_MSG_INFO,"Sample FX Cache enabled : Recycling identicial samples in FX chain (default)"); 
+	}
+}
 
 void vj_event_debug_level(void *ptr, const char format[], va_list ap)
 {

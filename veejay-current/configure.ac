@@ -510,7 +510,7 @@ fi
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
- debugCFLAGS="-g"
+ debugCFLAGS="-g -Wstack-protector -fstack-protector-all"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])

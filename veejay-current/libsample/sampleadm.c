@@ -1204,11 +1204,11 @@ int sample_set_chain_channel(int s1, int position, int input)
     //sample->effect_chain[position]->channel = input;
     int src_type =  sample->effect_chain[position]->source_type;
     // now, reset cache and setup
-   	 if( src_type == 0 )
+   	 if( src_type == 0)
    	 {
 		sample_info *new = sample_get( input );
 
-		if( sample->effect_chain[position]->channel != input )
+		if( sample->effect_chain[position]->channel != input && sample->effect_chain[position]->effect_id > 0)
 		{
 		    sample_info *old = sample_get( sample->effect_chain[position]->channel );
 		    if(old)
@@ -1249,18 +1249,21 @@ int	sample_cache_used( int s1 )
 	return cache_avail_mb();
 }
 
-int	sample_start_playing(int s1)
+int	sample_start_playing(int s1, int no_cache)
 {
 	sample_info *sample = sample_get(s1);
 	if (!sample)
 	return -1;
-   	int i; 
-	vj_el_setup_cache( sample->edit_list );
+   	int i;
+
+	if(!no_cache)
+		vj_el_setup_cache( sample->edit_list );
+
 	for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ )
 	{
 		int src_type =  sample->effect_chain[i]->source_type;
 		int id       =   sample->effect_chain[i]->channel;
-		if( src_type == 0 && id > 0 )
+		if( src_type == 0 && id > 0 && sample->effect_chain[i]->effect_id > 0 )
 		{
 			sample_info *second = sample_get( id );
 	       		if(second)
@@ -1291,7 +1294,8 @@ int sample_set_chain_source(int s1, int position, int input)
 	return -1;
 
 	if( sample->effect_chain[position]->source_type == 0 &&
-		    sample->effect_chain[position]->channel > 0 )
+		    sample->effect_chain[position]->channel > 0 &&
+			sample->effect_chain[position]->effect_id > 0)
 	{
 	    sample_info *second = sample_get( sample->effect_chain[position]->channel );
 	    if(second)

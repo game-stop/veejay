@@ -85,13 +85,14 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 
 	if(!widget)
 	{
-		veejay_msg(0, "%s: %d tracks, widget invalid!", __FUNCTION__,
-				n_tracks );
 		return;
 	}
 	gboolean valid;
 	int i;
-	int *tmp = sequence_get_track_status( user_data );
+
+	int tmp[16];
+
+//	int *tmp = sequence_get_track_status( user_data );
 
 /*	int index = 0;
 	valid = gtk_tree_model_get_iter_first( GTK_TREE_MODEL( store ), &iter );
@@ -103,13 +104,11 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 
 	}*/
 
-	int id = sequence_get_track_id( user_data );
-	veejay_msg(0, "track %d list track source", id );	
+	int id = multitrack_get_sequence_view_id( user_data ); 
 	for( i = 0; i < n_tracks; i ++ )
 	{
 		if(id != i)
 		{
-			veejay_msg(0, "Append track %d",  i );
 			char name[12];
 			sprintf(name,"Track %d", i);
 			gtk_list_store_append( store, &iter );
@@ -122,8 +121,6 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 	}
 		
 	
-	free(tmp);
-
 	gtk_tree_view_set_model( GTK_TREE_VIEW( widget ), model );	
 //	g_object_unref( model );
 
@@ -132,8 +129,6 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 GtkWidget	*get_track_tree( void *data)
 {
 	track_view_t *t = (track_view_t*) data;
-	veejay_msg(0 , "%s: get track tree %d, tree:%p",__FUNCTION__,
-			t->track_id,t->view );
 	return t->view;
 }
 
@@ -205,7 +200,6 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data)
 	my_view->view = view;
 
 	g_assert( GTK_IS_TREE_VIEW( view ) );
-	veejay_msg(0, "CREATED TRACK %d TREE %p", track_id, view );
 	
 	model = GTK_TREE_MODEL( store );
 	gtk_tree_view_set_model ( GTK_TREE_VIEW( view ), model );

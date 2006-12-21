@@ -1,5 +1,5 @@
 /* Gveejay Reloaded - graphical interface for VeeJay
- * 	     (C) 2002-2005 Niels Elburg <nelburg@looze.net> 
+ * 	     (C) 2002-2006 Niels Elburg <nelburg@looze.net> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -17,22 +17,37 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-GdkPixbuf	*veejay_get_image( void *data , gint *error);
+#ifndef PREVIEWH
+#define PREVIEWH
+typedef struct
+{
+	int tracks;
+	int master;
+	int *widths;
+	int *heights;
+	int **status_list;
+	GdkPixbuf **img_list;
+} sync_info;
 
-void	*veejay_sequence_init(int port, char *hostname, gint w, gint h, gfloat fps);
+void		*gvr_preview_init(int max_tracks);
+int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *track_num );
+void		gvr_track_disconnect( void *preview, int track_num );
+int		gvr_track_configure( void *preview, int track_num, int w, int h );
+int		gvr_track_toggle_preview( void *preview, int track_num, int status );
+void		gvr_need_track_list( void *preview, int track_id );
 
-void	veejay_configure_sequence( void *data, gint w, gint h, float fps );
+int		gvr_get_stream_id( void  *data, int id );
 
-void	veejay_sequence_free( void *data );
+//format and queue vims messages from extern
 
-int	veejay_sequence_send( void *data , int vims_id, const char format[], ... );
+void		gvr_queue_mmvims( void *preview, int track_id, int vims_id, int val1,int val2 );
+void		gvr_queue_mvims( void *preview, int track_id, int vims_id, int val );
+void		gvr_queue_vims( void *preview, int track_id, int vims_id );
 
-void	veejay_toggle_image_loader( void *data, gint state );
+void		gvr_queue_cxvims( void *preview, int track_id, int vims_id, int val1,unsigned char *val2 );
 
-void	veejay_get_status( void *data, guchar *dst );
+sync_info	*gvr_sync( void *preview );
 
-unsigned char	*veejay_sequence_get_track_list( void *data, int slen, int *bytes_written );
+#endif
 
-void	veejay_abort_sequence( void *data );
 
-void	veejay_sequence_preview_delay( void *data, double value );

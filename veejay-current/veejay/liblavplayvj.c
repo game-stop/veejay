@@ -703,7 +703,7 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 		if( info->uc->sample_id != sampleid)
 		  sample_stop_playing(sampleid);//@pfff	
 		veejay_reset_el_buffer(info);
-		sample_start_playing( sampleid );
+		sample_start_playing( sampleid, info->no_caching );
 
 	   	sample_get_short_info( sampleid , &start,&end,&looptype,&speed);
  /* Set min/max options so that it runs like it should */

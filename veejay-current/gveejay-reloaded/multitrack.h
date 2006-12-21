@@ -1,38 +1,26 @@
-#ifndef MULTITRACK_H
-#define MULTITRACK_H
+#ifndef MTRACK_H
+#define MTRACK_H
+        
+void            *multitrack_new(
+                void (*f)(int,char*,int),
+                int (*g)(GdkPixbuf *, GdkPixbuf *, GtkImage *),
+                GtkWidget *win,
+                GtkWidget *box,
+                GtkWidget *msg,
+                gint max_w,
+                gint max_h,
+                GtkWidget *main_preview_area);
 
 
-void		*multitrack_new(
-		void(*f)(int,char*,int), 
-		int(*g)(GdkPixbuf *, GdkPixbuf *, GtkImage *),
-		GtkWidget *win,
-		GtkWidget *box,
-		GtkWidget *msg,
-		gint w,
-		gint h,
-		GtkWidget *area);
+int             multitrack_add_track( void *data );
 
-void		multitrack_set_hlq( void *data, float fps,float ratio, int quality );
+void            multitrack_close_track( void *data );
 
-void		multitrack_open( void *data );
+int             multrack_audoadd( void *data, char *hostname, int port_num );
 
-void		multitrack_close( void *data );
+void            multitrack_release_track(void *data, int id, int release_this );
 
-int		multitrack_add_track( void *data );
+void            multitrack_bind_track( void *data, int id, int bind_this );
 
-void		multitrack_close_track( void *data );
-
-void		multitrack_rule_track( void *data );
-
-void		multitrack_set_current( void *data, char *hostname, int port_num , int w, int h);
-
-void		multitrack_restart( void *data );
-
-void		multitrack_sync_start(void *data);
-
-void		multitrack_sync_simple_cmd(void *data, int vims_id, int value);
-
-void		multitrack_quit( void *data );
-
-void		multitrack_set_preview_speed( void *data , double value );
 #endif
+

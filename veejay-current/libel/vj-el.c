@@ -327,14 +327,30 @@ void	vj_el_prepare()
 //	reset_cache( el->cache );
 }
 
+void	vj_el_break_cache( editlist *el )
+{
+	if( el->cache )
+		free_cache( el->cache );
+
+}
+
 //@ iterateovers over sample fx chain
 void	vj_el_setup_cache( editlist *el )
 {
 	if(!el->cache)
 	{
 		int n_slots = mem_chunk_ / el->max_frame_size;
-		veejay_msg(VEEJAY_MSG_DEBUG, "EditList caches at most %d slots", n_slots ); 
-		el->cache = init_cache( n_slots );
+		
+		if( n_slots < (el->video_frames - 1) )
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "Not caching this EDL to memory (Cachesize too small)");
+			veejay_msg(VEEJAY_MSG_DEBUG, "try increasing cache size with -m commandline parameter");
+		}
+		else
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "EditList caches at most %d slots", n_slots ); 
+			el->cache = init_cache( n_slots );
+		}
 	}
 }
 

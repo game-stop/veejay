@@ -1131,14 +1131,14 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast)
 
 	const int len = info->effect_frame1->width * info->effect_frame1->height;
 	const int uv_len = info->effect_frame1->uv_width * info->effect_frame1->uv_height;
-//	const int total_len = (2*uv_len) + len;
 	int hlen =0;
+
 	int compr_len = vj_perform_compress_frame( info, socket_buffer+20  );
 
 	if( !mcast )
 	{
 		/* peer to peer connection */
-		unsigned char info_line[12];
+		unsigned char info_line[32];
 		sprintf(info_line, "%04d %04d %1d %08d", info->effect_frame1->width,
 				info->effect_frame1->height, info->edit_list->pixel_format,
 		      		compr_len );
@@ -1156,6 +1156,7 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast)
 	int id = (mcast ? 2: 0);
 	
 	__socket_len = hlen + compr_len;
+
 	// mcast frame sender = info->vjs[2] ??
 	if(vj_server_send_frame( info->vjs[id], info->uc->current_link, socket_buffer, __socket_len,
 				helper_frame, info->effect_frame_info, info->real_fps )<=0)
@@ -1804,7 +1805,7 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
    case VJ_TAG_TYPE_NONE:
 	    nframe = vj_perform_get_subframe_tag(info, sample_id, chain_entry); // get exact frame number to decode
  	    centry = vj_perform_sample_is_cached(sample_id, chain_entry);
-            if(centry == -1)
+            if(centry == -1 || info->no_caching)
 	    {
 		editlist *el = sample_get_editlist( sample_id );
 		if(el)
@@ -1910,7 +1911,7 @@ static int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 	case VJ_TAG_TYPE_PICTURE:
 
 	centry = vj_perform_tag_is_cached(chain_entry, sample_id); // is it cached?
-	if (centry == -1)
+	if (centry == -1 )
 	{
 		if(! vj_tag_get_active( sample_id ) )
 		{
@@ -2962,15 +2963,6 @@ static	int	vj_perform_render_font( veejay_t *info, video_playback_setup *setting
 		frame->ssm = 0;
 	}
 
-	if( __send_frame )
-	{
-		veejay_memcpy( primary_buffer[1]->Y, primary_buffer[0]->Y, frame->len );
-		veejay_memcpy( primary_buffer[1]->Cb,primary_buffer[0]->Cb,frame->uv_len);
-		veejay_memcpy( primary_buffer[1]->Cr,primary_buffer[0]->Cr,frame->uv_len);
-//		vj_perform_send_primary_frame_s2(info, __send_frame == 2 ? 2 : 0);
-		__send_frame = 0;
-	}
-
 	
 	return ds;
 }
@@ -2986,7 +2978,7 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 	
 	current_sampling_fmt_ = -1;
 	int is444 = 0;
-
+	int res = 0;
 	veejay_memset( &pvar_, 0, sizeof(varcache_t));
 	
 	switch (info->uc->playback_mode)
@@ -3012,7 +3004,7 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 			if( pvar_.enc_active )
 				vj_perform_record_sample_frame(info,frame);
 
-		   	 return 1;
+		   	res = 1;
 
      			 break;
 		    
@@ -3020,7 +3012,8 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 
 			   vj_perform_plain_fill_buffer(info, frame);
 		  	   vj_perform_render_font(info, settings,is444);
-			   return 1;
+			   
+			   res = 1;
  		    break;
 		case VJ_PLAYBACK_MODE_TAG:
 
@@ -3041,14 +3034,27 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 				if( pvar_.enc_active )	
 					vj_perform_record_tag_frame(info,frame);
 			 }
-			 return 1;
-			 
+			 res = 1;	 
 		   	 break;
 		default:
 			return 0;
 	}
 
-	return 0;
+
+	if( __send_frame )
+	{
+		veejay_memcpy( primary_buffer[1]->Y, primary_buffer[0]->Y, 
+			info->effect_frame1->len );
+		veejay_memcpy( primary_buffer[1]->Cb,primary_buffer[0]->Cb,
+			info->effect_frame1->uv_len);
+		veejay_memcpy( primary_buffer[1]->Cr,primary_buffer[0]->Cr,
+			info->effect_frame1->uv_len);
+		__send_frame = 0;
+	}
+
+
+
+	return res;
 }
 
 
@@ -3225,5 +3231,6 @@ int	vj_perform_dump_ppm( veejay_t *info)
 	fclose( fd );
 	free( ppm_buf );
 	
+	return 1;
 }
 

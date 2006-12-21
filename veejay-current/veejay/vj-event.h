@@ -230,6 +230,7 @@ void vj_event_linkclose(void *ptr, const char format[], va_list ap);
 void	vj_event_send_track_list( void *ptr, const char format[], va_list ap);
 
 void	vj_event_toggle_bw( void *ptr, const char format[], va_list ap );
+void	vj_event_no_caching(void *ptr, const char format[], va_list ap);
 
 #ifdef HAVE_FREETYPE
 void	vj_event_get_srt_list(	void *ptr,	const char format[],	va_list	ap	);

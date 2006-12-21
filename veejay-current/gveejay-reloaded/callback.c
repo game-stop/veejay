@@ -48,6 +48,11 @@ void	text_defaults()
 
 }
 
+void	on_no_caching_clicked( GtkWidget *widget, gpointer user_data)
+{
+	single_vims( VIMS_NO_CACHING );
+}
+
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_SKIP_SECOND);
@@ -2304,7 +2309,9 @@ void		on_previewbw_toggled( GtkWidget *w , gpointer user_data)
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 {
-	multitrack_preview_master( info->mt, is_button_toggled("previewtoggle"));
+	multitrack_toggle_preview( info->mt, -1, is_button_toggled("previewtoggle"),
+			glade_xml_get_widget(info->main_window, "imageA") );
+
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 }
 
@@ -2320,43 +2327,30 @@ void		on_previewlarge_clicked( GtkWidget *widget, gpointer user_data )
 
 void		on_previewspeed_value_changed( GtkWidget *widget, gpointer user_data)
 {
+	veejay_msg(0, "%s", __FUNCTION__);
+
 	double val = 	       GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
 	double fps = (val * 100.0) / (double)info->el.fps ;
 	
-	multitrack_set_preview_speed( info->mt , fps );
+	//multitrack_set_preview_speed( info->mt , fps );
 	
 	//sprintf(speed,"%2.2f "
 }
 
 void		on_previewscale_value_changed( GtkWidget *widget, gpointer user_data)
 {
-	int w = info->el.width;
-	int h = info->el.height;
-
-	if(w == 0 || h == 0 )
-		return;
-
-	double value = GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
-
-	int nw = (w * value);
-	int nh = (h * value);
-
-	if( nw == 0 && nh == 0 )
-	{
-		set_toggle_button( "previewtoggle", 0 );
-	}
-	else
-	{
-		// @@@ MT!
-//		multitrack_resize( info->mt, nw,nh);	
-	}
+	veejay_msg(0, "%s", __FUNCTION__);
 }
+
 void		on_preview_width_value_changed( GtkWidget *w, gpointer user_data)
 {
+	veejay_msg(0, "%s", __FUNCTION__);
 
 }
 void		on_preview_height_value_changed( GtkWidget *w, gpointer user_data)
 {
+	veejay_msg(0, "%s", __FUNCTION__);
+
 }
 
 void		on_previewsmall_clicked( GtkWidget *widget, gpointer user_data)
@@ -2369,6 +2363,9 @@ void		on_previewsmall_clicked( GtkWidget *widget, gpointer user_data)
 	else h = h / 3;
 	update_spin_value( "preview_width", w );
         update_spin_value( "preview_height", h );
+
+	veejay_msg(0, "%s", __FUNCTION__);
+
 }
 
 void		on_multitrack_activate( GtkWidget *w, gpointer user_data)
@@ -2397,12 +2394,12 @@ void	on_mt_delete_activate( GtkWidget *w, gpointer user_data)
 
 void	on_mt_sync_start_clicked( GtkWidget *w, gpointer user_data)
 {
-	multitrack_sync_start( info->mt );
+	//multitrack_sync_start( info->mt );
 }
 
 void	on_mtwindow_delete_event( GtkWidget *w , gpointer user_data)
 {
-	on_multitrack_deactivate(w, user_data);
+	//on_multitrack_deactivate(w, user_data);
 }
 
 void	on_mtwindow_destroy_event( GtkWidget *w, gpointer user_data)
@@ -2412,7 +2409,7 @@ void	on_mtwindow_destroy_event( GtkWidget *w, gpointer user_data)
 
 void	on_mt_sync_stop_clicked( GtkWidget *w , gpointer user_data)
 {
-	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PLAY_STOP,0 );
+	//multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PLAY_STOP,0 );
 }
 void	on_mt_sync_play_clicked( GtkWidget *w, gpointer user_data)
 {
@@ -2435,7 +2432,7 @@ void	on_mt_sync_decspeed_clicked( GtkWidget *w, gpointer user_data)
 	int n = info->status_tokens[SAMPLE_SPEED];
 	if( n < 0 ) n += 1;
 	if( n > 0 ) n -= 1;
-	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
+	//multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
 
 }
 void	on_mt_sync_incspeed_clicked( GtkWidget *w, gpointer user_data)
@@ -2443,15 +2440,15 @@ void	on_mt_sync_incspeed_clicked( GtkWidget *w, gpointer user_data)
 	int n = info->status_tokens[SAMPLE_SPEED];
 	if( n < 0 ) n -= 1;
 	if( n > 0 ) n += 1;
-	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
+	//multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
 }
 void	on_mt_sync_prev_clicked( GtkWidget *w , gpointer user_data)
 {
-	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PREV_FRAME ,0 );
+	//multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_PREV_FRAME ,0 );
 }
 void	on_mt_sync_next_clicked( GtkWidget *w, gpointer user_data)
 {
-	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SKIP_FRAME, 0 );
+	//multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SKIP_FRAME, 0 );
 }
 
 void	on_delete1_activate(GtkWidget *w, gpointer user_data)
@@ -3461,16 +3458,21 @@ void	on_seqactive_toggled( GtkWidget *w, gpointer data )
 void	on_bq_button_clicked( GtkWidget *w, gpointer data )
 {
 	info->quality = 2;
-	multitrack_set_hlq( info->mt, info->el.fps,  info->el.ratio, 2 );
+	multitrack_set_quality( info->mt, 2 );
 }
 
 void	on_hqbutton_clicked( GtkWidget *w, gpointer data )
 {
 	info->quality = 1;
-	multitrack_set_hlq( info->mt, info->el.fps,  info->el.ratio, 1 );
+	multitrack_set_quality( info->mt, 1 );
 }
 void	on_lqbutton_clicked( GtkWidget *w, gpointer data )
 {
 	info->quality = 0;
-	multitrack_set_hlq( info->mt, info->el.fps,  info->el.ratio, 0 );
+	multitrack_set_quality( info->mt, 0 );
+}
+void	on_uq_button_clicked( GtkWidget *w, gpointer data )
+{
+	info->quality = 3;
+	multitrack_set_quality( info->mt, 3 );
 }
