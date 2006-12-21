@@ -2646,9 +2646,9 @@ static int vj_perform_tag_fill_buffer(veejay_t * info, int entry)
    prior to fading, we copy the orginal (unaffected) image to a tempory buffer */
 static inline void vj_perform_pre_chain(veejay_t *info, VJFrame *frame)
 {
-	veejay_memcpy( temp_buffer[0] ,frame->data[0], helper_frame->len );
-	veejay_memcpy( temp_buffer[1], frame->data[1], helper_frame->uv_len);
-	veejay_memcpy( temp_buffer[2], frame->data[2], helper_frame->uv_len ); /* /4 */
+	veejay_memcpy( temp_buffer[0] ,frame->data[0], frame->len );
+	veejay_memcpy( temp_buffer[1], frame->data[1], frame->uv_len);
+	veejay_memcpy( temp_buffer[2], frame->data[2], frame->uv_len ); /* /4 */
 }
 
 static	inline	void	vj_perform_supersample_chain( veejay_t *info, VJFrame *frame )
@@ -2675,7 +2675,7 @@ static void vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 //	int mode = sample_get_fader_active( info->uc->sample_id );
 	int mode = pvar_.fader_active;
 	
-	if( !frame->ssm )
+	if( frame->ssm )
 		vj_perform_supersample_chain( info, frame );
 	
  	if(mode == 2 ) // manual fade
