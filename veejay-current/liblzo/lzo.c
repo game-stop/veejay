@@ -84,8 +84,7 @@ int		lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, 
 	int r = lzo1x_1_compress( src, len, dst, dst_len, l->wrkmem );
 	if( r != LZO_E_OK )
 		return 0;
-	if( *size >= len )
-		veejay_msg(VEEJAY_MSG_WARNING, "Block contains incompressible data");
+	//@ dont care about incompressible blocks
 	return (*size);	
 }
 

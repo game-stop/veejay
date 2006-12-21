@@ -2345,13 +2345,9 @@ void		on_previewscale_value_changed( GtkWidget *widget, gpointer user_data)
 
 void		on_preview_width_value_changed( GtkWidget *w, gpointer user_data)
 {
-	veejay_msg(0, "%s", __FUNCTION__);
-
 }
 void		on_preview_height_value_changed( GtkWidget *w, gpointer user_data)
 {
-	veejay_msg(0, "%s", __FUNCTION__);
-
 }
 
 void		on_previewsmall_clicked( GtkWidget *widget, gpointer user_data)
