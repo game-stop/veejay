@@ -1,12 +1,27 @@
 
-	Veejay processes nativly in YUV, hence no RGB <-> YUV conversions are used
+Veejay processing
+=================
+
+
+	Veejay processes nativly in YUV, hence no RGB <-> YUV conversions 
+        are used while rendering.
 
 		YUV 4:2:0 Planar ( 1 Cr and 1 Cb sample per 2x2 Y samples)
 		YUV 4:2:2 Planar ( 1 Cr and 1 Cr sample per 1x2 Y samples)  
+		(both full range JPEG and clipped to 16-235 / 16-240)
+	
 
-	You can customize the sampling method used when sub- and super sampling
-	video data:    
-		OSC: /config/sampling
-		VIMS: 250:;
 
-	Use the triangle filter for best quality, or the box filter for best performance		(default is best quality).	
+	Conversion from RGB to YUV is only necessary for webcam devices.
+	Conversion from YUV to RGB is only necessary for preview image
+
+
+Why YUV ?
+=========
+
+	- Many video codecs decode into some YUV flavour
+	- Many capture devices deliver YUV 
+	- Software conversion of RGB <-> YUV is expensive
+	- Consumes less bandwith then RGB
+	
+
