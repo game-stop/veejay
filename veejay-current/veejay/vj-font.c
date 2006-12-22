@@ -1215,8 +1215,10 @@ static int	configure(vj_font_t *f, int size, int font)
 	f->current_font = font;
 	f->font = select_font( f , font );
 	if(f->font == NULL )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Selected font '%d' not available", font );
 		return 0;
-
+	}
 	if( f->face )
 	{
 		for( c = 0; c < 256 ; c ++)
@@ -1264,7 +1266,8 @@ static int	configure(vj_font_t *f, int size, int font)
 		}
 
 		f->glyphs_index[c] = FT_Get_Char_Index( f->face, (unsigned char) c );
-		FT_Glyph_Get_CBox( f->glyphs[ c ] , ft_glyph_bbox_pixels, &bbox);
+		if( f->glyphs_index[c] )
+			FT_Glyph_Get_CBox( f->glyphs[ c ] , ft_glyph_bbox_pixels, &bbox);
 
 		if( bbox.yMax > yMax )
 			yMax = bbox.yMax;
@@ -1394,7 +1397,11 @@ static	int	get_default_font( vj_font_t *f )
 			if( f->font_list[i])
 			{
 				if( strcasecmp( default_fonts[j].name, f->font_list[i] ) == 0 )
+				{
+					veejay_msg(VEEJAY_MSG_DEBUG, "Using default font '%s'",
+						default_fonts[j].name );
 					return i;
+				}
 			}
 		}
 	}
@@ -2039,7 +2046,8 @@ void vj_font_render(void *ctx, void *_picture, long position)
 
 			if( old_font != s->font || old_size != s->size )
 				if(!configure( f, s->size, s->font ))
-					configure( f, old_size, old_font );
+					if(!configure( f, old_size, old_font ))
+						break;
 			
 			f->x = s->x;
 			f->y = s->y;
