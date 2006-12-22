@@ -1183,6 +1183,7 @@ void	vj_font_destroy(void *ctx)
 		{
 			if( f->glyphs[c] )
 				FT_Done_Glyph( f->glyphs[c] );
+			f->glyphs[c] = NULL;
 		}
 		FT_Done_Face( f->face );
 	}
@@ -1225,6 +1226,7 @@ static int	configure(vj_font_t *f, int size, int font)
 		{
 			if( f->glyphs[c] )
 				FT_Done_Glyph( f->glyphs[c] );
+			f->glyphs[c] = NULL;
 		}
 		FT_Done_Face( f->face );
 	}
