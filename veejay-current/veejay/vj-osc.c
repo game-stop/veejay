@@ -1038,8 +1038,6 @@ static struct
 	{ "Toggle SDL video window fullscreen/windowed",
 							"fullscreen", vj_osc_cb_fullscreen,			10	},
 #endif
-	{ "Dump current frame as JPG <filename>",
-							"screenshot", vj_osc_cb_screenshot,			10	},
 	{ "Configure sampling mode (linear=0 or triangle=1)",
 							"sampling",	vj_osc_cb_sampling,				11	},
 	{ "Toggle verbose output mode",
@@ -1157,11 +1155,14 @@ int	vj_osc_attach_methods( vj_osc *o )
 	for( i = 0; osc_methods[i].name != NULL ; i ++ )
 	{
 		o->ris.description = osc_methods[i].descr;
+		if( o->leaves[ osc_methods[i].leave ] )
+		{
 		OSCNewMethod( osc_methods[i].name, 
 				o->leaves[ osc_methods[i].leave ],
 				osc_methods[i].cb , 
 				&(o->osc_args[0]),
 				&(o->ris));
+		}
 	}
 	return 1;
 }	

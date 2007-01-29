@@ -17,6 +17,23 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
+    	
+
+/* Alpha blending with MMX, shamelessy ripped from libvisual
+ *
+ *
+ * Libvisual-plugins - Standard plugins for libvisual
+ *
+ * Copyright (C) 2004, 2005, 2006 Dennis Smit <ds@nerds-incorporated.org>
+ *
+ * Authors: Dennis Smit <ds@nerds-incorporated.org>
+ *
+ * $Id: morph_alphablend.c,v 1.19 2006/01/27 20:19:18 synap Exp $
+ *
+ *
+ *
+ */     
+	
 #include <config.h>
 #include "opacity.h"
 
@@ -38,36 +55,100 @@ vj_effect *opacity_init(int w, int h)
     return ve;
 }
 
+#ifdef HAVE_ASM_MMX
+static	inline int	blend_plane(uint8_t *dst, uint8_t *A, uint8_t *B, int size, int alpha)
+{
+	uint32_t ialpha = alpha;
+	int i;
+
+	ialpha |= ialpha << 16;
+
+	__asm __volatile
+		("\n\t pxor %%mm6, %%mm6"
+		 ::);
+
+	for (i = size; i > 4; i -= 4) {
+		__asm __volatile
+			("\n\t movd %[alpha], %%mm3"
+			 "\n\t movd %[src2], %%mm0"
+			 "\n\t psllq $32, %%mm3"
+			 "\n\t movd %[alpha], %%mm2"
+			 "\n\t movd %[src1], %%mm1"
+			 "\n\t por %%mm3, %%mm2"
+			 "\n\t punpcklbw %%mm6, %%mm0"  /* interleaving dest */
+			 "\n\t punpcklbw %%mm6, %%mm1"  /* interleaving source */
+			 "\n\t psubsw %%mm1, %%mm0"     /* (src - dest) part */
+			 "\n\t pmullw %%mm2, %%mm0"     /* alpha * (src - dest) */
+			 "\n\t psrlw $8, %%mm0"         /* / 256 */
+			 "\n\t paddb %%mm1, %%mm0"      /* + dest */
+			 "\n\t packuswb %%mm0, %%mm0"
+			 "\n\t movd %%mm0, %[dest]"
+			 : [dest] "=m" (*(dst + i))
+			 : [src1] "m" (*(A + i))
+			 , [src2] "m" (*(B + i))
+			 , [alpha] "m" (ialpha));
+	}
+	return i;
+}
+#else
+static	inline void	blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, int size, int opacity )
+{
+    unsigned int i, op0, op1;
+    op1 = (opacity > 255) ? 255 : opacity;
+    op0 = 255 - op1;
+
+    for( i = 0; i < size; i ++ )
+	dst[i] = (op0 * A[i] + op1 * B[i] ) >> 8;
+}
+#endif
 
 
 void opacity_apply( VJFrame *frame, VJFrame *frame2, int width,
 		   int height, int opacity)
 {
-    unsigned int i, op0, op1;
-    unsigned int len =  frame->len;
-    unsigned int uv_len = frame->uv_len;
+	int y = blend_plane( frame->data[0], frame->data[0], frame2->data[0], frame->len, opacity );
+	int u = blend_plane( frame->data[1], frame->data[1], frame2->data[1], frame->uv_len, opacity );
+	int v = blend_plane( frame->data[2], frame->data[2], frame2->data[2], frame->uv_len, opacity );
+#ifdef HAVE_ASM_MMX
+	__asm __volatile( "\n\t emms" );
+#endif
+	while (y--)
+		frame->data[0][y] = ((opacity * (frame->data[0][y] - frame2->data[0][y])) >> 8 ) + frame->data[0][y];
+	while( u-- )
+		frame->data[1][u] = ((opacity * (frame->data[1][u] - frame2->data[1][u])) >> 8 ) + frame->data[1][u];
+	while( v-- )
+		frame->data[2][v] = ((opacity * (frame->data[2][v] - frame2->data[2][v])) >> 8 ) + frame->data[2][v];
 
-  	uint8_t *Y = frame->data[0];
-	uint8_t *Cb= frame->data[1];
-	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
- 	uint8_t *Cb2= frame2->data[1];
-	uint8_t *Cr2= frame2->data[2];
+}
 
-    op1 = (opacity > 255) ? 255 : opacity;
-    op0 = 255 - op1;
+void	opacity_blend_apply( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_len, int opacity )
+{
+	int y = blend_plane( src1[0], src1[0], src2[0], len, opacity );
+	int u = blend_plane( src1[1], src1[1], src2[1], uv_len,opacity);
+	int v = blend_plane( src1[2], src1[2], src2[2], uv_len, opacity);
+#ifdef HAVE_ASM_MMX
+	__asm __volatile( "\n\t emms" );
+#endif
+
+	while (y--)
+		src1[0][y] = ((opacity * (src1[0][y] - src2[0][y])) >> 8) + src1[0][y];
+	while( u-- )
+		src1[1][u] = ((opacity * (src1[1][u] - src2[1][u])) >> 8) + src1[1][u];
+	while( v-- )
+		src1[2][v] = ((opacity * (src1[2][v] - src2[2][v])) >> 8) + src1[2][v];
 
 
+}
 
-    for (i = 0; i < len; i++) {
-	Y[i] = (op0 * Y[i] + op1 * Y2[i]) >> 8;
-    }
 
-    for (i = 0; i < uv_len; i++) {
-	Cb[i] = (op0 * Cb[i] + op1 * Cb2[i]) >> 8;
-	Cr[i] = (op0 * Cr[i] + op1 * Cr2[i]) >> 8;
-    }
- 
+void	opacity_blend_luma_apply( uint8_t *A, uint8_t *B, int len,int opacity )
+{
+	int y = blend_plane( A,A,B, len, opacity );
+#ifdef HAVE_ASM_MMX
+	__asm __volatile( "\n\t emms" );
+#endif
+	while (y--)
+		A[y] = ((opacity * (A[y] - B[y])) >> 8 ) + A[y];
 }
 
 void opacity_free(){}

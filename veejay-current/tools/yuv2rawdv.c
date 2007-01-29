@@ -249,5 +249,6 @@ int main(int argc, char *argv[])
 int main(int argc, char *argv[])
 {
 	printf("yuv2rawdv needs libdv\n");
+	return 0;
 }
 #endif

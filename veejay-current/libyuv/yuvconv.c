@@ -21,12 +21,14 @@
 #include <unistd.h>
 #include <libyuv/yuvconv.h>
 #include <veejay/vj-global.h>
+#include <ffmpeg/swscale.h>
 #ifdef USE_SWSCALER
 #include <libpostproc/swscale.h>
 #endif
 #include <libvjmsg/vj-common.h>
-#include <ffmpeg/avcodec.h>
+
 #include <ffmpeg/avutil.h>
+#include <ffmpeg/avcodec.h>
 /* this routine is the same as frame_YUV422_to_YUV420P , unpack
  * libdv's 4:2:2-packed into 4:2:0 planar 
  * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)
@@ -36,6 +38,23 @@
 #include <assert.h>
 #endif
 
+
+#ifdef HAVE_ASM_MMX
+#undef HAVE_K6_2PLUS
+#if !defined( HAVE_ASM_MMX2) && defined( HAVE_ASM_3DNOW )
+#define HAVE_K6_2PLUS
+#endif
+
+#undef _EMMS
+
+#ifdef HAVE_K6_2PLUS
+/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
+#define _EMMS     "femms"
+#else
+#define _EMMS     "emms"
+#endif
+
+#endif
 
 /* convert 4:2:0 to yuv 4:2:2 packed */
 void yuv422p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
@@ -87,7 +106,7 @@ void yuv420p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
     }
 }
 
-#ifdef HAVE_MMX 
+#ifdef HAVE_ASM_MMX 
 #include "mmx_macros.h"
 #include "mmx.h"
 
@@ -117,7 +136,8 @@ void yuv420p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
 
 static mmx_t mmx_00ffw =   { 0x00ff00ff00ff00ffLL };
 
-#ifdef MMXEXT
+#ifdef HAVE_ASM_MMX2
+//#ifdef MMXEXT
 #define MOVQ_R2M(reg,mem) movntq_r2m(reg, mem)
 #else
 #define MOVQ_R2M(reg,mem) movq_r2m(reg, mem)
@@ -170,7 +190,20 @@ static mmx_t mmx_00ffw =   { 0x00ff00ff00ff00ffLL };
                            MOVQ_R2M(mm6, *dst_y);\
                            movd_r2m(mm0, *dst_u);\
                            movd_r2m(mm1, *dst_v);
-/* FIXME: corruption
+
+#define MMX_YUV422_YUYV "                                                 \n\
+movq       (%1), %%mm0  # Load 8 Y            y7 y6 y5 y4 y3 y2 y1 y0     \n\
+movd       (%2), %%mm1  # Load 4 Cb           00 00 00 00 u3 u2 u1 u0     \n\
+movd       (%3), %%mm2  # Load 4 Cr           00 00 00 00 v3 v2 v1 v0     \n\
+punpcklbw %%mm2, %%mm1  #                     v3 u3 v2 u2 v1 u1 v0 u0     \n\
+movq      %%mm0, %%mm2  #                     y7 y6 y5 y4 y3 y2 y1 y0     \n\
+punpcklbw %%mm1, %%mm2  #                     v1 y3 u1 y2 v0 y1 u0 y0     \n\
+movq      %%mm2, (%0)   # Store low YUYV                                  \n\
+punpckhbw %%mm1, %%mm0  #                     v3 y7 u3 y6 v2 y5 u2 y4     \n\
+movq      %%mm0, 8(%0)  # Store high YUYV                                 \n\
+"
+
+
 void	yuv422_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
 {
 	int j,jmax,imax,i;
@@ -179,24 +212,28 @@ void	yuv422_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
 	uint8_t *src_u = src[1];
 	uint8_t *src_v = src[2];
 	
-	jmax = w / 8;
+	jmax = w >> 3;
 	imax = h;
 
-	for( i = 0; i < imax ;i ++ )
+	for( i = imax; i-- ; )
 	{
-		for( j = 0; j < jmax ; j ++ )
+		for( j = jmax ; j -- ; )
 		{
-			PLANAR_TO_YUY2
+			__asm__( ".align 8" MMX_YUV422_YUYV
+				: : "r" (dst), "r" (src_y), "r" (src_u),
+				    "r" (src_v) );
+
 			dst += 16;
 			src_y += 8;
 			src_u += 4;
 			src_v += 4;
 		}
 	}
-
-	emms();
+#ifdef HAVE_ASM_MMX
+        __asm__ __volatile__ ( _EMMS:::"memory");
+#endif
 }
-*/
+
 
 void	yuy2toyv16(uint8_t *dst_y, uint8_t *dst_u, uint8_t *dst_v, uint8_t *srcI, int w, int h )
 {
@@ -217,7 +254,9 @@ void	yuy2toyv16(uint8_t *dst_y, uint8_t *dst_u, uint8_t *dst_v, uint8_t *srcI, i
 			dst_v += 4;
 		}
 	}
-	
+#ifdef HAVE_ASM_MMX
+        __asm__ __volatile__ ( _EMMS:::"memory");
+#endif	
 }
 
 void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
@@ -244,6 +283,9 @@ void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 		dst_u += width;
 		dst_v += width;
 	}
+#ifdef HAVE_ASM_MMX
+        __asm__ __volatile__ ( _EMMS:::"memory");
+#endif
 }
 #else
 // non mmx functions
@@ -325,8 +367,6 @@ void yuy2toyv16(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
     }
 }
 
-//before:
-#endif
 void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
 {
     int x,y;
@@ -356,8 +396,7 @@ void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
     }
 }
 
-//after
-//#endif
+#endif
 
 
 /* lav_common - some general utility functionality used by multiple
@@ -408,15 +447,13 @@ int luminance_mean(uint8_t * frame[], int w, int h)
     return sum / count;
 }
 
-#ifdef USE_SWSCALER
-
 typedef struct
 {
 	struct SwsContext *sws;
 	SwsFilter	  *src_filter;
 	SwsFilter	  *dst_filter;
 } vj_sws;
-#include <libpostproc/img_format.h>
+
 void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flags)
 {
 	vj_sws *s = (vj_sws*) vj_malloc(sizeof(vj_sws));
@@ -426,18 +463,6 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 	int	sws_type = 0;
 
 	memset( s, 0, sizeof(vj_sws) );
-
-	if( tmpl->use_filter )
-	{
-		s->src_filter = sws_getDefaultFilter(
-			tmpl->lumaGBlur,
-			tmpl->chromaGBlur,
-			tmpl->lumaSarpen,
-			tmpl->chromaSharpen,
-			tmpl->chromaHShift,
-			tmpl->chromaVShift,
-			tmpl->verbose );
-	}
 
 	switch(tmpl->flags)
 	{
@@ -494,8 +519,6 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 		if(s)free(s);
 		return NULL;
 	}	
-
-	sws_rgb2rgb_init( cpu_flags );
 
 	return ((void*)s);
 
@@ -563,15 +586,23 @@ void	yuv_free_swscaler(void *sws)
 	if(sws)
 	{
 		vj_sws *s = (vj_sws*) sws;
-		if(s->src_filter)
-			sws_freeFilter(s->src_filter);
-		if(s->dst_filter)
-			sws_freeFilter(s->dst_filter);
 		if(s->sws)
 			sws_freeContext( s->sws );
 		if(s) free(s);
 	}
 }
+
+void	yuv_convert_and_scale_gray_rgb(void *sws,VJFrame *src, VJFrame *dst)
+{
+	vj_sws *s = (vj_sws*) sws;
+	int src_stride[3] = { src->width,0,0 };
+	int dst_stride[3] = { src->width * 3, 0,0 };
+
+	sws_scale( s->sws, src->data,src_stride, 0,src->height,
+		dst->data, dst_stride );
+}
+
+
 void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
@@ -580,11 +611,9 @@ void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 
 	sws_scale( s->sws, src->data, src_stride, 0, src->height,
 		dst->data, dst_stride );
-
-#ifdef 	HAVE_ASM_MMX
-	asm volatile ("emms\n\t");
-#endif
-	
+//#ifdef HAVE_ASM_MMX
+  //      __asm__ __volatile__ ( _EMMS:::"memory");
+//#endif
 }
 void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 {
@@ -594,11 +623,9 @@ void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 
 	sws_scale( s->sws, src->data, src_stride, 0, src->height,
 		dst->data, dst_stride );
-
-#ifdef 	HAVE_ASM_MMX
-	asm volatile ("emms\n\t");
-#endif
-	
+//#ifdef HAVE_ASM_MMX
+  //      __asm__ __volatile__ ( _EMMS:::"memory");
+//#endif
 }
 
 int	yuv_sws_get_cpu_flags(void)
@@ -618,7 +645,6 @@ int	yuv_sws_get_cpu_flags(void)
 #endif
 	return cpu_flags;
 }
-#endif
 
 void    util_convertrgba32( uint8_t **data, int w, int h,int in_pix_fmt,int shiftv, void *out_buffer )
 {
@@ -651,7 +677,37 @@ void    util_convertrgba32( uint8_t **data, int w, int h,int in_pix_fmt,int shif
 #endif
         }
 }       
+void    util_convertrgb24( uint8_t **data, int w, int h,int in_pix_fmt,int shiftv, void *out_buffer )
+{
+        AVPicture p1,p2;
+        memset( &p1, 0, sizeof(p1));
+        memset( &p2, 0, sizeof(p2));
+#ifdef STRICT_CHECING
+        assert( data != NULL );
+        assert( w > 0 );
+        assert( h > 0 );
+        assert( out_buffer != NULL );
+#endif
 
+        p1.data[0] = out_buffer;
+        p1.linesize[0] = w * 3;
+
+        p2.data[0] = data[0];
+        p2.data[1] = data[1];
+        p2.data[2] = data[2];
+        p2.linesize[0] = w;
+        p2.linesize[1] = w >> shiftv;
+        p2.linesize[2] = w >> shiftv; 
+
+        // dest pix, dest format, informat, w , h 
+        if(img_convert( &p1, PIX_FMT_RGB24,&p2, in_pix_fmt,w,h ))
+        {
+#ifdef STRICT_CHECKING
+                veejay_msg(0, "Image conversion failed in %s", __FUNCTION__ );
+                assert(0);
+#endif
+        }
+}   
 
 void    util_convertsrc( void *indata, int w, int h, int out_pix_fmt, int shift, uint8_t **data, int rgb)
 {
@@ -664,7 +720,7 @@ void    util_convertsrc( void *indata, int w, int h, int out_pix_fmt, int shift,
         assert( h > 0 );
 #endif
         p2.data[0] = indata;
-        p2.linesize[0] = w * 4;
+        p2.linesize[0] = w * (rgb == FMT_RGB24 ? 3 : 4);
 
         p1.data[0] = data[0];
         p1.data[1] = data[1];

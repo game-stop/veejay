@@ -27,6 +27,7 @@
 #include <libvjmsg/vj-common.h>
 #include <veejay/vims.h>
 #include <libstream/vj-net.h>
+#include <liblzo/lzo.h>
 
 typedef struct
 {

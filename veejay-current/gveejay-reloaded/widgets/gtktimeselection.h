@@ -39,6 +39,7 @@ typedef struct _TimelineSelectionClass TimelineSelectionClass;
 GtkType		timeline_get_type	(void);
 GtkWidget*	timeline_new		(void);
 
+gdouble		timeline_get_length	(TimelineSelection *te);
 gdouble		timeline_get_pos	(TimelineSelection *te);
 gdouble		timeline_get_in_point	(TimelineSelection *te );
 gdouble		timeline_get_out_point  (TimelineSelection *te );

@@ -45,6 +45,7 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <libel/pixbuf.h>
 #include <unistd.h>
 #ifdef SUPPORT_READ_DV2
 #include "rawdv.h"
@@ -245,7 +246,6 @@ static void	_el_free_decoder( vj_decoder *d )
 {
 	if(d)
 	{
-		int i;
 		if(d->tmp_buffer)
 			free( d->tmp_buffer );
 		if(d->sampler )
@@ -394,7 +394,6 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 	
 	if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 && !found && id != CODEC_ID_YUVLZO)
         {
-		int i;
 		d->codec = avcodec_find_decoder( id );
 		d->context = avcodec_alloc_context();
 		d->context->width = width;
@@ -450,7 +449,6 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 		
         veejay_memset( d->deinterlace_buffer[0], 0, width * height * 3 );
 
-	int i;
         d->ref = 1;
         return d;
 }
@@ -462,8 +460,6 @@ void	vj_el_set_image_output_size(editlist *el)
 			el->pixel_format == FMT_420 ? 1 :0);
 }
 
-int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force,
-		char norm);
 
 static int _el_probe_for_pixel_fmt( lav_file_t *fd )
 {
@@ -1241,7 +1237,9 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 						ret = FMT_422F;
 				break;
 		case CODEC_ID_DVVIDEO:
+#ifdef SUPPORT_READ_DV2
 				ret = vj_dv_scan_frame( dv_decoder_, d->tmp_buffer );
+#endif
 				break;
 		case CODEC_ID_YUVLZO:
 				ret = FMT_422;
@@ -1719,7 +1717,6 @@ void	vj_el_free(editlist *el)
 {
 	if(el)
 	{
-		int n = el->num_video_files;
 		int i;
 		for( i = 0; i < MAX_EDIT_LIST_FILES ; i++ )
 		{

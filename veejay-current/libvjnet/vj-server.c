@@ -16,16 +16,16 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
+#include <config.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <string.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
 #include <libvjmsg/vj-common.h>
 #include <libvjnet/vj-server.h>
 #include <libvjmem/vjmem.h>
-#include <string.h>
 
 
 #define __INVALID 0
@@ -59,7 +59,6 @@ typedef struct
 
 int		_vj_server_free_slot(vj_server *vje);
 int		_vj_server_new_client(vj_server *vje, int socket_fd);
-int		_vj_server_del_client(vj_server *vje, int link_id);
 int		_vj_server_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, int priority );
 int		_vj_server_empty_queue(vj_server *vje, int link_id);
 
@@ -450,7 +449,7 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 	int i = 0;
 	char *s = buf;
 	int num_msg = 0;
-	vj_link **Link = (vj_link**) vje->link;
+	//vj_link **Link = (vj_link**) vje->link;
 
 	if( (i+4) > buf_len )
 	  _vj_malfunction("VIMS (v) Message too small", buf, buf_len, i );
@@ -458,94 +457,113 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 	while( (i+4) < buf_len )
 	{
 		if( !(s[i]=='V' && s[i+4] == 'D') )
-		{
-			_vj_malfunction( "VIMS (v) Cannot identify message as VIMS message",
-					buf,buf_len,i );
-			return 0;
-		}
-
-		char tmp_len[4];
-		char net_id[4];
-		int  slen = 0;
-		int	netid = 0;
-		bzero(tmp_len,4);
-		bzero(net_id,4 );
-
-		char *str_ptr = &s[i];
-		str_ptr ++;  // skip 'V'
-
-		strncpy( tmp_len,str_ptr, 3 ); // header length   
-
-		if( sscanf(tmp_len, "%03d", &slen) <= 0 )
-		{
-			_vj_malfunction( "VIMS (v) Cannot read header length", buf, buf_len, i + 1);
-			return 0;
-		}
-		if( slen > buf_len )
-		{
-			char msg[256];
-			veejay_memset(msg,0,256);
-			snprintf(msg, 256,"VIMS (v) Remote %s is sending corrupted packets", (char*) (inet_ntoa( vje->remote.sin_addr ) ) );
-			_vj_malfunction( NULL, buf, buf_len, i + 1 );
-			vj_server_close_connection( vje, link_id );
-			return 0;
-		}
-	
-
-		if ( slen > 999 )
-		{
-			char msg[256];
-			veejay_memset(msg,0,256);
-			snprintf(msg, 256, "VIMS (v) Remote %s is acting very suspiciously", (char* )( inet_ntoa( vje->remote.sin_addr ) ));
-			_vj_malfunction( msg, buf, buf_len, i + 1);  
-			vj_server_close_connection( vje, link_id );
-			return 0;
-		}
-
-		i += 4; // advance to message content
-		str_ptr += 4;
-		strncpy( net_id, str_ptr, 3 );
-
-		if( sscanf( net_id, "%03d", &netid ) <= 0 )
-		{
-			_vj_malfunction( "VIMS (v) Corrupt VIMS selector", buf, buf_len, i );
-			return 0;
-		}
-		if( netid < 0 && netid > 600 )
-		{
-			_vj_malfunction( "VIMS (v) selector out of range", buf,buf_len, i );
-			return 0;
-		}
-		if( vje->use_mcast )
-			if( netid >= 400 && netid < 500 )
+		{	
+			if(s[i] != 'K')
 			{
-				_vj_malfunction( "VIMS (v) multicast doesnt allow querying of data",buf,buf_len,i);
+			_vj_malfunction( "VIMS (v) Cannot identify message as VIMS message", buf, buf_len, i);
+			return 0;
+			}
+		}
+
+		if( s[i] != 'K' )
+		{
+			char tmp_len[4];
+			char net_id[4];
+			int  slen = 0;
+			int	netid = 0;
+
+			bzero(tmp_len,4);
+			bzero(net_id,4 );
+
+			char *str_ptr = &s[i];
+			str_ptr ++;  // skip 'V'
+
+			strncpy( tmp_len,str_ptr, 3 ); // header length   
+	
+			if( sscanf(tmp_len, "%03d", &slen) <= 0 )
+			{
+				_vj_malfunction( "VIMS (v) Cannot read header length", buf, buf_len, i + 1);
+				return 0;
+			}
+			if( slen > buf_len )
+			{
+				char msg[256];
+				veejay_memset(msg,0,256);
+				snprintf(msg, 256,"VIMS (v) Remote %s is sending corrupted packets", (char*) (inet_ntoa( vje->remote.sin_addr ) ) );
+				_vj_malfunction( NULL, buf, buf_len, i + 1 );
+				vj_server_close_connection( vje, link_id );
+				return 0;
+			}
+			if ( slen > 999 )
+			{
+				char msg[256];
+				veejay_memset(msg,0,256);
+				snprintf(msg, 256, "VIMS (v) Remote %s is acting very suspiciously", (char* )( inet_ntoa( vje->remote.sin_addr ) ));
+				_vj_malfunction( msg, buf, buf_len, i + 1);  
+				vj_server_close_connection( vje, link_id );
 				return 0;
 			}
 
+			i += 4; // advance to message content
+			str_ptr += 4;
+			strncpy( net_id, str_ptr, 3 );
 
-		//FIXME: malformed endings
-		int ch = i + slen - 1;
-
-		int last_char = slen - 1;
-		int failed = 1;
-		if( last_char > 1 )
-		{
-			if(str_ptr[last_char] == '\n' &&
-				str_ptr[last_char-1] == ';' )
-					failed = 0;
-			else if(str_ptr[last_char] == ';' )
-				failed = 0;
-			if(!failed)
+			if( sscanf( net_id, "%03d", &netid ) <= 0 )
 			{
-				num_msg ++;
-				i += slen + 1;
+				_vj_malfunction( "VIMS (v) Corrupt VIMS selector", buf, buf_len, i );
+				return 0;
+			}
+			if( netid < 0 && netid > 600 )
+			{
+				_vj_malfunction( "VIMS (v) selector out of range", buf,buf_len, i );
+				return 0;
+			}
+			if( vje->use_mcast )
+				if( netid >= 400 && netid < 500 )
+				{
+					_vj_malfunction( "VIMS (v) multicast doesnt allow querying of data",buf,buf_len,i);
+					return 0;
+				}
+
+
+			//FIXME: malformed endings
+			int last_char = slen - 1;
+			int failed = 1;
+			if( last_char > 1 )
+			{
+				if(str_ptr[last_char] == '\n' &&
+					str_ptr[last_char-1] == ';' )
+						failed = 0;
+				else if(str_ptr[last_char] == ';' )
+					failed = 0;
+				if(!failed)
+				{
+					num_msg ++;
+					i += slen + 1;
+				}
+			}
+			if(failed)
+			{
+				_vj_malfunction("VIMS (v) message does not end with ';'", buf, buf_len , i);
+				return 0;
 			}
 		}
-		if(failed)
+		else
 		{
-			_vj_malfunction("VIMS (v) message does not end with ';'", buf, buf_len , i);
-			return 0;
+			int len = 0;
+			char *str_ptr = &s[i];
+		
+			if(sscanf(str_ptr+1, "%8d",&len ))
+			{
+				i += len;
+				num_msg ++;
+				return num_msg;
+			}
+			else
+			{
+				_vj_malfunction("VIMS (v) keyframe packet length not set", str_ptr, buf_len, i );
+			}
+
 		}
 	}
 	if(num_msg > 0 )
@@ -564,58 +582,96 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 
 	while( (i+4) < buf_len )
 	{
-		char tmp_len[4];
+		char tmp_len[8];
 		char net_id[4];
 		int  slen = 0;
 		int	netid = 0;
-		bzero(tmp_len,4);
+		bzero(tmp_len,8);
 		bzero(net_id,4 );
 
 		char *str_ptr = &s[i];
-		str_ptr ++;
+		
+		if(s[i] == 'V')
+		{
+			str_ptr ++;
 	
-		strncpy( tmp_len,str_ptr, 3 ); // header length   
-		if( sscanf(tmp_len, "%03d", &slen) <= 0 )
-		{
-			return 0;
-		}
-		i += 4; // advance to message content
-		str_ptr += 4;
-		strncpy( net_id, str_ptr, 3 );
+			strncpy( tmp_len,str_ptr, 3 ); // header length   
+			if( sscanf(tmp_len, "%03d", &slen) <= 0 )
+			{
+				veejay_msg(0, "Error parsing header in '%s' (%d bytes)", buf, buf_len );
+				return 0;
+			}
+			i += 4; // advance to message content
+			str_ptr += 4;
+			strncpy( net_id, str_ptr, 3 );
 	
-		if( sscanf( net_id, "%03d", &netid ) <= 0 )
-		{
-			return 0;
+			if( sscanf( net_id, "%03d", &netid ) <= 0 )
+			{
+				if( strncasecmp(net_id, "key",3) != 0 )
+				{
+					veejay_msg(0, "Error parsing VIMS ID in '%s' (%d bytes)",buf,buf_len);
+					return 0;
+				}
+				else
+				{
+					v[num_msg]->msg = (char*) vj_calloc( slen );
+					veejay_memcpy( v[num_msg]->msg, str_ptr, slen );
+					v[num_msg]->len = slen;
+					num_msg++;
+				}
+			}
+			else
+			{
+				if(! priority )
+				{
+					// store message anyway
+					int n_len = slen;
+					v[num_msg]->msg = (char*)strndup( str_ptr , slen );
+					veejay_chomp_str( v[num_msg]->msg , &n_len );
+					v[num_msg]->len = n_len;
+					num_msg++;
+				}
+				if(priority && netid > 255 )
+				{
+					// store high priority only (reduce load) -         
+					int n_len = slen;
+					v[num_msg]->msg = (char*)strndup( str_ptr , slen );
+					veejay_chomp_str( v[num_msg]->msg, &n_len );
+					v[num_msg]->len = n_len;
+					num_msg++;
+				}
+			}
+	
+			if(num_msg == VJ_MAX_PENDING_MSG )
+				{
+				veejay_msg(VEEJAY_MSG_DEBUG, "VIMS server queue full - max messages per interval is %d",
+					VJ_MAX_PENDING_MSG );	
+				   return num_msg; // cant take more
+			}
+	//		i += slen;
+			i += (slen+1); // try next message
+
 		}
-		if(! priority )
+		else if (s[i] == 'K' )
 		{
-			// store message anyway
-			int n_len = slen;
-			v[num_msg]->msg = (char*)strndup( str_ptr , slen );
-			veejay_chomp_str( v[num_msg]->msg , &n_len );
-			v[num_msg]->len = n_len;
+			str_ptr ++;
+			veejay_memcpy( tmp_len,str_ptr, 8 );    
+			if( sscanf(tmp_len, "%08d", &slen) <= 0 )
+			{
+				veejay_msg(0, "Error parsing KF header in '%s' (%d bytes)", buf, buf_len );
+				return 0;
+			}
+
+			i += 8; // advance to message content
+			str_ptr += 8;
+	
+			v[num_msg]->msg = (char*) vj_calloc( slen );
+			veejay_memcpy( v[num_msg]->msg, str_ptr, slen );
+			v[num_msg]->len = slen;
 			num_msg++;
-		}
 
-		if(priority && netid > 255 )
-		{
-			// store high priority only (reduce load) -         
-			int n_len = slen;
-			v[num_msg]->msg = (char*)strndup( str_ptr , slen );
-			veejay_chomp_str( v[num_msg]->msg, &n_len );
-			v[num_msg]->len = n_len;
-			num_msg++;
+			i += slen;
 		}
-
-		if(num_msg == VJ_MAX_PENDING_MSG )
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "VIMS server queue full - max messages per interval is %d",
-				VJ_MAX_PENDING_MSG );	
-			   return num_msg; // cant take more
-		}
-	//	i += slen;
-		i += (slen+1); // try next message
-
 	}
 
 	if( ! priority )
@@ -776,7 +832,43 @@ int	vj_server_link_used( vj_server *vje, int link_id)
 	return 1;
 }
 
-int vj_server_retrieve_msg(vj_server *vje, int id, char *dst )
+
+int	vj_server_min_bufsize( vj_server *vje, int id )
+{
+	vj_link **Link = (vj_link**) vje->link;
+   	if (Link[id]->in_use == 0)
+		return 0;
+
+	int index = Link[id]->n_retrieved;
+	if( index >= Link[id]->n_queued )
+		return 0; // done
+
+	return Link[id]->m_queue[index]->len;
+}
+
+
+char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
+{
+	vj_link **Link = (vj_link**) vje->link;
+   	if (Link[id]->in_use == 0)
+		return NULL;
+
+	int index = Link[id]->n_retrieved;
+	if( index >= Link[id]->n_queued )
+		return NULL; // done
+
+	char *msg = Link[id]->m_queue[index]->msg;
+	int len = Link[id]->m_queue[index]->len;
+
+	index ++;
+	Link[id]->n_retrieved = index;
+
+	*str_len = len;
+	return msg;
+}
+
+/*
+int vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 {
 	vj_link **Link = (vj_link**) vje->link;
    	if (Link[id]->in_use == 0)
@@ -790,10 +882,13 @@ int vj_server_retrieve_msg(vj_server *vje, int id, char *dst )
 
 	msg = Link[id]->m_queue[index]->msg;
 	len = Link[id]->m_queue[index]->len;
-	strncpy( dst, msg, len );
+//	strncpy( dst, msg, len );
+
+	veejay_memcpy(dst,msg, len );
+	*str_len = len;
 
 	index ++;
 	Link[id]->n_retrieved = index;
 	return 1;			
 }
-
+*/

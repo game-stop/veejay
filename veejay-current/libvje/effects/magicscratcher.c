@@ -154,8 +154,8 @@ void magicscratcher_apply(VJFrame *frame,
 	memset_ycbcr( Cb, Cb, 128, uv_width, uv_height);
 	memset_ycbcr( Cr, Cr, 128, uv_width, uv_height);
 #else
-	memset( Cb, 128, uv_len);
-	memset( Cr, 128, uv_len);
+	veejay_memset( Cb, 128, frame->uv_len);
+	veejay_memset( Cr, 128, frame->uv_len);
 #endif
 
 

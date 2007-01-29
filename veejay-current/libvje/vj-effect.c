@@ -127,6 +127,7 @@
 #include "effects/cartonize.h"
 #include "effects/nervous.h"
 #include "effects/morphology.h"
+#include "effects/threshold.h"
 #include "effects/colmorphology.h"
 #include "effects/blob.h"
 #include "effects/ghost.h"
@@ -145,6 +146,8 @@
 #include "effects/flare.h"
 #include "effects/constantblend.h"
 #include "effects/colflash.h"
+#include "effects/rgbchannel.h"
+#include "effects/diffmap.h"
 #include	"plugload.h"
 
 #ifdef USE_SWSCALER
@@ -200,6 +203,8 @@ static struct
 {	overclock_malloc, 		overclock_free,		VJ_IMAGE_EFFECT_OVERCLOCK	},
 {	nervous_malloc,			nervous_free,		VJ_IMAGE_EFFECT_NERVOUS		},
 {	morphology_malloc,		morphology_free,	VJ_IMAGE_EFFECT_MORPHOLOGY	},
+{	differencemap_malloc,		differencemap_free,	VJ_VIDEO_EFFECT_EXTDIFF		},
+{	threshold_malloc,		threshold_free,		VJ_VIDEO_EFFECT_EXTTHRESHOLD	},
 {	colmorphology_malloc,		colmorphology_free,	VJ_IMAGE_EFFECT_COLMORPH	},
 {	blob_malloc,			blob_free,		VJ_IMAGE_EFFECT_VIDBLOB 	},
 {	boids_malloc,			boids_free,		VJ_IMAGE_EFFECT_VIDBOIDS 	},
@@ -216,6 +221,7 @@ static struct
 {	videowall_malloc,		videowall_free,		VJ_VIDEO_EFFECT_VIDEOWALL	},
 {	flare_malloc,			flare_free,		VJ_IMAGE_EFFECT_FLARE		},
 {	goomfx_malloc,			goomfx_free,		VJ_IMAGE_EFFECT_GOOM		},
+{	rgbchannel_malloc,		rgbchannel_free,	VJ_IMAGE_EFFECT_RGBCHANNEL	},
 {	NULL			,	NULL			,0				},
 };
 
@@ -472,11 +478,13 @@ void vj_effect_initialize(int width, int height, int full_range)
     vj_effects[36] = tripplicity_init(width,height);
     vj_effects[37] = videoplay_init(width,height);
     vj_effects[38] = videowall_init(width,height);
+    vj_effects[39] = threshold_init(width,height);
+	vj_effects[40] = differencemap_init(width,height);
 #ifdef USE_SWSCALER
-	vj_effects[39] = picinpic_init(width,height);
-        vj_effects[40] = dummy_init(width,height);
+	vj_effects[41] = picinpic_init(width,height);
+        vj_effects[42] = dummy_init(width,height);
 #else
-	vj_effects[39] = dummy_init(width,height);
+	vj_effects[41] = dummy_init(width,height);
 #endif
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
@@ -558,6 +566,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 78] = goomfx_init(width,height);
 	vj_effects[i + 79] = colmorphology_init(width,height);
 	vj_effects[i + 80] = colflash_init(width,height);
+	vj_effects[i + 81] = rgbchannel_init(width,height);
 	max_width = width;
 	max_height = height;
 

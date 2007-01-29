@@ -295,6 +295,59 @@ int vj_client_send(vj_client *v, int sock_type,char *buf )
    	return 1;
 }
 
+int vj_client_send_buf(vj_client *v, int sock_type,unsigned char *buf, int len )
+{
+	if( sock_type == V_CMD )
+	{
+
+		// format msg
+		sprintf(v->blob, "V%03dD", len);
+		veejay_memcpy( v->blob+5, buf, len );
+		if(v->c[0]->type == VSOCK_C)
+			return ( sock_t_send( v->c[0]->fd, v->blob, len + 5 ));
+		if(v->c[0]->type == VMCAST_C)
+			return ( mcast_send( v->c[0]->s, (void*) v->blob, len + 5,
+					v->ports[1] ));
+	}
+	if( sock_type == V_MSG )
+	{
+
+		// format msg
+		sprintf(v->blob, "V%03dD", len);
+		veejay_memcpy(v->blob+5, buf, len);
+		if(v->c[2]->type == VSOCK_C)
+			return ( sock_t_send( v->c[2]->fd, v->blob, len + 5 ));
+	}
+
+   	return 1;
+}
+
+int vj_client_send_bufX(vj_client *v, int sock_type,unsigned char *buf, int len )
+{
+	if( sock_type == V_CMD )
+	{
+
+		// format msg
+		sprintf(v->blob, "K%08d", len);
+		veejay_memcpy( v->blob+9, buf, len );
+		if(v->c[0]->type == VSOCK_C)
+			return ( sock_t_send( v->c[0]->fd, v->blob, len + 9 ));
+		if(v->c[0]->type == VMCAST_C)
+			return ( mcast_send( v->c[0]->s, (void*) v->blob, len + 9,
+					v->ports[1] ));
+	}
+	if( sock_type == V_MSG )
+	{
+
+		// format msg
+		sprintf(v->blob, "K%08d", len);
+		veejay_memcpy(v->blob+9, buf, len);
+		if(v->c[2]->type == VSOCK_C)
+			return ( sock_t_send( v->c[2]->fd, v->blob, len + 9 ));
+	}
+
+   	return 1;
+}
 
 int vj_client_close( vj_client *v )
 {
@@ -318,8 +371,6 @@ int vj_client_close( vj_client *v )
 
 int	vj_client_test(char *host, int port)
 {
-	struct hostent *he = gethostbyname( host );
-
 	if( h_errno == HOST_NOT_FOUND )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Specified host '%s':'%d' is unknown", host,port );

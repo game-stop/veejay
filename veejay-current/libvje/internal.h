@@ -111,8 +111,10 @@ enum {
     VJ_VIDEO_EFFECT_TRIPPLICITY = 236,
 	VJ_VIDEO_EFFECT_VIDEOPLAY = 237,
 	VJ_VIDEO_EFFECT_VIDEOWALL = 238,
+	VJ_VIDEO_EFFECT_EXTTHRESHOLD = 239,
+	VJ_VIDEO_EFFECT_EXTDIFF		= 240,
 #ifdef USE_SWSCALER
-	VJ_VIDEO_EFFECT_PICINPIC = 239,
+	VJ_VIDEO_EFFECT_PICINPIC = 241,
 #endif
   //  VJ_VIDEO_EFFECT_CHANNELMIX = 233,
 };
@@ -199,17 +201,18 @@ enum {
 	VJ_IMAGE_EFFECT_GOOM = 178,
 	VJ_IMAGE_EFFECT_COLMORPH = 179,
 	VJ_IMAGE_EFFECT_COLFLASH = 180,
-	VJ_IMAGE_EFFECT_DUMMY = 100,
+	VJ_IMAGE_EFFECT_RGBCHANNEL = 181,
+	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 181
+#define VJ_IMAGE_EFFECT_MAX 182
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #ifdef USE_SWSCALER
-#define VJ_VIDEO_EFFECT_MAX 240
+#define VJ_VIDEO_EFFECT_MAX 242
 #else
-#define VJ_VIDEO_EFFECT_MAX 239
+#define VJ_VIDEO_EFFECT_MAX 241
 #endif
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
@@ -532,10 +535,17 @@ extern void goom_apply(VJFrame *frame, int w, int h, int val );
 extern void flare_apply(VJFrame *frame, int w, int h, int type, int threshold, int radius );
 
 extern void constantblend_apply(VJFrame *frame , int w, int h, int type, int scale, int y );
+
 #ifdef USE_SWSCALER
 extern void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
 		   int twidth, int theight, int x1, int y1,
 		   int width, int height);
 #endif
+
+extern void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse );
+
+extern void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg , int chb);
+
+extern	void	differencemap_apply( VJFrame *f, VJFrame *f2, int w, int h, int t1, int rev );
 
 #endif

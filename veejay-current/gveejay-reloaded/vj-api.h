@@ -28,5 +28,17 @@ void	vj_gui_enable(void);
 void	vj_gui_disable(void);
 void	vj_gui_disconnect(void);
 void	vj_gui_set_debug_level(int level, int preview_p, int pw, int ph);
+void   get_gd(char *buf, char *suf, const char *filename);
+void   vj_gui_theme_setup(int default_theme);
+void   vj_gui_set_timeout(int timer);
+void   set_skin(int skin);
+void   default_bank_values(int *col, int *row );
+void   vj_gui_style_setup();
+gboolean       gveejay_running();
+gboolean       is_alive( void );
+int    vj_gui_sleep_time( void );
+int    get_total_frames();
+int    vj_img_cb(GdkPixbuf *img );
+
 
 #endif 

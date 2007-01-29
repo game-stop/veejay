@@ -28,9 +28,9 @@
 #define FX_LIMIT	1024
 
 #ifdef USE_SWSCALER
-#define MAX_EFFECTS 121
+#define MAX_EFFECTS 124
 #else
-#define MAX_EFFECTS 120
+#define MAX_EFFECTS 123
 #endif
 #define PARAM_WIDTH	    (1<<0x2)
 #define PARAM_HEIGHT	(1<<0x3)
@@ -47,7 +47,7 @@ typedef struct
 
 typedef struct VJFrame_t 
 {
-	uint8_t *data[3];
+	uint8_t *data[4];
 	int	uv_len;
 	int	len;
 	int	uv_width;
@@ -58,6 +58,7 @@ typedef struct VJFrame_t
 	int 	width;
 	int	height;
 	int	ssm;
+	int	alpha;
 } VJFrame;
 
 typedef struct VJRectangle_t
@@ -101,6 +102,7 @@ typedef struct vj_effect_t {
 // initialize library
 extern void vj_effect_initialize(int width, int height, int range);
 extern void vj_effect_shutdown();
+extern int vj_effect_max_effects();
 
 // convert effect number to internal num
 extern int vj_effect_real_to_sequence(int effect_id);
@@ -121,6 +123,7 @@ extern int vj_effect_has_cb(int effect_id);
 extern int vj_effect_has_rgbkey(int effect_id);
 extern int vj_effect_is_valid(int effect_id);
 extern int vj_effect_get_summary(int entry, char *dst);
+extern int vj_effect_get_summary_len(int entry);
 
 // activate an effect 
 extern int vj_effect_activate(int e);

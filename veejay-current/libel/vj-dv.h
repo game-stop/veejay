@@ -45,6 +45,7 @@ vj_dv_encoder *vj_dv_init_encoder(void * el, int pixel_format);
 
 void	   vj_dv_decoder_get_audio(vj_dv_decoder *d, uint8_t *audio_buf);
 
+int     vj_dv_scan_frame( vj_dv_decoder *d, uint8_t * input_buf );
 
 void		vj_dv_decoder_set_audio(vj_dv_decoder *d, int audio);
 

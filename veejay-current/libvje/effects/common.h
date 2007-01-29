@@ -44,10 +44,6 @@ extern int  pixel_U_lo_;
 
 extern void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t lo);
 
-#ifdef HAVE_MMX
-#define MMX_load8byte_mm7(data)__asm__("\n\t movq %0,%%mm7\n":	"=m" (data):)
-#endif
-
 #ifndef ARCH_X86
 # define sin_cos(si, co, x)     si = sin(x); co = cos(x)
 # define fast_sqrt( res,x ) res = sqrt(x) 

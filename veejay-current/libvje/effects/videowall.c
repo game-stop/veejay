@@ -89,10 +89,16 @@ static	int prepare_filmstrip(int w, int h)
 		photo_list[i]->h = picture_height;
 		for( j = 0; j < 3; j ++ )
 		{
-			photo_list[i]->data[j] = vj_calloc(sizeof(uint8_t) * picture_width * picture_height );
+			photo_list[i]->data[j] = vj_malloc(sizeof(uint8_t) * picture_width * picture_height );
 			if(!photo_list[i]->data[j])
 				return 0;
 		}
+		veejay_memset( photo_list[i]->data[0], 0,
+				picture_width * picture_height );
+		veejay_memset( photo_list[i]->data[1],128,
+				picture_width * picture_height );
+		veejay_memset( photo_list[i]->data[2],128,
+				picture_width * picture_height );
 		val+= inc;
 	}
 	frame_counter = 0;

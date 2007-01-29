@@ -224,10 +224,9 @@ void boids_free()
 
 typedef void (*blob_func)(int s, int width);
 
-static void	*blob_render_circle(int s, int width)
+static void	blob_render_circle(int s, int width)
 {
 	int i,j;
-	void *v;
 	for( i = 0; i < blob_dradius_ ; ++ i )	
 	{
 		for( j = 0; j < blob_dradius_ ; ++ j)
@@ -239,13 +238,11 @@ static void	*blob_render_circle(int s, int width)
 		}
 		s += width;
 	}
-	return v;
 }
 
-static void	*blob_render_rect(int s, int width)
+static void	blob_render_rect(int s, int width)
 {
 	int i,j;
-	void *v;
 	for( i = 0; i < blob_dradius_ ; ++ i )	
 	{
 		for( j = 0; j < blob_dradius_ ; ++ j)
@@ -254,14 +251,13 @@ static void	*blob_render_rect(int s, int width)
 		}
 		s += width;
 	}
-	return v;
 }
 
-static blob_func	*blob_render(void)
+static blob_func	blob_render(void)
 {
 	if( blob_type_ == BLOB_RECT)
-		return &blob_render_rect;
-	return &blob_render_circle;
+		return blob_render_rect;
+	return blob_render_circle;
 }
 
 

@@ -23,8 +23,8 @@
 #include <stdint.h>
 typedef struct
 {
-	void *map_start;	/* result of mmap() */
-	void *data_start;	/* start of data */
+	unsigned char  *map_start;	/* result of mmap() */
+	unsigned char *data_start;	/* start of data */
 	uint64_t	start_region;
 	uint64_t	end_region;
 	off_t	mem_offset;	/* start of image */

@@ -110,6 +110,7 @@ static	void	gvr_close_connection( veejay_track_t *v )
          if(v->compr_buffer) free(v->compr_buffer);
          if(v->data_buffer) free(v->data_buffer);
          free(v);
+	 v= NULL;
    }
 }
 
@@ -335,6 +336,8 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 
 static int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v )
 {
+	if(!v)
+		return 0;
 	if( vj_client_poll( v->fd , V_STATUS ) )
 		return veejay_process_status( vp, v );
 	return 0;
@@ -662,8 +665,6 @@ int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 
 static GdkPixbuf	**gvr_grab_images(void *preview)
 {
-	
-	//requires lock
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	GdkPixbuf **list = (GdkPixbuf**) vj_calloc( sizeof(GdkPixbuf*) * vp->n_tracks );
 	if(!list)
@@ -926,7 +927,7 @@ static	void	*gvr_preview_thread(gpointer data)
 			break;
 
 		if( score == 0 )
-			g_usleep( 1000 * 30 );
+			g_usleep( 2000 );
 	}
 
 	return NULL;

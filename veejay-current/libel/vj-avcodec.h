@@ -76,4 +76,7 @@ void 		*vj_avcodec_start( editlist *el, int encoder );
 
 int		vj_avcodec_stop( void *encoder , int fmt);
 
+void               vj_avcodec_close_encoder( vj_encoder *av );
+
+
 #endif

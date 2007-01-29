@@ -22,7 +22,6 @@
 #include <gtk/gtksignal.h>
 
 #include <gdk-pixbuf/gdk-pixbuf.h>
-
 #include "gtkknob.h"
 
 #ifndef M_PI
@@ -148,7 +147,7 @@ GtkWidget *gtk_knob_new(GtkAdjustment *adjustment, const char *path) {
   GtkKnob *knob;
 
   knob = gtk_type_new(gtk_knob_get_type());
-  knob->path = strdup( path );
+  knob->path = g_strdup( path );
 
   animation = get_anim_list( knob->path );
 

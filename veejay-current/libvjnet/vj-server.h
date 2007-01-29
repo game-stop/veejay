@@ -47,7 +47,7 @@ int vj_server_update(vj_server * vje, int link_id);
 
 void vj_server_shutdown(vj_server *vje);
 
-int vj_server_retrieve_msg(vj_server *vje, int link_id, char *dst);
+char *vj_server_retrieve_msg(vj_server *vje, int link_id, char *dst, int *res);
 
 int vj_server_poll(vj_server * vje);
 
@@ -56,6 +56,9 @@ int vj_server_send(vj_server *vje, int link_id, uint8_t *buf, int len);
 int vj_server_send_frame(vj_server *vje, int link_id, uint8_t *buf, int total_len, VJFrame *frame, VJFrameInfo *info,long ms);
 
 int	vj_server_init(void);
+
+int _vj_server_del_client(vj_server * vje, int link_id);
+
 
 void	vj_server_close_connection( vj_server *vje, int link_id );
 

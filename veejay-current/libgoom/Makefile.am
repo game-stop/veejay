@@ -1,20 +1,9 @@
-# libgoom
-
 MAINTAINERCLEANFILES=Makefile.in
 INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/libgoom
-
-if ARCH_PPC 
-PPC_FILES=ppc_zoom_ultimate.s ppc_drawings.s
-else
-PPC_FILES=
-endif
-
-LIBGOOM = libgoom.a
-noinst_LIBRARIES = $(LIBGOOM)
-
-#goom2_library_include_HEADERS = goom.h goom_plugin_info.h goom_typedefs.h goom_graphic.h goom_config_param.h goom_visual_fx.h goom_filters.h goom_tools.h goomsl.h goomsl_hash.h goomsl_heap.h goom_tools.h goom_config.h
-libgoom_a_SOURCES = goomsl_yacc.y goomsl_lex.l goomsl.c goomsl_hash.c goomsl_heap.c \
-	goom_tools.c $(PPC_FILES) \
+GOOM_LIB_FILE = libgoom.la
+noinst_LTLIBRARIES = $(GOOM_LIB_FILE)
+libgoom_la_SOURCES = goomsl_yacc.y goomsl_lex.l goomsl.c goomsl_hash.c goomsl_heap.c \
+	goom_tools.c \
 	config_param.c convolve_fx.c filters.c \
 	flying_stars_fx.c gfontlib.c gfontrle.c \
 	goom_core.c graphic.c ifs.c lines.c \
@@ -22,4 +11,5 @@ libgoom_a_SOURCES = goomsl_yacc.y goomsl_lex.l goomsl.c goomsl_hash.c goomsl_hea
 	tentacle3d.c plugin_info.c \
 	v3d.c drawmethods.c \
 	cpu_info.c
+
 

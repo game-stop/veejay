@@ -172,7 +172,7 @@ int 	vj_tag_set_trimmer(int t1, int position, int value);
    args must be initialized.
  */
 int 	vj_tag_get_all_effect_args(int t1, int position, int *args,
-			       int arg_len);
+			       int arg_len, int n_frame);
 
 int 	vj_tag_get_effect_arg(int t1, int p, int arg);
 
@@ -228,7 +228,7 @@ int 	vj_tag_enable(int t1);
 
 int 	vj_tag_disable(int t1);
 
-int		vj_tag_sprint_status(int tag_id, int cache,int r, int f, int m, int t,char *str );
+int		vj_tag_sprint_status(int tag_id, int cache,int sa, int ca, int r, int f, int m, int t,char *str );
 
 //int vj_tag_init_encoder(int t1, char *filename, int format,
 //	int w, int h, double fps, long seconds, int autoplay);
@@ -288,8 +288,23 @@ int 	vj_tag_set_logical_index(int t1, int stream_nr);
 int	vj_tag_set_description(int t1, char *descr);
 int	vj_tag_get_description(int t1, char *descr);
 void	vj_tag_get_by_type( int type, char *descr );
+
+
+int	vj_tag_chain_set_kfs( int s1, int len, unsigned char *data );
+unsigned char *	vj_tag_chain_get_kfs( int s1, int entry, int parameter_id, int *len );
+int	vj_tag_get_kf_status(int t1, int entry);
+int	vj_tag_chain_set_kf_status( int s1, int entry, int status );
+int	vj_tag_chain_reset_kf( int s1, int entry );
+int     vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *active );
+int vj_tag_true_size();
+
+char *vj_tag_scan_devices( void );
+int    vj_tag_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type);
+
+int    vj_tag_num_devices();
+
 #ifdef HAVE_XML2
 void tagCreateStreamFX(xmlNodePtr node, vj_tag *tag);
-void tagParseStreamFX(xmlDocPtr doc, xmlNodePtr cur, vj_tag *tag);
+void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font);
 #endif
 #endif

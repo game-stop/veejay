@@ -27,5 +27,10 @@ int		x_display_set_fullscreen( void *dctx, int status );
 
 int	x_display_push(void *dctx, uint8_t **data, int width, int height, int out );
 void	x_display_resize( int x, int y, int w, int h );
+void       x_display_event( void *dctx, int w, int h );
+int                x_display_get_fs( void *dctx );
+void	 x_display_open(void *dctx, int w, int h);
+void	x_display_mouse_update( void *dctx, int *a, int *b, int *c, int *d );
+void		x_display_mouse_grab( void *dctx, int a, int b, int c, int d );
 void	*x_get_display(void *ptr);
 #endif

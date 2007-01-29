@@ -38,7 +38,7 @@
 #include <sys/mman.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
-
+#include <veejay/vj-OSC.h>
 static int run_server = 1;
 static veejay_t *info;
 static float override_fps = 0.0;
@@ -51,7 +51,7 @@ static char override_norm = 'p';
 static int auto_loop = 0;
 static int n_slots_ = 4;
 static int max_mem_ = 30;
-
+static int viewport = 0;
 static void CompiledWith()
 {
 	veejay_msg(VEEJAY_MSG_INFO,"Compilation flags:");
@@ -109,9 +109,10 @@ static void CompiledWith()
 
 static void Usage(char *progname)
 {
+    fprintf(stderr, "This is Veejay %s\n\n", VERSION);
     fprintf(stderr, "Usage: %s [options] <filename> [<filename> ...]\n",
 	    progname);
-    fprintf(stderr, "where options are:\n");
+    fprintf(stderr, "where options are:\n\n");
 
     fprintf(stderr,
 	    "  -p/--portoffset\t\tTCP port to accept/send messages (default: 3490)\n");
@@ -186,7 +187,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -r/--audiorate\t\tDummy audio rate\n");
 	fprintf(stderr,
-		"  -m/--memory	\t\tMaximum memory to use for cache (0=disable, default=30%)\n");  
+		"  -m/--memory	\t\tMaximum memory to use for cache (0=disable, default=30 max=100)\n");  
 	fprintf(stderr,
 		"  -j/--max_cache \t\tDivide cache memory over N samples (default=4)\n");
 	fprintf(stderr,
@@ -199,7 +200,6 @@ static void Usage(char *progname)
 		"\t\t\t\t 2 = YUV 4:2:0 Planar full range\n");
 	fprintf(stderr,
 		"\t\t\t\t 3 = YUV 4:2:2 Planar full range\n");
-
 	fprintf(stderr,
 		"  -d/--dummy	\t\tDummy playback\n");
 	fprintf(stderr,
@@ -214,7 +214,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -M/--multicast-osc \t\tmulticast OSC\n");
 	fprintf(stderr,
-		"  -V/--multicast-vims \t\tmulticast VIMS\n");
+		"  -T/--multicast-vims \t\tmulticast VIMS\n");
 	fprintf(stderr,
 		"     --map-from-file <num>\tmap N frames to memory\n");
 #ifdef USE_SWSCALER
@@ -267,6 +267,10 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"\t\t\t\t-C/--zoomcrop [top:bottom:left:right] (crop source before scaling)\n");
 #endif
+	fprintf(stderr,
+		"  -V/--viewport \t\tStart with viewport\n");
+
+
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
 }
@@ -306,7 +310,7 @@ static int set_option(const char *name, char *value)
 	    printf("Valid timers:\n\t0=none\n\t2=normal\n\t1=rtc\n");
 	    nerr++;
 	}
-	} else if (strcmp(name, "multicast-vims") == 0 || strcmp(name,"V")==0)
+	} else if (strcmp(name, "multicast-vims") == 0 || strcmp(name,"T")==0)
 	{
 		check_val(optarg, name);
 		info->settings->use_vims_mcast = 1;
@@ -317,6 +321,10 @@ static int set_option(const char *name, char *value)
 		check_val(optarg,name);
 		info->settings->use_mcast = 1;
 		info->settings->group_name = strdup( optarg );
+	}
+	else if (strcmp(name, "viewport" ) == 0 || strcmp(name , "V" ) == 0 )
+	{
+		viewport = 1;
 	}
 	else if (strcmp(name, "max_cache" )== 0 || strcmp(name, "j" ) == 0 )
 	{
@@ -545,6 +553,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"framerate",1,0,0},
 	{"audiorate",1,0,0},
 	{"ycbcr",1,0,0},
+	{"viewport",0,0,0},
 	{"multicast-osc",1,0,0},
 	{"multicast-vims",1,0,0},
 	{"map-from-file",1,0,0},
@@ -571,12 +580,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:V:s:c:t:j:l:p:m:x:y:nLFPY:ugr:vdibIjf:N:H:W:R:M:V:z:qw:h:C:",
+			"o:G:O:a:H:V:s:c:t:j:l:p:m:x:y:nLFPY:ugr:vdibIjf:N:H:W:R:M:Vz:qw:h:C:T",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   "o:G:s:O:a:c:t:l:t:x:y:m:j:p:nLFPY:vudgibr:Ijf:N:H:W:R:M:V:z:qw:h:C:")) != EOF)
+		   "o:G:s:O:a:c:t:l:t:x:y:m:j:p:nLFPY:vudgibr:Ijf:N:H:W:R:M:Vz:qw:h:C:T")) != EOF)
 #endif
     {
 	switch (n) {
@@ -728,7 +737,8 @@ int main(int argc, char **argv)
 		default_geometry_y,
 		NULL,
 		0,
-		full_range)<0)
+		full_range,
+		viewport)<0)
 	{	
 		veejay_msg(VEEJAY_MSG_ERROR, "Initializing veejay");
 		return 0;

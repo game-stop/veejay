@@ -30,6 +30,11 @@ void 	vj_event_init				();
 void	vj_event_print_range			(	int n1,		int n2);
 int	veejay_finish_action_file(void *ptr, char *filename );
 int	veejay_load_action_file( void *ptr, char *filename );
+
+void    vj_event_stop();
+int  	vj_event_parse_msg( void *v, char *msg, int msg_len );
+
+
 #ifdef HAVE_SDL
 #ifdef HAVE_XML2
 void    vj_event_xml_new_keyb_event		( 	void *v,	xmlDocPtr doc, 	xmlNodePtr cur );
@@ -247,9 +252,15 @@ void	vj_event_font_set_size_and_font(void *ptr,const char format[],	va_list	ap	)
 void	vj_event_select_subtitle( void *ptr, const char format[],  va_list ap	);
 void	vj_event_toggle_osd( void *ptr, const char format[], va_list ap );
 void	vj_event_toggle_copyright( void *ptr, const char format[], va_list ap );
+void	vj_event_toggle_osd_extra(void *ptr, const char format[], va_list ap);
 #endif
-
-
+void	vj_event_toggle_vp_render( void *ptr, const char format[], va_list ap );
+void	vj_event_toggle_viewport( void *ptr, const char format[], va_list ap );
+void	vj_event_set_framerate( void *ptr, const char format[], va_list ap );
+void	vj_event_sync_correction( void *ptr,const char format[], va_list ap );
+void	vj_event_get_keyframes( void *ptr, 	const char format[],	va_list ap	);
+void	vj_event_set_kf_status( void *ptr,	const char format[], 	va_list ap	);
+void	vj_event_reset_kf( void *ptr,	const char format[], va_list ap);
 void	vj_event_sample_sequencer_active(	void *ptr, 	const char format[],	va_list ap );
 void	vj_event_get_sample_sequences( 		void *ptr, 	const char format[],	va_list ap );
 void	vj_event_sequencer_del_sample(		void *ptr, 	const char format[], 	va_list ap );

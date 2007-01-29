@@ -40,6 +40,12 @@
 #include <libvjmem/vjmem.h>
 #include <pthread.h>
 #include <veejay/vj-lib.h>
+#ifdef HAVE_XML2
+#include <libxml/xmlmemory.h>
+#include <libxml/parser.h>
+#endif
+
+extern	int	vj_tag_size();
 
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -64,7 +70,7 @@ typedef struct
 	int size;
 	int font;
 	char *key;
-	char *time;
+	int time;   
 	uint8_t bg[3];
 	uint8_t fg[3];
 	uint8_t ln[3];
@@ -74,13 +80,10 @@ typedef struct
 } srt_seq_t;
 
 
-struct srt_node_t
+typedef struct
 {
-	int id;
-	void *next;
-};
-
-typedef struct srt_node_t srt_nodes_t;
+	int	id[16];
+} srt_cycle_t;
 
 typedef struct {
 	unsigned char *text;
@@ -116,7 +119,7 @@ typedef struct {
 	int	auto_number;
 	int	font_index;
 	long		index_len;
-	srt_nodes_t	**index;
+	srt_cycle_t	**index;
 	float		fps;
 	void	*dictionary;
 	void	*plain;
@@ -130,7 +133,7 @@ static int	configure(vj_font_t *f, int size, int font);
 static char 	*make_key(int id);
 static char 	*vj_font_pos_to_timecode( vj_font_t *font, long pos );
 static long	vj_font_timecode_to_pos( vj_font_t *font, const char *tc );
-static srt_seq_t	*vj_font_new_srt_sequence( int id,char *text, long lo, long hi );
+static srt_seq_t	*vj_font_new_srt_sequence(vj_font_t *font, int id,char *text, long lo, long hi );
 static void	vj_font_del_srt_sequence( vj_font_t *f, int seq_id );
 static void	vj_font_store_srt_sequence( vj_font_t *f, srt_seq_t *s );
 static int	font_selector( const struct dirent *dir );
@@ -141,12 +144,9 @@ static  void    vj_font_substract_timecodes( vj_font_t *font, const char *tc_srt
 static char     *vj_font_split_strd( const char *str );
 static char     *vj_font_split_str( const char *str );
 
+static	int	get_default_font( vj_font_t *f );
+
 static int	test_font( vj_font_t *f , const char *font, int id);
-
-static	void	vj_font_zero_index( vj_font_t *font, srt_seq_t *s );
-static	void	vj_font_build_index( vj_font_t *f, srt_seq_t *seq );
-
-static	void	vj_font_rebuild_index( vj_font_t *font );
 
 static	void	font_lock(vj_font_t *f)
 {
@@ -156,139 +156,50 @@ static  void	font_unlock( vj_font_t *f )
 {
 	pthread_mutex_unlock( &(f->mutex) );
 }
-
+/*
 static	srt_nodes_t	*index_node_new( srt_seq_t *s )
 {
 	srt_nodes_t *seq = (srt_nodes_t*) vj_calloc(sizeof(srt_nodes_t));
 	seq->id = s->id;
 	seq->next = NULL;
 	return seq;
-}
+}*/
 
-
-static	void		index_node_append( vj_font_t *f, srt_seq_t *s, long lo )
+static	int	index_node_append( vj_font_t *f, srt_seq_t *s )
 {
-	srt_nodes_t *l = f->index[lo];
-	if( l == NULL )
+	int k; long i;
+	for( i = s->start ; i <= s->end ; i ++ )
 	{
-		f->index[lo] = index_node_new( s );
-		return;
-	}
-	else
-	{
-		for( l = f->index[lo]; l != NULL ; l = l->next )
+		srt_cycle_t *q = f->index[ i ];
+#ifdef STRICT_CHECKING
+		assert( q != NULL );
+#endif
+		for( k = 0; k < 16; k ++ )
 		{
-			if(l->next == NULL )
+			if( q->id[k] == 0 )
 			{
-				l->next = index_node_new( s );
+				q->id[k] = s->id;
 				break;
 			}
 		}
-		
-	}	
+	}
+	return 0;
 }
 
-static	void	vj_font_build_index( vj_font_t *f, srt_seq_t *seq )
+static	void	index_node_remove( vj_font_t *f, srt_seq_t *s )
 {
-	long lo = seq->start;
-	long hi = seq->end;
-	long k;
-
-	if( lo >= 0 && hi < f->index_len && seq->id > 0)
+	int k; long i;
+	for( i = s->start; i <= s->end; i ++ )
 	{
-		int first = f->index[seq->start] == NULL ? 1 : 0;
-		index_node_append(f, seq, seq->start );
-		
-		if(first)
+		srt_cycle_t *q = f->index[i];
+		if( q == NULL) continue;
+		for( k = 0;k < 16; k ++ )
 		{
-			for( k = seq->start+1; k <= seq->end; k ++ )
-				f->index[k] = f->index[seq->start];
+			if( q->id[k] == s->id )
+				q->id[k] =0;
 		}
 	}
-
 }
-
-static	void	vj_font_rebuild_index( vj_font_t *font )
-{
-#ifdef STRICT_CHECKING
-	assert( font->dictionary != NULL );
-#endif
-	
-	char **items = vevo_list_properties( font->dictionary );
-	if(!items)
-		return;
-
-	int i;
-	for( i = 0; items[i] != NULL ; i ++ )
-	{
-		void *srt = NULL;
-		if( vevo_property_get( font->dictionary, items[i], 0,&srt) == VEVO_NO_ERROR )
-		{
-			srt_seq_t *s = (srt_seq_t*) srt;
-			vj_font_build_index( font, s );	
-		}
-		free(items[i]);
-	}
-	free(items);
-
-	
-}
-
-static	void	vj_font_destroy_index( vj_font_t *font )
-{
-#ifdef STRICT_CHECKING
-	assert( font->dictionary != NULL );
-#endif	
-	char **items = vevo_list_properties( font->dictionary );
-	if(!items)
-		return;
-
-	int i;
-	for( i = 0; items[i] != NULL ; i ++ )
-	{
-		void *srt = NULL;
-		if( vevo_property_get( font->dictionary, items[i], 0,&srt) == VEVO_NO_ERROR )
-		{
-			srt_seq_t *s = (srt_seq_t*) srt;
-			vj_font_zero_index( font, s );
-		}
-		free(items[i]);
-	}
-	free(items);	
-}
-
-static	void	vj_font_zero_index( vj_font_t *font, srt_seq_t *s )
-{
-	srt_nodes_t *list   = font->index[ s->start ];
-	srt_nodes_t *prev = NULL;
-	if(!list || s->id == 0)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "No SRT sequence at pos %ld",s->start );
-		return;
-	}
-
-	for( list = font->index[s->start]; list != NULL ; list = list->next )
-	{
-		if( s->id == list->id )
-			break;
-		prev = list;
-	}
-
-	if( list )
-	{
-		long k;
-
-		if( prev != NULL )
-			prev->next = list->next;
-		else
-			font->index[s->start] = list->next;
-		
-		for( k = s->start+1; k <= s->end ;k ++ )
-			font->index[k] = list->next;
-		free( list );
-	}
-}
-
 
 static char *make_key(int id)
 {
@@ -299,6 +210,8 @@ static char *make_key(int id)
 
 int	vj_font_srt_sequence_exists( void *font, int id )
 {
+	if(!font)
+		return 0;
 	vj_font_t *f = (vj_font_t*) font;
 	if(!f->dictionary )
 		return 0;
@@ -307,12 +220,11 @@ int	vj_font_srt_sequence_exists( void *font, int id )
 	assert( f->dictionary != NULL );
 #endif
 	char *key = make_key(id);
-	if( vevo_property_get( f->dictionary, key,0, NULL ) == VEVO_NO_ERROR )
-	{
-		free(key);
-		return 1;
-	}
+	void *srt = NULL;
+	int error = vevo_property_get( f->dictionary, key,0,&srt );
 	free(key);
+	if( error == VEVO_NO_ERROR )
+		return 1;
 	return 0;
 }
 
@@ -338,7 +250,7 @@ static	long	vj_font_timecode_to_pos( vj_font_t *font, const char *tc )
 {
 	int t[4];
 
-	sscanf( tc, "%02d:%02d:%02d,%d", &t[0],&t[1],&t[2],&t[3] );
+	sscanf( tc, "%1d:%02d:%02d:%02d", &t[0],&t[1],&t[2],&t[3] );
 
 	long res = 0;
 
@@ -418,7 +330,7 @@ static char	*vj_font_split_str( const char *str )
 	return res;
 }
 
-static srt_seq_t 	*vj_font_new_srt_sequence( int id,char *text, long lo, long hi )
+static srt_seq_t 	*vj_font_new_srt_sequence( vj_font_t *f,int id,char *text, long lo, long hi )
 {
 	char tmp_key[16];
 	srt_seq_t *s = (srt_seq_t*) vj_calloc(sizeof( srt_seq_t ));
@@ -442,7 +354,7 @@ static srt_seq_t 	*vj_font_new_srt_sequence( int id,char *text, long lo, long hi
 	s->use_bg = 0;
 	s->outline = 0;
 	s->size  = 40;
-	s->font  = -1;
+	s->font  = get_default_font(f);
 	s->key  = strdup(tmp_key);
 	return s;
 }
@@ -474,6 +386,8 @@ static	void		vj_font_del_srt_sequence( vj_font_t *f, int seq_id )
 	{
 		srt_seq_t *s = (srt_seq_t*) srt;
 
+		index_node_remove( f, s );
+
 		free(s->text);
 		free(s->key);
 		free(s);
@@ -494,7 +408,7 @@ static void		vj_font_store_srt_sequence( vj_font_t *f, srt_seq_t *s )
 	{
 		srt_seq_t *old = (srt_seq_t*) srt;
 
-		vj_font_zero_index( f , old );
+		index_node_remove( f, old );
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "replacing subtitle %d, '%s', %ld -> %ld",
 				old->id, old->text,old->start,old->end );
@@ -510,7 +424,7 @@ static void		vj_font_store_srt_sequence( vj_font_t *f, srt_seq_t *s )
 	}
 	else
 	{
-		vj_font_build_index( f, s );
+		index_node_append( f, s );
 	}
 }
 
@@ -589,8 +503,15 @@ int	vj_font_load_srt( void *font, const char *filename )
 
 		vj_font_substract_timecodes( ff, timecode, &lo, &hi );
 
-		srt_seq_t *s = vj_font_new_srt_sequence( seq_id, text, lo,hi );
-		
+		if( lo == hi )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "It makes no sense to create a subtitle sequence with length 0");
+			font_unlock(ff);
+			return 0;
+		}
+
+		srt_seq_t *s = vj_font_new_srt_sequence(ff, seq_id, text, lo,hi );
+	
 		vj_font_store_srt_sequence( ff, s );
 
 		free(line);
@@ -603,12 +524,167 @@ int	vj_font_load_srt( void *font, const char *filename )
 	
 	return 1;
 }
+static   int    get_xml_int( xmlDocPtr doc, xmlNodePtr node )
+{
+        xmlChar *tmp = xmlNodeListGetString( doc, node->xmlChildrenNode, 1 );
+        char *ch = UTF8toLAT1( tmp );
+        int res = 0;
+        if( ch )
+        {
+                res = atoi( ch );
+                free(ch);
+        }
+        if(tmp)
+                free(tmp);
+        return res;
+}
+
+static   void    get_xml_3int( xmlDocPtr doc, xmlNodePtr node, int *first , int *second, int *third )
+{
+        xmlChar *tmp = xmlNodeListGetString( doc, node->xmlChildrenNode, 1 );
+        char *ch = UTF8toLAT1( tmp );
+        if( ch )
+        {
+                sscanf( ch, "%d %d %d" , first, second, third );
+                free(ch);
+        }
+        if(tmp)
+                free(tmp);
+}
+
+
+void	vj_font_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *font )
+{
+	if(!node)
+		return;
+	vj_font_t *f = (vj_font_t*) font;
+
+	int x=0,y=0,id=0,size=0,type=0, use_bg=0, outline=0;
+	int bg[3] = {0,0,0};
+	int fg[3] = {0,0,0};
+	int alpha[3] = {0,0,0};
+	int ln[3] = {0,0,0};
+
+	while( node != NULL )
+	{
+		if( !xmlStrcmp( node->name, (const xmlChar*) "srt_id" ))
+			id = get_xml_int( doc, node );	
+		if( !xmlStrcmp( node->name, (const xmlChar*) "x_pos" ))
+			x = get_xml_int( doc,node );
+		if( !xmlStrcmp( node->name, (const xmlChar*) "y_pos" ))
+			y = get_xml_int( doc, node );
+		if( !xmlStrcmp( node->name, (const xmlChar*) "font_size" ))
+			size = get_xml_int(doc,node);
+		if( !xmlStrcmp( node->name, (const xmlChar*) "font_family" ))
+			type = get_xml_int( doc, node );
+		if( !xmlStrcmp( node->name, (const xmlChar*) "bg" ))
+			get_xml_3int( doc, node, &bg[0], &bg[1], &bg[2] );
+		if( !xmlStrcmp( node->name, (const xmlChar*) "fg" ))
+			get_xml_3int( doc, node, &fg[0], &fg[1], &fg[2] );
+		if( !xmlStrcmp( node->name, (const xmlChar*) "ln" ))
+			get_xml_3int( doc, node, &ln[0], &ln[1], &ln[2] );
+		if( !xmlStrcmp( node->name, (const xmlChar*) "alpha" ))
+			get_xml_3int( doc, node, &alpha[0], &alpha[1], &alpha[2] );	
+		if( !xmlStrcmp( node->name, (const xmlChar*) "use_bg" ))
+			use_bg = get_xml_int( doc, node );
+		if( !xmlStrcmp( node->name, (const xmlChar*) "use_outline" ))
+			outline = get_xml_int(doc,node);
+
+		node = node->next;
+	}
+
+	char *key = make_key( id );
+	srt_seq_t *s = NULL;
+	if( vevo_property_get( f->dictionary, key, 0, &s ) == VEVO_NO_ERROR )
+	{
+		s->x = x; s->y = y; s->size = size; s->font = type;
+		s->use_bg = use_bg; s->outline = outline;
+		s->bg[0] = bg[0]; s->bg[1] = bg[1]; s->bg[2] = bg[2];
+		s->fg[0] = fg[0]; s->fg[1] = fg[1]; s->fg[2] = fg[2];
+		s->ln[0] = ln[0]; s->ln[1] = ln[1]; s->ln[2] = ln[2];
+		s->alpha[0] = alpha[0];
+		s->alpha[1] = alpha[1];
+		s->alpha[2] = alpha[2];
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Sequence %d (%s) not in .srt file (tried dictionary %p)", id,key, f->dictionary );
+	}
+	free(key);
+
+}
+
+void	vj_font_xml_pack( xmlNodePtr node, void *font )
+{
+	vj_font_t *ff = (vj_font_t*) font;
+        char **items = vevo_list_properties ( ff->dictionary );
+        if(!items)
+                return;
+#ifdef STRICT_CHECKING
+        assert( ff->dictionary != NULL );
+#endif
+
+	char buf[100];
+	int i;
+        for( i = 0; items[i] != NULL ; i ++ )
+        {
+                void *srt = NULL;
+                if ( vevo_property_get( ff->dictionary, items[i], 0, &srt ) == VEVO_NO_ERROR )
+                {
+                        srt_seq_t *s = (srt_seq_t*) srt;
+		
+			xmlNodePtr *childnode = xmlNewChild( node, NULL, (const xmlChar*) "SUBTITLES" , NULL );
+	
+				sprintf(buf, "%d", s->id );
+				xmlNewChild(childnode, NULL, (const xmlChar*) "srt_id", (const xmlChar*) buf );	
+
+				sprintf(buf, "%d",s->x );
+				xmlNewChild(childnode, NULL, (const xmlChar*) "x_pos", (const xmlChar*) buf );
+
+				sprintf(buf, "%d", s->y );
+				xmlNewChild(childnode, NULL, (const xmlChar*) "y_pos", (const xmlChar*) buf );
+	
+				sprintf(buf, "%d", s->size );
+				xmlNewChild(childnode, NULL, (const xmlChar*) "font_size", (const xmlChar*) buf );
+
+				sprintf(buf, "%d", s->font );
+				xmlNewChild(childnode, NULL, (const xmlChar*) "font_family", (const xmlChar*) buf );
+	
+				sprintf(buf, "%d %d %d", s->bg[0],s->bg[1],s->bg[2] );
+				xmlNewChild(childnode, NULL, (const xmlChar*) "bg" , (const xmlChar*) buf );
+
+				sprintf(buf, "%d %d %d", s->fg[0], s->fg[1], s->fg[2] );	
+				xmlNewChild(childnode, NULL, (const xmlChar*) "fg", (const xmlChar*) buf );
+
+				sprintf(buf, "%d %d %d", s->ln[0], s->ln[1], s->ln[2] );
+				xmlNewChild(childnode,NULL, (const xmlChar*) "ln", (const xmlChar*) buf );
+
+				sprintf(buf, "%d %d %d", s->alpha[0], s->alpha[1],s->alpha[2] );
+				xmlNewChild(childnode, NULL, (const xmlChar*) "alpha", (const xmlChar*) buf );
+
+				sprintf(buf, "%d", s->use_bg );
+				xmlNewChild(childnode, NULL, (const xmlChar*) "use_bg", (const xmlChar*) buf );
+	
+				sprintf(buf, "%d", s->outline );
+				xmlNewChild(childnode, NULL, (const xmlChar*) "use_outline", (const xmlChar*) buf );
+					
+
+                }
+                free(items[i]);
+        }
+        free(items);
+}
+
+
 int     vj_font_save_srt( void *font , const char *filename )
 {
 	vj_font_t *ff = (vj_font_t*) font;
 	char **items = vevo_list_properties ( ff->dictionary );
 	if(!items)
+	{
+		veejay_msg(0, "No subtitle sequences present, nothing to save");
 		return 0;
+	}
 	int i;
 	FILE *f = fopen( filename , "w" );
 	if(!f)
@@ -625,20 +701,27 @@ int     vj_font_save_srt( void *font , const char *filename )
 		if ( vevo_property_get( ff->dictionary, items[i], 0, &srt ) == VEVO_NO_ERROR )
 		{
 			srt_seq_t *s = (srt_seq_t*) srt;
-			char *tc1 = vj_font_pos_to_timecode( ff, s->start );
-			char *tc2 = vj_font_pos_to_timecode( ff, s->end );
-			fprintf( f, "%d\n%s --> %s\n%s\n\n",
+			int n = strlen(s->text);
+			if( n > 0 )
+			{
+				char *tc1 = vj_font_pos_to_timecode( ff, s->start );
+				char *tc2 = vj_font_pos_to_timecode( ff, s->end );
+				fprintf( f, "%d\n%s --> %s\n%s\n\n",
 					s->id,
 					tc1,
 					tc2,
 					s->text );
-			free(tc1);
-			free(tc2);
+				free(tc1);
+				free(tc2);
+			}
 		}
 		free(items[i]);
 	}
 	free(items);
 	fclose( f );
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Saved %d subtitles to %s", i, filename );
+
 	return 1;
 }
 
@@ -674,8 +757,8 @@ char    *vj_font_get_sequence( void *font, int seq )
 	
 	sprintf( tmp, "%05d%09d%09d%02d%s%02d%s%03d%s%04d%04d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d",
 			s->id,
-			s->start,
-			s->end,
+			(int)s->start,
+			(int)s->end,
 			tcl1,
 			tc1,
 			tcl2,
@@ -710,6 +793,11 @@ char    *vj_font_get_sequence( void *font, int seq )
 int	vj_font_new_text( void *font, char *text, long lo,long hi, int seq)
 {
 	vj_font_t *ff = (vj_font_t*) font;
+	if( lo == hi )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "It makes no sense to make a subtitle of length 0" );
+		return 0;
+	}
 	
 	if(seq == 0 )
 	{
@@ -717,12 +805,13 @@ int	vj_font_new_text( void *font, char *text, long lo,long hi, int seq)
 		while( vj_font_srt_sequence_exists( font, an ) )
 			an++;
 		ff->auto_number = an;
+		veejay_msg(VEEJAY_MSG_DEBUG, "New subtitle sequence %d", an );
 		seq = ff->auto_number;
 	}
 
 	font_lock( ff );
 	
-	srt_seq_t *s = vj_font_new_srt_sequence( seq, text, lo,hi );
+	srt_seq_t *s = vj_font_new_srt_sequence(ff, seq, text, lo,hi );
 		
 	vj_font_store_srt_sequence( ff, s );
 
@@ -803,14 +892,14 @@ void    vj_font_update_text( void *font, long s1, long s2, int seq, char *text)
 	void *srt = NULL;
 	if(seq == 0 )
 		seq = ff->auto_number;
-	
 	char *key = make_key( seq );
 #ifdef STRICT_CHECKING
 	assert( ff->dictionary != NULL );
 #endif
-	if( vevo_property_get( ff->dictionary, key, 0, &srt ) != VEVO_NO_ERROR )
+	int error = vevo_property_get( ff->dictionary, key, 0, &srt );
+	if( error != VEVO_NO_ERROR )
 	{
-		veejay_msg(0, "SRT sequence %d does not exist",seq);
+		veejay_msg(0, "Subtitle sequence %d does not exist, code %d, used key '%s'",seq,error,key);
 		free(key);
 		return;
 	}
@@ -818,14 +907,16 @@ void    vj_font_update_text( void *font, long s1, long s2, int seq, char *text)
 
 	font_lock( ff );
 	
-	vj_font_zero_index( ff, s );
+	index_node_remove( font, s );
 	
 	free(s->text);
 	s->text = strdup( text );
 	s->start = s1;
 	s->end = s2;
 
-	vj_font_build_index( ff, s );
+	ff->auto_number = seq;
+
+	index_node_append( font, s );
 
 	font_unlock( ff );
 	
@@ -845,7 +936,7 @@ char **vj_font_get_sequences( void *font )
 	for( i = 0; items[i] != NULL ; i ++ )
 		len ++;
 	
-	if( len <= NULL )
+	if( len <= 0 )
 		return NULL;
 	
 	char **res = (char**) vj_calloc(sizeof(char*) * (len+1));
@@ -863,6 +954,12 @@ char **vj_font_get_sequences( void *font )
 		
 	}
 	free(items);
+	if( j == 0 )
+	{
+		free(res);
+		return NULL;
+	}
+
 	return res;
 }
 
@@ -990,16 +1087,26 @@ static int	test_font( vj_font_t *f , const char *font, int id)
 		return 0;
 	}
 
+	memset( &qn, 0,sizeof( FT_SfntName ) );
+	memset( &zn, 0, sizeof( FT_SfntName ));
+	memset( &sn, 0, sizeof( FT_SfntName ));
+
 	FT_Get_Sfnt_Name( face, TT_NAME_ID_FONT_FAMILY, &qn );
 	FT_Get_Sfnt_Name( face, TT_NAME_ID_FONT_SUBFAMILY, &zn );
 
-	char *name1 = g_strndup( qn.string, qn.string_len );
-	char *name2 = g_strndup( zn.string, zn.string_len );
+
+	if( !zn.string || !qn.string ||  qn.string_len <= 0 || zn.string_len <= 0 )
+	{
+		FT_Done_Face(face);
+		return 0;
+	}
+	char *name1 = strndup( qn.string, qn.string_len );
+	char *name2 = strndup( zn.string, zn.string_len );
 
 	int n1 = strlen(name1);
 	int n2 = n1 + strlen(name2);
 
-	if( n2 <= 2 )
+	if( n2 <= 2 || (n2+n1) > 150)
 	{
 		FT_Done_Face(face);
 		free(name1);
@@ -1144,11 +1251,13 @@ void vj_font_set_fgcolor( void *font, int r, int g, int b, int a)
 	free(key);
 }
 
-void	vj_font_dictionary_destroy( void *dict )
+void	vj_font_dictionary_destroy( void *font, void *dict )
 {
 	char **items = vevo_list_properties(dict );
 	if(!items)
 		return;
+
+	vj_font_t *f = (vj_font_t*) font;
 
 	int i;
 	for( i = 0; items[i] != NULL ; i ++ )
@@ -1156,6 +1265,8 @@ void	vj_font_dictionary_destroy( void *dict )
 		srt_seq_t *s = NULL;
 		if( vevo_property_get( dict, items[i], 0,&s ) == VEVO_NO_ERROR )
 		{
+			index_node_remove( f, s );
+
 			free(s->text);
 			free(s);
 		}
@@ -1168,13 +1279,10 @@ void	vj_font_dictionary_destroy( void *dict )
 
 void	vj_font_destroy(void *ctx)
 {
-	vj_font_t *f = (vj_font_t*) ctx;
+	if(!ctx)
+		return;
 
-	if(f->index)
-	{
-		vj_font_destroy_index( f );
-		free(f->index);
-	}
+	vj_font_t *f = (vj_font_t*) ctx;
 
 	if( f->face )
 	{
@@ -1189,7 +1297,7 @@ void	vj_font_destroy(void *ctx)
 	}
 
 	if(f->plain)
-		vj_font_dictionary_destroy( f->plain );
+		vj_font_dictionary_destroy( f,f->plain );
 	
 	FT_Done_FreeType( f->library );
 	
@@ -1201,10 +1309,35 @@ void	vj_font_destroy(void *ctx)
 		if( f->font_table[i] )
 			free(f->font_table[i]);
 	}
-
+	if( f->index )
+	{
+		long k;
+		for( k =0; k <= f->index_len ; k ++ )
+		{
+		  if( f->index[k] )
+			free(f->index[k]);
+		}
+		free(f->index );
+	}
 	free( f->font_table );
 	free( f->font_list );
 	free( f );
+}
+
+static	void	fallback_font(vj_font_t *f)
+{
+	f->current_font = get_default_font( f );
+		
+	while( (f->font = select_font(f, f->current_font )) == NULL )
+	{
+		f->current_font ++;
+		if( f->current_font >= f->font_index )
+		{
+			veejay_msg(0, "No more fonts to try");
+			vj_font_destroy( f );
+		}		
+	}
+
 }
 
 static int	configure(vj_font_t *f, int size, int font)
@@ -1217,9 +1350,11 @@ static int	configure(vj_font_t *f, int size, int font)
 	f->font = select_font( f , font );
 	if(f->font == NULL )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Selected font '%d' not available", font );
-		return 0;
+		fallback_font( f );
 	}
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Using font %s, size %d (#%d)", f->font, size, font );
+
 	if( f->face )
 	{
 		for( c = 0; c < 256 ; c ++)
@@ -1265,20 +1400,21 @@ static int	configure(vj_font_t *f, int size, int font)
 
 			
 			FT_Get_Glyph( f->face->glyph, &(f->glyphs[c]) );
-		}
+		}	
 
 		f->glyphs_index[c] = FT_Get_Char_Index( f->face, (unsigned char) c );
 		if( f->glyphs_index[c] )
+		{
 			FT_Glyph_Get_CBox( f->glyphs[ c ] , ft_glyph_bbox_pixels, &bbox);
-
-		if( bbox.yMax > yMax )
-			yMax = bbox.yMax;
-		if( bbox.yMin < yMin )
-			yMin = bbox.yMin;
-		if( bbox.xMax > xMax )
-			xMax = bbox.xMax;
-		if( bbox.xMin < xMin )
-			xMin = bbox.xMin;
+			if( bbox.yMax > yMax )
+				yMax = bbox.yMax;
+			if( bbox.yMin < yMin )
+				yMin = bbox.yMin;
+			if( bbox.xMax > xMax )
+				xMax = bbox.xMax;
+			if( bbox.xMin < xMin )
+				xMin = bbox.xMin;
+		}
 	}
 
 	f->text_height = yMax - yMin;
@@ -1322,20 +1458,23 @@ void	vj_font_customize_osd( void *font,void *uc, int type )
 	switch( v->uc->playback_mode )
 	{
 		case VJ_PLAYBACK_MODE_SAMPLE:
-			sprintf(buf, "Sample %d|%d cache=%dMb cost=%2.2fms",
+			sprintf(buf, "Sample %d|%d cache=%dMb cost=%d ms",
 					v->uc->sample_id,
 					sample_size()-1,
 					sample_cache_used(0),
-					(float)	v->real_fps );
+					v->real_fps );
 			break;
 		case VJ_PLAYBACK_MODE_TAG:
-			sprintf(buf, "Stream %d|%d cost=%2.2fms",
+			sprintf(buf, "Stream %d|%d cost=%d ms",
 					v->uc->sample_id,
 					vj_tag_size(),
-					(float)v->real_fps);
+					v->real_fps);
 			break;
 		default:
-			if(f->add) { free(f->add); f->add = NULL; }
+			f->time = type;
+			if( f->add )
+				free(f->add );
+			f->add = NULL;			
 			return;
 			break;
 	}
@@ -1350,28 +1489,74 @@ void	vj_font_customize_osd( void *font,void *uc, int type )
 void	vj_font_set_constraints_and_dict( void *font, long lo, long hi, float fps, void *dict )
 {
 	vj_font_t *f = (vj_font_t*) font;
-	f->fps = fps;
 
 	long len = hi - lo + 1;
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Subtitle: Dictionary %p, Lo = %ld , Hi = %ld, Fps = %f",
-			dict, lo,hi, fps );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Subtitle: Dictionary %p, Lo = %ld , Hi = %ld, Fps = %f, font = %p",
+			dict, lo,hi, fps , font);
+
+
+	f->fps = fps;
+
+        if( f->dictionary )
+	{
+		char **items = vevo_list_properties(f->dictionary );
+		if(items)
+		{
+       			int i;
+       		 	for( i = 0; items[i] != NULL ; i ++ )
+       			{
+       	        		 srt_seq_t *s = NULL;
+                	 	 if( vevo_property_get( f->dictionary, items[i], 0,&s ) == VEVO_NO_ERROR )
+                		        index_node_remove( f, s );
+                		free(items[i]);
+			}
+       			free(items);
+		}
+	}
 	
 	if(f->index)
 	{
-		vj_font_destroy_index( f );
 		free(f->index);
 		f->index = NULL;
 	}
 
-	f->index = (srt_nodes_t**) vj_calloc(sizeof(srt_nodes_t*) * len );
+	f->index = (srt_cycle_t**) vj_calloc(sizeof(srt_cycle_t*)*(len+1));
 	f->index_len = len;
 
-	if(dict)
-		f->dictionary = dict;
+	long k;
+	for( k = 0; k <= f->index_len; k ++ )
+		f->index[k] = (srt_cycle_t*) vj_calloc(sizeof(srt_cycle_t));
 
-	vj_font_rebuild_index( f );
-	
+	if(dict)
+	{
+		f->dictionary = dict;
+		char **items = vevo_list_properties( f->dictionary );
+		if( items )
+		{
+			int i;
+			for( i = 0; items[i] != NULL  ; i ++ )
+			{
+				srt_seq_t *s = NULL;
+				if( vevo_property_get(dict, items[i],0, &s ) == VEVO_NO_ERROR )
+					index_node_append(f,s );
+				free(items[i]);
+			}
+			free(items);
+		}
+	}
+}
+
+void	vj_font_set_dict( void *font, void *dict )
+{
+	vj_font_t *f = (vj_font_t*) font;
+	f->dictionary = dict;
+}
+
+void	*vj_font_get_dict(void *font)
+{
+	vj_font_t *f = (vj_font_t*) font;
+	return f->dictionary;
 }
 
 static	int	compare_strings( char **p1, char **p2 )
@@ -1385,11 +1570,10 @@ static	int	get_default_font( vj_font_t *f )
 	{
 		char *name;
 	} default_fonts[] = {
-		"Bitstream Vera Sans (Roman)",
-		"Bitstream Vera Serif (Roman)",
-		"New (Regular)",
-		"New",
-		NULL,	
+		{ "Arab (Regular)"},
+		{ "Mashq (Regular)" },
+		{ "DejaVu Sans (Bold)" },
+		{ NULL },	
 	};
 	int i,j;
 	for( i = 0; i < f->font_index; i ++ )
@@ -1400,8 +1584,7 @@ static	int	get_default_font( vj_font_t *f )
 			{
 				if( strcasecmp( default_fonts[j].name, f->font_list[i] ) == 0 )
 				{
-					veejay_msg(VEEJAY_MSG_DEBUG, "Using default font '%s'",
-						default_fonts[j].name );
+					veejay_msg(VEEJAY_MSG_DEBUG,"Using default font '%s'", default_fonts[j].name );
 					return i;
 				}
 			}
@@ -1434,7 +1617,11 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 	f->bg = 0;
 	f->outline = 0;
 	f->text_height = 0;
-	f->current_size = (is_osd ? 10: 40);
+	
+	int tmp = (w / 100) * 4;
+	if(tmp>18) tmp = 18;
+	f->current_size = (is_osd ? (tmp): 40);
+
 	f->fps  = fps;
 	f->index = NULL;
 	f->font_table = (char**) vj_calloc(sizeof(char*) * MAX_FONTS );
@@ -1458,21 +1645,17 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 	find_fonts(f,"/usr/share/fonts/truetype");
 	find_fonts(f,"~/veejay-fonts");
 	
-	qsort( f->font_table, f->index, sizeof(char*), compare_strings );
-	qsort( f->font_list,  f->index, sizeof(char*), compare_strings );
-
-		
 	if( f->font_index <= 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "No TrueType fonts found");
 		vj_font_destroy( f );
 		return NULL;
 	}
+	qsort( f->font_table, f->font_index, sizeof(char*), compare_strings );
+	qsort( f->font_list,  f->font_index, sizeof(char*), compare_strings );
 
 	int df = get_default_font( f );
 	
-	veejay_msg(0, "Loaded %d fonts, size = %d", f->font_index,f->current_size );
-
 	while(!configure( f, f->current_size, df ))
 	{
 		f->current_font ++;
@@ -1486,7 +1669,7 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 
 	f->time = is_osd;
 	
-	print_fonts(f);
+	//print_fonts(f);
 
 	pthread_mutex_init( &(f->mutex), NULL );
 	
@@ -1868,8 +2051,7 @@ static void vj_font_text_render(vj_font_t *f, srt_seq_t *seq, void *_picture )
 
 }
 
-
-static void vj_font_text_osd_render(vj_font_t *f, long posi, void *_picture )
+static void vj_font_text_osd_render(vj_font_t *f, long posi, void *_picture, char *in_string )
 {
 	FT_Face face = f->face;
 	FT_GlyphSlot  slot = face->glyph;
@@ -1887,6 +2069,16 @@ static void vj_font_text_osd_render(vj_font_t *f, long posi, void *_picture )
 	str_w = str_w_max = 0;
 
 	int size = 0;
+	if(f->time > 2 )
+	{
+		if(in_string)
+		{
+			size = strlen( in_string );
+			strncpy(osd_text, in_string, size );
+			osd_text[size] = '\0';
+		}
+	}
+	else
 	if(f->time == 2 )
 	{
 		vj_font_print_credits(f,osd_text);
@@ -1905,11 +2097,15 @@ static void vj_font_text_osd_render(vj_font_t *f, long posi, void *_picture )
 		free(tmp_text);
 
 		y = picture->height - f->current_size - 4;
+
 	}
+
+	if( size <= 0 )
+		return;
 
 	x1 = x;
 	y1 = y;	
-	
+	unsigned int str_wi = 0;
 	char *text = osd_text;
 
 	for (i=0; i < size; i++)
@@ -1943,6 +2139,8 @@ static void vj_font_text_osd_render(vj_font_t *f, long posi, void *_picture )
 		{
 			str_w = width - f->x - 1;
 			y += f->text_height;
+			if( str_wi < x )
+				str_wi = x;
 			x = f->x;
 		}
 
@@ -1954,24 +2152,25 @@ static void vj_font_text_osd_render(vj_font_t *f, long posi, void *_picture )
 			str_w_max = str_w;
 	}
 	
-	if ( str_w_max + f->x >= width )
-		str_w_max = width - f->x - 1;
+//	if ( str_w_max + f->x >= width )
+//		str_w_max = width - f->x - 1;
+
 	if ( y >= height )
 		y = height - 1 - 2*f->y;
 
-	if( str_w_max == 0 )
-		str_w_max = x1 + (x - x1);
+//	if( str_w_max == 0 )
+	str_w_max = (x - x1);
 	
 	int bw = str_w_max;
 	int bh = y - y1;
 	if(bh <= 0 )
 		bh = y1	+ f->current_size + 4;
-	
+
 	draw_transparent_box(
 			picture,
 			x1,
 			y1,
-			picture->width,
+			str_wi,//picture->width,
 			bh,
 			f->bgcolor,
 			80 );
@@ -1996,51 +2195,59 @@ static void vj_font_text_osd_render(vj_font_t *f, long posi, void *_picture )
 
 int	vj_font_norender(void *ctx, long position)
 {
+	if(!ctx)
+		return 0;
 	vj_font_t *f = (vj_font_t *) ctx;
 
 	if(f->time)
 		return 1;
 	
-	if( position < 0 || position >= f->index_len )
+	if( position < 0 || position > f->index_len )
 		return 0;
 
 	if(!f->dictionary || !f->index )
 		return 0;
-	
-	srt_nodes_t *list = f->index[ position ];
 
-	if(!list)
+	if(!f->index[position])
 		return 0;
 
-	return 1;
+	int work = 0;
+	int k = 0;
+	for( k = 0; k <16; k ++ )
+		if( f->index[position]->id[k] )
+			work ++;
+	return work;
 }
 
-void vj_font_render(void *ctx, void *_picture, long position)
+void vj_font_render(void *ctx, void *_picture, long position, char *in_string)
 {
 	vj_font_t *f = (vj_font_t *) ctx;
 
 	if(f->time)
 	{
-		vj_font_text_osd_render( f, position, _picture );
+		vj_font_text_osd_render( f, position, _picture, in_string );
 		return;
 	}
 
-	if( position < 0 || position >= f->index_len )
+	if( position < 0 || position > f->index_len )
 		return;
 
-	srt_nodes_t *list = f->index[ position ];
+	srt_cycle_t *list = f->index[ position ];
 
 #ifdef STRICT_CHECKING
 	assert( f->dictionary != NULL );
 #endif
 
 	font_lock( f );
-	while( list != NULL )
+	int k;
+	for( k = 0; k < 16 ; k ++ )
 	{
+		if( list->id[k] == 0 )
+			continue;
+
 		srt_seq_t *s = NULL;
-		char *key = make_key( list->id );
-//@ FIXME: list still there?
-//veejay_msg(0,"\trender '%s' , list %p", key, list );
+		char *key = make_key( list->id[k] );
+
 		if( vevo_property_get( f->dictionary, key, 0, &s ) == VEVO_NO_ERROR )
 		{
 			int   old_font = f->current_font;
@@ -2068,7 +2275,6 @@ void vj_font_render(void *ctx, void *_picture, long position)
 			vj_font_text_render( f,s, _picture );
 		}
 		free(key);
-		list = list->next;
 	}
 	font_unlock(f);
 }

@@ -14,14 +14,53 @@
 
                                                                      CODENAME: classic
 	
-									0.9.9
+									0.9.13
 
 
-       2006/2007  - release date Dec. 21, 2006
+       2006/2007  - release date Jan. 6,  2007
        =======================================
  
  			 :: 	   Veejay, a visual instrument for GNU            ::
 	                                 http://veejay.dyne.org 
+
+
+
+ Veejay - a 'visual' instrument and realtime video sampler
+
+Veejay is a visual instrument and real-time video sampler.
+It allows you to "play" the video like you would play a piano.
+While playing, you can record the resulting video directly to disk (video sampling).
+
+Trigger samples, apply realtime fx (120+), scratch, mix and record , never stopping the video. Excellent for live video performing.
+Main Features
+
+# Client/Server architecture
+# Soft Realtime
+# Native YUV processing
+# Frame accurate
+# Loop based editing (always playing)
+# Non destructive editing
+# Trickplay (scratch, marker, speed, direction)
+# Mix your videos the FX chain
+# 120 built-in effects incl. luma , chroma key, invert,solarize,etc
+# Effect parameter animation
+# Support for FreeFrame and Frei0r
+# Support for truetype fonts
+# Audio playback through Jack
+# Load Quicktime, AVI and rawdv movie files
+# Video output to SDL, OpenGL
+# Full support for DV and MJPEG
+# Live clip loading
+# Live harddisk recording
+# Live sample sequencing
+# Live text
+# Live camera(s) support
+# Can stream over the network
+# Deck save/restore
+# Crash Recovery
+# Support for Open Sound Control
+# Support for pure-data through sendVIMS external
+# Free Software (GNU GPL)
 
 
 
@@ -46,7 +85,7 @@ $ veejay -p 4490 my-movie-B.avi
  
 Start a graphical user interface:
 
-$ gveejayreloaded ( -f0/-f1 )
+$ gveejayreloaded ( -n )
 $ gveejay
 
 

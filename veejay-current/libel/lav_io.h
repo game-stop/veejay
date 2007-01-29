@@ -15,14 +15,9 @@
 */
 
 #ifndef LAV_IO_H
-
 #define LAV_IO_H
 
 #include <config.h>
-#ifdef HAVE_MLT
-#include <mlt/framework/mlt.h>
-#endif
-
 #include <libel/avilib.h>
 #ifdef SUPPORT_READ_DV2
 #include <libel/rawdv.h>
@@ -55,12 +50,6 @@
 
 typedef struct
 {
-#ifdef HAVE_MLT
-	mlt_properties	properties;
-	mlt_producer	producer;
-	mlt_image_format format;
-	mlt_audio_format afmt;  
-#endif
    avi_t       *avi_fd;
 #ifdef SUPPORT_READ_DV2
    dv_t		*dv_fd;
@@ -82,6 +71,8 @@ typedef struct
    int	       mmap_size;
 } lav_file_t;
 
+
+int lav_detect_endian (void);
 int  lav_query_APP_marker(char format);
 int  lav_query_APP_length(char format);
 int  lav_query_polarity(char format);

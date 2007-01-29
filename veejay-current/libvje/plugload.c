@@ -29,9 +29,8 @@
                  http://www.gephex.org/
 
  */
-
+#include <config.h>
 #include <string.h>
-#include <dirent.h>
 #include <fcntl.h>
 #include <dlfcn.h>
 #include <libhash/hash.h>
@@ -39,11 +38,20 @@
 #include <libvjmem/vjmem.h>
 #include <libvevo/vevo.h>
 #include <libyuv/yuvconv.h>
+#include <ffmpeg/avutil.h>
 #include <ffmpeg/avcodec.h>
 #include <libvevo/vevo.h>
+#include <libvje/plugload.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
+#include <unistd.h>
+#include <ctype.h>
+#include <dirent.h>
+
+#ifndef PATH_MAX
+#define PATH_MAX 1024
+#endif
 
 #define LINUX 1 
 #include <libvje/specs/FreeFrame.h>
@@ -214,7 +222,6 @@ static	void*	deal_with_livido( void *handle, char *name )
 static	void* 	deal_with_fr( void *handle, char *name)
 {
 	void *port = vpn( VEVO_FR_PORT );
-	char *plugin_name = NULL;
 	
 	f0r_init_f	f0r_init	= dlsym( handle, "f0r_init" );
 	if( f0r_init == NULL )
@@ -425,7 +432,7 @@ static	int	instantiate_plugin( void *plugin, int w , int h )
 		void *base = NULL;
 		vevo_property_get( plugin, "base", 0, &base);
 		plugMainType *q = (plugMainType*) base; 
-		int instance = q( FF_INSTANTIATE, &v, 0).ivalue;
+		void *instance = q( FF_INSTANTIATE, &v, 0).ivalue;
 		if( instance == FF_FAIL )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize plugin");
@@ -469,7 +476,7 @@ static	void	deinstantiate_plugin( void *plugin )
 		vevo_property_get( plugin, "base", 0, &base);
 		plugMainType *q = (plugMainType*) base; 
 
-		int instance = 0;
+		void *instance = NULL;
 		vevo_property_get( plugin, "instance", 0, &instance );
 		if( instance )
 			q( FF_DEINSTANTIATE, NULL, instance );
@@ -728,7 +735,7 @@ static	void	process_plug_plugin( void *plugin, void *buffer , void *out_buffer)
 		void *base = NULL;
 		vevo_property_get( plugin, "base", 0, &base);
 		plugMainType *q = (plugMainType*) base; 
-		int instance = 0;
+		void *instance = NULL;
 		vevo_property_get( plugin, "instance",0, &instance );	
 		q( FF_PROCESSFRAME, buffer, instance );
 	}
@@ -881,7 +888,7 @@ void	plug_control( int fx_id, int *args )
 		vevo_property_get( port, "base", 0, &base);
 		plugMainType *q = (plugMainType*) base; 
 		int p,num_params=0;
-		int instance = 0;
+		void *instance = NULL;
 		vevo_property_get( port, "n_params", 0, &num_params);
 		vevo_property_get( port, "instance", 0, &instance );
 		for( p = 0; p < num_params; p ++ )
@@ -914,7 +921,8 @@ void	plug_control( int fx_id, int *args )
 			f0r_param_color_t col;
 							
 			double value = 0.0;
-			int instance = 0;
+		//nt instance = 0;
+			void *instance = NULL;
 			vevo_property_get( port, "instance", 0, &instance );
 			int max = 0;
 			vevo_property_get( param, "max",0,&max);

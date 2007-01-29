@@ -58,8 +58,8 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 typedef struct
 {
-	void *area;		/*!< Pointer to memory space containing ROUNDS_PER_MAG objects */
-	void **mag;		/*!< A magazine is a ROUNDS_PER_MAG-element array of pointers to objects */
+	unsigned char *area;		/*!< Pointer to memory space containing ROUNDS_PER_MAG objects */
+	unsigned char **mag;		/*!< A magazine is a ROUNDS_PER_MAG-element array of pointers to objects */
 	int	rounds;		/*!< Available rounds*/
 	void	*next;		/*!< Pointer to next space */
 } space_t;
@@ -82,7 +82,7 @@ typedef struct
 static space_t	*alloc_space( size_t bs )
 {
 	int k;
-	void *p;
+	unsigned char *p;
 	space_t *s;
 	s = (space_t*) vj_malloc(sizeof(space_t));
 #ifdef STRICT_CHECKING
@@ -176,7 +176,7 @@ void	vevo_pool_free( void *p, void *ptr, unsigned int k )
 	pool_t *pool = (pool_t*) p;
 	unsigned int n = pool->spaces[k]->rounds;
 	space_t *space = pool->spaces[k];
-	void **mag = space->mag;
+	unsigned char **mag = space->mag;
 	if( n == ROUNDS_PER_MAG )
 	{ 
 		space_t *l = space;

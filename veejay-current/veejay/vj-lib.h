@@ -187,6 +187,7 @@ typedef struct {
 	void	*export_image;
 	int	links[16];
 	int	ncpu;
+	int	vp_rec;
 } video_playback_setup;
 
 
@@ -235,6 +236,8 @@ typedef struct {
     int geox;
     int geoy;
     int file_as_sample;
+    int mouse[4];
+    char *osd_extra;
 } user_control;
 
 typedef struct {
@@ -311,6 +314,9 @@ typedef struct {
 	int  use_osd;
 	sequencer_t *seq;
 	int  no_caching;
+	void	*viewport;
+	int	 use_vp;
+	int	out_buf;
 } veejay_t;
 
 typedef struct {

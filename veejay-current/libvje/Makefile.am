@@ -4,7 +4,8 @@ MAINTAINERCLEANFILES=Makefile.in
 
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/libgoom -I$(top_srcdir)/vjmsg ${FFMPEG_CFLAGS} $(GLIB_CFLAGS)   
 
-AM_CFLAGS = $(CFLAGS) -freg-struct-return
+#AM_CFLAGS = $(CFLAGS) -freg-struct-return 
+AM_CFLAGS = $(CFLAGS) 
 
 VJE_LIB_FILE = libvje.la
 noinst_LTLIBRARIES = $(VJE_LIB_FILE)
@@ -33,9 +34,10 @@ libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			effects/isolate.c transitions/vbar.c transitions/3bar.c effects/enhancemask.c effects/noiseadd.c \
 			effects/contrast.c effects/motionblur.c effects/sinoids.c effects/average.c \
 		        effects/ripple.c effects/water.c effects/noisepencil.c effects/bathroom.c effects/slice.c \
-			effects/crosspixel.c effects/morphology.c effects/colmorphology.c effects/ghost.c effects/blob.c effects/boids.c effects/nervous.c \
+			effects/crosspixel.c effects/diffmap.c effects/threshold.c effects/morphology.c effects/colmorphology.c effects/ghost.c effects/blob.c effects/boids.c effects/nervous.c \
 			effects/cartonize.c effects/tripplicity.c effects/neighbours.c effects/neighbours2.c\
 			effects/neighbours3.c effects/neighbours4.c effects/neighbours5.c effects/cutstop.c\
-			effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/videowall.c effects/flare.c effects/constantblend.c effects/picinpic.c 
+			effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/rgbchannel.c \
+			effects/videowall.c effects/flare.c effects/constantblend.c effects/picinpic.c 
 
 

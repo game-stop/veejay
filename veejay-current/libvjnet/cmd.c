@@ -56,7 +56,6 @@ int			sock_t_connect( vj_sock_t *s, char *host, int port )
 	if( connect( s->sock_fd, (struct sockaddr*) &s->addr,
 			sizeof( struct sockaddr )) == -1 )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
 		return 0;
 	}
 	return 1;

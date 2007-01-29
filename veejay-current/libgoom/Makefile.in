@@ -14,9 +14,7 @@
 
 @SET_MAKE@
 
-# libgoom
-
-SOURCES = $(libgoom_a_SOURCES)
+SOURCES = $(libgoom_la_SOURCES)
 
 srcdir = @srcdir@
 top_srcdir = @top_srcdir@
@@ -49,47 +47,37 @@ am__configure_deps = $(am__aclocal_m4_deps) $(CONFIGURE_DEPENDENCIES) \
 mkinstalldirs = $(mkdir_p)
 CONFIG_HEADER = $(top_builddir)/config.h
 CONFIG_CLEAN_FILES =
-LIBRARIES = $(noinst_LIBRARIES)
-ARFLAGS = cru
-libgoom_a_AR = $(AR) $(ARFLAGS)
-libgoom_a_LIBADD =
-am__libgoom_a_SOURCES_DIST = goomsl_yacc.y goomsl_lex.l goomsl.c \
-	goomsl_hash.c goomsl_heap.c goom_tools.c ppc_zoom_ultimate.s \
-	ppc_drawings.s config_param.c convolve_fx.c filters.c \
-	flying_stars_fx.c gfontlib.c gfontrle.c goom_core.c graphic.c \
-	ifs.c lines.c mathtools.c sound_tester.c surf3d.c tentacle3d.c \
-	plugin_info.c v3d.c drawmethods.c cpu_info.c
-@ARCH_PPC_TRUE@am__objects_1 = ppc_zoom_ultimate.$(OBJEXT) \
-@ARCH_PPC_TRUE@	ppc_drawings.$(OBJEXT)
-am_libgoom_a_OBJECTS = goomsl_yacc.$(OBJEXT) goomsl_lex.$(OBJEXT) \
-	goomsl.$(OBJEXT) goomsl_hash.$(OBJEXT) goomsl_heap.$(OBJEXT) \
-	goom_tools.$(OBJEXT) $(am__objects_1) config_param.$(OBJEXT) \
-	convolve_fx.$(OBJEXT) filters.$(OBJEXT) \
-	flying_stars_fx.$(OBJEXT) gfontlib.$(OBJEXT) \
-	gfontrle.$(OBJEXT) goom_core.$(OBJEXT) graphic.$(OBJEXT) \
-	ifs.$(OBJEXT) lines.$(OBJEXT) mathtools.$(OBJEXT) \
-	sound_tester.$(OBJEXT) surf3d.$(OBJEXT) tentacle3d.$(OBJEXT) \
-	plugin_info.$(OBJEXT) v3d.$(OBJEXT) drawmethods.$(OBJEXT) \
-	cpu_info.$(OBJEXT)
-libgoom_a_OBJECTS = $(am_libgoom_a_OBJECTS)
+LTLIBRARIES = $(noinst_LTLIBRARIES)
+libgoom_la_LIBADD =
+am_libgoom_la_OBJECTS = goomsl_yacc.lo goomsl_lex.lo goomsl.lo \
+	goomsl_hash.lo goomsl_heap.lo goom_tools.lo config_param.lo \
+	convolve_fx.lo filters.lo flying_stars_fx.lo gfontlib.lo \
+	gfontrle.lo goom_core.lo graphic.lo ifs.lo lines.lo \
+	mathtools.lo sound_tester.lo surf3d.lo tentacle3d.lo \
+	plugin_info.lo v3d.lo drawmethods.lo cpu_info.lo
+libgoom_la_OBJECTS = $(am_libgoom_la_OBJECTS)
 DEFAULT_INCLUDES = -I. -I$(srcdir) -I$(top_builddir)
 depcomp = $(SHELL) $(top_srcdir)/depcomp
 am__depfiles_maybe = depfiles
-@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/config_param.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/convolve_fx.Po ./$(DEPDIR)/cpu_info.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/drawmethods.Po ./$(DEPDIR)/filters.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/flying_stars_fx.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/gfontlib.Po ./$(DEPDIR)/gfontrle.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/goom_core.Po ./$(DEPDIR)/goom_tools.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/goomsl.Po ./$(DEPDIR)/goomsl_hash.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/goomsl_heap.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/goomsl_lex.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/goomsl_yacc.Po ./$(DEPDIR)/graphic.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/ifs.Po ./$(DEPDIR)/lines.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/mathtools.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/plugin_info.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/sound_tester.Po ./$(DEPDIR)/surf3d.Po \
-@AMDEP_TRUE@	./$(DEPDIR)/tentacle3d.Po ./$(DEPDIR)/v3d.Po
+@AMDEP_TRUE@DEP_FILES = ./$(DEPDIR)/config_param.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/convolve_fx.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/cpu_info.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/drawmethods.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/filters.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/flying_stars_fx.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/gfontlib.Plo ./$(DEPDIR)/gfontrle.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/goom_core.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/goom_tools.Plo ./$(DEPDIR)/goomsl.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/goomsl_hash.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/goomsl_heap.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/goomsl_lex.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/goomsl_yacc.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/graphic.Plo ./$(DEPDIR)/ifs.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/lines.Plo ./$(DEPDIR)/mathtools.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/plugin_info.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/sound_tester.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/surf3d.Plo ./$(DEPDIR)/tentacle3d.Plo \
+@AMDEP_TRUE@	./$(DEPDIR)/v3d.Plo
 COMPILE = $(CC) $(DEFS) $(DEFAULT_INCLUDES) $(INCLUDES) $(AM_CPPFLAGS) \
 	$(CPPFLAGS) $(AM_CFLAGS) $(CFLAGS)
 LTCOMPILE = $(LIBTOOL) --mode=compile $(CC) $(DEFS) \
@@ -100,14 +88,11 @@ LINK = $(LIBTOOL) --mode=link $(CCLD) $(AM_CFLAGS) $(CFLAGS) \
 	$(AM_LDFLAGS) $(LDFLAGS) -o $@
 LEXCOMPILE = $(LEX) $(LFLAGS) $(AM_LFLAGS)
 LTLEXCOMPILE = $(LIBTOOL) --mode=compile $(LEX) $(LFLAGS) $(AM_LFLAGS)
-CCASCOMPILE = $(CCAS) $(AM_CCASFLAGS) $(CCASFLAGS)
-LTCCASCOMPILE = $(LIBTOOL) --mode=compile $(CCAS) $(AM_CCASFLAGS) \
-	$(CCASFLAGS)
 YACCCOMPILE = $(YACC) $(YFLAGS) $(AM_YFLAGS)
 LTYACCCOMPILE = $(LIBTOOL) --mode=compile $(YACC) $(YFLAGS) \
 	$(AM_YFLAGS)
-SOURCES = $(libgoom_a_SOURCES)
-DIST_SOURCES = $(am__libgoom_a_SOURCES_DIST)
+SOURCES = $(libgoom_la_SOURCES)
+DIST_SOURCES = $(libgoom_la_SOURCES)
 ETAGS = etags
 CTAGS = ctags
 DISTFILES = $(DIST_COMMON) $(DIST_SOURCES) $(TEXINFOS) $(EXTRA_DIST)
@@ -121,8 +106,6 @@ ARCH_PPC_FALSE = @ARCH_PPC_FALSE@
 ARCH_PPC_TRUE = @ARCH_PPC_TRUE@
 ARCH_X86_FALSE = @ARCH_X86_FALSE@
 ARCH_X86_TRUE = @ARCH_X86_TRUE@
-AS = @AS@
-ASFLAGS = @ASFLAGS@
 AUTOCONF = @AUTOCONF@
 AUTOHEADER = @AUTOHEADER@
 AUTOMAKE = @AUTOMAKE@
@@ -163,7 +146,6 @@ FT_LIBS = @FT_LIBS@
 GLADE_CFLAGS = @GLADE_CFLAGS@
 GLADE_LIBS = @GLADE_LIBS@
 GLIB_CFLAGS = @GLIB_CFLAGS@
-GLIB_CONFIG = @GLIB_CONFIG@
 GLIB_LIBS = @GLIB_LIBS@
 GL_CFLAGS = @GL_CFLAGS@
 GL_LIBS = @GL_LIBS@
@@ -214,6 +196,8 @@ HAVE_X86CPU_FALSE = @HAVE_X86CPU_FALSE@
 HAVE_X86CPU_TRUE = @HAVE_X86CPU_TRUE@
 HAVE_XML2_FALSE = @HAVE_XML2_FALSE@
 HAVE_XML2_TRUE = @HAVE_XML2_TRUE@
+HAVE_X_FALSE = @HAVE_X_FALSE@
+HAVE_X_TRUE = @HAVE_X_TRUE@
 INSTALL_DATA = @INSTALL_DATA@
 INSTALL_PROGRAM = @INSTALL_PROGRAM@
 INSTALL_SCRIPT = @INSTALL_SCRIPT@
@@ -284,9 +268,14 @@ USE_UNICAP_FALSE = @USE_UNICAP_FALSE@
 USE_UNICAP_TRUE = @USE_UNICAP_TRUE@
 V4LCONF_LIBS = @V4LCONF_LIBS@
 VERSION = @VERSION@
+XMKMF = @XMKMF@
 XML2_CONFIG = @XML2_CONFIG@
 XML_CPPFLAGS = @XML_CPPFLAGS@
 XML_LIBS = @XML_LIBS@
+X_CFLAGS = @X_CFLAGS@
+X_EXTRA_LIBS = @X_EXTRA_LIBS@
+X_LIBS = @X_LIBS@
+X_PRE_LIBS = @X_PRE_LIBS@
 YACC = @YACC@
 YFLAGS = @YFLAGS@
 ac_ct_CC = @ac_ct_CC@
@@ -341,14 +330,10 @@ target_os = @target_os@
 target_vendor = @target_vendor@
 MAINTAINERCLEANFILES = Makefile.in
 INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/libgoom
-@ARCH_PPC_FALSE@PPC_FILES = 
-@ARCH_PPC_TRUE@PPC_FILES = ppc_zoom_ultimate.s ppc_drawings.s
-LIBGOOM = libgoom.a
-noinst_LIBRARIES = $(LIBGOOM)
-
-#goom2_library_include_HEADERS = goom.h goom_plugin_info.h goom_typedefs.h goom_graphic.h goom_config_param.h goom_visual_fx.h goom_filters.h goom_tools.h goomsl.h goomsl_hash.h goomsl_heap.h goom_tools.h goom_config.h
-libgoom_a_SOURCES = goomsl_yacc.y goomsl_lex.l goomsl.c goomsl_hash.c goomsl_heap.c \
-	goom_tools.c $(PPC_FILES) \
+GOOM_LIB_FILE = libgoom.la
+noinst_LTLIBRARIES = $(GOOM_LIB_FILE)
+libgoom_la_SOURCES = goomsl_yacc.y goomsl_lex.l goomsl.c goomsl_hash.c goomsl_heap.c \
+	goom_tools.c \
 	config_param.c convolve_fx.c filters.c \
 	flying_stars_fx.c gfontlib.c gfontrle.c \
 	goom_core.c graphic.c ifs.c lines.c \
@@ -360,7 +345,7 @@ libgoom_a_SOURCES = goomsl_yacc.y goomsl_lex.l goomsl.c goomsl_hash.c goomsl_hea
 all: all-am
 
 .SUFFIXES:
-.SUFFIXES: .c .l .lo .o .obj .s .y
+.SUFFIXES: .c .l .lo .o .obj .y
 $(srcdir)/Makefile.in: @MAINTAINER_MODE_TRUE@ $(srcdir)/Makefile.am  $(am__configure_deps)
 	@for dep in $?; do \
 	  case '$(am__configure_deps)' in \
@@ -391,12 +376,16 @@ $(top_srcdir)/configure: @MAINTAINER_MODE_TRUE@ $(am__configure_deps)
 $(ACLOCAL_M4): @MAINTAINER_MODE_TRUE@ $(am__aclocal_m4_deps)
 	cd $(top_builddir) && $(MAKE) $(AM_MAKEFLAGS) am--refresh
 
-clean-noinstLIBRARIES:
-	-test -z "$(noinst_LIBRARIES)" || rm -f $(noinst_LIBRARIES)
-libgoom.a: $(libgoom_a_OBJECTS) $(libgoom_a_DEPENDENCIES) 
-	-rm -f libgoom.a
-	$(libgoom_a_AR) libgoom.a $(libgoom_a_OBJECTS) $(libgoom_a_LIBADD)
-	$(RANLIB) libgoom.a
+clean-noinstLTLIBRARIES:
+	-test -z "$(noinst_LTLIBRARIES)" || rm -f $(noinst_LTLIBRARIES)
+	@list='$(noinst_LTLIBRARIES)'; for p in $$list; do \
+	  dir="`echo $$p | sed -e 's|/[^/]*$$||'`"; \
+	  test "$$dir" != "$$p" || dir=.; \
+	  echo "rm -f \"$${dir}/so_locations\""; \
+	  rm -f "$${dir}/so_locations"; \
+	done
+libgoom.la: $(libgoom_la_OBJECTS) $(libgoom_la_DEPENDENCIES) 
+	$(LINK)  $(libgoom_la_LDFLAGS) $(libgoom_la_OBJECTS) $(libgoom_la_LIBADD) $(LIBS)
 
 mostlyclean-compile:
 	-rm -f *.$(OBJEXT)
@@ -404,30 +393,30 @@ mostlyclean-compile:
 distclean-compile:
 	-rm -f *.tab.c
 
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/config_param.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/convolve_fx.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu_info.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/drawmethods.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/filters.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/flying_stars_fx.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gfontlib.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gfontrle.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goom_core.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goom_tools.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goomsl.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goomsl_hash.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goomsl_heap.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goomsl_lex.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goomsl_yacc.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/graphic.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ifs.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lines.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mathtools.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/plugin_info.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sound_tester.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/surf3d.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tentacle3d.Po@am__quote@
-@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/v3d.Po@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/config_param.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/convolve_fx.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/cpu_info.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/drawmethods.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/filters.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/flying_stars_fx.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gfontlib.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/gfontrle.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goom_core.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goom_tools.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goomsl.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goomsl_hash.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goomsl_heap.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goomsl_lex.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/goomsl_yacc.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/graphic.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/ifs.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/lines.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/mathtools.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/plugin_info.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/sound_tester.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/surf3d.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/tentacle3d.Plo@am__quote@
+@AMDEP_TRUE@@am__include@ @am__quote@./$(DEPDIR)/v3d.Plo@am__quote@
 
 .c.o:
 @am__fastdepCC_TRUE@	if $(COMPILE) -MT $@ -MD -MP -MF "$(DEPDIR)/$*.Tpo" -c -o $@ $<; \
@@ -457,15 +446,6 @@ distclean-compile:
 	$(LEXCOMPILE) $<
 	sed '/^#/ s|$(LEX_OUTPUT_ROOT)\.c|$@|' $(LEX_OUTPUT_ROOT).c >$@
 	rm -f $(LEX_OUTPUT_ROOT).c
-
-.s.o:
-	$(CCASCOMPILE) -c $<
-
-.s.obj:
-	$(CCASCOMPILE) -c `$(CYGPATH_W) '$<'`
-
-.s.lo:
-	$(LTCCASCOMPILE) -c -o $@ $<
 
 .y.c:
 	$(YACCCOMPILE) $<
@@ -574,7 +554,7 @@ distdir: $(DISTFILES)
 	done
 check-am: all-am
 check: check-am
-all-am: Makefile $(LIBRARIES)
+all-am: Makefile $(LTLIBRARIES)
 installdirs:
 install: install-am
 install-exec: install-exec-am
@@ -605,7 +585,7 @@ maintainer-clean-generic:
 	-rm -f goomsl_yacc.c
 clean: clean-am
 
-clean-am: clean-generic clean-libtool clean-noinstLIBRARIES \
+clean-am: clean-generic clean-libtool clean-noinstLTLIBRARIES \
 	mostlyclean-am
 
 distclean: distclean-am
@@ -655,7 +635,7 @@ ps-am:
 uninstall-am: uninstall-info-am
 
 .PHONY: CTAGS GTAGS all all-am check check-am clean clean-generic \
-	clean-libtool clean-noinstLIBRARIES ctags distclean \
+	clean-libtool clean-noinstLTLIBRARIES ctags distclean \
 	distclean-compile distclean-generic distclean-libtool \
 	distclean-tags distdir dvi dvi-am html html-am info info-am \
 	install install-am install-data install-data-am install-exec \

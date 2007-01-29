@@ -12,7 +12,7 @@ void	vj_perform_unlock_primary_frame( void );
 VJFrame	*vj_perform_init_plugin_frame(veejay_t *info);
 VJFrameInfo *vj_perform_init_plugin_frame_info(veejay_t *info);
 
-int vj_perform_init(veejay_t * info);
+int vj_perform_init(veejay_t * info, int use_vp);
 
 int vj_perform_init_audio(veejay_t * info);
 
@@ -55,5 +55,11 @@ int	vj_perform_init_cropped_output_frame(veejay_t *info, VJFrame *src, int *dw, 
 void	vj_perform_get_crop_dimensions(veejay_t *info, int *w, int *h);
 int	vj_perform_rand_update(veejay_t *info);
 int	vj_perform_randomize(veejay_t *info);
+
+void       vj_perform_free_plugin_frame(VJFrameInfo *f );
+
+int        vj_perform_send_primary_frame_s2(veejay_t *info, int mcast);
+void       vj_perform_get_backstore( uint8_t **frame );
+int        vj_perform_get_sampling();
 
 #endif

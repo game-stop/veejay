@@ -30,6 +30,7 @@
 #include <veejay/vj-global.h>
 #include <libvjmem/vjmem.h>
 #include <libel/vj-avcodec.h>
+#include <veejay/libveejay.h>
 #include <string.h>
 #include <stdlib.h>
 //extern void *(* veejay_memcpy)(void *to, const void *from, size_t len) ;
@@ -42,7 +43,7 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
 	return NULL;
     vjsdl->flags[0] = 0;
     vjsdl->flags[1] = 0;
-    vjsdl->mouse_motion = 0;
+    vjsdl->mouse_motion = 1;
     vjsdl->use_keyboard = 1;
     vjsdl->pix_format = SDL_YUY2_OVERLAY; // have best quality by default
 	// use yuv420 test

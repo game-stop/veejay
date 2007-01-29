@@ -81,7 +81,8 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
     uint8_t *Y2 = frame2->data[0];
-
+	uint8_t *Cb2 = frame2->data[1];
+	uint8_t *Cr2 = frame2->data[1];
 	// keep copy of original frame
 	veejay_memcpy(buf[0], Y, width * height );
 	veejay_memcpy(buf[1], Cb, (width * height) );
@@ -100,14 +101,20 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
 			// new pixel coordinates
 			nx = x + dx;
 			ny = y + dy;
-			if(nx < 0) nx+=width;	
-			if(nx < 0) nx = 0; else if (nx > width) nx = width;
-			if(ny < 0) ny+=height;
-			if(ny < 0) ny = 0; else if (ny >= height) ny = height-1;
-			// put pixels from local copy
-			Y[y*width+x] = buf[0][ny * width + nx];
-			Cb[y*width+x] = buf[1][ny * width + nx];
-			Cr[y*width+x] = buf[2][ny * width + nx];
+
+
+			if( nx < 0 || ny < 0 || nx > width || ny >= height )
+                        {
+                               Y[y*width+x] = 16;
+                               Cb[y*width+x] = 128;
+                               Cr[y*width+x] = 128;
+                        }
+                        else
+                        {
+                               Y[y*width+x] = Y2[ny * width + nx];
+                               Cb[y*width+x] = Cb2[ny * width + nx];
+                               Cr[y*width+x] = Cr2[ny * width + nx];
+                        }
 		}
 	}
 }

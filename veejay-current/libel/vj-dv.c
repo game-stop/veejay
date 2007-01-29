@@ -24,6 +24,7 @@
 #include <stdint.h>
 #include <libel/vj-dv.h>
 #include <libel/vj-avcodec.h>
+#include <libyuv/yuvconv.h> 
 #include <string.h>
 
 #define NTSC_W 720
@@ -165,8 +166,8 @@ void	   vj_dv_decoder_get_audio(vj_dv_decoder *d, uint8_t *audio_buf)
 	if(!d->audio) return;
 
 	int n_samples = dv_get_num_samples( d->decoder);
-	int channels  = dv_get_num_channels( d->decoder );
-	int i,j;
+//	int channels  = dv_get_num_channels( d->decoder );
+	int i;
 	int16_t *ch0  = d->audio_buffers[0];
 	int16_t *ch1  = d->audio_buffers[1];
 	// convert short to uint8_t, 

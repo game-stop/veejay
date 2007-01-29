@@ -21,7 +21,7 @@
 
 #include <stdlib.h>
 #include "bwselect.h"
-
+#include "common.h"
 vj_effect *bwselect_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));

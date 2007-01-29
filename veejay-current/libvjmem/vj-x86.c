@@ -22,8 +22,10 @@
 #include <sys/time.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unistd.h>
 
 extern void find_best_memcpy(void);
+extern void find_best_memset(void);
 
 static int MEM_ALIGNMENT_SIZE = 0;
 
@@ -105,7 +107,6 @@ __asm__ __volatile__(
 }
 
 #else 
-
 void mymemset_generic(void *s, char c, size_t cc )
 {
 	memset(s,c,cc);
@@ -151,7 +152,7 @@ void *vj_malloc(unsigned int size)
 	return ptr;
 }
 
-void	*vj_calloc( size_t size )
+void	*vj_calloc( unsigned int size )
 {
 	void *ptr = vj_malloc( size );
 	if(ptr)
@@ -163,7 +164,7 @@ void	*vj_calloc( size_t size )
 void *vj_yuvalloc( unsigned int w, unsigned int h )
 {
 	size_t len = (w * h * 3);
-	void *ptr = vj_malloc( len );
+	unsigned char *ptr = vj_malloc( len );
 
 	veejay_memset( ptr, 0, (w*h));
 	veejay_memset( ptr + (w*h), 128, (w*h)*2);

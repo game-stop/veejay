@@ -19,11 +19,16 @@
 #include <config.h>
 #include <string.h>
 #include <libsample/sampleadm.h>
-#include <libel/vj-avcodec.h>
 #include <libvjmsg/vj-common.h>
 #include <libsamplerec/samplerecord.h>
 #include <veejay/vj-misc.h>
+#include <ffmpeg/avutil.h>
+#include <ffmpeg/avcodec.h>
+#include <libel/vj-avcodec.h>
+
 void	sample_reset_encoder(int sample_id);
+extern int   sufficient_space(int max_size, int nframes); 
+
 
 static uint8_t *sample_encoder_buf;
 

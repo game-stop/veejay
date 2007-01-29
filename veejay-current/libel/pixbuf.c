@@ -30,6 +30,8 @@
 #include <libyuv/yuvconv.h>
 #include <libel/pixbuf.h>
 #include <veejay/vj-global.h>
+#include <ffmpeg/swscale.h>
+
 typedef struct
 {
 	char *filename;
@@ -52,6 +54,8 @@ typedef struct
 } vj_pixbuf_out_t;
 
 static int	__initialized = 0;
+
+extern int	get_ffmpeg_pixfmt(int id);
 
 static	GdkPixbuf *open_pixbuf( const char *filename )
 {
@@ -389,6 +393,52 @@ static inline int       get_shift_size(int fmt)
         return 0;
 }
 
+static	sws_template	sws_templ;
+static  void *scaler = NULL;
+static  void *bwscaler = NULL;
+void		vj_picture_free()
+{
+	if(scaler)
+		yuv_free_swscaler( scaler );
+	if(bwscaler)
+		yuv_free_swscaler( bwscaler );
+}
+
+veejay_image_t	*vj_fast_picture_save_to_mem( uint8_t **frame, int w, int h, int out_w, int out_h, int fmt )
+{
+	veejay_image_t *image = (veejay_image_t*) vj_calloc(sizeof(veejay_image_t));
+	if(!image)
+		return NULL;
+
+	image->image= (void*) gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, out_w, out_h );
+	VJFrame src,dst;
+	veejay_memset(&src,0,sizeof(VJFrame));
+	veejay_memset(&dst,0,sizeof(VJFrame));
+
+	vj_get_yuv_template( &src,w,h,fmt );
+	src.data[0] = frame[0];
+	src.data[1] = frame[1];	
+	src.data[2] = frame[2];
+	vj_get_rgb_template( &dst, out_w, out_h);
+	dst.data[0] = (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );
+
+	if(!scaler )
+	{
+		scaler = yuv_init_swscaler( &src,&dst, &sws_templ, 
+				yuv_sws_get_cpu_flags() );
+
+		if(!scaler)
+		{
+			veejay_msg(0, "Unable to initialize software scaler");
+		}
+	}
+
+	yuv_convert_and_scale_rgb( scaler, &src, &dst );
+
+
+	return image;
+}
+
 veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int out_w, int out_h, int fmt  )
 {
 	veejay_image_t *image = (veejay_image_t*) vj_malloc(sizeof(veejay_image_t));
@@ -474,6 +524,63 @@ veejay_image_t *vj_picture_save_bw_to_memory( uint8_t **frame, int w, int h , in
 	return image;
 }
 
+veejay_image_t	*vj_fastbw_picture_save_to_mem( uint8_t **frame, int w, int h, int out_w, int out_h, int fmt )
+{
+	veejay_image_t *image = (veejay_image_t*) vj_calloc(sizeof(veejay_image_t));
+	if(!image)
+		return NULL;
 
+	image->image= (void*) gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, out_w, out_h );
+	VJFrame src,dst;
+	veejay_memset(&src,0,sizeof(VJFrame));
+	veejay_memset(&dst,0,sizeof(VJFrame));
+
+	vj_get_yuv_template( &src,w,h,fmt );
+	src.data[0] = frame[0];
+	src.data[1] = frame[1];	
+	src.data[2] = frame[2];
+	
+	//vj_get_rgb_template( &dst, out_w, out_h);
+	vj_get_yuv_template( &dst,out_w,out_h,fmt );
+
+	uint8_t *data[3];
+	data[0] = vj_malloc( sizeof(uint8_t) * out_w * out_h * 3 );
+	data[1] = data[0] + (out_w * out_h);
+	data[2] = data[1] + (out_w * out_h);
+
+	dst.data[0] = data[0];
+	dst.data[1] = data[1];
+	dst.data[2] = data[2];
+
+//	uint8_t data[0] = (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );
+	if(!bwscaler )
+	{
+		bwscaler = yuv_init_swscaler( &src,&dst, &sws_templ, 
+				yuv_sws_get_cpu_flags() );
+
+		if(!bwscaler)
+		{
+			veejay_msg(0, "Unable to initialize software scaler");
+		}
+	}
+
+	yuv_convert_and_scale( bwscaler, &src, &dst );
+
+	AVPicture pict1,pict2;
+	memset(&pict1,0,sizeof(pict1));
+        memset(&pict2,0,sizeof(pict2));
+
+	pict1.data[0] = data[0];
+        pict1.linesize[0] = out_w;
+
+	pict2.data[0] =  (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );;
+        pict2.linesize[0] = out_w * 3;
+
+	img_convert( &pict2, PIX_FMT_RGB24, &pict1, PIX_FMT_GRAY8, out_w, out_h );
+	
+	free( data[0] );
+
+	return image;
+}
 
 #endif

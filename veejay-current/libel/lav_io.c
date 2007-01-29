@@ -39,10 +39,13 @@
 #ifdef HAVE_LIBQUICKTIME
 #include <quicktime.h>
 #include <lqt.h>
+#include <lqt/lqt_version.h>
 #include <lqt/colormodels.h>
-#include <liblzo/lzo.h>
-#define QUICKTIME_MJPG_TAG 0x6d6a7067
 #endif
+#include <liblzo/lzo.h>
+#include <libvjmem/vjmem.h>
+#define QUICKTIME_MJPG_TAG 0x6d6a7067
+extern int vj_el_get_decoder_from_fourcc( const char *fourcc );
 
 
 extern int AVI_errno;
@@ -1031,7 +1034,7 @@ int lav_set_video_position(lav_file_t *lav_file, long frame)
 #endif
 #ifdef HAVE_LIBQUICKTIME
 	if(video_format == 'q')
-  		return quicktime_set_video_position(lav_file->qt_fd,frame,0);
+  		return quicktime_set_video_position(lav_file->qt_fd,(int64_t)frame,0);
 #endif   
    return (AVI_set_video_position(lav_file->avi_fd,frame));
 }
@@ -1800,11 +1803,13 @@ int lav_fileno(lav_file_t *lav_file)
          break;
 #ifdef HAVE_LIBQUICKTIME
       case 'q':
-//		res = lqt_fileno((quicktime_t *)lav_file->qt_fd);
-//	
 	 {
+#if ( LQT_CODEC_API_VERSION & 0xff ) >6  
+		 res = lqt_fileno( (quicktime_t*) lav_file->qt_fd );
+#else
 		 quicktime_t *q = lav_file->qt_fd;
 		 res = (int)fileno( (quicktime_t*) q->stream );
+#endif
 	 }
 		break;
 #endif		 

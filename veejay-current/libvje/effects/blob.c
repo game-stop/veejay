@@ -206,7 +206,7 @@ static void	blob_render_rect(int s, int width)
 	}
 }
 
-static blob_func	*blob_render(void)
+static blob_func	blob_render(void)
 {
 	if( blob_type_ == BLOB_RECT)
 		return &blob_render_rect;

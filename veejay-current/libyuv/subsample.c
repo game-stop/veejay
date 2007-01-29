@@ -71,18 +71,14 @@ typedef struct
 	uint8_t *buf; 
 } yuv_sampler_t;
 
-static uint8_t *sample_buffer = NULL;
-static int go = 0;
-
 void *subsample_init(int len)
 {
-	void *ret = NULL;
 	yuv_sampler_t *s = (yuv_sampler_t*) vj_malloc(sizeof(yuv_sampler_t) );
 	if(!s)
-		return ret;
-	s->buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
+		return NULL;
+	s->buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * (len*2) );
 	if(!s->buf)
-		return ret;
+		return NULL;
 
 	return (void*) s;
 }
@@ -92,7 +88,8 @@ void	subsample_free(void *data)
 	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
 	if(sampler)
 	{
-		if(sampler->buf) free(sampler->buf);
+		if(sampler->buf) 
+			free(sampler->buf);
 		free(sampler);
 	}
 	sampler = NULL;
@@ -386,8 +383,8 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
   }
 #else
 	int x,y;
-	const int mmx_stride = width/8;
-	uint8_t *src = buffer + (width * height/4)-1;
+	const int mmx_stride = width >> 3;
+	uint8_t *src = buffer + ((width * height) >> 2)-1;
 	uint8_t *dst = buffer + (width * height) -1;
 	uint8_t *dst2 = dst - width;
 
@@ -424,187 +421,221 @@ void ss_422_to_420(uint8_t *buffer, int width, int height )
 	//todo 2x1 down sampling (box)
 }
 
-#ifndef HAVE_ASM_MMX
-static void ss_444_to_422(void *data, uint8_t *buffer, int width, int height)
+#ifdef HAVE_ASM_MMX
+#undef HAVE_K6_2PLUS
+#if !defined( HAVE_ASM_MMX2) && defined( HAVE_ASM_3DNOW )
+#define HAVE_K6_2PLUS
+#endif
+
+#undef _EMMS
+
+#ifdef HAVE_K6_2PLUS
+/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
+#define _EMMS     "femms"
+#else
+#define _EMMS     "emms"
+#endif
+
+#endif
+
+#ifdef HAVE_ASM_MMX
+/* for small memory blocks (<256 bytes) this version is faster */
+#define small_memcpy(to,from,n)\
+{\
+register unsigned long int dummy;\
+__asm__ __volatile__(\
+  "rep; movsb"\
+  :"=&D"(to), "=&S"(from), "=&c"(dummy)\
+  :"0" (to), "1" (from),"2" (n)\
+  : "memory");\
+}
+
+static  inline	void	copy8( uint8_t *dst, uint8_t *in )
 {
-	const int dst_stride = width/2;
-	int x,y;
-	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
-	
-	for(y = 0; y < height; y ++)
+	__asm__ __volatile__ (
+		"movq	(%0),	%%mm0\n"
+		"movq %%mm0, (%1)\n"
+		:: "r" (in), "r" (dst) : "memory" );
+}
+
+static	inline	void	copy16( uint8_t *dst, uint8_t *in)
+{
+	__asm__ __volatile__ (
+		"movq	(%0),	%%mm0\n"
+		"movq  8(%0),	%%mm1\n"
+		"movq  %%mm0,   (%1)\n"
+		"movq  %%mm1,   8(%1)\n"
+		:: "r" (in), "r" (dst) : "memory" );
+}
+
+static	inline void	copy_width( uint8_t *dst, uint8_t *in, int width )
+{
+	int w = width >> 4;
+	int x;
+	uint8_t *d = dst;
+	uint8_t *i = in;
+
+	for( x = 0; x < w; x ++ )
 	{
-		uint8_t *src = sampler->buf;
-		uint8_t *dst = buffer + (y*dst_stride);
-		veejay_memcpy( src, buffer + (y*width), width );
-		for(x=0; x < dst_stride; x++)
-		{
-			*(dst++) = ( src[0] + src[1] ) >> 1;
-			src += 2;
-		}
+		copy16( d, i );
+		d += 16;
+		i += 16;
 	}
 
+	x = w % 16;
+
+	if( x >= 8 )
+	{
+		copy8( d,i );
+		d += 8;
+		i += 8;
+		x -= 8;
+	}
+
+	if( x )
+		small_memcpy( d, i, x);
+
 }
 
-#else
-
-/* mmx_average_2_u8 (function taken from mpeg2dec, a free MPEG-2 video
- * stream decoder 
- *
- * Copyright (C) 2000-2003 Michel Lespinasse <walken@zoy.org>
- * Copyright (C) 1999-2000 Aaron Holtzman <aholtzma@ess.engr.uvic.ca>
- */
-
-static mmx_t mask1 = {0xfefefefefefefefeLL};
-static mmx_t round4 = {0x0002000200020002LL};
-
-static inline void mmx_average_4_U8 (uint8_t * dest, const uint8_t * src1,
-                                     const uint8_t * src2,
-                                     const uint8_t * src3,
-                                     const uint8_t * src4)
+static	inline	void	load_mask16to8()
 {
-    /* *dest = (*src1 + *src2 + *src3 + *src4 + 2)/ 4; */
+	const uint64_t mask = 0x00ff00ff00ff00ffLL;
+	const uint8_t *m    = (uint8_t*)&mask;
 
-    movq_m2r (*src1, mm1);      /* load 8 src1 bytes */
-    movq_r2r (mm1, mm2);        /* copy 8 src1 bytes */
+	__asm __volatile(
+		"movq		(%0), %%mm4\n\t"
+		:: "r" (m)
+	);
 
-    punpcklbw_r2r (mm0, mm1);   /* unpack low src1 bytes */
-    punpckhbw_r2r (mm0, mm2);   /* unpack high src1 bytes */
-
-    movq_m2r (*src2, mm3);      /* load 8 src2 bytes */
-    movq_r2r (mm3, mm4);        /* copy 8 src2 bytes */
-
-    punpcklbw_r2r (mm0, mm3);   /* unpack low src2 bytes */
-    punpckhbw_r2r (mm0, mm4);   /* unpack high src2 bytes */
-
-    paddw_r2r (mm3, mm1);       /* add lows */
-    paddw_r2r (mm4, mm2);       /* add highs */
-
-    /* now have partials in mm1 and mm2 */
-
-    movq_m2r (*src3, mm3);      /* load 8 src3 bytes */
-    movq_r2r (mm3, mm4);        /* copy 8 src3 bytes */
-
-    punpcklbw_r2r (mm0, mm3);   /* unpack low src3 bytes */
-    punpckhbw_r2r (mm0, mm4);   /* unpack high src3 bytes */
-
-    paddw_r2r (mm3, mm1);       /* add lows */
-    paddw_r2r (mm4, mm2);       /* add highs */
-
-    movq_m2r (*src4, mm5);      /* load 8 src4 bytes */
-    movq_r2r (mm5, mm6);        /* copy 8 src4 bytes */
-
-    punpcklbw_r2r (mm0, mm5);   /* unpack low src4 bytes */
-    punpckhbw_r2r (mm0, mm6);   /* unpack high src4 bytes */
-
-    paddw_r2r (mm5, mm1);       /* add lows */
-    paddw_r2r (mm6, mm2);       /* add highs */
-
-    /* now have subtotal in mm1 and mm2 */
-
-    paddw_m2r (round4, mm1);
-    psraw_i2r (2, mm1);         /* /4 */
-    paddw_m2r (round4, mm2);
-    psraw_i2r (2, mm2);         /* /4 */
-
-    packuswb_r2r (mm2, mm1);    /* pack (w/ saturation) */
-    movq_r2m (mm1, *dest);      /* store result in dest */
 }
 
-
-static inline void mmx_average_2_U8 (uint8_t * dest, const uint8_t * src1,
-				     const uint8_t * src2)
+static	inline	void	down_sample16to8( uint8_t *out, uint8_t *in )
 {
-    /* *dest = (*src1 + *src2 + 1)/ 2; */
-
-    movq_m2r (*src1, mm1);	/* load 8 src1 bytes */
-    movq_r2r (mm1, mm2);	/* copy 8 src1 bytes */
-
-    movq_m2r (*src2, mm3);	/* load 8 src2 bytes */
-    movq_r2r (mm3, mm4);	/* copy 8 src2 bytes */
-
-    pxor_r2r (mm1, mm3);	/* xor src1 and src2 */
-    pand_m2r (mask1, mm3);	/* mask lower bits */
-    psrlq_i2r (1, mm3);		/* /2 */
-    por_r2r (mm2, mm4);		/* or src1 and src2 */
-    psubb_r2r (mm3, mm4);	/* subtract subresults */
-    movq_r2m (mm4, *dest);	/* store result in dest */
+	//@ down sample by dropping right pixels
+	__asm __volatile(
+		"movq		(%0), %%mm1\n\t"
+		"movq		8(%0),%%mm3\n\t"
+		"pxor		%%mm5,%%mm5\n\t"
+		"pand		%%mm4,%%mm1\n\t"
+		"pand		%%mm4,%%mm3\n\t"
+		"packuswb	%%mm1,%%mm2\n\t"
+		"packuswb	%%mm3,%%mm5\n\t"
+		"psrlq		$32, %%mm2\n\t"
+		"por		%%mm5,%%mm2\n\t"
+		"movq		%%mm2, (%1)\n\t"
+		:: "r" (in), "r" (out)
+	);
 }
-static void ss_444_to_422(void *data,uint8_t *buffer, int width, int height)
+#endif
+
+
+static void ss_444_to_422(void *data, uint8_t *buffer, int width, int height)
 {
-	const int dst_stride = width/2;
-	const int len = width * height;
-	const int mmx_stride = dst_stride / 8;
+	const int dst_stride = width >> 1;
 	int x,y;
-
+#ifdef HAVE_ASM_MMX
+	int mmxdst_stride=dst_stride >> 3;
+	int left = dst_stride & 8;
+#endif
 	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
+	uint8_t *src = sampler->buf;
+	uint8_t *dst;
 
+#ifdef HAVE_ASM_MMX
+	load_mask16to8();
+#endif
 	for(y = 0; y < height; y ++)
 	{
-		uint8_t *src = sampler->buf;
-		uint8_t *dst = buffer + (y*dst_stride);
-		veejay_memcpy( src, buffer + (y*width), width );
-		for(x=0; x < mmx_stride; x++)
+		src = sampler->buf;
+		dst = buffer + (y*dst_stride);
+
+#ifndef HAVE_ASM_MMX
+		for(x=0; x < dst_stride; x++)
 		{
-			mmx_average_2_U8( dst,src, src+8 );
+			*(dst++) = ( src[0] + src[1] + 1 ) >> 1;
+			src += 2;
+		}
+#else
+		copy_width( src, buffer + (y*width), width );
+
+		for( x= 0; x < mmxdst_stride; x++ )
+		{
+			down_sample16to8( dst, src );
 			src += 16;
 			dst += 8;
 		}
+		for(x=0; x < left; x++)
+		{
+			*(dst++) = ( src[0] + src[1] + 1 ) >> 1;
+			src += 2;
+		}
+#endif
 	}
+}
+#ifdef HAVE_ASM_MMX
 
+static	inline	void	super_sample8to16( uint8_t *in, uint8_t *out )
+{
+	//@ super sample by duplicating pixels
+	__asm__ __volatile__ (
+		"\n\tpxor	%%mm2,%%mm2"
+		"\n\tpxor	%%mm4,%%mm4"
+		"\n\tmovq	(%0), %%mm1"  
+		"\n\tpunpcklbw	%%mm1,%%mm2" 
+		"\n\tpunpckhbw	%%mm1,%%mm4"   
+		"\n\tmovq	%%mm2,%%mm5"
+		"\n\tmovq	%%mm4,%%mm6"
+		"\n\tpsrlq	$8, %%mm5"    
+		"\n\tpsrlq	$8, %%mm6"  
+		"\n\tpor	%%mm5,%%mm2"
+		"\n\tpor	%%mm6,%%mm4"	
+		"\n\tmovq	%%mm2, (%1)"
+		"\n\tmovq	%%mm4, 8(%1)"
+		:: "r" (in), "r" (out)
+
+	);
 }
 #endif
 
-static void tr_422_to_444(uint8_t *buffer, int width, int height)
+static void tr_422_to_444(void *data, uint8_t *buffer, int width, int height)
 {
-	/* YUV 4:2:2 Planar to 4:4:4 Planar */
-
-	/*const int stride = width/2;
-	const int len = stride * height; 
-#ifdef HAVE_ASM_MMX
-	//@ mmx sampler buggy :(
-	const int mmx_stride = stride / 8;
-#endif
 	int x,y;
+	const int stride = width >> 1;
 
+#ifndef HAVE_ASM_MMX
 	for( y = height-1; y > 0 ; y -- )
 	{
 		uint8_t *dst = buffer + (y * width);
 		uint8_t *src = buffer + (y * stride);
-#ifdef HAVE_ASM_MMX
-		for( x = 0; x < mmx_stride; x ++ )
+		for(x=0; x < stride; x++) // for 1 row
 		{
-			movq_m2r( *src,mm0 );
-			movq_m2r( *src,mm1 );
-			movq_r2m(mm0, *dst );
-			movq_r2m(mm1, *(dst+8) );
-			dst += 16;
-			src += 8;
+			dst[0] = src[x]; //put to dst
+			dst[1] = src[x];
+			dst+=2; // increment dst
 		}
+	}
 #else
-		for(x=0; x < stride; x++) // for 1 row
-		{
-			dst[0] = src[x]; //put to dst
-			dst[1] = src[x];
-			dst+=2; // increment dst
-		}
-#endif
-	}
-	*/
-	const int stride = width/2;
-//	const int stride = width;
-	int x,y;
 
+	const int mmx_stride = stride >> 3;
+	const int left = mmx_stride % 8;
 	for( y = height-1; y > 0 ; y -- )
 	{
-		uint8_t *dst = buffer + (y * width);
 		uint8_t *src = buffer + (y * stride);
-		for(x=0; x < stride; x++) // for 1 row
+		uint8_t *dst = buffer + (y * width);
+		for(x=0; x < mmx_stride; x++) // for 1 row
+		{
+			super_sample8to16(src,dst );
+			src += 8;
+			dst += 16;
+		}
+		for(x=0; x < left; x++) // for 1 row
 		{
 			dst[0] = src[x]; //put to dst
 			dst[1] = src[x];
 			dst+=2; // increment dst
 		}
 	}
+#endif
 }
 
 
@@ -672,7 +703,7 @@ void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
     ss_444_to_420jpeg(ycbcr[1], width, height);
     ss_444_to_420jpeg(ycbcr[2], width, height);
 #ifdef HAVE_ASM_MMX
-	emms();
+	__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
     break;
   case SSM_420_MPEG2:
@@ -683,7 +714,7 @@ void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
     ss_444_to_422(data,ycbcr[1],width,height);
     ss_444_to_422(data,ycbcr[2],width,height);
 #ifdef HAVE_ASM_MMX
-	emms();
+	__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
     break;
   case SSM_420_422:
@@ -704,7 +735,7 @@ void chroma_supersample(subsample_mode_t mode,void *data, uint8_t *ycbcr[],
       	ss_420jpeg_to_444(ycbcr[1], width, height);
     	ss_420jpeg_to_444(ycbcr[2], width, height);
 #ifdef HAVE_ASM_MMX
-	emms();
+	__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
     break;
   case SSM_420_JPEG_TR:
@@ -712,11 +743,11 @@ void chroma_supersample(subsample_mode_t mode,void *data, uint8_t *ycbcr[],
     tr_420jpeg_to_444(data,ycbcr[2], width, height);
     break;
   case SSM_422_444:
-    tr_422_to_444(ycbcr[2],width,height);
-    tr_422_to_444(ycbcr[1],width,height);
-//#ifdef HAVE_ASM_MMX
-//	emms();
-//#endif
+    tr_422_to_444(data,ycbcr[2],width,height);
+    tr_422_to_444(data,ycbcr[1],width,height);
+#ifdef HAVE_ASM_MMX
+	__asm__ __volatile__ ( _EMMS:::"memory");
+#endif
     break;
   case SSM_420_422:
     ss_420_to_422( ycbcr[1], width, height );
@@ -725,7 +756,6 @@ void chroma_supersample(subsample_mode_t mode,void *data, uint8_t *ycbcr[],
   case SSM_420_MPEG2:
     //    ss_420mpeg2_to_444(ycbcr[1], width, height);
     //    ss_420mpeg2_to_444(ycbcr[2], width, height);
-    exit(4);
     break;
   default:
     break;

@@ -169,7 +169,7 @@ void	cache_frame( void *cache, uint8_t *linbuf, int buflen, long frame_num , int
 	assert( frame_num >= 0 );
 #else
 	if( buflen <= 0 )
-		return 0;
+		return;
 #endif	
 	int slot_num = cache_free_slot( cache );
 	if( slot_num == -1 )

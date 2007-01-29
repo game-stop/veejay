@@ -17,6 +17,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/libsamplerec \
 		-I$(top_srcdir)/libvevo \
 		-I$(top_srcdir)/liblzo \
+		-I$(top_srcdir)/bio2jack \
 		$(FFMPEG_AVCODEC_CFLAGS) $(FFMPEG_AVFORMAT_CFLAGS) $(LIBQUICKTIME_CFLAGS) ${FT_CFLAGS} \
 		$(AVIPLAY_CFLAGS) ${XML_CFLAGS} ${GTK_CFLAGS} ${DV_FLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} ${GL_CFLAGS} \
 		$(DIRECTFB_CFLAGS) ${SDL_CFLAGS} ${JPEG_CFLAGS} ${PTHREAD_CFLAGS} ${SAMPLERATE_CFLAGS} ${MJPEGTOOLS_CFLAGS}
@@ -32,8 +33,8 @@ VEEJAY_ALL_LIB_OPTS = \
 	-export-dynamic 
 
 libveejay_la_SOURCES =  vj-misc.c \
-			vj-plugin.c vj-osc.c vj-event.c vj-eventman.c vj-pjack.c vj-perform.c \
-			x11misc.c vj-sdl.c vj-dfb.c gl.c \
+			vj-plugin.c vj-osc.c vjkf.c vj-event.c vj-eventman.c vj-pjack.c vj-perform.c \
+			x11misc.c vj-sdl.c vj-dfb.c gl.c vj-viewport.c \
 			vj-font.c liblavplayvj.c 
 
 libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS ) $(DEBUGLIBS)

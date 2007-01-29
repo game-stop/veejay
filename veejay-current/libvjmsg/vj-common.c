@@ -19,6 +19,7 @@
 #include <config.h>
 #include <stdio.h>
 #include <stdarg.h>
+#include <string.h>
 #include <libvjmem/vjmem.h>
 #include "vj-common.h"
 

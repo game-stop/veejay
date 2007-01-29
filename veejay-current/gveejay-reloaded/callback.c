@@ -41,11 +41,6 @@ void	text_defaults()
 	fg_[0] = 0;   fg_[1] = 0;   fg_[2] = 0;   fg_[3] = 0;
 	ln_[0] = 200; ln_[1] = 255; ln_[1] = 255; ln_[3] = 0;
 	srt_seq_ = 0;
-		veejay_msg(0, "FG: %d,%d,%d,%d BG: %d,%d,%d,%d LN: %d,%d,%d,%d",
-			fg_[0],fg_[1],fg_[2],fg_[3],
-			bg_[0],bg_[1],bg_[2],bg_[3],
-			ln_[0],ln_[1],ln_[2],ln_[3] );
-
 }
 
 void	on_no_caching_clicked( GtkWidget *widget, gpointer user_data)
@@ -246,19 +241,25 @@ void	on_button_fadein_clicked(GtkWidget *w, gpointer user_data)
 
 void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 {
+	if(info->status_lock)
+		return;
+
 	gdouble max_val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->upper;
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
 	
-	if(val < 0.0 )
-		val = 0.0;
-	if(val > 1.0) 
-		val = 1.0;
-
 	if( is_button_toggled( "loglinear" ))
-		if(val > 0.0) val = log( val /0.1 ) / log( max_val / 0.1 );	
+	{
+		double v = val;
+		if( v > 0.0 )
+			v = 255.0/v;
+		if( v > 0.0 )
+			v = log( val / 0.01 ) / log( 1.0 / 0.01 );
+		val = 255.0 * v;	
+	}
 
 	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d",
-		(int)(255.0 * val));
+		(int)(val));
+	
 
 	vj_msg(VEEJAY_MSG_INFO, "FX Opacity set to %1.2f", val ); 
 }
@@ -467,7 +468,6 @@ void	on_button_fx_clearchain_clicked(GtkWidget *w, gpointer user_data)
 	multi_vims( VIMS_CHAIN_CLEAR, "%d",0);
 	info->uc.reload_hint[HINT_CHAIN] = 1;
 	info->uc.reload_hint[HINT_ENTRY] = 1;
-	vj_akf_delete();
 	vj_msg(VEEJAY_MSG_INFO, "Clear FX Chain");
 }
 
@@ -507,7 +507,6 @@ void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 	info->uc.reload_hint[HINT_CHAIN] = 1;
 	vj_msg(VEEJAY_MSG_INFO, "Clear Effect from Entry %d",
 		info->uc.selected_chain_entry);
-	vj_kf_delete_parameter( info->uc.selected_chain_entry );
 }
 
 #define	slider_changed( arg_num, value ) \
@@ -536,8 +535,7 @@ info->parameter_lock = 0;\
 
 #define kf_changed( arg_num ) \
 {\
-info->uc.selected_parameter_id = arg_num;\
-if(!info->status_lock)\
+if(!info->status_lock && arg_num != info->uc.selected_parameter_id)\
 {\
 vj_kf_select_parameter(arg_num);\
 }\
@@ -731,6 +729,7 @@ void	on_spin_sampleend_value_changed( GtkWidget *widget, gpointer user_data)
 		vj_msg(VEEJAY_MSG_INFO, "Set sample's ending position to %d (timecode %s)",
 			value, time1);
 		g_free(time1);
+
 	}
 }
 
@@ -913,7 +912,7 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 		{
 			if( !isalnum( text[i] ))
 			{
-				vj_msg(VEEJAY_MSG_ERROR, "Only alphanumeric characters allowed");	
+				error_dialog("Error", "Only alpha numeric characters are allowed");
 				if( text) free(text);
 				return;
 			}
@@ -1018,24 +1017,27 @@ void	on_loop_none_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
-			"%d %d", 0,
-			get_loop_value() );
+			"%d %d", 0, 0 );
 }
 
 void	on_loop_normal_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
-			"%d %d", 0,
-			get_loop_value() );
+			"%d %d", 0, 1 );
+}
+void	on_loop_random_clicked(GtkWidget *widget, gpointer user_data)
+{
+	if(!info->status_lock)
+		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
+			"%d %d", 0,3 );
 }
 
 void	on_loop_pingpong_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
-			"%d %d", 0,
-			get_loop_value() );
+			"%d %d", 0,2 );
 }
 /*
 void	on_check_marker_bind_clicked(GtkWidget *widget, gpointer user_data)
@@ -1191,8 +1193,8 @@ void	on_button_key_detach_clicked(GtkWidget *widget, gpointer user)
 	{
 		multi_vims( 
 			VIMS_BUNDLE_ATTACH_KEY,
-			"0 %d %d",
-			key_val, key_mod );
+			"1 %d %d %s",
+			key_val, key_mod, "dummy" );
 		info->uc.reload_hint[HINT_BUNDLES] = 1; 
 	}
 }
@@ -1208,12 +1210,13 @@ void	on_vims_key_clicked( GtkWidget *widget, gpointer user_data)
 		int event_id = info->uc.selected_vims_entry;
 		int key_val  = gdk2sdl_key( info->uc.pressed_key );
 		int mod	     = gdk2sdl_mod( info->uc.pressed_mod );
+		char *buf    = info->uc.selected_vims_args;
 		if( event_id > 0 && key_val > 0 )
 		{
 			multi_vims( 
 				VIMS_BUNDLE_ATTACH_KEY,
-				"%d %d %d",
-				event_id, key_val, mod );
+				"%d %d %d %s",
+				event_id, key_val, mod, buf ? buf : "dummy" );
 			info->uc.reload_hint[HINT_BUNDLES] = 1; 
 		}
 	}	
@@ -1227,10 +1230,27 @@ void	on_button_vimsupdate_clicked(GtkWidget *widget, gpointer user_data)
 	if(count_textview_buffer( "vimsview" ) > 0 )
 	{
 		gchar *buf = get_textview_buffer( "vimsview" );
-		multi_vims( VIMS_BUNDLE_ADD, "%d %s",
-			info->uc.selected_vims_entry, buf );
+
+		if( info->uc.selected_vims_type == 0 )
+		{
+			multi_vims( VIMS_BUNDLE_ADD, "%d %s",
+				info->uc.selected_vims_entry, buf );
+		}
+		else
+		{
+			int key_val  = info->uc.selected_key_sym;
+			int key_mod  = info->uc.selected_key_mod;
+
+			multi_vims( 
+				VIMS_BUNDLE_ATTACH_KEY,
+				"2 %d %d %s",
+				key_val,
+				key_mod,
+				info->uc.selected_vims_args );
+		}
 		info->uc.reload_hint[HINT_BUNDLES] = 1; 
-	} 
+		 
+	}
 // passent current and overwrite if bundle is valdi
 
 }
@@ -1363,7 +1383,7 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 
 	if(bw == 0 || br == 0 || port <= 0 )
 	{
-		vj_msg(VEEJAY_MSG_ERROR, "You must enter a valid remote address and/or port number");
+		error_dialog("Error", "You must enter a valid remote address and/or port number");
 		return;
 	}
 
@@ -1400,7 +1420,7 @@ void	on_inputstream_file_button_clicked(GtkWidget *w, gpointer user_data)
 	gchar *filename = g_locale_from_utf8( file, -1, &br , &bw, NULL );
 	if( br == 0 || bw == 0 )
 	{
-		vj_msg(VEEJAY_MSG_ERROR, "No filename given");
+		error_dialog("Error", "Please enter a filename");
 		return;
 	}
 	if(use_y4m)
@@ -1460,8 +1480,8 @@ void on_veejay_connection_close             (GtkDialog       *dialog,
 		GtkWidget *w = glade_xml_get_widget_(info->main_window, "veejay_connection" );
 		gtk_widget_show( w );
 	}
-
-	//gveejay_quit(NULL,NULL);
+	else 
+		gveejay_quit(NULL,NULL);
 }
 
 
@@ -1603,12 +1623,6 @@ void	on_istream_cancel_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_curve_togglerun_toggled(GtkWidget *widget , gpointer user_data)
 {
-	int i = info->uc.selected_chain_entry;
-	int j = info->uc.selected_parameter_id;
-
-	sample_slot_t *s = info->selected_slot;
-	key_parameter_t *k = s->ec->effects[i]->parameters[j];
-	k->running = is_button_toggled( "curve_togglerun");
 }
 
 void	on_stream_length_value_changed( GtkWidget *widget, gpointer user_data)
@@ -1621,72 +1635,112 @@ void	on_stream_length_value_changed( GtkWidget *widget, gpointer user_data)
 
 int	on_curve_buttontime_clicked()
 {
-	// store the values in keyframe
-	sample_slot_t *s = info->selected_slot;
-	if(!s)
-		return 0;
-	int i = info->uc.selected_chain_entry;
-	int j = info->uc.selected_parameter_id;
-	int id = info->uc.entry_tokens[ENTRY_FXID];
-	int end = get_nums( "curve_spinend" );
-	int start = get_nums( "curve_spinstart" );
-
-	if( (end - start) <= 0 || id <= 0 )	
-	{
-		return 0;
-	}
-	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
-	
-	key_parameter_t *key = s->ec->effects[i]->parameters[j];
-
-	key->start_pos = start;
-	key->end_pos = end;
-	curve_timeline_preserve( key, end - start, curve );
 	return 1;
 }
 
 
+void	on_framerate_inc_clicked( GtkWidget *w, gpointer data )
+{
+	double cur = get_slider_val( "framerate" );
+	cur += 1.0;
+	update_slider_value( "framerate", (int) cur, 0 );
+}
+
+void    on_framerate_dec_clicked( GtkWidget *w, gpointer data )
+{
+        double cur = get_slider_val( "framerate" );
+        cur -= 1.0;
+        update_slider_value( "framerate", (int) cur, 0 );
+}
+
+
+void	on_frameratenormal_clicked( GtkWidget *w, gpointer data )
+{
+	update_slider_value( "framerate", (int) info->el.fps,0 );
+}
+
+void	on_framerate_value_changed( GtkWidget *w, gpointer data )
+{
+    gdouble slider_val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
+    int value = (int)(100.0 * slider_val);
+    multi_vims( VIMS_FRAMERATE, "%d", value );
+}
+
+void	on_sync_correction_clicked( GtkWidget *w, gpointer data )
+{
+	int status = is_button_toggled( "sync_correction" );
+
+	multi_vims( VIMS_SYNC_CORRECTION, "%d", status );
+}
+
 void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 {
-	if(!on_curve_buttontime_clicked())
-		return;
 	sample_slot_t *s = info->selected_slot;
+	if(!s) return;
 
 	int i = info->uc.selected_chain_entry;
 	int j = info->uc.selected_parameter_id;
 	int id = info->uc.entry_tokens[ENTRY_FXID];
 
-//	int end = s->ec->effects[i]->parameters[j]->end_pos;
-//	int start =  s->ec->effects[i]->parameters[j]->start_pos;
 	int end = get_nums( "curve_spinend" );
 	int start = get_nums( "curve_spinstart" );
-	int min = 0;
-	int max = 0;
 
 
 	if( (end - start) <= 0 || id <= 0 )	
 	{
 		return;
 	}
-
-	int curve_type = GTK_CURVE_TYPE_LINEAR;
-
-	if( is_button_toggled( "curve_typespline" ))
-		curve_type = GTK_CURVE_TYPE_SPLINE;
-	if( is_button_toggled( "curve_typefreehand" ))
-			curve_type = GTK_CURVE_TYPE_FREE;
-
+	
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
 
-	_effect_get_minmax( id, &min,&max, j );
+	int type = 0;
+	if( is_button_toggled( "curve_typelinear" ) ) {
+		type = GTK_CURVE_TYPE_LINEAR;
+	} else if ( is_button_toggled( "curve_typespline" ) ) {
+		type = GTK_CURVE_TYPE_SPLINE;
+	} else if ( is_button_toggled( "curve_typefreehand" ) ) {
+		type = GTK_CURVE_TYPE_FREE;
+	}
+	
+	int len = end - start;
+	float *data = (float*) vj_calloc(sizeof(float) * len );
+	int *values = (int*) vj_calloc(sizeof(int) * len );
+	unsigned char *kf = (unsigned char*) vj_calloc( (len*4)+25);
+	int min=0,max=0;
+		
+	_effect_get_minmax( id, &min,&max,j );
 
-	curve_store_key2( s->ec->effects[i]->parameters[j], curve,max,0, id, curve_type,
-			get_nums( "curve_spinstart" ), get_nums( "curve_spinend" ) );
 
-	s->ec->effects[i]->parameters[j]->running = is_button_toggled( "curve_togglerun" );
-	s->ec->effects[i]->enabled = is_button_toggled( "button_entry_toggle");
+	veejay_msg(VEEJAY_MSG_INFO, "Store KF sequence on FX entry %d, P%d (FX %d)",i,j,id);
+	veejay_msg(VEEJAY_MSG_INFO, "FX range: %d - %d, type = %d, range = %d -%d",min,max, type,
+		start,end);
 
-	//debug_key( s->ec->effects[i]->parameters[j] ); 
+	int k;
+	float fmin = (float) min;
+	float fmax = (float) max;
+
+	get_points_from_curve( curve,  len, data );
+	for( k = 0 ; k < len ; k++ )
+		values[k] = ( (int) ( data[k] * max ));
+
+	int total_len = 25 + (4 * len);
+	sprintf(kf, "key%02d%02d%08d%08d%02d",i,j,start,end,type );
+	unsigned char *ptr = kf + 25;
+	for( k = 0; k < len; k ++ )
+	{
+		unsigned char *p = ptr + (k*4);
+		p[0] = values[k] & 0xff;
+		p[1] = (values[k] >> 8) & 0xff;
+		p[2] = (values[k] >> 16) & 0xff;
+		p[3] = (values[k] >> 24) & 0xff;
+	}
+
+	free(values);
+	free(data);
+
+	vj_client_send_bufX( info->client, V_CMD, kf,total_len );
+	free(kf);
+
 }
 
 void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
@@ -1696,81 +1750,58 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 		id = 0;
 	int i = info->uc.selected_chain_entry;
 	int j = info->uc.selected_parameter_id;
-	sample_slot_t *s = info->selected_slot; 
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
-	clear_parameter_values ( s->ec->effects[i]->parameters[j]);
+	reset_curve( curve ); 
 
-	//set_points_in_curve( s->ec->effects[i]->parameters[j] , curve );
-	reset_curve( s->ec->effects[i]->parameters[j], curve ); 
-	set_toggle_button( "curve_togglerun", 0 );
-	//debug_key( s->ec->effects[i]->parameters[j] ); 
-
+	multi_vims( VIMS_SAMPLE_KF_RESET, "%d", i );
 }
 
 void	on_curve_typelinear_toggled(GtkWidget *widget, gpointer user_data)
 {
+	if(info->status_lock)
+		return;
+
 	if( is_button_toggled("curve_typelinear"))
 	{
 		sample_slot_t *s = info->selected_slot;
 		if(!s)
 			return;
 		GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
-		int i = info->uc.selected_chain_entry;
-		int j = info->uc.selected_parameter_id;
-		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_LINEAR;
-		reset_curve( s->ec->effects[i]->parameters[j], curve );
-	//	get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
-		set_points_in_curve( s->ec->effects[i]->parameters[j],curve );
+		set_points_in_curve( GTK_CURVE_TYPE_LINEAR, curve );
 	}
 }	
 void	on_curve_typespline_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
 		return;
-	int i = info->uc.selected_chain_entry;
-	int j = info->uc.selected_parameter_id;
-	sample_slot_t *s = info->selected_slot;
-	if(!s)
-		return;
-
-	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
 
 	if( is_button_toggled("curve_typespline"))
 	{
-		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_SPLINE;
-		reset_curve( s->ec->effects[i]->parameters[j], curve );
-	//	get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
-		set_points_in_curve( s->ec->effects[i]->parameters[j],curve );
+		sample_slot_t *s = info->selected_slot;
+		if(!s)
+			return;
+		GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+		set_points_in_curve( GTK_CURVE_TYPE_SPLINE, curve );
 	}
 }	
 void	on_curve_typefreehand_toggled(GtkWidget *widget, gpointer user_data)
 {
 	if(info->status_lock)
 		return;
-	int i = info->uc.selected_chain_entry;
-	int j = info->uc.selected_parameter_id;
-	sample_slot_t *s = info->selected_slot;
-	if(!s)
-		return;
-	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
-
 	if( is_button_toggled("curve_typefreehand"))
 	{
-	//reset_curve( s->ec->effects[i]->parameters[j], curve );
-		s->ec->effects[i]->parameters[j]->type = GTK_CURVE_TYPE_FREE;
-		reset_curve( s->ec->effects[i]->parameters[j], curve );
-		
-	//	get_points_from_curve( s->ec->effects[i]->parameters[j],curve );
-		set_points_in_curve( s->ec->effects[i]->parameters[j],curve );
+		sample_slot_t *s = info->selected_slot;
+		if(!s)
+			return;
+		GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
+		set_points_in_curve( GTK_CURVE_TYPE_FREE, curve );
 	}
+
 }
 
 void	on_curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 {
 	int k = is_button_toggled( "curve_toggleentry" );
-	sample_slot_t *s = info->selected_slot;
-
-	s->ec->effects[(info->uc.selected_chain_entry)]->enabled = k;
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
 					info->main_window, "tree_chain") ));
 
@@ -1778,55 +1809,80 @@ void	on_curve_toggleentry_toggled( GtkWidget *widget, gpointer user_data)
 			model,
 			chain_update_row, (gpointer*) info );
 
-	if(!k)
-		set_toggle_button( "curve_togglerun", k );
+	info->uc.reload_hint[HINT_ENTRY] = 1;
+	if(info->status_lock)
+		return;
+
+	int i = info->uc.selected_chain_entry;
+	multi_vims( VIMS_SAMPLE_KF_STATUS, "%d %d", i, k );
 }
 
 void	on_kf_p0_toggled( GtkWidget *widget, gpointer user_data)
 {
+	if(info->status_lock)
+		return;
 	if(is_button_toggled("kf_p0"))
 		kf_changed( 0 );
 }
 void	on_kf_p1_toggled( GtkWidget *widget, gpointer user_data)
 {
+	if(info->status_lock)
+		return;
+
 	if( is_button_toggled("kf_p1"))
-	kf_changed( 1 );
+		kf_changed( 1 );
 }
 void	on_kf_p2_toggled( GtkWidget *widget, gpointer user_data)
 {
+	if(info->status_lock)
+		return;
+
 	if( is_button_toggled("kf_p2"))
 		kf_changed( 2 );
 }
 void	on_kf_p3_toggled( GtkWidget *widget, gpointer user_data)
 {
+	if(info->status_lock)
+		return;
+
 	if( is_button_toggled("kf_p3"))
 		kf_changed( 3 );
 }
 void	on_kf_p4_toggled( GtkWidget *widget, gpointer user_data)
 {
+	if(info->status_lock)
+		return;
+
 	if( is_button_toggled("kf_p4"))
 		kf_changed( 4 );
 }
 void	on_kf_p5_toggled( GtkWidget *widget, gpointer user_data)
 {
+	if(info->status_lock)
+		return;
+
 	if( is_button_toggled("kf_p5"))
 		kf_changed( 5 );
 }
 void	on_kf_p6_toggled( GtkWidget *widget, gpointer user_data)
 {
+	if(info->status_lock)
+		return;
+
 	if( is_button_toggled("kf_p6"))
 		kf_changed( 6 );
 }
 void	on_kf_p7_toggled( GtkWidget *widget, gpointer user_data)
 {
+	if(info->status_lock)
+		return;
+
 	if( is_button_toggled("kf_p7"))
 		kf_changed( 7 );
 }
 
 void	on_curve_toggleglobal_toggled(GtkWidget *widget, gpointer user_data)
 {
-	sample_slot_t *s = info->selected_slot;
-	s->ec->enabled = is_button_toggled( "curve_toggleglobal" );
 }
 void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 {
@@ -1854,23 +1910,24 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 
 	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );
 	
-	
-	
-	if( info->uc.playmode != info->status_tokens[PLAY_MODE])
+	gint page_needed = 2;
+
+	switch( info->status_tokens[PLAY_MODE] )
 	{
-		if(info->status_tokens[PLAY_MODE] == MODE_SAMPLE)	
-			gtk_notebook_set_page(
-					GTK_NOTEBOOK(n),
-					0 );
-		if(info->status_tokens[PLAY_MODE] == MODE_STREAM)	
-			gtk_notebook_set_page(
-					GTK_NOTEBOOK(n),
-					1 );
-		if(info->status_tokens[PLAY_MODE] == MODE_PLAIN)	
-			gtk_notebook_set_page(
-					GTK_NOTEBOOK(n),
-					2 );
+		case MODE_SAMPLE:
+			page_needed =0 ; break;
+		case MODE_STREAM:
+			page_needed = 1; break;
+		case MODE_PLAIN:
+			page_needed = 2; break;
+		default:
+			break;
 	}	
+	
+	if( page_needed != page )
+		gtk_notebook_set_page(
+				GTK_NOTEBOOK(n),
+				page_needed );
 }
 
 void	on_timeline_cleared(GtkWidget *widget, gpointer user_data)
@@ -2212,31 +2269,19 @@ void	on_quit_veejay1_activate( GtkWidget *w, gpointer user_data)
 
 void	on_curve_spinend_value_changed(GtkWidget *w, gpointer user_data)
 {
-	int i = info->uc.selected_chain_entry;
-	int j = info->uc.selected_parameter_id;
-	sample_slot_t *s = info->selected_slot; 
-
-	key_parameter_t *key = s->ec->effects[i]->parameters[j];
-	
-	key->end_pos = get_nums( "curve_spinend" );
-
+	int end_pos = get_nums( "curve_spinend" );
 	gchar *end_time = format_time(
-			key->end_pos,info->el.fps );
+			end_pos,info->el.fps );
 	update_label_str( "curve_endtime", end_time );
 	g_free(end_time);
 }
+
 void	on_curve_spinstart_value_changed(GtkWidget *w, gpointer user_data)
 {
-	int i = info->uc.selected_chain_entry;
-	int j = info->uc.selected_parameter_id;
-	sample_slot_t *s = info->selected_slot; 
-
-	key_parameter_t *key = s->ec->effects[i]->parameters[j];
-	
-	key->start_pos = get_nums( "curve_spinstart" );
+	int start_pos = get_nums( "curve_spinstart" );
 
 	gchar *start_time = format_time(
-			key->start_pos,info->el.fps );
+			start_pos,info->el.fps );
 	update_label_str( "curve_endtime", start_time );
 	g_free(start_time);
 }
@@ -2331,8 +2376,6 @@ void		on_previewlarge_clicked( GtkWidget *widget, gpointer user_data )
 
 void		on_previewspeed_value_changed( GtkWidget *widget, gpointer user_data)
 {
-	veejay_msg(0, "%s", __FUNCTION__);
-
 	double val = 	       GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
 	double fps = (val * 100.0) / (double)info->el.fps ;
 	
@@ -2343,7 +2386,6 @@ void		on_previewspeed_value_changed( GtkWidget *widget, gpointer user_data)
 
 void		on_previewscale_value_changed( GtkWidget *widget, gpointer user_data)
 {
-	veejay_msg(0, "%s", __FUNCTION__);
 }
 
 void		on_preview_width_value_changed( GtkWidget *w, gpointer user_data)
@@ -2364,7 +2406,6 @@ void		on_previewsmall_clicked( GtkWidget *widget, gpointer user_data)
 	update_spin_value( "preview_width", w );
         update_spin_value( "preview_height", h );
 
-	veejay_msg(0, "%s", __FUNCTION__);
 
 }
 
@@ -2498,7 +2539,6 @@ gchar *get_clipboard_fx_buffer()
 	char preset[512];
 	bzero(preset,512);
 	sprintf(preset, "%d", p[0]);
-	veejay_msg(0, "%s", answer);
 	for(i=0;  i < p[2] ;i++)
 	{
 		char tmp[10];
@@ -2509,7 +2549,7 @@ gchar *get_clipboard_fx_buffer()
 	return strdup(preset);
 }	 
 
-static	*last_fx_buf = NULL;
+static	gchar* last_fx_buf = NULL;
 void	on_button_fx_cut_clicked( GtkWidget *w, gpointer user_data)
 {
 	if(last_fx_buf)
@@ -2679,17 +2719,15 @@ static	void	srt_load_subtitle(int sid)
 		n = sscanf( text+7+18 + tc1l+2+tc2l+3+tlen,"%04d%04d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d%03d",
 			&x,&y, &font, &size, &bg[0],&bg[1],&bg[2],&fg[0],&fg[1],&fg[2],&use_bg,&outline,&ln[0],&ln[1],
 			&ln[2],&bg[3],&fg[3],&ln[3] );
+#ifdef STRICT_CHECKING
+		assert( n == 18 );
+#endif
 	}
 
 	srt_locked_ = 1;
 	
 	update_spin_range( "spin_text_start",0, get_total_frames(),s1);
 	update_spin_range( "spin_text_end",0, get_total_frames(),s2);
-
-	veejay_msg(0, "x=%d,y=%d, font=%d,size=%d,bg=[%d,%d,%d,%d]",
-		x,y,font,size,bg[0],bg[1],bg[2],bg[3] );
-	veejay_msg(0, "fg=[%d,%d,%d,%d], ln=[%d,%d,%d,%d]",
-		fg[0],fg[1],fg[2],fg[3],ln[0],ln[1],ln[2],ln[3] );
 
 	set_textview_buffer( "textview_text", tmp );
 
@@ -2757,74 +2795,57 @@ void	on_button_text_new_clicked( GtkWidget *w, gpointer data )
 {
 	gint x = get_nums( "spin_text_x" );
 	gint y = get_nums( "spin_text_y" );
-
 	gint s1 = 0;
-	gint s2 = get_total_frames();
-	
-	//gchar *text = get_textview_buffer( "textview_text" );
-	
-	clear_textview_buffer( "textview_text" );
+	gint s2 = 0;
+	if( info->status_tokens[PLAY_MODE] == MODE_SAMPLE )
+        {
+              s1 = info->status_tokens[SAMPLE_START];
+              s2 = info->status_tokens[SAMPLE_END];
+        }
+        else
+        {
+          	s1 = 0;
+                s2 = get_nums("stream_length");
+        }
 
-	gchar *text = strdup("  ");
+	gchar *text = strdup(" ");
 	
 	multi_vims( VIMS_SRT_ADD, "%d %d %d %d %d %s",
 		0,s1,s2,x,y,text );
 
 	int tmp = 0;
 	gchar *new_srt_id = recv_vims( 5, &tmp );
-	
-	if(tmp>0)
+	int id = 0;
+	if(new_srt_id && tmp > 0)
 	{
-		int id = 0;
 		sscanf( new_srt_id, "%d", &id );
-		g_free(new_srt_id);
-		srt_seq_ = id;
+		if(id > 0 )
+		  srt_seq_ = id;
 	}
+	if( new_srt_id )
+		free(new_srt_id);
 	
-/*	gint font = gtk_combo_box_get_active( GTK_COMBO_BOX( w ) );
-	gint size = get_nums( "spin_text_size" );
-	gint use_border = is_button_toggled( "use_bg" );
-	gint outline = is_button_toggled( "use_outline");
-
-	veejay_msg(0, "%d - %d , %d x %d, '%s'", s1,s2,x,y , text );
-	veejay_msg(0, "Font: %d, Size: %d", font, size );
-	veejay_msg(0, "FG: %d,%d,%d,%d BG: %d,%d,%d,%d LN: %d,%d,%d,%d",
-			fg_[0],fg_[1],fg_[2],fg_[3],
-			bg_[0],bg_[1],bg_[2],bg_[3],
-			ln_[0],ln_[1],ln_[2],ln_[3] );
-	
-	multi_vims( VIMS_FONT_SIZE_FONT, "%d %d", font , size );
-	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", fg_[0],fg_[1],fg_[2],fg_[3], 1 );	
-	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", bg_[0],bg_[1],bg_[2],bg_[3], 2 );
-	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", ln_[0],ln_[1],ln_[2],ln_[3], 3 );
-	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", use_border, outline,0,0,0 );	
-*/	
 	free(text);
-//	srt_load_subtitle( srt_seq_ );
-	
-	info->uc.reload_hint[HINT_HISTORY] = 1;
+	if( id > 0 )
+		info->uc.reload_hint[HINT_HISTORY] = 1;
 }
+
 void	on_button_text_del_clicked( GtkWidget *w, gpointer data )
 {
 	multi_vims( VIMS_SRT_DEL, "%d", srt_seq_ );
 	info->uc.reload_hint[HINT_HISTORY] = 1;
-
 }
-
 
 void	on_spin_text_start_value_changed( GtkWidget *w, gpointer data )
 {
-	if(srt_locked_)
-		return;
 	gint start = get_nums( "spin_text_end");
 	char *text = format_time( start, info->el.fps );
 	update_label_str( "labeltextstart", text );
 	free(text);	
 }
+
 void	on_spin_text_end_value_changed( GtkWidget *w, gpointer data )
 {
-	if(srt_locked_)
-		return;
 	gint end = get_nums( "spin_text_end" );
 	char *text = format_time( end, info->el.fps );
 	update_label_str( "labeltextend", text );
@@ -2895,7 +2916,6 @@ void	on_button_text_update_clicked(GtkWidget *w, gpointer data)
 	gint s1 = get_nums( "spin_text_start" );
 	gint s2 = get_nums( "spin_text_end" );
 	gchar *text = get_textview_buffer( "textview_text" );
-	veejay_msg(0, "srt_seq = %d",srt_seq_ );
 	if(text)
 		multi_vims( VIMS_SRT_UPDATE, "%d %d %d %s", srt_seq_, s1,s2,text );
 }
@@ -2910,7 +2930,7 @@ static	int str_to_tc( char *tc )
 	res = (int) parts[3];
 	res += (int) ( fps * parts[2] );
 	res += (int) ( fps * 60 * parts[1] );
-	res += (int) ( fps * 1440 * parts[0] );
+	res += (int) ( fps * 3600 * parts[0] );
 
 	return res;
 }
@@ -2946,12 +2966,11 @@ static	void change_box_color_rgb( GtkWidget *box, int r, int g, int b,int a, int
 			24 );
 
 	gdk_gc_unref( gc );
-
 }
 
 void	on_combobox_textsrt_changed( GtkWidget *w, gpointer data)
 {
-	if(srt_locked_)
+	if(info->status_lock)
 		return;
 
 	gchar *k = gtk_combo_box_get_active_text( GTK_COMBO_BOX(w) );
@@ -3038,7 +3057,6 @@ static	void change_box_color( GtkWidget *box, double val, int plane, int fill )
 			24 );
 
 	gdk_gc_unref( gc );
-
 }
 
 static	void	colbox( const char *name1,const char *name2, int plane )
@@ -3078,8 +3096,9 @@ static	void	colbox( const char *name1,const char *name2, int plane )
 	
 void	on_textcoloralpha_value_changed(GtkWidget *w, gpointer data )
 {
-	if(srt_locked_)
+	if(info->status_lock || srt_locked_)
 		return;
+
 	int fg = is_button_toggled("textcolorfg");
 	int bg = is_button_toggled("textcolorbg");
 	int ln = is_button_toggled("textcolorln");
@@ -3110,75 +3129,54 @@ void	on_textcoloralpha_value_changed(GtkWidget *w, gpointer data )
 
 void	on_textcolorred_value_changed(GtkWidget *w , gpointer data )
 {
-	if(srt_locked_)
-		return;
 	colbox( "boxred", "textcolorred", 0 );
 }
 
 
 void	on_textcolorgreen_value_changed(GtkWidget *w , gpointer data )
 {
-	if(srt_locked_)
-		return;
-
 	colbox( "boxgreen", "textcolorgreen", 1 );
-
 }
 
 void	on_textcolorblue_value_changed(GtkWidget *w , gpointer data )
 {
-	if(srt_locked_)
-		return;
-
 	colbox( "boxblue", "textcolorblue", 2  );	
-	
 }
 
 void	on_textcolorfg_toggled( GtkWidget *w, gpointer data )
 {
 	if( is_button_toggled( "textcolorfg" ) )
 	{
-		srt_locked_ = 1;
 		update_slider_value( "textcolorred", fg_[0],0 );
 		update_slider_value( "textcolorgreen", fg_[1],0 );
 		update_slider_value( "textcolorblue", fg_[2],0);
 		update_slider_value( "textcoloralpha", fg_[3],0);
-		srt_locked_ = 0;
 	}
 }
 void	on_textcolorbg_toggled( GtkWidget *w, gpointer data )
 {
 	if( is_button_toggled( "textcolorbg" ) )
 	{
-		srt_locked_ = 1;
-
 		update_slider_value( "textcolorred", bg_[0],0 );
 		update_slider_value( "textcolorgreen", bg_[1],0 );
 		update_slider_value( "textcolorblue", bg_[2],0);
 		update_slider_value( "textcoloralpha", bg_[3],0);
-		
-		srt_locked_ = 0;
-
 	}
 }
 void	on_textcolorln_toggled( GtkWidget *w, gpointer data )
 {
 	if( is_button_toggled( "textcolorln" ) )
 	{
-			srt_locked_ = 1;
-
 		update_slider_value( "textcolorred", ln_[0],0 );
 		update_slider_value( "textcolorgreen", ln_[1],0 );
 		update_slider_value( "textcolorblue", ln_[2],0);
 		update_slider_value( "textcoloralpha", ln_[3],0);
-			srt_locked_ = 0;
-
 	}
 }
 
 void	on_use_bg_toggled( GtkWidget *w , gpointer data)
 {
-	if(srt_locked_)
+	if(srt_locked_ || info->status_lock)
 		return;
 
 	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", 
@@ -3191,7 +3189,7 @@ void	on_use_bg_toggled( GtkWidget *w , gpointer data)
 
 void	on_use_outline_toggled( GtkWidget *w, gpointer data)
 {
-	if(srt_locked_)
+	if(srt_locked_ || info->status_lock)
 		return;
 
 	multi_vims( VIMS_FONT_COL, "%d %d %d %d %d", 

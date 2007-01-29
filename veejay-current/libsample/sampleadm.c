@@ -40,9 +40,10 @@
 #include <libvjmsg/vj-common.h>
 #include <libvje/vje.h>
 #include <libvevo/vevo.h>
+#include <veejay/vjkf.h>
+#include <veejay/vj-font.h>
 #include <assert.h>
-//#include <veejay/vj-lib.h>
-//#include <veejay/vj-el.h>
+#include <libel/elcache.h>
 //todo: change this into enum
 //#define KAZLIB_OPAQUE_DEBUG 1
 
@@ -69,9 +70,14 @@ static hash_t *SampleHash;	/* hash of sample information structs */
 static int avail_num[SAMPLE_MAX_SAMPLES];	/* an array of freed sample id's */
 
 static int sampleadm_state = SAMPLE_PEEK;	/* default state */
-static int slots_consumed_ = 0;
 
-
+typedef struct
+{
+        int   active;
+        int   current;
+        int   size;
+        int     *samples;
+} seq_t;
 
 /****************************************************************************************************
  *
@@ -99,7 +105,7 @@ int sample_verify() {
  * internal usage. returns hash_val_t for key
  *
  ****************************************************************************************************/
-static inline hash_val_t int_hash(const void *key)
+static hash_val_t int_hash(const void *key)
 {
     return (hash_val_t) key;
 }
@@ -113,7 +119,7 @@ static inline hash_val_t int_hash(const void *key)
  * internal usage. compares keys for hash.
  *
  ****************************************************************************************************/
-static inline int int_compare(const void *key1, const void *key2)
+static int int_compare(const void *key1, const void *key2)
 {
     return ((int) key1 < (int) key2 ? -1 :
 	    ((int) key1 > (int) key2 ? +1 : 0));
@@ -258,7 +264,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     if (!initialized) {
     	return NULL;
 	}
-    si = (sample_info *) vj_malloc(sizeof(sample_info));
+    si = (sample_info *) vj_calloc(sizeof(sample_info));
     if(startFrame < 0) startFrame = 0;
 //    if(endFrame <= startFrame&& (endFrame !=0 && startFrame != 0))
 	if(endFrame <= startFrame ) 
@@ -320,7 +326,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
 	
 	si->effect_chain[i] =
-	    (sample_eff_chain *) vj_malloc(sizeof(sample_eff_chain));
+	    (sample_eff_chain *) vj_calloc(sizeof(sample_eff_chain));
 	if (si->effect_chain[i] == NULL) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error allocating entry %d in Effect Chain for new sample",i);
 		return NULL;
@@ -333,11 +339,14 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 	si->effect_chain[i]->volume = 50;
 	si->effect_chain[i]->a_flag = 0;
 	si->effect_chain[i]->source_type = 0;
-	si->effect_chain[i]->channel = ( sample_size()-1 <= 0 ? si->sample_id : sample_size()-1);
+	si->effect_chain[i]->channel = ( sample_size() <= 0 ? si->sample_id : sample_size()-1);
+	si->effect_chain[i]->kf_status = 0;
 	/* effect parameters initially 0 */
 	for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++) {
 	    si->effect_chain[i]->arg[j] = 0;
 	}
+
+	si->effect_chain[i]->kf = vpn( VEVO_ANONYMOUS_PORT );
 
     }
 #ifdef HAVE_FREETYPE
@@ -841,14 +850,16 @@ int sample_del(int sample_id)
 #ifdef HAVE_FREETYPE
 	vj_font_dictionary_destroy( si->dict );
 #endif
+
     sample_node = hash_lookup(SampleHash, (void *) si->sample_id);
     if (sample_node) {
     int i;
-    int j;
+    
 
     vj_el_clear_cache( si->edit_list );
     for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
     {
+		vevo_port_free( si->effect_chain[i]->kf );
 		if (si->effect_chain[i])
 			free(si->effect_chain[i]);
     }
@@ -1121,8 +1132,23 @@ int sample_get_all_effect_arg(int s1, int position, int *args, int arg_len, int 
 	return -1;
     if (arg_len < 0 || arg_len > SAMPLE_MAX_PARAMETERS)
 	return -1;
-    for (i = 0; i < arg_len; i++) {
+
+    if( sample->effect_chain[position]->kf_status )
+    {
+	 for( i = 0; i < arg_len; i ++ )
+	 {
+		int tmp = 0;
+		if(!get_keyframe_value( sample->effect_chain[position]->kf, n_frame, i, &tmp ) )
+			args[i] = sample->effect_chain[position]->arg[i];
+		else
+			args[i] = tmp;
+	 }
+    }
+    else
+    {
+   	 for (i = 0; i < arg_len; i++) {
 		args[i] = sample->effect_chain[position]->arg[i];
+    	}
     }
     return i;
 }
@@ -1298,7 +1324,7 @@ int sample_set_chain_source(int s1, int position, int input)
 			sample->effect_chain[position]->effect_id > 0)
 	{
 	    sample_info *second = sample_get( sample->effect_chain[position]->channel );
-	    if(second)
+	    if(second && second->edit_list)
 		vj_el_clear_cache( second->edit_list );
 	    sample_info *new = sample_get( input );
 	    if(new)
@@ -1392,7 +1418,7 @@ int sample_set_looptype(int s1, int looptype)
     sample_info *sample = sample_get(s1);
     if(!sample) return -1;
 
-    if (looptype == 0 || looptype == 1 || looptype == 2) {
+    if (looptype == 3 || looptype == 0 || looptype == 1 || looptype == 2) {
 	sample->looptype = looptype;
 	return ( sample_update(sample,s1));
     }
@@ -1544,7 +1570,7 @@ int sample_chain_malloc(int s1)
 			sum++;
 	}
     } 
-    veejay_msg(VEEJAY_MSG_INFO, "Allocated %d effects",sum);
+    veejay_msg(VEEJAY_MSG_DEBUG, "Allocated %d effects",sum);
     return sum; 
 }
 
@@ -1571,6 +1597,79 @@ int sample_chain_free(int s1)
     return sum;
 }
 
+int	sample_chain_reset_kf( int s1, int entry )
+{
+	sample_info *sample = sample_get(s1);
+        if(!sample) return 0;
+	sample->effect_chain[entry]->kf_status = 0;
+	if(sample->effect_chain[entry]->kf)
+	  vevo_port_free(sample->effect_chain[entry]->kf );
+	sample->effect_chain[entry]->kf = vpn(VEVO_ANONYMOUS_PORT );
+	return 1;
+}
+
+int	sample_get_kf_tokens( int s1, int entry, int id, int *start, int *end, int *type )
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample) return 0;
+	return keyframe_get_tokens( sample->effect_chain[entry]->kf, id, start,end,type );
+}
+
+void	*sample_get_kf_port( int s1, int entry )
+{
+	sample_info *sample = sample_get(s1);
+        if(!sample) return NULL;
+	return sample->effect_chain[entry]->kf;
+}
+
+int	sample_get_kf_status( int s1, int entry )
+{
+        sample_info *sample = sample_get(s1);
+        if(!sample) return 0;
+	return sample->effect_chain[entry]->kf_status;
+}
+
+int	sample_chain_set_kf_status( int s1, int entry, int status )
+{
+   sample_info *sample = sample_get(s1);
+   if (!sample)
+	return -1;
+   sample->effect_chain[entry]->kf_status = status;
+   return 1;	
+}
+
+unsigned char *	sample_chain_get_kfs( int s1, int entry, int parameter_id, int *len )
+{
+   sample_info *sample = sample_get(s1);
+   if (!sample)
+	return NULL;
+   if ( entry < 0 || entry > SAMPLE_MAX_EFFECTS )
+        return NULL;
+   if( parameter_id < 0 || parameter_id > 9 )
+	return NULL;
+
+   unsigned char *data = keyframe_pack( sample->effect_chain[entry]->kf, parameter_id, entry,len );
+   if( data )
+	return data;
+   return NULL;
+}
+
+int	sample_chain_set_kfs( int s1, int len, unsigned char *data )
+{
+   sample_info *sample = sample_get(s1);
+   if (!sample)
+	return -1;
+   if( len <= 0 )
+	return 0;
+
+   int entry = 0;
+   if(!keyframe_unpack( data, len, &entry,s1,1 ))
+   {
+	veejay_msg(0, "Unable to unpack keyframe packet");
+	return -1;
+   }
+   return 1;
+}
 int sample_chain_add(int s1, int c, int effect_nr)
 {
     int effect_params = 0, i;
@@ -1643,7 +1742,6 @@ int sample_chain_add(int s1, int c, int effect_nr)
         veejay_msg(VEEJAY_MSG_DEBUG,"Effect %s on entry %d overlaying with sample %d",
 			vj_effect_get_description(sample->effect_chain[c]->effect_id),c,sample->effect_chain[c]->channel);
     }
-veejay_msg(VEEJAY_MSG_DEBUG, "Added FX");
     sample_update(sample,s1);
 
     return c;			/* return position on which it was added */
@@ -1742,6 +1840,9 @@ int sample_chain_clear(int s1)
 	sample->effect_chain[i]->frame_trimmer = 0;
 	sample->effect_chain[i]->volume = 0;
 	sample->effect_chain[i]->a_flag = 0;
+	if( sample->effect_chain[i]->kf )	
+		vevo_port_free( sample->effect_chain[i]->kf );
+	sample->effect_chain[i]->kf = vpn(VEVO_ANONYMOUS_PORT);
 	int src_type = sample->effect_chain[i]->source_type;
 	int id       = sample->effect_chain[i]->channel;
 	if( src_type == 0 && id > 0 )
@@ -1841,6 +1942,11 @@ int sample_chain_remove(int s1, int position)
     sample->effect_chain[position]->frame_trimmer = 0;
     sample->effect_chain[position]->volume = 0;
     sample->effect_chain[position]->a_flag = 0;
+
+	if( sample->effect_chain[position]->kf )
+		vevo_port_free( sample->effect_chain[position]->kf );
+	sample->effect_chain[position]->kf = vpn( VEVO_ANONYMOUS_PORT );
+
  	int src_type = sample->effect_chain[position]->source_type;
 	int id       = sample->effect_chain[position]->channel;
 	if( src_type == 0 && id > 0 )
@@ -1887,10 +1993,15 @@ int	sample_cached(sample_info *s, int b_sample )
 		return 1;
         return 0;
 }
+void	sample_chain_set_kf( int s1,int i, void *port )
+{
+	sample_info *sample = sample_get(s1);
+    	if(!sample) return;
+	sample->effect_chain[i]->kf = port;
+}
 
 int	sample_set_editlist(int s1, editlist *edl)
 {
-	char tmp_file[1024];
 	sample_info *sample = sample_get(s1);
 	if(!sample) return -1;
 	if(sample->edit_list)
@@ -1936,7 +2047,7 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 	return -1;
 
 	sprintf(str,
-		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		pfps,
 		frame,
 		mode,
@@ -1956,7 +2067,8 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 		total_slots,
 		cache,
 		sa,
-		ca);
+		ca,
+		(int)( sample->fader_val ));
 		
 		
  
@@ -2023,7 +2135,11 @@ void ParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg)
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
 		arg[argIndex] = atoi(chTemp);
+
 		argIndex++;
+
+		
+
 	    }
 	    if (xmlTemp)
 	   	 xmlFree(xmlTemp);
@@ -2031,11 +2147,20 @@ void ParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg)
 	    	free(chTemp);
 	
 	}
-	// xmlTemp and chTemp should be freed after use
-	xmlTemp = NULL;
-	chTemp = NULL;
 	cur = cur->next;
     }
+}
+
+static void	ParseKeys( xmlDocPtr doc, xmlNodePtr cur, void *port )
+{
+	while( cur != NULL )
+	{
+		if(!xmlStrcmp( cur->name, (const xmlChar*) "KEYFRAMES" ))
+		{
+			keyframe_xml_unpack( doc, cur->xmlChildrenNode, port );
+		}
+		cur = cur->next;
+	}
 }
 
 
@@ -2046,7 +2171,7 @@ void ParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg)
  * Parse an effect using libxml2
  *
  ****************************************************************************************************/
-void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
+void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
 {
     xmlChar *xmlTemp = NULL;
     unsigned char *chTemp = NULL;
@@ -2061,6 +2186,8 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
     int volume = 0;
     int a_flag = 0;
     int chain_index = 0;
+    int kf_status = 0;
+    xmlNodePtr anim = NULL;
 
     for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++) {
 	arg[i] = 0;
@@ -2069,6 +2196,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
     if (cur == NULL)
 	return;
 
+    int k = 0;
 
     while (cur != NULL) {
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTID)) {
@@ -2077,6 +2205,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 	    if (chTemp) {
 		effect_id = atoi(chTemp);
 		free(chTemp);
+		k ++;
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
@@ -2092,8 +2221,15 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 	}
 
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_ARGUMENTS)) {
+
 	    ParseArguments(doc, cur->xmlChildrenNode, arg);
 	}
+
+	if( !xmlStrcmp(cur->name, (const xmlChar*) "ANIM" ))
+	{
+		anim = cur->xmlChildrenNode;
+	}
+	
 
 	/* add source,channel,trimmer,e_flag */
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTSOURCE)) {
@@ -2110,7 +2246,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		channel = atoi(chTemp);
+		channel = ( atoi(chTemp) ) + start_at;
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2169,6 +2305,14 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
+
+	if(!xmlStrcmp( cur->name, (const xmlChar*) "kf_status" )) {
+	   xmlTemp = xmlNodeListGetString(doc,cur->xmlChildrenNode,1);
+  	   chTemp = UTF8toLAT1(xmlTemp);
+	   if(chTemp)
+		{  kf_status = atoi(chTemp); free(chTemp); }
+	   if(xmlTemp) xmlFree(xmlTemp);
+	}
 	// xmlTemp and chTemp should be freed after use
 	xmlTemp = NULL;
 	chTemp = NULL;
@@ -2200,7 +2344,15 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
 
 	sample_set_offset(dst_sample, chain_index, frame_offset);
 	sample_set_trimmer(dst_sample, chain_index, frame_trimmer);
-    }
+
+	sample_info *skel = sample_get(dst_sample);
+
+	if(anim)
+	{
+		ParseKeys( doc, anim, skel->effect_chain[ chain_index ]->kf );
+		sample_chain_set_kf_status( dst_sample, chain_index, kf_status );
+	}
+    } 
 
 }
 
@@ -2211,17 +2363,44 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample)
  * Parse the effects array 
  *
  ****************************************************************************************************/
-void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
+void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, int start_at)
 {
     int effectIndex = 0;
     while (cur != NULL && effectIndex < SAMPLE_MAX_EFFECTS) {
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECT)) {
-	    ParseEffect(doc, cur->xmlChildrenNode, skel->sample_id);
+	    ParseEffect(doc, cur->xmlChildrenNode, skel->sample_id, start_at);
 		effectIndex++;
 	}
 	//effectIndex++;
 	cur = cur->next;
     }
+}
+
+void	LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq )
+{
+	seq_t *s = (seq_t*) seq;
+
+	int i;
+	xmlChar *xmlTemp = NULL;
+    	unsigned char *chTemp = NULL;
+
+	while (cur != NULL)
+	{
+		if (!xmlStrcmp(cur->name, (const xmlChar *) "SEQ_ID")) {
+			xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    		chTemp = UTF8toLAT1(xmlTemp);
+	    		if (chTemp) {
+				int id = atoi( chTemp );
+				s->samples[ s->size ] = id;
+				s->size ++;
+				free(chTemp);
+	    		}
+			if( xmlTemp )
+				xmlFree(xmlTemp);
+		}
+		cur = cur->next;
+	}
+
 }
 
 /*************************************************************************************************
@@ -2231,18 +2410,25 @@ void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
  * Parse a sample
  *
  ****************************************************************************************************/
-void ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
+xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *el, void  *font, int start_at )
 {
 
     xmlChar *xmlTemp = NULL;
     unsigned char *chTemp = NULL;
+    xmlNodePtr subs = NULL;
+
+    if(!sample_read_edl( skel ))
+        veejay_msg(VEEJAY_MSG_ERROR, "No EDL '%s' for sample %d", skel->edit_list_file, skel->sample_id );
+
+    if(!skel->edit_list)
+	skel->edit_list = el;
 
     while (cur != NULL) {
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLEID)) {
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
 	    if (chTemp) {
-		skel->sample_id = atoi(chTemp);
+		skel->sample_id = ( atoi(chTemp) ) + start_at;
 		free(chTemp);
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
@@ -2452,7 +2638,13 @@ void ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
 
 	}
 
-	ParseEffects(doc, cur->xmlChildrenNode, skel);
+	if(!xmlStrcmp(cur->name, (const xmlChar*) "SUBTITLES" ))
+	{
+		subs = cur->xmlChildrenNode;
+	//	vj_font_xml_unpack( doc, cur->xmlChildrenNode, font );
+	}
+
+	ParseEffects(doc, cur->xmlChildrenNode, skel, start_at);
 
 	// xmlTemp and chTemp should be freed after use
 	xmlTemp = NULL;
@@ -2460,11 +2652,11 @@ void ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel)
 
 	cur = cur->next;
     }
-    if(!sample_read_edl( skel ))
-	veejay_msg(VEEJAY_MSG_ERROR, "No EDL '%s' for sample %d", skel->edit_list_file, skel->sample_id );
+  //  if(!sample_read_edl( skel ))
+//	veejay_msg(VEEJAY_MSG_ERROR, "No EDL '%s' for sample %d", skel->edit_list_file, skel->sample_id );
 
 
-    return;
+    return subs;
 }
 
 
@@ -2527,7 +2719,21 @@ int	is_samplelist(char *filename)
 	return 1;
 }
 
-int sample_readFromFile(char *sampleFile)
+void	LoadSubtitles( sample_info *skel, char *file, void *font )
+{
+	char tmp[512];
+	float fps = 25.0;
+
+	sprintf(tmp, "%s-SUB-%d.srt", file,skel->sample_id );
+#ifdef STRICT_CHECKING
+	assert( skel->dict != NULL );
+#endif
+	vj_font_set_constraints_and_dict( font, (long)skel->first_frame, (long) skel->last_frame,fps, skel->dict );
+
+	vj_font_load_srt( font, tmp );
+}
+
+int sample_readFromFile(char *sampleFile, void *seq, void *font, void *el)
 {
     xmlDocPtr doc;
     xmlNodePtr cur;
@@ -2544,6 +2750,12 @@ int sample_readFromFile(char *sampleFile)
     /*
      * Check the document is of the right kind
      */
+
+    int start_at = sample_size()-1;
+    if( start_at != 0 )
+	veejay_msg(VEEJAY_MSG_INFO, "Merging %s into current samplelist, auto number starts at %d", sampleFile, start_at );
+    if( vj_tag_size()-1 > 0 )
+	veejay_msg(VEEJAY_MSG_INFO, "Existing streams will be deleted (samplelist overrides active streams)");
 
     cur = xmlDocGetRootElement(doc);
     if (cur == NULL) {
@@ -2565,9 +2777,26 @@ int sample_readFromFile(char *sampleFile)
 	    skel = sample_skeleton_new(0, 1);
 	    sample_store(skel);
 	    if (skel != NULL) {
-		ParseSample(doc, cur->xmlChildrenNode, skel);
+		void *d = vj_font_get_dict(font);
+
+		xmlNodePtr subs = ParseSample( doc, cur->xmlChildrenNode, skel, el, font, start_at );	
+		if(subs)
+	    	{
+			LoadSubtitles( skel, sampleFile, font );
+			vj_font_xml_unpack( doc, subs, font );
+		}
+		vj_font_set_dict(font,d);
+
 	    }
 	}
+        if( !xmlStrcmp( cur->name, (const xmlChar *) "SEQUENCE" )) {
+		LoadSequences( doc, cur->xmlChildrenNode,seq );
+	}
+
+	if( !xmlStrcmp( cur->name, (const xmlChar*) "stream" )) {
+		tagParseStreamFX( sampleFile, doc, cur->xmlChildrenNode, font );
+	}
+
 	cur = cur->next;
     }
     xmlFreeDoc(doc);
@@ -2579,14 +2808,21 @@ void CreateArguments(xmlNodePtr node, int *arg, int argcount)
 {
     int i;
     char buffer[100];
-    argcount = SAMPLE_MAX_PARAMETERS;
     for (i = 0; i < argcount; i++) {
-	//if (arg[i]) {
 	    sprintf(buffer, "%d", arg[i]);
 	    xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_ARGUMENT,
 			(const xmlChar *) buffer);
-	//}
     }
+}
+
+void	CreateKeys( xmlNodePtr node, int argcount, void *port )
+{
+	int i;
+	for( i = 0; i < argcount ; i++ )
+	{
+		xmlNodePtr childnode = xmlNewChild(node, NULL, (const xmlChar*) "KEYFRAMES", NULL);
+		keyframe_xml_pack( childnode, port, i );
+	}
 }
 
 void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int position)
@@ -2631,11 +2867,19 @@ void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int position)
 		(const xmlChar *) buffer);
 
 
+	sprintf(buffer, "%d", effect->kf_status );
+	xmlNewChild(node,NULL,(const xmlChar*) "kf_status", (const xmlChar*) buffer );
+   
+
     childnode =
 	xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_ARGUMENTS, NULL);
     CreateArguments(childnode, effect->arg,
 		    vj_effect_get_num_params(effect->effect_id));
 
+
+    childnode =
+	xmlNewChild(node,NULL,(const xmlChar*) "ANIM", NULL );
+    CreateKeys( childnode, vj_effect_get_num_params(effect->effect_id), effect->kf );
     
 }
 
@@ -2658,7 +2902,21 @@ void CreateEffects(xmlNodePtr node, sample_eff_chain ** effects)
     
 }
 
-void CreateSample(xmlNodePtr node, sample_info * sample)
+void	SaveSequences( xmlNodePtr node, void *seq )
+{
+    char buffer[100];
+    int i = 0;
+    seq_t *s = (seq_t*) seq;
+    for( i = 0; i < MAX_SEQUENCES; i ++ )
+    {
+	sprintf(buffer, "%d", s->samples[i] );
+	xmlNewChild(node, NULL, (const xmlChar*) "SEQ_ID",
+		(const xmlChar*) buffer );
+    }	
+		
+}
+
+void CreateSample(xmlNodePtr node, sample_info * sample, void *font)
 {
     char buffer[100];
     xmlNodePtr childnode;
@@ -2732,14 +2990,16 @@ void CreateSample(xmlNodePtr node, sample_info * sample)
 	sprintf(buffer,"%d",sample->selected_entry);
 	xmlNewChild(node,NULL,(const xmlChar *) XMLTAG_LASTENTRY,
 		(const xmlChar *)buffer);
+
+    vj_font_xml_pack( node, font );
+
+
     childnode =
 	xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTS, NULL);
 
-    
-    
     CreateEffects(childnode, sample->effect_chain);
 
-}
+} 
 
 /****************************************************************************************************
  *
@@ -2768,8 +3028,22 @@ static	int sample_write_edl(sample_info *sample)
 	return 0;
 }
 
+void	WriteSubtitles( sample_info *next_sample, void *font, char *file )
+{
+	char tmp[512];
 
-int sample_writeToFile(char *sampleFile)
+	void *d = vj_font_get_dict( font );
+
+	sprintf(tmp, "%s-SUB-%d.srt", file,next_sample->sample_id );
+	
+	vj_font_set_dict( font, next_sample->dict );
+
+	vj_font_save_srt( font, tmp );
+
+	vj_font_set_dict( font, d );
+}
+
+int sample_writeToFile(char *sampleFile, void *seq, void *font)
 {
     int i;
 	char *encoding = "UTF-8";	
@@ -2781,6 +3055,12 @@ int sample_writeToFile(char *sampleFile)
     rootnode =
 	xmlNewDocNode(doc, NULL, (const xmlChar *) XMLTAG_SAMPLES, NULL);
     xmlDocSetRootElement(doc, rootnode);
+
+    childnode = xmlNewChild( rootnode, NULL,
+			(const xmlChar*) "SEQUENCE", NULL );
+    SaveSequences( childnode, seq );
+
+
     for (i = 1; i < sample_size(); i++) {
 	next_sample = sample_get(i);
 	if (next_sample) {
@@ -2791,11 +3071,22 @@ int sample_writeToFile(char *sampleFile)
 	    childnode =
 		xmlNewChild(rootnode, NULL,
 			    (const xmlChar *) XMLTAG_SAMPLE, NULL);
-	    CreateSample(childnode, next_sample);
+
+            WriteSubtitles( next_sample,font, sampleFile );
+
+	    CreateSample(childnode, next_sample, font);
 	}
     }
-    //xmlSaveFormatFile(sampleFile, doc, 1);
-	xmlSaveFormatFileEnc( sampleFile, doc, encoding, 1 );
+
+    int max = vj_tag_size()-1;
+    i = 0; 
+    for( i = 1; i <= max; i ++ )
+    {
+        childnode = xmlNewChild(rootnode,NULL,(const xmlChar*) "stream", NULL );
+	tag_writeStream( sampleFile, i, childnode, font );
+    }
+
+    xmlSaveFormatFileEnc( sampleFile, doc, encoding, 1 );
     xmlFreeDoc(doc);
 
     return 1;

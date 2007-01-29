@@ -48,6 +48,7 @@ void chroma_subsample(subsample_mode_t mode, void *sampler, uint8_t * ycbcr[],
 
 void chroma_supersample(subsample_mode_t mode, void *sampler, uint8_t * ycbcr[],
 			int width, int height);
+void    util_convertrgb24( uint8_t **data, int w, int h,int in_pix_fmt,int shiftv, void *out_buffer );
 
 // yuv 4:2:2 packed to yuv 4:2:0 planar 
 void yuy2toyv12( uint8_t *y, uint8_t *u, uint8_t *v,  uint8_t *in, int w, int h);
@@ -86,6 +87,7 @@ void	yuv_convert_and_scale( void *sws, VJFrame *src, VJFrame *dst );
 
 void	yuv_convert_and_scale_rgb( void *sws, VJFrame *src, VJFrame *dst );
 
+void	yuv_convert_and_scale_gray_rgb(void *sws,VJFrame *src, VJFrame *dst);
 
 int	yuv_sws_get_cpu_flags(void);
 

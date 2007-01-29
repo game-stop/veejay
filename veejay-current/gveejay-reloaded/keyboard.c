@@ -50,6 +50,9 @@ int		gdk2sdl_mod( int gdk_mod )
 int		sdlmod_by_name( gchar *name )
 {
 	int i;
+	if(!name)
+		return 0;
+
 	for ( i = 0; modifier_translation_table_t[i].title != NULL ; i ++ )
 	{
 		if( g_utf8_collate(name,
@@ -63,6 +66,8 @@ int		sdlmod_by_name( gchar *name )
 int		sdlkey_by_name( gchar *name )
 {
 	int i;
+	if(!name)
+		return 0;
 	for ( i = 0; key_translation_table_t[i].title != NULL ; i ++ )
 	{
 		if( g_utf8_collate(name,

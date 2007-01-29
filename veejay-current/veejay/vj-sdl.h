@@ -61,5 +61,7 @@ int vj_sdl_direct_yuv_overlay(vj_sdl * vjsdl, uint8_t * buffer, int buflen,
 void vj_sdl_free(vj_sdl * vjsdl);
 void vj_sdl_quit();
 
+void vj_sdl_resize( vj_sdl *vjsdl , int scaled_width, int scaled_height, int fs );
+
 #endif
 #endif

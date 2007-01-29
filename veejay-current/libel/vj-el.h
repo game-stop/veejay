@@ -25,7 +25,7 @@
 #include <libvje/vje.h>
 
 #define N_EL_FRAME(x)  ( (x)&0xfffffffffffffLLU  )
-#define N_EL_FILE(x) (int)  ( ((x)>>52)&0xfff ) 
+#define N_EL_FILE(x) (uint32_t)  ( ((x)>>52)&0xfffU ) 
 /* ((file)&0xfff<<52) */
 #define EL_ENTRY(file,frame) ( ((file)<<52) | ((frame)& 0xfffffffffffffLLU) )
 
@@ -76,6 +76,8 @@ typedef struct
 	void		*cache;
 } editlist;  
 
+int     test_video_frame( lav_file_t *lav,int out_pix_fmt);
+
 
 editlist *vj_el_init_with_args(char **filenames, int n, int flags, int deinter, int force, char norm, int fmt);
 
@@ -87,6 +89,9 @@ void	vj_el_init(int out);
 
 void	vj_el_init_chunk(int n);
 
+int	vj_el_is_dv(editlist *el);
+
+
 void	vj_el_free(editlist *el);
 
 int	vj_el_get_audio_frame_at(editlist *el, uint32_t nframe, uint8_t *dst, int speed );
@@ -96,6 +101,10 @@ int	vj_el_append_video_file(editlist *el, char *filename);
 int	vj_el_write_editlist( char *filename, long start, long end, editlist *el );
 
 int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3]);
+
+void    vj_el_break_cache( editlist *el );
+
+void    vj_el_setup_cache( editlist *el );
 
 int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst);
 
@@ -127,5 +136,14 @@ int		vj_el_framelist_clone( editlist *src, editlist *dst);
 char *vj_el_write_line_ascii( editlist *el, int *bytes_written );
 
 void		vj_el_deinit();
+
+void	vj_el_clear_cache( editlist *el );
+
+int     get_ffmpeg_pixfmt( int pf );
+
+void    vj_el_set_image_output_size(editlist *el);
+
+int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force, char override_norm);
+
 
 #endif

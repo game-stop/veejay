@@ -35,7 +35,7 @@
 #include <libvjmsg/vj-common.h>
 #include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
-#include <libpostproc/img_format.h>
+#include <ffmpeg/avutil.h>
 
 static unsigned int vj_relative_time = 0;
 
@@ -180,7 +180,7 @@ void	vj_get_rgb_template(VJFrame *src, int w, int h )
 	src->height = h;
 	src->uv_width = 0;
 	src->uv_height = 0;
-	src->format = IMGFMT_BGR24;
+	src->format = PIX_FMT_RGB24;
 	src->len = w * h * 3;
 	src->uv_len = 0;
 	src->data[0] = NULL;
@@ -194,15 +194,15 @@ void	vj_get_yuv_template(VJFrame *src, int w, int h, int fmt)
 	src->uv_width = w >> 1;
 	src->height = h;
 	
-	if(fmt == 0)
+	src->format = get_ffmpeg_pixfmt( fmt );
+
+	if(fmt == 0||fmt == 2)
 	{
-		src->format = IMGFMT_YV12;
 		src->uv_height = h >> 1;
 		src->shift_v = 1;
 	}
-	if(fmt == 1)
+	if(fmt == 1||fmt==3)
 	{
-		src->format = IMGFMT_422P;
 		src->uv_height = h;
 		src->shift_v = 0;
 	}
@@ -220,7 +220,7 @@ void	vj_get_yuv444_template(VJFrame *src, int w, int h)
 	src->width = w;
 	src->uv_width = w;
 	src->height = h;
-	src->format = IMGFMT_444P;
+	src->format = PIX_FMT_YUV444P;
 	src->uv_height = h;
 	src->shift_v = 0;
 	src->len = w * h;

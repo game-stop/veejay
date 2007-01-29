@@ -46,6 +46,19 @@ void		gvr_queue_vims( void *preview, int track_id, int vims_id );
 
 void		gvr_queue_cxvims( void *preview, int track_id, int vims_id, int val1,unsigned char *val2 );
 
+int             gvr_track_already_open( void *preview, const char *hostname,        int port );
+
+void         gvr_ext_lock(void *preview);
+
+void         gvr_ext_unlock(void *preview);
+
+int          gvr_get_preview_status( void *preview, int track_num );
+
+char*        gvr_track_get_hostname( void *preview , int num );
+
+int          gvr_track_get_portnum( void *preview, int num);
+
+
 sync_info	*gvr_sync( void *preview );
 
 #endif

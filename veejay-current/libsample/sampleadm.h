@@ -114,6 +114,8 @@ typedef struct sample_eff_t {
     int source_type;		/* source type to mix with */
     int channel;		/* secundary source id */
     int is_rendering;		/* is rendering */
+    void *kf;			/* keyframe values for this entry */
+    int kf_status;	        /* use keyframed values */
 } sample_eff_chain;
 
 
@@ -168,6 +170,7 @@ typedef struct sample_info_t {
     editlist *edit_list;
     char     *edit_list_file;
     void	*dict;
+	void	*kf;
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
@@ -182,8 +185,8 @@ extern int sample_verify();
 extern void sample_init(int len);
 extern int sample_update(sample_info *sample, int s1);
 #ifdef HAVE_XML2
-extern int sample_readFromFile(char *);
-extern int sample_writeToFile(char *);
+extern int sample_readFromFile(char *, void *ptr, void *font, void *el);
+extern int sample_writeToFile(char *, void *ptr, void *font);
 #endif
 extern int sample_update_offset(int s1, int nframe);
 extern int sample_set_state(int new_state);
@@ -224,6 +227,15 @@ extern int sample_set_next(int s1, int next_sample_id);
 extern int sample_get_chain_source(int sample_id, int position);
 extern int sample_set_chain_source(int sample_id, int position, int source);
 extern int sample_get_sub_audio(int s1);
+void    *sample_get_kf_port( int s1, int entry );
+extern int	sample_chain_set_kf_status( int s1, int entry, int status );
+extern int	sample_get_kf_status( int s1, int entry );
+extern unsigned char * sample_chain_get_kfs( int s1, int entry, int parameter_id, int *len );
+extern int     sample_chain_set_kf_status( int s1, int entry, int status );
+extern int     sample_chain_set_kfs( int s1, int len, unsigned char *data );
+extern int	sample_chain_reset_kf( int s1, int entry );
+
+
 extern int sample_set_sub_audio(int s1, int audio);
 extern int sample_get_audio_volume(int s1);
 extern int sample_set_audio_volume(int s1, int volume);
@@ -308,15 +320,32 @@ extern int     sample_get_el_position( int sample_id, int *start, int *end );
 
 extern	void	*sample_get_dict( int sample_id );
 
+extern int sample_var( int s1, int *type, int *fader, int *fx, int *rec, int *active );
+
+extern void        sample_set_project(int fmt, int deinterlace, int flags, int force, char norm );
+
+
+
+extern int sample_cache_used( int s1 );
+extern void        sample_free();
+
+extern int sample_stop_playing(int s1);
+extern int sample_start_playing(int s1, int no_cache);
+extern int sample_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type);
+extern unsigned char *UTF8toLAT1(unsigned char *in);
+
+
 #ifdef HAVE_XML2
-extern void CreateSample(xmlNodePtr node, sample_info * sample);
+extern void CreateSample(xmlNodePtr node, sample_info * sample, void *font);
 extern void CreateEffects(xmlNodePtr node, sample_eff_chain ** effects);
 extern void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int pos);
 extern void CreateArguments(xmlNodePtr node, int *arg, int argcount);
-extern void ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel);
-extern void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel);
-extern void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample);
-extern void ParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg);
+extern void CreateKeys(xmlNodePtr node, int argcount, void *port );
+extern xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, void *el, void *font, int start_at);
+extern void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, int start_at);
+extern void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at);
+extern void ParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg );
+extern void ParseKEys(xmlDocPtr doc, xmlNodePtr cur, void *port);
 extern unsigned char *UTF8toLAT1(unsigned char *in);
 #endif
 

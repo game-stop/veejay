@@ -25,6 +25,7 @@
 #include <libvjmsg/vj-common.h>
 #include <libvje/vje.h>
 #include <libvje/internal.h>
+#include <libvje/plugload.h>
 extern vj_effect *vj_effects[]; 
 
 void vj_effman_apply_ff_effect(
@@ -38,7 +39,7 @@ void vj_effman_apply_ff_effect(
 {
 	plug_control( entry - MAX_EFFECTS, arg );
 	
-	plug_process( frames[0],frames[1], entry - MAX_EFFECTS, frames[0]->format );
+	plug_process( frames[0],frames[1],entry - MAX_EFFECTS, frames[0]->format );
 }
 
 void vj_effman_apply_image_effect(
@@ -323,7 +324,10 @@ void vj_effman_apply_image_effect(
      case VJ_IMAGE_EFFECT_BATHROOM:
 	bathroom_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
 	break;
-	case VJ_IMAGE_EFFECT_GOOM:
+     case VJ_IMAGE_EFFECT_RGBCHANNEL:
+	rgbchannel_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
+	break;
+    case VJ_IMAGE_EFFECT_GOOM:
 	goomfx_apply( frames[0], frameinfo->width,frameinfo->height,arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_ZOOM:
@@ -353,6 +357,12 @@ void vj_effman_apply_image_effect(
 void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp_kf *todo_info,int *arg, int entry, int e) {
 
     switch(e) {
+	case VJ_VIDEO_EFFECT_EXTDIFF:
+		differencemap_apply( frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0],arg[1]);
+		break;
+	case VJ_VIDEO_EFFECT_EXTTHRESHOLD:
+		threshold_apply( frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0],arg[1]);
+		break;
 	case VJ_VIDEO_EFFECT_VIDEOWALL:
 		videowall_apply(frames[0],frames[1],frameinfo->width,
 			frameinfo->height,arg[0],arg[1],arg[2],arg[3]);

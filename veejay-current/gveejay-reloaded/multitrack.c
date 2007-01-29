@@ -26,6 +26,7 @@
 #include <glib.h>
 #include <gdk/gdk.h>
 #include <libvevo/libvevo.h>
+
 #include "sequence.h"
 #include "tracksources.h"
 
@@ -38,7 +39,7 @@
 #include <gveejay-reloaded/common.h>
 #include <gveejay-reloaded/utils.h>
 #include <gveejay-reloaded/widgets/gtktimeselection.h>
-
+#include <gveejay-reloaded/vj-api.h>
 
 #define __MAX_TRACKS 64
 typedef struct
@@ -110,6 +111,8 @@ static	void	gtk_image_set_from_pixbuf__( GtkImage *w, GdkPixbuf *p, const char *
 static	void	gtk_widget_set_sensitive__( GtkWidget *w, gboolean state, const char *f, int l )
 {
 #ifdef STRICT_CHECKING
+	if( !GTK_IS_WIDGET(w) )
+	 veejay_msg(0, "Invalid widget '%s', %d", f, l );
 	assert( GTK_IS_WIDGET(w) );
 #endif
 	gtk_widget_set_sensitive(w, state );
@@ -371,6 +374,14 @@ static	void	add_buttons2( sequence_view_t *p, sequence_view_t *seqv , GtkWidget 
 static	void	playmode_sensitivity( sequence_view_t *p, gint pm )
 {
 	int i;
+
+	if( pm == MODE_STREAM || MODE_PLAIN || MODE_SAMPLE )
+	{
+		gtk_widget_set_sensitive_( GTK_WIDGET( p->toggle ), TRUE );
+		gtk_widget_set_sensitive_( GTK_WIDGET( p->panel ), TRUE );
+
+	}
+
 	if( pm == MODE_STREAM )
 	{
 		gtk_widget_set_sensitive_( GTK_WIDGET( p->button_box2 ), FALSE );
@@ -583,6 +594,9 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 		g_signal_connect( G_OBJECT( seqv->toggle ), "toggled", G_CALLBACK(sequence_preview_cb),
 			(gpointer)seqv );
 		gtk_box_pack_start( GTK_BOX(seqv->main_vbox), seqv->toggle,FALSE,FALSE, 0 );
+
+		gtk_widget_set_sensitive_( GTK_WIDGET( seqv->toggle ), FALSE );
+	
 		gtk_widget_show( seqv->toggle );
 	}
 
@@ -680,7 +694,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 static	int	vt__[16];
 static	int	vt___ = 0;
-sync_info		*multitrack_sync( void * mt )
+void		*multitrack_sync( void * mt )
 {
 	multitracker_t *m = (multitracker_t*) mt;
 	sync_info *s = gvr_sync( m->preview );	
@@ -695,17 +709,17 @@ sync_info		*multitrack_sync( void * mt )
 	{
 		if(!vt__[i] && s->status_list[i] == NULL )
 		{
-			gtk_widget_set_sensitive_(GTK_WIDGET(m->view[i]), FALSE );
+			//gtk_widget_set_sensitive_(GTK_WIDGET(m->view[i]), FALSE );
 			vt__[i] = 1;
 		}
 		else if( s->status_list[i] && vt__[i] )
 		{
-			gtk_widget_set_sensitive_(GTK_WIDGET(m->view[i]), TRUE );
+			//gtk_widget_set_sensitive_(GTK_WIDGET(m->view[i]), TRUE );
 			vt__[i] = 0;
 		}
 	}
 	s->master = m->master_track;
-	return s;
+	return (void*)s;
 }
 
 static		int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len, int *port_num)
@@ -831,14 +845,14 @@ int		multitrack_add_track( void *data )
 			status_print( mt, "Connection established with veejay runnning on %s port %d",
 				hostname, port_num );	
 	
-			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
+//			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
+//			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), TRUE );
+			res = 1;
 		}
 		else
 		{
 			status_print( mt, "Unable to open connection with %s : %d", hostname, port_num );
 		}
-
-		res = 1;
 	}
 
 	free( hostname );
@@ -910,7 +924,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 
 	mt->master_track = track;
 
-
+veejay_msg(VEEJAY_MSG_INFO, "Master track is %d", track);
 	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
 
 
@@ -1071,6 +1085,8 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 		gvr_ext_unlock(mt->preview);
 		vj_gui_cb( 0, host, port );
 
+
+		veejay_msg(VEEJAY_MSG_INFO, "Connecting to %s:%d", host,port );
 
 		vj_gui_enable();
 	}

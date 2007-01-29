@@ -175,7 +175,9 @@ typedef struct {
 
 
 //! \var port_ref_ Book keeping of allocated and freed ports
+#ifdef STRICT_CHECKING
 static	vevo_port_t	*port_ref_ = NULL;
+#endif
 static  size_t		atom_sizes_[100];
 
 //! Check if an object is soft referenced
@@ -192,7 +194,11 @@ static int vevo_property_is_soft_referenced(vevo_port_t * p, const char *key );
  \param p input port
  */
 static void vevo_port_recurse_free( vevo_port_t *sorted_port, vevo_port_t *p );
+static char *vevo_scan_token_( const char *s );
+static const char *vevo_split_token_q( const char *s, const char delim, char *buf, int buf_len );
 
+
+static const char *vevo_split_token_( const char *s, const char delim, char *buf, int buf_len );
 
 
 //! Construct a new vevo_property_t
@@ -507,6 +513,7 @@ static	void	vevo_port_add_property( vevo_port_t *p,int finalize, const char *key
  */
 static	void	vevo_port_finalize( vevo_port_t *port, int port_type )
 {
+#ifdef STRICT_CHECKING
 	if( port_type != VEVO_PORT_REFERENCES )
 	{
 		int ref = 1;
@@ -514,6 +521,7 @@ static	void	vevo_port_finalize( vevo_port_t *port, int port_type )
 		sprintf(ref_key,"%p",port );
 		vevo_property_set( port_ref_, ref_key, VEVO_ATOM_TYPE_INT, 1, &ref );
 	}
+#endif
 	if( port_type <= 1024 && port_type > 0 )
 		vevo_port_add_property( port, 1,"type",VEVO_ATOM_TYPE_INT,1, &port_type );
 }	
@@ -1031,8 +1039,6 @@ void	vevo_strict_init()
 {
 #ifdef STRICT_CHECKING
 	port_ref_ = vevo_port_new( VEVO_PORT_REFERENCES, __FUNCTION__,__LINE__ );
-#else
-	port_ref_ = vevo_port_new( VEVO_PORT_REFERENCES );
 #endif
 	memset( atom_sizes_,0,sizeof(atom_sizes_) );
 	atom_sizes_[1] = sizeof(int32_t);
@@ -1105,9 +1111,9 @@ static void vevo_port_free_(vevo_port_t * p)
  */
 int	vevo_port_verify( vevo_port_t *port )
 {
+#ifdef STRICT_CHECKING
 	if( port == port_ref_ )
 		return 1;
-
 	char pkey[32];
 	sprintf(pkey, "%p",port);
 
@@ -1132,6 +1138,7 @@ int	vevo_port_verify( vevo_port_t *port )
 		veejay_msg(0, "%s: Port %s has a reference count of 0 ",__FUNCTION__, pkey);
 		return 0;
 	}
+#endif
 	return 1;
 }
 
@@ -1144,7 +1151,6 @@ void	vevo_port_free( vevo_port_t *port )
 {
 	int ref_count = 1;
 	int dec_ref   = 1;
-	char pkey[32];
 	int error = 0;
 
 	if(!port)
@@ -1155,50 +1161,40 @@ void	vevo_port_free( vevo_port_t *port )
 #endif
 		return;
 	}
-	
+#ifdef STRICT_CHECKING
+	char pkey[32];
 	sprintf(pkey, "%p",port);
-
 	if( port == port_ref_ )
 	{
 		dec_ref = 0;
 		vevo_port_free_( port );
 	}
-
 	if( dec_ref)
 	{
 		error =	vevo_property_get( port_ref_, pkey, 0, &ref_count );
 		if( error != VEVO_NO_ERROR )
 		{
 			veejay_msg(0, "%s: Port '%s' not allocated by vevo_port_new()", __FUNCTION__, pkey );
-#ifdef STRICT_CHECKING
 			assert(0);
-#endif
-			return;
 		}
 		if( ref_count == 0 )
 		{
 			veejay_msg(0, "%s: Port '%s' has a reference count of 0 (already freed)", __FUNCTION__, pkey );
-#ifdef STRICT_CHECKING
 			assert(0);
-#endif
-			return;
 		}
 		if( ref_count > 1 )
 		{
 			veejay_msg(0, "%s: Port '%s' has a reference count of %d", __FUNCTION__,pkey,ref_count);
-#ifdef STRICT_CHECKING
-			assert(0);
-#endif
 			return;
 		}
 		ref_count --;
-#ifdef STRICT_CHECKING
 		assert( ref_count == 0 );
-#endif
 		vevo_property_set( port_ref_, pkey, VEVO_ATOM_TYPE_INT,1,&ref_count );
 		vevo_port_free_( port );
 	}
-	
+#else
+	vevo_port_free_(port );
+#endif	
 }
 
 //! Check if a Property is soft referenced
@@ -1596,6 +1592,7 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 //! Report statistics and free bookkeeping information
 void	vevo_report_stats()
 {
+#ifdef STRICT_CHECKING
 	if( port_ref_ )
 	{
 		int errs = vevo_port_ref_verify( port_ref_ );
@@ -1603,6 +1600,7 @@ void	vevo_report_stats()
 			veejay_msg(0,"%d VEVO ports are still referenced",errs);
 		vevo_port_free( port_ref_ );
 	}
+#endif
 }
 
 static	int	vevo_port_get_port( void *port, vevo_storage_t *item, void *res )
@@ -1797,7 +1795,6 @@ char	**vevo_port_deepen_namespace( void *port, char *path)
 #endif
 	char **top_level = vevo_list_properties(port);
 	int k;
-	int error;
 	int num = 0;
 	if(!top_level)
 	{
@@ -1888,7 +1885,6 @@ char	**vevo_port_recurse_namespace( vevo_port_t *port, const char *base )
 #ifdef STRICT_CHECKING
 			assert( error == VEVO_NO_ERROR );
 #endif	
-			int depth = 0;
 			strcat( path, "/" );
 			strcat( path, top_level[k] );
 
@@ -1977,10 +1973,11 @@ static void	vevo_port_recurse_free( vevo_port_t *sorted_port, vevo_port_t *p )
 
 static int	vevo_port_ref_verify( vevo_port_t *p) 
 {
+	int err = 0;
+#ifdef STRICT_CHECKING
 	char **item = NULL;
 	int i;
 	int ref_count = 0;
-	int err = 0;
 	item = vevo_list_properties( p );
 	if( item == NULL )
 	{
@@ -2004,15 +2001,12 @@ static int	vevo_port_ref_verify( vevo_port_t *p)
 		
 		if( ref_count != 0 )
 		{
-#ifdef STRICT_CHECKING
 			void *which_port = NULL;
 			error = vevo_property_get( port_ref_, item[i],0, &which_port );
 			if( error )
 				veejay_msg(0, "Port '%s' retrieval returns error %d", item[i],error );
 			else
 				veejay_msg(0, "Reference to Port %s exists, but may be invalid", item[i]);
-#endif
-			
 			veejay_msg(0, "Port '%s' reference count is %d",item[i], ref_count);
 			err++;
 		}
@@ -2020,6 +2014,7 @@ static int	vevo_port_ref_verify( vevo_port_t *p)
 		free(item[i]);
 	}
 	free(item);
+#endif
 	return err;
 }
 static	char	*vevo_property_get_str( vevo_port_t *port, const char *key )
@@ -2163,7 +2158,7 @@ char	*vevo_format_kind( vevo_port_t *port, const char *key )
 }
 
 
-const char *vevo_split_token_( const char *s, const char delim, char *buf, int buf_len )
+static const char *vevo_split_token_( const char *s, const char delim, char *buf, int buf_len )
 {
 	const char *c = s;
 	int n = 0;
@@ -2181,7 +2176,7 @@ const char *vevo_split_token_( const char *s, const char delim, char *buf, int b
 	return NULL;
 }
 
-char *vevo_scan_token_( const char *s )
+static char *vevo_scan_token_( const char *s )
 {
 	const char *c = s;
 	int   n = 0;
@@ -2207,7 +2202,7 @@ char *vevo_scan_token_( const char *s )
 	return res;
 }
 
-const char *vevo_split_token_q( const char *s, const char delim, char *buf, int buf_len )
+static const char *vevo_split_token_q( const char *s, const char delim, char *buf, int buf_len )
 {
 	const char *c = s;
 	int n = 0;

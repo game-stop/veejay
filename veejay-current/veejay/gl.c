@@ -36,10 +36,12 @@
 #include <X11/Xutil.h>
 #include <X11/keysym.h>
 #include <GL/glx.h>
+#include <GL/glext.h>
 #include <X11/Xatom.h>
 #include <veejay/x11misc.h>
 #include <ffmpeg/avcodec.h>
 #include <libyuv/yuvconv.h>
+#include <veejay/libveejay.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -105,6 +107,7 @@ typedef struct
 	int	raw_line_len;
 	uint8_t *ref_data;
 	void	*userdata;
+	int	mouse[4];
 } display_ctx;
 static Atom XA_NET_WM_PID;
 static Atom XA_NET_WM_STATE;
@@ -738,17 +741,117 @@ int		x_display_set_fullscreen( void *dctx, int status )
 	return 0;
 }
 
+#define	MOUSELEFT 1
+#define MOUSEMIDDLE 2
+#define MOUSERIGHT 3
+#define MOUSEWHEELUP 4
+#define MOUSEWHEELDOWN 5
+
+void		x_display_mouse_grab( void *dctx, int a, int b, int c, int d )
+{
+	display_ctx *ctx = (display_ctx*) dctx;
+
+
+	ctx->mouse[0] = a;
+	ctx->mouse[1] = b;
+	ctx->mouse[2] = c;
+	ctx->mouse[3] = d;
+}
+
+
+void		x_display_mouse_update( void *dctx, int *a, int *b, int *c, int *d )
+{
+	display_ctx *ctx = (display_ctx*) dctx;
+
+	*a = ctx->mouse[0];
+	*b = ctx->mouse[1];
+	*c = ctx->mouse[2];
+	*d = ctx->mouse[3];
+
+}	
+
+
 static	int	x_display_event_update( display_ctx *ctx , int *dw, int *dh )
 {
 	XEvent Event;
 	KeySym keySym;
 	static XComposeStatus stat;
+	int mouse_x=0, mouse_y=0, mouse_button=0;
+	int mouse_f = 0;
+	int mouse_s = ctx->mouse[3];
+	uint16_t mod=0;
+	int shift_pressed=0;
+	int ctrl_pressed=0;
 	while( XPending( ctx->display ) )
 	{
 		XNextEvent( ctx->display, &Event );
 
+		mod = Event.xkey.state;
+
+		if( mod == 4 || mod == 20 )
+			ctrl_pressed = 1;
+		else if ( mod == 1 || mod == 17 )
+			shift_pressed = 1;
+
 		switch(Event.type)
 		{
+			case MotionNotify:
+				mouse_x = Event.xbutton.x;
+				mouse_y = Event.xbutton.y;
+				mouse_button = 0;
+				break;
+			case ButtonPress:
+				mouse_x = Event.xbutton.x;
+				mouse_y = Event.xbutton.y;
+				mouse_button = Event.xbutton.button;
+				if( mouse_button == MOUSELEFT && shift_pressed )
+				{
+					mouse_f = 6;
+					mouse_s = 1;
+				} else if (mouse_button == MOUSEMIDDLE && shift_pressed )
+				{
+					mouse_f = 7;
+					mouse_s = 2;
+				}
+				break;
+			case ButtonRelease:
+				mouse_x = Event.xbutton.x;
+				mouse_y = Event.xbutton.y;
+				mouse_button = Event.xbutton.button;
+				if( mouse_button == MOUSELEFT )
+				{
+					if( mouse_s == 1 )
+					{
+						mouse_f = 6;
+						mouse_s = 0;
+					}
+					else 
+					{
+						if ( mouse_s == 0 )
+							mouse_f = 1;
+					}
+				} else if( mouse_button == MOUSERIGHT )
+				{
+					mouse_f = 2;
+				} else if ( mouse_button == MOUSEMIDDLE )
+				{
+					if( mouse_s == 2 )
+					{
+						mouse_f = 0;
+						mouse_s = 0;
+					}
+					else if ( mouse_s == 0 )
+					{
+						mouse_f = 3;
+					}
+				} else if ( mouse_button == MOUSEWHEELUP )
+				{
+					mouse_f = 4;
+				} else if ( mouse_button == MOUSEWHEELDOWN )
+				{
+					mouse_f = 5;
+				}
+				break;
 			case ConfigureNotify:
 				*dw = Event.xconfigure.width;
 				*dh = Event.xconfigure.height;
@@ -756,8 +859,6 @@ static	int	x_display_event_update( display_ctx *ctx , int *dw, int *dh )
 				break;
 			case KeyPress:
 				{
-					uint16_t mod;
-					mod = Event.xkey.state;
 					KeySym key_sym = XKeycodeToKeysym( ctx->display,
 							Event.xkey.keycode,0);
 
@@ -768,6 +869,12 @@ static	int	x_display_event_update( display_ctx *ctx , int *dw, int *dh )
 				break;	
 		}
 	}
+
+	ctx->mouse[0] = mouse_x;
+	ctx->mouse[1] = mouse_y;
+	ctx->mouse[2] = mouse_f;
+	ctx->mouse[3] = mouse_s;
+
 	return 0;
 }
 
@@ -824,8 +931,7 @@ static	int	x_display_init_gl( display_ctx *ctx, int w, int h )
 
 void	*x_display_init(void *ptr)
 {
-	display_ctx *ctx = (display_ctx*) vj_malloc(sizeof(display_ctx));
-	memset(ctx, 0,sizeof(display_ctx));
+	display_ctx *ctx = (display_ctx*) vj_calloc(sizeof(display_ctx));
    
 	XSetErrorHandler( x11_err_ );
 
@@ -955,7 +1061,7 @@ void	x_display_open(void *dctx, int w, int h)
 	XChangeProperty( ctx->display, ctx->win,XA_NET_WM_PID,
 		XA_CARDINAL,32, PropModeReplace,(unsigned char*) &pid,1);	
 
-	long event_mask = StructureNotifyMask | KeyPressMask;
+	long event_mask = StructureNotifyMask | KeyPressMask | ButtonPressMask | PointerMotionMask | ButtonReleaseMask;
 
 	XSelectInput( ctx->display, ctx->win, event_mask );
 

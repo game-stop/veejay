@@ -134,8 +134,27 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-/* definitions */
+
 #define BUFSIZE 1024
+
+#if defined ( HAVE_ASM_MMX2 ) || defined ( HAVE_ASM_3DNOW ) || defined( HAVE_ASM_MMX )
+#undef HAVE_MMX1
+#if defined ( HAVE_ASM_MMX  ) && !defined(HAVE_ASM_MMX2) && !defined( HAVE_ASM_3DNOW ) && !defined( HAVE_ASM_SSE)
+/* means:  mmx v.1. Note: Since we added alignment of destinition it speedups
+    of memory copying on PentMMX, Celeron-1 and P2 upto 12% versus
+    standard (non MMX-optimized) version.
+    Note: on K6-2+ it speedups memory copying upto 25% and
+          on K7 and P3 about 500% (5 times). */
+#define HAVE_MMX1
+#endif
+#undef HAVE_K6_2PLUS
+#if !defined( HAVE_ASM_MMX2) && defined( HAVE_ASM_3DNOW )
+#define HAVE_K6_2PLUS
+#endif
+#endif
+
+
+/* definitions */
 #define BLOCK_SIZE 4096
 #define CONFUSION_FACTOR 0
 //Feel free to fine-tune the above 2, it might be possible to get some speedup with them :)
@@ -169,6 +188,9 @@ static inline unsigned long long int rdtsc()
      return x;
 }
 #else
+#define	small_memcpy(to,from,n) memcpy( to,from,n )
+#define small_memset(to,val,n) memset(to,val,n)
+
 static inline unsigned long long int rdtsc()
 {
      struct timeval tv;
@@ -178,8 +200,7 @@ static inline unsigned long long int rdtsc()
 }
 #endif
 
-
-/* linux kernel __memcpy (from: /include/asm/string.h) */
+#ifdef ARCH_X86
 static inline void * __memcpy(void * to, const void * from, size_t n)
 {
      int d0, d1, d2;
@@ -202,7 +223,6 @@ static inline void * __memcpy(void * to, const void * from, size_t n)
 
      return(to);
 }
-
 /*
  * memset(x,0,y) is a reasonably common thing to do, so we want to fill
  * things 32 bits at a time even when we don't know the size of the
@@ -225,50 +245,41 @@ __asm__ __volatile__(
 	:"memory");
 }
 
-
 #undef _MMREG_SIZE
 #ifdef HAVE_ASM_SSE
 #define _MMREG_SIZE 16
 #else
-#define _MMREG_SIZE 64 //8
+#define _MMREG_SIZE 64 
 #endif
+
 #undef _MIN_LEN
-#ifdef HAVE_ASM_MMX
+#ifdef HAVE_MMX1
 #define _MIN_LEN 0x800  /* 2K blocks */
 #else
 #define _MIN_LEN 0x40  /* 64-byte blocks */
 #endif
+
+
 #undef _EMMS
-#ifdef HAVE_ASM_3DNOW
+#undef _PREFETCH
+
+#ifdef HAVE_K6_2PLUS
+#define _PREFETCH "prefetch"
 /* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
 #define _EMMS     "femms"
 #else
+#define _PREFETCH "prefetchnta"
 #define _EMMS     "emms"
 #endif
 
-#undef _PREFETCH
-#undef _PREFETCHW
-#undef _PAVGB
-#ifdef HAVE_ASM_DNOW
-#define _PREFETCH  "prefetch"
-#define _PREFETCHW "prefetchw"
-#define _PAVGB	  "pavgusb"
-#elif defined ( HAVE_ASM_MMX2 )
-#define _PREFETCH "prefetchnta"
-#define _PREFETCHW "prefetcht0"
-#define _PAVGB	  "pavgb"
-#else
-#define _PREFETCH "/nop"
-#define _PREFETCHW "/nop"
-#endif
 static void *fast_memcpy(void * to, const void * from, size_t len)
 {
 	void *retval;
 	size_t i;
 	retval = to;
 	unsigned char *t = to;
-	unsigned char *f = from;
-#ifndef HAVE_ASM_MMX
+	unsigned char *f = (unsigned char *)from;
+#ifndef HAVE_MMX1
 	/* PREFETCH has effect even for MOVSB instruction ;) */
 	__asm__ __volatile__ (
 		_PREFETCH" (%0)\n"
@@ -346,7 +357,7 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 	for(; ((int)to & (BLOCK_SIZE-1)) && i>0; i--)
 	{
 		__asm__ __volatile__ (
-#ifndef HAVE_ASM_MMX
+#ifndef HAVE_MMX1
 		_PREFETCH" 320(%0)\n"
 #endif
 		"movq (%0), %%mm0\n"
@@ -434,7 +445,7 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 	for(; i>0; i--)
 	{
 		__asm__ __volatile__ (
-#ifndef HAVE_ASM_MMX
+#ifndef HAVE_MMX1
 		_PREFETCH" 320(%0)\n"
 #endif
 		"movq (%0), %%mm0\n"
@@ -563,7 +574,7 @@ static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {
      return __memcpy(to,from,len);
 }
 
-/* save library size on platforms without special memcpy impl. */
+#endif
 
 static struct {
      char                 *name;
@@ -582,7 +593,7 @@ static struct {
 
 static struct {
      char                 *name;
-     void               *(*function)(void *to, int c, size_t len);
+     void                *(*function)(void *to, uint8_t c, size_t len);
      unsigned long long    time;
 } memset_method[] =
 {
@@ -605,7 +616,6 @@ char *get_memcpy_descr( void )
 {
 	int i = 1;
 	int best = 1;
-	unsigned long long t=0;
 	for (i=1; memcpy_method[i].name; i++)
 	{
 		if( memcpy_method[i].time <= memcpy_method[best].time )
@@ -615,14 +625,12 @@ char *get_memcpy_descr( void )
 	return res;
 }
 
-
 void find_best_memcpy()
 {
      /* save library size on platforms without special memcpy impl. */
-
      unsigned long long t;
      char *buf1, *buf2;
-     int i, j, best = 0;
+     int i, best = 0;
 
      if (!(buf1 = (char*) malloc( BUFSIZE * 2000 * sizeof(char) )))
           return;
@@ -649,7 +657,6 @@ void find_best_memcpy()
           if (best == 0 || t < memcpy_method[best].time)
                best = i;
      }
-
      if (best) {
           veejay_memcpy = memcpy_method[best].function;
      }
@@ -664,10 +671,9 @@ void find_best_memcpy()
 void find_best_memset()
 {
      /* save library size on platforms without special memcpy impl. */
-
      unsigned long long t;
      char *buf1, *buf2;
-     int i, j, best = 0;
+     int i, best = 0;
 
      if (!(buf1 = (char*) malloc( BUFSIZE * 2000 * sizeof(char) )))
           return;

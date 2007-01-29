@@ -59,7 +59,6 @@ int	is_mapped( mmap_region_t *map, int offset, int size )
 	// check if memory is in mapped region
 	off_t real_offset = PADDED( offset, map );
 	size_t padding    = offset % map->page_size;
-	size_t real_size  = padding + size + real_offset;
 
 	long rel_o = (map->mem_offset > 0 ? offset - map->mem_offset : offset );
 

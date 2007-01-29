@@ -23,5 +23,21 @@ void            multitrack_release_track(void *data, int id, int release_this );
 
 void            multitrack_bind_track( void *data, int id, int bind_this );
 
+void            *multitrack_sync( void * mt );
+
+void               multitrack_configure( void *data, float fps, int video_width, int video_height );
+
+
+void               multitrack_update_sequence_image( void *data , int track, GdkPixbuf *img );
+
+int                update_multitrack_widgets( void *data, int *array, int track );
+
+int                multitrack_locked( void *data);
+
+void               multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget *img );
+
+void               multitrack_set_quality( void *data , int quality );
+
+
 #endif
 

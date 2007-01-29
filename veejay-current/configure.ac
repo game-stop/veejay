@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[0.9.9],[veejay-users@lissts.sourceforge.net])
+AC_INIT([veejay],[0.9.15],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=0
 VEEJAY_MINOR_VERSION=9
-VEEJAY_MICRO_VERSION=9
+VEEJAY_MICRO_VERSION=16
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -18,6 +18,7 @@ AM_INIT_AUTOMAKE([1.7])
 AM_MAINTAINER_MODE
 AM_INIT_AUTOMAKE([dist-bzip2])
 
+AC_DEFINE(VEEJAY,1,[Building Veejay])
 
 # libtool versioning
 LT_RELEASE=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION
@@ -33,7 +34,7 @@ dnl Options
 
 
 dnl kill CFLAGS
-CFLAGS="-std=c99"
+CFLAGS=""
 AC_ARG_ENABLE(strict,
 		AC_HELP_STRING([--enable-strict],
 			     [Compile in paranoia assertion checking]))
@@ -141,6 +142,14 @@ AC_CHECK_FUNC(getopt_long,
                                        [long getopt support])
                              LIBGETOPT_LIB="-lgnugetopt"])
               ])
+
+AC_CHECK_SIZEOF([int])
+AC_CHECK_SIZEOF([long int])
+AC_CHECK_SIZEOF([size_t])
+AC_CHECK_SIZEOF([float])
+
+
+
 AC_SUBST(LIBGETOPT_LIB)
 
 AC_TYPE_SIGNAL
@@ -155,7 +164,7 @@ fi
 
 have_gl=false
 AC_CHECK_HEADERS(GL/gl.h ,,
-                [AC_MSG_ERROR([Cannot find OpenGL headers]) ])
+                [AC_MSG_WARN([Cannot find OpenGL headers]) ])
 GL_LIBS=""
 GL_CFLAGS="$GL_INC_PATH"
 AC_CHECK_LIB([GL], [main], have_gl=true)
@@ -164,7 +173,8 @@ if test x$have_gl = xtrue ; then
 	AC_SUBST( USE_GL )
 	AC_DEFINE(USE_GL,1,[use gl])
 else
-        AC_MSG_ERROR([Cannot find openGL library])
+        AC_MSG_WARN([Cannot find openGL library])
+	have_gl=false
 fi
 
 AC_SUBST( GL_LIBS )
@@ -398,14 +408,11 @@ AC_CHECK_LIB(Xxf86dga, XF86DGAQueryExtension,
 	AC_DEFINE(HAVE_LIBXXF86DGA,1, [libxf86dga is present]),,
 	$X_LIBS $X_PRE_LIBS -lXext -lX11 $X_EXTRA_LIBS)
 
-dnl ********************************************************************
-dnl Check for the GLIB library (for software playback)
-dnl   (defines SDL_CFLAGS and SDL_LIBS)
-dnl ********************************************************************
-have_glib=false
-AM_PATH_GLIB(2.0,[
-            have_glib=true
-            AC_DEFINE(HAVE_GLIB,, [Glib library present])],,)
+
+dnl Look for X
+AC_PATH_XTRA
+AM_CONDITIONAL(HAVE_X, test x$have_x = xyes)
+
 dnl ********************************************************************
 dnl Check for the SDL library (for software playback)
 dnl   (defines SDL_CFLAGS and SDL_LIBS)
@@ -419,7 +426,7 @@ fi
 
 
 have_unicap=false
-PKG_CHECK_MODULES( UNICAP, libunicap >= 1.14.1,
+PKG_CHECK_MODULES( UNICAP, libunicap >= 0.1.0,
                 ac_cv_unicap=1, ac_cv_unicap=0)
 
 AC_DEFINE_UNQUOTED([HAVE_UNICAP], ${ac_cv_unicap},
@@ -459,13 +466,13 @@ dnl
 
 have_jack=false
 if test x$with_jack != xno ; then
-  PKG_CHECK_MODULES(JACK, jack >= 0.98.1 , have_jack=true, have_jack=false)
+  PKG_CHECK_MODULES(JACK, jack >= 0.1 , have_jack=true, have_jack=false)
   if test x$have_jack = xtrue ; then
     AC_SUBST(JACK_LIBS)
     AC_SUBST(JACK_CFLAGS)
     AC_DEFINE(HAVE_JACK,,[Compiling with support for Jack])
   else
-    AC_MSG_WARN([Jack >= 0.981.1 is required, get it at http://jackit.sourceforge.net]);
+    AC_MSG_WARN([Jack >= 0.100 is required, get it at http://jackit.sourceforge.net]);
   fi
 fi
 
@@ -510,11 +517,12 @@ fi
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
- debugCFLAGS="-g -Wstack-protector -fstack-protector-all"
+ debugCFLAGS="-g"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
 fi
+AC_MSG_CHECKING(whether to compile in profiling information)
 if test "x$enable_profiling" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -fprofile-arcs -ftest-coverage"
  DEBUGLIBS="-lgcov"
@@ -523,6 +531,7 @@ if test "x$enable_profiling" = "xyes" ; then
 else
  AC_MSG_RESULT([no])
 fi
+AC_MSG_CHECKING(whether to compile in assertion checking)
 if test "x$enable_strict" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -DSTRICT_CHECKING"
  AC_MSG_RESULT([yes])
@@ -558,55 +567,56 @@ have_ps2=false
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
 	i[[3-7]]86)
-	AC_MSG_RESULT([x86])
-    AC_DEFINE(HAVE_X86CPU,, [Compiling for x86 architecture CPU])
-    AC_DEFINE(ARCH_X86,1,[Compiling for x86 architecture]) 
-    have_x86cpu=true
+	AC_DEFINE(HAVE_X86CPU,, [Compiling for x86 architecture CPU])
+	AC_DEFINE(ARCH_X86,1,[Compiling for x86 architecture]) 
+	have_x86cpu=true
 
-    dnl Programs without PIC!
-    PROGRAM_NOPIC="-fno-PIC"
+	PROGRAM_NOPIC="-fno-PIC"
 
-    if test "x$enable_debug" != "xyes" ; then
-	dnl optimize if not debugging
-	CFLAGS="-fno-common -O2 -fomit-frame-pointer"
-    fi
- 
-    dnl If the host is pentium, align on double word boundary
-    case $host_cpu in
-	i686)
-		CFLAGS="$CFLAGS -malign-double -mfpmath=sse" 
+	if test "x$enable_debug" != "xyes" ; then
+		dnl optimize if not debugging
+		CFLAGS="-fno-common -O2 -fomit-frame-pointer"
+    	fi
+   	dnl If the host is pentium, align on double word boundary
+    	case $host_cpu in
+		i686)
+			CFLAGS="$CFLAGS -malign-double"
 		;;
 	*)
 		;;
 	esac 
 	
     ;;
-  x86_64*)
-	AC_MSG_RESULT([x86-64])
-    AC_DEFINE(HAVE_X86_CPU,, [Compiling for x86-64 architecture CPU])
-    AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
-    have_x86cpu=true
-    have_x86_64cpu=true
-    PROGRAM_NOPIC="-fno-PIC"
+  x86_64*|k8-*)
+    	AC_DEFINE(HAVE_X86_CPU,, [Compiling for x86-64 architecture CPU])
+    	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
+    	have_x86cpu=true
+    	have_x86_64cpu=true
+    	PROGRAM_NOPIC="-fno-PIC"
+
+	if test "x$enable_debug" != "xyes" ; then
+		dnl optimize if not debugging
+		CFLAGS="-fno-common -O3 -fomit-frame-pointer"
+    	fi
+
     ;;
   powerpc | powerpc64)
-	AC_MSG_RESULT([powerpc])
-    AC_DEFINE(HAVE_PPCCPU,, [Compiling for PowerPC CPU])
-    AC_DEFINE(ARCH_PPC,,[Compiling for PowerPC])
-    have_ppccpu=true
-    case $host in
-      *-apple-darwin*)
-       PROGRAM_NOPIC="-mdynamic-no-pic" # dynamic-no-pic is an Apple gcc option
-dnl	PROGRAM_NOPIC="-bundle -flat_namespace -undefined suppress"
+	AC_DEFINE(HAVE_PPCCPU,, [Compiling for PowerPC CPU])
+	AC_DEFINE(ARCH_PPC,,[Compiling for PowerPC])
+	have_ppccpu=true
+
+	case $host in
+	      *-apple-darwin*)
+		PROGRAM_NOPIC="-mdynamic-no-pic" # dynamic-no-pic is an Apple gcc option
 dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
-       ;;
-      *)
-       PROGRAM_NOPIC=""
-       ;;
-    esac
+
+	        ;;
+     		 *)
+   		PROGRAM_NOPIC=""
+      		;;
+    	esac
     ;;
    mips | mipsel)
-	AC_MSG_RESULT([mips])
 	AC_DEFINE(ARCH_MIPS,,[Compiling for MIPS CPU])
 	AC_DEFINE(HAVE_MIPS,,[Compiling for MIPS CPU])
 	have_mips=true
@@ -625,6 +635,11 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 		AC_MSG_RESULT(no)
 	fi
 
+	if test "x$enable_debug" != "xyes" ; then
+		dnl optimize if not debugging
+		CFLAGS="-O2"
+    	fi
+
 	;;
   *)
     AC_MSG_RESULT([unknown])
@@ -638,23 +653,9 @@ dnl simply adding programname_CFLAGS=@PROGRAM_NOPIC@ to the Makefile.am
 
 AC_SUBST(PROGRAM_NOPIC)
 
-if test "$enable_simd_accel" != "false" -a "$enable_simd_accel" != "no"
+if test x$have_x86cpu = xtrue
 then
-  if test x$have_x86cpu = xtrue
-  then
-
-	AC_PATH_PROGS(AS, nasm nasmw)
-	if test x$AS = x -o x$AS = x'"$AS"'; then
-		AC_MSG_NOTICE([NASM not found]) 
-    	else
-    		AC_DEFINE(HAVE_ASM_NASM,,[Compiling with nasm])
-	 	have_asm_nasm=true
-     		ASFLAGS="-f elf"
-     		AC_SUBST(ASFLAGS)
-    	fi
-
-	dnl check for mmx
-	AC_CACHE_CHECK(for MMX on processor(s), ac_cv_flag_mxx, [
+	AC_CACHE_CHECK(for MMX on processor(s), ac_cv_flag_mmx, [
 		if grep "^flags.* mmx" /proc/cpuinfo > /dev/null; then
 			ac_cv_flag_mmx=yes
 		else
@@ -664,10 +665,10 @@ then
 
 	if test $ac_cv_flag_mmx = yes; then
        		AC_DEFINE(HAVE_ASM_MMX,,[Compiling in MMX support])
+		AC_DEFINE(HAVE_MMX,,[Compiling in MMX support])
        		have_asm_mmx=true
 	fi
 
-	dnl check for sse
 	AC_CACHE_CHECK(for SSE on processor(s), ac_cv_flag_sse, [
 		if grep "^flags.* sse" /proc/cpuinfo > /dev/null; then
  			ac_cv_flag_sse=yes
@@ -698,7 +699,6 @@ then
 		have_asm_sse2=true
 	fi
 
-	dnl check for 3dnow
 	AC_CACHE_CHECK(for 3DNOW on processor(s), ac_cv_flag_3dnow, [
 		if grep "^flags.* 3dnow" /proc/cpuinfo > /dev/null; then
 			ac_cv_flag_3dnow=yes
@@ -712,12 +712,11 @@ then
 		have_asm_3dnow=true
 	fi
 
-	dnl check for CMOV
 	AC_CACHE_CHECK(for CMOV on processor(s), ac_cv_flag_cmov, [
 		if grep "^flags.* cmov" /proc/cpuinfo > /dev/null; then
 			ac_cv_flag_cmov=yes
 		else
-			ac_cv_flag_cmov=no
+			ac_cv_flag_cmov=yes
 		fi
 	])
 
@@ -732,7 +731,7 @@ then
 		if grep "^flags.* mmxext" /proc/cpuinfo > /dev/null; then
 			ac_cv_flag_mmx2=yes
 		else
-			ac_cv_flag_mmx2=no
+			ac_cv_flag_mmx2=yes
 		fi
 	])
 
@@ -742,10 +741,10 @@ then
 		have_asm_mmx2=true
 	fi
 
-  fi
+fi
 
-  if test x$have_ppccpu = xtrue
-  then
+if test x$have_ppccpu = xtrue
+then
     AC_MSG_CHECKING([compiler support for AltiVec])
     cat > conftest.c <<EOF
 #ifdef HAVE_ALTIVEC_H
@@ -788,7 +787,8 @@ EOF
     else
       AC_MSG_RESULT(no)
     fi
-  fi
+
+
 fi
 
 if test ! -r $srcdir/cpuinfo.sh; then
@@ -796,18 +796,49 @@ if test ! -r $srcdir/cpuinfo.sh; then
 fi
 
 
-AC_MSG_CHECKING(sub-architecture settings)
-chmod +x $srcdir/cpuinfo.sh
+if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
+	if test x$host_alias != x; then
+		dnl Cross compiling
+		AC_MSG_CHECKING(sub-architecture settings)
+		if test x$have_x86cpu = xtrue; then
+			host_mod_cpu=`echo $host_cpu|tr _ -`
+			ARCHFLAGS="-march=$host_mod_cpu -mcpu=$host_mod_cpu"
+			AC_MSG_RESULT($ARCHFLAGS)
+		fi
+	else
+		AC_MSG_CHECKING(sub-architecture settings)
+		chmod +x $srcdir/cpuinfo.sh
 
-if test x$have_x86cpu = xtrue; then
-       ARCHFLAGS=`$srcdir/cpuinfo.sh x86`
-else
-  if test x$have_ppccpu = xtrue; then
-       ARCHFLAGS=`$srcdir/cpuinfo.sh ppc`
-  else
-       ARCHFLAGS=`$srcdir/cpuinfo.sh mips`
-  fi
+		if test x$have_x86cpu = xtrue; then
+       			ARCHFLAGS=`$srcdir/cpuinfo.sh x86`
+		fi
+  		if test x$have_ppccpu = xtrue; then
+       			ARCHFLAGS=`$srcdir/cpuinfo.sh ppc`
+  		fi
+		AC_MSG_RESULT($ARCHFLAGS)
+  	fi
 fi
+
+
+if test x$have_x86cpu = xtrue;
+then
+	AC_MSG_NOTICE([enable_debug = $enable_debug])
+	if test "x$enable_debug" != "xyes" ;
+	then
+		AC_MSG_NOTICE([debug koekje])
+		if test $ac_cv_flag_sse = yes; then
+			CFLAGS="$CFLAGS -msse -mfpmath=sse"
+			AC_MSG_NOTICE([cflags aangepast])
+		fi
+		if test $av_cv_flag_sse2 = yes; then
+			CFLAGS="$CFLAGS -msse2"
+			AC_MSG_NOTICE([cflags aangepast])
+		fi
+	fi	
+fi
+
+AC_MSG_RESULT($CFLAGS)
+
 
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
@@ -891,10 +922,10 @@ if test "x$enable_compile_warnings" != "xno" ; then
  if test "x$GCC" = "xyes" ; then
     case "$CFLAGS" in
      *-Wall*) ;;
-     *) warnCFLAGS="-Wall -Wunused" ;;
+     *) warnCFLAGS="-Wall -Wunused " ;;
     esac
   if test "x$enable_compile_warnings" = "xyes" ; then
-    warnCFLAGS="$warnCFLAGS -Wmissing-prototypes -Wmissing-declarations -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual"
+    warnCFLAGS="$warnCFLAGS -Wmissing-prototypes -Wundef -Wshadow -Wbad-function-cast -Wconversion -Wpadded -Wunreachable-code -Wmissing-declarations -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual"
     warnCXXFLAGS="$warnCXXFLAGS -Wmissing-prototypes  -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual"
   fi
   if test "x$enable_warnings_as_errors" = "xyes" ; then
@@ -903,8 +934,6 @@ if test "x$enable_compile_warnings" != "xno" ; then
   fi
  fi
 fi
-AC_MSG_RESULT($warnCFLAGS)
-AC_MSG_RESULT($warnCXXFLAGS)
 
 if test "x$cflags_set" != "xyes" ; then
   if test "x$enable_debug" = "xyes" ; then
@@ -968,7 +997,6 @@ if test x$with_gimp_stuff != xfalse ; then
 	AC_SUBST(GLADE_LIBS)
 fi
 
-AC_DEFINE(VEEJAY,,[Building veejay])
 
 dnl **********************************************************************
 dnl Output a Makefile or two and the lib/header descriptor script
@@ -993,7 +1021,6 @@ liblavjpeg/Makefile
 libsamplerec/Makefile
 bio2jack/Makefile
 veejay/Makefile
-gveejay/Makefile
 gveejay-reloaded/Makefile
 man/Makefile
 tools/Makefile
@@ -1014,13 +1041,12 @@ AC_MSG_NOTICE([ Architecture: ${host_cpu} ])
 AC_MSG_NOTICE([])
 if test "$have_x86cpu" = "true" ; then
 AC_MSG_NOTICE([   x86  ])
-AC_MSG_NOTICE([    MMX     enabled     : ${have_asm_mmx}])
-AC_MSG_NOTICE([    MMX2    enabled     : ${have_asm_mmx2}])
-AC_MSG_NOTICE([    SSE     enabled     : ${have_asm_sse}])
-AC_MSG_NOTICE([    SSE2    enabled     : ${have_asm_sse2}])
-AC_MSG_NOTICE([    3DNOW   enabled     : ${have_asm_3dnow}])
-AC_MSG_NOTICE([    CMOV    enabled     : ${have_cmov}])
-AC_MSG_NOTICE([    Nasm    enabled     : ${have_asm_nasm}])
+AC_MSG_NOTICE([    MMX     enabled     : ${ac_cv_flag_mmx}])
+AC_MSG_NOTICE([    MMX2    enabled     : ${ac_cv_flag_mmx2}])
+AC_MSG_NOTICE([    SSE     enabled     : ${ac_cv_flag_sse}])
+AC_MSG_NOTICE([    SSE2    enabled     : ${ac_cv_flag_sse2}])
+AC_MSG_NOTICE([    3DNOW   enabled     : ${ac_cv_flag_3dnow}])
+AC_MSG_NOTICE([    CMOV    enabled     : ${ac_cv_flag_cmov}])
 fi
 
 if test "$have_ppccpu" = "true" ; then
@@ -1045,25 +1071,25 @@ AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - MJPEGTools			 : ${have_mjpegtools}])
-
+AC_MSG_NOTICE([  - AVI MJPEG playback/recording  : true (always)])
+AC_MSG_NOTICE([  - FFmpeg AVFormat               : ${have_avformat} ])
+AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 
 AC_MSG_NOTICE([ Optional dependencies])
-
-AC_MSG_NOTICE([  - video4linux                   : ${have_v4l}])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
 AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
 AC_MSG_NOTICE([  - OpenGL support                : ${have_gl}])
-AC_MSG_NOTICE([  - AVI MJPEG playback/recording  : true (always)])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
-AC_MSG_NOTICE([  - FFmpeg AVFormat               : ${have_avformat} ])
-AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - Unicap Imaging                : ${have_unicap} ])
+AC_MSG_NOTICE([  - video4linux                   : ${have_v4l}])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
-AC_MSG_NOTICE([  - jack                          : ${have_jack}])
-AC_MSG_NOTICE([  - xml c library for gnome       : ${have_xml2}])
-AC_MSG_NOTICE([  - freetype support              : ${have_freetype}])
-dnl AC_MSG_NOTICE([  - GVeejay UI                    : ${use_gveejay}])
-AC_MSG_NOTICE([  - GVeejay Reloaded UI           : ${use_gveejayreloaded}])
-AC_MSG_NOTICE([  - Swscaler support              : ${use_swscaler}])
+AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
+AC_MSG_NOTICE([  - XML c library for Gnome       : ${have_xml2}])
+AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])
+
+AC_MSG_NOTICE([  Optional programs:])
+AC_MSG_NOTICE([  - GVeejay Reloaded              : ${use_gveejayreloaded}])
+AC_MSG_NOTICE([  - Swscaler support (obsolete)   : ${use_swscaler}])
+

@@ -39,6 +39,44 @@ vj_effect *negation_init(int w, int h)
     return ve;
 }
 
+#ifdef HAVE_ASM_MMX
+#undef HAVE_K6_2PLUS
+#if !defined( HAVE_ASM_MMX2) && defined( HAVE_ASM_3DNOW )
+#define HAVE_K6_2PLUS
+#endif
+
+#undef _EMMS
+
+#ifdef HAVE_K6_2PLUS
+/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
+#define _EMMS     "femms"
+#else
+#define _EMMS     "emms"
+#endif
+static	void	inline	negate_mask(uint8_t val)
+{
+	uint8_t mask[8] = { val,val,val,val,  val,val,val,val };
+//	uint64_t mask = 0xffffffffffffffffLL;
+        uint8_t *m    = (uint8_t*)&mask;
+	
+	__asm __volatile(
+		"movq	(%0),	%%mm4\n\t"
+		:: "r" (m) );
+}
+
+static	void	inline	mmx_negate( uint8_t *dst, uint8_t *in )
+{
+	__asm __volatile(
+		"movq	(%0),	%%mm0\n\t"
+		"movq	%%mm4,	%%mm1\n\t"
+		"psubb	%%mm0,  %%mm1\n\t"
+		"movq	%%mm1,	(%1)\n\t"
+		:: "r" (in) , "r" (dst)
+	);
+}
+
+#endif
+
 void negation_apply( VJFrame *frame, int width, int height, int val)
 {
     unsigned int i;
@@ -48,6 +86,8 @@ void negation_apply( VJFrame *frame, int width, int height, int val)
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
+
+#ifndef HAVE_ASM_MMX
     for (i = 0; i < len; i++) {
 	*(Y) = val - *(Y);
 	*(Y)++;
@@ -58,6 +98,51 @@ void negation_apply( VJFrame *frame, int width, int height, int val)
         *(Cb)++;
         *(Cr) = val - *(Cr);
 	*(Cr)++;
-	
     }
+#else
+
+    int left = len % 8;
+    int work=  len >> 3;
+
+    negate_mask(val);
+
+    for( i = 0; i < work ; i ++ )
+    {
+	mmx_negate( Y, Y );	
+	Y += 8;
+    }	
+
+    if (left )
+    {
+	for( i = 0; i < left; i ++ )
+	{
+		*(Y) = val - *(Y);
+		*(Y)++;
+	}	
+    }
+
+    work = uv_len >> 3;
+    left = uv_len % 8;
+    for( i = 0; i < work ; i ++ )
+    {
+	mmx_negate( Cb, Cb );
+	mmx_negate( Cr, Cr );
+	Cb += 8;
+	Cr += 8;
+    }
+
+    if(left )
+    {
+	for( i = 0; i < left; i ++ )
+	{
+		*(Cb) = val - *(Cb);
+      	 	*(Cb)++;
+     	  	*(Cr) = val - *(Cr);
+		*(Cr)++;
+	}
+    }
+
+	__asm__ __volatile__ ( _EMMS:::"memory");
+
+#endif
 }

@@ -29,7 +29,7 @@ void veejay_signal_loop(void *);
 
 int veejay_init_editlist(veejay_t * info);
 
-int veejay_init(veejay_t *info,int w, int h, char *arg, int td, int fr);
+int veejay_init(veejay_t *info,int w, int h, char *arg, int td, int fr, int use_vp);
 
 int veejay_open(veejay_t *info);
 
@@ -45,6 +45,10 @@ void veejay_quit(veejay_t *info);
 int veejay_dummy_open(veejay_t * info,int ofps, char *file, int pixfmt);
 
 int veejay_close(veejay_t *info);
+
+int      get_total_mem(void);
+
+char     *veejay_title( );
 
 void veejay_stop_sampling(veejay_t *info);
 
@@ -64,6 +68,8 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 			int index, int palette, int channel);
 
 int veejay_set_framedup(veejay_t *info, int n);
+
+void    veejay_set_framerate( veejay_t *info , float fps );
 
 int veejay_get_state(veejay_t *info); 
 

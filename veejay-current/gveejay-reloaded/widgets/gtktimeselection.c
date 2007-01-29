@@ -493,6 +493,13 @@ gdouble	timeline_get_pos( TimelineSelection *te )
 	return result;
 }
 
+gdouble	timeline_get_length( TimelineSelection *te )
+{
+	gdouble result = 0.0;
+	g_object_get( G_OBJECT(te), "length", &result, NULL );
+	return result;
+}
+
 static	void	move_selection( GtkWidget *widget, gdouble x, gdouble width )
 {
 	TimelineSelection *te = TIMELINE_SELECTION( widget );
@@ -724,10 +731,10 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 		cairo_set_source_rgba( cr, 1.0,0.0,0.0,1.0);
 		double x1 = marker_width * te->frame_num;
 		double x2 = x1 + frame_width;
-		te->stepper.x = x1;
+		te->stepper.x = x1 - 8;
 		te->stepper.y = 0;
-		te->stepper.width = te->stepper_size;
-		te->stepper.height = te->stepper_size;
+		te->stepper.width = te->stepper_size + 8;
+		te->stepper.height = te->stepper_size + 2;
 
 	//	cairo_set_line_width( cr, 0.16 );
 		cairo_move_to( cr, x1 - te->stepper_draw_size, 0.0 * height );

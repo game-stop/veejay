@@ -599,6 +599,41 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 
+	index_map_[VIMS_SAMPLE_KF_STATUS]		=	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_KF_STATUS,
+				"Change KF play status for entry X",
+				vj_event_set_kf_status,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Entry ID",
+				0,
+				"Status value",
+				0,
+				NULL );
+	index_map_[VIMS_SAMPLE_KF_RESET]		=	_new_event(
+				"%d",
+				VIMS_SAMPLE_KF_STATUS,
+				"Clear KF series on entry X",
+				vj_event_reset_kf,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Entry ID",
+				0,
+				NULL );
+	index_map_[VIMS_SAMPLE_KF_GET]		=	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_KF_GET,
+				"Get keyframes for parameter Y on entry X",
+				vj_event_get_keyframes,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Entry ID",
+				0,
+				"Parameter ID",
+				0,
+				NULL );
+
 	index_map_[VIMS_SET_SAMPLE_END] 		=	_new_event(
 				NULL,
 				VIMS_SET_SAMPLE_END,
@@ -936,7 +971,7 @@ void		vj_init_vevo_events(void)
 				"Load samples from file",
 				vj_event_sample_load_list,
 				1,
-				VIMS_REQUIRE_ALL_PARAMS,
+				VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
 				"Filename",
 				NULL,
 				NULL );
@@ -2137,6 +2172,26 @@ void		vj_init_vevo_events(void)
 				0,
 				VIMS_ALLOW_ANY,	
 				NULL );
+	index_map_[VIMS_SYNC_CORRECTION]		=	_new_event(
+				"%d",
+				VIMS_SYNC_CORRECTION,
+				"Enable/Disable sync correction",
+				vj_event_sync_correction,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"0=off,1=on",
+				0,
+				NULL );
+	index_map_[VIMS_FRAMERATE]			=	_new_event(
+				"%d",
+				VIMS_FRAMERATE,
+				"Change playback engine framerate",
+				vj_event_set_framerate,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Multiple by 100 (ie. for 25fps, use 2500)",
+				0,
+				NULL );
 	index_map_[VIMS_BEZERK]				=	_new_event(
 				NULL,
 				VIMS_BEZERK,	
@@ -2247,6 +2302,36 @@ void		vj_init_vevo_events(void)
 				"Font size",
 				0,
 				NULL );
+
+	index_map_[ VIMS_OSD_EXTRA ]			=	_new_event(
+				NULL,
+				VIMS_OSD_EXTRA,
+				"Print help in OSD (if available)",
+				vj_event_toggle_osd_extra,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL
+				);
+
+/*	index_map_[ VIMS_RECVIEWPORT ]			=	_new_event(
+				NULL,
+				VIMS_RECVIEWPORT,
+				"Record full video or record viewport",
+				vj_event_toggle_vp_render,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+*/
+	index_map_[ VIMS_VIEWPORT ]			=	_new_event(
+				NULL,
+				VIMS_VIEWPORT,
+				"Viewport configuration (Perspective Transfrom)",
+				vj_event_toggle_viewport,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL 
+				);
+
 
 	index_map_[ VIMS_COPYRIGHT ] 			= _new_event(
 				NULL,
@@ -2360,7 +2445,7 @@ void		vj_init_vevo_events(void)
 	
 	index_map_[VIMS_SRT_LIST]			=	_new_event(
 				NULL,
-				VIMS_FONT_LIST,
+				VIMS_SRT_LIST,
 				"GUI: Get list of loaded subtitle sequences",
 				vj_event_get_srt_list,
 				0,

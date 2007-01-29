@@ -24,7 +24,7 @@
 
 void	*vj_font_init(int s_w, int s_h, float fps, int osd);
 int	vj_font_srt_sequence_exists( void *font, int id );
-void vj_font_render(void *ctx, void *_picture, long nframe);
+void vj_font_render(void *ctx, void *_picture, long nframe, char *in_string);
 void	vj_font_destroy(void *ctx);
 int	vj_font_load_srt( void *font, const char *filename );
 int	vj_font_save_srt( void *font , const char *filename );
@@ -33,7 +33,7 @@ void	*vj_font_get_plain_dict( void *font );
 void	vj_font_set_constraints_and_dict( void *font, long lo, long hi, float fps, void *dict );
 void	vj_font_dictionary_destroy(void *dict);
 int	vj_font_clear_text( void *font );
-int	vj_font_new_text( void *font, char *text, uint64_t s1,uint64_t s2, int seq);
+int	vj_font_new_text( void *font, char *text,  long s1,long s2, int seq);
 void	vj_font_del_text( void *font, int seq );
 char 	**vj_font_get_all_fonts( void *font );
 void	vj_font_set_lncolor( void *font, int r, int g, int b, int a );
@@ -42,7 +42,14 @@ void	vj_font_set_bgcolor( void *font, int r, int g, int b, int a );
 void	vj_font_set_outline_and_border( void *font, int outline, int border);
 void	vj_font_set_position( void *font, int x, int y );
 void	vj_font_set_size_and_font( void *font, int f_id, int size );
-void	vj_font_update_text( void *font, uint64_t s1,uint64_t s2, int seq, char *text);
+void    vj_font_set_dict( void *font, void *dict );
+void    *vj_font_get_dict(void *font);
+void	vj_font_update_text( void *font, long s1,long s2, int seq, char *text);
 char **vj_font_get_sequences( void *font );
 char  *vj_font_get_sequence( void *font , int id );
+
+void    vj_font_xml_pack( xmlNodePtr node, void *font );
+void    vj_font_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *font );
+
+
 #endif

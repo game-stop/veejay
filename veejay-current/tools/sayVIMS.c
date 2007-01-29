@@ -235,6 +235,7 @@ int main(int argc, char *argv[])
 		sprintf(option,"%c",n);
 		err += set_option( option,optarg);
 	}
+        veejay_set_debug_level(0);
 
 	veejay_set_colors(colors);
 

@@ -40,6 +40,7 @@
 #define TOTAL_MEM	17
 #define SEQ_ACT		18
 #define SEQ_CUR		19
+#define CHAIN_FADE      20
 #define CURRENT_ENTRY	15
 #define	MODE_PLAIN	2
 #define MODE_SAMPLE	0

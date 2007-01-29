@@ -129,7 +129,7 @@ void flare_additive(VJFrame *frame, VJFrame *frame2, int width,
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
-	int a,b,c;	
+	int a,b;	
 	const unsigned int o1 = op_a;
  	const unsigned int o2 = 255 - op_a;
 
@@ -161,7 +161,7 @@ void flare_unfreeze( VJFrame *frame, VJFrame *frame2, int w, int h, int op_a ) {
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 
-	int a,b,c;
+	int a,b;
 
 	for(i=0; i < len; i++)
 	{
