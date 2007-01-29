@@ -2875,6 +2875,7 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 #endif
 			break;
 		case 1:	
+		case 0:
 #ifdef HAVE_SDL
 		{
 			int go_fs = v->sdl[id]->fs == 1 ? 0:1 ;
