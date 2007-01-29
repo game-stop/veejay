@@ -69,6 +69,8 @@ int	cutstop_malloc(int width, int height)
 	vvcutstop_buffer[0] = (uint8_t*)vj_yuvalloc(width,height);
 	vvcutstop_buffer[1] = vvcutstop_buffer[0] + (width  * height );
 	vvcutstop_buffer[2] = vvcutstop_buffer[1] + (width  * height );
+	veejay_memset( vvcutstop_buffer[1],128,(width*height));
+	veejay_memset( vvcutstop_buffer[2],128,(width*height));
 	return 1;
 }
 

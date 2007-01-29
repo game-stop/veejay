@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[0.9.15],[veejay-users@lists.sourceforge.net])
+AC_INIT([veejay],[0.9.16],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
@@ -574,13 +574,12 @@ case $host_cpu in
 	PROGRAM_NOPIC="-fno-PIC"
 
 	if test "x$enable_debug" != "xyes" ; then
-		dnl optimize if not debugging
-		CFLAGS="-fno-common -O2 -fomit-frame-pointer"
-    	fi
+		CFLAGS="$CFLAGS -fif-conversion -ftree-vectorize"   
+ 	fi
    	dnl If the host is pentium, align on double word boundary
     	case $host_cpu in
 		i686)
-			CFLAGS="$CFLAGS -malign-double"
+			CFLAGS="$CFLAGS"
 		;;
 	*)
 		;;
@@ -593,11 +592,6 @@ case $host_cpu in
     	have_x86cpu=true
     	have_x86_64cpu=true
     	PROGRAM_NOPIC="-fno-PIC"
-
-	if test "x$enable_debug" != "xyes" ; then
-		dnl optimize if not debugging
-		CFLAGS="-fno-common -O3 -fomit-frame-pointer"
-    	fi
 
     ;;
   powerpc | powerpc64)
@@ -634,11 +628,6 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
 	else
 		AC_MSG_RESULT(no)
 	fi
-
-	if test "x$enable_debug" != "xyes" ; then
-		dnl optimize if not debugging
-		CFLAGS="-O2"
-    	fi
 
 	;;
   *)
@@ -831,7 +820,7 @@ then
 			AC_MSG_NOTICE([cflags aangepast])
 		fi
 		if test $av_cv_flag_sse2 = yes; then
-			CFLAGS="$CFLAGS -msse2"
+			CFLAGS="$CFLAGS -msse2 -mfpmath=sse"
 			AC_MSG_NOTICE([cflags aangepast])
 		fi
 	fi	

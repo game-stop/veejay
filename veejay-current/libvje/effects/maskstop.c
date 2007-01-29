@@ -72,6 +72,8 @@ int	maskstop_malloc(int width, int height)
 	vvmaskstop_buffer[0] =  (uint8_t*) vj_malloc( sizeof(uint8_t)  * width * height  * 6 );
 	for( i = 1; i < 6; i ++ )
 		vvmaskstop_buffer[i] = vvmaskstop_buffer[(i-1)] + (width * height);
+	veejay_memset( vvmaskstop_buffer[1], 128, (width*height)*2);
+	veejay_memset( vvmaskstop_buffer[2], 128, (width*height)*2);
 
 	return 1;
 }

@@ -535,7 +535,7 @@ static void ss_444_to_422(void *data, uint8_t *buffer, int width, int height)
 	int x,y;
 #ifdef HAVE_ASM_MMX
 	int mmxdst_stride=dst_stride >> 3;
-	int left = dst_stride & 8;
+	int left = dst_stride % 8;
 #endif
 	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
 	uint8_t *src = sampler->buf;
