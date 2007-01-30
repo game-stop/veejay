@@ -27,11 +27,7 @@
 
 #define FX_LIMIT	1024
 
-#ifdef USE_SWSCALER
 #define MAX_EFFECTS 124
-#else
-#define MAX_EFFECTS 123
-#endif
 #define PARAM_WIDTH	    (1<<0x2)
 #define PARAM_HEIGHT	(1<<0x3)
 #define PARAM_FADER  	(1<<0x1)

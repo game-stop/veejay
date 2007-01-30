@@ -27,9 +27,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <libyuv/yuvconv.h>
-#include <libpostproc/img_format.h>
 
-#ifdef USE_SWSCALER
 typedef struct
 {
 	void		*scaler;
@@ -41,6 +39,7 @@ typedef struct
 	int		h;
 } pic_t;
 
+static	int	nearest_div(int val);
 
 vj_effect *picinpic_init(int width, int height)
 {
@@ -54,14 +53,14 @@ vj_effect *picinpic_init(int width, int height)
     ve->defaults[2] = 64;	/* x1 */
     ve->defaults[3] = 64;	/* y1 */
 
-    ve->limits[0][0] = 1;
-    ve->limits[1][0] = width;
-    ve->limits[0][1] = 1;
-    ve->limits[1][1] = height;
-    ve->limits[0][2] = 1;
-    ve->limits[1][2] = width;
-    ve->limits[0][3] = 1;
-    ve->limits[1][3] = height;
+    ve->limits[0][0] = 8;
+    ve->limits[1][0] = nearest_div(width);
+    ve->limits[0][1] = 8;
+    ve->limits[1][1] = nearest_div(height);
+    ve->limits[0][2] = 8;
+    ve->limits[1][2] = nearest_div(width);
+    ve->limits[0][3] = 8;
+    ve->limits[1][3] = nearest_div(height);
 
     ve->description = "Picture in picture";
     ve->sub_format = 1;
@@ -87,6 +86,14 @@ int	picinpic_malloc(void **d, int w, int h)
 	return 1;	
 }
 
+static int	nearest_div(int val )
+{
+	int r = val % 8;
+	while(r--)
+		val--;
+	return val;
+}
+
 void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2, int width, int height,
 		   int twidth, int theight, int x1, int y1 ) 
 {
@@ -98,10 +105,13 @@ void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2, int width
 	uint8_t *sCb = frame2->data[1];
 	uint8_t *sCr = frame2->data[2];
 	pic_t	*picture = (pic_t*) user_data;
-	int view_width = twidth;
-	int view_height = theight;
-	int dy = y1;
-	int dx = x1;
+	int view_width = nearest_div(twidth);
+	int view_height = nearest_div(theight);
+	int dy = nearest_div(y1);
+	int dx = nearest_div(x1);
+
+	//@ round view_width to nearest multiple of 2,4,8
+
 
 	if ( (dx + view_width ) > width )
 		view_width = width - dx;
@@ -142,9 +152,10 @@ void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2, int width
 			yuv_sws_get_cpu_flags()
 		);
 		picture->frame.data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * len );
-		picture->frame.data[1] = (uint8_t*) vj_calloc(sizeof(uint8_t) * len );
-		picture->frame.data[2] = (uint8_t*) vj_calloc(sizeof(uint8_t) * len );
-
+		picture->frame.data[1] = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
+		picture->frame.data[2] = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
+		veejay_memset( picture->frame.data[1],128, len );
+		veejay_memset( picture->frame.data[2],128, len );
 		picture->w = view_width;
 		picture->h = view_height;
 
@@ -153,9 +164,9 @@ void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2, int width
 	yuv_convert_and_scale( picture->scaler, scale_src.data, picture->frame.data ); 
 
 	/* Copy the scaled image to output */
-	for( y = 0 ; y < picture->h; y ++ )
+	for( y = 0 ; y < picture->h-1; y ++ )
 	{
-		for( x = 0 ; x < picture->w; x ++ )
+		for( x = 0 ; x < picture->w-1; x ++ )
 		{
 			dY[ (dy + y ) * width + dx + x ] = 
 				picture->frame.data[0][ y * picture->w + x];
@@ -179,4 +190,3 @@ void picinpic_free(void *d)
 	}
 	d=NULL;
 }
-#endif

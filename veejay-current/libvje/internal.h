@@ -113,10 +113,7 @@ enum {
 	VJ_VIDEO_EFFECT_VIDEOWALL = 238,
 	VJ_VIDEO_EFFECT_EXTTHRESHOLD = 239,
 	VJ_VIDEO_EFFECT_EXTDIFF		= 240,
-#ifdef USE_SWSCALER
 	VJ_VIDEO_EFFECT_PICINPIC = 241,
-#endif
-  //  VJ_VIDEO_EFFECT_CHANNELMIX = 233,
 };
 
 enum {
@@ -209,11 +206,8 @@ enum {
 #define VJ_IMAGE_EFFECT_MAX 182
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#ifdef USE_SWSCALER
 #define VJ_VIDEO_EFFECT_MAX 242
-#else
-#define VJ_VIDEO_EFFECT_MAX 241
-#endif
+
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
 #define	VJ_EXT_EFFECT	500
@@ -536,11 +530,9 @@ extern void flare_apply(VJFrame *frame, int w, int h, int type, int threshold, i
 
 extern void constantblend_apply(VJFrame *frame , int w, int h, int type, int scale, int y );
 
-#ifdef USE_SWSCALER
 extern void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
 		   int twidth, int theight, int x1, int y1,
 		   int width, int height);
-#endif
 
 extern void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse );
 

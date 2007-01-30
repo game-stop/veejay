@@ -149,10 +149,7 @@
 #include "effects/rgbchannel.h"
 #include "effects/diffmap.h"
 #include	"plugload.h"
-
-#ifdef USE_SWSCALER
 #include "effects/picinpic.h"
-#endif
 
 int  pixel_Y_hi_ = 235;
 int  pixel_U_hi_ = 240;
@@ -234,9 +231,7 @@ static struct
 } complex_effect_index[] = 
 {
 	{	diff_malloc,		diff_free,			VJ_VIDEO_EFFECT_DIFF },
-#ifdef USE_SWSCALER 
 	{	picinpic_malloc,	picinpic_free,			VJ_VIDEO_EFFECT_PICINPIC },
-#endif
 	{	NULL,			NULL,				0		     },
 };
 
@@ -480,12 +475,8 @@ void vj_effect_initialize(int width, int height, int full_range)
     vj_effects[38] = videowall_init(width,height);
     vj_effects[39] = threshold_init(width,height);
 	vj_effects[40] = differencemap_init(width,height);
-#ifdef USE_SWSCALER
 	vj_effects[41] = picinpic_init(width,height);
         vj_effects[42] = dummy_init(width,height);
-#else
-	vj_effects[41] = dummy_init(width,height);
-#endif
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);

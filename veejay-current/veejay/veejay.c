@@ -58,9 +58,7 @@ static void CompiledWith()
 #ifdef USE_GDK_PIXBUF
 	veejay_msg(VEEJAY_MSG_INFO,"\tUse GDK Pixbuf");
 #endif
-#ifdef USE_SWSCALER
 	veejay_msg(VEEJAY_MSG_INFO,"\tUse software scaler");
-#endif
 #ifdef HAVE_JACK
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Jack audio server");
 #endif
@@ -217,7 +215,6 @@ static void Usage(char *progname)
 		"  -T/--multicast-vims \t\tmulticast VIMS\n");
 	fprintf(stderr,
 		"     --map-from-file <num>\tmap N frames to memory\n");
-#ifdef USE_SWSCALER
 	fprintf(stderr,
 		"  -z/--zoom [1-11]\n");
 	fprintf(stderr,
@@ -266,7 +263,6 @@ static void Usage(char *progname)
 		"\t\t\t\t-h/--zoomheight \n");
 	fprintf(stderr,
 		"\t\t\t\t-C/--zoomcrop [top:bottom:left:right] (crop source before scaling)\n");
-#endif
 	fprintf(stderr,
 		"  -V/--viewport \t\tStart with viewport\n");
 
@@ -428,7 +424,6 @@ static int set_option(const char *name, char *value)
 	{
 		auto_loop = 1;
 	}
-#ifdef USE_SWSCALER 
 	else if (strcmp(name, "zoom") == 0 || strcmp(name, "z" ) == 0)
 	{
 		info->settings->zoom = atoi(optarg);
@@ -491,7 +486,6 @@ static int set_option(const char *name, char *value)
 		}
 		info->settings->crop = 1;
 	}
-#endif
 	else if (strcmp(name, "quit") == 0 || strcmp(name, "q") == 0 )
 	{
 		info->continuous = 0;

@@ -90,10 +90,6 @@ dnl AC_ARG_WITH(gveejay,
 dnl		AC_HELP_STRING([--without-gveejay], [Do not build GVeejay]),
 dnl		[with_gveejay=no]], [with_gveejay=yes])
 
-AC_ARG_WITH(swscaler,
-		AC_HELP_STRING([--with-swscaler], [Build without Swscaler support]),
-		[with_swscaler=yes],
-		[with_swscaler=no])
 AC_ARG_WITH(jpeg,
 		AC_HELP_STRING([--without-jpeg], [Do not JPEG support]),
 		[],	[with_libjpeg=yes])
@@ -155,12 +151,6 @@ AC_SUBST(LIBGETOPT_LIB)
 AC_TYPE_SIGNAL
 
 AC_MSG_NOTICE([The host is $host  $host_cpu  $host_vendor  $host_os .])
-use_swscaler=false
-if test x$with_swscaler != xno ; then
-	use_swscaler=true;
-	AC_SUBST( USE_SWSCALER )
-	AC_DEFINE(USE_SWSCALER,1, [use swscaler])
-fi
 
 have_gl=false
 AC_CHECK_HEADERS(GL/gl.h ,,
@@ -884,7 +874,6 @@ AM_CONDITIONAL(HAVE_V4L, test x$have_v4l = xtrue)
 AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
-AM_CONDITIONAL(USE_SWSCALER, test x$use_swscaler = xtrue)
 AM_CONDITIONAL(USE_GL, test x$have_gl = xtrue)
 AM_CONDITIONAL(USE_UNICAP,test x$have_unicap = xtrue)
 dnl AM_CONDITIONAL(USE_GVEEJAY,
@@ -993,7 +982,6 @@ dnl
 AC_CONFIG_FILES([
 Makefile
 libOSC/Makefile
-libpostproc/Makefile
 libhash/Makefile
 libvjmsg/Makefile
 libvevo/Makefile
@@ -1080,5 +1068,4 @@ AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])
 
 AC_MSG_NOTICE([  Optional programs:])
 AC_MSG_NOTICE([  - GVeejay Reloaded              : ${use_gveejayreloaded}])
-AC_MSG_NOTICE([  - Swscaler support (obsolete)   : ${use_swscaler}])
 

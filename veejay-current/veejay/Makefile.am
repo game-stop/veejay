@@ -39,9 +39,6 @@ libveejay_la_SOURCES =  vj-misc.c \
 
 libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS ) $(DEBUGLIBS)
 
-if USE_SWSCALER
-libveejay_la_LDFLAGS += -L$(top_builddir)/libpostproc/ -lpostproc 
-endif
 
 libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libhash / -lhash \
@@ -69,10 +66,6 @@ libveejay_la_LDFLAGS +=	${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} ${FT_LDFLAG
 # *********************************************************************
 # The tools themselves
 VEEJAY_BIN = veejay
-
-if USE_SWSCALER
-	VJ_LIBS += -L$(top_builddir)/libpostproc -lpostproc
-endif
 
 bin_PROGRAMS = $(VEEJAY_BIN)  
 
