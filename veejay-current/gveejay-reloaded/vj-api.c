@@ -1895,6 +1895,14 @@ int	is_current_track(char *host, int port )
 	return 0;
 }
 
+static	void	gveejay_error_slot( int mode )
+{
+	char message[255];
+	sprintf(message, "Failed to create a new slot. Make sure to check the properties of the %s you are trying to load",
+		(mode == MODE_SAMPLE ? "sample" : (mode==MODE_STREAM ?  "stream" : "sample/stream")));
+	message_dialog( "Error", message );
+}
+
 /* Create a new slot in the sample bank, This function is called by
    all VIMS commands that create a new stream or a new sample */
 int		gveejay_new_slot(int mode)
@@ -1902,44 +1910,55 @@ int		gveejay_new_slot(int mode)
 	int id = 0;
 	int result_len = 0;
 	gchar *result = recv_vims( 3, &result_len );
-	if(result_len > 0 )
+
+	if(result_len <= 0 )
 	{
-		sscanf( result, "%d", &id );
-		g_free(result);
-		if(id > 0 )
-			vj_msg(VEEJAY_MSG_INFO, "Created new %s %d", (mode == MODE_SAMPLE ? "Sample" : "Stream"), id);
+		gveejay_error_slot( mode );
+		return 0;
+	}
+
+	sscanf( result, "%d", &id );
+	g_free(result);
+
+	if( id <= 0 )
+	{
+		gveejay_error_slot( mode );
+		return 0;
+	}
+	else
+	{
+		vj_msg(VEEJAY_MSG_INFO, "Created new %s %d", (mode == MODE_SAMPLE ? "Sample" : "Stream"), id);
+
+		int poke_slot = 0;
+		int bank_page = 0;
+		if(verify_bank_capacity( &bank_page, &poke_slot, id, mode ))
+		{
+			sample_slot_t *tmp_slot = vj_gui_get_sample_info(id, mode );
+			if(tmp_slot)
+			{
+				tmp_slot->slot_number = poke_slot;
+					add_sample_to_sample_banks( bank_page, tmp_slot );
+				free_slot( tmp_slot );
+				info->uc.expected_slots ++;
+				return id;
+			}
+		}
 		else
 		{
-			char message[100];
-			sprintf(message, "Failed to create new %s",
-				(mode == MODE_SAMPLE ? "Sample" : "Stream" ) );
-			message_dialog( "Error", message );
-		}
-		if( id > 0 )
-		{ /* Add the sample/stream to a sample bank */
-
-
-			int poke_slot = 0;
-			int bank_page = 0;
-			if(verify_bank_capacity( &bank_page, &poke_slot, id, mode ))
-			{
-				sample_slot_t *tmp_slot = vj_gui_get_sample_info(id, mode );
-				if(tmp_slot)
-				{
-					tmp_slot->slot_number = poke_slot;
-					add_sample_to_sample_banks( bank_page, tmp_slot );
-					free_slot( tmp_slot );
-					info->uc.expected_slots ++;
-				//	 info->status_tokens[TOTAL_SLOTS] + 1;
-				}
-			}
-
-
+			message_dialog( "Error", "Samplebank is full");
+			return 0;
 		}
 	}
 
 	return id;
 }
+
+void	gveejay_popup_err( const char *type, const char *msg )
+{
+	message_dialog( type, msg );
+}
+
+
 #include "callback.c"
 enum
 {

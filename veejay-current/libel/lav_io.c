@@ -472,31 +472,45 @@ int lav_close(lav_file_t *lav_file)
 #ifdef SUPPORT_READ_DV2
 		case 'd':
 		case 'b':
-			veejay_msg(VEEJAY_MSG_DEBUG,"\tClosing raw dv file");
-			ret = rawdv_close(lav_file->dv_fd);
+			if( lav_file->dv_fd )
+			{
+				veejay_msg(VEEJAY_MSG_DEBUG,"\tClosing raw dv file");
+				ret = rawdv_close(lav_file->dv_fd);	
+			}
 			break;
 #endif
 #ifdef USE_GDK_PIXBUF
 		case 'x':
-			veejay_msg(VEEJAY_MSG_DEBUG,"\tClosing image file");
-			vj_picture_cleanup( lav_file->picture );
-			ret = 1;
+			if( lav_file->picture )
+			{
+				veejay_msg(VEEJAY_MSG_DEBUG,"\tClosing image file");
+				vj_picture_cleanup( lav_file->picture );
+				ret = 1;
+			}
 			break;
 #endif
 #ifdef HAVE_LIBQUICKTIME
       		case 'q':
-			veejay_msg(VEEJAY_MSG_DEBUG, "\tClosing Quicktime file");
-       			ret = quicktime_close( lav_file->qt_fd );
+			if( lav_file->qt_fd )
+			{
+				veejay_msg(VEEJAY_MSG_DEBUG, "\tClosing Quicktime file");
+       				ret = quicktime_close( lav_file->qt_fd );
+			}
 		        break;
 #endif			
 		default:
-			veejay_msg(VEEJAY_MSG_DEBUG, "\tClosing AVI file");
-			ret = AVI_close(lav_file->avi_fd);
+			if( lav_file->avi_fd )
+			{
+				veejay_msg(VEEJAY_MSG_DEBUG, "\tClosing AVI file");
+				ret = AVI_close(lav_file->avi_fd);
+			}
 			break;
 	}
 
         if(lav_file) free(lav_file);
     
+	lav_file = NULL;
+
     	return ret;
 }
 

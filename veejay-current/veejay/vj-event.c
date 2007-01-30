@@ -1964,7 +1964,8 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 			veejay_memset( live_set,0, 512 );
 		
 			sprintf(live_set, "%s-SL", file_name );
-			int res = sample_writeToFile( live_set, v->seq,v->font );
+			int res = sample_writeToFile( live_set, v->seq,v->font,
+					v->uc->sample_id, v->uc->playback_mode );
 			if(!res)
 				veejay_msg(VEEJAY_MSG_ERROR,"Error saving sample list to file '%s'", live_set ); 
 			else
@@ -3689,7 +3690,7 @@ void vj_event_sample_save_list(void *ptr, const char format[], va_list ap)
 	char str[255];
 	int *args = NULL;
 	P_A(args,str,format,ap);
-	if(sample_writeToFile( str, v->seq,v->font) )
+	if(sample_writeToFile( str, v->seq,v->font, v->uc->sample_id, v->uc->playback_mode) )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Saved %d samples to file '%s'", sample_size()-1, str);
 	}
@@ -3705,8 +3706,11 @@ void vj_event_sample_load_list(void *ptr, const char format[], va_list ap)
 	int *args = NULL;
 	veejay_t *v = (veejay_t*) ptr;
 	P_A( args, str, format, ap);
+
+	int id = 0;
+	int mode = 0;
 	
-	if( sample_readFromFile( str, v->seq, v->font, v->edit_list ) ) 
+	if( sample_readFromFile( str, v->seq, v->font, v->edit_list, &id, &mode ) ) 
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list from file '%s'", str);
 	}

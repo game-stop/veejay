@@ -260,7 +260,8 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 		snprintf(recover_samples,1024, "%s/recovery_samplelist_%d.sl", info->homedir, (int) my_pid);
 		snprintf(recover_edl, 1024, "%s/recovery_editlist_%d.edl", info->homedir, (int) my_pid);
 
-		int rs = sample_writeToFile( recover_samples,info->seq,info->font );
+		int rs = sample_writeToFile( recover_samples,info->seq,info->font,
+				info->uc->sample_id, info->uc->playback_mode );
 		int re = veejay_save_all( info, recover_edl, 0, 0 );
 		if(rs)
 			veejay_msg(VEEJAY_MSG_WARNING, "Saved samplelist to %s", recover_samples );
@@ -1723,14 +1724,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 
 	vj_event_init();
 
-
-#ifdef HAVE_XML2
-	if(info->load_action_file)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Loading configuaration file %s", info->action_file);
-		veejay_load_action_file(info, info->action_file );
-	}
-#endif
+	int id = 0, mode = 0;
 
 	switch (info->uc->use_timer)
 	{
@@ -1938,8 +1932,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 
 	if( info->settings->action_scheduler.sl && info->settings->action_scheduler.state )
 	{
+	
 		if(sample_readFromFile( info->settings->action_scheduler.sl,
-				info->seq, info->font, info->edit_list ) )
+				info->seq, info->font, info->edit_list, &(info->uc->sample_id), &(info->uc->playback_mode) ) )
 			veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list %s from actionfile",
 					info->settings->action_scheduler.sl );
 	}
@@ -2046,7 +2041,38 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		return -1;
 	break;
     }
-	if(def_tags )
+
+
+
+#ifdef HAVE_XML2
+	if(info->load_action_file)
+	{
+		if(veejay_load_action_file(info, info->action_file )==0)
+		{
+			if(sample_readFromFile( info->action_file,
+				info->seq, 
+				info->font, 
+				info->edit_list,
+				 &id,
+				 &mode ))
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file);
+				if( id > 0 )
+				{
+					veejay_change_playback_mode(info, mode, id );
+				}
+			}
+		}
+		else
+		{
+			veejay_msg(VEEJAY_MSG_INFO, "Loaded configuration file %s", info->action_file );
+		}
+	}
+#endif
+
+
+
+	if(def_tags && id <= 0)
 	{
 		int n = vj_tag_num_devices();
 		int i = 0;
@@ -2062,8 +2088,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		}
 		if( first_id > 0 ) veejay_change_playback_mode(info,VJ_PLAYBACK_MODE_TAG,first_id);
 	}
-	else
-	if(info->dummy->active)
+	else if(info->dummy->active && id <= 0)
 	{
 	 	int dummy_id;
 		/* Use dummy mode, action file could have specified something */
@@ -2083,8 +2108,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 			return -1;
 		}
 	}
-	else
-	if( info->uc->file_as_sample)
+	else if( info->uc->file_as_sample && id <= 0)
 	{
 		long i,n=info->current_edit_list->num_video_files;
 		for(i = 0; i < n; i ++ )
@@ -2104,6 +2128,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 			}	
 		}
 	}
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "ID %d | Mode %d", info->uc->sample_id, info->uc->playback_mode ); 
+
 /*
 #ifdef HAVE_FREETYPE
 	  if(info->font)

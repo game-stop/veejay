@@ -185,8 +185,8 @@ extern int sample_verify();
 extern void sample_init(int len);
 extern int sample_update(sample_info *sample, int s1);
 #ifdef HAVE_XML2
-extern int sample_readFromFile(char *, void *ptr, void *font, void *el);
-extern int sample_writeToFile(char *, void *ptr, void *font);
+extern int sample_readFromFile(char *, void *ptr, void *font, void *el, int *id, int *mode);
+extern int sample_writeToFile(char *, void *ptr, void *font, int id, int mode);
 #endif
 extern int sample_update_offset(int s1, int nframe);
 extern int sample_set_state(int new_state);

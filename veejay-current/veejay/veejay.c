@@ -161,7 +161,7 @@ static void Usage(char *progname)
 #endif
 #endif
     fprintf(stderr,
-	    "  -l/--action-file <filename>\tLoad an Configuartion/Action File (none at default)\n");
+	    "  -l/--action-file <filename>\tLoad a samplelist/actionlist file (none at default)\n");
 	fprintf(stderr,
 	    "  -u/--dump-events  \t\tDump event information to screen\n");
 	fprintf(stderr,
@@ -218,7 +218,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -z/--zoom [1-11]\n");
 	fprintf(stderr,
-		"\t\t\t\tsoftware scaler type (also use -W, -H ). \n");
+		"\t\t\t\tsoftware scaler type (also use -w/--zoomwidth, -h/--zoomheight ). \n");
 	fprintf(stderr,
 		"\t\t\t\tAvailable types are:\n");         
 	fprintf(stderr,

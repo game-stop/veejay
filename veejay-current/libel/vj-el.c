@@ -577,99 +577,101 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
     if (el->num_video_files >= 1)
 		chroma = el->MJPG_chroma;
          
-    n = el->num_video_files;
+    	n = el->num_video_files;
 
-    el->num_video_files++;
+    	//el->num_video_files++;
+	//el->lav_fd[n] = elfd;
 
-    el->lav_fd[n] = lav_open_input_file(filename,mmap_size);
+	lav_file_t	*elfd = lav_open_input_file(filename,mmap_size );
 
-    if (el->lav_fd[n] == NULL)
+
+	if (elfd == NULL)
 	{
-		el->num_video_files--;	
-		veejay_msg(VEEJAY_MSG_ERROR,"Error loading '%s'", realname);
+		veejay_msg(VEEJAY_MSG_ERROR,"Error loading videofile '%s'", realname);
 	        veejay_msg(VEEJAY_MSG_ERROR,"%s",lav_strerror());
 	 	if(realname) free(realname);
+		lav_close(elfd);
 		return -1;
 	}
 
-    _fc = lav_video_MJPG_chroma(el->lav_fd[n]);
+	if(lav_video_frames(elfd) < 2)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to load video files that contain less than 2 frames");
+		if(realname) free(realname);
+		lav_close(elfd);
+		return -1;
+	}
 
-    if( !(_fc == CHROMA422 || _fc == CHROMA420 || _fc == CHROMA444 || _fc == CHROMAUNKNOWN || _fc == CHROMA411 ))
+
+	_fc = lav_video_MJPG_chroma(elfd);
+
+	if( !(_fc == CHROMA422 || _fc == CHROMA420 || _fc == CHROMA444 || _fc == CHROMAUNKNOWN || _fc == CHROMA411 ))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Input file %s is not in a valid format (%d)",filename,_fc);
-		el->num_video_files --;
 	    	if(realname) free(realname);
+		lav_close( elfd );
 		return -1;
 
 	}
 
-    if(chroma == CHROMAUNKNOWN)
+	if(chroma == CHROMAUNKNOWN)
 	{ /* set chroma */
   	  el->MJPG_chroma = _fc;
 	  chroma = _fc;
 	}
 
-
-	pix_fmt = _el_probe_for_pixel_fmt( el->lav_fd[n] );
+	pix_fmt = _el_probe_for_pixel_fmt( elfd );
 
 	if(pix_fmt < 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to determine pixel format");
-		el->num_video_files--;	
+		lav_close( elfd );
 		if(realname) free(realname);
 		return -1;
 	}
 
 	el->yuv_taste[n] = pix_fmt;
-
-	if(lav_video_frames(el->lav_fd[n]) < 2)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to load video files that contain less than 2 frames");
-		if(realname) free(realname);
-		el->num_video_files --;
-		return -1;
-	}
-
-    el->num_frames[n] = lav_video_frames(el->lav_fd[n]);
-    el->video_file_list[n] = strndup(realname, strlen(realname));
-    /* Debug Output */
+	el->lav_fd[n] = elfd;
+	el->num_video_files ++;
+    	el->num_frames[n] = lav_video_frames(el->lav_fd[n]);
+    	el->video_file_list[n] = strndup(realname, strlen(realname));
+	
+	    /* Debug Output */
 	if(n == 0 )
 	{
-    veejay_msg(VEEJAY_MSG_DEBUG,"\tFull name:       %s", filename, realname);
-    veejay_msg(VEEJAY_MSG_DEBUG,"\tFrames:          %ld", lav_video_frames(el->lav_fd[n]));
-    veejay_msg(VEEJAY_MSG_DEBUG,"\tWidth:           %d", lav_video_width(el->lav_fd[n]));
-    veejay_msg(VEEJAY_MSG_DEBUG,"\tHeight:          %d", lav_video_height(el->lav_fd[n]));
-    {
-	const char *int_msg;
-	switch (lav_video_interlacing(el->lav_fd[n]))
+	    veejay_msg(VEEJAY_MSG_DEBUG,"\tFull name:       %s", filename, realname);
+	    veejay_msg(VEEJAY_MSG_DEBUG,"\tFrames:          %ld", lav_video_frames(el->lav_fd[n]));
+	    veejay_msg(VEEJAY_MSG_DEBUG,"\tWidth:           %d", lav_video_width(el->lav_fd[n]));
+	    veejay_msg(VEEJAY_MSG_DEBUG,"\tHeight:          %d", lav_video_height(el->lav_fd[n]));
+    	
+		const char *int_msg;
+		switch (lav_video_interlacing(el->lav_fd[n]))
 		{
-		case LAV_NOT_INTERLACED:
-		    int_msg = "Not interlaced";
-		    break;
-		case LAV_INTER_TOP_FIRST:
-		    int_msg = "Top field first";
-		    break;
-		case LAV_INTER_BOTTOM_FIRST:
-		    int_msg = "Bottom field first";
-		    break;
-		default:
-		    int_msg = "Unknown!";
-		    break;
+			case LAV_NOT_INTERLACED:
+			    int_msg = "Not interlaced";
+			    break;
+			case LAV_INTER_TOP_FIRST:
+			    int_msg = "Top field first";
+			    break;
+			case LAV_INTER_BOTTOM_FIRST:
+			    int_msg = "Bottom field first";
+			    break;
+			default:
+			    int_msg = "Unknown!";
+			    break;
 		}
 
-	 if( deinter == 1 && (lav_video_interlacing(el->lav_fd[n]) != LAV_NOT_INTERLACED))
-		el->auto_deinter = 1;
+		 if( deinter == 1 && (lav_video_interlacing(el->lav_fd[n]) != LAV_NOT_INTERLACED))
+			el->auto_deinter = 1;
 
-    	veejay_msg(VEEJAY_MSG_DEBUG,"\tInterlacing:      %s", int_msg);
-    }
-
-    veejay_msg(VEEJAY_MSG_DEBUG,"\tFrames/sec:       %f", lav_frame_rate(el->lav_fd[n]));
-    veejay_msg(VEEJAY_MSG_DEBUG,"\tSampling format:  %s", _chroma_str[ lav_video_MJPG_chroma(el->lav_fd[n])].name);
-    veejay_msg(VEEJAY_MSG_DEBUG,"\tFOURCC:           %s",lav_video_compressor(el->lav_fd[n]));
-    veejay_msg(VEEJAY_MSG_DEBUG,"\tAudio samps:      %ld", lav_audio_clips(el->lav_fd[n]));
-    veejay_msg(VEEJAY_MSG_DEBUG,"\tAudio chans:      %d", lav_audio_channels(el->lav_fd[n]));
-    veejay_msg(VEEJAY_MSG_DEBUG,"\tAudio bits:       %d", lav_audio_bits(el->lav_fd[n]));
-    veejay_msg(VEEJAY_MSG_DEBUG,"\tAudio rate:       %ld", lav_audio_rate(el->lav_fd[n]));
+ 	   	veejay_msg(VEEJAY_MSG_DEBUG,"\tInterlacing:      %s", int_msg);
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tFrames/sec:       %f", lav_frame_rate(el->lav_fd[n]));
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tSampling format:  %s", _chroma_str[ lav_video_MJPG_chroma(el->lav_fd[n])].name);
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tFOURCC:           %s",lav_video_compressor(el->lav_fd[n]));
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tAudio samps:      %ld", lav_audio_clips(el->lav_fd[n]));
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tAudio chans:      %d", lav_audio_channels(el->lav_fd[n]));
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tAudio bits:       %d", lav_audio_bits(el->lav_fd[n]));
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tAudio rate:       %ld", lav_audio_rate(el->lav_fd[n]));
 	}
 	else
 	{
@@ -875,10 +877,10 @@ void		vj_el_show_formats(void)
 {
 #ifdef SUPPORT_READ_DV2
 		veejay_msg(VEEJAY_MSG_INFO,
-			"Video containers: AVI (up to 2gb), RAW DV and Quicktime");
+			"Video containers: AVI (up to 32gb), RAW DV and Quicktime");
 #else
 		veejay_msg(VEEJAY_MSG_INFO,
-			"Video containers: AVI (up to 2gb) and  Quicktime");
+			"Video containers: AVI (up to 32gb) and  Quicktime");
 #endif
 		veejay_msg(VEEJAY_MSG_INFO,
 			"Video fourcc (preferred): mjpg, mjpb, mjpa, dv, dvsd,sp5x,dmb1,dvcp,dvhd, yv16,i420");

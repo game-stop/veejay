@@ -2376,6 +2376,40 @@ void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, int start_a
     }
 }
 
+void	LoadCurrentPlaying( xmlDocPtr doc, xmlNodePtr cur , int *id, int *mode )
+{
+	unsigned char *chTemp = NULL;
+	unsigned char *xmlTemp = NULL;
+        while (cur != NULL)
+        {
+                if (!xmlStrcmp(cur->name, (const xmlChar *) "PLAYING_ID")) {
+			xmlTemp = xmlNodeListGetString(doc,cur->xmlChildrenNode,1 );
+			chTemp = UTF8toLAT1(xmlTemp);
+			if(chTemp) {
+				int s_id = atoi(chTemp );
+				*id = s_id;
+				xmlFree(chTemp);
+			}
+			if( xmlTemp ) free(xmlTemp);
+		}
+	
+		if( !xmlStrcmp(cur->name, (const xmlChar*) "PLAYING_MODE" ))
+		{
+			xmlTemp = xmlNodeListGetString( doc,cur->xmlChildrenNode,1 );
+			chTemp = UTF8toLAT1( xmlTemp );
+			if(chTemp ) {
+				int s_pm = atoi( chTemp );
+				*mode = s_pm;
+				xmlFree(chTemp);
+			}
+			if( xmlTemp ) free(xmlTemp);
+		}
+
+		cur = cur->next;
+	}
+
+}
+
 void	LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq )
 {
 	seq_t *s = (seq_t*) seq;
@@ -2733,7 +2767,7 @@ void	LoadSubtitles( sample_info *skel, char *file, void *font )
 	vj_font_load_srt( font, tmp );
 }
 
-int sample_readFromFile(char *sampleFile, void *seq, void *font, void *el)
+int sample_readFromFile(char *sampleFile, void *seq, void *font, void *el,int *id, int *mode)
 {
     xmlDocPtr doc;
     xmlNodePtr cur;
@@ -2789,6 +2823,11 @@ int sample_readFromFile(char *sampleFile, void *seq, void *font, void *el)
 
 	    }
 	}
+
+	if( !xmlStrcmp( cur->name, (const xmlChar*) "CURRENT" )) {
+		LoadCurrentPlaying( doc, cur->xmlChildrenNode, id, mode );
+	}
+
         if( !xmlStrcmp( cur->name, (const xmlChar *) "SEQUENCE" )) {
 		LoadSequences( doc, cur->xmlChildrenNode,seq );
 	}
@@ -2914,6 +2953,18 @@ void	SaveSequences( xmlNodePtr node, void *seq )
 		(const xmlChar*) buffer );
     }	
 		
+}
+
+void	SaveCurrentPlaying( xmlNodePtr node, int id, int mode )
+{
+	char buffer[100];
+	sprintf(buffer, "%d", id );
+	xmlNewChild(node, NULL, (const xmlChar*) "PLAYING_ID",
+		(const xmlChar*) buffer );
+	sprintf(buffer, "%d", mode );
+	xmlNewChild(node,NULL, (const xmlChar*) "PLAYING_MODE",
+		(const xmlChar*) mode );
+
 }
 
 void CreateSample(xmlNodePtr node, sample_info * sample, void *font)
@@ -3043,7 +3094,7 @@ void	WriteSubtitles( sample_info *next_sample, void *font, char *file )
 	vj_font_set_dict( font, d );
 }
 
-int sample_writeToFile(char *sampleFile, void *seq, void *font)
+int sample_writeToFile(char *sampleFile, void *seq, void *font, int id, int mode)
 {
     int i;
 	char *encoding = "UTF-8";	
@@ -3060,6 +3111,10 @@ int sample_writeToFile(char *sampleFile, void *seq, void *font)
 			(const xmlChar*) "SEQUENCE", NULL );
     SaveSequences( childnode, seq );
 
+  
+    childnode = xmlNewChild( rootnode, NULL, (const xmlChar*) "CURRENT" , NULL );
+	
+    SaveCurrentPlaying( childnode , id, mode );
 
     for (i = 1; i < sample_size(); i++) {
 	next_sample = sample_get(i);
