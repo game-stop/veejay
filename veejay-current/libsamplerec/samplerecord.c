@@ -171,6 +171,7 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 
 	si->rec_total_bytes= 0;
 	si->encoder_succes_frames = 0;
+
 	if(format==ENCODER_DVVIDEO)
 		si->encoder_max_size = ( el->video_height == 480 ? 120000: 144000);
 	else

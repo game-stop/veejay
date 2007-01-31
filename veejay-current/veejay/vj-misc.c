@@ -162,8 +162,9 @@ int	veejay_create_temp_file(const char *prefix, char *dst)
 	   will be set to localtime (annoying for users who
 	   copy arround files)
 	*/
+
 	sprintf(dst,
-		"%s_[%02d-%02d-%02d]_[%02d:%02d:%02d]",		
+		"%s_%02d%02d%02d_%02d%02d%02d",		
 		prefix,
 		today->tm_mday,
 		today->tm_mon,
@@ -171,6 +172,7 @@ int	veejay_create_temp_file(const char *prefix, char *dst)
 		today->tm_hour,
 		today->tm_min,
 		today->tm_sec);
+
 	return 1;
 }
 
@@ -264,15 +266,8 @@ int	sufficient_space(int max_size, int nframes)
 	long needed = (max_size * nframes) + 2048;
 	long avail  = s.f_bfree;
 	
-	if(needed > avail )
-	{
-		double shortage = (double)(needed-avail)/1048576.0;
-		veejay_msg(VEEJAY_MSG_ERROR,
-				"Insufficient diskspace, I need an additional amount of %5.3g Mb", shortage);
-		return 1;
-	}
-	veejay_msg(VEEJAY_MSG_INFO, "%2.2f MB available, need %5.3g",
-			(float)(avail)/1048576.0, (float)(needed)/1048576.0);
+	veejay_msg(VEEJAY_MSG_INFO, "%.2f MB available, estimated I need at most %.2f. Continuing",
+			(float)(avail)/1048576.0f, (float)(needed)/1048576.0f);
 	return 1;
 }
 
