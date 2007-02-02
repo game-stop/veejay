@@ -1,6 +1,7 @@
 /* Gveejay Reloaded - graphical interface for VeeJay
  * 	     (C) 2002-2004 Niels Elburg <nelburg@looze.net> 
- *           (C) 2005      Thomas Rheinhold 
+ *  with contributions by  Thomas Rheinhold (2005)
+ * 	                   (initial sampledeck representation in GTK) 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -1517,22 +1518,23 @@ void	about_dialog()
 
     const gchar *authors[] = { 
       "Niels Elburg <nelburg@looze.net>",
+      "Matthijs v. Henten <cola@looze.net>",
       "Thomas Reinhold <stan@jf-chemnitz.de>",
       NULL 
     };
 
-	const gchar *license = 
-	{
-		"This program is Free Software; You can redistribute it and/or modify\n" \
-		"under the terms of the GNU General Public License as published by\n" \
-		"the Free Software Foundation; either version 2, or (at your option)\n"\
-		"any later version.\n\n"\
-		"This program is distributed in the hope it will be useful,\n"\
-		"but WITHOUT ANY WARRANTY; without even the implied warranty of\n"\
-		"MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n"\
-		"See the GNU General Public License for more details.\n\n"\
-		"For more information , see also: http://www.gnu.org\n"
-	};
+    const gchar *license = 
+    {
+	"This program is Free Software; You can redistribute it and/or modify\n" \
+	"under the terms of the GNU General Public License as published by\n" \
+	"the Free Software Foundation; either version 2, or (at your option)\n"\
+	"any later version.\n\n"\
+	"This program is distributed in the hope it will be useful,\n"\
+	"but WITHOUT ANY WARRANTY; without even the implied warranty of\n"\
+	"MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n"\
+	"See the GNU General Public License for more details.\n\n"\
+	"For more information , see also: http://www.gnu.org\n"
+    };
 
 #ifdef HAVE_GTK2_6
 	char path[MAX_PATH_LEN];
@@ -1544,7 +1546,7 @@ void	about_dialog()
 		GTK_TYPE_ABOUT_DIALOG,
 		"name", "GVeejay Reloaded",
 		"version", VERSION,
-		"copyright", "(C) 2004 - 2005 N. Elburg et all.",
+		"copyright", "(C) 2004 - 2007 N. Elburg et all.",
 		"comments", "The graphical interface for Veejay",
 		"authors", authors,
 		"artists", artists,
@@ -1554,19 +1556,6 @@ void	about_dialog()
 
 	g_signal_connect( about , "response", G_CALLBACK( gtk_widget_destroy),NULL);
 	gtk_window_present( GTK_WINDOW( about ) );
-#else
-	int i;
-//	vj_msg_detail( VEEJAY_MSG_INFO, "Gveejay Reloaded %s %d%d%d", VEEJAY_CODENAME,VEEJAY_MAJOR_VERSION,VEEJAY_MINOR_VERSION,VEEJAY_MICRO_VERSION );
-//	vj_msg_detail( VEEJAY_MSG_INFO, "%s", license );
-/*	for(i = 0; artists[i] != NULL ; i ++ )
-		vj_msg_detail( VEEJAY_MSG_INFO, "%s", artists[i] );
-	for(i = 0; authors[i] != NULL ; i ++ )
-		vj_msg_detail( VEEJAY_MSG_INFO, "%s", authors[i] );
-	vj_msg_detail( VEEJAY_MSG_INFO,
-		"Copyright (C) 2004 - 2005. N. Elburg et all." );
-	vj_msg_detail( VEEJAY_MSG_INFO,
-		"GVeejay Reloaded - Another graphical interface for Veejay");*/
-
 #endif
 
 }

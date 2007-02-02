@@ -23,13 +23,11 @@ sayVIMS "243:stream.yuv;"
 Move your mouse pointer to the SDL window (so it dissapears) and press 'ESC' to
 switch from the dummy footage to the last created or played video stream. 
 
-Veejay supports MJPG, DV avi type 2, IYUV AVI and to a certain extend also MPEG4 and DivX.
 Try loading an AVI file with something like:
 
 $ veejay -v mjpeg-video-file.avi
 
-The '-v' commandline option generates extra debugging output. Sometimes this can be a lot,
-you can type 'de' in veejay's console to disable/enable these messages anytime.
+The '-v' commandline option generates extra debugging output.
 
 By default, veejay uses a SDL window for displaying video. You can specify veejay to
 write to STDOUT :

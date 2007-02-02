@@ -17,7 +17,7 @@
 									0.9.16
 
 
-       2006/2007  - release date Feb. XX  2007
+       2006/2007  - release date Feb. 2  2007
        =======================================
  
  			 :: 	   Veejay, a visual instrument for GNU            ::
@@ -73,7 +73,10 @@ See file 'INSTALL'
 See doc/Howto_Compile.html
 See doc/Howto_Compile_on_Ubuntu.html
 
+Documentation
+=============
 
+See the directory 'doc' in this package, it contains usefull documentation.
 
 
 Running

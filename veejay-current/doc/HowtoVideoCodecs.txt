@@ -50,11 +50,11 @@ Wich resolutions to use ¶
 
 Veejay can do:
 
-    * high definition (use MLZO avi)
-    * pal: 720x576
+    * high definition (use MLZO/YUV avi)
+    * pal: 720x576 (recommended to use MLZO/YUV avi)
     * ntsc: 720x480
-    * 1/4 pal: 360x288
-    * 1/4 ntsc: 360x240 
+    * 1/4 pal: 360x288 (any)
+    * 1/4 ntsc: 360x240  (any)
 
 If you load multiple video files on the commandline, make sure that all files have the same resolution and audio properties.
 How to convert ¶

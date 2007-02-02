@@ -1,20 +1,17 @@
-
 Veejay processing
 =================
 
-
-	Veejay processes nativly in YUV, hence no RGB <-> YUV conversions 
-        are used while rendering.
+	Veejay processes nativly in YUV, this is to keep colorspace conversions
+        to a minimum.
 
 		YUV 4:2:0 Planar ( 1 Cr and 1 Cb sample per 2x2 Y samples)
 		YUV 4:2:2 Planar ( 1 Cr and 1 Cr sample per 1x2 Y samples)  
 		(both full range JPEG and clipped to 16-235 / 16-240)
 	
-
-
-	Conversion from RGB to YUV is only necessary for webcam devices.
-	Conversion from YUV to RGB is only necessary for preview image
-
+	Places where veejay uses software conversion:
+		Conversion from RGB to YUV is for webcam devices.
+		Conversion from YUV to RGB is for preview image
+		Some FX convert the frame to RGB
 
 Why YUV ?
 =========
@@ -23,5 +20,4 @@ Why YUV ?
 	- Many capture devices deliver YUV 
 	- Software conversion of RGB <-> YUV is expensive
 	- Consumes less bandwith then RGB
-	
 

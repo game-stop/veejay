@@ -216,7 +216,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"     --map-from-file <num>\tmap N frames to memory\n");
 	fprintf(stderr,
-		"  -z/--zoom [1-11]\n");
+		"  -z/--zoom [1-11]\t\tScale output video\n");
 	fprintf(stderr,
 		"\t\t\t\tsoftware scaler type (also use -w/--zoomwidth, -h/--zoomheight ). \n");
 	fprintf(stderr,
