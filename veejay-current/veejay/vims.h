@@ -18,7 +18,7 @@ enum {
 	VIMS_PRINT_INFO				=	4,
 	VIMS_PREVIEW_BW				=	8,
 	VIMS_VIEWPORT				=	9,		
-	VIMS_RECVIEWPORT			=	5,
+	VIMS_RECVIEWPORT			=	90,
 /* query information */
 	VIMS_VIDEO_INFORMATION			=	400,
 	VIMS_EFFECT_LIST			=	401,

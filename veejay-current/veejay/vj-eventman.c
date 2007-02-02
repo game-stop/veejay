@@ -2313,7 +2313,7 @@ void		vj_init_vevo_events(void)
 				NULL
 				);
 
-/*	index_map_[ VIMS_RECVIEWPORT ]			=	_new_event(
+	index_map_[ VIMS_RECVIEWPORT ]			=	_new_event(
 				NULL,
 				VIMS_RECVIEWPORT,
 				"Record full video or record viewport",
@@ -2321,7 +2321,7 @@ void		vj_init_vevo_events(void)
 				0,
 				VIMS_ALLOW_ANY,
 				NULL );
-*/
+
 	index_map_[ VIMS_VIEWPORT ]			=	_new_event(
 				NULL,
 				VIMS_VIEWPORT,
