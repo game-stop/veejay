@@ -150,6 +150,15 @@ static inline int myround(float n)
 	if( v > 0xff ) v = 0xff ; else if ( v < 0 ) v = 0;\
  }
 
+#define CCYUV_red( r,y,u,v )\
+	r = (int)( (float) y + 1.14f * (float) v) 
+
+#define CCYUV_green( g,y,u,v )\
+	g = (int)( (float)y - 0.396f * (float)u - 0.581f * (float)v)
+
+#define	CCYUV_blue( b,y,u,v )\
+	b = (int)( (float) y + 2.029f * (float) u )
+
 enum 
 {
 	GIMP_RGB=0,
@@ -278,3 +287,14 @@ double m_get_polar_y(double r, double a);
 
 inline void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep);
 inline void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep);
+
+
+void	veejay_histogram_analyze( void *his, VJFrame *f , int t);
+void	veejay_histogram_del(void *his);
+void	*veejay_histogram_new();
+void	veejay_histogram_draw( void *his, VJFrame *src, VJFrame *dst , int intensity, int strength );
+void	veejay_histogram_equalize( void *his, VJFrame *f, int intensity, int strength );
+
+void	veejay_histogram_analyze_rgb( void *his, uint8_t *rgb, VJFrame *f );
+void	veejay_histogram_equalize_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int st, int mode );
+void	veejay_histogram_draw_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int st, int mode );

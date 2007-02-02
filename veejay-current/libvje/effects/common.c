@@ -23,6 +23,7 @@
 #include <sys/types.h>
 #include <math.h>
 #include <libvje/internal.h>
+
 #include "common.h"
 
 static inline void linearBlend(unsigned char *src, int stride)
@@ -1402,4 +1403,279 @@ inline void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int 
 			dst[i*dstStep]= src[i*srcStep];
 	}
 }
+
+
+typedef struct 
+{
+	uint32_t hY[256];
+	uint32_t hR[256];
+	uint32_t hG[256];
+	uint32_t hB[256];
+} histogram_t;
+
+void	*veejay_histogram_new()
+{
+	histogram_t *h = (histogram_t*) vj_calloc(sizeof(histogram_t));
+	if(!h) return NULL;
+	return h;
+}
+
+void	veejay_histogram_del(void *his)
+{
+	histogram_t *h = (histogram_t*) his;
+	if( h ) free(h);
+}
+
+int		i_cmp( const void *a, const void *b )
+{
+	return ( *(uint32_t*) a - *(uint32_t*) b );
+}
+
+static	uint32_t	veejay_histogram_median( uint32_t *h )
+{
+	uint32_t list[256];
+	veejay_memcpy( h, list, sizeof(list));
+	qsort( list, 256, sizeof(uint32_t), i_cmp);
+	return ( list[128] );
+}
+
+static	void	build_histogram_rgb( uint8_t *rgb, histogram_t *h, VJFrame *f)
+{
+	unsigned int i,j, len;
+        uint32_t *Hr,*Hb,*Hg;
+        uint8_t  *p;
+
+        Hr = h->hR;
+	Hg = h->hG;
+	Hb = h->hB;
+
+	int W = f->width;
+	int H = f->height;
+	int r = W * 3;
+
+	veejay_memset( Hr, 0,sizeof(uint32_t) * 256 );
+	veejay_memset( Hg, 0,sizeof(uint32_t) * 256 );
+	veejay_memset( Hb, 0,sizeof(uint32_t) * 256 );
+
+	for( i = 0; i < H; i ++ )
+	{
+		for( j = 0; j < r; j += 3 )
+		{
+			Hr[ (rgb[i*r+j] ) ] ++;
+			Hg[ (rgb[i*r+j+1]) ] ++;
+			Hb[ (rgb[i*r+j+2]) ] ++;
+		}
+	}
+}
+
+static	void	build_histogram( histogram_t *h, VJFrame *f )
+{
+	unsigned int i, len;
+	uint32_t *H;
+	uint8_t  *p;
+
+	// intensity histogram
+	H = h->hY;
+	p = f->data[0];
+	len = f->len;
+	veejay_memset( H, 0, sizeof(uint32_t) * 256 );
+	for( i = 0; i < len; i ++ )
+		H[ p[i] ] ++;
+
+}
+
+static	void	veejay_lut_calc( uint32_t *h, uint32_t *lut, int intensity, int strength, int len )
+{
+	unsigned int i;
+	unsigned int op0 = 255 - strength;
+	unsigned int op1 = strength;
+	lut[0] = h[0];
+	for( i = 1; i < 256; i ++ )
+		lut[i] = lut[i-1] + h[i];
+	for( i = 0; i < 256; i ++ )
+		lut[i] = (lut[i] * intensity ) / len;
+	for( i = 0; i < 256; i ++ )
+		lut[i] = (op1 * lut[i] + op0 * i ) >> 8;
+}
+
+static	void	veejay_blit_histogram( uint8_t *D, uint32_t *h, int len )
+{
+	unsigned int i;
+	for( i = 0; i < 256; i ++ )
+		D[i] = (h[i] > 0 ? (len / h[i]) : 0 );
+}
+
+
+static	inline	void	veejay_histogram_qdraw( uint32_t *histi, histogram_t *h, VJFrame *f, uint8_t *plane, int left, int down)
+{
+	uint8_t lut[256];
+	unsigned int i,j,len;
+
+	len = f->len;
+	veejay_blit_histogram( lut, histi, len );
+	
+	int his_height = f->height/5;
+	int his_width = f->width/5;
+
+	float sx = his_width/256.0f;
+	float sy = his_height/256.0f;
+
+//@ slow!
+	for ( i = 0; i < 256; i ++ )
+	{
+		for( j = 0; j < 256 ; j ++ )
+		{
+			int dx = j * sx;
+			int dy = i * sy;
+		
+			int pos = (f->height - dy - 1 - down) * f->width + dx + left;
+			if( plane[pos] != 0xff)
+				plane[pos] = (lut[j] >= i ? 0xff: 0);
+		}
+	}
+}
+
+void	veejay_histogram_draw( void *his, VJFrame *org, VJFrame *f, int intensity, int strength )
+{
+	histogram_t *h = (histogram_t*) his;
+
+	veejay_histogram_analyze( his, org, 0 );
+	veejay_histogram_qdraw( h->hY, h, f, f->data[0],0,0 );
+
+
+	veejay_histogram_equalize( his, org, intensity, strength );
+	veejay_histogram_analyze( his, org, 0 );
+	veejay_histogram_qdraw( h->hY, h, f, f->data[0],f->width/4 + 10,0 );
+}
+
+void	veejay_histogram_draw_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int st, int mode )
+{
+	histogram_t *h = (histogram_t*) his;
+
+	veejay_histogram_analyze_rgb(his,rgb,f );
+	switch(mode)
+	{
+		case 0:
+			veejay_histogram_qdraw( h->hR, h, f, f->data[0], 0,f->height/4 );
+			break;
+		case 1:	
+			veejay_histogram_qdraw( h->hG, h, f, f->data[0], 0,f->height/4 );
+			break;
+		case 2:
+			veejay_histogram_qdraw( h->hB, h, f, f->data[0], 0,f->height/4 );
+			break;
+		case 3:
+			veejay_histogram_qdraw( h->hR, h , f, f->data[0], 0, f->height/4 );
+			veejay_histogram_qdraw( h->hG, h , f, f->data[0], (f->width/4+10), f->height/4 );
+			veejay_histogram_qdraw( h->hB, h,  f, f->data[0], (f->width/4+10)*2, f->height/4 );
+			break;
+	}
+
+	veejay_histogram_equalize_rgb( his, f, rgb, in,st, mode );
+	veejay_histogram_analyze_rgb(his,rgb,f );
+	
+	switch(mode)
+	{
+		case 0:
+			veejay_histogram_qdraw( h->hR, h,f,f->data[0], 0,0 );
+			break;
+		case 1:
+			veejay_histogram_qdraw( h->hG, h,f,f->data[0], 0,0);	
+			break;
+		case 2:
+			veejay_histogram_qdraw( h->hB, h,f, f->data[0],0,0);
+			break;
+		case 3:
+			veejay_histogram_qdraw( h->hR, h,f,f->data[0], 0, 0 );
+			veejay_histogram_qdraw( h->hG, h,f,f->data[0], (f->width/4 + 10),0 );
+			veejay_histogram_qdraw( h->hB, h,f,f->data[0], (f->width/4 + 10)*2,0 );
+			break;
+	}
+}
+
+void	veejay_histogram_equalize_rgb( void *his, VJFrame *f, uint8_t *rgb, int intensity, int strength, int mode )
+{
+	histogram_t *h = (histogram_t*) his;
+	uint32_t LUTr[256];
+	uint32_t LUTg[256];
+	uint32_t LUTb[256];
+	unsigned int i,j;
+	uint8_t *u,*v,*y;
+	unsigned int len = f->len;
+
+	int r = f->width * 3;
+	int H = f->height;
+
+	switch(mode)
+	{
+		case 0:
+			veejay_lut_calc( h->hR, LUTr, intensity , strength , len );
+			for( i = 0; i < H; i ++ )
+			{
+				for( j = 0; j < r ; j +=3 )
+					rgb[i*r+j] = LUTr[ rgb[i*r+j] ];
+			}
+			break;	
+		case 1:
+			veejay_lut_calc( h->hG, LUTg, intensity , strength , len );
+			for( i = 0; i < H; i ++ )
+			{
+				for( j = 0; j < r; j += 3 )
+					rgb[ i*r+j+1 ] = LUTg[rgb[i*r+j+1]];
+			}
+			break;
+		case 2:
+			veejay_lut_calc( h->hB, LUTb, intensity , strength , len );
+			for( i = 0; i < H; i ++ )
+			{
+				for( j = 0; j < r; j += 3 )
+					rgb[i*r+j+2] = LUTb[ rgb[i*r+j+2]];
+			}
+			break;
+		case 3:
+			veejay_lut_calc( h->hR, LUTr, intensity , strength , len );
+			veejay_lut_calc( h->hG, LUTg, intensity , strength , len );
+			veejay_lut_calc( h->hB, LUTb, intensity , strength , len );
+	
+			for( i = 0; i  < H; i ++ )
+			{
+				for( j = 0; j < r ; j +=3 )
+				{
+					rgb[i*r+j] = LUTr[ rgb[i*r+j] ];
+					rgb[i*r+j+1] = LUTg[rgb[i*r+j+1]];
+					rgb[i*r+j+2] = LUTb[ rgb[i*r+j+2]];
+				}	
+			}
+			break;	
+	}
+}
+
+void	veejay_histogram_equalize( void *his, VJFrame *f , int intensity, int strength)
+{
+	histogram_t *h = (histogram_t*) his;
+	uint32_t LUT[256];
+	unsigned int i;
+	uint8_t *u,*v,*y;
+	unsigned int len;
+
+	len = f->len;
+	veejay_lut_calc( h->hY, LUT, intensity, strength, len );
+	y = f->data[0];
+	for( i = 0; i < len ; i ++ )
+		y[i] = LUT[ y[i] ];
+}
+
+void	veejay_histogram_analyze_rgb( void *his, uint8_t *rgb, VJFrame *f )
+{
+	histogram_t *h = (histogram_t*) his;
+	build_histogram_rgb( rgb,h,f );
+}
+
+void	veejay_histogram_analyze( void *his, VJFrame *f, int type )
+{
+	histogram_t *h = (histogram_t*) his;
+
+	build_histogram( h, f );
+}
+
 

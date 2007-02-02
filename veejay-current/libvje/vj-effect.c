@@ -62,6 +62,8 @@
 #include "transitions/wipe.h"
 #include "transitions/vbar.h"
 #include "effects/diff.h"
+#include "effects/autoeq.h"
+#include "effects/colorhis.h"
 #include "effects/diffimg.h"
 #include "effects/whiteframe.h"
 #include "effects/lumakey.h"
@@ -174,6 +176,8 @@ static struct
 { 	chromascratcher_malloc	,	chromascratcher_free	,VJ_IMAGE_EFFECT_CHROMASCRATCHER},
 {	complexsync_malloc	,	complexsync_free	,VJ_VIDEO_EFFECT_COMPLEXSYNC	},
 {	dices_malloc	 	,	dices_free		,VJ_IMAGE_EFFECT_DICES		},
+{	colorhis_malloc,		colorhis_free,		VJ_IMAGE_EFFECT_COLORHIS	},
+{	autoeq_malloc,			autoeq_free		,VJ_IMAGE_EFFECT_AUTOEQ		},
 //{ 	diff_malloc		,	diff_free		,VJ_VIDEO_EFFECT_DIFF		},	
 {	magicscratcher_malloc	,	magicscratcher_free	,VJ_IMAGE_EFFECT_MAGICSCRATCHER	},
 {	lumamask_malloc		,	lumamask_free		,VJ_VIDEO_EFFECT_LUMAMASK	},
@@ -558,6 +562,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 79] = colmorphology_init(width,height);
 	vj_effects[i + 80] = colflash_init(width,height);
 	vj_effects[i + 81] = rgbchannel_init(width,height);
+	vj_effects[i + 82] = autoeq_init(width,height);
+	vj_effects[i + 83] = colorhis_init(width,height);
 	max_width = width;
 	max_height = height;
 

@@ -199,11 +199,13 @@ enum {
 	VJ_IMAGE_EFFECT_COLMORPH = 179,
 	VJ_IMAGE_EFFECT_COLFLASH = 180,
 	VJ_IMAGE_EFFECT_RGBCHANNEL = 181,
+	VJ_IMAGE_EFFECT_AUTOEQ	=	182,
+	VJ_IMAGE_EFFECT_COLORHIS = 	183,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 182
+#define VJ_IMAGE_EFFECT_MAX 184
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 242
@@ -539,5 +541,9 @@ extern void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int heig
 extern void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg , int chb);
 
 extern	void	differencemap_apply( VJFrame *f, VJFrame *f2, int w, int h, int t1, int rev );
+
+extern void autoeq_apply( VJFrame *frame, int width, int height, int val, int i, int s);
+
+extern void colorhis_apply( VJFrame *frame, int w, int h, int v, int m, int i, int s );
 
 #endif
