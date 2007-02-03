@@ -52,6 +52,7 @@ static int auto_loop = 0;
 static int n_slots_ = 4;
 static int max_mem_ = 30;
 static int viewport = 0;
+static int live =0;
 static void CompiledWith()
 {
 	veejay_msg(VEEJAY_MSG_INFO,"Compilation flags:");
@@ -265,8 +266,8 @@ static void Usage(char *progname)
 		"\t\t\t\t-C/--zoomcrop [top:bottom:left:right] (crop source before scaling)\n");
 	fprintf(stderr,
 		"  -V/--viewport \t\tStart with viewport\n");
-
-
+	fprintf(stderr,
+		"  -A/--all [num] \t\tStart with all capture devices, start with device <num> \n");
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
 }
@@ -298,6 +299,9 @@ static int set_option(const char *name, char *value)
 	 veejay_set_colors(0);
     } else if (strcmp(name, "audio") == 0 || strcmp(name, "a") == 0) {
 	info->audio = atoi(optarg);
+    } else if ( strcmp(name, "A" ) == 0 || strcmp(name, "all" ) == 0 ) {
+	live = atoi(optarg);
+	}
     } else if (strcmp(name, "bezerk") == 0 || strcmp(name, "b") == 0) {
 	info->no_bezerk = 0;
     } else if (strcmp(name, "timer") == 0 || strcmp(name, "t") == 0) {
@@ -730,7 +734,7 @@ int main(int argc, char **argv)
 		default_geometry_x,
 		default_geometry_y,
 		NULL,
-		0,
+		live,
 		full_range,
 		viewport)<0)
 	{	

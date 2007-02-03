@@ -2086,7 +2086,19 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 			   first_id = id;
 		   }
 		}
-		if( first_id > 0 ) veejay_change_playback_mode(info,VJ_PLAYBACK_MODE_TAG,first_id);
+		if( vj_tag_exists( def_tags ) )
+		{
+			veejay_msg(VEEJAY_MSG_INFO, "Playing video from requested capture device #%d",def_tags );
+			veejay_change_playback_mode(info, VJ_PLAYBACK_MODE_TAG, def_tags );
+		}
+		else
+		{
+			if( first_id > 0 ) 
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "Capture device #%d does not exist, using device #%d", def_tags, first_id );
+				veejay_change_playback_mode(info,VJ_PLAYBACK_MODE_TAG,first_id);
+			}
+		}
 	}
 	else if(info->dummy->active && id <= 0)
 	{
