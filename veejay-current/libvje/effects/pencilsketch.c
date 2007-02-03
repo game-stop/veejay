@@ -178,7 +178,6 @@ void pencilsketch_apply(
 			m = m + d;
 			/* a magical forumula to combine the pixel with the original*/
 			y = ((((y << 1) - (255 - m))>>1) + Y[i])>>1;
-		//	if(y < 16) y = 16; else if (y>240) y = 240;
 			/* apply blend operation on masked pixel */
 			Y[i] = _pff(y,yb,threshold_max);
 		}
@@ -192,11 +191,8 @@ void pencilsketch_apply(
 
 	if(type != 7) /* all b/w sketches */
 	{
-		for(i=0; i < uv_len; i++)
-		{	
-			Cb[i] = 128;
-			Cr[i] = 128;
-		}
+		veejay_memset( Cb, 0, uv_len );
+		veejay_memset( Cr, 0, uv_len );
 	}
 	else /* all colour sketches */
 	{

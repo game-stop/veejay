@@ -312,7 +312,9 @@ static	void* 	deal_with_fr( void *handle, char *name)
 	if( r_params > 8 )
 		r_params = 8;
 
-	char *plug_name = strdup( finfo.name );
+	char new_name[512];
+	sprintf(new_name, "Frei0r %s", finfo.name );
+	char *plug_name = strdup( new_name );
 	vevo_property_set( port, "n_params", VEVO_ATOM_TYPE_INT, 1, &r_params );
 	vevo_property_set( port, "f0r_p", VEVO_ATOM_TYPE_INT,1, &n_params );
 	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &plug_name );
@@ -351,7 +353,9 @@ static	void*	deal_with_ff( void *handle, char *name )
 		return NULL;
 	}
 
-	plugin_name = strdup( pis->pluginName ); 
+	char new_name[512];
+	sprintf(new_name, "FreeFrame %s", pis->pluginName );
+	plugin_name = strdup( new_name );
 	if ( (q(FF_INITIALISE, NULL, 0 )).ivalue == FF_FAIL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot call init()");
