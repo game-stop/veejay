@@ -301,7 +301,6 @@ static int set_option(const char *name, char *value)
 	info->audio = atoi(optarg);
     } else if ( strcmp(name, "A" ) == 0 || strcmp(name, "all" ) == 0 ) {
 	live = atoi(optarg);
-	}
     } else if (strcmp(name, "bezerk") == 0 || strcmp(name, "b") == 0) {
 	info->no_bezerk = 0;
     } else if (strcmp(name, "timer") == 0 || strcmp(name, "t") == 0) {
