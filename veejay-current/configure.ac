@@ -562,7 +562,6 @@ case $host_cpu in
 	have_x86cpu=true
 
 	PROGRAM_NOPIC="-fno-PIC"
-//@ gcc 4 has tree-vectorize
 
 	if test "x$enable_debug" != "xyes" ; then
 		CFLAGS="$CFLAGS -fif-conversion"   
@@ -840,13 +839,27 @@ PKG_CHECK_MODULES(FFMPEG_AVFORMAT, [libavformat],
                      AC_DEFINE(HAVE_AVFORMAT, 1, [use avformat])],
                     [have_avformat=false])
 
+PKG_CHECK_MODULES(FFMPEG_SWSCALER, [libswscale],
+			[ 
+				AC_SUBST( FFMPEG_SWSCALER_CFLAGS )
+				AC_SUBST( FFMPEG_SWSCALER_LIBS )
+				have_swscaler=true
+				AC_DEFINE( HAVE_SWSCALER,1,[use swscaler])],
+				[ have_swscaler=false] )
+				
+
+
 if test x$have_avcodec != xtrue ; then
  AC_MSG_ERROR([ FFmpeg AVCodec not found. Get it from http://ffmpeg.sourceforge.net ] )
 fi
+
 if test x$have_avformat != xtrue ; then
  AC_MSG_ERROR([ FFmpeg AVFormat not found. Get it from http://ffmpeg.sourceforge.net ] )
 fi
 
+if test x$have_swscaler != xtrue ; then
+ AC_MSG_ERROR([ FFmpeg Swscaler not found. Did you enable it when you compiled ffmpeg ? ])
+fi
 
 
 
@@ -1052,7 +1065,7 @@ AC_MSG_NOTICE([  - MJPEGTools			 : ${have_mjpegtools}])
 AC_MSG_NOTICE([  - AVI MJPEG playback/recording  : true (always)])
 AC_MSG_NOTICE([  - FFmpeg AVFormat               : ${have_avformat} ])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
-
+AC_MSG_NOTICE([  - FFmpeg Swscaler		 : ${have_swscaler} ])
 AC_MSG_NOTICE([ Optional dependencies])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
 AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])

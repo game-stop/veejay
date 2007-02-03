@@ -64,6 +64,9 @@
 #if GTK_MINOR_VERSION >= 6
   #define HAVE_GTK2_6 1
 #endif  
+#if GTK_MINOR_VERSION >= 8
+ #define HAVE_GTK2_8 1
+#endif
 #endif
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -1393,9 +1396,9 @@ gchar *dialog_save_file(const char *title )
 				GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
 				GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT,
 				NULL);
-
+#ifdef HAVE_GTK2_8
 	gtk_file_chooser_set_do_overwrite_confirmation( GTK_FILE_CHOOSER(dialog), TRUE );
-
+#endif
 	gtk_file_chooser_set_filename( GTK_FILE_CHOOSER(dialog), "veejay-samplelist.sl" );
 
 	if( gtk_dialog_run( GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
