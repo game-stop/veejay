@@ -53,6 +53,9 @@ AC_ARG_ENABLE(warnings_as_errors,
 AC_ARG_ENABLE(simd-accel,
               AC_HELP_STRING([--enable-simd-accel],
                              [use SIMD multimedia instructions such as MMX, AltiVec, etc.if possible]))
+AC_ARG_ENABLE(gl,
+		AC_HELP_STRING([--enable-gl],
+				[Compile with openGL display support]))
 
 AC_ARG_WITH(extra-cflags,
             AC_HELP_STRING([--with-extra-cflags=flags],
@@ -153,18 +156,20 @@ AC_TYPE_SIGNAL
 AC_MSG_NOTICE([The host is $host  $host_cpu  $host_vendor  $host_os .])
 
 have_gl=false
-AC_CHECK_HEADERS(GL/gl.h ,,
+if test "x$enable_gl" = "xyes" ; then
+  AC_CHECK_HEADERS(GL/gl.h ,,
                 [AC_MSG_WARN([Cannot find OpenGL headers]) ])
-GL_LIBS=""
-GL_CFLAGS="$GL_INC_PATH"
-AC_CHECK_LIB([GL], [main], have_gl=true)
-if test x$have_gl = xtrue ; then
+  GL_LIBS=""
+  GL_CFLAGS="$GL_INC_PATH"
+  AC_CHECK_LIB([GL], [main], have_gl=true)
+  if test x$have_gl = xtrue ; then
         GL_LIBS="$GL_LIB_PATH -lGL"
 	AC_SUBST( USE_GL )
 	AC_DEFINE(USE_GL,1,[use gl])
-else
-        AC_MSG_WARN([Cannot find openGL library])
+  else
+        AC_MSG_ERROR([Cannot find openGL library])
 	have_gl=false
+  fi
 fi
 
 AC_SUBST( GL_LIBS )
