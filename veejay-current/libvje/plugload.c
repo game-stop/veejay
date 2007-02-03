@@ -338,7 +338,7 @@ static	void*	deal_with_ff( void *handle, char *name )
 
 	if ((q(FF_GETPLUGINCAPS, (LPVOID)FF_CAP_V_BITS_VIDEO, 0)).ivalue != FF_TRUE)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "%s:%d", __FUNCTION__,__LINE__ );
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to get capabilities for plugin %s",name );
 		vevo_port_free(port);
 		return NULL;
 	}

@@ -4,8 +4,8 @@ MAINTAINERCLEANFILES=Makefile.in
 
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/libgoom -I$(top_srcdir)/vjmsg ${FFMPEG_CFLAGS} $(GLIB_CFLAGS)   
 
-#AM_CFLAGS = $(CFLAGS) -freg-struct-return 
-AM_CFLAGS = $(CFLAGS) 
+AM_CFLAGS = $(CFLAGS) -freg-struct-return 
+#AM_CFLAGS = $(CFLAGS) 
 
 VJE_LIB_FILE = libvje.la
 noinst_LTLIBRARIES = $(VJE_LIB_FILE)
