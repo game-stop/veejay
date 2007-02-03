@@ -562,9 +562,10 @@ case $host_cpu in
 	have_x86cpu=true
 
 	PROGRAM_NOPIC="-fno-PIC"
+//@ gcc 4 has tree-vectorize
 
 	if test "x$enable_debug" != "xyes" ; then
-		CFLAGS="$CFLAGS -fif-conversion -ftree-vectorize"   
+		CFLAGS="$CFLAGS -fif-conversion"   
  	fi
    	dnl If the host is pentium, align on double word boundary
     	case $host_cpu in
