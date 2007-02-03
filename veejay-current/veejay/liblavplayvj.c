@@ -2076,29 +2076,18 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	{
 		int n = vj_tag_num_devices();
 		int i = 0;
-		int first_id = 0;
-		for( i = 0; i < n ; i ++ )
+		int nid =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, "bogus", def_tags, el->pixel_format, 1 );
+		if( nid> 0)
 		{
-		   int id =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, "bogus", i, el->pixel_format, 1 );
-		   if( id> 0)
-		   {
-		   	   veejay_msg(VEEJAY_MSG_INFO, "Capture device available as stream %d", id );
-			   first_id = id;
-		   }
-		}
-		if( vj_tag_exists( def_tags ) )
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Playing video from requested capture device #%d",def_tags );
-			veejay_change_playback_mode(info, VJ_PLAYBACK_MODE_TAG, def_tags );
+		 	   veejay_msg(VEEJAY_MSG_INFO, "Requested capture device available as stream %d", nid );
 		}
 		else
 		{
-			if( first_id > 0 ) 
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "Capture device #%d does not exist, using device #%d", def_tags, first_id );
-				veejay_change_playback_mode(info,VJ_PLAYBACK_MODE_TAG,first_id);
-			}
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open capture device, Use -A[%d-%d]",
+				1, n );
+			return -1;
 		}
+		veejay_change_playback_mode(info,VJ_PLAYBACK_MODE_TAG,nid);
 	}
 	else if(info->dummy->active && id <= 0)
 	{
