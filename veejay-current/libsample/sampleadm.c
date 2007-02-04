@@ -194,7 +194,8 @@ void sample_init(int len)
 
 void	sample_free()
 {
-	vevo_port_free( chain_cache_ );
+	if( chain_cache_ )
+		vevo_port_free( chain_cache_ );
 	if(!SampleHash)
 		return;
 	hscan_t scan;

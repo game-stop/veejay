@@ -191,8 +191,8 @@ void pencilsketch_apply(
 
 	if(type != 7) /* all b/w sketches */
 	{
-		veejay_memset( Cb, 0, uv_len );
-		veejay_memset( Cr, 0, uv_len );
+		veejay_memset( Cb, 128, uv_len );
+		veejay_memset( Cr, 128, uv_len );
 	}
 	else /* all colour sketches */
 	{
