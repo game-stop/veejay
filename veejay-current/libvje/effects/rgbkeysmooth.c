@@ -40,7 +40,7 @@ vj_effect *rgbkeysmooth_init(int w,int h)
     ve->defaults[1] = 255;	/* r */
     ve->defaults[2] = 0;	/* g */
     ve->defaults[3] = 0;	/* b */
-    ve->defaults[4] = 1;	/* opacity */
+    ve->defaults[4] = 150;	/* opacity */
     ve->defaults[5] = 1500;	/* noise level */
     ve->limits[0][0] = 5;
     ve->limits[1][0] = 900;
@@ -57,14 +57,14 @@ vj_effect *rgbkeysmooth_init(int w,int h)
     ve->limits[0][4] = 0;
     ve->limits[1][4] = 255;
 
-	ve->limits[0][5] = 0;
-	ve->limits[1][5] = 3500;
+    ve->limits[0][5] = 0;
+    ve->limits[1][5] = 3500;
 
-	ve->has_user = 0;
+    ve->has_user = 0;
     ve->description = "Transparent Chroma Key (RGB)";
     ve->extra_frame = 1;
     ve->sub_format = 1;
-	ve->rgb_conv = 1;
+    ve->rgb_conv = 1;
     return ve;
 }
 
@@ -176,30 +176,21 @@ void rgbkeysmooth_apply(VJFrame *frame, VJFrame *frame2, int width,
 
 	    // convert suppressed fg back to cbcr 
 		// cb,cr are signed, go back to unsigned !
-	    val = ((x1 * (cb-128)) - (y1 * (cr-128))) >> 7;
-
-	    Cb[pos] = val;
-
-	    val = ((x1 * (cr-128)) - (y1 * (cb-128))) >> 7;
-	    Cr[pos] = val;
+	    Cb[pos] = ((x1 * (cb-128)) - (y1 * (cr-128))) >> 7;
+	    Cr[pos] = ((x1 * (cr-128)) - (y1 * (cb-128))) >> 7;
 
 	    // deal with noise 
-
 	    val = (yy * yy) + (kg * kg);
 	    if (val < (noise_level * noise_level)) {
 		kbg = 255;
 	    }
 
-	    val = (Y[pos] + (kbg * bg_y[pos])) >> 8;
-	    val = CLAMP_Y(val);
-	    Y[pos] = ((val*op0)+(fg_y[pos]*op1) )>>8 ;
-	
-	    val = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
-	    val = CLAMP_UV(val);
-	    Cb[pos] = ((val*op0) + (fg_cb[pos]*op1) )>>8;
-	    val = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
-	    val = CLAMP_UV(val);
-	    Cr[pos] = ((val*op0) + (fg_cr[pos]*op1) )>>8;
+	    Y[pos] = ( Y[pos] + (kbg * bg_y[pos])) >> 8;
+	    Y[pos] = ( Y[pos] * op0 + bg_y[pos]  * op1 ) >> 8;
+	    Cb[pos] = (Cb[pos] + (kbg * bg_cb[pos])) >> 8;
+	    Cb[pos] = (Cb[pos] * op0 + bg_cb[pos]  * op1) >> 8;
+	    Cr[pos] = (Cr[pos] + (kbg * bg_cr[pos])) >> 8;
+	    Cr[pos] = (Cr[pos] * op0 + bg_cr[pos] * op1 ) >> 8;
 		
 	}
     }
