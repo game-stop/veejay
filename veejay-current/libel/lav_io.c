@@ -466,7 +466,7 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 int lav_close(lav_file_t *lav_file)
 {
 	int ret = 0;
-    video_format = lav_file->format; internal_error = 0; /* for error messages */
+    	video_format = lav_file->format; internal_error = 0; /* for error messages */
 	switch(video_format)
 	{
 #ifdef SUPPORT_READ_DV2
@@ -1076,7 +1076,7 @@ int lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf)
    if(!kf)
    {
 	veejay_msg(0, "Requested frame is not a keyframe");
-	return 0;
+	return -1;
    }
 
    return ret;

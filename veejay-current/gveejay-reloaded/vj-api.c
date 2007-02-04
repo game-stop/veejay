@@ -6215,7 +6215,7 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	{
 		if( info->state == STATE_PLAYING )
 		{
-			vj_gui_disconnect( );                
+			vj_gui_disconnect( );
 			vj_msg(VEEJAY_MSG_ERROR, "Disconnected.");
 			info->state = STATE_RECONNECT;
 		}
@@ -6862,6 +6862,7 @@ gboolean		is_alive( void )
 	if(gui->watch.state == STATE_DISCONNECT )
 	{
 		gui->watch.state = STATE_STOPPED;
+		gui->status_lock = 1;
 		vj_gui_disconnect();
 		return TRUE;
 	}
@@ -6910,11 +6911,11 @@ gboolean		is_alive( void )
 
 void	vj_gui_disconnect()
 {
-//	g_source_remove( info->logging );
-//	g_source_remove( info->cpumeter );
-//	g_source_remove( info->cachemeter );
-	g_io_channel_shutdown(info->channel, FALSE, NULL);
-	g_io_channel_unref(info->channel);
+	if( info->channel )
+	{
+		g_io_channel_shutdown( info->channel, FALSE, NULL );
+		g_io_channel_unref(info->channel);
+	}
 	gtk_key_snooper_remove( info->key_id );
 	free_samplebank();
 

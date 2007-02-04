@@ -481,10 +481,6 @@ static int _el_probe_for_pixel_fmt( lav_file_t *fd )
 		case FMT_422F:
 				veejay_msg(VEEJAY_MSG_DEBUG,"\tPixel format: YUV Planar 4:2:2 [JPEG full range]");
 				break;
-		default:
-				veejay_msg(VEEJAY_MSG_DEBUG,"\tPixel format: %x (unknown)", new );
-				break;
-
 	}
 	
 	return new;
@@ -578,19 +574,13 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		chroma = el->MJPG_chroma;
          
     	n = el->num_video_files;
-
-    	//el->num_video_files++;
-	//el->lav_fd[n] = elfd;
-
 	lav_file_t	*elfd = lav_open_input_file(filename,mmap_size );
-
 
 	if (elfd == NULL)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Error loading videofile '%s'", realname);
 	        veejay_msg(VEEJAY_MSG_ERROR,"%s",lav_strerror());
 	 	if(realname) free(realname);
-		lav_close(elfd);
 		return -1;
 	}
 
