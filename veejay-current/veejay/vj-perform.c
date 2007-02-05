@@ -627,7 +627,7 @@ int vj_perform_init(veejay_t * info, int use_vp)
 
 
     primary_buffer =
-	(ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * 3); 
+	(ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * 4); 
     if(!primary_buffer) return 0;
 /*	v->img[0] = vj_malloc( (v->w * v->h * 3) + (3 * v->w));
 	v->img[1] = v->img[0] + len + v->w;
@@ -653,7 +653,7 @@ int vj_perform_init(veejay_t * info, int use_vp)
     }
 
 */
-	for( c = 0; c < 3; c ++ )
+	for( c = 0; c < 4; c ++ )
 	{
 		primary_buffer[c] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
 		primary_buffer[c]->Y = (uint8_t*) vj_malloc( sizeof(uint8_t) * (frame_len+w) * 3 );
@@ -860,7 +860,7 @@ void vj_perform_free(veejay_t * info)
 
    if(frame_buffer) free(frame_buffer);
 
-	for( c = 0;c < 3; c++ )
+	for( c = 0;c < 4; c++ )
 	{
 		if(primary_buffer[c]->Y) free(primary_buffer[c]->Y );
 		free(primary_buffer[c] );
@@ -3067,6 +3067,38 @@ static	void	vj_perform_render_font( veejay_t *info, video_playback_setup *settin
 #endif
 }
 
+static	void	vj_perform_record_frame( veejay_t *info, int n )
+{
+	VJFrame	*frame = info->effect_frame1;
+	
+	if(frame->ssm == 1)
+	{ //@ do some nasty things to speed up downsampling
+		video_playback_setup *settings = info->settings;
+		uint8_t *dst[3] = { NULL, primary_buffer[3]->Cb,
+					  primary_buffer[3]->Cr };
+		chroma_subsample_cp( settings->sample_mode, effect_sampler,
+				  frame->data,dst, frame->width,frame->height );
+		uint8_t *chroma[2] = { primary_buffer[0]->Cb, primary_buffer[0]->Cr };
+		primary_buffer[0]->Cb = dst[1];
+		primary_buffer[0]->Cr = dst[2];
+
+		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
+			vj_perform_record_tag_frame(info,n);
+		else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
+			vj_perform_record_sample_frame(info,n);
+
+		primary_buffer[0]->Cb = chroma[0];
+		primary_buffer[0]->Cr = chroma[1];
+	}
+	else
+	{
+		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
+			vj_perform_record_tag_frame(info,n);
+		else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
+			vj_perform_record_sample_frame(info,n);
+	}
+}
+
 static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settings, int frame )
 {
 	int deep = 0;
@@ -3076,25 +3108,20 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 	//@ Render any subtitles in sample/stream (Leaves FX chain supersampled)
 	vj_perform_render_font( info, settings );
 
-	//@ record frame before rendering viewport
+	//@ record frame before rendering viewport (default)
 	if( settings->vp_rec == 0 && pvar_.enc_active )
 	{
-		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
-			vj_perform_record_tag_frame(info,frame);
-		else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
-			vj_perform_record_sample_frame(info,frame);
+		vj_perform_record_frame(info, frame );
 	}
 
 	//@ Render viewport
 	if(info->use_vp)
 		deep = vj_perform_render_viewport( info, settings );
 
+	//@ record frame after rendering viewport
 	if( settings->vp_rec == 1 && pvar_.enc_active )
 	{
-		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
-			vj_perform_record_tag_frame(info,frame);
-		else if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
-			vj_perform_record_sample_frame(info,frame);
+		vj_perform_record_frame(info,frame);
 	}
 
 	//@ Render OSD menu

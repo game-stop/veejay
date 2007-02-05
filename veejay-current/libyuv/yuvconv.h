@@ -45,6 +45,8 @@ void subsample_free(void *sampler);
 
 void chroma_subsample(subsample_mode_t mode, void *sampler, uint8_t * ycbcr[],
 		      int width, int height);
+void chroma_subsample_cp(subsample_mode_t mode, void *data, uint8_t *ycbcr[], uint8_t *dcbcr[],
+		      int width, int height);
 
 void chroma_supersample(subsample_mode_t mode, void *sampler, uint8_t * ycbcr[],
 			int width, int height);

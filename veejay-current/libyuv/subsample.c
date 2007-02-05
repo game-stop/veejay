@@ -170,7 +170,36 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
     in1 += width*2;
   }
 }
- 
+static void ss_444_to_420jpeg_cp(uint8_t *buffer,uint8_t *dest, int width, int height)
+{
+  const uint8_t *in0, *in1;
+  uint8_t *out;
+  int x, y = height;
+  in0 = buffer;
+  in1 = buffer + width;
+  out = dest;
+  for (y = 0; y < height; y += 4) {
+    for (x = 0; x < width; x += 4) {
+     out[0] = (in0[0] + 3 * (in0[1] + in1[0]) + (9 * in1[1]) + 8) >> 4;
+     out[1] = (in0[2] + 3 * (in0[3] + in1[2]) + (9 * in1[3]) + 8) >> 4;
+     out[2] = (in0[4] + 3 * (in0[5] + in1[4]) + (9 * in1[5]) + 8) >> 4;
+     out[3] = (in0[6] + 3 * (in0[7] + in1[6]) + (9 * in1[7]) + 8) >> 4;
+
+      in0 += 8;
+      in1 += 8;
+      out += 4;
+    }
+    for (  ; x < width; x +=2 )
+    {
+ 	out[0] = (in0[0] + 3 * (in0[1] + in1[0]) + (9 * in1[1]) + 8) >> 4;
+        in0 += 2;
+        in1 += 2;
+	out++;
+    }
+    in0 += width*2;
+    in1 += width*2;
+  }
+}
 /* horizontal interstitial siting
  *
  *    Y   Y   Y   Y
@@ -527,6 +556,47 @@ static	inline	void	down_sample16to8( uint8_t *out, uint8_t *in )
 	);
 }
 #endif
+static void ss_444_to_422_cp(void *data, uint8_t *buffer, uint8_t *dest, int width, int height)
+{
+	const int dst_stride = width >> 1;
+	int x,y;
+#ifdef HAVE_ASM_MMX
+	int mmxdst_stride=dst_stride >> 3;
+	int left = dst_stride % 8;
+#endif
+	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
+	uint8_t *src = sampler->buf;
+	uint8_t *dst;
+
+#ifdef HAVE_ASM_MMX
+	load_mask16to8();
+#endif
+	for(y = 0; y < height; y ++)
+	{
+		src = buffer + (y*width);
+		dst = dest + (y*dst_stride);
+
+#ifndef HAVE_ASM_MMX
+		for(x=0; x < dst_stride; x++)
+		{
+			*(dst++) = ( src[0] + src[1] + 1 ) >> 1;
+			src += 2;
+		}
+#else
+		for( x= 0; x < mmxdst_stride; x++ )
+		{
+			down_sample16to8( dst, src );
+			src += 16;
+			dst += 8;
+		}
+		for(x=0; x < left; x++)
+		{
+			*(dst++) = ( src[0] + src[1] + 1 ) >> 1;
+			src += 2;
+		}
+#endif
+	}
+}
 
 
 static void ss_444_to_422(void *data, uint8_t *buffer, int width, int height)
@@ -689,6 +759,34 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
   }
 }
       
+
+void chroma_subsample_cp(subsample_mode_t mode, void *data, uint8_t *ycbcr[], uint8_t *dcbcr[],
+		      int width, int height)
+{
+
+  switch (mode) {
+  case SSM_420_JPEG_BOX:
+  case SSM_420_JPEG_TR:
+    ss_444_to_420jpeg_cp(ycbcr[1],dcbcr[1], width, height);
+    ss_444_to_420jpeg_cp(ycbcr[2],dcbcr[2], width, height);
+ 
+    break;
+  case SSM_420_MPEG2:
+    break;
+  case SSM_422_444:
+    ss_444_to_422_cp(data,ycbcr[1],dcbcr[1],width,height);
+    ss_444_to_422_cp(data,ycbcr[2],dcbcr[2],width,height);
+#ifdef HAVE_ASM_MMX
+	__asm__ __volatile__ ( _EMMS:::"memory");
+#endif
+    break;
+  case SSM_420_422:
+    break;
+  default:
+    break;
+  }
+}
+
 
 
 

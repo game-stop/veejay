@@ -1144,6 +1144,13 @@ static	void	viewport_save_settings( viewport_t *v )
 
 	FILE *fd = fopen( path, "wb" );
 
+	if(!fd)
+	{
+		veejay_msg(0, "Unable to open '%s' for writing. Cannot save viewport settings",
+			path );
+		return;
+	}
+
 	char content[512];
 
 	sprintf( content, "%f %f %f %f %f %f %f %f %d %d %d\n",
