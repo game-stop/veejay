@@ -31,9 +31,11 @@ void		mmap_free(mmap_region_t *map)
 {
 	if(map)
 	{
-		if(map->map_start) munmap_file(map);
+		if(map->map_start) 
+			munmap_file(map);
+		free(map);
 	}
-	free(map);
+	map = NULL;
 }
 
 mmap_region_t *	mmap_file(int fd, int offset, int length, int fs)

@@ -572,9 +572,13 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
     if (el->num_video_files >= 1)
 		chroma = el->MJPG_chroma;
-         
+        
+
+ 
     	n = el->num_video_files;
 	lav_file_t	*elfd = lav_open_input_file(filename,mmap_size );
+
+	el->lav_fd[n] = NULL;
 
 	if (elfd == NULL)
 	{
@@ -615,14 +619,13 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	if(pix_fmt < 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to determine pixel format");
-		lav_close( elfd );
+		if(elfd) lav_close( elfd );
 		if(realname) free(realname);
 		return -1;
 	}
 
 	el->yuv_taste[n] = pix_fmt;
 	el->lav_fd[n] = elfd;
-	el->num_video_files ++;
     	el->num_frames[n] = lav_video_frames(el->lav_fd[n]);
     	el->video_file_list[n] = strndup(realname, strlen(realname));
 	
@@ -716,10 +719,9 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		{
 			el->audio_chans = lav_audio_channels(el->lav_fd[n]);
 			if (el->audio_chans > 2) {
-		  	  el->num_video_files --;
 		  	  veejay_msg(VEEJAY_MSG_ERROR, "File %s has %d audio channels - cant play that!",
 			              filename,el->audio_chans);
-			    nerr++;
+			   nerr++;
 			}
 	
 			el->has_audio = (el->audio_chans == 0 ? 0: 1);
@@ -791,25 +793,37 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 			   lav_audio_bits(el->lav_fd[n]),
 			   lav_audio_rate(el->lav_fd[n]), el->audio_chans,
 			   el->audio_bits, el->audio_rate);
-	//	nerr++;
+		nerr++;
 	    }
 	}
 
+
+
+
 	if (nerr) {
-	    el->num_video_files --;
-		if(el->lav_fd[n]) lav_close( el->lav_fd[n] );
-		if(realname) free(realname);
-	    if(el->video_file_list[n]) free(el->video_file_list[n]);
+	    if(el->lav_fd[n]) 
+			lav_close( el->lav_fd[n] );
+	    el->lav_fd[n] = NULL;
+	    if(realname) free(realname);
+	    if(el->video_file_list[n]) 
+		free(el->video_file_list[n]);
+	    el->video_file_list[n] = NULL;
 	    return -1;
         }
     }
-    compr_type = (const char*) lav_video_compressor(el->lav_fd[n]);
+
+	compr_type = (const char*) lav_video_compressor(el->lav_fd[n]);
+
 	if(!compr_type)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot get codec information from lav file");
-		if(el->lav_fd[n]) lav_close( el->lav_fd[n] );
+		if(el->lav_fd[n])
+		 lav_close( el->lav_fd[n] );
+		el->lav_fd[n] = NULL;
 		if(realname) free(realname);
-		if(el->video_file_list[n]) free(el->video_file_list[n]);
+		if(el->video_file_list[n]) 
+			free(el->video_file_list[n]);
+		el->video_file_list[n] = NULL;
 		return -1;
 	}
      // initialze a decoder if needed
@@ -820,9 +834,13 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		if(c_i == -1)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unsupported codec %s",compr_type);
-			if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
+			if( el->lav_fd[n] ) 
+				lav_close( el->lav_fd[n] );
+			el->lav_fd[n] = NULL;
 			if( realname ) free(realname );
-			if( el->video_file_list[n]) free(el->video_file_list[n]);
+			if( el->video_file_list[n]) 
+				free(el->video_file_list[n]);
+			el->video_file_list[n] = NULL;
 			return -1;
 		}
 		if( el_codecs[c_i] == NULL )
@@ -833,9 +851,13 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 			if(!el_codecs[c_i])
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,"Cannot initialize %s codec", compr_type);
-				if( el->lav_fd[n] ) lav_close( el->lav_fd[n] );
+				if( el->lav_fd[n] ) 
+					lav_close( el->lav_fd[n] );
+				el->lav_fd[n] = NULL;
 			    	if(realname) free(realname);
-				if( el->video_file_list[n]) free(el->video_file_list[n]);
+				if( el->video_file_list[n]) 
+					free(el->video_file_list[n]);
+				el->video_file_list[n] = NULL;
 				return -1;
 			}
 		}
@@ -846,7 +868,10 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		veejay_msg(VEEJAY_MSG_ERROR, "Dont know how to handle %s (fmt %d) %x", compr_type, pix_fmt,decoder_id);
 		if(realname) free(realname);
 		if( el->video_file_list[n]) free( el->video_file_list[n] );
-		if( el->lav_fd[n] ) lav_close( el->lav_fd[n]);
+		if( el->lav_fd[n] ) 
+			lav_close( el->lav_fd[n]);
+		el->lav_fd[n] = NULL;
+		el->video_file_list[n] = NULL;
 		return -1;
 	}
 
@@ -860,6 +885,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	}
 	el->is_empty = 0;	
 	el->has_video = 1;
+	el->num_video_files ++;
     return n;
 }
 
@@ -1456,7 +1482,10 @@ void	vj_el_close( editlist *el )
 	{
 		if(!el->ref[i])
 		{
-			if( el->lav_fd[i] ) lav_close( el->lav_fd[i] );
+			if( el->lav_fd[i] ) 
+			{
+				lav_close( el->lav_fd[i] );
+			}
 		}
 		if( el->video_file_list[i]) free(el->video_file_list[i]);
 	}
@@ -1715,7 +1744,7 @@ void	vj_el_free(editlist *el)
 			if( el->video_file_list[i] && el->lav_fd[i])
 				free(el->video_file_list[i]);
 			/* close fd if ref counter is zero */
-			if(el->lav_fd[i])
+			if(!el->ref && el->lav_fd[i])
 				lav_close( el->lav_fd[i]);
 		}
 		if(el->frame_list)
