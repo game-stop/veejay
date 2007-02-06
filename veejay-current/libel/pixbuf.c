@@ -26,12 +26,15 @@
 #include <libvjmem/vjmem.h>
 #include <ffmpeg/avcodec.h>
 #include <gdk-pixbuf/gdk-pixbuf.h>
+#include <libvje/vje.h>
 #include <libvje/effects/common.h>
 #include <libyuv/yuvconv.h>
 #include <libel/pixbuf.h>
 #include <veejay/vj-global.h>
 #include <ffmpeg/swscale.h>
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 typedef struct
 {
 	char *filename;
@@ -394,8 +397,11 @@ static inline int       get_shift_size(int fmt)
 }
 
 static	sws_template	sws_templ;
+static  sws_template	bw_templ;
 static  void *scaler = NULL;
 static  void *bwscaler = NULL;
+static  int scale_dim_[2] = {0,0};
+static int scale_dim_bw[2] = {0,0};
 void		vj_picture_free()
 {
 	if(scaler)
@@ -404,7 +410,8 @@ void		vj_picture_free()
 		yuv_free_swscaler( bwscaler );
 }
 
-veejay_image_t	*vj_fast_picture_save_to_mem( uint8_t **frame, int w, int h, int out_w, int out_h, int fmt )
+veejay_image_t		*vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt )
+//veejay_image_t	*vj_fast_picture_save_to_mem( uint8_t **frame, int w, int h, int out_w, int out_h, int fmt )
 {
 	veejay_image_t *image = (veejay_image_t*) vj_calloc(sizeof(veejay_image_t));
 	if(!image)
@@ -415,26 +422,35 @@ veejay_image_t	*vj_fast_picture_save_to_mem( uint8_t **frame, int w, int h, int 
 	veejay_memset(&src,0,sizeof(VJFrame));
 	veejay_memset(&dst,0,sizeof(VJFrame));
 
-	vj_get_yuv_template( &src,w,h,fmt );
-	src.data[0] = frame[0];
-	src.data[1] = frame[1];	
-	src.data[2] = frame[2];
+	vj_get_yuv_template( &src,frame->width,frame->height,fmt );
+	src.data[0] = frame->data[0];
+	src.data[1] = frame->data[1];	
+	src.data[2] = frame->data[2];
+//veejay_msg(0, "Frame: fmt=%d, ssm=%d, %p,%p,%p, w=%d,uw=%d",
+//		frame->format,frame->ssm, frame->data[0],frame->data[1],frame->data[2], frame->width,
+//			frame->uv_width );
 	vj_get_rgb_template( &dst, out_w, out_h);
 	dst.data[0] = (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );
 
-	if(!scaler )
+	if( !scaler || scale_dim_[0] != out_w && scale_dim_[1] != out_h )
 	{
+		if(scaler)
+			yuv_free_swscaler(scaler);
 		scaler = yuv_init_swscaler( &src,&dst, &sws_templ, 
 				yuv_sws_get_cpu_flags() );
-
-		if(!scaler)
-		{
-			veejay_msg(0, "Unable to initialize software scaler");
-		}
+		scale_dim_[0] = out_w;
+		scale_dim_[1] = out_h;
+	}
+	else
+	{
+#ifdef STRICT_CHECKING
+		assert( scale_dim_[0] == dst.width );
+		assert( scale_dim_[1] == dst.height );
+		assert( scaler != NULL );
+#endif
 	}
 
 	yuv_convert_and_scale_rgb( scaler, &src, &dst );
-
 
 	return image;
 }
@@ -523,8 +539,8 @@ veejay_image_t *vj_picture_save_bw_to_memory( uint8_t **frame, int w, int h , in
 
 	return image;
 }
-
-veejay_image_t	*vj_fastbw_picture_save_to_mem( uint8_t **frame, int w, int h, int out_w, int out_h, int fmt )
+veejay_image_t		*vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt )
+//veejay_image_t	*vj_fastbw_picture_save_to_mem( uint8_t **frame, int w, int h, int out_w, int out_h, int fmt )
 {
 	veejay_image_t *image = (veejay_image_t*) vj_calloc(sizeof(veejay_image_t));
 	if(!image)
@@ -535,11 +551,14 @@ veejay_image_t	*vj_fastbw_picture_save_to_mem( uint8_t **frame, int w, int h, in
 	veejay_memset(&src,0,sizeof(VJFrame));
 	veejay_memset(&dst,0,sizeof(VJFrame));
 
-	vj_get_yuv_template( &src,w,h,fmt );
-	src.data[0] = frame[0];
-	src.data[1] = frame[1];	
-	src.data[2] = frame[2];
-	
+	vj_get_yuv_template( &src,frame->width,frame->height,fmt );
+	src.data[0] = frame->data[0];
+	src.data[1] = frame->data[1];	
+	src.data[2] = frame->data[2];
+//	veejay_msg(0, "Frame: fmt=%d, ssm=%d, %p,%p,%p, w=%d,uw=%d",
+//		frame->format,frame->ssm, frame->data[0],frame->data[1],frame->data[2], frame->width,
+//			frame->uv_width );
+//	
 	//vj_get_rgb_template( &dst, out_w, out_h);
 	vj_get_yuv_template( &dst,out_w,out_h,fmt );
 
@@ -552,18 +571,21 @@ veejay_image_t	*vj_fastbw_picture_save_to_mem( uint8_t **frame, int w, int h, in
 	dst.data[1] = data[1];
 	dst.data[2] = data[2];
 
-//	uint8_t data[0] = (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );
-	if(!bwscaler )
+
+	if( !bwscaler || scale_dim_bw[0] != out_w || scale_dim_bw[1] != out_h )
 	{
-		bwscaler = yuv_init_swscaler( &src,&dst, &sws_templ, 
+		if(bwscaler )
+			yuv_free_swscaler( bwscaler );
+
+		bwscaler = yuv_init_swscaler( &src,&dst, &bw_templ, 
 				yuv_sws_get_cpu_flags() );
 
-		if(!bwscaler)
-		{
-			veejay_msg(0, "Unable to initialize software scaler");
-		}
+		scale_dim_bw[0] = out_w;
+		scale_dim_bw[1] = out_h;
 	}
-
+#ifdef STRICT_CHECKING
+	assert( bwscaler != NULL );
+#endif
 	yuv_convert_and_scale( bwscaler, &src, &dst );
 
 	AVPicture pict1,pict2;

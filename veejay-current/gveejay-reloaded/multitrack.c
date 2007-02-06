@@ -374,10 +374,13 @@ static	void	add_buttons2( sequence_view_t *p, sequence_view_t *seqv , GtkWidget 
 static	void	playmode_sensitivity( sequence_view_t *p, gint pm )
 {
 	int i;
-
+#ifdef STRICT_CHECKING
+	assert( p != NULL );
+#endif
 	if( pm == MODE_STREAM || MODE_PLAIN || MODE_SAMPLE )
 	{
-		gtk_widget_set_sensitive_( GTK_WIDGET( p->toggle ), TRUE );
+		if(p->toggle)
+			gtk_widget_set_sensitive_( GTK_WIDGET( p->toggle ), TRUE );
 		gtk_widget_set_sensitive_( GTK_WIDGET( p->panel ), TRUE );
 
 	}

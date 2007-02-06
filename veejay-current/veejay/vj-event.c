@@ -112,8 +112,6 @@ static hash_t *keyboard_events = NULL;
 #endif
 
 static int _recorder_format = ENCODER_MJPEG;
-static	int 	cached_image_= 0;
-
 #ifdef USE_SWSCALER
 static	int	preview_active_ = 0;
 static	VJFrame	cached_cycle_[2];
@@ -121,10 +119,6 @@ static sws_template preview_template;
 static void	*preview_scaler = NULL;
 static int 	cached_width_ =0;
 static int 	cached_height_ = 0;
-#endif
-
-#ifdef USE_GDK_PIXBUF
-static veejay_image_t *cached_gdkimage_ = NULL;
 #endif
 
 #define SEND_BUF 125000
@@ -1232,10 +1226,10 @@ void vj_event_update_remote(void *ptr)
 	if( vj_server_poll( v->vjs[3] ) )
 		vj_server_new_connection( v->vjs[3] );
 
-	for( i = 0; i <  VJ_MAX_CONNECTIONS; i ++ )
-		if( vj_server_link_used( v->vjs[1], i ))
-			veejay_pipe_write_status( v, i );
-	
+//	for( i = 0; i <  VJ_MAX_CONNECTIONS; i ++ )
+//		if( vj_server_link_used( v->vjs[1], i ))
+//			veejay_pipe_write_status( v, i );
+//	
 	if( v->settings->use_vims_mcast )
 	{
 		int res = vj_server_update(v->vjs[2],0 );
@@ -1288,28 +1282,12 @@ void vj_event_update_remote(void *ptr)
 			}
 		}
 	}
-
+	for( i = 0; i <  VJ_MAX_CONNECTIONS; i ++ )
+		if( vj_server_link_used( v->vjs[1], i ))
+			veejay_pipe_write_status( v, i );
+	
 	if(!veejay_keep_messages())
 		veejay_reap_messages();
-#ifdef USE_GDK_PIXBUF
-	cached_image_ = 0;
-	if( cached_gdkimage_ )
-	{
-		if( cached_gdkimage_->image )
-		{
-			gdk_pixbuf_unref( (GdkPixbuf*) cached_gdkimage_->image );
-			cached_gdkimage_->image = NULL;
-		}
-		if( cached_gdkimage_->scaled_image )
-		{
-			gdk_pixbuf_unref( (GdkPixbuf*) cached_gdkimage_->scaled_image );
-			cached_gdkimage_->scaled_image = NULL;
-		}
-		free( cached_gdkimage_ );
-		cached_gdkimage_ = NULL;
-	}	
-#endif
-	// clear image cache
 }
 
 void	vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)
@@ -2243,6 +2221,9 @@ void vj_event_init()
 #ifdef HAVE_SDL
 	vj_event_init_keyboard_defaults();
 #endif
+	lzo_ = lzo_new();
+
+
 }
 
 void vj_event_linkclose(void *ptr, const char format[], va_list ap)
@@ -7383,186 +7364,83 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 	SEND_MSG(v , _s_print_buf );
 }
 
-#ifdef USE_SWSCALER
-// Try to use swscaler if enabled, looks like this is faster then GdkPixbuf
-void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list ap 	)
-{
-	veejay_t *v = (veejay_t*)ptr;
-	int args[2];
-	uint8_t *frame[3];
-	char *str = NULL;
-	P_A(args,str,format,ap);
-
-	editlist *el = v->edit_list;
-	int width = args[0];
-	int height = args[1];
-	/* Check dimensions */
-	if(width < 0 || height < 0 || width > 1024 || height > 768 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Use smaller width/height settings");	
-		return;
-	}
-
-	/* Reset preview scaler */
-	if( width != cached_width_ || height != cached_height_ )
-	{
-		preview_active_ = 0;
-		if(preview_scaler)
-		{
-			yuv_free_swscaler( preview_scaler );
-			preview_scaler = NULL;
-		}
-		if(cached_cycle_[1].data[0] )
-			free( cached_cycle_[1].data[0] );
-		cached_width_ = width;
-		cached_height_  = height;	
-	}	
-	/* Initialize preview scaler */
-
-	if(!preview_active_) 
-	{
-		veejay_memset( &(cached_cycle_[0]) , 0, sizeof(VJFrame) );
-		veejay_memset( &(cached_cycle_[1]) , 0, sizeof(VJFrame) );
-		veejay_memset( &(preview_template) , 0, sizeof( sws_template));
-		preview_template.flags = 1;
-	//	veejay_msg(0, "%d %d", el->pixel_format, v->pixel_format);
-		vj_get_yuv_template( &(cached_cycle_[0]), el->video_width,el->video_height,el->pixel_format );	
-		vj_get_rgb_template( &(cached_cycle_[1]) , cached_width_, cached_height_ ); // RGB24
-		preview_scaler = (void*)yuv_init_swscaler(
-			&(cached_cycle_[0]),
-			&(cached_cycle_[1]),
-			&(preview_template),
-			yuv_sws_get_cpu_flags()
-		);
-		if(!preview_scaler)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "cannot initialize sws scaler");
-			return;
-		}
-		cached_cycle_[1].data[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * cached_width_ * cached_height_ * 3 );
-		cached_cycle_[1].data[1] = NULL;
-		cached_cycle_[1].data[2] = NULL;
-		preview_active_ = 1;
-	}
-
-	/* If there is no image cached, (scale) and cache it */
-	if(! cached_image_ )
-	{
-		vj_perform_get_primary_frame( v, cached_cycle_[0].data , 0);
-		yuv_convert_and_scale_rgb( preview_scaler, cached_cycle_[0].data, cached_cycle_[1].data );
-		cached_image_ = 1;
-	}
-
-	/* Send cached image to client */
-	char header[7];
-	sprintf(header, "%06d", (cached_width_ * cached_height_ * 3) );
-	vj_server_send(v->vjs[0], v->uc->current_link, header, 6 );
-	vj_server_send(v->vjs[0], v->uc->current_link, cached_cycle_[1].data[0], (cached_width_*cached_height_*3));
-}
-#else
 #ifdef USE_GDK_PIXBUF
 void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int args[2];
-	uint8_t *frame[3];
 	char *str = NULL;
 	P_A(args,str,format,ap);
 
+	int w=0,h=0;
+	w = args[0]; 
+	h = args[1];
+
+	if( w <= 0 || h <= 0 )
+	{
+		veejay_msg(0, "Invalid image dimension %dx%d requested",w,h );
+		SEND_MSG(v, "000000" );
+		return;
+	}
+
 	veejay_image_t *img = NULL;
 
-	if(!lzo_)
-		lzo_ = lzo_new();
-	
-	if( !cached_image_)
-	{
-		vj_perform_get_primary_frame( v, frame, 0);
-		if( use_bw_preview_ )
-			img = vj_fastbw_picture_save_to_mem(
-					frame,
-					v->edit_list->video_width,
-					v->edit_list->video_height,
-					args[0],
-					args[1],
-				(v->video_out == 4 ? 4 : v->pixel_format ));
-		else
-			img = vj_fast_picture_save_to_mem(
-					frame,
-					v->edit_list->video_width,
-					v->edit_list->video_height,
-					args[0],
-					args[1],
-				(v->video_out == 4 ? 4 : v->pixel_format ));
+	VJFrame *frame = v->effect_frame1;
 
-		cached_image_ = 1;
-		cached_gdkimage_ = img;
-	}
+	if( use_bw_preview_ )
+		img = vj_fastbw_picture_save_to_mem(
+				frame,
+				args[0],
+				args[1],
+			(v->video_out == 4 ? 4 : v->pixel_format ));
 	else
-	{
-		img = cached_gdkimage_;
-	}
+		img = vj_fast_picture_save_to_mem(
+				frame,
+				args[0],
+				args[1],
+			(v->video_out == 4 ? 4 : v->pixel_format ));
 
-	if(img)
-	{
-		GdkPixbuf *p = NULL;
-		int w=0,h=0;
-//		if( img->scaled_image )
-//		{
-			p =  (GdkPixbuf*) img->image; //@scaled_image
-			w = args[0]; h = args[1];
-//		}	
-//		else
-//		{  
-//			p =  (GdkPixbuf*) img->image;
-			if( w <= 0 || h <= 0 )
-			{
-		 	  w = v->edit_list->video_width;
-			  h = v->edit_list->video_height;
-			}
-//		}
-
-		if( w == 0 || h == 0 )
-		{
-			veejay_msg(0, "Invalid image dimension %dx%d requested",w,h );
-			SEND_MSG(v, "000000" );
-		}
-		uint8_t *tmpbuf = vj_malloc( w * h * 4 );
-		
-		unsigned char *msg = gdk_pixbuf_get_pixels( p );
-
-		int size1 = 0;
-		if ( lzo_compress( lzo_, msg, tmpbuf, &size1, (w*h*3)) == 0)
-		{
-			veejay_msg(0, "Unable to compress preview image");
-			SEND_MSG( v, "000000" );
-		}
-		else
-		{
-			char header[7];
-			sprintf(header, "%06d", size1);
-			vj_server_send( v->vjs[0], v->uc->current_link, header, 6 );
-			vj_server_send( v->vjs[0], v->uc->current_link, tmpbuf, size1 );
-		}
-		
-		free(tmpbuf);
-	/*	char header[7];
-		sprintf( header, "%06d", (w*h*3));
-		vj_server_send( v->vjs[0], v->uc->current_link,
-					header, 6 );
-
-		vj_server_send( v->vjs[0], v->uc->current_link,
-					msg, (w*h*3));	*/
-
-		
-		
-	}
-	else
+	if(!img)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to get image");
 		SEND_MSG( v, "000000" );
+		return;
+	}
+
+#ifdef STRICT_CHECKING
+	assert(img->image);
+#endif
+	uint8_t *tmpbuf = vj_perform_get_a_work_buffer();
+	unsigned char *msg = gdk_pixbuf_get_pixels( img->image );
+#ifdef STRICT_CHECKING
+	assert( msg != NULL );
+	assert( lzo_ != NULL );
+	assert( tmpbuf != NULL );
+#endif
+	int size1 = 0;
+
+	if ( lzo_compress( lzo_, msg, tmpbuf, &size1, (w*h*3)) == 0)
+	{
+		veejay_msg(0, "Unable to compress preview image");
+		SEND_MSG( v, "000000" );
+	}
+	else
+	{
+		char header[7];
+		sprintf(header, "%06d", size1);
+		vj_server_send( v->vjs[0], v->uc->current_link, header, 6 );
+		vj_server_send( v->vjs[0], v->uc->current_link, tmpbuf, size1 );
+	}
+
+	if( img )
+	{
+		if( img->image )
+			gdk_pixbuf_unref( (GdkPixbuf*) img->image );
+		if( img->scaled_image )
+			gdk_pixbuf_unref( (GdkPixbuf*) img->scaled_image );
+		free( img );
 	}
 }
-#endif
 #endif
 
 void	vj_event_toggle_bw( void *ptr, const char format[], va_list ap )

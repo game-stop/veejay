@@ -1096,7 +1096,7 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir )
 		return NULL;
 	}
 
-	char *buf = vj_calloc( len );
+	char *buf = vj_calloc( (len+1) );
 
 	rewind( fd );
 	fread( buf, len, 1 , fd);

@@ -627,33 +627,9 @@ int vj_perform_init(veejay_t * info, int use_vp)
 
 
     primary_buffer =
-	(ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * 4); 
+	(ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * 5); 
     if(!primary_buffer) return 0;
-/*	v->img[0] = vj_malloc( (v->w * v->h * 3) + (3 * v->w));
-	v->img[1] = v->img[0] + len + v->w;
-	v->img[2] = v->img[1] + len + v->w;
-
-   	veejay_memset( v->img[0] + len, 0, v->w );
-       	veejay_memset( v->img[1] + len, 128, v->w );
-       	veejay_memset( v->img[2] + len, 128, v->w );
- 
-    for( c =0; c < 3 ; c ++ )
-    {
-   	 primary_buffer[c] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
- 	 if(!primary_buffer[c]) return 0;
-  	 primary_buffer[c]->Y = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
-    	 if(!primary_buffer[c]->Y) return 0;
-    	 veejay_memset(primary_buffer[c]->Y, 16, frame_len);
-    	 primary_buffer[c]->Cb = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
-    	 if(!primary_buffer[c]->Cb) return 0;
-    	 veejay_memset(primary_buffer[c]->Cb, 128, frame_len);
-	 primary_buffer[c]->Cr = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame_len );
-   	 if(!primary_buffer[c]->Cr) return 0;
-    	 veejay_memset(primary_buffer[c]->Cr,128, frame_len);
-    }
-
-*/
-	for( c = 0; c < 4; c ++ )
+	for( c = 0; c < 5; c ++ )
 	{
 		primary_buffer[c] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
 		primary_buffer[c]->Y = (uint8_t*) vj_malloc( sizeof(uint8_t) * (frame_len+w) * 3 );
@@ -860,7 +836,7 @@ void vj_perform_free(veejay_t * info)
 
    if(frame_buffer) free(frame_buffer);
 
-	for( c = 0;c < 4; c++ )
+	for( c = 0;c < 5; c++ )
 	{
 		if(primary_buffer[c]->Y) free(primary_buffer[c]->Y );
 		free(primary_buffer[c] );
@@ -1028,6 +1004,10 @@ void vj_perform_get_primary_frame(veejay_t * info, uint8_t ** frame,
     frame[2] = primary_buffer[info->out_buf]->Cr;
 }
 
+uint8_t	*vj_perform_get_a_work_buffer( )
+{
+	return primary_buffer[4]->Y;
+}
 
 void	vj_perform_get_output_frame( veejay_t *info, uint8_t **frame )
 {

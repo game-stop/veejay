@@ -545,61 +545,49 @@ static	void	add_to_plugin_list( const char *path )
 	for( i = 0 ; i < n_files; i ++ )
 	{
 		char *name = files[i]->d_name;
+		
+		if(!name)
+			continue;
 
 		if( vevo_property_get( illegal_plugins_, name, 0 , NULL ) == 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "'%s' marked as bad", name);
 			continue; 
 		}
-		bzero(fullname , PATH_MAX);
+
 		sprintf(fullname, "%s/%s", path,name );
 
 		void *handle = dlopen(fullname, RTLD_NOW );
 
-		if(!handle) continue;
-
-		if(dlsym( handle, "plugMain" ))
+		if(handle) 
 		{
-			void *plugin = deal_with_ff( handle, name );
-			if( plugin )
+			if(dlsym( handle, "plugMain" ))
 			{
-				index_map_[ index_ ] = plugin;
-				index_ ++;
-				n_ff_ ++;
+				void *plugin = deal_with_ff( handle, name );
+				if( plugin )
+				{
+					index_map_[ index_ ] = plugin;
+					index_ ++;
+					n_ff_ ++;
+				}
+				else
+					dlclose( handle );	
 			}
-			else
-				dlclose( handle );	
-		}
-	
-		if(dlsym( handle, "f0r_construct" ))
-		{
-			void *plugin = deal_with_fr( handle, name );
-			if( plugin )
+			else if (dlsym( handle, "f0r_construct" ))
 			{
-				index_map_[ index_ ] = plugin;	
-				index_ ++;
-				n_fr_ ++;
-			}
-			else
-				dlclose( handle );
-		}
-
-	/*	if(dlsym( handle, "livido_setup" ))
-		{
-			void *plugin = deal_with_livido( handle , name );
-veejay_msg(VEEJAY_MSG_DEBUG, "Load livido plugin '%s'",name);
-			if( plugin )
-			{
-				index_map_[index_] = plugin;
-				index_ ++;
-				n_lvd_ ++;
+				void *plugin = deal_with_fr( handle, name );
+				if( plugin )
+				{
+					index_map_[ index_ ] = plugin;	
+					index_ ++;
+					n_fr_ ++;
+				}
+				else
+					dlclose( handle );
 			}
 			else
 				dlclose(handle);
 		}
-		//@FIXME: backport livido from veejay-ng
-		*/
-
 	}
 
 	for( i = 0; i < n_files; i ++ )

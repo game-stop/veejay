@@ -2271,9 +2271,7 @@ static  void	update_curve_widget(const char *name)
 
 
 	if(p>=0)	
-	veejay_msg(VEEJAY_MSG_INFO, "Loaded KF for FX entry %d , P%d (FX %d), range is %d-%d",i, p, id,lo,hi );
-	else
-		veejay_msg(VEEJAY_MSG_INFO, "No KF on entry %d, Parameter %d", i, info->uc.selected_parameter_id );
+		veejay_msg(VEEJAY_MSG_INFO, "Loaded KF for FX entry %d , P%d (FX %d), range is %d-%d",i, p, id,lo,hi );
 
 	if(blob)	free(blob);
 }
@@ -5529,7 +5527,8 @@ static	void		veejay_update_multitrack( vj_gui_t *gui )
 				}
 				vj_img_cb( s->img_list[i] );
 			}
-			if(!no_preview_)multitrack_update_sequence_image( gui->mt, i, s->img_list[i] );
+			if(!no_preview_)
+				multitrack_update_sequence_image( gui->mt, i, s->img_list[i] );
 			gdk_pixbuf_unref( s->img_list[i] );
 		}
 	}
@@ -5931,6 +5930,20 @@ static void	update_gui()
 
 	update_globalinfo(history, pm, last_pm);
 
+	if( pm != MODE_PLAIN )
+	{
+		if(info->selected_slot)
+		{
+			if( info->selected_slot->sample_id == info->status_tokens[CURRENT_ID] && 
+			    info->selected_slot->sample_type == info->status_tokens[PLAY_MODE] )
+			veejay_update_multitrack( info );
+		}
+	}
+	else
+	{
+		veejay_update_multitrack(info);
+	}
+
 	process_reload_hints(history, pm);
 
 	on_vims_messenger();
@@ -6030,7 +6043,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 
 			info->prev_mode = gui->status_tokens[ PLAY_MODE ];
 
-			veejay_update_multitrack( info );
+//			veejay_update_multitrack( info );
 
 
 //			gdk_threads_leave();
@@ -6361,9 +6374,7 @@ int	vj_img_cb(GdkPixbuf *img )
 {
 	int i;
 	if( !info->selected_slot || !info->selected_gui_slot )
-	{
 		return 0;
-	}
 
 	int sample_id = info->status_tokens[ CURRENT_ID ];
 	int sample_type = info->status_tokens[ PLAY_MODE ]; 
@@ -6407,11 +6418,6 @@ int	vj_img_cb(GdkPixbuf *img )
 		}
 	}
 
-	//@redraw
-	//update_cached_slots();
-	
-//	gtk_widget_queue_draw( image );
-	
 	return 1;
 }
 
