@@ -90,7 +90,7 @@ enum {
 	VIMS_VIDEO_SET_SLOW			=	21,
 	VIMS_VIDEO_MCAST_START			=	22,
 	VIMS_VIDEO_MCAST_STOP			=	23,
-		
+	VIMS_VIDEO_SET_SPEEDK			=	24,		
 /* editlist commands */
 
 	VIMS_EDITLIST_PASTE_AT			=	50,

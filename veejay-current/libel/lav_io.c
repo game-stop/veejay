@@ -327,6 +327,10 @@ lav_file_t *lav_open_output_file(char *filename, char format,
    lav_fd->bps         = (asize*achans+7)/8;
    lav_fd->is_MJPG     = 1;
    lav_fd->MJPG_chroma = _lav_io_default_chroma;
+  
+   char fourcc[16];
+
+   int is_avi = 1;
 
    switch(format)
    {
@@ -334,96 +338,66 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 	case 'A':
         	 /* Open AVI output file */
 		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI MJPEG");
-        	lav_fd->avi_fd = AVI_open_output_file(filename);
+		sprintf(fourcc, "MJPG" );
+		break;
+	case 'L':
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI LZO");
+		sprintf(fourcc, "MLZO" );
+		break;
+	case 'Y':
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI IYUV");
+		sprintf(fourcc, "IYUV" );
+		break;
+	case 'P':
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI YV16");	
+		sprintf(fourcc, "YV16");
+		break;
+	case 'D':
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI DIV3");
+		sprintf(fourcc, "DIV3");
+		break;
+	case 'M':
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI MP4V");
+		sprintf(fourcc,"MP4V");
+		break;
+	case 'b':
+	case 'd':
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI DVSD");
+		sprintf(fourcc, "DVSD");
+		break;
+
+	case 'q':
+	case 'Q':
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in Quicktime MJPA/JPEG");
+		is_avi = 0;
+		break;
+	}
+
+	if( is_avi )	
+	{       
+ 		lav_fd->avi_fd = AVI_open_output_file(filename);
          	if(!lav_fd->avi_fd)
 		{
 			free(lav_fd);
 			return NULL;
 		}
-         	AVI_set_video(lav_fd->avi_fd, width, height, fps, "MJPG");
+         	AVI_set_video(lav_fd->avi_fd, width, height, fps, fourcc );
        	  	if (asize)
-			AVI_set_audio(lav_fd->avi_fd, achans, arate, asize, WAVE_FORMAT_PCM);
+		{
+			if(AVI_set_audio(lav_fd->avi_fd, achans, arate, asize, WAVE_FORMAT_PCM)==-1)
+			{
+				veejay_msg(0, "Too many channels or invalid AVI file");
+				lav_close( lav_fd );
+				return NULL;
+			}
+		}
       		return lav_fd;
-	case 'L':
-		veejay_msg(VEEJAY_MSG_DEBUG,"\tWriting output file in AVI LZO");
-		lav_fd->avi_fd=AVI_open_output_file(filename);
-		if(!lav_fd->avi_fd) 
-		{
-			free(lav_fd);
-			return NULL;
-		}
-		AVI_set_video(lav_fd->avi_fd, width,height,fps, "mlzo");
-		if(asize)
-			AVI_set_audio(lav_fd->avi_fd, achans,arate,asize,WAVE_FORMAT_PCM);
-		return lav_fd;
-     	case 'Y':
-		veejay_msg(VEEJAY_MSG_DEBUG,"\tWriting output file in AVI IYUV");
-		lav_fd->avi_fd = AVI_open_output_file(filename);
-		if(!lav_fd->avi_fd) 
-		{
-			free(lav_fd);
-			return NULL;
-		}
-		AVI_set_video(lav_fd->avi_fd, width,height,fps, "iyuv");
-		if(asize)
-			AVI_set_audio(lav_fd->avi_fd, achans,arate,asize,WAVE_FORMAT_PCM);
-		return lav_fd;
-     	case 'P':
-		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI yv16");
-		lav_fd->avi_fd = AVI_open_output_file(filename);
-		if(!lav_fd->avi_fd)
-		{
-			free(lav_fd);
-			return NULL;
-		}
-		AVI_set_video(lav_fd->avi_fd, width,height,fps, "yv16");
-		if(asize) 
-			AVI_set_audio(lav_fd->avi_fd, achans,arate,asize,WAVE_FORMAT_PCM);
-		return lav_fd;
-   	case 'D':
-		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI div3");
-		lav_fd->avi_fd = AVI_open_output_file(filename);
-		if(!lav_fd->avi_fd)
-		{
-			free(lav_fd);
-			return NULL;
-		}
-		AVI_set_video(lav_fd->avi_fd,width,height,fps, "div3");
-		if(asize)
-		       AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
-		return lav_fd;
-   	case 'M':
-		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI mp4v");
-		lav_fd->avi_fd = AVI_open_output_file(filename);
-		if(!lav_fd->avi_fd)
-		{
-			free(lav_fd);
-			return NULL;
-		}
-		AVI_set_video(lav_fd->avi_fd,width,height,fps, "mp4v");
-		if(asize) 
-			AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
- 		return lav_fd;
-   	case 'b':
-   	case 'd':
-		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI dvsd");
-		lav_fd->avi_fd = AVI_open_output_file(filename);
-		if(!lav_fd->avi_fd)
-		{
-			free(lav_fd);
-			return NULL;
-		}
-		AVI_set_video(lav_fd->avi_fd,width,height,fps, "dvsd");
-		if(asize) AVI_set_audio(lav_fd->avi_fd,achans,arate,asize,WAVE_FORMAT_PCM);
-		  return lav_fd;
-	case 'q':
-	case 'Q':
+	} else {
 #ifdef HAVE_LIBQUICKTIME
    	      /* open quicktime output file */
 
         	 /* since the documentation says that the file should be empty,
             		we try to remove it first */
-		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in Quicktime MJPA/JPEG");
         	remove(filename);
 
          	lav_fd->qt_fd = quicktime_open(filename, 0, 1);
@@ -434,10 +408,10 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 			return NULL;
 		}
 		if(format=='q')
-        	quicktime_set_video(lav_fd->qt_fd, 1, width, height, fps,
+  		     	quicktime_set_video(lav_fd->qt_fd, 1, width, height, fps,
                              (interlaced ? QUICKTIME_MJPA : QUICKTIME_JPEG));
 		else
-		quicktime_set_video(lav_fd->qt_fd,1, width,height,fps,
+			quicktime_set_video(lav_fd->qt_fd,1, width,height,fps,
 				QUICKTIME_DV );
         	if (asize)
 		    quicktime_set_audio(lav_fd->qt_fd, achans, arate, asize, QUICKTIME_TWOS);
@@ -450,10 +424,9 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 		veejay_msg(VEEJAY_MSG_DEBUG,
 				"(C) %s by %s, %s, has keyframes = %d", copyright,name,info,has_kf );
 				
-
 		return lav_fd;
 #else
-		veejay_msg(0,"Quicktime not included in build process. Abort");
+		veejay_msg(0,"Quicktime not compiled in, cannot use Quicktime.");
 		internal_error = ERROR_FORMAT;
 		return NULL;
 #endif
@@ -1125,23 +1098,22 @@ int lav_set_audio_position(lav_file_t *lav_file, long clip)
    return (AVI_set_audio_position(lav_file->avi_fd,clip*lav_file->bps));
 }
 
-long lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps)
+int lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps)
 {
-   
-   if(!lav_file->has_audio)
-   {
-      internal_error = ERROR_NOAUDIO;
-      return -1;
-   }
+	if(!lav_file->has_audio)
+   	{
+      		internal_error = ERROR_NOAUDIO;
+		return -1;
+	}
 #ifdef SUPPORT_READ_DV2
 	if(video_format == 'b')
 		return rawdv_read_audio_frame( lav_file->dv_fd, audbuf );
 #endif
 #ifdef USE_GDK_PIXBUF
-   if(video_format == 'x')
-	return 0;
+	if(video_format == 'x')
+		return 0;
 #endif
-   video_format = lav_file->format; internal_error = 0; /* for error messages */
+   	video_format = lav_file->format; internal_error = 0; /* for error messages */
 #ifdef HAVE_LIBQUICKTIME
 	if( video_format == 'q')
 	{
@@ -1167,29 +1139,30 @@ long lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps)
 				qt_audio[(channels*i) + j] = qt_audion[j][i];
 		    }
 
-       	if (lav_detect_endian())
-           {
-           i= 0;
-           while (i < (2*res) )
-                 {
-                 b0 = 0;
-                 b1 = 0; 
-                 b0 = (qt_audio[i] & 0x00FF);
-                 b1 =  (qt_audio[i] & 0xFF00) >> 8;
-                 qt_audio[i] = (b0 <<8) + b1;
-                 i = i +1;
-                 } 
-            }
+       		if (lav_detect_endian())
+           	{
+    	 		i= 0;
+    			while (i < (2*res) )
+        		{
+        			b0 = 0;
+                 		b1 = 0; 
+                 		b0 = (qt_audio[i] & 0x00FF);
+                 		b1 =  (qt_audio[i] & 0xFF00) >> 8;
+                 		qt_audio[i] = (b0 <<8) + b1;
+                 		i = i +1;
+                 	} 
+            	}
 out:
-	for (j = 0; j < channels; j++)
-            free(qt_audion[j]);
-	free(qt_audion);
-        return(res);
-	
-		
+		for (j = 0; j < channels; j++)
+            		free(qt_audion[j]);
+		free(qt_audion);
+	        return(res);
 	}
 #endif
-   return (AVI_read_audio(lav_file->avi_fd,audbuf,samps*lav_file->bps)/lav_file->bps);
+
+	int res = AVI_read_audio( lav_file->avi_fd, audbuf, 
+			(samps * lav_file->bps) );
+	return res;
 }
 
 int lav_filetype(lav_file_t *lav_file)

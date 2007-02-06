@@ -2985,6 +2985,8 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 			update_spin_range( "spin_text_start", 0, n_frames ,0);
 			update_spin_range( "spin_text_end", 0, n_frames,n_frames );
 
+			info->uc.sample_rec_duration = n_frames;
+
 			info->uc.reload_hint[HINT_KF] = 1;
 		}
 	}
@@ -5235,6 +5237,16 @@ static	void	load_editlist_info()
 	update_label_i( "label_el_arate", (int)rate, 0);
 	update_label_i( "label_el_achans", values[7], 0);
 	update_label_i( "label_el_abits", values[5], 0);
+
+	if( rate == 0 )
+	{
+		enable_widget( "vjframerate" );
+	}
+	else
+	{
+		disable_widget( "vjframerate");
+	}
+
 	
 /*	if( rate == 0 )
 	{
@@ -5397,7 +5409,7 @@ static	gboolean	update_sample_record_timeout(gpointer data)
 		gdouble cf = info->status_tokens[STREAM_RECORDED];
 
 		gdouble fraction = cf / tf;
-	
+
 		if(!info->status_tokens[STREAM_RECORDING] )
 		{
 			gtk_progress_bar_set_fraction( GTK_PROGRESS_BAR(w), 0.0);

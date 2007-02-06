@@ -726,7 +726,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	
 			el->has_audio = (el->audio_chans == 0 ? 0: 1);
 			el->audio_bits = lav_audio_bits(el->lav_fd[n]);
-			el->play_rate = el->audio_rate = lav_audio_rate(el->lav_fd[n]);
+			el->audio_rate = lav_audio_rate(el->lav_fd[n]);
 			el->audio_bps = (el->audio_bits * el->audio_chans + 7) / 8;
 		}
 		else
@@ -964,8 +964,8 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 	if (nframe < 0)
 		nframe = 0;
 
-	if (nframe > el->video_frames)
-		nframe = el->video_frames;
+	if (nframe >= el->video_frames)
+		nframe = el->video_frames-1;
 
 	n = el->frame_list[nframe];
 
@@ -1314,14 +1314,14 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
 		return 1;
 	}
 
-    if (!el->has_audio)
-	return 0;
+    	if (!el->has_audio)
+		return 0;
 
-    if (nframe < 0)
+    	if (nframe < 0)
 		nframe = 0;
 
-    if (nframe > el->video_frames)
-		nframe = el->video_frames;
+	if (nframe >= el->video_frames)
+		nframe = el->video_frames-1;
 
     n = el->frame_list[nframe];
 
@@ -1413,8 +1413,8 @@ int	vj_el_get_audio_frame_at(editlist *el, uint32_t nframe, uint8_t *dst, int nu
     if (nframe < 0)
 		nframe = 0;
 
-    if (nframe > el->video_frames)
-		nframe = el->video_frames - num;
+    if (nframe >= el->video_frames)
+		nframe = el->video_frames - 1;
 
     n = el->frame_list[nframe];
 
@@ -1451,7 +1451,6 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 	el->audio_bits = 0;
 	el->audio_bps = 0;
 	el->audio_chans = 0;
-	el->play_rate = 0;
 	el->num_video_files = 0;
 	el->video_width = width;
 	el->video_height = height;
@@ -2061,7 +2060,6 @@ editlist	*vj_el_soft_clone(editlist *el)
 	clone->audio_chans = el->audio_chans;
 	clone->audio_bits = el->audio_bits;
 	clone->audio_bps = el->audio_bps;
-	clone->play_rate = el->play_rate;
 	clone->video_frames = el->video_frames;
 	clone->num_video_files = el->num_video_files;
 	clone->max_frame_size = el->max_frame_size;

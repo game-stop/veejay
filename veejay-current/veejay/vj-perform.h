@@ -31,7 +31,7 @@ int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast);
 
 void	vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame ); 
 
-int vj_perform_fill_audio_buffers(veejay_t *info, uint8_t *audio_buf);
+int vj_perform_fill_audio_buffers(veejay_t *info, uint8_t *audio_buf, uint8_t *temporary_buffer);
 
 int vj_perform_tag_decode_buffers(veejay_t * info, int entry);
 

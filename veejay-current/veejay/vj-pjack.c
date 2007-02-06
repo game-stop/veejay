@@ -69,29 +69,32 @@ int vj_jack_init(editlist *el)
 
 	bits_per_sample = 16;
 	audio_channels = el->audio_chans;
-	audio_rate = el->audio_rate;
-
 
 	if( !_vj_jack_start(&driver) )
 		return ret;
+
+	long jack_rate = JACK_GetSampleRate(driver );
 
 	audio_bps = audio_rate * audio_channels;
 
 	buffer_len = vj_jack_get_space();
 
-	veejay_msg(2,"Jack:  %d Hz/ %d Channels %d Bit ", audio_rate, audio_channels,bits_per_sample);
+	veejay_msg(2,"Jack: %ld, %d Hz/ %d Channels %d Bit ", jack_rate,audio_channels,bits_per_sample);
 
 	ret = 1;
 
-	if( v_rate != audio_rate )
-	{
-		el->play_rate = audio_rate;               	
+	if( jack_rate != el->audio_rate )
 		ret = 2;
-	}
-
+	
 	//JACK_SetState( driver, PLAYING);
 	return ret;
 }
+
+int	vj_jack_rate()
+{
+	return JACK_GetSampleRate(driver);
+}
+
 
 int	vj_jack_continue(int speed)
 {

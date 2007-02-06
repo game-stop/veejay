@@ -481,6 +481,8 @@ int sample_get_longest(int sample_id)
 		int speed = abs(si->speed);
 		int duration = len / speed; //how many frames are played of this sample
 
+veejay_msg(0, "sample %d: %d - %d", sample_id, si->first_frame,si->last_frame );
+
 		if( si->looptype == 2) duration *= 2; // pingpong loop duration     
 
 		for(c=0; c < SAMPLE_MAX_EFFECTS; c++)
@@ -503,6 +505,9 @@ int sample_get_longest(int sample_id)
 		veejay_msg(VEEJAY_MSG_WARNING, "Length of sample in video frames: %ld",duration);
 		return duration;
 	}
+#ifdef STRICT_CHECKING
+	assert(0);
+#endif
 	return 0;
 }
 
@@ -2045,8 +2050,12 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
     sample_info *sample;
     sample = sample_get(s1);
     if (!sample)
+    {
+#ifdef STRICT_CHECKING
+	veejay_msg(0, "Fatal : sample %d is invalid, cannot produce a valid status line", s1 );
+#endif
 	return -1;
-
+    }
 	sprintf(str,
 		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		pfps,

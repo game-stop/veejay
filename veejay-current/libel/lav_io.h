@@ -102,7 +102,7 @@ int  lav_seek_start(lav_file_t *lav_file);
 int  lav_set_video_position(lav_file_t *lav_file, long frame);
 int  lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf);
 int  lav_set_audio_position(lav_file_t *lav_file, long clip);
-long lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps);
+int  lav_read_audio(lav_file_t *lav_file, uint8_t *audbuf, long samps);
 int  lav_filetype(lav_file_t *lav_file);
 lav_file_t *lav_open_input_file(char *filename, int mmap_size);
 int  lav_get_field_size(uint8_t * jpegdata, long jpeglen);

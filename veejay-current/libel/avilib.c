@@ -28,6 +28,7 @@
 #include <config.h>
 #include <unistd.h>
 #include <libvjmem/vjmem.h>
+#include <libvjmsg/vj-common.h>
 #include "avilib.h"
 
 #define INFO_LIST
@@ -455,16 +456,18 @@ static int avi_add_odml_index_entry(avi_t *AVI, unsigned char *tag, long flags, 
     if (AVI->video_superindex && 
 	    (off_t)(AVI->pos+towrite) > (off_t)((off_t)NEW_RIFF_THRES*AVI->video_superindex->nEntriesInUse)) {
 
-	fprintf(stderr, "Adding a new RIFF chunk: %d\n", AVI->video_superindex->nEntriesInUse);
+//	fprintf(stderr, "Adding a new RIFF chunk: %d\n", AVI->video_superindex->nEntriesInUse);
+	veejay_msg( 2, "Adding a new RIFF chunk: %d", AVI->video_superindex->nEntriesInUse );
 
 	// rotate ALL indices
 	AVI->video_superindex->nEntriesInUse++;
 	cur_std_idx = AVI->video_superindex->nEntriesInUse-1;
 
 	if (AVI->video_superindex->nEntriesInUse > NR_IXNN_CHUNKS) {
-	    fprintf (stderr, "Internal error in avilib - redefine NR_IXNN_CHUNKS\n");
-	    fprintf (stderr, "[avilib dump] cur_std_idx=%d NR_IXNN_CHUNKS=%d"
-		    "POS=%lld towrite=%lld\n",
+	    veejay_msg(0, "Internal error in avilib - redefine NR_IXNN_CHUNKS (needed=%d, current=%d)",
+		AVI->video_superindex->nEntriesInUse, NR_IXNN_CHUNKS);
+	    veejay_msg(0, "[avilib dump] cur_std_idx=%d NR_IXNN_CHUNKS=%d"
+		    "POS=%lld towrite=%lld",
 		    cur_std_idx,NR_IXNN_CHUNKS, AVI->pos, towrite);
 	    return -1;
 	}
@@ -575,8 +578,6 @@ static int avi_add_index_entry(avi_t *AVI, unsigned char *tag, long flags, unsig
    }
    
    /* Add index entry */
-
-   //   fprintf(stderr, "INDEX %s %ld %lu %lu\n", tag, flags, pos, len);
 
    veejay_memcpy(AVI->idx[AVI->n_idx],tag,4);
    long2str(AVI->idx[AVI->n_idx]+ 4,flags);
@@ -694,19 +695,19 @@ void AVI_set_video(avi_t *AVI, int width, int height, double fps, char *compress
    avi_update_header(AVI);
 }
 
-void AVI_set_audio(avi_t *AVI, int channels, long rate, int bits, int format)
+int AVI_set_audio(avi_t *AVI, int channels, long rate, int bits, int format)
 {
    /* may only be called if file is open for writing */
 
-   if(AVI->mode==AVI_MODE_READ) return;
+   if(AVI->mode==AVI_MODE_READ) return -1;
 
    //inc audio tracks
    AVI->aptr=AVI->anum;
    ++AVI->anum;
 
    if(AVI->anum > AVI_MAX_TRACKS) {
-     fprintf(stderr, "error - only %d audio tracks supported\n", AVI_MAX_TRACKS);
-     exit(1);
+     veejay_msg(0, "error - only %d audio tracks supported\n", AVI_MAX_TRACKS);
+     return -1;
    }
 
    AVI->track[AVI->aptr].a_chans = channels;
@@ -715,7 +716,7 @@ void AVI_set_audio(avi_t *AVI, int channels, long rate, int bits, int format)
    AVI->track[AVI->aptr].a_fmt   = format;
 //   AVI->track[AVI->aptr].mp3rate = mp3rate;
 
-   avi_update_header(AVI);
+   return avi_update_header(AVI);
 }
 
 #define OUT4CC(s) \
@@ -962,8 +963,9 @@ int avi_update_header(avi_t *AVI)
    
    if(njunk<=0)
      {
-       fprintf(stderr,"AVI_close_output_file: # of header bytes too small\n");
-       exit(1);
+       veejay_msg(0, "%s: # of header bytes too small",__FUNCTION__);
+       veejay_msg(0, "Somebody has played with HEADERBYTES of this AVI without knowing what (s)he did");
+       return -1;
      }
    
    OUT4CC ("JUNK");
@@ -3358,7 +3360,8 @@ long AVI_read_audio(avi_t *AVI, char *audbuf, long bytes)
       lseek(AVI->fdes, pos, SEEK_SET);
       if ( (ret = avi_read(AVI->fdes,audbuf+nr,todo)) != todo)
       {
-	 fprintf(stderr, "XXX pos = %lld, ret = %lld, todo = %ld\n", pos, ret, todo);
+//	 fprintf(stderr, "XXX pos = %lld, ret = %lld, todo = %ld\n", pos, ret, todo);
+	 veejay_msg(0, "No audio data at position %ld!");
          AVI_errno = AVI_ERR_READ;
          return -1;
       }

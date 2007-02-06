@@ -211,10 +211,9 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 			free(av->data[1]);
 		if(av->data[2])
 			free(av->data[2]);
-		free(av);
-
 		if(av->lzo)
 			lzo_free(av->lzo);
+		free(av);
 	}
 	av = NULL;
 }

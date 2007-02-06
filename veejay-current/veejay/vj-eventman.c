@@ -453,7 +453,18 @@ void		vj_init_vevo_events(void)
 				0,
 				VIMS_ALLOW_ANY,		
 				NULL );
-	
+
+	index_map_[VIMS_VIDEO_SET_SPEEDK] 	= 	_new_event(
+				"%d",
+				VIMS_VIDEO_SET_SPEED,
+				"Change trickplay speed depending on play direction",
+				vj_event_play_speed_kb,
+				1,
+				VIMS_ALLOW_ANY,
+				"Frame step",	
+				1,	
+				NULL );
+
 	index_map_[VIMS_VIDEO_SET_SPEED] 	= 	_new_event(
 				"%d",
 				VIMS_VIDEO_SET_SPEED,

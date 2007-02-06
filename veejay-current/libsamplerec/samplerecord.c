@@ -202,7 +202,7 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 
 	si->encoder_file = (void*)lav_open_output_file(si->encoder_destination,cformat,
 			el->video_width,el->video_height,el->video_inter,
-			el->video_fps,0,0,0);
+			el->video_fps,el->audio_bits, el->audio_chans, el->audio_rate );
 		
 	if(!si->encoder_file)
 	{
@@ -337,15 +337,14 @@ int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 
 	si->rec_total_bytes += buf_len;
 
-/*	if(audio_size > 0)
+	if(audio_size > 0)
 	{
 		if(lav_write_audio( (lav_file_t*) si->encoder_file, (uint8_t*)abuff, audio_size))
 		{
 	 	    veejay_msg(VEEJAY_MSG_ERROR, "Error writing output audio [%s] (%d)",lav_strerror(),audio_size);
 		}
-		// estimate samples , dont care
-		si->rec_total_bytes += ( audio_size * 4 );
-	}*/
+		si->rec_total_bytes += audio_size;
+	}
 	/* write OK */
 	si->encoder_succes_frames ++;
 	si->encoder_num_frames ++;

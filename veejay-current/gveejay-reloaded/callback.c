@@ -862,9 +862,6 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	GtkComboBox *combo = GTK_COMBO_BOX( GTK_WIDGET(glade_xml_get_widget(info->main_window,"combo_streamcodec")));
 	gchar *format = (gchar*)gtk_combo_box_get_active_text(combo) ;
 
-	if(nframes <= 0)
-		return;
-
 	if(format != NULL)
 	{
 		multi_vims( VIMS_RECORD_DATAFORMAT,"%s",
@@ -907,9 +904,6 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	gchar *format = (gchar*) gtk_combo_box_get_active_text(combo);
 
 	gint nframes = info->uc.sample_rec_duration;
-	if(nframes <= 0)
-		return;
-	
 	gsize br=0; gsize bw=0;
 	gchar *utftext = (gchar*) get_text( "entry_samplename"); 
 	gchar *text = (utftext != NULL ? g_locale_from_utf8( utftext, -1, &br, &bw,NULL) : NULL);	
@@ -956,7 +950,7 @@ void	on_button_sample_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 
 static	int	sample_calctime()
 {
-	gint n_frames = get_nums( "spin_sampleduration");
+/*	gint n_frames = get_nums( "spin_sampleduration");
 	if( is_button_toggled( "sample_mulloop" ) )
 	{
 		if(n_frames > 0)
@@ -965,7 +959,11 @@ static	int	sample_calctime()
 			if( info->status_tokens[SAMPLE_LOOP] == 2 )
 				n_frames *= 2;
 		}
-	}
+	}*/
+
+	int n_frames = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
+	if( info->status_tokens[SAMPLE_LOOP] == 2 )
+		n_frames *= 2;
 	return n_frames;
 }
 

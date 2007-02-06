@@ -93,7 +93,9 @@
 #include <veejay/vj-OSC.h>
 
 #include <veejay/vims.h>
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 #ifdef USE_GL
 #include <veejay/gl.h>
 #endif
@@ -275,6 +277,7 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 
 int veejay_set_framedup(veejay_t *info, int n) {
 	video_playback_setup *settings = (video_playback_setup*) settings;
+
 	switch(info->uc->playback_mode) {
 	  case VJ_PLAYBACK_MODE_PLAIN: info->sfd = n; break;
 	  case VJ_PLAYBACK_MODE_SAMPLE: info->sfd = n; sample_set_framedup(info->uc->sample_id,n);break;
@@ -540,7 +543,7 @@ void	veejay_set_framerate( veejay_t *info , float fps )
 	settings->spvf = 1.0 / fps;
 	settings->msec_per_frame = 1000 / settings->spvf;
 	if (info->current_edit_list->has_audio && (info->audio==AUDIO_PLAY || info->audio==AUDIO_RENDER))
-        	settings->spas = 1.0 / (double) info->current_edit_list->play_rate;
+        	settings->spas = 1.0 / (double) info->current_edit_list->audio_rate;
    	else
         	settings->spas = 0;
 
@@ -583,7 +586,7 @@ int veejay_init_editlist(veejay_t * info)
 
    if (el->has_audio && (info->audio==AUDIO_PLAY || info->audio==AUDIO_RENDER))
    {
-	settings->spas = 1.0 / (double) el->play_rate;
+	settings->spas = 1.0 / (double) el->audio_rate;
    }
    else
    {
@@ -1151,7 +1154,12 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 		if( sample_chain_sprint_status
 			(info->uc->sample_id,cache_used,info->seq->active,info->seq->current,info->real_fps,settings->current_frame_num, pm, total_slots,info->status_what ) != 0)
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
+			veejay_msg(VEEJAY_MSG_ERROR, "Fatal error, tried to collect properties of invalid sample");
+#ifdef STRICT_CHECKING
+			assert(0);
+#else
+			veejay_change_state( info, LAVPLAY_STATE_STOP );
+#endif	
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
@@ -1903,12 +1911,16 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 
 	//plugins_allocate();
 
-	if(info->current_edit_list->has_audio) {
-		if (vj_perform_init_audio(info) == 0)
+	if(info->current_edit_list->has_audio)
+	{
+		if (vj_perform_init_audio(info))
 			veejay_msg(VEEJAY_MSG_INFO, "Initialized Audio Task");
 		else
+		{
 			veejay_msg(VEEJAY_MSG_ERROR, 
 				"Unable to initialize Audio Task");
+			info->audio = NO_AUDIO;
+		}
 	}
 
   	veejay_msg(VEEJAY_MSG_INFO, 
@@ -2188,7 +2200,6 @@ static void veejay_playback_cycle(veejay_t * info)
     double tdiff1, tdiff2;
     int n;
     int first_free, frame, skipv, skipa, skipi, nvcorr;
-    long frame_number[2];	/* Must be at least as big as the number of buffers used */
     struct mjpeg_params bp;
     long ts, te;
     vj_perform_queue_audio_frame(info,0);
@@ -2243,20 +2254,15 @@ static void veejay_playback_cycle(veejay_t * info)
   
 
   
-    frame_number[0] = settings->current_frame_num;
     veejay_mjpeg_queue_buf(info, 0, 1);
     
     stats.nqueue = 1;
 
-   //	 settings->br.count;
+
      while (settings->state != LAVPLAY_STATE_STOP) {
-	/* Sync to get a free buffer. We want to have all free buffers,
-	 * which have been played so far. Normally there should be a function
-	 * in the kernel API to get the number of all free buffers.
-	 * I don't want to change this API at the moment, therefore
-	 * we look on the clock to see if there are more buffers ready
-	 */
 	first_free = stats.nsync;
+
+	int current_speed = settings->current_playback_speed;
 
     	do {
 	    if (settings->state == LAVPLAY_STATE_STOP) {
@@ -2268,26 +2274,17 @@ static void veejay_playback_cycle(veejay_t * info)
 	    }
 	
 	    frame = bs.frame;
-	    /* Since we queue the frames in order, we have to get them back in order */
-	    if (frame != stats.nsync % 1) {
-		veejay_msg(VEEJAY_MSG_ERROR, 
-			    "**INTERNAL ERROR: Bad frame order on sync: frame = %d, nsync = %d, br.count = %ld sould be %ld",
-			    frame, stats.nsync, 1, (stats.nsync % 1));
-		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
-		goto FINISH;
-	    }
-	   
+
 	    stats.nsync++;
-	    /* Lock on clock */
 	    gettimeofday(&time_now, 0);
 	    stats.tdiff = time_now.tv_sec - bs.timestamp.tv_sec +
 		(time_now.tv_usec - bs.timestamp.tv_usec)*1.e-6;
-	} while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (1 - 1));
+	} 
+	while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (1 - 1));
 
 #ifdef HAVE_JACK
-	if ( el->has_audio && info->audio==AUDIO_PLAY ) {
-	    //audio_get_output_status(&audio_tmstmp, &(stats.num_asamps),
-		//			    &(stats.num_aerr));
+	if ( el->has_audio && info->audio==AUDIO_PLAY ) 
+	{
 	   struct timeval audio_tmstmp;	
 	   long int sec=0;
 	   long int usec=0;
@@ -2295,13 +2292,10 @@ static void veejay_playback_cycle(veejay_t * info)
 	   audio_tmstmp.tv_sec = sec;
 	   audio_tmstmp.tv_usec = usec;
 	   if (audio_tmstmp.tv_sec)
-          {
-             tdiff1 = settings->spvf * (stats.nsync - nvcorr) -
-                settings->spas * num_audio_bytes_written;
-             tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) +
-                (bs.timestamp.tv_usec - audio_tmstmp.tv_usec) * 1.e-6;
-          }
-
+ 	   {
+         	    tdiff1 = settings->spvf * (stats.nsync - nvcorr) -  settings->spas * num_audio_bytes_written;
+             	    tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) + (bs.timestamp.tv_usec - audio_tmstmp.tv_usec) * 1.e-6;
+           }
 	}
 #endif
 	stats.tdiff = tdiff1 - tdiff2;
@@ -2316,7 +2310,7 @@ static void veejay_playback_cycle(veejay_t * info)
 		if (stats.tdiff > settings->spvf) {
 		    /* Video is ahead audio */
 		    skipa = 1;
-		    if (info->sync_ins_frames)
+		    if (info->sync_ins_frames && current_speed != 0)
 			skipi = 1;
 		    nvcorr++;
 		    stats.num_corrs_a++;
@@ -2326,72 +2320,39 @@ static void veejay_playback_cycle(veejay_t * info)
 		if (stats.tdiff < -settings->spvf) {
 		    /* Video is behind audio */
 		    skipv = 1;
-   		    if (!info->sync_skip_frames)
+   		    if (!info->sync_skip_frames && current_speed != 0)
 			skipi = 1;
 
-		    //veejay_msg(VEEJAY_MSG_INFO, "video behind audio, skip video frame = %s tdiff = %4.2f , spvf = %4.2f",
-		//	(skipi==0?"NO":"YES"), stats.tdiff, settings->spvf);
-				    nvcorr--;
+ 		    nvcorr--;
 		    stats.num_corrs_b++;
 		    stats.tdiff += settings->spvf;
 		    stats.stats_changed = 1;
 		}
 	    }
 
-	    /* Read one frame, break if EOF is reached */
 #ifdef HAVE_SDL
 	    ts= SDL_GetTicks();
 #endif
-	    // actually measure duration of render in ms */
 	    frame = n % 1;
-	    frame_number[frame] = settings->current_frame_num;
-	    settings->buffer_entry[frame] = settings->current_frame_num;
-//		el->frame_list[settings->current_frame_num];
+	//    settings->buffer_entry[frame] = 1; //settings->current_frame_num;
+	    settings->buffer_entry[frame] ++;
+
 	    if (!skipa) 
-		vj_perform_queue_audio_frame(info,frame);
+			vj_perform_queue_audio_frame(info,frame);
 
 	    if (!skipv)
 			vj_perform_queue_video_frame(info,frame,skipi);
   
-	    vj_perform_queue_frame(info,skipi,frame);
+//	    vj_perform_queue_frame(info,skipi,frame);
+
+		vj_perform_queue_frame( info, frame, skipi );
+
 #ifdef HAVE_SDL	
 	    te = SDL_GetTicks();
-#endif
-//	    if(info->real_fps == -1)
-//	    {
-/*		float elapsed = (float)(te-ts)/1000.0;
-		float spvf = info->settings->spvf;
-		int level = VEEJAY_MSG_INFO;
-		if(elapsed > (spvf*0.8) && elapsed < spvf)
-		{
-			level = VEEJAY_MSG_WARNING;
-		}
-		else
-		{
-			if( elapsed > spvf)
-			level = VEEJAY_MSG_ERROR;
-		}
-		veejay_msg( level,
-			"Seconds per video frame: %2.2f, seconds elapsed: %2.4f ",
-			(float)info->settings->spvf,
-			elapsed );
-	*/
-	//    }
-#ifdef HAVE_SDL
             info->real_fps = (int)( te - ts );
 #else
 	    info->real_fps = 0;
 #endif
-
-	//	int sta_poll = vj_server_poll(info->vjs[1]);
-	//	if(sta_poll>0) vj_server_new_connection( info->vjs[1]);
-	//	int i;
-	//	for( i = 0; i < info->vjs[1]->nr_of_links; i ++ )
-	//		veejay_pipe_write_status( info, i );
-//	int i;
-//	for( i = 0; i <  VJ_MAX_CONNECTIONS; i ++ )
-//		if( vj_server_link_used( info->vjs[1], i ))
-//		{ veejay_msg(VEEJAY_MSG_DEBUG, "sent sta");	veejay_pipe_write_status( info, i );}
 
 	    if(skipv ) continue;
 	    if (!veejay_mjpeg_queue_buf(info, frame, 1)) {
@@ -3377,7 +3338,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		{
 			editlist *el = info->current_edit_list;
 			el->has_audio = 1;
-			el->play_rate = el->audio_rate = info->dummy->arate;
+			el->audio_rate = info->dummy->arate;
 			el->audio_chans = 2;
 			el->audio_bits = 16;
 			el->audio_bps = 4;

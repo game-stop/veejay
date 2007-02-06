@@ -51,7 +51,6 @@ typedef struct
 	int	audio_chans;
 	int	audio_bits;
 	int	audio_bps;
-	int	play_rate;
 
 	long 	video_frames; 
 

@@ -102,6 +102,7 @@ void 	vj_event_output_raw_stop		(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_play_forward			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_play_reverse			(	void *ptr,	const char format[], 	va_list ap	); 
 void 	vj_event_play_speed			(	void *ptr, 	const char format[], 	va_list ap	);
+void	vj_event_play_speed_kb			(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_play_slow			( 	void *ptr,	const char format[], 	va_list ap	);
 void 	vj_event_play_stop			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_prev_second			(	void *ptr, 	const char format[], 	va_list ap	);

@@ -168,15 +168,15 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_VIDEO_PREV_SECOND,		SDLK_KP2, 	VIMS_MOD_NONE,	NULL	},
 	{ VIMS_VIDEO_GOTO_START,		SDLK_KP1, 	VIMS_MOD_NONE,	NULL	},
 	{ VIMS_VIDEO_GOTO_END,			SDLK_KP3, 	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_VIDEO_SET_SPEED,			SDLK_a,		VIMS_MOD_NONE,	"1"	},
-	{ VIMS_VIDEO_SET_SPEED,			SDLK_s,		VIMS_MOD_NONE,	"2"	},
-	{ VIMS_VIDEO_SET_SPEED,			SDLK_d,		VIMS_MOD_NONE,	"3"	},
-	{ VIMS_VIDEO_SET_SPEED,			SDLK_f,		VIMS_MOD_NONE,	"4"	},
-	{ VIMS_VIDEO_SET_SPEED,			SDLK_g,		VIMS_MOD_NONE,	"5"	},
-	{ VIMS_VIDEO_SET_SPEED,			SDLK_h,		VIMS_MOD_NONE,	"6"	},
-	{ VIMS_VIDEO_SET_SPEED,			SDLK_j,		VIMS_MOD_NONE,	"7"	},
-	{ VIMS_VIDEO_SET_SPEED,			SDLK_k,		VIMS_MOD_NONE,	"8"	},
-	{ VIMS_VIDEO_SET_SPEED,			SDLK_l,		VIMS_MOD_NONE,	"9"	},
+	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_a,		VIMS_MOD_NONE,	"1"	},
+	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_s,		VIMS_MOD_NONE,	"2"	},
+	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_d,		VIMS_MOD_NONE,	"3"	},
+	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_f,		VIMS_MOD_NONE,	"4"	},
+	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_g,		VIMS_MOD_NONE,	"5"	},
+	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_h,		VIMS_MOD_NONE,	"6"	},
+	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_j,		VIMS_MOD_NONE,	"7"	},
+	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_k,		VIMS_MOD_NONE,	"8"	},
+	{ VIMS_VIDEO_SET_SPEEDK,			SDLK_l,		VIMS_MOD_NONE,	"9"	},
 	{ VIMS_VIDEO_SET_SLOW,			SDLK_a,		VIMS_MOD_ALT,	"1"	},
 	{ VIMS_VIDEO_SET_SLOW,			SDLK_s,		VIMS_MOD_ALT,	"2"	},
 	{ VIMS_VIDEO_SET_SLOW,			SDLK_d,		VIMS_MOD_ALT,	"3"	},
@@ -1229,7 +1229,7 @@ void vj_event_update_remote(void *ptr)
 //	for( i = 0; i <  VJ_MAX_CONNECTIONS; i ++ )
 //		if( vj_server_link_used( v->vjs[1], i ))
 //			veejay_pipe_write_status( v, i );
-//	
+	
 	if( v->settings->use_vims_mcast )
 	{
 		int res = vj_server_update(v->vjs[2],0 );
@@ -1282,6 +1282,7 @@ void vj_event_update_remote(void *ptr)
 			}
 		}
 	}
+
 	for( i = 0; i <  VJ_MAX_CONNECTIONS; i ++ )
 		if( vj_server_link_used( v->vjs[1], i ))
 			veejay_pipe_write_status( v, i );
@@ -3057,6 +3058,32 @@ void vj_event_play_speed(void *ptr, const char format[], va_list ap)
 	}
 }
 
+void vj_event_play_speed_kb(void *ptr, const char format[], va_list ap)
+{
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	if(!STREAM_PLAYING(v))
+	{
+		char *s = NULL;
+		P_A(args,s,format,ap);
+	
+		int speed = abs(args[0]);
+		if( v->settings->current_playback_speed <  0 )
+			veejay_set_speed( v, -1 * speed );
+		else
+			veejay_set_speed(v, speed );
+		speed = v->settings->current_playback_speed;
+		veejay_msg(VEEJAY_MSG_INFO, "Video is playing at speed %d now (%s)",
+			speed, speed == 0 ? "paused" : speed < 0 ? "reverse" : "forward" );
+	}
+	else
+	{
+		p_invalid_mode();
+	}
+}
+
+
+
 void vj_event_play_slow(void *ptr, const char format[],va_list ap)
 {
 	int args[1];
@@ -3706,7 +3733,6 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 	int args[2];
-	int changed = 0;
 	int result = 0;
 	char *str = NULL;
 	char prefix[150];
@@ -3742,7 +3768,6 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 			if (n < 0 ) n = n * -1;
 		}
 		args[0] = sample_get_longest(v->uc->sample_id);
-		changed = 1;
 	}
 
 	int format_ = _recorder_format;
@@ -3762,16 +3787,15 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 	{
 		video_playback_setup *s = v->settings;
 		s->sample_record_id = v->uc->sample_id;
-		if(args[1])
-			s->sample_record_switch = 1;
+		s->sample_record_switch = args[1];
 		result = 1;
 		if(v->use_osd)
 		{
 			veejay_msg(VEEJAY_MSG_INFO,"Turned off OSD, recording now");
 			v->use_osd = 0;
 		}
-		veejay_msg(VEEJAY_MSG_INFO, "Sample recording started , record %d frames and %s",
-				args[0], (args[1] == 1 ? "play new sample" : "dont play new sample" ));
+		veejay_msg(VEEJAY_MSG_INFO, "Sample recording started , record %d frames from sample %d and %s",
+				args[0],s->sample_record_id, (args[1] == 1 ? "play new sample" : "dont play new sample" ));
 	}
 	else
 	{
