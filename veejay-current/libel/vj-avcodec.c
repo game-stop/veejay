@@ -294,12 +294,17 @@ void 		*vj_avcodec_start( editlist *el, int encoder )
 }
 
 
-int		vj_avcodec_init(editlist *el, int pixel_format)
+int		vj_avcodec_init( int pixel_format)
 {
-	if(!el) return 0;
 	out_pixel_format = pixel_format;
 
 	//av_log_set_level( AV_LOG_INFO );
+
+	avcodec_init();
+
+	avcodec_register_all();
+
+	veejay_msg(VEEJAY_MSG_INFO, "FFmpeg AVCodec initialized (http://ffmpeg.sourceforge.net)");
 	
 	return 1;
 }

@@ -46,9 +46,7 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
     vjsdl->mouse_motion = 1;
     vjsdl->use_keyboard = 1;
     vjsdl->pix_format = SDL_YUY2_OVERLAY; // have best quality by default
-	// use yuv420 test
-	//vjsdl->pix_format = SDL_YV12_OVERLAY; 
-   vjsdl->pix_fmt = fmt;
+    vjsdl->pix_fmt = fmt;
     vjsdl->width = width;
     vjsdl->height = height;
     vjsdl->frame_size = width * height;
@@ -94,8 +92,15 @@ void vj_sdl_resize( vj_sdl *vjsdl , int scaled_width, int scaled_height, int fs 
 
 	vjsdl->screen = SDL_SetVideoMode( vjsdl->sw_scale_width, vjsdl->sw_scale_height,my_bpp,
 				vjsdl->flags[fs]);
+
+	vjsdl->rectangle.x = 0;
+	vjsdl->rectangle.y = 0;
+	vjsdl->rectangle.w = scaled_width;
+	vjsdl->rectangle.h = scaled_height;
+
+
 	veejay_msg(VEEJAY_MSG_INFO, "Changed video window to size %d x %d",
-			scaled_width,scaled_height);
+			vjsdl->sw_scale_width,vjsdl->sw_scale_height);
 }
 
 
@@ -134,13 +139,13 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 
 	if( hw_on == 0 )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Setting up for software emulation");
+		veejay_msg(VEEJAY_MSG_WARNING, "Setting up for software emulation");
 		vjsdl->flags[0] = SDL_SWSURFACE | SDL_ANYFORMAT | extra_flags;
 		vjsdl->flags[1] = SDL_SWSURFACE | SDL_FULLSCREEN | SDL_ANYFORMAT | extra_flags;
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Setting up for Hardware Acceleration");
+		veejay_msg(VEEJAY_MSG_INFO, "Setting up SDL with Hardware Acceleration");
 		vjsdl->flags[0] = SDL_HWSURFACE | SDL_DOUBLEBUF | extra_flags;
 		vjsdl->flags[1] = SDL_HWSURFACE | SDL_FULLSCREEN | SDL_DOUBLEBUF | extra_flags;
 	}
@@ -325,10 +330,6 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
 	else
 		yuv422_to_yuyv( yuv420, vjsdl->yuv_overlay->pixels[0], vjsdl->width,vjsdl->height);
 
-	// test 420
-//	veejay_memcpy( vjsdl->yuv_overlay->pixels[0], yuv420[0], vjsdl->width * vjsdl->height );
-//	veejay_memcpy( vjsdl->yuv_overlay->pixels[1], yuv420[2], (vjsdl->width*vjsdl->height)/4);
-//	veejay_memcpy( vjsdl->yuv_overlay->pixels[2], yuv420[1], (vjsdl->width*vjsdl->height)/4);
 	if (!vj_sdl_unlock(vjsdl))
 		return 0;
 

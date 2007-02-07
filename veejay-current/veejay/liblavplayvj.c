@@ -3312,6 +3312,14 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 						(force_pix_fmt >1  ? "JPEG YUV" : "YCbCr" ),
 			((info->pixel_format == FMT_422 || info->pixel_format == FMT_422F) ? "4:2:2" : "4:2:0"));
 	}
+
+	if(!vj_avcodec_init( info->pixel_format ))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize encoders!");
+		return 0;
+	}
+	
+
 	//TODO: pass yuv sampling to dummy
 	if( info->dummy->active )
 	{
@@ -3364,13 +3372,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	{
 		return 0;
 	}
-
-	if(!vj_avcodec_init(info->current_edit_list , force_pix_fmt))
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize encoders!");
-		return 0;
-	}
-	
 
 	info->effect_frame_info->width = info->current_edit_list->video_width;
 	info->effect_frame_info->height= info->current_edit_list->video_height;

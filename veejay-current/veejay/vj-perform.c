@@ -892,7 +892,9 @@ int vj_perform_audio_start(veejay_t * info)
 {
     int res;
     editlist *el = info->edit_list;	
-    if (info->edit_list->has_audio) {
+
+	if (info->edit_list->has_audio)
+	{
 	
 #ifdef HAVE_JACK
 	vj_jack_initialize();
@@ -918,7 +920,7 @@ int vj_perform_audio_start(veejay_t * info)
 				el->audio_rate,jack_rate_);
 		}
 	
-		return 0;
+		return 1;
 	}
 	return 1;
 #else

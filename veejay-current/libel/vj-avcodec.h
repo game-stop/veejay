@@ -51,7 +51,7 @@ typedef struct
 	void *lzo;
 } vj_encoder;
 
-int		vj_avcodec_init(editlist *el, int pix);
+int		vj_avcodec_init(int pix);
 
 int		vj_avcodec_encode_frame(void *encoder,int nframe, int format, uint8_t *src[3], uint8_t *dst, int dst_len);
 
