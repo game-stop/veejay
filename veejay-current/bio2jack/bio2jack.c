@@ -32,7 +32,7 @@
 #include <jack/jack.h>
 #include <pthread.h>
 #include <sys/time.h>
-
+#include <libvjmem/vjmem.h>
 #include "bio2jack.h"
 
 //FIXME: this is only true if we actually have messages
@@ -165,9 +165,9 @@ static jack_driver_t outDev[MAX_OUTDEVICES];
 
 /* default audio buffer size */
 //#define SECONDS .25
-#define SECONDS .5
-//static long MAX_BUFFERED_BYTES = (16 * 2 * (44100/(1/SECONDS))) / 8; /* 16 bits, 2 channels .25 seconds */
-static long MAX_BUFFERED_BYTES = (16 * 2 * (44100/(1/SECONDS))) / 4; /* 16 bits, 2 channels .25 seconds */
+#define SECONDS .4
+static long MAX_BUFFERED_BYTES = (16 * 2 * (44100/(1/SECONDS))) / 8; /* 16 bits, 2 channels .25 seconds */
+//static long MAX_BUFFERED_BYTES = (16 * 2 * (44100/(1/SECONDS))) / 4; /* 16 bits, 2 channels .25 seconds */
 
 
 #if JACK_CLOSE_HACK
@@ -500,7 +500,7 @@ static int JACK_callback (nframes_t nframes, void *arg)
 			    (short*)buffer, numFramesToWrite, this->num_output_channels, this->num_input_channels);
       } else /* just copy the memory over */
       {
-        memcpy(this->sound_buffer + ((nframes - jackFramesAvailable) * this->bits_per_channel * this->num_output_channels) / 8,
+        veejay_memcpy(this->sound_buffer + ((nframes - jackFramesAvailable) * this->bits_per_channel * this->num_output_channels) / 8,
 	       buffer, (numFramesToWrite * this->bits_per_channel * this->num_input_channels) / 8);
       }
 
@@ -1082,7 +1082,7 @@ int JACK_OpenEx(int* deviceID, unsigned int bits_per_channel, unsigned long *rat
 
     if(this->jack_port_name_count != 0)
     {
-      this->jack_port_name = (char**)malloc(sizeof(char*) * this->jack_port_name_count);
+      this->jack_port_name = (char**)vj_malloc(sizeof(char*) * this->jack_port_name_count);
       for(i = 0; i < this->jack_port_name_count; i++)
       {
           this->jack_port_name[i] = strdup(jack_port_name[i]);
@@ -1215,14 +1215,14 @@ long JACK_Write(int deviceID, char *data, unsigned long bytes)
     return 0; /* indicate that we couldn't write any bytes */
   }
 
-  newWaveHeader = (wave_header_t*)malloc(sizeof(wave_header_t));   /* create a wave header for this data */
+  newWaveHeader = (wave_header_t*)vj_malloc(sizeof(wave_header_t));   /* create a wave header for this data */
   if(!newWaveHeader)
   {
     //ERR("error allocating memory for newWaveHeader\n");
   }
 
-  newWaveHeader->pData = (char*)malloc(sizeof(char) * bytes); /* allocate memory for the data */
-  memcpy(newWaveHeader->pData, data, sizeof(char) * bytes);   /* copy in the data */
+  newWaveHeader->pData = (char*)vj_malloc(sizeof(char) * bytes); /* allocate memory for the data */
+  veejay_memcpy(newWaveHeader->pData, data, sizeof(char) * bytes);   /* copy in the data */
   newWaveHeader->size = bytes;   /* update the size */
   newWaveHeader->pNext = 0;   /* setup the next pointer to point to null */
 
