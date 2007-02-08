@@ -100,6 +100,8 @@
 #include <veejay/gl.h>
 #endif
 
+static int	veejay_pin_cpu( veejay_t *info, int cpu_num );
+
 // following struct copied from ../utils/videodev.h
 
 /* This is identical with the mgavideo internal params struct, 
@@ -572,15 +574,6 @@ int veejay_init_editlist(veejay_t * info)
 
     /* Seconds per audio sample: */
  
-   if (el->has_audio && info->audio == AUDIO_PLAY) {
-	if (vj_perform_audio_start(info)) {
-	    veejay_msg(VEEJAY_MSG_INFO, "Started Audio Task");
-	//    stats.audio = 1;
-	} else {
-	    veejay_msg(VEEJAY_MSG_ERROR, "Could not start Audio Task, is Jack running ?");
-	    veejay_change_state(info,LAVPLAY_STATE_STOP );
-	}
-    }
    if( !el->has_audio )
 	veejay_msg(VEEJAY_MSG_DEBUG, "EditList has no audio");
 
@@ -1080,10 +1073,12 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
 
+	if (info->uc->use_timer ) {
+
     /* I really *wish* the timer was higher res on x86 Linux... 10mSec
      * is a *pain*.  Sooo wasteful here...
      */
-    if (info->uc->use_timer == 2) {
+
 	struct timeval now;
 	struct timespec nsecsleep;
 	int usec_since_lastframe=0;
@@ -1110,9 +1105,7 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 	     * sleep timer expiry will apply. Reasonable since X will
 	     * probably do something...
 	     */
-	    nsecsleep.tv_nsec =
-		(frame_periods * settings->usec_per_frame -
-		 usec_since_lastframe - 1000000 / HZ) * 1000;
+	    nsecsleep.tv_nsec = (frame_periods * settings->usec_per_frame - usec_since_lastframe - 1000000 / HZ) * 1000;
 	    nsecsleep.tv_sec = 0;
 	    nanosleep(&nsecsleep, NULL);
 	}
@@ -1280,25 +1273,22 @@ void veejay_handle_signal(void *arg, int sig)
 {
 	veejay_t *info = (veejay_t *) arg;
 	video_playback_setup *settings = (video_playback_setup *) info->settings;
-	if (sig == SIGINT)
+	struct sigaction new_action;
+	if (sig == SIGINT || sig == SIGQUIT)
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Veejay interrupted by user. Bye!");
 		veejay_change_state(info, LAVPLAY_STATE_STOP);
 	}
-	else if (sig == SIGSEGV || sig == SIGFPE || sig == SIGILL || sig == SIGPIPE || sig == SIGTERM ||
-					sig == SIGSTKFLT || sig == SIGABRT || sig == SIGPWR)
+	else 
 	{
-		if(info->homedir)
-			veejay_change_state_save(info,LAVPLAY_STATE_STOP);
-		if( sig == SIGSEGV || sig == SIGILL || sig == SIGSTKFLT || sig == SIGPWR || sig == SIGABRT
-						|| sig == SIGPIPE)
-			signal( SIGSEGV, SIG_DFL );
-		else
-		    veejay_msg(VEEJAY_MSG_WARNING, "Caught and ignored signal %x", sig );
-							
-	} else
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Caught and ignored unknown signal %x", sig );
+		if( sig == SIGPIPE || sig == SIGSEGV || sig == SIGBUS || sig == SIGPWR || sig == SIGABRT || sig == "SIGFPE" )
+		{
+			if(info->homedir)
+				veejay_change_state_save(info,LAVPLAY_STATE_STOP);
+			else
+				veejay_change_state( info, LAVPLAY_STATE_STOP );
+		}
+		signal( sig, SIG_DFL );
 	}
 }
 
@@ -1333,10 +1323,11 @@ static void *veejay_mjpeg_playback_thread(void *arg)
    /* Allow easy shutting down by other processes... */
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-    
+
+    vj_get_relative_time();
+
     vj_osc_set_veejay_t(info); 
     vj_tag_set_veejay_t(info);
-
 
 #ifdef HAVE_SDL
 	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
@@ -1739,14 +1730,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		case 0:
 			veejay_msg(VEEJAY_MSG_WARNING, "Not timing audio/video");
 		break;
-  		case 1:
-			veejay_msg(VEEJAY_MSG_DEBUG, 
-			    "RTC /dev/rtc hardware timer is broken!");
-			info->uc->use_timer = 2;
-			return -1;
-		break;
-    		case 2:
-			veejay_msg(VEEJAY_MSG_DEBUG, "Using nanosleep timer");
+    		default:
+			veejay_msg(VEEJAY_MSG_INFO, "Using nanosleep timer");
 		break;
     	}    
 
@@ -1909,8 +1894,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	if(!info->bes_height)
 		info->bes_height = info->video_output_height;		
 
-	//plugins_allocate();
-
 	if(info->current_edit_list->has_audio)
 	{
 		if (vj_perform_init_audio(info))
@@ -1963,97 +1946,90 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		return -1;
 	}
 
-    /* now setup the output driver */
-    switch (info->video_out) {
+    	/* now setup the output driver */
+    	switch (info->video_out)
+	 {
  		case 4:
 #ifdef USE_GL
-		info->gl = (void*) x_display_init(info);
-		x_display_open(info->gl, info->current_edit_list->video_width,
-			       		info->current_edit_list->video_height );
-
+			veejay_msg(VEEJAY_MSG_INFO, "Using output driver OpenGL");
+			info->gl = (void*) x_display_init(info);
+			x_display_open(info->gl, info->current_edit_list->video_width, info->current_edit_list->video_height );
 #endif
 			break;
 #ifdef HAVE_SDL
-    case 0:
+		case 0:
+			veejay_msg(VEEJAY_MSG_INFO, "Using output driver SDL");
 
-		info->sdl[0] =
-		    (vj_sdl *) vj_sdl_allocate( info->video_output_width,
-					      info->video_output_height,
-						info->pixel_format);
+			info->sdl[0] =
+			    (vj_sdl *) vj_sdl_allocate( info->video_output_width,info->video_output_height,info->pixel_format);
+			if( !info->sdl[0] )
+				return -1;
 
-		if( x != -1 && y != -1 )
-			vj_sdl_set_geometry(info->sdl[0],x,y);
+			if( x != -1 && y != -1 )
+				vj_sdl_set_geometry(info->sdl[0],x,y);
 
-		if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height, "Veejay",1,
-			info->settings->full_screen))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error initializing SDL");
-		    return -1;
-		}
-		break;
+			if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height, "Veejay",1,info->settings->full_screen))
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Error initializing SDL");
+		    		return -1;
+			}
+			break;
 #endif
 #ifdef HAVE_DIRECTFB
-    case 1:
-		veejay_msg(VEEJAY_MSG_DEBUG, "Initializing DirectFB");
-		info->dfb =
-		    (vj_dfb *) vj_dfb_allocate(
-							info->video_output_width,
-					       	info->video_output_height,
+		case 1:
+			veejay_msg(VEEJAY_MSG_INFO, "Using output driver DirectFB");
+			
+			info->dfb =(vj_dfb *) vj_dfb_allocate(info->video_output_width,info->video_output_height,
 					       	el->video_norm);
-		if (vj_dfb_init(info->dfb) != 0)
-	    	return -1;
+			if( !info->dfb )
+				return -1;
+			if (vj_dfb_init(info->dfb) != 0)
+	    			return -1;
 		break;
-	case 2:
-		veejay_msg(VEEJAY_MSG_DEBUG, 
-		    "Initializing cloned output (if both SDL/DirectFB are compiled in)");
+
+
+		case 2:
+			veejay_msg(VEEJAY_MSG_INFO, 
+			    "Using output driver SDL & DirectFB");
 #ifdef HAVE_SDL
-		info->sdl[0] =
-	    	(vj_sdl *) vj_sdl_allocate(info->video_output_width,
-				      info->video_output_height, info->pixel_format);
-
-		if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height,"Veejay",1,
-			info->settings->full_screen))
-	   	 return -1;
+			info->sdl[0] = 	(vj_sdl *) vj_sdl_allocate(info->video_output_width,info->video_output_height, info->pixel_format);
+			if(!info->sdl[0])		
+				return -1;
+	
+			if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height,"Veejay",1,info->settings->full_screen))
+	   	 		return -1;
 #endif
-		info->dfb =
-		    (vj_dfb *) vj_dfb_allocate( info->video_output_width,
-					       info->video_output_height,
-					       el->video_norm);
-		if (vj_dfb_init(info->dfb) != 0)
-		    return -1;
+			info->dfb =  (vj_dfb *) vj_dfb_allocate( info->video_output_width, info->video_output_height, el->video_norm);
+			if(!info->dfb)
+				return -1;
+
+			if (vj_dfb_init(info->dfb) != 0)
+			    return -1;
 		break;
 #endif
-    case 3:
-		veejay_msg(VEEJAY_MSG_INFO, 
-		    "Entering render mode (no visual output)");
+	    case 3:
+			veejay_msg(VEEJAY_MSG_INFO, "Entering render mode (no visual output)");
         
-		info->render_stream = vj_yuv4mpeg_alloc(info->current_edit_list, info->video_output_width,info->video_output_height);
+			info->render_stream = vj_yuv4mpeg_alloc(info->current_edit_list, info->video_output_width,info->video_output_height);
 
-
-
-		if (vj_yuv_stream_start_write
-		  	  (info->render_stream, info->stream_outname,
-	  		   info->current_edit_list) == 0) {
-	   	 		veejay_msg(VEEJAY_MSG_INFO, 
-					"Rendering to [%s].",
-					info->stream_outname);
- 		}
-	 	else {
-	   		veejay_msg(VEEJAY_MSG_ERROR, 
-				"Cannot create render stream. Aborting");
-	    	return -1;
-		}
+			if (vj_yuv_stream_start_write (info->render_stream, info->stream_outname, info->current_edit_list) == 0) {
+	   	 		veejay_msg(VEEJAY_MSG_INFO, "Rendering to [%s]",info->stream_outname);
+ 			}
+	 		else {
+	   			veejay_msg(VEEJAY_MSG_ERROR, "Cannot create render stream. Aborting");
+	    			return -1;
+			}
 		break;
 	
-	case 5:
+		case 5:
+			veejay_msg(VEEJAY_MSG_INFO, "Entering headless mode (no visual output)");
 		break;
-    default:
-		veejay_msg(VEEJAY_MSG_ERROR,
-		    "Invalid playback mode. Use -O [012345]");
+
+	default:
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode. Use -O [012345]");
 		return -1;
 	break;
     }
-
 
 
 #ifdef HAVE_XML2
@@ -2144,45 +2120,102 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "ID %d | Mode %d", info->uc->sample_id, info->uc->playback_mode ); 
 
-/*
-#ifdef HAVE_FREETYPE
-	  if(info->font)
-	  {
-		  void *dict = vj_font_get_plain_dict( info->font );
-		  vj_font_set_constraints_and_dict( info->font, settings->min_frame_num,
-				  settings->max_frame_num, info->edit_list->video_fps, dict );
-	  }
-#endif
-*/
+	/* After we have fired up the audio and video threads system (which
+     	* are assisted if we're installed setuid root, we want to set the
+     	* effective user id to the real user id
+    	 */
 
-    /* After we have fired up the audio and video threads system (which
-     * are assisted if we're installed setuid root, we want to set the
-     * effective user id to the real user id
-     */
-    if (seteuid(getuid()) < 0) {
-	/* fixme: get rid of sys_errlist and use sys_strerror */
-	veejay_msg(VEEJAY_MSG_ERROR, 
-		    "Can't set effective user-id: %s", sys_errlist[errno]);
-	return -1;
+
+ if (info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
+    {
+	if (vj_perform_audio_start(info)) {
+	    veejay_msg(VEEJAY_MSG_INFO, "Started Audio Task");
+	} else {
+	    return -1;
+	}
     }
 
 
-    veejay_change_state( info, LAVPLAY_STATE_PLAYING );  
+	if (seteuid(getuid()) < 0)
+	{
+		/* fixme: get rid of sys_errlist and use sys_strerror */
+		veejay_msg(VEEJAY_MSG_ERROR, "Can't set effective user-id: %s", sys_errlist[errno]);
+		return -1;
+    	}
 
-    if (!veejay_mjpeg_set_playback_rate(info, el->video_fps,
-					 el->video_norm ==
-					 'p' ? VIDEO_MODE_PAL : VIDEO_MODE_NTSC)) {
-	return -1;
-    }
 
-    if(veejay_open(info) != 1) {
-	veejay_msg(VEEJAY_MSG_ERROR, 
-	    "Unable to initialize the threading system");
-	return -1;   
+    	veejay_change_state( info, LAVPLAY_STATE_PLAYING );  
+
+    	if (!veejay_mjpeg_set_playback_rate(info, el->video_fps, el->video_norm == 'p' ? VIDEO_MODE_PAL : VIDEO_MODE_NTSC)) {
+		return -1;
+    	}
+
+   	if(veejay_open(info) != 1)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize the threading system");
+		return -1;   
       	}
-    return 0;
+    	return 0;
 }
 
+static	int	sched_ncpus() {
+	return sysconf( _SC_NPROCESSORS_ONLN );
+}
+
+static int	veejay_pin_cpu( veejay_t *info, int cpu_num )
+{
+	static unsigned long* mask = NULL;
+	static unsigned long* cpumask = NULL;
+	int sz = 0;
+	int ncpus = 0;
+	int i,j,retval;
+	if( mask == NULL )
+	{
+		sz = 1 + (2 * sched_ncpus()) / (8 * sizeof(unsigned long));
+		mask = (unsigned long*) malloc( sz * sizeof( unsigned long ));
+		cpumask = (unsigned long*) malloc( sz * sizeof( unsigned long ));
+		
+		retval = sched_getaffinity(0, sz * sizeof(unsigned long), cpumask );
+		if( retval < 0 )
+		{
+			veejay_msg(0,"sched_getaffinity()");
+			return retval;
+		}
+
+		for( i = 0; i < sz * 8 * sizeof(unsigned long); ++ i )
+		{
+			int word = i / (8 * sizeof(unsigned long));
+			int bit  = i % (8 * sizeof(unsigned long));
+			if( cpumask[word] & (1 << bit))
+				ncpus++;
+		}
+	}
+	
+	cpu_num %= ncpus;
+
+	memset( mask, 0, sz * sizeof( unsigned long ));
+
+	for ( i = 0, j = 0; i < sz * 8 * sizeof(unsigned long); ++ i )
+	{
+		int word = i / (8 * sizeof(unsigned long));
+		int bit  = i % (8 * sizeof(unsigned long));
+		if( cpumask[word] & (1 << bit ))
+		{
+			if( j >= cpu_num ) {
+				mask[word] |= ( 1 << bit );
+				break;
+			}
+			j++;
+		}
+	}
+
+	retval = sched_setaffinity( 0 , sz * sizeof( unsigned long ), mask );
+
+	veejay_msg(VEEJAY_MSG_DEBUG,
+			"%s(%d) : pid=%d, returning %d", __FUNCTION__,cpu_num, (int)getpid(), retval);
+
+	return retval;
+}
 
 /******************************************************
  * veejay_playback_cycle()
@@ -2202,6 +2235,14 @@ static void veejay_playback_cycle(veejay_t * info)
     int first_free, frame, skipv, skipa, skipi, nvcorr;
     struct mjpeg_params bp;
     long ts, te;
+
+
+    if( settings->ncpu > 1 )
+    {
+	veejay_msg(VEEJAY_MSG_INFO, "Running on multiprocessor. Locking CPU 1 for rendering purposes");
+	veejay_pin_cpu( info, 1 );
+    }
+
     vj_perform_queue_audio_frame(info,0);
     vj_perform_queue_video_frame(info,0,0);
     if (vj_perform_queue_frame(info, 0, 0) != 0)
@@ -2241,23 +2282,12 @@ static void veejay_playback_cycle(veejay_t * info)
     tdiff1 = 0.;
     tdiff2 = 0.;
     nvcorr = 0;
-    if(el->has_audio && info->audio == AUDIO_PLAY) stats.audio = 1;
-
-//   if (el->has_audio && info->audio == AUDIO_PLAY) {
-//	if (vj_perform_audio_start(info)) {
-//	    stats.audio = 1;
-//	} else {
-//	    veejay_msg(VEEJAY_MSG_ERROR, "Could not start Audio Task");
-//	}
-  //  }
- /* Queue the buffers read, this triggers video playback */
-  
-
+    if(el->has_audio && info->audio == AUDIO_PLAY)
+	stats.audio = 1;
   
     veejay_mjpeg_queue_buf(info, 0, 1);
     
     stats.nqueue = 1;
-
 
      while (settings->state != LAVPLAY_STATE_STOP) {
 	first_free = stats.nsync;
@@ -2299,6 +2329,7 @@ static void veejay_playback_cycle(veejay_t * info)
 	}
 #endif
 	stats.tdiff = tdiff1 - tdiff2;
+
 	/* Fill and queue free buffers again */
 	for (n = first_free; n < stats.nsync;) {
 	    /* Audio/Video sync correction */
@@ -2334,7 +2365,6 @@ static void veejay_playback_cycle(veejay_t * info)
 	    ts= SDL_GetTicks();
 #endif
 	    frame = n % 1;
-	//    settings->buffer_entry[frame] = 1; //settings->current_frame_num;
 	    settings->buffer_entry[frame] ++;
 
 	    if (!skipa) 
@@ -2343,9 +2373,7 @@ static void veejay_playback_cycle(veejay_t * info)
 	    if (!skipv)
 			vj_perform_queue_video_frame(info,frame,skipi);
   
-//	    vj_perform_queue_frame(info,skipi,frame);
-
-		vj_perform_queue_frame( info, frame, skipi );
+	    vj_perform_queue_frame( info, frame, skipi );
 
 #ifdef HAVE_SDL	
 	    te = SDL_GetTicks();
@@ -2355,12 +2383,12 @@ static void veejay_playback_cycle(veejay_t * info)
 #endif
 
 	    if(skipv ) continue;
+
 	    if (!veejay_mjpeg_queue_buf(info, frame, 1)) {
 		veejay_msg(VEEJAY_MSG_ERROR ,"Error queuing a frame");
 		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 		goto FINISH;
 	    }
-
 
 	    stats.nqueue++;
 	    n++;
@@ -3417,11 +3445,6 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 			override_norm );
 	}
 
-	if(!ret)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Failed to start veejay");
-		return ret;
-	}
 	return ret;
 }
 

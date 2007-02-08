@@ -80,9 +80,10 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
+
+	uint8_t *Y2 = frame2->data[0];
 	uint8_t *Cb2 = frame2->data[1];
-	uint8_t *Cr2 = frame2->data[1];
+	uint8_t *Cr2 = frame2->data[2];
 	// keep copy of original frame
 	veejay_memcpy(buf[0], Y, width * height );
 	veejay_memcpy(buf[1], Cb, (width * height) );

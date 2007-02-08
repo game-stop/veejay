@@ -123,9 +123,13 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 		return 0;
 	}
 
-	/* dont overwrite environment settings */
+	/* dont overwrite environment settings, but export if they are not set already */
+
 	setenv( "SDL_VIDEO_YUV_DIRECT", "1", 0 );
 	setenv( "SDL_VIDEO_HWACCEL", "1", 0 );
+
+	if(fs)
+		setenv( "SDL_VIDEO_X11_DGAMOUSE",0,0 );
 
 	char *hw_env = getenv("SDL_VIDEO_HWACCEL");
 	int hw_on = 0;
@@ -211,13 +215,15 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	else
 		SDL_EventState(SDL_MOUSEMOTION, SDL_IGNORE);
     
+
 	if (vjsdl->show_cursor == 1) 
 		SDL_ShowCursor(SDL_ENABLE);
     	else
 		SDL_ShowCursor(SDL_DISABLE);
-    
-
-   	 vjsdl->yuv_overlay = SDL_CreateYUVOverlay(vjsdl->width,
+  
+	SDL_WM_GrabInput( SDL_GRAB_OFF );
+  
+   	vjsdl->yuv_overlay = SDL_CreateYUVOverlay(vjsdl->width,
 					      vjsdl->height,
 					      vjsdl->pix_format,
 					      vjsdl->screen);

@@ -27,7 +27,7 @@ int   available_diskspace(void);
 
 int vj_perform_screenshot2(veejay_t * info, uint8_t ** src);
 
-float	vj_get_relative_time(void);
+unsigned int	vj_get_relative_time(void);
 
 int	vj_perform_take_bg( veejay_t *info, uint8_t **src);
 

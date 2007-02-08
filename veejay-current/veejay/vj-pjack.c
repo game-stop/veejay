@@ -43,8 +43,8 @@ static int _vj_jack_start(int *dri)
 	int err = JACK_Open(dri, bits_per_sample,&audio_rate,audio_channels);
 	if(err == ERR_RATE_MISMATCH)
 	{
-		veejay_msg(2,
-			"(Jack) Sample rate mismatch (Retrying)");
+		veejay_msg(1,
+			"(Jackd) Sample rate mismatch (Retrying)");
 
 		err = JACK_Open(dri, bits_per_sample,&audio_rate,
 			audio_channels);
@@ -53,6 +53,23 @@ static int _vj_jack_start(int *dri)
 
 	if(err != ERR_SUCCESS)
 	{
+		switch(err)
+		{
+			case ERR_OPENING_JACK:
+			  veejay_msg(0, "Unable to open Jackd (is jackd running?");
+			  break;
+			case ERR_RATE_MISMATCH:
+			  veejay_msg(0, "Jackd cannot handle samplerate of %d Hz", audio_rate);
+			  break;
+			case ERR_TOO_MANY_OUTPUT_CHANNELS:	
+			  veejay_msg(0, "Cannot connect to jackd, Too many output channels: %d",
+				audio_channels );
+			  break;
+			case ERR_PORT_NOT_FOUND:
+			   veejay_msg(0, "Unable to find jack port");
+			   break;
+		}
+		veejay_msg(0, "To run veejay without audio, use -a0");
 		return 0;
 	}
 
@@ -65,6 +82,7 @@ int vj_jack_init(editlist *el)
 	int v_rate = el->audio_rate;
 	int i = 0;
 	int ret = 0;
+
 	JACK_Init();
 
 	bits_per_sample = 16;
@@ -79,14 +97,15 @@ int vj_jack_init(editlist *el)
 
 	buffer_len = vj_jack_get_space();
 
-	veejay_msg(2,"Jack: %ld, %d Hz/ %d Channels %d Bit ", jack_rate,audio_channels,bits_per_sample);
+	veejay_msg(2,"Jack: %ld, %d Hz/ %d Channels %d Bit ", jack_rate,audio_rate,audio_channels,bits_per_sample);
 
 	ret = 1;
 
 	if( jack_rate != el->audio_rate )
 		ret = 2;
-	
-	//JACK_SetState( driver, PLAYING);
+
+	JACK_SetState(driver, PAUSED );
+
 	return ret;
 }
 
@@ -100,7 +119,9 @@ int	vj_jack_continue(int speed)
 {
 	if(speed==0)
 	{
-		if(JACK_GetState(driver) == PAUSED) return 1;
+		if(JACK_GetState(driver) == PAUSED) 
+			return 1;
+
 		JACK_SetState(driver, PAUSED );
 		return 1;
 	}

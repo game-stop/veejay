@@ -225,6 +225,7 @@ typedef struct {
     int sample_pressed;		/* which sample key was pressed */
     int chain_changed;
     int use_timer;
+    int rtc_fd;
     int current_link;
     int port;
     float rtc_delay;

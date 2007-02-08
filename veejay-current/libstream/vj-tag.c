@@ -73,7 +73,7 @@ extern int   sufficient_space(int max_size, int nframes);
 extern unsigned char *UTF8toLAT1(unsigned char *in);
 
 
-static uint8_t *_temp_buffer[3];
+static uint8_t *_temp_buffer[3]={NULL,NULL,NULL};
 static uint8_t *tag_encoder_buf = NULL; 
 static VJFrame _tmp;
 void	vj_tag_free(void)
@@ -227,9 +227,9 @@ int vj_tag_init(int width, int height, int pix_fmt)
     _tmp.len = width * height;
 
 	unicap_data_= (void*) vj_unicap_init();
-   _temp_buffer[0] = (uint8_t*) malloc(sizeof(uint8_t)*width*height);
-   _temp_buffer[1] = (uint8_t*) malloc(sizeof(uint8_t)*width*height);
-   _temp_buffer[2] = (uint8_t*) malloc(sizeof(uint8_t)*width*height);
+   _temp_buffer[0] = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height);
+   _temp_buffer[1] = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height);
+   _temp_buffer[2] = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height);
 		
 
     if( pix_fmt == FMT_422 || pix_fmt == FMT_422F )

@@ -620,14 +620,24 @@ static int check_command_line_options(int argc, char *argv[])
     	mjpeg_default_handler_verbosity( (info->verbose ? 1:0) );
     }
     if(!info->dump)
-       if(veejay_open_files(info, argv + optind, argc - optind,override_fps, force_video_file, override_pix_fmt, override_norm )<=0)
+	{
+       if(veejay_open_files(
+			info,
+			argv + optind,
+			argc - optind,
+			override_fps,
+			force_video_file,
+			override_pix_fmt,
+			override_norm )<=0)
        {
-	vj_el_show_formats();
-	veejay_msg(VEEJAY_MSG_ERROR, "Cannot start veejay");
-	nerr++;
+			vj_el_show_formats();
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open video file(s), codec/format not supported)");
+			nerr++;
        }
+	}
+
     if(!nerr) 
-	return 1;
+		return 1;
 	return 0;
 }
 
@@ -666,15 +676,16 @@ int main(int argc, char **argv)
 	if (!info)
 		return 1;
 
+
    	settings = (video_playback_setup *) info->settings;
 
 	if(!check_command_line_options(argc, argv))
-    	{
+    {
 		veejay_free(info);
 		return 0;
-    	}
+    }
 
-        if(info->dump)
+    if(info->dump)
  	{
 		veejay_set_colors(0);
 		vj_event_init();
@@ -689,8 +700,6 @@ int main(int argc, char **argv)
 	print_license();
 	prepare_cache_line( max_mem_, n_slots_ );
 	veejay_check_homedir( info );
-     
-
 
     	sigemptyset(&(settings->signal_set));
 	sigaddset(&(settings->signal_set), SIGINT);
@@ -700,12 +709,11 @@ int main(int argc, char **argv)
 	sigaddset(&(settings->signal_set), SIGFPE );
 	sigaddset(&(settings->signal_set), SIGTERM );
 	sigaddset(&(settings->signal_set), SIGABRT);
-	sigaddset(&(settings->signal_set), SIGSTKFLT );
 	sigaddset(&(settings->signal_set), SIGPWR );
 
 	pthread_sigmask(SIG_BLOCK, &(settings->signal_set), NULL);
 
-	dont_use = getenv("VEEJAY_SCHEDULE_NORMAL");
+/*	dont_use = getenv("VEEJAY_SCHEDULE_NORMAL");
 	if(dont_use==NULL || strcmp(dont_use, "0")==0||strcmp(dont_use,"no")==0)
 	{
  		memset(&schp, 0, sizeof(schp));
@@ -721,6 +729,7 @@ int main(int argc, char **argv)
 		    		"Using First In-First Out II scheduling");
 	 	}
 	}
+	*/
 
 	char *mem_func = get_memcpy_descr();
 	if(mem_func)
@@ -738,7 +747,7 @@ int main(int argc, char **argv)
 		full_range,
 		viewport)<0)
 	{	
-		veejay_msg(VEEJAY_MSG_ERROR, "Initializing veejay");
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot start Vveejay");
 		return 0;
 	}
 
@@ -761,24 +770,23 @@ int main(int argc, char **argv)
 			sigaction( i, &action, 0 );
 	
 	veejay_msg(VEEJAY_MSG_DEBUG, "Starting playback");
-	veejay_change_state(info, LAVPLAY_STATE_PLAYING);
+//	veejay_change_state(info, LAVPLAY_STATE_PLAYING);
 	veejay_set_frame(info, 0);
 	veejay_set_speed(info, 1);
 	
-
 	int sig;
 	
    	while (veejay_get_state(info) != LAVPLAY_STATE_STOP) 
     	{
 		sigwait( &(settings->signal_set), &sig );
-		veejay_msg(VEEJAY_MSG_ERROR, "Veejay caught signal %x", sig );
+		if( sig != SIGSEGV )
+		 sigprocmask( SIG_UNBLOCK, &(settings->signal_set), 0 );
 		veejay_handle_signal( info, sig );	
-       		//usleep(400000);
     	}
-	if(sig != SIGSEGV)
-	{
-		sigprocmask( SIG_UNBLOCK, &(settings->signal_set), 0 );
-	}
+//	if(sig != SIGSEGV)
+//	{
+//		sigprocmask( SIG_UNBLOCK, &(settings->signal_set), 0 );
+//	}
 	
 	veejay_quit(info);
 	veejay_busy(info);		/* wait for all the nice goodies to shut down */

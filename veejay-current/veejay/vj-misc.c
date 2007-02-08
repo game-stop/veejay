@@ -47,17 +47,14 @@ static unsigned int vj_get_timer()
 }
 
 
-float vj_get_relative_time()
+unsigned int vj_get_relative_time()
 {
-    long int time, relative;
+    unsigned int time, relative;
     time = vj_get_timer();
     relative = time - vj_relative_time;
     vj_relative_time = time;
-    //fprintf(stderr, "relative_time: %d, %d, %f\n",
-    //      time,relative,(relative*0.000001F));
-    if (relative < 0)
-	relative = 0;		/* cant keep counter increasing forever */
-    return (float) relative *0.000001F;
+    return relative;
+  //  return (float) relative *0.000001F;
 }
 
 int vj_perform_take_bg(veejay_t *info, uint8_t **src)

@@ -573,15 +573,11 @@ vj_keyboard_event *new_keyboard_event(
 
 	if( vj_event_exists( event_id ) )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "VIMS %d valid, registering key binding",
-				event_id);
 		ev->vims->act = (vj_event) vj_event_vevo_get_event_function( event_id );
 		ev->vims->list_id  = event_id;
 	}
 	else if ( vj_event_bundle_exists( event_id ) )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "BUNDLE %d valid, registering key binding",
-			event_id);
 		ev->vims->act = vj_event_do_bundled_msg;
 		ev->vims->list_id = event_id;
 	}
