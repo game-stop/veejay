@@ -181,6 +181,8 @@ AC_CHECK_LIB( Xinerama, XineramaQueryExtension,
 	[ AC_CHECK_HEADER(X11/extensions/Xinerama.h,
 	   [
 		AC_DEFINE( HAVE_XINERAMA,1,[Use Xinerama] )
+		XINERAMA_LIBS="-lXext -lXinerama"
+		AC_SUBST( XINERAMA_LIBS )
         	use_xinerama=yes,
 	   ],
 	   use_xinerama=no,
