@@ -100,7 +100,10 @@
 #include <veejay/gl.h>
 #endif
 
+#include <sched.h>
+
 static int	veejay_pin_cpu( veejay_t *info, int cpu_num );
+static void	veejay_schedule_fifo( veejay_t *info, int pid );
 
 // following struct copied from ../utils/videodev.h
 
@@ -1324,6 +1327,11 @@ static void *veejay_mjpeg_playback_thread(void *arg)
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
+
+  /* schedule FIFO */
+
+    veejay_schedule_fifo( info, getpid());
+
     vj_get_relative_time();
 
     vj_osc_set_veejay_t(info); 
@@ -2160,6 +2168,26 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 
 static	int	sched_ncpus() {
 	return sysconf( _SC_NPROCESSORS_ONLN );
+}
+
+static	void	veejay_schedule_fifo(veejay_t *info, int pid )
+{
+	struct sched_param schp;
+	veejay_memset( &schp, 0, sizeof(schp));
+	schp.sched_priority = sched_get_priority_max( SCHED_FIFO );
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Min prio = %d, Max prio = %d",
+		sched_get_priority_min( SCHED_FIFO ),
+		sched_get_priority_max( SCHED_FIFO ));
+
+	if( sched_setscheduler( pid, SCHED_FIFO, &schp ) != 0 )
+	{
+		veejay_msg(VEEJAY_MSG_WARNING, "Cannot set First-In-First-Out scheduling for process %d",pid);
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Using First-In-First-Out II scheduling for process %d", pid);
+	}
 }
 
 static int	veejay_pin_cpu( veejay_t *info, int cpu_num )

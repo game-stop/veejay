@@ -28,6 +28,8 @@
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-common.h>
 #include <gveejay-reloaded/vj-api.h>
+#include <sched.h>
+
 
 static int port_num	= 3490;
 static char hostname[255];
@@ -135,6 +137,13 @@ int main(int argc, char *argv[]) {
                 err ++;
 
         if( err ) usage(argv[0]);
+
+/*	struct sched_param schp;
+	memset( &schp, 0, sizeof( schp ));
+	schp.sched_priority = sched_get_priority_min(SCHED_RR );
+	if( sched_setscheduler( 0, SCHED_FIFO, &schp ) != 0 )
+	  veejay_msg(0, "Error setting RR");
+*/	
 
 	if( !g_thread_supported() )
 	{

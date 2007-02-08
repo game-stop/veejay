@@ -164,8 +164,11 @@ static int first_free_device = 0;
 static jack_driver_t outDev[MAX_OUTDEVICES];
 
 /* default audio buffer size */
-#define SECONDS .25
-static long MAX_BUFFERED_BYTES = (16 * 2 * (44100/(1/SECONDS))) / 8; /* 16 bits, 2 channels .25 seconds */
+//#define SECONDS .25
+#define SECONDS .5
+//static long MAX_BUFFERED_BYTES = (16 * 2 * (44100/(1/SECONDS))) / 8; /* 16 bits, 2 channels .25 seconds */
+static long MAX_BUFFERED_BYTES = (16 * 2 * (44100/(1/SECONDS))) / 4; /* 16 bits, 2 channels .25 seconds */
+
 
 #if JACK_CLOSE_HACK
 static void	JACK_CloseDevice(jack_driver_t* this, bool close_client);
