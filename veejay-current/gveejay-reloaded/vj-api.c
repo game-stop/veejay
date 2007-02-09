@@ -5210,10 +5210,10 @@ static	void	load_editlist_info()
 		fprintf(stderr, "cannot read VIDEO INFORMATION\n");
 		return;
 	}
-	sscanf( res, "%d %d %d %c %f %d %d %ld %d %ld %ld",
+	sscanf( res, "%d %d %d %c %f %d %d %ld %d %ld %ld %d",
 		&values[0], &values[1], &values[2], &norm,&fps,
 		&values[4], &values[5], &rate, &values[7],
-		&dum[0], &dum[1]);
+		&dum[0], &dum[1], &values[8]);
 		char tmp[15];
 	snprintf( tmp, sizeof(tmp)-1, "%dx%d", values[0],values[1]);
 
@@ -5262,6 +5262,16 @@ static	void	load_editlist_info()
 	}*/
 	info->el.ratio = (float)info->el.width / (float) info->el.height;
 
+	if( values[4] == 0 )
+	{
+		disable_widget( "button_5_4" );
+	}
+	else
+	{
+		set_toggle_button( "button_5_4", values[8]);
+		enable_widget( "button_5_4" );
+	}
+	
 
 	g_free(res);
 }
