@@ -91,7 +91,7 @@ static	inline int	blend_plane(uint8_t *dst, uint8_t *A, uint8_t *B, int size, in
 	return i;
 }
 #else
-static	inline void	blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, int size, int opacity )
+static	inline int	blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, int size, int opacity )
 {
     unsigned int i, op0, op1;
     op1 = (opacity > 255) ? 255 : opacity;
