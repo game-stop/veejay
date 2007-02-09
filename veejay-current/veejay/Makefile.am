@@ -1,7 +1,7 @@
 # Makefile for veejay
 
 MAINTAINERCLEANFILES = Makefile.in
-
+AM_CFLAGS=$(OP_CFLAGS)
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-DG_LOG_DOMAIN=\"veejay\" -DVEEJAY_VERSION=\"$(VERSION)\" \
      		-I /usr/X11R6/include -I$(top_srcdir)/libOSC \

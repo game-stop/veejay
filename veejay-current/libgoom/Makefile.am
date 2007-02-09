@@ -1,4 +1,5 @@
 MAINTAINERCLEANFILES=Makefile.in
+AM_CFLAGS=$(OP_CFLAGS)
 INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/libgoom
 GOOM_LIB_FILE = libgoom.la
 noinst_LTLIBRARIES = $(GOOM_LIB_FILE)

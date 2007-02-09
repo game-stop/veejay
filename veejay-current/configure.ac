@@ -561,6 +561,9 @@ have_mips=false
 have_ppccpu=false
 have_ps2=false
 
+OP_CFLAGS=""
+YUVCFLAGS="-fif-conversion"
+
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
 	i[[3-7]]86)
@@ -571,8 +574,12 @@ case $host_cpu in
 	PROGRAM_NOPIC="-fno-PIC"
 
 	if test "x$enable_debug" != "xyes" ; then
-		CFLAGS="$CFLAGS -fif-conversion"   
+		OP_CFLAGS="-O3"
  	fi
+
+	AC_SUBST( OP_CFLAGS )
+	AC_SUBST( YUVCFLAGS )
+
    	dnl If the host is pentium, align on double word boundary
     	case $host_cpu in
 		i686)
@@ -1034,6 +1041,8 @@ AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Veejay ${VERSION} build configuration :])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Compiler flags: $CFLAGS])
+AC_MSG_NOTICE([                 $YUVCFLAGS])
+AC_MSG_NOTICE([			$OP_CFLAGS])
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Architecture: ${host_cpu} ])
 AC_MSG_NOTICE([])

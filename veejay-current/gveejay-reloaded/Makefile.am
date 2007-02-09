@@ -1,7 +1,7 @@
 ## Process this file with automake to produce Makefile.in
 
 MAINTAINERCLEANFILES = Makefile.in
-
+AM_CFLAGS=$(OP_CFLAGS)
 INCLUDES = -I$(top_srcdir) -I$(top_srcdir)/gveejay-reloaded -I$(top_srcdir)/liblzo $(GTK_CFLAGS) \
 		$(MJPEGTOOLS_CFLAGS) $(GLIB_CFLAGS) $(GLADE_CFLAGS) $(GTKCAIRO_CFLAGS) -DGNOMELOCALEDIR=\""$(datadir)/locale"\" -DGVEEJAY_DATADIR=\""$(gveejay_datadir)"\"
 

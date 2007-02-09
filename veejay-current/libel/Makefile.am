@@ -1,7 +1,7 @@
 # Makefile for veejay
 
 MAINTAINERCLEANFILES = Makefile.in
-
+AM_CFLAGS=$(OP_CFLAGS)
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem \
 		-I$(top_srcdir)/vjmsg \
 		$(MJPEGTOOLS_CFLAGS) ${FFMPEG_CFLAGS} ${PIXBUF_CFLAGS} \

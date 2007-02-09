@@ -1,7 +1,7 @@
 # Makefile for veejay
 
 MAINTAINERCLEANFILES = Makefile.in
-
+AM_CFLAGS=$(OP_CFLAGS)
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg 
 VJNET_LIB_FILE = libvjnet.la
 noinst_LTLIBRARIES = $(VJNET_LIB_FILE)
