@@ -14627,7 +14627,6 @@ MLZO</property>
 
 			  <child>
 			    <widget class="GtkButton" id="setup_viewport">
-			      <property name="visible">True</property>
 			      <property name="can_focus">True</property>
 			      <property name="label" translatable="yes">Configure Viewport</property>
 			      <property name="use_underline">True</property>
