@@ -1327,7 +1327,6 @@ static void *veejay_mjpeg_playback_thread(void *arg)
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
-
   /* schedule FIFO */
 
     veejay_schedule_fifo( info, getpid());
@@ -2219,6 +2218,7 @@ static int	veejay_pin_cpu( veejay_t *info, int cpu_num )
 		}
 	}
 	
+
 	cpu_num %= ncpus;
 
 	memset( mask, 0, sz * sizeof( unsigned long ));
@@ -2237,10 +2237,12 @@ static int	veejay_pin_cpu( veejay_t *info, int cpu_num )
 		}
 	}
 
-	retval = sched_setaffinity( 0 , sz * sizeof( unsigned long ), mask );
+	int pi = (int) getpid();
+
+	retval = sched_setaffinity( pi, sz * sizeof( unsigned long ), mask );
 
 	veejay_msg(VEEJAY_MSG_DEBUG,
-			"%s(%d) : pid=%d, returning %d", __FUNCTION__,cpu_num, (int)getpid(), retval);
+			"%s(%d) : pid=%d, returning %d", __FUNCTION__,cpu_num,pi, retval);
 
 	return retval;
 }
@@ -2302,7 +2304,6 @@ static void veejay_playback_cycle(veejay_t * info)
     stats.stats_changed = 0;
     stats.num_corrs_a = 0;
     stats.num_corrs_b = 0;
-    stats.nqueue = 0;
     stats.nsync = 0;
     stats.audio = 0;
     stats.norm = el->video_norm == 'n' ? 1 : 0;
@@ -2315,8 +2316,6 @@ static void veejay_playback_cycle(veejay_t * info)
   
     veejay_mjpeg_queue_buf(info, 0, 1);
     
-    stats.nqueue = 1;
-
      while (settings->state != LAVPLAY_STATE_STOP) {
 	first_free = stats.nsync;
 
@@ -2418,7 +2417,6 @@ static void veejay_playback_cycle(veejay_t * info)
 		goto FINISH;
 	    }
 
-	    stats.nqueue++;
 	    n++;
 	}
 
