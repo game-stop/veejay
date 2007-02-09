@@ -99,6 +99,7 @@ static	inline int	blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, int size, i
 
     for( i = 0; i < size; i ++ )
 	dst[i] = (op0 * A[i] + op1 * B[i] ) >> 8;
+    return size;
 }
 #endif
 
