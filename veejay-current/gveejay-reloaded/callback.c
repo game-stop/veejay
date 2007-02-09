@@ -3489,3 +3489,9 @@ void	on_uq_button_clicked( GtkWidget *w, gpointer data )
 	info->quality = 3;
 	multitrack_set_quality( info->mt, 3 );
 }
+
+void	on_record_vp_clicked( GtkWidget *w, gpointer data )
+{
+	single_vims( VIMS_RECVIEWPORT );
+}
+
