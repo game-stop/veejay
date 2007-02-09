@@ -18,8 +18,6 @@
  */
 
 #include <config.h>
-
-
 #ifdef HAVE_JACK
 #include <bio2jack/bio2jack.h>
 #include <libel/vj-el.h>
@@ -28,7 +26,6 @@ static int bits_per_sample = 0;
 static unsigned long audio_rate = 0;
 static int audio_channels = 0;
 static int audio_bps = 0;
-static int buffer_len = 0;
 static unsigned long v_rate = 0;
 
 extern void veejay_msg(int type, const char format[], ...);
@@ -95,9 +92,8 @@ int vj_jack_init(editlist *el)
 
 	audio_bps = audio_rate * audio_channels;
 
-	buffer_len = vj_jack_get_space();
-
-	veejay_msg(2,"Jack: %ld, %d Hz/ %d Channels %d Bit ", jack_rate,audio_rate,audio_channels,bits_per_sample);
+	veejay_msg(2,"Jack: %ld, %d Hz/ %d Channels %d Bit, Buffering max %d bytes ", jack_rate,audio_rate,audio_channels,bits_per_sample,
+		vj_jack_get_space());
 
 	ret = 1;
 
@@ -148,11 +144,21 @@ int	vj_jack_stop()
 	return 1;
 }
 
-int	vj_jack_reset()
+void	vj_jack_enable()
+{
+	if( JACK_GetState(driver) == STOPPED )
+		JACK_SetState(driver, PLAYING );
+}
+
+void	vj_jack_disable()
+{
+	JACK_SetState( driver, STOPPED );
+}
+
+
+void	vj_jack_reset()
 {
 	JACK_Reset(driver);
-	buffer_len = 0;
-	return 1;
 }
 
 int	vj_jack_c_play(void *data, int len, int entry)
@@ -191,8 +197,6 @@ int	vj_jack_get_space()
 
 long	vj_jack_get_status(long int *sec, long int *usec)
 {
-//JACK_GetPosition(int deviceID, enum pos_enum position, int type);
-
 	return JACK_OutputStatus( driver, sec, usec);
 }
 #endif

@@ -6684,50 +6684,26 @@ void vj_event_output_y4m_stop(void *ptr, const char format[], va_list ap)
 void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	if(v->edit_list->has_audio)
+#ifdef HAVE_JACK
+	if( v->audio == NO_AUDIO )
 	{
-		if(v->audio != AUDIO_PLAY)
-		{
-			if( vj_perform_audio_start(v) )
-			{
-				v->audio = AUDIO_PLAY;
-			}
-			else 
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Cannot start Jack ");
-			}
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Already playing audio");
-		}
+		vj_jack_enable();
+		v->audio = AUDIO_PLAY;
 	}
-	else 
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Video has no audio");
-	}
-	
+#endif	
 }
 
 void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
-	if(v->edit_list->has_audio)
+#ifdef HAVE_JACK
+	if( v->audio != NO_AUDIO )
 	{
-		if(v->audio == AUDIO_PLAY)
-		{
-			vj_perform_audio_stop(v);
-			v->audio = NO_AUDIO;
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Not playing audio");
-		}
+		vj_jack_disable();
+		v->audio = NO_AUDIO;
+		vj_jack_reset();
 	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Video has no audio");
-	}
+#endif
 }
 
 
@@ -7751,7 +7727,7 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 	editlist *el = ( SAMPLE_PLAYING(v) ? sample_get_editlist( v->uc->sample_id ) : 
 				v->current_edit_list );
 
-	snprintf(info_msg,sizeof(info_msg)-1, "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld",
+	snprintf(info_msg,sizeof(info_msg)-1, "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld %1d",
 		el->video_width,
 		el->video_height,
 		el->video_inter,
@@ -7762,25 +7738,11 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 		el->audio_rate,
 		el->audio_chans,
 		el->num_video_files,
-		el->video_frames
+		el->video_frames,
+		v->audio
 		);	
 	sprintf( _s_print_buf, "%03d%s",strlen(info_msg), info_msg);
 
-	veejay_msg(VEEJAY_MSG_DEBUG, 
-		"%p ,  %04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld",
-		el,
-		el->video_width,
-		el->video_height,
-		el->video_inter,
-		el->video_norm,
-		el->video_fps,  
-		el->has_audio,
-		el->audio_bits,
-		el->audio_rate,
-		el->audio_chans,
-		el->num_video_files,
-		el->video_frames
-		);	
 
 	SEND_MSG(v,_s_print_buf);
 }

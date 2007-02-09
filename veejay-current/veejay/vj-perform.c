@@ -939,9 +939,13 @@ void vj_perform_audio_status(struct timeval tmpstmp, unsigned int nb_out,
 void vj_perform_audio_stop(veejay_t * info)
 {
     if (info->edit_list->has_audio) {
-	//audio_shutdown();
 #ifdef HAVE_JACK
 	vj_jack_stop();
+	if(resample_jack)
+	{
+		audio_resample_close(resample_jack);
+		resample_jack = NULL;
+	}
 #endif
 	info->audio = NO_AUDIO;
     }
