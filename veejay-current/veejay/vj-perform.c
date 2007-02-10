@@ -736,11 +736,10 @@ static void vj_perform_close_audio() {
 		if(downsample_context[i])
 			audio_resample_close( downsample_context[i]);
 	}
-#endif	
 
 	if(resample_jack)
 		audio_resample_close(resample_jack);
-
+#endif
 	veejay_msg(VEEJAY_MSG_INFO, "Stopped Audio playback task");
 }
 
