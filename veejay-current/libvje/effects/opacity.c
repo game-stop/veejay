@@ -91,7 +91,7 @@ static	inline int	blend_plane(uint8_t *dst, uint8_t *A, uint8_t *B, int size, in
 	return i;
 }
 #else
-static	inline int	blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, int size, int opacity )
+static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, int size, int opacity )
 {
     unsigned int i, op0, op1;
     op1 = (opacity > 255) ? 255 : opacity;
@@ -99,7 +99,9 @@ static	inline int	blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, int size, i
 
     for( i = 0; i < size; i ++ )
 	dst[i] = (op0 * A[i] + op1 * B[i] ) >> 8;
-    return size;
+
+
+    return 0;
 }
 #endif
 
@@ -113,11 +115,13 @@ void opacity_apply( VJFrame *frame, VJFrame *frame2, int width,
 #ifdef HAVE_ASM_MMX
 	__asm __volatile( "\n\t emms" );
 #endif
-	while (y--)
+	if( y>0) while (y--)
 		frame->data[0][y] = ((opacity * (frame->data[0][y] - frame2->data[0][y])) >> 8 ) + frame->data[0][y];
-	while( u-- )
+
+	if( u>0) while( u-- )
 		frame->data[1][u] = ((opacity * (frame->data[1][u] - frame2->data[1][u])) >> 8 ) + frame->data[1][u];
-	while( v-- )
+
+	if(v>0)	 while( v-- )
 		frame->data[2][v] = ((opacity * (frame->data[2][v] - frame2->data[2][v])) >> 8 ) + frame->data[2][v];
 
 }
