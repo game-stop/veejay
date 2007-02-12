@@ -37,7 +37,6 @@
 #include <libsample/sampleadm.h>
 #include <libstream/vj-yuv4mpeg.h>
 #include <libvjnet/vj-client.h>
-#include <libel/vj-avformat.h>
 #include <libstream/vj-dv1394.h>
 #ifdef USE_GDK_PIXBUF
 typedef struct
@@ -49,7 +48,6 @@ typedef struct
 typedef struct {
 	void	*unicap[VJ_TAG_MAX_STREAM_IN];
     vj_yuv *stream[VJ_TAG_MAX_STREAM_IN];
-    vj_avformat *avformat[VJ_TAG_MAX_STREAM_IN];
 	vj_client *net[VJ_TAG_MAX_STREAM_IN];
     vj_dv1394 *dv1394[VJ_TAG_MAX_STREAM_IN];
 #ifdef USE_GDK_PIXBUF
