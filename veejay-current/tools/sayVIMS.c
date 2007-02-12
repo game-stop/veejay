@@ -236,7 +236,7 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					fprintf(stderr,"Delay not valid: '%s'\n", wait_ );
+					fprintf(stderr,"Delay not valid: '%d'\n", wait_ );
 				}
 			}
 			else
