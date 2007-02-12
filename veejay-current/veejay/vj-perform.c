@@ -2865,6 +2865,7 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 	video_playback_setup *settings = info->settings;
 	long this_frame = settings->current_frame_num;
 	int num_samples =  (el->audio_rate/el->video_fps);
+	int pred_len = num_samples;
 	int bps		=   el->audio_bps;
 	uint8_t *a_buf = top_audio_buffer;
 
