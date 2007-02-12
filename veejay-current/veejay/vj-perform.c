@@ -1804,12 +1804,21 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 			veejay_memset( audio_buf, 0, pred_len * bps );
 		} else	{
 			len = vj_el_get_audio_frame( info->edit_list, settings->current_frame_num, audio_buf );
+			if(len <= 0 )
+			{
+				veejay_memset( audio_buf,0, pred_len * bps );
+				len = pred_len;
+			}
 			if( speed < 0 )
 				vj_perform_reverse_audio_frame(info,len,audio_buf);
 		}
 	
 		if( len < pred_len )
+		{
 			veejay_memset( audio_buf + (len * bps ) , 0, (pred_len- len) * bps );
+			len = pred_len;
+		}
+
 	} 
 
 	if( simple_frame_duplicator <= info->sfd  && info->sfd > 1)
@@ -1826,9 +1835,6 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 			veejay_memcpy( audio_buf, down_sample_buffer + (simple_frame_duplicator * pred_len * bps ), pred_len * bps );
 		}
 	}
-
-	if( len < pred_len )
-		len = pred_len;
 
 	return len;
 #else
@@ -2859,7 +2865,6 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 	video_playback_setup *settings = info->settings;
 	long this_frame = settings->current_frame_num;
 	int num_samples =  (el->audio_rate/el->video_fps);
-	int grab_samples = 0;
 	int bps		=   el->audio_bps;
 	uint8_t *a_buf = top_audio_buffer;
 
@@ -2877,11 +2882,21 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 			case VJ_PLAYBACK_MODE_SAMPLE:
 				if( el->has_audio )
 					num_samples = vj_perform_fill_audio_buffers(info,a_buf,	audio_render_buffer + (2* PERFORM_AUDIO_SIZE * MAX_SPEED));
+				if(num_samples <= 0 )
+				{
+					num_samples = pred_len;
+					veejay_memset( a_buf, 0, num_samples * bps );
+				}
 				break;
 			case VJ_PLAYBACK_MODE_PLAIN:
 				if( el->has_audio )
 				{
 					num_samples =	vj_el_get_audio_frame(el, this_frame,a_buf );
+					if( num_samples <= 0 )
+					{
+						num_samples = pred_len;
+						veejay_memset( a_buf, 0, num_samples * bps );
+					}
 					if( settings->current_playback_speed < 0 )
 						vj_perform_reverse_audio_frame(info,num_samples,a_buf);
 				}
@@ -2889,15 +2904,22 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 			//@ pfffff there is no stream that delivers audio anyway yet
 			case VJ_PLAYBACK_MODE_TAG:
 				if(el->has_audio)
+				{
 				    	num_samples = vj_tag_get_audio_frame(info->uc->sample_id, a_buf);
+					if(num_samples <= 0 )
+					{
+						num_samples = pred_len;
+						veejay_memset(a_buf, 0, num_samples * bps );
+					}
+				}
 				break;
 		}
 
 		if( jack_rate_ != el->audio_rate)
 		{
 			veejay_memcpy( resample_audio_buffer, a_buf, num_samples * bps);
-			grab_samples = audio_resample( resample_jack, (short*)top_audio_buffer,(short*)a_buf, num_samples );
-			vj_jack_play( top_audio_buffer, grab_samples * bps );
+			num_samples = audio_resample( resample_jack, (short*)top_audio_buffer,(short*)a_buf, num_samples );
+			vj_jack_play( top_audio_buffer, num_samples * bps );
 		}
 		else
 		{
