@@ -186,6 +186,7 @@ typedef struct {
 	int	links[16];
 	int	ncpu;
 	int	vp_rec;
+	int	late[2];
 } video_playback_setup;
 
 

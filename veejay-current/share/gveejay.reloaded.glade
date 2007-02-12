@@ -15468,7 +15468,6 @@ MLZO</property>
 
 	      <child>
 		<widget class="GtkExpander" id="expander9">
-		  <property name="visible">True</property>
 		  <property name="can_focus">True</property>
 		  <property name="expanded">False</property>
 		  <property name="spacing">0</property>

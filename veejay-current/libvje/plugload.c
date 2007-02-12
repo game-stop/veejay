@@ -57,7 +57,7 @@
 #include <libvje/specs/FreeFrame.h>
 #include <libvje/specs/frei0r.h>
 
-#define V_BITS 32
+#define V_BITS 24 
 #include <assert.h>
 
 #define   livido_port_t vevo_port_t
@@ -691,33 +691,6 @@ static	void	scan_plugins()
 	}
 }
 
-static	void	process_mix_plugin( void *plugin, void *buffera , void *bufferb, void *out_buffer)
-{
-	int type = 0;
-	vevo_property_get( plugin, "type", 0, &type);
-	if( type == VEVO_FF_PORT )
-	{	
-	/*	void *base = NULL;
-		vevo_property_get( plugin, "base", 0, &base);
-		plugMainType *q = (plugMainType*) base; 
-		int instance = 0;
-		vevo_property_get( plugin, "instance",0, &instance );	
-		q( FF_PROCESSFRAME, buffer, instance );*/
-	}
-	else if (type == VEVO_FR_PORT )
-	{
-		f0r_update2_f base;
-		vevo_property_get( plugin, "process_mix", 0, &base );
-		f0r_instance_t instance;
-		vevo_property_get( plugin, "instance",0, &instance );		
-		(*base)( instance, rand(), buffera, bufferb, NULL, out_buffer );
-	}
-	else if ( type == VEVO_LIVIDO_PORT )
-	{
-
-	}
-}
-
 static	void	process_plug_plugin( void *plugin, void *buffer , void *out_buffer)
 {
 	int type = 0;
@@ -760,12 +733,9 @@ void	plug_free(void)
 
 void	plug_init( int w, int h )
 {
-	buffer_ = (void*) malloc( w * h * (V_BITS >> 3));
-	memset( buffer_, 0, w * h * (V_BITS >> 3));
-	buffer2_ = (void*) malloc( w * h * (V_BITS >> 3));
-	memset( buffer2_, 0, w * h  * (V_BITS >> 3 ));
-	buffer_b_ = (void*) malloc( w * h * (V_BITS >> 3));
-	memset( buffer_b_, 0, w * h  * (V_BITS >> 3 ));
+	buffer_ = (void*) vj_calloc( w * h * (V_BITS >> 3));
+	buffer2_ = (void*) vj_calloc( w * h * (V_BITS >> 3));
+	buffer_b_ = (void*) vj_calloc( w * h * (V_BITS >> 3));
 	
 	base_width_ = w;
 	base_height_ = h;
@@ -773,8 +743,7 @@ void	plug_init( int w, int h )
 
 int	plug_detect_plugins(void)
 {
-	index_map_ = (vevo_port_t**) malloc(sizeof(vevo_port_t*) * 256 );
-	memset( index_map_ , 0, sizeof( vevo_port_t*) * 256 );
+	index_map_ = (vevo_port_t**) vj_calloc(sizeof(vevo_port_t*) * 256 );
 	
 	illegal_plugins_ = vpn( VEVO_ILLEGAL );
 
@@ -809,11 +778,10 @@ int	plug_detect_plugins(void)
 
 vj_effect	*plug_get_plugin( int n )
 {
-	vj_effect *vje = (vj_effect*) malloc(sizeof(vj_effect));
-	memset( vje, 0,sizeof(vj_effect));
+	vj_effect *vje = (vj_effect*) vj_calloc(sizeof(vj_effect));
 	vevo_port_t *port = index_map_[n];
 	size_t name_len = vevo_property_element_size( port, "name", 0 );
-	vje->description = (char*) malloc( name_len );
+	vje->description = (char*) vj_calloc( name_len );
 	vevo_property_get( port, "name", 0, &(vje->description));
 	vevo_property_get( port, "n_params", 0, &(vje->num_params));
 	vevo_property_get( port, "mixer", 0, &(vje->extra_frame));
@@ -826,13 +794,9 @@ vj_effect	*plug_get_plugin( int n )
 			vje->num_params = 8;
 		}	
 
-		vje->defaults = (int*) malloc(sizeof(int) * vje->num_params );
-		vje->limits[0] = (int*) malloc(sizeof(int) * vje->num_params );
-		vje->limits[1] = (int*) malloc(sizeof(int) * vje->num_params );
-
-		memset( vje->defaults,0,sizeof(int) * vje->num_params );
-		memset( vje->limits[0],0,sizeof(int) * vje->num_params );
-		memset( vje->limits[1],0, sizeof(int) * vje->num_params );
+		vje->defaults = (int*) vj_calloc(sizeof(int) * vje->num_params );
+		vje->limits[0] = (int*) vj_calloc(sizeof(int) * vje->num_params );
+		vje->limits[1] = (int*) vj_calloc(sizeof(int) * vje->num_params );
 
 		int k = 0;
 		int valid_p = 0;
@@ -957,82 +921,6 @@ void	plug_control( int fx_id, int *args )
 	}
 }
 
-void	plug_process_mix( VJFrame *frame, VJFrame *frame_b,int fx_id, int src_fmt )
-{
-	AVPicture p1,p2;
-	AVPicture o1,o2;
-	AVPicture b1,b2 ;
-	void	*plugin = index_map_[fx_id];
-	
-	memset( &p1, 0, sizeof(p1));
-	memset( &p2, 0, sizeof(p2));
-	memset( &o1, 0, sizeof(o1));
-	memset( &o2, 0, sizeof(o2));
-	memset( &b1, 0, sizeof(b1));
-	memset( &b2, 0, sizeof(b2));
-
-	p1.data[0] = buffer_;
-	p1.linesize[0] = base_width_ * 4;
-
-	p2.data[0] = frame->data[0];
-	p2.data[1] = frame->data[1];
-	p2.data[2] = frame->data[2];
-
-	b1.data[0] = buffer_b_;
-	b1.linesize[0] = base_width_ * 4;
-
-	b2.data[0] = frame_b->data[0];
-	b2.data[1] = frame_b->data[1];
-	b2.data[2] = frame_b->data[2];
-
-	p2.linesize[0] = base_width_;
-	p2.linesize[1] = (src_fmt < 2 ? base_width_ >> 1 : base_width_);
-	p2.linesize[2] = (src_fmt < 2 ? base_width_ >> 1 : base_width_); 
-
-	int srcf = 0;
-	if( src_fmt == 1 )
-		srcf = PIX_FMT_YUV422P;
-	else if( src_fmt == 0 )
-		srcf = PIX_FMT_YUV420P;
-		else if ( src_fmt == 2 )
-			srcf = PIX_FMT_YUVJ420P;
-		   else srcf = PIX_FMT_YUVJ422P;
-
-	img_convert( &p1, PIX_FMT_RGBA32,
-		     &p2, srcf,
-			base_width_, base_height_ );
-	img_convert( &b1, PIX_FMT_RGBA32,
-		     &b2, srcf,
-			base_width_, base_height_ );
-
-
-	process_mix_plugin( plugin, p1.data[0],buffer_b_, buffer2_ );
-	int type = 0;
-	vevo_property_get( plugin, "type", 0, &type );
-	if( type == VEVO_FF_PORT )
-	{
-		o1.data[0] = p1.data[0];
-		o1.linesize[0] = base_width_ * 4;
-	}
-	else if (type == VEVO_FR_PORT )
-	{
-		o1.data[0] = buffer2_;
-		o1.linesize[0] = base_width_ * 4;
-	}
-
-	o2.data[0] = frame->data[0];
-	o2.data[1] = frame->data[1];
-	o2.data[2] = frame->data[2];
-
-	o2.linesize[0] = base_width_;
-	o2.linesize[1] = (src_fmt < 2 ? base_width_ >> 1 : base_width_);
-	o2.linesize[2] = (src_fmt < 2 ? base_width_ >> 1 : base_width_); 
-
-	img_convert( &o2, srcf,
-		     &o1, PIX_FMT_RGBA32,
- 			base_width_, base_height_ );
-	
-}
 void	plug_process( VJFrame *frame,VJFrame *b, int fx_id, int src_fmt )
 {
 	AVPicture p1,p2;
@@ -1043,68 +931,20 @@ void	plug_process( VJFrame *frame,VJFrame *b, int fx_id, int src_fmt )
 	vevo_property_get( plugin, "mixer", 0, &is_mix );
 	if( is_mix ) 
 	{
-		plug_process_mix( frame, b, fx_id, src_fmt );
+		veejay_msg(0, "Not supporting mixing plugins yet");
 		return;
 	}
+
+	VJFrame *dst1 = yuv_rgb_template( buffer_, frame->width,frame->height,
+				PIX_FMT_RGB24 );
+
+	yuv_convert_any( frame, dst1, src_fmt, dst1->format );
 	
-	memset( &p1, 0, sizeof(p1));
-	memset( &p2, 0, sizeof(p2));
-	memset( &o1, 0, sizeof(o1));
-	memset( &o2, 0, sizeof(o2));
+	process_plug_plugin( plugin, buffer_, buffer2_ );
 
-	p1.data[0] = buffer_;
-	p1.linesize[0] = base_width_ * 4;
+	yuv_convert_any( dst1, frame, dst1->format, src_fmt );
 
-	p2.data[0] = frame->data[0];
-	p2.data[1] = frame->data[1];
-	p2.data[2] = frame->data[2];
+	free(dst1);
 
-	p2.linesize[0] = base_width_;
-	p2.linesize[1] = (src_fmt < 2 ? base_width_ >> 1 : base_width_);
-	p2.linesize[2] = (src_fmt < 2 ? base_width_ >> 1 : base_width_); 
-
-	int srcf = 0;
-	if( src_fmt == 1 )
-		srcf = PIX_FMT_YUV422P;
-	else if( src_fmt == 0 )
-		srcf = PIX_FMT_YUV420P;
-		else if( src_fmt == 2 )
-			srcf = PIX_FMT_YUVJ420P;
-	else srcf = PIX_FMT_YUVJ422P;
-
-	img_convert( &p1, PIX_FMT_RGBA32,
-		     &p2, srcf,
-			base_width_, base_height_ );
-
-	process_plug_plugin( plugin, p1.data[0], buffer2_ );
-	int type = 0;
-	vevo_property_get( plugin, "type", 0, &type );
-	if( type == VEVO_FF_PORT )
-	{
-		o1.data[0] = p1.data[0];
-		o1.linesize[0] = base_width_ * 4;
-	}
-	else if (type == VEVO_FR_PORT )
-	{
-		o1.data[0] = buffer2_;
-		o1.linesize[0] = base_width_ * 4;
-	}
-	else if (type == VEVO_LIVIDO_PORT )
-	{
-
-	}
-
-	o2.data[0] = frame->data[0];
-	o2.data[1] = frame->data[1];
-	o2.data[2] = frame->data[2];
-
-	o2.linesize[0] = base_width_;
-	o2.linesize[1] = (src_fmt < 2 ? base_width_ >> 1 : base_width_);
-	o2.linesize[2] = (src_fmt < 2 ? base_width_ >> 1 : base_width_); 
-
-	img_convert( &o2, srcf,
-		     &o1, PIX_FMT_RGBA32,
- 			base_width_, base_height_ );
-	
 }
 

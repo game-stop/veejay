@@ -160,8 +160,6 @@ void vj_osc_cb_tag_new_net(void *context, int arglen, const void *vargs, OSCTime
 
 void vj_osc_cb_tag_new_mcast(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra );
 
-void vj_osc_cb_tag_new_avformat(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
-
 void vj_osc_cb_load_samplelist(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_save_samplelist(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_output_start_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
@@ -829,11 +827,6 @@ void vj_osc_cb_tag_new_mcast(void *context, int arglen, const void *vargs, OSCTi
 {
 	NET_F_mixed(arglen,vargs,VIMS_STREAM_NEW_MCAST);
 }
-void vj_osc_cb_tag_new_avformat(void *context, int arglen, const void *vargs, OSCTimeTag when,
-	NetworkReturnAddressPtr ra)
-{
-	NET_F_str(arglen,vargs,VIMS_STREAM_NEW_AVFORMAT);
-}
 
 void vj_osc_cb_tag_new_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when,
 	NetworkReturnAddressPtr ra)
@@ -965,8 +958,6 @@ static struct
 								"v4l",			vj_osc_cb_tag_new_v4l,				19	},
 	{ "new yuv4mpeg input stream <filename>",
 								"y4m",			vj_osc_cb_tag_new_y4m,				19	},
-	{ "new ffmpeg input stream <filename>",
-								"avformat",		vj_osc_cb_tag_new_avformat,			19	},
 	{ "new multicast input stream <address> <port>",
 								"mcast",		vj_osc_cb_tag_new_mcast,			19 },
 	{ "new peer-to-peer input stream <hostname> <port>",

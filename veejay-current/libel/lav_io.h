@@ -19,6 +19,7 @@
 
 #include <config.h>
 #include <libel/avilib.h>
+#include <libvje/vje.h>
 #ifdef SUPPORT_READ_DV2
 #include <libel/rawdv.h>
 #endif
@@ -110,7 +111,7 @@ const char *lav_strerror(void);
 int  lav_fileno( lav_file_t *lav_file );
 void lav_set_default_chroma(int c);
 #ifdef USE_GDK_PIXBUF
-uint8_t *lav_get_frame_ptr( lav_file_t *lav_file );
+VJFrame *lav_get_frame_ptr( lav_file_t *lav_file );
 void	lav_set_project( int w, int h, float fps, int shift );
 #endif
 #endif

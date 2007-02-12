@@ -1057,7 +1057,7 @@ int lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf)
 }
 
 #ifdef USE_GDK_PIXBUF
-uint8_t *lav_get_frame_ptr( lav_file_t *lav_file )
+VJFrame *lav_get_frame_ptr( lav_file_t *lav_file )
 {
 	if(lav_file->format == 'x')
 		return vj_picture_get( lav_file->picture );
@@ -1338,7 +1338,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		if(!alt)
 		{
 			lav_fd->picture = vj_picture_open( (const char*) filename,
-				output_scale_width, output_scale_height, output_yuv );
+				output_scale_width, output_scale_height, get_ffmpeg_pixfmt(output_yuv) );
 			if(lav_fd->picture)
 			{
 				lav_fd->format = 'x';

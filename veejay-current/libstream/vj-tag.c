@@ -38,7 +38,6 @@
 #endif
 #include <libvjmsg/vj-common.h>
 #include <libstream/vj-shm.h>
-#include <libel/vj-avformat.h>
 #include <libel/vj-avcodec.h>
 #include <libvjnet/vj-client.h>
 #include <libvjnet/common.h>
@@ -66,7 +65,6 @@ static void *unicap_data_= NULL;
 //forward decl
 
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int ty );
-int _vj_tag_new_avformat( vj_tag *tag, int stream_nr, editlist *el);
 int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el);
 
 extern int   sufficient_space(int max_size, int nframes);
@@ -366,37 +364,6 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
 	return 1;
 }
 
-int _vj_tag_new_avformat( vj_tag *tag, int stream_nr, editlist *el)
-{
-	int stop = 0;
-	if(stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN) return 0;
-
-	vj_tag_input->avformat[stream_nr] = vj_avformat_open_input( (const char*)tag->source_name );	
-	if(vj_tag_input->avformat[stream_nr]==NULL)
-	{
-		return 0;
-	}
-	veejay_msg(VEEJAY_MSG_INFO, "Opened [%s] , %d x %d @ %2.2f fps ",
-			tag->source_name,
-			vj_avformat_get_video_width( vj_tag_input->avformat[stream_nr]),
-			vj_avformat_get_video_height( vj_tag_input->avformat[stream_nr]),
-			vj_avformat_get_video_fps( vj_tag_input->avformat[stream_nr]  ));
-
-	if( vj_avformat_get_video_width( vj_tag_input->avformat[stream_nr] ) != el->video_width)
-		stop = 1;
-	if( vj_avformat_get_video_height(vj_tag_input->avformat[stream_nr] ) != el->video_height)
-		stop = 1;
-	if( vj_avformat_get_video_fps(vj_tag_input->avformat[stream_nr] ) != el->video_fps)
-		stop = 1;
-	
-	if(stop)
-	{
-		vj_avformat_close_input( vj_tag_input->avformat[stream_nr]);
-		return 0;
-	}	
-
-	return 1;
-}
 #ifdef USE_GDK_PIXBUF
 int _vj_tag_new_picture( vj_tag *tag, int stream_nr, editlist *el)
 {
@@ -639,12 +606,6 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	veejay_msg(VEEJAY_MSG_DEBUG, "libdv not enabled at compile time");
 	return -1;
 #endif
-    case VJ_TAG_TYPE_AVFORMAT:
-	sprintf(tag->source_name, "%s", filename);
-	if( _vj_tag_new_avformat( tag,stream_nr, el ) != 1 )
-		return -1;
-	tag->active = 1;
-	break;
 #ifdef USE_GDK_PIXBUF
 	case VJ_TAG_TYPE_PICTURE:
 	sprintf(tag->source_name, "%s", filename);
@@ -805,10 +766,6 @@ int vj_tag_del(int id)
 		vj_dv1394_close( vj_tag_input->dv1394[tag->index] );
 		break;
 #endif
-     case VJ_TAG_TYPE_AVFORMAT:
-		veejay_msg(VEEJAY_MSG_INFO, "Closing avformat stream %s", tag->source_name);
-		vj_avformat_close_input( vj_tag_input->avformat[tag->index]);
-	break;
 #ifdef USE_GDK_PIXBUF
 	case VJ_TAG_TYPE_PICTURE:
 		veejay_msg(VEEJAY_MSG_INFO, "Closing picture stream %s", tag->source_name);
@@ -2059,9 +2016,6 @@ void	vj_tag_get_by_type(int type, char *description )
 	case VJ_TAG_TYPE_NET:
 	sprintf(description, "%s", "Unicast");
 	break;
-    case VJ_TAG_TYPE_AVFORMAT:
-	sprintf(description, "%s", "AVFormat");
-	break;
 #ifdef USE_GDK_PIXBUF
 	case VJ_TAG_TYPE_PICTURE:
 	sprintf(description, "%s", "GdkPixbuf");
@@ -2247,9 +2201,6 @@ int vj_tag_get_audio_frame(int t1, uint8_t *dst_buffer)
 		vj_dv_decoder_get_audio( vj_tag_input->dv1394[tag->index], dst_buffer );	
 	}
 #endif
-	if(tag->source_type == VJ_TAG_TYPE_AVFORMAT)
-		return (vj_avformat_get_audio( vj_tag_input->avformat[tag->index], dst_buffer, -1 ));
-
 	return 0;    
 }
 
@@ -2270,7 +2221,8 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	switch (tag->source_type)
 	{
 	case VJ_TAG_TYPE_V4L:
-		vj_unicap_grab_frame( vj_tag_input->unicap[tag->index], buffer, width,height );
+		if(vj_unicap_status(vj_tag_input->unicap[tag->index]) )
+			vj_unicap_grab_frame( vj_tag_input->unicap[tag->index], buffer, width,height );
 		return 1;
 		break;
 #ifdef USE_GDK_PIXBUF
@@ -2290,12 +2242,6 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		}
 		break;
 #endif
-
-    	case VJ_TAG_TYPE_AVFORMAT:
-		if(!vj_avformat_get_video_frame( vj_tag_input->avformat[tag->index], buffer, -1,vj_tag_input->pix_fmt )) 
-	 		return -1;
-		break;
-		
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
 		if(!net_thread_get_frame( tag,buffer ))
@@ -2319,7 +2265,17 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 				vj_tag_set_active(t1,0);
 				return -1;
 			}
-			yuv420p_to_yuv422p2( _temp_buffer[0],_temp_buffer[1],_temp_buffer[2],buffer,width,height);
+			
+			VJFrame *srci = yuv_yuv_template( _temp_buffer[0],_temp_buffer[1],_temp_buffer[2],
+						width,height, PIX_FMT_YUV420P);
+			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], width,height,
+						get_ffmpeg_pixfmt( vj_tag_input->pix_fmt ));
+
+			yuv_convert_any( srci,dsti, srci->format, dsti->format );
+			
+			free(srci);
+			free(dsti);
+
 		}
 		return 1;
 		

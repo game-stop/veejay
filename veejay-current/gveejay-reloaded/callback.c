@@ -1412,7 +1412,7 @@ void	on_inputstream_filebrowse_clicked(GtkWidget *w, gpointer user_data)
 		g_free(filename);
 	}
 }
-
+/*
 void	on_inputstream_file_button_clicked(GtkWidget *w, gpointer user_data)
 {
 	gint use_y4m = is_button_toggled( "inputstream_filey4m" );
@@ -1441,7 +1441,7 @@ void	on_inputstream_file_button_clicked(GtkWidget *w, gpointer user_data)
 	gveejay_new_slot(MODE_STREAM);
 
 	if(filename) g_free( filename );
-}
+}*/
 
 void	on_samplerand_toggled(GtkWidget *widget, gpointer user_data)
 {

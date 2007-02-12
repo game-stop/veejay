@@ -39,7 +39,7 @@ void vj_effman_apply_ff_effect(
 {
 	plug_control( entry - MAX_EFFECTS, arg );
 	
-	plug_process( frames[0],frames[1],entry - MAX_EFFECTS, frames[0]->format );
+	plug_process( frames[0],frames[1],entry - MAX_EFFECTS, get_ffmpeg_pixfmt(frames[0]->format) );
 }
 
 void vj_effman_apply_image_effect(

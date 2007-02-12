@@ -50,7 +50,6 @@ void chroma_subsample_cp(subsample_mode_t mode, void *data, uint8_t *ycbcr[], ui
 
 void chroma_supersample(subsample_mode_t mode, void *sampler, uint8_t * ycbcr[],
 			int width, int height);
-void    util_convertrgb24( uint8_t **data, int w, int h,int in_pix_fmt,int shiftv, void *out_buffer );
 
 // yuv 4:2:2 packed to yuv 4:2:0 planar 
 void yuy2toyv12( uint8_t *y, uint8_t *u, uint8_t *v,  uint8_t *in, int w, int h);
@@ -83,6 +82,8 @@ typedef struct
 	int	use_filter;
 } sws_template;
 
+void	yuv_init_lib();
+
 void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *templ, int cpu_flags);
 
 void	yuv_convert_and_scale( void *sws, VJFrame *src, VJFrame *dst );
@@ -99,11 +100,6 @@ void  	yuv_crop(VJFrame *src, VJFrame *dst, VJRectangle *rect );
 
 VJFrame	*yuv_allocate_crop_image( VJFrame *src, VJRectangle *rect );
 
-
-void    util_convertsrc( void *indata, int w, int h, int out_pix_fmt, int shift, uint8_t **data, int rgb);
-
-void    util_convertrgba32( uint8_t **data, int w, int h,int in_pix_fmt,int shiftv, void *out_buffer );
-
 void	yuv_deinterlace(
 		uint8_t *data[3],
 		const int width,
@@ -111,4 +107,20 @@ void	yuv_deinterlace(
 		int out_pix_fmt,
 		int shift,
 		uint8_t *Y,uint8_t *U, uint8_t *V );
+
+
+void	yuv_init_lib();
+
+void	yuv_free_lib();
+
+void	yuv_convert_any( VJFrame *src, VJFrame *dst, int a, int b );
+
+void	yuv_convert_any3( VJFrame *src,int strides[], VJFrame *dst, int a, int b );
+
+
+VJFrame *yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt );
+
+VJFrame *yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int fmt );
+
+
 #endif

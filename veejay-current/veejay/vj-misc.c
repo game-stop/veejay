@@ -97,10 +97,18 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
 
     if( tmp.shift_v == 0 )
     {
-	tmp.data[0] = (uint8_t*) malloc(sizeof(uint8_t) * tmp.len );
-	tmp.data[1] = (uint8_t*) malloc(sizeof(uint8_t) * tmp.uv_len );
-	tmp.data[2] = (uint8_t*) malloc(sizeof(uint8_t) * tmp.uv_len );
-	yuv422p_to_yuv420p2( src, tmp.data, tmp.width, tmp.height );
+	tmp.data[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * tmp.len * 3);
+	tmp.data[1] = tmp.data[0] + tmp.len;
+	tmp.data[2] = tmp.data[1] + tmp.len + tmp.uv_len;
+
+	tmp.format = PIX_FMT_YUV420P;
+	
+	VJFrame *srci = yuv_yuv_template( src[0],src[1],src[2], info->video_output_width,
+					info->video_output_height , PIX_FMT_YUV422P);
+
+	yuv_convert_any( srci,&tmp, srci->format, tmp.format );
+
+    	free(srci);
     }
     else
     {
@@ -137,8 +145,6 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
     if( tmp.shift_v == 0 )
     {
 	free(tmp.data[0]);
-	free(tmp.data[1]);
-	free(tmp.data[2]);
     }
 
     return res;

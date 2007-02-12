@@ -24,6 +24,7 @@
 #include <libgoom/goom.h>
 #include <stdlib.h>
 
+static	VJFrame	*rgb_frame_ = NULL;
 static	PluginInfo *goom_ = NULL;
 static uint8_t *goom_buffer_ = NULL;
 static  int last_= 0;
@@ -56,6 +57,7 @@ int goomfx_malloc(int width, int height)
 		return 0;
 	goom_buffer_ = vj_malloc( width * height * 4 );
 	goom_set_screenbuffer( goom_, goom_buffer_);
+	rgb_frame_ = yuv_rgb_template( goom_buffer_, width,height, PIX_FMT_RGBA);
 	return 1;
 }
 void goomfx_free()
@@ -63,58 +65,38 @@ void goomfx_free()
 	goom_close( goom_ );
 	if(goom_buffer_)
 		free(goom_buffer_);
+	if(rgb_frame_)
+		free(rgb_frame_);
 	goom_buffer_ = NULL;
 	goom_ = NULL;
+	rgb_frame_ = NULL;
 }
 
 
 
 void goomfx_apply( VJFrame *frame, int width, int height, int val, int val2)
 {
-    unsigned int i;
-    uint8_t *Y = frame->data[0];
-    uint8_t *U = frame->data[0];
-    uint8_t *V = frame->data[0];
-
-    
-    int chunks = frame->len / 1024;
-    int16_t data[2][1024];
-    float fps = (float)val2 * 0.01f;
-    int len = frame->width * frame->height;
-    int uv_len = frame->uv_len;
-    uint8_t hisUV[512];
+	unsigned int i;
+	int chunks = frame->len / 1024;
+	int16_t data[2][1024];
+	float fps = (float)val2 * 0.01f;
+	int len = frame->width * frame->height;
+	int uv_len = frame->uv_len;
+	uint8_t hisUV[512];
 	uint8_t hisY[256];
-    int j;
+	int j;
 
 	if( last_ >= chunks )
 		last_ = 0;
 	i = last_;
    	last_ ++; 
 
-/*	veejay_memset( hisY,0, 256 );
-	veejay_memset( hisUV,0,512 );
-	for( j = 0; j < len ; j ++ )
-		hisY[ ( Y[j] ) ] ++;
-	for( j = 0; j < uv_len ; j ++ )
-	{
-		hisUV[ ( U[j] ) ] ++;
-		hisUV[ (256 + ( V[j] )) ] ++;
-	}
-	*/
 	for( j = 0; j < 512; j ++ )
 	{
-//		data[0][j] = ( hisY[(j%2)]-128 ) * 256;
-//		data[1][j] = ( hisUV[j]-128 ) * 256;
 		data[0][j] = -32765 * rand()/(RAND_MAX);
 		data[1][j] = -32765 * rand()/(RAND_MAX);
 	}
 	
-//	for( j = 0; j < 512; j ++ )
-	//{
-	//	data[0][j] = (Y[i+j]-128) * 256;
-//	data[1][j] = (Y[i+j]-128) * 256;
-//	}
-	    
     	goom_update( goom_, 
 		    data,
 		    val,
@@ -122,17 +104,6 @@ void goomfx_apply( VJFrame *frame, int width, int height, int val, int val2)
 		    NULL,
 		    NULL );
     
-    int pix_fmt = 0;
-    if( frame->shift_v == 0 )
-	    pix_fmt = PIX_FMT_YUV422P;
-    else
-	    pix_fmt = PIX_FMT_YUV420P;
-    util_convertsrc( goom_buffer_,
-		    width,
-		    height,
-		    pix_fmt,
-		    1,
-		    frame->data,
-		    1 );
-		    
+    
+	yuv_convert_any( rgb_frame_, frame, PIX_FMT_RGBA, frame->format );
 }

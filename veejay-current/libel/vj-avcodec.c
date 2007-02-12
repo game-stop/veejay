@@ -35,8 +35,6 @@
 
 static int out_pixel_format = FMT_420; 
 
-static void	yuv422p3_to_yuv420p3( uint8_t *src[3], uint8_t *dst[3], int w, int h, int fmt);
-
 char*	vj_avcodec_get_codec_name(int codec_id )
 {
 	char name[20];
@@ -313,144 +311,6 @@ int		vj_avcodec_free()
 {
 	return 1;
 }
-void	yuv422p_to_yuv420p3( uint8_t *src, uint8_t *dst[3], int w, int h)
-{
-	AVPicture pict1,pict2;
-	memset(&pict1,0,sizeof(pict1));
-	memset(&pict2,0,sizeof(pict2));
-
-	pict1.data[0] = src;
-	pict1.data[1] = src+(w*h);
-	pict1.data[2] = src+(w*h)+((w*h)/2);
-	pict1.linesize[0] = w;
-	pict1.linesize[1] = w >> 1;
-	pict1.linesize[2] = w >> 1;
-	pict2.data[0] = dst[0];
-	pict2.data[1] = dst[1];
-	pict2.data[2] = dst[2];
-	pict2.linesize[0] = w;
-	pict2.linesize[1] = w >> 1;
-	pict2.linesize[2] = w >> 1;	
-
-	img_convert( &pict2, PIX_FMT_YUV420P, &pict1, PIX_FMT_YUV422P, w, h );
-	return;
-}
-void	yuv422p_to_yuv420p2( uint8_t *src[3], uint8_t *dst[3], int w, int h, int fmt)
-{
-	AVPicture pict1,pict2;
-	memset(&pict1,0,sizeof(pict1));
-	memset(&pict2,0,sizeof(pict2));
-
-	pict1.data[0] = src[0];
-	pict1.data[1] = src[1];
-	pict1.data[2] = src[2];
-	pict1.linesize[0] = w;
-	pict1.linesize[1] = w >> 1;
-	pict1.linesize[2] = w >> 1;
-	pict2.data[0] = dst[0];
-	pict2.data[1] = dst[1];
-	pict2.data[2] = dst[2];
-	pict2.linesize[0] = w;
-	pict2.linesize[1] = w >> 1;
-	pict2.linesize[2] = w >> 1;	
-
-	img_convert( &pict2, PIX_FMT_YUV420P, &pict1, (fmt == FMT_422 ?PIX_FMT_YUV422P: PIX_FMT_YUVJ422P), w, h );
-	return;
-}
-static void	yuv422p3_to_yuv420p3( uint8_t *src[3], uint8_t *dst[3], int w, int h, int fmt)
-{
-	AVPicture pict1,pict2;
-	memset(&pict1,0,sizeof(pict1));
-	memset(&pict2,0,sizeof(pict2));
-
-	pict1.data[0] = src[0];
-	pict1.data[1] = src[1];
-	pict1.data[2] = src[2];
-	pict1.linesize[0] = w;
-	pict1.linesize[1] = w >> 1;
-	pict1.linesize[2] = w >> 1;
-	pict2.data[0] = dst[0];
-	pict2.data[1] = dst[1];
-	pict2.data[2] = dst[2];
-	pict2.linesize[0] = w;
-	pict2.linesize[1] = w >> 1;
-	pict2.linesize[2] = w >> 1;	
-
-	img_convert( &pict2, PIX_FMT_YUV420P, &pict1, (fmt == FMT_422 ? PIX_FMT_YUV422P:PIX_FMT_YUVJ422P), w, h );
-}
-
-int	yuv422p_to_yuv420p( uint8_t *src[3], uint8_t *dst, int w, int h)
-{
-
-	int len = w* h ;
-	int uv_len = len / 4;
-	AVPicture pict1,pict2;
-	memset(&pict1,0,sizeof(pict1));
-	memset(&pict2,0,sizeof(pict2));
-
-	pict1.data[0] = src[0];
-	pict1.data[1] = src[1];
-	pict1.data[2] = src[2];
-	pict1.linesize[0] = w;
-	pict1.linesize[1] = w >> 1;
-	pict1.linesize[2] = w >> 1;
-	pict2.data[0] = dst;
-	pict2.data[1] = dst + len;
-	pict2.data[2] = dst + len + uv_len;
-	pict2.linesize[0] = w;
-	pict2.linesize[1] = w >> 1;
-	pict2.linesize[2] = w >> 1;	
-
-	img_convert( &pict2, PIX_FMT_YUV420P, &pict1, PIX_FMT_YUV422P, w, h );
-	return (len + uv_len + uv_len);
-
-}
-int	yuv420p_to_yuv422p2( uint8_t *sY,uint8_t *sCb, uint8_t *sCr, uint8_t *dst[3], int w, int h )
-{
-	const int len = w * h;
-	const int uv_len = len / 2; 
-	AVPicture pict1,pict2;
-	memset(&pict1,0,sizeof(pict1));
-	memset(&pict2,0,sizeof(pict2));
-	pict1.data[0] = sY;
-	pict1.data[1] = sCb;
-	pict1.data[2] = sCr;
-	pict1.linesize[0] = w;
-	pict1.linesize[1] = w >> 1;
-	pict1.linesize[2] = w >> 1;
-	pict2.data[0] = dst[0];
-	pict2.data[1] = dst[1];
-	pict2.data[2] = dst[2];
-	pict2.linesize[0] = w;
-	pict2.linesize[1] = w >> 1;
-	pict2.linesize[2] = w >> 1;	
-
-	img_convert( &pict2, PIX_FMT_YUV422P, &pict1, PIX_FMT_YUV420P, w, h );
-	return (len + uv_len + uv_len);
-
-}
-int	yuv420p_to_yuv422p( uint8_t *sY,uint8_t *sCb, uint8_t *sCr, uint8_t *dst[3], int w, int h )
-{
-	const int len = w * h;
-	const int uv_len = len / 2; 
-	AVPicture pict1,pict2;
-	memset(&pict1,0,sizeof(pict1));
-	memset(&pict2,0,sizeof(pict2));
-	pict1.data[0] = sY;
-	pict1.data[1] = sCb;
-	pict1.data[2] = sCr;
-	pict1.linesize[0] = w;
-	pict1.linesize[1] = w >> 1;
-	pict1.linesize[2] = w >> 1;
-	pict2.data[0] = dst[0];
-	pict2.data[1] = dst[1];
-	pict2.data[2] = dst[2];
-	pict2.linesize[0] = w;
-	pict2.linesize[1] = w >> 1;
-	pict2.linesize[2] = w >> 1;	
-	img_convert( &pict2, PIX_FMT_YUV422P, &pict1, PIX_FMT_YUV420P, w, h );
-	return (len + uv_len + uv_len);
-}
 
 static void long2str(unsigned char *dst, int32_t n)
 {
@@ -516,17 +376,26 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 	/* copy by converting */
 	if( av->encoder_id == 999 &&  (av->out_fmt == FMT_422 || av->out_fmt==FMT_422F)) 
 	{
-		yuv422p_to_yuv420p( src, dst, av->width, av->height);
+		VJFrame *srci= yuv_yuv_template( src[0],src[1],src[2], av->width,av->height, get_ffmpeg_pixfmt( av->out_fmt));
+		VJFrame *dsti= yuv_yuv_template( dst,dst+av->len,dst+av->len+(av->len/4), av->width,av->height, PIX_FMT_YUV420P );
+
+		yuv_convert_any( srci,dsti, srci->format, dsti->format );
+
+		free(srci);
+		free(dsti);
+
 		return ( av->len + (av->len/4) + (av->len/4));
 	}
 
 	if( av->encoder_id == 998 && (av->out_fmt == FMT_420||av->out_fmt==FMT_420F))
 	{
-		uint8_t *d[3];
-		d[0] = dst;
-		d[1] = dst + av->len;
-		d[2] = dst + av->len + (av->len / 2);
-		yuv420p_to_yuv422p2( src[0],src[1],src[2], d, av->width,av->height );
+		VJFrame *srci = yuv_yuv_template( src[0],src[1],src[2], av->width,av->height,get_ffmpeg_pixfmt(av->out_fmt));
+		VJFrame *dsti = yuv_yuv_template( dst, dst + av->len, dst + (av->len + (av->len/2)), 
+					av->width,av->height, PIX_FMT_YUV422P);
+
+		free(srci);
+		free(dsti);
+
 		return ( av->len + av->len );
 	}
 
@@ -558,7 +427,13 @@ int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[
 	pict.quality = 1;
 	pict.pts = (int64_t)( (int64_t)nframe );
 
-	if(av->context->pix_fmt == PIX_FMT_YUV420P && (out_pixel_format == FMT_422||out_pixel_format == FMT_422F) )
+	veejay_msg(0, "context pixfmt = %d, out_format = %d",
+		av->context->pix_fmt, get_ffmpeg_pixfmt( out_pixel_format ));
+
+	int src_fmt = get_ffmpeg_pixfmt( out_pixel_format );
+
+
+	if(av->context->pix_fmt != src_fmt )
 	{
 		pict.data[0] = av->data[0];
 		pict.data[1] = av->data[1];
@@ -566,17 +441,24 @@ int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[
 		pict.linesize[0] = av->context->width;
 		pict.linesize[1] = av->context->width /2;
 		pict.linesize[2] = av->context->width /2;
-		yuv422p3_to_yuv420p3( src, av->data, av->context->width,av->context->height, out_pixel_format );
+		
+		VJFrame *srci = yuv_yuv_template( src[0],src[1],src[2], av->context->width,av->context->height, src_fmt );
+		VJFrame *dsti = yuv_yuv_template( av->data[0],av->data[1],av->data[2],av->context->width,av->context->height,
+				   av->context->pix_fmt );
+
+		yuv_convert_any( srci,dsti, srci->format, dsti->format );
+
+		free(srci);
+		free(dsti);
 	}
 	else
 	{
-		int uv_width = (( out_pixel_format == FMT_420||out_pixel_format == FMT_420F) ? av->context->width / 2 : av->context->width);
 		pict.data[0] = src[0];
 		pict.data[1] = src[1];
 		pict.data[2] = src[2];
 		pict.linesize[0] = av->context->width;
-		pict.linesize[1] = uv_width;
-		pict.linesize[2] = uv_width;
+		pict.linesize[1] = pict.linesize[0]/2;
+		pict.linesize[2] = pict.linesize[0]/2;
 	}
 
 	res = avcodec_encode_video( av->context, buf, buf_len, &pict );

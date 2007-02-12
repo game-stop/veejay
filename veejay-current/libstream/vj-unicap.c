@@ -29,6 +29,7 @@
 #include <libyuv/yuvconv.h>
 #include <libvevo/libvevo.h>
 #include <libstream/vj-unicap.h>
+#include <ffmpeg/avutil.h>
 #include <pthread.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -238,8 +239,7 @@ char **vj_unicap_get_devices(void *unicap, int *n_dev)
 
 void	*vj_unicap_init(void)
 {
-	unicap_driver_t *ud = (unicap_driver_t*) vj_malloc(sizeof(unicap_driver_t));
-	memset( ud,0,sizeof(unicap_driver_t));
+	unicap_driver_t *ud = (unicap_driver_t*) vj_calloc(sizeof(unicap_driver_t));
 	ud->device_list = vpn( VEVO_ANONYMOUS_PORT );
 	ud->num_devices = vj_unicap_scan_enumerate_devices( (void*) ud );
 	veejay_msg(2, "Found %d capture devices on this system", ud->num_devices);
@@ -512,10 +512,9 @@ void	*vj_unicap_new_device( void *dud, int device_id )
 		return NULL;
 	}
 	
-	vj_unicap_t *vut = (vj_unicap_t*) vj_malloc(sizeof(vj_unicap_t));
-	memset(vut,0,sizeof(vj_unicap_t));
-	memset(vut->ctrl, 0 , sizeof(char*) *16 );
-	memset(vut->option,0, sizeof(int) * 16 );
+	vj_unicap_t *vut = (vj_unicap_t*) vj_calloc(sizeof(vj_unicap_t));
+	veejay_memset(vut->ctrl, 0 , sizeof(char*) *16 );
+	veejay_memset(vut->option,0, sizeof(int) * 16 );
 	vut->deviceID = device_id;
 	unicap_void_format( &(vut->format));
 
@@ -636,10 +635,13 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 		for( i = 0;
 	         	SUCCESS( unicap_enumerate_formats( vut->handle, &rgb_spec, &rgb_format, i ) ); i ++ )
 		{
-			if( rgb_fourcc == rgb_format.fourcc )
+			veejay_msg(1, "Support %s == %x, need %x or %x ", rgb_format.identifier, rgb_format.fourcc,
+				rgb24_fourcc, rgb_fourcc);
+			if( rgb24_fourcc == rgb_format.fourcc )
 			{
-				veejay_msg(0, "Capture device supports RGBA, software conversion RGBA -> YUV enabled");
-				vut->rgb = 1;
+				veejay_msg(0, "Capture device supports %s, software conversion RGBA -> YUV enabled",
+						rgb_format.identifier);
+				vut->rgb = 2;
 				rgb_format.size.width = w;
 				rgb_format.size.height = h;
 				break;
@@ -653,11 +655,9 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 			return 0;
 		}
 		else
-			if( !SUCCESS( unicap_set_format( vut->handle, &rgb_format ) ) )
-			{
-				unicap_unlock_properties( vut->handle );
-				return 0;
-			}
+		{
+			veejay_memcpy( &(vut->format), &rgb_format, sizeof( rgb_format ));
+		}
 	}
 
 	unicap_format_t test;
@@ -672,6 +672,9 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 			unicap_unlock_properties( vut->handle );
 			return 0;
 		}
+		else
+			veejay_msg(VEEJAY_MSG_INFO, "Okay, Capture device delivers %s image, %d x %d ",
+				vut->format.identifier, vut->format.size.width,vut->format.size.height );
 	}
 	
 
@@ -761,13 +764,12 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 int		vj_unicap_start_capture( void *vut )
 {
 	vj_unicap_t *v = (vj_unicap_t*) vut;
-
+#ifdef STRICT_CHECKING
+	assert( v->state == 0 );
+	assert( v->priv_buf == NULL );
+#endif
 	v->state = 1;
-	v->priv_buf = (uint8_t*) vj_calloc( 2  * v->width * v->height * 4 );
-	veejay_memset( v->priv_buf , 0, v->sizes[0]);
-	veejay_memset( v->priv_buf + v->sizes[0], 128, v->sizes[1] );
-	veejay_memset( v->priv_buf + v->sizes[0] + v->sizes[1] , 128, v->sizes[2] );
-		
+
 	pthread_mutex_init( &(v->mutex), NULL );
 	
 	int err = pthread_create( &(v->thread), NULL,
@@ -799,16 +801,30 @@ int		vj_unicap_stop_capture( void *vut )
 static int	vj_unicap_start_capture_( void *vut )
 {
 	vj_unicap_t *v = (vj_unicap_t*) vut;
+#ifdef STRICT_CHECKING
+	assert( v->priv_buf == NULL );
+	assert( v->state == 1 );
+#endif
+	v->priv_buf = (uint8_t*) vj_calloc( 2  * v->width * v->height * 4 );
 
+	veejay_memset( v->priv_buf , 0, v->sizes[0]);
+	veejay_memset( v->priv_buf + v->sizes[0], 128, v->sizes[1] );
+	veejay_memset( v->priv_buf + v->sizes[0] + v->sizes[1] , 128, v->sizes[2] );
+		
+		
 	if( !SUCCESS( unicap_start_capture( v->handle ) ) )
    	{
       		veejay_msg( 0, "Failed to start capture on device: %s\n", v->device.identifier );
+		free(v->priv_buf);
+		v->priv_buf = NULL;
 		return 0;
      	}
 
 	if( !SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer)))) 
 	{
 		veejay_msg(0, "Failed to queue buffer on device");
+		free(v->priv_buf);
+		v->priv_buf = NULL;
 		return 0;
 	}
 	v->active = 1;
@@ -862,7 +878,14 @@ int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const 
 		}
 		else
 		{
-			util_convertsrc( v->buffer.data, width,height,v->pixfmt,v->shift, buffer, v->rgb );
+			VJFrame *srci = yuv_rgb_template( v->buffer.data, width,height, (v->rgb==2 ? PIX_FMT_RGB24:PIX_FMT_RGBA32) );
+			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], width,height, v->pixfmt ); 
+
+			yuv_convert_any(srci,dsti, srci->format, dsti->format );
+
+			free(srci);
+			free(dsti);
+
 		}
 	}	
 	
@@ -873,6 +896,9 @@ int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const 
 int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const int height )
 {
 	vj_unicap_t *v = (vj_unicap_t*) vut;
+#ifdef STRICT_CHECKING
+	assert(v->state == 1 );
+#endif
 	
 	lock_(vut);
 	
@@ -961,7 +987,15 @@ int	vj_unicap_grab_a_frame( void *vut )
 		}
 		else
 		{
-			util_convertsrc( v->buf->data,v->width,v->height,v->pixfmt,v->shift, buffer, v->rgb );
+			VJFrame *srci = yuv_rgb_template( v->buf->data, v->width,v->height, (v->rgb==2 ? PIX_FMT_BGR24:PIX_FMT_RGBA32) );
+			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], v->width,v->height, v->pixfmt ); 
+
+			yuv_convert_any(srci,dsti, srci->format, dsti->format );
+
+			free(srci);
+			free(dsti);
+
+
 		}
 	}	
 
@@ -987,6 +1021,12 @@ static int	vj_unicap_stop_capture_( void *vut )
 	return 1;
 }
 
+int		vj_unicap_status(void *vut)
+{
+	if(!vut) return 0;
+	vj_unicap_t *v = (vj_unicap_t*) vut;
+	return v->active;
+}
 
 static void	*unicap_reader_thread(void *data)
 {
@@ -1002,21 +1042,26 @@ static void	*unicap_reader_thread(void *data)
 	for( ;; )
 	{
 		if( v->state == 0 )
+		{
+			veejay_msg(VEEJAY_MSG_INFO, "Stopping capture thread");
 			break;
+		}
 
 		if(vj_unicap_grab_a_frame( data )==0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to grab a frame from the capture device. ");
 			v->state = 0;
 		}
-
 	}
 
 	vj_unicap_stop_capture_( data );
 
 	free(v->priv_buf);
+	v->active = 0;
+	v->priv_buf = NULL;
 
-	veejay_msg(VEEJAY_MSG_ERROR, "Capture thread ended. (Stopped capturing)");
+
+	veejay_msg(VEEJAY_MSG_INFO, "Capture thread ended. (Stopped capturing)");
 	
 	return NULL;
 }
@@ -1027,7 +1072,7 @@ void	vj_unicap_free_device( void *vut )
    
 	unicap_unlock_stream( &(v->handle));
 	
-	if( v->active )
+	if( v->active || v->state )
 		vj_unicap_stop_capture( vut );
 	
 	if( !SUCCESS( unicap_close( v->handle ) ) )

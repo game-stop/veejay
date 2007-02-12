@@ -35,11 +35,14 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
+
 typedef struct
 {
 	char *filename;
-	GdkPixbuf *image;
-	uint8_t   *raw;	
+	VJFrame	  *picA;
+	VJFrame   *picB;
+	VJFrame	  *img;
+	uint8_t   *space;
 	int	  display_w;
 	int	  display_h;
 	int	  real_w;
@@ -60,75 +63,35 @@ static int	__initialized = 0;
 
 extern int	get_ffmpeg_pixfmt(int id);
 
-static	GdkPixbuf *open_pixbuf( const char *filename )
+static	VJFrame *open_pixbuf( const char *filename, int dst_w, int dst_h, int dst_fmt,
+			uint8_t *dY, uint8_t *dU, uint8_t *dV )
 {
 	GdkPixbuf *image =
 		gdk_pixbuf_new_from_file( filename, NULL );
 	if(!image)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cant load image");
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to load image '%s'", filename);
 		return NULL;
 	}
-	return image;
-}
 
-static int	picture_prepare_decode( vj_pixbuf_t *picture )
-{
-	if(!picture) 
-		return 0;
-	if(!picture->image)
-		return 0;
+	/* convert image to veejay frame in proper dimensions, free image */
 
-	int scale = 0;
-	picture->raw = (uint8_t*) vj_malloc(sizeof(uint8_t) *
-				   (picture->display_w * picture->display_h * 3));
-	if(!picture->raw)
-		return 0;
+	VJFrame *dst = yuv_yuv_template( dY, dU, dV, dst_w, dst_h, dst_fmt );
+	VJFrame *src = yuv_rgb_template(
+			(uint8_t*) gdk_pixbuf_get_pixels( image ),
+				   gdk_pixbuf_get_width(  image ),
+				   gdk_pixbuf_get_height( image ),
+				   PIX_FMT_RGB24
+			);
 
-
-	AVPicture pict1,pict2;
-	memset(&pict1,0,sizeof(pict1));
-        memset(&pict2,0,sizeof(pict2));
-
-	GdkPixbuf *img = NULL;
-
-	int len = picture->display_w * picture->display_h;
-	int uv_len = (picture->display_w >> 1 ) * (picture->display_h >> picture->fmt );
-
-	if( gdk_pixbuf_get_width( picture->image ) != picture->display_w ||
-		gdk_pixbuf_get_height( picture->image ) != picture->display_h )
-	{
-		img = gdk_pixbuf_scale_simple( picture->image, picture->display_w,
-				picture->display_h, GDK_INTERP_BILINEAR );
-		scale = 1;
-	}
-	else
-	{
-		img = picture->image;
-	}
+	yuv_convert_any( src, dst, src->format, dst->format );
+	
+	gdk_pixbuf_unref( image ); 
+	
+	free(src);
 
 
-	if(!img)
-		return 0;
-
-	pict1.data[0] = (uint8_t*) gdk_pixbuf_get_pixels( img );
-	pict1.linesize[0] = picture->display_w * 3;
-
-	pict2.data[0] = picture->raw;
-	pict2.data[1] = picture->raw + len;
-	pict2.data[2] = picture->raw + len + uv_len;
-	pict2.linesize[0] = picture->display_w;
-	pict2.linesize[1] = picture->display_w >> 1;
-	pict2.linesize[2] = picture->display_w >> 1;
-
-	img_convert( &pict2, get_ffmpeg_pixfmt( picture->fmt ),
-		&pict1,
-		PIX_FMT_RGB24,
-		picture->display_w, picture->display_h );
-
-	if(scale && img)
-		gdk_pixbuf_unref( img );
-	return 1;
+	return dst;
 }
 
 void	vj_picture_cleanup( void *pic )
@@ -136,12 +99,12 @@ void	vj_picture_cleanup( void *pic )
 	vj_pixbuf_t *picture = ( vj_pixbuf_t*) pic;
 	if(picture)
 	{
-		if(picture->raw)
-			free(picture->raw);
 		if( picture->filename )
 			free(picture->filename );
-		if(picture->image)
-			gdk_pixbuf_unref( picture->image );
+		if(picture->img)
+			free( picture->img );
+		if(picture->space)
+			free(picture->space);
 		if( picture )
 			free(picture);		
 	}
@@ -149,13 +112,14 @@ void	vj_picture_cleanup( void *pic )
 }
 
 
-uint8_t *vj_picture_get(void *pic)
+VJFrame *vj_picture_get(void *pic)
 {
 	if(!pic)
 		return NULL;
 	vj_pixbuf_t *picture = (vj_pixbuf_t*) pic;
-	return picture->raw;
+	return picture->img;
 }
+
 int	vj_picture_get_height( void *pic )
 {
 	vj_pixbuf_t *picture = (vj_pixbuf_t*) pic;
@@ -177,47 +141,34 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 	vj_pixbuf_t *pic = NULL;
 
 	if(filename == NULL || v_outw <= 0 || v_outh <= 0 )
+	{
+		veejay_msg(0, "No filename given or invalid image dimensions");
 		return NULL;
-
-	pic = (vj_pixbuf_t*)
-			    vj_malloc(sizeof(vj_pixbuf_t));
-	if(!pic) return NULL;
-	memset( pic, 0, sizeof( vj_pixbuf_t ));
-
+	}
+	pic = (vj_pixbuf_t*)  vj_calloc(sizeof(vj_pixbuf_t));
+	if(!pic) 
+	{
+		veejay_msg(0, "Memory allocation error in %s", __FUNCTION__ );
+		return NULL;
+	}
 	pic->filename = strdup( filename );
 	pic->display_w = v_outw;
 	pic->display_h = v_outh;
 	pic->fmt = v_outf;
-	pic->image = open_pixbuf( filename );
-	if(!pic->image)
-	{
-		free(pic);
-		return NULL;
-	}
-	pic->real_w = gdk_pixbuf_get_width( pic->image );
-	pic->real_h = gdk_pixbuf_get_height( pic->image );
-	if(pic->display_w == 0 && pic->display_h == 0)
-	{
-		pic->display_w = pic->real_w;
-		pic->display_h = pic->real_h;
-	}
-	// error check
 
 
-	if(!picture_prepare_decode( pic ))
-	{
-		vj_picture_cleanup( (void*) pic );
-		return NULL;
-	}
-//	if(pic->image)
-//		gdk_pixbuf_unref( pic->image );
+	pic->space = (uint8_t*) vj_malloc( sizeof(uint8_t) * v_outw * v_outh * 3 );
+
+	pic->img = open_pixbuf( filename, v_outw, v_outh, v_outf, pic->space, pic->space + (v_outw*v_outh) , pic->space + (2*v_outw*v_outh) );
+
 	return (void*) pic;
 }
 
 int	vj_picture_probe( const char *filename )
 {
 	int ret = 0;
-	GdkPixbuf *image = open_pixbuf( filename );
+	GdkPixbuf *image =
+		gdk_pixbuf_new_from_file( filename, NULL );
 	if(image)
 	{
 		ret = 1;
@@ -246,19 +197,17 @@ char	*vj_picture_get_filename( void *pic )
 void *	vj_picture_prepare_save(
 	const char *filename, char *type, int out_w, int out_h)
 {
-	vj_pixbuf_out_t *pic =  (vj_pixbuf_out_t*) vj_malloc(sizeof(vj_pixbuf_out_t));
+	if(!type || !filename )
+	{
+		veejay_msg(0, "Missing filename or file extension");
+		return NULL;
+	}
+
+	vj_pixbuf_out_t *pic =  (vj_pixbuf_out_t*) vj_calloc(sizeof(vj_pixbuf_out_t));
+
 	if(!pic)
 		return NULL;
 	  
-/* 
-	GSList *f = gdk_pixbuf_get_formats();
-	GSList *res = NULL;
-
-	g_slist_foreach( f, add_if_writeable, &res);
-
-	g_slist_free( f );
-	g_slist_free( res ); */
-
 	if(filename)
 		pic->filename = strdup( filename );
 	else
@@ -321,20 +270,7 @@ void	vj_picture_init()
 int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 {
 	int ret = 0;
-	if(!picture)	
-		return ret;
-	AVPicture pict1,pict2;
-	memset(&pict1,0,sizeof(pict1));
-        memset(&pict2,0,sizeof(pict2));
-
 	vj_pixbuf_out_t *pic = (vj_pixbuf_out_t*) picture;
-
-	pict1.data[0] = frame[0];
-	pict1.data[1] = frame[1];
-	pict1.data[2] = frame[2];
-        pict1.linesize[0] = w;
-	pict1.linesize[1] = w >> 1;
-	pict1.linesize[2] = w >> 1;
 
 	GdkPixbuf *img_ = gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, w, h );
 	if(!img_)
@@ -342,24 +278,17 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 		veejay_msg(VEEJAY_MSG_ERROR, "Cant allocate buffer for RGB");
 		return 0;
 	}
+	
+	// convert frame to yuv
+	VJFrame *src = yuv_yuv_template( frame[0],frame[1],frame[2],w,h, fmt );
+	VJFrame *dst = yuv_rgb_template(
+		(uint8_t*) gdk_pixbuf_get_pixels( img_ ),
+				   gdk_pixbuf_get_width(  img_ ),
+				   gdk_pixbuf_get_height( img_ ),
+				   PIX_FMT_RGB24
+			);
 
-	pict2.data[0] =  (uint8_t*) gdk_pixbuf_get_pixels( img_ );;
-        pict2.linesize[0] = w * 3;
-
-	img_convert( &pict2, PIX_FMT_RGB24, &pict1, get_ffmpeg_pixfmt(fmt),w, 	h );
-
-	GdkPixbuf *save = NULL;
-	if( pic->out_w != w || pic->out_h != h )
-	{
-		save = gdk_pixbuf_scale_simple(
-				img_, pic->out_w, pic->out_h,
-			 GDK_INTERP_BILINEAR );
-		if(save)
-		{
-			gdk_pixbuf_unref( img_ );
-			img_ = save;
-		}
-	}
+	yuv_convert_any( src, dst, fmt, PIX_FMT_RGB24 );
 	
 	if( gdk_pixbuf_savev( img_, pic->filename, pic->type, NULL, NULL, NULL ))
 	{
@@ -376,24 +305,12 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 	if( img_ ) 
 		gdk_pixbuf_unref( img_ );
 
+	free(src);
+	free(dst);
+
 	vj_picture_out_cleanup( pic );
 	
 	return ret;
-}
-static inline int       get_shift_size(int fmt)
-{
-        switch(fmt)
-        {
-                case FMT_420:
-                case FMT_420F:
-                        return 1;
-                case FMT_422:
-                case FMT_422F:
-                        return 1;
-                default:
-                        break;
-        }
-        return 0;
 }
 
 static	sws_template	sws_templ;
@@ -411,7 +328,6 @@ void		vj_picture_free()
 }
 
 veejay_image_t		*vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt )
-//veejay_image_t	*vj_fast_picture_save_to_mem( uint8_t **frame, int w, int h, int out_w, int out_h, int fmt )
 {
 	veejay_image_t *image = (veejay_image_t*) vj_calloc(sizeof(veejay_image_t));
 	if(!image)
@@ -426,9 +342,6 @@ veejay_image_t		*vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out
 	src.data[0] = frame->data[0];
 	src.data[1] = frame->data[1];	
 	src.data[2] = frame->data[2];
-//veejay_msg(0, "Frame: fmt=%d, ssm=%d, %p,%p,%p, w=%d,uw=%d",
-//		frame->format,frame->ssm, frame->data[0],frame->data[1],frame->data[2], frame->width,
-//			frame->uv_width );
 	vj_get_rgb_template( &dst, out_w, out_h);
 	dst.data[0] = (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );
 
@@ -455,92 +368,7 @@ veejay_image_t		*vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out
 	return image;
 }
 
-veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int out_w, int out_h, int fmt  )
-{
-	veejay_image_t *image = (veejay_image_t*) vj_malloc(sizeof(veejay_image_t));
-	if(!image)
-		return NULL;
-
-	memset(image, 0,sizeof(veejay_image_t));
-
-	AVPicture pict1,pict2;
-	memset(&pict1,0,sizeof(pict1));
-        memset(&pict2,0,sizeof(pict2));
-
-	pict1.data[0] = frame[0];
-	pict1.data[1] = frame[1];
-	pict1.data[2] = frame[2];
-        pict1.linesize[0] = w;
-	pict1.linesize[1] = w >> get_shift_size(fmt);
-	pict1.linesize[2] = w >> get_shift_size(fmt);
-
-	image->image = (void*)gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, w, h );
-	if(!image->image)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cant allocate buffer for RGB");
-		return NULL;
-	}
-
-	pict2.data[0] =  (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );;
-        pict2.linesize[0] = w * 3;
-
-	int pf = get_ffmpeg_pixfmt( fmt );
-	img_convert( &pict2, PIX_FMT_RGB24, &pict1, pf,	w, 	h );
-
-	if( out_w != w || out_h != h )
-	{
-		image->scaled_image = (void*)gdk_pixbuf_scale_simple(
-				(GdkPixbuf*) image->image, out_w, out_h,
-			 GDK_INTERP_NEAREST );
-	}
-
-	return image;
-}
-veejay_image_t *vj_picture_save_bw_to_memory( uint8_t **frame, int w, int h , int out_w, int out_h, int fmt  )
-{
-	veejay_image_t *image = (veejay_image_t*) vj_malloc(sizeof(veejay_image_t));
-	if(!image)
-		return NULL;
-
-	memset(image, 0,sizeof(veejay_image_t));
-
-	AVPicture pict1,pict2;
-	memset(&pict1,0,sizeof(pict1));
-        memset(&pict2,0,sizeof(pict2));
-
-	pict1.data[0] = frame[0];
-	pict1.data[1] = NULL;//frame[1];
-	pict1.data[2] = NULL;//frame[2];
-        pict1.linesize[0] = w;
-	pict1.linesize[1] = 0;//w >> get_shift_size(fmt);
-	pict1.linesize[2] = 0;//w >> get_shift_size(fmt);
-
-	image->image = (void*)gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, w, h );
-	if(!image->image)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cant allocate buffer for RGB");
-		return NULL;
-	}
-
-	pict2.data[0] =  (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );;
-        pict2.linesize[0] = w * 3;
-
-	img_convert( &pict2, PIX_FMT_RGB24, &pict1, PIX_FMT_GRAY8, w, h );
-	
-//	int pf = get_ffmpeg_pixfmt( fmt );
-//	img_convert( &pict2, PIX_FMT_RGB24, &pict1, pf,	w, 	h );
-
-	if( out_w != w || out_h != h )
-	{
-		image->scaled_image = (void*)gdk_pixbuf_scale_simple(
-				(GdkPixbuf*) image->image, out_w, out_h,
-			 GDK_INTERP_NEAREST );
-	}
-
-	return image;
-}
 veejay_image_t		*vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt )
-//veejay_image_t	*vj_fastbw_picture_save_to_mem( uint8_t **frame, int w, int h, int out_w, int out_h, int fmt )
 {
 	veejay_image_t *image = (veejay_image_t*) vj_calloc(sizeof(veejay_image_t));
 	if(!image)
@@ -555,11 +383,6 @@ veejay_image_t		*vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int o
 	src.data[0] = frame->data[0];
 	src.data[1] = frame->data[1];	
 	src.data[2] = frame->data[2];
-//	veejay_msg(0, "Frame: fmt=%d, ssm=%d, %p,%p,%p, w=%d,uw=%d",
-//		frame->format,frame->ssm, frame->data[0],frame->data[1],frame->data[2], frame->width,
-//			frame->uv_width );
-//	
-	//vj_get_rgb_template( &dst, out_w, out_h);
 	vj_get_yuv_template( &dst,out_w,out_h,fmt );
 
 	uint8_t *data[3];
@@ -571,7 +394,7 @@ veejay_image_t		*vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int o
 	dst.data[1] = data[1];
 	dst.data[2] = data[2];
 
-
+veejay_msg(1, "%s: not grayscale yet");
 	if( !bwscaler || scale_dim_bw[0] != out_w || scale_dim_bw[1] != out_h )
 	{
 		if(bwscaler )
@@ -587,20 +410,6 @@ veejay_image_t		*vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int o
 	assert( bwscaler != NULL );
 #endif
 	yuv_convert_and_scale( bwscaler, &src, &dst );
-
-	AVPicture pict1,pict2;
-	memset(&pict1,0,sizeof(pict1));
-        memset(&pict2,0,sizeof(pict2));
-
-	pict1.data[0] = data[0];
-        pict1.linesize[0] = out_w;
-
-	pict2.data[0] =  (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );;
-        pict2.linesize[0] = out_w * 3;
-
-	img_convert( &pict2, PIX_FMT_RGB24, &pict1, PIX_FMT_GRAY8, out_w, out_h );
-	
-	free( data[0] );
 
 	return image;
 }

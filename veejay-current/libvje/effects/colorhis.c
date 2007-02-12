@@ -54,6 +54,7 @@ vj_effect *colorhis_init(int w, int h)
 }
 
 static void	*histogram_ = NULL;
+static	VJFrame *rgb_frame_ = NULL;
 static uint8_t  *rgb_ = NULL;
 
 int	colorhis_malloc(int w, int h)
@@ -64,6 +65,7 @@ int	colorhis_malloc(int w, int h)
 		free(rgb_);
 	histogram_ = veejay_histogram_new();
 	rgb_ = vj_malloc(sizeof(uint8_t) * w * h * 3 );
+	rgb_frame_ = yuv_rgb_template( rgb_, w, h, PIX_FMT_RGB24 );
 	return 1;
 }
 
@@ -73,14 +75,19 @@ void	colorhis_free()
 		veejay_histogram_del(histogram_);
 	if( rgb_ )
 		free(rgb_);
+	if( rgb_frame_)
+		free(rgb_frame_);
 	rgb_ = NULL;
+	rgb_frame_ = NULL;
 	histogram_ = NULL;
 }
 
 
 void colorhis_apply( VJFrame *frame, int width, int height,int mode, int val, int intensity, int strength)
 {
-	util_convertrgb24( frame->data,width,height,PIX_FMT_YUV444P, 0, rgb_ );
+
+	yuv_convert_any( frame, rgb_frame_, PIX_FMT_YUV444P, PIX_FMT_RGB24 );
+
 	if( val == 0 )
 	{
 		veejay_histogram_draw_rgb( histogram_, frame, rgb_, intensity, strength, mode );
@@ -89,7 +96,9 @@ void colorhis_apply( VJFrame *frame, int width, int height,int mode, int val, in
 	{
 		veejay_histogram_analyze_rgb( histogram_,rgb_, frame );
 		veejay_histogram_equalize_rgb( histogram_, frame, rgb_, intensity, strength, mode );
-		util_convertsrc( rgb_, width,height,PIX_FMT_YUV444P,0,frame->data,FMT_RGB24 );
+	
+	
+		yuv_convert_any( rgb_frame_, frame, PIX_FMT_RGB24, PIX_FMT_YUV444P );
 	}	
 }
 

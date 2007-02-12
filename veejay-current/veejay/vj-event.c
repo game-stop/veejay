@@ -5972,19 +5972,6 @@ void vj_event_tag_new_picture(void *ptr, const char format[], va_list ap)
 }
 #endif
 
-void vj_event_tag_new_avformat(void *ptr, const char format[], va_list ap)
-{
-	veejay_t *v = (veejay_t*) ptr;
-	char str[255];
-	int *args = NULL;
-	P_A(args,str,format,ap);
-
-	int id = veejay_create_tag(v, VJ_TAG_TYPE_AVFORMAT, str, v->nstreams,0,0);
-
-	vj_event_send_new_id( v, id );
-	if( id <= 0 );
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new FFmpeg stream");
-}
 #ifdef SUPPORT_READ_DV2
 void	vj_event_tag_new_dv1394(void *ptr, const char format[], va_list ap)
 {

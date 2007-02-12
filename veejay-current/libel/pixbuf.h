@@ -29,7 +29,7 @@ typedef struct
 #ifdef USE_GDK_PIXBUF
 void	vj_picture_init();
 void	vj_picture_cleanup( void *pic );
-uint8_t *vj_picture_get( void *pic );
+VJFrame *vj_picture_get( void *pic );
 int	vj_picture_probe( const char *filename );
 void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf );
 int	vj_picture_get_width(void *pic);

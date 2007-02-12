@@ -311,7 +311,6 @@ void	vj_avformat_close_input( vj_avformat *av )
 
 int	vj_avformat_get_video_frame( vj_avformat *av, uint8_t *yuv420[3], long nframe, int fmt )
 {
-
 	AVPacket packet;
 	AVFrame  frame;
 	int got_picture = 0;
@@ -325,11 +324,6 @@ int	vj_avformat_get_video_frame( vj_avformat *av, uint8_t *yuv420[3], long nfram
 	else
 		av->requested_timecode = vj_avformat_get_timestamp(av,nframe);
 
-	// get a master clock like in ffplay.c !!!!
-
-		
-
-	// seek if necessary
 	if(av->seekable && av->requested_timecode != (av->time_unit + av->expected_timecode) )
 	{
 		if( av->requested_timecode != (av->expected_timecode-av->time_unit))
@@ -341,8 +335,8 @@ int	vj_avformat_get_video_frame( vj_avformat *av, uint8_t *yuv420[3], long nfram
 		}
 	}
 
-	memset( &packet, 0, sizeof( packet ) );
-	memset( &frame,  0, sizeof( packet ) );
+	veejay_memset( &packet, 0, sizeof( packet ) );
+	veejay_memset( &frame,  0, sizeof( packet ) );
 
 	while( !got_picture && ret>= 0 )
 	{
@@ -412,20 +406,19 @@ int	vj_avformat_get_video_frame( vj_avformat *av, uint8_t *yuv420[3], long nfram
 
 	if(got_picture) 
 	{
-		AVPicture pict;
 		int dst_fmt = get_ffmpeg_pixfmt(fmt);
-		pict.data[0] = yuv420[0];
-		pict.data[1] = yuv420[1];
-		pict.data[2] = yuv420[2];
-		pict.linesize[0] = av->cct->width;
-		pict.linesize[1] = av->cct->width >> 1;
-		pict.linesize[2] = av->cct->width >> 1;
-		img_convert( 	&pict, 
+	veejay_msg(0, "img_convert %d -> %d", src_fmt, dst_fmt );
+
+
+		if( av->cct->pix_fmt == PIX_FMT_RGB24 || av->cct->pix_fmt == PIX_FMT_RGBA )
+
+
+		/*img_convert( 	&pict, 
 				dst_fmt,
 				(const AVPicture*) &frame,	
 				av->cct->pix_fmt,	
 				av->cct->width,
-				av->cct->height );
+				av->cct->height );*/
 	}
 	return 1;
 }

@@ -1204,16 +1204,6 @@ void		vj_init_vevo_events(void)
 				"Multicast Address",
 				NULL,
 				NULL );
-	index_map_[VIMS_STREAM_NEW_AVFORMAT]			=	_new_event(
-				"%s",
-				VIMS_STREAM_NEW_AVFORMAT,
-				"Open input file as new input stream using FFmpeg",
-				vj_event_tag_new_avformat,
-				1,
-				VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS,
-				"Filename",
-				NULL,
-				NULL );
 #ifdef USE_GDK_PIXBUF
 	index_map_[VIMS_STREAM_NEW_PICTURE]			=	_new_event(
 				"%s",

@@ -904,7 +904,7 @@ int vj_perform_audio_start(veejay_t * info)
 		info->audio=NO_AUDIO;
 		veejay_msg(VEEJAY_MSG_WARNING,
 			"Audio playback disabled (unable to connect to jack)");
-		return 0;
+		return 1;
 	}
 	if ( res == 2 )
 	{
@@ -1241,8 +1241,17 @@ void	vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, i
 		src_frame[1] = video_output_buffer[0]->Cb;
 		src_frame[2] = video_output_buffer[0]->Cr;
 
-		yuv422p_to_yuv420p2(
-				src_frame, frame,w, h, info->pixel_format );
+		VJFrame *srci = yuv_yuv_template( video_output_buffer[0]->Y, video_output_buffer[0]->Cb,
+						 video_output_buffer[0]->Cr, w, h, 
+						 get_ffmpeg_pixfmt(info->pixel_format));
+		VJFrame *dsti = yuv_yuv_template( video_output_buffer[1]->Y, video_output_buffer[1]->Cb,
+						  video_output_buffer[1]->Cr, w, h,
+						  PIX_FMT_YUV420P );
+
+		yuv_convert_any( srci,dsti, srci->format, dsti->format );
+		free(srci);
+		free(dsti);
+
 	}
 	else
 	{
@@ -1280,7 +1289,17 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
 			 pframe[0] = primary_buffer[info->out_buf]->Y;
 			 pframe[1] = primary_buffer[info->out_buf]->Cb;
 			 pframe[2] = primary_buffer[info->out_buf]->Cr;
-			 yuv422p_to_yuv420p2( pframe,temp_buffer, el->video_width, el->video_height, info->pixel_format);
+	
+			 VJFrame *srci = yuv_yuv_template( pframe[0],pframe[1],pframe[2],el->video_width,el->video_height,
+						get_ffmpeg_pixfmt( info->pixel_format));
+			VJFrame *dsti = yuv_yuv_template( temp_buffer[0],temp_buffer[1], temp_buffer[2],el->video_width,
+						el->video_height, PIX_FMT_YUV420P );
+	
+			yuv_convert_any(srci,dsti, srci->format,dsti->format );
+
+			free(srci);
+			free(dsti);
+
 			video_output_buffer_convert = 1;
 		}
 		frame[0] = temp_buffer[0];
@@ -1720,6 +1739,7 @@ int vj_perform_new_audio_frame(veejay_t * info, char *dst_buf, int nframe,
 #define ARRAY_LEN(x) ((int)(sizeof(x)/sizeof((x)[0])))
 int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *temporary_buffer)
 {
+#ifdef HAVE_JACK
 	video_playback_setup *settings = info->settings;
 	int len = 0;
 	int speed = sample_get_speed(info->uc->sample_id);
@@ -1811,6 +1831,9 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 		len = pred_len;
 
 	return len;
+#else
+	return 0;
+#endif
 }
 
 static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
@@ -2389,15 +2412,18 @@ static void vj_perform_plain_fill_buffer(veejay_t * info, int entry)
 static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[3])
 {
 	int audio_len = 0;
-	//uint8_t buf[16384];
 	long nframe = info->settings->current_frame_num;
-	uint8_t *buf = (uint8_t*) vj_malloc( sizeof(uint8_t) * PERFORM_AUDIO_SIZE );
+	uint8_t *buf = NULL;
 
-	audio_len = vj_perform_fill_audio_buffers(info, buf, audio_render_buffer );
-
+	if( info->current_edit_list->has_audio )
+	{
+		buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * PERFORM_AUDIO_SIZE );
+		audio_len = vj_perform_fill_audio_buffers(info, buf, audio_render_buffer );
+	}
 	int res = sample_record_frame( info->uc->sample_id,frame,buf,audio_len );
 
-	free(buf);
+	if( buf )
+		free(buf);
 
 	return res;
 }
@@ -2839,7 +2865,7 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 
 	if (info->audio == AUDIO_PLAY)
   	{
-		if(settings->audio_mute)
+		if(settings->audio_mute || settings->current_playback_speed == 0 )
 		{
 			veejay_memset( a_buf, 0, num_samples * bps);
                         vj_jack_play( a_buf, num_samples * bps  );
@@ -2849,43 +2875,24 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 		switch (info->uc->playback_mode)
 		{
 			case VJ_PLAYBACK_MODE_SAMPLE:
-				num_samples = vj_perform_fill_audio_buffers(info,a_buf,
-					audio_render_buffer + (2* PERFORM_AUDIO_SIZE * MAX_SPEED));
+				if( el->has_audio )
+					num_samples = vj_perform_fill_audio_buffers(info,a_buf,	audio_render_buffer + (2* PERFORM_AUDIO_SIZE * MAX_SPEED));
 				break;
 			case VJ_PLAYBACK_MODE_PLAIN:
-				if (settings->current_playback_speed == 0)
-		    		{
-				    	veejay_memset( a_buf, 0, num_samples * bps );
-		    		}	
-		    		else
-		    		{
-					grab_samples =
-			    			vj_el_get_audio_frame(el, this_frame,a_buf );
-					if(grab_samples < 0)
-						veejay_memset(a_buf,0,num_samples * bps );
-					else
-						num_samples = grab_samples;
-		    		}
-
-	    	   		if (settings->current_playback_speed < 0)
-					vj_perform_reverse_audio_frame(info, num_samples,a_buf);
+				if( el->has_audio )
+				{
+					num_samples =	vj_el_get_audio_frame(el, this_frame,a_buf );
+					if( settings->current_playback_speed < 0 )
+						vj_perform_reverse_audio_frame(info,num_samples,a_buf);
+				}
 	    	    		break;
-
+			//@ pfffff there is no stream that delivers audio anyway yet
 			case VJ_PLAYBACK_MODE_TAG:
-			    	grab_samples = vj_tag_get_audio_frame(info->uc->sample_id, a_buf);
-				if(grab_samples <= 0)
-					veejay_memset( a_buf, 0, num_samples * bps );
-				else
-					num_samples = grab_samples;
+				if(el->has_audio)
+				    	num_samples = vj_tag_get_audio_frame(info->uc->sample_id, a_buf);
 				break;
 		}
 
- 		/* dump audio frame if required 
- 	    		if(info->stream_enabled==1)
-		{ // FIXME: does this still work ?
-		    vj_yuv_put_aframe(a_buf, el, num_samples * el->audio_bps);
-		} */
-	
 		if( jack_rate_ != el->audio_rate)
 		{
 			veejay_memcpy( resample_audio_buffer, a_buf, num_samples * bps);
@@ -3325,56 +3332,3 @@ int	vj_perform_register_ppm_dir( veejay_t *info , const char *path )
 	
 	return 1;
 }
-
-
-int	vj_perform_dump_ppm( veejay_t *info)
-{
-	char filename[256];
-	char buf[100];
-	sprintf(filename, "%s/frame-%06d.ppm", ppm_path, info->settings->current_frame_num );
-		
-	FILE *fd = fopen( filename, "wb" );
-	if(!fd)
-	{
-		veejay_msg(0, "Cannot open '%s' for writing");
-		return 0;
-	}
-
-	
-	uint8_t *ppm_buf = vj_malloc(
-			info->effect_frame1->width *
-			info->effect_frame2->height * 3 );
-
-	sprintf(buf, "P6 %d %d 255\n",
-			info->effect_frame1->width,
-			info->effect_frame2->height );
-	
-	AVPicture p1,p2;
-	veejay_memset( &p1,0,sizeof(AVPicture));
-	veejay_memset( &p2,0,sizeof(AVPicture));
-
-	p2.data[0] = ppm_buf;
-	p2.linesize[0] = info->effect_frame1->width * 3;
-	p1.data[0] = primary_buffer[info->out_buf]->Y;
-	p1.data[1] = primary_buffer[info->out_buf]->Cb;
-	p1.data[2] = primary_buffer[info->out_buf]->Cr;
-	p1.linesize[0] = info->effect_frame1->width;
-	p1.linesize[1] = info->effect_frame1->width >> info->effect_frame1->shift_v;
-	p1.linesize[2] = info->effect_frame1->width >> info->effect_frame1->shift_v;
-	
-	int in_pix = get_ffmpeg_pixfmt( info->pixel_format );
-	
-	if(!img_convert( &p1, PIX_FMT_RGB24, &p2, in_pix,
-				info->effect_frame1->width,
-				info->effect_frame2->height ))
-	{
-		fwrite( buf,     strlen(buf), 1 , fd );
-		fwrite( ppm_buf, info->effect_frame1->width * info->effect_frame1->height * 3,1,fd );
-	}
-
-	fclose( fd );
-	free( ppm_buf );
-	
-	return 1;
-}
-

@@ -30,7 +30,6 @@
 #include <sys/socket.h>
 #include <veejay/vims.h>
 #include <libvjnet/vj-client.h>
-#include <libvjmsg/vj-common.h>
 static int   interactive = 0;
 static int   port_num = 3490;
 static char  *filename = NULL;
@@ -69,7 +68,7 @@ static void vj_flush(int frames) {
 					}
 					if(n == -1)
 					{
-						
+						fprintf(stderr, "Error reading status from Veejay\n");	
 						exit(0);
 					}
 				}
@@ -80,21 +79,21 @@ static void vj_flush(int frames) {
 
 static void Usage(char *progname)
 {
-	veejay_msg(VEEJAY_MSG_INFO, "Usage: %s [options] [messages]",progname);
-	veejay_msg(VEEJAY_MSG_INFO, "where options are:");
-	veejay_msg(VEEJAY_MSG_INFO, " -p\t\tVeejay port (3490)"); 
-	veejay_msg(VEEJAY_MSG_INFO, " -g\t\tVeejay groupname (224.0.0.31)");
-	veejay_msg(VEEJAY_MSG_INFO, " -h\t\tVeejay hostname (localhost)");
-	veejay_msg(VEEJAY_MSG_INFO, " -m\t\tSend single message");
-	veejay_msg(VEEJAY_MSG_INFO, " -c\t\tColored output");
-	veejay_msg(VEEJAY_MSG_INFO, " -d\t\tDump status to stdout");
-	veejay_msg(VEEJAY_MSG_INFO, "Messages to send to veejay must be wrapped in quotes");
-	veejay_msg(VEEJAY_MSG_INFO, "You can send multiple messages by seperating them with a whitespace");  
-	veejay_msg(VEEJAY_MSG_INFO, "Example: %s \"600:;\"",progname);
-	veejay_msg(VEEJAY_MSG_INFO, "         (quit veejay)");
-	veejay_msg(VEEJAY_MSG_INFO, "Example: echo \"%03d:;\" | %s ", VIMS_QUIT, progname);
-
-	exit(-1);
+	fprintf(stderr, "Usage: %s [options] [messages]\n",progname);
+	fprintf(stderr, "where options are:\n");
+	fprintf(stderr, " -p\t\tVeejay port (3490)\n"); 
+	fprintf(stderr, " -g\t\tVeejay groupname (224.0.0.31)\n");
+	fprintf(stderr, " -h\t\tVeejay hostname (localhost)\n");
+	fprintf(stderr, " -m\t\tSend single message\n");
+	fprintf(stderr, " -c\t\tColored output\n");
+	fprintf(stderr, " -d\t\tDump status to stdout\n");
+	fprintf(stderr, "Messages to send to veejay must be wrapped in quotes\n");
+	fprintf(stderr, "You can send multiple messages by seperating them with a whitespace\n");  
+	fprintf(stderr, "Example: %s \"600:;\"\n",progname);
+	fprintf(stderr, "         (quit veejay)\n");
+	fprintf(stderr, "Example: echo \"%03d:;\" | %s \n", VIMS_QUIT, progname);
+	fprintf(stderr, "\n");
+	fprintf(stderr, "Example: sayVIMS -h 192.168.100.12 -m \"600:;\"\n");
 }
 
 static int set_option(const char *name, char *value)
@@ -135,86 +134,24 @@ static int set_option(const char *name, char *value)
 	return err;
 }
 
-static char buf[65535];
-
-static void human_friendly_msg( int net_id,char * buffer )
-{
-
-	char vims_msg[150];
-	if(buffer==NULL)
-		sprintf(vims_msg, "%03d:;", net_id );
-	else
-		sprintf( vims_msg, "%03d:%s;", net_id,buffer+1);
-
-	vj_client_send(sayvims,V_CMD, vims_msg);
-	vj_flush(1);
-}
-static int human_friendly_vims(char *buffer)
-{
-   if(buffer[0] == 'h' || buffer[0] == '?')
-   {
-	veejay_msg(VEEJAY_MSG_INFO, "vi\t\tOpen video4linux device");
-	veejay_msg(VEEJAY_MSG_INFO, "li\t\tOpen vloopback device");
- 	veejay_msg(VEEJAY_MSG_INFO, "fi\t\tOpen Y4M stream for input");
-	veejay_msg(VEEJAY_MSG_INFO, "fo\t\tOpen Y4M stream for output");
-	veejay_msg(VEEJAY_MSG_INFO, "lo\t\tOpen vloopback device for output");
-	veejay_msg(VEEJAY_MSG_INFO, "mr\t\tOpen multicast receiver [address port]");
-	veejay_msg(VEEJAY_MSG_INFO, "pr\t\tOpen unicast receiver [address port]");
-	veejay_msg(VEEJAY_MSG_INFO, "av\t\tOpen file as stream using FFmpeg [filename]");
-	veejay_msg(VEEJAY_MSG_INFO, "cl\t\tLoad samplelist from file");
-	veejay_msg(VEEJAY_MSG_INFO, "cn\t\tNew sample from frames n1 to n2");
-	veejay_msg(VEEJAY_MSG_INFO, "cd\t\tDelete sample n1");
-	veejay_msg(VEEJAY_MSG_INFO, "sd\t\tDelete Stream n1");
-	veejay_msg(VEEJAY_MSG_INFO, "cs\t\tSave samplelist to file");
-	veejay_msg(VEEJAY_MSG_INFO, "es\t\tSave editlist to file");
-	veejay_msg(VEEJAY_MSG_INFO, "ec\t\tCut frames n1 - n2 to buffer");
-	veejay_msg(VEEJAY_MSG_INFO, "ed\t\tDel franes n1 - n2");
-	veejay_msg(VEEJAY_MSG_INFO, "ep\t\tPaste from buffer at frame n1");
-	veejay_msg(VEEJAY_MSG_INFO, "ex\t\tCopy frames n1 - n2 to buffer");
-	veejay_msg(VEEJAY_MSG_INFO, "er\t\tCrop frames n1 - n2");
-        veejay_msg(VEEJAY_MSG_INFO, "al\t\tAction file Load");
-        veejay_msg(VEEJAY_MSG_INFO, "as\t\tAction file save");
-	veejay_msg(VEEJAY_MSG_INFO, "sa\t\tToggle 4:2:0 -> 4:4:4 sampling mode");
-	return 1;
-   }
-
-   if(strncmp( buffer, "vi",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_NEW_V4L, buffer+2); return 1; }
-   if(strncmp( buffer, "fi",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_NEW_Y4M, buffer+2); return 1; }
-   if(strncmp( buffer, "fo",2 ) == 0 ) { human_friendly_msg( VIMS_OUTPUT_Y4M_START,buffer+2); return 1; }
-   if(strncmp( buffer, "cl",2 ) == 0 ) { human_friendly_msg( VIMS_SAMPLE_LOAD_SAMPLELIST, buffer+2); return 1;}
-   if(strncmp( buffer, "cn",2 ) == 0 ) { human_friendly_msg( VIMS_SAMPLE_NEW, buffer+2); return 1;}
-   if(strncmp( buffer, "cd",2 ) == 0 ) { human_friendly_msg( VIMS_SAMPLE_DEL, buffer+2); return 1;}
-   if(strncmp( buffer, "sd",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_DELETE,buffer+2); return 1;}
-   if(strncmp( buffer, "cs",2 ) == 0 ) { human_friendly_msg( VIMS_SAMPLE_SAVE_SAMPLELIST,buffer+2); return 1;}
-   if(strncmp( buffer, "es",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_SAVE,buffer+2); return 1;}
-   if(strncmp( buffer, "ec",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_CUT,buffer+2); return 1;}
-   if(strncmp( buffer, "ed",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_DEL,buffer+2); return 1;}
-   if(strncmp( buffer, "ep",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_PASTE_AT,buffer+2); return 1; }
-   if(strncmp( buffer, "ex",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_COPY, buffer+2); return 1; }
-   if(strncmp( buffer, "er",2 ) == 0 ) { human_friendly_msg( VIMS_EDITLIST_CROP, buffer+2); return 1; }   
-   if(strncmp( buffer, "al",2 ) == 0 ) { human_friendly_msg( VIMS_BUNDLE_FILE,buffer+2); return 1; }
-   if(strncmp( buffer, "as",2 ) == 0 ) { human_friendly_msg( VIMS_BUNDLE_SAVE,buffer+2); return 1; }
-   if(strncmp( buffer, "de",2 ) == 0 ) { human_friendly_msg( VIMS_DEBUG_LEVEL, NULL); return 1;}
-   if(strncmp( buffer, "be",2 ) == 0 ) { human_friendly_msg( VIMS_BEZERK,NULL); return 1;}
-   if(strncmp( buffer, "sa",2 ) == 0 ) { human_friendly_msg( VIMS_SAMPLE_MODE,NULL); return 1;}
-	if(strncmp(buffer, "mr",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_NEW_MCAST, buffer+2); return 1; }
-	if(strncmp(buffer, "pr",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_NEW_UNICAST, buffer+2);
-return 1;}
-	if(strncmp(buffer, "av",2 ) == 0 ) { human_friendly_msg( VIMS_STREAM_NEW_AVFORMAT, buffer+2); return 1; }
-   return 0;
-}
-
-
 vj_client	*sayvims_connect(void)
 {
 	vj_client *client = vj_client_alloc( 0,0,0 );
+	if(!client)
+	{
+		fprintf(stderr, "Memory allocation error\n");
+		return NULL;
+	}
+
 	if(host_name == NULL)
 		host_name = strdup( "localhost" );
 
 	if(!vj_client_connect( client, host_name,group_name, port_num ))
 	{
+		fprintf(stderr,"Unable to connect to %s:%d\n", host_name, port_num );
 		return NULL;
 	}
+	
 	return client;
 }
 
@@ -229,57 +166,24 @@ int main(int argc, char *argv[])
 	char ibuf[1024];
 	int err = 0;
 	FILE *infile;
+
 	// parse commandline parameters
 	while( ( n = getopt(argc,argv, "h:g:p:micd")) != EOF)
 	{
 		sprintf(option,"%c",n);
 		err += set_option( option,optarg);
 	}
-        veejay_set_debug_level(0);
 
-	veejay_set_colors(colors);
+	if( err  || optind > argc)
+	{
+		Usage( argv[0] );
+		return -1;
+	}
 
-	if( optind > argc )
-		err ++;
-	if ( err )
-		Usage(argv[0]);
-
-	bzero( buf, 65535 );
-
-	// make connection with veejay
 	sayvims = sayvims_connect();
 	if(!sayvims)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot connect to %s", host_name);
-		exit(1);
-	}
+		return -1;
 
-	if(interactive)
-	{
-		fcntl( 0, F_SETFL, O_NONBLOCK);
-		veejay_msg(VEEJAY_MSG_INFO, "Interactive mode");
-	}
-
-	while(interactive==1)
-	{
-		bzero(ibuf,1024);
-		if(read(0, ibuf,255)>0)
-		{
-			int i;
-			for(i=0; i < strlen(ibuf); i++)
-			if(ibuf[i] == '\n') ibuf[i] = '\0';
-			if(!human_friendly_vims(ibuf))
-				vj_client_send(sayvims,V_CMD, ibuf);
-
-		}
-		vj_flush(1);
-	}
-	if ( interactive )
-	{
-		vj_client_close( sayvims );
-		vj_client_free(sayvims );
-		return 0;
-	}
 	if(single_msg || (optind == 1 && err == 0 && argc > 1 )) 
 	{
 		char **msg = argv + optind;
@@ -297,8 +201,8 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					veejay_msg(VEEJAY_MSG_ERROR, "Fatal: error parsing %s", tmp );
-					exit(-1);
+					fprintf(stderr, "Fatal: error parsing %s\n", tmp );
+					return -1;
 				}
 			}
 			else
@@ -316,10 +220,10 @@ int main(int argc, char *argv[])
 		infile = fdopen( fd_in, "r" );
 		if(!infile)
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Cannot read from STDIN");
+			fprintf(stderr, "Cannot read from STDIN\n");
 			return 0;
 		}	
-		veejay_msg(VEEJAY_MSG_ERROR, "Reading from STDIN");
+		char buf[128];
 		while( fgets(buf, 100, infile) )
 		{
 			if( buf[0] == '+' )
@@ -332,7 +236,7 @@ int main(int argc, char *argv[])
 				}
 				else
 				{
-					veejay_msg(VEEJAY_MSG_ERROR, "Delay not valid: '%s'", wait_ );
+					fprintf(stderr,"Delay not valid: '%s'\n", wait_ );
 				}
 			}
 			else

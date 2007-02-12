@@ -55,6 +55,7 @@ typedef struct VJFrame_t
 	int	height;
 	int	ssm;
 	int	alpha;
+	int	stride[4];
 } VJFrame;
 
 typedef struct VJRectangle_t

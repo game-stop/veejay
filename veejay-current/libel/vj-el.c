@@ -1017,17 +1017,17 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 	int uv_w = el->video_width / 2;
 	if( decoder_id == 0xffff )
 	{
-		uint8_t *p = (in_cache == NULL ? lav_get_frame_ptr( el->lav_fd[N_EL_FILE(n)]) : in_cache);
-		if( p == NULL )
+		VJFrame *srci  = lav_get_frame_ptr( el->lav_fd[ N_EL_FILE(n) ] );
+		if( srci == NULL )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Error decoding frame %ld",
 				N_EL_FRAME(n));
 			return -1;
 		}
 		
-		veejay_memcpy( dst[0], p, len );
-                veejay_memcpy( dst[1], p + len, uv_len );
-                veejay_memcpy( dst[2], p + len + uv_len, uv_len );
+		veejay_memcpy( dst[0], srci->data[0], len );
+                veejay_memcpy( dst[1], srci->data[1], uv_len );
+                veejay_memcpy( dst[2], srci->data[2], uv_len );
                 return 1;       
 	}
 
@@ -1035,7 +1035,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 	int inter = 0;
 	int got_picture = 0;
 
-	
 	switch( decoder_id )
 	{
 		case CODEC_ID_YUV420:
@@ -1047,19 +1046,30 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
                 	}
                		else
                 	{
-                	        return ( yuv420p_to_yuv422p(
-					data,
-                                        data+len,
-                                        data+len+(len/4),
-                                        dst,	
-					el->video_width,
-					el->video_height));
+
+				VJFrame *srci = yuv_yuv_template( data,data+len,data+len+(len/4),el->video_width,
+							el->video_height, PIX_FMT_YUV420P );
+				VJFrame *dsti = yuv_yuv_template( dst[0],dst[1],dst[2], el->video_width,
+							el->video_height, get_ffmpeg_pixfmt( out_pix_fmt));
+
+				yuv_convert_any( srci, dsti, srci->format, dsti->format );
+
+				free(srci);
+				free(dsti);
                 	}
 			return 1;
 			break;
 		case CODEC_ID_YUV422:
 			if(out_pix_fmt == FMT_420 || out_pix_fmt == FMT_420F)
-				yuv422p_to_yuv420p3( data, dst, el->video_width,el->video_height);
+			{
+				VJFrame *srci = yuv_yuv_template( data,data+len,data+len+uv_len, el->video_width,
+							el->video_height, PIX_FMT_YUV422P );
+				VJFrame *dsti = yuv_yuv_template( dst[0],dst[1], dst[2], el->video_width,
+							el->video_height, get_ffmpeg_pixfmt( out_pix_fmt));
+				yuv_convert_any( srci,dsti, srci->format, dsti->format );
+				free(srci);
+				free(dsti);
+			}
 			else
 			{	
 				veejay_memcpy( dst[0], data, len);
@@ -1113,23 +1123,15 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 				return 0;
 			}
 
-			AVPicture pict,pict2;
 			int dst_fmt = get_ffmpeg_pixfmt( el_pixel_format_ );
 			int src_fmt = d->context->pix_fmt;
-	
-			pict.data[0] = dst[0];
-			pict.data[1] = dst[1];
-			pict.data[2] = dst[2];
-	
-			pict.linesize[0] = el->video_width;
-			pict.linesize[1] = el->video_width / 2;
-			pict.linesize[2] = el->video_width / 2;
 
-			
 			if(!d->frame->opaque)
 			{
 				if( el->auto_deinter && inter != LAV_NOT_INTERLACED)
 				{
+					AVPicture pict2;
+					veejay_memset(&pict2,0,sizeof(AVPicture));
 					pict2.data[0] = d->deinterlace_buffer[0];
 					pict2.data[1] = d->deinterlace_buffer[1];
 					pict2.data[2] = d->deinterlace_buffer[2];
@@ -1143,12 +1145,25 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 						el->video_width,
 						el->video_height);
 
-					img_convert( &pict, dst_fmt, (const AVPicture*) &pict2, src_fmt,
-						el->video_width,el->video_height);
+					VJFrame *src1 = yuv_yuv_template( d->deinterlace_buffer[0],
+								d->deinterlace_buffer[1], d->deinterlace_buffer[2],
+								el->video_width, el->video_height,	
+								src_fmt );
+					VJFrame *dst1 = yuv_yuv_template( dst[0],dst[1],dst[2],
+								el->video_width, el->video_height,
+								dst_fmt );
+
+
+					yuv_convert_any3( src1,d->frame->linesize,dst1,src1->format,dst1->format);
+
+					free(src1);
+					free(dst1);
+
 				}
 				else
 				{
-					int hj = (src_fmt == dst_fmt ? 1: 0 );
+			/*		int hj = (src_fmt == dst_fmt ? 1: 0 );
+	
 					switch(hj)
 					{
 						case 1:
@@ -1157,12 +1172,27 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 							veejay_memcpy( dst[2], d->frame->data[2], uv_len );
 							break;
 						case 0:
-							img_convert( &pict, dst_fmt, (const AVPicture*) d->frame, src_fmt,
-								el->video_width, el->video_height );
-						break;
-							default:
+							{*/
+								VJFrame *src1 = yuv_yuv_template( d->frame->data[0],
+											d->frame->data[1], d->frame->data[2],
+											el->video_width,el->video_height,
+											src_fmt );
+								VJFrame *dst1 = yuv_yuv_template( dst[0],dst[1],dst[2],
+											el->video_width,el->video_height,
+											dst_fmt );
+		
+
+								yuv_convert_any3( src1,d->frame->linesize,dst1,src1->format,dst1->format);
+								free(src1);
+								free(dst1);
+				/*			}
 							break;
-					}
+						default:
+#ifdef STRICT_CHECKING
+							assert(0);
+#endif
+							break;
+					} */
 				}
 			}
 			else
@@ -1174,13 +1204,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			return 1;
 			break;
 	}
-
-#ifdef HAVE_MMX
-	// some codecs is broken, and doesn't restore MMX state :(
-	// it happens usually with broken/damaged files.
-//	__asm __volatile ("emms;":::"memory");
-#endif
-
 
 	veejay_msg(VEEJAY_MSG_WARNING, "Error decoding frame %ld - %d ", nframe,len);
 	return 0;  
@@ -1370,6 +1393,8 @@ int	vj_el_init_420_frame(editlist *el, VJFrame *frame)
 	frame->width = el->video_width;
 	frame->height = el->video_height;
 	frame->ssm = 0;
+	frame->stride[0] = el->video_width;
+	frame->stride[1] = frame->stride[2] = frame->stride[0]/2;
 	return 1;
 }
 
@@ -1389,6 +1414,8 @@ int	vj_el_init_422_frame(editlist *el, VJFrame *frame)
 	frame->width = el->video_width;
 	frame->height = el->video_height;
 	frame->ssm = 0;
+	frame->stride[0] = el->video_width;
+	frame->stride[1] = frame->stride[2] = frame->stride[0]/2;
 	return 1;
 }
 

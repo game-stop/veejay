@@ -56,6 +56,147 @@
 
 #endif
 
+
+static	int		    sws_context_flags_ = 0;
+
+void	yuv_init_lib()
+{
+	sws_context_flags_ = yuv_sws_get_cpu_flags();
+}
+
+VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int fmt )
+{
+	VJFrame *f = (VJFrame*) vj_calloc(sizeof(VJFrame));
+	f->format = fmt;
+	f->data[0] = Y;
+	f->data[1] = U;
+	f->data[2] = V;
+	f->data[3] = NULL;
+	f->width   = w;
+	f->height  = h;
+
+	switch(fmt)
+	{
+		case PIX_FMT_YUV422P:
+		case PIX_FMT_YUVJ422P:
+			f->uv_width = w/2;
+			f->uv_height= f->height;		
+			f->stride[0] = w;
+			f->stride[1] = f->stride[2] = f->stride[0]/2;
+			break;
+		case PIX_FMT_YUV420P:
+		case PIX_FMT_YUVJ420P:
+			f->uv_width = w/2;
+			f->uv_height=f->height/2;
+			f->stride[0] = w;
+			f->stride[1] = f->stride[2] = f->stride[0]/2;
+			break;
+		case PIX_FMT_YUV444P:
+		case PIX_FMT_YUVJ444P:
+			f->uv_width = w;
+			f->uv_height=f->height;
+			f->stride[0] = w;
+			f->stride[1] = f->stride[2] = f->stride[0];
+			break;
+		default:
+#ifdef STRICT_CHECKING
+			assert(0);
+#endif
+		break;
+	}
+
+
+	return f;
+}
+
+VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
+{
+#ifdef STRICT_CHECKING
+	assert( fmt == PIX_FMT_RGB24 || fmt == PIX_FMT_BGR24 ||
+			fmt == PIX_FMT_RGB32 );
+	assert( w > 0 );
+	assert( h > 0 );
+#endif
+	VJFrame *f = (VJFrame*) vj_calloc(sizeof(VJFrame));
+	f->format = fmt;
+	f->data[0] = rgb_buffer;
+	f->data[1] = NULL;
+	f->data[2] = NULL;
+	f->data[3] = NULL;
+	f->width   = w;
+	f->height  = h;
+
+	switch( fmt )
+	{
+		case PIX_FMT_RGB24:
+		case PIX_FMT_BGR24:
+				f->stride[0] = w * 3;
+		break;
+		default:
+				f->stride[0] = w * 4;
+		break;
+	}
+	f->stride[1] = 0;
+	f->stride[2] = 0;
+
+	return f;
+}
+
+#define ru4(num)  (((num)+3)&~3)
+
+void	yuv_convert_any( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
+{
+#ifdef STRICT_CHECKING
+	assert( dst_fmt >= 0 && dst_fmt < 32 );
+	assert( src_fmt == PIX_FMT_YUV420P || src_fmt == PIX_FMT_YUVJ420P ||
+		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
+		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
+		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA ||
+		src_fmt == PIX_FMT_BGR24);
+	assert( src->width > 0 );
+	assert( dst->width > 0 );
+#endif
+	struct SwsContext  *ctx = sws_getContext(
+			src->width,
+			src->height,
+			src_fmt,
+			dst->width,
+			dst->height,
+			dst_fmt,
+			sws_context_flags_,
+			NULL,NULL,NULL );
+
+	sws_scale( ctx, src->data, src->stride,0, src->height,dst->data, dst->stride );
+
+	sws_freeContext( ctx );
+}
+
+
+void	yuv_convert_any3( VJFrame *src, int src_stride[3], VJFrame *dst, int src_fmt, int dst_fmt )
+{
+#ifdef STRICT_CHECKING
+	assert( dst_fmt >= 0 && dst_fmt < 32 );
+	assert( src_fmt == PIX_FMT_YUV420P || src_fmt == PIX_FMT_YUVJ420P ||
+		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
+		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
+		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA );
+#endif
+	struct SwsContext *ctx = sws_getContext(
+			src->width,
+			src->height,
+			src_fmt,
+			dst->width,
+			dst->height,
+			dst_fmt,
+			sws_context_flags_,
+			NULL,NULL,NULL );
+	int dst_stride[3] = { ru4(dst->width),ru4(dst->uv_width),ru4(dst->uv_width) };
+	sws_scale( ctx, src->data, src_stride, 0, src->height, dst->data, dst_stride);
+
+	sws_freeContext( ctx );
+}
+
+
 /* convert 4:2:0 to yuv 4:2:2 packed */
 void yuv422p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
 		       int height)
@@ -644,99 +785,6 @@ int	yuv_sws_get_cpu_flags(void)
 	cpu_flags = cpu_flags | SWS_CPU_CAPS_ALTIVEC;
 #endif
 	return cpu_flags;
-}
-
-void    util_convertrgba32( uint8_t **data, int w, int h,int in_pix_fmt,int shiftv, void *out_buffer )
-{
-        AVPicture p1,p2;
-        memset( &p1, 0, sizeof(p1));
-        memset( &p2, 0, sizeof(p2));
-#ifdef STRICT_CHECING
-        assert( data != NULL );
-        assert( w > 0 );
-        assert( h > 0 );
-        assert( out_buffer != NULL );
-#endif
-
-        p1.data[0] = out_buffer;
-        p1.linesize[0] = w * 4;
-
-        p2.data[0] = data[0];
-        p2.data[1] = data[1];
-        p2.data[2] = data[2];
-        p2.linesize[0] = w;
-        p2.linesize[1] = w >> shiftv;
-        p2.linesize[2] = w >> shiftv; 
-
-        // dest pix, dest format, informat, w , h 
-        if(img_convert( &p1, PIX_FMT_RGBA32,&p2, in_pix_fmt,w,h ))
-        {
-#ifdef STRICT_CHECKING
-                veejay_msg(0, "Image conversion failed in %s", __FUNCTION__ );
-                assert(0);
-#endif
-        }
-}       
-void    util_convertrgb24( uint8_t **data, int w, int h,int in_pix_fmt,int shiftv, void *out_buffer )
-{
-        AVPicture p1,p2;
-        memset( &p1, 0, sizeof(p1));
-        memset( &p2, 0, sizeof(p2));
-#ifdef STRICT_CHECING
-        assert( data != NULL );
-        assert( w > 0 );
-        assert( h > 0 );
-        assert( out_buffer != NULL );
-#endif
-
-        p1.data[0] = out_buffer;
-        p1.linesize[0] = w * 3;
-
-        p2.data[0] = data[0];
-        p2.data[1] = data[1];
-        p2.data[2] = data[2];
-        p2.linesize[0] = w;
-        p2.linesize[1] = w >> shiftv;
-        p2.linesize[2] = w >> shiftv; 
-
-        // dest pix, dest format, informat, w , h 
-        if(img_convert( &p1, PIX_FMT_RGB24,&p2, in_pix_fmt,w,h ))
-        {
-#ifdef STRICT_CHECKING
-                veejay_msg(0, "Image conversion failed in %s", __FUNCTION__ );
-                assert(0);
-#endif
-        }
-}   
-
-void    util_convertsrc( void *indata, int w, int h, int out_pix_fmt, int shift, uint8_t **data, int rgb)
-{
-        AVPicture p1,p2;
-        memset( &p1, 0, sizeof(p1));
-        memset( &p2, 0, sizeof(p2));
-#ifdef STRICT_CHECING
-        assert( data != NULL );
-        assert( w > 0 );
-        assert( h > 0 );
-#endif
-        p2.data[0] = indata;
-        p2.linesize[0] = w * (rgb == FMT_RGB24 ? 3 : 4);
-
-        p1.data[0] = data[0];
-        p1.data[1] = data[1];
-        p1.data[2] = data[2];
-        p1.linesize[0] = w;
-        p1.linesize[1] = w >> shift;
-        p1.linesize[2] = w >> shift; 
-       
-	int in_fmt = (rgb == FMT_RGB24 ? PIX_FMT_RGB24 : PIX_FMT_RGBA32 );
-       	if(img_convert( &p1, out_pix_fmt,&p2, in_fmt,w,h ))
-        {
-#ifdef STRICT_CHECKING
-                veejay_msg(0, "Image conversion failed in %s", __FUNCTION__ );
-                assert(0);
-#endif
-        }
 }
 
 void	yuv_deinterlace(

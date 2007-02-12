@@ -931,7 +931,7 @@ static int veejay_screen_update(veejay_t * info )
 #ifdef USE_GDK_PIXBUF
 		if(!vj_picture_save( info->settings->export_image, frame, 
 				info->video_output_width, info->video_output_height,
-				info->current_edit_list->pixel_format ) )
+				get_ffmpeg_pixfmt( info->current_edit_list->pixel_format )) )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR,
 				"Unable to write frame %ld to image as '%s'",
@@ -2082,7 +2082,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 				1, n );
 			return -1;
 		}
-		veejay_change_playback_mode(info,VJ_PLAYBACK_MODE_TAG,nid);
+		info->settings->late[0] = VJ_PLAYBACK_MODE_TAG;
+		info->settings->late[1] = nid;
+	//	veejay_change_playback_mode(info,VJ_PLAYBACK_MODE_TAG,nid);
 	}
 	else if(info->dummy->active && id <= 0)
 	{
@@ -2135,9 +2137,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 
  if (info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
     {
-	if (vj_perform_audio_start(info)) {
-	    veejay_msg(VEEJAY_MSG_INFO, "Started Audio Task");
-	} else {
+	if (!vj_perform_audio_start(info)) {
 	    return -1;
 	}
     }
@@ -2189,18 +2189,24 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
 	}
 }
 
+/*
+ * pin_cpu: snapped from lm-sensors project
+ *
+ *
+ */
+
 static int	veejay_pin_cpu( veejay_t *info, int cpu_num )
 {
 	static unsigned long* mask = NULL;
 	static unsigned long* cpumask = NULL;
-	int sz = 0;
-	int ncpus = 0;
+	static int sz = 0;
+	static int ncpus = 0;
 	int i,j,retval;
-	if( mask == NULL )
+	if( cpumask == NULL )
 	{
 		sz = 1 + (2 * sched_ncpus()) / (8 * sizeof(unsigned long));
-		mask = (unsigned long*) malloc( sz * sizeof( unsigned long ));
-		cpumask = (unsigned long*) malloc( sz * sizeof( unsigned long ));
+		mask = (unsigned long*) vj_malloc( sz * sizeof( unsigned long ));
+		cpumask = (unsigned long*) vj_malloc( sz * sizeof( unsigned long ));
 		
 		retval = sched_getaffinity(0, sz * sizeof(unsigned long), cpumask );
 		if( retval < 0 )
@@ -2221,7 +2227,7 @@ static int	veejay_pin_cpu( veejay_t *info, int cpu_num )
 
 	cpu_num %= ncpus;
 
-	memset( mask, 0, sz * sizeof( unsigned long ));
+	veejay_memset( mask, 0, sz * sizeof( unsigned long ));
 
 	for ( i = 0, j = 0; i < sz * 8 * sizeof(unsigned long); ++ i )
 	{
@@ -2272,6 +2278,9 @@ static void veejay_playback_cycle(veejay_t * info)
 	veejay_msg(VEEJAY_MSG_INFO, "Running on multiprocessor. Locking CPU 1 for rendering purposes");
 	veejay_pin_cpu( info, 1 );
     }
+    if( info->settings->late[1] )
+   	 veejay_change_playback_mode(info,info->settings->late[0],info->settings->late[1]);
+
 
     vj_perform_queue_audio_frame(info,0);
     vj_perform_queue_video_frame(info,0,0);
@@ -2761,13 +2770,13 @@ veejay_t *veejay_malloc()
 
 
 #ifdef HAVE_SDL
-	info->sdl = (vj_sdl**) vj_malloc(sizeof(vj_sdl*) * MAX_SDL_OUT ); 
-	for( i = 0; i < MAX_SDL_OUT;i++ )
-		info->sdl[i] = NULL;
+	info->sdl = (vj_sdl**) vj_calloc(sizeof(vj_sdl*) * MAX_SDL_OUT ); 
 #endif
 
 
 	info->settings->ncpu = smp_check();
+
+	yuv_init_lib();
 	
     return info;
 }
@@ -2854,7 +2863,7 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 		free(settings->save_list);
 
     settings->save_list =
-		(uint64_t *) vj_malloc((n2 - n1 + 1) * sizeof(uint64_t));
+		(uint64_t *) vj_calloc((n2 - n1 + 1) * sizeof(uint64_t));
 
 	if (!settings->save_list)
 	{
@@ -3344,10 +3353,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 {
 	vj_el_frame_cache(info->seek_cache );
 
-
-	vj_avformat_init();
-
- 
 	if(info->auto_deinterlace)
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Auto deinterlacing (for playback on monitor / beamer with vga input");

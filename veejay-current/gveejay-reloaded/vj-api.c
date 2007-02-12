@@ -6759,6 +6759,12 @@ void	vj_gui_preview(void)
 
 int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 {
+	if(!hostname && !group_name )
+	{
+		veejay_msg(0,"Invalid host/group name given");
+		return 0;
+	}
+
 	if(info->client )
 	{
 		error_dialog("Warning", "You should disconnect first");
@@ -6766,8 +6772,15 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	}
 	
 	if(!info->client)
+	{
 		info->client = vj_client_alloc(0,0,0);
-	
+		if(!info->client)
+		{
+			veejay_msg(0, "Memory allocation error");
+			return 0;
+		}	
+	}
+
 	if(!vj_client_connect( info->client, hostname, group_name, port_num ) )
 	{
 		if(info->client)
@@ -6796,7 +6809,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	veejay_memset( info->status_msg, 0, STATUS_BYTES );	
 
 	load_editlist_info();
-	//multitrack_set_hlq( info->mt,info->el.fps,info->el.ratio, info->quality );
 
 	update_slider_value( "framerate", info->el.fps,  0 );
 

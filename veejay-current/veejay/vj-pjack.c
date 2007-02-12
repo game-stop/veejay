@@ -66,7 +66,7 @@ static int _vj_jack_start(int *dri)
 			   veejay_msg(0, "Unable to find jack port");
 			   break;
 		}
-		veejay_msg(0, "To run veejay without audio, use -a0");
+//		veejay_msg(0, "To run veejay without audio, use -a0");
 		return 0;
 	}
 

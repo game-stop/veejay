@@ -43,7 +43,7 @@ libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS ) $(DEBUGLIBS)
 libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libhash / -lhash \
 			-L$(top_builddir)/liblzo / -lminilzo \
-			-L$(top_builddir)/bio2jack/ -lbio2jack \
+			-L$(top_builddir)/bio2jack/ -lbio2jack4vj \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
 			-L$(top_builddir)/libvjmem/ -lvjmem \
 			-L$(top_builddir)/libvje -lvje \
