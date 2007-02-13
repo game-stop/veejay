@@ -2005,9 +2005,9 @@ static int	vevo_port_ref_verify( vevo_port_t *p)
 			error = vevo_property_get( port_ref_, item[i],0, &which_port );
 			if( error )
 				veejay_msg(0, "Port '%s' retrieval returns error %d", item[i],error );
-			else
-				veejay_msg(0, "Reference to Port %s exists, but may be invalid", item[i]);
-			veejay_msg(0, "Port '%s' reference count is %d",item[i], ref_count);
+//			else
+//				veejay_msg(0, "Reference to Port %s exists, but may be invalid", item[i]);
+//			veejay_msg(0, "Port '%s' reference count is %d",item[i], ref_count);
 			err++;
 		}
 		ref_count = 1;

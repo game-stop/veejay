@@ -217,8 +217,8 @@ static vevo_port_t	*_new_event(
 
 	va_list ap;
 	va_start(ap, flags);
-	veejay_msg(VEEJAY_MSG_DEBUG,
-	  "VIMS %03d: '%s' '%s' %d arguments", vims_id, name, format, n_arg );
+//	veejay_msg(VEEJAY_MSG_DEBUG,
+//	  "VIMS %03d: '%s' '%s' %d arguments", vims_id, name, format, n_arg );
 
 	for( n = 0; n < n_arg ; n ++)
 	{

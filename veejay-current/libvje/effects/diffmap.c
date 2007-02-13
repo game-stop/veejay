@@ -27,7 +27,7 @@ typedef int (*morph_func)(uint8_t *kernel, uint8_t mt[9] );
 vj_effect *differencemap_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
+    ve->num_params = 3;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
@@ -36,10 +36,12 @@ vj_effect *differencemap_init(int w, int h)
     ve->limits[1][0] = 255;
     ve->limits[0][1] = 0;  // reverse
     ve->limits[1][1] = 1;
-
+    ve->limits[0][2] = 0;
+    ve->limits[1][2] = 1; // show map
     ve->defaults[0] = 40;
     ve->defaults[1] = 0;
-    ve->description = "Map B to difference pixels";
+    ve->defaults[2] = 1;
+    ve->description = "Map B to A (bitmask)";
     ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
@@ -47,12 +49,15 @@ vj_effect *differencemap_init(int w, int h)
 }
 
 
-static uint8_t *binary_img;
-static uint8_t *previous_img;
+static uint8_t *binary_img = NULL;
+static uint8_t *previous_img = NULL;
 static int nframe = 0;
 
 int		differencemap_malloc(int w, int h )
 {
+	if(binary_img || previous_img)
+		differencemap_free();
+	
 	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
 	previous_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * w *h );
 	nframe = 0;
@@ -86,7 +91,7 @@ static int _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
 			return 1;
 	return 0;
 }
-
+/*
 #ifdef HAVE_ASM_MMX
 #undef HAVE_K6_2PLUS
 #if !defined( HAVE_ASM_MMX2) && defined( HAVE_ASM_3DNOW )
@@ -96,7 +101,6 @@ static int _dilate_kernel3x3( uint8_t *kernel, uint8_t img[9])
 #undef _EMMS
 
 #ifdef HAVE_K6_2PLUS
-/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
 #define _EMMS     "femms"
 #else
 #define _EMMS     "emms"
@@ -158,7 +162,9 @@ static	void	load_differencemapmm7(uint8_t v)
 		:: "r" (m) );
 }
 #endif
-/*
+
+
+
 static	void	binarify( uint8_t *dst, uint8_t *src, uint8_t *prev, uint8_t threshold, int reverse,int w, int h )
 {
 	int len = (w * h)>>3;
@@ -202,21 +208,24 @@ static	void	binarify( uint8_t *dst, uint8_t *src, uint8_t *prev, uint8_t thresho
 
 
 #else*/
-static	void	binarify( uint8_t *dst, uint8_t *src,uint8_t *prev, int threshold,int reverse, int w, int h )
+static	void	binarify( uint8_t *dst, uint8_t *src,int threshold,int reverse, int w, int h )
 {
 	const int len = w*h;
 	int i;
 	if(!reverse)
-	for( i = 0; i < len; i ++ )
 	{
-		dst[i] = (  abs(src[i]-prev[i]) <= threshold ? 0: 0xff );
+		for( i = 0; i < len; i ++ )
+			dst[i] = (  src[i] <= threshold ? 0: 0xff );
 	}
 	else
+	{
 		for( i = 0; i < len; i ++ )
-			dst[i] = ( abs(src[i]-prev[i]) > threshold ? 0: 0xff );
+			dst[i] = ( src[i] >= threshold ? 0: 0xff );
+	}
 }
 
-void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse )
+void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse,
+		int show )
 {
 	unsigned int i,x,y;
 	int len = (width * height);
@@ -232,19 +241,16 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height,
 
 //	morph_func	p = _dilate_kernel3x3;
 
-	softblur_apply( frame, width,height,0 );
+//@	take copy of image
+	VJFrame *tmp = vj_malloc(sizeof(VJFrame));
+	veejay_memcpy(tmp, frame, sizeof(VJFrame));
+	tmp->data[0] = previous_img;
+	veejay_memcpy( previous_img, Y, len );
+	softblur_apply( tmp, width,height,0 );
+	free(tmp);
 
-	if( nframe == 0 )
-	{
-		veejay_memcpy( previous_img, Y, len );
-		nframe = 1;
-		return;
-	}
-	
-	
-
-	binarify( binary_img,previous_img,Y,threshold,reverse, width,height);
-
+	binarify( binary_img,previous_img,threshold,reverse, width,height);
+/*
 
 #ifdef HAVE_ASM_MMX
 	int work = (width*height)>>3;
@@ -267,19 +273,26 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height,
 
  	 __asm__ __volatile__ ( _EMMS:::"memory");
 #else
+*/
+
+	//@ clear image
+
+	if(show)
+	{
+		veejay_memcpy(frame->data[0], binary_img, len );
+		veejay_memset(frame->data[1],128, len);
+		veejay_memset(frame->data[2],128, len);
+		return;
+	}
 
 	veejay_memset( Y, 0, width );
 	veejay_memset( Cb, 128, width );
 	veejay_memset( Cr, 128, width );
 
-//	veejay_memset(Y+(len-width),0, width );
-//	veejay_memset(Cb+(len-width),128,width);
-//	veejay_memset(Cr+(len-width),128,width);
-
 	len -= width;
 
-	if(!reverse)
-	{
+//	if(!reverse)
+//	{
 		for(y = width; y < len; y += width  )
 		{	
 			for(x = 1; x < width-1; x ++)
@@ -306,27 +319,25 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height,
 					Y[x+y] = Y2[x+y];
 					Cb[x+y] = Cb2[x+y];
 					Cr[x+y] = Cr2[x+y];
-
 				}
-				else //@ black
+				else
 				{
-					Y[x + y] = 0;
-					Cb[x + y] = 128;
-					Cr[x + y] = 128;
+					Y[x+y] = 0;
+					Cb[x+y] = 128;
+					Cr[x+y] = 128;
 				}
 			}
 		}
-	}
-	else
+//	}
+/*	else
 	{
 		for(y = width; y < len; y += width  )
 		{	
 			for(x = 1; x < width-1; x ++)
 			{	
-				if(binary_img[x+y] == 0x0) //@ found black pixel
+				if(!binary_img[x+y]) //@ found black pixel
 				{
-				//@ dilaton too slow ...
-			/*	uint8_t mt[9] = {
+				uint8_t mt[9] = {
 					0xff-binary_img[x-1+y-width], 0xff-binary_img[x+y-width], 0xff-binary_img[x+1+y-width],
 					0xff-binary_img[x-1+y], 	0xff-binary_img[x+y]	    , 0xff-binary_img[x+1+y],
 					0xff-binary_img[x-1+y+width], 0xff-binary_img[x+y+width], 0xff-binary_img[x+1+y+width]
@@ -342,19 +353,10 @@ void differencemap_apply( VJFrame *frame, VJFrame *frame2,int width, int height,
 					Y[x + y] = 0;
 					Cb[x + y] = 128;
 					Cr[x + y] = 128;
-				}*/
-					Y[x+y] = Y2[x+y];
-					Cb[x+y]= Cb2[x+y];
-					Cr[x+y]= Cr2[x+y];
-				}
-				else
-				{ 
-					Y[x+y] = 0x0;
-					Cb[x+y] = 128; 
-					Cr[x+y] = 128;
 				}
 			}
 		}
 	}
-#endif
+//#endif
+*/
 }

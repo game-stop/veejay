@@ -338,6 +338,9 @@ veejay_image_t		*vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out
 	veejay_memset(&src,0,sizeof(VJFrame));
 	veejay_memset(&dst,0,sizeof(VJFrame));
 
+	if( frame->ssm )
+		fmt = PIX_FMT_YUV444P;
+
 	vj_get_yuv_template( &src,frame->width,frame->height,fmt );
 	src.data[0] = frame->data[0];
 	src.data[1] = frame->data[1];	

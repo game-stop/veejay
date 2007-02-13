@@ -803,7 +803,7 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 		}
 	}
 //@ palette is used for other things
-	int id = vj_tag_new(type, filename, index, info->current_edit_list, info->pixel_format, channel, palette);
+	int id = vj_tag_new(type, filename, index, info->current_edit_list, info->pixel_format, palette, channel );
 
 	char descr[200];
 	veejay_memset(descr,0,200);
@@ -2075,7 +2075,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	{
 		int n = vj_tag_num_devices();
 		int i = 0;
-		int nid =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, "bogus", def_tags, el->pixel_format, 1 );
+		veejay_msg(0, "create_tag: nstreams=%d,pf=%d, %d",info->nstreams,1, (def_tags-1));
+		int nid =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, "bogus", info->nstreams, el->pixel_format, (def_tags-1) );
 		if( nid> 0)
 		{
 		 	   veejay_msg(VEEJAY_MSG_INFO, "Requested capture device available as stream %d", nid );

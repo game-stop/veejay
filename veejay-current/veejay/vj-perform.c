@@ -2042,6 +2042,7 @@ static int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 				error = 1; // something went wrong
 				vj_tag_set_active(sample_id, 0); // stop stream
 			}
+			frame_buffer[chain_entry]->ssm = 0;
 	    	}
 	}
 	else
@@ -2143,7 +2144,6 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 						chain_entry);
 		    		
 				vj_perform_apply_secundary_tag(info,sub_id,source,chain_entry,0 ); // get it
-				// FIXME: apply secundary ... sampling
 			 	frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 		frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
@@ -2195,18 +2195,6 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 			
 			vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
 				(int) settings->current_frame_num );
-		/*	if(ef && sub_mode)
-			{
-				veejay_msg(0, "subsample %d", __LINE__);
-				// restore frame
-				chroma_subsample(
-                                        settings->sample_mode,
-                                        effect_sampler,
-                                        frames[1]->data,frameinfo->width,
-                                        frameinfo->height
-                                );
-			}*/
-			
 	    } // if
 	} // for
 	return 0;
@@ -3036,13 +3024,12 @@ static	void 	vj_perform_finish_chain( veejay_t *info )
 		if( pvar_.fader_active)
 			vj_perform_post_chain_sample(info,frame);
 	}
-
 }
 
 static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *settings, int destination )
 {
 	VJFrame *frame = info->effect_frame1;
-
+	VJFrame *frame2= info->effect_frame2;
 	uint8_t *pri[3];
 
 	pri[0] = primary_buffer[destination]->Y;
@@ -3059,6 +3046,17 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 			frame->height
 			);
 		frame->ssm = 0;
+	}
+
+	if( frame2->ssm == 1 )
+	{
+		chroma_subsample(
+		settings->sample_mode,
+		effect_sampler,
+		frame2->data,
+		frame2->width,
+		frame2->height);
+		frame2->ssm=0;
 	}
 }
 

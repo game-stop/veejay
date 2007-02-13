@@ -364,7 +364,7 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
 
     switch(e) {
 	case VJ_VIDEO_EFFECT_EXTDIFF:
-		differencemap_apply( frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0],arg[1]);
+		differencemap_apply( frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
 		break;
 	case VJ_VIDEO_EFFECT_EXTTHRESHOLD:
 		threshold_apply( frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0],arg[1]);

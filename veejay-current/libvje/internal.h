@@ -540,7 +540,7 @@ extern void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int heig
 
 extern void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg , int chb);
 
-extern	void	differencemap_apply( VJFrame *f, VJFrame *f2, int w, int h, int t1, int rev );
+extern	void	differencemap_apply( VJFrame *f, VJFrame *f2, int w, int h, int t1, int rev, int show );
 
 extern void autoeq_apply( VJFrame *frame, int width, int height, int val, int i, int s);
 

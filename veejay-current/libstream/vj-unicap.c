@@ -35,6 +35,8 @@
 #include <assert.h>
 #endif
 
+#define BUFFERS	2	
+
 /* Using pthreads
  *  the unicap_wait_buffer blocks until a frame is filled by the capture device.
  *  In practice, it will block up to 40 ms when playing PAL at 25 fps. Meanwhile,
@@ -118,7 +120,7 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 
 		unicap_void_property(&property);	
 		unicap_void_format( &format );
-		
+	
 		unicap_reenumerate_properties( ud->handle, &property_count );
 		unicap_reenumerate_formats( ud->handle, &format_count );
 		char *device_name = strdup( ud->device.identifier );
@@ -131,6 +133,8 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 					       VEVO_ATOM_TYPE_STRING,
 					       1,
 					       &device_name);
+
+		veejay_msg( VEEJAY_MSG_INFO, "\tDevice %d : %s", i, ud->device.identifier );
 
 #ifdef STRICT_CHECKING
 		assert( error ==  VEVO_NO_ERROR );
@@ -512,6 +516,8 @@ void	*vj_unicap_new_device( void *dud, int device_id )
 		return NULL;
 	}
 	
+	veejay_msg(VEEJAY_MSG_DEBUG, "Trying to open Capture Device %d", device_id);
+
 	vj_unicap_t *vut = (vj_unicap_t*) vj_calloc(sizeof(vj_unicap_t));
 	veejay_memset(vut->ctrl, 0 , sizeof(char*) *16 );
 	veejay_memset(vut->option,0, sizeof(int) * 16 );
@@ -529,7 +535,11 @@ void	*vj_unicap_new_device( void *dud, int device_id )
 	if( !SUCCESS( unicap_open( &(vut->handle), &(vut->device) ) ) )
 	{
 		veejay_msg(0, "Failed to open capture device '%s'\n", vut->device.identifier );
+		free(vut);	
+		return NULL;
 	}
+
+
 	veejay_msg(2, "Using device '%s'", vut->device.identifier);
 
 	unicap_lock_stream( &(vut->handle) );
@@ -677,20 +687,16 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 				vut->format.identifier, vut->format.size.width,vut->format.size.height );
 	}
 	
-
 	veejay_memset(&(vut->buffer), 0, sizeof( unicap_data_buffer_t ) );
 	
-	vut->buffer.data = vj_malloc( vut->format.buffer_size );
+	/* allocate memory for unicap buffer */
 
+	vut->buffer.data = vj_malloc( vut->format.buffer_size );
 	veejay_memset( vut->buffer.data , 0, vut->sizes[0]);
 	veejay_memset( vut->buffer.data + vut->sizes[0], 128, vut->sizes[1] );
 	veejay_memset( vut->buffer.data + vut->sizes[0] + vut->sizes[1] , 128, vut->sizes[2] );
-	
-	vut->buffer.buffer_size = vut->format.buffer_size;
 
-	veejay_msg(VEEJAY_MSG_INFO,
-		"Capture device internal buffer %d bytes",
-			vut->buffer.buffer_size );
+	vut->buffer.buffer_size = vut->format.buffer_size;
 
 	vut->width = w;
 	vut->height = h;
@@ -805,13 +811,12 @@ static int	vj_unicap_start_capture_( void *vut )
 	assert( v->priv_buf == NULL );
 	assert( v->state == 1 );
 #endif
-	v->priv_buf = (uint8_t*) vj_calloc( 2  * v->width * v->height * 4 );
+	v->priv_buf = (uint8_t*) vj_calloc( BUFFERS  * v->width * v->height * 4 );
 
 	veejay_memset( v->priv_buf , 0, v->sizes[0]);
 	veejay_memset( v->priv_buf + v->sizes[0], 128, v->sizes[1] );
 	veejay_memset( v->priv_buf + v->sizes[0] + v->sizes[1] , 128, v->sizes[2] );
-		
-		
+	
 	if( !SUCCESS( unicap_start_capture( v->handle ) ) )
    	{
       		veejay_msg( 0, "Failed to start capture on device: %s\n", v->device.identifier );
@@ -820,13 +825,6 @@ static int	vj_unicap_start_capture_( void *vut )
 		return 0;
      	}
 
-	if( !SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer)))) 
-	{
-		veejay_msg(0, "Failed to queue buffer on device");
-		free(v->priv_buf);
-		v->priv_buf = NULL;
-		return 0;
-	}
 	v->active = 1;
 	veejay_msg(VEEJAY_MSG_DEBUG, "Started capture on device %s",
 			v->device.identifier );
@@ -921,6 +919,7 @@ int	vj_unicap_grab_a_frame( void *vut )
 {
 	vj_unicap_t *v = (vj_unicap_t*) vut;
 //	unicap_lock_properties( v->handle );
+	unicap_data_buffer_t *ready_buffer = NULL;
 
 	uint8_t *buffer[3] = 
 	{
@@ -935,30 +934,27 @@ int	vj_unicap_grab_a_frame( void *vut )
  		return 0;
 	}
 
-	if( !SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer)))) 
+	if( ! SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer) )) )
 	{
-		veejay_msg(0, "Failed to queue buffer on device");
+		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Failed to queue buffer ",__FUNCTION__,__LINE__);
 		return 0;
 	}
-	
-	if( !SUCCESS( unicap_wait_buffer( v->handle, &(v->buf )) )) 
+
+	if(! SUCCESS(unicap_wait_buffer(v->handle, &(v->buf)) ))
 	{
-		veejay_msg(0,"Failed to wait for buffer on device: %s\n", v->device.identifier );
-		unicap_unlock_properties( v->handle );
-		return 0;
+		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Failed to wait for buffer on device %s",
+				__FUNCTION__,__LINE__, v->device.identifier );
 	}
 
 	if( v->buf->buffer_size <= 0 )
 	{
 		veejay_msg(0, "Unicap returned a buffer of size 0!");	
-		unicap_unlock_properties( v->handle );
 		return 0;
 	}
 
 	if( !v->buf->data )
 	{
 		veejay_msg(0, "Unicap returned a NULL buffer!");	
-		unicap_unlock_properties( v->handle);
 		return 0;
 	}
 
@@ -1001,7 +997,6 @@ int	vj_unicap_grab_a_frame( void *vut )
 
 	unlock_(vut);
 	
-//	unicap_unlock_properties( v->handle );
 	return 1;
 }
 
@@ -1070,14 +1065,17 @@ void	vj_unicap_free_device( void *vut )
 {
 	vj_unicap_t *v = (vj_unicap_t*) vut;
    
-	unicap_unlock_stream( &(v->handle));
+//	unicap_unlock_stream( &(v->handle));
 	
 	if( v->active || v->state )
 		vj_unicap_stop_capture( vut );
 	
-	if( !SUCCESS( unicap_close( v->handle ) ) )
-   	{
-   	 	veejay_msg(0, "Failed to close the device: %s\n", v->device.identifier );
+	if( v->handle )	
+	{
+		if( !SUCCESS( unicap_close( v->handle ) ) )
+   		{
+   		 	veejay_msg(0, "Failed to close the device: %s\n", v->device.identifier );
+		}
 	}
 
 	int i = 0;
@@ -1087,7 +1085,8 @@ void	vj_unicap_free_device( void *vut )
 			free(v->ctrl[i]);
 	}
 
-	free(v->buffer.data);
+	if(v->buffer.data)
+		free(v->buffer.data);
 
 
 	free( v );
