@@ -255,7 +255,7 @@ void veejay_change_state(veejay_t * info, int new_state)
 {
     	video_playback_setup *settings =
 		(video_playback_setup *) info->settings;
-	    settings->state = new_state;
+        settings->state = new_state;
 }
 void veejay_change_state_save(veejay_t * info, int new_state)
 {
@@ -275,9 +275,7 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 		if(re)
 			veejay_msg(VEEJAY_MSG_WARNING, "Saved Editlist to %s", recover_edl );
 	}
-    	video_playback_setup *settings =
-		(video_playback_setup *) info->settings;
-	    settings->state = new_state;
+	veejay_change_state( info, new_state );
 }
 
 int veejay_set_framedup(veejay_t *info, int n) {
@@ -427,6 +425,7 @@ int veejay_free(veejay_t * info)
 	(video_playback_setup *) info->settings;
 
 	veejay_reap_messages();
+
 	vj_event_stop();
 
 	vj_effect_shutdown();
@@ -609,7 +608,10 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 	{
 		int cur_id = info->uc->sample_id;
 		if( cur_id != sample_id )
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "Stop playing stream %d", cur_id);
 			vj_tag_disable(cur_id);
+		}
 	}
 
 	if(new_pm == VJ_PLAYBACK_MODE_PLAIN )
@@ -1277,21 +1279,23 @@ void veejay_handle_signal(void *arg, int sig)
 	veejay_t *info = (veejay_t *) arg;
 	video_playback_setup *settings = (video_playback_setup *) info->settings;
 	struct sigaction new_action;
-	if (sig == SIGINT || sig == SIGQUIT)
+	if (sig == SIGINT || sig == SIGQUIT )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Veejay interrupted by user. Bye!");
 		veejay_change_state(info, LAVPLAY_STATE_STOP);
 	}
 	else 
 	{
-		if( sig == SIGPIPE || sig == SIGSEGV || sig == SIGBUS || sig == SIGPWR || sig == SIGABRT || sig == "SIGFPE" )
+		if( sig == SIGPIPE || sig == SIGSEGV || sig == SIGBUS || sig == SIGPWR || sig == SIGABRT || sig == SIGFPE )
 		{
 			if(info->homedir)
 				veejay_change_state_save(info,LAVPLAY_STATE_STOP);
 			else
 				veejay_change_state( info, LAVPLAY_STATE_STOP );
+			
+			if( sig == SIGSEGV || sig == SIGFPE )
+				signal( sig, SIG_DFL );
 		}
-		signal( sig, SIG_DFL );
 	}
 }
 
@@ -2540,9 +2544,10 @@ static void *veejay_playback_thread(void *data)
 	vj_font_destroy( info->osd );
 #endif
     veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
-	vj_perform_free(info);
+    vj_perform_free(info);
 
     pthread_exit(NULL);
+
     return NULL;
 }
 

@@ -3798,7 +3798,9 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_ERROR,"Unable to start sample recorder");
 	}   
 
-	veejay_set_sample(v,v->uc->sample_id);
+//	veejay_set_sample(v,v->uc->sample_id);
+
+	veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
 
 	if(result == 1)
 	{
@@ -3838,7 +3840,11 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
 			{
 				s->sample_record_switch = 0;
 				if( ns > 0 )
-					veejay_set_sample( v, ns );
+				{
+				//	veejay_set_sample( v, ns );
+	veejay_change_playback_mode( v,VJ_PLAYBACK_MODE_SAMPLE, ns );
+				}
+	
 			}
 		}
 		else
@@ -4992,7 +4998,13 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 		sample_set_chain_source( v->uc->sample_id, entry, src );
 		sample_set_chain_channel(v->uc->sample_id,entry,cha);
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d", entry,(src==VJ_TAG_TYPE_NONE ? "Sample":"Stream"), cha);
-		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
+//		if(v->no_bezerk) 
+//			veejay_set_sample(v, v->uc->sample_id);
+		if(v->no_bezerk)
+		{
+			veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
+		}
+
 	} 
 
 	if(STREAM_PLAYING(v))
@@ -5030,7 +5042,8 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 		}
 		vj_tag_set_chain_source( v->uc->sample_id, entry, src );
 		vj_tag_set_chain_channel(v->uc->sample_id,entry,cha);
-		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
+//		if(v->no_bezerk) 
+//			veejay_set_sample(v, v->uc->sample_id);
 
 		vj_tag_get_descriptive(cha, description);
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses channel %d (%s)", entry, cha,description);
@@ -5091,8 +5104,12 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 
 				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source (%s %d)", 
 					src == VJ_TAG_TYPE_NONE ? "sample" : "stream",c);
-				if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
-
+	//			if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
+				if(v->no_bezerk)
+				{
+					veejay_set_frame(v,
+						sample_get_startFrame(v->uc->sample_id));
+				}
 			}
 				
 		}
@@ -5144,7 +5161,7 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 			   vj_tag_set_chain_source (args[0],args[1],src);
 				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source (%s %d)", 
 					src==VJ_TAG_TYPE_NONE ? "sample" : "stream",c);
-			if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
+	//		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 
 			}	
 		}
@@ -5160,7 +5177,7 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 	//DUMP_ARG(args);
 
 	if(SAMPLE_PLAYING(v))
-	{
+	{ 
 		int entry = sample_get_selected_entry(v->uc->sample_id);
 		int cha = sample_get_chain_channel(v->uc->sample_id,entry);
 		int src = sample_get_chain_source(v->uc->sample_id,entry);
@@ -5203,8 +5220,8 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d",entry,
 				(src==VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),cha);
 			 
-		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
-
+		if(v->no_bezerk) 
+			veejay_set_frame(v , sample_get_startFrame(v->uc->sample_id));
 	}
 	if(STREAM_PLAYING(v))
 	{
@@ -5250,7 +5267,7 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 		vj_tag_get_descriptive( cha, description);
 
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses Stream %d (%s)",entry,cha,description);
-		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
+//		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
  
 	}
 
@@ -5309,8 +5326,8 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 		sample_set_chain_channel( v->uc->sample_id, entry, cha );
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d",entry,
 			(src==VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),cha);
-		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
-	
+//		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
+		if(v->no_bezerk) veejay_set_frame(v,sample_get_startFrame(v->uc->sample_id));	
 			 
 	}
 	if(STREAM_PLAYING(v))
@@ -5359,7 +5376,7 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 
 		vj_tag_set_chain_channel( v->uc->sample_id, entry, cha );
 		vj_tag_get_descriptive( cha, description);
-		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
+//		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses Stream %d (%s)",entry,
 			vj_tag_get_chain_channel(v->uc->sample_id,entry),description);
@@ -5397,8 +5414,8 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d)",
 				  (src == VJ_TAG_TYPE_NONE ? "sample" : "stream"),args[2]);
-				if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
-
+	//			if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
+				if(v->no_bezerk) veejay_set_frame(v,sample_get_startFrame(v->uc->sample_id));
 			}
 			else
 			{
@@ -5430,7 +5447,7 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d)",
 				(src==VJ_TAG_TYPE_NONE ? "sample" : "stream"), args[2]);
-				if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
+//				if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 
 			}
 			else
@@ -5476,7 +5493,8 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d) to mix in",
 					(source == VJ_TAG_TYPE_NONE ? "sample" : "stream") , channel_id);
-				if(v->no_bezerk) veejay_set_sample(v,v->uc->sample_id);
+		//		if(v->no_bezerk) veejay_set_sample(v,v->uc->sample_id);
+				if(v->no_bezerk) veejay_set_frame(v,sample_get_startFrame(v->uc->sample_id));
 			}
 			else
 			{
@@ -5513,7 +5531,7 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d) to mix in",
 					(source == VJ_TAG_TYPE_NONE ? "sample" : "stream") , channel_id);
-				if(v->no_bezerk) veejay_set_sample(v,v->uc->sample_id);
+		//		if(v->no_bezerk) veejay_set_sample(v,v->uc->sample_id);
 			}
 			else
 			{
@@ -6753,7 +6771,13 @@ void vj_event_effect_add(void *ptr, const char format[], va_list ap)
 				vj_effect_get_description(real_id),
 				c
 			);
-			if(v->no_bezerk && vj_effect_get_extra_frame(real_id) ) veejay_set_sample(v,v->uc->sample_id);
+			if(v->no_bezerk && vj_effect_get_extra_frame(real_id) ) 
+			{
+				//veejay_set_sample(v,v->uc->sample_id);
+				//
+				int nf = sample_get_startFrame( v->uc->sample_id );
+				veejay_set_frame(v,nf );
+			}
 			v->uc->chain_changed = 1;
 		}
 	}
@@ -6768,7 +6792,7 @@ void vj_event_effect_add(void *ptr, const char format[], va_list ap)
 				vj_effect_get_description(real_id),
 				c
 			);
-			if(v->no_bezerk && vj_effect_get_extra_frame(real_id)) veejay_set_sample(v,v->uc->sample_id);
+//			if(v->no_bezerk && vj_effect_get_extra_frame(real_id)) veejay_set_sample(v,v->uc->sample_id);
 			v->uc->chain_changed = 1;
 		}
 	}

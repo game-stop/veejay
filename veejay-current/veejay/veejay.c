@@ -40,7 +40,7 @@
 #include <unistd.h>
 #include <veejay/vj-OSC.h>
 static int run_server = 1;
-static veejay_t *info;
+static veejay_t *info = NULL;
 static float override_fps = 0.0;
 static int default_geometry_x = -1;
 static int default_geometry_y = -1;
@@ -659,6 +659,7 @@ static void print_license()
 static void donothing(int sig)
 {
 	veejay_msg(VEEJAY_MSG_INFO,"Received signal %x ",sig);
+	veejay_handle_signal( info, sig );	
 }
 int main(int argc, char **argv)
 {
@@ -710,27 +711,16 @@ int main(int argc, char **argv)
 	sigaddset(&(settings->signal_set), SIGTERM );
 	sigaddset(&(settings->signal_set), SIGABRT);
 	sigaddset(&(settings->signal_set), SIGPWR );
+	sigaddset(&(settings->signal_set), SIGQUIT );
 
-	pthread_sigmask(SIG_BLOCK, &(settings->signal_set), NULL);
-
-/*	dont_use = getenv("VEEJAY_SCHEDULE_NORMAL");
-	if(dont_use==NULL || strcmp(dont_use, "0")==0||strcmp(dont_use,"no")==0)
-	{
- 		memset(&schp, 0, sizeof(schp));
-		schp.sched_priority = sched_get_priority_max(SCHED_FIFO);
-   	 	if (sched_setscheduler(0, SCHED_FIFO, &schp) != 0)
-	 	{
-			veejay_msg(VEEJAY_MSG_WARNING,
-				    "Cannot set real-time playback thread scheduling (not root?)");
-   	 	}
-	 	else
-	 	{
-			veejay_msg(VEEJAY_MSG_INFO,
-		    		"Using First In-First Out II scheduling");
-	 	}
-	}
-	*/
-
+	sigfillset( &allsignals );
+	action.sa_handler = donothing;
+	action.sa_mask = allsignals;
+	action.sa_flags = SA_RESTART | SA_RESETHAND;
+	for( i = 1; i < NSIG; i ++ )
+		if( sigismember( &(settings->signal_set), i ))
+			sigaction( i, &action, 0 );
+	
 	char *mem_func = get_memcpy_descr();
 	if(mem_func)
 	{
@@ -761,16 +751,8 @@ int main(int argc, char **argv)
 	}
 
 
-	sigfillset( &allsignals );
-	action.sa_handler = donothing;
-	action.sa_mask = allsignals;
-	action.sa_flags = SA_RESTART | SA_RESETHAND;
-	for( i = 1; i < NSIG; i ++ )
-		if( sigismember( &(settings->signal_set), i ))
-			sigaction( i, &action, 0 );
-	
 	veejay_msg(VEEJAY_MSG_DEBUG, "Starting playback");
-//	veejay_change_state(info, LAVPLAY_STATE_PLAYING);
+
 	veejay_set_frame(info, 0);
 	veejay_set_speed(info, 1);
 	
@@ -778,19 +760,17 @@ int main(int argc, char **argv)
 	
    	while (veejay_get_state(info) != LAVPLAY_STATE_STOP) 
     	{
-		sigwait( &(settings->signal_set), &sig );
-		if( sig != SIGSEGV )
-		 sigprocmask( SIG_UNBLOCK, &(settings->signal_set), 0 );
-		veejay_handle_signal( info, sig );	
+		g_usleep( 25000 );
     	}
-//	if(sig != SIGSEGV)
-//	{
-//		sigprocmask( SIG_UNBLOCK, &(settings->signal_set), 0 );
-//	}
-	
+
 	veejay_quit(info);
 	veejay_busy(info);		/* wait for all the nice goodies to shut down */
 	veejay_free(info);
+
+	vevo_report_stats();
+
+
+	veejay_msg(VEEJAY_MSG_INFO, "Thank you for using Veejay");
 
 	return 0;
 }

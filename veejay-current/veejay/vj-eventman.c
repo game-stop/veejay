@@ -351,6 +351,9 @@ void		vj_event_vevo_dump(void)
 void		vj_event_vevo_free(void)
 {
 	int i;
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "Closing VIMS event system");
+
 	if( !index_map_)
 		return;
 
