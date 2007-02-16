@@ -1,5 +1,5 @@
 /* libvjnet - Linux VeeJay
- * 	     (C) 2002-2004 Niels Elburg <nelburg@looze.net> 
+ * 	     (C) 2002-2007 Niels Elburg <nelburg@looze.net> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -53,7 +53,8 @@ int vj_server_poll(vj_server * vje);
 
 int vj_server_send(vj_server *vje, int link_id, uint8_t *buf, int len);
 
-int vj_server_send_frame(vj_server *vje, int link_id, uint8_t *buf, int total_len, VJFrame *frame, VJFrameInfo *info,long ms);
+int vj_server_send_frame(vj_server *vje, int link_id, uint8_t *buf, int total_len, VJFrame *frame, long ms
+		);
 
 int	vj_server_init(void);
 

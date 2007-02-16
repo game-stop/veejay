@@ -113,7 +113,7 @@ VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 {
 #ifdef STRICT_CHECKING
 	assert( fmt == PIX_FMT_RGB24 || fmt == PIX_FMT_BGR24 ||
-			fmt == PIX_FMT_RGB32 );
+			fmt == PIX_FMT_RGBA || fmt == PIX_FMT_RGB32 );
 	assert( w > 0 );
 	assert( h > 0 );
 #endif
@@ -152,7 +152,7 @@ void	yuv_convert_any( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
 		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
 		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA ||
-		src_fmt == PIX_FMT_BGR24);
+		src_fmt == PIX_FMT_BGR24   );
 	assert( src->width > 0 );
 	assert( dst->width > 0 );
 #endif
@@ -179,7 +179,7 @@ void	yuv_convert_any3( VJFrame *src, int src_stride[3], VJFrame *dst, int src_fm
 	assert( src_fmt == PIX_FMT_YUV420P || src_fmt == PIX_FMT_YUVJ420P ||
 		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
 		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
-		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA );
+		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA  );
 #endif
 	struct SwsContext *ctx = sws_getContext(
 			src->width,
@@ -784,6 +784,11 @@ int	yuv_sws_get_cpu_flags(void)
 #ifdef HAVE_ALTIVEC
 	cpu_flags = cpu_flags | SWS_CPU_CAPS_ALTIVEC;
 #endif
+
+	cpu_flags = cpu_flags | SWS_FULL_CHR_H_INT;
+
+	cpu_flags = cpu_flags | SWS_FULL_CHR_H_INP;
+
 	return cpu_flags;
 }
 

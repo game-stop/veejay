@@ -1,5 +1,5 @@
 /* libvjnet - Linux VeeJay
- * 	     (C) 2002-2004 Niels Elburg <nelburg@looze.net> 
+ * 	     (C) 2002-2007 Niels Elburg <nelburg@looze.net> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -34,6 +34,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
+#include <liblzo/lzo.h>
+#include <veejay/vj-global.h>
 #define VJC_OK 0
 #define VJC_NO_MEM 1
 #define VJC_SOCKET 2
@@ -44,26 +46,24 @@
 vj_client *vj_client_alloc( int w, int h, int f )
 {
 	vj_client *v = (vj_client*) malloc(sizeof(vj_client));
+	memset(v, 0, sizeof(vj_client));
 	if(!v)
 	{
 		return NULL;
 	}
-	v->planes[0] = 0;
-	v->planes[1] = 0;
-	v->planes[2] = 0;
-	// recv. format / w/h 
 	v->cur_width = w;
 	v->cur_height = h;
 	v->cur_fmt = f;
+	v->space = NULL;
+//	v->lzo = lzo_new();
 	v->c = (conn_type_t**) malloc(sizeof(conn_type_t*) * 3);
 	v->c[0] = (conn_type_t*) malloc(sizeof(conn_type_t));
 	v->c[1] = (conn_type_t*) malloc(sizeof(conn_type_t));
 	v->c[2] = (conn_type_t*) malloc(sizeof(conn_type_t));
 	v->blob = (unsigned char*) malloc(sizeof(unsigned char) * PACKET_LEN ); 
 	v->mcast = 0;
-	if(!v->blob)
-		return NULL;
-	bzero( v->blob, PACKET_LEN );   
+	if( w > 0 && h > 0 )
+		v->space = (uint8_t*) malloc( sizeof(uint8_t) * SOCKETFRAMELEN );
 	return v;
 }
 
@@ -81,6 +81,10 @@ void		vj_client_free(vj_client *v)
 			free(v->c);
 		if(v->blob)
 			free(v->blob);
+		if(v->lzo)
+			free(v->lzo);
+		if(v->space)
+			free(v->space);
 		free(v);
 	}
 }
@@ -178,28 +182,56 @@ int	vj_client_poll( vj_client *v, int sock_type )
 	return 0;
 }
 
-int	vj_client_read_i( vj_client *v, uint8_t *dst )
+static	void	vj_client_decompress( vj_client *t, uint8_t *out, int len, int Y, int UV)
 {
-//	int len = v->planes[0] + v->planes[1] + v->planes[2];
-//	char line[32];
+	uint8_t *d[3] = {
+			out,
+			out + Y,
+			out + Y + UV };
+
+	lzo_decompress( t->lzo, t->space, len, d );
+}
+
+int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
+{
 	char line[32];
 	int p[4] = {0, 0,0,0 };
 	int n = 0;
 	int plen = 0;
+	int conv = 1;
+	int y_len = 0;
+	int uv_len = 0;
 	if( v->c[0]->type == VMCAST_C )
 	{
-		veejay_msg(0, "FIXME: mcast sender");
-		return 0;
-//		return mcast_recv_frame( v->c[0]->r, dst, 0 );
-	}
-	veejay_memset( line,0, sizeof(line));
-//	bzero(line,12);
-//	if( vj_client_poll( v, V_CMD ) <= 0 )
-//	{
-//		veejay_msg(VEEJAY_MSG_DEBUG, "Frame not ready");
-//		return 0;
-//	}
+		plen = mcast_recv_frame( v->c[0]->r, v->space, 0, v->cur_width,v->cur_height,v->cur_fmt,
+				&p[0],&p[1],&p[2] );
+		if(plen <= 0)
+			return 0;
 
+		v->in_width = p[0];
+		v->in_height = p[1];
+		v->in_fmt = p[2];
+
+		uv_len = 0;
+		y_len = p[0]  * p[1];
+		switch(v->in_fmt )
+		{
+			case FMT_420F:
+			case FMT_420:
+				uv_len = y_len/4; break;
+			default:
+				uv_len = y_len/2;break;
+		}
+			
+		if(plen)
+			vj_client_decompress( v, dst,plen,y_len,uv_len );
+
+		if( p[0] != v->cur_width || p[1] != v->cur_height || p[2] != v->cur_fmt )
+			return 2;
+		return 1;
+	}
+
+	veejay_memset( line,0, sizeof(line));
 	if( v->c[0]->type == VSOCK_C )
 		plen = sock_t_recv_w( v->c[0]->fd, line, 20 );	
 
@@ -208,23 +240,40 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst )
 		veejay_msg(VEEJAY_MSG_ERROR, "Frame header error");
 		return -1;
 	}
-	n = sscanf( line, "%d %d %d %d", p + 0 , p + 1, p + 2, p + 3 );
+	n = sscanf( line, "%d %d %d %d", &p[0],&p[1],&p[2],&p[3] );
 	if( n != 4)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Frame header invalid %s",line);
+		veejay_msg(VEEJAY_MSG_ERROR,"Frame header invalid");
 		return -1;
 	}
+
 	if( v->cur_width != p[0] || v->cur_height != p[1] || v->cur_fmt != p[2])
+		conv = 2;
+
+	v->in_width = p[0];
+	v->in_height = p[1];
+	v->in_fmt = p[2];
+	uv_len = 0;
+	y_len = p[0]  * p[1];
+	switch(v->in_fmt )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Frame contents invalid (video dimension or internal format did not match)");
-		return -1;
+		case FMT_420F:
+		case FMT_420:
+			uv_len = y_len/4; break;
+		default:
+			uv_len = y_len/2;break;
 	}
 	if( v->c[0]->type == VSOCK_C) 
-		n = sock_t_recv_w( v->c[0]->fd, dst, p[3] );
+	{
+		int n = sock_t_recv_w( v->c[0]->fd, v->space, p[3] );
+		if(n)
+			vj_client_decompress( v, dst, n, y_len, uv_len );
+	}
 	if(n > 0 )
 		plen += n;
 
-	return plen;
+
+	return conv;
 }
 
 int	vj_client_get_status_fd(vj_client *v, int sock_type )
@@ -299,7 +348,6 @@ int vj_client_send_buf(vj_client *v, int sock_type,unsigned char *buf, int len )
 {
 	if( sock_type == V_CMD )
 	{
-
 		// format msg
 		sprintf(v->blob, "V%03dD", len);
 		veejay_memcpy( v->blob+5, buf, len );

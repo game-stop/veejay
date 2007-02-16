@@ -2059,13 +2059,12 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
   
   /* Create avi_t structure */
   
-  AVI = (avi_t *) vj_malloc(sizeof(avi_t));
+  AVI = (avi_t *) vj_calloc(sizeof(avi_t));
   if(AVI==NULL)
     {
       AVI_errno = AVI_ERR_NO_MEM;
       return 0;
     }
-  veejay_memset((void *)AVI,0,sizeof(avi_t));
   
   AVI->mode = AVI_MODE_READ; /* open for reading */
   

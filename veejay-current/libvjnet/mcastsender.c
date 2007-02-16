@@ -1,6 +1,6 @@
 /* vjnet - low level network I/O for VeeJay
  *
- *           (C) 2005 Niels Elburg <nelburg@looze.net> 
+ *           (C) 2005-2007 Niels Elburg <nelburg@looze.net> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -17,7 +17,7 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
-
+#include <config.h>
 #include "mcastsender.h"
 #include <errno.h>
 #include <stdio.h> 
@@ -26,6 +26,9 @@
 #include <libvje/vje.h>
 #include "common.h" 
 #include "packet.h"
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 
 static void print_error(char *msg)
 {
@@ -44,7 +47,7 @@ mcast_sender	*mcast_new_sender( const char *group_name )
 	v->addr_len = sizeof( struct sockaddr_in );	
 	v->sock_fd = socket( AF_INET, SOCK_DGRAM, 0 );
 	v->send_buf_size = 240 * 1024;
-
+	v->stamp = 0;
 	if( v->sock_fd == -1 )
 	{
 		print_error( "socket");
@@ -140,8 +143,18 @@ int		mcast_send( mcast_sender *v, const void *buf, int len, int port_num )
 	return n;
 } 
 
+static	void	stamp_reset( mcast_sender *v )
+{
+	v->stamp = 0;
+}
 
-int		mcast_send_frame( mcast_sender *v, const VJFrame *frame, const VJFrameInfo *descr, 
+static	uint32_t	stamp_make( mcast_sender *v )
+{
+	v->stamp ++;
+	return v->stamp;
+}
+
+int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,  
 				uint8_t *buf, int total_len, long ms,int port_num)
 {
 	int n_chunks = total_len / CHUNK_SIZE;
@@ -149,27 +162,69 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame, const VJFrameInfo 
 	int tb = 0;
 	packet_header_t header = packet_construct_header( 1 );
 	frame_info_t	info;
-	/* 1 = 4:2:2 planer, 0 = 4:2:0 planar */
-	info.fmt = (frame->shift_v == 0 ? 1 : 0);
-	info.width = descr->width;
-	info.height = descr->height;
-	header.timeout = ms * 10000;
-//	header.timeout = 22000;
-	uint8_t	chunk[PACKET_PAYLOAD_SIZE];
+	info.fmt = frame->format;
+	info.width = frame->width;
+	info.height = frame->height;
+	info.len = total_len;
 
-	for ( i = 0 ; i <= n_chunks ; i ++ )
+	uint32_t frame_num = stamp_make(v);
+
+	header.timeout = ms * 10000;
+	header.sec     = 0;
+	header.usec    = frame_num;
+
+	uint8_t	chunk[PACKET_PAYLOAD_SIZE];
+	int res = 0;
+
+	//@ If we can send in a single packet:
+	if( total_len <= CHUNK_SIZE )
 	{
-		const uint8_t *data = buf + (i * CHUNK_SIZE );
-		int n;
+		header.seq_num = 0; header.flag = 1; header.length = 0;
+		packet_put_padded_data( &header,&info, chunk, buf, total_len);
+		packet_dump_header(&header);
+		res = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
+		if(res <= 0 )
+			return -1;
+		return 1;
+	}
+
+
+	int pred_chunks = (total_len / CHUNK_SIZE);
+	int bytes_left  = (total_len % CHUNK_SIZE);
+
+	header.length = pred_chunks + ( bytes_left > 0 ? 1 : 0 );
+
+	for( i = 0; i < pred_chunks; i ++ )
+	{
+		const uint8_t *data = buf + (i * CHUNK_SIZE);
 		header.seq_num = i;
-		packet_put_data( &header, &info, chunk, data );
-		n = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
-		if(n <= 0)
+		header.flag = 1;
+		packet_put_data( &header, &info, chunk, data );	
+		res = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
+		if(res <= 0 )
 		{
+			veejay_msg(0,"Unable to send packet %d out of %d", i, pred_chunks );
 			return -1;
 		}
-		tb += n;
-	} 
+	}
+
+	if( bytes_left )
+	{
+		i = header.length-1;
+		header.seq_num = i;
+		header.flag = 1;
+		int bytes_done = packet_put_padded_data( &header, &info, chunk, buf + (i * CHUNK_SIZE), bytes_left );
+		veejay_memset( chunk + bytes_done, 0, (PACKET_PAYLOAD_SIZE-bytes_done));
+		res = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
+		if( res <= 0 )
+		{
+			veejay_msg(0, "Unable to send last packet");
+			return -1;
+		}
+	}
+
+	if( frame_num == 0xffff )
+		stamp_reset(v);
 
 	return 1;
 }

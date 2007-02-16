@@ -262,7 +262,10 @@ static void	_el_free_decoder( vj_decoder *d )
 		}
 		if(d->frame) 
 			free(d->frame);
-		
+	
+		if(d->img)
+			free(d->img);
+	
 		free(d);
 	}
 	d = NULL;
@@ -340,15 +343,14 @@ void	vj_el_setup_cache( editlist *el )
 	if(!el->cache)
 	{
 		int n_slots = mem_chunk_ / el->max_frame_size;
-		
 		if( n_slots < (el->video_frames - 1) )
 		{
 			veejay_msg(VEEJAY_MSG_DEBUG, "Not caching this EDL to memory (Cachesize too small)");
 			veejay_msg(VEEJAY_MSG_DEBUG, "try increasing cache size with -m commandline parameter");
 		}
-		else
+		else if( el->max_frame_size > 1024 )
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "EditList caches at most %d slots", n_slots ); 
+			veejay_msg(VEEJAY_MSG_DEBUG, "EditList caches at most %d slots (chunk=%d, framesize=%d)", n_slots, mem_chunk_, el->max_frame_size ); 
 			el->cache = init_cache( n_slots );
 		}
 	}
@@ -456,10 +458,9 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 void	vj_el_set_image_output_size(editlist *el)
 {
 	lav_set_project(
-		el->video_width, el->video_height, el->video_fps ,
-			el->pixel_format == FMT_420 ? 1 :0);
-}
+		el->video_width, el->video_height, el->video_fps , el_pixel_format_ );
 
+}
 
 static int _el_probe_for_pixel_fmt( lav_file_t *fd )
 {
@@ -988,9 +989,47 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
  		}
 	}
 
+	int len = el->video_width * el->video_height;
+	int uv_len=len;
+	switch(out_pix_fmt)
+	{
+		case FMT_420:
+		case FMT_420F:
+			uv_len = len/4;
+			break;
+		case FMT_422:
+		case FMT_422F:
+			uv_len = len/2;
+			break;
+		default:
+			break;
+	}
+
+
+	int uv_w = el->video_width / 2;
+	
+
+	if( decoder_id == 0xffff )
+	{
+		VJFrame *srci  = lav_get_frame_ptr( el->lav_fd[ N_EL_FILE(n) ] );
+		if( srci == NULL )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Error decoding Image %ld",
+				N_EL_FRAME(n));
+			return -1;
+		}
+#ifdef STRICT_CHECKING
+		assert( dst[0] != NULL  && dst[1] != NULL && dst[2] != NULL );
+#endif	
+		veejay_memcpy( dst[0], srci->data[0], len );
+                veejay_memcpy( dst[1], srci->data[1], uv_len );
+                veejay_memcpy( dst[2], srci->data[2], uv_len );
+                return 1;     
+	}
+
 	c_i = _el_get_codec( decoder_id , in_pix_fmt);
-        if(c_i >= 0 && c_i < MAX_CODECS && el_codecs[c_i] != NULL)
-                d = el_codecs[c_i];
+	if(c_i >= 0 && c_i < MAX_CODECS && el_codecs[c_i] != NULL)
+       	       	d = el_codecs[c_i];
 	else
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Choked on decoder %x (%d), slot %d",decoder_id,decoder_id, c_i );
@@ -1010,25 +1049,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 		    if(res > 0 && el->cache)
 			cache_frame( el->cache, d->tmp_buffer, res, nframe, decoder_id );
 		}
-	}
-
-	int len = el->video_width * el->video_height;
-	int uv_len = (el->video_width >> 1) * (el->video_height >> ((out_pix_fmt == FMT_420 || out_pix_fmt == FMT_420F) ? 1:0)); 
-	int uv_w = el->video_width / 2;
-	if( decoder_id == 0xffff )
-	{
-		VJFrame *srci  = lav_get_frame_ptr( el->lav_fd[ N_EL_FILE(n) ] );
-		if( srci == NULL )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error decoding frame %ld",
-				N_EL_FRAME(n));
-			return -1;
-		}
-		
-		veejay_memcpy( dst[0], srci->data[0], len );
-                veejay_memcpy( dst[1], srci->data[1], uv_len );
-                veejay_memcpy( dst[2], srci->data[2], uv_len );
-                return 1;       
 	}
 
 	uint8_t *data = ( in_cache == NULL ? d->tmp_buffer: in_cache );
@@ -1221,8 +1241,14 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 		return -1;
 	}
 	
-    int decoder_id = lav_video_compressor_type( lav );
+    	int decoder_id = lav_video_compressor_type( lav );
 
+	if(lav_filetype( lav ) == 'x')
+	{
+		veejay_msg(VEEJAY_MSG_INFO,"\tFile is an image");
+		return out_pix_fmt;
+	}
+	
 	vj_decoder *d = _el_new_decoder(
 					decoder_id,
 					lav_video_width( lav),
@@ -1237,12 +1263,6 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 		return -1;
 	}
 
-	if(lav_filetype( lav ) == 'x')
-	{
-			_el_free_decoder( d );
-			veejay_msg(VEEJAY_MSG_INFO,"\tFile is an image");
-			return out_pix_fmt;
-	}
 	res = lav_read_frame( lav, d->tmp_buffer);
 
 	if( res <= 0 )
@@ -1395,6 +1415,7 @@ int	vj_el_init_420_frame(editlist *el, VJFrame *frame)
 	frame->ssm = 0;
 	frame->stride[0] = el->video_width;
 	frame->stride[1] = frame->stride[2] = frame->stride[0]/2;
+	frame->format = el_pixel_format_;
 	return 1;
 }
 
@@ -1416,6 +1437,7 @@ int	vj_el_init_422_frame(editlist *el, VJFrame *frame)
 	frame->ssm = 0;
 	frame->stride[0] = el->video_width;
 	frame->stride[1] = frame->stride[2] = frame->stride[0]/2;
+	frame->format = el_pixel_format_;
 	return 1;
 }
 
@@ -1548,6 +1570,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
     /* Check if a norm parameter is present */
 	if(!filename[0] || filename == NULL)
 	{
+		veejay_msg(VEEJAY_MSG_ERROR,"\tInvalid filename given");
 		vj_el_free(el);
 		return NULL;	
 	}
@@ -1717,8 +1740,14 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	}
 
 	if( el->num_video_files == 0 || 
-		el->video_width == 0 || el->video_height == 0 || el->video_frames <= 2)
+		el->video_width == 0 || el->video_height == 0 || el->video_frames < 2)
 	{
+		if( el->video_frames < 2 )
+			veejay_msg(VEEJAY_MSG_ERROR, "\tFile has only %d frame(s)", el->video_frames );
+		if( el->num_video_files == 0 )
+			veejay_msg(VEEJAY_MSG_ERROR, "\tNo videofiles in EDL");
+		if( el->video_height == 0 || el->video_width == 0 )
+			veejay_msg(VEEJAY_MSG_ERROR, "\tImage dimensions unknown");
 		vj_el_free(el);
 		return NULL;
 	}
@@ -1732,6 +1761,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		n = el->frame_list[i];
 		if(!el->lav_fd[N_EL_FILE(n)] )
 		{
+			veejay_msg(VEEJAY_MSG_ERROR, "\tUnable to read file");
 			vj_el_free(el);
 			return NULL;
 		}

@@ -27,14 +27,12 @@
 #include <libvjmsg/vj-common.h>
 #include <veejay/vims.h>
 #include <libstream/vj-net.h>
-#include <liblzo/lzo.h>
 
 typedef struct
 {
 	pthread_mutex_t mutex;
 	pthread_t thread;
 	vj_client      *remote;
-	void *lzo;
 	int state;
 	int have_frame;
 	int error;
@@ -68,13 +66,11 @@ void	*reader_thread(void *data)
 	
 	for( ;; )
 	{
-		int retrieve = 0;
 		int error    = 0;
 
 		if( t->state == 0 )
 		{
 			error = 1;
-			t->grab = 0;
 		}
 		
 		if( tag->source_type == VJ_TAG_TYPE_NET )
@@ -88,30 +84,54 @@ void	*reader_thread(void *data)
 
 		lock(t);
 		
-		if( t->grab )
+		if( t->grab && tag->source_type == VJ_TAG_TYPE_NET)
 		{
 			ret =  vj_client_send( v, V_CMD, buf );
 			if( ret <= 0 )
 				error = 1;
 			else
-				retrieve = 1;
-			t->grab = 0;
-		}
-		
-		if(!error && retrieve)
+				t->grab = 0;
+		} 
+
+		if (tag->source_type == VJ_TAG_TYPE_MCAST )
 		{
-			ret = vj_client_read_i ( v, tag->socket_frame );
+			error = 0;
+		}
+	
+		int wait_time = 0;
+	
+		if(!error)
+		{
+			if( vj_client_poll(v, V_CMD ) )
+			{
+			ret = vj_client_read_i ( v, tag->socket_frame,tag->socket_len );
 			if( ret <= 0 )
-				error = 1;
-			t->have_frame = ret;
+			{
+				if( tag->source_type == VJ_TAG_TYPE_NET )
+					error = 1;
+				else
+				{
+					wait_time = 1000;
+				}
+				ret = 0;
+			}
+			else
+			{
+				 t->have_frame = ret;
+			}
+			}
 		}
 		unlock(t);
+
+		if( wait_time )
+			usleep(wait_time);
 
 		if( error )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR,
 					"Closing connection with remote veejay,");
 			t->state = 0;
+			t->grab = 0;
 			pthread_exit( &(t->thread));
 			return NULL;
 		}
@@ -140,21 +160,53 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 		unlock(t);
 		return 0;
 	}
-	if(t->have_frame)
+
+	//@ color space convert frame	
+	int len = v->cur_width * v->cur_height;
+	int uv_len = len;
+	switch(v->cur_fmt)
 	{
-		lzo_decompress( t->lzo, buf, 0, buffer );
+		case FMT_420:
+		case FMT_420F:
+			uv_len=len/4;
+		break;
+		default:
+			uv_len=len/2;
+		break;
 	}
-	else
+
+	if(t->have_frame == 1 )
 	{
-		veejay_memset( buffer[0], 16, v->planes[0]);
-		veejay_memset( buffer[1], 128,v->planes[1]);
-		veejay_memset( buffer[2], 128,v->planes[2]);
+		veejay_memcpy(buffer[0], tag->socket_frame, len );
+		veejay_memcpy(buffer[1], tag->socket_frame+len, uv_len );
+		veejay_memcpy(buffer[2], tag->socket_frame+len+uv_len, uv_len );
+		t->grab = 1;
+		unlock(t);
+		return 1;
 	}
-		/*
-	veejay_memcpy( buffer[0], buf, v->planes[0] );
-	veejay_memcpy( buffer[1], buf+ v->planes[0], v->planes[1] );
-	veejay_memcpy( buffer[2], buf+ v->planes[0] + v->planes[1] , v->planes[2] );
-	*/
+	else if(t->have_frame == 2 )
+	{
+		int b_len = v->in_width * v->in_height;
+		int buvlen = b_len;
+		switch(v->in_fmt)
+		{
+			case FMT_420:
+			case FMT_420F:
+				buvlen = b_len/4;
+				break;
+			default:
+				buvlen = b_len/2;
+				break;
+		}
+	
+		VJFrame *a = yuv_yuv_template( tag->socket_frame, tag->socket_frame + b_len, tag->socket_frame+b_len+buvlen,
+						v->in_width,v->in_height, get_ffmpeg_pixfmt( v->in_fmt ));
+		VJFrame *b = yuv_yuv_template( buffer[0],buffer[1], buffer[2], 
+						v->cur_width,v->cur_height,get_ffmpeg_pixfmt(v->cur_fmt));
+		yuv_convert_any(a,b, a->format,b->format );
+		free(a);
+		free(b);
+	}	
 	t->grab = 1;
 	
 	unlock(t);
@@ -183,7 +235,7 @@ int	net_thread_start(vj_client *v, vj_tag *tag)
 	threaded_t *t = (threaded_t*)tag->priv;
 
 	pthread_mutex_init( &(t->mutex), NULL );
-	t->lzo = lzo_new();
+	v->lzo = lzo_new();
 	t->have_frame = 0;
 	t->error = 0;
 	t->state = 1;
@@ -203,15 +255,18 @@ int	net_thread_start(vj_client *v, vj_tag *tag)
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to send to %s port %d",
 					tag->source_name, tag->video_channel );
 			return 0;
-		}	
+		}
+		else
+			veejay_msg(VEEJAY_MSG_INFO, "Requested mcast stream from Veejay group %s port %d",
+					tag->source_name, tag->video_channel );	
 	}
 	int p_err = pthread_create( &(t->thread), NULL, &reader_thread, (void*) tag );
 	if( p_err ==0)
 
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Created new %s threaded stream",
+		veejay_msg(VEEJAY_MSG_INFO, "Created new %s threaded stream with Veejay host %s port %d",
 			tag->source_type == VJ_TAG_TYPE_MCAST ? 
-			"multicast" : "unicast");
+			"multicast" : "unicast", tag->source_name,tag->video_channel);
 		return 1;
 	}
 
@@ -229,21 +284,25 @@ void	net_thread_stop(vj_tag *tag)
 	{
 		sprintf(mcast_stop, "%03d:;", VIMS_VIDEO_MCAST_STOP );
 		ret = vj_client_send( t->remote , V_CMD, mcast_stop);
+		if(ret)
+			veejay_msg(VEEJAY_MSG_INFO, "Stopped multicast stream");
 	}
 	if(tag->source_type == VJ_TAG_TYPE_NET)
 	{
 		sprintf(mcast_stop, "%03d:;", VIMS_CLOSE );
 		ret = vj_client_send( t->remote, V_CMD, mcast_stop);
+		if(ret)
+			veejay_msg(VEEJAY_MSG_INFO, "Stopped unicast stream");
 	}
 	
 	t->state = 0;
-	lzo_free(t->lzo);
 
 	unlock(t);
 	
 	pthread_mutex_destroy( &(t->mutex));
 
-	veejay_msg(VEEJAY_MSG_INFO, "Disconnected from %s", tag->source_name);
+	veejay_msg(VEEJAY_MSG_INFO, "Disconnected from Veejay host %s:%d", tag->source_name,
+		tag->video_channel);
 }
 
 int	net_already_opened(const char *filename, int n, int channel)

@@ -1,6 +1,6 @@
 /* vjnet - low level network I/O for VeeJay
  *
- *           (C) 2005 Niels Elburg <nelburg@looze.net> 
+ *           (C) 2005-2007 Niels Elburg <nelburg@looze.net> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -29,7 +29,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <libvje/vje.h>
-
+#include <stdint.h>
 typedef struct
 {
 	char 	*group;
@@ -37,6 +37,7 @@ typedef struct
 	int	addr_len;
 	struct sockaddr_in	addr; 
 	int	send_buf_size;
+	uint32_t stamp;
 } mcast_sender;
 
 mcast_sender *mcast_new_sender( const char *group_name );
@@ -44,7 +45,7 @@ void	mcast_set_interface( mcast_sender *s, const char *interface );
 
 int	mcast_send( mcast_sender *s, const void *buf, int len, int port_num );
 
-int	mcast_send_frame( mcast_sender *s, const VJFrame *frame ,const VJFrameInfo *descr, uint8_t *buf, int total_len,long ms, int port_num );
+int	mcast_send_frame( mcast_sender *s, const VJFrame *frame , uint8_t *buf, int total_len,long ms, int port_num );
 
 void	mcast_close_sender(mcast_sender *s );
 

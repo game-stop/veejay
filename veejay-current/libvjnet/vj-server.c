@@ -1,5 +1,5 @@
 /* libvjnet - Linux VeeJay
- * 	     (C) 2002-2005 Niels Elburg <nelburg@looze.net> 
+ * 	     (C) 2002-2007 Niels Elburg <nelburg@looze.net> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -26,7 +26,8 @@
 #include <libvjmsg/vj-common.h>
 #include <libvjnet/vj-server.h>
 #include <libvjmem/vjmem.h>
-
+#include <sys/time.h>
+#include <sys/types.h>
 
 #define __INVALID 0
 #define __SENDER 1
@@ -251,12 +252,6 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 			return 0;
 		}
 
-//		if(!FD_ISSET( Link[link_id]->handle, &(vje->wds) ) )
-//		{
-//			veejay_msg(VEEJAY_MSG_ERROR, "Link %d not ready for sending", link_id);
-//			return 0;
-//		}
-
 		while (total < len)
 		{
 			n = send(Link[link_id]->handle, buf + total, bytes_left, 0);
@@ -286,20 +281,29 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 }
 
 int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len, 
-					VJFrame *frame, VJFrameInfo *info, long ms )
+					VJFrame *frame, long ms )
 {
 	if(len <= 0 || buf == NULL )
+	{
+		veejay_msg(0, "Nothing to send to remote!");
 		return 0;
-
+	}
 	if(!vje->use_mcast )
 	{
-		return vj_server_send( vje, link_id, buf, len );
+		fd_set wds;
+		vj_link **Link = (vj_link**) vje->link;
+		FD_ZERO(&wds);
+		FD_SET(Link[link_id]->handle, &wds );
+		int n = select( Link[link_id]->handle+1, NULL, &wds, NULL, NULL );
+		if( FD_ISSET(Link[link_id]->handle, &wds))
+			return vj_server_send( vje, link_id, buf, len );
+		return 0;
 	}
 	else
 	{
 		vj_proto **proto = (vj_proto**) vje->protocol;
 		if( vje->server_type == V_CMD  )
-			return mcast_send_frame( proto[0]->s, frame, info, buf,len,ms, vje->ports[0] );
+			return mcast_send_frame( proto[0]->s, frame, buf,len,ms, vje->ports[0] );
 	}
 	return 0;
 }

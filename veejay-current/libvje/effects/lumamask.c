@@ -104,7 +104,7 @@ void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
 			ny = y + dy;
 
 
-			if( nx < 0 || ny < 0 || nx > width || ny >= height )
+			if( nx < 0 || ny < 0 || nx >= width || ny >= height )
                         {
                                Y[y*width+x] = 16;
                                Cb[y*width+x] = 128;

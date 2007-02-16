@@ -139,12 +139,18 @@ int	vj_picture_get_width( void *pic )
 void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf )
 {
 	vj_pixbuf_t *pic = NULL;
-
-	if(filename == NULL || v_outw <= 0 || v_outh <= 0 )
+	if(filename == NULL )
 	{
-		veejay_msg(0, "No filename given or invalid image dimensions");
+		veejay_msg(0, "No image filename given");
 		return NULL;
 	}
+
+	if(v_outw <= 0 || v_outh <= 0 )
+	{
+		veejay_msg(0, "No image dimensions setup");
+		return NULL;
+	}
+
 	pic = (vj_pixbuf_t*)  vj_calloc(sizeof(vj_pixbuf_t));
 	if(!pic) 
 	{
@@ -156,10 +162,34 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 	pic->display_h = v_outh;
 	pic->fmt = v_outf;
 
+	int len = v_outw * v_outh;
+	int ulen = len;
+	switch( v_outf )
+	{
+		case PIX_FMT_YUV420P:
+		case PIX_FMT_YUVJ420P:
+			ulen = len / 4;
+			break;
+		case PIX_FMT_YUV422P:
+		case PIX_FMT_YUVJ422P:
+			ulen = len / 2;
+			break;
+		default:
+#ifdef STRICT_CHECKING
+		assert(0);
+#endif
+			break;
+	}
 
-	pic->space = (uint8_t*) vj_malloc( sizeof(uint8_t) * v_outw * v_outh * 3 );
-
-	pic->img = open_pixbuf( filename, v_outw, v_outh, v_outf, pic->space, pic->space + (v_outw*v_outh) , pic->space + (2*v_outw*v_outh) );
+	pic->space = (uint8_t*) vj_malloc( sizeof(uint8_t) * (len + 2*ulen) );
+	pic->img = open_pixbuf(
+			filename,	
+			v_outw,
+			v_outh,
+			v_outf,
+			pic->space,
+			pic->space + len,
+			pic->space + len + ulen );
 
 	return (void*) pic;
 }
@@ -382,22 +412,15 @@ veejay_image_t		*vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int o
 	veejay_memset(&src,0,sizeof(VJFrame));
 	veejay_memset(&dst,0,sizeof(VJFrame));
 
-	vj_get_yuv_template( &src,frame->width,frame->height,fmt );
+	vj_get_yuv_template( &src,frame->width,frame->height,fmt);
 	src.data[0] = frame->data[0];
 	src.data[1] = frame->data[1];	
 	src.data[2] = frame->data[2];
 	vj_get_yuv_template( &dst,out_w,out_h,fmt );
+	dst.data[0] = (uint8_t*) gdk_pixbuf_get_pixels( image->image );
+	dst.data[1] = dst.data[0] + (out_w * out_h );
+	dst.data[2] = dst.data[1] + (out_w * out_h );
 
-	uint8_t *data[3];
-	data[0] = vj_malloc( sizeof(uint8_t) * out_w * out_h * 3 );
-	data[1] = data[0] + (out_w * out_h);
-	data[2] = data[1] + (out_w * out_h);
-
-	dst.data[0] = data[0];
-	dst.data[1] = data[1];
-	dst.data[2] = data[2];
-
-veejay_msg(1, "%s: not grayscale yet");
 	if( !bwscaler || scale_dim_bw[0] != out_w || scale_dim_bw[1] != out_h )
 	{
 		if(bwscaler )

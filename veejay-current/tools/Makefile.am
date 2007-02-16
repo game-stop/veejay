@@ -9,6 +9,8 @@ INCLUDES = 	-I$(top_srcdir) \
 
 VJLIBS = $(top_builddir)/libvjnet/libvjnet.la \
 	 $(top_builddir)/libvjmsg/libvjmsg.la \
+	 $(top_builddir)/libyuv/libyuv.la \
+	 $(top_builddir)/liblzo/libminilzo.la \
 	 $(top_builddir)/libvjmem/libvjmem.la
 
 yuv2rawdv_SOURCES = yuv2rawdv.c 

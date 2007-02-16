@@ -170,6 +170,7 @@ typedef struct {
     int tag_record;
     int dct_method;
     subsample_mode_t sample_mode;
+	int unicast_frame_sender;
 	int mcast_frame_sender;
 	int use_mcast;
 	char *group_name;

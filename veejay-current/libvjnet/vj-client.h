@@ -1,5 +1,5 @@
 /* veejay - Linux VeeJay
- * 	     (C) 2002-2004 Niels Elburg <nelburg@looze.net> 
+ * 	     (C) 2002-2007 Niels Elburg <nelburg@looze.net> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -39,9 +39,14 @@ typedef struct
 	int cur_width;
 	int cur_height;
 	int cur_fmt;
+	int in_width;
+	int in_height;
+	int in_fmt;
+	uint8_t *space;
 	conn_type_t **c;
 	int ports[3];
 	int mcast;
+	void *lzo;
 	unsigned char *blob;
 } vj_client;
 
@@ -54,7 +59,7 @@ void	vj_client_flush( vj_client *v, int delay );
 
 int	vj_client_poll( vj_client *v, int sock_type );
 
-int	vj_client_read_i(vj_client *v, uint8_t *dst );
+int	vj_client_read_i(vj_client *v, uint8_t *dst, int len );
 
 int vj_client_read( vj_client *v, int sock_type, uint8_t *dst, int bytes );
 

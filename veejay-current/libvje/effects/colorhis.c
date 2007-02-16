@@ -47,7 +47,7 @@ vj_effect *colorhis_init(int w, int h)
     ve->defaults[3] = 132; // strength
 
     ve->description = "Color Histogram";
-    ve->sub_format = 1;
+    ve->sub_format = 0;
     ve->extra_frame = 0;
     ve->has_user = 0;
     return ve;
@@ -85,8 +85,8 @@ void	colorhis_free()
 
 void colorhis_apply( VJFrame *frame, int width, int height,int mode, int val, int intensity, int strength)
 {
-
-	yuv_convert_any( frame, rgb_frame_, PIX_FMT_YUV444P, PIX_FMT_RGB24 );
+	int src_fmt = (frame->uv_height == height ? PIX_FMT_YUV422P : PIX_FMT_YUV420P);
+	yuv_convert_any( frame, rgb_frame_, src_fmt, PIX_FMT_RGB24 );
 
 	if( val == 0 )
 	{
@@ -98,7 +98,7 @@ void colorhis_apply( VJFrame *frame, int width, int height,int mode, int val, in
 		veejay_histogram_equalize_rgb( histogram_, frame, rgb_, intensity, strength, mode );
 	
 	
-		yuv_convert_any( rgb_frame_, frame, PIX_FMT_RGB24, PIX_FMT_YUV444P );
+		yuv_convert_any( rgb_frame_, frame, PIX_FMT_RGB24, src_fmt );
 	}	
 }
 

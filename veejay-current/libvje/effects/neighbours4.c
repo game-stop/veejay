@@ -154,7 +154,7 @@ static inline pixel_t evaluate_pixel_bc(
 	{
 		dx = points[i].x + x;
 		dy = points[i].y + y;
-		if(dx < 0) dx = 0; else if (dx > w) dx = w;
+		if(dx < 0) dx = 0; else if (dx >= w) dx = w-1;
 		if(dy < 0) dy = 0; else if (dy >= h) dy = h-1;
 
 		brightness = premul[ dy * w + dx];

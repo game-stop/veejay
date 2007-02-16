@@ -362,7 +362,7 @@ extern void whiteframe_apply(VJFrame *frame, VJFrame *frame2,
 
 extern void diff_apply(void *dd, VJFrame *frame,
 		       VJFrame *frame2, int width, int height, 
-		       int mode, int threshold, int c, int d);
+		       int mode, int threshold, int c );
 
 extern void chromamagick_apply(VJFrame *frame, VJFrame *frame2,
 			       int width, int height, int type, int op0);
@@ -545,5 +545,7 @@ extern	void	differencemap_apply( VJFrame *f, VJFrame *f2, int w, int h, int t1, 
 extern void autoeq_apply( VJFrame *frame, int width, int height, int val, int i, int s);
 
 extern void colorhis_apply( VJFrame *frame, int w, int h, int v, int m, int i, int s );
+
+extern void diff_destroy();
 
 #endif

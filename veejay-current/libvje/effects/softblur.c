@@ -120,7 +120,7 @@ void softblur3_apply(VJFrame *frame, int width, int height ) {
  * Authors: Dennis Smit <ds@nerds-incorporated.org>
  */
 
-static	void	mmx_blur(uint8_t *buf, int width, int height)
+static	void	mmx_blur(uint8_t *buffer, int width, int height)
 {
 	__asm __volatile
 		("\n\t pxor %%mm6, %%mm6"
@@ -129,7 +129,7 @@ static	void	mmx_blur(uint8_t *buf, int width, int height)
 	int scrsh = height / 2;
 	int i;
 	int len = width * height;
-
+	uint8_t *buf = buffer;
 	/* Prepare substraction register */
 	for (i = 0; i < scrsh; i += 4) {
 		__asm __volatile
@@ -155,7 +155,7 @@ static	void	mmx_blur(uint8_t *buf, int width, int height)
 		//	 : "mm0", "mm1", "mm2", "mm3", "mm6");
 	}
 
-	for (i = len - 1; i > scrsh; i -= 4) {
+	for (i = len - 4; i > scrsh; i -= 4) {
 		__asm __volatile
 			("\n\t movd %[buf], %%mm0"
 			 "\n\t movd %[add1], %%mm1"

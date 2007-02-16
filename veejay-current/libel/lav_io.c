@@ -42,6 +42,7 @@
 #include <lqt/lqt_version.h>
 #include <lqt/colormodels.h>
 #endif
+#include <veejay/vj-global.h>
 #include <liblzo/lzo.h>
 #include <libvjmem/vjmem.h>
 #define QUICKTIME_MJPG_TAG 0x6d6a7067
@@ -74,7 +75,7 @@ uint16_t reorder_16(uint16_t todo, int big_endian);
 static int 		output_scale_width = 0;
 static int		output_scale_height = 0;
 static float		output_fps = 25.0;
-static int 		output_yuv = 0; // 422
+static int 		output_yuv = 1; // 422
 
 void	lav_set_project(int w, int h, float f, int fmt)
 {
@@ -709,7 +710,7 @@ int lav_video_width(lav_file_t *lav_file)
 #endif
 #ifdef USE_GDK_PIXBUF
 		case 'x':
-			return (output_scale_width == 0 ? vj_picture_get_width( lav_file->picture ) : output_scale_width);
+			return output_scale_width;
 #endif
 #ifdef HAVE_LIBQUICKTIME
       		case 'q':
@@ -738,7 +739,7 @@ int lav_video_height(lav_file_t *lav_file)
 #endif
 #ifdef USE_GDK_PIXBUF	
 		case 'x':
-			return (output_scale_height == 0 ? vj_picture_get_height( lav_file->picture ) : output_scale_height);
+			return output_scale_height;
 #endif
 #ifdef HAVE_LIBQUICKTIME
       case 'q':
@@ -753,9 +754,6 @@ double lav_frame_rate(lav_file_t *lav_file)
    video_format = lav_file->format; internal_error = 0; /* for error messages */
    switch(lav_file->format)
    {
-//		case 'a':
-//		case 'A':
-//				return AVI_frame_rate(lav_file->avi_fd);
 #ifdef SUPPORT_READ_DV2
 		case 'b':
    		   return rawdv_fps(lav_file->dv_fd);
@@ -765,12 +763,12 @@ double lav_frame_rate(lav_file_t *lav_file)
    		   return output_fps;
 #endif
 #ifdef HAVE_LIBQUICKTIME
-      case 'q':
-         return quicktime_frame_rate(lav_file->qt_fd,0);
+   	   case 'q':
+       		  return quicktime_frame_rate(lav_file->qt_fd,0);
 #endif	   
-	default:
-	 return AVI_frame_rate( lav_file->avi_fd);
-   }
+	   default:
+		return AVI_frame_rate( lav_file->avi_fd ); 
+  }
    return -1;
 }
 
@@ -1402,7 +1400,20 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 #ifdef USE_GDK_PIXBUF
 	if(strncasecmp(video_comp, "PICT",4) == 0 )
 	{
-		lav_fd->MJPG_chroma = (output_yuv == 1 ? CHROMA420: CHROMA422 );
+		switch(output_yuv)
+		{
+			case FMT_420:
+			case FMT_420F:
+				lav_fd->MJPG_chroma = CHROMA420;
+				break;
+			case FMT_422:
+			case FMT_422F:
+				lav_fd->MJPG_chroma = CHROMA422;
+				break;
+			default:
+				lav_fd->MJPG_chroma = CHROMAUNKNOWN;
+				break;
+		}
 		lav_fd->format = 'x';
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
 		return lav_fd;

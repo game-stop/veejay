@@ -135,7 +135,7 @@ extern int vj_effect_get_max_v();
 extern int vj_effect_get_by_name(char *name);
 
 extern int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int selector, int *arguments );
-extern int	vj_effect_prepare( VJFrame *frame, VJFrameInfo *frameinfo, int selector);
+extern int	vj_effect_prepare( VJFrame *frame, int selector);
 
 extern	void	vj_effect_dump(void);
 

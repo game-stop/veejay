@@ -103,6 +103,7 @@ typedef struct {
     int selected_entry;	
     int effect_toggle;
     int socket_ready;
+    int socket_len;
     uint8_t *socket_frame;
     int n_frames;
     void *priv;

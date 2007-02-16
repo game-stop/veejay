@@ -38,7 +38,7 @@
 #include <ffmpeg/avutil.h>
 
 static unsigned int vj_relative_time = 0;
-
+static unsigned int vj_stamp_ = 0;
 static unsigned int vj_get_timer()
 {
     struct timeval tv;
@@ -46,6 +46,16 @@ static unsigned int vj_get_timer()
     return ((tv.tv_sec & 1000000) + tv.tv_usec);
 }
 
+unsigned	int	vj_stamp()
+{
+	vj_stamp_ ++;
+	return vj_stamp_;
+}
+
+void	vj_stamp_clear()
+{
+	vj_stamp_ = 0;
+}
 
 unsigned int vj_get_relative_time()
 {
@@ -54,27 +64,24 @@ unsigned int vj_get_relative_time()
     relative = time - vj_relative_time;
     vj_relative_time = time;
     return relative;
-  //  return (float) relative *0.000001F;
 }
 
 int vj_perform_take_bg(veejay_t *info, uint8_t **src)
 {
 	VJFrame frame;
-	VJFrameInfo tag;
-	char *descr = "Difference Overlay";
-	memset(&frame, 0, sizeof(VJFrame));
-	memset(&tag, 0, sizeof(VJFrameInfo));
+	char *descr = "Map B to A (substract background mask)";
+	veejay_memset(&frame, 0, sizeof(VJFrame));
 	frame.data[0] = src[0];
 	frame.data[1] = src[1];
 	frame.data[2] = src[2];
-	tag.width = info->edit_list->video_width;
-	tag.height = info->edit_list->video_height;	
-	veejay_msg(VEEJAY_MSG_INFO, "Warning: taking current frame %d as static bg (%p)",info->settings->current_frame_num, src[0]);
+	frame.width = info->edit_list->video_width;
+	frame.height = info->edit_list->video_height;	
 
-	vj_effect_prepare( &frame, &tag, (int) vj_effect_get_by_name( descr ) );
+	vj_effect_prepare( &frame, vj_effect_get_by_name( descr ) );
 
 	return 1;
 }
+
 #ifdef HAVE_JPEG
 int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
 {

@@ -22,36 +22,35 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
+#include <ffmpeg/avutil.h>
+#include <libyuv/yuvconv.h>
+#include <libvjmsg/vj-common.h>
+static uint8_t *static_bg = NULL;
 
 typedef struct
 {
-	int has_bg;
-	uint8_t *static_bg[3];
-	double *sqrt_table[256];
 	uint8_t *data;
+	uint8_t *current;
 } diff_data;
 
 vj_effect *diff_init(int width, int height)
 {
     //int i,j;
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
+    ve->num_params = 3;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = 9;
-    ve->limits[0][1] = 0;	/* threshold min */
-    ve->limits[1][1] = 25500;
-    ve->limits[0][2] = 0;	/* threshold difference min */
-    ve->limits[1][2] = 25500;
-    ve->limits[0][3] = 0;
-    ve->limits[1][3] = 1;
-    ve->defaults[0] = 4;
-    ve->defaults[1] = 3000;
-    ve->defaults[2] = 3000;
-    ve->defaults[3] = 1;
-    ve->description = "Difference Overlay";
+    ve->limits[1][0] = 255;
+    ve->limits[0][1] = 0;	/* reverse */
+    ve->limits[1][1] = 1;
+    ve->limits[0][2] = 0;	/* show mask */
+    ve->limits[1][2] = 1;
+    ve->defaults[0] = 20;
+    ve->defaults[1] = 0;
+    ve->defaults[2] = 1;
+    ve->description = "Map B to A (substract background mask)";
     ve->extra_frame = 1;
     ve->sub_format = 1;
     ve->has_user = 1;
@@ -59,7 +58,15 @@ vj_effect *diff_init(int width, int height)
     return ve;
 }
 
+void	diff_destroy(void)
+{
+	if(static_bg)
+		free(static_bg);
+	static_bg = NULL;
+	
+}
 
+#define ru8(num)(((num)+8)&~8)
 
 int diff_malloc(void **d, int width, int height)
 {
@@ -67,12 +74,11 @@ int diff_malloc(void **d, int width, int height)
 	diff_data *my;
 	*d = (void*) vj_calloc(sizeof(diff_data));
 	my = (diff_data*) *d;
-	my->static_bg[0] = (uint8_t*) vj_calloc(sizeof(uint8_t)* width * height);
-	my->data = (uint8_t*) vj_calloc(sizeof(uint8_t) * width * height );
-	for(i=0; i < 256; i ++) 
-		my->sqrt_table[i] = (double*)vj_calloc(sizeof(double)* 256);
-	
-	my->has_bg = 0;
+	my->data = (uint8_t*) vj_calloc( ru8(sizeof(uint8_t) * 2 * width * height) );
+	my->current = my->data + (width*height);
+
+	if(static_bg == NULL)	
+		static_bg = (uint8_t*) vj_calloc( ru8(width * height * sizeof(uint8_t)) );
 	return 1;
 }
 
@@ -82,10 +88,7 @@ void diff_free(void *d)
 	{
 		int i;
 		diff_data *my = (diff_data*) d;
-		if(my->static_bg[0]) free( my->static_bg[0] );
 		if(my->data) free(my->data);
-		for(i = 0; i < 256 ; i ++)
-			if( my->sqrt_table[i]) free( my->sqrt_table[i]);
 		free(d);
 	}
 	d = NULL;
@@ -94,70 +97,57 @@ void diff_free(void *d)
 void diff_prepare(void *user, uint8_t *map[3], int width, int height)
 {
 	diff_data *my = (diff_data*) user;
-	int d,e,x,y,len=width*height;
-	uint8_t *luma_map = map[0];
-   	// map[0] contains luma information of the frame
-//	int g_width = 7;
-	my->static_bg[0][0] = luma_map[0];	
-	// first row, 3x1 average
-	for(y=1; y < width; y++)
+	if(!static_bg )
 	{
-		my->static_bg[0][y] = ( luma_map[y-1] + luma_map[y] + luma_map[y+1] ) / 3;
+		veejay_msg(0,"FX \"Map B to A (substract background mask)\" not initialized");
+		return;
 	}
-	// 3x3 window average
-	for(y=width; y < len-width; y+= width)
+	
+	veejay_memcpy( static_bg, map[0], (width*height));
+	
+	VJFrame tmp;
+	veejay_memset( &tmp, 0, sizeof(VJFrame));
+	tmp.data[0] = static_bg;
+	tmp.width = width;
+	tmp.height = height;
+	softblur_apply( &tmp, width,height,0);
+}
+
+static	void	binarify( uint8_t *dst, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len )
+{
+	int i;
+
+	if(!reverse)
 	{
-		// first pixel on row
-		my->static_bg[0][y] = luma_map[y];
-		for(x=1; x < width-1; x++)
+		for( i = 0; i < len; i ++ )
 		{
-			my->static_bg[0][y+x] = (
-
-				luma_map[x+y-width-1] +
-				luma_map[x+y-width]   +
-				luma_map[x+y-width+1] +
-
-				luma_map[x+y+width-1] +
-				luma_map[x+y+width+1] +
-				luma_map[x+y+width] +
-
-				luma_map[x+y-1 ] +
-				luma_map[x+y+1 ] + 
-				luma_map[x+y]
-				) / 9; 
+			if ( abs(bg[i] - src[i]) <= threshold )
+				dst[i] = 0;
+			else
+				dst[i] = 0xff;
 		}
-		// last pixel on row
-		my->static_bg[0][y+x+1] = luma_map[y+x+1];
+
 	}
-	// last row, 3x3 average
-	for(y=len-width; y < len; y++)
+	else
 	{
-		my->static_bg[0][y] = (luma_map[y-1] + luma_map[y+1] + luma_map[y] ) /3;
-	}
-	// calculate distance vector
-	for(d=0; d < 256; d ++)
-	{
-		for(e=0; e < 256;e++ )
+		for( i = 0; i < len; i ++ )
 		{
-			my->sqrt_table[d][e] = sqrt( (d-e) * (d-e) );
+			if ( abs(bg[i] - src[i]) >= threshold )
+				dst[i] = 0;
+			else
+				dst[i] = 0xff;
+		
 		}
 	}
-	my->has_bg = 1;
 }
 
 
 void diff_apply(void *ed, VJFrame *frame,
 		VJFrame *frame2, int width, int height, 
-		int K_level, int noise_level,int noise_level2, int mode)
+		int threshold, int reverse,int mode)
 {
     
 	unsigned int i;
-	double d;
-	int x,y;
-	int K = 0;
-	uint8_t *dst;
-	double level1 = (double)noise_level / 100.0;
-	double level2 = (double)noise_level2 / 100.0;
 	const int len = frame->len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
@@ -166,98 +156,43 @@ void diff_apply(void *ed, VJFrame *frame,
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 	diff_data *ud = (diff_data*) ed;
-	uint8_t *map = (uint8_t*) ud->static_bg[0];
-	double **tab = (double**) ud->sqrt_table;
- 
-	dst = ud->data;
 
-	// calculate if pixel is much different (has greater distance)
-	// accepted pixels are 0xff 
-	if(!ud->has_bg)
+	if(static_bg==NULL)
 	{
-		printf("No static bg in has_bg\n");
+		veejay_msg(0, "There is background mask!");
 		return;
 	}
 
-	for(i = 0 ; i < len ; i ++ )
+	VJFrame *tmp = yuv_yuv_template( ud->current, NULL,NULL, width,height, 
+					PIX_FMT_YUV444P );
+	veejay_memcpy( ud->current, frame->data[0], len );
+	softblur_apply(tmp,width,height,0);
+	free(tmp);
+
+
+	binarify( ud->data, static_bg, ud->current, threshold, reverse,len );
+
+	if(mode)
 	{
-		d = tab[ ( map[i]) ][ (Y[i]) ];
-		if(d > level1)
+		veejay_memcpy( Y, ud->data, len );
+		veejay_memset( Cb, 128, len );
+		veejay_memset( Cr, 128, len );
+		return;
+	}
+
+	uint8_t *bin = ud->data;
+	for( i = 0; i < len ;i ++ )
+	{
+		if(bin[i])
 		{
-			dst[i] = 0xff;
+			Y[i] = Y2[i];
+			Cb[i] = Cb2[i];
+			Cr[i] = Cr2[i];
 		}
 		else
 		{
-			dst[i] = 0x0;
-		}
-		d = tab[ map[i]][ (Y2[i]) ];
-		if(d > level2)
-		{
-			dst[i] = 0xf0;
-		}
-		
-	}
-	// anti alias frame to remove isolated white pixels
-
-	
-	for(y=width;  y < len-width; y+= width)
-	{
-		for(x=1; x < width-1; x ++)
-		{
-			if( dst[x+y] >= 0xf0)
-			{	// have a bad influence on branch prediction
-				// simple 3x3 window where the value of K
-				// indicates whether to accept or discard an isolated pixel
-		
-				K = 1;
-				if( dst[x+y-width] >= 0xf0 ) K++;
-				if( dst[x+y+width] >= 0xf0 ) K++;
-				if( dst[x+y-width+1] >= 0xf0 ) K++;
-				if( dst[x+y+width+1] >= 0xf0 ) K++;
-				if( dst[x+y+width-1] >= 0xf0 ) K++;
-				if( dst[x+y-width-1] >= 0xf0 ) K++;
-				if( dst[x+y-1] >= 0xf0) K++;
-				if( dst[x+y+1] >= 0xf0) K++;
-				if( K <= K_level ) dst[x+y] = 0x0; 
-		
-			}
-		}
-	}
-	if(mode == 0)
-	{
-
-		// apply difference frame  
-		for( i = 0; i < len ; i++)
-		{
-			if(dst[i] == 0xf0)
-			{
-				Y[i] = Y2[i];
-				Cb[i] = Cb2[i];
-				Cr[i] = Cr2[i];
-			}
-		}
-	}
-	else
-	{
-		// show different pixels in white
-		for( i = 0; i < len ; i++)
-		{
-			if(dst[i] == 0xf0)
-			{
-				Y[i] = 200;
-			}
-			else
-			{
-				if(dst[i] != 0xff)
-				{
-					Y[i] = pixel_Y_lo_;
-				}
-				else
-				{
-					Y[i] = pixel_Y_hi_;
-				}
-			}
-			Cr[i] = 128;
+			Y[i] = 0;
+			Cb[i] = 128;
 			Cr[i] = 128;
 		}
 	}

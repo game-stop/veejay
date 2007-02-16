@@ -117,6 +117,11 @@ void	*init_cache( unsigned int n_slots )
 	cache_t *v = (cache_t*) vj_malloc(sizeof(cache_t));
 	v->len = n_slots;
 	v->cache = (cache_slot_t**) vj_malloc(sizeof(cache_slot_t*) * v->len );
+	if(!v->cache)
+	{
+		free(v);
+		return NULL;
+	}
 	veejay_memset( v->cache, 0, sizeof(cache_slot_t*) * v->len );
 
 	v->index = (long*) malloc(sizeof(long) * v->len );

@@ -57,6 +57,7 @@
 #include <poll.h>
 #include <sys/wait.h>
 #include <sys/signal.h>
+#include <sys/statfs.h>
 #include <time.h>
 #include "jpegutils.h"
 #include "vj-event.h"
@@ -587,7 +588,10 @@ int veejay_init_editlist(veejay_t * info)
    {
 	settings->spas = 0;
    }
+
+   veejay_msg(VEEJAY_MSG_DEBUG, "%s: %dx%d, %d,%d", __FUNCTION__, el->video_width,el->video_height);
    vj_el_set_image_output_size( el );
+
    return 0;
 }
 
@@ -875,14 +879,6 @@ static int veejay_screen_update(veejay_t * info )
 
 	vj_perform_unlock_primary_frame();
 
-    	// get the frame to output, in 420 or 422
-    	if (info->uc->take_bg==1)
-    	{
-		vj_perform_get_primary_frame(info,frame,0);
-        	vj_perform_take_bg(info,frame);
-        	info->uc->take_bg = 0;
-    	} 
-
 	video_playback_setup *settings = info->settings;
 	if(settings->zoom )
 	{
@@ -991,10 +987,15 @@ static int veejay_screen_update(veejay_t * info )
 	// send a frame to all participants when using mcast
 	// (activated after sending VIMS MCAST SENDER START/STOP)
 
-	if( info->settings->use_vims_mcast)
+	if( info->settings->unicast_frame_sender )
+	{
+		vj_perform_send_primary_frame_s2(info, 0);
+		info->settings->unicast_frame_sender = 0;
+	}
+	if( info->settings->mcast_frame_sender && info->settings->use_vims_mcast )
+	{
 		vj_perform_send_primary_frame_s2(info, 1);
-
-	//todo: this sucks, have it modular.( video out drivers )
+	}
 
     	switch (info->video_out)
 	{
@@ -1212,6 +1213,7 @@ void	veejay_check_homedir(void *arg)
 {
 	veejay_t *info = (veejay_t *) arg;
 	char path[1024];
+	char tmp[1024];
 	struct stat s;
 	char *home = getenv("HOME");
 	if(!home)
@@ -1222,32 +1224,29 @@ void	veejay_check_homedir(void *arg)
 	}
 
 	snprintf(path,1024, "%s/.veejay", home);
-
 	int ret = stat( path, &s );
 	int error = 0;
 	if( ret < 0 )
 	{
-		veejay_msg(VEEJAY_MSG_WARNING, "%s does not exist", path );
-		veejay_msg(VEEJAY_MSG_INFO, "Configuring veejay in '%s'", path );
+		veejay_msg(VEEJAY_MSG_WARNING, "No veejay config file in %s", path );
 		ret = mkdir(path,0777);
 		if( ret != 0 )
-			error = 1;	
-		if( ret < 0 )
 		{
-			switch(errno)
-			{
-				case EACCES:
-					veejay_msg( VEEJAY_MSG_ERROR, "Permission denied");break;
-				case EEXIST:
-					veejay_msg( VEEJAY_MSG_ERROR, "Path already exists and may not be a directory");break;
-				case ELOOP:
-					veejay_msg( VEEJAY_MSG_ERROR, "Too many symbolic links"); break;
-				case ENOSPC:
-					veejay_msg( VEEJAY_MSG_ERROR, "Out of available diskpace. Delete some files and try again"); break;
-				default:
-					veejay_msg( VEEJAY_MSG_ERROR, "A mysterious error occured");
-					break;
-			}
+			error = 1;	
+		}
+		switch(errno)
+		{
+			case EACCES:
+				veejay_msg( VEEJAY_MSG_ERROR, "\tPermission denied");break;
+			case EEXIST:
+				veejay_msg( VEEJAY_MSG_ERROR, "\tPath already exists and may not be a directory");break;
+			case ELOOP:
+				veejay_msg( VEEJAY_MSG_ERROR, "\tToo many symbolic links"); break;
+			case ENOSPC:
+				veejay_msg( VEEJAY_MSG_ERROR, "\tOut of available diskpace. Delete some files and try again"); break;
+			default:
+				veejay_msg( VEEJAY_MSG_ERROR, "\tSome other error occured");
+				break;
 		}
 	}
 
@@ -1262,9 +1261,23 @@ void	veejay_check_homedir(void *arg)
 	
 	if(!error)
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Veejay uses %s", path);
+		veejay_msg(VEEJAY_MSG_INFO, "Veejay's configuration file is %s", path);
 		info->homedir = strndup( path, 1024 );
 	}
+
+	sprintf(tmp, "%s/plugins.cfg", path );
+	struct statfs ts;
+	if( statfs( tmp, &ts ) != 0 )
+	{
+		veejay_msg(VEEJAY_MSG_INFO,"\tNo plugins.cfg found (see DOC/HowtoPlugins)");
+	}
+	sprintf(tmp, "%s/viewport.cfg", path);
+	memset( &ts,0,sizeof(struct statfs));
+	if( statfs( tmp, &ts ) != 0 )
+	{
+		veejay_msg(VEEJAY_MSG_INFO,"\tNo viewport.cfg found (press CTRL-V to setup viewport)");
+	}
+
 }
 
 /******************************************************
@@ -1293,8 +1306,13 @@ void veejay_handle_signal(void *arg, int sig)
 			else
 				veejay_change_state( info, LAVPLAY_STATE_STOP );
 			
-			if( sig == SIGSEGV || sig == SIGFPE )
+			if( sig == SIGSEGV || sig == SIGFPE || sig == SIGBUS || sig == SIGPWR || sig == SIGABRT)
 				signal( sig, SIG_DFL );
+			else
+			{
+				veejay_msg(VEEJAY_MSG_DEBUG, "Broken pipe");
+				signal( sig, SIG_IGN );
+			}
 		}
 	}
 }
@@ -2132,20 +2150,18 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		}
 	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "ID %d | Mode %d", info->uc->sample_id, info->uc->playback_mode ); 
-
 	/* After we have fired up the audio and video threads system (which
      	* are assisted if we're installed setuid root, we want to set the
      	* effective user id to the real user id
     	 */
 
 
- if (info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
-    {
-	if (!vj_perform_audio_start(info)) {
-	    return -1;
-	}
-    }
+	if (info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
+ 	{
+		if (!vj_perform_audio_start(info)) {
+			return -1;
+		}
+    	}
 
 
 	if (seteuid(getuid()) < 0)
@@ -2180,10 +2196,6 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
 	veejay_memset( &schp, 0, sizeof(schp));
 	schp.sched_priority = sched_get_priority_max( SCHED_FIFO );
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Min prio = %d, Max prio = %d",
-		sched_get_priority_min( SCHED_FIFO ),
-		sched_get_priority_max( SCHED_FIFO ));
-
 	if( sched_setscheduler( pid, SCHED_FIFO, &schp ) != 0 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Cannot set First-In-First-Out scheduling for process %d",pid);
@@ -2191,6 +2203,7 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
 	else
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Using First-In-First-Out II scheduling for process %d", pid);
+		veejay_msg(VEEJAY_MSG_INFO, "\tPriority is set to %d (RT)", schp.sched_priority );
 	}
 }
 
@@ -2210,8 +2223,8 @@ static int	veejay_pin_cpu( veejay_t *info, int cpu_num )
 	if( cpumask == NULL )
 	{
 		sz = 1 + (2 * sched_ncpus()) / (8 * sizeof(unsigned long));
-		mask = (unsigned long*) vj_malloc( sz * sizeof( unsigned long ));
-		cpumask = (unsigned long*) vj_malloc( sz * sizeof( unsigned long ));
+		mask = (unsigned long*) vj_calloc( 8 * sz * sizeof( unsigned long ));
+		cpumask = (unsigned long*) vj_calloc( 8 * sz * sizeof( unsigned long ));
 		
 		retval = sched_getaffinity(0, sz * sizeof(unsigned long), cpumask );
 		if( retval < 0 )
@@ -2477,10 +2490,10 @@ static void Welcome(veejay_t *info)
 		veejay_msg(VEEJAY_MSG_INFO,"Software scaler - output stream dimensions %d x %d ",
 			info->video_output_width, info->video_output_height );
 	}
-	veejay_msg(VEEJAY_MSG_INFO,"Your best friends are 'man' and 'vi'");
+
 	veejay_msg(VEEJAY_MSG_INFO,"Type 'man veejay' in a shell to learn more about veejay");
 	veejay_msg(VEEJAY_MSG_INFO,"For a list of events, type 'veejay -u |less' in a shell");
-	veejay_msg(VEEJAY_MSG_INFO,"Use 'sayVIMS -i' or gveejay to enter interactive mode");
+	veejay_msg(VEEJAY_MSG_INFO,"Use 'gveejayreloaded' to enter interactive mode");
 	veejay_msg(VEEJAY_MSG_INFO,"Alternatives are OSC applications or 'sendVIMS' extension for PD"); 
 
 }
@@ -2587,11 +2600,14 @@ int vj_server_setup(veejay_t * info)
 		  		 "Unable to initialize mcast sender");
 			return 0;
 		}
-		//info->settings->mcast_frame_sender = 1;
+		else
+			veejay_msg(VEEJAY_MSG_INFO, "VIMS multicast channel ready at port %d group %s",
+				info->uc->port, info->settings->vims_group_name );
 	}
 	if(info->settings->use_mcast)
+	{
 		GoMultiCast( info->settings->group_name );
-
+	}
 	info->osc = (void*) vj_osc_allocate(info->uc->port+2);
 
     	if(!info->osc) 
@@ -2615,8 +2631,10 @@ int vj_server_setup(veejay_t * info)
 		veejay_msg(VEEJAY_MSG_INFO, "Initialized OSC (http://www.cnmat.berkeley.edu/OpenSoundControl/)");
 
     	if (info->osc == NULL || info->vjs[0] == NULL || info->vjs[1] == NULL) 
+	{
+		veejay_msg(0, "Unable to setup basic network I/O. Abort");
 		return 0;
-    	
+    	}
     	info->uc->is_server = 1;
 
 	return 1;
@@ -3193,14 +3211,17 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 				info->edit_list->video_norm , info->pixel_format);
 	// if that fails, bye
 	if(!sample_edl)
+	{
+		veejay_msg(0, "Error while creating EDL");
 		return -1;
-
+	}
 	// the editlist dimensions must match (there's more)
 	if( sample_edl->video_width != info->edit_list->video_width ||
 	    sample_edl->video_height != info->edit_list->video_height )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot add video file '%s' (wrong dimensions)", movie);
-		if(sample_edl) vj_el_free(sample_edl);
+		if(sample_edl) 
+			vj_el_free(sample_edl);
+		veejay_msg(0, "Frame dimensions do not match. Abort");
 		return -1;
 	}
 

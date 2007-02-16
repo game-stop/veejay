@@ -34,6 +34,7 @@ typedef struct
 	int   port_num;
 	vj_client *fd;
 	uint8_t *data_buffer;
+	uint8_t *tmp_buffer;
 	uint8_t *compr_buffer;		//shared
 	uint8_t *status_buffer;		
 	int	 track_list[16];
@@ -41,6 +42,7 @@ typedef struct
 	int	 status_tokens[32];	//shared
 	int   	 active;
 	int 	have_frame;
+	int	grey_scale;
 	int	preview;
 	int	width;
 	int	height;
@@ -109,6 +111,8 @@ static	void	gvr_close_connection( veejay_track_t *v )
          if(v->status_buffer) free(v->status_buffer);
          if(v->compr_buffer) free(v->compr_buffer);
          if(v->data_buffer) free(v->data_buffer);
+	 if(v->tmp_buffer) free(v->tmp_buffer);
+ 
          free(v);
 	 v= NULL;
    }
@@ -146,7 +150,6 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 	gint tmp_len = header_len + 1;
 	unsigned char *tmp = vj_calloc( tmp_len );
 	gint len = 0;
-
 	gint n = vj_client_read( v->fd, V_CMD, tmp, header_len );
 
 	if( n<= 0 )
@@ -156,7 +159,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 		return 0;
 	}
 
-	if( sscanf( (char*)tmp, "%6d", &len )<=0)
+	if( sscanf( (char*)tmp, "%6d%1d", &len,&(v->grey_scale) )<=0)
 	{
 		free(tmp);
 		veejay_msg(0, "Error reading header contents");
@@ -318,7 +321,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	}
 	gint bw = 0;
 
-	res = recvvims( v, 6, &bw, v->compr_buffer );
+	res = recvvims( v, 7, &bw, v->compr_buffer );
 	if( res <= 0 )
 	{
 		veejay_msg(0, "Error receiving compressed RGB image");
@@ -460,7 +463,7 @@ int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *
 	vt->status_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 256);
 	vt->compr_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
 	vt->data_buffer  = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
-
+	vt->tmp_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
 	veejay_msg(2, "Track %d connected to Veejay %s : %d", track_num,hostname,port_num);
 
 	g_mutex_lock( vp->mutex );
@@ -659,6 +662,7 @@ int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 		vp->tracks[ track_num ]->hostname,
 		vp->tracks[ track_num ]->port_num,
 		(status ? "Active" : "Disabled") );
+	return status;
 }
 
 
@@ -676,8 +680,24 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 		if( vp->tracks[i] && vp->tracks[i]->have_frame )
 		{			
 			veejay_track_t *v = vp->tracks[i];
-			list[i] = gdk_pixbuf_new_from_data( v->data_buffer, GDK_COLORSPACE_RGB,	FALSE,
+			if(v->grey_scale)	
+			{
+				uint8_t *rgb = v->tmp_buffer;
+				unsigned int j = 0;
+				for( j = 0; j < (v->width*v->height); j+=3 )
+				{
+					rgb[j+0] = v->data_buffer[j];
+					rgb[j+1] = v->data_buffer[j];
+					rgb[j+2] = v->data_buffer[j];
+				}
+				list[i] = gdk_pixbuf_new_from_data(v->tmp_buffer, GDK_COLORSPACE_RGB, FALSE,
+					8, v->width,v->height,v->width * 3, NULL,NULL );
+			}
+			else
+			{
+				list[i] = gdk_pixbuf_new_from_data( v->data_buffer, GDK_COLORSPACE_RGB,	FALSE,
 					8, v->width,v->height,v->width * 3,NULL,NULL );
+			}
 			vp->tracks[i]->have_frame = 0;
 		}
 	}

@@ -61,31 +61,25 @@ int			sock_t_connect( vj_sock_t *s, char *host, int port )
 	return 1;
 }
 
-int                     sock_t_poll_w( vj_sock_t *s )
+int			sock_t_poll_w(vj_sock_t *s )
 {
-        int     status;
-        fd_set  fds;
-        struct timeval no_wait;
-        memset( &no_wait, 0, sizeof(no_wait) );
+	int	status;
+	fd_set	fds;
+	struct timeval no_wait;
+	memset( &no_wait, 0, sizeof(no_wait) );
 
-        FD_ZERO( &fds );
-        FD_SET( s->sock_fd, &fds );
+	FD_ZERO( &fds );
+	FD_SET( s->sock_fd, &fds );
 
-        status = select( s->sock_fd + 1, 0,&fds, 0, &no_wait );
-        if( status < 0 )
-        {
-                veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
-                return 0;
-        }
-	
-        if( FD_ISSET( s->sock_fd, &fds ) )
-        {
-                return 1;
-        }
-        return 0;
+	status = select( s->sock_fd + 1,NULL, &fds, NULL, &no_wait );
+	if( status < 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
+		return 0;
+	}
+	return status;
 }
-        
-	
+
 
 int			sock_t_poll( vj_sock_t *s )
 {

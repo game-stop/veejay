@@ -1,6 +1,6 @@
 /* vjnet - low level network I/O for VeeJay
  *
- *           (C) 2005 Niels Elburg <nelburg@looze.net> 
+ *           (C) 2005-2007 Niels Elburg <nelburg@looze.net> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -38,6 +38,9 @@ typedef struct
 	int	port;
 	int	sock_fd;
 	int 	recv_buf_size;
+	uint8_t	*space;
+	int     space_len;
+	void	*next;
 } mcast_receiver;
 
 mcast_receiver *mcast_new_receiver( const char *group_name, int port );
@@ -46,7 +49,8 @@ int		mcast_poll( mcast_receiver *v );
 
 int		mcast_recv( mcast_receiver *v, void *dst, int len );
 
-int		mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf , int total_len);
+int		mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf , int total_len, int cw, int ch, int fmt,
+				int *dw, int *dh, int *df);
 
 void		mcast_close_receiver( mcast_receiver *v );
 

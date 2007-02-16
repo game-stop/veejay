@@ -52,14 +52,15 @@ vj_effect *differencemap_init(int w, int h)
 static uint8_t *binary_img = NULL;
 static uint8_t *previous_img = NULL;
 static int nframe = 0;
+#define    RUP8(num)(((num)+8)&~8)
 
 int		differencemap_malloc(int w, int h )
 {
 	if(binary_img || previous_img)
 		differencemap_free();
 	
-	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h );
-	previous_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * w *h );
+	binary_img = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(w*h*2) );
+	previous_img = binary_img + RUP8(w*h);
 	nframe = 0;
 	if(!binary_img) return 0;
 	return 1;
@@ -69,8 +70,6 @@ void		differencemap_free(void)
 {
 	if(binary_img)
 		free(binary_img);
-	if(previous_img)
-		free(previous_img);
 	binary_img = NULL;
 	previous_img = NULL;
 }

@@ -268,14 +268,28 @@ void vj_tag_record_init(int w, int h)
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int type )
 {
 	vj_client *v;
-	if( !host  ) return 0;
-	if( port <= 0 ) return 0;
-	if(stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN) return 0;
+	if( !host  ) {
+		veejay_msg(0, "No hostname given");
+		return 0;
+	}
+	if( port <= 0 ) {
+		veejay_msg(0, "Port number %d invalid", port );
+		return 0;
+	}
+	if(stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN)
+	{
+		veejay_msg(0, "Unable to create more network streams (%d reached)",
+			VJ_TAG_MAX_STREAM_IN );
+		 return 0;
+	}
 
 	vj_tag_input->net[stream_nr] = vj_client_alloc(w,h,f);
 	v = vj_tag_input->net[stream_nr];
-	if(!v) return 0;
-
+	if(!v) 
+	{
+		veejay_msg(0, "Memory allocation error while creating network stream");
+		return 0;
+	}
 	char tmp[255];
 	bzero(tmp,255);
 	snprintf(tmp,sizeof(tmp)-1, "%s %d", host, port );
@@ -295,7 +309,8 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 	}
 	if( tag->socket_ready == 0 )
 	{
-		tag->socket_frame = (uint8_t*) vj_calloc(sizeof(uint8_t) * v->planes[0] * 4);
+		tag->socket_frame = (uint8_t*) vj_calloc(sizeof(uint8_t) * SOCKETFRAMELEN);
+		tag->socket_len = SOCKETFRAMELEN;
 		if(!tag->socket_frame) 
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Insufficient error to allocate memory for Network Stream");
@@ -476,7 +491,10 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     char sourcename[255];
  
     vj_tag *tag;
-   
+  
+	veejay_msg(VEEJAY_MSG_DEBUG, "type=%d, file=%s, stream_nr=%d, pix=%d, chan=%d, extra=%d",
+		type, filename, stream_nr, pix_fmt, channel, extra );
+ 
     if( this_tag_id == 0)
 	{
 		this_tag_id = 1; // first tag
@@ -561,6 +579,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->effect_toggle = 1; /* same as for samples */
     tag->socket_ready = 0;
     tag->socket_frame = NULL;
+    tag->socket_len = 0;
     tag->color_r = 0;
     tag->color_g = 0;
     tag->color_b = 0;
@@ -623,18 +642,6 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	}
 	tag->active = 1;
 	break;
-    case VJ_TAG_TYPE_SHM:
-	sprintf(tag->source_name, "%s", "SHM");  
-	veejay_msg(VEEJAY_MSG_INFO, "Opened SHM as Stream");
-	break;
-/*
-    case VJ_TAG_TYPE_WHITE:
-    case VJ_TAG_TYPE_BLACK:
-    case VJ_TAG_TYPE_RED:
-    case VJ_TAG_TYPE_GREEN:
-    case VJ_TAG_TYPE_YELLOW:
-    case VJ_TAG_TYPE_BLUE:
-*/
 	case VJ_TAG_TYPE_COLOR:
 	sprintf(tag->source_name, "[%d,%d,%d]",
 		tag->color_r,tag->color_g,tag->color_b );
@@ -642,6 +649,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	break;
 
     default:
+	veejay_msg(0, "Stream type %d invalid", type );
 	return -1;
     }
 
@@ -778,9 +786,6 @@ int vj_tag_del(int id)
 		vj_tag_input->picture[tag->index] = NULL;
 		break;
 #endif
-	case VJ_TAG_TYPE_SHM:
-		veejay_msg(VEEJAY_MSG_INFO, "huh ?");
-		break;
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
 		net_thread_stop(tag);	
@@ -2031,9 +2036,6 @@ void	vj_tag_get_by_type(int type, char *description )
 #endif
     case VJ_TAG_TYPE_YUV4MPEG:
 	sprintf(description, "%s", "YUV4MPEG");
-	break;
-    case VJ_TAG_TYPE_SHM:
-	sprintf(description, "%s","SHM");
 	break;
     }
 

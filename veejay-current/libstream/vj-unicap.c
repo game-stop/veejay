@@ -101,7 +101,6 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 	int i;
 	unicap_driver_t *ud = (unicap_driver_t*) unicap;
 	char key[64];
-
 	unicap_void_device(&(ud->device));
 	
 	for( i = 0; SUCCESS( unicap_enumerate_devices( NULL, &(ud->device), i ) ); i++ )
@@ -113,10 +112,9 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 
 		if( !SUCCESS( unicap_open( &(ud->handle), &(ud->device) ) ) )
 		{
-			veejay_msg(0, "Failed to open: %s\n", &(ud->device.identifier) );
+			veejay_msg(0, "Failed to open: %s\n", ud->device.identifier );
 			continue;
 		}
-		unicap_lock_properties( ud->handle );
 
 		unicap_void_property(&property);	
 		unicap_void_format( &format );
@@ -160,9 +158,9 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 #ifdef STRICT_CHECKING
 		assert( error ==  VEVO_NO_ERROR );
 #endif
-		unicap_unlock_properties( ud->handle );
-
 		unicap_close( ud->handle );
+		
+		veejay_memset( &(ud->handle), 0 , sizeof( unicap_handle_t));
 	}
 	return i;
 }

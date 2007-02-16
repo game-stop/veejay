@@ -1216,32 +1216,23 @@ void vj_event_update_remote(void *ptr)
 
 	if( vj_server_poll( v->vjs[0] ) )
 		vj_server_new_connection( v->vjs[0] );
-	
 	if( vj_server_poll( v->vjs[1] ) )
 		vj_server_new_connection( v->vjs[1] );
 	if( vj_server_poll( v->vjs[3] ) )
 		vj_server_new_connection( v->vjs[3] );
 
-//	for( i = 0; i <  VJ_MAX_CONNECTIONS; i ++ )
-//		if( vj_server_link_used( v->vjs[1], i ))
-//			veejay_pipe_write_status( v, i );
-	
 	if( v->settings->use_vims_mcast )
 	{
 		int res = vj_server_update(v->vjs[2],0 );
 		if(res > 0)
 		{
 			v->uc->current_link = 0;
-		//	int size = vj_server_min_bufsize( v->vjs[2], 0 );
 			char *buf = NULL;
-		//	char buf[MESSAGE_SIZE];
-		//	veejay_memset(buf,0, MESSAGE_SIZE);
 			int len =0;
 			while( ( buf = vj_server_retrieve_msg( v->vjs[2], 0, buf,&len )) != NULL )
 			{
 		
 				vj_event_parse_msg( v, buf,len );
-		//		veejay_memset( buf, 0, size );
 			}
 		}
 		
@@ -1258,10 +1249,8 @@ void vj_event_update_remote(void *ptr)
 				if(res>0)
 				{
 					v->uc->current_link = i;
-				//	char buf[MESSAGE_SIZE];
 					int n = 0;
 					int len = 0;
-				//	veejay_memset( buf,0,MESSAGE_SIZE);
 					char *buf  = NULL;
 					while( (buf= vj_server_retrieve_msg(v->vjs[0],i,buf, &len))!= NULL )
 					{
@@ -5927,12 +5916,21 @@ void vj_event_el_add_video_sample(void *ptr, const char format[], va_list ap)
 
 	int new_sample_id = args[0];
 	if(new_sample_id == 0 )
-		veejay_msg(VEEJAY_MSG_DEBUG, "CREATING NEW");
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Trying to create new sample from %s",
+			str );
+	}
 	else
-		veejay_msg(VEEJAY_MSG_DEBUG, "APPENDING TO EXISITING");
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Trying to append %s to current sample",
+			str );
+	}
 	new_sample_id = veejay_edit_addmovie_sample(v,str,new_sample_id );
 	if(new_sample_id <= 0)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open %s", str );
 		new_sample_id = 0;
+	}
 	vj_event_send_new_id( v,new_sample_id );
 }
 
@@ -6041,7 +6039,7 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 		}
 	}
 	
-	int id = veejay_create_tag(v, VJ_TAG_TYPE_NET, str, v->nstreams, 0,args[0]);
+	int id = veejay_create_tag(v, VJ_TAG_TYPE_NET, str, v->nstreams, args[0],0);
 	vj_event_send_new_id( v, id);
 
 	if(id <= 0)
@@ -6056,7 +6054,10 @@ void vj_event_tag_new_mcast(void *ptr, const char format[], va_list ap)
 	int args[2];
 
 	P_A(args,str,format,ap);
-	int id = veejay_create_tag(v, VJ_TAG_TYPE_MCAST, str, v->nstreams, 0,args[0]);
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "%s, %d", str, args[0]);
+
+	int id = veejay_create_tag(v, VJ_TAG_TYPE_MCAST, str, v->nstreams, args[0],0);
 	vj_event_send_new_id( v, id  );
 
 	if( id <= 0)
@@ -7386,7 +7387,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	if( w <= 0 || h <= 0 )
 	{
 		veejay_msg(0, "Invalid image dimension %dx%d requested",w,h );
-		SEND_MSG(v, "000000" );
+		SEND_MSG(v, "0000000" );
 		return;
 	}
 
@@ -7410,7 +7411,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	if(!img)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to get image");
-		SEND_MSG( v, "000000" );
+		SEND_MSG( v, "0000000" );
 		return;
 	}
 
@@ -7426,16 +7427,18 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 #endif
 	int size1 = 0;
 
-	if ( lzo_compress( lzo_, msg, tmpbuf, &size1, (w*h*3)) == 0)
+	int input_len = (use_bw_preview_ ? (w*h) : (w*h*3));
+
+	if ( lzo_compress( lzo_, msg, tmpbuf, &size1, input_len) == 0)
 	{
 		veejay_msg(0, "Unable to compress preview image");
-		SEND_MSG( v, "000000" );
+		SEND_MSG( v, "0000000" );
 	}
 	else
 	{
-		char header[7];
-		sprintf(header, "%06d", size1);
-		vj_server_send( v->vjs[0], v->uc->current_link, header, 6 );
+		char header[8];
+		sprintf(header, "%06d%1d", size1,use_bw_preview_);
+		vj_server_send( v->vjs[0], v->uc->current_link, header, 7 );
 		vj_server_send( v->vjs[0], v->uc->current_link, tmpbuf, size1 );
 	}
 
@@ -7826,7 +7829,9 @@ void	vj_event_send_devices			(	void *ptr,	const char format[],	va_list ap	)
 void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	vj_perform_send_primary_frame_s2( v,0 );
+	//@ schedule
+	v->settings->unicast_frame_sender = 1;
+//	vj_perform_send_primary_frame_s2( v,0 );
 }
 
 

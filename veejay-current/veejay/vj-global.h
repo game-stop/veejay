@@ -72,7 +72,7 @@ enum {
 #define EL_MIN_BUF		(65535 * 4)
 #define XMLTAG_BUNDLE_FILE  "ACTIONFILE"
 #define XMLTAG_EVENT_AS_KEY "BUNDLE"
-
+#define SOCKETFRAMELEN		(1024*4096)
 #define FMT_420	0
 #define FMT_422 1
 #define FMT_420F 2

@@ -441,7 +441,7 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
 	break;
       case VJ_VIDEO_EFFECT_DIFF:
 	diff_apply( vj_effects[entry]->user_data, frames[0], frames[1],
-		   frameinfo->width, frameinfo->height, arg[0], arg[1],arg[2],arg[3]);
+		   frameinfo->width, frameinfo->height, arg[0], arg[1],arg[2]);
 	break;
 
       case VJ_VIDEO_EFFECT_WHITEFRAME:
@@ -563,21 +563,27 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
 
 }
 
-int vj_effect_prepare( VJFrame *frame, VJFrameInfo *frameinfo, int selector)
+int vj_effect_prepare( VJFrame *frame, int selector)
 {
+	veejay_msg(VEEJAY_MSG_DEBUG, "Found FX %d", selector);
 	if(selector == VJ_VIDEO_EFFECT_DIFF && vj_effect_has_cb(selector))
 	{
 		int i = vj_effect_real_to_sequence( selector );
+		veejay_msg(VEEJAY_MSG_DEBUG,"internal id = %d", i );
 		if( vj_effects[i]->user_data != NULL)
 		{
 			diff_prepare(
 				(void*) vj_effects[i]->user_data,
 				frame->data,
-				frameinfo->width,
-				frameinfo->height );
+				frame->width,
+				frame->height );
 	
 			return 1;
 		}
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"There is currently no FX that needs a background image");
 	}
 	return 0;
 }

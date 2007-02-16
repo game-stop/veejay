@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[0.9.23],[veejay-users@lists.sourceforge.net])
+AC_INIT([veejay],[0.9.24],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=0
 VEEJAY_MINOR_VERSION=9
-VEEJAY_MICRO_VERSION=23
+VEEJAY_MICRO_VERSION=24
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -233,6 +233,15 @@ dnl		fi
 	LIBM_LIBS=""
 	;;
 esac
+
+
+dnl ====== check for PKG_CONFIG_PATH
+if test x"$PKG_CONFIG_PATH" = x ; then
+	AC_MSG_NOTICE([The PKG_CONFIG_PATH variable was not set])
+	AC_MSG_NOTICE([You should set it to the directories that contain the .pc files])
+	AC_MSG_ERROR([Abort])
+fi
+
 
 AC_SUBST(LIBM_LIBS)
 

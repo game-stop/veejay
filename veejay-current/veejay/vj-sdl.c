@@ -116,6 +116,8 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	if (!vjsdl)
 		return 0;
 
+	veejay_memset( &wminfo, 0, sizeof(SDL_SysWMinfo));
+
 	if (SDL_Init(SDL_INIT_VIDEO) < 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "%s", SDL_GetError());

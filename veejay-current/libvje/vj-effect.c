@@ -603,10 +603,13 @@ void vj_effect_shutdown() {
 	if(vj_effects[i]) {
 	 if( i >= MAX_EFFECTS )
 	  if(vj_effects[i]->description) free(vj_effects[i]->description);
-	  vj_effect_free(vj_effects[i]);
+ 	  vj_effect_free(vj_effects[i]);
 
 	}
     }
+
+    diff_destroy();
+
 }
 
 void vj_effect_dump() {

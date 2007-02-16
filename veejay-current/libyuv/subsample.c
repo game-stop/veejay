@@ -511,18 +511,9 @@ static	inline void	copy_width( uint8_t *dst, uint8_t *in, int width )
 		i += 16;
 	}
 
-	x = w % 16;
-
-	if( x >= 8 )
-	{
-		copy8( d,i );
-		d += 8;
-		i += 8;
-		x -= 8;
-	}
-
-	if( x )
-		small_memcpy( d, i, x);
+	x = (w % 16);
+	if( x > 4 )
+		small_memcpy( d, i, x-1);
 
 }
 
@@ -687,7 +678,8 @@ static void tr_422_to_444(void *data, uint8_t *buffer, int width, int height)
 #else
 
 	const int mmx_stride = stride >> 3;
-	const int left = mmx_stride % 8;
+	int left = (mmx_stride % 8)-1;
+	if( left < 0 ) left = 0;
 	for( y = height-1; y > 0 ; y -- )
 	{
 		uint8_t *src = buffer + (y * stride);
@@ -698,12 +690,12 @@ static void tr_422_to_444(void *data, uint8_t *buffer, int width, int height)
 			src += 8;
 			dst += 16;
 		}
-		for(x=0; x < left; x++) // for 1 row
+	/*	for(x=0; x < left; x++) // for 1 row
 		{
 			dst[0] = src[x]; //put to dst
 			dst[1] = src[x];
 			dst+=2; // increment dst
-		}
+		}*/
 	}
 #endif
 }

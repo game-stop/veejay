@@ -384,7 +384,9 @@ static	void*	deal_with_ff( void *handle, char *name )
 	for( p=  0; p < n_params; p ++ )
 	{
 		void *parameter = vpn( VEVO_FF_PARAM_PORT );
-		
+#ifdef STRICT_CHECKING
+		assert( parameter != NULL );
+#endif		
 		int type = q( FF_GETPARAMETERTYPE, (LPVOID) p, 0 ).ivalue;
 		// name, kind, flags, description, min,max,default,transition
 		vevo_property_set( parameter, "type", VEVO_ATOM_TYPE_INT, 1, &type);
@@ -504,6 +506,34 @@ static	void	deinstantiate_plugin( void *plugin )
 	}
 }
 
+static	int	is_so( const char *file )
+{
+	if( strstr(file, ".so" ) || strstr( file, ".SO" ) )
+		return 1;
+	return 0;
+}
+
+static	int	is_valid_plugin( const char *file )
+{
+	if(!file) 
+		return 0;
+	struct stat l;
+	veejay_memset( &l, 0, sizeof( struct stat));
+	if ( lstat( file, &l ) < 0 )
+		return 0;
+
+	if( S_ISDIR( l.st_mode ))
+		return 0;
+
+	if( S_ISREG( l.st_mode ))
+	{
+		if( is_so(file) )
+			return 1;
+	}
+	return 0;
+
+}
+
 static	void	add_to_plugin_list( const char *path )
 {
 	if(!path)
@@ -556,6 +586,12 @@ static	void	add_to_plugin_list( const char *path )
 		}
 
 		sprintf(fullname, "%s/%s", path,name );
+
+		//@ check if name is regular file
+		if( is_valid_plugin( fullname ) == 0 )
+		{
+			continue;
+		}
 
 		void *handle = dlopen(fullname, RTLD_NOW );
 
@@ -655,19 +691,21 @@ static	void	scan_plugins()
 	char *home = getenv( "HOME" );
 	char path[PATH_MAX];
 	char data[CONFIG_FILE_LEN];
-	if(!home) return;
-	
-	sprintf( path , "%s/.veejay/plugins" , home );
+	if(!home) 
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Environment variable HOME not set!");
+		return;
+	}
+	sprintf( path , "%s/.veejay/plugins.cfg" , home );
 
 	int fd = open( path, O_RDONLY );
 	if( fd < 0 )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cant open '~/.veejay/plugins. No plugins loaded");
+		veejay_msg(VEEJAY_MSG_ERROR, "Cant open %s", path);
 		return;
 	}
-	veejay_msg(VEEJAY_MSG_INFO, "Parsing %s", path );
 
-	bzero( data, CONFIG_FILE_LEN );
+	veejay_memset( data, 0, CONFIG_FILE_LEN );
 
 	if( read( fd, data, CONFIG_FILE_LEN ) > 0 )
 	{
@@ -676,13 +714,13 @@ static	void	scan_plugins()
 		int k = 0;
 		char value[PATH_MAX];
 	
-		bzero( value, PATH_MAX );
+		veejay_memset( value,0, PATH_MAX );
 		for( j=0; j < len; j ++ )
 		{	
 			if(data[j] == '\0' )
 				break;
 			if( data[j] == '\n' )
-			 { add_to_plugin_list( value ); bzero(value,PATH_MAX); k =0;}
+			 { add_to_plugin_list( value ); veejay_memset(value,0,PATH_MAX); k =0;}
 
 			if( isascii( data[j] ) && data[j] != '\n')
 			  { value[k] = data[j]; if( k < PATH_MAX) k ++; }

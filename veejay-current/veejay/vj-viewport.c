@@ -1121,17 +1121,12 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir )
 	}
 
 	free(buf);
-
-	veejay_msg(VEEJAY_MSG_INFO,
-			"(1) %fx%f (2) %fx%f (3) %fx%f (4) %fx%f dir=%d, grid=%dx%d color=%x",
-			vc->x1,vc->y1,
-			vc->x2,vc->y2,
-			vc->x3,vc->y3,
-			vc->x4,vc->y4,
-			vc->reverse,
-			vc->grid_size,
-			vc->grid_size,
-			vc->grid_color );
+	veejay_msg(VEEJAY_MSG_INFO, "Viewport configuration:");
+	veejay_msg(VEEJAY_MSG_INFO, "\tBehaviour:\t%s", (vc->reverse ? "Forward" : "Projection") );
+	veejay_msg(VEEJAY_MSG_INFO, "\tQuad     :\t(1) %fx%f (2) %fx%f", vc->x1,vc->y1,vc->x2,vc->y2);
+	veejay_msg(VEEJAY_MSG_INFO, "\t         :\t(3) %fx%f (4) %fx%f", vc->x2,vc->y2,vc->x3,vc->y3);
+	veejay_msg(VEEJAY_MSG_INFO, "\tGrid     :\t%dx%d", vc->grid_size, vc->grid_size);
+	veejay_msg(VEEJAY_MSG_INFO, "\tPencil   :\t%s", (vc->grid_color == 0xff ? "white" : "black" ) );
 
 	return vc;
 }
@@ -1428,6 +1423,8 @@ void viewport_render( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, in
 	else
 	{
 		viewport_draw( v, in[0] );
+		veejay_memset( in[1], 128, len );
+		veejay_memset( in[2], 128, len );
 	}
 
 }
