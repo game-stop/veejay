@@ -59,6 +59,8 @@ void	vj_client_flush( vj_client *v, int delay );
 
 int	vj_client_poll( vj_client *v, int sock_type );
 
+int	vj_client_poll_w( vj_client *v, int sock_type );
+
 int	vj_client_read_i(vj_client *v, uint8_t *dst, int len );
 
 int vj_client_read( vj_client *v, int sock_type, uint8_t *dst, int bytes );

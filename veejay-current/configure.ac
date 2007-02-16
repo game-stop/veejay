@@ -487,13 +487,20 @@ dnl Check for the libxml2 library (for saving/loading project files)
 dnl
 have_xml2=false
 if test x$with_xml2 != xno; then
-AM_PATH_XML2(2.5.4, [ 
-	have_xml2=true
-	AC_DEFINE(HAVE_XML2,,[Compiling with XML2])],,)
-
-	if test x$have_xml2 = xfalse ; then
-		AC_MSG_WARN([cannot find The XML C library for gnome])
-	fi
+	PKG_CHECK_MODULES( XML2, [libxml-2.0 >= 2.5.4],
+	[
+		have_xml2=true
+		AC_DEFINE(HAVE_XML2,1,[with XML])
+	],
+	[ have_xml2=false ])
+	
+dnl AM_PATH_XML2(2.5.4, [ 
+dnl	have_xml2=true
+dnl	AC_DEFINE(HAVE_XML2,,[Compiling with XML2])],,)
+dnl
+dnl	if test x$have_xml2 = xfalse ; then
+dnl		AC_MSG_WARN([cannot find The XML C library for gnome])
+dnl	fi
 fi
 
 have_freetype=false

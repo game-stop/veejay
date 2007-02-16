@@ -157,7 +157,26 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 	return error;
 }
 
+int	vj_client_poll_w( vj_client *v, int sock_type )
+{
+	if(sock_type == V_STATUS )
+	{
+		if(v->c[1]->type == VSOCK_S)
+			return ( sock_t_poll_w(v->c[1]->fd ) );
+	}
+	if(sock_type == V_CMD )
+	{
+		if(v->c[0]->type == VSOCK_C)
+			return	( sock_t_poll_w( v->c[0]->fd ));
+	}
+	if(sock_type == V_MSG )
+	{
+		if(v->c[2]->type == VSOCK_C)
+			return	( sock_t_poll_w( v->c[2]->fd ));
+	}
 
+	return 0;
+}
 
 int	vj_client_poll( vj_client *v, int sock_type )
 {
@@ -229,51 +248,66 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 		if( p[0] != v->cur_width || p[1] != v->cur_height || p[2] != v->cur_fmt )
 			return 2;
 		return 1;
-	}
-
-	veejay_memset( line,0, sizeof(line));
-	if( v->c[0]->type == VSOCK_C )
-		plen = sock_t_recv_w( v->c[0]->fd, line, 20 );	
-
-	if( plen <= 0 )
+	} else if ( v->c[0]->type == VSOCK_C )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Frame header error");
-		return -1;
-	}
-	n = sscanf( line, "%d %d %d %d", &p[0],&p[1],&p[2],&p[3] );
-	if( n != 4)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Frame header invalid");
-		return -1;
-	}
+		veejay_memset( line,0, sizeof(line));
 
-	if( v->cur_width != p[0] || v->cur_height != p[1] || v->cur_fmt != p[2])
-		conv = 2;
+		if( sock_t_poll( v->c[0]->fd ) <= 0)
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "Nothing has arrived yet");
+			return -1;
+		}
+		if( v->c[0]->type == VSOCK_C )
+			plen = sock_t_recv_w( v->c[0]->fd, line, 20 );	
 
-	v->in_width = p[0];
-	v->in_height = p[1];
-	v->in_fmt = p[2];
-	uv_len = 0;
-	y_len = p[0]  * p[1];
-	switch(v->in_fmt )
-	{
-		case FMT_420F:
-		case FMT_420:
-			uv_len = y_len/4; break;
-		default:
-			uv_len = y_len/2;break;
+		if( plen <= 0 )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Read error: %s", strerror(errno));
+			return plen;
+		}
+		n = sscanf( line, "%d %d %d %d", &p[0],&p[1],&p[2],&p[3] );
+		if( n != 4)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR,"Frame header invalid");
+			return -1;
+		}
+
+		if( v->cur_width != p[0] || v->cur_height != p[1] || v->cur_fmt != p[2])
+			conv = 2;
+
+		v->in_width = p[0];
+		v->in_height = p[1];
+		v->in_fmt = p[2];
+		uv_len = 0;
+		y_len = p[0]  * p[1];
+		switch(v->in_fmt )
+		{
+			case FMT_420F:
+			case FMT_420:
+				uv_len = y_len/4; break;
+			default:
+				uv_len = y_len/2;break;
+		}
+
+		if( sock_t_poll( v->c[0]->fd ) <= 0 )
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "Nothing has arrived yet but we already got some");
+			return -1;
+		}
+		if( v->c[0]->type == VSOCK_C) 
+		{
+			int n = sock_t_recv_w( v->c[0]->fd, v->space, p[3] );
+			if(n)
+				vj_client_decompress( v, dst, n, y_len, uv_len );
+		}
+		if(n > 0 )
+			plen += n;
+
+
+		return conv;
 	}
-	if( v->c[0]->type == VSOCK_C) 
-	{
-		int n = sock_t_recv_w( v->c[0]->fd, v->space, p[3] );
-		if(n)
-			vj_client_decompress( v, dst, n, y_len, uv_len );
-	}
-	if(n > 0 )
-		plen += n;
-
-
-	return conv;
+veejay_msg(VEEJAY_MSG_DEBUG, "socket is not used for this");
+	return 0;
 }
 
 int	vj_client_get_status_fd(vj_client *v, int sock_type )

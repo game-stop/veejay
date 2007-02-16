@@ -27,7 +27,6 @@ void vj_perform_audio_stop(veejay_t * info);
 
 void vj_perform_get_primary_frame(veejay_t * info, uint8_t ** frame,
 				  int entry);
-int	vj_perform_send_primary_frame_s(veejay_t *info, int mcast);
 
 void	vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame ); 
 
@@ -60,7 +59,7 @@ void       vj_perform_free_plugin_frame(VJFrameInfo *f );
 
 uint8_t	*vj_perform_get_a_work_buffer( );
 
-int        vj_perform_send_primary_frame_s2(veejay_t *info, int mcast);
+int        vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int dst_link);
 void       vj_perform_get_backstore( uint8_t **frame );
 int        vj_perform_get_sampling();
 

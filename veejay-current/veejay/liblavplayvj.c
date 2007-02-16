@@ -968,33 +968,14 @@ static int veejay_screen_update(veejay_t * info )
 	}
 #endif
 
-	// also put frame to socket
-	/*int k;
-	for( k = 0; k < 16; k ++ )
-	{
-		if(info->settings->links[k])
-		{
-			vj_perform_send_frame_now( info, k );
-			info->settings->links[k] = 0;
-		}	
-	}*/
-
-//	vj_perform_update_plugin_frame( info->plugin_frame );
-
-//	plugins_process( (void*) info->plugin_frame_info, (void*) info->plugin_frame );
-//	plugins_process_video_out( (void*) info->plugin_frame_info, (void*) info->plugin_frame );
-
-	// send a frame to all participants when using mcast
-	// (activated after sending VIMS MCAST SENDER START/STOP)
-
 	if( info->settings->unicast_frame_sender )
 	{
-		vj_perform_send_primary_frame_s2(info, 0);
+		vj_perform_send_primary_frame_s2(info, 0, info->settings->unicast_link_id);
 		info->settings->unicast_frame_sender = 0;
 	}
 	if( info->settings->mcast_frame_sender && info->settings->use_vims_mcast )
 	{
-		vj_perform_send_primary_frame_s2(info, 1);
+		vj_perform_send_primary_frame_s2(info, 1, info->uc->current_link);
 	}
 
     	switch (info->video_out)
@@ -1378,12 +1359,15 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 	    }
 	}
 	pthread_mutex_unlock(&(settings->valid_mutex));
+
+
         if( settings->currently_processed_entry != settings->buffer_entry[settings->currently_processed_frame] &&
 		!veejay_screen_update(info) )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Error playing frame %d", settings->current_frame_num);
 		veejay_change_state_save( info, LAVPLAY_STATE_STOP);
 	}
+	
 
 	settings->currently_processed_entry = 
 		settings->buffer_entry[settings->currently_processed_frame];

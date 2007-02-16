@@ -31,6 +31,8 @@ typedef struct
 	int	sock_fd;	
 	int port_num;
 	unsigned char *sbuf;
+	int send_size;
+	int recv_size;
 } vj_sock_t;
 
 vj_sock_t	*alloc_sock_t(void);
@@ -42,5 +44,6 @@ int		sock_t_recvw(vj_sock_t *s, void *dst, int len );
 int		sock_t_recv( vj_sock_t *s, void *dst, int len );
 int             sock_t_recv_w( vj_sock_t *s, void *dst, int len );
 int		sock_t_send( vj_sock_t *s, unsigned char *buf, int len );
+int		sock_t_send_fd( int fd, int sndsize, unsigned char *buf, int len );
 void		sock_t_close( vj_sock_t *s );
 #endif

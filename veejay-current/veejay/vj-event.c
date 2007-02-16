@@ -7830,8 +7830,15 @@ void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
 	//@ schedule
+	//@ warn about 2nd connection
+	if( v->settings->unicast_frame_sender && v->uc->current_link !=
+		v->settings->unicast_link_id )
+	{
+		veejay_msg(0, "Bummer, only 1:1 Veejay communication. Consider using multicast");
+		return;
+	}
 	v->settings->unicast_frame_sender = 1;
-//	vj_perform_send_primary_frame_s2( v,0 );
+	v->settings->unicast_link_id      = v->uc->current_link;
 }
 
 

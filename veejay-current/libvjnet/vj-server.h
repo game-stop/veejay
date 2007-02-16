@@ -39,6 +39,7 @@ typedef struct vj_server_t {
 	int  ports[2];
 	void	**protocol;
 	char	*recv_buf;
+	int	send_size;
 } vj_server;
 
 vj_server *vj_server_alloc(int port, char *mcast_group_name, int type);

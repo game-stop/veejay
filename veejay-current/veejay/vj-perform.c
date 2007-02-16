@@ -1116,7 +1116,7 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 	return (size1+size2+size3+12);
 }
 
-int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast)
+int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 {
 	const int len = info->effect_frame1->width * info->effect_frame1->height;
 	const int uv_len = info->effect_frame1->uv_width * info->effect_frame1->uv_height;
@@ -1149,8 +1149,8 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast)
 #ifdef STRICT_CHECKING
 	assert( info->effect_frame1->ssm == 0 );
 #endif
-	// mcast frame sender = info->vjs[2] ??
-	if(vj_server_send_frame( info->vjs[id], info->uc->current_link, socket_buffer, __socket_len,
+
+	if(vj_server_send_frame( info->vjs[id], to_link_id, socket_buffer, __socket_len,
 				info->effect_frame1, info->real_fps )<=0)
 	{
 		/* frame send error handling */
@@ -1158,9 +1158,6 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast)
 		  "Error sending frame to remote");
 		//__send_frame=0;
 	}
-
-	//__send_frame = 1;
-	
 	return 1;
 }
 

@@ -28,7 +28,9 @@
 #include <libvjmem/vjmem.h>
 #include <sys/time.h>
 #include <sys/types.h>
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 #define __INVALID 0
 #define __SENDER 1
 #define __RECEIVER 2
@@ -138,7 +140,7 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 	int i = 0;
 	if ((vjs->handle = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP)) == -1)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create a socket: %s", strerror(errno));
 		return 0;
     	}
     	if (setsockopt( vjs->handle, SOL_SOCKET, SO_REUSEADDR, (const char*) &on, sizeof(on) )== -1)
@@ -168,6 +170,33 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
 		return 0;
    	}
+
+
+	int send_size = 512 * 1024;
+	if( setsockopt( vjs->handle, SOL_SOCKET, SO_SNDBUF, (const char*) &send_size, sizeof(send_size) ) == - 1)
+	{
+		veejay_msg(0, "Cannot set send buffer size: %s", strerror(errno));
+	}
+	int tmp = sizeof(int);
+	if( getsockopt( vjs->handle, SOL_SOCKET, SO_SNDBUF,(unsigned char*) &(vjs->send_size), &tmp) == -1 )
+	{
+		veejay_msg(0, "Cannot read socket buffer size: %s", strerror(errno));
+		return 0;
+	}
+	veejay_msg(VEEJAY_MSG_INFO, "\tSocket send size is %d", vjs->send_size);
+	if( setsockopt( vjs->handle, SOL_SOCKET, SO_RCVBUF, (const char*) &send_size, sizeof(send_size)) == 1 )
+	{
+		veejay_msg(0, "Cannot set recv buffer sze:%s", strerror(errno));
+		return 0;
+	}
+	int recv_size = 0;
+	if( getsockopt( vjs->handle, SOL_SOCKET, SO_RCVBUF, (unsigned char*) &recv_size, &tmp) == -1 )
+	{
+		veejay_msg(0, "Cannot read socket buffer receive size %s" , strerror(errno));
+		return 0;
+	}
+	veejay_msg(VEEJAY_MSG_INFO, "\tSocket recv size is %d", recv_size );
+
 
 	link = (vj_link **) vj_malloc(sizeof(vj_link *) * VJ_MAX_CONNECTIONS);
 	if(!link)
@@ -237,28 +266,45 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
     unsigned int total = 0;
     unsigned int bytes_left = len;
     int n;
+#ifdef STRICT_CHECKING
+	assert( vje->send_size > 0 );
+	assert( len > 0 );
+	assert( buf != NULL );
+	assert( link_id >= 0 );
+#endif
 
-	if(len <= 0 || buf == NULL)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Nothing to send?!");
-		return 0;
-	}
+//veejay_msg(VEEJAY_MSG_DEBUG, "%s: %p, link_id=%d, len=%d",__FUNCTION__,vje, link_id, len );
 	if( !vje->use_mcast)
 	{
+
 		vj_link **Link = (vj_link**) vje->link;
+#ifdef STRICT_CHECKING
+	assert( Link[link_id]->in_use == 1 );
+#endif
+
 		if (len <= 0 || Link[link_id]->in_use==0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Nothing to send or link %d is inactive", link_id);
 			return 0;
 		}
+#ifdef STRICT_CHECKING
+		assert( Link[link_id]->handle >= 0 );
+#endif
+		total  = sock_t_send_fd( Link[link_id]->handle, vje->send_size, buf, len, 0);
+		if( total <= 0 )
+		{
+			veejay_msg(0,"Unable to send buffer to %s:%s",
+				(char*)(inet_ntoa(vje->remote.sin_addr)),strerror(errno));
+			return 0;
+		}
 
+/*
 		while (total < len)
 		{
 			n = send(Link[link_id]->handle, buf + total, bytes_left, 0);
 			if (n <= 0)
 			{
-				//if(n == -1) 
-				veejay_msg(VEEJAY_MSG_DEBUG, "Connection with %s closed: %s", 
+				veejay_msg(VEEJAY_MSG_ERROR,"Send error to %s: %s", 
 						 (char*) (inet_ntoa( vje->remote.sin_addr )),
 						strerror(errno));
 		   		return -1;
@@ -266,7 +312,7 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 	
 			total += n;
 			bytes_left -= n;
-   		}
+   		}*/
 	}
 	else
 	{
@@ -280,23 +326,60 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
     return total;
 }
 
+int	vj_server_link_can_write( vj_server *vje, int link_id )
+{
+	fd_set wds;
+	fd_set eds;
+
+	vj_link **link = (vj_link**) vje->link;
+
+#ifdef STRICT_CHECKING
+	assert( link[link_id]->in_use == 1 );
+#endif
+
+	FD_ZERO(&wds );
+	FD_ZERO(&eds );
+	FD_SET( link[link_id]->handle, &wds );
+	FD_SET( link[link_id]->handle, &eds );
+
+	struct timeval tv;
+	memset( &tv, 0,sizeof(struct timeval));
+
+	int err = select( link[link_id]->handle+1, NULL, &wds, &eds,&tv );
+
+	if( err < 0 )
+	{
+		veejay_msg(0, "Unable to poll for immediate write: %s", link_id,strerror(errno));
+		return 0;
+	}
+	if( err == 0 )
+	{
+		veejay_msg(0, "Timeout expired");
+		return 1;
+	}
+
+	if( FD_ISSET( link[link_id]->handle, &eds ))
+	{
+		veejay_msg(0, "An exception occured to link %d", link_id );
+		return 0;
+	}
+	
+	if( FD_ISSET( link[link_id]->handle, &wds ))
+		return 1;
+	return 0;
+}
+
 int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len, 
 					VJFrame *frame, long ms )
 {
-	if(len <= 0 || buf == NULL )
-	{
-		veejay_msg(0, "Nothing to send to remote!");
-		return 0;
-	}
 	if(!vje->use_mcast )
 	{
-		fd_set wds;
-		vj_link **Link = (vj_link**) vje->link;
-		FD_ZERO(&wds);
-		FD_SET(Link[link_id]->handle, &wds );
-		int n = select( Link[link_id]->handle+1, NULL, &wds, NULL, NULL );
-		if( FD_ISSET(Link[link_id]->handle, &wds))
+		if( vj_server_link_can_write( vje, link_id ))
+		{
 			return vj_server_send( vje, link_id, buf, len );
+		}
+		else
+			veejay_msg(0, "Cant send frame, socket not ready");
 		return 0;
 	}
 	else
@@ -311,13 +394,13 @@ int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len,
 int _vj_server_free_slot(vj_server *vje)
 {
 	vj_link **Link = (vj_link**) vje->link;
-    int i;
+    	unsigned int i;
 	for (i = 0; i < VJ_MAX_CONNECTIONS; i++)
 	{
-	    if (Link[i]->in_use == 0)
+	    if (!Link[i]->in_use)
 			return i;
-    }
-    return VJ_MAX_CONNECTIONS;
+    	}
+    	return VJ_MAX_CONNECTIONS;
 }
 
 int _vj_server_new_client(vj_server *vje, int socket_fd)
@@ -325,20 +408,26 @@ int _vj_server_new_client(vj_server *vje, int socket_fd)
     int entry = _vj_server_free_slot(vje);
     vj_link **Link = (vj_link**) vje->link;
     if (entry == VJ_MAX_CONNECTIONS)
-	{
+    {
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot take more connections (max %d allowed)", VJ_MAX_CONNECTIONS);
 		return VJ_MAX_CONNECTIONS;
-	}
+    }
+
     Link[entry]->handle = socket_fd;
     Link[entry]->in_use = 1;
+
     FD_SET( socket_fd, &(vje->fds) );
-	FD_SET( socket_fd, &(vje->wds) );
+    FD_SET( socket_fd, &(vje->wds) );
+
     return entry;
 }
 
 int _vj_server_del_client(vj_server * vje, int link_id)
 {
 	vj_link **Link = (vj_link**) vje->link;
+	if(!Link[link_id]->in_use)
+		return 0;
+
 	Link[link_id]->in_use = 0;
 	if(Link[link_id]->handle)
 	{
@@ -353,16 +442,26 @@ int _vj_server_del_client(vj_server * vje, int link_id)
 
 void	vj_server_close_connection(vj_server *vje, int link_id )
 {
+	
 	_vj_server_del_client( vje, link_id );
+
 }
 int	vj_server_client_promoted( vj_server *vje, int link_id)
 {
-	vj_link **Link= (vj_link**) vje->link; 
+	
+	vj_link **Link= (vj_link**) vje->link;
+#ifdef STRICT_CHECKING
+	assert( Link[link_id]->in_use == 1 );
+#endif 
 	return Link[link_id]->promote;	
 }
 void	vj_server_client_promote( vj_server *vje, int link_id)
 {
+	
 	vj_link **Link= (vj_link**) vje->link; 
+#ifdef STRICT_CHECKING
+	assert( Link[link_id]->in_use == 1 );
+#endif 
 	Link[link_id]->promote = 1;	
 }
 
@@ -419,7 +518,6 @@ int vj_server_poll(vj_server * vje)
 
 int	_vj_server_empty_queue(vj_server *vje, int link_id)
 {
-	// ensure message queue is empty!!
 	vj_link **Link = (vj_link**) vje->link;
 	vj_message **v = Link[link_id]->m_queue;
 	int i;
@@ -701,7 +799,7 @@ int	vj_server_new_connection(vj_server *vje)
 		}	
 
 		char *host = inet_ntoa( vje->remote.sin_addr ); 
-		veejay_msg(VEEJAY_MSG_INFO, "Connection with %s", host);		
+		veejay_msg(VEEJAY_MSG_INFO, "Connection with %s ", host);		
 		if( vje->nr_of_connections < fd )
 			vje->nr_of_connections = fd;
 
@@ -722,7 +820,6 @@ int	vj_server_update( vj_server *vje, int id )
 {
 	int sock_fd = vje->handle;
 	int n = 0;
-
 	_vj_server_empty_queue(vje, id);
 
  	if(!vj_server_poll(vje))
@@ -744,7 +841,7 @@ int	vj_server_update( vj_server *vje, int id )
 		n = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
 		if( n <= 0)
 		{
-			//_vj_server_del_client(vje, id );  	
+			veejay_msg(VEEJAY_MSG_ERROR, "Receive error: %s", strerror(errno));
 			return -1;
 		}
 	}
@@ -830,17 +927,16 @@ int	vj_server_link_used( vj_server *vje, int link_id)
 	vj_link **Link = (vj_link**) vje->link;
 	if( link_id < 0 || link_id >= VJ_MAX_CONNECTIONS )
 		return 0;
-   	if (Link[link_id]->in_use == 0)
-		return 0;
-
-	return 1;
+   	if (Link[link_id]->in_use)
+		return 1;
+	return 0;
 }
 
 
 int	vj_server_min_bufsize( vj_server *vje, int id )
 {
 	vj_link **Link = (vj_link**) vje->link;
-   	if (Link[id]->in_use == 0)
+   	if (!Link[id]->in_use)
 		return 0;
 
 	int index = Link[id]->n_retrieved;
@@ -854,7 +950,7 @@ int	vj_server_min_bufsize( vj_server *vje, int id )
 char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 {
 	vj_link **Link = (vj_link**) vje->link;
-   	if (Link[id]->in_use == 0)
+   	if (!Link[id]->in_use)
 		return NULL;
 
 	int index = Link[id]->n_retrieved;
@@ -875,7 +971,7 @@ char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 int vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 {
 	vj_link **Link = (vj_link**) vje->link;
-   	if (Link[id]->in_use == 0)
+   	if (!Link[id]->in_use)
 		return 0;
 
 	int index = Link[id]->n_retrieved;

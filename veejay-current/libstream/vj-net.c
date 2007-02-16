@@ -37,6 +37,7 @@ typedef struct
 	int have_frame;
 	int error;
 	int grab;
+	int repeat;
 } threaded_t;
 
 static void lock_(threaded_t *t, const char *f, int line)
@@ -63,7 +64,7 @@ void	*reader_thread(void *data)
 	int ret = 0;
 	char buf[16];
 	sprintf(buf, "%03d:;", VIMS_GET_FRAME);
-	
+	int retrieve = 0;	
 	for( ;; )
 	{
 		int error    = 0;
@@ -84,41 +85,55 @@ void	*reader_thread(void *data)
 
 		lock(t);
 		
-		if( t->grab && tag->source_type == VJ_TAG_TYPE_NET)
+		if( t->grab && tag->source_type == VJ_TAG_TYPE_NET && retrieve== 0)
 		{
-			ret =  vj_client_send( v, V_CMD, buf );
-			if( ret <= 0 )
-				error = 1;
-			else
-				t->grab = 0;
+			ret = vj_client_poll_w(v , V_CMD );
+			if( ret )
+			{
+				ret =  vj_client_send( v, V_CMD, buf );
+				if( ret <= 0 )
+				{
+					error = 1;
+				}
+				else
+				{
+					t->grab = 0;
+					retrieve = 1;
+				}
+			}
 		} 
 
 		if (tag->source_type == VJ_TAG_TYPE_MCAST )
 		{
 			error = 0;
+			retrieve = 1;
 		}
 	
 		int wait_time = 0;
 	
-		if(!error)
+		if(!error && retrieve)
 		{
 			if( vj_client_poll(v, V_CMD ) )
 			{
-			ret = vj_client_read_i ( v, tag->socket_frame,tag->socket_len );
-			if( ret <= 0 )
-			{
-				if( tag->source_type == VJ_TAG_TYPE_NET )
-					error = 1;
+				ret = vj_client_read_i ( v, tag->socket_frame,tag->socket_len );
+				if( ret <= 0 )
+				{
+					if( tag->source_type == VJ_TAG_TYPE_NET )
+					{
+						error = 1;
+					}
+					else
+					{
+						wait_time = 1000;
+					}
+					ret = 0;
+				}
 				else
 				{
-					wait_time = 1000;
+					 t->have_frame = ret;
+					 t->grab = 1;
+					 retrieve =0;
 				}
-				ret = 0;
-			}
-			else
-			{
-				 t->have_frame = ret;
-			}
 			}
 		}
 		unlock(t);
@@ -156,7 +171,9 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 	lock(t);
 	if( t->state == 0 || t->error  )
 	{
-		veejay_msg(0, "Connection closed with remote host");
+		if(t->repeat < 0)
+			veejay_msg(VEEJAY_MSG_INFO, "Connection closed with remote host");
+		t->repeat++;
 		unlock(t);
 		return 0;
 	}
@@ -229,13 +246,16 @@ int	net_thread_start(vj_client *v, vj_tag *tag)
 		return 0;
 	}
 	else
+	{
 		veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name,
 				tag->video_channel);
+	}
 	
 	threaded_t *t = (threaded_t*)tag->priv;
 
 	pthread_mutex_init( &(t->mutex), NULL );
 	v->lzo = lzo_new();
+	t->repeat = 0;
 	t->have_frame = 0;
 	t->error = 0;
 	t->state = 1;
