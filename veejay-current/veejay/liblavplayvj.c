@@ -191,6 +191,7 @@ struct mjpeg_params
 
 //#include <videodev_mjpeg.h>
 #include <pthread.h>
+#include <signal.h>
 #ifdef HAVE_SDL
 #include <SDL/SDL.h>
 #define MAX_SDL_OUT	2
@@ -1288,13 +1289,7 @@ void veejay_handle_signal(void *arg, int sig)
 			else
 				veejay_change_state( info, LAVPLAY_STATE_STOP );
 			
-			if( sig == SIGSEGV || sig == SIGFPE || sig == SIGBUS || sig == SIGPWR || sig == SIGABRT)
-				signal( sig, SIG_DFL );
-			else
-			{
-				veejay_msg(VEEJAY_MSG_DEBUG, "Broken pipe");
-				signal( sig, SIG_IGN );
-			}
+			signal( sig, SIG_DFL );
 		}
 	}
 }
@@ -1321,6 +1316,11 @@ void vj_unlock(veejay_t *info)
 	pthread_mutex_unlock(&(settings->valid_mutex));
 }	 
 
+static void donothing2(int sig)
+{
+	veejay_msg(0,"Catch signal %d",sig );
+}
+
 
 static void *veejay_mjpeg_playback_thread(void *arg)
 {
@@ -1330,6 +1330,18 @@ static void *veejay_mjpeg_playback_thread(void *arg)
    /* Allow easy shutting down by other processes... */
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
+	sigset_t mask;
+	struct sigaction act;
+	sigemptyset(&mask);
+	sigaddset( &mask, SIGPIPE );
+	act.sa_handler = donothing2;
+	act.sa_flags = 0;
+	sigemptyset(&act.sa_mask);
+
+
+    pthread_sigmask( SIG_BLOCK, &mask, NULL );
+
 
   /* schedule FIFO */
 

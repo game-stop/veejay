@@ -2973,7 +2973,7 @@ void	SaveCurrentPlaying( xmlNodePtr node, int id, int mode )
 		(const xmlChar*) buffer );
 	sprintf(buffer, "%d", mode );
 	xmlNewChild(node,NULL, (const xmlChar*) "PLAYING_MODE",
-		(const xmlChar*) mode );
+		(const xmlChar*) buffer );
 
 }
 

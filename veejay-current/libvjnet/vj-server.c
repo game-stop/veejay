@@ -298,9 +298,9 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 		total  = sock_t_send_fd( Link[link_id]->handle, vje->send_size, buf, len, 0);
 		if( total <= 0 )
 		{
-			veejay_msg(0,"Unable to send buffer to %s:%s",
+			veejay_msg(0,"Unable to send buffer to %s:%s ",
 				(char*)(inet_ntoa(vje->remote.sin_addr)),strerror(errno));
-			return 0;
+			return -1;
 		}
 	}
 	else
@@ -377,7 +377,7 @@ static int vj_server_send_frame_now( vj_server *vje, int link_id, uint8_t *buf, 
 	total  = sock_t_send_fd( Link[link_id]->handle, vje->send_size, buf, len, 0);
 	if( total <= 0 )
 	{
-		veejay_msg(0,"Unable to send buffer to %s:%s",
+		veejay_msg(0,"Unable to send buffer to %s: %s",
 			(char*)(inet_ntoa(vje->remote.sin_addr)),strerror(errno));
 		return 0;
 	}
@@ -852,9 +852,14 @@ int	vj_server_update( vj_server *vje, int id )
 	if(!vje->use_mcast)
 	{
 		n = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
-		if( n <= 0)
+		if( n < 0)
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Receive error: %s", strerror(errno));
+	//		veejay_msg(VEEJAY_MSG_ERROR, "Receive error: %s", strerror(errno));
+			return -1;
+		}
+		if( n == 0 )
+		{
+			veejay_msg(VEEJAY_MSG_INFO ,"Connection closed by remote");
 			return -1;
 		}
 	}
@@ -862,8 +867,10 @@ int	vj_server_update( vj_server *vje, int id )
 	{
 		vj_proto **proto = (vj_proto**) vje->protocol;
 		n = mcast_recv( proto[0]->r, (void*) vje->recv_buf, RECV_SIZE );
-		if( n <= 0 )
-			return 0;
+		if( n < 0 )
+			return -1;
+		if( n == 0 )
+			return -1;
 	}
 
 

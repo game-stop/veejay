@@ -717,6 +717,9 @@ int main(int argc, char **argv)
 	action.sa_handler = donothing;
 	action.sa_mask = allsignals;
 	action.sa_flags = SA_RESTART | SA_RESETHAND;
+
+	signal( SIGPIPE, SIG_IGN );
+
 	for( i = 1; i < NSIG; i ++ )
 		if( sigismember( &(settings->signal_set), i ))
 			sigaction( i, &action, 0 );

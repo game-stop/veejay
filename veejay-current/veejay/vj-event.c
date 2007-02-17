@@ -284,7 +284,9 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
 
 #define SEND_MSG(v,str)\
 {\
-vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, str, strlen(str));\
+if(vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, str, strlen(str)) < 0) { \
+	_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link); \
+	_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link);} \
 }
 #define RAW_SEND_MSG(v,str,len)\
 {\
