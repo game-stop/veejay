@@ -37,11 +37,10 @@ Ignoring machine byte order. Fix it yourself
 typedef struct
 {
 	uint8_t		flag;
-	uint16_t	seq_num;
-	uint32_t	sec;
+	uint8_t		seq_num;
 	uint32_t	usec;
 	uint32_t	timeout;	
-	uint32_t	length;
+	uint8_t		length;
 } packet_header_t;
 
 typedef struct

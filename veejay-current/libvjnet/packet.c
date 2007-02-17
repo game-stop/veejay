@@ -31,8 +31,8 @@ void		packet_dump_header( packet_header_t *h)
 #ifdef STRICT_CHECKING
 	assert( h != NULL );
 #endif
-	veejay_msg(VEEJAY_MSG_DEBUG, "Flag: %x, Sequence Num %d/%d, Timestamp %x:%x Timeout : %ld",
-		h->flag, h->seq_num,h->length, h->sec, h->usec,h->timeout );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Flag: %x, Sequence Num %d/%d, Timestamp %x Timeout : %ld",
+		h->flag, h->seq_num,h->length, h->usec,h->timeout );
 }
 
 packet_header_t		packet_construct_header(uint8_t flag)
@@ -42,9 +42,8 @@ packet_header_t		packet_construct_header(uint8_t flag)
 	packet_header_t header;
 	header.flag = flag;
 	header.seq_num = 0;	// not set
-	header.sec = tv.tv_sec;
 	header.usec = tv.tv_usec;
-	header.timeout = 1000;
+	header.timeout = 0;
 	header.length = 0;
 	return header;
 }
@@ -55,7 +54,6 @@ packet_header_t		packet_get_header(const void *data)
 	veejay_memcpy( &tmp, data, sizeof(packet_header_t) );
 	h.flag = tmp.flag;
 	h.seq_num = tmp.seq_num;
-	h.sec = tmp.sec;
 	h.length = tmp.length;
 	h.usec = tmp.usec;
 	h.timeout = tmp.timeout;

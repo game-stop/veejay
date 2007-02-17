@@ -126,11 +126,18 @@ void	*reader_thread(void *data)
 					 retrieve =0;
 				}
 			}
+			else
+			{
+				if(tag->source_type == VJ_TAG_TYPE_MCAST )
+					wait_time = 15000;
+			}
 		}
 		unlock(t);
 
 		if( wait_time )
+		{
 			usleep(wait_time);
+		}
 
 		if( error )
 		{

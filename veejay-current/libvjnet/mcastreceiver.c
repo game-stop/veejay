@@ -40,16 +40,6 @@
 #include <assert.h>
 #endif
 
-typedef struct
-{
-	uint8_t *packet;
-	uint32_t *len;
-	packet_header_t hdr;
-	frame_info_t    inf;
-	uint32_t      packets;
-	uint32_t	length;
-} frame_next_t;
-
 static 	void	print_error(char *msg)
 {
 	veejay_msg(VEEJAY_MSG_ERROR,"%s: %s\n", msg,strerror(errno));
@@ -164,7 +154,10 @@ static int	mcast_poll_timeout( mcast_receiver *v, long timeout )
 	FD_ZERO( &fds );	
 	FD_SET( v->sock_fd, &fds );
 
-	n = select( v->sock_fd + 1, &fds, 0,0, &tv );
+	if( timeout == 0 )
+		n = select( v->sock_fd + 1, &fds, NULL,NULL, NULL );
+	else
+		n = select( v->sock_fd + 1, &fds, 0,0, &tv );
 	if(n == -1)
 		print_error("timeout select");
 
@@ -184,44 +177,6 @@ int	mcast_recv( mcast_receiver *v, void *buf, int len )
 
 	return n;
 }
-
-int	mcast_store_next_packet( mcast_receiver *v , packet_header_t *h, frame_info_t *i, uint8_t *payload)
-{
-	uint8_t *chunk = payload + (sizeof(packet_header_t) + sizeof(frame_info_t));
-	if(v->next == NULL )
-	  v->next = (void*) vj_calloc(sizeof(frame_next_t));
-        frame_next_t *n = (frame_next_t*) v->next;
-	int res = 1;
-	if(n->packet == NULL)
-	{
-	 	n->packet = vj_malloc( CHUNK_SIZE + ( h->length * CHUNK_SIZE) );
-		n->length = h->length;
-		veejay_memcpy( &(n->hdr), h, sizeof(packet_header_t));
-		veejay_memcpy( &(n->inf), i, sizeof(frame_info_t));
-	}
-	else
-	{
-		//@ must have same timestamp
-		if( h->usec != n->hdr.usec )
-		{
-			veejay_msg(0,"Cannot keep pace with sending veejay? Next frame:[tdiff=%d], In frame: [tdiff=%d], have %d/%d",
-				n->hdr.usec, h->usec, n->packets,h->length );
-			return 0;
-		}
-
-	}
-	
-
-	//@ store compressed data
-	veejay_memcpy( n->packet + (CHUNK_SIZE * h->seq_num), chunk, CHUNK_SIZE);
-	n->packets ++;
-
-	if( n->packets >= n->length )
-		res = 2;
-
-	return res;
-}
-
 
 int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len, int cw, int ch, int cfmt,
 		int *dw, int *dh, int *dfmt )
@@ -246,110 +201,19 @@ int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len, int
 		return 0;
 	}
 
-	//@ there is a packet, get it.
-
-/*	if(v->next)
-	{	
-		frame_next_t *pn = (frame_next_t*) v->next;
-		packet_len = pn->inf.len;
-		total_recv = (pn->packets * CHUNK_SIZE);
-		veejay_memcpy( &header, &(pn->hdr), sizeof(packet_header_t));
-		n_packet = pn->packets;	
-		nos = 1;
-	}
-*/
-
 	while( total_recv < packet_len )
 	{
 		int put_data = 1;
 		res = recv(v->sock_fd, chunk, PACKET_PAYLOAD_SIZE, 0 );
 		if( res <= 0 )
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Nothing there to read!");
+			veejay_msg(VEEJAY_MSG_ERROR, "Error receiving multicast packet:%s", strerror(errno));
 			return 0;
 		}	
 	
 		packet_header_t hdr = packet_get_header( chunk );
-//		packet_dump_header(&hdr);
 		packet_get_info(&info,chunk );
 	
-		//@ do the first packet
-/*if( n_packet==0 )
-		{
-#ifdef STRICT_CHECKING
-			assert( hdr.flag == 1 );
-#endif
-			*dw = info.width;
-			*dh = info.height;
-			*dfmt = info.fmt;
-			packet_len = info.len;
-			veejay_memcpy( &header,&hdr, sizeof(packet_header_t));
-		}
-		else
-		{
-			//@ more packets follow
-			if( hdr.usec != header.usec )
-			{
-				//@ this packet is older!
-				if( hdr.usec < header.usec )
-				{
-					//@ check for rollover
-					if(hdr.usec <= 1 && header.usec >= 0xffff )
-					{
-					  veejay_msg(0, "ROLLOVER INTEGER");
-				//	  header.usec = 0;
-				//	  if( hdr.usec <= (header.usec + 1 ) )
-				//	    mcast_store_next_packet( v, &hdr,&info,chunk);
-					}
-				
-					put_data = 0;		
-					veejay_msg(0, "Dropped old packet: time=%d, current=%d", hdr.usec, header.usec);
-				}
-				else
-				{ 
-					veejay_msg(0, "DROP OLD header %d, take %d", header.usec, hdr.usec );
-					packet_len = info
-
-					
-
-
-					if(!nos)
-					{
-						int mr = mcast_store_next_packet(v, &hdr, &info, chunk );
-						if(mr <= 0)
-						{
-							packet_len = info.len;
-							veejay_memcpy( &header, &hdr, sizeof(packet_header_t));
-							n_packet = 0;
-							put_data = 1;
-							veejay_msg(0, "Out of Pace, take newest packets");
-						}
-						else
-						{
-							if( mr == 2 )
-							{
-							uint8_t *dst = linear_buf;
-							frame_next_t *pn = v->next;
-veejay_msg(0, "NEWEST BUFFER FULL, DROP TIMECODE %d, continue with %d", header.usec, pn->hdr.usec);		
-			*dw = pn->inf.width;
-			*dh = pn->inf.height;
-			*dfmt = pn->inf.fmt;
-		
-							veejay_memcpy( dst, pn->packet, pn->inf.len );
-							free(pn->packet);
-							free(pn);
-							v->next=NULL;
-							return pn->inf.len;
-							}
-							else
-								put_data = 0;
-						}
-					}
-				}
-			}
-		}
-		*/
-
 		if( n_packet == 0 )
 		{
 			packet_len = info.len;
@@ -369,7 +233,6 @@ veejay_msg(0, "NEWEST BUFFER FULL, DROP TIMECODE %d, continue with %d", header.u
 				veejay_memcpy( &header,&hdr,sizeof(packet_header_t));
 			}
 		}
-
 
 		if( put_data )
 		{
@@ -392,14 +255,6 @@ veejay_msg(0, "NEWEST BUFFER FULL, DROP TIMECODE %d, continue with %d", header.u
 #ifdef STRICT_CHECKING
 	assert( total_recv >=  packet_len );
 #endif
-/*
-	if(nos)
-	{
-		frame_next_t *pn = v->next;
-		free(pn->packet);
-		free(pn);
-		v->next = NULL;
-	}*/
 	*dw = info.width;
 	*dh = info.height;
 	*dfmt = info.fmt;
@@ -415,12 +270,5 @@ void	mcast_close_receiver( mcast_receiver *v )
 		close(v->sock_fd);
 		if(v->group) free(v->group);
 		v->group = NULL;
-		if(v->next)
-		{
-			frame_next_t *pn = v->next;
-			free(pn->packet);
-			free(pn);
-		}
-		v->next = NULL;
 	}
 }

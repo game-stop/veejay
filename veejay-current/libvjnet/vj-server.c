@@ -26,6 +26,7 @@
 #include <libvjmsg/vj-common.h>
 #include <libvjnet/vj-server.h>
 #include <libvjmem/vjmem.h>
+#include <netinet/tcp.h>
 #include <sys/time.h>
 #include <sys/types.h>
 #ifdef STRICT_CHECKING
@@ -187,6 +188,13 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 	if( getsockopt( vjs->handle, SOL_SOCKET, SO_RCVBUF, (unsigned char*) &(vjs->recv_size), &tmp) == -1 )
 	{
 		veejay_msg(0, "Cannot read socket buffer receive size %s" , strerror(errno));
+		return 0;
+	}
+
+	int flag = 1;
+	if( setsockopt( vjs->handle, IPPROTO_TCP, TCP_NODELAY, (char*) &flag, sizeof(int)) == -1 )
+	{
+		veejay_msg(0, "Cannot disable Nagle buffering algorithm: %s", strerror(errno));
 		return 0;
 	}
 

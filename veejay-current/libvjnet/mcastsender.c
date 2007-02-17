@@ -169,8 +169,7 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 
 	uint32_t frame_num = stamp_make(v);
 
-	header.timeout = ms * 10000;
-	header.sec     = 0;
+	header.timeout = ms * 1000;
 	header.usec    = frame_num;
 
 	uint8_t	chunk[PACKET_PAYLOAD_SIZE];
@@ -181,7 +180,6 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 	{
 		header.seq_num = 0; header.flag = 1; header.length = 0;
 		packet_put_padded_data( &header,&info, chunk, buf, total_len);
-		packet_dump_header(&header);
 		res = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
 		if(res <= 0 )
 			return -1;
@@ -203,7 +201,6 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 		res = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
 		if(res <= 0 )
 		{
-			veejay_msg(0,"Unable to send packet %d out of %d", i, pred_chunks );
 			return -1;
 		}
 	}
