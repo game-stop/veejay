@@ -1379,29 +1379,50 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 	gint bw = 0;
 	gint br = 0;
 
+	if(!remote_)
+	{
+		error_dialog("Error", "Not a valid hostname. Try 'localhost' or '127.0.0.1'");
+		GtkWidget *dialog = glade_xml_get_widget_( info->main_window, "inputstream_window" );
+		gtk_widget_hide( dialog );
+		return;
+	}
+
 	gchar *remote = g_locale_from_utf8(
 			remote_ , -1, &br, &bw, NULL ); 
 
-	veejay_msg(VEEJAY_MSG_ERROR, 
-		"%d, [%s], %d ~ %d", mcast,remote, port, strlen(remote) );
+	if( !remote || strlen(remote) <= 1 )
+	{
+		GtkWidget *dialog = glade_xml_get_widget_( info->main_window, "inputstream_window" );
+		gtk_widget_hide( dialog );
+		error_dialog("Error", "Not a valid hostname. Try 'localhost' or '127.0.0.1'");
+		return;
+	}
 
 	remote[strlen(remote)] = '\0';
 
 	if(bw == 0 || br == 0 || port <= 0 )
 	{
+		GtkWidget *dialog = glade_xml_get_widget_( info->main_window, "inputstream_window" );
+		gtk_widget_hide( dialog );
 		error_dialog("Error", "You must enter a valid remote address and/or port number");
 		return;
 	}
+
 
 	if(mcast)
 		multi_vims( VIMS_STREAM_NEW_MCAST,"%d %s", port, remote );
 	else
 		multi_vims( VIMS_STREAM_NEW_UNICAST, "%d %s", port, remote );
 
+
 	gveejay_new_slot(MODE_STREAM);	
+
 	if(remote) g_free(remote);
-	if(remote_) g_free(remote_);
-	}
+
+	GtkWidget *dialog = glade_xml_get_widget_( info->main_window, "inputstream_window" );
+	gtk_widget_hide( dialog );
+
+}
 
 void	on_inputstream_filebrowse_clicked(GtkWidget *w, gpointer user_data)
 {

@@ -1922,10 +1922,6 @@ static	void	vj_event_send_new_id(veejay_t * v, int new_id)
 	if( vj_server_client_promoted( v->vjs[0], v->uc->current_link ))
 	{
 		char result[6];
-		if(new_id < 0 ) new_id = 0;
-		veejay_memset( result, 0 , 6 );
-		veejay_memset( _s_print_buf, 0,SEND_BUF );
-
 		sprintf( result, "%05d",new_id );
 		sprintf(_s_print_buf, "%03d%s",5, result);	
 		SEND_MSG( v,_s_print_buf );

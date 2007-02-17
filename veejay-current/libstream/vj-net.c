@@ -333,7 +333,7 @@ int	net_already_opened(const char *filename, int n, int channel)
 		if (vj_tag_exists(i) )
 		{
 		    vj_tag_get_source_name(i, sourcename);
-		    if (strcmp(sourcename, filename) == 0)
+		    if (strcasecmp(sourcename, filename) == 0)
 		    {
 			vj_tag *tt = vj_tag_get( i );
 			if( tt->source_type == VJ_TAG_TYPE_NET || tt->source_type == VJ_TAG_TYPE_MCAST )

@@ -181,7 +181,7 @@ char *vj_tag_scan_devices( void )
 	for( i = 0; device_list[i] != NULL ;i++ )
 		len += strlen( device_list[i] );
 
-	char *n = (char*) vj_calloc(sizeof(char) * len );
+	char *n = (char*) vj_calloc(sizeof(char) * (len+1) );
 	char *p = n + 6;
 
 	sprintf(n, "%06d",  (len-6) );	

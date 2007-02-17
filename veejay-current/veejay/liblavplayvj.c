@@ -803,7 +803,7 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "It makes no sense to connect to myself (%s - %d)",
 					filename,channel);
-				return -1;
+				return 0;
 			}	   
 		}
 	}
@@ -823,7 +823,7 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to create new Input Stream '%s'", descr );
     	}
- 	return -1;
+ 	return 0;
 }
 
 /******************************************************

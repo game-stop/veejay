@@ -827,84 +827,6 @@ GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
 	return widget;		
 }
 
-/*
-static void scan_devices( const char *name)
-{
-	struct stat	v4ldir;
-	int	n;
-	GtkWidget *tree = glade_xml_get_widget_(info->main_window,name);
-	GtkListStore *store;
-	GtkTreeIter iter;
-	GtkTreeModel *model = gtk_tree_view_get_model
-		(GTK_TREE_VIEW(tree));
-	store = GTK_LIST_STORE(model);
-
-	// kernel 2.6
-	const char *v4lpath = "/sys/class/video4linux/";
-	n = stat( v4lpath, &v4ldir );
-	if(n < 0) return;
-
-	if( S_ISDIR(v4ldir.st_mode))
-	{
-		char dirname[20];
-		char abspath[1024];
-		char filename[1024];
-		int i = 0;
-		for( i = 0; i < 8 ; i ++ )
-		{
-			struct stat v4ldev;
-			sprintf(dirname, "video%d/", i );
-			sprintf(abspath, "%s%s",v4lpath,dirname);
-			n = stat(abspath, &v4ldev );
-			if(n < 0)
-				continue;
- 
-			if( S_ISDIR( v4ldev.st_mode )) 
-			{
-				bzero(filename,1024);
-				sprintf(filename, "%sname",abspath);
-				char devicename[1024];
-				bzero(devicename,1024);
-				read_file(filename, 0, devicename );
-
-				gdouble gchannel = 1.0; // default to composite
-				gchar *thename = _utf8str( devicename );
-				gtk_list_store_append( store, &iter);
-				gtk_list_store_set(
-					store, &iter,
-						V4L_NUM, i,
-					 	V4L_NAME, thename, 
-						V4L_SPINBOX, gchannel, -1);
-				g_free(thename);
-			}
-		}
-	}
-	else
-	{
-	// if on linux ,scan proc for devices.
-	// on 2.6 , /sys/class/video4linux/video0/dev , name
-	// if reading fails, fill a bogus list and test for /dev/video0
-		char filename[1024];
-		int i;
-		for( i = 0; i < 8 ; i ++ )
-		{
-			sprintf(filename, "/dev/video%d", i);
-			struct stat v4lfile;
-			int n = stat( filename, &v4lfile );
-			if( n > 0)
-				continue;
-			if( S_ISREG( v4lfile.st_mode ) )
-			{
-			}
-		
-		}
-		
-	}
-
-
-	gtk_tree_view_set_model(GTK_TREE_VIEW(tree), model );
-}*/
-
 static void scan_devices( const char *name)
 {
 	GtkWidget *tree = glade_xml_get_widget_(info->main_window,name);
@@ -943,14 +865,13 @@ static void scan_devices( const char *name)
 		tmp[3] = '\0';
 		offset += 3;
 		name_len = atoi( tmp );
-			if(name_len <=  0 )
+		if(name_len <=  0 )
 		{
 			veejay_msg(0, "Error reading name of capture device: '%s'",ptr+offset );
 			return;
 		}
 		name = strndup( ptr + offset, name_len );
 		offset += name_len;
-
 		strncpy( tmp, ptr + offset, 3 );
 		tmp[3] = '\0';
 		offset += 3;
@@ -961,10 +882,8 @@ static void scan_devices( const char *name)
 			veejay_msg(0, "Error reading location of capture device");
 			return;
 		}	
-	
 		loca = strndup( ptr + offset, loc_len );
 		offset += loc_len;
-	
 		gchar *thename = _utf8str( name );
 		gchar *theloca = _utf8str( loca );
 		
@@ -984,7 +903,8 @@ static void scan_devices( const char *name)
 		free(name);
 		i ++;
 	}
-	g_free(text);
+	free(text);
+
 	gtk_tree_view_set_model(GTK_TREE_VIEW(tree), model );
 }
 
@@ -1910,7 +1830,8 @@ int		gveejay_new_slot(int mode)
 	}
 
 	sscanf( result, "%d", &id );
-	g_free(result);
+
+	free(result);
 
 	if( id <= 0 )
 	{
@@ -2119,6 +2040,7 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 	char tmp[tmp_len];
 	bzero(tmp,tmp_len);
 	int ret = vj_client_read( info->client, V_CMD, tmp, slen );
+
 	int len = 0;
 	sscanf( tmp, "%d", &len );
 	gchar *result = NULL;
@@ -2126,26 +2048,10 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 	{
 		return result;
 	}
-	result = (gchar*) malloc(sizeof(gchar) * (len + 1) );
+	result = (gchar*) vj_calloc(sizeof(gchar) * (len + 1) );
 
-	bzero(result, (len+1));
+	*bytes_written = vj_client_read( info->client, V_CMD, result, len );
 
-	int bytes_left = len;
-	*bytes_written = 0;
-
-	while( bytes_left > 0)
-	{
-		int n = vj_client_read( info->client, V_CMD, result + (*bytes_written), bytes_left );
-		if( n <= 0 )
-		{
-			bytes_left = 0;
-		}
-		if( n > 0 )
-		{
-			*bytes_written +=n;
-			bytes_left -= n;
-		}
-	}
 	return result;
 }
 
@@ -3928,7 +3834,6 @@ void	load_effectlist_info()
 
 
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
-//	g_object_unref( G_OBJECT( store ) );
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree2), GTK_TREE_MODEL(store2));
 	g_free(fxtext);
 	
@@ -5208,6 +5113,9 @@ static	void	load_editlist_info()
 	if( len <= 0 || res==NULL)
 	{
 		fprintf(stderr, "cannot read VIDEO INFORMATION\n");
+#ifdef STRICT_CHECKING
+		assert(0);
+#endif
 		return;
 	}
 	sscanf( res, "%d %d %d %c %f %d %d %ld %d %ld %ld %d",

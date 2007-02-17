@@ -352,9 +352,9 @@ static	void	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
 	{
 		if( veejay_get_image_data( vp, v ) == 0 )
 		{
-			g_mutex_lock(vp->mutex);
+		//	g_mutex_lock(vp->mutex);
 			gvr_close_connection( v );
-			g_mutex_unlock(vp->mutex);
+		//	g_mutex_unlock(vp->mutex);
 		}
 	}
 }
