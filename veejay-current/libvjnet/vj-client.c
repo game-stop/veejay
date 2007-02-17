@@ -220,6 +220,10 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 	int conv = 1;
 	int y_len = 0;
 	int uv_len = 0;
+veejay_msg(0, "Error: use v->c[2]->type (verify)");
+	assert(0);
+ compile error here
+
 	if( v->c[0]->type == VMCAST_C )
 	{
 		plen = mcast_recv_frame( v->c[0]->r, v->space, 0, v->cur_width,v->cur_height,v->cur_fmt,

@@ -332,6 +332,8 @@ int	vj_server_link_can_write( vj_server *vje, int link_id )
 	fd_set eds;
 
 	vj_link **link = (vj_link**) vje->link;
+	if( !link[link_id]->in_use )
+		return 0;
 
 #ifdef STRICT_CHECKING
 	assert( link[link_id]->in_use == 1 );
