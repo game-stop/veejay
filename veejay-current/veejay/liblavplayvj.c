@@ -1177,12 +1177,13 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     
     d_len = strlen(info->status_what);
     snprintf(info->status_msg,MESSAGE_SIZE, "V%03dS%s", d_len, info->status_what);
-   res = vj_server_send(info->vjs[1],link_id, info->status_msg, strlen(info->status_msg));
+    res = vj_server_send(info->vjs[VEEJAY_PORT_STA],link_id, info->status_msg, strlen(info->status_msg));
 
-   if( res <= 0) { /* close command socket */
-		_vj_server_del_client(info->vjs[1], link_id );
-		_vj_server_del_client(info->vjs[0], link_id );
-		_vj_server_del_client(info->vjs[3], link_id );
+    if( res <= 0)
+	{ /* close command socket */
+		veejay_msg(VEEJAY_MSG_DEBUG ,"Error sending status message , closing connection(s)");
+		_vj_server_del_client(info->vjs[VEEJAY_PORT_CMD], link_id );
+		_vj_server_del_client(info->vjs[VEEJAY_PORT_STA], link_id );
 	}
     if (info->uc->chain_changed == 1)
 		info->uc->chain_changed = 0;
@@ -2560,39 +2561,39 @@ int vj_server_setup(veejay_t * info)
 {
 	if (info->uc->port == 0)
 		info->uc->port = VJ_PORT;
-	info->vjs[0] = vj_server_alloc(info->uc->port, NULL, V_CMD);
-
-	if(!info->vjs[0])
+	info->vjs[VEEJAY_PORT_CMD] = vj_server_alloc(info->uc->port, NULL, V_CMD);
+	if(!info->vjs[VEEJAY_PORT_CMD])
 		return 0;
 
-	info->vjs[1] = vj_server_alloc(info->uc->port, NULL, V_STATUS);
-	if(!info->vjs[1])
+	info->vjs[VEEJAY_PORT_STA] = vj_server_alloc(info->uc->port, NULL, V_STATUS);
+	if(!info->vjs[VEEJAY_PORT_STA])
 		return 0;
 
-	info->vjs[3] = vj_server_alloc(info->uc->port, NULL, V_MSG );
-	if(!info->vjs[3])
+	//@ second VIMS control port
+	info->vjs[VEEJAY_PORT_DAT] = vj_server_alloc(info->uc->port + 5, NULL, V_CMD );
+	if(!info->vjs[VEEJAY_PORT_DAT])
 		return 0;
 
-	info->vjs[2] = NULL;
+	info->vjs[VEEJAY_PORT_MAT] = NULL;
 	if( info->settings->use_vims_mcast )
 	{
-		info->vjs[2] =
+		info->vjs[VEEJAY_PORT_MAT] =
 			vj_server_alloc(info->uc->port, info->settings->vims_group_name, V_CMD );
-		if(!info->vjs[2])
+		if(!info->vjs[VEEJAY_PORT_MAT])
 		{
 			veejay_msg(VEEJAY_MSG_ERROR,
 		  		 "Unable to initialize mcast sender");
 			return 0;
 		}
 		else
-			veejay_msg(VEEJAY_MSG_INFO, "VIMS multicast channel ready at port %d group %s",
+			veejay_msg(VEEJAY_MSG_INFO, "UDP multicast frame sender socket ready at port %d group %s",
 				info->uc->port, info->settings->vims_group_name );
 	}
 	if(info->settings->use_mcast)
 	{
 		GoMultiCast( info->settings->group_name );
 	}
-	info->osc = (void*) vj_osc_allocate(info->uc->port+2);
+	info->osc = (void*) vj_osc_allocate(info->uc->port+4);
 
     	if(!info->osc) 
 	{
@@ -2601,8 +2602,6 @@ int vj_server_setup(veejay_t * info)
 			info->uc->port + 2 );
 		return 0;
 	}
-
-	// see libvjnet/common.h
 
 	if( info->settings->use_mcast )
 		veejay_msg(VEEJAY_MSG_INFO, "UDP multicast OSC channel ready at port %d (group '%s')",
@@ -2614,7 +2613,7 @@ int vj_server_setup(veejay_t * info)
 	if(vj_osc_setup_addr_space(info->osc) == 0)
 		veejay_msg(VEEJAY_MSG_INFO, "Initialized OSC (http://www.cnmat.berkeley.edu/OpenSoundControl/)");
 
-    	if (info->osc == NULL || info->vjs[0] == NULL || info->vjs[1] == NULL) 
+    	if (info->osc == NULL || info->vjs[VEEJAY_PORT_CMD] == NULL || info->vjs[VEEJAY_PORT_STA] == NULL) 
 	{
 		veejay_msg(0, "Unable to setup basic network I/O. Abort");
 		return 0;

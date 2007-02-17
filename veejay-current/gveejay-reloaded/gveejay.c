@@ -70,12 +70,12 @@ static int      set_option( const char *name, char *value )
         if( strcmp(name, "h") == 0 || strcmp(name, "hostname") == 0 )
         {
                 strcpy( hostname, optarg );
-		launcher = 1;
+		launcher ++;
         }
         else if( strcmp(name, "p") == 0 || strcmp(name ,"port") == 0 )
         {
-                port_num = atoi(optarg);
-		launcher = 1;
+                if(sscanf( optarg, "%d", &port_num ))
+			launcher++;
         }
 	else if (strcmp(name, "X") == 0 )
 	{
@@ -125,9 +125,9 @@ int main(int argc, char *argv[]) {
         if(!argc) usage(argv[0]);
 
 	// default host to connect to
-	sprintf(hostname, "localhost");
+	sprintf(hostname, "127.0.0.1");
 
-        while( ( n = getopt( argc, argv, "s:h:pP::nvHf:X:")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:p:P::nvHf:X:")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
@@ -137,13 +137,6 @@ int main(int argc, char *argv[]) {
                 err ++;
 
         if( err ) usage(argv[0]);
-
-/*	struct sched_param schp;
-	memset( &schp, 0, sizeof( schp ));
-	schp.sched_priority = sched_get_priority_min(SCHED_RR );
-	if( sched_setscheduler( 0, SCHED_FIFO, &schp ) != 0 )
-	  veejay_msg(0, "Error setting RR");
-*/	
 
 	if( !g_thread_supported() )
 	{
@@ -169,6 +162,16 @@ int main(int argc, char *argv[]) {
 	
 	vj_gui_init( skins[0].file, launcher, hostname, port_num );
 	vj_gui_style_setup();
+
+	struct sched_param schp;
+	memset( &schp, 0, sizeof( schp ));
+	schp.sched_priority = sched_get_priority_min(SCHED_RR );
+	if( sched_setscheduler( 0, SCHED_FIFO, &schp ) != 0 )
+	  veejay_msg(0, "Error setting RR");
+	else
+	  veejay_msg(VEEJAY_MSG_INFO, "GVeejayReloaded running with low priority");	
+
+
 
 	while(gveejay_running())
 	{

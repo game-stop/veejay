@@ -63,7 +63,7 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
-
+#include <veejay/vj-global.h>
 #ifdef HAVE_FREETYPE
 #include <veejay/vj-font.h>
 #endif
@@ -284,17 +284,12 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
 
 #define SEND_MSG(v,str)\
 {\
-vj_server_send(v->vjs[0], v->uc->current_link, str, strlen(str));\
+vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, str, strlen(str));\
 }
 #define RAW_SEND_MSG(v,str,len)\
 {\
-vj_server_send(v->vjs[0],v->uc->current_link, str, len );\
+vj_server_send(v->vjs[VEEJAY_PORT_CMD],v->uc->current_link, str, len );\
 }	
-
-#define SEND_LOG_MSG(v,str)\
-{\
-vj_server_send(v->vjs[3], v->uc->current_link,str,strlen(str));\
-}
 
 /* some macros for commonly used checks */
 
@@ -1096,7 +1091,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 	}
 
 	if( net_id >= 400 && net_id < 499 )
-		vj_server_client_promote( v->vjs[0] , v->uc->current_link );
+		vj_server_client_promote( v->vjs[VEEJAY_PORT_CMD] , v->uc->current_link );
 
 	np = vj_event_vevo_get_num_args( net_id );
 		
@@ -1214,22 +1209,25 @@ void vj_event_update_remote(void *ptr)
 	veejay_t *v = (veejay_t*)ptr;
 	int i;
 
-	if( vj_server_poll( v->vjs[0] ) )
-		vj_server_new_connection( v->vjs[0] );
-	if( vj_server_poll( v->vjs[1] ) )
-		vj_server_new_connection( v->vjs[1] );
-	if( vj_server_poll( v->vjs[3] ) )
-		vj_server_new_connection( v->vjs[3] );
+	if( vj_server_poll( v->vjs[VEEJAY_PORT_CMD] ) )
+		vj_server_new_connection( v->vjs[VEEJAY_PORT_CMD] );
+	if( vj_server_poll( v->vjs[VEEJAY_PORT_STA] ) )
+		vj_server_new_connection( v->vjs[VEEJAY_PORT_STA] );
+
+	if( vj_server_poll( v->vjs[VEEJAY_PORT_DAT] ) )
+	{
+		vj_server_new_connection( v->vjs[VEEJAY_PORT_DAT] );
+	}
 
 	if( v->settings->use_vims_mcast )
 	{
-		int res = vj_server_update(v->vjs[2],0 );
+		int res = vj_server_update(v->vjs[VEEJAY_PORT_MAT],0 );
 		if(res > 0)
 		{
 			v->uc->current_link = 0;
 			char *buf = NULL;
 			int len =0;
-			while( ( buf = vj_server_retrieve_msg( v->vjs[2], 0, buf,&len )) != NULL )
+			while( ( buf = vj_server_retrieve_msg( v->vjs[VEEJAY_PORT_MAT], 0, buf,&len )) != NULL )
 			{
 		
 				vj_event_parse_msg( v, buf,len );
@@ -1238,21 +1236,22 @@ void vj_event_update_remote(void *ptr)
 		
 	}
 
+	v->settings->is_dat = 0;
 	for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ )
 	{	
-		if( vj_server_link_used( v->vjs[0], i ) )
+		if( vj_server_link_used( v->vjs[VEEJAY_PORT_CMD], i ) )
 		{
 			int res = 1;
 			while( res != 0 )
 			{
-				res = vj_server_update( v->vjs[0], i );
+				res = vj_server_update( v->vjs[VEEJAY_PORT_CMD], i );
 				if(res>0)
 				{
 					v->uc->current_link = i;
 					int n = 0;
 					int len = 0;
 					char *buf  = NULL;
-					while( (buf= vj_server_retrieve_msg(v->vjs[0],i,buf, &len))!= NULL )
+					while( (buf= vj_server_retrieve_msg(v->vjs[VEEJAY_PORT_CMD],i,buf, &len))!= NULL )
 					{
 						vj_event_parse_msg( v, buf,len );
 						n++;
@@ -1260,16 +1259,46 @@ void vj_event_update_remote(void *ptr)
 				}	
 				if( res == -1 )
 				{
-					_vj_server_del_client( v->vjs[0], i );
-					_vj_server_del_client( v->vjs[1], i );
-					_vj_server_del_client( v->vjs[3], i );
+					_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
+					_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
 				}
 			}
 		}
 	}
 
+	v->settings->is_dat = 1;
+	for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ )
+	{	
+		if( vj_server_link_used( v->vjs[VEEJAY_PORT_DAT], i ) )
+		{
+			int res = 1;
+			while( res != 0 )
+			{
+				res = vj_server_update( v->vjs[VEEJAY_PORT_DAT], i );
+				if(res>0)
+				{
+					v->uc->current_link = i;
+					int n = 0;
+					int len = 0;
+					char *buf  = NULL;
+					while( (buf= vj_server_retrieve_msg(v->vjs[VEEJAY_PORT_DAT],i,buf, &len))!= NULL )
+					{
+						vj_event_parse_msg( v, buf,len );
+						n++;
+					}
+				}	
+				if( res == -1 )
+				{
+					_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
+				}
+			}
+		}
+	}
+	v->settings->is_dat = 0;
+
+
 	for( i = 0; i <  VJ_MAX_CONNECTIONS; i ++ )
-		if( vj_server_link_used( v->vjs[1], i ))
+		if( vj_server_link_used( v->vjs[VEEJAY_PORT_STA], i ))
 			veejay_pipe_write_status( v, i );
 	
 	if(!veejay_keep_messages())
@@ -7530,7 +7559,9 @@ void	vj_event_send_log			(	void *ptr,	const char format[],	va_list ap 	)
 	if(messages)
 		free(messages);	
 
-	SEND_LOG_MSG( v, _s_print_buf );
+	veejay_msg(VEEJAY_MSG_DEBUG, "\tDebug: send log %s", _s_print_buf);
+
+	SEND_MSG( v, _s_print_buf );
 }
 
 void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
@@ -7831,6 +7862,13 @@ void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 	veejay_t *v = (veejay_t*) ptr;
 	//@ schedule
 	//@ warn about 2nd connection
+	if (!v->settings->is_dat )
+	{
+		veejay_msg(1, "Wrong control port for retrieving frames!");
+		SEND_MSG(v, "00000000000000000000"); //@ send empty header only (20 bytes)
+		return;
+	}
+
 	if( v->settings->unicast_frame_sender && v->uc->current_link !=
 		v->settings->unicast_link_id )
 	{

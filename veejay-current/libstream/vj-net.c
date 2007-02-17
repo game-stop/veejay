@@ -74,15 +74,6 @@ void	*reader_thread(void *data)
 			error = 1;
 		}
 		
-		if( tag->source_type == VJ_TAG_TYPE_NET )
-		{
-			if( vj_client_poll(v, V_STATUS ) )
-			{
-				vj_client_flush	( v, V_STATUS);
-			}	
-		}
-
-
 		lock(t);
 		
 		if( t->grab && tag->source_type == VJ_TAG_TYPE_NET && retrieve== 0)
@@ -234,21 +225,22 @@ int	net_thread_start(vj_client *v, vj_tag *tag)
 {
 	int success = 0;
 	int res = 0;
+
 	if(tag->source_type == VJ_TAG_TYPE_MCAST )
-		success = vj_client_connect( v, NULL,tag->source_name,tag->video_channel);
+		success = vj_client_connect( v,NULL,tag->source_name,tag->video_channel  );
 	else
-		success = vj_client_connect( v, tag->source_name,NULL,tag->video_channel);
+		success = vj_client_connect_dat( v, tag->source_name,tag->video_channel );
 	
 	if( success <= 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to establish connection with %s on port %d",
-				tag->source_name, tag->video_channel );
+				tag->source_name, tag->video_channel + 5);
 		return 0;
 	}
 	else
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Connecton established with %s:%d",tag->source_name,
-				tag->video_channel);
+				tag->video_channel + 5);
 	}
 	
 	threaded_t *t = (threaded_t*)tag->priv;

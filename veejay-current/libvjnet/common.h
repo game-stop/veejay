@@ -24,7 +24,6 @@
 #define VSOCK_C 1
 #define V_STATUS 0
 #define V_CMD 1
-#define V_MSG 2
 #define VMCAST_S 4
 #define VMCAST_C 5
 

@@ -1143,7 +1143,9 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 		compr_len = vj_perform_compress_frame(info,socket_buffer );
 	}
 
-	int id = (mcast ? 2: 0);
+	//@ was 0, but collides with VIMS . use seperate socket
+
+	int id = (mcast ? 2: 3);
 	
 	int __socket_len = hlen + compr_len;
 #ifdef STRICT_CHECKING
@@ -1157,6 +1159,8 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 		veejay_msg(VEEJAY_MSG_ERROR,
 		  "Error sending frame to remote");
 		//__send_frame=0;
+		if(!mcast )
+			_vj_server_del_client( info->vjs[id], to_link_id );
 	}
 	return 1;
 }

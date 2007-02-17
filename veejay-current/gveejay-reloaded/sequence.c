@@ -683,12 +683,24 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 			if(v->grey_scale)	
 			{
 				uint8_t *rgb = v->tmp_buffer;
-				unsigned int j = 0;
-				for( j = 0; j < (v->width*v->height); j+=3 )
+				uint8_t *plane = v->data_buffer;
+				unsigned int j,k = 0;
+				unsigned int stride = v->width * 3;
+			/*	for( j = 0; j < (v->width*v->height); j+=3 )
 				{
 					rgb[j+0] = v->data_buffer[j];
 					rgb[j+1] = v->data_buffer[j];
 					rgb[j+2] = v->data_buffer[j];
+				}*/
+				for( j = 0; j < v->height; j ++ )
+				{
+					for( k = 0; k < v->width ; k ++ )
+					{
+						uint8_t *p = rgb + j * stride + (k*3); 	
+						p[0] = plane[j * v->width + k];
+						p[1] = plane[j * v->width + k];
+						p[2] = plane[j * v->width + k];
+					}
 				}
 				list[i] = gdk_pixbuf_new_from_data(v->tmp_buffer, GDK_COLORSPACE_RGB, FALSE,
 					8, v->width,v->height,v->width * 3, NULL,NULL );

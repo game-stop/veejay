@@ -48,7 +48,7 @@ int			sock_t_connect( vj_sock_t *s, char *host, int port )
 	s->sock_fd = socket( AF_INET, SOCK_STREAM , 0);
 	if(s->sock_fd < 0)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Connection error with Veejay host %s:%d %s ", host,port,strerror(errno));
+		veejay_msg(VEEJAY_MSG_ERROR, "Socket error with Veejay host %s:%d %s ", host,port,strerror(errno));
 		return 0;
 	}
 	s->port_num = port;
@@ -59,6 +59,8 @@ int			sock_t_connect( vj_sock_t *s, char *host, int port )
 	if( connect( s->sock_fd, (struct sockaddr*) &s->addr,
 			sizeof( struct sockaddr )) == -1 )
 	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Connection error with Veejay host %s:%d %s",
+				host, port, strerror(errno));
 		return 0;
 	}
 	unsigned int tmp = sizeof(int);
@@ -147,6 +149,7 @@ int			sock_t_recv_w( vj_sock_t *s, void *dst, int len )
 	{
 		int done = 0;
 		int bytes_left = s->recv_size;
+
 		while( done < len )
 		{
 			n = recv( s->sock_fd, dst + done,bytes_left,0 );

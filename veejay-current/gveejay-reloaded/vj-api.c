@@ -2154,14 +2154,14 @@ static gchar	*recv_log_vims(int slen, int *bytes_written)
 	gchar tmp[slen+1];
 	bzero(tmp,slen+1);
 
-	vj_client_read( info->client, V_MSG, tmp, slen );
+	vj_client_read( info->client, V_CMD, tmp, slen );
 	int len = atoi(tmp);
 	gchar *result = NULL;
 	int n = 0;
 	if(len > 0)
 	{
 		result = g_new( gchar, len+1 );
-		n = vj_client_read( info->client, V_MSG, result, len );
+		n = vj_client_read( info->client, V_CMD, result, len );
 		*bytes_written = n;
 		result[len] = '\0';
 	}	

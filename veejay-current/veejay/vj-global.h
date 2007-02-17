@@ -78,6 +78,11 @@ enum {
 #define FMT_420F 2
 #define FMT_422F 3
 
+#define VEEJAY_PORT_CMD 0
+#define VEEJAY_PORT_STA 1
+#define VEEJAY_PORT_DAT 3
+#define VEEJAY_PORT_MAT 2
+
 #define FMT_RGB24	2
 #define FMT_RGB32	1
 

@@ -126,8 +126,6 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 	v->link = (void**) link;
 	veejay_msg(VEEJAY_MSG_INFO, "UDP multicast frame sender ready at port %d (group '%s')",
 	  	 v->ports[0], group_name );
-	veejay_msg(VEEJAY_MSG_INFO, "UDP multicast command receiver ready at port %d (group '%s')",
-		v->ports[1], group_name );
 
 	return 1;
 }
@@ -155,8 +153,6 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		port_num = port_offset + VJ_CMD_PORT;
 	if( vjs->server_type == V_STATUS )
 		port_num = port_offset + VJ_STA_PORT;
-	if( vjs->server_type == V_MSG )
-		port_num = port_offset + VJ_MSG_PORT;
 
 	vjs->myself.sin_port = htons(port_num);
 	veejay_memset(&(vjs->myself.sin_zero), 0, 8);
@@ -183,20 +179,16 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		veejay_msg(0, "Cannot read socket buffer size: %s", strerror(errno));
 		return 0;
 	}
-	veejay_msg(VEEJAY_MSG_INFO, "\tSocket send size is %d", vjs->send_size);
 	if( setsockopt( vjs->handle, SOL_SOCKET, SO_RCVBUF, (const char*) &send_size, sizeof(send_size)) == 1 )
 	{
 		veejay_msg(0, "Cannot set recv buffer sze:%s", strerror(errno));
 		return 0;
 	}
-	int recv_size = 0;
-	if( getsockopt( vjs->handle, SOL_SOCKET, SO_RCVBUF, (unsigned char*) &recv_size, &tmp) == -1 )
+	if( getsockopt( vjs->handle, SOL_SOCKET, SO_RCVBUF, (unsigned char*) &(vjs->recv_size), &tmp) == -1 )
 	{
 		veejay_msg(0, "Cannot read socket buffer receive size %s" , strerror(errno));
 		return 0;
 	}
-	veejay_msg(VEEJAY_MSG_INFO, "\tSocket recv size is %d", recv_size );
-
 
 	link = (vj_link **) vj_malloc(sizeof(vj_link *) * VJ_MAX_CONNECTIONS);
 	if(!link)
@@ -222,8 +214,23 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 	}
 	vjs->link = (void**) link;
 	vjs->nr_of_connections = vjs->handle;
-	veejay_msg(VEEJAY_MSG_INFO, "TCP/IP Unicast %s channel ready at port %d",
-	  (vjs->server_type == V_STATUS ? "status" : "command" ),	 port_num );
+
+	switch(vjs->server_type )
+	{
+		case V_STATUS:
+			veejay_msg(VEEJAY_MSG_INFO,"TCP/IP unicast VIMS status socket ready at port %d, (R:%d, S:%d)",
+				port_num, vjs->recv_size, vjs->send_size );
+			break;
+		case V_CMD:
+			veejay_msg(VEEJAY_MSG_INFO,"TCP/IP unicast VIMS control socket ready at port %d (R:%d, S:%d)",
+				port_num, vjs->recv_size, vjs->send_size );
+			break;
+		default:
+#ifdef STRICT_CHECKING
+		assert(0);
+#endif
+		break;
+	}
 
 	return 1;
 }
@@ -263,9 +270,9 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
 
 int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 {
-    unsigned int total = 0;
-    unsigned int bytes_left = len;
-    int n;
+	unsigned int total = 0;
+	unsigned int bytes_left = len;
+	int n;
 #ifdef STRICT_CHECKING
 	assert( vje->send_size > 0 );
 	assert( len > 0 );
@@ -273,22 +280,12 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 	assert( link_id >= 0 );
 #endif
 
-//veejay_msg(VEEJAY_MSG_DEBUG, "%s: %p, link_id=%d, len=%d",__FUNCTION__,vje, link_id, len );
 	if( !vje->use_mcast)
 	{
 
 		vj_link **Link = (vj_link**) vje->link;
 #ifdef STRICT_CHECKING
-	assert( Link[link_id]->in_use == 1 );
-#endif
-
-		if (len <= 0 || Link[link_id]->in_use==0)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Nothing to send or link %d is inactive", link_id);
-			return 0;
-		}
-#ifdef STRICT_CHECKING
-		assert( Link[link_id]->handle >= 0 );
+		assert( Link[link_id]->in_use == 1 );
 #endif
 		total  = sock_t_send_fd( Link[link_id]->handle, vje->send_size, buf, len, 0);
 		if( total <= 0 )
@@ -297,33 +294,14 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 				(char*)(inet_ntoa(vje->remote.sin_addr)),strerror(errno));
 			return 0;
 		}
-
-/*
-		while (total < len)
-		{
-			n = send(Link[link_id]->handle, buf + total, bytes_left, 0);
-			if (n <= 0)
-			{
-				veejay_msg(VEEJAY_MSG_ERROR,"Send error to %s: %s", 
-						 (char*) (inet_ntoa( vje->remote.sin_addr )),
-						strerror(errno));
-		   		return -1;
-			}
-	
-			total += n;
-			bytes_left -= n;
-   		}*/
 	}
 	else
 	{
 		vj_proto **proto = (vj_proto**) vje->protocol;
-
 		if( vje->server_type == V_CMD )
 			return mcast_send( proto[0]->s, buf, bytes_left, vje->ports[0] );
 	}
-  
- 
-    return total;
+	return total;
 }
 
 int	vj_server_link_can_write( vj_server *vje, int link_id )
@@ -371,6 +349,34 @@ int	vj_server_link_can_write( vj_server *vje, int link_id )
 	return 0;
 }
 
+static int vj_server_send_frame_now( vj_server *vje, int link_id, uint8_t *buf, int len )
+{
+    unsigned int total = 0;
+    unsigned int bytes_left = len;
+    int n;
+#ifdef STRICT_CHECKING
+	assert( vje->send_size > 0 );
+	assert( len > 0 );
+	assert( buf != NULL );
+	assert( link_id >= 0 );
+#endif
+
+	vj_link **Link = (vj_link**) vje->link;
+#ifdef STRICT_CHECKING
+	assert( Link[link_id]->in_use == 1 );
+#endif
+
+	total  = sock_t_send_fd( Link[link_id]->handle, vje->send_size, buf, len, 0);
+	if( total <= 0 )
+	{
+		veejay_msg(0,"Unable to send buffer to %s:%s",
+			(char*)(inet_ntoa(vje->remote.sin_addr)),strerror(errno));
+		return 0;
+	}
+
+    	return total;
+}
+
 int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len, 
 					VJFrame *frame, long ms )
 {
@@ -378,7 +384,7 @@ int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len,
 	{
 		if( vj_server_link_can_write( vje, link_id ))
 		{
-			return vj_server_send( vje, link_id, buf, len );
+			return vj_server_send_frame_now( vje, link_id, buf, len );
 		}
 		else
 			veejay_msg(0, "Cant send frame, socket not ready");
@@ -497,10 +503,6 @@ int vj_server_poll(vj_server * vje)
 			if(vje->server_type == V_CMD )
 			{
 				FD_SET( Link[i]->handle, &(vje->fds) );
-				FD_SET( Link[i]->handle, &(vje->wds) );	
-			}
-			if(vje->server_type == V_MSG)
-			{
 				FD_SET( Link[i]->handle, &(vje->wds) );	
 			}
 			if(vje->server_type == V_STATUS )
@@ -801,7 +803,8 @@ int	vj_server_new_connection(vj_server *vje)
 		}	
 
 		char *host = inet_ntoa( vje->remote.sin_addr ); 
-		veejay_msg(VEEJAY_MSG_INFO, "Connection with %s ", host);		
+		veejay_msg(VEEJAY_MSG_INFO, "Connection with %s on port %d", host,
+			vje->remote.sin_port);		
 		if( vje->nr_of_connections < fd )
 			vje->nr_of_connections = fd;
 
