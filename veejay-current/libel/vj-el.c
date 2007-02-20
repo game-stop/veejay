@@ -1193,6 +1193,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 							break;
 						case 0:
 							{*/
+
 								VJFrame *src1 = yuv_yuv_template( d->frame->data[0],
 											d->frame->data[1], d->frame->data[2],
 											el->video_width,el->video_height,

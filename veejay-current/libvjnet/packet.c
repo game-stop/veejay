@@ -35,6 +35,12 @@ void		packet_dump_header( packet_header_t *h)
 		h->flag, h->seq_num,h->length, h->usec,h->timeout );
 }
 
+void		packet_dump_info( frame_info_t *i )
+{
+	veejay_msg(VEEJAY_MSG_DEBUG, "Frame: %dx%d, fmt %d, data_len=%d",
+		i->width,i->height,i->fmt, i->len );
+}
+
 packet_header_t		packet_construct_header(uint8_t flag)
 {
 	struct timeval tv;

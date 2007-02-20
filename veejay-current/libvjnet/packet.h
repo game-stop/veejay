@@ -59,6 +59,8 @@ typedef struct
 
 void			packet_dump_header( packet_header_t *h);
 
+void			packet_dump_info( frame_info_t * i );
+
 packet_header_t		packet_construct_header(uint8_t flag);
 
 packet_header_t		packet_get_header(const void *data);

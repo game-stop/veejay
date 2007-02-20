@@ -113,7 +113,7 @@ VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 {
 #ifdef STRICT_CHECKING
 	assert( fmt == PIX_FMT_RGB24 || fmt == PIX_FMT_BGR24 ||
-			fmt == PIX_FMT_RGBA || fmt == PIX_FMT_RGB32 );
+		fmt == PIX_FMT_RGBA || fmt == PIX_FMT_RGB32_1 || fmt == PIX_FMT_RGB32);
 	assert( w > 0 );
 	assert( h > 0 );
 #endif
@@ -152,7 +152,8 @@ void	yuv_convert_any( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
 		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
 		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA ||
-		src_fmt == PIX_FMT_BGR24   );
+		src_fmt == PIX_FMT_BGR24   || src_fmt == PIX_FMT_RGB32 ||
+		src_fmt == PIX_FMT_RGB32_1  );
 	assert( src->width > 0 );
 	assert( dst->width > 0 );
 #endif
@@ -180,6 +181,12 @@ void	yuv_convert_any3( VJFrame *src, int src_stride[3], VJFrame *dst, int src_fm
 		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
 		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
 		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA  );
+	assert( src_stride[0] > 0 );
+	assert( dst->width > 0 );
+	assert( dst->height > 0 );
+	assert( dst->data[0] != NULL );
+	assert( dst->data[1] != NULL );
+	assert( dst->data[2] != NULL );
 #endif
 	struct SwsContext *ctx = sws_getContext(
 			src->width,
@@ -772,6 +779,7 @@ void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 int	yuv_sws_get_cpu_flags(void)
 {
 	int cpu_flags = 0;
+	return 0;
 #ifdef HAVE_ASM_MMX
 	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX;
 #endif

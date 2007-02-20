@@ -1089,7 +1089,10 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 	int i = lzo_compress( lzo_ , primary_buffer[info->out_buf]->Y, dstI, &size1, len );
 	if( i == 0 )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Unable to compress Y plane");
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to compress Y plane");
+#ifdef STRICT_CHECKING
+		assert(0);
+#endif
 		return 0;
 	}
 	dstI += size1;
@@ -1097,7 +1100,10 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 	i = lzo_compress( lzo_, primary_buffer[info->out_buf]->Cb, dstI, &size2, uv_len );
 	if( i == 0 )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Unable to compress U plane");
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to compress U plane");
+#ifdef STRICT_CHECKING
+		assert(0);
+#endif
 		return 0;
 	}
 	dstI += size2;
@@ -1105,7 +1111,10 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 	i = lzo_compress( lzo_, primary_buffer[info->out_buf]->Cr, dstI, &size3, uv_len );
 	if( i == 0 )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Unable to compress V plane");
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to compress V plane");
+#ifdef STRICT_CHECKING
+		assert(0);
+#endif
 		return 0;
 	}	
 
@@ -1126,7 +1135,9 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 	if( !mcast )
 	{
 		compr_len = vj_perform_compress_frame(info,socket_buffer+20);
-
+#ifdef STRICT_CHECKING
+		assert( compr_len > 0 );
+#endif
 		/* peer to peer connection */
 		unsigned char info_line[32];
 		sprintf(info_line, "%04d %04d %1d %08d", info->effect_frame1->width,
@@ -1141,6 +1152,9 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 	else	
 	{
 		compr_len = vj_perform_compress_frame(info,socket_buffer );
+#ifdef STRICT_CHECKING
+		assert(compr_len > 0 );
+#endif
 	}
 
 	//@ was 0, but collides with VIMS . use seperate socket

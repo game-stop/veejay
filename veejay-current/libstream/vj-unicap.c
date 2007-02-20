@@ -98,29 +98,29 @@ static void unlock_(vj_unicap_t *t)
 
 static int	vj_unicap_scan_enumerate_devices(void *unicap)
 {
-	int i;
+	int i=0;
 	unicap_driver_t *ud = (unicap_driver_t*) unicap;
 	char key[64];
 	unicap_void_device(&(ud->device));
 	
-	for( i = 0; SUCCESS( unicap_enumerate_devices( NULL, &(ud->device), i ) ); i++ )
+	while( SUCCESS( unicap_enumerate_devices( NULL, &(ud->device), i )) )
 	{
-		unicap_property_t property;
-		unicap_format_t format;
-		int property_count = 0;
-		int format_count = 0;
+	//	unicap_property_t property;
+	//	unicap_format_t format;
+	//	int property_count = 0;
+	//	int format_count = 0;
 
-		if( !SUCCESS( unicap_open( &(ud->handle), &(ud->device) ) ) )
+/*		if( !SUCCESS( unicap_open( &(ud->handle), &(ud->device) ) ) )
 		{
 			veejay_msg(0, "Failed to open: %s\n", ud->device.identifier );
 			continue;
-		}
+		}*/
 
-		unicap_void_property(&property);	
-		unicap_void_format( &format );
+//		unicap_void_property(&property);	
+//		unicap_void_format( &format );
 	
-		unicap_reenumerate_properties( ud->handle, &property_count );
-		unicap_reenumerate_formats( ud->handle, &format_count );
+//		unicap_reenumerate_properties( ud->handle, &property_count );
+//		unicap_reenumerate_formats( ud->handle, &format_count );
 		char *device_name = strdup( ud->device.identifier );
 
 		void	*device_port = vpn( VEVO_ANONYMOUS_PORT );
@@ -132,7 +132,7 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 					       1,
 					       &device_name);
 
-		veejay_msg( VEEJAY_MSG_INFO, "\tDevice %d : %s", i, ud->device.identifier );
+		veejay_msg( VEEJAY_MSG_DEBUG, "\tDevice %d: %s (%s)", i, ud->device.identifier, device_location );
 
 #ifdef STRICT_CHECKING
 		assert( error ==  VEVO_NO_ERROR );
@@ -153,14 +153,16 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 
 		
 		free( device_location );
-		free( device_name );
 		
 #ifdef STRICT_CHECKING
 		assert( error ==  VEVO_NO_ERROR );
 #endif
-		unicap_close( ud->handle );
-		
-		veejay_memset( &(ud->handle), 0 , sizeof( unicap_handle_t));
+	veejay_msg(0, "Close device %s", device_name );
+	//	unicap_close( ud->handle );
+		free(device_name);
+	//	veejay_memset( &(ud->handle), 0 , sizeof( unicap_handle_t));
+
+		i++;
 	}
 	return i;
 }
@@ -177,9 +179,7 @@ char **vj_unicap_get_devices(void *unicap, int *n_dev)
 		veejay_msg(0, "I didn't find any capture devices");
 		return NULL;
 	}
-
-	veejay_msg(VEEJAY_MSG_DEBUG, "There are %d devices", ud->num_devices);
-
+/*
 	result = (char**) vj_calloc(sizeof(char*) * (ud->num_devices+1));
 
 	unicap_void_device( &(ud->device) );
@@ -233,7 +233,7 @@ char **vj_unicap_get_devices(void *unicap, int *n_dev)
 	}
 
 	*n_dev = j;
-
+*/
 	return result;
 }
 
@@ -501,7 +501,7 @@ int	vj_unicap_num_capture_devices( void *dud )
 void	*vj_unicap_new_device( void *dud, int device_id )
 {
 	unicap_driver_t *ud = (unicap_driver_t*) dud;
-	
+	veejay_msg(VEEJAY_MSG_DEBUG, "%s: device id %d", __FUNCTION__ , device_id );	
 	if( ud->num_devices <= 0 )
 	{
 		veejay_msg(0, "I didn't find any capture devices");
@@ -540,7 +540,6 @@ void	*vj_unicap_new_device( void *dud, int device_id )
 
 	veejay_msg(2, "Using device '%s'", vut->device.identifier);
 
-	unicap_lock_stream( &(vut->handle) );
 	
 	return (void*) vut;
 }
@@ -650,6 +649,14 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 				veejay_msg(0, "Capture device supports %s, software conversion RGBA -> YUV enabled",
 						rgb_format.identifier);
 				vut->rgb = 2;
+				rgb_format.size.width = w;
+				rgb_format.size.height = h;
+				break;
+			} else if ( rgb_fourcc == rgb_format.fourcc )
+			{
+				veejay_msg(0, "Capture device supports %s, software conversion RGB32 -> YUV enabled",
+						rgb_format.identifier );
+				vut->rgb = 1;
 				rgb_format.size.width = w;
 				rgb_format.size.height = h;
 				break;
@@ -874,7 +881,7 @@ int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const 
 		}
 		else
 		{
-			VJFrame *srci = yuv_rgb_template( v->buffer.data, width,height, (v->rgb==2 ? PIX_FMT_RGB24:PIX_FMT_RGBA32) );
+			VJFrame *srci = yuv_rgb_template( v->buffer.data, width,height, (v->rgb==2 ? PIX_FMT_RGB24:PIX_FMT_RGB32_1) );
 			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], width,height, v->pixfmt ); 
 
 			yuv_convert_any(srci,dsti, srci->format, dsti->format );
@@ -1063,8 +1070,6 @@ void	vj_unicap_free_device( void *vut )
 {
 	vj_unicap_t *v = (vj_unicap_t*) vut;
    
-//	unicap_unlock_stream( &(v->handle));
-	
 	if( v->active || v->state )
 		vj_unicap_stop_capture( vut );
 	

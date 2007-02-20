@@ -178,7 +178,7 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 	//@ If we can send in a single packet:
 	if( total_len <= CHUNK_SIZE )
 	{
-		header.seq_num = 0; header.flag = 1; header.length = 0;
+		header.seq_num = 0; header.flag = 1; header.length = 1;
 		packet_put_padded_data( &header,&info, chunk, buf, total_len);
 		res = mcast_send( v, chunk, PACKET_PAYLOAD_SIZE, port_num );
 		if(res <= 0 )

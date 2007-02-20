@@ -36,6 +36,9 @@
 #include <pthread.h>
 #include <liblzo/lzo.h>
 #include <veejay/vj-global.h>
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 #define VJC_OK 0
 #define VJC_NO_MEM 1
 #define VJC_SOCKET 2
@@ -114,6 +117,8 @@ int vj_client_connect_dat(vj_client *v, char *host, int port_id  )
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid port number. Use [1-65535]");
 		return 0;
 	}
+
+
 	v->c[0]->type = VSOCK_C;
 	v->c[0]->fd   = alloc_sock_t();
 	  free(v->c[1]);
@@ -129,6 +134,7 @@ int vj_client_connect_dat(vj_client *v, char *host, int port_id  )
 int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 {
 	int error = 0;
+	
 	if( group_name == NULL )
 	{
 
@@ -163,6 +169,9 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 		v->c[0]->s    = mcast_new_sender( group_name );
 		v->ports[0] = port_id + VJ_CMD_MCAST;
 		v->ports[1] = port_id + VJ_CMD_MCAST_IN;
+fprintf(stderr, "%s: receiver at port %d (v->ports[0] = %d, v->ports[1] = %d)",
+		__FUNCTION__, port_id + VJ_CMD_MCAST, v->ports[0], v->ports[1] );
+
 		mcast_sender_set_peer( v->c[0]->s , group_name );
 		v->mcast = 1;
 //		mcast_receiver_set_peer( v->c[0]->r, group_name);
@@ -213,7 +222,11 @@ static	void	vj_client_decompress( vj_client *t, uint8_t *out, int len, int Y, in
 			out,
 			out + Y,
 			out + Y + UV };
-
+#ifdef STRICT_CHECKING
+	assert( len > 0 );
+	assert( Y > 0 );
+	assert( UV > 0 );
+#endif
 	lzo_decompress( t->lzo, t->space, len, d );
 }
 

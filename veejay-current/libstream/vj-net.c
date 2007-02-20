@@ -27,7 +27,9 @@
 #include <libvjmsg/vj-common.h>
 #include <veejay/vims.h>
 #include <libstream/vj-net.h>
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 typedef struct
 {
 	pthread_mutex_t mutex;
@@ -63,7 +65,12 @@ void	*reader_thread(void *data)
 	vj_client *v = t->remote;
 	int ret = 0;
 	char buf[16];
+#ifdef STRICT_CHECKING
+	assert( v != NULL );
+#endif
+
 	sprintf(buf, "%03d:;", VIMS_GET_FRAME);
+
 	int retrieve = 0;	
 	for( ;; )
 	{
