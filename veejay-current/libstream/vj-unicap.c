@@ -105,27 +105,9 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 	
 	while( SUCCESS( unicap_enumerate_devices( NULL, &(ud->device), i )) )
 	{
-	//	unicap_property_t property;
-	//	unicap_format_t format;
-	//	int property_count = 0;
-	//	int format_count = 0;
-
-/*		if( !SUCCESS( unicap_open( &(ud->handle), &(ud->device) ) ) )
-		{
-			veejay_msg(0, "Failed to open: %s\n", ud->device.identifier );
-			continue;
-		}*/
-
-//		unicap_void_property(&property);	
-//		unicap_void_format( &format );
-	
-//		unicap_reenumerate_properties( ud->handle, &property_count );
-//		unicap_reenumerate_formats( ud->handle, &format_count );
 		char *device_name = strdup( ud->device.identifier );
-
 		void	*device_port = vpn( VEVO_ANONYMOUS_PORT );
 		char *device_location = strdup( ud->device.device );
-		
 		int error = vevo_property_set( device_port,
 					       "name",
 					       VEVO_ATOM_TYPE_STRING,
@@ -143,25 +125,17 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 #ifdef STRICT_CHECKING
 		assert( error ==  VEVO_NO_ERROR );
 #endif
-
-		
 		error = vevo_property_set( device_port,
 						"device",
 						VEVO_ATOM_TYPE_STRING,
 						1,
 						&device_location );
-
+#ifdef STRICT_CHECKING
+		assert( error == VEVO_NO_ERROR );
+#endif
 		
 		free( device_location );
-		
-#ifdef STRICT_CHECKING
-		assert( error ==  VEVO_NO_ERROR );
-#endif
-	veejay_msg(0, "Close device %s", device_name );
-	//	unicap_close( ud->handle );
 		free(device_name);
-	//	veejay_memset( &(ud->handle), 0 , sizeof( unicap_handle_t));
-
 		i++;
 	}
 	return i;
@@ -501,7 +475,6 @@ int	vj_unicap_num_capture_devices( void *dud )
 void	*vj_unicap_new_device( void *dud, int device_id )
 {
 	unicap_driver_t *ud = (unicap_driver_t*) dud;
-	veejay_msg(VEEJAY_MSG_DEBUG, "%s: device id %d", __FUNCTION__ , device_id );	
 	if( ud->num_devices <= 0 )
 	{
 		veejay_msg(0, "I didn't find any capture devices");
@@ -520,7 +493,6 @@ void	*vj_unicap_new_device( void *dud, int device_id )
 	veejay_memset(vut->ctrl, 0 , sizeof(char*) *16 );
 	veejay_memset(vut->option,0, sizeof(int) * 16 );
 	vut->deviceID = device_id;
-	unicap_void_format( &(vut->format));
 
 
 	if( !SUCCESS( unicap_enumerate_devices( NULL, &(vut->device), device_id ) ) )
