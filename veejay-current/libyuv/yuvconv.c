@@ -157,6 +157,7 @@ void	yuv_convert_any( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 	assert( src->width > 0 );
 	assert( dst->width > 0 );
 #endif
+
 	struct SwsContext  *ctx = sws_getContext(
 			src->width,
 			src->height,

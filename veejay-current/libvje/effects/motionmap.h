@@ -1,7 +1,7 @@
-/*
+/* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2007 Niels Elburg <elburg@hio.hen.nl>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,15 +18,14 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef LUMAMASK_H
-#define LUMAMASK_H
+#ifndef MOTIONMAP_H
+#define MOTIONMAP_H
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
 
-void lumamask_apply( VJFrame *frame, VJFrame *frame2, int width,
-		   int height, int mode, int h_scale, int border);
-vj_effect *lumamask_init(int w, int h);
-int lumamask_malloc(int w, int h);
-void lumamask_free();
+vj_effect *motionmap_init(int w, int h);
+void motionmap_apply( VJFrame *frame, int width, int height, int t, int n, int draw, int histo, int op);
+int	motionmap_malloc(int w, int h);
+void	motionmap_free(void);
 #endif

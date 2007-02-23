@@ -345,6 +345,9 @@ void vj_effman_apply_image_effect(
      case VJ_IMAGE_EFFECT_DEINTERLACE:
 	 deinterlace_apply( frames[0], frameinfo->width, frameinfo->height, arg[0]);
 	 break;
+	case VJ_IMAGE_EFFECT_MOTIONMAP:
+	motionmap_apply( frames[0], frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
+	break;
      case VJ_IMAGE_EFFECT_SLICE:
 	if(arg[2] > 0) { 
 	   todo_info->tmp[0] ++; 
@@ -403,7 +406,7 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
 	simplemask_apply(frames[0],frames[1], frameinfo->width,frameinfo->height,arg[0], arg[1]);
 	break;
 	case VJ_VIDEO_EFFECT_LUMAMASK:
-	lumamask_apply(frames[0], frames[1], frameinfo->width,frameinfo->height,arg[0],arg[1]);
+	lumamask_apply(frames[0], frames[1], frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
 	break;
 	case VJ_VIDEO_EFFECT_DISSOLVE:
 	dissolve_apply(frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0]);break; 

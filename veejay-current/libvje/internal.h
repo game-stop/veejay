@@ -201,11 +201,12 @@ enum {
 	VJ_IMAGE_EFFECT_RGBCHANNEL = 181,
 	VJ_IMAGE_EFFECT_AUTOEQ	=	182,
 	VJ_IMAGE_EFFECT_COLORHIS = 	183,
+	VJ_IMAGE_EFFECT_MOTIONMAP	=	184,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 184
+#define VJ_IMAGE_EFFECT_MAX 185
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 242
@@ -285,6 +286,7 @@ extern void opacityadv_apply(VJFrame *frame, VJFrame *frame2, int w,
 			     int h, int o, int t1, int t2);
 extern void opacitythreshold_apply(VJFrame *frame, VJFrame *frame2,
 				   int w, int h, int o, int t1, int t2);
+
 
 extern void posterize_apply( VJFrame *frame, int width, int height,
 			    int factor, int t1, int t2);
@@ -468,7 +470,7 @@ extern void pixelate_apply(VJFrame *frame, int w, int h, int v );
 
 extern void magicmirror_apply(VJFrame *frame, int w, int h, int x, int y, int d, int n );
 
-extern void lumamask_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int n, int m);
+extern void lumamask_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int n, int m, int border);
 
 extern void smear_apply(VJFrame *frame, int w, int h, int n, int m);
 
@@ -537,6 +539,8 @@ extern void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2,
 		   int width, int height);
 
 extern void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int threshold, int reverse );
+
+extern void	motionmap_apply( VJFrame *frame, int w, int h, int threshold, int reverse, int draw, int his, int op );
 
 extern void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg , int chb);
 

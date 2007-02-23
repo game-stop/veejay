@@ -1982,10 +1982,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 			x_display_open(info->gl, info->current_edit_list->video_width, info->current_edit_list->video_height );
 #endif
 			break;
-#ifdef HAVE_SDL
 		case 0:
 			veejay_msg(VEEJAY_MSG_INFO, "Using output driver SDL");
-
+#ifdef HAVE_SDL
 			info->sdl[0] =
 			    (vj_sdl *) vj_sdl_allocate( info->video_output_width,info->video_output_height,info->pixel_format);
 			if( !info->sdl[0] )
@@ -1999,18 +1998,19 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 				veejay_msg(VEEJAY_MSG_ERROR, "Error initializing SDL");
 		    		return -1;
 			}
-			break;
 #endif
-#ifdef HAVE_DIRECTFB
+			break;
 		case 1:
+
 			veejay_msg(VEEJAY_MSG_INFO, "Using output driver DirectFB");
-			
+#ifdef HAVE_DIRECTFB			
 			info->dfb =(vj_dfb *) vj_dfb_allocate(info->video_output_width,info->video_output_height,
 					       	el->video_norm);
 			if( !info->dfb )
 				return -1;
 			if (vj_dfb_init(info->dfb) != 0)
 	    			return -1;
+#endif
 		break;
 
 
@@ -2025,14 +2025,15 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 			if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height,"Veejay",1,info->settings->full_screen))
 	   	 		return -1;
 #endif
+#ifdef HAVE_DIRECTFB
 			info->dfb =  (vj_dfb *) vj_dfb_allocate( info->video_output_width, info->video_output_height, el->video_norm);
 			if(!info->dfb)
 				return -1;
 
 			if (vj_dfb_init(info->dfb) != 0)
 			    return -1;
-		break;
 #endif
+		break;
 	    case 3:
 			veejay_msg(VEEJAY_MSG_INFO, "Entering render mode (no visual output)");
         

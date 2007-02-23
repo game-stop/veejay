@@ -299,7 +299,7 @@ static int set_option(const char *name, char *value)
 	 veejay_set_colors(0);
     } else if (strcmp(name, "audio") == 0 || strcmp(name, "a") == 0) {
 	info->audio = atoi(optarg);
-    } else if ( strcmp(name, "A" ) == 0 || strcmp(name, "all" ) == 0 ) {
+    } else if ( strcmp(name, "A" ) == 0 || strcmp(name, "capture-device" ) == 0 ) {
 	live = atoi(optarg);
     } else if (strcmp(name, "bezerk") == 0 || strcmp(name, "b") == 0) {
 	info->no_bezerk = 0;
@@ -410,8 +410,8 @@ static int set_option(const char *name, char *value)
 	else if(strcmp(name, "framerate") == 0 || strcmp(name, "R" ) == 0 ) {
 		info->dummy->fps = atof(optarg);
 	}
-    else if (strcmp(name,"fps")==0 || strcmp(name, "f")==0) {
-	override_fps = atof(optarg);
+    	else if (strcmp(name,"fps")==0 || strcmp(name, "f")==0) {
+		override_fps = atof(optarg);
 	}
 	else if(strcmp(name,"ycbcr")==0 || strcmp(name,"Y")==0)
 	{
@@ -501,8 +501,8 @@ static int set_option(const char *name, char *value)
 	{
 		info->dummy->active = 1; // enable DUMMY MODE
 	}	
-    else
-	nerr++;			/* unknown option - error */
+    	else
+		nerr++;			/* unknown option - error */
 
     return nerr;
 }
@@ -564,7 +564,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"quit",0,0,0},
 	{"memory",1,0,0},
 	{"max_cache",1,0,0},
-	{"all",1,0,0},
+	{"capture-device",1,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -578,12 +578,13 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:V:s:c:t:j:l:p:m:x:y:nLFPY:ugr:vdibIjf:A:N:H:W:R:M:Vz:qw:h:C:T:",
+			"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:z:f:Y:A:N:H:W:R:M:C:T:nILFPVugvdibjq",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   "o:G:s:O:a:c:t:l:t:x:y:m:j:p:nLFPY:vudgibr:Ijf:N:H:W:R:A:M:Vz:qw:h:C:T:")) != EOF)
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:z:f:Y:A:N:H:W:R:M:C:T:nILFPVugvdibjq"
+						   )) != EOF)
 #endif
     {
 	switch (n) {
@@ -597,7 +598,16 @@ static int check_command_line_options(int argc, char *argv[])
 	    /* These are the old getopt-values (non-long) */
 	default:
 	    sprintf(option, "%c", n);
+#ifdef STRICT_CHECKING
+	    {
+		int tmpn = set_option( option,optarg );
+		if(tmpn)
+			veejay_msg(VEEJAY_MSG_ERROR, "Error setting option '%c'", option );
+		nerr += tmpn;
+	    }
+#else
 	    nerr += set_option(option, optarg);
+#endif	    
 	    break;
 	}
 	

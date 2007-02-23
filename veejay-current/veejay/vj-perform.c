@@ -630,9 +630,9 @@ int vj_perform_init(veejay_t * info, int use_vp)
 
 
     primary_buffer =
-	(ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * 5); 
+	(ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * 6); 
     if(!primary_buffer) return 0;
-	for( c = 0; c < 5; c ++ )
+	for( c = 0; c < 6; c ++ )
 	{
 		primary_buffer[c] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
 		primary_buffer[c]->Y = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8((frame_len+w) * 3) );
@@ -707,14 +707,26 @@ int vj_perform_init(veejay_t * info, int use_vp)
 
 	lzo_ = lzo_new();
 
-	int vp = 0;
+	int vp = 0;  int frontback = 0;
+	int pvp = 0; int pfb = 0;
 
-	info->viewport = viewport_init( w, h, info->homedir, &vp );
-	
+	info->viewport = viewport_init( w, h, info->homedir, &vp, &frontback,0 );
+	info->projport = viewport_init( w, h, info->homedir, &pvp, &pfb, 1 );	
+
 	veejay_memset( &pvar_, 0, sizeof( varcache_t));
-	
+
+	if( pvp )
+		veejay_msg(VEEJAY_MSG_INFO, "Initialized Projection");
+ 	if( vp )
+		veejay_msg(VEEJAY_MSG_INFO, "Initialized Viewport");
+
 	if( use_vp )
+	{
 		info->use_vp = vp;
+		info->frontback = frontback;
+		info->use_proj = pvp;
+		veejay_msg(VEEJAY_MSG_INFO, "Loaded viewport and projection configuration");
+	}
 
     return 1;
 }
@@ -840,7 +852,7 @@ void vj_perform_free(veejay_t * info)
 
    if(frame_buffer) free(frame_buffer);
 
-	for( c = 0;c < 5; c++ )
+	for( c = 0;c < 6; c++ )
 	{
 		if(primary_buffer[c]->Y) free(primary_buffer[c]->Y );
 		free(primary_buffer[c] );
@@ -862,6 +874,8 @@ void vj_perform_free(veejay_t * info)
 
    if( info->viewport )
 	viewport_destroy( info->viewport );
+   if( info->projport )
+	viewport_destroy( info->projport );
 
    for(c=0; c < 3; c ++)
    {
@@ -971,9 +985,9 @@ uint8_t	*vj_perform_get_a_work_buffer( )
 
 void	vj_perform_get_output_frame( veejay_t *info, uint8_t **frame )
 {
-	frame[0] = video_output_buffer[info->out_buf]->Y;
-	frame[1] = video_output_buffer[info->out_buf]->Cb;
-	frame[2] = video_output_buffer[info->out_buf]->Cr;
+	frame[0] = video_output_buffer[0]->Y;
+	frame[1] = video_output_buffer[0]->Cb;
+	frame[2] = video_output_buffer[0]->Cr;
 }
 void	vj_perform_get_crop_dimensions(veejay_t *info, int *w, int *h)
 {
@@ -1186,23 +1200,28 @@ void	vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, i
 		frame[0] = video_output_buffer[1]->Y;
 		frame[1] = video_output_buffer[1]->Cb;
 		frame[2] = video_output_buffer[1]->Cr;
-			
-		uint8_t *src_frame[3];
-		src_frame[0] = video_output_buffer[0]->Y;
-		src_frame[1] = video_output_buffer[0]->Cb;
-		src_frame[2] = video_output_buffer[0]->Cr;
+		
+		if( video_output_buffer_convert == 0 )
+		{
+			uint8_t *src_frame[3];
+			src_frame[0] = video_output_buffer[0]->Y;
+			src_frame[1] = video_output_buffer[0]->Cb;
+			src_frame[2] = video_output_buffer[0]->Cr;
 
-		VJFrame *srci = yuv_yuv_template( video_output_buffer[0]->Y, video_output_buffer[0]->Cb,
+			VJFrame *srci = yuv_yuv_template( video_output_buffer[0]->Y, video_output_buffer[0]->Cb,
 						 video_output_buffer[0]->Cr, w, h, 
 						 get_ffmpeg_pixfmt(info->pixel_format));
-		VJFrame *dsti = yuv_yuv_template( video_output_buffer[1]->Y, video_output_buffer[1]->Cb,
+			VJFrame *dsti = yuv_yuv_template( video_output_buffer[1]->Y, video_output_buffer[1]->Cb,
 						  video_output_buffer[1]->Cr, w, h,
 						  PIX_FMT_YUV420P );
 
-		yuv_convert_any( srci,dsti, srci->format, dsti->format );
-		free(srci);
-		free(dsti);
+			yuv_convert_any( srci,dsti, srci->format, dsti->format );
+			free(srci);
+			free(dsti);
 
+			video_output_buffer_convert = 1;
+			return;
+		}
 	}
 	else
 	{
@@ -1234,29 +1253,25 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
 	editlist *el = info->edit_list;
 	if(info->pixel_format==FMT_422 || info->pixel_format == FMT_422F)
 	{
-		if( video_output_buffer_convert == 0 )
-		{
-			uint8_t *pframe[3];
-			 pframe[0] = primary_buffer[info->out_buf]->Y;
-			 pframe[1] = primary_buffer[info->out_buf]->Cb;
-			 pframe[2] = primary_buffer[info->out_buf]->Cr;
+		uint8_t *pframe[3];
+		pframe[0] = primary_buffer[info->out_buf]->Y;
+		pframe[1] = primary_buffer[info->out_buf]->Cb;
+		pframe[2] = primary_buffer[info->out_buf]->Cr;
 	
-			 VJFrame *srci = yuv_yuv_template( pframe[0],pframe[1],pframe[2],el->video_width,el->video_height,
-						get_ffmpeg_pixfmt( info->pixel_format));
-			VJFrame *dsti = yuv_yuv_template( temp_buffer[0],temp_buffer[1], temp_buffer[2],el->video_width,
-						el->video_height, PIX_FMT_YUV420P );
+		VJFrame *srci = yuv_yuv_template( pframe[0],pframe[1],pframe[2],el->video_width,el->video_height,
+					get_ffmpeg_pixfmt( info->pixel_format));
+		VJFrame *dsti = yuv_yuv_template( temp_buffer[0],temp_buffer[1], temp_buffer[2],el->video_width,
+					el->video_height, (info->pixel_format == FMT_420 ? PIX_FMT_YUV420P:
+						PIX_FMT_YUVJ420P) );
 	
-			yuv_convert_any(srci,dsti, srci->format,dsti->format );
+		yuv_convert_any(srci,dsti, srci->format,dsti->format );
 
-			free(srci);
-			free(dsti);
+		free(srci);
+		free(dsti);
 
-			video_output_buffer_convert = 1;
-		}
 		frame[0] = temp_buffer[0];
 		frame[1] = temp_buffer[1];
 		frame[2] = temp_buffer[2];
-		
 	}
 	else
 	{
@@ -2892,15 +2907,85 @@ static	int	vj_perform_render_viewport( veejay_t *info, video_playback_setup *set
 	
 	int deep = 0;
 
+	in[0]  = primary_buffer[0]->Y;
+	in[1]  = primary_buffer[0]->Cb;
+	in[2]  = primary_buffer[0]->Cr;
+
 	out[0] = primary_buffer[2]->Y;
 	out[1] = primary_buffer[2]->Cb;
 	out[2] = primary_buffer[2]->Cr;
 
-	viewport_external_mouse( info->viewport, info->uc->mouse[0], info->uc->mouse[1], info->uc->mouse[2] );
+	if( info->which_vp == 0 )
+		viewport_external_mouse( info->viewport, info->uc->mouse[0], info->uc->mouse[1], info->uc->mouse[2], info->frontback );
 
-	if( viewport_active( info->viewport )==0 )
+	if( viewport_render_ssm( info->viewport ))
 	{
 		if(!frame->ssm)
+		{
+			chroma_supersample(
+				settings->sample_mode,
+				effect_sampler,
+				in,
+				frame->width,
+				frame->height
+			       	);
+			frame->ssm = 1;
+		}
+		deep = 2;
+#ifdef STRICT_CHECKING
+		assert( frame->ssm == 1 );
+#endif
+	}
+
+	viewport_render(
+		info->viewport,
+		in,
+		out,
+		frame->width,
+		frame->height,
+		(frame->ssm == 1 ? frame->len : frame->uv_len) );
+
+	if( info->frontback )
+	{
+		if( frame->ssm )
+		{
+			chroma_subsample( settings->sample_mode, effect_sampler, out, frame->width,frame->height );
+			frame->ssm = 0;
+		}
+		veejay_memcpy( primary_buffer[0]->Y, out[0], frame->len );
+		veejay_memcpy( primary_buffer[0]->Cb,out[1], frame->uv_len);
+		veejay_memcpy( primary_buffer[0]->Cr,out[2], frame->uv_len);
+		deep = 0;
+	}
+
+	return deep;
+}
+
+static	int	vj_perform_render_projport( veejay_t *info, video_playback_setup *settings, int in_buf )
+{
+	VJFrame *frame = info->effect_frame1;
+
+	uint8_t *in[3];
+	uint8_t *out[3];
+	
+	int deep = in_buf;
+
+	out[0] = primary_buffer[5]->Y;
+	out[1] = primary_buffer[5]->Cb;
+	out[2] = primary_buffer[5]->Cr;
+
+	in[0]  = primary_buffer[ in_buf ]->Y;
+	in[1]  = primary_buffer[ in_buf ]->Cb;
+	in[2]  = primary_buffer[ in_buf ]->Cr;
+
+
+        if(info->which_vp == 1 )
+                viewport_external_mouse( info->projport, info->uc->mouse[0], info->uc->mouse[1], info->uc->mouse[2], 0);
+
+
+	if( viewport_render_ssm( info->projport ))
+	{
+		if(!frame->ssm )
 		{
 			chroma_supersample(
 				settings->sample_mode,
@@ -2911,15 +2996,16 @@ static	int	vj_perform_render_viewport( veejay_t *info, video_playback_setup *set
 			       	);
 			frame->ssm = 1;
 		}
-		deep = 2;
-	}	
+		deep = 5;
+	}
 
 	viewport_render(
-		info->viewport,
-		frame->data,
+		info->projport,
+		in,
 		out,
 		frame->width,
-		frame->height );
+		frame->height,
+		(frame->ssm ? frame->len : frame->uv_len) );
 
 	return deep;
 }
@@ -2947,13 +3033,25 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 	}
 
 	//@ Viewport is not enabled, do not set osd_extra
-	if( viewport_active( info->viewport ) == 1 )
-		info->uc->osd_extra = viewport_get_help( info->viewport );
+	//
+	//
+	if( info->which_vp == 0 )
+	{
+		if( viewport_active( info->viewport ) == 1 )
+			info->uc->osd_extra = viewport_get_help( info->viewport );
+		else
+			info->uc->osd_extra = NULL;
+	}
 	else
-		info->uc->osd_extra = NULL;
-
+	{
+		if( viewport_active( info->projport ) == 1 )
+			info->uc->osd_extra = viewport_get_help( info->projport );
+		else
+			info->uc->osd_extra = NULL;
+		
+	}
 	//@ render whatever OSD is needed
-	vj_font_customize_osd(info->osd, info, info->use_osd );
+	vj_font_customize_osd(info->osd, info, info->use_osd, info->use_vp,info->use_proj,info->which_vp );
 	vj_font_render( info->osd, frame , settings->current_frame_num,info->uc->osd_extra );
 }
 
@@ -2985,6 +3083,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	pri[0] = primary_buffer[destination]->Y;
 	pri[1] = primary_buffer[destination]->Cb;
 	pri[2] = primary_buffer[destination]->Cr;
+
 
 	if( frame->ssm == 1 )
 	{
@@ -3094,7 +3193,7 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 	}
 
 	//@ Render viewport
-	if(info->use_vp)
+	if(info->use_vp && info->frontback==0)
 		deep = vj_perform_render_viewport( info, settings );
 
 	//@ record frame after rendering viewport
@@ -3103,8 +3202,12 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 		vj_perform_record_frame(info,frame);
 	}
 
+	if(info->use_proj )
+		deep = vj_perform_render_projport( info, settings, deep );
+
 	//@ Render OSD menu
 	vj_perform_render_osd( info, settings, deep );
+
 
 	//@ Do the subsampling 
 	vj_perform_finish_render( info, settings,deep );
@@ -3144,7 +3247,10 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 			vj_perform_plain_fill_buffer(info, frame);
 		   
 			cached_sample_frames[0] = info->uc->sample_id;
-			
+			//@ Render viewport
+			if(info->use_vp && info->frontback)
+				vj_perform_render_viewport( info, settings );
+
 			if(vj_perform_verify_rows(info,frame))
 		   	 	vj_perform_sample_complete_buffers(info, frame, &is444);
 
@@ -3157,6 +3263,9 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 		case VJ_PLAYBACK_MODE_PLAIN:
 
 			   vj_perform_plain_fill_buffer(info, frame);
+
+			   if(info->use_vp && info->frontback)
+				vj_perform_render_viewport( info,settings);
 			   info->out_buf = vj_perform_render_magic( info, info->settings,frame );
 			   res = 1;
  		    break;
@@ -3173,6 +3282,10 @@ int vj_perform_queue_video_frame(veejay_t *info, int frame, const int skip_incr)
 
 			 if (vj_perform_tag_fill_buffer(info, frame))
 			 {
+				//@ Render viewport
+				if(info->use_vp && info->frontback)
+					vj_perform_render_viewport( info, settings );
+
 				if(vj_perform_verify_rows(info,frame))
 					vj_perform_tag_complete_buffers(info, frame, &is444);
 				info->out_buf = vj_perform_render_magic( info, info->settings,frame );
@@ -3247,14 +3360,6 @@ int	vj_perform_randomize(veejay_t *info)
 			 "Sample to play (at random) %d does not exist",
 				take_n);
 			take_n = info->uc->sample_id;
-		}
-
-		max_delay = ( sample_get_endFrame(take_n) -
-			      sample_get_startFrame(take_n) );
-
-		if(settings->randplayer.timer == RANDTIMER_LENGTH)
-			min_delay = max_delay;
-		else
 			max_delay = min_delay + (int) ((double)max_delay * rand() / (RAND_MAX+1.0));
 		settings->randplayer.max_delay = max_delay;
 		settings->randplayer.min_delay = min_delay;	
@@ -3276,6 +3381,7 @@ int	vj_perform_randomize(veejay_t *info)
 		veejay_set_sample( info, take_n );
 
 		return 1;
+		}
 	}
 	return 0;
 }
@@ -3302,27 +3408,3 @@ int	vj_perform_rand_update(veejay_t *info)
 	return 0;	
 }
 
-
-int	vj_perform_register_ppm_dir( veejay_t *info , const char *path )
-{
-	switch(info->uc->playback_mode)
-	{
-		case VJ_PLAYBACK_MODE_PLAIN:
-			sprintf(ppm_path, "%s/plain-video/", path); break;
-		case VJ_PLAYBACK_MODE_SAMPLE:
-			sprintf(ppm_path, "%s/sample-%04d",path, info->uc->sample_id ); break;
-		case VJ_PLAYBACK_MODE_TAG:
-			sprintf(ppm_path, "%s/stream-%04d",path, info->uc->sample_id ); break;
-		default:
-			break;
-	}
-
-	int n = mkdir ( ppm_path, 0777 );
-	if( n == -1)
-	{
-		veejay_msg(0, "Unable to create directory '%s'", ppm_path );
-		return 0;
-	}
-	
-	return 1;
-}

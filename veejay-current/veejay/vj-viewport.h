@@ -27,10 +27,12 @@ void 		*viewport_fx_init(	int type, int wid, int hei, int x, int y, int zoom );
 
 
 /* The viewport */
-void	viewport_render( void *data, uint8_t *in[3], uint8_t *out[3], int width, int height );
-void	viewport_external_mouse( void *data, int sx, int sy, int button );
+
+int	viewport_render_ssm(void *vdata );
+void	viewport_render( void *data, uint8_t *in[3], uint8_t *out[3], int width, int height,int uv_len );
+void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontback );
 char	*viewport_get_help(void *data);
-void 	*viewport_init(int w, int h, const char *dir, int *enable);
+void 	*viewport_init(int w, int h, const char *dir, int *enable, int *frontback, int mode);
 int	viewport_active( void *data );
 void			viewport_destroy( void *data );
 

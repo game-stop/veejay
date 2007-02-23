@@ -22,6 +22,7 @@
 #include <stdint.h>
 #include <sys/types.h>
 #include <string.h>
+#include "common.h"
 
 vj_effect *mirrors_init(int width,int height)
 {
@@ -31,7 +32,7 @@ vj_effect *mirrors_init(int width,int height)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->defaults[0] = 1;
+    ve->defaults[0] = 0;
     ve->defaults[1] = 1;
     ve->limits[0][0] = 0;	/* horizontal or vertical mirror */
     ve->limits[1][0] = 3;
@@ -128,23 +129,48 @@ void _mirrors_h( uint8_t *yuv[3], int width, int height, int factor, int swap)
 	}
 }
 
+static int n__ = 0;
+static int N__ = 0;
 
 void mirrors_apply(VJFrame *frame, int width, int height, int type,
 		   int factor )
 {
+	int interpolate = 1;
+	int motion = 0;
+	int tmp1 = 0;
+	int tmp2 = factor;
+	if( motionmap_active() )
+	{
+		int hi = (int)((float)(width * 0.33));
+
+		motionmap_scale_to( hi,hi,0,0,&tmp1,&tmp2,&n__,&N__);
+		motion = 1;
+	}
+	else
+	{
+		n__ = 0;
+		N__ = 0;
+		interpolate=0;
+	}
+
     switch (type) {
     case 0:
-	_mirrors_v(frame->data, width, height, factor, 0);
+	_mirrors_v(frame->data, width, height, tmp2, 0);
 	break;
     case 1:
-	_mirrors_v(frame->data,width,height,factor,1);
+	_mirrors_v(frame->data,width,height,tmp2,1);
 	break;
     case 2:
-	_mirrors_h(frame->data,width,height,factor,0);
+	_mirrors_h(frame->data,width,height,tmp2,0);
 	break;
     case 3:
-	_mirrors_h(frame->data,width,height,factor,1);
+	_mirrors_h(frame->data,width,height,tmp2,1);
 	break;
 	}
+
+	if( interpolate )
+		motionmap_interpolate_frame( frame, N__,n__ );
+	if( motion )
+		motionmap_store_frame( frame );
 }
 void mirrors_free(){}

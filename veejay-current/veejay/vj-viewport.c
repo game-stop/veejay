@@ -119,7 +119,7 @@ typedef struct
 	int	parameters[8];
 	char    *homedir;
 	int32_t tx1,tx2,ty1,ty2;
-
+	int	mode;
 } viewport_t;
 
 typedef struct
@@ -127,6 +127,7 @@ typedef struct
 	int	reverse;
 	int	grid_size;
 	int	grid_color;
+	int	frontback;
 	float x1;
 	float x2;
 	float x3;
@@ -172,8 +173,8 @@ static void		viewport_find_transform( float *coord, matrix_t *M );
 static void		viewport_print_matrix( matrix_t *M );
 static void 		viewport_line (uint8_t *plane,int x1, int y1, int x2, int y2, int w, int h, uint8_t col);
 static void		draw_point( uint8_t *plane, int x, int y, int w, int h, int size, int col );
-static viewport_config_t *viewport_load_settings( const char *dir );
-static void		viewport_save_settings( viewport_t *v );
+static viewport_config_t *viewport_load_settings( const char *dir, int mode );
+static void		viewport_save_settings( viewport_t *v , int frontback);
 static	void		viewport_prepare_process( viewport_t *v );
 
 #ifdef HAVE_X86CPU
@@ -411,14 +412,27 @@ static	void	viewport_update_context_help(viewport_t *v)
 	}
 	else
 		sprintf(tmp, "Mouse Right = %s\nMouse Middle = %s\nCTRL + h = Hide/Show this Help", reverse_mode, render_mode );
-			
-	if( v->user_ui )
-	sprintf(hlp, "Viewport\nPerspective Transform\n%s\n(1) %.2fx%.2f    Pos: %.2fx%.2f\n(2) %.2fx%.2f\n(3) %.2fx%.2f\n(4) %.2fx%.2f\n",
-		tmp,v->x1,v->y1, v->usermouse[0],v->usermouse[1],
-		v->x2,v->y2,v->x3,v->y3,v->x4,v->y4 );
+
+	if(v->mode == 0 )
+	{
+		if( v->user_ui )
+		sprintf(hlp, "Viewport\nPerspective Transform\n%s\n(1) %.2fx%.2f    Pos: %.2fx%.2f\n(2) %.2fx%.2f\n(3) %.2fx%.2f\n(4) %.2fx%.2f\n",
+			tmp,v->x1,v->y1, v->usermouse[0],v->usermouse[1],
+			v->x2,v->y2,v->x3,v->y3,v->x4,v->y4 );
+		else
+			sprintf(hlp, "Viewport\nPerspective Transform %s\n%s",
+			reverse_mode, tmp );
+	}
 	else
-	sprintf(hlp, "Viewport\nPerspective Transform %s\n%s",
-		reverse_mode, tmp );
+	{
+		if(v->user_ui )
+			sprintf(hlp, "Projection calibration\n%s\n(1)  %.2fx%.2f    Pos: %.2fx%.2f\n(2) %.2fx%.2f\n(3) %.2fx%.2f\n(4) %.2fx%.2f\n",
+                        tmp,v->x1,v->y1, v->usermouse[0],v->usermouse[1],
+                        v->x2,v->y2,v->x3,v->y3,v->x4,v->y4 );
+		else
+			sprintf(hlp, "Projection calibration\nPerspective Transform %s\n%s", reverse_mode, tmp );
+
+	}
 
 	if(v->help)
 		free(v->help);
@@ -983,10 +997,10 @@ static	void		viewport_update_perspective( viewport_t *v, float *values )
 }
 
 
-void *viewport_init(int w, int h, const char *homedir, int *enable)
+void *viewport_init(int w, int h, const char *homedir, int *enable, int *frontback, int mode)
 {
 	//@ try to load last saved settings
-	viewport_config_t *vc = viewport_load_settings( homedir );
+	viewport_config_t *vc = viewport_load_settings( homedir,mode );
 	if(!vc)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "No or invalid viewport configuration file in %s", homedir );
@@ -996,7 +1010,7 @@ void *viewport_init(int w, int h, const char *homedir, int *enable)
 	viewport_t *v = (viewport_t*) vj_calloc(sizeof(viewport_t));
 
 	v->homedir = strdup(homedir);
-
+	v->mode	   = mode;
 	int res;
 
 	if( vc == NULL )
@@ -1012,6 +1026,7 @@ void *viewport_init(int w, int h, const char *homedir, int *enable)
 					    w/32 );
 
 		*enable = 0;
+		*frontback = 1;
 		v->user_ui = 1;
 
 	}
@@ -1028,6 +1043,7 @@ void *viewport_init(int w, int h, const char *homedir, int *enable)
 						vc->grid_size );
 
 		*enable = 1;
+		*frontback = vc->frontback;
 		v->user_ui = 0;
 
 		free( vc );
@@ -1074,13 +1090,15 @@ char	*viewport_get_help(void *data)
 	return v->help;
 }
 
-static	viewport_config_t 	*viewport_load_settings( const char *dir )
+static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 {
 	viewport_config_t *vc = vj_calloc(sizeof(viewport_config_t));
 
 	char path[1024];
-	sprintf(path, "%s/viewport.cfg", dir);
-
+	if(!mode)
+		sprintf(path, "%s/viewport-mapping.cfg", dir);
+	else
+		sprintf(path, "%s/viewport-projection.cfg", dir);
 	FILE *fd = fopen( path, "r" );
 	if(!fd)
 	{
@@ -1103,16 +1121,17 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir )
 
 	fclose(fd );
 
-	int n = sscanf(buf, "%f %f %f %f %f %f %f %f %d %d %d",
+	int n = sscanf(buf, "%f %f %f %f %f %f %f %f %d %d %d %d",
 			&vc->x1, &vc->y1,
 			&vc->x2, &vc->y2,
 			&vc->x3, &vc->y3,
 			&vc->x4, &vc->y4,
 			&vc->reverse,
 			&vc->grid_size,
-			&vc->grid_color);
+			&vc->grid_color,
+			&vc->frontback);
 
-	if( n != 11 )
+	if( n != 12 )
 	{
 		veejay_msg(0, "Unable to read %s (file is %d bytes)",path, len );
 		free(vc);
@@ -1131,11 +1150,13 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir )
 	return vc;
 }
 
-static	void	viewport_save_settings( viewport_t *v )
+static	void	viewport_save_settings( viewport_t *v, int frontback )
 {
 	char path[1024];
-
-	sprintf(path, "%s/viewport.cfg", v->homedir );
+	if( !v->mode )
+		sprintf(path, "%s/viewport-mapping.cfg", v->homedir );
+	else
+		sprintf(path, "%s/viewport-projection.cfg", v->homedir );
 
 	FILE *fd = fopen( path, "wb" );
 
@@ -1148,12 +1169,13 @@ static	void	viewport_save_settings( viewport_t *v )
 
 	char content[512];
 
-	sprintf( content, "%f %f %f %f %f %f %f %f %d %d %d\n",
+	sprintf( content, "%f %f %f %f %f %f %f %f %d %d %d %d\n",
 			v->x1,v->y1,v->x2,v->y2,
 			v->x3,v->y3,v->x4,v->y4,
 			v->user_reverse,
 			v->grid_size,
-			v->grid_val );
+			v->grid_val,
+			frontback );
 
 	int res = fwrite( content, strlen(content), 1, fd );
 
@@ -1165,7 +1187,7 @@ static	void	viewport_save_settings( viewport_t *v )
 	veejay_msg(VEEJAY_MSG_DEBUG, "Saved viewport settings to %s", path);
 }
 
-void	viewport_external_mouse( void *data, int sx, int sy, int button )
+void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontback )
 {
 	if( sx == 0 && sy == 0 && button == 0 )
 		return;
@@ -1251,7 +1273,7 @@ void	viewport_external_mouse( void *data, int sx, int sy, int button )
 
 		if( v->user_ui == 0 )
 		{
-			viewport_save_settings(v);
+			viewport_save_settings(v, frontback);
 		}
 	}
 
@@ -1383,7 +1405,17 @@ static void	viewport_draw( void *data, uint8_t *plane )
 	 }
 }
 
-void viewport_render( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, int height )
+int	viewport_render_ssm(void *vdata )
+{
+	viewport_t *v = (viewport_t*) vdata;
+
+	if( v->disable || v->user_ui) 
+		return 0;
+
+	return 1;
+}
+
+void viewport_render( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, int height, int uv_len )
 {
 	viewport_t *v = (viewport_t*) vdata;
 
@@ -1423,10 +1455,9 @@ void viewport_render( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, in
 	else
 	{
 		viewport_draw( v, in[0] );
-		veejay_memset( in[1], 128, len );
-		veejay_memset( in[2], 128, len );
+		veejay_memset( in[1], 128, uv_len );
+		veejay_memset( in[2], 128, uv_len );
 	}
-
 }
 void viewport_render_dynamic( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, int height )
 {

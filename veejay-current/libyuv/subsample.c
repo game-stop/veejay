@@ -80,6 +80,8 @@ void *subsample_init(int len)
 	if(!s->buf)
 		return NULL;
 
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
 	return (void*) s;
 }
 

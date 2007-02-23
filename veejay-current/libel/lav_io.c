@@ -1803,7 +1803,7 @@ int lav_fileno(lav_file_t *lav_file)
       case 'q':
 	 {
 #if ( LQT_CODEC_API_VERSION & 0xff ) >6  
-		 res = lqt_fileno( (quicktime_t*) lav_file->qt_fd );
+ 		res = lqt_fileno( (quicktime_t*) lav_file->qt_fd );
 #else
 		 quicktime_t *q = lav_file->qt_fd;
 		 res = (int)fileno( (quicktime_t*) q->stream );

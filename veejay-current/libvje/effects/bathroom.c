@@ -28,7 +28,7 @@
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include "bathroom.h"
-
+#include "common.h"
 static uint8_t *bathroom_frame[3];
 
 vj_effect *bathroom_init(int width,int height)
@@ -52,6 +52,8 @@ vj_effect *bathroom_init(int width,int height)
     return ve;
 }
 
+static int n__ = 0;
+static int N__ = 0;
 // FIXME private
 
 int bathroom_malloc(int width, int height)
@@ -61,6 +63,8 @@ int bathroom_malloc(int width, int height)
   
     bathroom_frame[1] = bathroom_frame[0] + (width * height );
     bathroom_frame[2] = bathroom_frame[1] + (width * height );
+	n__ = 0;
+	N__ = 0;
     return 1;
 }
 
@@ -126,11 +130,38 @@ void bathroom_hori_apply(VJFrame *frame, int width, int height, int val)
 
 }
 
-
 void bathroom_apply(VJFrame *frame, int width, int height, int mode, int val) {
- 
-  switch(mode) {
-   case 1: bathroom_hori_apply(frame,width,height,val); break;
-   case 0: bathroom_verti_apply(frame,width,height,val); break;
-  }
+
+	int interpolate = 1;
+ 	int tmp1 = val;
+	int tmp2 = 0;
+	int motion = 0;
+	if(motionmap_active())
+	{
+		motionmap_scale_to( 64, 64, 1, 1, &tmp1, &tmp2, &n__, &N__ );
+		motion = 1;
+	}
+	else
+	{
+		N__ = 0;
+		n__ = 0;
+	}
+	if( n__ == N__ || n__ == 0 )
+		interpolate = 0;
+
+	switch(mode)
+	{
+	   case 1: bathroom_hori_apply(frame,width,height,tmp1); break;
+	   case 0: bathroom_verti_apply(frame,width,height,tmp1); break;
+  	}
+
+	if( interpolate )
+	{
+		motionmap_interpolate_frame( frame, N__,n__ );
+	}
+
+	if(motion)
+	{
+		motionmap_store_frame( frame );
+	}
 }

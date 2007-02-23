@@ -130,6 +130,7 @@
 #include "effects/nervous.h"
 #include "effects/morphology.h"
 #include "effects/threshold.h"
+#include "effects/motionmap.h"
 #include "effects/colmorphology.h"
 #include "effects/blob.h"
 #include "effects/ghost.h"
@@ -206,6 +207,7 @@ static struct
 {	morphology_malloc,		morphology_free,	VJ_IMAGE_EFFECT_MORPHOLOGY	},
 {	differencemap_malloc,		differencemap_free,	VJ_VIDEO_EFFECT_EXTDIFF		},
 {	threshold_malloc,		threshold_free,		VJ_VIDEO_EFFECT_EXTTHRESHOLD	},
+{	motionmap_malloc,		motionmap_free,		VJ_IMAGE_EFFECT_MOTIONMAP	},
 {	colmorphology_malloc,		colmorphology_free,	VJ_IMAGE_EFFECT_COLMORPH	},
 {	blob_malloc,			blob_free,		VJ_IMAGE_EFFECT_VIDBLOB 	},
 {	boids_malloc,			boids_free,		VJ_IMAGE_EFFECT_VIDBOIDS 	},
@@ -564,6 +566,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 81] = rgbchannel_init(width,height);
 	vj_effects[i + 82] = autoeq_init(width,height);
 	vj_effects[i + 83] = colorhis_init(width,height);
+	vj_effects[i + 84] = motionmap_init(width,height);
 	max_width = width;
 	max_height = height;
 

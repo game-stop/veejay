@@ -20,10 +20,13 @@
 #include <config.h>
 #include "slice.h"
 #include <stdlib.h>
+#include "common.h"
 
 static uint8_t *slice_frame[3];
 static int *slice_xshift;
 static int *slice_yshift;
+static int n__ = 0;
+static int N__ = 0;
 void slice_recalc(int width, int height, int val);
 
 
@@ -62,7 +65,8 @@ int 	slice_malloc(int width, int height)
     slice_yshift = (int*) vj_malloc(sizeof(int) * width);
     if(!slice_yshift) return 0;
     slice_recalc(width,height, 63);
- 
+    n__ = 0;
+    N__ = 0; 
     return 1;
 }
 
@@ -104,6 +108,7 @@ void slice_recalc(int width, int height, int val) {
   }
 }
 
+
 void slice_apply(VJFrame *frame, int width, int height, int val, int re_init) {
   unsigned int x,y,dx,dy;
   unsigned int len = (width*height);
@@ -112,7 +117,34 @@ void slice_apply(VJFrame *frame, int width, int height, int val, int re_init) {
 	uint8_t *Cr= frame->data[2];
 	
 
-  if(re_init==1) slice_recalc(width,height,val);
+	int interpolate = 1;
+	int tmp1 = val;
+	int tmp2 = re_init;
+	int motion = 0;
+	if( motionmap_active())
+	{
+		motionmap_scale_to( 128,1, 2, 0, &tmp1, &tmp2, &n__ , &N__ );
+		if( val >= 64 )
+		{
+			if( (rand() % 25 )== 0)
+				tmp2 = 1;
+		}
+		else
+		{
+			tmp2 = 1;
+		}
+		motion = 1;
+	}
+	else
+	{
+		n__ = 0;
+		N__ = 0;
+	}
+
+	if( n__ == N__ || n__ == 0 )
+		interpolate = 0;
+
+  if(tmp2==1) slice_recalc(width,height,tmp1);
 
   veejay_memcpy( slice_frame[0], Y, len);
   veejay_memcpy( slice_frame[1], Cb, len);
@@ -128,5 +160,12 @@ void slice_apply(VJFrame *frame, int width, int height, int val, int re_init) {
 	}
      }
   }
+
+	if( interpolate )
+		motionmap_interpolate_frame( frame, N__, n__ );
+
+	if( motion )
+		motionmap_store_frame( frame );
+
 }
 

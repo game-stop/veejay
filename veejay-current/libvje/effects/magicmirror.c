@@ -29,6 +29,7 @@ static double *funhouse_y = NULL;
 static unsigned int *cache_x = NULL;
 static unsigned int *cache_y = NULL;
 static unsigned int last[2] = {0,0};
+//static uint8_t *p0_frame_ = NULL;
 
 vj_effect *magicmirror_init(int w, int h)
 {
@@ -38,19 +39,19 @@ vj_effect *magicmirror_init(int w, int h)
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
 
-    ve->defaults[0] = 76;
-    ve->defaults[1] = 3;
-    ve->defaults[2] = 8;
-    ve->defaults[3] = 87;
+    ve->defaults[0] = w/4;
+    ve->defaults[1] = h/4;
+    ve->defaults[2] = 20;
+    ve->defaults[3] = 20;
 
     ve->limits[0][0] = 0;
-    ve->limits[1][0] = w;
+    ve->limits[1][0] = w/2;
     ve->limits[0][1] = 0;
-    ve->limits[1][1] = h;
+    ve->limits[1][1] = h/2;
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = 3600;
+    ve->limits[1][2] = 100;
     ve->limits[0][3] = 0;
-    ve->limits[1][3] = 3600;
+    ve->limits[1][3] = 100;
 
     ve->sub_format = 1;
     ve->description = "Magic Mirror Surface";
@@ -60,7 +61,10 @@ vj_effect *magicmirror_init(int w, int h)
     return ve;
 }
 // FIXME private
+#define    RUP8(num)(((num)+8)&~8)
 
+static int n__ = 0;
+static int N__ = 0;
 int magicmirror_malloc(int w, int h)
 {
 	magicmirrorbuf[0] = (uint8_t*)vj_yuvalloc(w,h);
@@ -82,6 +86,10 @@ int magicmirror_malloc(int w, int h)
 	veejay_memset(cache_x,0,w);
 	veejay_memset(cache_y,0,h);
 
+	n__ =0;
+	N__ =0;
+	//p0_frame_ = (uint8_t*) vj_malloc( sizeof(uint8_t) * RUP8( w  * h * 3) );
+
 	return 1;
 }
 
@@ -92,6 +100,8 @@ void magicmirror_free()
 	if(funhouse_y) free(funhouse_y);
 	if(cache_x) free(cache_x);
 	if(cache_y) free(cache_y);
+//	if(p0_frame_) free(p0_frame_);	
+//	p0_frame_=0;
 	magicmirrorbuf[0] = NULL;
 	magicmirrorbuf[1] = NULL;
 	magicmirrorbuf[2] = NULL;
@@ -105,13 +115,29 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 {
 	double c1 = (double)vx;
 	double c2 = (double)vy;
-	double c3 = (double)d/1000.;
+	int motion = 0;
+	if( motionmap_active())
+	{
+		motionmap_scale_to( 100,100,0,0, &d, &n, &n__, &N__ );
+		motion = 1;
+	}
+	else
+	{
+		n__ = 0;
+		N__ = 0;
+	}
+
+	double c3 = (double)d * 0.001;
 	unsigned int dx,dy,x,y,p,q,len=w*h;
-	double c4 = (double)n/1000.;
+	double c4 = (double)n * 0.001;
 	int changed = 0;
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
+	int interpolate = 1;
+
+	if( n__ == N__ || n__ == 0)
+		interpolate = 0;
 
 	if( d != last[1] )
 	{
@@ -134,7 +160,7 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 		for(y=0; y < h; y++)
 		{
 			double res;
-			fast_sin(res,(double)(c4*x));
+			fast_sin(res,(double)(c4*y));
 			funhouse_y[y] = res;
 			//funhouse_y[y] = sin(c4 * y);
 		}
@@ -145,29 +171,6 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 	veejay_memcpy( magicmirrorbuf[2], Cr, len );
 
 
-/*	for(y=0; y < h ; y++)
-	{
-		for(x=0; x < w; x++)
-		{
-			
-			dx = x + sin( c3 * x) * c1;
-			dy = y + sin( c4 * y ) * c2;
-
-			//dy = y + cos( c4 * y ) * c3;
-			if(dx < 0) dx += w;
-			if(dy < 0) dy += h;
-			if(dx < 0) dx = 0; else if (dx > w) dx = w;
-			if(dy < 0) dy = 0; else if (dy >= h) dy = h-1;
-			p = dy * w + dx;
-			yuv[0][y*w+x] = magicmirrorbuf[p];
-			
-			//yuv[0][y*w+x] = (magicmirrorbuf[p] + yuv[0][y*w+x] )>> 1;
-
-		}
-	}
-*/
-
-	// cache row results (speed up)
 	for(x=0; x < w; x++)
 	{
 		dx = x + funhouse_x[x] * c1;
@@ -183,7 +186,6 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 		cache_y[y] = dy;
 	}
 
-	// do image 
 	for(y=1; y < h-1; y++)
 	{
 		for(x=1; x < w-1; x++)
@@ -195,4 +197,38 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 			Cr[q] = magicmirrorbuf[2][p];
 		}
 	}
+/*
+	uint8_t *p0[3] = { 
+		p0_frame_ + 0,
+		p0_frame_ + (w*h),
+		p0_frame_ + (2*w*h) };
+
+	if(interpolate)
+	{
+		VJFrame prev;
+		veejay_memcpy(&prev, frame, sizeof(VJFrame));
+		prev->data[0] = p0_frame_;
+		prev->data[1] = p0_frame_ + (w*h);
+		prev->data[2] = p0_frame_ + (2*w*h);
+
+		motionmap_lerp_frame( frame, &prev, N__, n__ );
+	}
+
+	if( motionmap_active())
+	{
+		veejay_memcpy( prev->data[0], Y, w*h);
+		veejay_memcpy( prev->data[1], Cb, w*h);
+		veejay_memcpY( prev->data[2], Cr,w*h);
+	}*/
+
+	if( interpolate )
+	{
+		motionmap_interpolate_frame( frame, N__, n__ );
+	}
+
+	if( motion )
+	{
+		motionmap_store_frame(frame);
+	}
+
 }

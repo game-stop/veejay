@@ -24,7 +24,7 @@ libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			transitions/fadecolor.c effects/lumablend.c effects/chromamagick.c \
 			transitions/fadecolorrgb.c effects/magicoverlays.c  effects/binaryoverlays.c effects/pencilsketch.c effects/diffimg.c \
 			effects/swirl.c effects/chromium.c effects/uvcorrect.c effects/chromapalette.c effects/radialblur.c effects/fisheye.c effects/raster.c effects/smear.c effects/magicmirror.c effects/lumamask.c effects/pixelate.c effects/colorshift.c effects/scratcher.c effects/opacitythreshold.c \
-			effects/opacityadv.c effects/rgbkeysmooth.c effects/mask.c effects/distort.c \
+			effects/opacityadv.c effects/rgbkeysmooth.c effects/mask.c effects/distort.c effects/motionmap.c \
 			transitions/wipe.c effects/magicscratcher.c effects/chromascratcher.c \
 			effects/tracer.c effects/mtracer.c effects/dupmagic.c effects/keyselect.c \
 			effects/greyselect.c effects/bwselect.c effects/complexsaturate.c \

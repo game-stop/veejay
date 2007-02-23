@@ -1,7 +1,9 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002-2007 Niels Elburg <elburg@hio.hen.nl>
+ *
+ * some portion by: (referenced)
  * Copyright (C) 2001 Matthew J. Marjanovic <maddog@mir.com>
  *
  * This program is free software; you can redistribute it and/or
@@ -287,6 +289,13 @@ double m_get_polar_y(double r, double a);
 
 inline void blur(uint8_t *dst, uint8_t *src, int w, int radius, int dstStep, int srcStep);
 inline void blur2(uint8_t *dst, uint8_t *src, int w, int radius, int power, int dstStep, int srcStep);
+
+
+extern	int     motionmap_active();
+extern void	motionmap_scale_to( int p1max, int p2max,int p1min,int p2min, int *p1val, int *p2val, int *pos, int *len );
+extern void	motionmap_lerp_frame( VJFrame *cur, VJFrame *prev, int N, int n );
+extern void	motionmap_store_frame(VJFrame *fx);
+extern void	motionmap_interpolate_frame(VJFrame *fx, int N, int n);
 
 
 void	veejay_histogram_analyze( void *his, VJFrame *f , int t);

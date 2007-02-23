@@ -20,7 +20,7 @@
 #include <config.h>
 #include "smear.h"
 #include <stdlib.h>
-
+#include "common.h"
 
 vj_effect *smear_init(int w, int h)
 {
@@ -134,17 +134,47 @@ static void _smear_apply_y(VJFrame *frame, int width, int height, int val)
 }
 
 
+static int n__ = 0;
+static int N__ = 0;
 
 void smear_apply( VJFrame *frame, int width, int height,int mode, int val)
 {
-   switch(mode)
-   {
-	case 0:	_smear_apply_x(frame,width,height,val); break;
-	case 1: _smear_apply_x_avg(frame,width,height,val); break;
-	case 2: _smear_apply_y(frame,width,height,val); break; 
-        case 3: _smear_apply_y_avg(frame,width,height,val); break;
-	default: break;
+   	int interpolate = 1;
+        int tmp1 = mode;
+        int tmp2 = val;
+        int motion = 0;
+        if(motionmap_active())
+        {
+                motionmap_scale_to( 255, 3, 0, 0, &tmp2, &tmp1, &n__, &N__ );
+                motion = 1;
+        }
+	else
+	{
+		N__ = 0;
+		n__ = 0;
+	}
 
-   }
+        if( n__ == N__ || n__ == 0 )
+                interpolate = 0;
+
+	switch(mode)
+   	{
+		case 0:	_smear_apply_x(frame,width,height,tmp2); break;
+		case 1: _smear_apply_x_avg(frame,width,height,tmp2); break;
+		case 2: _smear_apply_y(frame,width,height,tmp2); break; 
+		case 3: _smear_apply_y_avg(frame,width,height,tmp2); break;
+		default: break;
+   	}
+
+  	if( interpolate )
+        {
+                motionmap_interpolate_frame( frame, N__,n__ );
+        }
+
+        if(motion)
+        {
+                motionmap_store_frame( frame );
+        }
+
 }
 

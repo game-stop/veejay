@@ -47,6 +47,9 @@ vj_effect *sinoids_init(int width, int height)
 	ve->has_user = 0;
     return ve;
 }
+
+static int n__ = 0;
+static int N__= 0;
 //FIXME private
 int sinoids_malloc(int width, int height)
 {
@@ -59,7 +62,8 @@ int sinoids_malloc(int width, int height)
   sinoid_frame[1] = sinoid_frame[0] + (width * height);
   sinoid_frame[2] = sinoid_frame[1] + (width * height);
 
-    
+   n__ = 0;
+   N__ = 0; 
   for(i=0; i < width; i++ ) {
 	sinoids_X[i] = (int) ( sin( ((double)i/(double)width) * 2 * 3.1415926) * 1);
 	sinoids_X[i] *= 4;
@@ -93,14 +97,32 @@ static int current_sinoids = 100;
 void sinoids_apply(VJFrame *frame, int width, int height, int m, int s) {
 	unsigned int len = width * height;
 	unsigned int r,c;
-  uint8_t *Y = frame->data[0];
+	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
+	int interpolate = 1;
+	int tmp1 = m;
+	int tmp2 = s;
+	int motion = 0;
+	if( motionmap_active())
+	{
+		motionmap_scale_to( 1,1000,0, 0, &tmp1, &tmp2, &n__, &N__ );
+		motion = 1;
+	}
+	else
+	{
+		n__ = 0;
+		N__ = 0;
+	}
+	if( n__ == N__ || n__ == 0 )
+		interpolate = 0;
 	
-        if(s != current_sinoids) {
-		sinoids_recalc( width, s);
-		current_sinoids = s;
+
+	
+        if(tmp2 != current_sinoids) {
+		sinoids_recalc( width, tmp2);
+		current_sinoids = tmp2;
 	}
 
 	if(m==0) {
@@ -127,4 +149,11 @@ void sinoids_apply(VJFrame *frame, int width, int height, int m, int s) {
 	        }
 	      }
 	}
+
+	if( interpolate )
+		motionmap_interpolate_frame( frame, N__, n__ );
+	
+	if (motion)
+		motionmap_store_frame( frame );
+
 }

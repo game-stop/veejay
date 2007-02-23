@@ -160,10 +160,11 @@ void	*vj_calloc( unsigned int size )
 	return ptr;	
 }
 
+#define    RUP8(num)(((num)+8)&~8)
 
 void *vj_yuvalloc( unsigned int w, unsigned int h )
 {
-	size_t len = (w * h * 3);
+	size_t len = RUP8(w * h * 3);
 	unsigned char *ptr = vj_malloc( len );
 
 	veejay_memset( ptr, 0, (w*h));

@@ -256,6 +256,8 @@ void	vj_event_toggle_copyright( void *ptr, const char format[], va_list ap );
 void	vj_event_toggle_osd_extra(void *ptr, const char format[], va_list ap);
 #endif
 void	vj_event_toggle_vp_render( void *ptr, const char format[], va_list ap );
+void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap);
+void	vj_event_toggle_projport( void *ptr, const char format[], va_list ap );
 void	vj_event_toggle_viewport( void *ptr, const char format[], va_list ap );
 void	vj_event_set_framerate( void *ptr, const char format[], va_list ap );
 void	vj_event_sync_correction( void *ptr,const char format[], va_list ap );

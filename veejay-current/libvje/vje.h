@@ -27,7 +27,7 @@
 
 #define FX_LIMIT	1024
 
-#define MAX_EFFECTS 126
+#define MAX_EFFECTS 127
 #define PARAM_WIDTH	    (1<<0x2)
 #define PARAM_HEIGHT	(1<<0x3)
 #define PARAM_FADER  	(1<<0x1)
@@ -93,6 +93,7 @@ typedef struct vj_effect_t {
     int static_bg;				// unused
     int has_help;				// unused
     int rgb_conv;			// temporary fix for color effects
+    int n_out;	
     void *user_data;			// private effect data
 } vj_effect;
 

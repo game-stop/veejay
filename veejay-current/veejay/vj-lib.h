@@ -318,7 +318,11 @@ typedef struct {
 	sequencer_t *seq;
 	int  no_caching;
 	void	*viewport;
+	void	*projport;
 	int	 use_vp;
+	int	 use_proj;
+	int 	which_vp;
+	int	frontback;
 	int	out_buf;
 } veejay_t;
 

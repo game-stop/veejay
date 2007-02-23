@@ -215,6 +215,8 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_COPYRIGHT,			SDLK_c,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_OSD_EXTRA,			SDLK_h,		VIMS_MOD_CTRL,	NULL	},
 	{ VIMS_VIEWPORT,			SDLK_v,		VIMS_MOD_CTRL,	NULL	},
+	{ VIMS_PROJECTION,			SDLK_p,		VIMS_MOD_CTRL,  NULL	},
+	{ VIMS_FRONTBACK,			SDLK_b,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_SELECT_BANK,			SDLK_1,		VIMS_MOD_NONE,	"1"	},
 	{ VIMS_SELECT_BANK,			SDLK_2,		VIMS_MOD_NONE,	"2"	},
 	{ VIMS_SELECT_BANK,			SDLK_3,		VIMS_MOD_NONE,	"3"	},
@@ -6265,6 +6267,41 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 	}
 
 }
+
+void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	if(v->frontback == 0 )
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Viewport is rendered before FX processing");
+		v->frontback = 1;
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Viewport is rendered after FX processing");
+		v->frontback = 0;
+	}
+
+}
+void	vj_event_toggle_projport( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	if(v->use_proj == 0 )
+	{
+		v->use_proj = 1;
+		if( viewport_active( v->projport ))
+		{
+			v->use_osd = 3;
+		}
+		veejay_msg(VEEJAY_MSG_INFO, "Projection enabled");
+		v->which_vp = 1;
+	}
+	else
+	{
+		v->use_proj = 0;
+		veejay_msg(VEEJAY_MSG_INFO, "Projection disabled");
+	}
+}
 void	vj_event_toggle_viewport( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -6278,6 +6315,7 @@ void	vj_event_toggle_viewport( void *ptr, const char format[], va_list ap )
 			v->use_osd = 3;
 			veejay_msg(VEEJAY_MSG_INFO, "Viewport help enabled");
 		}
+		v->which_vp = 0;
 	}
 	else
 	{
@@ -6305,9 +6343,15 @@ void	vj_event_toggle_osd( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
 	if(v->use_osd == 0 )
+	{
 		v->use_osd = 1;
+		veejay_msg(VEEJAY_MSG_INFO, "OSD on");
+	}
 	else
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "OSD off");
 		v->use_osd = 0;
+	}
 }
 void	vj_event_toggle_copyright( void *ptr, const char format[], va_list ap )
 {

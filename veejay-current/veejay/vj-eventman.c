@@ -767,6 +767,17 @@ void		vj_init_vevo_events(void)
 				"Looptype (0=None, 1=Normal, 2=Pingpong)",
 				-1,
 				NULL);
+	index_map_[VIMS_FRONTBACK]	=	_new_event(
+				NULL,
+				VIMS_FRONTBACK,
+				"Render viewport before or after FX processing",
+				vj_event_viewport_frontback,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL,
+				NULL );
+
+
 	index_map_[VIMS_PREVIEW_BW]	=	_new_event(
 				NULL,
 				VIMS_PREVIEW_BW,
@@ -2334,6 +2345,16 @@ void		vj_init_vevo_events(void)
 				0,
 				VIMS_ALLOW_ANY,
 				NULL 
+				);
+
+	index_map_[ VIMS_PROJECTION ] 			=	_new_event(		
+				NULL,
+				VIMS_PROJECTION,
+				"Projection configuration (Perspective Projection)",
+				vj_event_toggle_projport,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL
 				);
 
 
