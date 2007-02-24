@@ -986,6 +986,12 @@ void		multitrack_set_quality( void *data , int quality )
 			break;
 	}
 
+	if( w && h )
+	{
+		w = (w / 8 ) * 8;
+		h = (h / 8 ) * 8;
+	}
+
 	if(!gvr_track_configure( mt->preview, mt->master_track,w,h ) )
 	{
 		veejay_msg(0, "Unable to configure preview %d x %d",w , h );
