@@ -80,8 +80,8 @@ int 	timedistort_malloc( int w, int h )
 	planes[2] = planes[1] + (PLANES * w * h );
 
 	veejay_memset( planes[0],0, (PLANES * w * h ));
-	veejay_memset( planes[1],128,(PLANES * w * H ));
-	veejay_memset( planes[2],128,(PLANES * w * H ));
+	veejay_memset( planes[1],128,(PLANES * w * h  ));
+	veejay_memset( planes[2],128,(PLANES * w * h ));
 
 	have_bg = 0;
 	n__ = 0;
