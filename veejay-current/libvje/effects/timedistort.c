@@ -75,9 +75,13 @@ int 	timedistort_malloc( int w, int h )
 	if(!nonmap)
 		return 0;
 
-	planes[0] = vj_calloc( (PLANES * 3 * w * h) * sizeof(uint8_t));
+	planes[0] = vj_malloc( (PLANES * 3 * w * h) * sizeof(uint8_t));
 	planes[1] = planes[0] + (PLANES * w * h );
 	planes[2] = planes[1] + (PLANES * w * h );
+
+	veejay_memset( planes[0],0, (PLANES * w * h ));
+	veejay_memset( planes[1],128,(PLANES * w * H ));
+	veejay_memset( planes[2],128,(PLANES * w * H ));
 
 	have_bg = 0;
 	n__ = 0;
