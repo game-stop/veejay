@@ -103,6 +103,8 @@
 #include "effects/ripple.h"
 #include "effects/rippletv.h"
 #include "effects/bathroom.h"
+#include "effects/timedistort.h"
+#include "effects/chameleon.h"
 #include "effects/goom.h"
 #include "effects/slice.h"
 #include "effects/zoom.h"
@@ -225,6 +227,8 @@ static struct
 {	flare_malloc,			flare_free,		VJ_IMAGE_EFFECT_FLARE		},
 {	goomfx_malloc,			goomfx_free,		VJ_IMAGE_EFFECT_GOOM		},
 {	rgbchannel_malloc,		rgbchannel_free,	VJ_IMAGE_EFFECT_RGBCHANNEL	},
+{	timedistort_malloc,		timedistort_free,	VJ_IMAGE_EFFECT_TIMEDISTORT	},
+{	chameleon_malloc,		chameleon_free,		VJ_IMAGE_EFFECT_CHAMELEON	},
 {	NULL			,	NULL			,0				},
 };
 
@@ -567,6 +571,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 82] = autoeq_init(width,height);
 	vj_effects[i + 83] = colorhis_init(width,height);
 	vj_effects[i + 84] = motionmap_init(width,height);
+	vj_effects[i + 85] = timedistort_init(width,height);
+	vj_effects[i + 86] = chameleon_init(width,height);
 	max_width = width;
 	max_height = height;
 

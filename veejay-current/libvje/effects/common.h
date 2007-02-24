@@ -296,7 +296,8 @@ extern void	motionmap_scale_to( int p1max, int p2max,int p1min,int p2min, int *p
 extern void	motionmap_lerp_frame( VJFrame *cur, VJFrame *prev, int N, int n );
 extern void	motionmap_store_frame(VJFrame *fx);
 extern void	motionmap_interpolate_frame(VJFrame *fx, int N, int n);
-
+extern uint8_t *motionmap_bgmap();
+extern uint32_t motionmap_activity();
 
 void	veejay_histogram_analyze( void *his, VJFrame *f , int t);
 void	veejay_histogram_del(void *his);

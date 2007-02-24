@@ -111,7 +111,7 @@ int		motionmap_malloc(int w, int h )
 	veejay_msg(2, "This is 'Motion Mapping'");
 	veejay_msg(2, "Add any of the following to the FX chain (if not already present)");
 	veejay_msg(2, "\tBathroom Window, Displacement Mapping, Multi Mirrors, Magic Mirror, Sinoids");
-	veejay_msg(2, "\tSlice Window and/or Smear");
+	veejay_msg(2, "\tSlice Window , Smear, ChameleonTV and TimeDistort TV");
 	veejay_msg(2, "Using %2.2fMb for large buffer", (RUP8(w*h*3)*(MAXCAPBUF+1))/1048576.0f);
 	veejay_memset( histogram_, 0, sizeof(uint32_t) * HIS_LEN );
 	nframe_ = 0;
@@ -166,11 +166,20 @@ uint8_t	*motionmap_interpolate_buffer()
 	return interpolate_buf;
 }
 
+uint8_t *motionmap_bgmap()
+{
+	return binary_img;
+}
+
 int	motionmap_active()
 {
 	return running;
 }
 
+uint32_t	motionmap_activity()
+{
+	return keyv_;
+}
 
 void	motionmap_scale_to( int p1max, int p2max, int p1min, int p2min, int *p1val, int *p2val, int *pos, int *len )
 {

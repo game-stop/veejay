@@ -16,8 +16,8 @@ libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			effects/revtv.c effects/softblur.c effects/zoom.c effects/split.c effects/widthmirror.c \
 			effects/frameborder.c effects/dummy.c effects/rawman.c effects/rawval.c \
 			effects/smuck.c effects/transform.c effects/borders.c effects/colflash.c \
-			effects/rgbkey.c effects/solarize.c effects/mirrors2.c \
-			effects/whiteframe.c effects/deinterlace.c effects/lumakey.c \
+			effects/rgbkey.c effects/solarize.c effects/mirrors2.c effects/timedistort.c \
+			effects/whiteframe.c effects/deinterlace.c effects/lumakey.c effects/chameleon.c \
 			effects/coloradjust.c effects/gamma.c effects/reflection.c effects/rotozoom.c \
 			transitions/transblend.c transitions/slidingdoor.c effects/color.c \
 			transitions/transline.c transitions/transop.c transitions/transcarot.c \

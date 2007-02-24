@@ -202,11 +202,13 @@ enum {
 	VJ_IMAGE_EFFECT_AUTOEQ	=	182,
 	VJ_IMAGE_EFFECT_COLORHIS = 	183,
 	VJ_IMAGE_EFFECT_MOTIONMAP	=	184,
+	VJ_IMAGE_EFFECT_TIMEDISTORT	=	185,
+	VJ_IMAGE_EFFECT_CHAMELEON	=	186,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 185
+#define VJ_IMAGE_EFFECT_MAX 187
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 242
@@ -551,5 +553,9 @@ extern void autoeq_apply( VJFrame *frame, int width, int height, int val, int i,
 extern void colorhis_apply( VJFrame *frame, int w, int h, int v, int m, int i, int s );
 
 extern void diff_destroy();
+
+extern void timedistort_apply( VJFrame *frame, int w, int h, int val );
+
+extern void chameleon_apply( VJFrame *frame, int w, int h, int mode, int refresh );
 
 #endif
