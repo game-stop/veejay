@@ -129,7 +129,10 @@ static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... )
 		g_snprintf( block, sizeof(block)-1, "%03d:;", vims_id );
 		gint n = vj_client_send( v->fd, V_CMD, block );
 		if( n <= 0 )
+		{
+			gvr_close_connection( v );
 			return 0;
+		}
 		return n;
 	}
 
@@ -140,8 +143,10 @@ static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... )
 	
 	gint n	= vj_client_send( v->fd, V_CMD, block );
 	if( n <= 0 )
+	{
+		gvr_close_connection( v);
 		return 0;
-
+	}
 	return n;
 }
 
@@ -156,6 +161,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 	{
 		free(tmp);
 		veejay_msg(0,"Error reading header of %d bytes: %d", header_len,n );
+		gvr_close_connection(v);
 		return 0;
 	}
 
@@ -163,6 +169,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 	{
 		free(tmp);
 		veejay_msg(0, "Error reading header contents");
+		gvr_close_connection(v);
 		return 0;
 	}
 	
@@ -170,6 +177,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 	{
 		free(tmp);
 		veejay_msg(0, "Frame is empty");
+		gvr_close_connection(v);
 		return 0;
 	}
 
@@ -187,6 +195,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 		{
 			veejay_msg(0, "Recv %d out of %d bytes", bw,len);
 			free(tmp);
+			gvr_close_connection(v);
 			return 0;
 		}
 		bw += n;
@@ -306,7 +315,6 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 
 	if(v->have_frame )
 	{
-//		veejay_msg(0, "Missed frame, UI too slow");
 		return 1;
 	}
 
@@ -328,11 +336,8 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 		return 0;
 	}
 
-//	g_mutex_lock(vp->mutex);
 	bw = lzo_decompress2( vp->lzo, v->compr_buffer, bw, v->data_buffer);
 	v->have_frame = 1;
-//	g_mutex_unlock(vp->mutex);	
-
 	return bw;
 }
 
@@ -341,8 +346,12 @@ static int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v )
 {
 	if(!v)
 		return 0;
-	if( vj_client_poll( v->fd , V_STATUS ) )
+	int tmp1 = 0;
+	tmp1 = vj_client_poll( v->fd , V_STATUS );
+ 	if(tmp1)
 		return veejay_process_status( vp, v );
+	else if( tmp1 == -1 )
+		gvr_close_connection(v);
 	return 0;
 }
 
@@ -352,9 +361,7 @@ static	void	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
 	{
 		if( veejay_get_image_data( vp, v ) == 0 )
 		{
-		//	g_mutex_lock(vp->mutex);
 			gvr_close_connection( v );
-		//	g_mutex_unlock(vp->mutex);
 		}
 	}
 }

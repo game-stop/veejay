@@ -1683,18 +1683,6 @@ prompt_dialog(const char *title, char *msg)
 }
 
 
-static	void	gveejay_crash()
-{
-	GtkWidget *w = glade_xml_get_widget_(info->main_window, "veejay_connection" );
-	gtk_widget_show( w );
-	GtkWidget *ww = glade_xml_get_widget_(info->main_window, "gveejay_window" );
-	gtk_widget_hide( ww );
-
-	info->watch.state = STATE_DISCONNECT;
-
-	vj_launch_toggle(TRUE);
-}
-
 int
 error_dialog(const char *title, char *msg)
 {
@@ -1981,11 +1969,19 @@ static  void	vj_msg(int type, const char format[], ...)
 	va_end(args);
 }*/
 
+static	void	abort_gveejay()
+{
+	veejay_msg(0,"Fatal Error: Lost connection with Veejay" );
+	exit(-1);
+}
+
 static	void	msg_vims(char *message)
 {
 	if(!info->client)
 		return;
-	vj_client_send(info->client, V_CMD, message);
+	int n = vj_client_send(info->client, V_CMD, message);
+	if( n <= 0 )
+		abort_gveejay();
 }
 
 int	get_loop_value()
@@ -2020,7 +2016,7 @@ static	void	multi_vims(int id, const char format[],...)
 	va_end(args);
 
 	if(vj_client_send( info->client, V_CMD, block)<=0 )
-		gveejay_crash();
+		abort_gveejay();
  
 }
 
@@ -2031,7 +2027,7 @@ static	void single_vims(int id)
 		return;
 	sprintf(block, "%03d:;",id);
 	if(vj_client_send( info->client, V_CMD, block )<=0)
-		gveejay_crash();
+		abort_gveejay();
 }
 
 static gchar	*recv_vims(int slen, int *bytes_written)
@@ -5889,13 +5885,13 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 {
 	vj_gui_t *gui = (vj_gui_t*) data;
 	if( (condition&G_IO_ERR) ) {
-		gveejay_crash();
+		abort_gveejay();
 		return FALSE; }
 	if( (condition&G_IO_HUP) ) {
-		gveejay_crash();
+		abort_gveejay();
 		return FALSE; }
 	if( (condition&G_IO_NVAL) ) {
-		gveejay_crash();
+		abort_gveejay();
 		return FALSE; 
 	}
 	if(gui->watch.state==STATE_PLAYING && (condition & G_IO_IN)&& gui->watch.p_state == 0 )
@@ -5910,7 +5906,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if(sta_len[0] != 'V' || nb <= 0 )
 		{
 			gui->status_lock = 0;
-			gveejay_crash();
+			abort_gveejay();
 			return FALSE;
 		}
 		int n_bytes = 0;
@@ -5918,7 +5914,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if( n_bytes == 0 || n_bytes >= STATUS_BYTES )
 		{
 			gui->status_lock = 0;
-			gveejay_crash();
+			abort_gveejay();
 			return FALSE;
 		}
 		veejay_memset( gui->status_msg,0, STATUS_BYTES ); 
@@ -5927,14 +5923,17 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		if(nb <= 0 )
 		{
 			gui->status_lock = 0;
-			gveejay_crash();
+			abort_gveejay();
 			return FALSE;
- 		}
-                while(vj_client_poll( gui->client, V_STATUS ) > 0)
+		}
+
+		int tmp1;
+
+                while((tmp1 = vj_client_poll( gui->client, V_STATUS )) > 0)
                 {
 			// is there a more recent message ?
 			unsigned char tmp[6];
-			bzero(tmp,6);
+			veejay_memset( tmp, 0, sizeof(tmp));
 			veejay_memset( gui->status_msg, 0,STATUS_BYTES ); 
 		        nb = vj_client_read( gui->client,V_STATUS,tmp, 5);
 			int bb = 0;
@@ -5943,10 +5942,12 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 				nb = vj_client_read(gui->client, V_STATUS, gui->status_msg, bb );
 			if(nb<=0)
 			{
-				gveejay_crash();
+				abort_gveejay();
 				return FALSE;
 			}
 		}
+		if( tmp1 == -1 )
+			abort_gveejay();
 
 		if(nb > 0)
 		{
@@ -5990,8 +5991,15 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 
 	//	info->prev_mode = pm;
 		char tmp[5];
-                while(vj_client_poll( gui->client, V_STATUS ))
-                       nb = vj_client_read( gui->client,V_STATUS,tmp, 1); 
+                while( (tmp1 = vj_client_poll( gui->client, V_STATUS )))
+                {
+		       nb = vj_client_read( gui->client,V_STATUS,tmp, 1);
+		       if(nb <= 0 )
+				abort_gveejay();
+		}
+		if(tmp1==-1)
+			abort_gveejay();
+		 
 	}
 	return TRUE;
 }
@@ -6744,8 +6752,8 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		info->play_direction = -1; else info->play_direction=1;
 	if( speed < 0 ) speed *= -1;
 
-	update_spin_range( "spin_framedelay", 0, 9, 0);
-	update_slider_range( "speed_slider", -25,25,speed,0);
+	update_spin_range( "spin_framedelay", 1, 13, 0);
+	update_slider_range( "speed_slider", -13,13,speed,0);
 	update_label_str( "label_hostnamex", (hostname == NULL ? group_name: hostname ) );
 	update_label_i( "label_portx",port_num,0);
 
@@ -6836,20 +6844,19 @@ gboolean		is_alive( void )
 		if(!vj_gui_reconnect( remote, NULL, port ))
 		{
 			info->watch.state = STATE_STOPPED;
-		// prompt error FIXME
+			if(gui->sensitive)
+				vj_gui_disable();
+			if(!gui->launch_sensitive)
+				vj_launch_toggle(TRUE);			
+
 		}
 		else
 		{
 			info->watch.state = STATE_PLAYING;
 			info->key_id = gtk_key_snooper_install( key_handler , NULL);
-		//	init_cpumeter();
-		//	info->logging = g_timeout_add( G_PRIORITY_LOW, update_log,(gpointer*) info );
 			veejay_stop_connecting(gui);
-		//	info->watch.state = STATE_PLAYING;
 			multrack_audoadd( info->mt, remote, port );
 			info->watch.p_state = 0; 
-			info->watch.state = STATE_PLAYING;
-
 		}
 	}
 

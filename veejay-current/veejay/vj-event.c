@@ -7465,17 +7465,19 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 
 	veejay_image_t *img = NULL;
 
-	VJFrame *frame = v->effect_frame1;
+	VJFrame frame;
+	veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
+	vj_perform_get_primary_frame( v, frame.data, 0 );
 
 	if( use_bw_preview_ )
 		img = vj_fastbw_picture_save_to_mem(
-				frame,
+				&frame,
 				args[0],
 				args[1],
 			(v->video_out == 4 ? 4 : v->pixel_format ));
 	else
 		img = vj_fast_picture_save_to_mem(
-				frame,
+				&frame,
 				args[0],
 				args[1],
 			(v->video_out == 4 ? 4 : v->pixel_format ));

@@ -657,7 +657,8 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 			dst->width,
 			dst->height,
 			dst->format,
-			sws_type | cpu_flags,
+		//	sws_type | sws_context_flags_,
+			sws_context_flags_,
 			s->src_filter,
 			s->dst_filter,
 			NULL
@@ -760,9 +761,6 @@ void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 
 	sws_scale( s->sws, src->data, src_stride, 0, src->height,
 		dst->data, dst_stride );
-//#ifdef HAVE_ASM_MMX
-  //      __asm__ __volatile__ ( _EMMS:::"memory");
-//#endif
 }
 void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 {
@@ -772,15 +770,11 @@ void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 
 	sws_scale( s->sws, src->data, src_stride, 0, src->height,
 		dst->data, dst_stride );
-//#ifdef HAVE_ASM_MMX
-  //      __asm__ __volatile__ ( _EMMS:::"memory");
-//#endif
 }
 
 int	yuv_sws_get_cpu_flags(void)
 {
 	int cpu_flags = 0;
-	return 0;
 #ifdef HAVE_ASM_MMX
 	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX;
 #endif
@@ -794,9 +788,7 @@ int	yuv_sws_get_cpu_flags(void)
 	cpu_flags = cpu_flags | SWS_CPU_CAPS_ALTIVEC;
 #endif
 
-	cpu_flags = cpu_flags | SWS_FULL_CHR_H_INT;
-
-	cpu_flags = cpu_flags | SWS_FULL_CHR_H_INP;
+	cpu_flags = cpu_flags | SWS_FAST_BILINEAR;
 
 	return cpu_flags;
 }

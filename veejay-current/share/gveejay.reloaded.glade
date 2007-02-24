@@ -818,7 +818,7 @@
 		  <child>
 		    <widget class="GtkImage" id="image2404">
 		      <property name="visible">True</property>
-		      <property name="pixbuf">icon_plus.png</property>
+		      <property name="pixbuf">icon_osd.png</property>
 		      <property name="xalign">0.5</property>
 		      <property name="yalign">0.5</property>
 		      <property name="xpad">0</property>

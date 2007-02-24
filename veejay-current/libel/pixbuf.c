@@ -343,18 +343,9 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 	return ret;
 }
 
-static	sws_template	sws_templ;
-static  sws_template	bw_templ;
-static  void *scaler = NULL;
-static  void *bwscaler = NULL;
-static  int scale_dim_[2] = {0,0};
-static int scale_dim_bw[2] = {0,0};
 void		vj_picture_free()
 {
-	if(scaler)
-		yuv_free_swscaler( scaler );
-	if(bwscaler)
-		yuv_free_swscaler( bwscaler );
+
 }
 
 veejay_image_t		*vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt )
@@ -364,39 +355,32 @@ veejay_image_t		*vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out
 		return NULL;
 
 	image->image= (void*) gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, out_w, out_h );
-	VJFrame src,dst;
-	veejay_memset(&src,0,sizeof(VJFrame));
-	veejay_memset(&dst,0,sizeof(VJFrame));
 
-	if( frame->ssm )
-		fmt = PIX_FMT_YUV444P;
+	int pixfmt = get_ffmpeg_pixfmt( fmt );
 
-	vj_get_yuv_template( &src,frame->width,frame->height,fmt );
-	src.data[0] = frame->data[0];
-	src.data[1] = frame->data[1];	
-	src.data[2] = frame->data[2];
-	vj_get_rgb_template( &dst, out_w, out_h);
-	dst.data[0] = (uint8_t*) gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image );
-
-	if( !scaler || scale_dim_[0] != out_w && scale_dim_[1] != out_h )
+	if(frame->ssm)
 	{
-		if(scaler)
-			yuv_free_swscaler(scaler);
-		scaler = yuv_init_swscaler( &src,&dst, &sws_templ, 
-				yuv_sws_get_cpu_flags() );
-		scale_dim_[0] = out_w;
-		scale_dim_[1] = out_h;
-	}
-	else
-	{
-#ifdef STRICT_CHECKING
-		assert( scale_dim_[0] == dst.width );
-		assert( scale_dim_[1] == dst.height );
-		assert( scaler != NULL );
-#endif
+		switch( fmt )
+		{
+			case FMT_420F:
+			case FMT_422F:
+				pixfmt = PIX_FMT_YUVJ444P;
+				break;
+			default:	
+				pixfmt = PIX_FMT_YUV444P;
+				break;
+		}
 	}
 
-	yuv_convert_and_scale_rgb( scaler, &src, &dst );
+	VJFrame *src1 = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
+				frame->width,frame->height, pixfmt );
+	VJFrame *dst1 = yuv_rgb_template( gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image ),
+					  out_w, out_h, PIX_FMT_RGB24 ); 
+
+	yuv_convert_any( src1, dst1, src1->format,dst1->format );
+
+	free(src1);
+	free(dst1);
 
 	return image;
 }
@@ -408,34 +392,40 @@ veejay_image_t		*vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int o
 		return NULL;
 
 	image->image= (void*) gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, out_w, out_h );
-	VJFrame src,dst;
-	veejay_memset(&src,0,sizeof(VJFrame));
-	veejay_memset(&dst,0,sizeof(VJFrame));
+	int pixfmt = get_ffmpeg_pixfmt( fmt );
 
-	vj_get_yuv_template( &src,frame->width,frame->height,fmt);
-	src.data[0] = frame->data[0];
-	src.data[1] = frame->data[1];	
-	src.data[2] = frame->data[2];
-	vj_get_yuv_template( &dst,out_w,out_h,fmt );
-	dst.data[0] = (uint8_t*) gdk_pixbuf_get_pixels( image->image );
-	dst.data[1] = dst.data[0] + (out_w * out_h );
-	dst.data[2] = dst.data[1] + (out_w * out_h );
-
-	if( !bwscaler || scale_dim_bw[0] != out_w || scale_dim_bw[1] != out_h )
+	if(frame->ssm)
 	{
-		if(bwscaler )
-			yuv_free_swscaler( bwscaler );
-
-		bwscaler = yuv_init_swscaler( &src,&dst, &bw_templ, 
-				yuv_sws_get_cpu_flags() );
-
-		scale_dim_bw[0] = out_w;
-		scale_dim_bw[1] = out_h;
+		switch( fmt )
+		{
+			case FMT_420F:
+			case FMT_422F:
+				pixfmt = PIX_FMT_YUVJ444P;
+				break;
+			default:	
+				pixfmt = PIX_FMT_YUV444P;
+				break;
+		}
 	}
-#ifdef STRICT_CHECKING
-	assert( bwscaler != NULL );
-#endif
-	yuv_convert_and_scale( bwscaler, &src, &dst );
+
+
+	VJFrame *src1 = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
+						frame->width,frame->height, pixfmt );
+
+	uint8_t *planes[3]; 
+		
+	planes[0] = (uint8_t*) gdk_pixbuf_get_pixels( image->image );
+	planes[1] = planes[0] + (out_w * out_h );
+	planes[2] = planes[1] + (out_w * out_h );
+
+
+	VJFrame *dst1 = yuv_yuv_template( planes[0], planes[1], planes[2],
+					  out_w , out_h, pixfmt );
+
+	yuv_convert_any(src1,dst1,src1->format, dst1->format );
+
+	free(src1);
+	free(dst1);
 
 	return image;
 }

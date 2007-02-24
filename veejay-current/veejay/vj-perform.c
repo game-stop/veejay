@@ -922,9 +922,11 @@ int vj_perform_audio_start(veejay_t * info)
 			"Audio playback disabled (unable to connect to jack)");
 		return 1;
 	}
+
+	jack_rate_ = vj_jack_rate();
+
 	if ( res == 2 )
 	{
-		jack_rate_ = vj_jack_rate();	
 		veejay_msg(VEEJAY_MSG_WARNING, "Jack plays at %d Hz, resampling audio from %d -> %d",jack_rate_,el->audio_rate,jack_rate_);
 		resample_jack = audio_resample_init( el->audio_chans,el->audio_chans, jack_rate_, el->audio_rate);
 
@@ -936,6 +938,10 @@ int vj_perform_audio_start(veejay_t * info)
 		}
 	
 		return 1;
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Jack is running the same samplerate as Veejay");
 	}
 	return 1;
 #else
@@ -2882,9 +2888,12 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 				break;
 		}
 
-	
 		if( jack_rate_ != el->audio_rate && rs)
 		{
+#ifdef STRICT_CHECKING
+			assert( resample_jack != NULL );
+			assert( num_samples > 0 );
+#endif
 			veejay_memcpy( resample_audio_buffer, a_buf, num_samples * bps);
 			num_samples = audio_resample( resample_jack, (short*)top_audio_buffer,(short*)a_buf, num_samples );
 			vj_jack_play( top_audio_buffer, num_samples * bps );
