@@ -359,7 +359,7 @@ if test x$with_jpeg != xno ; then
 fi
 have_pixbuf=false
 if test x$with_pixbuf != xno ; then
-  PKG_CHECK_MODULES(PIXBUF, [gtk+-2.0 >= 2.4 gdk-pixbuf-2.0],
+  PKG_CHECK_MODULES(PIXBUF, [gtk+-2.0 >= 2.0 gdk-pixbuf-2.0],
                     [
  		     AC_SUBST( PIXBUF_CFLAGS )
 		     AC_SUBST( PIXBUF_LIBS )
@@ -1013,7 +1013,7 @@ if test x$with_gimp_stuff != xfalse ; then
 	AC_SUBST(GTK_CFLAGS)
 	AC_SUBST(GTK_LIBS)
 
-	libglade_modules="libglade-2.0 >= 2.2.0"
+	libglade_modules="libglade-2.0 >= 2.0.1"
 	PKG_CHECK_MODULES(GLADE, [$libglade_modules])
 	AC_SUBST(GLADE_CFLAGS)
 	AC_SUBST(GLADE_LIBS)
