@@ -2575,7 +2575,6 @@ void	vj_event_send_devicelist( void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*) ptr;
 
 	char *buf = vj_tag_scan_devices();
-	veejay_msg(0, "%s",buf);
 	SEND_MSG( v, buf );
 	free(buf);
 }

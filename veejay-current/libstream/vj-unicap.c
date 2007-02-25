@@ -102,6 +102,7 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 	unicap_driver_t *ud = (unicap_driver_t*) unicap;
 	char key[64];
 	unicap_void_device(&(ud->device));
+
 	
 	while( SUCCESS( unicap_enumerate_devices( NULL, &(ud->device), i )) )
 	{
@@ -153,61 +154,53 @@ char **vj_unicap_get_devices(void *unicap, int *n_dev)
 		veejay_msg(0, "I didn't find any capture devices");
 		return NULL;
 	}
-/*
-	result = (char**) vj_calloc(sizeof(char*) * (ud->num_devices+1));
 
-	unicap_void_device( &(ud->device) );
-
-	for( i = 0; i < ud->num_devices; i++ )
+	char **items = vevo_list_properties( ud->device_list );
+	if(! items )
 	{
-		char tmp[1024];
-		unicap_property_t property;
-		unicap_format_t format;
-		int property_count = 0;
-		int format_count = 0;
-
-		if( !SUCCESS( unicap_enumerate_devices( NULL, &(ud->device), i)))
-		{
-			veejay_msg(0, "Failed to get information for device '%s'", ud->device.identifier );
-			continue;
-		}
-
-		if( !SUCCESS( unicap_open( &(ud->handle), &(ud->device) ) ) )
-		{
-			veejay_msg(0, "Failed to open: %s (device '%d')\n", &(ud->device.identifier), i );
-			continue;
-		}
-		unicap_lock_properties( ud->handle );
-
-		unicap_void_property( &property );
-		unicap_void_format( &format );
-	
-		
-		unicap_reenumerate_properties( ud->handle, &property_count );
-		unicap_reenumerate_formats( ud->handle, &format_count );
-		char *device_name = strdup( ud->device.identifier );
-		char *device_location = strdup( ud->device.device );
-		
-
-	    	snprintf(tmp,1024, "%03d%s%03d%s", 
-			strlen( device_name ), 
-			device_name,
-			strlen( device_location ),
-			device_location );
-
-		result[j] = strdup( tmp );	
-		j++;
-
-		free( device_location );
-		free( device_name );
-		
-		unicap_unlock_properties( ud->handle );
-
-		unicap_close( ud->handle );
+		veejay_msg(0, "Empty list of capture devices");
+		return NULL;
 	}
+	
+	int len = 1;
+	int error = 0;
+	for ( i = 0; items[i] != NULL ; i ++ )
+	{
+		error = vevo_property_get( ud->device_list,items[i], 0, NULL );
+		if( error == VEVO_NO_ERROR )
+			len ++;
+	}
+	
+	result = vj_calloc( sizeof(char*) * len );
+	for( i = 0; items[i] != NULL ; i ++ )
+	{
+		void *port = NULL;
+		error = vevo_property_get( ud->device_list, items[i], 0, &port );
+		if( error == VEVO_NO_ERROR )
+		{
+			size_t name_len = vevo_property_element_size( port, "name", 0 );
+			char *name = (char*) vj_calloc( name_len );
+			vevo_property_get( port, "name",0,&name );
+			name_len = vevo_property_element_size( port, "device", 0 );
+			char *loc  = (char*) vj_calloc( name_len );
+			vevo_property_get( port, "device", 0, &loc );
+			int new_len = strlen(loc) + strlen(name) + 8;
+	
+			char *text = vj_calloc( new_len );
+			snprintf(text, new_len, "%03d%s%03d%s",strlen(name), name,strlen(loc), loc );
+			
+			free(name);
+			free(loc);
+
+			result[j] = strdup(text );
+			free(text);
+			j++;
+		}
+		free(items[i]);
+	}
+	free(items );
 
 	*n_dev = j;
-*/
 	return result;
 }
 
