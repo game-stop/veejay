@@ -1423,9 +1423,9 @@ char **vevo_list_properties(vevo_port_t * p)
 
 #ifdef STRICT_CHECKING
     if( n != nn )
-    veejay_msg(0, "%s:%s (%p) Expected %d properties but there are %d",
+    veejay_msg(VEEJAY_MSG_WARNING, "%s:%s (%p) Expected %d properties but there are %d",
 		    __FILE__,__FUNCTION__,p,nn, n );
-    assert(nn == n);
+    assert(n == nn );
 #endif
 
     list = (char **) malloc(sizeof(char *) * n);

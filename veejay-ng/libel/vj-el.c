@@ -442,9 +442,15 @@ int	vj_el_match( void *sv, void *edl)
 	assert( el != NULL );
 #endif
 	if ( v->w != el->video_width)
+	{
+		veejay_msg(0, "Video width of %d does not match %d",v->w, el->video_width );
 		return 0;
+	}
 	if ( v->h != el->video_height)
+	{
+		veejay_msg(0, "Video height of %d does not match %d",v->h, el->video_height);
 		return 0;
+	}
 	return 1;	
 }
 
@@ -1170,8 +1176,8 @@ int	vj_el_get_video_frame(void *edl, long nframe, void *fdst)
 	else
 	{
 		inter = lav_video_interlacing(el->lav_fd[N_EL_FILE(n)]);
-                int src_fmt = d->context->pix_fmt;
-                int dst_fmt = dst->pixfmt;
+        	int src_fmt = 0;
+		int dst_fmt = dst->pixfmt;
    		AVPicture pict,pict2;
                 memset(&pict,0,sizeof(AVPicture));
                 pict.data[0] = dst->data[0];
@@ -1190,6 +1196,15 @@ int	vj_el_get_video_frame(void *edl, long nframe, void *fdst)
                         data,
                         res
                 );
+		
+		src_fmt = d->context->pix_fmt;
+
+		if(! got_picture )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR,
+			 "Frame %ld not a keyframe", nframe );
+			return 0;
+		}
 
                 if( len <= 0 )
                 {
@@ -1214,18 +1229,20 @@ int	vj_el_get_video_frame(void *edl, long nframe, void *fdst)
                                         src_fmt,
                                         el->video_width,
                                         el->video_height);
-                                img_convert( &pict, dst_fmt, (const AVPicture*) &pict2, src_fmt,
-                                        el->video_width,el->video_height);
-                        }
+   
+				VJFrame *src1 = yuv_yuv_template( d->deinterlace_buffer[0], d->deinterlace_buffer[1],
+							d->deinterlace_buffer[2], el->video_width,el->video_height, src_fmt );
+
+				yuv_convert_any3( src1, d->frame->linesize, dst, src1->format, dst_fmt );
+				free(src1);
+                    	} 
                         else
                         {
-                                __builtin_prefetch( pict.data[0],1,3 );
-                                __builtin_prefetch( pict.data[1],1,3 );
-                                __builtin_prefetch( pict.data[2],1,3 );
-                                __builtin_prefetch( d->frame->data[0],0,3);
-
-                                img_convert( &pict, dst_fmt, (const AVPicture*) d->frame, src_fmt,
-                                        el->video_width, el->video_height );
+				VJFrame *src1 = yuv_yuv_template( d->frame->data[0],d->frame->data[1],d->frame->data[2],
+					el->video_width,el->video_height, src_fmt );
+				
+				yuv_convert_any3( src1, d->frame->linesize, dst, src_fmt, dst_fmt );
+				free(src1);
                         }
                 }
                 else

@@ -27,7 +27,8 @@
 
 #include <config.h>
 #include <unistd.h>
-
+#include <libvjmem/vjmem.h>
+#include <libvjmsg/vj-common.h>
 #include "avilib.h"
 
 #define INFO_LIST
@@ -67,6 +68,9 @@ long AVI_errno = 0;
 static char id_str[MAX_INFO_STRLEN];
 
 #define FRAME_RATE_SCALE 1000000
+
+extern int vj_el_get_decoder_from_fourcc( const char *fourcc );
+
 
 /*******************************************************************
  *                                                                 *
@@ -200,7 +204,7 @@ static int avi_add_chunk(avi_t *AVI, unsigned char *tag, unsigned char *data, in
    /* Copy tag and length int c, so that we need only 1 write system call
       for these two values */
 
-   memcpy(c,tag,4);
+   veejay_memcpy(c,tag,4);
    long2str(c+4,length);
 
    /* Output tag, length and data, restore previous position
@@ -227,16 +231,16 @@ static int avi_add_chunk(avi_t *AVI, unsigned char *tag, unsigned char *data, in
 #define OUTD(n) long2str(ix00+bl,n); bl+=4
 #define OUTW(n) ix00[bl] = (n)&0xff; ix00[bl+1] = (n>>8)&0xff; bl+=2
 #define OUTC(n) ix00[bl] = (n)&0xff; bl+=1
-#define OUTS(s) memcpy(ix00+bl,s,4); bl+=4
+#define OUTS(s) veejay_memcpy(ix00+bl,s,4); bl+=4
 
 // this does the physical writeout of the ix## structure
 static int avi_ixnn_entry(avi_t *AVI, avistdindex_chunk *ch, avisuperindex_entry *en) 
 {
     int bl, k;
     unsigned int max = ch->nEntriesInUse * sizeof (uint32_t) * ch->wLongsPerEntry + 24; // header
-    char *ix00 = malloc (max);
+    char *ix00 = vj_malloc (max);
     char dfcc[5];
-    memcpy (dfcc, ch->fcc, 4);
+    veejay_memcpy (dfcc, ch->fcc, 4);
     dfcc[4] = 0;
 
     bl = 0;
@@ -285,36 +289,36 @@ static int avi_init_super_index(avi_t *AVI, unsigned char *idxtag, avisuperindex
 
     avisuperindex_chunk *sil = NULL;
 
-    if ((sil = (avisuperindex_chunk *) malloc (sizeof (avisuperindex_chunk))) == NULL) {
+    if ((sil = (avisuperindex_chunk *) vj_malloc (sizeof (avisuperindex_chunk))) == NULL) {
 	AVI_errno = AVI_ERR_NO_MEM;
 	return -1;
     }
-    memset(sil, 0, sizeof (avisuperindex_chunk));
-    memcpy (sil->fcc, "indx", 4);
+    veejay_memset(sil, 0, sizeof (avisuperindex_chunk));
+    veejay_memcpy (sil->fcc, "indx", 4);
     sil->dwSize = 0; // size of this chunk
     sil->wLongsPerEntry = 4;
     sil->bIndexSubType = 0;
     sil->bIndexType = AVI_INDEX_OF_INDEXES;
     sil->nEntriesInUse = 0; // none are in use
-    memcpy (sil->dwChunkId, idxtag, 4);
-    memset (sil->dwReserved, 0, sizeof (sil->dwReserved));
+    veejay_memcpy (sil->dwChunkId, idxtag, 4);
+    veejay_memset (sil->dwReserved, 0, sizeof (sil->dwReserved));
 
     // NR_IXNN_CHUNKS == allow 32 indices which means 32 GB files -- arbitrary
-    sil->aIndex = malloc (sil->wLongsPerEntry * NR_IXNN_CHUNKS * sizeof (uint32_t));
+    sil->aIndex = vj_malloc (sil->wLongsPerEntry * NR_IXNN_CHUNKS * sizeof (uint32_t));
     if (!sil->aIndex) {
 	AVI_errno = AVI_ERR_NO_MEM;
 	return -1;
     }
-    memset (sil->aIndex, 0, sil->wLongsPerEntry * NR_IXNN_CHUNKS * sizeof (uint32_t));
+    veejay_memset (sil->aIndex, 0, sil->wLongsPerEntry * NR_IXNN_CHUNKS * sizeof (uint32_t));
 
-    sil->stdindex = malloc (NR_IXNN_CHUNKS * sizeof (avistdindex_chunk *));
+    sil->stdindex = vj_malloc (NR_IXNN_CHUNKS * sizeof (avistdindex_chunk *));
     if (!sil->stdindex) {
 	AVI_errno = AVI_ERR_NO_MEM;
 	return -1;
     }
     for (k = 0; k < NR_IXNN_CHUNKS; k++) {
-	sil->stdindex[k] = malloc (sizeof (avistdindex_chunk));
-	memset(sil->stdindex[k], 0, sizeof (avistdindex_chunk));
+	sil->stdindex[k] = vj_malloc (sizeof (avistdindex_chunk));
+	veejay_memset(sil->stdindex[k], 0, sizeof (avistdindex_chunk));
 	// gets rewritten later
 	sil->stdindex[k]->qwBaseOffset = (uint64_t)k * NEW_RIFF_THRES;
     }
@@ -324,12 +328,12 @@ static int avi_init_super_index(avi_t *AVI, unsigned char *idxtag, avisuperindex
     return 0;
 }
 
-// fills an alloc'ed stdindex structure and mallocs some entries for the actual chunks
+// fills an alloc'ed stdindex structure and vj_mallocs some entries for the actual chunks
 static int avi_add_std_index(avi_t *AVI, unsigned char *idxtag, unsigned char *strtag,
 	avistdindex_chunk *stdil)
 {
 
-    memcpy (stdil->fcc, idxtag, 4); 
+    veejay_memcpy (stdil->fcc, idxtag, 4); 
     stdil->dwSize = 4096;
     stdil->wLongsPerEntry = 2; //sizeof(avistdindex_entry)/sizeof(uint32_t);
     stdil->bIndexSubType = 0;
@@ -337,11 +341,11 @@ static int avi_add_std_index(avi_t *AVI, unsigned char *idxtag, unsigned char *s
     stdil->nEntriesInUse = 0;
 
     // cp 00db ChunkId
-    memcpy(stdil->dwChunkId, strtag, 4);
+    veejay_memcpy(stdil->dwChunkId, strtag, 4);
 
     //stdil->qwBaseOffset = AVI->video_superindex->aIndex[ cur_std_idx ]->qwOffset;
 
-    stdil->aIndex = malloc(stdil->dwSize * sizeof (uint32_t) * stdil->wLongsPerEntry);
+    stdil->aIndex = vj_malloc(stdil->dwSize * sizeof (uint32_t) * stdil->wLongsPerEntry);
 
     if (!stdil->aIndex) {
 	AVI_errno = AVI_ERR_NO_MEM;
@@ -452,16 +456,18 @@ static int avi_add_odml_index_entry(avi_t *AVI, unsigned char *tag, long flags, 
     if (AVI->video_superindex && 
 	    (off_t)(AVI->pos+towrite) > (off_t)((off_t)NEW_RIFF_THRES*AVI->video_superindex->nEntriesInUse)) {
 
-	fprintf(stderr, "Adding a new RIFF chunk: %d\n", AVI->video_superindex->nEntriesInUse);
+//	fprintf(stderr, "Adding a new RIFF chunk: %d\n", AVI->video_superindex->nEntriesInUse);
+	veejay_msg( 2, "Adding a new RIFF chunk: %d", AVI->video_superindex->nEntriesInUse );
 
 	// rotate ALL indices
 	AVI->video_superindex->nEntriesInUse++;
 	cur_std_idx = AVI->video_superindex->nEntriesInUse-1;
 
 	if (AVI->video_superindex->nEntriesInUse > NR_IXNN_CHUNKS) {
-	    fprintf (stderr, "Internal error in avilib - redefine NR_IXNN_CHUNKS\n");
-	    fprintf (stderr, "[avilib dump] cur_std_idx=%d NR_IXNN_CHUNKS=%d"
-		    "POS=%lld towrite=%lld\n",
+	    veejay_msg(0, "Internal error in avilib - redefine NR_IXNN_CHUNKS (needed=%d, current=%d)",
+		AVI->video_superindex->nEntriesInUse, NR_IXNN_CHUNKS);
+	    veejay_msg(0, "[avilib dump] cur_std_idx=%d NR_IXNN_CHUNKS=%d"
+		    "POS=%lld towrite=%lld",
 		    cur_std_idx,NR_IXNN_CHUNKS, AVI->pos, towrite);
 	    return -1;
 	}
@@ -573,9 +579,7 @@ static int avi_add_index_entry(avi_t *AVI, unsigned char *tag, long flags, unsig
    
    /* Add index entry */
 
-   //   fprintf(stderr, "INDEX %s %ld %lu %lu\n", tag, flags, pos, len);
-
-   memcpy(AVI->idx[AVI->n_idx],tag,4);
+   veejay_memcpy(AVI->idx[AVI->n_idx],tag,4);
    long2str(AVI->idx[AVI->n_idx]+ 4,flags);
    long2str(AVI->idx[AVI->n_idx]+ 8, pos);
    long2str(AVI->idx[AVI->n_idx]+12, len);
@@ -623,13 +627,13 @@ avi_t* AVI_open_output_file(char * filename)
 
    /* Allocate the avi_t struct and zero it */
 
-   AVI = (avi_t *) malloc(sizeof(avi_t));
+   AVI = (avi_t *) vj_malloc(sizeof(avi_t));
    if(AVI==0)
    {
       AVI_errno = AVI_ERR_NO_MEM;
       return 0;
    }
-   memset((void *)AVI,0,sizeof(avi_t));
+   veejay_memset((void *)AVI,0,sizeof(avi_t));
 
    /* Since Linux needs a long time when deleting big files,
       we do not truncate the file when we open it.
@@ -681,9 +685,9 @@ void AVI_set_video(avi_t *AVI, int width, int height, double fps, char *compress
    AVI->fps    = fps;
    
    if(strncmp(compressor, "RGB", 3)==0) {
-     memset(AVI->compressor, 0, 4);
+     veejay_memset(AVI->compressor, 0, 4);
    } else {
-     memcpy(AVI->compressor,compressor,4);
+     veejay_memcpy(AVI->compressor,compressor,4);
    }     
    
    AVI->compressor[4] = 0;
@@ -691,19 +695,19 @@ void AVI_set_video(avi_t *AVI, int width, int height, double fps, char *compress
    avi_update_header(AVI);
 }
 
-void AVI_set_audio(avi_t *AVI, int channels, long rate, int bits, int format)
+int AVI_set_audio(avi_t *AVI, int channels, long rate, int bits, int format)
 {
    /* may only be called if file is open for writing */
 
-   if(AVI->mode==AVI_MODE_READ) return;
+   if(AVI->mode==AVI_MODE_READ) return -1;
 
    //inc audio tracks
    AVI->aptr=AVI->anum;
    ++AVI->anum;
 
    if(AVI->anum > AVI_MAX_TRACKS) {
-     fprintf(stderr, "error - only %d audio tracks supported\n", AVI_MAX_TRACKS);
-     exit(1);
+     veejay_msg(0, "error - only %d audio tracks supported\n", AVI_MAX_TRACKS);
+     return -1;
    }
 
    AVI->track[AVI->aptr].a_chans = channels;
@@ -712,11 +716,11 @@ void AVI_set_audio(avi_t *AVI, int channels, long rate, int bits, int format)
    AVI->track[AVI->aptr].a_fmt   = format;
 //   AVI->track[AVI->aptr].mp3rate = mp3rate;
 
-   avi_update_header(AVI);
+   return avi_update_header(AVI);
 }
 
 #define OUT4CC(s) \
-   if(nhb<=HEADERBYTES-4) memcpy(AVI_header+nhb,s,4); nhb += 4
+   if(nhb<=HEADERBYTES-4) veejay_memcpy(AVI_header+nhb,s,4); nhb += 4
 
 #define OUTLONG(n) \
    if(nhb<=HEADERBYTES-4) long2str(AVI_header+nhb,n); nhb += 4
@@ -738,7 +742,7 @@ void AVI_set_audio(avi_t *AVI, int channels, long rate, int bits, int format)
    { \
      unsigned int s_ = (s); \
      if(nhb <= HEADERBYTES-s_) \
-        memcpy(AVI_header+nhb, (d), s_); \
+        veejay_memcpy(AVI_header+nhb, (d), s_); \
      nhb += s_; \
    }
 
@@ -959,13 +963,14 @@ int avi_update_header(avi_t *AVI)
    
    if(njunk<=0)
      {
-       fprintf(stderr,"AVI_close_output_file: # of header bytes too small\n");
-       exit(1);
+       veejay_msg(0, "%s: # of header bytes too small",__FUNCTION__);
+       veejay_msg(0, "Somebody has played with HEADERBYTES of this AVI without knowing what (s)he did");
+       return -1;
      }
    
    OUT4CC ("JUNK");
    OUTLONG(njunk);
-   memset(AVI_header+nhb,0,njunk);
+   veejay_memset(AVI_header+nhb,0,njunk);
    
    nhb += njunk;
 
@@ -1029,14 +1034,14 @@ static int avi_parse_comments (int fd, char *buf, int space_left)
     if (fd<=0 || !buf || space_left<=0)
 	return -1;
 
-    memset (buf, 0, space_left);
+    veejay_memset (buf, 0, space_left);
     if (fstat (fd, &st) == -1) {
 	perror ("stat");
 	return -1;
     }
 
-    if ( !(data = malloc(st.st_size*sizeof(char)+1)) ) {
-	fprintf(stderr, "malloc failed\n"); 
+    if ( !(data = vj_malloc(st.st_size*sizeof(char)+1)) ) {
+	fprintf(stderr, "vj_malloc failed\n"); 
 	return -1;
     }
 
@@ -1087,14 +1092,14 @@ static int avi_parse_comments (int fd, char *buf, int space_left)
 	    if (k>=space_left) return len;
 
 	    // write TAG
-	    memcpy(buf+len,c,4); 
+	    veejay_memcpy(buf+len,c,4); 
 	    len += 4;
 
 	    // write length + '\0'
 	    long2str(buf+len, k+1); len += 4;
 
 	    // write comment string
-	    memcpy (buf+len, d, k);
+	    veejay_memcpy (buf+len, d, k);
 	    // must be null terminated
 	    *(buf+len+k+1) = '\0';
 
@@ -1596,7 +1601,7 @@ static int avi_close_output_file(avi_t *AVI)
 
    OUT4CC ("ISFT");
    //OUTLONG(MAX_INFO_STRLEN);
-   memset(id_str, 0, MAX_INFO_STRLEN);
+   veejay_memset(id_str, 0, MAX_INFO_STRLEN);
 
    snprintf(id_str, sizeof(id_str), "%s-%s", PACKAGE, VERSION);
    real_id_len = id_len = strlen(id_str)+1;
@@ -1604,8 +1609,8 @@ static int avi_close_output_file(avi_t *AVI)
 
    OUTLONG(real_id_len);
 
-   memset(AVI_header+nhb, 0, id_len);
-   memcpy(AVI_header+nhb, id_str, id_len);
+   veejay_memset(AVI_header+nhb, 0, id_len);
+   veejay_memcpy(AVI_header+nhb, id_str, id_len);
    nhb += id_len;
 
    info_len = avi_parse_comments (AVI->comment_fd, AVI_header+nhb, HEADERBYTES - nhb - 8 - 12);
@@ -1621,8 +1626,8 @@ static int avi_close_output_file(avi_t *AVI)
 
 //   calptr=time(NULL); 
 //   snprintf(id_str, sizeof(id_str), "\t%s %s", ctime(&calptr), "");
-//   memset(AVI_header+nhb, 0, MAX_INFO_STRLEN);
-//   memcpy(AVI_header+nhb, id_str, 25);
+//   veejay_memset(AVI_header+nhb, 0, MAX_INFO_STRLEN);
+//   veejay_memcpy(AVI_header+nhb, id_str, 25);
 //   nhb += MAX_INFO_STRLEN;
 #endif
 
@@ -1644,7 +1649,7 @@ static int avi_close_output_file(avi_t *AVI)
 
    OUT4CC ("JUNK");
    OUTLONG(njunk);
-   memset(AVI_header+nhb,0,njunk);
+   veejay_memset(AVI_header+nhb,0,njunk);
    
    nhb += njunk;
 
@@ -1966,13 +1971,13 @@ avi_t *AVI_open_input_indexfile(char *filename, int getIndex, char *indexfile)
   
   /* Create avi_t structure */
   
-  AVI = (avi_t *) malloc(sizeof(avi_t));
+  AVI = (avi_t *) vj_malloc(sizeof(avi_t));
   if(AVI==NULL)
     {
       AVI_errno = AVI_ERR_NO_MEM;
       return 0;
     }
-  memset((void *)AVI,0,sizeof(avi_t));
+  veejay_memset((void *)AVI,0,sizeof(avi_t));
   
   AVI->mode = AVI_MODE_READ; /* open for reading */
   
@@ -2020,13 +2025,13 @@ avi_t *AVI_open_indexfd(int fd, int getIndex, char *indexfile)
   
   /* Create avi_t structure */
   
-  AVI = (avi_t *) malloc(sizeof(avi_t));
+  AVI = (avi_t *) vj_malloc(sizeof(avi_t));
   if(AVI==NULL)
     {
       AVI_errno = AVI_ERR_NO_MEM;
       return 0;
     }
-  memset((void *)AVI,0,sizeof(avi_t));
+  veejay_memset((void *)AVI,0,sizeof(avi_t));
   
   AVI->mode = AVI_MODE_READ; /* open for reading */
   
@@ -2054,13 +2059,12 @@ avi_t *AVI_open_input_file(char *filename, int getIndex, int mmap_size)
   
   /* Create avi_t structure */
   
-  AVI = (avi_t *) malloc(sizeof(avi_t));
+  AVI = (avi_t *) vj_calloc(sizeof(avi_t));
   if(AVI==NULL)
     {
       AVI_errno = AVI_ERR_NO_MEM;
       return 0;
     }
-  memset((void *)AVI,0,sizeof(avi_t));
   
   AVI->mode = AVI_MODE_READ; /* open for reading */
   
@@ -2093,13 +2097,13 @@ avi_t *AVI_open_fd(int fd, int getIndex, int mmap_size)
   
   /* Create avi_t structure */
   
-  AVI = (avi_t *) malloc(sizeof(avi_t));
+  AVI = (avi_t *) vj_malloc(sizeof(avi_t));
   if(AVI==NULL)
     {
       AVI_errno = AVI_ERR_NO_MEM;
       return 0;
     }
-  memset((void *)AVI,0,sizeof(avi_t));
+  veejay_memset((void *)AVI,0,sizeof(avi_t));
   
   AVI->mode = AVI_MODE_READ; /* open for reading */
   
@@ -2194,12 +2198,12 @@ int avi_parse_index_from_file(avi_t *AVI, char *filename)
     for(j=0; j<AVI->anum; ++j) AVI->track[j].audio_chunks = aud_chunks[j];
 
     if(AVI->video_frames==0) ERR_EXIT(AVI_ERR_NO_VIDS);
-    AVI->video_index = (video_index_entry *) malloc(vid_chunks*sizeof(video_index_entry));
+    AVI->video_index = (video_index_entry *) vj_malloc(vid_chunks*sizeof(video_index_entry));
     if(AVI->video_index==0) ERR_EXIT(AVI_ERR_NO_MEM);
 
     for(j=0; j<AVI->anum; ++j) {
 	if(AVI->track[j].audio_chunks) {
-	    AVI->track[j].audio_index = (audio_index_entry *) malloc(aud_chunks[j]*sizeof(audio_index_entry));
+	    AVI->track[j].audio_index = (audio_index_entry *) vj_malloc(aud_chunks[j]*sizeof(audio_index_entry));
 	    if(AVI->track[j].audio_index==0) ERR_EXIT(AVI_ERR_NO_MEM);
 	}
     }   
@@ -2305,7 +2309,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
          if(strncasecmp(data,"hdrl",4) == 0)
          {
             hdrl_len = n;
-            hdrl_data = (unsigned char *) malloc(n);
+            hdrl_data = (unsigned char *) vj_malloc(n);
             if(hdrl_data==0) ERR_EXIT(AVI_ERR_NO_MEM);
 				 
 	    // offset of header
@@ -2328,7 +2332,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
             break if this is not the case */
 
          AVI->n_idx = AVI->max_idx = n/16;
-         AVI->idx = (unsigned  char((*)[16]) ) malloc(n);
+         AVI->idx = (unsigned  char((*)[16]) ) vj_malloc(n);
          if(AVI->idx==0) ERR_EXIT(AVI_ERR_NO_MEM)
          if(avi_read(AVI->fdes, (char *) AVI->idx, n) != n ) {
 	     free ( AVI->idx); AVI->idx=NULL;
@@ -2368,7 +2372,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 #endif
          if(strncasecmp((char *)hdrl_data+i,"vids",4) == 0 && !vids_strh_seen)
          {
-            memcpy(AVI->compressor,hdrl_data+i+4,4);
+            veejay_memcpy(AVI->compressor,hdrl_data+i+4,4);
             AVI->compressor[4] = 0;
 
 	    // ThOe
@@ -2435,11 +2439,11 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
          {
             alBITMAPINFOHEADER bih;
             
-            memcpy(&bih, hdrl_data + i, sizeof(alBITMAPINFOHEADER));
+            veejay_memcpy(&bih, hdrl_data + i, sizeof(alBITMAPINFOHEADER));
             AVI->bitmap_info_header = (alBITMAPINFOHEADER *)
-              malloc(str2ulong((unsigned char *)&bih.bi_size));
+              vj_malloc(str2ulong((unsigned char *)&bih.bi_size));
             if (AVI->bitmap_info_header != NULL)
-              memcpy(AVI->bitmap_info_header, hdrl_data + i,
+              veejay_memcpy(AVI->bitmap_info_header, hdrl_data + i,
                      str2ulong((unsigned char *)&bih.bi_size));
             
             AVI->width  = str2ulong(hdrl_data+i+4);
@@ -2448,7 +2452,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 	    //ThOe
 	    AVI->v_codecf_off = header_offset + i+16;
 
-	    memcpy(AVI->compressor2, hdrl_data+i+16, 4);
+	    veejay_memcpy(AVI->compressor2, hdrl_data+i+16, 4);
             AVI->compressor2[4] = 0;
 
          }
@@ -2462,10 +2466,10 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
               wfes = hdrl_len - i;
             else
               wfes = sizeof(alWAVEFORMATEX);
-            wfe = (alWAVEFORMATEX *)malloc(sizeof(alWAVEFORMATEX));
+            wfe = (alWAVEFORMATEX *)vj_malloc(sizeof(alWAVEFORMATEX));
             if (wfe != NULL) {
-              memset(wfe, 0, sizeof(alWAVEFORMATEX));
-	      memcpy(wfe, hdrl_data + i, wfes);
+              veejay_memset(wfe, 0, sizeof(alWAVEFORMATEX));
+	      veejay_memcpy(wfe, hdrl_data + i, wfes);
 	      if (str2ushort((unsigned char *)&wfe->cb_size) != 0) {
 		nwfe = (char *)
                   realloc(wfe, sizeof(alWAVEFORMATEX) +
@@ -2507,14 +2511,14 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 
 	    a = hdrl_data+i;
 
-	    AVI->video_superindex = (avisuperindex_chunk *) malloc (sizeof (avisuperindex_chunk));
-	    memcpy (AVI->video_superindex->fcc, a, 4);             a += 4;
+	    AVI->video_superindex = (avisuperindex_chunk *) vj_calloc (sizeof (avisuperindex_chunk));
+	    veejay_memcpy (AVI->video_superindex->fcc, a, 4);             a += 4;
 	    AVI->video_superindex->dwSize = str2ulong(a);          a += 4;
 	    AVI->video_superindex->wLongsPerEntry = str2ushort(a); a += 2;
 	    AVI->video_superindex->bIndexSubType = *a;             a += 1;
 	    AVI->video_superindex->bIndexType = *a;                a += 1;
 	    AVI->video_superindex->nEntriesInUse = str2ulong(a);   a += 4;
-	    memcpy (AVI->video_superindex->dwChunkId, a, 4);       a += 4;
+	    veejay_memcpy (AVI->video_superindex->dwChunkId, a, 4);       a += 4;
 
 	    // 3 * reserved
 	    a += 4; a += 4; a += 4;
@@ -2522,7 +2526,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 	    if (AVI->video_superindex->bIndexSubType != 0) {fprintf(stderr, "Invalid Header, bIndexSubType != 0\n"); }
 	    
 	    AVI->video_superindex->aIndex = 
-	       malloc (AVI->video_superindex->wLongsPerEntry * AVI->video_superindex->nEntriesInUse * sizeof (uint32_t));
+	       vj_malloc (AVI->video_superindex->wLongsPerEntry * AVI->video_superindex->nEntriesInUse * sizeof (uint32_t));
 
 	    // position of ix## chunks
 	    for (j=0; j<AVI->video_superindex->nEntriesInUse; ++j) {
@@ -2560,14 +2564,14 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 
 	    a = hdrl_data+i;
 
-	    AVI->track[AVI->aptr].audio_superindex = (avisuperindex_chunk *) malloc (sizeof (avisuperindex_chunk));
-	    memcpy (AVI->track[AVI->aptr].audio_superindex->fcc, a, 4);             a += 4;
+	    AVI->track[AVI->aptr].audio_superindex = (avisuperindex_chunk *) vj_malloc (sizeof (avisuperindex_chunk));
+	    veejay_memcpy (AVI->track[AVI->aptr].audio_superindex->fcc, a, 4);             a += 4;
 	    AVI->track[AVI->aptr].audio_superindex->dwSize = str2ulong(a);          a += 4;
 	    AVI->track[AVI->aptr].audio_superindex->wLongsPerEntry = str2ushort(a); a += 2;
 	    AVI->track[AVI->aptr].audio_superindex->bIndexSubType = *a;             a += 1;
 	    AVI->track[AVI->aptr].audio_superindex->bIndexType = *a;                a += 1;
 	    AVI->track[AVI->aptr].audio_superindex->nEntriesInUse = str2ulong(a);   a += 4;
-	    memcpy (AVI->track[AVI->aptr].audio_superindex->dwChunkId, a, 4);       a += 4;
+	    veejay_memcpy (AVI->track[AVI->aptr].audio_superindex->dwChunkId, a, 4);       a += 4;
 
 	    // 3 * reserved
 	    a += 4; a += 4; a += 4;
@@ -2575,7 +2579,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 	    if (AVI->track[AVI->aptr].audio_superindex->bIndexSubType != 0) {fprintf(stderr, "Invalid Header, bIndexSubType != 0\n"); }
 	    
 	    AVI->track[AVI->aptr].audio_superindex->aIndex = 
-	       malloc (AVI->track[AVI->aptr].audio_superindex->wLongsPerEntry * 
+	       vj_malloc (AVI->track[AVI->aptr].audio_superindex->wLongsPerEntry * 
 		     AVI->track[AVI->aptr].audio_superindex->nEntriesInUse * sizeof (uint32_t));
 
 	    // position of ix## chunks
@@ -2762,7 +2766,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
       for (j=0; j<AVI->video_superindex->nEntriesInUse; j++) {
 
 	 // read from file
-	 chunk_start = en = malloc (AVI->video_superindex->aIndex[j].dwSize+hdrl_len);
+	 chunk_start = en = vj_malloc (AVI->video_superindex->aIndex[j].dwSize+hdrl_len);
 
 	 if (lseek(AVI->fdes, AVI->video_superindex->aIndex[j].qwOffset, SEEK_SET) == (off_t)-1) {
 	    fprintf(stderr, "(%s) cannot seek to 0x%llx\n", __FILE__, 
@@ -2843,7 +2847,7 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
 	 for (j=0; j<AVI->track[audtr].audio_superindex->nEntriesInUse; j++) {
 
 	    // read from file
-	    chunk_start = en = malloc (AVI->track[audtr].audio_superindex->aIndex[j].dwSize+hdrl_len);
+	    chunk_start = en = vj_malloc (AVI->track[audtr].audio_superindex->aIndex[j].dwSize+hdrl_len);
 
 	    if (lseek(AVI->fdes, AVI->track[audtr].audio_superindex->aIndex[j].qwOffset, SEEK_SET) == (off_t)-1) {
 	       fprintf(stderr, "(%s) cannot seek to 0x%llx\n", __FILE__, (unsigned long long)AVI->track[audtr].audio_superindex->aIndex[j].qwOffset);
@@ -2917,14 +2921,14 @@ multiple_riff:
       nai[0] = AVI->track[0].audio_chunks = AVI->total_frames;
       for(j=1; j<AVI->anum; ++j) AVI->track[j].audio_chunks = 0;
 
-      AVI->video_index = (video_index_entry *) malloc(nvi*sizeof(video_index_entry));
+      AVI->video_index = (video_index_entry *) vj_malloc(nvi*sizeof(video_index_entry));
 
       if(AVI->video_index==0) ERR_EXIT(AVI_ERR_NO_MEM);
 
       for(j=0; j<AVI->anum; ++j) {
 	  if(AVI->track[j].audio_chunks) {
-	      AVI->track[j].audio_index = (audio_index_entry *) malloc((nai[j]+1)*sizeof(audio_index_entry));
-	      memset(AVI->track[j].audio_index, 0, (nai[j]+1)*(sizeof(audio_index_entry)));
+	      AVI->track[j].audio_index = (audio_index_entry *) vj_malloc((nai[j]+1)*sizeof(audio_index_entry));
+	      veejay_memset(AVI->track[j].audio_index, 0, (nai[j]+1)*(sizeof(audio_index_entry)));
 	      if(AVI->track[j].audio_index==0) ERR_EXIT(AVI_ERR_NO_MEM);
 	  }
       }   
@@ -3034,13 +3038,13 @@ multiple_riff:
   
 
    if(AVI->video_frames==0) ERR_EXIT(AVI_ERR_NO_VIDS);
-   AVI->video_index = (video_index_entry *) malloc(nvi*sizeof(video_index_entry));
+   AVI->video_index = (video_index_entry *) vj_malloc(nvi*sizeof(video_index_entry));
    if(AVI->video_index==0) ERR_EXIT(AVI_ERR_NO_MEM);
    
    for(j=0; j<AVI->anum; ++j) {
        if(AVI->track[j].audio_chunks) {
-	   AVI->track[j].audio_index = (audio_index_entry *) malloc((nai[j]+1)*sizeof(audio_index_entry));
-	   memset(AVI->track[j].audio_index, 0, (nai[j]+1)*(sizeof(audio_index_entry)));
+	   AVI->track[j].audio_index = (audio_index_entry *) vj_malloc((nai[j]+1)*sizeof(audio_index_entry));
+	   veejay_memset(AVI->track[j].audio_index, 0, (nai[j]+1)*(sizeof(audio_index_entry)));
 	   if(AVI->track[j].audio_index==0) ERR_EXIT(AVI_ERR_NO_MEM);
        }
    }   
@@ -3355,7 +3359,8 @@ long AVI_read_audio(avi_t *AVI, char *audbuf, long bytes)
       lseek(AVI->fdes, pos, SEEK_SET);
       if ( (ret = avi_read(AVI->fdes,audbuf+nr,todo)) != todo)
       {
-	 fprintf(stderr, "XXX pos = %lld, ret = %lld, todo = %ld\n", pos, ret, todo);
+//	 fprintf(stderr, "XXX pos = %lld, ret = %lld, todo = %ld\n", pos, ret, todo);
+	 veejay_msg(0, "No audio data at position %ld!");
          AVI_errno = AVI_ERR_READ;
          return -1;
       }
@@ -3480,7 +3485,7 @@ char *(avi_errors[]) =
   /*  5 */ "avilib - Error writing index (file may still be useable)",
   /*  6 */ "avilib - Error closing AVI file",
   /*  7 */ "avilib - Operation (read/write) not permitted",
-  /*  8 */ "avilib - Out of memory (malloc failed)",
+  /*  8 */ "avilib - Out of memory (vj_malloc failed)",
   /*  9 */ "avilib - Not an AVI file",
   /* 10 */ "avilib - AVI file has no header list (corrupted?)",
   /* 11 */ "avilib - AVI file has no MOVI list (corrupted?)",
@@ -3561,22 +3566,22 @@ int AVI_read_wave_header( int fd, struct wave_header * wave )
 	return -1;
     }
 
-    memcpy(&wave->riff.id      ,buf+0, 4);
-    memcpy(&wave->riff.len     ,buf+4, 4);
-    memcpy(&wave->riff.wave_id ,buf+8, 4);
+    veejay_memcpy(&wave->riff.id      ,buf+0, 4);
+    veejay_memcpy(&wave->riff.len     ,buf+4, 4);
+    veejay_memcpy(&wave->riff.wave_id ,buf+8, 4);
 
-    memcpy(&wave->format.id    ,buf+12, 4);
-    memcpy(&wave->format.len   ,buf+16, 4);
+    veejay_memcpy(&wave->format.id    ,buf+12, 4);
+    veejay_memcpy(&wave->format.len   ,buf+16, 4);
 
-    memcpy(&wave->common.wFormatTag       ,buf+20, 2);
-    memcpy(&wave->common.wChannels        ,buf+22, 2);
-    memcpy(&wave->common.dwSamplesPerSec  ,buf+24, 4);
-    memcpy(&wave->common.dwAvgBytesPerSec ,buf+28, 4);
-    memcpy(&wave->common.wBlockAlign      ,buf+32, 2);
-    memcpy(&wave->common.wBitsPerSample   ,buf+34, 2);
+    veejay_memcpy(&wave->common.wFormatTag       ,buf+20, 2);
+    veejay_memcpy(&wave->common.wChannels        ,buf+22, 2);
+    veejay_memcpy(&wave->common.dwSamplesPerSec  ,buf+24, 4);
+    veejay_memcpy(&wave->common.dwAvgBytesPerSec ,buf+28, 4);
+    veejay_memcpy(&wave->common.wBlockAlign      ,buf+32, 2);
+    veejay_memcpy(&wave->common.wBitsPerSample   ,buf+34, 2);
 
-    memcpy(&wave->data.id  ,buf+36, 4);
-    memcpy(&wave->data.len ,buf+40, 4);
+    veejay_memcpy(&wave->data.id  ,buf+36, 4);
+    veejay_memcpy(&wave->data.len ,buf+40, 4);
 
 
     /*
@@ -3645,22 +3650,22 @@ int AVI_write_wave_header( int fd, const struct wave_header * wave )
 #undef x_FIXUP
 #endif
 
-    memcpy(buf+ 0, &buffer.riff.id, 4);
-    memcpy(buf+ 4, &buffer.riff.len, 4);
-    memcpy(buf+ 8, &buffer.riff.wave_id, 4);
+    veejay_memcpy(buf+ 0, &buffer.riff.id, 4);
+    veejay_memcpy(buf+ 4, &buffer.riff.len, 4);
+    veejay_memcpy(buf+ 8, &buffer.riff.wave_id, 4);
 
-    memcpy(buf+12, &buffer.format.id, 4);
-    memcpy(buf+16, &buffer.format.len, 4);
+    veejay_memcpy(buf+12, &buffer.format.id, 4);
+    veejay_memcpy(buf+16, &buffer.format.len, 4);
 
-    memcpy(buf+20, &buffer.common.wFormatTag, 2);
-    memcpy(buf+22, &buffer.common.wChannels, 2);
-    memcpy(buf+24, &buffer.common.dwSamplesPerSec, 4);
-    memcpy(buf+28, &buffer.common.dwAvgBytesPerSec, 4);
-    memcpy(buf+32, &buffer.common.wBlockAlign, 2);
-    memcpy(buf+34, &buffer.common.wBitsPerSample, 2);
+    veejay_memcpy(buf+20, &buffer.common.wFormatTag, 2);
+    veejay_memcpy(buf+22, &buffer.common.wChannels, 2);
+    veejay_memcpy(buf+24, &buffer.common.dwSamplesPerSec, 4);
+    veejay_memcpy(buf+28, &buffer.common.dwAvgBytesPerSec, 4);
+    veejay_memcpy(buf+32, &buffer.common.wBlockAlign, 2);
+    veejay_memcpy(buf+34, &buffer.common.wBitsPerSample, 2);
 
-    memcpy(buf+36, &buffer.data.id, 4);
-    memcpy(buf+40, &buffer.data.len, 4);
+    veejay_memcpy(buf+36, &buffer.data.id, 4);
+    veejay_memcpy(buf+40, &buffer.data.len, 4);
 
 
     // write raw data

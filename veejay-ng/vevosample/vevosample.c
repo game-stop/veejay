@@ -2397,8 +2397,16 @@ int	sample_get_frame( void *current_sample , void *dslot )
 			vj_el_get_video_frame ( srd->data, frame_num,slot);
 			break;
 		case VJ_TAG_TYPE_CAPTURE:
-			vj_unicap_grab_frame( srd->data, (void*) slot );
-
+			if( vj_unicap_status( srd->data ))
+			{
+				if(!vj_unicap_grab_frame( srd->data, slot, slot->width,slot->height))
+				{
+					vj_unicap_stop_capture( srd->data );
+				}
+			}
+			else {
+				vj_unicap_start_capture( srd->data );
+			}
 			break;
 		case VJ_TAG_TYPE_NET:
 			break;
@@ -3720,6 +3728,7 @@ int	sample_apply_bind( void *sample, void *current_entry, int k_entry )
 				char *output_pval = vevo_sprintf_property_value( slot->out_values, pkey );
 
 				sprintf(output_pname, "o%02d", bpt->p[BIND_OUT_P]);
+
 				if(bpt->kind == HOST_PARAM_INDEX)
 				{
 					if( vevo_property_get( slot->out_values, pkey,0,&value ) == VEVO_NO_ERROR )
@@ -3740,6 +3749,7 @@ int	sample_apply_bind( void *sample, void *current_entry, int k_entry )
 					{
 						double norm = (1.0 / (bpt->max[0] - bpt->min[0])) * value;
 						double gv = (bpt->max[1] - bpt->min[1]) * norm + bpt->min[1];
+	
 						plug_set_parameter( dst_slot->fx_instance, bpt->p[BIND_IN_P], 1, &gv );
 	
 						if(path && sender)
@@ -3771,10 +3781,6 @@ int	sample_apply_bind( void *sample, void *current_entry, int k_entry )
 				if(fmt)  free(fmt);
 				if(output_pval) free(output_pval);
 
-			}
-			else 
-			{
-				veejay_msg(0, "Kind is not compatible: %d", bpt->kind );
 			}
 		}
 		

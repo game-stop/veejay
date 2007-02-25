@@ -21,9 +21,7 @@
  *
  */
 
-/** \defgroup Planar YUV sampling
- *
- */
+
 
 #include <config.h>
 
@@ -67,31 +65,34 @@ const char *ssm_description[SSM_COUNT] = {
 // forward decl
 void ss_420_to_422(uint8_t *buffer, int width, int height);
 void ss_422_to_420(uint8_t *buffer, int width, int height);
+static	void	subsample_y_clamp_plane(
+		uint8_t *plane,
+		uint8_t *dplane,
+		int len );
+static void 	subsample_uv_clamp_plane(
+		uint8_t *plane_u,
+		uint8_t *plane_v,
+		uint8_t *dplane_u,
+		uint8_t *dplane_v,
+		int len);
 
 typedef struct
 {
-	uint8_t *buf;
+	uint8_t *buf; 
         uint8_t *YUV_to_YCbCr[2];
 	int     jyuv;
 	uint8_t *planes[4];
 } yuv_sampler_t;
 
-static uint8_t *sample_buffer = NULL;
-static int go = 0;
-
 void *subsample_init(int len)
 {
-	void *ret = NULL;
 	yuv_sampler_t *s = (yuv_sampler_t*) vj_malloc(sizeof(yuv_sampler_t) );
 	if(!s)
-		return ret;
-	memset( s, 0 , sizeof( yuv_sampler_t ));
-	s->buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
-	s->YUV_to_YCbCr[0] = NULL;
-	s->YUV_to_YCbCr[1] = NULL;
+		return NULL;
+	s->buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * (len*2) );
 	if(!s->buf)
-		return ret;
-
+		return NULL;
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
 	return (void*) s;
 }
 
@@ -112,10 +113,10 @@ void *subsample_init_copy(int w, int h)
 	s->planes[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * w * h );
 	s->planes[1] = (uint8_t*) vj_malloc( sizeof(uint8_t) * w * h );
 	s->planes[2] = (uint8_t*) vj_malloc( sizeof(uint8_t) * w * h );
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
 	
 	return (void*) s;
 }
-
 
 
 void	subsample_free(void *data)
@@ -123,306 +124,14 @@ void	subsample_free(void *data)
 	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
 	if(sampler)
 	{
-		if(sampler->buf) free(sampler->buf);
-		if(sampler->YUV_to_YCbCr[0])
-			free(sampler->YUV_to_YCbCr[0]);
-		if(sampler->YUV_to_YCbCr[1])
-			free(sampler->YUV_to_YCbCr[1]);
-		if(sampler->planes[0])
-			free(sampler->planes[0]);
-		if(sampler->planes[1])
-			free(sampler->planes[1]);
-		if(sampler->planes[2])
-			free(sampler->planes[2]);
+		if(sampler->buf) 
+			free(sampler->buf);
 		free(sampler);
 	}
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
 	sampler = NULL;
 }
-
-
-#define CLAMP_Y( f) ( f < 16 ? 16: f > 235 ? 235: f )
-#define CLAMP_C( u) ( u < 16 ? 16: u > 240 ? 240: u )
-static	void	subsample_init_YUV_to_CbCr(void *data)
-{
-	unsigned int n;
-	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
-
-	for( n = 0; n < 2; n ++ )
-	{
-		sampler->YUV_to_YCbCr[n] =
-			(uint8_t*) vj_malloc(sizeof(uint8_t) * 256 );
-		memset( sampler->YUV_to_YCbCr[n], 0, 256 );
-	}	
-	uint8_t *y = sampler->YUV_to_YCbCr[0];
-	uint8_t *uv = sampler->YUV_to_YCbCr[1];
-	for( n = 0; n < 256; n ++ )
-	{
-		y[n] = CLAMP_Y( (n * 219.0 / 256.0 + 16) );
-		uv[n] = CLAMP_C( (n* 224.0 / 256.0 + 16) );
-	}
-	sampler->jyuv = 1;
-}
-
-#ifdef HAVE_ASM_MMX
-//! Clamp Y to 16-235 - MMX optimized, 64 bytes at a time.
-/*!
- \param plane Source
- \param dplane Destination
- \param len Size
- */
-static	void	subsample_y_clamp_plane(
-		uint8_t *plane,
-		uint8_t *dplane,
-		int len )
-{
-	uint8_t mi[8] = { 16,16,16,16, 16,16,16,16 };
-	uint8_t ma[8] = { 235,235,235,235,  235,235,235,235};
-	const uint8_t *min = &mi[0];
-	const uint8_t *max = &ma[0];
-	unsigned int k = 0;
-	unsigned int align = (len/8);
-	
-	for( k = 0; k < align ; k ++ )
-	{
-		__asm__ __volatile__ ( 
-#if defined HAVE_ASM_MMX2 || defined HAVE_ASM_SSE
-			"prefetchnta (%0)\n"
-			"prefetchnta (%1)\n"
-			"prefetchnta (%2)\n"
-#endif
-			"movq (%0), %%mm0\n"
-			"movq (%1), %%mm1\n" //eb
-			"movq (%2), %%mm2\n" //10
-			"pmaxub %%mm0, %%mm2\n"
-			"pminub %%mm1, %%mm2\n"
-			"movntq %%mm2, (%3)\n"
-          	  :: "r" (plane),"r" (max), "r" (min), "r" (dplane) : "memory");
-
-		plane += 8;
-		dplane += 8;
-	}
-	if( (align*8) < len)
-	{
-		for( k = 8*align; k < len; k ++ )
-			*(dplane++) = CLAMP_Y( (*plane++) );
-
-	}
-}
-#else
-static	void	subsample_y_clamp_plane(
-		uint8_t *plane,
-		uint8_t *dplane,
-		int len )
-{
-	unsigned int n;
-	for( n = 0 ; n < len; n ++ )
-		dplane[n] = CLAMP_Y( plane[n] );
-}
-#endif
-
-#ifdef HAVE_ASM_MMX
-//! Clamp Chroma planes 16-240, MMX 8 pixel at a time
-static void 	subsample_uv_clamp_plane(
-		uint8_t *plane_u,
-		uint8_t *plane_v,
-		uint8_t *dplane_u,
-		uint8_t *dplane_v,
-		int len)
-{
-	uint8_t mi[8] = { 16,16,16,16, 16,16,16,16 };
-	uint8_t ma[8] = { 240,240,240,240,  240,240,240,240 };
-	const uint8_t *min = &mi[0];
-	const uint8_t *max = &ma[0];
-	unsigned int k = 0;
-	unsigned int align = (len/8);
-	
-	for( k = 0; k < align ; k ++ )
-	{
-		__asm__ __volatile__ (
-#if defined HAVE_ASM_MMX2 || defined HAVE_ASM_SSE  
-			"prefetchnta (%0)\n"
-			"prefetchnta (%1)\n"
-			"prefetchnta (%2)\n"
-			"prefetchnta (%3)\n"
-#endif
-			"movq (%0), %%mm0\n"
-			"movq (%1), %%mm1\n"
-			"movq (%2), %%mm2\n"
-			"pmaxub %%mm0, %%mm2\n"
-			"pminub %%mm1, %%mm2\n"
-			"movntq %%mm2, (%3)\n"
-      			:: "r" (plane_u),"r" (max), "r" (min), "r" (dplane_u) : "memory");
-
-		plane_u += 8;
-		dplane_u += 8;
-	}
-	
-	for( k = 0; k < align ; k ++ )
-	{
-		__asm__ __volatile__ (
-    			"prefetchnta (%0)\n"
-			"prefetchnta (%1)\n"
-			"prefetchnta (%2)\n"
- 	    		"prefetchnta (%3)\n"
-			"movq (%0), %%mm0\n"
-			"movq (%1), %%mm1\n"
-			"movq (%2), %%mm2\n"
-			"pmaxub %%mm0, %%mm2\n"
-			"pminub %%mm1, %%mm2\n"
-			"movntq %%mm2, (%3)\n"
-          	  :: "r" (plane_v),"r" (max), "r" (min), "r" (dplane_v) : "memory");
-
-		plane_v += 8;
-		dplane_v += 8;
-	}
-}
-#else
-static	void	subsample_uv_clamp_plane(
-		uint8_t *plane_u,
-		uint8_t *plane_v,
-		uint8_t *dplane_u,
-		uint8_t *dplane_v,
-		int len )
-{
-	unsigned int n;
-	for( n = 0 ; n < len; n ++ )
-	{
-		dplane_u[n] = CLAMP_Y( plane_u[n] );
-		dplane_v[n] = CLAMP_C( plane_v[n] );
-	}
-}
-#endif
-static	void	subsample_ycbcr_itu601_plane(
-	       	uint8_t *plane,
-		int	 len,
-		uint8_t *lookup,
-	        uint8_t *dplane	)
-{
-	unsigned int n;
-	for( n = 0 ; n < len; n ++ )
-		dplane[n] = lookup[ plane[n] ];
-}
-
-static	void	subsample_ycbcr_itu601_chroma_plane(
-	       	uint8_t *planeU,
-		uint8_t *planeV,
-		int	 len,
-		uint8_t *lookup,
-	        uint8_t *dplaneU,
-		uint8_t *dplaneV	)
-{
-	unsigned int n;
-	for( n = 0 ; n < len; n ++ )
-	{
-		dplaneU[n] = lookup[ (planeU[n]) ];
-		dplaneV[n] = lookup[ (planeV[n]) ];
-	}
-}
-
-void	subsample_ycbcr_itu601(void *data, VJFrame *frame)
-{
-	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
-
-	if(!sampler->jyuv)
-		subsample_init_YUV_to_CbCr(sampler);
-	
-	subsample_ycbcr_itu601_plane(
-			frame->data[0],
-			frame->len,
-			sampler->YUV_to_YCbCr[0],
-		        frame->data[0]	);
-	subsample_ycbcr_itu601_chroma_plane(
-			frame->data[1],
-			frame->data[2],
-			frame->uv_len,
-			sampler->YUV_to_YCbCr[1],
-		        frame->data[1],
-			frame->data[2]	);
-}
-
-void	subsample_ycbcr_itu601_copy(void *data, VJFrame *src_frame, VJFrame *dst_frame)
-{
-	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
-	if(!sampler->YUV_to_YCbCr[0])
-		subsample_init_YUV_to_CbCr(sampler);
-	
-	subsample_ycbcr_itu601_plane(
-			src_frame->data[0],
-			src_frame->len,
-			sampler->YUV_to_YCbCr[0],
-		        dst_frame->data[0]	);
-	subsample_ycbcr_itu601_chroma_plane(
-			src_frame->data[1],
-			src_frame->data[2],
-			src_frame->uv_len,
-			sampler->YUV_to_YCbCr[1],
-		        dst_frame->data[1],
-			dst_frame->data[2]	);
-}
-
-void	subsample_ycbcr_clamp_itu601_copy(VJFrame *frame, VJFrame *dst_frame)
-{
-	subsample_y_clamp_plane(
-			frame->data[0],
-			dst_frame->data[0],
-			frame->len );
-	subsample_uv_clamp_plane(
-			frame->data[1],
-			frame->data[2],
-			dst_frame->data[1],
-			dst_frame->data[2],
-			frame->uv_len );
-#ifdef HAVE_ASM_MMX
-	__asm__ __volatile__ ("sfence":::"memory");
-        __asm__ __volatile__ ("emms":::"memory");
-#endif
-}
-/*
-#ifdef HAVE_ASM_MMX
-void	subsample_clear_plane( uint8_t bval, uint8_t *plane, uint32_t plane_len )
-{
-	unsigned int k = 0;
-	unsigned int align = (plane_len/64);
-
-	double val = (double) bval;
-
-	__asm__ __volatile__ (
-			"pxor	%%mm0,	%%mm0\n"
-			"movq	%%mm0,	(%0)\n"
-		:: "r" (val) );
-	
-	for( k = 0; k < align ; k ++ )
-	{
-		__asm__ __volatile__ (
-			"prefetchnta (%0)\n"
-			"prefetchnta 8(%0)\n"
-			"prefetchnta 16(%0)\n"
-			"prefetchnta 24(%0)\n"
-			"prefetchnta 32(%0)\n"
-			"prefetchnta 40(%0)\n"
-			"prefetchnta 49(%0)\n"
-			"prefetchnta 56(%0)\n"
-			"movntq %%mm0,(%0)\n"
-			"movntq %%mm0,8(%0)\n"
-			"movntq %%mm0,16(%0)\n"
-			"movntq %%mm0,24(%0)\n"
-			"movntq %%mm0,32(%0)\n"
-			"movntq %%mm0,40(%0)\n"
-			"movntq %%mm0,48(%0)\n"
-			"movntq %%mm0,56(%0)\n"
-        	    :: "r" (plane) : "memory");
-		plane += 64;
-	}
-	__asm__ __volatile__ ("sfence":::"memory");
-        __asm__ __volatile__ ("emms":::"memory");
-}*/
-//#else
-void	subsample_clear_plane( uint8_t bval, uint8_t *plane, uint32_t plane_len )
-{
-	memset( plane, bval, plane_len );
-}
-
-//#endif
 
 /*************************************************************************
  * Chroma Subsampling
@@ -477,6 +186,9 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
   in0 = buffer;
   in1 = buffer + width;
   out = buffer;
+
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
   for (y = 0; y < height; y += 4) {
     for (x = 0; x < width; x += 4) {
      out[0] = (in0[0] + 3 * (in0[1] + in1[0]) + (9 * in1[1]) + 8) >> 4;
@@ -499,7 +211,38 @@ static void ss_444_to_420jpeg(uint8_t *buffer, int width, int height)
     in1 += width*2;
   }
 }
- 
+static void ss_444_to_420jpeg_cp(uint8_t *buffer,uint8_t *dest, int width, int height)
+{
+  const uint8_t *in0, *in1;
+  uint8_t *out;
+  int x, y = height;
+  in0 = buffer;
+  in1 = buffer + width;
+  out = dest;
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
+  for (y = 0; y < height; y += 4) {
+    for (x = 0; x < width; x += 4) {
+     out[0] = (in0[0] + 3 * (in0[1] + in1[0]) + (9 * in1[1]) + 8) >> 4;
+     out[1] = (in0[2] + 3 * (in0[3] + in1[2]) + (9 * in1[3]) + 8) >> 4;
+     out[2] = (in0[4] + 3 * (in0[5] + in1[4]) + (9 * in1[5]) + 8) >> 4;
+     out[3] = (in0[6] + 3 * (in0[7] + in1[6]) + (9 * in1[7]) + 8) >> 4;
+
+      in0 += 8;
+      in1 += 8;
+      out += 4;
+    }
+    for (  ; x < width; x +=2 )
+    {
+ 	out[0] = (in0[0] + 3 * (in0[1] + in1[0]) + (9 * in1[1]) + 8) >> 4;
+        in0 += 2;
+        in1 += 2;
+	out++;
+    }
+    in0 += width*2;
+    in1 += width*2;
+  }
+}
 /* horizontal interstitial siting
  *
  *    Y   Y   Y   Y
@@ -548,6 +291,7 @@ static void tr_420jpeg_to_444(void *data, uint8_t *buffer, int width, int height
   uint8_t *inm, *in0, *inp, *out0, *out1;
   uint8_t cmm, cm0, cmp, c0m, c00, c0p, cpm, cp0, cpp;
   int x, y;
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
 
   yuv_sampler_t *sampler = (yuv_sampler_t*) data;
 
@@ -693,6 +437,9 @@ static void tr_420jpeg_to_444(void *data, uint8_t *buffer, int width, int height
 
 static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 {
+
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
 #ifndef HAVE_ASM_MMX
   uint8_t *in, *out0, *out1;
   int x, y;
@@ -712,8 +459,8 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
   }
 #else
 	int x,y;
-	const int mmx_stride = width/8;
-	uint8_t *src = buffer + (width * height/4)-1;
+	const int mmx_stride = width >> 3;
+	uint8_t *src = buffer + ((width * height) >> 2)-1;
 	uint8_t *dst = buffer + (width * height) -1;
 	uint8_t *dst2 = dst - width;
 
@@ -740,180 +487,273 @@ static void ss_420jpeg_to_444(uint8_t *buffer, int width, int height)
 
 void ss_420_to_422(uint8_t *buffer, int width, int height)
 {
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
 	//todo, 1x2 super sampling (box)
 }
 
 void ss_422_to_420(uint8_t *buffer, int width, int height )
 {
-	veejay_msg(0, "%s: Implement me", __FUNCTION__);
-	
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
 	//todo 2x1 down sampling (box)
 }
 
-#ifndef HAVE_ASM_MMX
-static void ss_444_to_422(void *data, uint8_t *buffer, int width, int height)
+#ifdef HAVE_ASM_MMX
+#undef HAVE_K6_2PLUS
+#if !defined( HAVE_ASM_MMX2) && defined( HAVE_ASM_3DNOW )
+#define HAVE_K6_2PLUS
+#endif
+
+#undef _EMMS
+
+#ifdef HAVE_K6_2PLUS
+/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
+#define _EMMS     "femms"
+#else
+#define _EMMS     "emms"
+#endif
+
+#endif
+
+#ifdef HAVE_ASM_MMX
+/* for small memory blocks (<256 bytes) this version is faster */
+#define small_memcpy(to,from,n)\
+{\
+register unsigned long int dummy;\
+__asm__ __volatile__(\
+  "rep; movsb"\
+  :"=&D"(to), "=&S"(from), "=&c"(dummy)\
+  :"0" (to), "1" (from),"2" (n)\
+  : "memory");\
+}
+
+static  inline	void	copy8( uint8_t *dst, uint8_t *in )
 {
-	const int dst_stride = width/2;
-	int x,y;
-	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
-	
-	for(y = 0; y < height; y ++)
+	__asm__ __volatile__ (
+		"movq	(%0),	%%mm0\n"
+		"movq %%mm0, (%1)\n"
+		:: "r" (in), "r" (dst) : "memory" );
+}
+
+static	inline	void	copy16( uint8_t *dst, uint8_t *in)
+{
+	__asm__ __volatile__ (
+		"movq	(%0),	%%mm0\n"
+		"movq  8(%0),	%%mm1\n"
+		"movq  %%mm0,   (%1)\n"
+		"movq  %%mm1,   8(%1)\n"
+		:: "r" (in), "r" (dst) : "memory" );
+}
+
+static	inline void	copy_width( uint8_t *dst, uint8_t *in, int width )
+{
+	int w = width >> 4;
+	int x;
+	uint8_t *d = dst;
+	uint8_t *i = in;
+
+	for( x = 0; x < w; x ++ )
 	{
-		uint8_t *src = sampler->buf;
-		uint8_t *dst = buffer + (y*dst_stride);
-		veejay_memcpy( src, buffer + (y*width), width );
-		for(x=0; x < dst_stride; x++)
-		{
-			*(dst++) = ( src[0] + src[1] ) >> 1;
-			src += 2;
-		}
+		copy16( d, i );
+		d += 16;
+		i += 16;
 	}
 
+	x = (w % 16);
+	if( x > 4 )
+		small_memcpy( d, i, x-1);
+
 }
 
-#else
-
-/* mmx_average_2_u8 (function taken from mpeg2dec, a free MPEG-2 video
- * stream decoder 
- *
- * Copyright (C) 2000-2003 Michel Lespinasse <walken@zoy.org>
- * Copyright (C) 1999-2000 Aaron Holtzman <aholtzma@ess.engr.uvic.ca>
- */
-
-static mmx_t mask1 = {0xfefefefefefefefeLL};
-static mmx_t round4 = {0x0002000200020002LL};
-
-static inline void mmx_average_4_U8 (uint8_t * dest, const uint8_t * src1,
-                                     const uint8_t * src2,
-                                     const uint8_t * src3,
-                                     const uint8_t * src4)
+static	inline	void	load_mask16to8()
 {
-    /* *dest = (*src1 + *src2 + *src3 + *src4 + 2)/ 4; */
+	const uint64_t mask = 0x00ff00ff00ff00ffLL;
+	const uint8_t *m    = (uint8_t*)&mask;
 
-    movq_m2r (*src1, mm1);      /* load 8 src1 bytes */
-    movq_r2r (mm1, mm2);        /* copy 8 src1 bytes */
+	__asm __volatile(
+		"movq		(%0), %%mm4\n\t"
+		:: "r" (m)
+	);
 
-    punpcklbw_r2r (mm0, mm1);   /* unpack low src1 bytes */
-    punpckhbw_r2r (mm0, mm2);   /* unpack high src1 bytes */
-
-    movq_m2r (*src2, mm3);      /* load 8 src2 bytes */
-    movq_r2r (mm3, mm4);        /* copy 8 src2 bytes */
-
-    punpcklbw_r2r (mm0, mm3);   /* unpack low src2 bytes */
-    punpckhbw_r2r (mm0, mm4);   /* unpack high src2 bytes */
-
-    paddw_r2r (mm3, mm1);       /* add lows */
-    paddw_r2r (mm4, mm2);       /* add highs */
-
-    /* now have partials in mm1 and mm2 */
-
-    movq_m2r (*src3, mm3);      /* load 8 src3 bytes */
-    movq_r2r (mm3, mm4);        /* copy 8 src3 bytes */
-
-    punpcklbw_r2r (mm0, mm3);   /* unpack low src3 bytes */
-    punpckhbw_r2r (mm0, mm4);   /* unpack high src3 bytes */
-
-    paddw_r2r (mm3, mm1);       /* add lows */
-    paddw_r2r (mm4, mm2);       /* add highs */
-
-    movq_m2r (*src4, mm5);      /* load 8 src4 bytes */
-    movq_r2r (mm5, mm6);        /* copy 8 src4 bytes */
-
-    punpcklbw_r2r (mm0, mm5);   /* unpack low src4 bytes */
-    punpckhbw_r2r (mm0, mm6);   /* unpack high src4 bytes */
-
-    paddw_r2r (mm5, mm1);       /* add lows */
-    paddw_r2r (mm6, mm2);       /* add highs */
-
-    /* now have subtotal in mm1 and mm2 */
-
-    paddw_m2r (round4, mm1);
-    psraw_i2r (2, mm1);         /* /4 */
-    paddw_m2r (round4, mm2);
-    psraw_i2r (2, mm2);         /* /4 */
-
-    packuswb_r2r (mm2, mm1);    /* pack (w/ saturation) */
-    movq_r2m (mm1, *dest);      /* store result in dest */
 }
 
-
-static inline void mmx_average_2_U8 (uint8_t * dest, const uint8_t * src1,
-				     const uint8_t * src2)
+static	inline	void	down_sample16to8( uint8_t *out, uint8_t *in )
 {
-    /* *dest = (*src1 + *src2 + 1)/ 2; */
-
-    movq_m2r (*src1, mm1);	/* load 8 src1 bytes */
-    movq_r2r (mm1, mm2);	/* copy 8 src1 bytes */
-
-    movq_m2r (*src2, mm3);	/* load 8 src2 bytes */
-    movq_r2r (mm3, mm4);	/* copy 8 src2 bytes */
-
-    pxor_r2r (mm1, mm3);	/* xor src1 and src2 */
-    pand_m2r (mask1, mm3);	/* mask lower bits */
-    psrlq_i2r (1, mm3);		/* /2 */
-    por_r2r (mm2, mm4);		/* or src1 and src2 */
-    psubb_r2r (mm3, mm4);	/* subtract subresults */
-    movq_r2m (mm4, *dest);	/* store result in dest */
+	//@ down sample by dropping right pixels
+	__asm __volatile(
+		"movq		(%0), %%mm1\n\t"
+		"movq		8(%0),%%mm3\n\t"
+		"pxor		%%mm5,%%mm5\n\t"
+		"pand		%%mm4,%%mm1\n\t"
+		"pand		%%mm4,%%mm3\n\t"
+		"packuswb	%%mm1,%%mm2\n\t"
+		"packuswb	%%mm3,%%mm5\n\t"
+		"psrlq		$32, %%mm2\n\t"
+		"por		%%mm5,%%mm2\n\t"
+		"movq		%%mm2, (%1)\n\t"
+		:: "r" (in), "r" (out)
+	);
 }
-static void ss_444_to_422(void *data,uint8_t *buffer, int width, int height)
+#endif
+static void ss_444_to_422_cp(void *data, uint8_t *buffer, uint8_t *dest, int width, int height)
 {
-	const int dst_stride = width/2;
-	const int len = width * height;
-	const int mmx_stride = dst_stride / 8;
+	const int dst_stride = width >> 1;
 	int x,y;
-
+#ifdef HAVE_ASM_MMX
+	int mmxdst_stride=dst_stride >> 3;
+	int left = dst_stride % 8;
+#endif
 	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
+	uint8_t *src = sampler->buf;
+	uint8_t *dst;
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
 
+#ifdef HAVE_ASM_MMX
+	load_mask16to8();
+#endif
 	for(y = 0; y < height; y ++)
 	{
-		uint8_t *src = sampler->buf;
-		uint8_t *dst = buffer + (y*dst_stride);
-		veejay_memcpy( src, buffer + (y*width), width );
-		for(x=0; x < mmx_stride; x++)
+		src = buffer + (y*width);
+		dst = dest + (y*dst_stride);
+
+#ifndef HAVE_ASM_MMX
+		for(x=0; x < dst_stride; x++)
 		{
-			mmx_average_2_U8( dst,src, src+8 );
+			*(dst++) = ( src[0] + src[1] + 1 ) >> 1;
+			src += 2;
+		}
+#else
+		for( x= 0; x < mmxdst_stride; x++ )
+		{
+			down_sample16to8( dst, src );
 			src += 16;
 			dst += 8;
 		}
+		for(x=0; x < left; x++)
+		{
+			*(dst++) = ( src[0] + src[1] + 1 ) >> 1;
+			src += 2;
+		}
+#endif
 	}
+}
 
+
+static void ss_444_to_422(void *data, uint8_t *buffer, int width, int height)
+{
+	const int dst_stride = width >> 1;
+	int x,y;
+#ifdef HAVE_ASM_MMX
+	int mmxdst_stride=dst_stride >> 3;
+	int left = dst_stride % 8;
+#endif
+	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
+	uint8_t *src = sampler->buf;
+	uint8_t *dst;
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
+#ifdef HAVE_ASM_MMX
+	load_mask16to8();
+#endif
+	for(y = 0; y < height; y ++)
+	{
+		src = sampler->buf;
+		dst = buffer + (y*dst_stride);
+
+#ifndef HAVE_ASM_MMX
+		for(x=0; x < dst_stride; x++)
+		{
+			*(dst++) = ( src[0] + src[1] + 1 ) >> 1;
+			src += 2;
+		}
+#else
+		copy_width( src, buffer + (y*width), width );
+
+		for( x= 0; x < mmxdst_stride; x++ )
+		{
+			down_sample16to8( dst, src );
+			src += 16;
+			dst += 8;
+		}
+		for(x=0; x < left; x++)
+		{
+			*(dst++) = ( src[0] + src[1] + 1 ) >> 1;
+			src += 2;
+		}
+#endif
+	}
+}
+#ifdef HAVE_ASM_MMX
+
+static	inline	void	super_sample8to16( uint8_t *in, uint8_t *out )
+{
+	//@ super sample by duplicating pixels
+	__asm__ __volatile__ (
+		"\n\tpxor	%%mm2,%%mm2"
+		"\n\tpxor	%%mm4,%%mm4"
+		"\n\tmovq	(%0), %%mm1"  
+		"\n\tpunpcklbw	%%mm1,%%mm2" 
+		"\n\tpunpckhbw	%%mm1,%%mm4"   
+		"\n\tmovq	%%mm2,%%mm5"
+		"\n\tmovq	%%mm4,%%mm6"
+		"\n\tpsrlq	$8, %%mm5"    
+		"\n\tpsrlq	$8, %%mm6"  
+		"\n\tpor	%%mm5,%%mm2"
+		"\n\tpor	%%mm6,%%mm4"	
+		"\n\tmovq	%%mm2, (%1)"
+		"\n\tmovq	%%mm4, 8(%1)"
+		:: "r" (in), "r" (out)
+
+	);
 }
 #endif
 
-static void tr_422_to_444(uint8_t *buffer, int width, int height)
+static void tr_422_to_444(void *data, uint8_t *buffer, int width, int height)
 {
-	/* YUV 4:2:2 Planar to 4:4:4 Planar */
-
-	const int stride = width/2;
-	const int len = stride * height; 
-#ifdef HAVE_ASM_MMX
-	const int mmx_stride = stride / 8;
-#endif
 	int x,y;
+	const int stride = width >> 1;
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
+#ifndef HAVE_ASM_MMX
 	for( y = height-1; y > 0 ; y -- )
 	{
 		uint8_t *dst = buffer + (y * width);
 		uint8_t *src = buffer + (y * stride);
-#ifdef HAVE_ASM_MMX
-		for( x = 0; x < mmx_stride; x ++ )
-		{
-			movq_m2r( *src,mm0 );
-			movq_m2r( *src,mm1 );
-			movq_r2m(mm0, *dst );
-			movq_r2m(mm1, *(dst+8) );
-			dst += 16;
-			src += 8;
-		}
-#else
 		for(x=0; x < stride; x++) // for 1 row
 		{
 			dst[0] = src[x]; //put to dst
 			dst[1] = src[x];
 			dst+=2; // increment dst
 		}
-#endif
 	}
+#else
+
+	const int mmx_stride = stride >> 3;
+	int left = (mmx_stride % 8)-1;
+	if( left < 0 ) left = 0;
+	for( y = height-1; y > 0 ; y -- )
+	{
+		uint8_t *src = buffer + (y * stride);
+		uint8_t *dst = buffer + (y * width);
+		for(x=0; x < mmx_stride; x++) // for 1 row
+		{
+			super_sample8to16(src,dst );
+			src += 8;
+			dst += 16;
+		}
+	/*	for(x=0; x < left; x++) // for 1 row
+		{
+			dst[0] = src[x]; //put to dst
+			dst[1] = src[x];
+			dst+=2; // increment dst
+		}*/
+	}
+#endif
 }
+
+
+
 
 /* vertical intersitial siting; horizontal cositing
  *
@@ -939,6 +779,7 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
 {
   uint8_t *in0, *in1, *out;
   int x, y;
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
 
   in0 = buffer;          /* points to */
   in1 = buffer + width;  /* second of pair of lines */
@@ -962,7 +803,270 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
     in1 += width + 1;
   }
 }
-      
+
+static	void	subsample_ycbcr_itu601_plane(
+	       	uint8_t *plane,
+		int	 len,
+		uint8_t *lookup,
+	        uint8_t *dplane	)
+{
+	unsigned int n;
+	for( n = 0 ; n < len; n ++ )
+		dplane[n] = lookup[ plane[n] ];
+}
+
+static	void	subsample_ycbcr_itu601_chroma_plane(
+	       	uint8_t *planeU,
+		uint8_t *planeV,
+		int	 len,
+		uint8_t *lookup,
+	        uint8_t *dplaneU,
+		uint8_t *dplaneV	)
+{
+	unsigned int n;
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
+	for( n = 0 ; n < len; n ++ )
+	{
+		dplaneU[n] = lookup[ (planeU[n]) ];
+		dplaneV[n] = lookup[ (planeV[n]) ];
+	}
+}
+
+
+
+
+#define CLAMP_Y( f) ( f < 16 ? 16: f > 235 ? 235: f )
+#define CLAMP_C( u) ( u < 16 ? 16: u > 240 ? 240: u )
+static	void	subsample_init_YUV_to_CbCr(void *data)
+{
+	unsigned int n;
+	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
+	for( n = 0; n < 2; n ++ )
+	{
+		sampler->YUV_to_YCbCr[n] =
+			(uint8_t*) vj_malloc(sizeof(uint8_t) * 256 );
+		memset( sampler->YUV_to_YCbCr[n], 0, 256 );
+	}	
+	uint8_t *y = sampler->YUV_to_YCbCr[0];
+	uint8_t *uv = sampler->YUV_to_YCbCr[1];
+	for( n = 0; n < 256; n ++ )
+	{
+		y[n] = CLAMP_Y( (n * 219.0 / 256.0 + 16) );
+		uv[n] = CLAMP_C( (n* 224.0 / 256.0 + 16) );
+	}
+	sampler->jyuv = 1;
+}
+
+#ifdef HAVE_ASM_MMX
+//! Clamp Y to 16-235 - MMX optimized, 64 bytes at a time.
+/*!
+ \param plane Source
+ \param dplane Destination
+ \param len Size
+ */
+static	void	subsample_y_clamp_plane(
+		uint8_t *plane,
+		uint8_t *dplane,
+		int len )
+{
+	uint8_t mi[8] = { 16,16,16,16, 16,16,16,16 };
+	uint8_t ma[8] = { 235,235,235,235,  235,235,235,235};
+	const uint8_t *min = &mi[0];
+	const uint8_t *max = &ma[0];
+	unsigned int k = 0;
+	unsigned int align = (len/8);
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+	
+	for( k = 0; k < align ; k ++ )
+	{
+		__asm__ __volatile__ ( 
+#if defined HAVE_ASM_MMX2 || defined HAVE_ASM_SSE
+			"prefetchnta (%0)\n"
+			"prefetchnta (%1)\n"
+			"prefetchnta (%2)\n"
+#endif
+			"movq (%0), %%mm0\n"
+			"movq (%1), %%mm1\n" //eb
+			"movq (%2), %%mm2\n" //10
+			"pmaxub %%mm0, %%mm2\n"
+			"pminub %%mm1, %%mm2\n"
+			"movntq %%mm2, (%3)\n"
+          	  :: "r" (plane),"r" (max), "r" (min), "r" (dplane) : "memory");
+
+		plane += 8;
+		dplane += 8;
+	}
+	if( (align*8) < len)
+	{
+		for( k = 8*align; k < len; k ++ )
+			*(dplane++) = CLAMP_Y( (*plane++) );
+
+	}
+}
+#else
+static	void	subsample_y_clamp_plane(
+		uint8_t *plane,
+		uint8_t *dplane,
+		int len )
+{
+	unsigned int n;
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
+	for( n = 0 ; n < len; n ++ )
+		dplane[n] = CLAMP_Y( plane[n] );
+}
+#endif
+#ifdef HAVE_ASM_MMX
+//! Clamp Chroma planes 16-240, MMX 8 pixel at a time
+static void 	subsample_uv_clamp_plane(
+		uint8_t *plane_u,
+		uint8_t *plane_v,
+		uint8_t *dplane_u,
+		uint8_t *dplane_v,
+		int len)
+{
+	uint8_t mi[8] = { 16,16,16,16, 16,16,16,16 };
+	uint8_t ma[8] = { 240,240,240,240,  240,240,240,240 };
+	const uint8_t *min = &mi[0];
+	const uint8_t *max = &ma[0];
+	unsigned int k = 0;
+	unsigned int align = (len/8);
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+	
+	for( k = 0; k < align ; k ++ )
+	{
+		__asm__ __volatile__ (
+#if defined HAVE_ASM_MMX2 || defined HAVE_ASM_SSE  
+			"prefetchnta (%0)\n"
+			"prefetchnta (%1)\n"
+			"prefetchnta (%2)\n"
+			"prefetchnta (%3)\n"
+#endif
+			"movq (%0), %%mm0\n"
+			"movq (%1), %%mm1\n"
+			"movq (%2), %%mm2\n"
+			"pmaxub %%mm0, %%mm2\n"
+			"pminub %%mm1, %%mm2\n"
+			"movntq %%mm2, (%3)\n"
+      			:: "r" (plane_u),"r" (max), "r" (min), "r" (dplane_u) : "memory");
+
+		plane_u += 8;
+		dplane_u += 8;
+	}
+	
+	for( k = 0; k < align ; k ++ )
+	{
+		__asm__ __volatile__ (
+    			"prefetchnta (%0)\n"
+			"prefetchnta (%1)\n"
+			"prefetchnta (%2)\n"
+ 	    		"prefetchnta (%3)\n"
+			"movq (%0), %%mm0\n"
+			"movq (%1), %%mm1\n"
+			"movq (%2), %%mm2\n"
+			"pmaxub %%mm0, %%mm2\n"
+			"pminub %%mm1, %%mm2\n"
+			"movntq %%mm2, (%3)\n"
+          	  :: "r" (plane_v),"r" (max), "r" (min), "r" (dplane_v) : "memory");
+
+		plane_v += 8;
+		dplane_v += 8;
+	}
+}
+#else
+static	void	subsample_uv_clamp_plane(
+		uint8_t *plane_u,
+		uint8_t *plane_v,
+		uint8_t *dplane_u,
+		uint8_t *dplane_v,
+		int len )
+{
+	unsigned int n;
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
+	for( n = 0 ; n < len; n ++ )
+	{
+		dplane_u[n] = CLAMP_Y( plane_u[n] );
+		dplane_v[n] = CLAMP_C( plane_v[n] );
+	}
+}
+#endif
+
+
+void	subsample_ycbcr_itu601(void *data, VJFrame *frame)
+{
+	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
+	if(!sampler->jyuv)
+		subsample_init_YUV_to_CbCr(sampler);
+	
+	subsample_ycbcr_itu601_plane(
+			frame->data[0],
+			frame->len,
+			sampler->YUV_to_YCbCr[0],
+		        frame->data[0]	);
+	subsample_ycbcr_itu601_chroma_plane(
+			frame->data[1],
+			frame->data[2],
+			frame->uv_len,
+			sampler->YUV_to_YCbCr[1],
+		        frame->data[1],
+			frame->data[2]	);
+}
+
+void	subsample_ycbcr_itu601_copy(void *data, VJFrame *src_frame, VJFrame *dst_frame)
+{
+	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
+
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
+	if(!sampler->YUV_to_YCbCr[0])
+		subsample_init_YUV_to_CbCr(sampler);
+	
+	subsample_ycbcr_itu601_plane(
+			src_frame->data[0],
+			src_frame->len,
+			sampler->YUV_to_YCbCr[0],
+		        dst_frame->data[0]	);
+	subsample_ycbcr_itu601_chroma_plane(
+			src_frame->data[1],
+			src_frame->data[2],
+			src_frame->uv_len,
+			sampler->YUV_to_YCbCr[1],
+		        dst_frame->data[1],
+			dst_frame->data[2]	);
+}
+
+void	subsample_ycbcr_clamp_itu601_copy(VJFrame *frame, VJFrame *dst_frame)
+{
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
+	subsample_y_clamp_plane(
+			frame->data[0],
+			dst_frame->data[0],
+			frame->len );
+	subsample_uv_clamp_plane(
+			frame->data[1],
+			frame->data[2],
+			dst_frame->data[1],
+			dst_frame->data[2],
+			frame->uv_len );
+#ifdef HAVE_ASM_MMX
+	__asm__ __volatile__ ("sfence":::"memory");
+        __asm__ __volatile__ ("emms":::"memory");
+#endif
+}
+void	subsample_clear_plane( uint8_t bval, uint8_t *plane, uint32_t plane_len )
+{
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
+	veejay_memset( plane, bval, plane_len );
+}
+
 
 
 
@@ -970,7 +1074,8 @@ void chroma_subsample_copy(subsample_mode_t mode, void *data, VJFrame *frame,
 		      int width, int height, uint8_t *res[])
 {
   yuv_sampler_t *sampler = (yuv_sampler_t*) data;
- 
+ 	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
   veejay_memcpy( sampler->planes[1], frame->data[1], frame->uv_len );
   veejay_memcpy( sampler->planes[2], frame->data[2], frame->uv_len );    
   
@@ -1006,10 +1111,44 @@ void chroma_subsample_copy(subsample_mode_t mode, void *data, VJFrame *frame,
     res[1] = sampler->planes[1];
     res[2] = sampler->planes[2];    
 }
+      
+
+void chroma_subsample_cp(subsample_mode_t mode, void *data, uint8_t *ycbcr[], uint8_t *dcbcr[],
+		      int width, int height)
+{
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
+  switch (mode) {
+  case SSM_420_JPEG_BOX:
+  case SSM_420_JPEG_TR:
+    ss_444_to_420jpeg_cp(ycbcr[1],dcbcr[1], width, height);
+    ss_444_to_420jpeg_cp(ycbcr[2],dcbcr[2], width, height);
+ 
+    break;
+  case SSM_420_MPEG2:
+    break;
+  case SSM_422_444:
+    ss_444_to_422_cp(data,ycbcr[1],dcbcr[1],width,height);
+    ss_444_to_422_cp(data,ycbcr[2],dcbcr[2],width,height);
+#ifdef HAVE_ASM_MMX
+	__asm__ __volatile__ ( _EMMS:::"memory");
+#endif
+    break;
+  case SSM_420_422:
+    break;
+  default:
+    break;
+  }
+}
+
+
+
+
 
 void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
 		      int width, int height)
 {
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
 
   switch (mode) {
   case SSM_420_JPEG_BOX:
@@ -1017,7 +1156,7 @@ void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
     ss_444_to_420jpeg(ycbcr[1], width, height);
     ss_444_to_420jpeg(ycbcr[2], width, height);
 #ifdef HAVE_ASM_MMX
-	emms();
+	__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
     break;
   case SSM_420_MPEG2:
@@ -1028,7 +1167,7 @@ void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
     ss_444_to_422(data,ycbcr[1],width,height);
     ss_444_to_422(data,ycbcr[2],width,height);
 #ifdef HAVE_ASM_MMX
-	emms();
+	__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
     break;
   case SSM_420_422:
@@ -1044,12 +1183,14 @@ void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
 void chroma_supersample(subsample_mode_t mode,void *data, uint8_t *ycbcr[],
 			int width, int height)
 {
+	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
+
   switch (mode) {
   case SSM_420_JPEG_BOX:
-    ss_420jpeg_to_444(ycbcr[1], width, height);
-    ss_420jpeg_to_444(ycbcr[2], width, height);
+      	ss_420jpeg_to_444(ycbcr[1], width, height);
+    	ss_420jpeg_to_444(ycbcr[2], width, height);
 #ifdef HAVE_ASM_MMX
-	emms();
+	__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
     break;
   case SSM_420_JPEG_TR:
@@ -1057,21 +1198,19 @@ void chroma_supersample(subsample_mode_t mode,void *data, uint8_t *ycbcr[],
     tr_420jpeg_to_444(data,ycbcr[2], width, height);
     break;
   case SSM_422_444:
-    tr_422_to_444(ycbcr[2],width,height);
-    tr_422_to_444(ycbcr[1],width,height);
+    tr_422_to_444(data,ycbcr[2],width,height);
+    tr_422_to_444(data,ycbcr[1],width,height);
 #ifdef HAVE_ASM_MMX
-	emms();
+	__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
     break;
   case SSM_420_422:
     ss_420_to_422( ycbcr[1], width, height );
     ss_420_to_422( ycbcr[2], width, height );
-	exit(0);
     break;
   case SSM_420_MPEG2:
     //    ss_420mpeg2_to_444(ycbcr[1], width, height);
     //    ss_420mpeg2_to_444(ycbcr[2], width, height);
-    exit(4);
     break;
   default:
     break;

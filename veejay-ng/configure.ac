@@ -123,8 +123,6 @@ AC_SUBST(LIBGETOPT_LIB)
 AC_TYPE_SIGNAL
 
 AC_MSG_NOTICE([The host is $host  $host_cpu  $host_vendor  $host_os .])
-have_glut=false
-have_glu=false
 have_sdl=false
 have_gl=false
 have_display=false
@@ -149,21 +147,6 @@ if test x$use_display != xno ; then
 		AC_MSG_ERROR([Cannot find openGL library])
 	fi
 
-	AC_CHECK_HEADERS(GL/glut.h ,,
-		[AC_MSG_ERROR([Cannot find Glut headers]) ])
-
-	AC_CHECK_LIB([glut], [glutInit], have_glut=true)
-	if test x$have_glut = xtrue; then
-		GL_LIBS="$GL_LIBS -lglut"
-	else
-		AC_MSG_ERROR([Cannot find glut library])
-	fi
-	AC_CHECK_LIB([GLU], [gluProject], have_glu=true)
-	if test x$have_glu = xtrue; then
-		GL_LIBS="$GL_LIBS -lGLU"
-	else
-		AC_MSG_ERROR([Cannot find GLU library])
-	fi
 	AC_SUBST( GL_LIBS )
 	AC_SUBST( GL_CFLAGS )
 fi
@@ -263,10 +246,26 @@ dnl
                      AC_DEFINE(HAVE_AVFORMAT, 1, [use avformat])],
                     [have_avformat=false])
 
+  PKG_CHECK_MODULES(FFMPEG_SWSCALER, [libswscale],	
+		[
+			AC_SUBST( FFMPEG_SWSCALER_CFLAGS )
+			AC_SUBST( FFMPEG_SWSCALER_LIBS )
+			have_swscaler=true
+			AC_DEFINE(HAVE_SWSCALER,1,[use swscaler])],
+			[ have_swscaler=false ] )
+
+
 if test x$have_avcodec != xtrue ; then
- AC_MSG_ERROR([ FFmpeg not found. Get it from http://ffmpeg.sourceforge.net ] )
+ AC_MSG_ERROR([ FFmpeg AVCodec not found. Get it from http://ffmpeg.sourceforge.net ] )
 fi
 
+if test x$have_avformat != xtrue; then
+ AC_MSG_ERROR([ FFmpeg AVFormat not found. ])
+fi
+
+if test x$have_swscaler != xtrue; then
+ AC_MSG_ERROR([ FFMpeg swsacler not found. ])
+fi
 
 
 dnl *********************************************************************
@@ -405,7 +404,7 @@ AC_SUBST(SAMPLERATE_LIBS)
 
 fi
 have_unicap=false
-PKG_CHECK_MODULES( UNICAP, libunicap >= 1.14.1,
+PKG_CHECK_MODULES( UNICAP, libunicap >= 0.1.0,
 		ac_cv_unicap=1, ac_cv_unicap=0)
 
 AC_DEFINE_UNQUOTED([HAVE_UNICAP], ${ac_cv_unicap},
@@ -481,6 +480,8 @@ have_mips=false
 have_ppccpu=false
 have_ps2=false
 
+YUVCFLAGS=""
+
 AC_MSG_CHECKING([Architecture])
 case $host_cpu in
 	i[[3-7]]86)
@@ -494,7 +495,8 @@ case $host_cpu in
 
     if test "x$enable_debug" != "xyes" ; then
 	dnl optimize if not debugging
-	CFLAGS="-fno-common -O2 -fomit-frame-pointer"
+	CFLAGS="-fno-common -O3 -fomit-frame-pointer"
+	YUVCFLAGS="-fif-conversion"
     fi
  
     dnl If the host is pentium, align on double word boundary
@@ -556,6 +558,8 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
     AC_MSG_RESULT([unknown])
     ;;
 esac
+
+AC_SUBST(YUVCFLAGS)
 
 dnl This flag is used for PROGRAMS not SHARED LIBRARIES.  PIC code is required
 dnl for shared libraries but is slower than non-pic code.  Compute bound 

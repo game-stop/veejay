@@ -369,6 +369,8 @@ int	livido_plug_parameter_set_bool( void *parameter, void *value )
 	{
 		error = vevo_property_set( parameter, "value", VEVO_ATOM_TYPE_BOOL, 1, value );
 #ifdef STRICT_CHECKING
+		if( error != VEVO_NO_ERROR )
+			 veejay_msg(0, "%s: error code %x", __FUNCTION__, error );
 		assert( error == VEVO_NO_ERROR );
 #endif
 		return 1;

@@ -32,6 +32,7 @@ typedef struct VJFrame_t
         int     width;
         int     height;
         int     sampling;
+	int	stride[4];
 	double	timecode;
 	double	fps;
 } VJFrame;
@@ -45,6 +46,15 @@ typedef struct AFrame_t
 	int	samples;
 	int	num_chans;
 } AFrame;
+
+typedef struct VJRectangle_t
+{
+        int top;
+        int bottom;
+        int left;
+        int right;
+} VJRectangle;
+
 
 #define	FMT_420	0
 #define	FMT_422	1	

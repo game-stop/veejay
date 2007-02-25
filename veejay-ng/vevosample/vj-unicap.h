@@ -27,8 +27,7 @@ int	vj_unicap_num_capture_devices( void *dud );
 
 void	*vj_unicap_new_device( void *ud, int device_id );
 int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h );
-int	vj_unicap_start_capture( void *vut, void *slot );
-int	vj_unicap_grab_frame( void *vut, void *slot );
+int	vj_unicap_start_capture( void *vut );
 int	vj_unicap_stop_capture( void *vut );
 void	vj_unicap_free_device( void *vut );
 

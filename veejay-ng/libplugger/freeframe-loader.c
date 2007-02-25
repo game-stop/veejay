@@ -15,7 +15,7 @@
 #include <ffmpeg/avcodec.h>
 #define LINUX 1 
 #include <libplugger/specs/FreeFrame.h>
-#define V_BITS 32
+#define V_BITS 24
 #include <libplugger/freeframe-loader.h>
 
 #ifdef STRICT_CHECKING
@@ -480,8 +480,13 @@ void	freeframe_push_channel( void *instance, const char *key,int n, VJFrame *fra
 #ifdef STRICT_CHECKING
 		assert( error == VEVO_NO_ERROR );
 #endif
-		util_convertrgba32( frame->data,frame->width,frame->height,frame->pixfmt, frame->shift_v,
-			space );		
+
+		VJFrame *dst1 = yuv_rgb_template( space, frame->width,frame->height, PIX_FMT_RGB24 );
+
+		yuv_convert_any( frame, dst1, frame->format, dst1->format );
+
+		free(dst1);
+
 	}
 	
 }
@@ -521,8 +526,10 @@ int	freeframe_plug_process( void *plugin, double timecode )
 #ifdef STRICT_CHECING
 	assert( error == LIVIDO_NO_ERROR );
 #endif
-	util_convertsrc( in, output_frame->width, output_frame->height, output_frame->pixfmt,
-			output_frame->data );
+
+	VJFrame *dst1 = yuv_rgb_template( in, output_frame->width, output_frame->height, PIX_FMT_RGB24 );
+
+	yuv_convert_any( dst1, 	 output_frame, dst1->format, output_frame->format );
 	
 	return 1;
 }

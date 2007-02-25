@@ -35,6 +35,9 @@ typedef struct
 	
 } bg_t;
 
+#define ru8(num)(((num)+8)&~8)
+
+
 livido_init_f	init_instance( livido_port_t *my_instance )
 {
 	int w=0;
@@ -44,11 +47,11 @@ livido_init_f	init_instance( livido_port_t *my_instance )
      
 	bg_t *b = (bg_t*) livido_malloc( sizeof( bg_t ));
 	livido_memset( b,0,sizeof(bg_t));
-	b->tmpy = (uint8_t*) livido_malloc(sizeof(uint8_t) * w * h );
-	b->tmpu = (uint8_t*) livido_malloc(sizeof(uint8_t) * w * h );
+	b->tmpy = (uint8_t*) livido_malloc(sizeof(uint8_t) * ru8( w * h ));
+	b->tmpu = (uint8_t*) livido_malloc(sizeof(uint8_t) * ru8( w * h ));
 	
-	b->axis_x   = (unsigned int*) livido_malloc(sizeof(unsigned int) * w  );
-	b->axis_y   = (unsigned int*) livido_malloc(sizeof(unsigned int) * h  );
+	b->axis_x   = (unsigned int*) livido_malloc(sizeof(unsigned int) * ru8(w)  );
+	b->axis_y   = (unsigned int*) livido_malloc(sizeof(unsigned int) * ru8(h)  );
 
 	int error = livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR, 1, &b );
         
@@ -87,6 +90,108 @@ static	int		_max(unsigned int *arr, int n)
 	}
 	return k;
 }
+
+static	int	binarify( uint8_t *dst, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len )
+{
+	int i;
+	int act = 0;
+	if(!reverse)
+	{
+		for( i = 0; i < len; i ++ )
+		{
+			if ( abs(bg[i] - src[i]) <= threshold )
+				dst[i] = 0;
+			else
+			{	dst[i] = 0xff; act ++ ; }
+		}
+
+	}
+	else
+	{
+		for( i = 0; i < len; i ++ )
+		{
+			if ( abs(bg[i] - src[i]) >= threshold )
+				dst[i] = 0;
+			else
+			{	dst[i] = 0xff; act ++;}
+		
+		}
+	}
+	return act;
+}
+
+/* mmx_blur() taken from libvisual plugins
+ *
+ * Libvisual-plugins - Standard plugins for libvisual
+ *
+ * Copyright (C) 2002, 2003, 2004, 2005 Dennis Smit <ds@nerds-incorporated.org>
+ *
+ * Authors: Dennis Smit <ds@nerds-incorporated.org>
+ */
+
+static  void    mmx_blur(uint8_t *buffer, int width, int height)
+{
+        __asm __volatile
+                ("\n\t pxor %%mm6, %%mm6"
+                 ::);
+
+        int scrsh = height / 2;
+        int i;
+        int len = width * height;
+        uint8_t *buf = buffer;
+        /* Prepare substraction register */
+        for (i = 0; i < scrsh; i += 4) {
+                __asm __volatile
+                        ("\n\t movd %[buf], %%mm0"
+                         "\n\t movd %[add1], %%mm1"
+                         "\n\t punpcklbw %%mm6, %%mm0"
+                         "\n\t movd %[add2], %%mm2"
+                         "\n\t punpcklbw %%mm6, %%mm1"
+                         "\n\t movd %[add3], %%mm3"
+                         "\n\t punpcklbw %%mm6, %%mm2"
+                         "\n\t paddw %%mm1, %%mm0"
+                         "\n\t punpcklbw %%mm6, %%mm3"
+                         "\n\t paddw %%mm2, %%mm0"
+                         "\n\t paddw %%mm3, %%mm0"
+                         "\n\t psrlw $2, %%mm0"
+                         "\n\t packuswb %%mm6, %%mm0"
+                         "\n\t movd %%mm0, %[buf]"
+                         :: [buf] "m" (*(buf + i))
+                         , [add1] "m" (*(buf + i + width))
+                         , [add2] "m" (*(buf + i + width + 1))
+                         , [add3] "m" (*(buf + i + width - 1))
+                  );
+                //       : "mm0", "mm1", "mm2", "mm3", "mm6");
+        }
+
+        for (i = len - 4; i > scrsh; i -= 4) {
+                __asm __volatile
+                        ("\n\t movd %[buf], %%mm0"
+                         "\n\t movd %[add1], %%mm1"
+                         "\n\t punpcklbw %%mm6, %%mm0"
+                         "\n\t movd %[add2], %%mm2"
+                         "\n\t punpcklbw %%mm6, %%mm1"
+                         "\n\t movd %[add3], %%mm3"
+                         "\n\t punpcklbw %%mm6, %%mm2"
+                         "\n\t paddw %%mm1, %%mm0"
+                         "\n\t punpcklbw %%mm6, %%mm3"
+                         "\n\t paddw %%mm2, %%mm0"
+                         "\n\t paddw %%mm3, %%mm0"
+                         "\n\t psrlw $2, %%mm0"
+                         "\n\t packuswb %%mm6, %%mm0"
+                         "\n\t movd %%mm0, %[buf]"
+                         :: [buf] "m" (*(buf + i))
+                         , [add1] "m" (*(buf + i - width))
+                         , [add2] "m" (*(buf + i - width + 1))
+                         , [add3] "m" (*(buf + i - width - 1))
+                );//     : "mm0", "mm1", "mm2", "mm3", "mm6");
+        }
+
+         __asm__ __volatile__ ( "emms":::"memory");
+
+}
+
+
 
 static	inline	double	calc( double n, double ip, double x)
 {
@@ -148,6 +253,10 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
                                 my_instance,
                                 "in_parameters",
                                 2 );
+
+	int	reverse = lvd_extract_param_boolean(
+				my_instance, "in_parameters", 3 );
+
 	const int	threshold = (const int)(255.0 * thres);
 	
 	const int	wac       = (const int)(100.0 * wacf);
@@ -159,6 +268,7 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 	if( !b->empty )
 	{
 		livido_memcpy( b->tmpy, A[0], len );
+		mmx_blur( b->tmpy, wid,hei );
 		b->empty=1;
 		return LIVIDO_NO_ERROR;
 	}
@@ -168,6 +278,14 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 		uint8_t *diff = b->tmpu;
 		unsigned int activity = 0;
 		//@ construct difference
+		//
+		//
+		mmx_blur( A[0], wid, hei );
+
+		activity = binarify( diff, prev, A[0], threshold, reverse, len );
+
+		livido_memcpy( prev, A[0], len );	
+/*
 		for( i = 0; i < len ; i ++ )
 		{
 			uint8_t a = A[0][i];
@@ -177,7 +295,7 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 				diff[i] = 0;
 			b->tmpy[i] = a;
 			O[0][i] = diff[i];
-		}
+		}*/
 		unsigned int *ax_x = b->axis_x;
 		unsigned int *ax_y = b->axis_y;
 
@@ -244,7 +362,7 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 		norm[2] = ( 1.0 / (double) max_ta  ) * (double) da;
 		norm[3] = ( 1.0 / (double) max_tb  ) * (double) db;
 	
-//	printf("  Measure {%g\t%g\t%g\t%g} %d\n", norm[0],norm[1],norm[2],norm[3], b->h);
+	printf("  Measure {%g\t%g\t%g\t%g} %d\n", norm[0],norm[1],norm[2],norm[3], b->h);
 
 		b->ip[0] = calc( norm[0], b->ip[0], b->lx );
 		b->ip[1] = calc( norm[1], b->ip[1], b->ly );
@@ -261,8 +379,8 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 		values[1] = b->ly;
 		values[2] = b->wx;
 		values[3] = b->wy;
-//	printf("  Set: {%g\t%g\t%g\t%g} | {%g\t%g\t%g\t%g}\n", values[0],values[1],values[2],values[3],
-//	     b->ip[0],b->ip[1],b->ip[2],b->ip[3] );		
+	printf("  Set: {%g\t%g\t%g\t%g} | {%g\t%g\t%g\t%g}\n", values[0],values[1],values[2],values[3],
+	     b->ip[0],b->ip[1],b->ip[2],b->ip[3] );		
 	lvd_set_param_number(my_instance, "out_parameters",0,b->ip[0] );
 	lvd_set_param_number(my_instance, "out_parameters",1,1.0 - b->ip[1] );
 
@@ -364,6 +482,15 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
                 livido_set_double_value( port, "default", 0.2 );
 
 		livido_set_string_value( port, "description" ,"Multiply activity");
+	in_params[3] = livido_port_new( LIVIDO_PORT_TYPE_PARAMETER_TEMPLATE );
+        port = in_params[3];
+
+                livido_set_string_value(port, "name", "Invert" );
+                livido_set_string_value(port, "kind", "SWITCH" );
+                livido_set_int_value( port, "default", 0 );
+
+		livido_set_string_value( port, "description" ,"Invert mask");
+
 
   	int i; 
 	int np = 0;
@@ -395,7 +522,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_int_value( port, "flags", 0);
 	
 	livido_set_portptr_array( filter, "in_channel_templates", 1 , in_chans );
-	livido_set_portptr_array( filter, "in_parameter_templates",3, in_params );
+	livido_set_portptr_array( filter, "in_parameter_templates",4, in_params );
 	livido_set_portptr_array( filter, "out_parameter_templates",np, out_params );
 	livido_set_portptr_array( filter, "out_channel_templates", 1, out_chans );
 

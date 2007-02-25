@@ -113,9 +113,13 @@ static	VJFrame	*performer_alloc_frame( veejay_t *info, uint8_t *p0, uint8_t *p1,
 	sample_video_info_t *svit = (sample_video_info_t*) info->video_info;
 	VJFrame *f = (VJFrame*) vj_malloc(sizeof(VJFrame));
 	memset( f,0, sizeof( VJFrame ));
+
+	veejay_msg(0, "%s:%d : %dx%d, fmt=%d",__FUNCTION__,__LINE__,svit->w,svit->h, svit->fmt );
+
 	switch(svit->fmt)
 	{
 		case FMT_420:
+		case FMT_420F:
 			f->uv_width = svit->w / 2;
 			f->uv_height = svit->h / 2;
 			f->shift_h = 1;
@@ -123,6 +127,7 @@ static	VJFrame	*performer_alloc_frame( veejay_t *info, uint8_t *p0, uint8_t *p1,
 			f->pixfmt = PIX_FMT_YUV420P;
 			break;
 		case FMT_422:
+		case FMT_422F:
 			f->uv_width = svit->w/2;
 			f->uv_height = svit->h;
 			f->shift_h = 0;
@@ -130,6 +135,7 @@ static	VJFrame	*performer_alloc_frame( veejay_t *info, uint8_t *p0, uint8_t *p1,
 			f->pixfmt = PIX_FMT_YUV422P;
 			break;
 		case FMT_444:
+		case FMT_444F:
 			f->uv_width = svit->w;
 			f->uv_height = svit->h;
 			f->pixfmt = PIX_FMT_YUV444P;
@@ -153,11 +159,11 @@ static	VJFrame	*performer_alloc_frame( veejay_t *info, uint8_t *p0, uint8_t *p1,
 	f->data[1] = p1;
 	f->data[2] = p2;
 	f->data[3] = p3;
-
+/*
 #ifdef STRICT_CHECKING
 	assert( performer_verify_frame( f) );
 #endif
-	
+*/	
 	return f;
 }
 
@@ -929,23 +935,12 @@ static	int	performer_verify_frame( VJFrame *f )
 	int fy = 0;
 	long avg = 0;
 	int avg_;
-	for( i = u; i < un; i ++ )
-	{
-		if( f->data[1][i] < 16 )
-			fu ++;
-		if( f->data[2][i] < 16 )
-			fu ++;
-	}
-	for( i = y; i < yn; i ++ )
-	{
-		if( f->data[0][i] < 16)
-		{	fy ++; avg += f->data[0][i]; avg_ ++; }
-	}
-	if( fu > 0 || fy > 0 )
-	{
-		veejay_msg(0, "Last line fail count: %d,%d, Y average = %d", fu,fy, ( avg > 0 ? avg  / avg_ :0 ));
-		return 0;
-	}
+
+	veejay_msg(0, "%s:%d, frame %p , len=%d,uv_len=%d, w=%d,h=%d, uw=%d, uh=%d fmt=%d",
+		__FUNCTION__,__LINE__, f, f->len,f->uv_len,f->width,f->height,
+		f->uv_width,f->uv_height, f->format );
+
+
 	return 1;
 }
 #endif

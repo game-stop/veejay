@@ -17,7 +17,9 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/liblavjpeg \
 		-I$(top_srcdir)/libsamplerec \
 		-I$(top_srcdir)/libvevo \
-		$(FFMPEG_CFLAGS)\
+		$(FFMPEG_AVCODEC_CFLAGS)\
+		$(FFMPEG_AVFORMAT_CFLAGS)\
+		$(FFMMPEG_SWSCALER_CFLAGS)\
 		${XML_CFLAGS} ${DV_FLAGS} ${X_CFLAGS} ${XML_CPPFLAGS} ${LIBQUICKTIME_CFLAGS} \
 		${PTHREAD_CFLAGS} ${MJPEGTOOLS_CFLAGS} ${GL_CFLAGS} ${SDL_CFLAGS} ${LIBLO_CFLAGS}  
 
@@ -52,14 +54,6 @@ libveejayng_la_LIBADD = -L$(top_builddir)/libhash / -lhash \
 			-L$(top_builddir)/libvjaudio -lvjaudio \
 			-L$(top_builddir)/vevosample -lvevosample 
 
-#libveejay_la_LDFLAGS +=	${FFMPEG_LIBS} \
-#			${SDL_LIBS} ${DIRECTFB_LIBS} ${PTHREAD_LIBS} \
-#			${XML_LIBS} ${JPEG_LIBS} ${JACK_LIBS} \
-#			${LIBDV_LIBS} ${LIBM_LIBS} ${PIXBUF_LIBS} ${MJPEGTOOLS_LIBS}\
-#			-DDYNAMIC -O3 -Wall -rdynamic 
-#
-
-
 # *********************************************************************
 # The tools themselves
 VEEJAY_BIN = veejayng
@@ -67,6 +61,6 @@ VEEJAY_BIN = veejayng
 bin_PROGRAMS = $(VEEJAY_BIN)  
 
 veejayng_SOURCES	= veejay.c  
-veejayng_LDADD 	= libveejayng.la @LIBGETOPT_LIB@ ${FFMPEG_AVCODEC_LIBS} ${FFMPEG_AVFORMAT_LIBS} \
+veejayng_LDADD 	= libveejayng.la @LIBGETOPT_LIB@ ${FFMPEG_AVCODEC_LIBS} ${FFMPEG_AVFORMAT_LIBS} ${FFMPEG_SWSCALER_LIBS} \
 			${PTHREAD_LIBS} ${XML_LIBS} ${LIBDV_LIBS} ${GL_LIBS} ${LIBQUICKTIME_LIBS} \
 			${MJPEGTOOLS_LIBS} ${UNICAP_LIBS} ${LIBM_LIBS}  ${SDL_LIBS} ${LIBLO_LIBS}

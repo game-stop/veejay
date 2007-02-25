@@ -978,12 +978,8 @@ void	x_display_push(void *dctx, VJFrame *frame )
 	
 	if(!ctx->prog)
 	{
-		util_convertrgba24( frame->data,
-			frame->width,
-			frame->height,
-			PIX_FMT_YUV444P,
-			0,
-			ctx->data );
+		veejay_msg(0, "No hardware YUV conversion available");
+		return;
 	}
 	else
 	{

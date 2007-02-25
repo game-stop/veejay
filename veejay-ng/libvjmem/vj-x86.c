@@ -20,14 +20,12 @@
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include <sys/time.h>
+#include <stdlib.h>
+#include <string.h>
 #include <unistd.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 
-/** \defgroup memman Fast memory copy and aligned memory allocation 
- */
 extern void find_best_memcpy(void);
+extern void find_best_memset(void);
 
 static int MEM_ALIGNMENT_SIZE = 0;
 
@@ -109,7 +107,6 @@ __asm__ __volatile__(
 }
 
 #else 
-
 void mymemset_generic(void *s, char c, size_t cc )
 {
 	memset(s,c,cc);
@@ -122,6 +119,7 @@ unsigned int vj_get_timer()
     gettimeofday(&tv, 0);
     return ((tv.tv_sec & 1000000) + tv.tv_usec);
 }
+
 void vj_mem_init(void)
 {
 #ifdef ARCH_X86 
@@ -129,8 +127,9 @@ void vj_mem_init(void)
 #endif
 	if(MEM_ALIGNMENT_SIZE == 0)
 		MEM_ALIGNMENT_SIZE = getpagesize();
-
+	
 	find_best_memcpy();	
+	find_best_memset();
 }
 
 void *vj_malloc(unsigned int size)
@@ -138,12 +137,6 @@ void *vj_malloc(unsigned int size)
 	if( size == 0 )
 		return NULL;
 	void *ptr = NULL;
-
-#ifdef STRICT_CHECKING
-	assert( size > 0 );
-	assert( MEM_ALIGNMENT_SIZE > 0 );
-#endif
-	
 #ifdef HAVE_POSIX_MEMALIGN
 	posix_memalign( &ptr, MEM_ALIGNMENT_SIZE, size );
 #else
@@ -159,6 +152,24 @@ void *vj_malloc(unsigned int size)
 	return ptr;
 }
 
+void	*vj_calloc( unsigned int size )
+{
+	void *ptr = vj_malloc( size );
+	if(ptr)
+		veejay_memset( ptr, 0, size );
+	return ptr;	
+}
+
+
+void *vj_yuvalloc( unsigned int w, unsigned int h )
+{
+	size_t len = (w * h * 3);
+	unsigned char *ptr = vj_malloc( len );
+
+	veejay_memset( ptr, 0, (w*h));
+	veejay_memset( ptr + (w*h), 128, (w*h)*2);
+	return ptr;
+}
 
 
 
