@@ -1122,20 +1122,20 @@ int	vevo_port_verify( vevo_port_t *port )
 
 	if( error != 0 )
 	{
-		veejay_msg(0, "%s: Port '%s' not allocated by vevo_port_new()", __FUNCTION__, pkey );
+		//veejay_msg(0, "%s: Port '%s' not allocated by vevo_port_new()", __FUNCTION__, pkey );
 		return 0;
 	}
 
 	if( error == VEVO_ERROR_NOSUCH_ELEMENT || error == 
 	 	VEVO_ERROR_NOSUCH_PROPERTY )
 	{
-		veejay_msg(0, "%s: Port '%s' does not exist" );
+		//veejay_msg(0, "%s: Port '%s' does not exist" );
 		return 0;
 	}
 	
 	if( ref_count == 0 )
 	{
-		veejay_msg(0, "%s: Port %s has a reference count of 0 ",__FUNCTION__, pkey);
+		//veejay_msg(0, "%s: Port %s has a reference count of 0 ",__FUNCTION__, pkey);
 		return 0;
 	}
 #endif
@@ -1174,17 +1174,17 @@ void	vevo_port_free( vevo_port_t *port )
 		error =	vevo_property_get( port_ref_, pkey, 0, &ref_count );
 		if( error != VEVO_NO_ERROR )
 		{
-			veejay_msg(0, "%s: Port '%s' not allocated by vevo_port_new()", __FUNCTION__, pkey );
+	//		veejay_msg(0, "%s: Port '%s' not allocated by vevo_port_new()", __FUNCTION__, pkey );
 			assert(0);
 		}
 		if( ref_count == 0 )
 		{
-			veejay_msg(0, "%s: Port '%s' has a reference count of 0 (already freed)", __FUNCTION__, pkey );
+	//		veejay_msg(0, "%s: Port '%s' has a reference count of 0 (already freed)", __FUNCTION__, pkey );
 			assert(0);
 		}
 		if( ref_count > 1 )
 		{
-			veejay_msg(0, "%s: Port '%s' has a reference count of %d", __FUNCTION__,pkey,ref_count);
+	//		veejay_msg(0, "%s: Port '%s' has a reference count of %d", __FUNCTION__,pkey,ref_count);
 			return;
 		}
 		ref_count --;

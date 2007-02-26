@@ -1,0 +1,10 @@
+[Desktop Entry]
+Encoding=UTF-8
+Version=1.0
+Name=Veejay (640x480, /dev/video0) 
+Comment=Start veejay server with capture device #0 in 640x480
+Exec=veejay -A1 -v -W640 -H480
+Terminal=true
+Type=Application
+Icon=veejay-icon.png
+Categories=AudioVideoEditing;AudioVideo;

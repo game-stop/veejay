@@ -34,6 +34,7 @@
 #include <assert.h>
 #endif
 #define PLANES 32
+#define    RUP8(num)(((num)+8)&~8)
 
 vj_effect *timedistort_init(int w, int h)
 {
@@ -71,17 +72,17 @@ int 	timedistort_malloc( int w, int h )
 {	
 	unsigned int i;
 	if(nonmap) timedistort_free();
-	nonmap = vj_malloc( 2 * w * h * sizeof(uint8_t));
+	nonmap = vj_malloc( RUP8(2 * w * h) * sizeof(uint8_t));
 	if(!nonmap)
 		return 0;
 
-	planes[0] = vj_malloc( (PLANES * 3 * w * h) * sizeof(uint8_t));
-	planes[1] = planes[0] + (PLANES * w * h );
-	planes[2] = planes[1] + (PLANES * w * h );
+	planes[0] = vj_malloc( RUP8(PLANES * 3 * w * h) * sizeof(uint8_t));
+	planes[1] = planes[0] + RUP8(PLANES * w * h );
+	planes[2] = planes[1] + RUP8(PLANES * w * h );
 
-	veejay_memset( planes[0],0, (PLANES * w * h ));
-	veejay_memset( planes[1],128,(PLANES * w * h  ));
-	veejay_memset( planes[2],128,(PLANES * w * h ));
+	veejay_memset( planes[0],0, RUP8(PLANES * w * h ));
+	veejay_memset( planes[1],128,RUP8(PLANES * w * h  ));
+	veejay_memset( planes[2],128,RUP8(PLANES * w * h ));
 
 	have_bg = 0;
 	n__ = 0;
@@ -94,8 +95,8 @@ int 	timedistort_malloc( int w, int h )
 		planetableV[i] = &planes[2][ (w*h) * i ];
 	}
 
-	warptime[0] = (uint8_t*) vj_calloc( sizeof(uint8_t) * w * h );
-	warptime[1] = (uint8_t*) vj_calloc( sizeof(uint8_t) * w * h );
+	warptime[0] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8(w * h) );
+	warptime[1] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8(w * h) );
 	if( warptime[0] == NULL || warptime[1] == NULL )
 		return 0;
 
@@ -142,9 +143,9 @@ void timedistort_apply( VJFrame *frame, int width, int height, int val)
 	int motion = 0;
 	int tmp1,tmp2;
 	int stor_local = 0;
-	if(motionmap_active())
+	if(motionmap_active()) //@ use motion mapping frame
 	{
-		motionmap_scale_to( 255,255,0,0,&tmp1,&tmp2, &n__,&N__ );
+		motionmap_scale_to( 255,255,1,1,&tmp1,&tmp2, &n__,&N__ );
 		motion = 1;
 		diff = motionmap_bgmap();
 	}

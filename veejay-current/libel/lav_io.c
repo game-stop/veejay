@@ -1432,6 +1432,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	} 
 
 	if(	strncasecmp(video_comp,"mp4v",4 )==0 ||
+		strncasecmp(video_comp,"fmp4",4 )==0 ||
 		strncasecmp(video_comp,"divx",4 ) == 0 ||
 		strncasecmp(video_comp,"xvid",4 ) == 0 ||
 		strncasecmp(video_comp,"dxsd",4 ) == 0 ||
@@ -1439,7 +1440,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		strncasecmp(video_comp,"m4s2",4 ) == 0 )
 	{
 		lav_fd->format = 'D';
-		lav_fd->MJPG_chroma = CHROMA420;
+		lav_fd->MJPG_chroma = CHROMAUNKNOWN;
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
 		veejay_msg(VEEJAY_MSG_WARNING, "Playing MPEG4 Video (Every frame should be an intra frame)");
 		return lav_fd;

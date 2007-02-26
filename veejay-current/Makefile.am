@@ -60,13 +60,28 @@ MAINTAINERCLEANFILES = \
 install-data-local:
 	@$(NORMAL_INSTALL)
 	if test -d $(srcdir)/share; then \
-	 $(mkinstalldirs) $(DESTDIR)$(pkgdatadir); \
-	 for dialog in $(srcdir)/share/*; do \
-	 	if test -f $$dialog; then \
-		 $(INSTALL_DATA) $$dialog $(DESTDIR)$(pkgdatadir); \
+		$(mkinstalldirs) $(DESTDIR)$(pkgdatadir); \
+		for dialog in $(srcdir)/share/*; do \
+	 		if test -f $$dialog; then \
+		 		$(INSTALL_DATA) $$dialog $(DESTDIR)$(pkgdatadir); \
+			fi \
+		done \
+	fi; \
+	if test -d $(srcdir)/menu; then \
+	 if test -d /usr/share/applications; then \
+	 	for desktop in $(srcdir)/menu/*; do \
+	 		if test -f $$desktop; then \
+				$(INSTALL_DATA) $$desktop /usr/share/applications; \
+	 		fi \
+	 	done \
+	 fi \
+	fi; \
+        if test -d $(srcdir)/share/veejay-logo.png; then \
+		if test -d /usr/share/pixmaps; then \
+		  $(INSTALL_DATA) $(srcdir)/share/veejay-logo.png /usr/share/pixmaps; \
 		fi \
-	 done \
 	fi
+
 
 gveejay-path.h: gveejay-paths.sh
 	@sh $< > $@.tmp ;

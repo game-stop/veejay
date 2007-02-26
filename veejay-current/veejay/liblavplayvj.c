@@ -2972,11 +2972,14 @@ int veejay_edit_delete(veejay_t * info, editlist *el, long start, long end)
 		veejay_msg(VEEJAY_MSG_ERROR, "Nothing in EDL to delete");
 		return 0;
 	}
-    video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
-    uint64_t i;
-    uint64_t n1 =  (uint64_t) start;
-    uint64_t n2 =  (uint64_t) end;
+
+	video_playback_setup *settings =
+		(video_playback_setup *) info->settings;
+
+
+	uint64_t i;
+	uint64_t n1 =  (uint64_t) start;
+	uint64_t n2 =  (uint64_t) end;
 
 	if(info->dummy->active)
 	{
@@ -2984,47 +2987,47 @@ int veejay_edit_delete(veejay_t * info, editlist *el, long start, long end)
 		return 0;
 	}
 
-    if (end < start || start > el->video_frames
-		|| end >= el->video_frames || end < 0 || start < 0) {
-		veejay_msg(VEEJAY_MSG_WARNING, 
+	if (n2 < n1 || n1 > el->video_frames|| n2 >= el->video_frames || n2 < 0 || n1 < 0)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, 
 			    "Incorrect parameters for deleting frames");
 		return 0;
-    }
+    	}
 
-    for (i = n2 + 1; i < el->video_frames; i++)
-		el->frame_list[i - (n2 - n1 + 1)] =
-	    	el->frame_list[i];
+    	for (i = n2 + 1; i < el->video_frames; i++)
+		el->frame_list[i - (n2 - n1 + 1)] = el->frame_list[i];
 
-    if (start - 1 < settings->min_frame_num)
+	if (n1 - 1 < settings->min_frame_num)
 	{
-		if (end < settings->min_frame_num)
-		    settings->min_frame_num -= (end - start + 1);
+		if (n2 < settings->min_frame_num)
+		    settings->min_frame_num -= (n2 - n1 + 1);
 		else
-		    settings->min_frame_num = start;
-    }
+		    settings->min_frame_num = n1;
+    	}
 
-    if (start - 1 < settings->max_frame_num)
+    	if (n1 - 1 < settings->max_frame_num)
 	{
-		if (end <= settings->max_frame_num)
-		    settings->max_frame_num -= (end - start + 1);
+		if (n2 <= settings->max_frame_num)
+		    settings->max_frame_num -= (n2 - n1 + 1);
 		else
-		    settings->max_frame_num = start - 1;
-    }
-    if (start <= settings->current_frame_num) {
+		    settings->max_frame_num = n1 - 1;
+    	}
+    	
+	if (n1 <= settings->current_frame_num) {
 
-		if (settings->current_frame_num <= end)
+		if (settings->current_frame_num <= n2)
 		{
-		    settings->current_frame_num = start;
+		    settings->current_frame_num = n1;
 		}
 		else
 		{
-		    settings->current_frame_num -= (end - start);
+		    settings->current_frame_num -= (n2 - n1 + 1);
 		}
-    }
+    	}
 
-    el->video_frames -= (end - start + 1);
+    	el->video_frames -= (n2 - n1 + 1);
 
-    return 1;
+    	return 1;
 }
 
 

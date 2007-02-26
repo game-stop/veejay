@@ -5780,7 +5780,8 @@ void vj_event_el_del(void *ptr, const char format[], va_list ap)
 
 		if(veejay_edit_delete( v,el, args[0], args[1] ))
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Deleted frames %d-%d from sample %d into buffer",v->uc->sample_id,args[0],args[1]);
+			veejay_msg(VEEJAY_MSG_INFO, "Deleted frames %d-%d from EDL of sample %d",
+				v->uc->sample_id,args[0],args[1]);
 		}
 		sample_set_startframe( v->uc->sample_id, 0 );
 		sample_set_endframe(   v->uc->sample_id,
