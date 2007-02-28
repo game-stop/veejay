@@ -963,9 +963,9 @@ int	vj_unicap_grab_a_frame( void *vut )
 			int dst_fmt = 0;
 			switch(v->rgb)
 			{
-				case 1: PIX_FMT_RGB32; break;
-				case 2: PIX_FMT_RGB24: break;
-				case 3: PIX_FMT_BGR24: break;
+				case 1: dst_fmt=PIX_FMT_RGBA32; break;
+				case 2: dst_fmt=PIX_FMT_RGB24: break;
+				case 3: dst_fmt=PIX_FMT_BGR24: break;
 				default:
 #ifdef STRICT_CHECKING	
 				assert(0);
