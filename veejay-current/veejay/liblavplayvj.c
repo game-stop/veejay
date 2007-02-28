@@ -2263,9 +2263,6 @@ static int	veejay_pin_cpu( veejay_t *info, int cpu_num )
 
 	retval = sched_setaffinity( pi, sz * sizeof( unsigned long ), mask );
 
-	veejay_msg(VEEJAY_MSG_DEBUG,
-			"%s(%d) : pid=%d, returning %d", __FUNCTION__,cpu_num,pi, retval);
-
 	return retval;
 }
 
