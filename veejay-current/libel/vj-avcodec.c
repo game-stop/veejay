@@ -248,12 +248,14 @@ int		vj_avcodec_stop( void *encoder , int fmt)
 {
 	if(!encoder)
 		return 0;
+#ifdef SUPPORT_READ_DV2
 	if( fmt == CODEC_ID_DVVIDEO )
 	{
 		vj_dv_free_encoder(encoder);
 		encoder = NULL;
 		return 1;
 	}
+#endif
 	if( fmt == 900 )
 	{
 		return 1;
@@ -268,6 +270,7 @@ void 		*vj_avcodec_start( editlist *el, int encoder )
 {
 	int codec_id = vj_avcodec_find_codec( encoder );
 	void *ee = NULL;
+#ifdef SUPPORT_READ_DV2
 	if(codec_id == CODEC_ID_DVVIDEO )
 	{
 		if(!is_dv_resolution(el->video_width, el->video_height ))
@@ -281,7 +284,10 @@ void 		*vj_avcodec_start( editlist *el, int encoder )
 			return ee;
 		}
 	}
-	
+#else
+	if( codec_id == CODEC_ID_DVVIDEO )
+		return NULL;
+#endif	
 	ee = vj_avcodec_new_encoder( codec_id, el , encoder );
 	if(!ee)
 	{

@@ -427,6 +427,9 @@ int vj_event_bundle_update( vj_msg_bundle *bundle, int bundle_id )
 
 static	void	constrain_sample( veejay_t *v,int n, long lo, long hi )
 {
+#ifdef STRICT_CHECKING
+	assert( v->font != NULL );
+#endif
 	vj_font_set_constraints_and_dict(
 		v->font,
 		lo,
@@ -437,6 +440,9 @@ static	void	constrain_sample( veejay_t *v,int n, long lo, long hi )
 
 static	void	constrain_stream( veejay_t *v, int n, long hi )
 {
+#ifdef STRICT_CHECKING
+	assert(v->font != NULL );
+#endif
 	vj_font_set_constraints_and_dict(
 		v->font,
 		0,
@@ -8440,6 +8446,12 @@ void	vj_event_get_srt_list(	void *ptr,	const char format[],	va_list	ap	)
 	char *str = NULL;
 	int len = 0;
 
+	if(!v->font)
+	{
+		SEND_MSG(v, "000000" );
+		return;
+	}
+
 	char **list = vj_font_get_sequences( v->font );
 	int i;
 
@@ -8482,6 +8494,12 @@ void	vj_event_get_font_list(	void *ptr,	const char format[],	va_list	ap	)
 	veejay_t *v = (veejay_t*)ptr;
 	char *str = NULL;
 	int len = 0;
+
+	if(!v->font)
+	{
+		SEND_MSG(v, "000000" );
+		return;
+	}
 
 	char **list = vj_font_get_all_fonts( v->font );
 	int i;
@@ -8528,6 +8546,12 @@ void	vj_event_get_srt_info(	void *ptr,	const char format[],	va_list	ap	)
 	char *str = NULL;
 	P_A(args,str,format,ap);
 
+	if(!v->font)
+	{
+		SEND_MSG(v, "000000");
+		return;
+	}
+
 	char *sequence = vj_font_get_sequence( v->font,args[0] );
 
 	if(!sequence)
@@ -8553,6 +8577,12 @@ void	vj_event_save_srt(	void *ptr,	const char format[],	va_list	ap	)
 
 	P_A(args,file_name,format,ap);
 
+	if(!v->font)
+	{
+		veejay_msg(0, "No font renderer active");
+		return;
+	}
+
 	if( vj_font_save_srt( v->font, file_name ) )
 		veejay_msg(VEEJAY_MSG_INFO, "Saved SRT file '%s'", file_name );
 	else
@@ -8565,6 +8595,12 @@ void	vj_event_load_srt(	void *ptr,	const char format[],	va_list	ap	)
 	veejay_t *v = (veejay_t*)ptr;
 
 	P_A(args,file_name,format,ap);
+
+	if(!v->font)
+	{
+		veejay_msg(0, "No font renderer active");
+		return;
+	}
 
 	if( vj_font_load_srt( v->font, file_name ) )
 		veejay_msg(VEEJAY_MSG_INFO, "Loaded SRT file '%s'", file_name );
@@ -8727,6 +8763,13 @@ void	vj_event_upd_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 
 	veejay_t *v = (veejay_t*)ptr;
 	P_A(args,text,format,ap);
+
+	if(!v->font )
+	{
+		veejay_msg(0, "No font renderer active");
+		return;
+	}
+
         void *dict = select_dict( v, v->uc->sample_id );
         if(!dict)
         {
@@ -8744,6 +8787,14 @@ void	vj_event_del_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 	int args[5];
 	veejay_t *v = (veejay_t*)ptr;
 	P_A(args,NULL,format,ap);
+	
+	if(!v->font)
+	{
+		veejay_msg(0, "No font renderer active");
+		return;
+	}
+
+
         void *dict = select_dict( v, v->uc->sample_id );
         if(!dict)
         {
@@ -8763,6 +8814,12 @@ void	vj_event_font_set_position(	void *ptr,	const char format[],	va_list	ap	)
 	veejay_t *v = (veejay_t*)ptr;
 	P_A(args,NULL,format,ap);
 
+	if(!v->font)
+	{
+		veejay_msg(0, "No font renderer active");
+		return;
+	}
+
         void *dict = select_dict( v, v->uc->sample_id );
         if(!dict)
         {
@@ -8778,6 +8835,12 @@ void	vj_event_font_set_color(	void *ptr,	const char format[],	va_list	ap	)
 	int args[6];
 	veejay_t *v = (veejay_t*)ptr;
 	P_A(args,NULL,format,ap);
+
+	if(!v->font)
+	{
+		veejay_msg(0, "No font renderer active");
+		return;
+	}
 
 	void *dict = select_dict( v, v->uc->sample_id );
         if(!dict)
@@ -8817,7 +8880,13 @@ void	vj_event_font_set_size_and_font(	void *ptr,	const char format[],	va_list	ap
 	int args[5];
 	veejay_t *v = (veejay_t*)ptr;
 	P_A(args,NULL,format,ap);
-  
+ 
+	if(!v->font)
+	{
+		veejay_msg(0, "No font renderer active");
+		return;
+	}
+ 
 	void *dict = select_dict( v, v->uc->sample_id );
         if(!dict)
         {

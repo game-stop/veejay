@@ -978,15 +978,15 @@ char 	**vj_font_get_all_fonts( void *font )
 	return res;
 }
 
-
 static int	font_selector( const struct dirent *dir )
 {	
 	if(strstr(dir->d_name, ".ttf" )) return 1;
 	if(strstr(dir->d_name, ".TTF" )) return 1;
-	if(strstr(dir->d_name, ".pfa" )) return 1;
-	if(strstr(dir->d_name, ".pcf.gz" )) return 1;
+//	if(strstr(dir->d_name, ".pfa" )) return 1;
+//	if(strstr(dir->d_name, ".pcf.gz" )) return 1;
 	return 0;
 }
+
 static int	dir_selector( const struct dirent *dir )
 {	
 	return 1;

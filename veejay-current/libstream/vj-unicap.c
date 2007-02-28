@@ -600,6 +600,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 	{
 		unsigned int rgb24_fourcc = get_fourcc( "RGB3" );
 		unsigned int rgb_fourcc = get_fourcc( "RGB4" );
+		unsigned int bgr24_fourcc = get_fourcc( "BGR3");
 		unicap_format_t rgb_spec, rgb_format;
 		unicap_void_format( &rgb_spec);
 		veejay_msg(2, "Capture device has no support for YUV");
@@ -625,6 +626,11 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 				rgb_format.size.width = w;
 				rgb_format.size.height = h;
 				break;
+			} else if ( bgr24_fourcc == rgb_format.fourcc )
+			{
+				veejay_msg(0, "Capture device supports %s, software conversion BGR24 -> YUV enabled");
+				vut->rgb = 3;
+				rgb_format.size.width = w; rgb_format.size.height = h;
 			}
 		}
 		
@@ -953,7 +959,15 @@ int	vj_unicap_grab_a_frame( void *vut )
 		}
 		else
 		{
-			VJFrame *srci = yuv_rgb_template( v->buf->data, v->width,v->height, (v->rgb==2 ? PIX_FMT_BGR24:PIX_FMT_RGBA32) );
+			int dst_fmt = 0;
+			switch(v->rgb)
+			{
+				case 1: PIX_FMT_RGBA32; break;
+				case 2: PIX_FMT_RGB24: break;
+				case 3: PIX_FMT_BGR24: break;
+			}
+
+			VJFrame *srci = yuv_rgb_template( v->buf->data, v->width,v->height, dst_fmt );
 			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], v->width,v->height, v->pixfmt ); 
 
 			yuv_convert_any(srci,dsti, srci->format, dsti->format );
