@@ -631,6 +631,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 				veejay_msg(0, "Capture device supports %s, software conversion BGR24 -> YUV enabled");
 				vut->rgb = 3;
 				rgb_format.size.width = w; rgb_format.size.height = h;
+				break;
 			}
 		}
 		
