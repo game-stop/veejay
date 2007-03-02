@@ -28,7 +28,7 @@ int	vj_unicap_start_capture( void *vut );
 int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int w, const int h );
 int	vj_unicap_stop_capture( void *vut );
 int	vj_unicap_status(void *vut);
-void	vj_unicap_free_device( void *vut );
+void	vj_unicap_free_device( void *dud, void *vut );
 char        **vj_unicap_get_list( void *ud );
 
 int	vj_unicap_select_value( void *ud, int key, double );

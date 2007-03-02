@@ -325,6 +325,7 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
 		    int norm, int palette, int freq, int channel)
 {
+	veejay_msg(VEEJAY_MSG_DEBUG, "%s: %dx%d, channel=%d, stream id=%d",__FUNCTION__,width,height, channel,stream_nr );
   	if (stream_nr < 0 || stream_nr > vj_tag_num_devices())
 	{
 		return 0;
@@ -341,7 +342,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
 			   palette, width,height))
 	{
 		veejay_msg(0,"Unable to configure device %d",channel);
-	   	vj_unicap_free_device( vj_tag_input->unicap[stream_nr] );
+	   	vj_unicap_free_device( unicap_data_,vj_tag_input->unicap[stream_nr] );
 	   	return 0;
    	}
 	else
@@ -761,7 +762,7 @@ int vj_tag_del(int id)
     switch(tag->source_type) {
 	case VJ_TAG_TYPE_V4L: 
 		veejay_msg(VEEJAY_MSG_INFO, "Closing unicap device");
-	   	vj_unicap_free_device(  vj_tag_input->unicap[tag->index] );
+	   	vj_unicap_free_device(unicap_data_,  vj_tag_input->unicap[tag->index] );
 		break;
      case VJ_TAG_TYPE_YUV4MPEG: 
 		veejay_msg(VEEJAY_MSG_INFO,"Closing yuv4mpeg file %s (Stream %d)",
