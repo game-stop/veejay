@@ -1747,15 +1747,24 @@ int vj_tag_disable(int t1) {
 
 int vj_tag_enable(int t1) {
 	vj_tag *tag = vj_tag_get(t1);
-	if(!tag) return -1;
+#ifdef STRICT_CHECKING
+	assert( tag != NULL );
+#endif
 
-	veejay_msg(VEEJAY_MSG_INFO, "Enable stream %d", t1 );
-
-	if(tag->active ) 
+	if( tag->source_type == VJ_TAG_TYPE_V4L )
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Already active");
+		int v4l_stat = vj_unicap_status( vj_tag_input->unicap[tag->index]);
+		if(!v4l_stat)
+		{
+			tag->active = vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
+		}
+		else
+			tag->active = v4l_stat;
+
+		vj_tag_update(tag,t1);
 		return 1;
 	}
+
 	if(tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST )
 	{
 		if(!net_thread_start(vj_tag_input->net[tag->index], tag))
