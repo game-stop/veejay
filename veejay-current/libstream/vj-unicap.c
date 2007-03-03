@@ -50,7 +50,7 @@ typedef struct
 	unicap_format_t format_spec;
 	unicap_format_t format;
 	unicap_data_buffer_t buffer;
-	unicap_data_buffer_t *buf;
+//	unicap_data_buffer_t *buf;
 	pthread_mutex_t	mutex;
 	pthread_t	thread;
 	pthread_attr_t	attr;
@@ -560,6 +560,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 	unicap_void_format( &(vut->format_spec));
 
 	unsigned int fourcc = 0;
+	unsigned int frame_size = w*h;
 	vut->sizes[0] = w * h;
 	
 	switch(pixel_format)
@@ -584,7 +585,8 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 			break;
 #endif
 	}	
-	
+	frame_size += vut->sizes[1];
+	frame_size += vut->sizes[2];
 	vut->pixfmt = get_ffmpeg_pixfmt( pixel_format );
 	vut->shift    = get_shift_size(pixel_format);
 	int i;
@@ -595,7 +597,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 	{
 		if( fourcc == vut->format.fourcc )
 		{
-			veejay_msg(0, "Found native colorspace");
+		  veejay_msg(VEEJAY_MSG_INFO, "Found native colorspace '%s'", vut->format.identifier);
 	   	  found_native = 1;
 		  break;
 		}
@@ -603,18 +605,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 
 	if( found_native )
 	{
-		vut->format.size.width = w;
-		vut->format.size.height = h;
-
-		if (!SUCCESS(unicap_set_format( vut->handle, &(vut->format) )))
-		{
-			veejay_msg(0, "Unable to set video size %d x %d in format %s",
-					w,h,vut->format.identifier );
-			unicap_unlock_properties( vut->handle );
-
-			return 0;
-		}
-		vut->deinterlace = 1;
+		vut->deinterlace = 0;
 	}
 	else
 	{
@@ -633,22 +624,20 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 				veejay_msg(0, "Capture device supports %s, software conversion RGB24 -> YUV enabled",
 						rgb_format.identifier);
 				vut->rgb = 2;
-				rgb_format.size.width = w;
-				rgb_format.size.height = h;
+				frame_size = w * h * 3;
 				break;
 			} else if ( rgb_fourcc == rgb_format.fourcc )
 			{
 				veejay_msg(0, "Capture device supports %s, software conversion RGB32 -> YUV enabled",
 						rgb_format.identifier );
 				vut->rgb = 1;
-				rgb_format.size.width = w;
-				rgb_format.size.height = h;
+				frame_size = w * h * 4;
 				break;
 			} else if ( bgr24_fourcc == rgb_format.fourcc )
 			{
 				veejay_msg(0, "Capture device supports %s, software conversion BGR24 -> YUV enabled");
 				vut->rgb = 3;
-				rgb_format.size.width = w; rgb_format.size.height = h;
+				frame_size = w * h * 3;
 				break;
 			}
 		}
@@ -668,33 +657,36 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 	unicap_format_t test;
 	unicap_void_format( &test);
 
-	if ( test.size.width != w || test.size.height != h ) 
-	{
-		vut->format.size.width = w;
-		vut->format.size.height = h;
-		if( !SUCCESS( unicap_set_format( vut->handle, &(vut->format) ) ) )
-		{
-			unicap_unlock_properties( vut->handle );
-			return 0;
-		}
-		else
-			veejay_msg(VEEJAY_MSG_INFO, "Okay, Capture device delivers %s image, %d x %d ",
-				vut->format.identifier, vut->format.size.width,vut->format.size.height );
-	}
-	
-	veejay_memset(&(vut->buffer), 0, sizeof( unicap_data_buffer_t ) );
-	
-	/* allocate memory for unicap buffer */
-
-	vut->buffer.data = vj_malloc( vut->format.buffer_size );
-	veejay_memset( vut->buffer.data , 0, vut->sizes[0]);
-	veejay_memset( vut->buffer.data + vut->sizes[0], 128, vut->sizes[1] );
-	veejay_memset( vut->buffer.data + vut->sizes[0] + vut->sizes[1] , 128, vut->sizes[2] );
-
-	vut->buffer.buffer_size = vut->format.buffer_size;
-
+	vut->format.buffer_type = UNICAP_BUFFER_TYPE_USER;
+	vut->format.size.width = w;
+	vut->format.size.height = h;
+	vut->format.buffer_size = frame_size;
 	vut->width = w;
 	vut->height = h;
+
+	if( !SUCCESS( unicap_set_format( vut->handle, &(vut->format) ) ) )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR,"Cannot configure capture device to use %dx%d %s",
+			w,h, vut->format.identifier );
+		unicap_unlock_properties( vut->handle );
+		return 0;
+	}
+	else
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Okay, Capture device delivers %s image, %d x %d  buf=%d bytes, type=%x",
+			vut->format.identifier, vut->format.size.width,vut->format.size.height,
+			vut->format.buffer_size, vut->format.buffer_type );
+	}
+	/* allocate memory for unicap buffer */
+	vut->buffer.data = vj_malloc( vut->format.buffer_size );
+	if(!vut->rgb)
+	{
+		veejay_memset( vut->buffer.data , 128, frame_size);
+	}
+	else
+		veejay_memset( vut->buffer.data, 0, frame_size);
+
+	vut->buffer.buffer_size = vut->format.buffer_size;
 	
 	char **properties = vj_unicap_get_list( vut );
 	if(!properties)
@@ -796,6 +788,8 @@ int		vj_unicap_stop_capture( void *vut )
 	v->state = 0;
 	unlock_( vut );
 
+	g_usleep(2000);
+
 	return 1;
 }
 
@@ -810,11 +804,10 @@ static int	vj_unicap_start_capture_( void *vut )
 	assert( v->state == 1 );
 #endif
 	v->priv_buf = (uint8_t*) vj_calloc( BUFFERS  * v->width * v->height * 4 );
-
 	veejay_memset( v->priv_buf , 0, v->sizes[0]);
 	veejay_memset( v->priv_buf + v->sizes[0], 128, v->sizes[1] );
 	veejay_memset( v->priv_buf + v->sizes[0] + v->sizes[1] , 128, v->sizes[2] );
-	
+	veejay_memset( v->handle, 0, sizeof( unicap_handle_t));	
 	if( !SUCCESS( unicap_start_capture( v->handle ) ) )
    	{
       		veejay_msg( 0, "Failed to start capture on device: %s\n", v->device.identifier );
@@ -822,7 +815,6 @@ static int	vj_unicap_start_capture_( void *vut )
 		v->priv_buf = NULL;
 		return 0;
      	}
-
 	if( ! SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer) )) )
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Failed to queue buffer ",__FUNCTION__,__LINE__);
@@ -883,26 +875,19 @@ int	vj_unicap_grab_a_frame( void *vut )
 		veejay_msg(VEEJAY_MSG_ERROR, "Capture not started!");
  		return 0;
 	}
-
-	if(! SUCCESS(unicap_wait_buffer(v->handle, &(v->buf)) ))
+	if(! SUCCESS(unicap_wait_buffer(v->handle, &ready_buffer ) ))
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Failed to wait for buffer on device %s",
 				__FUNCTION__,__LINE__, v->device.identifier );
 		return 1;
 	}
-	if( ! SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer) )) )
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Failed to queue buffer ",__FUNCTION__,__LINE__);
-		return 0;
-	}
-
-	if( v->buf->buffer_size <= 0 )
+	if( ready_buffer->buffer_size <= 0 )
 	{
 		veejay_msg(0, "Unicap returned a buffer of size 0!");	
 		return 0;
 	}
 
-	if( !v->buf->data )
+	if(!ready_buffer->data )
 	{
 		veejay_msg(0, "Unicap returned a NULL buffer!");	
 		return 0;
@@ -924,18 +909,18 @@ int	vj_unicap_grab_a_frame( void *vut )
 			v->height,
 			v->pixfmt,
 			v->shift,
-			v->buf->data,
-			v->buf->data + v->sizes[0],
-			v->buf->data +v->sizes[0] + v->sizes[1]
+			ready_buffer->data,
+			ready_buffer->data + v->sizes[0],
+			ready_buffer->data + v->sizes[0] + v->sizes[1]
 		);
 	}
 	else
 	{
 		if(!v->rgb)
 		{
-			veejay_memcpy( buffer[0], v->buf->data, v->sizes[0] );
-			veejay_memcpy( buffer[1], v->buf->data + v->sizes[0], v->sizes[1] );
-			veejay_memcpy( buffer[2], v->buf->data + v->sizes[0] +v->sizes[1] , v->sizes[2]);
+			veejay_memcpy( buffer[0], ready_buffer->data, v->sizes[0] );
+			veejay_memcpy( buffer[1], ready_buffer->data + v->sizes[0], v->sizes[1] );
+			veejay_memcpy( buffer[2], ready_buffer->data + v->sizes[0] +v->sizes[1] , v->sizes[2]);
 		}
 		else
 		{
@@ -952,7 +937,7 @@ int	vj_unicap_grab_a_frame( void *vut )
 				break;
 			}
 
-			VJFrame *srci = yuv_rgb_template( v->buf->data, v->width,v->height, dst_fmt );
+			VJFrame *srci = yuv_rgb_template( ready_buffer->data, v->width,v->height, dst_fmt );
 			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], v->width,v->height, v->pixfmt ); 
 
 			yuv_convert_any(srci,dsti, srci->format, dsti->format );
@@ -961,7 +946,11 @@ int	vj_unicap_grab_a_frame( void *vut )
 			free(dsti);
 		}
 	}	
-
+	if( ! SUCCESS( unicap_queue_buffer( v->handle, ready_buffer) )) 
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Failed to queue buffer ",__FUNCTION__,__LINE__);
+		return 0;
+	}
 	unlock_(vut);
 	
 	return 1;
