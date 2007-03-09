@@ -924,8 +924,8 @@ void	on_devicelist_row_activated(GtkTreeView *treeview,
 		gint	num = info->uc.strtmpl[0].dev;
 	
 		multi_vims( VIMS_STREAM_NEW_V4L,"%d %d",
-				num,
-				channel
+				channel,
+				num
 				);
 		gveejay_new_slot(MODE_STREAM);
 

@@ -41,7 +41,7 @@ vj_effect *chameleon_init(int w, int h)
     ve->limits[1][1] = 1;
     ve->defaults[0] = 0;
     ve->defaults[1] = 0;
-    ve->description = "Chameleon TV";
+    ve->description = "ChameleonTV";
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;

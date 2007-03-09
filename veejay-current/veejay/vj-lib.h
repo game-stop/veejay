@@ -179,6 +179,7 @@ typedef struct {
 	int use_vims_mcast;
 	char *vims_group_name;
 	int zoom;
+	int composite;
 	sws_template sws_templ;
 	vj_schedule_t action_scheduler;
 	float	output_fps;
@@ -318,7 +319,7 @@ typedef struct {
 	sequencer_t *seq;
 	int  no_caching;
 	void	*viewport;
-	void	*projport;
+	void	*composite;
 	int	 use_vp;
 	int	 use_proj;
 	int 	which_vp;

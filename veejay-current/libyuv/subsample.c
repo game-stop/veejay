@@ -61,6 +61,8 @@ const char *ssm_description[SSM_COUNT] = {
 #endif
 };
 
+ 
+#define    RUP8(num)(((num)+8)&~8)
 
 // forward decl
 void ss_420_to_422(uint8_t *buffer, int width, int height);
@@ -76,7 +78,7 @@ void *subsample_init(int len)
 	yuv_sampler_t *s = (yuv_sampler_t*) vj_malloc(sizeof(yuv_sampler_t) );
 	if(!s)
 		return NULL;
-	s->buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * (len*2) );
+	s->buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(len*2) );
 	if(!s->buf)
 		return NULL;
 

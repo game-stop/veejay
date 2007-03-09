@@ -44,6 +44,7 @@
 #include <veejay/vj-font.h>
 #include <assert.h>
 #include <libel/elcache.h>
+#include <veejay/vj-misc.h>
 //todo: change this into enum
 //#define KAZLIB_OPAQUE_DEBUG 1
 
@@ -2056,7 +2057,7 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 #endif
 	return -1;
     }
-	sprintf(str,
+	veejay_sprintf(str,1024,
 		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		pfps,
 		frame,

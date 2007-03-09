@@ -444,6 +444,8 @@ int veejay_free(veejay_t * info)
 
   	if( info->settings->zoom )
 		yuv_free_swscaler( info->video_out_scaler );
+	if( info->settings->composite )
+		composite_destroy( info->composite );
 	if( info->settings->action_scheduler.state )
 	{
 		if(info->settings->action_scheduler.sl )
@@ -590,7 +592,6 @@ int veejay_init_editlist(veejay_t * info)
 	settings->spas = 0;
    }
 
-   veejay_msg(VEEJAY_MSG_DEBUG, "%s: %dx%d, %d,%d", __FUNCTION__, el->video_width,el->video_height);
    vj_el_set_image_output_size( el );
 
    return 0;
@@ -700,27 +701,22 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 	     	   return;
         }
 
-	info->last_tag_id = sampleid;
-	info->uc->sample_id = sampleid;
+//	info->last_tag_id = sampleid;
+//	info->uc->sample_id = sampleid;
 
 	if(info->settings->current_playback_speed==0) 
 		veejay_set_speed(info, 1);
 
- 	veejay_msg(VEEJAY_MSG_INFO, "Playing Stream %d",
-		sampleid);
+ 	 veejay_msg(VEEJAY_MSG_INFO, "Playing Stream %d",sampleid);
 	
-	vj_tag_set_active( sampleid, 1 );
-
-	info->edit_list = info->current_edit_list;
-	
-	veejay_reset_el_buffer(info);
+	  vj_tag_set_active( sampleid, 1 );
 
 	  info->uc->render_changed = 1;
 	  settings->min_frame_num = 0;
-	  settings->max_frame_num = vj_tag_get_n_frames( info->uc->sample_id );
+	  settings->max_frame_num = vj_tag_get_n_frames( sampleid );
 
 #ifdef HAVE_FREETYPE
-	  if(info->font)
+	  if(info->font && sampleid != info->uc->sample_id)
 	  {
 		  void *dict = vj_tag_get_dict( sampleid );
 		  vj_font_set_constraints_and_dict( info->font, settings->min_frame_num,
@@ -729,8 +725,11 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 				  settings->min_frame_num, settings->max_frame_num );
 	  }
 #endif
+	  info->last_tag_id = sampleid;
+	  info->uc->sample_id = sampleid;
 
-
+	  info->edit_list = info->current_edit_list;
+  	  veejay_reset_el_buffer(info);
      }
      else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
      {
@@ -754,7 +753,7 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 	 	settings->max_frame_num = info->edit_list->video_frames - 1;
 
 #ifdef HAVE_FREETYPE
-		if(info->font)
+		if(info->font && sampleid != info->uc->sample_id)
 		{
 			video_playback_setup *settings = info->settings;
 
@@ -877,11 +876,28 @@ static int veejay_screen_update(veejay_t * info )
 	uint8_t *frame[3];
 	uint8_t *c_frame[3];
 	int i = 0;
-
+	int skip_update = 0;
 	vj_perform_unlock_primary_frame();
 
 	video_playback_setup *settings = info->settings;
-	if(settings->zoom )
+
+	if(settings->composite)
+	{
+		if(!vj_sdl_lock( info->sdl[0] ) )
+			return 0;
+
+		uint8_t *yuyv = vj_sdl_get_yuv_overlay(info->sdl[0]);
+	
+		composite_blit( info->composite, viewport_active(info->viewport), yuyv );
+
+		if(!vj_sdl_unlock( info->sdl[0]) )
+			return 0;
+
+		//vj_sdl_flip(info->sdl[0]);
+
+		skip_update = 1;
+	}
+	else if(settings->zoom )
 	{
 		VJFrame src,dst;
 		memset(&src,0,sizeof(VJFrame));
@@ -977,6 +993,12 @@ static int veejay_screen_update(veejay_t * info )
 	if( info->settings->mcast_frame_sender && info->settings->use_vims_mcast )
 	{
 		vj_perform_send_primary_frame_s2(info, 1, info->uc->current_link);
+	}
+
+	if( skip_update )
+	{
+		vj_sdl_flip(info->sdl[0]);
+		return 1;
 	}
 
     	switch (info->video_out)
@@ -1144,7 +1166,7 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		sprintf(info->status_what, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		veejay_sprintf(info->status_what,1024, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			info->real_fps,
 			settings->current_frame_num,
 			info->uc->playback_mode,
@@ -1176,16 +1198,24 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 		break;
     }
     
-    d_len = strlen(info->status_what);
-    snprintf(info->status_msg,MESSAGE_SIZE, "V%03dS%s", d_len, info->status_what);
-    res = vj_server_send(info->vjs[VEEJAY_PORT_STA],link_id, info->status_msg, strlen(info->status_msg));
+	d_len = strlen(info->status_what);
+	snprintf(info->status_msg,MESSAGE_SIZE, "V%03dS", d_len );
 
-    if( res <= 0)
+    	res = vj_server_send(info->vjs[VEEJAY_PORT_STA],link_id, info->status_msg, 5);
+    	if( res <= 0)
 	{ /* close command socket */
 		veejay_msg(VEEJAY_MSG_DEBUG ,"Error sending status message , closing connection(s)");
 		_vj_server_del_client(info->vjs[VEEJAY_PORT_CMD], link_id );
 		_vj_server_del_client(info->vjs[VEEJAY_PORT_STA], link_id );
 	}
+    	res = vj_server_send(info->vjs[VEEJAY_PORT_STA], link_id, info->status_what, d_len );
+    	if( res <= 0)
+	{ /* close command socket */
+		veejay_msg(VEEJAY_MSG_DEBUG ,"Error sending status message , closing connection(s)");
+		_vj_server_del_client(info->vjs[VEEJAY_PORT_CMD], link_id );
+		_vj_server_del_client(info->vjs[VEEJAY_PORT_STA], link_id );
+	}
+
     if (info->uc->chain_changed == 1)
 		info->uc->chain_changed = 0;
     if (info->uc->render_changed == 1)
@@ -1318,81 +1348,11 @@ void vj_unlock(veejay_t *info)
 
 static void donothing2(int sig)
 {
-	veejay_msg(0,"Catch signal %d",sig );
+	veejay_msg(VEEJAY_MSG_WARNING,"Catched signal %x (ignored)",sig );
 }
 
-
-static void *veejay_mjpeg_playback_thread(void *arg)
+static	void	veejay_event_handle(veejay_t *info)
 {
-    veejay_t *info = (veejay_t *) arg;
-    video_playback_setup *settings =
-	(video_playback_setup *) info->settings;
-   /* Allow easy shutting down by other processes... */
-    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
-	sigset_t mask;
-	struct sigaction act;
-	sigemptyset(&mask);
-	sigaddset( &mask, SIGPIPE );
-	act.sa_handler = donothing2;
-	act.sa_flags = 0;
-	sigemptyset(&act.sa_mask);
-
-
-    pthread_sigmask( SIG_BLOCK, &mask, NULL );
-
-
-  /* schedule FIFO */
-
-    veejay_schedule_fifo( info, getpid());
-
-    vj_get_relative_time();
-
-    vj_osc_set_veejay_t(info); 
-    vj_tag_set_veejay_t(info);
-
-#ifdef HAVE_SDL
-	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
-#endif
-    while (settings->state != LAVPLAY_STATE_STOP) {
-	pthread_mutex_lock(&(settings->valid_mutex));
-	while (settings->valid[settings->currently_processed_frame] == 0) {
-	    pthread_cond_wait(&
-			      (settings->
-			       buffer_filled[settings->
-					     currently_processed_frame]),
-			      &(settings->valid_mutex));
-	    if (settings->state == LAVPLAY_STATE_STOP) {
-		// Ok, we shall exit, that's the reason for the wakeup 
-		veejay_msg(VEEJAY_MSG_DEBUG,
-			    "Veejay was told to exit");
-		pthread_exit(NULL);
-	 	return NULL;
-	    }
-	}
-	pthread_mutex_unlock(&(settings->valid_mutex));
-
-
-        if( settings->currently_processed_entry != settings->buffer_entry[settings->currently_processed_frame] &&
-		!veejay_screen_update(info) )
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Error playing frame %d", settings->current_frame_num);
-		veejay_change_state_save( info, LAVPLAY_STATE_STOP);
-	}
-	
-
-	settings->currently_processed_entry = 
-		settings->buffer_entry[settings->currently_processed_frame];
-	/* sync timestamp */
-
-	veejay_mjpeg_software_frame_sync(info,
-					  settings->valid[settings->
-							  currently_processed_frame]);
-	settings->syncinfo[settings->currently_processed_frame].frame =
-	    settings->currently_processed_frame;
-
-
 	veejay_handle_callbacks(info);
 #ifdef HAVE_SDL
 	if( info->video_out == 0 )
@@ -1428,6 +1388,10 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 				{
 					but = 6;
 					info->uc->mouse[3] = 1;
+				} else if( mev->button == SDL_BUTTON_LEFT && ctrl_pressed )
+				{
+					but = 10;
+					info->uc->mouse[3] = 4;
 				}
 				if (mev->button == SDL_BUTTON_MIDDLE && shift_pressed )
 				{
@@ -1446,8 +1410,14 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 						but = 6;
 						info->uc->mouse[3] = 0;
 					}
-					else {if (info->uc->mouse[3] == 0 )
-						but = 1; }
+					else if (info->uc->mouse[3] == 4 )
+					{	
+						but = 10;
+						info->uc->mouse[3] = 0;
+					} else if (info->uc->mouse[3] == 0 )
+					{
+						but = 1;
+					}
 				}
 				else if (mev->button == SDL_BUTTON_RIGHT ) {
 					but = 2;
@@ -1490,6 +1460,72 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 						&(info->uc->mouse[3]));
 	}
 #endif
+
+}
+
+
+static void *veejay_mjpeg_playback_thread(void *arg)
+{
+    veejay_t *info = (veejay_t *) arg;
+    video_playback_setup *settings =
+	(video_playback_setup *) info->settings;
+   /* Allow easy shutting down by other processes... */
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
+
+  /* schedule FIFO */
+
+    veejay_schedule_fifo( info, getpid());
+
+    vj_get_relative_time();
+
+    vj_osc_set_veejay_t(info); 
+    vj_tag_set_veejay_t(info);
+
+//#ifdef HAVE_SDL
+//	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
+//#endif
+    while (settings->state != LAVPLAY_STATE_STOP) {
+	pthread_mutex_lock(&(settings->valid_mutex));
+	while (settings->valid[settings->currently_processed_frame] == 0) {
+	    pthread_cond_wait(&
+			      (settings->
+			       buffer_filled[settings->
+					     currently_processed_frame]),
+			      &(settings->valid_mutex));
+	    if (settings->state == LAVPLAY_STATE_STOP) {
+		// Ok, we shall exit, that's the reason for the wakeup 
+		veejay_msg(VEEJAY_MSG_DEBUG,
+			    "Veejay was told to exit");
+		pthread_exit(NULL);
+	 	return NULL;
+	    }
+	}
+	pthread_mutex_unlock(&(settings->valid_mutex));
+
+
+        if( settings->currently_processed_entry != settings->buffer_entry[settings->currently_processed_frame] &&
+		!veejay_screen_update(info) )
+	{
+		veejay_msg(VEEJAY_MSG_WARNING, "Error playing frame %d", settings->current_frame_num);
+	}
+	
+	//@ here callbacks fixme was
+
+	settings->currently_processed_entry = 
+		settings->buffer_entry[settings->currently_processed_frame];
+	/* sync timestamp */
+
+	veejay_mjpeg_software_frame_sync(info,
+					  settings->valid[settings->
+							  currently_processed_frame]);
+	settings->syncinfo[settings->currently_processed_frame].frame =
+	    settings->currently_processed_frame;
+
+
+
+
 	pthread_mutex_lock(&(settings->valid_mutex));
 	settings->valid[settings->currently_processed_frame] = 0;
 	pthread_mutex_unlock(&(settings->valid_mutex));
@@ -1786,14 +1822,18 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame1)) return 0;
 		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame2)) return 0;
 		info->settings->sample_mode = SSM_422_444;
-		veejay_msg(VEEJAY_MSG_INFO, "Internal YUV format is 4:2:2 Planar");
+		veejay_msg(VEEJAY_MSG_INFO, "Internal YUV format is 4:2:2 Planar, %d x %d",
+				info->current_edit_list->video_width,
+				info->current_edit_list->video_height);
 	}
 	else 
 	{
 		if(!vj_el_init_420_frame( info->current_edit_list, info->effect_frame1)) return 0;
 		if(!vj_el_init_420_frame( info->current_edit_list, info->effect_frame2)) return 0;
 		info->settings->sample_mode = SSM_420_JPEG_TR;
-		veejay_msg(VEEJAY_MSG_INFO, "Internal YUV format is 4:2:0 Planar");
+		veejay_msg(VEEJAY_MSG_INFO, "Internal YUV format is 4:2:0 Planar, %d x %d",
+				info->current_edit_list->video_width,
+				info->current_edit_list->video_height);
 	}
 
 	
@@ -1802,11 +1842,18 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 				   info->current_edit_list->video_height,
 				   info->current_edit_list->video_fps,0 );
 
-	
-	info->osd = vj_font_init( info->current_edit_list->video_width,
+
+	if(info->settings->composite)
+	{
+		info->osd = vj_font_init( info->video_output_width,info->video_output_height,
+					  info->current_edit_list->video_fps ,1  );
+	}
+	else
+	{	
+		info->osd = vj_font_init( info->current_edit_list->video_width,
 				   info->current_edit_list->video_height,
 				   info->current_edit_list->video_fps,1 );
-
+	}
 	
 #endif
 	if(!vj_perform_init(info, use_vp))
@@ -1814,6 +1861,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Veejay Performer");
 		return -1;
     	}
+
 	if( info->settings->crop && info->settings->zoom)
 	{
 		VJFrame src;
@@ -1908,9 +1956,21 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 				t->chromaSharpen,t->chromaHShift,t->chromaVShift);
 		}
 	}
-	else
+
+	if( info->settings->composite )
 	{
-	    /* setup output dimensions */
+		if(info->settings->zoom <= 0 || info->settings->zoom > 11 )
+			info->settings->zoom = 1;
+		info->composite = composite_init( info->video_output_width, info->video_output_height,
+			el->video_width, el->video_height, info->homedir, info->settings->sample_mode,
+				info->settings->zoom, info->pixel_format );
+		info->settings->zoom = 0;
+		info->which_vp = 1;
+		info->bes_width  = info->video_output_width;
+		info->bes_height = info->video_output_height;
+	}
+	else if(!info->settings->zoom)
+	{
 	    info->video_output_width = el->video_width;
 	    info->video_output_height = el->video_height;
 	}
@@ -1918,8 +1978,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	if(!info->bes_width)
 		info->bes_width = info->video_output_width;
 	if(!info->bes_height)
-		info->bes_height = info->video_output_height;		
-
+		info->bes_height = info->video_output_height;	
+	
 	if(info->current_edit_list->has_audio)
 	{
 		if (vj_perform_init_audio(info))
@@ -1936,6 +1996,14 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		"Initialized %d Image- and Video Effects", vj_effect_max_effects());
     	vj_effect_initialize(info->current_edit_list->video_width, info->current_edit_list->video_height,
 						full_range);
+	veejay_msg(VEEJAY_MSG_INFO,
+		"BES %d x %d, Video %d x %d , Screen %d x %d",
+		info->bes_width,
+		info->bes_height,	
+		el->video_width,
+		el->video_height,
+		info->video_output_width,
+		info->video_output_height);
    
 //	info->plugin_frame = vj_perform_init_plugin_frame(info);
 //	info->plugin_frame_info = vj_perform_init_plugin_frame_info(info);
@@ -2379,6 +2447,8 @@ static void veejay_playback_cycle(veejay_t * info)
 #endif
 	stats.tdiff = tdiff1 - tdiff2;
 
+//	veejay_event_handle(info);
+
 	/* Fill and queue free buffers again */
 	for (n = first_free; n < stats.nsync;) {
 	    /* Audio/Video sync correction */
@@ -2423,6 +2493,9 @@ static void veejay_playback_cycle(veejay_t * info)
 			vj_perform_queue_video_frame(info,frame,skipi);
   
 	    vj_perform_queue_frame( info, frame, skipi );
+
+	    veejay_event_handle(info);
+
 
 #ifdef HAVE_SDL	
 	    te = SDL_GetTicks();
@@ -2485,6 +2558,12 @@ static void Welcome(veejay_t *info)
 		veejay_msg(VEEJAY_MSG_INFO,"Software scaler - output stream dimensions %d x %d ",
 			info->video_output_width, info->video_output_height );
 	}
+	else if(info->settings->composite )
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Software composite - projection screen is %d x %d",
+			info->video_output_width, info->video_output_height );
+	}
+	
 
 	veejay_msg(VEEJAY_MSG_INFO,"Type 'man veejay' in a shell to learn more about veejay");
 	veejay_msg(VEEJAY_MSG_INFO,"For a list of events, type 'veejay -u |less' in a shell");
@@ -2497,7 +2576,18 @@ static void *veejay_playback_thread(void *data)
 {
     veejay_t *info = (veejay_t *) data;
     int i;
-    
+   
+	sigset_t mask;
+	struct sigaction act;
+	sigemptyset(&mask);
+	sigaddset( &mask, SIGPIPE );
+	act.sa_handler = donothing2;
+	act.sa_flags = 0;
+	sigemptyset(&act.sa_mask);
+
+
+    pthread_sigmask( SIG_BLOCK, &mask, NULL );
+ 
 
     Welcome(info);
    

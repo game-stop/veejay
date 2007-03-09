@@ -35,6 +35,7 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
+#define    RUP8(num)(((num)+8)&~8)
 
 typedef struct
 {
@@ -62,6 +63,9 @@ typedef struct
 static int	__initialized = 0;
 
 extern int	get_ffmpeg_pixfmt(int id);
+
+extern uint8_t *vj_perform_get_preview_buffer();
+
 
 static	VJFrame *open_pixbuf( const char *filename, int dst_w, int dst_h, int dst_fmt,
 			uint8_t *dY, uint8_t *dU, uint8_t *dV )
@@ -291,7 +295,7 @@ void	vj_picture_init()
 {
 	if(!__initialized)
 	{
-		g_type_init();
+	//	g_type_init();
 		veejay_msg(VEEJAY_MSG_DEBUG, "Using gdk pixbuf %s", gdk_pixbuf_version );
 		__initialized = 1;
 	}
@@ -348,16 +352,9 @@ void		vj_picture_free()
 
 }
 
-veejay_image_t		*vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt )
+void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt )
 {
-	veejay_image_t *image = (veejay_image_t*) vj_calloc(sizeof(veejay_image_t));
-	if(!image)
-		return NULL;
-
-	image->image= (void*) gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, out_w, out_h );
-
 	int pixfmt = get_ffmpeg_pixfmt( fmt );
-
 	if(frame->ssm)
 	{
 		switch( fmt )
@@ -374,26 +371,20 @@ veejay_image_t		*vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out
 
 	VJFrame *src1 = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
 				frame->width,frame->height, pixfmt );
-	VJFrame *dst1 = yuv_rgb_template( gdk_pixbuf_get_pixels( (GdkPixbuf*) image->image ),
-					  out_w, out_h, PIX_FMT_RGB24 ); 
+	VJFrame *dst1 = yuv_rgb_template( vj_perform_get_preview_buffer(), out_w, out_h, PIX_FMT_RGB24 );
 
-	yuv_convert_any( src1, dst1, src1->format,dst1->format );
+	if( frame->width == out_w && frame->height == out_h )
+		yuv_convert_any_ac( src1, dst1, src1->format, dst1->format );
+	else
+		yuv_convert_any( src1, dst1, src1->format,dst1->format );
 
 	free(src1);
 	free(dst1);
-
-	return image;
 }
 
-veejay_image_t		*vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt )
+void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt )
 {
-	veejay_image_t *image = (veejay_image_t*) vj_calloc(sizeof(veejay_image_t));
-	if(!image)
-		return NULL;
-
-	image->image= (void*) gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, out_w, out_h );
 	int pixfmt = get_ffmpeg_pixfmt( fmt );
-
 	if(frame->ssm)
 	{
 		switch( fmt )
@@ -414,20 +405,20 @@ veejay_image_t		*vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int o
 
 	uint8_t *planes[3]; 
 		
-	planes[0] = (uint8_t*) gdk_pixbuf_get_pixels( image->image );
+	planes[0] = vj_perform_get_preview_buffer();
 	planes[1] = planes[0] + (out_w * out_h );
 	planes[2] = planes[1] + (out_w * out_h );
-
 
 	VJFrame *dst1 = yuv_yuv_template( planes[0], planes[1], planes[2],
 					  out_w , out_h, pixfmt );
 
-	yuv_convert_any(src1,dst1,src1->format, dst1->format );
+	if( frame->width == out_w && frame->height == out_h )
+		yuv_convert_any_ac( src1,dst1,src1->format, dst1->format );
+	else
+		yuv_convert_any(src1,dst1,src1->format, dst1->format );
 
 	free(src1);
 	free(dst1);
-
-	return image;
 }
 
 #endif

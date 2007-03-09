@@ -351,12 +351,12 @@ int	vj_client_read(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 	if( sock_type == V_STATUS )
 	{
 		if(v->c[1]->type == VSOCK_S)
-			return( sock_t_recv( v->c[1]->fd, dst, bytes ) );
+			return( sock_t_recv_w( v->c[1]->fd, dst, bytes ) );
 	}
 	if( sock_type == V_CMD )
 	{
 		if(v->c[0]->type == VSOCK_C)
-			return ( sock_t_recv( v->c[0]->fd, dst, bytes ) );
+			return ( sock_t_recv_w( v->c[0]->fd, dst, bytes ) );
 	}
 	return 0;
 }

@@ -249,7 +249,7 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
 	if (!vjs)
 		return NULL;
 
-	vjs->recv_buf = (char*) vj_calloc(sizeof(char) * 16384 );
+	vjs->recv_buf = (char*) vj_calloc(sizeof(char) * RECV_SIZE );
 	if(!vjs->recv_buf)
 	{
 		if(vjs) free(vjs);
@@ -302,6 +302,9 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 				(char*)(inet_ntoa(vje->remote.sin_addr)),strerror(errno));
 			return -1;
 		}
+#ifdef STRICT_CHECKING
+		assert( len == total );
+#endif
 	}
 	else
 	{
@@ -728,7 +731,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 				}
 				else
 				{
-					v[num_msg]->msg = (char*) vj_calloc( slen );
+					v[num_msg]->msg = (char*) vj_malloc( slen );
 					veejay_memcpy( v[num_msg]->msg, str_ptr, slen );
 					v[num_msg]->len = slen;
 					num_msg++;
@@ -846,8 +849,8 @@ int	vj_server_update( vj_server *vje, int id )
 		if(!FD_ISSET( sock_fd, &(vje->fds)) )
 			return 0;
 	}
-	// clear recv_buf
-	veejay_memset( vje->recv_buf, 0, 16384 );
+
+	veejay_memset( vje->recv_buf, 0, RECV_SIZE );
 	
 	if(!vje->use_mcast)
 	{
@@ -867,10 +870,10 @@ int	vj_server_update( vj_server *vje, int id )
 	{
 		vj_proto **proto = (vj_proto**) vje->protocol;
 		n = mcast_recv( proto[0]->r, (void*) vje->recv_buf, RECV_SIZE );
-		if( n < 0 )
+		if( n <= 0 )
+		{
 			return -1;
-		if( n == 0 )
-			return -1;
+		}
 	}
 
 
@@ -945,11 +948,16 @@ void vj_server_shutdown(vj_server *vje)
 int	vj_server_link_used( vj_server *vje, int link_id)
 {
 	vj_link **Link = (vj_link**) vje->link;
+#ifdef STRICT_CHECKING
+	assert( link_id >= 0 && link_id < VJ_MAX_CONNECTIONS );
+#endif
+	return Link[link_id]->in_use;
+/*
 	if( link_id < 0 || link_id >= VJ_MAX_CONNECTIONS )
 		return 0;
    	if (Link[link_id]->in_use)
 		return 1;
-	return 0;
+	return 0;*/
 }
 
 

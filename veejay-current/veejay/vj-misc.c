@@ -36,7 +36,9 @@
 #include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
 #include <ffmpeg/avutil.h>
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 static unsigned int vj_relative_time = 0;
 static unsigned int vj_stamp_ = 0;
 static unsigned int vj_get_timer()
@@ -280,4 +282,135 @@ int	sufficient_space(int max_size, int nframes)
 			(float)(avail)/1048576.0f, (float)(needed)/1048576.0f);
 	return 1;
 }
+#define ZEROPAD	1		/* pad with zero */
+#define SIGN	2		/* unsigned/signed long */
+#define PLUS	4		/* show plus */
+#define SPACE	8		/* space if plus */
+#define LEFT	16		/* left justified */
+#define SPECIAL	32		/* 0x */
+#define LARGE	64		/* use 'ABCDEF' instead of 'abcdef' */
 
+
+/* the sprintf functions below was stolen and stripped from linux 2.4.33
+ * from files:
+ *  linux/lib/vsprintf.c
+ *  asm-i386/div64.h
+ */
+#ifdef ARCH_X86
+#define do_div(n,base) ({ \
+	unsigned long __upper, __low, __high, __mod; \
+	asm("":"=a" (__low), "=d" (__high):"A" (n)); \
+	__upper = __high; \
+	if (__high) { \
+		__upper = __high % (base); \
+		__high = __high / (base); \
+	} \
+	asm("divl %2":"=a" (__low), "=d" (__mod):"rm" (base), "0" (__low), "1" (__upper)); \
+	asm("":"=A" (n):"a" (__low),"d" (__high)); \
+	__mod; \
+})
+
+static char * kern_number(char * buf, char * end, long long num, int base, int type)
+{
+	char c,sign=0,tmp[66];
+	static const char small_digits[] = "0123456789abcdefghijklmnopqrstuvwxyz";
+	int i=0;
+	const char *digits = small_digits;
+
+	if (type & SIGN) {
+		if (num < 0) {
+			sign = '-';
+			num = -num;
+		}
+	}
+
+	if (num == 0)
+		tmp[i++]='0';
+	else while (num != 0)
+		tmp[i++] = digits[do_div(num,base)];
+
+	if (sign) {
+		if (buf <= end)
+			*buf = sign;
+		++buf;
+	}
+
+	while (i-- > 0) {
+		if (buf <= end)
+			*buf = tmp[i];
+		++buf;
+	}
+
+	return buf;
+}
+
+static	int	kern_vsnprintf(char *buf, size_t size, const char *fmt, va_list args)
+{
+#ifdef STRICT_CHECKING
+	assert( size > 0 );
+#endif
+	int num,flags,base;
+	char *str, *end, c;
+	const char *s;
+	str = buf;
+	end = buf + size - 1;
+
+	if( end < buf - 1 ) {
+		end = ((void*)-1);
+		size = end - buf + 1;
+	}
+
+	for( ; *fmt; ++fmt ) {
+		if( *fmt != '%' ) {
+			if( str <= end )
+				*str = *fmt;
+			++str;
+			continue;
+		}
+
+		flags = 0;
+		repeat:
+			++ fmt;
+			switch( *fmt ) {
+				case ' ': flags |= SPACE; goto repeat;
+			}
+
+			base = 10;
+
+			switch( *fmt ) {
+				case 'd':
+					flags |= SIGN;
+					break;
+			}
+
+			num = va_arg(args, unsigned int);
+			if (flags & SIGN)
+				num = (signed int) num;
+
+			str = kern_number(str, end, num, base, flags);
+	}
+	if( str <= end )
+		*str = '\0';
+	else if ( size > 0 )
+		*end = '\0';
+
+	return str-buf;
+}
+
+/*
+ * veejay_sprintf can only deal with format 'd' ... it is used to produce
+ * status lines.
+ *
+ *
+ */
+
+int	veejay_sprintf( char *s, size_t size, const char *format, ... )
+{
+	va_list arg;
+	int done;
+	va_start( arg, format );
+	done = kern_vsnprintf( s, size, format, arg );
+	va_end(arg);
+	return done;
+}
+#endif

@@ -159,17 +159,15 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 
 	if( n<= 0 )
 	{
-		free(tmp);
 		veejay_msg(0,"Error reading header of %d bytes: %d", header_len,n );
-		gvr_close_connection(v);
+		free(tmp);
 		return 0;
 	}
 
 	if( sscanf( (char*)tmp, "%6d%1d", &len,&(v->grey_scale) )<=0)
 	{
+		veejay_msg(0, "Error reading header contents '%s'", tmp);
 		free(tmp);
-		veejay_msg(0, "Error reading header contents");
-		gvr_close_connection(v);
 		return 0;
 	}
 	
@@ -177,10 +175,8 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 	{
 		free(tmp);
 		veejay_msg(0, "Frame is empty");
-		gvr_close_connection(v);
 		return 0;
 	}
-
 	
 	gint bw = 0;
 	gint bytes_read = len;
@@ -195,7 +191,6 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 		{
 			veejay_msg(0, "Recv %d out of %d bytes", bw,len);
 			free(tmp);
-			gvr_close_connection(v);
 			return 0;
 		}
 		bw += n;
@@ -203,9 +198,8 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 		bytes_read -= n;
 		buf_ptr += bw;
 	}
-
 	*payload = bw;
-  
+
 	free(tmp);
 	return 1;
 }
@@ -329,14 +323,30 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	}
 	gint bw = 0;
 
-	res = recvvims( v, 7, &bw, v->compr_buffer );
+	res = recvvims( v, 7, &bw, v->data_buffer );
 	if( res <= 0 )
 	{
 		veejay_msg(0, "Error receiving compressed RGB image");
 		return 0;
 	}
 
-	bw = lzo_decompress2( vp->lzo, v->compr_buffer, bw, v->data_buffer);
+	if( bw != (3 * v->width * v->height) && bw != (v->width * v->height))
+	{
+		veejay_msg(0, "Corrupted image. Drop it");
+		v->have_frame = 0;
+		return bw;
+	}
+//
+//	bw = lzo_decompress2( vp->lzo, v->compr_buffer, bw, v->data_buffer);
+
+	if( bw == (v->width * v->height ))
+	{
+		//@ repeat plane in data_buffer
+		veejay_memcpy( v->data_buffer + bw, v->data_buffer, bw );
+		veejay_memcpy( v->data_buffer + bw + bw, v->data_buffer,bw );
+	}
+
+
 	v->have_frame = 1;
 	return bw;
 }
@@ -687,18 +697,22 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 		if( vp->tracks[i] && vp->tracks[i]->have_frame )
 		{			
 			veejay_track_t *v = vp->tracks[i];
+
+			list[i] = gdk_pixbuf_new_from_data( v->data_buffer, GDK_COLORSPACE_RGB, FALSE,
+					8, v->width, v->height, v->width * 3, NULL,NULL );
+/*
 			if(v->grey_scale)	
 			{
 				uint8_t *rgb = v->tmp_buffer;
 				uint8_t *plane = v->data_buffer;
 				unsigned int j,k = 0;
 				unsigned int stride = v->width * 3;
-			/*	for( j = 0; j < (v->width*v->height); j+=3 )
+				for( j = 0; j < (v->width*v->height); j+=3 )
 				{
 					rgb[j+0] = v->data_buffer[j];
 					rgb[j+1] = v->data_buffer[j];
 					rgb[j+2] = v->data_buffer[j];
-				}*/
+				}
 				for( j = 0; j < v->height; j ++ )
 				{
 					for( k = 0; k < v->width ; k ++ )
@@ -708,15 +722,15 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 						p[1] = plane[j * v->width + k];
 						p[2] = plane[j * v->width + k];
 					}
-				}
-				list[i] = gdk_pixbuf_new_from_data(v->tmp_buffer, GDK_COLORSPACE_RGB, FALSE,
+				} 
+				list[i] = gdk_pixbuf_new_from_data(v->data_buffer, GDK_COLORSPACE_RGB, FALSE,
 					8, v->width,v->height,v->width * 3, NULL,NULL );
 			}
 			else
 			{
 				list[i] = gdk_pixbuf_new_from_data( v->data_buffer, GDK_COLORSPACE_RGB,	FALSE,
 					8, v->width,v->height,v->width * 3,NULL,NULL );
-			}
+			}*/
 			vp->tracks[i]->have_frame = 0;
 		}
 	}

@@ -34,7 +34,9 @@
 #include <string.h>
 #include <stdlib.h>
 //extern void *(* veejay_memcpy)(void *to, const void *from, size_t len) ;
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 
 vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
 {
@@ -77,6 +79,7 @@ void vj_sdl_set_geometry(vj_sdl* sdl, int w, int h)
 
 void vj_sdl_resize( vj_sdl *vjsdl , int scaled_width, int scaled_height, int fs )
 {
+	//@ sw_scale_width is misleading ; it lets SDL use the BES 
 	if (scaled_width)
 		vjsdl->sw_scale_width = scaled_width;
 	if (scaled_height)
@@ -130,9 +133,6 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	setenv( "SDL_VIDEO_YUV_DIRECT", "1", 0 );
 	setenv( "SDL_VIDEO_HWACCEL", "1", 0 );
 
-	if(fs)
-		setenv( "SDL_VIDEO_X11_DGAMOUSE",0,0 );
-
 	char *hw_env = getenv("SDL_VIDEO_HWACCEL");
 	int hw_on = 0;
 	if(hw_env)
@@ -179,22 +179,21 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	info = SDL_GetVideoInfo();
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Video output driver: SDL");
-	veejay_msg(VEEJAY_MSG_DEBUG, " hw_surface = %s",
+	veejay_msg( (info->hw_available ? VEEJAY_MSG_DEBUG : VEEJAY_MSG_WARNING), " hw_surface = %s",
 			(info->hw_available ? "Yes" : "No"));
 	veejay_msg(VEEJAY_MSG_DEBUG, " window manager = %s",
 			(info->wm_available ? "Yes" : "No" ));
-	veejay_msg(VEEJAY_MSG_DEBUG, " BLIT acceleration: %s ",
+	veejay_msg((info->blit_hw ? VEEJAY_MSG_DEBUG : VEEJAY_MSG_WARNING), " BLIT acceleration: %s ",
 			( info->blit_hw ? "Yes" : "No" ) );
 	veejay_msg(VEEJAY_MSG_DEBUG, " Software surface: %s",
 			( info->blit_sw ? "Yes" : "No" ) );
-	veejay_msg(VEEJAY_MSG_DEBUG, " Video memory: %dKB ", info->video_mem );
 	veejay_msg(VEEJAY_MSG_DEBUG, " Preferred depth: %d bits/pixel", info->vfmt->BitsPerPixel);
  
 	int my_bpp = SDL_VideoModeOK( vjsdl->sw_scale_width, vjsdl->sw_scale_height,bpp,	
 				vjsdl->flags[fs] );
 	if(!my_bpp)
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Requested depth of 24 bits/pixel not supported");
+		veejay_msg(VEEJAY_MSG_ERROR, "Requested depth of %d bits/pixel not supported",bpp);
 		return 0;
 	}
 
@@ -206,6 +205,9 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 		veejay_msg(VEEJAY_MSG_WARNING, "%s", SDL_GetError());
 		return 0;
     	}
+
+	veejay_msg(VEEJAY_MSG_DEBUG, " Output dimensions: %d x %d",
+			vjsdl->sw_scale_width, vjsdl->sw_scale_height );
 
 	if (vjsdl->use_keyboard == 1) 
 		SDL_EventState(SDL_KEYDOWN, SDL_ENABLE);
@@ -295,7 +297,18 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 
 	vjsdl->fs = fs;
 
+	SDL_EnableKeyRepeat( SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL );
+
  	return 1;
+}
+
+int	vj_sdl_screen_w( vj_sdl *vjsdl )
+{
+	return vjsdl->screen->w;
+}
+int	vj_sdl_screen_h( vj_sdl *vjsdl )
+{
+	return vjsdl->screen->h;
 }
 
 void vj_sdl_show(vj_sdl *vjsdl) {
@@ -326,13 +339,26 @@ int vj_sdl_unlock(vj_sdl * vjsdl)
     return 1;
 }
 
+uint8_t	*vj_sdl_get_yuv_overlay(vj_sdl *vjsdl )
+{
+	return vjsdl->yuv_overlay->pixels[0];
+}
+
+void	vj_sdl_flip( vj_sdl *vjsdl )
+{
+	SDL_DisplayYUVOverlay( vjsdl->yuv_overlay, &(vjsdl->rectangle));
+}
+
+
 int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
 {
 	if (!vj_sdl_lock(vjsdl))
 		return 0;
-	if (!yuv420[0] || !yuv420[1] || !yuv420[2])
-		return 0;
-
+#ifdef STRICT_CHECKING
+	assert( yuv420[0] != NULL );
+	assert( yuv420[1] != NULL );
+	assert( yuv420[2] != NULL );
+#endif
 	if(vjsdl->pix_fmt == FMT_420 || vjsdl->pix_fmt == FMT_420F)
 		yuv420p_to_yuv422( yuv420, vjsdl->yuv_overlay->pixels[0],vjsdl->width,vjsdl->height);
 	else
@@ -345,7 +371,6 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
 
 	return 1;
 }
-
 
 void	vj_sdl_quit()
 {

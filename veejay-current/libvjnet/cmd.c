@@ -152,7 +152,7 @@ int			sock_t_recv_w( vj_sock_t *s, void *dst, int len )
 
 		while( done < len )
 		{
-			n = recv( s->sock_fd, dst + done,bytes_left,0 );
+			n = recv( s->sock_fd, dst + done,bytes_left,MSG_WAITALL );
 			if( n == -1)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "%s",strerror(errno));

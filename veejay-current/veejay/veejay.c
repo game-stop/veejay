@@ -267,6 +267,8 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -V/--viewport \t\tStart with viewport\n");
 	fprintf(stderr,
+		"  -D/--composite \t\tProjection screen setup\n");
+	fprintf(stderr,
 		"  -A/--all [num] \t\tStart with all capture devices, start with device <num> \n");
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
@@ -344,6 +346,13 @@ static int set_option(const char *name, char *value)
 	       || strcmp(name, "output-driver") == 0
 	       || strcmp(name, "O") == 0) {
 	    info->video_out = atoi(optarg);	/* use SDL */
+#ifndef USE_GL
+            if(info->video_out==4)
+	    {
+		fprintf(stderr, "OpenGL support not enabled at compile time\n");
+		exit(-1);
+	    }
+#endif
     } else if (strcmp(name, "F") == 0 || strcmp(name, "features")==0) {
 	CompiledWith();
         nerr++;
@@ -396,6 +405,10 @@ static int set_option(const char *name, char *value)
 		info->dummy->norm = optarg[0];
 		if(info->dummy->norm == 1 )	
 			override_norm = 'n';
+	}
+	else if(strcmp(name, "D") == 0 || strcmp(name, "composite") == 0)
+	{
+		info->settings->composite = 1;
 	}
 	else if(strcmp(name, "zoomwidth") == 0 || strcmp(name, "w") == 0) {
 		info->video_output_width = atoi(optarg);
@@ -561,6 +574,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"cs",1,0,0},
 	{"chs",1,0,0},
 	{"cvs",1,0,0},
+	{"composite",0,0,0},
 	{"quit",0,0,0},
 	{"memory",1,0,0},
 	{"max_cache",1,0,0},
@@ -578,12 +592,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:z:f:Y:A:N:H:W:R:M:C:T:nILFPVugvdibjq",
+			"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:z:f:Y:A:N:H:W:R:M:C:T:nILFPVDugvdibjq",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:z:f:Y:A:N:H:W:R:M:C:T:nILFPVugvdibjq"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:z:f:Y:A:N:H:W:R:M:C:T:nILFPVDugvdibjq"
 						   )) != EOF)
 #endif
     {
@@ -740,6 +754,9 @@ int main(int argc, char **argv)
 		veejay_msg(VEEJAY_MSG_INFO, "Using SIMD %s", mem_func);
 		free(mem_func);
 	}
+
+	veejay_msg(VEEJAY_MSG_INFO, "CPU cache line size is %d bytes",
+			cpu_cache_size());
 
 	if(veejay_init(
 		info,

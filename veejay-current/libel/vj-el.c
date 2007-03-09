@@ -45,7 +45,6 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-#include <libel/pixbuf.h>
 #include <unistd.h>
 #ifdef SUPPORT_READ_DV2
 #include "rawdv.h"
@@ -1975,14 +1974,14 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 				fourcc 
 			);
 			sprintf(fourcc, "%04d", strlen( filename ));
-			strncat( result, fourcc, strlen(fourcc ));
-			strncat ( result, filename, strlen(filename));
+			veejay_strncat( result, fourcc, strlen(fourcc ));
+			veejay_strncat ( result, filename, strlen(filename));
 		}
 	}
 
 	char first[33];
 	sprintf(first, "%016lld%016lld",oldfile, oldframe);
-	strncat( result, first, strlen(first) );
+	veejay_strncat( result, first, strlen(first) );
 
   	for (j = n1+1; j <= n2; j++)
 	{
@@ -1996,7 +1995,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 				 oldframe,
 				 index[N_EL_FILE(n)],
 				 N_EL_FRAME(n) );
-			strncat( result, tmp, strlen(tmp) );
+			veejay_strncat( result, tmp, strlen(tmp) );
 			free(tmp);
 		}
 		oldfile = index[N_EL_FILE(n)];
@@ -2005,7 +2004,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 
 	char last_word[16];
 	sprintf(last_word,"%016lld", oldframe);
-	strncat( result, last_word, 16 );
+	veejay_strncat( result, last_word, 16 );
 	*bytes_written = strlen( result );
 
 	return result;

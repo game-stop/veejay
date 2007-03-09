@@ -134,7 +134,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 #define BUFSIZE 1024
 
 #if defined ( HAVE_ASM_MMX2 ) || defined ( HAVE_ASM_3DNOW ) || defined( HAVE_ASM_MMX )
@@ -223,27 +225,6 @@ static inline void * __memcpy(void * to, const void * from, size_t n)
 
      return(to);
 }
-/*
- * memset(x,0,y) is a reasonably common thing to do, so we want to fill
- * things 32 bits at a time even when we don't know the size of the
- * area at compile-time..
- */
-void mymemzero(void * s, unsigned long c ,size_t count)
-{
-int d0, d1;
-__asm__ __volatile__(
-	"rep ; stosl\n\t"
-	"testb $2,%b3\n\t"
-	"je 1f\n\t"
-	"stosw\n"
-	"1:\ttestb $1,%b3\n\t"
-	"je 2f\n\t"
-	"stosb\n"
-	"2:"
-	: "=&c" (d0), "=&D" (d1)
-	:"a" (c), "q" (count), "0" (count/4), "1" ((long) s)
-	:"memory");
-}
 
 #undef _MMREG_SIZE
 #ifdef HAVE_ASM_SSE
@@ -253,10 +234,10 @@ __asm__ __volatile__(
 #endif
 
 #undef _MIN_LEN
-#ifdef HAVE_MMX1
-#define _MIN_LEN 0x800  /* 2K blocks */
+#ifdef HAVE_ASM_MMX2 //@ was ifndef HAVE_MMX1
+#define _MIN_LEN 0x40
 #else
-#define _MIN_LEN 0x40  /* 64-byte blocks */
+#define _MIN_LEN 0x800  /* 2K blocks */
 #endif
 
 
@@ -271,6 +252,193 @@ __asm__ __volatile__(
 #define _PREFETCH "prefetchnta"
 #define _EMMS     "emms"
 #endif
+
+#ifdef HAVE_ASM_MMX2
+#define MOVNTQ "movntq"
+#else
+#define MOVNTQ "movq"
+#endif
+
+char	*veejay_strncat( char *s1, char *s2, size_t n )
+{
+#ifdef STRICT_CHECKING
+	assert( strlen(s2) == n );
+#endif
+	//@ run forward
+	char *s = s1;
+	while(*s != '\0' )
+		*s ++;
+	//@ small
+	if( n < 0xff )
+	{
+		s2[n] = '\0';
+		small_memcpy( s, s2, n+1);
+	}
+	else if ( n < 512 ) // bit smaller
+	{	
+		s2[n] = '\0';
+		small_memcpy( s, s2, n+1);
+	} else 
+	{
+		s2[n] = '\0';
+		veejay_memcpy(s,s2, n+1 );
+	}
+	return s1;
+}
+
+void	prefetch_memory( void *from )
+{
+#ifndef HAVE_MMX1
+	__asm__ __volatile__ (
+			_PREFETCH" (%0)\n"
+			_PREFETCH" 64(%0)\n"
+			_PREFETCH" 128(%0)\n"
+			_PREFETCH" 192(%0)\n"
+			_PREFETCH" 256(%0)\n"
+		:: "r" (from));
+#else
+#ifdef HAVE_ASM_SSE
+	__asm__ __volatile__ (
+		_PREFETCH" 320(%0)\n"
+		:: "r" (from));
+	
+#endif
+#endif
+}
+
+
+static uint8_t ppmask[16] = { 0,128,128,0, 128,128,0,128, 128,0,128,128,0,128,128, 0 };
+static uint8_t yuyv_mmreg_[_MMREG_SIZE];
+
+void	yuyv_plane_init()
+{
+	unsigned int i;
+	for( i = 0; i < _MMREG_SIZE ;i ++ )
+		yuyv_mmreg_[i] = ( (i%2) ? 128: 0 );
+}
+
+
+void	yuyv_plane_clear( size_t len, void *to )
+{
+	uint8_t *t = (uint8_t*) to;
+	unsigned int i;
+
+#ifdef HAVE_ASM_MMX2
+	__asm __volatile(
+		"movq	(%0),	%%mm0\n"
+		:: "r" (yuyv_mmreg_) : "memory" );
+
+	i = len >> 7;
+	len = len % 128;
+
+	for(; i > 0 ; i -- )
+	{
+		__asm __volatile(
+			_PREFETCH" 320(%0)\n"
+			MOVNTQ"	%%mm0,	(%0)\n"
+			MOVNTQ"	%%mm0,	8(%0)\n"
+			MOVNTQ"	%%mm0,	16(%0)\n"
+			MOVNTQ"	%%mm0,	24(%0)\n"
+			MOVNTQ"	%%mm0,	32(%0)\n"
+			MOVNTQ"	%%mm0,	40(%0)\n"
+			MOVNTQ"	%%mm0,	48(%0)\n"
+			MOVNTQ"	%%mm0,	56(%0)\n"
+			MOVNTQ"	%%mm0,	64(%0)\n"
+			MOVNTQ"	%%mm0,	72(%0)\n"
+			MOVNTQ"	%%mm0,	80(%0)\n"
+			MOVNTQ"	%%mm0,	88(%0)\n"
+			MOVNTQ"	%%mm0,	96(%0)\n"
+			MOVNTQ"	%%mm0,	104(%0)\n"
+			MOVNTQ"	%%mm0,	112(%0)\n"
+			MOVNTQ" %%mm0,  120(%0)\n"
+		:: "r" (t) : "memory" );
+		t += 128;
+	}
+#else
+#ifdef HAVE_ASM_MMX
+	__asm __volatile(
+		"movq (%0),	%%mm0\n\t"
+		:: "r" (yuyv_mmreg_): "memory");
+	i = len >> 6;
+	len = len % 64;
+
+	for(; i > 0 ; i -- )
+	{
+		__asm__ __volatile__ (
+			"movq	%%mm0,	(%0)\n"
+			"movq	%%mm0,	8(%0)\n"
+			"movq	%%mm0, 16(%0)\n"
+			"movq	%%mm0, 24(%0)\n"
+			"movq	%%mm0, 32(%0)\n"
+			"movq	%%mm0, 40(%0)\n"
+			"movq   %%mm0, 48(%0)\n"
+			"movq	%%mm0, 56(%0)\n"
+		:: "r" (t) : "memory");
+		t += 64;
+	}
+#endif
+#endif
+#ifdef HAVE_ASM_MMX
+	i = len >> 3;
+	len = i % 8;
+	for( ; i > 0; i -- )
+	{
+		__asm__ __volatile__ (
+			"movq	%%mm0, (%0)\n"
+		:: "r" (t) : "memory" );
+		t += 8;
+	}
+#endif
+	i = len;
+	for( ; i > 0 ; i -- )
+	{
+		t[0] = 0;
+		t[1] = 128;
+		t[2] = 0;
+		t[3] = 128;
+		t += 4;
+	}
+}
+
+void	packed_plane_clear( size_t len, void *to )
+{
+	uint8_t *t = (uint8_t*) to;
+	unsigned int i;
+	uint8_t *m = (uint8_t*) &ppmask;
+#ifdef HAVE_ASM_MMX
+	__asm __volatile(
+		"movq (%0),	%%mm0\n\t"
+		:: "r" (m));
+	i = len / 64;
+	len = len % 64;
+
+	for(; i > 0 ; i -- )
+	{
+		__asm__ __volatile__ (
+			"movq	%%mm0,	(%0)\n"
+			"movq	%%mm0,	8(%0)\n"
+			"movq	%%mm0, 16(%0)\n"
+			"movq	%%mm0, 24(%0)\n"
+			"movq	%%mm0, 32(%0)\n"
+			"movq	%%mm0, 40(%0)\n"
+			"movq   %%mm0, 48(%0)\n"
+			"movq	%%mm0, 56(%0)\n"
+		:: "r" (t) : "memory");
+		t += 64;
+	}
+#endif	
+	i = len;
+	for( ; i > 0 ; i -- )
+	{
+		t[0] = 0;
+		t[1] = 128;
+		t[2] = 0;
+		t[3] = 128;
+		t += 4;
+	}
+}
+
+
 
 static void *fast_memcpy(void * to, const void * from, size_t len)
 {
@@ -486,6 +654,104 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 	if(len) small_memcpy(t, f, len);
 	return retval;
 }
+
+void fast_memset_finish()
+{
+#ifdef HAVE_ASM_MMX2
+                /* since movntq is weakly-ordered, a "sfence"
+ *                  * is needed to become ordered again. */
+                __asm__ __volatile__ ("sfence":::"memory");
+#endif
+#ifndef HAVE_ASM_SSE
+                /* enables to use FPU */
+                __asm__ __volatile__ (EMMS:::"memory");
+#endif
+
+}
+
+void fast_memset_dirty(void * to, int val, size_t len)
+{
+	size_t i;
+	unsigned char mm_reg[_MMREG_SIZE], *pmm_reg;
+	unsigned char *t = to;
+        if(len >= _MIN_LEN)
+	{
+	  register unsigned long int delta;
+          delta = ((unsigned long int)to)&(_MMREG_SIZE-1);
+          if(delta)
+	  {
+	    delta=_MMREG_SIZE-delta;
+	    len -= delta;
+	    small_memset(t, val, delta);
+	  }
+	  i = len >> 7; /* len/128 */
+	  len&=127;
+	  pmm_reg = mm_reg;
+	  small_memset(pmm_reg,val,sizeof(mm_reg));
+#ifdef HAVE_ASM_SSE /* Only P3 (may be Cyrix3) */
+	__asm__ __volatile__(
+		"movups (%0), %%xmm0\n"
+		:: "r"(mm_reg):"memory");
+	for(; i>0; i--)
+	{
+		__asm__ __volatile__ (
+		"movntps %%xmm0, (%0)\n"
+		"movntps %%xmm0, 16(%0)\n"
+		"movntps %%xmm0, 32(%0)\n"
+		"movntps %%xmm0, 48(%0)\n"
+		"movntps %%xmm0, 64(%0)\n"
+		"movntps %%xmm0, 80(%0)\n"
+		"movntps %%xmm0, 96(%0)\n"
+		"movntps %%xmm0, 112(%0)\n"
+		:: "r" (t) : "memory");
+		t+=128;
+	}
+#else
+	__asm__ __volatile__(
+		"movq (%0), %%mm0\n"
+		:: "r"(mm_reg):"memory");
+	for(; i>0; i--)
+	{
+		__asm__ __volatile__ (
+		MOVNTQ" %%mm0, (%0)\n"
+		MOVNTQ" %%mm0, 8(%0)\n"
+		MOVNTQ" %%mm0, 16(%0)\n"
+		MOVNTQ" %%mm0, 24(%0)\n"
+		MOVNTQ" %%mm0, 32(%0)\n"
+		MOVNTQ" %%mm0, 40(%0)\n"
+		MOVNTQ" %%mm0, 48(%0)\n"
+		MOVNTQ" %%mm0, 56(%0)\n"
+		MOVNTQ" %%mm0, 64(%0)\n"
+		MOVNTQ" %%mm0, 72(%0)\n"
+		MOVNTQ" %%mm0, 80(%0)\n"
+		MOVNTQ" %%mm0, 88(%0)\n"
+		MOVNTQ" %%mm0, 96(%0)\n"
+		MOVNTQ" %%mm0, 104(%0)\n"
+		MOVNTQ" %%mm0, 112(%0)\n"
+		MOVNTQ" %%mm0, 120(%0)\n"
+		:: "r" (t) : "memory");
+		t+=128;
+	}
+#endif /* Have SSE */
+//#ifdef HAVE_ASM_MMX2
+//              /* since movntq is weakly-ordered, a "sfence"
+//		 * is needed to become ordered again. */
+//		__asm__ __volatile__ ("sfence":::"memory");
+//#endif
+//#ifndef HAVE_ASM_SSE
+//		/* enables to use FPU */
+//		__asm__ __volatile__ (EMMS:::"memory");
+//#endif
+	}
+	/*
+	 *	Now do the tail of the block
+	 */
+	if(len) small_memset(t, val, len);
+}
+
+
+
+
 /* Fast memory set. See comments for fast_memcpy */
 void * fast_memset(void * to, int val, size_t len)
 {
@@ -588,7 +854,7 @@ static struct {
      { "linux kernel memcpy()",     linux_kernel_memcpy, 0},
      { "MMX/MMX2/SSE optimized memcpy()",    fast_memcpy, 0},
 #endif
-    { NULL, NULL, 0},
+     { NULL, NULL, 0},
 };
 
 static struct {

@@ -109,6 +109,10 @@ typedef struct
 } vj_keyboard_event;
 
 static hash_t *keyboard_events = NULL;
+
+static	vj_keyboard_event *keyboard_event_map_[1024];
+
+
 #endif
 
 static int _recorder_format = ENCODER_MJPEG;
@@ -266,7 +270,7 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 #define VIMS_ALLOW_ANY (1<<4)				/* use defaults when optional arguments are not given */			
 
 #define FORMAT_MSG(dst,str) sprintf(dst,"%03d%s",strlen(str),str)
-#define APPEND_MSG(dst,str) strncat(dst,str,strlen(str))
+#define APPEND_MSG(dst,str) veejay_strncat(dst,str,strlen(str))
 #define SEND_MSG_DEBUG(v,str) \
 {\
 char *__buf = str;\
@@ -489,12 +493,17 @@ void			del_all_keyb_events()
 		hash_free_nodes( keyboard_events );
 		hash_destroy( keyboard_events );
 	}
+
+	veejay_memset( keyboard_event_map_, 0, sizeof(keyboard_event_map_));
 }
 
 int			del_keyboard_event(int id )
 {
 	hnode_t *node;
 	vj_keyboard_event *ev = get_keyboard_event( id );
+
+	keyboard_event_map_[ id ] = NULL;
+
 	if(ev == NULL)
 		return 0;
 	node = hash_lookup( keyboard_events, (void*) id );
@@ -505,6 +514,7 @@ int			del_keyboard_event(int id )
 	if(ev->vims )
 		free(ev->vims );
 	hash_delete( keyboard_events, node );
+
 	return 1;  
 }
 
@@ -524,6 +534,8 @@ int		keyboard_event_exists(int id)
 			return 1;
 	return 0;
 }
+
+static	vj_keyboard_event *keyboard_event_map_[1024];
 
 vj_keyboard_event *new_keyboard_event(
 		int symbol, int modifier, const char *value, int event_id )
@@ -555,6 +567,8 @@ vj_keyboard_event *new_keyboard_event(
 		return NULL;
 
 	ev->event_id = event_id;
+
+	keyboard_event_map_[ event_id ] = ev;
 
 	if(value)
 	{
@@ -2029,7 +2043,17 @@ static void vj_event_get_key( int event_id, int *key_id, int *key_mod )
 	}
 	else
 	{
-		int i;
+		vj_keyboard_event *ev = keyboard_event_map_[ event_id ];
+		if(ev)
+		{
+#ifdef STRICT_CHECKING
+			assert(ev->vims->list_id == event_id );
+#endif
+			*key_id = ev->key_symbol;
+			*key_mod = ev->key_mod;
+		}	
+
+/*		int i;
 		for ( i = 0; i < MAX_SDL_KEY ; i ++ )
 		{
 			if( keyboard_event_exists( i ) )
@@ -2045,7 +2069,7 @@ static void vj_event_get_key( int event_id, int *key_id, int *key_mod )
 					}
 				}
 			}
-		}
+		}*/
 		// see if binding is in 
 	}
 	*key_id  = 0;
@@ -2218,6 +2242,9 @@ void	vj_event_init_keyboard_defaults()
 void vj_event_init()
 {
 	int i;
+	
+	veejay_memset( keyboard_event_map_, 0, sizeof(keyboard_event_map_));
+
 	vj_init_vevo_events();
 #ifdef HAVE_SDL
 	if( !(keyboard_events = hash_create( HASHCOUNT_T_MAX, int_bundle_compare, int_bundle_hash)))
@@ -2513,7 +2540,7 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 			sprintf(tmp, "%04d%03d%03d%04d%s%03d%03d",
 				i, m->accelerator, m->modifier, bun_len, m->bundle, 0,0 );
 
-			strncat( buf, tmp, strlen(tmp) );
+			veejay_strncat( buf, tmp, strlen(tmp) );
 		}
 		else
 		{
@@ -2548,11 +2575,11 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 			sprintf(tmp, "%04d%03d%03d%04d%s%03d%03d",
 				i, key_id, key_mod, descr_len, name,format_len,arg_len );	
 			
-			strncat( buf, tmp, strlen(tmp) );			
+			veejay_strncat( buf, tmp, strlen(tmp) );			
 			if( vformat )
-				strncat( buf, vformat, format_len );
+				veejay_strncat( buf, vformat, format_len );
 			if( earg )
-				strncat( buf, earg, arg_len );
+				veejay_strncat( buf, earg, arg_len );
 
 			free(name);
 			if(vformat)
@@ -2888,8 +2915,10 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 			vj_sdl_init(
 				v->settings->ncpu,
 				v->sdl[id],
-				v->edit_list->video_width,
-				v->edit_list->video_height,
+				v->bes_width,
+				v->bes_height,
+			//	v->edit_list->video_width,
+			//	v->edit_list->video_height,
 				caption,
 				1,
 				go_fs
@@ -2970,8 +2999,10 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 				
 					if(vj_sdl_init( v->settings->ncpu,
 						v->sdl[id],
-						w,
-						h,
+					//	w,
+					//	h,
+						v->bes_width,
+						v->bes_height,
 						title,
 						1,
 						v->settings->full_screen )
@@ -6292,20 +6323,20 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 void	vj_event_toggle_projport( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	if(v->use_proj == 0 )
-	{
-		v->use_proj = 1;
-		if( viewport_active( v->projport ))
-		{
-			v->use_osd = 3;
-		}
-		veejay_msg(VEEJAY_MSG_INFO, "Projection enabled");
-		v->which_vp = 1;
-	}
+
+	if( v->settings->composite == 0 )
+		veejay_msg(VEEJAY_MSG_ERROR, "To use projetion setup, start veejay with -D");
 	else
 	{
-		v->use_proj = 0;
-		veejay_msg(VEEJAY_MSG_INFO, "Projection disabled");
+		if( v->which_vp == 0 )
+		{
+			v->which_vp = 1;
+		}
+		else
+		{
+			v->which_vp = 0;
+		}
+		veejay_msg(VEEJAY_MSG_INFO, "Focus is at %s", (v->which_vp == 1 ? "Projection" : "Viewport" ));
 	}
 }
 void	vj_event_toggle_viewport( void *ptr, const char format[], va_list ap )
@@ -6316,12 +6347,12 @@ void	vj_event_toggle_viewport( void *ptr, const char format[], va_list ap )
 		veejay_msg(VEEJAY_MSG_INFO, "Viewport enabled");
 		v->use_vp = 1;
 		//@ If viewport is in user UI mode, enable context help
-		if( viewport_active( v->viewport ))
-		{
-			v->use_osd = 3;
-			veejay_msg(VEEJAY_MSG_INFO, "Viewport help enabled");
-		}
-		v->which_vp = 0;
+		//@ fixme: print OSD in projection setup
+//		if( viewport_active( v->viewport ))
+//		{
+//			v->use_osd = 3;
+//			veejay_msg(VEEJAY_MSG_INFO, "Viewport help enabled");
+//		}
 	}
 	else
 	{
@@ -7106,7 +7137,7 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 							sprintf(svalue, " %d;", value);
 						else 
 							sprintf(svalue, " %d", value);
-						strncat( bundle, svalue, strlen(svalue));
+						veejay_strncat( bundle, svalue, strlen(svalue));
 					}
 				}
 				strncpy( blob+bunlen, bundle,strlen(bundle));
@@ -7462,6 +7493,9 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	w = args[0]; 
 	h = args[1];
 
+	if ( w > 512 ) w = 512; 
+	if ( h > 512 ) h = 512;
+	
 	if( w <= 0 || h <= 0 )
 	{
 		veejay_msg(0, "Invalid image dimension %dx%d requested",w,h );
@@ -7476,25 +7510,20 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	vj_perform_get_primary_frame( v, frame.data, 0 );
 
 	if( use_bw_preview_ )
-		img = vj_fastbw_picture_save_to_mem(
+		vj_fastbw_picture_save_to_mem(
 				&frame,
-				args[0],
-				args[1],
+				w,
+				h,
 			(v->video_out == 4 ? 4 : v->pixel_format ));
 	else
-		img = vj_fast_picture_save_to_mem(
+		vj_fast_picture_save_to_mem(
 				&frame,
-				args[0],
-				args[1],
+				w,
+				h,
 			(v->video_out == 4 ? 4 : v->pixel_format ));
 
-	if(!img)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Failed to get image");
-		SEND_MSG( v, "0000000" );
-		return;
-	}
-
+	int input_len = (use_bw_preview_ ? ( w * h ) : (w * h * 3 ));
+/*
 #ifdef STRICT_CHECKING
 	assert(img->image);
 #endif
@@ -7509,6 +7538,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 
 	int input_len = (use_bw_preview_ ? (w*h) : (w*h*3));
 
+//@ profiling: lzo_compression takes more then time needed to scale image
 	if ( lzo_compress( lzo_, msg, tmpbuf, &size1, input_len) == 0)
 	{
 		veejay_msg(0, "Unable to compress preview image");
@@ -7521,15 +7551,13 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 		vj_server_send( v->vjs[0], v->uc->current_link, header, 7 );
 		vj_server_send( v->vjs[0], v->uc->current_link, tmpbuf, size1 );
 	}
-
-	if( img )
-	{
-		if( img->image )
-			gdk_pixbuf_unref( (GdkPixbuf*) img->image );
-		if( img->scaled_image )
-			gdk_pixbuf_unref( (GdkPixbuf*) img->scaled_image );
-		free( img );
-	}
+*/
+	char header[8];
+	sprintf( header, "%06d%1d", input_len, use_bw_preview_ );
+	int res = vj_server_send( v->vjs[0], v->uc->current_link, header, 7 );
+	if( res )
+		res = vj_server_send( v->vjs[0], v->uc->current_link, vj_perform_get_preview_buffer(), input_len );
+	
 }
 #endif
 
@@ -7980,7 +8008,7 @@ void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)
 		if(vj_effect_get_summary(i,line))
 		{
 			sprintf(fline, "%03d%s", strlen(line), line );
-			strncat( priv_msg, fline, strlen(fline) );
+			veejay_strncat( priv_msg, fline, strlen(fline) );
 		}
 	}
 	SEND_MSG(v,priv_msg);
@@ -8981,7 +9009,7 @@ void	vj_event_get_sample_sequences( 		void *ptr, 	const char format[],	va_list a
 	{
 		char tmp[32];
 		sprintf(tmp, "%04d", v->seq->samples[i]);
-		strcat(_s_print_buf, tmp );
+		veejay_strncat(_s_print_buf, tmp, 4 );
 	}
 
 	SEND_MSG(v, _s_print_buf );

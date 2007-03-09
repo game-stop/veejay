@@ -19,7 +19,7 @@ AM_MAINTAINER_MODE
 AM_INIT_AUTOMAKE([dist-bzip2])
 
 AC_DEFINE(VEEJAY,1,[Building Veejay])
-
+AC_DEFINE(HAVE_CONFIG_H,1,[Include config.h])
 # libtool versioning
 LT_RELEASE=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION
 LT_CURRENT=$VEEJAY_MICRO_VERSION
@@ -747,6 +747,7 @@ then
 	if test $ac_cv_flag_mmx2 = yes; then
 		AC_DEFINE(HAVE_ASM_MMX2,,[Compiling in MMX2])
 		AC_DEFINE(HAVE_MMX2,,[Compiling in MMX2])
+		AC_DEFINE(HAVE_ASM_MMXEXT,,[Compiling in MMXEXT])
 		have_asm_mmx2=true
 	fi
 
@@ -1025,6 +1026,7 @@ dnl Output a Makefile or two and the lib/header descriptor script
 dnl
 AC_CONFIG_FILES([
 Makefile
+aclib/Makefile
 libOSC/Makefile
 libhash/Makefile
 libvjmsg/Makefile

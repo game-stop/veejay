@@ -288,10 +288,18 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 
 
 	uint32_t sum = 0,min=0xffff,max=0;
-	uint32_t activity_level = 0;
-	for( i = 0; i < len; i ++ )
-		if( binary_img[i] )
-		  activity_level ++;
+	uint32_t activity_level1 = 0;
+	uint32_t activity_level2 = 0;
+	uint32_t activity_level3 = 0;
+	uint32_t activity_level4 = 0;
+	for( i = 0; i < len; i += 4 )
+	{
+		activity_level1 += binary_img[i];
+		activity_level2 += binary_img[i+1];
+		activity_level3 += binary_img[i+2];
+		activity_level4 += binary_img[i+3];
+	}
+	uint32_t activity_level = (activity_level1 + activity_level2 + activity_level3 + activity_level4);
 
 	max_d = reverse;
 

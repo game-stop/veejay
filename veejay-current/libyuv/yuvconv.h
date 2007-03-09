@@ -113,6 +113,8 @@ void	yuv_init_lib();
 
 void	yuv_free_lib();
 
+void	yuv_convert_ac( VJFrame *src, VJFrame *dst, int a, int b );
+
 void	yuv_convert_any( VJFrame *src, VJFrame *dst, int a, int b );
 
 void	yuv_convert_any3( VJFrame *src,int strides[], VJFrame *dst, int a, int b );
@@ -122,5 +124,6 @@ VJFrame *yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt );
 
 VJFrame *yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int fmt );
 
+char	*yuv_get_scaler_name(int id);
 
 #endif

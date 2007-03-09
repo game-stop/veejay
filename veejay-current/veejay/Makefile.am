@@ -34,7 +34,7 @@ VEEJAY_ALL_LIB_OPTS = \
 
 libveejay_la_SOURCES =  vj-misc.c \
 			vj-plugin.c vj-osc.c vjkf.c vj-event.c vj-eventman.c vj-pjack.c vj-perform.c \
-			x11misc.c vj-sdl.c vj-dfb.c gl.c vj-viewport.c \
+			x11misc.c vj-sdl.c vj-dfb.c gl.c vj-viewport.c vj-composite.c \
 			vj-font.c liblavplayvj.c 
 
 libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS ) $(DEBUGLIBS)
@@ -51,6 +51,7 @@ libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libvjnet -lvjnet \
 			-L$(top_builddir)/libel -lel \
 			-L$(top_builddir)/libstream -lstream \
+			-L$(top_builddir)/aclib -lac \
 			-L$(top_builddir)/libyuv -lyuv \
 			-L$(top_builddir)/liblavjpeg -llavjpeg \
 			-L$(top_builddir)/libsamplerec -lsamplerec \

@@ -928,6 +928,17 @@ static	int	x_display_init_gl( display_ctx *ctx, int w, int h )
 	return 1;
 }
 
+int	x_display_width( void *ptr )
+{
+	display_ctx *ctx = (display_ctx*) ptr;
+	return ctx->disp_w;
+}
+
+int	x_display_height( void *ptr )
+{
+	display_ctx *ctx = (display_ctx*) ptr;
+	return ctx->disp_h;
+}	
 
 void	*x_display_init(void *ptr)
 {

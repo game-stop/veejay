@@ -1447,7 +1447,7 @@ void	vj_font_print_credits(void *font, char *text)
 }
 
 
-void	vj_font_customize_osd( void *font,void *uc, int type, int vp, int pp, int wp )
+void	vj_font_customize_osd( void *font,void *uc, int type, int vp, int wp )
 {
 	vj_font_t *f = (vj_font_t*) font;
 	veejay_t *v = (veejay_t*) uc;
@@ -1458,22 +1458,20 @@ void	vj_font_customize_osd( void *font,void *uc, int type, int vp, int pp, int w
 	switch( v->uc->playback_mode )
 	{
 		case VJ_PLAYBACK_MODE_SAMPLE:
-			sprintf(buf, "(S) %d|%d M=%dMb C=%dms V=%s P=%s F=%s",
+			sprintf(buf, "(S) %d|%d M=%dMb C=%dms V=%s F%s",
 					v->uc->sample_id,
 					sample_size()-1,
 					sample_cache_used(0),
 					v->real_fps,
 					(vp ? "Y" : "N" ),
-					(pp ? "Y" : "N" ),
 					(wp ? "P" : "V") );
 			break;
 		case VJ_PLAYBACK_MODE_TAG:
-			sprintf(buf, "(T) %d|%d C=%dms V=%s P=%s F=%s",
+			sprintf(buf, "(T) %d|%d C=%dms V=%s F=%s",
 					v->uc->sample_id,
 					vj_tag_size(),
 					v->real_fps,
 					(vp ? "Y" : "N" ),
-					(pp ? "Y" : "N" ),
 					(wp ? "P" : "V" ));
 			break;
 		default:
@@ -1625,7 +1623,7 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 	f->text_height = 0;
 	
 	int tmp = (w / 100) * 3;
-	if(tmp>18) tmp = 18;
+	if(tmp>15) tmp = 14;
 	if(tmp<11) tmp = 11;
 	f->current_size = (is_osd ? (tmp): 40);
 

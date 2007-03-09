@@ -22,8 +22,8 @@
 #include <libvje/vje.h>
 typedef struct
 {	
-	void *image;
-	void *scaled_image;
+	int	w;
+	int	h;
 } veejay_image_t;
 
 #ifdef USE_GDK_PIXBUF
@@ -42,8 +42,8 @@ void  vj_picture_display_formats(void);
 
 veejay_image_t *vj_picture_save_bw_to_memory( uint8_t **frame, int w, int h , int out_w, int out_h, int fmt  );
 veejay_image_t *vj_picture_save_to_memory( uint8_t **frame, int w, int h , int out_w, int out_h, int fmt  );
-veejay_image_t *vj_fastbw_picture_save_to_mem( VJFrame *f, int out_w, int out_h, int fmt );
-veejay_image_t *vj_fast_picture_save_to_mem(VJFrame *f, int out_w, int out_h, int fmt );
+void vj_fastbw_picture_save_to_mem( VJFrame *f, int out_w, int out_h, int fmt );
+void vj_fast_picture_save_to_mem(VJFrame *f, int out_w, int out_h, int fmt );
 
 void	vj_picture_free();
 

@@ -49,7 +49,7 @@
 #include <libstream/vj-net.h>
 #include <libstream/vj-unicap.h>
 #include <libvevo/libvevo.h>
-
+#include <veejay/vj-misc.h>
 #ifdef HAVE_FREETYPE
 #include <veejay/vj-font.h>
 #endif
@@ -1370,11 +1370,10 @@ int	vj_tag_get_v4l_properties(int t1,
 
 int vj_tag_get_effect_any(int t1, int position) {
 	vj_tag *tag = vj_tag_get(t1);
-	if (!tag) return -1;
 #ifdef STRICT_CHECKING
+	assert( tag != NULL );
 	assert( position >= 0 && position < SAMPLE_MAX_EFFECTS );
 #endif
-//	if( position >= SAMPLE_MAX_EFFECTS) return -1;
 	return tag->effect_chain[position]->effect_id;
 }
 
@@ -1384,8 +1383,9 @@ int vj_tag_chain_malloc(int t1)
     int i=0;
     int e_id = 0; 
     int sum =0;
-    if (!tag)
-	return -1;
+#ifdef STRICT_CHECKING
+	assert( tag != NULL );
+#endif
 
     for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
     {
@@ -1405,11 +1405,13 @@ int vj_tag_chain_malloc(int t1)
 int vj_tag_chain_free(int t1)
 {
     vj_tag *tag = vj_tag_get(t1);
+#ifdef STRICT_CHECKING
+	assert(tag != NULL );
+#endif
     int i=0;
     int e_id = 0; 
     int sum = 0;
-    if (!tag)
-	return -1;
+   
     for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
     {
 	e_id = tag->effect_chain[i]->effect_id;
@@ -2322,41 +2324,13 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
 {
     vj_tag *tag;
     tag = vj_tag_get(tag_id);
+#ifdef STRICT_CHECKING
+	assert( tag != NULL );
+#endif
+    //if (!tag)
+    //return -1;
 
-    if (!tag)
-	return -1;
-    /*
-    sprintf(str,
-	    "%d %d %d %d %d %d %d %d %d %d %d %ld %ld %d %d %d %d %d %d %d %d %d %d %d %d",
-	    tag->id,
-	    tag->selected_entry,
-	    tag->effect_toggle,
-	    tag->next_id,
-	    tag->source_type,
-	    tag->index,
-	    tag->depth,
-	    tag->active,
-	    tag->source,
-	    tag->video_channel,
-	    tag->encoder_active,
-	    tag->encoder_duration,
-	    tag->encoder_succes_frames,
-	    entry,
-	    changed,
-	    vj_effect_real_to_sequence(tag->effect_chain[entry]->
-				       effect_id),
-	    tag->effect_chain[entry]->e_flag,
-	    tag->effect_chain[entry]->frame_offset,
-	    tag->effect_chain[entry]->frame_trimmer,
-	    tag->effect_chain[entry]->source_type,
-	    tag->effect_chain[entry]->channel,
-	    tag->effect_chain[entry]->a_flag,
-	    tag->effect_chain[entry]->volume,
-		this_tag_id-1,
-	    (int)(tag->fader_val));
-	*/
-
-	sprintf(str,
+	veejay_sprintf(str, 1024,
 			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			pfps,
 			frame,

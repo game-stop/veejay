@@ -21,4 +21,18 @@ extern	void *vj_calloc(unsigned int size );
 
 extern void *vj_yuvalloc( unsigned int w, unsigned int h );
 
+extern void fast_memset_dirty(void * to, int val, size_t len);
+
+extern void fast_memset_finish();
+
+extern void	packed_plane_clear( size_t len, void *to );
+
+extern void	yuyv_plane_clear( size_t len, void *to );
+
+extern int	cpu_cache_size();
+
+extern char	*veejay_strncat( char *s1, char *s2, size_t n );
+
+
+
 #endif

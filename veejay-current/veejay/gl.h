@@ -24,7 +24,8 @@
 void	*x_display_init(void *ptr);
 void	x_display_close(void *dctx);
 int		x_display_set_fullscreen( void *dctx, int status );
-
+int	x_display_width(void *ptr );
+int	x_display_height(void *ptr);
 int	x_display_push(void *dctx, uint8_t **data, int width, int height, int out );
 void	x_display_resize( int x, int y, int w, int h );
 void       x_display_event( void *dctx, int w, int h );

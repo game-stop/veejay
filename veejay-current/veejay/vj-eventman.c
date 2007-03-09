@@ -138,11 +138,11 @@ char	*vj_event_vevo_list_serialize(void)
 			char tmp[13];
 			sprintf( tmp, "%04d%02d%03d%03d",
 				i, vj_event_vevo_get_num_args(i), fmt_len, name_len );
-			strncat( res, tmp, 12 );
+			veejay_strncat( res, tmp, 12 );
 			if( format != NULL )
-				strncat( res, format, fmt_len );
+				veejay_strncat( res, format, fmt_len );
 			if( name != NULL )
-				strncat( res, name, name_len );
+				veejay_strncat( res, name, name_len );
 			if(name) free(name);
 			if(format) free(format);
 			

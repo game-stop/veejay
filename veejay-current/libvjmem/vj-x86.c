@@ -26,8 +26,11 @@
 
 extern void find_best_memcpy(void);
 extern void find_best_memset(void);
+extern void yuyv_plane_init();
 
 static int MEM_ALIGNMENT_SIZE = 0;
+static int CACHE_LINE_SIZE = 16;
+
 
 #ifdef ARCH_X86
 int has_cpuid(void)
@@ -73,25 +76,31 @@ do_cpuid(unsigned int ax, unsigned int *p)
          : "0" (ax));
 }
 
-void	get_cache_line_size()
+int	get_cache_line_size()
 {
 	unsigned int regs[4];
 	unsigned int regs2[4];
-	unsigned int ret = 16; // default cache line size
+	unsigned int ret = 32; // default cache line size
 
 	if(!has_cpuid())
 	{
-		return;
+		return ret;
 	}
-	do_cpuid( 0x00000000, regs); // get _max_ cpuid level and vendor name
 
+	do_cpuid( 0x00000000, regs); // get _max_ cpuid level and vendor name
 	if( regs[0] >= 0x00000001)
 	{
 		do_cpuid(  0x00000001, regs2 );
 		ret = (( regs2[1] >> 8) & 0xff) * 8;
-		if(ret > 0)
-			MEM_ALIGNMENT_SIZE = ret;
+		return ret;
 	}
+	do_cpuid(0x80000000, regs );
+	if( regs[0] >= 0x80000006) {
+		do_cpuid( 0x80000001, regs2 );
+		ret = (regs[2] & 0xff);
+		return ret;
+	}
+	return ret;
 }
 
 
@@ -120,16 +129,24 @@ unsigned int vj_get_timer()
     return ((tv.tv_sec & 1000000) + tv.tv_usec);
 }
 
+int	cpu_cache_size()
+{
+	return CACHE_LINE_SIZE;
+}
+
 void vj_mem_init(void)
 {
 #ifdef ARCH_X86 
-	get_cache_line_size();
+	CACHE_LINE_SIZE = get_cache_line_size();
 #endif
 	if(MEM_ALIGNMENT_SIZE == 0)
 		MEM_ALIGNMENT_SIZE = getpagesize();
 	
+	yuyv_plane_init();
+
 	find_best_memcpy();	
 	find_best_memset();
+
 }
 
 void *vj_malloc(unsigned int size)

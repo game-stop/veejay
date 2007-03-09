@@ -31,16 +31,16 @@ typedef struct vj_server_t {
     struct sockaddr_in remote;
     int handle;
     int nr_of_connections;
-	void **link;
-	fd_set	fds;
-	fd_set	wds;
-	int	 use_mcast;
-	int	 server_type;
-	int  ports[2];
-	void	**protocol;
-	char	*recv_buf;
-	int	send_size;
-	int	recv_size;
+    void **link;
+    fd_set	fds;
+    fd_set	wds;
+    int	 use_mcast;
+    int	 server_type;
+    int  ports[2];
+    void	**protocol;
+    char	*recv_buf;
+    int	send_size;
+    int	recv_size;
 } vj_server;
 
 vj_server *vj_server_alloc(int port, char *mcast_group_name, int type);

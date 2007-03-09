@@ -22,11 +22,9 @@
 #include <libyuv/yuvconv.h>
 #include <veejay/vj-global.h>
 #include <ffmpeg/swscale.h>
-#ifdef USE_SWSCALER
-#include <libpostproc/swscale.h>
-#endif
+#include <aclib/ac.h>
+#include <aclib/imgconvert.h>
 #include <libvjmsg/vj-common.h>
-
 #include <ffmpeg/avutil.h>
 #include <ffmpeg/avcodec.h>
 /* this routine is the same as frame_YUV422_to_YUV420P , unpack
@@ -58,10 +56,32 @@
 
 
 static	int		    sws_context_flags_ = 0;
+static  int		    ffmpeg_aclib[64];
+
+#define	put(a,b)	ffmpeg_aclib[a] = b
 
 void	yuv_init_lib()
 {
 	sws_context_flags_ = yuv_sws_get_cpu_flags();
+	
+	int my_ac_flags = ac_cpuinfo();
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "CPU Flags available:", ac_flagstotext( my_ac_flags ));
+
+	ac_init( AC_ALL );
+
+	ac_imgconvert_init(AC_ALL);
+
+	veejay_memset( ffmpeg_aclib, 0, sizeof(ffmpeg_aclib ));
+
+	put( PIX_FMT_YUV420P, IMG_YUV420P );
+	put( PIX_FMT_YUV422P, IMG_YUV422P );
+	put( PIX_FMT_YUV444P, IMG_YUV444P );
+	put( PIX_FMT_RGB24,   IMG_RGB24 );
+	put( PIX_FMT_BGR24,   IMG_BGR24 );
+	put( PIX_FMT_RGB32,   IMG_ARGB32 );
+	put( PIX_FMT_RGBA,    IMG_RGBA32 );
+	put( PIX_FMT_RGB32_1, IMG_RGBA32 );
 }
 
 VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int fmt )
@@ -144,6 +164,44 @@ VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 
 #define ru4(num)  (((num)+3)&~3)
 
+
+static struct
+{
+	int ffmpeg;
+	int aclib;
+} ffmpegaclib[] = 
+{
+	{ PIX_FMT_YUV420P,	IMG_YUV420P },
+	{ PIX_FMT_YUV422P,	IMG_YUV422P },
+	{ PIX_FMT_YUV444P,	IMG_YUV444P },
+	{ PIX_FMT_RGB24,	IMG_RGB24 },
+	{ PIX_FMT_BGR24,	IMG_BGR24 },
+	{ PIX_FMT_RGB32,	IMG_ARGB32 },
+	{ PIX_FMT_RGBA,		IMG_RGBA32 },
+	{ PIX_FMT_RGB32_1,	IMG_RGBA32 },
+	{ -1,			-1},
+};
+
+void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
+{
+#ifdef STRICT_CHECKING
+	assert( dst_fmt >= 0 && dst_fmt < 32 );
+	assert( src_fmt == PIX_FMT_YUV420P || src_fmt == PIX_FMT_YUVJ420P ||
+		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
+		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
+		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA ||
+		src_fmt == PIX_FMT_BGR24   || src_fmt == PIX_FMT_RGB32 ||
+		src_fmt == PIX_FMT_RGB32_1  );
+	assert( src->width > 0 );
+	assert( dst->width > 0 );
+#endif
+	if(!ac_imgconvert( src->data, ffmpeg_aclib[ src_fmt ], 
+			dst->data, ffmpeg_aclib[ dst_fmt] , dst->width,dst->height ))
+	{
+		//@ simply try this if that fails
+		yuv_convert_any( src,dst, src_fmt,dst_fmt );
+	}
+}
 void	yuv_convert_any( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 {
 #ifdef STRICT_CHECKING
@@ -603,7 +661,7 @@ typedef struct
 	SwsFilter	  *dst_filter;
 } vj_sws;
 
-void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flags)
+void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_flagss)
 {
 	vj_sws *s = (vj_sws*) vj_malloc(sizeof(vj_sws));
 	if(!s)
@@ -613,40 +671,54 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 
 	memset( s, 0, sizeof(vj_sws) );
 
+	int cpu_flags = 0;
+
+#ifdef HAVE_ASM_MMX
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX;
+#endif
+#ifdef HAVE_ASM_3DNOW
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_3DNOW;
+#endif
+#ifdef HAVE_ASM_MMX2
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX2;
+#endif
+#ifdef HAVE_ALTIVEC
+	cpu_flags = cpu_flags | SWS_CPU_CAPS_ALTIVEC;
+#endif
 	switch(tmpl->flags)
 	{
 		case 1:
-			sws_type = SWS_FAST_BILINEAR;
+			cpu_flags = cpu_flags|SWS_FAST_BILINEAR;
 			break;
 		case 2:
-			sws_type = SWS_BILINEAR;
+			cpu_flags = cpu_flags|SWS_BILINEAR;
 			break;
 		case 3:
-			sws_type = SWS_BICUBIC;
+			cpu_flags = cpu_flags|SWS_BICUBIC;
 			break;
 		case 4:
-			sws_type = SWS_POINT;
+			cpu_flags = cpu_flags |SWS_POINT;
 			break;
 		case 5:
-			sws_type = SWS_X;
+			cpu_flags = cpu_flags|SWS_X;
 			break;
 		case 6:
-			sws_type = SWS_AREA;
+			cpu_flags = cpu_flags | SWS_AREA;
 			break;
 		case 7:
-			sws_type = SWS_BICUBLIN;
+			cpu_flags = cpu_flags | SWS_BICUBLIN;
 			break;
 		case 8: 
-			sws_type = SWS_GAUSS;
+			cpu_flags = cpu_flags | SWS_GAUSS;
 			break;
 		case 9:
-			sws_type = SWS_SINC;
+			cpu_flags = cpu_flags | SWS_SINC;
 			break;
 		case 10:
-			sws_type = SWS_LANCZOS;
+			cpu_flags = cpu_flags |SWS_LANCZOS;
 			break;
 		case 11:
-			sws_type = SWS_SPLINE;
+			cpu_flags = cpu_flags | SWS_SPLINE;
 			break;
 	}	
 
@@ -657,8 +729,7 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 			dst->width,
 			dst->height,
 			dst->format,
-		//	sws_type | sws_context_flags_,
-			sws_context_flags_,
+			cpu_flags,
 			s->src_filter,
 			s->dst_filter,
 			NULL
@@ -815,4 +886,33 @@ void	yuv_deinterlace(
 	q.linesize[1] = width >> shift;
 	q.linesize[2] = width >> shift;
 	avpicture_deinterlace( &p,&q, out_pix_fmt, width, height );
+}
+
+static struct
+{	
+	int i;
+	const char *name;
+} sws_scaler_types[] = 
+{
+	{	1,	"Fast bilinear (default)" },
+	{	2,	"Bilinear" },
+	{	3, 	"Bicubic"  },
+	{	4,	"Nearest neighbour"},
+	{	5,	"Experimental"},
+	{	6,	"Area"},
+	{	7,	"Linear bicubic"},	
+	{	8,	"Gaussian"},
+	{	9,	"Sinc"},
+	{	10,	"Lanzcos"},
+	{	11,	"Natural bicubic spline"},
+	{	0,	NULL }
+};
+
+char	*yuv_get_scaler_name(int id)
+{
+	int i;
+	for( i = 0; sws_scaler_types[i].i != 0 ; i ++ )
+		if( id == sws_scaler_types[i].i )
+			return sws_scaler_types[i].name;
+	return NULL;
 }

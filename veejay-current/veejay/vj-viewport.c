@@ -43,6 +43,7 @@
 #include <libvje/vje.h>
 #include <veejay/vj-viewport.h>
 #include <libvje/effects/opacity.h>
+#include <libvjmem/vjmem.h>
 
 #define X0 0
 #define Y0 1
@@ -82,7 +83,7 @@
 
 typedef struct
 {
-	float m[3][3];
+	float m[4][4];
 } matrix_t;
 
 typedef struct
@@ -110,7 +111,7 @@ typedef struct
 	float y3;
 	float y4;
 	int32_t *map;
-	uint8_t *img[3];
+	uint8_t *img[4];
 	matrix_t *M;
 	matrix_t *m;
 	char *help;
@@ -138,7 +139,7 @@ typedef struct
 	float y4;
 } viewport_config_t;
 
-
+static void		viewport_draw_col( void *data, uint8_t *img, uint8_t *u, uint8_t *v );
 static void		viewport_draw( void *data, uint8_t *img );
 static inline	int	grab_pixel( uint8_t *plane, int x, int y, int w );
 static void		viewport_update_perspective( viewport_t *v, float *values );
@@ -628,7 +629,6 @@ static int		viewport_configure(
 					int size)
 {
 	v->grid_size = size;
-
 	v->points[X0] = (float) x + x1 * (float) w / 100.0;
 	v->points[Y0] = (float) y + y1 * (float) h / 100.0;
 
@@ -666,7 +666,7 @@ static int		viewport_configure(
 	v->points[Y3] = v->points[Y2];
 	v->points[Y2] = tmp;
 
-	matrix_t *m = viewport_transform( x, y, x + w, x + h, v->points );
+	matrix_t *m = viewport_transform( x, y, x + w, y + h, v->points );
 
 	if ( reverse )
 	{
@@ -997,7 +997,7 @@ static	void		viewport_update_perspective( viewport_t *v, float *values )
 }
 
 
-void *viewport_init(int w, int h, const char *homedir, int *enable, int *frontback, int mode)
+void *viewport_init(int w, int h, const char *homedir, int *enable, int *frontback, int mode )
 {
 	//@ try to load last saved settings
 	viewport_config_t *vc = viewport_load_settings( homedir,mode );
@@ -1023,7 +1023,7 @@ void *viewport_init(int w, int h, const char *homedir, int *enable, int *frontba
 					    w,h,
 					    0,
 					    0xff,
-					    w/32 );
+					    w/16 );
 
 		*enable = 0;
 		*frontback = 1;
@@ -1073,7 +1073,6 @@ void *viewport_init(int w, int h, const char *homedir, int *enable, int *frontba
 
 	// calculate initial view
 	viewport_process( v );
-
 
     	return (void*)v;
 }
@@ -1187,12 +1186,11 @@ static	void	viewport_save_settings( viewport_t *v, int frontback )
 	veejay_msg(VEEJAY_MSG_DEBUG, "Saved viewport settings to %s", path);
 }
 
-void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontback )
+void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontback, int screen_width, int screen_height )
 {
+	viewport_t *v = (viewport_t*) data;
 	if( sx == 0 && sy == 0 && button == 0 )
 		return;
-
-	viewport_t *v = (viewport_t*) data;
 
 	int osd = 0;
 	int grid =0;
@@ -1202,8 +1200,9 @@ void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontb
 	int point = -1;
 	int i;
 
-	float x = (float)sx / ( width / 100.0f );
-	float y = (float)sy / ( height / 100.0f );
+	//@ use screen width/height
+	float x = (float)sx / ( screen_width / 100.0f );
+	float y = (float)sy / ( screen_height / 100.0f );
 	double dist = 100.0;
 
 	float p[9];
@@ -1354,8 +1353,9 @@ void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontb
 	}
 
 	if( ch )
+	{
 		viewport_update_perspective( v, p );
-	
+	}
 }
 
 static	inline	int	grab_pixel( uint8_t *plane, int x, int y, int w )
@@ -1405,6 +1405,64 @@ static void	viewport_draw( void *data, uint8_t *plane )
 	 }
 }
 
+static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *V )
+{
+	viewport_t *v = (viewport_t*) data;
+	int	width = v->w;
+	int 	height = v->h;
+
+	float wx =(float) v->w / 100.0;
+	float wy =(float) v->h / 100.0;
+
+	int fx1 = (int)( v->x1 *wx );
+	int fy1 = (int)( v->y1 *wy );
+	int fx2 = (int)( v->x2 *wx );
+	int fy2 = (int)( v->y2 *wy );
+	int fx3 = (int)( v->x3 *wx );
+	int fy3 = (int)( v->y3 *wy );
+	int fx4 = (int)( v->x4 *wx );
+	int fy4 = (int)( v->y4 *wy );
+
+	const uint8_t p = v->grid_val;
+	const uint8_t uv = 128;
+	opacity_blend_luma_apply( plane,v->grid, (width*height), 100 );
+
+	viewport_line( plane, fx1, fy1, fx2,fy2,width,height, p);
+	viewport_line( plane, fx1, fy1, fx4,fy4,width,height, p );
+	viewport_line( plane, fx4, fy4, fx3,fy3,width,height, p );
+	viewport_line( plane, fx2, fy2, fx3,fy3,width,height, p );
+	viewport_line( u, fx1, fy1, fx2,fy2,width,height, uv);
+	viewport_line( u, fx1, fy1, fx4,fy4,width,height, uv );
+	viewport_line( u, fx4, fy4, fx3,fy3,width,height, uv );
+	viewport_line( u, fx2, fy2, fx3,fy3,width,height, uv );
+	viewport_line( V, fx1, fy1, fx2,fy2,width,height, uv );
+	viewport_line( V, fx1, fy1, fx4,fy4,width,height, uv );
+	viewport_line( V, fx4, fy4, fx3,fy3,width,height, uv );
+	viewport_line( V, fx2, fy2, fx3,fy3,width,height, uv );
+
+	draw_point( plane, fx1,fy1, width,height, v->users[0],p );
+	draw_point( plane, fx2,fy2, width,height, v->users[1],p );
+	draw_point( plane, fx3,fy3, width,height, v->users[2],p );
+	draw_point( plane, fx4,fy4, width,height, v->users[3],p );
+	draw_point( u, fx1,fy1, width,height, v->users[0],uv );
+	draw_point( u, fx2,fy2, width,height, v->users[1],uv );
+	draw_point( u, fx3,fy3, width,height, v->users[2],uv );
+	draw_point( u, fx4,fy4, width,height, v->users[3],uv );
+	draw_point( V, fx1,fy1, width,height, v->users[0],uv );
+	draw_point( V, fx2,fy2, width,height, v->users[1],uv );
+	draw_point( V, fx3,fy3, width,height, v->users[2],uv );
+	draw_point( V, fx4,fy4, width,height, v->users[3],uv );
+
+	 int mx = v->usermouse[0] * wx;
+	 int my = v->usermouse[1] * wy;
+	 
+	 if( mx >= 0 && my >= 0 && mx <= width && my < height )
+	 {
+		 int col = grab_pixel( plane, v->usermouse[0]*wx, v->usermouse[1]*wy,width );
+		 draw_point( plane, v->usermouse[0]*wx,v->usermouse[1]*wy, width,height,1, v->grid_val );
+	 }
+}
+
 int	viewport_render_ssm(void *vdata )
 {
 	viewport_t *v = (viewport_t*) vdata;
@@ -1414,6 +1472,217 @@ int	viewport_render_ssm(void *vdata )
 
 	return 1;
 }
+
+void	viewport_draw_interface( void *vdata, uint8_t *img[3] )
+{
+	viewport_t *v = (viewport_t*) vdata;
+	viewport_draw( v, img[0] );
+}
+void	viewport_draw_interface_color( void *vdata, uint8_t *img[3] )
+{
+	viewport_t *v = (viewport_t*) vdata;
+	viewport_draw_col( v, img[0],img[1],img[2] );
+}
+
+
+void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3] )
+{
+	viewport_t *v = (viewport_t*) vdata;
+	const int len = v->w * v->h;
+	register const int w = v->w;
+	register uint32_t i,j,n;
+	const int32_t *map = v->map;
+	uint8_t *inY  = img[0];
+	uint8_t *inU  = img[1];
+	uint8_t *inV  = img[2];
+	uint8_t       *outY = out_img[0];
+	uint8_t	      *outU = out_img[1];
+        uint8_t	      *outV = out_img[2];
+	inY[len+1] = 0;
+	inU[len+1] = 128;
+	inV[len+1] = 128;
+
+	register const	int32_t	tx1 = v->tx1;
+	register const	int32_t tx2 = v->tx2;
+	register const	int32_t	ty1 = v->ty1;
+	register const	int32_t ty2 = v->ty2;
+	int x,y;
+
+	y  = ty1 * w;
+	fast_memset_dirty( outY, 0, y );
+	fast_memset_dirty( outU, 128, y );
+	fast_memset_dirty( outV, 128, y );
+
+	for( y = ty1; y < ty2; y ++ )
+	{
+		fast_memset_dirty( outY + (y * w ), 0, tx1 );
+		fast_memset_dirty( outY + (y * w ) + tx2, 0, (w-tx2));
+
+		fast_memset_dirty( outU + (y * w ), 128, tx1 );
+		fast_memset_dirty( outU + (y * w ) + tx2, 128, (w-tx2));
+
+		fast_memset_dirty( outV + (y * w ), 128, tx1 );
+		fast_memset_dirty( outV + (y * w ) + tx2, 128, (w-tx2));
+
+		prefetch_memory( outY );
+		prefetch_memory( outU );
+		prefetch_memory( outV );
+
+		for( x = tx1; x < tx2 ; x ++ )
+		{
+			i = y * w + x;
+			n = map[i];
+			outY[i] = inY[n];
+			outU[i] = inU[n];
+			outV[i] = inV[n];
+		}
+	}
+	y = (v->h - ty2 ) * w;
+	x = ty2 * w;
+	fast_memset_dirty( outY + x, 0, y );
+	fast_memset_dirty( outU + x, 128, y );
+	fast_memset_dirty( outV + x, 128, y );
+
+
+	fast_memset_finish();
+}
+
+#define pack_yuyv_pixel( y0,u0,u1,y1,v0,v1 ) (\
+		( (int) y0 ) & 0xff ) +\
+                ( (((int) ((u0+u1)>>1) ) & 0xff) << 8) +\
+                ( ((((int) y1) & 0xff) << 16 )) +\
+                ( ((((int) ((v0+v1)>>1)) & 0xff) << 24 ))
+
+void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_img )
+{
+	viewport_t *v = (viewport_t*) vdata;
+	const int len = v->w * v->h;
+	const int32_t *map = v->map;
+	register uint8_t *inY  = img[0];
+	register uint8_t *inU  = img[1];
+	register uint8_t *inV  = img[2];
+	register uint32_t	*plane_yuyv = (uint32_t*)out_img;
+	register uint8_t 	*outYUYV    = out_img;
+	register const	int32_t	tx1 = v->tx1;
+	register const	int32_t tx2 = v->tx2;
+	register const	int32_t	ty1 = v->ty1;
+	register const	int32_t ty2 = v->ty2;
+	register const int w = v->w;
+	register const int uw = v->w >> 1;
+	register uint32_t i,x,y;
+	register int32_t n,m;
+
+	inY[len+1] = 0;		// "out of range" pixel value 
+	inU[len+1] = 128;
+	inV[len+1] = 128;
+
+	// clear the yuyv plane (black)
+	y  = ty1 * w;
+	yuyv_plane_clear( y*2, out_img);
+	for( y = ty1; y < ty2; y ++ )
+	{
+		i = (y * w);
+		yuyv_plane_clear( tx1+tx1, outYUYV + i + i );
+		yuyv_plane_clear( (w-tx2)+(w-tx2),outYUYV + (i+tx2) + (i+tx2));
+	}
+	y = (v->h - ty2 ) * w;
+	x = ty2 * w;
+
+	yuyv_plane_clear( y+y, out_img + (x+x) );
+	fast_memset_finish(); // finish yuyv_plane_clear
+
+	for( y = ty1 ; y < ty2; y ++ )
+	{
+		for( x = tx1; x < tx2; x += 8 )
+		{ // 4 YUYV pixels out, 8 Y in,  16 UV in
+			i = y * w ;
+			n = map[ i + x ];
+			m = map[ i + x + 1];
+
+
+			plane_yuyv[y * uw + ( (x+1)>>1)] = pack_yuyv_pixel( inY[n], inU[n], inU[m],
+								 inY[m], inV[n], inV[m] );
+
+			n = map[ i + x + 2 ];
+			m = map[ i + x + 3 ];
+
+
+			plane_yuyv[y * uw + ( (x+1+2)>>1)] = pack_yuyv_pixel( inY[n], inU[n], inU[m],
+								 inY[m], inV[n], inV[m] );
+
+
+			n = map[ i + x + 4 ];
+			m = map[ i + x + 5 ];
+
+
+			plane_yuyv[y * uw + ( (x+1+4)>>1)] = pack_yuyv_pixel( inY[n], inU[n], inU[m],
+								 inY[m], inV[n], inV[m] );
+
+
+			n = map[ i + x + 6 ];
+			m = map[ i + x + 7 ];
+
+
+			plane_yuyv[y * uw + ( (x+1+6)>>1)] = pack_yuyv_pixel( inY[n], inU[n], inU[m],
+								 inY[m], inV[n], inV[m] );
+
+		}	
+		for( ; x < tx2; x += 2 )
+		{
+			i = y * w ;
+			n = map[ i + x ];
+			m = map[ i + x + 1];
+
+			plane_yuyv[y * uw + ( (x+1)>>1)] = pack_yuyv_pixel( inY[n], inU[n], inU[m],
+								 inY[m], inV[n], inV[m] );
+		}
+	}
+}
+
+void	viewport_produce_full_img_packed( void *vdata, uint8_t *img[3], uint8_t *out_img )
+{
+	viewport_t *v = (viewport_t*) vdata;
+	const int len = v->w * v->h;
+	const int32_t *map = v->map;
+	uint8_t *inY  = img[0];
+	uint8_t *inU  = img[1];
+	uint8_t *inV  = img[2];
+	uint8_t       *outYUYV = out_img;
+
+	inY[len+1] = 0;
+	inU[len+1] = 128;
+	inV[len+1] = 128;
+
+	register const	int32_t	tx1 = v->tx1;
+	register const	int32_t tx2 = v->tx2;
+	register const	int32_t	ty1 = v->ty1;
+	register const	int32_t ty2 = v->ty2;
+	register const int w = v->w;
+	register uint32_t n,i,x,y,m;
+
+	y  = ty1 * w;
+	packed_plane_clear( y*3, out_img);
+
+	for( y = ty1 ; y < ty2; y ++ )
+	{
+		packed_plane_clear( tx1*3, outYUYV + 3 * (y*w) );
+		packed_plane_clear( (w-tx2)*3, outYUYV + 3 * (y*w+tx2));
+		for( x = tx1; x < tx2; x ++ )
+		{
+			i = y * w + x;
+			n = map[ i ];
+			outYUYV[3  * i  ] = inY[n];
+			outYUYV[3  * i + 1 ] = inV[n];
+			outYUYV[3  * i + 3 ] = inU[n];
+		}
+	}
+	y = (v->h - ty2 ) * w;
+	x = ty2 * w;
+
+	packed_plane_clear( y*3, out_img + (x*3) );
+	fast_memset_finish();
+}
+
 
 void viewport_render( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, int height, int uv_len )
 {
@@ -1428,7 +1697,7 @@ void viewport_render( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, in
 	{
 		const int len = v->w * v->h;
 		const int w = v->w;
-		register uint32_t i,j,n;
+		register uint32_t i,j,n,block;
 		const int32_t *map = v->map;
 		uint8_t *inY  = in[0];
 		uint8_t *inU  = in[1];
@@ -1443,7 +1712,34 @@ void viewport_render( void *vdata, uint8_t *in[3], uint8_t *out[3],int width, in
 
 		for( i = 0; i < len ; i += v->w )
 		{
-			for( j = 0; j < w; j ++ )
+		/*	for( j = 0; j < w; j ++ )
+			{
+				n = map[i+j];
+				outY[i+j] = inY[n];
+				outU[i+j] = inU[n];
+				outV[i+j] = inV[n];
+			}*/
+	
+			for( j = 0; j < w; j += 4 )
+			{
+				n = map[i + j];
+				outY[i + j ] = inY[n];
+				outU[i + j ] = inU[n];
+				outV[i + j ] = inV[n];
+				n = map[ i + j + 1 ];
+				outY[ i + 1 + j ] = inY[n];
+				outU[ i + 1 + j ] = inU[n];
+				outV[ i + 1 + j ] = inV[n];
+				n = map[ i + j + 2 ];
+				outY[ i + 2 + j ] = inY[n];
+				outU[ i + 2 + j ] = inU[n];
+				outV[ i + 2 + j ] = inV[n];
+				n = map[ i + j + 3 ];
+				outY[ i + 3 + j ] = inY[n];
+				outU[ i + 3 + j ] = inU[n];
+				outV[ i + 3 + j ] = inV[n]; 
+			}
+			for( ; j < w; j ++ )
 			{
 				n = map[i+j];
 				outY[i+j] = inY[n];

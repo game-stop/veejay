@@ -18,6 +18,7 @@
  */
 #ifndef VJ_MISC_H
 #define VJ_MISC_H
+#include <config.h>
 #include <stdarg.h>
 #include "vj-lib.h"
 
@@ -26,6 +27,13 @@
 int   available_diskspace(void);
 
 int vj_perform_screenshot2(veejay_t * info, uint8_t ** src);
+
+#ifdef ARCH_X86
+int	veejay_sprintf( char *s, size_t size, const char *format, ... );
+#define	veejay_snprintf	veejay_sprintf
+#else
+#define	veejay_snprintf snprintf
+#endif
 
 unsigned int	vj_get_relative_time(void);
 
