@@ -86,7 +86,7 @@ void	colorhis_free()
 void colorhis_apply( VJFrame *frame, int width, int height,int mode, int val, int intensity, int strength)
 {
 	int src_fmt = (frame->uv_height == height ? PIX_FMT_YUV422P : PIX_FMT_YUV420P);
-	yuv_convert_any( frame, rgb_frame_, src_fmt, PIX_FMT_RGB24 );
+	yuv_convert_any_ac( frame, rgb_frame_, src_fmt, PIX_FMT_RGB24 );
 
 	if( val == 0 )
 	{
@@ -98,7 +98,7 @@ void colorhis_apply( VJFrame *frame, int width, int height,int mode, int val, in
 		veejay_histogram_equalize_rgb( histogram_, frame, rgb_, intensity, strength, mode );
 	
 	
-		yuv_convert_any( rgb_frame_, frame, PIX_FMT_RGB24, src_fmt );
+		yuv_convert_any_ac( rgb_frame_, frame, PIX_FMT_RGB24, src_fmt );
 	}	
 }
 

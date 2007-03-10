@@ -105,5 +105,5 @@ void goomfx_apply( VJFrame *frame, int width, int height, int val, int val2)
 		    NULL );
     
     
-	yuv_convert_any( rgb_frame_, frame, PIX_FMT_RGBA, frame->format );
+	yuv_convert_any_ac( rgb_frame_, frame, PIX_FMT_RGBA, frame->format );
 }

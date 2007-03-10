@@ -976,11 +976,11 @@ void	plug_process( VJFrame *frame,VJFrame *b, int fx_id, int src_fmt )
 	VJFrame *dst1 = yuv_rgb_template( buffer_, frame->width,frame->height,
 				PIX_FMT_RGB24 );
 
-	yuv_convert_any( frame, dst1, src_fmt, dst1->format );
+	yuv_convert_any_ac( frame, dst1, src_fmt, dst1->format );
 	
 	process_plug_plugin( plugin, buffer_, buffer2_ );
 
-	yuv_convert_any( dst1, frame, dst1->format, src_fmt );
+	yuv_convert_any_ac( dst1, frame, dst1->format, src_fmt );
 
 	free(dst1);
 

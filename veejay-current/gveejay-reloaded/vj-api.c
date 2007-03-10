@@ -5902,10 +5902,13 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		unsigned char sta_len[6];
 		bzero(sta_len,6);
 		nb = vj_client_read( gui->client, V_STATUS, sta_len, 5 );
-		
+
+
+/*
 		if(sta_len[0] != 'V' || nb <= 0 )
 		{
 			gui->status_lock = 0;
+veejay_msg(0, "G_IO_IN: %d bytes read, sta = '%s' ", nb, sta_len );
 			abort_gveejay();
 			return FALSE;
 		}
@@ -5916,16 +5919,31 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 			gui->status_lock = 0;
 			abort_gveejay();
 			return FALSE;
-		}
-		veejay_memset( gui->status_msg,0, STATUS_BYTES ); 
+		}*/
 
-		nb = vj_client_read( gui->client, V_STATUS, gui->status_msg, n_bytes );
-		if(nb <= 0 )
+		if(sta_len[0] == 'V' && nb > 0 )
+		{
+			int n_bytes = 0;
+			if(sscanf(sta_len+1,"%03d",&n_bytes ))
+			{
+				veejay_memset(gui->status_msg,0,STATUS_BYTES );
+				nb = vj_client_read( gui->client,V_STATUS,gui->status_msg, n_bytes);
+				if( nb <= 0 )
+				{
+					gui->status_lock = 0;
+					abort_gveejay();
+					return FALSE;
+				}
+			}
+		}
+
+		//nb = vj_client_read( gui->client, V_STATUS, gui->status_msg, n_bytes );
+/*		if(nb <= 0 )
 		{
 			gui->status_lock = 0;
 			abort_gveejay();
 			return FALSE;
-		}
+		}*/
 
 		int tmp1;
 
@@ -5947,8 +5965,10 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 			}
 		}
 		if( tmp1 == -1 )
+		{
 			abort_gveejay();
-
+			return FALSE;
+		}
 		if(nb > 0)
 		{
 			int n = status_to_arr( gui->status_msg, gui->status_tokens );

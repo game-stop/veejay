@@ -83,7 +83,7 @@ void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg ,
 					 frame->data[2],
 					 width, height, PIX_FMT_YUV444P );
 
-	yuv_convert_any( tmp, rgb_frame_, PIX_FMT_YUV444P, PIX_FMT_RGB24 );
+	yuv_convert_any_ac( tmp, rgb_frame_, PIX_FMT_YUV444P, PIX_FMT_RGB24 );
 
 	int row_stride = width * 3;
 
@@ -118,7 +118,7 @@ void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg ,
 		}
 	}
 
-	yuv_convert_any( rgb_frame_, tmp, PIX_FMT_RGB24, PIX_FMT_YUV444P );
+	yuv_convert_any_ac( rgb_frame_, tmp, PIX_FMT_RGB24, PIX_FMT_YUV444P );
 
 	free(tmp);
 
