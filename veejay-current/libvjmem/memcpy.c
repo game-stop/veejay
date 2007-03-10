@@ -202,7 +202,7 @@ static inline unsigned long long int rdtsc()
 }
 #endif
 
-#ifdef ARCH_X86
+#if defined(ARCH_X86) || defined (ARCH_X86_64)
 static inline void * __memcpy(void * to, const void * from, size_t n)
 {
      int d0, d1, d2;
@@ -850,7 +850,7 @@ static struct {
 {
      { NULL, NULL, 0},
      { "glibc memcpy()",            memcpy, 0},
-#ifdef ARCH_X86
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
      { "linux kernel memcpy()",     linux_kernel_memcpy, 0},
      { "MMX/MMX2/SSE optimized memcpy()",    fast_memcpy, 0},
 #endif
@@ -865,7 +865,7 @@ static struct {
 {
      { NULL, NULL, 0},
      { "glibc memset()",            memset, 0},
-#ifdef ARCH_X86
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
      { "MMX/MMX2/SSE optimized memset()",    fast_memset, 0},
 #endif
      { NULL, NULL, 0},

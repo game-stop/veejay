@@ -611,8 +611,7 @@ case $host_cpu in
     	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
     	have_x86cpu=true
     	have_x86_64cpu=true
-    	PROGRAM_NOPIC="-fno-PIC"
-
+	CFLAGS="$CFLAGS -fPIC -DPIC"
     ;;
   powerpc | powerpc64)
 	AC_DEFINE(HAVE_PPCCPU,, [Compiling for PowerPC CPU])
@@ -960,7 +959,7 @@ fi
 
 if test "x$cflags_set" != "xyes" ; then
   if test "x$enable_debug" = "xyes" ; then
-  	CFLAGS="$debugCFLAGS $warnCFLAGS"
+  	CFLAGS="$debugCFLAGS $warnCFLAGS $CFLAGS"
   else
  	CFLAGS="$CFLAGS $warnCFLAGS"
   fi

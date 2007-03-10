@@ -33,6 +33,8 @@ extern int	cpu_cache_size();
 
 extern char	*veejay_strncat( char *s1, char *s2, size_t n );
 
+extern void    yuyv_plane_init();
 
+extern void    yuyv_plane_clear( size_t len, void *to );
 
 #endif

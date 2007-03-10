@@ -309,7 +309,18 @@ int	sufficient_space(int max_size, int nframes)
 	asm("":"=A" (n):"a" (__low),"d" (__high)); \
 	__mod; \
 })
+#endif
+#ifdef ARCH_X86_64
+#define do_div(n,base)						\
+({								\
+	int _res;						\
+	_res = ((unsigned long) (n)) % (unsigned) (base);	\
+	(n) = ((unsigned long) (n)) / (unsigned) (base);	\
+	_res;							\
+})
+#endif
 
+#if defined(ARCH_X86) || defined(ARCH_X86_64)
 static char * kern_number(char * buf, char * end, long long num, int base, int type)
 {
 	char c,sign=0,tmp[66];
@@ -411,6 +422,15 @@ int	veejay_sprintf( char *s, size_t size, const char *format, ... )
 	va_start( arg, format );
 	done = kern_vsnprintf( s, size, format, arg );
 	va_end(arg);
+	return done;
+}
+#else
+int	veejay_sprintf( char *s, size_t size, const char *format, ... )
+{
+	va_list arg;
+	int done;
+	va_start(arg,format);
+	done = vsnprintf( s,size, format, arg );
 	return done;
 }
 #endif
