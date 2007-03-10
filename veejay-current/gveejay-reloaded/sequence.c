@@ -67,7 +67,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v );
 static	int	track_find(  veejay_preview_t *vp );
 static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v );
-static	void	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v );
+static int	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v );
 static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_num, int *at );
 static	int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v );
 
@@ -167,6 +167,8 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 	if( sscanf( (char*)tmp, "%6d%1d", &len,&(v->grey_scale) )<=0)
 	{
 		veejay_msg(0, "Error reading header contents '%s'", tmp);
+		//@ If this happens, there is still data in the socket and it is unwanted
+		//@ to fallback, reduce image resolution by a half and try again when reconnecting.
 		free(tmp);
 		return 0;
 	}
@@ -365,15 +367,16 @@ static int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v )
 	return 0;
 }
 
-static	void	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
+static int 	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
 {
 	if( v->preview )
 	{
 		if( veejay_get_image_data( vp, v ) == 0 )
 		{
-			gvr_close_connection( v );
+			return 0;
 		}
 	}
+	return 1;
 }
 
 static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_num, int *at_track )
@@ -482,6 +485,10 @@ int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *
 	vt->data_buffer  = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
 	vt->tmp_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
 	veejay_msg(2, "Track %d connected to Veejay %s : %d", track_num,hostname,port_num);
+
+	int send_s,recv_s;
+	vj_client_window_sizes( vj_client_get_status_fd( fd, V_CMD ) , &send_s, &recv_s );
+	veejay_msg(2, "\tTCP window size: %d send, %d recv",send_s, recv_s );
 
 	g_mutex_lock( vp->mutex );
 	vp->tracks[ track_num ] = vt;
@@ -897,7 +904,7 @@ static	void	gvr_parse_queue( veejay_track_t *v )
 	v->n_queued = 0;
 }
 
-static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v )
+static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num )
 {
 	int score = 0;
 	g_mutex_lock( vp->mutex );
@@ -918,8 +925,40 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v )
 	}
 	if( v->preview )
 	{
-		gvr_preview_process_image( vp,v );
-		score ++;
+		if( gvr_preview_process_image( vp,v ))
+			score++;
+		else
+		{
+		        v->preview = 0;
+     			v->have_frame = 0;
+        		veejay_msg(2, "Track %d VeejayGrabber %s:%d disabled",
+                		track_num,
+               			 vp->tracks[ track_num ]->hostname,
+               			 vp->tracks[ track_num ]->port_num);
+			vj_client_close(v->fd);
+    		 	if(!vj_client_connect( v->fd, v->hostname, NULL, v->port_num ) )
+			{
+				veejay_msg(0, "Unable to reconnect to Veejay. Closing track %d",
+					track_num );
+				if(v->hostname) free(v->hostname);
+       				if(v->status_buffer) free(v->status_buffer);
+				if(v->compr_buffer) free(v->compr_buffer);
+				if(v->data_buffer) free(v->data_buffer);
+				if(v->tmp_buffer) free(v->tmp_buffer);
+         			free(v);
+				vp->tracks[track_num] = NULL;
+			}
+			else
+			{
+				v->preview = 1;
+				v->have_frame = 0;
+				v->active = 1;
+				v->width = v->width >> 1;
+				v->height = v->height >> 1;
+				veejay_msg(2, "Restablished connection with veejay, changed preview size to %d x %d", v->width,v->height);
+			} 
+		}
+
 	}
 	g_mutex_unlock( vp->mutex );
 	return score;
@@ -941,7 +980,7 @@ static	void	*gvr_preview_thread(gpointer data)
 				{
 					//after lock in status, assert
 					if( vp->tracks[i] )
-						score += gvr_veejay( vp, vp->tracks[i] );	
+						score += gvr_veejay( vp, vp->tracks[i],i );	
 				}
 			if( vp->state == 0 )
 				break;
