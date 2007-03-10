@@ -89,6 +89,22 @@ void		vj_client_free(vj_client *v)
 	}
 }
 
+int	vj_client_window_sizes( int socket_fd, int *r, int *s )
+{
+	int tmp = sizeof(int);
+	if( getsockopt( socket_fd, SOL_SOCKET, SO_SNDBUF,(unsigned char*) s, &tmp) == -1 )
+        {
+                veejay_msg(0, "Cannot read socket buffer size: %s", strerror(errno));
+                return 0;
+        }
+        if( getsockopt( socket_fd, SOL_SOCKET, SO_RCVBUF, (unsigned char*) r, &tmp) == -1 )
+        {
+                veejay_msg(0, "Cannot read socket buffer receive size %s" , strerror(errno));
+                return 0;
+        }
+	return 1;
+}
+
 
 void	vj_client_flush(vj_client *v, int num_frames)
 {

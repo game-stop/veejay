@@ -486,10 +486,6 @@ int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *
 	vt->tmp_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
 	veejay_msg(2, "Track %d connected to Veejay %s : %d", track_num,hostname,port_num);
 
-	int send_s,recv_s;
-	vj_client_window_sizes( vj_client_get_status_fd( fd, V_CMD ) , &send_s, &recv_s );
-	veejay_msg(2, "\tTCP window size: %d send, %d recv",send_s, recv_s );
-
 	g_mutex_lock( vp->mutex );
 	vp->tracks[ track_num ] = vt;
 	g_mutex_unlock( vp->mutex );

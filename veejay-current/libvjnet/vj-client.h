@@ -77,6 +77,8 @@ int	vj_client_test(char *addr, int port );
 
 int vj_client_send_bufX(vj_client *v, int sock_type,unsigned char *buf, int len );
 
+int	vj_client_window_sizes( int socket_fd, int *r, int *s );
+
 
 #endif
 
