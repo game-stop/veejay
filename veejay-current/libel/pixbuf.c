@@ -410,7 +410,7 @@ void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int f
 	planes[2] = planes[1] + (out_w * out_h );
 
 	VJFrame *dst1 = yuv_yuv_template( planes[0], planes[1], planes[2],
-					  out_w , out_h, pixfmt );
+					  out_w , out_h, PIX_FMT_GRAY8 );
 
 	if( frame->width == out_w && frame->height == out_h )
 		yuv_convert_any_ac( src1,dst1,src1->format, dst1->format );

@@ -35,7 +35,6 @@ typedef struct
 	vj_client *fd;
 	uint8_t *data_buffer;
 	uint8_t *tmp_buffer;
-	uint8_t *compr_buffer;		//shared
 	uint8_t *status_buffer;		
 	int	 track_list[16];
 	int	 track_items;			//shared
@@ -49,6 +48,7 @@ typedef struct
 	int	need_track_list;
 	unsigned char 	*queue[16];
 	int	n_queued;
+	int	bw;
 } veejay_track_t;
 
 typedef struct
@@ -109,7 +109,6 @@ static	void	gvr_close_connection( veejay_track_t *v )
          vj_client_close(v->fd);
          if(v->hostname) free(v->hostname);
          if(v->status_buffer) free(v->status_buffer);
-         if(v->compr_buffer) free(v->compr_buffer);
          if(v->data_buffer) free(v->data_buffer);
 	 if(v->tmp_buffer) free(v->tmp_buffer);
  
@@ -339,13 +338,27 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 		return bw;
 	}
 //
-//	bw = lzo_decompress2( vp->lzo, v->compr_buffer, bw, v->data_buffer);
-
+	v->bw = 0;
 	if( bw == (v->width * v->height ))
 	{
-		//@ repeat plane in data_buffer
-		veejay_memcpy( v->data_buffer + bw, v->data_buffer, bw );
-		veejay_memcpy( v->data_buffer + bw + bw, v->data_buffer,bw );
+		uint8_t *in = v->data_buffer;
+		uint8_t *out = v->tmp_buffer;
+		unsigned int i,j;	
+		unsigned int len = v->width * v->height;
+		unsigned int stride = v->width * 3;
+		unsigned int width = v->width;
+		unsigned int height = v->height;
+		for( j = 0; j < height ; j ++ )
+		{
+			for( i = 0; i < width; i ++ )
+			{
+				uint8_t *dst = out + j * stride + (i*3);
+				dst[0] = in[ j * width + i ];
+				dst[1] = in[ j * width + i ];
+				dst[2] = in[ j * width + i ];
+			}
+		}
+		v->bw = 1; 
 	}
 
 
@@ -481,7 +494,6 @@ int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *
 
 
 	vt->status_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 256);
-	vt->compr_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
 	vt->data_buffer  = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
 	vt->tmp_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
 	veejay_msg(2, "Track %d connected to Veejay %s : %d", track_num,hostname,port_num);
@@ -701,7 +713,11 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 		{			
 			veejay_track_t *v = vp->tracks[i];
 
-			list[i] = gdk_pixbuf_new_from_data( v->data_buffer, GDK_COLORSPACE_RGB, FALSE,
+			if( v->bw )
+				list[i] =gdk_pixbuf_new_from_data(v->tmp_buffer,GDK_COLORSPACE_RGB,FALSE,	
+					8,v->width,v->height,v->width*3,NULL,NULL );
+			else
+				list[i] = gdk_pixbuf_new_from_data( v->data_buffer, GDK_COLORSPACE_RGB, FALSE,
 					8, v->width, v->height, v->width * 3, NULL,NULL );
 /*
 			if(v->grey_scale)	
@@ -938,7 +954,6 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 					track_num );
 				if(v->hostname) free(v->hostname);
        				if(v->status_buffer) free(v->status_buffer);
-				if(v->compr_buffer) free(v->compr_buffer);
 				if(v->data_buffer) free(v->data_buffer);
 				if(v->tmp_buffer) free(v->tmp_buffer);
          			free(v);

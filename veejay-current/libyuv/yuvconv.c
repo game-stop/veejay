@@ -118,6 +118,12 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->stride[0] = w;
 			f->stride[1] = f->stride[2] = f->stride[0];
 			break;
+		case PIX_FMT_GRAY8:
+			f->uv_width = 0;
+			f->uv_height = 0;
+			f->stride[0] = w;
+			f->stride[1] = f->stride[2] = 0;
+			break;
 		default:
 #ifdef STRICT_CHECKING
 			assert(0);
@@ -179,6 +185,7 @@ static struct
 	{ PIX_FMT_RGB32,	IMG_ARGB32 },
 	{ PIX_FMT_RGBA,		IMG_RGBA32 },
 	{ PIX_FMT_RGB32_1,	IMG_RGBA32 },
+	{ PIX_FMT_GRAY8,	IMG_GRAY8 },
 	{ -1,			-1},
 };
 
@@ -191,7 +198,7 @@ void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
 		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA ||
 		src_fmt == PIX_FMT_BGR24   || src_fmt == PIX_FMT_RGB32 ||
-		src_fmt == PIX_FMT_RGB32_1  );
+		src_fmt == PIX_FMT_RGB32_1 || src_fmt == PIX_FMT_GRAY8 );
 	assert( src->width > 0 );
 	assert( dst->width > 0 );
 #endif
@@ -211,7 +218,7 @@ void	yuv_convert_any( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
 		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA ||
 		src_fmt == PIX_FMT_BGR24   || src_fmt == PIX_FMT_RGB32 ||
-		src_fmt == PIX_FMT_RGB32_1  );
+		src_fmt == PIX_FMT_RGB32_1 || src_fmt == PIX_FMT_GRAY8  );
 	assert( src->width > 0 );
 	assert( dst->width > 0 );
 #endif
