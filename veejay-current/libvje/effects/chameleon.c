@@ -54,11 +54,11 @@ static int N__ = 0;
 static int n__ = 0;
 
 static	int	has_bg = 0;
-int32_t	*sum = NULL;
-uint8_t		*timebuffer = NULL;
-uint8_t		*tmpimage[3] = { NULL,NULL,NULL};
+static int32_t	*sum = NULL;
+static uint8_t		*timebuffer = NULL;
+static uint8_t		*tmpimage[3] = { NULL,NULL,NULL};
 static	int	plane = 0;
-uint8_t		*bgimage[3] = { NULL,NULL,NULL};
+static uint8_t		*bgimage[3] = { NULL,NULL,NULL};
 
 #define PLANES_DEPTH 6
 #define	PLANES (1<< PLANES_DEPTH)
