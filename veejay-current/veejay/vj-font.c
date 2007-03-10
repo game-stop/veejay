@@ -119,6 +119,7 @@ typedef struct {
 	int	auto_number;
 	int	font_index;
 	long		index_len;
+	srt_cycle_t	*index_ptr;
 	srt_cycle_t	**index;
 	float		fps;
 	void	*dictionary;
@@ -1311,12 +1312,14 @@ void	vj_font_destroy(void *ctx)
 	}
 	if( f->index )
 	{
-		long k;
+	/*	long k;
 		for( k =0; k <= f->index_len ; k ++ )
 		{
 		  if( f->index[k] )
 			free(f->index[k]);
-		}
+		}*/
+		if(f->index_ptr)
+		  free(f->index_ptr);
 		free(f->index );
 	}
 	free( f->font_table );
@@ -1524,13 +1527,21 @@ void	vj_font_set_constraints_and_dict( void *font, long lo, long hi, float fps, 
 		free(f->index);
 		f->index = NULL;
 	}
+	if(f->index_ptr)
+	{
+		free(f->index_ptr);
+		f->index_ptr = NULL;
+	}
 
 	f->index = (srt_cycle_t**) vj_calloc(sizeof(srt_cycle_t*)*(len+1));
 	f->index_len = len;
 
 	long k;
+	srt_cycle_t *lin = vj_calloc( sizeof(srt_cycle_t) * f->index_len );
+
 	for( k = 0; k <= f->index_len; k ++ )
-		f->index[k] = (srt_cycle_t*) vj_calloc(sizeof(srt_cycle_t));
+		f->index[k] = &(lin[k]);
+	f->index_ptr = lin;
 
 	if(dict)
 	{
@@ -1606,6 +1617,7 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 	f->y = 0;
 	f->auto_number = 1;
 	f->index_len = 0;
+	f->index_ptr = NULL;
 	f->fgcolor[0] = 235;
 	f->fgcolor[1] = 128;
 	f->fgcolor[2] = 128;
