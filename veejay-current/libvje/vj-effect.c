@@ -105,6 +105,7 @@
 #include "effects/bathroom.h"
 #include "effects/timedistort.h"
 #include "effects/chameleon.h"
+#include "effects/chameleonblend.h"
 #include "effects/goom.h"
 #include "effects/slice.h"
 #include "effects/zoom.h"
@@ -229,6 +230,7 @@ static struct
 {	rgbchannel_malloc,		rgbchannel_free,	VJ_IMAGE_EFFECT_RGBCHANNEL	},
 {	timedistort_malloc,		timedistort_free,	VJ_IMAGE_EFFECT_TIMEDISTORT	},
 {	chameleon_malloc,		chameleon_free,		VJ_IMAGE_EFFECT_CHAMELEON	},
+{	chameleonblend_malloc,		chameleonblend_free,	VJ_VIDEO_EFFECT_CHAMBLEND	},
 {	NULL			,	NULL			,0				},
 };
 
@@ -486,7 +488,8 @@ void vj_effect_initialize(int width, int height, int full_range)
     vj_effects[39] = threshold_init(width,height);
 	vj_effects[40] = differencemap_init(width,height);
 	vj_effects[41] = picinpic_init(width,height);
-        vj_effects[42] = dummy_init(width,height);
+	vj_effects[42] = chameleonblend_init(width,height);
+        vj_effects[43] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);

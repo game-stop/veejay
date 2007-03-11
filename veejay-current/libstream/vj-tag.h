@@ -109,6 +109,7 @@ typedef struct {
     void *priv;
     void *extra;
     void *dict;
+    char padding[4];
 } vj_tag;
 
 void	*vj_tag_get_dict( int id );

@@ -47,6 +47,7 @@ typedef struct {
 	int in_use;
 	int promote;
 	vj_message **m_queue;
+	vj_message *lin_queue;
 	int n_queued;
 	int n_retrieved;
 } vj_link;
@@ -112,14 +113,17 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 		link[i]->promote = 0;
 		link[i]->m_queue = (vj_message**) vj_malloc(sizeof( vj_message * ) * VJ_MAX_PENDING_MSG );
 		if(!link[i]->m_queue)
-		{
 			return 0;
-		}
+		link[i]->lin_queue = (vj_message*) vj_calloc(sizeof(vj_message) * VJ_MAX_PENDING_MSG );
+		if(!link[i]->lin_queue)
+			return 0;
+
 		for( j = 0; j < VJ_MAX_PENDING_MSG; j ++ )
 		{
-			link[i]->m_queue[j] = (vj_message*) vj_malloc(sizeof(vj_message));
+		/*	link[i]->m_queue[j] = (vj_message*) vj_malloc(sizeof(vj_message));
 			link[i]->m_queue[j]->len = 0;
-			link[i]->m_queue[j]->msg = NULL;
+			link[i]->m_queue[j]->msg = NULL;*/
+			link[i]->m_queue[j] = &(link[i]->lin_queue[j]);
 		}
 		link[i]->n_queued = 0;
 		link[i]->n_retrieved = 0;
@@ -215,8 +219,11 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
 		link[i]->promote = 0;
 		link[i]->m_queue = (vj_message**) vj_calloc(sizeof( vj_message * ) * VJ_MAX_PENDING_MSG );
 		if(!link[i]->m_queue)	return 0;
+		link[i]->lin_queue = (vj_message*) vj_calloc(sizeof(vj_message) * VJ_MAX_PENDING_MSG );
+		if(!link[i]->lin_queue)
+			return 0;
 		for( j = 0; j < VJ_MAX_PENDING_MSG; j ++ )
-			link[i]->m_queue[j] = (vj_message*) vj_calloc(sizeof(vj_message));	
+			link[i]->m_queue[j] = &(link[i]->lin_queue[j]);
 		link[i]->n_queued = 0;
 		link[i]->n_retrieved = 0;		
 	}
@@ -917,9 +924,13 @@ void vj_server_shutdown(vj_server *vje)
 			close(Link[i]->handle);
 		for( j = 0; j < VJ_MAX_PENDING_MSG; j ++ )
 		{
-			if(Link[i]->m_queue[j]->msg ) free( Link[i]->m_queue[j]->msg );
-			if(Link[i]->m_queue[j] ) free( Link[i]->m_queue[j] );
+			if(Link[i]->m_queue[j]->msg )
+				free( Link[i]->m_queue[j]->msg );
+			//if(Link[i]->m_queue[j] ) free( Link[i]->m_queue[j] );
 		}
+		if( Link[i]->lin_queue)
+			free( Link[i]->lin_queue );
+	
 		if( Link[i]->m_queue ) free( Link[i]->m_queue );
 		if( Link[i] ) free( Link[i] );
     	}
@@ -986,6 +997,9 @@ char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 		return NULL; // done
 
 	char *msg = Link[id]->m_queue[index]->msg;
+#ifdef STRICT_CHECKING
+	assert( msg != NULL );
+#endif
 	int len = Link[id]->m_queue[index]->len;
 
 	index ++;

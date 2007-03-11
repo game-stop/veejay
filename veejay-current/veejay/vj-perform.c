@@ -74,6 +74,7 @@ typedef struct {
     uint8_t *Cr;
     uint8_t *alpha;
     int	     ssm;
+    char     padding[12];
 } ycbcr_frame;
 
 typedef struct {
@@ -82,6 +83,7 @@ typedef struct {
 	int	enc_active;
 	int	type;
 	int	active;
+	char	padding[12];
 } varcache_t;
 
 #define	RUP8(num)(((num)+8)&~8)
@@ -103,6 +105,7 @@ static int cached_sample_frames[CACHE_SIZE];
 
 static int frame_info[64][SAMPLE_MAX_EFFECTS];	/* array holding frame lengths  */
 static uint8_t *audio_buffer[SAMPLE_MAX_EFFECTS];	/* the audio buffer */
+static uint8_t *lin_audio_buffer_ = NULL;
 static uint8_t *top_audio_buffer;
 static uint8_t *resample_audio_buffer;
 static uint8_t *audio_render_buffer;
@@ -721,9 +724,14 @@ int vj_perform_init(veejay_t * info, int use_vp)
 static void vj_perform_close_audio() {
 	int i;
 
+	if( lin_audio_buffer_ )
+		free(lin_audio_buffer_ );
+	veejay_memset( audio_buffer, 0, sizeof(uint8_t*) * SAMPLE_MAX_EFFECTS );
+
+	/*
 	for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
 		if(audio_buffer[i]) free(audio_buffer[i]);
-
+	*/
 	if(top_audio_buffer) free(top_audio_buffer);
 	if(resample_audio_buffer) free(resample_audio_buffer);
 	if(audio_render_buffer) free( audio_render_buffer );
@@ -774,11 +782,12 @@ int vj_perform_init_audio(veejay_t * info)
 		return 0;
 
 	/* chained audio */
-	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
-	    audio_buffer[i] =
-		(uint8_t *) vj_calloc(sizeof(uint8_t) * PERFORM_AUDIO_SIZE);
-	    if(!audio_buffer[i])
+	lin_audio_buffer_ = (uint8_t*) vj_calloc( sizeof(uint8_t) * PERFORM_AUDIO_SIZE * SAMPLE_MAX_EFFECTS );
+	if(!lin_audio_buffer_)
 		return 0;
+
+	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
+	    audio_buffer[i] = lin_audio_buffer_ + (PERFORM_AUDIO_SIZE * i);
 	}
  
 	for( i = 0; i <= MAX_SPEED; i ++ )

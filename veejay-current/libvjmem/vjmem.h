@@ -1,7 +1,7 @@
 #ifndef VJ_X86_H
 #define VJ_X86_H
 
-
+#include <config.h>
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -15,10 +15,17 @@ extern void vj_mem_init(void);
 
 extern char *get_memcpy_descr( void );
 
-extern void *vj_malloc(unsigned int size);
-
-extern	void *vj_calloc(unsigned int size );
-
+#ifdef STRICT_CHECKING
+extern void *vj_strict_malloc(unsigned int size, const char *f, int line );
+extern void *vj_strict_calloc(unsigned int size, const char *f, int line );
+#define vj_malloc(i) vj_strict_malloc(i, __FUNCTION__,__LINE__)
+#define vj_calloc(i) vj_strict_calloc(i, __FUNCTION__,__LINE__)
+#else
+extern void *vj_malloc_(unsigned int size);
+#define vj_malloc(i) vj_malloc_(i)
+extern	void *vj_calloc_(unsigned int size );
+#define vj_calloc(i) vj_calloc_(i)
+#endif
 extern void *vj_yuvalloc( unsigned int w, unsigned int h );
 
 extern void fast_memset_dirty(void * to, int val, size_t len);

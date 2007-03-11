@@ -11,7 +11,8 @@ noinst_LTLIBRARIES = $(VJE_LIB_FILE)
 libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			effects/diff.c effects/fibdownscale.c effects/killchroma.c \
 			effects/lumamagick.c effects/autoeq.c effects/colorhis.c \
-		        effects/mirrors.c effects/goom.c effects/colormap.c effects/negation.c effects/overclock.c effects/dissolve.c effects/opacity.c effects/posterize.c \
+		        effects/mirrors.c effects/goom.c effects/colormap.c effects/negation.c \
+			effects/overclock.c effects/dissolve.c effects/opacity.c effects/posterize.c \
 			effects/dither.c effects/dices.c effects/emboss.c effects/flip.c \
 			effects/revtv.c effects/softblur.c effects/zoom.c effects/split.c effects/widthmirror.c \
 			effects/frameborder.c effects/dummy.c effects/rawman.c effects/rawval.c \
@@ -22,7 +23,8 @@ libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			transitions/transblend.c transitions/slidingdoor.c effects/color.c \
 			transitions/transline.c transitions/transop.c transitions/transcarot.c \
 			transitions/fadecolor.c effects/lumablend.c effects/chromamagick.c \
-			transitions/fadecolorrgb.c effects/magicoverlays.c  effects/binaryoverlays.c effects/pencilsketch.c effects/diffimg.c \
+			transitions/fadecolorrgb.c effects/magicoverlays.c  effects/binaryoverlays.c \
+			effects/pencilsketch.c effects/chameleonblend.c effects/diffimg.c \
 			effects/swirl.c effects/chromium.c effects/uvcorrect.c effects/chromapalette.c effects/radialblur.c effects/fisheye.c effects/raster.c effects/smear.c effects/magicmirror.c effects/lumamask.c effects/pixelate.c effects/colorshift.c effects/scratcher.c effects/opacitythreshold.c \
 			effects/opacityadv.c effects/rgbkeysmooth.c effects/mask.c effects/distort.c effects/motionmap.c \
 			transitions/wipe.c effects/magicscratcher.c effects/chromascratcher.c \

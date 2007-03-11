@@ -114,6 +114,7 @@ enum {
 	VJ_VIDEO_EFFECT_EXTTHRESHOLD = 239,
 	VJ_VIDEO_EFFECT_EXTDIFF		= 240,
 	VJ_VIDEO_EFFECT_PICINPIC = 241,
+	VJ_VIDEO_EFFECT_CHAMBLEND = 242,
 };
 
 enum {
@@ -211,7 +212,7 @@ enum {
 #define VJ_IMAGE_EFFECT_MAX 187
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 242
+#define VJ_VIDEO_EFFECT_MAX 243
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
@@ -557,5 +558,7 @@ extern void diff_destroy();
 extern void timedistort_apply( VJFrame *frame, int w, int h, int val );
 
 extern void chameleon_apply( VJFrame *frame, int w, int h, int mode, int refresh );
+
+extern void	chameleonblend_apply( VJFrame *frame, VJFrame *source, int w, int h, int mode, int refresh );
 
 #endif
