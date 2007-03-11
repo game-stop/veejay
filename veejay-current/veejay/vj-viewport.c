@@ -1578,17 +1578,19 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 
 	// clear the yuyv plane (black)
 	y  = ty1 * w;
-	yuyv_plane_clear( y*2, out_img);
+	if( y > 0) 
+		yuyv_plane_clear( y*2, out_img);
+
 	for( y = ty1; y < ty2; y ++ )
 	{
 		i = (y * w);
 		yuyv_plane_clear( tx1+tx1, outYUYV + i + i );
 		yuyv_plane_clear( (w-tx2)+(w-tx2),outYUYV + (i+tx2) + (i+tx2));
 	}
-	y = (v->h - ty2 ) * w;
+	y = (v->h - ty2 -1 ) * w;
 	x = ty2 * w;
-
-	yuyv_plane_clear( y+y, out_img + (x+x) );
+	if( y > 0 )
+		yuyv_plane_clear( y*2, out_img + (x*2) );
 	fast_memset_finish(); // finish yuyv_plane_clear
 
 	for( y = ty1 ; y < ty2; y ++ )

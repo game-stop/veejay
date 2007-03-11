@@ -82,8 +82,6 @@ void *subsample_init(int len)
 	if(!s->buf)
 		return NULL;
 
-	veejay_msg(0, "%s:%d",__FUNCTION__,__LINE__);
-
 	return (void*) s;
 }
 
@@ -515,10 +513,9 @@ static	inline void	copy_width( uint8_t *dst, uint8_t *in, int width )
 		i += 16;
 	}
 
-	x = (w % 16);
-	if( x > 4 )
-		small_memcpy( d, i, x-1);
-
+	x = (width % 16);
+	if( x )
+		small_memcpy( d, i, x);
 }
 
 static	inline	void	load_mask16to8()
@@ -571,13 +568,8 @@ static void ss_444_to_422_cp(void *data, uint8_t *buffer, uint8_t *dest, int wid
 		src = buffer + (y*width);
 		dst = dest + (y*dst_stride);
 
-#ifndef HAVE_ASM_MMX
-		for(x=0; x < dst_stride; x++)
-		{
-			*(dst++) = ( src[0] + src[1] + 1 ) >> 1;
-			src += 2;
-		}
-#else
+#if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_MMX2)
+
 		for( x= 0; x < mmxdst_stride; x++ )
 		{
 			down_sample16to8( dst, src );
@@ -589,6 +581,13 @@ static void ss_444_to_422_cp(void *data, uint8_t *buffer, uint8_t *dest, int wid
 			*(dst++) = ( src[0] + src[1] + 1 ) >> 1;
 			src += 2;
 		}
+#else
+		for(x=0; x < dst_stride; x++)
+		{
+			*(dst++) = ( src[0] + src[1] + 1 ) >> 1;
+			src += 2;
+		}
+
 #endif
 	}
 }
@@ -614,13 +613,7 @@ static void ss_444_to_422(void *data, uint8_t *buffer, int width, int height)
 		src = sampler->buf;
 		dst = buffer + (y*dst_stride);
 
-#ifndef HAVE_ASM_MMX
-		for(x=0; x < dst_stride; x++)
-		{
-			*(dst++) = ( src[0] + src[1] + 1 ) >> 1;
-			src += 2;
-		}
-#else
+#if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_MMX2)
 		copy_width( src, buffer + (y*width), width );
 
 		for( x= 0; x < mmxdst_stride; x++ )
@@ -632,6 +625,12 @@ static void ss_444_to_422(void *data, uint8_t *buffer, int width, int height)
 		for(x=0; x < left; x++)
 		{
 			*(dst++) = ( src[0] + src[1] + 1 ) >> 1;
+			src += 2;
+		}
+#else
+		for( x = 0; x < dst_stride; x ++ )
+		{
+			*(dst++) = (src[0] + src[1] + 1 ) >> 1;
 			src += 2;
 		}
 #endif

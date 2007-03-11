@@ -95,8 +95,8 @@ int 	timedistort_malloc( int w, int h )
 		planetableV[i] = &planes[2][ (w*h) * i ];
 	}
 
-	warptime[0] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8(w * h) );
-	warptime[1] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8(w * h) );
+	warptime[0] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8((w * h)+w+1) );
+	warptime[1] = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8((w * h)+w+1) );
 	if( warptime[0] == NULL || warptime[1] == NULL )
 		return 0;
 

@@ -647,6 +647,12 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 	{
 		int tmp=0;
 		// new mode is stream, see if sample_id is a network stream (if so, connect!)
+
+		if(!vj_tag_exists(sample_id ))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "There is no stream with #%d", sample_id );
+			return;
+		}
 		if( vj_tag_get_type( sample_id ) == VJ_TAG_TYPE_NET ||
 			vj_tag_get_type( sample_id) == VJ_TAG_TYPE_MCAST ||
 			vj_tag_get_type( sample_id) == VJ_TAG_TYPE_V4L )

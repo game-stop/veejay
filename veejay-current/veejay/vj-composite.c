@@ -91,7 +91,7 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 
 	c->vp1 = viewport_init( pw, ph, homedir, &vp1_enabled, &vp1_frontback, 1 );
 
-	c->sampler = subsample_init( iw );
+	c->sampler = subsample_init( pw );
 
 	sws_template sws_templ;
 	veejay_memset(&sws_templ,0,sizeof(sws_template));
