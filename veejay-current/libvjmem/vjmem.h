@@ -15,7 +15,7 @@ extern void vj_mem_init(void);
 
 extern char *get_memcpy_descr( void );
 
-#ifdef STRICT_CHECKING
+/*#ifdef STRICT_CHECKING
 extern void *vj_strict_malloc(unsigned int size, const char *f, int line );
 extern void *vj_strict_calloc(unsigned int size, const char *f, int line );
 #define vj_malloc(i) vj_strict_malloc(i, __FUNCTION__,__LINE__)
@@ -25,7 +25,14 @@ extern void *vj_malloc_(unsigned int size);
 #define vj_malloc(i) vj_malloc_(i)
 extern	void *vj_calloc_(unsigned int size );
 #define vj_calloc(i) vj_calloc_(i)
-#endif
+#endif*/
+
+extern void *vj_malloc_(unsigned int size);
+#define vj_malloc(i) vj_malloc_(i)
+extern  void *vj_calloc_(unsigned int size );
+#define vj_calloc(i) vj_calloc_(i)
+
+
 extern void *vj_yuvalloc( unsigned int w, unsigned int h );
 
 extern void fast_memset_dirty(void * to, int val, size_t len);

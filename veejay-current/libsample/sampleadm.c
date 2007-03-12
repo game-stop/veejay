@@ -69,7 +69,7 @@ static int next_avail_num = 0;	/* available sample id */
 static int initialized = 0;	/* whether we are initialized or not */
 static hash_t *SampleHash;	/* hash of sample information structs */
 static int avail_num[SAMPLE_MAX_SAMPLES];	/* an array of freed sample id's */
-
+static void *sample_font_ = NULL;
 static int sampleadm_state = SAMPLE_PEEK;	/* default state */
 
 typedef struct
@@ -174,7 +174,7 @@ void	*sample_get_dict( int sample_id )
  * call before using any other function as sample_skeleton_new
  *
  ****************************************************************************************************/
-void sample_init(int len)
+void sample_init(int len, void *font)
 {
     if (!initialized) {
 	int i;
@@ -191,6 +191,8 @@ void sample_init(int len)
         chain_cache_ = vpn( 2000 ); //@ fx cache lines
 
     }
+
+    sample_font_ = font;
 }
 
 void	sample_free()
@@ -853,38 +855,46 @@ int sample_del(int sample_id)
     sample_info *si;
     si = sample_get(sample_id);
     if (!si)
-	return -1;
-#ifdef HAVE_FREETYPE
-	vj_font_dictionary_destroy( si->dict );
-#endif
+	return 0;
 
     sample_node = hash_lookup(SampleHash, (void *) si->sample_id);
     if (sample_node) {
-    int i;
-    
-
-    vj_el_clear_cache( si->edit_list );
-    for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
-    {
+	    int i;
+ 	    vj_el_break_cache( si->edit_list ); //@ destroy cache, if any
+	    for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
+	    {
 		vevo_port_free( si->effect_chain[i]->kf );
 		if (si->effect_chain[i])
 			free(si->effect_chain[i]);
-    }
+	    }
   
-    // better not do this
-  //  if(si->edit_list)
-//	vj_el_free(si->edit_list);
-    if (si)
-      free(si);
-    /* store freed sample_id */
-    avail_num[next_avail_num] = sample_id;
-    next_avail_num++;
-    hash_delete(SampleHash, sample_node);
+	    if(si->edit_list)
+		vj_el_free(si->edit_list);
 
-    return 1;
+	    if(si->encoder_base )
+		free(si->encoder_base );
+	    if(si->encoder_destination )
+		free(si->encoder_destination );
+	    if(si->edit_list_file)
+		free( si->edit_list_file );
+#ifdef HAVE_FREETYPE
+//font ?
+	    if( si->dict )
+		vj_font_dictionary_destroy( sample_font_,si->dict );
+#endif
+	    free(si);
+
+		  /* store freed sample_id */
+  	 	  avail_num[next_avail_num] = sample_id;
+  		  next_avail_num++;
+   		   hash_delete(SampleHash, sample_node);
+
+	     veejay_msg(VEEJAY_MSG_DEBUG, "Deleted sample %d",sample_id );
+
+    		return 1;
     }
 
-    return -1;
+    return 0;
 }
 
 
@@ -1245,10 +1255,10 @@ int sample_set_chain_channel(int s1, int position, int input)
 		{
 		    sample_info *old = sample_get( sample->effect_chain[position]->channel );
 		    if(old)
-			    vj_el_clear_cache( old->edit_list );
+			    vj_el_break_cache( old->edit_list ); // no longer needed
 	    	
-			if(new)
-				vj_el_setup_cache( new->edit_list );
+		    if(new)
+			vj_el_setup_cache( new->edit_list ); // setup new cache
 		}
 	 }
 	sample->effect_chain[position]->channel = input;
@@ -1256,24 +1266,72 @@ int sample_set_chain_channel(int s1, int position, int input)
     	return ( sample_update(sample,s1));
 }
 
-int	sample_stop_playing(int s1)
+static	int sample_sample_used(sample_info *a, int b )
+{
+	int i;
+	for( i = 0; i < SAMPLE_MAX_EFFECTS; i ++ )
+	{
+		int src_type =  a->effect_chain[i]->source_type;
+		int id       =  a->effect_chain[i]->channel;
+		if( src_type == 0 && id == b )
+			return 1;
+	}
+	return 0;
+}
+
+int	sample_stop_playing(int s1, int new_s1)
 {
 	sample_info *sample = sample_get(s1);
+	sample_info *newsample = NULL;
+	if( new_s1 )
+		newsample = sample_get(new_s1);
 	if (!sample)
-		return -1;
-	int i;
-	vj_el_clear_cache( sample->edit_list );
-	for( i = 0; i < SAMPLE_MAX_EFFECTS;i++ )
+		return 0;
+	if (new_s1 && !newsample)
+		return 0;
+	unsigned int i,j;
+	
+	//@ stop playing, if new_s1
+
+	if( new_s1 == s1 )
+		return 1;
+
+	int destroy_s1 = 1;
+
+	if( new_s1 )
 	{
-		int src_type =  sample->effect_chain[i]->source_type;
-		int id       =   sample->effect_chain[i]->channel;
-		if( src_type == 0 && id > 0 )
+		for( i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ )
 		{
-			sample_info *second = sample_get( id );
-	       		if(second)
-				vj_el_clear_cache( second->edit_list );
-	    	}
-    	}
+			int src_type =  newsample->effect_chain[i]->source_type;
+			int id       =  newsample->effect_chain[i]->channel;
+			if( src_type == 0 && id == s1 )
+				destroy_s1 = 0; // no need to destroy cache, used by newsample
+		}			
+	}
+
+	if(destroy_s1)
+		vj_el_break_cache( sample->edit_list ); // break the cache
+
+	
+	if( new_s1 )
+	{
+		for( i = 0; i < SAMPLE_MAX_EFFECTS;i++ )
+		{
+			int src_type =  sample->effect_chain[i]->source_type;
+			int id       =   sample->effect_chain[i]->channel;
+			if( src_type == 0 && id > 0 )
+			{
+				//@ if ID is not in newsample,
+				if( !sample_sample_used( newsample, id ))
+				{
+					sample_info *second = sample_get( id );
+		       			if(second) //@ get and destroy its cache
+						vj_el_break_cache( second->edit_list );
+		    		}
+			}
+    		}
+	}
+
 	return 1;
 }
 

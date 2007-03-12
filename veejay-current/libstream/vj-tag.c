@@ -83,6 +83,17 @@ void	vj_tag_free(void)
 			free( _temp_buffer[i] );
 		_temp_buffer[i] = NULL;
 	}
+	
+	vj_tag_close_all();
+
+	if( vj_tag_input)
+		free(vj_tag_input);
+
+	if( tag_encoder_buf )
+		free( tag_encoder_buf );
+
+	vj_unicap_deinit(unicap_data_);
+
 }
 
 
@@ -325,6 +336,7 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
 		    int norm, int palette, int freq, int channel)
 {
+	char refname[100];
 	veejay_msg(VEEJAY_MSG_DEBUG, "%s: %dx%d, channel=%d, stream id=%d",__FUNCTION__,width,height, channel,stream_nr );
   	if (stream_nr < 0 || stream_nr > vj_tag_num_devices())
 	{
@@ -337,7 +349,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
 	    veejay_msg(0,"Unable to open device %d", channel);
 	    return 0;
     	}
-	
+
 	if(!vj_unicap_configure_device(   vj_tag_input->unicap[stream_nr] ,
 			   palette, width,height))
 	{
@@ -347,6 +359,8 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
    	}
 	else
 		veejay_msg(VEEJAY_MSG_DEBUG, "Configured device %d", channel);
+	sprintf(refname, "%d",channel );
+	tag->extra = strdup(refname);
 
 
 	char **props = vj_unicap_get_list(
@@ -596,7 +610,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     switch (type) {
 	    case VJ_TAG_TYPE_V4L:
 		sprintf(tag->source_name, "%s", filename );
-
+		
 		if (!_vj_tag_new_unicap
 		    (tag, stream_nr, w, h,el->video_norm, pix_fmt, extra,channel ))
 		{
@@ -752,7 +766,7 @@ int vj_tag_del(int id)
     if(!tag)
 	return 0;
 #ifdef HAVE_TRUETYPE
-	vj_font_dictionary_destroy(tag->dict);
+	vj_font_dictionary_destroy(_tag_info->font ,tag->dict);
 #endif
     
     if(tag->extra)
@@ -813,7 +827,10 @@ int vj_tag_del(int id)
 		if (tag->effect_chain[i])
 		    free(tag->effect_chain[i]);
 
-      	if(tag) free(tag);
+	if(tag->socket_frame)
+		free(tag->socket_frame);
+
+      	free(tag);
       	avail_tag[ next_avail_tag] = id;
       	next_avail_tag++;
       	hash_delete(TagHash, tag_node);
@@ -2652,6 +2669,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 
 	int fx_on=0, id=0, source_id=0, source_type=0;
 	char *source_file = NULL;
+	char *extra_data = NULL;
 	int col[3] = {0,0,0};
 	int fader_active=0, fader_val=0, fader_dir=0, opacity=0, nframes=0;
 #ifdef STRICT_CHECKING
@@ -2676,6 +2694,9 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 			source_type = tag_get_int_xml(doc,cur,"source_type" );
 		if( !xmlStrcmp(cur->name, (const xmlChar*) "source_file" ) )
 			source_file = tag_get_char_xml(doc,cur, "source_file");
+		if( !xmlStrcmp(cur->name, (const xmlChar*) "extra_data" ))
+			extra_data = tag_get_char_xml(doc,cur, "extra_data");
+
 		if(! xmlStrcmp(cur->name, (const xmlChar*) "red" ) )
 			col[0] = tag_get_int_xml( doc,cur, "red" );
 		if(! xmlStrcmp(cur->name, (const xmlChar*) "green" ) )
@@ -2709,8 +2730,8 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 	{
 		int zer = 0;
 
-		if( source_type == VJ_TAG_TYPE_V4L && source_file )	
-			sscanf( source_file, "video%d",&zer );	
+		if( source_type == VJ_TAG_TYPE_V4L && extra_data )	
+			sscanf( extra_data, "%d",&zer );	
 
 		vj_tag_del( id );
 
@@ -2881,6 +2902,9 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font)
 
 	sprintf(buffer, "%s", tag->source_name );
 	xmlNewChild(node,NULL,(const xmlChar*) "source_file", (const xmlChar*) buffer );
+
+	sprintf(buffer, "%s", tag->extra );
+	xmlNewChild(node, NULL,(const xmlChar) "extra_data", (const xmlChar*) buffer );
 
 	sprintf(buffer, "%d", tag->color_r );
 	xmlNewChild(node,NULL,(const xmlChar*) "red", (const xmlChar*) buffer );

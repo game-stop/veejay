@@ -555,6 +555,10 @@ extern void colorhis_apply( VJFrame *frame, int w, int h, int v, int m, int i, i
 
 extern void diff_destroy();
 
+extern void distortion_destroy();
+
+extern void rotozoom_destroy();
+
 extern void timedistort_apply( VJFrame *frame, int w, int h, int val );
 
 extern void chameleon_apply( VJFrame *frame, int w, int h, int mode, int refresh );

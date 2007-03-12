@@ -895,6 +895,10 @@ void vj_osc_free(void *d)
 {
 	if(!d) return;
 	vj_osc *c = (vj_osc*) d;
+	void *addr = OSCPacketBufferGetClientAddr(c->packet );
+	if(addr)
+		free(addr);
+	if(c->osc_args) free(c->osc_args);
 	if(c->leaves) free(c->leaves);
 	if(c) free(c);
 	c = NULL;

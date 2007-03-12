@@ -2362,6 +2362,8 @@ void vj_event_no_caching(void *ptr, const char format[], va_list ap)
 		vj_el_setup_cache( v->current_edit_list );
 		veejay_msg(VEEJAY_MSG_INFO,"Sample FX Cache enabled : Recycling identicial samples in FX chain (default)"); 
 	}
+
+	vj_el_set_caching(v->no_caching);
 }
 
 void vj_event_debug_level(void *ptr, const char format[], va_list ap)

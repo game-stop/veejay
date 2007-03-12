@@ -182,7 +182,7 @@ extern int sample_chain_malloc(int sample_id);
 extern int sample_chain_free(int sample_id);
 extern int sample_size();
 extern int sample_verify();
-extern void sample_init(int len);
+extern void sample_init(int len, void *font);
 extern int sample_update(sample_info *sample, int s1);
 #ifdef HAVE_XML2
 extern int sample_readFromFile(char *, void *ptr, void *font, void *el, int *id, int *mode);
@@ -329,7 +329,7 @@ extern void        sample_set_project(int fmt, int deinterlace, int flags, int f
 extern int sample_cache_used( int s1 );
 extern void        sample_free();
 
-extern int sample_stop_playing(int s1);
+extern int sample_stop_playing(int s1, int new_s1);
 extern int sample_start_playing(int s1, int no_cache);
 extern int sample_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type);
 extern unsigned char *UTF8toLAT1(unsigned char *in);

@@ -621,6 +621,8 @@ void vj_effect_shutdown() {
     }
 
     diff_destroy();
+    rotozoom_destroy();
+    distortion_destroy();
 
 }
 

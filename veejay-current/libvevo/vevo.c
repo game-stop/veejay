@@ -175,9 +175,9 @@ typedef struct {
 
 
 //! \var port_ref_ Book keeping of allocated and freed ports
-#ifdef STRICT_CHECKING
+/*#ifdef STRICT_CHECKING
 static	vevo_port_t	*port_ref_ = NULL;
-#endif
+#endif*/
 static  size_t		atom_sizes_[100];
 
 //! Check if an object is soft referenced
@@ -372,8 +372,9 @@ for( i = 0; i < t->num_elements ; i ++ )\
  \return vevo_storage_t a new vevo_storage_t object
 */
 static vevo_storage_t *vevo_new_storage(__vevo_port_t *port );
-
+/*
 static int	vevo_port_ref_verify( vevo_port_t *p) ;
+*/
 //! Copy a value into a new atom
 /*!
  \param port port
@@ -513,6 +514,7 @@ static	void	vevo_port_add_property( vevo_port_t *p,int finalize, const char *key
  */
 static	void	vevo_port_finalize( vevo_port_t *port, int port_type )
 {
+/*
 #ifdef STRICT_CHECKING
 	if( port_type != VEVO_PORT_REFERENCES )
 	{
@@ -521,7 +523,8 @@ static	void	vevo_port_finalize( vevo_port_t *port, int port_type )
 		sprintf(ref_key,"%p",port );
 		vevo_property_set( port_ref_, ref_key, VEVO_ATOM_TYPE_INT, 1, &ref );
 	}
-#endif
+#endif 
+*/
 	if( port_type <= 1024 && port_type > 0 )
 		vevo_port_add_property( port, 1,"type",VEVO_ATOM_TYPE_INT,1, &port_type );
 }	
@@ -1037,9 +1040,11 @@ vevo_port_t *vevo_port_new(int port_type, const char *func, int line_num)
 //! Initialize VeVo. Set up bookkeeping information to track Port construction and destruction
 void	vevo_strict_init()
 {
+/*
 #ifdef STRICT_CHECKING
 	port_ref_ = vevo_port_new( VEVO_PORT_REFERENCES, __FUNCTION__,__LINE__ );
 #endif
+*/
 	memset( atom_sizes_,0,sizeof(atom_sizes_) );
 	atom_sizes_[1] = sizeof(int32_t);
 	atom_sizes_[2] = sizeof(double);
@@ -1110,7 +1115,7 @@ static void vevo_port_free_(vevo_port_t * p)
  \return error code
  */
 int	vevo_port_verify( vevo_port_t *port )
-{
+{/*
 #ifdef STRICT_CHECKING
 	if( port == port_ref_ )
 		return 1;
@@ -1139,6 +1144,7 @@ int	vevo_port_verify( vevo_port_t *port )
 		return 0;
 	}
 #endif
+*/
 	return 1;
 }
 
@@ -1161,6 +1167,7 @@ void	vevo_port_free( vevo_port_t *port )
 #endif
 		return;
 	}
+/*
 #ifdef STRICT_CHECKING
 	char pkey[32];
 	sprintf(pkey, "%p",port);
@@ -1193,8 +1200,11 @@ void	vevo_port_free( vevo_port_t *port )
 		vevo_port_free_( port );
 	}
 #else
+*/
 	vevo_port_free_(port );
+/*
 #endif	
+*/
 }
 
 //! Check if a Property is soft referenced
@@ -1592,6 +1602,7 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 //! Report statistics and free bookkeeping information
 void	vevo_report_stats()
 {
+/*
 #ifdef STRICT_CHECKING
 	if( port_ref_ )
 	{
@@ -1600,7 +1611,7 @@ void	vevo_report_stats()
 			veejay_msg(0,"%d VEVO ports are still referenced",errs);
 		vevo_port_free( port_ref_ );
 	}
-#endif
+#endif*/
 }
 
 static	int	vevo_port_get_port( void *port, vevo_storage_t *item, void *res )
@@ -1974,6 +1985,7 @@ static void	vevo_port_recurse_free( vevo_port_t *sorted_port, vevo_port_t *p )
 static int	vevo_port_ref_verify( vevo_port_t *p) 
 {
 	int err = 0;
+/*
 #ifdef STRICT_CHECKING
 	char **item = NULL;
 	int i;
@@ -2016,6 +2028,8 @@ static int	vevo_port_ref_verify( vevo_port_t *p)
 	free(item);
 #endif
 	return err;
+*/
+	return 1;
 }
 static	char	*vevo_property_get_str( vevo_port_t *port, const char *key )
 {

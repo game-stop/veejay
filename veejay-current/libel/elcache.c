@@ -113,20 +113,18 @@ void	*init_cache( unsigned int n_slots )
 {
 	if(n_slots <= 0)
 		return NULL;
-
-	cache_t *v = (cache_t*) vj_malloc(sizeof(cache_t));
+	cache_t *v = (cache_t*) vj_calloc(sizeof(cache_t));
 	v->len = n_slots;
-	v->cache = (cache_slot_t**) vj_malloc(sizeof(cache_slot_t*) * v->len );
+	v->cache = (cache_slot_t**) vj_calloc(sizeof(cache_slot_t*) * v->len );
 	if(!v->cache)
 	{
 		free(v);
 		return NULL;
 	}
-	veejay_memset( v->cache, 0, sizeof(cache_slot_t*) * v->len );
-
-	v->index = (long*) malloc(sizeof(long) * v->len );
-	veejay_memset( v->index, -1, sizeof(long) * v->len );
-
+	v->index = (long*) vj_malloc(sizeof(long) * v->len );
+	int n;
+	for( n = 0; n < v->len ; n ++ )
+		v->index[n] = -1;
 	return (void*) v;
 }
 
@@ -135,9 +133,9 @@ void	reset_cache(void *cache)
 	int i = 0;
 	cache_t *v = (cache_t*) cache;
 
-	veejay_memset( v->index, -1, sizeof(long) * v->len );
 	for( i = 0; i < v->len; i ++ )
 	{
+		v->index[i] = -1;
 		if( v->cache[i] )
 		{
 			total_mem_used_ -= v->cache[i]->size;
@@ -145,7 +143,7 @@ void	reset_cache(void *cache)
 			 free(v->cache[i]->buffer);
 			free(v->cache[i]);
 			v->cache[i] = NULL;
-		};
+		}
 	}
 }
 
@@ -162,6 +160,7 @@ void	free_cache(void *cache)
 	free(v->cache);
 	free(v->index);
 	free(v);
+	v = NULL;
 }
 
 void	cache_frame( void *cache, uint8_t *linbuf, int buflen, long frame_num , int decoder_id)
@@ -194,6 +193,10 @@ uint8_t *get_cached_frame( void *cache, long frame_num, int *buf_len, int *decod
 		return NULL;
 
 	cache_slot_t *data = v->cache[ slot ];
+#ifdef STRICT_CHECKING
+	assert( data->size > 0 );
+	assert( data->buffer != NULL );
+#endif
 
 	*buf_len 	= data->size;
 	*decoder_id	= data->fmt;

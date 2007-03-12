@@ -28,4 +28,5 @@ vj_effect *distortion_init(int w, int h);
 void distortion_apply( VJFrame *frame, int width, int height, int n,
 		      int type);
 void distort_free();
+void distortion_destroy();
 #endif

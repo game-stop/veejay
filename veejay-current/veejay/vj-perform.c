@@ -93,7 +93,7 @@ static	void		*lzo_;
 static void 	*effect_sampler = NULL;
 static void	*crop_sampler = NULL;
 static VJFrame *crop_frame = NULL;
-static ycbcr_frame **video_output_buffer; /* scaled video output */
+static ycbcr_frame **video_output_buffer = NULL; /* scaled video output */
 static int	video_output_buffer_convert = 0;
 static ycbcr_frame **frame_buffer;	/* chain */
 static ycbcr_frame **primary_buffer;	/* normal */
@@ -106,14 +106,14 @@ static int cached_sample_frames[CACHE_SIZE];
 static int frame_info[64][SAMPLE_MAX_EFFECTS];	/* array holding frame lengths  */
 static uint8_t *audio_buffer[SAMPLE_MAX_EFFECTS];	/* the audio buffer */
 static uint8_t *lin_audio_buffer_ = NULL;
-static uint8_t *top_audio_buffer;
-static uint8_t *resample_audio_buffer;
-static uint8_t *audio_render_buffer;
-static uint8_t *down_sample_buffer;
+static uint8_t *top_audio_buffer = NULL;
+static uint8_t *resample_audio_buffer = NULL;
+static uint8_t *audio_render_buffer = NULL;
+static uint8_t *down_sample_buffer = NULL;
 static uint8_t *temp_buffer[4];
-static uint8_t *socket_buffer;
-static ycbcr_frame *record_buffer;	// needed for recording invisible streams
-static VJFrame *helper_frame;
+static uint8_t *socket_buffer = NULL;
+static ycbcr_frame *record_buffer = NULL;	// needed for recording invisible streams
+static VJFrame *helper_frame = NULL;
 static int vj_perform_record_buffer_init();
 static void vj_perform_record_buffer_free();
 #ifdef HAVE_JACK
@@ -884,9 +884,13 @@ void vj_perform_free(veejay_t * info)
 			free(video_output_buffer[c]->Cb );
 		if(video_output_buffer[c]->Cr )
 			free(video_output_buffer[c]->Cr );
+		free(video_output_buffer[c]);
 	}
-
 	free(video_output_buffer);
+	free(helper_frame);
+
+	if(lzo_)
+		lzo_free(lzo_);
 }
 
 /***********************************************************************

@@ -22,7 +22,7 @@
 #include <veejay/vims.h>
 #include <veejay/vevo.h>
 #include <libvjmsg/vj-common.h>
-
+#include <libvjmem/vjmem.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -179,7 +179,6 @@ void		vj_event_vevo_inline_fire_default( void *super, int vims_id, const char *f
 	vj_event_vevo_inline_fire( super, vims_id, format, &dval[0],&dval[1],&dval[2],&dval[3]);
 }	
 
-
 static vevo_port_t	*_new_event(
 		const char *format,
 		int vims_id,	
@@ -217,8 +216,6 @@ static vevo_port_t	*_new_event(
 
 	va_list ap;
 	va_start(ap, flags);
-//	veejay_msg(VEEJAY_MSG_DEBUG,
-//	  "VIMS %03d: '%s' '%s' %d arguments", vims_id, name, format, n_arg );
 
 	for( n = 0; n < n_arg ; n ++)
 	{
@@ -365,8 +362,8 @@ void		vj_event_vevo_free(void)
 
 void		vj_init_vevo_events(void)
 {	
-	index_map_ = (vevo_port_t*) malloc(sizeof(vevo_port_t*) * MAX_INDEX );
-	memset( index_map_, 0, sizeof( vevo_port_t *) * MAX_INDEX );
+	index_map_ = (vevo_port_t*) vj_malloc(sizeof(vevo_port_t*) * MAX_INDEX );
+	veejay_memset( index_map_, 0, sizeof( vevo_port_t *) * MAX_INDEX );
 
 	index_map_[VIMS_VIDEO_PLAY_FORWARD] = _new_event(  
 				NULL,

@@ -36,7 +36,7 @@ static int g_map_width = 0;
 static int g_map_height = 0;
 static int g_cube_size = 0;
 static int g_cube_bits = 0;
-static uint8_t *g_dicemap;
+static uint8_t *g_dicemap=NULL;
 
 void dice_create_map(int w, int h);
 
@@ -62,8 +62,6 @@ vj_effect *dices_init(int width, int height)
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;
-    g_dicemap = (uint8_t *) vj_calloc(sizeof(uint8_t) * width * height);
-    dice_create_map(width, height);
     return ve;
 }
 // FIXME: private

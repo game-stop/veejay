@@ -337,13 +337,20 @@ void	vj_el_break_cache( editlist *el )
 {
 	if( el->cache )
 		free_cache( el->cache );
+	el->cache = NULL;
+}
 
+static int never_cache_ = 0;
+void	vj_el_set_caching(int status)
+{
+	never_cache_ = status;
 }
 
 //@ iterateovers over sample fx chain
 void	vj_el_setup_cache( editlist *el )
 {
-	if(!el->cache)
+//@ FIXME: user setting to prevent cache setup!
+	if(!el->cache && !never_cache_)
 	{
 		int n_slots = mem_chunk_ / el->max_frame_size;
 		if( n_slots < (el->video_frames - 1) )
@@ -454,7 +461,6 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 		
         veejay_memset( d->deinterlace_buffer[0], 0, width * height * 3 );
 
-        d->ref = 1;
         return d;
 }
 
@@ -1527,28 +1533,6 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 	return el;
 }
 
-void	vj_el_close( editlist *el )
-{
-	int i;
-	for ( i = 0; i < el->num_video_files; i ++ )
-	{
-		if(!el->ref[i])
-		{
-			if( el->lav_fd[i] ) 
-			{
-				lav_close( el->lav_fd[i] );
-			}
-		}
-		if( el->video_file_list[i]) free(el->video_file_list[i]);
-	}
-	if( el->cache )
-		free_cache( el->cache );
-
-	if( el->frame_list )
-		free(el->frame_list );
-	free(el);
-}
-
 editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int deinterlace, int force	,char norm , int fmt)
 {
 	editlist *el = vj_malloc(sizeof(editlist));
@@ -1796,34 +1780,38 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 
 void	vj_el_free(editlist *el)
 {
-	if(el)
+#ifndef STRICT_CHECKING
+	if(!el)
+		return;
+#else
+	assert( el != NULL );
+#endif
+	int i;
+	if(el->is_clone)
 	{
-		int i;
-		for( i = 0; i < MAX_EDIT_LIST_FILES ; i++ )
+		for( i = 0; i < el->num_video_files; i ++ )
 		{
-			if( el->video_file_list[i] && el->lav_fd[i])
-				free(el->video_file_list[i]);
-			/* close fd if ref counter is zero */
-			if(!el->ref && el->lav_fd[i])
-				lav_close( el->lav_fd[i]);
+			if( el->video_file_list[i])
+				free(el->video_file_list[i] );
 		}
-		if(el->frame_list)
-			free(el->frame_list);
-		if(el->cache)
-			free_cache(el->cache);
-		free(el);   
-		el = NULL;
 	}
-}
+	else
+	{
+		for ( i = 0; i < el->num_video_files; i ++ )
+		{
+			if( el->lav_fd[i] ) 
+				lav_close( el->lav_fd[i] );
+			if( el->video_file_list[i]) free(el->video_file_list[i]);
+		}
+	}
 
-void	vj_el_ref(editlist *el, int n)
-{
-	el->ref[n]++;
-}
-void	vj_el_unref(editlist *el, int n)
-{
-	if(el->ref[n])
-		el->ref[n]--;
+	if( el->cache )
+		free_cache( el->cache );
+	if( el->frame_list )
+		free(el->frame_list );
+	free(el);
+
+	el = NULL;
 }
 
 void	vj_el_print(editlist *el)
@@ -2104,10 +2092,9 @@ void	vj_el_frame_cache(int n )
 
 editlist	*vj_el_soft_clone(editlist *el)
 {
-	editlist *clone = (editlist*) vj_malloc(sizeof(editlist));
-	veejay_memset( clone, 0, sizeof(editlist));
+	editlist *clone = (editlist*) vj_calloc(sizeof(editlist));
 	if(!clone)
-		return 0;
+		return NULL;
 	clone->is_empty = el->is_empty;
 	clone->has_video = el->has_video;
 	clone->video_width = el->video_width;
@@ -2125,15 +2112,12 @@ editlist	*vj_el_soft_clone(editlist *el)
 	clone->num_video_files = el->num_video_files;
 	clone->max_frame_size = el->max_frame_size;
 	clone->MJPG_chroma = el->MJPG_chroma;
-
 	clone->frame_list = NULL;
 	clone->last_afile = el->last_afile;
 	clone->last_apos  = el->last_apos;
 	clone->auto_deinter = el->auto_deinter;
 	clone->pixel_format = el->pixel_format;
-//	int n_slots = mem_chunk_ / el->max_frame_size;
-//	clone->cache = init_cache( n_slots );
-//	veejay_msg(VEEJAY_MSG_DEBUG, "EditList caches at most %d frames", n_slots );
+	clone->is_clone = 1;
 	int i;
 	for( i = 0; i < MAX_EDIT_LIST_FILES; i ++ )
 	{
@@ -2145,7 +2129,6 @@ editlist	*vj_el_soft_clone(editlist *el)
 		{
 			clone->video_file_list[i] = strdup( el->video_file_list[i] );
 			clone->lav_fd[i] = el->lav_fd[i];
-			clone->ref[i] = 1; // clone starts with ref count of 1
 			clone->num_frames[i] = el->num_frames[i];
 			clone->yuv_taste[i] =el->yuv_taste[i];
 		}

@@ -430,6 +430,8 @@ int veejay_free(veejay_t * info)
 
 	vj_event_stop();
 
+	sample_del_all();
+
 	vj_effect_shutdown();
 
      	vj_tag_free();
@@ -470,6 +472,10 @@ int veejay_free(veejay_t * info)
         free(info->status_what);
 	free(info->homedir);  
         free(info->uc);
+	if(info->cpumask)
+	  free(info->cpumask);
+	if(info->mask)
+          free(info->mask);
         free(settings);
         free(info);
     return 1;
@@ -597,199 +603,199 @@ int veejay_init_editlist(veejay_t * info)
    return 0;
 }
 
-void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
+static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 {
-	// if current is stream and playing network stream, close connection
-	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
+	if(!sample_stop_playing( info->uc->sample_id, new_sample_id ) )
 	{
-		int cur_id = info->uc->sample_id;
-		if( new_pm != info->uc->playback_mode ||
-				( new_pm == VJ_PLAYBACK_MODE_SAMPLE && sample_id != cur_id ) )
-		{
-			sample_stop_playing( cur_id );
-		}
+		veejay_msg(0, "There is no sample %d", new_sample_id );
+		return 0;
 	}
-
-	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
-	{
-		int cur_id = info->uc->sample_id;
-		if( cur_id != sample_id )
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Stop playing stream %d", cur_id);
-			vj_tag_disable(cur_id);
-		}
-	}
-
-	if(new_pm == VJ_PLAYBACK_MODE_PLAIN )
-	{
-          int n = 0;
-	  if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG) 
-		n = vj_tag_chain_free( info->uc->sample_id );
-	  if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
-		n = sample_chain_free( info->uc->sample_id);
-	  info->uc->playback_mode = new_pm;
-	  veejay_msg(VEEJAY_MSG_INFO, "Playing plain video now");
-	  info->edit_list = info->current_edit_list;
-	  video_playback_setup *settings = info->settings;
-	  settings->min_frame_num = 0;
-	  settings->max_frame_num = info->edit_list->video_frames-1;
-/*#ifdef HAVE_FREETYPE
-	  if(info->font)
-	  {
-		  void *dict = vj_font_get_plain_dict( info->font );
-		  vj_font_set_constraints_and_dict( info->font, settings->min_frame_num,
-				  settings->max_frame_num, info->edit_list->video_fps, dict );
-	  }
-#endif*/
-	  
-	}
-	if(new_pm == VJ_PLAYBACK_MODE_TAG)
-	{
-		int tmp=0;
-		// new mode is stream, see if sample_id is a network stream (if so, connect!)
-
-		if(!vj_tag_exists(sample_id ))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "There is no stream with #%d", sample_id );
-			return;
-		}
-		if( vj_tag_get_type( sample_id ) == VJ_TAG_TYPE_NET ||
-			vj_tag_get_type( sample_id) == VJ_TAG_TYPE_MCAST ||
-			vj_tag_get_type( sample_id) == VJ_TAG_TYPE_V4L )
-		{
-			if(vj_tag_enable( sample_id )<= 0 )
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Unable to activate network stream!");
-				return;
-			}
-		}	
-			
-		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE)
-			tmp = sample_chain_free(info->uc->sample_id);
-		if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
-		{
-			if(sample_id == info->uc->sample_id) return;
-			tmp = vj_tag_chain_free(info->uc->sample_id);
-		}
-		tmp = vj_tag_chain_malloc( sample_id);
-		info->uc->playback_mode = new_pm;
-		veejay_set_sample(info,sample_id);
-	}
-	if(new_pm == VJ_PLAYBACK_MODE_SAMPLE) 
-	{
-		int tmp =0;
-		
-		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG)
-			tmp = vj_tag_chain_free(info->uc->sample_id);
-		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE)	
-		{
-			if(sample_id != info->uc->sample_id)
-				tmp = sample_chain_free( info->uc->sample_id );
-		}
-		tmp = sample_chain_malloc( sample_id );
-		info->uc->playback_mode = new_pm;
-		veejay_set_sample(info, sample_id);
-	}
+	int n = sample_chain_free( info->uc->sample_id );	
+	veejay_reset_el_buffer(info);
+	return 1;
 }
-
-void veejay_set_sample(veejay_t * info, int sampleid)
+static  void	veejay_stop_playing_stream( veejay_t *info, int new_stream_id )
 {
-    int start,end,speed,looptype;
-
-
-    if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
-    {
+	vj_tag_disable( info->uc->sample_id );
+	vj_tag_chain_free( info->uc->sample_id );
+}
+static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
+{
+	int looptype,speed,start,end;
 	video_playback_setup *settings = info->settings;
+	if(!sample_exists(sample_id) )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist", sample_id);
+		return 0;
+	}
 
-	if(!vj_tag_exists(sampleid))
-        {
-		   veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist", sampleid);
-	     	   return;
-        }
+	info->edit_list = sample_get_editlist( sample_id );
+	veejay_reset_el_buffer(info);
 
-//	info->last_tag_id = sampleid;
-//	info->uc->sample_id = sampleid;
+	sample_start_playing( sample_id, info->no_caching );
+	int tmp = sample_chain_malloc( sample_id );
 
-	if(info->settings->current_playback_speed==0) 
-		veejay_set_speed(info, 1);
+   	sample_get_short_info( sample_id , &start,&end,&looptype,&speed);
 
- 	 veejay_msg(VEEJAY_MSG_INFO, "Playing Stream %d",sampleid);
-	
-	  vj_tag_set_active( sampleid, 1 );
-
-	  info->uc->render_changed = 1;
-	  settings->min_frame_num = 0;
-	  settings->max_frame_num = vj_tag_get_n_frames( sampleid );
+	settings->min_frame_num = 0;
+	settings->max_frame_num = info->edit_list->video_frames - 1;
 
 #ifdef HAVE_FREETYPE
-	  if(info->font && sampleid != info->uc->sample_id)
-	  {
-		  void *dict = vj_tag_get_dict( sampleid );
-		  vj_font_set_constraints_and_dict( info->font, settings->min_frame_num,
-				  settings->max_frame_num, info->edit_list->video_fps, dict );
-		  veejay_msg(VEEJAY_MSG_DEBUG, "Subtitling tag %d: %ld - %ld", sampleid,
-				  settings->min_frame_num, settings->max_frame_num );
-	  }
-#endif
-	  info->last_tag_id = sampleid;
-	  info->uc->sample_id = sampleid;
-
-	  info->edit_list = info->current_edit_list;
-  	  veejay_reset_el_buffer(info);
-     }
-     else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
-     {
-	       video_playback_setup *settings = info->settings;
-
-		if(!sample_exists(sampleid))
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist", sampleid);
-			return;
-		}
-
-		info->edit_list = sample_get_editlist( sampleid );
-		if( info->uc->sample_id != sampleid)
-		  sample_stop_playing(sampleid);//@pfff	
-		veejay_reset_el_buffer(info);
-		sample_start_playing( sampleid, info->no_caching );
-
-	   	sample_get_short_info( sampleid , &start,&end,&looptype,&speed);
- /* Set min/max options so that it runs like it should */
-	 	settings->min_frame_num = 0;
-	 	settings->max_frame_num = info->edit_list->video_frames - 1;
-
-#ifdef HAVE_FREETYPE
-		if(info->font && sampleid != info->uc->sample_id)
-		{
-			video_playback_setup *settings = info->settings;
-
-			void *dict = sample_get_dict( sampleid );
-			vj_font_set_constraints_and_dict(
+	if(info->font && info->uc->sample_id != sample_id)
+	{
+		void *dict = sample_get_dict( sample_id );
+		vj_font_set_constraints_and_dict(
 				info->font,
 				settings->min_frame_num,
 				settings->max_frame_num,
 				info->edit_list->video_fps,
 				dict
-				);
+			);
 
-			veejay_msg(VEEJAY_MSG_DEBUG, "Subtitling Sample %d: %ld - %ld", sampleid,
-				  settings->min_frame_num, settings->max_frame_num );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Subtitling sample %d: %ld - %ld", sample_id,
+			  settings->min_frame_num, settings->max_frame_num );
 
-		  }
+	}
 #endif
 
- 		 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d",
-			sampleid );
+	 info->uc->sample_id = sample_id;
+	 info->last_sample_id = sample_id;
 
-		 info->uc->sample_id = sampleid;
-		 info->last_sample_id = sampleid;
-		 info->sfd = sample_get_framedup(sampleid);
+	 info->sfd = sample_get_framedup(sample_id);
 
-		 info->uc->render_changed = 1; /* different render list */
-    		 sample_reset_offset( sampleid );	/* reset mixing offsets */
-    		 veejay_set_frame(info, start);
-    		 veejay_set_speed(info, speed);
-     } 
+	 info->uc->render_changed = 1; /* different render list */
+    	
+	 sample_reset_offset( sample_id );	/* reset mixing offsets */
+    	 veejay_set_frame(info, start);
+    	 veejay_set_speed(info, speed);
+ 	 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (FX=%x, Sl=%d, Speed=%d, Start=%d, Loop=%d)",
+			sample_id, tmp,info->sfd, speed, start, looptype );
+
+
+	return 1;
+}
+
+static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
+{
+	video_playback_setup *settings = info->settings;
+	if(!vj_tag_exists(stream_id))
+        {
+		   veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist", stream_id);
+	     	   return 0;
+        }
+	
+	if(vj_tag_enable( stream_id ) <= 0 )
+	{
+		veejay_msg(0, "Unable to activate stream ?");
+		return 0;
+	}
+
+	vj_tag_set_active( stream_id, 1 );
+
+	int	tmp = vj_tag_chain_malloc( stream_id);
+
+	info->uc->render_changed = 1;
+	settings->min_frame_num = 0;
+	settings->max_frame_num = vj_tag_get_n_frames( stream_id );
+
+#ifdef HAVE_FREETYPE
+	  if(info->font && info->uc->sample_id != stream_id )
+	  {
+		  void *dict = vj_tag_get_dict( stream_id );
+		  vj_font_set_constraints_and_dict( info->font, settings->min_frame_num,
+				  settings->max_frame_num, info->edit_list->video_fps, dict );
+		  veejay_msg(VEEJAY_MSG_DEBUG, "Subtitling stream %d: %ld - %ld", stream_id,
+				  settings->min_frame_num, settings->max_frame_num );
+	  }
+#endif
+	  info->last_tag_id = stream_id;
+	  info->uc->sample_id = stream_id;
+	
+	 veejay_msg(VEEJAY_MSG_INFO,"Playing stream %d (FX=%x) (Ff=%d)", stream_id, tmp,
+			settings->max_frame_num );
+
+	 //@ use edl of plain/dummy
+	  info->edit_list = info->current_edit_list;
+  	  veejay_reset_el_buffer(info);
+	
+	return 1;
+}
+
+void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
+{
+	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
+	{
+		int cur_id = info->uc->sample_id;
+		if( cur_id == sample_id && new_pm == VJ_PLAYBACK_MODE_SAMPLE )
+		{
+			int start = sample_get_startFrame( cur_id );
+			veejay_set_frame(info,start);
+			veejay_msg(VEEJAY_MSG_INFO, "Sample %d starts playing from frame %d",sample_id,start);
+			return;
+		}
+		else
+		{
+			if(!veejay_stop_playing_sample(info, sample_id ))
+				return;
+		}
+	}
+	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
+	{
+		int cur_id = info->uc->sample_id;
+		if( cur_id == sample_id && new_pm == VJ_PLAYBACK_MODE_TAG )
+		{
+			veejay_msg(0, "Already playing stream %d", cur_id );
+			return;
+		}
+		else
+		{
+			veejay_stop_playing_stream(info, sample_id );
+		}
+	}
+
+	if(new_pm == VJ_PLAYBACK_MODE_PLAIN )
+	{
+		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG) 
+			veejay_stop_playing_stream( info , 0);
+		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
+			veejay_stop_playing_sample( info, 0 );
+		info->uc->playback_mode = new_pm;
+		info->edit_list = info->current_edit_list;
+		video_playback_setup *settings = info->settings;
+		settings->min_frame_num = 0;
+		settings->max_frame_num = info->edit_list->video_frames-1;
+		veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %d - %d",
+			(int)settings->min_frame_num,  (int)settings->max_frame_num );
+	}
+	if(new_pm == VJ_PLAYBACK_MODE_TAG)
+	{
+		info->uc->playback_mode = new_pm;
+		veejay_start_playing_stream(info,sample_id);
+	}
+	if(new_pm == VJ_PLAYBACK_MODE_SAMPLE) 
+	{
+		info->uc->playback_mode = new_pm;
+		veejay_start_playing_sample(info,sample_id );
+	}
+}
+
+void veejay_set_sample(veejay_t * info, int sampleid)
+{
+    	if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
+	{
+		veejay_start_playing_stream(info,sampleid );
+     	}
+     	else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+	{
+		if( info->uc->sample_id == sampleid )
+		{
+			int start = sample_get_startFrame( info->uc->sample_id );
+			veejay_set_frame(info,start);
+			veejay_msg(VEEJAY_MSG_INFO, "Sample %d starts playing from frame %d",sampleid,start);
+		}
+		else
+			veejay_start_playing_sample(info,sampleid );
+	}
 }
 
 /******************************************************
@@ -1809,13 +1815,36 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 			    "Cannot initialize the EditList");
 		return -1;
 	}
+	vj_tag_set_veejay_t(info);
 
 	if (vj_tag_init(info->current_edit_list->video_width, info->current_edit_list->video_height, info->pixel_format) != 0) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing Stream Manager");
 		return -1;
     	}
+	
+#ifdef HAVE_FREETYPE
+	info->font = vj_font_init( info->current_edit_list->video_width,
+				   info->current_edit_list->video_height,
+				   info->current_edit_list->video_fps,0 );
 
- 	sample_init( (info->current_edit_list->video_width * info->current_edit_list->video_height)  ); 
+
+	if(info->settings->composite)
+	{
+		info->osd = vj_font_init( info->video_output_width,info->video_output_height,
+					  info->current_edit_list->video_fps ,1  );
+	}
+	else
+	{	
+		info->osd = vj_font_init( info->current_edit_list->video_width,
+				   info->current_edit_list->video_height,
+				   info->current_edit_list->video_fps,1 );
+	}
+	
+#endif
+
+
+ 	sample_init( (info->current_edit_list->video_width * info->current_edit_list->video_height) ,
+		info->font ); 
 
 	sample_set_project( info->pixel_format,
 			    info->auto_deinterlace,
@@ -1841,27 +1870,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 				info->current_edit_list->video_width,
 				info->current_edit_list->video_height);
 	}
-
 	
-#ifdef HAVE_FREETYPE
-	info->font = vj_font_init( info->current_edit_list->video_width,
-				   info->current_edit_list->video_height,
-				   info->current_edit_list->video_fps,0 );
-
-
-	if(info->settings->composite)
-	{
-		info->osd = vj_font_init( info->video_output_width,info->video_output_height,
-					  info->current_edit_list->video_fps ,1  );
-	}
-	else
-	{	
-		info->osd = vj_font_init( info->current_edit_list->video_width,
-				   info->current_edit_list->video_height,
-				   info->current_edit_list->video_fps,1 );
-	}
-	
-#endif
 	if(!vj_perform_init(info, use_vp))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Veejay Performer");
@@ -2212,6 +2221,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 				editlist *el = veejay_edit_copy_to_new(
 					info,info->current_edit_list,
 					start,end );
+				if(!el)
+				{
+					veejay_msg(0, "Unable to start from file, Abort");
+					return -1;
+				}
 				sample_info *skel = sample_skeleton_new( 0,el->video_frames-1 );
 				if(skel)
 				{
@@ -2227,13 +2241,13 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
      	* effective user id to the real user id
     	 */
 
-
+/*
 	if (info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
  	{
 		if (!vj_perform_audio_start(info)) {
 			return -1;
 		}
-    	}
+    	}*/
 
 
 	if (seteuid(getuid()) < 0)
@@ -2287,46 +2301,43 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
 
 static int	veejay_pin_cpu( veejay_t *info, int cpu_num )
 {
-	static unsigned long* mask = NULL;
-	static unsigned long* cpumask = NULL;
-	static int sz = 0;
-	static int ncpus = 0;
+	uint32_t st = sizeof(cpu_set_t);
+	
 	int i,j,retval;
-	if( cpumask == NULL )
+	if( info->cpumask == NULL )
 	{
-		sz = 1 + (2 * sched_ncpus()) / (8 * sizeof(unsigned long));
-		mask = (unsigned long*) vj_calloc( 8 * sz * sizeof( unsigned long ));
-		cpumask = (unsigned long*) vj_calloc( 8 * sz * sizeof( unsigned long ));
-		
-		retval = sched_getaffinity(0, sz * sizeof(unsigned long), cpumask );
+		info->sz = 1 + (2 * sched_ncpus()) / (8 * sizeof(unsigned long));
+		info->mask = (unsigned long*) vj_calloc( st );
+		info->cpumask = (unsigned long*) vj_calloc( st);
+		retval = sched_getaffinity(0, st, info->cpumask );
 		if( retval < 0 )
 		{
 			veejay_msg(0,"sched_getaffinity()");
 			return retval;
 		}
 
-		for( i = 0; i < sz * 8 * sizeof(unsigned long); ++ i )
+		for( i = 0; i < st; ++ i )
 		{
 			int word = i / (8 * sizeof(unsigned long));
 			int bit  = i % (8 * sizeof(unsigned long));
-			if( cpumask[word] & (1 << bit))
-				ncpus++;
+			if( info->cpumask[word] & (1 << bit))
+				info->ncpus++;
 		}
 	}
 	
 
-	cpu_num %= ncpus;
+	cpu_num %= info->ncpus;
 
-	veejay_memset( mask, 0, sz * sizeof( unsigned long ));
+	veejay_memset( info->mask, 0, st );
 
-	for ( i = 0, j = 0; i < sz * 8 * sizeof(unsigned long); ++ i )
+	for ( i = 0, j = 0; i < st; ++ i )
 	{
 		int word = i / (8 * sizeof(unsigned long));
 		int bit  = i % (8 * sizeof(unsigned long));
-		if( cpumask[word] & (1 << bit ))
+		if( info->cpumask[word] & (1 << bit ))
 		{
 			if( j >= cpu_num ) {
-				mask[word] |= ( 1 << bit );
+				info->mask[word] |= ( 1 << bit );
 				break;
 			}
 			j++;
@@ -2335,7 +2346,7 @@ static int	veejay_pin_cpu( veejay_t *info, int cpu_num )
 
 	int pi = (int) getpid();
 
-	retval = sched_setaffinity( pi, sz * sizeof( unsigned long ), mask );
+	retval = sched_setaffinity( pi, st, info->mask );
 
 	return retval;
 }
@@ -2367,6 +2378,13 @@ static void veejay_playback_cycle(veejay_t * info)
     }
     if( info->settings->late[1] )
    	 veejay_change_playback_mode(info,info->settings->late[0],info->settings->late[1]);
+
+    if (info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
+        {
+                if (!vj_perform_audio_start(info)) {
+                        return -1;
+                }
+        }
 
 
     vj_perform_queue_audio_frame(info,0);
@@ -3003,52 +3021,52 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 		return NULL;
 	}
 
-    uint64_t k, i;
-    uint64_t n1 = (uint64_t) start;
-    uint64_t n2 = (uint64_t) end;
+	uint64_t k, i;
+	uint64_t n1 = (uint64_t) start;
+	uint64_t n2 = (uint64_t) end;
 
-    uint64_t len = n2 - n1 + 1;
+	uint64_t len = n2 - n1 + 1;
 
-    if( n1 < 0 || n2 > el->video_frames-1)
-    {
-	veejay_msg(VEEJAY_MSG_ERROR, "Sample start and end are outside of editlist");
-	return NULL;
-    }
+	if( n1 < 0 || n2 > el->video_frames-1)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Sample start and end are outside of editlist");
+		return NULL;
+	}
 
-    if(len <= 0 )
-    {
-	veejay_msg(VEEJAY_MSG_ERROR, "Sample too short");
-	return NULL;
-    }
+	if(len <= 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Sample too short");
+		return NULL;
+	}
 
-    /* Copy edl */
+	/* Copy edl */
 	editlist *new_el = vj_el_soft_clone( el );
  
 	if(!new_el)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot soft clone EDL");
+		return NULL;
 	}
 
     /* copy edl frames */
-    new_el->frame_list =
-		(uint64_t *) vj_malloc(  sizeof(uint64_t) * len );
+   	new_el->frame_list = (uint64_t *) vj_malloc(  sizeof(uint64_t) * len );
 
-    if (!new_el->frame_list)
+	if (!new_el->frame_list)
 	{
+		veejay_msg(0, "Out of memory, unable to allocate editlist of %lld bytes", len);
 		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 		return NULL;
    	}
 
-    k = 0;
+    	k = 0;
 
-    for (i = n1; i <= n2; i++)
+    	for (i = n1; i <= n2; i++)
 		new_el->frame_list[k++] = el->frame_list[i];
-	veejay_msg(VEEJAY_MSG_DEBUG, "Copied %d frames to EDL", k);
-    // set length
-    new_el->video_frames = k;
 
+    	// set length
+    	new_el->video_frames = k;
 
-    return new_el;
+	return new_el;
 }
 
 /******************************************************

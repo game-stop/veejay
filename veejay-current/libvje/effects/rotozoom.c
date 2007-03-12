@@ -119,10 +119,18 @@ vj_effect *rotozoom_init(int width, int height)
 	test_roto2[8][i] = c * 4096.0;
     }
 
-
-
-
     return ve;
+}
+
+void	rotozoom_destroy()
+{
+    int j;
+    for (j = 0; j < 9; j++) {
+	 if( test_roto[j] )
+		free(test_roto[j]);
+	 if( test_roto2[j]);
+		free(test_roto2[j]);
+    }
 }
 
 int rotozoom_malloc(int width, int height)

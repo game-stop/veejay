@@ -27,6 +27,7 @@
 
 vj_effect *rotozoom_init(int width, int height);
 int rotozoom_malloc(int w, int h);
+void rotozoom_destroy();
 void rotozoom_free();
 void rotozoom_apply( VJFrame *frame, int width, int height, int mode,
 		    int rot, int zoom, int autom);

@@ -25,7 +25,7 @@
 #include <math.h>
 #include "widthmirror.h"
 
-static int *plasma_table;
+static int *plasma_table = NULL;
 static int plasma_pos1 = 0;
 static int plasma_pos2 = 0;
 
@@ -60,6 +60,12 @@ vj_effect *distortion_init(int width, int height)
 
 void distortion_free() {
    if(plasma_table) free(plasma_table);
+}
+
+void	distortion_destroy()
+{
+	if(plasma_table)
+		free( plasma_table );
 }
 
 /* the distortion effect comes originally from the demo effects collection,

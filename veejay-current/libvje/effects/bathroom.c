@@ -80,7 +80,7 @@ void bathroom_verti_apply(VJFrame *frame, int width, int height, int val)
 {
     unsigned int i;
     const unsigned int len = frame->len;
-    const unsigned int y_val = val;
+    unsigned int y_val = val;
     unsigned int x,y;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
@@ -89,6 +89,9 @@ void bathroom_verti_apply(VJFrame *frame, int width, int height, int val)
     veejay_memcpy( bathroom_frame[0], Y, len);
     veejay_memcpy( bathroom_frame[1], Cb, len);
     veejay_memcpy( bathroom_frame[2], Cr, len);
+
+    if( y_val <= 0 )
+	y_val = 1;
 
     for(y=0; y < height;y++) {
      for(x=0; x <width; x++) {
@@ -108,7 +111,7 @@ void bathroom_hori_apply(VJFrame *frame, int width, int height, int val)
 {
     unsigned int i;
     unsigned int len = (width * height);
-    const unsigned int y_val = val;
+    unsigned int y_val = val;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
@@ -117,6 +120,9 @@ void bathroom_hori_apply(VJFrame *frame, int width, int height, int val)
     veejay_memcpy( bathroom_frame[0], Y, len);
     veejay_memcpy( bathroom_frame[1], Cb, len);
     veejay_memcpy( bathroom_frame[2], Cr, len);
+
+	if( y_val <= 0 )
+		y_val = 1;
 
     for(y=0; y < height;y++) {
      for(x=0; x <width; x++) {

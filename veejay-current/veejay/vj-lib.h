@@ -325,6 +325,10 @@ typedef struct {
 	int 	which_vp;
 	int	frontback;
 	int	out_buf;
+	unsigned long *mask;
+	unsigned long *cpumask;
+	int	ncpus;
+	int	sz;
 } veejay_t;
 
 typedef struct {
