@@ -1988,6 +1988,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	{
 	    info->video_output_width = el->video_width;
 	    info->video_output_height = el->video_height;
+	    info->settings->sws_templ.flags  = 1; // fast bicubic
 	}
 
 	if(!info->bes_width)

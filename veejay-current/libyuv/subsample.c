@@ -758,7 +758,6 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
 void chroma_subsample_cp(subsample_mode_t mode, void *data, uint8_t *ycbcr[], uint8_t *dcbcr[],
 		      int width, int height)
 {
-
   switch (mode) {
   case SSM_420_JPEG_BOX:
   case SSM_420_JPEG_TR:
@@ -789,7 +788,6 @@ void chroma_subsample_cp(subsample_mode_t mode, void *data, uint8_t *ycbcr[], ui
 void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
 		      int width, int height)
 {
-
   switch (mode) {
   case SSM_420_JPEG_BOX:
   case SSM_420_JPEG_TR: 
@@ -836,8 +834,8 @@ void chroma_supersample(subsample_mode_t mode,void *data, uint8_t *ycbcr[],
     tr_420jpeg_to_444(data,ycbcr[2], width, height);
     break;
   case SSM_422_444:
-    tr_422_to_444(data,ycbcr[2],width,height);
     tr_422_to_444(data,ycbcr[1],width,height);
+    tr_422_to_444(data,ycbcr[2],width,height);
 #ifdef HAVE_ASM_MMX
 	__asm__ __volatile__ ( _EMMS:::"memory");
 #endif

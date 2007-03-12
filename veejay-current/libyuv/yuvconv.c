@@ -264,6 +264,7 @@ void	yuv_convert_any3( VJFrame *src, int src_stride[3], VJFrame *dst, int src_fm
 			sws_context_flags_,
 			NULL,NULL,NULL );
 	int dst_stride[3] = { ru4(dst->width),ru4(dst->uv_width),ru4(dst->uv_width) };
+
 	sws_scale( ctx, src->data, src_stride, 0, src->height, dst->data, dst_stride);
 
 	sws_freeContext( ctx );

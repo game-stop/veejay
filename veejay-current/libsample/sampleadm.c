@@ -484,8 +484,6 @@ int sample_get_longest(int sample_id)
 		int speed = abs(si->speed);
 		int duration = len / speed; //how many frames are played of this sample
 
-veejay_msg(0, "sample %d: %d - %d", sample_id, si->first_frame,si->last_frame );
-
 		if( si->looptype == 2) duration *= 2; // pingpong loop duration     
 
 		for(c=0; c < SAMPLE_MAX_EFFECTS; c++)
@@ -860,7 +858,8 @@ int sample_del(int sample_id)
     sample_node = hash_lookup(SampleHash, (void *) si->sample_id);
     if (sample_node) {
 	    int i;
- 	    vj_el_break_cache( si->edit_list ); //@ destroy cache, if any
+	    if(si->edit_list)
+ 	 	   vj_el_break_cache( si->edit_list ); //@ destroy cache, if any
 	    for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
 	    {
 		vevo_port_free( si->effect_chain[i]->kf );
@@ -2773,7 +2772,7 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 int sample_read_edl( sample_info *sample )
 {
 	char *files[1];
-	int res = -1;
+	int res = 0;
 	files[0] = strdup(sample->edit_list_file);
 	if(sample->edit_list)
 	{

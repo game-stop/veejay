@@ -24,7 +24,7 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  */
-
+#include <config.h>
 #include <libvje/vje.h>
 typedef enum subsample_mode {
     SSM_UNKNOWN = 0,
@@ -125,5 +125,7 @@ VJFrame *yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt );
 VJFrame *yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int fmt );
 
 char	*yuv_get_scaler_name(int id);
+
+void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt );
 
 #endif

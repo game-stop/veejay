@@ -439,7 +439,7 @@ void	packed_plane_clear( size_t len, void *to )
 }
 
 
-
+#if defined (HAVE_ASM_SSE) || defined (HAVE_ASM_MMX)
 static void *fast_memcpy(void * to, const void * from, size_t len)
 {
 	void *retval;
@@ -643,8 +643,9 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 		 * is needed to become ordered again. */
 		__asm__ __volatile__ ("sfence":::"memory");
 #endif
-#ifndef HAVE_ASM_SSE
+#ifdef HAVE_ASM_MMX
 		/* enables to use FPU */
+
 		__asm__ __volatile__ (_EMMS:::"memory");
 #endif
 	}
@@ -654,6 +655,7 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 	if(len) small_memcpy(t, f, len);
 	return retval;
 }
+#endif
 
 void fast_memset_finish()
 {
@@ -662,9 +664,9 @@ void fast_memset_finish()
  *                  * is needed to become ordered again. */
                 __asm__ __volatile__ ("sfence":::"memory");
 #endif
-#ifndef HAVE_ASM_SSE
+#ifdef HAVE_ASM_MMX
                 /* enables to use FPU */
-                __asm__ __volatile__ (EMMS:::"memory");
+                __asm__ __volatile__ (_EMMS:::"memory");
 #endif
 
 }
@@ -751,7 +753,7 @@ void fast_memset_dirty(void * to, int val, size_t len)
 
 
 
-
+#if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE )
 /* Fast memory set. See comments for fast_memcpy */
 void * fast_memset(void * to, int val, size_t len)
 {
@@ -835,6 +837,7 @@ void * fast_memset(void * to, int val, size_t len)
 	if(len) small_memset(t, val, len);
 	return retval;
 }
+#endif
 
 static void *linux_kernel_memcpy(void *to, const void *from, size_t len) {
      return __memcpy(to,from,len);
@@ -852,6 +855,8 @@ static struct {
      { "glibc memcpy()",            memcpy, 0},
 #if defined(ARCH_X86) || defined(ARCH_X86_64)
      { "linux kernel memcpy()",     linux_kernel_memcpy, 0},
+#endif
+#if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE )
      { "MMX/MMX2/SSE optimized memcpy()",    fast_memcpy, 0},
 #endif
      { NULL, NULL, 0},
@@ -865,7 +870,7 @@ static struct {
 {
      { NULL, NULL, 0},
      { "glibc memset()",            memset, 0},
-#if defined(ARCH_X86) || defined(ARCH_X86_64)
+#if defined(HAVE_ASM_MMX) || defined(HAVE_ASM_SSE)
      { "MMX/MMX2/SSE optimized memset()",    fast_memset, 0},
 #endif
      { NULL, NULL, 0},

@@ -2222,7 +2222,10 @@ int	vj_font_norender(void *ctx, long position)
 	if( position < 0 || position > f->index_len )
 		return 0;
 
-	if(!f->dictionary || !f->index )
+	if(!f->dictionary  )
+		return 0;
+
+	if(!f->index || !f->index_ptr)
 		return 0;
 
 	if(!f->index[position])
@@ -2254,6 +2257,9 @@ void vj_font_render(void *ctx, void *_picture, long position, char *in_string)
 #ifdef STRICT_CHECKING
 	assert( f->dictionary != NULL );
 #endif
+
+	if(!list )
+		return;
 
 	font_lock( f );
 	int k;

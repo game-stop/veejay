@@ -7516,6 +7516,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	if( v->video_out == 4 )
 		full444 = 1;
 
+	//@ fast*_picture delivers always 4:2:0 data to reduce bandwidth
 	if( use_bw_preview_ )
 		vj_fastbw_picture_save_to_mem(
 				&frame,
@@ -7529,36 +7530,8 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 				h,
 			(full444 ? 4 : v->pixel_format ));
 
-	int input_len = (use_bw_preview_ ? ( w * h ) : (w * h * 3 ));
-/*
-#ifdef STRICT_CHECKING
-	assert(img->image);
-#endif
-	uint8_t *tmpbuf = vj_perform_get_a_work_buffer();
-	unsigned char *msg = gdk_pixbuf_get_pixels( img->image );
-#ifdef STRICT_CHECKING
-	assert( msg != NULL );
-	assert( lzo_ != NULL );
-	assert( tmpbuf != NULL );
-#endif
-	int size1 = 0;
+	int input_len = (use_bw_preview_ ? ( w * h ) : (( w * h ) + ((w * h)/2)) );
 
-	int input_len = (use_bw_preview_ ? (w*h) : (w*h*3));
-
-//@ profiling: lzo_compression takes more then time needed to scale image
-	if ( lzo_compress( lzo_, msg, tmpbuf, &size1, input_len) == 0)
-	{
-		veejay_msg(0, "Unable to compress preview image");
-		SEND_MSG( v, "0000000" );
-	}
-	else
-	{
-		char header[8];
-		sprintf(header, "%06d%1d", size1,use_bw_preview_);
-		vj_server_send( v->vjs[0], v->uc->current_link, header, 7 );
-		vj_server_send( v->vjs[0], v->uc->current_link, tmpbuf, size1 );
-	}
-*/
 	char header[8];
 	sprintf( header, "%06d%1d", input_len, use_bw_preview_ );
 	int res = vj_server_send( v->vjs[0], v->uc->current_link, header, 7 );

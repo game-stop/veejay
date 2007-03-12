@@ -492,8 +492,8 @@ static int vj_perform_alloc_row(veejay_t *info, int frame, int c, int frame_len)
 		return 0;
 
 	frame_buffer[c]->Y = buf;
-	frame_buffer[c]->Cb = buf + RUP8(frame_len);
-	frame_buffer[c]->Cr = buf + RUP8(frame_len);
+	frame_buffer[c]->Cb = frame_buffer[c]->Y + RUP8(frame_len);
+	frame_buffer[c]->Cr = frame_buffer[c]->Cb + RUP8(frame_len);
 
 	frame_buffer[c]->ssm = info->effect_frame1->ssm;
 
@@ -693,7 +693,7 @@ int vj_perform_init(veejay_t * info, int use_vp)
 	effect_sampler = subsample_init( w );
 
 #ifdef USE_GDK_PIXBUF
-	vj_picture_init();
+	vj_picture_init( &(info->settings->sws_templ));
 #endif
 
 	lzo_ = lzo_new();
@@ -1829,7 +1829,9 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
     int nframe;
     int len = 0;
     int centry = -2;
-
+#ifdef STRICT_CHECKING
+	assert( frame_buffer[chain_entry]->Cb != frame_buffer[chain_entry]->Cr );
+#endif
     uint8_t *fb[3] = {
 		frame_buffer[chain_entry]->Y,
 		frame_buffer[chain_entry]->Cb,
@@ -2045,7 +2047,6 @@ static int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 				veejay_memcpy( frame_buffer[chain_entry]->Cb, primary_buffer[0]->Cb, len2);
 				veejay_memcpy( frame_buffer[chain_entry]->Cr, primary_buffer[0]->Cr,len2);
 				error =  0;
-				
 				frame_buffer[chain_entry]->ssm = info->effect_frame1->ssm;
 			}
 		    	else
@@ -2181,11 +2182,11 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 	frames[1] = info->effect_frame2;
 	frames[1]->format = info->pixel_format;
     	frameinfo = info->effect_frame_info;
-    	// setup pointers to ycbcr 4:2:0 or 4:2:2 data
     	frames[0]->data[0] = primary_buffer[0]->Y;
    	frames[0]->data[1] = primary_buffer[0]->Cb;
     	frames[0]->data[2] = primary_buffer[0]->Cr;
 	frames[0]->format  = info->pixel_format;
+
 	vjp_kf *setup;
     	setup = info->effect_info;
     	setup->ref = info->uc->sample_id;
@@ -2209,13 +2210,10 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 						chain_entry);
 				vj_perform_apply_secundary(info,sub_id,source,chain_entry,0); // get it
 
-				// FIXME: apply secundary needs sampling ?!!
 			 	frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 		frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
-				frames[1]->format = info->pixel_format;
 				frames[1]->ssm     = frame_buffer[chain_entry]->ssm;	
-				
 				if(frames[1]->ssm == 0 && sub_mode)
 				{
 					chroma_supersample(
@@ -2265,16 +2263,6 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 			vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
 				(int) settings->current_frame_num );
 
-/*			if(ef && sub_mode )
-			{
-				veejay_msg(0, "subsample B%d",__LINE__);
-				chroma_subsample(
-					settings->sample_mode,
-					effect_sampler,
-					frames[1]->data,frameinfo->width,
-					frameinfo->height
-				);
-			}*/
 	    	} // if
 	} // status
 	return 0;
@@ -2288,20 +2276,15 @@ static int vj_perform_sample_complete_buffers(veejay_t * info, int entry, int *h
 	VJFrameInfo *frameinfo;
 	video_playback_setup *settings = info->settings;
     	int chain_fade =0;
-//    	if (sample_get_effect_status(info->uc->sample_id)!=1)
-//		return 0;		/* nothing to do */
     	setup = info->effect_info;
 
 	frames[0] = info->effect_frame1;
 	frames[1] = info->effect_frame2;
     	frameinfo = info->effect_frame_info;
     	setup->ref = info->uc->sample_id;
-    	// setup pointers to ycbcr 4:2:0 or 4:2:2 data
     	frames[0]->data[0] = primary_buffer[0]->Y;
    	frames[0]->data[1] = primary_buffer[0]->Cb;
     	frames[0]->data[2] = primary_buffer[0]->Cr;
-//   	chain_fade = sample_get_fader_active(info->uc->sample_id);
-//   	if(chain_fade)
 	if(pvar_.fader_active)
 		vj_perform_pre_chain( info, frames[0] );
 
@@ -3017,7 +3000,7 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 			frame->width,
 			frame->height
 		       	);
-			frame->ssm = 1;
+		frame->ssm = 1;
 	}
 
 	//@ Viewport is not enabled, do not set osd_extra
@@ -3104,7 +3087,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 
 	if( frame2->ssm == 1 )
 	{
-		/*chroma_subsample(
+/*		chroma_subsample(
 			settings->sample_mode,
 				effect_sampler,
 				frame2->data,

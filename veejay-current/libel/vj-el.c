@@ -1154,7 +1154,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 
 			int dst_fmt = get_ffmpeg_pixfmt( el_pixel_format_ );
 			int src_fmt = d->context->pix_fmt;
-
 			if(!d->frame->opaque)
 			{
 				if( el->auto_deinter && inter != LAV_NOT_INTERLACED)
@@ -1191,38 +1190,17 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 				}
 				else
 				{
-			/*		int hj = (src_fmt == dst_fmt ? 1: 0 );
-	
-					switch(hj)
-					{
-						case 1:
-							veejay_memcpy( dst[0], d->frame->data[0], len );
-							veejay_memcpy( dst[1], d->frame->data[1], uv_len);
-							veejay_memcpy( dst[2], d->frame->data[2], uv_len );
-							break;
-						case 0:
-							{*/
-
-								VJFrame *src1 = yuv_yuv_template( d->frame->data[0],
-											d->frame->data[1], d->frame->data[2],
-											el->video_width,el->video_height,
-											src_fmt );
-								VJFrame *dst1 = yuv_yuv_template( dst[0],dst[1],dst[2],
-											el->video_width,el->video_height,
-											dst_fmt );
+					VJFrame *src1 = yuv_yuv_template( d->frame->data[0],
+								d->frame->data[1], d->frame->data[2],
+								el->video_width,el->video_height,
+								src_fmt );
+					VJFrame *dst1 = yuv_yuv_template( dst[0],dst[1],dst[2],
+								el->video_width,el->video_height,
+								dst_fmt );
 		
-
-								yuv_convert_any3( src1,d->frame->linesize,dst1,src1->format,dst1->format);
-								free(src1);
-								free(dst1);
-				/*			}
-							break;
-						default:
-#ifdef STRICT_CHECKING
-							assert(0);
-#endif
-							break;
-					} */
+					yuv_convert_any3( src1,d->frame->linesize,dst1,src1->format,dst1->format);
+					free(src1);
+					free(dst1);
 				}
 			}
 			else
@@ -1499,12 +1477,12 @@ int	vj_el_get_audio_frame_at(editlist *el, uint32_t nframe, uint8_t *dst, int nu
 
 editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int width, int height, float fps, int fmt)
 {
-	editlist *el = vj_malloc(sizeof(editlist));
+	editlist *el = vj_calloc(sizeof(editlist));
 	if(!el) return NULL;
-	veejay_memset( el, 0, sizeof(editlist));
 	el->MJPG_chroma = chroma;
 	el->video_norm = norm;
 	el->is_empty = 1;
+	el->is_clone = 1;
 	el->has_audio = 0;
 	el->audio_rate = 0;
 	el->audio_bits = 0;
@@ -1535,8 +1513,7 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 
 editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int deinterlace, int force	,char norm , int fmt)
 {
-	editlist *el = vj_malloc(sizeof(editlist));
-	veejay_memset(el, 0, sizeof(editlist));
+	editlist *el = vj_calloc(sizeof(editlist));
 	FILE *fd;
 	char line[1024];
 	uint64_t	index_list[MAX_EDIT_LIST_FILES];
@@ -1787,6 +1764,7 @@ void	vj_el_free(editlist *el)
 	assert( el != NULL );
 #endif
 	int i;
+
 	if(el->is_clone)
 	{
 		for( i = 0; i < el->num_video_files; i ++ )
@@ -1800,8 +1778,14 @@ void	vj_el_free(editlist *el)
 		for ( i = 0; i < el->num_video_files; i ++ )
 		{
 			if( el->lav_fd[i] ) 
+			{
 				lav_close( el->lav_fd[i] );
-			if( el->video_file_list[i]) free(el->video_file_list[i]);
+				el->lav_fd[i] = NULL;
+			}
+			if( el->video_file_list[i]) {
+				free(el->video_file_list[i]);
+				el->video_file_list[i] = NULL;
+			}
 		}
 	}
 

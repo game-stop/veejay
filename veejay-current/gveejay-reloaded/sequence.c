@@ -27,7 +27,8 @@
 #include <sys/time.h>
 #include <liblzo/lzo.h>
 #include <gveejay-reloaded/sequence.h>
-
+#include <ffmpeg/avutil.h>
+#include <libyuv/yuvconv.h>
 typedef struct
 {
 	char *hostname;
@@ -80,6 +81,8 @@ void	*gvr_preview_init(int max_tracks)
 
 	vp->tracks = (veejay_track_t**) vj_calloc(sizeof( veejay_track_t*) * max_tracks );
 	vp->n_tracks = max_tracks;
+
+	yuv_init_lib();
 
 	vp->state = 1;
 
@@ -331,18 +334,20 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 		return 0;
 	}
 
-	if( bw != (3 * v->width * v->height) && bw != (v->width * v->height))
+	int expected_len = (v->width * v->height) + (v->width*v->height/2);
+
+	if( bw != (v->width * v->height) && bw != expected_len )
 	{
 		veejay_msg(0, "Corrupted image. Drop it");
 		v->have_frame = 0;
 		return bw;
 	}
-//
+	uint8_t *in = v->data_buffer;
+	uint8_t *out = v->tmp_buffer;
+	
 	v->bw = 0;
 	if( bw == (v->width * v->height ))
 	{
-		uint8_t *in = v->data_buffer;
-		uint8_t *out = v->tmp_buffer;
 		unsigned int i,j;	
 		unsigned int len = v->width * v->height;
 		unsigned int stride = v->width * 3;
@@ -359,6 +364,18 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 			}
 		}
 		v->bw = 1; 
+	}
+	else
+	{
+		VJFrame *src1 = yuv_yuv_template( in, in + (v->width * v->height),
+						      in + (v->width * v->height) + (v->width*v->height)/4 ,
+						      v->width,v->height, PIX_FMT_YUV420P );
+		VJFrame *dst1 = yuv_rgb_template( out, v->width,v->height, PIX_FMT_RGB24 );
+
+		yuv_convert_any_ac( src1, dst1, src1->format, dst1->format );	
+
+		free(src1);
+		free(dst1);
 	}
 
 
@@ -713,43 +730,8 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 		{			
 			veejay_track_t *v = vp->tracks[i];
 
-			if( v->bw )
-				list[i] =gdk_pixbuf_new_from_data(v->tmp_buffer,GDK_COLORSPACE_RGB,FALSE,	
-					8,v->width,v->height,v->width*3,NULL,NULL );
-			else
-				list[i] = gdk_pixbuf_new_from_data( v->data_buffer, GDK_COLORSPACE_RGB, FALSE,
-					8, v->width, v->height, v->width * 3, NULL,NULL );
-/*
-			if(v->grey_scale)	
-			{
-				uint8_t *rgb = v->tmp_buffer;
-				uint8_t *plane = v->data_buffer;
-				unsigned int j,k = 0;
-				unsigned int stride = v->width * 3;
-				for( j = 0; j < (v->width*v->height); j+=3 )
-				{
-					rgb[j+0] = v->data_buffer[j];
-					rgb[j+1] = v->data_buffer[j];
-					rgb[j+2] = v->data_buffer[j];
-				}
-				for( j = 0; j < v->height; j ++ )
-				{
-					for( k = 0; k < v->width ; k ++ )
-					{
-						uint8_t *p = rgb + j * stride + (k*3); 	
-						p[0] = plane[j * v->width + k];
-						p[1] = plane[j * v->width + k];
-						p[2] = plane[j * v->width + k];
-					}
-				} 
-				list[i] = gdk_pixbuf_new_from_data(v->data_buffer, GDK_COLORSPACE_RGB, FALSE,
-					8, v->width,v->height,v->width * 3, NULL,NULL );
-			}
-			else
-			{
-				list[i] = gdk_pixbuf_new_from_data( v->data_buffer, GDK_COLORSPACE_RGB,	FALSE,
-					8, v->width,v->height,v->width * 3,NULL,NULL );
-			}*/
+			list[i] =gdk_pixbuf_new_from_data(v->tmp_buffer,GDK_COLORSPACE_RGB,FALSE,	
+				8,v->width,v->height,v->width*3,NULL,NULL );
 			vp->tracks[i]->have_frame = 0;
 		}
 	}

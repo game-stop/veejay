@@ -27,7 +27,7 @@ typedef struct
 } veejay_image_t;
 
 #ifdef USE_GDK_PIXBUF
-void	vj_picture_init();
+void	vj_picture_init(void *templ);
 void	vj_picture_cleanup( void *pic );
 VJFrame *vj_picture_get( void *pic );
 int	vj_picture_probe( const char *filename );

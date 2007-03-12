@@ -32,6 +32,7 @@
 #include <libel/pixbuf.h>
 #include <veejay/vj-global.h>
 #include <ffmpeg/swscale.h>
+#include <libyuv/yuvconv.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -291,7 +292,12 @@ static	void	vj_picture_out_cleanup( vj_pixbuf_out_t *pic )
 	pic = NULL;
 }
 
-void	vj_picture_init()
+static	void	*pic_scaler_ = NULL;
+static   int	 pic_data_[3] = { 0,0,0};
+static   int	 pic_changed_ = 0;
+static	sws_template	*pic_template_ = NULL;
+
+void	vj_picture_init( void *templ )
 {
 	if(!__initialized)
 	{
@@ -299,6 +305,9 @@ void	vj_picture_init()
 		veejay_msg(VEEJAY_MSG_DEBUG, "Using gdk pixbuf %s", gdk_pixbuf_version );
 		__initialized = 1;
 	}
+
+	pic_template_ = (sws_template*) templ;
+
 }
 
 int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
@@ -352,31 +361,37 @@ void		vj_picture_free()
 
 }
 
+#define	pic_has_changed(a,b,c) ( (a == pic_data_[0] && b == pic_data_[1] && c == pic_data_[2] ) ? 0: 1)
+#define update_pic_data(a,b,c) { pic_data_[0] = a; pic_data_[1] = b; pic_data_[2] = c;}
+
 void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt )
 {
 	int pixfmt = get_ffmpeg_pixfmt( fmt );
-	if(frame->ssm)
-	{
-		switch( fmt )
-		{
-			case FMT_420F:
-			case FMT_422F:
-				pixfmt = PIX_FMT_YUVJ444P;
-				break;
-			default:	
-				pixfmt = PIX_FMT_YUV444P;
-				break;
-		}
-	}
 
 	VJFrame *src1 = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
 				frame->width,frame->height, pixfmt );
-	VJFrame *dst1 = yuv_rgb_template( vj_perform_get_preview_buffer(), out_w, out_h, PIX_FMT_RGB24 );
+
+	uint8_t *dest[3];	
+	dest[0] = vj_perform_get_preview_buffer();
+	dest[1] = dest[0] + (out_w * out_h);
+	dest[2] = dest[1] + ( (out_w * out_h)/4 );
+
+	VJFrame *dst1 = yuv_yuv_template( dest[0], dest[1], dest[2], out_w, out_h, PIX_FMT_YUV420P );
+
+	pic_changed_ = pic_has_changed( out_w,out_h, pixfmt );
+
+	if(pic_changed_ )
+	{
+		if(pic_scaler_)
+			yuv_free_swscaler( pic_scaler_ );
+		pic_scaler_ = yuv_init_swscaler( src1,dst1, pic_template_, yuv_sws_get_cpu_flags());
+		update_pic_data( out_w, out_h, pixfmt );
+	}
 
 	if( frame->width == out_w && frame->height == out_h )
 		yuv_convert_any_ac( src1, dst1, src1->format, dst1->format );
 	else
-		yuv_convert_any( src1, dst1, src1->format,dst1->format );
+		yuv_convert_and_scale( pic_scaler_, src1,dst1);
 
 	free(src1);
 	free(dst1);
@@ -385,20 +400,6 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt 
 void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt )
 {
 	int pixfmt = get_ffmpeg_pixfmt( fmt );
-	if(frame->ssm)
-	{
-		switch( fmt )
-		{
-			case FMT_420F:
-			case FMT_422F:
-				pixfmt = PIX_FMT_YUVJ444P;
-				break;
-			default:	
-				pixfmt = PIX_FMT_YUV444P;
-				break;
-		}
-	}
-
 
 	VJFrame *src1 = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
 						frame->width,frame->height, pixfmt );
@@ -411,11 +412,21 @@ void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int f
 
 	VJFrame *dst1 = yuv_yuv_template( planes[0], planes[1], planes[2],
 					  out_w , out_h, PIX_FMT_GRAY8 );
+	pic_changed_ = pic_has_changed( out_w,out_h, pixfmt );
+
+	if(pic_changed_ )
+	{
+		if(pic_scaler_)
+			yuv_free_swscaler( pic_scaler_ );
+		pic_scaler_ = yuv_init_swscaler( src1,dst1, pic_template_, yuv_sws_get_cpu_flags());
+		update_pic_data( out_w, out_h, pixfmt );
+	}
+
 
 	if( frame->width == out_w && frame->height == out_h )
 		yuv_convert_any_ac( src1,dst1,src1->format, dst1->format );
 	else
-		yuv_convert_any(src1,dst1,src1->format, dst1->format );
+		yuv_convert_and_scale( pic_scaler_, src1, dst1);
 
 	free(src1);
 	free(dst1);
