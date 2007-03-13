@@ -101,7 +101,8 @@ static int      set_option( const char *name, char *value )
 			err++;
 		}
 	}
-                err++;
+        else
+	        err++;
         return err;
 }
 static volatile gulong g_trap_free_size = 0;
