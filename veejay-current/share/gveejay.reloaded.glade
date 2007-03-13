@@ -11899,13 +11899,22 @@ MLZO</property>
 					      <property name="visible">True</property>
 					      <property name="tooltip" translatable="yes">Start / Stop randomizer</property>
 					      <property name="can_focus">True</property>
-					      <property name="label" translatable="yes">rand()</property>
-					      <property name="use_underline">True</property>
 					      <property name="relief">GTK_RELIEF_HALF</property>
 					      <property name="focus_on_click">True</property>
 					      <property name="active">False</property>
 					      <property name="inconsistent">False</property>
 					      <signal name="toggled" handler="on_samplerand_toggled" last_modification_time="Fri, 17 Jun 2005 17:02:39 GMT"/>
+
+					      <child>
+						<widget class="GtkImage" id="image2544">
+						  <property name="visible">True</property>
+						  <property name="pixbuf">button_rand.png</property>
+						  <property name="xalign">0.5</property>
+						  <property name="yalign">0.5</property>
+						  <property name="xpad">0</property>
+						  <property name="ypad">0</property>
+						</widget>
+					      </child>
 					    </widget>
 					    <packing>
 					      <property name="padding">0</property>
@@ -15168,7 +15177,7 @@ MLZO</property>
   <property name="default_height">400</property>
   <property name="resizable">True</property>
   <property name="destroy_with_parent">False</property>
-  <property name="icon">icon_streamnew.png</property>
+  <property name="icon">icon_stream.png</property>
   <property name="decorated">True</property>
   <property name="skip_taskbar_hint">False</property>
   <property name="skip_pager_hint">False</property>
