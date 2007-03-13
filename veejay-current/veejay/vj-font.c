@@ -126,6 +126,7 @@ typedef struct {
 	void	*plain;
 	int	time;
 	char	*add;
+	char 	*prev;
 	pthread_mutex_t	mutex;
 } vj_font_t;
 
@@ -1714,24 +1715,35 @@ static void draw_glyph(
 	uint8_t *U = picture->data[1];
 	uint8_t *V = picture->data[2];
 
+	uint8_t	*bitbuffer = bitmap->buffer;
+	uint32_t bitmap_rows = bitmap->rows;
+	uint32_t bitmap_wid  = bitmap->width;
+	uint32_t bitmap_pitch = bitmap->pitch;
+
+	int p,left,top,bot,pos;
+
     if (bitmap->pixel_mode == ft_pixel_mode_mono)
     {
         in_glyph = 0;
-	for (r=0; (r < bitmap->rows) && (r+y < height); r++)
+	for (r=0; (r < bitmap_rows) && (r+y < height); r++)
 	{
-		for (c=0; (c < bitmap->width) && (c+x < width); c++)
+		for (c=0; (c < bitmap_wid) && (c+x < width); c++)
 		{
-			int p  = (c+x) + ((y+r)*width);
-			int left  = (c+x-1) + ((y+r)*width);    
-			int top   = (c+x) + ((y+r-1)*width);
-	    		int bot   = (c+x) + ((y+r+1)*width);
+			p  = (c+x) + ((y+r)*width);
+			left  = (c+x-1) + ((y+r)*width);    
+			top   = (c+x) + ((y+r-1)*width);
+	    		bot   = (c+x) + ((y+r+1)*width);
 			
 			dpixel[0] = Y[ p ];
 			dpixel[1] = U[ p ];
 			dpixel[2] = V[ p ];
 
-	      		spixel = bitmap->buffer[r*bitmap->pitch +c/8] & (0x80>>(c%8)); 
-	      
+			pos = r * bitmap_pitch + (c >> 3 );
+
+	   //   		spixel = bitmap->buffer[r*bitmap->pitch +c/8] & (0x80>>(c%8)); 
+	     
+			spixel = bitbuffer[ pos ] & ( 0x80 >> ( c % 8 ));
+ 
 	     	 	if (spixel) 
 	     	 	{
 	     			dpixel[0] = yuv_fgcolor[0];
@@ -1760,14 +1772,14 @@ static void draw_glyph(
 		 
 		  		if (in_glyph) 
 		    		{
-		      			if ( (r-1 >= 0) && (! bitmap->buffer[(r-1)*bitmap->pitch +c/8] & (0x80>>(c%8))) )
+		      			if ( (r-1 >= 0) && (! bitbuffer[(r-1)*bitmap->pitch +c/8] & (0x80>>(c%8))) )
 					{
 						Y[ top ] = yuv_lncolor[0];	
 						U[ top ] = yuv_lncolor[1];
 						V[ top ] = yuv_lncolor[2]; 
 					}
 			
-					if ( (r+1 < height) && (! bitmap->buffer[(r+1)*bitmap->pitch +c/8] & (0x80>>(c%8))) )
+					if ( (r+1 < height) && (! bitbuffer[(r+1)*bitmap->pitch +c/8] & (0x80>>(c%8))) )
 					{
 						Y[ bot  ] = yuv_lncolor[0];	
 						U[ bot ] = yuv_lncolor[1];

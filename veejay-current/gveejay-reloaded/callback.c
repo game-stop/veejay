@@ -1262,8 +1262,8 @@ void	on_button_vimsupdate_clicked(GtkWidget *widget, gpointer user_data)
 			multi_vims( 
 				VIMS_BUNDLE_ATTACH_KEY,
 				"2 %d %d %s",
-				info->uc.selected_vims_accel[0],
 				info->uc.selected_vims_accel[1],
+				info->uc.selected_vims_accel[0],
 				info->uc.selected_vims_args );
 		}
 		info->uc.reload_hint[HINT_BUNDLES] = 1; 
