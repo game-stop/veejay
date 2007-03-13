@@ -301,7 +301,8 @@ void	vj_picture_init( void *templ )
 {
 	if(!__initialized)
 	{
-	//	g_type_init();
+	//@ we call this so gdk works EVIL
+		g_type_init();
 		veejay_msg(VEEJAY_MSG_DEBUG, "Using gdk pixbuf %s", gdk_pixbuf_version );
 		__initialized = 1;
 	}

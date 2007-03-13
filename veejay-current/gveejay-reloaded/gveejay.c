@@ -60,7 +60,6 @@ static void usage(char *progname)
 	printf( "-v/--verbose\t\tBe extra verbose (usefull for debugging)\n");
 	printf( "-s/--size\t\tSet bank resolution (row X columns)\n");
         printf( "-X/\t\tSet number of tracks\n");
-	printf( "-P/--preview\t\tSet main preview geometry (default to 112x96)" );
 	printf( "\n\n");
         exit(-1);
 }
@@ -102,16 +101,6 @@ static int      set_option( const char *name, char *value )
 			err++;
 		}
 	}
-	else if (strcmp(name, "P") == 0 || strcmp(name, "preview") == 0)
-	{
-		if(sscanf( (char*) optarg, "%dx%d",
-			&pw, &ph ) != 2 )
-		{
-			fprintf(stderr, "--preview parameter requires NxN argument");
-			err++;
-		}
-	}
-        else
                 err++;
         return err;
 }
@@ -127,7 +116,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	sprintf(hostname, "127.0.0.1");
 
-        while( ( n = getopt( argc, argv, "s:h:p:P::nvHf:X:")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:p:nvHf:X:")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);

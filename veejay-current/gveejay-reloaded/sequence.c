@@ -110,7 +110,8 @@ static	void	gvr_close_connection( veejay_track_t *v )
          veejay_msg(2, "Disconnectin VeejayGrabber %s:%d",
                       v->hostname,v->port_num );
          vj_client_close(v->fd);
-         if(v->hostname) free(v->hostname);
+      	 vj_client_free(v->fd);
+	 if(v->hostname) free(v->hostname);
          if(v->status_buffer) free(v->status_buffer);
          if(v->data_buffer) free(v->data_buffer);
 	 if(v->tmp_buffer) free(v->tmp_buffer);
@@ -346,7 +347,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	uint8_t *out = v->tmp_buffer;
 	
 	v->bw = 0;
-	if( bw == (v->width * v->height ))
+/*	if( bw == (v->width * v->height ))
 	{
 		unsigned int i,j;	
 		unsigned int len = v->width * v->height;
@@ -367,16 +368,22 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	}
 	else
 	{
-		VJFrame *src1 = yuv_yuv_template( in, in + (v->width * v->height),
+*/
+	VJFrame *src1 = NULL;
+	if( bw != (v->width * v->height ))
+		src1 = yuv_yuv_template( in, in + (v->width * v->height),
 						      in + (v->width * v->height) + (v->width*v->height)/4 ,
 						      v->width,v->height, PIX_FMT_YUV420P );
-		VJFrame *dst1 = yuv_rgb_template( out, v->width,v->height, PIX_FMT_RGB24 );
+	else
+		src1 = yuv_yuv_template( in, in, in, v->width,v->height, PIX_FMT_GRAY8 );
 
-		yuv_convert_any_ac( src1, dst1, src1->format, dst1->format );	
+	VJFrame *dst1 = yuv_rgb_template( out, v->width,v->height, PIX_FMT_RGB24 );
 
-		free(src1);
-		free(dst1);
-	}
+	yuv_convert_any_ac( src1, dst1, src1->format, dst1->format );	
+
+	free(src1);
+	free(dst1);
+//	}
 
 
 	v->have_frame = 1;
@@ -934,6 +941,7 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 			{
 				veejay_msg(0, "Unable to reconnect to Veejay. Closing track %d",
 					track_num );
+				vj_client_free(v->fd);
 				if(v->hostname) free(v->hostname);
        				if(v->status_buffer) free(v->status_buffer);
 				if(v->data_buffer) free(v->data_buffer);

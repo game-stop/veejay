@@ -2903,9 +2903,11 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font)
 	sprintf(buffer, "%s", tag->source_name );
 	xmlNewChild(node,NULL,(const xmlChar*) "source_file", (const xmlChar*) buffer );
 
-	sprintf(buffer, "%s", tag->extra );
-	xmlNewChild(node, NULL,(const xmlChar) "extra_data", (const xmlChar*) buffer );
-
+	if(tag->extra)
+	{
+		sprintf(buffer, "%s", tag->extra );
+		xmlNewChild(node, NULL,(const xmlChar) "extra_data", (const xmlChar*) buffer );
+	}
 	sprintf(buffer, "%d", tag->color_r );
 	xmlNewChild(node,NULL,(const xmlChar*) "red", (const xmlChar*) buffer );
 	sprintf(buffer, "%d", tag->color_g );

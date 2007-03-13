@@ -19,7 +19,7 @@
 
 #include <gtk/gtk.h>
 #include <glib.h>
-
+#include <libvjmem/vjmem.h>
 extern veejay_release_track(int id, int release_this);
 extern void	veejay_bind_track( int id, int bind_this );
 
@@ -141,8 +141,7 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data)
 	renderer = gtk_cell_renderer_text_new();
 	wrenderer = gtk_cell_renderer_toggle_new();
 
-	track_view_t *my_view = (track_view_t*) malloc(sizeof(track_view_t));
-	memset(my_view,0,sizeof(track_view_t));
+	track_view_t *my_view = (track_view_t*) vj_calloc(sizeof(track_view_t));
 
 	gtk_cell_renderer_toggle_set_active( wrenderer , FALSE );
 

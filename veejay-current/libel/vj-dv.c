@@ -328,7 +328,7 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 	  	if(fmt==FMT_422 || fmt == FMT_422F)
                        yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
                else
-                       yuy2toyv12( Y,Cb,Cr, d->dv_video, width, height );
+                       vj_yuy2toyv12( Y,Cb,Cr, d->dv_video, width, height );
 
 		return 1;
 	}

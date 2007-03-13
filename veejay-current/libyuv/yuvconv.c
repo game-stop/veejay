@@ -474,7 +474,7 @@ void	yuy2toyv16(uint8_t *dst_y, uint8_t *dst_u, uint8_t *dst_v, uint8_t *srcI, i
 #endif	
 }
 
-void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
+void vj_yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 		int width, int height)
 {
 	int j,jmax,imax,i;
@@ -505,7 +505,7 @@ void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 #else
 // non mmx functions
 
-void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
+void vj_yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 		int width, int height)
 {
   int i, j, w2;

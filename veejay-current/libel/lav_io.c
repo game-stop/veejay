@@ -681,7 +681,7 @@ long lav_video_frames(lav_file_t *lav_file)
 #endif
 #ifdef USE_GDK_PIXBUF
 	case 'x':
-		return 2;
+		return 25;
 #endif
 #ifdef HAVE_LIBQUICKTIME
       case 'q':

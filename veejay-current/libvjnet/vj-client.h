@@ -65,6 +65,8 @@ int	vj_client_read_i(vj_client *v, uint8_t *dst, int len );
 
 int vj_client_read( vj_client *v, int sock_type, uint8_t *dst, int bytes );
 
+int vj_client_read_no_wait( vj_client *v, int sock_type, uint8_t *dst, int bytes );
+
 int	vj_client_close( vj_client *v );
 
 int vj_client_send( vj_client *v, int sock_type, char *buf);
@@ -78,7 +80,6 @@ int	vj_client_test(char *addr, int port );
 int vj_client_send_bufX(vj_client *v, int sock_type,unsigned char *buf, int len );
 
 int	vj_client_window_sizes( int socket_fd, int *r, int *s );
-
 
 #endif
 

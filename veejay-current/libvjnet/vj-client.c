@@ -105,7 +105,6 @@ int	vj_client_window_sizes( int socket_fd, int *r, int *s )
 	return 1;
 }
 
-
 void	vj_client_flush(vj_client *v, int num_frames)
 {
 	if(vj_client_poll(v, V_STATUS ))
@@ -360,6 +359,20 @@ int	vj_client_get_status_fd(vj_client *v, int sock_type )
 			return  v->c[0]->r->sock_fd;
 	}
 	return 0;	
+}
+int	vj_client_read_no_wait(vj_client *v, int sock_type, uint8_t *dst, int bytes )
+{
+	if( sock_type == V_STATUS )
+	{
+		if(v->c[1]->type == VSOCK_S)
+			return( sock_t_recv( v->c[1]->fd, dst, bytes ) );
+	}
+	if( sock_type == V_CMD )
+	{
+		if(v->c[0]->type == VSOCK_C)
+			return ( sock_t_recv( v->c[0]->fd, dst, bytes ) );
+	}
+	return 0;
 }
 
 int	vj_client_read(vj_client *v, int sock_type, uint8_t *dst, int bytes )

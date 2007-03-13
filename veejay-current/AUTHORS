@@ -18,7 +18,10 @@ veejay contributors:
  Daniel Rohr for giving practical tips on math problems (optimizations) 
  Rupert Reddington for sending in a Matrox G550 card (thanks!)
  Toni (from Germany) for fixing veejay.spec file and compilation for gtk 2.4
-   
+ Thomas Reinhold (graphical samplebank)
+ Tom Schouten (sendVIMS for PD)
+ Maciek Szczesniak (vv-FX)
+  
 
 veejay/gveejay author:
 ======================
@@ -28,7 +31,6 @@ veejay/gveejay author:
 gveejayreloaded authors:
 =======================
    Matthijs van Henten (artist/HCI) (interface design)
-   Thomas Reinhold     (developer)
    Niels Elburg        (developer)
 
 

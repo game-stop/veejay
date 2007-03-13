@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <mjpegtools/mpegconsts.h>
 #include <mjpegtools/mpegtimecode.h>
+#include <libvjmem/vjmem.h>
 #include <string.h>
 
 int	status_to_arr( char *status, int *array )
@@ -52,8 +53,8 @@ int	status_to_arr( char *status, int *array )
 char   *format_time(int pos, float fps)
 {
         MPEG_timecode_t tc;
-	memset(&tc, 0,sizeof(MPEG_timecode_t));
-	char *tmp = (char*) malloc( 20 );
+	veejay_memset(&tc, 0,sizeof(MPEG_timecode_t));
+	char *tmp = (char*) vj_malloc( 20 );
 	y4m_ratio_t ratio = mpeg_conform_framerate( fps );
 	int n = mpeg_framerate_code( ratio );
 

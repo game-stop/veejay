@@ -1174,9 +1174,13 @@ void	_el_ref_reset()
 	if(info->elref != NULL)
 	{
 		int n = g_list_length( info->elref );
-	//	for(i = 0; i < n; i ++ )
-		
-	//		free( g_list_nth_data( info->elref, i ));
+		int i;
+		for(i = 0; i < n; i ++ )
+		{
+			el_ref *edl = g_list_nth_data(info->elref, i );
+			if(edl)
+				free(edl);
+		}	
 		g_list_free(info->elref);
 		info->elref = NULL;
 	}
@@ -1429,22 +1433,82 @@ gchar *dialog_open_file(const char *title, int type)
 	return file;
 }
 
+static	char *	produce_os_str()
+{
+	char os_str[512];
+	char cpu_type[32];
+	char *simd = vj_calloc( 128 );
+#ifdef ARCH_X86
+	sprintf(cpu_type,"x86");
+#endif
+#ifdef ARCH_X86_64
+	sprintf(cpu_type, "x86-64");
+#endif
+#ifdef ARCH_PPC
+	sprintf(cpu_type, "ppc");
+#endif
+#ifdef ARCH_MIPS
+	sprintf(cpu_type, "mips");
+#endif
+#ifdef HAVE_ASM_MMX
+	strcat( simd, "MMX ");
+#endif
+#ifdef HAVE_ASM_MMX2
+	strcat( simd, "MMX2 ");
+#endif
+#ifdef HAVE_ASM_SSE
+	strcat( simd, "SSE " );
+#endif
+#ifdef HAVE_ASM_SSE2
+	strcat( simd, "SSE2" );
+#endif
+#ifdef HAVE_ASM_CMOV
+	strcat( simd, "cmov" );
+#endif
+#ifdef HAVE_ASM_3DNOW
+	strcat( simd, "3DNow");
+#endif
+#ifdef ARCH_PPC
+#ifdef HAVE_ALTIVEC
+	strcat( simd, "altivec");
+#else
+	strcat( simd, "no optimizations");
+#endif
+#endif
+#ifdef ARCH_MIPS
+	strcat( simd, "no optimizations");
+#endif
+	sprintf(os_str,"Arch: %s with %s",
+		cpu_type, simd );
 
+	return strdup( os_str );
+}
 
 void	about_dialog()
 {
     const gchar *artists[] = { 
       "Matthijs v. Henten (glade, pixmaps) <cola@looze.net>", 
-      "Dursun Koca (logo)",
+      "Dursun Koca (V-logo)",
       NULL 
     };
 
     const gchar *authors[] = { 
-      "Niels Elburg <nelburg@looze.net>",
-      "Matthijs v. Henten <cola@looze.net>",
-      "Thomas Reinhold <stan@jf-chemnitz.de>",
-      NULL 
+	"Veejay/GVeejayReloaded:",
+	"Niels Elburg <nelburg@looze.net>",
+	"Matthijs v. Henten <cola@looze.net>",
+      	NULL 
     };
+
+	const gchar *web = {
+		"http://www.veejayhq.net | http://veejay.dyne.org",
+		NULL
+
+	};
+
+	char blob[1024];
+	char *os_str = produce_os_str();
+	sprintf(blob, "Veejay - A visual instrument and realtime video sampler for GNU/Linux\n%s", os_str );
+	free(os_str);
 
     const gchar *license = 
     {
@@ -1471,8 +1535,10 @@ void	about_dialog()
 		"version", VERSION,
 		"copyright", "(C) 2004 - 2007 N. Elburg et all.",
 		"comments", "The graphical interface for Veejay",
+		"website", web,
 		"authors", authors,
 		"artists", artists,
+		"comments", blob,
 		"license", license,
 		"logo", pixbuf, NULL );
 	g_object_unref(pixbuf);
@@ -3332,9 +3398,9 @@ static	void	load_effectchain_info()
 		gchar toggle[4];
 		gchar kf_toggle[4];
 		guint arr[6];
-		bzero(toggle,4);
-		bzero(kf_toggle,4);
-		memset(arr,0,sizeof(arr));
+		veejay_memset(toggle,0,4);
+		veejay_memset(kf_toggle,0,4);
+		veejay_memset(arr,0,sizeof(arr));
 		char line[12];
 		bzero(line,12);
 		strncpy( line, fxtext + offset, 8 );
@@ -4025,7 +4091,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	
 				int values[10];
 
-				memset(values,0, 10 * sizeof(int));
+				veejay_memset(values,0, sizeof(values));
 				
 				sscanf( line, "%05d%02d%03d%03d%03d%03d%03d%03d",
 					&values[0], &values[1], &values[2], 
@@ -4643,11 +4709,6 @@ static	void	reload_bundles()
 	}
 
 
-//	for( k = 0; k < sizeof(vims_keys_t); k ++ )
-//		if( vims_keys_list[k].args ) g_free( vims_keys_list[k].args );
-//	memset( &vims_keys_list, 0, sizeof(vims_keys_t));
-
-
 	char *ptr = eltext;
 
 
@@ -4696,9 +4757,11 @@ static	void	reload_bundles()
 		vims_keys_list[ (val[2] * MOD_OFFSET) + val[1] ].state = val[2];
 		vims_keys_list[ (val[2] * MOD_OFFSET) + val[1] ].event_id = val[0];	
 
-	//	if( vims_keys_list[ (val[2] * MOD_OFFSET ) + val[1] ].args )
-	//		free( vims_keys_list[ (val[2] * MOD_OFFSET ) + val[1] ]. args );
-
+		if( vims_keys_list[ (val[2] * MOD_OFFSET ) + val[1] ].args )
+		{
+			free( vims_keys_list[ (val[2] * MOD_OFFSET ) + val[1] ]. args );
+			vims_keys_list[ (val[2] * MOD_OFFSET) + val[1] ].args = NULL;
+		}
 		if( val[0] >= VIMS_BUNDLE_START && val[0] < VIMS_BUNDLE_END )
 		{
 			g_content	= _utf8str( message );
@@ -5102,7 +5165,7 @@ static	void	load_editlist_info()
 	int values[10];
 	long rate = 0;
 	long dum[2];
-	memset(values, 0, sizeof(values));
+	veejay_memset(values, 0, sizeof(values));
 	single_vims( VIMS_VIDEO_INFORMATION );
 	int len = 0;
 	gchar *res = recv_vims(3,&len);
@@ -5219,7 +5282,7 @@ static	gchar	*format_time(int pos)
 {
 	MPEG_timecode_t	tc;
 	if(pos==0)
-		memset(&tc, 0, sizeof(tc));
+		veejay_memset(&tc, 0, sizeof(tc));
 	else
 		mpeg_timecode( &tc, pos,
 			mpeg_framerate_code(
@@ -5234,9 +5297,9 @@ static	gchar	*format_time(int pos)
 static	gchar	*format_selection_time(int start, int end)
 {
 	MPEG_timecode_t tc;
-	memset( &tc, 0,sizeof(tc));
+	veejay_memset( &tc, 0,sizeof(tc));
 	if( (end-start) <= 0)
-		memset( &tc, 0, sizeof(tc));
+		veejay_memset( &tc, 0, sizeof(tc));
 	else
 		mpeg_timecode( &tc, (end-start), mpeg_framerate_code(	
 			mpeg_conform_framerate( info->el.fps ) ), info->el.fps );
@@ -5680,15 +5743,17 @@ static void	process_reload_hints(int *history, int pm)
 {
 	int	*entry_tokens = &(info->uc.entry_tokens[0]);
 
-	if(info->uc.reload_hint[HINT_V4L] == 1 && pm == MODE_STREAM)
+	if( pm == MODE_STREAM )
 	{
-		load_v4l_info();
+		if(info->uc.reload_hint[HINT_V4L])
+			load_v4l_info();
+	
+		if( info->uc.reload_hint[HINT_RGBSOLID])
+			update_colorselection();
+
 	}
 
-	if( info->uc.reload_hint[HINT_RGBSOLID] == 1 && pm == MODE_STREAM )
-		update_colorselection();
-
-	if( info->uc.reload_hint[HINT_EL] ==  1 )
+	if( info->uc.reload_hint[HINT_EL] )
 	{
 		load_editlist_info();
 		reload_editlist_contents();
@@ -5699,9 +5764,8 @@ static void	process_reload_hints(int *history, int pm)
 	}
 
 
-	if( info->uc.reload_hint[HINT_SLIST] == 1 )
+	if( info->uc.reload_hint[HINT_SLIST] )
 	{
-		//load_samplelist_info(TRUE);
 		load_samplelist_info(FALSE);
 		info->uc.expected_slots = info->status_tokens[TOTAL_SLOTS];
 	}
@@ -5903,24 +5967,6 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		bzero(sta_len,6);
 		nb = vj_client_read( gui->client, V_STATUS, sta_len, 5 );
 
-
-/*
-		if(sta_len[0] != 'V' || nb <= 0 )
-		{
-			gui->status_lock = 0;
-veejay_msg(0, "G_IO_IN: %d bytes read, sta = '%s' ", nb, sta_len );
-			abort_gveejay();
-			return FALSE;
-		}
-		int n_bytes = 0;
-		sscanf( sta_len+1, "%03d", &n_bytes );
-		if( n_bytes == 0 || n_bytes >= STATUS_BYTES )
-		{
-			gui->status_lock = 0;
-			abort_gveejay();
-			return FALSE;
-		}*/
-
 		if(sta_len[0] == 'V' && nb > 0 )
 		{
 			int n_bytes = 0;
@@ -5937,27 +5983,23 @@ veejay_msg(0, "G_IO_IN: %d bytes read, sta = '%s' ", nb, sta_len );
 			}
 		}
 
-		//nb = vj_client_read( gui->client, V_STATUS, gui->status_msg, n_bytes );
-/*		if(nb <= 0 )
-		{
-			gui->status_lock = 0;
-			abort_gveejay();
-			return FALSE;
-		}*/
-
 		int tmp1;
 
                 while((tmp1 = vj_client_poll( gui->client, V_STATUS )) > 0)
                 {
 			// is there a more recent message ?
 			unsigned char tmp[6];
-			veejay_memset( tmp, 0, sizeof(tmp));
-			veejay_memset( gui->status_msg, 0,STATUS_BYTES ); 
-		        nb = vj_client_read( gui->client,V_STATUS,tmp, 5);
 			int bb = 0;
+			veejay_memset( tmp, 0, sizeof(tmp));
+		        nb = vj_client_read( gui->client,V_STATUS,tmp, 5);
 			sscanf( tmp+1, "%03d", &bb );
+
 			if(bb>0)
+			{
+				veejay_memset( gui->status_msg, 0, STATUS_BYTES );
 				nb = vj_client_read(gui->client, V_STATUS, gui->status_msg, bb );
+			}
+
 			if(nb<=0)
 			{
 				abort_gveejay();
@@ -5979,26 +6021,15 @@ veejay_msg(0, "G_IO_IN: %d bytes read, sta = '%s' ", nb, sta_len );
 
 			if( n != 21 )
 			{
-	fprintf(stderr, "insane status %d\n",n);
-				// restore status (to prevent gui from going bezerk)
+				veejay_msg(0, "Received corrupt status line!");
 				int *history = info->history_tokens[ info->uc.playmode ];
 				int i;
 				for(i = 0; i <= 21; i ++ )
 					gui->status_tokens[i] = history[i];
 			}
 
-
-//			gdk_threads_enter();
-
 			update_gui();
-
 			info->prev_mode = gui->status_tokens[ PLAY_MODE ];
-
-//			veejay_update_multitrack( info );
-
-
-//			gdk_threads_leave();
-
 		}
 		gui->status_lock = 0;
 
@@ -6009,11 +6040,15 @@ veejay_msg(0, "G_IO_IN: %d bytes read, sta = '%s' ", nb, sta_len );
 		for( i = 0; i < STATUS_TOKENS; i ++ )
 			history[i] = info->status_tokens[i];
 
-	//	info->prev_mode = pm;
-		char tmp[5];
-                while( (tmp1 = vj_client_poll( gui->client, V_STATUS )))
+		//if(!vj_client_discard( gui->client, V_STATUS ))
+		//		abort_gveejay();
+
+	
+	
+		char tmp[100];
+	        while( (tmp1 = vj_client_poll( gui->client, V_STATUS )))
                 {
-		       nb = vj_client_read( gui->client,V_STATUS,tmp, 1);
+		       nb = vj_client_read_no_wait( gui->client,V_STATUS,tmp, 100);
 		       if(nb <= 0 )
 				abort_gveejay();
 		}
@@ -6203,7 +6238,9 @@ void	vj_gui_free()
 	if(info)
 	{
 		int i;
-		//vj_gui_disconnect();
+		if(info->client)
+			vj_client_free(info->client);
+
 		for( i = 0; i < 3 ;  i ++ )
 		{
 			if(info->history_tokens[i])
@@ -6517,6 +6554,10 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	create_ref_slots( 32 );
 	
 	create_sequencer_slots( 10 );
+
+	veejay_memset( vj_event_list, 0, sizeof( vj_event_list ));
+	veejay_memset( vims_keys_list, 0, sizeof( vims_keys_list) );
+
 	
 	gtk_widget_show( info->sample_bank_pad );
 
@@ -6588,9 +6629,9 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 			ph,
 			img_wid);
 
-	memset( &info->watch, 0, sizeof(watchdog_t));
+	veejay_memset( &info->watch, 0, sizeof(watchdog_t));
 	info->watch.state = STATE_STOPPED; //
-	memset(&(info->watch.p_time),0,sizeof(struct timeval));
+	veejay_memset(&(info->watch.p_time),0,sizeof(struct timeval));
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "veejay_connection" );
 	if( launcher )
 	{
@@ -6750,11 +6791,8 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	info->rawdata = (guchar*) vj_calloc(sizeof(guchar) * info->el.width * info->el.height * 3);
 
-	for( k = 0; k < VIMS_MAX  ; k ++ )
-	{
-		vims_keys_t *p = &vims_keys_list[k];
-		veejay_memset( p, 0, sizeof( vims_keys_t ) );
-	}
+	veejay_memset( vims_keys_list, 0 , sizeof(vims_keys_list));
+	veejay_memset( vj_event_list,  0, sizeof( vj_event_list));
 
 	load_effectlist_info();
 	reload_vimslist();
@@ -6936,7 +6974,6 @@ void	vj_gui_disable()
 	disable_widget_by_pointer(info->audiovolume_knob);		
 
 	info->sensitive = 0;
-	enable_widget ("vs_box" );
 
 	preview_change_ = is_button_toggled( "previewtoggle");
 	set_toggle_button( "previewtoggle", 0 );
@@ -6962,7 +6999,6 @@ void	vj_gui_enable()
 
 	info->sensitive = 1;
 
-	disable_widget( "vs_box" );
    	 set_toggle_button( "previewtoggle", preview_change_ );
 
 }

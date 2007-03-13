@@ -187,7 +187,7 @@ int main(int argc, char *argv[])
 	if(!sayvims)
 		return -1;
 
-	if(single_msg || (optind == 1 && err == 0 && argc > 1 )) 
+	if(single_msg || !interactive )
 	{
 		char **msg = argv + optind;
 		int  nmsg  = argc - optind;
@@ -244,11 +244,14 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				vj_client_send( sayvims, V_CMD, buf );
+				if(vj_client_send( sayvims, V_CMD, buf ))
+					fprintf(stderr, "Cannot send '%s'!\n",
+						buf );
 			}
 		}
 	}
 	vj_client_close(sayvims);
 	vj_client_free(sayvims);
+
         return 0;
 } 
