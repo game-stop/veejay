@@ -180,9 +180,7 @@ typedef struct
 	int	selected_chain_entry;
 	int	selected_el_entry;
 	int	selected_vims_entry;
-	int	selected_key_mod;
-	int	selected_key_sym;
-	int	selected_vims_id;
+	int	selected_vims_accel[2];
 	int	render_record; 
 	int	entry_tokens[21];
 	int	iterator;
@@ -231,6 +229,7 @@ typedef struct
 	gint params;
 	gchar *format;
 	gchar *descr;
+	gchar *args;
 } vims_t;
 
 typedef struct
@@ -238,6 +237,7 @@ typedef struct
 	gint keyval;
 	gint state;
 	gchar *args;
+	gchar *vims;
 	gint event_id;
 } vims_keys_t;
 
@@ -1552,26 +1552,27 @@ void	about_dialog()
 gboolean	dialogkey_snooper( GtkWidget *w, GdkEventKey *event, gpointer user_data)
 {
 	GtkWidget *entry = (GtkWidget*) user_data;
- 	if(gtk_widget_is_focus(GTK_WIDGET(entry)) == FALSE )
-	{	// entry doesnt have focus, bye!
+
+	if( !gtk_widget_is_focus( entry ) )
+	{
 		return FALSE;
 	}
-	
 	if(event->type == GDK_KEY_PRESS)
 	{
 		gchar tmp[100];
 		bzero(tmp,100);
-		info->uc.pressed_key = event->keyval;
-		info->uc.pressed_mod = event->state;
+		info->uc.pressed_key = gdk2sdl_key( event->keyval );
+		info->uc.pressed_mod = gdk2sdl_mod( event->state );
 		gchar *text = gdkkey_by_id( event->keyval );
 		gchar *mod  = gdkmod_by_id( event->state );
 
-		if( mod != NULL && text != NULL)
+		if( text )
 		{
-			if(strlen(mod) < 2 )
+			if(!mod || strncmp(mod, " ", 1 ) == 0 )
 				sprintf(tmp, "%s", text );
 			else
-				sprintf(tmp, "%s + %s", text,mod);
+				sprintf(tmp, "%s + %s", mod,text);
+
 			gchar *utf8_text = _utf8str( tmp );
 			gtk_entry_set_text( GTK_ENTRY(entry), utf8_text);
 			g_free(utf8_text);
@@ -1589,37 +1590,38 @@ gboolean	key_handler( GtkWidget *w, GdkEventKey *event, gpointer user_data)
 	if(event->type != GDK_KEY_PRESS)
 		return FALSE;
 
-	/* translate GDK keys to veejay's SDL set */
 	int gdk_keyval = gdk2sdl_key( event->keyval );
 	int gdk_state  = gdk2sdl_mod( event->state );
 
-	if(gdk_keyval == 0)
-		return FALSE;
-
-	int i;
-	for( i = 0; i <VIMS_MAX; i ++ )
-	 if( vims_keys_list[i].keyval == gdk_keyval && vims_keys_list[i].state == gdk_state )
+	if( gdk_keyval >= 0 && gdk_state >= 0 )
 	{
-		gchar message[100];
-		if( vims_keys_list[i].args != NULL )
-			sprintf(message, "%03d:%s;", vims_keys_list[i].event_id, vims_keys_list[i].args );
-		else
-			sprintf(message, "%03d:;", vims_keys_list[i].event_id );
-		msg_vims( message );
-//		fprintf(stderr, "Send message '%s'\n", message );
+		char *message = vims_keys_list[(gdk_state * MOD_OFFSET)+gdk_keyval].vims;
+		if(message)
+			msg_vims(message);	
 	}
-
-
 	return FALSE;
 }
 
+static int	check_format_string( char *args, char *format )
+{
+	if(!format || !args )
+		return 0;
+	char dirty[128];
+	int n = sscanf( args, format, &dirty,&dirty, &dirty,&dirty, &dirty,&dirty, &dirty,&dirty, &dirty,&dirty );
+	return n;
+}
 
 int
 prompt_keydialog(const char *title, char *msg)
 {
+	if(!info->uc.selected_vims_entry )
+		return 0;
+	info->uc.pressed_mod = 0;
+	info->uc.pressed_key = 0; 
+
 	char pixmap[512];
 	bzero(pixmap,512);
-	get_gd( pixmap, NULL, "icon_key.png");
+	get_gd( pixmap, NULL, "icon_keybind.png");
 
 	GtkWidget *mainw = glade_xml_get_widget_(info->main_window, "gveejay_window");
 	GtkWidget *dialog = gtk_dialog_new_with_buttons( title,
@@ -1631,10 +1633,8 @@ prompt_keydialog(const char *title, char *msg)
 				GTK_RESPONSE_ACCEPT,
 				NULL);
 
-
-
 	GtkWidget *keyentry = gtk_entry_new();
-	gtk_entry_set_text( GTK_ENTRY(keyentry), "<press a key>");
+	gtk_entry_set_text( GTK_ENTRY(keyentry), "<press any key>");
 	gtk_editable_set_editable( GTK_ENTRY(keyentry), FALSE );  
 	gtk_dialog_set_default_response( GTK_DIALOG(dialog), GTK_RESPONSE_REJECT );
 	gtk_window_set_resizable( GTK_WINDOW(dialog), FALSE );
@@ -1653,32 +1653,43 @@ prompt_keydialog(const char *title, char *msg)
 	gtk_container_add( GTK_CONTAINER( hbox1 ), icon );
 	gtk_container_add( GTK_CONTAINER( hbox1 ), label );
 	gtk_container_add( GTK_CONTAINER( hbox1 ), keyentry );
+	
+	GtkWidget *pentry = NULL;
 
-	if( info->uc.selected_vims_entry &&
-			(info->uc.selected_key_mod || 
-			info->uc.selected_key_sym ))
+	if(vj_event_list[ info->uc.selected_vims_entry ].params)
+	{
+		//@ put in default args
+		char *arg_str = vj_event_list[ info->uc.selected_vims_entry ].args;
+		pentry = gtk_entry_new();
+		GtkWidget *arglabel = gtk_label_new("Arguments:");
+				
+		if(arg_str)
+			gtk_entry_set_text( GTK_ENTRY(pentry), arg_str );
+		gtk_editable_set_editable( GTK_ENTRY(pentry), TRUE );
+		gtk_container_add( GTK_CONTAINER(hbox1), arglabel );
+		gtk_container_add( GTK_CONTAINER(hbox1), pentry );
+	} 
+
+	if( info->uc.selected_vims_entry  )
 	{
 		char tmp[100];
-		sprintf(tmp,"VIMS %d : %s + %s",
-			info->uc.selected_vims_entry,
-			sdlmod_by_id( info->uc.selected_key_mod ),
-			sdlkey_by_id( info->uc.selected_key_sym ) );
+		char *str_mod = sdlmod_by_id( info->uc.pressed_mod );
+		char *str_key = sdlkey_by_id( info->uc.pressed_key );
+		int key_combo_ok = 0;
 
-		GtkWidget *current = gtk_label_new( tmp );
-		gtk_container_add( GTK_CONTAINER( hbox1 ), current );
-/*	
-		if( vj_event_list[ info->uc.selected_vims_entry ].params > 0 )
+		if(str_mod && str_key ) {
+			snprintf(tmp,100,"VIMS %d : %s + %s",
+				info->uc.selected_vims_entry, str_mod, str_key );
+			key_combo_ok = 1;
+		 } else if ( str_key ) {
+			snprintf(tmp, 100,"VIMS %d: %s", info->uc.selected_vims_entry,str_key);
+			key_combo_ok = 1;
+		} 
+
+		if( key_combo_ok )
 		{
-			GtkWidget *arglabel = gtk_label_new("Enter arguments for VIMS");
-			GtkWidget *argentry = gtk_entry_new();
-			gtk_entry_set_text( 
-				GTK_ENTRY(argentry), 
-				info->uc.selected_arg_buf
-			);
-			gtk_container_add( GTK_CONTAINER( hbox2 ), arglabel );
-			gtk_container_add( GTK_CONTAINER( hbox2 ), argentry );
-		}*/
-
+			gtk_entry_set_text( GTK_ENTRY(keyentry), tmp );
+		}
 	}
 
 
@@ -1687,11 +1698,27 @@ prompt_keydialog(const char *title, char *msg)
 
 	gtk_widget_show_all( dialog );
 
-	int id = gtk_key_snooper_install( dialogkey_snooper, (gpointer*) keyentry );
+	int id = gtk_key_snooper_install( dialogkey_snooper, keyentry);
 	int n = gtk_dialog_run(GTK_DIALOG(dialog));
 
 	gtk_key_snooper_remove( id );
+
+	if(pentry)
+	{
+		gchar *args =  (gchar*) gtk_entry_get_text( GTK_ENTRY(pentry));
+		int np = check_format_string( args, vj_event_list[ info->uc.selected_vims_entry  ].format );
+		
+		if( np == vj_event_list[ info->uc.selected_vims_entry ].params )
+		{
+			if(info->uc.selected_vims_args )
+				free(info->uc.selected_vims_args );
+
+			info->uc.selected_vims_args = strdup( args );	
+		}
+	}
+
 	gtk_widget_destroy(dialog);
+
 
 	return n;
 }
@@ -1722,9 +1749,9 @@ prompt_dialog(const char *title, char *msg)
 	GtkWidget *dialog = gtk_dialog_new_with_buttons( title,
 				GTK_WINDOW( mainw ),
 				GTK_DIALOG_DESTROY_WITH_PARENT,
-				GTK_STOCK_NO,
+				GTK_STOCK_OK,
 				GTK_RESPONSE_REJECT,
-				GTK_STOCK_YES,	
+				GTK_STOCK_CANCEL,	
 				GTK_RESPONSE_ACCEPT,
 				NULL);
 	gtk_dialog_set_default_response( GTK_DIALOG(dialog), GTK_RESPONSE_REJECT );
@@ -4182,7 +4209,6 @@ on_vims_row_activated(GtkTreeView *treeview,
 	GtkTreeModel *model;
 	GtkTreeIter iter;
 	model = gtk_tree_view_get_model(treeview);
-
 	if(gtk_tree_model_get_iter(model,&iter,path))
 	{
 		gchar *vimsid = NULL;
@@ -4225,6 +4251,7 @@ on_vims_row_activated(GtkTreeView *treeview,
 		if( vimsid ) g_free( vimsid );
 	}
 }
+/*
 void
 on_vimslist_row_activated(GtkTreeView *treeview,
 		GtkTreePath *path,
@@ -4234,33 +4261,33 @@ on_vimslist_row_activated(GtkTreeView *treeview,
 	GtkTreeModel *model;
 	GtkTreeIter iter;
 	model = gtk_tree_view_get_model(treeview);
-
 	if(gtk_tree_model_get_iter(model,&iter,path))
 	{
 		gchar *vimsid = NULL;
+		gchar *text = NULL;
 		gint event_id = 0;
 		gtk_tree_model_get(model,&iter, VIMS_ID, &vimsid, -1);
-
-
-		if(!sscanf(vimsid, "%d", &event_id))
-		{
-			return;
-		}	
-		info->uc.selected_vims_entry = event_id;
-
-		info->uc.selected_key_mod = 0;
-		info->uc.selected_key_sym = 0;
+       		gtk_tree_model_get(model, &iter, VIMS_CONTENTS, &text, -1 );
 
 		if(sscanf( vimsid, "%d", &event_id ) && event_id > 0)
 		{
+			int n;
 			char msg[100];
+			info->uc.selected_vims_entry = event_id;
+			if(info->uc.selected_vims_args )
+				free(info->uc.selected_vims_args );
+			if(text)
+				info->uc.selected_vims_args = strdup( text );
+			else
+				info->uc.selected_vims_args = NULL;
+
 			sprintf(msg, "Press a key for VIMS %03d", event_id);
-			// prompt for key!
-			int n = prompt_keydialog("Attach key to VIMS event", msg);
+			n = prompt_keydialog("Attach key to VIMS event", msg);
 			if( n == GTK_RESPONSE_ACCEPT )
 			{
-				int key_val = gdk2sdl_key( info->uc.pressed_key );
-				int key_mod = gdk2sdl_mod( info->uc.pressed_mod );
+				int key_val = info->uc.pressed_key;
+				int key_mod = info->uc.pressed_mod;
+				
 				multi_vims(
 					VIMS_BUNDLE_ATTACH_KEY,
 					"%d %d %d",  // 4th = string arguments
@@ -4270,8 +4297,8 @@ on_vimslist_row_activated(GtkTreeView *treeview,
 		}
 		if( vimsid ) g_free(vimsid);
 	}
-}
-
+}*/
+/*
 gboolean
   view_vimslist_selection_func (GtkTreeSelection *selection,
                        GtkTreeModel     *model,
@@ -4284,20 +4311,29 @@ gboolean
     if (gtk_tree_model_get_iter(model, &iter, path))
     {
 	gchar *vimsid = NULL;
+	gchar *text = NULL;
  	gint event_id = 0;
 
         gtk_tree_model_get(model, &iter, VIMS_ID, &vimsid, -1);
+	gtk_tree_model_get(model, &iter, VIMS_CONTENTS, &text, -1 );
+
 
 	if(sscanf( vimsid, "%d", &event_id ))
 	{
-		info->uc.selected_vims_id = event_id;
-    	}
+		info->uc.selected_vims_entry = event_id;
+		if(info->uc.selected_vims_args )
+			free(info->uc.selected_vims_args );
+		if(text)
+			info->uc.selected_vims_args = strdup( text );
+		else
+			info->uc.selected_vims_args = NULL;
+ 	}
 	if(vimsid) g_free(vimsid);
     }
 
-    return TRUE; /* allow selection state to change */
+    return TRUE;
   }
-
+*/
 
 gboolean
   view_vims_selection_func (GtkTreeSelection *selection,
@@ -4307,15 +4343,16 @@ gboolean
                        gpointer          userdata)
   {
     GtkTreeIter iter;
-
+veejay_msg(0, "%s",__FUNCTION__);
     if (gtk_tree_model_get_iter(model, &iter, path))
     {
 	gchar *vimsid = NULL;
  	gint event_id = 0;
 	gchar *text = NULL;
-
+	gint n_params = 0;
         gtk_tree_model_get(model, &iter, VIMS_ID, &vimsid, -1);
 	gtk_tree_model_get(model, &iter, VIMS_CONTENTS, &text, -1 );
+	gtk_tree_model_get(model, &iter, VIMS_PARAMS, &n_params, -1);
 	int k=0; 
 	int m=0;
 	gchar *key = NULL;
@@ -4329,36 +4366,26 @@ gboolean
 		k = sdlkey_by_name( key );
 		m = sdlmod_by_name( mod );	
 
-		if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
-		{
-			info->uc.selected_vims_type = 0;
-		}
-		else
-		{
-			info->uc.selected_vims_type = 1;
-			if(info->uc.selected_vims_args )
-				free(info->uc.selected_vims_args);
-			if( vj_event_list[event_id].params > 0 && text )
-			  info->uc.selected_vims_args = strdup( text );
-			  
-		}
-		if(text)
-			set_textview_buffer( "vimsview", text );
-		else
-			clear_textview_buffer( "vimsview" );	
-
-//		if( info->uc.selected_arg_buf != NULL )
-//			free(info->uc.selected_arg_buf );
-//		info->uc.selected_arg_buf = NULL;
-//		if( vj_event_list[event_id].params > 0 )
-//			info->uc.selected_arg_buf = (text == NULL ? NULL: strdup( text ));
-
 		info->uc.selected_vims_entry = event_id;
-		if(k > 0)
-		{
-			info->uc.selected_key_mod = m;
-			info->uc.selected_key_sym = k;
-		}
+
+		if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
+			info->uc.selected_vims_type = 0;
+		else
+			info->uc.selected_vims_type = 1;
+
+		if(info->uc.selected_vims_args )
+			free(info->uc.selected_vims_args);
+		info->uc.selected_vims_args = NULL;
+
+		if( n_params > 0 && text )
+			info->uc.selected_vims_args = strdup( text );
+
+		info->uc.selected_vims_accel[0] = m;
+		info->uc.selected_vims_accel[1] = k;
+
+		clear_textview_buffer( "vimsview" );	
+		if( info->uc.selected_vims_type == 1 && text)
+			set_textview_buffer( "vimsview", text );
     	}
 	if(vimsid) g_free( vimsid );
 	if(text) g_free( text );
@@ -4496,116 +4523,14 @@ static	void	setup_vimslist()
 	gtk_tree_sortable_set_sort_column_id( 
 		sortable, VIMS_ID, GTK_SORT_ASCENDING);
 
-	g_signal_connect( tree, "row-activated",
-		(GCallback) on_vimslist_row_activated, NULL );
+//	g_signal_connect( tree, "row-activated",
+//		(GCallback) on_vimslist_row_activated, NULL );
 
-  	GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
-    	gtk_tree_selection_set_select_function(selection, view_vimslist_selection_func, NULL, NULL);
-   	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
+  //	GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+    //	gtk_tree_selection_set_select_function(selection, view_vimslist_selection_func, NULL, NULL);
+   //	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 }
 
-
-void	on_vimslist_edited(GtkCellRendererText *cell,
-		gchar *path_string,
-		gchar *new_text,
-		gpointer user_data
-		)
-{
-	// welke sample id is klikked?
-	GtkWidget *tree = glade_xml_get_widget_(info->main_window,
-				"tree_bundles");
-	GtkTreeIter iter;
-	gchar *id = NULL;
-	gchar *contents = NULL;
-	gchar *format = NULL;
-	gchar *key_sym = NULL;
-	gchar *key_mod = NULL;
-	gint event_id = 0;
-	int n;
-	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
-	n = gtk_tree_model_get_iter_from_string(
-		model,
-		&iter,
-		path_string);
-
-	// error !!
-
-	gtk_tree_model_get(
-		model,
-		&iter,
-		VIMS_ID,
-		&id,
-		-1);
-	gtk_tree_model_get(
-		model,
-		&iter,
-		VIMS_FORMAT,
-		&format,
-		-1);
-	gtk_tree_model_get(
-		model,
-		&iter,
-		VIMS_CONTENTS,
-		&contents
-		-1 );	
-	gtk_tree_model_get(
-		model,
-		&iter,
-		VIMS_KEY,
-		&key_sym,
-		-1);
-	gtk_tree_model_get(
-		model,
-		&iter,
-		VIMS_MOD,
-		&key_mod
-		-1 );	
-
-	sscanf( id, "%d", &event_id );
-
-	gint bytes_read = 0;
-	gint bytes_written = 0;
-	GError *error = NULL;
-	gchar *sysstr = g_locale_from_utf8( new_text, -1, &bytes_read, &bytes_written,&error);	
-	
-	if(sysstr == NULL || error != NULL)
-	{
-		goto vimslist_error;
-	}
-
-	if( event_id < VIMS_BUNDLE_START || event_id > VIMS_BUNDLE_END ) 	
-	{
-		int np = vj_event_list[ event_id ].params; 
-		char *c = format+1;
-		int i;	
-		int tmp_val = 0;
-		int k = sdlkey_by_name( key_sym );
-		int m = sdlmod_by_name( key_mod );
-
-		for( i =0 ; i < np; i ++ )
-		{
-			if(*(c) == 'd')
-			  if( sscanf( sysstr, "%d", &tmp_val ) != 1 )	 
-				goto vimslist_error;
-			c+=2;
-		}
-
-		multi_vims( VIMS_BUNDLE_ATTACH_KEY, "%d %d %d %s",
-			event_id, k, m, sysstr );
-		info->uc.reload_hint[HINT_BUNDLES]=1;
-		
-	}	
-
-	vimslist_error:
-
-	if(sysstr) g_free(sysstr);
-	if(id) g_free(id);
-	if(contents) g_free(contents);
-	if(key_sym) g_free(key_sym);
-	if(key_mod) g_free(key_mod);
-	if(format) g_free(format);
-
-}
 
 static	void	setup_bundles()
 {
@@ -4632,8 +4557,7 @@ static	void	setup_bundles()
 	setup_tree_text_column( "tree_bundles", VIMS_MOD, 	"Mod",0);
 	setup_tree_text_column( "tree_bundles", VIMS_PARAMS,	"Max args",0);
 	setup_tree_text_column( "tree_bundles", VIMS_FORMAT,	"Format",0 );
-	setup_tree_texteditable_column( "tree_bundles", VIMS_CONTENTS,	"Content", G_CALLBACK(on_vimslist_edited) );
-
+//	setup_tree_texteditable_column( "tree_bundles", VIMS_CONTENTS,	"Content", G_CALLBACK(on_vimslist_edited) );
 	g_signal_connect( tree, "row-activated",
 		(GCallback) on_vims_row_activated, NULL );
 
@@ -4677,8 +4601,65 @@ static	void	setup_editlist_info()
 
 */
 
+static	void	reload_keys()
+{
+	gint len = 0;
+	single_vims( VIMS_KEYLIST );
+	gchar *text = recv_vims( 6, &len );
+	gint offset = 0;
+
+	if( len == 0 || text == NULL )
+		return;
+
+	//@ destroy old VIMS list , keep argument list
+	gint k,index;
+	for( k = 0; k < VIMS_MAX  ; k ++ )
+	{
+		vims_keys_t *p = &vims_keys_list[k];
+		if(p->vims)
+			free(p->vims);
+		p->keyval = 0;
+		p->state = 0;
+		p->event_id = 0;
+	}
+
+	char *ptr = text;
+
+	while( offset < len )
+	{
+		int val[6];
+		veejay_memset(val,0,sizeof(val));
+		int n = sscanf( ptr + offset, "%04d%03d%03d%03d", &val[0],&val[1],&val[2],&val[3]);
+		if( n != 4 )
+		{
+			veejay_msg(0, "Syntax error while parsing key list");
+			free(text);
+			return;
+		}
+
+		offset += 13;
+		char *message = strndup( ptr + offset , val[3] );
+
+		offset += val[3];
+
+		
+		index = (val[1] * MOD_OFFSET) + val[2];
+
+		vims_keys_list[ index ].keyval 		= val[2];
+		vims_keys_list[ index ].state 		= val[1];
+		vims_keys_list[ index ].event_id 	= val[0];	
+		vims_keys_list[ index ].vims		= message;
+	}
+
+	free(text);
+}
+
+
 static	void	reload_bundles()
 {
+
+	reload_keys();
+
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_bundles");
 	GtkListStore *store;
 	GtkTreeIter iter;
@@ -4699,16 +4680,6 @@ static	void	reload_bundles()
 	store = GTK_LIST_STORE(model);
 
 	int k;
-
-	for( k = 0; k < VIMS_MAX  ; k ++ )
-	{
-		vims_keys_t *p = &vims_keys_list[k];
-		if(p->args )
-			free(p->args );
-		veejay_memset( p, 0, sizeof( vims_keys_t ) );
-	}
-
-
 	char *ptr = eltext;
 
 
@@ -4753,31 +4724,27 @@ static	void	reload_bundles()
 
 		sprintf( g_vims, "%03d", val[0] );
 
-		vims_keys_list[ (val[2] * MOD_OFFSET) + val[1] ].keyval = val[1];
-		vims_keys_list[ (val[2] * MOD_OFFSET) + val[1] ].state = val[2];
-		vims_keys_list[ (val[2] * MOD_OFFSET) + val[1] ].event_id = val[0];	
-
-		if( vims_keys_list[ (val[2] * MOD_OFFSET ) + val[1] ].args )
-		{
-			free( vims_keys_list[ (val[2] * MOD_OFFSET ) + val[1] ]. args );
-			vims_keys_list[ (val[2] * MOD_OFFSET) + val[1] ].args = NULL;
-		}
 		if( val[0] >= VIMS_BUNDLE_START && val[0] < VIMS_BUNDLE_END )
 		{
-			g_content	= _utf8str( message );
-			vims_keys_list[ (val[2] * MOD_OFFSET) + val[1] ].args = _utf8str(message);
+			g_content = _utf8str( message );
 		}
 		else
 		{
-			g_descr  	= _utf8str( message );
+			g_descr = _utf8str( message );
 			if( format )
-				g_format 	= _utf8str( format  );
-
-			if(args)
+				g_format = _utf8str( format );
+			if( args )
 			{
-				g_content	= _utf8str( args );
-				vims_keys_list[ (val[2] * MOD_OFFSET) + val[1] ].args = _utf8str( args );
+				g_content = _utf8str( args );
+		//@ set default VIMS argument:
+				if(vj_event_list[val[0]].args )	
+				{
+					free(vj_event_list[val[0]].args );
+					vj_event_list[val[0]].args = NULL;
+				}
+				vj_event_list[ val[0] ].args     = strdup( args );
 			}
+
 		}
 
 		gtk_list_store_append( store, &iter );
@@ -4858,6 +4825,10 @@ static	void	reload_vimslist()
 		gchar *g_format = (format == NULL ? NULL :_utf8str( format ));
 		gchar *g_descr  = (descr == NULL ? NULL :_utf8str( descr  ));
 
+		if(vj_event_list[val[0]].format )
+			free(vj_event_list[val[0]].format);
+		if(vj_event_list[val[0]].descr )
+			free(vj_event_list[val[0]].descr);
 
 		gtk_list_store_append( store, &iter );
 
@@ -4865,7 +4836,7 @@ static	void	reload_vimslist()
 		vj_event_list[ val[0] ].params   = val[1];
 		vj_event_list[ val[0] ].format   = (format == NULL ? NULL :_utf8str( format ));
 		vj_event_list[ val[0] ].descr	 = (descr == NULL ? NULL : _utf8str( descr ));
-
+	
 		sprintf(vimsid, "%03d", val[0] );
 		gtk_list_store_set( store, &iter,
 				VIMS_ID, vimsid, 
@@ -6764,7 +6735,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 			vj_client_free(info->client);
 		info->client = NULL;
 		char msg[200];
-		sprintf(msg, "Unable to connect to %s at port %d. Is the veejay server running?", hostname,port_num);
+		sprintf(msg, "Unable to connect to %s at port %d. Is the veejay server running?\nThe quickest way to launch a veejay server is by typing 'veejay -d' in a terminal", hostname,port_num);
 		error_dialog("Error", msg);
 		return 0;
 	}
@@ -7908,10 +7879,6 @@ static void set_activation_of_slot_in_samplebank( gboolean activate)
 
 	gtk_widget_modify_fg ( info->selected_gui_slot->timecode,
 		GTK_STATE_NORMAL, &color );
-//	veejay_msg(0, "frame");
-//	gtk_widget_modify_fg ( gtk_frame_get_label_widget( info->selected_gui_slot->frame ),
-//		GTK_STATE_NORMAL, &color );
-	
 }
 
 static	void	set_selection_of_slot_in_samplebank(gboolean active)

@@ -165,6 +165,7 @@ void 	vj_event_select_bank			( 	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_enable_audio			( 	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_disable_audio			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_print_info			(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_send_keylist( void *ptr, const char format[], va_list ap );
 void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_sample_list			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_send_log			(	void *ptr,	const char format[],	va_list ap	);

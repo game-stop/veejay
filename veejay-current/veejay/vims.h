@@ -42,6 +42,7 @@ enum {
 	VIMS_SRT_INFO				=	418,
 	VIMS_TRACK_LIST				=	5,
 	VIMS_SEQUENCE_LIST			=	419,
+	VIMS_KEYLIST				=	420,
 	/* general controls */
 	VIMS_SET_VOLUME				=	300,
 	VIMS_FULLSCREEN				=	301,

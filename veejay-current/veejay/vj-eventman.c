@@ -168,6 +168,11 @@ void		vj_event_vevo_inline_fire_default( void *super, int vims_id, const char *f
 	int i = 0;
 	int n = 0;
 	int dval[4] = {0,0,0,0};
+	if(!index_map_[vims_id])
+	{
+		veejay_msg(0, "No such event: %d", vims_id);
+		return;
+	}
 	vevo_property_get( index_map_[vims_id] , "arguments", 0, &n );
 	// dangerous, dval != atom_type, i != n defaults
 	while( i < n )
@@ -282,6 +287,8 @@ char	*vj_event_vevo_get_event_name( int id )
 char	*vj_event_vevo_get_event_format( int id )
 {
 	char *fmt = NULL;
+	if(!index_map_[id])
+		return NULL;
 	size_t len = vevo_property_element_size( index_map_[id], "format", 0 );
 	if(len > 0 )
 	{
@@ -302,6 +309,8 @@ int	vj_event_exists( int id )
 int	vj_event_vevo_get_default_value(int id, int p)
 {
 	int n =0;
+	if(!index_map_[id])
+		return 0;
 	char key[15];
 	sprintf(key, "argument_%d",p);
 	vevo_property_get(index_map_[id], key, 0, &n );
@@ -309,12 +318,16 @@ int	vj_event_vevo_get_default_value(int id, int p)
 }
 int	vj_event_vevo_get_num_args(int id)
 {
+	if(!index_map_[id])
+		return 0;
 	int n =0;
 	vevo_property_get(index_map_[id], "arguments", 0, &n );
 	return n;
 }
 int		vj_event_vevo_get_flags( int id )
 {
+	if(!index_map_[id])
+		return 0;
 	int flags = 0;
 	vevo_property_get( index_map_[id], "flags", 0, &flags );
 	return flags;
@@ -322,6 +335,8 @@ int		vj_event_vevo_get_flags( int id )
 
 int		vj_event_vevo_get_vims_id( int id )
 {
+	if(!index_map_[id])
+		return 0;
 	int vims_id = 0;
 	vevo_property_get( index_map_[id], "vims_id", 0, &vims_id );
 	return vims_id;
@@ -1835,6 +1850,16 @@ void		vj_init_vevo_events(void)
 				0,
 				VIMS_ALLOW_ANY,
 				NULL );
+
+	index_map_[ VIMS_KEYLIST ]				=	_new_event(
+				NULL,
+				VIMS_KEYLIST,
+				"GUI: Get all keys",
+				vj_event_send_keylist,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
 	index_map_[VIMS_DEVICE_LIST]				=	_new_event(
 				NULL,
 				VIMS_DEVICE_LIST,

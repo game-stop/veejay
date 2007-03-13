@@ -33,9 +33,14 @@ static struct
 } modifier_translation_table_t[] = 
 {
 	{	0,	0,			" "  },
+	{	0,	16,			" "  },
 	{	3,	1,			"shift" },
+	{	3,	17,			"shift"	},
 	{	1, 	8,			"alt"	},
+	{	1,	24,			"alt"	},
+	{	1,	44,			"alt"	},
 	{	2, 	4,			"ctrl"	},
+	{	2,	20,			"ctrl"	},
 	{	0,	0,			NULL	},
 };
 

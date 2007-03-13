@@ -110,8 +110,16 @@ typedef struct
 
 static hash_t *keyboard_events = NULL;
 
-static	vj_keyboard_event *keyboard_event_map_[1024];
+static	vj_keyboard_event *keyboard_event_map_[2048];
 
+typedef struct
+{
+	int	key_symbol;
+	int	key_mod;
+	char	*args;
+	int	arg_len;
+	void	*next;
+} vims_key_list;
 
 #endif
 
@@ -398,7 +406,7 @@ int	vj_has_video(veejay_t *v);
 void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int arglen, int type);
 void    vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod);
 #ifdef HAVE_SDL
-static void vj_event_get_key( int event_id, int *key_id, int *key_mod );
+static vims_key_list * vj_event_get_keys( int event_id );
 void vj_event_single_fire(void *ptr , SDL_Event event, int pressed);
 int vj_event_register_keyb_event(int event_id, int key_id, int key_mod, const char *args);
 void vj_event_unregister_keyb_event(int key_id, int key_mod);
@@ -535,7 +543,6 @@ int		keyboard_event_exists(int id)
 	return 0;
 }
 
-static	vj_keyboard_event *keyboard_event_map_[1024];
 
 vj_keyboard_event *new_keyboard_event(
 		int symbol, int modifier, const char *value, int event_id )
@@ -568,7 +575,9 @@ vj_keyboard_event *new_keyboard_event(
 
 	ev->event_id = event_id;
 
-	keyboard_event_map_[ event_id ] = ev;
+//	keyboard_event_map_[ event_id ] = ev;
+
+	keyboard_event_map_ [ (modifier * SDLK_LAST) + symbol ] = ev;
 
 	if(value)
 	{
@@ -1877,7 +1886,23 @@ void	vj_event_format_xml_event( xmlNodePtr node, int event_id )
 			// m->event_id and event_id should be equal
 	}
 #ifdef HAVE_SDL
-	vj_event_get_key( event_id, &key_id, &key_mod );
+/*	vims_key_list *tree = vj_event_get_keys( i );
+	while( tree != NULL )
+	{
+		vims_key_list *this = tree;
+		int index = (tree->key_mod * SDLK_LAST ) + tree->key_sym;	
+		sprintf(tmp, "%04d%03d%03d%04d%03d%03d",
+				i, tree->key_symbol, tree->key_mod, name_len, name, form_len,form, tree->arg_len );
+		veejay_strncat( buf,tmp,strlen(tmp));	
+		if(form)
+			veejay_strncat( buf, form, form_len);	
+		if(tree->arg_len)
+			veejay_strncat( buf, tree->args, tree->arg_len );
+		tree = tree->next;
+		free(this);
+	}
+*/
+
  #endif
 	/* Put all known VIMS so we can detect differences in runtime
            some Events will not exist if SDL, Jack, DV, Video4Linux would be missing */
@@ -2026,55 +2051,52 @@ void	vj_event_read_file( void *ptr, 	const char format[], va_list ap )
 }
 
 #ifdef HAVE_SDL
-static void vj_event_get_key( int event_id, int *key_id, int *key_mod )
-{
-	if ( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
-	{
-		if( vj_event_bundle_exists( event_id ))
-		{
-			vj_msg_bundle *bun = vj_event_bundle_get( event_id );
-			if( bun )
-			{
-				*key_id = bun->accelerator;
-				*key_mod = bun->modifier;
-			}
-		}
-		return;
-	}
-	else
-	{
-		vj_keyboard_event *ev = keyboard_event_map_[ event_id ];
-		if(ev)
-		{
-#ifdef STRICT_CHECKING
-			assert(ev->vims->list_id == event_id );
-#endif
-			*key_id = ev->key_symbol;
-			*key_mod = ev->key_mod;
-		}	
 
-/*		int i;
-		for ( i = 0; i < MAX_SDL_KEY ; i ++ )
-		{
-			if( keyboard_event_exists( i ) )
-			{
-				vj_keyboard_event *ev = get_keyboard_event(i);
-				if(ev)
-				{
-					if(ev->vims->list_id == event_id )
-					{
-						*key_id =  ev->key_symbol;
-  						*key_mod=  ev->key_mod;
-						return;
-					}
-				}
-			}
-		}*/
-		// see if binding is in 
+vims_key_list	*vj_event_get_keys( int event_id )
+{
+	vims_key_list *list = vj_calloc( sizeof(vims_key_list));
+	vims_key_list *tree = list;
+	vims_key_list *next = NULL;
+	if ( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
+        {
+                if( vj_event_bundle_exists( event_id ))
+                {
+                        vj_msg_bundle *bun = vj_event_bundle_get( event_id );
+                        if( bun )
+                        {
+                                list->key_symbol = bun->accelerator;
+                                list->key_mod = bun->modifier;
+                        }
+                }
+		return list;
 	}
-	*key_id  = 0;
-	*key_mod = 0;
+
+        if(!hash_isempty( keyboard_events ))
+        {
+                hscan_t scan;
+                hash_scan_begin( &scan, keyboard_events );
+                hnode_t *node;
+                while( ( node = hash_scan_next(&scan)) != NULL )
+                {
+                        vj_keyboard_event *ev = NULL;
+                        ev = hnode_get( node );
+                        if(ev && ev->event_id == event_id)
+                        {
+				next = vj_calloc( sizeof(vims_key_list));
+				 
+				tree->key_symbol = ev->key_symbol;
+				tree->key_mod = ev->key_mod;
+				tree->args = ev->arguments;
+				tree->arg_len = ev->arg_len;
+				tree->next = next;
+				
+				tree = next;
+                        }       
+                }
+        }
+	return list;
 }
+
 void	vj_event_unregister_keyb_event( int sdl_key, int modifier )
 {
 	int index = (modifier * SDLK_LAST) + sdl_key;
@@ -2467,15 +2489,70 @@ void vj_event_effect_set_bg(void *ptr, const char format[], va_list ap)
 	veejay_msg(VEEJAY_MSG_INFO, "Next frame will be taken for static background\n");
 }
 
-void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
+void	vj_event_send_keylist( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
+	unsigned int i,len=0;
+	char message[256];
+	char *blob = vj_calloc( 1024 * 32 );
+	char line[512];
+	char header[7];
+	int skip = 0;
+	if(!hash_isempty( keyboard_events ))
+	{
+		hscan_t scan;
+		hash_scan_begin( &scan, keyboard_events );
+		hnode_t *node;
+		while( ( node = hash_scan_next(&scan)) != NULL )
+		{
+			vj_keyboard_event *ev = NULL;
+			ev = hnode_get( node );
+			if(ev)
+			{
+				if( ev->event_id >= VIMS_BUNDLE_START && ev->event_id < VIMS_BUNDLE_END )
+				{
+					if( vj_event_bundle_exists(ev->event_id))
+						snprintf( message,256, "%s", vj_event_bundle_get( ev->event_id ));
+					else
+						skip = 1;
+				}
+				else
+				{
+					if(ev->arguments)
+						snprintf(message,256, "%03d:%s;", ev->event_id,ev->arguments);
+					else
+						snprintf(message,256, "%03d:;", ev->event_id );
+				}
+
+				if(!skip)
+				{
+					snprintf( line, 512, "%04d%03d%03d%03d%s",
+						ev->event_id, ev->key_mod, ev->key_symbol, strlen(message), message );
+					int line_len = strlen(line);
+					len += line_len;
+					strncat( blob, line, line_len);
+				}
+				skip = 0;
+			}	
+		}
+	}
+
+	sprintf( header, "%06d", len );
+
+	SEND_MSG( v, header );
+	SEND_MSG( v, blob );
+
+	free( blob );
+
+}
+
+static	int	min_bundles_len(veejay_t *v )
+{
 	vj_msg_bundle *m;
 	int i;
 	int len = 0;
 	const int token_len = 20;
 	char tmp[1024];
-
 	char *buf = NULL;
 
 	for( i = 0; i <= 600 ; i ++ )
@@ -2497,31 +2574,54 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 		
 			char *name = vj_event_vevo_get_event_name(i);
 			char *form = vj_event_vevo_get_event_format(i);
-			int key=0, mod=0;
-
+		
 			len += token_len;
 			len += strlen(name);
+	
+			int form_len = (form ? strlen( form ): 0);
+			int name_len = (name ? strlen(name) : 0);
 #ifdef HAVE_SDL
-			vj_event_get_key(i,&key,&mod);
-			int index = (mod * SDLK_LAST ) + key;
-
-			// vims may have customizeable args
-			vj_keyboard_event *ev = get_keyboard_event(index);
-			if( ev )
-				len += ev->arg_len;
-#endif
-			if(form)
+			vims_key_list *tree = vj_event_get_keys( i );
+			while( tree != NULL )
 			{
-				len += strlen(form);
+				vims_key_list *this = tree;
+				len += tree->arg_len;
+				len += form_len;
+				len += token_len;
+				len += name_len;
+				tree = tree->next;
+				free(this);
 			}
+
+#endif
 			free(name);	
 			if(form) free(form);
 		}
 	}
+	return len;
+}
 
-	buf = vj_calloc( len+6+64 );
+void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+	vj_msg_bundle *m;
+	int i;
+	const int token_len = 20;
+	char tmp[1024];
 
-	sprintf(buf, "%06d", len ); 
+	int len = min_bundles_len(v);
+#ifdef STRICT_CHECKING
+	int consumed_len = len;
+#endif
+
+	if( len <= 0 )
+	{
+		SEND_MSG(v, "000000");
+		return;
+	}
+
+	char *buf = vj_calloc( len+6+64 );
+
 	int rc  = 0;
 
 	for( i = 0; i <= 600 ; i ++ )
@@ -2537,12 +2637,14 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 #endif
 			int bun_len = strlen(m->bundle);
 
-//			vj_event_get_key( i, &key_id, &key_mod );
-
 			sprintf(tmp, "%04d%03d%03d%04d%s%03d%03d",
 				i, m->accelerator, m->modifier, bun_len, m->bundle, 0,0 );
 
 			veejay_strncat( buf, tmp, strlen(tmp) );
+#ifdef STRICT_CHECKING
+			consumed_len -= strlen(tmp);
+			assert( consumed_len > 0 );
+#endif
 		}
 		else
 		{
@@ -2550,47 +2652,53 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 				continue;
 		
 			char *name = vj_event_vevo_get_event_name(i);
-			char *vformat = vj_event_vevo_get_event_format(i);
+			char *form  = vj_event_vevo_get_event_format(i);
 #ifdef STRICT_CHECKING
 			assert( name != NULL );
 #endif
-			int key_id = 0, key_mod = 0, descr_len = strlen(name);
-			int format_len = 0;
-			int arg_len = 0;
-			char *earg = NULL;
-
+			int name_len = strlen(name);
+			int form_len = (form ? strlen(form)  : 0);
 #ifdef HAVE_SDL
-			vj_event_get_key( i, &key_id, &key_mod );
-	
-			int index = (key_mod * SDLK_LAST ) + key_id;
-			// vims may have customizeable args
-			vj_keyboard_event *ev = get_keyboard_event(index);
-			if(ev)
+			vims_key_list *tree = vj_event_get_keys( i );
+			while( tree != NULL )
 			{
-				arg_len = ev->arg_len;
-				earg    = ev->arguments;
-			}
+				vims_key_list *this = tree;
+				sprintf(tmp, "%04d%03d%03d%04d%s%03d%03d",
+					i, tree->key_symbol, tree->key_mod, name_len, name, form_len, tree->arg_len );
+				veejay_strncat( buf,tmp,strlen(tmp));
+#ifdef STRICT_CHECKING
+				if( tree->arg_len )
+					assert( tree->args != NULL );
+#endif	
+				if(form)
+					veejay_strncat( buf, form, form_len);	
+				if(tree->arg_len)
+					veejay_strncat( buf, tree->args, tree->arg_len );
+#ifdef STRICT_CHECKING
+				consumed_len -= strlen(tmp);
+				consumed_len -= form_len;
+				consumed_len -= tree->arg_len;
+				assert( consumed_len > 0 );
 #endif
-			if( vformat )
-				format_len = strlen( vformat );
-	
-			sprintf(tmp, "%04d%03d%03d%04d%s%03d%03d",
-				i, key_id, key_mod, descr_len, name,format_len,arg_len );	
-			
-			veejay_strncat( buf, tmp, strlen(tmp) );			
-			if( vformat )
-				veejay_strncat( buf, vformat, format_len );
-			if( earg )
-				veejay_strncat( buf, earg, arg_len );
+				tree = tree->next;
+				free(this);
+			}
 
+#endif
 			free(name);
-			if(vformat)
-				free(vformat);
+			if(form)
+				free(form);
 
 		}
-
 	}
 
+#ifdef STRICT_CHECKING
+	assert( consumed_len >= 0 );
+#endif
+	int  pack_len = strlen( buf );
+	char header[7];
+	sprintf(header, "%06d", pack_len );
+	SEND_MSG(v, header);
 	SEND_MSG(v,buf);
 
 	if(buf) free(buf);
@@ -8056,7 +8164,7 @@ void vj_event_attach_detach_key(void *ptr, const char format[], va_list ap)
 {
 	int args[4] = { 0,0,0,0 };
 	char value[100];
-	veejay_memset(value,0,100);
+	veejay_memset(value,0,sizeof(value));
 	int mode = 0;
 	
 
@@ -8079,15 +8187,13 @@ void vj_event_attach_detach_key(void *ptr, const char format[], va_list ap)
 	switch(mode)
 	{
 		case 1:
-		vj_event_unregister_keyb_event( args[1],args[2] );
-		break;
+			vj_event_unregister_keyb_event( args[1],args[2] );
+			break;
 		default:
 
-		if( value && strcmp(value, "dummy" ) != 0 )
-			clone = value;
-		
-
-		vj_event_register_keyb_event( args[0], args[1], args[2], clone );
+			if( strncmp(value, "dummy",5 ) != 0 )
+				clone = value;
+			vj_event_register_keyb_event( args[0], args[1], args[2], clone );
 		break;
 	}
 }	

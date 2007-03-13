@@ -1187,13 +1187,12 @@ void	on_vims_take_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_BUNDLE_CAPTURE );
 	info->uc.reload_hint[HINT_BUNDLES] = 1;
-	vj_msg(VEEJAY_MSG_INFO, "Create a new bundle from FX Chain");
+	vj_msg(VEEJAY_MSG_INFO, "Create a new bundle from FX Chain. See View -> VIMS Bundles");
 }
 void	on_button_key_detach_clicked(GtkWidget *widget, gpointer user)
 {
-	int key_val  = info->uc.selected_key_sym;
-	int key_mod  = info->uc.selected_key_mod;
-
+	int key_val  = info->uc.pressed_key;
+	int key_mod  = info->uc.pressed_mod;
 
 	if( key_val > 0 )
 	{
@@ -1201,22 +1200,33 @@ void	on_button_key_detach_clicked(GtkWidget *widget, gpointer user)
 			VIMS_BUNDLE_ATTACH_KEY,
 			"1 %d %d %s",
 			key_val, key_mod, "dummy" );
-		info->uc.reload_hint[HINT_BUNDLES] = 1; 
+		info->uc.reload_hint[HINT_BUNDLES] = 1;
+		char *strmod = sdlmod_by_id( key_mod );
+		char *strkey = sdlkey_by_id( key_val);
+		if(key_mod)
+			vj_msg(VEEJAY_MSG_INFO, "Key binding %s + %s released",strmod,strkey); 
+		else
+			vj_msg(VEEJAY_MSG_INFO, "Key binding %s released", strkey );
 	}
 }
 
 void	on_vims_key_clicked( GtkWidget *widget, gpointer user_data)
 {
+	char which_vims[128];
+	sprintf(which_vims, "Press a key to bind VIMS %03d",
+			info->uc.selected_vims_entry );
+
 	int n = prompt_keydialog(
-			"Press Key",
-			"Key for Bundle " );
+			which_vims,
+			"Key combination" );
 
 	if( n == GTK_RESPONSE_ACCEPT )
 	{
 		int event_id = info->uc.selected_vims_entry;
-		int key_val  = gdk2sdl_key( info->uc.pressed_key );
-		int mod	     = gdk2sdl_mod( info->uc.pressed_mod );
+		int key_val  = info->uc.pressed_key;
+		int mod	     = info->uc.pressed_mod;
 		char *buf    = info->uc.selected_vims_args;
+
 		if( event_id > 0 && key_val > 0 )
 		{
 			multi_vims( 
@@ -1224,10 +1234,15 @@ void	on_vims_key_clicked( GtkWidget *widget, gpointer user_data)
 				"%d %d %d %s",
 				event_id, key_val, mod, buf ? buf : "dummy" );
 			info->uc.reload_hint[HINT_BUNDLES] = 1; 
+			char *strmod = sdlmod_by_id( mod );
+			if(strmod)
+				vj_msg(VEEJAY_MSG_INFO, "VIMS %d attached to key combination %s + %s",
+				event_id, strmod, sdlkey_by_id( key_val));
+			else 
+				vj_msg(VEEJAY_MSG_INFO, "VIMS %d attached to key %s",
+					event_id, sdlkey_by_id(key_val) );
 		}
 	}	
-
-
 }
 
 
@@ -1244,20 +1259,15 @@ void	on_button_vimsupdate_clicked(GtkWidget *widget, gpointer user_data)
 		}
 		else
 		{
-			int key_val  = info->uc.selected_key_sym;
-			int key_mod  = info->uc.selected_key_mod;
-
 			multi_vims( 
 				VIMS_BUNDLE_ATTACH_KEY,
 				"2 %d %d %s",
-				key_val,
-				key_mod,
+				info->uc.selected_vims_accel[0],
+				info->uc.selected_vims_accel[1],
 				info->uc.selected_vims_args );
 		}
 		info->uc.reload_hint[HINT_BUNDLES] = 1; 
-		 
 	}
-// passent current and overwrite if bundle is valdi
 
 }
 
@@ -1268,11 +1278,18 @@ void	on_vims_clear_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_vims_delete_clicked(GtkWidget *widget, gpointer user_data)
 {
-	// delete selected bundle
-	multi_vims( VIMS_BUNDLE_DEL, "%d", info->uc.selected_vims_entry );
-	info->uc.reload_hint[HINT_BUNDLES] = 1;
-	vj_msg(VEEJAY_MSG_INFO, "Delete bundle %d from VIMS event list",
-		info->uc.selected_vims_entry );
+	if( info->uc.selected_vims_entry >= VIMS_BUNDLE_START &&
+	    info->uc.selected_vims_entry < VIMS_BUNDLE_END )
+	{
+		multi_vims( VIMS_BUNDLE_DEL, "%d", info->uc.selected_vims_entry );
+		info->uc.reload_hint[HINT_BUNDLES] = 1;
+		vj_msg(VEEJAY_MSG_INFO, "Delete bundle %d from VIMS event list",
+			info->uc.selected_vims_entry );
+	}
+	else
+	{
+		vj_msg(VEEJAY_MSG_ERROR, "VIMS %d is not a bundle.", info->uc.selected_vims_entry );
+	}
 }
 
 void	on_button_saveactionfile_clicked(GtkWidget *widget, gpointer user_data)
@@ -1325,6 +1342,11 @@ void	on_button_newbundle_clicked(GtkWidget *widget, gpointer user_data)
 		gchar *buf = get_textview_buffer( "vimsview" );
 		multi_vims( VIMS_BUNDLE_ADD, "%d %s", 0, buf ); 
 		info->uc.reload_hint[HINT_BUNDLES] = 1;	
+		vj_msg(VEEJAY_MSG_INFO, "If your VIMS document was valid,you'll find it in the list.");
+	}
+	else
+	{
+		vj_msg(VEEJAY_MSG_ERROR, "VIMS document is empty, type text first.");
 	}
 }
 
@@ -1336,6 +1358,7 @@ void	on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_BUNDLE_FILE, "%s", filename );
 		g_free( filename );
 		info->uc.reload_hint[HINT_BUNDLES] = 1;
+		vj_msg(VEEJAY_MSG_INFO ,"Tried to load '%s'",filename);
 	}
 }
 
