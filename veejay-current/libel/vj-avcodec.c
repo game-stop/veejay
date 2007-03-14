@@ -433,11 +433,7 @@ int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[
 	pict.quality = 1;
 	pict.pts = (int64_t)( (int64_t)nframe );
 
-	veejay_msg(0, "context pixfmt = %d, out_format = %d",
-		av->context->pix_fmt, get_ffmpeg_pixfmt( out_pixel_format ));
-
 	int src_fmt = get_ffmpeg_pixfmt( out_pixel_format );
-
 
 	if(av->context->pix_fmt != src_fmt )
 	{
@@ -445,8 +441,8 @@ int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[
 		pict.data[1] = av->data[1];
 		pict.data[2] = av->data[2];
 		pict.linesize[0] = av->context->width;
-		pict.linesize[1] = av->context->width /2;
-		pict.linesize[2] = av->context->width /2;
+		pict.linesize[1] = av->context->width >> 1;
+		pict.linesize[2] = av->context->width >> 1;
 		
 		VJFrame *srci = yuv_yuv_template( src[0],src[1],src[2], av->context->width,av->context->height, src_fmt );
 		VJFrame *dsti = yuv_yuv_template( av->data[0],av->data[1],av->data[2],av->context->width,av->context->height,
@@ -463,8 +459,8 @@ int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[
 		pict.data[1] = src[1];
 		pict.data[2] = src[2];
 		pict.linesize[0] = av->context->width;
-		pict.linesize[1] = pict.linesize[0]/2;
-		pict.linesize[2] = pict.linesize[0]/2;
+		pict.linesize[1] = pict.linesize[0]>>1;
+		pict.linesize[2] = pict.linesize[0]>>1;
 	}
 
 	res = avcodec_encode_video( av->context, buf, buf_len, &pict );

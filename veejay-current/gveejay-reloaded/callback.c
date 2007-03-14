@@ -32,6 +32,7 @@ static int bg_[4];
 static int fg_[4];
 static int ln_[4];
 
+static int sample_calctime();
 
 static	void change_box_color_rgb( GtkWidget *box, int r, int g, int b,int a, int fill );
 
@@ -902,8 +903,19 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	GtkComboBox *combo = GTK_COMBO_BOX( GTK_WIDGET(glade_xml_get_widget(info->main_window,"combo_samplecodec")));
 
 	gchar *format = (gchar*) gtk_combo_box_get_active_text(combo);
+	gint n_frames = 0;
 
-	gint nframes = info->uc.sample_rec_duration;
+	gint dur_val = get_nums( "spin_sampleduration" );
+	if( is_button_toggled( "sample_mulloop" ) )
+	{
+		int base = sample_calctime();
+		n_frames = base * dur_val;
+	}
+	else
+	{
+		n_frames = dur_val;
+	}
+
 	gsize br=0; gsize bw=0;
 	gchar *utftext = (gchar*) get_text( "entry_samplename"); 
 	gchar *text = (utftext != NULL ? g_locale_from_utf8( utftext, -1, &br, &bw,NULL) : NULL);	
@@ -931,10 +943,10 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	}		
 	multi_vims( VIMS_SAMPLE_REC_START,
 		"%d %d",
-		nframes,
+		n_frames,
 		autoplay );
 
-	gchar *time1 = format_time(nframes,info->el.fps);
+	gchar *time1 = format_time(n_frames,info->el.fps);
 	vj_msg(VEEJAY_MSG_INFO,"Record duration: %s",
 		time1);
 	g_free(time1);
@@ -950,17 +962,6 @@ void	on_button_sample_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 
 static	int	sample_calctime()
 {
-/*	gint n_frames = get_nums( "spin_sampleduration");
-	if( is_button_toggled( "sample_mulloop" ) )
-	{
-		if(n_frames > 0)
-		{
-			n_frames *= (info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START]);
-			if( info->status_tokens[SAMPLE_LOOP] == 2 )
-				n_frames *= 2;
-		}
-	}*/
-
 	int n_frames = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
 	if( info->status_tokens[SAMPLE_LOOP] == 2 )
 		n_frames *= 2;
@@ -971,27 +972,30 @@ void	on_spin_sampleduration_value_changed(GtkWidget *widget , gpointer user_data
 {
 	// get num and display label_samplerecord_duration
 	gint n_frames = sample_calctime();
+	if( is_button_toggled( "sample_mulloop" ))
+		n_frames *= get_nums( "spin_sampleduration" );
+	else
+		n_frames = get_nums( "spin_sampleduration" );
 	gchar *time = format_time( n_frames,info->el.fps );
 	update_label_str( "label_samplerecord_duration", time );
-	info->uc.sample_rec_duration = n_frames;
 	g_free(time);
 }
 
 void	on_sample_mulloop_clicked(GtkWidget *w, gpointer user_data)
 {
 	gint n_frames = sample_calctime();
+	if( is_button_toggled( "sample_mulloop" ))
+		n_frames *= get_nums( "spin_sampleduration");
 	gchar *time = format_time( n_frames,info->el.fps );
 	update_label_str( "label_samplerecord_duration", time );
-	info->uc.sample_rec_duration = n_frames;
 	g_free(time);
 }
 
 void	on_sample_mulframes_clicked(GtkWidget *w, gpointer user_data)
 {
-	gint n_frames = sample_calctime();
+	gint n_frames = get_nums( "spin_sampleduration" );
 	gchar *time = format_time( n_frames,info->el.fps );
 	update_label_str( "label_samplerecord_duration", time );
-	info->uc.sample_rec_duration = n_frames;
 	g_free(time);
 }
 

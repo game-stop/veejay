@@ -3000,7 +3000,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 			update_spin_range( "spin_text_start", 0, n_frames ,0);
 			update_spin_range( "spin_text_end", 0, n_frames,n_frames );
 
-			info->uc.sample_rec_duration = n_frames;
+		//	info->uc.sample_rec_duration = n_frames;
 
 			info->uc.reload_hint[HINT_KF] = 1;
 		}
