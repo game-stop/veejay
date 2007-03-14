@@ -148,8 +148,6 @@ typedef struct jack_driver_s
   /* variables used for trying to restart the connection to jack */
   bool             jackd_died;                    /* true if jackd has died and we should try to restart it */
   struct timeval   last_reconnect_attempt;
-
-  char 	   *wave_buffer;
 } jack_driver_t;
 
 
@@ -516,8 +514,7 @@ static int JACK_callback (nframes_t nframes, void *arg)
 	TRACE("numFramesToWrite == inputFramesAvailable, advancing to next header\n");
 #endif
 
-   //     free(this->pPlayPtr->pData); /* free the data we've played */
-        this->pPlayPtr->size = 0; 
+        free(this->pPlayPtr->pData); /* free the data we've played */
         this->playptr_offset = 0;
         pOldHeader = this->pPlayPtr;
         this->pPlayPtr = this->pPlayPtr->pNext;
@@ -622,7 +619,7 @@ static int JACK_callback (nframes_t nframes, void *arg)
           while(wh)
           {
               wh = wh->pNext;
-          //    free(this->pPlayPtr->pData); /* free up the app data */
+              free(this->pPlayPtr->pData); /* free up the app data */
               free(this->pPlayPtr); /* free the structure itself */
               this->pPlayPtr = wh;
           }
@@ -735,7 +732,7 @@ static bool JACK_SendMessage(jack_driver_t* this, enum cmd_enum command, long da
   message_t *newMessage;
   message_t **m;
 
-  newMessage = (message_t*)malloc(sizeof(message_t));
+  newMessage = (message_t*)vj_malloc(sizeof(message_t));
   if(!newMessage)
   {
     //ERR("error allocating new message\n");
@@ -789,8 +786,6 @@ static int JACK_OpenDevice(jack_driver_t* this)
   this->sound_buffer = 0;
   this->buffer_size = 0;
   this->playptr_offset = 0;
-
-  this->wave_buffer = (char*) vj_calloc( 16384 * 4 * sizeof(char));
 
   /* set up an error handler */
   jack_set_error_function(JACK_Error);
@@ -1187,10 +1182,6 @@ int JACK_Close(int deviceID)
 
   first_free_device--; /* decrement device count */
 
-  if(this->wave_buffer)
-	free(this->wave_buffer);
-  this->wave_buffer = NULL;
-
   releaseDriver(this);
   return 0;
 }
@@ -1230,8 +1221,7 @@ long JACK_Write(int deviceID, char *data, unsigned long bytes)
     //ERR("error allocating memory for newWaveHeader\n");
   }
 
-//  newWaveHeader->pData = (char*)vj_malloc(sizeof(char) * bytes); /* allocate memory for the data */
-  newWaveHeader->pData = this->wave_buffer;
+  newWaveHeader->pData = (char*)vj_malloc(sizeof(char) * bytes); /* allocate memory for the data */
   veejay_memcpy(newWaveHeader->pData, data, sizeof(char) * bytes);   /* copy in the data */
   newWaveHeader->size = bytes;   /* update the size */
   newWaveHeader->pNext = 0;   /* setup the next pointer to point to null */
