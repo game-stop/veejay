@@ -2358,6 +2358,9 @@ void	on_veejayevent_leave_notify_event(GtkWidget *w , gpointer user_data)
 
 void 	on_spin_framedelay_value_changed(GtkWidget *w, gpointer user_data)
 {
+	if( info->status_lock )
+		return;
+
 	multi_vims(VIMS_VIDEO_SET_SLOW, "%d", get_nums("spin_framedelay"));
 }
 

@@ -1173,7 +1173,7 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		veejay_sprintf(info->status_what,1024, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		veejay_sprintf(info->status_what,1024, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			info->real_fps,
 			settings->current_frame_num,
 			info->uc->playback_mode,
@@ -1194,6 +1194,7 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 			cache_used,
 		      	0,
 		        0,
+			0,
 			0 );
 		break;
     	case VJ_PLAYBACK_MODE_TAG:

@@ -2127,7 +2127,7 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 	return -1;
     }
 	veejay_sprintf(str,1024,
-		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		pfps,
 		frame,
 		mode,
@@ -2148,7 +2148,8 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 		cache,
 		sa,
 		ca,
-		(int)( sample->fader_val ));
+		(int)( sample->fader_val ),
+		sample->dup);
 		
 		
  

@@ -2348,7 +2348,7 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
     //return -1;
 
 	veejay_sprintf(str, 1024,
-			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			pfps,
 			frame,
 			mode,
@@ -2369,7 +2369,8 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
 			cache,
 			sa,
 			ca,
-			(int)(tag->fader_val));
+			(int)(tag->fader_val),
+			0);
     return 0;
 }
 

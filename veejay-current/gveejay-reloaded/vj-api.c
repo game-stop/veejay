@@ -2963,6 +2963,12 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 	//		update_knob_value(info->speed_knob, speed, 0);
 		}
 
+		if( history[FRAME_DUP] != info->status_tokens[FRAME_DUP] )
+		{
+			update_spin_value( "spin_framedelay", info->status_tokens[FRAME_DUP]);
+		}
+
+
 		if(update)
 		{
 			speed = info->status_tokens[SAMPLE_SPEED];
@@ -6025,16 +6031,16 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		{
 			int n = status_to_arr( gui->status_msg, gui->status_tokens );
 #ifdef STRICT_CHECKING
-			assert(n == 21);
+			assert(n == 22);
 #endif
 			info->uc.playmode = gui->status_tokens[ PLAY_MODE ];
 
-			if( n != 21 )
+			if( n != 22)
 			{
 				veejay_msg(0, "Received corrupt status line!");
 				int *history = info->history_tokens[ info->uc.playmode ];
 				int i;
-				for(i = 0; i <= 21; i ++ )
+				for(i = 0; i <= 22; i ++ )
 					gui->status_tokens[i] = history[i];
 			}
 

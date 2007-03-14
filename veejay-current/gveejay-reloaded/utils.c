@@ -25,7 +25,7 @@
 
 int	status_to_arr( char *status, int *array )
 {
-	int n = sscanf(status, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+	int n = sscanf(status, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		array + 0,
 		array + 1,
 		array + 2,
@@ -46,7 +46,8 @@ int	status_to_arr( char *status, int *array )
 		array + 17,
 	        array + 18,
 	        array + 19,
-		array + 20	);
+		array + 20,
+		array + 21	);
 	return n;
 }
 
