@@ -1587,7 +1587,7 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 		yuyv_plane_clear( tx1+tx1, outYUYV + i + i );
 		yuyv_plane_clear( (w-tx2)+(w-tx2),outYUYV + (i+tx2) + (i+tx2));
 	}
-	y = (v->h - ty2 -1 ) * w;
+	y = (v->h - ty2 ) * w;
 	x = ty2 * w;
 	if( y > 0 )
 		yuyv_plane_clear( y*2, out_img + (x*2) );
