@@ -5487,8 +5487,6 @@ GdkPixbuf	*vj_gdk_pixbuf_scale_simple( const GdkPixbuf *src, int dw, int dh, Gdk
 	VJFrame *src1 = yuv_rgb_template( src_in, src_w, src_h, PIX_FMT_RGB24 );
 	VJFrame *dst1 = yuv_rgb_template( res_out, dw, dh, PIX_FMT_RGB24 );
 
-veejay_msg(0, "%d x %d --> %d x %d", src_w, src_h, dw,dh );
-
 	yuv_convert_any( src1,dst1, src1->format, dst1->format );
 
 	free(src1);
