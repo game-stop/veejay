@@ -158,13 +158,13 @@ pd_msg_t *pd_msg_new(char *msg){
     int s[22]; 
     int n = 0;
 
-    /* get 20 ints */
-    n = sscanf(body, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+    /* get 22 ints */
+    n = sscanf(body, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 	       s+0, s+1, s+2, s+3,
 	       s+4, s+5, s+6, s+7,
 	       s+8, s+9, s+10, s+11,
-		s+12, s + 13, s + 14, s + 15, s + 16, s + 17, s + 18, s + 19);
-	if (n != 20) goto error;
+		s+12, s + 13, s + 14, s + 15, s + 16, s + 17, s + 18, s + 19, s + 20, s + 21);
+	if (n != 22) goto error;
 
     /* create msg */
     m = malloc(sizeof(*m));
