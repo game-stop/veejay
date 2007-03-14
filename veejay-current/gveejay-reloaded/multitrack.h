@@ -25,7 +25,7 @@ void            multitrack_bind_track( void *data, int id, int bind_this );
 
 void            *multitrack_sync( void * mt );
 
-void               multitrack_configure( void *data, float fps, int video_width, int video_height );
+void               multitrack_configure( void *data, float fps, int video_width, int video_height, int *bw, int *bh );
 
 
 void               multitrack_update_sequence_image( void *data , int track, GdkPixbuf *img );

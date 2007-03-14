@@ -57,6 +57,8 @@
 #include <gveejay-reloaded/common.h>
 #include <gveejay-reloaded/utils.h>
 #include <gveejay-reloaded/sequence.h>
+#include <libyuv/yuvconv.h>
+#include <ffmpeg/avutil.h>
 #include <libvevo/vevo.h>
 #include <veejay/vevo.h>
 //if gtk2_6 is not defined, 2.4 is assumed.
@@ -601,6 +603,19 @@ static struct
 
 static	int	no_preview_ = 0;
 static int	no_draw_ = 0;
+
+static	uint32_t	preview_box_w_ = 352;
+static  uint32_t	preview_box_h_ = 288;
+
+int	vj_get_preview_box_w()
+{
+	return preview_box_w_;
+}
+
+int	vj_get_preview_box_h()
+{
+	return preview_box_h_;
+}
 
 static	void	gtk_image_set_from_pixbuf__( GtkImage *w, GdkPixbuf *p, const char *f, int l )
 {
@@ -1500,9 +1515,7 @@ void	about_dialog()
     };
 
 	const gchar *web = {
-		"http://www.veejayhq.net | http://veejay.dyne.org",
-		NULL
-
+		"http://www.veejayhq.net | http://veejay.dyne.org"
 	};
 
 	char blob[1024];
@@ -5457,12 +5470,31 @@ static	void		veejay_untick(gpointer data)
 }*/
 
 
+GdkPixbuf	*vj_gdk_pixbuf_scale_simple( const GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type )
+{
+	GdkPixbuf *res = gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, dw, dh );
+	uint8_t *res_out = gdk_pixbuf_get_pixels( res );
+	uint8_t *src_in  = gdk_pixbuf_get_pixels( src );
+	uint32_t src_w   = gdk_pixbuf_get_width( src );
+	uint32_t src_h   = gdk_pixbuf_get_height( src );
+	VJFrame *src1 = yuv_rgb_template( src_in, src_w, src_h, PIX_FMT_RGB24 );
+	VJFrame *dst1 = yuv_rgb_template( res_out, dw, dh, PIX_FMT_RGB24 );
+
+	yuv_convert_any( src1,dst1, src1->format, dst1->format );
+
+	free(src1);
+	free(dst1);
+
+	return res;
+}
+
+
 static	void		veejay_update_multitrack( vj_gui_t *gui )
 {
 	sync_info *s = multitrack_sync( gui->mt );
 	GtkWidget *maintrack = glade_xml_get_widget( info->main_window, "imageA");
 	int i;
-
+	GtkWidget *ww = glade_xml_get_widget( info->main_window, "panels" );
 	for( i = 0; i < s->tracks ; i ++ )
 	{
 		if( s->status_list[i])
@@ -5481,13 +5513,14 @@ static	void		veejay_update_multitrack( vj_gui_t *gui )
 				}
 				else
 				{
-					GdkPixbuf *result = gdk_pixbuf_scale_simple( s->img_list[i], 352,288,GDK_INTERP_BILINEAR );
+				//	GdkPixbuf *result = gdk_pixbuf_scale_simple( s->img_list[i], preview_box_w_,preview_box_h_,GDK_INTERP_BILINEAR );
+					GdkPixbuf *result = vj_gdk_pixbuf_scale_simple( s->img_list[i],preview_box_w_,preview_box_h_, 0 );
 					gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), result );
 					gdk_pixbuf_unref(result);
 				}
 				vj_img_cb( s->img_list[i] );
 			}
-			if(!no_preview_)
+			if(!no_preview_ && gtk_notebook_get_current_page( GTK_NOTEBOOK(ww))==3 )
 				multitrack_update_sequence_image( gui->mt, i, s->img_list[i] );
 			gdk_pixbuf_unref( s->img_list[i] );
 		}
@@ -6355,7 +6388,7 @@ int	vj_img_cb(GdkPixbuf *img )
 		{
 			sample_slot_t *slot = info->sample_banks[bank_num]->slot[poke_slot];
 			sample_gui_slot_t *gui_slot = info->sample_banks[bank_num]->gui_slot[poke_slot];
-			slot->pixbuf = gdk_pixbuf_scale_simple(
+			slot->pixbuf = vj_gdk_pixbuf_scale_simple(
 				img, 	info->image_dimensions[0],
 					info->image_dimensions[1], GDK_INTERP_NEAREST);
 
@@ -6371,7 +6404,7 @@ int	vj_img_cb(GdkPixbuf *img )
 		sample_slot_t *s = info->selected_slot;
 		if(g->sample_id == info->selected_slot->sample_id && g->sample_type == info->selected_slot->sample_type && s->pixbuf)
 		{
-			g->pixbuf_ref = gdk_pixbuf_scale_simple(
+			g->pixbuf_ref = vj_gdk_pixbuf_scale_simple(
 				img,
 				info->sequence_view->w,
 				info->sequence_view->h,
@@ -6788,7 +6821,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 
 	multitrack_configure( info->mt,
-			      info->el.fps, info->el.width, info->el.height );
+			      info->el.fps, info->el.width, info->el.height, &preview_box_w_, &preview_box_h_ );
 
 	vj_gui_preview();
 	g_io_add_watch_full(
@@ -7233,16 +7266,6 @@ void	free_samplebank(void)
 	}
 	memset( info->sample_banks, 0, sizeof(sample_bank_t*) * NUM_BANKS );
 
-/*	GtkWidget *imgA = glade_xml_get_widget_ (info->main_window, "imageA" );
-	if(imgA)
-	{
-		char path[MAX_PATH_LEN];
-		bzero(path,MAX_PATH_LEN);
-		get_gd(path,NULL, "veejay-logo.png");
-		GdkPixbuf *buf = gdk_pixbuf_new_from_file( path,NULL );
-		gtk_image_set_from_pixbuf_( imgA, buf );
-		gdk_pixbuf_unref( buf );
-	}*/
 }
 
 void setup_samplebank(gint num_cols, gint num_rows)
@@ -7477,7 +7500,7 @@ static	void	update_cached_slots(void)
 			if(!g->pixbuf_ref
 				&& is_button_toggled("previewtoggle"))
 			{
-				g->pixbuf_ref = gdk_pixbuf_scale_simple(
+				g->pixbuf_ref = vj_gdk_pixbuf_scale_simple(
 				s->pixbuf,
 				info->sequence_view->w,
 				info->sequence_view->h,

@@ -26,7 +26,7 @@
 #include <glib.h>
 #include <gdk/gdk.h>
 #include <libvevo/libvevo.h>
-
+#include <gveejay-reloaded/vj-api.h>
 #include "sequence.h"
 #include "tracksources.h"
 
@@ -82,6 +82,7 @@ typedef struct
 	int	  selected;
 	int	  sensitive;
 	float	  fps;
+	float	  aspect_ratio;
 	int	  width;
 	int	  height;
 	int	  master_track;
@@ -140,7 +141,7 @@ static	void	status_print(multitracker_t *mt, const char format[], ... )
 	va_end(args);
 }
 
-static	GdkPixbuf	*load_logo_image( )
+static	GdkPixbuf	*load_logo_image(int dw, int dh )
 {
 	char path[1024];
 	bzero(path,1024);
@@ -156,7 +157,7 @@ int		multitrack_get_sequence_view_id( void *data )
 
 static	void	set_logo(GtkWidget *area)
 {
-/*	GdkPixbuf *buf2 = gdk_pixbuf_scale_simple( logo_img_,114,96, GDK_INTERP_BILINEAR );
+/*	GdkPixbuf *buf2 = vj_gdk_pixbuf_scale_simple( logo_img_,114,96, GDK_INTERP_BILINEAR );
 	gtk_image_set_from_pixbuf_( GTK_IMAGE(area), buf2 );
 	gdk_pixbuf_unref( buf2 );*/
 }
@@ -528,7 +529,7 @@ static void sequence_preview_cb(GtkWidget *widget, gpointer user_data)
 		float ratio = mt->width / (float) mt->height;
 		int w = 160;
 		int h = ( (int)( (float)w / ratio)) /16*16;
-		GdkPixbuf *logo = gdk_pixbuf_scale_simple( mt->logo, w,h, GDK_INTERP_BILINEAR );
+		GdkPixbuf *logo = vj_gdk_pixbuf_scale_simple( mt->logo, w,h, GDK_INTERP_BILINEAR );
 		gtk_image_set_from_pixbuf_(
 			GTK_IMAGE( v->area ), logo );
 		veejay_msg(2, "Set GVeejayReloaded logo %d x %d",w,h);
@@ -799,7 +800,7 @@ void		*multitrack_new(
 	mt->main_window = win; 
 	mt->main_box    = box;
 	mt->status_bar  = msg;
- 	mt->logo = load_logo_image();
+ 	mt->logo = load_logo_image(vj_get_preview_box_w(), vj_get_preview_box_h());
 	mt->preview_toggle = preview_toggle;
 	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
 	gtk_widget_set_size_request(mt->scroll,450, 300);
@@ -899,7 +900,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 		sequence_preview_size( mt, mt->master_track );
 
 		/* configure master preview size */
-		if(!gvr_track_configure( mt->preview, track, mt->pw,mt->ph ) )
+		if(!gvr_track_configure( mt->preview, track, mt->pw,mt->ph) )
 		{
 			veejay_msg(0, "Unable to configure preview %d x %d",mt->pw , mt->ph );
 		}
@@ -941,21 +942,29 @@ int		multitrack_locked( void *data)
 	return mt->view[mt->master_track]->status_lock;
 }
 
-void		multitrack_configure( void *data, float fps, int video_width, int video_height )
+#define RUP8(num)(((num)+8)&~8)
+
+void		multitrack_configure( void *data, float fps, int video_width, int video_height, int *box_w, int *box_h )
 {
 	multitracker_t *mt = (multitracker_t*) data;
 	mt->fps = fps;
 	mt->width = video_width;
 	mt->height = video_height;
-
-
+	float r = (float)mt->width / (float) mt->height;
+	mt->aspect_ratio = r;
 	if(mt->width > 360 || mt->height > 288 )
 	{
-		veejay_msg(2, "Maximum preview resolution clipped to 352x288" );
 		mt->width = 352;
-		mt->height = 288;
+		mt->height = (mt->width / r );
 	}
-	veejay_msg(2, "Multitrack %d x %d, %2.2f", mt->width,mt->height,mt->fps );
+
+	mt->width = RUP8(mt->width);
+	mt->height = RUP8(mt->height);
+
+	*box_w = mt->width;
+	*box_h = mt->height;
+
+	veejay_msg(2, "Multitrack %d x %d, %2.2f, ratio %f", mt->width,mt->height,mt->fps,r);
 }
 
 void		multitrack_set_quality( void *data , int quality )
@@ -965,31 +974,30 @@ void		multitrack_set_quality( void *data , int quality )
 	int w = 0;
 	int h = 0;
 
-	float ratio = mt->width / (float) mt->height;
 	switch( quality )
 	{
 		case 1:
-			w = (mt->width/16)*16;
-			h = (w / ratio)/16*16;
+			w = mt->width;
+			h = (float) w / mt->aspect_ratio;
 			break;	
 		case 0:
-			w = (mt->width / 2)/16*16;
-			h = (w / ratio)/16*16;
+			w = mt->width >> 1;
+			h = (float)w / mt->aspect_ratio;
 			break;
 		case 2:
-			w = (mt->width / 4)/16*16;
-			h = (w/ ratio)/16*16;
+			w = mt->width >> 2;
+			h = (float)w/ mt->aspect_ratio;
 			break;
 		case 3:
-			w = (mt->width / 8)/16*16;
-			h = (w/ ratio)/16*16;
+			w = mt->width >> 3;
+			h = (float)w / mt->aspect_ratio;
 			break;
 	}
 
 	if( w && h )
 	{
-		w = (w / 8 ) * 8;
-		h = (h / 8 ) * 8;
+		w = RUP8(w);
+		h = RUP8(h);
 	}
 
 	if(!gvr_track_configure( mt->preview, mt->master_track,w,h ) )
@@ -1014,15 +1022,13 @@ void		multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget
 			float ratio = mt->width / (float) mt->height;
 			int w = 160;
 			int h = ( (int)( (float)w / ratio)) /16*16;
-			GdkPixbuf *logo = gdk_pixbuf_scale_simple( mt->logo, w,h, GDK_INTERP_BILINEAR );
+			GdkPixbuf *logo = vj_gdk_pixbuf_scale_simple( mt->logo, w,h, GDK_INTERP_BILINEAR );
 			gtk_image_set_from_pixbuf_(
 				GTK_IMAGE( mt->view[mt->master_track]->area ), logo );
 
 			gtk_image_set_from_pixbuf_(
 				GTK_IMAGE(img), mt->logo );
 
-
-			veejay_msg(0, "Set track %d preview logo", mt->master_track);
 			gdk_pixbuf_unref( logo );
 		}
 	}
@@ -1069,7 +1075,7 @@ void		multitrack_update_sequence_image( void *data , int track, GdkPixbuf *img )
 	int   w = 160;
 	int   h = ((int) (float )w / ratio )/16 *16;
 
-	GdkPixbuf *scaled = gdk_pixbuf_scale_simple( img, w, h, GDK_INTERP_BILINEAR );
+	GdkPixbuf *scaled = vj_gdk_pixbuf_scale_simple( img, w, h, GDK_INTERP_BILINEAR );
 	gtk_image_set_from_pixbuf( mt->view[track]->area, scaled);
 
 	gdk_pixbuf_unref( scaled );

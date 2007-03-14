@@ -17,8 +17,11 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <config.h>
+#include <gtk/gtk.h>
+#include <glib.h>
 #include <libvjmsg/vj-common.h>
 #include <libvjmem/vjmem.h>
+#include <gveejay-reloaded/vj-api.h>
 #include <stdlib.h>
 #include "curve.h"
 #ifdef STRICT_CHECKING

@@ -27,6 +27,7 @@
 #include <sys/time.h>
 #include <liblzo/lzo.h>
 #include <gveejay-reloaded/sequence.h>
+#include <gveejay-reloaded/utils.h>
 #include <ffmpeg/avutil.h>
 #include <libyuv/yuvconv.h>
 typedef struct

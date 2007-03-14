@@ -39,6 +39,11 @@ gboolean       is_alive( void );
 int    vj_gui_sleep_time( void );
 int    get_total_frames();
 int    vj_img_cb(GdkPixbuf *img );
+int	vj_get_preview_box_w();
+int	vj_get_preview_box_h();
+int    _effect_get_minmax( int effect_id, int *min, int *max, int index );
+void   vj_gui_cb(int state, char *hostname, int port_num);
 
+GdkPixbuf       *vj_gdk_pixbuf_scale_simple( const GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 
 #endif 
