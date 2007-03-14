@@ -7969,7 +7969,7 @@ MLZO</property>
 								  <child>
 								    <widget class="GtkImage" id="image2361">
 								      <property name="visible">True</property>
-								      <property name="pixbuf">icon_new.png</property>
+								      <property name="pixbuf">button_text.png</property>
 								      <property name="xalign">0.5</property>
 								      <property name="yalign">0.5</property>
 								      <property name="xpad">0</property>
@@ -12705,7 +12705,7 @@ MLZO</property>
 
 <widget class="GtkDialog" id="veejay_connection">
   <property name="visible">True</property>
-  <property name="title" translatable="yes">GVeejayReloaded Launcher</property>
+  <property name="title" translatable="yes">Connect to Veejay</property>
   <property name="type">GTK_WINDOW_TOPLEVEL</property>
   <property name="window_position">GTK_WIN_POS_CENTER_ALWAYS</property>
   <property name="modal">False</property>
@@ -13965,7 +13965,7 @@ MLZO</property>
 </widget>
 
 <widget class="GtkDialog" id="video_options">
-  <property name="title" translatable="yes">GVeejay Reloaded -  Video settings</property>
+  <property name="title" translatable="yes">GVeejay Reloaded -  Preferences</property>
   <property name="type">GTK_WINDOW_TOPLEVEL</property>
   <property name="window_position">GTK_WIN_POS_CENTER_ON_PARENT</property>
   <property name="modal">True</property>
@@ -14046,7 +14046,7 @@ MLZO</property>
 		      <property name="n_rows">2</property>
 		      <property name="n_columns">4</property>
 		      <property name="homogeneous">False</property>
-		      <property name="row_spacing">0</property>
+		      <property name="row_spacing">2</property>
 		      <property name="column_spacing">5</property>
 
 		      <child>
@@ -14236,7 +14236,7 @@ MLZO</property>
 	  </child>
 	</widget>
 	<packing>
-	  <property name="padding">3</property>
+	  <property name="padding">2</property>
 	  <property name="expand">True</property>
 	  <property name="fill">True</property>
 	</packing>
@@ -14244,7 +14244,7 @@ MLZO</property>
 
       <child>
 	<widget class="GtkFrame" id="frame169">
-	  <property name="visible">True</property>
+	  <property name="sensitive">False</property>
 	  <property name="label_xalign">0</property>
 	  <property name="label_yalign">0.5</property>
 	  <property name="shadow_type">GTK_SHADOW_ETCHED_IN</property>
@@ -14267,8 +14267,8 @@ MLZO</property>
 		  <property name="n_rows">3</property>
 		  <property name="n_columns">4</property>
 		  <property name="homogeneous">False</property>
-		  <property name="row_spacing">0</property>
-		  <property name="column_spacing">0</property>
+		  <property name="row_spacing">2</property>
+		  <property name="column_spacing">5</property>
 
 		  <child>
 		    <widget class="GtkLabel" id="label634">
@@ -14601,7 +14601,7 @@ MLZO</property>
 			<widget class="GtkHBox" id="hbox832">
 			  <property name="visible">True</property>
 			  <property name="homogeneous">False</property>
-			  <property name="spacing">0</property>
+			  <property name="spacing">1</property>
 
 			  <child>
 			    <widget class="GtkCheckButton" id="record_vp">
@@ -14666,7 +14666,7 @@ MLZO</property>
 		  </child>
 		</widget>
 		<packing>
-		  <property name="padding">0</property>
+		  <property name="padding">2</property>
 		  <property name="expand">True</property>
 		  <property name="fill">True</property>
 		</packing>
@@ -14703,8 +14703,8 @@ MLZO</property>
 			      <property name="n_rows">2</property>
 			      <property name="n_columns">4</property>
 			      <property name="homogeneous">False</property>
-			      <property name="row_spacing">0</property>
-			      <property name="column_spacing">0</property>
+			      <property name="row_spacing">2</property>
+			      <property name="column_spacing">5</property>
 
 			      <child>
 				<widget class="GtkLabel" id="label575">
@@ -14958,7 +14958,7 @@ MLZO</property>
 			    <widget class="GtkHButtonBox" id="hbuttonbox5">
 			      <property name="visible">True</property>
 			      <property name="layout_style">GTK_BUTTONBOX_START</property>
-			      <property name="spacing">0</property>
+			      <property name="spacing">10</property>
 
 			      <child>
 				<widget class="GtkButton" id="video_options_apply">
@@ -15145,7 +15145,7 @@ MLZO</property>
 		  </child>
 		</widget>
 		<packing>
-		  <property name="padding">0</property>
+		  <property name="padding">2</property>
 		  <property name="expand">True</property>
 		  <property name="fill">True</property>
 		</packing>

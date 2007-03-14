@@ -1627,9 +1627,9 @@ prompt_keydialog(const char *title, char *msg)
 	GtkWidget *dialog = gtk_dialog_new_with_buttons( title,
 				GTK_WINDOW( mainw ),
 				GTK_DIALOG_DESTROY_WITH_PARENT,
-				GTK_STOCK_NO,
+				GTK_STOCK_CANCEL,
 				GTK_RESPONSE_REJECT,
-				GTK_STOCK_YES,	
+				GTK_STOCK_OK,	
 				GTK_RESPONSE_ACCEPT,
 				NULL);
 
@@ -1749,9 +1749,9 @@ prompt_dialog(const char *title, char *msg)
 	GtkWidget *dialog = gtk_dialog_new_with_buttons( title,
 				GTK_WINDOW( mainw ),
 				GTK_DIALOG_DESTROY_WITH_PARENT,
-				GTK_STOCK_OK,
+				GTK_STOCK_NO,
 				GTK_RESPONSE_REJECT,
-				GTK_STOCK_CANCEL,	
+				GTK_STOCK_YES,	
 				GTK_RESPONSE_ACCEPT,
 				NULL);
 	gtk_dialog_set_default_response( GTK_DIALOG(dialog), GTK_RESPONSE_REJECT );

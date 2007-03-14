@@ -1086,7 +1086,12 @@ int sample_get_framedup(int s1) {
 	if(sample) return sample->dup;
 	return 0;
 }
+int sample_get_framedups(int s1) {
+	sample_info *sample = sample_get(s1);
+	if(sample) return sample->dups;
+	return 0;
 
+}
 
 int sample_get_effect_status(int s1)
 {
@@ -1423,6 +1428,13 @@ int sample_set_speed(int s1, int speed)
     sample->speed = speed;
     return ( sample_update(sample,s1));
 }
+int sample_set_framedups(int s1, int n) {
+	sample_info *sample = sample_get(s1);
+	if(!sample) return -1;
+	sample->dups = n;
+	return ( sample_update(sample,s1));
+}
+
 
 int sample_set_framedup(int s1, int n) {
 	sample_info *sample = sample_get(s1);

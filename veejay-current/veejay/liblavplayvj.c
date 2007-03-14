@@ -284,8 +284,13 @@ int veejay_set_framedup(veejay_t *info, int n) {
 	video_playback_setup *settings = (video_playback_setup*) settings;
 
 	switch(info->uc->playback_mode) {
-	  case VJ_PLAYBACK_MODE_PLAIN: info->sfd = n; break;
-	  case VJ_PLAYBACK_MODE_SAMPLE: info->sfd = n; sample_set_framedup(info->uc->sample_id,n);break;
+	  case VJ_PLAYBACK_MODE_PLAIN: 
+			info->sfd = n; 
+			break;
+	  case VJ_PLAYBACK_MODE_SAMPLE: 
+			sample_set_framedup(info->uc->sample_id,n);
+			sample_set_framedups(info->uc->sample_id,0);
+		break;
 	  default:
 		return -1;
 	}
@@ -376,29 +381,19 @@ int veejay_increase_frame(veejay_t * info, long num)
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
 
-	/*
-    simple_frame_duplicator++;
-
-    if (simple_frame_duplicator >= info->sfd) {
-	settings->current_frame_num += num;
-	simple_frame_duplicator = 0;
-    }
-	*/
    if( info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN)
-	{
+   {
 		if(settings->current_frame_num < settings->min_frame_num) return 0;
 		if(settings->current_frame_num > settings->max_frame_num) return 0;
    }
-
-   if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
-	{
+   else   if (info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+   {
 		if ((settings->current_frame_num + num) <=
 		    sample_get_startFrame(info->uc->sample_id)) return 0;
 		if((settings->current_frame_num + num) >=
 		    sample_get_endFrame(info->uc->sample_id)) return 0;
     
     }
-
     settings->current_frame_num += num;
 
     return 1;
@@ -2380,21 +2375,16 @@ static void veejay_playback_cycle(veejay_t * info)
     if( info->settings->late[1] )
    	 veejay_change_playback_mode(info,info->settings->late[0],info->settings->late[1]);
 
-    if (info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
-        {
-                if (!vj_perform_audio_start(info)) {
-                        return -1;
-                }
-        }
-
 
     vj_perform_queue_audio_frame(info,0);
     vj_perform_queue_video_frame(info,0,0);
+ 
     if (vj_perform_queue_frame(info, 0, 0) != 0)
     {
 	   veejay_msg(VEEJAY_MSG_ERROR,"Unable to queue frame");
            return;
     }
+
 
     bp.input = 0;
     bp.norm =
@@ -2938,6 +2928,15 @@ int veejay_main(veejay_t * info)
 
     /* Flush the Linux File buffers to disk */
     sync();
+
+
+    if (info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
+        {
+                if (!vj_perform_audio_start(info)) {
+                        return -1;
+                }
+        }
+
 
     veejay_msg(VEEJAY_MSG_INFO, "Starting playback thread. Giving control to main app");
 

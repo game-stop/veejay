@@ -64,7 +64,7 @@
 #endif
 
 #define PERFORM_AUDIO_SIZE 16384
-static int simple_frame_duplicator;
+static int simple_frame_duplicator =0;
 
 static int performer_framelen = 0;
 
@@ -243,8 +243,6 @@ static int vj_perform_increase_tag_frame(veejay_t * info, long num)
 static int vj_perform_increase_plain_frame(veejay_t * info, long num)
 {
     video_playback_setup *settings = info->settings;
-    //settings->current_frame_num += num;
-    //simple_frame_duplicator+=2;
 
     simple_frame_duplicator++;
 
@@ -361,19 +359,26 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 	(video_playback_setup *) info->settings;
     int start,end,looptype,speed;
     int ret_val = 1;
+
     if(num == 0 ) return 1;
 
     if(sample_get_short_info(info->uc->sample_id,&start,&end,&looptype,&speed)!=0) return -1;
 
     settings->current_playback_speed = speed;
 
-    simple_frame_duplicator++;
+    int cur_sfd = sample_get_framedups( info->uc->sample_id );
+    int max_sfd = sample_get_framedup( info->uc->sample_id );
 
-	if (simple_frame_duplicator >= info->sfd)
-	 {
+	cur_sfd ++;
+
+	if( cur_sfd >= max_sfd )
+	{
 		settings->current_frame_num += num;
-    		simple_frame_duplicator = 0;	
-	 }
+		cur_sfd = 0;
+	}
+
+	sample_set_framedups( info->uc->sample_id , cur_sfd);
+
 
     if (speed >= 0) {		/* forward play */
 
@@ -617,7 +622,7 @@ int vj_perform_init(veejay_t * info, int use_vp)
 
 
     primary_buffer =
-	(ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * 7); 
+	(ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame **) * 8); 
     if(!primary_buffer) return 0;
 	for( c = 0; c < 6; c ++ )
 	{
@@ -638,6 +643,11 @@ int vj_perform_init(veejay_t * info, int use_vp)
 
 	primary_buffer[6] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
 	primary_buffer[6]->Y = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8(512 * 512 * 3));
+	primary_buffer[7] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
+	primary_buffer[7]->Y = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8(w * h * 3));
+	primary_buffer[7]->Cb = primary_buffer[7]->Y + ( RUP8(w*h));
+	primary_buffer[7]->Cr = primary_buffer[7]->Cb + ( RUP8(w*h));
+
 
     video_output_buffer_convert = 0;
     video_output_buffer =
@@ -847,7 +857,7 @@ void vj_perform_free(veejay_t * info)
 
    if(frame_buffer) free(frame_buffer);
 
-	for( c = 0;c < 7; c++ )
+	for( c = 0;c < 8; c++ )
 	{
 		if(primary_buffer[c]->Y) free(primary_buffer[c]->Y );
 		free(primary_buffer[c] );
@@ -900,51 +910,50 @@ void vj_perform_free(veejay_t * info)
 // rate * channels * 2 = 16 bits             
 int vj_perform_audio_start(veejay_t * info)
 {
-    int res;
-    editlist *el = info->edit_list;	
+	int res;
+	editlist *el = info->current_edit_list;	
 
-	if (info->edit_list->has_audio)
+	if (el->has_audio)
 	{
-	
 #ifdef HAVE_JACK
-	vj_jack_initialize();
+		vj_jack_initialize();
 
- 	res = vj_jack_init( info->edit_list );
-	if( res <= 0)
-	{
-		info->audio=NO_AUDIO;
-		veejay_msg(VEEJAY_MSG_WARNING,
-			"Audio playback disabled (unable to connect to jack)");
-		return 1;
-	}
-
-	jack_rate_ = vj_jack_rate();
-
-	if ( res == 2 )
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Jack plays at %d Hz, resampling audio from %d -> %d",jack_rate_,el->audio_rate,jack_rate_);
-		resample_jack = audio_resample_init( el->audio_chans,el->audio_chans, jack_rate_, el->audio_rate);
-
-		if(!resample_jack)
+ 		res = vj_jack_init( info->current_edit_list );
+		if( res <= 0)
 		{
-			resample_jack = NULL;
-			veejay_msg(VEEJAY_MSG_WARNING, "Cannot initialize resampler for %d -> %d audio rate conversion ",
-				el->audio_rate,jack_rate_);
+			info->audio=NO_AUDIO;
+			veejay_msg(VEEJAY_MSG_WARNING,
+				"Audio playback disabled (unable to connect to jack)");
+			return 1;
 		}
+
+		jack_rate_ = vj_jack_rate();
+
+		if ( res == 2 )
+		{
+			veejay_msg(VEEJAY_MSG_WARNING, "Jack plays at %d Hz, resampling audio from %d -> %d",jack_rate_,el->audio_rate,jack_rate_);
+			resample_jack = audio_resample_init( el->audio_chans,el->audio_chans, jack_rate_, el->audio_rate);
+
+			if(!resample_jack)
+			{
+				resample_jack = NULL;
+				veejay_msg(VEEJAY_MSG_WARNING, "Cannot initialize resampler for %d -> %d audio rate conversion ",
+					el->audio_rate,jack_rate_);
+			}
 	
+			return 1;
+		}
+		else
+		{
+			veejay_msg(VEEJAY_MSG_INFO, "Jack is running the same samplerate as Veejay");
+		}
 		return 1;
-	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Jack is running the same samplerate as Veejay");
-	}
-	return 1;
 #else
-	veejay_msg(VEEJAY_MSG_INFO, "Jack support not compiled in (no audio)");
-	return 0;
+		veejay_msg(VEEJAY_MSG_INFO, "Jack support not compiled in (no audio)");
+		return 0;
 #endif
-    }
-    return 0;
+	}
+	return 0;
 }
 
 void vj_perform_audio_status(struct timeval tmpstmp, unsigned int nb_out,
@@ -1724,7 +1733,12 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 	int pred_len = (info->edit_list->audio_rate / info->edit_list->video_fps );
         int rs = 0;
 	int n_samples = 0;
-	if( simple_frame_duplicator <= 0 )
+
+	int cur_sfd = sample_get_framedups( info->uc->sample_id );
+	int max_sfd = sample_get_framedup( info->uc->sample_id );
+
+
+	if( cur_sfd <= 0 )
 	{
 		if (speed > 1 || speed < -1) 
 		{
@@ -1799,19 +1813,19 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 
 	} 
 
-	if( simple_frame_duplicator <= info->sfd  && info->sfd > 1)
+	if( cur_sfd <= max_sfd  && max_sfd > 1)
 	{
-		if( simple_frame_duplicator == 0 )
+		if( cur_sfd == 0 )
 		{
 			// @ resample buffer
-			int down_sample = audio_resample( downsample_context[ info->sfd-2 ], 
+			int down_sample = audio_resample( downsample_context[ max_sfd-2 ], 
 					down_sample_buffer, audio_buf, n_samples  );
 		}
 		else
 		{
 			n_samples = pred_len;
 		}
-		veejay_memcpy( audio_buf, down_sample_buffer + (simple_frame_duplicator * pred_len *bps ), n_samples * bps );
+		veejay_memcpy( audio_buf, down_sample_buffer + (cur_sfd * pred_len *bps ), n_samples * bps );
 	}
 
 	return n_samples;
@@ -1943,8 +1957,64 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
     return 0;
 }
 
+static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *img[3] )
+{
+	editlist *el = ( s1 ? sample_get_editlist(s1) : info->current_edit_list);
+	int speed = info->settings->current_playback_speed;
+	int max_sfd = (s1 ? sample_get_framedup( s1 ) : info->sfd );
+	int cur_sfd = (s1 ? sample_get_framedups(s1 ) : simple_frame_duplicator );
+	if( cur_sfd <= max_sfd && max_sfd > 1 )
+	{
+		uint8_t *p0_buffer[3] = {
+			primary_buffer[7]->Y,
+			primary_buffer[7]->Cb,
+			primary_buffer[7]->Cr };
 
-static int vj_perform_get_frame_(veejay_t *info, int s1, long nframe, uint8_t *img[3])
+		uint8_t *p1_buffer[3]= {
+			primary_buffer[4]->Y,
+			primary_buffer[4]->Cb,
+			primary_buffer[4]->Cr };
+
+		int speed = info->settings->current_playback_speed;
+		int start = ( s1 ? sample_get_startFrame(s1) : info->settings->min_frame_num );
+		int end   = ( s1 ? sample_get_endFrame(s1)  : info->settings->max_frame_num );	
+
+		if( cur_sfd == 0 )
+		{
+			int p0,p1, n2frame;
+			p0 = vj_el_get_video_frame( el, nframe, p0_buffer );
+			n2frame = nframe + speed;
+			if( n2frame < start ) n2frame = start; else if (n2frame > end ) n2frame = end;
+			p1 = vj_el_get_video_frame( el, n2frame, p1_buffer );
+			int uv_len = (info->effect_frame1->ssm ? info->effect_frame1->len : info->effect_frame1->uv_len );
+			veejay_memcpy( img[0], p0_buffer[0], info->effect_frame1->len );
+			veejay_memcpy( img[1], p0_buffer[1], uv_len);
+			veejay_memcpy( img[2], p0_buffer[2], uv_len );
+			return 1;
+		}
+		else
+		{
+			uint32_t i;
+			const uint32_t N = max_sfd;
+			const uint32_t n1 = cur_sfd;
+			const float frac = 1.0f / (float) N * n1;
+			const uint32_t len = el->video_width * el->video_height;
+			for( i  = 0; i < len ; i ++ )
+			{
+				img[0][i] = p0_buffer[0][i] + ( frac * (p1_buffer[0][i] - p0_buffer[0][i]));
+				img[1][i] = p0_buffer[1][i] + ( frac * (p1_buffer[1][i] - p0_buffer[1][i]));
+				img[2][i] = p0_buffer[2][i] + ( frac * (p1_buffer[2][i] - p0_buffer[2][i]));
+			}
+			return 1;
+		}
+	}
+
+	return vj_el_get_video_frame( el, nframe, img );
+
+}
+
+
+static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t *img[3])
 {
 	return vj_el_get_video_frame(
 				//info->edit_list,
@@ -2031,7 +2101,7 @@ static int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 
 	    	if(centry == -1)
 	    	{
-			len = vj_perform_get_frame_( info, sample_id, nframe, fb );	
+			len = vj_perform_get_frame_fx( info, sample_id, nframe, fb );	
 			if(len > 0 )
 				error = 0;
 			frame_buffer[chain_entry]->ssm = 0;
@@ -2805,11 +2875,11 @@ static void vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 
 int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 {
-	if( info->audio == NO_AUDIO || !info->edit_list->has_audio)
+	if( info->audio == NO_AUDIO || !info->current_edit_list->has_audio)
 		return 1;
 
 #ifdef HAVE_JACK
-	editlist *el = info->edit_list;
+	editlist *el = info->current_edit_list;
 	video_playback_setup *settings = info->settings;
 	long this_frame = settings->current_frame_num;
 	int num_samples =  (el->audio_rate/el->video_fps);
@@ -2869,7 +2939,6 @@ int vj_perform_queue_audio_frame(veejay_t *info, int frame)
 				}
 				break;
 		}
-
 		if( jack_rate_ != el->audio_rate && rs)
 		{
 #ifdef STRICT_CHECKING

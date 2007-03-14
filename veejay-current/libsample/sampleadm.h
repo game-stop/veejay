@@ -140,6 +140,7 @@ typedef struct sample_info_t {
     int marker_start;
     int marker_end;
     int dup;			/* frame duplicator */
+    int dups;
     int loop_dec;
     int loop_periods;
     int marker_speed;
@@ -217,6 +218,8 @@ extern int sample_set_depth(int s1, int n);
 extern int sample_set_speed(int s1, int speed);
 extern int sample_set_framedup(int s1, int n);
 extern int sample_get_framedup(int s1);
+extern int sample_set_framedups(int s1, int n);
+extern int sample_get_framedups(int s1);
 extern int sample_marker_clear(int sample_id); 
 extern int sample_set_looptype(int s1, int looptype);
 extern int sample_get_speed(int s1);
