@@ -18,7 +18,6 @@
  */
 #ifndef VJ_BIOJACK_H
 #define VJ_BIOJACK_H
-
 int	vj_jack_initialize();
 int 	vj_jack_init(int rate_hz, int channels, int bps);
 int	vj_jack_stop();

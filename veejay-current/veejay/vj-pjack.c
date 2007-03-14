@@ -27,7 +27,6 @@ static unsigned long audio_rate = 0;
 static int audio_channels = 0;
 static int audio_bps = 0;
 static unsigned long v_rate = 0;
-
 extern void veejay_msg(int type, const char format[], ...);
 
 int vj_jack_initialize()

@@ -329,6 +329,7 @@ typedef struct {
 	unsigned long *cpumask;
 	int	ncpus;
 	int	sz;
+	int	audio_running;
 } veejay_t;
 
 typedef struct {

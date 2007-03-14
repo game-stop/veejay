@@ -6,7 +6,6 @@
 /* multithreaded code, what starts in queue belongs to playback_thread */
 uint8_t *vj_perform_get_preview_buffer();
 
-
 void	vj_perform_update_plugin_frame(VJFrame *frame);         
 
 void	vj_perform_unlock_primary_frame( void );

@@ -2237,15 +2237,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
      	* effective user id to the real user id
     	 */
 
-/*
-	if (info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
- 	{
-		if (!vj_perform_audio_start(info)) {
-			return -1;
-		}
-    	}*/
-
-
 	if (seteuid(getuid()) < 0)
 	{
 		/* fixme: get rid of sys_errlist and use sys_strerror */
@@ -2932,10 +2923,8 @@ int veejay_main(veejay_t * info)
 
     if (info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
         {
-                if (!vj_perform_audio_start(info)) {
-                        return -1;
-                }
-        }
+                info->audio_running = vj_perform_audio_start(info);
+  	}
 
 
     veejay_msg(VEEJAY_MSG_INFO, "Starting playback thread. Giving control to main app");

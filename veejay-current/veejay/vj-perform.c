@@ -924,7 +924,7 @@ int vj_perform_audio_start(veejay_t * info)
 			info->audio=NO_AUDIO;
 			veejay_msg(VEEJAY_MSG_WARNING,
 				"Audio playback disabled (unable to connect to jack)");
-			return 1;
+			return 0;
 		}
 
 		jack_rate_ = vj_jack_rate();

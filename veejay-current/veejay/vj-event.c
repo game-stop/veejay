@@ -6910,7 +6910,13 @@ void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
 #ifdef HAVE_JACK
-	if( v->audio == NO_AUDIO )
+	if (!v->audio_running )
+	{
+		veejay_msg(0,"Veejay was started without audio.");
+		return;
+	}
+
+	if( v->audio == NO_AUDIO  )
 	{
 		vj_jack_enable();
 		v->audio = AUDIO_PLAY;
@@ -6922,6 +6928,12 @@ void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t *)ptr;
 #ifdef HAVE_JACK
+	if (!v->audio_running )
+	{
+		veejay_msg(0,"Veejay was started without audio.");
+		return;
+	}
+
 	if( v->audio != NO_AUDIO )
 	{
 		vj_jack_disable();
