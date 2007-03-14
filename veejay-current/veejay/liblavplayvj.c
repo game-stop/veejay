@@ -2047,7 +2047,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 
 	if( !vj_server_setup(info) )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Setting up server");
+		veejay_msg(VEEJAY_MSG_ERROR,"Unable to start network server. Most likely, there is already a veejay running");
+		veejay_msg(VEEJAY_MSG_ERROR,"If you want to run multiple veejay's on the same machine, use the '-p/--port'");
+		veejay_msg(VEEJAY_MSG_ERROR,"commandline option. For example: $ veejay -p 4490 -d");
 		return -1;
 	}
 
