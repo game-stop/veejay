@@ -586,6 +586,8 @@ static	void set_textview_buffer(const char *name, gchar *utf8text);
 void	interrupt_cb();
 //static	gboolean	update_log(gpointer data);
 
+
+
 static struct
 {
 	const char *name;
@@ -606,6 +608,8 @@ static int	no_draw_ = 0;
 
 static	uint32_t	preview_box_w_ = 352;
 static  uint32_t	preview_box_h_ = 288;
+
+static	void		*bankport_ = NULL;
 
 int	vj_get_preview_box_w()
 {
@@ -741,6 +745,9 @@ enum
 	TC_STREAM_M = 6,
 	TC_STREAM_H = 7
 };
+
+static  sample_slot_t *find_slot_by_sample( int sample_id , int sample_type );
+static  sample_gui_slot_t *find_gui_slot_by_sample( int sample_id , int sample_type );
 
 /* Function to see if selected is playing */
 static	int	selected_is_playing()
@@ -5480,6 +5487,8 @@ GdkPixbuf	*vj_gdk_pixbuf_scale_simple( const GdkPixbuf *src, int dw, int dh, Gdk
 	VJFrame *src1 = yuv_rgb_template( src_in, src_w, src_h, PIX_FMT_RGB24 );
 	VJFrame *dst1 = yuv_rgb_template( res_out, dw, dh, PIX_FMT_RGB24 );
 
+veejay_msg(0, "%d x %d --> %d x %d", src_w, src_h, dw,dh );
+
 	yuv_convert_any( src1,dst1, src1->format, dst1->format );
 
 	free(src1);
@@ -5507,13 +5516,12 @@ static	void		veejay_update_multitrack( vj_gui_t *gui )
 		{
 			if( i == s->master )
 			{
-				if( s->widths[i] > 350 )
+				if( s->widths[i] >= 350 )
 				{
 					gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), s->img_list[i] );
 				}
 				else
 				{
-				//	GdkPixbuf *result = gdk_pixbuf_scale_simple( s->img_list[i], preview_box_w_,preview_box_h_,GDK_INTERP_BILINEAR );
 					GdkPixbuf *result = vj_gdk_pixbuf_scale_simple( s->img_list[i],preview_box_w_,preview_box_h_, 0 );
 					gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), result );
 					gdk_pixbuf_unref(result);
@@ -6255,6 +6263,7 @@ void	vj_gui_free()
 	info = NULL;
 
 	vevo_port_free( fx_list_ );
+	vevo_port_free( bankport_ );
 }
 
 static	void	vj_init_style( const char *name, const char *font )
@@ -6382,6 +6391,19 @@ int	vj_img_cb(GdkPixbuf *img )
 	{
 		int poke_slot = -1;	
 		int bank_num = -1;
+
+		sample_slot_t *slot = find_slot_by_sample( sample_id, sample_type );
+		sample_gui_slot_t *gui_slot = find_gui_slot_by_sample( sample_id, sample_type );
+
+		if( slot && gui_slot )
+		{
+			slot->pixbuf = vj_gdk_pixbuf_scale_simple(img, info->image_dimensions[0],info->image_dimensions[1], GDK_INTERP_NEAREST);
+			gtk_image_set_from_pixbuf_( GTK_IMAGE( gui_slot->image ), slot->pixbuf );
+			gdk_pixbuf_unref( slot->pixbuf );
+		} 
+
+/*
+
 		bank_num = find_bank_by_sample( sample_id, sample_type, &poke_slot );
 		if( bank_num >= 0 && sample_id == info->selected_slot->sample_id && sample_type ==
 			info->selected_slot->sample_type )
@@ -6395,7 +6417,7 @@ int	vj_img_cb(GdkPixbuf *img )
 			gtk_image_set_from_pixbuf_( GTK_IMAGE( gui_slot->image ), slot->pixbuf );
 
 			gdk_pixbuf_unref( slot->pixbuf );
-		}
+		}*/
 	}
 
 	for( i = 0; i < info->sequence_view->envelope_size; i ++ )
@@ -6524,6 +6546,9 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 		(GCallback) on_timeline_bind_toggled, NULL );	
 	g_signal_connect( info->tl, "cleared",
 		(GCallback) on_timeline_cleared, NULL );
+
+
+	bankport_ = vpn( VEVO_ANONYMOUS_PORT );
 
 	gtk_widget_show(frame);
 	gtk_container_add( GTK_CONTAINER(frame), info->tl );
@@ -7267,6 +7292,7 @@ void	free_samplebank(void)
 	memset( info->sample_banks, 0, sizeof(sample_bank_t*) * NUM_BANKS );
 
 }
+#define RUP8(num)(((num)+8)&~8)
 
 void setup_samplebank(gint num_cols, gint num_rows)
 {
@@ -7283,8 +7309,8 @@ void setup_samplebank(gint num_cols, gint num_rows)
 		gint image_height = result.height / num_cols;
 		float ratio = (float) info->el.height / (float) info->el.width;
 		image_height = image_width * ratio;
-		info->image_dimensions[0] = image_width ;
-		info->image_dimensions[1] = image_height;
+		info->image_dimensions[0] = image_width/8*8;
+		info->image_dimensions[1] = image_height/8*8;
 	}
 	else
 	{
@@ -7306,6 +7332,29 @@ static	int	bank_exists( int bank_page, int slot_num )
 	if(!info->sample_banks[bank_page])
 		return 0;
 	return 1;
+}
+
+static	sample_slot_t *find_slot_by_sample( int sample_id , int sample_type )
+{
+	char key[32];
+	sprintf(key, "S%04d%02d",sample_id, sample_type );
+
+	void *slot = NULL;
+	vevo_property_get( bankport_, key, 0,&slot );
+	if(!slot)
+		return NULL;
+	return (sample_slot_t*) slot;
+}
+static	sample_gui_slot_t *find_gui_slot_by_sample( int sample_id , int sample_type )
+{
+	char key[32];
+	sprintf(key, "G%04d%02d",sample_id, sample_type );
+
+	void *slot = NULL;
+	vevo_property_get( bankport_, key, 0,&slot );
+	if(!slot)
+		return NULL;
+	return (sample_gui_slot_t*) slot;
 }
 
 static	int	find_bank_by_sample(int sample_id, int sample_type, int *slot )
@@ -8055,9 +8104,17 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 	slot->timecode = timecode == NULL ? strdup("") : strdup( timecode );
 	slot->title = title == NULL ? strdup("") : strdup( title );
 	// add sample/stream to sources
-	if(sample_id > 0)
+
+
+	if( sample_id )
+	{
+		char sample_key[32];
+		sprintf(sample_key, "S%04d%02d", sample_id, sample_type );
+		vevo_property_set( bankport_, sample_key, VEVO_ATOM_TYPE_VOIDPTR,1, &slot );
+		sprintf(sample_key, "G%04d%02d", sample_id, sample_type );
+		vevo_property_set( bankport_, sample_key, VEVO_ATOM_TYPE_VOIDPTR,1,&gui_slot);
 		add_sample_to_effect_sources_list(sample_id, sample_type, title, timecode);
-	
+	}
 
 	if(gui_slot)
 	{

@@ -205,7 +205,7 @@ static	void	index_node_remove( vj_font_t *f, srt_seq_t *s )
 
 static char *make_key(int id)
 {
-	char key[10];
+	char key[32];
 	sprintf(key,"s%d",id);
 	return strdup(key);
 }

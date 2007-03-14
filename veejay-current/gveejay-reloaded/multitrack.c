@@ -942,7 +942,7 @@ int		multitrack_locked( void *data)
 	return mt->view[mt->master_track]->status_lock;
 }
 
-#define RUP8(num)(((num)+8)&~8)
+#define RUP8(num)(num/8*8)
 
 void		multitrack_configure( void *data, float fps, int video_width, int video_height, int *box_w, int *box_h )
 {
