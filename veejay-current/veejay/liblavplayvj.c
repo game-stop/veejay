@@ -2355,7 +2355,7 @@ static void veejay_playback_cycle(veejay_t * info)
     
     struct timeval time_now;
     double tdiff1, tdiff2;
-    int n;
+    int n = 0;
     int first_free, frame, skipv, skipa, skipi, nvcorr;
     struct mjpeg_params bp;
     long ts, te;
@@ -2410,12 +2410,13 @@ static void veejay_playback_cycle(veejay_t * info)
     tdiff1 = 0.;
     tdiff2 = 0.;
     nvcorr = 0;
+
     if(el->has_audio && info->audio == AUDIO_PLAY)
 	stats.audio = 1;
   
-    veejay_mjpeg_queue_buf(info, 0, 1);
+    veejay_mjpeg_queue_buf(info, n, 1);
     
-     while (settings->state != LAVPLAY_STATE_STOP) {
+    while (settings->state != LAVPLAY_STATE_STOP) {
 	first_free = stats.nsync;
 
 	int current_speed = settings->current_playback_speed;
@@ -2436,10 +2437,10 @@ static void veejay_playback_cycle(veejay_t * info)
 	    stats.tdiff = time_now.tv_sec - bs.timestamp.tv_sec +
 		(time_now.tv_usec - bs.timestamp.tv_usec)*1.e-6;
 	} 
-	while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < (1 - 1));
+	while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < 0);
 
 #ifdef HAVE_JACK
-	if ( el->has_audio && info->audio==AUDIO_PLAY ) 
+	if ( info->audio==AUDIO_PLAY ) 
 	{
 	   struct timeval audio_tmstmp;	
 	   long int sec=0;
@@ -2447,16 +2448,16 @@ static void veejay_playback_cycle(veejay_t * info)
 	   long num_audio_bytes_written = vj_jack_get_status( &sec,&usec);
 	   audio_tmstmp.tv_sec = sec;
 	   audio_tmstmp.tv_usec = usec;
+
 	   if (audio_tmstmp.tv_sec)
  	   {
-         	    tdiff1 = settings->spvf * (stats.nsync - nvcorr) -  settings->spas * num_audio_bytes_written;
+         	    tdiff1 = settings->spvf * (stats.nsync - nvcorr) -  
+				settings->spas * num_audio_bytes_written;
              	    tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) + (bs.timestamp.tv_usec - audio_tmstmp.tv_usec) * 1.e-6;
            }
 	}
 #endif
 	stats.tdiff = tdiff1 - tdiff2;
-
-//	veejay_event_handle(info);
 
 	/* Fill and queue free buffers again */
 	for (n = first_free; n < stats.nsync;) {
@@ -2488,7 +2489,6 @@ static void veejay_playback_cycle(veejay_t * info)
 		    stats.stats_changed = 1;
 		}
 	    }
-
 #ifdef HAVE_SDL
 	    ts= SDL_GetTicks();
 #endif
@@ -2503,7 +2503,7 @@ static void veejay_playback_cycle(veejay_t * info)
   
 	    vj_perform_queue_frame( info, frame, skipi );
 
-	    veejay_event_handle(info);
+	//    veejay_event_handle(info);
 
 
 #ifdef HAVE_SDL	
@@ -2512,7 +2512,6 @@ static void veejay_playback_cycle(veejay_t * info)
 #else
 	    info->real_fps = 0;
 #endif
-
 	    if(skipv ) continue;
 
 	    if (!veejay_mjpeg_queue_buf(info, frame, 1)) {
@@ -2523,6 +2522,8 @@ static void veejay_playback_cycle(veejay_t * info)
 
 	    n++;
 	}
+            veejay_event_handle(info);
+
 
 		/* output statistics */
 	if (el->has_audio && (info->audio==AUDIO_PLAY))
