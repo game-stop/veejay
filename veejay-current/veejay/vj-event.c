@@ -3042,6 +3042,7 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 	}
 	veejay_msg(VEEJAY_MSG_INFO,"Video screen is %s",
 		(v->settings->full_screen ? "full screen" : "windowed"));
+
 }
 
 

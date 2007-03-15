@@ -2359,15 +2359,32 @@ static void veejay_playback_cycle(veejay_t * info)
     struct mjpeg_params bp;
     long ts, te;
 
-
-    if( settings->ncpu > 1 )
+    int   which_cpu = 1;
+    char *env_value = getenv( "VEEJAY_SET_CPU" );
+    if( env_value )
     {
-	veejay_msg(VEEJAY_MSG_INFO, "Running on multiprocessor. Locking CPU 1 for rendering purposes");
-	veejay_pin_cpu( info, 1 );
+	if( sscanf( env_value, "%d", &which_cpu ))
+	{
+		if( which_cpu < 0 || which_cpu > settings->ncpu )
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "VEEJAY_SET_CPU valid values are [%d ... %d]", 0, settings->ncpu );
+			which_cpu = 1;
+		}
+		if(!which_cpu)
+			veejay_msg(VEEJAY_MSG_INFO, "VEEJAY_SET_CPU set to 0 , render thread not locked on a single CPU.");
+		else
+			veejay_msg(VEEJAY_MSG_INFO, "VEEJAY_SET_CPU set to %d", which_cpu );
+	}
     }
+
+    if( settings->ncpu > 1 && which_cpu)
+    {
+	veejay_msg(VEEJAY_MSG_INFO, "Running on multiprocessor. Locking CPU %d for rendering purposes", which_cpu);
+	veejay_pin_cpu( info, which_cpu );
+    }
+
     if( info->settings->late[1] )
    	 veejay_change_playback_mode(info,info->settings->late[0],info->settings->late[1]);
-
 
     vj_perform_queue_audio_frame(info,0);
     vj_perform_queue_video_frame(info,0,0);
@@ -2411,8 +2428,9 @@ static void veejay_playback_cycle(veejay_t * info)
     nvcorr = 0;
 
     if(el->has_audio && info->audio == AUDIO_PLAY)
+    {
 	stats.audio = 1;
-  
+    }
     veejay_mjpeg_queue_buf(info, n, 1);
     
     while (settings->state != LAVPLAY_STATE_STOP) {
@@ -2536,7 +2554,7 @@ static void veejay_playback_cycle(veejay_t * info)
      * Never try to sync on the last buffer, it is a hostage of
      * the codec since it is played over and over again
      */
-    if (info->audio==AUDIO_PLAY)
+    if (info->audio_running || info->audio ==AUDIO_PLAY)
 	vj_perform_audio_stop(info);
 }
 
@@ -2922,14 +2940,10 @@ int veejay_main(veejay_t * info)
 
     /* Flush the Linux File buffers to disk */
     sync();
-
-
-    if (info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
-        {
-                info->audio_running = vj_perform_audio_start(info);
-  	}
-
-
+    if(info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
+    {
+        info->audio_running = vj_perform_audio_start(info);
+    }
     veejay_msg(VEEJAY_MSG_INFO, "Starting playback thread. Giving control to main app");
 
     /* fork ourselves to return control to the main app */

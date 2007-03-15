@@ -47,8 +47,6 @@ typedef struct vj_sdl_t {
     void *display;
 } vj_sdl;
 
-
-
 vj_sdl *vj_sdl_allocate(int width, int height, int pixel_format);
 void vj_sdl_set_geometry(vj_sdl *sdl, int w, int h);
 void vj_sdl_show(vj_sdl *vjsdl);
