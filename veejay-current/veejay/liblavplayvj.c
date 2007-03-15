@@ -892,16 +892,14 @@ static int veejay_screen_update(veejay_t * info )
 	{
 		if(!vj_sdl_lock( info->sdl[0] ) )
 			return 0;
-
+	
 		uint8_t *yuyv = vj_sdl_get_yuv_overlay(info->sdl[0]);
 	
 		composite_blit( info->composite, viewport_active(info->viewport), yuyv );
 
 		if(!vj_sdl_unlock( info->sdl[0]) )
 			return 0;
-
-		//vj_sdl_flip(info->sdl[0]);
-
+	
 		skip_update = 1;
 	}
 	else if(settings->zoom )
@@ -1001,6 +999,7 @@ static int veejay_screen_update(veejay_t * info )
 	{
 		vj_perform_send_primary_frame_s2(info, 1, info->uc->current_link);
 	}
+
 
 	if( skip_update )
 	{
@@ -1514,7 +1513,7 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 
 
         if( settings->currently_processed_entry != settings->buffer_entry[settings->currently_processed_frame] &&
-		!veejay_screen_update(info) )
+		!veejay_screen_update(info)  )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Error playing frame %d", settings->current_frame_num);
 	}
@@ -2439,6 +2438,9 @@ static void veejay_playback_cycle(veejay_t * info)
 	} 
 	while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < 0);
 
+        veejay_event_handle(info);
+
+
 #ifdef HAVE_JACK
 	if ( info->audio==AUDIO_PLAY ) 
 	{
@@ -2503,9 +2505,6 @@ static void veejay_playback_cycle(veejay_t * info)
   
 	    vj_perform_queue_frame( info, frame, skipi );
 
-	//    veejay_event_handle(info);
-
-
 #ifdef HAVE_SDL	
 	    te = SDL_GetTicks();
             info->real_fps = (int)( te - ts );
@@ -2522,7 +2521,7 @@ static void veejay_playback_cycle(veejay_t * info)
 
 	    n++;
 	}
-            veejay_event_handle(info);
+//            veejay_event_handle(info);
 
 
 		/* output statistics */
