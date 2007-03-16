@@ -28,6 +28,7 @@ static	VJFrame	*rgb_frame_ = NULL;
 static	PluginInfo *goom_ = NULL;
 static uint8_t *goom_buffer_ = NULL;
 static  int last_= 0;
+static void *convert_rgb = NULL;
 
 vj_effect *goomfx_init(int w, int h)
 {
@@ -70,7 +71,12 @@ void goomfx_free()
 	goom_buffer_ = NULL;
 	goom_ = NULL;
 	rgb_frame_ = NULL;
+
+	if( convert_rgb )
+		yuv_fx_context_destroy( convert_rgb );
+	convert_rgb = NULL;
 }
+
 
 
 
@@ -104,7 +110,14 @@ void goomfx_apply( VJFrame *frame, int width, int height, int val, int val2)
 		    NULL,
 		    NULL );
     
-    
-	yuv_convert_any_ac( rgb_frame_, frame, PIX_FMT_RGBA, (frame->shift_v == 0 ? PIX_FMT_YUV422P : 
+    	if( !convert_rgb )
+		convert_rgb = yuv_fx_context_create( rgb_frame_, frame, PIX_FMT_RGBA, 
+			 (frame->shift_v == 0 ? PIX_FMT_YUV422P : 
 					PIX_FMT_YUV420P) );
+	
+	//yuv_convert_any_ac( rgb_frame_, frame, PIX_FMT_RGBA, (frame->shift_v == 0 ? PIX_FMT_YUV422P : 
+	//				PIX_FMT_YUV420P) );
+
+	yuv_fx_context_process( convert_rgb, rgb_frame_, frame );
+	
 }

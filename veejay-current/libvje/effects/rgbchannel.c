@@ -53,6 +53,8 @@ vj_effect *rgbchannel_init(int w, int h)
 
 static uint8_t *rgb_ = NULL;
 static	VJFrame *rgb_frame_ = NULL;
+static void *convert_yuv = NULL;
+static void *convert_rgb = NULL;
 int	rgbchannel_malloc( int w, int h )
 {
 	if(!rgb_)
@@ -72,6 +74,13 @@ void	rgbchannel_free( )
 		free(rgb_frame_);
 	rgb_frame_ = NULL;
 	rgb_ = NULL;
+
+	if(convert_rgb)
+		yuv_fx_context_destroy( convert_rgb );
+	if(convert_yuv)
+		yuv_fx_context_destroy( convert_yuv );
+	convert_rgb = NULL;
+	convert_yuv = NULL;
 }
 
 void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg , int chb)
@@ -83,7 +92,14 @@ void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg ,
 					 frame->data[2],
 					 width, height, PIX_FMT_YUV444P );
 
-	yuv_convert_any_ac( tmp, rgb_frame_, PIX_FMT_YUV444P, PIX_FMT_RGB24 );
+//	yuv_convert_any_ac( tmp, rgb_frame_, PIX_FMT_YUV444P, PIX_FMT_RGB24 );
+
+	if(!convert_yuv )
+		convert_yuv = yuv_fx_context_create( tmp, rgb_frame_, PIX_FMT_YUV444P, PIX_FMT_RGB24 );
+	if(!convert_rgb )
+		convert_rgb = yuv_fx_context_create( rgb_frame_,tmp, PIX_FMT_RGB24, PIX_FMT_YUV444P );
+
+	yuv_fx_context_process( convert_yuv, tmp, rgb_frame_ );
 
 	int row_stride = width * 3;
 
@@ -118,7 +134,9 @@ void rgbchannel_apply( VJFrame *frame, int width, int height, int chr, int chg ,
 		}
 	}
 
-	yuv_convert_any_ac( rgb_frame_, tmp, PIX_FMT_RGB24, PIX_FMT_YUV444P );
+//	yuv_convert_any_ac( rgb_frame_, tmp, PIX_FMT_RGB24, PIX_FMT_YUV444P );
+
+	yuv_fx_context_process( convert_rgb, rgb_frame_, tmp );
 
 	free(tmp);
 

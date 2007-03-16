@@ -92,6 +92,8 @@ typedef void (*f0r_set_param_value_f)(f0r_instance_t *instance, f0r_param_t *par
 #define FF_CAP_V_BITS_VIDEO     FF_CAP_16BITVIDEO
 #endif
 
+static	void	*convert_yuv = NULL;
+static  void 	*convert_rgb = NULL;
 static	vevo_port_t **index_map_ = NULL;
 static  vevo_port_t *illegal_plugins_ =NULL;
 static  int	index_     = 0;
@@ -761,6 +763,12 @@ static	void	process_plug_plugin( void *plugin, void *buffer , void *out_buffer)
 void	plug_free(void)
 {
 	free_plugins();
+
+	if( convert_rgb )
+		yuv_fx_context_destroy( convert_rgb );
+	if( convert_yuv )
+		yuv_fx_context_destroy( convert_yuv );
+
 	if( buffer_ )
 		free( buffer_ );
 	if( buffer2_ )
@@ -976,11 +984,20 @@ void	plug_process( VJFrame *frame,VJFrame *b, int fx_id, int src_fmt )
 	VJFrame *dst1 = yuv_rgb_template( buffer_, frame->width,frame->height,
 				PIX_FMT_RGB24 );
 
-	yuv_convert_any_ac( frame, dst1, src_fmt, dst1->format );
+	if(!convert_yuv)
+		convert_yuv = yuv_fx_context_create( frame,dst1,src_fmt,dst1->format );
+	if(!convert_rgb )
+		convert_rgb = yuv_fx_context_create( dst1, frame, dst1->format, src_fmt );
+
+//	yuv_convert_any_ac( frame, dst1, src_fmt, dst1->format );
 	
+	yuv_fx_context_process( convert_yuv, frame,dst1 );
+
 	process_plug_plugin( plugin, buffer_, buffer2_ );
 
-	yuv_convert_any_ac( dst1, frame, dst1->format, src_fmt );
+	yuv_fx_context_process( convert_rgb, dst1, frame );
+
+//	yuv_convert_any_ac( dst1, frame, dst1->format, src_fmt );
 
 	free(dst1);
 
