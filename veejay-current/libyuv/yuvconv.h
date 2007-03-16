@@ -128,4 +128,11 @@ char	*yuv_get_scaler_name(int id);
 
 void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt );
 
+void    *yuv_fx_context_create( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt );
+
+void    yuv_fx_context_process( void *ctx, VJFrame *src, VJFrame *dst );
+
+void    yuv_fx_context_destroy( void *ctx );
+
+
 #endif

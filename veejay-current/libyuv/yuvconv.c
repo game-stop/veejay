@@ -77,6 +77,9 @@ void	yuv_init_lib()
 	put( PIX_FMT_YUV420P, IMG_YUV420P );
 	put( PIX_FMT_YUV422P, IMG_YUV422P );
 	put( PIX_FMT_YUV444P, IMG_YUV444P );
+	put( PIX_FMT_YUVJ420P, IMG_YUV420P ); //@ pfff dont care
+	put( PIX_FMT_YUVJ422P, IMG_YUV422P );
+	put( PIX_FMT_YUVJ422P, IMG_YUV444P );
 	put( PIX_FMT_RGB24,   IMG_RGB24 );
 	put( PIX_FMT_BGR24,   IMG_BGR24 );
 	put( PIX_FMT_RGB32,   IMG_ARGB32 );
@@ -99,17 +102,17 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 	{
 		case PIX_FMT_YUV422P:
 		case PIX_FMT_YUVJ422P:
-			f->uv_width = w/2;
+			f->uv_width = w>>1;
 			f->uv_height= f->height;		
 			f->stride[0] = w;
-			f->stride[1] = f->stride[2] = f->stride[0]/2;
+			f->stride[1] = f->stride[2] = f->stride[0]>>1;
 			break;
 		case PIX_FMT_YUV420P:
 		case PIX_FMT_YUVJ420P:
-			f->uv_width = w/2;
-			f->uv_height=f->height/2;
+			f->uv_width = w>>1;
+			f->uv_height=f->height>>1;
 			f->stride[0] = w;
-			f->stride[1] = f->stride[2] = f->stride[0]/2;
+			f->stride[1] = f->stride[2] = f->stride[0]>>1;
 			break;
 		case PIX_FMT_YUV444P:
 		case PIX_FMT_YUVJ444P:
@@ -236,6 +239,24 @@ void	yuv_convert_any( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 	sws_scale( ctx, src->data, src->stride,0, src->height,dst->data, dst->stride );
 
 	sws_freeContext( ctx );
+}
+
+void	*yuv_fx_context_create( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
+{
+	struct SwsContext *ctx = sws_getContext( src->width,src->height,src_fmt, dst->width,dst->height,dst_fmt,
+			sws_context_flags_, NULL,NULL,NULL );
+	return (void*) ctx;
+}
+
+void	yuv_fx_context_process( void *ctx, VJFrame *src, VJFrame *dst )
+{
+	sws_scale( ctx, src->data, src->stride,0,src->height,dst->data,dst->stride );
+}
+
+void	yuv_fx_context_destroy( void *ctx )
+{
+	struct SwsContext *stx = (struct SwsContext*) ctx;
+	sws_freeContext( stx );
 }
 
 
