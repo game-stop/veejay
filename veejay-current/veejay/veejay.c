@@ -109,14 +109,14 @@ static void CompiledWith()
 static void Usage(char *progname)
 {
     fprintf(stderr, "This is Veejay %s\n\n", VERSION);
-    fprintf(stderr, "Usage: %s [options] <filename> [<filename> ...]\n",
+    fprintf(stderr, "Usage: %s [options] <file name> [<file name> ...]\n",
 	    progname);
     fprintf(stderr, "where options are:\n\n");
 
     fprintf(stderr,
 	    "  -p/--portoffset\t\tTCP port to accept/send messages (default: 3490)\n");
     fprintf(stderr,
-	    "  -t/--timer num\t\tspecify timer to use (none:0,normal:2,rtc:1) default is 1\n");
+	    "  -t/--timer num\t\specify timer to use (none:0,normal:2,rtc:1) default is 1\n");
 
 	fprintf(stderr,
 		"  -O/--output [012345]\t\tOutput video\n");
@@ -129,11 +129,11 @@ static void Usage(char *progname)
 		"\t\t\t\t1 = DirectDB\t\n");
 #ifdef HAVE_SDL
 	fprintf(stderr,
-		"\t\t\t\t2 = SDL and DirectDB secundary head (TV-Out) clone mode\n");
+		"\t\t\t\t2 = SDL and DirectDB secondary head (TV-Out) clone mode\n");
 #endif
 #endif
 	fprintf(stderr,
-		"\t\t\t\t3 = YUV4MPEG stream (use with -o/--outstream <filename>)\n");
+		"\t\t\t\t3 = YUV4MPEG stream (use with -o/--outstream <file name>)\n");
 #ifdef USE_GL
 	fprintf(stderr,
 		"\t\t\t\t4 = OpenGL (requires openGL extension ARB fragment program)\n");
@@ -142,13 +142,13 @@ static void Usage(char *progname)
 		"\t\t\t\t5 = Head less (no video output)\n");	
 		
     fprintf(stderr,
-	    "  -o/--outstream <filename>\twhere to write the yuv4mpeg stream (use with -O3)\n");
+	    "  -o/--outstream <file name>\twhere to write the yuv4mpeg stream (use with -O3)\n");
     fprintf(stderr,
 	    "  -c/--synchronization [01]\tSync correction off/on (default on)\n");
     fprintf(stderr,
-		"  -f/--fps num\t\t\tOverride default framerate (default: read from first loaded file)\n");
+		"  -f/--fps num\t\t\tOverride default frame rate (default: read from first loaded file)\n");
     fprintf(stderr,
-	    "  -P/--preserve-pathnames\tDo not 'canonicalise' pathnames in editlists\n");
+	    "  -P/--preserve-pathnames\tDo not 'canonicalise' pathnames in edit lists\n");
     fprintf(stderr,
 	    "  -a/--audio [01]\t\tEnable (1) or disable (0) audio (default 1)\n");
 #ifdef HAVE_SDL
@@ -158,11 +158,11 @@ static void Usage(char *progname)
 #ifdef HAVE_XINERAMA
 #ifdef USE_GL
     fprintf(stderr,
-            "  -X/--Xinerama N\t\tSelect xinerama screen [0-n] (Use with -O4)\n");
+            "  -X/--Xinerama N\t\tSelect Xinerama screen [0-n] (Use with -O4)\n");
 #endif
 #endif
     fprintf(stderr,
-	    "  -l/--action-file <filename>\tLoad a samplelist/actionlist file (none at default)\n");
+	    "  -l/--action-file <file name>\tLoad a sample list/action list file (none at default)\n");
 	fprintf(stderr,
 	    "  -u/--dump-events  \t\tDump event information to screen\n");
 	fprintf(stderr,
@@ -221,7 +221,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"\t\t\t\tsoftware scaler type (also use -w/--zoomwidth, -h/--zoomheight ). \n");
 	fprintf(stderr,
-		"\t\t\t\tAvailable types are:\n");         
+		"\t\t\t\available types are:\n");         
 	fprintf(stderr,
 		"\t\t\t\t1\tFast bilinear (default)\n");
 	fprintf(stderr,
@@ -231,11 +231,11 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"\t\t\t\t4\tExperimental\n");
 	fprintf(stderr,
-		"\t\t\t\t5\tNearest Neighbour (bad quality)\n");
+		"\t\t\t\t5\tNearest Neighbor (bad quality)\n");
 	fprintf(stderr,
 		"\t\t\t\t6\tArea\n");
 	fprintf(stderr,
-		"\t\t\t\t7\tLuma bicubic / chroma bilinear\n");
+		"\t\t\t\t7\tLuma bi cubic / chroma bilinear\n");
 	fprintf(stderr,
 		"\t\t\t\t9\tGauss\n");
 	fprintf(stderr,
@@ -243,7 +243,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"\t\t\t\t10\tLanczos\n");
 	fprintf(stderr,
-		"\t\t\t\t11\tNatural bicubic spline\n");
+		"\t\t\t\t11\tNatural bi cubic spline\n");
 	fprintf(stderr,
 		"\n\t\t\t\tsoftware scaler options:\n");
 	fprintf(stderr,
