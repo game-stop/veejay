@@ -242,6 +242,9 @@ void vj_effman_apply_image_effect(
 	case VJ_IMAGE_EFFECT_AUTOEQ:
 		autoeq_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
 	break;
+	case VJ_IMAGE_EFFECT_BALTANTV:
+		baltantv_apply(frames[0],frameinfo->width,frameinfo->height,arg[0]);
+		break;
 	case VJ_IMAGE_EFFECT_CHAMELEON:
 		chameleon_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
 		break;

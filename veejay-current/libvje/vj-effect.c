@@ -105,6 +105,7 @@
 #include "effects/bathroom.h"
 #include "effects/timedistort.h"
 #include "effects/chameleon.h"
+#include "effects/baltantv.h"
 #include "effects/chameleonblend.h"
 #include "effects/goom.h"
 #include "effects/slice.h"
@@ -231,6 +232,7 @@ static struct
 {	timedistort_malloc,		timedistort_free,	VJ_IMAGE_EFFECT_TIMEDISTORT	},
 {	chameleon_malloc,		chameleon_free,		VJ_IMAGE_EFFECT_CHAMELEON	},
 {	chameleonblend_malloc,		chameleonblend_free,	VJ_VIDEO_EFFECT_CHAMBLEND	},
+{	baltantv_malloc,		baltantv_free,		VJ_IMAGE_EFFECT_BALTANTV	},
 {	NULL			,	NULL			,0				},
 };
 
@@ -576,6 +578,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 84] = motionmap_init(width,height);
 	vj_effects[i + 85] = timedistort_init(width,height);
 	vj_effects[i + 86] = chameleon_init(width,height);
+	vj_effects[i + 87] = baltantv_init(width,height);
 	max_width = width;
 	max_height = height;
 

@@ -205,11 +205,12 @@ enum {
 	VJ_IMAGE_EFFECT_MOTIONMAP	=	184,
 	VJ_IMAGE_EFFECT_TIMEDISTORT	=	185,
 	VJ_IMAGE_EFFECT_CHAMELEON	=	186,
+	VJ_IMAGE_EFFECT_BALTANTV	=	187,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 187
+#define VJ_IMAGE_EFFECT_MAX 188
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 243
@@ -564,5 +565,7 @@ extern void timedistort_apply( VJFrame *frame, int w, int h, int val );
 extern void chameleon_apply( VJFrame *frame, int w, int h, int mode, int refresh );
 
 extern void	chameleonblend_apply( VJFrame *frame, VJFrame *source, int w, int h, int mode, int refresh );
+
+extern void	baltantv_apply (VJFrame *frame, int w, int h , int stride );
 
 #endif
