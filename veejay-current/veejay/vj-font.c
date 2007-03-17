@@ -119,7 +119,6 @@ typedef struct {
 	int	auto_number;
 	int	font_index;
 	long		index_len;
-	srt_cycle_t	*index_ptr;
 	srt_cycle_t	**index;
 	float		fps;
 	void	*dictionary;
@@ -128,8 +127,9 @@ typedef struct {
 	char	*add;
 	char 	*prev;
 	pthread_mutex_t	mutex;
+	srt_cycle_t	*text_buffer;
+	uint32_t	 text_max_size;
 } vj_font_t;
-
 
 static int	configure(vj_font_t *f, int size, int font);
 static char 	*make_key(int id);
@@ -1311,18 +1311,7 @@ void	vj_font_destroy(void *ctx)
 		if( f->font_table[i] )
 			free(f->font_table[i]);
 	}
-	if( f->index )
-	{
-	/*	long k;
-		for( k =0; k <= f->index_len ; k ++ )
-		{
-		  if( f->index[k] )
-			free(f->index[k]);
-		}*/
-		if(f->index_ptr)
-		  free(f->index_ptr);
-		free(f->index );
-	}
+	free( f->text_buffer );	
 	free( f->font_table );
 	free( f->font_list );
 	free( f );
@@ -1523,26 +1512,21 @@ void	vj_font_set_constraints_and_dict( void *font, long lo, long hi, float fps, 
 		}
 	}
 	
-	if(f->index)
-	{
-		free(f->index);
-		f->index = NULL;
-	}
-	if(f->index_ptr)
-	{
-		free(f->index_ptr);
-		f->index_ptr = NULL;
-	}
+	veejay_memset( f->text_buffer, 0, f->text_max_size );
 
-	f->index = (srt_cycle_t**) vj_calloc(sizeof(srt_cycle_t*)*(len+1));
+	f->index = NULL;
+	f->index = f->text_buffer;
+	if( len > f->text_max_size )
+	{
+		veejay_msg(VEEJAY_MSG_WARNING,
+			"Sample too long , subtitling frames %d - %d", 0, f->text_max_size);
+		len = f->text_max_size;
+	}
 	f->index_len = len;
 
 	long k;
-	srt_cycle_t *lin = vj_calloc( sizeof(srt_cycle_t) * f->index_len );
-
 	for( k = 0; k <= f->index_len; k ++ )
-		f->index[k] = &(lin[k]);
-	f->index_ptr = lin;
+		f->index[k] = &(f->text_buffer[k]);
 
 	if(dict)
 	{
@@ -1618,7 +1602,6 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 	f->y = 0;
 	f->auto_number = 1;
 	f->index_len = 0;
-	f->index_ptr = NULL;
 	f->fgcolor[0] = 235;
 	f->fgcolor[1] = 128;
 	f->fgcolor[2] = 128;
@@ -1686,7 +1669,9 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 	}
 
 	f->time = is_osd;
-	
+	f->text_buffer = (srt_cycle_t*)
+		vj_calloc(sizeof(srt_cycle_t) *	(sizeof(srt_cycle_t)*22500));
+	f->text_max_size = 22500;
 	//print_fonts(f);
 
 	pthread_mutex_init( &(f->mutex), NULL );
@@ -2235,9 +2220,6 @@ int	vj_font_norender(void *ctx, long position)
 		return 0;
 
 	if(!f->dictionary  )
-		return 0;
-
-	if(!f->index || !f->index_ptr)
 		return 0;
 
 	if(!f->index[position])
