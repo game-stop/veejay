@@ -1,7 +1,7 @@
 /*
  * Linux VeeJay
  *
- * Copyright(C)2002-2004 Niels Elburg <nelburg@looze.net>
+ * Copyright(C)2002-2007 Niels Elburg <nelburg@looze.net>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -575,8 +575,6 @@ vj_keyboard_event *new_keyboard_event(
 
 	ev->event_id = event_id;
 
-//	keyboard_event_map_[ event_id ] = ev;
-
 	keyboard_event_map_ [ (modifier * SDLK_LAST) + symbol ] = ev;
 
 	if(value)
@@ -657,10 +655,9 @@ int vj_event_bundle_store( vj_msg_bundle *m )
  
 	net_list[ m->event_id ].list_id = m->event_id;
 	net_list[ m->event_id ].act = vj_event_none;
-
-
 	return 1;
 }
+
 int vj_event_bundle_del( int event_id )
 {
 	hnode_t *n;
@@ -677,7 +674,6 @@ int vj_event_bundle_del( int event_id )
 #ifdef HAVE_SDL
 	vj_event_unregister_keyb_event( m->accelerator, m->modifier );
 #endif	
-
 	if( m->bundle )
 		free(m->bundle);
 	if(m)
@@ -685,8 +681,6 @@ int vj_event_bundle_del( int event_id )
 	m = NULL;
 
 	hash_delete( BundleHash, n );
-
-
 	return 0;
 }
 
@@ -696,10 +690,9 @@ vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id)
 	int len = 0;
 	if(!bundle_msg || strlen(bundle_msg) < 1)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Doesnt make sense to store empty bundles in memory");
+		veejay_msg(VEEJAY_MSG_ERROR, "Doesn't make sense to store empty bundles in memory");
 		return NULL;
 	}	
-
 	len = strlen(bundle_msg);
 	m = (vj_msg_bundle*) malloc(sizeof(vj_msg_bundle));
 	if(!m) 
@@ -721,7 +714,7 @@ vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id)
 	m->event_id = event_id;
 
 	veejay_msg(VEEJAY_MSG_DEBUG, 
-		"New VIMS Bundle %d [%s]",
+		"New VIMS Bundle %d [%s] created",
 			event_id, m->bundle );
 
 	return m;
@@ -744,16 +737,16 @@ void	vj_event_parse_kf( veejay_t *v, unsigned char *msg, int len )
 	if(SAMPLE_PLAYING(v))
 	{
 		if(sample_chain_set_kfs( v->uc->sample_id, len, msg )==-1)
-			veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Invalid keyframe blob [%s]",msg);
+			veejay_msg(VEEJAY_MSG_ERROR,"(VIMS) Invalid key frame blob [%s]",msg);
 	}
 	else if (STREAM_PLAYING(v))
 	{
 		if(vj_tag_chain_set_kfs(v->uc->sample_id,len,msg ) == -1)
-			veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Invalid keyframe blob [%s]",msg);
+			veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Invalid key frame blob [%s]",msg);
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Cannot store keyframe in this playback mode");
+		veejay_msg(VEEJAY_MSG_ERROR, "(VIMS) Cannot store key frame in this playback mode");
 	}
 }
 
@@ -835,14 +828,13 @@ static	void	dump_arguments_(int net_id,int arglen, int np, int prefixed, char *f
 	int i;
 	char *name = vj_event_vevo_get_event_name( net_id );
 	veejay_msg(VEEJAY_MSG_ERROR, "VIMS '%03d' : '%s'", net_id, name );
-	veejay_msg(VEEJAY_MSG_ERROR, "Invalid number of arguments given: %d out of %d",
-			arglen,np);	
-	veejay_msg(VEEJAY_MSG_ERROR, "Format is '%s'", fmt );
+	veejay_msg(VEEJAY_MSG_ERROR, "\tOnly %d arguments of %d seen",arglen,np);	
+	veejay_msg(VEEJAY_MSG_ERROR, "\tFormat is '%s'", fmt );
 
 	for( i = prefixed; i < np; i ++ )
 	{
 		char *help = vj_event_vevo_help_vims( net_id, i );
-		veejay_msg(VEEJAY_MSG_ERROR,"\tArgument %d : %s",
+		veejay_msg(VEEJAY_MSG_ERROR,"\t\tArgument %d : %s",
 			i,help );
 		if(help) free(help);
 	}
@@ -851,7 +843,7 @@ static	void	dump_arguments_(int net_id,int arglen, int np, int prefixed, char *f
 static	void	dump_argument_( int net_id , int i )
 {
 	char *help = vj_event_vevo_help_vims( net_id, i );
-		veejay_msg(VEEJAY_MSG_ERROR,"\tArgument %d : %s",
+		veejay_msg(VEEJAY_MSG_ERROR,"\t\tArgument %d : %s",
 			i,help );
 	if(help) free(help);
 }
@@ -1050,15 +1042,12 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		return 0;
 	}
 
-//	int msg_len = strlen( msg );
 	if( msg_len < MSG_MIN_LEN )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "VIMS Message too small, dropped!");
 		return 0;
 
 	}
-//	veejay_chomp_str( msg, &msg_len );
-//	msg_len --;
 
 	veejay_memcpy(head,msg,4);
 
@@ -1077,7 +1066,6 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 
 	veejay_chomp_str( msg, &msg_len );
 	msg_len --;
-
 
 	/* try to scan VIMS id */
 	if ( sscanf( head, "%03d", &net_id ) != 1 )
@@ -1166,7 +1154,6 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 			return 0;
 		}
 		
-		/* fill defaults first */
 		while( i < np )
 		{
 			if( fmt[fmt_offset] == 'd' )
@@ -1234,9 +1221,6 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 	return 0;
 }
 
-/*
-	update connections
- */
 void vj_event_update_remote(void *ptr)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -1371,9 +1355,7 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 		return;
 	}
 
-	// event_id is here VIMS list entry!
 	int event_id = ev->vims->list_id;
-
 	if( event_id >= VIMS_BUNDLE_START && event_id < VIMS_BUNDLE_END )
 	{
 		vj_msg_bundle *bun = vj_event_bundle_get(event_id );
@@ -1515,7 +1497,7 @@ void vj_event_single_gl_fire(void *ptr , int mod, int key)
 #endif
 void vj_event_none(void *ptr, const char format[], va_list ap)
 {
-	veejay_msg(VEEJAY_MSG_DEBUG, "No event attached on this key");
+	veejay_msg(VEEJAY_MSG_DEBUG, "No action implemented for requested event");
 }
 
 #ifdef HAVE_XML2
@@ -1758,7 +1740,7 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 
 	if( event_id <= 0 )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Invalid event_id in configuration file used ?!");
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid key '%s' in configuration file", XML_CONFIG_KEY_VIMS);
 		return;
 	}
 
@@ -1775,7 +1757,8 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 			}
 			if(!override_keyboard)
 			{
-				veejay_msg(VEEJAY_MSG_WARNING, "Bundle %d already exists in VIMS system! (Bundle in configfile was ignored)",event_id);
+				veejay_msg(VEEJAY_MSG_WARNING,
+					 "Bundle %d already exists in VIMS system! (Bundle in configfile was ignored)",event_id);
 				return;
 			}
 			else
@@ -1885,32 +1868,12 @@ void	vj_event_format_xml_event( xmlNodePtr node, int event_id )
 			(const xmlChar*) buffer);
 			// m->event_id and event_id should be equal
 	}
-#ifdef HAVE_SDL
-/*	vims_key_list *tree = vj_event_get_keys( i );
-	while( tree != NULL )
-	{
-		vims_key_list *this = tree;
-		int index = (tree->key_mod * SDLK_LAST ) + tree->key_sym;	
-		sprintf(tmp, "%04d%03d%03d%04d%03d%03d",
-				i, tree->key_symbol, tree->key_mod, name_len, name, form_len,form, tree->arg_len );
-		veejay_strncat( buf,tmp,strlen(tmp));	
-		if(form)
-			veejay_strncat( buf, form, form_len);	
-		if(tree->arg_len)
-			veejay_strncat( buf, tree->args, tree->arg_len );
-		tree = tree->next;
-		free(this);
-	}
-*/
-
- #endif
 	/* Put all known VIMS so we can detect differences in runtime
            some Events will not exist if SDL, Jack, DV, Video4Linux would be missing */
 
 	sprintf(buffer, "%d", event_id);
 	xmlNewChild(node, NULL, (const xmlChar*) XML_CONFIG_KEY_VIMS , 
 		(const xmlChar*) buffer);
-
 #ifdef HAVE_SDL
 	if(key_id > 0 && key_mod >= 0 )
 	{
@@ -1923,45 +1886,6 @@ void	vj_event_format_xml_event( xmlNodePtr node, int event_id )
 	}
 #endif
 }
-/*
-void	vj_event_format_xml_stream( xmlNodePtr node, int stream_id )
-{
-	char tmp[1024];
-	
-	int type = vj_tag_get_type(stream_id);
-	int col[3] = {0,0,0};
-
-	vj_tag *stream = vj_tag_get( stream_id );
-	if(!stream )
-		return;
-
-	vj_tag_get_source_name( stream_id, tmp );
-	xmlNewChild(node, NULL, (const xmlChar*) XML_CONFIG_STREAM_SOURCE , (const xmlChar*) tmp );
-
-	vj_tag_get_method_filename( stream_id, tmp );
-	xmlNewChild(node, NULL, (const xmlChar*) XML_CONFIG_STREAM_FILENAME, (const xmlChar*) tmp );
-	
-	sprintf (tmp, "%d", type );
-	xmlNewChild(node, NULL, (const xmlChar*) XML_CONFIG_STREAM_TYPE, (const xmlChar*) tmp );
-
-	if( type == VJ_TAG_TYPE_COLOR )
-	{
-		vj_tag_get_stream_color( stream_id, &col[0], &col[1], &col[2] );
-		sprintf(tmp, "%03d %03d %03d", col[0],col[1],col[2] );
-		xmlNewChild( node, NULL, (const xmlChar*) XML_CONFIG_STREAM_COLOR,
-			(const xmlChar*) tmp );
-	}
-	else
-	{
-		sprintf(tmp, "%d", stream->video_channel );
-		xmlNewChild( node, NULL, (const xmlChar*) XML_CONFIG_STREAM_OPTION,
-			(const xmlChar*) tmp );
-	}
-
-	xmlNodePtr cnode = xmlNewChild( node, NULL, (const xmlChar*) XML_CONFIG_STREAM_CHAIN , 
-		NULL );
-	tagCreateStreamFX( cnode, stream );
-}*/
 
 static	void	vj_event_send_new_id(veejay_t * v, int new_id)
 {
@@ -1990,27 +1914,6 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 	rootnode = xmlNewDocNode( doc, NULL, (const xmlChar*) XML_CONFIG_FILE,NULL);
 	xmlDocSetRootElement( doc, rootnode );
 
-	/* dont save EDL/SL
-	if(args[0]==1 || args[1]==1)
-	{
-		char tmp_buf[1024];
-		veejay_memset(tmp_buf,0,1024);
-		childnode = xmlNewChild( rootnode, NULL, (const xmlChar*) XML_CONFIG_SETTINGS, NULL );
-
-		if( sample_size() > 1 )	
-		{	
-			veejay_memset( live_set,0, 512 );
-		
-			sprintf(live_set, "%s-SL", file_name );
-			int res = sample_writeToFile( live_set, v->seq,v->font,
-					v->uc->sample_id, v->uc->playback_mode );
-			if(!res)
-				veejay_msg(VEEJAY_MSG_ERROR,"Error saving sample list to file '%s'", live_set ); 
-			else
-				__xml_cstr( tmp_buf, live_set, childnode, XML_CONFIG_SETTING_SAMPLELIST );
-		}
-	} */
-
 	for( i = 0; i < VIMS_MAX; i ++ )
 	{
 		if( net_list[i].list_id > 0 )
@@ -2019,21 +1922,11 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 			vj_event_format_xml_event( childnode, i );
 		}
 	}
-	/*
-	for ( i = 1 ; i < vj_tag_size(); i ++ )
-	{
-		if(vj_tag_exists(i))
-		{
-			childnode = xmlNewChild( rootnode, NULL, (const xmlChar*) XML_CONFIG_STREAM , NULL );
-			vj_event_format_xml_stream( childnode, i );
-		}
-	}*/
 	xmlSaveFormatFile( file_name, doc, 1);
 
 	veejay_msg(VEEJAY_MSG_INFO, "Saved Action file as '%s'" , file_name );
 	xmlFreeDoc(doc);	
 }
-
 #endif  // XML2
 void	vj_event_read_file( void *ptr, 	const char format[], va_list ap )
 {
@@ -2051,7 +1944,6 @@ void	vj_event_read_file( void *ptr, 	const char format[], va_list ap )
 }
 
 #ifdef HAVE_SDL
-
 vims_key_list	*vj_event_get_keys( int event_id )
 {
 	vims_key_list *list = vj_calloc( sizeof(vims_key_list));
@@ -2117,13 +2009,13 @@ void	vj_event_unregister_keyb_event( int sdl_key, int modifier )
 			free(ev->vims);
 		if( ev->arguments)
 			free(ev->arguments );
-		memset(ev, 0, sizeof( vj_keyboard_event ));
+		veejay_memset(ev, 0, sizeof( vj_keyboard_event ));
 
 		del_keyboard_event( index );
 	}
 	else
 	{
-		veejay_msg(0,"No event bound to key %d : %d", modifier, sdl_key);
+		veejay_msg(0,"No event was attached to key %d : %d", modifier, sdl_key);
 	}
 }
 
@@ -2142,7 +2034,8 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 			ff->arguments = strdup(value);
 			ff->arg_len   = strlen(value);
 			veejay_msg( VEEJAY_MSG_DEBUG,
-			  "Updated argument settings '%s' ",value);
+			  "Updated arguments of keybinding %d+%d, (VIMS %03d:%s;) ",modifier,symbol, ff->event_id,
+				value);
 			return 1;
 		}
 		return 0;
@@ -2156,7 +2049,8 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 			ev->key_symbol = symbol;
 			ev->key_mod = modifier;
 			veejay_msg(VEEJAY_MSG_INFO,
-				"Updated Bundle ID with new key configuration");
+				"Updated Bundle ID %d with keybinding %d+%d",
+					 ev->event_id, modifier, symbol );
 			return 1;
 		}
 	}
@@ -2255,7 +2149,7 @@ void	vj_event_init_keyboard_defaults()
 		{
 
 			veejay_msg(VEEJAY_MSG_ERROR,
-			  "VIMS event %d not yet implemented", vj_event_default_sdl_keys[i].event_id );
+			  "VIMS event %03d does not exist ", vj_event_default_sdl_keys[i].event_id );
 		}
 	}
 }
@@ -3027,8 +2921,6 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 				v->sdl[id],
 				v->bes_width,
 				v->bes_height,
-			//	v->edit_list->video_width,
-			//	v->edit_list->video_height,
 				caption,
 				1,
 				go_fs
@@ -3110,8 +3002,6 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 				
 					if(vj_sdl_init( v->settings->ncpu,
 						v->sdl[id],
-					//	w,
-					//	h,
 						v->bes_width,
 						v->bes_height,
 						title,

@@ -115,6 +115,7 @@ enum {
 	VJ_VIDEO_EFFECT_EXTDIFF		= 240,
 	VJ_VIDEO_EFFECT_PICINPIC = 241,
 	VJ_VIDEO_EFFECT_CHAMBLEND = 242,
+	VJ_VIDEO_EFFECT_RADIOACTIVE = 243,
 };
 
 enum {
@@ -213,7 +214,7 @@ enum {
 #define VJ_IMAGE_EFFECT_MAX 188
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 243
+#define VJ_VIDEO_EFFECT_MAX 244
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
@@ -566,6 +567,8 @@ extern void chameleon_apply( VJFrame *frame, int w, int h, int mode, int refresh
 
 extern void	chameleonblend_apply( VJFrame *frame, VJFrame *source, int w, int h, int mode, int refresh );
 
-extern void	baltantv_apply (VJFrame *frame, int w, int h , int stride );
+extern void	baltantv_apply (VJFrame *frame, int w, int h , int stride, int mode );
+
+extern	void	radioactivetv_apply( VJFrame *a, VJFrame *b,int w, int h, int mode, int t, int sn, int threhold);
 
 #endif

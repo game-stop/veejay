@@ -90,7 +90,7 @@ vj_effect *water_init(int width, int height)
     ve->defaults[0] = 10;
     ve->defaults[1] = 2;
     ve->defaults[2] = 8;
-    ve->description = "RippleTV - Raindrops";
+    ve->description = "RippleTV  (EffectTV)";
     ve->sub_format = 0;
     ve->extra_frame = 0;
 	ve->has_user = 0;

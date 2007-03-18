@@ -30,15 +30,18 @@
 vj_effect *baltantv_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 1;
+    ve->num_params = 2;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 2;
-    ve->limits[1][0] = 8;
+    ve->limits[1][0] = 16;
+    ve->limits[0][1] = 0;
+    ve->limits[1][1] = 1;
     ve->defaults[0] = 8;
-    ve->description = "BaltanTV";
-    ve->sub_format = 1;
+    ve->defaults[1] = 0;
+    ve->description = "BaltanTV (EffecTV)";
+    ve->sub_format = 0;
     ve->extra_frame = 0;
     ve->has_user = 0;
     return ve;
@@ -46,7 +49,7 @@ vj_effect *baltantv_init(int w, int h)
 
 static	unsigned int	plane_ = 0;
 
-#define	PLANES 32
+#define	PLANES 64
 
 static	uint8_t	**planetable_ = NULL;
 
@@ -55,7 +58,9 @@ int	baltantv_malloc(int w, int h)
 	if( planetable_ )
 		free(planetable_ );
 	planetable_ = (uint8_t**) vj_malloc( sizeof(uint8_t*) * PLANES *
-		(w * h * 3 ));
+		(w * h ));
+	if(!planetable_)
+		return 0;
 
 	return 1;
 }
@@ -68,24 +73,15 @@ void	baltantv_free()
 	planetable_ = NULL;
 }
 
-void baltantv_apply( VJFrame *frame, int width, int height, int stride)
+void baltantv_apply( VJFrame *frame, int width, int height, int stride, int mode)
 {
 	unsigned int i,cf;
 	const int len = (width * height);
 	uint8_t *Y = frame->data[0];
-	uint8_t *U = frame->data[1];
-	uint8_t *V = frame->data[2];
-	uint8_t *pDst[3] = {
-			planetable_ + (plane_ * frame->len),
-			planetable_ + (plane_ * frame->len) + frame->len,
-			planetable_ + (plane_ * frame->len) + frame->len + frame->len };
+	uint8_t *pDst = planetable_ + (plane_ * frame->len);
 
 	for( i = 0; i < len ; i ++ )
-	{
-		pDst[0][i] = (Y[i] >> 2 );
-//		pDst[1][i] = (U[i] >> 2 );
-//		pDst[2][i] = (V[i] >> 2 );
-	}
+		pDst[i] = (Y[i] >> 2 );
 
 	cf = plane_ & (stride-1);	
 
@@ -96,26 +92,27 @@ void baltantv_apply( VJFrame *frame, int width, int height, int stride)
 			planetable_ + ((cf+stride*3) * frame->len)
 		};
 
-	for( i = 0; i < len; i ++ )
-	{	
-		Y[i] =  pSrc[0][i] + 
-			pSrc[1][i] + 
-			pSrc[2][i] + 
-			pSrc[3][i];
-/*		U[i] =  pSrc[0][len+i] +
-		        pSrc[1][len+i] +
-		        pSrc[2][len+i] +
-		        pSrc[3][len+i];
-		V[i] =  pSrc[0][len+len+i] +
-		        pSrc[1][len+len+i] +
-		        pSrc[2][len+len+i] +
-		        pSrc[3][len+len+i];
-*/
-		pDst[0][i] = (Y[i] >> 2 );
-//		pDst[1][i] = (U[i] >> 2 );
-//		pDst[2][i] = (V[i] >> 2 );
+	if( mode == 0 )
+	{
+		for( i = 0; i < len; i ++ )
+		{	
+			Y[i] =  pSrc[0][i] + 
+				pSrc[1][i] + 
+				pSrc[2][i] + 
+				pSrc[3][i];
+			pDst[i] = (Y[i] >> 2 );
+		}
 	}
-
+	else
+	{
+		for( i = 0; i < len ; i++ )
+		{
+			Y[i] =  pSrc[0][i] + 
+				pSrc[1][i] + 
+				pSrc[2][i] + 
+				pSrc[3][i];
+		}
+	}
 	plane_ ++;
 
 	plane_ = plane_ & (PLANES-1);

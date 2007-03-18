@@ -3982,7 +3982,7 @@ static	void	select_slot__( int pm )
 					info->selected_slot = info->sample_banks[b]->slot[p];
 					info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
 					set_activation_of_slot_in_samplebank(TRUE);
-					no_preview_ = 0;
+				//	no_preview_ = 0;
 				}
 			}	
 		}
@@ -6031,6 +6031,8 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		{
 			int n = status_to_arr( gui->status_msg, gui->status_tokens );
 #ifdef STRICT_CHECKING
+			if( n != 22 )
+				veejay_msg(0, "Only got %d symbols", n );
 			assert(n == 22);
 #endif
 			info->uc.playmode = gui->status_tokens[ PLAY_MODE ];

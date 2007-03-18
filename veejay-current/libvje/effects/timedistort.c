@@ -47,7 +47,7 @@ vj_effect *timedistort_init(int w, int h)
     ve->limits[0][0] = 5;
     ve->limits[1][0] = 100;
     ve->defaults[0] = 40;
-    ve->description = "Time Distortion TV";
+    ve->description = "TimeDistortionTV (EffectTV)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;

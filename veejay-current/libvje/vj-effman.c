@@ -243,7 +243,7 @@ void vj_effman_apply_image_effect(
 		autoeq_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
 	break;
 	case VJ_IMAGE_EFFECT_BALTANTV:
-		baltantv_apply(frames[0],frameinfo->width,frameinfo->height,arg[0]);
+		baltantv_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
 		break;
 	case VJ_IMAGE_EFFECT_CHAMELEON:
 		chameleon_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
@@ -572,6 +572,10 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
 	picinpic_apply( vj_effects[entry]->user_data,frames[0], frames[1], frameinfo->width, frameinfo->height,
 			arg[0], arg[1], arg[2], arg[3] );
 	break;
+	case VJ_VIDEO_EFFECT_RADIOACTIVE:
+	radioactivetv_apply( frames[0],frames[1], frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
+	break;
+   
       default:
 	break;
     }

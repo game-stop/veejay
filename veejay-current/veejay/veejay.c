@@ -82,11 +82,17 @@ static void CompiledWith()
 #ifdef HAVE_DIRECTFB
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing DirectFB");
 #endif
+#ifdef ARCH_X86_64
+	veejay_msg(VEEJAY_MSG_INFO,"\tCompiled for x86-64 architecture");
+#endif
 #ifdef HAVE_X86CPU
 	veejay_msg(VEEJAY_MSG_INFO,"\tCompiled for x86 architecture");
 #endif
 #ifdef HAVE_PPCCPU
 	veejay_msg(VEEJAY_MSG_INFO,"\tCompiled for PPC architecture");
+#endif
+#ifdef HAVE_ALTIVEC
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Altivec");
 #endif
 #ifdef HAVE_ASM_SSE
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing SSE instruction set");
@@ -99,6 +105,9 @@ static void CompiledWith()
 #endif
 #ifdef HAVE_ASM_MMX
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing MMX instruction set");
+#endif
+#ifdef HAVE_ASM_MMX2	
+	veejay_msg(VEEJAY_MSG_INFO,"\tUsing MMX2 instruction set");
 #endif
 #ifdef HAVE_ASM_3DNOW
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing 3Dnow instruction set");

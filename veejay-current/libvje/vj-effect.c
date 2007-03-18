@@ -106,6 +106,7 @@
 #include "effects/timedistort.h"
 #include "effects/chameleon.h"
 #include "effects/baltantv.h"
+#include "effects/radioactive.h"
 #include "effects/chameleonblend.h"
 #include "effects/goom.h"
 #include "effects/slice.h"
@@ -233,6 +234,7 @@ static struct
 {	chameleon_malloc,		chameleon_free,		VJ_IMAGE_EFFECT_CHAMELEON	},
 {	chameleonblend_malloc,		chameleonblend_free,	VJ_VIDEO_EFFECT_CHAMBLEND	},
 {	baltantv_malloc,		baltantv_free,		VJ_IMAGE_EFFECT_BALTANTV	},
+{	radioactivetv_malloc,		radioactivetv_free,	VJ_VIDEO_EFFECT_RADIOACTIVE	},
 {	NULL			,	NULL			,0				},
 };
 
@@ -491,7 +493,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[40] = differencemap_init(width,height);
 	vj_effects[41] = picinpic_init(width,height);
 	vj_effects[42] = chameleonblend_init(width,height);
-        vj_effects[43] = dummy_init(width,height);
+	vj_effects[43] = radioactivetv_init(width,height);
+      vj_effects[44] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);

@@ -58,7 +58,7 @@ vj_effect *dices_init(int width, int height)
     ve->defaults[0] = 4;
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 5;
-    ve->description = "Dices";
+    ve->description = "Dices (EffectTV)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user = 0;

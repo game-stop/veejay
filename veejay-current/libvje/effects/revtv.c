@@ -41,7 +41,7 @@ vj_effect *revtv_init(int max_width, int max_height)
     ve->limits[1][2] = 255;
     ve->limits[0][3] = 0;	/* color range */
     ve->limits[1][3] = 7;
-    ve->description = "RevTV";
+    ve->description = "RevTV (EffectTV)";
     ve->sub_format = 0;
     ve->extra_frame = 0;
 	ve->has_user = 0;

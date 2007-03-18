@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2007 Niels Elburg <elburg@hio.hen.nl>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,14 +18,14 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef BALTAN_TVH
-#define BALTAN_TVH
+#ifndef RADIOACTIVE_TVH
+#define RADIOACTIVE_TVH
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
 
-vj_effect *baltantv_init(int w, int h);
-void baltantv_apply( VJFrame *frame, int width, int height, int stride, int mode);
-int baltantv_malloc(int w, int h );
-void baltantv_free();
+vj_effect *radioactivetv_init(int w, int h);
+void radioactivetv_apply( VJFrame *frame, VJFrame *blue,int width, int height, int bla,int stride, int mode, int thres);
+int radioactivetv_malloc(int w, int h );
+void radioactivetv_free();
 #endif
