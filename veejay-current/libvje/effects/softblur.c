@@ -159,7 +159,7 @@ static	void	mmx_blur(uint8_t *buffer, int width, int height)
 
 	len = (width*height)-1;
 
-	for (i = len; i > scrsh; i -= 4) {
+	for (i = len-1; i > scrsh; i -= 4) {
 		__asm __volatile
 			("\n\t movd %[buf], %%mm0"
 			 "\n\t movd %[add1], %%mm1"

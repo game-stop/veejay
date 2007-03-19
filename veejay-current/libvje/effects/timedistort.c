@@ -72,7 +72,7 @@ int 	timedistort_malloc( int w, int h )
 {	
 	unsigned int i;
 	if(nonmap) timedistort_free();
-	nonmap = vj_malloc( RUP8(2 * w * h) * sizeof(uint8_t));
+	nonmap = vj_malloc( RUP8(w + 2 * w * h) * sizeof(uint8_t));
 	if(!nonmap)
 		return 0;
 

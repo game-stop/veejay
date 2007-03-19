@@ -78,7 +78,7 @@ int diff_malloc(void **d, int width, int height)
 	my->current = my->data + (width*height);
 
 	if(static_bg == NULL)	
-		static_bg = (uint8_t*) vj_calloc( ru8(width * height * sizeof(uint8_t)) );
+		static_bg = (uint8_t*) vj_calloc( ru8( width + width * height * sizeof(uint8_t)) );
 	return 1;
 }
 
