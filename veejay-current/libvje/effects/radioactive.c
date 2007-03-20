@@ -45,14 +45,14 @@ vj_effect *radioactivetv_init(int w, int h)
     ve->limits[1][0] = 6;
     ve->limits[0][1] = 50;// zoom ratio
     ve->limits[1][1] = 100;
-    ve->limits[0][2] = 0; //threshold 
+    ve->limits[0][2] = 0; // strength 
     ve->limits[1][2] = 255; 
     ve->limits[0][3] = 0; //diff threhsold
     ve->limits[1][3] = 255;
     ve->defaults[0] = 0;
     ve->defaults[1] = 95;
-    ve->defaults[2] = 0;
-    ve->defaults[3] = 40;
+    ve->defaults[2] = 200;
+    ve->defaults[3] = 30;
     ve->description = "RadioActive EffecTV";
     ve->sub_format = 1;
     ve->extra_frame = 1;
@@ -217,7 +217,6 @@ void	radioactivetv_free()
 	diffbuf = NULL;
 
 }
-
 void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 		int mode, int snapRatio, int snapInterval, int threshold)
 {
@@ -246,14 +245,6 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 		setTable();
 	}
 
-	if( last_mode != mode )
-	{
-		veejay_memset( blurzoombuf, 0, 2*len);
-		veejay_memset( diff, 0, len );
-		last_mode = mode;
-	}
-
-
 	if( !first_frame )
 	{	//@ take current 
 		veejay_memcpy( prev, lum , len );
@@ -261,10 +252,28 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 		first_frame++;
 		return;
 	}
+	if( last_mode != mode )
+	{
+//@ mode changed, reset
+		veejay_memset( blurzoombuf, 0, 2*len);
+		veejay_memset( diff, 0, len );
+		last_mode = mode;
+	}
 
+	uint8_t *d = diff;
+
+//@ varying diff methods (strobe, normal, average, etc)
 	switch( mode )
 	{
 		case 0:
+			for( y = 0; y < len; y ++ ){
+				diff[y] = abs(lum[y] - prev[y]);
+				if(diff[y] < threshold )
+					diff[y] = 0;	
+				prev[y] = (prev[y] + lum[y])>>1;
+			}
+			break;
+		case 1:
 			for( y = 0; y < len; y ++ ) {
 				diff[y] = abs(lum[y] - prev[y]);
 				if(diff[y] < threshold )
@@ -272,19 +281,9 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 				prev[y] = lum[y];
 			}
 			break;
-		case 1:
+		case 2:
 			for( y = 0; y < len; y ++ ){
 				diff[y] = ( prev[y] >> 1 ) + lum[y] >> 1;
-				if( diff[y] < threshold )
-					diff[y] = 0;
-				prev[y] = lum[y];
-			}
-			break;
-		case 2:
-			threshold = 0xff - threshold;
-			for( y = 0; y < len; y ++ ) {
-				diff[y] = abs( lum[y] - prev[y] );
-				diff[y] = (lum[y] - prev[y])>>1;
 				if( diff[y] < threshold )
 					diff[y] = 0;
 				prev[y] = lum[y];
@@ -300,7 +299,6 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 			}
 			break;
 		case 4:
-			threshold = 0xff - threshold;
 			for( y = 0; y < len; y ++ ) {
 				diff[y] = abs( lum[y] - prev[y] );
 				diff[y] = (lum[y] - prev[y])>>1;
@@ -312,16 +310,14 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 			}
 			break;
 		case 5:
-			for( y = 0; y < len; y ++ ){
-				if( abs( lum[y] - prev[y]) > threshold )
-					diff[y] = 0xff;
-				else
-					diff[y] = 0;
+			for( y = 0; y < len; y ++ ) {
+				diff[y] = abs(lum[y] - prev[y]);
+				if(diff[y] < threshold )
+					diff[y] = 0;	
 				prev[y] = lum[y];
 			}
 			break;
 		case 6:
-			threshold = 255 - threshold;
 			for( y = 0; y < len; y ++ ){
 				if( abs( lum[y] - prev[y]) > threshold )
 					diff[y] = lum[y]>>2;
@@ -332,49 +328,48 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 
 			break;
 	}
+//@ end of diff
 
-	softblur_apply( &smooth, width,height,0);
 
-	uint8_t *diff_ptr = diff;
-	diff_ptr += buf_margin_left;
 	p = blurzoombuf;
-	for( y = 0; y < buf_height; y ++ )
-	{
-		for( x = 0; x < buf_width; x ++ )
-			p[x] |= diff_ptr[x];
-		diff_ptr += width;
-		p    += buf_width;
+	d += buf_margin_left;
+	for( y = 0; y < buf_height; y++ ) {
+		for( x = 0; x< buf_width; x ++ ) {
+			p[x] |= ( (d[x] * snapInterval)>>7);
+		}
+		d += width;
+		p += buf_width;
 	}
-
-	if(mode > 3 )
-	{
-		veejay_memset( dstU,128,len);
-		veejay_memset( dstV,128,len);
-		veejay_memcpy( dstY, blurzoombuf, len );
-	}
+	//@ prepare frame for next difference take
+	softblur_apply( &smooth, width,height,0);
 
 	blurzoomcore();
 	p = blurzoombuf;
 
-	uint32_t k =0;
+	if(mode >= 3 )
+	{
+		veejay_memset( dstU,128,len);
+		veejay_memset( dstV,128,len);
+		veejay_memcpy( dstY, blurzoombuf, len );
+		return;
+	}
 
+	
+	uint32_t k =0;
 	for( y = 0; y < height; y ++ )
 	{
 		k += buf_margin_left;
-
 		for( x = 0; x  < buf_width; x ++ )
 		{
 			uint8_t op0 = (*p ++);
 			uint8_t op1 = 0xff - op0;
-			if( op0 > snapInterval )
-			{
-				dstY[k] = (op1 * blueY[k] + op0 * dstY[k])>>8; 
-				dstU[k] = (op1 * blueU[k] + op0 * dstU[k])>>8;
-				dstV[k] = (op1 * blueV[k] + op0 * dstV[k])>>8;
-			}
+
+			dstY[k] = (op0 * blueY[k] + op1 * dstY[k])>>8; 
+			dstU[k] = (op0 * blueU[k] + op1 * dstU[k])>>8;
+			dstV[k] = (op0 * blueV[k] + op1 * dstV[k])>>8;
+
 			k ++;
 		}
 		k += buf_margin_right;
 	}
-
 }
