@@ -1,0 +1,78 @@
+                                                                                
+                                                                      ~==   
+                                                                    ~====     
+              :...                                                 ~~====       
+             :......                                            ~~~~====         
+              :.....:                                        ~~~~====          
+               :......                                    -~~~~===             
+                :.......                                 --~~~~~==               
+                 :.......                              ::~~~~~~=                 
+                   :......                           "::~~~~==                   
+                    :.....,                         :::~~~===                    
+                     :.....                      =::~~~~===      
+                      :......                    :::~~~====     
+                       .......                 ::~~~~~===      
+                         .......              :::~~~~~~==     
+                           ......            ~::~~~~~~==      
+                            ......          |::~~~=|
+                            .....         :::|:~==|
+                           ..:::        |:=|||==+
+                           ., :.,       :|||?||+=                   
+                           ..::,,.:      :||=~=.||                         
+                              ,...::,,, |~:=|||||+|                                
+                              :..,:::||||~~~====++                                 
+                            ,:,,,:::~~~~~===++++       GveejayReloaded                               
+                             ,::::~~~====++++                                 
+                               ~~~~~===+++++               version 1.0                 
+                                ~~===+++++++:                               
+                                 N=++++++++++          March, 25. 2007.                             
+                                   +++++++++                                   
+                                    ++++::::                                  
+                                     :::::                                      
+                                       ||                                         
+          
+   
+ 	        :: GveejayReloaded, a graphical interface for Veejay ::
+
+
+Main Features:
+
+ # dumb client (TCP/IP) (reloaded pulls everything from veejay)
+ # tracks multiple veejay servers
+ # slick user interface
+
+
+Install
+=======
+
+See file 'INSTALL'
+
+See doc/Howto_Compile.html
+See doc/Howto_Compile_on_Ubuntu.html
+
+Documentation
+=============
+
+See source code. 
+
+Running
+=======
+
+$ gveejayreloaded
+
+
+About
+=====
+
+GveejayReloaded is a client for veejay. As long as veejay (the server)
+is running, you can connect and disconnect from it with gveejayreloaded.
+
+
+
+
+
+
+
+
+
+                                                                      

@@ -1,0 +1,103 @@
+
+
+
+
+    10x0            0x     x10x0x10x0x10x   10x0x10x0x10x0        x0x1         x0x1       10x0        x0x1
+  0x10x0            0x0x   x10x0x10x0x10x   10x0x10x0x10x0        x0x1       10x0x10x      10x0x1    10x0x1
+0x0x10              0x0x10 x10x             10x0                  x0x1       10x0x10x       x0x10x  10x0
+0x0x10x0            0x0x10 x10x0x10x0x1	    10x0x10x0x10          x0x1     0x10    0x0        x10x0x10
+  0x10x0          x10x0x   x10x0x10x0x10x   10x0x10x0x10          x0x1     0x10x0x10x0        x10x0x10
+    10x0x1      x0x10x     x10x             10x0                  x0x1     0x10x0x10x0          0x0x
+      x0x10x0x10x0x1       x10x             10x0            x10x   x0x1    0x10x0x10x0x10       0x0x
+        x10x0x10x0         x10x0x10x0x10x   10x0x10x0x10x0  x10x  10x0    0x0x        0x10      0x0x
+          0x0x10           x10x0x10x0x10x   10x0x10x0x10x0    0x010x0     0x0x        0x10      0x0x    
+
+									              version 1.0	
+
+
+       2006/2007  - release date March 25. 2007
+       =========================================
+ 
+ 			 :: 	   Veejay, a visual instrument for GNU            ::
+	                                 http://veejay.dyne.org 
+
+
+ Veejay - a 'visual' instrument and realtime video sampler
+
+Veejay is a visual instrument and real-time video sampler.
+It allows you to "play" the video like you would play a piano.
+While playing, you can record the resulting video directly to disk (video sampling).
+
+Trigger samples, apply realtime fx (120+), scratch, mix and record , never stopping the video. Excellent for live video performing.
+Main Features
+
+# Hybrid client/server architecture
+# Soft realtime
+# Native YUV processing (4:2:2)
+# Frame accurate
+# Loop based editing (always playing)
+# Non destructive editing (EDL)
+# Trickplay (scratch, marker, speed,slow motion, looping)
+* fast/slow/reverse audio (trickplay)
+# 132 built-in effects incl. luma , chroma key, invert,solarize,etc
+# 20 fx slots
+# 20 mixing channels (1 per slot)
+# FX parameter animation
+# Support for FreeFrame and Frei0r
+# Simple Text overlay
+# Audio playback through Jack
+# Quicktime, AVI and rawdv movie files
+# Support DV and MJPEG
+# SDL, OpenGL or DirectFB video output
+# Projector/Beamer calibration
+# Live clip loading
+# Live harddisk recording
+# Live sample sequencing
+# Live text
+# Live camera(s) support (unlimited)
+# Network streaming (v2v) (multicast,unicast)
+# Deck save/restore
+# Crash Recovery 
+# Support for Open Sound Control
+# Free Software (GNU GPL)
+
+
+
+
+Install
+=======
+
+See file 'INSTALL'
+
+See doc/Howto_Compile.html
+See doc/Howto_Compile_on_Ubuntu.html
+
+Documentation
+=============
+
+See the directory 'doc' in this package, it contains usefull documentation.
+
+
+Running
+=======
+
+Start 1 or more Veejay servers:
+$ veejay my-movie-A.avi
+$ veejay -p 4490 my-movie-B.avi
+ 
+CONTACT / FEEDBACK & HELP
+=========================
+
+http://veejayhq.net
+
+
+BUG REPORTS / BLEEDING EDGE SOURCE CODE
+=======================================
+
+Please use the ticket system !
+
+http://veejay.dyne.org
+http://veejayhq.net
+
+ENJOY! And let us know about your performances/installations with veejay! 
+

@@ -1,0 +1,8 @@
+Since version 0.9.3 veejay features a caching mechanism to load frames from disk into the system's memory. The cache size is limited to the amount of RAM available in your machine. If the cache is full, Veejay must decide which frames to discard. Veejay will discard the frame furthest away from the current position.
+
+You can configure the cache with two commandline options:
+
+  -m / --memory [percentage of available RAM to use]
+  -j / --max_chain [maximum number of samples to cache]      
+
+The second option, '-j' is used to divide up the cache memory into a number of equal sized chunks. Veejay will cache by default up to 8 samples into your system's main memory, if you specified the -m option. 
