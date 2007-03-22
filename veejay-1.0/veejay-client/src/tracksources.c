@@ -58,17 +58,19 @@ static	void	cell_toggled_callback( GtkCellRenderer *cell, gchar *path_string, gp
 	gtk_tree_model_get( model, &iter,0, &data, -1 );
 
 	int id_data = -1; // invalid
-	char junk[10];
-	sscanf( data, "%s %d", junk,&id_data );
-	if( gtk_cell_renderer_toggle_get_active( cell ) )
+	char junk[32];
+	if(sscanf( data, "%s %d", junk,&id_data ) == 2 )
 	{
-	     veejay_release_track( v->track_id, id_data);
+		if( gtk_cell_renderer_toggle_get_active( cell ) )
+		{
+		     veejay_release_track( v->track_id, id_data);
+		}
+		else
+		{
+		     veejay_bind_track( v->track_id, id_data );
+		}
+		g_free(data);
 	}
-	else
-	{
-	     veejay_bind_track( v->track_id, id_data );
-	}
-	g_free(data);
 	gtk_tree_path_free( path );
 }
 
@@ -83,27 +85,8 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 
 	gtk_list_store_clear( GTK_LIST_STORE( model ) );
 
-	if(!widget)
-	{
-		return;
-	}
 	gboolean valid;
 	int i;
-
-	int tmp[16];
-
-//	int *tmp = sequence_get_track_status( user_data );
-
-/*	int index = 0;
-	valid = gtk_tree_model_get_iter_first( GTK_TREE_MODEL( store ), &iter );
-	while(valid)
-	{
-		gtk_list_store_set( store, &iter, 1, tmp[index], -1 );
-		index ++;
-		valid = gtk_tree_model_iter_next( GTK_TREE_MODEL(store), &iter );
-
-	}*/
-
 	int id = multitrack_get_sequence_view_id( user_data ); 
 	for( i = 0; i < n_tracks; i ++ )
 	{
@@ -111,18 +94,19 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 		{
 			char name[12];
 			sprintf(name,"Track %d", i);
+			gchar *uname = _utf8str( name );
 			gtk_list_store_append( store, &iter );
 			gtk_list_store_set(
 				store, &iter,
-				0, name,
-				1, tmp[i],
+				0, uname,
+				1, 0,
 				-1 );
+			g_free( uname );
 		}
 	}
 		
 	
 	gtk_tree_view_set_model( GTK_TREE_VIEW( widget ), model );	
-//	g_object_unref( model );
 
 }
 
@@ -184,11 +168,13 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data)
 		{
 			char str[16];
 			sprintf(str,"Track %d",i);
+			gchar *ustr = _utf8str( str );
 			gtk_list_store_append( store, &iter );
 			gtk_list_store_set( store, &iter,
-				0,  str,
+				0,  ustr,
 				1,  0,
 				-1);
+			g_free(ustr);
 		}
 	}		
 

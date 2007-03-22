@@ -172,6 +172,12 @@ void	multitrack_sync_start(void *data)
 	gvr_queue_vims( mt->preview,-1,VIMS_VIDEO_PLAY_FORWARD );
 }
 
+void	multitrack_sync_simple_cmd( void *data, int vims, int arg )
+{
+	multitracker_t *mt = (multitracker_t*)data;
+	gvr_queue_mvims(mt->preview,-1, vims, arg);
+}
+
 static	void	seq_gotostart(GtkWidget *w, gpointer data )
 {
 	sequence_view_t *v = (sequence_view_t*) data;
@@ -517,7 +523,12 @@ static void sequence_preview_cb(GtkWidget *widget, gpointer user_data)
 {
 	sequence_view_t *v = (sequence_view_t*) user_data;
 	multitracker_t *mt = v->backlink;
-	int status = (gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) == TRUE ? 1 : 0 );
+	int status = 0;
+
+	if(v->num != mt->master_track )
+	 status = (gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) == TRUE ? 1 : 0 );
+	else
+	 status = is_button_toggled( "previewtoggle" );
 
 	if(v->status_lock)
 		return;

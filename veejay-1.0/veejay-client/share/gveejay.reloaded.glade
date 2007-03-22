@@ -4693,7 +4693,7 @@ MLZO</property>
 	      <property name="spacing">0</property>
 
 	      <child>
-		<widget class="GtkNotebook" id="notebook11">
+		<widget class="GtkNotebook" id="vjdeck">
 		  <property name="visible">True</property>
 		  <property name="can_focus">True</property>
 		  <property name="show_tabs">True</property>
@@ -9937,7 +9937,6 @@ MLZO</property>
 
 				  <child>
 				    <widget class="GtkHBox" id="hbox825">
-				      <property name="visible">True</property>
 				      <property name="homogeneous">False</property>
 				      <property name="spacing">0</property>
 

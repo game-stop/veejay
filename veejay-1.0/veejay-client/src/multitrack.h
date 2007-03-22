@@ -39,5 +39,7 @@ void               multitrack_toggle_preview( void *data, int track_id, int stat
 void               multitrack_set_quality( void *data , int quality );
 
 
+void	multitrack_sync_simple_cmd( void *data, int vims, int arg );
+
 #endif
 

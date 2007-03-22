@@ -546,7 +546,7 @@ static	void	gvr_single_queue_vims( veejay_track_t *v, int vims_id )
 	}
 }
 
-static	void	gvr_multi_queue_vims( veejay_track_t *v, int vims_id, int val )
+static void	gvr_multi_queue_vims( veejay_track_t *v, int vims_id, int val )
 {
 	char message[10];
 

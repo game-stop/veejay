@@ -237,7 +237,7 @@ else
 fi
 AC_MSG_CHECKING(whether to compile in assertion checking)
 if test "x$enable_strict" = "xyes" ; then
- debugCFLAGS="$debugCFLAGS -DSTRICT_CHECKING"
+ debugCFLAGS="$debugCFLAGS -g -DSTRICT_CHECKING"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
@@ -639,7 +639,7 @@ else
 	AC_MSG_ERROR([GtkCairo not found: get it at http://www.cairographics.org/GtkCairo])
 fi
 
-gveejay_datadir="${datadir}/veejay"
+gveejay_datadir="${datadir}/gveejay"
 AC_SUBST(gveejay_datadir)
 sh gveejay-paths.sh > gveejay-paths.h
 

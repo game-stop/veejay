@@ -58,7 +58,6 @@ char*        gvr_track_get_hostname( void *preview , int num );
 
 int          gvr_track_get_portnum( void *preview, int num);
 
-
 sync_info	*gvr_sync( void *preview );
 
 #endif
