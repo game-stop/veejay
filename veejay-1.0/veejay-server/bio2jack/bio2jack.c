@@ -169,9 +169,10 @@ typedef struct jack_driver_s
 
   jack_ringbuffer_t *pPlayPtr;  /* the playback ringbuffer */
   jack_ringbuffer_t *pRecPtr;   /* the recording ringbuffer */
-
-//  SRC_STATE *output_src;        /* SRC object for the output stream */
-//  SRC_STATE *input_src;         /* SRC object for the output stream */
+/*
+  SRC_STATE *output_src;        
+  SRC_STATE *input_src;    
+*/
 
   enum status_enum state;       /* one of PLAYING, PAUSED, STOPPED, CLOSED, RESET etc */
 
@@ -694,7 +695,10 @@ JACK_callback(nframes_t nframes, void *arg)
                                       drv->num_output_channels);
               }
           }
-
+	}
+#endif
+	if( !(drv->output_sample_rate_ratio != 1.0))
+	{
           /* demux the stream: we skip over the number of samples we have output channels as the channel data */
           /* is encoded like chan1,chan2,chan3,chan1,chan2,chan3... */
           for(i = 0; i < drv->num_output_channels; i++)
@@ -703,8 +707,8 @@ JACK_callback(nframes_t nframes, void *arg)
                     (sample_t *) drv->callback_buffer2 + i,
                     (nframes - jackFramesAvailable), drv->num_output_channels);
           }
+
       }
-#endif
     }
 
     /* handle record data, if any */
