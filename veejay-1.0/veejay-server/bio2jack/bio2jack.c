@@ -31,8 +31,9 @@
 #include <jack/ringbuffer.h>
 #include <pthread.h>
 #include <sys/time.h>
+#ifdef HAVE_SAMPLERATE
 #include <samplerate.h>
-
+#endif
 #include "bio2jack.h"
 
 /* enable/disable TRACING through the JACK_Callback() function */
@@ -169,8 +170,8 @@ typedef struct jack_driver_s
   jack_ringbuffer_t *pPlayPtr;  /* the playback ringbuffer */
   jack_ringbuffer_t *pRecPtr;   /* the recording ringbuffer */
 
-  SRC_STATE *output_src;        /* SRC object for the output stream */
-  SRC_STATE *input_src;         /* SRC object for the output stream */
+//  SRC_STATE *output_src;        /* SRC object for the output stream */
+//  SRC_STATE *input_src;         /* SRC object for the output stream */
 
   enum status_enum state;       /* one of PLAYING, PAUSED, STOPPED, CLOSED, RESET etc */
 
@@ -673,6 +674,7 @@ JACK_callback(nframes_t nframes, void *arg)
 
       /* if we aren't converting or we are converting and src_error == 0 then we should */
       /* apply volume and demux */
+#ifdef HAVE_SAMPLERATE
       if(!(drv->output_src && drv->output_sample_rate_ratio != 1.0) || (src_error == 0))
       {
           /* apply volume */
@@ -702,6 +704,7 @@ JACK_callback(nframes_t nframes, void *arg)
                     (nframes - jackFramesAvailable), drv->num_output_channels);
           }
       }
+#endif
     }
 
     /* handle record data, if any */
