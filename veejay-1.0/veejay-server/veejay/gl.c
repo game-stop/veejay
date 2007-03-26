@@ -30,6 +30,7 @@
 #include <config.h>
 #ifdef USE_GL
 #include <stdio.h>
+#include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <X11/Xlib.h>
@@ -38,7 +39,9 @@
 #include <GL/glx.h>
 #include <GL/glext.h>
 #include <X11/Xatom.h>
+#include <libvje/vje.h>
 #include <veejay/x11misc.h>
+#include <libvjmem/vjmem.h>
 #include <ffmpeg/avcodec.h>
 #include <libyuv/yuvconv.h>
 #include <veejay/libveejay.h>
