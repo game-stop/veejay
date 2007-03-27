@@ -114,6 +114,7 @@ typedef struct
 	int   current;
 	int   size;
 	int	*samples;
+	int	rec_id;
 } sequencer_t;
 
 

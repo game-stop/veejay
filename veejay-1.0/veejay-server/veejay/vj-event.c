@@ -3781,6 +3781,7 @@ void vj_event_sample_load_list(void *ptr, const char format[], va_list ap)
 
 void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 {
+	char tmp[255];
 	veejay_t *v = (veejay_t *)ptr;
 	int args[2];
 	int result = 0;
@@ -3794,42 +3795,68 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-	char tmp[255];
 	veejay_memset(tmp,0,255);
 	veejay_memset(prefix,0,150);
-	sample_get_description(v->uc->sample_id, prefix );
+
+	if( !v->seq->active )
+	{
+		sample_get_description(v->uc->sample_id, prefix );
+	}
+	else
+	{
+		if( v->seq->rec_id )
+		{
+			veejay_msg(0, "Already recording the sequence!");
+			return;
+		}
+		else
+		{
+			v->seq->rec_id = v->uc->sample_id;
+			sprintf( prefix, "sequence_");
+		}
+	}
 
 	if(!veejay_create_temp_file(prefix, tmp))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create temporary file, Record aborted." );
+		if(v->seq->rec_id && v->seq->active)
+			v->seq->rec_id = 0;
 		return;
 	}
 
+
 	if( args[0] == 0 )
 	{
-		int n = sample_get_speed(v->uc->sample_id);
-		if( n == 0) 
+		if(!v->seq->active )
 		{
-			veejay_msg(VEEJAY_MSG_WARNING, "Sample was paused, forcing normal speed");
-			n = 1;
+			args[0] = sample_get_longest(v->uc->sample_id);
 		}
 		else
 		{
-			if (n < 0 ) n = n * -1;
+			int i;
+			for( i = 0; i < MAX_SEQUENCES; i ++ )
+			{
+				args[0] += sample_get_longest( v->seq->samples[i] );
+			}
 		}
-		args[0] = sample_get_longest(v->uc->sample_id);
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tRecording %d frames", args[0]);
 	}
 
 	int format_ = _recorder_format;
 	if(format_==-1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Select a video codec first");
+		if(v->seq->active && v->seq->rec_id )
+			v->seq->rec_id = 0;
 		return; 
 	}
 
 	if(args[0] <= 1 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing to record less then 2 frames");
+		if(v->seq->active && v->seq->rec_id )
+			v->seq->rec_id = 0;
+
 		return;
 	}
 
@@ -3852,16 +3879,31 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_ERROR,"Unable to start sample recorder");
 	}   
 
-//	veejay_set_sample(v,v->uc->sample_id);
-
-	veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
-
 	if(result == 1)
 	{
 		v->settings->sample_record = 1;
 		v->settings->sample_record_switch = args[1];
 	}
 
+	if( v->seq->active )
+	{
+		int i;
+		int start_at = 0;
+		for( i = 0; i < MAX_SEQUENCES; i ++ )
+		{
+			start_at = v->seq->samples[i];
+			if(sample_exists(start_at))
+				break;	
+		}
+		if( start_at == v->uc->sample_id )
+			veejay_set_frame(v,sample_get_startFrame(v->uc->sample_id));
+		else
+			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE, start_at );	
+	}
+	else
+	{
+		veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
+	}
 }
 
 void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap) 
@@ -3871,41 +3913,46 @@ void vj_event_sample_rec_stop(void *ptr, const char format[], va_list ap)
 	if( SAMPLE_PLAYING(v)) 
 	{
 		video_playback_setup *s = v->settings;
-		if( sample_stop_encoder( v->uc->sample_id ) == 1 ) 
+		int stop_sample = v->uc->sample_id;
+
+		if(v->seq->active && v->seq->rec_id )
+			stop_sample = v->seq->rec_id;
+
+		if( sample_stop_encoder( stop_sample ) == 1 ) 
 		{
 			char avi_file[255];
 			v->settings->sample_record = 0;
-			if( sample_get_encoded_file(v->uc->sample_id, avi_file) <= 0 )
+			if( sample_get_encoded_file( stop_sample, avi_file) <= 0 )
 			{
-			 	veejay_msg(VEEJAY_MSG_ERROR, "Unable to append file '%s' to sample %d", avi_file, v->uc->sample_id);
-				return;
+			 	veejay_msg(VEEJAY_MSG_ERROR, "Unable to append file '%s' to sample %d", avi_file, stop_sample);
 			}
-			// add to new sample
-			int ns = veejay_edit_addmovie_sample(v,avi_file,0 );
-			if(ns > 0)
-				veejay_msg(VEEJAY_MSG_INFO, "Loaded file '%s' to new sample %d",avi_file, ns);
-			if(ns <= 0 )
-				veejay_msg(VEEJAY_MSG_ERROR, "Unable to append file %s to EditList!",avi_file);
-
-			sample_reset_encoder( v->uc->sample_id);
-			s->sample_record = 0;	
-			s->sample_record_id = 0;
-			if(s->sample_record_switch) 
+			else
 			{
-				s->sample_record_switch = 0;
-				if( ns > 0 )
+				// add to new sample
+				int ns = veejay_edit_addmovie_sample(v,avi_file,0 );
+				if(ns > 0)
+					veejay_msg(VEEJAY_MSG_INFO, "Loaded file '%s' to new sample %d",avi_file, ns);
+				if(ns <= 0 )
+					veejay_msg(VEEJAY_MSG_ERROR, "Unable to append file %s to EditList!",avi_file);
+			
+		
+				sample_reset_encoder( stop_sample );
+				s->sample_record = 0;	
+				s->sample_record_id = 0;
+				if(v->seq->active && v->seq->rec_id )
+					v->seq->rec_id = 0;
+				if(s->sample_record_switch) 
 				{
-				//	veejay_set_sample( v, ns );
-	veejay_change_playback_mode( v,VJ_PLAYBACK_MODE_SAMPLE, ns );
+					s->sample_record_switch = 0;
+					if( ns > 0 )
+						veejay_change_playback_mode( v,VJ_PLAYBACK_MODE_SAMPLE, ns );
 				}
-	
 			}
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Sample recorder was never started for sample %d",v->uc->sample_id);
+			veejay_msg(VEEJAY_MSG_ERROR, "Sample recorder was never started for sample %d",stop_sample);
 		}
-		
 	}
 	else 
 	{

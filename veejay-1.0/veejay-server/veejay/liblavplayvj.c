@@ -1160,7 +1160,7 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 			RANDMODE_SAMPLE)
 			pm = VJ_PLAYBACK_MODE_PATTERN;
 		if( sample_chain_sprint_status
-			(info->uc->sample_id,cache_used,info->seq->active,info->seq->current,info->real_fps,settings->current_frame_num, pm, total_slots,info->status_what ) != 0)
+			(info->uc->sample_id,cache_used,info->seq->active,info->seq->current,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,info->status_what ) != 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Fatal error, tried to collect properties of invalid sample");
 #ifdef STRICT_CHECKING
