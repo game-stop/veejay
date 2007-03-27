@@ -1851,7 +1851,7 @@ void		veejay_quit( )
 	clear_progress_bar( "connecting",0.0 );
 	clear_progress_bar( "samplerecord_progress",0.0 );
 	clear_progress_bar( "streamrecord_progress",0.0 );
-
+	clear_progress_bar( "seq_rec_progress",0.0);
 	exit(0);
 }
 
@@ -5378,9 +5378,18 @@ static	gboolean	update_sample_record_timeout(gpointer data)
 {
 	if( info->uc.playmode == MODE_SAMPLE )
 	{
-		GtkWidget *w = glade_xml_get_widget_( info->main_window, 
-			"samplerecord_progress" );
-	
+		GtkWidget *w;
+		if( is_button_toggled("seqactive" ) )
+		{
+			w = glade_xml_get_widget_( info->main_window, 
+				"rec_seq_progress" );
+		}
+		else
+		{
+			w = glade_xml_get_widget_( info->main_window, 
+				"samplerecord_progress" );
+
+		}	
 		gdouble	tf = info->status_tokens[STREAM_DURATION];
 		gdouble cf = info->status_tokens[STREAM_RECORDED];
 

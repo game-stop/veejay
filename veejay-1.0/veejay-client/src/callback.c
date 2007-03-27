@@ -853,6 +853,32 @@ g_return_val_if_fail( GTK_IS_LIST_STORE(_model),NULL);
 #define gtk_combo_box_get_active_text( combo ) my_gtk_combo_box_get_active_text(combo)
 #endif
 
+void	on_seq_rec_stop_clicked( GtkWidget *w, gpointer data )
+{
+	single_vims( VIMS_SAMPLE_REC_STOP );
+}
+
+void	on_rec_seq_start_clicked( GtkWidget *w, gpointer data )
+{
+	GtkComboBox *combo = GTK_COMBO_BOX( GTK_WIDGET(glade_xml_get_widget(info->main_window,"combo_samplecodec")));
+	gchar *gformat = (gchar*)gtk_combo_box_get_active_text(combo) ;
+	gchar *format = gformat;
+	if(format != NULL && strlen(format) > 2)
+	{
+		multi_vims( VIMS_RECORD_DATAFORMAT,"%s",
+			format );
+	}	
+	else
+	{
+		format = NULL;
+	}	
+
+	multi_vims( VIMS_SAMPLE_REC_START,
+		"%d %d",
+		0,
+		0 );
+}
+
 void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 {
 
