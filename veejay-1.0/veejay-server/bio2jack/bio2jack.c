@@ -642,7 +642,6 @@ JACK_callback(nframes_t nframes, void *arg)
       }
       else                      /* no resampling needed or requested */
       {
-#endif
         /* read as much data from the buffer as is available */
         if(jackFramesAvailable && inputBytesAvailable > 0)
         {
@@ -654,8 +653,20 @@ JACK_callback(nframes_t nframes, void *arg)
           read = numFramesToWrite * drv->bytes_per_output_frame;
           jackFramesAvailable -= numFramesToWrite;      /* take away what was written */
         }
-#ifdef HAVE_SAMPLERATE
       }
+#else
+        /* read as much data from the buffer as is available */
+        if(jackFramesAvailable && inputBytesAvailable > 0)
+        {
+          /* write as many bytes as we have space remaining, or as much as we have data to write */
+          numFramesToWrite = min(jackFramesAvailable, inputFramesAvailable);
+          jack_ringbuffer_read(drv->pPlayPtr, drv->callback_buffer2,
+                               jackBytesAvailable);
+          /* add on what we wrote */
+          read = numFramesToWrite * drv->bytes_per_output_frame;
+          jackFramesAvailable -= numFramesToWrite;      /* take away what was written */
+        }
+ 
 #endif
       drv->written_client_bytes += read;
       drv->played_client_bytes += drv->clientBytesInJack;       /* move forward by the previous bytes we wrote since those must have finished by now */
