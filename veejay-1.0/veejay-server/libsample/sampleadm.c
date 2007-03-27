@@ -513,9 +513,6 @@ int sample_get_longest(int sample_id)
 		veejay_msg(VEEJAY_MSG_WARNING, "Length of sample in video frames: %ld",duration);
 		return duration;
 	}
-#ifdef STRICT_CHECKING
-	assert(0);
-#endif
 	return 0;
 }
 
@@ -2122,17 +2119,33 @@ int sample_apply_loop_dec(int s1, double fps) {
 /* print sample status information into an allocated string str*/
 //int sample_chain_sprint_status(int s1, int entry, int changed, int r_changed,char *str,
 //			       int frame)
-int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int frame, int mode,int total_slots, char *str )
+int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int frame, int mode,int total_slots, int seq_rec,char *str )
 {
-    sample_info *sample;
-    sample = sample_get(s1);
-    if (!sample)
-    {
+	sample_info *sample;
+	sample = sample_get(s1);
+
+    	if (!sample)
+    	{
 #ifdef STRICT_CHECKING
-	veejay_msg(0, "Fatal : sample %d is invalid, cannot produce a valid status line", s1 );
+		veejay_msg(0, "Fatal : sample %d is invalid, cannot produce a valid status line", s1 );
 #endif
-	return -1;
-    }
+		return -1;
+	}
+	int e_a, e_d, e_s;
+	if( sa && seq_rec)
+	{
+		sample_info *rs = sample_get( seq_rec );
+		e_a = rs->encoder_active;
+		e_d = rs->encoder_duration;
+		e_s = rs->encoder_succes_frames;
+	}
+	else
+	{
+		e_a = sample->encoder_active;
+		e_d = sample->encoder_duration;
+		e_s = sample->encoder_succes_frames;
+	}
+
 	veejay_sprintf(str,1024,
 		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		pfps,
@@ -2144,9 +2157,9 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 		sample->last_frame,
 		sample->speed,
 		sample->looptype,
-		sample->encoder_active,
-		sample->encoder_duration,
-		sample->encoder_succes_frames,
+		e_a,
+		e_d,
+		e_s,
 		sample_size(),
 		sample->marker_start,
 		sample->marker_end,
