@@ -554,6 +554,7 @@ static	gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer user
 		if(!te->bind)
 		{
 			gdouble val = (1.0 / width) * ev->x;
+			if( val < 0.0 ) val = 0.0; else if (val > 1.0 ) val = 1.0;
 			timeline_set_in_point( widget, val );  
 		}
 	}
@@ -566,6 +567,7 @@ static	gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer user
 		if(!te->bind)
 		{
 			gdouble val = (1.0/width) * ev->x;
+			if( val < 0.0 ) val = 0.0; else if (val > 1.0) val = 1.0;
 			timeline_set_out_point( widget, val );
 		}
 	}
@@ -619,7 +621,7 @@ event_motion (GtkWidget *widget, GdkEventMotion *ev, gpointer user_data)
 		if(!te->bind)
 		{
 			gdouble gx = (1.0 / width) * x;
-
+			if( gx  < 0.0 ) gx = 0.0; else if ( gx > 1.0 ) gx = 1.0;
 			if(te->grab_button == 1  && ev->state & GDK_BUTTON1_MASK)
 				timeline_set_in_point(widget, gx );
 			else if(te->grab_button == 3 && ev->state & GDK_BUTTON3_MASK)
