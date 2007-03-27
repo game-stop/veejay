@@ -254,13 +254,7 @@ typedef struct
 	gint event_id;
 } vims_keys_t;
 
-// Have room for only 2 * 120 samples
-//#define NUM_BANKS 20   
-//#define NUM_PAGES 10
-//#define NUM_SAMPLES_PER_PAGE 12
-//#define NUM_SAMPLES_PER_COL 2
-//#define NUM_SAMPLES_PER_ROW 6
-
+static  int	user_preview = 0;
 static	int	NUM_BANKS =	30;
 static	int	NUM_PAGES =	16;
 static 	int	NUM_SAMPLES_PER_PAGE = 12;
@@ -6773,6 +6767,11 @@ void	vj_gui_preview(void)
 	gtk_widget_set_size_request(info->quick_select, image_width, image_height );
 }
 
+void	gveejay_preview( int p )
+{
+	user_preview = p;
+}
+
 int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 {
 	if(!hostname && !group_name )
@@ -6951,6 +6950,11 @@ gboolean		is_alive( void )
 			veejay_stop_connecting(gui);
 			multrack_audoadd( info->mt, remote, port );
 			info->watch.p_state = 0; 
+			if( user_preview )
+			{
+				multitrack_set_quality( info->mt, user_preview );
+				set_toggle_button( "previewtoggle", 1 );
+			}
 		}
 	}
 

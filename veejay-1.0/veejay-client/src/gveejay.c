@@ -44,6 +44,7 @@ static int n_tracks = 3;
 static int launcher = 0;
 static int pw = 176;
 static int ph = 144;
+static int preview = 0; // off
 static struct
 {
 	char *file;
@@ -56,12 +57,13 @@ static void usage(char *progname)
 {
         printf( "Usage: %s <options>\n",progname);
         printf( "where options are:\n");
-        printf( "-h/--hostname\t\tVeejay host to connect to (defaults to localhost) \n");         
-        printf( "-p/--port\t\tVeejay port to connect to (defaults to 3490) \n");
-	printf( "-n/--no-theme\t\tDont load gveejay's GTK theme\n");
-	printf( "-v/--verbose\t\tBe extra verbose (usefull for debugging)\n");
-	printf( "-s/--size\t\tSet bank resolution (row X columns)\n");
-        printf( "-X/\t\tSet number of tracks\n");
+        printf( "-h\t\tVeejay host to connect to (defaults to localhost) \n");         
+        printf( "-p\t\tVeejay port to connect to (defaults to 3490) \n");
+	printf( "-n\t\tDont load gveejay's GTK theme\n");
+	printf( "-v\t\tBe extra verbose (usefull for debugging)\n");
+	printf( "-s\t\tSet bank resolution (row X columns)\n");
+	printf( "-P\t\tStart with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)\n");
+        printf( "-X\t\tSet number of tracks\n");
 	printf( "\n\n");
         exit(-1);
 }
@@ -103,6 +105,15 @@ static int      set_option( const char *name, char *value )
 			err++;
 		}
 	}
+	else if (strcmp(name, "P" ) == 0 || strcmp(name, "preview" ) == 0 )
+	{
+		preview = atoi(optarg);
+		if(preview <= 0 || preview > 4 )
+		{
+			fprintf(stderr, "--preview [0-4]\n");
+			err++;
+		}
+	}
         else
 	        err++;
         return err;
@@ -119,7 +130,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	sprintf(hostname, "127.0.0.1");
 
-        while( ( n = getopt( argc, argv, "s:h:p:nvHf:X:")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:p:nvHf:X:P:")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
@@ -163,7 +174,11 @@ int main(int argc, char *argv[]) {
 	else
 	  veejay_msg(VEEJAY_MSG_INFO, "GVeejayReloaded running with low priority");	
 
-
+	if( preview )
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Starting with preview enabled");
+		gveejay_preview(preview);
+	}
 
 	while(gveejay_running())
 	{
