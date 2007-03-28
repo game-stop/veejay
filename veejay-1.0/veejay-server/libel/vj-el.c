@@ -643,6 +643,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	    /* Debug Output */
 	if(n == 0 )
 	{
+	    veejay_msg(VEEJAY_MSG_INFO,"First video file determines video settings! Using %s", filename);
 	    veejay_msg(VEEJAY_MSG_DEBUG,"\tFull name:       %s", filename, realname);
 	    veejay_msg(VEEJAY_MSG_DEBUG,"\tFrames:          %ld", lav_video_frames(el->lav_fd[n]));
 	    veejay_msg(VEEJAY_MSG_DEBUG,"\tWidth:           %d", lav_video_width(el->lav_fd[n]));
@@ -789,23 +790,28 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	   for live performances */
 	if (fabs(el->video_fps - lav_frame_rate(el->lav_fd[n])) >
 	    0.0000001) {
-	    veejay_msg(VEEJAY_MSG_WARNING,"(Ignoring) File %s: fps is %3.2f should be %3.2f", filename,
+	    veejay_msg(VEEJAY_MSG_WARNING,"(Ignoring) File %s: fps is %3.2f , but playing at %3.2f", filename,
 		       lav_frame_rate(el->lav_fd[n]), el->video_fps);
 	}
 	/* If first file has no audio, we don't care about audio */
 
 	if (el->has_audio) {
+	    if( el->audio_rate < 44000 )
+	    {
+		veejay_msg(VEEJAY_MSG_ERROR, "File %s: Cannot play %d Hz audio. Use at least 44100 Hz or start with -a0", filename, el->audio_rate);
+		nerr++;
+	    }
+            else {
 	    if (el->audio_chans != lav_audio_channels(el->lav_fd[n]) ||
 		el->audio_bits != lav_audio_bits(el->lav_fd[n]) ||
 		el->audio_rate != lav_audio_rate(el->lav_fd[n])) {
-		veejay_msg(VEEJAY_MSG_WARNING,"File %s: Audio is %d chans %d bit %ld Hz,"
-			   " should be %d chans %d bit %ld Hz",
+		veejay_msg(VEEJAY_MSG_WARNING,"File %s: Mismatched audio properties: %d channels , %d bit %ld Hz",
 			   filename, lav_audio_channels(el->lav_fd[n]),
 			   lav_audio_bits(el->lav_fd[n]),
-			   lav_audio_rate(el->lav_fd[n]), el->audio_chans,
-			   el->audio_bits, el->audio_rate);
+			   lav_audio_rate(el->lav_fd[n]) );
 		nerr++;
 	    }
+            }
 	}
 
 
@@ -1582,21 +1588,18 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 					{
 						if (el->video_norm == 'p')
 						{	
-							veejay_msg(VEEJAY_MSG_ERROR, "Norm already set to PAL");
-							vj_el_free(el);
-							return NULL;
+							veejay_msg(VEEJAY_MSG_WARNING, "Norm already set to PAL, ignoring new norm 'NTSC'");
 						}
-						el->video_norm = 'n';
+						else el->video_norm = 'n';
 					}
 		    		else
 				{
 					if (el->video_norm == 'n')
 					{
-			    		veejay_msg(VEEJAY_MSG_ERROR,"Norm allready set to NTSC");
-						vj_el_free(el);
-						return NULL;
+					    	veejay_msg(VEEJAY_MSG_WARNING,"Norm allready set to NTSC, ignoring new norm PAL");
 					}
-					el->video_norm = 'p';
+					else
+						el->video_norm = 'p';
 			    	}
 		   	 	/* read third line: Number of files */
 		    		fgets(line, 1024, fd);
