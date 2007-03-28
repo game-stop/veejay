@@ -31,6 +31,7 @@
 #include <sys/types.h>
 #include <sys/wait.h>
 #include <unistd.h>
+#include <dirent.h>
 #include <stdarg.h>
 #include <glib.h>
 #include <errno.h>
@@ -1850,6 +1851,12 @@ void		veejay_quit( )
 }
 
 static	int	running_g_ = 1;
+static  int	restart_   = 0;
+
+int		gveejay_restart()
+{
+	return restart_;
+}
 
 gboolean	gveejay_running()
 {
@@ -5465,16 +5472,168 @@ static	void	init_cpumeter()
 //			(gpointer*) info );
 }
 
+static char theme_path[1024];
+static char glade_path[1024];
+static char theme_file[1024];
+static char theme_dir[1024];
+static int  use_default_theme_ = 0;
+static char **theme_list = NULL;
+GtkSettings *theme_settings = NULL;
+static int	select_f(const struct dirent *d )
+{
+	if ((strcmp(d->d_name, ".") == 0) ||
+		(strcmp(d->d_name, "..") == 0))
+		 return 0;
+	return 1;
+}
+
+static void set_default_theme()
+{
+	sprintf( theme_path, "%s", GVEEJAY_DATADIR);
+	sprintf( theme_file, "%s/gveejay.rc", GVEEJAY_DATADIR );
+	use_default_theme_ = 1;
+}
+
+void	find_user_themes()
+{
+	char *home = getenv("HOME");
+	char data[1024];
+	char location[1024];
+	char path[1024];
+	veejay_memset( theme_path, 0, sizeof(theme_path));
+	veejay_memset( theme_file, 0, sizeof(theme_file));
+
+	theme_settings = gtk_settings_get_default();
+	snprintf( glade_path, sizeof(glade_path), "%s/gveejay.reloaded.glade",GVEEJAY_DATADIR);
+
+
+	if(!home)
+	{
+		set_default_theme();
+		return;
+	}
+
+	snprintf( path, sizeof(path),"%s/.veejay/theme/theme.config", home );
+
+	int sloppy = open( path,O_RDONLY );
+	if( sloppy < 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Theme config '%s' not found", path );
+		set_default_theme();
+		return;
+	}
+
+	veejay_memset(data,0,sizeof(data));
+	veejay_memset(location,0,sizeof(location));
+	char *dst = location;
+
+	if( read( sloppy, data, sizeof(data) ) > 0 )
+	{
+		int str_len = strlen( data );
+		int i;
+		for( i = 0; i < str_len ; i ++ )
+		{
+			if( data[i] == '\0' || data[i] == '\n' ) break;
+			*dst = data[i];
+			*dst++;
+		}
+	}
+	close( sloppy );
+
+	if( strcmp( location, "Default" ) == 0 )	
+	{
+		set_default_theme();
+	}
+	else
+	{
+		snprintf(theme_path, sizeof(theme_path), "%s/.veejay/theme/%s", home, location );
+		snprintf(theme_file, sizeof(theme_file), "%s/gveejay.rc", theme_path );
+		use_default_theme_ = 0;
+		veejay_msg(VEEJAY_MSG_INFO, "\tRC-style '%s'", theme_file );
+		veejay_msg(VEEJAY_MSG_INFO, "\tTheme location: '%s'", theme_path);
+	}
+
+	struct dirent **files = NULL;
+	struct stat sbuf;
+	snprintf(theme_dir,sizeof(theme_dir), "%s/.veejay/theme/", home );
+
+	veejay_memset( &sbuf,0,sizeof(struct stat));
+
+	int n_files = scandir( theme_dir, &files, select_f, alphasort );
+	if( n_files <= 0 )
+	{
+		veejay_msg(0, "No themes in %s", theme_dir );
+		return;
+	}
+
+	GtkWidget *menu = NULL;
+
+	theme_list = (char**) vj_calloc(sizeof(char*) * (n_files+2) );
+	int i,k=0;
+	for( i = 0; i < n_files; i ++ )
+	{
+		char *name = files[i]->d_name;
+		if( name && strcmp(name, "Default" ) != 0)
+		{
+			snprintf(location, sizeof(location), "%s/%s", theme_dir, name );
+			veejay_memset( &sbuf,0, sizeof(struct stat ));
+			if( lstat( location, &sbuf ) == 0 )
+			{
+				if( S_ISLNK( sbuf.st_mode ))
+				{
+					veejay_memset( &sbuf,0,sizeof(struct stat));
+					stat(location, &sbuf);
+				}
+				if( S_ISDIR( sbuf.st_mode  ))
+				{
+					//@ test for gveejay.rc
+					struct stat inf;
+					gchar *test_file = g_strdup_printf( "%s/%s/gveejay.rc",theme_dir,name );
+					if( stat( test_file, &inf) == 0 && (S_ISREG(inf.st_mode) || S_ISLNK( inf.st_mode)))
+					{ 
+						theme_list[k] = strdup( name );
+						k++;
+					}
+					else
+					{
+						veejay_msg(VEEJAY_MSG_WARNING, "%s/%s does not contain a gveejay.rc file", theme_dir,name);
+					}
+					g_free(test_file);
+				}
+			}
+			else
+				veejay_msg(0, "Failed to stat %s", location );
+		}
+	}
+
+	if( k == 0 )
+	{
+		free(theme_list);
+		theme_list = NULL;
+		return;
+	}
+
+	theme_list[ k ] = strdup("Default");
+	for( k = 0; theme_list[k] != NULL ; k ++ )
+		veejay_msg(VEEJAY_MSG_INFO, "Theme #%d = %s", k, theme_list[k]);
+
+}
+
+char	*get_glade_path()
+{
+	return glade_path;
+}
 
 void	get_gd(char *buf, char *suf, const char *filename)
 {
-
+	const char *dir = GVEEJAY_DATADIR;
+	
 	if(filename !=NULL && suf != NULL)
-		sprintf(buf, "%s/%s/%s", GVEEJAY_DATADIR,suf, filename );
+		sprintf(buf, "%s/%s/%s",dir,suf, filename );
 	if(filename !=NULL && suf==NULL)
-		sprintf(buf, "%s/%s", GVEEJAY_DATADIR, filename);
+		sprintf(buf, "%s/%s", dir, filename);
 	if(filename == NULL && suf != NULL)
-		sprintf(buf, "%s/%s/" , GVEEJAY_DATADIR, suf);
+		sprintf(buf, "%s/%s/" , dir, suf);
 }
 /*
 static	void		veejay_untick(gpointer data)
@@ -6294,13 +6453,19 @@ void	vj_gui_style_setup()
 
 void	vj_gui_theme_setup(int default_theme)
 {
-	char path[MAX_PATH_LEN];
-	bzero(path,MAX_PATH_LEN);
-	if(!default_theme)
-		get_gd(path,NULL, "gveejay-default.rc");
-	else
-		get_gd(path,NULL, "gveejay.rc");
-	gtk_rc_parse(path);
+	gtk_rc_parse(theme_file);
+}
+
+void
+send_refresh_signal(void)
+{
+        GdkEventClient event;
+        event.type = GDK_CLIENT_EVENT;
+        event.send_event = TRUE;
+        event.window = NULL;
+        event.message_type = gdk_atom_intern("_GTK_READ_RCFILES", FALSE);
+        event.data_format = 8;
+        gdk_event_send_clientmessage_toall((GdkEvent *)&event);
 }
 
 gint
@@ -6313,11 +6478,21 @@ gui_client_event_signal(GtkWidget *widget, GdkEventClient *event,
 
 	if(event->message_type == atom_rcfiles)
 	{
-		char path[MAX_PATH_LEN];
-		get_gd(path,NULL, "gveejay.rc");
+		gtk_rc_parse( theme_file );
 
-		gtk_rc_parse(path);
+                gtk_widget_reset_rc_styles( 
+			glade_xml_get_widget_(info->main_window, "gveejay_window") );
 
+		gtk_rc_reparse_all();
+
+		veejay_msg(VEEJAY_MSG_WARNING,
+			"Loaded GTK theme %s (catched _GTK_READ_RCFILES)", theme_file );
+		veejay_msg(VEEJAY_MSG_INFO,
+			"If the new theme is using an engine that modifies the internal structure");
+		veejay_msg(VEEJAY_MSG_INFO,
+			"of the widgets, there is no way for me to undo those changes and display");
+		veejay_msg(VEEJAY_MSG_INFO,
+			"%s correctly", theme_file );
 		return TRUE;
 	}
 	return FALSE;
@@ -6497,6 +6672,33 @@ int	vj_gui_yield()
 	return 0;
 }
 
+static	void	theme_response( gchar *string )
+{
+	char theme_config[1024];
+	snprintf(theme_config,sizeof(theme_config), "%stheme.config", theme_dir );
+	snprintf(theme_file,sizeof(theme_file), "%s/%s/gveejay.rc", theme_dir, string );
+	int fd = open( theme_config , O_WRONLY | O_CREAT | O_TRUNC);
+	if(fd > 0)
+	{
+		write( fd, string, strlen(string));
+		close(fd);
+		vj_msg(VEEJAY_MSG_INFO, "Restart GveejayReloaded for changes to take effect");
+//this does not work if theme uses engines:		send_refresh_signal();
+//
+		if( prompt_dialog("Restart GveejayReloaded", "For changes to take effect, you should restart now" ) == GTK_RESPONSE_ACCEPT)
+		{
+			info->watch.w_state = STATE_DISCONNECT;
+			running_g_ = 0;
+			restart_   = 1;
+		}
+	}
+	else
+	{
+		vj_msg(VEEJAY_MSG_ERROR, "Unable to write to %s", theme_config );
+	}
+
+}
+
 void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 {
 	char path[MAX_PATH_LEN];
@@ -6525,10 +6727,8 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 
 	veejay_memset( vj_event_list, 0, sizeof(vj_event_list));
 
-	get_gd( path, NULL, glade_file);
-
 	gui->client = NULL;
-	gui->main_window = glade_xml_new(path,NULL,NULL);
+	gui->main_window = glade_xml_new(glade_path,NULL,NULL);
 	if(!gui->main_window)
 	{
 		free(gui);
@@ -6662,6 +6862,29 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 			ph,
 			img_wid);
 
+	if( theme_list )
+	{
+		GtkWidget *menu = gtk_menu_new();
+		for( i = 0; theme_list[i] != NULL ; i ++ )
+		{
+			GtkWidget *mi = gtk_menu_item_new_with_label( theme_list[i] );	
+			gtk_menu_shell_append( GTK_MENU_SHELL( menu ), mi );
+	
+			g_signal_connect_swapped( G_OBJECT(mi), "activate", G_CALLBACK(theme_response),
+						(gpointer) g_strdup( theme_list[i] ));
+
+			gtk_widget_show( mi );
+		}
+
+		GtkWidget *root_menu = gtk_menu_item_new_with_label( "Themes" );
+		gtk_menu_item_set_submenu( GTK_MENU_ITEM( root_menu ),  menu );
+
+		GtkWidget *menu_bar = glade_xml_get_widget_(info->main_window, "menubar1");
+		gtk_menu_shell_append( GTK_MENU_SHELL(menu_bar), root_menu);
+
+		gtk_widget_show( root_menu );
+
+	}
 	veejay_memset( &info->watch, 0, sizeof(watchdog_t));
 	info->watch.state = STATE_STOPPED; //
 	veejay_memset(&(info->watch.p_time),0,sizeof(struct timeval));

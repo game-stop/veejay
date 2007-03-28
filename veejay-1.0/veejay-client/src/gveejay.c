@@ -155,6 +155,8 @@ int main(int argc, char *argv[]) {
 	vj_mem_init();
 
 	vevo_strict_init();
+
+	find_user_themes();
 	
 	vj_gui_theme_setup(gveejay_theme);
 	vj_gui_set_debug_level( verbosity , n_tracks,pw,ph);
@@ -193,6 +195,12 @@ int main(int argc, char *argv[]) {
 		}
 	}
 	vj_gui_free();
+
+	if( gveejay_restart() )
+	{
+		if( execvp( argv[0], argv ) == -1 )
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to restart %s", argv[0]);
+	}
 
 	return 0;  
 }

@@ -47,5 +47,6 @@ void	gveejay_preview(int p);
 int     is_button_toggled(const char *name);	
 GdkPixbuf       *vj_gdk_pixbuf_scale_simple( const GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 gchar	*_utf8str( const char *c_str );
-
+void	find_user_themes();
+char *get_glade_path();
 #endif 
