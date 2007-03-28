@@ -265,8 +265,8 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 		char recover_samples[1024];
 		char recover_edl[1024];
 		pid_t my_pid = getpid();
-		snprintf(recover_samples,1024, "%s/recovery_samplelist_%d.sl", info->homedir, (int) my_pid);
-		snprintf(recover_edl, 1024, "%s/recovery_editlist_%d.edl", info->homedir, (int) my_pid);
+		snprintf(recover_samples,1024, "%s/recovery/recovery_samplelist_%d.sl", info->homedir, (int) my_pid);
+		snprintf(recover_edl, 1024, "%s/recovery/recovery_editlist_%d.edl", info->homedir, (int) my_pid);
 
 		int rs = sample_writeToFile( recover_samples,info->seq,info->font,
 				info->uc->sample_id, info->uc->playback_mode );
@@ -1253,8 +1253,18 @@ void	veejay_check_homedir(void *arg)
 		{
 			error = 1;	
 		}
+		else
+		{
+			snprintf(path,1024, "%s/.veejay/recovery", home );
+			mkdir(path,0777);
+			snprintf(path,1024, "%s/.veejay/theme", home );
+			mkdir(path,0777);
+		}
+		if(error)
 		switch(errno)
 		{
+			case 0:
+				break;
 			case EACCES:
 				veejay_msg( VEEJAY_MSG_ERROR, "\tPermission denied");break;
 			case EEXIST:
@@ -1269,6 +1279,7 @@ void	veejay_check_homedir(void *arg)
 		}
 	}
 
+	stat( path, &s );
 	if(!error)
 	{
 		if( !S_ISDIR( s.st_mode )) 

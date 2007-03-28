@@ -33,11 +33,11 @@ Veejay uses Jack , a low latency audio server, to transport (playback) audio in 
 .TP
 Veejay has a console- and a video window ; the console is used for displaying messages only. If the mouse is moved over to the video window, you can use the keyboard like a piano to play/manipulate the video.
 .TP
-You can start veejay with multiple files , video files and/or Mjpegtools' EditList files. Upon startup, veejay creates a new EditList in memory containing all the files you have loaded. As a result, all files will appear as a single large video file.Next you can start making selections (clips) of your EditList. These clips will be placed in so called 'clip banks' and they can be triggered for playback by pressing the F-keys (1 to 12). You can select a bank by pressing a number 1 to 9.
+You can start veejay with multiple files , video files and/or Mjpegtools' EditList files. Upon startup, veejay creates a new EditList in memory containing all the files you have loaded. As a result, all files will appear as a single large video file.Next you can start making selections (samples) of your EditList. These samples will be placed in so called 'sample banks' and they can be triggered for playback by pressing the F-keys (1 to 12). You can select a bank by pressing a number 1 to 9.
 .TP
-Note that if you change the EditList (for example , when deleting portions of your editlist) you should save your editlist as well as your cliplist.
+Note that if you change the EditList (for example , when deleting portions of your editlist) you should save your editlist as well as your samplelist.
 .TP
-You can select effects to put on your clips by pressing the cursor keys up and down, once you have found an effect you would like to use, press ENTER and it will be added to the current chain entry. The current chain entry can be changed with the PLUG and MINUS key on your numeric keyboard. Look at the KEYBINDS in this manual page to see what other possibilities you could have. 
+You can select effects to put on your samples by pressing the cursor keys up and down, once you have found an effect you would like to use, press ENTER and it will be added to the current chain entry. The current chain entry can be changed with the PLUG and MINUS key on your numeric keyboard. Look at the KEYBINDS in this manual page to see what other possibilities you could have. 
 .TP 
 .SH Interoperability
 .TP
@@ -90,7 +90,7 @@ The configuration file stores custom keybindings, custom bundles, available VIMS
 and commandline options.
 .TP
 .B \-b/--bezerk
-Bezerk mode, if enabled it allows you to change input channels on the fly (without restarting the clip)      
+Bezerk mode, if enabled it allows you to change input channels on the fly (without restarting the samples)      
 .TP
 .B \-g/--clip-as-sample
 Load every file on the commandline as a new sample
@@ -132,7 +132,7 @@ Specify norm of dummy video (0=PAL, 1=NTSC). defaults to PAL
 .B \-M/--multicast-osc <address>
 Starts OSC receiver in multicast mode
 .TP
-.B \-V/--multicast-vims <address>
+.B \-T/--multicast-vims <address>
 Setup additional multicast frame sender / command receiver.
 The frame sender transmits on port offset + 3, send commands to port offset + 4, 
 .TP
@@ -142,6 +142,40 @@ of frames to be cached in memory from file (only valid for rawDV and AVI)
 Use smaller values for better performance (mapping several hundreds of
 megabytes can become a problem)
 .TP
+.B \-V/--viewport
+Start with source viewport enabled. Use this if you have previously setup
+a viewport. Use CTRL+v to enable the viewport setup.
+.TP
+.B \-A/--all
+Start with all capture devices active as streams
+.TP
+.B \-D/--composite
+Start with projection enabled. Use this if you need to calibrate your
+projection (beamer). Use CTRL+p to enable the viewport setup.
+.TP
+.TP
+.SH Environment variables
+.TP
+.B VEEJAY_SET_CPU
+Tell veejay which CPU to use (and lock) for rendering. By default
+veejay will lock CPU #1 if running on a SMP machine. 
+Use "0" to disable this behaviour. Use 1 for CPU#1, etc. 
+.TP
+.SH Home directory
+.TP
+Veejay creates a new directory in your HOME , ".veejay".
+.TP
+.B .veejay/recovery
+If veejay stops unexpectedly, it will try to save your samplelist and editlist before aborting. 
+.TP
+.B .veejay/theme 
+Theme directory for GVeejayReloaded. 
+.TP
+.B .veejay/plugins.cfg
+If you want to load frei0r or freeframe plugins , set the paths
+to the .so files in the plugins.cfg file. Only support for single
+channel plugins.  
+.TP
 .SH EXAMPLES
 .TP
 .B veejay -u |less
@@ -149,7 +183,6 @@ Startup veejay and list all events (VIMS/OSC) and effect descriptions
 .TP
 .B veejay -p 4000 ~/my_video1.avi
 Startup veejay listening on port 4000 (use this to use multiple veejays)
-.TP
 .TP
 .B veejay -d -W 352 -H 288 -R 25 -N 0
 Startup veejay using dummy video at 25 frames per second, dimensions 352x288

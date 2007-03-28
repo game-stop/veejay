@@ -137,8 +137,7 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	int hw_on = 0;
 	if(hw_env)
 	{
-		char *val = strtok(hw_env, "=");
-		hw_on = val ? atoi(val): 0;	
+		hw_on = atoi(hw_env);	
 	}
 
 	int extra_flags = (ncpu > 1  ? SDL_ASYNCBLIT : 0 );
@@ -155,7 +154,6 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 		vjsdl->flags[0] = SDL_HWSURFACE | SDL_DOUBLEBUF | extra_flags;
 		vjsdl->flags[1] = SDL_HWSURFACE | SDL_FULLSCREEN | SDL_DOUBLEBUF | extra_flags;
 	}
-
 
 	if (vjsdl->custom_geo[0] != -1 && vjsdl->custom_geo[1]!=-1)
        	{
