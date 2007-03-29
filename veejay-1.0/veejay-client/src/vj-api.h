@@ -49,4 +49,5 @@ GdkPixbuf       *vj_gdk_pixbuf_scale_simple( const GdkPixbuf *src, int dw, int d
 gchar	*_utf8str( const char *c_str );
 void	find_user_themes();
 char *get_glade_path();
+char *get_gveejay_dir();
 #endif 

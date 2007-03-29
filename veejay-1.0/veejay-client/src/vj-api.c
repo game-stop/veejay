@@ -5624,6 +5624,11 @@ char	*get_glade_path()
 	return glade_path;
 }
 
+char	*get_gveejay_dir()
+{
+	return GVEEJAY_DATADIR;
+}
+
 void	get_gd(char *buf, char *suf, const char *filename)
 {
 	const char *dir = GVEEJAY_DATADIR;

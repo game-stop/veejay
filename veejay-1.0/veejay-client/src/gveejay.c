@@ -105,6 +105,11 @@ static int      set_option( const char *name, char *value )
 			err++;
 		}
 	}
+	else if (strcmp(name, "q") == 0 )
+	{
+		fprintf(stdout, "%s", get_gveejay_dir());
+		exit(0);
+	}
 	else if (strcmp(name, "P" ) == 0 || strcmp(name, "preview" ) == 0 )
 	{
 		preview = atoi(optarg);
@@ -130,7 +135,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	sprintf(hostname, "127.0.0.1");
 
-        while( ( n = getopt( argc, argv, "s:h:p:nvHf:X:P:")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:p:nvHf:X:P:q")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
