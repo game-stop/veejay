@@ -294,16 +294,22 @@ vj_server_send(v->vjs[0], v->uc->current_link, __buf, strlen(__buf));\
 veejay_msg(VEEJAY_MSG_INFO, "--------------------------------------------------------");\
 }
 
+#define SEND_DATA(v,buf,buflen)\
+{\
+  int res_ = vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, buf, buflen);\
+  if(res_ <= 0) { \
+	_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link); \
+	_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link); \
+	return;\
+	}\
+}
+
 #define SEND_MSG(v,str)\
 {\
 if(vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, str, strlen(str)) < 0) { \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link); \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link);} \
 }
-#define RAW_SEND_MSG(v,str,len)\
-{\
-vj_server_send(v->vjs[VEEJAY_PORT_CMD],v->uc->current_link, str, len );\
-}	
 
 /* some macros for commonly used checks */
 
@@ -7543,10 +7549,8 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 
 	char header[8];
 	sprintf( header, "%06d%1d", input_len, use_bw_preview_ );
-	int res = vj_server_send( v->vjs[0], v->uc->current_link, header, 7 );
-	if( res )
-		res = vj_server_send( v->vjs[0], v->uc->current_link, vj_perform_get_preview_buffer(), input_len );
-	
+	SEND_DATA(v, header, 7 );
+	SEND_DATA(v, vj_perform_get_preview_buffer(), input_len );
 }
 #endif
 
@@ -8655,8 +8659,8 @@ void	vj_event_get_keyframes( void *ptr, 	const char format[],	va_list ap	)
 		{	
 			char header[32];
 			sprintf(header, "%08d",data_len );
-			SEND_MSG( v, header);
-			vj_server_send( v->vjs[0], v->uc->current_link, data, data_len );
+			SEND_DATA( v, header,8);
+			SEND_DATA( v, data, data_len );
 			free(data);
 			return;
 		}
@@ -8668,8 +8672,8 @@ void	vj_event_get_keyframes( void *ptr, 	const char format[],	va_list ap	)
 		{	
 			char header[32];
 			sprintf(header, "%08d",data_len );
-			SEND_MSG( v, header);
-			vj_server_send( v->vjs[0], v->uc->current_link, data, data_len );
+			SEND_DATA( v, header,8);
+			SEND_DATA( v, data, data_len );
 			free(data);
 			return;
 		}
