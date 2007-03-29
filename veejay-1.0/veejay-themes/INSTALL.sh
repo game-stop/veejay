@@ -31,3 +31,12 @@ for rcfile in $srcdir/*.rc; do
 		echo "Installed $themename to $themedir"
 	fi
 done
+
+if test -f $lndir/theme.config ; then
+	content=`cat $lndir/theme.config`
+	echo "Current theme is $content"
+else
+	echo "Default" > $lndir/theme.config
+	echo "Using default theme"
+fi
+echo "You can now (re)start gveejayreloaded"
