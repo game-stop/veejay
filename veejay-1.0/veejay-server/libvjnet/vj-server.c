@@ -313,9 +313,8 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 				(char*)(inet_ntoa(vje->remote.sin_addr)),strerror(errno));
 			return -1;
 		}
-#ifdef STRICT_CHECKING
-		assert( len == total );
-#endif
+		if( total < len )
+			return -1;
 	}
 	else
 	{
