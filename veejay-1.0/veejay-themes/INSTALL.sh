@@ -17,6 +17,10 @@ fi
 
 themedir=$dstdir/theme
 
+# make sure dir exists
+mkdir -p $lndir 2>/dev/null
+
+# find all rc files in current dir
 for rcfile in $srcdir/*.rc; do
 	tmp=`basename $rcfile`
 	themename=`echo $tmp|cut -d '.' -f1`
