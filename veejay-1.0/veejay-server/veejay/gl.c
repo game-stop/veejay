@@ -913,6 +913,8 @@ static	int	x_display_init_gl( display_ctx *ctx, int w, int h )
 	}
 	
 	ctx->prog = init_shader();
+	if(!ctx->prog)
+		return 0;
 	
 	resize(w,h,w,h);
 	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
@@ -1132,6 +1134,14 @@ static	void	flip_page(display_ctx *ctx)
 static	int init_shader()
 {
 #ifdef USE_ARB
+	const char *ext = glGetString( GL_EXTENSIONS );
+	const int has_arb = ( strstr(ext, "GL_ARB_fragment_program" ) != NULL );
+	if( !has_arb )
+	{
+		veejay_msg(0, "Your video card does not support the ARB fragment program extension");
+		return 0;
+	}
+
 	GLuint modulateProg = 0;
 
  	const char *modulateYUV =
