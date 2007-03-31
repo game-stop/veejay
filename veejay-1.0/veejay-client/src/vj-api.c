@@ -5201,7 +5201,6 @@ static	void	load_editlist_info()
 	info->el.width = values[0];
 	info->el.height = values[1];
 	info->el.num_frames = dum[1];
-fprintf(stderr, "Full frames = %ld\n", dum[1] );
 	update_label_str( "label_el_wh", tmp );
 	snprintf( tmp, sizeof(tmp)-1, "%s",
 		(norm == 'p' ? "PAL" : "NTSC" ) );
