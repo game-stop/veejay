@@ -5162,7 +5162,9 @@ static	void	reload_editlist_contents()
 		total_frames = total_frames + (n2-n1) + 1;
 		row_num ++;
 	}
-	info->el.num_frames = total_frames;
+//	info->el.num_frames = total_frames;
+
+
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 		
 	g_free( eltext );
@@ -5198,7 +5200,8 @@ static	void	load_editlist_info()
 
 	info->el.width = values[0];
 	info->el.height = values[1];
-
+	info->el.num_frames = dum[1];
+fprintf(stderr, "Full frames = %ld\n", dum[1] );
 	update_label_str( "label_el_wh", tmp );
 	snprintf( tmp, sizeof(tmp)-1, "%s",
 		(norm == 'p' ? "PAL" : "NTSC" ) );
@@ -5944,12 +5947,11 @@ static void	process_reload_hints(int *history, int pm)
 	{
 		load_editlist_info();
 		reload_editlist_contents();
-		update_spin_range(
-		 	"spin_samplestart", 0, info->el.num_frames, info->status_tokens[SAMPLE_START] );
-		update_spin_range(
-			"spin_sampleend", 0, info->el.num_frames , info->status_tokens[SAMPLE_END] );
 	}
-
+	update_spin_range(
+	 	"spin_samplestart", 0, info->el.num_frames, info->status_tokens[SAMPLE_START] );
+	update_spin_range(
+		"spin_sampleend", 0, info->el.num_frames , info->status_tokens[SAMPLE_END] );
 
 	if( info->uc.reload_hint[HINT_SLIST] )
 	{
