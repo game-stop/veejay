@@ -1445,6 +1445,7 @@ gchar *dialog_open_file(const char *title, int type)
 	{
 		gtk_file_chooser_set_current_folder_uri(GTK_FILE_CHOOSER(dialog), _file_path);	
 		g_free(_file_path);
+		_file_path = NULL;
 	}
 
 	if( gtk_dialog_run( GTK_DIALOG(dialog)) == GTK_RESPONSE_ACCEPT)
@@ -1453,7 +1454,6 @@ gchar *dialog_open_file(const char *title, int type)
 				GTK_FILE_CHOOSER(dialog) );
 		_file_path = gtk_file_chooser_get_current_folder_uri(GTK_FILE_CHOOSER(dialog));
 	}
-
 	gtk_widget_destroy(GTK_WIDGET(dialog));
 	return file;
 }
