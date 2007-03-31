@@ -374,6 +374,12 @@ int sample_store(sample_info * skel)
     sample_node = hnode_create(skel);
     if (!sample_node)
 	return -1;
+
+    if(skel->edit_list)
+	{
+		skel->play_length = vj_el_bogus_length( skel->edit_list, 0 );
+	}
+
     if (!sample_exists(skel->sample_id)) {
 	hash_insert(SampleHash, sample_node, (void *) skel->sample_id);
     } else {
@@ -1525,29 +1531,97 @@ int sample_set_startframe(int s1, long frame_num)
 {
     sample_info *sample = sample_get(s1);
     if (!sample)
-	return -1;
-    if(frame_num < 0) return frame_num = 0;
+	return 0;
+
+    if( frame_num < 0 )
+	return 0;
+
+    if(sample->play_length )
+	 return 1; //@ simpler to lie
+
     if(sample->edit_list)
-	if( frame_num > sample->edit_list->video_frames - 1 )
+	if( frame_num >= sample->edit_list->video_frames  )
 		frame_num = sample->edit_list->video_frames - 1;
+  
     sample->first_frame = frame_num;
+    if(sample->first_frame >= sample->last_frame )
+	sample->first_frame = sample->last_frame-1;
     return (sample_update(sample,s1));
+}
+
+int	sample_usable_edl( int s1 )
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample) return 0;
+	if( sample->play_length )
+		return 0;
+	if( sample->edit_list )
+		return 1;
+	return 0;
+}
+
+int	sample_max_video_length(int s1)
+{
+	sample_info *sample = sample_get(s1);
+	float fps = 25.0;
+	if(!sample) return 0;
+	if(sample->edit_list)
+		fps = sample->edit_list->video_fps;
+
+	if( sample->play_length )
+		return (60 * fps * 6); // 6 minutes
+	
+	if( sample->edit_list )
+		return (int) sample->edit_list->video_frames;
+	return 0;
+}
+
+int	sample_video_length( int s1 )
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample) return 0;
+	if( sample->play_length )
+		return sample->play_length;
+	if( sample->edit_list )
+		return sample->edit_list->video_frames;
+	return 0;
 }
 
 int sample_set_endframe(int s1, long frame_num)
 {
     sample_info *sample = sample_get(s1);
     if (!sample)
-	return -1;
-    if(frame_num < 0) return -1;
+	return 0;
+    if(frame_num < 0)
+	return 0;
+
+    if(sample->play_length)
+    {
+#ifdef STRICT_CHECKING
+	assert( sample->edit_list != NULL );
+#endif
+	int new_len = ( frame_num - sample->first_frame );
+	if( new_len <= 1 )
+		new_len = 1;
+	sample->last_frame = sample->first_frame + new_len;
+	
+	if( vj_el_set_bogus_length( sample->edit_list, 0, new_len ) )
+	{
+		sample->play_length = new_len;
+		return (sample_update(sample,s1));
+	}
+	return 0;
+    }
+
     if(sample->edit_list)
-	if( frame_num > sample->edit_list->video_frames - 1 )
+	if( frame_num >= sample->edit_list->video_frames )
 		frame_num = sample->edit_list->video_frames - 1;
 
     sample->last_frame = frame_num;
 
     return (sample_update(sample,s1));
 }
+
 int sample_get_next(int s1)
 {
     sample_info *sample = sample_get(s1);
@@ -2568,6 +2642,16 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 	    }
 	    if(xmlTemp) xmlFree(xmlTemp);
 	}
+	if( !xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_BOGUSVIDEO ) )
+	{
+	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
+	    chTemp = UTF8toLAT1(xmlTemp);
+            if (chTemp) {
+                skel->play_length = atoi(chTemp);
+                free(chTemp);
+            }
+            if(xmlTemp) xmlFree(xmlTemp);
+	}
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EDIT_LIST_FILE)) {
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
 	    chTemp = UTF8toLAT1(xmlTemp);
@@ -3096,6 +3180,10 @@ void CreateSample(xmlNodePtr node, sample_info * sample, void *font)
     sprintf(buffer, "%ld", sample->last_frame);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_LASTFRAME,
 		(const xmlChar *) buffer);
+
+    sprintf(buffer, "%d", sample->play_length ); 
+    xmlNewChild(node, NULL, (const xmlChar*) XMLTAG_BOGUSVIDEO,
+		(const xmlChar*) buffer );
     sprintf(buffer, "%d", sample->speed);
     xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_SPEED,
 		(const xmlChar *) buffer);

@@ -141,4 +141,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 void	vj_el_set_caching(int status);
 
+int	vj_el_bogus_length( editlist *el, long nframe );
+
+int	vj_el_set_bogus_length( editlist *el, long nframe, int len );
+
 #endif

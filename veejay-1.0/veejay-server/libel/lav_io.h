@@ -70,6 +70,7 @@ typedef struct
    int         is_MJPG;
    int         MJPG_chroma;
    int	       mmap_size;
+   int	       bogus_len;
 } lav_file_t;
 
 
@@ -110,6 +111,8 @@ int  lav_get_field_size(uint8_t * jpegdata, long jpeglen);
 const char *lav_strerror(void);
 int  lav_fileno( lav_file_t *lav_file );
 void lav_set_default_chroma(int c);
+int	lav_bogus_video_length( lav_file_t *lav_file );
+void    lav_bogus_set_length( lav_file_t *lav_file , int len );
 #ifdef USE_GDK_PIXBUF
 VJFrame *lav_get_frame_ptr( lav_file_t *lav_file );
 void	lav_set_project( int w, int h, float fps, int shift );

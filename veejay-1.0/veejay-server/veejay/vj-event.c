@@ -4024,21 +4024,12 @@ void vj_event_sample_rel_start(void *ptr, const char format[], va_list ap)
 		s_start = sample_get_startFrame(args[0]) + args[1];
 		s_end = sample_get_endFrame(args[0]) + args[2];
 
-		if(s_end > v->edit_list->video_frames-1) s_end = v->edit_list->video_frames - 1;
-
-		if( s_start >= 1 && s_end <= (v->edit_list->video_frames-1) )
-		{ 
-			if	(sample_set_startframe(args[0],s_start) &&
-				sample_set_endframe(args[0],s_end))
-			{
-				constrain_sample( v, args[0], s_start, s_end );
-				veejay_msg(VEEJAY_MSG_INFO, "Sample update start %d end %d",
-					s_start,s_end);
-			}
-		}
-		else
+		if	(sample_set_startframe(args[0],s_start) &&
+			sample_set_endframe(args[0],s_end))
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Starting position not in range %d - %d", 1, v->edit_list->video_frames-1);
+			constrain_sample( v, args[0], s_start, s_end );
+			veejay_msg(VEEJAY_MSG_INFO, "Sample update start %d end %d",
+				s_start,s_end);
 		}
 	}
 	else
@@ -4065,17 +4056,13 @@ void vj_event_sample_set_start(void *ptr, const char format[], va_list ap)
 
 	if(args[0] == 0) 
 		args[0] = v->uc->sample_id;
-	if(args[0] == -1) args[0] = sample_size()-1;
+	if(args[0] == -1)
+		args[0] = sample_size()-1;
 	
-	editlist *el = sample_get_editlist( args[0] );
-	if(el)
-		mf = el->video_frames-1;
-	else
-		mf = v->edit_list->video_frames -1;
+	if( args[0] <= 0 )
+		return;
 
-	if( (args[1] >= s->min_frame_num) && (args[1] <= mf) && sample_exists(args[0])) 
-	{
-	  if( args[1] < sample_get_endFrame(args[0])) {
+	if( args[1] < sample_get_endFrame(args[0])) {
 		if( sample_set_startframe(args[0],args[1] ) ) {
 			veejay_msg(VEEJAY_MSG_INFO, "Sample starting frame updated to frame %d",
 			  sample_get_startFrame(args[0]));
@@ -4084,16 +4071,11 @@ void vj_event_sample_set_start(void *ptr, const char format[], va_list ap)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to update sample %d 's starting position to %d",args[0],args[1]);
 		}
-	  }
-	  else 
-	  {
+	}
+	else 
+	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Sample %d 's starting position %d must be greater than ending position %d.",
 			args[0],args[1], sample_get_endFrame(args[0]));
-	  }
-	}
-	else
-	{
-		if(!sample_exists(args[0])) p_no_sample(args[0]) else veejay_msg(VEEJAY_MSG_ERROR, "Invalid position %d given",args[1]);
 	}
 }
 
@@ -4114,40 +4096,32 @@ void vj_event_sample_set_end(void *ptr, const char format[] , va_list ap)
 	if(args[0] == 0) 
 		args[0] = v->uc->sample_id;
 	if(args[1] == -1)
-		args[1] = v->edit_list->video_frames-1;
-
-	editlist *el = sample_get_editlist( args[0] );	
-	if(el)
-		mf = el->video_frames-1;
-	else
-		mf = v->edit_list->video_frames -1;
-
-	if( (args[1] >= s->min_frame_num) && (args[1] <= mf) && (sample_exists(args[0])))
+		args[1] = sample_video_length( args[0] );
+	if(args[1] <= 0 )
 	{
-		if( args[1] >= sample_get_startFrame(v->uc->sample_id)) {
-	       		if(sample_set_endframe(args[0],args[1])) {
-				constrain_sample( v, args[0], sample_get_startFrame(v->uc->sample_id),
-					sample_get_endFrame(v->uc->sample_id ) );
-	   			veejay_msg(VEEJAY_MSG_INFO,"Sample ending frame updated to frame %d",
-		        		sample_get_endFrame(args[0]));
-			}
-			else
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "Unable to update sample %d 's ending position to %d",
-					args[0],args[1]);
-			}
-	      	}
-		else 
+		veejay_msg(0, "Impossible to set ending position %d for sample %d", args[1],args[0] );
+		return;
+	}
+	if( args[1] >= sample_get_startFrame(v->uc->sample_id))
+	{
+		if(sample_set_endframe(args[0],args[1]))
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Sample %d 's ending position %d must be greater than or equal to starting position %d.",
-				args[0],args[1], sample_get_startFrame(v->uc->sample_id));
+			constrain_sample( v, args[0],
+					sample_get_startFrame(v->uc->sample_id),
+					sample_get_endFrame(v->uc->sample_id )
+				);
+	   		veejay_msg(VEEJAY_MSG_INFO,"Sample ending frame updated to frame %d",
+		        	sample_get_endFrame(args[0]));
+		}
+		else
+		{
+			veejay_msg(0, "Impossible to set ending position %d for sample %d", args[1],args[0] );
 		}
 	}
 	else
 	{
-		if(!sample_exists(args[0])) p_no_sample(args[0]) else veejay_msg(VEEJAY_MSG_ERROR, "Invalid position %d given",args[1]);
+		veejay_msg(0, "Ending position must be greater then start position");
 	}
-	
 }
 
 void vj_event_sample_del(void *ptr, const char format[], va_list ap)
@@ -5772,6 +5746,12 @@ void vj_event_el_cut(void *ptr, const char format[], va_list ap)
 
 	if( SAMPLE_PLAYING(v))
 	{
+		if( !sample_usable_edl( v->uc->sample_id ))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "This sample type has no EDL (all frames are identical)");
+			return;
+		}
+
 		editlist *el = sample_get_editlist( v->uc->sample_id );
 		if(!el)
 		{
@@ -5791,8 +5771,7 @@ void vj_event_el_cut(void *ptr, const char format[], va_list ap)
 		}
 
 		sample_set_startframe( v->uc->sample_id, 0 );
-		sample_set_endframe(   v->uc->sample_id,
-						el->video_frames-1 );
+		sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id) );
 
 		constrain_sample( v, v->uc->sample_id, 0, el->video_frames -1 );
 	}
@@ -5813,6 +5792,12 @@ void vj_event_el_copy(void *ptr, const char format[], va_list ap)
 
 	if ( SAMPLE_PLAYING(v))
 	{
+                if( !sample_usable_edl( v->uc->sample_id ))
+                {
+                        veejay_msg(VEEJAY_MSG_ERROR, "This sample type has no EDL (all frames are identical)");
+                        return;
+                }
+
 		editlist *el = sample_get_editlist( v->uc->sample_id );
 		if(!el)
 		{
@@ -5832,9 +5817,7 @@ void vj_event_el_copy(void *ptr, const char format[], va_list ap)
 		}
 
 		sample_set_startframe( v->uc->sample_id, 0 );
-		sample_set_endframe(   v->uc->sample_id,
-					el->video_frames-1 );
-
+		sample_set_endframe(   v->uc->sample_id,sample_video_length(v->uc->sample_id));
 
 		constrain_sample( v, v->uc->sample_id, 0, el->video_frames - 1 );
 	}
@@ -5854,6 +5837,12 @@ void vj_event_el_del(void *ptr, const char format[], va_list ap)
 
 	if ( SAMPLE_PLAYING(v))
 	{
+                if( !sample_usable_edl( v->uc->sample_id ))
+                {
+                        veejay_msg(VEEJAY_MSG_ERROR, "This sample type has no EDL (all frames are identical)");
+                        return;
+                }
+
 		editlist *el = sample_get_editlist( v->uc->sample_id );
 
 		if(!el)
@@ -5873,8 +5862,7 @@ void vj_event_el_del(void *ptr, const char format[], va_list ap)
 				v->uc->sample_id,args[0],args[1]);
 		}
 		sample_set_startframe( v->uc->sample_id, 0 );
-		sample_set_endframe(   v->uc->sample_id,
-						el->video_frames-1 );
+		sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id));
 
 		constrain_sample( v, v->uc->sample_id, 0, el->video_frames - 1 );
 
@@ -5902,6 +5890,12 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 
 	if(SAMPLE_PLAYING(v))
 	{
+                if( !sample_usable_edl( v->uc->sample_id ))
+                {
+                        veejay_msg(VEEJAY_MSG_ERROR, "This sample type has no EDL (all frames are identical)");
+                        return;
+                }
+
 		editlist *el = sample_get_editlist( v->uc->sample_id);
 		if(!el)
 		{
@@ -5934,8 +5928,7 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 					el->video_frames - 1, v->uc->sample_id);
 				res = 1;
 				sample_set_startframe( v->uc->sample_id, 0 );
-				sample_set_endframe(   v->uc->sample_id,
-						el->video_frames-1 );
+				sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id) );
 				constrain_sample( v, v->uc->sample_id,0, el->video_frames - 1 );
 			}
 
@@ -5960,6 +5953,12 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 
 	if( SAMPLE_PLAYING(v))
 	{
+                if( !sample_usable_edl( v->uc->sample_id ))
+                {
+                        veejay_msg(VEEJAY_MSG_ERROR, "This sample type has no EDL (all frames are identical)");
+                        return;
+                }
+
 		editlist *el = sample_get_editlist( v->uc->sample_id );
 		long length = el->video_frames-1;
 		if(!el)
@@ -5974,8 +5973,7 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 				veejay_msg(VEEJAY_MSG_INFO, "Pasted buffer at frame %d",args[0]);
 			}
 			sample_set_startframe( v->uc->sample_id, 0 );
-			sample_set_endframe(   v->uc->sample_id,
-						el->video_frames-1 );
+			sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id));
 			constrain_sample( v, v->uc->sample_id, 0, el->video_frames-1);
 		}
 
@@ -6019,6 +6017,15 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 	char str[1024];
 	int *args = NULL;
 	P_A(args,str,format,ap);
+
+	if(SAMPLE_PLAYING(v))
+	{
+		if( !sample_usable_edl( v->uc->sample_id ))
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot append video to a picture sample");
+			return;
+		}
+	}
 
 	if ( veejay_edit_addmovie(v,( SAMPLE_PLAYING(v) ? v->edit_list : v->current_edit_list),str,start,destination,destination))
 		veejay_msg(VEEJAY_MSG_INFO, "Added video file %s to EditList",str); 
@@ -7844,6 +7851,10 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 	editlist *el = ( SAMPLE_PLAYING(v) ? sample_get_editlist( v->uc->sample_id ) : 
 				v->current_edit_list );
 
+	int n_frames = el->video_frames;
+	if( SAMPLE_PLAYING(v))
+		n_frames = sample_max_video_length( v->uc->sample_id );
+
 	snprintf(info_msg,sizeof(info_msg)-1, "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld %1d",
 		el->video_width,
 		el->video_height,
@@ -7855,7 +7866,7 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 		el->audio_rate,
 		el->audio_chans,
 		el->num_video_files,
-		el->video_frames,
+		n_frames,
 		v->audio
 		);	
 	sprintf( _s_print_buf, "%03d%s",strlen(info_msg), info_msg);

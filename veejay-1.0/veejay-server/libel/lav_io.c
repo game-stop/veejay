@@ -660,6 +660,19 @@ int lav_write_audio(lav_file_t *lav_file, uint8_t *buff, long samps)
 	return 0;
 }
 
+void	lav_bogus_set_length( lav_file_t *lav_file , int len )
+{
+	lav_file->bogus_len = len;
+}
+
+int	lav_bogus_video_length( lav_file_t *lav_file )
+{
+	video_format = lav_file->format;
+	if( lav_file->format == 'x' )
+		return lav_file->bogus_len;
+	return 0;
+}
+
 
 
 long lav_video_frames(lav_file_t *lav_file)
@@ -681,7 +694,7 @@ long lav_video_frames(lav_file_t *lav_file)
 #endif
 #ifdef USE_GDK_PIXBUF
 	case 'x':
-		return 25;
+		return lav_file->bogus_len;
 #endif
 #ifdef HAVE_LIBQUICKTIME
       case 'q':
@@ -1341,6 +1354,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 			{
 				lav_fd->format = 'x';
 				lav_fd->has_audio = 0;
+				lav_fd->bogus_len = (int) output_fps;
 				video_comp = strdup( "PICT" );
 				ret = 1;
 				alt = 1;

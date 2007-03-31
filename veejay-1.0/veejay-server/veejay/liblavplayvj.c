@@ -496,13 +496,7 @@ int veejay_set_frame(veejay_t * info, long framenum)
     if(framenum < 0)
 		return -1;
 
- /*   if(framenum > (info->edit_list->video_frames-1))
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot set frame %ld (There are %d frames in EDL)",framenum, info->edit_list->video_frames-1);
-		framenum = info->edit_list->video_frames-1;
-	}*/
-
-	if( framenum > settings->max_frame_num )
+    if( framenum > settings->max_frame_num )
 		framenum = settings->max_frame_num;
 
     if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE)
@@ -632,7 +626,7 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
    	sample_get_short_info( sample_id , &start,&end,&looptype,&speed);
 
 	settings->min_frame_num = 0;
-	settings->max_frame_num = info->edit_list->video_frames - 1;
+	settings->max_frame_num = sample_video_length( sample_id );
 
 #ifdef HAVE_FREETYPE
 	if(info->font && info->uc->sample_id != sample_id)
@@ -2234,7 +2228,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 					veejay_msg(0, "Unable to start from file, Abort");
 					return -1;
 				}
-				sample_info *skel = sample_skeleton_new( 0,el->video_frames-1 );
+				sample_info *skel = sample_skeleton_new( 0, el->video_frames-1 );
 				if(skel)
 				{
 					skel->edit_list = el;
@@ -3318,10 +3312,19 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 	// if sample exists, get it for update
 	if(sample_exists(id) )
 		sample = sample_get(id);
+
 	// if sample exists, it could have a edit list */
-	if(sample)
+	if( sample )
+	{
+		if( !sample_usable_edl( id ) )
+		{
+			veejay_msg(0, "Sample %d has no EDL (its a picture!)", id );
+			return -1;
+		}
+
 		sample_edl = sample_get_editlist( id );
-	
+	}
+
 	// if both, append it to sample's edit list 
 	if(sample_edl && sample)
 	{
@@ -3357,11 +3360,13 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 		sample = sample_skeleton_new( 0, sample_edl->video_frames - 1 );
 		if(sample)
 		{
-		sample_store(sample);
-		sample_set_editlist( sample->sample_id , sample_edl );
-		veejay_msg(VEEJAY_MSG_INFO,
-			"Created new sample %d from file %s",sample->sample_id,
-				files[0]);
+			sample->edit_list = sample_edl;
+			sample_store(sample);
+			//	sample_set_editlist( sample->sample_id , sample_edl );
+
+			veejay_msg(VEEJAY_MSG_INFO,
+				"Created new sample %d from file %s",sample->sample_id,
+					files[0]);
 		}
 		else
 			veejay_msg(VEEJAY_MSG_ERROR,

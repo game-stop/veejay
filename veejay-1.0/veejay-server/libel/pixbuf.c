@@ -89,6 +89,9 @@ static	VJFrame *open_pixbuf( const char *filename, int dst_w, int dst_h, int dst
 				   PIX_FMT_RGB24
 			);
 
+	veejay_msg(VEEJAY_MSG_DEBUG,"Image is %dx%d (dst fmt=%d), scaling to %dx%d",
+				src->width,src->height,dst_fmt,dst->width,dst->height );
+
 	yuv_convert_any( src, dst, src->format, dst->format );
 	
 	gdk_pixbuf_unref( image ); 
@@ -186,7 +189,10 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 			break;
 	}
 
-	pic->space = (uint8_t*) vj_malloc( sizeof(uint8_t) * (len + 2*ulen) );
+	pic->space = (uint8_t*) vj_malloc( sizeof(uint8_t) * (3 * len));
+#ifdef STRICT_CHECKING
+		assert(pic->space != NULL );
+#endif
 	pic->img = open_pixbuf(
 			filename,	
 			v_outw,

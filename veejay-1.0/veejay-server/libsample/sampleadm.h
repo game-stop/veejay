@@ -82,6 +82,7 @@
 #define XMLTAG_LASTENTRY    "current_entry"
 #define XMLTAG_CHAIN_ENABLED "fx"
 #define XMLTAG_EDIT_LIST_FILE "editlist_filename"
+#define XMLTAG_BOGUSVIDEO	 "playlength"
 #endif
 #define SAMPLE_FREEZE_NONE 0
 #define SAMPLE_FREEZE_PAUSE 1
@@ -167,10 +168,11 @@ typedef struct sample_info_t {
     int selected_entry;
     int effect_toggle;
     int offset;
+    int play_length;
     editlist *edit_list;
     char     *edit_list_file;
     void	*dict;
-	void	*kf;
+    void	*kf;
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
@@ -326,7 +328,8 @@ extern int sample_var( int s1, int *type, int *fader, int *fx, int *rec, int *ac
 
 extern void        sample_set_project(int fmt, int deinterlace, int flags, int force, char norm );
 
-
+extern int     sample_video_length( int s1 );
+extern int	sample_usable_edl( int s1 );
 
 extern int sample_cache_used( int s1 );
 extern void        sample_free();
@@ -336,6 +339,8 @@ extern int sample_start_playing(int s1, int no_cache);
 extern int sample_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type);
 extern unsigned char *UTF8toLAT1(unsigned char *in);
 extern int sample_read_edl( sample_info *sample );
+
+extern int     sample_max_video_length(int s1);
 
 
 #ifdef HAVE_XML2

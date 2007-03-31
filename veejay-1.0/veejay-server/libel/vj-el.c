@@ -962,6 +962,49 @@ int	vj_el_get_file_fourcc(editlist *el, int num, char *fourcc)
 	return 1;
 }
 
+
+int	vj_el_bogus_length( editlist *el, long nframe )
+{
+	uint64_t n = 0;
+	
+	if( !el->has_video || el->is_empty )
+		return 0;
+
+	if( nframe < 0 )
+		nframe = 0;
+	else if (nframe >= el->video_frames )
+		nframe = el->video_frames - 1;
+
+	n = el->frame_list[nframe];
+
+	return lav_bogus_video_length( el->lav_fd[ N_EL_FILE(n) ] );
+}
+
+int	vj_el_set_bogus_length( editlist *el, long nframe, int len )
+{
+	uint64_t n = 0;
+	
+	if( len <= 0 )
+		return 0;	
+
+	if( !el->has_video || el->is_empty )
+		return 0;
+
+	if( nframe < 0 )
+		nframe = 0;
+	else if (nframe >= el->video_frames )
+		nframe = el->video_frames - 1;
+
+	n = el->frame_list[nframe];
+
+	if( !lav_bogus_video_length( el->lav_fd[N_EL_FILE(n)] ) )
+		return 0;
+
+	lav_bogus_set_length( el->lav_fd[N_EL_FILE(n)], len );
+	
+	return 1;
+}
+
 int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 {
 	int res = 0;
@@ -1758,14 +1801,10 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 
 void	vj_el_free(editlist *el)
 {
-#ifndef STRICT_CHECKING
 	if(!el)
 		return;
-#else
-	assert( el != NULL );
-#endif
-	int i;
 
+	int i;
 	if(el->is_clone)
 	{
 		for( i = 0; i < el->num_video_files; i ++ )
