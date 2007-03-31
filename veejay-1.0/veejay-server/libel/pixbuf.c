@@ -67,7 +67,6 @@ extern int	get_ffmpeg_pixfmt(int id);
 
 extern uint8_t *vj_perform_get_preview_buffer();
 
-
 static	VJFrame *open_pixbuf( const char *filename, int dst_w, int dst_h, int dst_fmt,
 			uint8_t *dY, uint8_t *dU, uint8_t *dV )
 {
@@ -81,16 +80,24 @@ static	VJFrame *open_pixbuf( const char *filename, int dst_w, int dst_h, int dst
 
 	/* convert image to veejay frame in proper dimensions, free image */
 
+	int img_fmt = PIX_FMT_RGB24;
+	if( gdk_pixbuf_get_has_alpha( image ))
+		img_fmt = PIX_FMT_RGBA;
+
 	VJFrame *dst = yuv_yuv_template( dY, dU, dV, dst_w, dst_h, dst_fmt );
 	VJFrame *src = yuv_rgb_template(
 			(uint8_t*) gdk_pixbuf_get_pixels( image ),
 				   gdk_pixbuf_get_width(  image ),
 				   gdk_pixbuf_get_height( image ),
-				   PIX_FMT_RGB24
+				   img_fmt // PIX_FMT_RGB24
 			);
+	int stride = gdk_pixbuf_get_rowstride(image);
 
-	veejay_msg(VEEJAY_MSG_DEBUG,"Image is %dx%d (dst fmt=%d), scaling to %dx%d",
-				src->width,src->height,dst_fmt,dst->width,dst->height );
+	if( stride != src->stride[0] )
+		src->stride[0] = stride;
+
+	veejay_msg(VEEJAY_MSG_DEBUG,"Image is %dx%d (src=%d, stride=%d, dstfmt=%d), scaling to %dx%d",
+				src->width,src->height,img_fmt, stride,dst_fmt,dst->width,dst->height );
 
 	yuv_convert_any( src, dst, src->format, dst->format );
 	
