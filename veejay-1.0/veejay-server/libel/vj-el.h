@@ -145,4 +145,7 @@ int	vj_el_bogus_length( editlist *el, long nframe );
 
 int	vj_el_set_bogus_length( editlist *el, long nframe, int len );
 
+void	vj_el_get_video_fourcc(editlist *el, int num, char *fourcc);
+
+
 #endif

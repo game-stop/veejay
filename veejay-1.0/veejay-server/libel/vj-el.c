@@ -174,6 +174,7 @@ static struct
 	{ "x264",	CODEC_ID_H264 	},
 	{ "davc",	CODEC_ID_H264 	},
 	{ "div3",	CODEC_ID_MSMPEG4V3 },
+	{ "divx",	CODEC_ID_MPEG4 },
 	{ "mp43",	CODEC_ID_MSMPEG4V3 },
 	{ "mp42",	CODEC_ID_MSMPEG4V2 },
 	{ "mpg4",	CODEC_ID_MSMPEG4V1 },
@@ -947,6 +948,18 @@ static int	vj_el_dummy_frame( uint8_t *dst[3], editlist *el ,int pix_fmt)
 	return 1;
 }
 
+void	vj_el_get_video_fourcc(editlist *el, int num, char *fourcc)
+{
+	uint64_t n;
+	if( num < 0 ) num = 0; else if (num >= el->video_frames ) num = el->video_frames - 1;
+
+	n = el->frame_list[ num ];
+
+	const char *compr = lav_video_compressor( el->lav_fd[ N_EL_FILE(n) ] );
+	snprintf(fourcc,4,"%s", compr );
+}
+
+
 int	vj_el_get_file_fourcc(editlist *el, int num, char *fourcc)
 {
 	if(num >= el->num_video_files)
@@ -1280,6 +1293,12 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 	}
 	
     	int decoder_id = lav_video_compressor_type( lav );
+
+	if( decoder_id < 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot play that file, unsupported codec");
+		return -1;
+	}
 
 	if(lav_filetype( lav ) == 'x')
 	{

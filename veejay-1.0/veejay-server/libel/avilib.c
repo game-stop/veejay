@@ -2385,9 +2385,6 @@ int avi_parse_input_file(avi_t *AVI, int getIndex)
             AVI->video_strn = num_stream;
 	    AVI->max_len = 0;
             vids_strh_seen = 1;
-	    AVI->ffmpeg_codec_id =
-		    vj_el_get_decoder_from_fourcc( AVI->compressor );
-
 	    lasttag = 1; /* vids */
          }
          else if (strncasecmp ((char *)hdrl_data+i,"auds",4) ==0 && ! auds_strh_seen)
@@ -3086,6 +3083,9 @@ multiple_riff:
    
    lseek(AVI->fdes,AVI->movi_start,SEEK_SET);
    AVI->video_pos = 0;
+
+	    AVI->ffmpeg_codec_id =
+		    vj_el_get_decoder_from_fourcc( AVI->compressor );
 
    return(0);
 }
