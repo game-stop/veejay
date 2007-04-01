@@ -2193,7 +2193,7 @@ int sample_apply_loop_dec(int s1, double fps) {
 /* print sample status information into an allocated string str*/
 //int sample_chain_sprint_status(int s1, int entry, int changed, int r_changed,char *str,
 //			       int frame)
-int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int frame, int mode,int total_slots, int seq_rec,char *str )
+int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int frame, int mode,int total_slots, int seq_rec,int macro,char *str )
 {
 	sample_info *sample;
 	sample = sample_get(s1);
@@ -2221,7 +2221,7 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 	}
 
 	veejay_sprintf(str,1024,
-		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 		pfps,
 		frame,
 		mode,
@@ -2243,7 +2243,8 @@ int	sample_chain_sprint_status( int s1,int cache,int sa,int ca, int pfps, int fr
 		sa,
 		ca,
 		(int)( sample->fader_val ),
-		sample->dup);
+		sample->dup,
+		macro);
 		
 		
  

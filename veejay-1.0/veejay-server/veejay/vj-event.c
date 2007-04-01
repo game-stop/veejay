@@ -50,6 +50,7 @@
 #include <libel/pixbuf.h>
 #endif
 #include <libvevo/vevo.h>
+#include <libvevo/libvevo.h>
 #include <veejay/vj-OSC.h>
 #include <libvjnet/vj-server.h>
 #include <veejay/vevo.h>
@@ -133,6 +134,29 @@ static int 	cached_height_ = 0;
 #define SEND_BUF 125000
 static char _print_buf[SEND_BUF];
 static char _s_print_buf[SEND_BUF];
+
+static	void	*macro_port_ = NULL;
+static	int	macro_status_ = 0;
+static	int	macro_key_    = 1;
+static	int	macro_line_[3] = {-1 ,0,0};
+static  int	macro_current_age_ = 0;
+static  int	macro_expected_age_ = 0;
+#define MAX_MACROS 8
+typedef struct {
+	char *msg[MAX_MACROS];
+	int   pending[MAX_MACROS];
+	int   age[MAX_MACROS];
+} macro_block_t;
+
+int	vj_event_macro_status(void)
+{
+	return macro_status_;
+}
+
+static	char	*retrieve_macro_(veejay_t *v, long frame, int idx );
+static	void	store_macro_( veejay_t *v,char *str, long frame );
+static	void	reset_macro_(void);
+static	void	replay_macro_(void);
 
 extern void	veejay_pipe_write_status(veejay_t *info, int link_id );
 extern int	_vj_server_del_client(vj_server * vje, int link_id);
@@ -266,6 +290,9 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_SWITCH_SAMPLE_STREAM,		SDLK_ESCAPE,		VIMS_MOD_NONE, NULL	},
 	{ VIMS_PRINT_INFO,			SDLK_HOME,		VIMS_MOD_NONE, NULL	},
 	{ VIMS_SAMPLE_CLEAR_MARKER,		SDLK_BACKSPACE,		VIMS_MOD_NONE, NULL },
+	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_NONE, "2 1"	},
+	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_SHIFT,  "1 1"	},
+	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_CTRL, "0 0"	},
 	{ 0,0,0,NULL },
 };
 #endif
@@ -364,6 +391,145 @@ else { veejay_msg(VEEJAY_MSG_DEBUG,"arg has size of 0x0");}
 
 
 #define CLAMPVAL(a) { if(a<0)a=0; else if(a >255) a =255; }
+
+
+static  void    init_vims_for_macro();
+
+static	void	replay_macro_(void)
+{
+	int i,k;
+	char **items;
+
+	if(!macro_port_ )
+		return;	
+
+	items = vevo_list_properties( macro_port_ );
+	if(items)
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Clear keystrokes!");
+		for(k = 0; items[k] != NULL ; k ++ )
+		{
+			void *mb = NULL;
+			if( vevo_property_get( macro_port_, items[k],0,&mb ) == VEVO_NO_ERROR )
+			{
+				macro_block_t *m = (macro_block_t*) mb;
+				for( i = 0; i < MAX_MACROS; i ++ )
+				{
+					if(m->msg[i]) m->pending[i] = 1;
+				}
+			}
+			free(items[k]);	
+		}
+		free(items);
+	}
+}
+
+static	void	reset_macro_(void)
+{
+	int i,k;
+	char **items;
+
+	if(!macro_port_ )
+		return;	
+
+	items = vevo_list_properties( macro_port_ );
+	if(items)
+	{
+		veejay_msg(VEEJAY_MSG_INFO, "Clear keystrokes!");
+		for(k = 0; items[k] != NULL ; k ++ )
+		{
+			void *mb = NULL;
+			if( vevo_property_get( macro_port_, items[k],0,&mb ) == VEVO_NO_ERROR )
+			{
+				macro_block_t *m = (macro_block_t*) mb;
+				for( i = 0; i < MAX_MACROS; i ++ )
+					if(m->msg[i]) free(m->msg[i]);
+				free(m);
+			}
+			free(items[k]);	
+		}
+		free(items);
+	}
+	vevo_port_free(macro_port_);
+	macro_port_ = NULL;
+}
+
+static	char	*retrieve_macro_(veejay_t *v, long frame, int idx )
+{
+	void *mb = NULL;
+	char key[16];
+
+	int s = 0;
+	if( SAMPLE_PLAYING(v))
+		s = sample_get_framedups( v->uc->sample_id );
+	else if ( PLAIN_PLAYING(v))
+		s = vj_perform_get_dups();	
+
+	snprintf(key,16,"%08ld%02d", frame,s );
+
+	int error = vevo_property_get( macro_port_, key, 0, &mb );
+	if( error == VEVO_NO_ERROR )
+	{
+		if( idx == MAX_MACROS )
+			return NULL;
+
+		macro_block_t *m = (macro_block_t*) mb;
+		if( m->msg[idx ] && m->pending[idx] == 1 && m->age[idx] == macro_expected_age_)
+		{
+			m->pending[idx] = 0;
+			macro_expected_age_ ++;
+			return m->msg[idx];
+		}
+	}
+	return NULL;
+}
+
+static	void	store_macro_(veejay_t *v, char *str, long frame )
+{
+	void *mb = NULL;
+	char key[16];
+	int k;
+	int s = 0;
+	if( SAMPLE_PLAYING(v))
+		s = sample_get_framedups( v->uc->sample_id );
+	else if ( PLAIN_PLAYING(v))
+		s = vj_perform_get_dups();	
+
+
+	snprintf(key,16,"%08ld%02d", frame,s );
+
+	int error = vevo_property_get( macro_port_, key, 0, &mb );
+	if( error != VEVO_NO_ERROR )
+	{ // first element
+		macro_block_t *m = vj_calloc( sizeof(macro_block_t));
+		m->msg[0] = strdup(str); 	
+		m->pending[0] = 1;
+		m->age[0] = macro_current_age_;
+		macro_current_age_++;
+		vevo_property_set( macro_port_, key, VEVO_ATOM_TYPE_VOIDPTR,1,&m );
+	}
+	else
+	{
+	 // following elements
+		macro_block_t *c = (macro_block_t*) mb;
+		for( k = 1; k < MAX_MACROS; k ++ )
+		{
+			if(c->msg[k] == NULL )	
+			{
+				c->msg[k] = strdup(str);
+				c->pending[k] = 1;
+				c->age[k] = macro_current_age_;
+				macro_current_age_ ++;
+				return;
+			}
+		}
+		veejay_msg(VEEJAY_MSG_ERROR, "Slot for frame %ld is full (keystroke recorder)",frame );
+	}
+
+	veejay_msg(0, "key = %s, '%s' %ld", key,str,frame);
+	
+}
+
 
 
 static hash_val_t int_bundle_hash(const void *key)
@@ -844,6 +1010,77 @@ static	void	dump_arguments_(int net_id,int arglen, int np, int prefixed, char *f
 	}
 }
 
+static	int vvm_[600];
+
+static	void	init_vims_for_macro()
+{
+	veejay_memset( vvm_,1, sizeof(vvm_));
+	vvm_[VIMS_MACRO] = 0;
+	vvm_[VIMS_TRACK_LIST] = 0;
+	vvm_[VIMS_RGB24_IMAGE] = 0;
+	vvm_[VIMS_SET_SAMPLE_START] =0;
+	vvm_[VIMS_SET_SAMPLE_END] = 0;
+	vvm_[VIMS_SAMPLE_NEW] = 0;
+	vvm_[VIMS_SAMPLE_DEL] = 0;
+	vvm_[VIMS_STREAM_DELETE] = 0;
+	vvm_[VIMS_SAMPLE_LOAD_SAMPLELIST]=0;
+	vvm_[VIMS_SAMPLE_SAVE_SAMPLELIST]=0;
+	vvm_[VIMS_SAMPLE_DEL_ALL] = 0;
+	vvm_[VIMS_SAMPLE_COPY] = 0;
+	vvm_[VIMS_SAMPLE_UPDATE] = 0;
+	vvm_[VIMS_SAMPLE_KF_GET]=0;
+	vvm_[VIMS_SAMPLE_KF_RESET]=0;
+	vvm_[VIMS_SAMPLE_KF_STATUS]=0;
+	vvm_[VIMS_STREAM_NEW_V4L] = 0;
+	vvm_[VIMS_STREAM_NEW_DV1394] = 0;
+	vvm_[VIMS_STREAM_NEW_COLOR] = 0;
+	vvm_[VIMS_STREAM_NEW_Y4M] = 0;
+	vvm_[VIMS_STREAM_NEW_UNICAST]=0;
+	vvm_[VIMS_STREAM_NEW_MCAST]=0;
+	vvm_[VIMS_STREAM_NEW_PICTURE]=0;
+	vvm_[VIMS_STREAM_SET_DESCRIPTION]=0;
+	vvm_[VIMS_SAMPLE_SET_DESCRIPTION]=0;
+	vvm_[VIMS_STREAM_SET_LENGTH]=0;
+	vvm_[VIMS_SEQUENCE_STATUS]=0;
+	vvm_[VIMS_SEQUENCE_ADD]=0;
+	vvm_[VIMS_SEQUENCE_DEL]=0;
+	vvm_[VIMS_CHAIN_LIST]=0;
+	vvm_[VIMS_OUTPUT_Y4M_START]=0;
+	vvm_[VIMS_OUTPUT_Y4M_STOP]=0;
+	vvm_[VIMS_GET_FRAME]=0;
+	vvm_[VIMS_VLOOPBACK_START]=0;
+	vvm_[VIMS_VLOOPBACK_STOP]=0;
+	vvm_[VIMS_VIDEO_MCAST_START]=0;
+	vvm_[VIMS_VIDEO_MCAST_STOP]=0;
+	vvm_[VIMS_SYNC_CORRECTION]=0;
+	vvm_[VIMS_NO_CACHING]=0;
+	vvm_[VIMS_SCREENSHOT]=0;
+	vvm_[VIMS_RGB_PARAMETER_TYPE]=0;
+	vvm_[VIMS_RESIZE_SDL_SCREEN] =0;
+	vvm_[VIMS_DEBUG_LEVEL]=0;
+	vvm_[VIMS_SAMPLE_MODE]=0;
+	vvm_[VIMS_BEZERK] = 0;
+	vvm_[VIMS_AUDIO_ENABLE]=0;
+	vvm_[VIMS_AUDIO_DISABLE]=0;
+	vvm_[VIMS_RECORD_DATAFORMAT]=0;
+	vvm_[VIMS_INIT_GUI_SCREEN]=0;
+	vvm_[VIMS_SUSPEND]=0;
+	vvm_[VIMS_VIEWPORT]=0;
+	vvm_[VIMS_PREVIEW_BW]=0;
+	vvm_[VIMS_FRONTBACK]=0;
+	vvm_[VIMS_RECVIEWPORT]=0;
+	vvm_[VIMS_PROJECTION] = 0;
+}
+
+static	int	valid_for_macro(int net_id)
+{
+	int k;
+	if(net_id > 400 || net_id >= 388 || net_id >= 80 && net_id <= 86 || net_id >= 50 && net_id <= 59)
+		return 0;
+
+	return vvm_[net_id];
+}
+
 static	void	dump_argument_( int net_id , int i )
 {
 	char *help = vj_event_vevo_help_vims( net_id, i );
@@ -1130,6 +1367,12 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 			i++;
 		}
 		vj_event_fire_net_event( v, net_id, NULL, i_args, np, 0 );
+		if( macro_status_ == 1 )
+		{
+			if( valid_for_macro(net_id))
+				store_macro_( v,msg, v->settings->current_frame_num );
+		}
+		
 	}
 	else
 	{
@@ -1212,6 +1455,11 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		if( flags & VIMS_ALLOW_ANY )
  			i = np;
 
+		if( macro_status_ == 1 )
+		{
+			if( valid_for_macro(net_id))
+				store_macro_( v,msg, v->settings->current_frame_num );
+		}
 		vj_event_fire_net_event( v, net_id, str, i_args, i, 0 );
 		
 
@@ -1315,6 +1563,21 @@ void vj_event_update_remote(void *ptr)
 			}
 		}
 	}
+
+	//@ repeat macros
+	if(macro_status_ == 2 )
+	{
+		int n_macro = 0;
+		char *macro_msg = NULL;
+		for( n_macro = 0; n_macro < MAX_MACROS ; n_macro ++ )
+		{
+			macro_msg = retrieve_macro_( v, v->settings->current_frame_num, n_macro );
+			if(macro_msg)
+				vj_event_parse_msg(v,macro_msg, strlen(macro_msg));
+		}
+	}
+
+
 	v->settings->is_dat = 0;
 
 
@@ -2191,6 +2454,10 @@ void vj_event_init()
 #endif
 	lzo_ = lzo_new();
 
+	init_vims_for_macro();
+
+
+	//macro_port_ = vpn(VEVO_ANONYMOUS_PORT);
 
 }
 
@@ -3327,7 +3594,7 @@ void vj_event_goto_end(void *ptr, const char format[], va_list ap)
  	if(SAMPLE_PLAYING(v))
   	{	
 		veejay_set_frame(v, sample_get_endFrame(v->uc->sample_id));
-		veejay_msg(VEEJAY_MSG_INFO, "Goto sample's starting position");
+		veejay_msg(VEEJAY_MSG_INFO, "Goto sample's endings position");
   	}
   	if(PLAIN_PLAYING(v)) 
  	{
@@ -3347,7 +3614,7 @@ void vj_event_goto_start(void *ptr, const char format[], va_list ap)
   	if( SAMPLE_PLAYING(v))
 	{
 		veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
-		veejay_msg(VEEJAY_MSG_INFO, "Goto sample's ending position"); 
+		veejay_msg(VEEJAY_MSG_INFO, "Goto sample's starting position"); 
   	}
   	if ( PLAIN_PLAYING(v))
 	{
@@ -9046,8 +9313,65 @@ void	vj_event_sample_sequencer_active(	void *ptr, 	const char format[],	va_list 
 	}
 }
 
+void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[2] = {0,0};
+	int k,i;
+	char *str = NULL;
+	P_A(args,str,format,ap);
 
-
+	if( args[1] == 0 )
+	{
+		reset_macro_();
+		macro_status_ = 0;
+		macro_current_age_ = 0;
+		macro_expected_age_ = 0;
+		args[0] = 0;
+		macro_line_[0] = -1;
+		macro_line_[1] = 0;
+		macro_line_[2] = 0;
+		veejay_msg(VEEJAY_MSG_INFO, "Cleared all recorded keystrokes");
+	}
+	if( args[0] == 0 )
+	{
+		if( macro_port_ )
+		{
+			macro_status_ = 0; //@ stop
+			veejay_msg(VEEJAY_MSG_INFO, "Stopped macro recorder");
+		}
+	} else if (args[0] == 1 )
+	{
+		reset_macro_();
+		macro_port_ = vpn(VEVO_ANONYMOUS_PORT);
+		veejay_msg(VEEJAY_MSG_INFO , "Recording keystrokes!");
+		macro_status_ = 1; 
+		macro_line_[0] = v->settings->current_frame_num;
+		macro_line_[1] = v->uc->playback_mode;
+		macro_line_[2] = v->uc->sample_id;
+		macro_current_age_ =0;
+	} 
+	else if (args[0] == 2)
+	{
+		if( macro_status_ == 0 && macro_port_ )
+		{
+			macro_status_ = 2;
+			veejay_msg(VEEJAY_MSG_INFO, "Resume playing keystrokes");
+		} else if( macro_line_[0] >= 0 && macro_port_ != NULL)
+		{
+			macro_status_ = 2;
+			veejay_msg(VEEJAY_MSG_INFO, "Replay all keystrokes!");
+			veejay_change_playback_mode( v, macro_line_[1],macro_line_[2] );
+			veejay_set_frame( v, macro_line_[0] );
+			macro_expected_age_ = 0;
+			replay_macro_();
+		}
+		else
+		{
+			veejay_msg(VEEJAY_MSG_INFO, "No keystrokes to playback!");
+		}
+	}
+}
 
 void	vj_event_stop()
 {
@@ -9061,5 +9385,7 @@ void	vj_event_stop()
 	vj_event_vevo_free();
 
 	lzo_free( lzo_ );
+
+	reset_macro_();
 }
 

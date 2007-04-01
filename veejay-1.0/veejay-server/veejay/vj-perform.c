@@ -241,6 +241,12 @@ static int vj_perform_increase_tag_frame(veejay_t * info, long num)
  *
  * returns 0 on sucess, -1 on error
  */
+
+int	vj_perform_get_dups()
+{
+	return simple_frame_duplicator;
+}
+
 static int vj_perform_increase_plain_frame(veejay_t * info, long num)
 {
     video_playback_setup *settings = info->settings;

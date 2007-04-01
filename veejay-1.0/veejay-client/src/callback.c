@@ -3577,3 +3577,35 @@ void	on_record_vp_clicked( GtkWidget *w, gpointer data )
 	single_vims( VIMS_RECVIEWPORT );
 }
 
+void	on_macroplay_toggled( GtkWidget *w, gpointer data )
+{
+	if(info->status_lock)
+		return;
+	if( is_button_toggled( "macroplay" ))
+	multi_vims( VIMS_MACRO, "%d %d", 2,1 );
+}
+
+void	on_macrorecord_toggled( GtkWidget *w, gpointer data  )
+{
+	if(info->status_lock)
+		return;
+	if( is_button_toggled( "macrorecord"))
+	multi_vims( VIMS_MACRO, "%d %d", 1, 1 );
+}
+
+void	on_macrostop_toggled( GtkWidget *w, gpointer data )
+{
+	if(info->status_lock)
+		return;
+	if( is_button_toggled( "macrostop"))
+	multi_vims( VIMS_MACRO, "%d %d", 0 , 1 );
+}
+
+void	on_macroclear_clicked( GtkWidget *w, gpointer data )
+{
+	if(info->status_lock)
+		return;
+	
+	multi_vims( VIMS_MACRO, "%d %d", 0, 0 );
+}
+

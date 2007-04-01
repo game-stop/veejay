@@ -5782,6 +5782,20 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 	if( last_pm != pm )
 		update_status_accessibility( last_pm, pm);
 
+	if( info->status_tokens[MACRO] != history[MACRO] )
+	{
+		switch(info->status_tokens[MACRO])
+		{
+			case 0:
+				set_toggle_button( "macrostop", 1 ); break;
+			case 1:
+				set_toggle_button( "macrorecord",1); break;
+			case 2:
+				set_toggle_button( "macroplay",1 ); break;
+		}
+		
+	}
+
 	if( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || last_pm != pm )
 	{
 		// slot changed
@@ -6200,18 +6214,18 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		{
 			int n = status_to_arr( gui->status_msg, gui->status_tokens );
 #ifdef STRICT_CHECKING
-			if( n != 22 )
+			if( n != 23 )
 				veejay_msg(0, "Only got %d symbols", n );
-			assert(n == 22);
+			assert(n == 23);
 #endif
 			info->uc.playmode = gui->status_tokens[ PLAY_MODE ];
 
-			if( n != 22)
+			if( n != 23)
 			{
 				veejay_msg(0, "Received corrupt status line!");
 				int *history = info->history_tokens[ info->uc.playmode ];
 				int i;
-				for(i = 0; i <= 22; i ++ )
+				for(i = 0; i <= 23; i ++ )
 					gui->status_tokens[i] = history[i];
 			}
 			update_gui();

@@ -2342,7 +2342,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 
 
 //int vj_tag_sprint_status(int tag_id, int entry, int changed, char *str)
-int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int frame, int mode,int ts, char *str )
+int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int frame, int mode,int ts, int macro, char *str )
 {
     vj_tag *tag;
     tag = vj_tag_get(tag_id);
@@ -2353,7 +2353,7 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
     //return -1;
 
 	veejay_sprintf(str, 1024,
-			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+			"%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			pfps,
 			frame,
 			mode,
@@ -2375,7 +2375,8 @@ int vj_tag_sprint_status( int tag_id,int cache,int sa, int ca, int pfps,int fram
 			sa,
 			ca,
 			(int)(tag->fader_val),
-			0);
+			0,
+			macro);
     return 0;
 }
 
