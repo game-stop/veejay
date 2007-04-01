@@ -404,13 +404,26 @@ Increase parameter 7 of selected effect
 OSD status (timecode , current sample, cost and cache)
 .TP
 .B SHIFT + spacebar
-Start keystroke recorder
+Start keystroke recorder. The keystroke recorder
+records most of the received VIMS messages and plays them
+back in order and on the position you have pressed them.
+Instead of using the keyboard, you can also use gveejayreloaded,
+and record the buttons pressed. However, some VIMS messages
+are excluded from the keystroke recorder for safety reasons. 
 .TP
 .B spacebar
-(re)play recorder keystrokes
+(re)play recorded VIMS messages. The keystroke recorder
+will jump to the starting position and replay all
+recorded VIMS messages. 
 .TP
 .B CTRL + spacebar
-Clear recorded keystrokes
+Clear recorded keystrokes. This clears all VIMS messages
+in the current selected macro slot.
+.TP
+.B CTRL + [ F1 - F12 ]
+Select a slot to record keystrokes to (default=0)
+Use this if you want to record multiple keystrokes. You
+can switch slots while in keystroke playback.
 .TP
 .B ALT + B 
 Take a snapshot of a video frame and put it in a seperate

@@ -135,7 +135,9 @@ static int 	cached_height_ = 0;
 static char _print_buf[SEND_BUF];
 static char _s_print_buf[SEND_BUF];
 
+static	void	*macro_bank_[12];
 static	void	*macro_port_ = NULL;
+static  int	current_macro_ = 0;
 static	int	macro_status_ = 0;
 static	int	macro_key_    = 1;
 static	int	macro_line_[3] = {-1 ,0,0};
@@ -293,6 +295,19 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_NONE, "2 1"	},
 	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_SHIFT,  "1 1"	},
 	{ VIMS_MACRO,				SDLK_SPACE,		VIMS_MOD_CTRL, "0 0"	},
+	{ VIMS_MACRO_SELECT,			SDLK_F1,		VIMS_MOD_CTRL, "0"	},
+	{ VIMS_MACRO_SELECT,			SDLK_F2,		VIMS_MOD_CTRL, "1"	},
+	{ VIMS_MACRO_SELECT,			SDLK_F3,		VIMS_MOD_CTRL, "2"	},
+	{ VIMS_MACRO_SELECT,			SDLK_F4,		VIMS_MOD_CTRL, "3"	},
+	{ VIMS_MACRO_SELECT,			SDLK_F5,		VIMS_MOD_CTRL, "4"	},
+	{ VIMS_MACRO_SELECT,			SDLK_F6,		VIMS_MOD_CTRL, "5"	},
+	{ VIMS_MACRO_SELECT,			SDLK_F7,		VIMS_MOD_CTRL, "6"	},
+	{ VIMS_MACRO_SELECT,			SDLK_F8,		VIMS_MOD_CTRL, "7"	},
+	{ VIMS_MACRO_SELECT,			SDLK_F9,		VIMS_MOD_CTRL, "8"	},
+	{ VIMS_MACRO_SELECT,			SDLK_F10,		VIMS_MOD_CTRL, "9"	},
+	{ VIMS_MACRO_SELECT,			SDLK_F11,		VIMS_MOD_CTRL, "10"	},
+	{ VIMS_MACRO_SELECT,			SDLK_F12,		VIMS_MOD_CTRL, "11"	},
+
 	{ 0,0,0,NULL },
 };
 #endif
@@ -395,6 +410,34 @@ else { veejay_msg(VEEJAY_MSG_DEBUG,"arg has size of 0x0");}
 
 static  void    init_vims_for_macro();
 
+static	void	macro_select( int slot )
+{
+	if( slot >= 0 && slot < 12 )
+	{
+		macro_bank_[ current_macro_ ] = macro_port_;
+		current_macro_ = slot;
+		macro_port_    = macro_bank_[ current_macro_ ];
+		if( !macro_port_ )
+		{
+			if( macro_status_ == 1 )
+			{
+				veejay_msg(VEEJAY_MSG_INFO,
+					"Continuing recording keystrokes in slot %d", current_macro_);
+				macro_bank_[ current_macro_ ] =
+					vpn(VEVO_ANONYMOUS_PORT );
+				macro_port_ = macro_bank_[ current_macro_ ];
+			}
+			else if (macro_status_ == 2 )
+			{
+				veejay_msg(VEEJAY_MSG_INFO,
+					"No keystrokes found in slot %d", current_macro_);
+			}
+		}
+		macro_current_age_ = 0;
+		macro_expected_age_ = 0;
+	}
+}
+
 static	void	replay_macro_(void)
 {
 	int i,k;
@@ -406,7 +449,7 @@ static	void	replay_macro_(void)
 	items = vevo_list_properties( macro_port_ );
 	if(items)
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Clear keystrokes!");
+		int strokes = 0;
 		for(k = 0; items[k] != NULL ; k ++ )
 		{
 			void *mb = NULL;
@@ -415,11 +458,13 @@ static	void	replay_macro_(void)
 				macro_block_t *m = (macro_block_t*) mb;
 				for( i = 0; i < MAX_MACROS; i ++ )
 				{
-					if(m->msg[i]) m->pending[i] = 1;
+					if(m->msg[i]) { m->pending[i] = 1; strokes ++; }
 				}
 			}
 			free(items[k]);	
 		}
+		veejay_msg(VEEJAY_MSG_INFO, "Replay %d keystrokes in macro slot %d!", strokes,
+			current_macro_ );
 		free(items);
 	}
 }
@@ -435,7 +480,7 @@ static	void	reset_macro_(void)
 	items = vevo_list_properties( macro_port_ );
 	if(items)
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Clear keystrokes!");
+		int strokes = 0;
 		for(k = 0; items[k] != NULL ; k ++ )
 		{
 			void *mb = NULL;
@@ -443,14 +488,17 @@ static	void	reset_macro_(void)
 			{
 				macro_block_t *m = (macro_block_t*) mb;
 				for( i = 0; i < MAX_MACROS; i ++ )
-					if(m->msg[i]) free(m->msg[i]);
+					if(m->msg[i]) { free(m->msg[i]); strokes ++; }
 				free(m);
 			}
 			free(items[k]);	
 		}
+		veejay_msg(VEEJAY_MSG_INFO, "Cleared %d keystrokes from macro slot %d",
+				strokes, current_macro_ );
 		free(items);
 	}
 	vevo_port_free(macro_port_);
+	macro_bank_[ current_macro_ ] = NULL;
 	macro_port_ = NULL;
 }
 
@@ -1367,7 +1415,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 			i++;
 		}
 		vj_event_fire_net_event( v, net_id, NULL, i_args, np, 0 );
-		if( macro_status_ == 1 )
+		if( macro_status_ == 1 && macro_port_ != NULL)
 		{
 			if( valid_for_macro(net_id))
 				store_macro_( v,msg, v->settings->current_frame_num );
@@ -1455,7 +1503,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		if( flags & VIMS_ALLOW_ANY )
  			i = np;
 
-		if( macro_status_ == 1 )
+		if( macro_status_ == 1 && macro_port_ != NULL)
 		{
 			if( valid_for_macro(net_id))
 				store_macro_( v,msg, v->settings->current_frame_num );
@@ -1565,7 +1613,7 @@ void vj_event_update_remote(void *ptr)
 	}
 
 	//@ repeat macros
-	if(macro_status_ == 2 )
+	if(macro_status_ == 2 && macro_port_ != NULL)
 	{
 		int n_macro = 0;
 		char *macro_msg = NULL;
@@ -2455,9 +2503,6 @@ void vj_event_init()
 	lzo_ = lzo_new();
 
 	init_vims_for_macro();
-
-
-	//macro_port_ = vpn(VEVO_ANONYMOUS_PORT);
 
 }
 
@@ -7296,6 +7341,15 @@ void vj_event_select_id(void *ptr, const char format[], va_list ap)
 
 }
 
+void	vj_event_select_macro( void *ptr, const char format[], va_list ap )
+{
+	int args[2];
+	char *str = NULL;
+	P_A( args, str, format, ap );
+	macro_select( args[0] );
+	veejay_msg(VEEJAY_MSG_INFO, "Changed macro slot to %d", current_macro_ );
+}
+
 void vj_event_select_bank(void *ptr, const char format[], va_list ap) 
 {
 	veejay_t *v =(veejay_t*) ptr;
@@ -9344,6 +9398,7 @@ void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap )
 	{
 		reset_macro_();
 		macro_port_ = vpn(VEVO_ANONYMOUS_PORT);
+		macro_bank_[ current_macro_ ] = macro_port_;
 		veejay_msg(VEEJAY_MSG_INFO , "Recording keystrokes!");
 		macro_status_ = 1; 
 		macro_line_[0] = v->settings->current_frame_num;
@@ -9359,6 +9414,13 @@ void	vj_event_set_macro_status( void *ptr,	const char format[], va_list ap )
 			veejay_msg(VEEJAY_MSG_INFO, "Resume playing keystrokes");
 		} else if( macro_line_[0] >= 0 && macro_port_ != NULL)
 		{
+		/*	if( macro_status_ == 1 )
+			{ //@ store current speed and direction 
+				char last[100];
+				snprintf(last,100, "%03d:%d;",
+					VIMS_VIDEO_SET_SPEED, v->settings->current_playback_speed );
+				store_macro_( v, last, v->settings->current_frame_num );
+			}*/
 			macro_status_ = 2;
 			veejay_msg(VEEJAY_MSG_INFO, "Replay all keystrokes!");
 			veejay_change_playback_mode( v, macro_line_[1],macro_line_[2] );
@@ -9386,6 +9448,12 @@ void	vj_event_stop()
 
 	lzo_free( lzo_ );
 
-	reset_macro_();
+	int i;
+	for( i = 0; i < 12; i ++ )
+	{
+		macro_port_ = macro_bank_[i];
+		if(macro_port_)
+		reset_macro_();
+	}
 }
 

@@ -394,6 +394,17 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
+	index_map_[VIMS_MACRO_SELECT] = _new_event(
+				"%d",
+				VIMS_MACRO_SELECT,
+				"Select a bank to store macro keystrokes",
+				vj_event_select_macro,
+				1,
+				VIMS_ALLOW_ANY,
+				"Bank ID",
+				0,
+				NULL );
+
 	index_map_[VIMS_VIDEO_PLAY_FORWARD] = _new_event(  
 				NULL,
 				VIMS_VIDEO_PLAY_FORWARD,
