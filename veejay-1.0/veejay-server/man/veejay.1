@@ -403,17 +403,23 @@ Increase parameter 7 of selected effect
 .B CTRL + O
 OSD status (timecode , current sample, cost and cache)
 .TP
+.B SHIFT + spacebar
+Start keystroke recorder
+.TP
+.B spacebar
+(re)play recorder keystrokes
+.TP
+.B CTRL + spacebar
+Clear recorded keystrokes
+.TP
 .B ALT + B 
 Take a snapshot of a video frame and put it in a seperate
 buffer (used by some effects like Difference Overlay)
 .TP
-.B Left CTRL + Right CTRL + [Any key]
-Take a snapshot of the effect chain and store as effect
-template. Use SHIFT + [Any key] to apply the template
 .SH REFERENCES
 .TP
-sendVIMS for PD: http://zwizwa.fartit.com/pd/sendVIMS/
-SVN repository: http://veejay.dyne.org
+http://veejay.sourceforge.net
+http://veejayhq.net
 .SH BUGS
 see BUGS in the source package
 .SH AUTHOR
@@ -423,7 +429,8 @@ contact the developers, the main mailing list for this
 project is: 
 .I veejay-users@lists.sourceforge.net
 For more info see the website at
+.I http://veejayhq.net
 .I http://veejay.dyne.org
 .I http://veejay.sourceforge.net
 .SH "SEE ALSO"
-.B veejay yuv2rawdv rawdv2yuv any2yuv sayVIMS 
+.B veejay sayVIMS gveejayreloaded 
