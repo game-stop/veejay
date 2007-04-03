@@ -3183,7 +3183,7 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 			if(sample_store(skel)==0) 
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Created new sample [%d] with EDL", skel->sample_id);
-				sample_set_looptype(skel->sample_id,1);
+//				sample_set_looptype(skel->sample_id,1);
 				new_id = skel->sample_id;
 			}
 		
@@ -3599,9 +3599,29 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 	{
 		v->uc->sample_end = s->current_frame_num;
 		if( v->uc->sample_end > v->uc->sample_start) {
-			editlist *el = veejay_edit_copy_to_new( v, v->current_edit_list, v->uc->sample_start,v->uc->sample_end );
-			int start = 0;
-			int end = el->video_frames -1;
+			long vstart = v->uc->sample_start;
+			long vend   = v->uc->sample_end;
+			long devia  = (long) v->current_edit_list->video_fps * 2;
+			vstart -= devia;
+			vend   += devia;
+
+			long start_dif = devia;
+			long end_dif   = (v->uc->sample_end - v->uc->sample_start);
+			if(vstart < 0 ) { vstart=0; start_dif = v->uc->sample_start; }
+			if(vend >= v->current_edit_list->video_frames) {
+ 				vend = v->current_edit_list->video_frames-1;
+				}
+
+			editlist *el = veejay_edit_copy_to_new( v, v->current_edit_list, vstart, vend );
+			if(!el)
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Unable to clone current editlist!");
+				return;
+			}
+	
+			int start = (int) start_dif;
+			int end   = (int) end_dif + start;
+
 			sample_info *skel = sample_skeleton_new(start,end);
 			if(!skel)
 			{
@@ -3609,9 +3629,14 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 				return;
 			}	
 			skel->edit_list = el;
+
 			if(sample_store(skel)==0) {
-				veejay_msg(VEEJAY_MSG_INFO,"Created new sample [%d]", skel->sample_id);
-				sample_set_looptype(skel->sample_id, 1);	
+				veejay_msg(VEEJAY_MSG_INFO,"Created new Sample %d\t [%ld] | %ld-%ld | [%ld]",
+					skel->sample_id,
+					0,
+					start,
+					end,
+					el->video_frames-1);
 			}
 			else
 			{

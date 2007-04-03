@@ -267,20 +267,20 @@ static int _new_id()
 
 sample_info *sample_skeleton_new(long startFrame, long endFrame)
 {
-	char tmp_file[20];
+   char tmp_file[32];
+   sample_info *si;
+   int i, j;
 
-    sample_info *si;
-    int i, j;
-
-    if (!initialized) {
+   if (!initialized) {
     	return NULL;
-	}
-    si = (sample_info *) vj_calloc(sizeof(sample_info));
-    if(startFrame < 0) startFrame = 0;
-//    if(endFrame <= startFrame&& (endFrame !=0 && startFrame != 0))
-	if(endFrame <= startFrame ) 
+   }
+   si = (sample_info *) vj_calloc(sizeof(sample_info));
+
+   if(startFrame < 0) startFrame = 0;
+
+   if(endFrame <= startFrame ) 
    {
-	veejay_msg(VEEJAY_MSG_ERROR,"End frame %ld must be greater then start frame %ld", startFrame, endFrame);
+	veejay_msg(VEEJAY_MSG_ERROR,"End frame %ld must be greater then start frame %ld", endFrame, startFrame);
 	return NULL;
     }
 
@@ -294,43 +294,43 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->last_frame = endFrame;
     si->edit_list = NULL;	// clone later
     si->speed = 1;
-    si->looptype = 1;
-    si->max_loops = 0;
-    si->next_sample_id = 0;
-    si->playmode = 0;
-    si->depth = 0;
-    si->sub_audio = 0;
+    si->looptype = 1; // normal looping
+//  si->max_loops = 0;
+//  si->next_sample_id = 0;
+//  si->playmode = 0;
+//  si->depth = 0;
+//  si->sub_audio = 0;
     si->audio_volume = 50;
     si->marker_start = -1;
     si->marker_end = -1;
-    si->dup = 0;
-    si->loop_dec = 0;
-	si->max_loops2 = 0;
-    si->fader_active = 0;
-    si->fader_val = 0;
-    si->fader_inc = 0;
-    si->fader_direction = 0;
-    si->rec_total_bytes = 0;
-    si->encoder_format = 0;
+//  si->dup = 0;
+//  si->loop_dec = 0;
+//  si->max_loops2 = 0;
+//  si->fader_active = 0;
+//  si->fader_val = 0;
+//  si->fader_inc = 0;
+//  si->fader_direction = 0;
+//  si->rec_total_bytes = 0;
+//  si->encoder_format = 0;
     si->encoder_base = (char*) vj_malloc(sizeof(char) * 255);
-    si->sequence_num = 0;
-    si->encoder_duration = 0;
-    si->encoder_num_frames = 0;
+//  si->sequence_num = 0;
+//  si->encoder_duration = 0;
+//  si->encoder_num_frames = 0;
     si->encoder_destination = (char*) vj_malloc(sizeof(char) * 255);
-	si->encoder_succes_frames = 0;
-    si->encoder_active = 0;
-    si->encoder_total_frames = 0;
-    si->rec_total_bytes = 0;
-    si->encoder_max_size = 0;
-    si->encoder_width = 0;
-    si->encoder_height = 0;
-    si->encoder_duration = 0;
+//  sii->encoder_succes_frames = 0;
+//    si->encoder_active = 0;
+//    si->encoder_total_frames = 0;
+//    si->rec_total_bytes = 0;
+//    si->encoder_max_size = 0;
+//    si->encoder_width = 0;
+//    si->encoder_height = 0;
+//    si->encoder_duration = 0;
    // si->encoder_buf = (char*) malloc(sizeof(char) * 10 * 65535 + 16);
-    si->auto_switch = 0;
-    si->selected_entry = 0;
-    si->effect_toggle = 1;
-    si->offset = 0;
-    sprintf(tmp_file, "sample_%05d.edl", si->sample_id );
+//    si->auto_switch = 0;
+//    si->selected_entry = 0;
+//    si->effect_toggle = 1;
+//    si->offset = 0;
+    snprintf(tmp_file,sizeof(tmp_file), "sample_%05d.edl", si->sample_id );
     si->edit_list_file = strdup( tmp_file );
 
     /* the effect chain is initially empty ! */
@@ -342,20 +342,20 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 		veejay_msg(VEEJAY_MSG_ERROR, "Error allocating entry %d in Effect Chain for new sample",i);
 		return NULL;
 		}
-	si->effect_chain[i]->is_rendering = 0;
+//	si->effect_chain[i]->is_rendering = 0;
 	si->effect_chain[i]->effect_id = -1;
-	si->effect_chain[i]->e_flag = 0;
-	si->effect_chain[i]->frame_offset = 0;
-	si->effect_chain[i]->frame_trimmer = 0;
+//	si->effect_chain[i]->e_flag = 0;
+//	si->effect_chain[i]->frame_offset = 0;
+//	si->effect_chain[i]->frame_trimmer = 0;
 	si->effect_chain[i]->volume = 50;
-	si->effect_chain[i]->a_flag = 0;
-	si->effect_chain[i]->source_type = 0;
+//	si->effect_chain[i]->a_flag = 0;
+//	si->effect_chain[i]->source_type = 0;
 	si->effect_chain[i]->channel = ( sample_size() <= 0 ? si->sample_id : sample_size()-1);
-	si->effect_chain[i]->kf_status = 0;
+//	si->effect_chain[i]->kf_status = 0;
 	/* effect parameters initially 0 */
-	for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++) {
-	    si->effect_chain[i]->arg[j] = 0;
-	}
+//	for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++) {
+//	    si->effect_chain[i]->arg[j] = 0;
+//	}
 
 	si->effect_chain[i]->kf = vpn( VEVO_ANONYMOUS_PORT );
 

@@ -3020,7 +3020,7 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 	uint64_t n1 = (uint64_t) start;
 	uint64_t n2 = (uint64_t) end;
 
-	uint64_t len = n2 - n1 + 1;
+	long len = end - start + 1;
 
 	if( n2 >= el->video_frames)
 	{
@@ -3048,19 +3048,23 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 
 	if (!new_el->frame_list)
 	{
-		veejay_msg(0, "Out of memory, unable to allocate editlist of %lld bytes", len);
+		veejay_msg(0, "Out of memory, unable to allocate editlist of %ld bytes", len);
 		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 		return NULL;
    	}
 
     	k = 0;
 
-    	for (i = n1; i <= n2; i++)
-		new_el->frame_list[k++] = el->frame_list[i];
 
-    	// set length
-    	new_el->video_frames = k;
+//veejay_msg(0, "start of framelist: %p, end = %p", &(el->frame_list[n1]), &(el->frame_list[n2+1]) );
+//veejay_msg(0, "memcpy %p, %p", el->frame_list + n1, el->frame_list + n1 + len );
+	veejay_memcpy( new_el->frame_list , el->frame_list + n1, sizeof(uint64_t) * len );
+	new_el->video_frames = len;
 
+//	for (i = n1; i <= n2; i++)
+//		new_el->frame_list[k++] = el->frame_list[i];
+
+//    	new_el->video_frames = k;
 	return new_el;
 }
 
