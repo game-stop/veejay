@@ -100,8 +100,8 @@ void _fibrectangle_apply(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
 {
     unsigned int i, f1;
-	const int len = frame->len /2;
-	const int uv_len = frame->uv_len/2;
+	const uint32_t len = frame->len /2;
+	const uint32_t uv_len = frame->uv_len/2;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

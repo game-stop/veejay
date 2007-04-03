@@ -192,7 +192,30 @@ static inline unsigned long long int rdtsc()
 #else
 #define	small_memcpy(to,from,n) memcpy( to,from,n )
 #define small_memset(to,val,n) memset(to,val,n)
+char	*veejay_strncpy( char *dest, const char *src, size_t n )
+{
+	dest[n-1] = '\0';
+	return strncpy( dest,src, n-1 );
+}
+char	*veejay_strncat( char *s1, char *s2, size_t n ) {
+	s2[n] = '\0';
+	return strncat( s1,s2, n);
+}
 
+void	yuyv_plane_clear( size_t len, void *to )
+{
+	uint8_t *t = (uint8_t*) to;
+	unsigned int i;
+	i = len;
+	for( ; i > 0 ; i -- )
+	{
+		t[0] = 0;
+		t[1] = 128;
+		t[2] = 0;
+		t[3] = 128;
+		t += 4;
+	}
+}
 static inline unsigned long long int rdtsc()
 {
      struct timeval tv;
@@ -259,6 +282,20 @@ static inline void * __memcpy(void * to, const void * from, size_t n)
 #define MOVNTQ "movq"
 #endif
 
+char	*veejay_strncpy( char *dest, const char *src, size_t n )
+{
+	dest[n-1] = '\0';
+	if( n < 0xff ) {
+		small_memcpy( dest,src, n-1 );
+	} else if ( n < 512 ) {
+		small_memcpy( dest,src, n-1 );
+	} else {
+		return veejay_memcpy( dest,src, n-1 );
+	}
+	return dest;
+}
+
+
 char	*veejay_strncat( char *s1, char *s2, size_t n )
 {
 #ifdef STRICT_CHECKING
@@ -281,7 +318,7 @@ char	*veejay_strncat( char *s1, char *s2, size_t n )
 	} else 
 	{
 		s2[n] = '\0';
-		veejay_memcpy(s,s2, n+1 );
+		return veejay_memcpy(s,s2, n+1 );
 	}
 	return s1;
 }
@@ -869,9 +906,9 @@ static struct {
 } memset_method[] =
 {
      { NULL, NULL, 0},
-     { "glibc memset()",            memset, 0},
+     { "glibc memset()",            (void*)memset, 0},
 #if defined(HAVE_ASM_MMX) || defined(HAVE_ASM_SSE)
-     { "MMX/MMX2/SSE optimized memset()",    fast_memset, 0},
+     { "MMX/MMX2/SSE optimized memset()", (void*)   fast_memset, 0},
 #endif
      { NULL, NULL, 0},
 };

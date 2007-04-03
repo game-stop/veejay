@@ -54,7 +54,7 @@ vj_effect *negation_init(int w, int h)
 #else
 #define _EMMS     "emms"
 #endif
-static	void	inline	negate_mask(uint8_t val)
+static	inline void	negate_mask(uint8_t val)
 {
 	uint8_t mask[8] = { val,val,val,val,  val,val,val,val };
 //	uint64_t mask = 0xffffffffffffffffLL;
@@ -65,7 +65,7 @@ static	void	inline	negate_mask(uint8_t val)
 		:: "r" (m) );
 }
 
-static	void	inline	mmx_negate( uint8_t *dst, uint8_t *in )
+static	inline void	mmx_negate( uint8_t *dst, uint8_t *in )
 {
 	__asm __volatile(
 		"movq	(%0),	%%mm0\n\t"
@@ -80,7 +80,7 @@ static	void	inline	mmx_negate( uint8_t *dst, uint8_t *in )
 
 void negation_apply( VJFrame *frame, int width, int height, int val)
 {
-    unsigned int i;
+    int i;
     int len = (width * height);
     int uv_len = frame->uv_len;
 

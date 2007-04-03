@@ -389,7 +389,7 @@ static int set_option(const char *name, char *value)
 #ifdef HAVE_XML2
     } else if (strcmp(name, "action-file")==0 || strcmp(name,"l")==0) {
 	check_val(optarg,name);
-	strcpy(info->action_file,(char*) optarg);
+	veejay_strncpy(info->action_file,(char*) optarg, strlen( (char*) optarg));
 	info->load_action_file = 1;
 #endif
 	}

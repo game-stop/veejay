@@ -89,7 +89,6 @@ void veejay_msg(int type, const char format[], ...)
 {
     char prefix[10];
     char buf[256];
-    char sline[260];
     va_list args;
     int line = 0;
 
@@ -222,7 +221,6 @@ int	veejay_keep_messages(void)
 
 void	veejay_reap_messages(void)
 {
-	int i;
 /*	for( i = 0; i < _message_history.w_index ; i ++ )
 	{
 		if( _message_history.msg[i] ) 

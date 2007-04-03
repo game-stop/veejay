@@ -38,7 +38,9 @@ extern void fast_memset_finish();
 extern void	packed_plane_clear( size_t len, void *to );
 extern void	yuyv_plane_clear( size_t len, void *to );
 extern int	cpu_cache_size();
+extern int	get_cache_line_size();
 extern char	*veejay_strncat( char *s1, char *s2, size_t n );
+extern char	*veejay_strncpy( char *s1, const char *s2, size_t n );
 extern void    yuyv_plane_init();
 extern void    yuyv_plane_clear( size_t len, void *to );
 

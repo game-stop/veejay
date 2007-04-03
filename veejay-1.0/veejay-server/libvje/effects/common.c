@@ -1601,11 +1601,10 @@ void	veejay_histogram_equalize_rgb( void *his, VJFrame *f, uint8_t *rgb, int int
 	uint32_t LUTg[256];
 	uint32_t LUTb[256];
 	unsigned int i,j;
-	uint8_t *u,*v,*y;
 	unsigned int len = f->len;
 
-	int r = f->width * 3;
-	int H = f->height;
+	uint32_t r = f->width * 3;
+	uint32_t H = f->height;
 
 	switch(mode)
 	{

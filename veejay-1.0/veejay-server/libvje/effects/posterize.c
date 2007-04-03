@@ -49,7 +49,7 @@ vj_effect *posterize_init(int w, int h)
 
 static void _posterize_y_simple(uint8_t *src[3], int len, int value, int threshold_min,int threshold_max)
 {
-	unsigned int i;
+	int i;
 	uint8_t Y;
 	uint8_t *y = src[0];
 	const unsigned int factor = (256 / value);

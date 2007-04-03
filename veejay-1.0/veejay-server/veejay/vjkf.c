@@ -67,8 +67,8 @@ static	char	*extract_( const char *prefix , int p_id )
 unsigned char *keyframe_pack( void *port, int parameter_id, int entry_id, int *rlen )
 {
 	int i,k=0;
-	unsigned char *result = NULL;
-	int n_items = 0;
+	char *result = NULL;
+
 
 	int start = 0, end = 0, type =0;
 
@@ -248,11 +248,11 @@ int keyframe_xml_pack( xmlNodePtr node, void *port, int parameter_id  )
 
 	char xmlbuf[100];
 
-	sprintf(xmlbuf, "%d", start );
+	snprintf(xmlbuf, 100,"%d", start );
 	xmlNewChild(node, NULL, (const xmlChar*) k_s, xmlbuf );
-	sprintf(xmlbuf, "%d", end );
+	snprintf(xmlbuf, 100,"%d", end );
 	xmlNewChild(node, NULL, (const xmlChar*) k_e, xmlbuf );
-	sprintf(xmlbuf, "%d", type );
+	snprintf(xmlbuf, 100,"%d", type );
 	xmlNewChild(node, NULL, (const xmlChar*) k_t, xmlbuf );
 
 	for( i = start; i < end; i ++ )

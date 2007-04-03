@@ -598,7 +598,7 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 		veejay_msg(0, "There is no sample %d", new_sample_id );
 		return 0;
 	}
-	int n = sample_chain_free( info->uc->sample_id );	
+	sample_chain_free( info->uc->sample_id );	
 	veejay_reset_el_buffer(info);
 	return 1;
 }
@@ -920,18 +920,18 @@ static int veejay_screen_update(veejay_t * info )
 					   info->pixel_format );
 
 		if(info->settings->crop)
-			vj_perform_get_cropped_frame(info, &(src.data), 1);
+			vj_perform_get_cropped_frame(info, src.data, 1);
 		else
-			vj_perform_get_primary_frame(info, src.data, 0 );
+			vj_perform_get_primary_frame(info, src.data );
 
-		vj_perform_get_output_frame(info, dst.data );
+		vj_perform_get_output_frame( dst.data );
 
 		yuv_convert_and_scale( info->video_out_scaler, src.data, dst.data );	
 
-		vj_perform_get_output_frame( info, frame );
+		vj_perform_get_output_frame(  frame );
 	}
  	else
-		vj_perform_get_primary_frame(info,frame,0);
+		vj_perform_get_primary_frame(info,frame);
 
 
 #ifdef HAVE_JPEG
@@ -964,7 +964,7 @@ static int veejay_screen_update(veejay_t * info )
 	/* hack to write YCbCr data to stream*/
 	if (info->stream_enabled == 1)
 	{
-		vj_perform_get_primary_frame_420p(info, c_frame );
+		vj_perform_get_primary_frame_420p(info,c_frame );
 		if (vj_yuv_put_frame(info->output_stream, c_frame) == -1)
 		{
 		    veejay_msg(VEEJAY_MSG_ERROR, 
@@ -1317,8 +1317,6 @@ void	veejay_check_homedir(void *arg)
 void veejay_handle_signal(void *arg, int sig)
 {
 	veejay_t *info = (veejay_t *) arg;
-	video_playback_setup *settings = (video_playback_setup *) info->settings;
-	struct sigaction new_action;
 	if (sig == SIGINT || sig == SIGQUIT )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Veejay interrupted by user. Bye!");
@@ -1597,7 +1595,8 @@ int veejay_open(veejay_t * info)
 	settings->buffer_entry[0] = 0;
 	pthread_cond_init(&(settings->buffer_filled[0]), NULL);
 	pthread_cond_init(&(settings->buffer_done[0]), NULL);
-	mymemset_generic(&(settings->syncinfo[0]), 0, sizeof(struct mjpeg_sync));
+
+	veejay_memset( &(settings->syncinfo[0]), 0, sizeof(struct mjpeg_sync));
 
     /* Now do the thread magic */
     settings->currently_processed_frame = 0;
@@ -1637,7 +1636,7 @@ static int veejay_mjpeg_get_params(veejay_t * info,
     for (i = 0; i < 60; i++)
 	bp->COM_data[i] = 0;
     bp->VFIFO_FB = 1;
-    mymemset_generic(bp->reserved, 0, sizeof(bp->reserved));
+    veejay_memset( bp->reserved, 0, sizeof(bp->reserved));
 
     return 1;
 }
@@ -1698,15 +1697,14 @@ static int veejay_mjpeg_set_playback_rate(veejay_t * info,
  * return value: 1 on success, 0 on error
  ******************************************************/
 
-static int veejay_mjpeg_queue_buf(veejay_t * info, int frame,
-				   int frame_periods)
+static int veejay_mjpeg_queue_buf(veejay_t * info,   int frame_periods)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     /* mark this buffer as playable and tell the software playback thread to wake up if it sleeps */
     pthread_mutex_lock(&(settings->valid_mutex));
-    settings->valid[frame] = frame_periods;
-    pthread_cond_broadcast(&(settings->buffer_filled[frame]));
+    settings->valid[0] = frame_periods;
+    pthread_cond_broadcast(&(settings->buffer_filled[0]));
     pthread_mutex_unlock(&(settings->valid_mutex));
     return 1;
 }
@@ -1943,7 +1941,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		if(info->settings->crop)
 			vj_perform_get_cropped_frame(info, &src.data, 0);
 		else
-			vj_perform_get_primary_frame(info, &src.data ,0 );
+			vj_perform_get_primary_frame(info, &src.data  );
 	
 		vj_perform_init_output_frame(info, &(dst.data),
 			info->video_output_width, info->video_output_height );
@@ -2023,11 +2021,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		info->video_output_width,
 		info->video_output_height);
    
-//	info->plugin_frame = vj_perform_init_plugin_frame(info);
-//	info->plugin_frame_info = vj_perform_init_plugin_frame_info(info);
-
-
-
     if(info->dump) vj_effect_dump(); 	
     info->output_stream = vj_yuv4mpeg_alloc(info->current_edit_list, info->video_output_width,
 		info->video_output_height );
@@ -2178,7 +2171,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	if(def_tags && id <= 0)
 	{
 		int n = vj_tag_num_devices();
-		int i = 0;
 		veejay_msg(0, "create_tag: nstreams=%d,pf=%d, %d",info->nstreams,1, (def_tags-1));
 		int nid =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, "bogus", info->nstreams, el->pixel_format, (def_tags-1) );
 		if( nid> 0)
@@ -2361,8 +2353,7 @@ static void veejay_playback_cycle(veejay_t * info)
     
     struct timeval time_now;
     double tdiff1, tdiff2;
-    int n = 0;
-    int first_free, frame, skipv, skipa, skipi, nvcorr;
+    int first_free, skipv, skipa, skipi, nvcorr;
     struct mjpeg_params bp;
     long ts, te;
 
@@ -2393,10 +2384,10 @@ static void veejay_playback_cycle(veejay_t * info)
     if( info->settings->late[1] )
    	 veejay_change_playback_mode(info,info->settings->late[0],info->settings->late[1]);
 
-    vj_perform_queue_audio_frame(info,0);
-    vj_perform_queue_video_frame(info,0,0);
+    vj_perform_queue_audio_frame(info);
+    vj_perform_queue_video_frame(info,0);
  
-    if (vj_perform_queue_frame(info, 0, 0) != 0)
+    if (vj_perform_queue_frame(info, 0) != 0)
     {
 	   veejay_msg(VEEJAY_MSG_ERROR,"Unable to queue frame");
            return;
@@ -2429,7 +2420,6 @@ static void veejay_playback_cycle(veejay_t * info)
     stats.nsync = 0;
     stats.audio = 0;
     stats.norm = el->video_norm == 'n' ? 1 : 0;
-    frame = 0;
     tdiff1 = 0.;
     tdiff2 = 0.;
     nvcorr = 0;
@@ -2438,7 +2428,7 @@ static void veejay_playback_cycle(veejay_t * info)
     {
 	stats.audio = 1;
     }
-    veejay_mjpeg_queue_buf(info, n, 1);
+    veejay_mjpeg_queue_buf(info, 1);
     
     while (settings->state != LAVPLAY_STATE_STOP) {
 	first_free = stats.nsync;
@@ -2454,8 +2444,6 @@ static void veejay_playback_cycle(veejay_t * info)
 		goto FINISH;
 	    }
 	
-	    frame = bs.frame;
-
 	    stats.nsync++;
 	    gettimeofday(&time_now, 0);
 	    stats.tdiff = time_now.tv_sec - bs.timestamp.tv_sec +
@@ -2487,6 +2475,7 @@ static void veejay_playback_cycle(veejay_t * info)
 	stats.tdiff = tdiff1 - tdiff2;
 
 	/* Fill and queue free buffers again */
+	int n;
 	for (n = first_free; n < stats.nsync;) {
 	    /* Audio/Video sync correction */
 	    skipv = 0;
@@ -2519,16 +2508,15 @@ static void veejay_playback_cycle(veejay_t * info)
 #ifdef HAVE_SDL
 	    ts= SDL_GetTicks();
 #endif
-	    frame = n % 1;
-	    settings->buffer_entry[frame] ++;
+	    settings->buffer_entry[0] ++;
 
 	    if (!skipa) 
-			vj_perform_queue_audio_frame(info,frame);
+			vj_perform_queue_audio_frame(info);
 
 	    if (!skipv)
-			vj_perform_queue_video_frame(info,frame,skipi);
+			vj_perform_queue_video_frame(info,skipi);
   
-	    vj_perform_queue_frame( info, frame, skipi );
+	    vj_perform_queue_frame( info, skipi );
 
 #ifdef HAVE_SDL	
 	    te = SDL_GetTicks();
@@ -2538,7 +2526,7 @@ static void veejay_playback_cycle(veejay_t * info)
 #endif
 	    if(skipv ) continue;
 
-	    if (!veejay_mjpeg_queue_buf(info, frame, 1)) {
+	    if (!veejay_mjpeg_queue_buf(info, 1)) {
 		veejay_msg(VEEJAY_MSG_ERROR ,"Error queuing a frame");
 		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 		goto FINISH;
@@ -2766,9 +2754,6 @@ int vj_server_setup(veejay_t * info)
 int	prepare_cache_line(int perc, int n_slots)
 {
 	int total = 0; 
-	int avail  = 0;
-	int buffer = 0;
-	int cache = 0;
 	char line[128];
 	FILE *file = fopen( "/proc/meminfo","r");
 	if(!file)
@@ -2813,10 +2798,7 @@ int	prepare_cache_line(int perc, int n_slots)
 
 int smp_check()
 {
-	int n_cpu = get_nprocs();
-	int c_cpu = get_nprocs_conf();
-	
-	return n_cpu;
+	return get_nprocs();
 }
 
 veejay_t *veejay_malloc()
@@ -3040,9 +3022,9 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 
 	uint64_t len = n2 - n1 + 1;
 
-	if( n1 < 0 || n2 > el->video_frames-1)
+	if( n2 >= el->video_frames)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Sample start and end are outside of editlist");
+		veejay_msg(VEEJAY_MSG_ERROR, "Sample end is outside of editlist");
 		return NULL;
 	}
 
@@ -3111,7 +3093,7 @@ int veejay_edit_delete(veejay_t * info, editlist *el, long start, long end)
 		return 0;
 	}
 
-	if (n2 < n1 || n1 > el->video_frames|| n2 >= el->video_frames || n2 < 0 || n1 < 0)
+	if (n2 < n1 || n1 >= el->video_frames|| n2 >= el->video_frames )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, 
 			    "Incorrect parameters for deleting frames");
@@ -3385,7 +3367,7 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
         return sample->sample_id;
 }
 
-int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start,long end, long destination )
+int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start,long end )
 {
 	video_playback_setup *settings =
 		(video_playback_setup *) info->settings;
@@ -3394,10 +3376,10 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start,
 	if( el->is_empty )
 		c -= 2;
 
-	n = open_video_file(movie, el, info->preserve_pathnames, info->auto_deinterlace,1,
+	int res = open_video_file(movie, el, info->preserve_pathnames, info->auto_deinterlace,1,
 		info->edit_list->video_norm );
 
-	if (n < 0)
+	if (res < 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Error adding file '%s' to EDL", movie );
 		return 0;

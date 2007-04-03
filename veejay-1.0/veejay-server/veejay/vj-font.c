@@ -2088,7 +2088,7 @@ static void vj_font_text_osd_render(vj_font_t *f, long posi, void *_picture, cha
 		if(in_string)
 		{
 			size = strlen( in_string );
-			strncpy(osd_text, in_string, size );
+			veejay_strncpy(osd_text, in_string, size );
 			osd_text[size] = '\0';
 		}
 	}

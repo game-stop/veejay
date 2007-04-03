@@ -19,6 +19,7 @@
 #include <config.h>
 #include <stdlib.h>
 #include <libvjmem/vjmem.h>
+#include <libvjmsg/vj-msg.h>
 #include <sys/time.h>
 #include <stdlib.h>
 #include <string.h>
@@ -141,9 +142,9 @@ void vj_mem_init(void)
 #endif
 	if(MEM_ALIGNMENT_SIZE == 0)
 		MEM_ALIGNMENT_SIZE = getpagesize();
-	
+#if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE)
 	yuyv_plane_init();
-
+#endif
 	find_best_memcpy();	
 	find_best_memset();
 

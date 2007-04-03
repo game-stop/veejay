@@ -86,7 +86,7 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination);
 int veejay_edit_move(veejay_t * info, editlist *el , long start, long end,long dest);
 
 int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start,
-			  long end, long destination);
+			  long end);
 int veejay_edit_addmovie_sample(veejay_t * info, char *movie , int new_s);
 
 int veejay_edit_set_playable(veejay_t * info, long start, long end);

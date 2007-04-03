@@ -115,7 +115,7 @@ void overclock_free()
 
 void overclock_apply(VJFrame *frame, int width, int height, int n, int radius )
 {
-    unsigned int x,y,dx,dy;
+    int x,y,dx,dy;
     uint8_t t = 0; 
 	int s = 0;
     int i = 0;

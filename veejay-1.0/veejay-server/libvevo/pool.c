@@ -161,7 +161,7 @@ void	*vevo_pool_alloc( void *p, size_t bs, unsigned int k )
 		pool->spaces[k] = m;
 		space = m;
 	}
-	void **mag = pool->spaces[k]->mag;
+	void **mag = (void**)pool->spaces[k]->mag;
 	return mag[ --space->rounds ];
 }
 
@@ -258,7 +258,7 @@ void	*vevo_pool_slice_alloc( void *p, size_t bs )
 		pool->space = m;
 		space = m;
 	}
-	void **mag = pool->space->mag;
+	void **mag =(void**) pool->space->mag;
 	return mag[ --space->rounds ];
 }
 
@@ -272,7 +272,7 @@ void	vevo_pool_slice_free( void *p, void *ptr )
 	pool_t *pool = (pool_t*) p;
 	unsigned int n = pool->space->rounds;
 	space_t *space = pool->space;
-	void **mag = space->mag;
+	void **mag = (void**)space->mag;
 	if( n == ROUNDS_PER_MAG )
 	{ 
 		space_t *l = space;
@@ -280,7 +280,7 @@ void	vevo_pool_slice_free( void *p, void *ptr )
 		{
 			if( l->rounds < ROUNDS_PER_MAG )
 			{
-				mag = l->mag;
+				mag = (void**)l->mag;
 				mag[ l->rounds ++ ] = ptr;
 				return;
 			}

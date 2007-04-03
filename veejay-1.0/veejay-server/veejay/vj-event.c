@@ -338,7 +338,7 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
 
 #define SEND_DATA(v,buf,buflen)\
 {\
-  int res_ = vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, buf, buflen);\
+  int res_ = vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8_t*) buf, buflen);\
   if(res_ <= 0) { \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link); \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link); \
@@ -348,7 +348,7 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
 
 #define SEND_MSG(v,str)\
 {\
-if(vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, str, strlen(str)) < 0) { \
+if(vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8_t*) str, strlen(str)) < 0) { \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link); \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link);} \
 }
@@ -927,7 +927,7 @@ vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id)
 		veejay_msg(VEEJAY_MSG_ERROR, "Error allocating memory for bundled message context");
 		return NULL;
 	}
-	strncpy(m->bundle, bundle_msg, len);
+	veejay_strncpy(m->bundle, bundle_msg, len);
 	
 	m->event_id = event_id;
 
@@ -1018,7 +1018,7 @@ void vj_event_parse_bundle(veejay_t *v, char *msg )
 				if(msg[offset+j] == ';')
 				{
 					found_end_of_msg = offset+j+1;
-					strncpy(atomic_msg, msg+offset, (found_end_of_msg-offset));
+					veejay_strncpy(atomic_msg, msg+offset, (found_end_of_msg-offset));
 					atomic_msg[ (found_end_of_msg-offset) ] ='\0';
 					offset += j + 1;
 					j = 0;
@@ -1123,7 +1123,7 @@ static	void	init_vims_for_macro()
 static	int	valid_for_macro(int net_id)
 {
 	int k;
-	if(net_id > 400 || net_id >= 388 || net_id >= 80 && net_id <= 86 || net_id >= 50 && net_id <= 59)
+	if(net_id > 400 || net_id >= 388 || (net_id >= 80 && net_id <= 86) || (net_id >= 50 && net_id <= 59))
 		return 0;
 
 	return vvm_[net_id];
@@ -1306,7 +1306,7 @@ static		char 	*inline_str_to_str(int flags, char *msg)
 		res = (char*) malloc(sizeof(char) * len );
 		memset(res, 0, len );
 		if( msg[len-1] == ';' )
-			strncpy( res, msg, len- 1 );
+			veejay_strncpy( res, msg, len- 1 );
 	}
 	else			
 	{
@@ -1826,7 +1826,7 @@ static	int	get_cstr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, char *d
 		t   = UTF8toLAT1(tmp);
 		if(!t)
 			return 0;
-		strncpy( dst, t, strlen(t) );	
+		veejay_strncpy( dst, t, strlen(t) );	
 		free(t);
 		xmlFree(tmp);
 		return 1;
@@ -1949,7 +1949,7 @@ xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );\
 #define __xml_cstr( buf, var , node, name )\
 {\
 if(var != NULL){\
-strncpy(buf,var,strlen(var));\
+veejay_strncpy(buf,var,strlen(var));\
 xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );}\
 }
 
@@ -2178,7 +2178,7 @@ void	vj_event_format_xml_event( xmlNodePtr node, int event_id )
 			veejay_msg(VEEJAY_MSG_ERROR, "bundle %d does not exist", event_id);
 			return;
 		}
-		strncpy(buffer, m->bundle, strlen(m->bundle) );
+		veejay_strncpy(buffer, m->bundle, strlen(m->bundle) );
 		xmlNewChild(node, NULL, (const xmlChar*) XML_CONFIG_KEY_EXTRA ,
 			(const xmlChar*) buffer);
 			// m->event_id and event_id should be equal
@@ -2721,10 +2721,12 @@ void	vj_event_send_keylist( void *ptr, const char format[], va_list ap )
 			{
 				if( ev->event_id >= VIMS_BUNDLE_START && ev->event_id < VIMS_BUNDLE_END )
 				{
+					skip = 1;
 					if( vj_event_bundle_exists(ev->event_id))
-						snprintf( message,256, "%s", vj_event_bundle_get( ev->event_id ));
-					else
-						skip = 1;
+					{
+						vj_msg_bundle *mm = vj_event_bundle_get( ev->event_id);
+						if( mm->bundle ) { skip = 0; snprintf(message, 256, "%s", mm->bundle ); }
+					}
 				}
 				else
 				{
@@ -2740,7 +2742,7 @@ void	vj_event_send_keylist( void *ptr, const char format[], va_list ap )
 						ev->event_id, ev->key_mod, ev->key_symbol, strlen(message), message );
 					int line_len = strlen(line);
 					len += line_len;
-					strncat( blob, line, line_len);
+					veejay_strncat( blob, line, line_len);
 				}
 				skip = 0;
 			}	
@@ -2779,7 +2781,7 @@ static	int	min_bundles_len(veejay_t *v )
 		}
 		else
 		{
-			if( !vj_event_exists(i) || i >= 400 && i < VIMS_BUNDLE_START)
+			if( !vj_event_exists(i) || (i >= 400 && i < VIMS_BUNDLE_START))
 				continue;
 		
 			char *name = vj_event_vevo_get_event_name(i);
@@ -2858,7 +2860,7 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 		}
 		else
 		{
-			if( !vj_event_exists(i) || i >= 400 && i < VIMS_BUNDLE_START )
+			if( !vj_event_exists(i) || (i >= 400 && i < VIMS_BUNDLE_START) )
 				continue;
 		
 			char *name = vj_event_vevo_get_event_name(i);
@@ -6339,7 +6341,7 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 		}
 	}
 
-	if ( veejay_edit_addmovie(v,( SAMPLE_PLAYING(v) ? v->edit_list : v->current_edit_list),str,start,destination,destination))
+	if ( veejay_edit_addmovie(v,( SAMPLE_PLAYING(v) ? v->edit_list : v->current_edit_list),str,start,destination))
 		veejay_msg(VEEJAY_MSG_INFO, "Added video file %s to EditList",str); 
 	else
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to add file %s to EditList",str); 
@@ -6662,7 +6664,7 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	int args[2];
-	char *str = NULL;
+	unsigned char *str = NULL;
 	P_A(args,str,format,ap);
 	if(args[0] == 0) args[0] = v->uc->sample_id;
 	if(args[0] == -1) args[0] = vj_tag_size()-1;
@@ -7127,7 +7129,7 @@ void vj_event_output_y4m_start(void *ptr, const char format[], va_list ap)
 	if(v->stream_enabled==0)
 	{
 		int n=0;
-		strncpy(v->stream_outname, str,strlen(str));
+		veejay_strncpy(v->stream_outname, str,strlen(str));
 		n= vj_yuv_stream_start_write(v->output_stream,str,v->edit_list);
 		if(n==1) 
 		{
@@ -7485,7 +7487,7 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 						veejay_strncat( bundle, svalue, strlen(svalue));
 					}
 				}
-				strncpy( blob+bunlen, bundle,strlen(bundle));
+				veejay_strncpy( blob+bunlen, bundle,strlen(bundle));
 				bunlen += strlen(bundle);
 			}
 		}
@@ -7856,7 +7858,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 
 	VJFrame frame;
 	veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
-	vj_perform_get_primary_frame( v, frame.data, 0 );
+	vj_perform_get_primary_frame( v, frame.data );
 
 	//@ 420,422,444
 	int full444 =  (v->settings->composite);
@@ -8176,7 +8178,7 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 	editlist *el = ( SAMPLE_PLAYING(v) ? sample_get_editlist( v->uc->sample_id ) : 
 				v->current_edit_list );
 
-	int n_frames = el->video_frames;
+	long n_frames = el->video_frames;
 	if( SAMPLE_PLAYING(v))
 		n_frames = sample_max_video_length( v->uc->sample_id );
 
@@ -9065,7 +9067,7 @@ static	void	*select_dict( veejay_t *v , int n )
 
 void	vj_event_add_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 {
-	char text[2048];
+	unsigned char text[2048];
 	int args[6];
 	veejay_t *v = (veejay_t*)ptr;
 

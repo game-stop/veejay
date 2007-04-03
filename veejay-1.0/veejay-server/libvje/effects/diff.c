@@ -73,7 +73,6 @@ void	diff_destroy(void)
 
 int diff_malloc(void **d, int width, int height)
 {
-	int i;
 	diff_data *my;
 	*d = (void*) vj_calloc(sizeof(diff_data));
 	my = (diff_data*) *d;
@@ -89,7 +88,6 @@ void diff_free(void *d)
 {
 	if(d)
 	{
-		int i;
 		diff_data *my = (diff_data*) d;
 		if(my->data) free(my->data);
 		free(d);
@@ -99,7 +97,6 @@ void diff_free(void *d)
 
 void diff_prepare(void *user, uint8_t *map[3], int width, int height)
 {
-	diff_data *my = (diff_data*) user;
 	if(!static_bg )
 	{
 		veejay_msg(0,"FX \"Map B to A (substract background mask)\" not initialized");
@@ -151,7 +148,7 @@ void diff_apply(void *ed, VJFrame *frame,
 {
     
 	unsigned int i;
-	const int len = frame->len;
+	const uint32_t len = frame->len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];

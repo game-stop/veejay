@@ -605,7 +605,7 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 			char *str_ptr = &s[i];
 			str_ptr ++;  // skip 'V'
 
-			strncpy( tmp_len,str_ptr, 3 ); // header length   
+			veejay_strncpy( tmp_len,str_ptr, 3 ); // header length   
 	
 			if( sscanf(tmp_len, "%03d", &slen) <= 0 )
 			{
@@ -633,7 +633,7 @@ static  int	_vj_verify_msg(vj_server *vje,int link_id, char *buf, int buf_len )
 
 			i += 4; // advance to message content
 			str_ptr += 4;
-			strncpy( net_id, str_ptr, 3 );
+			veejay_strncpy( net_id, str_ptr, 3 );
 
 			if( sscanf( net_id, "%03d", &netid ) <= 0 )
 			{
@@ -722,7 +722,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 		{
 			str_ptr ++;
 	
-			strncpy( tmp_len,str_ptr, 3 ); // header length   
+			veejay_strncpy( tmp_len,str_ptr, 3 ); // header length   
 			if( sscanf(tmp_len, "%03d", &slen) <= 0 )
 			{
 				veejay_msg(0, "Error parsing header in '%s' (%d bytes)", buf, buf_len );
@@ -730,7 +730,7 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 			}
 			i += 4; // advance to message content
 			str_ptr += 4;
-			strncpy( net_id, str_ptr, 3 );
+			veejay_strncpy( net_id, str_ptr, 3 );
 	
 			if( sscanf( net_id, "%03d", &netid ) <= 0 )
 			{

@@ -1156,10 +1156,6 @@ int	vevo_port_verify( vevo_port_t *port )
 
 void	vevo_port_free( vevo_port_t *port )
 {
-	int ref_count = 1;
-	int dec_ref   = 1;
-	int error = 0;
-
 	if(!port)
 	{
 		veejay_msg(0, "Port invalid in free()");
@@ -1552,16 +1548,10 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 	while((node=hash_scan_next(&scan)) != NULL)
 	{
 		s = hnode_get(node);
-		if( s && s->atom_type == atype || atype == 0)
+		if( (s && s->atom_type == atype) || atype == 0)
 		{
 			int type = 0;
 			int ec = atom_get_value(s, 0, &type);
-		/*	if( type != PORT_TYPE_FILTER_CLASS ||
-				type != PORT_TYPE_CHANNEL_TEMPLATE ||
-				 	type != PORT_TYPE_PARAMETER_TEMPLATE ||
-						type != PORT_TYPE_PLUGIN_INFO ||
-			 	!(s->flags & VEVO_PROPERTY_SOFTREF) )*/
-
 			if( ec == VEVO_NO_ERROR && !s->softlink )
 				list[i++] = s;
 		}

@@ -924,7 +924,7 @@ if test "x$enable_compile_warnings" != "xno" ; then
  if test "x$GCC" = "xyes" ; then
     case "$CFLAGS" in
      *-Wall*) ;;
-     *) warnCFLAGS="-Wall -Wunused " ;;
+     *) warnCFLAGS="" ;;
     esac
   if test "x$enable_compile_warnings" = "xyes" ; then
     warnCFLAGS="$warnCFLAGS -Wmissing-prototypes -Wundef -Wshadow -Wbad-function-cast -Wconversion -Wpadded -Wunreachable-code -Wmissing-declarations -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual"

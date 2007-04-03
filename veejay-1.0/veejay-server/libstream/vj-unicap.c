@@ -333,7 +333,7 @@ int	vj_unicap_select_value( void *ud, int key, double attr )
 			if( property.type == UNICAP_PROPERTY_TYPE_MENU )
 			{
 				int idx  = vut->option[ key ];
-				strcpy( property.menu_item, property.menu.menu_items[idx]  );
+				veejay_strncpy( property.menu_item, property.menu.menu_items[idx], strlen( property.menu.menu_items[idx])  );
 				unicap_set_property( vut->handle, &property );
 				unicap_unlock_properties( vut->handle );
 				return 1;
@@ -714,7 +714,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 		} else if (strncasecmp( properties[i], "video source",12) == 0 ) {
 			unicap_property_t p;
 			unicap_void_property(  &p  );
-			strcpy( p.identifier, properties[i]);
+			veejay_strncpy( p.identifier, properties[i], strlen( properties[i]));
 			unicap_get_property( vut->handle, &p );
 			for(j=0;j<p.menu.menu_item_count;j++)
 			{
@@ -724,7 +724,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 		}else if (strncasecmp( properties[i], "video norm",10) == 0 ) {
 			unicap_property_t p;
 			unicap_void_property(  &p  );
-			strcpy( p.identifier, properties[i]);
+			veejay_strncpy( p.identifier, properties[i], strlen(i));
 			unicap_get_property( vut->handle, &p );
 			for(j=0;j<p.menu.menu_item_count;j++)
 			{

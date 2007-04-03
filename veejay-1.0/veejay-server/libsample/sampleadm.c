@@ -2280,7 +2280,7 @@ unsigned char *UTF8toLAT1(unsigned char *in)
 		//veejay_msg(VEEJAY_MSG_ERROR, "Cannot convert '%s'", in );
 		//free(out);
 		//return (NULL);
-		strncpy( out, in, out_size );
+		veejay_strncpy( out, in, out_size );
     }
 
     out = realloc(out, out_size + 1);

@@ -465,7 +465,7 @@ sample_move_float_char(unsigned char *dst, sample_t * src, unsigned long nsample
 }
 
 /* fill dst buffer with nsamples worth of silence */
-static void inline
+static inline void
 sample_silence_float(sample_t * dst, unsigned long nsamples)
 {
   /* ALERT: signed sign-extension portability !!! */
@@ -476,7 +476,7 @@ sample_silence_float(sample_t * dst, unsigned long nsamples)
   }
 }
 
-static bool inline
+static inline bool
 ensure_buffer_size(char **buffer, unsigned long *cur_size,
                    unsigned long needed_size)
 {
@@ -508,7 +508,7 @@ JACK_callback(nframes_t nframes, void *arg)
   jack_driver_t *drv = (jack_driver_t *) arg;
 
   unsigned int i;
-  int src_error = 0;
+
 
   drv->chunk_size = nframes;
 
@@ -567,8 +567,8 @@ JACK_callback(nframes_t nframes, void *arg)
          (&drv->callback_buffer2, &drv->callback_buffer2_size,
           jackBytesAvailable))
       {
-        ERR("allocated %lu bytes, need %lu bytes\n",
-            drv->callback_buffer2_size, jackBytesAvailable);
+
+
         return -1;
       }
 
@@ -1116,7 +1116,7 @@ JACK_OpenDevice(jack_driver_t * drv)
       }
 
       /* display a trace of the output ports we found */
-      int num_ports = 0;
+      unsigned int num_ports = 0;
       if(ports)
       {
         for(i = 0; ports[i]; i++)
@@ -1238,7 +1238,7 @@ JACK_OpenDevice(jack_driver_t * drv)
       }
 
       /* display a trace of the input ports we found */
-      int num_ports = 0;
+      unsigned int num_ports = 0;
       if(ports)
       {
         for(i = 0; ports[i]; i++)
@@ -1912,7 +1912,7 @@ JACK_Read(int deviceID, unsigned char *data, unsigned long bytes)
         jack_ringbuffer_read_space(drv->pRecPtr),
         jack_ringbuffer_write_space(drv->pRecPtr));
 
-  int i;
+  unsigned int i;
   for(i = 0; i < drv->num_output_channels; i++)
   {
     /* apply volume to the floating value */
@@ -2234,8 +2234,6 @@ JACK_GetBytesFreeSpace(int deviceID)
 
   return_val = JACK_GetBytesFreeSpaceFromDriver(drv);
   releaseDriver(drv);
-
-  if(return_val < 0) return_val = 0;
 
   TRACE("deviceID(%d), retval == %ld\n", deviceID, return_val);
 

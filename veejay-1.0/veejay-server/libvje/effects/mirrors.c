@@ -45,10 +45,10 @@ vj_effect *mirrors_init(int width,int height)
 
 void _mirrors_v( uint8_t *yuv[3], int width, int height, int factor, int swap)
 {
-	const unsigned int len = width * height;
-	unsigned int r,c;
-	const unsigned int line_width = width / ( factor + 1);
-	unsigned int i=0;
+	const int len = width * height;
+	int r,c;
+	const int line_width = width / ( factor + 1);
+	int i=0;
 
 	if(swap)
 	{
@@ -85,12 +85,12 @@ void _mirrors_v( uint8_t *yuv[3], int width, int height, int factor, int swap)
 }
 void _mirrors_h( uint8_t *yuv[3], int width, int height, int factor, int swap)
 {
-	unsigned int line_height = height / ( factor + 1);
+	int line_height = height / ( factor + 1);
 
-	unsigned int nr = height / line_height;
-	unsigned int x,y,i;
-	unsigned int slice = 0;
-	unsigned int slice_end = 0;
+	int nr = height / line_height;
+	int x,y,i;
+	int slice = 0;
+	int slice_end = 0;
 	if(swap)
 	{
 		for(i=0; i < nr; i++)

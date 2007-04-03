@@ -1509,12 +1509,19 @@ void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3
 	int x,y;
 
 	y  = ty1 * w;
+#if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE)
 	fast_memset_dirty( outY, 0, y );
 	fast_memset_dirty( outU, 128, y );
 	fast_memset_dirty( outV, 128, y );
+#else
+	veejay_memset( outY,0,y);
+	veejay_memset( outU,128,y);
+	veejay_memset( outV, 128,y);
+#endif
 
 	for( y = ty1; y < ty2; y ++ )
 	{
+#if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE )
 		fast_memset_dirty( outY + (y * w ), 0, tx1 );
 		fast_memset_dirty( outY + (y * w ) + tx2, 0, (w-tx2));
 
@@ -1523,7 +1530,16 @@ void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3
 
 		fast_memset_dirty( outV + (y * w ), 128, tx1 );
 		fast_memset_dirty( outV + (y * w ) + tx2, 128, (w-tx2));
+#else
+		veejay_memset( outY + (y * w ), 0, tx1 );
+		veejay_memset( outY + (y * w ) + tx2, 0, (w-tx2));
 
+		veejay_memset( outU + (y * w ), 128, tx1 );
+		veejay_memset( outU + (y * w ) + tx2, 128, (w-tx2));
+
+		veejay_memset( outV + (y * w ), 128, tx1 );
+		veejay_memset( outV + (y * w ) + tx2, 128, (w-tx2));
+#endif
 		for( x = tx1; x < tx2 ; x ++ )
 		{
 			i = y * w + x;
@@ -1535,12 +1551,18 @@ void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3
 	}
 	y = (v->h - ty2 ) * w;
 	x = ty2 * w;
+#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
+
 	fast_memset_dirty( outY + x, 0, y );
 	fast_memset_dirty( outU + x, 128, y );
 	fast_memset_dirty( outV + x, 128, y );
-
-
 	fast_memset_finish();
+#else
+	veejay_memset( outY+x,0,y);
+	veejay_memset( outU + x, 128,y);
+	veejay_memset( outV + x , 128, y );
+
+#endif
 }
 
 #define pack_yuyv_pixel( y0,u0,u1,y1,v0,v1 ) (\
@@ -1587,8 +1609,9 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 	x = ty2 * w;
 	if( y > 0 )
 		yuyv_plane_clear( y*2, out_img + (x*2) );
+#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
 	fast_memset_finish(); // finish yuyv_plane_clear
-
+#endif
 	for( y = ty1 ; y < ty2; y ++ )
 	{
 		for( x = tx1; x < tx2; x += 8 )
@@ -1659,12 +1682,12 @@ void	viewport_produce_full_img_packed( void *vdata, uint8_t *img[3], uint8_t *ou
 	register uint32_t n,i,x,y,m;
 
 	y  = ty1 * w;
-	packed_plane_clear( y*3, out_img);
+	yuyv_plane_clear( y*3, out_img);
 
 	for( y = ty1 ; y < ty2; y ++ )
 	{
-		packed_plane_clear( tx1*3, outYUYV + 3 * (y*w) );
-		packed_plane_clear( (w-tx2)*3, outYUYV + 3 * (y*w+tx2));
+		yuyv_plane_clear( tx1*3, outYUYV + 3 * (y*w) );
+		yuyv_plane_clear( (w-tx2)*3, outYUYV + 3 * (y*w+tx2));
 		for( x = tx1; x < tx2; x ++ )
 		{
 			i = y * w + x;
@@ -1677,8 +1700,10 @@ void	viewport_produce_full_img_packed( void *vdata, uint8_t *img[3], uint8_t *ou
 	y = (v->h - ty2 ) * w;
 	x = ty2 * w;
 
-	packed_plane_clear( y*3, out_img + (x*3) );
+	yuyv_plane_clear( y*3, out_img + (x*3) );
+#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
 	fast_memset_finish();
+#endif
 }
 
 
