@@ -243,9 +243,7 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				if(vj_client_send( sayvims, V_CMD, buf )<=0)
-					fprintf(stderr, "Cannot send '%s'!\n",
-						buf );
+				vj_client_send( sayvims, V_CMD, buf );
 				vj_flush(1);
 			}
 		}
