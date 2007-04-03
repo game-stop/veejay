@@ -756,6 +756,9 @@ static  sample_gui_slot_t *find_gui_slot_by_sample( int sample_id , int sample_t
 static	int	selected_is_playing()
 {
 	int *history = info->history_tokens[ (info->status_tokens[PLAY_MODE]) ];
+#ifdef STRICT_CHECKING
+	assert( history != NULL );
+#endif
 	if(!info->selected_slot)
 	{
 		return 0;
@@ -3971,6 +3974,11 @@ void	load_effectlist_info()
 static	void	select_slot__( int pm )
 {
 	int *history = info->history_tokens[ pm ];
+#ifdef STRICT_CHECKING
+	if(history == NULL )
+	  veejay_msg(0, "History NULL for pm %d", pm);
+	assert( history != NULL );
+#endif
 	if( pm != MODE_PLAIN )
 	{
 		if(info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||

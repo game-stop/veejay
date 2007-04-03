@@ -19,7 +19,7 @@
 #ifndef GVRCOMMON_H
 #define GVRCOMMON_H
 #define STATUS_BYTES 	150
-#define STATUS_TOKENS 	22
+#define STATUS_TOKENS 	23
 #define VEEJAY_CODENAME VERSION
 /* Status bytes */
 
