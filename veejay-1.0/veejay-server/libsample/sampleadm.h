@@ -248,7 +248,7 @@ extern int sample_get_effect(int s1, int position);
 /* get effect any, even if effect is disabled (required for informational purposes)*/
 extern int sample_get_effect_any(int s1, int position);
 extern int sample_get_offset(int s1, int position);
-
+extern int sample_get_first_mix_offset(int s1, int *parent, int look_for );
 /* trimmer is usefull for underlying samples in the effect chain.
    you can manual adjust the video/audio sync of the underlying sample */
 extern int sample_get_trimmer(int s1, int position);

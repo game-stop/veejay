@@ -328,16 +328,21 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
    // si->encoder_buf = (char*) malloc(sizeof(char) * 10 * 65535 + 16);
 //    si->auto_switch = 0;
 //    si->selected_entry = 0;
-//    si->effect_toggle = 1;
+    si->effect_toggle = 1;
 //    si->offset = 0;
     snprintf(tmp_file,sizeof(tmp_file), "sample_%05d.edl", si->sample_id );
     si->edit_list_file = strdup( tmp_file );
 
+    sample_eff_chain *sec = (sample_eff_chain*) vj_calloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
+
     /* the effect chain is initially empty ! */
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
+
+	si->effect_chain[i] = &sec[i];
 	
-	si->effect_chain[i] =
-	    (sample_eff_chain *) vj_calloc(sizeof(sample_eff_chain));
+//	si->effect_chain[i] =
+//	    (sample_eff_chain *) vj_calloc(sizeof(sample_eff_chain));
+
 	if (si->effect_chain[i] == NULL) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error allocating entry %d in Effect Chain for new sample",i);
 		return NULL;
@@ -453,10 +458,17 @@ int sample_copy(int sample_id)
 	org = sample_get(sample_id);
 	copy = (sample_info*) vj_malloc(sizeof(sample_info));
 	veejay_memcpy( copy,org,sizeof(sample_info));\
+
+	sample_eff_chain *b = vj_malloc(sizeof(sample_eff_chain) * SAMPLE_MAX_EFFECTS );
+
 	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
-		copy->effect_chain[i] =
-			(sample_eff_chain *) vj_malloc(sizeof(sample_eff_chain));
+//		copy->effect_chain[i] =
+//			(sample_eff_chain *) vj_malloc(sizeof(sample_eff_chain));
+//
+
+		copy->effect_chain[i] = &b[i];
+
 		if (copy->effect_chain[i] == NULL)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Error allocating entry %d in Effect Chain for new sample",i);
@@ -870,11 +882,14 @@ int sample_del(int sample_id)
 	    int i;
 	    if(si->edit_list)
  	 	   vj_el_break_cache( si->edit_list ); //@ destroy cache, if any
+
+	    if( si->effect_chain[0] )	
+		free( si->effect_chain[0] );
 	    for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
 	    {
 		vevo_port_free( si->effect_chain[i]->kf );
-		if (si->effect_chain[i])
-			free(si->effect_chain[i]);
+//		if (si->effect_chain[i])
+//			free(si->effect_chain[i]);
 	    }
   
 	    if(si->edit_list)
@@ -958,6 +973,21 @@ int sample_get_chain_status(int s1, int position)
     if (position >= SAMPLE_MAX_EFFECTS)
 	return -1;
     return sample->effect_chain[position]->e_flag;
+}
+
+int	sample_get_first_mix_offset(int s1, int *parent, int look_for)
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample)
+		return 0;
+	int p = 0;
+	for( p = 0; p < SAMPLE_MAX_EFFECTS; p ++ )
+	  if( sample->effect_chain[p]->frame_offset && sample->effect_chain[p]->source_type == 0 && look_for ==
+			sample->effect_chain[p]->channel)
+	  {	 
+		return sample->effect_chain[p]->frame_offset;
+ 	  }
+	return 0;
 }
 
 

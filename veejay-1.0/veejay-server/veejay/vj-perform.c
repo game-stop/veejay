@@ -346,9 +346,10 @@ static	void	seq_play_sample( veejay_t *info, int n)
 		sample_chain_malloc( id );
 	}
 
-	veejay_set_sample( info, info->seq->samples[ info->seq->current ] );
+	int which_sample = 0;
+	int offset = sample_get_first_mix_offset( info->uc->sample_id, &which_sample, info->seq->samples[info->seq->current] );
 
-
+	veejay_set_sample_f( info, info->seq->samples[ info->seq->current ] , offset );
 }
 
 /********************************************************************

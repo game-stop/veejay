@@ -767,6 +767,28 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 	}
 }
 
+void	veejay_set_sample_f(veejay_t *info, int sample_id, int offset )
+{
+    	if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
+	{
+		veejay_start_playing_stream(info,sample_id );
+     	}
+     	else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
+	{
+		if( info->uc->sample_id == sample_id )
+		{
+			int start = sample_get_startFrame( info->uc->sample_id );
+			veejay_set_frame(info,start+offset);
+			veejay_msg(VEEJAY_MSG_INFO, "Sample %d starts playing from frame %d",sample_id,start);
+		}
+		else
+		{
+			veejay_start_playing_sample(info,sample_id );
+			veejay_set_frame( info, sample_get_startFrame(sample_id)+offset );
+		}
+	}
+}
+
 void veejay_set_sample(veejay_t * info, int sampleid)
 {
     	if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
