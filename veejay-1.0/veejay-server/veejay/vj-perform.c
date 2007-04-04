@@ -269,7 +269,8 @@ static int vj_perform_increase_plain_frame(veejay_t * info, long num)
 		veejay_msg(VEEJAY_MSG_DEBUG, "Reached end of video - Ending veejay session ... ");
 		veejay_change_state(info, LAVPLAY_STATE_STOP);
 	}
-	settings->current_frame_num = settings->max_frame_num;
+	//@ restart
+	//veejay_set_frame( info, settings->min_frame_num );
 	return 0;
     }
     return 0;
@@ -2792,7 +2793,10 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 			case VJ_PLAYBACK_MODE_PLAIN:
 				if( el->has_audio )
 				{
-					num_samples =	vj_el_get_audio_frame(el, this_frame,a_buf );
+					if (settings->current_frame_num <= settings->max_frame_num) 
+						num_samples =	vj_el_get_audio_frame(el, this_frame,a_buf );
+					else
+						num_samples = 0;
 					if( num_samples <= 0 )
 					{
 						num_samples = pred_len;
