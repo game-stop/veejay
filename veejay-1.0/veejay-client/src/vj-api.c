@@ -1219,11 +1219,10 @@ effect_constr* _effect_new( char *effect_line )
 	int p;
 	int tokens = 0;
 	char len[4];
-	char line[100];
+	//char line[100];
 	int offset = 0;
 
-	bzero( len, 4 );
-	bzero( line, 100 );
+	veejay_memset(len,0,sizeof(len));
 
 	if(!effect_line) return NULL;
 
@@ -1232,7 +1231,7 @@ effect_constr* _effect_new( char *effect_line )
 	if(descr_len <= 0) return NULL;
 
 	ec = g_new( effect_constr, 1);
-	bzero( ec->description, 150 );
+	veejay_memset(ec->description,0,sizeof(ec->description));
 	strncpy( ec->description, effect_line+3, descr_len );
 	tokens = sscanf(effect_line+(descr_len+3), "%03d%1d%1d%02d", &(ec->id),&(ec->is_video),
 		&(ec->has_rgb), &(ec->num_arg));
@@ -1491,7 +1490,7 @@ void	about_dialog()
 
 #ifdef HAVE_GTK2_6
 	char path[MAX_PATH_LEN];
-	bzero(path,MAX_PATH_LEN);
+	veejay_memset( path,0, sizeof(path));
 	get_gd( path, NULL,  "veejay-logo.png" );
 	GdkPixbuf *pixbuf = gdk_pixbuf_new_from_file
 		( path, NULL );
@@ -1526,7 +1525,6 @@ gboolean	dialogkey_snooper( GtkWidget *w, GdkEventKey *event, gpointer user_data
 	if(event->type == GDK_KEY_PRESS)
 	{
 		gchar tmp[100];
-		bzero(tmp,100);
 		info->uc.pressed_key = gdk2sdl_key( event->keyval );
 		info->uc.pressed_mod = gdk2sdl_mod( event->state );
 		gchar *text = gdkkey_by_id( event->keyval );
@@ -1585,8 +1583,8 @@ prompt_keydialog(const char *title, char *msg)
 	info->uc.pressed_mod = 0;
 	info->uc.pressed_key = 0; 
 
-	char pixmap[512];
-	bzero(pixmap,512);
+	char pixmap[1024];
+	veejay_memset(pixmap,0,sizeof(pixmap));
 	get_gd( pixmap, NULL, "icon_keybind.png");
 
 	GtkWidget *mainw = glade_xml_get_widget_(info->main_window, "gveejay_window");
@@ -1944,10 +1942,6 @@ static  void	vj_msg(int type, const char format[], ...)
 	char buf[1024];
 	char prefix[20];
 	va_list args;
-	gchar level[6];
-	bzero(level,0);	
-	bzero(tmp, 1024);
-	bzero(buf, 1024);
 
 	va_start( args,format );
 	vsnprintf( tmp, sizeof(tmp), format, args );
@@ -1967,7 +1961,6 @@ static  void	vj_msg(int type, const char format[], ...)
 	gsize nr,nw;
         gchar *text = g_locale_to_utf8( buf, -1, &nr, &nw, NULL);
         text[strlen(text)-1] = '\0';
-//        put_text( "lastmessage", text );
 
 	GtkWidget *sb = glade_xml_get_widget_( info->main_window, "statusbar");
 	gtk_statusbar_push( GTK_STATUSBAR(sb),0, text ); 
@@ -1989,11 +1982,7 @@ static  void	vj_msg(int type, const char format[], ...)
 	char buf[1024];
 	char prefix[20];
 	va_list args;
-	gchar level[6];
-	bzero(level,0);	
 	int color = -1;
-	bzero(tmp, 1024);
-	bzero(buf, 1024);
 	va_start( args,format );
 	vsnprintf( tmp, sizeof(tmp), format, args );
 	
@@ -2006,6 +1995,8 @@ static  void	vj_msg(int type, const char format[], ...)
 		case 0: sprintf(prefix,"Error  : ");sprintf(level, "errormsg"); color=COLOR_RED; break;
 		case 3:
 			sprintf(prefix,"Debug  : ");sprintf(level, "debugmsg"); color=COLOR_BLUE; break;
+		default:
+			sprintf(prefix, "??? : "); sprintf(level, "infomsg"); color=COLOR_GREEN; break;
 	}
 
 	if(type==4)
@@ -2027,8 +2018,6 @@ static  void	vj_msg(int type, const char format[], ...)
 		0.0,
 		0.0 );
 		
-
-
 	g_free( text );
 	va_end(args);
 }*/
@@ -2098,7 +2087,6 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 {
 	int tmp_len = slen+1;
 	char tmp[tmp_len];
-	bzero(tmp,tmp_len);
 	int ret = vj_client_read( info->client, V_CMD, tmp, slen );
 
 	int len = 0;
@@ -2599,7 +2587,7 @@ static  GdkPixbuf	*update_pixmap_kf( int status )
 {
 	char path[MAX_PATH_LEN];
 	char filename[MAX_PATH_LEN];
-	bzero(path,MAX_PATH_LEN);
+	veejay_memset( filename, 0,sizeof(filename));
 
 	sprintf(filename, "fx_entry_%s.png", ( status == 1 ? "on" : "off" ));
 	get_gd(path,NULL, filename);
@@ -2614,7 +2602,7 @@ static  GdkPixbuf	*update_pixmap_entry( int status )
 {
 	char path[MAX_PATH_LEN];
 	char filename[MAX_PATH_LEN];
-	bzero(path,MAX_PATH_LEN);
+	veejay_memset( filename,0,sizeof(filename));
 
 	sprintf(filename, "fx_entry_%s.png", ( status == 1 ? "on" : "off" ));
 	get_gd(path,NULL, filename);
@@ -3341,7 +3329,7 @@ static	void	load_effectchain_info()
 		veejay_memset(kf_toggle,0,4);
 		veejay_memset(arr,0,sizeof(arr));
 		char line[12];
-		bzero(line,12);
+		veejay_memset(line,0,sizeof(line));
 		strncpy( line, fxtext + offset, 8 );
 		sscanf( line, "%02d%03d%1d%1d%1d",
 			&arr[0],&arr[1],&arr[2],&arr[3],&arr[4]);
@@ -3672,7 +3660,7 @@ void	on_samplelist_edited(GtkCellRendererText *cell,
 		
 		int i;
 		char descr[150];
-		bzero(descr,150);
+		veejay_memset( descr,0,sizeof(descr));
 		char *res = &descr[0];
 		for( i = 0; i < bytes_written; i ++ )
 		{
@@ -3788,7 +3776,7 @@ void	load_effectlist_info()
 	while( offset < fxlen )
 	{
 		char tmp_len[4];
-		bzero(tmp_len, 4);
+		veejay_memset(tmp_len,0,sizeof(tmp_len));
 		strncpy(tmp_len, fxtext + offset, 3 );
 		int  len = atoi(tmp_len);
 		offset += 3;
@@ -3796,7 +3784,7 @@ void	load_effectlist_info()
 		{
 			effect_constr *ec;
 			char line[255];
-			bzero( line, 255 );
+			veejay_memset( line,0,sizeof(line));
 			strncpy( line, fxtext + offset, len );
 			ec = _effect_new(line);
 			if(ec) info->effect_info = g_list_append( info->effect_info, ec );
@@ -3961,7 +3949,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 		while( offset < fxlen )
 		{
 			char tmp_len[4];
-			bzero(tmp_len, 4);
+			veejay_memset(tmp_len,0,sizeof(tmp_len));
 			strncpy(tmp_len, fxtext + offset, 3 );
 			int  len = atoi(tmp_len);
 			offset += 3;
@@ -3969,8 +3957,8 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 			{
 				char line[300];
 				char descr[255];
-				bzero( line, 300 );
-				bzero( descr, 255 );
+				veejay_memset( line,0,sizeof(line));
+				veejay_memset( descr,0,sizeof(descr));
 				strncpy( line, fxtext + offset, len );
 				
 				int values[4];
@@ -4016,7 +4004,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 		while( offset < fxlen )
 		{
 			char tmp_len[4];
-			bzero(tmp_len, 4);
+			veejay_memset(tmp_len,0,sizeof(tmp_len));
 			strncpy(tmp_len, fxtext + offset, 3 );
 	
 			int  len = atoi(tmp_len);
@@ -4826,7 +4814,7 @@ static	void	reload_fontlist()
 	while( i < len )
 	{
 		char tmp[4];
-		bzero(tmp,4);
+		veejay_memset(tmp,0,sizeof(tmp));
 		strncpy(tmp, p, 3 );
 		int slen = atoi(tmp);
 		p += 3;
@@ -4943,7 +4931,7 @@ static	void	reload_editlist_contents()
 		char *tmp1 = (char*) strndup( eltext+offset, 4 );
 		int line_len = 0;
 		char fourcc[4];
-		bzero(fourcc,4);
+		veejay_memset(fourcc,0,sizeof(fourcc));
 		n = sscanf( tmp1, "%04d", &line_len ); // line len
 		if(line_len>0)
 		{
@@ -5972,7 +5960,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 
 		int nb = 0;
 		unsigned char sta_len[6];
-		bzero(sta_len,6);
+		veejay_memset(sta_len,0,sizeof(sta_len));
 		nb = vj_client_read( gui->client, V_STATUS, sta_len, 5 );
 		if(sta_len[0] == 'V' && nb > 0 )
 		{
@@ -8015,7 +8003,7 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 {		
     GtkAdjustment *speed_adj;       
     char path[MAX_PATH_LEN];
-    bzero(path,MAX_PATH_LEN);
+    veejay_memset(path,0,sizeof(path));
     get_gd( path, NULL,  "knob.png" );
     // audio volume 
 	GtkAdjustment *adj = GTK_ADJUSTMENT(gtk_adjustment_new( 100.0,0.0,100.0,0.1,1.0,0.0 ));

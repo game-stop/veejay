@@ -132,7 +132,6 @@ static	void	status_print(multitracker_t *mt, const char format[], ... )
 {
 	char buf[1024];
 	va_list args;
-	bzero(buf,1024);
 	va_start(args,format);
 	vsnprintf( buf,sizeof(buf), format, args );
 	gsize nr,nw;
@@ -146,7 +145,7 @@ static	void	status_print(multitracker_t *mt, const char format[], ... )
 static	GdkPixbuf	*load_logo_image(int dw, int dh )
 {
 	char path[1024];
-	bzero(path,1024);
+	veejay_memset(path,0,sizeof(path));
 	get_gd(path,NULL, "veejay-logo.png");
 	return gdk_pixbuf_new_from_file( path,NULL );
 }
@@ -329,7 +328,7 @@ static	void	add_buttons( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *
 	for( i = 0; i < FIRST_ROW_END;i ++ )
 	{
 		char path[1024];
-		bzero(path,1024);
+		veejay_memset(path,0,sizeof(path));
 		get_gd(path,NULL, button_template_t[i].file );
 		seqv->icons[i] = gtk_image_new_from_file( path );
 		seqv->buttons[i] = gtk_button_new_with_label(" ");
@@ -351,7 +350,7 @@ static	void	add_buttons2( sequence_view_t *p, sequence_view_t *seqv , GtkWidget 
 	for( i = FIRST_ROW_END; button_template_t[i].name != NULL ;i ++ )
 	{
 		char path[1024];
-		bzero(path,1024);
+		veejay_memset(path,0,sizeof(path));
 		get_gd(path,NULL, button_template_t[i].file );
 		seqv->icons[i] = gtk_image_new_from_file( path );
 		seqv->buttons2[i] = gtk_button_new_with_label(" ");

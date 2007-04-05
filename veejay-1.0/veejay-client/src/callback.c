@@ -2624,7 +2624,6 @@ gchar *get_clipboard_fx_buffer()
 			);	
 	
 	char preset[512];
-	bzero(preset,512);
 	sprintf(preset, "%d", p[0]);
 	for(i=0;  i < p[2] ;i++)
 	{
@@ -2786,10 +2785,9 @@ static	void	srt_load_subtitle(int sid)
 
 	multi_vims( VIMS_SRT_INFO, "%d", sid );
 	gchar *text = recv_vims( 6,&len );
-
-	bzero(tmp,1000);
-	bzero(tc1,20);
-	bzero(tc2,20);
+	veejay_memset(tmp,0,sizeof(tmp));
+	veejay_memset(tc1,0,sizeof(tc1));
+	veejay_memset(tc2,0,sizeof(tc2));
 
 	clear_textview_buffer( "textview_text" );
 	int s1=0,s2=0;
