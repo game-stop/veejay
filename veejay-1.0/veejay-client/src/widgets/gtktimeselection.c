@@ -475,6 +475,7 @@ void	timeline_set_selection( GtkWidget *widget, gboolean active)
 void	timeline_set_length( GtkWidget *widget, gdouble length, gdouble pos)
 {
 	TimelineSelection *te = TIMELINE_SELECTION( widget );
+	if( pos < 0.0 ) pos = 0.0;
 	g_object_set( G_OBJECT(te), "length", length, NULL );
 	timeline_set_pos( GTK_WIDGET(te->widget), pos );	
 }
@@ -482,6 +483,7 @@ void	timeline_set_length( GtkWidget *widget, gdouble length, gdouble pos)
 void	timeline_set_pos( GtkWidget *widget,gdouble pos)
 {
 	TimelineSelection *te = TIMELINE_SELECTION( widget );
+	if( pos < 0.0 ) pos = 0.0;
 	g_object_set( G_OBJECT(te), "pos", pos, NULL );
 	g_signal_emit( te->widget, timeline_signals[POS_CHANGED], 0);
 	gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
