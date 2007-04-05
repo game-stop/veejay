@@ -735,7 +735,7 @@ static		int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len,
 {
 	GtkWidget *dialog = gtk_dialog_new_with_buttons( 
 				"Connect to a Veejay",
-				GTK_WINDOW( mt->main_box ),
+				GTK_WINDOW( mt->main_window ),
 				GTK_DIALOG_DESTROY_WITH_PARENT,
 				GTK_STOCK_CANCEL,
 				GTK_RESPONSE_REJECT,	
@@ -852,7 +852,6 @@ int		multitrack_add_track( void *data )
 
 		if( gvr_track_connect( mt->preview, hostname, port_num, &track ) )
 		{
-			veejay_msg(0, "Track = %d",track );
 			status_print( mt, "Connection established with veejay runnning on %s port %d",
 				hostname, port_num );	
 			if( gveejay_user_preview() )

@@ -438,6 +438,7 @@ void	timeline_set_bind(GtkWidget *widget, gboolean active)
 void	timeline_set_out_point( GtkWidget *widget, gdouble pos )
 {
 	TimelineSelection *te = TIMELINE_SELECTION(widget);
+	if( pos < 0.0 ) pos = 0.0; else if (pos > 1.0 ) pos = 1.0;
 	g_object_set( G_OBJECT(te), "out", pos, NULL );
 	g_signal_emit(te->widget, timeline_signals[OUT_CHANGED], 0);
 	gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
@@ -459,6 +460,7 @@ void	timeline_clear_points( GtkWidget *widget )
 void	timeline_set_in_point( GtkWidget *widget, gdouble pos )
 {
 	TimelineSelection *te = TIMELINE_SELECTION(widget);
+	if( pos < 0.0 ) pos = 0.0; else if (pos > 1.0 ) pos = 1.0;
 	g_object_set( G_OBJECT(te), "in", pos, NULL );
 	g_signal_emit(te->widget, timeline_signals[IN_CHANGED], 0);
 	gtk_widget_queue_draw( GTK_WIDGET(te->widget) );
@@ -512,9 +514,6 @@ static	void	move_selection( GtkWidget *widget, gdouble x, gdouble width )
 	te->in = (1.0/width) * dx1;
 	te->out = (1.0/width ) * dx2;
 	
-	if(te->in < 0.0 ) te->in = 0.0; else if (te->in > 1.0) te->in = 1.0;
-	if(te->out < 0.0 ) te->out = 0.0; else if (te->out > 1.0) te->out = 1.0;
-
 	timeline_set_out_point(widget, te->out ); 
 	timeline_set_in_point(widget, te->in );
 	te->move_x = x;
@@ -554,7 +553,6 @@ static	gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer user
 		if(!te->bind)
 		{
 			gdouble val = (1.0 / width) * ev->x;
-			if( val < 0.0 ) val = 0.0; else if (val > 1.0 ) val = 1.0;
 			timeline_set_in_point( widget, val );  
 		}
 	}
@@ -567,7 +565,6 @@ static	gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer user
 		if(!te->bind)
 		{
 			gdouble val = (1.0/width) * ev->x;
-			if( val < 0.0 ) val = 0.0; else if (val > 1.0) val = 1.0;
 			timeline_set_out_point( widget, val );
 		}
 	}
@@ -621,7 +618,6 @@ event_motion (GtkWidget *widget, GdkEventMotion *ev, gpointer user_data)
 		if(!te->bind)
 		{
 			gdouble gx = (1.0 / width) * x;
-			if( gx  < 0.0 ) gx = 0.0; else if ( gx > 1.0 ) gx = 1.0;
 			if(te->grab_button == 1  && ev->state & GDK_BUTTON1_MASK)
 				timeline_set_in_point(widget, gx );
 			else if(te->grab_button == 3 && ev->state & GDK_BUTTON3_MASK)
