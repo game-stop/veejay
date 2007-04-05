@@ -268,7 +268,6 @@ static	int	NUM_SAMPLES_PER_ROW = 6;
 
 static	vims_t	vj_event_list[VIMS_MAX];
 static  vims_keys_t vims_keys_list[VIMS_MAX];
-static	int	preview_change_ = 0;
 static  int vims_verbosity = 0;
 #define   livido_port_t vevo_port_t
 
@@ -4004,7 +4003,6 @@ static	void	select_slot__( int pm )
 					info->selected_slot = info->sample_banks[b]->slot[p];
 					info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
 					set_activation_of_slot_in_samplebank(TRUE);
-				//	no_preview_ = 0;
 				}
 			}	
 		}
@@ -4391,7 +4389,6 @@ gboolean
                        gpointer          userdata)
   {
     GtkTreeIter iter;
-veejay_msg(0, "%s",__FUNCTION__);
     if (gtk_tree_model_get_iter(model, &iter, path))
     {
 	gchar *vimsid = NULL;
@@ -6151,6 +6148,16 @@ static void	update_gui()
 //	info->prev_mode = pm;
 }
 
+void			gveejay_status_lock(void *p )
+{
+	vj_gui_t *gui = (vj_gui_t*) p;	
+	gui->status_lock =1;
+}
+void			gveejay_status_unlock(void *p)
+{
+	vj_gui_t *gui = (vj_gui_t*) p;
+	gui->status_lock = 0;
+}
 
 static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointer data)
 {
@@ -6223,7 +6230,7 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 			int n = status_to_arr( gui->status_msg, gui->status_tokens );
 #ifdef STRICT_CHECKING
 			if( n != 23 )
-				veejay_msg(0, "Only got %d symbols", n );
+				veejay_msg(0, "Only got %d symbols: '%s'", n, gui->status_msg );
 			assert(n == 23);
 #endif
 			info->uc.playmode = gui->status_tokens[ PLAY_MODE ];
@@ -6588,43 +6595,30 @@ int	vj_gui_sleep_time( void )
 int	vj_img_cb(GdkPixbuf *img )
 {
 	int i;
-	if( !info->selected_slot || !info->selected_gui_slot )
+	if( !info->selected_slot || !info->selected_gui_slot || no_preview_)
+	{
 		return 0;
-
+	}
 	int sample_id = info->status_tokens[ CURRENT_ID ];
 	int sample_type = info->status_tokens[ PLAY_MODE ]; 
+	
+	if( info->selected_slot->sample_type != sample_type || info->selected_slot->sample_id !=
+			sample_id )
+		return 0;
 
 	if( sample_type == MODE_SAMPLE || sample_type == MODE_STREAM )
 	{
-		int poke_slot = -1;	
-		int bank_num = -1;
-
 		sample_slot_t *slot = find_slot_by_sample( sample_id, sample_type );
 		sample_gui_slot_t *gui_slot = find_gui_slot_by_sample( sample_id, sample_type );
 
 		if( slot && gui_slot )
 		{
-			slot->pixbuf = vj_gdk_pixbuf_scale_simple(img, info->image_dimensions[0],info->image_dimensions[1], GDK_INTERP_NEAREST);
+			slot->pixbuf = vj_gdk_pixbuf_scale_simple(img,
+				info->image_dimensions[0],info->image_dimensions[1], GDK_INTERP_NEAREST);
 			gtk_image_set_from_pixbuf_( GTK_IMAGE( gui_slot->image ), slot->pixbuf );
 			gdk_pixbuf_unref( slot->pixbuf );
 		} 
 
-/*
-
-		bank_num = find_bank_by_sample( sample_id, sample_type, &poke_slot );
-		if( bank_num >= 0 && sample_id == info->selected_slot->sample_id && sample_type ==
-			info->selected_slot->sample_type )
-		{
-			sample_slot_t *slot = info->sample_banks[bank_num]->slot[poke_slot];
-			sample_gui_slot_t *gui_slot = info->sample_banks[bank_num]->gui_slot[poke_slot];
-			slot->pixbuf = vj_gdk_pixbuf_scale_simple(
-				img, 	info->image_dimensions[0],
-					info->image_dimensions[1], GDK_INTERP_NEAREST);
-
-			gtk_image_set_from_pixbuf_( GTK_IMAGE( gui_slot->image ), slot->pixbuf );
-
-			gdk_pixbuf_unref( slot->pixbuf );
-		}*/
 	}
 
 	for( i = 0; i < info->sequence_view->envelope_size; i ++ )
@@ -6888,7 +6882,8 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 			glade_xml_get_widget_( info->main_window, "previewtoggle"),
 			pw,
 			ph,
-			img_wid);
+			img_wid,
+			(void*) gui);
 
 	if( theme_list )
 	{
@@ -7023,6 +7018,11 @@ void	gveejay_preview( int p )
 	user_preview = p;
 }
 
+int	gveejay_user_preview()
+{
+	return user_preview;
+}
+
 int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 {
 	if(!hostname && !group_name )
@@ -7047,6 +7047,8 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		}	
 	}
 
+	gveejay_status_lock( info );
+
 	if(!vj_client_connect( info->client, hostname, group_name, port_num ) )
 	{
 		if(info->client)
@@ -7055,6 +7057,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		char msg[200];
 		sprintf(msg, "Unable to connect to %s at port %d. Is the veejay server running?\nThe quickest way to launch a veejay server is by typing 'veejay -d' in a terminal", hostname,port_num);
 		error_dialog("Error", msg);
+		gveejay_status_unlock(info);
 		return 0;
 	}
 	
@@ -7062,9 +7065,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		(group_name == NULL ? hostname : group_name), port_num );
 	
 	veejay_msg(VEEJAY_MSG_INFO, "Connection established with %s:%d",hostname,port_num);
-
-	//set_toggle_button( "previewtoggle", 0 );
-
 
 	int k = 0;
 	for( k = 0; k < 3; k ++ )
@@ -7076,8 +7076,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	load_editlist_info();
 
 	update_slider_value( "framerate", info->el.fps,  0 );
-
-//	info->rawdata = (guchar*) vj_calloc(sizeof(guchar) * info->el.width * info->el.height * 3);
 
 	veejay_memset( vims_keys_list, 0 , sizeof(vims_keys_list));
 	veejay_memset( vj_event_list,  0, sizeof( vj_event_list));
@@ -7123,6 +7121,8 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 	info->uc.reload_hint[HINT_HISTORY] = 1;       
 	
+	gveejay_status_unlock( info );
+
 	return 1;
 }
 
@@ -7204,7 +7204,8 @@ gboolean		is_alive( void )
 			if( user_preview )
 			{
 				multitrack_set_quality( info->mt, user_preview );
-				set_toggle_button( "previewtoggle", 1 );
+				if(!is_button_toggled("previewtoggle") )
+					set_toggle_button( "previewtoggle", 1 );
 			}
 		}
 	}
@@ -7266,11 +7267,7 @@ void	vj_gui_disable()
 
 	info->sensitive = 0;
 
-	preview_change_ = is_button_toggled( "previewtoggle");
-	
 	no_preview_ = 1;
-//	set_toggle_button( "previewtoggle", 0 );
-
 }	
 
 
@@ -7293,7 +7290,6 @@ void	vj_gui_enable()
 
 	info->sensitive = 1;
        
-   //	set_toggle_button( "previewtoggle", preview_change_ );
 
 	no_preview_ = 0;
 }
@@ -7867,7 +7863,6 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
 
 		}
 		multi_vims(VIMS_SET_MODE_AND_GO, "%d %d", g->sample_type, g->sample_id );
-		no_preview_ = 1;
 	}
 
 	
@@ -8118,7 +8113,6 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
 	{
 		sample_slot_t *s = sample_banks[bank_nr]->slot[slot_nr];
 		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d", s->sample_type, s->sample_id);
-		no_preview_ = 1;
 	}
 	else if(event->type == GDK_BUTTON_PRESS )
 	{

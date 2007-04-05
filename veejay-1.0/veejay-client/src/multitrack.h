@@ -10,7 +10,8 @@ void            *multitrack_new(
 		GtkWidget *button,
                 gint max_w,
                 gint max_h,
-                GtkWidget *main_preview_area);
+                GtkWidget *main_preview_area,
+		void *gui);
 
 
 int             multitrack_add_track( void *data );

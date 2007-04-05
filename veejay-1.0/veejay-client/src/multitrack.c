@@ -95,7 +95,7 @@ typedef struct
 } multitracker_t;
 
 static volatile int	MAX_TRACKS = 4;
-
+static	void		*parent__ = NULL;
 
 static	int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len, int *port_num);
 static	void	add_buttons( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *w);
@@ -155,13 +155,6 @@ int		multitrack_get_sequence_view_id( void *data )
 {
 	sequence_view_t *s = (sequence_view_t*) data;
 	return s->num;
-}
-
-static	void	set_logo(GtkWidget *area)
-{
-/*	GdkPixbuf *buf2 = vj_gdk_pixbuf_scale_simple( logo_img_,114,96, GDK_INTERP_BILINEAR );
-	gtk_image_set_from_pixbuf_( GTK_IMAGE(area), buf2 );
-	gdk_pixbuf_unref( buf2 );*/
 }
 
 void	multitrack_sync_start(void *data)
@@ -227,7 +220,6 @@ static	void	seq_speeddown(GtkWidget *w, gpointer data)
 
 	if( n < 0 ) n += 1;
 	if( n > 0 ) n -= 1;
-
 	gvr_queue_mvims( mt->preview, v->num ,VIMS_VIDEO_SET_SPEED , n );
 }
 
@@ -240,7 +232,6 @@ static	void	seq_speedup(GtkWidget *w, gpointer data)
 
 	if( n < 0 ) n -= 1;
 	if( n > 0 ) n += 1;
-
 	gvr_queue_mvims( mt->preview, v->num ,VIMS_VIDEO_SET_SPEED , n );
 }
 
@@ -267,7 +258,6 @@ static	void	seq_speed( GtkWidget *w, gpointer data)
 	multitracker_t *mt = v->backlink;
 	if(v->status_lock)
 		return;
-
 	gdouble value = GTK_ADJUSTMENT( GTK_RANGE(w)->adjustment )->value;
 	gint speed = (gint) value;
 	gvr_queue_mvims( mt->preview, v->num ,VIMS_VIDEO_SET_SPEED , speed );
@@ -539,14 +529,16 @@ static void sequence_preview_cb(GtkWidget *widget, gpointer user_data)
 
 	if( !status )
 	{
-		float ratio = mt->width / (float) mt->height;
-		int w = 160;
-		int h = ( (int)( (float)w / ratio)) /16*16;
-		GdkPixbuf *logo = vj_gdk_pixbuf_scale_simple( mt->logo, w,h, GDK_INTERP_BILINEAR );
-		gtk_image_set_from_pixbuf_(
-			GTK_IMAGE( v->area ), logo );
-		veejay_msg(2, "Set GVeejayReloaded logo %d x %d",w,h);
-		gdk_pixbuf_unref( logo );
+	//	float ratio = mt->width / (float) mt->height;
+	//	int w = 160;
+	//	int h = ( (int)( (float)w / ratio)) /16*16;
+//		GdkPixbuf *logo = vj_gdk_pixbuf_scale_simple( mt->logo, w,h, GDK_INTERP_BILINEAR );
+//		gtk_image_set_from_pixbuf_(
+//			GTK_IMAGE( v->area ), logo );
+//		veejay_msg(2, "Set GVeejayReloaded logo %d x %d",w,h);
+		gtk_image_clear( GTK_IMAGE(v->area ) );
+		
+//		gdk_pixbuf_unref( logo );
 	}
 }
 
@@ -803,7 +795,8 @@ void		*multitrack_new(
 		GtkWidget *preview_toggle,
 		gint max_w,
 		gint max_h,
-		GtkWidget *main_preview_area)
+		GtkWidget *main_preview_area,
+		void *infog)
 {
 	multitracker_t *mt = NULL;
 
@@ -840,7 +833,7 @@ void		*multitrack_new(
 
 	mt->preview = gvr_preview_init( MAX_TRACKS );
 
-
+	parent__ = infog;
 
 	return (void*) mt;
 }
@@ -859,11 +852,14 @@ int		multitrack_add_track( void *data )
 
 		if( gvr_track_connect( mt->preview, hostname, port_num, &track ) )
 		{
+			veejay_msg(0, "Track = %d",track );
 			status_print( mt, "Connection established with veejay runnning on %s port %d",
 				hostname, port_num );	
-	
-//			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
-//			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), TRUE );
+			if( gveejay_user_preview() )
+				gtk_toggle_button_set_active( GTK_WIDGET(mt->view[track]->toggle), TRUE );
+			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
+			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), TRUE );
+			
 			res = 1;
 		}
 		else
@@ -887,8 +883,9 @@ void		multitrack_close_track( void *data )
 		mt->view[mt->selected]->status_lock = 1;
 		gtk_toggle_button_set_active(
 			GTK_TOGGLE_BUTTON(mt->view[mt->selected]->toggle), FALSE );
-
 		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[mt->selected]->panel), FALSE );
+		gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[mt->selected]->toggle), FALSE );
+		gtk_image_clear( GTK_IMAGE(mt->view[mt->selected]->area ) );
 		mt->view[mt->selected]->status_lock = 0;
 
 	}
@@ -1032,17 +1029,7 @@ void		multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget
 
 		if(!status)
 		{
-			float ratio = mt->width / (float) mt->height;
-			int w = 160;
-			int h = ( (int)( (float)w / ratio)) /16*16;
-			GdkPixbuf *logo = vj_gdk_pixbuf_scale_simple( mt->logo, w,h, GDK_INTERP_BILINEAR );
-			gtk_image_set_from_pixbuf_(
-				GTK_IMAGE( mt->view[mt->master_track]->area ), logo );
-
-			gtk_image_set_from_pixbuf_(
-				GTK_IMAGE(img), mt->logo );
-
-			gdk_pixbuf_unref( logo );
+			gtk_image_set_from_pixbuf_( GTK_IMAGE(img), mt->logo );
 		}
 	}
 }
@@ -1102,8 +1089,11 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 
 	if(event->type == GDK_2BUTTON_PRESS)
 	{
-		mt->selected = v->num;
+		if( !gvr_track_test( mt->preview , v->num ) )
+			return FALSE;
 
+		mt->selected = v->num;
+		
 		vj_gui_disable();		
 	
 		// hostname, port_num from gvr
@@ -1111,12 +1101,20 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 		char *host = gvr_track_get_hostname( mt->preview, v->num );
 		int   port = gvr_track_get_portnum ( mt->preview, v->num );
 		gvr_ext_unlock(mt->preview);
+
+		if(!host || port <= 0 )
+		{
+			vj_gui_enable();
+			return FALSE;
+		}
+
 		vj_gui_cb( 0, host, port );
 
 
 		veejay_msg(VEEJAY_MSG_INFO, "Connecting to %s:%d", host,port );
 
 		vj_gui_enable();
+
 	}
 	
 	if( event->type == GDK_BUTTON_PRESS )

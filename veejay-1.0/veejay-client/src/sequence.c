@@ -135,10 +135,7 @@ static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... )
 		g_snprintf( block, sizeof(block)-1, "%03d:;", vims_id );
 		gint n = vj_client_send( v->fd, V_CMD, block );
 		if( n <= 0 )
-		{
-			gvr_close_connection( v );
 			return 0;
-		}
 		return n;
 	}
 
@@ -149,10 +146,7 @@ static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... )
 	
 	gint n	= vj_client_send( v->fd, V_CMD, block );
 	if( n <= 0 )
-	{
-		gvr_close_connection( v);
 		return 0;
-	}
 	return n;
 }
 
@@ -173,8 +167,6 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 	if( sscanf( (char*)tmp, "%6d%1d", &len,&(v->grey_scale) )<=0)
 	{
 		veejay_msg(0, "Error reading header contents '%s'", tmp);
-		//@ If this happens, there is still data in the socket and it is unwanted
-		//@ to fallback, reduce image resolution by a half and try again when reconnecting.
 		free(tmp);
 		return 0;
 	}
@@ -271,7 +263,6 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 	unsigned char status_len[6];
 	veejay_memset( status_len, 0, sizeof(status_len) );
 	gint nb = vj_client_read( v->fd, V_STATUS, status_len, 5 );
-
 	if( status_len[0] == 'V' )
 	{
 		gint bytes = 0;
@@ -292,7 +283,11 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 				n = vj_client_read(v->fd, V_STATUS, status_len, 5 );
 				sscanf( status_len+1, "%03d", &bytes );
 				if(bytes > 0 )
-					vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
+				{
+					n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
+					if( n <= 0 )
+						break;
+				}
 			}
 
 			g_mutex_lock( vp->mutex );
@@ -304,29 +299,29 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 	}
 	else
 	{
-		g_mutex_lock(vp->mutex);
-		gvr_close_connection( v );
-		g_mutex_unlock(vp->mutex);
+		while( vj_client_poll( v->fd, V_STATUS )) 
+		{
+			char trashcan[100];
+			if( vj_client_read( v->fd, V_STATUS, trashcan,sizeof(trashcan))<= 0)
+				break;
+		}
 	}
-	return 0;
+	return 1;
 }
 
 
 static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 {
-
 	if(v->have_frame )
-	{
 		return 1;
-	}
 
 	if(!v->have_frame && v->width <= 0 || v->height <= 0 )
 		return 1;
-	
+
 	gint res = sendvims( v, VIMS_RGB24_IMAGE, "%d %d", v->width,v->height );
 	if( res <= 0 )
 	{
-		veejay_msg(0, "Error sending VIMS_RGB24_IMAGE");	
+		v->have_frame = 0;
 		return 0;
 	}
 	gint bw = 0;
@@ -335,6 +330,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	if( res <= 0 )
 	{
 		veejay_msg(0, "Error receiving compressed RGB image");
+		v->have_frame = 0;
 		return 0;
 	}
 
@@ -344,34 +340,13 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	{
 		veejay_msg(0, "Corrupted image. Drop it");
 		v->have_frame = 0;
-		return bw;
+		return 0;
 	}
 	uint8_t *in = v->data_buffer;
 	uint8_t *out = v->tmp_buffer;
 	
 	v->bw = 0;
-/*	if( bw == (v->width * v->height ))
-	{
-		unsigned int i,j;	
-		unsigned int len = v->width * v->height;
-		unsigned int stride = v->width * 3;
-		unsigned int width = v->width;
-		unsigned int height = v->height;
-		for( j = 0; j < height ; j ++ )
-		{
-			for( i = 0; i < width; i ++ )
-			{
-				uint8_t *dst = out + j * stride + (i*3);
-				dst[0] = in[ j * width + i ];
-				dst[1] = in[ j * width + i ];
-				dst[2] = in[ j * width + i ];
-			}
-		}
-		v->bw = 1; 
-	}
-	else
-	{
-*/
+
 	VJFrame *src1 = NULL;
 	if( bw != (v->width * v->height ))
 		src1 = yuv_yuv_template( in, in + (v->width * v->height),
@@ -386,8 +361,6 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 
 	free(src1);
 	free(dst1);
-//	}
-
 
 	v->have_frame = 1;
 	return bw;
@@ -409,13 +382,8 @@ static int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v )
 
 static int 	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
 {
-	if( v->preview )
-	{
-		if( veejay_get_image_data( vp, v ) == 0 )
-		{
-			return 0;
-		}
-	}
+	if( veejay_get_image_data( vp, v ) == 0 )
+		return 0;
 	return 1;
 }
 
@@ -437,6 +405,14 @@ static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_nu
 		}
 	}
 	return 0;
+}
+
+int		gvr_track_test( void *preview, int track_id )
+{
+	veejay_preview_t *vp = (veejay_preview_t*) preview;
+	if( track_id < 0 || track_id > vp->n_tracks )
+		return 0;
+	return (vp->tracks[track_id]  ? 1:0);
 }
 
 static	int	track_find(  veejay_preview_t *vp )
@@ -501,14 +477,19 @@ int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *
 	int track_num = track_find( vp );
 
 	if(track_num == -1)
+	{
+		veejay_msg(0, "All tracks used.");
 		return 0;
-
+	}
 	if(track_exists( vp, hostname, port_num, new_track ) )
+	{
+		veejay_msg(0, "Veejay '%s':%d already in track %d", hostname, port_num, *new_track );
 		return 0;
-	
+	}
 	vj_client *fd = vj_client_alloc(0,0,0);
 	if(!vj_client_connect( fd, hostname, NULL, port_num ) )
 	{
+		veejay_msg(0, "Unable to connect to %s:%d", hostname, port_num );
 		vj_client_free( fd );
 		return 0;
 	}
@@ -518,12 +499,13 @@ int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *
 	vt->port_num  = port_num;
 	vt->active   = 1;
 	vt->fd       = fd;
-
+	vt->preview  = is_button_toggled( "previewtoggle" );
 
 	vt->status_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 256);
 	vt->data_buffer  = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
 	vt->tmp_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
-	veejay_msg(2, "Track %d connected to Veejay %s : %d", track_num,hostname,port_num);
+	
+	*new_track = track_num;
 
 	g_mutex_lock( vp->mutex );
 	vp->tracks[ track_num ] = vt;
@@ -714,7 +696,6 @@ int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	g_mutex_lock( vp->mutex );
 	vp->tracks[ track_num ]->preview = status;
-	vp->tracks[ track_num ]->have_frame = 0;
 	g_mutex_unlock( vp->mutex );
 	veejay_msg(2, "Track %d VeejayGrabber %s:%d %s",
 		track_num,
@@ -734,12 +715,12 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 		return NULL;
 
 	int i;
+
 	for( i = 0; i < vp->n_tracks; i ++ )
 	{
 		if( vp->tracks[i] && vp->tracks[i]->have_frame )
-		{			
-			veejay_track_t *v = vp->tracks[i];
-
+		{		
+			veejay_track_t *v = vp->tracks[i];	
 			list[i] =gdk_pixbuf_new_from_data(v->tmp_buffer,GDK_COLORSPACE_RGB,FALSE,	
 				8,v->width,v->height,v->width*3,NULL,NULL );
 			vp->tracks[i]->have_frame = 0;
@@ -934,7 +915,6 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 		else
 		{
 		        v->preview = 0;
-     			v->have_frame = 0;
         		veejay_msg(2, "Track %d VeejayGrabber %s:%d disabled",
                 		track_num,
                			 vp->tracks[ track_num ]->hostname,
@@ -954,11 +934,10 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 			}
 			else
 			{
-				v->preview = 1;
-				v->have_frame = 0;
+				v->preview = is_button_toggled( "previewtoggle");
 				v->active = 1;
-				v->width = v->width >> 1;
-				v->height = v->height >> 1;
+				v->width = ( v->width > 300 ? v->width >> 1 : v->width );
+				v->height = ( v->width > 200 ? v->height >> 1 : v->height );
 				veejay_msg(2, "Restablished connection with veejay, changed preview size to %d x %d", v->width,v->height);
 			} 
 		}
@@ -977,6 +956,7 @@ static	void	*gvr_preview_thread(gpointer data)
 	for( ;; )
 	{
 		int score = 0;
+		int ac    = 1;
 		for( i = 0; i < vp->n_tracks ; i ++ )
 		{
 			if( vp->tracks[i] && vp->tracks[i]->active)
@@ -984,47 +964,22 @@ static	void	*gvr_preview_thread(gpointer data)
 				{
 					//after lock in status, assert
 					if( vp->tracks[i] )
+					{
 						score += gvr_veejay( vp, vp->tracks[i],i );	
+						ac ++;
+					}
 				}
 			if( vp->state == 0 )
 				break;
 		}
 
-/*		for( i = 0; i < vp->n_tracks ; i ++ )
-		{
-			if( vp->tracks[i]  && vp->tracks[i]->active && ( vp->tracks[i]->need_track_list || vp->tracks[i]->n_queued > 0 ))
-			{
-				g_mutex_lock( vp->mutex );
-				if( vp->tracks[i]->need_track_list )
-				{
-					int bw = 0;
-					unsigned char *tmp = vims_track_list( vp->tracks[i], 5, &bw );
-					gvr_parse_track_list( vp, vp->tracks[i], tmp, bw );
-					vp->tracks[i]->need_track_list = 0;
-				}
-
-				if( vp->tracks[i]->n_queued > 0 )
-					gvr_parse_queue( vp->tracks[i] );	
-
-				g_mutex_unlock( vp->mutex );
-			}
-		}	
-
-		for( i = 0; i < vp->n_tracks ;i ++ )
-		{
-			if( vp->tracks[i] && vp->tracks[i]->active )
-			{	
-				if( vp->tracks[i]->preview )
-					gvr_preview_process_image( vp,vp->tracks[i] );
-			}
-		}*/
-
 		if( vp->state == 0 )
 			break;
 
 		if( score == 0 )
-			g_usleep( 2000 );
+			g_usleep( 40000 / ac  );
 	}
+
 
 	return NULL;
 }
