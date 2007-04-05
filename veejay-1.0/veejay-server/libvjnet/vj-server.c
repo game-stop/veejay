@@ -298,14 +298,13 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 	assert( buf != NULL );
 	assert( link_id >= 0 );
 #endif
+	vj_link **Link = (vj_link**) vje->link;
+	
+	if( !Link[link_id]->in_use ) 
+		return -1;
 
 	if( !vje->use_mcast)
 	{
-
-		vj_link **Link = (vj_link**) vje->link;
-#ifdef STRICT_CHECKING
-		assert( Link[link_id]->in_use == 1 );
-#endif
 		total  = sock_t_send_fd( Link[link_id]->handle, vje->send_size, buf, len);
 		if( total <= 0 )
 		{
