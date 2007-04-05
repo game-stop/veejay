@@ -268,9 +268,8 @@ static	void	vj_font_substract_timecodes( vj_font_t *font, const char *tc_srt, lo
 {
 	char tc1[20];
 	char tc2[20];
-
-	bzero(tc1,20);
-	bzero(tc2,20);
+	veejay_memset(tc1,0,sizeof(tc1));
+	veejay_memset(tc2,0,sizeof(tc2));
 
 	sscanf( tc_srt, "%s %*s %s", tc1,tc2 );
 
