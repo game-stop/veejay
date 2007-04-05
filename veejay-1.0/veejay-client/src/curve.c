@@ -48,7 +48,7 @@ int	set_points_in_curve_ext( GtkWidget *curve, unsigned char *blob, int id, int 
 	int parameter_id = 0;
 	int start = 0, end =0,type=0;
 	int entry  = 0;
-	int n = sscanf( blob, "key%2d%2d%8d%8d%2d", &entry, &parameter_id, &start, &end,&type );
+	int n = sscanf( (char*) blob, "key%2d%2d%8d%8d%2d", &entry, &parameter_id, &start, &end,&type );
 	int len = end - start;
 	int i;
 	int min = 0, max = 0;

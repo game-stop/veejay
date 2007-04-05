@@ -135,7 +135,7 @@ static	void	status_print(multitracker_t *mt, const char format[], ... )
 	bzero(buf,1024);
 	va_start(args,format);
 	vsnprintf( buf,sizeof(buf), format, args );
-	int nr,nw;
+	gsize nr,nw;
 	gchar *text = g_locale_to_utf8( buf, -1, &nr, &nw, NULL );
 	text[strlen(text)-1] = '\0';
 	gtk_statusbar_push( GTK_STATUSBAR(mt->status_bar), 0, text);
@@ -287,15 +287,14 @@ static	void	update_pos( void *user_data, gint total, gint current )
    	gtk_adjustment_set_value(
                 GTK_ADJUSTMENT(GTK_RANGE(v->timeline_)->adjustment), 1.0 / (gdouble) total * current );     
 
-	char *now = format_time( current , mt->fps);
-	gtk_label_set_text( v->labels_[0], now );
+	gchar *now = format_time( current , mt->fps);
+	gtk_label_set_text( GTK_LABEL(v->labels_[0]), now );
 	g_free(now);
 }
 
 static	void	update_speed( void *user_data, gint speed )
 {
 	sequence_view_t *v = (sequence_view_t*) user_data;
-	multitracker_t *mt = v->backlink;
 	if(v->status_lock)
 		return;
 
@@ -464,6 +463,7 @@ int		update_multitrack_widgets( void *data, int *array, int track )
 	for( i  =  0; i < 20; i ++ )
 		his[i] = array[i];
 	p->status_lock = 0;
+	return 1;
 }
 
 /*
@@ -564,7 +564,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	seqv->backlink = vp;
 
 	seqv->event_box = gtk_event_box_new();
-	gtk_event_box_set_visible_window( seqv->event_box, TRUE );
+	gtk_event_box_set_visible_window( GTK_EVENT_BOX(seqv->event_box), TRUE );
 	GTK_WIDGET_SET_FLAGS( seqv->event_box, GTK_CAN_FOCUS );
 
 	g_signal_connect( G_OBJECT( seqv->event_box ),
@@ -626,7 +626,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	
 	GtkWidget *box = gtk_vbox_new(FALSE,0);
 	seqv->timeline_ = gtk_hscale_new_with_range( 0.0,1.0,0.1 );
-	gtk_scale_set_draw_value( seqv->timeline_, FALSE );
+	gtk_scale_set_draw_value( GTK_SCALE(seqv->timeline_), FALSE );
 	gtk_widget_set_size_request( seqv->panel,180 ,180);
 	gtk_adjustment_set_value(
                 GTK_ADJUSTMENT(GTK_RANGE(seqv->timeline_)->adjustment), 0.0 );
@@ -682,7 +682,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	
 	GtkWidget *hbox = gtk_hbox_new(FALSE,0);
-	gtk_box_set_spacing( hbox, 10 );
+	gtk_box_set_spacing( GTK_BOX(hbox), 10 );
 	seqv->labels_[0] = gtk_label_new( "00:00:00:00" );
 	seqv->labels_[1] = gtk_label_new( "00:00:00:00" );
 	gtk_box_pack_start( GTK_BOX( hbox ), seqv->labels_[0], FALSE, FALSE, 0 );
@@ -746,7 +746,7 @@ static		int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len,
 	
 	GtkWidget *text_entry = gtk_entry_new();
 	gtk_entry_set_text( GTK_ENTRY(text_entry), "localhost" );
-	gtk_editable_set_editable( GTK_ENTRY(text_entry), TRUE );
+	gtk_editable_set_editable( GTK_EDITABLE(text_entry), TRUE );
 	gtk_dialog_set_default_response( GTK_DIALOG(dialog), GTK_RESPONSE_REJECT );
 	gtk_window_set_resizable( GTK_WINDOW( dialog ), FALSE );
 
@@ -755,7 +755,7 @@ static		int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len,
 	gint   p = (1000 * (mt->selected)) + base;
 
 	GtkObject *adj = gtk_adjustment_new( p,1024,65535,5,10,0);
-	GtkWidget *num_entry = gtk_spin_button_new( adj, 5.0, 0 );
+	GtkWidget *num_entry = gtk_spin_button_new( GTK_ADJUSTMENT(adj), 5.0, 0 );
 
 	GtkWidget *text_label = gtk_label_new( "Hostname" );
 	GtkWidget *num_label  = gtk_label_new( "Port" );
@@ -774,7 +774,7 @@ static		int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len,
 
 	if( res == GTK_RESPONSE_ACCEPT )
 	{
-		gchar *host = gtk_entry_get_text( GTK_ENTRY( text_entry ) );
+		const gchar *host = gtk_entry_get_text( GTK_ENTRY( text_entry ) );
 		gint   port = gtk_spin_button_get_value( GTK_SPIN_BUTTON(num_entry ));
 		strncpy( hostname, host, len );
 		*port_num = port;
@@ -801,7 +801,7 @@ void		*multitrack_new(
 	multitracker_t *mt = NULL;
 
 	mt 		= (multitracker_t*) vj_calloc(sizeof(multitracker_t));
-	mt->view 	= (sequence_view_t*) vj_calloc(sizeof(sequence_view_t*) * MAX_TRACKS );
+	mt->view 	= (sequence_view_t**) vj_calloc(sizeof(sequence_view_t*) * MAX_TRACKS );
 	mt->preview	= NULL;
 	mt->main_window = win; 
 	mt->main_box    = box;
@@ -820,7 +820,7 @@ void		*multitrack_new(
 	for( c = 0; c < MAX_TRACKS; c ++ ) 
 	{
 		mt->view[c] = new_sequence_view( mt,  c );
-		gtk_table_attach_defaults( table, mt->view[c]->event_box, c, c+1, 0, 1 );
+		gtk_table_attach_defaults( GTK_TABLE(table), mt->view[c]->event_box, c, c+1, 0, 1 );
 	}
 
 	gtk_scrolled_window_add_with_viewport(
@@ -855,7 +855,7 @@ int		multitrack_add_track( void *data )
 			status_print( mt, "Connection established with veejay runnning on %s port %d",
 				hostname, port_num );	
 			if( gveejay_user_preview() )
-				gtk_toggle_button_set_active( GTK_WIDGET(mt->view[track]->toggle), TRUE );
+				gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON(mt->view[track]->toggle), TRUE );
 			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
 			gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->toggle), TRUE );
 			
@@ -1063,7 +1063,7 @@ void		multitrack_bind_track( void *data, int id, int bind_this )
 	gvr_ext_unlock(mt->preview);
 
 	if( host != NULL && port > 0 )
-		gvr_queue_cxvims( mt->preview, id, VIMS_STREAM_NEW_UNICAST, port,host );
+		gvr_queue_cxvims( mt->preview, id, VIMS_STREAM_NEW_UNICAST, port, (unsigned char*)host );
 }
 
 void		multitrack_update_sequence_image( void *data , int track, GdkPixbuf *img )
@@ -1075,7 +1075,7 @@ void		multitrack_update_sequence_image( void *data , int track, GdkPixbuf *img )
 	int   h = ((int) (float )w / ratio )/16 *16;
 
 	GdkPixbuf *scaled = vj_gdk_pixbuf_scale_simple( img, w, h, GDK_INTERP_BILINEAR );
-	gtk_image_set_from_pixbuf( mt->view[track]->area, scaled);
+	gtk_image_set_from_pixbuf( GTK_IMAGE(mt->view[track]->area), scaled);
 
 	gdk_pixbuf_unref( scaled );
 }

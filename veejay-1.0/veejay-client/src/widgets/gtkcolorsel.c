@@ -1615,8 +1615,8 @@ make_label_spinbutton (GtkColorSelection *colorsel,
 
   // create hbox with 2 placeholders and add the hbox to one table element
   hbox = gtk_hbox_new(FALSE,1);
-  gtk_box_pack_start(hbox,GTK_WIDGET(label),FALSE,FALSE,0);
-  gtk_box_pack_start(hbox,GTK_WIDGET(*spinbutton),TRUE,TRUE,0);
+  gtk_box_pack_start(GTK_BOX(hbox),GTK_WIDGET(label),FALSE,FALSE,0);
+  gtk_box_pack_start(GTK_BOX(hbox),GTK_WIDGET(*spinbutton),TRUE,TRUE,0);
   gtk_table_attach(GTK_TABLE (table),hbox,i, i+1, j, j+1,GTK_FILL,GTK_FILL,0,0);
 }
 
@@ -1880,8 +1880,8 @@ gtk_color_selection_init (GtkColorSelection *colorsel)
   GtkWidget *top_hbox;
   GtkWidget *top_right_vbox;
   GtkWidget *palette_table, *table, *label, *hbox, *frame, *vbox, *button;
-  GtkHBox *opacity_hbox;
-  GtkHBox *colorhexname_hbox;  
+  GtkWidget *opacity_hbox;
+  GtkWidget *colorhexname_hbox;  
   GtkAdjustment *adjust;
   GtkWidget *picker_image;
   gint i, j;
@@ -1964,7 +1964,7 @@ gtk_color_selection_init (GtkColorSelection *colorsel)
   opacity_hbox = gtk_hbox_new(FALSE,1); 
   priv->opacity_label = gtk_label_new_with_mnemonic (_("Opacity:")); 
   gtk_misc_set_alignment (GTK_MISC (priv->opacity_label), 1.0, 0.5); 
-  gtk_box_pack_start(opacity_hbox,GTK_WIDGET(priv->opacity_label),FALSE,FALSE,0);  
+  gtk_box_pack_start(GTK_BOX(opacity_hbox),GTK_WIDGET(priv->opacity_label),FALSE,FALSE,0);  
   adjust = GTK_ADJUSTMENT (gtk_adjustment_new (0.0, 0.0, 255.0, 1.0, 1.0, 0.0)); 
   g_object_set_data (G_OBJECT (adjust), "COLORSEL", colorsel); 
   priv->opacity_slider = gtk_hscale_new (adjust);
@@ -1977,7 +1977,7 @@ gtk_color_selection_init (GtkColorSelection *colorsel)
   g_signal_connect (adjust, "value_changed",
                     G_CALLBACK (adjustment_changed),
                     GINT_TO_POINTER (COLORSEL_OPACITY));
-  gtk_box_pack_start(opacity_hbox,GTK_WIDGET(priv->opacity_slider),TRUE,TRUE,0);  
+  gtk_box_pack_start(GTK_BOX(opacity_hbox),GTK_WIDGET(priv->opacity_slider),TRUE,TRUE,0);  
   priv->opacity_entry = gtk_entry_new (); 
   gtk_tooltips_set_tip (priv->tooltips,
                         priv->opacity_entry,
@@ -1986,16 +1986,16 @@ gtk_color_selection_init (GtkColorSelection *colorsel)
 
   g_signal_connect (priv->opacity_entry, "activate",
                     G_CALLBACK (opacity_entry_changed), colorsel);
-  gtk_box_pack_start(opacity_hbox,GTK_WIDGET(priv->opacity_entry),FALSE,FALSE,0);  
+  gtk_box_pack_start(GTK_BOX(opacity_hbox),GTK_WIDGET(priv->opacity_entry),FALSE,FALSE,0);  
   gtk_table_attach(GTK_TABLE (table),opacity_hbox,0, 3, 2, 3,GTK_FILL,GTK_FILL,0,0);
 
 
   colorhexname_hbox = gtk_hbox_new(FALSE,1); 
   label = gtk_label_new_with_mnemonic (_("Color Name:"));
-  gtk_box_pack_start(colorhexname_hbox,GTK_WIDGET(label),FALSE,FALSE,0);  
+  gtk_box_pack_start(GTK_BOX(colorhexname_hbox),GTK_WIDGET(label),FALSE,FALSE,0);  
   gtk_misc_set_alignment (GTK_MISC (label), 1.0, 0.5);
   priv->hex_entry = gtk_entry_new ();
-  gtk_entry_set_text(priv->hex_entry,"#000000");
+  gtk_entry_set_text( GTK_ENTRY(priv->hex_entry),"#000000");
 
   gtk_label_set_mnemonic_widget (GTK_LABEL (label), priv->hex_entry);
 
@@ -2011,7 +2011,7 @@ gtk_color_selection_init (GtkColorSelection *colorsel)
   
   gtk_entry_set_width_chars (GTK_ENTRY (priv->hex_entry), 7);
   gtk_table_set_col_spacing (GTK_TABLE (table), 3, 15);
-  gtk_box_pack_start(colorhexname_hbox,GTK_WIDGET(priv->hex_entry),TRUE,TRUE,0);  
+  gtk_box_pack_start(GTK_BOX(colorhexname_hbox),GTK_WIDGET(priv->hex_entry),TRUE,TRUE,0);  
   gtk_table_attach(GTK_TABLE (table),colorhexname_hbox,0, 3, 3, 4,GTK_FILL,GTK_FILL,0,0);
 
   /* Set up the palette */

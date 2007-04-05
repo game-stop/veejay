@@ -159,7 +159,9 @@ int main(int argc, char *argv[]) {
 	
 	vj_mem_init();
 
+#ifdef STRICT_CHECKING
 	vevo_strict_init();
+#endif
 
 	find_user_themes();
 	

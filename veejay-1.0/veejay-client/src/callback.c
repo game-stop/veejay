@@ -243,7 +243,6 @@ void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 	if(info->status_lock)
 		return;
 
-	gdouble max_val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->upper;
 	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
 	
 	if( is_button_toggled( "loglinear" ))
@@ -1434,8 +1433,8 @@ void	on_inputstream_button_clicked(GtkWidget *widget, gpointer user_data)
 	gchar *remote_ = get_text( "inputstream_remote" );
 	gint port = get_nums( "inputstream_portnum" );
 
-	gint bw = 0;
-	gint br = 0;
+	gsize bw = 0;
+	gsize br = 0;
 
 	if(!remote_)
 	{
@@ -1801,15 +1800,13 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 		start,end);
 
 	int k;
-	float fmin = (float) min;
-	float fmax = (float) max;
 
 	get_points_from_curve( curve,  len, data );
 	for( k = 0 ; k < len ; k++ )
 		values[k] = ( (int) ( data[k] * max ));
 
 	int total_len = 25 + (4 * len);
-	sprintf(kf, "key%02d%02d%08d%08d%02d",i,j,start,end,type );
+	sprintf( (char*)kf, "key%02d%02d%08d%08d%02d",i,j,start,end,type );
 	unsigned char *ptr = kf + 25;
 	for( k = 0; k < len; k ++ )
 	{
@@ -1834,7 +1831,6 @@ void	on_curve_buttonclear_clicked(GtkWidget *widget, gpointer user_data)
 	if( id < 0 )
 		id = 0;
 	int i = info->uc.selected_chain_entry;
-	int j = info->uc.selected_parameter_id;
 	GtkWidget *curve = glade_xml_get_widget_( info->main_window, "curve");
 	reset_curve( curve ); 
 
@@ -2471,12 +2467,6 @@ void		on_previewlarge_clicked( GtkWidget *widget, gpointer user_data )
 
 void		on_previewspeed_value_changed( GtkWidget *widget, gpointer user_data)
 {
-	double val = 	       GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value;
-	double fps = (val * 100.0) / (double)info->el.fps ;
-	
-	//multitrack_set_preview_speed( info->mt , fps );
-	
-	//sprintf(speed,"%2.2f "
 }
 
 void		on_previewscale_value_changed( GtkWidget *widget, gpointer user_data)
@@ -2692,7 +2682,6 @@ void	on_new_color1_activate(GtkWidget *w , gpointer user_data)
 void	on_delete2_activate( GtkWidget *w, gpointer user_data)
 {
 }
-static	void	refresh_srt_info( void );
 void
 on_spin_samplebank_select_value_changed
                                         (GtkSpinButton   *spinbutton,
@@ -3015,21 +3004,6 @@ void	on_button_text_update_clicked(GtkWidget *w, gpointer data)
 	gchar *text = get_textview_buffer( "textview_text" );
 	if(text)
 		multi_vims( VIMS_SRT_UPDATE, "%d %d %d %s", srt_seq_, s1,s2,text );
-}
-
-static	int str_to_tc( char *tc )
-{
-	int res = 0;
-	float fps = info->el.fps;
-	int parts[4] = { 0,0,0,0};
-	int n = sscanf( tc, "%2d:%2d:%2d,%d",&parts[0],&parts[1],&parts[2],&parts[3]);
-
-	res = (int) parts[3];
-	res += (int) ( fps * parts[2] );
-	res += (int) ( fps * 60 * parts[1] );
-	res += (int) ( fps * 3600 * parts[0] );
-
-	return res;
 }
 
 static	void change_box_color_rgb( GtkWidget *box, int r, int g, int b,int a, int fill )

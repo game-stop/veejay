@@ -275,7 +275,7 @@ gui_cell_renderer_spin_focus_out_event (GtkWidget *spinbutton,
 static gboolean
 onButtonPress (GtkWidget *spinbutton, GdkEventButton *bevent, gpointer data)
 {
-        if (bevent->button == 1 && bevent->type == GDK_2BUTTON_PRESS || bevent->type == GDK_3BUTTON_PRESS)
+        if ((bevent->button == 1 && bevent->type == GDK_2BUTTON_PRESS) || bevent->type == GDK_3BUTTON_PRESS)
         {
                 g_print ("double or triple click caught and ignored.\n");
                 return TRUE; /* don't invoke other handlers */

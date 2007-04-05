@@ -133,7 +133,6 @@ static	void	timeline_init(TimelineSelection *te );
 static	void	paint(GtkWidget *widget, cairo_t *cr, gpointer user_data);
 
 static	GObjectClass	*parent_class = NULL;
-static  GtkActionGroup *action_group = NULL;
 static	gint	timeline_signals[LAST_SIGNAL] = { 0 };
  
 struct _TimelineSelectionClass
@@ -693,16 +692,13 @@ cairo_rectangle_round (cairo_t * cr,
 
 static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 {
- 	GtkStyle *style = widget->style;
  	TimelineSelection *te = TIMELINE_SELECTION( widget );
 	double width = widget->allocation.width;
 	double height = widget->allocation.height;
 
 	gdouble marker_width = width/ te->num_video_frames;
-	gdouble frame_width = marker_width * 0.9;
 //	gdouble marker_height = height / te->num_video_frames;
 	gdouble marker_height = te->frame_height;
-	gint i;
 
 	te->frame_width = marker_width;
 
@@ -728,7 +724,6 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 	{
 		cairo_set_source_rgba( cr, 1.0,0.0,0.0,1.0);
 		double x1 = marker_width * te->frame_num;
-		double x2 = x1 + frame_width;
 		te->stepper.x = x1 - 8;
 		te->stepper.y = 0;
 		te->stepper.width = te->stepper_size + 8;
