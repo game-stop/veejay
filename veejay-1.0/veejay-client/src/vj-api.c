@@ -256,8 +256,8 @@ typedef struct
 } vims_keys_t;
 
 static  int	user_preview = 0;
-static	int	NUM_BANKS =	30;
-static	int	NUM_PAGES =	16;
+static	int	NUM_BANKS =	35;
+static	int	NUM_PAGES =	10;
 static 	int	NUM_SAMPLES_PER_PAGE = 12;
 static	int	NUM_SAMPLES_PER_COL = 2;
 static	int	NUM_SAMPLES_PER_ROW = 6;
@@ -4026,9 +4026,8 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				char line[300];
 				char source[255];
 				char descr[255];
-				bzero( line, 300 );
-				bzero( descr, 255 );
-				bzero( source, 255 ); 
+				veejay_memset(line,0,sizeof(line));
+				veejay_memset(descr,0,sizeof(descr));
 				strncpy( line, fxtext + offset, len );
 	
 				int values[10];
@@ -4043,18 +4042,16 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				strncpy( descr, line + 22, values[6] );
 				switch( values[1] )
 				{
-					case STREAM_VIDEO4LINUX :sprintf(source,"Video4Linux stream");break;
-					case STREAM_WHITE	:sprintf(source,"Solid stream"); 
-								 sprintf(descr,"infinite"); 
+					case STREAM_VIDEO4LINUX :sprintf(source,"unicap %d",values[0]);break;
+					case STREAM_WHITE	:sprintf(source,"solid %d",values[0]); 
 								 break;
-					case STREAM_MCAST	:sprintf(source,"Multicast stream");break;
-					case STREAM_NETWORK	:sprintf(source,"Unicast stream");break;
-					case STREAM_YUV4MPEG	:sprintf(source,"Yuv4Mpeg file stream");break;
-					case STREAM_AVFORMAT	:sprintf(source,"libavformat stream");break;
-					case STREAM_DV1394	:sprintf(source,"DV1394 Camera stream");break;
-					case STREAM_PICTURE	:sprintf(source,"Image stream");break;
+					case STREAM_MCAST	:sprintf(source,"multicast %d",values[0]);break;
+					case STREAM_NETWORK	:sprintf(source,"unicast %d",values[0]);break;
+					case STREAM_YUV4MPEG	:sprintf(source,"y4n %d",values[0]);break;
+					case STREAM_DV1394	:sprintf(source,"dv1394 %d",values[0]);break;
+					case STREAM_PICTURE	:sprintf(source,"image %d",values[0]);break;
 					default:
-					sprintf(source,"Streaming from unknown");	
+					sprintf(source,"??? %d", values[0]);	
 				}
 				gchar *gsource = _utf8str( descr );
 				gchar *gtype = _utf8str( source );
@@ -6334,9 +6331,6 @@ int	vj_gui_get_preview_priority(void)
 
 void	default_bank_values(int *col, int *row )
 {
-	NUM_BANKS =	20;
-	NUM_PAGES =	10;
-
 	if( *col == 0 && *row == 0 )
 	{
 		NUM_SAMPLES_PER_COL = 3;
@@ -6348,6 +6342,7 @@ void	default_bank_values(int *col, int *row )
 		NUM_SAMPLES_PER_COL = *row;
 	}
 	NUM_SAMPLES_PER_PAGE = NUM_SAMPLES_PER_COL * NUM_SAMPLES_PER_ROW;
+	NUM_BANKS = (4096 / NUM_SAMPLES_PER_PAGE );
 }
 
 void	set_skin(int skin)
@@ -7228,17 +7223,18 @@ void	reset_samplebank(void)
 			for(j = 0; j < NUM_SAMPLES_PER_PAGE ; j ++ )
 			{
 				sample_slot_t *slot = info->sample_banks[i]->slot[j];
-				
-				if(slot->title) free(slot->title);
-				if(slot->timecode) free(slot->timecode);
-				if(slot->pixbuf) gdk_pixbuf_unref( slot->pixbuf );
-				slot->title = NULL;
-				slot->timecode = NULL;
-				slot->sample_id = 0;
-				slot->sample_type = 0;
-				   update_sample_slot_data( i,j, slot->sample_id,slot->sample_type,slot->title,slot->timecode);
-
-
+				if(slot->sample_id)
+				{		
+					if(slot->title) free(slot->title);
+					if(slot->timecode) free(slot->timecode);
+					if(slot->pixbuf) gdk_pixbuf_unref( slot->pixbuf );
+					slot->title = NULL;
+					slot->timecode = NULL;
+					slot->sample_id = 0;
+					slot->sample_type = 0;
+					slot->pixbuf = NULL;
+				}
+				update_sample_slot_data( i,j, slot->sample_id,slot->sample_type,slot->title,slot->timecode);
 			}
 		}
 	}
