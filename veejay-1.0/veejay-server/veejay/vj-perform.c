@@ -103,7 +103,6 @@ static ycbcr_frame **primary_buffer;	/* normal */
 #define CACHE_SIZE (SAMPLE_MAX_EFFECTS+CACHE)
 static int cached_tag_frames[CACHE_SIZE];	/* cache a frame into the buffer only once */
 static int cached_sample_frames[CACHE_SIZE];
-
 static int frame_info[64][SAMPLE_MAX_EFFECTS];	/* array holding frame lengths  */
 static uint8_t *audio_buffer[SAMPLE_MAX_EFFECTS];	/* the audio buffer */
 static uint8_t *lin_audio_buffer_ = NULL;
@@ -130,6 +129,7 @@ if((var) > (high)) { var = (high); }
 
 //forward
 
+static int	vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t *img[3]);
 static void vj_perform_pre_chain(veejay_t *info, VJFrame *frame);
 static void vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame);
 static void vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame);
@@ -1358,6 +1358,8 @@ static void vj_perform_use_cached_ycbcr_frame(veejay_t *info, int centry, int ch
 		veejay_memcpy(frame_buffer[chain_entry]->Y,primary_buffer[0]->Y,  len1 );
 		veejay_memcpy(frame_buffer[chain_entry]->Cb,primary_buffer[0]->Cb,len2 );
 		veejay_memcpy(frame_buffer[chain_entry]->Cr,primary_buffer[0]->Cr,len2);
+
+		frame_buffer[chain_entry]->ssm = info->effect_frame1->ssm;
 	}
 	else
 	{
@@ -1367,6 +1369,8 @@ static void vj_perform_use_cached_ycbcr_frame(veejay_t *info, int centry, int ch
 		veejay_memcpy(	frame_buffer[chain_entry]->Y,frame_buffer[c]->Y,   len1);
 		veejay_memcpy(	frame_buffer[chain_entry]->Cb,frame_buffer[c]->Cb, len2);
 		veejay_memcpy(	frame_buffer[chain_entry]->Cr,frame_buffer[c]->Cr, len2);
+
+		frame_buffer[chain_entry]->ssm = frame_buffer[c]->ssm;
    	 }
 }
 
@@ -1760,7 +1764,7 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
     int error = 1;
     int nframe;
     int len = 0;
-    int centry = -2;
+    int centry = -1;
 #ifdef STRICT_CHECKING
 	assert( frame_buffer[chain_entry]->Cb != frame_buffer[chain_entry]->Cr );
 #endif
@@ -1793,28 +1797,20 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 	  	if (vj_tag_get_active(sample_id) == 1 )
 		{
 			int res =  vj_tag_get_frame(sample_id, fb, audio_buffer[chain_entry]);
-
 			if(res==1)	
-			{
 		  		error = 0;
-		  	 	cached_tag_frames[1 + chain_entry] = sample_id;
-	        	}
 			else
-			{
-				error = 1;
 		   		vj_tag_set_active(sample_id, 0);
-			}
-			cached_tag_frames[1 + chain_entry ] = sample_id;
 			frame_buffer[chain_entry]->ssm = 0;
 	     	}
 	}
 	else
 	{	
 		vj_perform_use_cached_ycbcr_frame(info, centry, chain_entry, width,height);
-	    	cached_tag_frames[1 + chain_entry ] = sample_id;
 	    	error = 0;
 	}
-	
+	if(!error)
+		cached_tag_frames[1 + chain_entry ] = sample_id;	
 	break;
 	
    case VJ_TAG_TYPE_NONE:
@@ -1822,43 +1818,16 @@ static int vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
  	    centry = vj_perform_sample_is_cached(sample_id, chain_entry);
             if(centry == -1 || info->no_caching)
 	    {
-		editlist *el = sample_get_editlist( sample_id );
-		if(el)
-			len = vj_el_get_video_frame(el, nframe, fb); 
+		len = vj_perform_get_frame_fx( info, sample_id, nframe, fb );
 		if(len > 0)
 			error = 0;
-		
 		frame_buffer[chain_entry]->ssm = 0;
 	    }
 	    else
 	    {
-	   	 if(centry == 0)
-		 {
-			int len = info->effect_frame1->len;
-			int len2 = ( info->effect_frame1->ssm == 1  ? len : info->effect_frame1->uv_len );
-			veejay_memcpy( frame_buffer[chain_entry]->Y, primary_buffer[0]->Y,  len);
-			veejay_memcpy( frame_buffer[chain_entry]->Cb, primary_buffer[0]->Cb, len2);
-			veejay_memcpy( frame_buffer[chain_entry]->Cr, primary_buffer[0]->Cr, len2);
-			frame_buffer[chain_entry]->ssm = info->effect_frame1->ssm;
-			error =  0;
-
-		//	veejay_msg(0, "len1=%d, len2=%d,  ssm top = %d, ssm %d = %d",
-		//		       len,len2, info->effect_frame1->ssm, chain_entry, frame_buffer[chain_entry]->ssm );
-		 }
-		else
-		{
-			int len = (width*height);
-			int len2 = ( frame_buffer[centry-1]->ssm == 1 ? len : info->effect_frame2->uv_len );
-			veejay_memcpy(frame_buffer[chain_entry]->Y, frame_buffer[centry-1]->Y, len);
-			veejay_memcpy(frame_buffer[chain_entry]->Cb, frame_buffer[centry-1]->Cb,len2);
-			veejay_memcpy(frame_buffer[chain_entry]->Cr, frame_buffer[centry-1]->Cr,len2);
-			frame_buffer[chain_entry]->ssm = frame_buffer[centry-1]->ssm;
-			error =0;
-		//		veejay_msg(0, "len1=%d, len2=%d,  chain (read %d) = %d, ssm %d",
-		//		       len,len2, chain_entry, centry-1,frame_buffer[chain_entry]->ssm,
-		//		       frame_buffer[centry-1]->ssm );
-
-		}
+		vj_perform_use_cached_ycbcr_frame( info, centry, chain_entry, width,height );
+		cached_sample_frames[ 1 + chain_entry ] = sample_id;
+		error = 0;
 	   }
 	   if(!error)
 	  	 cached_sample_frames[chain_entry+1] = sample_id;
@@ -1949,6 +1918,9 @@ static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t 
  * returns 0 on success, -1 on error 
  */
 
+//@ apply_secundary: get the 2nd image, after this func. the data may be sampled, according to fx.
+//  ssm of frame_buffer[chain_entry] must be set correctly.
+
 static int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 			       int chain_entry)
 {				/* second sample */
@@ -1960,14 +1932,12 @@ static int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
     int nframe;
     int len;
     int res = 1;
-    int centry = -2;
+    int centry = -1;
 
     uint8_t *fb[3] = {
 		frame_buffer[chain_entry]->Y,
 		frame_buffer[chain_entry]->Cb,
 		frame_buffer[chain_entry]->Cr };
-
- //   if(chain_entry < 0 || chain_entry >= SAMPLE_MAX_EFFECTS) return -1;
 
     switch (type)
     {
@@ -1981,6 +1951,7 @@ static int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 	case VJ_TAG_TYPE_PICTURE:
 
 	centry = vj_perform_tag_is_cached(chain_entry, sample_id); // is it cached?
+	//@ not cached
 	if (centry == -1 )
 	{
 		if(! vj_tag_get_active( sample_id ) )
@@ -1992,31 +1963,26 @@ static int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 		if (vj_tag_get_active(sample_id) == 1)
 		{ 
 			res = vj_tag_get_frame(sample_id, fb,  audio_buffer[chain_entry]);
-			if(res==1)
-			{ 
+			if(res)
 				error = 0;                               
-				cached_tag_frames[1 + chain_entry] = sample_id; // frame is cached now , admin it 
-			}	
 			else
-			{
-				error = 1; // something went wrong
 				vj_tag_set_active(sample_id, 0); // stop stream
-			}
 			frame_buffer[chain_entry]->ssm = 0;
 	    	}
 	}
 	else
 	{
 	    vj_perform_use_cached_ycbcr_frame(info,centry, chain_entry, width, height);
-	    cached_tag_frames[1 + chain_entry] = sample_id;
 	    error = 0;
-	}	
+	}
+	if(!error )
+		cached_tag_frames[1 + chain_entry ] = sample_id;	
 	break;
     case VJ_TAG_TYPE_NONE:
 	    	nframe = vj_perform_get_subframe(info, sample_id, chain_entry); // get exact frame number to decode
  	  	centry = vj_perform_sample_is_cached(sample_id, chain_entry);
 
-	    	if(centry == -1)
+	    	if(centry == -1 || info->no_caching)
 	    	{
 			len = vj_perform_get_frame_fx( info, sample_id, nframe, fb );	
 			if(len > 0 )
@@ -2025,38 +1991,18 @@ static int vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 		}
 		else
 		{
-			if(centry==0)
-			{
-				int len = (width * height);
-				int len2 = ( info->effect_frame1->ssm == 1  ? len : info->effect_frame1->uv_len );
-			
-				veejay_memcpy( frame_buffer[chain_entry]->Y, primary_buffer[0]->Y,  len);
-				veejay_memcpy( frame_buffer[chain_entry]->Cb, primary_buffer[0]->Cb, len2);
-				veejay_memcpy( frame_buffer[chain_entry]->Cr, primary_buffer[0]->Cr,len2);
-				error =  0;
-				frame_buffer[chain_entry]->ssm = info->effect_frame1->ssm;
-			}
-		    	else
-			{
-				int len = (width * height);
-				int len2 = ( frame_buffer[centry-1]->ssm == 1  ? len : info->effect_frame2->uv_len );
-				
-				veejay_memcpy( frame_buffer[chain_entry]->Y, frame_buffer[centry-1]->Y, len);
-				veejay_memcpy( frame_buffer[chain_entry]->Cb, frame_buffer[centry-1]->Cb,len2);
-				veejay_memcpy( frame_buffer[chain_entry]->Cr, frame_buffer[centry-1]->Cr,len2);
-				error =0;
-
-				frame_buffer[chain_entry]->ssm = frame_buffer[centry-1]->ssm;
-			}
+			vj_perform_use_cached_ycbcr_frame(info,centry, chain_entry,width,height);	
+			cached_sample_frames[ 1 + chain_entry ] = sample_id;
+			error = 0;
 		}
 		if(!error)
 			cached_sample_frames[chain_entry+1] = sample_id;
 	break;
 
     }
-
-    if (error == 1)
-	veejay_msg(0,"Unable to retrieve source for FX entry %d", chain_entry );
+    if (error == 1) {
+	dummy_apply( fb, width, height, VJ_EFFECT_COLOR_BLACK);
+    }
     return 0;
 }
 
@@ -2106,7 +2052,8 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 			 	frames[1]->data[0] = frame_buffer[chain_entry]->Y;
 	   	 		frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
-				frames[1]->format = info->pixel_format;
+				frames[1]->format  = info->pixel_format;
+				frames[1]->ssm     = frame_buffer[chain_entry]->ssm;
 				// sample B
 	   			if(sub_mode && frames[1]->ssm == 0)
 				{
@@ -2117,6 +2064,7 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 						frameinfo->width,
 						frameinfo->height );
 					frames[1]->ssm = 1;
+					frame_buffer[chain_entry]->ssm = 1;	
 				}
 				else if (!sub_mode && frames[1]->ssm == 1 )
 				{
@@ -2127,7 +2075,8 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 						frameinfo->width,
                                     		frameinfo->height
                                 		);
-					frames[1]->ssm = 0;
+					  frames[1]->ssm = 0;
+					  frame_buffer[chain_entry]->ssm = 0;
 				}
 			}
 
@@ -2139,7 +2088,7 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 					frames[0]->data,
 					frameinfo->width,
 					frameinfo->height );
-				frames[0]->ssm = 1;
+				frames[0]->ssm = 1;	
 			}
 			else if(!sub_mode && frames[0]->ssm == 1)
                         {
@@ -2208,11 +2157,13 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 						frames[1]->data,
 						frameinfo->width,
 						frameinfo->height );
-					frames[1]->ssm = 1;
+					frames[1]->ssm = 0;
+					frame_buffer[chain_entry]->ssm = 1;
 				}
 				else if(frames[1]->ssm == 1 && !sub_mode )
-				{
+				{	
 					frames[1]->ssm = 0;
+					frame_buffer[chain_entry]->ssm = 0;
 					chroma_subsample(
 						settings->sample_mode,
 						effect_sampler,
