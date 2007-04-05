@@ -5588,12 +5588,12 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 	{
 		switch(info->status_tokens[MACRO])
 		{
-			case 0:
-				set_toggle_button( "macrostop", 1 ); break;
 			case 1:
 				set_toggle_button( "macrorecord",1); break;
 			case 2:
 				set_toggle_button( "macroplay",1 ); break;
+			default:
+				set_toggle_button( "macrostop",1); break;
 		}
 		
 	}
@@ -6523,7 +6523,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 			
 	for( i = 0 ; i < 3 ; i ++ )
 	{
-		gui->history_tokens[i] = (int*) vj_calloc(sizeof(int) * STATUS_TOKENS);
+		gui->history_tokens[i] = (int*) vj_calloc(sizeof(int) * (STATUS_TOKENS+1));
 	}
 
 	gui->uc.reload_force_avoid = FALSE;
