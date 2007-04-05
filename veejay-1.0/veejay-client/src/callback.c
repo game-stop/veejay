@@ -744,8 +744,6 @@ void	on_speed_slider_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
-fprintf(stderr, "%s\n",__FUNCTION__);
-
 		gint value = (gint) get_slider_val( "speed_slider" );
 	//	value *= info->play_direction;
 		multi_vims( VIMS_VIDEO_SET_SPEED, "%d", value );
@@ -2454,7 +2452,6 @@ void		on_previewbw_toggled( GtkWidget *w , gpointer user_data)
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 {
-veejay_msg(0,"%s",__FUNCTION__);
 	if(!multitrack_locked( info->mt ) )
 	multitrack_toggle_preview( info->mt, -1, is_button_toggled("previewtoggle"),
 			glade_xml_get_widget(info->main_window, "imageA") );
@@ -2571,7 +2568,6 @@ void	on_mt_sync_decspeed_clicked( GtkWidget *w, gpointer user_data)
 	int n = info->status_tokens[SAMPLE_SPEED];
 	if( n < 0 ) n += 1;
 	if( n > 0 ) n -= 1;
-fprintf(stderr, "%s\n",__FUNCTION__);
 	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
 
 }
@@ -2580,8 +2576,6 @@ void	on_mt_sync_incspeed_clicked( GtkWidget *w, gpointer user_data)
 	int n = info->status_tokens[SAMPLE_SPEED];
 	if( n < 0 ) n -= 1;
 	if( n > 0 ) n += 1;
-fprintf(stderr, "%s\n",__FUNCTION__);
-
 	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
 }
 void	on_mt_sync_prev_clicked( GtkWidget *w , gpointer user_data)
