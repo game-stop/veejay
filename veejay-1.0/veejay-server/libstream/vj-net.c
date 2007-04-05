@@ -112,7 +112,7 @@ void	*reader_thread(void *data)
 			retrieve = 1;
 		}
 	
-		int wait_time = 0;
+		int wait_time = 15000;
 	
 		if(!error && retrieve)
 		{
@@ -127,7 +127,7 @@ void	*reader_thread(void *data)
 					}
 					else
 					{
-						wait_time = 1000;
+						wait_time += 1000;
 					}
 					ret = 0;
 				}
