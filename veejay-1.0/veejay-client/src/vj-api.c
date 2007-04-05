@@ -2087,6 +2087,7 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 {
 	int tmp_len = slen+1;
 	char tmp[tmp_len];
+	veejay_memset(tmp,0,sizeof(tmp));
 	int ret = vj_client_read( info->client, V_CMD, tmp, slen );
 
 	int len = 0;
