@@ -908,6 +908,8 @@ JACK_srate(nframes_t nframes, void *arg)
   jack_driver_t *drv = (jack_driver_t *) arg;
 
   drv->jack_sample_rate = (long) nframes;
+  drv->output_sample_rate_ratio = 1.0;
+  drv->input_sample_rate_ratio = 1.0;
 #ifdef HAVE_SAMPLERATE
   /* make sure to recalculate the ratios needed for proper sample rate conversion */
   drv->output_sample_rate_ratio = (double) drv->jack_sample_rate / (double) drv->client_sample_rate;
@@ -1024,6 +1026,8 @@ JACK_OpenDevice(jack_driver_t * drv)
 
   free(our_client_name);
 
+  drv->client_sample_rate = jack_get_sample_rate(drv->client);
+ 
   TRACE("setting up jack callbacks\n");
 
   /* JACK server to call `JACK_callback()' whenever
@@ -1590,7 +1594,6 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
   JACK_ResetFromDriver(drv);    /* flushes all queued buffers, sets status to STOPPED and resets some variables */
 
   /* drv->jack_sample_rate is set by JACK_OpenDevice() */
-//  drv->client_sample_rate = *rate;
 //@ veejay resamples
     drv->client_sample_rate = *rate;
   drv->bits_per_channel = bits_per_channel;
@@ -1636,9 +1639,6 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
     TRACE("succeeded opening jack device\n");
   }
 
-  drv->client_sample_rate = jack_get_sample_rate(drv->client);
- 
-
   /* setup SRC objects just in case they'll be needed but only if requested */
 #ifdef HAVE_SAMPLERATE
   if(do_sample_rate_conversion)
@@ -1668,7 +1668,7 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
     }
   }
 #endif
-  if((long) (*rate) != drv->jack_sample_rate)
+/*  if((long) (*rate) != drv->jack_sample_rate)
   {
     TRACE("rate of %ld doesn't match jack sample rate of %ld, returning error\n",
           *rate, drv->jack_sample_rate);
@@ -1681,7 +1681,7 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
     releaseDriver(drv);
     pthread_mutex_unlock(&device_mutex);
     return ERR_RATE_MISMATCH;
-  }
+  } */
 
   drv->allocated = TRUE;        /* record that we opened this device */
 
