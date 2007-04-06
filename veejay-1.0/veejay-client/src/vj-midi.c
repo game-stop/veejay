@@ -73,10 +73,13 @@ void	vj_midi_load(void *vv, const char *filename)
 
 	int fd = open( filename, O_RDONLY );
 	if(!fd)
+	{
+		vj_msg(VEEJAY_MSG_ERROR, "Unable to open %s",filename);
 		return;
-
+	}
 	char *buf = (char*) vj_calloc( 64000 );
 	int done = 0;
+	uint32_t count = 0;
 	if (read( fd, buf, 64000 ) > 0 )
 	{
 		int len = strlen( buf );
@@ -108,6 +111,7 @@ void	vj_midi_load(void *vv, const char *filename)
 					veejay_memset( key,0,sizeof(key));
 					veejay_memset( widget,0,sizeof(widget));
 					veejay_memset( message,0,sizeof(message));
+					count ++;
 				}
 
 			}
@@ -117,6 +121,7 @@ void	vj_midi_load(void *vv, const char *filename)
 		}
 	
 	}
+	vj_msg(VEEJAY_MSG_INFO, "Loaded %d MIDI events from %s", count ,filename);
 }
 
 void	vj_midi_save(void *vv, const char *filename)
