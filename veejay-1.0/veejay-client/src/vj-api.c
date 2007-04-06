@@ -5899,6 +5899,7 @@ static void	update_gui()
 	
 	int *history = NULL;
 	int llast_pm = -1;
+
 	
 	if( last_pm >= 0 )
 	{
@@ -5931,18 +5932,17 @@ static void	update_gui()
 		pm = MODE_SAMPLE;
 	}
 
-	update_globalinfo(history, pm, last_pm);
+	veejay_update_multitrack(info);
 
+	update_globalinfo(history, pm, last_pm);
+/*
 	if(info->selected_slot)
 	{
 		if( info->selected_slot->sample_id == info->status_tokens[CURRENT_ID] && 
 		    info->selected_slot->sample_type == info->status_tokens[PLAY_MODE] )
-		veejay_update_multitrack( info );
-	}
-	else
-	{
-		veejay_update_multitrack(info);
-	}
+	}*/
+//	veejay_update_multitrack(info);
+	
 
 	process_reload_hints(history, pm);
 

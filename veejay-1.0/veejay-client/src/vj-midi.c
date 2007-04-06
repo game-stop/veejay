@@ -16,6 +16,10 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <config.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <unistd.h>
+
 #include <veejay/vjmem.h>
 #include <veejay/vj-msg.h>
 #include <alsa/asoundlib.h>
@@ -28,6 +32,8 @@
 extern GtkWidget      *glade_xml_get_widget_( GladeXML *m, const char *name );
 extern void    msg_vims(char *message);
 extern void    vj_msg(int type, const char format[], ...);
+extern int prompt_dialog(const char *title, char *msg);
+static	int	vj_midi_events(void *vv );
 
 typedef struct
 {
@@ -63,7 +69,49 @@ void	vj_midi_play(void *vv )
         if(!v->active) return;
 
 	v->learn = 0;
-	vj_msg(VEEJAY_MSG_INFO, "MIDI listener active");
+	int a = vj_midi_events(vv);
+	char msg[100];
+	snprintf(msg,sizeof(msg), "MIDI listener active, %d events registered", a );
+	vj_msg(VEEJAY_MSG_INFO, "%s",msg);
+}
+static	int	vj_midi_events(void *vv )
+{
+	vmidi_t *v = (vmidi_t*)vv;
+	char **items = vevo_list_properties(v->vims);
+	if(!items) return 0;
+
+	int i;
+	int len = 0;
+	for( i = 0; items[i] != NULL ; i ++ )
+	{
+		len ++;
+		free(items[i]);
+	}
+	free(items);
+	return len;	
+}
+static	void	vj_midi_reset( void *vv )
+{
+	vmidi_t *v = (vmidi_t*)vv;
+	char **items = vevo_list_properties(v->vims);
+	if(!items) return;
+
+	int i;
+	for( i = 0; items[i] != NULL ; i ++ )
+	{
+		dvims_t *d = NULL;
+		if( vevo_property_get( v->vims, items[i],0,&d ) == VEVO_NO_ERROR )
+		{
+			if(d->msg) free(d->msg);
+			if(d->widget) free(d->widget);
+			free(d);
+		}
+		free(items[i]);
+	}
+	free(items);
+	
+	vevo_port_free(v->vims);
+	v->vims = vpn(VEVO_ANONYMOUS_PORT);
 }
 
 void	vj_midi_load(void *vv, const char *filename)
@@ -71,16 +119,42 @@ void	vj_midi_load(void *vv, const char *filename)
 	vmidi_t *v = (vmidi_t*) vv;
         if(!v->active) return;
 
+	int a = vj_midi_events(vv);
+	if( a > 0 )
+	{
+		char warn[200];
+		snprintf(warn,sizeof(warn), "There are %d MIDI event known, loading from file will overwrite any existing events. Continue ?", a );
+		if( prompt_dialog( "MIDI", warn ) == GTK_RESPONSE_REJECT )
+			return;
+
+	}
+
 	int fd = open( filename, O_RDONLY );
 	if(!fd)
 	{
-		vj_msg(VEEJAY_MSG_ERROR, "Unable to open %s",filename);
+		vj_msg(VEEJAY_MSG_ERROR, "Unable to open file '%s': %s", filename, strerror(errno));
 		return;
 	}
-	char *buf = (char*) vj_calloc( 64000 );
+	struct stat t;
+	if( fstat( fd, &t) != 0 )
+	{
+		vj_msg(VEEJAY_MSG_ERROR,"Unable to load %s: %s", filename, strerror(errno));
+		return;
+	}
+	else
+	{
+		if( !S_ISREG( t.st_mode ) && !S_ISLNK(t.st_mode) )
+		{
+			vj_msg(VEEJAY_MSG_ERROR, "File '%s' is not a regular file or symbolic link. Refusing to load it.",
+				filename );
+			return;
+		}
+	}
+
+	char *buf = (char*) vj_calloc( 128000 );
 	int done = 0;
 	uint32_t count = 0;
-	if (read( fd, buf, 64000 ) > 0 )
+	if (read( fd, buf, 128000 ) > 0 )
 	{
 		int len = strlen( buf );
 		int j,k=0;
@@ -102,11 +176,18 @@ void	vj_midi_load(void *vv, const char *filename)
 					veejay_memset( value,0,sizeof(value));
 					k = 0;
 					dvims_t *d = (dvims_t*) vj_calloc(sizeof(dvims_t));
+					dvims_t *cur = NULL;
 					d->extra = extra;
 					d->widget = NULL;
 					if( strncasecmp( widget, "none", 4 ) !=0 )
 						d->widget = strdup(widget);
 					d->msg = strdup(message);
+					if( vevo_property_get( v->vims, key, 0, &cur ) == VEVO_NO_ERROR )
+					{
+						if(cur->widget) free(cur->widget);
+						if(cur->msg) free(cur->msg);
+						free(cur);
+					}
 					int error = vevo_property_set( v->vims, key, 1, VEVO_ATOM_TYPE_VOIDPTR, &d);
 					veejay_memset( key,0,sizeof(key));
 					veejay_memset( widget,0,sizeof(widget));
@@ -121,6 +202,7 @@ void	vj_midi_load(void *vv, const char *filename)
 		}
 	
 	}
+	free(buf);
 	vj_msg(VEEJAY_MSG_INFO, "Loaded %d MIDI events from %s", count ,filename);
 }
 
@@ -158,8 +240,9 @@ void	vj_midi_save(void *vv, const char *filename)
 			write( fd, tmp, strlen( tmp ));
 			count ++;
 		}
+		free(items[i]);
 	}
-
+	free(items);
 	close(fd);
 
 	vj_msg(VEEJAY_MSG_INFO, "Wrote %d MIDI events to %s", count, filename );
@@ -179,6 +262,13 @@ void	vj_midi_learning_vims( void *vv, char *widget, char *msg, int extra )
 	char key[32];
 	snprintf(key,sizeof(key), "%03d%03d", v->learn_event[0],v->learn_event[1] );
 
+	dvims_t *cur = NULL;
+	if( vevo_property_get( v->vims, key, 0, &cur ) == VEVO_NO_ERROR )
+	{
+		if( cur->widget ) free(cur->widget );
+		if( cur->msg ) free(cur->msg);
+		free(cur);
+	}
 	int error = vevo_property_set( v->vims, key, 1, VEVO_ATOM_TYPE_VOIDPTR, &d );
 	if( error != VEVO_NO_ERROR )
 		return;
