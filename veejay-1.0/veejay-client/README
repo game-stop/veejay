@@ -25,7 +25,7 @@
                              ,::::~~~====++++                                 
                                ~~~~~===+++++               version 1.0                 
                                 ~~===+++++++:                               
-                                 N=++++++++++          March, 25. 2007.                             
+                                 N=++++++++++              April  2007.                             
                                    +++++++++                                   
                                     ++++::::                                  
                                      :::::                                      
@@ -34,14 +34,16 @@
    
  	        :: GveejayReloaded, a graphical interface for Veejay ::
 
+	
+	FEATURE OVERVIEW
 
-Main Features:
 
- # dumb client (TCP/IP) (reloaded pulls everything from veejay)
- # tracks multiple veejay servers
- # slick user interface
- # midi support
+General:
 
+ # Thin client (TCP/IP) 
+ # MIDI support (auto learning)
+ # Slick interface designed for live performing
+ # Tracks multiple veejay servers
 
 Install
 =======
