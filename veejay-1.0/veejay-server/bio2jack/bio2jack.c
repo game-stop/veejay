@@ -1590,7 +1590,9 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
   JACK_ResetFromDriver(drv);    /* flushes all queued buffers, sets status to STOPPED and resets some variables */
 
   /* drv->jack_sample_rate is set by JACK_OpenDevice() */
-  drv->client_sample_rate = *rate;
+//  drv->client_sample_rate = *rate;
+//@ veejay resamples
+    drv->client_sample_rate = *rate;
   drv->bits_per_channel = bits_per_channel;
   drv->num_input_channels = input_channels;
   drv->num_output_channels = output_channels;
@@ -1633,6 +1635,9 @@ JACK_OpenEx(int *deviceID, unsigned int bits_per_channel,
   {
     TRACE("succeeded opening jack device\n");
   }
+
+  drv->client_sample_rate = jack_get_sample_rate(drv->client);
+ 
 
   /* setup SRC objects just in case they'll be needed but only if requested */
 #ifdef HAVE_SAMPLERATE
