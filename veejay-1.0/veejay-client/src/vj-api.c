@@ -6714,6 +6714,8 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 
 	info->midi =  vj_midi_new( info->main_window );
 
+	set_toggle_button( "midievent", 1 );
+
 }
 
 
