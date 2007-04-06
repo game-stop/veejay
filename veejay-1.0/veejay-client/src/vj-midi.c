@@ -37,6 +37,7 @@ typedef struct
 	int		npfd;
 	int		learn;
 	int		learn_event[4];
+	int		active;
 	void		*mw;
 } vmidi_t;
 
@@ -47,9 +48,11 @@ typedef struct
 	char		*msg;
 } dvims_t;
 
+
 void	vj_midi_learn( void *vv )
 {
 	vmidi_t *v = (vmidi_t*) vv;
+	if(!v->active) return;
 	v->learn = 1;
 	vj_msg(VEEJAY_MSG_INFO, "Learning MIDI commands. Touch a midi key and then click a widget");
 }
@@ -57,6 +60,8 @@ void	vj_midi_learn( void *vv )
 void	vj_midi_play(void *vv )
 {
 	vmidi_t *v = (vmidi_t*) vv;
+        if(!v->active) return;
+
 	v->learn = 0;
 	vj_msg(VEEJAY_MSG_INFO, "MIDI listener active");
 }
@@ -64,6 +69,8 @@ void	vj_midi_play(void *vv )
 void	vj_midi_load(void *vv, const char *filename)
 {
 	vmidi_t *v = (vmidi_t*) vv;
+        if(!v->active) return;
+
 	int fd = open( filename, O_RDONLY );
 	if(!fd)
 		return;
@@ -115,6 +122,8 @@ void	vj_midi_load(void *vv, const char *filename)
 void	vj_midi_save(void *vv, const char *filename)
 {
 	vmidi_t *v = (vmidi_t*) vv;
+        if(!v->active) return;
+
 	int fd = open( filename, O_TRUNC|O_CREAT|O_WRONLY );
 	if(!fd)
 	{
@@ -154,6 +163,8 @@ void	vj_midi_save(void *vv, const char *filename)
 void	vj_midi_learning_vims( void *vv, char *widget, char *msg, int extra )
 {
 	vmidi_t *v = (vmidi_t*) vv;
+        if(!v->active) return;
+
 	if( !v->learn )
 		return;
 	dvims_t *d = (dvims_t*) vj_malloc(sizeof(dvims_t));
@@ -226,6 +237,7 @@ void	vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, int c
 static	void	queue_vims_event( vmidi_t *v, int *data )
 {
 	char key[32];
+
 	if( v->learn )
 	{
 		veejay_memcpy( v->learn_event, data, sizeof(v->learn_event ));
@@ -341,6 +353,8 @@ static	void	vj_midi_action( vmidi_t *v )
 int	vj_midi_handle_events(void *vv)
 {
 	vmidi_t *v = (vmidi_t*) vv;
+        if(!v->active) return 0;
+
 	if( poll( v->pfd, v->npfd, 0 ) > 0 )
 	{
 	//@ snd_event_input_pending doesnt work
@@ -371,22 +385,20 @@ void	*vj_midi_new(void *mw)
 			SND_SEQ_PORT_TYPE_APPLICATION )) < 0 )
 	{
 		veejay_msg(0, "Error creating sequencer port");
-		if(v) free(v);
-		return NULL;
+		return v;
 	}
 
 	v->npfd = snd_seq_poll_descriptors_count( v->sequencer, POLLIN );
 	if( v->npfd <= 0 )
 	{
 		veejay_msg(0,"Unable to poll in from sequencer");
-		if(v) free(v);
-		return NULL;
+		return v;
 	}
 	v->pfd     = (struct pollfd *) vj_calloc( v->npfd * sizeof( struct pollfd ));
 	v->mw      = mw;
 	v->learn   = 0;
 	v->vims    = vpn(VEVO_ANONYMOUS_PORT);	
-
+	v->active = 1;
 	snd_seq_poll_descriptors( v->sequencer, v->pfd, v->npfd, POLLIN );
 
 	veejay_msg(VEEJAY_MSG_INFO, "MIDI listener active");
