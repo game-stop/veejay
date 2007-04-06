@@ -52,4 +52,5 @@ int	gveejay_user_preview();
 char *get_glade_path();
 char *get_gveejay_dir();
 int	gveejay_restart();
+int	gveejay_update();
 #endif 

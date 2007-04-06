@@ -159,9 +159,7 @@ int main(int argc, char *argv[]) {
 	
 	vj_mem_init();
 
-#ifdef STRICT_CHECKING
 	vevo_strict_init();
-#endif
 
 	find_user_themes();
 	
@@ -198,7 +196,8 @@ int main(int argc, char *argv[]) {
 		{
 			g_thread_yield();
 			//g_usleep( 1000 );
-			g_usleep(1000 * vj_gui_sleep_time());
+			if(!update_gveejay())
+				g_usleep(100 * vj_gui_sleep_time());
 		}
 	}
 	vj_gui_free();

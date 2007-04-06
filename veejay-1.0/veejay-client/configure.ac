@@ -158,6 +158,16 @@ AC_CHECK_FUNC(pthread_attr_getstacksize,
 				AC_DEFINE(HAVE_PTHREADSTACKSIZE,,[Using pthread stack size])
 			  ] )
 
+
+have_alsa=false
+AC_CHECK_LIB( asound, snd_seq_open,
+	[
+		AC_DEFINE( HAVE_ALSA,1, [Whether or not we have alsa])
+		ALSA_LIBS="-lasound"
+		AC_SUBST( ALSA_LIBS )
+		have_alsa=true ],,)
+
+
 have_dl_dlopen=false
 AC_CHECK_LIB(dl,dlopen)
 if test "$ac_cv_lib_dl_dlopen" = "yes"; then
@@ -716,4 +726,4 @@ AC_MSG_NOTICE([  - MJPEGTools                    : ${have_mjpegtools}])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscaler} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
-
+AC_MSG_NOTICE([  - Alsa support (midi sequencer) : ${have_alsa}])

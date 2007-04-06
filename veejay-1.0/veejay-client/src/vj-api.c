@@ -72,6 +72,7 @@
 #include <veejay/vevo.h>
 #include <veejay/libvevo.h>
 #include <veejay/vevo.h>
+#include <src/vmidi.h>
 //if gtk2_6 is not defined, 2.4 is assumed.
 #ifdef GTK_CHECK_VERSION
 #if GTK_MINOR_VERSION >= 6
@@ -432,6 +433,7 @@ typedef struct
 	watchdog_t	watch;
 	int		vims_line;
 	int		quality;
+	void		*midi;
 } vj_gui_t;
 
 enum
@@ -496,9 +498,9 @@ static  GtkTreeModel *editlist_model = NULL;
 
 gboolean	is_alive( void );
 static	int	get_slider_val(const char *name);
-static  void    vj_msg(int type, const char format[], ...);
+void    vj_msg(int type, const char format[], ...);
 //static  void    vj_msg_detail(int type, const char format[], ...);
-static	void	msg_vims(char *message);
+void	msg_vims(char *message);
 static  void    multi_vims(int id, const char format[],...);
 static  void 	single_vims(int id);
 static	gdouble	get_numd(const char *name);
@@ -1933,7 +1935,7 @@ enum
 	COLOR_NUM
 };
 
-static  void	vj_msg(int type, const char format[], ...)
+void	vj_msg(int type, const char format[], ...)
 {
 	if( type == VEEJAY_MSG_DEBUG && vims_verbosity == 0 )
 		return;
@@ -2028,7 +2030,7 @@ static	void	abort_gveejay()
 	exit(-1);
 }
 
-static	void	msg_vims(char *message)
+void	msg_vims(char *message)
 {
 	if(!info->client)
 		return;
@@ -2582,7 +2584,10 @@ static	void	v4l_expander_toggle(int mode)
 	gtk_expander_set_expanded( e ,(mode==0 ? FALSE : TRUE) );
 }
 
-
+int		update_gveejay()
+{
+	return vj_midi_handle_events( info->midi );
+}
 
 static  GdkPixbuf	*update_pixmap_kf( int status )
 {
@@ -3033,6 +3038,7 @@ gboolean
       if (!path_currently_selected && name != info->uc.selected_chain_entry)
       {
 	multi_vims( VIMS_CHAIN_SET_ENTRY, "%d", name );
+	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_CHAIN_SET_ENTRY, info->uc.selected_chain_entry );
       }
     }
 
@@ -3432,6 +3438,10 @@ on_effectmixlist_row_activated(GtkTreeView *treeview,
 			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
 				0, info->uc.selected_chain_entry,gid );
 			info->uc.reload_hint[HINT_ENTRY] = 1;
+			
+			char trip[100];
+			snprintf(trip,sizeof(trip), "%03d:%d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,0,info->uc.selected_chain_entry, gid );
+			vj_midi_learning_vims( info->midi, NULL, trip, 0 );
 		}
 		g_free(name);
 	}
@@ -3457,6 +3467,10 @@ on_effectlist_row_activated(GtkTreeView *treeview,
 			multi_vims(VIMS_CHAIN_ENTRY_SET_EFFECT, "%d %d %d",
 				0, info->uc.selected_chain_entry,gid );
 			info->uc.reload_hint[HINT_ENTRY] = 1;
+			char trip[100];
+			snprintf(trip,sizeof(trip), "%03d:%d %d %d;", VIMS_CHAIN_ENTRY_SET_EFFECT,0,info->uc.selected_chain_entry, gid );
+			vj_midi_learning_vims( info->midi, NULL, trip, 0 );
+
 		}
 		g_free(name);
 	}
@@ -3605,6 +3619,15 @@ on_effectlist_sources_row_activated(GtkTreeView *treeview,
 			( idstr[0] == 'T' ? 1 : 0 ),
 			id );	
 		    vj_msg(VEEJAY_MSG_INFO, "Set source channel to %d, %d", info->uc.selected_chain_entry,id );
+
+
+			char trip[100];
+			snprintf(trip, sizeof(trip), "%03d:%d %d %d %d",VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
+				0,
+				info->uc.selected_chain_entry,
+				( idstr[0] == 'T' ? 1 : 0 ),
+				id );	
+			vj_midi_learning_vims( info->midi, NULL, trip, 0 );
 		}
 		if(idstr) g_free(idstr);
 	}
@@ -6688,6 +6711,9 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	{
 		gtk_widget_show( w );
 	}
+
+	info->midi =  vj_midi_new( info->main_window );
+
 }
 
 
@@ -7468,6 +7494,7 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
 
 		}
 		multi_vims(VIMS_SET_MODE_AND_GO, "%d %d", g->sample_type, g->sample_id );
+		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO, g->sample_type,g->sample_id );
 	}
 
 	
@@ -7708,6 +7735,7 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
 	{
 		sample_slot_t *s = sample_banks[bank_nr]->slot[slot_nr];
 		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d", s->sample_type, s->sample_id);
+		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO, s->sample_type, s->sample_id );
 	}
 	else if(event->type == GDK_BUTTON_PRESS )
 	{

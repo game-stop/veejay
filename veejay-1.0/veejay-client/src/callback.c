@@ -50,38 +50,49 @@ void	on_no_caching_clicked( GtkWidget *widget, gpointer user_data)
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_SKIP_SECOND);
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_SKIP_SECOND );
 }
 void	on_button_086_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_PREV_SECOND );
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_PREV_SECOND );
+
 }
 void	on_button_080_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_PLAY_FORWARD);
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_PLAY_FORWARD );
+
 }
 void	on_button_081_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_PLAY_BACKWARD);
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_PLAY_BACKWARD );
 }
 void	on_button_082_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_PLAY_STOP );
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_PLAY_STOP );
 }
 void	on_button_083_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_SKIP_FRAME );
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_SKIP_FRAME );
 }
 void 	on_button_084_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_PREV_FRAME );
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_PREV_FRAME );
 }
 void	on_button_087_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_GOTO_START );
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_GOTO_START );
 }
 void	on_button_088_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_VIDEO_GOTO_END);
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_VIDEO_GOTO_END );
 }
 
 void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
@@ -103,26 +114,15 @@ void	on_videobar_value_changed(GtkWidget *widget, gpointer user_data)
 				return;
 		}
 		multi_vims( VIMS_VIDEO_SET_FRAME, "%d", val );
+
+		vj_midi_learning_vims_simple( info->midi, "videobar", VIMS_VIDEO_SET_FRAME );
 	}
-}
-/*
-void	on_audiovolume_value_changed(GtkWidget *widget, gpointer user_data)
-{
-	GtkWidget *w = glade_xml_get_widget(info->main_window, "audiovolume");
-	gdouble val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
-	multi_vims( VIMS_SET_VOLUME, "%d", (gint) (val * 100.0) );
-	vj_msg(VEEJAY_MSG_INFO,"Set volume to %d", (gint)(val * 100.0));
-}*/
-void	on_audiovolume_knob_value_changed(GtkAdjustment *adj, gpointer user_data)
-{
-	gdouble val = gtk_adjustment_get_value(adj);
-	multi_vims( VIMS_SET_VOLUME, "%d", (gint) val );
-	update_label_i( "volume_label", (gint)val,0);
 }
 
 void	on_button_001_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_SET_PLAIN_MODE );
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_SET_PLAIN_MODE );
 }
 
 void	on_button_252_clicked( GtkWidget *widget, gpointer user_data)
@@ -139,6 +139,7 @@ void	on_button_252_clicked( GtkWidget *widget, gpointer user_data)
 void	on_button_251_clicked( GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_BEZERK );
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_BEZERK );
 	vj_msg(VEEJAY_MSG_INFO, "Bezerk mode toggled");
 }	
 
@@ -159,6 +160,7 @@ void	on_button_054_clicked(GtkWidget *widget, gpointer user_data)
 void	on_button_200_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_EFFECT_SET_BG ); 
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_EFFECT_SET_BG );
 	vj_msg(VEEJAY_MSG_INFO,
 		"Requested background mask of frame %d",
 			info->status_tokens[FRAME_NUM] + 1 );
@@ -169,11 +171,13 @@ void	on_button_5_4_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		single_vims( VIMS_AUDIO_ENABLE );
 		vj_msg(VEEJAY_MSG_INFO, "Audio is enabled");
+		vj_midi_learning_vims_simple(info->midi, NULL, VIMS_AUDIO_ENABLE );
 	}
 	else
 	{
 		single_vims( VIMS_AUDIO_DISABLE );	
 		vj_msg(VEEJAY_MSG_INFO, "Audio is disabled");
+		vj_midi_learning_vims_simple(info->midi, NULL, VIMS_AUDIO_DISABLE );
 	}
 
 }
@@ -207,6 +211,7 @@ void	on_button_sendvims_clicked(GtkWidget *widget, gpointer user_data)
 void	on_vimsmessage_activate(GtkWidget *widget, gpointer user_data)
 {
 	msg_vims( get_text( "vimsmessage") );
+	vj_midi_learning_vims_simple( info->midi, NULL, get_text("vimsmessage"));
 	vj_msg(VEEJAY_MSG_INFO, "User defined VIMS message sent '%s'", get_text("vimsmessage"));
 }
 
@@ -220,6 +225,7 @@ void	on_button_fadeout_clicked(GtkWidget *w, gpointer user_data)
 	gint num = (gint)get_numd( "button_fadedur");
 	gchar *timenow = format_time( num, info->el.fps );
 	multi_vims( VIMS_CHAIN_FADE_OUT, "0 %d", num );
+	vj_midi_learning_vims_complex( info->midi, "button_fadedur", VIMS_CHAIN_FADE_OUT, 0,2 );
 	vj_msg(VEEJAY_MSG_INFO, "Fade out duration %s (frames %d)",
 		timenow,
 		num );
@@ -231,6 +237,8 @@ void	on_button_fadein_clicked(GtkWidget *w, gpointer user_data)
 	gint num = (gint)get_numd( "button_fadedur");
 	gchar *timenow = format_time( num, info->el.fps );
 	multi_vims( VIMS_CHAIN_FADE_IN, "0 %d", num );
+	vj_midi_learning_vims_complex( info->midi, "button_fadedur", VIMS_CHAIN_FADE_IN, 0,2 );
+	
 	vj_msg(VEEJAY_MSG_INFO, "Fade in duration %s (frames %d)",
 		timenow,
 		num );
@@ -258,7 +266,8 @@ void	on_manualopacity_value_changed(GtkWidget *w, gpointer user_data)
 	multi_vims( VIMS_CHAIN_MANUAL_FADE, "0 %d",
 		(int)(val));
 	
-
+	vj_midi_learning_vims_complex( info->midi, "loglinear", VIMS_CHAIN_FADE_IN, 0,1 );
+	
 	vj_msg(VEEJAY_MSG_INFO, "FX Opacity set to %1.2f", val ); 
 }
 
@@ -474,6 +483,7 @@ void	on_button_fx_clearchain_clicked(GtkWidget *w, gpointer user_data)
 	multi_vims( VIMS_CHAIN_CLEAR, "%d",0);
 	info->uc.reload_hint[HINT_CHAIN] = 1;
 	info->uc.reload_hint[HINT_ENTRY] = 1;
+	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_CHAIN_CLEAR,0 );
 	vj_msg(VEEJAY_MSG_INFO, "Clear FX Chain");
 }
 
@@ -482,12 +492,12 @@ void	on_button_entry_toggle_clicked(GtkWidget *w, gpointer user_data)
 	if(!info->status_lock)
 	{
 		gint val = is_button_toggled( "button_entry_toggle" );
+		int vims_id = VIMS_CHAIN_ENTRY_SET_VIDEO_OFF;
 		if(val)
-			multi_vims( VIMS_CHAIN_ENTRY_SET_VIDEO_ON,
-				"%d %d", 0, info->uc.selected_chain_entry );
-		else
-			multi_vims( VIMS_CHAIN_ENTRY_SET_VIDEO_OFF,
-				"%d %d", 0, info->uc.selected_chain_entry );
+			vims_id = VIMS_CHAIN_ENTRY_SET_VIDEO_ON;
+		multi_vims( vims_id,"%d %d", 0, info->uc.selected_chain_entry );
+
+		vj_midi_learning_vims_msg2( info->midi, NULL, vims_id, 0, info->uc.selected_chain_entry );
 		vj_msg(VEEJAY_MSG_INFO, "Chain Entry %d is %s",
 			info->uc.selected_chain_entry,
 			(val ? "Enabled" : "Disabled" ));
@@ -502,6 +512,7 @@ void	on_button_fx_entry_value_changed(GtkWidget *w, gpointer user_data)
 		multi_vims( VIMS_CHAIN_SET_ENTRY, "%d",
 			(gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(w))
 		);
+		vj_midi_learning_vims_spin( info->midi, "fx_entry", VIMS_CHAIN_SET_ENTRY );
 	}  	
 }
 
@@ -511,6 +522,7 @@ void	on_button_fx_del_clicked(GtkWidget *w, gpointer user_data)
 		info->uc.selected_chain_entry );
 	info->uc.reload_hint[HINT_ENTRY] = 1;
 	info->uc.reload_hint[HINT_CHAIN] = 1;
+	vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_CHAIN_ENTRY_CLEAR, 0, info->uc.selected_chain_entry );
 	vj_msg(VEEJAY_MSG_INFO, "Clear Effect from Entry %d",
 		info->uc.selected_chain_entry);
 }
@@ -521,6 +533,7 @@ if(!info->status_lock && !info->parameter_lock)\
 	{\
 info->parameter_lock = 1;\
 multi_vims( VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d", 0, info->uc.selected_chain_entry,arg_num, value );\
+vj_midi_learning_vims_fx( info->midi, arg_num, VIMS_CHAIN_ENTRY_SET_ARG_VAL, 0,info->uc.selected_chain_entry, arg_num,1 );\
 if(info->uc.selected_rgbkey) update_rgbkey_from_slider(); \
 info->parameter_lock = 0;\
 }\
@@ -533,6 +546,7 @@ if(!info->status_lock && !info->parameter_lock)\
 info->parameter_lock = 1;\
 multi_vims( VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d", 0, info->uc.selected_chain_entry,arg_num, (get_slider_val(name) + fraction) );\
 update_slider_value( name, (get_slider_val(name) + fraction), 0 );\
+vj_midi_learning_vims_fx( info->midi, arg_num, VIMS_CHAIN_ENTRY_SET_ARG_VAL, 0, info->uc.selected_chain_entry,arg_num,2 );\
 if(info->uc.selected_rgbkey) update_rgbkey_from_slider(); \
 info->parameter_lock = 0;\
 }\
@@ -549,7 +563,7 @@ vj_kf_select_parameter(arg_num);\
 
 void	on_slider_p0_value_changed(GtkWidget *w, gpointer user_data)
 {
-		slider_changed( 0, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
+	slider_changed( 0, (gint)GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value );
 }
 void	on_slider_p1_value_changed(GtkWidget *w, gpointer user_data)
 {
@@ -669,6 +683,9 @@ void	on_button_sample_play_clicked(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_SET_MODE_AND_GO , "%d %d" ,
 			info->selection_slot->sample_type,		
 			info->selection_slot->sample_id );
+
+		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO, info->selection_slot->sample_type,
+						info->selection_slot->sample_id );
 	}
 }
 void	on_button_sample_del_clicked(GtkWidget *widget, gpointer user_data)
@@ -748,20 +765,7 @@ void	on_speed_slider_value_changed(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_VIDEO_SET_SPEED, "%d", value );
 			vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
-	}
-}
-
-void on_speed_knob_value_changed(GtkAdjustment *adj, gpointer user_data)
-{
-	if(!info->status_lock)
-	{
-		gint value = gtk_adjustment_get_value(adj);
-		value *= info->play_direction;
-		update_label_i( "speed_label", (gint)adj->value,0);
-		multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
-		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
-			value );
-		update_label_i( "speed_label", value,0);
+		vj_midi_learning_vims_simple( info->midi, "speed_slider", VIMS_VIDEO_SET_SPEED );
 	}
 }
 
@@ -772,6 +776,7 @@ void	on_spin_samplespeed_value_changed(GtkWidget *widget, gpointer user_data)
 		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
 		value *= info->play_direction;
 		multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
+		vj_midi_learning_vims_spin( info->midi, "samplespeed", VIMS_SAMPLE_SET_SPEED );
 		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
 	}
@@ -784,6 +789,8 @@ void	on_v4l_brightness_value_changed(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_STREAM_SET_BRIGHTNESS, "%d %d",
 			info->selected_slot->sample_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) );
+		vj_midi_learning_vims_complex( info->midi, "v4l_brightness", VIMS_STREAM_SET_BRIGHTNESS, info->selected_slot->sample_id,
+			1 );
 	}
 }
 
@@ -794,6 +801,8 @@ void	on_v4l_contrast_value_changed(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_STREAM_SET_CONTRAST, "%d %d", 
 			info->selected_slot->sample_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0 ) );
+		vj_midi_learning_vims_complex( info->midi, "v4l_contrast", VIMS_STREAM_SET_CONTRAST, info->selected_slot->sample_id,
+			1 );
 
 	}
 }
@@ -805,6 +814,9 @@ void	on_v4l_hue_value_changed(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_STREAM_SET_HUE, "%d %d",
 			info->selected_slot->sample_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0 ) );
+		vj_midi_learning_vims_complex( info->midi, "v4l_hue", VIMS_STREAM_SET_HUE, info->selected_slot->sample_id,
+			1 );
+
 	}
 }	
 
@@ -815,6 +827,9 @@ void	on_v4l_white_value_changed(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_STREAM_SET_WHITE, "%d %d",
 			info->selected_slot->sample_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0 ) );
+		vj_midi_learning_vims_complex( info->midi, "v4l_white", VIMS_STREAM_SET_WHITE, info->selected_slot->sample_id,
+			1 );
+
 	}
 }
 
@@ -825,6 +840,9 @@ void	on_v4l_color_value_changed(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_STREAM_SET_COLOR, "%d %d",
 			info->selected_slot->sample_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) );
+	vj_midi_learning_vims_complex( info->midi, "v4l_color", VIMS_STREAM_SET_COLOR, info->selected_slot->sample_id,
+			1 );
+
 	}
 }
 void	on_v4l_saturation_value_changed(GtkWidget *widget, gpointer user_data)
@@ -834,6 +852,9 @@ void	on_v4l_saturation_value_changed(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_STREAM_SET_SATURATION, "%d %d",
 			info->selected_slot->sample_id,
 			(gint) (GTK_ADJUSTMENT(GTK_RANGE(widget)->adjustment)->value * 65535.0) );
+	vj_midi_learning_vims_complex( info->midi, "v4l_saturation", VIMS_STREAM_SET_SATURATION, info->selected_slot->sample_id,
+			1 );
+
 	}
 }
 #ifndef HAVE_GTK2_6
@@ -876,6 +897,8 @@ void	on_rec_seq_start_clicked( GtkWidget *w, gpointer data )
 		"%d %d",
 		0,
 		0 );
+
+	vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SAMPLE_REC_START, 0, 0 );
 }
 
 void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
@@ -900,7 +923,8 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 		"%d %d",
 		nframes,
 		autoplay );
-	
+	vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_STREAM_REC_START, nframes, autoplay );
+
 	gchar *time1 = format_time( nframes,info->el.fps );
 	if(format)
 		vj_msg(VEEJAY_MSG_INFO, "Record in %s,  duration: %s",format, time1); 
@@ -914,6 +938,7 @@ void	on_stream_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 void	on_stream_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_STREAM_REC_STOP );
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_STREAM_REC_STOP );
 	vj_msg(VEEJAY_MSG_INFO, "Stream record stop");
 }
 
@@ -976,6 +1001,8 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 		n_frames,
 		autoplay );
 
+	vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SAMPLE_REC_START, n_frames, autoplay );
+
 	gchar *time1 = format_time(n_frames,info->el.fps);
 	vj_msg(VEEJAY_MSG_INFO,"Record duration: %s",
 		time1);
@@ -987,6 +1014,7 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 void	on_button_sample_recordstop_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims( VIMS_SAMPLE_REC_STOP );
+	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_SAMPLE_REC_STOP );
 	vj_msg(VEEJAY_MSG_INFO, "Sample record stop");
 }
 
@@ -1036,48 +1064,65 @@ void	on_check_samplefx_clicked(GtkWidget *widget , gpointer user_data)
 {
 	if(!info->status_lock)
 	{
+		int vims_id = VIMS_SAMPLE_CHAIN_DISABLE;
+		
 		if( is_button_toggled( "check_samplefx" ) )
-			multi_vims( VIMS_SAMPLE_CHAIN_ENABLE , "%d", 0 );
-		else
-			multi_vims( VIMS_SAMPLE_CHAIN_DISABLE, "%d", 0 );
+			vims_id = VIMS_SAMPLE_CHAIN_ENABLE;
+		multi_vims( vims_id, "%d", 0 );
+
+		vj_midi_learning_vims_msg( info->midi, NULL, vims_id, 0 );
 	}
 }
 void	on_check_streamfx_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
 	{
+		int vims_id = VIMS_STREAM_CHAIN_DISABLE;
 		if( is_button_toggled( "check_streamfx"))
-			multi_vims( VIMS_STREAM_CHAIN_ENABLE, "%d", 0 );
-		else
-			multi_vims( VIMS_STREAM_CHAIN_DISABLE, "%d", 0 );	
+			vims_id = VIMS_STREAM_CHAIN_ENABLE;
+		multi_vims( VIMS_STREAM_CHAIN_DISABLE, "%d", 0 );	
+		vj_midi_learning_vims_msg( info->midi, NULL, vims_id, 0 );
 	}
 }
 
 void	on_loop_none_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
+	{
 		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
 			"%d %d", 0, 0 );
+		vj_midi_learning_vims_msg2(info->midi,NULL,VIMS_SAMPLE_SET_LOOPTYPE,0,0 );
+	}
 }
 
 void	on_loop_normal_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
+	{
 		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
 			"%d %d", 0, 1 );
+		vj_midi_learning_vims_msg2(info->midi,NULL,VIMS_SAMPLE_SET_LOOPTYPE,0,1 );
+	}
 }
 void	on_loop_random_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
+	{
 		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
 			"%d %d", 0,3 );
+		vj_midi_learning_vims_msg2(info->midi,NULL,VIMS_SAMPLE_SET_LOOPTYPE,0,3 );
+
+	}
 }
 
 void	on_loop_pingpong_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
-		multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
+	{	multi_vims( VIMS_SAMPLE_SET_LOOPTYPE,
 			"%d %d", 0,2 );
+		vj_midi_learning_vims_msg2(info->midi,NULL,VIMS_SAMPLE_SET_LOOPTYPE,0,2 );
+
+	}
 }
 /*
 void	on_check_marker_bind_clicked(GtkWidget *widget, gpointer user_data)
@@ -1089,6 +1134,7 @@ void	on_check_marker_bind_clicked(GtkWidget *widget, gpointer user_data)
 void	on_button_clearmarker_clicked(GtkWidget *widget, gpointer user_data)
 {
 	multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
+	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_SAMPLE_CLEAR_MARKER, 0 );
 	gchar *dur = format_time( 0,info->el.fps );
 	update_label_str( "label_markerduration", dur );
 	g_free(dur);
@@ -1528,10 +1574,11 @@ void	on_samplerand_toggled(GtkWidget *widget, gpointer user_data)
 		int arg = is_button_toggled( "freestyle" );
 		int start = is_button_toggled( "samplerand" );
 
+		int vims_id = VIMS_SAMPLE_RAND_START;
 		if( start == 0 )
-			single_vims( VIMS_SAMPLE_RAND_STOP );
-		else
-			multi_vims( VIMS_SAMPLE_RAND_START, "%d", arg );
+			vims_id = VIMS_SAMPLE_RAND_STOP;
+		multi_vims( vims_id,"%d", arg );
+		vj_midi_learning_vims_msg( info->midi,NULL, vims_id, arg );
 	}
 }
 
@@ -1748,6 +1795,7 @@ void	on_framerate_value_changed( GtkWidget *w, gpointer data )
     gdouble slider_val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
     int value = (int)(100.0 * slider_val);
     multi_vims( VIMS_FRAMERATE, "%d", value );
+	vj_midi_learning_vims_simple( info->midi, "framerate", VIMS_FRAMERATE );
 }
 
 void	on_sync_correction_clicked( GtkWidget *w, gpointer data )
@@ -1755,6 +1803,7 @@ void	on_sync_correction_clicked( GtkWidget *w, gpointer data )
 	int status = is_button_toggled( "sync_correction" );
 
 	multi_vims( VIMS_SYNC_CORRECTION, "%d", status );
+	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_SYNC_CORRECTION, status );
 }
 
 void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
@@ -1982,6 +2031,9 @@ void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d",
 			info->selected_slot->sample_type,
 			info->selected_slot->sample_id );
+		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO,
+				info->selected_slot->sample_type,
+				info->selected_slot->sample_id );
 	}
 }
 
@@ -2014,6 +2066,7 @@ void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 void	on_timeline_cleared(GtkWidget *widget, gpointer user_data)
 {
 	multi_vims( VIMS_SAMPLE_CLEAR_MARKER, "%d", 0 );
+	vj_midi_learning_vims_msg( info->midi, NULL, VIMS_SAMPLE_CLEAR_MARKER, 0 );
 }
 
 void	on_timeline_bind_toggled( GtkWidget *widget, gpointer user_data)
@@ -2389,6 +2442,8 @@ void 	on_spin_framedelay_value_changed(GtkWidget *w, gpointer user_data)
 		return;
 
 	multi_vims(VIMS_VIDEO_SET_SLOW, "%d", get_nums("spin_framedelay"));
+
+	vj_midi_learning_vims_spin( info->midi, "framedelay", VIMS_VIDEO_SET_SLOW );
 }
 
 void	on_mixing_effects_toggled(GtkWidget *w, gpointer user_data)
@@ -2444,6 +2499,7 @@ gboolean 	on_entry_filename_focus_in_event( GtkWidget *w, gpointer user_data)
 void		on_previewbw_toggled( GtkWidget *w , gpointer user_data)
 {
 	single_vims( VIMS_PREVIEW_BW );
+	vj_midi_learning_vims_simple(info->midi,NULL,VIMS_PREVIEW_BW);
 }
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
@@ -2453,16 +2509,6 @@ void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 			glade_xml_get_widget(info->main_window, "imageA") );
 
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
-}
-
-void		on_previewlarge_clicked( GtkWidget *widget, gpointer user_data )
-{
-	int w = info->el.width;
-	int h = info->el.height;
-	if( w > 360 ) w = 360;
-	if( h > 288 ) h = 288;
-	update_spin_value( "preview_width", w );
-        update_spin_value( "preview_height",h );
 }
 
 void		on_previewspeed_value_changed( GtkWidget *widget, gpointer user_data)
@@ -2478,20 +2524,6 @@ void		on_preview_width_value_changed( GtkWidget *w, gpointer user_data)
 }
 void		on_preview_height_value_changed( GtkWidget *w, gpointer user_data)
 {
-}
-
-void		on_previewsmall_clicked( GtkWidget *widget, gpointer user_data)
-{
-	int w = info->el.width;
-	int h = info->el.height;
-	if( w >= 720) w = w / 4;
-	else w= w / 3;
-	if( h >= 480 ) h = h / 4;
-	else h = h / 3;
-	update_spin_value( "preview_width", w );
-        update_spin_value( "preview_height", h );
-
-
 }
 
 void		on_multitrack_activate( GtkWidget *w, gpointer user_data)
@@ -2943,7 +2975,6 @@ void	on_spin_text_x_value_changed( GtkWidget *w, gpointer data )
 	gint x = get_nums( "spin_text_x" );
 	gint y = get_nums( "spin_text_y");
 	multi_vims( VIMS_FONT_POS,"%d %d", x,y );
-
 }
 void	on_spin_text_y_value_changed( GtkWidget *w, gpointer data )
 {
@@ -3521,6 +3552,7 @@ void	on_seqactive_toggled( GtkWidget *w, gpointer data )
 	if(info->status_lock)
 		return;
 	multi_vims( VIMS_SEQUENCE_STATUS, "%d" , is_button_toggled("seqactive" ) ? 1 : 0 );
+	vj_midi_learning_vims_msg(info->midi,NULL, VIMS_SEQUENCE_STATUS, is_button_toggled("seqactive"));
 }
 void	on_bq_button_clicked( GtkWidget *w, gpointer data )
 {
@@ -3554,7 +3586,10 @@ void	on_macroplay_toggled( GtkWidget *w, gpointer data )
 	if(info->status_lock)
 		return;
 	if( is_button_toggled( "macroplay" ))
-	multi_vims( VIMS_MACRO, "%d %d", 2,1 );
+	{	
+		multi_vims( VIMS_MACRO, "%d %d", 2,1 );
+		vj_midi_learning_vims_msg2( info->midi,NULL,VIMS_MACRO,2,1 );
+	}
 }
 
 void	on_macrorecord_toggled( GtkWidget *w, gpointer data  )
@@ -3562,7 +3597,10 @@ void	on_macrorecord_toggled( GtkWidget *w, gpointer data  )
 	if(info->status_lock)
 		return;
 	if( is_button_toggled( "macrorecord"))
-	multi_vims( VIMS_MACRO, "%d %d", 1, 1 );
+	{	
+		multi_vims( VIMS_MACRO, "%d %d", 1, 1 );
+		vj_midi_learning_vims_msg2( info->midi,NULL,VIMS_MACRO,1,1 );
+	}
 }
 
 void	on_macrostop_toggled( GtkWidget *w, gpointer data )
@@ -3570,7 +3608,10 @@ void	on_macrostop_toggled( GtkWidget *w, gpointer data )
 	if(info->status_lock)
 		return;
 	if( is_button_toggled( "macrostop"))
-	multi_vims( VIMS_MACRO, "%d %d", 0 , 1 );
+	{
+		multi_vims( VIMS_MACRO, "%d %d", 0 , 1 );
+		vj_midi_learning_vims_msg2( info->midi,NULL,VIMS_MACRO,0,1 );
+	}
 }
 
 void	on_macroclear_clicked( GtkWidget *w, gpointer data )
@@ -3579,5 +3620,30 @@ void	on_macroclear_clicked( GtkWidget *w, gpointer data )
 		return;
 	
 	multi_vims( VIMS_MACRO, "%d %d", 0, 0 );
+	vj_midi_learning_vims_msg2( info->midi,NULL, VIMS_MACRO, 0, 0);
 }
 
+void	on_midilearn_toggled( GtkWidget *w, gpointer data )
+{
+	vj_midi_learn( info->midi);
+}
+
+void	on_midievent_toggled( GtkWidget *w, gpointer data )
+{
+	vj_midi_play( info->midi );
+}
+
+
+void	on_load_midi_layout1_activate( GtkWidget *w , gpointer data )
+{
+	gchar *filename = dialog_open_file( "Select MIDI configuration file to load",0);
+	if( filename )
+		vj_midi_load( info->midi, filename );
+}
+void	on_save_midi_layout1_activate( GtkWidget *w, gpointer data )
+{
+	gchar *filename = dialog_save_file( "Save MIDI configuration to file");
+	if(filename)
+		vj_midi_save( info->midi, filename );
+}
+	
