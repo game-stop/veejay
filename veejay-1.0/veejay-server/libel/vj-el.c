@@ -1447,10 +1447,7 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
     //mlt need int16_t
     ret = lav_read_audio(el->lav_fd[N_EL_FILE(n)], dst, (ns1 - ns0));
     if (ret < 0)
-    {
-	    veejay_msg(0,"Unable to read audio data");
-		return -1;
-	}
+ 	return -1;
     return (ns1 - ns0);
 
 }

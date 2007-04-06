@@ -3356,11 +3356,18 @@ long AVI_read_audio(avi_t *AVI, char *audbuf, long bytes)
       else
          todo = left;
       pos = AVI->track[AVI->aptr].audio_index[AVI->track[AVI->aptr].audio_posc].pos + AVI->track[AVI->aptr].audio_posb;
-      lseek(AVI->fdes, pos, SEEK_SET);
+	if( pos < 0 )
+	{
+		AVI_errno = AVI_ERR_READ;
+		return -1;
+	}
+      if(lseek(AVI->fdes, pos, SEEK_SET) == -1)
+	{
+		AVI_errno = AVI_ERR_READ;
+		return -1;
+	}
       if ( (ret = avi_read(AVI->fdes,audbuf+nr,todo)) != todo)
       {
-//	 fprintf(stderr, "XXX pos = %lld, ret = %lld, todo = %ld\n", pos, ret, todo);
-	 veejay_msg(0, "No audio data at position %ld!");
          AVI_errno = AVI_ERR_READ;
          return -1;
       }
