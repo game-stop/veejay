@@ -301,8 +301,8 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 //  si->depth = 0;
 //  si->sub_audio = 0;
     si->audio_volume = 50;
-    si->marker_start = -1;
-    si->marker_end = -1;
+    si->marker_start = 0;
+    si->marker_end = 0;
 //  si->dup = 0;
 //  si->loop_dec = 0;
 //  si->max_loops2 = 0;
@@ -729,8 +729,8 @@ int sample_marker_clear(int sample_id) {
     sample_info *si = sample_get(sample_id);
     if (!si)
 	return -1;
-    si->marker_start = -1;
-    si->marker_end   = -1;
+    si->marker_start = 0;
+    si->marker_end   = 0;
     veejay_msg(VEEJAY_MSG_INFO, "Marker cleared (%d - %d) - (speed=%d)",
 	si->marker_start, si->marker_end, si->speed);
     return ( sample_update(si,sample_id));
@@ -757,7 +757,7 @@ int sample_set_marker_start(int sample_id, int marker)
 int sample_set_marker(int sample_id, int start, int end)
 {
     sample_info *si = sample_get(sample_id);
-    if(!si) return -1;
+    if(!si) return 0;
     
     if( start < si->first_frame )
 		return 0;
@@ -769,7 +769,7 @@ int sample_set_marker(int sample_id, int start, int end)
 		return 0; 
 
     si->marker_start	= start;
-    si->marker_end		= end;
+    si->marker_end	= end;
     
     return ( sample_update( si , sample_id ) );	
 }
