@@ -2526,18 +2526,6 @@ void		on_preview_height_value_changed( GtkWidget *w, gpointer user_data)
 {
 }
 
-void		on_multitrack_activate( GtkWidget *w, gpointer user_data)
-{
-//	multitrack_open( info->mt );
-//	gtk_widget_show( glade_xml_get_widget_( info->main_window , "mtwindow" ));
-
-}
-void		on_multitrack_deactivate( GtkWidget *w, gpointer user_data)
-{
-//	multitrack_close( info->mt );
-//	gtk_widget_hide( glade_xml_get_widget_( info->main_window , "mtwindow" ));
-
-}
 void	on_mt_new_activate( GtkWidget *w, gpointer user_data)
 {
 	multitrack_add_track( info->mt );
@@ -2553,16 +2541,6 @@ void	on_mt_delete_activate( GtkWidget *w, gpointer user_data)
 void	on_mt_sync_start_clicked( GtkWidget *w, gpointer user_data)
 {
 	multitrack_sync_start( info->mt );
-}
-
-void	on_mtwindow_delete_event( GtkWidget *w , gpointer user_data)
-{
-	on_multitrack_deactivate(w, user_data);
-}
-
-void	on_mtwindow_destroy_event( GtkWidget *w, gpointer user_data)
-{
-	on_mtwindow_delete_event( w, user_data );
 }
 
 void	on_mt_sync_stop_clicked( GtkWidget *w , gpointer user_data)

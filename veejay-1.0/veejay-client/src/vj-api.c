@@ -650,6 +650,11 @@ static struct
 {
 	const char *name;
 } gwidgets[] = {
+	{"sample_panel"},
+	{"stream_panel"},
+	{"frame_fxtree"},
+	{"frame_fxtree2"},
+	{"frame_fxtree3"},
 	{"button_sendvims"},
 	{"button_087"},
 	{"button_086"},
@@ -675,7 +680,6 @@ static struct
 	{"manualopacity"},
 	{"button_fadedur"},
 	{"vimsmessage"},
-	{"frame_fxtree"},
 	{"button_clipcopy"},
 	{"button_sample_play"},
 	{"button_samplelist_open"},
@@ -683,17 +687,9 @@ static struct
 	{"button_sample_del"},
 	{"samplerand"},
 	{"freestyle"},
-	{"frame_sampleproperties"},
-	{"frame_samplerecord"},
 	{"expander10"}, // edl
 	{"colorselection"},
-	{"frame_streamproperties"},
-	{"frame_streamrecord"},
 	{"loglinear"},
-	{"curve"},
-	{"curve_toggleglobal"},
-	{"curve_table"},
-	{"curve_toggleentry"},
 	{"streamnew"},
 	{"sampleadd"},	
 	{"samplepage"},
@@ -727,6 +723,8 @@ static struct
 	{"manualopacity"},
 	{"loglinear"},
 	{"frame_fxtree"},
+	{"frame_fxtree2"},	
+	{"frame_fxtree3"},
 	{NULL}
 };
 
@@ -2218,13 +2216,11 @@ static	void	update_curve_accessibility(const char *name)
 
 	if( info->status_tokens[PLAY_MODE] == MODE_PLAIN )
 	{
-		disable_widget( "curve" );
-		disable_widget( "curve_table" );
+		disable_widget( "frame_fxtree3" );
 	}
 	else
 	{
-		enable_widget( "curve_table" );
-		enable_widget( "curve" );
+		enable_widget( "frame_fxtree3" );
 	}	
 }
 
@@ -5483,7 +5479,6 @@ GdkPixbuf	*vj_gdk_pixbuf_scale_simple( const GdkPixbuf *src, int dw, int dh, Gdk
 	return res;
 }
 
-
 static	void		veejay_update_multitrack( vj_gui_t *gui )
 {
 	sync_info *s = multitrack_sync( gui->mt );
@@ -5516,7 +5511,7 @@ static	void		veejay_update_multitrack( vj_gui_t *gui )
 				}
 				vj_img_cb( s->img_list[i] );
 			}
-			if(!no_preview_ && deckpage == 3)
+			if(!no_preview_ && deckpage == 2)
 				multitrack_update_sequence_image( gui->mt, i, s->img_list[i] );
 			gdk_pixbuf_unref( s->img_list[i] );
 		}
@@ -5534,10 +5529,8 @@ static	void	update_status_accessibility(int old_pm, int new_pm)
 
 	if( new_pm == MODE_STREAM )
 	{
-		enable_widget("frame_streamproperties");
-		enable_widget("frame_streamrecord");
-		disable_widget("frame_samplerecord");
-		disable_widget("frame_sampleproperties");
+		enable_widget("stream_panel");
+		disable_widget("sample_panel");
 		for(i=0; videowidgets[i].name != NULL; i++)
 			disable_widget( videowidgets[i].name);
 		disable_widget( "speed_slider" );			
@@ -5551,17 +5544,13 @@ static	void	update_status_accessibility(int old_pm, int new_pm)
 
 	if( new_pm == MODE_SAMPLE )
 	{
-		enable_widget("expander10");
-		enable_widget("frame_samplerecord");
-		enable_widget("frame_sampleproperties");
-		disable_widget("frame_streamproperties");
-		disable_widget("frame_streamrecord");
+		enable_widget("sample_panel");
+		disable_widget("stream_panel");
 		enable_widget( "samplerand" );
 		enable_widget( "freestyle" );
 	}
 	else
 	{
-		disable_widget( "expander10");
 		disable_widget( "samplerand" );
 		disable_widget( "freestyle" );
 	}
@@ -5583,7 +5572,6 @@ static	void	update_status_accessibility(int old_pm, int new_pm)
 	else
 		for( i = 0; plainwidgets[i].name != NULL ; i ++ )
 			enable_widget( plainwidgets[i].name );
-//	info->uc.reload_hint[HINT_HISTORY] = 1;
 }
 
 static void 	update_globalinfo(int *history, int pm, int last_pm)
@@ -5832,12 +5820,12 @@ static void	process_reload_hints(int *history, int pm)
 		if( entry_tokens[ENTRY_FXID] == 0)
 		{
 			put_text( "entry_effectname" ,"" );
-			disable_widget( "FXframe" );
+			disable_widget( "frame_fxtree2" );
 		}
 		else
 		{
 			put_text( "entry_effectname", _effect_get_description( entry_tokens[ENTRY_FXID] ));
-			enable_widget( "FXframe");
+			enable_widget( "frame_fxtree2");
 			set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_FXSTATUS] );
 			np = _effect_get_np( entry_tokens[ENTRY_FXID] );
 			for( i = 0; i < np ; i ++ )
@@ -6714,7 +6702,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 
 	info->midi =  vj_midi_new( info->main_window );
 
-	set_toggle_button( "midievent", 1 );
+//	set_toggle_button( "midievent", 1 );
 
 }
 
