@@ -190,7 +190,6 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 */
 	return e;
 }
-#include <valgrind/memcheck.h>
 void		vj_avcodec_close_encoder( vj_encoder *av )
 {
 	if(av)

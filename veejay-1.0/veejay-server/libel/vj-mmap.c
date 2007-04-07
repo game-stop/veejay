@@ -23,7 +23,6 @@
 #include <errno.h>
 #include <unistd.h>
 #include <string.h>
-//#include <valgrind/memcheck.h>
 #include <libvjmem/vjmem.h>
 #define PADDED(a,m) ( a > 0 ? (a / m->page_size) * m->page_size  : 0)
 
