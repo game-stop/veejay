@@ -22,6 +22,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <stdint.h>
 #ifdef HAVE_SDL
 #include <SDL/SDL.h>
 #endif
