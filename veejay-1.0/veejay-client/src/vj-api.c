@@ -655,6 +655,7 @@ static struct
 	{"frame_fxtree"},
 	{"frame_fxtree2"},
 	{"frame_fxtree3"},
+	{"frame_fxtree4"},
 	{"button_sendvims"},
 	{"button_087"},
 	{"button_086"},
@@ -693,6 +694,8 @@ static struct
 	{"streamnew"},
 	{"sampleadd"},	
 	{"samplepage"},
+	{"rgbkey"},
+	{"tree_sources"},
 	{NULL} 
 };
 static struct
@@ -725,6 +728,9 @@ static struct
 	{"frame_fxtree"},
 	{"frame_fxtree2"},	
 	{"frame_fxtree3"},
+	{"frame_fxtree4"},
+	{"rgbkey"},
+	{"tree_sources"},
 	{NULL}
 };
 
@@ -5821,11 +5827,17 @@ static void	process_reload_hints(int *history, int pm)
 		{
 			put_text( "entry_effectname" ,"" );
 			disable_widget( "frame_fxtree2" );
+			disable_widget( "frame_fxtree4" );
+			disable_widget( "tree_sources");
+			disable_widget( "rgbkey");
 		}
 		else
 		{
 			put_text( "entry_effectname", _effect_get_description( entry_tokens[ENTRY_FXID] ));
 			enable_widget( "frame_fxtree2");
+			enable_widget( "frame_fxtree4");
+			enable_widget( "tree_sources");
+			enable_widget( "rgbkey" );
 			set_toggle_button( "button_entry_toggle", entry_tokens[ENTRY_FXSTATUS] );
 			np = _effect_get_np( entry_tokens[ENTRY_FXID] );
 			for( i = 0; i < np ; i ++ )
@@ -6582,7 +6594,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 
 //@ FIXME: to setup_defaults
-	create_ref_slots( 32 );
+	create_ref_slots( 16 );
 	
 	create_sequencer_slots( 10 );
 
