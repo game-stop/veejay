@@ -882,8 +882,8 @@ void veejay_stop_sampling(veejay_t * info)
 {
     info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
     info->uc->sample_id = 0;
-    info->uc->sample_start = -1;
-    info->uc->sample_end = -1;
+    info->uc->sample_start = 0;
+    info->uc->sample_end = 0;
 }
 
 /******************************************************
@@ -2892,8 +2892,8 @@ veejay_t *veejay_malloc()
     info->uc->use_timer = 2;
     info->uc->sample_key = 1;
     info->uc->direction = 1;	/* pause */
-    info->uc->sample_start = -1;
-    info->uc->sample_end = -1;
+    info->uc->sample_start = 0;
+    info->uc->sample_end = 0;
     info->net = 1;
 
     veejay_memset(info->action_file,0,256); 

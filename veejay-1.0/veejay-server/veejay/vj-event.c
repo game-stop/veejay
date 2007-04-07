@@ -3628,6 +3628,8 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 				veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new sample!");
 				return;
 			}	
+
+			v->uc->sample_start = v->uc->sample_end;
 			skel->edit_list = el;
 
 			if(sample_store(skel)==0) {
