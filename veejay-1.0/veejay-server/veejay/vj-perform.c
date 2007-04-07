@@ -1462,7 +1462,7 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample,
 }
 
 #define ARRAY_LEN(x) ((int)(sizeof(x)/sizeof((x)[0])))
-int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *temporary_buffer)
+int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *temporary_buffer, int *sampled_down)
 {
 #ifdef HAVE_JACK
 	video_playback_setup *settings = info->settings;
@@ -1554,17 +1554,21 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 
 	if( cur_sfd <= max_sfd  && max_sfd > 1)
 	{
+		int val = *sampled_down;
 		if( cur_sfd == 0 )
 		{
 			// @ resample buffer
 			n_samples = audio_resample( downsample_context[ max_sfd-2 ], 
 					down_sample_buffer, audio_buf, n_samples  );
+			*sampled_down = n_samples / max_sfd;
+			val = n_samples / max_sfd;
+			n_samples = pred_len;
 		}
 		else
 		{
 			n_samples = pred_len;
 		}
-		veejay_memcpy( audio_buf, down_sample_buffer + (cur_sfd * pred_len *bps ), n_samples * bps );
+		veejay_memcpy( audio_buf, down_sample_buffer + (cur_sfd * val *bps ), val * bps );
 	}
 
 	return n_samples;
@@ -2066,7 +2070,7 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 	}
 }
-
+static uint32_t rec_audio_sample_ = 0;
 static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[3], int sample)
 {
 	int audio_len = 0;
@@ -2076,7 +2080,7 @@ static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[3], int
 	if( info->current_edit_list->has_audio )
 	{
 		buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * PERFORM_AUDIO_SIZE );
-		audio_len = vj_perform_fill_audio_buffers(info, buf, audio_render_buffer );
+		audio_len = vj_perform_fill_audio_buffers(info, buf, audio_render_buffer, &rec_audio_sample_ );
 	}
 	int res = sample_record_frame( sample,frame,buf,audio_len );
 
@@ -2450,7 +2454,7 @@ static void vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 	int len2 = ( frame->ssm == 1 ? helper_frame->len : helper_frame->uv_len );
 	opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
 }
-
+static uint32_t play_audio_sample_ = 0;
 int vj_perform_queue_audio_frame(veejay_t *info)
 {
 	if( info->audio == NO_AUDIO || !info->current_edit_list->has_audio)
@@ -2478,7 +2482,7 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 		{
 			case VJ_PLAYBACK_MODE_SAMPLE:
 				if( el->has_audio )
-					num_samples = vj_perform_fill_audio_buffers(info,a_buf,	audio_render_buffer + (2* PERFORM_AUDIO_SIZE * MAX_SPEED));
+					num_samples = vj_perform_fill_audio_buffers(info,a_buf,	audio_render_buffer + (2* PERFORM_AUDIO_SIZE * MAX_SPEED), &play_audio_sample_);
 				if(num_samples <= 0 )
 				{
 					num_samples = pred_len;
