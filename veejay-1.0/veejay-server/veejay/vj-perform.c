@@ -18,7 +18,6 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA  02111-1307, USA.
  *
  */
-#include <valgrind/memcheck.h>
 #include <config.h>
 #include <stdint.h>
 #include <sys/ioctl.h>
@@ -2530,8 +2529,6 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 			assert( resample_jack != NULL );
 			assert( num_samples > 0 );
 #endif
-	VALGRIND_CHECK_DEFINED( resample_audio_buffer );
-	VALGRIND_CHECK_DEFINED( a_buf);
 			veejay_memcpy( resample_audio_buffer, a_buf, num_samples * bps);
 			num_samples = audio_resample( resample_jack, (short*)top_audio_buffer,(short*)a_buf, num_samples );
 			vj_jack_play( top_audio_buffer, num_samples * bps );
