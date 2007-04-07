@@ -241,6 +241,7 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	vjsdl->display = NULL;
 	if(SDL_GetWMInfo(&wminfo))
 	{
+		veejay_msg(0, "subsystem = %x", wminfo.subsystem );
 		if( wminfo.subsystem == SDL_SYSWM_X11 )
 			vjsdl->display = wminfo.info.x11.display;
 	}
@@ -248,7 +249,7 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	if( vjsdl->display )
 		x11_disable_screensaver( vjsdl->display );
 	
-	veejay_msg(VEEJAY_MSG_DEBUG, "Using Video Driver %s", name );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Using Video Driver %s, display = %s", name, vjsdl->display );
 
 	veejay_msg(VEEJAY_MSG_INFO, "Initialized %s SDL video overlay (%dx%d), %s",
 		( vjsdl->pix_format == SDL_YV12_OVERLAY ? "YV12" : "YUYV"),

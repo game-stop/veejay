@@ -248,23 +248,6 @@ void	vj_get_yuv444_template(VJFrame *src, int w, int h)
 }
 int	available_diskspace(void)
 {
-	const char *point = ".";
-	struct statfs s;
-	if(statfs(point,&s) != 0)
-		return 0;
-	uint64_t avail = 0;
-	avail = ((uint64_t) s.f_bavail) * ( (uint64_t) s.f_bsize);
-
-	if( avail <= 0 )
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "No available diskspace in CWD. Delete some files and try again");
-		return 0;
-	}
-	if( avail <= 1048576 * 1024)
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Almost no available diskspace in CWD");
-		return 0;
-	}
 	return 1;
 }
 
