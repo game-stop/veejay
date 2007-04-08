@@ -808,7 +808,7 @@ void		*multitrack_new(
  	mt->logo = load_logo_image(vj_get_preview_box_w(), vj_get_preview_box_h());
 	mt->preview_toggle = preview_toggle;
 	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
-	gtk_widget_set_size_request(mt->scroll,450, 300);
+	gtk_widget_set_size_request(mt->scroll,300, 300);
 	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),1);
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(mt->scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_ALWAYS );
 	GtkWidget *table = gtk_table_new( 1, MAX_TRACKS, FALSE );
