@@ -2014,7 +2014,6 @@ gtk_color_selection_init (GtkColorSelection *colorsel)
   gtk_box_pack_start(GTK_BOX(colorhexname_hbox),GTK_WIDGET(priv->hex_entry),TRUE,TRUE,0);  
   gtk_table_attach(GTK_TABLE (table),colorhexname_hbox,0, 3, 3, 4,GTK_FILL,GTK_FILL,0,0);
 
-  /* Set up the palette */
   palette_table = gtk_table_new (GTK_CUSTOM_PALETTE_HEIGHT, GTK_CUSTOM_PALETTE_WIDTH, TRUE);
   gtk_table_set_row_spacings (GTK_TABLE (palette_table), 0);
   gtk_table_set_col_spacings (GTK_TABLE (palette_table), 0);
@@ -2038,11 +2037,16 @@ gtk_color_selection_init (GtkColorSelection *colorsel)
   gtk_container_set_border_width (GTK_CONTAINER (vbox), 4);
   gtk_table_attach(GTK_TABLE (table),priv->palette_frame,0, 3, 4, 5,GTK_FILL,GTK_FILL,0,0);
 
-  
   gtk_widget_show_all (top_hbox);
 
-  /* hide unused stuff */
-  
+  gtk_widget_hide( priv->palette_frame );
+  gtk_widget_hide( colorhexname_hbox);
+  gtk_widget_hide( palette_table );
+  gtk_widget_hide( vbox );
+  gtk_widget_hide( label );
+  gtk_widget_hide( opacity_hbox );
+  gtk_widget_hide( top_right_vbox );
+  gtk_widget_hide( hbox );
   if (priv->has_opacity == FALSE)
     {
       gtk_widget_hide (priv->opacity_label);
@@ -2166,7 +2170,8 @@ gtk_color_selection_new (void)
   /* This way the user can still set it */
   priv->default_set = FALSE;
   priv->default_alpha_set = FALSE;
-  
+  priv->has_palette = 0;
+  priv->has_opacity=0;
   return GTK_WIDGET (colorsel);
 }
 
