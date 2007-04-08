@@ -179,7 +179,7 @@ int main(int argc, char *argv[]) {
 	if( sched_setscheduler( 0, SCHED_FIFO, &schp ) != 0 )
 	  veejay_msg(0, "Error setting RR");
 	else
-	  veejay_msg(VEEJAY_MSG_INFO, "GVeejayReloaded running with low priority");	
+	  veejay_msg(VEEJAY_MSG_INFO, "Reloaded running with low priority");	
 
 	if( preview )
 	{

@@ -21,7 +21,7 @@
                            ..::,,.:      :||=~=.||                         
                               ,...::,,, |~:=|||||+|                                
                               :..,:::||||~~~====++                                 
-                            ,:,,,:::~~~~~===++++       GveejayReloaded                               
+                            ,:,,,:::~~~~~===++++            Reloaded                               
                              ,::::~~~====++++                                 
                                ~~~~~===+++++               version 1.0                 
                                 ~~===+++++++:                               
@@ -32,7 +32,7 @@
                                        ||                                         
           
    
- 	        :: GveejayReloaded, a graphical interface for Veejay ::
+ 	        :: Reloaded, a graphical interface for Veejay ::
 
 	
 	FEATURE OVERVIEW
@@ -61,7 +61,7 @@ See source code.
 Running
 =======
 
-$ gveejayreloaded
+$ reloaded
 
 
 To use a midi controller with veejay you must connect
@@ -91,7 +91,7 @@ About
 =====
 
 GveejayReloaded is a client for veejay. As long as veejay (the server)
-is running, you can connect and disconnect from it with gveejayreloaded.
+is running, you can connect and disconnect from it with reloaded.
 
 
 

@@ -4,7 +4,7 @@
 <glade-interface>
 
 <widget class="GtkWindow" id="gveejay_window">
-  <property name="title" translatable="yes">GVeejayReloaded </property>
+  <property name="title" translatable="yes">Reloaded</property>
   <property name="type">GTK_WINDOW_TOPLEVEL</property>
   <property name="window_position">GTK_WIN_POS_NONE</property>
   <property name="modal">False</property>
@@ -547,7 +547,7 @@
 		      <child>
 			<widget class="GtkImageMenuItem" id="about1">
 			  <property name="visible">True</property>
-			  <property name="label" translatable="yes">About GVeejayReloaded</property>
+			  <property name="label" translatable="yes">About Reloaded</property>
 			  <property name="use_underline">True</property>
 			  <signal name="activate" handler="on_about1_activate" last_modification_time="Thu, 15 Sep 2005 22:07:40 GMT"/>
 
@@ -12466,7 +12466,7 @@ MLZO</property>
   <property name="urgency_hint">False</property>
   <property name="has_separator">False</property>
   <accessibility>
-    <atkproperty name="AtkObject::accessible_name" translatable="yes">GVeejayReloaded Launcher</atkproperty>
+    <atkproperty name="AtkObject::accessible_name" translatable="yes">Reloaded Launcher</atkproperty>
   </accessibility>
   <signal name="close" handler="on_veejay_connection_close" last_modification_time="Sat, 23 Jul 2005 16:04:51 GMT"/>
   <signal name="delete_event" handler="on_veejay_connection_close" last_modification_time="Sat, 23 Jul 2005 18:53:55 GMT"/>

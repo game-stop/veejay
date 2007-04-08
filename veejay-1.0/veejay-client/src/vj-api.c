@@ -258,7 +258,6 @@ typedef struct
 
 static  int	user_preview = 0;
 static	int	NUM_BANKS =	35;
-static	int	NUM_PAGES =	10;
 static 	int	NUM_SAMPLES_PER_PAGE = 12;
 static	int	NUM_SAMPLES_PER_COL = 2;
 static	int	NUM_SAMPLES_PER_ROW = 6;
@@ -1502,7 +1501,7 @@ void	about_dialog()
 		( path, NULL );
 	GtkWidget *about = g_object_new(
 		GTK_TYPE_ABOUT_DIALOG,
-		"name", "GVeejay Reloaded",
+		"name", "Reloaded",
 		"version", VERSION,
 		"copyright", "(C) 2004 - 2007 N. Elburg et all.",
 		"comments", "The graphical interface for Veejay",
@@ -6345,7 +6344,7 @@ void	default_bank_values(int *col, int *row )
 {
 	if( *col == 0 && *row == 0 )
 	{
-		NUM_SAMPLES_PER_COL = 3;
+		NUM_SAMPLES_PER_COL = 5;
 		NUM_SAMPLES_PER_ROW = 4;
 	}
 	else
@@ -6594,7 +6593,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 
 //@ FIXME: to setup_defaults
-	create_ref_slots( 16 );
+	create_ref_slots( 12 );
 	
 	create_sequencer_slots( 10 );
 
@@ -6994,6 +6993,10 @@ gboolean		is_alive( void )
 			veejay_stop_connecting(gui);
 			multrack_audoadd( info->mt, remote, port );
 			info->watch.p_state = 0; 
+
+			if(!user_preview)
+			multitrack_set_quality( info->mt, 2 );
+
 			if( user_preview )
 			{
 				multitrack_set_quality( info->mt, user_preview );
