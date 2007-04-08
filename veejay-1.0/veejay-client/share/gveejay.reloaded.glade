@@ -3434,7 +3434,7 @@ MLZO</property>
 				    </widget>
 				    <packing>
 				      <property name="padding">0</property>
-				      <property name="expand">True</property>
+				      <property name="expand">False</property>
 				      <property name="fill">True</property>
 				    </packing>
 				  </child>
@@ -3865,30 +3865,11 @@ MLZO</property>
 			      </child>
 
 			      <child>
-				<widget class="GtkScrolledWindow" id="scrolledwindow48">
-				  <property name="height_request">200</property>
+				<widget class="GtkColorSelection" id="colorselection">
 				  <property name="visible">True</property>
-				  <property name="can_focus">True</property>
-				  <property name="hscrollbar_policy">GTK_POLICY_AUTOMATIC</property>
-				  <property name="vscrollbar_policy">GTK_POLICY_AUTOMATIC</property>
-				  <property name="shadow_type">GTK_SHADOW_NONE</property>
-				  <property name="window_placement">GTK_CORNER_TOP_LEFT</property>
-
-				  <child>
-				    <widget class="GtkViewport" id="viewport5">
-				      <property name="visible">True</property>
-				      <property name="shadow_type">GTK_SHADOW_IN</property>
-
-				      <child>
-					<widget class="GtkColorSelection" id="colorselection">
-					  <property name="visible">True</property>
-					  <property name="has_opacity_control">True</property>
-					  <property name="has_palette">True</property>
-					  <signal name="color_changed" handler="on_colorselection_color_changed" last_modification_time="Tue, 25 Oct 2005 00:09:40 GMT"/>
-					</widget>
-				      </child>
-				    </widget>
-				  </child>
+				  <property name="has_opacity_control">True</property>
+				  <property name="has_palette">True</property>
+				  <signal name="color_changed" handler="on_colorselection_color_changed" last_modification_time="Tue, 25 Oct 2005 00:09:40 GMT"/>
 				</widget>
 				<packing>
 				  <property name="tab_expand">False</property>
