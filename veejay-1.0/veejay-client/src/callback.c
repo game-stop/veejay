@@ -211,7 +211,7 @@ void	on_button_sendvims_clicked(GtkWidget *widget, gpointer user_data)
 void	on_vimsmessage_activate(GtkWidget *widget, gpointer user_data)
 {
 	msg_vims( get_text( "vimsmessage") );
-	vj_midi_learning_vims_simple( info->midi, NULL, get_text("vimsmessage"));
+	vj_midi_learning_vims( info->midi, NULL, get_text("vimsmessage"),0);
 	vj_msg(VEEJAY_MSG_INFO, "User defined VIMS message sent '%s'", get_text("vimsmessage"));
 }
 

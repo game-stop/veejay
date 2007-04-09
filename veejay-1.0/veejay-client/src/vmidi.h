@@ -38,5 +38,4 @@ void    vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, in
 void    vj_midi_learning_vims_msg2(void *vv, char *widget, int id, int arg, int b );
 void    vj_midi_learning_vims_msg( void *vv, char *widget, int id, int arg );
 void    vj_midi_learning_vims_spin( void *vv, char *widget, int id );
-void    vj_midi_learning_vims( void *vv, char *widget, char *msg, int extra );
 #endif

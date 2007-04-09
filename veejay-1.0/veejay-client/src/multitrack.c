@@ -784,6 +784,11 @@ static		int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len,
 	return res;
 }
 
+void		multitrack_resize( void *m , int w, int h )
+{
+	multitracker_t *mt = (multitracker_t*) m;
+//	gtk_widget_set_size_request( mt->scroll, w, h );
+}
 	
 void		*multitrack_new(
 		void (*f)(int,char*,int),
@@ -808,11 +813,11 @@ void		*multitrack_new(
  	mt->logo = load_logo_image(vj_get_preview_box_w(), vj_get_preview_box_h());
 	mt->preview_toggle = preview_toggle;
 	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
-	gtk_widget_set_size_request(mt->scroll,300, 300);
+//	gtk_widget_set_size_request(mt->scroll,300, 300);
 	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),1);
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(mt->scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_ALWAYS );
 	GtkWidget *table = gtk_table_new( 1, MAX_TRACKS, FALSE );
-	gtk_box_pack_start( GTK_BOX( mt->main_box ), mt->scroll , FALSE,FALSE, 0 );
+	gtk_box_pack_start( GTK_BOX( mt->main_box ), mt->scroll , TRUE,TRUE, 0 );
 	gtk_widget_show(mt->scroll);
 
 	int c = 0;

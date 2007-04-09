@@ -161,9 +161,8 @@ int main(int argc, char *argv[]) {
 
 	vevo_strict_init();
 
-	find_user_themes();
+	find_user_themes(gveejay_theme);
 	
-	vj_gui_theme_setup(gveejay_theme);
 	vj_gui_set_debug_level( verbosity , n_tracks,pw,ph);
 	vj_gui_set_timeout(timer);
 	set_skin( 0 );

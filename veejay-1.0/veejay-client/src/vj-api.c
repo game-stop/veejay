@@ -492,9 +492,7 @@ static int		default_preview_height_ = 144;
 static 	GtkWidget *editlist_tree = NULL;
 static	GtkListStore *editlist_store = NULL;
 static  GtkTreeModel *editlist_model = NULL;	
-
-/* global pointer to the actual selected slot in the sample_bank */
-
+//void    gtk_configure_window_cb( GtkWidget *w, GdkEventConfigure *ev, gpointer data );
 gboolean	is_alive( void );
 static	int	get_slider_val(const char *name);
 void    vj_msg(int type, const char format[], ...);
@@ -4871,7 +4869,6 @@ static	void	reload_srt()
 	single_vims( VIMS_SRT_LIST );
 	gint i=0, len = 0;
 
-
 	gchar *srts = recv_vims(6,&len );
 	if( srts == NULL || len <= 0 )
 	{
@@ -5310,7 +5307,7 @@ static void set_default_theme()
 	use_default_theme_ = 1;
 }
 
-void	find_user_themes()
+void	find_user_themes(int theme)
 {
 	char *home = getenv("HOME");
 	char data[1024];
@@ -5325,10 +5322,15 @@ void	find_user_themes()
 
 	if(!home)
 	{
-		set_default_theme();
+		if(theme) set_default_theme();
 		return;
 	}
 
+	if(!theme)
+	{
+		veejay_msg(VEEJAY_MSG_INFO,"Do not load veejay themes");
+		return;
+	}
 	snprintf( path, sizeof(path),"%s/.veejay/theme/theme.config", home );
 
 	int sloppy = open( path,O_RDONLY );
@@ -5430,6 +5432,9 @@ void	find_user_themes()
 	theme_list[ k ] = strdup("Default");
 	for( k = 0; theme_list[k] != NULL ; k ++ )
 		veejay_msg(VEEJAY_MSG_INFO, "Theme #%d = %s", k, theme_list[k]);
+
+	gtk_rc_parse(theme_file);
+
 
 }
 
@@ -6561,6 +6566,10 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 		(GCallback) on_timeline_cleared, NULL );
 
 
+	//void    gtk_configure_window_cb( GtkWidget *w, GdkEventConfigure *ev, gpointer data )
+	//g_signal_connect( glade_xml_get_widget_(info->main_window , "gveejay_window"), "window-state-event",
+	//	GTK_SIGNAL_FUNC( gtk_configure_window_cb ), (gpointer) gui );
+
 	bankport_ = vpn( VEVO_ANONYMOUS_PORT );
 
 	gtk_widget_show(frame);
@@ -6762,6 +6771,19 @@ static	gboolean	update_log(gpointer data)
 	return TRUE;
 }
 */
+/*
+void	gtk_configure_window_cb( GtkWidget *w, GdkEventConfigure *ev, gpointer data )
+{
+   GtkWidget *box = glade_xml_get_widget_( info->main_window, "sample_bank_hbox" );
+   GdkRectangle result;
+   widget_get_rect_in_screen(
+                 info->sample_bank_pad,
+                 &result
+   );
+veejay_msg(0, "Size= %d x %d", result.width, result.height );
+   multitrack_resize(info->mt, result.width, -1 );
+   
+}*/
 
 void	vj_gui_preview(void)
 {
