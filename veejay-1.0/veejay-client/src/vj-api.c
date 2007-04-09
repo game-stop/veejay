@@ -5986,7 +5986,26 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		unsigned char sta_len[6];
 		veejay_memset(sta_len,0,sizeof(sta_len));
 		nb = vj_client_read( gui->client, V_STATUS, sta_len, 5 );
-		if(sta_len[0] == 'V' && nb > 0 )
+		if( nb <= 0 )
+		{
+			gui->status_lock=0; abort_gveejay();
+			return FALSE;
+		}
+
+		if( sta_len[0] != 'V' )
+		{
+			int tmp1;
+			if( vj_client_poll( gui->client, V_STATUS ) > 0 ) {
+				unsigned char tmp[100];
+				nb = vj_client_read_no_wait( gui->client,V_STATUS, tmp, 100 );
+				if( nb <= 0 )
+				{
+					gui->status_lock = 0; abort_gveejay();
+					return FALSE;
+				}
+			}
+		}
+		else
 		{
 			int n_bytes = 0;
 			if(sscanf( (char*)sta_len+1,"%03d",&n_bytes ))
@@ -6003,33 +6022,6 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		}
 
 		int tmp1;
-
-                while((tmp1 = vj_client_poll( gui->client, V_STATUS )) > 0)
-                {
-			// is there a more recent message ?
-			unsigned char tmp[6];
-			int bb = 0;
-			veejay_memset( tmp, 0, sizeof(tmp));
-		        nb = vj_client_read( gui->client,V_STATUS,tmp, 5);
-			sscanf( tmp+1, "%03d", &bb );
-
-			if(bb>0)
-			{
-				veejay_memset( gui->status_msg, 0, STATUS_BYTES );
-				nb = vj_client_read(gui->client, V_STATUS, gui->status_msg, bb );
-			}
-
-			if(nb<=0)
-			{
-				abort_gveejay();
-				return FALSE;
-			}
-		}
-		if( tmp1 == -1 )
-		{
-			abort_gveejay();
-			return FALSE;
-		}
 
 		if(nb > 0)
 		{
@@ -6061,16 +6053,6 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		for( i = 0; i < STATUS_TOKENS; i ++ )
 			history[i] = info->status_tokens[i];
 
-		char tmp[100];
-	        while( (tmp1 = vj_client_poll( gui->client, V_STATUS )))
-                {
-		       nb = vj_client_read_no_wait( gui->client,V_STATUS,tmp, 100);
-		       if(nb <= 0 )
-				abort_gveejay();
-		}
-		if(tmp1==-1)
-			abort_gveejay();
-		 
 	}
 	return TRUE;
 }
@@ -7212,6 +7194,8 @@ static int	add_bank( gint bank_num  )
 	GtkWidget *sb = info->sample_bank_pad;
 	GtkWidget *frame = gtk_frame_new(frame_label);
 	GtkWidget *label = gtk_label_new( str_label );
+
+	gtk_container_set_border_width( GTK_CONTAINER( frame), 0 );
 
 	gtk_widget_show(frame);
 	info->sample_banks[bank_num]->page_num = gtk_notebook_append_page(GTK_NOTEBOOK(info->sample_bank_pad), frame, label);
