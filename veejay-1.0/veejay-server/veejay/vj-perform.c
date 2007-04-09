@@ -2962,25 +2962,35 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
 }
 
 
-
+static int track_dup = 0;
 void	vj_perform_randomize(veejay_t *info)
 {
 	video_playback_setup *settings = info->settings;
-
 	if(settings->randplayer.mode == RANDMODE_INACTIVE)
 		return;
 
 	double n_sample = (double) (sample_size()-1);
+
+	if( settings->randplayer.mode == RANDMODE_SAMPLE )
+	track_dup = info->uc->sample_id;
+
+	if( n_sample == 1.0 )
+		track_dup = 0;
+
 	int take_n   = 1 + (int) (n_sample * rand() / (RAND_MAX+1.0));
 	int min_delay = 1;
 	int max_delay = 0;
 	char timecode[15];
-	while(!sample_exists(take_n))
+
+	int use = ( take_n == track_dup ? 0: 1 );
+
+	while(!sample_exists(take_n)  || !use)
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, 
 		 "Sample to play (at random) %d does not exist",
 			take_n);
 		take_n = 1 + (int) ( n_sample * rand()/(RAND_MAX+1.0));
+		use = (track_dup == take_n ? 0:1 );
 	}
 
 	int start,end;
