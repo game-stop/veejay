@@ -1491,7 +1491,6 @@ void	vj_font_set_constraints_and_dict( void *font, long lo, long hi, float fps, 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Subtitle: Dictionary %p, Lo = %ld , Hi = %ld, Fps = %f, font = %p",
 			dict, lo,hi, fps , font);
 
-
 	f->fps = fps;
 
         if( f->dictionary )

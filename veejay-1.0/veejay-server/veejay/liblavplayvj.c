@@ -687,7 +687,7 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	settings->max_frame_num = vj_tag_get_n_frames( stream_id );
 
 #ifdef HAVE_FREETYPE
-	  if(info->font && info->uc->sample_id != stream_id )
+	  if(info->font )
 	  {
 		  void *dict = vj_tag_get_dict( stream_id );
 		  vj_font_set_constraints_and_dict( info->font, settings->min_frame_num,
