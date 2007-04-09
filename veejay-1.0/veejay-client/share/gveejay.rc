@@ -4,7 +4,7 @@ style "default"
 #  engine "hcengine" {}
   xthickness = 1
   ythickness = 1
-  GtkWidget::shadow_type = GTK_SHADOW_ETCHED_OUT
+  GtkWidget::shadow_type = GTK_SHADOW_ETCHED_IN
   #GtkWidget::interior_focus = 0
   #GtkWidget::focus_padding = 0
   #GtkWidget::default_border         = {0, 0, 0, 0}
