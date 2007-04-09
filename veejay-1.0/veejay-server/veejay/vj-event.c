@@ -3705,22 +3705,20 @@ void	vj_event_sample_rand_start( void *ptr, const char format[], va_list ap)
 	int args[2];
 	char *s = NULL;
 	P_A(args,s,format,ap);
+
 	if(args[0] == RANDTIMER_FRAME)
 		settings->randplayer.timer = RANDTIMER_FRAME;
 	else
 		settings->randplayer.timer = RANDTIMER_LENGTH;
+
+
 	settings->randplayer.mode = RANDMODE_SAMPLE;
 
-	if(!vj_perform_randomize(v))
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to start the sample randomizer");
-	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Started sample randomizer, %s",
-				(settings->randplayer.timer == RANDTIMER_FRAME ? "freestyling" : "playing full length of gambled samples"));	
-	}
+	vj_perform_randomize(v);
+	veejay_msg(VEEJAY_MSG_INFO, "Started sample randomizer, %s",
+			(settings->randplayer.timer == RANDTIMER_FRAME ? "freestyling" : "playing full length of gambled samples"));	
 }
+
 void	vj_event_sample_rand_stop( void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;

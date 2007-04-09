@@ -2963,48 +2963,56 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
 
 
 
-int	vj_perform_randomize(veejay_t *info)
+void	vj_perform_randomize(veejay_t *info)
 {
 	video_playback_setup *settings = info->settings;
+
 	if(settings->randplayer.mode == RANDMODE_INACTIVE)
-		return 0;
-	if(settings->randplayer.mode == RANDMODE_SAMPLE)
+		return;
+
+	double n_sample = (double) (sample_size()-1);
+	int take_n   = 1 + (int) (n_sample * rand() / (RAND_MAX+1.0));
+	int min_delay = 1;
+	int max_delay = 0;
+	char timecode[15];
+	while(!sample_exists(take_n))
 	{
-		double n_sample = (double) (sample_size()-1);
-		int take_n   = 1 + (int) (n_sample * rand() / (RAND_MAX+1.0));
-		int min_delay = 1;
-		int max_delay = 0;
-		char timecode[15];
-		if(!sample_exists(take_n))
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, 
-			 "Sample to play (at random) %d does not exist",
-				take_n);
-			take_n = info->uc->sample_id;
-			max_delay = min_delay + (int) ((double)max_delay * rand() / (RAND_MAX+1.0));
-		settings->randplayer.max_delay = max_delay;
-		settings->randplayer.min_delay = min_delay;	
+		veejay_msg(VEEJAY_MSG_DEBUG, 
+		 "Sample to play (at random) %d does not exist",
+			take_n);
+		take_n = 1 + (int) ( n_sample * rand()/(RAND_MAX+1.0));
+	}
 
-		MPEG_timecode_t tc;
-		
-		
-		mpeg_timecode(&tc, max_delay,
-	                mpeg_framerate_code(mpeg_conform_framerate(
-				info->edit_list->video_fps)),
-				info->edit_list->video_fps );
+	int start,end;
+	start = sample_get_startFrame( take_n);
+	end   = sample_get_endFrame( take_n );
+	
+	if( settings->randplayer.timer == RANDTIMER_FRAME )
+	{
+		max_delay = (end-start) + 1;
+		max_delay = min_delay + (int) ((double)max_delay * rand() / (RAND_MAX+1.0));
+	}
+	else
+	{
+		max_delay = (end-start);	
+	}
 
-		sprintf(timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
+	settings->randplayer.max_delay = max_delay;
+	settings->randplayer.min_delay = min_delay;	
 
-		veejay_msg(VEEJAY_MSG_DEBUG,
+
+	MPEG_timecode_t tc;
+	
+	mpeg_timecode(&tc, max_delay,
+                mpeg_framerate_code(mpeg_conform_framerate(
+			info->edit_list->video_fps)),
+			info->edit_list->video_fps );
+	sprintf(timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
+	veejay_msg(VEEJAY_MSG_DEBUG,
 		 "Sample randomizer trigger in %s",
 			timecode );
 
-		veejay_set_sample( info, take_n );
-
-		return 1;
-		}
-	}
-	return 0;
+	veejay_set_sample( info, take_n );
 }
 
 int	vj_perform_rand_update(veejay_t *info)
@@ -3016,14 +3024,7 @@ int	vj_perform_rand_update(veejay_t *info)
 	{
 		settings->randplayer.max_delay --;
 		if(settings->randplayer.max_delay <= 0 )
-		{
-			if(!vj_perform_randomize(info))
-			{
-			  veejay_msg(VEEJAY_MSG_ERROR,
-			   "Woops cant start randomizer");
-			  settings->randplayer.mode = RANDMODE_INACTIVE;
-			}
-		}
+			vj_perform_randomize(info);
 		return 1;
 	}
 	return 0;	

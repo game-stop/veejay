@@ -57,7 +57,7 @@ int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop );
 int	vj_perform_init_cropped_output_frame(veejay_t *info, VJFrame *src, int *dw, int *dh );
 void	vj_perform_get_crop_dimensions(veejay_t *info, int *w, int *h);
 int	vj_perform_rand_update(veejay_t *info);
-int	vj_perform_randomize(veejay_t *info);
+void	vj_perform_randomize(veejay_t *info);
 
 void       vj_perform_free_plugin_frame(VJFrameInfo *f );
 
