@@ -32,6 +32,7 @@
 #include <ffmpeg/avutil.h>
 #include <veejay/vje.h>
 #include <veejay/yuvconv.h>
+#include <string.h>
 typedef struct
 {
 	char *hostname;
@@ -79,7 +80,6 @@ void	*gvr_preview_init(int max_tracks)
 {
 	veejay_preview_t *vp = (veejay_preview_t*) vj_calloc(sizeof( veejay_preview_t ));
 	GError *err = NULL;
-	vp->lzo = lzo_new();
 	vp->mutex = g_mutex_new();
 
 	vp->tracks = (veejay_track_t**) vj_calloc(sizeof( veejay_track_t*) * max_tracks );
@@ -97,7 +97,6 @@ void	*gvr_preview_init(int max_tracks)
 
 	if(!vp->thread )
 	{
-		lzo_free(vp->lzo);
 		g_mutex_free( vp->mutex );
 		free(vp);
 		return NULL;
@@ -315,7 +314,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	if(v->have_frame )
 		return 1;
 
-	if(!v->have_frame && v->width <= 0 || v->height <= 0 )
+	if(!v->have_frame && (v->width <= 0 || v->height <= 0) )
 		return 1;
 
 	gint res = sendvims( v, VIMS_RGB24_IMAGE, "%d %d", v->width,v->height );
@@ -575,12 +574,13 @@ void		gvr_queue_cxvims( void *preview, int track_id, int vims_id, int val1,unsig
 	if( track_id == -1 )
 	{
 		for( i = 0; i < vp->n_tracks; i ++ )
-			if( vp->tracks[i]->active )
+			if( vp->tracks[i] && vp->tracks[i]->active )
 				gvr_multivx_queue_vims( vp->tracks[i], vims_id,val1,val2 );
 	}
 	else
 	{
-		gvr_multivx_queue_vims( vp->tracks[track_id], vims_id,val1,val2 );
+		if( vp->tracks[track_id] && vp->tracks[track_id]->active)
+			gvr_multivx_queue_vims( vp->tracks[track_id], vims_id,val1,val2 );
 	}
 	g_mutex_unlock( vp->mutex );
 
@@ -596,12 +596,13 @@ void		gvr_queue_vims( void *preview, int track_id, int vims_id )
 	if( track_id == -1 )
 	{
 		for( i = 0; i < vp->n_tracks; i ++ )
-			if( vp->tracks[i]->active )
+			if( vp->tracks[i]  && vp->tracks[i]->active )
 				gvr_single_queue_vims( vp->tracks[i], vims_id );
 	}
 	else
 	{
-		gvr_single_queue_vims( vp->tracks[track_id], vims_id );
+		if( vp->tracks[track_id] && vp->tracks[track_id]->active)
+			gvr_single_queue_vims( vp->tracks[track_id], vims_id );
 	}
 	g_mutex_unlock( vp->mutex );
 
@@ -617,12 +618,13 @@ void		gvr_queue_mvims( void *preview, int track_id, int vims_id, int val )
 	if( track_id == -1 )
 	{
 		for( i = 0; i < vp->n_tracks ; i ++ )
-			if( vp->tracks[i]->active )
+			if( vp->tracks[i] && vp->tracks[i]->active )
 				gvr_multi_queue_vims( vp->tracks[i], vims_id,val );
 	}
 	else
 	{
-		gvr_multi_queue_vims( vp->tracks[track_id], vims_id,val );
+		if( vp->tracks[track_id] && vp->tracks[track_id]->active )
+			gvr_multi_queue_vims( vp->tracks[track_id], vims_id,val );
 	}
 	g_mutex_unlock( vp->mutex );
 
@@ -648,12 +650,13 @@ void		gvr_queue_mmvims( void *preview, int track_id, int vims_id, int val1,int v
 	if( track_id == -1 )
 	{
 		for( i = 0; i < vp->n_tracks; i ++ )
-			if( vp->tracks[i]->active )
+			if( vp->tracks[i] && vp->tracks[i]->active )
 				gvr_multiv_queue_vims( vp->tracks[i], vims_id,val1,val2 );
 	}
 	else
 	{
-		gvr_multiv_queue_vims( vp->tracks[track_id], vims_id,val1,val2 );
+		if( vp->tracks[track_id] && vp->tracks[track_id]->active)
+			gvr_multiv_queue_vims( vp->tracks[track_id], vims_id,val1,val2 );
 	}
 	g_mutex_unlock( vp->mutex );
 
@@ -664,7 +667,8 @@ void		gvr_track_disconnect( void *preview, int track_num )
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	g_mutex_lock( vp->mutex );
 	veejay_track_t *v = vp->tracks[ track_num ];
-	gvr_close_connection( v );
+	if(v)
+		gvr_close_connection( v );
 	vp->tracks[ track_num ] = NULL;
 	g_mutex_unlock( vp->mutex );
 }
@@ -673,8 +677,11 @@ int		gvr_track_configure( void *preview, int track_num, int w, int h )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	g_mutex_lock( vp->mutex );
-	vp->tracks[ track_num ]->width   = w;
-	vp->tracks[ track_num ]->height  = h;
+	if( vp->tracks[track_num] )
+	{
+		vp->tracks[ track_num ]->width   = w;
+		vp->tracks[ track_num ]->height  = h;
+	}
 	g_mutex_unlock( vp->mutex );
 	veejay_msg(2, "Track %d VeejayGrabber %s:%d %dx%d image",
 		track_num,
@@ -687,6 +694,8 @@ int		gvr_track_configure( void *preview, int track_num, int w, int h )
 int		gvr_get_preview_status( void *preview, int track_num )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
+	if(!vp->tracks[track_num] )
+		return 0;
 	return vp->tracks[track_num]->preview;
 }
 
@@ -695,6 +704,8 @@ int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	g_mutex_lock( vp->mutex );
+	if(!vp->tracks[track_num])
+		return 0;
 	vp->tracks[ track_num ]->preview = status;
 	g_mutex_unlock( vp->mutex );
 	veejay_msg(2, "Track %d VeejayGrabber %s:%d %s",
@@ -742,7 +753,7 @@ static	int	*int_dup( int *status )
 static int	**gvr_grab_stati( void *preview )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
-	int **list = (GdkPixbuf**) vj_calloc( sizeof(int*) * vp->n_tracks );
+	int **list = (int**) vj_calloc( sizeof(int*) * vp->n_tracks );
 	if(!list)
 		return NULL;
 
@@ -750,7 +761,7 @@ static int	**gvr_grab_stati( void *preview )
 	for( i = 0; i < vp->n_tracks; i ++ )
 	{
 		veejay_track_t *v = vp->tracks[i];
-		if(v)
+		if(v && v->active)
 			list[i] = int_dup( vp->tracks[i]->status_tokens );	
 	}
 	
@@ -760,7 +771,7 @@ static int	**gvr_grab_stati( void *preview )
 static int	*gvr_grab_widths( void *preview )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
-	int *list = (GdkPixbuf**) vj_calloc( sizeof(int) * vp->n_tracks );
+	int *list = (int**) vj_calloc( sizeof(int) * vp->n_tracks );
 	if(!list)
 		return NULL;
 
@@ -768,7 +779,7 @@ static int	*gvr_grab_widths( void *preview )
 	for( i = 0; i < vp->n_tracks; i ++ )
 	{
 		veejay_track_t *v = vp->tracks[i];
-		if(v)
+		if(v && v->active)
 			list[i] = vp->tracks[i]->width;	
 	}
 	
@@ -785,7 +796,7 @@ static int	*gvr_grab_heights( void *preview )
 	for( i = 0; i < vp->n_tracks; i ++ )
 	{
 		veejay_track_t *v = vp->tracks[i];
-		if(v)
+		if(v && v->active)
 			list[i] = vp->tracks[i]->height;	
 	}
 	
@@ -847,7 +858,7 @@ static	void	gvr_parse_track_list( veejay_preview_t *vp, veejay_track_t *v, unsig
 					int  port = 0;
 					int  stream_id = 0;
 					veejay_memset(hostname,0,255 );
-					if( sscanf( (char*) z[i], "%s %d %d", hostname, port, &stream_id ))
+					if( sscanf( (char*) z[i], "%s %d %d", hostname, &port, &stream_id ))
 					{
 						if( strcasecmp(	hostname, t->hostname ) == 0 &&
 							port == t->port_num )

@@ -24,6 +24,9 @@ void            multitrack_release_track(void *data, int id, int release_this );
 
 void            multitrack_bind_track( void *data, int id, int bind_this );
 
+void   	 	multitrack_sync_simple_cmd2( void *data, int vims, int arg );
+
+
 void            *multitrack_sync( void * mt );
 
 void               multitrack_configure( void *data, float fps, int video_width, int video_height, int *bw, int *bh );

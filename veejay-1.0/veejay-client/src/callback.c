@@ -2568,7 +2568,7 @@ void	on_mt_sync_decspeed_clicked( GtkWidget *w, gpointer user_data)
 	int n = info->status_tokens[SAMPLE_SPEED];
 	if( n < 0 ) n += 1;
 	if( n > 0 ) n -= 1;
-	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
+	multitrack_sync_simple_cmd2( info->mt, VIMS_VIDEO_SET_SPEED, n );
 
 }
 void	on_mt_sync_incspeed_clicked( GtkWidget *w, gpointer user_data)
@@ -2576,7 +2576,7 @@ void	on_mt_sync_incspeed_clicked( GtkWidget *w, gpointer user_data)
 	int n = info->status_tokens[SAMPLE_SPEED];
 	if( n < 0 ) n -= 1;
 	if( n > 0 ) n += 1;
-	multitrack_sync_simple_cmd( info->mt, VIMS_VIDEO_SET_SPEED, n );
+	multitrack_sync_simple_cmd2( info->mt, VIMS_VIDEO_SET_SPEED, n );
 }
 void	on_mt_sync_prev_clicked( GtkWidget *w , gpointer user_data)
 {

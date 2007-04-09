@@ -167,8 +167,15 @@ void	multitrack_sync_start(void *data)
 void	multitrack_sync_simple_cmd( void *data, int vims, int arg )
 {
 	multitracker_t *mt = (multitracker_t*)data;
-	gvr_queue_mvims(mt->preview,-1, vims, arg);
+	gvr_queue_vims(mt->preview,-1, vims);
 }
+
+void    multitrack_sync_simple_cmd2( void *data, int vims, int arg )
+{
+        multitracker_t *mt = (multitracker_t*)data;
+        gvr_queue_mvims(mt->preview,-1, vims, arg);
+}
+
 
 static	void	seq_gotostart(GtkWidget *w, gpointer data )
 {
