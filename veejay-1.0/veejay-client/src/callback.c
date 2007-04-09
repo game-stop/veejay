@@ -1577,8 +1577,20 @@ void	on_samplerand_toggled(GtkWidget *widget, gpointer user_data)
 		int vims_id = VIMS_SAMPLE_RAND_START;
 		if( start == 0 )
 			vims_id = VIMS_SAMPLE_RAND_STOP;
-		multi_vims( vims_id,"%d", arg );
-		vj_midi_learning_vims_msg( info->midi,NULL, vims_id, arg );
+
+		if( vims_id == VIMS_SAMPLE_RAND_START )
+		{
+			multi_vims( vims_id,"%d", arg );
+			vj_midi_learning_vims_msg( info->midi,NULL, vims_id, arg );
+		}
+		else
+		{
+			single_vims( vims_id );
+			vj_midi_learning_vims_simple(info->midi, NULL, vims_id );
+		}
+
+		vj_msg(VEEJAY_MSG_INFO, "You should restart the sample randomizer now.");
+
 	}
 }
 
@@ -1842,11 +1854,6 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	int min=0,max=0;
 		
 	_effect_get_minmax( id, &min,&max,j );
-
-
-	veejay_msg(VEEJAY_MSG_INFO, "Store KF sequence on FX entry %d, P%d (FX %d)",i,j,id);
-	veejay_msg(VEEJAY_MSG_INFO, "FX range: %d - %d, type = %d, range = %d -%d",min,max, type,
-		start,end);
 
 	int k;
 

@@ -757,7 +757,6 @@ gchar	*_utf8str(const char *c_str)
 
 	if(error)
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "%s cannot convert [%s] : %s",__FUNCTION__ , c_str, error->message);
 		g_free(error);
 		if( result )
 			g_free(result);
@@ -784,7 +783,7 @@ GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
 	GtkWidget *widget = glade_xml_get_widget( m , name );
 	if(!widget)
 	{
-		veejay_msg(0,"%s DANGER:%s",__FUNCTION__,name);
+		veejay_msg(0,"Missing widget: %s ",__FUNCTION__,name);
 		return NULL;
 	}
 #ifdef STRICT_CHECKING
@@ -2205,9 +2204,6 @@ static  void	update_curve_widget(const char *name)
 	update_spin_range( "curve_spinstart", lo, hi, lo );
 	update_spin_range( "curve_spinend", lo, hi, hi );
 
-
-	if(p>=0)	
-		veejay_msg(VEEJAY_MSG_INFO, "Loaded KF for FX entry %d , P%d (FX %d), range is %d-%d",i, p, id,lo,hi );
 
 	if(blob)	free(blob);
 }
