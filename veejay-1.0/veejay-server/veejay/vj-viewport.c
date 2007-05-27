@@ -1029,7 +1029,7 @@ void *viewport_init(int w, int h, const char *homedir, int *enable, int *frontba
 					  10.0,90.0,
 					    0,0,
 					    w,h,
-					    0,
+					    1,
 					    0xff,
 					    w/16 );
 
@@ -1194,8 +1194,11 @@ static	void	viewport_save_settings( viewport_t *v, int frontback )
 	veejay_msg(VEEJAY_MSG_DEBUG, "Saved viewport settings to %s", path);
 }
 
-static int	viewport_locate_marker( viewport_t *v, uint8_t *img, int x, int y , float *dx, float *dy )
+static int	viewport_locate_marker( viewport_t *v, uint8_t *img, float fx, float fy , float *dx, float *dy )
 {
+	uint32_t x  = fx / 100.0f * v->w;
+	uint32_t y  = fy / 100.0f * v->h;
+
 	uint32_t x1 = x - v->marker_size * 2;
 	uint32_t y1 = y - v->marker_size * 2;
 	uint32_t x2 = x + v->marker_size * 2;
@@ -1219,7 +1222,7 @@ static int	viewport_locate_marker( viewport_t *v, uint8_t *img, int x, int y , f
 		pixels_row = 0;
 		for( j = x1; j < x2 ; j ++ )
 		{
-			if (img[i * v->w + j] >= 235)
+			if (img[i * v->w + j] > 230)
 				pixels_row++;
 		}
 		product_row += (i * pixels_row);
@@ -1231,7 +1234,7 @@ static int	viewport_locate_marker( viewport_t *v, uint8_t *img, int x, int y , f
 		pixels_col = 0;
 		for( j = y1; j < y2; j ++ )
 		{
-			if( img[j*v->w + i] >= 235 )
+			if( img[j*v->w + i] > 230 )
 				pixels_col ++;
 		}
 		product_col += (i * pixels_col);
@@ -1242,11 +1245,12 @@ static int	viewport_locate_marker( viewport_t *v, uint8_t *img, int x, int y , f
 		return 0;
 
 
-	uint32_t cx = ( product_row / pixels_row_c );
-	uint32_t cy = ( product_col / product_col_c );
+	uint32_t cy = ( product_row / pixels_row_c );
+	uint32_t cx = ( product_col / product_col_c );
 
-	*dx = (float)  cx / ( v->w / 100.0f );
-	*dy = (float)  cy / ( v->h / 100.0f );
+	*dx = (float) cx / (v->w / 100.0f);
+	*dy = (float) cy / (v->h / 100.0f);
+
 
 	return 1;
 }
@@ -1432,12 +1436,13 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 
 	}
 
-	if( ch && v->save)
+	if( ch )
 	{
-		if( v->snap_marker )
+		if( v->save && v->snap_marker )
 		{
 			float tx = x;
 			float ty = y;
+
 			if( viewport_locate_marker( v, img[0], tx, ty, &x, &y ) )
 			{
 				switch( point )
@@ -1459,7 +1464,6 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 					v->y4 = y;
 					break;
 				}
-
 			}
 			else
 			{
