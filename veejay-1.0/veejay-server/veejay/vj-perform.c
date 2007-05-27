@@ -2587,7 +2587,7 @@ static	int	vj_perform_render_viewport( veejay_t *info, video_playback_setup *set
 
 	if(info->use_vp && info->which_vp == 0 && !info->settings->composite)
 	{
-		viewport_external_mouse( info->viewport, info->uc->mouse[0], info->uc->mouse[1], info->uc->mouse[2], info->frontback,
+		viewport_external_mouse( info->viewport,in, info->uc->mouse[0], info->uc->mouse[1], info->uc->mouse[2], info->frontback,
 			vj_perform_get_width(info), vj_perform_get_height(info) );
 	}
 
@@ -2710,12 +2710,12 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 
 		if(info->which_vp == 1 )
 		{	//@ focus on projection screen
-			composite_event( info->composite, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
+			composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
 				vj_perform_get_width(info), vj_perform_get_height(info));
 		}
 		else if(info->use_vp)
 		{	//@ focus on viewport screen
-			viewport_external_mouse( info->viewport, info->uc->mouse[0], info->uc->mouse[1], info->uc->mouse[2], info->frontback,
+			viewport_external_mouse( info->viewport, pri, info->uc->mouse[0], info->uc->mouse[1], info->uc->mouse[2], info->frontback,
 				vj_sdl_screen_w( info->sdl[0] ), vj_sdl_screen_h(info->sdl[0]) );
 		}
 

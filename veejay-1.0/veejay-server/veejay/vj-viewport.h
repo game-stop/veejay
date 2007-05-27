@@ -30,7 +30,7 @@ void 		*viewport_fx_init(	int type, int wid, int hei, int x, int y, int zoom );
 int        viewport_active( void *data );
 int	viewport_render_ssm(void *vdata );
 void	viewport_render( void *data, uint8_t *in[3], uint8_t *out[3], int width, int height,int uv_len );
-void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontback, int w, int h  );
+void	viewport_external_mouse( void *data, uint8_t *in[3],int sx, int sy, int button, int frontback, int w, int h  );
 char	*viewport_get_help(void *data);
 void	viewport_clone_parameters( void *src , void *dst );
 void 	*viewport_init(int w, int h, const char *dir, int *enable, int *frontback, int mode);
@@ -39,4 +39,5 @@ void			viewport_destroy( void *data );
 void	vewport_draw_interface_color( void *vdata, uint8_t *img[3] );
 void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_img );
 void      viewport_draw_interface_color( void *vdata, uint8_t *img[3] );
+void	viewport_set_marker( void *vdata, int status );
 #endif

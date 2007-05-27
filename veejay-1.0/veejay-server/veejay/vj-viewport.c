@@ -102,6 +102,8 @@ typedef struct
 	int	grid_size;
 	int   renew;
 	int   disable;
+	int   snap_marker;
+	int   marker_size;
 	float x1;
 	float x2;
 	float x3;
@@ -219,6 +221,11 @@ static void viewport_line (uint8_t *plane,
   int dx, dy, t, inc, d, inc1, inc2;
   int swap_x = 0;
   int swap_y = 0;
+
+  if( x1 < 0 ) x1 = 0; else if (x1 > w ) x1 = w;
+  if( y1 < 0 ) y1 = 0; else if (y1 > h ) y1 = h;
+  if( x2 < 0 ) x2 = 0; else if (x2 > w ) x2 = w;
+  if( y2 < 0 ) y2 = 0; else if (y2 > h ) y2 = h;
 
   /* sort line */
   if (x2 < x1) {
@@ -1011,6 +1018,7 @@ void *viewport_init(int w, int h, const char *homedir, int *enable, int *frontba
 
 	v->homedir = strdup(homedir);
 	v->mode	   = mode;
+	v->marker_size = 8;
 	int res;
 
 	if( vc == NULL )
@@ -1069,7 +1077,7 @@ void *viewport_init(int w, int h, const char *homedir, int *enable, int *frontba
 	v->grid = (uint8_t*) vj_malloc( len + v->w );
 	
 	//draw grid
-	viewport_draw_grid( v->w, v->h, v->grid, v->grid_size, v->grid_val );
+//	viewport_draw_grid( v->w, v->h, v->grid, v->grid_size, v->grid_val );
 
 	// calculate initial view
 	viewport_process( v );
@@ -1186,7 +1194,64 @@ static	void	viewport_save_settings( viewport_t *v, int frontback )
 	veejay_msg(VEEJAY_MSG_DEBUG, "Saved viewport settings to %s", path);
 }
 
-void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontback, int screen_width, int screen_height )
+static int	viewport_locate_marker( viewport_t *v, uint8_t *img, int x, int y , float *dx, float *dy )
+{
+	uint32_t x1 = x - v->marker_size * 2;
+	uint32_t y1 = y - v->marker_size * 2;
+	uint32_t x2 = x + v->marker_size * 2;
+	uint32_t y2 = y + v->marker_size * 2;
+
+	if( x1 < 0 ) x1 = 0; else if ( x1 > v->w ) x1 = v->w;
+	if( y1 < 0 ) y1 = 0; else if ( y1 > v->h ) y1 = v->h;
+	if( x2 < 0 ) x2 = 0; else if ( x2 > v->w ) x2 = v->w;
+	if( y2 < 0 ) y2 = 0; else if ( y2 > v->h ) y2 = v->h;
+
+	unsigned int i,j;
+	uint32_t product_row = 0;
+	uint32_t pixels_row = 0;
+	uint32_t product_col = 0;
+	uint32_t pixels_col = 0;
+	uint32_t pixels_row_c = 0;
+	uint32_t product_col_c = 0;
+
+	for( i = y1; i < y2; i ++ ) 
+	{
+		pixels_row = 0;
+		for( j = x1; j < x2 ; j ++ )
+		{
+			if (img[i * v->w + j] >= 235)
+				pixels_row++;
+		}
+		product_row += (i * pixels_row);
+		pixels_row_c += pixels_row;
+	}
+
+	for( i = x1; i < x2; i ++ )
+	{
+		pixels_col = 0;
+		for( j = y1; j < y2; j ++ )
+		{
+			if( img[j*v->w + i] >= 235 )
+				pixels_col ++;
+		}
+		product_col += (i * pixels_col);
+		product_col_c += pixels_col;	
+	}
+
+	if( pixels_row_c == 0 || product_col_c == 0 )
+		return 0;
+
+
+	uint32_t cx = ( product_row / pixels_row_c );
+	uint32_t cy = ( product_col / product_col_c );
+
+	*dx = (float)  cx / ( v->w / 100.0f );
+	*dy = (float)  cy / ( v->h / 100.0f );
+
+	return 1;
+}
+
+void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int button, int frontback, int screen_width, int screen_height )
 {
 	viewport_t *v = (viewport_t*) data;
 	if( sx == 0 && sy == 0 && button == 0 )
@@ -1206,7 +1271,7 @@ void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontb
 	double dist = 100.0;
 
 	float p[9];
-
+	// x,y in range 0.0-1.0
 	// make a copy of the parameters
 
 	p[0] = v->x1;
@@ -1278,7 +1343,15 @@ void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontb
 
 	if( button == 4 ) // wheel up
 	{
-		if( v->user_ui )
+		if( v->user_ui && v->snap_marker )
+		{
+			if( v->marker_size <= 4 )
+				v->marker_size = 32;
+			else
+				v->marker_size -=2;
+
+			grid = 0;
+		} else	if( v->user_ui )
 		{
 			if(v->grid_size <= 8 )
 				v->grid_size = 8;
@@ -1290,7 +1363,14 @@ void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontb
 	}
 	if (button == 5 ) // wheel down
 	{	
-		if( v->user_ui )
+		if( v->user_ui && v->snap_marker )
+		{
+			if( v->marker_size > 32 )
+				v->marker_size = 4;
+			else
+				v->marker_size += 2;
+			grid = 0;
+		} else 	if( v->user_ui )
 		{
 			if( v->grid_size > ( width / 4 ) )
 				v->grid_size = width/4;
@@ -1310,7 +1390,7 @@ void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontb
 		grid = 1;
 	}
 
-	if( grid )	
+	if( grid && !v->snap_marker )	
 		viewport_update_grid( v, v->grid_size, v->grid_val );
 
 	if( osd )
@@ -1318,7 +1398,7 @@ void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontb
 
 	if(v->save)
 	{
-		if( button == 6 )
+		if( button == 6 && !v->snap_marker)
 		{	//@ Snap selected point to grid (upper left corner)
 			float rx = v->w / 100.0 * x;
 			float ry = v->h / 100.0 * y;
@@ -1352,8 +1432,40 @@ void	viewport_external_mouse( void *data, int sx, int sy, int button, int frontb
 
 	}
 
-	if( ch )
+	if( ch && v->save)
 	{
+		if( v->snap_marker )
+		{
+			float tx = x;
+			float ty = y;
+			if( viewport_locate_marker( v, img[0], tx, ty, &x, &y ) )
+			{
+				switch( point )
+				{
+					case 0:
+					v->x1 = x;
+					v->y1 = y;
+					break;
+				case 1:
+					v->x2 = x;
+					v->y2 = y;
+					break;
+				case 2:
+					v->x3 = x;
+					v->y3 = y;
+					break;
+				case 3:
+					v->x4 = x;
+					v->y4 = y;
+					break;
+				}
+
+			}
+			else
+			{
+				veejay_msg(1, "No marker seen (no blob).  Mouse location used");
+			}
+		}
 		viewport_update_perspective( v, p );
 	}
 }
@@ -1390,6 +1502,7 @@ static void	viewport_draw( void *data, uint8_t *plane )
 	viewport_line( plane, fx4, fy4, fx3,fy3,width,height, v->grid_val );
 	viewport_line( plane, fx2, fy2, fx3,fy3,width,height, v->grid_val );
 
+
 	 draw_point( plane, fx1,fy1, width,height, v->users[0],v->grid_val );
 	 draw_point( plane, fx2,fy2, width,height, v->users[1],v->grid_val );
 	 draw_point( plane, fx3,fy3, width,height, v->users[2],v->grid_val );
@@ -1397,12 +1510,19 @@ static void	viewport_draw( void *data, uint8_t *plane )
 
 	 int mx = v->usermouse[0] * wx;
 	 int my = v->usermouse[1] * wy;
-	 
 	 if( mx >= 0 && my >= 0 && mx <= width && my < height )
 	 {
 		 int col = grab_pixel( plane, v->usermouse[0]*wx, v->usermouse[1]*wy,width );
 		 draw_point( plane, v->usermouse[0]*wx,v->usermouse[1]*wy, width,height,1, v->grid_val );
+
 	 }
+}
+
+void		viewport_set_marker( void *data, int status )
+{
+	viewport_t *v = (viewport_t*) data;
+	v->snap_marker = status;
+	v->marker_size = 8;
 }
 
 static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *V )
@@ -1460,6 +1580,24 @@ static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *
 	 {
 		 int col = grab_pixel( plane, v->usermouse[0]*wx, v->usermouse[1]*wy,width );
 		 draw_point( plane, v->usermouse[0]*wx,v->usermouse[1]*wy, width,height,1, v->grid_val );
+
+		if( v->snap_marker )
+		{
+			int mx1 = mx - (v->marker_size * 2);
+			int my1 = my - (v->marker_size * 2);
+			int mx2 = mx + (v->marker_size * 2);
+			int my2 = my1;
+			int mx3 = mx2;
+			int my3 = my + v->marker_size*2;
+			int mx4 = mx1;
+			int my4 = my + v->marker_size * 2;
+
+			viewport_line( plane, mx1, my1, mx2,my2,width,height, v->grid_val);
+			viewport_line( plane, mx1, my1, mx4,my4,width,height, v->grid_val );
+			viewport_line( plane, mx4, my4, mx3,my3,width,height, v->grid_val );
+			viewport_line( plane, mx2, my2, mx3,my3,width,height, v->grid_val );
+
+		}
 	 }
 }
 

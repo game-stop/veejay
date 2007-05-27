@@ -91,6 +91,8 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 
 	c->vp1 = viewport_init( pw, ph, homedir, &vp1_enabled, &vp1_frontback, 1 );
 
+	viewport_set_marker( c->vp1, 1 );
+
 	c->sampler = subsample_init( pw );
 
 	sws_template sws_templ;
@@ -136,10 +138,10 @@ void	composite_destroy( void *compiz )
 	c = NULL;
 }
 
-void	composite_event( void *compiz, int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y )
+void	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y )
 {
 	composite_t *c = (composite_t*) compiz;
-	viewport_external_mouse( c->vp1, mouse_x, mouse_y, mouse_button, 1,w_x,w_y );
+	viewport_external_mouse( c->vp1, in, mouse_x, mouse_y, mouse_button, 1,w_x,w_y );
 }
 
 static inline void	composite_fit_l( composite_t *c, VJFrame *img_data, uint8_t *planes[3] )
