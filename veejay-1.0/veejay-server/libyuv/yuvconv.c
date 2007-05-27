@@ -82,8 +82,10 @@ void	yuv_init_lib()
 	put( PIX_FMT_YUVJ420P, IMG_YUV420P ); //@ pfff dont care
 	put( PIX_FMT_YUVJ422P, IMG_YUV422P );
 	put( PIX_FMT_YUVJ422P, IMG_YUV444P );
-	put( PIX_FMT_RGB24,   IMG_RGB24 );
-	put( PIX_FMT_BGR24,   IMG_BGR24 );
+//	put( PIX_FMT_RGB24,   IMG_RGB24 );
+//	put( PIX_FMT_BGR24,   IMG_BGR24 );
+	put( PIX_FMT_RGB24,   IMG_BGR24 );
+	put( PIX_FMT_BGR24,   IMG_RGB24 );
 	put( PIX_FMT_RGB32,   IMG_ARGB32 );
 	put( PIX_FMT_RGBA,    IMG_RGBA32 );
 	put( PIX_FMT_RGB32_1, IMG_RGBA32 );
