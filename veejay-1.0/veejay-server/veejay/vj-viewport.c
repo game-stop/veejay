@@ -1443,7 +1443,7 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 			float tx = x;
 			float ty = y;
 
-			if( viewport_locate_marker( v, img[0], tx, ty, &x, &y ) )
+			if( button != 6 && viewport_locate_marker( v, img[0], tx, ty, &x, &y ) )
 			{
 				switch( point )
 				{
@@ -1464,10 +1464,6 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 					v->y4 = y;
 					break;
 				}
-			}
-			else
-			{
-				veejay_msg(1, "No marker seen (no blob).  Mouse location used");
 			}
 		}
 		viewport_update_perspective( v, p );

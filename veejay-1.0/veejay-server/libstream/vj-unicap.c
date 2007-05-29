@@ -714,7 +714,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 		} else if (strncasecmp( properties[i], "video source",12) == 0 ) {
 			unicap_property_t p;
 			unicap_void_property(  &p  );
-			veejay_strncpy( p.identifier, properties[i], strlen( properties[i]));
+			strcpy( p.identifier, properties[i] );//, strlen( properties[i]));
 			unicap_get_property( vut->handle, &p );
 			for(j=0;j<p.menu.menu_item_count;j++)
 			{
@@ -724,7 +724,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h )
 		}else if (strncasecmp( properties[i], "video norm",10) == 0 ) {
 			unicap_property_t p;
 			unicap_void_property(  &p  );
-			veejay_strncpy( p.identifier, properties[i], strlen(i));
+			strcpy( p.identifier, properties[i] ); //, strlen(i));
 			unicap_get_property( vut->handle, &p );
 			for(j=0;j<p.menu.menu_item_count;j++)
 			{
