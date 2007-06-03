@@ -244,10 +244,10 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 		if( wminfo.subsystem == SDL_SYSWM_X11 )
 			vjsdl->display = wminfo.info.x11.display;
 	}
-
+#ifndef X_DISPLAY_MISSING
 	if( vjsdl->display )
 		x11_disable_screensaver( vjsdl->display );
-	
+#endif
 	veejay_msg(VEEJAY_MSG_DEBUG, "Using Video Driver %s", name );
 
 	veejay_msg(VEEJAY_MSG_INFO, "Initialized %s SDL video overlay (%dx%d), %s",

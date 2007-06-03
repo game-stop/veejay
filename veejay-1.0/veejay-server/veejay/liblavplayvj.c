@@ -69,7 +69,9 @@
 #ifdef HAVE_FREETYPE
 #include <veejay/vj-font.h>
 #endif
+#ifndef X_DISPLAY_MISSING
 #include <veejay/x11misc.h>
+#endif
 #include <libvjnet/vj-client.h>
 #include <veejay/vj-jack.h>
 #include <veejay/vj-misc.h>
@@ -2650,8 +2652,10 @@ static void *veejay_playback_thread(void *data)
     for ( i = 0; i < MAX_SDL_OUT ; i ++ )
 		if( info->sdl[i] )
 		{
+#ifndef X_DISPLAY_MISSING
 			 if(info->sdl[i]->display)
 				 x11_enable_screensaver( info->sdl[i]->display);
+#endif
 			 vj_sdl_free(info->sdl[i]);
 			 free(info->sdl[i]);
 		}
@@ -2676,11 +2680,13 @@ static void *veejay_playback_thread(void *data)
 			    info->stream_outname);
 	}
 #ifdef USE_GL
+#ifndef X_DISPLAY_MISSING
 	if( info->video_out == 4 )
 	{
 		x11_enable_screensaver( x_get_display(info->gl) );
 		x_display_close( info->gl );
     	}
+#endif
 #endif
 #ifdef HAVE_FREETYPE
 	vj_font_destroy( info->font );

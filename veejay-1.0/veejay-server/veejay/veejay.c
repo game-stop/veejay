@@ -35,7 +35,9 @@
 #include <libvje/vje.h>
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>
+#ifndef X_DISPLAY_MISSING
 #include <veejay/x11misc.h>
+#endif
 #include <sys/mman.h>
 #include <sys/sysinfo.h>
 #include <unistd.h>
@@ -166,9 +168,11 @@ static void Usage(char *progname)
 	    "  -s/--size NxN\t\t\twidth X height for SDL video window\n");
 #endif
 #ifdef HAVE_XINERAMA
+#ifndef X_DISPLAY_MISSING
 #ifdef USE_GL
     fprintf(stderr,
             "  -X/--Xinerama N\t\tSelect Xinerama screen [0-n] (Use with -O4)\n");
+#endif
 #endif
 #endif
     fprintf(stderr,
@@ -378,10 +382,12 @@ static int set_option(const char *name, char *value)
 	    nerr++;
 	}
      }
-#ifdef HAVE_XINERAMA
+#ifndef HAVE_XINERAMA
+#ifndef X_DISPLAY_MISSING
     else if (strcmp(name, "Xinerama") == 0 || strcmp(name, "X") == 0 ) {
 	x11_user_select( atoi(optarg) );
     }
+#endif
 #endif
     else if (strcmp(name, "outstream") == 0 || strcmp(name, "o") == 0) {
 	check_val(optarg,name);
@@ -544,7 +550,9 @@ static int check_command_line_options(int argc, char *argv[])
 	{"audio", 1, 0, 0},	/* -a/--audio num       */
 	{"size", 1, 0, 0},	/* -S/--size            */
 #ifdef HAVE_XINERAMA
+#ifndef X_DISPLAY_MISSING
 	{"Xinerama",1,0,0},	/* -X/--Xinerama	*/
+#endif
 #endif
 	{"graphics-driver", 1, 0, 0},
 	{"timer", 1, 0, 0},	/* timer */
