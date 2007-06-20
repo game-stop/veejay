@@ -254,41 +254,24 @@ void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int
  	 __asm__ __volatile__ ( _EMMS:::"memory");
 #else
 
-	veejay_memset( Y, 0, width );
-	veejay_memset( Cb, 128, width );
-	veejay_memset( Cr, 128, width );
+//	veejay_memset( Y, 0, width );
+//	veejay_memset( Cb, 128, width );
+//	veejay_memset( Cr, 128, width );
 
 //	veejay_memset(Y+(len-width),0, width );
 //	veejay_memset(Cb+(len-width),128,width);
 //	veejay_memset(Cr+(len-width),128,width);
 
-	len -= width;
+//	len -= width;
 
 	if(!reverse)
 	{
-		for(y = width; y < len; y += width  )
+		for(y = 0; y < len; y += width  )
 		{	
-			for(x = 1; x < width-1; x ++)
+			for(x = 0; x < width; x ++)
 			{	
 				if(binary_img[x+y]) //@ found white pixel
 				{
-				/*	uint8_t mt[9] = {
-					binary_img[x-1+y-width], binary_img[x+y-width], binary_img[x+1+y-width],
-					binary_img[x-1+y], 	binary_img[x+y]	    , binary_img[x+1+y],
-					binary_img[x-1+y+width], binary_img[x+y+width], binary_img[x+1+y+width]
-					};
-					if( p( kernel, mt ) ) //@ replace pixel for B
-					{
-						 Y[x + y] = Y2[x+y];
-						Cb[x + y] = Cb2[1][x+y];
-						Cr[x + y] = Cr[2][x+y];
-					}
-					else //@ black
-					{
-						Y[x + y] = 0;
-						Cb[x + y] = 128;
-						Cr[x+ y] = 128;
-					}*/
 					Y[x+y] = Y2[x+y];
 					Cb[x+y] = Cb2[x+y];
 					Cr[x+y] = Cr2[x+y];
@@ -305,30 +288,12 @@ void threshold_apply( VJFrame *frame, VJFrame *frame2,int width, int height, int
 	}
 	else
 	{
-		for(y = width; y < len; y += width  )
+		for(y = 0; y < len; y += width  )
 		{	
-			for(x = 1; x < width-1; x ++)
+			for(x = 0; x < width; x ++)
 			{	
 				if(binary_img[x+y] == 0x0) //@ found black pixel
 				{
-				//@ dilaton too slow ...
-			/*	uint8_t mt[9] = {
-					0xff-binary_img[x-1+y-width], 0xff-binary_img[x+y-width], 0xff-binary_img[x+1+y-width],
-					0xff-binary_img[x-1+y], 	0xff-binary_img[x+y]	    , 0xff-binary_img[x+1+y],
-					0xff-binary_img[x-1+y+width], 0xff-binary_img[x+y+width], 0xff-binary_img[x+1+y+width]
-					};
-				if( p( kernel, mt ) )
-				{
-					 Y[x + y] = frame2->data[0][x+y];
-					Cb[x + y] = frame2->data[1][x+y];
-					Cr[x + y] = frame2->data[2][x+y];
-				}
-				else
-				{
-					Y[x + y] = 0;
-					Cb[x + y] = 128;
-					Cr[x + y] = 128;
-				}*/
 					Y[x+y] = Y2[x+y];
 					Cb[x+y]= Cb2[x+y];
 					Cr[x+y]= Cr2[x+y];
