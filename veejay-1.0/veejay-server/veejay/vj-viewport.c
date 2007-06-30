@@ -411,11 +411,11 @@ static	void	viewport_update_context_help(viewport_t *v)
 
 	if( v->user_ui )
 	{
-		sprintf(tmp, "Mouse Left = Select point\nMouse Left + SHIFT = Snap to grid\nMouse Right = %s\nMouse Middle = %s\nMouse Middle + SHIFT = Grid/Line Color\nMouse Wheel = Grid resolution (%dx%d)\nCTRL + h = Hide/Show this Help",
-			reverse_mode, render_mode , v->grid_size,v->grid_size);
+		sprintf(tmp, "Mouse Left: Find center of blob\nMouse Left + SHIFT: Set point\nMouse Left + ALTGr: Set projection quad\nMouse Right: %s\nMouse Middle: %s\nMouse Middle + SHIFT: Line Color\nMouse Wheel: Marker size\nMouse Wheel + ALTGr: Scale projection quad\nMouse Wheel + CTRL: Scale camera and projection quad\nCTRL + h:Hide/Show this Help",
+			reverse_mode, render_mode);
 	}
 	else
-		sprintf(tmp, "Mouse Right = %s\nMouse Middle = %s\nCTRL + h = Hide/Show this Help", reverse_mode, render_mode );
+		sprintf(tmp, "Mouse Right = %s\nMouse Middle = %s\nCTRL + h = Hide/Show this Help\nMouse Wheel + CTRL = Scale quads\nMouse Wheel + ALTGr = Scale projection area", reverse_mode, render_mode );
 
 	if(v->mode == 0 )
 	{
@@ -430,11 +430,11 @@ static	void	viewport_update_context_help(viewport_t *v)
 	else
 	{
 		if(v->user_ui )
-			sprintf(hlp, "Projection calibration\n%s\n(1)  %.2fx%.2f    Pos: %.2fx%.2f\n(2) %.2fx%.2f\n(3) %.2fx%.2f\n(4) %.2fx%.2f\n",
+			sprintf(hlp, "Interactive Camera/Projection setup\n%s\n(1)  %.2fx%.2f    Pos: %.2fx%.2f\n(2) %.2fx%.2f\n(3) %.2fx%.2f\n(4) %.2fx%.2f\n",
                         tmp,v->x1,v->y1, v->usermouse[0],v->usermouse[1],
                         v->x2,v->y2,v->x3,v->y3,v->x4,v->y4 );
 		else
-			sprintf(hlp, "Projection calibration\nPerspective Transform %s\n%s", reverse_mode, tmp );
+			sprintf(hlp, "Interactive Camera/Projection\nPerspective Transform %s\n%s", reverse_mode, tmp );
 
 	}
 
@@ -442,6 +442,44 @@ static	void	viewport_update_context_help(viewport_t *v)
 		free(v->help);
 	v->help = strdup( hlp );
 }
+
+char *viewport_get_my_help(viewport_t *v)
+{
+	char render_mode[32];
+	sprintf(render_mode, "%s", ( v->user_ui == 0 ? "Grid Mode" : "Render Mode" ) );
+	char reverse_mode[32];
+	sprintf(reverse_mode, "%s", ( v->user_reverse ? "Forward"  : "Reverse" ) );
+	char tmp[1024];
+	char hlp[1024];
+
+	if( v->user_ui )
+	{
+		sprintf(tmp, "Mouse Left: Find center of blob\nMouse Left + SHIFT: Set point\nMouse Left + ALTGr: Set projection quad\nMouse Right: %s\nMouse Middle: %s\nMouse Middle + SHIFT: Line Color\nMouse Wheel: Marker size (%dx%d)\nMouse Wheel + ALTGr:Scale projection quad\nMouse Wheel + CTRL: Scale camera and projection quad\nCTRL + h:Hide/Show this Help",
+			reverse_mode, render_mode , v->marker_size,v->marker_size);
+	}
+	else
+		sprintf(tmp, "Mouse Right = %s\nMouse Middle = %s\nCTRL + h = Hide/Show this Help\nMouse Wheel + CTRL = Scale quads\nMouse Wheel + ALTGr = Scale projection area", reverse_mode, render_mode );
+
+	if(v->mode == 0 )
+	{
+		if( v->user_ui )
+			sprintf(hlp, "Viewport\nPerspective Transform\n%s\n",tmp );
+		else
+			sprintf(hlp, "Viewport\nPerspective Transform %s\n%s",
+			reverse_mode, tmp );
+	}
+	else
+	{
+		if(v->user_ui )
+			sprintf(hlp, "Interactive Camera/Projection setup\n%s",tmp );
+		else
+			sprintf(hlp, "Interactive Camera/Projection\nPerspective Transform %s\n%s", reverse_mode, tmp );
+
+	}
+
+	return strdup( hlp );
+}
+
 
 static matrix_t	*viewport_matrix(void)
 {

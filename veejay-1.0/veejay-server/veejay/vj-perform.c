@@ -2656,9 +2656,6 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 		frame->ssm = 1;
 	}
 
-	//@ Viewport is not enabled, do not set osd_extra
-	//
-	//
 	if( info->which_vp == 0 )
 	{
 		if( viewport_active( info->viewport ) == 1 )
@@ -2668,12 +2665,22 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 	}
 	else
 	{
-		info->uc->osd_extra = NULL;
+		if( info->which_vp == 1 )
+		{
+			info->uc->osd_extra = viewport_get_my_help( info->composite );
+		}
+		else
+			info->uc->osd_extra = NULL;
 	}
 
 	vj_font_customize_osd(info->osd, info, info->use_osd, info->use_vp,info->which_vp );
-
 	vj_font_render( info->osd, frame , settings->current_frame_num,info->uc->osd_extra );
+
+	if(info->which_vp )
+	{
+		if(info->uc->osd_extra) free(info->uc->osd_extra);
+		info->uc->osd_extra = NULL;
+	}
 }
 
 static	void 	vj_perform_finish_chain( veejay_t *info )

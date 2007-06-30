@@ -1469,7 +1469,9 @@ void	vj_font_customize_osd( void *font,void *uc, int type, int vp, int wp )
 		default:
 			f->time = type;
 			if( f->add )
+			{	
 				free(f->add );
+			}
 			f->add = NULL;			
 			return;
 			break;
@@ -1477,7 +1479,9 @@ void	vj_font_customize_osd( void *font,void *uc, int type, int vp, int wp )
 	
 	
 	if(f->add)
+	{
 		free(f->add);
+	}
 	f->add = strdup( buf );
 	f->time = type;
 }
