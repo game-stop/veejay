@@ -702,11 +702,11 @@ void	viewport_set_projection( void *data, float *res )
 
 static int		viewport_configure( 
 					viewport_t *v,
-					float x1, float y1,
+					float x1, float y1, /* output */
 					float x2, float y2,
 					float x3, float y3,
 					float x4, float y4,
-					int32_t x0,  int32_t y0,
+					int32_t x0,  int32_t y0, /* input */
 					int32_t w0,  int32_t h0,
 					int32_t wid,  int32_t hei,
 					uint32_t reverse,
@@ -714,30 +714,29 @@ static int		viewport_configure(
 					int size)
 {
 	//FIXME
-	int x = 0, y = 0;	
 	int w = wid, h = hei;
 
 	v->grid_size = size;
 
-	// points are input coordinates
-	v->points[X0] = (float) x + x1 * (float) w / 100.0;
-	v->points[Y0] = (float) y + y1 * (float) h / 100.0;
-
-	v->points[X1] = (float) x + x2 * (float) w / 100.0;
-	v->points[Y1] = (float) y + y2 * (float) h / 100.0;
-
-	v->points[X2] = (float) x + x3 * (float) w / 100.0;
-	v->points[Y2] = (float) y + y3 * (float) h / 100.0;
-
-	v->points[X3] = (float) x + x4 * (float) w / 100.0;
-	v->points[Y3] = (float) y + y4 * (float) h / 100.0;
 	
-	v->w = wid;
+	v->points[X0] = (float) x1 * (float) w / 100.0;
+	v->points[Y0] = (float) y1 * (float) h / 100.0;
+
+	v->points[X1] = (float) x2 * (float) w / 100.0;
+	v->points[Y1] = (float) y2 * (float) h / 100.0;
+
+	v->points[X2] = (float) x3 * (float) w / 100.0;
+	v->points[Y2] = (float) y3 * (float) h / 100.0;
+
+	v->points[X3] = (float) x4 * (float) w / 100.0;
+	v->points[Y3] = (float) y4 * (float) h / 100.0;
+	
+	v->w = wid; /* image plane boundaries */
 	v->x = 0;
 	v->h = hei;
 	v->y = 0;
 
-	v->x0 = x0;
+	v->x0 = x0; 
 	v->y0 = y0;
 	v->w0 = w0;
 	v->h0 = h0;
@@ -808,12 +807,7 @@ static void		viewport_process( viewport_t *p )
 	const int32_t Y = p->y0;
 	const int32_t W0 = p->w0;
 	const int32_t H0 = p->h0;
-/*
-	const int32_t X = 0;
-	const int32_t Y = 0;
-	const int32_t W0 = w;
-	const int32_t H0 = h;
-*/
+
 	matrix_t *M = p->M;
 	matrix_t *m = p->m;
 
@@ -888,24 +882,13 @@ static	void	viewport_prepare_process( viewport_t *v )
 	const int32_t X = v->x0;
 	const int32_t Y = v->y0;
 
-/*	const int32_t X = 0;
-	const int32_t Y = 0;
-*/	
 	float dx1,dx2,dx3,dx4,dy1,dy2,dy3,dy4;
 	matrix_t *M = v->M;
-
-/*	point_map( M, v->x0, v->y0, &dx1, &dy1);
-	point_map( M, v->x0 + v->w0, v->y0, &dx2, &dy2 );
-	point_map( M, v->x0, v->y0 + v->h0, &dx4, &dy4 );
-	point_map( M, v->x0 + v->w0, v->y0 + v->h0, &dx3, &dy3 );*/
-
 
 	point_map( M, v->x, v->y, &dx1, &dy1);
 	point_map( M, v->x + v->w, v->y, &dx2, &dy2 );
 	point_map( M, v->x, v->y + v->h, &dx4, &dy4 );
 	point_map( M, v->x + v->w, v->y + v->h, &dx3, &dy3 );
-
-
 	
 	v->tx1 = round1( min4( dx1, dx2, dx3, dx4 ) );
 	v->ty1 = round1( min4( dy1, dy2, dy3, dy4 ) );
@@ -917,7 +900,7 @@ static	void	viewport_prepare_process( viewport_t *v )
 	clamp1( v->tx1, X, X + v->w0 );
 	clamp1( v->tx2, X, X + v->w0 );
 }
-//FIXME
+
 void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 {
 	viewport_t *v = (viewport_t*) data;
