@@ -46,9 +46,6 @@
 #include <liblzo/lzo.h>
 #include <veejay/vj-viewport.h>
 #include <veejay/vj-composite.h>
-#ifdef HAVE_SAMPLERATE
-#include <samplerate.h>
-#endif
 #ifdef HAVE_FREETYPE
 #include <veejay/vj-font.h>
 #endif
