@@ -1396,6 +1396,7 @@ static	void	veejay_event_handle(veejay_t *info)
 		SDL_Event event;
 		int ctrl_pressed = 0;
 		int shift_pressed = 0;
+		int alt_pressed = 0;
 		int mouse_x=0,mouse_y=0,but=0;
 		while(SDL_PollEvent(&event) == 1) 
 		{
@@ -1415,10 +1416,12 @@ static	void	veejay_event_handle(veejay_t *info)
 				mouse_y = event.button.y;
 				int mod = SDL_GetModState();
 				shift_pressed = (mod & (KMOD_LSHIFT || KMOD_RSHIFT));
+				alt_pressed = (mod & (KMOD_LALT || KMOD_RALT ));
 				if( mod == 0x1080 || mod == 0x1040 || (mod & KMOD_LCTRL) || (mod & KMOD_RCTRL) )
 					ctrl_pressed = 1; 
 				else
 					ctrl_pressed = 0;
+				if( mod == 0x4000 ) alt_pressed = 1;
 				SDL_MouseButtonEvent *mev = &(event.button);
 				if( mev->button == SDL_BUTTON_LEFT && shift_pressed)
 				{
@@ -1434,11 +1437,25 @@ static	void	veejay_event_handle(veejay_t *info)
 					but = 7;
 					info->uc->mouse[3] = 2;
 				}
+				if( mev->button == SDL_BUTTON_LEFT && alt_pressed )
+				{
+					but = 11;
+					info->uc->mouse[3] = 11;
+				}
 			}
 
 			if( event.type == SDL_MOUSEBUTTONUP )
 			{
 				SDL_MouseButtonEvent *mev = &(event.button);
+				int mod = SDL_GetModState();
+				alt_pressed = (mod & (KMOD_LALT || KMOD_RALT ));
+				if( mod == 0x4000 ) 
+					alt_pressed = 1;
+				if( mod == 0x1080 || mod == 0x1040 || (mod & KMOD_LCTRL) || (mod & KMOD_RCTRL) )
+					ctrl_pressed = 1; 
+				else
+					ctrl_pressed = 0;
+
 				if( mev->button == SDL_BUTTON_LEFT )
 				{
 					if( info->uc->mouse[3] == 1 )
@@ -1453,6 +1470,10 @@ static	void	veejay_event_handle(veejay_t *info)
 					} else if (info->uc->mouse[3] == 0 )
 					{
 						but = 1;
+					} else if ( info->uc->mouse[3] == 11 )
+					{	
+						but = 12;
+						info->uc->mouse[3] = 0;
 					}
 				}
 				else if (mev->button == SDL_BUTTON_RIGHT ) {
@@ -1466,13 +1487,29 @@ static	void	veejay_event_handle(veejay_t *info)
 					else {if( info->uc->mouse[3] == 0 )
 						but = 3;}
 				}
-				else if (mev->button == SDL_BUTTON_WHEELUP )
+				else if (mev->button == SDL_BUTTON_WHEELUP && !alt_pressed && !ctrl_pressed)
 				{
 					but = 4;
 				}
-				else if (mev->button == SDL_BUTTON_WHEELDOWN )
+				else if (mev->button == SDL_BUTTON_WHEELDOWN && !alt_pressed && !ctrl_pressed)
 				{
 					but = 5;
+				}
+				else if (mev->button == SDL_BUTTON_WHEELUP && alt_pressed && !ctrl_pressed )
+				{
+					but = 13;
+				}
+				else if (mev->button == SDL_BUTTON_WHEELDOWN && alt_pressed && !ctrl_pressed )
+				{
+					but = 14;
+				}
+				else if (mev->button == SDL_BUTTON_WHEELUP && ctrl_pressed )
+				{	
+					but = 15;
+				}	
+				else if (mev->button == SDL_BUTTON_WHEELDOWN && ctrl_pressed )
+				{
+					but = 16;
 				}
 				mouse_x = event.button.x;
 				mouse_y = event.button.y;
@@ -2005,8 +2042,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 				info->settings->zoom, info->pixel_format );
 		info->settings->zoom = 0;
 		info->which_vp = 1;
-		info->bes_width  = info->video_output_width;
-		info->bes_height = info->video_output_height;
+	//	info->bes_width  = info->video_output_width;
+	//	info->bes_height = info->video_output_height;
 	}
 	else if(!info->settings->zoom)
 	{

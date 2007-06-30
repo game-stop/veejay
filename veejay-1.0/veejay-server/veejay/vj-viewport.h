@@ -33,7 +33,7 @@ void	viewport_render( void *data, uint8_t *in[3], uint8_t *out[3], int width, in
 void	viewport_external_mouse( void *data, uint8_t *in[3],int sx, int sy, int button, int frontback, int w, int h  );
 char	*viewport_get_help(void *data);
 void	viewport_clone_parameters( void *src , void *dst );
-void 	*viewport_init(int w, int h, const char *dir, int *enable, int *frontback, int mode);
+void 	*viewport_init(int x0, int y0, int w0, int h0, int w, int h, const char *dir, int *enable, int *frontback, int mode);
 int	viewport_active( void *data );
 void			viewport_destroy( void *data );
 void	vewport_draw_interface_color( void *vdata, uint8_t *img[3] );

@@ -47,7 +47,7 @@ typedef struct
 	int mode;
 	int focus;
 	uint8_t *proj_plane[3];
-	uint8_t *img_plane[3];
+//	uint8_t *img_plane[3];
 	uint8_t *large_plane[3]; //@slow
 	void *vp1;
 	void *sampler;
@@ -89,7 +89,7 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	veejay_memset(c->large_plane[1], 128,  pw*ph);
 	veejay_memset(c->large_plane[2], 128,  pw*ph);
 
-	c->vp1 = viewport_init( pw, ph, homedir, &vp1_enabled, &vp1_frontback, 1 );
+	c->vp1 = viewport_init( 0,0,pw,ph,pw, ph, homedir, &vp1_enabled, &vp1_frontback, 1);
 
 	viewport_set_marker( c->vp1, 1 );
 
@@ -129,7 +129,7 @@ void	composite_destroy( void *compiz )
 	{
 		if(c->proj_plane[0]) free(c->proj_plane[0]);
 		if(c->large_plane[0]) free(c->large_plane[0]);
-		if(c->img_plane[0]) free(c->img_plane[0]);
+//		if(c->img_plane[0]) free(c->img_plane[0]);
 		if(c->vp1) viewport_destroy( c->vp1 );
 		if(c->scaler)	yuv_free_swscaler( c->scaler );
 		if(c->sampler) subsample_free(c->sampler);
@@ -141,7 +141,7 @@ void	composite_destroy( void *compiz )
 void	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y )
 {
 	composite_t *c = (composite_t*) compiz;
-	viewport_external_mouse( c->vp1, in, mouse_x, mouse_y, mouse_button, 1,w_x,w_y );
+	viewport_external_mouse( c->vp1, c->large_plane, mouse_x, mouse_y, mouse_button, 1,w_x,w_y );
 }
 
 static inline void	composite_fit_l( composite_t *c, VJFrame *img_data, uint8_t *planes[3] )

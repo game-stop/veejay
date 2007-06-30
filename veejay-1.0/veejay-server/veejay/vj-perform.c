@@ -638,7 +638,7 @@ int vj_perform_init(veejay_t * info, int use_vp)
 	int vp = 0;  int frontback = 0;
 	int pvp = 0;
 
-	info->viewport = viewport_init( w, h, info->homedir, &vp, &frontback,0 );
+	info->viewport = viewport_init( 0,0,w,h,w, h, info->homedir, &vp, &frontback,0 );
 	veejay_memset( &pvar_, 0, sizeof( varcache_t));
 
 	if( pvp )
