@@ -116,6 +116,7 @@ typedef struct
 	int	parameters[8];
 	char    *homedir;
 	int32_t tx1,tx2,ty1,ty2;
+	int32_t ttx1,ttx2,tty1,tty2;
 	int	mode;
 } viewport_t;
 
@@ -816,10 +817,10 @@ static void		viewport_process( viewport_t *p )
 	const float yinc = m->m[1][0];
 	const float winc = m->m[2][0];
 
-	const	int32_t	tx1 = p->tx1;
-	const	int32_t tx2 = p->tx2;
-	const	int32_t	ty1 = p->ty1;
-	const	int32_t ty2 = p->ty2;
+	const	int32_t	tx1 = p->ttx1;
+	const	int32_t tx2 = p->ttx2;
+	const	int32_t	ty1 = p->tty1;
+	const	int32_t ty2 = p->tty2;
 
 	const	float	m01 = m->m[0][1];
 	const	float	m11 = m->m[1][1];
@@ -899,6 +900,17 @@ static	void	viewport_prepare_process( viewport_t *v )
 	clamp1( v->ty2 ,Y,Y + v->h0 );
 	clamp1( v->tx1, X, X + v->w0 );
 	clamp1( v->tx2, X, X + v->w0 );
+
+	v->ttx2 = v->tx2;
+	v->tty2 = v->ty2;
+	v->ttx1 = v->tx1;
+	v->tty1 = v->ty1;
+
+	clamp1( v->ttx2,0, v->w );	
+	clamp1( v->tty2,0, v->h );
+	clamp1( v->ttx1,0, v->w );	
+	clamp1( v->tty1,0, v->h );
+
 }
 
 void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
@@ -914,10 +926,10 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 	const 	float xinc = m->m[0][0];
 	const 	float yinc = m->m[1][0];
 	const 	float winc = m->m[2][0];
-	const	int32_t	tx1 = v->tx1;
-	const	int32_t tx2 = v->tx2;
-	const	int32_t	ty1 = v->ty1;
-	const	int32_t ty2 = v->ty2;
+	const	int32_t	tx1 = v->ttx1;
+	const	int32_t tx2 = v->ttx2;
+	const	int32_t	ty1 = v->tty1;
+	const	int32_t ty2 = v->tty2;
 
 	const	float	m01 = m->m[0][1];
 	const	float	m11 = m->m[1][1];
@@ -1505,10 +1517,7 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 			v->y0 --;
 			v->w0 +=2;
 			v->h0 +=2;
-			if( v->x0 < 0 ) v->x0 = 0;
-			if( v->y0 < 0 ) v->y0 = 0;
-			if( v->w0 > v->w ) v->w0 = v->w;	
-			if( v->h0 > v->h ) v->h0 = v->h;
+
 			if( button == 15 )	
 			{
 				matrix_t *tmp = viewport_matrix();
@@ -1565,14 +1574,7 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 			v->y0 ++;
 			v->w0 -=2;
 			v->h0 -=2;
-			if(v->x0 >= v->w )
-				v->x0 = 0;
-			if(v->y0 >= v->h )
-				v->y0 = 0;
-			if(v->w0 <= 2 )
-				v->w0 = 2;	
-			if(v->h0 <= 2 )
-				v->h0 = 2;
+
 			if( button == 16 )	
 			{
 				matrix_t *tmp = viewport_matrix();
@@ -1656,19 +1658,28 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 				case 0:	
 					v->x0 = (int32_t)sx;
 					v->y0 = (int32_t)sy;
+					clamp1(v->x0, 0, v->w );
+					clamp1(v->y0, 0, v->h );
 					break;
 				case 1:
 					v->w0 = sx - v->x0;
-					v->y0 = sy;
+					v->y0 = sy;		
+					clamp1(v->w0, 0,v->w );
+					clamp1(v->y0, 0,v->h );
 					break;
 				case 2:
 					v->w0 = sx - v->x0;	
 					v->h0 = sy - v->y0;
+					clamp1(v->w0, 0,v->w );
+					clamp1(v->h0, 0,v->h );
 					break;
 				case 3:	
 					v->w0 = ( v->x0 - sx ) + v->w0;
 					v->x0 = sx;
 					v->h0 = sy - v->y0;
+					clamp1(v->x0, 0,v->w );
+					clamp1(v->h0, 0,v->h );
+					clamp1(v->w0, 0,v->w );
 				break;
 			}
 
@@ -1914,10 +1925,10 @@ void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3
 	inU[len+1] = 128;
 	inV[len+1] = 128;
 
-	register const	int32_t	tx1 = v->tx1;
-	register const	int32_t tx2 = v->tx2;
-	register const	int32_t	ty1 = v->ty1;
-	register const	int32_t ty2 = v->ty2;
+	register const	int32_t	tx1 = v->ttx1;
+	register const	int32_t tx2 = v->ttx2;
+	register const	int32_t	ty1 = v->tty1;
+	register const	int32_t ty2 = v->tty2;
 	int x,y;
 
 	y  = ty1 * w;
@@ -1993,10 +2004,10 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 	register uint8_t *inV  = img[2];
 	register uint32_t	*plane_yuyv = (uint32_t*)out_img;
 	register uint8_t 	*outYUYV    = out_img;
-	register const	int32_t	tx1 = v->tx1;
-	register const	int32_t tx2 = v->tx2;
-	register const	int32_t	ty1 = v->ty1;
-	register const	int32_t ty2 = v->ty2;
+	register const	int32_t	tx1 = v->ttx1;
+	register const	int32_t tx2 = v->ttx2;
+	register const	int32_t	ty1 = v->tty1;
+	register const	int32_t ty2 = v->tty2;
 	register const int w = v->w;
 	register const int h = v->h;
 	register const int uw = v->w >> 1;
@@ -2011,6 +2022,8 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 	y  = ty1 * w;
 	if( y > 0) 
 		yuyv_plane_clear( y*2, out_img);
+
+veejay_msg(0, "%d,%d,%d,5d",tx1,ty1,tx2,ty2 );
 
 	for( y = ty1; y < ty2; y ++ )
 	{
@@ -2087,10 +2100,10 @@ void	viewport_produce_full_img_packed( void *vdata, uint8_t *img[3], uint8_t *ou
 	inU[len+1] = 128;
 	inV[len+1] = 128;
 
-	register const	int32_t	tx1 = v->tx1;
-	register const	int32_t tx2 = v->tx2;
-	register const	int32_t	ty1 = v->ty1;
-	register const	int32_t ty2 = v->ty2;
+	register const	int32_t	tx1 = v->ttx1;
+	register const	int32_t tx2 = v->ttx2;
+	register const	int32_t	ty1 = v->tty1;
+	register const	int32_t ty2 = v->tty2;
 	register const int w = v->w;
 	register uint32_t n,i,x,y,m;
 
