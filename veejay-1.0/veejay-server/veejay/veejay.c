@@ -171,7 +171,7 @@ static void Usage(char *progname)
 #ifndef X_DISPLAY_MISSING
 #ifdef USE_GL
     fprintf(stderr,
-            "  -X/--Xinerama N\t\tSelect Xinerama screen [0-n] (Use with -O4)\n");
+            "  -X/--xinerama N\t\tSelect Xinerama screen [0-n] (Use with -O4)\n");
 #endif
 #endif
 #endif
@@ -382,9 +382,9 @@ static int set_option(const char *name, char *value)
 	    nerr++;
 	}
      }
-#ifndef HAVE_XINERAMA
+#ifdef HAVE_XINERAMA
 #ifndef X_DISPLAY_MISSING
-    else if (strcmp(name, "Xinerama") == 0 || strcmp(name, "X") == 0 ) {
+    else if (strcmp(name, "xinerama") == 0 || strcmp(name, "X") == 0 ) {
 	x11_user_select( atoi(optarg) );
     }
 #endif
@@ -551,7 +551,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"size", 1, 0, 0},	/* -S/--size            */
 #ifdef HAVE_XINERAMA
 #ifndef X_DISPLAY_MISSING
-	{"Xinerama",1,0,0},	/* -X/--Xinerama	*/
+	{"xinerama",1,0,0},	/* -X/--Xinerama	*/
 #endif
 #endif
 	{"graphics-driver", 1, 0, 0},
