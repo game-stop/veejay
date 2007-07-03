@@ -26,13 +26,14 @@
 vj_effect *zoom_init(int width , int height)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
+    ve->num_params = 4;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = width/2;
     ve->defaults[1] = height/2;
     ve->defaults[2] = 50;
+    ve->defaults[3] = 1;
 
     ve->limits[0][0] = 0;
     ve->limits[1][0] = width;
@@ -43,13 +44,16 @@ vj_effect *zoom_init(int width , int height)
     ve->limits[0][2] = 10;
     ve->limits[1][2] = 100;
 
+    ve->limits[0][3] = 0;
+    ve->limits[1][3] = 1;
+
     ve->description = "Zoom";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
     return ve;
 }
-static int zoom_[3] = { 0,0,0 };
+static int zoom_[4] = { 0,0,0,0 };
 static void *zoom_vp_ = NULL;
 
 static uint8_t *zoom_private_[3];
@@ -72,16 +76,16 @@ void zoom_free() {
 	zoom_vp_ = NULL;
 }
 
-void zoom_apply( VJFrame *frame, int width, int height, int x, int y, int factor)
+void zoom_apply( VJFrame *frame, int width, int height, int x, int y, int factor, int dir)
 {
-	if( zoom_[0] != x || zoom_[1] != y || zoom_[2] != factor || !zoom_vp_)
+	if( zoom_[0] != x || zoom_[1] != y || zoom_[2] != factor || !zoom_vp_ || dir != zoom_[3])
 	{
 		if( zoom_vp_ )
 			viewport_destroy( zoom_vp_ );
-		zoom_vp_ = viewport_fx_init( VP_QUADZOOM, width,height,x,y,factor );
+		zoom_vp_ = viewport_fx_init( VP_QUADZOOM, width,height,x,y,factor, dir );
 		if(!zoom_vp_ )
 			return;
-		zoom_[0] = x; zoom_[1] = y; zoom_[2] = factor;
+		zoom_[0] = x; zoom_[1] = y; zoom_[2] = factor; zoom_[3] = dir;
 	}
 
 	veejay_memcpy( zoom_private_[0], frame->data[0], (width*height));
@@ -89,5 +93,6 @@ void zoom_apply( VJFrame *frame, int width, int height, int x, int y, int factor
 	veejay_memcpy( zoom_private_[2], frame->data[2], (width*height));
 
 	viewport_process_dynamic( zoom_vp_, zoom_private_, frame->data );
+	
 }
 

@@ -951,10 +951,9 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 	int32_t x,y;
 	int32_t itx,ity;
 
-
 	for( y =0 ; y < ty1; y ++ )
 	{
-		for( x = 0; x < tx1; x ++ )
+		/*for( x = 0; x < tx1; x ++ )
 		{
 			outY[(y*w+x)] = 0;	
 			outU[(y*w+x)] = 128;
@@ -965,6 +964,12 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 			outY[(y*w+x)] = 0;	
 			outU[(y*w+x)] = 128;
 			outV[(y*w+x)] = 128;
+		}*/
+		for( x = 0 ; x < w ; x ++ )
+		{
+			outY[ (y * w +x ) ] = 0;
+			outU[ (y * w +x ) ] = 128;
+			outV[ (y * w +x ) ] = 128;
 		}
 	}
 
@@ -1024,7 +1029,7 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 	}
 	for( y = ty2 ; y < h; y ++ )
 	{
-		for( x = 0; x < tx1; x ++ )
+	/*	for( x = 0; x < tx1; x ++ )
 		{
 			outY[(y*w+x)] = 0;	
 			outU[(y*w+x)] = 128;
@@ -1035,9 +1040,15 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 			outY[(y*w+x)] = 0;	
 			outU[(y*w+x)] = 128;
 			outV[(y*w+x)] = 128;
-		}
+		}*/
+		
+		for( x = 0; x < w; x ++ )
+		{
+			outY[(y*w+x)] = 0;	
+			outU[(y*w+x)] = 128;
+			outV[(y*w+x)] = 128;
+		}			
 	}
-
 	
 }
 
@@ -2210,7 +2221,7 @@ void viewport_render_dynamic( void *vdata, uint8_t *in[3], uint8_t *out[3],int w
 
 }
 
-void *viewport_fx_init(int type, int wid, int hei, int x, int y, int zoom)
+void *viewport_fx_init(int type, int wid, int hei, int x, int y, int zoom, int dir)
 {
 	viewport_t *v = (viewport_t*) vj_calloc(sizeof(viewport_t));
 
@@ -2249,7 +2260,7 @@ void *viewport_fx_init(int type, int wid, int hei, int x, int y, int zoom)
 			0,0,
 			wid,hei,
 			wid,hei,
-			1,
+			dir,
 			0xff,
 			wid/32 );
 

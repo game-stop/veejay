@@ -23,7 +23,7 @@
 /* Viewport component for FX */
 #define	VP_QUADZOOM 1
 void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] );
-void 		*viewport_fx_init(	int type, int wid, int hei, int x, int y, int zoom );
+void 		*viewport_fx_init(	int type, int wid, int hei, int x, int y, int zoom, int dir );
 
 
 /* The viewport */

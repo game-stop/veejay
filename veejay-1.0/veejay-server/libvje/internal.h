@@ -457,7 +457,7 @@ extern void bathroom_apply(VJFrame *frame, int width, int height, int mode, int 
 
 extern void slice_apply(VJFrame *frame, int width, int height, int val, int reinit);
 
-extern void zoom_apply(VJFrame *frame, int w, int h , int xo, int yo, int f);
+extern void zoom_apply(VJFrame *frame, int w, int h , int xo, int yo, int f, int dir);
 
 extern void deinterlace_apply(VJFrame *frame, int w, int h, int val);
 
