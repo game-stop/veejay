@@ -2787,7 +2787,7 @@ int vj_server_setup(veejay_t * info)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,
 		  "Unable to start OSC server at port %d",
-			info->uc->port + 2 );
+			info->uc->port + 4 );
 		return 0;
 	}
 
