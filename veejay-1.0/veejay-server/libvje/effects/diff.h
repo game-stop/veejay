@@ -30,6 +30,6 @@ int diff_malloc(void **c, int w, int h);
 void diff_prepare(void *d, uint8_t *map[3], int w, int h); 
 void diff_apply(void *d , VJFrame *frame,
 		VJFrame *frame2, int width, int height, 
-		int th, int reverse, int show);
+		int th, int reverse, int show, int take);
 void	diff_destroy();
 #endif

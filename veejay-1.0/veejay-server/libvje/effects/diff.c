@@ -29,6 +29,7 @@
 #include <libvjmsg/vj-msg.h>
 #include "softblur.h"
 static uint8_t *static_bg = NULL;
+static int take_bg_ = 0;
 
 typedef struct
 {
@@ -40,7 +41,7 @@ vj_effect *diff_init(int width, int height)
 {
     //int i,j;
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 3;
+    ve->num_params = 4;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
@@ -50,14 +51,17 @@ vj_effect *diff_init(int width, int height)
     ve->limits[1][1] = 1;
     ve->limits[0][2] = 0;	/* show mask */
     ve->limits[1][2] = 1;
+    ve->limits[0][3] = 0;       /* switch to take bg mask */
+    ve->limits[1][3] = 1;
     ve->defaults[0] = 20;
     ve->defaults[1] = 0;
     ve->defaults[2] = 1;
+    ve->defaults[3] = 0;
     ve->description = "Map B to A (substract background mask)";
     ve->extra_frame = 1;
     ve->sub_format = 1;
     ve->has_user = 1;
-	ve->user_data = NULL;
+    ve->user_data = NULL;
     return ve;
 }
 
@@ -111,6 +115,8 @@ void diff_prepare(void *user, uint8_t *map[3], int width, int height)
 	tmp.width = width;
 	tmp.height = height;
 	softblur_apply( &tmp, width,height,0);
+
+	veejay_msg(0, "Snapped and softblurred current frame to use as background mask");
 }
 
 static	void	binarify( uint8_t *dst, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len )
@@ -144,7 +150,7 @@ static	void	binarify( uint8_t *dst, uint8_t *bg, uint8_t *src,int threshold,int 
 
 void diff_apply(void *ed, VJFrame *frame,
 		VJFrame *frame2, int width, int height, 
-		int threshold, int reverse,int mode)
+		int threshold, int reverse,int mode, int take_bg)
 {
     
 	unsigned int i;
@@ -157,9 +163,16 @@ void diff_apply(void *ed, VJFrame *frame,
 	uint8_t *Cr2 = frame2->data[2];
 	diff_data *ud = (diff_data*) ed;
 
-	if(static_bg==NULL)
+	if( take_bg != take_bg_ )
 	{
-		veejay_msg(0, "There is background mask!");
+		veejay_memcpy( static_bg, frame->data[0], frame->len );
+		VJFrame tmp;
+		veejay_memset( &tmp, 0, sizeof(VJFrame));
+		tmp.data[0] = static_bg;
+		tmp.width = width;
+		tmp.height = height;
+		softblur_apply( &tmp, width,height,0);
+		take_bg_ = take_bg;
 		return;
 	}
 
@@ -168,7 +181,6 @@ void diff_apply(void *ed, VJFrame *frame,
 	veejay_memcpy( ud->current, frame->data[0], len );
 	softblur_apply(tmp,width,height,0);
 	free(tmp);
-
 
 	binarify( ud->data, static_bg, ud->current, threshold, reverse,len );
 

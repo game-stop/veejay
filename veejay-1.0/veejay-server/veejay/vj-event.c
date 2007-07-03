@@ -626,7 +626,7 @@ void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, 
 void    vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod);
 #ifdef HAVE_SDL
 static vims_key_list * vj_event_get_keys( int event_id );
-void vj_event_single_fire(void *ptr , SDL_Event event, int pressed);
+int vj_event_single_fire(void *ptr , SDL_Event event, int pressed);
 int vj_event_register_keyb_event(int event_id, int key_id, int key_mod, const char *args);
 void vj_event_unregister_keyb_event(int key_id, int key_mod);
 #endif
@@ -1646,7 +1646,7 @@ void	vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)
 }
 
 #ifdef HAVE_SDL
-void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
+int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 {
 	
 	SDL_KeyboardEvent *key = &event.key;
@@ -1668,7 +1668,7 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 	if(!ev )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Keyboard event %d unknown", index );
-		return;
+		return 0;
 	}
 
 	int event_id = ev->vims->list_id;
@@ -1693,6 +1693,7 @@ void vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 			sprintf(msg,"%03d:;", event_id );
 		vj_event_parse_msg( (veejay_t*) ptr, msg, strlen(msg) );
 	}
+	return 1;
 }
 
 #endif

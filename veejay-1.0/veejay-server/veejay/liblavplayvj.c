@@ -226,7 +226,7 @@ struct mjpeg_params
 extern void vj_osc_set_veejay_t(veejay_t *t);
 
 #ifdef HAVE_SDL
-extern void vj_event_single_fire(void *ptr, SDL_Event event, int pressed);
+extern int vj_event_single_fire(void *ptr, SDL_Event event, int pressed);
 #endif
 static int	total_mem_mb_ = 0;
 static int 	chunk_size_ = 0;
@@ -1398,11 +1398,14 @@ static	void	veejay_event_handle(veejay_t *info)
 		int shift_pressed = 0;
 		int alt_pressed = 0;
 		int mouse_x=0,mouse_y=0,but=0;
+		int res = 0;
 		while(SDL_PollEvent(&event) == 1) 
 		{
+			SDL_KeyboardEvent *k = &event.key;
+			int mod = SDL_GetModState();
 			if( event.type == SDL_KEYDOWN)
 			{
-				vj_event_single_fire( (void*) info, event, 0);
+				res = vj_event_single_fire( (void*) info, event, 0);
 			}
 			if( event.type == SDL_MOUSEMOTION )
 			{
@@ -1414,15 +1417,15 @@ static	void	veejay_event_handle(veejay_t *info)
 			{
 				mouse_x = event.button.x;
 				mouse_y = event.button.y;
-				int mod = SDL_GetModState();
-				shift_pressed = (mod & (KMOD_LSHIFT || KMOD_RSHIFT));
-				alt_pressed = (mod & (KMOD_LALT || KMOD_RALT ));
+				shift_pressed = (mod & KMOD_LSHIFT );
+				alt_pressed = (mod & KMOD_RSHIFT );
 				if( mod == 0x1080 || mod == 0x1040 || (mod & KMOD_LCTRL) || (mod & KMOD_RCTRL) )
 					ctrl_pressed = 1; 
 				else
 					ctrl_pressed = 0;
-				if( mod == 0x4000 ) alt_pressed = 1;
+
 				SDL_MouseButtonEvent *mev = &(event.button);
+
 				if( mev->button == SDL_BUTTON_LEFT && shift_pressed)
 				{
 					but = 6;
@@ -1447,10 +1450,8 @@ static	void	veejay_event_handle(veejay_t *info)
 			if( event.type == SDL_MOUSEBUTTONUP )
 			{
 				SDL_MouseButtonEvent *mev = &(event.button);
-				int mod = SDL_GetModState();
-				alt_pressed = (mod & (KMOD_LALT || KMOD_RALT ));
-				if( mod == 0x4000 ) 
-					alt_pressed = 1;
+				alt_pressed = (mod & KMOD_RSHIFT );
+				shift_pressed = (mod & KMOD_LSHIFT );
 				if( mod == 0x1080 || mod == 0x1040 || (mod & KMOD_LCTRL) || (mod & KMOD_RCTRL) )
 					ctrl_pressed = 1; 
 				else
@@ -1487,23 +1488,23 @@ static	void	veejay_event_handle(veejay_t *info)
 					else {if( info->uc->mouse[3] == 0 )
 						but = 3;}
 				}
-				else if (mev->button == SDL_BUTTON_WHEELUP && !alt_pressed && !ctrl_pressed)
+				else if ((mev->button == SDL_BUTTON_WHEELUP ) && !alt_pressed && !ctrl_pressed)
 				{
 					but = 4;
 				}
-				else if (mev->button == SDL_BUTTON_WHEELDOWN && !alt_pressed && !ctrl_pressed)
+				else if ((mev->button == SDL_BUTTON_WHEELDOWN ) && !alt_pressed && !ctrl_pressed)
 				{
 					but = 5;
 				}
-				else if (mev->button == SDL_BUTTON_WHEELUP && alt_pressed && !ctrl_pressed )
+				else if ((mev->button == SDL_BUTTON_WHEELUP) && alt_pressed && !ctrl_pressed )
 				{
 					but = 13;
 				}
-				else if (mev->button == SDL_BUTTON_WHEELDOWN && alt_pressed && !ctrl_pressed )
+				else if ((mev->button == SDL_BUTTON_WHEELDOWN) && alt_pressed && !ctrl_pressed )
 				{
 					but = 14;
 				}
-				else if (mev->button == SDL_BUTTON_WHEELUP && ctrl_pressed )
+				else if (mev->button == SDL_BUTTON_WHEELUP && ctrl_pressed )  
 				{	
 					but = 15;
 				}	

@@ -2910,7 +2910,7 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font)
 	sprintf(buffer, "%s", tag->source_name );
 	xmlNewChild(node,NULL,(const xmlChar*) "source_file", (const xmlChar*) buffer );
 
-	if(tag->extra)
+	if(tag->extra && strlen(tag->extra) > 1)
 	{
 		sprintf(buffer, "%s", tag->extra );
 		xmlNewChild(node, NULL,(const xmlChar) "extra_data", (const xmlChar*) buffer );

@@ -455,7 +455,7 @@ char *viewport_get_my_help(viewport_t *v)
 
 	if( v->user_ui )
 	{
-		sprintf(tmp, "Mouse Left: Find center of blob\nMouse Left + SHIFT: Set point\nMouse Left + ALTGr: Set projection quad\nMouse Right: %s\nMouse Middle: %s\nMouse Middle + SHIFT: Line Color\nMouse Wheel: Marker size (%dx%d)\nMouse Wheel + ALTGr:Scale projection quad\nMouse Wheel + CTRL: Scale camera and projection quad\nCTRL + h:Hide/Show this Help",
+		sprintf(tmp, "Mouse Left: Find center of blob\nMouse Left + LSHIFT: Set point\nMouse Left + RSHIFT: Set projection quad\nMouse Right: %s\nMouse Middle: %s\nMouse Middle + LSHIFT: Line Color\nMouse Wheel: Marker size (%dx%d)\nMouse Wheel + RSHIFT:Scale projection quad\nMouse Wheel + CTRL: Scale camera and projection quad\nCTRL + h:Hide/Show this Help",
 			reverse_mode, render_mode , v->marker_size,v->marker_size);
 	}
 	else
@@ -1125,7 +1125,7 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, const char *ho
 
 	v->homedir = strdup(homedir);
 	v->mode	   = mode;
-	v->marker_size = 8;
+	v->marker_size = 4;
 	int res;
 
 	if( vc == NULL )
@@ -2022,8 +2022,6 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 	y  = ty1 * w;
 	if( y > 0) 
 		yuyv_plane_clear( y*2, out_img);
-
-veejay_msg(0, "%d,%d,%d,5d",tx1,ty1,tx2,ty2 );
 
 	for( y = ty1; y < ty2; y ++ )
 	{
