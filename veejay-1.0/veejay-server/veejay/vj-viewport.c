@@ -951,20 +951,16 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 	int32_t x,y;
 	int32_t itx,ity;
 
+#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
+
+	fast_memset_dirty( outY , 0, ty1 * v->w );
+	fast_memset_dirty( outU , 128, ty1 * v->w );
+	fast_memset_dirty( outV , 128, ty1 * v->w );
+	fast_memset_finish();
+#else
+	
 	for( y =0 ; y < ty1; y ++ )
 	{
-		/*for( x = 0; x < tx1; x ++ )
-		{
-			outY[(y*w+x)] = 0;	
-			outU[(y*w+x)] = 128;
-			outV[(y*w+x)] = 128;
-		}
-		for( x = tx2; x < w; x ++ )
-		{
-			outY[(y*w+x)] = 0;	
-			outU[(y*w+x)] = 128;
-			outV[(y*w+x)] = 128;
-		}*/
 		for( x = 0 ; x < w ; x ++ )
 		{
 			outY[ (y * w +x ) ] = 0;
@@ -972,7 +968,8 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 			outV[ (y * w +x ) ] = 128;
 		}
 	}
-
+#endif
+	
 	for( y = ty1; y < ty2; y ++ )
 	{
 		tx = xinc * ( tx1 + 0.5 ) + m01 * ( y + 0.5) + m02;
@@ -1027,21 +1024,16 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 		}
 
 	}
+
+#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
+	int rest = h - ty2;
+	fast_memset_dirty( outY + (ty2 * v->w),0, rest * v->w );
+	fast_memset_dirty( outU + (ty2 * v->w), 128, rest * v->w );
+	fast_memset_dirty( outV + (ty2 * v->w), 128, rest * v->w );
+	fast_memset_finish();
+#else
 	for( y = ty2 ; y < h; y ++ )
 	{
-	/*	for( x = 0; x < tx1; x ++ )
-		{
-			outY[(y*w+x)] = 0;	
-			outU[(y*w+x)] = 128;
-			outV[(y*w+x)] = 128;
-		}
-		for( x = tx2; x < w; x ++ )
-		{
-			outY[(y*w+x)] = 0;	
-			outU[(y*w+x)] = 128;
-			outV[(y*w+x)] = 128;
-		}*/
-		
 		for( x = 0; x < w; x ++ )
 		{
 			outY[(y*w+x)] = 0;	
@@ -1049,7 +1041,7 @@ void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 			outV[(y*w+x)] = 128;
 		}			
 	}
-	
+#endif	
 }
 
 

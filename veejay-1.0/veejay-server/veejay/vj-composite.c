@@ -218,6 +218,7 @@ static void	composite_prerender( composite_t *c, VJFrame *img_data, uint8_t *pla
 void	composite_process(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int use_vp, int focus )
 {
 	composite_t *c = (composite_t*) compiz;
+
 	if(!input->ssm)
 	{
 		chroma_supersample( c->sample_mode, c->sampler, img_dat, input->width, input->height );
