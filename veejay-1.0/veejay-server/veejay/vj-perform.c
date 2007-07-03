@@ -531,7 +531,7 @@ static void vj_perform_record_buffer_free()
 }
 static	char ppm_path[1024];
 
-int vj_perform_init(veejay_t * info, int use_vp)
+int vj_perform_init(veejay_t * info)
 {
     const int w = info->edit_list->video_width;
     const int h = info->edit_list->video_height;
@@ -635,10 +635,10 @@ int vj_perform_init(veejay_t * info, int use_vp)
 	int vp = 0;  int frontback = 0;
 	int pvp = 0;
 
-	info->viewport = viewport_init( 0,0,w,h,w, h, info->homedir, &vp, &frontback,0 );
+//	info->viewport = viewport_init( 0,0,w,h,w, h, info->homedir, &vp, &frontback,0 );
 	veejay_memset( &pvar_, 0, sizeof( varcache_t));
 
-	if( pvp )
+/*	if( pvp )
 		veejay_msg(VEEJAY_MSG_INFO, "Initialized Projection");
  	if( vp )
 		veejay_msg(VEEJAY_MSG_INFO, "Initialized Viewport");
@@ -649,7 +649,7 @@ int vj_perform_init(veejay_t * info, int use_vp)
 		info->frontback = frontback;
 		info->use_proj = pvp;
 		veejay_msg(VEEJAY_MSG_INFO, "Loaded viewport and projection configuration");
-	}
+	}*/
 
     return 1;
 }
@@ -797,8 +797,8 @@ void vj_perform_free(veejay_t * info)
 	subsample_free(effect_sampler);
 
 
-   if( info->viewport )
-	viewport_destroy( info->viewport );
+//   if( info->viewport )
+//	viewport_destroy( info->viewport );
 
    for(c=0; c < 3; c ++)
    {
@@ -2564,7 +2564,7 @@ static	int	vj_perform_get_height( veejay_t *info )
 #endif
 	return info->video_output_height;
 }
-
+/*
 static	int	vj_perform_render_viewport( veejay_t *info, video_playback_setup *settings )
 {
 	VJFrame *frame = info->effect_frame1;
@@ -2630,7 +2630,7 @@ static	int	vj_perform_render_viewport( veejay_t *info, video_playback_setup *set
 
 	return deep;
 }
-
+*/
 static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *settings, int destination )
 {
 	if(info->use_osd <= 0)
@@ -2653,7 +2653,7 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 		frame->ssm = 1;
 	}
 
-	if( info->which_vp == 0 )
+/*	if( info->which_vp == 0 )
 	{
 		if( viewport_active( info->viewport ) == 1 )
 			info->uc->osd_extra = viewport_get_help( info->viewport );
@@ -2661,16 +2661,17 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 			info->uc->osd_extra = NULL;
 	}
 	else
+	{*/
+	
+	if( info->which_vp == 1 )
 	{
-		if( info->which_vp == 1 )
-		{
-			info->uc->osd_extra = viewport_get_my_help( info->composite );
-		}
-		else
-			info->uc->osd_extra = NULL;
+		info->uc->osd_extra = viewport_get_my_help( info->composite );
 	}
+	else
+		info->uc->osd_extra = NULL;
+//	}
 
-	vj_font_customize_osd(info->osd, info, info->use_osd, info->use_vp,info->which_vp );
+	vj_font_customize_osd(info->osd, info, info->use_osd, 0,info->which_vp );
 	vj_font_render( info->osd, frame , settings->current_frame_num,info->uc->osd_extra );
 
 	if(info->which_vp )
@@ -2717,14 +2718,15 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 			composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
 				vj_perform_get_width(info), vj_perform_get_height(info));
 		}
+		/*
 		else if(info->use_vp)
 		{	//@ focus on viewport screen
 			viewport_external_mouse( info->viewport, pri, info->uc->mouse[0], info->uc->mouse[1], info->uc->mouse[2], info->frontback,
 				vj_sdl_screen_w( info->sdl[0] ), vj_sdl_screen_h(info->sdl[0]) );
-		}
+		}*/
 
-		composite_process( info->composite, pri, frame, info->use_vp, info->which_vp,
-			viewport_active(info->viewport) );
+		composite_process( info->composite, pri, frame, 0, info->which_vp );
+//			viewport_active(info->viewport) );
 	}
 
 	if( frame->ssm == 1 )
@@ -2828,17 +2830,17 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 	vj_perform_render_font( info, settings );
 
 	//@ record frame before rendering viewport (default)
-	if( settings->vp_rec == 0 && pvar_.enc_active )
-	{
-		vj_perform_record_frame(info );
-	}
+	//if( settings->vp_rec == 0 && pvar_.enc_active )
+	//{
+	//	vj_perform_record_frame(info );
+	//}
 
 	//@ Render viewport
-	if(info->use_vp && info->frontback==0)
-		deep = vj_perform_render_viewport( info, settings );
+	//	if(info->use_vp && info->frontback==0)
+	//	deep = vj_perform_render_viewport( info, settings );
 
-	//@ record frame after rendering viewport
-	if( settings->vp_rec == 1 && pvar_.enc_active )
+	//@ record frame 
+	if( pvar_.enc_active )
 	{
 		vj_perform_record_frame(info);
 	}
@@ -2887,8 +2889,8 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 		   
 			cached_sample_frames[0] = info->uc->sample_id;
 			//@ Render viewport
-			if(info->use_vp && info->frontback)
-				vj_perform_render_viewport( info, settings );
+			//if(info->use_vp && info->frontback)
+			//	vj_perform_render_viewport( info, settings );
 
 			if(vj_perform_verify_rows(info))
 		   	 	vj_perform_sample_complete_buffers(info, &is444);
@@ -2903,8 +2905,8 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 
 			   vj_perform_plain_fill_buffer(info);
 
-			   if(info->use_vp && info->frontback)
-				vj_perform_render_viewport( info,settings);
+			   //if(info->use_vp && info->frontback)
+			   //	vj_perform_render_viewport( info,settings);
 			   info->out_buf = vj_perform_render_magic( info, info->settings );
 			   res = 1;
  		    break;
@@ -2922,8 +2924,8 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 			 if (vj_perform_tag_fill_buffer(info))
 			 {
 				//@ Render viewport
-				if(info->use_vp && info->frontback)
-					vj_perform_render_viewport( info, settings );
+				//if(info->use_vp && info->frontback)
+				//	vj_perform_render_viewport( info, settings );
 
 				if(vj_perform_verify_rows(info))
 					vj_perform_tag_complete_buffers(info, &is444);

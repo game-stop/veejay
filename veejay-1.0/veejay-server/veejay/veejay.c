@@ -54,7 +54,6 @@ static char override_norm = 'p';
 static int auto_loop = 0;
 static int n_slots_ = 4;
 static int max_mem_ = 30;
-static int viewport = 0;
 static int live =0;
 static void CompiledWith()
 {
@@ -279,8 +278,6 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"\t\t\t\t-C/--zoomcrop [top:bottom:left:right] (crop source before scaling)\n");
 	fprintf(stderr,
-		"  -V/--viewport \t\tStart with viewport\n");
-	fprintf(stderr,
 		"  -D/--composite \t\tProjection screen setup\n");
 	fprintf(stderr,
 		"  -A/--all [num] \t\tStart with all capture devices, start with device <num> \n");
@@ -336,10 +333,6 @@ static int set_option(const char *name, char *value)
 		check_val(optarg,name);
 		info->settings->use_mcast = 1;
 		info->settings->group_name = strdup( optarg );
-	}
-	else if (strcmp(name, "viewport" ) == 0 || strcmp(name , "V" ) == 0 )
-	{
-		viewport = 1;
 	}
 	else if (strcmp(name, "max_cache" )== 0 || strcmp(name, "j" ) == 0 )
 	{
@@ -581,7 +574,6 @@ static int check_command_line_options(int argc, char *argv[])
 	{"framerate",1,0,0},
 	{"audiorate",1,0,0},
 	{"ycbcr",1,0,0},
-	{"viewport",0,0,0},
 	{"multicast-osc",1,0,0},
 	{"multicast-vims",1,0,0},
 	{"map-from-file",1,0,0},
@@ -779,8 +771,7 @@ int main(int argc, char **argv)
 		default_geometry_y,
 		NULL,
 		live,
-		full_range,
-		viewport)<0)
+		full_range ) < 0 )
 	{	
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot start Vveejay");
 		return 0;

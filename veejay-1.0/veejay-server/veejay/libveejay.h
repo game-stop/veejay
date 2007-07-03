@@ -29,7 +29,7 @@ void veejay_signal_loop(void *);
 
 int veejay_init_editlist(veejay_t * info);
 
-int veejay_init(veejay_t *info,int w, int h, char *arg, int td, int fr, int use_vp);
+int veejay_init(veejay_t *info,int w, int h, char *arg, int td, int fr);
 
 int veejay_open(veejay_t *info);
 

@@ -6720,61 +6720,6 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 	}
 
 }
-void	vj_event_toggle_projport( void *ptr, const char format[], va_list ap )
-{
-	veejay_t *v = (veejay_t*) ptr;
-
-	if( v->settings->composite == 0 )
-		veejay_msg(VEEJAY_MSG_ERROR, "To use projetion setup, start veejay with -D");
-	else
-	{
-		if( v->which_vp == 0 )
-		{
-			v->which_vp = 1;
-		}
-		else
-		{
-			v->which_vp = 0;
-		}
-		veejay_msg(VEEJAY_MSG_INFO, "Focus is at %s", (v->which_vp == 1 ? "Projection" : "Viewport" ));
-	}
-}
-void	vj_event_toggle_viewport( void *ptr, const char format[], va_list ap )
-{
-	veejay_t *v = (veejay_t*) ptr;
-	if(v->use_vp == 0 )
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Viewport enabled");
-		v->use_vp = 1;
-		//@ If viewport is in user UI mode, enable context help
-		//@ fixme: print OSD in projection setup
-//		if( viewport_active( v->viewport ))
-//		{
-//			v->use_osd = 3;
-//			veejay_msg(VEEJAY_MSG_INFO, "Viewport help enabled");
-//		}
-	}
-	else
-	{
-		v->use_vp = 0;
-		veejay_msg(VEEJAY_MSG_INFO, "Viewport disabled");
-	}
-}
-
-void	vj_event_toggle_vp_render( void *ptr, const char format[], va_list ap )
-{
-	veejay_t *v = (veejay_t*) ptr;
-	if( v->settings->vp_rec == 0 )
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Recording from Viewport");
-		v->settings->vp_rec = 1;
-	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Recording original video (default)");
-		v->settings->vp_rec = 0;
-	}
-}
 
 void	vj_event_toggle_osd( void *ptr, const char format[], va_list ap )
 {

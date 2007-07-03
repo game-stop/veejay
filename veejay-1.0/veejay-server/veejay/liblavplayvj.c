@@ -912,7 +912,7 @@ static int veejay_screen_update(veejay_t * info )
 	
 		uint8_t *yuyv = vj_sdl_get_yuv_overlay(info->sdl[0]);
 	
-		composite_blit( info->composite, viewport_active(info->viewport), yuyv );
+		composite_blit( info->composite, yuyv );
 
 		if(!vj_sdl_unlock( info->sdl[0]) )
 			return 0;
@@ -1838,7 +1838,7 @@ static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
  ******************************************************/
 
 
-int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_range, int use_vp)
+int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_range)
 {
 	editlist *el = info->current_edit_list;
 	video_playback_setup *settings = info->settings;
@@ -1933,7 +1933,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 				info->current_edit_list->video_height);
 	}
 	
-	if(!vj_perform_init(info, use_vp))
+	if(!vj_perform_init(info))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize Veejay Performer");
 		return -1;

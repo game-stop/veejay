@@ -16,7 +16,7 @@ void	vj_perform_unlock_primary_frame( void );
 VJFrame	*vj_perform_init_plugin_frame(veejay_t *info);
 VJFrameInfo *vj_perform_init_plugin_frame_info(veejay_t *info);
 
-int vj_perform_init(veejay_t * info, int use_vp);
+int vj_perform_init(veejay_t * info);
 
 int vj_perform_init_audio(veejay_t * info);
 

@@ -215,7 +215,7 @@ static void	composite_prerender( composite_t *c, VJFrame *img_data, uint8_t *pla
 	free(dst1);
 }
 */
-void	composite_process(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int use_vp, int focus, int view_active )
+void	composite_process(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int use_vp, int focus )
 {
 	composite_t *c = (composite_t*) compiz;
 	if(!input->ssm)
@@ -264,7 +264,7 @@ void	composite_process(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int 
 	}
 }
 
-void	composite_blit( void *compiz, int active, uint8_t *yuyv )
+void	composite_blit( void *compiz, uint8_t *yuyv )
 {
 	composite_t *c = (composite_t*) compiz;
 	
