@@ -54,7 +54,7 @@ vj_effect *diff_init(int width, int height)
     ve->limits[1][2] = 2;
     ve->limits[0][3] = 0;       /* switch to take bg mask */
     ve->limits[1][3] = 1;
-    ve->limits[0][4] = 0;	/* thinning */
+    ve->limits[0][4] = 1;	/* thinning */
     ve->limits[1][4] = 100;
 
     ve->defaults[0] = 30;
@@ -236,7 +236,7 @@ void diff_apply(void *ed, VJFrame *frame,
 	uint8_t *bin = ud->data;
 	for( i = 0; i < len ;i ++ )
 	{
-		if( dt_map[ i ] > feather )
+		if( dt_map[ i ] >= feather )
 		{
 			Y[i] = Y2[i];
 			Cb[i] = Cb2[i];
