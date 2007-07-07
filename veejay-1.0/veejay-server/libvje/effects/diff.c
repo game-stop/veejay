@@ -30,6 +30,7 @@
 #include "softblur.h"
 static uint8_t *static_bg = NULL;
 static int take_bg_ = 0;
+static int *dt_map = NULL;
 
 typedef struct
 {
@@ -41,7 +42,7 @@ vj_effect *diff_init(int width, int height)
 {
     //int i,j;
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 4;
+    ve->num_params = 5;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
@@ -50,13 +51,18 @@ vj_effect *diff_init(int width, int height)
     ve->limits[0][1] = 0;	/* reverse */
     ve->limits[1][1] = 1;
     ve->limits[0][2] = 0;	/* show mask */
-    ve->limits[1][2] = 1;
+    ve->limits[1][2] = 2;
     ve->limits[0][3] = 0;       /* switch to take bg mask */
     ve->limits[1][3] = 1;
-    ve->defaults[0] = 20;
+    ve->limits[0][4] = 0;	/* thinning */
+    ve->limits[1][4] = 100;
+
+    ve->defaults[0] = 30;
     ve->defaults[1] = 0;
-    ve->defaults[2] = 1;
+    ve->defaults[2] = 2;
     ve->defaults[3] = 0;
+    ve->defaults[4] = 5;
+
     ve->description = "Map B to A (substract background mask)";
     ve->extra_frame = 1;
     ve->sub_format = 1;
@@ -69,7 +75,10 @@ void	diff_destroy(void)
 {
 	if(static_bg)
 		free(static_bg);
+	if(dt_map)
+		free(dt_map);
 	static_bg = NULL;
+	dt_map = NULL;
 	
 }
 
@@ -85,6 +94,8 @@ int diff_malloc(void **d, int width, int height)
 
 	if(static_bg == NULL)	
 		static_bg = (uint8_t*) vj_calloc( ru8( width + width * height * sizeof(uint8_t)) );
+	if(dt_map == NULL )
+		dt_map = (uint32_t*) vj_calloc( ru8(width * height * sizeof(uint32_t) + width ) );
 	return 1;
 }
 
@@ -150,7 +161,7 @@ static	void	binarify( uint8_t *dst, uint8_t *bg, uint8_t *src,int threshold,int 
 
 void diff_apply(void *ed, VJFrame *frame,
 		VJFrame *frame2, int width, int height, 
-		int threshold, int reverse,int mode, int take_bg)
+		int threshold, int reverse,int mode, int take_bg, int feather)
 {
     
 	unsigned int i;
@@ -162,6 +173,7 @@ void diff_apply(void *ed, VJFrame *frame,
 	uint8_t *Cb2 = frame2->data[1];
 	uint8_t *Cr2 = frame2->data[2];
 	diff_data *ud = (diff_data*) ed;
+
 
 	if( take_bg != take_bg_ )
 	{
@@ -182,20 +194,46 @@ void diff_apply(void *ed, VJFrame *frame,
 	softblur_apply(tmp,width,height,0);
 	free(tmp);
 
+	//@ clear distance transform map
+	veejay_memset( dt_map, 0 , len * sizeof(uint32_t) );
+
+	//@ todo: optimize with mmx
 	binarify( ud->data, static_bg, ud->current, threshold, reverse,len );
 
-	if(mode)
+	//@ calculate distance map
+	veejay_distance_transform( ud->data, width, height, dt_map );
+	
+	if(mode==1)
 	{
+		//@ show difference image in grayscale
 		veejay_memcpy( Y, ud->data, len );
 		veejay_memset( Cb, 128, len );
 		veejay_memset( Cr, 128, len );
+
+		return;
+	} else if (mode == 2 )
+	{
+		//@ show dt map as grayscale image, intensity starts at 128
+		for( i = 0; i  < len ; i ++ )
+		{
+			if( dt_map[i] == feather )	
+				Y[i] = 0xff; //@ border white
+			else if( dt_map[i] > feather )	{
+				Y[i] = 128 + (dt_map[i] % 128); //grayscale value
+			} else {
+				Y[i] = 0;	//@ black (background)
+			}
+			Cb[i] = 128;	
+			Cr[i] = 128;
+		}
 		return;
 	}
 
+	//@ process dt map
 	uint8_t *bin = ud->data;
 	for( i = 0; i < len ;i ++ )
 	{
-		if(bin[i])
+		if( dt_map[ i ] > feather )
 		{
 			Y[i] = Y2[i];
 			Cb[i] = Cb2[i];

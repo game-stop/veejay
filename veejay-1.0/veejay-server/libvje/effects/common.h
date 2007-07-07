@@ -309,3 +309,5 @@ void	veejay_histogram_equalize( void *his, VJFrame *f, int intensity, int streng
 void	veejay_histogram_analyze_rgb( void *his, uint8_t *rgb, VJFrame *f );
 void	veejay_histogram_equalize_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int st, int mode );
 void	veejay_histogram_draw_rgb( void *his, VJFrame *f, uint8_t *rgb, int in, int st, int mode );
+
+void	veejay_distance_transform( uint8_t *plane, int w, int h, uint32_t *output);

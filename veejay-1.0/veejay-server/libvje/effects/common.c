@@ -1678,4 +1678,44 @@ void	veejay_histogram_analyze( void *his, VJFrame *f, int type )
 	build_histogram( h, f );
 }
 
+#ifndef MIN
+#define MIN(a,b) ( (a)>(b) ? (b) : (a) )
+#endif
+#define min4(a,b,c,d) MIN(MIN(MIN(a,b),c),d)
+#define min5(a,b,c,d,e) MIN(MIN(MIN(MIN(a,b),c),d),e)
 
+
+
+void	veejay_distance_transform( uint8_t *plane, int w, int h, uint32_t *output)
+{
+	register unsigned int x,y;
+	const uint8_t *I = plane;
+	uint32_t *Id = output;
+	for( y = 0; y < h; y ++ )
+	{
+		for( x = 0; x < w; x ++ )
+		{
+			if( I[ y * w + x ] )
+				Id[ y * w + x ] = min4(
+					Id[ (y-1) * w + (x-1) ] + 1,
+					Id[ (y-1) * w + x ] + 1,
+					Id[ (y-1) * w + (x+1) ] + 1,
+					Id[ y * w + (x-1) ] + 1 );
+		}
+	}
+	
+	for( y = h-1; y > 0; y -- )
+	{
+		for( x = w-1; x > 0; x -- )
+		{
+			if( I[ y * w + x ] )	
+				Id[ y * w + x ] = min5(
+					Id[ (y+1) * w + (x-1) ] + 1,
+					Id[ y * w + x ],
+					Id[ (y+1) * w + x ] + 1,
+					Id[ y * w + (x + 1) ] + 1,
+					Id[ (y+1) * w + (x+1) ] + 1	
+			);
+		}
+	}
+}
