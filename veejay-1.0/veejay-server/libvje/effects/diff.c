@@ -89,8 +89,8 @@ int diff_malloc(void **d, int width, int height)
 	diff_data *my;
 	*d = (void*) vj_calloc(sizeof(diff_data));
 	my = (diff_data*) *d;
-	my->data = (uint8_t*) vj_calloc( ru8(sizeof(uint8_t) * 2 * width * height) );
-	my->current = my->data + (width*height);
+	my->data = (uint8_t*) vj_calloc( ru8(sizeof(uint8_t) * width * height) );
+//	my->current = my->data + (width*height);
 
 	if(static_bg == NULL)	
 		static_bg = (uint8_t*) vj_calloc( ru8( width + width * height * sizeof(uint8_t)) );
@@ -188,17 +188,17 @@ void diff_apply(void *ed, VJFrame *frame,
 		return;
 	}
 
-	VJFrame *tmp = yuv_yuv_template( ud->current, NULL,NULL, width,height, 
+/*	VJFrame *tmp = yuv_yuv_template( ud->current, NULL,NULL, width,height, 
 					PIX_FMT_YUV444P );
 	veejay_memcpy( ud->current, frame->data[0], len );
 	softblur_apply(tmp,width,height,0);
 	free(tmp);
-
+*/
 	//@ clear distance transform map
 	veejay_memset( dt_map, 0 , len * sizeof(uint32_t) );
 
 	//@ todo: optimize with mmx
-	binarify( ud->data, static_bg, ud->current, threshold, reverse,len );
+	binarify( ud->data, static_bg, frame->data[0], threshold, reverse,len );
 
 	//@ calculate distance map
 	veejay_distance_transform( ud->data, width, height, dt_map );
@@ -216,10 +216,13 @@ void diff_apply(void *ed, VJFrame *frame,
 		//@ show dt map as grayscale image, intensity starts at 128
 		for( i = 0; i  < len ; i ++ )
 		{
+			
 			if( dt_map[i] == feather )	
 				Y[i] = 0xff; //@ border white
 			else if( dt_map[i] > feather )	{
 				Y[i] = 128 + (dt_map[i] % 128); //grayscale value
+			} else if ( dt_map[i] == 1 ) {
+				Y[i] = 0xff;
 			} else {
 				Y[i] = 0;	//@ black (background)
 			}
