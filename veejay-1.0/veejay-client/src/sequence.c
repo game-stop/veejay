@@ -354,7 +354,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	else
 		src1 = yuv_yuv_template( in, in, in, v->width,v->height, PIX_FMT_GRAY8 );
 
-	VJFrame *dst1 = yuv_rgb_template( out, v->width,v->height, PIX_FMT_RGB24 );
+	VJFrame *dst1 = yuv_rgb_template( out, v->width,v->height, PIX_FMT_BGR24 );
 
 	yuv_convert_any_ac( src1, dst1, src1->format, dst1->format );	
 
