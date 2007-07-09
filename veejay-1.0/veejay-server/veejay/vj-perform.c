@@ -854,6 +854,7 @@ int vj_perform_audio_start(veejay_t * info)
 				resample_jack = NULL;
 				veejay_msg(VEEJAY_MSG_WARNING, "Cannot initialize resampler for %d -> %d audio rate conversion ",
 					el->audio_rate,jack_rate_);
+				return 0;
 			}
 	
 			return 1;
@@ -2527,7 +2528,7 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 			assert( num_samples > 0 );
 #endif
 			veejay_memcpy( resample_audio_buffer, a_buf, num_samples * bps);
-			num_samples = audio_resample( resample_jack, (short*)top_audio_buffer,(short*)a_buf, num_samples );
+			num_samples = audio_resample( resample_jack, (short*)top_audio_buffer,(short*)resample_audio_buffer, num_samples );
 			vj_jack_play( top_audio_buffer, num_samples * bps );
 		}
 		else
@@ -2564,73 +2565,6 @@ static	int	vj_perform_get_height( veejay_t *info )
 #endif
 	return info->video_output_height;
 }
-/*
-static	int	vj_perform_render_viewport( veejay_t *info, video_playback_setup *settings )
-{
-	VJFrame *frame = info->effect_frame1;
-
-	uint8_t *in[3];
-	uint8_t *out[3];
-	
-	int deep = 0;
-
-	in[0]  = primary_buffer[0]->Y;
-	in[1]  = primary_buffer[0]->Cb;
-	in[2]  = primary_buffer[0]->Cr;
-
-	out[0] = primary_buffer[2]->Y;
-	out[1] = primary_buffer[2]->Cb;
-	out[2] = primary_buffer[2]->Cr;
-
-	if(info->use_vp && info->which_vp == 0 && !info->settings->composite)
-	{
-		viewport_external_mouse( info->viewport,in, info->uc->mouse[0], info->uc->mouse[1], info->uc->mouse[2], info->frontback,
-			vj_perform_get_width(info), vj_perform_get_height(info) );
-	}
-
-	if( viewport_render_ssm( info->viewport ))
-	{
-		if(!frame->ssm)
-		{
-			chroma_supersample(
-				settings->sample_mode,
-				effect_sampler,
-				in,
-				frame->width,
-				frame->height
-			       	);
-			frame->ssm = 1;
-		}
-		deep = 2;
-#ifdef STRICT_CHECKING
-		assert( frame->ssm == 1 );
-#endif
-	}
-
-	viewport_render(
-		info->viewport,
-		in,
-		out,
-		frame->width,
-		frame->height,
-		(frame->ssm == 1 ? frame->len : frame->uv_len) );
-
-	if( info->frontback )
-	{
-		if( frame->ssm )
-		{
-			chroma_subsample( settings->sample_mode, effect_sampler, out, frame->width,frame->height );
-			frame->ssm = 0;
-		}
-		veejay_memcpy( primary_buffer[0]->Y, out[0], frame->len );
-		veejay_memcpy( primary_buffer[0]->Cb,out[1], frame->uv_len);
-		veejay_memcpy( primary_buffer[0]->Cr,out[2], frame->uv_len);
-		deep = 0;
-	}
-
-	return deep;
-}
-*/
 static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *settings, int destination )
 {
 	if(info->use_osd <= 0)
@@ -2653,23 +2587,12 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 		frame->ssm = 1;
 	}
 
-/*	if( info->which_vp == 0 )
-	{
-		if( viewport_active( info->viewport ) == 1 )
-			info->uc->osd_extra = viewport_get_help( info->viewport );
-		else
-			info->uc->osd_extra = NULL;
-	}
-	else
-	{*/
-	
 	if( info->which_vp == 1 )
 	{
 		info->uc->osd_extra = viewport_get_my_help( info->composite );
 	}
 	else
 		info->uc->osd_extra = NULL;
-//	}
 
 	vj_font_customize_osd(info->osd, info, info->use_osd, 0,info->which_vp );
 	vj_font_render( info->osd, frame , settings->current_frame_num,info->uc->osd_extra );
@@ -2718,15 +2641,8 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 			composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
 				vj_perform_get_width(info), vj_perform_get_height(info));
 		}
-		/*
-		else if(info->use_vp)
-		{	//@ focus on viewport screen
-			viewport_external_mouse( info->viewport, pri, info->uc->mouse[0], info->uc->mouse[1], info->uc->mouse[2], info->frontback,
-				vj_sdl_screen_w( info->sdl[0] ), vj_sdl_screen_h(info->sdl[0]) );
-		}*/
 
 		composite_process( info->composite, pri, frame, 0, info->which_vp );
-//			viewport_active(info->viewport) );
 	}
 
 	if( frame->ssm == 1 )
@@ -2888,9 +2804,6 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 			vj_perform_plain_fill_buffer(info);
 		   
 			cached_sample_frames[0] = info->uc->sample_id;
-			//@ Render viewport
-			//if(info->use_vp && info->frontback)
-			//	vj_perform_render_viewport( info, settings );
 
 			if(vj_perform_verify_rows(info))
 		   	 	vj_perform_sample_complete_buffers(info, &is444);
@@ -2905,8 +2818,6 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 
 			   vj_perform_plain_fill_buffer(info);
 
-			   //if(info->use_vp && info->frontback)
-			   //	vj_perform_render_viewport( info,settings);
 			   info->out_buf = vj_perform_render_magic( info, info->settings );
 			   res = 1;
  		    break;
@@ -2923,10 +2834,6 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 
 			 if (vj_perform_tag_fill_buffer(info))
 			 {
-				//@ Render viewport
-				//if(info->use_vp && info->frontback)
-				//	vj_perform_render_viewport( info, settings );
-
 				if(vj_perform_verify_rows(info))
 					vj_perform_tag_complete_buffers(info, &is444);
 				info->out_buf = vj_perform_render_magic( info, info->settings );
