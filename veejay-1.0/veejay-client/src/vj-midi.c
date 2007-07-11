@@ -469,8 +469,7 @@ void	*vj_midi_new(void *mw)
 	if( snd_seq_open( &(v->sequencer), "hw", SND_SEQ_OPEN_DUPLEX, 0 ) < 0 )
 	{
 		veejay_msg(0, "Error opening ALSA sequencer");
-		if(v) free(v);
-		return NULL;
+		return v;
 	}
 
 	snd_seq_set_client_name( v->sequencer, "Veejay" );
@@ -480,6 +479,7 @@ void	*vj_midi_new(void *mw)
 			SND_SEQ_PORT_TYPE_APPLICATION )) < 0 )
 	{
 		veejay_msg(0, "Error creating sequencer port");
+	
 		return v;
 	}
 
