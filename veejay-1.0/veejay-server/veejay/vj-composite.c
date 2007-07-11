@@ -62,6 +62,13 @@ typedef struct
 //@ round to multiple of 8
 #define    RUP8(num)(((num)+8)&~8)
 
+
+void	*composite_get_vp( void *data )
+{
+	composite_t *c = (composite_t*) data;
+	return c->vp1;
+}
+
 void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int sample_mode, int zoom_type, int pf )
 {
 	composite_t *c = (composite_t*) vj_calloc(sizeof(composite_t));

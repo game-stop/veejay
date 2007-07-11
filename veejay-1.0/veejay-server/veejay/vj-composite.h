@@ -26,5 +26,5 @@ void    composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y,
 void    composite_process( void *compiz, uint8_t *in[3], VJFrame *input, int vp_active, int focus);
 void	composite_blit( void *compiz,uint8_t *yuyv );
 void	composite_get_blit_buffer( void *compiz, uint8_t *buf[3] );
-
+void	*composite_get_vp( void *data );
 #endif
