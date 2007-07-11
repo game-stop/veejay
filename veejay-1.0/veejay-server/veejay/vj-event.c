@@ -3507,13 +3507,13 @@ void	vj_event_projection_dec( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
 	if( v->settings->composite )
-		viewport_projection_inc( v, -1, vj_perform_get_width(v), vj_perform_get_height(v) );
+		viewport_projection_inc( v->composite, -1, vj_perform_get_width(v), vj_perform_get_height(v) );
 }
 void	vj_event_projection_inc( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
 	if( v->settings->composite )
-		viewport_projection_inc( v, 1, vj_perform_get_width(v), vj_perform_get_height(v) );
+		viewport_projection_inc( v->composite, 1, vj_perform_get_width(v), vj_perform_get_height(v) );
 }
 
 void vj_event_inc_frame(void *ptr, const char format[], va_list ap)
