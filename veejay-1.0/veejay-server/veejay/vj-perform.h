@@ -67,6 +67,10 @@ int        vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int dst_l
 void       vj_perform_get_backstore( uint8_t **frame );
 int        vj_perform_get_sampling();
 
+int	vj_perform_get_width( veejay_t *info );
+int	vj_perform_get_height( veejay_t *info );
+
+
 int	vj_perform_get_dups();
 
 #endif
