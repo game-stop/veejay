@@ -308,7 +308,8 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_MACRO_SELECT,			SDLK_F10,		VIMS_MOD_CTRL, "9"	},
 	{ VIMS_MACRO_SELECT,			SDLK_F11,		VIMS_MOD_CTRL, "10"	},
 	{ VIMS_MACRO_SELECT,			SDLK_F12,		VIMS_MOD_CTRL, "11"	},
-
+	{ VIMS_PROJ_INC,			SDLK_LEFT,		VIMS_MOD_NONE, NULL 	},
+	{ VIMS_PROJ_DEC,			SDLK_RIGHT,		VIMS_MOD_NONE, NULL	},
 	{ 0,0,0,NULL },
 };
 #endif
