@@ -2295,6 +2295,26 @@ void		vj_init_vevo_events(void)
 				0,
 				VIMS_ALLOW_ANY,
 				NULL );
+
+
+	index_map_[ VIMS_PROJ_INC ] 			=	_new_event(
+				NULL,
+				VIMS_PROJ_INC,
+				"Increase projection/camera area",
+				vj_event_projection_inc,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
+	index_map_[ VIMS_PROJ_DEC ] 			=	_new_event(
+				NULL,
+				VIMS_PROJ_DEC,
+				"Decrease projection/camera area",
+				vj_event_projection_dec,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
 #ifdef HAVE_SDL
 	index_map_[VIMS_FULLSCREEN]			=	_new_event(
 				"%d",

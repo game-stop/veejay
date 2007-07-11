@@ -2540,7 +2540,7 @@ int vj_perform_queue_audio_frame(veejay_t *info)
      return 1;
 }
 
-static	int	vj_perform_get_width( veejay_t *info )
+int	vj_perform_get_width( veejay_t *info )
 {
 #ifdef USE_GL
 	if(info->video_out == 4 )
@@ -2553,7 +2553,7 @@ static	int	vj_perform_get_width( veejay_t *info )
 	return info->video_output_width;
 }
 
-static	int	vj_perform_get_height( veejay_t *info )
+int	vj_perform_get_height( veejay_t *info )
 {
 #ifdef USE_GL
 	if(info->video_out == 4 )

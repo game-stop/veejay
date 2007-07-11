@@ -268,5 +268,6 @@ void	vj_event_sample_sequencer_active(	void *ptr, 	const char format[],	va_list 
 void	vj_event_get_sample_sequences( 		void *ptr, 	const char format[],	va_list ap );
 void	vj_event_sequencer_del_sample(		void *ptr, 	const char format[], 	va_list ap );
 void	vj_event_sequencer_add_sample(		void *ptr,	const char format[],	va_list ap );
-
+void	vj_event_projection_inc( void *ptr, const char format[], va_list ap);
+void	vj_event_projection_dec( void *ptr, const char format[], va_list ap);
 #endif

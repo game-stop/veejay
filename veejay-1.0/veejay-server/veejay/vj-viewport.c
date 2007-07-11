@@ -1409,6 +1409,51 @@ static int	viewport_locate_marker( viewport_t *v, uint8_t *img, float fx, float 
 	return 1;
 }
 
+void	viewport_projection_inc( void *data, int incr, int screen_width, int screen_height )
+{
+	viewport_t *v = (viewport_t*) data;
+	float p[9];
+
+	p[0] = v->x1;
+	p[2] = v->x2;
+	p[4] = v->x3;
+	p[6] = v->x4;
+	p[1] = v->y1;
+	p[3] = v->y2;
+	p[5] = v->y3;	
+	p[7] = v->y4;
+	
+	v->x0 += incr;
+	v->y0 += incr;
+	v->w0 += incr;
+	v->w0 += incr;
+	v->h0 += incr;
+	v->h0 += incr;
+
+	matrix_t *tmp = viewport_matrix();
+	matrix_t *im = viewport_invert_matrix( v->M, tmp );
+
+	float dx1 ,dy1,dx2,dy2,dx3,dy3,dx4,dy4;
+
+	point_map( im, v->x0, v->y0, &dx1, &dy1);
+	point_map( im, v->x0 + v->w0, v->y0, &dx2, &dy2 );
+	point_map( im, v->x0, v->y0 + v->h0, &dx3, &dy3 );
+	point_map( im, v->x0 + v->w0, v->y0 + v->h0, &dx4, &dy4 );
+
+	v->x1 = dx1 / (screen_width / 100.0f);
+	v->y1 = dy1 / (screen_height / 100.0f);
+	v->x2 = dx2 / (screen_width / 100.0f);	
+	v->y2 = dy2 / (screen_height / 100.0f);
+	v->x4 = dx3 / (screen_width / 100.0f);
+	v->y4 = dy3 / (screen_height / 100.0f);
+	v->x3 = dx4 / (screen_width / 100.0f);	
+	v->y3 = dy4 / (screen_height / 100.0f);
+	free(im);
+	free(tmp);
+
+	viewport_update_perspective(v, p);
+}
+
 void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int button, int frontback, int screen_width, int screen_height )
 {
 	viewport_t *v = (viewport_t*) data;
