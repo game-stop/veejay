@@ -1422,14 +1422,24 @@ void	viewport_projection_inc( void *data, int incr, int screen_width, int screen
 	p[3] = v->y2;
 	p[5] = v->y3;	
 	p[7] = v->y4;
-	
+
 	v->x0 += incr;
 	v->y0 += incr;
-	v->w0 += incr;
-	v->w0 += incr;
-	v->h0 += incr;
-	v->h0 += incr;
-
+	if( incr < 0 )
+	{
+		v->w0 -= incr;
+		v->h0 -= incr;
+		v->w0 -= incr;
+		v->h0 -= incr;
+	}
+	else
+	{
+		v->w0 += incr;
+		v->h0 += incr;
+		v->w0 += incr;
+		v->h0 += incr;
+	}
+	
 	matrix_t *tmp = viewport_matrix();
 	matrix_t *im = viewport_invert_matrix( v->M, tmp );
 
