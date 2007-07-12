@@ -2807,6 +2807,8 @@ static void tagCreateArguments(xmlNodePtr node, int *arg, int argcount)
     char buffer[100];
     for (i = 0; i < argcount; i++) {
 	    sprintf(buffer, "%d", arg[i]);
+		xmlNewChild( node, NULL, (const xmlChar*) XMLTAG_ARGUMENT,
+				(const xmlChar*) buffer );
     }
 }
 
