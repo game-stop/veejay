@@ -1684,12 +1684,14 @@ void	veejay_histogram_analyze( void *his, VJFrame *f, int type )
 #define min4(a,b,c,d) MIN(MIN(MIN(a,b),c),d)
 #define min5(a,b,c,d,e) MIN(MIN(MIN(MIN(a,b),c),d),e)
 
+#ifndef MAX
+#define MAX(a,b) ( (a)>(b) ? (a) : (b) )
+#endif
 
-
-void	veejay_distance_transform( uint8_t *plane, int w, int h, uint32_t *output)
+void	veejay_distance_transform( uint32_t *plane, int w, int h, uint32_t *output)
 {
 	register unsigned int x,y;
-	const uint8_t *I = plane;
+	const uint32_t *I = plane;
 	uint32_t *Id = output;
 	for( y = 0; y < h; y ++ )
 	{
@@ -1719,3 +1721,258 @@ void	veejay_distance_transform( uint8_t *plane, int w, int h, uint32_t *output)
 		}
 	}
 }
+
+uint32_t 	veejay_component_labeling(int w, int h, uint32_t *I , uint32_t *M)
+{
+	uint32_t label = 0;
+	uint32_t x,y,i;
+	uint32_t p1,p2;
+	uint32_t Mi=0,Ma=0;
+	uint32_t Eq[5000];
+
+	uint32_t n_labels = 0;
+
+	for( y = 1; y < (h-1); y ++ )
+	{
+		for ( x = 1; x < (w-1); x ++ )
+		{
+			if( I[ y * w + x] )
+			{
+				p1 = I[ (y-1) * w + x ];
+				p2 = I[ y * w + (x-1) ];
+			
+				if( p1 == 0 && p2 == 0 )
+				{
+					label++;
+					if( label > 5000 )
+						return 0;
+
+					I[ y * w + x ] = Eq[ label ] = label;
+				} else if ( p1 == 0 ) {
+					I[ y * w + x ] = p2;
+				} else if ( p2 == 0 ) {
+					I[ y * w + x ] = p1;
+				} else if ( p1 == p2 ) {
+					I[ y * w + x ] = p1;
+				} else {	
+
+				Mi = MIN( p1,p2 );
+				Ma = MAX( p1,p2 );
+
+				I[ y * w + x ] = Mi;
+			
+				while( Eq[ Ma ] != Ma )
+					Ma = Eq[ Ma ];
+				while( Eq[ Mi ] != Mi )
+					Mi = Eq[ Mi ];
+
+				if( Ma >= Mi )
+					Eq[ Ma ] = Mi;
+				else	
+					Eq[ Mi ] = Ma;
+				}
+			}
+		}
+	}
+	n_labels = 0;
+	for( i = 1; i <= label; i ++ )
+	{
+		if( Eq[ i ] == i ) {
+			n_labels ++;
+			Eq[i] = n_labels;
+		}
+		else {	
+			 Eq[i] = Eq[ Eq[i] ];
+		}
+	}
+
+	if( n_labels > 5000 )
+		return 0;	
+
+	for( i = 1; i < n_labels ; i ++ )
+		M[ i ] = 0;
+
+	for( y = 0; y < h ; y ++ )
+	{
+		for( x = 0; x < w ; x ++ )
+		{
+			if( I[y * w + x ] )
+			{
+				I[y * w + x ] = Eq[ I[y * w + x] ];
+				M[ I[y * w +x ] ]++;
+			}
+		}
+	}
+
+	return n_labels;
+}
+
+static inline int	center_of_blob(
+	uint8_t *img,
+	int width,
+	int height,	
+	uint8_t label,
+	uint32_t *dx, uint32_t *dy)
+{
+	unsigned int i,j;
+	uint32_t product_row = 0;
+	uint32_t pixels_row = 0;
+	uint32_t product_col = 0;
+	uint32_t pixels_col = 0;
+	uint32_t pixels_row_c = 0;
+	uint32_t product_col_c = 0;
+
+	for( i = 0; i < height; i ++ ) 
+	{
+		pixels_row = 0;
+		for( j = 0; j < width; j ++ )
+		{
+			if ( img[i * width + j] == label )
+				pixels_row++; 
+		}
+		product_row += (i * pixels_row);
+		pixels_row_c += pixels_row;
+	}
+
+	for( j = 0; j < width; j ++ )
+	{
+		pixels_col = 0;
+		for( i = 0; i < height; i ++ )
+		{
+			if( img[i * width + j ] == label )
+				pixels_col ++;
+		}
+		product_col += (j * pixels_col);
+		product_col_c += pixels_col;
+	}
+
+	/*for( i = 0; i < height; i ++ )
+	{
+		pixels_col = 0;
+		for( j = 0; j < width; j ++ )
+		{
+			if ( img[i * width + j] == label )
+				pixels_col ++;
+		}
+		product_col += (i * pixels_col);
+		product_col_c += pixels_col;	
+	}*/
+
+	if( pixels_row_c == 0 || product_col_c == 0 )
+	{
+		return 0;
+	}
+
+	*dy = ( product_row / pixels_row_c );
+	*dx = ( product_col / product_col_c );
+
+	return 1;
+}
+
+int	compare_l8( const void *a, const void *b )
+{
+	return ( *(int*)a - *(int*)b );
+}
+
+uint8_t 	veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M,
+			uint32_t *XX,
+			uint32_t *YY)
+{
+	uint8_t label = 0;
+	uint32_t x,y,i;
+	uint8_t p1,p2;
+	uint32_t Mi=0,Ma=0;
+	uint8_t Eq[256];
+
+	uint8_t n_labels = 0;
+
+	for( y = 1; y < (h-1); y ++ )
+	{
+		for ( x = 1; x < (w-1); x ++ )
+		{
+			if( I[ y * w + x] )
+			{
+				p1 = I[ (y-1) * w + x ];
+				p2 = I[ y * w + (x-1) ];
+			
+				if( p1 == 0 && p2 == 0 )
+				{
+					label++;
+					if( label > 0xff )
+						return 0;
+
+					I[ y * w + x ] = Eq[ label ] = label;
+				} else if ( p1 == 0 ) {
+					I[ y * w + x ] = p2;
+				} else if ( p2 == 0 ) {
+					I[ y * w + x ] = p1;
+				} else if ( p1 == p2 ) {
+					I[ y * w + x ] = p1;
+				} else {	
+
+				Mi = MIN( p1,p2 );
+				Ma = MAX( p1,p2 );
+
+				I[ y * w + x ] = Mi;
+			
+				while( Eq[ Ma ] != Ma )
+					Ma = Eq[ Ma ];
+				while( Eq[ Mi ] != Mi )
+					Mi = Eq[ Mi ];
+
+				if( Ma >= Mi )
+					Eq[ Ma ] = Mi;
+				else	
+					Eq[ Mi ] = Ma;
+				}
+			}
+		}
+	}
+	n_labels = 0;
+	for( i = 1; i <= label; i ++ )
+	{
+		if( Eq[ i ] == i ) {
+			n_labels ++;
+			Eq[i] = n_labels;
+		}
+		else {	
+			 Eq[i] = Eq[ Eq[i] ];
+		}
+	}
+
+	if( n_labels > 255 )
+	{
+		veejay_msg(0, "Too many blobs");
+		return 0;	
+	}
+	for( i = 0; i < n_labels ; i ++ )
+		M[ i ] = 0;
+
+	for( y = 0; y < h ; y ++ )
+	{
+		for( x = 0; x < w ; x ++ )
+		{
+			if( I[y * w + x ] )
+			{
+				I[y * w + x ] = Eq[ I[y * w + x] ];
+				M[ I[y * w +x ] ]++;
+			}
+		}
+	}
+
+	if( n_labels <= 0 )
+	{
+		return 0;
+	}
+
+	for( i = 1; i <= n_labels; i ++ )
+	{
+		if(! center_of_blob( I,w,h, i, &(XX[i]), &(YY[i]) ) )
+		{
+			M[i] = 0;
+		}
+	}
+
+	return n_labels;
+}
+

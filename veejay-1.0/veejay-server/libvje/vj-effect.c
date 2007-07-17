@@ -62,6 +62,7 @@
 #include "transitions/wipe.h"
 #include "transitions/vbar.h"
 #include "effects/diff.h"
+#include "effects/texmap.h"
 #include "effects/autoeq.h"
 #include "effects/colorhis.h"
 #include "effects/diffimg.h"
@@ -247,6 +248,7 @@ static struct
 } complex_effect_index[] = 
 {
 	{	diff_malloc,		diff_free,			VJ_VIDEO_EFFECT_DIFF },
+	{	texmap_malloc,		texmap_free,			VJ_VIDEO_EFFECT_TEXMAP },
 	{	picinpic_malloc,	picinpic_free,			VJ_VIDEO_EFFECT_PICINPIC },
 	{	NULL,			NULL,				0		     },
 };
@@ -494,7 +496,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[41] = picinpic_init(width,height);
 	vj_effects[42] = chameleonblend_init(width,height);
 	vj_effects[43] = radioactivetv_init(width,height);
-      vj_effects[44] = dummy_init(width,height);
+	vj_effects[44] = texmap_init( width,height);
+      vj_effects[45] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);
@@ -627,6 +630,7 @@ void vj_effect_shutdown() {
     }
 
     diff_destroy();
+    texmap_destroy();
     rotozoom_destroy();
     distortion_destroy();
 

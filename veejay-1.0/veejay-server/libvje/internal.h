@@ -116,6 +116,7 @@ enum {
 	VJ_VIDEO_EFFECT_PICINPIC = 241,
 	VJ_VIDEO_EFFECT_CHAMBLEND = 242,
 	VJ_VIDEO_EFFECT_RADIOACTIVE = 243,
+	VJ_VIDEO_EFFECT_TEXMAP = 244,
 };
 
 enum {
@@ -214,7 +215,7 @@ enum {
 #define VJ_IMAGE_EFFECT_MAX 188
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 244
+#define VJ_VIDEO_EFFECT_MAX 245
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
@@ -367,9 +368,13 @@ extern void rotozoom_apply(VJFrame *frame, int width, int height, int a,
 extern void whiteframe_apply(VJFrame *frame, VJFrame *frame2,
 			     int width, int height);
 
+extern void texmap_apply(void *dd, VJFrame *frame,
+		       VJFrame *frame2, int width, int height, 
+		       int mode, int threshold, int c , int take, int feather);
+
 extern void diff_apply(void *dd, VJFrame *frame,
 		       VJFrame *frame2, int width, int height, 
-		       int mode, int threshold, int c , int take);
+		       int mode, int threshold, int c , int take, int feather);
 
 extern void chromamagick_apply(VJFrame *frame, VJFrame *frame2,
 			       int width, int height, int type, int op0);
@@ -556,6 +561,8 @@ extern void autoeq_apply( VJFrame *frame, int width, int height, int val, int i,
 extern void colorhis_apply( VJFrame *frame, int w, int h, int v, int m, int i, int s );
 
 extern void diff_destroy();
+
+extern void texmap_destroy();
 
 extern void distortion_destroy();
 
