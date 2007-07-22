@@ -876,6 +876,15 @@ void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 	sws_scale( s->sws, src->data, src_stride, 0, src->height,
 		dst->data, dst_stride );
 }
+void	yuv_convert_and_scale_grey(void *sws , VJFrame *src, VJFrame *dst)
+{
+	vj_sws *s = (vj_sws*) sws;
+	int src_stride[3] = { src->width,0,0 };
+	int dst_stride[3] = { dst->width,0,0 };
+
+	sws_scale( s->sws, src->data, src_stride, 0, src->height,
+		dst->data, dst_stride );
+}
 
 int	yuv_sws_get_cpu_flags(void)
 {
@@ -921,6 +930,32 @@ void	yuv_deinterlace(
 	q.linesize[2] = width >> shift;
 	avpicture_deinterlace( &p,&q, out_pix_fmt, width, height );
 }
+
+
+void 	rgb_deinterlace(
+		uint8_t *data[3],
+		const int width,
+		const int height,
+		int out_pix_fmt,
+		int shift,
+		uint8_t *R,uint8_t *G, uint8_t *B )
+{
+	AVPicture p,q;
+	p.data[0] = data[0];
+	p.data[1] = data[1];
+	p.data[2] = data[2];
+	p.linesize[0] = width * 3;
+	p.linesize[1] = 0;
+	p.linesize[2] = 0;
+	q.data[0] = R;
+	q.data[1] = G;
+	q.data[2] = B;
+	q.linesize[0] = width;
+	q.linesize[1] = 0;
+	q.linesize[2] = 0;
+	avpicture_deinterlace( &p,&q, out_pix_fmt, width, height );
+}
+
 
 static struct
 {	
