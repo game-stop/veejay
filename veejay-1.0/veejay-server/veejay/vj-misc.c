@@ -204,6 +204,22 @@ void	vj_get_rgb_template(VJFrame *src, int w, int h )
 	src->data[2] = NULL;
 }
 
+void	vj_get_yuvgrey_template(VJFrame *src, int w, int h)
+{
+	src->width = w;
+	src->uv_width = 0;
+	src->height = h;
+	src->format = PIX_FMT_GRAY8;
+	src->uv_height = 0;
+	src->shift_v = 0;
+	src->len = w * h;
+	src->uv_len = 0;
+	src->shift_h = 0;
+	src->data[0] = NULL;
+	src->data[1] = NULL;
+	src->data[2] = NULL;
+}
+
 void	vj_get_yuv_template(VJFrame *src, int w, int h, int fmt)
 {
 	src->width = w;

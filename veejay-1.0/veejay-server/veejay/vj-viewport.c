@@ -171,7 +171,7 @@ static matrix_t		*viewport_matrix(void);
 static void		viewport_update_context_help(viewport_t *v);
 static void		viewport_find_transform( float *coord, matrix_t *M );
 static void		viewport_print_matrix( matrix_t *M );
-static void 		viewport_line (uint8_t *plane,int x1, int y1, int x2, int y2, int w, int h, uint8_t col);
+void 		viewport_line (uint8_t *plane,int x1, int y1, int x2, int y2, int w, int h, uint8_t col);
 static void		draw_point( uint8_t *plane, int x, int y, int w, int h, int size, int col );
 static viewport_config_t *viewport_load_settings( const char *dir, int mode );
 static void		viewport_save_settings( viewport_t *v , int frontback);
@@ -211,7 +211,7 @@ static void		viewport_print_matrix( matrix_t *M )
  * Bresenham line implementation from Xine
  */
 
-static void viewport_line (uint8_t *plane,
+void viewport_line (uint8_t *plane,
 		      int x1, int y1, int x2, int y2, int w, int h, uint8_t col) {
 
   uint8_t *c;
@@ -895,7 +895,7 @@ static	void	viewport_prepare_process( viewport_t *v )
 	v->ty1 = round1( min4( dy1, dy2, dy3, dy4 ) );
 	v->tx2 = round1( max4( dx1, dx2, dx3, dx4 ) );	
 	v->ty2 = round1( max4( dy1, dy2, dy3, dy4 ) );
-
+	
 	clamp1( v->ty1 , Y, Y + v->h0 );
 	clamp1( v->ty2 ,Y,Y + v->h0 );
 	clamp1( v->tx1, X, X + v->w0 );
@@ -910,9 +910,147 @@ static	void	viewport_prepare_process( viewport_t *v )
 	clamp1( v->tty2,0, v->h );
 	clamp1( v->ttx1,0, v->w );	
 	clamp1( v->tty1,0, v->h );
-
+	
 }
 
+
+void		viewport_process_dynamic_map( void *data, uint8_t *in[3], uint8_t *out[3], uint32_t *map, int feather )
+{
+	viewport_t *v = (viewport_t*) data;
+	const int32_t w = v->w;
+	const int32_t h = v->h;
+	const int32_t X = v->x0;
+	const int32_t Y = v->y0;
+	const int32_t W0 = v->w0;
+	const int32_t H0 = v->h0;
+	matrix_t *M = v->M;
+	matrix_t *m = v->m;
+
+	const 	float xinc = m->m[0][0];
+	const 	float yinc = m->m[1][0];
+	const 	float winc = m->m[2][0];
+	const	int32_t	tx1 = v->ttx1;
+	const	int32_t tx2 = v->ttx2;
+	const	int32_t	ty1 = v->tty1;
+	const	int32_t ty2 = v->tty2;
+
+	const	float	m01 = m->m[0][1];
+	const	float	m11 = m->m[1][1];
+	const	float	m21 = m->m[2][1];
+	const	float	m02 = m->m[0][2];
+	const 	float	m12 = m->m[1][2];
+	const 	float	m22 = m->m[2][2];
+
+	const	uint8_t	*inY	= in[0];
+	const	uint8_t *inU	= in[1];
+	const	uint8_t *inV	= in[2];
+
+	uint8_t		*outY	= out[0];
+	uint8_t		*outU	= out[1];
+	uint8_t		*outV	= out[2];
+
+	float tx,ty,tw;
+	float ttx,tty;
+	int32_t x,y;
+	int32_t itx,ity;
+/*
+#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
+
+	fast_memset_dirty( outY , 0, ty1 * v->w );
+	fast_memset_dirty( outU , 128, ty1 * v->w );
+	fast_memset_dirty( outV , 128, ty1 * v->w );
+	fast_memset_finish();
+#else
+
+	for( y =0 ; y < ty1; y ++ )
+	{
+		for( x = 0 ; x < w ; x ++ )
+		{
+			outY[ (y * w +x ) ] = 0;
+			outU[ (y * w +x ) ] = 128;
+			outV[ (y * w +x ) ] = 128;
+		}
+	}
+#endif
+*/
+	for( y = ty1; y < ty2; y ++ )
+	{
+		tx = xinc * ( tx1 + 0.5 ) + m01 * ( y + 0.5) + m02;
+		ty = yinc * ( tx1 + 0.5 ) + m11 * ( y + 0.5) + m12;
+		tw = winc * ( tx1 + 0.5 ) + m21 * ( y + 0.5) + m22;
+	/*	for( x = 0; x < tx1; x ++ )
+		{
+			outY[(y*w+x)] = 0;	
+			outU[(y*w+x)] = 128;
+			outV[(y*w+x)] = 128;
+		}*/
+
+		for( x = tx1; x < tx2 ; x ++ )
+		{
+			if( tw == 0.0 )	{
+				ttx = 0.0;
+				tty = 0.0;
+			} else if ( tw != 1.0 ) {	
+				ttx = tx / tw;
+				tty = ty / tw;
+			} else	{
+				ttx = tx;
+				tty = ty;
+			}
+
+			itx = (int32_t) ttx;
+			ity = (int32_t) tty;
+
+			if( itx >= X && itx <= w && ity >= Y && ity < h 
+				&&
+					map[( y * w + x)] >= feather )
+			{
+				outY[(y*w+x)] = inY[(ity*w+itx)];
+				outU[(y*w+x)] = inU[(ity*w+itx)];
+				outV[(y*w+x)] = inV[(ity*w+itx)];
+			}
+			/*else
+			{
+				outY[(y*w+x)] = 0;
+				outU[(y*w+x)] = 128;
+				outV[(y*w+x)] = 128;
+
+			}*/
+
+			tx += xinc;
+			ty += yinc;
+			tw += winc;
+		}
+		/*
+		for( x = tx2; x < w; x ++ )
+		{
+			outY[(y*w+x)] = 0;	
+			outU[(y*w+x)] = 128;
+			outV[(y*w+x)] = 128;
+		}*/
+
+	}
+/*
+#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
+	int rest = h - ty2;
+	fast_memset_dirty( outY + (ty2 * v->w),0, rest * v->w );
+	fast_memset_dirty( outU + (ty2 * v->w), 128, rest * v->w );
+	fast_memset_dirty( outV + (ty2 * v->w), 128, rest * v->w );
+	fast_memset_finish();
+#else
+	for( y = ty2 ; y < h; y ++ )
+	{
+		for( x = 0; x < w; x ++ )
+		{
+			outY[(y*w+x)] = 0;	
+			outU[(y*w+x)] = 128;
+			outV[(y*w+x)] = 128;
+		}			
+	}
+#endif	
+*/
+	
+}
 void		viewport_process_dynamic( void *data, uint8_t *in[3], uint8_t *out[3] )
 {
 	viewport_t *v = (viewport_t*) data;
@@ -2255,6 +2393,47 @@ void viewport_render_dynamic( void *vdata, uint8_t *in[3], uint8_t *out[3],int w
 
 }
 
+void *viewport_fx_init_map( int wid, int hei, int x1, int y1,  
+		int x2, int y2, int x3, int y3, int x4, int y4)
+{
+	viewport_t *v = (viewport_t*) vj_calloc(sizeof(viewport_t));
+
+	float fracx = (float) wid / 100.0f;
+	float fracy = (float) hei / 100.0f;
+
+	v->x1 = x1 / fracx;
+	v->y1 = y1 / fracy;
+	v->x2 = x2 / fracx;
+	v->y2 = y2 / fracy;
+	v->x3 = x3 / fracx;
+	v->y3 = y3 / fracy;
+	v->x4 = x4 / fracx;
+	v->y4 = y4 / fracy;
+
+	int res = viewport_configure (v, 
+			v->x1, v->y1,
+			v->x2, v->y2,
+			v->x3, v->y3,
+			v->x4, v->y4,
+			0,0,
+			wid,hei,
+			wid,hei,
+			0,
+			0xff,
+			wid/32 );
+
+	v->user_ui = 0;
+
+	if(! res )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid point locations");
+		viewport_destroy( v );
+		return NULL;
+	}
+
+
+    	return (void*)v;
+}
 void *viewport_fx_init(int type, int wid, int hei, int x, int y, int zoom, int dir)
 {
 	viewport_t *v = (viewport_t*) vj_calloc(sizeof(viewport_t));
