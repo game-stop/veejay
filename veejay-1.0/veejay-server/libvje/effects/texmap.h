@@ -30,6 +30,6 @@ int texmap_malloc(void **c, int w, int h);
 void texmap_prepare(void *d, uint8_t *map[3], int w, int h); 
 void texmap_apply(void *d , VJFrame *frame,
 		VJFrame *frame2, int width, int height, 
-		int th, int reverse, int show, int take, int feather);
+		int th, int reverse, int show, int take, int feather, int blob);
 void	texmap_destroy();
 #endif

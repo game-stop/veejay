@@ -1688,6 +1688,8 @@ void	veejay_histogram_analyze( void *his, VJFrame *f, int type )
 #define MAX(a,b) ( (a)>(b) ? (a) : (b) )
 #endif
 
+#define max4(a,b,c,d) MAX(MAX(MAX(a,b),c),d)
+				    
 void	veejay_distance_transform( uint32_t *plane, int w, int h, uint32_t *output)
 {
 	register unsigned int x,y;
@@ -1756,8 +1758,10 @@ uint32_t 	veejay_component_labeling(int w, int h, uint32_t *I , uint32_t *M)
 					I[ y * w + x ] = p1;
 				} else {	
 
-				Mi = MIN( p1,p2 );
-				Ma = MAX( p1,p2 );
+			//	Mi = min4(p1,p2,p3,p4);
+			//	Ma = max4(p1,p2,p3,p4);
+				//Mi = MIN( p1,p2 );
+				//Ma = MAX( p1,p2 );
 
 				I[ y * w + x ] = Mi;
 			
@@ -1812,7 +1816,7 @@ static inline int	center_of_blob(
 	int width,
 	int height,	
 	uint8_t label,
-	uint32_t *dx, uint32_t *dy)
+	uint32_t *dx, uint32_t *dy, uint32_t *xsize, uint32_t *ysize)
 {
 	unsigned int i,j;
 	uint32_t product_row = 0;
@@ -1830,6 +1834,8 @@ static inline int	center_of_blob(
 			if ( img[i * width + j] == label )
 				pixels_row++; 
 		}
+		if( pixels_row > *(xsize) )
+			*xsize = pixels_row;
 		product_row += (i * pixels_row);
 		pixels_row_c += pixels_row;
 	}
@@ -1842,26 +1848,15 @@ static inline int	center_of_blob(
 			if( img[i * width + j ] == label )
 				pixels_col ++;
 		}
+		if( pixels_col > *(ysize) )
+			*ysize = pixels_col;
 		product_col += (j * pixels_col);
 		product_col_c += pixels_col;
 	}
 
-	/*for( i = 0; i < height; i ++ )
-	{
-		pixels_col = 0;
-		for( j = 0; j < width; j ++ )
-		{
-			if ( img[i * width + j] == label )
-				pixels_col ++;
-		}
-		product_col += (i * pixels_col);
-		product_col_c += pixels_col;	
-	}*/
 
 	if( pixels_row_c == 0 || product_col_c == 0 )
-	{
 		return 0;
-	}
 
 	*dy = ( product_row / pixels_row_c );
 	*dx = ( product_col / product_col_c );
@@ -1876,7 +1871,10 @@ int	compare_l8( const void *a, const void *b )
 
 uint8_t 	veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M,
 			uint32_t *XX,
-			uint32_t *YY)
+			uint32_t *YY,
+			uint32_t *xsize,
+			uint32_t *ysize,
+			int min_blob_weight)
 {
 	uint8_t label = 0;
 	uint32_t x,y,i;
@@ -1886,6 +1884,8 @@ uint8_t 	veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M,
 
 	uint8_t n_labels = 0;
 
+	veejay_memset( Eq, 0, sizeof(Eq) );
+	
 	for( y = 1; y < (h-1); y ++ )
 	{
 		for ( x = 1; x < (w-1); x ++ )
@@ -1894,21 +1894,23 @@ uint8_t 	veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M,
 			{
 				p1 = I[ (y-1) * w + x ];
 				p2 = I[ y * w + (x-1) ];
-			
+
 				if( p1 == 0 && p2 == 0 )
 				{
 					label++;
-					if( label > 0xff )
+					if( label > 254 )
+					{
+						veejay_msg(0, "available labels exceeded");	
 						return 0;
-
+					}
 					I[ y * w + x ] = Eq[ label ] = label;
-				} else if ( p1 == 0 ) {
+				} else if ( p1 == 0) {
 					I[ y * w + x ] = p2;
 				} else if ( p2 == 0 ) {
 					I[ y * w + x ] = p1;
 				} else if ( p1 == p2 ) {
 					I[ y * w + x ] = p1;
-				} else {	
+				} else {
 
 				Mi = MIN( p1,p2 );
 				Ma = MAX( p1,p2 );
@@ -1940,12 +1942,12 @@ uint8_t 	veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M,
 		}
 	}
 
-	if( n_labels > 255 )
+	if( n_labels > 254 )
 	{
 		veejay_msg(0, "Too many blobs");
 		return 0;	
 	}
-	for( i = 0; i < n_labels ; i ++ )
+	for( i = 0; i <= n_labels ; i ++ )
 		M[ i ] = 0;
 
 	for( y = 0; y < h ; y ++ )
@@ -1961,13 +1963,18 @@ uint8_t 	veejay_component_labeling_8(int w, int h, uint8_t *I , uint32_t *M,
 	}
 
 	if( n_labels <= 0 )
-	{
 		return 0;
-	}
 
 	for( i = 1; i <= n_labels; i ++ )
 	{
-		if(! center_of_blob( I,w,h, i, &(XX[i]), &(YY[i]) ) )
+		if( (M[i] * 8) >= min_blob_weight )
+		{
+			if(! center_of_blob( I,w,h, i, &(XX[i]), &(YY[i]), &(xsize[i]), &(ysize[i]) ) )
+			{
+				M[i] = 0;
+			}
+		}
+		else
 		{
 			M[i] = 0;
 		}

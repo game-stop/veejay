@@ -38,6 +38,9 @@ static sws_template template_;
 static VJFrame to_shrink_;
 static VJFrame shrinked_;
 static int dw_, dh_;
+static int x_[255];
+static int y_[255];
+static void *proj_[255];
 
 typedef struct
 {
@@ -46,11 +49,21 @@ typedef struct
 	uint8_t *current;
 } texmap_data;
 
+#define ANIMAX
+
+#ifdef ANIMAX
+#define ANIMAX_GROUP "224.0.0.17"
+#define ANIMAX_PORT  1234
+#include <libvjnet/mcastsender.h>
+#endif
+
+static void *sender_ = NULL;
+
 vj_effect *texmap_init(int width, int height)
 {
     //int i,j;
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 5;
+    ve->num_params = 6;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
@@ -59,23 +72,29 @@ vj_effect *texmap_init(int width, int height)
     ve->limits[0][1] = 0;	/* reverse */
     ve->limits[1][1] = 1;
     ve->limits[0][2] = 0;	/* show mask */
-    ve->limits[1][2] = 3;
+    ve->limits[1][2] = 4;
     ve->limits[0][3] = 0;       /* switch to take bg mask */
     ve->limits[1][3] = 1;
     ve->limits[0][4] = 1;	/* thinning */
     ve->limits[1][4] = 100;
-
+    ve->limits[0][5] = 1;	/* minimum blob weight */
+    ve->limits[1][5] = 5000;
+    
     ve->defaults[0] = 30;
     ve->defaults[1] = 0;
     ve->defaults[2] = 2;
     ve->defaults[3] = 0;
     ve->defaults[4] = 5;
-
+    ve->defaults[5] = 200;
+    
     ve->description = "Map B to A (sub bg, texture map))";
     ve->extra_frame = 1;
     ve->sub_format = 1;
     ve->has_user = 1;
     ve->user_data = NULL;
+#ifdef ANIMAX
+	sender_ = mcast_new_sender( ANIMAX_GROUP );
+#endif
     return ve;
 }
 
@@ -117,7 +136,8 @@ int texmap_malloc(void **d, int width, int height)
 		dt_map = (uint32_t*) vj_calloc( ru8(width * height * sizeof(uint32_t) + width ) );
 
 	veejay_memset( &template_, 0, sizeof(sws_template) );
-
+	veejay_memset( proj_, 0, sizeof(proj_) );
+	
 	template_.flags = 1;
 
 	vj_get_yuvgrey_template( &to_shrink_, width, height );
@@ -130,6 +150,9 @@ int texmap_malloc(void **d, int width, int height)
 			yuv_sws_get_cpu_flags() );
 
 
+	veejay_memset( x_, 0, sizeof(x_) );
+	veejay_memset( y_, 0, sizeof(y_) );
+	
 	return 1;
 }
 
@@ -150,6 +173,11 @@ void texmap_free(void *d)
 		shrink_ = NULL;
 	}
 
+	int i;
+	for( i = 0; i < 255; i++ )
+		if( proj_[i] )
+			viewport_destroy( proj_[i] );
+	
 	d = NULL;
 }
 
@@ -176,9 +204,6 @@ void texmap_prepare(void *user, uint8_t *map[3], int width, int height)
 static	void	binarify( uint8_t *bm, uint32_t *dst, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len )
 {
 	int i;
-
-
-
 	if(!reverse)
 	{
 		for( i = 0; i < len; i ++ )
@@ -186,7 +211,7 @@ static	void	binarify( uint8_t *bm, uint32_t *dst, uint8_t *bg, uint8_t *src,int 
 			if ( abs(bg[i] - src[i]) <= threshold )
 			{	dst[i] = 0; bm[i] = 0; }
 			else
-			{	dst[i] = 1; bm[i] = 1; }
+			{	dst[i] = 1; bm[i] = 0xff; }
 		}
 
 	}
@@ -197,7 +222,7 @@ static	void	binarify( uint8_t *bm, uint32_t *dst, uint8_t *bg, uint8_t *src,int 
 			if ( abs(bg[i] - src[i]) >= threshold )
 			{	dst[i] = 0; bm[i] = 0; }
 			else
-			{	dst[i] = 1; bm[i] = 1; }
+			{	dst[i] = 1; bm[i] = 0xff; }
 		
 		}
 	}
@@ -208,9 +233,11 @@ static	void	texmap_centroid()
 	
 }
 
+static int bg_frame_ = 0;
+
 void texmap_apply(void *ed, VJFrame *frame,
 		VJFrame *frame2, int width, int height, 
-		int threshold, int reverse,int mode, int take_bg, int feather)
+		int threshold, int reverse,int mode, int take_bg, int feather, int min_blob_weight)
 {
     
 	unsigned int i;
@@ -224,22 +251,42 @@ void texmap_apply(void *ed, VJFrame *frame,
 
 	uint32_t cx[256];
 	uint32_t cy[256];
-
+	uint32_t xsize[256];
+	uint32_t ysize[256];
+	
+	float sx = (float) width / (float) dw_;
+	float sy = (float) height / (float) dh_;
+	float sw = (float) sqrt( sx * sy );
+	
 	veejay_memset( cx,0,sizeof(cx));
 	veejay_memset( cy,0,sizeof(cy));
-
+	
+	veejay_memset( xsize,0,sizeof(xsize));
+	veejay_memset( ysize,0,sizeof(ysize));
+	
 	texmap_data *ud = (texmap_data*) ed;
 
 	if( take_bg != take_bg_ )
 	{
 		veejay_memcpy( static_bg, frame->data[0], frame->len );
-		VJFrame tmp;
+	/*	VJFrame tmp;
 		veejay_memset( &tmp, 0, sizeof(VJFrame));
 		tmp.data[0] = static_bg;
 		tmp.width = width;
 		tmp.height = height;
 		softblur_apply( &tmp, width,height,0);
+	*/
 		take_bg_ = take_bg;
+		bg_frame_ ++;
+		return;
+	}
+	if( bg_frame_ > 0 && bg_frame_ < 4 )
+	{
+		for( i = 0 ; i < len ; i ++ )
+		{
+			static_bg[i] = (static_bg[i] + Y[i] ) >> 1;
+		}
+		bg_frame_ ++;
 		return;
 	}
 
@@ -251,6 +298,26 @@ void texmap_apply(void *ed, VJFrame *frame,
 
 	//@ calculate distance map
 	veejay_distance_transform( ud->data, width, height, dt_map );
+#ifdef ANIMAX
+	uint32_t x,y,k=2;
+	uint32_t *coord = vj_calloc( sizeof(uint32_t) * len);
+	coord[0] = width;
+	coord[1] = height;
+	for( y =0 ; y < height; y ++ )
+	{
+		for( x =0 ; x < width; x++ )
+		{
+			if( dt_map[ y * width + x ] == 1 )
+			{
+				coord[k]   = x;
+				coord[k+1] = y;
+				k+=2;
+			}
+		}
+	}
+	mcast_send( sender_, coord, k * sizeof(uint32_t), ANIMAX_PORT);
+	free(coord);
+#endif
 	
 	if(mode==1)
 	{
@@ -302,40 +369,85 @@ void texmap_apply(void *ed, VJFrame *frame,
 	to_shrink_.data[0] = ud->bitmap;
 	shrinked_.data[0] = ud->current;
 
-	uint8_t blobs[255];
+	uint32_t blobs[255];
 
 	veejay_memset( blobs, 0, sizeof(blobs) );
 
 	yuv_convert_and_scale_grey( shrink_, &to_shrink_, &shrinked_ );
 
-	uint32_t labels = veejay_component_labeling_8(dw_,dh_, ud->current, blobs, cx,cy );
+	uint32_t labels = veejay_component_labeling_8(dw_,dh_, shrinked_.data[0], blobs, cx,cy,xsize,ysize,
+			min_blob_weight);
 
-	for( i = 1; i <= labels ; i ++ )
+	if(mode == 4 )
 	{
-		if( blobs[i] )
+		veejay_memcpy( Y, ud->bitmap, len );
+		veejay_memset( Cb, 128, len );
+		veejay_memset( Cr, 128, len );
+	}
+	else
+	{
+		veejay_memset( Y,  0 ,  len );
+		veejay_memset( Cb, 128, len );
+		veejay_memset( Cr, 128, len );
+	}
+	
+	for( i = 1; i <= labels; i ++ )
+	{
+		if( blobs[i] > 0 )
 		{
-			int radius = (int) ( 0.5 + sqrt( (double) 8.0 * blobs[i]) );
-			cx[i] = cx[i] * 8;
-			cy[i] = cy[i] * 8;
-			viewport_line( Y, cx[i] - radius, cy[i] - radius ,
-					  cx[i] + radius, cy[i] - radius ,
-					  width, height, 128 );
+			int radius = (int) ( 0.5 + sqrt( sw * blobs[i]) );
+			int nx = cx[i] * sx;
+			int ny = cy[i] * sy;
+			int size_x = xsize[i] * sx;
+			int size_y = ysize[i] * sy * 0.5; // over size in x axis
+			
+			if( mode != 4 && ( abs( nx - x_[i] ) > 10 || abs( ny - y_[i] ) > 10 ) )
+					//if( mode!=4 && cx[i] != x_[i]  || cy[i] != y_[i] || !proj_[i])
+			{
+				x_[i] = nx;
+				y_[i] = ny;
 
-			viewport_line( Y, cx[i] - radius, cy[i] - radius ,
-					  cx[i] - radius, cy[i] + radius ,
-					  width, height, 128 );
+				if(proj_[i])
+				  	 viewport_destroy( proj_[i] );
+				proj_[i] = viewport_fx_init_map( width,height,
+						nx - size_x,
+						ny - size_y,
+						nx + size_x,
+						ny - size_y,
+						nx + size_x,
+						ny + size_y,
+						nx - size_x,
+						ny + size_y );
+				if(!proj_[i])
+					return;
+			}
 
-			viewport_line( Y, cx[i] + radius, cy[i] - radius ,
-					  cx[i] + radius, cy[i] + radius ,
-					  width, height, 128 );
+			if( mode == 4 )
+			{
+				viewport_line( Y, nx - size_x, ny - size_y ,
+						  nx + size_x, ny - size_y ,
+						  width, height, 0xff );
 
-			viewport_line( Y, cx[i] - radius, cy[i] + radius,
-					  cx[i] + radius, cy[i] + radius ,
-					  width, height, 128 );
-//			veejay_msg( 0, "B %d: %dx%d, weight: %d, pos %d x %d",
-//				i, dw_, dh_, blobs[i], cx[i],cy[i]);
+				viewport_line( Y, nx - size_x, ny - size_y ,
+						  nx - size_x, ny + size_y ,
+						  width, height, 0xff );
+
+				viewport_line( Y, nx + size_x, ny - size_y ,
+						  nx + size_x, ny + size_y ,
+						  width, height, 0xff );
+
+				viewport_line( Y, nx - size_x, ny + size_y,
+						  nx + size_x, ny + size_y ,
+						  width, height, 128 );
+			}
+			else
+			{
+				viewport_process_dynamic_map( proj_[i], frame2->data, frame->data, dt_map, feather );
+			} 
 		}
 	}
+
+
 
 
 }

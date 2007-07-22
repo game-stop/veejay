@@ -460,7 +460,7 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
 	break;
 	case VJ_VIDEO_EFFECT_TEXMAP:
 	texmap_apply( vj_effects[entry]->user_data, frames[0],frames[1],
-			frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4] );	
+			frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5] );	
 	break;
       case VJ_VIDEO_EFFECT_WHITEFRAME:
 	whiteframe_apply(frames[0], frames[1], frameinfo->width, frameinfo->height);

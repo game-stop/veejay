@@ -370,7 +370,7 @@ extern void whiteframe_apply(VJFrame *frame, VJFrame *frame2,
 
 extern void texmap_apply(void *dd, VJFrame *frame,
 		       VJFrame *frame2, int width, int height, 
-		       int mode, int threshold, int c , int take, int feather);
+		       int mode, int threshold, int c , int take, int feather, int blob);
 
 extern void diff_apply(void *dd, VJFrame *frame,
 		       VJFrame *frame2, int width, int height, 
