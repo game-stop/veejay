@@ -63,6 +63,7 @@
 #include "transitions/vbar.h"
 #include "effects/diff.h"
 #include "effects/texmap.h"
+#include "effects/contourextract.h"
 #include "effects/autoeq.h"
 #include "effects/colorhis.h"
 #include "effects/diffimg.h"
@@ -249,6 +250,7 @@ static struct
 {
 	{	diff_malloc,		diff_free,			VJ_VIDEO_EFFECT_DIFF },
 	{	texmap_malloc,		texmap_free,			VJ_VIDEO_EFFECT_TEXMAP },
+	{	contourextract_malloc,  contourextract_free,		VJ_IMAGE_EFFECT_CONTOUR },
 	{	picinpic_malloc,	picinpic_free,			VJ_VIDEO_EFFECT_PICINPIC },
 	{	NULL,			NULL,				0		     },
 };
@@ -585,6 +587,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 85] = timedistort_init(width,height);
 	vj_effects[i + 86] = chameleon_init(width,height);
 	vj_effects[i + 87] = baltantv_init(width,height);
+	vj_effects[i + 88] = contourextract_init(width,height);
 	max_width = width;
 	max_height = height;
 
@@ -631,6 +634,7 @@ void vj_effect_shutdown() {
 
     diff_destroy();
     texmap_destroy();
+    contourextract_destroy();
     rotozoom_destroy();
     distortion_destroy();
 

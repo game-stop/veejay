@@ -1695,9 +1695,9 @@ void	veejay_distance_transform( uint32_t *plane, int w, int h, uint32_t *output)
 	register unsigned int x,y;
 	const uint32_t *I = plane;
 	uint32_t *Id = output;
-	for( y = 0; y < h; y ++ )
+	for( y = 1; y < h-1; y ++ )
 	{
-		for( x = 0; x < w; x ++ )
+		for( x = 1; x < w-1; x ++ )
 		{
 			if( I[ y * w + x ] )
 				Id[ y * w + x ] = min4(
@@ -1708,9 +1708,9 @@ void	veejay_distance_transform( uint32_t *plane, int w, int h, uint32_t *output)
 		}
 	}
 	
-	for( y = h-1; y > 0; y -- )
+	for( y = h-1; y > 1; y -- )
 	{
-		for( x = w-1; x > 0; x -- )
+		for( x = w-1; x > 1; x -- )
 		{
 			if( I[ y * w + x ] )	
 				Id[ y * w + x ] = min5(

@@ -37,7 +37,7 @@ libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			effects/crosspixel.c effects/diffmap.c effects/threshold.c effects/morphology.c effects/colmorphology.c effects/ghost.c effects/blob.c effects/boids.c effects/nervous.c \
 			effects/cartonize.c effects/tripplicity.c effects/neighbours.c effects/neighbours2.c\
 			effects/neighbours3.c effects/neighbours4.c effects/neighbours5.c effects/cutstop.c\
-			effects/texmap.c effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/rgbchannel.c \
+			effects/contourextract.c effects/texmap.c effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/rgbchannel.c \
 			effects/videowall.c effects/flare.c effects/radioactive.c effects/baltantv.c effects/constantblend.c effects/picinpic.c 
 
 

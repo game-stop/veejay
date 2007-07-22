@@ -208,11 +208,12 @@ enum {
 	VJ_IMAGE_EFFECT_TIMEDISTORT	=	185,
 	VJ_IMAGE_EFFECT_CHAMELEON	=	186,
 	VJ_IMAGE_EFFECT_BALTANTV	=	187,
+	VJ_IMAGE_EFFECT_CONTOUR		=	188,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 188
+#define VJ_IMAGE_EFFECT_MAX 189
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 245
@@ -370,6 +371,9 @@ extern void whiteframe_apply(VJFrame *frame, VJFrame *frame2,
 
 extern void texmap_apply(void *dd, VJFrame *frame,
 		       VJFrame *frame2, int width, int height, 
+		       int mode, int threshold, int c , int take, int feather, int blob);
+extern void contourextract_apply(void *dd, VJFrame *frame,
+		       int width, int height, 
 		       int mode, int threshold, int c , int take, int feather, int blob);
 
 extern void diff_apply(void *dd, VJFrame *frame,
@@ -563,6 +567,8 @@ extern void colorhis_apply( VJFrame *frame, int w, int h, int v, int m, int i, i
 extern void diff_destroy();
 
 extern void texmap_destroy();
+
+extern void contourextract_destroy();
 
 extern void distortion_destroy();
 
