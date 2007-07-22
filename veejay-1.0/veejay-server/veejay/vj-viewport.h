@@ -42,4 +42,5 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 void      viewport_draw_interface_color( void *vdata, uint8_t *img[3] );
 void	viewport_set_marker( void *vdata, int status );
 void	viewport_projection_inc( void *data, int incr , int w, int h );
+void	viewport_transform_coords( void *data, int *in_x, int *in_y, int n, int blob_id );
 #endif

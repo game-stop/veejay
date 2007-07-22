@@ -118,6 +118,7 @@ typedef struct
 	int32_t tx1,tx2,ty1,ty2;
 	int32_t ttx1,ttx2,tty1,tty2;
 	int	mode;
+	int32_t 	*buf;
 } viewport_t;
 
 typedef struct
@@ -1194,6 +1195,7 @@ void			viewport_destroy( void *data )
 		if( v->map ) free( v->map );
 		if( v->help ) free( v->help );
 		if( v->homedir) free(v->homedir);
+		if( v->buf ) free(v->buf);
 		free(v);
 	}
 	v = NULL;
@@ -1330,6 +1332,8 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, const char *ho
 
 	// calculate initial view
 	viewport_process( v );
+
+	v->buf = vj_calloc( sizeof(int32_t) * 5000 );
 
     	return (void*)v;
 }
@@ -1561,10 +1565,19 @@ void	viewport_projection_inc( void *data, int incr, int screen_width, int screen
 	p[5] = v->y3;	
 	p[7] = v->y4;
 
-	v->x0 += incr;
-	v->y0 += incr;
-	v->w0 += incr;
-	v->h0 += incr;
+	if( incr == -1 )
+	{
+		v->x0 ++;
+		v->y0 ++;
+		v->w0 -= 2;
+		v->h0 -= 2;
+	} else
+	{
+		v->x0 --;
+		v->y0 --;
+		v->w0 +=2;
+		v->h0 +=2;
+	}
 	matrix_t *tmp = viewport_matrix();
 	matrix_t *im = viewport_invert_matrix( v->M, tmp );
 
@@ -1587,6 +1600,52 @@ void	viewport_projection_inc( void *data, int incr, int screen_width, int screen
 	free(tmp);
 
 	viewport_update_perspective(v, p);
+}
+
+#ifdef ANIMAX
+#include <libvjnet/mcastsender.h>
+static void *sender_ = NULL;
+#define GROUP 227.0.0.17
+#define PORT 1234
+#endif
+
+void	viewport_transform_coords( void *data, int *in_x, int *in_y, int n, int blob_id )
+{
+	viewport_t *v = (viewport_t*) data;
+	matrix_t *tmp = viewport_matrix();
+	matrix_t *im = viewport_invert_matrix( v->M, tmp );
+	int i,j=2;
+
+	v->buf[0] = blob_id;
+	v->buf[1] = n;
+
+	for( i = 0; i < n; i ++ )
+	{
+		float dx1 ,dy1;
+		point_map( im, in_x[i], in_y[i], &dx1, &dy1);
+		v->buf[j+0] = dx1 / (v->w / 1000.0f);
+		v->buf[j+1] = dy1 / (v->h / 1000.0f); 
+		j+=2;
+	}
+
+	//@ send out coordinates
+
+	/*
+ 		protocol: blob_id (4 bytes) | numer of points (4 bytes) | points 0..n (4 byte per point)
+	*/
+
+#ifdef ANIMAX	
+	if(! sender_ )
+		sender_ = mcast_new_sender( GROUP );
+	if(mcast_send( sender_, v->buf, (n+2) * sizeof(int32_t), PORT_NUM )<=0)
+	{
+		veejay_msg(0, "Cannot send contour over mcast %s:%d", GROUP,PORT_NUM );
+		mcast_close_sender( sender_ );
+		sender_ = NULL;
+	}
+#endif
+	free(im);	
+	free(tmp);
 }
 
 void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int button, int frontback, int screen_width, int screen_height )
@@ -1712,6 +1771,9 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 				point_map( im, v->x0, v->y0 + v->h0, &dx3, &dy3 );
 				point_map( im, v->x0 + v->w0, v->y0 + v->h0, &dx4, &dy4 );
 
+				veejay_msg(2, "Rect x0=%d, y0=%d, w0=%d, h0=%d",
+					v->x0,v->y0, v->w0, v->h0 );
+
 				v->x1 = dx1 / (screen_width / 100.0f);
 				v->y1 = dy1 / (screen_height / 100.0f);
 				v->x2 = dx2 / (screen_width / 100.0f);	
@@ -1768,7 +1830,9 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 				point_map( im, v->x0 + v->w0, v->y0, &dx2, &dy2 );
 				point_map( im, v->x0, v->y0 + v->h0, &dx3, &dy3 );
 				point_map( im, v->x0 + v->w0, v->y0 + v->h0, &dx4, &dy4 );
-		
+				veejay_msg(2, "Rect x0=%d, y0=%d, w0=%d, h0=%d",
+					v->x0,v->y0, v->w0, v->h0 );
+
 				v->x1 = dx1 / (screen_width / 100.0f);
 				v->y1 = dy1 / (screen_height / 100.0f);
 				v->x2 = dx2 / (screen_width / 100.0f);	

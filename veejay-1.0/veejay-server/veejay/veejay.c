@@ -695,6 +695,17 @@ static void donothing(int sig)
 	veejay_msg(VEEJAY_MSG_INFO,"Received signal %x ",sig);
 	veejay_handle_signal( info, sig );	
 }
+
+int	vj_composite_active()
+{
+	return veejay_composite_active( info );
+}
+
+void	vj_composite_transform( int *in_x, int *in_y, int points, int blob_id)
+{
+	veejay_composite_transform_points( info, in_x, in_y, points, blob_id );
+}
+
 int main(int argc, char **argv)
 {
 	video_playback_setup *settings;
