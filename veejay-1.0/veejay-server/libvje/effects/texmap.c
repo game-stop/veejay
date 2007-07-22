@@ -41,6 +41,8 @@ static int dw_, dh_;
 static int x_[255];
 static int y_[255];
 static void *proj_[255];
+static int *coord_x = NULL;
+static int *coord_y = NULL;
 
 typedef struct
 {
@@ -48,14 +50,6 @@ typedef struct
 	uint8_t *bitmap;
 	uint8_t *current;
 } texmap_data;
-
-#define ANIMAX
-
-#ifdef ANIMAX
-#define ANIMAX_GROUP "224.0.0.17"
-#define ANIMAX_PORT  1234
-#include <libvjnet/mcastsender.h>
-#endif
 
 static void *sender_ = NULL;
 
@@ -92,9 +86,6 @@ vj_effect *texmap_init(int width, int height)
     ve->sub_format = 1;
     ve->has_user = 1;
     ve->user_data = NULL;
-#ifdef ANIMAX
-	sender_ = mcast_new_sender( ANIMAX_GROUP );
-#endif
     return ve;
 }
 
@@ -149,6 +140,9 @@ int texmap_malloc(void **d, int width, int height)
 			&template_ ,
 			yuv_sws_get_cpu_flags() );
 
+	coord_x = vj_calloc( ru8( sizeof(int) * 5000 ) );
+	coord_y = vj_calloc( ru8( sizeof(int) * 5000 ) );
+
 
 	veejay_memset( x_, 0, sizeof(x_) );
 	veejay_memset( y_, 0, sizeof(y_) );
@@ -178,6 +172,9 @@ void texmap_free(void *d)
 		if( proj_[i] )
 			viewport_destroy( proj_[i] );
 	
+	if( coord_x ) free(coord_x );
+	if( coord_y ) free(coord_y );
+
 	d = NULL;
 }
 
@@ -235,12 +232,15 @@ static	void	texmap_centroid()
 
 static int bg_frame_ = 0;
 
+extern void    vj_composite_transform( int *in_x, int *in_y, int points, int blob_id);
+extern int     vj_composite_active();
+
 void texmap_apply(void *ed, VJFrame *frame,
 		VJFrame *frame2, int width, int height, 
 		int threshold, int reverse,int mode, int take_bg, int feather, int min_blob_weight)
 {
     
-	unsigned int i;
+	unsigned int i,j,k;
 	const uint32_t len = frame->len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
@@ -296,29 +296,6 @@ void texmap_apply(void *ed, VJFrame *frame,
 	//@ todo: optimize with mmx
 	binarify( ud->bitmap, ud->data, static_bg, frame->data[0], threshold, reverse,len );
 
-	//@ calculate distance map
-	veejay_distance_transform( ud->data, width, height, dt_map );
-#ifdef ANIMAX
-	uint32_t x,y,k=2;
-	uint32_t *coord = vj_calloc( sizeof(uint32_t) * len);
-	coord[0] = width;
-	coord[1] = height;
-	for( y =0 ; y < height; y ++ )
-	{
-		for( x =0 ; x < width; x++ )
-		{
-			if( dt_map[ y * width + x ] == 1 )
-			{
-				coord[k]   = x;
-				coord[k+1] = y;
-				k+=2;
-			}
-		}
-	}
-	mcast_send( sender_, coord, k * sizeof(uint32_t), ANIMAX_PORT);
-	free(coord);
-#endif
-	
 	if(mode==1)
 	{
 		//@ show difference image in grayscale
@@ -327,25 +304,12 @@ void texmap_apply(void *ed, VJFrame *frame,
 		veejay_memset( Cr, 128, len );
 
 		return;
-	} else if (mode == 2 )
-	{
-		//@ show dt map as grayscale image, intensity starts at 128
-		for( i = 0; i  < len ; i ++ )
-		{
-			if( dt_map[i] == feather )	
-				Y[i] = 0xff; //@ border white
-			else if( dt_map[i] > feather )	{
-				Y[i] = 128 + (dt_map[i] % 128); //grayscale value
-			} else if ( dt_map[i] == 1 ) {
-				Y[i] = 0xff;
-			} else {
-				Y[i] = 0;	//@ black (background)
-			}
-			Cb[i] = 128;	
-			Cr[i] = 128;
-		}
-		return;
-	} else if( mode ==3 )
+	}
+
+	//@ calculate distance map
+	veejay_distance_transform( ud->data, width, height, dt_map );
+
+	if( mode ==3 )
 	{
 		//@ process dt map
 		for( i = 0; i < len ;i ++ )
@@ -378,6 +342,70 @@ void texmap_apply(void *ed, VJFrame *frame,
 	uint32_t labels = veejay_component_labeling_8(dw_,dh_, shrinked_.data[0], blobs, cx,cy,xsize,ysize,
 			min_blob_weight);
 
+
+	
+	if (mode == 2 )
+	{
+		//@ show dt map as grayscale image, intensity starts at 128
+		for( i = 0; i  < len ; i ++ )
+		{
+			if( dt_map[i] == feather )	
+				Y[i] = 0xff; //@ border white
+			else if( dt_map[i] > feather )	{
+				Y[i] = 128 + (dt_map[i] % 128); //grayscale value
+			} else if ( dt_map[i] == 1 ) {
+				Y[i] = 0xff;
+			} else {
+				Y[i] = 0;	//@ black (background)
+			}
+			Cb[i] = 128;	
+			Cr[i] = 128;
+		}
+
+		if(! vj_composite_active() )
+			return;
+	
+		//@ Iterate over blob's bounding boxes and extract contours
+		for( i = 1; i <= labels; i ++ )
+		{
+			if( blobs[i] > 0 )
+			{
+				int nx = cx[i] * sx;
+				int ny = cy[i] * sy;
+				int size_x = xsize[i] * sx;
+				int size_y = ysize[i] * sy * 0.5; 
+
+				int x1 = nx - size_x;
+				int y1 = ny - size_y;
+				int x2 = nx + size_y;
+				int y2 = ny + size_y;
+
+				int points = 0;
+
+				for( k = y1; k < y2; k ++ )
+				{
+					for( j = x1; j < x2; j ++ )
+					{
+						if( dt_map[ (k * width + j) ] == 1 )
+						{
+							coord_x[points] = k; //@ produces unsorted list of coordinates
+							coord_y[points] = j;
+							points++;
+							if( points >= 5000 )
+							{
+								veejay_msg(0, "Too many points in contour");	
+								return;
+							}
+						}
+					}
+				}
+				vj_composite_transform( coord_x, coord_y, points, i);
+				
+			}
+		}
+		return;
+	} 
+
 	if(mode == 4 )
 	{
 		veejay_memcpy( Y, ud->bitmap, len );
@@ -385,7 +413,7 @@ void texmap_apply(void *ed, VJFrame *frame,
 		veejay_memset( Cr, 128, len );
 	}
 	else
-	{
+	{ //@ clear the image , this mode maps B to A in perspective
 		veejay_memset( Y,  0 ,  len );
 		veejay_memset( Cb, 128, len );
 		veejay_memset( Cr, 128, len );
