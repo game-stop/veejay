@@ -140,8 +140,8 @@ int texmap_malloc(void **d, int width, int height)
 			&template_ ,
 			yuv_sws_get_cpu_flags() );
 
-	coord_x = vj_calloc( ru8( sizeof(int) * 5000 ) );
-	coord_y = vj_calloc( ru8( sizeof(int) * 5000 ) );
+	coord_x = vj_calloc( ru8( sizeof(int) * 12000 ) );
+	coord_y = vj_calloc( ru8( sizeof(int) * 12000 ) );
 
 
 	veejay_memset( x_, 0, sizeof(x_) );
@@ -386,12 +386,12 @@ void texmap_apply(void *ed, VJFrame *frame,
 				{
 					for( j = x1; j < x2; j ++ )
 					{
-						if( dt_map[ (k * width + j) ] == 1 )
+						if( dt_map[ (k * width + j) ] == feather )
 						{
 							coord_x[points] = k; //@ produces unsorted list of coordinates
 							coord_y[points] = j;
 							points++;
-							if( points >= 5000 )
+							if( points >= 10000 )
 							{
 								veejay_msg(0, "Too many points in contour");	
 								return;

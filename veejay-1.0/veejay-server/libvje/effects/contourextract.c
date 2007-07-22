@@ -83,7 +83,7 @@ vj_effect *contourextract_init(int width, int height)
     
     ve->description = "Contour extraction";
     ve->extra_frame = 0;
-    ve->sub_format = 1;
+    ve->sub_format = 0;
     ve->has_user = 1;
     ve->user_data = NULL;
     return ve;
@@ -140,8 +140,8 @@ int contourextract_malloc(void **d, int width, int height)
 			&template_ ,
 			yuv_sws_get_cpu_flags() );
 
-	coord_x = vj_calloc( ru8( sizeof(int) * 5000 ) );
-	coord_y = vj_calloc( ru8( sizeof(int) * 5000 ) );
+	coord_x = vj_calloc( ru8( sizeof(int) * 12000 ) );
+	coord_y = vj_calloc( ru8( sizeof(int) * 12000 ) );
 
 
 	veejay_memset( x_, 0, sizeof(x_) );
@@ -241,6 +241,7 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
     
 	unsigned int i,j,k;
 	const uint32_t len = frame->len;
+	const uint32_t uv_len = frame->uv_len;
  	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
@@ -289,9 +290,8 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 	{
 		//@ show difference image in grayscale
 		veejay_memcpy( Y, ud->bitmap, len );
-		veejay_memset( Cb, 128, len );
-		veejay_memset( Cr, 128, len );
-
+		veejay_memset( Cb, 128, uv_len );
+		veejay_memset( Cr, 128, uv_len );
 		return;
 	}
 
@@ -310,6 +310,10 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 	uint32_t labels = veejay_component_labeling_8(dw_,dh_, shrinked_.data[0], blobs, cx,cy,xsize,ysize,
 			min_blob_weight);
 
+	veejay_memset( Y, 0, len );
+	veejay_memset( Cb , 128, uv_len);
+	veejay_memset( Cr , 128, uv_len );  
+/*
 	//@ show dt map as grayscale image, intensity starts at 128
 	for( i = 0; i  < len ; i ++ )
 	{
@@ -317,19 +321,17 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 			Y[i] = 0xff; //@ border white
 		else
 			Y[i] = 0;	
-		/*	
-	else if( dt_map[i] > feather )	{
-			Y[i] = 128 + (dt_map[i] % 128); //grayscale value
-		} else if ( dt_map[i] == 1 ) {
-			Y[i] = 0xff;
-		} else {
-			Y[i] = 0;	//@ black (background)
-		}*/
+	//else if( dt_map[i] > feather )	{
+	//		Y[i] = 128 + (dt_map[i] % 128); //grayscale value
+	//	} else if ( dt_map[i] == 1 ) {
+	//		Y[i] = 0xff;
+	//	} else {
+	//		Y[i] = 0;	//@ black (background)
+	//	}
 		Cb[i] = 128;	
 		Cr[i] = 128;
 	}
-	if(! vj_composite_active() )
-		return;
+*/
 
 	//@ Iterate over blob's bounding boxes and extract contours
 	for( i = 1; i <= labels; i ++ )
@@ -352,10 +354,11 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 				{
 					if( dt_map[ (k * width + j) ] == feather )
 					{
+						Y[ (k * width +j)] = 0xff;
 						coord_x[points] = k; //@ produces unsorted list of coordinates
 						coord_y[points] = j;
 						points++;
-						if( points >= 5000 )
+						if( points >= 10000 )
 						{
 							veejay_msg(0, "Too many points in contour");	
 							return;
@@ -363,7 +366,8 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 					}
 				}
 			}
-			vj_composite_transform( coord_x, coord_y, points, i);
+			if( vj_composite_active() )
+				vj_composite_transform( coord_x, coord_y, points, i);
 		
 		}
 	}
