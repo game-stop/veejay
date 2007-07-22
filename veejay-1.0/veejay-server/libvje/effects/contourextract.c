@@ -232,7 +232,7 @@ static	void	contourextract_centroid()
 
 static int bg_frame_ = 0;
 
-extern void    vj_composite_transform( int *in_x, int *in_y, int points, int blob_id);
+extern void    vj_composite_transform( int *in_x, int *in_y, int points, int blob_id, int cx , int cy);
 extern int     vj_composite_active();
 
 void contourextract_apply(void *ed, VJFrame *frame,int width, int height, 
@@ -367,7 +367,7 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 				}
 			}
 			if( vj_composite_active() )
-				vj_composite_transform( coord_x, coord_y, points, i);
+				vj_composite_transform( coord_x, coord_y, points, i, nx,ny);
 		
 		}
 	}

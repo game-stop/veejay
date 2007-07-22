@@ -37,7 +37,7 @@
 #include <veejay/vj-viewport.h>
 #include <libvje/effects/opacity.h>
 #include <libvjmem/vjmem.h>
-
+#include <math.h>
 #define X0 0
 #define Y0 1
 #define X1 2
@@ -1333,7 +1333,7 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, const char *ho
 	// calculate initial view
 	viewport_process( v );
 
-	v->buf = vj_calloc( sizeof(int32_t) * 12000 );
+	v->buf = vj_calloc( sizeof(int32_t) * 24000 );
 
     	return (void*)v;
 }
@@ -1609,7 +1609,7 @@ static void *sender_ = NULL;
 #define PORT 1234
 #endif
 
-void	viewport_transform_coords( void *data, int *in_x, int *in_y, int n, int blob_id )
+void	viewport_transform_coords( void *data, int *in_x, int *in_y, int n, int blob_id, int cx, int cy )
 {
 	viewport_t *v = (viewport_t*) data;
 	matrix_t *tmp = viewport_matrix();
@@ -1623,10 +1623,15 @@ void	viewport_transform_coords( void *data, int *in_x, int *in_y, int n, int blo
 	{
 		float dx1 ,dy1;
 		point_map( im, in_x[i], in_y[i], &dx1, &dy1);
+		double angle = atan2( (in_x[i] - cx), (in_y[i] - cy) ) * (180.0/M_PI);
 		v->buf[j+0] = dx1 / (v->w / 1000.0f);
 		v->buf[j+1] = dy1 / (v->h / 1000.0f); 
+		//@ fixme: incomplete
 		j+=2;
 	}
+
+	//@ sort coordinates by angle: (angle : x,y )
+	// qsort()
 
 	//@ send out coordinates
 

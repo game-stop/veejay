@@ -701,9 +701,9 @@ int	vj_composite_active()
 	return veejay_composite_active( info );
 }
 
-void	vj_composite_transform( int *in_x, int *in_y, int points, int blob_id)
+void	vj_composite_transform( int *in_x, int *in_y, int points, int blob_id, int cx, int cy)
 {
-	veejay_composite_transform_points( info, in_x, in_y, points, blob_id );
+	veejay_composite_transform_points( info, in_x, in_y, points, blob_id, cx, cy );
 }
 
 int main(int argc, char **argv)

@@ -27,5 +27,5 @@ void    composite_process( void *compiz, uint8_t *in[3], VJFrame *input, int vp_
 void	composite_blit( void *compiz,uint8_t *yuyv );
 void	composite_get_blit_buffer( void *compiz, uint8_t *buf[3] );
 void	*composite_get_vp( void *data );
-void	composite_transform_points( void *compiz, int *in_x, int *in_y, int n, int blob_id );
+void	composite_transform_points( void *compiz, int *in_x, int *in_y, int n, int blob_id, int cx, int cy );
 #endif

@@ -527,9 +527,9 @@ int	veejay_composite_active( veejay_t *info )
 	return info->settings->composite;
 }
 
-void	veejay_composite_transform_points( veejay_t *info, int *in_x, int *in_y, int points, int blob_id )
+void	veejay_composite_transform_points( veejay_t *info, int *in_x, int *in_y, int points, int blob_id, int cx, int cy )
 {
-	composite_transform_points( info->composite, in_x, in_y, points, blob_id);
+	composite_transform_points( info->composite, in_x, in_y, points, blob_id,cx,cy);
 }
 
 void	veejay_auto_loop(veejay_t *info)
