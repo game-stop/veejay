@@ -1602,53 +1602,219 @@ void	viewport_projection_inc( void *data, int incr, int screen_width, int screen
 	viewport_update_perspective(v, p);
 }
 
+#define ANIMAX
+
 #ifdef ANIMAX
 #include <libvjnet/mcastsender.h>
 static void *sender_ = NULL;
-#define GROUP 227.0.0.17
-#define PORT 1234
+#define GROUP "227.0.0.17"
+#define PORT_NUM 1234
 #endif
 
-void	viewport_transform_coords( void *data, int *in_x, int *in_y, int n, int blob_id, int cx, int cy )
+typedef struct
 {
-	viewport_t *v = (viewport_t*) data;
-	matrix_t *tmp = viewport_matrix();
-	matrix_t *im = viewport_invert_matrix( v->M, tmp );
-	int i,j=2;
+	int x;
+	int y;
+} point_t;
 
-	v->buf[0] = blob_id;
-	v->buf[1] = n;
+inline int is_left( point_t *p0, point_t *p1, point_t *p2 )
+{
+	return ( 
+		(p1->x - p0->x) * (p2->y - p0->y) -
+		(p2->x - p0->x) * (p1->y - p0->y) 
+	       );
+}
 
-	for( i = 0; i < n; i ++ )
-	{
-		float dx1 ,dy1;
-		point_map( im, in_x[i], in_y[i], &dx1, &dy1);
-		double angle = atan2( (in_x[i] - cx), (in_y[i] - cy) ) * (180.0/M_PI);
-		v->buf[j+0] = dx1 / (v->w / 1000.0f);
-		v->buf[j+1] = dy1 / (v->h / 1000.0f); 
-		//@ fixme: incomplete
-		j+=2;
+//@ chainhull 2D (C) 2001 softSurfer (www.softsurfer.com)
+//@ http://geometryalgorithms.com/Archive/algorithm_0109/algorithm_0109.htm
+point_t **chainhull_2d( point_t **p , int n, int *res )
+{
+	point_t **H = (point_t**) vj_malloc( n * sizeof(point_t));
+	int i;
+
+	int bot=0, top=-1;
+
+	int xmin = p[0]->x;
+	for( i = 1; i < n; i++)
+		if( p[i]->x != xmin ) break;
+	int minmax = i-1;
+	int minmin = 0;
+	if( minmax == (n-1)) {
+		H[++top] = p[minmin];
+		if( p[minmax]->y != p[minmin]->y )
+			H[++top] = p[minmax];
+		H[++top] = p[minmin];
+		*res = top + 1;
 	}
 
-	//@ sort coordinates by angle: (angle : x,y )
-	// qsort()
+	int maxmin,maxmax = n-1;
+	int xmax = p[n-1]->x;
+	for( i = n-2; i >= 0; i -- )
+		if( p[i]->x != xmax ) break;
+	maxmin = i+1;
 
-	//@ send out coordinates
+	H[++top] = p[minmin];
+	i= minmax;
+	while( ++i <= maxmin )
+	{
+		if ( is_left( p[minmin], p[maxmin], p[i]) >= 0 && i < maxmin )
+			continue;
+		while( top > 0 )
+		{
+			if ( is_left( H[top-1], H[top], p[i] ) > 0 )
+				break;
+			else
+				top--;
+		}
+		H[++top] = p[i];
+	}
 
-	/*
- 		protocol: blob_id (4 bytes) | numer of points (4 bytes) | points 0..n (4 byte per point)
-	*/
 
+	if( maxmax != maxmin )
+		H[++top] = p[maxmax];
+	bot = top;
+	i = maxmin;
+	while( --i >= minmax )
+	{
+		if( is_left( p[maxmax], p[minmax], p[i] ) >= 0 && i > minmax )
+			continue;
+		while( top > bot )
+		{
+			if( is_left( H[top-1], H[top], p[i] ) > 0 )
+				break;
+			else
+				top--;
+		}
+		H[++top] = p[i];
+	}
+	if( minmax != minmin )
+		H[++top] = p[minmin];
+
+	*res = top + 1;
+	
+	return H;
+}
+
+static void sort_points_by_degree( double *a, point_t **p, int n )
+{
+        int i;
+        for( i = 2; i <= n; i ++ )
+        {
+                float sentinel = a[i];
+		point_t point;
+		point.x = p[i]->x;
+		point.y = p[i]->y;
+		int k = i;
+                while( sentinel < a[k-1] && k > 0)
+		{
+		       int j = k;
+                       a[k] = a[--k];
+		       p[j]->x = p[k]->x;
+		       p[j]->y = p[k]->y;
+	        }	       
+	        a[k] = sentinel;
+		p[k]->x = point.x;
+		p[k]->y = point.y;
+        }
+}
+
+
+void	viewport_transform_coords( 
+		void *data, 
+		void *input,
+		int n, 
+		int blob_id, 
+		int wid, 
+		int hei, 
+		uint8_t *plane )
+{
+	viewport_t *v = (viewport_t*) data;
+	if( n <= 0 )
+		return;
+	
+	matrix_t *tmp = viewport_matrix();
+	matrix_t *im = viewport_invert_matrix( v->M, tmp );
+	int i;
+	int res = 0;
+
+	point_t **points = (point_t**) input;
+	double  *array   = (double*) vj_malloc( (n+3) * sizeof(double));
+
+	uint32_t cx=0,cy=0;
+	for( i = 0; i < n; i ++ )
+	{
+		cx += points[i]->x;
+		cy += points[i]->y;
+		array[i] = atan2( (points[i]->x - cx), (points[i]->y - cy) ) * (180.0/M_PI );
+	}
+	cx = cx / n;
+	cy = cy / n;
+
+	//@ convex hull 
+	point_t **contour = chainhull_2d( points, n, &res );
+	if ( plane )
+	{
+		for( i = 0; i < (res-1); i ++ )
+		{
+			//@ draw lines in plane
+			viewport_line( plane, 
+				contour[i]->y,
+				contour[i]->x,
+				contour[i+1]->y,
+				contour[i+1]->x,
+				wid,
+				hei,
+				200 );
+		}
+	}
+
+	//@ fixme: sort_points_by_degree has a very bad performance
+	//
+	sort_points_by_degree( array, points, n );
+	//@ Protocol: 
+	//@          |....|....|....|....|....|....| --> |....|
+	//@          0    4    8   12   16   20   24       N      bytes
+	//@          BLOB | HP | CP | HP 0 ... HP N | CP 0 .. CP N | 
+	//@          HP: Number of Hull points
+	//@          CP: Number of Contour points
+	//@          HPi:A point of the convex hull
+	//@          CPi:A point of the contour
+	
+	v->buf[0] = blob_id;		
+	v->buf[1] = res;	
+	v->buf[2] = n;	
+	int j = 3;
+	for( i = 0; i < res; i ++ )
+	{
+		float dx1,dy1;
+		point_map( im, contour[i]->x, contour[i]->y, &dx1, &dy1 );
+		v->buf[j+0] = dx1 / (v->w / 1000.0f );
+		v->buf[j+1] = dy1 / (v->h / 1000.0f );
+		j+=2;
+	}
+	for( i = 0; i < n; i ++ )
+	{
+		float dx1,dy1;
+		point_map( im, points[i]->x, points[i]->y, &dx1,&dy1 );
+		v->buf[j + 0] = dx1 / (v->w / 1000.0f);
+		v->buf[j + 1] = dy1 / (v->h / 1000.0f);
+		j += 2;
+	}
+	
 #ifdef ANIMAX	
 	if(! sender_ )
 		sender_ = mcast_new_sender( GROUP );
-	if(mcast_send( sender_, v->buf, (n+2) * sizeof(int32_t), PORT_NUM )<=0)
+	if(mcast_send( sender_, v->buf, (3+res+n) * sizeof(int32_t), PORT_NUM )<=0)
 	{
 		veejay_msg(0, "Cannot send contour over mcast %s:%d", GROUP,PORT_NUM );
 		mcast_close_sender( sender_ );
 		sender_ = NULL;
 	}
 #endif
+
+	free(contour);
+	free(array);
+	
 	free(im);	
 	free(tmp);
 }
