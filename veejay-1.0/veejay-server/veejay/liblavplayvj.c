@@ -527,9 +527,9 @@ int	veejay_composite_active( veejay_t *info )
 	return info->settings->composite;
 }
 
-void	veejay_composite_transform_points( veejay_t *info, void *coords, int points, int blob_id, int cx, int cy, uint8_t *plane )
+void	veejay_composite_transform_points( veejay_t *info, void *coords, int points, int blob_id, int cx, int cy,int w, int h,int num, uint8_t *plane )
 {
-	composite_transform_points( info->composite, coords, points, blob_id,cx,cy, plane);
+	composite_transform_points( info->composite, coords, points, blob_id,cx,cy,w,h, num,plane);
 }
 
 void	veejay_auto_loop(veejay_t *info)
@@ -914,7 +914,7 @@ static int veejay_screen_update(veejay_t * info )
 
 	video_playback_setup *settings = info->settings;
 
-	if(settings->composite==1)
+	if(settings->composite==1 && info->sdl[0])
 	{
 		if(!vj_sdl_lock( info->sdl[0] ) )
 			return 0;

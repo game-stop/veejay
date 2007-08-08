@@ -399,7 +399,7 @@ void texmap_apply(void *ed, VJFrame *frame,
 						}
 					}
 				}
-				vj_composite_transform( coord_x, coord_y, points, i);
+				//vj_composite_transform( coord_x, coord_y, points, i);
 				
 			}
 		}

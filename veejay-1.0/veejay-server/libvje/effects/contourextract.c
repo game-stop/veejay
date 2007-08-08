@@ -243,7 +243,7 @@ static	void	contourextract_centroid()
 
 static int bg_frame_ = 0;
 
-extern void    vj_composite_transform( void *coords, int points, int blob_id, int cx , int cy, uint8_t *plane);
+extern void    vj_composite_transform( void *coords, int points, int blob_id, int cx , int cy, int w, int h, int num_objects,uint8_t *plane);
 extern int     vj_composite_active();
 
 void contourextract_apply(void *ed, VJFrame *frame,int width, int height, 
@@ -324,26 +324,13 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 	veejay_memset( Y, 0, len );
 	veejay_memset( Cb , 128, uv_len);
 	veejay_memset( Cr , 128, uv_len );  
-/*
-	//@ show dt map as grayscale image, intensity starts at 128
-	for( i = 0; i  < len ; i ++ )
-	{
-		if( dt_map[i] == feather )	
-			Y[i] = 0xff; //@ border white
-		else
-			Y[i] = 0;	
-	//else if( dt_map[i] > feather )	{
-	//		Y[i] = 128 + (dt_map[i] % 128); //grayscale value
-	//	} else if ( dt_map[i] == 1 ) {
-	//		Y[i] = 0xff;
-	//	} else {
-	//		Y[i] = 0;	//@ black (background)
-	//	}
-		Cb[i] = 128;	
-		Cr[i] = 128;
-	}
-*/
 
+	int num_objects = 0;
+	for( i = 1 ; i <= labels; i ++ )
+		if( blobs[i] ) 
+			num_objects ++;
+	
+	
 	//@ Iterate over blob's bounding boxes and extract contours
 	for( i = 1; i <= labels; i ++ )
 	{
@@ -358,11 +345,19 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 			int x2 = nx + size_y;
 			int y2 = ny + size_y;
 			int n_points = 0;
-
+			int center = 0;
+			int dx1 = 0,dy1=0;
 			for( k = y1; k < y2; k ++ )
 			{
 				for( j = x1; j < x2; j ++ )
 				{
+					//@ use distance transform map to find centroid (fuzzy)
+					if( dt_map[ (k * width + j) ] > center )
+					{
+						center = dt_map[ (k* width +j) ];
+						dx1 = j;
+						dy1 = k;
+					}
 					if( dt_map[ (k * width + j) ] == feather )
 					{
 						Y[ (k * width +j)] = 0xff;
@@ -378,8 +373,7 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 				}
 			}
 			if( vj_composite_active() )
-				vj_composite_transform( (void*) points, n_points, i, width,height,(mode == 2 ? Y: NULL));
-		
+				vj_composite_transform( (void*) points, n_points, i,dx1,dy1, width,height,num_objects,(mode == 2 ? Y: NULL));
 		}
 	}
 

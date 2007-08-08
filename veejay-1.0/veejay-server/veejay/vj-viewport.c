@@ -110,6 +110,7 @@ typedef struct
 	uint8_t *img[4];
 	matrix_t *M;
 	matrix_t *m;
+	matrix_t *T;
 	char *help;
 	uint8_t *grid;
 	uint8_t  grid_val;
@@ -119,6 +120,8 @@ typedef struct
 	int32_t ttx1,ttx2,tty1,tty2;
 	int	mode;
 	int32_t 	*buf;
+	void *sender;
+	uint32_t	seq_id;
 } viewport_t;
 
 typedef struct
@@ -1191,6 +1194,7 @@ void			viewport_destroy( void *data )
 	{
 		if( v->M ) free( v->M );
 		if( v->m ) free( v->m );
+		if( v->T ) free( v->T );
 		if( v->grid) free( v->grid );
 		if( v->map ) free( v->map );
 		if( v->help ) free( v->help );
@@ -1333,7 +1337,7 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, const char *ho
 	// calculate initial view
 	viewport_process( v );
 
-	v->buf = vj_calloc( sizeof(int32_t) * 24000 );
+	v->buf = vj_calloc( sizeof(int32_t) * 5000 );
 
     	return (void*)v;
 }
@@ -1606,7 +1610,6 @@ void	viewport_projection_inc( void *data, int incr, int screen_width, int screen
 
 #ifdef ANIMAX
 #include <libvjnet/mcastsender.h>
-static void *sender_ = NULL;
 #define GROUP "227.0.0.17"
 #define PORT_NUM 1234
 #endif
@@ -1695,6 +1698,36 @@ point_t **chainhull_2d( point_t **p , int n, int *res )
 	return H;
 }
 
+static	void	shell_sort_points_by_degree( double *a , point_t **p, int n )
+{
+	int i,j,increment=3;
+	double temp;
+
+	while( increment > 0 )
+	{
+		for( i = 0; i < n; i ++ )
+		{
+			j=i;
+			temp = a[i];
+			while(( j>= increment) && (a[j-increment] > temp ))
+			{
+				a[j] = a[j-increment];
+				p[j]->x = p[j-increment]->x;
+				p[j]->y = p[j-increment]->y;
+				j = j - increment;
+			}
+			a[j] = temp;
+		}
+		if( increment / 2 != 0 )
+			increment = increment / 2;
+		else if (increment ==1 )
+			increment = 0;
+		else 
+			increment = 1;
+	}
+
+}
+
 static void sort_points_by_degree( double *a, point_t **p, int n )
 {
         int i;
@@ -1718,45 +1751,59 @@ static void sort_points_by_degree( double *a, point_t **p, int n )
         }
 }
 
-
 void	viewport_transform_coords( 
 		void *data, 
 		void *input,
 		int n, 
-		int blob_id, 
+		int blob_id,
+		int center_x,
+		int center_y,
 		int wid, 
 		int hei, 
+		int num_objects,
 		uint8_t *plane )
 {
+	int i, res = 0;
 	viewport_t *v = (viewport_t*) data;
 	if( n <= 0 )
 		return;
+#ifdef ANIMAX	
+	if(! v->sender )
+	{
+		v->sender = mcast_new_sender( GROUP );
+		v->seq_id = 0;
+	}
+	if(!v->sender)
+		return;
+#endif
 	
-	matrix_t *tmp = viewport_matrix();
-	matrix_t *im = viewport_invert_matrix( v->M, tmp );
-	int i;
-	int res = 0;
+	if( !v->T )
+	{
+		matrix_t *tmp = viewport_matrix();
+		v->T = viewport_invert_matrix( v->M, tmp );
+		free(tmp);
+	}
 
 	point_t **points = (point_t**) input;
-	double  *array   = (double*) vj_malloc( (n+3) * sizeof(double));
+//double  *array   = (double*) vj_malloc( (n+3) * sizeof(double));
 
-	uint32_t cx=0,cy=0;
-	for( i = 0; i < n; i ++ )
-	{
-		cx += points[i]->x;
-		cy += points[i]->y;
-		array[i] = atan2( (points[i]->x - cx), (points[i]->y - cy) ) * (180.0/M_PI );
-	}
-	cx = cx / n;
-	cy = cy / n;
+//	for( i = 0; i < n; i ++ )
+//		array[i] = atan2( (points[i]->x - center_x), (points[i]->y - center_y) ) * (180.0/M_PI );
 
 	//@ convex hull 
 	point_t **contour = chainhull_2d( points, n, &res );
+
+	if( res > 256 )
+	{
+		veejay_msg(1, "Convex Hull has %d points, Maximum allowed is 256", res );
+		res = 256;
+	}
+
 	if ( plane )
 	{
 		for( i = 0; i < (res-1); i ++ )
 		{
-			//@ draw lines in plane
+			//@ draw polygon 
 			viewport_line( plane, 
 				contour[i]->y,
 				contour[i]->x,
@@ -1766,11 +1813,11 @@ void	viewport_transform_coords(
 				hei,
 				200 );
 		}
+
+		plane[ center_y * wid + center_x ] = 0xff; //@ display centroid
 	}
 
-	//@ fixme: sort_points_by_degree has a very bad performance
-	//
-	sort_points_by_degree( array, points, n );
+//	shell_sort_points_by_degree( array, points, n );
 	//@ Protocol: 
 	//@          |....|....|....|....|....|....| --> |....|
 	//@          0    4    8   12   16   20   24       N      bytes
@@ -1779,44 +1826,53 @@ void	viewport_transform_coords(
 	//@          CP: Number of Contour points
 	//@          HPi:A point of the convex hull
 	//@          CPi:A point of the contour
-	
+
 	v->buf[0] = blob_id;		
-	v->buf[1] = res;	
-	v->buf[2] = n;	
-	int j = 3;
+	v->buf[1] = res*2;	
+//	v->buf[2] = n*2;	
+	v->buf[2] = -1;
+	v->buf[3] = v->seq_id ++;
+	v->buf[4] = num_objects;
+	int j = 5;
 	for( i = 0; i < res; i ++ )
 	{
 		float dx1,dy1;
-		point_map( im, contour[i]->x, contour[i]->y, &dx1, &dy1 );
+		point_map( v->T, contour[i]->x, contour[i]->y, &dx1, &dy1 );
 		v->buf[j+0] = dx1 / (v->w / 1000.0f );
 		v->buf[j+1] = dy1 / (v->h / 1000.0f );
 		j+=2;
 	}
+	/*
 	for( i = 0; i < n; i ++ )
 	{
 		float dx1,dy1;
-		point_map( im, points[i]->x, points[i]->y, &dx1,&dy1 );
+		point_map( v->T, points[i]->x, points[i]->y, &dx1,&dy1 );
 		v->buf[j + 0] = dx1 / (v->w / 1000.0f);
 		v->buf[j + 1] = dy1 / (v->h / 1000.0f);
 		j += 2;
 	}
+	*/
+	int payload = ((res * 2 + 5) * sizeof(int));
+	int left = 1024 - payload;
+	if(left > 0)
+		veejay_memset( v->buf + payload, 0, left );
 	
 #ifdef ANIMAX	
-	if(! sender_ )
-		sender_ = mcast_new_sender( GROUP );
-	if(mcast_send( sender_, v->buf, (3+res+n) * sizeof(int32_t), PORT_NUM )<=0)
+//	int result = mcast_send( v->sender, v->buf, (res*2+4) * sizeof(int32_t), PORT_NUM );
+
+	int result = mcast_send( v->sender, v->buf, 1024, PORT_NUM );
+	
+	if(result<=0)
 	{
 		veejay_msg(0, "Cannot send contour over mcast %s:%d", GROUP,PORT_NUM );
-		mcast_close_sender( sender_ );
-		sender_ = NULL;
+		mcast_close_sender( v->sender );
+		v->sender = NULL;
 	}
 #endif
 
 	free(contour);
-	free(array);
+//	free(array);
 	
-	free(im);	
-	free(tmp);
 }
 
 void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int button, int frontback, int screen_width, int screen_height )

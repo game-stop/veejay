@@ -271,10 +271,10 @@ void	composite_process(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int 
 		}
 	}
 }
-void	composite_transform_points( void *compiz, void *coords, int n, int blob_id, int cx, int cy,uint8_t *plane )
+void	composite_transform_points( void *compiz, void *coords, int n, int blob_id, int cx, int cy,int w, int h,int num_objects,uint8_t *plane )
 {
 	composite_t *c = (composite_t*) compiz;
-	viewport_transform_coords( c->vp1, coords, n , blob_id,cx,cy, plane);
+	viewport_transform_coords( c->vp1, coords, n , blob_id,cx,cy,w,h,num_objects, plane);
 }
 void	composite_blit( void *compiz, uint8_t *yuyv )
 {
