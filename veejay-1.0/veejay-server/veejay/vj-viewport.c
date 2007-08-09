@@ -1337,7 +1337,7 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, const char *ho
 	// calculate initial view
 	viewport_process( v );
 
-	v->buf = vj_calloc( sizeof(int32_t) * 5000 );
+	v->buf = vj_calloc( sizeof(int32_t) * 50000 );
 
     	return (void*)v;
 }
@@ -1702,13 +1702,15 @@ static	void	shell_sort_points_by_degree( double *a , point_t **p, int n )
 {
 	int i,j,increment=3;
 	double temp;
-
+	int dx,dy;
 	while( increment > 0 )
 	{
 		for( i = 0; i < n; i ++ )
 		{
 			j=i;
 			temp = a[i];
+			dx = p[i]->x;
+			dy = p[i]->y;
 			while(( j>= increment) && (a[j-increment] > temp ))
 			{
 				a[j] = a[j-increment];
@@ -1717,6 +1719,8 @@ static	void	shell_sort_points_by_degree( double *a , point_t **p, int n )
 				j = j - increment;
 			}
 			a[j] = temp;
+			p[j]->x = dx;
+			p[j]->y = dy;
 		}
 		if( increment / 2 != 0 )
 			increment = increment / 2;
@@ -1750,6 +1754,8 @@ static void sort_points_by_degree( double *a, point_t **p, int n )
 		p[k]->y = point.y;
         }
 }
+
+#define VEEJAY_PACKET_SIZE 16384
 
 void	viewport_transform_coords( 
 		void *data, 
@@ -1785,10 +1791,10 @@ void	viewport_transform_coords(
 	}
 
 	point_t **points = (point_t**) input;
-//double  *array   = (double*) vj_malloc( (n+3) * sizeof(double));
+	double  *array   = (double*) vj_malloc( (n+3) * sizeof(double));
 
-//	for( i = 0; i < n; i ++ )
-//		array[i] = atan2( (points[i]->x - center_x), (points[i]->y - center_y) ) * (180.0/M_PI );
+	for( i = 0; i < n; i ++ )
+		array[i] = atan2( (points[i]->x - center_x), (points[i]->y - center_y) ) * (180.0/M_PI );
 
 	//@ convex hull 
 	point_t **contour = chainhull_2d( points, n, &res );
@@ -1817,23 +1823,27 @@ void	viewport_transform_coords(
 		plane[ center_y * wid + center_x ] = 0xff; //@ display centroid
 	}
 
-//	shell_sort_points_by_degree( array, points, n );
+	shell_sort_points_by_degree( array, points, n );
+	
 	//@ Protocol: 
-	//@          |....|....|....|....|....|....| --> |....|
-	//@          0    4    8   12   16   20   24       N      bytes
-	//@          BLOB | HP | CP | HP 0 ... HP N | CP 0 .. CP N | 
-	//@          HP: Number of Hull points
-	//@          CP: Number of Contour points
-	//@          HPi:A point of the convex hull
-	//@          CPi:A point of the contour
-
+	//@ bytes 0 ...  4 : blob id
+	//        4 ...  8 : number of points in convex hull
+	//        8 ... 12 : header symbol
+	//       12 ... 16 : sequence number
+	//       16 ... 20 : total number of blobs
+	//       20 ... 24 : number of points in contour
+	//       24 ... N1 : convex hull points
+	//       N1 ... N2 : contour hull points
+	//
+	//       packet size: 16 Kbytes
+	
 	v->buf[0] = blob_id;		
 	v->buf[1] = res*2;	
-//	v->buf[2] = n*2;	
 	v->buf[2] = -1;
 	v->buf[3] = v->seq_id ++;
 	v->buf[4] = num_objects;
-	int j = 5;
+	v->buf[5] = n*2;
+	int j = 6;
 	for( i = 0; i < res; i ++ )
 	{
 		float dx1,dy1;
@@ -1842,7 +1852,7 @@ void	viewport_transform_coords(
 		v->buf[j+1] = dy1 / (v->h / 1000.0f );
 		j+=2;
 	}
-	/*
+	
 	for( i = 0; i < n; i ++ )
 	{
 		float dx1,dy1;
@@ -1851,27 +1861,29 @@ void	viewport_transform_coords(
 		v->buf[j + 1] = dy1 / (v->h / 1000.0f);
 		j += 2;
 	}
-	*/
-	int payload = ((res * 2 + 5) * sizeof(int));
-	int left = 1024 - payload;
-	if(left > 0)
-		veejay_memset( v->buf + payload, 0, left );
-	
-#ifdef ANIMAX	
-//	int result = mcast_send( v->sender, v->buf, (res*2+4) * sizeof(int32_t), PORT_NUM );
+	int payload = ((n*2)+(res * 2) + 6) * sizeof(int);
+	int left = VEEJAY_PACKET_SIZE - payload;
 
-	int result = mcast_send( v->sender, v->buf, 1024, PORT_NUM );
+	int *ptr = &(v->buf[j]);
 	
+	if(left > 0)
+		veejay_memset( ptr,0, left );
+
+	if( payload > VEEJAY_PACKET_SIZE )
+		veejay_msg(1, "Contours and convex hull too large for packet");
+
+#ifdef ANIMAX	
+	int result = mcast_send( v->sender, v->buf,VEEJAY_PACKET_SIZE, PORT_NUM );
 	if(result<=0)
 	{
-		veejay_msg(0, "Cannot send contour over mcast %s:%d", GROUP,PORT_NUM );
+		veejay_msg(0, "Cannot send contour/convex hull over mcast %s:%d", GROUP,PORT_NUM );
 		mcast_close_sender( v->sender );
 		v->sender = NULL;
 	}
 #endif
 
 	free(contour);
-//	free(array);
+	free(array);
 	
 }
 
