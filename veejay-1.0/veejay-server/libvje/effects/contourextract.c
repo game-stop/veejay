@@ -361,8 +361,8 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 					if( dt_map[ (k * width + j) ] == feather )
 					{
 						Y[ (k * width +j)] = 0xff;
-						points[ n_points ]->x = k;
-						points[ n_points ]->y = j;
+						points[ n_points ]->x = j;
+						points[ n_points ]->y = k;
 						n_points++;
 						if( n_points >= 11999 )
 						{

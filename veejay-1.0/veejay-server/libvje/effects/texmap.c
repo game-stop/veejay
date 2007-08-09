@@ -51,7 +51,13 @@ typedef struct
 	uint8_t *current;
 } texmap_data;
 
-static void *sender_ = NULL;
+typedef struct
+{
+	int x;
+	int y;
+} point_t;
+
+static	point_t	**points = NULL;
 
 vj_effect *texmap_init(int width, int height)
 {
@@ -140,9 +146,11 @@ int texmap_malloc(void **d, int width, int height)
 			&template_ ,
 			yuv_sws_get_cpu_flags() );
 
-	coord_x = vj_calloc( ru8( sizeof(int) * 12000 ) );
-	coord_y = vj_calloc( ru8( sizeof(int) * 12000 ) );
-
+	points = (point_t**) vj_calloc( sizeof(point_t) * 12000 );
+	int i;
+	for( i = 0; i < 12000;i ++ )
+		points[i] = (point_t*) vj_calloc(sizeof(point_t));
+	
 
 	veejay_memset( x_, 0, sizeof(x_) );
 	veejay_memset( y_, 0, sizeof(y_) );
@@ -172,9 +180,13 @@ void texmap_free(void *d)
 		if( proj_[i] )
 			viewport_destroy( proj_[i] );
 	
-	if( coord_x ) free(coord_x );
-	if( coord_y ) free(coord_y );
-
+	if( points )
+	{
+		for( i = 0; i < 12000; i ++ )
+			if( points[i]) free(points[i]);
+		free(points);
+	}
+	
 	d = NULL;
 }
 
@@ -232,8 +244,10 @@ static	void	texmap_centroid()
 
 static int bg_frame_ = 0;
 
-extern void    vj_composite_transform( int *in_x, int *in_y, int points, int blob_id);
 extern int     vj_composite_active();
+
+extern void		vj_composite_transform(  void *points, int n_points, int blob_id, int dx, int dy, int w, int h, int num,
+						 void *plane );
 
 void texmap_apply(void *ed, VJFrame *frame,
 		VJFrame *frame2, int width, int height, 
@@ -361,63 +375,74 @@ void texmap_apply(void *ed, VJFrame *frame,
 			Cb[i] = 128;	
 			Cr[i] = 128;
 		}
+		return;
+	}
 
-		if(! vj_composite_active() )
-			return;
+	if(! vj_composite_active() )
+		return;
 	
-		//@ Iterate over blob's bounding boxes and extract contours
-		for( i = 1; i <= labels; i ++ )
+	int num_objects = 0;
+	for( i = 1; i <=labels; i ++ )
+		if( blobs[i] )
+			num_objects ++;
+		
+	//@ Iterate over blob's bounding boxes and extract contours
+	for( i = 1; i <= labels; i ++ )
+	{
+		if( blobs[i] > 0 )
 		{
-			if( blobs[i] > 0 )
+			int nx = cx[i] * sx;
+			int ny = cy[i] * sy;
+			int size_x = xsize[i] * sx;
+			int size_y = ysize[i] * sy * 0.5; 
+
+			int x1 = nx - size_x;
+			int y1 = ny - size_y;
+			int x2 = nx + size_y;
+			int y2 = ny + size_y;
+
+			int n_points = 0;
+			int dx1 = 0, dy1=0;
+			int center = 0;
+
+			for( k = y1; k < y2; k ++ )
 			{
-				int nx = cx[i] * sx;
-				int ny = cy[i] * sy;
-				int size_x = xsize[i] * sx;
-				int size_y = ysize[i] * sy * 0.5; 
-
-				int x1 = nx - size_x;
-				int y1 = ny - size_y;
-				int x2 = nx + size_y;
-				int y2 = ny + size_y;
-
-				int points = 0;
-
-				for( k = y1; k < y2; k ++ )
+				for( j = x1; j < x2; j ++ )
 				{
-					for( j = x1; j < x2; j ++ )
+					if( dt_map[ (k* width + j) ] > center )
 					{
-						if( dt_map[ (k * width + j) ] == feather )
+						center = dt_map[ (k*width+j) ];
+						dx1 = j;
+						dy1 = k;
+					}
+					if( dt_map[ (k * width + j) ] == feather )
+					{
+						points[n_points]->x = k; //@ produces unsorted list of coordinates
+						points[n_points]->y = j;
+						n_points++;
+						if( n_points >= 10000 )
 						{
-							coord_x[points] = k; //@ produces unsorted list of coordinates
-							coord_y[points] = j;
-							points++;
-							if( points >= 10000 )
-							{
-								veejay_msg(0, "Too many points in contour");	
-								return;
-							}
+							veejay_msg(0, "Too many points in contour");	
+							return;
 						}
 					}
 				}
-				//vj_composite_transform( coord_x, coord_y, points, i);
-				
 			}
+			vj_composite_transform( 
+					(void*) points, 
+					n_points, i,
+					dx1,
+					dy1, 
+					width,
+					height,
+					num_objects,(mode == 2 ? Y: NULL));
+			
 		}
-		return;
 	} 
 
-	if(mode == 4 )
-	{
-		veejay_memcpy( Y, ud->bitmap, len );
-		veejay_memset( Cb, 128, len );
-		veejay_memset( Cr, 128, len );
-	}
-	else
-	{ //@ clear the image , this mode maps B to A in perspective
-		veejay_memset( Y,  0 ,  len );
-		veejay_memset( Cb, 128, len );
-		veejay_memset( Cr, 128, len );
-	}
+	veejay_memset( Y,  0 ,  len );
+	veejay_memset( Cb, 128, len );
+	veejay_memset( Cr, 128, len );
 	
 	for( i = 1; i <= labels; i ++ )
 	{
@@ -474,8 +499,6 @@ void texmap_apply(void *ed, VJFrame *frame,
 			} 
 		}
 	}
-
-
 
 
 }
