@@ -271,6 +271,8 @@ void texmap_apply(void *ed, VJFrame *frame,
 	float sx = (float) width / (float) dw_;
 	float sy = (float) height / (float) dh_;
 	float sw = (float) sqrt( sx * sy );
+
+	int packets = 0;
 	
 	veejay_memset( cx,0,sizeof(cx));
 	veejay_memset( cy,0,sizeof(cy));
@@ -316,7 +318,7 @@ void texmap_apply(void *ed, VJFrame *frame,
 		veejay_memcpy( Y, ud->bitmap, len );
 		veejay_memset( Cb, 128, len );
 		veejay_memset( Cr, 128, len );
-
+		vj_dummy_send();
 		return;
 	}
 
@@ -341,6 +343,7 @@ void texmap_apply(void *ed, VJFrame *frame,
 				Cr[i] = 128;
 			}
 		}
+		vj_dummy_send();
 		return;
 	}
 
@@ -375,11 +378,15 @@ void texmap_apply(void *ed, VJFrame *frame,
 			Cb[i] = 128;	
 			Cr[i] = 128;
 		}
+		vj_dummy_send();
 		return;
 	}
 
 	if(! vj_composite_active() )
+	{
+		vj_dummy_send();
 		return;
+	}
 	
 	int num_objects = 0;
 	for( i = 1; i <=labels; i ++ )
@@ -417,8 +424,8 @@ void texmap_apply(void *ed, VJFrame *frame,
 					}
 					if( dt_map[ (k * width + j) ] == feather )
 					{
-						points[n_points]->x = k; //@ produces unsorted list of coordinates
-						points[n_points]->y = j;
+						points[n_points]->x = j; //@ produces unsorted list of coordinates
+						points[n_points]->y = k;
 						n_points++;
 						if( n_points >= 10000 )
 						{
@@ -496,10 +503,12 @@ void texmap_apply(void *ed, VJFrame *frame,
 			else
 			{
 				viewport_process_dynamic_map( proj_[i], frame2->data, frame->data, dt_map, feather );
+				packets++;
 			} 
 		}
 	}
-
+	if(!packets)
+		vj_dummy_send();
 
 }
 

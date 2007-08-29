@@ -1757,6 +1757,31 @@ static void sort_points_by_degree( double *a, point_t **p, int n )
 
 #define VEEJAY_PACKET_SIZE 16384
 
+void	viewport_dummy_send( void *data )
+{
+	viewport_t *v = (viewport_t*) data;
+#ifdef ANIMAX
+	unsigned char empty_buf[VEEJAY_PACKET_SIZE];
+	veejay_memset( empty_buf, 0, VEEJAY_PACKET_SIZE );
+
+	if(! v->sender )
+	{
+		v->sender = mcast_new_sender( GROUP );
+		v->seq_id = 0;
+	}
+	if(!v->sender)
+		return;
+
+	int result = mcast_send( v->sender, empty_buf,VEEJAY_PACKET_SIZE, PORT_NUM );
+	if(result<=0)
+	{
+		veejay_msg(0, "Cannot send empty packet over mcast %s:%d", GROUP,PORT_NUM );
+		mcast_close_sender( v->sender );
+		v->sender = NULL;
+	}
+#endif
+}
+
 void	viewport_transform_coords( 
 		void *data, 
 		void *input,
@@ -1771,8 +1796,6 @@ void	viewport_transform_coords(
 {
 	int i, res = 0;
 	viewport_t *v = (viewport_t*) data;
-	if( n <= 0 )
-		return;
 #ifdef ANIMAX	
 	if(! v->sender )
 	{
@@ -1782,6 +1805,12 @@ void	viewport_transform_coords(
 	if(!v->sender)
 		return;
 #endif
+
+	if( n <= 0 )
+	{
+		viewport_dummy_send( data );
+		return;
+	}
 	
 	if( !v->T )
 	{
@@ -1811,10 +1840,10 @@ void	viewport_transform_coords(
 		{
 			//@ draw polygon 
 			viewport_line( plane, 
-				contour[i]->y,
 				contour[i]->x,
-				contour[i+1]->y,
+				contour[i]->y,
 				contour[i+1]->x,
+				contour[i+1]->y,
 				wid,
 				hei,
 				200 );
@@ -1848,8 +1877,10 @@ void	viewport_transform_coords(
 	{
 		float dx1,dy1;
 		point_map( v->T, contour[i]->x, contour[i]->y, &dx1, &dy1 );
-		v->buf[j+0] = dx1 / (v->w / 1000.0f );
-		v->buf[j+1] = dy1 / (v->h / 1000.0f );
+		v->buf[j + 0] = (int)((dx1/ (float) v->w) * 1000.0f );
+		v->buf[j + 1] = (int)((dy1/ (float) v->h) * 1000.0f );
+	//	v->buf[j+0] = dx1 / (v->w / 1000.0f );
+	//	v->buf[j+1] = dy1 / (v->h / 1000.0f );
 		j+=2;
 	}
 	
@@ -1857,8 +1888,10 @@ void	viewport_transform_coords(
 	{
 		float dx1,dy1;
 		point_map( v->T, points[i]->x, points[i]->y, &dx1,&dy1 );
-		v->buf[j + 0] = dx1 / (v->w / 1000.0f);
-		v->buf[j + 1] = dy1 / (v->h / 1000.0f);
+		v->buf[j + 0] = (int) ( ( dx1/(float) v->w) * 1000.0f );
+		v->buf[j + 1] = (int) ( ( dy1/(float) v->h) * 1000.0f );
+	//	v->buf[j + 0] = dx1 / (v->w / 1000.0f);
+	//	v->buf[j + 1] = dy1 / (v->h / 1000.0f);
 		j += 2;
 	}
 	int payload = ((n*2)+(res * 2) + 6) * sizeof(int);

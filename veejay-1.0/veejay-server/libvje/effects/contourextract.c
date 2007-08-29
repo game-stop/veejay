@@ -291,6 +291,8 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 		return;
 	}
 
+	int packets = 0;
+	
 	//@ clear distance transform map
 	veejay_memset( dt_map, 0 , len * sizeof(uint32_t) );
 
@@ -303,6 +305,7 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 		veejay_memcpy( Y, ud->bitmap, len );
 		veejay_memset( Cb, 128, uv_len );
 		veejay_memset( Cr, 128, uv_len );
+		vj_dummy_send();
 		return;
 	}
 
@@ -373,10 +376,16 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 				}
 			}
 			if( vj_composite_active() )
-				vj_composite_transform( (void*) points, n_points, i,dx1,dy1, width,height,num_objects,(mode == 2 ? Y: NULL));
+			{
+					packets ++;
+					vj_composite_transform( (void*) points, n_points, i,dx1,dy1, width,height,num_objects,(mode == 2 ? Y: NULL));
+			}
 		}
 	}
 
+	if(!packets)
+		vj_dummy_send();
+	
 }
 
 

@@ -276,6 +276,13 @@ void	composite_transform_points( void *compiz, void *coords, int n, int blob_id,
 	composite_t *c = (composite_t*) compiz;
 	viewport_transform_coords( c->vp1, coords, n , blob_id,cx,cy,w,h,num_objects, plane);
 }
+
+void	composite_dummy( void *compiz )
+{
+	composite_t *c = (composite_t*) compiz;
+	viewport_dummy_send( c->vp1 );
+}
+
 void	composite_blit( void *compiz, uint8_t *yuyv )
 {
 	composite_t *c = (composite_t*) compiz;

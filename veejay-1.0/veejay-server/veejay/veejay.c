@@ -706,6 +706,11 @@ void	vj_composite_transform( void  *coords, int points, int blob_id, int cx, int
 	veejay_composite_transform_points( info, coords, points, blob_id, cx, cy,w,h,num_objects,plane );
 }
 
+void	vj_dummy_send( )
+{
+	veejay_composite_dummy( info );
+}
+
 int main(int argc, char **argv)
 {
 	video_playback_setup *settings;

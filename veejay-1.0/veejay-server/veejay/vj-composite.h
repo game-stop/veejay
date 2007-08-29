@@ -28,4 +28,5 @@ void	composite_blit( void *compiz,uint8_t *yuyv );
 void	composite_get_blit_buffer( void *compiz, uint8_t *buf[3] );
 void	*composite_get_vp( void *data );
 void	composite_transform_points( void *compiz, void *coords, int n, int blob_id, int cx, int cy, int w, int h,int num_objects,uint8_t *plane );
+void	composite_dummy( void *compiz );
 #endif

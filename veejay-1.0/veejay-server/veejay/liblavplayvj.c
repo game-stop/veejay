@@ -532,6 +532,11 @@ void	veejay_composite_transform_points( veejay_t *info, void *coords, int points
 	composite_transform_points( info->composite, coords, points, blob_id,cx,cy,w,h, num,plane);
 }
 
+void	veejay_composite_dummy( veejay_t *info )
+{
+	composite_dummy( info->composite );
+}
+
 void	veejay_auto_loop(veejay_t *info)
 {
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN)
