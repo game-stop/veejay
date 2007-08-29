@@ -1879,8 +1879,6 @@ void	viewport_transform_coords(
 		point_map( v->T, contour[i]->x, contour[i]->y, &dx1, &dy1 );
 		v->buf[j + 0] = (int)((dx1/ (float) v->w) * 1000.0f );
 		v->buf[j + 1] = (int)((dy1/ (float) v->h) * 1000.0f );
-	//	v->buf[j+0] = dx1 / (v->w / 1000.0f );
-	//	v->buf[j+1] = dy1 / (v->h / 1000.0f );
 		j+=2;
 	}
 	
@@ -1890,8 +1888,6 @@ void	viewport_transform_coords(
 		point_map( v->T, points[i]->x, points[i]->y, &dx1,&dy1 );
 		v->buf[j + 0] = (int) ( ( dx1/(float) v->w) * 1000.0f );
 		v->buf[j + 1] = (int) ( ( dy1/(float) v->h) * 1000.0f );
-	//	v->buf[j + 0] = dx1 / (v->w / 1000.0f);
-	//	v->buf[j + 1] = dy1 / (v->h / 1000.0f);
 		j += 2;
 	}
 	int payload = ((n*2)+(res * 2) + 6) * sizeof(int);
