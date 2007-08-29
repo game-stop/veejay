@@ -19,6 +19,8 @@
 #define VJ_LIBLAVPLAY_H
 #include "vj-lib.h"
 
+void	veejay_set_instance( veejay_t *info );
+
 veejay_t *veejay_malloc();
 
 void veejay_change_playback_mode(veejay_t *info, int pm, int sample);

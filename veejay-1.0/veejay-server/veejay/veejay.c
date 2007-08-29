@@ -696,21 +696,6 @@ static void donothing(int sig)
 	veejay_handle_signal( info, sig );	
 }
 
-int	vj_composite_active()
-{
-	return veejay_composite_active( info );
-}
-
-void	vj_composite_transform( void  *coords, int points, int blob_id, int cx, int cy, int w, int h, int num_objects, uint8_t *plane)
-{
-	veejay_composite_transform_points( info, coords, points, blob_id, cx, cy,w,h,num_objects,plane );
-}
-
-void	vj_dummy_send( )
-{
-	veejay_composite_dummy( info );
-}
-
 int main(int argc, char **argv)
 {
 	video_playback_setup *settings;
@@ -727,6 +712,7 @@ int main(int argc, char **argv)
 	if (!info)
 		return 1;
 
+	veejay_set_instance ( info );
 
    	settings = (video_playback_setup *) info->settings;
 

@@ -106,6 +106,31 @@
 
 #include <sched.h>
 
+static	veejay_t	*veejay_instance_ = NULL;
+
+void	veejay_set_instance( veejay_t *info )
+{
+	veejay_instance_ = info;
+}
+
+int     vj_composite_active()
+{
+        return veejay_composite_active( veejay_instance_ );
+}
+
+void    vj_composite_transform( void  *coords, int points, int blob_id, int cx, int cy, int w, int h, int num_objects, uint8_t *plane)
+{
+        veejay_composite_transform_points( veejay_instance_, coords, points, blob_id, cx, cy,w,h,num_objects,plane );
+}
+
+void    vj_dummy_send( )
+{
+        veejay_composite_dummy( veejay_instance_ );
+}
+
+
+
+
 static int	veejay_pin_cpu( veejay_t *info, int cpu_num );
 static void	veejay_schedule_fifo( veejay_t *info, int pid );
 
