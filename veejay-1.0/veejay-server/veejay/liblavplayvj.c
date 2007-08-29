@@ -125,7 +125,7 @@ void    vj_composite_transform( void  *coords, int points, int blob_id, int cx, 
 
 void    vj_dummy_send( )
 {
-        veejay_composite_dummy( veejay_instance_ );
+	composite_dummy( veejay_instance_->composite );
 }
 
 
@@ -555,11 +555,6 @@ int	veejay_composite_active( veejay_t *info )
 void	veejay_composite_transform_points( veejay_t *info, void *coords, int points, int blob_id, int cx, int cy,int w, int h,int num, uint8_t *plane )
 {
 	composite_transform_points( info->composite, coords, points, blob_id,cx,cy,w,h, num,plane);
-}
-
-void	veejay_composite_dummy( veejay_t *info )
-{
-	composite_dummy( info->composite );
 }
 
 void	veejay_auto_loop(veejay_t *info)
@@ -2457,6 +2452,8 @@ static void veejay_playback_cycle(veejay_t * info)
     int first_free, skipv, skipa, skipi, nvcorr;
     struct mjpeg_params bp;
     long ts, te;
+
+    veejay_set_instance( info );
 
     int   which_cpu = 1;
     char *env_value = getenv( "VEEJAY_SET_CPU" );

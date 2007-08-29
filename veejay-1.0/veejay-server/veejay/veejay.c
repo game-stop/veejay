@@ -712,8 +712,6 @@ int main(int argc, char **argv)
 	if (!info)
 		return 1;
 
-	veejay_set_instance ( info );
-
    	settings = (video_playback_setup *) info->settings;
 
 	if(!check_command_line_options(argc, argv))
