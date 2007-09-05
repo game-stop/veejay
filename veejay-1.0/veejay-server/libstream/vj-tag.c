@@ -1751,7 +1751,9 @@ int vj_tag_disable(int t1) {
 	}
 	if(tag->source_type == VJ_TAG_TYPE_V4L )
 	{
-		vj_unicap_stop_capture( vj_tag_input->unicap[ tag->index] );
+		vj_unicap_set_pause( vj_tag_input->unicap[tag->index], 1 );
+		//if( vj_unicap_status( vj_tag_input->unicap[tag->index]) )
+		//	vj_unicap_stop_capture( vj_tag_input->unicap[ tag->index] );
 	}
 #ifdef USE_GDK_PIXBUF
 	if(tag->source_type == VJ_TAG_TYPE_PICTURE )
@@ -1777,14 +1779,15 @@ int vj_tag_enable(int t1) {
 
 	if( tag->source_type == VJ_TAG_TYPE_V4L )
 	{
-		int v4l_stat = vj_unicap_status( vj_tag_input->unicap[tag->index]);
-		if(!v4l_stat)
-		{
-			tag->active = vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
+		if( vj_unicap_get_pause( vj_tag_input->unicap[tag->index] ) )
+			vj_unicap_set_pause( vj_tag_input->unicap[tag->index] , 0 );
+		else {
+			int v4l_stat = vj_unicap_status( vj_tag_input->unicap[tag->index]);
+			if(!v4l_stat)
+				tag->active = vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
+			else
+				tag->active = v4l_stat;
 		}
-		else
-			tag->active = v4l_stat;
-
 		vj_tag_update(tag,t1);
 		return 1;
 	}
@@ -1815,7 +1818,11 @@ int vj_tag_enable(int t1) {
 #endif
 	if( tag->source_type == VJ_TAG_TYPE_V4L )
 	{
-	    vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
+		if( vj_unicap_get_pause( vj_tag_input->unicap[ tag->index ]  ) )
+			vj_unicap_set_pause( vj_tag_input->unicap[ tag->index ] , 0 );
+			
+	    if(!vj_unicap_status( vj_tag_input->unicap[tag->index]) )
+	    	vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
 	}
 
 	tag->active = 1;
@@ -1847,10 +1854,19 @@ int vj_tag_set_active(int t1, int active)
  	
     switch (tag->source_type) {
 	   case VJ_TAG_TYPE_V4L:
-		if(active)
-		    vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
-		else
-		    vj_unicap_stop_capture( vj_tag_input->unicap[ tag->index] );
+		if(active) {
+		   if( vj_unicap_get_pause( vj_tag_input->unicap[ tag->index] ) ) {
+		   	vj_unicap_set_pause( vj_tag_input->unicap[tag->index] , 0 );\
+		    } else {
+		    	if( !vj_unicap_status( vj_tag_input->unicap[tag->index]) )
+		    		vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
+			}
+		} else {
+		    if( !vj_unicap_get_pause( vj_tag_input->unicap[ tag->index ] ) )
+		       vj_unicap_set_pause( vj_tag_input->unicap[tag->index] , 1 );
+	//	     if( vj_unicap_status( vj_tag_input->unicap[tag->index]) )
+	//		vj_unicap_stop_capture( vj_tag_input->unicap[ tag->index] );
+		}
 		tag->active = active;
 		break;
 	case VJ_TAG_TYPE_YUV4MPEG:
@@ -2949,11 +2965,14 @@ void	tag_writeStream( char *file, int n, xmlNodePtr node, void *font )
 	char tmp[512];
 	void *d = vj_font_get_dict( font );
 	sprintf(tmp, "%s-SUB-s%d.srt", file,tag->id );
-	
-	vj_font_set_dict( font, tag->dict );
-	vj_font_save_srt( font, tmp );
 
-	vj_font_set_dict( font, d );
+	if( tag->dict )
+	{
+		vj_font_set_dict( font, tag->dict );
+		vj_font_save_srt( font, tmp );
+
+		vj_font_set_dict( font, d );
+	}
 
 	tagCreateStream(node,  tag , font);
 }

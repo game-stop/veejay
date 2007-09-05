@@ -39,8 +39,6 @@
 #ifdef HAVE_LIBQUICKTIME
 #include <quicktime.h>
 #include <lqt.h>
-#include <lqt/lqt_version.h>
-#include <lqt/colormodels.h>
 #endif
 #include <veejay/vims.h>
 #include <liblzo/lzo.h>
@@ -1817,12 +1815,7 @@ int lav_fileno(lav_file_t *lav_file)
 #ifdef HAVE_LIBQUICKTIME
       case 'q':
 	 {
-#if ( LQT_CODEC_API_VERSION & 0xff ) >6  
- 		res = lqt_fileno( (quicktime_t*) lav_file->qt_fd );
-#else
-		 quicktime_t *q = lav_file->qt_fd;
-		 res = (int)fileno( q->stream );
-#endif
+		res = lqt_fileno( (quicktime_t*) lav_file->qt_fd );
 	 }
 		break;
 #endif		 

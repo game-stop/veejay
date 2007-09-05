@@ -1695,30 +1695,33 @@ void	veejay_distance_transform( uint32_t *plane, int w, int h, uint32_t *output)
 	register unsigned int x,y;
 	const uint32_t *I = plane;
 	uint32_t *Id = output;
-	for( y = 1; y < h-1; y ++ )
+	const uint32_t wid = w - 1;
+	const uint32_t hei = h - 2;
+
+	for( y = 1; y < hei; y ++ )
 	{
-		for( x = 1; x < w-1; x ++ )
+		for( x = 1; x < wid; x ++ )
 		{
 			if( I[ y * w + x ] )
 				Id[ y * w + x ] = min4(
-					Id[ (y-1) * w + (x-1) ] + 1,
-					Id[ (y-1) * w + x ] + 1,
-					Id[ (y-1) * w + (x+1) ] + 1,
-					Id[ y * w + (x-1) ] + 1 );
+					(Id[ (y-1) * w + (x-1) ]) + 1,
+					(Id[ (y-1) * w + x ]) + 1,
+					(Id[ (y-1) * w + (x+1) ]) + 1,
+					(Id[ y * w + (x-1) ]) + 1 );
 		}
 	}
 	
-	for( y = h-1; y > 1; y -- )
+	for( y = hei; y > 1; y -- )
 	{
-		for( x = w-1; x > 1; x -- )
+		for( x = wid; x > 1; x -- )
 		{
 			if( I[ y * w + x ] )	
 				Id[ y * w + x ] = min5(
-					Id[ (y+1) * w + (x-1) ] + 1,
+					(Id[ (y+1) * w + (x-1) ]) + 1,
 					Id[ y * w + x ],
-					Id[ (y+1) * w + x ] + 1,
-					Id[ y * w + (x + 1) ] + 1,
-					Id[ (y+1) * w + (x+1) ] + 1	
+					(Id[ (y+1) * w + x ]) + 1,
+					(Id[ y * w + (x + 1) ]) + 1,
+					(Id[ (y+1) * w + (x+1) ]) + 1	
 			);
 		}
 	}

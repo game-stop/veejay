@@ -375,7 +375,6 @@ void vj_effman_apply_image_effect(
     }
 }
 
-
 void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp_kf *todo_info,int *arg, int entry, int e) {
 
     switch(e) {

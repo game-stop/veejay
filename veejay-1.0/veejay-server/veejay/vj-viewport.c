@@ -1801,6 +1801,7 @@ void	viewport_transform_coords(
 	{
 		v->sender = mcast_new_sender( GROUP );
 		v->seq_id = 0;
+		veejay_memset( v->buf, 0, VEEJAY_PACKET_SIZE );
 	}
 	if(!v->sender)
 		return;

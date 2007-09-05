@@ -337,9 +337,11 @@ void	vj_el_prepare()
 
 void	vj_el_break_cache( editlist *el )
 {
-	if( el->cache )
-		free_cache( el->cache );
-	el->cache = NULL;
+	if(el) {
+		if( el->cache )
+			free_cache( el->cache );
+		el->cache = NULL;
+	}
 }
 
 static int never_cache_ = 0;
@@ -2048,6 +2050,9 @@ int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 	int64_t n1 = (uint64_t) _n1;
 	int64_t n2 = (uint64_t) _n2;
 	int64_t i;
+
+	if(!el) 
+		return 0;
 
 	if(el->is_empty)
 	{

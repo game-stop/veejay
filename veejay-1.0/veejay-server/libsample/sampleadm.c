@@ -293,6 +293,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->first_frame = startFrame;
     si->last_frame = endFrame;
     si->edit_list = NULL;	// clone later
+    si->soft_edl = 1;
     si->speed = 1;
     si->looptype = 1; // normal looping
 //  si->max_loops = 0;
@@ -480,7 +481,10 @@ int sample_copy(int sample_id)
 	copy->sample_id = _new_id(); 
 
 	if(org->edit_list)
+	{
 		copy->edit_list = vj_el_clone( org->edit_list );
+		copy->soft_edl = 1;
+	}
 
 	if (sample_store(copy) != 0)
 		return 0;
@@ -880,16 +884,14 @@ int sample_del(int sample_id)
     sample_node = hash_lookup(SampleHash, (void *) si->sample_id);
     if (sample_node) {
 	    int i;
-	    if(si->edit_list)
+	    if(si->soft_edl == 0 && si->edit_list != NULL)
  	 	   vj_el_break_cache( si->edit_list ); //@ destroy cache, if any
 
-	    if( si->effect_chain[0] )	
-		free( si->effect_chain[0] );
 	    for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
 	    {
 		vevo_port_free( si->effect_chain[i]->kf );
-//		if (si->effect_chain[i])
-//			free(si->effect_chain[i]);
+		if (si->effect_chain[i])
+			free(si->effect_chain[i]);
 	    }
   
 	    if(si->edit_list)
@@ -926,9 +928,10 @@ void sample_del_all()
 {
     int end = sample_size();
     int i;
-    for (i = 0; i < end; i++) {
+    for (i = 1; i < end; i++) {
 	if (sample_exists(i)) {
-	    sample_del(i);
+		sample_chain_clear(i);
+		sample_del(i);
 	}
     }
     this_sample_id = 0;
@@ -2194,6 +2197,7 @@ int	sample_set_editlist(int s1, editlist *edl)
 		return 0;
 	}
 	sample->edit_list = edl;
+	sample->soft_edl = 1;
 	return (sample_update(sample,s1));
 }
 
@@ -2310,7 +2314,7 @@ unsigned char *UTF8toLAT1(unsigned char *in)
 		//veejay_msg(VEEJAY_MSG_ERROR, "Cannot convert '%s'", in );
 		//free(out);
 		//return (NULL);
-		veejay_strncpy( out, in, out_size );
+		strncpy( out, in, out_size );
     }
 
     out = realloc(out, out_size + 1);
@@ -2661,8 +2665,12 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
         veejay_msg(VEEJAY_MSG_ERROR, "No EDL '%s' for sample %d", skel->edit_list_file, skel->sample_id );
 
     if(!skel->edit_list)
-	skel->edit_list = el;
-
+    {
+    	skel->edit_list = el;
+	skel->soft_edl = 1;
+    } else {
+	skel->soft_edl = 0;
+    }
     while (cur != NULL) {
 	if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_SAMPLEID)) {
 	    xmlTemp = xmlNodeListGetString(doc, cur->xmlChildrenNode, 1);
@@ -2935,10 +2943,13 @@ int sample_read_edl( sample_info *sample )
 			__sample_project_settings.fmt );
 
 	if(sample->edit_list)
+	{
 		res = 1;
-
+		sample->soft_edl = 0;
+	}
 	if(files[0])
 		free(files[0]);
+
 
 	return res;
 }

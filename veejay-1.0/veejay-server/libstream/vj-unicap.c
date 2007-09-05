@@ -76,6 +76,7 @@ typedef struct
 	int	 option[16];
 	int 	ready;
 	int	frame_size;
+	int	pause;
 } vj_unicap_t;
 
 
@@ -100,11 +101,11 @@ static	void	vj_unicap_new_frame_cb( unicap_event_t event, unicap_handle_t handle
 
 #ifdef STRICT_CHECKING
 static void lock__(vj_unicap_t *t, const char *f) {
-	//veejay_msg(0,"%s: from %s, %p", __FUNCTION__,f,t );
+//	veejay_msg(0,"%s: from %s, %p", __FUNCTION__,f,t );
 	pthread_mutex_lock(&(t->mutex));
 }
 static void unlock__(vj_unicap_t *t, const char *f) {
-	//veejay_msg(0,"%s: from %s, %p", __FUNCTION__,f,t);
+//	veejay_msg(0,"%s: from %s, %p", __FUNCTION__,f,t);
 	pthread_mutex_unlock(&(t->mutex));
 }
 #define lock_(t) lock__(t,__FUNCTION__)
@@ -126,6 +127,9 @@ static int	vj_unicap_scan_enumerate_devices(void *unicap)
 	int i=0;
 	unicap_driver_t *ud = (unicap_driver_t*) unicap;
 	char key[64];
+
+	memset( &(ud->device) , 0, sizeof(unicap_device_t));
+
 	unicap_void_device(&(ud->device));
 
 	
@@ -245,7 +249,7 @@ void	vj_unicap_deinit(void *dud )
 	unicap_driver_t *ud = (unicap_driver_t*) dud;
 	if( ud )
 	{
-		vevo_port_recursive_free( ud->device_list );
+		//vevo_port_recursive_free( ud->device_list );
 		free(ud);
 	}
 	dud = NULL;
@@ -879,6 +883,18 @@ static int	vj_unicap_start_capture_( void *vut )
 	return 1;
 }
 
+int	vj_unicap_get_pause( void *vut ) {
+	vj_unicap_t *v = (vj_unicap_t*) vut;
+	return v->pause;
+}
+
+void	vj_unicap_set_pause( void *vut , int status ) {
+	vj_unicap_t *v = (vj_unicap_t*) vut;
+	lock_(vut);
+	v->pause = status;
+	unlock_(vut);
+}
+
 int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const int height )
 {
 	vj_unicap_t *v = (vj_unicap_t*) vut;
@@ -889,6 +905,13 @@ int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const 
 		unlock_(vut);
 		return 0;
 	}
+	
+	if( v->pause )
+	{
+		unlock_(vut);
+		return 1;
+	}	
+
 #ifdef STRICT_CHECKING
 	assert(v->priv_buf != NULL );
 #endif	
@@ -1125,10 +1148,16 @@ static void	*unicap_reader_thread(void *data)
 
 	while( v->state )
 	{
-		if(vj_unicap_grab_a_frame( data )==0)
+		if( v->pause )
+			usleep( 25 * 50 );
+		else
+		if( v->active )
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to grab a frame from capture device %d", v->deviceID);
-			v->state = 0;
+			if(vj_unicap_grab_a_frame( data )==0)
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Unable to grab a frame from capture device %d", v->deviceID);
+				v->state = 0;
+			}
 		}
 	}
 

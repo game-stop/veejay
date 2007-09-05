@@ -451,8 +451,6 @@ int veejay_free(veejay_t * info)
 
 	vj_event_stop();
 
-	sample_del_all();
-
 	vj_effect_shutdown();
 
      	vj_tag_free();

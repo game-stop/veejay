@@ -412,6 +412,11 @@ void texmap_apply(void *ed, VJFrame *frame,
 			int dx1 = 0, dy1=0;
 			int center = 0;
 
+			if( x1 < 0 ) x1 = 0; else if ( x1 > width ) x1 = width;
+			if( x2 < 0 ) x2 = 0; else if ( x2 > width ) x2 = width;
+			if( y1 < 0 ) y1 = 0; else if ( y1 >= height ) y1 = height -1;
+			if( y2 < 0 ) y2 = 0; else if ( y2 >= height ) y2 = height -1;
+
 			for( k = y1; k < y2; k ++ )
 			{
 				for( j = x1; j < x2; j ++ )

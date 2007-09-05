@@ -33,6 +33,9 @@ char        **vj_unicap_get_list( void *ud );
 int vj_unicap_get_value( void *ud, char *key, int atom_type, void *value );
 int	vj_unicap_select_value( void *ud, int key, double );
 
+void	vj_unicap_set_pause( void *vut , int status );
+int	vj_unicap_get_pause( void *vut );
+
 #define	UNICAP_BRIGHTNESS	0
 #define	UNICAP_COLOR		1
 #define UNICAP_SATURATION	2

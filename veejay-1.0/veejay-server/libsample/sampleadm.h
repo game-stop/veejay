@@ -171,6 +171,7 @@ typedef struct sample_info_t {
     int play_length;
     editlist *edit_list;
     char     *edit_list_file;
+    int		soft_edl;
     void	*dict;
     void	*kf;
 } sample_info;

@@ -1753,7 +1753,7 @@ void	vevo_port_recursive_free( vevo_port_t *port )
 	assert( sor != NULL );
 #endif
 	vevo_port_recurse_free( sor, port );
-	#ifdef STRICT_CHECKING
+#ifdef STRICT_CHECKING
 	assert( sor != NULL );
 #endif
 	int i;
