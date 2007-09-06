@@ -201,7 +201,7 @@ void diff_apply(void *ed, VJFrame *frame,
 	binarify( ud->data, static_bg, frame->data[0], threshold, reverse,len );
 
 	//@ calculate distance map
-	veejay_distance_transform( ud->data, width, height, dt_map );
+	veejay_distance_transform8( ud->data, width, height, dt_map );
 	
 	if(mode==1)
 	{

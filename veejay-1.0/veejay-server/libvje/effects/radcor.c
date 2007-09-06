@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2004 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2007 Niels Elburg <nwelburg@gmail>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -16,6 +16,11 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
+ */
+
+/* Radial Distortion Correction
+ * http://local.wasp.uwa.edu.au/~pbourke/projection/lenscorrection/
+ *
  */
 #include <config.h>
 #include <stdint.h>
@@ -127,28 +132,29 @@ void radcor_apply( VJFrame *frame, int width, int height, int alpaX, int alpaY, 
 
 	if( update_map )
 	{
-		for( i = 0; i < nxout; i ++ ) 
+		for( i = 0; i < nyout; i ++ ) 
 		{
-			for( j = 0; j < nyout; j ++ )
+			for( j = 0; j < nxout; j ++ )
 			{	
-				x = ( 2 * i - nxout ) / (double) nxout;
-				y = ( 2 * j - nyout ) / (double) nyout;
+				x = ( 2 * j - nxout ) / (double) nxout;
+				y = ( 2 * i - nyout ) / (double) nyout;
 
 				r = x*x + y*y;
 				x3 = x / (1 - alphax * r);
 				y3 = y / (1 - alphay * r); 
 				x2 = x / (1 - alphax * (x3*x3+y3*y3));
 				y2 = y / (1 - alphay * (x3*x3+y3*y3));	
-				i2 = (x2 + 1) * nx / 2;
-				j2 = (y2 + 1) * ny / 2;
+				i2 = (y2 + 1) * ny / 2;
+				j2 = (x2 + 1) * nx / 2;
 	
-				if( i2 >= 0 && i2 < nx && j2 >= 0 && j2 < ny )
-					Map[ j * nxout + i ] = j2 * nx + i2;
+				if( i2 >= 0 && i2 < ny && j2 >= 0 && j2 < nx )
+					Map[ i * nxout + j ] = i2 * nx + j2;
 				else
-					Map[ j * nxout + i ] = 0;
+					Map[ i * nxout + j ] = 0;
 
 			}
 		}
+
 	}
 
 

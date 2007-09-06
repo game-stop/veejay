@@ -123,9 +123,9 @@ int texmap_malloc(void **d, int width, int height)
 	dw_ = nearest_div( width / 8  );
 	dh_ = nearest_div( height / 8 );
 
-	my->current = (uint8_t*) vj_calloc( ru8( sizeof(uint8_t) * dw_ * dh_ * 3 ) );
-	my->data = (uint32_t*) vj_calloc( ru8(sizeof(uint32_t) * width * height) );
-	my->bitmap = (uint8_t*) vj_calloc( ru8(sizeof(uint8_t) * width * height ));
+	my->current = (uint8_t*) vj_calloc( ru8( sizeof(uint8_t) * dw_ * dh_ * 4 ) );
+	my->data = (uint32_t*) vj_calloc( ru8(sizeof(uint32_t) * width * height * 2) );
+	my->bitmap = (uint8_t*) vj_calloc( ru8(sizeof(uint8_t) * width * height * 2));
 	
 	if(static_bg == NULL)	
 		static_bg = (uint8_t*) vj_calloc( ru8( width + width * height * sizeof(uint8_t)) );
