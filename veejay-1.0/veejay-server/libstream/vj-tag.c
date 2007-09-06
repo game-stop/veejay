@@ -1782,12 +1782,10 @@ int vj_tag_enable(int t1) {
 		if( vj_unicap_get_pause( vj_tag_input->unicap[tag->index] ) )
 			vj_unicap_set_pause( vj_tag_input->unicap[tag->index] , 0 );
 		else {
-			int v4l_stat = vj_unicap_status( vj_tag_input->unicap[tag->index]);
-			if(!v4l_stat)
-				tag->active = vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
-			else
-				tag->active = v4l_stat;
+			if(! vj_unicap_status( vj_tag_input->unicap[tag->index]) )
+				vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
 		}
+		tag->active = 1;
 		vj_tag_update(tag,t1);
 		return 1;
 	}
