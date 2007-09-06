@@ -233,8 +233,6 @@ char **vj_unicap_get_devices(void *unicap, int *n_dev)
 	return result;
 }
 
-
-
 void	*vj_unicap_init(void)
 {
 	unicap_driver_t *ud = (unicap_driver_t*) vj_calloc(sizeof(unicap_driver_t));
@@ -1148,9 +1146,6 @@ static void	*unicap_reader_thread(void *data)
 
 	while( v->state )
 	{
-		if( v->pause )
-			usleep( 25 * 50 );
-		else
 		if( v->active )
 		{
 			if(vj_unicap_grab_a_frame( data )==0)
