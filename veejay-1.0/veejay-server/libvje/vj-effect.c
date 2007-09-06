@@ -28,6 +28,7 @@
 #include "effects/fibdownscale.h"
 #include "effects/magicoverlays.h"
 #include "effects/negation.h"
+#include "effects/radcor.h"
 #include "effects/opacity.h"
 #include "effects/posterize.h"
 #include "effects/killchroma.h"
@@ -236,6 +237,7 @@ static struct
 {	chameleon_malloc,		chameleon_free,		VJ_IMAGE_EFFECT_CHAMELEON	},
 {	chameleonblend_malloc,		chameleonblend_free,	VJ_VIDEO_EFFECT_CHAMBLEND	},
 {	baltantv_malloc,		baltantv_free,		VJ_IMAGE_EFFECT_BALTANTV	},
+{	radcor_malloc,			radcor_free,		VJ_IMAGE_EFFECT_LENSCORRECTION	},
 {	radioactivetv_malloc,		radioactivetv_free,	VJ_VIDEO_EFFECT_RADIOACTIVE	},
 {	NULL			,	NULL			,0				},
 };
@@ -588,6 +590,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 86] = chameleon_init(width,height);
 	vj_effects[i + 87] = baltantv_init(width,height);
 	vj_effects[i + 88] = contourextract_init(width,height);
+	vj_effects[i + 89] = radcor_init(width,height);
 	max_width = width;
 	max_height = height;
 

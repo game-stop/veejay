@@ -25,7 +25,9 @@ libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			transitions/fadecolor.c effects/lumablend.c effects/chromamagick.c \
 			transitions/fadecolorrgb.c effects/magicoverlays.c  effects/binaryoverlays.c \
 			effects/pencilsketch.c effects/chameleonblend.c effects/diffimg.c \
-			effects/swirl.c effects/chromium.c effects/uvcorrect.c effects/chromapalette.c effects/radialblur.c effects/fisheye.c effects/raster.c effects/smear.c effects/magicmirror.c effects/lumamask.c effects/pixelate.c effects/colorshift.c effects/scratcher.c effects/opacitythreshold.c \
+			effects/swirl.c effects/chromium.c effects/uvcorrect.c effects/chromapalette.c \
+			effects/radialblur.c effects/fisheye.c effects/raster.c effects/smear.c effects/magicmirror.c \
+			effects/lumamask.c effects/pixelate.c effects/colorshift.c effects/scratcher.c effects/opacitythreshold.c \
 			effects/opacityadv.c effects/rgbkeysmooth.c effects/mask.c effects/distort.c effects/motionmap.c \
 			transitions/wipe.c effects/magicscratcher.c effects/chromascratcher.c \
 			effects/tracer.c effects/mtracer.c effects/dupmagic.c effects/keyselect.c \
@@ -34,7 +36,8 @@ libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			effects/isolate.c transitions/vbar.c transitions/3bar.c effects/enhancemask.c effects/noiseadd.c \
 			effects/contrast.c effects/motionblur.c effects/sinoids.c effects/average.c \
 		        effects/ripple.c effects/water.c effects/noisepencil.c effects/bathroom.c effects/slice.c \
-			effects/crosspixel.c effects/diffmap.c effects/threshold.c effects/morphology.c effects/colmorphology.c effects/ghost.c effects/blob.c effects/boids.c effects/nervous.c \
+			effects/crosspixel.c effects/diffmap.c effects/threshold.c effects/morphology.c effects/colmorphology.c \
+			effects/ghost.c effects/blob.c effects/radcor.c effects/boids.c effects/nervous.c \
 			effects/cartonize.c effects/tripplicity.c effects/neighbours.c effects/neighbours2.c\
 			effects/neighbours3.c effects/neighbours4.c effects/neighbours5.c effects/cutstop.c\
 			effects/contourextract.c effects/texmap.c effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/rgbchannel.c \

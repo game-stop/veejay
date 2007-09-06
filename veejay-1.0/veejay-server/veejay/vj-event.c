@@ -5416,11 +5416,11 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 				}
 			}
 			veejay_msg(VEEJAY_MSG_DEBUG, "Switched from source Sample to Stream");
-			src = vj_tag_get_type(cha);
+			//src = vj_tag_get_type(cha);
+			src = 1;
 		}
 		else
 		{
-			src = 0; // source is stream, toggle to sample
 			if(!sample_exists(cha))
 			{
 				cha = sample_size()-1;
@@ -5431,12 +5431,11 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 				}
 			}
 			veejay_msg(VEEJAY_MSG_DEBUG, "Switched from source Stream to Sample");
+			src = 0;
 		}
 		sample_set_chain_source( v->uc->sample_id, entry, src );
 		sample_set_chain_channel(v->uc->sample_id,entry,cha);
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d", entry,(src==VJ_TAG_TYPE_NONE ? "Sample":"Stream"), cha);
-//		if(v->no_bezerk) 
-//			veejay_set_sample(v, v->uc->sample_id);
 		if(v->no_bezerk)
 		{
 			veejay_set_frame(v, sample_get_startFrame(v->uc->sample_id));
@@ -5451,7 +5450,7 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 		int cha = vj_tag_get_chain_channel( v->uc->sample_id, entry );
 		char description[100];
 
-		if(src == VJ_TAG_TYPE_NONE ) 
+		if(src == VJ_TAG_TYPE_NONE ) // mix sample, change to stream
 		{
 			if(!vj_tag_exists(cha))
 			{
@@ -5462,11 +5461,10 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 					return;
 				}
 			}
-			src = vj_tag_get_type(cha);
+			src = 1;
 		}
 		else
 		{
-			src = 0;
 			if(!sample_exists(cha))
 			{
 				cha = sample_size()-1;
@@ -5476,14 +5474,13 @@ void vj_event_chain_entry_src_toggle(void *ptr, const char format[], va_list ap)
 					return;
 				}
 			}
+			src = 0;
 		}
 		vj_tag_set_chain_source( v->uc->sample_id, entry, src );
 		vj_tag_set_chain_channel(v->uc->sample_id,entry,cha);
-//		if(v->no_bezerk) 
-//			veejay_set_sample(v, v->uc->sample_id);
 
 		vj_tag_get_descriptive(cha, description);
-		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses channel %d (%s)", entry, cha,description);
+		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d (%s)", entry,( src == 0 ? "Sample" : "Stream" ), cha,description);
 	} 
 }
 
@@ -5605,53 +5602,51 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 	}
 }
 
+#define clamp_channel( a, b, c ) ( ( a < b ? c : (a >= c ? b : a )))
+
 void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int args[1];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	//DUMP_ARG(args);
-
 	if(SAMPLE_PLAYING(v))
 	{ 
 		int entry = sample_get_selected_entry(v->uc->sample_id);
 		int cha = sample_get_chain_channel(v->uc->sample_id,entry);
 		int src = sample_get_chain_source(v->uc->sample_id,entry);
-
+		int old = cha;
 		if(src==VJ_TAG_TYPE_NONE)
 		{	//decrease sample id
-			if(cha <= 1)
+			cha = cha - args[0];
+			if( sample_size()-1 <= 0 )
 			{
-				cha = sample_size()-1;
-				if(cha <= 0)
-				{
-					veejay_msg(VEEJAY_MSG_ERROR, "No samples to mix with");
-					return;
-				}		
+				veejay_msg(0, "No samples to mix with");
+				return;
 			}
-			else
-			{
-				cha = cha - args[0];
-			}
+			clamp_channel(
+				cha,
+				1,
+				sample_size()-1 );
+
+			if( !sample_exists( cha ) )
+				cha = old;
 		}
 		else	
 		{
-			if( cha <= 1)
+			cha = cha - args[0];
+			if( vj_tag_size()-1 <= 0 )
 			{
-				cha = vj_tag_size()-1;
-				if(cha<=0)
-				{
-					veejay_msg(VEEJAY_MSG_ERROR, "No streams to mix with");
-					return;
-				}
+				veejay_msg(0, "No streams to mix with");
+				return;
 			}
-			else
-			{
-				cha = cha - args[0];
-			}
-			src = vj_tag_get_type( cha );
-			sample_set_chain_source( v->uc->sample_id,entry,src);
+			clamp_channel(
+				cha,
+				1,
+				vj_tag_size()-1 );
+
+			if( !vj_tag_exists( cha ))
+				cha = old;
 		}
 		sample_set_chain_channel( v->uc->sample_id, entry, cha );
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d",entry,
@@ -5665,41 +5660,40 @@ void vj_event_chain_entry_channel_dec(void *ptr, const char format[], va_list ap
 		int entry = vj_tag_get_selected_entry(v->uc->sample_id);
 		int cha   = vj_tag_get_chain_channel(v->uc->sample_id,entry);
 		int src   = vj_tag_get_chain_source(v->uc->sample_id,entry);
+		int old = cha;	
 		char description[100];
+
 		if(src==VJ_TAG_TYPE_NONE)
 		{	//decrease sample id
-			if(cha <= 1)
+			cha = cha - args[0];
+			if( sample_size()-1 <= 0 )
 			{
-				cha = sample_size()-1;
-				if(cha <= 0)
-				{
-					veejay_msg(VEEJAY_MSG_ERROR, "No samples to mix with");
-					return;
-				}		
+				veejay_msg(0, "No samples to mix with");
+				return;
 			}
-			else
-			{
-				cha = cha - args[0];
-			}
+			clamp_channel(
+				cha,
+				1,
+				sample_size()-1 );
+			if( !sample_exists(cha ) )
+				cha = old;
 		}
 		else	
 		{
-			if( cha <= 1)
+			cha = cha - args[0];
+			if( vj_tag_size()-1 <= 0 )
 			{
-				cha = vj_tag_size()-1;
-				if(cha<=0)
-				{
-					veejay_msg(VEEJAY_MSG_ERROR, "No streams to mix with");
-					return;
-				}
+				veejay_msg(0, "No streams to mix with");
+				return;
 			}
-			else
-			{
-				cha = cha - args[0];
-			}
-			src = vj_tag_get_type( cha );
-			vj_tag_set_chain_source( v->uc->sample_id, entry, src);
+			clamp_channel(
+				cha,
+				1,
+				vj_tag_size()-1 );
+			if(! vj_tag_exists( cha ))
+				cha = old;
 		}
+
 		vj_tag_set_chain_channel( v->uc->sample_id, entry, cha );
 		vj_tag_get_descriptive( cha, description);
 
@@ -5716,50 +5710,43 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 	int args[1];
 	char *str = NULL; P_A(args,str,format,ap);
 
-	//DUMP_ARG(args);
-
 	if(SAMPLE_PLAYING(v))
 	{
 		int entry = sample_get_selected_entry(v->uc->sample_id);
 		int cha = sample_get_chain_channel(v->uc->sample_id,entry);
 		int src = sample_get_chain_source(v->uc->sample_id,entry);
+		int old = cha;
 		if(src==VJ_TAG_TYPE_NONE)
-		{
-			int num_c = sample_size()-1;
-			if(num_c <= 0)
+		{	//decrease sample id
+			cha = cha + args[0];
+			if( sample_size()-1 <= 0 )
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "No samples to mix with");
+				veejay_msg(0, "No samples to mix with");
 				return;
 			}
-			//decrease sample id
-			if(cha >= num_c)
-			{
-				cha = 1;
-			}
-			else
-			{
-				cha = cha + args[0];
-			}
+			clamp_channel(
+				cha,
+				1,
+				sample_size()-1 );
+			if( !sample_exists( cha ) )
+				cha = old;
 		}
 		else	
 		{
-			int num_c = vj_tag_size()-1;
-			if(num_c <=0 )
+			cha = cha + args[0];
+			if( vj_tag_size()-1 <= 0 )
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "No streams to mix with");	
+				veejay_msg(0, "No streams to mix with");
 				return;
 			}
-			if( cha >= num_c)
-			{
-				cha = 1;
-			}
-			else
-			{
-				cha = cha + args[0];
-			}
-			src = vj_tag_get_type( cha );
-			sample_set_chain_source( v->uc->sample_id, entry,src );
+			clamp_channel(
+				cha,
+				1,
+				vj_tag_size()-1 );
+			if( !vj_tag_exists(cha) )
+				cha = old;
 		}
+	
 		sample_set_chain_channel( v->uc->sample_id, entry, cha );
 		veejay_msg(VEEJAY_MSG_INFO, "Chain entry %d uses %s %d",entry,
 			(src==VJ_TAG_TYPE_NONE ? "Sample" : "Stream"),cha);
@@ -5772,43 +5759,38 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 		int entry = vj_tag_get_selected_entry(v->uc->sample_id);
 		int cha   = vj_tag_get_chain_channel(v->uc->sample_id,entry);
 		int src   = vj_tag_get_chain_source(v->uc->sample_id,entry);
+		int old   = cha;
 		char description[100];
-		if(src==VJ_TAG_TYPE_NONE)
-		{
-			int num_c = sample_size()-1;
-			if(num_c <= 0)
+
+		if(src==0)
+		{	//decrease sample id
+			cha = cha - args[0];
+			if( sample_size()-1 <= 0 )
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "No samples to mix with");
+				veejay_msg(0, "No samples to mix with");
 				return;
 			}
-			//decrease sample id
-			if(cha >= num_c)
-			{
-				cha = 1;
-			}
-			else
-			{
-				cha = cha + args[0];
-			}
+			clamp_channel(
+				cha,
+				1,
+				sample_size()-1 );
+			if( !sample_exists( cha ) )
+				cha = old;
 		}
 		else	
 		{
-			int num_c = vj_tag_size()-1;
-			if(num_c <=0 )
+			cha = cha - args[0];
+			if( vj_tag_size()-1 <= 0 )
 			{
-				veejay_msg(VEEJAY_MSG_ERROR, "No streams to mix with");	
+				veejay_msg(0, "No streams to mix with");
 				return;
 			}
-			if( cha >= num_c)
-			{
-				cha = 1;
-			}
-			else
-			{
-				cha = cha + args[0];
-			}
-			src = vj_tag_get_type( cha );
-			vj_tag_set_chain_source( v->uc->sample_id, entry, src);
+			clamp_channel(
+				cha,
+				1,
+				vj_tag_size()-1 );
+			if( !vj_tag_exists( cha ))
+				cha = old;
 		}
 
 		vj_tag_set_chain_channel( v->uc->sample_id, entry, cha );
