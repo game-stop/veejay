@@ -472,17 +472,27 @@ void texmap_apply(void *ed, VJFrame *frame,
 				x_[i] = nx;
 				y_[i] = ny;
 
+				int x1 = nx - size_x;
+				int y1 = ny - size_y;
+				int x2 = nx + size_x;
+				int y2 = ny + size_y;
+
+				if( x1 < 0 ) x1 = 0; else if ( x1 > width ) x1 = width;
+				if( x2 < 0 ) x2 = 0; else if ( x2 > width ) x2 = width;
+				if( y1 < 0 ) y1 = 0; else if ( y1 >= height ) y1 = height -1;
+				if( y2 < 0 ) y2 = 0; else if ( y2 >= height ) y2 = height -1;
+
 				if(proj_[i])
 				  	 viewport_destroy( proj_[i] );
 				proj_[i] = viewport_fx_init_map( width,height,
-						nx - size_x,
-						ny - size_y,
-						nx + size_x,
-						ny - size_y,
-						nx + size_x,
-						ny + size_y,
-						nx - size_x,
-						ny + size_y );
+						x1,
+						y1,
+						x2,
+						y1,
+						x2,
+						y2,
+						x1,
+						y2 );
 				if(!proj_[i])
 					return;
 			}
