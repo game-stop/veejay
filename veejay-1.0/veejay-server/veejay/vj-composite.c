@@ -279,6 +279,7 @@ void	composite_transform_points( void *compiz, void *coords, int n, int blob_id,
 
 void	composite_dummy( void *compiz )
 {
+	if(!compiz) return;
 	composite_t *c = (composite_t*) compiz;
 	viewport_dummy_send( c->vp1 );
 }
