@@ -5764,7 +5764,7 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 
 		if(src==0)
 		{	//decrease sample id
-			cha = cha - args[0];
+			cha = cha + args[0];
 			if( sample_size()-1 <= 0 )
 			{
 				veejay_msg(0, "No samples to mix with");
@@ -5779,7 +5779,7 @@ void vj_event_chain_entry_channel_inc(void *ptr, const char format[], va_list ap
 		}
 		else	
 		{
-			cha = cha - args[0];
+			cha = cha + args[0];
 			if( vj_tag_size()-1 <= 0 )
 			{
 				veejay_msg(0, "No streams to mix with");
