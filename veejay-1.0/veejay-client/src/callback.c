@@ -965,6 +965,7 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		int base = sample_calctime();
 		n_frames = base * dur_val;
+		n_frames = 0;
 	}
 	else
 	{
@@ -1023,6 +1024,8 @@ static	int	sample_calctime()
 	int n_frames = info->status_tokens[SAMPLE_END] - info->status_tokens[SAMPLE_START];
 	if( info->status_tokens[SAMPLE_LOOP] == 2 )
 		n_frames *= 2;
+	if( info->status_tokens[FRAME_DUP] > 0 )
+		n_frames *= info->status_tokens[FRAME_DUP];
 	return n_frames;
 }
 
