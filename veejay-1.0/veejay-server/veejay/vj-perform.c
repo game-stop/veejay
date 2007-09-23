@@ -330,14 +330,17 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 
 	cur_sfd ++;
 
-	if( cur_sfd >= max_sfd )
-	{
-		settings->current_frame_num += num;
-		cur_sfd = 0;
+	if( max_sfd > 0 ) {
+		if( cur_sfd >= max_sfd )
+		{
+		//	settings->current_frame_num += num;
+			cur_sfd = 0;
+		}
+		sample_set_framedups( info->uc->sample_id , cur_sfd);
+		if( cur_sfd != 0 )
+			return 1;
 	}
-
-	sample_set_framedups( info->uc->sample_id , cur_sfd);
-
+	settings->current_frame_num += num;
 
     if (speed >= 0) {		/* forward play */
 

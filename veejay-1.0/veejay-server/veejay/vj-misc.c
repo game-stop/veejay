@@ -20,11 +20,13 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <dirent.h>
 #include <time.h>
 #include <sys/time.h>
 #include <stdarg.h>
 #include <string.h>
 #include <stdint.h>
+#include <unistd.h>
 #include <sys/statfs.h>
 #include <libvje/vje.h>
 #include <veejay/vj-misc.h>
@@ -265,6 +267,52 @@ void	vj_get_yuv444_template(VJFrame *src, int w, int h)
 int	available_diskspace(void)
 {
 	return 1;
+}
+
+static int	possible_veejay_file( const char *file )
+{
+	if( strstr( file , ".edl" ) || strstr( file, ".EDL" ) ||
+		strstr( file, ".sl" ) || strstr(file, ".SL" ) ||
+		strstr( file, ".cfg" ) || strstr(file, ".CFG" ) ||	
+		strstr( file, ".avi" ) || strstr(file, ".mov" ) )
+		return 1;
+	return 0;
+}
+
+static int	try_file( char *path )
+{
+	struct stat l;
+	memset( &l, 0, sizeof( struct stat ) );
+	if( lstat(path, &l ) < 0 )
+		return 0;
+	if( S_ISREG(l.st_mode ))
+	{
+		if( possible_veejay_file( path ) )
+			return 1;
+	}
+	return 0;
+}
+
+int	verify_working_dir()
+{
+	char path[1024];
+	if(getcwd( path, sizeof(path))== NULL )
+		return 0;
+	struct dirent **files;
+	int n = scandir( path, &files, NULL, alphasort );
+	if( n <= 0 )
+		return 0;
+
+	int c = 0;
+	while( n -- ) {
+		char tmp[1024];
+		snprintf( tmp, sizeof(tmp), "%s/%s", path, files[n]->d_name );
+		if( try_file( tmp ) )
+			c++;
+	}
+
+	free(files);
+	return c;
 }
 
 

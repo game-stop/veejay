@@ -4186,7 +4186,6 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-
 	if( args[0] == 0 )
 	{
 		if(!v->seq->active )
@@ -4253,9 +4252,11 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 		int start_at = 0;
 		for( i = 0; i < MAX_SEQUENCES; i ++ )
 		{
-			start_at = v->seq->samples[i];
-			if(sample_exists(start_at))
+			if ( sample_exists( v->seq->samples[i] ))
+			{
+				start_at = v->seq->samples[i];
 				break;	
+			}
 		}
 		if( start_at == v->uc->sample_id )
 			veejay_set_frame(v,sample_get_startFrame(v->uc->sample_id));
@@ -9234,7 +9235,7 @@ void	vj_event_sequencer_add_sample(		void *ptr,	const char format[],	va_list ap 
 	int seq = args[0];
 	int id = args[1];
 
-	if( seq < 0 || seq > 1023 )
+	if( seq < 0 || seq >= MAX_SEQUENCES )
 	{
 		veejay_msg( VEEJAY_MSG_ERROR,"Slot not within bounds");
 		return;
@@ -9242,13 +9243,11 @@ void	vj_event_sequencer_add_sample(		void *ptr,	const char format[],	va_list ap 
 	
 	if( sample_exists(id ))
 	{
-		if( v->seq->size >= MAX_SEQUENCES)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Sequence bank is full. Cannot add more samples");
-			return;
-		}
 		v->seq->samples[ seq ] = id;
-		v->seq->size ++;
+		if( v->seq->size < MAX_SEQUENCES )
+		{ 
+			v->seq->size ++;
+		}
 		veejay_msg(VEEJAY_MSG_INFO, "Added sample %d to slot %d/%d",
 				id, seq,MAX_SEQUENCES );
 	}
@@ -9329,6 +9328,7 @@ void	vj_event_sample_sequencer_active(	void *ptr, 	const char format[],	va_list 
 	if( args[0] == 0 )
 	{
 		v->seq->active = 0;
+		v->seq->current = 0;
 		veejay_msg(VEEJAY_MSG_INFO, "Sample sequencer disabled");
 	}
 	else 

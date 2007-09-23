@@ -2685,9 +2685,17 @@ static void Welcome(veejay_t *info)
 
 	veejay_msg(VEEJAY_MSG_INFO,"Type 'man veejay' in a shell to learn more about veejay");
 	veejay_msg(VEEJAY_MSG_INFO,"For a list of events, type 'veejay -u |less' in a shell");
-	veejay_msg(VEEJAY_MSG_INFO,"Use 'gveejayreloaded' to enter interactive mode");
+	veejay_msg(VEEJAY_MSG_INFO,"Use 'reloaded' to enter interactive mode");
 	veejay_msg(VEEJAY_MSG_INFO,"Alternatives are OSC applications or 'sendVIMS' extension for PD"); 
 
+	int k = verify_working_dir();
+	if( k > 0 )
+	{
+		veejay_msg(VEEJAY_MSG_WARNING,
+			"Found %d veejay project files in current working directory (.edl,.sl, .cfg,.avi).",k);
+		veejay_msg(VEEJAY_MSG_WARNING,
+			"If you want to start a new project, start veejay in an empty directory");
+	}
 }
 
 static void *veejay_playback_thread(void *data)

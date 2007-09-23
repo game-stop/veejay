@@ -515,6 +515,9 @@ int sample_get_longest(int sample_id)
 
 		if( si->looptype == 2) duration *= 2; // pingpong loop duration     
 
+		if( sample_get_framedup(sample_id) > 0 )
+			duration *= sample_get_framedup(sample_id);
+
 		for(c=0; c < SAMPLE_MAX_EFFECTS; c++)
 		{
 			_id = sample_get_chain_channel(sample_id,c);
@@ -532,7 +535,10 @@ int sample_get_longest(int sample_id)
 				if(tmp > duration) duration = tmp; //which one is longer ...	
 		        }
 		}
-		veejay_msg(VEEJAY_MSG_WARNING, "Length of sample in video frames: %ld",duration);
+		veejay_msg(VEEJAY_MSG_DEBUG, "Length of sample in video frames: %ld (slow=%d, loop=%d, speed=%d)",duration,
+			sample_get_framedup(sample_id), si->looptype, si->speed );
+		
+
 		return duration;
 	}
 	return 0;
