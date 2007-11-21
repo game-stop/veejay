@@ -143,6 +143,27 @@ void	on_button_251_clicked( GtkWidget *widget, gpointer user_data)
 	vj_msg(VEEJAY_MSG_INFO, "Bezerk mode toggled");
 }	
 
+void	on_entry_samplename_button_clicked( GtkWidget *widget, gpointer user_data )
+{
+	gchar *title = get_text( "entry_samplename" );
+	multi_vims( VIMS_SAMPLE_SET_DESCRIPTION, "%d %s", 0,title );
+
+	//@ dont reload sample, print info to samplebank
+	int i,j;
+	for( i= 0; i < NUM_BANKS; i ++ )
+	{
+		for( j = 0; j < NUM_SAMPLES_PER_PAGE ; j ++ )
+		{
+			if( (info->sample_banks[i]->slot[j]->sample_id ==
+			    info->status_tokens[CURRENT_ID]) ) 
+			{
+				gtk_frame_set_label( GTK_FRAME( info->sample_banks[i]->gui_slot[j]->frame ) , title );
+				return;
+			}
+		}
+	}
+}
+
 void	on_button_054_clicked(GtkWidget *widget, gpointer user_data)
 {
 	gchar *ext = get_text( "screenshotformat" );

@@ -2720,6 +2720,8 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 		}
 
 		info->uc.reload_hint[HINT_HISTORY] = 1;
+
+		put_text( "entry_samplename", "" );
 	}
 	if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ||
 		info->uc.reload_hint[HINT_ENTRY] == 1 )
@@ -3604,7 +3606,7 @@ on_effectlist_sources_row_activated(GtkTreeView *treeview,
 		gchar *idstr = NULL;
 		gtk_tree_model_get(model,&iter, SL_ID, &idstr, -1);
 		gint id = 0;
-		if( sscanf( idstr+1, "%d", &id ) )
+		if( sscanf( idstr, "[ %d]", &id ) )
 		{
 		    // set source / channel
 		    multi_vims( VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
@@ -3627,102 +3629,6 @@ on_effectlist_sources_row_activated(GtkTreeView *treeview,
 		if(idstr) g_free(idstr);
 	}
 }
-/*
-void	on_samplelist_edited(GtkCellRendererText *cell,
-		gchar *path_string,
-		gchar *new_text,
-		gpointer user_data)
-{
-	// welke sample id is klikked?
-	GtkWidget *tree = glade_xml_get_widget_(info->main_window,
-				"tree_samples");
-	GtkTreeIter iter;
-	gchar *id = NULL;
-	int n;
-	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
-	n = gtk_tree_model_get_iter_from_string(
-		model,
-		&iter,
-		path_string);
-
-	gtk_tree_model_get(
-		model,
-		&iter,
-		SL_ID,
-		&id,
-		-1 );	
-
-	int br=0; int bw=0;
-	gchar *sysid = g_locale_from_utf8( id, -1, &br, &bw,NULL);	
-	unsigned  int sample_id =  (unsigned int )atoi(sysid+1);
-	if(sample_id > 0)
-	{
-		char digits[2] = { 48, 57 };
-		char alphauc[2] = { 65,90 };  
-		char alphalw[2] = { 97,122};
-		char specials[3] = { 95,46,45 };
-
-		// convert spaces,tabs to ..
-		gint bytes_read = 0;
-		gint bytes_written = 0;
-		GError *error = NULL;
-		gchar *sysstr = g_locale_from_utf8( new_text, -1, &bytes_read, &bytes_written,&error);	
-	
-		if(error)
-		{
-			vj_msg_detail(VEEJAY_MSG_ERROR,"Invalid string: %s", error->message );
-			if(sysstr) g_free(sysstr);
-			if(sysid) g_free(sysid);
-			if(id)	g_free(id);
-			return;
-		}
-		
-		int i;
-		char descr[150];
-		veejay_memset( descr,0,sizeof(descr));
-		char *res = &descr[0];
-		for( i = 0; i < bytes_written; i ++ )
-		{
-			char c = sysstr[i];
-			int  j;
-			if(c >= digits[0] && c <= digits[1])
-				*(res)++  = c;
-			if(c >= alphauc[0] && c <= alphauc[1])
-				*(res)++ = c;
-			if(c >= alphalw[0] && c <= alphalw[1]) 
-				*(res)++ = c;
-			if( c == 32)
-				*(res)++ = '_';
-			for( j = 0; j < 3; j ++ )
-				if( specials[j]  == c )
-					*(res)++ = c;
-
-		}
-
-		if( id[0] == 'S' )
-			multi_vims( VIMS_SAMPLE_SET_DESCRIPTION,
-				"%d %s", sample_id, descr );
-		else
-			multi_vims( VIMS_STREAM_SET_DESCRIPTION,
-				"%d %s", sample_id, descr );		
-
-		if(info->selected_slot->sample_id == sample_id )
-		{
-			if(info->selected_slot->title )
-				free(info->selected_slot->title );	
-			info->selected_slot->title = strdup( descr );
-			gtk_label_set_text( GTK_LABEL( info->selected_gui_slot->title ),
-				info->selected_slot->title );
-		}
-		
-
-		if(sysstr) g_free( sysstr );
-	}
-
-	if(sysid) g_free(sysid);
-	if(id) g_free(id);
-}
-*/
 
 /* Return a bank page and slot number to place sample in */
 
@@ -3941,11 +3847,6 @@ static	void	load_sequence_list()
 	
 }
 
-/* execute after sample/stream/mixing sources list update
- * same for load_mixlist_info(), only different widget !! 
- * with_reset_slotselection should be TRUE when the reset
- * of the samplebanks that is used here should also reset the
- * current selection of a slot */
 static	void	load_samplelist_info(gboolean with_reset_slotselection)
 {
 	gint offset=0;	
@@ -4004,6 +3905,8 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 						   update_sample_slot_data( bank_page, poke_slot, int_id,0,title,timecode);
 					}				
 				}
+				if( info->status_tokens[CURRENT_ID] == values[0] && info->status_tokens[PLAY_MODE] == 0 )
+					put_text( "entry_samplename", title );
 				g_free(timecode);
 				g_free(title);
 			}
@@ -4816,7 +4719,6 @@ static	void	init_srt_editor()
 
 	// clear text view
 	
-//	disable_widget( "srtframe");
 }
 
 
@@ -5644,7 +5546,7 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 	if( info->status_tokens[SEQ_CUR] != history[SEQ_CUR] )
 	{
 		int in = info->status_tokens[SEQ_CUR];
-		if(info->sequence_playing)
+		if(info->sequence_playing >= 0)
 			indicate_sequence( FALSE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
 		info->sequence_playing = in;
 		indicate_sequence( TRUE, info->sequencer_view->gui_slot[ info->sequence_playing ] );
@@ -6146,84 +6048,9 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	}
 	if( info->watch.state == STATE_STOPPED)
 	{
-		// start local veejay
-	//	if(strncasecmp(remote, "localhost", strlen(remote)) == 0 || strncasecmp(remote, "127.0.0.1", strlen(remote))==0)
-	//	{
-			// lock state
-			info->watch.state = STATE_CONNECT;
-			info->run_state = RUN_STATE_REMOTE;
-
-			/* now, how to see to stop connecting ? for now we do not 
-			// another veejay may be locally running at host:port
-			if(!vj_gui_reconnect( remote, NULL, port ))
-			{
-				GError *error = NULL;
-				int pid;
-				info->connecting = g_timeout_add( 300 , update_progress_timeout, (gpointer*) info );
-
-				gettimeofday( &(info->timer) , NULL );
-				memcpy( &(info->alarm), &(info->timer), sizeof(struct timeval));
-
-
-				gboolean ret = g_spawn_async_with_pipes( 
-							NULL,
-							args,
-							NULL,
-							G_SPAWN_SEARCH_PATH | G_SPAWN_STDOUT_TO_DEV_NULL,
-							NULL,
-							NULL,
-							&pid,
-							NULL,
-							NULL,
-							NULL, //&(iot.stderr_pipe),
-							&error );
-				g_strfreev( args );
-
-				if(error)
-				{
-					vj_msg_detail(VEEJAY_MSG_ERROR, "There was an error: [%s]\n", error->message );
-					ret = FALSE;
-					g_error_free(error);
-				}
-
-				if( ret == FALSE )
-				{
-					info->state = STATE_IDLE;
-					vj_msg(VEEJAY_MSG_ERROR,
-					 "Failed to start veejay");
-				}
-				else
-				{
-					info->run_state = RUN_STATE_LOCAL;
-					info->state = STATE_RECONNECT;
-					vj_launch_toggle(FALSE);
-				}
-				
-			}
-			else
-			{
-				info->run_state = RUN_STATE_REMOTE;
-			}*/
-//		}
-//		else
-//		{	
-	//		printf("Implement me: something else then localhost\n");
-		/*	if(!vj_gui_reconnect(remote,NULL,port ))
-			{
-				vj_msg(VEEJAY_MSG_ERROR, "Cannot establish connection with %s : %d",
-					remote, port );
-			}*/
-	//	}
+		info->watch.state = STATE_CONNECT;
+		info->run_state = RUN_STATE_REMOTE;
 	}
-/*	else
-	{
-		if( info->state == STATE_PLAYING )
-		{
-			vj_gui_disconnect( );
-			vj_msg(VEEJAY_MSG_ERROR, "Disconnected.");
-			info->state = STATE_RECONNECT;
-		}
-	}*/
 
 	for( i = 0; i < n_args; i ++)
 	{
@@ -6544,10 +6371,6 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 		(GCallback) on_timeline_cleared, NULL );
 
 
-	//void    gtk_configure_window_cb( GtkWidget *w, GdkEventConfigure *ev, gpointer data )
-	//g_signal_connect( glade_xml_get_widget_(info->main_window , "gveejay_window"), "window-state-event",
-	//	GTK_SIGNAL_FUNC( gtk_configure_window_cb ), (gpointer) gui );
-
 	bankport_ = vpn( VEVO_ANONYMOUS_PORT );
 
 	gtk_widget_show(frame);
@@ -6556,10 +6379,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 
 
 	GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
-    /* Make this run after any internal handling of the client event happened
-     * to make sure that all changes implicated by it are already in place and
-     * we thus can make our own adjustments.
-     */
+
 	gtk_label_set_text( GTK_LABEL(glade_xml_get_widget_(info->main_window, "build_revision")), VEEJAY_CODENAME );
 
 	g_signal_connect_after( GTK_OBJECT(mainw), "client_event",
@@ -6579,14 +6399,11 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	gtk_box_pack_start (GTK_BOX (box), GTK_WIDGET(info->sample_bank_pad), TRUE, TRUE, 0);
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 
-//@ FIXME: to setup_defaults
 	create_ref_slots( 12 );
-	
 	create_sequencer_slots( 10 );
 
 	veejay_memset( vj_event_list, 0, sizeof( vj_event_list ));
 	veejay_memset( vims_keys_list, 0, sizeof( vims_keys_list) );
-
 	
 	gtk_widget_show( info->sample_bank_pad );
 
@@ -6926,11 +6743,6 @@ static	void	veejay_stop_connecting(vj_gui_t *gui)
 		vj_gui_enable();
 
 	vj_launch_toggle(FALSE);
-	/*gtk_progress_bar_set_fraction(
-		GTK_PROGRESS_BAR (glade_xml_get_widget_(info->main_window, "connecting")),0.0);
-	g_source_remove( info->connecting );
-
-	info->connecting = 0;*/
 	
 	veejay_conncection_window = glade_xml_get_widget(info->main_window, "veejay_connection");
 	gtk_widget_hide(veejay_conncection_window);		
@@ -7082,14 +6894,6 @@ void	vj_gui_enable()
 	no_preview_ = 0;
 }
 
-/* --------------------------------------------------------------------------------------------------------------------------
- * Returns infos to a given sample/stream... use as follows
- * which_one decides what sample/stream do you mean: 0 = current playing, -1 = last created, > 0 = sample number
- * mode decides if you gather informations of a sample (== VJ_PLAYBACK_MODE_SAMPLE) or a stream (== VJ_PLAYBACK_MODE_TAG)
-		to see, why this is made see comments in veejay/vj-event.c in void vj_event_send_sample_info(..) 
- * s_type, descr and timecode are pointers to return the loaded values of the selected sample/stream
- * This function loads the SAMPLE_INFO to a new temporary sample_slot you should free after use
-  -------------------------------------------------------------------------------------------------------------------------- */
 sample_slot_t *vj_gui_get_sample_info(gint which_one, gint mode )
 {
 	sample_slot_t *tmp_slot = (sample_slot_t*) vj_calloc(sizeof(sample_slot_t));
@@ -7406,7 +7210,6 @@ static	int	find_bank_by_sample(int sample_id, int sample_type, int *slot )
 			}
 		}
 	}
-	/* Everything is full ?? TODO: Error checking/handling*/
 	*slot = -1;
 	return -1;
 }
@@ -7420,30 +7223,17 @@ static	int	find_bank(int page_nr)
 			return info->sample_banks[i]->bank_number;
 		}
 	return -1;
-}/*
-static int 	find_free_bank_slot(void)
-{
-	int i = 0;
-	for( i = 0; i < NUM_BANKS; i++ )
-		if(info->sample_banks[i])
-		{
-			int j;
-			for(j = 0; j < NUM_SAMPLES_PER_PAGE; j ++ )
-				if(info->sample_banks[i]->slot[j]->sample_id == 0 )
-					return i;
-
-				
-		}  
 }
-*/
-
 
 static void set_activation_of_cache_slot_in_samplebank( sequence_gui_slot_t *gui_slot, gboolean activate)
 {
 	if (activate)
+	{
 		gtk_frame_set_shadow_type(GTK_FRAME(gui_slot->frame),GTK_SHADOW_IN);
-	else 
+	}
+	else {
 		gtk_frame_set_shadow_type(GTK_FRAME(gui_slot->frame),GTK_SHADOW_ETCHED_IN);
+	}
 }	
 
 static gboolean on_sequencerslot_activated_by_mouse(GtkWidget *widget, GdkEventButton *event, gpointer user_data)
@@ -7465,10 +7255,7 @@ static gboolean on_sequencerslot_activated_by_mouse(GtkWidget *widget, GdkEventB
 		multi_vims( VIMS_SEQUENCE_ADD, "%d %d", slot_nr, id );
 		info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 	}
-	
-
 	return FALSE;
-
 }		
 
 static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButton *event, gpointer user_data)
@@ -7503,10 +7290,7 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
 		multi_vims(VIMS_SET_MODE_AND_GO, "%d %d", g->sample_type, g->sample_id );
 		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO, g->sample_type,g->sample_id );
 	}
-
-	
 	return FALSE;
-
 }		
 
 
@@ -7560,14 +7344,6 @@ static void create_sequencer_slots(int envelope_size)
 		gtk_box_pack_start (GTK_BOX (gui_slot->main_vbox), GTK_WIDGET(gui_slot->image), TRUE, TRUE, 0);
 		
 		gtk_widget_show( gui_slot->image);
-		/* The sample's image */
-		/*gui_slot->image = gtk_drawing_area_new();
-		gtk_box_pack_start (GTK_BOX (gui_slot->main_vbox), GTK_WIDGET(gui_slot->image), TRUE, TRUE, 0);
-		gtk_widget_set_size_request( GTK_WIDGET(gui_slot->image), info->sequencer_view->w,info->sequencer_view->h );
-		g_signal_connect( gui_slot->image, "expose_event",
-			G_CALLBACK(image_expose_sequence_event), //@@@@@@@@@@@ 
-			(gpointer) row + (col * envelope_size) );
-		gtk_widget_show( GTK_WIDGET(gui_slot->image));*/
 
 		gtk_table_attach_defaults ( GTK_TABLE(table), gui_slot->event_box, row, row+1, col, col+1);   
 
@@ -7628,8 +7404,6 @@ static void create_ref_slots(int envelope_size)
 
 
 	}
-//	info->sequence_view->w = 0;
-//	info->sequence_view->h = 0;
 	info->sequence_view->envelope_size = envelope_size;
 }
 
@@ -7659,7 +7433,6 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 	gtk_widget_show(GTK_WIDGET(gui_slot->event_box));	
 	/* the surrounding frame for each slot */
 	gui_slot->frame = gtk_frame_new(NULL);
-//	gui_slot->frame = gtk_aspect_frame_new( NULL, 0.5, 0.5, 1.0, TRUE );
 		
 	gtk_container_set_border_width (GTK_CONTAINER(gui_slot->frame),0);
 	gtk_widget_show(GTK_WIDGET(gui_slot->frame));
@@ -7846,8 +7619,6 @@ static	void	set_selection_of_slot_in_samplebank(gboolean active)
 
 static int add_sample_to_sample_banks(int bank_page,sample_slot_t *slot)
 {
-	/* Add the temporary sample */
-	// FIXME : slot loading
 	int bp = 0; int s = 0;
 
        if(verify_bank_capacity( &bp, &s, slot->sample_id, slot->sample_type ))
@@ -7917,35 +7688,17 @@ static	void	remove_sample_from_slot()
    -------------------------------------------------------------------------------------------------------------------------- */ 
 static void add_sample_to_effect_sources_list(gint id, gint type, gchar *title, gchar *timecode)
 {
-	gchar id_string[10];
+	gchar id_string[512];
 	GtkTreeIter iter;	
 
-	if (type == STREAM_NO_STREAM) sprintf( id_string, "S%04d", id);    
-	else sprintf( id_string, "T%04d", id);
+	if (type == STREAM_NO_STREAM) 
+		sprintf( id_string, "[%4d] %s", id, title);    
+	else sprintf( id_string, "[%4d]", id);
 
 	gtk_list_store_append( effect_sources_store, &iter );
 	gtk_list_store_set( effect_sources_store, &iter, SL_ID, id_string, SL_DESCR, title, SL_TIMECODE , timecode,-1 );
 
 }
-
-
-/* --------------------------------------------------------------------------------------------------------------------------
- *  Function adds the given infos to Editlist
-   -------------------------------------------------------------------------------------------------------------------------- 
-static void add_sample_to_editlist(guint row_number, gchar *timeline, gchar *fname, gchar *timecode, gchar *gfourcc)
-{
-    GtkTreeIter iter;
-    
-    gtk_list_store_append( editlist_store, &iter );
-    gtk_list_store_set( editlist_store, &iter,
-	COLUMN_INT, row_number, // <- start timecode?! (timecode of offset)
-	COLUMN_STRING0, timeline,
-	COLUMN_STRINGA, fname,
-	COLUMN_STRINGB, timecode,
-	COLUMN_STRINGC, gfourcc,-1 );	
-
-}
-*/
 
 /*
 	Update a slot, either set from function arguments or clear it
@@ -7962,8 +7715,6 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
     	slot->sample_type = sample_type;
 	slot->timecode = timecode == NULL ? strdup("") : strdup( timecode );
 	slot->title = title == NULL ? strdup("") : strdup( title );
-	// add sample/stream to sources
-
 
 	if( sample_id )
 	{
@@ -8004,70 +7755,6 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 	}
 
 }
-
-
-/*
-      Adding a video clip as sample; the VIMS command editlist add sample returns
-      a new ID, which we read by gveejay_new_slot()
-      then, we create a temporary sample and use this object to update the bank.
- */
-
-/* -------------------------------------------------------------------------------------------------------------------------- 
- * Function that is used for the VJ-GUI to show the options-dailog for a selected sample/stream
- * and decides if the selected slot contains an video-sample or an stream
- * -------------------------------------------------------------------------------------------------------------------------- */ 
-/* -------------------------------------------------------------------------------------------------------------------------- 
- * Function that is used to show in the options dialog the values of the selected sample... This function decides wether to 
- * take these values from the current loaded sample or by using a different way if the selected sample is not the currently
- * loaded on. The gboolean-Flag determines if the options-dialog is filled with actual data even if the selected sample
- * isn't currently played ... this is useful to avoid constantly reloading of unchanged values if the dialog currently
- * shows data of a non-played sample
-   -------------------------------------------------------------------------------------------------------------------------- */ 
-
-/* -------------------------------------------------------------------------------------------------------------------------- 
- * Function that is used for the VJ-GUI to apply all changes that are made within the sample/stream-options dialog
- * to the sample/stream that is shown within this dialog (which is the selected slot of the sample bank)
- * -------------------------------------------------------------------------------------------------------------------------- */
-
-
-
-/* -------------------------------------------------------------------------------------------------------------------------- 
- *
- * Function initialize the knobs to regulate the global speed and the audio volume 
- *  --------------------------------------------------------------------------------------------------------------------------*/
-/*void setup_knobs()
-{		
-    GtkAdjustment *speed_adj;       
-    char path[MAX_PATH_LEN];
-    veejay_memset(path,0,sizeof(path));
-    get_gd( path, NULL,  "knob.png" );
-    // audio volume 
-	GtkAdjustment *adj = GTK_ADJUSTMENT(gtk_adjustment_new( 100.0,0.0,100.0,0.1,1.0,0.0 ));
-
-//    info->audiovolume_knob = (GtkKnob *) gtk_knob_new(adj, path);
-//    gtk_widget_show(GTK_WIDGET(info->audiovolume_knob));
-//    gtk_widget_set_sensitive_( GTK_WIDGET(info->audiovolume_knob), TRUE);	
-//    gtk_container_add (GTK_CONTAINER (glade_xml_get_widget_( info->main_window, "audio_knobframe")), GTK_WIDGET(info->audiovolume_knob));    
-
-  //  g_signal_connect( adj, "value_changed", (GCallback) on_audiovolume_knob_value_changed, NULL );
-    update_label_i( "volume_label", 100,0); 
-
-    // speed
-    info->speed_knob = (GtkKnob *) gtk_knob_new(NULL,path);
-    gtk_widget_show(GTK_WIDGET(info->speed_knob));
-    gtk_widget_set_sensitive_( GTK_WIDGET(info->speed_knob), TRUE);	
-    gtk_container_add (GTK_CONTAINER (glade_xml_get_widget_( info->main_window, "speed_knobframe")), GTK_WIDGET(info->speed_knob));    
-
-    speed_adj = gtk_knob_get_adjustment(info->speed_knob);
-    speed_adj->lower = 0;
-    speed_adj->upper = 12;
-    speed_adj->step_increment = 1;    
-    speed_adj->page_size = 0;
-    speed_adj->page_increment = 1;    
-    g_signal_connect( speed_adj, "value_changed", (GCallback) on_speed_knob_value_changed, NULL );
-
-}
-*/
 
 void	veejay_release_track(int id, int release_this)
 {
