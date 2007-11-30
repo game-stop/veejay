@@ -1,0 +1,26 @@
+
+
+In this directory:
+
+ OSC/
+	Open Sound Control 'sendOSC' utility 
+	Use 'veejay -u |less' to find out what to send.
+ 
+ examples/
+	perl scripts that generate the files in vims/ are found here
+
+ livecinema/
+	action-file.xml  	;example action file for veejay , run with -l or --action-file 
+	     
+ vims/
+	the files in this directory can be send to veejay, it demonstrates series of effect chains.
+
+	sendVIMS -f montevideo-auto.txt
+
+
+ Example to produce a vims file and to send it to veejay:
+
+ $ perl examples/swirl.nl > vims/swirl.vims
+
+ $ sendVIMS -f vims/swirl.vims
+ 

@@ -1,0 +1,161 @@
+# (C) Matthijs v. Henten, 2007
+# For license details, see COPYING. 
+# License: GNU GPL
+
+style "default"
+{
+  xthickness = 1
+  ythickness = 1
+  GtkWidget::shadow_type = GTK_SHADOW_NONE
+  #GtkWidget::interior_focus = 0
+  #GtkWidget::focus_padding = 0
+  GtkWidget::default_border         = {0, 0, 0, 0}
+  GtkWidget::default_outside_border = {0, 0, 0, 0} 
+  GtkWidget::default_spacing        = 0
+  
+  GtkScale::stepper_size = 8
+  GtkRange::through-width = 1
+  GtkRange::trough_border = 0
+  GtkRange::slider-width = 16
+  GtkScale::slider-length = 12
+  
+  font_name = "Sans 10"
+
+  fg[NORMAL]        = "#333" # borders etc.
+  fg[PRELIGHT]      = "#444"
+  fg[ACTIVE]        = "#555" # ook borders, van sliders en notebook
+  fg[SELECTED]      = "#666"
+  fg[INSENSITIVE]   = "#777"
+  
+  bg[NORMAL]        = "#86b3b2" # algemene achtergrond kleur
+  bg[PRELIGHT]      = "#ad8282" # achtergrond geselecteerd widget
+  bg[ACTIVE]        = "#8e8e6b" # niet actieve tabs, achtergrond sliders
+  bg[SELECTED]      = "#444"
+  bg[INSENSITIVE]   = "#8e8e6b" # achtergrond kleur van niet actieve knopjes
+
+  text[NORMAL]      = "#ccc"
+  text[PRELIGHT]    = "#d8d8d8"
+  text[ACTIVE]      = "#fff"
+  text[SELECTED]    = "#fff"
+  text[INSENSITIVE] = "#404040"
+
+  base[NORMAL]      = "#37383f"
+  base[PRELIGHT]    = "#aaacc1"
+  base[ACTIVE]      = "#444"
+  base[SELECTED]    = "#444"
+  base[INSENSITIVE] = "#27282f"
+  
+}
+
+
+style "container"{
+  bg[NORMAL]	= "#cccc9b"
+  bg[ACTIVE]    = "#878765" # niet actieve tabs, achtergrond sliders
+}
+
+style "menubar"{
+	# bg_pixmap[NORMAL] = "gradient.png"
+	bg[NORMAL] = "#000000"
+}
+
+style "frame"{
+  bg[NORMAL]        = "#333" # 4lgemene achtergrond kleur
+}
+
+
+style "spin"{
+  font_name = "sans bold 10"
+
+  GtkButton::default-border = {0, 0, 0, 0}
+  GtkButton::default-outside-border = {0, 0, 0, 0}
+  GtkButton::inner-border = {0, 0, 0, 0}
+
+  
+  bg[NORMAL]        = "#ad8282"	# normal
+  bg[PRELIGHT]      = "#7a7c7c" # mouseover
+  bg[ACTIVE]        = "#0f0" # onmouseclick
+  bg[INSENSITIVE]   = "#878765"
+  
+  base[NORMAL]      = "#fff" # default background
+  base[SELECTED]    = "#444" # selected background
+	
+  text[NORMAL]      = "#000"
+  text[SELECTED]    = "#fff"
+}
+
+style "buttons"
+{
+
+  # bg_pixmap[NORMAL] = "gradient.png"
+  bg[NORMAL]        = "#ad8282"	# normal
+  bg[PRELIGHT]      = "#7a7c7c" # mouseover
+  bg[ACTIVE]        = "#0f0" # onmouseclick
+  bg[INSENSITIVE]   = "#878765"
+  
+  GtkButton::default-border = {0, 0, 0, 0}
+  GtkButton::default-outside-border = {0, 0, 0, 0}
+  GtkButton::inner-border = {0, 0, 0, 0}
+
+  GtkButton::child-displacement-x = 0
+  GtkButton::child-displacement-y = 0
+  GtkButton::displace-focus = 0
+
+}
+
+
+style "combobox"
+{
+  GtkButton::default-border = {0, 0, 0, 0}
+  GtkButton::default-outside-border = {0, 0, 0, 0}
+  GtkButton::inner-border = {0, 0, 0, 0}
+  GtkWidget::focus-line-width = 0
+  GtkWidget::focus-padding = 0
+  GtkWidget::focus-line-pattern = "\0\0\0\0\0\0\0\0"
+  GtkComboBox::hildonlike = 0
+  GtkComboBox::arrow-width = 20
+  GtkComboBox::arrow-height = 10
+  GtkComboBox::minimum-width = 50
+  GtkComboBox::minimum-height = 15
+  GtkComboBox::autodimmed_button = 0
+  GtkComboBox::appears-as-list = 0
+}
+
+style "menubar"{
+  font_name = "Sans Bold Italic 10"
+  bg[NORMAL]        = "#009696"	# normal
+  bg[PRELIGHT]      = "#7a7c7c" # mouseover
+  bg[ACTIVE]        = "#0f0" # onmouseclick
+  bg[INSENSITIVE]   = "#ccc"
+}
+
+style "white"{
+  bg[NORMAL]        = "#fff"	# normal
+  bg[PRELIGHT]      = "#fff" # mouseover
+  bg[ACTIVE]        = "#fff" # onmouseclick
+  bg[INSENSITIVE]   = "#fff"
+
+}
+
+
+
+class "GtkButton" style "buttons"
+class "GtkSpinButton" style "spin"
+class "GtkToggleButton" style "spin"
+class "GtkCheckBox" style "spin"
+class "GtkEntry" style "spin"
+
+
+class "GtkWidget" style "default"
+class "GtkComboBox" style "combobox"
+class "GtkComboBoxEntry" style "combobox"
+class "GtkNotebook" style "container"
+
+
+# class "GtkTreeView" style "tree"
+class "GtkMenuBar" style "menubar"
+widget "*.GtkComboBox.*" style "combobox"
+widget "menubar2" style "white"
+widget "sample_bank_hbox" style "container"
+
+
+

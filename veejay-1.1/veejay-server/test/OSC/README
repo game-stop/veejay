@@ -1,0 +1,4 @@
+1. run make in libOSC
+2. run make in send+dump
+
+now you have a sendOSC utility in send+dump

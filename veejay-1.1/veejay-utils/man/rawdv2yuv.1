@@ -1,0 +1,58 @@
+.TH "rawdv2yuv" 1
+.SH NAME
+rawdv2yuv decodes a rawdv stream from stdin to yuv I420/YV12 and
+writes it to stdout.
+.SH SYNOPSIS
+.B rawdv2yuv [options] 
+.SH DESCRIPTION
+.B rawdv2yuv
+rawdv2yuv is a simple I420/YV12 encoder that has some additional
+parameters to produce a half sized I420/YV12 frame. The motivation
+for this option is to be able to quickly downscale a full PAL/NTSC
+frame. 
+
+This program expects input from STDIN and writes a Y4M stream
+to STDOUT. 
+
+.SH OPTIONS
+The command line options allow to specify its behaviour
+.TP
+.B \-x
+Swap cb/cr channels to produce IV12 (default is I420)
+.TP
+.B \-n [01]
+Norm to use for rawdv input, 0 = NTSC , 1 = PAL (default is PAL)
+.TP
+.B \-h 
+Output half sized YV12/I420 frame (default is no downscaling)
+.TP
+.B \-c <num>
+Clip width by a multiple of 8  
+.TP
+.B \-q 
+Set rawdv quality to FASTEST (monochrome). Default is BEST.
+.TP
+.B \-v [012]
+Try to be silent or verbose
+.SH USEFULL EXAMPLES
+.TP
+.B dvgrab --format rawdv - |rawdv2yuv -h -c 8 | yuvplay
+This commands grabs rawdv and pipes it trough rawdv2yuv
+to produce a 352x288 y4m stream. Full PAL is 720x576, 
+the -h option produces 360x288 and -c clips off 8 pixels
+from the frame width.
+.TP
+.B cat rawdv_file.dv | rawdv2yuv -n 1 > i420_stream.y4m
+Converts a NTSC rawdv file to a 720x480 y4m frame (I420)
+.SH BUGS
+see BUGS in the source package
+.SH AUTHOR
+This man page was written by Niels Elburg.
+If you have questions, remarks or you just want to
+contact the developers, the main mailing list for this
+project is: 
+.I veejay-users@lists.sourceforge.net
+For more info see the website at
+.I http://veejay.sourceforge.net
+.SH "SEE ALSO"
+.B veejay yuv2rawdv rawdv2yuv sendVIMS
