@@ -978,7 +978,6 @@ libsamplerec/Makefile
 bio2jack/Makefile
 veejay/Makefile
 man/Makefile
-veejay-config
 veejay.pc
 ])
 AC_OUTPUT
