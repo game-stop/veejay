@@ -988,7 +988,10 @@ static	void	*gvr_preview_thread(gpointer data)
 			break;
 
 		if( score == 0 )
-			g_usleep( 40000 / ac  );
+		{
+			gulong sl = 40000 / (gulong) ac;
+			g_usleep( sl );
+		}
 	}
 
 

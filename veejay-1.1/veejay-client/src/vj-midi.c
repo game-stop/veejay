@@ -452,9 +452,7 @@ int	vj_midi_handle_events(void *vv)
 
 	if( poll( v->pfd, v->npfd, 0 ) > 0 )
 	{
-	//@ snd_event_input_pending doesnt work
-	//	while( snd_seq_event_input_pending( v->sequencer, 0 ) > 0 )
-			vj_midi_action( v );
+		vj_midi_action( v );
 		return 1;
 	}
 	return 0;
