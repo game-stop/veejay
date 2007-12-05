@@ -640,7 +640,7 @@ void	vj_event_init(void);
 
 int	vj_has_video(veejay_t *v)
 {
-	if(v->current_edit_list->video_frames >= 1 && !v->current_edit_list->is_empty)
+	if(v->current_edit_list->video_frames >= 1 && !v->current_edit_list->is_empty && v->current_edit_list->total_frames > 0)
 		return 1;
 	return 0;
 }
@@ -2100,12 +2100,8 @@ void vj_event_xml_new_keyb_event( void *ptr, xmlDocPtr doc, xmlNodePtr cur )
 		m->modifier    = b_mod;
 
 
-		if(!vj_event_bundle_store(m))
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "%s Error storing newly created bundle?!", __FUNCTION__);
-			return;
-		}
-		veejay_msg(VEEJAY_MSG_DEBUG, "Added bundle %d , trigger with key %d (mod %d)", event_id, b_key, b_mod);
+		if(vj_event_bundle_store(m))
+			veejay_msg(VEEJAY_MSG_DEBUG, "Added bundle %d , trigger with key %d (mod %d)", event_id, b_key, b_mod);
 	}
 
 #ifdef HAVE_SDL
@@ -2398,11 +2394,7 @@ int 	vj_event_register_keyb_event(int event_id, int symbol, int modifier, const 
 
 
 	if(!ev)
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Error in %s, %d + %d (%s, %p)  VIMS %d",
-			__FUNCTION__ , modifier, symbol,  value, value, event_id );
 		return 0;
-	}
 	
 	hnode_t *node = hnode_create( ev );
 	if(!node)
@@ -3148,18 +3140,18 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 	{
 		int args[2];
 		char *s = NULL;
-		int num_frames = v->edit_list->video_frames-1;
+		int num_frames = v->edit_list->total_frames;
 		P_A(args,s,format,ap);
 
 		if(args[0] < 0)
 		{
 			/* count from last frame */
 			int nframe = args[0];
-			args[0] = v->edit_list->video_frames - 1 + nframe;
+			args[0] = v->edit_list->total_frames + nframe;
 		}
 		if(args[1] == 0)
 		{
-			args[1] = v->edit_list->video_frames - 1;
+			args[1] = v->edit_list->total_frames;
 		}
 
 		if(args[0] >= 0 && args[1] > 0 && args[0] <= args[1] && args[0] <= num_frames &&
@@ -3172,7 +3164,7 @@ void vj_event_sample_new(void *ptr, const char format[], va_list ap)
 				return;
 			}
 			int start = 0;
-			int end = el->video_frames - 1;
+			int end = el->total_frames;
 
 			sample_info *skel = sample_skeleton_new(start, end );
 			if(skel)
@@ -3493,7 +3485,7 @@ void vj_event_set_frame(void *ptr, const char format[], va_list ap)
 		char *str = NULL;
 		P_A(args,str,format,ap);
 		if(args[0] == -1 )
-			args[0] = v->edit_list->video_frames - 1;
+			args[0] = v->edit_list->total_frames;
 		veejay_set_frame(v, args[0]);
 	}
 	else
@@ -3625,8 +3617,8 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 			long start_dif = devia;
 			long end_dif   = (v->uc->sample_end - v->uc->sample_start);
 			if(vstart < 0 ) { vstart=0; start_dif = v->uc->sample_start; }
-			if(vend >= v->current_edit_list->video_frames) {
- 				vend = v->current_edit_list->video_frames-1;
+			if(vend > v->current_edit_list->total_frames) {
+ 				vend = v->current_edit_list->total_frames;
 				}
 
 			editlist *el = veejay_edit_copy_to_new( v, v->current_edit_list, vstart, vend );
@@ -3655,7 +3647,7 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 					0,
 					start,
 					end,
-					el->video_frames-1);
+					el->total_frames);
 			}
 			else
 			{
@@ -3689,8 +3681,9 @@ void vj_event_goto_end(void *ptr, const char format[], va_list ap)
   	}
   	if(PLAIN_PLAYING(v)) 
  	{
-		veejay_set_frame(v,(v->edit_list->video_frames-1));
-		veejay_msg(VEEJAY_MSG_INFO, "Goto last frame of edit decision list");
+		veejay_set_frame(v,v->edit_list->total_frames);
+		veejay_msg(VEEJAY_MSG_INFO, "Goto frame %ld of edit decision list",
+				v->edit_list->total_frames);
   	}
 }
 
@@ -6097,7 +6090,7 @@ void vj_event_el_cut(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL (is this possible?)");
 			return;
 		}	
-		if( args[0] < 0 || args[0] >= el->video_frames || args[1] < 0 || args[1] >= el->video_frames)
+		if( args[0] < 0 || args[0] > el->total_frames || args[1] < 0 || args[1] > el->total_frames)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Frame number out of bounds");
 			return;
@@ -6112,7 +6105,7 @@ void vj_event_el_cut(void *ptr, const char format[], va_list ap)
 		sample_set_startframe( v->uc->sample_id, 0 );
 		sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id) );
 
-		constrain_sample( v, v->uc->sample_id, 0, el->video_frames -1 );
+		constrain_sample( v, v->uc->sample_id, 0, el->total_frames );
 	}
 
 	if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
@@ -6143,7 +6136,7 @@ void vj_event_el_copy(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL (is this possible?)");
 			return;
 		}
-		if( args[0] < 0 || args[0] >= el->video_frames || args[1] < 0 || args[1] >= el->video_frames)
+		if( args[0] < 0 || args[0] > el->total_frames || args[1] < 0 || args[1] > el->total_frames)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Frame number out of bounds");
 			return;
@@ -6158,7 +6151,7 @@ void vj_event_el_copy(void *ptr, const char format[], va_list ap)
 		sample_set_startframe( v->uc->sample_id, 0 );
 		sample_set_endframe(   v->uc->sample_id,sample_video_length(v->uc->sample_id));
 
-		constrain_sample( v, v->uc->sample_id, 0, el->video_frames - 1 );
+		constrain_sample( v, v->uc->sample_id, 0, el->total_frames );
 	}
 	if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
 	{
@@ -6189,7 +6182,7 @@ void vj_event_el_del(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL (is this possible?)");
 			return;
 		}	
-		if( args[0] < 0 || args[0] >= el->video_frames || args[1] < 0 || args[1] >= el->video_frames)
+		if( args[0] < 0 || args[0] > el->total_frames || args[1] < 0 || args[1] > el->total_frames)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Frame number out of bounds");
 			return;
@@ -6203,7 +6196,7 @@ void vj_event_el_del(void *ptr, const char format[], va_list ap)
 		sample_set_startframe( v->uc->sample_id, 0 );
 		sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id));
 
-		constrain_sample( v, v->uc->sample_id, 0, el->video_frames - 1 );
+		constrain_sample( v, v->uc->sample_id, 0, el->total_frames  );
 
 	}
 
@@ -6242,7 +6235,7 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 			return;
 		}
 
-		if( args[0] < 0 || args[0] >= el->video_frames || args[1] < 0 || args[1] >= el->video_frames)
+		if( args[0] < 0 || args[0] > el->total_frames || args[1] < 0 || args[1] > el->total_frames)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Frame number out of bounds");
 			return;
@@ -6259,16 +6252,16 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 		if(s1)
 		{
 			args[1] -= args[0]; // after deleting the first part, move arg[1]
-			s2 = veejay_edit_delete(v, el,args[1], el->video_frames-1); 
+			s2 = veejay_edit_delete(v, el,args[1], el->total_frames); 
 			if(s2)
 			{
 				veejay_set_frame(v,0);
 				veejay_msg(VEEJAY_MSG_INFO, "Delete frames 0- %d , %d - %d from sample %d", 0,args[0],args[1],
-					el->video_frames - 1, v->uc->sample_id);
+					el->total_frames, v->uc->sample_id);
 				res = 1;
 				sample_set_startframe( v->uc->sample_id, 0 );
 				sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id) );
-				constrain_sample( v, v->uc->sample_id,0, el->video_frames - 1 );
+				constrain_sample( v, v->uc->sample_id,0, el->total_frames );
 			}
 
 		}
@@ -6299,13 +6292,13 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
                 }
 
 		editlist *el = sample_get_editlist( v->uc->sample_id );
-		long length = el->video_frames-1;
+		long length = el->total_frames;
 		if(!el)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Sample has no EDL");
 			return;
 		}
-		if( args[0] >= 0 && args[0] <= el->video_frames-1)
+		if( args[0] >= 0 && args[0] <= el->total_frames)
 		{		
 			if( veejay_edit_paste( v, el, args[0] ) ) 
 			{
@@ -6313,7 +6306,7 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 			}
 			sample_set_startframe( v->uc->sample_id, 0 );
 			sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id));
-			constrain_sample( v, v->uc->sample_id, 0, el->video_frames-1);
+			constrain_sample( v, v->uc->sample_id, 0, el->total_frames);
 		}
 
 	}
@@ -6352,7 +6345,7 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int start = -1;
-	int destination = v->edit_list->video_frames-1;
+	int destination = v->edit_list->total_frames;
 	char str[1024];
 	int *args = NULL;
 	P_A(args,str,format,ap);
@@ -8148,7 +8141,7 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 	editlist *el = ( SAMPLE_PLAYING(v) ? sample_get_editlist( v->uc->sample_id ) : 
 				v->current_edit_list );
 
-	long n_frames = el->video_frames;
+	long n_frames = el->total_frames;
 	if( SAMPLE_PLAYING(v))
 		n_frames = sample_max_video_length( v->uc->sample_id );
 
