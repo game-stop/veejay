@@ -345,7 +345,8 @@ int veejay_set_speed(veejay_t * info, int speed)
 	{
 
 	case VJ_PLAYBACK_MODE_PLAIN:
-		len = info->current_edit_list->video_frames - 1;
+//		len = info->current_edit_list->video_frames - 1;
+		len = info->current_edit_list->total_frames;
 		if( abs(speed) <= len )
 			settings->current_playback_speed = speed;	
 		else
@@ -420,6 +421,7 @@ int veejay_increase_frame(veejay_t * info, long num)
 		    sample_get_endFrame(info->uc->sample_id)) return 0;
     
     }
+
     settings->current_frame_num += num;
 
     return 1;
@@ -541,7 +543,6 @@ int veejay_set_frame(veejay_t * info, long framenum)
 
     settings->current_frame_num = framenum;
 
-
     return 1;  
 }
 
@@ -596,8 +597,8 @@ int veejay_init_editlist(veejay_t * info)
 
     /* Set min/max options so that it runs like it should */
     settings->min_frame_num = 0;
-    settings->max_frame_num = el->video_frames - 1;
-
+//    settings->max_frame_num = el->video_frames - 1;
+    settings->max_frame_num = el->total_frames;
     settings->current_frame_num = settings->min_frame_num;
     settings->previous_frame_num = 1;
     settings->spvf = 1.0 / el->video_fps;
@@ -785,7 +786,8 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		info->edit_list = info->current_edit_list;
 		video_playback_setup *settings = info->settings;
 		settings->min_frame_num = 0;
-		settings->max_frame_num = info->edit_list->video_frames-1;
+//		settings->max_frame_num = info->edit_list->video_frames-1;
+		settings->max_frame_num = info->edit_list->total_frames;
 		veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %d - %d",
 			(int)settings->min_frame_num,  (int)settings->max_frame_num );
 	}
@@ -2317,7 +2319,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 					veejay_msg(0, "Unable to start from file, Abort");
 					return -1;
 				}
-				sample_info *skel = sample_skeleton_new( 0, el->video_frames-1 );
+				sample_info *skel = sample_skeleton_new( 0, el->total_frames );
 				if(skel)
 				{
 					skel->edit_list = el;
@@ -2471,9 +2473,9 @@ static void veejay_playback_cycle(veejay_t * info)
 	}
     }
 
-    if( settings->ncpu > 1 && which_cpu)
+    if( settings->ncpu > 1 && which_cpu && settings->ncpu == 2)
     {
-	veejay_msg(VEEJAY_MSG_INFO, "Running on multiprocessor. Locking CPU %d for rendering purposes", which_cpu);
+	veejay_msg(VEEJAY_MSG_INFO, "Found two cpu's, locking CPU %d for rendering purposes", which_cpu);
 	veejay_pin_cpu( info, which_cpu );
     }
 
@@ -2835,10 +2837,10 @@ int vj_server_setup(veejay_t * info)
 
 	if( info->settings->use_mcast )
 		veejay_msg(VEEJAY_MSG_INFO, "UDP multicast OSC channel ready at port %d (group '%s')",
-			info->uc->port + 2, info->settings->group_name );
+			info->uc->port + 4, info->settings->group_name );
 	else
 		veejay_msg(VEEJAY_MSG_INFO, "UDP unicast OSC channel ready at port %d",
-			info->uc->port + 2 );
+			info->uc->port + 4 );
 
 	if(vj_osc_setup_addr_space(info->osc) == 0)
 		veejay_msg(VEEJAY_MSG_INFO, "Initialized OSC (http://www.cnmat.berkeley.edu/OpenSoundControl/)");
@@ -2894,8 +2896,8 @@ int	prepare_cache_line(int perc, int n_slots)
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "%d Kb total system RAM , Consuming up to %2.2f Mb",
 				total, (float)max_memory / 1024.0 );
-		veejay_msg(VEEJAY_MSG_INFO, "Cache line size is %d Mb per Sample",
-				chunk_size);
+		veejay_msg(VEEJAY_MSG_INFO, "Cache line size is %d Kb (%2.2f Mb) per sample",
+				chunk_size, (float) chunk_size/1024.0);
 		vj_el_init_chunk( chunk_size );
 	}
 	else
@@ -3168,7 +3170,7 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 //veejay_msg(0, "memcpy %p, %p", el->frame_list + n1, el->frame_list + n1 + len );
 	veejay_memcpy( new_el->frame_list , el->frame_list + n1, sizeof(uint64_t) * len );
 	new_el->video_frames = len;
-
+	new_el->total_frames = len - 1;
 //	for (i = n1; i <= n2; i++)
 //		new_el->frame_list[k++] = el->frame_list[i];
 
@@ -3205,7 +3207,7 @@ int veejay_edit_delete(veejay_t * info, editlist *el, long start, long end)
 		return 0;
 	}
 
-	if (n2 < n1 || n1 >= el->video_frames|| n2 >= el->video_frames )
+	if (n2 < n1 || n1 > el->total_frames || n2 > el->total_frames )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, 
 			    "Incorrect parameters for deleting frames");
@@ -3244,7 +3246,7 @@ int veejay_edit_delete(veejay_t * info, editlist *el, long start, long end)
     	}
 
     	el->video_frames -= (n2 - n1 + 1);
-
+	el->total_frames = el->video_frames - 1;
     	return 1;
 }
 
@@ -3300,12 +3302,12 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 	}
 	else
 	{
-		if (destination < 0 || destination >= el->video_frames)
+		if (destination < 0 || destination > el->total_frames)
 		{
 			if(destination < 0)
 				veejay_msg(VEEJAY_MSG_ERROR, 
 					    "Destination cannot be negative");
-			if(destination >= el->video_frames)
+			if(destination > el->total_frames)
 				veejay_msg(VEEJAY_MSG_ERROR, "Cannot paste beyond Edit List!");
 			return 0;
     		}
@@ -3322,7 +3324,7 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
     }
 
    	k = (uint64_t)settings->save_list_len;
-    	for (i = el->video_frames - 1; i >= destination && i > 0; i--)
+    	for (i = el->total_frames; i >= destination && i > 0; i--)
 		el->frame_list[i + k] = el->frame_list[i];
     	k = destination;
 	for (i = 0; i < settings->save_list_len; i++)
@@ -3336,7 +3338,7 @@ int veejay_edit_paste(veejay_t * info, editlist *el, long destination)
 		k++;
 	}
 	el->video_frames += settings->save_list_len;
-
+	el->total_frames = el->video_frames - 1;
 	if(el->is_empty)
 		el->is_empty = 0;
     	veejay_increase_frame(info, 0);
@@ -3363,13 +3365,13 @@ int veejay_edit_move(veejay_t * info,editlist *el, long start, long end,
     if( el->is_empty )
 		return 0;
 	
-    if (destination >= el->video_frames || destination < 0
+    if (destination > el->total_frames || destination < 0
 		|| start < 0 || end < 0 || start >= el->video_frames
-		|| end >= el->video_frames || end < start)
+		|| end > el->total_frames || end < start)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid parameters for moving video from %ld - %ld to position %ld",
 			start,end,destination);
-		veejay_msg(VEEJAY_MSG_ERROR, "Range is 0 - %ld", el->video_frames);   
+		veejay_msg(VEEJAY_MSG_ERROR, "Range is 0 - %ld", el->total_frames);   
 		return 0;
     }
 
@@ -3454,7 +3456,7 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 	// the sample is not there yet,create it
 	if(!sample)
 	{
-		sample = sample_skeleton_new( 0, sample_edl->video_frames - 1 );
+		sample = sample_skeleton_new( 0, sample_edl->total_frames );
 		if(sample)
 		{
 			sample->edit_list = sample_edl;
@@ -3514,8 +3516,8 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start,
 	}
  
 	el->video_frames = c;
-
-	settings->max_frame_num = el->video_frames - 1;
+	el->total_frames = el->video_frames - 1;
+	settings->max_frame_num = el->total_frames;
 	settings->min_frame_num = 0;
 
 	return 1;
@@ -3579,7 +3581,7 @@ int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
 		return 0;
 	}
 	if(n1 == 0 && n2 == 0 )
-		n2 = info->edit_list->video_frames - 1;
+		n2 = info->edit_list->total_frames;
 	if( vj_el_write_editlist( filename, n1,n2, info->edit_list ) )
 		veejay_msg(VEEJAY_MSG_INFO, "Saved editlist to file [%s]", filename);
 	else
