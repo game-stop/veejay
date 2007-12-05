@@ -156,6 +156,7 @@ void vj_osc_cb_set_parameter7(void *context, int arglen, const void *vargs, OSCT
 void vj_osc_cb_set_parameter8(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_tag_new_v4l(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 void vj_osc_cb_tag_new_y4m(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
+void vj_osc_cb_tag_new_solid(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra);
 
 void vj_osc_cb_tag_new_net(void *context, int arglen, const void *vargs, OSCTimeTag when,NetworkReturnAddressPtr ra );
 
@@ -817,6 +818,11 @@ void vj_osc_cb_tag_new_v4l(void *context, int arglen, const void *vargs, OSCTime
 {
 	NET_F(arglen,vargs,VIMS_STREAM_NEW_V4L);
 }
+void vj_osc_cb_tag_new_solid(void *context, int arglen, const void *vargs, OSCTimeTag when,
+	NetworkReturnAddressPtr ra)
+{
+	NET_F(arglen,vargs,VIMS_STREAM_NEW_COLOR);
+}
 
 void vj_osc_cb_tag_new_net(void *context, int arglen, const void *vargs, OSCTimeTag when,
     NetworkReturnAddressPtr ra)
@@ -961,6 +967,8 @@ static struct
 								"select",		vj_osc_cb_tag_select,				2	},
 	{ "new video4linux input stream <device num> <channel num>",
 								"v4l",			vj_osc_cb_tag_new_v4l,				19	},
+	{ "new solid color stream <R> <G> <B>",		
+								"solid",		vj_osc_cb_tag_new_solid,			19	},
 	{ "new yuv4mpeg input stream <filename>",
 								"y4m",			vj_osc_cb_tag_new_y4m,				19	},
 	{ "new multicast input stream <address> <port>",
