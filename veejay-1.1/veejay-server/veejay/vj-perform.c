@@ -207,7 +207,7 @@ static int vj_perform_increase_tag_frame(veejay_t * info, long num)
 	}
 	return -1;
     }
-    if (settings->current_frame_num > settings->max_frame_num) {
+    if (settings->current_frame_num >= settings->max_frame_num) {
 	settings->current_frame_num = settings->min_frame_num;
 	return -1;
     }
@@ -236,12 +236,13 @@ static int vj_perform_increase_plain_frame(veejay_t * info, long num)
 	        	
 	return 0;
     }
-    if (settings->current_frame_num > settings->max_frame_num) {
+    if (settings->current_frame_num >= settings->max_frame_num) {
 	if(!info->continuous)
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Reached end of video - Ending veejay session ... ");
 		veejay_change_state(info, LAVPLAY_STATE_STOP);
 	}
+	settings->current_frame_num = settings->max_frame_num;
 	return 0;
     }
     return 0;
@@ -391,8 +392,10 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 		int num   = end - ((int) ( (double)range*rand()/(RAND_MAX)));
 		settings->current_frame_num = num;
 	}
-
-	if (settings->current_frame_num < start || settings->current_frame_num > end || settings->current_frame_num < 0) {
+#ifdef STRICT_CHECKING
+	assert( settings->current_frame_num >= 0 );
+#endif 
+	if (settings->current_frame_num < start || settings->current_frame_num >= end ) {
 	    switch (looptype) {
 	    case 2:
 		info->uc->direction = 1;
@@ -2747,16 +2750,6 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
    	
 	//@ Render any subtitles in sample/stream (Leaves FX chain supersampled)
 	vj_perform_render_font( info, settings );
-
-	//@ record frame before rendering viewport (default)
-	//if( settings->vp_rec == 0 && pvar_.enc_active )
-	//{
-	//	vj_perform_record_frame(info );
-	//}
-
-	//@ Render viewport
-	//	if(info->use_vp && info->frontback==0)
-	//	deep = vj_perform_render_viewport( info, settings );
 
 	//@ record frame 
 	if( pvar_.enc_active )
