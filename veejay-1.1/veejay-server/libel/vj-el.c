@@ -357,7 +357,8 @@ void	vj_el_setup_cache( editlist *el )
 	if(!el->cache && !never_cache_)
 	{
 		int n_slots = mem_chunk_ / el->max_frame_size;
-		if( n_slots < (el->video_frames - 1) )
+//		if( n_slots < (el->video_frames - 1) )
+		if( n_slots < el->total_frames )
 		{
 			veejay_msg(VEEJAY_MSG_DEBUG, "Not caching this EDL to memory (Cachesize too small)");
 			veejay_msg(VEEJAY_MSG_DEBUG, "try increasing cache size with -m commandline parameter");
@@ -906,6 +907,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	el->is_empty = 0;	
 	el->has_video = 1;
 	el->num_video_files ++;
+	el->total_frames = el->video_frames - 1;
     return n;
 }
 
@@ -953,8 +955,10 @@ static int	vj_el_dummy_frame( uint8_t *dst[3], editlist *el ,int pix_fmt)
 void	vj_el_get_video_fourcc(editlist *el, int num, char *fourcc)
 {
 	uint64_t n;
-	if( num < 0 ) num = 0; else if (num >= el->video_frames ) num = el->video_frames - 1;
-
+//	if( num < 0 ) num = 0; else if (num >= el->video_frames ) num = el->video_frames - 1;
+#ifdef STRICT_CHECKING
+	assert( num >= 0 && num <= el->total_frames );
+#endif
 	n = el->frame_list[ num ];
 
 	const char *compr = lav_video_compressor( el->lav_fd[ N_EL_FILE(n) ] );
@@ -1004,11 +1008,13 @@ int	vj_el_set_bogus_length( editlist *el, long nframe, int len )
 
 	if( !el->has_video || el->is_empty )
 		return 0;
-
-	if( nframe < 0 )
-		nframe = 0;
-	else if (nframe >= el->video_frames )
-		nframe = el->video_frames - 1;
+#ifdef STRICT_CHECKING
+	assert( nframe >= 0 && nframe <= el->total_frames );
+#endif
+//	if( nframe < 0 )
+//		nframe = 0;
+//	else if (nframe >= el->video_frames )
+//		nframe = el->video_frames - 1;
 
 	n = el->frame_list[nframe];
 
@@ -1022,25 +1028,31 @@ int	vj_el_set_bogus_length( editlist *el, long nframe, int len )
 
 int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 {
+	if( el->has_video == 0 || el->is_empty )
+	{
+		vj_el_dummy_frame( dst, el, el->pixel_format );
+		return 2;
+	}
+
 	int res = 0;
    	uint64_t n;
 	int decoder_id =0;
 	int c_i = 0;
 	vj_decoder *d = NULL;
-
 	int out_pix_fmt = el->pixel_format;
 	int in_pix_fmt  = out_pix_fmt;
-	if( el->has_video == 0 || el->is_empty )
-	{
-		vj_el_dummy_frame( dst, el, out_pix_fmt );
-		return 2;
-	}
 
-	if (nframe < 0)
-		nframe = 0;
+#ifdef STRICT_CHECKING
+	if( nframe > el->total_frames  )
+		veejay_msg(0, "Fatal: %ld requested, have only %ld",
+			nframe, el->total_frames);
+	assert( nframe >= 0 && nframe < el->video_frames );
+#endif
+//	if (nframe < 0)
+//		nframe = 0;
 
-	if (nframe >= el->video_frames)
-		nframe = el->video_frames-1;
+//	if (nframe >= el->video_frames)
+//		nframe = el->video_frames-1;
 
 	n = el->frame_list[nframe];
 
@@ -1418,12 +1430,14 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
 
     	if (!el->has_audio)
 		return 0;
+#ifdef STRICT_CHECKING
+	assert( nframe >= 0 && nframe < el->video_frames );
+#endif
+//    	if (nframe < 0)
+//		nframe = 0;
 
-    	if (nframe < 0)
-		nframe = 0;
-
-	if (nframe >= el->video_frames)
-		nframe = el->video_frames-1;
+//	if (nframe >= el->video_frames)
+//		nframe = el->video_frames-1;
 
     n = el->frame_list[nframe];
 
@@ -1514,12 +1528,15 @@ int	vj_el_get_audio_frame_at(editlist *el, uint32_t nframe, uint8_t *dst, int nu
 		veejay_memset(dst,0,size);
 		return size;
 	}
+#ifdef STRICT_CHECKING
+	assert( nframe >= 0 && nframe < el->video_frames );
+#endif
 
-    if (nframe < 0)
-		nframe = 0;
+//    if (nframe < 0)
+//		nframe = 0;
 
-    if (nframe >= el->video_frames)
-		nframe = el->video_frames - 1;
+//    if (nframe >= el->video_frames)
+//		nframe = el->video_frames - 1;
 
     n = el->frame_list[nframe];
 
@@ -1560,6 +1577,7 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 	el->video_width = width;
 	el->video_height = height;
 	el->video_frames = DUMMY_FRAMES; /* veejay needs at least 2 frames (play and queue next)*/
+	el->total_frames = DUMMY_FRAMES-1;
 	el->video_fps = fps;
 	el->video_inter = LAV_NOT_INTERLACED;
 
@@ -1812,7 +1830,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
     //el->auto_deinter = auto_deinter;
     //if(el->video_inter != 0 ) el->auto_deinter = 0;
 	el->auto_deinter = 0;
-
+	el->total_frames = el->video_frames - 1;
 	return el;
 }
 
@@ -2036,7 +2054,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	sprintf(last_word,"%016lld", oldframe);
 	veejay_strncat( result, last_word, 16 );
 	*bytes_written = strlen( result );
-
+	el->total_frames = el->video_frames - 1;
 	return result;
 }
 
@@ -2121,7 +2139,7 @@ int	vj_el_write_editlist( char *name, long _n1, long _n2, editlist *el )
 		veejay_msg(VEEJAY_MSG_ERROR,"Error writing edit list: ");
 		return 0;
     	}
-
+	el->total_frames = el->video_frames - 1;
     	fclose(fd);
 
 	return 1;
@@ -2154,6 +2172,7 @@ editlist	*vj_el_soft_clone(editlist *el)
 	clone->audio_bits = el->audio_bits;
 	clone->audio_bps = el->audio_bps;
 	clone->video_frames = el->video_frames;
+	clone->total_frames = el->video_frames-1;
 	clone->num_video_files = el->num_video_files;
 	clone->max_frame_size = el->max_frame_size;
 	clone->MJPG_chroma = el->MJPG_chroma;

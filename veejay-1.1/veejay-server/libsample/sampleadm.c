@@ -1579,8 +1579,8 @@ int sample_set_startframe(int s1, long frame_num)
 	 return 1; //@ simpler to lie
 
     if(sample->edit_list)
-	if( frame_num >= sample->edit_list->video_frames  )
-		frame_num = sample->edit_list->video_frames - 1;
+	if( frame_num > sample->edit_list->total_frames  )
+		frame_num = sample->edit_list->total_frames;
   
     sample->first_frame = frame_num;
     if(sample->first_frame >= sample->last_frame )
@@ -1611,7 +1611,7 @@ int	sample_max_video_length(int s1)
 		return (60 * fps * 6); // 6 minutes
 	
 	if( sample->edit_list )
-		return (int) sample->edit_list->video_frames;
+		return (int) sample->edit_list->total_frames;
 	return 0;
 }
 
@@ -1622,7 +1622,7 @@ int	sample_video_length( int s1 )
 	if( sample->play_length )
 		return sample->play_length;
 	if( sample->edit_list )
-		return sample->edit_list->video_frames;
+		return sample->edit_list->total_frames;
 	return 0;
 }
 
@@ -1653,8 +1653,8 @@ int sample_set_endframe(int s1, long frame_num)
     }
 
     if(sample->edit_list)
-	if( frame_num >= sample->edit_list->video_frames )
-		frame_num = sample->edit_list->video_frames - 1;
+	if( frame_num > sample->edit_list->total_frames )
+		frame_num = sample->edit_list->total_frames;
 
     sample->last_frame = frame_num;
 

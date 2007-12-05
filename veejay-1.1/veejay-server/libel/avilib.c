@@ -30,7 +30,9 @@
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include "avilib.h"
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 #define INFO_LIST
 
 // add a new riff chunk after XX MB
@@ -3220,11 +3222,15 @@ int AVI_seek_start(avi_t *AVI)
 
 int AVI_set_video_position(avi_t *AVI, long frame)
 {
-   if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
-   if(!AVI->video_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
-
-   if (frame < 0 ) frame = 0;
-   AVI->video_pos = frame;
+#ifdef STRICT_CHECKING
+	assert( AVI->mode != AVI_MODE_WRITE );
+	assert( AVI->video_index );
+	assert( frame >= 0 && frame < AVI->video_frames);
+#endif
+//   if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
+//   if(!AVI->video_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
+//   if (frame < 0 ) frame = 0;
+     AVI->video_pos = frame;
    return 0;
 }
 
@@ -3240,12 +3246,15 @@ int AVI_set_audio_bitrate(avi_t *AVI, long bitrate)
 long AVI_read_frame(avi_t *AVI, char *vidbuf, int *keyframe)
 {
    long n;
-
-   if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
-   if(!AVI->video_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
-
-   if(AVI->video_pos < 0 || AVI->video_pos >= AVI->video_frames) return -1;
-   n = AVI->video_index[AVI->video_pos].len;
+#ifdef STRICT_CHECKING
+	assert( AVI->mode != AVI_MODE_WRITE );
+	assert( AVI->video_index );
+	assert( AVI->video_pos >= 0 && AVI->video_pos < AVI->video_frames );
+#endif
+//  if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
+//   if(!AVI->video_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
+//   if(AVI->video_pos < 0 || AVI->video_pos >= AVI->video_frames) return -1;
+    n = AVI->video_index[AVI->video_pos].len;
 
    *keyframe = (AVI->video_index[AVI->video_pos].key==0x10) ? 1:0;
 
@@ -3256,7 +3265,7 @@ long AVI_read_frame(avi_t *AVI, char *vidbuf, int *keyframe)
 
    if( AVI->mmap_region == NULL )
    {
-  	 lseek(AVI->fdes, AVI->video_index[AVI->video_pos].pos, SEEK_SET);
+  	lseek(AVI->fdes, AVI->video_index[AVI->video_pos].pos, SEEK_SET);
    	if (avi_read(AVI->fdes,vidbuf,n) != n)
    	{
       		AVI_errno = AVI_ERR_READ;
@@ -3330,9 +3339,12 @@ long AVI_read_audio(avi_t *AVI, char *audbuf, long bytes)
    long nr, left, todo;
    off_t pos;
 
-   if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
-   if(!AVI->track[AVI->aptr].audio_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
-
+//   if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
+//   if(!AVI->track[AVI->aptr].audio_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
+#ifdef STRICT_CHECKING
+	assert( AVI->mode != AVI_MODE_WRITE );
+	assert( AVI->track[AVI->aptr].audio_index );
+#endif
    nr = 0; /* total number of bytes read */
 
    if (bytes==0) {
@@ -3384,10 +3396,16 @@ long AVI_read_audio_chunk(avi_t *AVI, char *audbuf)
    long left;
    off_t pos;
 
-   if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
-   if(!AVI->track[AVI->aptr].audio_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
+//   if(AVI->mode==AVI_MODE_WRITE) { AVI_errno = AVI_ERR_NOT_PERM; return -1; }
+//   if(!AVI->track[AVI->aptr].audio_index)         { AVI_errno = AVI_ERR_NO_IDX;   return -1; }
 
-   if (AVI->track[AVI->aptr].audio_posc+1>AVI->track[AVI->aptr].audio_chunks) return -1;
+//   if (AVI->track[AVI->aptr].audio_posc+1>AVI->track[AVI->aptr].audio_chunks) return -1;
+
+#ifdef STRICT_CHECKING
+	assert( AVI->mode != AVI_MODE_WRITE );
+	assert( AVI->track[AVI->aptr].audio_index );
+	assert( AVI->track[AVI->aptr].audio_posc+1 <= AVI->track[AVI->aptr].audio_chunks );
+#endif
 
    left = AVI->track[AVI->aptr].audio_index[AVI->track[AVI->aptr].audio_posc].len - AVI->track[AVI->aptr].audio_posb;
    
@@ -3433,8 +3451,10 @@ int AVI_read_data(avi_t *AVI, char *vidbuf, long max_vidbuf,
    off_t n;
    char data[8];
  
-   if(AVI->mode==AVI_MODE_WRITE) return 0;
-
+//   if(AVI->mode==AVI_MODE_WRITE) return 0;
+#ifdef STRICT_CHECKING
+	assert( AVI->mode != AVI_MODE_WRITE );
+#endif
    while(1)
    {
       /* Read tag and length */

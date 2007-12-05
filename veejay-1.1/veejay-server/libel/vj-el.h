@@ -51,7 +51,7 @@ typedef struct
 	int	audio_bps;
 
 	long 	video_frames; 
-
+	long	total_frames;
 	long	num_video_files;
 
 	long	max_frame_size;

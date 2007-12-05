@@ -476,11 +476,7 @@ void	vj_server_close_connection(vj_server *vje, int link_id )
 }
 int	vj_server_client_promoted( vj_server *vje, int link_id)
 {
-	
 	vj_link **Link= (vj_link**) vje->link;
-#ifdef STRICT_CHECKING
-	assert( Link[link_id]->in_use == 1 );
-#endif 
 	return Link[link_id]->promote;	
 }
 void	vj_server_client_promote( vj_server *vje, int link_id)
