@@ -307,7 +307,7 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 		n = sscanf( line, "%d %d %d %d", &p[0],&p[1],&p[2],&p[3] );
 		if( n != 4)
 		{
-			veejay_msg(VEEJAY_MSG_ERROR,"Frame header invalid");
+			veejay_msg(VEEJAY_MSG_ERROR,"Frame header invalid, received garbage" );
 			return -1;
 		}
 

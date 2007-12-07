@@ -30,6 +30,7 @@
 #include <libel/vj-dv.h>
 #endif
 #include <ffmpeg/avcodec.h>
+#include <ffmpeg/log.h>
 #define YUV420_ONLY_CODEC(id) ( ( id == CODEC_ID_MJPEG || id == CODEC_ID_MJPEGB || id == CODEC_ID_MSMPEG4V3 || id == CODEC_ID_MPEG4) ? 1: 0)
 
 
@@ -295,11 +296,13 @@ void 		*vj_avcodec_start( editlist *el, int encoder )
 }
 
 
-int		vj_avcodec_init( int pixel_format)
+int		vj_avcodec_init( int pixel_format, int verbose)
 {
 	out_pixel_format = pixel_format;
-
-	//av_log_set_level( AV_LOG_INFO );
+	if( !verbose )
+		av_log_set_level( AV_LOG_QUIET);
+	else
+		av_log_set_level( AV_LOG_VERBOSE );
 
 	avcodec_init();
 

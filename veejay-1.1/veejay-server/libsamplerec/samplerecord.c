@@ -95,12 +95,22 @@ int sample_try_filename(int sample_id, char *filename, int format)
 {
 	sample_info *si= sample_get(sample_id);
 	if(!si) return 0;
-	
-	if(filename != NULL)
-	{
+
+	if( filename == NULL )
+		snprintf(si->encoder_base, 255, "Sample_%04d", sample_id);
+	else
 		snprintf(si->encoder_base,255,"%s",filename);
-	}
-//	sprintf(si->encoder_destination, "%s-%05ld.avi", si->encoder_base,si->sequence_num);
+	
+
+	int i = 0;
+	int len = strlen(si->encoder_base);
+	for(i=0; i <len; i ++ ) {
+		if( si->encoder_base[i] == 0x20 )
+			si->encoder_base[i] = '_';
+	} 
+
+	sprintf(si->encoder_destination, "%s-%05ld.avi",
+		si->encoder_base,si->sequence_num);
 
 	char ext[5];
 	switch(format)

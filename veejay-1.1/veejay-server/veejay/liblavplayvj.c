@@ -3629,7 +3629,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 			((info->pixel_format == FMT_422 || info->pixel_format == FMT_422F) ? "4:2:2" : "4:2:0"));
 	}
 
-	if(!vj_avcodec_init( info->pixel_format ))
+	if(!vj_avcodec_init( info->pixel_format, info->verbose ))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize encoders!");
 		return 0;

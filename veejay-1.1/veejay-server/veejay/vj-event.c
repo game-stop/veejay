@@ -7826,8 +7826,8 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	//@ 420,422,444
 	int full444 =  (v->settings->composite);
 	if( v->video_out == 4 )
-		full444 = 1;
-
+		full444 = 1; 
+	
 	//@ fast*_picture delivers always 4:2:0 data to reduce bandwidth
 	if( use_bw_preview_ )
 		vj_fastbw_picture_save_to_mem(
