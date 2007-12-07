@@ -6808,7 +6808,7 @@ gboolean		is_alive( void )
 			multrack_audoadd( info->mt, remote, port );
 			info->watch.p_state = 0; 
 
-			if(!user_preview)
+			if(user_preview==0)
 				multitrack_set_quality( info->mt, 2 );
 			else
 			{	

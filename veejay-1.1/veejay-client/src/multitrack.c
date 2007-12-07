@@ -1014,12 +1014,20 @@ void		multitrack_set_quality( void *data , int quality )
 			break;
 	}
 
-	if( w && h )
+	if( w > 16 && h > 16 )
 	{
 		w = RUP8(w);
 		h = RUP8(h);
 	}
+	else
+	{
+		w = RUP8(mt->width);
+		h = RUP8(mt->height);
+	}
 
+	veejay_msg(VEEJAY_MSG_INFO,
+		"Preview image dimensions set to %d x %d",w,h); 
+	
 	if(!gvr_track_configure( mt->preview, mt->master_track,w,h ) )
 	{
 		veejay_msg(0, "Unable to configure preview %d x %d",w , h );
