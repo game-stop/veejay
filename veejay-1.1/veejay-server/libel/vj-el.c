@@ -426,7 +426,7 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
        		       return NULL;
       		}
 		
-		if( out_fmt == pixel_format )
+	/*	if( out_fmt == pixel_format )
 		{
 			if( d->codec->capabilities & CODEC_CAP_DR1 && out_fmt ==
 					PIX_FMT_YUV420P)
@@ -436,7 +436,7 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 				veejay_msg(VEEJAY_MSG_DEBUG,
 					"\tDirect rendering to frame buffer is enabled");
 			}
-		}
+		}*/
         }
 	else
 	{
