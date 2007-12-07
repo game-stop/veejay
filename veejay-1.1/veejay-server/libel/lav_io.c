@@ -1373,22 +1373,14 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	  		if(lav_fd->dv_fd > 0)
 			{
 				lav_fd->MJPG_chroma = rawdv_sampling( lav_fd->dv_fd );
-				if ( lav_fd->MJPG_chroma == -1 )
-				{
-					veejay_msg(VEEJAY_MSG_ERROR, "Dont know how to treat this file");
-					ret = 0;
-				}
-				else
-				{
-					video_comp = rawdv_video_compressor( lav_fd->dv_fd );
-					lav_fd->format = 'b'; 
-					lav_fd->has_audio = 0;
-					ret = 1;
-					alt = 1;
-					veejay_msg(VEEJAY_MSG_DEBUG,
-							"RAW DV file '%s'",
-							video_comp );
-				}
+				video_comp = rawdv_video_compressor( lav_fd->dv_fd );
+				lav_fd->format = 'b'; 
+				lav_fd->has_audio = 0;
+				ret = 1;
+				alt = 1;
+				veejay_msg(VEEJAY_MSG_DEBUG,
+						"RAW DV file '%s'",
+						video_comp );
 	    		}
 			else
 				veejay_msg(VEEJAY_MSG_DEBUG, "\tNot a raw dv file");
@@ -1452,7 +1444,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		strncasecmp(video_comp,"m4s2",4 ) == 0 )
 	{
 		lav_fd->format = 'D';
-		lav_fd->MJPG_chroma = CHROMAUNKNOWN;
+		lav_fd->MJPG_chroma = CHROMA420;
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
 		veejay_msg(VEEJAY_MSG_WARNING, "Playing MPEG4 Video (Every frame should be an intra frame)");
 		return lav_fd;

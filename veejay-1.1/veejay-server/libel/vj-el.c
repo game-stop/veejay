@@ -253,11 +253,8 @@ static void	_el_free_decoder( vj_decoder *d )
 	{
 		if(d->tmp_buffer)
 			free( d->tmp_buffer );
-		if(d->sampler )
-			subsample_free( d->sampler );
-
-			if(d->deinterlace_buffer[0])
-					free(d->deinterlace_buffer[0]);
+		if(d->deinterlace_buffer[0])
+			free(d->deinterlace_buffer[0]);
 
 		if(d->context)
 		{
@@ -267,6 +264,9 @@ static void	_el_free_decoder( vj_decoder *d )
 		}
 		if(d->frame) 
 			free(d->frame);
+
+		if(d->sampler)
+			subsample_free(d->sampler);
 	
 		if(d->img)
 			free(d->img);
@@ -306,6 +306,9 @@ static void release_buffer(struct AVCodecContext *context, AVFrame *av_frame){
 }
 
 static int el_pixel_format_ = 1;
+static int el_len_ = 0;
+static int el_uv_len_ = 0;
+static int el_uv_wid_ = 0;
 static int mem_chunk_ = 0;
 void	vj_el_init_chunk(int size)
 {
@@ -318,6 +321,9 @@ void	vj_el_init(int pf)
 	for( i = 0; i < MAX_CODECS ;i ++ )
 		el_codecs[i] = NULL;
 	el_pixel_format_ =pf;
+#ifdef STRICT_CHECKING
+	assert( pf == FMT_420 || pf == FMT_420F || pf == FMT_422 || pf == FMT_422F );
+#endif
 }
 
 int	vj_el_is_dv(editlist *el)
@@ -392,24 +398,22 @@ int	vj_el_cache_size()
 	return cache_avail_mb();
 }
 
+//@ pixel_format = input pixel format FIXME
 vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixel_format, int out_fmt)
 {
         vj_decoder *d = (vj_decoder*) vj_calloc(sizeof(vj_decoder));
         if(!d)
 	  return NULL;
 
-	int found = 0;
-	
 #ifdef SUPPORT_READ_DV2
 	if( id == CODEC_ID_DVVIDEO )
+		dv_decoder_ = vj_dv_decoder_init(1, width, height, pixel_format );
+#endif	
+	if( id == CODEC_ID_YUVLZO )
 	{
-		dv_decoder_ = vj_dv_decoder_init(
-				1, width, height, pixel_format );
-		found = 1;
-	}
-#endif		
-	
-	if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 && !found && id != CODEC_ID_YUVLZO)
+		lzo_decoder_ = lzo_new();
+		d->sampler = subsample_init( width );
+	} else  if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 )
         {
 		d->codec = avcodec_find_decoder( id );
 		d->context = avcodec_alloc_context();
@@ -422,33 +426,12 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 		d->img->width = width;	
 		if ( avcodec_open( d->context, d->codec ) < 0 )
        		{
-      		        veejay_msg(VEEJAY_MSG_ERROR, "Error initializing decoder %d",id); 
+      		       veejay_msg(VEEJAY_MSG_ERROR, "Error initializing decoder %d",id); 
+		       _el_free_decoder( d );
        		       return NULL;
       		}
+	}
 		
-	/*	if( out_fmt == pixel_format )
-		{
-			if( d->codec->capabilities & CODEC_CAP_DR1 && out_fmt ==
-					PIX_FMT_YUV420P)
-			{
-				d->context->get_buffer = get_buffer;
-				d->context->release_buffer = release_buffer;
-				veejay_msg(VEEJAY_MSG_DEBUG,
-					"\tDirect rendering to frame buffer is enabled");
-			}
-		}*/
-        }
-	else
-	{
-		veejay_msg(VEEJAY_MSG_DEBUG,"\tResampling YUV planar to preferred pixel format");
-		d->sampler = subsample_init( width );
-		if( id == CODEC_ID_YUVLZO )
-		{
-			lzo_decoder_ = lzo_new();
-		}
-
-	}       
-
         d->tmp_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * width * height * 4 );
         if(!d->tmp_buffer)
 	{
@@ -1048,12 +1031,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			nframe, el->total_frames);
 	assert( nframe >= 0 && nframe < el->video_frames );
 #endif
-//	if (nframe < 0)
-//		nframe = 0;
-
-//	if (nframe >= el->video_frames)
-//		nframe = el->video_frames-1;
-
 	n = el->frame_list[nframe];
 
 	in_pix_fmt = el->yuv_taste[N_EL_FILE(n)];
@@ -1075,26 +1052,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
  		}
 	}
 
-	int len = el->video_width * el->video_height;
-	int uv_len=len;
-	switch(out_pix_fmt)
-	{
-		case FMT_420:
-		case FMT_420F:
-			uv_len = len/4;
-			break;
-		case FMT_422:
-		case FMT_422F:
-			uv_len = len/2;
-			break;
-		default:
-			break;
-	}
-
-
-	int uv_w = el->video_width / 2;
-	
-
 	if( decoder_id == 0xffff )
 	{
 		VJFrame *srci  = lav_get_frame_ptr( el->lav_fd[ N_EL_FILE(n) ] );
@@ -1107,9 +1064,9 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 #ifdef STRICT_CHECKING
 		assert( dst[0] != NULL  && dst[1] != NULL && dst[2] != NULL );
 #endif	
-		veejay_memcpy( dst[0], srci->data[0], len );
-                veejay_memcpy( dst[1], srci->data[1], uv_len );
-                veejay_memcpy( dst[2], srci->data[2], uv_len );
+		veejay_memcpy( dst[0], srci->data[0], el_len_ );
+                veejay_memcpy( dst[1], srci->data[1], el_uv_len_ );
+                veejay_memcpy( dst[2], srci->data[2], el_uv_len_ );
                 return 1;     
 	}
 
@@ -1122,7 +1079,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 		return -1;
 	}
 
-	if(!in_cache )
+	if(!in_cache)
 	{
 		if( d == NULL )
 		{
@@ -1146,14 +1103,13 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 		case CODEC_ID_YUV420:
 			if(out_pix_fmt == FMT_420 || out_pix_fmt == FMT_420F)
                 	{
-                	        veejay_memcpy( dst[0], data, len);
-               		        veejay_memcpy( dst[1], data+len,uv_len);
-                		veejay_memcpy( dst[2], data+(len+uv_len), uv_len);
+                	        veejay_memcpy( dst[0], data, el_len_);
+               		        veejay_memcpy( dst[1], data+el_len_,el_uv_len_);
+                		veejay_memcpy( dst[2], data+(el_len_+el_uv_len_), el_uv_len_);
                 	}
                		else
                 	{
-
-				VJFrame *srci = yuv_yuv_template( data,data+len,data+len+(len/4),el->video_width,
+				VJFrame *srci = yuv_yuv_template( data,data+el_len_,data+el_len_+el_uv_len_,el->video_width,
 							el->video_height, PIX_FMT_YUV420P );
 				VJFrame *dsti = yuv_yuv_template( dst[0],dst[1],dst[2], el->video_width,
 							el->video_height, get_ffmpeg_pixfmt( out_pix_fmt));
@@ -1168,7 +1124,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 		case CODEC_ID_YUV422:
 			if(out_pix_fmt == FMT_420 || out_pix_fmt == FMT_420F)
 			{
-				VJFrame *srci = yuv_yuv_template( data,data+len,data+len+uv_len, el->video_width,
+				VJFrame *srci = yuv_yuv_template( data,data+el_len_,data+el_len_+el_uv_len_, el->video_width,
 							el->video_height, PIX_FMT_YUV422P );
 				VJFrame *dsti = yuv_yuv_template( dst[0],dst[1], dst[2], el->video_width,
 							el->video_height, get_ffmpeg_pixfmt( out_pix_fmt));
@@ -1178,9 +1134,9 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			}
 			else
 			{	
-				veejay_memcpy( dst[0], data, len);
-            			veejay_memcpy( dst[1], data+len,uv_len);
-            			veejay_memcpy( dst[2], data+len+uv_len, uv_len);
+				veejay_memcpy( dst[0], data, el_len_);
+            			veejay_memcpy( dst[1], data+el_len_,el_uv_len_);
+            			veejay_memcpy( dst[2], data+el_len_+el_uv_len_, el_uv_len_);
 			}
 			return 1;
 			break;
@@ -1198,6 +1154,13 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			if( inter == 0 )
 				return 0;
 
+			if( in_pix_fmt != out_pix_fmt )
+			{
+				if( out_pix_fmt > in_pix_fmt )
+					chroma_supersample( SSM_420_422, d->sampler, dst, el->video_width,el->video_height );
+				else
+					chroma_subsample( SSM_420_422, d->sampler, dst, el->video_width,el->video_height );
+			}
 			return inter;
 
 			break;			
@@ -1290,7 +1253,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			break;
 	}
 
-	veejay_msg(VEEJAY_MSG_WARNING, "Error decoding frame %ld - %d ", nframe,len);
+	veejay_msg(VEEJAY_MSG_WARNING, "Error decoding frame %ld", nframe);
 	return 0;  
 }
 
@@ -1319,13 +1282,24 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 		veejay_msg(VEEJAY_MSG_INFO,"\tFile is an image");
 		return out_pix_fmt;
 	}
-	
+
+	switch( lav->MJPG_chroma )
+	{
+		case CHROMA420:
+			in_pix_fmt = FMT_420; break;
+		case CHROMA422:
+		case CHROMA411:
+			in_pix_fmt = FMT_422; break;
+		default:
+			veejay_msg(0 ,"Unsupported pixel format");
+			break;			
+	}
 	vj_decoder *d = _el_new_decoder(
 					decoder_id,
 					lav_video_width( lav),
 					lav_video_height( lav),
 				   	(float) lav_frame_rate( lav ),
-					0,
+					in_pix_fmt,
 					out_pix_fmt );
 
 	if(!d)
@@ -1349,58 +1323,76 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 	switch( decoder_id )
 	{
 		case CODEC_ID_YUV420:
-				if( out_pix_fmt == FMT_422 ) {
-						ret = FMT_420;
-				} else if( out_pix_fmt == FMT_420 ) {
-						ret = FMT_420;
-				} else if( out_pix_fmt == FMT_422F ) {
-						ret = FMT_420F;
-				} else
-					   	ret = FMT_420F;
-				break;
+			if( out_pix_fmt == FMT_422 ) {
+				ret = FMT_420;
+			} else if( out_pix_fmt == FMT_420 ) {
+				ret = FMT_420;
+			} else if( out_pix_fmt == FMT_422F ) {
+				ret = FMT_420F;
+			} else
+			   	ret = FMT_420F;
+			break;
 		case CODEC_ID_YUV422:
-			 	if( out_pix_fmt == FMT_422 ) {
-						ret = FMT_422;
-				} else if( out_pix_fmt == FMT_420 ) {
-						ret = FMT_422;
-				} else if( out_pix_fmt == FMT_420F ) {
-						ret = FMT_422F;
-				} else 
-						ret = FMT_422F;
-				break;
+			if( out_pix_fmt == FMT_422 ) {
+				ret = FMT_422;
+			} else if( out_pix_fmt == FMT_420 ) {
+				ret = FMT_422;
+			} else if( out_pix_fmt == FMT_420F ) {
+				ret = FMT_422F;
+			} else 
+				ret = FMT_422F;
+			break;
 		case CODEC_ID_DVVIDEO:
 #ifdef SUPPORT_READ_DV2
-				ret = vj_dv_scan_frame( dv_decoder_, d->tmp_buffer );
+			ret = vj_dv_scan_frame( dv_decoder_, d->tmp_buffer );
+			if ( in_pix_fmt != ret )	
+			{
+				//@ correct chroma 
+				if( ret == FMT_420 || ret == FMT_420F )
+					lav->MJPG_chroma = CHROMA420;
+				else
+					lav->MJPG_chroma = CHROMA422;
+					
+			}
 #endif
-				break;
+			break;
 		case CODEC_ID_YUVLZO:
-				ret = FMT_422;
-				break;
+			ret = FMT_422;
+			if ( in_pix_fmt != ret )	
+			{
+				//@ correct chroma 
+				if( ret == FMT_420 || ret == FMT_420F )
+					lav->MJPG_chroma = CHROMA420;
+				else
+					lav->MJPG_chroma = CHROMA422;
+			}
+
+			break;
 		default:
 
-				len = avcodec_decode_video(
-					d->context,
-					d->frame,
-					&got_picture,
-					d->tmp_buffer,
-					res
-				);
+			len = avcodec_decode_video(
+				d->context,
+				d->frame,
+				&got_picture,
+				d->tmp_buffer,
+				res
+			);
 
-				if(!got_picture || len <= 0 )
-				{
-					veejay_msg(VEEJAY_MSG_ERROR, "Unable to get whole picture");
-					ret = -1;
-				}
-				else
+			if(!got_picture || len <= 0 )
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Unable to get whole picture");
+				ret = -1;
+			}
+			else
 				switch( d->context->pix_fmt )
 				{
-						case PIX_FMT_YUV420P: ret = FMT_420; break;
-						case PIX_FMT_YUV422P: ret = FMT_422; break;
-						case PIX_FMT_YUVJ420P:ret = FMT_420F;break;
-						case PIX_FMT_YUVJ422P:ret = FMT_422F;break;
-						default:
-								ret= d->context->pix_fmt;
-								break;
+					case PIX_FMT_YUV420P: ret = FMT_420; break;
+					case PIX_FMT_YUV422P: ret = FMT_422; break;
+					case PIX_FMT_YUVJ420P:ret = FMT_420F;break;
+					case PIX_FMT_YUVJ422P:ret = FMT_422F;break;
+					default:
+						ret= d->context->pix_fmt;
+						break;
 				}
 			
 				break;	
@@ -1594,6 +1586,23 @@ editlist *vj_el_dummy(int flags, int deinterlace, int chroma, char norm, int wid
 	el->frame_list = NULL;
 	el->has_video = 0;
 	el->cache = NULL;
+	el_len_ = el->video_width * el->video_height;
+	el_uv_len_ = el_len_;
+
+	switch(fmt)
+	{
+		case FMT_420:
+		case FMT_420F:
+			el_uv_len_ = el_len_ / 4;
+			el_uv_wid_ = el->video_width/2;
+			break;
+		case FMT_422:
+		case FMT_422F:
+			el_uv_len_ = el_len_ / 2;
+			el_uv_wid_ = el->video_width;
+			break;
+	}
+
 	return el;
 }
 
@@ -1831,6 +1840,24 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
     //if(el->video_inter != 0 ) el->auto_deinter = 0;
 	el->auto_deinter = 0;
 	el->total_frames = el->video_frames - 1;
+
+	el_len_ = el->video_width * el->video_height;
+	el_uv_len_ = el_len_;
+
+	switch( el_pixel_format_ )
+	{
+		case FMT_420:
+		case FMT_420F:
+			el_uv_len_ = el_len_ / 4;
+			el_uv_wid_ = el->video_width/2;
+			break;
+		case FMT_422:
+		case FMT_422F:
+			el_uv_len_ = el_len_ / 2;
+			el_uv_wid_ = el->video_width;
+			break;
+	}
+
 	return el;
 }
 

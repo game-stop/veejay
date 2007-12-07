@@ -127,7 +127,7 @@ static void Usage(char *progname)
     fprintf(stderr,
 	    "  -p/--portoffset\t\tTCP port to accept/send messages (default: 3490)\n");
     fprintf(stderr,
-	    "  -t/--timer num\t\specify timer to use (none:0,normal:2,rtc:1) default is 1\n");
+	    "  -t/--timer num\t\tspecify timer to use (none:0,normal:2,rtc:1) default is 1\n");
 
 	fprintf(stderr,
 		"  -O/--output [012345]\t\tOutput video\n");
@@ -203,7 +203,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -j/--max_cache \t\tDivide cache memory over N samples (default=4)\n");
 	fprintf(stderr,
-		"  -Y/--ycbcr [0123]\t\tInternal processing format\n");
+		"  -Y/--yuv [0123]\t\tForce pixel format if you get a corrupted image. Load one videofile only.\n");
 	fprintf(stderr,
 		"\t\t\t\t 0 = YUV 4:2:0 Planar\n");
 	fprintf(stderr,
@@ -435,7 +435,7 @@ static int set_option(const char *name, char *value)
     	else if (strcmp(name,"fps")==0 || strcmp(name, "f")==0) {
 		override_fps = atof(optarg);
 	}
-	else if(strcmp(name,"ycbcr")==0 || strcmp(name,"Y")==0)
+	else if(strcmp(name,"yuv")==0 || strcmp(name,"Y")==0)
 	{
 		override_pix_fmt = atoi(optarg);
 		if(override_pix_fmt > 1 )
@@ -573,7 +573,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"norm",1,0,0},
 	{"framerate",1,0,0},
 	{"audiorate",1,0,0},
-	{"ycbcr",1,0,0},
+	{"yuv",1,0,0},
 	{"multicast-osc",1,0,0},
 	{"multicast-vims",1,0,0},
 	{"map-from-file",1,0,0},

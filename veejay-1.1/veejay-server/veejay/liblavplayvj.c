@@ -3006,7 +3006,7 @@ veejay_t *veejay_malloc()
 	info->sdl = (vj_sdl**) vj_calloc(sizeof(vj_sdl*) * MAX_SDL_OUT ); 
 #endif
 
-
+	info->pixel_format = FMT_422; //@default 
 	info->settings->ncpu = smp_check();
 
 	yuv_init_lib();
@@ -3606,7 +3606,7 @@ int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
  * return value: 1 on succes, 0 on error
  ******************************************************/
 // open_video_files is called BEFORE init
-static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, int force_pix_fmt, int force , char override_norm)
+static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, int force , char override_norm)
 {
 	vj_el_frame_cache(info->seek_cache );
 
@@ -3619,14 +3619,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Fallback to dummy - no video files given at commandline");
 		info->dummy->active = 1;
-	}
-
-	if(force_pix_fmt >= 0)
-	{
-			info->pixel_format = force_pix_fmt;
-			veejay_msg(VEEJAY_MSG_INFO, "Processing video in pixel format %s %s",
-						(force_pix_fmt >1  ? "JPEG YUV" : "YCbCr" ),
-			((info->pixel_format == FMT_422 || info->pixel_format == FMT_422F) ? "4:2:2" : "4:2:0"));
 	}
 
 	if(!vj_avcodec_init( info->pixel_format, info->verbose ))
@@ -3647,7 +3639,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 			info->dummy->width = 352;
 		if( !info->dummy->height)
 			info->dummy->height = 288;
-		if( !force_pix_fmt)
+		if( info->pixel_format <= 1)
 			info->dummy->chroma = CHROMA420;
 		else
 			info->dummy->chroma = CHROMA422;	
@@ -3656,7 +3648,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	
 		info->current_edit_list = vj_el_dummy( 0, info->auto_deinterlace, info->dummy->chroma,
 				info->dummy->norm, info->dummy->width, info->dummy->height, info->dummy->fps,
-				force_pix_fmt );
+				info->pixel_format );
 
 		if( info->dummy->arate )
 		{
@@ -3680,7 +3672,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 					info->auto_deinterlace,
 				       	force,
 					override_norm,
-					force_pix_fmt);
+					info->pixel_format);
 	}
 	info->edit_list = info->current_edit_list;
 
@@ -3713,7 +3705,28 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
    	video_playback_setup *settings =
 		(video_playback_setup *) info->settings;
 
-	vj_el_init( force_pix_fmt );
+	if(force_pix_fmt >= 0)
+		info->pixel_format = force_pix_fmt;
+	
+	char text[24];
+
+	switch(info->pixel_format) {
+		case FMT_422:
+			sprintf(text, "4:2:2 [16-235][16-240]");break;
+		case FMT_422F:	
+			sprintf(text, "4:2:2 [0-255]");break;
+		case FMT_420:
+			sprintf(text, "4:2:0 [16-235][16-240]");break;
+		case FMT_420F:
+			sprintf(text, "4:2:0 [0-255]");break;
+		default:
+			veejay_msg(VEEJAY_MSG_ERROR, "Unknown pixel format set"); 
+			return 0;
+	}
+
+	veejay_msg(VEEJAY_MSG_INFO, "Processing set to YUV %s", text );
+
+	vj_el_init( info->pixel_format );
 	
 	/* override options */
 	if(ofps<=0.0)
@@ -3724,12 +3737,12 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	if(num_files == 0)
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Trying to start without video");
-		ret = veejay_open_video_files( info, NULL, 0 , force_pix_fmt, force,
+		ret = veejay_open_video_files( info, NULL, 0 , force,
 			override_norm );
 	}
 	else
 	{
-		ret = veejay_open_video_files( info, files, num_files, force_pix_fmt, force,
+		ret = veejay_open_video_files( info, files, num_files, force,
 			override_norm );
 	}
 

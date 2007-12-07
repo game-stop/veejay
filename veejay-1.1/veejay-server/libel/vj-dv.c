@@ -37,6 +37,10 @@
 #define DV_NTSC_SIZE 120000
 #define DV_AUDIO_MAX_SAMPLES 1944
 
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
+
 int	is_dv_resolution(int w, int h)
 {
 	if( h == NTSC_H && w == NTSC_W )
@@ -256,10 +260,31 @@ int	vj_dv_scan_frame( vj_dv_decoder *d, uint8_t * input_buf )
 		veejay_msg(0, "No valid PAL or NTSC video frame detected");
 		return -1;
 	}
-	if (d->decoder->sampling == e_dv_sample_411 || d->decoder->sampling == e_dv_sample_422)
-		return 1;
+
+	char sampling[8];
+	switch( d->decoder->sampling )
+	{
+		case e_dv_sample_411:
+				veejay_msg(0, "YUV 4:1:1 not supported.");
+				return -1;
+		case e_dv_sample_420:
+				sprintf(sampling, "4:2:0"); break;
+		case e_dv_sample_422:
+				sprintf(sampling, "4:2:2"); break;
+		case e_dv_sample_none:
+				veejay_msg(0 ,"No sampling format, cant handle this file (yet)");
+				return -1;
+		default:
+			veejay_msg(0, "Unknown sampling format in DV file");
+			return -1;
+	}
+
+	veejay_msg( VEEJAY_MSG_DEBUG, "\tDetected DV sampling format %s", sampling );
+
+	if ( d->decoder->sampling == e_dv_sample_422)
+		return FMT_422;
 	if( d->decoder->sampling == e_dv_sample_420 )
-		return 0;
+		return FMT_420;
 	return -1;
 }
 
@@ -299,8 +324,14 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 				d->decoder->num_dif_seqs );
 		return 0;
 	}
+#ifdef STRICT_CHECKING
+//	if ( d->decoder->sampling == e_dv_sample_420 )
+//		assert( d->fmt == FMT_420 || d->fmt == FMT_420F );
+//	if ( d->decoder->sampling == e_dv_sample_422 )
+//		assert( d->fmt == FMT_422 || d->fmt == FMT_422F );
+#endif
        
-    	if (d->decoder->sampling == e_dv_sample_411 || d->decoder->sampling == e_dv_sample_422)
+    	if ( d->decoder->sampling == e_dv_sample_422)
 	{
 		pitches[0] = width * 2;
 		pitches[1] = 0;
@@ -313,9 +344,7 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 		frame_YUV422_to_planar( pixels, pixels[0], width, height, fmt );
 
 		return 1;
-    	}
-
-	if( d->decoder->sampling == e_dv_sample_420 )
+    	} else if( d->decoder->sampling == e_dv_sample_420 )
 	{	
 		uint8_t *pixels[3];
                 pixels[0] = d->dv_video;
@@ -329,7 +358,7 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 
 	  	if(fmt==FMT_422 || fmt == FMT_422F)
                        yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
-               else
+               else //@ FIXME broken!
                        vj_yuy2toyv12( Y,Cb,Cr, d->dv_video, width, height );
 
 		return 1;

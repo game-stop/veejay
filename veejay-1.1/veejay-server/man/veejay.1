@@ -110,9 +110,9 @@ Maximum number of samples to cache
 .B \-F/--features
 Show compiled in options
 .TP
-.B \-Y/--ycbcr [0123]
-Specify veejay to use either YUV 4:2:0 (0) , YUV 4:2:2 (1), YUV 4:2:0 JPEG (2), YUV 4:2:2 JPEG(3).
-By default, veejay will try to select the best format.
+.B \-Y/--yuv [0123]
+Force pixel format if you get a corrupted image. Its recommanded to load
+only one videofile and re-record it.
 .TP
 .B \-d/--dummy
 Start veejay with no video files (dummy mode). By default it will play black video (Stream 1 [F1])
