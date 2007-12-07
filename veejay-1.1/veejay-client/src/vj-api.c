@@ -432,6 +432,7 @@ typedef struct
 	watchdog_t	watch;
 	int		vims_line;
 	int		quality;
+	int		preview_locked;
 	void		*midi;
 } vj_gui_t;
 
@@ -6287,6 +6288,7 @@ void	vj_gui_setup_defaults( vj_gui_t *gui )
 
 int	vj_gui_yield()
 {
+veejay_msg(0, "%s",__FUNCTION__ );
  	if( is_button_toggled("previewtoggle"))
 		return 1;
 	return 0;
@@ -6807,13 +6809,13 @@ gboolean		is_alive( void )
 			info->watch.p_state = 0; 
 
 			if(!user_preview)
-			multitrack_set_quality( info->mt, 2 );
-
-			if( user_preview )
-			{
+				multitrack_set_quality( info->mt, 2 );
+			else
+			{	
+				info->preview_locked = 1;
 				multitrack_set_quality( info->mt, user_preview );
-				if(!is_button_toggled("previewtoggle") )
-					set_toggle_button( "previewtoggle", 1 );
+				set_toggle_button( "previewtoggle", 1 );
+				info->preview_locked = 0;
 			}
 		}
 	}

@@ -2535,10 +2535,14 @@ void		on_previewbw_toggled( GtkWidget *w , gpointer user_data)
 
 void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 {
-	if(!multitrack_locked( info->mt ) )
-	multitrack_toggle_preview( info->mt, -1, is_button_toggled("previewtoggle"),
+	if(!info->preview_locked)
+	{
+		multitrack_toggle_preview( info->mt, -1, is_button_toggled("previewtoggle"),
 			glade_xml_get_widget(info->main_window, "imageA") );
-
+	}
+	else {
+		multitrack_toggle_preview( info->mt, -1, 1, glade_xml_get_widget(info->main_window,"imageA")); //@ enable
+	}
 	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 }
 
