@@ -32,6 +32,7 @@
 #include <jack/ringbuffer.h>
 #include <pthread.h>
 #include <sys/time.h>
+#include <libvjmsg/vj-msg.h>
 #ifdef HAVE_SAMPLERATE
 #include <samplerate.h>
 #endif
@@ -103,8 +104,7 @@ static struct timeval timer_now;
 #define WARN(...)
 #endif
 
-#define ERR(format,args...) fprintf(OUTFILE, "ERR: %s::%s(%d) "format, __FILE__,__FUNCTION__,__LINE__,##args);	\
-         fflush(OUTFILE);
+#define ERR(format,args...) veejay_msg(0, format, ##args);	
 
 #define min(a,b)   (((a) < (b)) ? (a) : (b))
 #define max(a,b)   (((a) < (b)) ? (b) : (a))

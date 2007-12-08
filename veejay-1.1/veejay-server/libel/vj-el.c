@@ -41,6 +41,7 @@
 #include <libvjmem/vjmem.h>
 #include <libyuv/yuvconv.h>
 #include <ffmpeg/avcodec.h>
+#include <ffmpeg/avformat.h>
 #include <liblzo/lzo.h>
 #include <math.h>
 #include <stdlib.h>
@@ -275,8 +276,8 @@ static void	_el_free_decoder( vj_decoder *d )
 	}
 	d = NULL;
 }
-
 #define LARGE_NUM (256*256*256*64)
+/*
 static int get_buffer(AVCodecContext *context, AVFrame *av_frame){
 	vj_decoder *this = (vj_decoder *)context->opaque;
 	int width  = context->width;
@@ -303,7 +304,7 @@ static int get_buffer(AVCodecContext *context, AVFrame *av_frame){
 static void release_buffer(struct AVCodecContext *context, AVFrame *av_frame){
  VJFrame *img = (VJFrame*)av_frame->opaque;
   av_frame->opaque = NULL;
-}
+}*/
 
 static int el_pixel_format_ = 1;
 static int el_len_ = 0;
@@ -452,10 +453,13 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
         return d;
 }
 
-void	vj_el_set_image_output_size(editlist *el)
+void	vj_el_set_image_output_size(editlist *el, int dw, int dh, float fps, int pf)
 {
-	lav_set_project(
-		el->video_width, el->video_height, el->video_fps , el_pixel_format_ );
+	if( el->video_width <= 0 || el->video_height <= 0 )
+		lav_set_project( dw,dh, fps, pf );
+	else
+		lav_set_project(
+			el->video_width, el->video_height, el->video_fps , el_pixel_format_ );
 
 }
 
@@ -537,8 +541,6 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		return -1;
 	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Opening file '%s'", filename );
-
 	if (preserve_pathname)
 		realname = strdup(filename);
 	else
@@ -560,18 +562,19 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		}
 	}
 
-    if (el->num_video_files >= MAX_EDIT_LIST_FILES)
+	if (el->num_video_files >= MAX_EDIT_LIST_FILES)
 	{
 		// mjpeg_error_exit1("Maximum number of video files exceeded");
 		veejay_msg(VEEJAY_MSG_ERROR,"Maximum number of video files exceeded\n");
-        if(realname) free(realname);
+        	if(realname) free(realname);
 		return -1; 
-    }
+    	}
 
-    if (el->num_video_files >= 1)
+    	if (el->num_video_files >= 1)
 		chroma = el->MJPG_chroma;
         
-
+	int in_pixel_format = detect_pixel_format_with_ffmpeg( filename );
+	
  
     	n = el->num_video_files;
 	lav_file_t	*elfd = lav_open_input_file(filename,mmap_size );
@@ -594,8 +597,17 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		return -1;
 	}
 
-
+	
 	_fc = lav_video_MJPG_chroma(elfd);
+#ifdef STRICT_CHECKING
+	if( in_pixel_format >= 0 )
+	{
+		if ( _fc == CHROMA422 )
+			assert( (in_pixel_format == FMT_422 || in_pixel_format == FMT_422F ) );
+		if ( _fc == CHROMA420 )
+			assert( (in_pixel_format == FMT_420 || in_pixel_format == FMT_420F ) );
+	}
+#endif
 
 	if( !(_fc == CHROMA422 || _fc == CHROMA420 || _fc == CHROMA444 || _fc == CHROMAUNKNOWN || _fc == CHROMA411 ))
 	{
@@ -613,13 +625,23 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	}
 
 	pix_fmt = _el_probe_for_pixel_fmt( elfd );
-
-	if(pix_fmt < 0)
+#ifdef STRICT_CHECKING
+	if( in_pixel_format >= 0 )
+		assert( pix_fmt == in_pixel_format );
+#endif
+	
+	if(pix_fmt < 0 && in_pixel_format < 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to determine pixel format");
 		if(elfd) lav_close( elfd );
 		if(realname) free(realname);
 		return -1;
+	}
+
+	if( pix_fmt < 0 )
+	{
+		veejay_msg(VEEJAY_MSG_WARNING, "(!) Using pixelformat detected by FFmpeg (fallback)");
+		pix_fmt = in_pixel_format;
 	}
 
 	el->yuv_taste[n] = pix_fmt;
@@ -777,7 +799,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	   for live performances */
 	if (fabs(el->video_fps - lav_frame_rate(el->lav_fd[n])) >
 	    0.0000001) {
-	    veejay_msg(VEEJAY_MSG_WARNING,"(Ignoring) File %s: fps is %3.2f , but playing at %3.2f", filename,
+	    veejay_msg(VEEJAY_MSG_WARNING,"File %s: fps is %3.2f , but playing at %3.2f", filename,
 		       lav_frame_rate(el->lav_fd[n]), el->video_fps);
 	}
 	/* If first file has no audio, we don't care about audio */
@@ -792,7 +814,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	    if (el->audio_chans != lav_audio_channels(el->lav_fd[n]) ||
 		el->audio_bits != lav_audio_bits(el->lav_fd[n]) ||
 		el->audio_rate != lav_audio_rate(el->lav_fd[n])) {
-		veejay_msg(VEEJAY_MSG_WARNING,"File %s: Mismatched audio properties: %d channels , %d bit %ld Hz",
+		veejay_msg(VEEJAY_MSG_ERROR,"File %s: Mismatched audio properties: %d channels , %d bit %ld Hz",
 			   filename, lav_audio_channels(el->lav_fd[n]),
 			   lav_audio_bits(el->lav_fd[n]),
 			   lav_audio_rate(el->lav_fd[n]) );
@@ -1253,11 +1275,131 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			break;
 	}
 
-	veejay_msg(VEEJAY_MSG_WARNING, "Error decoding frame %ld", nframe);
+	veejay_msg(VEEJAY_MSG_ERROR, "Error decoding frame %ld", nframe);
 	return 0;  
 }
 
+int	detect_pixel_format_with_ffmpeg( const char *filename )
+{
+	AVCodec *codec = NULL;
+	AVCodecContext *codec_ctx = NULL;
+	AVFormatContext *avformat_ctx = NULL;
+	AVStream *avformat_stream = NULL;	
+	AVInputFormat *av_input_format = NULL;
+	AVFormatParameters avf;
+	AVFrame *av_frame = NULL;
+	AVPacket pkt;
 
+//	int err = av_open_input_file( &avformat_ctx,filename, av_input_format,0,&avf);	
+	int err = av_open_input_file( &avformat_ctx,filename,NULL,0,NULL );
+	if(err < 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unable to open %s: %d",filename,err );
+		return -1;
+	}
+	err = av_find_stream_info( avformat_ctx );
+	if(err < 0 )
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Stream information found in %s",filename);
+		av_close_input_file( avformat_ctx );
+		return -1;
+	}
+	av_read_play(avformat_ctx);
+
+	int i,j;
+	int n = avformat_ctx->nb_streams;
+	int vi = -1;
+
+	veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: File has %d %s", n, ( n == 1 ? "stream" : "streams") );
+
+	for( i=0; i < n; i ++ )
+	{
+		if( avformat_ctx->streams[i]->codec )
+		{
+			if( avformat_ctx->streams[i]->codec->codec_type == CODEC_TYPE_VIDEO )
+			{
+				int sup_codec = 0;
+				for( j = 0; _supported_codecs[j].name != NULL; j ++ ) {
+					if( avformat_ctx->streams[i]->codec->codec_id == _supported_codecs[j].id ) {
+						sup_codec = 1;
+						goto further;
+					}
+				}	
+further:
+				if( !sup_codec ) {
+					veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unrecognized file %s",		
+						avformat_ctx->streams[i]->codec->codec_name );
+					av_close_input_file( avformat_ctx );
+					return -1;
+				}
+				codec = avcodec_find_decoder( avformat_ctx->streams[i]->codec->codec_id );
+				if( codec == NULL ) 
+				{
+					veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unable to find decoder for codec %s", 
+						avformat_ctx->streams[i]->codec->codec_name);	
+					av_close_input_file( avformat_ctx );
+					return -1;
+				}
+				vi = i;
+				break;
+			}
+		}
+	}
+
+	if( vi == -1 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: No video streams found");
+		av_close_input_file( avformat_ctx );
+		return -1;
+	}
+
+	codec_ctx = avformat_ctx->streams[vi]->codec;
+	avformat_stream=avformat_ctx->streams[vi];
+	if ( avcodec_open( codec_ctx, codec ) < 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unable to open %s decoder (codec %x)",
+				codec_ctx->codec_name, codec_ctx->codec_id);
+		return -1;
+	}
+
+	veejay_memset( &pkt, 0, sizeof(AVPacket));
+	AVFrame *f = avcodec_alloc_frame();
+	int input_pix_fmt = -1;
+
+	int got_picture = 0;
+	while( (av_read_frame(avformat_ctx, &pkt) >= 0 ) ) {
+		avcodec_decode_video( codec_ctx,f,&got_picture, pkt.data, pkt.size );
+
+		if( got_picture ) {
+			break;
+		}
+	}
+	
+	if(!got_picture) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Error while reading %s", filename );
+		av_free(f);
+		av_free_packet(&pkt); 
+		avcodec_close( codec_ctx );
+		av_close_input_file( avformat_ctx );
+		return -1;
+	}
+		
+	veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg reports Video [%s] %dx%d. Pixel format: %x Has B frames: %s (%s)",
+		codec_ctx->codec_name, codec_ctx->width,codec_ctx->height, codec_ctx->pix_fmt, 
+		(codec_ctx->has_b_frames ? "Yes" : "No"), filename );
+
+	av_free_packet(&pkt); 
+	avcodec_close( codec_ctx );
+	av_close_input_file( avformat_ctx );
+	av_free(f);
+
+	switch( input_pix_fmt ) {	
+		case PIX_FMT_YUV420P:	input_pix_fmt = FMT_420;	break;	
+		case PIX_FMT_YUV422P:	input_pix_fmt = FMT_422;	break;
+		case PIX_FMT_YUVJ420P:	input_pix_fmt = FMT_420F;	break;
+		case PIX_FMT_YUVJ422P:	input_pix_fmt = FMT_422F;	break;
+	}
+	
+	return input_pix_fmt;	
+}
+ 
 int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 {
 	int in_pix_fmt  = 0;
@@ -1345,15 +1487,10 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 		case CODEC_ID_DVVIDEO:
 #ifdef SUPPORT_READ_DV2
 			ret = vj_dv_scan_frame( dv_decoder_, d->tmp_buffer );
-			if ( in_pix_fmt != ret )	
-			{
-				//@ correct chroma 
-				if( ret == FMT_420 || ret == FMT_420F )
-					lav->MJPG_chroma = CHROMA420;
-				else
-					lav->MJPG_chroma = CHROMA422;
-					
-			}
+			if( ret == FMT_420 || ret == FMT_420F )
+				lav->MJPG_chroma = CHROMA420;
+			else
+				lav->MJPG_chroma = CHROMA422;
 #endif
 			break;
 		case CODEC_ID_YUVLZO:

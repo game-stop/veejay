@@ -641,23 +641,9 @@ int vj_perform_init(veejay_t * info)
 	int vp = 0;  int frontback = 0;
 	int pvp = 0;
 
-//	info->viewport = viewport_init( 0,0,w,h,w, h, info->homedir, &vp, &frontback,0 );
 	veejay_memset( &pvar_, 0, sizeof( varcache_t));
 
-/*	if( pvp )
-		veejay_msg(VEEJAY_MSG_INFO, "Initialized Projection");
- 	if( vp )
-		veejay_msg(VEEJAY_MSG_INFO, "Initialized Viewport");
-
-	if( use_vp )
-	{
-		info->use_vp = vp;
-		info->frontback = frontback;
-		info->use_proj = pvp;
-		veejay_msg(VEEJAY_MSG_INFO, "Loaded viewport and projection configuration");
-	}*/
-
-    return 1;
+	return 1;
 }
 
 
@@ -871,7 +857,7 @@ int vj_perform_audio_start(veejay_t * info)
 		}
 		return 1;
 #else
-		veejay_msg(VEEJAY_MSG_INFO, "Jack support not compiled in (no audio)");
+		veejay_msg(VEEJAY_MSG_WARNING, "Jack support not compiled in (no audio)");
 		return 0;
 #endif
 	}
@@ -2162,16 +2148,12 @@ void vj_perform_record_stop(veejay_t *info)
 	 {
 		settings->sample_record_switch = 0;
 		veejay_set_sample( info,sample_size()-1);
+		veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d", sample_size()-1);
 	 }
-	 else
-         {
- 		veejay_msg(VEEJAY_MSG_INFO,"Not autoplaying new sample");
-         }
-
 	 settings->sample_record = 0;
 	 settings->sample_record_id = 0;
 	 settings->sample_record_switch =0;
-     settings->render_list = 0;
+	 settings->render_list = 0;
  }
 
  if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG)
@@ -2197,10 +2179,7 @@ void vj_perform_record_stop(veejay_t *info)
 	{
 		info->uc->playback_mode = VJ_PLAYBACK_MODE_SAMPLE;
 		veejay_set_sample(info ,sample_size()-1);
-	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Not autoplaying new sample");
+		veejay_msg(VEEJAY_MSG_INFO, "Autoplaying new sample %d", sample_size()-1);
 	}
  
   }
@@ -2236,6 +2215,7 @@ void vj_perform_record_sample_frame(veejay_t *info, int sample) {
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,
 				"Error while auto splitting "); 
+				report_bug( info->verbose );
 			}
 		}
 		else
@@ -2301,8 +2281,9 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 			if( vj_tag_init_encoder( stream_id, NULL,
 				df, frames_left)==-1)
 			{
-				veejay_msg(VEEJAY_MSG_INFO,
-				"Error while auto splitting "); 
+				veejay_msg(VEEJAY_MSG_WARNING,
+					"Error while auto splitting."); 
+				report_bug(info->verbose);
 			}
 		}
 	 }
@@ -2408,13 +2389,13 @@ static void vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 		{
 			sample_set_effect_status(info->uc->sample_id, 1);
      			sample_reset_fader(info->uc->sample_id);
-	      		veejay_msg(VEEJAY_MSG_INFO, "Sample Chain Auto Fade Out done");
+	      		veejay_msg(VEEJAY_MSG_DEBUG, "Sample Chain Auto Fade Out done");
 		}
 		if((dir>0) && (opacity==255))
 		{
 			sample_set_effect_status(info->uc->sample_id,0);
 			sample_reset_fader(info->uc->sample_id);
-			veejay_msg(VEEJAY_MSG_INFO, "Sample Chain Auto fade In done");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Sample Chain Auto fade In done");
 		}
     	}
 
@@ -2443,13 +2424,13 @@ static void vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 		{
 			vj_tag_set_effect_status(info->uc->sample_id,1);
 			vj_tag_reset_fader(info->uc->sample_id);
-			veejay_msg(VEEJAY_MSG_INFO, "Stream Chain Auto Fade done");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Stream Chain Auto Fade done");
 		}
 		if((dir > 0) && (opacity == 255))
 		{
 			vj_tag_set_effect_status(info->uc->sample_id,0);
 			vj_tag_reset_fader(info->uc->sample_id);
-			veejay_msg(VEEJAY_MSG_INFO, "Stream Chain Auto Fade done");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Stream Chain Auto Fade done");
 		}
 		
     	}

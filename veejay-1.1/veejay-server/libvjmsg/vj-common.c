@@ -84,6 +84,15 @@ int veejay_is_silent()
 	return 0;
 }
 
+void	report_bug(int verbose)
+{
+	veejay_msg(VEEJAY_MSG_WARNING, "Please report this error to http://groups.google.com/group/veejay-discussion?hl=en");
+	veejay_msg(VEEJAY_MSG_WARNING, "You can also use our mailinglist: veejay-users@lists.sourceforge.net");
+	veejay_msg(VEEJAY_MSG_WARNING, "Send at least veejay's output and include the command(s) you have used to start it.");
+	if( !verbose )
+		veejay_msg(VEEJAY_MSG_WARNING, "Please re-run veejay with the -v commandline option to produce additional details");
+
+}
 
 void veejay_msg(int type, const char format[], ...)
 {

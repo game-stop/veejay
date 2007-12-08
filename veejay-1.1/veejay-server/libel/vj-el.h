@@ -135,7 +135,7 @@ void	vj_el_clear_cache( editlist *el );
 
 int     get_ffmpeg_pixfmt( int pf );
 
-void    vj_el_set_image_output_size(editlist *el);
+void    vj_el_set_image_output_size(editlist *el,int w, int h, float fps, int pf);
 
 int open_video_file(char *filename, editlist * el, int preserve_pathname, int deinter, int force, char override_norm);
 

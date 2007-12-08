@@ -53,6 +53,7 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
+#define _POSIX_C_SOURCE 199309
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <poll.h>
@@ -303,6 +304,9 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 		if(re)
 			veejay_msg(VEEJAY_MSG_WARNING, "Saved Editlist to %s", recover_edl );
 	}
+
+	report_bug( info->verbose );
+
 	veejay_change_state( info, new_state );
 }
 
@@ -621,7 +625,8 @@ int veejay_init_editlist(veejay_t * info)
 	settings->spas = 0;
    }
 
-   vj_el_set_image_output_size( el );
+   vj_el_set_image_output_size( el, info->dummy->width, info->dummy->height,		
+				    info->dummy->fps, info->pixel_format );
 
    return 0;
 }
@@ -1354,13 +1359,13 @@ void	veejay_check_homedir(void *arg)
 	struct statfs ts;
 	if( statfs( tmp, &ts ) != 0 )
 	{
-		veejay_msg(VEEJAY_MSG_INFO,"\tNo plugins.cfg found (see DOC/HowtoPlugins)");
+		veejay_msg(VEEJAY_MSG_WARNING,"\tNo plugins.cfg found (see DOC/HowtoPlugins)");
 	}
 	sprintf(tmp, "%s/viewport.cfg", path);
 	memset( &ts,0,sizeof(struct statfs));
 	if( statfs( tmp, &ts ) != 0 )
 	{
-		veejay_msg(VEEJAY_MSG_INFO,"\tNo viewport.cfg found (press CTRL-V to setup viewport)");
+		veejay_msg(VEEJAY_MSG_WARNING,"\tNo viewport.cfg found (start veejay with -D -w -h and press CTRL-V to setup viewport)");
 	}
 
 }
@@ -1901,7 +1906,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 			veejay_msg(VEEJAY_MSG_WARNING, "Not timing audio/video");
 		break;
     		default:
-			veejay_msg(VEEJAY_MSG_INFO, "Using nanosleep timer");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Using nanosleep timer");
 		break;
     	}    
 
@@ -1953,7 +1958,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame1)) return 0;
 		if(!vj_el_init_422_frame( info->current_edit_list, info->effect_frame2)) return 0;
 		info->settings->sample_mode = SSM_422_444;
-		veejay_msg(VEEJAY_MSG_INFO, "Internal YUV format is 4:2:2 Planar, %d x %d",
+		veejay_msg(VEEJAY_MSG_DEBUG, "Internal YUV format is 4:2:2 Planar, %d x %d",
 				info->current_edit_list->video_width,
 				info->current_edit_list->video_height);
 	}
@@ -1962,7 +1967,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		if(!vj_el_init_420_frame( info->current_edit_list, info->effect_frame1)) return 0;
 		if(!vj_el_init_420_frame( info->current_edit_list, info->effect_frame2)) return 0;
 		info->settings->sample_mode = SSM_420_JPEG_TR;
-		veejay_msg(VEEJAY_MSG_INFO, "Internal YUV format is 4:2:0 Planar, %d x %d",
+		veejay_msg(VEEJAY_MSG_DEBUG, "Internal YUV format is 4:2:0 Planar, %d x %d",
 				info->current_edit_list->video_width,
 				info->current_edit_list->video_height);
 	}
@@ -2108,7 +2113,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		"Initialized %d Image- and Video Effects", vj_effect_max_effects());
     	vj_effect_initialize(info->current_edit_list->video_width, info->current_edit_list->video_height,
 						full_range);
-	veejay_msg(VEEJAY_MSG_INFO,
+	veejay_msg(VEEJAY_MSG_DEBUG,
 		"BES %d x %d, Video %d x %d , Screen %d x %d",
 		info->bes_width,
 		info->bes_height,	
@@ -2267,7 +2272,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	if(def_tags && id <= 0)
 	{
 		int n = vj_tag_num_devices();
-		veejay_msg(0, "create_tag: nstreams=%d,pf=%d, %d",info->nstreams,1, (def_tags-1));
 		int nid =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, "bogus", info->nstreams, el->pixel_format, (def_tags-1) );
 		if( nid> 0)
 		{
@@ -2467,9 +2471,9 @@ static void veejay_playback_cycle(veejay_t * info)
 			which_cpu = 1;
 		}
 		if(!which_cpu)
-			veejay_msg(VEEJAY_MSG_INFO, "VEEJAY_SET_CPU set to 0 , render thread not locked on a single CPU.");
+			veejay_msg(VEEJAY_MSG_INFO, "VEEJAY_SET_CPU set to 0, render thread not locked on a single CPU.");
 		else
-			veejay_msg(VEEJAY_MSG_INFO, "VEEJAY_SET_CPU set to %d", which_cpu );
+			veejay_msg(VEEJAY_MSG_INFO, "VEEJAY_SET_CPU set to CPU %d", which_cpu );
 	}
     }
 
@@ -3010,6 +3014,14 @@ veejay_t *veejay_malloc()
 	info->settings->ncpu = smp_check();
 
 	yuv_init_lib();
+
+	if(!vj_avcodec_init( info->pixel_format, info->verbose ))
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize encoders!");
+		return 0;
+	}
+	
+
 	
     return info;
 }
@@ -3621,12 +3633,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		info->dummy->active = 1;
 	}
 
-	if(!vj_avcodec_init( info->pixel_format, info->verbose ))
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize encoders!");
-		return 0;
-	}
-	
 
 	//TODO: pass yuv sampling to dummy
 	if( info->dummy->active )
@@ -3639,7 +3645,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 			info->dummy->width = 352;
 		if( !info->dummy->height)
 			info->dummy->height = 288;
-		if( info->pixel_format <= 1)
+		if( info->pixel_format == FMT_420 || info->pixel_format == FMT_420F)
 			info->dummy->chroma = CHROMA420;
 		else
 			info->dummy->chroma = CHROMA422;	
@@ -3724,7 +3730,7 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 			return 0;
 	}
 
-	veejay_msg(VEEJAY_MSG_INFO, "Processing set to YUV %s", text );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Processing set to YUV %s", text );
 
 	vj_el_init( info->pixel_format );
 	

@@ -32,6 +32,10 @@
 #include <veejay/vims.h>
 #include <libstream/vj-net.h>
 #include <liblzo/lzo.h>
+#define _POSIX_C_SOURCE 199309 
+#include <time.h>
+
+
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -61,6 +65,15 @@ static void unlock_(threaded_t *t, const char *f, int line)
 
 #define lock( t ) lock_( t, __FUNCTION__, __LINE__ )
 #define unlock( t ) unlock_( t, __FUNCTION__ , __LINE__ )
+
+#define MS_TO_NANO(a) (a *= 1000000)
+static	void	net_delay(long nsec )
+{
+	struct timespec ts;
+	ts.tv_sec = 0;
+	ts.tv_nsec = MS_TO_NANO( nsec);
+	nanosleep( &ts, NULL );
+}
 
 
 void	*reader_thread(void *data)
@@ -112,7 +125,7 @@ void	*reader_thread(void *data)
 			retrieve = 1;
 		}
 	
-		int wait_time = 15000;
+		long wait_time = 20;
 	
 		if(!error && retrieve)
 		{
@@ -127,7 +140,7 @@ void	*reader_thread(void *data)
 					}
 					else
 					{
-						wait_time += 1000;
+						wait_time += 10;
 					}
 					ret = 0;
 				}
@@ -141,14 +154,17 @@ void	*reader_thread(void *data)
 			else
 			{
 				if(tag->source_type == VJ_TAG_TYPE_MCAST )
-					wait_time = 15000;
+					wait_time = 25;
 			}
 		}
 		unlock(t);
 
 		if( wait_time )
-		{
-			usleep(wait_time);
+		{	
+			if ( wait_time > 40 )
+				wait_time = 25;
+			net_delay( wait_time );
+	//		usleep(wait_time);
 		}
 
 		if( error )

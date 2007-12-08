@@ -804,7 +804,7 @@ int		vj_unicap_stop_capture( void *vut )
 	v->state = 0;
 	unlock_( vut );
 
-	usleep( 200 * 1000 );
+	usleep( 200 * 1000 ); //@ bad way to sync threads
 
 	lock_( vut );
 	if( v->active )

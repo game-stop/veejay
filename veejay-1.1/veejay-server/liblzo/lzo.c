@@ -64,7 +64,7 @@ void	*lzo_new( )
 		if(l) free(l);
 		return NULL;
 	}
-	veejay_msg(VEEJAY_MSG_INFO,"LZO real-time data compression library (v%s, %s).",
+	veejay_msg(VEEJAY_MSG_DEBUG,"LZO real-time data compression library (v%s, %s).",
             lzo_version_string(), lzo_version_date());
 
 	return (void*) l;	
