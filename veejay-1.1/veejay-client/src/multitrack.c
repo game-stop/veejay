@@ -534,18 +534,7 @@ static void sequence_preview_cb(GtkWidget *widget, gpointer user_data)
 	sequence_preview_size( mt, v->num );
 
 	if( !status )
-	{
-	//	float ratio = mt->width / (float) mt->height;
-	//	int w = 160;
-	//	int h = ( (int)( (float)w / ratio)) /16*16;
-//		GdkPixbuf *logo = vj_gdk_pixbuf_scale_simple( mt->logo, w,h, GDK_INTERP_BILINEAR );
-//		gtk_image_set_from_pixbuf_(
-//			GTK_IMAGE( v->area ), logo );
-//		veejay_msg(2, "Set GVeejayReloaded logo %d x %d",w,h);
 		gtk_image_clear( GTK_IMAGE(v->area ) );
-		
-//		gdk_pixbuf_unref( logo );
-	}
 }
 
 static	void	sequence_set_current_frame(GtkWidget *w, gpointer user_data)
@@ -1037,6 +1026,12 @@ void		multitrack_set_quality( void *data , int quality )
 	mt->ph = h;
 }
 
+void		multitrack_set_logo(void *data , GtkWidget *img)
+{
+	multitracker_t *mt = (multitracker_t*) data;
+	gtk_image_set_from_pixbuf_( GTK_IMAGE(img), mt->logo );
+}
+
 void		multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget *img )
 {
 	multitracker_t *mt = (multitracker_t*) data;
@@ -1044,11 +1039,6 @@ void		multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget
 	{
 		gvr_track_toggle_preview( mt->preview, mt->master_track, status );
 		veejay_msg(2, "Veejay Master Preview %s", (status ? "Enabled" : "Disabled") );
-
-		if(!status)
-		{
-			gtk_image_set_from_pixbuf_( GTK_IMAGE(img), mt->logo );
-		}
 	}
 }
 

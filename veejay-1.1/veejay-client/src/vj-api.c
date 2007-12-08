@@ -3060,7 +3060,7 @@ gboolean
       if (!path_currently_selected)
       {
 	gint id = 0;
-	sscanf(name+1, "%d", &id);
+	sscanf(name+1, "[ %d]", &id);
 	if(name[0] == 'S')
 	{
 	   	info->uc.selected_mix_sample_id = id;
@@ -3607,7 +3607,7 @@ on_effectlist_sources_row_activated(GtkTreeView *treeview,
 		gchar *idstr = NULL;
 		gtk_tree_model_get(model,&iter, SL_ID, &idstr, -1);
 		gint id = 0;
-		if( sscanf( idstr, "[ %d]", &id ) )
+		if( sscanf( idstr+1, "[ %d]", &id ) )
 		{
 		    // set source / channel
 		    multi_vims( VIMS_CHAIN_ENTRY_SET_SOURCE_CHANNEL,
@@ -5423,6 +5423,9 @@ static	void		veejay_update_multitrack( vj_gui_t *gui )
 			if(!no_preview_ && deckpage == 2)
 				multitrack_update_sequence_image( gui->mt, i, s->img_list[i] );
 			gdk_pixbuf_unref( s->img_list[i] );
+		} else {
+			if( i == s->master )
+				multitrack_set_logo( gui->mt, maintrack );
 		}
 	}
 	free(s->status_list);
@@ -5848,7 +5851,6 @@ static void	update_gui()
 	
 
 	process_reload_hints(history, pm);
-
 	on_vims_messenger();
 
 	update_cpumeter_timeout(NULL);
@@ -6284,14 +6286,6 @@ void	vj_gui_setup_defaults( vj_gui_t *gui )
 	gui->config.vims = 0;
 	gui->config.mcast_osc = g_strdup( "224.0.0.32" );
 	gui->config.mcast_vims = g_strdup( "224.0.0.33" );
-}
-
-int	vj_gui_yield()
-{
-veejay_msg(0, "%s",__FUNCTION__ );
- 	if( is_button_toggled("previewtoggle"))
-		return 1;
-	return 0;
 }
 
 static	void	theme_response( gchar *string )
@@ -7694,8 +7688,8 @@ static void add_sample_to_effect_sources_list(gint id, gint type, gchar *title, 
 	GtkTreeIter iter;	
 
 	if (type == STREAM_NO_STREAM) 
-		sprintf( id_string, "[%4d] %s", id, title);    
-	else sprintf( id_string, "[%4d]", id);
+		sprintf( id_string, "S[%4d] %s", id, title);    
+	else sprintf( id_string, "T[%4d]", id);
 
 	gtk_list_store_append( effect_sources_store, &iter );
 	gtk_list_store_set( effect_sources_store, &iter, SL_ID, id_string, SL_DESCR, title, SL_TIMECODE , timecode,-1 );

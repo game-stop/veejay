@@ -14,6 +14,8 @@ void            *multitrack_new(
 		void *gui);
 
 
+void		multitrack_set_logo(void *data , GtkWidget *img);
+
 int             multitrack_add_track( void *data );
 
 void            multitrack_close_track( void *data );
