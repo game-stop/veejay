@@ -524,11 +524,11 @@ int veejay_set_frame(veejay_t * info, long framenum)
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
 
-    if(framenum < 0)
-		return -1;
+    if(framenum < settings->min_frame_num)
+	framenum = settings->min_frame_num;
 
     if( framenum > settings->max_frame_num )
-		framenum = settings->max_frame_num;
+	framenum = settings->max_frame_num;
 
     if(info->uc->playback_mode==VJ_PLAYBACK_MODE_SAMPLE)
 	{

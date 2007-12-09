@@ -392,9 +392,7 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 		int num   = end - ((int) ( (double)range*rand()/(RAND_MAX)));
 		settings->current_frame_num = num;
 	}
-#ifdef STRICT_CHECKING
-	assert( settings->current_frame_num >= 0 );
-#endif 
+
 	if (settings->current_frame_num < start || settings->current_frame_num >= end ) {
 	    switch (looptype) {
 	    case 2:
