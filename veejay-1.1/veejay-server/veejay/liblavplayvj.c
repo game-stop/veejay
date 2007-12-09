@@ -1309,34 +1309,10 @@ void	veejay_check_homedir(void *arg)
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "No veejay config file in %s", path );
 		ret = mkdir(path,0777);
-		if( ret != 0 )
-		{
-			error = 1;	
-		}
-		else
-		{
-			snprintf(path,1024, "%s/.veejay/recovery", home );
-			mkdir(path,0777);
-			snprintf(path,1024, "%s/.veejay/theme", home );
-			mkdir(path,0777);
-		}
-		if(error)
-		switch(errno)
-		{
-			case 0:
-				break;
-			case EACCES:
-				veejay_msg( VEEJAY_MSG_ERROR, "\tPermission denied");break;
-			case EEXIST:
-				veejay_msg( VEEJAY_MSG_ERROR, "\tPath already exists and may not be a directory");break;
-			case ELOOP:
-				veejay_msg( VEEJAY_MSG_ERROR, "\tToo many symbolic links"); break;
-			case ENOSPC:
-				veejay_msg( VEEJAY_MSG_ERROR, "\tOut of available diskpace. Delete some files and try again"); break;
-			default:
-				veejay_msg( VEEJAY_MSG_ERROR, "\tSome other error occured");
-				break;
-		}
+		snprintf(path,1024, "%s/.veejay/recovery", home );
+		mkdir(path,0777);
+		snprintf(path,1024, "%s/.veejay/theme", home );
+		mkdir(path,0777);
 	}
 
 	stat( path, &s );
