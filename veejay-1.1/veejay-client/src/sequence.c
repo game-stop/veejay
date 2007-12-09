@@ -75,8 +75,6 @@ typedef struct
 	void 	*lzo;
 	veejay_track_t **tracks;
 	int	n_tracks;
-//	GMutex	*mutex;
-//	GStaticRecMutex *mutex;
 	GThread *thread;
 	int	state;
 	track_sync_t *track_sync;
@@ -126,8 +124,6 @@ void	*gvr_preview_init(int max_tracks)
 
 	if(!vp->thread )
 	{
-	//	g_static_rec_mutex_free(mutex);
-	//	g_mutex_free( vp->mutex );
 		free(vp);
 		return NULL;
 	}
@@ -702,7 +698,7 @@ int		gvr_track_configure( void *preview, int track_num, int w, int h )
 	}
 	gvr_ext_unlock( vp );
 
-	veejay_msg(2, "Track %d VeejayGrabber %s:%d %dx%d image",
+	veejay_msg(VEEJAY_MSG_INFO, "Track %d VeejayGrabber %s:%d %dx%d image",
 		track_num,
 		vp->tracks[ track_num ]->hostname,
 		vp->tracks[ track_num ]->port_num,
@@ -726,7 +722,7 @@ int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 	vp->tracks[ track_num ]->preview = status;
 	gvr_ext_unlock( vp );
 
-	veejay_msg(2, "Track %d VeejayGrabber %s:%d %s",
+	veejay_msg(VEEJAY_MSG_INFO, "Track %d VeejayGrabber %s:%d %s",
 		track_num,
 		vp->tracks[ track_num ]->hostname,
 		vp->tracks[ track_num ]->port_num,
@@ -930,7 +926,7 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 		else
 		{
 		        v->preview = 0;
-        		veejay_msg(2, "Track %d VeejayGrabber %s:%d disabled",
+        		veejay_msg(0, "Unexpected: Track %d VeejayGrabber %s:%d disabled",
                 		track_num,
                			 vp->tracks[ track_num ]->hostname,
                			 vp->tracks[ track_num ]->port_num);
@@ -958,8 +954,6 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 		}
 
 	}
-//	g_mutex_unlock( vp->mutex );
-//	gvr_ext_unlock( vp );
 
 	return score;
 }
@@ -978,6 +972,8 @@ static	void	*gvr_preview_thread(gpointer data)
 	veejay_preview_t *vp = (veejay_preview_t*) data;
 	int i;
 
+	veejay_msg(VEEJAY_MSG_INFO, "Started preview thread.");
+
 	for( ;; )
 	{
 		int score = 0;
@@ -987,19 +983,15 @@ static	void	*gvr_preview_thread(gpointer data)
 			if( vp->tracks[i] && vp->tracks[i]->active)
 				if(gvr_preview_process_status( vp, vp->tracks[i] ))
 				{
-					//after lock in status, assert
 					if( vp->tracks[i] )
 					{
 						score += gvr_veejay( vp, vp->tracks[i],i );	
 						ac ++;
 					}
 				}
-			if( vp->state == 0 )
-				break;
 		}
-	
+
 		gvr_ext_lock( vp );	
-		//@ lock and prepare data 
 		for( i = 0; i < vp->n_tracks ; i ++ )
 		{
 			vp->track_sync->frame_list[i] = 0;
@@ -1023,19 +1015,21 @@ static	void	*gvr_preview_thread(gpointer data)
 				vp->track_sync->heights[i] = 0;
 			}
 		}
-		//@ unlock
 		gvr_ext_unlock( vp );
 
 		if( vp->state == 0 )
-			break;
+			goto preview_err;
 
 		if( score == 0 )
 		{
 			long sl = 20 / (long) ac;
 			net_delay( sl );
-//			g_usleep( sl );
 		}
 	}
+
+preview_err:
+
+	veejay_msg(VEEJAY_MSG_INFO, "Preview thread was told to exit.");
 
 
 	return NULL;

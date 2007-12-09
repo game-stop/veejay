@@ -521,20 +521,22 @@ static void sequence_preview_cb(GtkWidget *widget, gpointer user_data)
 	multitracker_t *mt = v->backlink;
 	int status = 0;
 
-	if(v->num != mt->master_track )
-	 status = (gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) == TRUE ? 1 : 0 );
-	else
-	 status = is_button_toggled( "previewtoggle" );
-
 	if(v->status_lock)
 		return;
 
-	gvr_track_toggle_preview( mt->preview, v->num,status );
+	if(v->num != mt->master_track )
+	{
+		 status = (gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) == TRUE ? 1 : 0 );
+	//	else
+	// status = is_button_toggled( "previewtoggle" );
 
-	sequence_preview_size( mt, v->num );
+		gvr_track_toggle_preview( mt->preview, v->num,status );
 
-	if( !status )
-		gtk_image_clear( GTK_IMAGE(v->area ) );
+		sequence_preview_size( mt, v->num );
+	
+		if( !status )
+			gtk_image_clear( GTK_IMAGE(v->area ) );
+	}
 }
 
 static	void	sequence_set_current_frame(GtkWidget *w, gpointer user_data)
@@ -920,10 +922,10 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 		/* set status of preview toggle button in trackview */
 		if( track == 0 )
 		{
-			mt->view[track]->status_lock=1;
-			gtk_toggle_button_set_active(
-				GTK_TOGGLE_BUTTON( mt->preview_toggle), (preview ? TRUE: FALSE ) );
-			mt->view[track]->status_lock=0;
+		//	mt->view[track]->status_lock=1;
+		//	gtk_toggle_button_set_active(
+		//		GTK_TOGGLE_BUTTON( mt->preview_toggle), (preview ? TRUE: FALSE ) );
+		//	mt->view[track]->status_lock=0;
 		}
 		else
 		{
@@ -1035,7 +1037,7 @@ void		multitrack_set_logo(void *data , GtkWidget *img)
 void		multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget *img )
 {
 	multitracker_t *mt = (multitracker_t*) data;
-	if(track_id == -1)
+	if(track_id == -1 )
 	{
 		gvr_track_toggle_preview( mt->preview, mt->master_track, status );
 		veejay_msg(2, "Veejay Master Preview %s", (status ? "Enabled" : "Disabled") );

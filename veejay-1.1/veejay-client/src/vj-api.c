@@ -598,8 +598,6 @@ static struct
 	{ NULL },
 };
 
-static	int	no_preview_ = 0;
-
 static	uint32_t	preview_box_w_ = 352;
 static  uint32_t	preview_box_h_ = 288;
 
@@ -1806,7 +1804,6 @@ gboolean	gveejay_running()
 
 gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 {
-	no_preview_ = 0;
 	if(!running_g_)
 		return FALSE;
 
@@ -5420,8 +5417,9 @@ static	void		veejay_update_multitrack( vj_gui_t *gui )
 				}
 				vj_img_cb( s->img_list[i] );
 			}
-			if(!no_preview_ && deckpage == 2)
+			if(deckpage == 2)
 				multitrack_update_sequence_image( gui->mt, i, s->img_list[i] );
+
 			gdk_pixbuf_unref( s->img_list[i] );
 		} else {
 			if( i == s->master )
@@ -6196,7 +6194,7 @@ int	vj_gui_sleep_time( void )
 int	vj_img_cb(GdkPixbuf *img )
 {
 	int i;
-	if( !info->selected_slot || !info->selected_gui_slot || no_preview_)
+	if( !info->selected_slot || !info->selected_gui_slot )
 	{
 		return 0;
 	}
@@ -6868,8 +6866,6 @@ void	vj_gui_disable()
 	}
 
 	info->sensitive = 0;
-
-	no_preview_ = 1;
 }	
 
 
@@ -6885,9 +6881,6 @@ void	vj_gui_enable()
 
 	enable_widget( "speed_slider");
 	info->sensitive = 1;
-       
-
-	no_preview_ = 0;
 }
 
 sample_slot_t *vj_gui_get_sample_info(gint which_one, gint mode )
