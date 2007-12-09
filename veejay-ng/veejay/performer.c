@@ -114,8 +114,6 @@ static	VJFrame	*performer_alloc_frame( veejay_t *info, uint8_t *p0, uint8_t *p1,
 	VJFrame *f = (VJFrame*) vj_malloc(sizeof(VJFrame));
 	memset( f,0, sizeof( VJFrame ));
 
-	veejay_msg(0, "%s:%d : %dx%d, fmt=%d",__FUNCTION__,__LINE__,svit->w,svit->h, svit->fmt );
-
 	switch(svit->fmt)
 	{
 		case FMT_420:
@@ -503,11 +501,12 @@ void	*performer_get_output_frame( veejay_t *info )
 
 
 void	performer_clean_output_frame( veejay_t *info )
-{
+{/*
 	performer_t *p = (performer_t*) info->performer;
+veejay_msg(0, "%s",__FUNCTION__ );
 	memset( p->display->data[0],16,p->display->len );
 	memset( p->display->data[1],128,p->display->uv_len );
-	memset( p->display->data[2],128,p->display->uv_len );
+	memset( p->display->data[2],128,p->display->uv_len );*/
 }
 
 //! Queue sufficient audio samples for immediate playback
@@ -532,8 +531,6 @@ static	uint8_t *performer_fetch_audio_frames( veejay_t *info, int *gen_samples )
 		n_samples = 0;
 	}
 
-	veejay_msg("%s: has_audio=%d, n_samples=%d, speed=%d",__FUNCTION__,has_audio,n_samples, speed );
-	
 	if( n_samples == 0 )
 	{
 		sample_get_property_ptr(info->current_sample, "audio_spas", &n_samples );
@@ -926,21 +923,6 @@ static	int	performer_push_in_frames( void *sample, performer_t *p, int i )
 #ifdef STRICT_CHECKING
 static	int	performer_verify_frame( VJFrame *f )
 {
-	int i;
-	int u = f->uv_len - f->uv_width;
-	int un = f->uv_len;
-	int y = f->len - f->width;
-	int yn = f->len;
-	int fu = 0;
-	int fy = 0;
-	long avg = 0;
-	int avg_;
-
-	veejay_msg(0, "%s:%d, frame %p , len=%d,uv_len=%d, w=%d,h=%d, uw=%d, uh=%d fmt=%d",
-		__FUNCTION__,__LINE__, f, f->len,f->uv_len,f->width,f->height,
-		f->uv_width,f->uv_height, f->format );
-
-
 	return 1;
 }
 #endif

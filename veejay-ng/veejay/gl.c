@@ -146,7 +146,7 @@ static	int	x11_err_( Display *display, XErrorEvent *event )
 			event->type,event->display,event->resourceid,event->serial);
 	veejay_msg(0, "Error code: %x, request code: %x, minor code: %x",
 			event->error_code, event->request_code, event->minor_code );
-	exit(0);
+	return 0;
 }
 
 static 	void	x11_screen_saver_disable( Display *display )
@@ -755,16 +755,14 @@ static	int	x_display_init_gl( display_ctx *ctx, int w, int h )
 
 void	*x_display_init(void)
 {
-	display_ctx *ctx = (display_ctx*) vj_malloc(sizeof(display_ctx));
-	memset(ctx, 0,sizeof(display_ctx));
+	display_ctx *ctx = (display_ctx*) vj_calloc(sizeof(display_ctx));
    
 	XSetErrorHandler( x11_err_ );
 
-	ctx->name = XDisplayName(":0.0");
-	ctx->display = XOpenDisplay( ctx->name );
+	ctx->display = XOpenDisplay( NULL );
 	if(!ctx->display)
 	{
-		veejay_msg(0, "Error opening the X11 display %s", ctx->name );
+		veejay_msg(0, "Can't open the X11 display %s", ctx->name );
 		return NULL;
 	}
 	XA_INIT(ctx->display,_NET_WM_PID);
@@ -798,10 +796,10 @@ void	*x_display_init(void)
 	}
 
 	x11_screen_saver_disable(ctx->display);
-        veejay_msg(2,"\tX11 Display:   %s", ctx->name);
-        veejay_msg(2,"\tX11 Window :   %dx%d", ctx->disp_w, ctx->disp_h );
-        veejay_msg(2,"\tColor depth:   %d", ctx->depth);
-        veejay_msg(2,"\tBits per pixel:%d", ctx->bpp);
+        veejay_msg(1,"\tX11 Display:   %s", ctx->name);
+        veejay_msg(1,"\tX11 Window :   %dx%d", ctx->disp_w, ctx->disp_h );
+        veejay_msg(1,"\tColor depth:   %d", ctx->depth);
+        veejay_msg(1,"\tBits per pixel:%d", ctx->bpp);
 
 	
 	return ctx;	

@@ -1215,8 +1215,9 @@ int	vj_el_get_video_frame(void *edl, long nframe, void *fdst)
 		}
 		 if( !d->frame->opaque ) //@ indirect
                 {
-                        if( el->auto_deinter && inter != LAV_NOT_INTERLACED)
+                     /*   if( el->auto_deinter && inter != LAV_NOT_INTERLACED)
                         {
+				veejay_msg(0, "%s: not opaque, interlaced",__FUNCTION__);
                                 pict2.data[0] = d->deinterlace_buffer[0];
                                 pict2.data[1] = d->deinterlace_buffer[1];
                                 pict2.data[2] = d->deinterlace_buffer[2];
@@ -1237,16 +1238,22 @@ int	vj_el_get_video_frame(void *edl, long nframe, void *fdst)
 				free(src1);
                     	} 
                         else
-                        {
+                        {*/
+				veejay_msg(0, "%s: not opaque, not interlaced. linesize=%d,%d,%d",__FUNCTION__,
+					d->frame->linesize[0],d->frame->linesize[1],d->frame->linesize[2]);
+				
+
 				VJFrame *src1 = yuv_yuv_template( d->frame->data[0],d->frame->data[1],d->frame->data[2],
 					el->video_width,el->video_height, src_fmt );
 				
 				yuv_convert_any3( src1, d->frame->linesize, dst, src_fmt, dst_fmt );
 				free(src1);
-                        }
+                        //}
                 }
                 else
                 {
+		veejay_msg(0, "%s: direct render",__FUNCTION__);
+	
                         //@ dri
                         dst = d->frame->opaque;
                         if(el->itu601)

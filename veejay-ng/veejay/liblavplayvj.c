@@ -290,6 +290,8 @@ void veejay_quit(veejay_t * info)
 int veejay_init_project_from_args( veejay_t *info, int w, int h, float fps, int inter, int norm, int fmt,
 		int audio, int rate, int n_chan, int bps, int display )
 {
+	veejay_msg(0, "%s: %dx%d, %f, inter=%d,norm=%d,fmt=%d,audio=%d,rate=%d,chan=%d,bps=%d",
+			__FUNCTION__,w,h,fps, inter,norm, fmt, audio,rate,n_chan,bps );
 	sample_video_info_t *svit = (sample_video_info_t*) vj_malloc(sizeof( sample_video_info_t ));
 	memset( svit,0,sizeof(sample_video_info_t));
 #ifdef STRICT_CHECKING
@@ -478,13 +480,13 @@ int	veejay_push_results( veejay_t *info )
 	switch( info->use_display )
 	{
 		case 2:
-		x_display_push( info->display, ref );
+			x_display_push( info->display, ref );
 		break;
 		case 1:
-		vj_sdl_update_yuv_overlay( info->sdl_display, ref );
+			vj_sdl_update_yuv_overlay( info->sdl_display, ref );
 		break;
 	}
-	performer_clean_output_frame( info );
+//	performer_clean_output_frame( info );
 
 	return 1;
 }
@@ -527,6 +529,8 @@ static void *veejay_software_playback_thread(void *arg)
 	if( info->use_display == 2)
 	{
 		info->display = x_display_init();
+		if(!info->display)
+			return NULL;
 		x_display_open( info->display, vid_info->w, vid_info->h );
 	}
 
@@ -918,7 +922,7 @@ int veejay_init(veejay_t * info)
 				vid_info->w,
 				vid_info->h,
 				vid_info->fmt );
-		vj_sdl_init( info->sdl_display, 352,288, "Veejay", 1, 0 );
+		vj_sdl_init( info->sdl_display, vid_info->w,vid_info->h, "Veejay", 1, 0 );
 	}
 
 	if (seteuid(getuid()) < 0)

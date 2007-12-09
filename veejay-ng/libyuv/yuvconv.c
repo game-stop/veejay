@@ -64,6 +64,31 @@ void	yuv_init_lib()
 	sws_context_flags_ = yuv_sws_get_cpu_flags();
 }
 
+static struct  {
+	const char *name;
+	int id;
+} pixel_format_descr[] = 
+{
+	{	"PIX_FMT_YUV420P", PIX_FMT_YUV420P },
+	{	"PIX_FMT_YUV422P",	PIX_FMT_YUV422P },
+	{	"PIX_FMT_YUV444P", PIX_FMT_YUV444P },
+	{	"PIX_FMT_YUVJ420P", PIX_FMT_YUVJ420P },
+	{	"PIX_FMT_YUVJ422P", PIX_FMT_YUVJ422P },
+	{	"PIX_FMT_YUVJ444P", PIX_FMT_YUVJ444P },		
+	{	"PIX_FMT_YUYV422",	PIX_FMT_YUYV422 },
+	{	NULL,			0 }
+};
+
+
+static	char *find_pixel_format_descr( int id )
+{
+	int i;
+	for( i = 0; pixel_format_descr[i].name != NULL ; i ++ )
+		if( id == pixel_format_descr[i].id )
+			return pixel_format_descr[i].name ;
+	return NULL;
+}
+
 VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int fmt )
 {
 	VJFrame *f = (VJFrame*) vj_calloc(sizeof(VJFrame));
@@ -75,8 +100,7 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 	f->width   = w;
 	f->height  = h;
 
-	veejay_msg(0, "%s:%d Y=%p,U=%p,V=%p,w=%d,h=%d,fmt=%d",
-		__FUNCTION__,__LINE__,Y,U,V,w,h,fmt );
+	veejay_msg(0, "%s: %dx%d, fmt = %s ", __FUNCTION__, w,h, find_pixel_format_descr(fmt) );
 
 	switch(fmt)
 	{
@@ -100,6 +124,12 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->uv_height=f->height;
 			f->stride[0] = w;
 			f->stride[1] = f->stride[2] = f->stride[0];
+			break;
+		case PIX_FMT_YUYV422:
+			f->uv_width = w;
+			f->uv_height=f->height;
+			f->stride[0] = w;
+			f->stride[1] = f->stride[2] = f->stride[0] / 2;
 			break;
 		default:
 #ifdef STRICT_CHECKING
@@ -128,8 +158,6 @@ VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 	f->data[3] = NULL;
 	f->width   = w;
 	f->height  = h;
-
-	veejay_msg(0, "%s:%d rgb=%p, w=%d,h=%d,fmt=%d",__FUNCTION__,__LINE__,rgb_buffer, w,h ,fmt);
 
 	switch( fmt )
 	{
@@ -162,10 +190,11 @@ void	yuv_convert_any( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 	assert( src->width > 0 );
 	assert( dst->width > 0 );
 #endif
-	
-	veejay_msg(0, "%s:%d src_fmt=%d,dst_fmt=%d, src=%dx%d dst=%dx%d",
-		__FUNCTION__,__LINE__, src_fmt,dst_fmt, src->width,src->height,dst->width,dst->height );
 
+	veejay_msg(0, "%s: from %s to %s", __FUNCTION__,
+		find_pixel_format_descr( src_fmt ),
+		find_pixel_format_descr( dst_fmt ) );
+	
 	struct SwsContext  *ctx = sws_getContext(
 			src->width,
 			src->height,
@@ -197,10 +226,6 @@ void	yuv_convert_any3( VJFrame *src, int src_stride[3], VJFrame *dst, int src_fm
 	assert( dst->data[1] != NULL );
 	assert( dst->data[2] != NULL );
 #endif
-	veejay_msg(0, "%s:%d src_fmt=%d,dst_fmt=%d, src=%dx%d dst=%dx%d",
-		__FUNCTION__,__LINE__, src_fmt,dst_fmt, src->width,src->height,dst->width,dst->height );
-
-	
 	struct SwsContext *ctx = sws_getContext(
 			src->width,
 			src->height,
@@ -212,7 +237,17 @@ void	yuv_convert_any3( VJFrame *src, int src_stride[3], VJFrame *dst, int src_fm
 			NULL,NULL,NULL );
 	int dst_stride[3] = { ru4(dst->width),ru4(dst->uv_width),ru4(dst->uv_width) };
 	sws_scale( ctx, src->data, src_stride, 0, src->height, dst->data, dst_stride);
-
+	veejay_msg(0, "%s: from %s to %s, dst_stride[%d,%d,%d], src_stride[%d,%d,%d]",
+		__FUNCTION__,
+		find_pixel_format_descr(src_fmt),
+		find_pixel_format_descr(dst_fmt),
+		dst_stride[0],
+		dst_stride[1],
+		dst_stride[2],
+		src_stride[0],	
+		src_stride[1],
+		src_stride[2] );
+	
 	sws_freeContext( ctx );
 }
 
@@ -223,7 +258,6 @@ void yuv422p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
 {
     unsigned int x, y;
 
-	veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
 
     for (y = 0; y < height; ++y) {
 	uint8_t *Y = yuv420[0] + y * width;
@@ -249,8 +283,6 @@ void yuv420p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
 		       int height)
 {
     unsigned int x, y;
-	veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
-
 
     for (y = 0; y < height; ++y) {
 	uint8_t *Y = yuv420[0] + y * width;
@@ -374,7 +406,6 @@ void	yuv422_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
 	uint8_t *src_y = src[0];
 	uint8_t *src_u = src[1];
 	uint8_t *src_v = src[2];
-	veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
 	
 	jmax = w >> 3;
 	imax = h;
@@ -406,7 +437,6 @@ void	yuy2toyv16(uint8_t *dst_y, uint8_t *dst_u, uint8_t *dst_v, uint8_t *srcI, i
 	
 	jmax = w / 8;
 	imax = h;
-	veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
 
 	for( i = 0; i < imax ;i ++ )
 	{
@@ -434,8 +464,6 @@ void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 	uint8_t *dst_v = _v;
 	jmax = width / 8;
 	imax = height;
-	veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
-
 
 	for( i = 0; i < imax ;i ++ )
 	{
@@ -462,7 +490,6 @@ void yuy2toyv12(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 {
   int i, j, w2;
     uint8_t *y, *u, *v;
-	veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
 
     w2 = width / 2;
 
@@ -515,7 +542,6 @@ void yuy2toyv16(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 
     int i, j, w2;
     uint8_t *y, *u, *v;
-	veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
 
     w2 = width / 2;
 
@@ -535,7 +561,49 @@ void yuy2toyv16(uint8_t * _y, uint8_t * _u, uint8_t * _v, uint8_t * input,
 	}
     }
 }
+#define MMX_YUV422_YUYV "                                                 \n\
+movq       (%1), %%mm0  # Load 8 Y            y7 y6 y5 y4 y3 y2 y1 y0     \n\
+movd       (%2), %%mm1  # Load 4 Cb           00 00 00 00 u3 u2 u1 u0     \n\
+movd       (%3), %%mm2  # Load 4 Cr           00 00 00 00 v3 v2 v1 v0     \n\
+punpcklbw %%mm2, %%mm1  #                     v3 u3 v2 u2 v1 u1 v0 u0     \n\
+movq      %%mm0, %%mm2  #                     y7 y6 y5 y4 y3 y2 y1 y0     \n\
+punpcklbw %%mm1, %%mm2  #                     v1 y3 u1 y2 v0 y1 u0 y0     \n\
+movq      %%mm2, (%0)   # Store low YUYV                                  \n\
+punpckhbw %%mm1, %%mm0  #                     v3 y7 u3 y6 v2 y5 u2 y4     \n\
+movq      %%mm0, 8(%0)  # Store high YUYV                                 \n\
+"
 
+
+void	yuv422_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
+{
+	int j,jmax,imax,i;
+	uint8_t *dst = dstI;
+	uint8_t *src_y = src[0];
+	uint8_t *src_u = src[1];
+	uint8_t *src_v = src[2];
+	
+	jmax = w >> 3;
+	imax = h;
+
+	for( i = imax; i-- ; )
+	{
+		for( j = jmax ; j -- ; )
+		{
+			__asm__( ".align 8" MMX_YUV422_YUYV
+				: : "r" (dst), "r" (src_y), "r" (src_u),
+				    "r" (src_v) );
+
+			dst += 16;
+			src_y += 8;
+			src_u += 4;
+			src_v += 4;
+		}
+	}
+#ifdef HAVE_ASM_MMX
+        __asm__ __volatile__ ( _EMMS:::"memory");
+#endif
+}
+/*
 void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
 {
     int x,y;
@@ -543,7 +611,6 @@ void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
     uint8_t *U = yuv422[1];
     uint8_t *V = yuv422[2]; // U Y V Y
 
-	veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
 
 	for(y = 0; y < h; y ++ )
 	{
@@ -566,7 +633,7 @@ void yuv422_to_yuyv(uint8_t *yuv422[3], uint8_t *pixels, int w, int h)
 			V+=2;
 		}
     }
-}
+}*/
 
 #endif
 
@@ -841,7 +908,7 @@ void	yuv_deinterlace(
 		int shift,
 		uint8_t *Y,uint8_t *U, uint8_t *V )
 {
-	veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
+	veejay_msg(0, "%s: deinterlace %s",__FUNCTION__, find_pixel_format_descr( out_pix_fmt ) );
 
 	AVPicture p,q;
 	p.data[0] = data[0];
@@ -942,11 +1009,22 @@ static void yuv420_444_1plane(
 
 void yuv444_to_yuyv(void *sampler, uint8_t *data[3], uint8_t *pixels, int w, int h)
 {
-	veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
+
+	VJFrame *src = yuv_yuv_template( data[0],data[1],data[2], w,h, PIX_FMT_YUV444P );
+	VJFrame *dst = yuv_yuv_template( pixels, NULL,NULL,w,h,PIX_FMT_YUYV422 );
+
+	yuv_convert_any(src,dst, PIX_FMT_YUV444P, PIX_FMT_YUYV422 );
+
+	free(src);
+	free(dst);
+
+/*	veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
 
 	int x,y;
 	chroma_subsample( SSM_422_444, sampler, data, w, h );
-	yuv422_to_yuyv( data, pixels, w,h);
+	yuv422_to_yuyv( data, pixels, w,h);*/
+
+
 
 	/*for(y = 0; y < h; y ++ )
 	{
@@ -1054,36 +1132,20 @@ static void yuv444_444_1plane(
 {
 	veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
 
-	/* YUV 4:2:2 Planar to 4:4:4 Packed: Y, V, U */
-	unsigned int x;
+	/* YUV 4:4:4 Planar to 4:4:4 Packed: Y, V, U */
+	unsigned int x,k=0;
 	uint8_t *yp = frame->data[0];
 	uint8_t *up = frame->data[2];
 	uint8_t *vp = frame->data[1];
-	int len = frame->len / 4;
-//	int *dst = dst_buffer;
+	int len = frame->len;
 	uint8_t *dst = dst_buffer;
-	for( x = 0 ; x < frame->len ; x ++ )
+	for( x = 0 ; x < len ; x ++ )
 	{
-		*(dst++) = *(yp++);
-		*(dst++) = *(vp++);
-		*(dst++) = *(up++);
+		dst[k+0] = yp[x];
+		dst[k+1] = up[x]; //@ chroma not ok, FIXME. k+1,k+2 = 128 
+		dst[k+2] = vp[x];
+		k+=3;
 	}
-/*	__builtin_prefetch( yp, 0 ,3);
-	__builtin_prefetch( up, 0 ,3);
-	__builtin_prefetch( vp, 0 ,3);
-	__builtin_prefetch( dst, 1,3);
-	
-	for( x=0; x < len; x ++ )
-	{
-		dst[0] = packv0__( yp[0],up[0],vp[0],yp[1]);
-		dst[1] = packv1__( up[1],vp[1],yp[2],up[2]);
-		dst[2] = packv2__( vp[2],yp[3],up[3],vp[3]);
-
-		yp += 4;
-		up += 4;
-		vp += 4;
-		dst += 3;
-	}	*/
 	
 }
 
@@ -1141,7 +1203,6 @@ static	void	yuv_planar_grow( VJFrame *dst, subsample_mode_t mode, void *data, in
 {
 	int w = dst->width;
 	int h = dst->height;
-		veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
 
 	switch(fmt)
 	{
@@ -1164,7 +1225,6 @@ static	void	yuv_planar_shrink( VJFrame *dst, subsample_mode_t mode, void *data, 
 {
 	int w = dst->width;
 	int h = dst->height;
-		veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
 
 	switch(fmt)
 	{
@@ -1235,8 +1295,6 @@ void	yuv_422_1plane_to_planar(VJFrame *dst, const uint8_t *plane, void *sampler)
 
 void	yuv_1plane_to_planar( int fmt, uint8_t *plane, VJFrame *dst, void *sampler )
 {
-	veejay_msg(0, "%s:%d",__FUNCTION__, __LINE__ );
-
 
 	switch(fmt)
 	{
