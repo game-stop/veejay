@@ -19,7 +19,8 @@
  
 #ifndef VJAPI_H
 #define VJAPI_H
-
+int	veejay_tick();
+void	*get_ui_info();
 void	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num);
 int	vj_gui_reconnect( char *host, char *group, int port);
 void	vj_gui_free();
@@ -53,4 +54,6 @@ char *get_glade_path();
 char *get_gveejay_dir();
 int	gveejay_restart();
 int	gveejay_update();
+int            update_gveejay();
+void           veejay_update_multitrack( void *data );
 #endif 

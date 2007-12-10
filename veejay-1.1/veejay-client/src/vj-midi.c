@@ -466,17 +466,17 @@ void	*vj_midi_new(void *mw)
 
 	if( snd_seq_open( &(v->sequencer), "hw", SND_SEQ_OPEN_DUPLEX, 0 ) < 0 )
 	{
-		veejay_msg(0, "Error opening ALSA sequencer");
+		veejay_msg(0, "Opening ALSA sequencer, MIDI support disabled");
 		return v;
 	}
 
 	snd_seq_set_client_name( v->sequencer, "Veejay" );
 
-	if( (portid = snd_seq_create_simple_port( v->sequencer, "Veejay",
+	if( (portid = snd_seq_create_simple_port( v->sequencer, "Reloaded",
 			SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE ,
 			SND_SEQ_PORT_TYPE_APPLICATION )) < 0 )
 	{
-		veejay_msg(0, "Error creating sequencer port");
+		veejay_msg(0, "Creating sequencer port 'Reloaded' ");
 	
 		return v;
 	}
@@ -494,7 +494,7 @@ void	*vj_midi_new(void *mw)
 	v->active = 1;
 	snd_seq_poll_descriptors( v->sequencer, v->pfd, v->npfd, POLLIN );
 
-	veejay_msg(VEEJAY_MSG_INFO, "MIDI listener active");
+	veejay_msg(VEEJAY_MSG_INFO, "MIDI enabled");
 
 	return (void*) v;
 }

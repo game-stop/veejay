@@ -59,7 +59,8 @@ static void usage(char *progname)
         printf( "where options are:\n");
         printf( "-h\t\tVeejay host to connect to (defaults to localhost) \n");         
         printf( "-p\t\tVeejay port to connect to (defaults to 3490) \n");
-	printf( "-n\t\tDont load gveejay's GTK theme\n");
+	printf( "-t\t\tDont load gveejay's GTK theme\n");
+	printf( "-n\t\tDont use colored text\n");
 	printf( "-v\t\tBe extra verbose (usefull for debugging)\n");
 	printf( "-s\t\tSet bank resolution (row X columns)\n");
 	printf( "-P\t\tStart with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)\n");
@@ -80,11 +81,15 @@ static int      set_option( const char *name, char *value )
                 if(sscanf( optarg, "%d", &port_num ))
 			launcher++;
         }
+	else if (strcmp(name, "n") == 0 )
+	{
+		veejay_set_colors(0);
+	}
 	else if (strcmp(name, "X") == 0 )
 	{
 		n_tracks = atoi(optarg); 
 	}
-	else if( strcmp(name, "n") == 0 || strcmp(name, "no-theme") == 0)
+	else if( strcmp(name, "t") == 0 || strcmp(name, "no-theme") == 0)
 	{
 		gveejay_theme = 0;
 	}
@@ -135,7 +140,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	sprintf(hostname, "127.0.0.1");
 
-        while( ( n = getopt( argc, argv, "s:h:p:nvHf:X:P:q")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:q")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
@@ -148,6 +153,7 @@ int main(int argc, char *argv[]) {
 
 	if( !g_thread_supported() )
 	{
+	veejay_msg(2, "Initializing GDK threads");
 	     g_thread_init(NULL);
 	     gdk_threads_init();                   // Called to initialize internal mutex "gdk_threads_mutex".
         }
@@ -192,8 +198,10 @@ int main(int argc, char *argv[]) {
 		if( gtk_events_pending() )
 			gtk_main_iteration();
 		else 
-		{
-			g_thread_yield();
+		{	
+			if(veejay_tick()) {
+				veejay_update_multitrack( get_ui_info() );
+			}
 			//g_usleep( 1000 );
 			if(!update_gveejay())
 				g_usleep(100 * vj_gui_sleep_time());

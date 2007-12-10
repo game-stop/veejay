@@ -704,6 +704,9 @@ void		*multitrack_sync( void * mt )
 {
 	multitracker_t *m = (multitracker_t*) mt;
 	sync_info *s = gvr_sync( m->preview );	
+	if(!s)
+		return NULL;
+
 	if(!vt___)
 	{
 		veejay_memset(vt__,0,sizeof(vt__));
@@ -939,7 +942,6 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 
 	mt->master_track = track;
 
-veejay_msg(VEEJAY_MSG_INFO, "Master track is %d", track);
 	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
 
 
@@ -975,7 +977,7 @@ void		multitrack_configure( void *data, float fps, int video_width, int video_he
 	*box_w = mt->width;
 	*box_h = mt->height;
 
-	veejay_msg(2, "Multitrack %d x %d, %2.2f, ratio %f", mt->width,mt->height,mt->fps,r);
+	veejay_msg(VEEJAY_MSG_DEBUG, "Multitrack %d x %d, %2.2f, ratio %f", mt->width,mt->height,mt->fps,r);
 }
 
 void		multitrack_set_quality( void *data , int quality )
@@ -1016,7 +1018,7 @@ void		multitrack_set_quality( void *data , int quality )
 		h = RUP8(mt->height);
 	}
 
-	veejay_msg(VEEJAY_MSG_INFO,
+	veejay_msg(VEEJAY_MSG_DEBUG,
 		"Preview image dimensions set to %d x %d",w,h); 
 	
 	if(!gvr_track_configure( mt->preview, mt->master_track,w,h ) )
@@ -1040,7 +1042,7 @@ void		multitrack_toggle_preview( void *data, int track_id, int status, GtkWidget
 	if(track_id == -1 )
 	{
 		gvr_track_toggle_preview( mt->preview, mt->master_track, status );
-		veejay_msg(2, "Veejay Master Preview %s", (status ? "Enabled" : "Disabled") );
+		veejay_msg(2, "VeejayGrabber: master preview %s", (status ? "enabled" : "disabled") );
 	}
 }
 
@@ -1119,12 +1121,7 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 		}
 
 		vj_gui_cb( 0, host, port );
-
-
-		veejay_msg(VEEJAY_MSG_INFO, "Connecting to %s:%d", host,port );
-
 		vj_gui_enable();
-
 	}
 	
 	if( event->type == GDK_BUTTON_PRESS )

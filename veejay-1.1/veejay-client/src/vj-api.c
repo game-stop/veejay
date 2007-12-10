@@ -384,7 +384,7 @@ typedef struct
 	int		launch_sensitive;
 	struct	timeval	alarm;
 	struct	timeval	timer;
-	GIOChannel	*channel;
+//	GIOChannel	*channel;
 	GdkColormap	*color_map;
 	gint		connecting;
 //	gint		logging;
@@ -479,6 +479,8 @@ enum
 #define VEEJAY_MSG_OUTPUT	4
 
 static	vj_gui_t	*info = NULL;
+
+void 	*get_ui_info() { return (void*) info; }
 
 /* global pointer to the sample-bank */
 
@@ -803,7 +805,7 @@ static void scan_devices( const char *name)
 	gchar *text = recv_vims(6,&len);
 	if(len <= 0|| !text )
 	{
-		veejay_msg(0, "No capture devices found on veejay server");
+		veejay_msg(VEEJAY_MSG_WARNING, "No capture devices found on veejay server");
 		return;
 	}
 	GtkTreeModel *model = gtk_tree_view_get_model
@@ -831,7 +833,7 @@ static void scan_devices( const char *name)
 		name_len = atoi( tmp );
 		if(name_len <=  0 )
 		{
-			veejay_msg(0, "Error reading name of capture device: '%s'",ptr+offset );
+			veejay_msg(0, "Reading name of capture device: '%s'",ptr+offset );
 			return;
 		}
 		name = strndup( ptr + offset, name_len );
@@ -843,7 +845,7 @@ static void scan_devices( const char *name)
 		loc_len = atoi( tmp );
 		if( loc_len <= 0 )
 		{
-			veejay_msg(0, "Error reading location of capture device");
+			veejay_msg(0, "Reading location of capture device");
 			return;
 		}	
 		loca = strndup( ptr + offset, loc_len );
@@ -2024,7 +2026,7 @@ void	vj_msg(int type, const char format[], ...)
 
 static	void	abort_gveejay()
 {
-	veejay_msg(0,"Fatal Error: Lost connection with Veejay" );
+	veejay_msg(0,"Lost connection with Veejay." );
 	exit(-1);
 }
 
@@ -3754,8 +3756,6 @@ static	void	select_slot__( int pm )
 {
 	int *history = info->history_tokens[ pm ];
 #ifdef STRICT_CHECKING
-	if(history == NULL )
-	  veejay_msg(0, "History NULL for pm %d", pm);
 	assert( history != NULL );
 #endif
 	if( pm != MODE_PLAIN )
@@ -4452,7 +4452,6 @@ static	void	reload_keys()
 		int n = sscanf( ptr + offset, "%04d%03d%03d%03d", &val[0],&val[1],&val[2],&val[3]);
 		if( n != 4 )
 		{
-			veejay_msg(0, "Syntax error while parsing key list");
 			free(text);
 			return;
 		}
@@ -4961,7 +4960,6 @@ static	void	load_editlist_info()
 	gchar *res = recv_vims(3,&len);
 	if( len <= 0 || res==NULL)
 	{
-		veejay_msg(0, "Unable to talk to veejay. Abort");
 #ifdef STRICT_CHECKING
 		assert(0);
 #endif
@@ -5224,7 +5222,7 @@ void	find_user_themes(int theme)
 
 	if(!theme)
 	{
-		veejay_msg(VEEJAY_MSG_INFO,"Do not load veejay themes");
+		veejay_msg(VEEJAY_MSG_INFO,"Not loading veejay themes");
 		return;
 	}
 	snprintf( path, sizeof(path),"%s/.veejay/theme/theme.config", home );
@@ -5232,8 +5230,17 @@ void	find_user_themes(int theme)
 	int sloppy = open( path,O_RDONLY );
 	if( sloppy < 0 )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Theme config '%s' not found", path );
+		veejay_msg(VEEJAY_MSG_WARNING, "Theme config '%s' not found, creating default.", path );
+		veejay_msg(VEEJAY_MSG_WARNING, "Please setup symbolic links from %s/theme/{themename}" );
+		veejay_msg(VEEJAY_MSG_WARNING, "                            to %s/.veejay/theme/{themename}",GVEEJAY_DATADIR, path);
 		set_default_theme();
+		int wd=	open( path, O_WRONLY );
+		if(wd)
+		{	
+			char text[7] = "Default";
+			write(wd,text, sizeof(text));
+			close(wd);
+		}
 		return;
 	}
 
@@ -5276,7 +5283,7 @@ void	find_user_themes(int theme)
 	int n_files = scandir( theme_dir, &files, select_f, alphasort );
 	if( n_files <= 0 )
 	{
-		veejay_msg(0, "No themes in %s", theme_dir );
+		veejay_msg(0, "No themes found in %s", theme_dir );
 		return;
 	}
 
@@ -5313,8 +5320,6 @@ void	find_user_themes(int theme)
 					g_free(test_file);
 				}
 			}
-			else
-				veejay_msg(0, "Failed to stat %s", location );
 		}
 	}
 
@@ -5327,7 +5332,7 @@ void	find_user_themes(int theme)
 
 	theme_list[ k ] = strdup("Default");
 	for( k = 0; theme_list[k] != NULL ; k ++ )
-		veejay_msg(VEEJAY_MSG_INFO, "Theme #%d = %s", k, theme_list[k]);
+		veejay_msg(VEEJAY_MSG_INFO, "Added Theme #%d %s", k, theme_list[k]);
 
 	gtk_rc_parse(theme_file);
 
@@ -5385,8 +5390,9 @@ GdkPixbuf	*vj_gdk_pixbuf_scale_simple( const GdkPixbuf *src, int dw, int dh, Gdk
 	return res;
 }
 
-static	void		veejay_update_multitrack( vj_gui_t *gui )
+void		veejay_update_multitrack( void *data )
 {
+	vj_gui_t *gui = (vj_gui_t*) data;
 	sync_info *s = multitrack_sync( gui->mt );
 	GtkWidget *maintrack = glade_xml_get_widget( info->main_window, "imageA");
 	int i;
@@ -5795,7 +5801,7 @@ static void	process_reload_hints(int *history, int pm)
 	
 	veejay_memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));	
 }
-static void	update_gui()
+void	update_gui()
 {
 	static int space[32];
 	int pm = info->status_tokens[PLAY_MODE];
@@ -5836,7 +5842,7 @@ static void	update_gui()
 		pm = MODE_SAMPLE;
 	}
 
-	veejay_update_multitrack(info);
+
 
 	update_globalinfo(history, pm, last_pm);
 /*
@@ -5867,11 +5873,12 @@ void			gveejay_status_unlock(void *p)
 	vj_gui_t *gui = (vj_gui_t*) p;
 	gui->status_lock = 0;
 }
-
-static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointer data)
+int		veejay_tick()
+//static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointer data)
 {
-	vj_gui_t *gui = (vj_gui_t*) data;
-	if( (condition&G_IO_ERR) ) {
+	vj_gui_t *gui = info;
+//	vj_gui_t *gui = (vj_gui_t*) data;
+/*	if( (condition&G_IO_ERR) ) {
 		abort_gveejay();
 		return FALSE; }
 	if( (condition&G_IO_HUP) ) {
@@ -5880,8 +5887,12 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 	if( (condition&G_IO_NVAL) ) {
 		abort_gveejay();
 		return FALSE; 
-	}
-	if(gui->watch.state==STATE_PLAYING && (condition & G_IO_IN)&& gui->watch.p_state == 0 )
+	}*/
+
+//	if(gui->watch.state==STATE_PLAYING && (condition & G_IO_IN)&& gui->watch.p_state == 0 )
+	if(gui->watch.state==STATE_PLAYING && gui->watch.p_state == 0 )
+
+
 	{
 		gui->status_lock = 1;
 
@@ -5891,7 +5902,8 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 		nb = vj_client_read( gui->client, V_STATUS, sta_len, 5 );
 		if( nb <= 0 )
 		{
-			gui->status_lock=0; abort_gveejay();
+			gui->status_lock=0;
+			abort_gveejay();
 			return FALSE;
 		}
 
@@ -5903,7 +5915,8 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 				nb = vj_client_read_no_wait( gui->client,V_STATUS, tmp, 100 );
 				if( nb <= 0 )
 				{
-					gui->status_lock = 0; abort_gveejay();
+					gui->status_lock = 0;
+					abort_gveejay();
 					return FALSE;
 				}
 			}
@@ -5931,14 +5944,14 @@ static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointe
 			int n = status_to_arr( gui->status_msg, gui->status_tokens );
 #ifdef STRICT_CHECKING
 			if( n != 23 )
-				veejay_msg(0, "Only got %d symbols: '%s'", n, gui->status_msg );
+				veejay_msg(0, "Only got %d symbols from status message: '%s'", n, gui->status_msg );
 			assert(n == 23);
 #endif
 			info->uc.playmode = gui->status_tokens[ PLAY_MODE ];
 
 			if( n != 23)
 			{
-				veejay_msg(0, "Received corrupt status line!");
+				veejay_msg(VEEJAY_MSG_WARNING, "(dumped) only got %d symbols from status message: '%s'", n, gui->status_msg );
 				int *history = info->history_tokens[ info->uc.playmode ];
 				int i;
 				for(i = 0; i <= 23; i ++ )
@@ -6139,9 +6152,6 @@ void	vj_gui_set_debug_level(int level, int preview_p, int pw, int ph )
 	veejay_set_debug_level( level );
 
 	vims_verbosity = level;
-	if(level)
-		veejay_msg(VEEJAY_MSG_INFO, "Be verbosive");
-
 	num_tracks_ = preview_p;
 	default_preview_width_ = pw;
 	default_preview_height_ = ph;
@@ -6645,7 +6655,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		info->client = vj_client_alloc(0,0,0);
 		if(!info->client)
 		{
-			veejay_msg(0, "Memory allocation error");
 			return 0;
 		}	
 	}
@@ -6667,7 +6676,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	vj_msg(VEEJAY_MSG_INFO, "New connection with Veejay running on %s port %d",
 		(group_name == NULL ? hostname : group_name), port_num );
 	
-	veejay_msg(VEEJAY_MSG_INFO, "Connection established with %s:%d",hostname,port_num);
+	veejay_msg(VEEJAY_MSG_INFO, "Connection established with %s:%d (Track 0)",hostname,port_num);
 
 	int k = 0;
 	for( k = 0; k < 3; k ++ )
@@ -6688,7 +6697,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	reload_editlist_contents();
 	reload_bundles();
 
-	info->channel = g_io_channel_unix_new( vj_client_get_status_fd( info->client, V_STATUS));
+//	info->channel = g_io_channel_unix_new( vj_client_get_status_fd( info->client, V_STATUS));
 
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
 	gtk_widget_show( w );
@@ -6709,14 +6718,14 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 			      info->el.fps, info->el.width, info->el.height, &preview_box_w_, &preview_box_h_ );
 
 	vj_gui_preview();
-	g_io_add_watch_full(
+/*	g_io_add_watch_full(
 			info->channel,
-			G_PRIORITY_HIGH,
+			G_PRIORITY_DEFAULT,
 			G_IO_IN| G_IO_ERR | G_IO_NVAL | G_IO_HUP,
 			veejay_tick,
 			(gpointer*) info,
 			NULL 
-		);
+		);*/
 
 	info->uc.reload_hint[HINT_SLIST] = 1;
 	info->uc.reload_hint[HINT_CHAIN] = 1;
@@ -6752,7 +6761,6 @@ gboolean		is_alive( void )
 
 	if( gui->watch.state == STATE_RECONNECT )
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Master track was disconnected");
 		vj_gui_disconnect();
 		gui->watch.state = STATE_CONNECT;
 	}
@@ -6771,8 +6779,6 @@ gboolean		is_alive( void )
 		 	vj_gui_disable(); 
 		if(!gui->launch_sensitive)
 			vj_launch_toggle(TRUE);
-//		if( gui->watch.p_state == STATE_RECONNECT )
-//			gui->watch.state = STATE_CONNECT;
 	}
 
 	if( gui->watch.state == STATE_CONNECT )
@@ -6818,11 +6824,11 @@ gboolean		is_alive( void )
 
 void	vj_gui_disconnect()
 {
-	if( info->channel )
+	/*if( info->channel )
 	{
 		g_io_channel_shutdown( info->channel, FALSE, NULL );
 		g_io_channel_unref(info->channel);
-	}
+	}*/
 	gtk_key_snooper_remove( info->key_id );
 	free_samplebank();
 
@@ -7261,6 +7267,10 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
 		info->current_sequence_slot = slot_nr;
 		sample_slot_t *s = info->selected_slot;
 		sequence_gui_slot_t *g = info->sequence_view->gui_slot[slot_nr];
+#ifdef STRICT_CHECKING
+		assert( s != NULL );
+		assert( g != NULL );
+#endif
 		g->sample_id = s->sample_id;	
 		g->sample_type = s->sample_type;
 		vj_msg(VEEJAY_MSG_INFO, "Placed %s %d in Memory slot %d",
