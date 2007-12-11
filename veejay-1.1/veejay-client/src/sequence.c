@@ -78,6 +78,7 @@ typedef struct
 	GThread *thread;
 	GMutex	*mutex;
 	int	state;
+	int 	threaded;
 	track_sync_t *track_sync;
 #ifdef STRICT_CHECKING
 	int	locked;
@@ -97,7 +98,7 @@ static	int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v )
 
 static	GStaticRecMutex	mutex_ = G_STATIC_REC_MUTEX_INIT;
 
-void	*gvr_preview_init(int max_tracks)
+void	*gvr_preview_init(int max_tracks, int use_threads)
 {
 	veejay_preview_t *vp = (veejay_preview_t*) vj_calloc(sizeof( veejay_preview_t ));
 	GError *err = NULL;
@@ -106,28 +107,31 @@ void	*gvr_preview_init(int max_tracks)
 	vp->track_sync = (track_sync_t*) vj_calloc(sizeof( track_sync_t ));
 	int i;
 	for( i = 0; i < max_tracks; i++ )
-	{
-		vp->track_sync->image_data[i] = (uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
 		vp->track_sync->status_tokens[i] = (int*) vj_calloc(sizeof(int) * 32);
-	}
 
 	vp->n_tracks = max_tracks;
 
 	yuv_init_lib();
 
-	vp->state = 1;
-	vp->mutex = g_mutex_new();
-
-	vp->thread =  g_thread_create(
+	if( use_threads )
+	{
+		for( i = 0; i < max_tracks; i++ )
+			vp->track_sync->image_data[i] = 	
+				(uint8_t*) vj_calloc(sizeof(uint8_t) * 512 * 512 * 3 );
+		
+		vp->thread =  g_thread_create(
 			(GThreadFunc) gvr_preview_thread,
 			(gpointer*) vp,
 			TRUE,
 			&err );
-
-	if(!vp->thread )
-	{
-		free(vp);
-		return NULL;
+	
+		if(!vp->thread )
+		{
+			free(vp);
+			return NULL;
+		}
+		vp->state = 1;
+		vp->threaded = 1;
 	}
 
 	return (void*) vp;
@@ -365,7 +369,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	}
 	uint8_t *in = v->data_buffer;
 	uint8_t *out = v->tmp_buffer;
-	
+
 	v->bw = 0;
 
 	VJFrame *src1 = NULL;
@@ -453,12 +457,16 @@ static	int	track_find(  veejay_preview_t *vp )
 void		gvr_ext_lock(void *preview)
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
+	if(!vp->threaded)
+		return;
 	g_static_rec_mutex_lock( &mutex_ );
 }
 
 void		gvr_ext_unlock(void *preview)
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
+	if(!vp->threaded)
+		return;
 	g_static_rec_mutex_unlock( &mutex_ );
 }
 
@@ -741,7 +749,21 @@ static GdkPixbuf	**gvr_grab_images(void *preview)
 		return NULL;
 
 	int i;
+	
+	if(!vp->threaded)
+	{
+	for( i = 0; i < vp->n_tracks; i ++ )
+	{
+		if( vp->tracks[i] && vp->tracks[i]->active )
+		{
+			veejay_track_t *v = vp->tracks[i];	
+			list[i] =gdk_pixbuf_new_from_data(vp->tracks[i]->tmp_buffer,GDK_COLORSPACE_RGB,FALSE,	
+				8,vp->tracks[i]->width,vp->tracks[i]->height,
+				  vp->tracks[i]->width*3,NULL,NULL );
+		} 
+	}
 
+	} else
 	for( i = 0; i < vp->n_tracks; i ++ )
 	{
 		if( vp->track_sync->active_list[i] == 1 && vp->track_sync->frame_list[i] == 1 )
@@ -773,9 +795,18 @@ static int	**gvr_grab_stati( void *preview )
 		return NULL;
 
 	int i;
-	for( i = 0; i < vp->n_tracks; i ++ )
-		list[i] = int_dup( (vp->track_sync->status_tokens[i]) );
-	
+
+	if(!vp->threaded)	
+	{
+		for( i = 0; i < vp->n_tracks; i ++ )
+			if( vp->tracks[i] && vp->tracks[i]->active)
+				list[i] = int_dup( vp->tracks[i]->status_tokens );
+		
+	} else
+	{
+		for( i = 0; i < vp->n_tracks; i ++ )
+			list[i] = int_dup( (vp->track_sync->status_tokens[i]) );
+	}	
 	return list;
 }
 
@@ -787,6 +818,11 @@ static int	*gvr_grab_widths( void *preview )
 		return NULL;
 
 	int i;
+	if( !vp->threaded ) {	
+		for( i = 0; i < vp->n_tracks; i ++ )
+			if( vp->tracks[i] && vp->tracks[i]->active )
+				list[i] = vp->track_sync->widths[i];
+	} else
 	for( i = 0; i < vp->n_tracks; i ++ )
 		list[i] = vp->track_sync->widths[i];
 	
@@ -800,6 +836,11 @@ static int	*gvr_grab_heights( void *preview )
 		return NULL;
 
 	int i;
+	if( !vp->threaded ) {	
+		for( i = 0; i < vp->n_tracks; i ++ )
+			if( vp->tracks[i] && vp->tracks[i]->active )
+				list[i] = vp->track_sync->widths[i];
+	} else
 	for( i = 0; i < vp->n_tracks; i ++ )
 		list[i] = vp->track_sync->heights[i];
 	
@@ -810,6 +851,10 @@ sync_info	*gvr_sync( void *preview )
 {
 	veejay_preview_t *vp = (veejay_preview_t*) preview;
 	sync_info *s = (sync_info*) vj_calloc(sizeof(sync_info));
+
+	if(!vp->threaded)
+		gvr_veejay_grabber_step( preview );
+
 	gvr_ext_lock( preview );
 	s->status_list = gvr_grab_stati( preview );
 	s->img_list    = gvr_grab_images( preview );
@@ -920,6 +965,7 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 		}
 		score ++;
 	}
+
 	if( v->preview )
 	{
 		if( gvr_preview_process_image( vp,v ))
@@ -964,6 +1010,38 @@ static  void    net_delay(long nsec )
         ts.tv_nsec = MS_TO_NANO( nsec);
         nanosleep( &ts, NULL );
 }
+
+void		gvr_veejay_grabber_step( void *data )
+{
+	veejay_preview_t *vp = (veejay_preview_t*) data;
+	int i;
+
+	int ac    = 1;
+	int try_picture = 0;
+
+	for( i = 0; i < vp->n_tracks ; i ++ )
+	{
+		if( vp->tracks[i] && vp->tracks[i]->active) {
+			if(gvr_preview_process_status( vp, vp->tracks[i] ))
+			{
+				if( gvr_get_preview_status( vp, i ) )
+					try_picture ++;
+			}
+		}
+	}
+
+	long ttw = 0;
+	for( i = 0; i < vp->n_tracks ; i ++ )
+	{
+		if( vp->tracks[i] && vp->tracks[i]->active) 
+		{
+			if( vp->tracks[i] )
+				ttw += gvr_veejay( vp, vp->tracks[i],i );	
+		}
+	}
+
+}
+
 
 
 static	void	*gvr_preview_thread(gpointer data)

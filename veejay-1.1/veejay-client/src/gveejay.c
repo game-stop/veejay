@@ -45,6 +45,7 @@ static int launcher = 0;
 static int pw = 176;
 static int ph = 144;
 static int preview = 0; // off
+static int use_threads = 1;
 static struct
 {
 	char *file;
@@ -65,6 +66,7 @@ static void usage(char *progname)
 	printf( "-s\t\tSet bank resolution (row X columns)\n");
 	printf( "-P\t\tStart with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)\n");
         printf( "-X\t\tSet number of tracks\n");
+	printf( "-G\t\tStart without threads\n");
 	printf( "\n\n");
         exit(-1);
 }
@@ -84,6 +86,10 @@ static int      set_option( const char *name, char *value )
 	else if (strcmp(name, "n") == 0 )
 	{
 		veejay_set_colors(0);
+	}
+	else if (strcmp(name, "G") == 0 )
+	{
+		use_threads = 0;
 	}
 	else if (strcmp(name, "X") == 0 )
 	{
@@ -140,7 +146,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	sprintf(hostname, "127.0.0.1");
 
-        while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:q")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:p:tnvHGf:X:P:q")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
@@ -175,7 +181,7 @@ int main(int argc, char *argv[]) {
 
 	default_bank_values( &col, &row );
 	
-	vj_gui_init( skins[0].file, launcher, hostname, port_num );
+	vj_gui_init( skins[0].file, launcher, hostname, port_num, use_threads );
 	vj_gui_style_setup();
 
 	struct sched_param schp;

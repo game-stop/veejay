@@ -434,6 +434,7 @@ typedef struct
 	int		quality;
 	int		preview_locked;
 	void		*midi;
+	int		threaded;
 } vj_gui_t;
 
 enum
@@ -874,6 +875,9 @@ static void scan_devices( const char *name)
 	gtk_tree_view_set_model(GTK_TREE_VIEW(tree), model );
 }
 
+int	ui_threaded(void) {
+	return info->threaded;
+}
 
 void	on_devicelist_row_activated(GtkTreeView *treeview, 
 		GtkTreePath *path,
@@ -6323,7 +6327,7 @@ static	void	theme_response( gchar *string )
 
 }
 
-void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
+void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, int use_threads)
 {
 	int i;
 
@@ -6332,6 +6336,9 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 	{
 		return;
 	}
+
+	gui->threaded = use_threads;
+
 	veejay_memset( gui->status_tokens, 0, STATUS_TOKENS );
 	veejay_memset( gui->sample, 0, 2 );
 	veejay_memset( gui->selection, 0, 3 );
@@ -6478,7 +6485,8 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num)
 			pw,
 			ph,
 			img_wid,
-			(void*) gui);
+			(void*) gui,
+			use_threads);
 
 	if( theme_list )
 	{

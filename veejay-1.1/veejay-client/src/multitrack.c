@@ -801,7 +801,8 @@ void		*multitrack_new(
 		gint max_w,
 		gint max_h,
 		GtkWidget *main_preview_area,
-		void *infog)
+		void *infog,
+		int threads)
 {
 	multitracker_t *mt = NULL;
 
@@ -836,7 +837,7 @@ void		*multitrack_new(
 	mt->master_track = 0;
 
 
-	mt->preview = gvr_preview_init( MAX_TRACKS );
+	mt->preview = gvr_preview_init( MAX_TRACKS, threads );
 
 	parent__ = infog;
 
