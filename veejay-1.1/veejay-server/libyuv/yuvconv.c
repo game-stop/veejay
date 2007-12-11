@@ -213,7 +213,11 @@ void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 	if(!ac_imgconvert( src->data, ffmpeg_aclib[ src_fmt ], 
 			dst->data, ffmpeg_aclib[ dst_fmt] , dst->width,dst->height ))
 	{
-		//@ simply try this if that fails
+		veejay_msg(VEEJAY_MSG_WARNING,
+			"Unable to convert image %dx%d in %x to %dx%d in %x, using fallback",
+				src->width,src->height,src_fmt,
+				dst->width,dst->height,dst_fmt );
+		report_bug();
 		yuv_convert_any( src,dst, src_fmt,dst_fmt );
 	}
 }
