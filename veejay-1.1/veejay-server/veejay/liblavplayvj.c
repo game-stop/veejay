@@ -305,7 +305,7 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 			veejay_msg(VEEJAY_MSG_WARNING, "Saved Editlist to %s", recover_edl );
 	}
 
-	report_bug( info->verbose );
+	report_bug();
 
 	veejay_change_state( info, new_state );
 }

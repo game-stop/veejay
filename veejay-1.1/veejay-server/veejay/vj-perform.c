@@ -2213,7 +2213,7 @@ void vj_perform_record_sample_frame(veejay_t *info, int sample) {
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,
 				"Error while auto splitting "); 
-				report_bug( info->verbose );
+				report_bug();
 			}
 		}
 		else
@@ -2281,7 +2281,7 @@ void vj_perform_record_tag_frame(veejay_t *info) {
 			{
 				veejay_msg(VEEJAY_MSG_WARNING,
 					"Error while auto splitting."); 
-				report_bug(info->verbose);
+				report_bug();
 			}
 		}
 	 }
