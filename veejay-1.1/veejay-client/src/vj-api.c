@@ -370,7 +370,7 @@ typedef struct
 	GladeXML *main_window;
 	vj_client	*client;
 	char		status_msg[STATUS_BYTES];
-	int		status_tokens[STATUS_TOKENS]; 	/* current status tokens */
+	int		status_tokens[32]; 	/* current status tokens */
 	int		*history_tokens[3];		/* list last known status tokens */
 	int		status_passed;
 	int		status_lock;
@@ -1974,59 +1974,6 @@ void	vj_msg(int type, const char format[], ...)
 	g_free( text );
 	va_end(args);
 }
-/*static  void	vj_msg_detail(int type, const char format[], ...)
-{
-	GtkWidget *view = glade_xml_get_widget_( info->main_window,"veejaytext");
-	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
-	GtkTextIter iter;
-
-
-	//if( type == VEEJAY_MSG_DEBUG && vims_verbosity == 0 )
-	//	return;
-
-	char tmp[1024];
-	char buf[1024];
-	char prefix[20];
-	va_list args;
-	int color = -1;
-	va_start( args,format );
-	vsnprintf( tmp, sizeof(tmp), format, args );
-	
-	gtk_text_buffer_get_end_iter(buffer, &iter);
-	
-	switch(type)
-	{
-		case 2: sprintf(prefix,"Info   : ");sprintf(level, "infomsg"); color=COLOR_GREEN; break;
-		case 1: sprintf(prefix,"Warning: ");sprintf(level, "warnmsg"); color=COLOR_RED; break;
-		case 0: sprintf(prefix,"Error  : ");sprintf(level, "errormsg"); color=COLOR_RED; break;
-		case 3:
-			sprintf(prefix,"Debug  : ");sprintf(level, "debugmsg"); color=COLOR_BLUE; break;
-		default:
-			sprintf(prefix, "??? : "); sprintf(level, "infomsg"); color=COLOR_GREEN; break;
-	}
-
-	if(type==4)
-		snprintf(buf,sizeof(buf),"gveejay: %s",tmp);
-	else
-		snprintf(buf, sizeof(buf), "%s %s\n",prefix,tmp );
-	gsize nr,nw;
-
-	gchar *text = g_locale_to_utf8( buf, -1, &nr, &nw, NULL);
-	gtk_text_buffer_insert( buffer, &iter, text, nw );
-
-	GtkTextIter enditer;
-	gtk_text_buffer_get_end_iter(buffer, &enditer);
-	gtk_text_view_scroll_to_iter(
-		GTK_TEXT_VIEW(view),
-		&enditer,
-		0.0,
-		FALSE,
-		0.0,
-		0.0 );
-		
-	g_free( text );
-	va_end(args);
-}*/
 
 static	void	abort_gveejay()
 {
@@ -2687,8 +2634,6 @@ static	void	update_record_tab(int pm)
 static void	update_current_slot(int *history, int pm, int last_pm)
 {
 	gint update = 0;
-	/* Mode changed or ID changed, 
-	   Reload FX Chain, Reload current entry and disable widgets based on stream type */
 
 	if( pm != info->prev_mode || info->status_tokens[PLAY_MODE] != history[PLAY_MODE] || info->status_tokens[CURRENT_ID] != history[CURRENT_ID] )
 	{
@@ -2741,8 +2686,6 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 	/* Actions for stream */
 	if( pm != last_pm && pm == MODE_STREAM )
 	{
-		// pop up stream notepad
-		
 		/* Is a solid color stream */	
 		if( info->status_tokens[STREAM_TYPE] == STREAM_WHITE )
 		{
@@ -2858,13 +2801,10 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 		{	
 			speed = info->status_tokens[SAMPLE_SPEED];
 			update_slider_value( "speed_slider", speed, 0 );
-//			update_label_i( "speed_label", speed,0 );
-
 
 			if( speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
 			if( speed < 0 ) speed *= -1;
 			update_spin_value( "spin_samplespeed", speed);
-	//		update_knob_value(info->speed_knob, speed, 0);
 		}
 
 		if( history[FRAME_DUP] != info->status_tokens[FRAME_DUP] )
@@ -2887,30 +2827,21 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 			update_spin_range( "spin_samplespeed", 0, len, speed );
 	
 			gchar *time = format_selection_time( 0, len );
-//			update_label_str( "label_samplelength", time );
 			g_free(time);	
 
 			update_label_str( "label_currentsource", "Sample");
 
 			update_spin_value( "spin_samplestart", info->status_tokens[SAMPLE_START]);
 			update_spin_value( "spin_sampleend", info->status_tokens[SAMPLE_END]);
-	
-		//	info->uc.reload_hint[HINT_HISTORY] = 1;
 		
 			gint n_frames = sample_calctime();
-		//	time = format_time( n_frames, info->el.fps );
 	
 			timeline_set_length( info->tl,
 				(gdouble) n_frames , info->status_tokens[FRAME_NUM]- info->status_tokens[SAMPLE_START] );
 
 
-
-			//@ update font panel
-			
 			update_spin_range( "spin_text_start", 0, n_frames ,0);
 			update_spin_range( "spin_text_end", 0, n_frames,n_frames );
-
-		//	info->uc.sample_rec_duration = n_frames;
 
 			info->uc.reload_hint[HINT_KF] = 1;
 		}
@@ -2934,7 +2865,6 @@ on_vims_messenger       (void)
         GtkTextBuffer* buffer;
         GtkTextView* t= NULL;
         gchar *str = NULL;
-        // static gint line = 0; make this global (...)
         static int wait = 0;
         t =
 		GTK_TEXT_VIEW(GTK_WIDGET(glade_xml_get_widget(info->main_window,"vims_messenger_textview")));
@@ -2989,34 +2919,7 @@ static	void	reset_tree(const char *name)
 	GtkWidget *tree_widget = glade_xml_get_widget_( info->main_window,name );
 	GtkTreeModel *tree_model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree_widget) );
 	
-	// get a GList of all TreeViewColumns
-/*
-	GList *columns =gtk_tree_view_get_columns(GTK_TREE_VIEW( tree_widget ) );
-	while( columns != NULL )
-	{
-		GList *renderers;
-		// get single column
-		column = GTK_TREE_VIEW_COLUMN( columns->data );
-*/
-
-	/* renderers = gtk_tree_view_column_get_cell_renderers( GTK_TREE_VIEW_COLUMN(column) );
-		while( renderers != NULL)
-		{
-			GtkCellRenderer *cell = GTK_CELL_RENDERER( renderers->data );  
-			gtk_tree_view_column_clear_attributes( GTK_TREE_VIEW_COLUMN(column ), 
-							       GTK_CELL_RENDERER( cell ) );
-			renderers = renderers->next;
-		}
-		g_list_free(renderers); */
-
-/*
-		gtk_tree_view_column_clear( column );
-		columns = columns->next;
-	}
-	g_list_free(columns);
-*/
 	gtk_list_store_clear( GTK_LIST_STORE( tree_model ) );
-//	gtk_tree_view_set_model( GTK_TREE_VIEW(tree_widget), GTK_TREE_MODEL(tree_model));
 	
 }
 
@@ -3324,7 +3227,6 @@ static	void	load_effectchain_info()
 
 	if(fxlen == 5 )
 		offset = fxlen;
-	
 
 	gint last_index =0;
 
@@ -3342,7 +3244,6 @@ static	void	load_effectchain_info()
 		sscanf( line, "%02d%03d%1d%1d%1d",
 			&arr[0],&arr[1],&arr[2],&arr[3],&arr[4]);
 
-		
 		char *name = _effect_get_description( arr[1] );
 		sprintf(toggle,"%s",
 			arr[3] == 1 ? "on" : "off" );
@@ -3382,7 +3283,6 @@ static	void	load_effectchain_info()
 	}
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 	g_free(fxtext);
-
 }
 
 enum 
@@ -3674,9 +3574,6 @@ void	setup_samplelist_info()
     	gtk_tree_selection_set_select_function(selection, view_sources_selection_func, NULL, NULL);
     	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 
-//	g_signal_connect( effect_sources_tree, "edited", 
-//		(GCallback) on_samplelist_edited, (gpointer*) "tree_sources" );
-
 	g_signal_connect( effect_sources_tree, "row-activated", (GCallback) on_effectlist_sources_row_activated, (gpointer*)"tree_sources");
 }
 
@@ -3696,7 +3593,6 @@ void	load_effectlist_info()
 	gchar *fxtext = recv_vims(5,&fxlen);
 	_effect_reset();
  	reset_tree( "tree_effectlist");
-//	store = gtk_list_store_new( 3, G_TYPE_INT,GDK_TYPE_PIXBUF , G_TYPE_STRING );
 	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
 	store = GTK_LIST_STORE(model);
 
@@ -3732,17 +3628,14 @@ void	load_effectlist_info()
 			if( _effect_get_mix(ec->id) > 0 )
 			{
 				gtk_list_store_append( store2, &iter );
-	//			gtk_list_store_set( store2, &iter, FX_ID,(guint) ec->id, FX_STRING, name, -1 );
 				gtk_list_store_set( store2, &iter, FX_STRING, name, -1 );
 				vevo_property_set( fx_list_, name, LIVIDO_ATOM_TYPE_INT, 1, &(ec->id));
 			}
 			else
 			{
 				gtk_list_store_append( store, &iter );
-			//	gtk_list_store_set( store, &iter, FX_ID,(guint) ec->id, FX_STRING, name, -1 );
 				gtk_list_store_set( store, &iter, FX_STRING, name, -1 );
 				vevo_property_set( fx_list_, name, LIVIDO_ATOM_TYPE_INT, 1, &(ec->id));
-
 			}
 
 		}
@@ -3762,43 +3655,49 @@ static	void	select_slot__( int pm )
 #ifdef STRICT_CHECKING
 	assert( history != NULL );
 #endif
+	info->selected_slot = NULL;
+	info->selected_gui_slot = NULL;
+
+
+	if(info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
+		pm != history[PLAY_MODE] )
+	{
+		if(info->selected_slot)
+		{
+		//	set_activation_of_slot_in_samplebank(FALSE);
+			
+			info->selected_slot= NULL;
+			info->selected_gui_slot=NULL;
+		}
+	}
+
+
 	if( pm != MODE_PLAIN )
 	{
-		if(info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
-			pm != history[PLAY_MODE] )
+		int b = 0; int p = 0;
+		/* falsify activation */
+		if(info->status_tokens[CURRENT_ID] > 0)
 		{
-			if(info->selected_slot)
-			{
-				set_activation_of_slot_in_samplebank(FALSE);
-				info->selected_slot= NULL;
-				info->selected_gui_slot=NULL;
-			}
-		}
-		if(info->selected_slot == NULL || info->selected_slot->sample_id !=
-			info->status_tokens[CURRENT_ID] || pm != info->selected_slot->sample_type)
-		{
-			int b = 0; int p = 0;
-			/* falsify activation */
-			if(info->status_tokens[CURRENT_ID] > 0)
-			{
-				if(verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID],
-					info->status_tokens[PLAY_MODE] ))
-				{
+			if(verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID],
+				info->status_tokens[PLAY_MODE] ))
+			{	
+				if( !info->selected_slot ) {
+					info->selected_slot = info->sample_banks[b]->slot[p];
+					info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
+					set_activation_of_slot_in_samplebank(TRUE);
+				} else if ( info->selected_slot->sample_type != pm || info->selected_slot->sample_id !=
+						info->status_tokens[CURRENT_ID] ) {
+					set_activation_of_slot_in_samplebank(FALSE);
 					info->selected_slot = info->sample_banks[b]->slot[p];
 					info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
 					set_activation_of_slot_in_samplebank(TRUE);
 				}
-			}	
-		}
-	}
-	else
-	{
-		if(info->selected_slot)	 
-			set_activation_of_slot_in_samplebank(FALSE);
-		info->selected_slot = NULL;
-		info->selected_gui_slot = NULL;
+			}
+		}	
 	}
 
+	if( !info->selected_slot )
+		set_activation_of_slot_in_samplebank(FALSE);
 }
 
 static	void	select_slot_(int pm, const char *f, int line)
@@ -3858,10 +3757,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	reset_tree( "tree_sources" );
 
 	if( with_reset_slotselection )
-	{
-	//	reset_tree( "tree_sources" );
 		reset_samplebank();
-	}
 	multi_vims( VIMS_SAMPLE_LIST,"%d", 0 );
 	gint fxlen = 0;
 	gchar *fxtext = recv_vims(5,&fxlen);
@@ -4075,89 +3971,6 @@ on_vims_row_activated(GtkTreeView *treeview,
 		if( vimsid ) g_free( vimsid );
 	}
 }
-/*
-void
-on_vimslist_row_activated(GtkTreeView *treeview,
-		GtkTreePath *path,
-		GtkTreeViewColumn *col,
-		gpointer user_data)
-{
-	GtkTreeModel *model;
-	GtkTreeIter iter;
-	model = gtk_tree_view_get_model(treeview);
-	if(gtk_tree_model_get_iter(model,&iter,path))
-	{
-		gchar *vimsid = NULL;
-		gchar *text = NULL;
-		gint event_id = 0;
-		gtk_tree_model_get(model,&iter, VIMS_ID, &vimsid, -1);
-       		gtk_tree_model_get(model, &iter, VIMS_CONTENTS, &text, -1 );
-
-		if(sscanf( vimsid, "%d", &event_id ) && event_id > 0)
-		{
-			int n;
-			char msg[100];
-			info->uc.selected_vims_entry = event_id;
-			if(info->uc.selected_vims_args )
-				free(info->uc.selected_vims_args );
-			if(text)
-				info->uc.selected_vims_args = strdup( text );
-			else
-				info->uc.selected_vims_args = NULL;
-
-			sprintf(msg, "Press a key for VIMS %03d", event_id);
-			n = prompt_keydialog("Attach key to VIMS event", msg);
-			if( n == GTK_RESPONSE_ACCEPT )
-			{
-				int key_val = info->uc.pressed_key;
-				int key_mod = info->uc.pressed_mod;
-				
-				multi_vims(
-					VIMS_BUNDLE_ATTACH_KEY,
-					"%d %d %d",  // 4th = string arguments
-					event_id, key_val, key_mod );	
-				info->uc.reload_hint[HINT_BUNDLES] = 1;
-			}		
-		}
-		if( vimsid ) g_free(vimsid);
-	}
-}*/
-/*
-gboolean
-  view_vimslist_selection_func (GtkTreeSelection *selection,
-                       GtkTreeModel     *model,
-                       GtkTreePath      *path,
-                       gboolean          path_currently_selected,
-                       gpointer          userdata)
-  {
-    GtkTreeIter iter;
-
-    if (gtk_tree_model_get_iter(model, &iter, path))
-    {
-	gchar *vimsid = NULL;
-	gchar *text = NULL;
- 	gint event_id = 0;
-
-        gtk_tree_model_get(model, &iter, VIMS_ID, &vimsid, -1);
-	gtk_tree_model_get(model, &iter, VIMS_CONTENTS, &text, -1 );
-
-
-	if(sscanf( vimsid, "%d", &event_id ))
-	{
-		info->uc.selected_vims_entry = event_id;
-		if(info->uc.selected_vims_args )
-			free(info->uc.selected_vims_args );
-		if(text)
-			info->uc.selected_vims_args = strdup( text );
-		else
-			info->uc.selected_vims_args = NULL;
- 	}
-	if(vimsid) g_free(vimsid);
-    }
-
-    return TRUE;
-  }
-*/
 
 gboolean
   view_vims_selection_func (GtkTreeSelection *selection,
@@ -4251,7 +4064,6 @@ on_stream_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 		GTK_COLOR_SELECTION( colorsel ),
 		&current_color );
 
-	// scale to 0 - 255
 	gint red = current_color.red / 256.0;
 	gint green = current_color.green / 256.0;
 	gint blue = current_color.blue / 256.0;
@@ -4293,8 +4105,6 @@ on_rgbkey_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 		gint green = current_color.green / 256.0;
 		gint blue = current_color.blue / 256.0;
 
-		// send p1,p2,p3 to veejay
-		// (if effect currently on entry has rgb, this will be enabled but not here) 
 		multi_vims( 
 			VIMS_CHAIN_ENTRY_SET_ARG_VAL, "%d %d %d %d",
 			0, info->uc.selected_chain_entry, 1, red );
@@ -4315,7 +4125,6 @@ on_rgbkey_color_changed(GtkColorSelection *colorsel, gpointer user_data)
 	
 		info->parameter_lock = 0;
 	}
-
 }
 
 
@@ -4345,13 +4154,6 @@ static	void	setup_vimslist()
 
 	gtk_tree_sortable_set_sort_column_id( 
 		sortable, VIMS_ID, GTK_SORT_ASCENDING);
-
-//	g_signal_connect( tree, "row-activated",
-//		(GCallback) on_vimslist_row_activated, NULL );
-
-  //	GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
-    //	gtk_tree_selection_set_select_function(selection, view_vimslist_selection_func, NULL, NULL);
-   //	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 }
 
 
@@ -4380,7 +4182,6 @@ static	void	setup_bundles()
 	setup_tree_text_column( "tree_bundles", VIMS_MOD, 	"Mod",0);
 	setup_tree_text_column( "tree_bundles", VIMS_PARAMS,	"Max args",0);
 	setup_tree_text_column( "tree_bundles", VIMS_FORMAT,	"Format",0 );
-//	setup_tree_texteditable_column( "tree_bundles", VIMS_CONTENTS,	"Content", G_CALLBACK(on_vimslist_edited) );
 	g_signal_connect( tree, "row-activated",
 		(GCallback) on_vims_row_activated, NULL );
 
@@ -4390,7 +4191,6 @@ static	void	setup_bundles()
 
 	GtkWidget *tv = glade_xml_get_widget_( info->main_window, "vimsview" );
 	gtk_text_view_set_wrap_mode( GTK_TEXT_VIEW(tv), GTK_WRAP_WORD_CHAR );
-	
 }
 
 static	void	setup_editlist_info()
@@ -4416,14 +4216,6 @@ static	void	setup_editlist_info()
     	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 }
 
-/*
-	el format
-
-	[4] : number of rows
-	[16],[16],[16],[3],[filename] [16]
-
-*/
-
 static	void	reload_keys()
 {
 	gint len = 0;
@@ -4434,7 +4226,6 @@ static	void	reload_keys()
 	if( len == 0 || text == NULL )
 		return;
 
-	//@ destroy old VIMS list , keep argument list
 	gint k,index;
 	for( k = 0; k < VIMS_MAX  ; k ++ )
 	{
@@ -4473,14 +4264,12 @@ static	void	reload_keys()
 		vims_keys_list[ index ].event_id 	= val[0];	
 		vims_keys_list[ index ].vims		= message;
 	}
-
 	free(text);
 }
 
 
 static	void	reload_bundles()
 {
-
 	reload_keys();
 
 	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "tree_bundles");
@@ -4496,6 +4285,9 @@ static	void	reload_bundles()
 
 	if(len == 0 || eltext == NULL )
 	{
+#ifdef STRICT_CHECKING
+		assert(eltext != NULL && len > 0);
+#endif
 		return;
 	}
 
@@ -4503,7 +4295,6 @@ static	void	reload_bundles()
 	store = GTK_LIST_STORE(model);
 
 	char *ptr = eltext;
-
 
 	while( offset < len )
 	{
@@ -4612,6 +4403,9 @@ static	void	reload_vimslist()
 
 	if(len == 0 || eltext == NULL )
 	{
+#ifdef STRICT_CHECKING
+		assert(eltext != NULL && len > 0);
+#endif
 		return;
 	}
 
@@ -4682,12 +4476,6 @@ static void remove_all (GtkComboBox *combo_box)
 {
 	GtkTreeModel* model = gtk_combo_box_get_model (combo_box);
 	gtk_list_store_clear (GTK_LIST_STORE(model));
-	
-}
-
-void	reload_current_srt( int selected )
-{
-//	multi_vims( VIMS_SRT_INFO, "%d" , selected );
 }
 
 static	char *tokenize_on_space( char *q )
@@ -4711,15 +4499,10 @@ static int have_srt_ = 0;
 static	void	init_srt_editor()
 {
 	reload_fontlist();
-
 	update_spin_range( "spin_text_x", 0, info->el.width-1 , 0 );
 	update_spin_range( "spin_text_y", 0, info->el.height-1, 0 );
-
 	update_spin_range( "spin_text_size", 10, 500, 40 );
 	update_spin_range( "spin_text_start", 0, total_frames_, 0 );
-
-	// clear text view
-	
 }
 
 
@@ -4746,10 +4529,7 @@ static	void	reload_fontlist()
 		free(seq_str);
 		i += (slen + 3);
 	}
-//	gtk_combo_box_set_active( GTK_COMBO_BOX(box), 0 );
-
 	free(srts);
-
 }
 
 static	void	reload_srt()
@@ -4796,7 +4576,6 @@ static	void	reload_srt()
 			i++;
 		p = srts + i;
 	}
-//	gtk_combo_box_set_active( GTK_COMBO_BOX(box), 0 );
 	free(srts);	
 }
 void	_edl_reset(void)
@@ -4830,7 +4609,6 @@ static	void	reload_editlist_contents()
 	reset_tree("editlisttree");
 	_el_ref_reset();
 	_el_entry_reset();
-
 	_edl_reset();
 	
 	if( eltext == NULL || len < 0 )
@@ -4921,9 +4699,6 @@ static	void	reload_editlist_contents()
 		gchar *gfourcc = _utf8str( _el_get_fourcc(nl) );
 		gchar *timeline = format_selection_time( 0, total_frames );
 
-		// insert values to editlist
-		//add_sample_to_editlist((guint)row_num,timeline,fname,timecode,gfourcc);
-
 		gtk_list_store_append( store, &iter );
 		gtk_list_store_set( store, &iter,
 				COLUMN_INT, (guint) row_num,
@@ -4941,8 +4716,6 @@ static	void	reload_editlist_contents()
 		total_frames = total_frames + (n2-n1) + 1;
 		row_num ++;
 	}
-//	info->el.num_frames = total_frames;
-
 
 	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
 		
@@ -4965,7 +4738,7 @@ static	void	load_editlist_info()
 	if( len <= 0 || res==NULL)
 	{
 #ifdef STRICT_CHECKING
-		assert(0);
+		assert(len > 0 && res != NULL);
 #endif
 		return;
 	}
@@ -5026,6 +4799,10 @@ static	void	load_editlist_info()
 static	void	disable_widget(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
+#ifdef STRICT_CHECKING
+	if(!w) veejay_msg(VEEJAY_MSG_ERROR, "Cant find widget '%s'", name );
+	assert( w!= NULL );
+#endif
 	if(!w) return ;
 	gtk_widget_set_sensitive_( GTK_WIDGET(w), FALSE );
 }
@@ -5033,6 +4810,10 @@ static	void	disable_widget(const char *name)
 static	void	enable_widget(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
+#ifdef STRICT_CHECKING
+	if(!w) veejay_msg(VEEJAY_MSG_ERROR, "Cant find widget '%s'", name );
+	assert( w!= NULL );
+#endif
 	if(!w) return;
 	gtk_widget_set_sensitive_( GTK_WIDGET(w), TRUE );
 }
@@ -5059,35 +4840,13 @@ static	gboolean	update_cpumeter_timeout( gpointer data )
 
 
 	gdouble lim  = (1.0f/fs)*1000.0;
-
-
-//@ fps ?
-//  40 =max, in=20, fps=(40/20)*info->el.fps
-	
 	char text[65];
 	if( ms < lim )
-	{
 		sprintf(text, "Running realtime" );
-	}
 	else
-	{
 		sprintf(text, "%2.2f FPS", ( 1.0 / ms ) * 1000.0 );
-	}
 	update_label_str( "cpumeter", text );	
 	
-	/*	gdouble max  = ((1.0/info->el.fps)*1000);
-	gdouble frac =  1.0 / max;
-	gdouble invert = 0.0;
-
-	gdouble v = frac * ms;
-	if( v > 1.0 )
-		invert = 0.0;
-	else if ( v >= 0.0 )
-		invert = 1.0 - v;	
-	
-
-	gtk_progress_bar_set_fraction( GTK_PROGRESS_BAR(w), invert );*/
-
 	return TRUE;
 }
 static	gboolean	update_cachemeter_timeout( gpointer data )
@@ -5364,17 +5123,6 @@ void	get_gd(char *buf, char *suf, const char *filename)
 	if(filename == NULL && suf != NULL)
 		sprintf(buf, "%s/%s/" , dir, suf);
 }
-/*
-static	void		veejay_untick(gpointer data)
-{
-	printf("Ending veejay session untick: %d, %d\n", info->watch.state, info->watch.p_state);
-	if(info->watch.state == STATE_PLAYING)
-	{
-		printf("FATAL\n");
-		exit(0);
-	}
-}*/
-
 
 GdkPixbuf	*vj_gdk_pixbuf_scale_simple( const GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type )
 {
@@ -5398,14 +5146,46 @@ void		veejay_update_multitrack( void *data )
 {
 	vj_gui_t *gui = (vj_gui_t*) data;
 	sync_info *s = multitrack_sync( gui->mt );
+
 	GtkWidget *maintrack = glade_xml_get_widget( info->main_window, "imageA");
 	int i;
 	GtkWidget *ww = glade_xml_get_widget_( info->main_window, "vjdeck" );
 	int deckpage = gtk_notebook_get_current_page(GTK_NOTEBOOK(ww));
 
+	if( s->status_list[ s->master ] != NULL)
+	{
+		int tmp = 0;
+		for ( i = 0; i < 32; i ++ )
+		{	
+			tmp += s->status_list[s->master][i];
+			info->status_tokens[i] = s->status_list[s->master][i];
+		}
+		if( tmp == 0 )
+		{
+			free(s->status_list);
+			free(s->img_list );
+			free(s->widths);
+			free(s->heights);
+			free(s);
+			return;
+		}
+		info->status_lock = 1;
+		info->uc.playmode = gui->status_tokens[ PLAY_MODE ];
+		update_gui();
+		info->prev_mode = gui->status_tokens[ PLAY_MODE ];
+		gui->status_lock = 0;
+
+		int pm = info->status_tokens[PLAY_MODE];
+		int *history = info->history_tokens[pm];
+		int i;
+
+		for( i = 0; i < STATUS_TOKENS; i ++ )
+			history[i] = info->status_tokens[i];
+	}
+
 	for( i = 0; i < s->tracks ; i ++ )
 	{
-		if( s->status_list[i])
+		if( s->status_list[i] )
 		{
 			update_multitrack_widgets( info->mt, s->status_list[i], i );
 
@@ -5537,6 +5317,10 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 		select_slot( info->status_tokens[PLAY_MODE] );
 	
 		on_samplepage_clicked(NULL,NULL);
+#ifdef STRICT_CHECKING
+		if( pm != MODE_PLAIN )
+		assert( info->selected_slot != NULL );
+#endif
 	}
 
 	if( info->status_tokens[TOTAL_SLOTS] !=
@@ -5807,7 +5591,6 @@ static void	process_reload_hints(int *history, int pm)
 }
 void	update_gui()
 {
-	static int space[32];
 	int pm = info->status_tokens[PLAY_MODE];
 	int last_pm = info->prev_mode;
 	
@@ -5819,12 +5602,8 @@ void	update_gui()
 	{
 		history = info->history_tokens[ last_pm ];
 		llast_pm = history[PLAY_MODE];
-	}
-	else
-	{
-		veejay_memset( space, 0, sizeof(space));
-		history = &space[0];
-		llast_pm = -1;
+	} else 	{
+		return;
 	}
 
 	if( info->uc.randplayer && pm != last_pm )
@@ -5846,17 +5625,7 @@ void	update_gui()
 		pm = MODE_SAMPLE;
 	}
 
-
-
 	update_globalinfo(history, pm, last_pm);
-/*
-	if(info->selected_slot)
-	{
-		if( info->selected_slot->sample_id == info->status_tokens[CURRENT_ID] && 
-		    info->selected_slot->sample_type == info->status_tokens[PLAY_MODE] )
-	}*/
-//	veejay_update_multitrack(info);
-	
 
 	process_reload_hints(history, pm);
 	on_vims_messenger();
@@ -5864,117 +5633,6 @@ void	update_gui()
 	update_cpumeter_timeout(NULL);
 	update_cachemeter_timeout(NULL);
 
-//	info->prev_mode = pm;
-}
-
-void			gveejay_status_lock(void *p )
-{
-	vj_gui_t *gui = (vj_gui_t*) p;	
-	gui->status_lock =1;
-}
-void			gveejay_status_unlock(void *p)
-{
-	vj_gui_t *gui = (vj_gui_t*) p;
-	gui->status_lock = 0;
-}
-int		veejay_tick()
-//static	gboolean	veejay_tick( GIOChannel *source, GIOCondition condition, gpointer data)
-{
-	vj_gui_t *gui = info;
-//	vj_gui_t *gui = (vj_gui_t*) data;
-/*	if( (condition&G_IO_ERR) ) {
-		abort_gveejay();
-		return FALSE; }
-	if( (condition&G_IO_HUP) ) {
-		abort_gveejay();
-		return FALSE; }
-	if( (condition&G_IO_NVAL) ) {
-		abort_gveejay();
-		return FALSE; 
-	}*/
-
-//	if(gui->watch.state==STATE_PLAYING && (condition & G_IO_IN)&& gui->watch.p_state == 0 )
-	if(gui->watch.state==STATE_PLAYING && gui->watch.p_state == 0 )
-
-
-	{
-		gui->status_lock = 1;
-
-		int nb = 0;
-		unsigned char sta_len[6];
-		veejay_memset(sta_len,0,sizeof(sta_len));
-		nb = vj_client_read( gui->client, V_STATUS, sta_len, 5 );
-		if( nb <= 0 )
-		{
-			gui->status_lock=0;
-			abort_gveejay();
-			return FALSE;
-		}
-
-		if( sta_len[0] != 'V' )
-		{
-			int tmp1;
-			if( vj_client_poll( gui->client, V_STATUS ) > 0 ) {
-				unsigned char tmp[100];
-				nb = vj_client_read_no_wait( gui->client,V_STATUS, tmp, 100 );
-				if( nb <= 0 )
-				{
-					gui->status_lock = 0;
-					abort_gveejay();
-					return FALSE;
-				}
-			}
-		}
-		else
-		{
-			int n_bytes = 0;
-			if(sscanf( (char*)sta_len+1,"%03d",&n_bytes ))
-			{
-				veejay_memset(gui->status_msg,0,STATUS_BYTES );
-				nb = vj_client_read( gui->client,V_STATUS,gui->status_msg, n_bytes);
-				if( nb <= 0 )
-				{
-					gui->status_lock = 0;
-					abort_gveejay();
-					return FALSE;
-				}
-			}
-		}
-
-		int tmp1;
-
-		if(nb > 0)
-		{
-			int n = status_to_arr( gui->status_msg, gui->status_tokens );
-#ifdef STRICT_CHECKING
-			if( n != 23 )
-				veejay_msg(0, "Only got %d symbols from status message: '%s'", n, gui->status_msg );
-			assert(n == 23);
-#endif
-			info->uc.playmode = gui->status_tokens[ PLAY_MODE ];
-
-			if( n != 23)
-			{
-				veejay_msg(VEEJAY_MSG_WARNING, "(dumped) only got %d symbols from status message: '%s'", n, gui->status_msg );
-				int *history = info->history_tokens[ info->uc.playmode ];
-				int i;
-				for(i = 0; i <= 23; i ++ )
-					gui->status_tokens[i] = history[i];
-			}
-			update_gui();
-			info->prev_mode = gui->status_tokens[ PLAY_MODE ];
-		}
-		gui->status_lock = 0;
-
-		int pm = info->status_tokens[PLAY_MODE];
-		int *history = info->history_tokens[pm];
-		int i;
-
-		for( i = 0; i < STATUS_TOKENS; i ++ )
-			history[i] = info->status_tokens[i];
-
-	}
-	return TRUE;
 }
 
 void	vj_fork_or_connect_veejay(char *configfile)
@@ -6071,9 +5729,7 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	}
 
 	for( i = 0; i < n_args; i ++)
-	{
 		g_free(args[i]);
-	}
 }
 
 void	vj_gui_free()
@@ -6101,7 +5757,6 @@ void	vj_gui_style_setup()
 {
 	if(!info) return;
 	info->color_map = gdk_colormap_get_system();
-//	vj_init_style( "veejaytext", "Monospace, 8" );
 }
 
 void	vj_gui_theme_setup(int default_theme)
@@ -6265,12 +5920,8 @@ int	gveejay_busy(void)
 
 void	vj_gui_cb(int state, char *hostname, int port_num)
 {
-//	info->watch.hostname = strdup(hostname);
-//	info->watch.port_num = port_num;
-//	info->watch.state = STATE_DISCONNECT;
 	info->watch.state = STATE_RECONNECT;
 	info->watch.p_state = 1;
-	//	info->run_state = RUN_STATE_REMOTE;
 	put_text( "entry_hostname", hostname );
 	update_spin_value( "button_portnum", port_num );
 }
@@ -6280,8 +5931,7 @@ void	interrupt_cb()
    info->watch.state = STATE_STOPPED; 
 }
 
-//@ reloaded options !
-//@ cleanup, total mess!
+
 void	vj_gui_setup_defaults( vj_gui_t *gui )
 {
 	gui->config.w = 352;
@@ -6311,8 +5961,6 @@ static	void	theme_response( gchar *string )
 		write( fd, string, strlen(string));
 		close(fd);
 		vj_msg(VEEJAY_MSG_INFO, "Restart GveejayReloaded for changes to take effect");
-//this does not work if theme uses engines:		send_refresh_signal();
-//
 		if( prompt_dialog("Restart GveejayReloaded", "For changes to take effect, you should restart now" ) == GTK_RESPONSE_ACCEPT)
 		{
 			info->watch.w_state = STATE_DISCONNECT;
@@ -6465,10 +6113,6 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 
 	set_toggle_button( "button_252", vims_verbosity );
 
-//@ after connect:
-
-//	int pw = default_preview_width_ == 0 ? 352/2: default_preview_width_;
-//	int ph = default_preview_height_ == 0 ? 288/2: default_preview_height_;
 
 	int pw = default_preview_width_;
 	int ph = default_preview_height_;
@@ -6529,10 +6173,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 
 	info->midi =  vj_midi_new( info->main_window );
 
-//	set_toggle_button( "midievent", 1 );
-
 }
-
 
 /*
 static	gboolean	update_log(gpointer data)
@@ -6578,19 +6219,6 @@ static	gboolean	update_log(gpointer data)
 	return TRUE;
 }
 */
-/*
-void	gtk_configure_window_cb( GtkWidget *w, GdkEventConfigure *ev, gpointer data )
-{
-   GtkWidget *box = glade_xml_get_widget_( info->main_window, "sample_bank_hbox" );
-   GdkRectangle result;
-   widget_get_rect_in_screen(
-                 info->sample_bank_pad,
-                 &result
-   );
-veejay_msg(0, "Size= %d x %d", result.width, result.height );
-   multitrack_resize(info->mt, result.width, -1 );
-   
-}*/
 
 void	vj_gui_preview(void)
 {
@@ -6667,7 +6295,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		}	
 	}
 
-	gveejay_status_lock( info );
+//	gveejay_status_lock( info );
 
 	if(!vj_client_connect( info->client, hostname, group_name, port_num ) )
 	{
@@ -6677,7 +6305,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		char msg[200];
 		sprintf(msg, "Unable to connect to %s at port %d. Is the veejay server running?\nThe quickest way to launch a veejay server is by typing 'veejay -d' in a terminal", hostname,port_num);
 		error_dialog("Error", msg);
-		gveejay_status_unlock(info);
+		//gveejay_status_unlock(info);
 		return 0;
 	}
 	
@@ -6741,7 +6369,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 	info->uc.reload_hint[HINT_HISTORY] = 1;       
 	
-	gveejay_status_unlock( info );
+//	gveejay_status_unlock( info );
 
 	return 1;
 }
@@ -6776,7 +6404,7 @@ gboolean		is_alive( void )
 	if(gui->watch.state == STATE_DISCONNECT )
 	{
 		gui->watch.state = STATE_STOPPED;
-		gui->status_lock = 1;
+//		gui->status_lock = 1;
 		vj_gui_disconnect();
 		return TRUE;
 	}

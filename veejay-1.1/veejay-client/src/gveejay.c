@@ -45,7 +45,7 @@ static int launcher = 0;
 static int pw = 176;
 static int ph = 144;
 static int preview = 0; // off
-static int use_threads = 1;
+static int use_threads = 0;
 static struct
 {
 	char *file;
@@ -66,7 +66,7 @@ static void usage(char *progname)
 	printf( "-s\t\tSet bank resolution (row X columns)\n");
 	printf( "-P\t\tStart with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)\n");
         printf( "-X\t\tSet number of tracks\n");
-	printf( "-G\t\tStart without threads\n");
+	printf( "-G\t\tStart with threads\n");
 	printf( "\n\n");
         exit(-1);
 }
@@ -89,7 +89,7 @@ static int      set_option( const char *name, char *value )
 	}
 	else if (strcmp(name, "G") == 0 )
 	{
-		use_threads = 0;
+		use_threads = 1;
 	}
 	else if (strcmp(name, "X") == 0 )
 	{
@@ -205,9 +205,11 @@ int main(int argc, char *argv[]) {
 			gtk_main_iteration();
 		else 
 		{	
+			veejay_update_multitrack( get_ui_info() );
+/*
 			if(veejay_tick()) {
 				veejay_update_multitrack( get_ui_info() );
-			}
+			}*/
 			//g_usleep( 1000 );
 			if(!update_gveejay())
 				g_usleep(100 * vj_gui_sleep_time());
