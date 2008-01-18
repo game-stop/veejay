@@ -169,7 +169,7 @@ void	vj_midi_load(void *vv, const char *filename)
 			{
 				char key[32];
 				char widget[100];
-				char message[200];
+				char message[512];
 				int extra = 0;
 				if(sscanf( value, "%s %d %s \"%[^\"]", key, &extra, widget, message ) == 4 )
 				{
