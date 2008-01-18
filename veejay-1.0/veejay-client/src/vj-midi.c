@@ -171,7 +171,7 @@ void	vj_midi_load(void *vv, const char *filename)
 				char widget[100];
 				char message[200];
 				int extra = 0;
-				if(sscanf( value, "%s %d %s %s", key, &extra, widget, message ) == 4 )
+				if(sscanf( value, "%s %d %s \"%[^\"]", key, &extra, widget, message ) == 4 )
 				{
 					veejay_memset( value,0,sizeof(value));
 					k = 0;
@@ -232,7 +232,7 @@ void	vj_midi_save(void *vv, const char *filename)
 		dvims_t *d  = NULL;
 		if( vevo_property_get( v->vims, items[i], 0, &d ) == VEVO_NO_ERROR )
 		{
-			snprintf(tmp, 512, "%s %d %s %s\n",
+			snprintf(tmp, 512, "%s %d %s \"%s\"\n",
 				items[i],
 				d->extra,
 				(d->widget == NULL ? "none" : d->widget ),
