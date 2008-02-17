@@ -135,6 +135,43 @@ static int      set_option( const char *name, char *value )
         return err;
 }
 static volatile gulong g_trap_free_size = 0;
+static struct timeval time_last_;
+
+static char **cargv = NULL;
+
+
+gboolean	gveejay_idle(gpointer data)
+{
+	if(gveejay_running())
+	{
+		is_alive();
+		if( gveejay_time_to_sync( get_ui_info() ) )
+		{
+			veejay_update_multitrack( get_ui_info() );
+			update_gveejay();
+		}
+	}
+	if( gveejay_restart() )
+	{
+		if( execvp( cargv[0], cargv ) == -1 )
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to restart");
+	}
+
+	return TRUE;
+}
+
+static	void	clone_args( char *argv[], int argc )
+{	
+	int i = 0;
+	if( argc <= 0 )
+		return;
+
+	cargv = (char**) malloc(sizeof(char*) * (argc+1) );
+	memset( cargv, 0, sizeof(char*) * (argc+1));
+	for( i = 0; i < argc ; i ++ )
+		cargv[i] = strdup( argv[i] );
+
+}
 
 int main(int argc, char *argv[]) {
         char option[2];
@@ -142,6 +179,8 @@ int main(int argc, char *argv[]) {
         int err=0;
 
         if(!argc) usage(argv[0]);
+
+	clone_args( argv, argc );
 
 	// default host to connect to
 	sprintf(hostname, "127.0.0.1");
@@ -198,30 +237,12 @@ int main(int argc, char *argv[]) {
 		gveejay_preview(preview);
 	}
 
-	while(gveejay_running())
-	{
-		is_alive();
-		if( gtk_events_pending() )
-			gtk_main_iteration();
-		else 
-		{	
-			veejay_update_multitrack( get_ui_info() );
-/*
-			if(veejay_tick()) {
-				veejay_update_multitrack( get_ui_info() );
-			}*/
-			//g_usleep( 1000 );
-			if(!update_gveejay())
-				g_usleep(100 * vj_gui_sleep_time());
-		}
-	}
-	vj_gui_free();
+	gtk_idle_add_priority( GTK_PRIORITY_DEFAULT,
+		gveejay_idle,
+		NULL );
 
-	if( gveejay_restart() )
-	{
-		if( execvp( argv[0], argv ) == -1 )
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to restart %s", argv[0]);
-	}
+	memset( &time_last_, 0, sizeof(struct timeval));
+	gtk_main();
 
 	return 0;  
 }

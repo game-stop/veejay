@@ -55,5 +55,5 @@ char *get_gveejay_dir();
 int	gveejay_restart();
 int	gveejay_update();
 int            update_gveejay();
-void           veejay_update_multitrack( void *data );
+int           veejay_update_multitrack( void *data );
 #endif 

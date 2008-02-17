@@ -435,6 +435,7 @@ typedef struct
 	int		preview_locked;
 	void		*midi;
 	int		threaded;
+	struct timeval	time_last;
 } vj_gui_t;
 
 enum
@@ -1818,12 +1819,10 @@ gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 		if( prompt_dialog("Quit gveejay", "Are you sure?" ) == GTK_RESPONSE_REJECT)
 			return TRUE;
 	}
-//	multitrack_quit( info->mt );
 	
 	info->watch.w_state = STATE_DISCONNECT;
-//	vj_gui_free();
-
 	running_g_ = 0;
+	gtk_main_quit();
 
 	return FALSE;
 }
@@ -4994,8 +4993,9 @@ void	find_user_themes(int theme)
 	if( sloppy < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Theme config '%s' not found, creating default.", path );
-		veejay_msg(VEEJAY_MSG_WARNING, "Please setup symbolic links from %s/theme/{themename}" );
-		veejay_msg(VEEJAY_MSG_WARNING, "                            to %s/.veejay/theme/{themename}",GVEEJAY_DATADIR, path);
+		veejay_msg(VEEJAY_MSG_WARNING, "Please setup symbolic links from %s/theme/", GVEEJAY_DATADIR );
+		veejay_msg(VEEJAY_MSG_WARNING, "                            to %s/.veejay/theme/",home);
+		veejay_msg(VEEJAY_MSG_WARNING, "and set the name of the theme in theme.config" );
 		set_default_theme();
 		int wd=	open( path, O_WRONLY );
 		if(wd)
@@ -5142,7 +5142,48 @@ GdkPixbuf	*vj_gdk_pixbuf_scale_simple( const GdkPixbuf *src, int dw, int dh, Gdk
 	return res;
 }
 
-void		veejay_update_multitrack( void *data )
+
+int		gveejay_time_to_sync( vj_gui_t *ui )
+{
+	struct timeval time_now;
+	gettimeofday( &time_now, 0 );
+
+	double diff = time_now.tv_sec - ui->time_last.tv_sec +
+			(time_now.tv_usec - ui->time_last.tv_usec ) * 1.e-6;
+	float fps = 0.0;
+
+	struct timespec nsecsleep;
+
+	if ( ui->watch.state == STATE_PLAYING && ui->watch.p_state == 0 )
+	{
+		fps = ui->el.fps;	
+		float spvf = 1.0 / fps;
+		if( diff > spvf ) {
+			ui->time_last.tv_sec = time_now.tv_sec;
+			ui->time_last.tv_usec = time_now.tv_usec;
+			return 1;
+		}
+		int usec = 0;
+		int uspf = (int)(1000000.0 / fps);
+		usec = time_now.tv_usec - ui->time_last.tv_usec;
+		if( usec < 0 )
+			usec += 1000000;
+		if( time_now.tv_sec > ui->time_last.tv_sec + 1 )
+			usec = 1000000;
+		if( (uspf - usec) < (1000000 / 100))
+			return 0;
+			nsecsleep.tv_nsec = (uspf - usec - 1000000 / 100 ) * 1000;
+		nsecsleep.tv_sec = 0;	
+		nanosleep( &nsecsleep, NULL ); 	
+		return 0;
+	} 
+	nsecsleep.tv_nsec = 1000000;
+	nsecsleep.tv_sec = 0;
+	nanosleep( &nsecsleep, NULL );
+	return 0;
+}
+
+int		veejay_update_multitrack( void *data )
 {
 	vj_gui_t *gui = (vj_gui_t*) data;
 	sync_info *s = multitrack_sync( gui->mt );
@@ -5167,7 +5208,7 @@ void		veejay_update_multitrack( void *data )
 			free(s->widths);
 			free(s->heights);
 			free(s);
-			return;
+			return 0;
 		}
 		info->status_lock = 1;
 		info->uc.playmode = gui->status_tokens[ PLAY_MODE ];
@@ -5221,6 +5262,7 @@ void		veejay_update_multitrack( void *data )
 	free(s->widths);
 	free(s->heights);
 	free(s);
+	return 1;
 }
 
 static	void	update_status_accessibility(int old_pm, int new_pm)
@@ -6172,7 +6214,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	}
 
 	info->midi =  vj_midi_new( info->main_window );
-
+	gettimeofday( &(info->time_last) , 0 );
 }
 
 /*
