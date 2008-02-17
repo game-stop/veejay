@@ -3,15 +3,33 @@
 
 # install scripts in gveejay directory, symlink to user's dir
 
-reloaded=`which gveejayreloaded`
+reloaded=`which reloaded`
 srcdir=`pwd`
 dstdir=""
-lndir=`echo $HOME/.veejay/theme`
+home=$1
+
+if [ -z $reloaded ]; then
+	echo "Cannot find reloaded in PATH"
+	exit 1
+fi
+
+echo "Using srcdir $srcdir"
+
+if [ -z $home ]; then
+	echo "Using $HOME for current reloaded user, use $0 /path/to/home to specify another"
+	home=$HOME
+fi
+
+lndir=`echo $home/.veejay/theme`
 
 if test -x $reloaded; then 
 	dstdir=`$reloaded -q`
+	if [ -z $dstdir ]; then
+		echo "Wrong version of reloaded"
+		exit
+	fi
 else
-	echo "gveejayreloaded not found"
+	echo "reloaded not executable"
 	exit 1
 fi
 
@@ -19,6 +37,10 @@ themedir=$dstdir/theme
 
 # make sure dir exists
 mkdir -p $lndir 2>/dev/null
+if [ ! -d $lndir ]; then
+	echo "Cannot create $lndir, abort"
+	exit 1
+fi
 
 # find all rc files in current dir
 for rcfile in $srcdir/*.rc; do
@@ -26,6 +48,10 @@ for rcfile in $srcdir/*.rc; do
 	themename=`echo $tmp|cut -d '.' -f1`
 	extra=$themename.tar.bz2
 	mkdir -p $themedir/$themename 2>/dev/null
+	if [ ! -d $themedir/$themename ]; then
+		echo "Cannot create $themedir/$themename, abort"
+		exit 1
+	fi
 	if test -f $extra ; then
 		cd $themedir/$themename/
 		if tar -jxvf $srcdir/$extra >/dev/null ; then
