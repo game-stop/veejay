@@ -70,6 +70,7 @@
 static int use_bw_preview_ = 0;
 static int _last_known_num_args = 0;
 static hash_t *BundleHash = NULL;
+static struct timeval time_last_;
 static void *lzo_ = NULL;
 
 static int vj_event_valid_mode(int mode) {
@@ -2496,6 +2497,8 @@ void vj_event_init()
 	vj_event_init_keyboard_defaults();
 #endif
 	lzo_ = lzo_new();
+
+	veejay_memset( &time_last_, 0, sizeof( struct timeval ));	
 
 	init_vims_for_macro();
 

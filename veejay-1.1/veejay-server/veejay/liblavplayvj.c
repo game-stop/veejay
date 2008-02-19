@@ -293,8 +293,8 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 		char recover_samples[1024];
 		char recover_edl[1024];
 		pid_t my_pid = getpid();
-		snprintf(recover_samples,1024, "%s/recovery/recovery_samplelist_%d.sl", info->homedir, (int) my_pid);
-		snprintf(recover_edl, 1024, "%s/recovery/recovery_editlist_%d.edl", info->homedir, (int) my_pid);
+		snprintf(recover_samples,1024, "%s/recovery/recovery_samplelist_p%d.sl", info->homedir, (int) my_pid);
+		snprintf(recover_edl, 1024, "%s/recovery/recovery_editlist_p%d.edl", info->homedir, (int) my_pid);
 
 		int rs = sample_writeToFile( recover_samples,info->seq,info->font,
 				info->uc->sample_id, info->uc->playback_mode );
@@ -1287,7 +1287,76 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     if (info->uc->render_changed == 1)
 		info->uc->render_changed = 0;
 }
+static	char	*veejay_concat_paths(char *path, char *suffix)
+{
+	int n = strlen(path) + strlen(suffix) + 2;
+	char *str = vj_calloc( n * sizeof(char));
+	sprintf(str, "%s/%s", path,suffix);
+	return str;
+}
 
+static int	veejay_is_dir(char *path)
+{
+	struct stat s;
+	if( stat( path, &s ) == -1 )
+	{
+		veejay_msg(0, "%s (%s)", strerror(errno),path);
+		return 0;
+	}
+	if( !S_ISDIR( s.st_mode )) {
+		veejay_msg(0, "%s is not a valid path.");
+		return 0;
+	}
+	return 1;
+}	
+static	int	veejay_valid_homedir(char *path)
+{
+	char *recovery_dir = veejay_concat_paths( path, "recovery" );
+	char *theme_dir    = veejay_concat_paths( path, "theme" );
+	int sum = veejay_is_dir( recovery_dir );
+	sum += veejay_is_dir( theme_dir );
+	sum += veejay_is_dir( path );
+	free(theme_dir);
+	free(recovery_dir);
+	if( sum == 3 ) 
+		return 1;
+	return 0;
+}
+static	int	veejay_create_homedir(char *path)
+{
+	if( mkdir(path,0700 ) == -1 )
+	{
+		if( errno != EEXIST )
+		{
+			veejay_msg(0, "Unable to create %s - No veejay home setup (error=%s)", strerror(errno));
+			return 0;	
+		}
+	}
+
+	char *recovery_dir = veejay_concat_paths( path, "recovery" );
+	if( mkdir(recovery_dir,0700) == -1 ) {
+		if( errno != EEXIST )
+		{
+			veejay_msg(0, "%s", strerror(errno));
+			free(recovery_dir);
+			return 0;
+		}
+	}
+	free(recovery_dir);
+
+	char *theme_dir = veejay_concat_paths( path, "theme" );
+	if( mkdir(theme_dir,0700) == -1 ) {
+		if( errno != EEXIST )
+		{
+			veejay_msg(0, "%s", strerror(errno));
+			free(theme_dir);
+			return 0;
+		}
+	}
+	free(theme_dir);
+	veejay_msg(VEEJAY_MSG_INFO, "veejay home is setup");
+	return 1;
+}
 void	veejay_check_homedir(void *arg)
 {
 	veejay_t *info = (veejay_t *) arg;
@@ -1301,34 +1370,18 @@ void	veejay_check_homedir(void *arg)
 				"HOME environment variable not set.");
 		return;
 	}
+	sprintf(path, "%s/.veejay", home );
+	info->homedir = strndup( path, 1024 );
 
-	snprintf(path,1024, "%s/.veejay", home);
-	int ret = stat( path, &s );
-	int error = 0;
-	if( ret < 0 )
-	{
-		veejay_msg(VEEJAY_MSG_WARNING, "No veejay config file in %s", path );
-		ret = mkdir(path,0777);
-		snprintf(path,1024, "%s/.veejay/recovery", home );
-		mkdir(path,0777);
-		snprintf(path,1024, "%s/.veejay/theme", home );
-		mkdir(path,0777);
-	}
 
-	stat( path, &s );
-	if(!error)
+	if( veejay_valid_homedir(path) == 0)
 	{
-		if( !S_ISDIR( s.st_mode )) 
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "%s is not a directory");
-			error = 1;
+		if( veejay_create_homedir(path) == 0 )
+		{	
+			veejay_msg(VEEJAY_MSG_WARNING,
+				"Invalid veejay home %s",info->homedir);
+			return;
 		}
-	}
-	
-	if(!error)
-	{
-		veejay_msg(VEEJAY_MSG_INFO, "Veejay's configuration file is %s", path);
-		info->homedir = strndup( path, 1024 );
 	}
 
 	sprintf(tmp, "%s/plugins.cfg", path );

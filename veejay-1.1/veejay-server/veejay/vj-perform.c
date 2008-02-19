@@ -2052,7 +2052,7 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 
 	if(ret <= 0)
 	{
-		veejay_msg(0, "Unable to queue video frae %d, stopping Veejay", 
+		veejay_msg(0, "Unable to queue video frame %d, stopping Veejay", 
 			settings->current_frame_num );
 		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 	}
