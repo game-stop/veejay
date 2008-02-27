@@ -1951,12 +1951,18 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	if( el->num_video_files == 0 || 
 		el->video_width == 0 || el->video_height == 0 || el->video_frames < 2)
 	{
-		if( el->video_frames < 2 )
+		if( el->video_frames < 2 ) {
 			veejay_msg(VEEJAY_MSG_ERROR, "\tFile has only %d frame(s)", el->video_frames );
-		if( el->num_video_files == 0 )
+			vj_el_free(el); return NULL;
+		}
+		if( el->num_video_files == 0 ) {
 			veejay_msg(VEEJAY_MSG_ERROR, "\tNo videofiles in EDL");
-		if( el->video_height == 0 || el->video_width == 0 )
+			vj_el_free(el); return NULL;
+		}
+		if( el->video_height == 0 || el->video_width == 0 ) {
 			veejay_msg(VEEJAY_MSG_ERROR, "\tImage dimensions unknown");
+			vj_el_free(el); return NULL;
+		}
 		vj_el_free(el);
 		return NULL;
 	}

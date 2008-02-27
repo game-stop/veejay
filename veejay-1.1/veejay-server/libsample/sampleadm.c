@@ -2666,10 +2666,13 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
     xmlChar *xmlTemp = NULL;
     unsigned char *chTemp = NULL;
     xmlNodePtr subs = NULL;
+    int post_check = 0;
 
-    if(!sample_read_edl( skel ))
-        veejay_msg(VEEJAY_MSG_ERROR, "No EDL '%s' for sample %d", skel->edit_list_file, skel->sample_id );
-
+    if(!sample_read_edl( skel )) {
+        veejay_msg(VEEJAY_MSG_WARNING, "No saved edit decision list '%s' for sample %d", skel->edit_list_file, skel->sample_id );
+	veejay_msg(VEEJAY_MSG_WARNING, "Using plainmode to play sample %d", skel->sample_id );
+	post_check = 1;
+    }
     if(!skel->edit_list)
     {
     	skel->edit_list = el;
@@ -2918,6 +2921,7 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
     }
   //  if(!sample_read_edl( skel ))
 //	veejay_msg(VEEJAY_MSG_ERROR, "No EDL '%s' for sample %d", skel->edit_list_file, skel->sample_id );
+
 
 
     return subs;
