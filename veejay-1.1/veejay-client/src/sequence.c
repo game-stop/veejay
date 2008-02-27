@@ -505,18 +505,18 @@ int		gvr_track_connect( void *preview, const char *hostname, int port_num, int *
 
 	if(track_num == -1)
 	{
-		veejay_msg(0, "All tracks used.");
+		vj_msg(0, "All tracks used.");
 		return 0;
 	}
 	if(track_exists( vp, hostname, port_num, new_track ) )
 	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Veejay '%s':%d already in track %d", hostname, port_num, *new_track );
+		vj_msg(VEEJAY_MSG_WARNING, "Veejay '%s':%d already in track %d", hostname, port_num, *new_track );
 		return 0;
 	}
 	vj_client *fd = vj_client_alloc(0,0,0);
 	if(!vj_client_connect( fd, hostname, NULL, port_num ) )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to connect to %s:%d", hostname, port_num );
+		vj_msg(VEEJAY_MSG_ERROR, "Unable to connect to %s:%d", hostname, port_num );
 		vj_client_free( fd );
 		return 0;
 	}
@@ -731,7 +731,7 @@ int		gvr_track_toggle_preview( void *preview, int track_num, int status )
 	vp->tracks[ track_num ]->preview = status;
 	gvr_ext_unlock( vp );
 
-	veejay_msg(VEEJAY_MSG_INFO, "VeejayGrabber to %s:%d on Track %d %s",
+	vj_msg(VEEJAY_MSG_INFO, "VeejayGrabber to %s:%d on Track %d %s",
 		vp->tracks[ track_num ]->hostname,
 		vp->tracks[ track_num ]->port_num,
 		track_num,
@@ -946,7 +946,7 @@ static	void	gvr_parse_queue( veejay_track_t *v )
 	}
 	v->n_queued = 0;
 }
-
+extern void reloaded_restart();
 static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num )
 {
 	int score = 0;
@@ -985,7 +985,8 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 				if(v->data_buffer) free(v->data_buffer);
 				if(v->tmp_buffer) free(v->tmp_buffer);
          			free(v);
-				vp->tracks[track_num] = NULL;
+				vp->tracks[track_num] = NULL;			
+				reloaded_restart();
 			}
 			else
 			{
@@ -993,7 +994,7 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 				v->active = 1;
 				v->width = ( v->width > 300 ? v->width >> 1 : v->width );
 				v->height = ( v->width > 200 ? v->height >> 1 : v->height );
-				veejay_msg(VEEJAY_MSG_WARNING, "VeejayGrabber: connected with %s:%d on Track %d  %d x %d", 
+				vj_msg(VEEJAY_MSG_WARNING, "VeejayGrabber: connected with %s:%d on Track %d  %d x %d", 
 					v->hostname, v->port_num, track_num, v->width,v->height);
 			} 
 		}

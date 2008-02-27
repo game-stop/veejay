@@ -1844,9 +1844,6 @@ void	on_sync_correction_clicked( GtkWidget *w, gpointer data )
 
 void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 {
-	sample_slot_t *s = info->selected_slot;
-	if(!s) return;
-
 	int i = info->uc.selected_chain_entry;
 	int j = info->uc.selected_parameter_id;
 	int id = info->uc.entry_tokens[ENTRY_FXID];
@@ -1857,6 +1854,10 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 
 	if( (end - start) <= 0 || id <= 0 )	
 	{
+		if( id <= 0 )
+			vj_msg(VEEJAY_MSG_INFO, "No FX set on entry %d",i);
+		else
+			vj_msg(VEEJAY_MSG_INFO, "Length of animation is 0");
 		return;
 	}
 	
@@ -1902,6 +1903,9 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 
 	vj_client_send_bufX( info->client, V_CMD, kf,total_len );
 	free(kf);
+
+	vj_msg( VEEJAY_MSG_INFO, "Saved new animation for parameter %d on entry %d, start at frame %d and end at frame %d",j,i,start,end );
+				
 
 }
 

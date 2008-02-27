@@ -371,7 +371,7 @@ typedef struct
 	vj_client	*client;
 	char		status_msg[STATUS_BYTES];
 	int		status_tokens[32]; 	/* current status tokens */
-	int		*history_tokens[3];		/* list last known status tokens */
+	int		*history_tokens[4];		/* list last known status tokens */
 	int		status_passed;
 	int		status_lock;
 	int		slider_lock;
@@ -5217,6 +5217,11 @@ int		veejay_update_multitrack( void *data )
 		gui->status_lock = 0;
 
 		int pm = info->status_tokens[PLAY_MODE];
+
+#ifdef STRICT_CHECKING
+		assert( pm >= 0 && pm < 4 );
+#endif
+
 		int *history = info->history_tokens[pm];
 		int i;
 
@@ -5782,7 +5787,7 @@ void	vj_gui_free()
 		if(info->client)
 			vj_client_free(info->client);
 
-		for( i = 0; i < 3 ;  i ++ )
+		for( i = 0; i < 4;  i ++ )
 		{
 			if(info->history_tokens[i])
 				free(info->history_tokens[i]);
@@ -6038,7 +6043,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	veejay_memset( &(gui->el), 0, sizeof(veejay_el_t));
 	gui->sample_banks = (sample_bank_t**) vj_calloc(sizeof(sample_bank_t*) * NUM_BANKS );
 			
-	for( i = 0 ; i < 3 ; i ++ )
+	for( i = 0 ; i < 4; i ++ )
 	{
 		gui->history_tokens[i] = (int*) vj_calloc(sizeof(int) * (STATUS_TOKENS+1));
 	}
@@ -6357,7 +6362,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	veejay_msg(VEEJAY_MSG_INFO, "Connection established with %s:%d (Track 0)",hostname,port_num);
 
 	int k = 0;
-	for( k = 0; k < 3; k ++ )
+	for( k = 0; k < 4; k ++ )
 		veejay_memset( info->history_tokens[k] , 0, (sizeof(int) * STATUS_TOKENS) );
 
 	veejay_memset( info->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
@@ -6429,6 +6434,15 @@ static	void	veejay_stop_connecting(vj_gui_t *gui)
 	gtk_widget_hide(veejay_conncection_window);		
 }
 
+void			reloaded_restart(void)
+{
+	info->watch.state = STATE_STOPPED;
+	if(info->sensitive)
+		vj_gui_disable();
+	if(!info->launch_sensitive)
+		vj_launch_toggle(TRUE);		
+}
+
 gboolean		is_alive( void )
 {
 	void *data = info;
@@ -6469,12 +6483,7 @@ gboolean		is_alive( void )
 		veejay_msg(VEEJAY_MSG_INFO, "Connecting to %s: %d", remote,port );
 		if(!vj_gui_reconnect( remote, NULL, port ))
 		{
-			info->watch.state = STATE_STOPPED;
-			if(gui->sensitive)
-				vj_gui_disable();
-			if(!gui->launch_sensitive)
-				vj_launch_toggle(TRUE);			
-
+			reloaded_restart();
 		}
 		else
 		{
