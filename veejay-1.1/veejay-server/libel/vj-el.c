@@ -963,6 +963,11 @@ void	vj_el_get_video_fourcc(editlist *el, int num, char *fourcc)
 //	if( num < 0 ) num = 0; else if (num >= el->video_frames ) num = el->video_frames - 1;
 #ifdef STRICT_CHECKING
 	assert( num >= 0 && num <= el->total_frames );
+#else
+	if (num < 0)
+		num = 0;
+	if (num >= el->video_frames)
+		num = el->video_frames-1;
 #endif
 	n = el->frame_list[ num ];
 
@@ -1015,11 +1020,14 @@ int	vj_el_set_bogus_length( editlist *el, long nframe, int len )
 		return 0;
 #ifdef STRICT_CHECKING
 	assert( nframe >= 0 && nframe <= el->total_frames );
+#else
+	if (nframe < 0)
+		nframe = 0;
+
+	if (nframe >= el->video_frames)
+		nframe = el->video_frames-1;
+
 #endif
-//	if( nframe < 0 )
-//		nframe = 0;
-//	else if (nframe >= el->video_frames )
-//		nframe = el->video_frames - 1;
 
 	n = el->frame_list[nframe];
 
@@ -1052,6 +1060,13 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 		veejay_msg(0, "Fatal: %ld requested, have only %ld",
 			nframe, el->total_frames);
 	assert( nframe >= 0 && nframe < el->video_frames );
+#else
+	if (nframe < 0)
+		nframe = 0;
+
+	if (nframe >= el->video_frames)
+		nframe = el->video_frames-1;
+
 #endif
 	n = el->frame_list[nframe];
 
@@ -1561,12 +1576,14 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
 		return 0;
 #ifdef STRICT_CHECKING
 	assert( nframe >= 0 && nframe < el->video_frames );
-#endif
-//    	if (nframe < 0)
-//		nframe = 0;
+#else
+    	if (nframe < 0)
+		nframe = 0;
 
-//	if (nframe >= el->video_frames)
-//		nframe = el->video_frames-1;
+	if (nframe >= el->video_frames)
+		nframe = el->video_frames-1;
+
+#endif
 
     n = el->frame_list[nframe];
 
@@ -1659,13 +1676,14 @@ int	vj_el_get_audio_frame_at(editlist *el, uint32_t nframe, uint8_t *dst, int nu
 	}
 #ifdef STRICT_CHECKING
 	assert( nframe >= 0 && nframe < el->video_frames );
+#else
+	if (nframe < 0)
+		nframe = 0;
+
+	if (nframe >= el->video_frames)
+		nframe = el->video_frames-1;
+
 #endif
-
-//    if (nframe < 0)
-//		nframe = 0;
-
-//    if (nframe >= el->video_frames)
-//		nframe = el->video_frames - 1;
 
     n = el->frame_list[nframe];
 

@@ -90,6 +90,7 @@ void	yuv_init_lib()
 	put( PIX_FMT_RGB32,   IMG_RGBA32 );
 	put( PIX_FMT_RGBA,    IMG_RGBA32 );
 	put( PIX_FMT_RGB32_1, IMG_RGBA32 );
+	put( PIX_FMT_GRAY8,   IMG_Y8 );
 }
 
 VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int fmt )
@@ -217,7 +218,6 @@ void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 			"Unable to convert image %dx%d in %x to %dx%d in %x, using fallback",
 				src->width,src->height,src_fmt,
 				dst->width,dst->height,dst_fmt );
-		report_bug();
 		yuv_convert_any( src,dst, src_fmt,dst_fmt );
 	}
 }
