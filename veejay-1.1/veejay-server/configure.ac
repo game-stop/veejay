@@ -258,6 +258,10 @@ AC_CHECK_FUNC(pthread_attr_getstacksize,
 				AC_DEFINE(HAVE_PTHREADSTACKSIZE,,[Using pthread stack size])
 			  ] )
 
+if test x$have_pthread != xtrue ; then
+	AC_MSG_ERROR([Cannot find pthread library])
+fi
+
 have_dl_dlopen=false
 AC_CHECK_LIB(dl,dlopen)
 if test "$ac_cv_lib_dl_dlopen" = "yes"; then
@@ -351,6 +355,14 @@ if test x$with_pixbuf != xno ; then
                      AC_DEFINE(USE_GDK_PIXBUF, 1, [use gdk image load / save])],
                     [have_pixbuf=false])
 fi
+
+
+if test x$have_pixbuf != xtrue ; then
+	AC_MSG_ERROR([Cannot find the gdk pixbuf library])
+fi
+
+
+
 dnl *********************************************************************
 dnl Check for libdv
 dnl   (creates LIBDV_CFLAGS, LIBDV_LIBS; defines HAVE_LIBDV)
@@ -486,6 +498,11 @@ dnl	if test x$have_xml2 = xfalse ; then
 dnl		AC_MSG_WARN([cannot find The XML C library for gnome])
 dnl	fi
 fi
+
+if test x$have_xml2 != xtrue ; then
+	AC_MSG_ERROR([Cannot find the The XML C library for gnome])
+fi
+
 
 have_freetype=false
 AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
