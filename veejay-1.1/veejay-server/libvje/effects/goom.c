@@ -21,7 +21,7 @@
 #include <stdint.h>
 #include <libvjmem/vjmem.h>
 #include "goom.h"
-#include <libavutil/avutil.h>
+#include AVUTIL_INC
 #include <libyuv/yuvconv.h>
 #include <libgoom/goom.h>
 #include <stdlib.h>

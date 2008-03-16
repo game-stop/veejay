@@ -42,7 +42,7 @@
 #include <libvje/vje.h>
 #include <veejay/x11misc.h>
 #include <libvjmem/vjmem.h>
-#include <ffmpeg/avcodec.h>
+#include AVCODEC_INC
 #include <libyuv/yuvconv.h>
 #include <veejay/libveejay.h>
 #ifdef STRICT_CHECKING

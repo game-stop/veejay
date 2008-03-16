@@ -892,6 +892,24 @@ if test x$have_swscaler != xtrue ; then
  AC_MSG_ERROR([ FFmpeg Swscaler not found. Did you enable it when you compiled ffmpeg ? ])
 fi
 
+FFMPEG_INCLUDE_AVCODEC="1"
+FFMPEG_INCLUDE_AVUTIL="2"
+FFMPEG_INCLUDE_SWSCALE="3"
+FFMPEG_INCLUDE_AVFORMAT="4"
+
+AC_CHECK_HEADER( ffmpeg/avcodec.h, [FFMPEG_INCLUDE_AVCODEC="<ffmpeg/avcodec.h>"],[])
+AC_CHECK_HEADER( ffmpeg/avformat.h, [FFMPEG_INCLUDE_AVFORMAT="<ffmpeg/avformat.h>"],[])
+AC_CHECK_HEADER( ffmpeg/avutil.h, [FFMPEG_INCLUDE_AVUTIL="<ffmpeg/avutil.h>"],[])
+AC_CHECK_HEADER( ffmpeg/swscale.h, [FFMPEG_INCLUDE_SWSCALE="<ffmpeg/swscale.h>"],[])
+AC_CHECK_HEADER( libavutil/avutil.h , [FFMPEG_INCLUDE_AVUTIL="<libavutil/avutil.h>"],[])
+AC_CHECK_HEADER( libswscale/swscale.h, [FFMPEG_INCLUDE_SWSCALE="<libswcale/swscale.h>"],[])
+AC_CHECK_HEADER( libavcodec/avcodec.h, [FFMPEG_INCLUDE_AVCODEC="<libavcodec/avcodec.h>"],[])
+AC_CHECK_HEADER( libavformat/avformat.h, [FFMPEG_INCLUDE_AVFORMAT="<libavformat/avformat.h>"],[])
+
+AC_DEFINE_UNQUOTED( AVCODEC_INC, $FFMPEG_INCLUDE_AVCODEC,[] )
+AC_DEFINE_UNQUOTED( AVUTIL_INC, $FFMPEG_INCLUDE_AVUTIL,[] )
+AC_DEFINE_UNQUOTED( AVFORMAT_INC, $FFMPEG_INCLUDE_AVFORMAT,[] )
+AC_DEFINE_UNQUOTED( SWSCALE_INC, $FFMPEG_INCLUDE_SWSCALE,[] )
 
 
 dnl **********************************************************************

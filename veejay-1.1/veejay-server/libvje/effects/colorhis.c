@@ -22,7 +22,7 @@
 #include <libvjmem/vjmem.h>
 #include "colorhis.h"
 #include <stdlib.h>
-#include <libavutil/avutil.h>
+#include AVUTIL_INC
 #include <libyuv/yuvconv.h>
 #include <veejay/vims.h>
 #include "common.h"

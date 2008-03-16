@@ -35,7 +35,7 @@
 #ifdef USE_GDK_PIXBUF
 #include <libel/pixbuf.h>
 #endif
-#include <libavcodec/avcodec.h>
+#include AVCODEC_INC
 #ifdef HAVE_LIBQUICKTIME
 #include <quicktime.h>
 #include <lqt.h>

@@ -24,14 +24,14 @@
 #include <string.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
-#include <libavcodec/avcodec.h>
 #include <gdk-pixbuf/gdk-pixbuf.h>
 #include <libvje/vje.h>
 #include <libvje/effects/common.h>
 #include <libyuv/yuvconv.h>
 #include <libel/pixbuf.h>
 #include <veejay/vims.h>
-#include <libswscale/swscale.h>
+#include AVCODEC_INC
+#include SWSCALE_INC
 #include <libyuv/yuvconv.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
