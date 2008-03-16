@@ -892,10 +892,10 @@ if test x$have_swscaler != xtrue ; then
  AC_MSG_ERROR([ FFmpeg Swscaler not found. Did you enable it when you compiled ffmpeg ? ])
 fi
 
-FFMPEG_INCLUDE_AVCODEC="1"
-FFMPEG_INCLUDE_AVUTIL="2"
-FFMPEG_INCLUDE_SWSCALE="3"
-FFMPEG_INCLUDE_AVFORMAT="4"
+FFMPEG_INCLUDE_AVCODEC=""
+FFMPEG_INCLUDE_AVUTIL=""
+FFMPEG_INCLUDE_SWSCALE=""
+FFMPEG_INCLUDE_AVFORMAT=""
 
 AC_CHECK_HEADER( ffmpeg/avcodec.h, [FFMPEG_INCLUDE_AVCODEC="<ffmpeg/avcodec.h>"],[])
 AC_CHECK_HEADER( ffmpeg/avformat.h, [FFMPEG_INCLUDE_AVFORMAT="<ffmpeg/avformat.h>"],[])
