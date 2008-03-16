@@ -36,7 +36,7 @@ void   set_skin(int skin);
 void   default_bank_values(int *col, int *row );
 void   vj_gui_style_setup();
 gboolean       gveejay_running();
-gboolean       is_alive( void );
+gboolean       is_alive( int *sync );
 int    vj_gui_sleep_time( void );
 int    get_total_frames();
 int    vj_img_cb(GdkPixbuf *img );

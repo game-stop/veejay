@@ -144,15 +144,25 @@ gboolean	gveejay_idle(gpointer data)
 {
 	if(gveejay_running())
 	{
-		is_alive();
-		if( gveejay_time_to_sync( get_ui_info() ) )
-		{
-			veejay_update_multitrack( get_ui_info() );
-			update_gveejay();
+		int sync = 0;
+		if( is_alive(&sync) == FALSE ) {
+			//@ restart reloaded
+			veejay_msg(VEEJAY_MSG_WARNING,
+				"No connection with veejay, attempting restart.");
+			reloaded_restart();
+		} 
+		if( sync ) {
+			if( gveejay_time_to_sync( get_ui_info() ) )
+			{
+				if(veejay_update_multitrack( get_ui_info() ))
+					update_gveejay();
+			}
 		}
 	}
+
 	if( gveejay_restart() )
 	{
+		//@ reinvoke 
 		if( execvp( cargv[0], cargv ) == -1 )
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to restart");
 	}
@@ -219,17 +229,15 @@ int main(int argc, char *argv[]) {
 	set_skin( 0 );
 
 	default_bank_values( &col, &row );
-	
+	gui_load_theme();	
 	vj_gui_init( skins[0].file, launcher, hostname, port_num, use_threads );
 	vj_gui_style_setup();
 
-	struct sched_param schp;
-	memset( &schp, 0, sizeof( schp ));
-	schp.sched_priority = sched_get_priority_min(SCHED_RR );
-	if( sched_setscheduler( 0, SCHED_FIFO, &schp ) != 0 )
-	  veejay_msg(0, "Error setting RR");
-	else
-	  veejay_msg(VEEJAY_MSG_INFO, "Reloaded running with low priority");	
+//struct sched_param schp;
+//memset( &schp, 0, sizeof( schp ));
+//schp.sched_priority = sched_get_priority_min(SCHED_RR );
+//if( sched_setscheduler( 0, SCHED_FIFO, &schp ) == 0 )
+//  veejay_msg(VEEJAY_MSG_INFO, "Reloaded running with low priority");	
 
 	if( preview )
 	{

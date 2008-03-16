@@ -219,6 +219,9 @@ void	on_button_sampleend_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_button_veejay_clicked(GtkWidget *widget, gpointer user_data)
 {
+#ifdef STRICT_CHECKING
+	assert( info->watch.state == STATE_WAIT_FOR_USER );
+#endif
 	info->watch.state = STATE_CONNECT;
 }
 void	on_button_sendvims_clicked(GtkWidget *widget, gpointer user_data)

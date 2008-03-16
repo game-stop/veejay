@@ -37,7 +37,7 @@ int		gvr_track_toggle_preview( void *preview, int track_num, int status );
 void		gvr_need_track_list( void *preview, int track_id );
 
 int		gvr_get_stream_id( void  *data, int id );
-
+void		gvr_set_master( void *preview, int master_track );
 //format and queue vims messages from extern
 
 void		gvr_queue_mmvims( void *preview, int track_id, int vims_id, int val1,int val2 );

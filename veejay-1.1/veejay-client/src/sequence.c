@@ -29,14 +29,14 @@
 #include <veejay/libvevo.h>
 #include <src/sequence.h>
 #include <src/utils.h>
-#include <ffmpeg/avutil.h>
+#include <libavutil/avutil.h>
 #include <veejay/vje.h>
 #include <veejay/yuvconv.h>
 #include <string.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
-
+extern void reloaded_schedule_restart();
 typedef struct
 {
 	uint8_t *image_data[16];
@@ -68,6 +68,7 @@ typedef struct
 	unsigned char 	*queue[16];
 	int	n_queued;
 	int	bw;
+	int	is_master;
 } veejay_track_t;
 
 typedef struct
@@ -160,13 +161,16 @@ static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... )
 	gchar	block[255];	
 	gchar	tmp[255];
 	va_list args;
-	
+	gint    n;
 	if( format == NULL )
 	{
 		g_snprintf( block, sizeof(block)-1, "%03d:;", vims_id );
-		gint n = vj_client_send( v->fd, V_CMD, block );
-		if( n <= 0 )
+		n = vj_client_send( v->fd, V_CMD, block );
+		if( n <= 0 ) {
+			if( n == -1 && v->is_master )	
+				reloaded_schedule_restart();
 			return 0;
+		}
 		return n;
 	}
 
@@ -175,9 +179,11 @@ static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... )
 	g_snprintf( block,sizeof(block)-1, "%03d:%s;", vims_id, tmp );
 	va_end( args );
 	
-	gint n	= vj_client_send( v->fd, V_CMD, block );
-	if( n <= 0 )
-		return 0;
+	n = vj_client_send( v->fd, V_CMD, block );
+	if( n <= 0 ) {
+		if( n == -1 && v->is_master )
+			reloaded_schedule_restart();
+	}
 	return n;
 }
 
@@ -190,6 +196,8 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 
 	if( n<= 0 )
 	{
+		if( n == -1 && v->is_master)
+			reloaded_schedule_restart();
 		veejay_msg(0,"Reading header of %d bytes: %d", header_len,n );
 		free(tmp);
 		return 0;
@@ -220,6 +228,8 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 		n = vj_client_read( v->fd, V_CMD, buf_ptr, bytes_read );
 		if ( n <= 0 )
 		{
+			if( n == -1 && v->is_master )
+				reloaded_schedule_restart();
 			veejay_msg(0, "Received %d out of %d bytes", bw,len);
 			free(tmp);
 			return 0;
@@ -245,7 +255,9 @@ static unsigned char		*vims_track_list( veejay_track_t *v, int slen, int *bytes_
 	sprintf(message, "%03d:;", VIMS_TRACK_LIST );
 	int ret = vj_client_send( v->fd, V_CMD, message );
 	if( ret <= 0)
-	{
+	{	
+		if( ret == -1  && v->is_master )
+			reloaded_schedule_restart();
 		free(tmp);
 		return NULL;
 	}	
@@ -253,6 +265,9 @@ static unsigned char		*vims_track_list( veejay_track_t *v, int slen, int *bytes_
         ret = vj_client_read( v->fd, V_CMD, tmp, slen );
 	if( ret <= 0 )
 	{
+
+		if( ret == -1 && v->is_master )
+			reloaded_schedule_restart();
 		free(tmp);
 		return NULL;
 	}
@@ -276,6 +291,8 @@ static unsigned char		*vims_track_list( veejay_track_t *v, int slen, int *bytes_
                 int n = vj_client_read( v->fd, V_CMD, result + (*bytes_written), bytes_left );
                 if( n <= 0 )
   		{
+			if( n == -1 && v->is_master )
+				reloaded_schedule_restart();	
                         bytes_left = 0;
                 }
                 if( n > 0 )
@@ -293,7 +310,10 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 {
 	unsigned char status_len[6];
 	veejay_memset( status_len, 0, sizeof(status_len) );
-	gint nb = vj_client_read( v->fd, V_STATUS, status_len, 5 );
+	gint n = vj_client_read( v->fd, V_STATUS, status_len, 5 );
+	if( n <= 0 && v->is_master )
+		reloaded_schedule_restart();
+
 	if( status_len[0] == 'V' )
 	{
 		gint bytes = 0;
@@ -301,25 +321,35 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 		if( bytes > 0 )
 		{
 			veejay_memset( v->status_buffer,0, sizeof(v->status_buffer));
-			gint n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
+			n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
 			if( n <= 0 )
 			{
+				if( n == -1 && v->is_master )
+					reloaded_schedule_restart();
 				veejay_msg(0, "Status message corrupted.");
 				return 0;
 			}
-
-			while( vj_client_poll( v->fd, V_STATUS ) ) // is there a more recent message?
+			int k = -1;
+			while( (k = vj_client_poll( v->fd, V_STATUS )) ) // is there a more recent message?
 			{
 				veejay_memset( status_len, 0, sizeof( status_len ) );
 				n = vj_client_read(v->fd, V_STATUS, status_len, 5 );
+				if( n == -1  && v->is_master )
+					reloaded_schedule_restart();
 				sscanf( status_len+1, "%03d", &bytes );
 				if(bytes > 0 )
 				{
 					n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
-					if( n <= 0 )
+					if( n <= 0 ) {	
+						if( n == -1 && v->is_master )
+							reloaded_schedule_restart();		
+												
 						break;
+					}
 				}
 			}
+			if( k == -1 && v->is_master )
+				reloaded_schedule_restart();
 			veejay_memset( v->status_tokens,0, sizeof(sizeof(int) * 32));
 			status_to_arr( v->status_buffer, v->status_tokens );	
 			return 1;
@@ -327,12 +357,17 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 	}
 	else
 	{
-		while( vj_client_poll( v->fd, V_STATUS )) 
+		while( ( n = vj_client_poll( v->fd, V_STATUS ))) 
 		{
 			char trashcan[100];
-			if( vj_client_read( v->fd, V_STATUS, trashcan,sizeof(trashcan))<= 0)
+			int k = vj_client_read( v->fd, V_STATUS, trashcan,sizeof(trashcan));
+			if( k == -1 && v->is_master )
+				reloaded_schedule_restart();
+			if( k <= 0 )
 				break;
 		}
+		if( n == -1 && v->is_master )
+			reloaded_schedule_restart();
 	}
 	return 1;
 }
@@ -398,9 +433,18 @@ static int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v )
 	int tmp1 = 0;
 	tmp1 = vj_client_poll( v->fd , V_STATUS );
  	if(tmp1)
-		return veejay_process_status( vp, v );
+	{
+		int k =	 veejay_process_status( vp, v );
+		if( k == -1 && v->is_master)
+			reloaded_schedule_restart();
+	}
 	else if( tmp1 == -1 )
-		gvr_close_connection(v);
+	{
+		if(v->is_master)
+			reloaded_schedule_restart();
+		else
+			gvr_close_connection(v);
+	}
 	return 0;
 }
 
@@ -409,6 +453,16 @@ static int 	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
 	if( veejay_get_image_data( vp, v ) == 0 )
 		return 0;
 	return 1;
+}
+
+void		gvr_set_master(void *data, int master_track )
+{
+	veejay_preview_t *vp = (veejay_preview_t*) data;
+	int i;
+	for( i = 0; i < vp->n_tracks; i ++ )
+		if( vp->tracks[i] )
+			vp->tracks[i]->is_master = 0;
+	vp->tracks[master_track]->is_master = 1;
 }
 
 static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_num, int *at_track )
@@ -941,12 +995,14 @@ static	void	gvr_parse_queue( veejay_track_t *v )
 
 	for( i = 0; i < v->n_queued ; i ++ )
 	{
-		vj_client_send( v->fd, V_CMD, v->queue[i] );
+		if( vj_client_send( v->fd, V_CMD, v->queue[i] ) == -1  &&
+			v->is_master )
+			reloaded_schedule_restart();
 		free( v->queue[i] );
+		v->queue[i] = NULL;
 	}
 	v->n_queued = 0;
 }
-extern void reloaded_restart();
 static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num )
 {
 	int score = 0;
@@ -974,7 +1030,8 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 		{
 		        v->preview = 0;
 			vj_client_close(v->fd);
-    		 	if(!vj_client_connect( v->fd, v->hostname, NULL, v->port_num ) )
+    		 	int ok = vj_client_connect( v->fd, v->hostname, NULL, v->port_num );
+			if( ok <= 0 )
 			{
 				veejay_msg(0, "VeejayGrabber: Unable to reconnect to %s, Destroying Track %d",
 					(v->hostname ? v->hostname : "<unknown>"),
@@ -986,7 +1043,8 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 				if(v->tmp_buffer) free(v->tmp_buffer);
          			free(v);
 				vp->tracks[track_num] = NULL;			
-				reloaded_restart();
+				if(  v->is_master )
+					reloaded_schedule_restart();
 			}
 			else
 			{

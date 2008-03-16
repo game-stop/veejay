@@ -472,36 +472,6 @@ int		update_multitrack_widgets( void *data, int *array, int track )
 	return 1;
 }
 
-/*
-
-
-static gboolean	update_sequence_widgets( gpointer data )
-{
-	mt_priv_t *p = (mt_priv_t*) data;
-	char status[108];
-	int  array[101];
-
-	if( !p->active )
-		return TRUE;
-
-
-	p->status_lock = 1;
-
-
-	int pm = array[PLAY_MODE];
-	int i;
-	for( i  =  0; i < 20; i ++ )
-		p->status_cache[i] = array[i];
-
-	update_widgets(array, p, pm);
-
-	int *his = p->history[ pm ];	
-	for( i  =  0; i < 20; i ++ )
-		his[i] = array[i];
-	p->status_lock = 0;
-	return TRUE;
-}*/
-
 static	void	sequence_preview_size(multitracker_t *mt, int track_num)
 {
 	float ratio = mt->width / (float)mt->height;
@@ -527,8 +497,6 @@ static void sequence_preview_cb(GtkWidget *widget, gpointer user_data)
 	if(v->num != mt->master_track )
 	{
 		 status = (gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) == TRUE ? 1 : 0 );
-	//	else
-	// status = is_button_toggled( "previewtoggle" );
 
 		gvr_track_toggle_preview( mt->preview, v->num,status );
 
@@ -836,7 +804,6 @@ void		*multitrack_new(
 
 	mt->master_track = 0;
 
-
 	mt->preview = gvr_preview_init( MAX_TRACKS, threads );
 
 	parent__ = infog;
@@ -911,8 +878,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 
 	if(mt->pw > 0 && mt->ph > 0 )
 	{
- 		 /* re-configure current master track for preview-size */
-		sequence_preview_size( mt, mt->master_track );
+		//sequence_preview_size( mt, mt->master_track );
 
 		/* configure master preview size */
 		if(!gvr_track_configure( mt->preview, track, mt->pw,mt->ph) )
@@ -942,6 +908,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 	}
 
 	mt->master_track = track;
+	gvr_set_master( mt->preview, track );
 
 	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
 

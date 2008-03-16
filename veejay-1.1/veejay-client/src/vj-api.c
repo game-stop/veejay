@@ -68,7 +68,7 @@
 #include <src/utils.h>
 #include <src/sequence.h>
 #include <veejay/yuvconv.h>
-#include <ffmpeg/avutil.h>
+#include <libavutil/avutil.h>
 #include <veejay/vevo.h>
 #include <veejay/libvevo.h>
 #include <veejay/vevo.h>
@@ -359,7 +359,6 @@ typedef struct
 	char	*hostname;
 	int	port_num;
 	int	state;    // IDLE, PLAYING, RECONNECT, STOPPED 
-	int	p_state;
 	struct timeval p_time;
 	int	w_state; // watchdog state 
 	int	w_delay;
@@ -369,7 +368,6 @@ typedef struct
 {
 	GladeXML *main_window;
 	vj_client	*client;
-	char		status_msg[STATUS_BYTES];
 	int		status_tokens[32]; 	/* current status tokens */
 	int		*history_tokens[4];		/* list last known status tokens */
 	int		status_passed;
@@ -447,6 +445,7 @@ enum
 	STATE_DISCONNECT = 4,
 	STATE_BUSY      = 5,
 	STATE_LOADING	= 6,
+	STATE_WAIT_FOR_USER = 7,
 };
 
 enum
@@ -481,9 +480,9 @@ enum
 #define VEEJAY_MSG_OUTPUT	4
 
 static	vj_gui_t	*info = NULL;
-
+void	reloaded_restart();
 void 	*get_ui_info() { return (void*) info; }
-
+void	reloaded_schedule_restart();
 /* global pointer to the sample-bank */
 
 /* global pointer to the effects-source-list */
@@ -498,7 +497,6 @@ static 	GtkWidget *editlist_tree = NULL;
 static	GtkListStore *editlist_store = NULL;
 static  GtkTreeModel *editlist_model = NULL;	
 //void    gtk_configure_window_cb( GtkWidget *w, GdkEventConfigure *ev, gpointer data );
-gboolean	is_alive( void );
 static	int	get_slider_val(const char *name);
 void    vj_msg(int type, const char format[], ...);
 //static  void    vj_msg_detail(int type, const char format[], ...);
@@ -551,7 +549,6 @@ static	void	clear_textview_buffer(const char *name);
 static	void	init_recorder(int total_frames, gint mode);
 static	void	reload_bundles();
 static	void	update_rgbkey_from_slider();
-void	vj_launch_toggle(gboolean value);
 static	gchar	*get_textview_buffer(const char *name);
 static void 	  create_slot(gint bank_nr, gint slot_nr, gint w, gint h);
 static void 	  setup_samplebank(gint c, gint r);
@@ -1504,9 +1501,10 @@ void	about_dialog()
 		( path, NULL );
 	GtkWidget *about = g_object_new(
 		GTK_TYPE_ABOUT_DIALOG,
-		"name", "Reloaded",
+		"program_name", "reloaded",   
+		"name", "reloaded",
 		"version", VERSION,
-		"copyright", "(C) 2004 - 2007 N. Elburg et all.",
+		"copyright", "(C) 2004 - 2008 N. Elburg et all.",
 		"comments", "The graphical interface for Veejay",
 		"website", web,
 		"authors", authors,
@@ -1820,7 +1818,6 @@ gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 			return TRUE;
 	}
 	
-	info->watch.w_state = STATE_DISCONNECT;
 	running_g_ = 0;
 	gtk_main_quit();
 
@@ -1974,19 +1971,13 @@ void	vj_msg(int type, const char format[], ...)
 	va_end(args);
 }
 
-static	void	abort_gveejay()
-{
-	veejay_msg(0,"Lost connection with Veejay." );
-	exit(-1);
-}
-
 void	msg_vims(char *message)
 {
 	if(!info->client)
 		return;
 	int n = vj_client_send(info->client, V_CMD, message);
 	if( n <= 0 )
-		abort_gveejay();
+		reloaded_schedule_restart();
 }
 
 int	get_loop_value()
@@ -2021,7 +2012,7 @@ static	void	multi_vims(int id, const char format[],...)
 	va_end(args);
 
 	if(vj_client_send( info->client, V_CMD, block)<=0 )
-		abort_gveejay();
+		reloaded_schedule_restart();
  
 }
 
@@ -2032,7 +2023,7 @@ static	void single_vims(int id)
 		return;
 	sprintf(block, "%03d:;",id);
 	if(vj_client_send( info->client, V_CMD, block )<=0)
-		abort_gveejay();
+		reloaded_schedule_restart();
 }
 
 static gchar	*recv_vims(int slen, int *bytes_written)
@@ -2041,18 +2032,18 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 	char tmp[tmp_len];
 	veejay_memset(tmp,0,sizeof(tmp));
 	int ret = vj_client_read( info->client, V_CMD, tmp, slen );
-
+	if( ret == -1 )
+		reloaded_schedule_restart();
 	int len = 0;
 	sscanf( tmp, "%d", &len );
 	gchar *result = NULL;
 	if( ret <= 0 || len <= 0 || slen <= 0)
-	{
 		return result;
-	}
 	result = (gchar*) vj_calloc(sizeof(gchar) * (len + 1) );
 
 	*bytes_written = vj_client_read( info->client, V_CMD, result, len );
-
+	if( *bytes_written == -1 )
+		reloaded_schedule_restart();
 	return result;
 }
 
@@ -5026,6 +5017,7 @@ void	find_user_themes(int theme)
 
 	if( strcmp( location, "Default" ) == 0 )	
 	{
+		veejay_msg(VEEJAY_MSG_INFO, "Using default theme.");
 		set_default_theme();
 	}
 	else
@@ -5096,10 +5088,14 @@ void	find_user_themes(int theme)
 	theme_list[ k ] = strdup("Default");
 	for( k = 0; theme_list[k] != NULL ; k ++ )
 		veejay_msg(VEEJAY_MSG_INFO, "Added Theme #%d %s", k, theme_list[k]);
+//	veejay_msg(VEEJAY_MSG_INFO, "Loading %s", theme_file );
 
-	gtk_rc_parse(theme_file);
 
+}
 
+void	gui_load_theme()
+{
+	gtk_rc_parse( theme_file );
 }
 
 char	*get_glade_path()
@@ -5153,8 +5149,7 @@ int		gveejay_time_to_sync( vj_gui_t *ui )
 	float fps = 0.0;
 
 	struct timespec nsecsleep;
-
-	if ( ui->watch.state == STATE_PLAYING && ui->watch.p_state == 0 )
+	if ( ui->watch.state == STATE_PLAYING )
 	{
 		fps = ui->el.fps;	
 		float spvf = 1.0 / fps;
@@ -5176,6 +5171,9 @@ int		gveejay_time_to_sync( vj_gui_t *ui )
 		nsecsleep.tv_sec = 0;	
 		nanosleep( &nsecsleep, NULL ); 	
 		return 0;
+	} else if ( ui->watch.state == STATE_STOPPED ) 
+	{
+		reloaded_restart();
 	} 
 	nsecsleep.tv_nsec = 1000000;
 	nsecsleep.tv_sec = 0;
@@ -5888,11 +5886,6 @@ void	set_skin(int skin)
 	timeline_theme_colors( skin ? 1: 0 );
 }
 
-int	vj_gui_cb_locked()
-{
-	return info->watch.p_state;
-}
-
 int	vj_gui_sleep_time( void )
 {
 	float f =  (float) info->status_tokens[ELAPSED_TIME];
@@ -5958,26 +5951,12 @@ int	vj_img_cb(GdkPixbuf *img )
 	return 1;
 }
 
-int	gveejay_busy(void)
-{
-	if( info->watch.p_state != 0 )
-		return 1;
-	return 0;
-}
-
 void	vj_gui_cb(int state, char *hostname, int port_num)
 {
 	info->watch.state = STATE_RECONNECT;
-	info->watch.p_state = 1;
 	put_text( "entry_hostname", hostname );
 	update_spin_value( "button_portnum", port_num );
 }
-
-void	interrupt_cb()
-{
-   info->watch.state = STATE_STOPPED; 
-}
-
 
 void	vj_gui_setup_defaults( vj_gui_t *gui )
 {
@@ -6021,11 +6000,40 @@ static	void	theme_response( gchar *string )
 	}
 
 }
+static void reloaded_sighandler(int x) 
+{
+	veejay_msg(VEEJAY_MSG_WARNING, "Caught signal %x", x);
+	switch( x ) {
+		case SIGINT:
+			//@ quit dialog;
+			break;
+		case SIGQUIT:
+		case SIGTERM:
+		case SIGKILL:
+		case SIGSEGV:
+			break;
+		case SIGPIPE:
+			reloaded_schedule_restart();
+			break;
+	}
+	veejay_msg(VEEJAY_MSG_WARNING, "Stopping reloaded");
+	exit(0);
+}
+
+void	register_signals()
+{
+	signal( SIGTERM, reloaded_sighandler );
+	signal( SIGINT,  reloaded_sighandler );
+	signal( SIGHUP , reloaded_sighandler );
+	signal( SIGPIPE, reloaded_sighandler );
+	signal( SIGQUIT, reloaded_sighandler );
+	signal( SIGSEGV, reloaded_sighandler );
+}
 
 void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, int use_threads)
 {
 	int i;
-
+	
 	vj_gui_t *gui = (vj_gui_t*)vj_calloc(sizeof(vj_gui_t));
 	if(!gui)
 	{
@@ -6203,69 +6211,11 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 
 	}
 	veejay_memset( &info->watch, 0, sizeof(watchdog_t));
-	info->watch.state = STATE_STOPPED; //
+	info->watch.state = STATE_WAIT_FOR_USER; //
 	veejay_memset(&(info->watch.p_time),0,sizeof(struct timeval));
-	GtkWidget *w = glade_xml_get_widget_(info->main_window, "veejay_connection" );
-	if( launcher )
-	{
-		gtk_widget_hide( w );
-		put_text( "entry_hostname", hostname );
-		update_spin_value( "button_portnum", port_num ); 
-		gui->watch.state = STATE_CONNECT; 
-	}
-	else
-	{
-		gtk_widget_show( w );
-	}
-
 	info->midi =  vj_midi_new( info->main_window );
 	gettimeofday( &(info->time_last) , 0 );
 }
-
-/*
-static	gboolean	update_log(gpointer data)
-{
-	if(info->watch.state != STATE_PLAYING && info->watch.p_state == 0)
-		return TRUE;
-	gint len = 0;
-
-	single_vims( VIMS_LOG );
-	gchar *buf = recv_log_vims(6, &len );
-	if(len <= 0)
-	{
-		return TRUE;
-	}
-	GtkWidget *view = glade_xml_get_widget_( info->main_window, "veejaytext");
-	GtkTextBuffer *buffer = gtk_text_view_get_buffer(GTK_TEXT_VIEW(view));
-	GtkTextIter iter,enditer;
-
-	if(line_count > 100)
-	{
-		clear_textview_buffer( "veejaytext" );
-		line_count = 1;
-	}
-	gtk_text_buffer_get_end_iter(buffer, &iter);
-	
-	int nr,nw;
-	gchar *text = g_locale_to_utf8( buf, -1, &nr, &nw, NULL);
-	gtk_text_buffer_insert( buffer, &iter, text, nw );
-
-	line_count ++;	
-	gtk_text_buffer_get_end_iter(buffer, &enditer);
-	gtk_text_view_scroll_to_iter(
-		GTK_TEXT_VIEW(view),
-		&enditer,
-		0.0,
-		FALSE,
-		0.0,
-		0.0 );
-	
-	g_free( text );
-	g_free(buf);
-
-	return TRUE;
-}
-*/
 
 void	vj_gui_preview(void)
 {
@@ -6349,10 +6299,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		if(info->client)
 			vj_client_free(info->client);
 		info->client = NULL;
-		char msg[200];
-		sprintf(msg, "Unable to connect to %s at port %d. Is the veejay server running?\nThe quickest way to launch a veejay server is by typing 'veejay -d' in a terminal", hostname,port_num);
-		error_dialog("Error", msg);
-		//gveejay_status_unlock(info);
 		return 0;
 	}
 	
@@ -6366,7 +6312,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		veejay_memset( info->history_tokens[k] , 0, (sizeof(int) * STATUS_TOKENS) );
 
 	veejay_memset( info->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
-	veejay_memset( info->status_msg, 0, STATUS_BYTES );	
 
 	load_editlist_info();
 
@@ -6379,8 +6324,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	reload_vimslist();
 	reload_editlist_contents();
 	reload_bundles();
-
-//	info->channel = g_io_channel_unix_new( vj_client_get_status_fd( info->client, V_STATUS));
 
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
 	gtk_widget_show( w );
@@ -6401,14 +6344,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 			      info->el.fps, info->el.width, info->el.height, &preview_box_w_, &preview_box_h_ );
 
 	vj_gui_preview();
-/*	g_io_add_watch_full(
-			info->channel,
-			G_PRIORITY_DEFAULT,
-			G_IO_IN| G_IO_ERR | G_IO_NVAL | G_IO_HUP,
-			veejay_tick,
-			(gpointer*) info,
-			NULL 
-		);*/
 
 	info->uc.reload_hint[HINT_SLIST] = 1;
 	info->uc.reload_hint[HINT_CHAIN] = 1;
@@ -6428,28 +6363,53 @@ static	void	veejay_stop_connecting(vj_gui_t *gui)
 	if(!gui->sensitive)
 		vj_gui_enable();
 
-	vj_launch_toggle(FALSE);
-	
+	info->launch_sensitive = 0;
+
 	veejay_conncection_window = glade_xml_get_widget(info->main_window, "veejay_connection");
 	gtk_widget_hide(veejay_conncection_window);		
+	GtkWidget *mw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+
+	gtk_widget_show( mw );
 }
 
-void			reloaded_restart(void)
+void			reloaded_schedule_restart()
 {
 	info->watch.state = STATE_STOPPED;
-	if(info->sensitive)
-		vj_gui_disable();
-	if(!info->launch_sensitive)
-		vj_launch_toggle(TRUE);		
+	veejay_msg(VEEJAY_MSG_WARNING, "Reloaded is shutting down.");
 }
 
-gboolean		is_alive( void )
+void			reloaded_restart()
+{
+#ifdef STRICT_CHECKING
+	assert( info->watch.state == STATE_STOPPED );
+#endif
+	GtkWidget *cd = glade_xml_get_widget_(info->main_window, "veejay_connection" );
+	GtkWidget *mw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
+
+	// disable and hide mainwindow
+	if(info->sensitive)
+		vj_gui_disable();
+	gtk_widget_hide( mw );
+	
+	//@ bring up the launcher window
+	gtk_widget_show( cd );
+//	info->watch.state = STATE_CONNECT;
+	info->watch.state = STATE_WAIT_FOR_USER;
+	info->launch_sensitive = TRUE;
+
+	veejay_msg(VEEJAY_MSG_INFO, "Ready to make a connection to a veejay server");
+}
+
+gboolean		is_alive( int *do_sync )
 {
 	void *data = info;
 	vj_gui_t *gui = (vj_gui_t*) data;
 
-	if( gui->watch.state == STATE_PLAYING && gui->watch.p_state == 0)
+	if( gui->watch.state == STATE_PLAYING )
+	{
+		*do_sync = 1;
 		return TRUE;
+	}
 
 	if( gui->watch.state == STATE_RECONNECT )
 	{
@@ -6460,17 +6420,15 @@ gboolean		is_alive( void )
 	if(gui->watch.state == STATE_DISCONNECT )
 	{
 		gui->watch.state = STATE_STOPPED;
-//		gui->status_lock = 1;
 		vj_gui_disconnect();
-		return TRUE;
+		return FALSE;
 	}
 
 	if( gui->watch.state == STATE_STOPPED )
-	{ 
-		if(gui->sensitive)
-		 	vj_gui_disable(); 
-		if(!gui->launch_sensitive)
-			vj_launch_toggle(TRUE);
+	{
+		if(info->client)
+			vj_gui_disconnect();
+		return FALSE; 
 	}
 
 	if( gui->watch.state == STATE_CONNECT )
@@ -6483,26 +6441,31 @@ gboolean		is_alive( void )
 		veejay_msg(VEEJAY_MSG_INFO, "Connecting to %s: %d", remote,port );
 		if(!vj_gui_reconnect( remote, NULL, port ))
 		{
-			reloaded_restart();
+			reloaded_schedule_restart();
 		}
 		else
 		{
 			info->watch.state = STATE_PLAYING;
 			info->key_id = gtk_key_snooper_install( key_handler , NULL);
-			veejay_stop_connecting(gui);
 			multrack_audoadd( info->mt, remote, port );
-			info->watch.p_state = 0; 
-
-			if(user_preview==0)
-				multitrack_set_quality( info->mt, 2 );
-			else
-			{	
+			*do_sync = 1;
+		//	if(user_preview==0)
+		//		multitrack_set_quality( info->mt, 2 );
+		//	else
+		//	{	
+			if( user_preview ) {
 				info->preview_locked = 1;
 				multitrack_set_quality( info->mt, user_preview );
 				set_toggle_button( "previewtoggle", 1 );
 				info->preview_locked = 0;
 			}
+			veejay_stop_connecting(gui);
 		}
+	}
+
+	if( gui->watch.state == STATE_WAIT_FOR_USER )
+	{
+		*do_sync = 0;
 	}
 
 	return TRUE;
@@ -6511,21 +6474,15 @@ gboolean		is_alive( void )
 
 void	vj_gui_disconnect()
 {
-	/*if( info->channel )
-	{
-		g_io_channel_shutdown( info->channel, FALSE, NULL );
-		g_io_channel_unref(info->channel);
-	}*/
-	gtk_key_snooper_remove( info->key_id );
+	veejay_msg(0,"Disconnecting ...");
+	if(info->key_id)
+		gtk_key_snooper_remove( info->key_id );
 	free_samplebank();
 
 	if(info->client)
 	{
 		vj_client_close(info->client);
 		vj_client_free(info->client);
-//		if(info->rawdata)
-//			free(info->rawdata);
-//		info->rawdata = NULL;
 		info->client = NULL;
 	}
 	/* reset all trees */
@@ -6535,16 +6492,7 @@ void	vj_gui_disconnect()
 	reset_tree("tree_sources");
 	reset_tree("editlisttree");
 
-	/* clear console text */
-//	clear_textview_buffer("veejaytext");
-}
-
-void	vj_launch_toggle(gboolean value)
-{
-	GtkWidget *w = glade_xml_get_widget_(info->main_window, "button_veejay" );
-	if(!w) return;
-	gtk_widget_set_sensitive_( GTK_WIDGET(w), value );
-	info->launch_sensitive = ( value == TRUE ? 1 : 0);
+	reloaded_schedule_restart();
 }
 
 void	vj_gui_disable()

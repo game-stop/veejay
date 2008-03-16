@@ -167,6 +167,7 @@ AC_CHECK_LIB( asound, snd_seq_open,
 		AC_SUBST( ALSA_LIBS )
 		have_alsa=true ],,)
 
+AC_CHECK_HEADER(alsa/asoundlib.h,,[AC_MSG_ERROR([alsa/asoundlib.h not found - please install the alsa header])] )
 
 have_dl_dlopen=false
 AC_CHECK_LIB(dl,dlopen)
