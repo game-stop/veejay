@@ -29,7 +29,7 @@
 #include <veejay/libvevo.h>
 #include <src/sequence.h>
 #include <src/utils.h>
-#include <libavutil/avutil.h>
+#include AVUTIL_INC
 #include <veejay/vje.h>
 #include <veejay/yuvconv.h>
 #include <string.h>

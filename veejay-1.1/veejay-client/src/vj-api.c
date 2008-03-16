@@ -68,7 +68,7 @@
 #include <src/utils.h>
 #include <src/sequence.h>
 #include <veejay/yuvconv.h>
-#include <libavutil/avutil.h>
+#include AVUTIL_INC
 #include <veejay/vevo.h>
 #include <veejay/libvevo.h>
 #include <veejay/vevo.h>
