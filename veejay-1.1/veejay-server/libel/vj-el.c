@@ -40,8 +40,8 @@
 #include <mjpegtools/mpegtimecode.h>
 #include <libvjmem/vjmem.h>
 #include <libyuv/yuvconv.h>
-#include <ffmpeg/avcodec.h>
-#include <ffmpeg/avformat.h>
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
 #include <liblzo/lzo.h>
 #include <math.h>
 #include <stdlib.h>

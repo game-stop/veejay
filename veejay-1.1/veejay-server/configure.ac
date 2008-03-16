@@ -284,7 +284,7 @@ PKG_CHECK_MODULES(MJPEGTOOLS, [mjpegtools >= 1.6 ],
                     [have_mjpegtools=false])
 
 if test x$have_mjpegtools != xtrue ; then
-	AC_MSG_ERROR([Cannot find mjpegtools. Did you set PKG_CONFIG_PATH variable?])
+	AC_MSG_ERROR([Cannot find mjpegtools.] )
 fi
 
 dnl

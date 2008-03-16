@@ -32,7 +32,7 @@
 #include <libyuv/yuvconv.h>
 #include <libvevo/libvevo.h>
 #include <libstream/vj-unicap.h>
-#include <ffmpeg/avutil.h>
+#include <libavutil/avutil.h>
 #include <pthread.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>

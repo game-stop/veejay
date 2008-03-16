@@ -29,8 +29,8 @@
 #define __FALLBACK_LIBDV
 #include <libel/vj-dv.h>
 #endif
-#include <ffmpeg/avcodec.h>
-#include <ffmpeg/log.h>
+#include <libavcodec/avcodec.h>
+#include <libavutil/avutil.h>
 #define YUV420_ONLY_CODEC(id) ( ( id == CODEC_ID_MJPEG || id == CODEC_ID_MJPEGB || id == CODEC_ID_MSMPEG4V3 || id == CODEC_ID_MPEG4) ? 1: 0)
 
 

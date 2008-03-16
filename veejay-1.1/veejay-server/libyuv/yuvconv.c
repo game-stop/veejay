@@ -22,13 +22,13 @@
 #include <libvjmem/vjmem.h>
 #include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
-#include <ffmpeg/swscale.h>
+#include <libswscale/swscale.h>
 #include <aclib/ac.h>
 #include <aclib/imgconvert.h>
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>
-#include <ffmpeg/avutil.h>
-#include <ffmpeg/avcodec.h>
+#include <libavutil/avutil.h>
+#include <libavcodec/avcodec.h>
 /* this routine is the same as frame_YUV422_to_YUV420P , unpack
  * libdv's 4:2:2-packed into 4:2:0 planar 
  * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)

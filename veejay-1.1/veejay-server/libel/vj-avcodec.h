@@ -19,7 +19,7 @@
 #ifndef VJ_AVCODEC_H
 #define VJ_AVCODEC_H
 //bad
-#include <ffmpeg/avcodec.h>
+#include <libavcodec/avcodec.h>
 #include "vj-el.h"
 
 #define ENCODER_MJPEG 0

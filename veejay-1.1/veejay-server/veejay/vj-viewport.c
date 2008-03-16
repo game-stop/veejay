@@ -1279,8 +1279,10 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, const char *ho
 	{
 		res = viewport_configure (v, 16.0, 16.0,
 					     90.0, 16.0,
-					     90.0,90.0,
-					     16.0,90.0,
+						16.0, 90.0,
+						90.0, 90.0,
+					   //  90.0,90.0,
+					 //    16.0,90.0,
 					     x0,y0,w0,h0,
 					     w,h,
 					     1,

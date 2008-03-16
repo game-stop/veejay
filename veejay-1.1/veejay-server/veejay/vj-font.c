@@ -1431,7 +1431,7 @@ void	vj_font_print_credits(void *font, char *text)
 	static const char *license =
 		"This program is licensed as\n     Free Software (GNU/GPL version 2)\n\nFor more information see:\nhttp://veejay.dyne.org\nhttp://www.sourceforge.net/projects/veejay\nhttp://www.gnu.org";
 	static const char *copyr =
-		"(C) 2002-2006 Copyright N.Elburg et all\n";
+		"(C) 2002-2008 Copyright N.Elburg et all\n";
 	//@ create text to print
 	sprintf(text, "This is Veejay version %s\n%s\n%s\n%s",VERSION,intro,copyr,license);
 	

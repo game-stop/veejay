@@ -31,7 +31,7 @@
 #include <libvje/vje.h>
 #include <veejay/vj-viewport.h>
 #include <veejay/vj-composite.h>
-#include <ffmpeg/avutil.h>
+#include <libavutil/avutil.h>
 #include <libyuv/yuvconv.h>
 #include <veejay/vims.h>
 #ifdef STRICT_CHECKING

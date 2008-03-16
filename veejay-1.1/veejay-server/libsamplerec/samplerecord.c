@@ -22,8 +22,8 @@
 #include <libvjmsg/vj-msg.h>
 #include <libsamplerec/samplerecord.h>
 #include <veejay/vj-misc.h>
-#include <ffmpeg/avutil.h>
-#include <ffmpeg/avcodec.h>
+#include <libavutil/avutil.h>
+#include <libavcodec/avcodec.h>
 #include <libel/vj-avcodec.h>
 
 void	sample_reset_encoder(int sample_id);

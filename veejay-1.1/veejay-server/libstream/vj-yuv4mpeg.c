@@ -139,7 +139,7 @@ int vj_yuv_stream_write_header(vj_yuv * yuv4mpeg, editlist * el)
     if (i != Y4M_OK)
 	return -1;
 
-    y4m_log_stream_info(LOG_INFO, "vj-yuv4mpeg", &(yuv4mpeg->streaminfo));
+    y4m_log_stream_info(2, "vj-yuv4mpeg", &(yuv4mpeg->streaminfo));
 
     return 0;
 }

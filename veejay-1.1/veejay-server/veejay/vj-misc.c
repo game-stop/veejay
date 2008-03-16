@@ -39,7 +39,7 @@
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
-#include <ffmpeg/avutil.h>
+#include <libavutil/avutil.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif

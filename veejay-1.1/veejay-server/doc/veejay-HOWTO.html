@@ -5,7 +5,8 @@ Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">
 <meta http-equiv="content-type" content="text/html; charset=UTF-8" >
 <title>veejay HOWTO (work in progress)</title>
 </head>
-<body><div>
+<body>
+<div>
 <h2>Veejay HOWTO</h2>
 Matthijs van Henten ( cola@cb3rob.net )<br>
 Niels Elburg ( nielselburg@yahoo.de )<br>
@@ -17,6 +18,7 @@ v1.4,  24 May 2004<br>
 v2.0,  25 July 2004<br>
 v2.1   27 January 2005<br>
 v2.2   22 April 2005<br>
+v3.0   8 March 2008<br>
 <hr><i>
 This document describes  how to use <b>veejay</b>, a visual 'music' instrument for Linux/GNU </i>
 <dl><hr></dl>
@@ -111,6 +113,8 @@ This document is targeted at the Linux user interested in learning a bit about v
 <dd><dl><dt>Updated Howto to match version 0.7.2</dd></dl></dt>
 <b>Version 2.2</b>
 <dd><dl><dt>Updated Howto to match version 0.8</dd></dl></dt>
+<b>Version 3.0</b>
+<dd><dl><dt>Large rewrite to match version 1.1</dd></dl></dt>
 </p>
 
 <h2><a name="1.5">1.5 New versions of this document</a></h2>
@@ -146,68 +150,127 @@ It allows you to 'play' the video like you would play <b>a Piano</b>
 and it allows you to record the resulting video directly to disk for
 immediate playback (video sampling).<br>
 <br>
-Thus, Veejay can be operated live by using the keyboard (which is 100%
-user definable) and remotely over network (both unicast and multicast)
-using an inhouse message system that allows mapping of various protocols
-on top of it, like OSC (OpenSoundControl). <br><br>
-Veejay is beeing developed in the hope it will be usefull for VJ's,
-media artists and other interested users that want to use Free Software
-for their performances and/or video installations.<br> 
-<br>
-As of version 0.8 Veejay comes with a graphical user interface GVeejay.
-You can use GVeejay to connect (and switch) to any Veejay on the network , alternativly
-it can launch a veejay locally on your machine.<br>
-Use GVeejay to customize keyboard mappings and save the configuration file.<br>
-Gveejay supports hot switching between multiple running instances of veejay,
-simply disconnect and connect to another veejay.<br>
+Veejay consists out of several packages:<br>
+<ul>
+	<li>veejay-server
+	<li>veejay-client
+	<li>veejay-tools
+	<li>veejay-themes
+</ul>
+<table width="300px" border="1">
+<tr>
+	<td width="50px">
+		<b>veejay-server</b>
+	</td>
+	<td>
+		This is veejay
+	</td>
+</tr>
+<tr>
+	<td width="50px">
+		<b>veejay-client</b>
+	</td>
+	<td>
+		This is reloaded, the graphical user interface to veejay
+	</td>
+</tr>
+<tr>	
+	<td width="50px">
+		<b>veejay-tools</b>
+	</td>
+	<td>
+		Commandline utilities to interface with veejay
+	</td>
+</tr>
+<tr>
+	<td width="50px">
+		<b>veejay-themes</b>
+	</td>
+	<td>
+		Themepack for reloaded
+	</td>
+</tr>
+</table>
 </p>
 
 <h2><a name="2.1">2.1 Features</a></h2><p>
 
 <h3>General</h3>
 <ul>
-<li> Free Software (GNU GPL)
-<li> Realtime video mixing from multiple sources
-<li> Native YUV processing
-<li> XML configuration file - and cliplists
-<li> JACK (low latency audio server) support
-<li> SDL video output
-<li> DirectFB secundary head (TV-Out) video output
-<li> Man pages
-<li> Graphical User Interface 'GVeejay'
-</ul>
-<h3>Media</h3>
-<ul>
-<li> MJPEG (Quicktime/Movtar or AVI)
-<li> DV avi type 2 (PAL or NTSC)
-<li> YUV 4:2:0/  4:2:2 AVI support (uncompressed) for lossless editing
-<li> limited support for MPEG4 and Divx;-)
-<li> YUV4MPEG streams 
-<li> Video4Linux support (only Input)
-<li> unicast/multicast video streaming
-</ul>
-<h3>Editing/Mixing</h3>
-<ul>
-<li> Clip based (purely virtual,also called 'Sample')
-<li> Non descructive (Edit Decision List)
-<li> Chained FX Editing (can hold up to 20 effects)
-<li> Over 40 different types of blending
-<li> Chroma / Luma keying
-<li> 110+ image/video effects
-<li> No undo/redo
-<li> Frame accurate navigation/editing
-<li> Cut/Copy/Paste/Crop/Delete editlist portions
-<li> Chainable Veejay's
-<li> Support for trickplay, jamming and jittering
+ <li> Free Software (GNU GPL) 
+ <li> Servent architecture 
+ <li> Soft realtime 
+ <li> Frame accurate 
+ <li> Loop based editing
+ <li> Native YUV processing
+ <li> Crash recovery
 </ul>
 
-<h3>Interaction</h3>
+<h3>Media</h3>
 <ul>
-<li> VIMS (over TCP/IP unicast and UDP multicast)
-<li> sayVIMS (command line utility)
-<li> Dynamic keyboard mappings
-<li> Programmable User Events (Bundled VIMS)
-<li> OSC (over UDP, both unicast and multicast)
+ <li> Codecs: MJPEG,MPNG, DV, YUV (raw)
+ <li> Containers: AVI , Quicktime, rawDV
+ <li> Devices: USB webcams, DV1394, TV capture cards, etc.
+ <li> Support for unlimited capture devices
+ <li> Support for Image files (PNG ,JPEG,TIFF,etc)
+</ul>
+
+<h3>FX processing</h3>
+<ul>
+ <li> 132 built-in FX , many unique and original FX filters 
+ <li> FX chain (20 slots)
+ <li> All FX parameters can be animated.
+ <li> Mix up to two layers per FX slot
+</ul>
+
+<h3>Editing</h3>
+<ul>
+ <li> Non destructive edit decision lists (cut/copy/paste/crop video)
+ <li> Simple text editor 
+ <li> Sample editor
+ <li> Sequence editor
+ <li> Live disk recorder (sampling)
+ <li> Full deck save/restore
+ <li> Live clip loading 
+ <li> Live sample sequencing
+ <li> VIMS event recording/playback (6)
+ <li> Various looping modes including bounce looping
+ <li> Playback speed and direction
+ <li> Video scratching
+ <li> Change in-and out points of a sample (marker)
+ <li> Slow motion audio / video (7)
+ <li> Fast motion audio / video
+ <li> Dynamic framerate 
+ <li> Random frame play
+ <li> Random sample play
+ <li> Access up to 4096 video samples instantly	
+ <li> Full screen or windowed mode
+ <li> Perspective and foward projection
+</ul>
+
+<h3>Output</h3>
+<ul>
+ <li> Audio trough Jack (low latency audio server) (8)
+ <li> SDL and OpenGL video
+ <li> Headless
+ <li> YUV4MPEG streaming
+ <li> Network streaming (unicast and multicast)
+ <li> Preview rendering
+</ul>
+
+<h3>Input</h3>
+<ul>
+ <li> Programmable keyboard interface
+ <li> VIMS (tcp/ip) 
+ <li> OSC (udp)
+ <li> PureData trough sendVIMS external
+ <li> Full screen or windowed mode
+</ul>
+
+<h3>Plugin systems</h3>
+<ul>
+ <li> Support for FreeFrame plugins
+ <li> Support for Frei0r plugins
 </ul>
 
 </p>
@@ -239,9 +302,12 @@ your project. If you are going to use the recording functions, make sure you hav
 Before you install Veejay, you should install the following software packages.
 Although none of them is required, Veejay will be much less usable without them.<br>
 <ul> 
+<li>(required) mjpegtools >= 1.9.0
+<li>(required) The XML C library 2 for gnome >= 2.5.4
+<li>(required) libunicap >= 0.2.0
+<li>(required) ffmpeg (libavcodec, etc) >= 0.50.0
 <li>(optional) libdv >= 1.02 
 <li>(optional) The SDL library >= 1.2.3
-<li>(optional) The XML C library 2 for gnome >=2.5.4
 <li>(optional) JACK low latency audio server >= 0.98.1
 <li>(optional) DirectFB >= 0.9.17
 <li>(optional) FreeType >= 2.1.9 
@@ -251,8 +317,45 @@ Although none of them is required, Veejay will be much less usable without them.
 <i>On newer distributions, some of the listed software is already installed but you may be missing the -devel- packages! (especially on redhat, suse and debdian systems!!)</i><br><br>
 You can find the websites of these projects in <a href="veejay-HOWTO.html#6">Other Resources</a>.<br><br>
 </p>
+<h3><a name="3.1.0">3.1.0 From source</a></h3><p>
+You can compile the following packages from source if your distribution does not include them:<br>
+<ul>
+<li>libavcodec, libavutil, libswscale and libavformat from the FFmpeg project
+<li>mjpegtools
+<li>unicap
+<li>gtkcairo
+</ul>
+<br>
+<h4>FFmpeg</h4>
+<p>
+You can download the ffmpeg sources from the SVN repository via <a href="http://ffmpeg.sourceforge.net">http://ffmpeg.sourecforge.net"</a>
+After downloading and unpacking the source tarball, run the configure script with the following options:<br>
+<pre>
+$ ./configure --enable-swscaler --enable-shared --enable-gpl
+...
+$ make
+# make install
+</pre>
+</p>
+</p>
+<h4>MjpegTools, Unicap</h4>
+You can download the MjpegTools from <a href="http://mjpeg.sourceforge.net">http://mjpeg.sourceforge.net</a><br>
+and the Unicap Imaging library from <a href="http://unicap.sourceforge.net">http://unicap.sourceforge.net</a><br>
+<br>
+Compilation of both packages is straightforward , in general the following will do it:<br>
+<pre>
+$ ./configure && make
+# make install
+</pre>
+</p>
+<h4>GtkCairo</h4>
+<p>
+	GtkCairo is available from the veejay repository.
+<pre>
+</pre>
+</p>
 <h2><a name="3.2">3.2 Installing veejay</a></h2><p>
-Verify that the PKG_CONFIG_PATH variable is set to the directory containing files like jack.pc and directfb.pc to include them in the build process.
+Verify that the PKG_CONFIG_PATH variable is set to the directory containing files like jack.pc and directfb.pc to include them in the build process. If it is not set , the configure script will abort with an error message.
 <pre>
 $ echo $PKG_CONFIG_PATH   
 </pre>
@@ -262,51 +365,54 @@ $ export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
 </pre>
 Decompress and untar the file by typing:
 <pre>
-$ tar -jxvf veejay-0.8.x.tar.bz2
+$ tar -jxvf veejay-1.1.x.tar.bz2
 </pre>
 Change to the directory containing veejay's source's:
 <pre>
-$ cd veejay-0.8.x
+$ cd veejay-1.1.x
 
 $ ./configure
 </pre>
 On completion it will summarize the results of the ./configure script, which could look like this:
 <pre>
+configure:  Veejay 1.1 build configuration :
 configure: 
-configure:  Veejay 0.8.0 build configuration :
-configure: 
-configure:  Compiler flags: -march=pentium4 -mcpu=pentium4 -fno-common -O2 -fomi
-t-frame-pointer -malign-double -mfpmath=sse -Wall -Wunused 
+configure:  Compiler flags: -march=pentium4 -mtune=pentium4  -msse -mfpmath=sse 
+configure:                  -fif-conversion
+configure:                      -O3
 configure: 
 configure:  Architecture: i686 
 configure: 
 configure:    x86  
-configure:     MMX     enabled     : true
-configure:     MMX2    enabled     : false
-configure:     SSE     enabled     : true
-configure:     SSE2    enabled     : true
-configure:     3DNOW   enabled     : false
-configure:     CMOV    enabled     : true
-configure:     Nasm    enabled     : true
+configure:     MMX     enabled     : yes
+configure:     MMX2    enabled     : yes
+configure:     SSE     enabled     : yes
+configure:     SSE2    enabled     : yes
+configure:     3DNOW   enabled     : no
+configure:     CMOV    enabled     : yes
 configure: 
 configure:    Platform: Linux
 configure: 
 configure:  Required dependencies:
 configure:   - POSIX Threads (pthread)       : true
+configure:   - MJPEGTools                        : true
+configure:   - AVI MJPEG playback/recording  : true (always)
+configure:   - FFmpeg AVFormat               : true 
+configure:   - FFmpeg AVCodec                : true 
+configure:   - FFmpeg Swscaler           : true 
 configure:  Optional dependencies
-configure:   - video4linux                   : true
 configure:   - SDL support                   : true
 configure:   - DirectFB support              : false
-configure:   - AVI MJPEG playback/recording  : true (always)
-configure:   - libDV (digital video) support : true
+configure:   - OpenGL support                : false
+configure:   - libDV (digital video) support : false 
+configure:   - QuickTime support             : false 
+configure:   - Unicap Imaging                : true 
+configure:   - video4linux                   : true
 configure:   - JPEG support                  : true 
-configure:   - jack                          : false
-configure:   - xml c library for gnome       : true
-configure:   - freetype support              : true
-configure: 
-configure:    - GVeejay UI
-configure:      share : ${prefix}/share/veejay
-
+configure:   - GDK Pixbuf support            : true
+configure:   - Jack Audio Connection Kit     : false
+configure:   - XML c library for Gnome       : true
+configure:   - Freetype support              : true
 </pre>
 Now, you can start building veejay
 <pre>
@@ -343,8 +449,8 @@ Next, Veejay can be started with the commandline flags
 </p>
 
 <h2><a name="4">4. Using Veejay</a></h2><p>
-Veejay uses by default a SDL window to play a video file or video stream,
-all the keybinding in veejay depend on SDL; if you move your mouse over to the
+Veejay uses by default a SDL window to play the video.
+All the keybinding in veejay depend on SDL; if you move your mouse over to the
 SDL windows to focus it , you can press the keys explained in <a href="veejay-HOWTO.html#4.3">4.3 The keyboard interface</a>.<br>
 To use veejay in commandline style interface mode, see  
 <a href="veejay-HOWTO.html#4.2">4.2 sayVIMS</a>.<br>
@@ -353,7 +459,11 @@ using the '-d' commandline parameter:<br>
 <pre>
 $ veejay -d
 </pre>
-
+<br>
+To use the graphical client with veejay:
+<pre>
+$ reloaded -h localhost
+</pre>
 <br>
 </p>
 <h2><a name="4.1">4.1 Terminology and limitations</a></h2><p>
@@ -364,16 +474,16 @@ the first loaded movie). All movies loaded must have identical properties, other
 This limitation is also valid when streaming video from veejay to another veejay.<br>
 
 <br><br>
-<table border=0 width=80%>
+<table border="1">
 <caption><h4>Playback modes in veejay</h4></caption>
 
 <tr>
-<td><i>Mode</i></td>
-<td><i>Description</i></td>
-<td><i>Navigation</i></td>
-<td><i>Looping</i></td>
-<td><i>Speed</i></td>
-<td><i>Effect Chain</i></td>
+<td width="50px"><i>Mode</i></td>
+<td width="100px"><i>Description</i></td>
+<td width="50px"><i>Navigation</i></td>
+<td width="50px"><i>Looping</i></td>
+<td width="50px"><i>Speed</i></td>
+<td width="50px"><i>Effect Chain</i></td>
 </tr>
 
 <tr>

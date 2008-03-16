@@ -35,7 +35,7 @@
 #ifdef USE_GDK_PIXBUF
 #include <libel/pixbuf.h>
 #endif
-#include <ffmpeg/avcodec.h>
+#include <libavcodec/avcodec.h>
 #ifdef HAVE_LIBQUICKTIME
 #include <quicktime.h>
 #include <lqt.h>
@@ -1054,13 +1054,13 @@ int lav_read_frame(lav_file_t *lav_file, uint8_t *vidbuf)
 #endif
    int kf = 1;	
    int ret = (AVI_read_frame(lav_file->avi_fd,vidbuf,&kf));
-
+/*
    if(!kf)
    {
-	veejay_msg(0, "Requested frame is not a keyframe");
-	return -1;
+//	veejay_msg(0, "Requested frame is not a keyframe");
+	return ret;
    }
-
+*/
    return ret;
 
 }

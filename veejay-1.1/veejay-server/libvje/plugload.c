@@ -40,8 +40,8 @@
 #include <libvje/vje.h>
 #include <libvevo/libvevo.h>
 #include <libyuv/yuvconv.h>
-#include <ffmpeg/avutil.h>
-#include <ffmpeg/avcodec.h>
+#include <libavutil/avutil.h>
+#include <libavcodec/avcodec.h>
 #include <libvevo/vevo.h>
 #include <libvje/plugload.h>
 #include <stdlib.h>

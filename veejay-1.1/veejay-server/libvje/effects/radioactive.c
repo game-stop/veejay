@@ -33,7 +33,7 @@
 #include "radioactive.h"
 #include "softblur.h"
 #include <libyuv/yuvconv.h>
-#include <ffmpeg/avutil.h>
+#include <libavutil/avutil.h>
 #include "common.h"
 #include <stdlib.h>
 
