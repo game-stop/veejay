@@ -46,7 +46,6 @@ int    _effect_get_minmax( int effect_id, int *min, int *max, int index );
 void   vj_gui_cb(int state, char *hostname, int port_num);
 void	gveejay_preview(int p);	
 int     is_button_toggled(const char *name);	
-GdkPixbuf       *vj_gdk_pixbuf_scale_simple( const GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
 gchar	*_utf8str( const char *c_str );
 void	find_user_themes();
 int	gveejay_user_preview();

@@ -54,6 +54,8 @@ static struct
  {	NULL 	}
 };
 
+extern void	reloaded_launcher( char *h, int p );
+
 static void usage(char *progname)
 {
         printf( "Usage: %s <options>\n",progname);
@@ -66,7 +68,6 @@ static void usage(char *progname)
 	printf( "-s\t\tSet bank resolution (row X columns)\n");
 	printf( "-P\t\tStart with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)\n");
         printf( "-X\t\tSet number of tracks\n");
-	printf( "-G\t\tStart with threads\n");
 	printf( "\n\n");
         exit(-1);
 }
@@ -86,10 +87,6 @@ static int      set_option( const char *name, char *value )
 	else if (strcmp(name, "n") == 0 )
 	{
 		veejay_set_colors(0);
-	}
-	else if (strcmp(name, "G") == 0 )
-	{
-		use_threads = 1;
 	}
 	else if (strcmp(name, "X") == 0 )
 	{
@@ -195,7 +192,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	sprintf(hostname, "127.0.0.1");
 
-        while( ( n = getopt( argc, argv, "s:h:p:tnvHGf:X:P:q")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:q")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
@@ -205,13 +202,13 @@ int main(int argc, char *argv[]) {
                 err ++;
 
         if( err ) usage(argv[0]);
-
+/*
 	if( !g_thread_supported() )
 	{
-	veejay_msg(2, "Initializing GDK threads");
+	    veejay_msg(2, "Initializing GDK threads");
 	     g_thread_init(NULL);
 	     gdk_threads_init();                   // Called to initialize internal mutex "gdk_threads_mutex".
-        }
+        }*/
 
 	gtk_init( NULL,NULL );
 	glade_init();
@@ -244,13 +241,20 @@ int main(int argc, char *argv[]) {
 		veejay_msg(VEEJAY_MSG_INFO, "Starting with preview enabled");
 		gveejay_preview(preview);
 	}
-
-	gtk_idle_add_priority( GTK_PRIORITY_DEFAULT,
-		gveejay_idle,
-		NULL );
+	if( launcher )
+	{
+		reloaded_launcher( hostname, port_num );
+	}
 
 	memset( &time_last_, 0, sizeof(struct timeval));
-	gtk_main();
+
+	while(gveejay_running()) {
+		gveejay_idle(NULL);
+		while( gtk_events_pending()  ) 
+			gtk_main_iteration();
+
+	}
+
 
 	return 0;  
 }

@@ -105,6 +105,9 @@ static	void	update_pos( void *data, gint total, gint current );
 static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gpointer user_data);
 
 
+extern GdkPixbuf       *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
+
+
 static	void	gtk_image_set_from_pixbuf__( GtkImage *w, GdkPixbuf *p, const char *f, int l )
 {
 	gtk_image_set_from_pixbuf(w, p);
@@ -933,10 +936,14 @@ void		multitrack_configure( void *data, float fps, int video_width, int video_he
 	mt->height = video_height;
 	float r = (float)mt->width / (float) mt->height;
 	mt->aspect_ratio = r;
-	if(mt->width > 360 || mt->height > 288 )
-	{
+
+	if( mt->height > 300 ) {
+		mt->height = 288;
+		mt->width  = (int) ( (float) mt->height * r );
+	}
+	if( mt->width > 360 ) {
 		mt->width = 352;
-		mt->height = (mt->width / r );
+		mt->height = mt->width / r;
 	}
 
 	mt->width = RUP8(mt->width);
@@ -1021,9 +1028,7 @@ void		multitrack_release_track(void *data, int id, int release_this )
 
 	//release this: track um
 
-	gvr_ext_lock(mt->preview);
 	stream_id = gvr_get_stream_id( mt->preview, release_this );
-	gvr_ext_unlock(mt->preview); 
 	if(stream_id > 0)
 		gvr_queue_mvims( mt->preview, id, VIMS_STREAM_DELETE,stream_id );
 }
@@ -1038,10 +1043,8 @@ void		multitrack_bind_track( void *data, int id, int bind_this )
 	if( id < 0 || id > MAX_TRACKS )
 		return;
 
-	gvr_ext_lock(mt->preview);
 	char *host = gvr_track_get_hostname( mt->preview, bind_this );
 	int   port = gvr_track_get_portnum ( mt->preview, bind_this );
-	gvr_ext_unlock(mt->preview);
 
 	if( host != NULL && port > 0 )
 		gvr_queue_cxvims( mt->preview, id, VIMS_STREAM_NEW_UNICAST, port, (unsigned char*)host );
@@ -1077,10 +1080,8 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 		vj_gui_disable();		
 	
 		// hostname, port_num from gvr
-		gvr_ext_lock(mt->preview);
 		char *host = gvr_track_get_hostname( mt->preview, v->num );
 		int   port = gvr_track_get_portnum ( mt->preview, v->num );
-		gvr_ext_unlock(mt->preview);
 
 		if(!host || port <= 0 )
 		{

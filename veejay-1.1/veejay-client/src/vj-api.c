@@ -432,7 +432,6 @@ typedef struct
 	int		quality;
 	int		preview_locked;
 	void		*midi;
-	int		threaded;
 	struct timeval	time_last;
 } vj_gui_t;
 
@@ -871,10 +870,6 @@ static void scan_devices( const char *name)
 	free(text);
 
 	gtk_tree_view_set_model(GTK_TREE_VIEW(tree), model );
-}
-
-int	ui_threaded(void) {
-	return info->threaded;
 }
 
 void	on_devicelist_row_activated(GtkTreeView *treeview, 
@@ -1819,7 +1814,6 @@ gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 	}
 	
 	running_g_ = 0;
-	gtk_main_quit();
 
 	return FALSE;
 }
@@ -3645,24 +3639,10 @@ static	void	select_slot__( int pm )
 #ifdef STRICT_CHECKING
 	assert( history != NULL );
 #endif
-	info->selected_slot = NULL;
-	info->selected_gui_slot = NULL;
+	int poke_slot = 0;
+	int bank_page = 0;
 
-
-	if(info->status_tokens[CURRENT_ID] != history[CURRENT_ID] ||
-		pm != history[PLAY_MODE] )
-	{
-		if(info->selected_slot)
-		{
-		//	set_activation_of_slot_in_samplebank(FALSE);
-			
-			info->selected_slot= NULL;
-			info->selected_gui_slot=NULL;
-		}
-	}
-
-
-	if( pm != MODE_PLAIN )
+	if( pm == MODE_SAMPLE || pm == MODE_STREAM  )
 	{
 		int b = 0; int p = 0;
 		/* falsify activation */
@@ -3671,23 +3651,28 @@ static	void	select_slot__( int pm )
 			if(verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID],
 				info->status_tokens[PLAY_MODE] ))
 			{	
-				if( !info->selected_slot ) {
-					info->selected_slot = info->sample_banks[b]->slot[p];
-					info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
-					set_activation_of_slot_in_samplebank(TRUE);
-				} else if ( info->selected_slot->sample_type != pm || info->selected_slot->sample_id !=
+				if( info->selected_slot ) {			
+				if ( info->selected_slot->sample_type != pm || info->selected_slot->sample_id !=
 						info->status_tokens[CURRENT_ID] ) {
 					set_activation_of_slot_in_samplebank(FALSE);
-					info->selected_slot = info->sample_banks[b]->slot[p];
-					info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
-					set_activation_of_slot_in_samplebank(TRUE);
 				}
+				}
+				info->selected_slot = info->sample_banks[b]->slot[p];
+				info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
+				set_activation_of_slot_in_samplebank(TRUE);
 			}
+			/*bank_page =  find_bank_by_sample( info->status_tokens[CURRENT_ID], pm, &poke_slot );
+
+			info->selected_slot=  info->sample_banks[bank_page]->slot[poke_slot];
+			info->selected_gui_slot= info->sample_banks[bank_page]->gui_slot[poke_slot];*/
+
 		}	
 	}
-
-	if( !info->selected_slot )
+	else {
 		set_activation_of_slot_in_samplebank(FALSE);
+		info->selected_slot = NULL;
+		info->selected_gui_slot = NULL;
+	}
 }
 
 static	void	select_slot_(int pm, const char *f, int line)
@@ -5120,22 +5105,34 @@ void	get_gd(char *buf, char *suf, const char *filename)
 		sprintf(buf, "%s/%s/" , dir, suf);
 }
 
-GdkPixbuf	*vj_gdk_pixbuf_scale_simple( const GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type )
+GdkPixbuf	*vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type )
 {
+#ifdef STRICT_CHECKING
+	assert( GDK_IS_PIXBUF(src));
+#endif
+	return gdk_pixbuf_scale_simple( src,dw,dh,inter_type );
+/*
 	GdkPixbuf *res = gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, dw, dh );
+#ifdef STRICT_CHECKING
+	assert( GDK_IS_PIXBUF( res ) );
+#endif
 	uint8_t *res_out = gdk_pixbuf_get_pixels( res );
 	uint8_t *src_in  = gdk_pixbuf_get_pixels( src );
 	uint32_t src_w   = gdk_pixbuf_get_width( src );
 	uint32_t src_h   = gdk_pixbuf_get_height( src );
-	VJFrame *src1 = yuv_rgb_template( src_in, src_w, src_h, PIX_FMT_RGB24 );
-	VJFrame *dst1 = yuv_rgb_template( res_out, dw, dh, PIX_FMT_RGB24 );
+	int dst_w = gdk_pixbuf_get_width( res );
+	int dst_h = gdk_pixbuf_get_height( res );
+	VJFrame *src1 = yuv_rgb_template( src_in, src_w, src_h, PIX_FMT_BGR24 );
+	VJFrame *dst1 = yuv_rgb_template( res_out, dst_w, dst_h, PIX_FMT_BGR24 );
 
-	yuv_convert_any( src1,dst1, src1->format, dst1->format );
+	veejay_msg(0, "%s: %dx%d -> %dx%d", __FUNCTION__, src_w,src_h,dst_w,dst_h );
+
+	yuv_convert_any_ac( src1,dst1, src1->format, dst1->format );
 
 	free(src1);
 	free(dst1);
 
-	return res;
+	return res;*/
 }
 
 
@@ -5239,25 +5236,49 @@ int		veejay_update_multitrack( void *data )
 		{
 			if( i == s->master )
 			{
-				if( s->widths[i] >= 350 || s->widths[i] >= info->el.width )
-				{
-					gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), s->img_list[i] );
+#ifdef STRICT_CHECKING
+				assert( s->widths[i] > 0 );
+				assert( s->heights[i] > 0 );
+				assert( GDK_IS_PIXBUF( s->img_list[i] ) );
+#endif
+			//	GdkPixbuf *result = vj_gdk_pixbuf_scale_simple( s->img_list[i],352,288, GDK_INTERP_NEAREST );
+			//	gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), result );
+			//	gdk_pixbuf_unref(result);
+
+			//	GdkPixbuf *result = vj_gdk_pixbuf_scale_simple( s->img_list[i],352,288, 0 );
+			//	gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), result );
+			//	gdk_pixbuf_unref(result);
+
+				if( gdk_pixbuf_get_height(s->img_list[i]) >= 255 ||
+				    gdk_pixbuf_get_width(s->img_list[i]) >= 320 ) 
+				gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), s->img_list[i] );
+				else {
+				GdkPixbuf *result = vj_gdk_pixbuf_scale_simple( s->img_list[i],352,288, GDK_INTERP_NEAREST );
+				gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), result );
+				gdk_pixbuf_unref(result);
+
 				}
-				else
+				
+
+				vj_img_cb( s->img_list[i] );
+			} 
+			//	}
+			/*	else
 				{
 					GdkPixbuf *result = vj_gdk_pixbuf_scale_simple( s->img_list[i],preview_box_w_,preview_box_h_, 0 );
 					gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), result );
 					gdk_pixbuf_unref(result);
-				}
-				vj_img_cb( s->img_list[i] );
-			}
+				}*/
+			//	vj_img_cb( s->img_list[i] );
+			
 			if(deckpage == 2)
 				multitrack_update_sequence_image( gui->mt, i, s->img_list[i] );
 
 			gdk_pixbuf_unref( s->img_list[i] );
 		} else {
-			if( i == s->master )
+			if( i == s->master ) {
 				multitrack_set_logo( gui->mt, maintrack );
+			}
 		}
 	}
 	free(s->status_list);
@@ -5905,15 +5926,16 @@ int	vj_img_cb(GdkPixbuf *img )
 	int i;
 	if( !info->selected_slot || !info->selected_gui_slot )
 	{
+//DM
 		return 0;
 	}
 	int sample_id = info->status_tokens[ CURRENT_ID ];
 	int sample_type = info->status_tokens[ PLAY_MODE ]; 
 	
 	if( info->selected_slot->sample_type != sample_type || info->selected_slot->sample_id !=
-			sample_id )
+			sample_id ) {
 		return 0;
-
+	}
 	if( sample_type == MODE_SAMPLE || sample_type == MODE_STREAM )
 	{
 		sample_slot_t *slot = find_slot_by_sample( sample_id, sample_type );
@@ -5925,7 +5947,7 @@ int	vj_img_cb(GdkPixbuf *img )
 				info->image_dimensions[0],info->image_dimensions[1], GDK_INTERP_NEAREST);
 			gtk_image_set_from_pixbuf_( GTK_IMAGE( gui_slot->image ), slot->pixbuf );
 			gdk_pixbuf_unref( slot->pixbuf );
-		} 
+		}
 
 	}
 
@@ -6039,8 +6061,6 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	{
 		return;
 	}
-
-	gui->threaded = use_threads;
 
 	veejay_memset( gui->status_tokens, 0, STATUS_TOKENS );
 	veejay_memset( gui->sample, 0, 2 );
@@ -6372,10 +6392,18 @@ static	void	veejay_stop_connecting(vj_gui_t *gui)
 	gtk_widget_show( mw );
 }
 
+void	reloaded_launcher(char *hostname, int port_num)
+{
+	info->watch.state = STATE_RECONNECT;
+	put_text( "entry_hostname", hostname );
+	update_spin_value( "button_portnum", port_num );
+}
+
+
+
 void			reloaded_schedule_restart()
 {
 	info->watch.state = STATE_STOPPED;
-	veejay_msg(VEEJAY_MSG_WARNING, "Reloaded is shutting down.");
 }
 
 void			reloaded_restart()
@@ -6474,7 +6502,6 @@ gboolean		is_alive( int *do_sync )
 
 void	vj_gui_disconnect()
 {
-	veejay_msg(0,"Disconnecting ...");
 	if(info->key_id)
 		gtk_key_snooper_remove( info->key_id );
 	free_samplebank();

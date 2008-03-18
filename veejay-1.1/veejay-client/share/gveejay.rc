@@ -112,7 +112,9 @@ class "GtkButton" style "buttons"
 class "GtkSpinButton" style "buttons"
 class "GtkToggleButton" style "buttons"
 class "GtkCheckBox" style "buttons"
-
+widget_class "*GtkTree*" style "text"
 class "GtkLabel" style "text"
-
+class "*List" style "text"
+class "GtkListItem" style "text"
+class "*GtkCList*" style "text"
 class "GtkWidget" style "default"
