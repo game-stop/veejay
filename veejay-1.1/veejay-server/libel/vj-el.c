@@ -1151,7 +1151,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 				VJFrame *dsti = yuv_yuv_template( dst[0],dst[1],dst[2], el->video_width,
 							el->video_height, get_ffmpeg_pixfmt( out_pix_fmt));
 
-				yuv_convert_any( srci, dsti, srci->format, dsti->format );
+				yuv_convert_any_ac( srci, dsti, srci->format, dsti->format );
 
 				free(srci);
 				free(dsti);
@@ -1165,7 +1165,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 							el->video_height, PIX_FMT_YUV422P );
 				VJFrame *dsti = yuv_yuv_template( dst[0],dst[1], dst[2], el->video_width,
 							el->video_height, get_ffmpeg_pixfmt( out_pix_fmt));
-				yuv_convert_any( srci,dsti, srci->format, dsti->format );
+				yuv_convert_any_ac( srci,dsti, srci->format, dsti->format );
 				free(srci);
 				free(dsti);
 			}

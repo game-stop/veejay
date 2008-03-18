@@ -383,7 +383,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 		VJFrame *srci= yuv_yuv_template( src[0],src[1],src[2], av->width,av->height, get_ffmpeg_pixfmt( av->out_fmt));
 		VJFrame *dsti= yuv_yuv_template( dst,dst+av->len,dst+av->len+(av->len/4), av->width,av->height, PIX_FMT_YUV420P );
 
-		yuv_convert_any( srci,dsti, srci->format, dsti->format );
+		yuv_convert_any_ac( srci,dsti, srci->format, dsti->format );
 
 		free(srci);
 		free(dsti);
@@ -446,7 +446,7 @@ int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[
 		VJFrame *dsti = yuv_yuv_template( av->data[0],av->data[1],av->data[2],av->context->width,av->context->height,
 				   av->context->pix_fmt );
 
-		yuv_convert_any( srci,dsti, srci->format, dsti->format );
+		yuv_convert_any_ac( srci,dsti, srci->format, dsti->format );
 
 		free(srci);
 		free(dsti);

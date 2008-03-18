@@ -62,6 +62,37 @@ static  int		    ffmpeg_aclib[64];
 
 #define	put(a,b)	ffmpeg_aclib[a] = b
 
+static struct {
+	int i;
+	char *s;
+} pixstr[] = {
+	{PIX_FMT_YUV420P, "PIX_FMT_YUV420P"},
+{	PIX_FMT_YUV422P, "PIX_FMT_YUV422P"},
+{	PIX_FMT_YUVJ420P, "PIX_FMT_YUVJ420P"},
+{	PIX_FMT_YUVJ422P, "PIX_FMT_YUVJ422P"},
+{	PIX_FMT_RGB24,	  "PIX_FMT_RGB24"},
+{	PIX_FMT_BGR24,	  "PIX_FMT_BGR24"},
+{	PIX_FMT_YUV444P,  "PIX_FMT_YUV444P"},
+{	PIX_FMT_YUVJ444P, "PIX_FMT_YUVJ444P"},
+{	PIX_FMT_RGB32,		"PIX_FMT_RGB32"},
+{	PIX_FMT_BGR32,		"PIX_FMT_BGR32"},
+{	PIX_FMT_GRAY8,		"PIX_FMT_GRAY8"},
+{	PIX_FMT_RGB32_1,	"PIX_FMT_RGB32_1"},
+{	0	,		NULL}
+
+};
+
+void	yuv_pixstr( const char *s, char *s2, int fmt ) {
+	char *str = NULL;
+	int i;
+	for( i = 0; pixstr[i].s != NULL ; i ++ )
+		if( fmt == pixstr[i].i ) str = pixstr[i].s;
+	if( str ) 
+		veejay_msg(0, "%s: %s format %d : %s", s,s2,fmt, str );
+	else
+		veejay_msg(0, "%s: format %d invalid", s, fmt );
+}
+
 void	yuv_init_lib()
 {
 	sws_context_flags_ = yuv_sws_get_cpu_flags();
@@ -140,7 +171,6 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 		break;
 	}
 
-
 	return f;
 }
 
@@ -215,14 +245,20 @@ void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 			dst->data, ffmpeg_aclib[ dst_fmt] , dst->width,dst->height ))
 	{
 		veejay_msg(VEEJAY_MSG_WARNING,
-			"Unable to convert image %dx%d in %x to %dx%d in %x, using fallback",
+			"Unable to convert image %dx%d in %x to %dx%d in %x!",
 				src->width,src->height,src_fmt,
 				dst->width,dst->height,dst_fmt );
-		yuv_convert_any( src,dst, src_fmt,dst_fmt );
+		yuv_pixstr( __FUNCTION__, "src_fmt", src_fmt );
+		yuv_pixstr( __FUNCTION__, "dst_fmt", dst_fmt );
+
 	}
 }
+/*
 void	yuv_convert_any( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 {
+	yuv_pixstr( __FUNCTION__, "src_fmt", src_fmt );
+	yuv_pixstr( __FUNCTION__, "dst_fmt", dst_fmt );
+		
 #ifdef STRICT_CHECKING
 	assert( dst_fmt >= 0 && dst_fmt < 32 );
 	assert( src_fmt == PIX_FMT_YUV420P || src_fmt == PIX_FMT_YUVJ420P ||
@@ -248,7 +284,7 @@ void	yuv_convert_any( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 	sws_scale( ctx, src->data, src->stride,0, src->height,dst->data, dst->stride );
 
 	sws_freeContext( ctx );
-}
+}*/
 
 void	*yuv_fx_context_create( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 {

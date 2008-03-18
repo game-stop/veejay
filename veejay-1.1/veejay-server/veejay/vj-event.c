@@ -7810,16 +7810,12 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	w = args[0]; 
 	h = args[1];
 
-	if ( w > 512 ) w = 512; 
-	if ( h > 512 ) h = 512;
-	
-	if( w <= 0 || h <= 0 )
+	if( w <= 0 || h <= 0 || w >= 2000 || h >= 2000 )
 	{
 		veejay_msg(0, "Invalid image dimension %dx%d requested",w,h );
 		SEND_MSG(v, "0000000" );
 		return;
 	}
-
 	veejay_image_t *img = NULL;
 
 	VJFrame frame;
@@ -7830,7 +7826,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	int full444 =  (v->settings->composite);
 	if( v->video_out == 4 )
 		full444 = 1; 
-	
+
 	//@ fast*_picture delivers always 4:2:0 data to reduce bandwidth
 	if( use_bw_preview_ )
 		vj_fastbw_picture_save_to_mem(
@@ -7847,10 +7843,12 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 
 	int input_len = (use_bw_preview_ ? ( w * h ) : (( w * h ) + ((w * h)/2)) );
 
+
 	char header[8];
 	sprintf( header, "%06d%1d", input_len, use_bw_preview_ );
 	SEND_DATA(v, header, 7 );
 	SEND_DATA(v, vj_perform_get_preview_buffer(), input_len );
+
 }
 #endif
 

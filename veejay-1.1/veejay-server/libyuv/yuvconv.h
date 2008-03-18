@@ -113,7 +113,7 @@ void	yuv_free_lib();
 
 void	yuv_convert_ac( VJFrame *src, VJFrame *dst, int a, int b );
 
-void	yuv_convert_any( VJFrame *src, VJFrame *dst, int a, int b );
+//void	yuv_convert_any( VJFrame *src, VJFrame *dst, int a, int b );
 
 void	yuv_convert_any3( VJFrame *src,int strides[], VJFrame *dst, int a, int b );
 

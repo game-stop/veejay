@@ -246,7 +246,7 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 						v->in_width,v->in_height, get_ffmpeg_pixfmt( v->in_fmt ));
 		VJFrame *b = yuv_yuv_template( buffer[0],buffer[1], buffer[2], 
 						v->cur_width,v->cur_height,get_ffmpeg_pixfmt(v->cur_fmt));
-		yuv_convert_any(a,b, a->format,b->format );
+		yuv_convert_any_ac(a,b, a->format,b->format );
 		free(a);
 		free(b);
 	}	

@@ -119,7 +119,7 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
 	VJFrame *srci = yuv_yuv_template( src[0],src[1],src[2], info->video_output_width,
 					info->video_output_height , PIX_FMT_YUV422P);
 
-	yuv_convert_any( srci,&tmp, srci->format, tmp.format );
+	yuv_convert_any_ac( srci,&tmp, srci->format, tmp.format );
 
     	free(srci);
     }

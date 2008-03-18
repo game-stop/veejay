@@ -2321,7 +2321,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], width,height,
 						get_ffmpeg_pixfmt( vj_tag_input->pix_fmt ));
 
-			yuv_convert_any( srci,dsti, srci->format, dsti->format );
+			yuv_convert_any_ac( srci,dsti, srci->format, dsti->format );
 			
 			free(srci);
 			free(dsti);

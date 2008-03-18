@@ -99,7 +99,7 @@ static	VJFrame *open_pixbuf( const char *filename, int dst_w, int dst_h, int dst
 	veejay_msg(VEEJAY_MSG_DEBUG,"Image is %dx%d (src=%d, stride=%d, dstfmt=%d), scaling to %dx%d",
 				src->width,src->height,img_fmt, stride,dst_fmt,dst->width,dst->height );
 
-	yuv_convert_any( src, dst, src->format, dst->format );
+	yuv_convert_any_ac( src, dst, src->format, dst->format );
 	
 	gdk_pixbuf_unref( image ); 
 	
@@ -345,7 +345,7 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 				   PIX_FMT_RGB24
 			);
 
-	yuv_convert_any( src, dst, fmt, PIX_FMT_RGB24 );
+	yuv_convert_any_ac( src, dst, fmt, PIX_FMT_RGB24 );
 	
 	if( gdk_pixbuf_savev( img_, pic->filename, pic->type, NULL, NULL, NULL ))
 	{
