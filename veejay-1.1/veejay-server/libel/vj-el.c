@@ -652,7 +652,6 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	    /* Debug Output */
 	if(n == 0 )
 	{
-	    veejay_msg(VEEJAY_MSG_INFO,"First video file determines video settings! Using %s", filename);
 	    veejay_msg(VEEJAY_MSG_DEBUG,"\tFull name:       %s", filename, realname);
 	    veejay_msg(VEEJAY_MSG_DEBUG,"\tFrames:          %ld", lav_video_frames(el->lav_fd[n]));
 	    veejay_msg(VEEJAY_MSG_DEBUG,"\tWidth:           %d", lav_video_width(el->lav_fd[n]));
@@ -966,7 +965,7 @@ void	vj_el_get_video_fourcc(editlist *el, int num, char *fourcc)
 #else
 	if (num < 0)
 		num = 0;
-	if (num >= el->video_frames)
+	else if (num >= el->video_frames)
 		num = el->video_frames-1;
 #endif
 	n = el->frame_list[ num ];
@@ -1150,7 +1149,6 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 							el->video_height, PIX_FMT_YUV420P );
 				VJFrame *dsti = yuv_yuv_template( dst[0],dst[1],dst[2], el->video_width,
 							el->video_height, get_ffmpeg_pixfmt( out_pix_fmt));
-
 				yuv_convert_any_ac( srci, dsti, srci->format, dsti->format );
 
 				free(srci);
@@ -1803,8 +1801,12 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	{
 		/* Check if file really exists, is mounted etc... */
 		struct stat fileinfo;
-		if(stat( filename[nf], &fileinfo)== 0) 
-		{	/* Check if filename[nf] is a edit list */
+		if(stat( filename[nf], &fileinfo)!= 0)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to access file '%s'",filename[nf] );
+			vj_el_free(el);
+			return NULL;
+		} 
 			fd = fopen(filename[nf], "r");
 			if (fd <= 0)
 			{
@@ -1873,6 +1875,27 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 						vj_el_free(el);
 						return NULL;
 					}
+
+				/*	el->frame_list = (uint64_t *) realloc(el->frame_list,
+					      (el->video_frames +
+					       el->num_frames[i]) *
+					      sizeof(uint64_t));
+					if (el->frame_list==NULL)
+					{
+						veejay_msg(VEEJAY_MSG_ERROR, "Insufficient memory to allocate frame_list");
+						vj_el_free(el);
+						return NULL;
+					}
+					
+					long x = el->num_frames[i] + el->total_frames;	
+					long j;
+	    				for (j = el->video_frames; j < x; j++)
+					{
+						el->frame_list[el->video_frames] = EL_ENTRY(n, j);
+						el->video_frames++;
+					}*/
+
+
 		   		 }
 	
 				    /* Read edit list entries */
@@ -1945,7 +1968,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 					}
 				}
 			}
-    		}
 	}
 
 	if( el->num_video_files == 0 || 

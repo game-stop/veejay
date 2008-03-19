@@ -2670,8 +2670,12 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 
     if(!sample_read_edl( skel )) {
         veejay_msg(VEEJAY_MSG_WARNING, "No saved edit decision list '%s' for sample %d", skel->edit_list_file, skel->sample_id );
+	if( el == NULL || ((editlist*)el)->video_frames <= 2 ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Plainmode is dummy !");
+	}
 	veejay_msg(VEEJAY_MSG_WARNING, "Using plainmode to play sample %d", skel->sample_id );
 	post_check = 1;
+	skel->edit_list = NULL;
     }
     if(!skel->edit_list)
     {

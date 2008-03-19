@@ -7507,13 +7507,10 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 	sprintf(curtime, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
 	sample_get_description( id, sampletitle );
 
-	char sfourcc[8];
-	vj_el_get_video_fourcc( v->edit_list, s->current_frame_num, sfourcc );
-
 	veejay_msg(VEEJAY_MSG_PRINT, "\n");
 	veejay_msg(VEEJAY_MSG_INFO, 
-		"Sample '%s'[%4d]/[%4d]\t[duration: %s | %8d | %s]",
-		sampletitle,id,sample_size()-1,timecode,len,sfourcc);
+		"Sample '%s'[%4d]/[%4d]\t[duration: %s | %8d]",
+		sampletitle,id,sample_size()-1,timecode,len);
 
 	if(sample_encoder_active(v->uc->sample_id))
 	{
