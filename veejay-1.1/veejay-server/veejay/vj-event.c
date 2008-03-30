@@ -6476,12 +6476,17 @@ void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 
 	sprintf(filename, "video%d", args[0]);
 
+#ifdef USE_UNICAP
 	int id = veejay_create_tag(v, VJ_TAG_TYPE_V4L, filename, v->nstreams,args[0],args[1]);
 	vj_event_send_new_id( v, id );
-
+#else
+	int id = -1;
+	vj_event_send_new_id( v, id );
+#endif
 	if( id <= 0 )
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new Video4Linux stream ");
 }
+
 void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -6564,6 +6569,7 @@ void vj_event_tag_new_y4m(void *ptr, const char format[], va_list ap)
 	if( id <= 0 )
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Yuv4mpeg stream");
 }
+#ifdef USE_UNICAP
 void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -6581,6 +6587,7 @@ void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 	}
 	
 }
+#endif
 // 159, 164 for white
 void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 {
@@ -6600,17 +6607,21 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 	{
 		int values[6];
 		memset(values,0,6*sizeof(int));
+#ifdef USE_UNICAP
 		if(vj_tag_get_v4l_properties( args[0], &values[0], &values[1], &values[2], &values[3],	&values[4], &values[5]))
 		{
 			sprintf(message, "%05d%05d%05d%05d%05d%05d",
 				values[0],values[1],values[2],values[3],values[4],values[5] );
 		}
+#else
+		sprintf(message, "000000000000000000000000000000" );
+#endif
 	}
 	FORMAT_MSG(send_msg, message);
 	SEND_MSG( v,send_msg );
 }
 
-
+#ifdef USE_UNICAP
 void vj_event_v4l_set_contrast(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -6698,7 +6709,7 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 	}
 
 }
-
+#endif
 void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -7813,6 +7824,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 		SEND_MSG(v, "0000000" );
 		return;
 	}
+
 	veejay_image_t *img = NULL;
 
 	VJFrame frame;
@@ -7823,7 +7835,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	int full444 =  (v->settings->composite);
 	if( v->video_out == 4 )
 		full444 = 1; 
-
+	
 	//@ fast*_picture delivers always 4:2:0 data to reduce bandwidth
 	if( use_bw_preview_ )
 		vj_fastbw_picture_save_to_mem(
@@ -7840,12 +7852,10 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 
 	int input_len = (use_bw_preview_ ? ( w * h ) : (( w * h ) + ((w * h)/2)) );
 
-
 	char header[8];
 	sprintf( header, "%06d%1d", input_len, use_bw_preview_ );
 	SEND_DATA(v, header, 7 );
 	SEND_DATA(v, vj_perform_get_preview_buffer(), input_len );
-
 }
 #endif
 
@@ -8714,6 +8724,7 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 		     * once so only ONE VIMS-command is needed */
 		    else if (stream_type == VJ_TAG_TYPE_V4L)
 			{
+#ifdef USE_UNICAP
 			int brightness=0;
 			int hue = 0;
 			int contrast = 0;
@@ -8735,6 +8746,7 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 			    white,
 			    effects_on);
 			failed = 0;
+#endif
 			}
 		    else	
 			{

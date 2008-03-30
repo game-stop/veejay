@@ -93,6 +93,9 @@ AC_ARG_WITH(jpeg-mmx,
             AC_HELP_STRING([--with-jpegmmx=PFX],
                            [Prefix where jpeg-mmx is installed (optional).]))
 
+AC_ARG_WITH(unicap, AC_HELP_STRING([--without-unicap], [Do not use unicap]),
+		[],	[with_unicap=yes])
+
 
 AC_GNU_SOURCE
 
@@ -428,6 +431,7 @@ fi
 
 
 have_unicap=false
+if test x$with_unicap != xno; then
 PKG_CHECK_MODULES( UNICAP, libunicap >= 0.1.0,
                 ac_cv_unicap=1, ac_cv_unicap=0)
 
@@ -436,11 +440,13 @@ AC_DEFINE_UNQUOTED([HAVE_UNICAP], ${ac_cv_unicap},
 
 if test "${ac_cv_unicap}" = 0
 then
-  AC_MSG_ERROR([Could not find libunicap, see that you have libunicap-dev installed.])
+  AC_MSG_WARN([Could not find libunicap, dropping capture device support])
 else
 have_unicap=true
 AC_SUBST(USE_UNICAP)
 AC_DEFINE(USE_UNICAP,,[define if unicap])
+fi
+
 fi
 
 AC_SUBST(UNICAP_CFLAGS)

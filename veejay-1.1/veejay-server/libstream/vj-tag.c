@@ -45,7 +45,9 @@
 #include <libvjmem/vjmem.h>
 #include <libvje/internal.h>
 #include <libstream/vj-net.h>
+#ifdef USE_UNICAP
 #include <libstream/vj-unicap.h>
+#endif
 #include <libvevo/libvevo.h>
 #include <veejay/vj-misc.h>
 #ifdef HAVE_FREETYPE
@@ -90,9 +92,9 @@ void	vj_tag_free(void)
 
 	if( tag_encoder_buf )
 		free( tag_encoder_buf );
-
+#ifdef USE_UNICAP
 	vj_unicap_deinit(unicap_data_);
-
+#endif
 }
 
 
@@ -175,7 +177,11 @@ static int vj_tag_update(vj_tag *tag, int id) {
 
 int	vj_tag_num_devices()
 {
+#ifdef USE_UNICAP
 	return vj_unicap_num_capture_devices( unicap_data_ );
+#else
+	return 0;
+#endif
 }
 
 char *vj_tag_scan_devices( void )
@@ -184,6 +190,7 @@ char *vj_tag_scan_devices( void )
 	int num = 0;
 	int i;
 	int len = 6;
+#ifdef USE_UNICAP
 	char **device_list = vj_unicap_get_devices(unicap_data_, &num);
 	if(!device_list)
 		return strdup(default_str);
@@ -203,8 +210,10 @@ char *vj_tag_scan_devices( void )
 		free(device_list[i]);
 	}
 	free(device_list);
-
-	return n;	
+	return n;
+#else
+	return strdup(default_str);
+#endif
 }
 
 int vj_tag_init(int width, int height, int pix_fmt)
@@ -233,8 +242,9 @@ int vj_tag_init(int width, int height, int pix_fmt)
 
     memset( &_tmp, 0, sizeof(VJFrame));
     _tmp.len = width * height;
-
-	unicap_data_= (void*) vj_unicap_init();
+#ifdef USE_UNICAP
+ 	unicap_data_= (void*) vj_unicap_init();
+#endif
    _temp_buffer[0] = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height);
    _temp_buffer[1] = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height);
    _temp_buffer[2] = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height);
@@ -331,7 +341,7 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 
 	return 1;
 }
-
+#ifdef USE_UNICAP
 int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
 		    int norm, int palette, int freq, int channel)
 {
@@ -392,7 +402,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
 	
 	return 1;
 }
-
+#endif
 #ifdef USE_GDK_PIXBUF
 int _vj_tag_new_picture( vj_tag *tag, int stream_nr, editlist *el)
 {
@@ -607,6 +617,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     
  
     switch (type) {
+#ifdef USE_UNICAP
 	    case VJ_TAG_TYPE_V4L:
 		sprintf(tag->source_name, "%s", filename );
 		
@@ -618,6 +629,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 			    return -1;
 		}
 		break;
+#endif
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
 		sprintf(tag->source_name, "%s", filename );
@@ -773,10 +785,12 @@ int vj_tag_del(int id)
 
     /* stop streaming in first */
     switch(tag->source_type) {
+#ifdef USE_UNICAP
 	case VJ_TAG_TYPE_V4L: 
 		veejay_msg(VEEJAY_MSG_INFO, "Closing unicap device");
 	   	vj_unicap_free_device(unicap_data_,  vj_tag_input->unicap[tag->index] );
 		break;
+#endif
      case VJ_TAG_TYPE_YUV4MPEG: 
 		veejay_msg(VEEJAY_MSG_INFO,"Closing yuv4mpeg file %s (Stream %d)",
 			tag->source_name,id);
@@ -1256,6 +1270,7 @@ int vj_tag_continue_record( int t1 )
 	return 0;
 
 }
+#ifdef USE_UNICAP
 int vj_tag_set_brightness(int t1, int value)
 {
 	vj_tag *tag = vj_tag_get(t1);
@@ -1388,7 +1403,7 @@ int	vj_tag_get_v4l_properties(int t1,
 	free(props);
 	return 0;
 }
-
+#endif
 
 int vj_tag_get_effect_any(int t1, int position) {
 	vj_tag *tag = vj_tag_get(t1);
@@ -1749,12 +1764,14 @@ int vj_tag_disable(int t1) {
 	{
 		net_thread_stop( tag );
 	}
+#ifdef USE_UNICAP
 	if(tag->source_type == VJ_TAG_TYPE_V4L )
 	{
 		vj_unicap_set_pause( vj_tag_input->unicap[tag->index], 1 );
 		//if( vj_unicap_status( vj_tag_input->unicap[tag->index]) )
 		//	vj_unicap_stop_capture( vj_tag_input->unicap[ tag->index] );
 	}
+#endif
 #ifdef USE_GDK_PIXBUF
 	if(tag->source_type == VJ_TAG_TYPE_PICTURE )
 	{
@@ -1776,7 +1793,7 @@ int vj_tag_enable(int t1) {
 #ifdef STRICT_CHECKING
 	assert( tag != NULL );
 #endif
-
+#ifdef USE_UNICAP
 	if( tag->source_type == VJ_TAG_TYPE_V4L )
 	{
 		if( vj_unicap_get_pause( vj_tag_input->unicap[tag->index] ) )
@@ -1789,7 +1806,7 @@ int vj_tag_enable(int t1) {
 		vj_tag_update(tag,t1);
 		return 1;
 	}
-
+#endif
 	if(tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST )
 	{
 		if(!net_thread_start(vj_tag_input->net[tag->index], tag))
@@ -1814,6 +1831,7 @@ int vj_tag_enable(int t1) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "Streaming from picture '%s'", tag->source_name );
 	}
 #endif
+#ifdef USE_UNICAP
 	if( tag->source_type == VJ_TAG_TYPE_V4L )
 	{
 		if( vj_unicap_get_pause( vj_tag_input->unicap[ tag->index ]  ) )
@@ -1822,7 +1840,7 @@ int vj_tag_enable(int t1) {
 	    if(!vj_unicap_status( vj_tag_input->unicap[tag->index]) )
 	    	vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
 	}
-
+#endif
 	tag->active = 1;
 	if(!vj_tag_update(tag,t1)) return -1;
 	return 1;
@@ -1851,6 +1869,7 @@ int vj_tag_set_active(int t1, int active)
 	    return 1;
  	
     switch (tag->source_type) {
+#ifdef USE_UNICAP
 	   case VJ_TAG_TYPE_V4L:
 		if(active) {
 		   if( vj_unicap_get_pause( vj_tag_input->unicap[ tag->index] ) ) {
@@ -1867,6 +1886,7 @@ int vj_tag_set_active(int t1, int active)
 		}
 		tag->active = active;
 		break;
+#endif
 	case VJ_TAG_TYPE_YUV4MPEG:
 	     if(active==0)
 		{
@@ -2270,11 +2290,13 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
     
 	switch (tag->source_type)
 	{
+#ifdef USE_UNICAP
 	case VJ_TAG_TYPE_V4L:
 		if(vj_unicap_status(vj_tag_input->unicap[tag->index]) )
 			vj_unicap_grab_frame( vj_tag_input->unicap[tag->index], buffer, width,height );
 		return 1;
 		break;
+#endif
 #ifdef USE_GDK_PIXBUF
 	case VJ_TAG_TYPE_PICTURE:
 		{

@@ -279,8 +279,10 @@ static void Usage(char *progname)
 		"\t\t\t\t-C/--zoomcrop [top:bottom:left:right] (crop source before scaling)\n");
 	fprintf(stderr,
 		"  -D/--composite \t\tProjection screen setup\n");
+#ifdef USE_UNICAP
 	fprintf(stderr,
 		"  -A/--all [num] \t\tStart with all capture devices, start with device <num> \n");
+#endif
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
 }
