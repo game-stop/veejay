@@ -1437,7 +1437,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		char *arg_str = NULL;
 		memset( i_args, 0, sizeof(i_args) );
 
-		arg_str = arguments = strndup( msg + 4 , msg_len - 3 );
+		arg_str = arguments = strndup( msg + 4 , msg_len - 4 );
 
 		if( arguments == NULL )
 		{

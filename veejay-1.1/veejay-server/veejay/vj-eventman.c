@@ -1211,7 +1211,7 @@ void		vj_init_vevo_events(void)
 				"Change RGB color of solid stream",
 				vj_event_set_stream_color,
 				4,
-				VIMS_REQUIRE_ALL_PARAMS,
+				VIMS_LONG_PARAMS | VIMS_REQUIRE_ALL_PARAMS,
 				STREAM_ID_HELP,
 				0,
 				"Red",
