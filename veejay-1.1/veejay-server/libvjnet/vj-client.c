@@ -128,7 +128,7 @@ int vj_client_connect_dat(vj_client *v, char *host, int port_id  )
 	int error = 0;
 	if(host == NULL)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid host name");
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid host name (cannot be empty)");
 		return 0;
 	}
 	if(port_id < 1 || port_id > 65535)
@@ -194,7 +194,6 @@ fprintf(stderr, "%s: receiver at port %d (v->ports[0] = %d, v->ports[1] = %d)",
 		mcast_sender_set_peer( v->c[0]->s , group_name );
 		v->mcast = 1;
 //		mcast_receiver_set_peer( v->c[0]->r, group_name);
-//		veejay_msg(VEEJAY_MSG_DEBUG, "Added peer");
 		veejay_msg(VEEJAY_MSG_DEBUG, "Client is interested in packets from group %s : %d, send to %d",
 			group_name, port_id + VJ_CMD_MCAST , port_id + VJ_CMD_MCAST_IN);
 
@@ -235,23 +234,40 @@ int	vj_client_poll( vj_client *v, int sock_type )
 	return 0;
 }
 
-static	void	vj_client_decompress( vj_client *t, uint8_t *out, int len, int Y, int UV)
+static	void	vj_client_decompress( vj_client *t, uint8_t *out, int data_len, int Y, int UV , int header_len)
 {
 	uint8_t *d[3] = {
 			out,
 			out + Y,
 			out + Y + UV };
 #ifdef STRICT_CHECKING
-	assert( len > 0 );
+	assert( data_len > 0 );
 	assert( Y > 0 );
 	assert( UV > 0 );
 #endif
-	lzo_decompress( t->lzo, t->space, len, d );
+	lzo_decompress( t->lzo, t->space, data_len, d );
 }
 
+static	void	hexstr(uint8_t *bytes, int len){
+	unsigned int i;
+	printf("\tHex:");
+	for( i = 0  ; i < len ; i ++ )  {
+		printf("%x.", bytes[i]);
+	}
+	printf("\n");
+
+}
+static	int	getint(uint8_t *in, int len ) {
+	
+	char *ptr, *word = strndup( in, len+1 );
+	word[len] = '\0';
+	long v = strtol( word, &ptr, 10 );
+	free(word);
+	return (int) v;
+}
 int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 {
-	char line[32];
+	uint8_t line[32];
 	int p[4] = {0, 0,0,0 };
 	int n = 0;
 	int plen = 0;
@@ -281,8 +297,7 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 				uv_len = y_len/2;break;
 		}
 			
-		if(plen)
-			vj_client_decompress( v, dst,plen,y_len,uv_len );
+		vj_client_decompress( v, dst,p[3],y_len,uv_len ,0);
 
 		if( p[0] != v->cur_width || p[1] != v->cur_height || p[2] != v->cur_fmt )
 			return 2;
@@ -290,29 +305,25 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 	} else if ( v->c[0]->type == VSOCK_C )
 	{
 		veejay_memset( line,0, sizeof(line));
-
-		if( sock_t_poll( v->c[0]->fd ) <= 0)
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Nothing has arrived yet");
-			return -1;
-		}
-		if( v->c[0]->type == VSOCK_C )
-			plen = sock_t_recv_w( v->c[0]->fd, line, 20 );	
-
+		plen = sock_t_recv_w( v->c[0]->fd, line, 21 );	
 		if( plen <= 0 )
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Read error: %s", strerror(errno));
-			return plen;
-		}
-		n = sscanf( line, "%d %d %d %d", &p[0],&p[1],&p[2],&p[3] );
-		if( n != 4)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR,"Frame header invalid, received garbage" );
+			veejay_msg(VEEJAY_MSG_ERROR, "Network I/O Error while reading header: %s", strerror(errno));
 			return -1;
 		}
+#ifdef STRICT_CHECKING
+		assert( plen == 21 );
+#endif
+		p[0] = getint( line , 4 );
+		p[1] = getint( line + 5, 4 );
+		p[2] = getint( line + 4 + 5, 4 );
+		p[3] = getint( line + 4 + 5 + 5, 8 );
 
-		if( v->cur_width != p[0] || v->cur_height != p[1] || v->cur_fmt != p[2])
-			conv = 2;
+		if( v->cur_width != p[0] || v->cur_height != p[1] || v->cur_fmt != p[2]) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Unexpected video frame format, %dx%d (%d) , received %dx%d(%d)",
+				v->cur_width,v->cur_height,v->cur_fmt,p[0],p[1],p[2]);
+			return 0;
+		}
 
 		v->in_width = p[0];
 		v->in_height = p[1];
@@ -328,24 +339,22 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 				uv_len = y_len/2;break;
 		}
 
-		if( sock_t_poll( v->c[0]->fd ) <= 0 )
+		int n = sock_t_recv_w( v->c[0]->fd, v->space, p[3]  );
+		if( n != p[3] )
 		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Nothing has arrived yet but we already got some");
+			if( n < 0 ) {
+				veejay_msg(VEEJAY_MSG_ERROR, "Network I/O Error: %s", strerror(errno));
+			} else {
+				veejay_msg(VEEJAY_MSG_ERROR, "Broken video packet , got %d out of %d bytes",
+					n, p[3] );	
+			}
 			return -1;
 		}
-		if( v->c[0]->type == VSOCK_C) 
-		{
-			int n = sock_t_recv_w( v->c[0]->fd, v->space, p[3] );
-			if(n)
-				vj_client_decompress( v, dst, n, y_len, uv_len );
-		}
-		if(n > 0 )
-			plen += n;
 
+		vj_client_decompress( v, dst, p[3], y_len, uv_len , plen);
 
-		return conv;
+		return 2;
 	}
-veejay_msg(VEEJAY_MSG_DEBUG, "socket is not used for this");
 	return 0;
 }
 
@@ -390,13 +399,15 @@ int	vj_client_read(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 {
 	if( sock_type == V_STATUS )
 	{
-		if(v->c[1]->type == VSOCK_S)
+		if(v->c[1]->type == VSOCK_S) {
 			return( sock_t_recv_w( v->c[1]->fd, dst, bytes ) );
+		}
 	}
 	if( sock_type == V_CMD )
 	{
-		if(v->c[0]->type == VSOCK_C)
+		if(v->c[0]->type == VSOCK_C) {
 			return ( sock_t_recv_w( v->c[0]->fd, dst, bytes ) );
+		}
 	}
 	return 0;
 }

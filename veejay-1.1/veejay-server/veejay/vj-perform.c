@@ -1008,7 +1008,6 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 	const int uv_len = info->effect_frame1->uv_width * info->effect_frame1->uv_height;
 	uint8_t *dstI = dst + (3*4);
 	unsigned int size1=0,size2=0,size3=0;
-
 	int i = lzo_compress( lzo_ , primary_buffer[info->out_buf]->Y, dstI, &size1, len );
 	if( i == 0 )
 	{
@@ -1051,24 +1050,25 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 {
 	int hlen =0;
+	unsigned char info_line[32];
 
 	int compr_len = 0;
 	if( !mcast )
 	{
-		compr_len = vj_perform_compress_frame(info,socket_buffer+20);
+		uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * 21 );
+		compr_len = vj_perform_compress_frame(info,sbuf);
 #ifdef STRICT_CHECKING
 		assert( compr_len > 0 );
 #endif
 		/* peer to peer connection */
-		unsigned char info_line[32];
-		sprintf(info_line, "%04d %04d %1d %08d", info->effect_frame1->width,
+		sprintf(info_line, "%04d %04d %1d %08d ", info->effect_frame1->width,
 				info->effect_frame1->height, info->effect_frame1->format,
 		      		compr_len );
 		hlen = strlen(info_line );
 #ifdef STRICT_CHECKING
-		assert( hlen == 20 );
+		assert( hlen == 21 );
 #endif
-		veejay_memcpy( socket_buffer, info_line, hlen );
+		veejay_memcpy( socket_buffer, info_line, sizeof(uint8_t) * 21 );
 	}
 	else	
 	{
@@ -1078,24 +1078,33 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 #endif
 	}
 
-	//@ was 0, but collides with VIMS . use seperate socket
-
 	int id = (mcast ? 2: 3);
-	
 	int __socket_len = hlen + compr_len;
-#ifdef STRICT_CHECKING
-	assert( info->effect_frame1->ssm == 0 );
-#endif
 
-	if(vj_server_send_frame( info->vjs[id], to_link_id, socket_buffer, __socket_len,
-				info->effect_frame1, info->real_fps )<=0)
+	if(!mcast) 
 	{
-		/* frame send error handling */
-		veejay_msg(VEEJAY_MSG_ERROR,
-		  "Error sending frame to remote");
-		//__send_frame=0;
-		if(!mcast )
-			_vj_server_del_client( info->vjs[id], to_link_id );
+		int i;
+		for( i = 0; i < 8 ; i++ ) {
+			if( info->rlinks[i] >= 0 ) {
+				to_link_id = info->rlinks[i];
+				if(vj_server_send_frame( info->vjs[id], to_link_id, socket_buffer, __socket_len,
+						info->effect_frame1, info->real_fps )<=0)
+				{
+					veejay_msg(VEEJAY_MSG_ERROR,  "Error sending frame to remote");
+					_vj_server_del_client( info->vjs[id], to_link_id );
+				}
+				info->rlinks[i] = -1;
+			}	
+		}
+	
+	}
+	else
+	{		
+		if(vj_server_send_frame( info->vjs[id], to_link_id, socket_buffer, __socket_len,
+					info->effect_frame1, info->real_fps )<=0)
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG,  "Error sending multicast frame.");
+		}
 	}
 	return 1;
 }
@@ -1122,7 +1131,7 @@ void	vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, i
 						  video_output_buffer[1]->Cr, w, h,
 						  PIX_FMT_YUV420P );
 
-			yuv_convert_any_ac( srci,dsti, srci->format, dsti->format );
+			yuv_convert_any( srci,dsti, srci->format, dsti->format );
 			free(srci);
 			free(dsti);
 
@@ -1171,7 +1180,7 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
 					el->video_height, (info->pixel_format == FMT_420 ? PIX_FMT_YUV420P:
 						PIX_FMT_YUVJ420P) );
 	
-		yuv_convert_any_ac(srci,dsti, srci->format,dsti->format );
+		yuv_convert_any(srci,dsti, srci->format,dsti->format );
 
 		free(srci);
 		free(dsti);

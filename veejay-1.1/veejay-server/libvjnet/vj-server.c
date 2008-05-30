@@ -385,8 +385,10 @@ static int vj_server_send_frame_now( vj_server *vje, int link_id, uint8_t *buf, 
 #ifdef STRICT_CHECKING
 	assert( Link[link_id]->in_use == 1 );
 #endif
-
 	total  = sock_t_send_fd( Link[link_id]->handle, vje->send_size, buf, len);
+#ifdef STRICT_CHECKING
+	assert( total == len );
+#endif
 	if( total <= 0 )
 	{
 		veejay_msg(0,"Unable to send buffer to %s: %s",
@@ -406,8 +408,6 @@ int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len,
 		{
 			return vj_server_send_frame_now( vje, link_id, buf, len );
 		}
-		else
-			veejay_msg(0, "Cant send frame, socket not ready");
 		return 0;
 	}
 	else

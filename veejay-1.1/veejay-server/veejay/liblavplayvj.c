@@ -3005,7 +3005,7 @@ veejay_t *veejay_malloc()
     info->no_bezerk = 1;
     info->nstreams = 1;
     info->stream_outformat = -1;
-
+    info->rlinks = (int*) vj_calloc(sizeof(int) * 8 );
     info->settings->currently_processed_entry = -1;
     info->settings->first_frame = 1;
     info->settings->state = LAVPLAY_STATE_STOP;
@@ -3016,6 +3016,8 @@ veejay_t *veejay_malloc()
     info->uc->sample_start = 0;
     info->uc->sample_end = 0;
     info->net = 1;
+	for( i =0; i < 8 ; i ++ )
+		info->rlinks[i] = -1;
 
     veejay_memset(info->action_file,0,256); 
     veejay_memset(info->stream_outname,0,256);

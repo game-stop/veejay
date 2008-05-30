@@ -211,6 +211,7 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 			}
 			done += n;
 		}
+		return done;
 	}
 	return 0;
 }
@@ -236,18 +237,22 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 	else
 	{	
 		int done = 0;
-		int bs   = send_size;
+		int bytes_left = len;
 		while( done < len )
 		{
-			n = send( fd, buf + done, bs , 0 );
+			n = send( fd, buf + done, bytes_left , 0 );
 			if(n == -1)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "TCP send error: %s", strerror(errno));
 				return 0;
 			}
+			bytes_left -= n;
 			done += n;
 		}
-		return len;
+#ifdef STRICT_CHECKING
+		assert( done == len );
+#endif
+		return done;
 	}
 	return 0;
 }

@@ -328,6 +328,7 @@ typedef struct {
 	int	ncpus;
 	int	sz;
 	int	audio_running;
+	int	*rlinks;
 } veejay_t;
 
 typedef struct {

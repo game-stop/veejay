@@ -8241,8 +8241,18 @@ void	vj_event_send_devices			(	void *ptr,	const char format[],	va_list ap	)
 void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	//@ schedule
-	//@ warn about 2nd connection
+	
+	int i = 0;
+	for( i = 0; i < 8 ; v->rlinks ++ )
+		if( v->rlinks[i] < 0 || v->rlinks[i] == v->uc->current_link )
+			break;
+
+	if( i == 8 ) {
+		veejay_msg(0, "No more video stream connections allowed, limited to 8");	
+		SEND_MSG(v,"00000000000000000000"); 
+		return;
+	}
+
 	if (!v->settings->is_dat )
 	{
 		veejay_msg(1, "Wrong control port for retrieving frames!");
@@ -8250,14 +8260,12 @@ void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 		return;
 	}
 
-	if( v->settings->unicast_frame_sender && v->uc->current_link !=
-		v->settings->unicast_link_id )
-	{
-		veejay_msg(0, "Bummer, only 1:1 Veejay communication. Consider using multicast");
-		return;
-	}
+
+	v->rlinks[i] = v->uc->current_link;
 	v->settings->unicast_frame_sender = 1;
-	v->settings->unicast_link_id      = v->uc->current_link;
+
+//	v->settings->unicast_frame_sender = 1;
+//	v->settings->unicast_link_id      = v->uc->current_link;
 }
 
 

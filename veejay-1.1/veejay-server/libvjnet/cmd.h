@@ -43,6 +43,7 @@ int		sock_t_poll( vj_sock_t *s );
 int		sock_t_recvw(vj_sock_t *s, void *dst, int len );
 int		sock_t_recv( vj_sock_t *s, void *dst, int len );
 int             sock_t_recv_w( vj_sock_t *s, void *dst, int len );
+int             sock_t_recv_w1( vj_sock_t *s, void *dst, int len );
 int		sock_t_send( vj_sock_t *s, unsigned char *buf, int len );
 int		sock_t_send_fd( int fd, int sndsize, unsigned char *buf, int len );
 void		sock_t_close( vj_sock_t *s );

@@ -27,7 +27,9 @@
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <liblzo/lzo.h>
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 typedef struct
 {
 	lzo_byte *wrkmem;
@@ -86,7 +88,6 @@ int		lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, 
 	int r = lzo1x_1_compress( src, len, dst, dst_len, l->wrkmem );
 	if( r != LZO_E_OK )
 		return 0;
-	//@ dont care about incompressible blocks
 	return (*size);	
 }
 
@@ -102,6 +103,10 @@ long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3
 	len[0] = str2ulong( linbuf );
 	len[1] = str2ulong( linbuf+4 );
 	len[2] = str2ulong( linbuf+8 );
+
+#ifdef STRICT_CHECKING
+	assert( len[0] > 0 && len[1] > 0 && len[2] > 0 );
+#endif
 
 	for( i = 0; i <= 2; i ++ )
 	{
