@@ -1131,7 +1131,7 @@ void	vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, i
 						  video_output_buffer[1]->Cr, w, h,
 						  PIX_FMT_YUV420P );
 
-			yuv_convert_any( srci,dsti, srci->format, dsti->format );
+			yuv_convert_any_ac( srci,dsti, srci->format, dsti->format );
 			free(srci);
 			free(dsti);
 
@@ -1180,7 +1180,7 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
 					el->video_height, (info->pixel_format == FMT_420 ? PIX_FMT_YUV420P:
 						PIX_FMT_YUVJ420P) );
 	
-		yuv_convert_any(srci,dsti, srci->format,dsti->format );
+		yuv_convert_any_ac(srci,dsti, srci->format,dsti->format );
 
 		free(srci);
 		free(dsti);
