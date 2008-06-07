@@ -1307,9 +1307,7 @@ static		char 	*inline_str_to_str(int flags, char *msg)
 	if( (flags & VIMS_LONG_PARAMS) ) /* copy rest of message */
 	{
 		res = (char*) malloc(sizeof(char) * len );
-		memset(res, 0, len );
-		if( msg[len-1] == ';' )
-			veejay_strncpy( res, msg, len- 1 );
+		veejay_strncpy( res, msg, len );
 	}
 	else			
 	{
