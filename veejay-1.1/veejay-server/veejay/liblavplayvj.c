@@ -101,7 +101,7 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
-#ifdef USE_GL
+#ifdef HAVE_GL
 #include <veejay/gl.h>
 #endif
 
@@ -1110,7 +1110,7 @@ static int veejay_screen_update(veejay_t * info )
 	     		}
 	    		 break;
 		case 4:
-#ifdef USE_GL
+#ifdef HAVE_GL
 			x_display_push( info->gl, frame , info->current_edit_list->video_width,
 					 info->current_edit_list->video_height, 
 					info->current_edit_list->pixel_format 	);
@@ -1590,7 +1590,7 @@ static	void	veejay_event_handle(veejay_t *info)
 		info->uc->mouse[2] = but;
 	}
 #endif
-#ifdef USE_GL
+#ifdef HAVE_GL
 	if(info->video_out == 4 )
 	{
 		x_display_mouse_grab( info->gl, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],
@@ -2187,7 +2187,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
     	switch (info->video_out)
 	 {
  		case 4:
-#ifdef USE_GL
+#ifdef HAVE_GL
 			veejay_msg(VEEJAY_MSG_INFO, "Using output driver OpenGL");
 			info->gl = (void*) x_display_init(info);
 			x_display_open(info->gl, info->current_edit_list->video_width, info->current_edit_list->video_height );
@@ -2794,7 +2794,7 @@ static void *veejay_playback_thread(void *data)
 		veejay_msg(VEEJAY_MSG_DEBUG, "Stopped rendering to [%s]",
 			    info->stream_outname);
 	}
-#ifdef USE_GL
+#ifdef HAVE_GL
 #ifndef X_DISPLAY_MISSING
 	if( info->video_out == 4 )
 	{

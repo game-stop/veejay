@@ -44,7 +44,7 @@
 #include <libstream/vj-vloopback.h>
 #include <liblzo/lzo.h>
 #include <veejay/vjkf.h>
-#ifdef USE_GL
+#ifdef HAVE_GL
 #include <veejay/gl.h>
 #endif
 #ifdef USE_GDK_PIXBUF
@@ -1697,7 +1697,7 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 }
 
 #endif
-#ifdef USE_GL
+#ifdef HAVE_GL
 void vj_event_single_gl_fire(void *ptr , int mod, int key)
 {
 	int vims_mod = 0;
@@ -3214,7 +3214,7 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 	switch(v->video_out)
 	{
 		case 4:
-#ifdef USE_GL
+#ifdef HAVE_GL
 		{
 			int go_fs = x_display_get_fs( v->gl ) == 1 ? 0:1;
 			x_display_set_fullscreen( v->gl, go_fs );
@@ -3338,7 +3338,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 				break;
 		
 			case 4:
-#ifdef USE_GL
+#ifdef HAVE_GL
 				if( w > 0 && h > 0 )
 					x_display_resize(w,h,w,h);	
 #endif
@@ -6474,7 +6474,7 @@ void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 
 	sprintf(filename, "video%d", args[0]);
 
-#ifdef USE_UNICAP
+#ifdef HAVE_UNICAP
 	int id = veejay_create_tag(v, VJ_TAG_TYPE_V4L, filename, v->nstreams,args[0],args[1]);
 	vj_event_send_new_id( v, id );
 #else
@@ -6567,7 +6567,7 @@ void vj_event_tag_new_y4m(void *ptr, const char format[], va_list ap)
 	if( id <= 0 )
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Yuv4mpeg stream");
 }
-#ifdef USE_UNICAP
+#ifdef HAVE_UNICAP
 void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -6605,7 +6605,7 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 	{
 		int values[6];
 		memset(values,0,6*sizeof(int));
-#ifdef USE_UNICAP
+#ifdef HAVE_UNICAP
 		if(vj_tag_get_v4l_properties( args[0], &values[0], &values[1], &values[2], &values[3],	&values[4], &values[5]))
 		{
 			sprintf(message, "%05d%05d%05d%05d%05d%05d",
@@ -6619,7 +6619,7 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 	SEND_MSG( v,send_msg );
 }
 
-#ifdef USE_UNICAP
+#ifdef HAVE_UNICAP
 void vj_event_v4l_set_contrast(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -8730,7 +8730,7 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 		     * once so only ONE VIMS-command is needed */
 		    else if (stream_type == VJ_TAG_TYPE_V4L)
 			{
-#ifdef USE_UNICAP
+#ifdef HAVE_UNICAP
 			int brightness=0;
 			int hue = 0;
 			int contrast = 0;

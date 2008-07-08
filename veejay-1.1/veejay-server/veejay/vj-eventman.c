@@ -2072,7 +2072,7 @@ void		vj_init_vevo_events(void)
 				"Number of frames",
 				0,
 				NULL);
-#ifdef USE_UNICAP
+#ifdef HAVE_UNICAP
 	index_map_[VIMS_STREAM_SET_BRIGHTNESS]			=	_new_event(
 				"%d %d",
 				VIMS_STREAM_SET_BRIGHTNESS,

@@ -43,7 +43,7 @@ vj_effect *bathroom_init(int width,int height)
     ve->limits[1][0] = 1;
     ve->limits[0][1] = 1;
     ve->limits[1][1] = 64;
-    ve->defaults[0] = 0;
+    ve->defaults[0] = 1;
     ve->defaults[1] = 32;
     ve->description = "Bathroom Window";
     ve->sub_format = 1;
@@ -120,9 +120,6 @@ void bathroom_hori_apply(VJFrame *frame, int width, int height, int val)
     veejay_memcpy( bathroom_frame[0], Y, len);
     veejay_memcpy( bathroom_frame[1], Cb, len);
     veejay_memcpy( bathroom_frame[2], Cr, len);
-
-	if( y_val <= 0 )
-		y_val = 1;
 
     for(y=0; y < height;y++) {
      for(x=0; x <width; x++) {

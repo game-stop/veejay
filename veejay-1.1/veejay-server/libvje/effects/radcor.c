@@ -35,9 +35,9 @@ vj_effect *radcor_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    ve->limits[0][0] = 0;
+    ve->limits[0][0] = 1;
     ve->limits[1][0] = 1000;
-    ve->limits[0][1] = 0;
+    ve->limits[0][1] = 1;
     ve->limits[1][1] = 1000;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 1;

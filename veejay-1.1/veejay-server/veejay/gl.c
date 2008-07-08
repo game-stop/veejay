@@ -28,7 +28,7 @@
 
 
 #include <config.h>
-#ifdef USE_GL
+#ifdef HAVE_GL
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>

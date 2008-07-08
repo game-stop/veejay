@@ -895,10 +895,12 @@ int sample_del(int sample_id)
 
 	    for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
 	    {
-		vevo_port_free( si->effect_chain[i]->kf );
-		if (si->effect_chain[i])
-			free(si->effect_chain[i]);
+		if( si->effect_chain[i]->kf )
+			vevo_port_free( si->effect_chain[i]->kf );
 	    }
+	//@  *sample_eff_chain -> &addr[0]
+	    if( si->effect_chain[0] )
+		free(si->effect_chain[0]);
   
 	    if(si->edit_list)
 		vj_el_free(si->edit_list);

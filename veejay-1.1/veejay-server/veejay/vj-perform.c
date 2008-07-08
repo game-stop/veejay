@@ -2536,7 +2536,7 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 
 int	vj_perform_get_width( veejay_t *info )
 {
-#ifdef USE_GL
+#ifdef HAVE_GL
 	if(info->video_out == 4 )
 		return  x_display_width(info->gl);
 #endif
@@ -2549,7 +2549,7 @@ int	vj_perform_get_width( veejay_t *info )
 
 int	vj_perform_get_height( veejay_t *info )
 {
-#ifdef USE_GL
+#ifdef HAVE_GL
 	if(info->video_out == 4 )
 		return x_display_height(info->gl);
 #endif

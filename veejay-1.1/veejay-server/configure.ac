@@ -159,8 +159,8 @@ if test "x$enable_gl" = "xyes" ; then
   AC_CHECK_LIB([GL], [main], have_gl=true)
   if test x$have_gl = xtrue ; then
         GL_LIBS="$GL_LIB_PATH -lGL"
-	AC_SUBST( USE_GL )
-	AC_DEFINE(USE_GL,1,[use gl])
+	AC_SUBST( HAVE_GL )
+	AC_DEFINE(HAVE_GL,1,[use gl])
   else
         AC_MSG_ERROR([Cannot find openGL library])
 	have_gl=false
@@ -443,8 +443,8 @@ then
   AC_MSG_WARN([Could not find libunicap, dropping capture device support])
 else
 have_unicap=true
-AC_SUBST(USE_UNICAP)
-AC_DEFINE(USE_UNICAP,,[define if unicap])
+AC_SUBST(HAVE_UNICAP)
+AC_DEFINE(HAVE_UNICAP,,[define if unicap])
 fi
 
 fi
@@ -943,8 +943,8 @@ AM_CONDITIONAL(HAVE_V4L, test x$have_v4l = xtrue)
 AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
-AM_CONDITIONAL(USE_GL, test x$have_gl = xtrue)
-AM_CONDITIONAL(USE_UNICAP,test x$have_unicap = xtrue)
+AM_CONDITIONAL(HAVE_GL, test x$have_gl = xtrue)
+AM_CONDITIONAL(HAVE_UNICAP,test x$have_unicap = xtrue)
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.

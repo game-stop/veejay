@@ -78,7 +78,7 @@ static void CompiledWith()
 #ifdef HAVE_SDL
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Simple Direct Media Layer");
 #endif
-#ifdef USE_GL
+#ifdef HAVE_GL
 	veejay_msg( VEEJAY_MSG_INFO,  "\tUsing  openGL ");
 #endif
 #ifdef HAVE_DIRECTFB
@@ -145,7 +145,7 @@ static void Usage(char *progname)
 #endif
 	fprintf(stderr,
 		"\t\t\t\t3 = YUV4MPEG stream (use with -o/--outstream <file name>)\n");
-#ifdef USE_GL
+#ifdef HAVE_GL
 	fprintf(stderr,
 		"\t\t\t\t4 = OpenGL (requires openGL extension ARB fragment program)\n");
 #endif
@@ -168,7 +168,7 @@ static void Usage(char *progname)
 #endif
 #ifdef HAVE_XINERAMA
 #ifndef X_DISPLAY_MISSING
-#ifdef USE_GL
+#ifdef HAVE_GL
     fprintf(stderr,
             "  -X/--xinerama N\t\tSelect Xinerama screen [0-n] (Use with -O4)\n");
 #endif
@@ -279,7 +279,7 @@ static void Usage(char *progname)
 		"\t\t\t\t-C/--zoomcrop [top:bottom:left:right] (crop source before scaling)\n");
 	fprintf(stderr,
 		"  -D/--composite \t\tProjection screen setup\n");
-#ifdef USE_UNICAP
+#ifdef HAVE_UNICAP
 	fprintf(stderr,
 		"  -A/--all [num] \t\tStart with all capture devices, start with device <num> \n");
 #endif
@@ -355,7 +355,7 @@ static int set_option(const char *name, char *value)
 	       || strcmp(name, "output-driver") == 0
 	       || strcmp(name, "O") == 0) {
 	    info->video_out = atoi(optarg);	/* use SDL */
-#ifndef USE_GL
+#ifndef HAVE_GL
             if(info->video_out==4)
 	    {
 		fprintf(stderr, "OpenGL support not enabled at compile time\n");
