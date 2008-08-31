@@ -22,6 +22,7 @@
 #include <string.h>
 #include <dirent.h>
 #include <fcntl.h>
+#include <ctype.h>
 #include <stdint.h>
 #ifdef HAVE_SDL
 #include <SDL/SDL.h>
@@ -9048,6 +9049,7 @@ void	vj_event_add_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 {
 	unsigned char text[2048];
 	int args[6];
+	int k;
 	veejay_t *v = (veejay_t*)ptr;
 
 	if(!v->font)
@@ -9072,6 +9074,12 @@ void	vj_event_add_subtitle(	void *ptr,	const char format[],	va_list	ap	)
 		veejay_msg(VEEJAY_MSG_ERROR, "No text given");
 		return;
 	}
+	for( k = 0; k < len ; k ++ ) {
+		if( !isprint( text[k] ) )
+			text[k] == 0x20;
+	}
+		
+
 
 	if( args[3] < 0 || args[4] < 0 ||
 			args[3] >= v->current_edit_list->video_width ||
@@ -9114,7 +9122,10 @@ void	vj_event_upd_subtitle(	void *ptr,	const char format[],	va_list	ap	)
         }
 
 	vj_font_set_dict( v->font, dict );
-
+//	vj_font_set_constraints_and_dict( v->font, 
+//			(long) args[1], (long) args[2], 
+//			v->current_edit_list->video_fps,
+//			dict );
 	vj_font_update_text( v->font, (long) args[1], (long) args[2], args[0], text );
 }
 

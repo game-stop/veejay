@@ -59,6 +59,8 @@ extern	int	vj_tag_size();
 #include FT_FREETYPE_H
 #include FT_GLYPH_H
 
+#define BSIZE 256
+
 typedef struct
 {	
 	int id;
@@ -102,12 +104,12 @@ typedef struct {
 	
 	FT_Library library;
 	FT_Face    face;
-	FT_Glyph   glyphs[ 255 ]; 
-	FT_Bitmap  bitmaps[ 255 ];
-	int        advance[ 255 ];
-	int        bitmap_left[ 255 ];
-	int        bitmap_top[ 255 ];
-	unsigned int glyphs_index[ 255 ];
+	FT_Glyph   glyphs[ BSIZE ]; 
+	FT_Bitmap  bitmaps[ BSIZE ];
+	int        advance[ BSIZE ];
+	int        bitmap_left[ BSIZE ];
+	int        bitmap_top[ BSIZE ];
+	unsigned int glyphs_index[ BSIZE ];
 	int        text_height;
 	int	   text_width;
 	int	   current_font;
@@ -234,7 +236,7 @@ static	char 	*vj_font_pos_to_timecode( vj_font_t *font, long pos )
 {
 	vj_font_t *ff = (vj_font_t*) font;
 	MPEG_timecode_t tc;
-        memset(&tc, 0,sizeof(MPEG_timecode_t));
+        veejay_memset(&tc, 0,sizeof(MPEG_timecode_t));
        	char tmp[20];
 	
         y4m_ratio_t ratio = mpeg_conform_framerate( ff->fps );
@@ -907,10 +909,30 @@ void    vj_font_update_text( void *font, long s1, long s2, int seq, char *text)
 	s = (srt_seq_t*) srt;
 
 	font_lock( ff );
+
+	long k;
+/*
+	long len = s2 - s1;
+	if( len > ff->text_max_size )
+		len = ff->text_max_size;
+*/	
+	if( s2 > ff->text_max_size )
+		s2 = ff->text_max_size;
+	if( s1 > ff->text_max_size )
+		s1 = ff->text_max_size;
+	if( s1 == s2 ) {
+		veejay_msg(0, "Sample too long to subtitle");
+		free(key);
+		return;
+	}	
+
+	for( k = s1; k <= s2; k ++ )
+		ff->index[k] = &(ff->text_buffer[k]);
+
 	
 	index_node_remove( font, s );
-	
-	free(s->text);
+	if( s->text )
+		free(s->text);
 	s->text = strdup( text );
 	s->start = s1;
 	s->end = s2;
@@ -1429,13 +1451,11 @@ void	vj_font_print_credits(void *font, char *text)
 	static const char *intro = 
 		"A visual instrument for GNU/Linux\n";
 	static const char *license =
-		"This program is licensed as\n     Free Software (GNU/GPL version 2)\n\nFor more information see:\nhttp://veejay.dyne.org\nhttp://www.sourceforge.net/projects/veejay\nhttp://www.gnu.org";
+		"This program is licensed as\nFree Software (GNU/GPL version 2)\n\nFor more information see:\nhttp://veejayhq.net\nhttp://veejay.dyne.org\nhttp://www.sourceforge.net/projects/veejay\nhttp://www.gnu.org";
 	static const char *copyr =
 		"(C) 2002-2008 Copyright N.Elburg et all\n";
 	//@ create text to print
-	sprintf(text, "This is Veejay version %s\n%s\n%s\n%s",VERSION,intro,copyr,license);
-	
-	
+	snprintf(text, 1024,"This is Veejay version %s\n%s\n%s\n%s",VERSION,intro,copyr,license);
 }
 
 
@@ -1450,7 +1470,7 @@ void	vj_font_customize_osd( void *font,void *uc, int type, int vp, int wp )
 	switch( v->uc->playback_mode )
 	{
 		case VJ_PLAYBACK_MODE_SAMPLE:
-			sprintf(buf, "(S) %d|%d M=%dMb C=%dms V=%s F%s",
+			snprintf(buf,256, "(S) %d|%d M=%dMb C=%dms V=%s F%s",
 					v->uc->sample_id,
 					sample_size()-1,
 					sample_cache_used(0),
@@ -1459,7 +1479,7 @@ void	vj_font_customize_osd( void *font,void *uc, int type, int vp, int wp )
 					(wp ? "P" : "V") );
 			break;
 		case VJ_PLAYBACK_MODE_TAG:
-			sprintf(buf, "(T) %d|%d C=%dms V=%s F=%s",
+			snprintf(buf,256, "(T) %d|%d C=%dms V=%s F=%s",
 					v->uc->sample_id,
 					vj_tag_size(),
 					v->real_fps,
@@ -1514,9 +1534,7 @@ void	vj_font_set_constraints_and_dict( void *font, long lo, long hi, float fps, 
 		}
 	}
 	
-	veejay_memset( f->text_buffer, 0, f->text_max_size );
-
-	f->index = NULL;
+	veejay_memset( f->text_buffer, 0, f->text_max_size * sizeof(srt_cycle_t));
 	f->index = f->text_buffer;
 	if( len > f->text_max_size )
 	{
@@ -2085,38 +2103,38 @@ static void vj_font_text_osd_render(vj_font_t *f, long posi, void *_picture, cha
 	str_w = str_w_max = 0;
 
 	int size = 0;
-	if(f->time > 2 )
-	{
-		if(in_string)
-		{
-			size = strlen( in_string );
-			veejay_strncpy(osd_text, in_string, size );
-			osd_text[size] = '\0';
+
+	if( in_string == NULL && f->time > 2 )
+		return;
+
+	if(f->time > 2 )	{
+		veejay_memset( osd_text, 0, sizeof(osd_text));
+		size = strlen( in_string );
+		if( size > 1024 ) {
+			veejay_msg(VEEJAY_MSG_WARNING, "Text buffer too long, truncating.");
+			size=1024;
 		}
-	}
-	else
-	if(f->time == 2 )
-	{
+		if( size > 0 )
+			veejay_strncpy(osd_text, in_string, size );
+	} else if(f->time == 2 ) {
 		vj_font_print_credits(f,osd_text);
 		size = strlen(osd_text);
-
 	}
 	else
 	{
 		unsigned char *tmp_text = vj_font_pos_to_timecode( f, posi );
 
 		if( f->add )
-			sprintf(osd_text, "%s %s", tmp_text, f->add );
+			snprintf(osd_text,1024, "%s %s", tmp_text, f->add );
 		else
-			sprintf(osd_text, "%s", tmp_text );
+			snprintf(osd_text,1024, "%s", tmp_text );
+
 		size = strlen( osd_text );
 		free(tmp_text);
-
 		y = picture->height - f->current_size - 4;
-
 	}
 
-	if( size <= 0 )
+	if( size <= 0 ) //@ Nothing to do
 		return;
 
 	x1 = x;
@@ -2239,8 +2257,7 @@ void vj_font_render(void *ctx, void *_picture, long position, char *in_string)
 {
 	vj_font_t *f = (vj_font_t *) ctx;
 
-	if(f->time)
-	{
+	if(f->time) {
 		vj_font_text_osd_render( f, position, _picture, in_string );
 		return;
 	}
