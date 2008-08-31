@@ -3129,7 +3129,7 @@ static	void change_box_color( GtkWidget *box, double val, int plane, int fill )
 	}
 	if(plane==1)
 	{
-		col.green = 65536 * v;
+		col.green = 65535 * v;
 		switch(fill)
 		{
 			case 0:	fg_[1] = g; break;
@@ -3139,7 +3139,7 @@ static	void change_box_color( GtkWidget *box, double val, int plane, int fill )
 	}
 	if(plane==2)
 	{
-		col.blue = 65536 * v;
+		col.blue = 65535 * v;
 		switch(fill)
 		{
 			case 0:	fg_[2] = b; break;
