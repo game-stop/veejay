@@ -445,6 +445,7 @@ enum
 	STATE_BUSY      = 5,
 	STATE_LOADING	= 6,
 	STATE_WAIT_FOR_USER = 7,
+	STATE_QUIT = 8,
 };
 
 enum
@@ -1814,6 +1815,7 @@ gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 	}
 	
 	running_g_ = 0;
+	info->watch.state == STATE_QUIT;
 
 	return FALSE;
 }
@@ -2895,6 +2897,98 @@ static int total_frames_ = 0;
 int	get_total_frames()
 {
 	return total_frames_;
+}
+/*
+static char *bugbuffer_ = NULL;
+static int   bugoffset_ = 0;
+
+gboolean	capture_data	(GIOChannel *source, GIOCondition condition, gpointer data )
+{
+	int fd = g_io_channel_unix_get_fd( source );
+	GIOStatus ret;
+        GError *err = NULL;
+        gchar *msg;
+        gsize len;
+
+        if (condition & G_IO_HUP)
+                g_error ("Read end of pipe died!\n");
+
+        ret = g_io_channel_read_line (source, &msg, &len, NULL, &err);
+        if (ret == G_IO_STATUS_ERROR)
+                g_error ("Error reading: %s\n", err->message);
+
+	memcpy( bugbuffer_ + (sizeof(char) * bugoffset_) , msg , len );
+	
+	bugoffset_ += len;
+
+        g_free (msg);
+	return TRUE;
+}
+*/
+void	reportbug()
+{
+	char l[3] = { 'e','n', '\0'};
+	char *home = getenv("HOME");
+	char *lang = getenv("LANG");
+	char URL[1024];
+
+	if(lang) {
+		l[0] = lang[0];
+		l[1] = lang[1];
+	}	
+/*	char veejay_homedir[1024];
+	char body[1024];
+	char subj[100];
+	gchar **argv = (gchar**) malloc ( sizeof(gchar*) * 5 );
+	int i;
+	argv[0] = malloc( sizeof(char) * 100 );
+	memset( argv[0], 0, sizeof(char) * 100 );
+	argv[2] = NULL;
+
+//	snprintf(subj,sizeof(subj),"reloaded %s has a problem", VERSION);
+	snprintf(veejay_homedir, sizeof(veejay_homedir),"%s/.veejay/", home );
+	sprintf(argv[0], "%s/report_problem.sh" ,veejay_homedir);
+	argv[1] = strdup( veejay_homedir );
+
+	if( bugoffset_ > 0 ) 	{
+		free(bugbuffer_);
+		bugoffset_= 0;
+		bugbuffer_ = NULL;
+	}
+
+//	GError		error = NULL;
+	gint		stdout_pipe = 0;
+	gint		pid =0;
+	gboolean	ret = 	g_spawn_async_with_pipes( 
+					NULL,
+					argv,
+					NULL,
+					 G_SPAWN_LEAVE_DESCRIPTORS_OPEN & G_SPAWN_STDERR_TO_DEV_NULL,
+					NULL,
+					NULL,
+					&pid,
+					NULL,
+					&stdout_pipe,
+					NULL,
+					NULL );
+	if( !ret ) {
+		veejay_msg(0, "Error executing bug report tool");
+		return;
+	}
+
+	GIOChannel	*chan	= g_io_channel_unix_new( stdout_pipe );
+	bugbuffer_ = (char*) malloc(sizeof(char) * 32000 );
+	memset(bugbuffer_, 0, sizeof(char) * 32000);
+	guint	retb = g_io_add_watch( chan, G_IO_IN, capture_data, NULL );
+*/
+//	if( prompt_dialog("Report a problem", "" )
+//		 == GTK_RESPONSE_ACCEPT )
+	snprintf(URL , sizeof(URL),	
+		"firefox http://groups.google.com/group/veejay-discussion/post?hl=%s",l );
+
+	printf(URL);
+
+	system(URL);
 }
 
 
@@ -6456,7 +6550,13 @@ gboolean		is_alive( int *do_sync )
 	{
 		if(info->client)
 			vj_gui_disconnect();
-		return FALSE; 
+	//	return FALSE; 
+	}
+
+	if( gui->watch.state == STATE_QUIT )
+	{
+		if(info->client) vj_gui_disconnect();
+		return FALSE;
 	}
 
 	if( gui->watch.state == STATE_CONNECT )

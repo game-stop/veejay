@@ -47,6 +47,11 @@ void	on_no_caching_clicked( GtkWidget *widget, gpointer user_data)
 	single_vims( VIMS_NO_CACHING );
 }
 
+void	on_report_a_bug1_activate(GtkWidget *w, gpointer user_data )
+{
+	reportbug();
+}
+
 void	on_button_085_clicked(GtkWidget *widget, gpointer user_data)
 {
 	single_vims(VIMS_VIDEO_SKIP_SECOND);
