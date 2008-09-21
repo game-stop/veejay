@@ -1313,7 +1313,7 @@ static		char 	*inline_str_to_str(int flags, char *msg)
 	else			
 	{
 		char str[255];
-		veejay_memset(str,0, 255 );
+		veejay_memset(str,0, sizeof(str) );
 		if(sscanf( msg, "%s", str ) <= 0 )
 			return res;
 		res = strndup( str, 255 ); 	
@@ -1324,7 +1324,7 @@ static		char 	*inline_str_to_str(int flags, char *msg)
 int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 {
 	veejay_t *v = (veejay_t*)ptr;
-	char head[4];
+	char head[5] = { 0,0,0,0,0};
 	int net_id = 0;
 	int np = 0;
 	if( msg == NULL )
