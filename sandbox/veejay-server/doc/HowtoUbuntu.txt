@@ -1,0 +1,77 @@
+Which packages do I need ? ¶
+
+You will need about 200 megabytes of available diskspace, this includes the packages below and the space needed for building veejay.
+
+    * subversion
+    * cvs
+    * build-essentials
+    * autogen
+    * autotools-dev
+    * autoconf
+    * automake1.8
+    * libtool
+    * libsdl1.2-dev
+    * libjack0.100.0-dev
+    * libquicktime-dev
+    * libxml2-dev
+    * libglade2-dev
+    * libgtk2.0-dev 
+
+Which packages do I need to compile myself ? ¶
+
+    * mjpegtools 
+
+
+        If there is a compile error in Region2D.hh, complaining about 'assert' insert a line in top of the file '#include <assert.h>'
+
+    * libunicap
+    * FFmpeg
+    * GTK Cairo
+
+            cvs -d :pserver:anoncvs@cvs.cairographics.org:/cvs/cairo co gtkcairo
+            cd gtkcairo
+            sh autogen.sh
+            ./configure && make && sudo make install
+
+WARNING ¶
+
+I use ffmpeg from source, I suggest you do the same. There are unmet dependencies in libavcodec-dev and libavformat-dev that relate to ogg,vorbis,theora, *1394* packages in Ubuntu 6.06.
+
+ $ sudo apt-get remove libavcodec-dev libavformat-dev
+ $ svn checkout svn://svn.mplayerhq.hu/ffmpeg/trunk ffmpeg
+ $ cd ffmpeg
+ $ ./configure --help
+
+Disable what you dont need, then:
+
+ $ ./configure --prefix=/usr --enable-shared ...
+ $ make && make install
+
+And continue building veejay
+Building veejay ¶
+
+Check if the PKG_CONFIG_PATH variable has been set properly.
+
+ $ echo $PKG_CONFIG_PATH
+
+If you just ran 'configure' and 'make' for mjpegtools,libunicap etc, check if the accompanying .pc files are in /usr/local/lib/pkgconfig
+
+ $ export PKG_CONFIG_PATH=$PKG_CONFIG_PATH:/usr/local/lib/pkgconfig
+
+To get the latest veejay:
+
+  $ svn co svn://dyne.org/veejay/trunk/veejay-current
+
+To build a veejay optimized for speed:
+
+ $ sh autogen.sh
+ $ ./configure 
+ $ make && sudo make install
+
+To build a veejay to send usefull bugreports:
+
+ $ sh autogen.sh
+ $ ./configure --enable-debug
+ $ make && sudo make install
+
+

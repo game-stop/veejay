@@ -1,0 +1,1439 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.0
+Transitional//EN" "http://www.w3.org/TR/REC-html40/loose.dtd">
+<html>
+<head>
+<meta http-equiv="content-type" content="text/html; charset=UTF-8" >
+<title>veejay HOWTO (work in progress)</title>
+</head>
+<body>
+<div>
+<h2>Veejay HOWTO</h2>
+Matthijs van Henten ( cola@cb3rob.net )<br>
+Niels Elburg ( nielselburg@yahoo.de )<br>
+v1.0, 30 March 2003<br>
+v1.1,  22 June 2003<br>
+v1.2,  26 August 2003<br>
+v1.3,   9 November 2003<br>
+v1.4,  24 May 2004<br>
+v2.0,  25 July 2004<br>
+v2.1   27 January 2005<br>
+v2.2   22 April 2005<br>
+v3.0   8 March 2008<br>
+<hr><i>
+This document describes  how to use <b>veejay</b>, a visual 'music' instrument for Linux/GNU </i>
+<dl><hr></dl>
+
+<dt>1.<a href="veejay-HOWTO.html#1">Introduction</a></dt>
+<dd><dl><dt>1.1 <a href="veejay-HOWTO.html#1.1">Disclaimer</a></dt>
+<dt>1.2 <a href="veejay-HOWTO.html#1.2">Acknowledgements</a></dt>
+<dt>1.3 <a href="veejay-HOWTO.html#1.3">Audience and Intent</a></dt>
+<dt>1.4 <a href="veejay-HOWTO.html#1.4">Revision History</a></dt>
+<dt>1.5 <a href="veejay-HOWTO.html#1.5">New versions of this document</a></dt>
+<dt>1.6 <a href="veejay-HOWTO.html#1.6">Feedback</a></dt>
+<dt>1.7 <a href="veejay-HOWTO.html#1.7">Distribution Policy</a></dt></dl></dd>
+
+<dt>2.  <a href="veejay-HOWTO.html#2">About veejay</a></dt>
+<dd><dl><dt>2.1 <a href="veejay-HOWTO.html#2.1">Features</a></dt>
+<dt>2.2<a href="veejay-HOWTO.html#2.2">Hardware configuration</a></dt>
+</dl></dd>
+
+<dt>3.  <a href="veejay-HOWTO.html#3">Installation</a></dt>
+<dd><dl><dt>3.1 <a href="veejay-HOWTO.html#3.1">Dependencies</a></dt>
+<dt>3.2 <a href="veejay-HOWTO.html#3.2">Installing veejay</a></dt>
+<dt>3.3 <a href="veejay-HOWTO.html#3.3">Setting up multicast</a></dt></dl></dd>
+
+<dt>4.  <a href="veejay-HOWTO.html#4">Using Veejay</a></dt>
+<dd><dl><dt>4.1 <a href="veejay-HOWTO.html#4.1">Terminology and limitations</a></dt>
+<dt>4.2 <a href="veejay-HOWTO.html#4.2">VIMS</a></dt>
+<dt>4.3 <a href="veejay-HOWTO.html#4.3">The keyboard interface</a></dt>
+<dt>4.4 <a href="veejay-HOWTO.html#4.4">Recording video</a></dt>
+<dt>4.5 <a href="veejay-HOWTO.html#4.5">Streaming video</a></dt>
+<dt>4.6 <a href="veejay-HOWTO.html#4.5">Other utilities</a></dt></dt></dl></dd>
+
+<dt>5<a href="veejay-HOWTO.html#5">Popular packages</a></dt>
+<dd><dl><dt>5.1<a href="veejay-HOWTO.html#5.1">EffecTV</a></dt>
+<dt>5.2<a href="veejay-HOWTO.html#5.2">mplayer</a></dt>
+<dt>5.3<a href="veejay-HOWTO.html#5.3">The MJPEG Tools</a></dt>
+<dt>5.4<a href="veejay-HOWTO.html#5.4">Transcode</a></dt>
+</dl>
+</dd>
+</dl>
+</dd>
+
+<dt>6.<a href="veejay-HOWTO.html#6">Other Resources</a></dt>
+<dd><dl><dt>6.1<a href="veejay-HOWTO.html#6.1">Web Sites</a></dt>
+<dt>6.2 <a href="veejay-HOWTO.html#6.2">Mailing Lists</a></dt></dl></dd>
+
+<dt>7.<a href="veejay-HOWTO.html#7">Credits</dt><br>
+<dt>8.<a href="veejay-HOWTO.html#8">GNU Free Documentation License</dt>
+<dl><p><hr></p></dl>
+
+
+<h2><a name="1">1. Introduction</a></h2><p>
+</p>
+
+<h2><a name="1.1">1.1 Disclaimer</a></h2><p>
+No liability for the contents of this documents can be accepted. Use the concepts, examples and other
+content at your own risk. As this is a new edition of this document, there may be errors and inaccuracies, that may of course be damaging to your system. Proceed with caution, and although this is highly unlikely, the authors do not take any responsibility for that.
+<br>
+All copyrights are held by their respective owners, unless specifically noted otherwise. Use of a term in 
+this document should not be regarded as affecting the validity of any trademark or service mark.
+<br>
+Naming of particular products or brands should not be seen as endorsements.
+<br>
+You are strongly recommended to take a backup of your system before major installation and backups at regular intervals.
+</p>
+
+<h2><a name="1.2">1.2 Acknowledgements</a></h2><p>
+The following peope have been helpful in getting this HOWTO done:
+<ul>
+<li>Matthijs van Henten ( <a href="mailto:cola@cb3rob.net">cola@cb3rob.net</a> )
+</ul>
+
+</p>
+
+<h2><a name="1.3">1.3 Audience and Intent</a></h2><p>
+This document is targeted at the Linux user interested in learning a bit about veejay and trying it out. 
+</p>
+
+<h2><a name="1.4">1.4 Revision History</a></h2><p>
+<b>Version 1.0</b>
+<dd><dl><dt>First version for public release</dd></dl></dt>
+<b>Version 1.1</b>
+<dd><dl><dt>Updated Howto to match version 0.4.0. Revised chapters 2.2,4.4, 5.3 and 6</dd></dl></dt>
+<b>Version 1.2</b>
+<dd><dl><dt>Updated Howto to match version 0.4.6. Revised chapter 2.1,2.2,3.3</dd></dl></dt>
+<b>Version 1.3</b>
+<dd><dl><dt>Updated Howto to match version 0.5.3. </dd></dl></dt>
+<b>Version 1.4</b>
+<dd><dl><dt>Updated Howto to match version 0.5.9</dd></dl></dt>
+<b>Version 2.0</b>
+<dd><dl><dt>Partial re-write to match version 0.6</dd></dl></dt>
+<b>Version 2.1</b>
+<dd><dl><dt>Updated Howto to match version 0.7.2</dd></dl></dt>
+<b>Version 2.2</b>
+<dd><dl><dt>Updated Howto to match version 0.8</dd></dl></dt>
+<b>Version 3.0</b>
+<dd><dl><dt>Large rewrite to match version 1.1</dd></dl></dt>
+</p>
+
+<h2><a name="1.5">1.5 New versions of this document</a></h2>
+<p>
+You will find the most recent version of this document at <a href="http://veejay.sourceforge.net/veejay-HOWTO.html">veejay.sourceforge.net/veejay-HOWTO.html</a>.<br>
+If you make a translation of this document into another langauge, let us know and we'll include a reference to it here.
+</p>
+
+<h2><a name="1.6">1.6 Feedback</a></h2><p>
+We rely on you, the reader, to make this HOWTO usefull. If you have any suggestions, corrections , or comments , please
+send them to us ( <a href="veejay-users@lists.sourceforge.net">veejay-users@lists.sourceforge.net</a> ), and we will try to incorporate
+them in the next revision. Please add 'HOWTO veejay' to the Subject-line of the mail.
+<br>
+Before sending bug reports or questions, <i>please read all of the information in this HOWTO, </i>and<i> send detailed information about the problem</i>.
+<br>
+If you publish this document on a CD-ROM or in hardcopy form, a complimentary copy would be appreciated. Mail us for our postal address. 
+Also consider making a donation to the Veejay Project to help support free video editing software in the future. 
+
+</p>
+
+<h2><a name="1.7">1.7 Distribution Policy</a></h2><p>
+Permission is granted to copy, distribute and/or modify this document under the terms of the GNU Free Documentation License,
+Version 1.1 or any later version published by the Free Software Foundation; with no Invariant Sections,
+with no Front-Cover Texts , and with no Back-Cover Texts. A copy of this license is included in the section entitled "GNU Free Documentation License".
+
+</p>
+
+
+
+<h2><a name="2">2. About Veejay</a></h2><p>
+Veejay is a <b>visual instrument</b> and <b>realtime video sampler</b>.
+It allows you to 'play' the video like you would play <b>a Piano</b>
+and it allows you to record the resulting video directly to disk for
+immediate playback (video sampling).<br>
+<br>
+Veejay consists out of several packages:<br>
+<ul>
+	<li>veejay-server
+	<li>veejay-client
+	<li>veejay-tools
+	<li>veejay-themes
+</ul>
+<table width="300px" border="1">
+<tr>
+	<td width="50px">
+		<b>veejay-server</b>
+	</td>
+	<td>
+		This is veejay
+	</td>
+</tr>
+<tr>
+	<td width="50px">
+		<b>veejay-client</b>
+	</td>
+	<td>
+		This is reloaded, the graphical user interface to veejay
+	</td>
+</tr>
+<tr>	
+	<td width="50px">
+		<b>veejay-tools</b>
+	</td>
+	<td>
+		Commandline utilities to interface with veejay
+	</td>
+</tr>
+<tr>
+	<td width="50px">
+		<b>veejay-themes</b>
+	</td>
+	<td>
+		Themepack for reloaded
+	</td>
+</tr>
+</table>
+</p>
+
+<h2><a name="2.1">2.1 Features</a></h2><p>
+
+<h3>General</h3>
+<ul>
+ <li> Free Software (GNU GPL) 
+ <li> Servent architecture 
+ <li> Soft realtime 
+ <li> Frame accurate 
+ <li> Loop based editing
+ <li> Native YUV processing
+ <li> Crash recovery
+</ul>
+
+<h3>Media</h3>
+<ul>
+ <li> Codecs: MJPEG,MPNG, DV, YUV (raw)
+ <li> Containers: AVI , Quicktime, rawDV
+ <li> Devices: USB webcams, DV1394, TV capture cards, etc.
+ <li> Support for unlimited capture devices
+ <li> Support for Image files (PNG ,JPEG,TIFF,etc)
+</ul>
+
+<h3>FX processing</h3>
+<ul>
+ <li> 132 built-in FX , many unique and original FX filters 
+ <li> FX chain (20 slots)
+ <li> All FX parameters can be animated.
+ <li> Mix up to two layers per FX slot
+</ul>
+
+<h3>Editing</h3>
+<ul>
+ <li> Non destructive edit decision lists (cut/copy/paste/crop video)
+ <li> Simple text editor 
+ <li> Sample editor
+ <li> Sequence editor
+ <li> Live disk recorder (sampling)
+ <li> Full deck save/restore
+ <li> Live clip loading 
+ <li> Live sample sequencing
+ <li> VIMS event recording/playback (6)
+ <li> Various looping modes including bounce looping
+ <li> Playback speed and direction
+ <li> Video scratching
+ <li> Change in-and out points of a sample (marker)
+ <li> Slow motion audio / video (7)
+ <li> Fast motion audio / video
+ <li> Dynamic framerate 
+ <li> Random frame play
+ <li> Random sample play
+ <li> Access up to 4096 video samples instantly	
+ <li> Full screen or windowed mode
+ <li> Perspective and foward projection
+</ul>
+
+<h3>Output</h3>
+<ul>
+ <li> Audio trough Jack (low latency audio server) (8)
+ <li> SDL and OpenGL video
+ <li> Headless
+ <li> YUV4MPEG streaming
+ <li> Network streaming (unicast and multicast)
+ <li> Preview rendering
+</ul>
+
+<h3>Input</h3>
+<ul>
+ <li> Programmable keyboard interface
+ <li> VIMS (tcp/ip) 
+ <li> OSC (udp)
+ <li> PureData trough sendVIMS external
+ <li> Full screen or windowed mode
+</ul>
+
+<h3>Plugin systems</h3>
+<ul>
+ <li> Support for FreeFrame plugins
+ <li> Support for Frei0r plugins
+</ul>
+
+</p>
+
+<h2><a name="2.2">2.2</a> Hardware configuration</h2><p>
+
+Veejay requires at least a linux kernel 2.4.x, 2.6.x or later, a lot of diskspace and a fast CPU.
+Depending on the speed of your machine, your milage may vary. See the list below for
+a few systems veejay was reported to work on:<br> 
+<ul>
+<li>An Intel Pentium 4 3.0 Ghz HT/512 MB DDR RAM with a ATI Radeon 9600 XT
+<li>A dual celeron 400 Mhz/512 MB RAM with a voodoo3 and second pci card.  
+<li>An Athlon 750 Mhz with voodoo3 and second pci card.
+<li>An Athlon 750 Mhz with Matrox G400 Dualhead(TVout using X11/SDL or DirectFB)
+<li>An Athlon 850 Mhz and Matrox G550 Dualhead( TVout support through DirectFB)
+<li>An Athlon XP 1600 Mhz and Matrox G550 Dualhead( TVout support through DirectFB)
+<li>A Pentium 4 2.2 Ghz and Matrox G550 Dualhead( TVout support through DirectFB)
+<li>A Pentium 4 3.0 Ghz and ATI Radeon 9600 XT/ (no TVout yet)
+<li>Sony Playstation 2 (MIPS, little endian) (but runs very slow +/- 20 fps)
+</ul><br>
+Video Editing requires a lot of diskspace, make sure you you have enough diskspace available for
+your project. If you are going to use the recording functions, make sure you have sufficient free disk space available.Otherwise you are quite safe, veejay does not change your original video or fill your harddisk with needless temporary files. Neither does it waste your resources (unless you fill the effect chain with a lot of effects)<br> 
+</p>
+
+<h2><a name="3">3. Installation</a></h2><p>
+</p>
+
+<h2><a name="3.1">3.1 Dependencies</a></h2><p>
+Before you install Veejay, you should install the following software packages.
+Although none of them is required, Veejay will be much less usable without them.<br>
+<ul> 
+<li>(required) mjpegtools >= 1.9.0
+<li>(required) The XML C library 2 for gnome >= 2.5.4
+<li>(required) libunicap >= 0.2.0
+<li>(required) ffmpeg (libavcodec, etc) >= 0.50.0
+<li>(optional) libdv >= 1.02 
+<li>(optional) The SDL library >= 1.2.3
+<li>(optional) JACK low latency audio server >= 0.98.1
+<li>(optional) DirectFB >= 0.9.17
+<li>(optional) FreeType >= 2.1.9 
+<li>(optional) GTK >= 2.6.0
+</ul>
+<br>
+<i>On newer distributions, some of the listed software is already installed but you may be missing the -devel- packages! (especially on redhat, suse and debdian systems!!)</i><br><br>
+You can find the websites of these projects in <a href="veejay-HOWTO.html#6">Other Resources</a>.<br><br>
+</p>
+<h3><a name="3.1.0">3.1.0 From source</a></h3><p>
+You can compile the following packages from source if your distribution does not include them:<br>
+<ul>
+<li>libavcodec, libavutil, libswscale and libavformat from the FFmpeg project
+<li>mjpegtools
+<li>unicap
+<li>gtkcairo
+</ul>
+<br>
+<h4>FFmpeg</h4>
+<p>
+You can download the ffmpeg sources from the SVN repository via <a href="http://ffmpeg.sourceforge.net">http://ffmpeg.sourecforge.net"</a>
+After downloading and unpacking the source tarball, run the configure script with the following options:<br>
+<pre>
+$ ./configure --enable-swscaler --enable-shared --enable-gpl
+...
+$ make
+# make install
+</pre>
+</p>
+</p>
+<h4>MjpegTools, Unicap</h4>
+You can download the MjpegTools from <a href="http://mjpeg.sourceforge.net">http://mjpeg.sourceforge.net</a><br>
+and the Unicap Imaging library from <a href="http://unicap.sourceforge.net">http://unicap.sourceforge.net</a><br>
+<br>
+Compilation of both packages is straightforward , in general the following will do it:<br>
+<pre>
+$ ./configure && make
+# make install
+</pre>
+</p>
+<h4>GtkCairo</h4>
+<p>
+	GtkCairo is available from the veejay repository.
+<pre>
+</pre>
+</p>
+<h2><a name="3.2">3.2 Installing veejay</a></h2><p>
+Verify that the PKG_CONFIG_PATH variable is set to the directory containing files like jack.pc and directfb.pc to include them in the build process. If it is not set , the configure script will abort with an error message.
+<pre>
+$ echo $PKG_CONFIG_PATH   
+</pre>
+If nothing is set, do something like
+<pre>
+$ export PKG_CONFIG_PATH=/usr/local/lib/pkgconfig
+</pre>
+Decompress and untar the file by typing:
+<pre>
+$ tar -jxvf veejay-1.1.x.tar.bz2
+</pre>
+Change to the directory containing veejay's source's:
+<pre>
+$ cd veejay-1.1.x
+
+$ ./configure
+</pre>
+On completion it will summarize the results of the ./configure script, which could look like this:
+<pre>
+configure:  Veejay 1.1 build configuration :
+configure: 
+configure:  Compiler flags: -march=pentium4 -mtune=pentium4  -msse -mfpmath=sse 
+configure:                  -fif-conversion
+configure:                      -O3
+configure: 
+configure:  Architecture: i686 
+configure: 
+configure:    x86  
+configure:     MMX     enabled     : yes
+configure:     MMX2    enabled     : yes
+configure:     SSE     enabled     : yes
+configure:     SSE2    enabled     : yes
+configure:     3DNOW   enabled     : no
+configure:     CMOV    enabled     : yes
+configure: 
+configure:    Platform: Linux
+configure: 
+configure:  Required dependencies:
+configure:   - POSIX Threads (pthread)       : true
+configure:   - MJPEGTools                        : true
+configure:   - AVI MJPEG playback/recording  : true (always)
+configure:   - FFmpeg AVFormat               : true 
+configure:   - FFmpeg AVCodec                : true 
+configure:   - FFmpeg Swscaler           : true 
+configure:  Optional dependencies
+configure:   - SDL support                   : true
+configure:   - DirectFB support              : false
+configure:   - OpenGL support                : false
+configure:   - libDV (digital video) support : false 
+configure:   - QuickTime support             : false 
+configure:   - Unicap Imaging                : true 
+configure:   - video4linux                   : true
+configure:   - JPEG support                  : true 
+configure:   - GDK Pixbuf support            : true
+configure:   - Jack Audio Connection Kit     : false
+configure:   - XML c library for Gnome       : true
+configure:   - Freetype support              : true
+</pre>
+Now, you can start building veejay
+<pre>
+$ make
+</pre>
+Followed by
+<pre>
+# make install
+</pre>
+</p>
+
+<h2><a name="3.3">3.3 Setting up multicast</h2><p>
+
+Multicast is a technology that reduces network traffic by
+simultaneously delivering a single stream of information
+to any interested recipient.
+<br><br>
+To enable multicast in Veejay, you must have enabled <i>IP multicast</i>
+in your kernel configuration.
+<br><br>
+Finally you need to add a multicast route :
+<pre>
+for 1 ethernet device:
+# route add -net 224.0.0.0 netmask 255.255.255.0 dev eth0
+
+for > 1 
+# route add -net 224.0.0.0 netmask 255.255.255.0 gw 192.168.100.1 dev eth1
+</pre>
+<br>
+Next, Veejay can be started with the commandline flags
+<b>-M/--multicast-osc</b> and/or <b>-V/--multicast-vims</b>
+<br>
+
+</p>
+
+<h2><a name="4">4. Using Veejay</a></h2><p>
+Veejay uses by default a SDL window to play the video.
+All the keybinding in veejay depend on SDL; if you move your mouse over to the
+SDL windows to focus it , you can press the keys explained in <a href="veejay-HOWTO.html#4.3">4.3 The keyboard interface</a>.<br>
+To use veejay in commandline style interface mode, see  
+<a href="veejay-HOWTO.html#4.2">4.2 sayVIMS</a>.<br>
+You must no longer provide a video file to use with veejay; it will run in dummy mode by
+using the '-d' commandline parameter:<br>
+<pre>
+$ veejay -d
+</pre>
+<br>
+To use the graphical client with veejay:
+<pre>
+$ reloaded -h localhost
+</pre>
+<br>
+</p>
+<h2><a name="4.1">4.1 Terminology and limitations</a></h2><p>
+Veejay has a number of playback modes, each playback mode is unique and defines more or less
+a different functionality:<br><br>
+Also, note that veejay runs in only 1 resolution at a time (depending on the video dimensions of
+the first loaded movie). All movies loaded must have identical properties, otherwise veejay will not start.
+This limitation is also valid when streaming video from veejay to another veejay.<br>
+
+<br><br>
+<table border="1">
+<caption><h4>Playback modes in veejay</h4></caption>
+
+<tr>
+<td width="50px"><i>Mode</i></td>
+<td width="100px"><i>Description</i></td>
+<td width="50px"><i>Navigation</i></td>
+<td width="50px"><i>Looping</i></td>
+<td width="50px"><i>Speed</i></td>
+<td width="50px"><i>Effect Chain</i></td>
+</tr>
+
+<tr>
+<td>Plain</td>
+<td>Default mode, playback of video</td>
+<td>Yes</td>
+<td>No</td>
+<td>Yes</td>
+<td>No</td>
+</tr>
+
+<tr>
+<td>Sample</td>
+<td>Sample mode, playback of video samples.</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+<td>Yes</td>
+</tr>
+
+<tr>
+<td>Tag</td>
+<td>Tag mode, playback of video streams</td>
+<td>No</td>
+<td>No</td>
+<td>No</td>
+<td>Yes</td>
+</tr>
+
+</table>
+
+</p>
+
+<h2><a name="4.2">4.2 VIMS</a></h2><p>
+<pre>
+
+Use the command 
+$ veejay -u -n |less
+
+to dump all VIMS messages.
+
+1.1 Message Format
+==================
+
+A message is described as:
+
+	 <Action Identifer> : <Argument List> ; 
+
+Example:
+
+	080:;
+	099:0 0;
+
+
+<Action Identifier>
+The action identifier is a 3 digit number describing a Network Event  
+The colon is used to indicate the start of the Argument List and must be given. 
+
+
+<Argument List>
+The Argument List is described by a printf() style formatted template 
+which describes the number and type of arguments to be used. 
+
+The semicolon must be given to indicate the end of this message
+
+1.2 Bundled Messages
+====================
+
+A message bundle is a special message that contains an ordered list of at least 1 or more messages. Each message is executed from left to right (first in, first out) while parsing the bundle.   
+
+
+Example:
+
+	5032|BUN:002{361:0 3 56 230 93 0;361:0 4 1 7;}|
+	5033|BUN:003{361:0 3 56 230 93 0;361:0 4 1 7;361:0 5 1 7;}|
+	5034|BUN:003{361:0 3 56 230 93 0;361:0 4 1 7;361:0 5 1 8;}|
+
+
+A message bundle is described as:
+
+	 BUN: <Number of Messages> { 
+		<Action Idenfifier> : <Argument List> ;
+		<Action Identifier> : <Argument List> ;
+		... 
+		}
+		;
+
+
+The token 'BUN:' indicates the start of a messaage bundle, the first 3 digit numeric value represents the total number of messages in the bundle. The '{' symbol indicates the start of a message block and is ended with '};' or just '}'. 
+
+
+1.3 Format of an Action File/Attaching Keys to Bundles
+======================================================
+
+	<501 - 599> | <message bundle> |
+
+The contents of some action file can be :
+
+	516|BUN:001{355:;}|
+
+
+
+The message bundle BUN sends '355' for clear effect chain.
+This message bundle is attached to action identifier 516.
+
+A key is attached to this function trough using the GUI (GVeejay)
+or by using: 
+
+
+DYNAMIC KEYMAPPING:
+==================
+
+	"083:516 <sdl symbol> <modifier> <optional arguments>;"
+
+
+The message bundle can be attached to a key , for example 'SHIFT + A' by sending 
+	
+	083:516 97 3;
+
+Which attaches bundle '516' to SDL key '97' using a modifier '3', which is SHIFT. 
+
+Modifiers: 0 = none, 1 = alt , 2 = ctrl,  3 = shift
+Keys     : see SDLkeysym.h somewhere in include/SDL/
+
+If the number 0 is used for an event number, a given key combination can be
+unset (wiped) :
+
+	083:0 97 3;
+
+Alternativly, you can bind keys to any action identifier. The complete
+list can be viewd by typing veejay -u |less or with Gveejay. 
+
+	083:20 97 0 4;
+
+The example above sets key 'a' to 'change video speed to 4'
+
+
+
+General  description of VIMS messages
+=====================================  
+
+
+Some reserved numbers:
+
+	clip id		0	:	select currently playing clip	
+	clip id		-1	:	select highest clip number 
+        chain entry	-1      :   	select current chain entry 
+	stream id 	0	:	select currently playing stream 
+	stream id 	-1	:	select highest stream number
+	key modifier	        :	0 = normal, 1= alt , 2 = ctrl, 3 = shift
+	frame		-1	:	use highest possible frame number (usually num video frames)
+	playback mode   	:	0 = clip, 1 = stream, 2 = plain
+	data format     	: 	yv16 (yuv 4:2:2 raw) , mpeg4, divx, msmpeg4v3,
+					div3, dvvideo, dvsd, mjpeg, i420 and yv12 (yuv 4:2:0 raw)
+	loop type		:  	0 = no looping, 1 = normal loop, 2 = pingpong (bounce) loop
+</pre>
+<br><br>
+<h2><a name="#4.2"></a>sayVIMS</h2>
+<br><br>
+sayVIMS is a commandline utility distributed with the veejay package,
+it allows you to give short commands in interactive mode<br><br>
+<i>$ sayVIMS -i -h localhost -p 3490</i><br><br>
+Typing '?' followed by pressing ENTER gives the list of command below:
+<pre>
+  vi [file]           Open video4linux device 
+  fi [file]           Open Y4M stream for input 
+  fo [file]           Open Y4M stream for output 
+  av [file]           Open (almost any) video file using FFmpeg 
+  mc [address] [port] Open a multicast UDP video stream 
+  pr [hostname][port] Open a unicast TCP video stream
+  cl [file]           Load cliplist from file 
+  cn [n1] [n2]        New clip from frames n1 to n2 
+  cd [n]              Delete clip n1 
+  sd [n]              Delete Stream n1 
+  cs [file]           Save cliplist to file 
+  es [file]           Save editlist to file 
+  ec [n1] [n2]        Cut frames n1 - n2 to buffer 
+  ed [n1] [n2]        Del franes n1 - n2  
+  ep [n]              Paste from buffer at frame n1 
+  ex [n1] [n2]        Copy frames n1 - n2 to buffer 
+  er [n1] [n2]        Crop frames n1 - n2 
+  al [file]           Action file Load 
+  as [file]           Action file save 
+  de                  Toggle debug level (default off) 
+  be                  Toggle bezerk mode (default on) 
+</pre>
+Also, you can send messages in VIMS format (or files, containing VIMS messages )<br><br>
+For example, add the Pixelate effect on the Effect Chain of the current playing stream or clip:
+<pre>
+sayVIMS -h localhost -p 3490 "361:0 0 150 3;"
+</pre>
+<br>
+Last but not least, sayVIMS can parse files containing VIMS messages.<br>
+See the test/examples directory of the package for a list of perl
+scripts that output a VIMS script.<br>
+<pre>
+sayVIMS -f advocate.vims -h localhost -p 3490
+</pre>
+<br>
+Alternativly, you can start a secundary veejay and stream from peer to peer in uncompressed video:
+<br>
+<pre>
+$ veejay -d -p 5000
+
+$ sayVIMS -h localhost -p 5000 "245:localhost 3490;"
+
+(press 'F7' in veejay to display the stream, prob. stream 7)
+</pre>
+Or for multicast:
+<pre>
+$ veejay -V 224.0.0.50 -p 5000 -n -L movie1.avi
+
+$ veejay -d 
+
+$ sayVIMS -h localhost -p 3490 "246:224.0.0.50 5000;"
+
+$ veejay -d -p 4000
+
+$ sayVIMS -h localhost -p 4000 "246:224.0.0.50 5000;"
+
+</pre>
+
+Or, if you want to play a XVID movie (or any other compressed format that is not I frame only):
+<pre>
+$ sayVIMS -h localhost -p 3490 "244:/tmp/my-XVID-movie.avi;"
+</pre>
+
+<h2><a name="4.3">4.3 The keyboard interface</a></h2><p>
+Here is a quick overview for the most used default keys, if applied in order you will end up
+with a newly created video sample looping in some way (depending on how many times you press the asterix key)<br>
+<br><br>
+<table border=0 width=80%>
+<caption><h4>Some keyboard bindings</h4></caption>
+
+<tr>
+<td><i>Description</i></td>
+<td><i>SDL key </i></td>
+<td><i>In plain english </i></td>
+</tr>
+
+<tr>
+<td>Set the starting position of a new sample</td>
+<td>SDLK_LEFTBRACKET</td>
+<td>Left bracket</td>
+</tr>
+
+<tr>
+<td>Set ending position and create a new sample</td>
+<td>SDLK_RIGHTBRACKET</td>
+<td>Right bracket</td>
+</tr>
+
+<tr>
+<td>Select and play sample <b>1</b></td>
+<td>SDLK_F1</td>
+<td>F1</td>
+</tr>
+
+<tr>
+<td>Set playback speed to 3</td>
+<td>SDLK_d</td>
+<td>d</td>
+<tr>
+
+<tr>
+<td>Change looptype</td>
+<td>SDLK_KP_MULTIPLY</td>
+<td>asterix on numeric keypad</td>
+</tr>
+
+<tr>
+<td>Play backward</td>
+<td>SDLK_KP_4</td>
+<td>Cursor left on numeric keypad</td>
+</tr>
+
+<tr>
+<td>Play forward</td>
+<td>SDLK_KP_6</td>
+<td>Cursor right on numeric keypad</td>
+</tr>
+
+<tr>
+<td>Skip 1 second</td>
+<td>SDLK_KP_8</td>
+<td>Cursor up on numeric keypad</td>
+</tr>
+
+<tr>
+<td>Switch playmode to Plain</td>
+<td>SDLK_KP_DIVIDE</td>
+<td>Divide on numeric keypad</td>
+</tr>
+
+<tr>
+<td>Print information about sample</td>
+<td>SDLK_HOME</td>
+<td>Home</td>
+</tr>
+
+</table>
+<br><br>
+The function keys <b>F1</b>...<b>F12</b> can be used to select sample <b>1</b> ... <b>12</b>,
+use the keys <b>1</b>...<b>9</b> to select a sample range <b>1-12</b> ... <b>108-120</b> and press
+one of the <b>F</b>-keys to play that sample.<br>
+<br>
+Use <b>ESC</b> to switch between samples and streams.
+Press <b>ESC</b> again to switch back to the sample playmode<br>
+You can create new input streams by using the console interface or by using GVeejay.<br>
+All new input streams (and samples) are auto numbered.<br>
+<br><br>
+</p>
+
+<h2><a name="4.4">4.4 Recording video</a></h2><p>
+You can record video to a new clip , by using the stream- or clip recorder functions.<br>
+For example, to record a new clip from a playing clip in MJPG format:<br>
+<pre>
+302:mjpg;
+</pre>
+Record 100 frames and start playing new clip when ready:
+<pre>
+130:100 1;
+</pre>
+Record the whole clip and dont start playing new clip when ready:
+<pre>
+130:0 0;
+</pre>
+If your Effect Chain is very CPU demanding , consider disabling audio and using the commandline parameter -c 0 to
+disable sync correction.<br>
+<br>
+It is possible to start veejay headless and have it write all video data to
+a (special) file for further processing.<br><br>
+Refer to chapter <a href="veejay-HOWTO.html#5.3">5.3</a> for some examples.<br><br>
+
+<h2><a name="4.5">4.5 Streaming video</a></h2><p>
+You can create an input stream to read video coming from a video4linux device, from a pipe 
+or from a network socket (both unicast and multicast).<br>
+<h3><a name="4.5.1">4.5.1 video4linux</a></h3>
+To open a video4linux device use gveejay or type the command:<br>
+<br>
+<pre>
+$ sayVIMS 240:0 1;
+</pre>
+The selector '240' tells veejay to open a video4linux device, the first argument '0' indicates
+the device number (i.e. /dev/video0) and the last argument '1' indicates the video in port
+of your capture card (in this case composite).<br>
+Veejay will create a new stream see <a href="#4.4">chapter 4.4</a> for activating the stream.<br>
+</p>
+<h3><a name="4.5.2">4.5.2 pipe</a></h3>
+Veejay supports reading video data from a pipe (FIFO) by means of an input stream.<br>
+The only supported transport format is yuv4mpeg (yuv 4:2:0). When playing YUV 4:2:2
+the video stream will be sampled to YUV 4:2:0 and vice versa<br>
+You can create the input stream by typing the command
+<pre>
+$ sayVIMS 243:/tmp/stream.yuv;
+</pre> 
+<h3><a name="4.5.3">4.5.3 network</a></h3>
+To get frames from another running veejay, use the command:
+<br>
+<pre>
+$ sayVIMS 245:<hostname> <portnum>;
+</pre>
+For example, sayVIMS 245:localhost 5000;<br>
+<br>
+If you want to send the same video to multiple running veejays accross the network,
+you can save bandwith by starting the veejay you wish to use as server with the -V option.
+<br>
+You can use the -V <multicast address> option to start an optional multicast frame sender.<br>
+First, you need a multicast route in your routing table. See chapter <a href="#3.3">3.3</a> for
+a short introduction 
+or consult a howto that disuccess setting up multicast for your operating system.
+<br>
+<br>
+   
+<pre>
+$ veejay -V 224.0.0.50 -p 5000
+</pre>
+
+Start another veejay, and use this command:
+<br>
+<pre>
+$ sayVIMS "246:5000 224.0.0.50;" 
+</pre>
+To create a new input stream. Start more veejays and use sayVIMS with the -p option to give
+it a port offset number. <br> 
+</p>
+<h2><a name="4.6">4.6 Other utilities</a></h2><p>
+
+Currently there are 4 extra utilities <b>yuv2rawdv</b> , <b>rawdv2yuv</b> , <b>sayVIMS</b> and <b>any2yuv</b> included in the veejay package for encoding
+a Y'C<sub>B</sub>C<sub>R</sub> 4:2:0 stream to raw DV and vice versa.
+<br><br>
+
+<b>yuv2rawdv</b> takes input from STDIN and outputs to STDOUT, we illustrate this with 
+a few examples.<br>
+<br>
+When loading yuv2raw dv without parameters you will see:<br>
+<pre>
+This program reads a YUV4MPEG stream and puts RAW DV to stdout
+Usage:  yuv2rawdv [params]
+where possible params are:
+    -v num    Verbosity [0..2] (default 1)
+    -l num    Clamp Luma (default 0)
+    -c num    Clamp Chroma (default 0)
+</pre>
+
+If you use the clamp parameters, it will clip (not scale!) a pixel into a valid range,
+the resulting video could be for example a bit darker if the input stream has values for
+Luminance exceeding the maximum of 235.<br>
+See the table below for all valid ranges.
+<table border=0 width=80%>
+<caption><h4>Y'C<sub>B</sub>C<sub>R</sub></h4></caption> 
+
+<tr>
+<td><i>Channel</i></td>
+<td><i>Range (Clamp)</i></td>
+<td><i>Byte range (no clamping)</i></td>
+</tr>
+
+<tr>
+<td>Y (Luminance)</td>
+<td>16 - 235</td>
+<td>0 - 255</td>
+</tr>
+
+<tr>
+<td>Cb (Chroma Blue)</td>
+<td>16 - 240</td>
+<td>0 - 255</td>
+</tr>
+
+<tr>
+<td>Cr (Chroma Red) </td>
+<td>16 - 240</td>
+<td>0 - 255</td>
+</tr>
+</table>
+<br>
+
+To convert a yuv4mpeg file to rawdv (the yuv4mpeg file needs to be compatible with the
+digital video format properties)<br>
+<pre>$ cat yuv4mpeg-file.yuv | yuv2rawdv | playdv</pre>
+<br><br>
+To convert a yuv4mpeg file to rawdv with luminance and chroma information clipped
+to a valid range:<br>
+<pre>$ cat yuv4mpeg-file.yuv | yuv2rawdv -l 1 -c 1 | playdv</pre>
+<br>
+
+<br><br>
+<b>rawdv2yuv</b> takes input from STDIN and outputs to STDOUT, we illustrate this with 
+a few examples.<br>
+
+<pre>
+This program reads a raw DV stream from stdin and puts YV12/I420 to stdout
+Usage:  rawdv2yuv [params]
+where possible params are:
+   -v num     Verbosity [0..2] (default 1)
+   -x         Swap Cb/Cr channels to produce IV12 (default is I420)
+   -n num     Norm to use: 0 = NTSC, 1 = PAL (default 1)
+   -q         DV quality to fastest (Monochrome)
+   -h         Output Half frame size
+   -c num     clip off <num> rows of frame (for use with -h)
+              must be a multiple of 8
+</pre>
+<br>
+If you want to convert a full PAL/NTSC dv frame to half PAL YCbCr (I420 or YV12) you can
+give the command:
+<br>
+<pre>
+$ cat raw.dv | rawdv2yuv -h | yuvplay</pre>
+<br>
+You can use the -c parameter to clip the width of the video frame.<br>
+<pre>
+$ cat raw.dv | rawdv2yuv -h -c 8 | yuvplay</pre>
+<br>
+The resizer in rawdv2yuv uses a best neighbour interpolation algorithm for downsizing.<br>
+
+<br><br>
+<b>any2yuv</b> takes input from STDIN and puts YV12/I420 to stdout: 
+<pre>
+This program reads anything from stdin and puts YV12/I420 to stdout
+Usage:  any2yuv [params]
+where possible params are:
+   -v num     Verbosity [0..2] (default 1)
+   -x         Swap Cb/Cr channels to produce IV12 (default is I420)
+   -n num     Norm to use: 0 = NTSC, 1 = PAL (default 1)
+</pre>
+<br>
+<br><br>
+<b>sayVIMS</b> can be used to send commands or files to batch-process to veejay
+<pre>
+Usage: sayVIMS [options] [messages]
+where options are:
+ -p             Veejay port (3490)
+ -h             Veejay host (localhost)
+ -g			    Veejay multicast address (224.0.0.50)
+ -f <filename>  Send contents of this file to veejay
+ -c             Colored output (geek feature)
+
+Messages to send to veejay must be wrapped in quotes
+You can send multiple messages by seperating them with a whitespace
+</pre>
+<br><br>
+
+</p>
+
+<h2><a name="5">5 Popular Packages</a></h2><p>
+Usefull software (in no apparant order):
+<ul>
+<li>The MJPEG Tools
+<li>Transcode
+<li>PureData (PD)
+<li>PDP for  PD
+</ul>
+Please refer to <a href="veejay-HOWTO.html#5">Other Resources</a> to find the project's website<br>
+</p>
+<p><h2><a name="5.3">5.1 The MJPEG Tools</h2></a></p>
+<p>The Mjpeg tools are a set of tools that can do recording of videos and playback, simple cut-and-paste
+editing and the MPEG compression of audio and video under Linux.
+You can use the EditLists from this package in veejay and vice versa<br>
+
+Here are a few examples for processing video data:<br><br>
+
+1. Start veejay headless:
+<pre>
+$ mkfifo /tmp/special_file
+$ veejay /video/video.avi -O3 -o /tmp/special_file
+</pre>
+<br>
+Encoding it to DV avi type 2 (if video dimensions match either full PAL or NTSC)
+<pre>
+$ cat /tmp/special_file | yuv2rawdv -v 2 > rawdv
+</pre>
+<br>
+Encoding it to MJPEG file 'video-mjpeg.avi'
+<pre>
+$ cat /tmp/special_file | yuv2lav -v2 -f 0 -I 0 -q 90 -o video-mjpeg.avi
+</pre>
+Encoding veejay output to MJPEG file:
+<pre>
+$ veejay movie1.avi -o stdout -O3 | yuv2lav -f 0 -I 0 -q 90 -o movie1-mjpeg.avi
+</pre>
+
+</p>
+
+<h2><a name="5.4">5.2 Transcode</b></h2></a>
+<p>Transcode is a Linux video Stream Processing Tool, it can convert between different types of video formats<br>
+<br>
+Encode a file to mjpeg with no audio and rescale the output video to 352x288:<br><br>
+<pre>$ transcode -i input_file.avi -o new_mjpeg_file.avi -y mjpeg,null -Z352x288</pre>
+<br>
+</p>
+
+
+
+
+<p><h2><a name="6">6. Other Resources</a></h2></p>
+Here you will find the websites of the packages veejay requires as well as packages
+you can use in combination with veejay.
+<h2><a name="6.1">6.1 Web Sites</a></h2><p>
+<h3>Packages you need</h3>
+<ul>
+<li><a href="http://veejay.sourceforge.net">veejay</a>
+<li><a href="http://libdv.sourceforge.net">Quasar DV Codec http://libdv.sourcefoge.net</a>
+<li><a href="http://www.libsdl.org">Simple DirectMedia Layer http://www.libsdl.org</a>
+<li><a href="http://www.xmlsoft.org">The XML C library for Gnome http://www.xmlsoft.org</a>
+<li><a href="http://www.directfb.org">DirectFB http://www.directfb.org</a>
+<li><a href="http://jackit.sourceforge.net">JACK http://jackit.sourceforge.net</a>
+<li><a href="http://freetype.sourceforge.net">FreeType , http://freetype.sourceforge.net</a>
+</ul>
+</p>
+<p>
+<h3>Usefull software</h3>
+<ul>
+<li><a href="http://www.mplayerhq.hu/">Mplayer http://www.mplayerhq.hu</a>
+<li><a href="http://mjpeg.sourceforge.net">The MJPEGTools http://mjpeg.sourceforge.net</a>
+<li><a href="http://pure-data.sourceforge.net">Pure Data</a>
+<li><a href="http://zwizwa.fartit.com/pd/sendVIMS/">sendVIMS PD module (very cool!)</a>
+<li><a href="http://www.theorie.physik.uni-goettingen.de/~ostreich/transcode/">Transcode http://www.theorie.physik.uni-goettingen.de/~ostreich/transcode/</a>
+</ul>
+</p>
+<h2><a name="6.2">6.2 Mailing Lists</a></h2><p>
+There is a mailing list for veejay which is hosted by Sourceforge. 
+The address is <a href="mailto:veejay-users@lists.sourceforge.net">veejay-users@lists.sourceforge.net</a>
+</p>
+<p>
+<h2><a name="6.3">6.3 Veejay developer's lounge</a></h2>
+Veejay's developer lounge provides a ticket system for you , the user, to report
+any problem or feature requests. The ticket system allows us to keep track of
+problems.<br>
+Also, the developer lounge hosts a subversion code repository where you can 
+find the 'on the bleeding edge' source codes of veejay.<br>
+Many thanks to jaromil (author of FreeJ/Muse) and the <a href="http://dyne.org">Dyne Foundation</a> for providing these tools<br>.
+</p>
+
+<h2><a name="7">7. Credits</a></h2><p>
+End of the Veejay HOWTO. (You can stop reading here.)
+</p>
+
+<h2><a name="8">8. GNU Free Documentation License</a></h2>
+
+<p>GNU Free Documentation License
+
+<p>Version 1.1, March 2000
+
+<p>Copyright (C) 2000  Free Software Foundation, Inc. 
+  59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
+
+<p>Everyone is permitted to copy and distribute verbatim copies
+ of this license document, but changing it is not allowed.
+
+<p>0. PREAMBLE
+
+<p>The purpose of this License is to make a manual, textbook, or other
+written document "free" in the sense of freedom: to assure everyone
+the effective freedom to copy and redistribute it, with or without
+modifying it, either commercially or noncommercially.  Secondarily,
+this License preserves for the author and publisher a way to get
+credit for their work, while not being considered responsible for
+modifications made by others.
+
+<p>This License is a kind of "copyleft", which means that derivative
+works of the document must themselves be free in the same sense.  It
+complements the GNU General Public License, which is a copyleft
+license designed for free software.
+
+<p>We have designed this License in order to use it for manuals for free
+software, because free software needs free documentation: a free
+program should come with manuals providing the same freedoms that the
+software does.  But this License is not limited to software manuals;
+it can be used for any textual work, regardless of subject matter or
+whether it is published as a printed book.  We recommend this License
+principally for works whose purpose is instruction or reference.
+
+<p>1. APPLICABILITY AND DEFINITIONS
+
+<p>This License applies to any manual or other work that contains a
+notice placed by the copyright holder saying it can be distributed
+under the terms of this License.  The "Document", below, refers to any
+such manual or work.  Any member of the public is a licensee, and is
+addressed as "you".
+
+<p>A "Modified Version" of the Document means any work containing the
+Document or a portion of it, either copied verbatim, or with
+modifications and/or translated into another language.
+
+<p>A "Secondary Section" is a named appendix or a front-matter section of
+the Document that deals exclusively with the relationship of the
+publishers or authors of the Document to the Document's overall subject
+(or to related matters) and contains nothing that could fall directly
+within that overall subject.  (For example, if the Document is in part a
+textbook of mathematics, a Secondary Section may not explain any
+mathematics.)  The relationship could be a matter of historical
+connection with the subject or with related matters, or of legal,
+commercial, philosophical, ethical or political position regarding
+them.
+
+<p>The "Invariant Sections" are certain Secondary Sections whose titles
+are designated, as being those of Invariant Sections, in the notice
+that says that the Document is released under this License.
+
+<p>The "Cover Texts" are certain short passages of text that are listed,
+as Front-Cover Texts or Back-Cover Texts, in the notice that says that
+the Document is released under this License.
+
+<p>A "Transparent" copy of the Document means a machine-readable copy,
+represented in a format whose specification is available to the
+general public, whose contents can be viewed and edited directly and
+straightforwardly with generic text editors or (for images composed of
+pixels) generic paint programs or (for drawings) some widely available
+drawing editor, and that is suitable for input to text formatters or
+for automatic translation to a variety of formats suitable for input
+to text formatters.  A copy made in an otherwise Transparent file
+format whose markup has been designed to thwart or discourage
+subsequent modification by readers is not Transparent.  A copy that is
+not "Transparent" is called "Opaque".
+
+<p>Examples of suitable formats for Transparent copies include plain
+ASCII without markup, Texinfo input format, LaTeX input format, SGML
+or XML using a publicly available DTD, and standard-conforming simple
+HTML designed for human modification.  Opaque formats include
+PostScript, PDF, proprietary formats that can be read and edited only
+by proprietary word processors, SGML or XML for which the DTD and/or
+processing tools are not generally available, and the
+machine-generated HTML produced by some word processors for output
+purposes only.
+
+<p>The "Title Page" means, for a printed book, the title page itself,
+plus such following pages as are needed to hold, legibly, the material
+this License requires to appear in the title page.  For works in
+formats which do not have any title page as such, "Title Page" means
+the text near the most prominent appearance of the work's title,
+preceding the beginning of the body of the text.
+
+<p>2. VERBATIM COPYING
+
+<p>You may copy and distribute the Document in any medium, either
+commercially or noncommercially, provided that this License, the
+copyright notices, and the license notice saying this License applies
+to the Document are reproduced in all copies, and that you add no other
+conditions whatsoever to those of this License.  You may not use
+technical measures to obstruct or control the reading or further
+copying of the copies you make or distribute.  However, you may accept
+compensation in exchange for copies.  If you distribute a large enough
+number of copies you must also follow the conditions in section 3.
+
+<p>You may also lend copies, under the same conditions stated above, and
+you may publicly display copies.
+
+<p>3. COPYING IN QUANTITY
+
+<p>If you publish printed copies of the Document numbering more than 100,
+and the Document's license notice requires Cover Texts, you must enclose
+the copies in covers that carry, clearly and legibly, all these Cover
+Texts: Front-Cover Texts on the front cover, and Back-Cover Texts on
+the back cover.  Both covers must also clearly and legibly identify
+you as the publisher of these copies.  The front cover must present
+the full title with all words of the title equally prominent and
+visible.  You may add other material on the covers in addition. 
+Copying with changes limited to the covers, as long as they preserve
+the title of the Document and satisfy these conditions, can be treated
+as verbatim copying in other respects.
+
+<p>If the required texts for either cover are too voluminous to fit
+legibly, you should put the first ones listed (as many as fit
+reasonably) on the actual cover, and continue the rest onto adjacent
+pages.
+
+<p>If you publish or distribute Opaque copies of the Document numbering
+more than 100, you must either include a machine-readable Transparent
+copy along with each Opaque copy, or state in or with each Opaque copy
+a publicly-accessible computer-network location containing a complete
+Transparent copy of the Document, free of added material, which the
+general network-using public has access to download anonymously at no
+charge using public-standard network protocols.  If you use the latter
+option, you must take reasonably prudent steps, when you begin
+distribution of Opaque copies in quantity, to ensure that this
+Transparent copy will remain thus accessible at the stated location
+until at least one year after the last time you distribute an Opaque
+copy (directly or through your agents or retailers) of that edition to
+the public.
+
+<p>It is requested, but not required, that you contact the authors of the
+Document well before redistributing any large number of copies, to give
+them a chance to provide you with an updated version of the Document.
+
+<p>4. MODIFICATIONS
+
+<p>You may copy and distribute a Modified Version of the Document under
+the conditions of sections 2 and 3 above, provided that you release
+the Modified Version under precisely this License, with the Modified
+Version filling the role of the Document, thus licensing distribution
+and modification of the Modified Version to whoever possesses a copy
+of it.  In addition, you must do these things in the Modified Version:
+
+<p>A. Use in the Title Page (and on the covers, if any) a title distinct
+   from that of the Document, and from those of previous versions
+   (which should, if there were any, be listed in the History section
+   of the Document).  You may use the same title as a previous version
+   if the original publisher of that version gives permission. 
+B. List on the Title Page, as authors, one or more persons or entities
+   responsible for authorship of the modifications in the Modified
+   Version, together with at least five of the principal authors of the
+   Document (all of its principal authors, if it has less than five). 
+C. State on the Title page the name of the publisher of the
+   Modified Version, as the publisher. 
+D. Preserve all the copyright notices of the Document. 
+E. Add an appropriate copyright notice for your modifications
+   adjacent to the other copyright notices. 
+F. Include, immediately after the copyright notices, a license notice
+   giving the public permission to use the Modified Version under the
+   terms of this License, in the form shown in the Addendum below. 
+G. Preserve in that license notice the full lists of Invariant Sections
+   and required Cover Texts given in the Document's license notice. 
+H. Include an unaltered copy of this License. 
+I. Preserve the section entitled "History", and its title, and add to
+   it an item stating at least the title, year, new authors, and
+   publisher of the Modified Version as given on the Title Page.  If
+   there is no section entitled "History" in the Document, create one
+   stating the title, year, authors, and publisher of the Document as
+   given on its Title Page, then add an item describing the Modified
+   Version as stated in the previous sentence. 
+J. Preserve the network location, if any, given in the Document for
+   public access to a Transparent copy of the Document, and likewise
+   the network locations given in the Document for previous versions
+   it was based on.  These may be placed in the "History" section. 
+   You may omit a network location for a work that was published at
+   least four years before the Document itself, or if the original
+   publisher of the version it refers to gives permission. 
+K. In any section entitled "Acknowledgements" or "Dedications",
+   preserve the section's title, and preserve in the section all the
+   substance and tone of each of the contributor acknowledgements
+   and/or dedications given therein. 
+L. Preserve all the Invariant Sections of the Document,
+   unaltered in their text and in their titles.  Section numbers
+   or the equivalent are not considered part of the section titles. 
+M. Delete any section entitled "Endorsements".  Such a section
+   may not be included in the Modified Version. 
+N. Do not retitle any existing section as "Endorsements"
+   or to conflict in title with any Invariant Section.
+
+<p>If the Modified Version includes new front-matter sections or
+appendices that qualify as Secondary Sections and contain no material
+copied from the Document, you may at your option designate some or all
+of these sections as invariant.  To do this, add their titles to the
+list of Invariant Sections in the Modified Version's license notice. 
+These titles must be distinct from any other section titles.
+
+<p>You may add a section entitled "Endorsements", provided it contains
+nothing but endorsements of your Modified Version by various
+parties-for example, statements of peer review or that the text has
+been approved by an organization as the authoritative definition of a
+standard.
+
+<p>You may add a passage of up to five words as a Front-Cover Text, and a
+passage of up to 25 words as a Back-Cover Text, to the end of the list
+of Cover Texts in the Modified Version.  Only one passage of
+Front-Cover Text and one of Back-Cover Text may be added by (or
+through arrangements made by) any one entity.  If the Document already
+includes a cover text for the same cover, previously added by you or
+by arrangement made by the same entity you are acting on behalf of,
+you may not add another; but you may replace the old one, on explicit
+permission from the previous publisher that added the old one.
+
+<p>The author(s) and publisher(s) of the Document do not by this License
+give permission to use their names for publicity for or to assert or
+imply endorsement of any Modified Version.
+
+<p>5. COMBINING DOCUMENTS
+
+<p>You may combine the Document with other documents released under this
+License, under the terms defined in section 4 above for modified
+versions, provided that you include in the combination all of the
+Invariant Sections of all of the original documents, unmodified, and
+list them all as Invariant Sections of your combined work in its
+license notice.
+
+<p>The combined work need only contain one copy of this License, and
+multiple identical Invariant Sections may be replaced with a single
+copy.  If there are multiple Invariant Sections with the same name but
+different contents, make the title of each such section unique by
+adding at the end of it, in parentheses, the name of the original
+author or publisher of that section if known, or else a unique number. 
+Make the same adjustment to the section titles in the list of
+Invariant Sections in the license notice of the combined work.
+
+<p>In the combination, you must combine any sections entitled "History"
+in the various original documents, forming one section entitled
+"History"; likewise combine any sections entitled "Acknowledgements",
+and any sections entitled "Dedications".  You must delete all sections
+entitled "Endorsements."
+
+<p>6. COLLECTIONS OF DOCUMENTS
+
+<p>You may make a collection consisting of the Document and other documents
+released under this License, and replace the individual copies of this
+License in the various documents with a single copy that is included in
+the collection, provided that you follow the rules of this License for
+verbatim copying of each of the documents in all other respects.
+
+<p>You may extract a single document from such a collection, and distribute
+it individually under this License, provided you insert a copy of this
+License into the extracted document, and follow this License in all
+other respects regarding verbatim copying of that document.
+
+<p>7. AGGREGATION WITH INDEPENDENT WORKS
+
+<p>A compilation of the Document or its derivatives with other separate
+and independent documents or works, in or on a volume of a storage or
+distribution medium, does not as a whole count as a Modified Version
+of the Document, provided no compilation copyright is claimed for the
+compilation.  Such a compilation is called an "aggregate", and this
+License does not apply to the other self-contained works thus compiled
+with the Document, on account of their being thus compiled, if they
+are not themselves derivative works of the Document.
+
+<p>If the Cover Text requirement of section 3 is applicable to these
+copies of the Document, then if the Document is less than one quarter
+of the entire aggregate, the Document's Cover Texts may be placed on
+covers that surround only the Document within the aggregate. 
+Otherwise they must appear on covers around the whole aggregate.
+
+<p>8. TRANSLATION
+
+<p>Translation is considered a kind of modification, so you may
+distribute translations of the Document under the terms of section 4. 
+Replacing Invariant Sections with translations requires special
+permission from their copyright holders, but you may include
+translations of some or all Invariant Sections in addition to the
+original versions of these Invariant Sections.  You may include a
+translation of this License provided that you also include the
+original English version of this License.  In case of a disagreement
+between the translation and the original English version of this
+License, the original English version will prevail.
+
+<p>9. TERMINATION
+
+<p>You may not copy, modify, sublicense, or distribute the Document except
+as expressly provided for under this License.  Any other attempt to
+copy, modify, sublicense or distribute the Document is void, and will
+automatically terminate your rights under this License.  However,
+parties who have received copies, or rights, from you under this
+License will not have their licenses terminated so long as such
+parties remain in full compliance.
+
+<p>10. FUTURE REVISIONS OF THIS LICENSE
+
+<p>The Free Software Foundation may publish new, revised versions
+of the GNU Free Documentation License from time to time.  Such new
+versions will be similar in spirit to the present version, but may
+differ in detail to address new problems or concerns.  See
+http://www.gnu.org/copyleft/.
+
+<p>Each version of the License is given a distinguishing version number. 
+If the Document specifies that a particular numbered version of this
+License "or any later version" applies to it, you have the option of
+following the terms and conditions either of that specified version or
+of any later version that has been published (not as a draft) by the
+Free Software Foundation.  If the Document does not specify a version
+number of this License, you may choose any version ever published (not
+as a draft) by the Free Software Foundation.
+
+<p>ADDENDUM: How to use this License for your documents
+
+<p>To use this License in a document you have written, include a copy of
+the License in the document and put the following copyright and
+license notices just after the title page:
+
+<br><pre>    Copyright (c)  YEAR  YOUR NAME.
+    Permission is granted to copy, distribute and/or modify this document
+    under the terms of the GNU Free Documentation License, Version 1.1
+    or any later version published by the Free Software Foundation;
+    with the Invariant Sections being LIST THEIR TITLES, with the
+    Front-Cover Texts being LIST, and with the Back-Cover Texts being LIST.
+    A copy of the license is included in the section entitled "GNU
+    Free Documentation License".
+</pre>
+
+<p>If you have no Invariant Sections, write "with no Invariant Sections"
+instead of saying which ones are invariant.  If you have no
+Front-Cover Texts, write "no Front-Cover Texts" instead of
+"Front-Cover Texts being LIST"; likewise for Back-Cover Texts.
+
+<p>If your document contains nontrivial examples of program code, we
+recommend releasing these examples in parallel under your choice of
+free software license, such as the GNU General Public License,
+to permit their use in free software.
+
+
+
+</div>
+</body>
+</html>
+
