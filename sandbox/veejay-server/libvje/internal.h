@@ -169,7 +169,7 @@ enum {
     VJ_IMAGE_EFFECT_COLORTEST = 146,
     VJ_IMAGE_EFFECT_DIFF = 147,
     VJ_IMAGE_EFFECT_NOISEPENCIL = 148,
-  //  VJ_IMAGE_EFFECT_RIPPLETV = 149,
+    VJ_IMAGE_EFFECT_RIPPLETV = 149,
     VJ_IMAGE_EFFECT_PENCILSKETCH = 143,
     VJ_IMAGE_EFFECT_PIXELATE = 150,
     VJ_IMAGE_EFFECT_MAGICMIRROR = 151,
@@ -210,12 +210,12 @@ enum {
 	VJ_IMAGE_EFFECT_CHAMELEON	=	186,
 	VJ_IMAGE_EFFECT_BALTANTV	=	187,
 	VJ_IMAGE_EFFECT_CONTOUR		=	188,
-	VJ_IMAGE_EFFECT_LENSCORRECTION  = 	149,
+	VJ_IMAGE_EFFECT_LENSCORRECTION  = 	189,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 189
+#define VJ_IMAGE_EFFECT_MAX 190
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 246
@@ -479,7 +479,7 @@ extern void crosspixel_apply(VJFrame *frame, int w, int h,int type, int val);
 extern void color_apply(VJFrame *frame, int w, int h, int a,int b, int c);
 
 //extern void water_apply(VJFrame *frame, int w, int h, int val, int l, int d);
-extern void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, int height, int fresh_rate, int loopnum, int decay, int mode, int threshold);
+extern void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, int height, int fresh,int loopnum, int decay, int mode, int threshold);
 
 extern void pencilsketch_apply(VJFrame *frame, int w, int h, int type, int threshold, int opacity);
 

@@ -35,7 +35,7 @@ libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			effects/complexthreshold.c effects/complexinvert.c effects/complexsync.c \
 			effects/isolate.c transitions/vbar.c transitions/3bar.c effects/enhancemask.c effects/noiseadd.c \
 			effects/contrast.c effects/motionblur.c effects/sinoids.c effects/average.c \
-		        effects/ripple.c effects/water.c effects/noisepencil.c effects/bathroom.c effects/slice.c \
+		        effects/ripple.c effects/waterrippletv.c effects/water.c effects/noisepencil.c effects/bathroom.c effects/slice.c \
 			effects/crosspixel.c effects/diffmap.c effects/threshold.c effects/morphology.c effects/colmorphology.c \
 			effects/ghost.c effects/blob.c effects/radcor.c effects/boids.c effects/nervous.c \
 			effects/cartonize.c effects/tripplicity.c effects/neighbours.c effects/neighbours2.c\

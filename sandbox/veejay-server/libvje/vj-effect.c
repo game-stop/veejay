@@ -105,6 +105,7 @@
 #include "effects/average.h"
 #include "effects/ripple.h"
 #include "effects/rippletv.h"
+#include "effects/waterrippletv.h"
 #include "effects/bathroom.h"
 #include "effects/timedistort.h"
 #include "effects/chameleon.h"
@@ -238,6 +239,7 @@ static struct
 {	baltantv_malloc,		baltantv_free,		VJ_IMAGE_EFFECT_BALTANTV	},
 {	radcor_malloc,			radcor_free,		VJ_IMAGE_EFFECT_LENSCORRECTION	},
 {	radioactivetv_malloc,		radioactivetv_free,	VJ_VIDEO_EFFECT_RADIOACTIVE	},
+{	waterrippletv_malloc,		waterrippletv_free,	VJ_IMAGE_EFFECT_RIPPLETV	},
 {	NULL			,	NULL			,0				},
 };
 
@@ -590,7 +592,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 86] = chameleon_init(width,height);
 	vj_effects[i + 87] = baltantv_init(width,height);
 	vj_effects[i + 88] = contourextract_init(width,height);
-	vj_effects[i + 49] = radcor_init(width,height);
+	vj_effects[i + 49] = waterrippletv_init(width,height);
+	vj_effects[i + 89 ]= radcor_init(width,height);
 	max_width = width;
 	max_height = height;
 
