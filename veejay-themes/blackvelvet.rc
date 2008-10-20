@@ -1,0 +1,165 @@
+# Edit these colors and fonts however you like.
+style "default"
+{
+#  engine "hcengine" {}
+  xthickness = 1
+  ythickness = 1
+  GtkWidget::shadow_type = GTK_SHADOW_ETCHED_OUT
+  #GtkWidget::interior_focus = 0
+  #GtkWidget::focus_padding = 0
+  #GtkWidget::default_border         = {0, 0, 0, 0}
+  #GtkWidget::default_outside_border = {0, 0, 0, 0} 
+  GtkWidget::default_spacing        = 0
+  GtkScale::stepper_size = 8
+  GtkRange::through-width = 4
+  GtkRange::trough_border = 0
+  GtkRange::slider-width = 16
+  GtkScale::slider-length = 12
+  
+  font_name = "Sans 8"
+
+  fg[NORMAL]        = "#333" # borders etc.
+  fg[PRELIGHT]      = "#444"
+  fg[ACTIVE]        = "#555" # ook borders, van sliders en notebook
+  fg[SELECTED]      = "#666"
+  fg[INSENSITIVE]   = "#777"
+  
+  bg[NORMAL]        = "#000" # algemene achtergrond kleur
+  bg[PRELIGHT]      = "#000" # achtergrond geselecteerd widget
+  bg[ACTIVE]        = "#000" # niet actieve tabs, achtergrond sliders
+  bg[SELECTED]      = "#444"
+  bg[INSENSITIVE]   = "#444" # achtergrond kleur van niet actieve knopjes
+
+  text[NORMAL]      = "#ccc"
+  text[PRELIGHT]    = "#d8d8d8"
+  text[ACTIVE]      = "#FF0000"
+  text[SELECTED]    = "#FF0000"
+  text[INSENSITIVE] = "#404040"
+
+  base[NORMAL]      = "#37383f"
+  base[PRELIGHT]    = "#aaacc1"
+  base[ACTIVE]      = "#757f90"
+  base[SELECTED]    = "#757ab3"
+  base[INSENSITIVE] = "#27282f"
+  
+}
+
+style "scale"{
+  GtkScale::stepper_size = 8
+  GtkRange::through-width = 1
+  GtkRange::trough_border = 0
+  GtkRange::slider-width = 16
+  GtkScale::slider-length = 12
+  
+  bg[ACTIVE]        = "#333" # trough
+  bg[NORMAL]        = "#444"	# normal
+  bg[PRELIGHT]      = "#7a7c7c" # mouseover
+  bg[INSENSITIVE]   = "#222" # achtergrond kleur van niet actieve knopjes
+  
+  fg[NORMAL]        = "#ccc" # values ( text)
+  fg[INSENSITIVE]   = "#000" # shadow color insensitive
+
+}
+
+style "notebook"{
+  bg[ACTIVE]        = "#333" # niet actieve tabs, achtergrond sliders
+}
+
+style "menubar"{
+	bg_pixmap[NORMAL] = "gradient.png"
+	bg[NORMAL] = "#000000"
+}
+
+style "frame"{
+  bg[NORMAL]        = "#333" # 4lgemene achtergrond kleur
+}
+
+
+style "button"{
+	bg[NORMAL] = "#000"
+	
+}
+
+style "text"
+{
+  font_name = "Sans 8"
+
+  fg[NORMAL]        = "#fff" # borders etc.
+  fg[PRELIGHT]      = "#ccc"
+  fg[ACTIVE]        = "#ffffff" # ook borders, van sliders en notebook
+  fg[SELECTED]      = "#ffffff"
+  fg[INSENSITIVE]   = "#ffffff"
+  
+
+  bg[NORMAL]        = "#27282F" # algemene achtergrond kleur
+  bg[PRELIGHT]      = "#aaacc1" # achtergrond geselecteerd widget
+  bg[ACTIVE]        = "#454f60" # niet actieve tabs, achtergrond sliders
+  bg[SELECTED]      = "#5058a0"
+  bg[INSENSITIVE]   = "#27282f" # achtergrond kleur van niet actieve knopjes
+
+  text[NORMAL]      = "#d8d8d8"
+  text[PRELIGHT]    = "#d8d8d8"
+  text[ACTIVE]      = "#fff"
+  text[SELECTED]    = "#fff"
+  text[INSENSITIVE] = "#404040"
+ 
+}
+
+style "tree"{
+ 	
+  text[NORMAL]      = "#ccc"
+  text[PRELIGHT]    = "#fff"
+  text[ACTIVE]      = "#ccc" # when clicked on parent
+  text[SELECTED]    = "#fff" # selected text
+  text[INSENSITIVE] = "#333"
+
+  base[NORMAL]      = "#333" # default background
+  base[PRELIGHT]    = "#444" # special click
+  base[ACTIVE]      = "#555" # matches text
+  base[SELECTED]    = "#444" # selected background
+  base[INSENSITIVE] = "#000" # disabled
+  	
+}
+
+style "spin"{
+
+}
+
+style "buttons"
+{
+ 
+  font_name = "Sans 8"
+  bg_pixmap[NORMAL] = "gradient.png"
+  bg[NORMAL]        = "#333"	# normal
+  bg[PRELIGHT]      = "#7a7c7c" # mouseover
+  bg[ACTIVE]        = "#0f0" # onmouseclick
+  bg[SELECTED]      = "#00f"
+  bg[INSENSITIVE]   = "#000"
+}
+
+style "togglebutton"
+{
+  bg[PRELIGHT]      = "#000" # mouseover
+  bg[INSENSITIVE]   = "#000"
+  
+  fg[NORMAL]        = "#333" # borders etc.
+  fg[PRELIGHT]      = "#444"
+  fg[ACTIVE]        = "#000" # border on click
+  fg[SELECTED]      = "#000" # check on click
+  fg[INSENSITIVE]   = "#000" # disabled
+}
+
+
+
+
+class "GtkButton" style "buttons"
+class "GtkSpinButton" style "spin"
+class "GtkToggleButton" style "togglebutton"
+class "GtkCheckBox" style "togglebutton"
+class "GtkLabel" style "text"
+class "GtkWidget" style "default"
+class "GtkScale" style "scale"
+class "GtkMenuBar" style "menubar"
+class "GtkFrame" style "frame"
+class "GtkNotebook" style "notebook"
+class "GtkTreeView" style "tree"

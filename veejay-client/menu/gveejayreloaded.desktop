@@ -1,0 +1,10 @@
+[Desktop Entry]
+Encoding=UTF-8
+Version=1.0
+Name=GVeejayReloaded
+Comment=Graphical Veejay Client
+Exec=gveejayreloaded
+Terminal=false
+Type=Application
+Icon=veejay-icon.png
+Categories=AudioVideoEditing;AudioVideo;

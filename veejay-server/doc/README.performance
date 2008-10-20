@@ -1,0 +1,22 @@
+
+ Veejay's performace depends much on the memory bandwith, CPU and disk access.
+
+ For HDTV (1280x720) mjpeg, you need at least a 2.5 ghz. The faster the better.
+
+ For full PAL/NTSC resolutions (720x576 resp. 720x480) DV/Mjpeg  you need at least a 1.5 ghz,
+ for lower resolution (352x288) you can do fine with a 500-800 mhz PC.
+ 
+ If you need to record without framedrop, you can do so by disabling audio and
+ disabling synchronization with the commandline options -a0 -c0
+ 
+ On newer PC's (pentium4) your best bet is working in RAW or MLZO (compressed) 
+ YUV 4:2:0 / 4:2:2  On my pentium 4 , 3.0 ghz playing a AVI file that contains RAW YUV frames 
+ uses about 3-4% for a full PAL movie and 10-12% for mixing 2 movies.
+ The tradeoff here is your diskspeed. You could use compression, this reduces the
+ size of the videofile anywhere between 0-30% .
+ 
+ Typical for laptops is slow diskspeed access, on my 1.8 ghz dell latitude laptop
+ the best I get is an average of about 20.0 mb/sec which is barely sufficient
+ for playing full PAL avi's containing RAW YUV.
+ (you can test yours with hdparm -T -t /dev/hdX) 
+ 

@@ -1,0 +1,19 @@
+Draft for abstract for guadec 2004, kristiansand norway.
+
+Title: Custom GtkWidgets using GtkCairo
+
+Abstract:
+
+Cairo is a vector graphics library with cross-device output support. There are
+plans for basing either the next generation, gtk+ or gnome canvas on cairo. One
+of the existing prototypes gtk+/Cairo integration is GtkCairo.
+
+In this talk, I'll give an introduction to programming with Cairo's imaging 
+model, focusing specially on issues relating to integration with gtk+, and 
+deriving GtkWidgets using GtkCairo, maintaing a consistent look and feel with 
+the rest of the gtk+ widget set. During the presentation I will demonstrate code
+and usage of both simple and advanced GtkCairo widgets.
+
+How cairo eventually will be integrated with gtk+/gnome in the future isn't quite
+sure yet, but Cairo's base API won't change, thus code created using GtkCairo; will
+easily be adopted to future interfaces.
