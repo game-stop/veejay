@@ -50,6 +50,7 @@ typedef struct {
 	int impact;
 	int last_fresh_rate;
 	int loopnum;
+	int lastmode;
 	unsigned int wfastrand_val;
 } water_t;
 
@@ -113,15 +114,15 @@ vj_effect *water_init(int width, int height)
     ve->limits[0][2] = 1;
     ve->limits[1][2] = 31; //number of waves
     ve->limits[0][3] = 0;
-    ve->limits[1][3] = 3;    // mode
+    ve->limits[1][3] = 6;    // mode
     ve->limits[0][4] = 0;
     ve->limits[1][4] = 255; // threshold
     ve->defaults[0] = 10;
     ve->defaults[1] = 1;
     ve->defaults[2] = 10;
-    ve->defaults[3] = 0;
+    ve->defaults[3] = 1;
     ve->defaults[4] = 45;
-    ve->description = "RippleTV  (EffectTV)";
+    ve->description = "Water ripples";
     ve->sub_format = 0;
     ve->extra_frame = 1;
     ve->has_user = 1;
@@ -266,7 +267,54 @@ static	int	globalactivity(VJFrame *f2, water_t *w, int in)
 	return res;
 }
 
-static	void	motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
+static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
+{
+        uint8_t *bg = w->diff_img + (f->width * f->height);
+        uint8_t *in = f2->data[0];
+        if(!w->have_img)
+        {
+                softblur_apply( f2,f->width,f->height,0);
+                veejay_memcpy(bg, f2->data[0], f->width * f->height );  
+                w->have_img = 1;
+                return;
+        }
+
+        int i,len= f->width * f->height;
+        uint8_t pp1;
+        for(i = 0; i < len ; i ++ ) {
+                pp1 = abs(bg[i] - in[i]);
+                if(pp1 > threshold ) {
+                        w->diff_img[i] = pp1;
+                } else {
+                        w->diff_img[i] = 0;
+// (w->diff_img[i] + 0)>>1;
+                } 
+        }
+
+        int *p = w->map1 + w->map_w + 1;
+        int *q = w->map2 + w->map_w + 1;        
+        int width = f->width;
+        int x,y,h;
+        uint8_t *d = w->diff_img + width + 2;
+        for( y = w->map_h - 2; y > 0 ; y -- ) { 
+                for( x = w->map_w - 2 ; x > 0 ; x -- ) {
+                        h = (int) *d + (int) *(d+1) + (int) *(d+width) + (int) *(d+width+1);
+                        if(h>0) {
+                                *p = h << ( w->point + w->impact - 8 );
+                                *q = *p;                        
+                        }
+                        p ++; q ++;
+                        d += 2;
+                }
+                d += width + 2;
+                p += 2;
+                q += 2; 
+        }
+        
+}
+
+
+static	void	motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
 	uint8_t *bg = w->diff_img + (f->width * f->height);
 	uint8_t *in = f2->data[0];
@@ -283,7 +331,7 @@ static	void	motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 	for(i = 0; i < len ; i ++ ) {
 		pp1 = abs(bg[i] - in[i]);
 		if(pp1 > threshold ) {
-			w->diff_img[i] = pp1;
+			w->diff_img[i] = 0xff-pp1;
 		} else {
 			w->diff_img[i] = 0;
 // (w->diff_img[i] + 0)>>1;
@@ -311,7 +359,9 @@ static	void	motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 	}
 	
 }
-static	void	motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
+
+
+static	void	motiondetect3(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 {
 	uint8_t *bg = w->diff_img + (f->width * f->height);
 	uint8_t *in = f2->data[0];
@@ -452,7 +502,12 @@ void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, in
 		w->last_fresh_rate = fresh_rate;
 		veejay_memset( w->map, 0, (w->map_h*w->map_w*2*sizeof(int)));
 	}
-
+	if(w->lastmode != mode )
+	{
+		veejay_memset( w->map, 0, (w->map_h*w->map_w*2*sizeof(int)));
+		w->have_img = 0;
+		w->lastmode = mode;
+	}
 	veejay_memcpy ( w->ripple_data[0], Y,len);
 
 	dest = Y;
@@ -469,13 +524,42 @@ void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, in
 		motiondetect(frame,frame2,threshold,w);
 //		decay  = globalactivity(frame2,w,decay);
 //veejay_msg(0, "Decay = %d",decay);
-	} else if(mode==3) {
-		motiondetect2(frame,frame2,threshold,w);
+	} else if(mode==4) {
+		motiondetect3(frame,frame2,threshold,w);
 //		decay  = globalactivity(frame2,w,decay);
+	} else if ( mode == 3 ) {
+		motiondetect2(frame,frame2,threshold,w);
 	} else if(mode == 1 ) {
 		motiondetect(frame,frame2,threshold,w);
 		drawmotionframe(frame,w);
 		return;
+	}
+
+	switch(mode) {
+		case 0: raindrop(w); w->have_img = 0; break;
+		case 1: 
+			motiondetect(frame,frame2,threshold,w);	
+			drawmotionframe(frame,w);
+			return; 
+		case 2: motiondetect(frame,frame2,threshold,w);
+			break;
+		case 3:
+			motiondetect2(frame,frame2,threshold,w);
+			drawmotionframe(frame,w);
+			return;
+			break;
+		case 4:
+			motiondetect2(frame,frame2,threshold,w);
+			break;
+		case 5:
+			motiondetect3(frame,frame2,threshold,w);
+			drawmotionframe(frame,w);
+			return;	
+		case 6:
+			motiondetect3(frame,frame2,threshold,w);
+			break;
+		default:
+		break;
 	}
 
 	/* simulate surface wave */

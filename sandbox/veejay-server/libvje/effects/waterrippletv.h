@@ -18,15 +18,15 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef RIPPLETV_H
-#define RIPPLETV_H
+#ifndef WARIPPLETV_H
+#define WARIPPLETV_H
 #include <libvje/vje.h>
 #include <libvjmem/vjmem.h>
 #include <sys/types.h>
 #include <stdint.h>
 
-vj_effect* water_init(int width, int height);
-int water_malloc(void **d,int w, int h);
-void water_free(void *d);
-void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, int height,int fresh, int loopnum, int decay, int mode, int threshold );
+vj_effect* waterrippletv_init(int width, int height);
+int waterrippletv_malloc(int w, int h);
+void waterrippletv_free();
+void waterrippletv_apply(VJFrame *frame, int width, int height, int val, int loop, int decay);
 #endif
