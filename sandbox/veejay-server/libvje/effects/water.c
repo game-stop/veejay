@@ -273,7 +273,7 @@ static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
         uint8_t *in = f2->data[0];
         if(!w->have_img)
         {
-                softblur_apply( f2,f->width,f->height,0);
+                //softblur_apply( f2,f->width,f->height,0);
                 veejay_memcpy(bg, f2->data[0], f->width * f->height );  
                 w->have_img = 1;
                 return;
@@ -517,7 +517,7 @@ void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, in
 	w->loopnum = loopnum;
 
 	/* impact from the motion or rain drop */
-	if(!mode) {
+/*	if(!mode) {
 		raindrop(w);
 		w->have_img = 0;
 	} else if(mode==2) {
@@ -534,7 +534,7 @@ void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, in
 		drawmotionframe(frame,w);
 		return;
 	}
-
+*/
 	switch(mode) {
 		case 0: raindrop(w); w->have_img = 0; break;
 		case 1: 
