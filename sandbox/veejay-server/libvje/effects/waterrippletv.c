@@ -31,6 +31,8 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "common.h"
+#define    RUP8(num)(((num)+8)&~8)
+
 static uint8_t *ripple_data[3];
 
 static int stat;
@@ -100,15 +102,15 @@ vj_effect *waterrippletv_init(int width, int height)
 
 int waterrippletv_malloc(int width, int height)
 {
-	ripple_data[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height);
+	ripple_data[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(width * height));
 	if(!ripple_data[0]) return 0;
 	veejay_memset( ripple_data[0], pixel_Y_lo_, width*height);
 
 	map_h = height / 2 + 1;
 	map_w = width / 2 + 1;
-	map = (int*) vj_calloc (sizeof(int) * map_h * map_w * 3);
+	map = (int*) vj_calloc (sizeof(int) * RUP8(map_h * map_w * 3));
 	if(!map) return 0;
-	vtable = (signed char*) vj_calloc( sizeof(signed char) * map_w * map_h * 2);
+	vtable = (signed char*) vj_calloc( sizeof(signed char) * RUP8(map_w * map_h * 2));
 	if(!vtable) return 0;
 	map3 = map + map_w * map_h * 2;
 	setTable();
@@ -123,7 +125,6 @@ void waterrippletv_free() {
 	if(ripple_data[0]) free(ripple_data[0]);
 	if(map) free(map);
 	if(vtable) free(vtable);
-
 }
 
 
@@ -131,7 +132,6 @@ static inline void drop(int power)
 {
 	int x, y;
 	int *p, *q;
-
 	x = wfastrand()%(map_w-4)+2;
 	y = wfastrand()%(map_h-4)+2;
 	p = map1 + y*map_w + x;
@@ -230,7 +230,6 @@ void	waterrippletv_apply(VJFrame *frame, int width, int height, int fresh_rate, 
 	signed char *vp;
 	uint8_t *src,*dest;
 	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
 
 	if(last_fresh_rate != fresh_rate || tick > fresh_rate)
 	{
@@ -240,9 +239,9 @@ void	waterrippletv_apply(VJFrame *frame, int width, int height, int fresh_rate, 
 	}
 
 	tick ++;
-	veejay_memcpy ( ripple_data[0], Y,len);
+	veejay_memcpy ( ripple_data[0], frame->data[0],len);
 
-	dest = Y;
+	dest = frame->data[0];
 	src = ripple_data[0];
 
 	/* impact from the motion or rain drop */
