@@ -1957,11 +1957,17 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 				   info->current_edit_list->video_height,
 				   info->current_edit_list->video_fps,0 );
 
+	if(!info->font) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing font system.");
+		return -1;
+	}
+
 
 	if(info->settings->composite)
 	{
 		info->osd = vj_font_init( info->video_output_width,info->video_output_height,
 					  info->current_edit_list->video_fps ,1  );
+
 	}
 	else
 	{	
@@ -1970,6 +1976,12 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 				   info->current_edit_list->video_fps,1 );
 	}
 	
+
+	if(!info->osd) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing font system for OSD.");
+		return -1;
+	}
+
 #endif
 
 
