@@ -32,6 +32,7 @@
 #include <stdio.h>
 #include <stdint.h>
 #include "common.h"
+#define RUP8(num)(((num)+8)&~8)
 
 typedef struct {
 	uint8_t *ripple_data[3];
@@ -141,28 +142,24 @@ int water_malloc(void **d, int width, int height)
 	*d = (void*) vj_calloc(sizeof(water_t));
 	water_t *w = (water_t*) *d;
 
-	w->ripple_data[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height);
+	w->ripple_data[0] = (uint8_t*)vj_calloc(sizeof(uint8_t) * RUP8(width * height));
 	if(!w->ripple_data[0]) return 0;
 
-	w->diff_img = (uint8_t*)vj_malloc(sizeof(uint8_t) * width * height * 2);
+	w->diff_img = (uint8_t*)vj_calloc(sizeof(uint8_t) * RUP8(width * height * 2));
 	if(!w->diff_img) return 0;
-
-	veejay_memset( w->ripple_data[0], pixel_Y_lo_, width*height);
-	veejay_memset( w->diff_img, pixel_Y_lo_, width * height );
 
 	w->map_h = height / 2 + 1;
 	w->map_w = width / 2 + 1;
 
-	w->map = (int*) vj_calloc (sizeof(int) * w->map_h * w->map_w * 3);
+	w->map = (int*) vj_calloc (sizeof(int) * RUP8( w->map_h * w->map_w * 3));
 	if(!w->map) return 0;
 
-	w->vtable = (signed char*) vj_calloc( sizeof(signed char) * w->map_w * w->map_h * 2);
+	w->vtable = (signed char*) vj_calloc( sizeof(signed char) * RUP8(w->map_w * w->map_h * 2));
 	if(!w->vtable) return 0;
 
 	w->map3 = w->map + w->map_w * w->map_h * 2;
 
 	setTable(w);
-
 
 	w->map1 = w->map;
 	w->map2 = w->map + w->map_h*w->map_w;
@@ -209,10 +206,7 @@ static	void	drawmotionframe( VJFrame *f , water_t *w )
 {
 	veejay_memset( f->data[1], 128, f->uv_len );
 	veejay_memset( f->data[2], 128, f->uv_len );
-	int i;
-	int len = f->width * f->height;
-	for( i = 0; i <len; i ++ )
-		f->data[0][i] = w->diff_img[i];
+	veejay_memcpy( f->data[0], w->diff_img, f->width * f->height );
 }
 
 static	int	globalactivity(VJFrame *f2, water_t *w, int in)
@@ -493,7 +487,6 @@ void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, in
 	signed char *vp;
 	uint8_t *src,*dest;
 	const int len = frame->len;
-	uint8_t *Y = frame->data[0];
 	int dummy = 0;
 	water_t *w = (water_t*) user_data;
 
@@ -508,33 +501,14 @@ void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, in
 		w->have_img = 0;
 		w->lastmode = mode;
 	}
-	veejay_memcpy ( w->ripple_data[0], Y,len);
+	veejay_memcpy ( w->ripple_data[0],frame->data[0],len);
 
-	dest = Y;
+	dest = frame->data[0];
 	src = w->ripple_data[0];
 
 
 	w->loopnum = loopnum;
 
-	/* impact from the motion or rain drop */
-/*	if(!mode) {
-		raindrop(w);
-		w->have_img = 0;
-	} else if(mode==2) {
-		motiondetect(frame,frame2,threshold,w);
-//		decay  = globalactivity(frame2,w,decay);
-//veejay_msg(0, "Decay = %d",decay);
-	} else if(mode==4) {
-		motiondetect3(frame,frame2,threshold,w);
-//		decay  = globalactivity(frame2,w,decay);
-	} else if ( mode == 3 ) {
-		motiondetect2(frame,frame2,threshold,w);
-	} else if(mode == 1 ) {
-		motiondetect(frame,frame2,threshold,w);
-		drawmotionframe(frame,w);
-		return;
-	}
-*/
 	switch(mode) {
 		case 0: raindrop(w); w->have_img = 0; break;
 		case 1: 
@@ -628,29 +602,6 @@ void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, in
 	wi = width;
 	vp = w->vtable;
 
-/*	dest2 = dest;
-        p = map1;
-        for(y=0; y<hi; y+=2) {
-                for(x=0; x<wi; x+=2) {
-                        h = (p[0]>>(point-5))+128;
-                        if(h < 0) h = 0;
-                        if(h > 255) h = 255;
-                        dest[0] = h;
-                        dest[1] = h;
-                        dest[wi] = h;
-                        dest[wi+1] = h;
-                        p++;
-                        dest+=2;
-                        vp+=2;
-                }
-                dest += width;
-                vp += 2;
-                p++;
-        }
-
-*/
-	 
-	
 	for(y=0; y<hi; y+=2) {
 		for(x=0; x<wi; x+=2) {
 			h = (int)vp[0];
