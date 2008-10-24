@@ -703,6 +703,9 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 		veejay_msg(VEEJAY_MSG_WARNING, "Your capture card doesnt understand %s, using fallback.",
 			unicap_pf_str( vut->pixfmt ));
 		vut->composite = 0;
+	}
+
+	if(!found_native) {
 		switch(pixel_format)
 		{
 			case FMT_420:
@@ -725,9 +728,21 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 				break;
 #endif
 		}	
-		vut->pixfmt = get_ffmpeg_pixfmt( pixel_format );
-		vut->shift    = get_shift_size(pixel_format);
-		vut->frame_size = vut->sizes[0] + vut->sizes[1] + vut->sizes[2];
+
+		for( i = 0;  SUCCESS( unicap_enumerate_formats( vut->handle, NULL, &(vut->format), i ) ); i ++ )
+		{
+			if( fourcc == vut->format.fourcc )
+			{
+			  veejay_msg(VEEJAY_MSG_INFO, "Found native colorspace '%s'", vut->format.identifier);
+		   	  found_native = 1;
+			  break;
+			}
+		}
+
+		if( found_native ) {
+			vut->pixfmt = get_ffmpeg_pixfmt( pixel_format );
+			vut->shift    = get_shift_size(pixel_format);
+		}
 	}
 
 	if( !found_native )
