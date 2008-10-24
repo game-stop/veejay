@@ -38,6 +38,7 @@ void 	*viewport_init(int x0, int y0, int w0, int h0, int w, int h, const char *d
 int	viewport_active( void *data );
 void			viewport_destroy( void *data );
 void	vewport_draw_interface_color( void *vdata, uint8_t *img[3] );
+void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3], int Yonly);
 void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_img );
 void      viewport_draw_interface_color( void *vdata, uint8_t *img[3] );
 void	viewport_set_marker( void *vdata, int status );

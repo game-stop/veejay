@@ -25,6 +25,10 @@ void composite_destroy( void *c );
 void    composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w, int h );
 void    composite_process( void *compiz, uint8_t *in[3], VJFrame *input, int vp_active, int focus);
 void	composite_blit( void *compiz,uint8_t *yuyv );
+int	composite_blitX( void *compiz, uint8_t *img[3] , uint8_t *out_img[3], int uvlen, int isFull);
+
+void	composite_blitXfinish(void *compiz, uint8_t *out_img[3] );
+
 void	composite_get_blit_buffer( void *compiz, uint8_t *buf[3] );
 void	*composite_get_vp( void *data );
 void	composite_transform_points( void *compiz, void *coords, int n, int blob_id, int cx, int cy, int w, int h,int num_objects,uint8_t *plane );

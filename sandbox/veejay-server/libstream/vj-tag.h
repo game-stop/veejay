@@ -130,7 +130,7 @@ int	vj_tag_get_stream_color(int t1, int *r, int *g, int *b );
    stream_nr indicates which stream to take of the same type
  */
 int 	vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
-	        int pix_fmt, int channel, int extra);
+	        int pix_fmt, int channel, int extra, int has_composite);
 
 /* return 1 if tag exists , 0 otherwise*/
 int 	vj_tag_exists(int id);
@@ -262,6 +262,7 @@ int 	vj_tag_set_effect_status(int s1, int status);
 int 	vj_tag_set_selected_entry(int s1, int position);
 void 	vj_tag_close_all();
 
+int	vj_tag_composite(int t1);
 
 int		vj_tag_init_encoder(int t1, char *filename, int format, long nframes);
 int		vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_size); 

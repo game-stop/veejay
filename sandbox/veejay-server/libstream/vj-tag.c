@@ -343,7 +343,7 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 }
 #ifdef HAVE_UNICAP
 int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
-		    int norm, int palette, int freq, int channel)
+		    int norm, int palette, int freq, int channel, int has_composite)
 {
 	char refname[100];
 	veejay_msg(VEEJAY_MSG_DEBUG, "%s: %dx%d, channel=%d, stream id=%d",__FUNCTION__,width,height, channel,stream_nr );
@@ -360,7 +360,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
     	}
 
 	if(!vj_unicap_configure_device(   vj_tag_input->unicap[stream_nr] ,
-			   palette, width,height))
+			   palette, width,height, has_composite))
 	{
 		veejay_msg(0,"Unable to configure device %d",channel);
 	   	vj_unicap_free_device( unicap_data_,vj_tag_input->unicap[stream_nr] );
@@ -502,9 +502,23 @@ int	vj_tag_get_stream_color(int t1, int *r, int *g, int *b )
 
 	return 1;
 }
+
+int	vj_tag_composite(int t1)
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return 0;
+	if(tag->source_type != VJ_TAG_TYPE_V4L )
+		return 0;
+#ifdef HAVE_UNICAP	
+	return vj_unicap_composite_status( vj_tag_input->unicap[ tag->index ] );
+#else
+	return 0;
+#endif
+}
+
 // for network, filename /channel is passed as host/port num
 int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
-	        int pix_fmt, int channel , int extra)
+	        int pix_fmt, int channel , int extra , int has_composite)
 {
     int i, j;
     int palette;
@@ -622,7 +636,7 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 		sprintf(tag->source_name, "%s", filename );
 		
 		if (!_vj_tag_new_unicap
-		    (tag, stream_nr, w, h,el->video_norm, pix_fmt, extra,channel ))
+		    (tag, stream_nr, w, h,el->video_norm, pix_fmt, extra,channel,has_composite ))
 		{
 			veejay_msg(0, "Unable to create unicap stream '%dx%d' %c, %d,  [%d,%d]",
 				w,h,el->video_norm, pix_fmt, extra,channel );
@@ -2779,7 +2793,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 		vj_tag_del( id );
 
 		int n_id = vj_tag_new( source_type, source_file, _tag_info->nstreams,_tag_info->current_edit_list,
-				_tag_info->pixel_format, source_id,zer );
+				_tag_info->pixel_format, source_id,zer, _tag_info->settings->composite );
 
 		if(n_id > 0 )
 		{

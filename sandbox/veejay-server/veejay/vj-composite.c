@@ -57,6 +57,7 @@ typedef struct
 	int  blit;
 	uint8_t *ptr[3];
 	int use_ptr;
+	int	Y_only;
 } composite_t;
 
 //@ round to multiple of 8
@@ -85,7 +86,7 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	c->img_height = ih;
 
 	c->pf = pf;
-	
+	c->Y_only = 1;
 	c->proj_plane[0] = (uint8_t*) vj_malloc( RUP8( pw * ph * 3) + RUP8(pw * 3));
 	c->proj_plane[1] = c->proj_plane[0] + RUP8(pw * ph) + RUP8(pw);
 	c->proj_plane[2] = c->proj_plane[1] + RUP8(pw * ph) + RUP8(pw);
@@ -289,12 +290,13 @@ void	composite_processX(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int
 {
 	composite_t *c = (composite_t*) compiz;
 	int proj_active = viewport_active(c->vp1 );
+
+
 	c->blit = 0;
 	//@ If the current focus is VIEWPORT, pass trough
 	if( focus == 0 )
 	{
 		composite_fit( c, input, img_dat );
-		return;
 	}
 	else
 	{
@@ -308,6 +310,8 @@ void	composite_processX(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int
 			composite_fit(c,input, img_dat );
 		}
 	}
+veejay_msg(0, "%s: use_vp=%d,focus=%d,c->blit=%d, proj_active=%d",__FUNCTION__,
+		use_vp,focus,c->blit,proj_active);
 }
 
 
@@ -324,12 +328,40 @@ void	composite_dummy( void *compiz )
 	viewport_dummy_send( c->vp1 );
 }
 
-void	composite_blitX( void *compiz, uint8_t *img[3] , uint8_t *out_img[3])
+int	composite_blitX( void *compiz, uint8_t *img[3] , uint8_t *out_img[3], int uvlen, int isFull)
 {
-		composite_t *c = (composite_t*) compiz;
-	viewport_produce_bw_img( c->vp1,
-		img, out_img );
+	composite_t *c = (composite_t*) compiz;
+veejay_msg(0, "%s: %s",
+	(c->Y_only == 1 ? "Greyscale" : "Color"),
+	(isFull == 1 ? "444Planar" : "System"));
+	if(c->Y_only && isFull ) {
+		viewport_produce_bw_img(c->vp1,img,out_img,1);
+		veejay_memset( out_img[1],128,uvlen);
+		veejay_memset( out_img[2],128,uvlen);
+		return 1;
+	}
+
+	if(isFull) {
+		viewport_produce_bw_img(c->vp1,img,out_img,0);
+		return 1;
+	} else {
+		chroma_supersample( c->sample_mode, c->sampler, img, c->proj_width, c->proj_height );
+		viewport_produce_bw_img( c->vp1,img, out_img , c->Y_only);
+		chroma_subsample( c->sample_mode, c->sampler, out_img, c->proj_width, c->proj_height );
+		if(c->Y_only) {
+			veejay_memset( out_img[1],128,uvlen);
+			veejay_memset( out_img[2],128,uvlen);
+		}
+	}
+	return 0;
 }
+
+void	composite_blitXfinish(void *compiz, uint8_t *out_img[3] ) {
+	composite_t *c = (composite_t*) compiz;
+
+	chroma_subsample( c->sample_mode, c->sampler, out_img, c->proj_width, c->proj_height );
+}
+
 void	composite_blit( void *compiz, uint8_t *yuyv )
 {
 	composite_t *c = (composite_t*) compiz;

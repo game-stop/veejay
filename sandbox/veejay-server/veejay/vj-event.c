@@ -6544,7 +6544,7 @@ void vj_event_tag_new_color(void *ptr, const char format[], va_list ap)
 		CLAMPVAL( args[i] );
 
 	
-	int id =  vj_tag_new( VJ_TAG_TYPE_COLOR, NULL, -1, v->edit_list,v->pixel_format, -1,0 );
+	int id =  vj_tag_new( VJ_TAG_TYPE_COLOR, NULL, -1, v->edit_list,v->pixel_format, -1,0 , v->settings->composite);
 	if(id > 0)
 	{
 		vj_tag_set_stream_color( id, args[0],args[1],args[2] );

@@ -870,7 +870,8 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 		}
 	}
 //@ palette is used for other things
-	int id = vj_tag_new(type, filename, index, info->current_edit_list, info->pixel_format, palette, channel );
+	int id = vj_tag_new(type, filename, index, info->current_edit_list, info->pixel_format, palette, channel,
+			info->settings->composite );
 
 	char descr[200];
 	veejay_memset(descr,0,200);
@@ -2336,7 +2337,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	 	int dummy_id;
 		/* Use dummy mode, action file could have specified something */
 		if( vj_tag_size()-1 <= 0 )
-			dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, "Solid", -1, info->current_edit_list,info->pixel_format,-1,0);
+			dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, "Solid", -1, info->current_edit_list,info->pixel_format,-1,0,0);
 		else
 			dummy_id = vj_tag_size()-1;
 

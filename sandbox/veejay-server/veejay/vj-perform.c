@@ -599,15 +599,15 @@ int vj_perform_init(veejay_t * info)
     sample_record_init(frame_len);
     vj_tag_record_init(w,h);
     // to render fading of effect chain:
-    temp_buffer[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len) * 2 );
+    temp_buffer[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len+16) * 2 );
     if(!temp_buffer[0]) return 0;
-	veejay_memset( temp_buffer[0], 16, frame_len );
-    temp_buffer[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len) * 2);
+	veejay_memset( temp_buffer[0], 16,  RUP8(frame_len+16) * 2  );
+    temp_buffer[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len+16) * 2);
     if(!temp_buffer[1]) return 0;
-	veejay_memset( temp_buffer[1], 128, frame_len );
-    temp_buffer[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len) * 2 );
+	veejay_memset( temp_buffer[1],128, (sizeof(uint8_t) * RUP8(frame_len+16) * 2)  );
+    temp_buffer[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len+16) * 2 );
     if(!temp_buffer[2]) return 0;
-	veejay_memset( temp_buffer[2], 128, frame_len );
+	veejay_memset( temp_buffer[2], 128,sizeof(uint8_t) * RUP8(frame_len+16) * 2 );
     // to render fading of effect chain:
     socket_buffer = (uint8_t*)vj_malloc(sizeof(uint8_t) * frame_len * 4 ); // large enough !!
     veejay_memset( socket_buffer, 16, frame_len * 4 );
@@ -615,9 +615,8 @@ int vj_perform_init(veejay_t * info)
 
     /* allocate space for frame_buffer, the place we render effects  in */
     for (c = 0; c < SAMPLE_MAX_EFFECTS; c++) {
-	frame_buffer[c] = (ycbcr_frame *) vj_malloc(sizeof(ycbcr_frame));
+	frame_buffer[c] = (ycbcr_frame *) vj_calloc(sizeof(ycbcr_frame));
         if(!frame_buffer[c]) return 0;
-	veejay_memset( frame_buffer[c],0, sizeof(ycbcr_frame));
     }
     // clear the cache information
 	vj_perform_clear_cache();
@@ -1590,6 +1589,14 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 		frame_buffer[chain_entry]->Cb,
 		frame_buffer[chain_entry]->Cr };
 
+    uint8_t  *backing_fb[3] = {
+		temp_buffer[0] + info->effect_frame1->len,
+		temp_buffer[1] + info->effect_frame1->len,
+		temp_buffer[2] + info->effect_frame1->len};
+    video_playback_setup *settings = info->settings;
+#ifdef STRICT_CHECKING
+	assert( info->effect_frame1->len > 0 );
+#endif
     switch (type)
     {		
 	case VJ_TAG_TYPE_YUV4MPEG:	/* playing from stream */
@@ -1612,37 +1619,26 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 		}
 		
 	  	if (vj_tag_get_active(sample_id) == 1 )
-		{
-			int res =  vj_tag_get_frame(sample_id, fb, audio_buffer[chain_entry]);
+		{	
+			int res = 0;
+			//@ Capture frame into backing buffer
+			if( settings->composite ) {
+				res = vj_tag_get_frame(sample_id,backing_fb, audio_buffer[chain_entry]);
+			} else {
+				res =  vj_tag_get_frame(sample_id, fb, audio_buffer[chain_entry]);
+			}
+
 			if(res==1)	
 		  		error = 0;
 			else
-		   		vj_tag_set_active(sample_id, 0);
-			video_playback_setup *settings = info->settings;
-	frame_buffer[chain_entry]->ssm = 0;
+		   		vj_tag_set_active(sample_id, 0); 
+			frame_buffer[chain_entry]->ssm = 0;
 
 			if( settings->composite )
-			{ //@ scales in software
-				if( settings->ca ) {
-					settings->ca = 0;
-					viewport_event_set_projection( composite_get_vp( info->composite ),
-						settings->cx,settings->cy,settings->cn , info->uc->mouse[2] );
-
-				}
-				if(info->which_vp == 1 )
-				{	//@ focus on projection screen
-					composite_event( info->composite, fb, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
-						vj_perform_get_width(info), vj_perform_get_height(info));
-				}
-			//	uint8_t *tmp = (uint8_t*) vj_malloc(sizeof(uint8_t) * 	vj_perform_get_width(info)* vj_perform_get_height(info));
-				uint8_t *t[3] = { temp_buffer[0] + (vj_perform_get_width(info)* vj_perform_get_height(info)), NULL,NULL };
-				veejay_memcpy(t[0],fb[0],vj_perform_get_width(info)* vj_perform_get_height(info));
-				composite_process(info->composite,fb,t,0,info->which_vp);
-				composite_blitX( info->composite, t, fb );
-			//	free(tmp);
-			///	veejay_memset(fb[1],128,info->effect_frame1->uv_len);
-			//	veejay_memset(fb[2],128,info->effect_frame1->uv_len);
-
+			{
+				composite_process(info->composite,fb,backing_fb,0,info->which_vp);
+				frame_buffer[chain_entry]->ssm = composite_blitX( info->composite, backing_fb, fb,
+					info->effect_frame1->uv_len, vj_tag_composite(sample_id) );
 			}
 
 	     	}
@@ -1661,10 +1657,21 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
  	    centry = vj_perform_sample_is_cached(sample_id, chain_entry);
             if(centry == -1 || info->no_caching)
 	    {
-		len = vj_perform_get_frame_fx( info, sample_id, nframe, fb );
-		if(len > 0)
+		if(settings->composite) {
+			len = vj_perform_get_frame_fx(info,sample_id,nframe,backing_fb );
+		} else {
+			len = vj_perform_get_frame_fx( info, sample_id, nframe, fb );	
+		}
+
+		if(len > 0 )
 			error = 0;
 		frame_buffer[chain_entry]->ssm = 0;
+
+		if(settings->composite) {
+			composite_process(info->composite,fb,backing_fb,0,info->which_vp);
+			frame_buffer[chain_entry]->ssm = composite_blitX(info->composite, backing_fb,fb,
+				info->effect_frame1->uv_len,0 );
+		}
 	    }
 	    else
 	    {
@@ -1763,6 +1770,15 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 		frame_buffer[chain_entry]->Y,
 		frame_buffer[chain_entry]->Cb,
 		frame_buffer[chain_entry]->Cr };
+    uint8_t  *backing_fb[3] = {
+		temp_buffer[0] + info->effect_frame1->len,
+		temp_buffer[1] + info->effect_frame1->len,
+		temp_buffer[2] + info->effect_frame1->len};
+#ifdef STRICT_CHECKING
+	assert( info->effect_frame1->len > 0 );
+#endif
+veejay_msg(0, "%s: %d ",__FUNCTION__, info->effect_frame1->len );
+	video_playback_setup *settings = info->settings;
 
     switch (type)
     {
@@ -1787,36 +1803,24 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 
 		if (vj_tag_get_active(sample_id) == 1)
 		{ 
-			res = vj_tag_get_frame(sample_id, fb,  audio_buffer[chain_entry]);
+			if( settings->composite ) {
+				res = vj_tag_get_frame(sample_id,backing_fb,audio_buffer[chain_entry] );
+			} else {
+				res = vj_tag_get_frame(sample_id, fb,  audio_buffer[chain_entry]);
+			}
 			if(res)
 				error = 0;                               
 			else
 				vj_tag_set_active(sample_id, 0); // stop stream
+
 			frame_buffer[chain_entry]->ssm = 0;
 //	frame_buffer[chain_entry]->ssm = 0;
 			video_playback_setup *settings = info->settings;
 			if( settings->composite )
-			{ //@ scales in software
-				if( settings->ca ) {
-					settings->ca = 0;
-					viewport_event_set_projection( composite_get_vp( info->composite ),
-						settings->cx,settings->cy,settings->cn , info->uc->mouse[2] );
-
-				}
-				if(info->which_vp == 1 )
-				{	//@ focus on projection screen
-					composite_event( info->composite, fb, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
-						vj_perform_get_width(info), vj_perform_get_height(info));
-				}
-			//	uint8_t *tmp = (uint8_t*) vj_malloc(sizeof(uint8_t) * 	vj_perform_get_width(info)* vj_perform_get_height(info));
-				uint8_t *t[3] = { temp_buffer[0] + (vj_perform_get_width(info)* vj_perform_get_height(info)), NULL,NULL };
-				veejay_memcpy(t[0],fb[0],vj_perform_get_width(info)* vj_perform_get_height(info));
-				composite_processX(info->composite,fb,t,0,info->which_vp);
-				composite_blitX( info->composite, t, fb );
-			//	free(tmp);
-			//	veejay_memset(fb[1],128,info->effect_frame1->uv_len);
-			//	veejay_memset(fb[2],128,info->effect_frame1->uv_len);
-
+			{
+				composite_processX(info->composite,fb,backing_fb,0,info->which_vp);
+				frame_buffer[chain_entry]->ssm = composite_blitX( info->composite, backing_fb, fb, 
+					info->effect_frame1->uv_len, vj_tag_composite(sample_id) );
 			}
 
 	    	}
@@ -1833,12 +1837,23 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 	    	nframe = vj_perform_get_subframe(info, sample_id, chain_entry); // get exact frame number to decode
  	  	centry = vj_perform_sample_is_cached(sample_id, chain_entry);
 
+
 	    	if(centry == -1 || info->no_caching)
 	    	{
-			len = vj_perform_get_frame_fx( info, sample_id, nframe, fb );	
+			if(settings->composite) {
+				len = vj_perform_get_frame_fx(info,sample_id,nframe,backing_fb );
+			} else {
+				len = vj_perform_get_frame_fx( info, sample_id, nframe, fb );	
+			}
+
 			if(len > 0 )
 				error = 0;
 			frame_buffer[chain_entry]->ssm = 0;
+			if(settings->composite) {
+				composite_process(info->composite,fb,backing_fb,0,info->which_vp);
+				frame_buffer[chain_entry]->ssm = composite_blitX(info->composite, backing_fb,fb,
+					info->effect_frame1->uv_len,0 );
+			}
 		}
 		else
 		{

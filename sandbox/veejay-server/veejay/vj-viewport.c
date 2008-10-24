@@ -2530,28 +2530,12 @@ void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3
 	int x,y;
 
 	y  = ty1 * w;
-#if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE)
-	fast_memset_dirty( outY, 0, y );
-	fast_memset_dirty( outU, 128, y );
-	fast_memset_dirty( outV, 128, y );
-#else
 	veejay_memset( outY,0,y);
 	veejay_memset( outU,128,y);
 	veejay_memset( outV, 128,y);
-#endif
 
 	for( y = ty1; y < ty2; y ++ )
 	{
-#if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE )
-		fast_memset_dirty( outY + (y * w ), 0, tx1 );
-		fast_memset_dirty( outY + (y * w ) + tx2, 0, (w-tx2));
-
-		fast_memset_dirty( outU + (y * w ), 128, tx1 );
-		fast_memset_dirty( outU + (y * w ) + tx2, 128, (w-tx2));
-
-		fast_memset_dirty( outV + (y * w ), 128, tx1 );
-		fast_memset_dirty( outV + (y * w ) + tx2, 128, (w-tx2));
-#else
 		veejay_memset( outY + (y * w ), 0, tx1 );
 		veejay_memset( outY + (y * w ) + tx2, 0, (w-tx2));
 
@@ -2560,7 +2544,6 @@ void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3
 
 		veejay_memset( outV + (y * w ), 128, tx1 );
 		veejay_memset( outV + (y * w ) + tx2, 128, (w-tx2));
-#endif
 		for( x = tx1; x < tx2 ; x ++ )
 		{
 			i = y * w + x;
@@ -2572,22 +2555,20 @@ void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3
 	}
 	y = (v->h - ty2 ) * w;
 	x = ty2 * w;
-#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
-
-	fast_memset_dirty( outY + x, 0, y );
-	fast_memset_dirty( outU + x, 128, y );
-	fast_memset_dirty( outV + x, 128, y );
-	fast_memset_finish();
-#else
 	veejay_memset( outY+x,0,y);
 	veejay_memset( outU + x, 128,y);
 	veejay_memset( outV + x , 128, y );
-
-#endif
 }
 
-void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3] )
+void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3], int Yonly)
 {
+	if( !Yonly ) {
+		viewport_produce_full_img( vdata, img, out_img );
+		return;
+	}
+
+
+
 	viewport_t *v = (viewport_t*) vdata;
 	const int len = v->w * v->h;
 	register const int w = v->w;
@@ -2604,23 +2585,12 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3] 
 	int x,y;
 
 	y  = ty1 * w;
-#if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE)
-	fast_memset_dirty( outY, 0, y );
-#else
 	veejay_memset( outY,0,y);
-#endif
 
 	for( y = ty1; y < ty2; y ++ )
 	{
-#if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE )
-		fast_memset_dirty( outY + (y * w ), 0, tx1 );
-		fast_memset_dirty( outY + (y * w ) + tx2, 0, (w-tx2));
-
-#else
 		veejay_memset( outY + (y * w ), 0, tx1 );
 		veejay_memset( outY + (y * w ) + tx2, 0, (w-tx2));
-
-#endif
 		for( x = tx1; x < tx2 ; x ++ )
 		{
 			i = y * w + x;
@@ -2630,14 +2600,7 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3] 
 	}
 	y = (v->h - ty2 ) * w;
 	x = ty2 * w;
-#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
-
-	fast_memset_dirty( outY + x, 0, y );
-	fast_memset_finish();
-#else
 	veejay_memset( outY+x,0,y);
-
-#endif
 }
 
 #define pack_yuyv_pixel( y0,u0,u1,y1,v0,v1 ) (\
