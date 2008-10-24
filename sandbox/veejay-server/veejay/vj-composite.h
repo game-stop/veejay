@@ -26,7 +26,7 @@ void    composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y,
 void    composite_process( void *compiz, uint8_t *in[3], VJFrame *input, int vp_active, int focus);
 void	composite_blit( void *compiz,uint8_t *yuyv );
 int	composite_blitX( void *compiz, uint8_t *img[3] , uint8_t *out_img[3], int uvlen, int isFull);
-
+void	composite_set_colormode( void *compiz, int mode );
 void	composite_blitXfinish(void *compiz, uint8_t *out_img[3] );
 
 void	composite_get_blit_buffer( void *compiz, uint8_t *buf[3] );

@@ -86,7 +86,7 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	c->img_height = ih;
 
 	c->pf = pf;
-	c->Y_only = 1;
+	c->Y_only = 0;
 	c->proj_plane[0] = (uint8_t*) vj_malloc( RUP8( pw * ph * 3) + RUP8(pw * 3));
 	c->proj_plane[1] = c->proj_plane[0] + RUP8(pw * ph) + RUP8(pw);
 	c->proj_plane[2] = c->proj_plane[1] + RUP8(pw * ph) + RUP8(pw);
@@ -328,16 +328,23 @@ void	composite_dummy( void *compiz )
 	viewport_dummy_send( c->vp1 );
 }
 
+void	composite_set_colormode( void *compiz, int mode )
+{
+	composite_t *c = (composite_t*) compiz;
+	if( mode == 0 )
+		c->Y_only = 0;
+	else if( mode == 1 )
+		c->Y_only = 1;
+}
+
+
 int	composite_blitX( void *compiz, uint8_t *img[3] , uint8_t *out_img[3], int uvlen, int isFull)
 {
 	composite_t *c = (composite_t*) compiz;
-veejay_msg(0, "%s: %s",
-	(c->Y_only == 1 ? "Greyscale" : "Color"),
-	(isFull == 1 ? "444Planar" : "System"));
 	if(c->Y_only && isFull ) {
-		viewport_produce_bw_img(c->vp1,img,out_img,1);
-		veejay_memset( out_img[1],128,uvlen);
-		veejay_memset( out_img[2],128,uvlen);
+		viewport_produce_bw_img(c->vp1,img,out_img,c->Y_only);
+//		veejay_memset( out_img[1],128,uvlen);
+//		veejay_memset( out_img[2],128,uvlen);
 		return 1;
 	}
 

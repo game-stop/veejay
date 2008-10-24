@@ -2328,6 +2328,19 @@ void		vj_init_vevo_events(void)
 				1000,
 				NULL );
 
+	index_map_[ VIMS_PROJ_STACK ] 				=	_new_event(
+				"%d %d",
+				VIMS_PROJ_STACK,
+				"Push viewport to secundary input",
+				vj_event_vp_stack,
+				2,
+				VIMS_ALLOW_ANY,
+				"On/Off",
+				0,
+				"Color=0, Grayscale=1",
+				0,
+				NULL );
+
 	index_map_[ VIMS_PROJ_SET_POINT ]				=	_new_event(
 				"%d %d %d %d",
 				VIMS_PROJ_SET_POINT,

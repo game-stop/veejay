@@ -435,7 +435,7 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 
 static int vj_perform_alloc_row(veejay_t *info, int c, int frame_len)
 {
-	uint8_t *buf = vj_malloc(sizeof(uint8_t) * RUP8(helper_frame->len * 3));
+	uint8_t *buf = vj_malloc(sizeof(uint8_t) * RUP8(helper_frame->len * 4));
 #ifdef STRICT_CHECKING
 	assert ( buf != NULL );
 #endif
@@ -1622,7 +1622,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 		{	
 			int res = 0;
 			//@ Capture frame into backing buffer
-			if( settings->composite ) {
+			if( settings->composite == 2) {
 				res = vj_tag_get_frame(sample_id,backing_fb, audio_buffer[chain_entry]);
 			} else {
 				res =  vj_tag_get_frame(sample_id, fb, audio_buffer[chain_entry]);
@@ -1634,7 +1634,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 		   		vj_tag_set_active(sample_id, 0); 
 			frame_buffer[chain_entry]->ssm = 0;
 
-			if( settings->composite )
+			if( settings->composite == 2 )
 			{
 				composite_process(info->composite,fb,backing_fb,0,info->which_vp);
 				frame_buffer[chain_entry]->ssm = composite_blitX( info->composite, backing_fb, fb,
@@ -1657,7 +1657,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
  	    centry = vj_perform_sample_is_cached(sample_id, chain_entry);
             if(centry == -1 || info->no_caching)
 	    {
-		if(settings->composite) {
+		if(settings->composite == 2) {
 			len = vj_perform_get_frame_fx(info,sample_id,nframe,backing_fb );
 		} else {
 			len = vj_perform_get_frame_fx( info, sample_id, nframe, fb );	
@@ -1667,7 +1667,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 			error = 0;
 		frame_buffer[chain_entry]->ssm = 0;
 
-		if(settings->composite) {
+		if(settings->composite == 2) {
 			composite_process(info->composite,fb,backing_fb,0,info->which_vp);
 			frame_buffer[chain_entry]->ssm = composite_blitX(info->composite, backing_fb,fb,
 				info->effect_frame1->uv_len,0 );
@@ -1803,7 +1803,7 @@ veejay_msg(0, "%s: %d ",__FUNCTION__, info->effect_frame1->len );
 
 		if (vj_tag_get_active(sample_id) == 1)
 		{ 
-			if( settings->composite ) {
+			if( settings->composite == 2) {
 				res = vj_tag_get_frame(sample_id,backing_fb,audio_buffer[chain_entry] );
 			} else {
 				res = vj_tag_get_frame(sample_id, fb,  audio_buffer[chain_entry]);
@@ -1816,7 +1816,7 @@ veejay_msg(0, "%s: %d ",__FUNCTION__, info->effect_frame1->len );
 			frame_buffer[chain_entry]->ssm = 0;
 //	frame_buffer[chain_entry]->ssm = 0;
 			video_playback_setup *settings = info->settings;
-			if( settings->composite )
+			if( settings->composite == 2 )
 			{
 				composite_processX(info->composite,fb,backing_fb,0,info->which_vp);
 				frame_buffer[chain_entry]->ssm = composite_blitX( info->composite, backing_fb, fb, 
@@ -1840,7 +1840,7 @@ veejay_msg(0, "%s: %d ",__FUNCTION__, info->effect_frame1->len );
 
 	    	if(centry == -1 || info->no_caching)
 	    	{
-			if(settings->composite) {
+			if(settings->composite==2) {
 				len = vj_perform_get_frame_fx(info,sample_id,nframe,backing_fb );
 			} else {
 				len = vj_perform_get_frame_fx( info, sample_id, nframe, fb );	
@@ -1849,7 +1849,7 @@ veejay_msg(0, "%s: %d ",__FUNCTION__, info->effect_frame1->len );
 			if(len > 0 )
 				error = 0;
 			frame_buffer[chain_entry]->ssm = 0;
-			if(settings->composite) {
+			if(settings->composite==2) {
 				composite_process(info->composite,fb,backing_fb,0,info->which_vp);
 				frame_buffer[chain_entry]->ssm = composite_blitX(info->composite, backing_fb,fb,
 					info->effect_frame1->uv_len,0 );
@@ -2128,7 +2128,6 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 	{
 		ret = vj_el_get_video_frame(info->current_edit_list,settings->current_frame_num,frame);
 	}
-
 	if(ret <= 0)
 	{
 		veejay_msg(0, "Unable to queue video frame %d, stopping Veejay", 
@@ -2392,6 +2391,8 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
     frame[1] = primary_buffer[0]->Cb;
     frame[2] = primary_buffer[0]->Cr;
 
+    
+
     if(!active)
     {
 	if (type == VJ_TAG_TYPE_V4L || type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_PICTURE ) 
@@ -2399,11 +2400,16 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
     }
     else
     {
+
+
 	if (vj_tag_get_frame(info->uc->sample_id, frame, NULL))
 	{
 	    error = 0;
 	    cached_tag_frames[0] = info->uc->sample_id;
    	}
+	if( error == 0 && info->settings->composite )
+		info->effect_frame1->ssm = 1;
+
    }         
 
 	
@@ -2423,7 +2429,7 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
 		    info->edit_list->video_width,
 		    info->edit_list->video_height, VJ_EFFECT_COLOR_BLACK);
   	}
-  return 1;      	
+ 	 return 1;      	
 }
 
 static void vj_perform_pre_chain(veejay_t *info, VJFrame *frame)
@@ -2696,8 +2702,8 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	pri[0] = primary_buffer[destination]->Y;
 	pri[1] = primary_buffer[destination]->Cb;
 	pri[2] = primary_buffer[destination]->Cr;
-/*
-	if( settings->composite )
+
+	if( settings->composite  )
 	{ //@ scales in software
 		if( settings->ca ) {
 			settings->ca = 0;
@@ -2710,8 +2716,12 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 			composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
 				vj_perform_get_width(info), vj_perform_get_height(info));
 		}
+
+	}
+
+	if( settings->composite == 1 ) {
 			composite_process(info->composite,pri,frame,0,info->which_vp);	
-	} */
+	} 
 	
 	if( frame->ssm == 1 )
 	{

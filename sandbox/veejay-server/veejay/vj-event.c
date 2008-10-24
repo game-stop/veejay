@@ -6588,6 +6588,32 @@ void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 }
 #endif
 
+void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+
+	if(!v->composite ) {
+		veejay_msg(0, "No viewport active.");
+		return;
+	}
+
+	if( args[1] == 0 || args[1] == 1 ) {
+		composite_set_colormode( v->composite, args[1] );
+		veejay_msg(VEEJAY_MSG_INFO ,"Viewport set to %s", (args[1] == 1 ?"Grayscale" : "Color" ) );
+	}
+
+	if ( args[0] == 0 ) {
+		v->settings->composite = 1;
+		veejay_msg(VEEJAY_MSG_INFO, "Viewport on front.");
+	} else {
+		v->settings->composite = 2;
+		veejay_msg(VEEJAY_MSG_INFO, "Viewport in back.");
+	}
+
+}
 void	vj_event_vp_get_points( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -6598,14 +6624,11 @@ void	vj_event_vp_get_points( void *ptr, const char format[], va_list ap )
 	char msg[280];
 	char message[256];
 	
-	if( args[0] == 0 ) {
-		veejay_msg(0, "Scale factor must > 0");
+	if( args[0] == 0 || !v->composite) {
 		snprintf(message,256,"%d %d %d %d %d %d %d %d",
 			0,0,0,0,0,0,0,0);
 		FORMAT_MSG(msg,message);
 		SEND_MSG(v,msg);
-
-
 		return;
 	}	
 
@@ -6626,6 +6649,11 @@ void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
 	veejay_memset(args,0,sizeof(args)); 
 	char *str = NULL;
 	P_A(args,str,format,ap);
+
+	if(!v->composite ) {
+		veejay_msg(0, "No viewport active.");
+		return;
+	}
 
 	if( args[0] <= 0 || args[0] > 4 ) {
 		veejay_msg(0, "Invalid point number. Use 1 - 4");

@@ -945,7 +945,7 @@ static int veejay_screen_update(veejay_t * info )
 
 	video_playback_setup *settings = info->settings;
 
-/*	if(settings->composite==1 && info->sdl[0])
+	if(settings->composite==1 && info->sdl[0])
 	{
 		if(!vj_sdl_lock( info->sdl[0] ) )
 			return 0;
@@ -959,7 +959,7 @@ static int veejay_screen_update(veejay_t * info )
 	
 		skip_update = 1;
 	}
-	else*/
+	else
  if(settings->zoom )
 	{
 		VJFrame src,dst;

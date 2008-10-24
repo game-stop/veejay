@@ -274,6 +274,6 @@ void	vj_event_projection_dec( void *ptr, const char format[], va_list ap);
 
 
 void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap );
-
+void	vj_event_vp_stack(void *ptr, const char format[], va_list ap );
 void	vj_event_vp_get_points( void *ptr, const char format[], va_list ap );
 #endif

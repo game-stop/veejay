@@ -651,7 +651,14 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 	}
 
 	if( vut->composite ) {
-		vut->dst_fmt = PIX_FMT_YUV444P;
+		switch(vut->composite) {
+			case 1:
+				vut->dst_fmt = PIX_FMT_YUV444P;	
+				break;
+			case 2:
+				vut->dst_fmt = PIX_FMT_GRAY8;
+				break;
+		}
 	}
 	
 	for( i = 0;  SUCCESS( unicap_enumerate_formats( vut->handle, NULL, &(vut->format), i ) ); i ++ )
@@ -662,6 +669,8 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 	   	  found_native = 1;
 		  break;
 		}
+		if( vut->format.fourcc == get_fourcc("RGB3") || vut->format.fourcc == get_fourcc("BGR3") )
+			break;
 	}
 
 	int maxw = vut->format.max_size.width;
@@ -733,7 +742,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 				if(vut->format.fourcc == get_fourcc("BGR3") ) 
 					vut->src_fmt = PIX_FMT_BGR24;
 				vut->frame_size = vut->src_width * vut->src_height * 3;
-			} else if ( (vut->format.fourcc == get_fourcc("RGB4") ) ||
+			}/* else if ( (vut->format.fourcc == get_fourcc("RGB4") ) ||
 					(vut->format.fourcc == get_fourcc("BGR4") ) ) {
 				vut->src_sizes[0] = vut->src_width * 4;
 				vut->src_sizes[1] = 0; vut->src_sizes[2] = 0;
@@ -742,10 +751,10 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 				if(vut->format.fourcc == get_fourcc("BGR4") )
 					vut->src_fmt = PIX_FMT_BGR32;
 				vut->frame_size = vut->src_width * vut->src_height * 4;
-			} 
+			} */
 #ifdef STRICT_CHECKING
 			else {
-				veejay_msg(0,  "Invalid pixel format.");
+				veejay_msg(0,  "Invalid pixel format:  %s", vut->format.identifier);
 				assert( 0 );
 			}
 #endif
@@ -962,9 +971,7 @@ static int	vj_unicap_start_capture_( void *vut )
 		assert( v->frame_size > 0 );
 #endif
 		v->priv_buf = (uint8_t*) vj_calloc( v->dst_width * v->dst_height * 4 * sizeof(uint8_t) );
-		v->buffer.data = vj_calloc( (v->src_sizes[0] + v->src_sizes[1] + v->src_sizes[2]) * sizeof(uint8_t) * 2 );
-		if(!v->rgb)
-			veejay_memset( v->buffer.data + (v->src_sizes[0]), 128, (v->src_sizes[1] + v->src_sizes[2]) * sizeof(uint8_t));
+		v->buffer.data = vj_calloc( v->format.buffer_size * sizeof(uint8_t) * 2  );
 
 	}
 
@@ -1157,6 +1164,11 @@ int	vj_unicap_grab_a_frame( void *vut )
 		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Failed to queue buffer ",__FUNCTION__,__LINE__);
 		return 0;
 	}
+	if(v->dst_fmt == PIX_FMT_GRAY8) {	
+		veejay_memset( buffer[1], 128, v->dst_sizes[0]);
+		veejay_memset( buffer[2], 128, v->dst_sizes[0]);
+	}
+
 	unlock_(vut);
 	
 	return 1;
