@@ -65,12 +65,7 @@ typedef struct
 	int	 deviceID;
 	int	 sizes[3];
 	int	active;
-	int	deinterlace;
 	int	rgb;
-	int	pixfmt;
-	int	shift;
-	int	width;
-	int	height;
 	void	*sampler;
 	char 	*ctrl[16];
 	int	 option[16];
@@ -131,13 +126,6 @@ static void	unicap_report_error( vj_unicap_t *v, char *err_msg )
 	veejay_msg(VEEJAY_MSG_DEBUG,
 		"System expects %s, %dx%d, strides=%d,%d,%d",
 			unicap_pf_str(v->dst_fmt), v->dst_width,v->dst_height,v->dst_sizes[0],v->dst_sizes[1],v->dst_sizes[2]);
-	veejay_msg(VEEJAY_MSG_DEBUG,
-		"At time of initialization: %dx%d, strides=%d,%d,%d",
-			v->width,v->height,v->sizes[0],v->sizes[1],v->sizes[2]);
-
-	veejay_msg(VEEJAY_MSG_DEBUG,
-		"Camera configured in %dx%d, frame_size=%d",v->format.size.width,v->format.size.height, v->frame_size);
-
 
 }
 
@@ -634,60 +622,38 @@ int	vj_unicap_composite_status(void *ud )
 	return vut->composite;
 }
 
+
 int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int composite )
 {
 	vj_unicap_t *vut = (vj_unicap_t*) ud;
+	unsigned int fourcc = 0;
+	int found_native    = 0;
+	int i;
 	unicap_lock_properties( vut->handle );
 
 	unicap_void_format( &(vut->format_spec));
 	unicap_void_format( &(vut->format) );
 
-	unsigned int fourcc = 0;
-	vut->frame_size = vut->sizes[0] = w * h;
 	vut->composite  = composite;
-
-	if( vut->composite ) {
-		fourcc = get_fourcc("444P");
-		vut->sizes[1] = w*h;
-		vut->sizes[2] = w*h;
-		vut->pixfmt = PIX_FMT_YUV444P;
-		vut->shift  = 0;
-	} else {
-		switch(pixel_format)
-		{
-			case FMT_420:
-			case FMT_420F:
-				fourcc = get_fourcc( "YU12" );
-				vut->sizes[1] = (w*h)/4;
-				vut->sizes[2] = vut->sizes[1];
-				break;
-			case FMT_422:
-			case FMT_422F:
-				fourcc = get_fourcc( "422P" );
-				vut->sizes[1] = (w*h)/2;
-				vut->sizes[2] = vut->sizes[1];
-				break;
-#ifdef STRICT_CHECKING
-			default:
-				veejay_msg(0,
-					"Unknown pixel format used to configure device: %d", pixel_format);
-				assert(0);
-				break;
-#endif
-		}	
-		vut->pixfmt = get_ffmpeg_pixfmt( pixel_format );
-		vut->shift    = get_shift_size(pixel_format);
-	}
-	vut->frame_size += vut->sizes[1];
-	vut->frame_size += vut->sizes[2];
-	
+	vut->dst_fmt = get_ffmpeg_pixfmt( pixel_format );
+	vut->src_fmt = get_ffmpeg_pixfmt( pixel_format );
+	vut->format.buffer_type = UNICAP_BUFFER_TYPE_USER;
 	vut->template.flags = 1;
 	vut->scaler = NULL;
 
-	int i;
-	int j;
-	int found_native = 0;
+	switch( pixel_format ) {	
+		case FMT_420:
+		case FMT_420F:
+			fourcc = get_fourcc("YU12" );break;
+		case FMT_422:
+		case FMT_422F:
+			fourcc = get_fourcc("422P");break;
+	}
 
+	if( vut->composite ) {
+		vut->dst_fmt = PIX_FMT_YUV444P;
+	}
+	
 	for( i = 0;  SUCCESS( unicap_enumerate_formats( vut->handle, NULL, &(vut->format), i ) ); i ++ )
 	{
 		if( fourcc == vut->format.fourcc )
@@ -698,143 +664,53 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 		}
 	}
 
+	int maxw = vut->format.max_size.width;
+	int maxh = vut->format.max_size.height;
+	int search = 0;
+	int j = 0;
 
-	if( composite && !found_native ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Your capture card doesnt understand %s, using fallback.",
-			unicap_pf_str( vut->pixfmt ));
-		vut->composite = 0;
-	}
-
-	if(!found_native) {
-		switch(pixel_format)
-		{
-			case FMT_420:
-			case FMT_420F:
-				fourcc = get_fourcc( "YU12" );
-				vut->sizes[1] = (w*h)/4;
-				vut->sizes[2] = vut->sizes[1];
-				break;
-			case FMT_422:
-			case FMT_422F:
-				fourcc = get_fourcc( "422P" );
-				vut->sizes[1] = (w*h)/2;
-				vut->sizes[2] = vut->sizes[1];
-				break;
-#ifdef STRICT_CHECKING
-			default:
-				veejay_msg(0,
-					"Unknown pixel format used to configure device: %d", pixel_format);
-				assert(0);
-				break;
-#endif
-		}	
-
-		for( i = 0;  SUCCESS( unicap_enumerate_formats( vut->handle, NULL, &(vut->format), i ) ); i ++ )
-		{
-			if( fourcc == vut->format.fourcc )
-			{
-			  veejay_msg(VEEJAY_MSG_INFO, "Found native colorspace '%s'", vut->format.identifier);
-		   	  found_native = 1;
-			  break;
-			}
-		}
-
-		if( found_native ) {
-			vut->pixfmt = get_ffmpeg_pixfmt( pixel_format );
-			vut->shift    = get_shift_size(pixel_format);
-		}
-	}
-
-	if( !found_native )
-	{
-		unsigned int rgb24_fourcc = get_fourcc( "RGB3" );
-		unsigned int rgb_fourcc = get_fourcc( "RGB4" );
-		unsigned int bgr24_fourcc = get_fourcc( "BGR3");
-		unicap_format_t rgb_spec, rgb_format;
-		unicap_void_format( &rgb_spec);
-		veejay_msg(VEEJAY_MSG_WARNING, "Capture device has no support for YUV, trying RGB formats");
-		
-		for( i = 0;
-	         	SUCCESS( unicap_enumerate_formats( vut->handle, &rgb_spec, &rgb_format, i ) ); i ++ )
-		{
-			if( rgb24_fourcc == rgb_format.fourcc )
-			{
-				vut->rgb = 2;
-				vut->frame_size = w * h * 3;
-				vut->sizes[0] = w * 3;
-				vut->sizes[1] = 0; vut->sizes[2] = 0;
-				
-				break;
-			} else if ( rgb_fourcc == rgb_format.fourcc )
-			{
-				vut->rgb = 1;
-				vut->frame_size = w * h * 4;
-				vut->sizes[0] = w * 4;
-				vut->sizes[1] = 0; vut->sizes[2] = 0;
-
-				break;
-			} else if ( bgr24_fourcc == rgb_format.fourcc )
-			{
-				vut->rgb = 3;
-				vut->sizes[0] = w * 3;
-				vut->sizes[1] = 0; vut->sizes[2] = 0;
-				vut->frame_size = w * h * 3;
-				break;
-			}
-		}
-		
-		if(!vut->rgb)
-		{
-			veejay_msg(0, "No matching formats found. Capture device not supported.");
-			unicap_unlock_properties( vut->handle );
-			return 0;
-		}
-		else
-		{
-			veejay_memcpy( &(vut->format), &rgb_format, sizeof( rgb_format ));
-			vut->frame_size = vut->sizes[0];
-		}
-	}
-
-
-	vut->format.buffer_type = UNICAP_BUFFER_TYPE_USER;
-	vut->format.size.width = w;
-	vut->format.size.height = h;
-	vut->format.buffer_size = vut->frame_size;
-	vut->width = w;
-	vut->height = h;
-	vut->src_width = w;
-	vut->src_height = h;
-	vut->dst_width = w;
-	vut->dst_height = h;
-	vut->dst_sizes[0] = vut->sizes[0];
-	vut->dst_sizes[1] = vut->sizes[1];
-	vut->dst_sizes[2] = vut->sizes[2];
-	vut->src_sizes[0] = vut->sizes[0];
-	vut->src_sizes[1] = vut->sizes[1];
-	vut->src_sizes[2] = vut->sizes[2];
-
-	int 	max_sw = vut->format.max_size.width;
-	int	max_sh = vut->format.max_size.height;
-	int	search = 0;
-
-	if( w > vut->format.max_size.width || h > vut->format.max_size.height ) {
+	if( w > maxw || h > maxh ) {
 		veejay_msg(VEEJAY_MSG_WARNING, "%s does not support %dx%d, using %dx%d instead with a software scaler.",
-			vut->device.identifier, w,h,vut->format.max_size.width,vut->format.max_size.height );
+			vut->device.identifier, w,h,maxw,maxh );
 		search = 1;
+	} else {
+		vut->src_width = w;
+		vut->src_height= h;
+		vut->dst_width = w;
+		vut->dst_height = h;
+		vut->dst_sizes[0] = vut->dst_width * vut->dst_height;	
+
+		if ( vut->format.fourcc == get_fourcc("422P" ) ) {
+			vut->src_sizes[0] = vut->src_width * vut->src_height;	
+			vut->src_sizes[1] = vut->src_sizes[0]/2;
+			vut->src_sizes[2] = vut->src_sizes[1]/2;
+			vut->src_fmt = PIX_FMT_YUV422P;
+			vut->frame_size = vut->src_sizes[0] + vut->src_sizes[1] + vut->src_sizes[2];
+		} else if ( vut->format.fourcc == get_fourcc("420P")) {
+			vut->src_sizes[0] = vut->src_width * vut->src_height;	
+			vut->src_sizes[1] = vut->src_sizes[0]/4;
+			vut->src_sizes[2] = vut->src_sizes[1]/4;
+			vut->src_fmt = PIX_FMT_YUV420P;
+			vut->frame_size = vut->src_sizes[0] + vut->src_sizes[1] + vut->src_sizes[2];
+		}
+		vut->format.buffer_size = vut->frame_size;
+		vut->format.size.width = vut->src_width;
+		vut->format.size.height = vut->src_height;
+#ifdef STRICT_CHECKING
+		assert( vut->frame_size > 0 );
+#endif
 	}
 
 	if( search || !SUCCESS( unicap_set_format( vut->handle, &(vut->format) ) )  )
 	{
-		int try_format[8] = { max_sw,max_sh,720,576,640,480,320,240 };
-		int i;
+		int try_format[8] = { maxw,maxh,720,576,640,480,320,240 };
 		int good = 0;
 		for( i = 0; i < 8 ; i +=2 ) {
 			vut->src_width = try_format[i];
 			vut->src_height= try_format[i+1];
 			vut->dst_width = w;
 			vut->dst_height = h;
-			vut->dst_fmt = vut->pixfmt;
+			vut->dst_sizes[0] = vut->dst_width * vut->dst_height;	
 		
 			if ( vut->format.fourcc == get_fourcc("422P" ) ) {
 				vut->src_sizes[0] = vut->src_width * vut->src_height;	
@@ -852,8 +728,9 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 				  || (vut->format.fourcc == get_fourcc("BGR3") ) ) {
 				vut->src_sizes[0] = vut->src_width * 3;
 				vut->src_sizes[1] = 0; vut->src_sizes[2] = 0;
-				vut->src_fmt = PIX_FMT_RGB24;
-				if(vut->format.fourcc == get_fourcc("BGR3") )
+				vut->src_fmt = PIX_FMT_RGB24;	
+				vut->rgb = 1;
+				if(vut->format.fourcc == get_fourcc("BGR3") ) 
 					vut->src_fmt = PIX_FMT_BGR24;
 				vut->frame_size = vut->src_width * vut->src_height * 3;
 			} else if ( (vut->format.fourcc == get_fourcc("RGB4") ) ||
@@ -861,6 +738,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 				vut->src_sizes[0] = vut->src_width * 4;
 				vut->src_sizes[1] = 0; vut->src_sizes[2] = 0;
 				vut->src_fmt = PIX_FMT_RGB32;
+				vut->rgb = 1;
 				if(vut->format.fourcc == get_fourcc("BGR4") )
 					vut->src_fmt = PIX_FMT_BGR32;
 				vut->frame_size = vut->src_width * vut->src_height * 4;
@@ -875,42 +753,26 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 			vut->format.buffer_size = vut->frame_size;
 			vut->format.size.width = vut->src_width;
 			vut->format.size.height = vut->src_height;
-			vut->dst_sizes[0] = vut->dst_width * vut->dst_height;	
-
 		
-			if(vut->composite) {
-				vut->dst_sizes[1] = vut->dst_sizes[0];
-				vut->dst_sizes[2] = vut->dst_sizes[0];
-				vut->dst_fmt      = PIX_FMT_YUV444P;
-			} else if(pixel_format == FMT_420F || pixel_format == FMT_420 ) {
-				vut->dst_sizes[1] = vut->dst_sizes[0]/4;
-				vut->dst_sizes[2] = vut->dst_sizes[1];
-			} else {
-				vut->dst_sizes[1] = vut->dst_sizes[0]/2;
-				vut->dst_sizes[2] = vut->dst_sizes[1];
-			} 
+			if( SUCCESS( unicap_set_format( vut->handle, &(vut->format)) ) )
+			{
+				veejay_msg(VEEJAY_MSG_WARNING, 
+					"(OK)    Source %dx%d in %s , Dest %dx%d in %s (%d bytes framebuffer)",
+					vut->src_width,vut->src_height,vut->format.identifier,vut->dst_width,
+					vut->dst_height, unicap_pf_str(vut->dst_fmt),
+					vut->format.buffer_size );
 
-		
-
-			if( SUCCESS( unicap_set_format( vut->handle, &(vut->format)) ) ) {
-			veejay_msg(VEEJAY_MSG_WARNING, 
-				"(OK)    Source %dx%d in %s , Dest %dx%d in %s (%d bytes framebuffer)",
-				vut->src_width,vut->src_height,vut->format.identifier,vut->dst_width,
-				vut->dst_height, unicap_pf_str(vut->dst_fmt),
-				vut->format.buffer_size );
-
-				good = 1;
+						good = 1;
 				break;
-			} else {
-			veejay_msg(VEEJAY_MSG_ERROR, 
-				"(FAIL)  Source %dx%d in %s , Dest %dx%d in %s (%d bytes framebuffer)",
-				vut->src_width,vut->src_height,vut->format.identifier,vut->dst_width,
-				vut->dst_height, unicap_pf_str(vut->dst_fmt),
-				vut->format.buffer_size );
-
-	
+			}	
+			else
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, 
+					"(FAIL)  Source %dx%d in %s , Dest %dx%d in %s (%d bytes framebuffer)",
+					vut->src_width,vut->src_height,vut->format.identifier,vut->dst_width,
+					vut->dst_height, unicap_pf_str(vut->dst_fmt),
+					vut->format.buffer_size );
 			}
-	
 		}
 		
 		if(!good) {
@@ -925,6 +787,19 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 			vut->format.identifier, vut->format.size.width,vut->format.size.height,
 			vut->format.buffer_size, vut->format.buffer_type );
 	}
+
+	if(vut->composite) {
+		vut->dst_sizes[1] = vut->dst_sizes[0];
+		vut->dst_sizes[2] = vut->dst_sizes[0];
+	} else if(pixel_format == FMT_420F || pixel_format == FMT_420 ) {
+		vut->dst_sizes[1] = vut->dst_sizes[0]/4;
+		vut->dst_sizes[2] = vut->dst_sizes[1];
+	} else {
+		vut->dst_sizes[1] = vut->dst_sizes[0]/2;
+		vut->dst_sizes[2] = vut->dst_sizes[1];
+	} 
+
+
 // buffer alloced	
 	char **properties = vj_unicap_get_list( vut );
 	if(!properties)
@@ -1071,21 +946,15 @@ static int	vj_unicap_start_capture_( void *vut )
 	assert( v->state == 0 );
 #endif
 
-	int dw = v->width;	
-	int dh = v->height;
-
 	if( v->src_width == v->dst_width && v->src_height == v->dst_height ) {
-		v->priv_buf = (uint8_t*) vj_calloc( v->width * v->height * 4 * sizeof(uint8_t) );
+		v->priv_buf = (uint8_t*) vj_calloc( v->dst_width * v->dst_height * 4 * sizeof(uint8_t) );
 		v->buffer.data = vj_malloc( v->frame_size * sizeof(uint8_t) );
-		if(!v->rgb)
-		{
-			veejay_memset( v->buffer.data,    0, (v->width * v->height));
-			veejay_memset( v->buffer.data + (v->width*v->height), 128, v->frame_size - (v->width*v->height));
+		if(!v->rgb){
+			veejay_memset( v->buffer.data,    0, v->src_sizes[1] );
+			veejay_memset( v->buffer.data + v->src_sizes[0], 128, v->src_sizes[1]  + v->src_sizes[2]);
+		} else  {
+			veejay_memset( v->buffer.data, 0, v->src_sizes[0]);
 		}
-		else
-			veejay_memset( v->buffer.data, 0, v->frame_size);
-
-
 	} else {
 #ifdef STRICT_CHECKING
 		assert( v->dst_width > 0 );
@@ -1269,8 +1138,8 @@ int	vj_unicap_grab_a_frame( void *vut )
 	{
 		if( v->src_width == v->dst_width && v->src_height == v->dst_height )
 		{
-			VJFrame *srci = yuv_rgb_template( ready_buffer->data, v->width,v->height, v->src_fmt );
-			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], v->width,v->height, v->dst_fmt ); 
+			VJFrame *srci = yuv_rgb_template( ready_buffer->data, v->src_width,v->src_height, v->src_fmt );
+			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], v->dst_width,v->dst_height, v->dst_fmt ); 
 			yuv_convert_any_ac(srci,dsti, srci->format, dsti->format );
 			free(srci);
 			free(dsti);
@@ -1313,16 +1182,6 @@ veejay_msg(0, "%s: wait",__FUNCTION__);
 
 	if( v->deinterlace )
 	{
-		yuv_deinterlace(
-			buffer,
-			v->width,
-			v->height,
-			v->pixfmt,
-			v->shift,
-			ready_buffer->data,
-			ready_buffer->data + v->sizes[0],
-			ready_buffer->data + v->sizes[0] + v->sizes[1]
-		);
 	}
 	else
 	{
@@ -1334,8 +1193,8 @@ veejay_msg(0, "%s: wait",__FUNCTION__);
 		}
 		else
 		{
-			VJFrame *srci = yuv_rgb_template( ready_buffer->data, v->width,v->height, vut->src_fmt );
-			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], v->width,v->height, vut->dst_fmt ); 
+			VJFrame *srci = yuv_rgb_template( ready_buffer->data, v->src_width,v->src_height, vut->src_fmt );
+			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], v->dst_width,v->dst_height, vut->dst_fmt ); 
 
 			yuv_convert_any_ac(srci,dsti, srci->format, dsti->format );
 
