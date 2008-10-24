@@ -640,6 +640,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 	unicap_lock_properties( vut->handle );
 
 	unicap_void_format( &(vut->format_spec));
+	unicap_void_format( &(vut->format) );
 
 	unsigned int fourcc = 0;
 	vut->frame_size = vut->sizes[0] = w * h;
@@ -779,8 +780,6 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 		}
 	}
 
-	unicap_format_t test;
-	unicap_void_format( &test);
 
 	vut->format.buffer_type = UNICAP_BUFFER_TYPE_USER;
 	vut->format.size.width = w;
@@ -809,7 +808,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 		search = 1;
 	}
 
-	if( !SUCCESS( unicap_set_format( vut->handle, &(vut->format) ) ) || search == 1 )
+	if( search || !SUCCESS( unicap_set_format( vut->handle, &(vut->format) ) )  )
 	{
 		int try_format[8] = { max_sw,max_sh,720,576,640,480,320,240 };
 		int i;
