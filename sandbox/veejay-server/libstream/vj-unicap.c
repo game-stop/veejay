@@ -676,11 +676,11 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 		}	
 		vut->pixfmt = get_ffmpeg_pixfmt( pixel_format );
 		vut->shift    = get_shift_size(pixel_format);
+		vut->frame_size += vut->sizes[1];
+		vut->frame_size += vut->sizes[2];
 
 	}
 
-	vut->frame_size += vut->sizes[1];
-	vut->frame_size += vut->sizes[2];
 	vut->template.flags = 1;
 	vut->scaler = NULL;
 
@@ -700,7 +700,8 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 
 
 	if( composite && !found_native ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Your capture card doesnt understand YUV 4:4:4 Planar, using fallback.");
+		veejay_msg(VEEJAY_MSG_WARNING, "Your capture card doesnt understand %s, using fallback.",
+			unicap_pf_str( vut->pixfmt ));
 		vut->composite = 0;
 		switch(pixel_format)
 		{
@@ -744,15 +745,23 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 			{
 				vut->rgb = 2;
 				vut->frame_size = w * h * 3;
+				vut->sizes[0] = w * 3;
+				vut->sizes[1] = 0; vut->sizes[2] = 0;
+				
 				break;
 			} else if ( rgb_fourcc == rgb_format.fourcc )
 			{
 				vut->rgb = 1;
 				vut->frame_size = w * h * 4;
+				vut->sizes[0] = w * 4;
+				vut->sizes[1] = 0; vut->sizes[2] = 0;
+
 				break;
 			} else if ( bgr24_fourcc == rgb_format.fourcc )
 			{
 				vut->rgb = 3;
+				vut->sizes[0] = w * 3;
+				vut->sizes[1] = 0; vut->sizes[2] = 0;
 				vut->frame_size = w * h * 3;
 				break;
 			}
@@ -781,13 +790,21 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 	vut->height = h;
 	vut->src_width = w;
 	vut->src_height = h;
+	vut->dst_width = w;
+	vut->dst_height = h;
+	vut->dst_sizes[0] = vut->sizes[0];
+	vut->dst_sizes[1] = vut->sizes[1];
+	vut->dst_sizes[2] = vut->sizes[2];
+	vut->src_sizes[0] = vut->sizes[0];
+	vut->src_sizes[1] = vut->sizes[1];
+	vut->src_sizes[2] = vut->sizes[2];
 
 	if( !SUCCESS( unicap_set_format( vut->handle, &(vut->format) ) ) )
 	{
-		int try_format[4] = { 720,576,640,480 };
+		int try_format[6] = { 720,576,640,480,320,240 };
 		int i;
 		int good = 0;
-		for( i = 0; i < 4 ; i +=2 ) {
+		for( i = 0; i < 6 ; i +=2 ) {
 			vut->src_width = try_format[i];
 			vut->src_height= try_format[i+1];
 			vut->dst_width = w;
@@ -806,24 +823,30 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 				vut->src_sizes[2] = vut->src_sizes[1]/2;
 				vut->src_fmt = PIX_FMT_YUV422P;
 				vut->frame_size = vut->src_sizes[0] + vut->src_sizes[1] + vut->src_sizes[2];
+			} else if ( vut->format.fourcc == get_fourcc("420P")) {
+				vut->src_sizes[0] = vut->src_width * vut->src_height;	
+				vut->src_sizes[1] = vut->src_sizes[0]/4;
+				vut->src_sizes[2] = vut->src_sizes[1]/4;
+				vut->src_fmt = PIX_FMT_YUV420P;
+				vut->frame_size = vut->src_sizes[0] + vut->src_sizes[1] + vut->src_sizes[2];
 			}
-	veejay_msg(0, "Try : %dx%d - %d  %d %d",vut->src_width,vut->src_height, vut->src_sizes[0],vut->src_sizes[1],vut->src_sizes[2]);	
 
 			vut->format.buffer_size = vut->frame_size;
 			vut->format.size.width = vut->src_width;
 			vut->format.size.height = vut->src_height;
 			vut->dst_sizes[0] = vut->dst_width * vut->dst_height;	
 
-			if(pixel_format == FMT_420F || pixel_format == FMT_420 ) {
-				vut->dst_sizes[1] = vut->dst_sizes[0]/4;
-				vut->dst_sizes[2] = vut->dst_sizes[1];
-			} else if (!vut->composite ) {
-				vut->dst_sizes[1] = vut->dst_sizes[0]/2;
-				vut->dst_sizes[2] = vut->dst_sizes[1];
-			} else {
+			if(vut->composite) {
 				vut->dst_sizes[1] = vut->dst_sizes[0];
 				vut->dst_sizes[2] = vut->dst_sizes[0];
-			}
+				vut->dst_fmt      = PIX_FMT_YUV444P;
+			} else if(pixel_format == FMT_420F || pixel_format == FMT_420 ) {
+				vut->dst_sizes[1] = vut->dst_sizes[0]/4;
+				vut->dst_sizes[2] = vut->dst_sizes[1];
+			} else {
+				vut->dst_sizes[1] = vut->dst_sizes[0]/2;
+				vut->dst_sizes[2] = vut->dst_sizes[1];
+			} 
 
 			if( SUCCESS( unicap_set_format( vut->handle, &(vut->format)) ) ) {
 				veejay_msg(VEEJAY_MSG_INFO ,"Camera supports %dx%d (buffer=%d)", vut->src_width,vut->src_height,vut->frame_size);
@@ -834,8 +857,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 		}
 		
 		if(!good) {
-			veejay_msg(VEEJAY_MSG_ERROR,"Cannot configure capture device to use %dx%d %s",
-				w,h, vut->format.identifier );
+			veejay_msg(VEEJAY_MSG_ERROR,"Cannot configure capture device %s", vut->format.identifier );
 			unicap_unlock_properties( vut->handle );
 			return 0;
 		}
@@ -893,7 +915,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 				}
 				else if( strncasecmp( p.menu.menu_items[j], "ntsc", 4 ) == 0 )
 				{
-					vut->ctrl[UNICAP_NTSC] = strdup(properties);
+					vut->ctrl[UNICAP_NTSC] = strdup(properties[i]);
 					vut->option[UNICAP_NTSC] = j;
 				}
 			}		
