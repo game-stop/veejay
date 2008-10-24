@@ -5268,7 +5268,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 {
 	int args[16];
 	veejay_t *v = (veejay_t*)ptr;
-	memset(args,0,16); 
+	veejay_memset(args,0,sizeof(int) * 16); 
 	//P_A16(args,format,ap);
 	char *str = NULL;
 	P_A(args,str,format,ap);
@@ -6587,6 +6587,65 @@ void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 	
 }
 #endif
+
+void	vj_event_vp_get_points( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+
+	char msg[280];
+	char message[256];
+	
+	if( args[0] == 0 ) {
+		veejay_msg(0, "Scale factor must > 0");
+		snprintf(message,256,"%d %d %d %d %d %d %d %d",
+			0,0,0,0,0,0,0,0);
+		FORMAT_MSG(msg,message);
+		SEND_MSG(v,msg);
+
+
+		return;
+	}	
+
+	int *r = viewport_event_get_projection(  composite_get_vp( v->composite ),args[0] );
+	
+	snprintf(message,256, "%d %d %d %d %d %d %d %d",
+		r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7] );
+
+	FORMAT_MSG(msg,message);
+	SEND_MSG(v,msg);
+
+	free(r);
+}
+void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
+{
+	int args[4];
+	veejay_t *v = (veejay_t*)ptr;
+	veejay_memset(args,0,sizeof(args)); 
+	char *str = NULL;
+	P_A(args,str,format,ap);
+
+	if( args[0] <= 0 || args[0] > 4 ) {
+		veejay_msg(0, "Invalid point number. Use 1 - 4");
+		return;
+	}
+	if( args[1] < 0 ) {
+		veejay_msg(0, "Scale must be a positive number.");
+		return;
+	}
+	float point_x =  ( (float) args[2] / (float) args[1] );
+	float point_y =  ( (float) args[3] / (float) args[1] );
+
+	video_playback_setup *settings = v->settings;
+	v->settings->cx = point_x;
+	v->settings->cy = point_y;
+	v->settings->cn = args[0];
+	v->settings->ca = 1;
+
+}
+
 // 159, 164 for white
 void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 {

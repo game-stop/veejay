@@ -180,6 +180,7 @@ typedef struct {
 	char *vims_group_name;
 	int zoom;
 	int composite;
+	int composite2;
 	sws_template sws_templ;
 	vj_schedule_t action_scheduler;
 	float	output_fps;
@@ -191,8 +192,11 @@ typedef struct {
 	int	ncpu;
 	int	vp_rec;
 	int	late[2];
+	int	cy;
+	int	cx;
+	int	cn;
+	int	ca;
 } video_playback_setup;
-
 
 typedef struct {
     int stats_changed;		/* has anything bad happened?                        */
@@ -318,6 +322,7 @@ typedef struct {
 	int  no_caching;
 	void	*viewport;
 	void	*composite;
+	void	*composite2;
 	int	 use_vp;
 	int	 use_proj;
 	int 	which_vp;

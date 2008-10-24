@@ -144,7 +144,7 @@ typedef struct
 static void		viewport_draw_col( void *data, uint8_t *img, uint8_t *u, uint8_t *v );
 static void		viewport_draw( void *data, uint8_t *img );
 static inline	int	grab_pixel( uint8_t *plane, int x, int y, int w );
-static void		viewport_update_perspective( viewport_t *v, float *values );
+static int		viewport_update_perspective( viewport_t *v, float *values );
 static void		viewport_update_grid( viewport_t *v, int size, uint8_t val );
 static void		viewport_process( viewport_t *p );
 static int		viewport_configure( 
@@ -664,7 +664,8 @@ static	void		viewport_draw_grid(int32_t w, int32_t h, uint8_t *grid, int32_t gri
 			grid[j*w+k] = ((k%grid_size>1)?((j%grid_size>1)? op1 : op0 ) : op0 );
 }
 
-void	viewport_get_projection_coords( void *data, int32_t *x0, int32_t *y0, int32_t *w0, int32_t *h0 )
+void	viewport_get_projection_coords( 
+	void *data, int32_t *x0, int32_t *y0, int32_t *w0, int32_t *h0 )
 {
 	viewport_t *v = (viewport_t*) data;
 
@@ -1213,7 +1214,7 @@ static	void		viewport_update_grid( viewport_t *v, int size, uint8_t val )
 	viewport_draw_grid( v->w, v->h, v->grid, v->grid_size, v->grid_val );
 }
 
-static	void		viewport_update_perspective( viewport_t *v, float *values )
+static	int		viewport_update_perspective( viewport_t *v, float *values )
 {
 	int res = viewport_configure (v, v->x1, v->y1,
 					 v->x2, v->y2,
@@ -1240,8 +1241,13 @@ static	void		viewport_update_perspective( viewport_t *v, float *values )
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to configure the viewport");
 			veejay_msg(VEEJAY_MSG_ERROR, "If you are using a preset-configuration, see ~/.veejay/viewport.cfg");
 			v->disable = 1;
-			return;
+			return res;
 		}
+	} else {
+		veejay_msg(VEEJAY_MSG_INFO,
+			"Configured viewport: %fx%f,%fx%f,%fx%f,%fx%f",
+				v->x1,v->y1,v->x2,v->y2,v->x3,v->y3,v->x4,v->y4);
+
 	}
 
 
@@ -1255,6 +1261,8 @@ static	void		viewport_update_perspective( viewport_t *v, float *values )
 
 	// Update map
 	viewport_process( v );
+
+	return res;
 }
 
 
@@ -1919,11 +1927,90 @@ void	viewport_transform_coords(
 	
 }
 
+int	*viewport_event_get_projection(void *data, int scale) {
+	viewport_t *v = (viewport_t*) data;
+	float fscale = 1.0f;
+	float set[9];	
+	if( scale == 100 ) {
+		set[0] = v->x1;// * sw;
+		set[1] = v->y1;// * sh;
+		set[2] = v->x2;// * sw;
+		set[3] = v->y2;// * sh;
+		set[4] = v->x3;// * sw;
+		set[5] = v->y3;// * sh;
+		set[6] = v->x4;// * sw;
+		set[7] = v->y4;// * sh;
+	} else {
+		float sw = (float) scale / 100.0;
+		float sh = (float) scale / 100.0;	
+		fscale   = sw;
+		set[0] = v->x1 * sw;
+		set[1] = v->y1 * sh;
+		set[2] = v->x2 * sw;
+		set[3] = v->y2 * sh;
+		set[4] = v->x3 * sw;
+		set[5] = v->y3 * sh;
+		set[6] = v->x4 * sw;
+		set[7] = v->y4 * sh;
+	}
+
+	int *res = (int*) vj_malloc(sizeof(int) * 8 );
+	int i;
+
+	for( i = 0; i < 8 ; i ++ ) {
+		res[i] = (int) ( set[i]);
+	}
+	return res;
+}
+
+int	viewport_event_set_projection(void *data, float x, float y, int num, int frontback) {
+	
+
+	viewport_t *v = (viewport_t*) data;
+	switch(num) {
+		case 1:
+			v->x1 = x;
+			v->y1 = y;
+			break;
+		case 2:
+			v->x2 = x;
+			v->y2 = y;
+			break;
+		case 3:
+			v->x3 = x;
+			v->y3 = y;
+			break;
+		case 4:
+			v->x4 = x;
+			v->y4 = y;
+			break;
+	}
+	float p[8];
+	p[0] = v->x1;
+	p[2] = v->x2;
+	p[4] = v->x3;
+	p[6] = v->x4;
+	p[1] = v->y1;
+	p[3] = v->y2;
+	p[5] = v->y3;	
+	p[7] = v->y4;
+
+	if(	viewport_update_perspective( v, p ) )  {
+		veejay_msg(VEEJAY_MSG_INFO, "Accepted viewport configuration from remote.");
+	} else {
+		veejay_msg(0, "Error updating points");
+	}
+
+	return 1;
+}
+
 void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int button, int frontback, int screen_width, int screen_height )
 {
 	viewport_t *v = (viewport_t*) data;
 	if( sx == 0 && sy == 0 && button == 0 )
 		return;
+
+	
 
 	int osd = 0;
 	int grid =0;
@@ -2042,9 +2129,6 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 				point_map( im, v->x0, v->y0 + v->h0, &dx3, &dy3 );
 				point_map( im, v->x0 + v->w0, v->y0 + v->h0, &dx4, &dy4 );
 
-				veejay_msg(2, "Rect x0=%d, y0=%d, w0=%d, h0=%d",
-					v->x0,v->y0, v->w0, v->h0 );
-
 				v->x1 = dx1 / (screen_width / 100.0f);
 				v->y1 = dy1 / (screen_height / 100.0f);
 				v->x2 = dx2 / (screen_width / 100.0f);	
@@ -2101,8 +2185,6 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 				point_map( im, v->x0 + v->w0, v->y0, &dx2, &dy2 );
 				point_map( im, v->x0, v->y0 + v->h0, &dx3, &dy3 );
 				point_map( im, v->x0 + v->w0, v->y0 + v->h0, &dx4, &dy4 );
-				veejay_msg(2, "Rect x0=%d, y0=%d, w0=%d, h0=%d",
-					v->x0,v->y0, v->w0, v->h0 );
 
 				v->x1 = dx1 / (screen_width / 100.0f);
 				v->y1 = dy1 / (screen_height / 100.0f);
@@ -2200,8 +2282,6 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 					clamp1(v->w0, 0,v->w );
 				break;
 			}
-
-
 		}
 		else
 		{

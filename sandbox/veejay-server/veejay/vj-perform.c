@@ -599,13 +599,13 @@ int vj_perform_init(veejay_t * info)
     sample_record_init(frame_len);
     vj_tag_record_init(w,h);
     // to render fading of effect chain:
-    temp_buffer[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len) );
+    temp_buffer[0] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len) * 2 );
     if(!temp_buffer[0]) return 0;
 	veejay_memset( temp_buffer[0], 16, frame_len );
-    temp_buffer[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len) );
+    temp_buffer[1] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len) * 2);
     if(!temp_buffer[1]) return 0;
 	veejay_memset( temp_buffer[1], 128, frame_len );
-    temp_buffer[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len) );
+    temp_buffer[2] = (uint8_t*)vj_malloc(sizeof(uint8_t) * RUP8(frame_len) * 2 );
     if(!temp_buffer[2]) return 0;
 	veejay_memset( temp_buffer[2], 128, frame_len );
     // to render fading of effect chain:
@@ -1840,6 +1840,34 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
 				frames[1]->format  = info->pixel_format;
 				frames[1]->ssm     = frame_buffer[chain_entry]->ssm;
+
+
+				if( settings->composite )
+				{ //@ scales in software
+				/*	if( settings->ca ) {
+						settings->ca = 0;
+						viewport_event_set_projection( composite_get_vp( info->composite ),
+							settings->cx,settings->cy,settings->cn , info->uc->mouse[2] );
+
+					}
+					if(info->which_vp == 1 )
+					{	//@ focus on projection screen
+						composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
+						vj_perform_get_width(info), vj_perform_get_height(info));
+					}*/
+					/*	uint8_t *tmpd[3] = {	
+							temp_buffer[0] + frames[1]->len,
+							temp_buffer[1] + frames[1]->len,
+							temp_buffer[2] + frames[1]->len
+						};
+						composite_process( info->composite, tmpd, frames[1]->data, 0, info->which_vp );
+						veejay_memcpy( frames[1]->data[0], temp_buffer[0]+frames[1]->len, frames[1]->len );
+						veejay_memcpy( frames[1]->data[1], temp_buffer[1]+frames[1]->len, frames[1]->len );
+						veejay_memcpy( frames[1]->data[2], temp_buffer[1]+frames[1]->len, frames[1]->len ); 
+						frames[1]->ssm = 1;*/
+				}
+
+
 				// sample B
 	   			if(sub_mode && frames[1]->ssm == 0)
 				{
@@ -2626,10 +2654,14 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	pri[0] = primary_buffer[destination]->Y;
 	pri[1] = primary_buffer[destination]->Cb;
 	pri[2] = primary_buffer[destination]->Cr;
-
 	if( settings->composite )
 	{ //@ scales in software
+		if( settings->ca ) {
+			settings->ca = 0;
+			viewport_event_set_projection( composite_get_vp( info->composite ),
+				settings->cx,settings->cy,settings->cn , info->uc->mouse[2] );
 
+		}
 		if(info->which_vp == 1 )
 		{	//@ focus on projection screen
 			composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
@@ -2733,6 +2765,33 @@ static	void	vj_perform_record_frame( veejay_t *info )
 static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settings )
 {
 	int deep = 0;
+/*	VJFrame *frame = info->effect_frame1;
+	VJFrame *frame2= info->effect_frame2;
+	uint8_t *pri[3];
+
+	pri[0] = primary_buffer[0]->Y;
+	pri[1] = primary_buffer[0]->Cb;
+	pri[2] = primary_buffer[0]->Cr;
+
+	if( settings->composite )
+	{ //@ scales in software
+		if( settings->ca ) {
+			settings->ca = 0;
+			viewport_event_set_projection( composite_get_vp( info->composite ),
+				settings->cx,settings->cy,settings->cn , info->uc->mouse[2] );
+
+		}
+		if(info->which_vp == 1 )
+		{	//@ focus on projection screen
+			composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
+				vj_perform_get_width(info), vj_perform_get_height(info));
+		}
+
+		composite_process( info->composite, pri, frame, 0, info->which_vp );
+	}
+*/
+
+
 	//@ Finalize the FX chain (Could leave the FX chain supersampled)
 	vj_perform_finish_chain( info );
    	

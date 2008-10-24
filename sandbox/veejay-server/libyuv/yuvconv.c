@@ -896,7 +896,15 @@ void	yuv_convert_and_scale_gray_rgb(void *sws,VJFrame *src, VJFrame *dst)
 	sws_scale( s->sws, src->data,src_stride, 0,src->height,
 		dst->data, dst_stride );
 }
+void	yuv_convert_and_scale_from_rgb(void *sws , VJFrame *src, VJFrame *dst)
+{
+	vj_sws *s = (vj_sws*) sws;
+	int src_stride[3] = { src->width*3,0,0};
+	int dst_stride[3] = { dst->width,dst->uv_width,dst->uv_width };
 
+	sws_scale( s->sws, src->data, src_stride, 0, src->height,
+		dst->data, dst_stride );
+}
 
 void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 {

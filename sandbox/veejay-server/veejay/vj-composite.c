@@ -121,11 +121,11 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	veejay_msg(VEEJAY_MSG_INFO, "\tSoftware scaler  : %s", yuv_get_scaler_name(zoom_type) );
 	veejay_msg(VEEJAY_MSG_INFO, "\tVideo resolution : %dx%d", iw,ih );
 	veejay_msg(VEEJAY_MSG_INFO, "\tScreen resolution: %dx%d", pw,ph );
-	veejay_msg(VEEJAY_MSG_INFO, "Usage:");
+/*	veejay_msg(VEEJAY_MSG_INFO, "Usage:");
 	veejay_msg(VEEJAY_MSG_INFO, "Press Middle-Mouse button to activate setup,");
 	veejay_msg(VEEJAY_MSG_INFO, "Press CTRL+p to switch between projection and viewport focus");
 	veejay_msg(VEEJAY_MSG_INFO, "Press CTRL+v to activate user viewport");
-	
+	*/
 	return (void*) c;
 }
 
@@ -234,7 +234,6 @@ void	composite_process(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int 
 	int proj_active = viewport_active(c->vp1 );
 
 	c->blit = 0;
-
 	//@ If the current focus is VIEWPORT, pass trough
 	if( focus == 0 )
 	{

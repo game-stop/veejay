@@ -2317,6 +2317,35 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 
+	index_map_[ VIMS_PROJ_GET_POINT ]			=	_new_event(
+				"%d",
+				VIMS_PROJ_GET_POINT,
+				"Get viewport points using scale",
+				vj_event_vp_get_points,
+				1,
+				VIMS_ALLOW_ANY,
+				"Grid size",
+				1000,
+				NULL );
+
+	index_map_[ VIMS_PROJ_SET_POINT ]				=	_new_event(
+				"%d %d %d %d",
+				VIMS_PROJ_SET_POINT,
+				"Set a viewport point using scale",
+				vj_event_vp_set_points,
+				4,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Point number",
+				0,
+				"Scale factor",
+				0,
+				"X",
+				0,
+				"Y",
+				0,
+				NULL );
+
+
 #ifdef HAVE_SDL
 	index_map_[VIMS_FULLSCREEN]			=	_new_event(
 				"%d",

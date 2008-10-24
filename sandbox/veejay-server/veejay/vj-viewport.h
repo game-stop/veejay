@@ -44,4 +44,7 @@ void	viewport_set_marker( void *vdata, int status );
 void	viewport_projection_inc( void *data, int incr , int w, int h );
 void	viewport_transform_coords( void *data, void *coords, int n, int blob_id, int cx, int cy ,int w, int h, int num_objects,uint8_t *plane);
 void	viewport_dummy_send( void *data );
+int	*viewport_event_get_projection(void *data, int scale);
+int	viewport_event_set_projection(void *data, float x, float y, int num, int fb);
 #endif
+

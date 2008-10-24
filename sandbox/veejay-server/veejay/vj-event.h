@@ -35,7 +35,8 @@ void	vj_event_select_macro(				void *ptr,
 	const char format[], va_list ap);
 void    vj_event_stop();
 int  	vj_event_parse_msg( void *v, char *msg, int msg_len );
-
+void	vj_event_push_coords(void *ptr);
+ 
 
 #ifdef HAVE_SDL
 #ifdef HAVE_XML2
@@ -270,4 +271,9 @@ void	vj_event_sequencer_del_sample(		void *ptr, 	const char format[], 	va_list a
 void	vj_event_sequencer_add_sample(		void *ptr,	const char format[],	va_list ap );
 void	vj_event_projection_inc( void *ptr, const char format[], va_list ap);
 void	vj_event_projection_dec( void *ptr, const char format[], va_list ap);
+
+
+void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap );
+
+void	vj_event_vp_get_points( void *ptr, const char format[], va_list ap );
 #endif

@@ -2133,6 +2133,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	    info->settings->sws_templ.flags  = 1; // fast bicubic
 	}
 
+	//vj_tag_push(info->homedir, info->settings->sample_mode,info->settings->zoom);
+
 	if(!info->bes_width)
 		info->bes_width = info->video_output_width;
 	if(!info->bes_height)
