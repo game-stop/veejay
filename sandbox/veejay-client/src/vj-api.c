@@ -190,6 +190,7 @@ enum
 	DV1394_DEVICE=1,
 };
 
+static	GdkPixmap *backing_pixmap = NULL;
 typedef struct
 {
 	int	selected_chain_entry;
@@ -366,7 +367,8 @@ typedef struct
 
 typedef struct
 {
-	GladeXML *main_window;
+	GladeXML *main_window;	
+	GtkWidget	*viewport_window;
 	vj_client	*client;
 	int		status_tokens[32]; 	/* current status tokens */
 	int		*history_tokens[4];		/* list last known status tokens */
@@ -433,7 +435,24 @@ typedef struct
 	int		preview_locked;
 	void		*midi;
 	struct timeval	time_last;
+	GtkWidget	*drawing_area;
+	int		viewport_data[10];
+	int		viewport_reload;
 } vj_gui_t;
+
+enum
+{
+	VP_CURRENT_POINT = 0,
+	VP_CURRENT_SCALE = 1,
+	VP_POINT_1	 = 2,
+	VP_POINT_2	 = 3,
+	VP_POINT_3	 = 4,
+	VP_POINT_4	 = 5,
+	VP_POINT_5	 = 6,
+	VP_POINT_6	 = 7,
+	VP_POINT_7	 = 8,
+	VP_POINT_8	 = 9,
+};
 
 enum
 {
@@ -581,8 +600,10 @@ static	void	indicate_sequence( gboolean active, sequence_gui_slot_t *slot );
 static	void set_textview_buffer(const char *name, gchar *utf8text);
 void	interrupt_cb();
 //static	gboolean	update_log(gpointer data);
+void	update_gui();
 
-
+void	reportbug();
+static		void	viewportarea_drawpoint(gint x , gint y, gint w, gint h );
 
 static struct
 {
@@ -1815,7 +1836,7 @@ gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 	}
 	
 	running_g_ = 0;
-	info->watch.state == STATE_QUIT;
+	info->watch.state = STATE_QUIT;
 
 	return FALSE;
 }
@@ -5330,6 +5351,26 @@ int		veejay_update_multitrack( void *data )
 		{
 			if( i == s->master )
 			{
+					gint rect_w = info->viewport_data[VP_CURRENT_SCALE];
+	gint area_w=0;
+	gint area_h=0;
+
+	gdk_drawable_get_size( GDK_DRAWABLE(info->drawing_area->window),&area_w,&area_h);
+
+
+	gint rect_h = info->viewport_data[VP_CURRENT_SCALE];
+	
+	gint qw,qh;
+	qw  = area_w / 2;
+	qh  = area_h / 2;
+
+	int sqw = qw / 2;
+	int sqh = qh / 2;
+
+	int offset_x = qw - sqw;
+	int offset_y = qh - sqh;	
+
+
 #ifdef STRICT_CHECKING
 				assert( s->widths[i] > 0 );
 				assert( s->heights[i] > 0 );
@@ -5352,8 +5393,23 @@ int		veejay_update_multitrack( void *data )
 				gdk_pixbuf_unref(result);
 
 				}
-				
+			/*	if( info->viewport_data[VP_CURRENT_SCALE] > 0 ) {
+				GdkPixbuf *tmpp = vj_gdk_pixbuf_scale_simple( 
+					s->img_list[i],
+					info->viewport_data[VP_CURRENT_SCALE],
+					info->viewport_data[VP_CURRENT_SCALE],GDK_INTERP_NEAREST );
+					gdk_draw_pixbuf( backing_pixmap,
+						 info->drawing_area->style->white_gc,
+						 tmpp,
+					         0,0,
+						 offset_x,
+					         offset_y,
+						 info->viewport_data[VP_CURRENT_SCALE],
+						 info->viewport_data[VP_CURRENT_SCALE],GDK_RGB_DITHER_NONE,0,0);
+	viewportarea_draw( info->viewport_data );
 
+					gdk_pixbuf_unref(tmpp);
+				}*/
 				vj_img_cb( s->img_list[i] );
 			} 
 			//	}
@@ -5746,6 +5802,33 @@ static void	process_reload_hints(int *history, int pm)
 	
 	if( info->uc.reload_hint[HINT_HISTORY] )
 		reload_srt();
+
+
+	if( info->viewport_reload == 1 ) {
+
+		info->viewport_data[ VP_CURRENT_SCALE ] = 400;
+
+		multi_vims( VIMS_PROJ_GET_POINT, "%d",
+			info->viewport_data[VP_CURRENT_SCALE] );
+		int len = 0;
+		gchar *res = recv_vims(3, &len);
+		if( len > 0 && res != NULL ) {
+			int values[8];
+			sscanf(res, "%d %d %d %d %d %d %d %d",
+				&values[0],&values[1],&values[2],&values[3],&values[4],
+				&values[5],&values[6],&values[7] );
+			veejay_msg(0,"Draw:  %d %d %d %d %d %d %d %d",
+				values[0],values[1],values[2],values[3],values[4],
+				values[5],values[6],values[7] );
+			int i;
+			for(i = 0; i < 8 ; i ++ )
+				info->viewport_data[2 + i ] = values[i];
+			viewportarea_draw( values );
+			free(res);
+
+		}	
+		info->viewport_reload = 0;
+	}
 	
 	veejay_memset( info->uc.reload_hint, 0, sizeof(info->uc.reload_hint ));	
 }
@@ -6146,6 +6229,258 @@ void	register_signals()
 	signal( SIGSEGV, reloaded_sighandler );
 }
 
+void	viewportarea_reconfigure()
+{
+	if(backing_pixmap)	
+	{
+		GtkWidget *widget = GTK_WIDGET(info->drawing_area);
+		g_object_unref(backing_pixmap);
+		backing_pixmap = NULL;
+		backing_pixmap = gdk_pixmap_new(
+					// widget->window,
+				  GDK_DRAWABLE(info->drawing_area->window),
+				  widget->allocation.width,widget->allocation.height,-1);
+		
+		gdk_draw_rectangle(backing_pixmap, widget->style->white_gc,TRUE,0,0,widget->allocation.width,
+			widget->allocation.height );
+	}
+
+}
+gboolean	viewportarea_configure(GtkWidget *widget, GdkEventConfigure *event)
+{
+	if(backing_pixmap)	
+	{
+		g_object_unref(backing_pixmap);
+		backing_pixmap = NULL;
+	}
+	if(!backing_pixmap)	
+	{
+		backing_pixmap = gdk_pixmap_new(
+					// widget->window,
+				  GDK_DRAWABLE(info->drawing_area->window),
+				widget->allocation.width,widget->allocation.height,-1);
+		
+		gdk_draw_rectangle(backing_pixmap, widget->style->white_gc,TRUE,0,0,widget->allocation.width,
+			widget->allocation.height );
+	}
+	return TRUE;
+}
+
+gboolean	viewportarea_expose(GtkWidget *widget,GdkEventExpose *event)
+{
+	gdk_draw_drawable(
+		  	  GDK_DRAWABLE(widget->window),
+			  widget->style->fg_gc[GTK_WIDGET_STATE(widget)],
+			  backing_pixmap,
+			  event->area.x,event->area.y,
+			  event->area.x,event->area.y,
+			  event->area.width,event->area.height );
+	return FALSE;
+}
+
+gboolean	viewportarea_motion_notify( GtkWidget *widget, GdkEventMotion *event)
+{
+	gdouble x,y;
+	gdouble pressure;
+	GdkModifierType state;
+
+	if( event->is_hint ) {
+	  gdk_device_get_state (event->device, event->window, NULL, &state);
+     	  gdk_event_get_axis ((GdkEvent *)event, GDK_AXIS_X, &x);
+      	  gdk_event_get_axis ((GdkEvent *)event, GDK_AXIS_Y, &y);
+      	  gdk_event_get_axis ((GdkEvent *)event, GDK_AXIS_PRESSURE, &pressure);
+    	}
+ 	else
+	{
+      		x = event->x;
+      		y = event->y;
+      		gdk_event_get_axis ((GdkEvent *)event, GDK_AXIS_PRESSURE, &pressure);
+      		state = event->state;
+    	}
+	if( state & GDK_BUTTON1_MASK && backing_pixmap != NULL )
+		viewportarea_drawpoint(  (int)x, (int) y, 	1, 1);
+	return TRUE;
+}
+
+
+static		void	viewportarea_drawpoint(gint x , gint y, gint w, gint h )
+{
+	GdkRectangle rect;
+	GdkGC *gc = info->drawing_area->style->black_gc;
+
+	rect.x = x;
+	rect.y = y;
+	rect.width = w;
+	rect.height = h;
+
+	gdk_draw_rectangle( backing_pixmap, gc, TRUE,rect.x,rect.y,rect.width,rect.height);
+	gtk_widget_queue_draw_area( GTK_WIDGET(info->drawing_area), rect.x,rect.y,rect.width,rect.height);
+
+}
+
+void		viewportarea_draw( int *values )
+{
+	gint area_w=0;
+	gint area_h=0;
+
+	gdk_drawable_get_size( GDK_DRAWABLE(info->drawing_area->window),&area_w,&area_h);
+
+	viewportarea_reconfigure();
+
+	//@ translate points to center of drawable
+	gint rect_w = info->viewport_data[VP_CURRENT_SCALE];
+	gint rect_h = info->viewport_data[VP_CURRENT_SCALE];
+
+	gint qw,qh;
+	qw  = area_w / 2;
+	qh  = area_h / 2;
+
+//	qw = area_w / info->viewport_data[VP_CURRENT_SCALE];
+//	qh = area_h / info->viewport_data[VP_CURRENT_SCALE];
+
+	int sqw = qw / 2;
+	int sqh = qh / 2;
+
+	
+
+	int offset_x = qw - sqw;
+	int offset_y = qh - sqh;	
+
+	viewportarea_drawpoint( offset_x + values[0] , offset_y + values[1], 2, 2);
+	viewportarea_drawpoint( offset_x + values[2],  offset_y + values[3], 2, 2);
+	viewportarea_drawpoint( offset_x + values[4],  offset_y + values[5], 2, 2);	
+	viewportarea_drawpoint( offset_x + values[6],  offset_y + values[7], 2, 2);
+
+	GdkPoint *points = (GdkPoint*) malloc(sizeof(GdkPoint) * 8 );
+	int i = 0;
+	int j = 0;
+	for( i = 0; i < 4; i ++ )
+	{
+		points[i].x =  offset_x + values[j];
+		points[i].y =  offset_y + values[j+1];
+		j+=2;
+	}
+
+	GdkColor color;
+	GdkGC *red_gc = gdk_gc_new( info->drawing_area->window );
+	gdk_color_parse( "Red", &color);
+	gdk_colormap_alloc_color( gdk_colormap_get_system(),&color,FALSE,TRUE);
+	gdk_gc_set_foreground(red_gc,&color);
+
+	gdk_draw_line( backing_pixmap, red_gc, offset_x + values[0] , offset_y + values[1], 
+		 offset_x + values[2],  offset_y + values[3] );
+
+	gdk_draw_line( backing_pixmap, red_gc, offset_x + values[2] , offset_y + values[3], 
+		 offset_x + values[4],  offset_y + values[5] );
+
+	gdk_draw_line( backing_pixmap, red_gc, offset_x + values[4] , offset_y + values[5], 
+		 offset_x + values[6],  offset_y + values[7] );
+
+	gdk_draw_line( backing_pixmap, red_gc, offset_x + values[6] , offset_y + values[7], 
+		 offset_x + values[0],  offset_y + values[1] );
+
+
+	gdk_draw_line(  backing_pixmap, red_gc, offset_x, offset_y,
+			offset_x + rect_w, offset_y  );
+
+	gdk_draw_line(  backing_pixmap, red_gc, offset_x, offset_y,
+			offset_x , offset_y + rect_h  );
+
+	gdk_draw_line(  backing_pixmap, red_gc, offset_x, offset_y + rect_h,
+			offset_x + rect_w , offset_y + rect_h  );
+
+	gdk_draw_line(  backing_pixmap, red_gc, offset_x + rect_w, offset_y,
+			offset_x + rect_w , offset_y + rect_h  );
+
+	gtk_widget_queue_draw_area( GTK_WIDGET(info->drawing_area), 0,0,1024,768);
+
+
+	free(points);
+
+
+}
+
+gboolean	viewportarea_button_press(GtkWidget *widget,GdkEventButton *event)
+{
+	if( event->button == 1 )
+	{
+		gdouble x,y;
+		gdk_event_get_axis ((GdkEvent *)event, GDK_AXIS_X, &x);
+	      	gdk_event_get_axis ((GdkEvent *)event, GDK_AXIS_Y, &y);
+		gint area_w,area_h;
+		gdk_drawable_get_size( GDK_DRAWABLE(info->drawing_area->window),&area_w,&area_h);
+		gint rect_w = info->viewport_data[VP_CURRENT_SCALE];
+		gint rect_h = info->viewport_data[VP_CURRENT_SCALE];
+		gint qw,qh;
+		qw  = area_w / 2;
+		qh  = area_h / 2;
+		int sqw = qw / 2;
+		int sqh = qh / 2;
+
+		int offset_x = qw - sqw;
+		int offset_y = qh - sqh;	
+
+		float scale = 1.0;
+		if( info->viewport_data[VP_CURRENT_SCALE] != 100 ) {
+			scale = (float) info->viewport_data[VP_CURRENT_SCALE] / 100.0f;
+		}
+		double nx = (x-offset_x) / scale;
+		double ny = (y-offset_y) / scale;
+
+			
+		double px[8];
+		int i;
+		for( i = 0; i < 8; i ++ ) {
+			px[i] = (double) info->viewport_data[2 + i] / scale;
+		}
+
+		//@ Find closest point
+		double dt[4];
+		dt[0] = sqrt( (px[0] - nx) *
+		              (px[0] - nx) +
+			      (px[1] - ny) *
+			      (px[1] - ny) );
+		dt[1] = sqrt( (px[2] - nx) *
+		              (px[2] - nx) +
+			      (px[3] - ny) *
+			      (px[3] - ny) );
+		dt[2] = sqrt( (px[4] - nx) *
+		              (px[4] - nx) +
+			      (px[5] - ny) *
+			      (px[5] - ny) );
+		dt[3] = sqrt( (px[6] - nx) *
+		              (px[6] - nx) +
+			      (px[7] - ny) *
+			      (px[7] - ny) );
+		double dist = (double) info->viewport_data[VP_CURRENT_SCALE];
+		int point = -1;
+		for ( i = 0; i < 4;  i ++ )
+                {
+                        if( dt[i] < dist )
+                        {
+                                dist = dt[i];
+                                point = i;
+                        }       
+                }
+
+		veejay_msg( 0,"Closest point: %d, scaled=%gx%g, source=%gx%g", point,nx,ny,x,y );
+
+		if( point >= 0 ) {
+			
+			multi_vims( VIMS_PROJ_SET_POINT,
+					"%d %d %d %d",
+					(point+1),
+					100,
+					(int) (nx*100),
+					(int) (ny*100) );
+
+		}
+
+		info->viewport_reload = 1;
+	}
+	return TRUE;
+}
+
 void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, int use_threads)
 {
 	int i;
@@ -6197,7 +6532,6 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 		(GCallback) on_timeline_bind_toggled, NULL );	
 	g_signal_connect( info->tl, "cleared",
 		(GCallback) on_timeline_cleared, NULL );
-
 
 	bankport_ = vpn( VEVO_ANONYMOUS_PORT );
 
@@ -6278,6 +6612,29 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 			G_CALLBACK( boxgreen_expose_event ), NULL);
 	g_signal_connect( G_OBJECT( bb ), "expose_event",
 			G_CALLBACK( boxblue_expose_event ), NULL);
+
+
+	GtkWidget *drawbox = glade_xml_get_widget(info->main_window , "drawbox");
+	info->drawing_area = gtk_drawing_area_new();
+	gtk_widget_set_events( info->drawing_area, 	
+		GDK_EXPOSURE_MASK | GDK_LEAVE_NOTIFY_MASK |
+		GDK_BUTTON_PRESS_MASK | GDK_POINTER_MOTION_MASK |
+		GDK_POINTER_MOTION_HINT_MASK );
+	gtk_widget_set_extension_events( info->drawing_area,
+		GDK_EXTENSION_EVENTS_CURSOR );
+
+	gtk_widget_set_size_request( GTK_WIDGET(info->drawing_area),1024,768);
+	gtk_box_pack_start( GTK_BOX(drawbox), info->drawing_area,TRUE,TRUE,0);	
+
+
+
+	g_signal_connect( G_OBJECT( info->drawing_area),"expose_event", G_CALLBACK(viewportarea_expose),NULL);
+	g_signal_connect( G_OBJECT( info->drawing_area),"configure_event", G_CALLBACK(viewportarea_configure),NULL);	
+	g_signal_connect( G_OBJECT(info->drawing_area),"motion_notify_event", G_CALLBACK(viewportarea_motion_notify),NULL );
+	g_signal_connect( G_OBJECT(info->drawing_area),"button_press_event",G_CALLBACK(viewportarea_button_press),NULL );
+
+	gtk_widget_show( info->drawing_area);
+
 
 
 	set_toggle_button( "button_252", vims_verbosity );
