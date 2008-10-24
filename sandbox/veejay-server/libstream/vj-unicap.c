@@ -677,11 +677,10 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 		}	
 		vut->pixfmt = get_ffmpeg_pixfmt( pixel_format );
 		vut->shift    = get_shift_size(pixel_format);
-		vut->frame_size += vut->sizes[1];
-		vut->frame_size += vut->sizes[2];
-
 	}
-
+	vut->frame_size += vut->sizes[1];
+	vut->frame_size += vut->sizes[2];
+	
 	vut->template.flags = 1;
 	vut->scaler = NULL;
 
@@ -819,11 +818,12 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 			vut->dst_width = w;
 			vut->dst_height = h;
 			vut->dst_fmt = vut->pixfmt;
-
+		
 			veejay_msg(VEEJAY_MSG_WARNING, 
 				"Test mode %dx%d in %s to %dx%d in %s",
 				vut->src_width,vut->src_height,vut->format.identifier,vut->dst_width,
 				vut->dst_height, unicap_pf_str(vut->dst_fmt) );
+
 
 			if( ( vut->format.fourcc == get_fourcc("RGB3") ) || (vut->format.fourcc == get_fourcc("BGR3") ) ) {
 				vut->src_sizes[0] = vut->src_width * 3;
