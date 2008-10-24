@@ -1618,7 +1618,33 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 		  		error = 0;
 			else
 		   		vj_tag_set_active(sample_id, 0);
-			frame_buffer[chain_entry]->ssm = 0;
+			video_playback_setup *settings = info->settings;
+	frame_buffer[chain_entry]->ssm = 0;
+
+			if( settings->composite )
+			{ //@ scales in software
+				if( settings->ca ) {
+					settings->ca = 0;
+					viewport_event_set_projection( composite_get_vp( info->composite ),
+						settings->cx,settings->cy,settings->cn , info->uc->mouse[2] );
+
+				}
+				if(info->which_vp == 1 )
+				{	//@ focus on projection screen
+					composite_event( info->composite, fb, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
+						vj_perform_get_width(info), vj_perform_get_height(info));
+				}
+			//	uint8_t *tmp = (uint8_t*) vj_malloc(sizeof(uint8_t) * 	vj_perform_get_width(info)* vj_perform_get_height(info));
+				uint8_t *t[3] = { temp_buffer[0] + (vj_perform_get_width(info)* vj_perform_get_height(info)), NULL,NULL };
+				veejay_memcpy(t[0],fb[0],vj_perform_get_width(info)* vj_perform_get_height(info));
+				composite_process(info->composite,fb,t,0,info->which_vp);
+				composite_blitX( info->composite, t, fb );
+			//	free(tmp);
+			///	veejay_memset(fb[1],128,info->effect_frame1->uv_len);
+			//	veejay_memset(fb[2],128,info->effect_frame1->uv_len);
+
+			}
+
 	     	}
 	}
 	else
@@ -1767,6 +1793,32 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 			else
 				vj_tag_set_active(sample_id, 0); // stop stream
 			frame_buffer[chain_entry]->ssm = 0;
+//	frame_buffer[chain_entry]->ssm = 0;
+			video_playback_setup *settings = info->settings;
+			if( settings->composite )
+			{ //@ scales in software
+				if( settings->ca ) {
+					settings->ca = 0;
+					viewport_event_set_projection( composite_get_vp( info->composite ),
+						settings->cx,settings->cy,settings->cn , info->uc->mouse[2] );
+
+				}
+				if(info->which_vp == 1 )
+				{	//@ focus on projection screen
+					composite_event( info->composite, fb, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
+						vj_perform_get_width(info), vj_perform_get_height(info));
+				}
+			//	uint8_t *tmp = (uint8_t*) vj_malloc(sizeof(uint8_t) * 	vj_perform_get_width(info)* vj_perform_get_height(info));
+				uint8_t *t[3] = { temp_buffer[0] + (vj_perform_get_width(info)* vj_perform_get_height(info)), NULL,NULL };
+				veejay_memcpy(t[0],fb[0],vj_perform_get_width(info)* vj_perform_get_height(info));
+				composite_processX(info->composite,fb,t,0,info->which_vp);
+				composite_blitX( info->composite, t, fb );
+			//	free(tmp);
+			//	veejay_memset(fb[1],128,info->effect_frame1->uv_len);
+			//	veejay_memset(fb[2],128,info->effect_frame1->uv_len);
+
+			}
+
 	    	}
 	}
 	else
@@ -1840,32 +1892,6 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
 				frames[1]->format  = info->pixel_format;
 				frames[1]->ssm     = frame_buffer[chain_entry]->ssm;
-
-
-				if( settings->composite )
-				{ //@ scales in software
-				/*	if( settings->ca ) {
-						settings->ca = 0;
-						viewport_event_set_projection( composite_get_vp( info->composite ),
-							settings->cx,settings->cy,settings->cn , info->uc->mouse[2] );
-
-					}
-					if(info->which_vp == 1 )
-					{	//@ focus on projection screen
-						composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
-						vj_perform_get_width(info), vj_perform_get_height(info));
-					}*/
-					/*	uint8_t *tmpd[3] = {	
-							temp_buffer[0] + frames[1]->len,
-							temp_buffer[1] + frames[1]->len,
-							temp_buffer[2] + frames[1]->len
-						};
-						composite_process( info->composite, tmpd, frames[1]->data, 0, info->which_vp );
-						veejay_memcpy( frames[1]->data[0], temp_buffer[0]+frames[1]->len, frames[1]->len );
-						veejay_memcpy( frames[1]->data[1], temp_buffer[1]+frames[1]->len, frames[1]->len );
-						veejay_memcpy( frames[1]->data[2], temp_buffer[1]+frames[1]->len, frames[1]->len ); 
-						frames[1]->ssm = 1;*/
-				}
 
 
 				// sample B
@@ -1963,6 +1989,7 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 	   	 		frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
 				frames[1]->ssm     = frame_buffer[chain_entry]->ssm;	
+
 				if(frames[1]->ssm == 0 && sub_mode)
 				{
 					chroma_supersample(
@@ -2654,6 +2681,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	pri[0] = primary_buffer[destination]->Y;
 	pri[1] = primary_buffer[destination]->Cb;
 	pri[2] = primary_buffer[destination]->Cr;
+/*
 	if( settings->composite )
 	{ //@ scales in software
 		if( settings->ca ) {
@@ -2667,10 +2695,9 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 			composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
 				vj_perform_get_width(info), vj_perform_get_height(info));
 		}
-
-		composite_process( info->composite, pri, frame, 0, info->which_vp );
-	}
-
+			composite_process(info->composite,pri,frame,0,info->which_vp);	
+	} */
+	
 	if( frame->ssm == 1 )
 	{
 		chroma_subsample(
@@ -2765,32 +2792,25 @@ static	void	vj_perform_record_frame( veejay_t *info )
 static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settings )
 {
 	int deep = 0;
-/*	VJFrame *frame = info->effect_frame1;
+
+	VJFrame *frame = info->effect_frame1;
 	VJFrame *frame2= info->effect_frame2;
 	uint8_t *pri[3];
-
 	pri[0] = primary_buffer[0]->Y;
 	pri[1] = primary_buffer[0]->Cb;
 	pri[2] = primary_buffer[0]->Cr;
-
-	if( settings->composite )
-	{ //@ scales in software
-		if( settings->ca ) {
-			settings->ca = 0;
-			viewport_event_set_projection( composite_get_vp( info->composite ),
-				settings->cx,settings->cy,settings->cn , info->uc->mouse[2] );
-
-		}
-		if(info->which_vp == 1 )
-		{	//@ focus on projection screen
-			composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
-				vj_perform_get_width(info), vj_perform_get_height(info));
-		}
-
-		composite_process( info->composite, pri, frame, 0, info->which_vp );
+	
+	if( frame->ssm == 1 )
+	{
+		chroma_subsample(
+		settings->sample_mode,
+			effect_sampler,
+			pri,
+			frame->width,
+			frame->height
+			);
+		frame->ssm = 0;
 	}
-*/
-
 
 	//@ Finalize the FX chain (Could leave the FX chain supersampled)
 	vj_perform_finish_chain( info );

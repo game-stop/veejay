@@ -169,7 +169,6 @@ static inline void	composite_fit_l( composite_t *c, VJFrame *img_data, uint8_t *
 
 		VJFrame *dst1 = yuv_yuv_template( c->large_plane[0],c->large_plane[1], c->large_plane[2],
 					  c->proj_width,c->proj_height, PIX_FMT_YUV444P );
-
 		yuv_convert_and_scale(c->scaler,src1,dst1 );
 		free(src1);
 		free(dst1);
@@ -178,6 +177,7 @@ static inline void	composite_fit_l( composite_t *c, VJFrame *img_data, uint8_t *
 
 static inline void	composite_fit( composite_t *c, VJFrame *img_data, uint8_t *planes[3] )
 {
+
 	if(img_data->width == c->proj_width && img_data->height == c->proj_height )
 	{
 		c->use_ptr = 1;
@@ -202,6 +202,7 @@ static inline void	composite_fit( composite_t *c, VJFrame *img_data, uint8_t *pl
 
 static void	composite_configure( composite_t *c,VJFrame *img_data, uint8_t *planes[3] )
 {
+
 	composite_fit(c,img_data, planes );
 	if( c->use_ptr )
 		viewport_draw_interface_color(c->vp1, c->ptr );
@@ -222,6 +223,19 @@ static void	composite_prerender( composite_t *c, VJFrame *img_data, uint8_t *pla
 	free(dst1);
 }
 */
+
+void	composite_process_secundary(void *compiz, uint8_t *dst_data[3], VJFrame *input )
+{
+	composite_t *c = (composite_t*) compiz;
+	c->ptr[0] = input->data[0];
+	c->ptr[1] = input->data[1];
+	c->ptr[2] = input->data[2];
+	c->blit = 1;
+
+	viewport_produce_full_img( c->vp1, c->ptr, dst_data );
+
+}
+
 void	composite_process(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int use_vp, int focus )
 {
 	composite_t *c = (composite_t*) compiz;
@@ -232,7 +246,6 @@ void	composite_process(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int 
 		input->ssm = 1;
 	}
 	int proj_active = viewport_active(c->vp1 );
-
 	c->blit = 0;
 	//@ If the current focus is VIEWPORT, pass trough
 	if( focus == 0 )
@@ -270,6 +283,34 @@ void	composite_process(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int 
 		}
 	}
 }
+
+
+void	composite_processX(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int use_vp, int focus )
+{
+	composite_t *c = (composite_t*) compiz;
+	int proj_active = viewport_active(c->vp1 );
+	c->blit = 0;
+	//@ If the current focus is VIEWPORT, pass trough
+	if( focus == 0 )
+	{
+		composite_fit( c, input, img_dat );
+		return;
+	}
+	else
+	{
+		if( !proj_active ) //@ render projection to yuyv surface
+		{
+			composite_fit_l(c, input,img_dat );
+			c->blit = 1;
+		}
+		else
+		{
+			composite_fit(c,input, img_dat );
+		}
+	}
+}
+
+
 void	composite_transform_points( void *compiz, void *coords, int n, int blob_id, int cx, int cy,int w, int h,int num_objects,uint8_t *plane )
 {
 	composite_t *c = (composite_t*) compiz;
@@ -283,10 +324,15 @@ void	composite_dummy( void *compiz )
 	viewport_dummy_send( c->vp1 );
 }
 
+void	composite_blitX( void *compiz, uint8_t *img[3] , uint8_t *out_img[3])
+{
+		composite_t *c = (composite_t*) compiz;
+	viewport_produce_bw_img( c->vp1,
+		img, out_img );
+}
 void	composite_blit( void *compiz, uint8_t *yuyv )
 {
 	composite_t *c = (composite_t*) compiz;
-	
 	if(c->use_ptr)
 	{
 		if(c->blit)
@@ -314,6 +360,7 @@ void	composite_blit( void *compiz, uint8_t *yuyv )
 
 void	composite_get_blit_buffer( void *compiz, uint8_t *buf[3] )
 {
+
 	composite_t *c = (composite_t*) compiz;
 	if(c->blit)
 	{

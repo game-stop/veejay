@@ -2586,6 +2586,60 @@ void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3
 #endif
 }
 
+void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3] )
+{
+	viewport_t *v = (viewport_t*) vdata;
+	const int len = v->w * v->h;
+	register const int w = v->w;
+	register uint32_t i,j,n;
+	const int32_t *map = v->map;
+	uint8_t *inY  = img[0];
+	uint8_t       *outY = out_img[0];
+	inY[len+1] = 0;
+
+	register const	int32_t	tx1 = v->ttx1;
+	register const	int32_t tx2 = v->ttx2;
+	register const	int32_t	ty1 = v->tty1;
+	register const	int32_t ty2 = v->tty2;
+	int x,y;
+
+	y  = ty1 * w;
+#if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE)
+	fast_memset_dirty( outY, 0, y );
+#else
+	veejay_memset( outY,0,y);
+#endif
+
+	for( y = ty1; y < ty2; y ++ )
+	{
+#if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE )
+		fast_memset_dirty( outY + (y * w ), 0, tx1 );
+		fast_memset_dirty( outY + (y * w ) + tx2, 0, (w-tx2));
+
+#else
+		veejay_memset( outY + (y * w ), 0, tx1 );
+		veejay_memset( outY + (y * w ) + tx2, 0, (w-tx2));
+
+#endif
+		for( x = tx1; x < tx2 ; x ++ )
+		{
+			i = y * w + x;
+			n = map[i];
+			outY[i] = inY[n];
+		}
+	}
+	y = (v->h - ty2 ) * w;
+	x = ty2 * w;
+#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
+
+	fast_memset_dirty( outY + x, 0, y );
+	fast_memset_finish();
+#else
+	veejay_memset( outY+x,0,y);
+
+#endif
+}
+
 #define pack_yuyv_pixel( y0,u0,u1,y1,v0,v1 ) (\
 		( (int) y0 ) & 0xff ) +\
                 ( (((int) ((u0+u1)>>1) ) & 0xff) << 8) +\

@@ -1099,7 +1099,6 @@ int	vj_unicap_grab_a_frame( void *vut )
 					v->scaler = yuv_init_swscaler( srci,dsti,&(v->template),
 					yuv_sws_get_cpu_flags());
 				}
-	
 				yuv_convert_and_scale_from_rgb( v->scaler, srci,dsti );
 				free(srci);
 				free(dsti);
