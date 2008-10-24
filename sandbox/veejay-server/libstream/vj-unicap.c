@@ -799,12 +799,22 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 	vut->src_sizes[1] = vut->sizes[1];
 	vut->src_sizes[2] = vut->sizes[2];
 
-	if( !SUCCESS( unicap_set_format( vut->handle, &(vut->format) ) ) )
+	int 	max_sw = vut->format.max_size.width;
+	int	max_sh = vut->format.max_size.height;
+	int	search = 0;
+
+	if( w > vut->format.max_size.width || h > vut->format.max_size.height ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "%s does not support %dx%d, using %dx%d instead with a software scaler.",
+			vut->device.identifier, w,h,vut->format.max_size.width,vut->format.max_size.height );
+		search = 1;
+	}
+
+	if( !SUCCESS( unicap_set_format( vut->handle, &(vut->format) ) ) || search == 1 )
 	{
-		int try_format[6] = { 720,576,640,480,320,240 };
+		int try_format[8] = { max_sw,max_sh,720,576,640,480,320,240 };
 		int i;
 		int good = 0;
-		for( i = 0; i < 6 ; i +=2 ) {
+		for( i = 0; i < 8 ; i +=2 ) {
 			vut->src_width = try_format[i];
 			vut->src_height= try_format[i+1];
 			vut->dst_width = w;
