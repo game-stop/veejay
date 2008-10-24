@@ -90,6 +90,44 @@ typedef struct
 	int	composite;
 } vj_unicap_t;
 
+static struct {
+	int i;
+	char *s;
+} pixstr[] = {
+	{PIX_FMT_YUV420P, "PIX_FMT_YUV420P"},
+{	PIX_FMT_YUV422P, "PIX_FMT_YUV422P"},
+{	PIX_FMT_YUVJ420P, "PIX_FMT_YUVJ420P"},
+{	PIX_FMT_YUVJ422P, "PIX_FMT_YUVJ422P"},
+{	PIX_FMT_RGB24,	  "PIX_FMT_RGB24"},
+{	PIX_FMT_BGR24,	  "PIX_FMT_BGR24"},
+{	PIX_FMT_YUV444P,  "PIX_FMT_YUV444P"},
+{	PIX_FMT_YUVJ444P, "PIX_FMT_YUVJ444P"},
+{	PIX_FMT_RGB32,		"PIX_FMT_RGB32"},
+{	PIX_FMT_BGR32,		"PIX_FMT_BGR32"},
+{	PIX_FMT_GRAY8,		"PIX_FMT_GRAY8"},
+{	PIX_FMT_RGB32_1,	"PIX_FMT_RGB32_1"},
+{	0	,		NULL}
+
+};
+void	unicap_report_error( vj_unicap_t *v, char *err_msg ) 
+{
+
+	veejay_msg(0,"%s: %s", err_msg, v->device.identifier );
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"Capture device delivers in %s, %dx%d strides=%d,%d,%d",
+			pixstr[v->src_fmt], v->src_width,v->src_height,v->src_sizes[0],v->src_sizes[1],v->src_sizes[2]);
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"System expects %s, %dx%d, strides=%d,%d,%d",
+			pixstr[v->dst_fmt], v->dst_width,v->dst_height,v->dst_sizes[0],v->dst_sizes[1],v->dst_sizes[2]);
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"At time of initialization: %dx%d, strides=%d,%d,%d",
+			v->width,v->height,v->sizes[0],v->sizes[1],v->sizes[2]);
+
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"Camera configured in %dx%d, frame_size=%d",v->format.size.width,v->format.size.height, v->frame_size);
+
+
+}
 
 typedef struct
 {
@@ -979,9 +1017,9 @@ static int	vj_unicap_start_capture_( void *vut )
 #endif
 	if( !SUCCESS( unicap_start_capture( v->handle ) ) )
    	{
-      		veejay_msg( 0, "Failed to start capture on device: %s\n", v->device.identifier );
 		free(v->priv_buf);
 		v->priv_buf = NULL;
+		unicap_report_error(v, "Failed to start capture on device" );
 		return 0;
      	}
 #ifndef USE_UNICAP_CB
