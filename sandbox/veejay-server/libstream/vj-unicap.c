@@ -962,14 +962,9 @@ static int	vj_unicap_start_capture_( void *vut )
 		assert( v->frame_size > 0 );
 #endif
 		v->priv_buf = (uint8_t*) vj_calloc( v->dst_width * v->dst_height * 4 * sizeof(uint8_t) );
-		v->buffer.data = vj_malloc( (v->src_sizes[0] + v->src_sizes[1] + v->src_sizes[2]) * sizeof(uint8_t) * 2 );
+		v->buffer.data = vj_calloc( (v->src_sizes[0] + v->src_sizes[1] + v->src_sizes[2]) * sizeof(uint8_t) * 2 );
 		if(!v->rgb)
-		{
-			veejay_memset( v->buffer.data,    0, v->src_sizes[0] * sizeof(uint8_t));
 			veejay_memset( v->buffer.data + (v->src_sizes[0]), 128, (v->src_sizes[1] + v->src_sizes[2]) * sizeof(uint8_t));
-		}
-		else
-			veejay_memset( v->buffer.data, 0, v->src_sizes[0] * sizeof(uint8_t));
 
 	}
 
