@@ -115,10 +115,10 @@ void	unicap_report_error( vj_unicap_t *v, char *err_msg )
 	veejay_msg(0,"%s: %s", err_msg, v->device.identifier );
 	veejay_msg(VEEJAY_MSG_DEBUG,
 		"Capture device delivers in %s, %dx%d strides=%d,%d,%d",
-			pixstr[v->src_fmt], v->src_width,v->src_height,v->src_sizes[0],v->src_sizes[1],v->src_sizes[2]);
+			pixstr[v->src_fmt].s, v->src_width,v->src_height,v->src_sizes[0],v->src_sizes[1],v->src_sizes[2]);
 	veejay_msg(VEEJAY_MSG_DEBUG,
 		"System expects %s, %dx%d, strides=%d,%d,%d",
-			pixstr[v->dst_fmt], v->dst_width,v->dst_height,v->dst_sizes[0],v->dst_sizes[1],v->dst_sizes[2]);
+			pixstr[v->dst_fmt].s, v->dst_width,v->dst_height,v->dst_sizes[0],v->dst_sizes[1],v->dst_sizes[2]);
 	veejay_msg(VEEJAY_MSG_DEBUG,
 		"At time of initialization: %dx%d, strides=%d,%d,%d",
 			v->width,v->height,v->sizes[0],v->sizes[1],v->sizes[2]);
