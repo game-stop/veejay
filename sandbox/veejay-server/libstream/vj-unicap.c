@@ -109,16 +109,28 @@ static struct {
 {	0	,		NULL}
 
 };
-void	unicap_report_error( vj_unicap_t *v, char *err_msg ) 
+
+
+static const	char	*unicap_pf_str(int i)
+{
+	int j;
+	for( j = 0; pixstr[j].s != NULL ; j ++ ) {
+		if( i == pixstr[j].i )
+			return pixstr[j].s;
+	}
+	return NULL;
+}
+
+static void	unicap_report_error( vj_unicap_t *v, char *err_msg ) 
 {
 
 	veejay_msg(0,"%s: %s", err_msg, v->device.identifier );
 	veejay_msg(VEEJAY_MSG_DEBUG,
 		"Capture device delivers in %s, %dx%d strides=%d,%d,%d",
-			pixstr[v->src_fmt].s, v->src_width,v->src_height,v->src_sizes[0],v->src_sizes[1],v->src_sizes[2]);
+			unicap_pf_str(v->src_fmt), v->src_width,v->src_height,v->src_sizes[0],v->src_sizes[1],v->src_sizes[2]);
 	veejay_msg(VEEJAY_MSG_DEBUG,
 		"System expects %s, %dx%d, strides=%d,%d,%d",
-			pixstr[v->dst_fmt].s, v->dst_width,v->dst_height,v->dst_sizes[0],v->dst_sizes[1],v->dst_sizes[2]);
+			unicap_pf_str(v->dst_fmt), v->dst_width,v->dst_height,v->dst_sizes[0],v->dst_sizes[1],v->dst_sizes[2]);
 	veejay_msg(VEEJAY_MSG_DEBUG,
 		"At time of initialization: %dx%d, strides=%d,%d,%d",
 			v->width,v->height,v->sizes[0],v->sizes[1],v->sizes[2]);
