@@ -94,18 +94,18 @@ static struct {
 	int i;
 	char *s;
 } pixstr[] = {
-	{PIX_FMT_YUV420P, "PIX_FMT_YUV420P"},
-{	PIX_FMT_YUV422P, "PIX_FMT_YUV422P"},
-{	PIX_FMT_YUVJ420P, "PIX_FMT_YUVJ420P"},
-{	PIX_FMT_YUVJ422P, "PIX_FMT_YUVJ422P"},
-{	PIX_FMT_RGB24,	  "PIX_FMT_RGB24"},
-{	PIX_FMT_BGR24,	  "PIX_FMT_BGR24"},
-{	PIX_FMT_YUV444P,  "PIX_FMT_YUV444P"},
-{	PIX_FMT_YUVJ444P, "PIX_FMT_YUVJ444P"},
-{	PIX_FMT_RGB32,		"PIX_FMT_RGB32"},
-{	PIX_FMT_BGR32,		"PIX_FMT_BGR32"},
-{	PIX_FMT_GRAY8,		"PIX_FMT_GRAY8"},
-{	PIX_FMT_RGB32_1,	"PIX_FMT_RGB32_1"},
+	{PIX_FMT_YUV420P, "YUVPIX_FMT_YUV420P"},
+{	PIX_FMT_YUV422P, "4:2:2 planar, Y-Cb-Cr ( 422P )"},
+{	PIX_FMT_YUVJ420P, "4:2:0 planar, Y-U-V (420P JPEG)"},
+{	PIX_FMT_YUVJ422P, "4:2:2 planar, Y-U-V (422P JPEG)"},
+{	PIX_FMT_RGB24,	  "RGB 24 bit"},
+{	PIX_FMT_BGR24,	  "BGR 24 bit"},
+{	PIX_FMT_YUV444P,  "YUV 4:4:4 planar, Y-Cb-Cr (444P)"},
+{	PIX_FMT_YUVJ444P, "YUV 4:4:4 planar, Y-U-V (444P JPEG)"},
+{	PIX_FMT_RGB32,	  "RGB 32 bit"},
+{	PIX_FMT_BGR32,	  "BGR 32 bit"},
+{	PIX_FMT_GRAY8,	  "Greyscale"},
+{	PIX_FMT_RGB32_1,  "RGB 32 bit LE"},
 {	0	,		NULL}
 
 };
@@ -820,6 +820,12 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 			vut->dst_width = w;
 			vut->dst_height = h;
 			vut->dst_fmt = vut->pixfmt;
+
+			veejay_msg(VEEJAY_MSG_DEBUG, 
+				"Test mode %dx%d in %s to %dx%d in %s",
+				vut->src_width,vut->src_height,vut->format.identifier,vut->dst_width,
+				vut->dst_height, unicap_pf_str(vut->dst_fmt) );
+
 			if( ( vut->format.fourcc == get_fourcc("RGB3") ) || (vut->format.fourcc == get_fourcc("BGR3") ) ) {
 				vut->src_sizes[0] = vut->src_width * 3;
 				vut->src_sizes[1] = 0; vut->src_sizes[2] = 0;
@@ -839,7 +845,13 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 				vut->src_sizes[2] = vut->src_sizes[1]/4;
 				vut->src_fmt = PIX_FMT_YUV420P;
 				vut->frame_size = vut->src_sizes[0] + vut->src_sizes[1] + vut->src_sizes[2];
+			} 
+#ifdef STRICT_CHECKING
+			else {
+				veejay_msg(0,  "Invalid pixel format.");
+				assert( 0 );
 			}
+#endif
 
 			vut->format.buffer_size = vut->frame_size;
 			vut->format.size.width = vut->src_width;
@@ -1043,6 +1055,7 @@ static int	vj_unicap_start_capture_( void *vut )
 #ifdef STRICT_CHECKING
 		assert( v->dst_width > 0 );
 		assert( v->dst_height > 0 );
+		assert( v->frame_size > 0 );
 #endif
 		v->priv_buf = (uint8_t*) vj_calloc( v->dst_width * v->dst_height * 4 * sizeof(uint8_t) );
 		v->buffer.data = vj_malloc( v->frame_size * sizeof(uint8_t) );
