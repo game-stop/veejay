@@ -1008,6 +1008,10 @@ static int	vj_unicap_start_capture_( void *vut )
 
 
 	} else {
+#ifdef STRICT_CHECKING
+		assert( v->dst_width > 0 );
+		assert( v->dst_height > 0 );
+#endif
 		v->priv_buf = (uint8_t*) vj_calloc( v->dst_width * v->dst_height * 4 * sizeof(uint8_t) );
 		v->buffer.data = vj_malloc( v->frame_size * sizeof(uint8_t) );
 		if(!v->rgb)
