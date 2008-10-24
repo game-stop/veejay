@@ -821,7 +821,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 			vut->dst_height = h;
 			vut->dst_fmt = vut->pixfmt;
 
-			veejay_msg(VEEJAY_MSG_DEBUG, 
+			veejay_msg(VEEJAY_MSG_WARNING, 
 				"Test mode %dx%d in %s to %dx%d in %s",
 				vut->src_width,vut->src_height,vut->format.identifier,vut->dst_width,
 				vut->dst_height, unicap_pf_str(vut->dst_fmt) );
@@ -871,7 +871,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 			} 
 
 			if( SUCCESS( unicap_set_format( vut->handle, &(vut->format)) ) ) {
-				veejay_msg(VEEJAY_MSG_INFO ,"Camera supports %dx%d (buffer=%d)", vut->src_width,vut->src_height,vut->frame_size);
+				veejay_msg(VEEJAY_MSG_INFO ,"Camera supports %dx%d in %s", vut->src_width,vut->src_height,vut->format.identifier);
 				good = 1;
 				break;
 			}
