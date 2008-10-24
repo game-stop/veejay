@@ -1155,14 +1155,14 @@ int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const 
 	assert(v->priv_buf != NULL );
 #endif	
 	if( v->src_width == v->dst_width && v->src_height == v->dst_height ) {
-	uint8_t *src[3] = {
-		v->priv_buf,
-		v->priv_buf + v->sizes[0],
-		v->priv_buf + v->sizes[0] + v->sizes[1] 
-	};
-	veejay_memcpy( buffer[0], src[0], v->sizes[0] );
-	veejay_memcpy( buffer[1], src[1], v->sizes[1] );
-	veejay_memcpy( buffer[2], src[2], v->sizes[2]);
+		uint8_t *src[3] = {
+			v->priv_buf,
+			v->priv_buf + v->sizes[0],
+			v->priv_buf + v->sizes[0] + v->sizes[1] 
+		};
+		veejay_memcpy( buffer[0], src[0], v->sizes[0] );
+		veejay_memcpy( buffer[1], src[1], v->sizes[1] );
+		veejay_memcpy( buffer[2], src[2], v->sizes[2]);
 	} else {
 		uint8_t *src[3] = {	
 			v->priv_buf,	
@@ -1171,7 +1171,6 @@ int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const 
 		veejay_memcpy( buffer[0], src[0], v->dst_sizes[0] );
 		veejay_memcpy( buffer[1], src[1], v->dst_sizes[1] );
 		veejay_memcpy( buffer[2], src[2], v->dst_sizes[2] );
-
 	}
 
 	unlock_(vut);
@@ -1228,7 +1227,8 @@ int	vj_unicap_grab_a_frame( void *vut )
 
 	if(!v->rgb)
 	{
-		if( v->src_width == v->dst_width && v->src_height == v->dst_height ) {
+		if( v->src_width == v->dst_width && v->src_height == v->dst_height )
+		{
 			veejay_memcpy( buffer[0], ready_buffer->data, v->sizes[0] );
 			veejay_memcpy( buffer[1], ready_buffer->data + v->sizes[0], v->sizes[1] );
 			veejay_memcpy( buffer[2], ready_buffer->data + v->sizes[0] +v->sizes[1] , v->sizes[2]);
@@ -1239,37 +1239,38 @@ int	vj_unicap_grab_a_frame( void *vut )
 							  ready_buffer->data + v->src_sizes[0] + v->src_sizes[1],
 							  v->src_width,
 							  v->src_height, v->src_fmt );
-			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], v->dst_width,v->dst_height, v->dst_fmt ); 
+			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], 
+							  v->dst_width,v->dst_height, v->dst_fmt ); 
 			if(!v->scaler) {
-				v->scaler = yuv_init_swscaler( srci,dsti,&(v->template),
-				yuv_sws_get_cpu_flags());
+				v->scaler = yuv_init_swscaler( srci,dsti,&(v->template),yuv_sws_get_cpu_flags());
 			}
 	
-			yuv_convert_and_scale_from_rgb( v->scaler, srci,dsti );
+			yuv_convert_and_scale( v->scaler, srci,dsti );
 			free(srci);
 			free(dsti);
 		}
 	}
 	else
 	{
-		if( v->src_width == v->dst_width && v->src_height == v->dst_height ) {
-				VJFrame *srci = yuv_rgb_template( ready_buffer->data, v->width,v->height, v->dst_fmt );
-				VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], v->width,v->height, v->pixfmt ); 
-				yuv_convert_any_ac(srci,dsti, srci->format, dsti->format );
-				free(srci);
-				free(dsti);
+		if( v->src_width == v->dst_width && v->src_height == v->dst_height )
+		{
+			VJFrame *srci = yuv_rgb_template( ready_buffer->data, v->width,v->height, v->src_fmt );
+			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], v->width,v->height, v->dst_fmt ); 
+			yuv_convert_any_ac(srci,dsti, srci->format, dsti->format );
+			free(srci);
+			free(dsti);
+		}
+		else {
+			VJFrame *srci = yuv_rgb_template( ready_buffer->data, v->src_width,v->src_height, v->src_fmt );
+			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], 
+							  v->dst_width,v->dst_height, v->dst_fmt ); 
+			if(!v->scaler) {
+				v->scaler = yuv_init_swscaler( srci,dsti,&(v->template),yuv_sws_get_cpu_flags());
 			}
-			else {
-				VJFrame *srci = yuv_rgb_template( ready_buffer->data, v->src_width,v->src_height, v->src_fmt );
-				VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], v->dst_width,v->dst_height, v->dst_fmt ); 
-				if(!v->scaler) {
-					v->scaler = yuv_init_swscaler( srci,dsti,&(v->template),
-					yuv_sws_get_cpu_flags());
-				}
-				yuv_convert_and_scale_from_rgb( v->scaler, srci,dsti );
-				free(srci);
-				free(dsti);
-			}
+			yuv_convert_and_scale_from_rgb( v->scaler, srci,dsti );
+			free(srci);
+			free(dsti);
+		}
 	}
 	
 	if( ! SUCCESS( unicap_queue_buffer( v->handle, ready_buffer) )) 
