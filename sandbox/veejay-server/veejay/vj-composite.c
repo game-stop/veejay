@@ -122,11 +122,7 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	veejay_msg(VEEJAY_MSG_INFO, "\tSoftware scaler  : %s", yuv_get_scaler_name(zoom_type) );
 	veejay_msg(VEEJAY_MSG_INFO, "\tVideo resolution : %dx%d", iw,ih );
 	veejay_msg(VEEJAY_MSG_INFO, "\tScreen resolution: %dx%d", pw,ph );
-/*	veejay_msg(VEEJAY_MSG_INFO, "Usage:");
-	veejay_msg(VEEJAY_MSG_INFO, "Press Middle-Mouse button to activate setup,");
-	veejay_msg(VEEJAY_MSG_INFO, "Press CTRL+p to switch between projection and viewport focus");
-	veejay_msg(VEEJAY_MSG_INFO, "Press CTRL+v to activate user viewport");
-	*/
+	veejay_msg(VEEJAY_MSG_INFO, "Press Middle-Mouse button to activate setup.");
 	return (void*) c;
 }
 
@@ -310,8 +306,6 @@ void	composite_processX(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int
 			composite_fit(c,input, img_dat );
 		}
 	}
-veejay_msg(0, "%s: use_vp=%d,focus=%d,c->blit=%d, proj_active=%d",__FUNCTION__,
-		use_vp,focus,c->blit,proj_active);
 }
 
 
