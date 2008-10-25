@@ -191,6 +191,53 @@ void	on_button_200_clicked(GtkWidget *widget, gpointer user_data)
 		"Requested background mask of frame %d",
 			info->status_tokens[FRAME_NUM] + 1 );
 }
+
+void	on_viewportarea_mode_toggled(GtkWidget *widget, gpointer user_data )
+{
+	int gray = is_button_toggled( "viewportarea_mode_gray" );
+	int color = is_button_toggled( "viewportarea_mode" );
+	int front = is_button_toggled("viewportarea_set_video_out" );
+	int back =  is_button_toggled("viewportarea_set_video_in");
+	
+	multi_vims(VIMS_PROJ_STACK, "%d %d",
+		( front == 1 ? 0 : 1 ), ( gray == 1 ? 1 : 0 ) );
+}
+
+void	on_viewport_mode_gray_toggled(GtkWidget *widget, gpointer user_data)
+{
+	int gray = is_button_toggled( "viewportarea_mode_gray" );
+	int color = is_button_toggled( "viewportarea_mode" );
+	int front = is_button_toggled("viewportarea_set_video_out" );
+	int back =  is_button_toggled("viewportarea_set_video_in");
+	
+	multi_vims(VIMS_PROJ_STACK, "%d %d",
+		( front == 1 ? 0 : 1 ), ( gray == 1 ? 1 : 0 ) );
+
+}
+void 	on_viewportarea_set_video_in_toggled(GtkWidget *widget, gpointer user_data)
+{
+	int gray = is_button_toggled( "viewportarea_mode_gray" );
+	int color = is_button_toggled( "viewportarea_mode" );
+	int front = is_button_toggled("viewportarea_set_video_out" );
+	int back =  is_button_toggled("viewportarea_set_video_in");
+	
+	multi_vims(VIMS_PROJ_STACK, "%d %d",
+		( front == 1 ? 0 : 1 ), ( gray == 1 ? 1 : 0 ) );
+
+}
+
+void	on_viewportarea_set_video_out_toggled( GtkWidget *widget, gpointer user_data )
+{
+	int gray = is_button_toggled( "viewportarea_mode_gray" );
+	int color = is_button_toggled( "viewportarea_mode" );
+	int front = is_button_toggled("viewportarea_set_video_out" );
+	int back =  is_button_toggled("viewportarea_set_video_in");
+	
+	multi_vims(VIMS_PROJ_STACK, "%d %d",
+		( front == 1 ? 0 : 1 ), ( gray == 1 ? 1 : 0 ) );
+
+}
+
 void	on_button_5_4_clicked(GtkWidget *widget, gpointer user_data)
 {
 	if( is_button_toggled("button_5_4") )
