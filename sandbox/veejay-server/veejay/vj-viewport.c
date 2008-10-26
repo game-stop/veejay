@@ -163,7 +163,6 @@ static void		viewport_draw_col( void *data, uint8_t *img, uint8_t *u, uint8_t *v
 static void		viewport_draw( void *data, uint8_t *img );
 static inline	int	grab_pixel( uint8_t *plane, int x, int y, int w );
 static int		viewport_update_perspective( viewport_t *v, float *values );
-static void		viewport_update_grid( viewport_t *v, int size, uint8_t val );
 static void		viewport_process( viewport_t *p );
 static int		viewport_configure( 
 					viewport_t *v,
@@ -1254,14 +1253,6 @@ void			viewport_destroy( void *data )
 	v = NULL;
 }
 
-static	void		viewport_update_grid( viewport_t *v, int size, uint8_t val )
-{
-	v->grid_size = size;
-	v->grid_val  = val;
-
-	viewport_draw_grid( v->w, v->h, v->grid, v->grid_size, v->grid_val );
-}
-
 static	int		viewport_update_perspective( viewport_t *v, float *values )
 {
 	int res = viewport_configure (v, v->x1, v->y1,
@@ -2345,9 +2336,6 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 		grid = 1;
 	}
 
-	if( grid )	
-		viewport_update_grid( v, v->grid_size, v->grid_val );
-
 	if( osd )
 		viewport_update_context_help(v);
 
@@ -2540,8 +2528,6 @@ static void	viewport_draw( void *data, uint8_t *plane )
 	int fx4 = (int)( a[6] *wx );
 	int fy4 = (int)( a[7] *wy );
 
-	opacity_blend_luma_apply( plane,v->grid, (width*height), 100 );
-
 	viewport_line( plane, fx1, fy1, fx2,fy2,width,height, v->grid_val);
 	viewport_line( plane, fx1, fy1, fx4,fy4,width,height, v->grid_val );
 	viewport_line( plane, fx4, fy4, fx3,fy3,width,height, v->grid_val );
@@ -2596,7 +2582,6 @@ static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *
 
 	const uint8_t p = v->grid_val;
 	const uint8_t uv = 128;
-	opacity_blend_luma_apply( plane,v->grid, (width*height), 20 );
 
 	
 	viewport_line( plane, fx1, fy1, fx2,fy2,width,height, p);
