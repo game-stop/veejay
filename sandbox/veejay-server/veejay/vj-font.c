@@ -1459,7 +1459,7 @@ void	vj_font_print_credits(void *font, char *text)
 }
 
 
-void	vj_font_customize_osd( void *font,void *uc, int type, int vp, int wp )
+void	vj_font_customize_osd( void *font,void *uc, int type, char *extra )
 {
 	vj_font_t *f = (vj_font_t*) font;
 	veejay_t *v = (veejay_t*) uc;
@@ -1470,21 +1470,19 @@ void	vj_font_customize_osd( void *font,void *uc, int type, int vp, int wp )
 	switch( v->uc->playback_mode )
 	{
 		case VJ_PLAYBACK_MODE_SAMPLE:
-			snprintf(buf,256, "(S) %d|%d M=%dMb C=%dms V=%s F%s",
+			snprintf(buf,256, "(S) %d|%d M=%dMb C=%dms %s",
 					v->uc->sample_id,
 					sample_size()-1,
 					sample_cache_used(0),
 					v->real_fps,
-					(vp ? "Y" : "N" ),
-					(wp ? "P" : "V") );
+					extra );
 			break;
 		case VJ_PLAYBACK_MODE_TAG:
-			snprintf(buf,256, "(T) %d|%d C=%dms V=%s F=%s",
+			snprintf(buf,256, "(T) %d|%d C=%dms %s",
 					v->uc->sample_id,
 					vj_tag_size(),
 					v->real_fps,
-					(vp ? "Y" : "N" ),
-					(wp ? "P" : "V" ));
+					extra );
 			break;
 		default:
 			f->time = type;

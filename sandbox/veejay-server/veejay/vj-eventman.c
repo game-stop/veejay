@@ -2336,9 +2336,9 @@ void		vj_init_vevo_events(void)
 				2,
 				VIMS_ALLOW_ANY,
 				"On/Off",
-				0,
+				1,
 				"Color=0, Grayscale=1",
-				0,
+				1,
 				NULL );
 
 	index_map_[ VIMS_PROJ_SET_POINT ]				=	_new_event(

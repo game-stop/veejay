@@ -50,6 +50,6 @@ char  *vj_font_get_sequence( void *font , int id );
 void                  vj_font_set_current( void *font , int cur );
 void    vj_font_xml_pack( xmlNodePtr node, void *font );
 void    vj_font_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *font );
-void    vj_font_customize_osd( void *font,void *uc, int type, int vp, int wp );
+void	vj_font_customize_osd( void *font,void *uc, int type, char *extra );
 int   vj_font_norender(void *ctx, long position);
 #endif

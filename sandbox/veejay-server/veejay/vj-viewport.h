@@ -47,5 +47,8 @@ void	viewport_transform_coords( void *data, void *coords, int n, int blob_id, in
 void	viewport_dummy_send( void *data );
 int	*viewport_event_get_projection(void *data, int scale);
 int	viewport_event_set_projection(void *data, float x, float y, int num, int fb);
+void		viewport_push_frame(void *data, int w, int h, uint8_t *Y, uint8_t *U, uint8_t *V );
+void		viewport_translate_frame(void *data, uint8_t *plane);
+
 #endif
 

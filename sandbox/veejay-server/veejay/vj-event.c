@@ -253,7 +253,8 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_OSD,				SDLK_o,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_COPYRIGHT,			SDLK_c,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_OSD_EXTRA,			SDLK_h,		VIMS_MOD_CTRL,	NULL	},
-	{ VIMS_VIEWPORT,			SDLK_v,		VIMS_MOD_CTRL,	NULL	},
+	{ VIMS_PROJ_STACK,			SDLK_v,		VIMS_MOD_CTRL,	"1 1"	},
+	{ VIMS_PROJ_STACK,			SDLK_p,		VIMS_MOD_CTRL,  "0 1"   },
 	{ VIMS_PROJECTION,			SDLK_p,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_FRONTBACK,			SDLK_b,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_SELECT_BANK,			SDLK_1,		VIMS_MOD_NONE,	"1"	},
@@ -6632,8 +6633,9 @@ void	vj_event_vp_get_points( void *ptr, const char format[], va_list ap )
 		return;
 	}	
 
-	int *r = viewport_event_get_projection(  composite_get_vp( v->composite ),args[0] );
-	
+//	int *r = viewport_event_get_projection(  composite_get_vp( v->composite ),args[0] );
+	int r[8];
+	memset(r,0,sizeof(r));	
 	snprintf(message,256, "%d %d %d %d %d %d %d %d",
 		r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7] );
 

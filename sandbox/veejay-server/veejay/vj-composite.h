@@ -23,6 +23,8 @@
 void *composite_init( int pw, int ph, int iw, int ih, const char *hd, int sample_mode, int zoom_type, int pixf );
 void composite_destroy( void *c );
 void    composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w, int h );
+
+void	composite_process_prepare(void *compiz, uint8_t *img_dat[3], VJFrame *input, int use_vp , int focus );
 void    composite_process( void *compiz, uint8_t *in[3], VJFrame *input, int vp_active, int focus);
 void	composite_blit( void *compiz,uint8_t *yuyv );
 int	composite_blitX( void *compiz, uint8_t *img[3] , uint8_t *out_img[3], int uvlen, int isFull);

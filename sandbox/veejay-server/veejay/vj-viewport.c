@@ -36,8 +36,11 @@
 #include <libvje/vje.h>
 #include <veejay/vj-viewport.h>
 #include <libvje/effects/opacity.h>
+#include <libyuv/yuvconv.h>
+#include AVUTIL_INC
 #include <libvjmem/vjmem.h>
 #include <math.h>
+#include <assert.h>
 #define X0 0
 #define Y0 1
 #define X1 2
@@ -52,6 +55,8 @@
 #ifndef MAX
 #define MAX(a,b) ( (a)>(b) ? (a) : (b) )
 #endif
+
+#define        RUP8(num)(((num)+8)&~8)
 
 #define clamp1(x, y, z) ((x) = ((x) < (y) ? (y) : ((x) > (z) ? (z) : (x))))
 #define distance1(x1,y1,x2,y2) (  sqrt( (x1 - x2) * (x1 - x2) + ( y1 - y2 ) * (y1 -y2 ) ) )
@@ -78,6 +83,17 @@ typedef struct
 {
 	float m[4][4];
 } matrix_t;
+
+typedef struct
+{
+	void *scaler;
+	uint8_t *buf[3];
+	float	scale;
+	float   sx;
+	float	sy;
+	int	sw;
+	int	sh;
+} ui_t;
 
 typedef struct
 {
@@ -122,6 +138,7 @@ typedef struct
 	int32_t 	*buf;
 	void *sender;
 	uint32_t	seq_id;
+	ui_t	*ui;
 } viewport_t;
 
 typedef struct
@@ -139,6 +156,7 @@ typedef struct
 	float y2;
 	float y3;
 	float y4;
+	float	scale;
 } viewport_config_t;
 
 static void		viewport_draw_col( void *data, uint8_t *img, uint8_t *u, uint8_t *v );
@@ -663,7 +681,7 @@ static	void		viewport_draw_grid(int32_t w, int32_t h, uint8_t *grid, int32_t gri
 		for( k = 0;k < w ; k ++ )
 			grid[j*w+k] = ((k%grid_size>1)?((j%grid_size>1)? op1 : op0 ) : op0 );
 }
-
+/*
 void	viewport_get_projection_coords( 
 	void *data, int32_t *x0, int32_t *y0, int32_t *w0, int32_t *h0 )
 {
@@ -704,7 +722,38 @@ void	viewport_set_projection( void *data, float *res )
 	v->x4 = res[6];
 	v->y4 = res[7];
 	
+}*/
+
+static	float		vsx(viewport_t *v, float x)
+{
+	ui_t *u = v->ui;
+	int	    cx = v->w / 2;
+	int	    cy = v->h / 2;
+	int	    dx = cx - ( u->sw / 2 );
+	int	    dy = cy - ( u->sh / 2 );
+
+	float		a = (float) dx / ( v->w / 100.0f );
+
+	float		s  = (float) v->w / (float) v->ui->sw;
+
+	return (x-a)*s;
 }
+static	float		vsy(viewport_t *v, float x)
+{
+	ui_t *u = v->ui;
+	int	    cx = v->w / 2;
+	int	    cy = v->h / 2;
+	int	    dx = cx - ( u->sw / 2 );
+	int	    dy = cy - ( u->sh / 2 );
+
+	float		a = (float) dy / ( v->h / 100.0f );
+
+	float		s  = (float) v->h / (float) v->ui->sh;
+
+	return (x-a)*s;
+}
+
+
 
 static int		viewport_configure( 
 					viewport_t *v,
@@ -723,19 +772,18 @@ static int		viewport_configure(
 	int w = wid, h = hei;
 
 	v->grid_size = size;
+	float scale = 1.0f;//v->ui->scale;
+	v->points[X0] = (float) vsx(v,x1) * (float) w / 100.0;
+	v->points[Y0] = (float) vsy(v,y1) * (float) h / 100.0;
 
-	
-	v->points[X0] = (float) x1 * (float) w / 100.0;
-	v->points[Y0] = (float) y1 * (float) h / 100.0;
+	v->points[X1] = (float) vsx(v,x2) * (float) w / 100.0;
+	v->points[Y1] = (float) vsy(v,y2) * (float) h / 100.0;
 
-	v->points[X1] = (float) x2 * (float) w / 100.0;
-	v->points[Y1] = (float) y2 * (float) h / 100.0;
+	v->points[X2] = (float) vsx(v,x3) * (float) w / 100.0;
+	v->points[Y2] = (float) vsy(v,y3) * (float) h / 100.0;
 
-	v->points[X2] = (float) x3 * (float) w / 100.0;
-	v->points[Y2] = (float) y3 * (float) h / 100.0;
-
-	v->points[X3] = (float) x4 * (float) w / 100.0;
-	v->points[Y3] = (float) y4 * (float) h / 100.0;
+	v->points[X3] = (float) vsx(v,x4) * (float) w / 100.0;
+	v->points[Y3] = (float) vsy(v,y4) * (float) h / 100.0;
 	
 	v->w = wid; /* image plane boundaries */
 	v->x = 0;
@@ -1264,10 +1312,40 @@ static	int		viewport_update_perspective( viewport_t *v, float *values )
 
 	return res;
 }
+static int      nearest_div(int val )
+{
+        int r = val % 8;
+        while(r--)
+                val--;
+        return val;
+}
 
+static	void	*viewport_init_swscaler(ui_t *u, int w, int h)
+{
+	uint8_t *dummy[3] = { NULL,NULL,NULL };
+	int nw = w * u->scale;
+	int nh = h * u->scale;
+	u->sw  = nearest_div(nw);
+	u->sh  = nearest_div(nh);
+	VJFrame *srci = yuv_yuv_template( dummy[0],dummy[1],dummy[2],w,h,PIX_FMT_GRAY8);
+	VJFrame *dsti = yuv_yuv_template( dummy[0],dummy[1],dummy[2],u->sw,u->sh,PIX_FMT_GRAY8);
+	sws_template t;
+	memset(&t,0,sizeof(sws_template));
+	t.flags = 1;
+	u->sx   = (float)w / (float) u->sw;
+	u->sy   = (float)h / (float) u->sh;
+	void *scaler = yuv_init_swscaler( srci,dsti,&t,yuv_sws_get_cpu_flags());
+	return scaler;
+}
 
 void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, const char *homedir, int *enable, int *frontback, int mode )
 {
+#ifdef STRICT_CHECKING
+	assert( w > 0 );
+	assert( h > 0 );
+	assert( w0 > 0 );
+	assert( h0 > 0 );
+#endif
 	//@ try to load last saved settings
 	viewport_config_t *vc = viewport_load_settings( homedir,mode );
 	if(!vc)
@@ -1277,25 +1355,28 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, const char *ho
 	}
 
 	viewport_t *v = (viewport_t*) vj_calloc(sizeof(viewport_t));
+	v->ui  = vj_calloc( sizeof(ui_t));
+
+	v->ui->buf[0] = vj_calloc(sizeof(uint8_t) * (w * h) );
+	v->ui->scale  = 0.5f;
+	v->ui->scaler = viewport_init_swscaler(v->ui,w,h);
 
 	v->homedir = strdup(homedir);
 	v->mode	   = mode;
-	v->marker_size = 4;
+	v->marker_size = 1;
 	int res;
 
 	if( vc == NULL )
 	{
-		res = viewport_configure (v, 16.0, 16.0,
-					     90.0, 16.0,
-						16.0, 90.0,
-						90.0, 90.0,
-					   //  90.0,90.0,
-					 //    16.0,90.0,
+		res = viewport_configure (v, 8.0, 8.0,
+					     45.0, 8.0,
+						45.0, 45.0,
+						8.0, 45.0,
 					     x0,y0,w0,h0,
 					     w,h,
 					     1,
 					     0xff,
-					     w/16 );
+					     w/32 );
 
 		*enable = 0;
 		*frontback = 1;
@@ -1319,14 +1400,17 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, const char *ho
 		*frontback = vc->frontback;
 		v->user_ui = 0;
 
-		free( vc );
 	}
 
 
 	if(! res )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid point locations");
-		viewport_destroy( v );
+		free(v->homedir);
+		free(v->ui->buf[0]);
+		free(v->ui);
+		free(v);
+		free(vc);
 		return NULL;
 	}
 
@@ -1342,12 +1426,13 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, const char *ho
 	v->grid = (uint8_t*) vj_malloc( len + v->w );
 	
 	//draw grid
-//	viewport_draw_grid( v->w, v->h, v->grid, v->grid_size, v->grid_val );
+	viewport_draw_grid( v->w, v->h, v->grid, v->grid_size, v->grid_val );
 
 	// calculate initial view
 	viewport_process( v );
 
 	v->buf = vj_calloc( sizeof(int32_t) * 50000 );
+	free(vc);
 
     	return (void*)v;
 }
@@ -1369,13 +1454,11 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 	viewport_config_t *vc = vj_calloc(sizeof(viewport_config_t));
 
 	char path[1024];
-	if(!mode)
-		sprintf(path, "%s/viewport-mapping.cfg", dir);
-	else
-		sprintf(path, "%s/viewport-projection.cfg", dir);
+	sprintf(path, "%s/viewport.cfg", dir);
 	FILE *fd = fopen( path, "r" );
 	if(!fd)
 	{
+		veejay_msg(0, "Unable to open file %s",path);
 		free(vc);
 		return NULL;
 	}
@@ -1384,6 +1467,7 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 		
 	if( len <= 0 )
 	{
+		veejay_msg(0, "%s is empty", path);
 		free(vc);
 		return NULL;
 	}
@@ -1395,7 +1479,7 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 
 	fclose(fd );
 
-	int n = sscanf(buf, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d",
+	int n = sscanf(buf, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %f",
 			&vc->x1, &vc->y1,
 			&vc->x2, &vc->y2,
 			&vc->x3, &vc->y3,
@@ -1407,9 +1491,9 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 			&vc->y0,
 			&vc->w0,
 			&vc->h0,
-			&vc->frontback);
+			&vc->frontback,	&vc->scale);
 
-	if( n != 16 )
+	if( n != 17 )
 	{
 		veejay_msg(0, "Unable to read %s (file is %d bytes)",path, len );
 		free(vc);
@@ -1431,10 +1515,7 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 static	void	viewport_save_settings( viewport_t *v, int frontback )
 {
 	char path[1024];
-	if( !v->mode )
-		sprintf(path, "%s/viewport-mapping.cfg", v->homedir );
-	else
-		sprintf(path, "%s/viewport-projection.cfg", v->homedir );
+	sprintf(path, "%s/viewport.cfg", v->homedir );
 
 	FILE *fd = fopen( path, "wb" );
 
@@ -1447,7 +1528,7 @@ static	void	viewport_save_settings( viewport_t *v, int frontback )
 
 	char content[512];
 
-	sprintf( content, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d\n",
+	sprintf( content, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %f\n",
 			v->x1,v->y1,v->x2,v->y2,
 			v->x3,v->y3,v->x4,v->y4,
 			v->user_reverse,
@@ -1457,7 +1538,8 @@ static	void	viewport_save_settings( viewport_t *v, int frontback )
 			v->y0,
 			v->w0,
 			v->h0,
-			frontback );
+			frontback,
+			v->ui->scale );
 
 	int res = fwrite( content, strlen(content), 1, fd );
 
@@ -1468,7 +1550,7 @@ static	void	viewport_save_settings( viewport_t *v, int frontback )
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Saved viewport settings to %s", path);
 }
-
+/*
 static int	viewport_locate_marker( viewport_t *v, uint8_t *img, float fx, float fy , float *dx, float *dy )
 {
 	uint32_t x  = fx / 100.0f * v->w;
@@ -1563,11 +1645,11 @@ static int	viewport_locate_marker( viewport_t *v, uint8_t *img, float fx, float 
 	*dy = (float) cy / (v->h / 100.0f);
 
 	return 1;
-}
+}*/
 
 void	viewport_projection_inc( void *data, int incr, int screen_width, int screen_height )
 {
-	viewport_t *v = (viewport_t*) data;
+/*	viewport_t *v = (viewport_t*) data;
 	float p[9];
 
 	p[0] = v->x1;
@@ -1602,6 +1684,22 @@ void	viewport_projection_inc( void *data, int incr, int screen_width, int screen
 	point_map( im, v->x0, v->y0 + v->h0, &dx3, &dy3 );
 	point_map( im, v->x0 + v->w0, v->y0 + v->h0, &dx4, &dy4 );
 
+	float a[8];
+	image_x_to_screen(v,v->x1,v->y1,&a[0],&a[1]);
+	image_x_to_screen(v,v->x2,v->y2,&a[2],&a[3]);
+	image_x_to_screen(v,v->x3,v->y3,&a[4],&a[5]);
+	image_x_to_screen(v,v->x4,v->y4,&a[6],&a[7]);
+	
+
+	int fx1 = (int)( a[0] *wx );
+	int fy1 = (int)( a[1] *wy );
+	int fx2 = (int)( a[2] *wx );
+	int fy2 = (int)( a[3] *wy );
+	int fx3 = (int)( a[4] *wx );
+	int fy3 = (int)( a[5] *wy );
+	int fx4 = (int)( a[6] *wx );
+	int fy4 = (int)( a[7] *wy );
+
 	v->x1 = dx1 / (screen_width / 100.0f);
 	v->y1 = dy1 / (screen_height / 100.0f);
 	v->x2 = dx2 / (screen_width / 100.0f);	
@@ -1613,9 +1711,9 @@ void	viewport_projection_inc( void *data, int incr, int screen_width, int screen
 	free(im);
 	free(tmp);
 
-	viewport_update_perspective(v, p);
+	viewport_update_perspective(v, p);*/
 }
-
+/*
 #define ANIMAX
 
 #ifdef ANIMAX
@@ -2002,6 +2100,44 @@ int	viewport_event_set_projection(void *data, float x, float y, int num, int fro
 	}
 
 	return 1;
+}*/
+static	void	image_x_to_screen(viewport_t *v, float x, float y, float *rx, float *ry )
+{
+	ui_t *u = v->ui;
+	int	    dx = (v->w/2) - ( u->sw /2);
+	int	    dy = (v->h/2) - ( u->sh/2 );
+
+	float 		a = (float) dx /  (v->w / 100.0f);
+	float	     	b = (float) dy / (v->h / 100.0f);
+	float		w = v->w / (float)u->sw;
+	float		h = v->h / (float)u->sh;
+
+
+	*rx = x;//(x+a);
+	*ry = y;//(y+b);
+
+}
+
+
+static	void	screen_to_image_x(viewport_t *v, float x, float y, float *rx, float *ry)
+{
+	ui_t *u = v->ui;
+	int	    dx = (v->w/2) - ( u->sw/2  );
+	int	    dy = (v->h/2) - ( u->sh/2  );
+	
+	float	     a = (float) dx / (v->w / 100.0f);
+	float	     b = (float) dy / (v->h / 100.0f);
+
+	float		w = v->w / (float)u->sw;
+	float		h = v->h / (float)u->sh;
+
+//	*rx = x;// (x- a);
+//	*ry = y;//(y - b);
+
+	*rx = x;
+	*ry = y;
+//	*rx = (float) x / (v->w / 100.0f);
+//	*ry = (float) y / (v->h / 100.0f);
 }
 
 void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int button, int frontback, int screen_width, int screen_height )
@@ -2010,7 +2146,7 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 	if( sx == 0 && sy == 0 && button == 0 )
 		return;
 
-	
+
 
 	int osd = 0;
 	int grid =0;
@@ -2025,42 +2161,45 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 	float y = (float)sy / ( screen_height / 100.0f );
 	double dist = 100.0;
 
+
+	float Mx,My;
+	screen_to_image_x(v,x,y,&Mx,&My);
+
+	//@ show corresponding translated coords
+
+
 	float p[9];
+	float Mp[9];
 	// x,y in range 0.0-1.0
 	// make a copy of the parameters
 
-	if( button == 11 )
-	{
-		p[0] = v->x0;
-		p[1] = v->y0;
-		p[2] = v->x0 + v->w0;
-		p[3] = v->y0;
-		p[4] = v->x0 + v->w0;
-		p[5] = v->y0 + v->h0;
-		p[6] = v->x0;
-		p[7] = v->y0 + v->h0;
-	} else
-	{
-		p[0] = v->x1;
-		p[2] = v->x2;
-		p[4] = v->x3;
-		p[6] = v->x4;
-		p[1] = v->y1;
-		p[3] = v->y2;
-		p[5] = v->y3;	
-		p[7] = v->y4;
-	}
+	
+	p[0] = v->x1;
+	p[2] = v->x2;
+	p[4] = v->x3;
+	p[6] = v->x4;
+	p[1] = v->y1;
+	p[3] = v->y2;
+	p[5] = v->y3;	
+	p[7] = v->y4;
 
+
+	//@ translate to screen parameters
+	image_x_to_screen(v,p[0],p[1],&Mp[0],&Mp[1]);
+	image_x_to_screen(v,p[2],p[3],&Mp[2],&Mp[3]);
+	image_x_to_screen(v,p[4],p[5],&Mp[4],&Mp[5]);
+	image_x_to_screen(v,p[6],p[7],&Mp[6],&Mp[7]);
+	
 	for( i = 0; i < 4 ; i ++ )
 		v->users[ i ]  = 1;
 
 	if( v->user_ui )
 	{
 		double dt[4];
-		dt[0] = sqrt( (p[0] - x) * (p[0] - x) + ( p[1] - y ) * (p[1] -y ) );
-		dt[1] = sqrt( (p[2] - x) * (p[2] - x) + ( p[3] - y ) * (p[3] -y ) );
-		dt[2] = sqrt( (p[4] - x) * (p[4] - x) + ( p[5] - y ) * (p[5] -y ) );
-		dt[3] = sqrt( (p[6] - x) * (p[6] - x) + ( p[7] - y ) * (p[7] -y ) );
+		dt[0] = sqrt( (Mp[0] - x) * (Mp[0] - x) + ( Mp[1] - y ) * (Mp[1] -y ) );
+		dt[1] = sqrt( (Mp[2] - x) * (Mp[2] - x) + ( Mp[3] - y ) * (Mp[3] -y ) );
+		dt[2] = sqrt( (Mp[4] - x) * (Mp[4] - x) + ( Mp[5] - y ) * (Mp[5] -y ) );
+		dt[3] = sqrt( (Mp[6] - x) * (Mp[6] - x) + ( Mp[7] - y ) * (Mp[7] -y ) );
 	
 		for ( i = 0; i < 4;  i ++ )
 		{
@@ -2111,7 +2250,7 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 
 	if( button == 4 || button == 13 || button == 15) // wheel up
 	{
-		if( button == 13 || button == 15 )
+/*		if( button == 13 || button == 15 )
 		{
 			v->x0 --;
 			v->y0 --;
@@ -2143,19 +2282,8 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 			}
 			viewport_update_perspective( v, p );
 			return;
-
-		}
-		else	
-		{
-			if( v->user_ui && v->snap_marker )
-			{
-				if( v->marker_size <= 2 )
-					v->marker_size = 32;
-				else
-					v->marker_size -= 2;
-	
-				grid = 0;
-			} else	if( v->user_ui )
+			*/
+			if( v->user_ui )
 			{
 				if(v->grid_size <= 8 )
 					v->grid_size = 8;
@@ -2164,13 +2292,11 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 				grid = 1;
 				osd = 1;
 			}
-		}
+	//	}
 	}
 	if (button == 5 || button == 14 || button == 16) // wheel down
 	{	
-		if( button == 14 || button == 16 )
-		{
-			v->x0 ++;
+	/*		v->x0 ++;
 			v->y0 ++;
 			v->w0 -=2;
 			v->h0 -=2;
@@ -2198,19 +2324,8 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 				free(im);
 				free(tmp);
 			}
-			viewport_update_perspective(v,p);
-			return;
-		}
-		else
-		{
-			if( v->user_ui && v->snap_marker )
-			{
-				if( v->marker_size > 32 )
-					v->marker_size = 2;
-				else
-					v->marker_size += 2;
-				grid = 0;
-			} else 	if( v->user_ui )
+			viewport_update_perspective(v,p);*/
+			if( v->user_ui )
 			{
 				if( v->grid_size > ( width / 4 ) )
 					v->grid_size = width/4;
@@ -2219,7 +2334,6 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 					grid = 1;
 				osd = 1;
 			}
-		}
 	}
 
 	if( button == 7 )
@@ -2231,7 +2345,7 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 		grid = 1;
 	}
 
-	if( grid && !v->snap_marker )	
+	if( grid )	
 		viewport_update_grid( v, v->grid_size, v->grid_val );
 
 	if( osd )
@@ -2241,8 +2355,8 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 	{
 		if( button == 6 && !v->snap_marker)
 		{	//@ Snap selected point to grid (upper left corner)
-			float rx = v->w / 100.0 * x;
-			float ry = v->h / 100.0 * y;
+			float rx = v->w / 100.0 * Mx;
+			float ry = v->h / 100.0 * My;
 			int   dx = (rx+0.5) / v->grid_size;
 			int   dy = (ry+0.5) / v->grid_size;
 
@@ -2252,7 +2366,7 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 
 		if( button == 12 )
 		{
-			int my,mx;
+		/*	int my,mx;
 			switch( point )
 			{
 				case 0:	
@@ -2281,28 +2395,29 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 					clamp1(v->h0, 0,v->h );
 					clamp1(v->w0, 0,v->w );
 				break;
-			}
+			}*/
 		}
 		else
 		{
 			switch( point )
 			{
 				case 0:
-					v->x1 = x;
-					v->y1 = y;
+					v->x1 = Mx;
+					v->y1 = My;
 					break;
 				case 1:
-					v->x2 = x;
-					v->y2 = y;
+					v->x2 = Mx;
+					v->y2 = My;
 					break;
 				case 2:
-					v->x3 = x;
-					v->y3 = y;
+					v->x3 = Mx;
+					v->y3 = My;
 					break;
 				case 3:
-					v->x4 = x;
-					v->y4 = y;
+					v->x4 = Mx;
+					v->y4 = My;
 				break;
+				
 			}
 		}
 		ch = 1;
@@ -2311,34 +2426,36 @@ void	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int b
 
 	if( ch )
 	{
-		if( v->save && v->snap_marker && button != 12)
+	/*	if( v->save && v->snap_marker && button != 12)
 		{
 			float tx = x;
 			float ty = y;
-
+		
 			if( button != 6 && viewport_locate_marker( v, img[0], tx, ty, &x, &y ) )
 			{
+				screen_to_image_x(v, x, y, &Mx, &My);
+
 				switch( point )
 				{
 					case 0:
-					v->x1 = x;
-					v->y1 = y;
+					v->x1 = Mx ;
+					v->y1 = My ;
 					break;
 				case 1:
-					v->x2 = x;
-					v->y2 = y;
+					v->x2 = Mx ;
+					v->y2 = My ;
 					break;
 				case 2:
-					v->x3 = x;
-					v->y3 = y;
+					v->x3 = Mx ;
+					v->y3 = My ;
 					break;
 				case 3:
-					v->x4 = x;
-					v->y4 = y;
+					v->x4 = Mx;
+					v->y4 = My;
 					break;
 				}
 			}
-		}
+		}*/
 		viewport_update_perspective( v, p );
 	}
 }
@@ -2351,6 +2468,53 @@ static	inline	int	grab_pixel( uint8_t *plane, int x, int y, int w )
 	return 255;
 }
 
+void		viewport_push_frame(void *data, int w, int h, uint8_t *Y, uint8_t *U, uint8_t *V )
+{
+	viewport_t *v = (viewport_t*) data;
+	ui_t	   *u = v->ui;
+
+	float	    s = u->scale;
+
+	int	    nw = w * s;
+	int	    nh = w * s;
+//@ checking multiple of 8
+	VJFrame *srci = yuv_yuv_template( Y, U,V, w,h, PIX_FMT_GRAY8 );
+        VJFrame *dsti = yuv_yuv_template( u->buf[0],u->buf[1], u->buf[2],u->sw, u->sh, PIX_FMT_GRAY8); 
+  
+        yuv_convert_and_scale( u->scaler, srci,dsti );
+        free(srci);
+        free(dsti);
+}
+
+void		viewport_translate_frame(void *data, uint8_t *plane) 
+{
+	viewport_t *v = (viewport_t*) data;
+	ui_t	   *u = v->ui;
+	int	    cx = v->w / 2;
+	int	    cy = v->h / 2;
+	int	     w = v->w;
+	int	     h = v->h;
+	int	    dx = cx - ( u->sw / 2 );
+	int	    dy = cy - ( u->sh / 2 );
+
+	int 		x,y;
+	int		ty = dy;
+	int		tx = dx;
+	int		 j = 0;
+
+	uint8_t		*img = u->buf[0];
+	for( y = 0; y < u->sh; y ++ ) {
+		for( x = 0; x < u->sw; x ++ ) {
+			plane[ (ty + y ) * w + tx + x ] = img[ y * u->sw + x ];
+			j++;
+		}
+	}
+#ifdef STRICT_CHECKING
+	assert( j == (u->sw * u->sh) );
+#endif
+	
+}
+
 static void	viewport_draw( void *data, uint8_t *plane )
 {
 	viewport_t *v = (viewport_t*) data;
@@ -2360,16 +2524,23 @@ static void	viewport_draw( void *data, uint8_t *plane )
 	float wx =(float) v->w / 100.0;
 	float wy =(float) v->h / 100.0;
 
-	int fx1 = (int)( v->x1 *wx );
-	int fy1 = (int)( v->y1 *wy );
-	int fx2 = (int)( v->x2 *wx );
-	int fy2 = (int)( v->y2 *wy );
-	int fx3 = (int)( v->x3 *wx );
-	int fy3 = (int)( v->y3 *wy );
-	int fx4 = (int)( v->x4 *wx );
-	int fy4 = (int)( v->y4 *wy );
+	float a[8];
+	image_x_to_screen(v,v->x1,v->y1,&a[0],&a[1]);
+	image_x_to_screen(v,v->x2,v->y2,&a[2],&a[3]);
+	image_x_to_screen(v,v->x3,v->y3,&a[4],&a[5]);
+	image_x_to_screen(v,v->x4,v->y4,&a[6],&a[7]);
+	
 
-//	opacity_blend_luma_apply( plane,v->grid, (width*height), 100 );
+	int fx1 = (int)( a[0] *wx );
+	int fy1 = (int)( a[1] *wy );
+	int fx2 = (int)( a[2] *wx );
+	int fy2 = (int)( a[3] *wy );
+	int fx3 = (int)( a[4] *wx );
+	int fy3 = (int)( a[5] *wy );
+	int fx4 = (int)( a[6] *wx );
+	int fy4 = (int)( a[7] *wy );
+
+	opacity_blend_luma_apply( plane,v->grid, (width*height), 100 );
 
 	viewport_line( plane, fx1, fy1, fx2,fy2,width,height, v->grid_val);
 	viewport_line( plane, fx1, fy1, fx4,fy4,width,height, v->grid_val );
@@ -2395,7 +2566,7 @@ void		viewport_set_marker( void *data, int status )
 {
 	viewport_t *v = (viewport_t*) data;
 	v->snap_marker = status;
-	v->marker_size = 8;
+	v->marker_size = 1;
 }
 
 static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *V )
@@ -2407,19 +2578,27 @@ static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *
 	float wx =(float) v->w / 100.0;
 	float wy =(float) v->h / 100.0;
 
-	int fx1 = (int)( v->x1 *wx );
-	int fy1 = (int)( v->y1 *wy );
-	int fx2 = (int)( v->x2 *wx );
-	int fy2 = (int)( v->y2 *wy );
-	int fx3 = (int)( v->x3 *wx );
-	int fy3 = (int)( v->y3 *wy );
-	int fx4 = (int)( v->x4 *wx );
-	int fy4 = (int)( v->y4 *wy );
+	float a[8];
+	image_x_to_screen(v,v->x1,v->y1,&a[0],&a[1]);
+	image_x_to_screen(v,v->x2,v->y2,&a[2],&a[3]);
+	image_x_to_screen(v,v->x3,v->y3,&a[4],&a[5]);
+	image_x_to_screen(v,v->x4,v->y4,&a[6],&a[7]);
+	
+
+	int fx1 = (int)( a[0] *wx );
+	int fy1 = (int)( a[1] *wy );
+	int fx2 = (int)( a[2] *wx );
+	int fy2 = (int)( a[3] *wy );
+	int fx3 = (int)( a[4] *wx );
+	int fy3 = (int)( a[5] *wy );
+	int fx4 = (int)( a[6] *wx );
+	int fy4 = (int)( a[7] *wy );
 
 	const uint8_t p = v->grid_val;
 	const uint8_t uv = 128;
-	//opacity_blend_luma_apply( plane,v->grid, (width*height), 100 );
+	opacity_blend_luma_apply( plane,v->grid, (width*height), 20 );
 
+	
 	viewport_line( plane, fx1, fy1, fx2,fy2,width,height, p);
 	viewport_line( plane, fx1, fy1, fx4,fy4,width,height, p );
 	viewport_line( plane, fx4, fy4, fx3,fy3,width,height, p );
@@ -2463,7 +2642,7 @@ static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *
 	 {
 		 int col = grab_pixel( plane, v->usermouse[0]*wx, v->usermouse[1]*wy,width );
 		 draw_point( plane, v->usermouse[0]*wx,v->usermouse[1]*wy, width,height,1, v->grid_val );
-
+/*
 		if( v->snap_marker )
 		{
 			int mx1 = mx - (v->marker_size * 2);
@@ -2480,7 +2659,7 @@ static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *
 			viewport_line( plane, mx4, my4, mx3,my3,width,height, v->grid_val );
 			viewport_line( plane, mx2, my2, mx3,my3,width,height, v->grid_val );
 
-		}
+		}*/
 	 }
 }
 
@@ -2501,8 +2680,12 @@ void	viewport_draw_interface( void *vdata, uint8_t *img[3] )
 }
 void	viewport_draw_interface_color( void *vdata, uint8_t *img[3] )
 {
+
 	viewport_t *v = (viewport_t*) vdata;
+	viewport_translate_frame( v, img[0] );
+
 	viewport_draw_col( v, img[0],img[1],img[2] );
+
 }
 
 
@@ -2583,7 +2766,7 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3],
 	register const	int32_t	ty1 = v->tty1;
 	register const	int32_t ty2 = v->tty2;
 	int x,y;
-
+//@ FIXME: veejay_memset may actualy be slow here due to emms call
 	y  = ty1 * w;
 	veejay_memset( outY,0,y);
 

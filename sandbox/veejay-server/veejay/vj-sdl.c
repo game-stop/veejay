@@ -191,7 +191,7 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 				vjsdl->flags[fs] );
 	if(!my_bpp)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Requested depth of %d bits/pixel not supported",bpp);
+		veejay_msg(VEEJAY_MSG_ERROR, "Requested depth of %d bits/pixel not supported for %dx%d",bpp,vjsdl->sw_scale_width,vjsdl->sw_scale_height);
 		return 0;
 	}
 

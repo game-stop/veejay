@@ -991,7 +991,7 @@ static int veejay_screen_update(veejay_t * info )
 
 		vj_perform_get_output_frame( dst.data );
 
-		yuv_convert_and_scale( info->video_out_scaler, src.data, dst.data );	
+		yuv_convert_and_scale( info->video_out_scaler, src.data,dst.data );	
 
 		vj_perform_get_output_frame(  frame );
 	}
@@ -1953,6 +1953,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing Stream Manager");
 		return -1;
     	}
+
+	if( info->video_output_width <= 0 || info->video_output_height <= 0 ) {
+		info->video_output_width = info->current_edit_list->video_width;
+		info->video_output_height = info->current_edit_list->video_height;
+	}
 	
 #ifdef HAVE_FREETYPE
 	info->font = vj_font_init( info->current_edit_list->video_width,
@@ -2123,10 +2128,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		info->composite = composite_init( info->video_output_width, info->video_output_height,
 			el->video_width, el->video_height, info->homedir, info->settings->sample_mode,
 				info->settings->zoom, info->pixel_format );
+		if(!info->composite) {
+			return -1;
+		}
 		info->settings->zoom = 0;
 		info->which_vp = 1;
-	//	info->bes_width  = info->video_output_width;
-	//	info->bes_height = info->video_output_height;
 	}
 	else if(!info->settings->zoom)
 	{
@@ -2134,8 +2140,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	    info->video_output_height = el->video_height;
 	    info->settings->sws_templ.flags  = 1; // fast bicubic
 	}
-
-	//vj_tag_push(info->homedir, info->settings->sample_mode,info->settings->zoom);
 
 	if(!info->bes_width)
 		info->bes_width = info->video_output_width;

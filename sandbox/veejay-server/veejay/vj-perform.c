@@ -1777,7 +1777,6 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 #ifdef STRICT_CHECKING
 	assert( info->effect_frame1->len > 0 );
 #endif
-veejay_msg(0, "%s: %d ",__FUNCTION__, info->effect_frame1->len );
 	video_playback_setup *settings = info->settings;
 
     switch (type)
@@ -2645,6 +2644,15 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 	frame->data[1] = primary_buffer[destination]->Cb;
 	frame->data[2] = primary_buffer[destination]->Cr;
 
+
+/*	if( info->which_vp == 1 )
+	{
+		info->uc->osd_extra = viewport_get_my_help( info->composite );
+	}
+	else
+		info->uc->osd_extra = NULL;*/
+
+	if(!info->settings->composite) {
 	if( !frame->ssm)
 	{
 		chroma_supersample(
@@ -2657,21 +2665,16 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 		frame->ssm = 1;
 	}
 
-	if( info->which_vp == 1 )
-	{
-		info->uc->osd_extra = viewport_get_my_help( info->composite );
+		vj_font_customize_osd(info->osd, info, info->use_osd, ""); //info->which_vp );
+		vj_font_render( info->osd, frame , settings->current_frame_num,NULL );
 	}
-	else
-		info->uc->osd_extra = NULL;
-
-	vj_font_customize_osd(info->osd, info, info->use_osd, 0,info->which_vp );
-	vj_font_render( info->osd, frame , settings->current_frame_num,info->uc->osd_extra );
-
+	//info->uc->osd_extra );
+/*
 	if(info->which_vp==1 )
 	{
 		if(info->uc->osd_extra) free(info->uc->osd_extra);
 		info->uc->osd_extra = NULL;
-	}
+	}*/
 }
 
 static	void 	vj_perform_finish_chain( veejay_t *info )
@@ -2707,8 +2710,8 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	{ //@ scales in software
 		if( settings->ca ) {
 			settings->ca = 0;
-			viewport_event_set_projection( composite_get_vp( info->composite ),
-				settings->cx,settings->cy,settings->cn , info->uc->mouse[2] );
+			//viewport_event_set_projection( composite_get_vp( info->composite ),
+			//	settings->cx,settings->cy,settings->cn , info->uc->mouse[2] );
 
 		}
 		if(info->which_vp == 1 )
@@ -2720,9 +2723,24 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	}
 
 	if( settings->composite == 1 ) {
-			composite_process(info->composite,pri,frame,0,info->which_vp);	
-	} 
-	
+		composite_process_prepare(info->composite,pri,frame,0,info->which_vp);
+
+		if(info->use_osd ) {
+			if( info->which_vp == 1 )
+				info->uc->osd_extra = viewport_get_my_help(info->composite);
+			vj_font_customize_osd(info->osd,info,info->use_osd,"VP");
+			uint8_t *cbuf[3];
+			composite_get_blit_buffer( info->composite,cbuf );
+			vj_font_render(info->osd,cbuf,settings->current_frame_num,NULL );
+			if(info->which_vp == 1 ) {
+				if(info->uc->osd_extra) free(info->uc->osd_extra);
+				info->uc->osd_extra=NULL;
+			}
+		}
+
+		composite_process(info->composite,pri,frame,0,info->which_vp);	
+	}
+
 	if( frame->ssm == 1 )
 	{
 		chroma_subsample(
@@ -2848,9 +2866,9 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 	{
 		vj_perform_record_frame(info);
 	}
-
 	//@ Render OSD menu
 	vj_perform_render_osd( info, settings, deep );
+
 
 	//@ Do the subsampling 
 	vj_perform_finish_render( info, settings,deep );
