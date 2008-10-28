@@ -252,10 +252,10 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_CHAIN_ENTRY_DEC_ARG,		SDLK_o,		VIMS_MOD_NONE,	"7 -1"	},
 	{ VIMS_OSD,				SDLK_o,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_COPYRIGHT,			SDLK_c,		VIMS_MOD_CTRL,  NULL	},
+	{ VIMS_COMPOSITE,			SDLK_i,		VIMS_MOD_CTRL,  NULL    },
 	{ VIMS_OSD_EXTRA,			SDLK_h,		VIMS_MOD_CTRL,	NULL	},
-	{ VIMS_PROJ_STACK,			SDLK_v,		VIMS_MOD_CTRL,	"1 1"	},
-	{ VIMS_PROJ_STACK,			SDLK_p,		VIMS_MOD_CTRL,  "0 1"   },
-	{ VIMS_PROJECTION,			SDLK_p,		VIMS_MOD_CTRL,  NULL	},
+	{ VIMS_PROJ_STACK,			SDLK_v,		VIMS_MOD_CTRL,	"0 1"	},
+	{ VIMS_PROJ_STACK,			SDLK_p,		VIMS_MOD_CTRL,	"1 0"	},
 	{ VIMS_FRONTBACK,			SDLK_b,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_SELECT_BANK,			SDLK_1,		VIMS_MOD_NONE,	"1"	},
 	{ VIMS_SELECT_BANK,			SDLK_2,		VIMS_MOD_NONE,	"2"	},
@@ -3365,6 +3365,33 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
 	}
 }
 
+void	vj_event_viewport_composition( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	if(STREAM_PLAYING(v))
+	{
+		int status = vj_tag_get_composite( v->uc->sample_id );
+		if( status == 0 ) {
+			status = 1;
+		} else {
+			status = 0;
+		}
+		vj_tag_set_composite( v->uc->sample_id, status );
+		veejay_msg(VEEJAY_MSG_INFO, "Stream #%d will %s be transformed when used as secundary input",
+			v->uc->sample_id, (status==1? "now" : "not"));
+	} else if (SAMPLE_PLAYING(v)) {
+		int status = sample_get_composite( v->uc->sample_id );
+		if( status == 0 ) 
+			status = 1;
+		else 
+			status = 0;
+		sample_set_composite( v->uc->sample_id, status );
+		veejay_msg(VEEJAY_MSG_INFO, "Sample #%d will %s be transformed when used as secundary input",
+			v->uc->sample_id, (status==1? "now" : "not"));
+
+	}
+
+}
 
 void vj_event_play_reverse(void *ptr,const char format[],va_list ap) 
 {
@@ -6601,18 +6628,36 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 		return;
 	}
 
-	if( args[1] == 0 || args[1] == 1 ) {
-		composite_set_colormode( v->composite, args[1] );
-		veejay_msg(VEEJAY_MSG_INFO ,"Viewport set to %s", (args[1] == 1 ?"Grayscale" : "Color" ) );
+	if( args[1] == 1 )
+	{
+		int cs = composite_get_colormode(v->composite);
+		if(cs == 0 )
+			cs = 1;
+		else 
+			cs = 0;	
+		composite_set_colormode( v->composite, cs );
+		veejay_msg(VEEJAY_MSG_INFO ,"Secundary Input renders in %s", (cs == 1 ?"Grayscale" : "Color" ) );
 	}
 
-	if ( args[0] == 0 ) {
-		v->settings->composite = 1;
-		veejay_msg(VEEJAY_MSG_INFO, "Viewport on front.");
-	} else {
-		v->settings->composite = 2;
-		veejay_msg(VEEJAY_MSG_INFO, "Viewport in back.");
-	}
+	if ( args[0] == 1 ) {
+		if(v->settings->composite == 1 ) 
+			v->settings->composite = 2;
+		else if (v->settings->composite == 2 )
+			v->settings->composite = 1;
+		veejay_msg(VEEJAY_MSG_INFO, "Viewport on %s", (v->settings->composite == 1 ? "Projection" : "Secundary Input"));
+		if( SAMPLE_PLAYING(v) ) {
+			sample_set_composite( v->uc->sample_id, (v->settings->composite == 2 ? 1:0 ) );
+			veejay_msg(VEEJAY_MSG_INFO,
+				"Secundary input sample %d will %s.", v->uc->sample_id,
+				(v->settings->composite == 2 ? "be transformed" : "not be transformed" ) );
+		} else if (STREAM_PLAYING(v)) {
+			vj_tag_set_composite( v->uc->sample_id, (v->settings->composite == 2 ? 1 :0 ) );
+				veejay_msg(VEEJAY_MSG_INFO,
+				"Secundary input stream %d will %s.", v->uc->sample_id,
+				(v->settings->composite == 2 ? "be transformed" : "not be transformed" ) );
+
+		}
+	} 
 
 }
 void	vj_event_vp_get_points( void *ptr, const char format[], va_list ap )
@@ -7452,6 +7497,9 @@ void vj_event_print_tag_info(veejay_t *v, int id)
 		id, vj_tag_size()-1, description,
 		(vj_tag_get_active(id) == 1 ? "is active" : "is not active"));
 
+	if( vj_tag_get_composite( id ) ) 
+		veejay_msg(VEEJAY_MSG_INFO, "This tag is transformed when used as secundary input.");
+
 	veejay_msg(VEEJAY_MSG_INFO,  "|-----------------------------------|");	
 	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
@@ -7610,6 +7658,9 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 	veejay_msg(VEEJAY_MSG_INFO, 
 		"Sample '%s'[%4d]/[%4d]\t[duration: %s | %8d]",
 		sampletitle,id,sample_size()-1,timecode,len);
+	
+	if( sample_get_composite( id ) )
+		veejay_msg(VEEJAY_MSG_INFO, "This sample will be transformed when used as secundary input.");
 
 	if(sample_encoder_active(v->uc->sample_id))
 	{

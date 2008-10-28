@@ -488,6 +488,13 @@ int	vj_tag_set_stream_color(int t1, int r, int g, int b)
     return (vj_tag_update(tag,t1));
 }
 
+int	vj_tag_get_composite(int t1)
+{	
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return -1;
+	return tag->composite;
+}
+
 int	vj_tag_get_stream_color(int t1, int *r, int *g, int *b )
 {
     vj_tag *tag = vj_tag_get(t1);
@@ -895,6 +902,14 @@ int	vj_tag_set_n_frames( int t1, int n )
 	return -1;
   tag->n_frames = n;
   return ( vj_tag_update(tag, t1)); 
+}
+
+int	vj_tag_set_composite( int t1, int n )
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return -1;
+	tag->composite = n;
+	return (vj_tag_update(tag,t1));
 }
 
 int vj_tag_get_effect(int t1, int position)

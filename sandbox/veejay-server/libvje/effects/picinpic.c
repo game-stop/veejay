@@ -161,7 +161,7 @@ void picinpic_apply( void *user_data, VJFrame *frame, VJFrame *frame2, int width
 
 	}
 
-	yuv_convert_and_scale( picture->scaler, scale_src.data, picture->frame.data ); 
+	yuv_convert_and_scale( picture->scaler, &(scale_src), &(picture->frame) ); 
 
 	/* Copy the scaled image to output */
 	for( y = 0 ; y < picture->h-1; y ++ )

@@ -21,6 +21,7 @@
  *
  *
  */
+void	*vj_font_single_init(int s_w, int s_h, float fps, char *home);
 
 void	*vj_font_init(int s_w, int s_h, float fps, int osd);
 int	vj_font_srt_sequence_exists( void *font, int id );
@@ -43,6 +44,7 @@ void	vj_font_set_outline_and_border( void *font, int outline, int border);
 void	vj_font_set_position( void *font, int x, int y );
 void	vj_font_set_size_and_font( void *font, int f_id, int size );
 void    vj_font_set_dict( void *font, void *dict );
+void	vj_font_set_osd_text(void *font, char *text );
 void    *vj_font_get_dict(void *font);
 void	vj_font_update_text( void *font, long s1,long s2, int seq, char *text);
 char **vj_font_get_sequences( void *font );
@@ -50,6 +52,5 @@ char  *vj_font_get_sequence( void *font , int id );
 void                  vj_font_set_current( void *font , int cur );
 void    vj_font_xml_pack( xmlNodePtr node, void *font );
 void    vj_font_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *font );
-void	vj_font_customize_osd( void *font,void *uc, int type, char *extra );
 int   vj_font_norender(void *ctx, long position);
 #endif

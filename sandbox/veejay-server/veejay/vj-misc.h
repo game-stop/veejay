@@ -22,7 +22,6 @@
 #include <stdarg.h>
 #include "vj-lib.h"
 
-//#define VEEJAY_FILE_LIMIT (1048576 * 1900)
 #define VEEJAY_FILE_LIMIT (1048576 * 16000)
 int   available_diskspace(void);
 

@@ -174,6 +174,7 @@ typedef struct sample_info_t {
     int		soft_edl;
     void	*dict;
     void	*kf;
+    int          composite;
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
@@ -218,6 +219,8 @@ extern int sample_get_next(int s1);
 extern int sample_get_depth(int s1);
 extern int sample_set_depth(int s1, int n);
 extern int sample_set_speed(int s1, int speed);
+extern int sample_set_composite(int s1, int composite);
+extern int sample_get_composite(int s1);
 extern int sample_set_framedup(int s1, int n);
 extern int sample_get_framedup(int s1);
 extern int sample_set_framedups(int s1, int n);

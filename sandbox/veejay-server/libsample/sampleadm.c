@@ -1455,6 +1455,20 @@ int sample_set_chain_source(int s1, int position, int input)
     return (sample_update(sample,s1));
 }
 
+int	sample_set_composite(int s1, int composite)
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample) return -1;
+	sample->composite = composite;
+	return ( sample_update(sample,s1));
+}
+
+int	sample_get_composite(int s1)
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample) return -1;
+	return sample->composite;	
+}
 /****************************************************************************************************
  *
  * sample_set_speed

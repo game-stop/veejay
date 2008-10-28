@@ -243,9 +243,6 @@ static	void	contourextract_centroid()
 
 static int bg_frame_ = 0;
 
-extern void    vj_composite_transform( void *coords, int points, int blob_id, int cx , int cy, int w, int h, int num_objects,uint8_t *plane);
-extern int     vj_composite_active();
-
 void contourextract_apply(void *ed, VJFrame *frame,int width, int height, 
 		int threshold, int reverse,int mode, int take_bg, int feather, int min_blob_weight)
 {
@@ -305,7 +302,6 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 		veejay_memcpy( Y, ud->bitmap, len );
 		veejay_memset( Cb, 128, uv_len );
 		veejay_memset( Cr, 128, uv_len );
-		vj_dummy_send();
 		return;
 	}
 
@@ -383,17 +379,9 @@ void contourextract_apply(void *ed, VJFrame *frame,int width, int height,
 					}
 				}
 			}
-			if( vj_composite_active() )
-			{
-					packets ++;
-					vj_composite_transform( (void*) points, n_points, i,dx1,dy1, width,height,num_objects,(mode == 2 ? Y: NULL));
-			}
 		}
 	}
 
-	if(!packets)
-		vj_dummy_send();
-	
 }
 
 

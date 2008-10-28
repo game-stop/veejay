@@ -244,10 +244,7 @@ static	void	texmap_centroid()
 
 static int bg_frame_ = 0;
 
-extern int     vj_composite_active();
 
-extern void		vj_composite_transform(  void *points, int n_points, int blob_id, int dx, int dy, int w, int h, int num,
-						 void *plane );
 
 void texmap_apply(void *ed, VJFrame *frame,
 		VJFrame *frame2, int width, int height, 
@@ -318,7 +315,6 @@ void texmap_apply(void *ed, VJFrame *frame,
 		veejay_memcpy( Y, ud->bitmap, len );
 		veejay_memset( Cb, 128, len );
 		veejay_memset( Cr, 128, len );
-		vj_dummy_send();
 		return;
 	}
 
@@ -343,7 +339,6 @@ void texmap_apply(void *ed, VJFrame *frame,
 				Cr[i] = 128;
 			}
 		}
-		vj_dummy_send();
 		return;
 	}
 
@@ -378,16 +373,8 @@ void texmap_apply(void *ed, VJFrame *frame,
 			Cb[i] = 128;	
 			Cr[i] = 128;
 		}
-		vj_dummy_send();
-		return;
 	}
 
-	if(! vj_composite_active() )
-	{
-		vj_dummy_send();
-		return;
-	}
-	
 	int num_objects = 0;
 	for( i = 1; i <=labels; i ++ )
 		if( blobs[i] )
@@ -440,15 +427,6 @@ void texmap_apply(void *ed, VJFrame *frame,
 					}
 				}
 			}
-			vj_composite_transform( 
-					(void*) points, 
-					n_points, i,
-					dx1,
-					dy1, 
-					width,
-					height,
-					num_objects,(mode == 2 ? Y: NULL));
-			
 		}
 	} 
 
@@ -522,8 +500,6 @@ void texmap_apply(void *ed, VJFrame *frame,
 			} 
 		}
 	}
-	if(!packets)
-		vj_dummy_send();
 
 }
 

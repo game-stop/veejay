@@ -114,23 +114,6 @@ void	veejay_set_instance( veejay_t *info )
 	veejay_instance_ = info;
 }
 
-int     vj_composite_active()
-{
-        return veejay_composite_active( veejay_instance_ );
-}
-
-void    vj_composite_transform( void  *coords, int points, int blob_id, int cx, int cy, int w, int h, int num_objects, uint8_t *plane)
-{
-        veejay_composite_transform_points( veejay_instance_, coords, points, blob_id, cx, cy,w,h,num_objects,plane );
-}
-
-void    vj_dummy_send( )
-{
-	composite_dummy( veejay_instance_->composite );
-}
-
-
-
 
 static int	veejay_pin_cpu( veejay_t *info, int cpu_num );
 static void	veejay_schedule_fifo( veejay_t *info, int pid );
@@ -555,11 +538,6 @@ int	veejay_composite_active( veejay_t *info )
 	return info->settings->composite;
 }
 
-void	veejay_composite_transform_points( veejay_t *info, void *coords, int points, int blob_id, int cx, int cy,int w, int h,int num, uint8_t *plane )
-{
-	composite_transform_points( info->composite, coords, points, blob_id,cx,cy,w,h, num,plane);
-}
-
 void	veejay_auto_loop(veejay_t *info)
 {
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN)
@@ -945,20 +923,17 @@ static int veejay_screen_update(veejay_t * info )
 
 	video_playback_setup *settings = info->settings;
 
-	if(settings->composite==1 && info->sdl[0])
+	if(settings->composite && info->sdl[0])
 	{
 		if(!vj_sdl_lock( info->sdl[0] ) )
 			return 0;
-	
-		uint8_t *yuyv = vj_sdl_get_yuv_overlay(info->sdl[0]);
-	
-		composite_blit( info->composite, yuyv );
+		composite_blit( info->composite, vj_sdl_get_yuv_overlay(info->sdl[0]));
 
 		if(!vj_sdl_unlock( info->sdl[0]) )
 			return 0;
 	
 		skip_update = 1;
-	}
+	} 
 	else
  if(settings->zoom )
 	{
@@ -991,7 +966,7 @@ static int veejay_screen_update(veejay_t * info )
 
 		vj_perform_get_output_frame( dst.data );
 
-		yuv_convert_and_scale( info->video_out_scaler, src.data,dst.data );	
+		yuv_convert_and_scale( info->video_out_scaler, &src,&dst );	
 
 		vj_perform_get_output_frame(  frame );
 	}
@@ -1972,15 +1947,15 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 
 	if(info->settings->composite)
 	{
-		info->osd = vj_font_init( info->video_output_width,info->video_output_height,
-					  info->current_edit_list->video_fps ,1  );
+		info->osd = vj_font_single_init( info->video_output_width,info->video_output_height,
+					  info->current_edit_list->video_fps ,info->homedir  );
 
 	}
 	else
 	{	
-		info->osd = vj_font_init( info->current_edit_list->video_width,
+		info->osd = vj_font_single_init( info->current_edit_list->video_width,
 				   info->current_edit_list->video_height,
-				   info->current_edit_list->video_fps,1 );
+				   info->current_edit_list->video_fps,info->homedir );
 	}
 	
 
@@ -2088,12 +2063,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 					info->pixel_format );
 
 		if(info->settings->crop)
-			vj_perform_get_cropped_frame(info, &src.data, 0);
+			vj_perform_get_cropped_frame(info, src.data, 0);
 		else
-			vj_perform_get_primary_frame(info, &src.data  );
+			vj_perform_get_primary_frame(info, src.data  );
 	
-		vj_perform_init_output_frame(info, &(dst.data),
-			info->video_output_width, info->video_output_height );
+		vj_perform_init_output_frame(info, dst.data,	info->video_output_width, info->video_output_height );
 
 		info->settings->sws_templ.flags  = info->settings->zoom;
 	        info->video_out_scaler = (void*)
@@ -2123,6 +2097,14 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 
 	if( info->settings->composite )
 	{
+		int o1 = info->video_output_width * info->video_output_height;
+		int o2 = el->video_width * el->video_height;
+
+		if( o2 > o1 ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to perform viewport rendering when input resolution is larger then output resolution.");
+			return -1;
+		}
+
 		if(info->settings->zoom <= 0 || info->settings->zoom > 11 )
 			info->settings->zoom = 1;
 		info->composite = composite_init( info->video_output_width, info->video_output_height,

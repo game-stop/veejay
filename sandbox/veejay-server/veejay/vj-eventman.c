@@ -2328,6 +2328,15 @@ void		vj_init_vevo_events(void)
 				1000,
 				NULL );
 
+	index_map_[ VIMS_COMPOSITE ] 				=	_new_event(
+				NULL,
+				VIMS_COMPOSITE,
+				"Push current playing sample or stream as viewport input",
+				vj_event_viewport_composition,
+				0,
+				VIMS_ALLOW_ANY,	
+				NULL );
+
 	index_map_[ VIMS_PROJ_STACK ] 				=	_new_event(
 				"%d %d",
 				VIMS_PROJ_STACK,

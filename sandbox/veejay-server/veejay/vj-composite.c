@@ -31,7 +31,14 @@
 #include <libvje/vje.h>
 #include <veejay/vj-viewport.h>
 #include <veejay/vj-composite.h>
+#include <veejay/vj-misc.h>
 #include AVUTIL_INC
+
+#ifdef HAVE_XML2
+#include <libxml/xmlmemory.h>
+#include <libxml/parser.h>
+#endif
+
 #include <libyuv/yuvconv.h>
 #include <veejay/vims.h>
 #ifdef STRICT_CHECKING
@@ -47,9 +54,8 @@ typedef struct
 	int mode;
 	int focus;
 	uint8_t *proj_plane[3];
-//	uint8_t *img_plane[3];
-	uint8_t *large_plane[3]; //@slow
 	void *vp1;
+	void *back1;
 	void *sampler;
 	void *scaler;
 	int  sample_mode;
@@ -57,7 +63,10 @@ typedef struct
 	int  blit;
 	uint8_t *ptr[3];
 	int use_ptr;
+	int use_back;
 	int	Y_only;
+	int 	run;
+	int 	back_run;
 } composite_t;
 
 //@ round to multiple of 8
@@ -84,32 +93,36 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	}
 
 	c->sample_mode = sample_mode;
-
 	c->mode = 0;
-
 	c->proj_width = pw;
 	c->proj_height = ph;
 	c->img_width = iw;
 	c->img_height = ih;
-
 	c->pf = pf;
 	c->Y_only = 0;
 
-	c->vp1 = viewport_init( 0,0,pw,ph,pw, ph, homedir, &vp1_enabled, &vp1_frontback, 1);
+	c->vp1 = viewport_init( 0,0,pw,ph,pw, ph,iw,ih, homedir, &vp1_enabled, &vp1_frontback, 1);
 	if(!c->vp1) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to use viewport calibration.");
 		free(c);
 		return NULL;
 	}
+
+	if( iw != pw || ih != ph ) {
+		c->back1 = viewport_clone( c->vp1, iw, ih );
+		if(!c->back1 ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Unable to use secundary viewport calibration.");
+			free(c);
+			return NULL;
+		}
+		c->use_back = 1;
+	}
 	c->proj_plane[0] = (uint8_t*) vj_calloc( RUP8( pw * ph * 3) + RUP8(pw * 3) * sizeof(uint8_t));
 	c->proj_plane[1] = c->proj_plane[0] + RUP8(pw * ph) + RUP8(pw);
 	c->proj_plane[2] = c->proj_plane[1] + RUP8(pw * ph) + RUP8(pw);
-	c->large_plane[0] = (uint8_t*) vj_calloc( RUP8(pw * ph * 3)+ RUP8(pw*3) * sizeof(uint8_t) );
-	c->large_plane[1] = c->large_plane[0] + RUP8(pw * ph) + RUP8(pw);
-	c->large_plane[2] = c->large_plane[1] + RUP8(pw * ph) + RUP8(pw);
 
 	viewport_set_marker( c->vp1, 1 );
-
+	
 	c->sampler = subsample_init( pw );
 
 	sws_template sws_templ;
@@ -118,8 +131,8 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 
 	VJFrame *src = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],
 					iw,ih, PIX_FMT_YUV444P);
-
-	VJFrame *dst = yuv_yuv_template( c->large_plane[0],c->large_plane[1],c->large_plane[2],
+	
+	VJFrame *dst = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],
 					pw, ph, PIX_FMT_YUV444P );
 
 	c->scaler = yuv_init_swscaler( src, dst, &sws_templ, 0 );
@@ -141,9 +154,9 @@ void	composite_destroy( void *compiz )
 	if(c)
 	{
 		if(c->proj_plane[0]) free(c->proj_plane[0]);
-		if(c->large_plane[0]) free(c->large_plane[0]);
-//		if(c->img_plane[0]) free(c->img_plane[0]);
+		/*if(c->large_plane[0]) free(c->large_plane[0]);*/
 		if(c->vp1) viewport_destroy( c->vp1 );
+		if(c->back1) viewport_destroy(c->vp1);
 		if(c->scaler)	yuv_free_swscaler( c->scaler );
 		if(c->sampler) subsample_free(c->sampler);
 		free(c);
@@ -153,9 +166,13 @@ void	composite_destroy( void *compiz )
 
 void	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y )
 {
-	composite_t *c = (composite_t*) compiz;
-	viewport_external_mouse( c->vp1, c->large_plane, mouse_x, mouse_y, mouse_button, 1,w_x,w_y );
+	composite_t *c = (composite_t*) compiz; //@large
+	if(viewport_external_mouse( c->vp1, c->proj_plane, mouse_x, mouse_y, mouse_button, 1,w_x,w_y )) {
+		if(c->back1)
+			viewport_update_from(c->vp1, c->back1 );
+	}
 }
+
 
 static inline void	composite_fit_l( composite_t *c, VJFrame *img_data, uint8_t *planes[3] )
 {
@@ -168,19 +185,17 @@ static inline void	composite_fit_l( composite_t *c, VJFrame *img_data, uint8_t *
 	}
 	else
 	{
-		//@ software scaling
-		c->use_ptr = 0;
-		VJFrame *src1 = yuv_yuv_template( planes[0], planes[1], planes[2],
-					  img_data->width,   img_data->height, PIX_FMT_YUV444P );
+		VJFrame *src1= yuv_yuv_template( planes[0], planes[1], planes[2],
+			 img_data->width,   img_data->height, PIX_FMT_YUV444P );
 
-		VJFrame *dst1 = yuv_yuv_template( c->large_plane[0],c->large_plane[1], c->large_plane[2],
+		c->use_ptr = 0;
+		VJFrame *dst1 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1], c->proj_plane[2],
 					  c->proj_width,c->proj_height, PIX_FMT_YUV444P );
 		yuv_convert_and_scale(c->scaler,src1,dst1 );
 		free(src1);
 		free(dst1);
 	}
 }
-
 static inline void	composite_fit( composite_t *c, VJFrame *img_data, uint8_t *planes[3] )
 {
 
@@ -218,33 +233,20 @@ static void	composite_configure( composite_t *c,VJFrame *img_data, uint8_t *plan
 				img_data->data[2]
 				);	
 
-	veejay_memset( img_data->data[0], 125, img_data->width * img_data->height );	
-	veejay_memset( img_data->data[1], 128, img_data->width* img_data->height );
-	veejay_memset( img_data->data[2], 128, img_data->width* img_data->height );
-
-
 	if( c->use_ptr ) {
+		veejay_memset( img_data->data[0], 125, img_data->width * img_data->height );	
+		veejay_memset( img_data->data[1], 128, img_data->width* img_data->height );
+		veejay_memset( img_data->data[2], 128, img_data->width* img_data->height );
 		viewport_draw_interface_color(c->vp1, c->ptr );
 	} else {
+		veejay_memset( c->proj_plane[0], 125, c->proj_width * c->proj_height );	
+		veejay_memset( c->proj_plane[1], 128, c->proj_width* c->proj_height );
+		veejay_memset( c->proj_plane[2], 128, c->proj_width* c->proj_height );
 		viewport_draw_interface_color( c->vp1, c->proj_plane );
 	}
-
+	
 
 }
-/*
-static void	composite_prerender( composite_t *c, VJFrame *img_data, uint8_t *planes[3])
-{
-	VJFrame *src1 = yuv_yuv_template( planes[0], planes[1], planes[2],
-					  img_data->width,   img_data->height, PIX_FMT_YUV444P);
-
-	VJFrame *dst1 = yuv_yuv_template( c->large_plane[0],c->large_plane[1], c->large_plane[2],
-					  c->proj_width,c->proj_height, PIX_FMT_YUV444P);
-
-	yuv_convert_and_scale( c->scaler, src1, dst1 );
-	free(src1);
-	free(dst1);
-}
-*/
 
 void	composite_process_secundary(void *compiz, uint8_t *dst_data[3], VJFrame *input )
 {
@@ -252,17 +254,20 @@ void	composite_process_secundary(void *compiz, uint8_t *dst_data[3], VJFrame *in
 	c->ptr[0] = input->data[0];
 	c->ptr[1] = input->data[1];
 	c->ptr[2] = input->data[2];
-	c->blit = 1;
 
 	viewport_produce_full_img( c->vp1, c->ptr, dst_data );
 
 }
 
-void	composite_process_prepare(void *compiz, uint8_t *img_dat[3], VJFrame *input, int use_vp , int focus ) 
+void	composite_process_prepare(void *compiz, uint8_t *img_dat[3], VJFrame *input, int use_vp , int focus, int mode ) 
 {
 	composite_t *c = (composite_t*) compiz;
 	c->blit = 0;
 
+	if(c->run == 0 ) {
+		viewport_reconfigure(c->vp1);
+		c->run=1;
+	}
 
 	if(!input->ssm)
 	{
@@ -276,15 +281,20 @@ void	composite_process_prepare(void *compiz, uint8_t *img_dat[3], VJFrame *input
 	else {
 		if( !viewport_active(c->vp1) ) {
 			composite_fit_l(c, input,img_dat );
-			c->blit = 1;
-			input->ssm = 0; //@ blit subsamples data
+
+			if(!use_vp) {
+				c->blit = 1;
+				input->ssm = 0; //@ blit subsamples data
+			}
 		} else {
-			if(use_vp)
-				composite_configure(c,input,input->data);
+			if(use_vp) {
+				composite_fit_l(c,input,img_dat);
+			}
 			else
 				composite_configure(c, input, img_dat );
 		}
 	}
+
 }
 
 void	composite_process(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int use_vp, int focus )
@@ -292,8 +302,7 @@ void	composite_process(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int 
 	composite_t *c = (composite_t*) compiz;
 	int proj_active = viewport_active(c->vp1 );
 
-	//@ If the current focus is VIEWPORT, pass trough
-	if( focus == 0 )
+	if( focus == 0 || use_vp == 1)
 	{
 		if(!c->use_ptr)
 		{
@@ -302,11 +311,10 @@ void	composite_process(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int 
 			chroma_subsample( c->sample_mode, c->sampler, c->ptr, c->proj_width,c->proj_height);
 		}
 		input->ssm = 0;	
-		return;
 	}
 	else
 	{
-		if( proj_active ) //@ render projection to yuyv surface
+		if( proj_active ) 
 		{	
 			if(!c->use_ptr) {
 				chroma_subsample( c->sample_mode, c->sampler, c->proj_plane, c->proj_width,c->proj_height );
@@ -320,45 +328,69 @@ void	composite_process(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int 
 	}
 }
 
-
+//@img_dat = result, step 1 , input = source
 void	composite_processX(  void *compiz, uint8_t *img_dat[3], VJFrame *input, int use_vp, int focus )
 {
 	composite_t *c = (composite_t*) compiz;
 	int proj_active = viewport_active(c->vp1 );
 
-
 	c->blit = 0;
-	//@ If the current focus is VIEWPORT, pass trough
+
+	if(c->back_run == 0 ) {
+		viewport_reconfigure(c->back1);
+		c->back_run = 1;
+	}
 	if( focus == 0 )
 	{
-		composite_fit( c, input, img_dat );
+			if(c->use_back) {
+			     	veejay_memcpy( img_dat[0], input->data[0], input->len );
+				veejay_memcpy( img_dat[1], input->data[1], input->len );
+				veejay_memcpy( img_dat[2], input->data[2], input->len );
+			} else {
+				c->use_ptr = 1;
+				c->ptr[0] = img_dat[0];
+				c->ptr[1] = img_dat[1];
+				c->ptr[2] = img_dat[2];
+			}
+
 	}
 	else
 	{
 		if( !proj_active ) //@ render projection to yuyv surface
 		{
-			composite_fit_l(c, input,img_dat );
-			c->blit = 1;
+			if(c->use_back) {
+			     	veejay_memcpy( img_dat[0], input->data[0], input->len );
+				veejay_memcpy( img_dat[1], input->data[1], input->len );
+				veejay_memcpy( img_dat[2], input->data[2], input->len );
+			} else {
+				c->use_ptr = 1;
+				c->ptr[0] = img_dat[0];
+				c->ptr[1] = img_dat[1];
+				c->ptr[2] = img_dat[2];
+			}
 		}
 		else
 		{
-			composite_fit(c,input, img_dat );
+			if(c->use_back) {
+			     	veejay_memcpy( img_dat[0], input->data[0], input->len );
+				veejay_memcpy( img_dat[1], input->data[1], input->len );
+				veejay_memcpy( img_dat[2], input->data[2], input->len );
+			} else {
+				c->use_ptr = 1;
+				c->ptr[0] = img_dat[0];
+				c->ptr[1] = img_dat[1];
+				c->ptr[2] = img_dat[2];
+			}
+
 		}
 	}
 }
 
 
-void	composite_transform_points( void *compiz, void *coords, int n, int blob_id, int cx, int cy,int w, int h,int num_objects,uint8_t *plane )
+int	composite_get_colormode(void *compiz)
 {
 	composite_t *c = (composite_t*) compiz;
-//	viewport_transform_coords( c->vp1, coords, n , blob_id,cx,cy,w,h,num_objects, plane);
-}
-
-void	composite_dummy( void *compiz )
-{
-	if(!compiz) return;
-	composite_t *c = (composite_t*) compiz;
-//	viewport_dummy_send( c->vp1 );
+	return c->Y_only;
 }
 
 void	composite_set_colormode( void *compiz, int mode )
@@ -374,19 +406,34 @@ void	composite_set_colormode( void *compiz, int mode )
 int	composite_blitX( void *compiz, uint8_t *img[3] , uint8_t *out_img[3], int uvlen, int isFull)
 {
 	composite_t *c = (composite_t*) compiz;
-	if(c->Y_only && isFull ) {
-		viewport_produce_bw_img(c->vp1,img,out_img,c->Y_only);
-//		veejay_memset( out_img[1],128,uvlen);
-//		veejay_memset( out_img[2],128,uvlen);
-		return 1;
-	}
 
-	if(isFull) {
-		viewport_produce_bw_img(c->vp1,img,out_img,0);
-		return 1;
+	void *view = c->vp1;
+	if(c->use_back==1)
+		view = c->back1;
+
+	
+	if(!c->use_back) {
+		if(c->Y_only && isFull ) {
+			viewport_produce_bw_img(view,img,out_img,c->Y_only);
+			return 1;
+		}
+	
+		if(isFull) {
+			viewport_produce_bw_img(view,img,out_img,0);
+			return 1;
+		}
+
 	} else {
+		if(c->use_back) {
+			viewport_produce_bw_img( view,img, out_img , c->Y_only);
+			if(c->Y_only) {
+				veejay_memset( out_img[1],128,uvlen);
+				veejay_memset( out_img[2],128,uvlen);
+			}
+			return 1;
+		}
 		chroma_supersample( c->sample_mode, c->sampler, img, c->proj_width, c->proj_height );
-		viewport_produce_bw_img( c->vp1,img, out_img , c->Y_only);
+		viewport_produce_bw_img( view,img, out_img , c->Y_only);
 		chroma_subsample( c->sample_mode, c->sampler, out_img, c->proj_width, c->proj_height );
 		if(c->Y_only) {
 			veejay_memset( out_img[1],128,uvlen);
@@ -405,6 +452,7 @@ void	composite_blitXfinish(void *compiz, uint8_t *out_img[3] ) {
 void	composite_blit( void *compiz, uint8_t *yuyv )
 {
 	composite_t *c = (composite_t*) compiz;
+
 	if(c->use_ptr)
 	{
 		if(c->blit)
@@ -418,8 +466,9 @@ void	composite_blit( void *compiz, uint8_t *yuyv )
 		}
 	}
 	else {
-		if(c->blit)
-			viewport_produce_full_img_yuyv( c->vp1, c->large_plane, yuyv);
+		if(c->blit) {	
+			viewport_produce_full_img_yuyv( c->vp1,c->proj_plane,yuyv);
+		}
 		else
 		{
 			if( c->pf == FMT_420 || c->pf == FMT_420F )
@@ -430,21 +479,40 @@ void	composite_blit( void *compiz, uint8_t *yuyv )
 	}
 }
 
+void	composite_blit2( void *compiz, uint8_t *yuyv )
+{
+	composite_t *c = (composite_t*) compiz;
+
+	if( c->pf == FMT_420 || c->pf == FMT_420F )
+		yuv420p_to_yuv422( c->proj_plane, yuyv, c->proj_width,c->proj_height );
+	else
+		yuv422_to_yuyv( c->proj_plane, yuyv, c->proj_width,c->proj_height );
+}
+
+
+
+void	*composite_get_draw_buffer( void *compiz )
+{
+	composite_t *c = (composite_t*) compiz;
+	VJFrame *frame = (VJFrame*) vj_malloc(sizeof(VJFrame));
+	vj_get_yuv444_template( frame, c->proj_width,c->proj_height);
+	if(c->use_ptr) { //@fix use_ptr
+		frame->data[0] = c->ptr[0];	
+		frame->data[1] = c->ptr[1];
+		frame->data[2] = c->ptr[2];
+	} else {
+		frame->data[0] = c->proj_plane[0];
+		frame->data[1] = c->proj_plane[1];
+		frame->data[2] = c->proj_plane[2];
+	}
+	return (void*)frame;
+}
 void	composite_get_blit_buffer( void *compiz, uint8_t *buf[3] )
 {
 
 	composite_t *c = (composite_t*) compiz;
-	if(c->blit)
-	{
-		buf[0] = c->large_plane[0];
-		buf[1] = c->large_plane[1];
-		buf[2] = c->large_plane[2];
-	}
-	else
-	{
-		buf[0] = c->proj_plane[0];
-		buf[1] = c->proj_plane[1];
-		buf[2] = c->proj_plane[2];
-	}
+	buf[0] = c->proj_plane[0];
+	buf[1] = c->proj_plane[1];
+	buf[2] = c->proj_plane[2];
 }
 

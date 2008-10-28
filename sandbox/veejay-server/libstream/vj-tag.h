@@ -110,10 +110,12 @@ typedef struct {
     void *extra;
     void *dict;
     char padding[4];
+    int composite;
 } vj_tag;
 
 void	*vj_tag_get_dict( int id );
-
+int	vj_tag_set_composite(int id, int n);
+int	vj_tag_get_composite(int t1);
 int 	vj_tag_chain_malloc(int e);
 int 	vj_tag_chain_free(int e);
 int	vj_tag_get_v4l_properties(int t1,int *brightness, int *contrast, int *hue,int *saturation,int *color, int *white );
