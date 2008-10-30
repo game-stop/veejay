@@ -7971,9 +7971,9 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	vj_perform_get_primary_frame( v, frame.data );
 
 	//@ 420,422,444
-	int full444 =  (v->settings->composite);
-	if( v->video_out == 4 )
-		full444 = 1; 
+	//int full444 =  (v->settings->composite);
+	//if( v->video_out == 4 )
+	//	full444 = 1; 
 	
 	//@ fast*_picture delivers always 4:2:0 data to reduce bandwidth
 	if( use_bw_preview_ )
@@ -7981,13 +7981,13 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 				&frame,
 				w,
 				h,
-			(full444 ? 4: v->pixel_format ));
+				v->pixel_format );
 	else
 		vj_fast_picture_save_to_mem(
 				&frame,
 				w,
 				h,
-			(full444 ? 4 : v->pixel_format ));
+				v->pixel_format );
 
 	int input_len = (use_bw_preview_ ? ( w * h ) : (( w * h ) + ((w * h)/2)) );
 

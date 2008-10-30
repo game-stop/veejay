@@ -923,11 +923,18 @@ static int veejay_screen_update(veejay_t * info )
 
 	video_playback_setup *settings = info->settings;
 
-	if(settings->composite && info->sdl[0])
+	int check_vp = settings->composite;
+//	if(check_vp==2)
+//		check_vp = composite_has_back(info->composite);
+
+	if(check_vp && info->sdl[0])
 	{
+		vj_perform_get_primary_frame(info,frame);
+
+
 		if(!vj_sdl_lock( info->sdl[0] ) )
 			return 0;
-		composite_blit( info->composite, vj_sdl_get_yuv_overlay(info->sdl[0]));
+		composite_blit( info->composite,frame, vj_sdl_get_yuv_overlay(info->sdl[0]),settings->composite);
 
 		if(!vj_sdl_unlock( info->sdl[0]) )
 			return 0;
@@ -2108,8 +2115,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		if(info->settings->zoom <= 0 || info->settings->zoom > 11 )
 			info->settings->zoom = 1;
 		info->composite = composite_init( info->video_output_width, info->video_output_height,
-			el->video_width, el->video_height, info->homedir, info->settings->sample_mode,
-				info->settings->zoom, info->pixel_format );
+						  el->video_width, el->video_height,
+						  info->homedir,
+						  info->settings->sample_mode,
+						  info->settings->zoom,
+						  info->pixel_format );
 		if(!info->composite) {
 			return -1;
 		}

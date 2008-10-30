@@ -138,10 +138,14 @@ typedef struct
 	void *sender;
 	uint32_t	seq_id;
 	ui_t	*ui;
+	int 	saved_w;
+	int	saved_h;
 } viewport_t;
 
 typedef struct
 {
+	int	saved_w;
+	int	saved_h;
 	int	reverse;
 	int	grid_size;
 	int	grid_color;
@@ -431,7 +435,7 @@ char *viewport_get_my_help(void *vv)
 	sprintf(reverse_mode, "%s", ( v->user_reverse ? "Forward"  : "Reverse" ) );
 	char tmp[1024];
 
-	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Focus projection/secundary input\nCTRL + v: Transform secundary input in grayscale/color\n\n",
+	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Focus projection/secundary input\nCTRL + v: Transform secundary input in grayscale/color\nCTRL + o: Toggle OSD status\n",
 			reverse_mode);
 	
 
@@ -672,6 +676,9 @@ void	viewport_set_projection( void *data, float *res )
 
 static	float		vsx(viewport_t *v, float x)
 {
+	if( v->ui->scale == 1.0f ) { 
+		return x;
+	}
 	ui_t *u = v->ui;
 	int	    cx = v->w / 2;
 	int	    cy = v->h / 2;
@@ -681,11 +688,19 @@ static	float		vsx(viewport_t *v, float x)
 	float		a = (float) dx / ( v->w / 100.0f );
 
 	float		s  = (float) v->w / (float) v->ui->sw;
-
+#ifdef STRICT_CHECKING
+	assert( (v->w > 0) );
+	assert( (v->h > 0 ));
+	assert( (v->ui->sw > 0));
+	assert( (v->ui->sh > 0 ));
+#endif
 	return (x-a)*s;
 }
 static	float		vsy(viewport_t *v, float x)
 {
+	if( v->ui->scale == 1.0f ) 
+		return x;
+
 	ui_t *u = v->ui;
 	int	    cx = v->w / 2;
 	int	    cy = v->h / 2;
@@ -695,7 +710,12 @@ static	float		vsy(viewport_t *v, float x)
 	float		a = (float) dy / ( v->h / 100.0f );
 
 	float		s  = (float) v->h / (float) v->ui->sh;
-
+#ifdef STRICT_CHECKING
+	assert( (v->w > 0) );
+	assert( (v->h > 0 ));
+	assert( (v->ui->sw > 0));
+	assert( (v->ui->sh > 0 ));
+#endif
 	return (x-a)*s;
 }
 
@@ -1267,6 +1287,14 @@ static	void	*viewport_init_swscaler(ui_t *u, int w, int h)
 	u->sx   = (float)w / (float) u->sw;
 	u->sy   = (float)h / (float) u->sh;
 	void *scaler = yuv_init_swscaler( srci,dsti,&t,yuv_sws_get_cpu_flags());
+
+	veejay_msg(VEEJAY_MSG_INFO,
+			"Scaling from %dx%d to %dx%d with a scale of %f",
+			w,h,u->sw,u->sh,u->scale );
+
+	free(srci);	
+	free(dsti);
+
 	return scaler;
 }
 
@@ -1349,26 +1377,21 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 #endif
 	//@ try to load last saved settings
 	viewport_config_t *vc = viewport_load_settings( homedir,mode );
-	if(!vc)
-	{
+	if(vc) {
+		float sx = (float) w / (float) vc->saved_w;
+		float sy = (float) h / (float) vc->saved_h;
+
+		vc->x0 = vc->x0 * sx;
+		vc->y0 = vc->y0 * sy;
+		vc->w0 = vc->w0 * sx;
+		vc->h0 = vc->h0 * sy;
+		veejay_msg(VEEJAY_MSG_INFO,"\tQuad    : %dx%d+%dx%d",vc->x0,vc->y0,vc->w0,vc->h0 );
+		
+	} else {
 		veejay_msg(VEEJAY_MSG_ERROR, "No or invalid viewport configuration file in %s", homedir );
 		veejay_msg(VEEJAY_MSG_ERROR, "Using default values");
-	}
-
-	veejay_msg(VEEJAY_MSG_INFO,"\tBacking  : %dx%d",w,h);
-	veejay_msg(VEEJAY_MSG_INFO,"\tRectangle: %dx%d+%dx%d",x0,y0,w0,h0);
-
-	if( vc->x0 == 0 && vc->y0 == 0 ) {
- 		if( vc->w0 != w0 || vc->h0 != h0  ) {
-			veejay_msg(VEEJAY_MSG_WARNING,
-				 "Previous viewport was saved with a projection quad of %dx%d+%dx%d, scaling to %dx%d",
-				vc->x0,vc->y0,vc->w0,vc->h0, w,h );
-			vc->w0 = w0;
-			vc->h0 = h0;
-		}
-	} else if ( vc->w0 != w0 || vc->h0 != h0 ) {
-		veejay_msg(VEEJAY_MSG_WARNING,
-				"Previous viewport was saved in another resolution, you need to correct the projection quad.");
+		veejay_msg(VEEJAY_MSG_INFO,"\tBacking  : %dx%d",w,h);
+		veejay_msg(VEEJAY_MSG_INFO,"\tRectangle: %dx%d+%dx%d",x0,y0,w0,h0);
 	}
 
 	viewport_t *v = (viewport_t*) vj_calloc(sizeof(viewport_t));
@@ -1377,11 +1400,13 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 	v->usermouse[2] = 0.0;
 	v->usermouse[3] = 0.0;
 	v->ui  = vj_calloc( sizeof(ui_t));
-
 	v->ui->buf[0] = vj_calloc(sizeof(uint8_t) * RUP8(w * h) );
 	v->ui->scale  = 0.5f;
 	v->ui->scaler = viewport_init_swscaler(v->ui,iw,ih);
-
+	v->saved_w = w;
+	v->saved_h = h;
+	v->w = w;
+	v->h = h;
 	v->homedir = strdup(homedir);
 	v->mode	   = mode;
 	v->marker_size = 1;
@@ -1458,7 +1483,10 @@ void *viewport_clone(void *vv, int new_w, int new_h )
 {
 	viewport_t *v = (viewport_t*) vv;
 	if(!v) return NULL;
-
+#ifdef STRICT_CHECKING
+	assert( new_w > 0 );
+	assert( new_h > 0 );
+#endif
 	viewport_t *q = (viewport_t*) vj_malloc(sizeof(viewport_t));
 	veejay_memcpy(q,v,sizeof(viewport_t));
 
@@ -1479,8 +1507,8 @@ void *viewport_clone(void *vv, int new_w, int new_h )
 	q->usermouse[3] = 0.0;
 	q->ui  = vj_calloc( sizeof(ui_t));
 	q->ui->buf[0] = vj_calloc(sizeof(uint8_t) * RUP8(new_w * new_h) );
-	q->ui->scale  = 0.5f;
-	q->ui->scaler = viewport_init_swscaler(v->ui,new_w,new_h);
+	q->ui->scale  = 1.0f;
+	q->ui->scaler = viewport_init_swscaler(q->ui,new_w,new_h);
 	q->homedir = strdup(v->homedir);
 
 	int	res = viewport_configure( q, 	q->x1, q->y1,
@@ -1569,7 +1597,7 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 
 	fclose(fd );
 
-	int n = sscanf(buf, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %f",
+	int n = sscanf(buf, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %d %d",
 			&vc->x1, &vc->y1,
 			&vc->x2, &vc->y2,
 			&vc->x3, &vc->y3,
@@ -1581,9 +1609,11 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 			&vc->y0,
 			&vc->w0,
 			&vc->h0,
-			&vc->frontback,	&vc->scale);
+			&vc->frontback,
+			&vc->saved_w,
+			&vc->saved_h);
 
-	if( n != 17 )
+	if( n != 18 )
 	{
 		veejay_msg(0, "Unable to read %s (file is %d bytes)",path, len );
 		free(vc);
@@ -1617,7 +1647,7 @@ static	void	viewport_save_settings( viewport_t *v, int frontback )
 
 	char content[512];
 
-	sprintf( content, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %f\n",
+	sprintf( content, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %d %d\n",
 			v->x1,v->y1,v->x2,v->y2,
 			v->x3,v->y3,v->x4,v->y4,
 			v->user_reverse,
@@ -1628,7 +1658,8 @@ static	void	viewport_save_settings( viewport_t *v, int frontback )
 			v->w0,
 			v->h0,
 			frontback,
-			v->ui->scale );
+			v->saved_w,
+			v->saved_h );
 
 	int res = fwrite( content, strlen(content), 1, fd );
 
@@ -2535,6 +2566,7 @@ void		viewport_push_frame(void *data, int w, int h, uint8_t *Y, uint8_t *U, uint
 
 	int	    nw = w * s;
 	int	    nh = h * s;
+
 //@ checking multiple of 8
 	VJFrame *srci = yuv_yuv_template( Y, U,V, w,h, PIX_FMT_GRAY8 );
         VJFrame *dsti = yuv_yuv_template( u->buf[0],NULL,NULL,u->sw, u->sh, PIX_FMT_GRAY8); 
@@ -2821,6 +2853,14 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3],
 	register const	int32_t tx2 = v->ttx2;
 	register const	int32_t	ty1 = v->tty1;
 	register const	int32_t ty2 = v->tty2;
+
+#ifdef STRICT_CHECKING
+	assert(tx1>= 0 );
+	assert(tx2>= 0 );
+	assert(ty1>= 0 );
+	assert(ty2>= 0 );
+#endif
+
 	int x,y;
 //@ FIXME: veejay_memset may actualy be slow here due to emms call
 	y  = ty1 * w;

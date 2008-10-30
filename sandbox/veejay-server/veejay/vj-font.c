@@ -1479,8 +1479,7 @@ void	vj_font_set_constraints_and_dict( void *font, long lo, long hi, float fps, 
        			free(items);
 		}
 	}
-	
-	veejay_memset( f->text_buffer, 0, f->text_max_size * sizeof(srt_cycle_t));
+
 	f->index = f->text_buffer;
 	if( len > f->text_max_size )
 	{
@@ -1489,10 +1488,14 @@ void	vj_font_set_constraints_and_dict( void *font, long lo, long hi, float fps, 
 		len = f->text_max_size;
 	}
 	f->index_len = len;
-
 	long k;
-	for( k = 0; k <= f->index_len; k ++ )
-		f->index[k] = &(f->text_buffer[k]);
+	int  j;
+	for( k = 0; k < f->index_len; k ++ ) {
+		srt_cycle_t *list = &(f->text_buffer[k]);
+		f->index[k] = list;
+		for(j = 0; j < 16; j ++ )
+			list->id[0] = 0;
+	}
 
 	if(dict)
 	{
@@ -2279,8 +2282,9 @@ int	vj_font_norender(void *ctx, long position)
 	int work = 0;
 	int k = 0;
 	for( k = 0; k <16; k ++ )
-		if( f->index[position]->id[k] )
+		if( f->index[position]->id[k] ) {
 			work ++;
+		}
 	return work;
 }
 
