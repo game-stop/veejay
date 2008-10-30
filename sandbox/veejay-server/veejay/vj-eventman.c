@@ -2328,6 +2328,15 @@ void		vj_init_vevo_events(void)
 				1000,
 				NULL );
 
+	index_map_[ VIMS_FRONTBACK ]				=	_new_event(
+				NULL,
+				VIMS_FRONTBACK,
+				"Camera/Projection calibration setup",
+				vj_event_viewport_frontback,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
 	index_map_[ VIMS_COMPOSITE ] 				=	_new_event(
 				NULL,
 				VIMS_COMPOSITE,

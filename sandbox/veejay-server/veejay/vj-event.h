@@ -36,7 +36,7 @@ void	vj_event_select_macro(				void *ptr,
 void    vj_event_stop();
 int  	vj_event_parse_msg( void *v, char *msg, int msg_len );
 void	vj_event_push_coords(void *ptr);
- 
+ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap);
 
 #ifdef HAVE_SDL
 #ifdef HAVE_XML2

@@ -423,6 +423,12 @@ static void		viewport_find_transform( float *coord, matrix_t *M )
 	M->m[2][2] = 1.0;
 }
 
+void	viewport_set_ui(void *vv, int i)
+{
+	viewport_t *v = (viewport_t*) vv;
+	v->user_ui = i;
+}
+
 
 char *viewport_get_my_help(void *vv)
 {
@@ -435,7 +441,7 @@ char *viewport_get_my_help(void *vv)
 	sprintf(reverse_mode, "%s", ( v->user_reverse ? "Forward"  : "Reverse" ) );
 	char tmp[1024];
 
-	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Focus projection/secundary input\nCTRL + v: Transform secundary input in grayscale/color\nCTRL + o: Toggle OSD status\n",
+	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Focus projection/secundary input\nCTRL + v: Transform secundary input in grayscale/color \nCTRL + o: Toggle OSD status\n\n",
 			reverse_mode);
 	
 

@@ -254,9 +254,9 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_COPYRIGHT,			SDLK_c,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_COMPOSITE,			SDLK_i,		VIMS_MOD_CTRL,  NULL    },
 	{ VIMS_OSD_EXTRA,			SDLK_h,		VIMS_MOD_CTRL,	NULL	},
-	{ VIMS_PROJ_STACK,			SDLK_v,		VIMS_MOD_CTRL,	"0 1"	},
-	{ VIMS_PROJ_STACK,			SDLK_p,		VIMS_MOD_CTRL,	"1 0"	},
-	{ VIMS_FRONTBACK,			SDLK_b,		VIMS_MOD_CTRL,  NULL	},
+	{ VIMS_PROJ_STACK,			SDLK_v,		VIMS_MOD_CTRL,	"1 0"	},
+	{ VIMS_PROJ_STACK,			SDLK_p,		VIMS_MOD_CTRL,	"0 1"	},
+	{ VIMS_FRONTBACK,			SDLK_s,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_SELECT_BANK,			SDLK_1,		VIMS_MOD_NONE,	"1"	},
 	{ VIMS_SELECT_BANK,			SDLK_2,		VIMS_MOD_NONE,	"2"	},
 	{ VIMS_SELECT_BANK,			SDLK_3,		VIMS_MOD_NONE,	"3"	},
@@ -6628,7 +6628,7 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 		return;
 	}
 
-	if( args[1] == 1 )
+	if( args[0] == 1 )
 	{
 		int cs = composite_get_colormode(v->composite);
 		if(cs == 0 )
@@ -6637,21 +6637,22 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 			cs = 0;	
 		composite_set_colormode( v->composite, cs );
 		veejay_msg(VEEJAY_MSG_INFO ,"Secundary Input renders in %s", (cs == 1 ?"Grayscale" : "Color" ) );
+		return;
 	}
 
-	if ( args[0] == 1 ) {
+	if ( args[1] == 1 ) {
 		if(v->settings->composite == 1 ) 
 			v->settings->composite = 2;
 		else if (v->settings->composite == 2 )
 			v->settings->composite = 1;
-		veejay_msg(VEEJAY_MSG_INFO, "Viewport on %s", (v->settings->composite == 1 ? "Projection" : "Secundary Input"));
+		veejay_msg(VEEJAY_MSG_INFO, "Calibrate %s, press CTRL-h for more help.", (v->settings->composite == 1 ? "Projection" : "Secundary Input"));
 		if( SAMPLE_PLAYING(v) ) {
-			sample_set_composite( v->uc->sample_id, (v->settings->composite == 2 ? 1:0 ) );
+			sample_set_composite( v->uc->sample_id, v->settings->composite  );
 			veejay_msg(VEEJAY_MSG_INFO,
 				"Secundary input sample %d will %s.", v->uc->sample_id,
 				(v->settings->composite == 2 ? "be transformed" : "not be transformed" ) );
 		} else if (STREAM_PLAYING(v)) {
-			vj_tag_set_composite( v->uc->sample_id, (v->settings->composite == 2 ? 1 :0 ) );
+			vj_tag_set_composite( v->uc->sample_id, v->settings->composite  );
 				veejay_msg(VEEJAY_MSG_INFO,
 				"Secundary input stream %d will %s.", v->uc->sample_id,
 				(v->settings->composite == 2 ? "be transformed" : "not be transformed" ) );
@@ -6846,16 +6847,23 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
+	if(!v->composite) {
+		veejay_msg(VEEJAY_MSG_ERROR, "No viewport active.");
+		return;
+	}
+
 	if(v->frontback == 0 )
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Viewport is rendered before FX processing");
 		v->frontback = 1;
+		veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera");
 	}
 	else
 	{
-		veejay_msg(VEEJAY_MSG_INFO, "Viewport is rendered after FX processing");
 		v->frontback = 0;
+		veejay_msg(VEEJAY_MSG_INFO, "Press CTRL-s or Middle mouse button again to activate setup.");
 	}
+
+	composite_set_ui( v->composite, v->frontback );
 
 }
 

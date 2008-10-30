@@ -39,7 +39,7 @@ void	composite_destroy( void *compiz );
 void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int sample_mode, int zoom_type, int pf );
 
 void	*composite_get_vp( void *data );
-
+void	composite_set_ui(void *compiz, int status );
 
 
 #endif

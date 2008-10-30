@@ -47,31 +47,28 @@
 
 typedef struct
 {
-	int proj_width;			/* projection (output) */
-	int proj_height;
-	int img_width;			/* image (input) */
-	int img_height;
-	int focus;
 	uint8_t *proj_plane[3];
-	uint8_t *back_plane[3];
 	void *vp1;
 	void *back1;
 	void *sampler;
 	void *scaler;
-	int  sample_mode;
-	int  pf;
-	int  blit;
-	uint8_t *ptr[3];
-	int use_ptr;
-	int use_back;
-	int	Y_only;
-	int 	run;
-	int 	back_run;
+	void *back_scaler;
 	VJFrame	*frame1;
 	VJFrame *frame2;
-	VJFrame *bp1;
-	int	has_back;
-	int 	pipe;
+	VJFrame *frame3;
+	VJFrame *frame4;
+	int sample_mode;
+	int pf;
+	int use_back;
+	int Y_only;
+	int run;
+	int back_run;
+	int has_back;
+	int pipe;
+	int proj_width;			/* projection (output) */
+	int proj_height;
+	int img_width;			/* image (input) */
+	int img_height;
 } composite_t;
 
 //@ round to multiple of 8
@@ -96,7 +93,6 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	int 	vp1_enabled = 0;
 	int	vp1_frontback = 0;
 
-
 	if( pw <= 0 || ph <= 0 ) {
 		veejay_msg(VEEJAY_MSG_WARNING ,"Missing projection dimensions,using image dimensions %dx%d",iw,ih);
 		pw = iw;
@@ -113,7 +109,6 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 
 	c->vp1 = viewport_init( 0,0,pw,ph,pw, ph,iw,ih, homedir, &vp1_enabled, &vp1_frontback, 1);
 	if(!c->vp1) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to use viewport calibration.");
 		free(c);
 		return NULL;
 	}
@@ -121,9 +116,6 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	c->proj_plane[0] = (uint8_t*) vj_calloc( RUP8( pw * ph * 3) + RUP8(pw * 3) * sizeof(uint8_t));
 	c->proj_plane[1] = c->proj_plane[0] + RUP8(pw * ph) + RUP8(pw);
 	c->proj_plane[2] = c->proj_plane[1] + RUP8(pw * ph) + RUP8(pw);
-	c->back_plane[0] = (uint8_t*) vj_calloc( RUP8( pw * ph * 4) * sizeof(uint8_t));
-	c->back_plane[1] = c->proj_plane[0] + RUP8(pw * ph);
-	c->back_plane[2] = c->proj_plane[1] + RUP8(pw * ph);
 	viewport_set_marker( c->vp1, 1 );
 	
 	c->sampler = subsample_init( pw );
@@ -135,19 +127,15 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	c->frame1 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],iw,ih, 
 						get_ffmpeg_pixfmt( pf ));
 	c->frame2 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw, ph, PIX_FMT_YUV444P );
-	c->bp1    = yuv_yuv_template( c->back_plane[0],c->back_plane[1],c->back_plane[2],pw,ph,
-						get_ffmpeg_pixfmt(pf));
+	c->frame3 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw,ph,c->frame1->format );
+	c->frame4 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],iw,ih,c->frame1->format );
+
 	c->scaler = yuv_init_swscaler( c->frame1, c->frame2, &sws_templ, 0 );
+	c->back_scaler = yuv_init_swscaler( c->frame4, c->frame3, &sws_templ, 0 );
+
 	c->back1  = viewport_clone( c->vp1, iw, ih );
 	if(!c->back1 ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to use secundary viewport calibration.");
-		free(c);
 		return NULL;
-	}
-
-	if( iw == pw && ih == ph )
-	{
-		c->use_ptr  = 1;
 	}
 
 	veejay_msg(VEEJAY_MSG_INFO, "Configuring projection:");
@@ -166,11 +154,23 @@ void	composite_destroy( void *compiz )
 		if(c->proj_plane[0]) free(c->proj_plane[0]);
 		if(c->vp1) viewport_destroy( c->vp1 );
 		if(c->back1) viewport_destroy(c->back1);
-		if(c->scaler)	yuv_free_swscaler( c->scaler );
+		if(c->scaler)	yuv_free_swscaler( c->scaler );	
+		if(c->back_scaler) yuv_free_swscaler(c->back_scaler);
+		if(c->frame1) free(c->frame1);
+		if(c->frame2) free(c->frame2);
+		if(c->frame3) free(c->frame3);
+		if(c->frame4) free(c->frame4);
 		if(c->sampler) subsample_free(c->sampler);
 		free(c);
 	}
 	c = NULL;
+}
+
+void	composite_set_ui(void *compiz, int status )
+{
+	composite_t *c = (composite_t*) compiz; 
+
+	viewport_set_ui( c->vp1, status );
 }
 
 void	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y )
@@ -242,12 +242,13 @@ void	composite_blit( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which_vp )
 			yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
 		return;
 	} else if (which_vp == 2 ) {
-		/* eeep, not properly scaled, must render back1 to yuyv */
-#ifdef STRICT_CHECKING
-		assert( c->proj_width == c->img_width );
-		assert( c->proj_height == c->img_height );
-#endif
-		yuv422_to_yuyv(in,yuyv,c->proj_width,c->proj_height );
+		if( c->pipe ) {
+			yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height);
+			c->pipe = 0;
+		}
+		else {
+			yuv422_to_yuyv(in,yuyv,c->proj_width,c->proj_height );	
+		}
 		return;
 	} 
 
@@ -269,14 +270,21 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 {
 	composite_t *c = (composite_t*) compiz;
 	int vp1_active = viewport_active(c->vp1);
-/*	veejay_msg(0 ,"%s:prepare %p (%dx%d) %s to %p (%dx%d) %s |%d,%d", __FUNCTION__,
-			input,input->width,input->height, 
-			unicap_pf_str( input->format ),
-			output, output->width,output->height,
-			unicap_pf_str( output->format ) ,
-			input->ssm,output->ssm);*/
 	if( which_vp == 2 && !vp1_active ) 
-	{ 
+	{
+		if( input->width != output->width ||
+	           input->height != output->height ) {
+			c->frame4->data[0] = output->data[0];
+			c->frame4->data[1] = output->data[1];
+			c->frame4->data[2] = output->data[2];
+			if(output->ssm)
+				c->frame4->format = PIX_FMT_YUV444P;
+			else
+				c->frame4->format = c->frame3;
+			yuv_convert_and_scale(c->back_scaler,c->frame4,c->frame3);
+			c->pipe = 1;
+		}
+
 		return output->ssm;
 	} 
 

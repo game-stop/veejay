@@ -27,7 +27,7 @@ void		viewport_process_dynamic_map( void *data, uint8_t *in[3], uint8_t *out[3],
 void 		*viewport_fx_init(	int type, int wid, int hei, int x, int y, int zoom, int dir );
 void	viewport_update_from(void *vv, void *bb);
 void *viewport_clone(void *iv, int new_w, int new_h );
-
+void	viewport_set_ui(void *vv, int value );
 /* The viewport */
 int        viewport_active( void *data );
 int	viewport_render_ssm(void *vdata );

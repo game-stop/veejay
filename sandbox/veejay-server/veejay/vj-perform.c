@@ -1628,7 +1628,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 			int res = 0;	
 			int dovp = vj_tag_get_composite( sample_id );
 			//@ Capture frame into backing buffer
-			if( settings->composite == 2 && dovp ) {
+			if( dovp == 2) {
 				res = vj_tag_get_frame(sample_id,backing_fb, audio_buffer[chain_entry]);
 			} else {
 				res =  vj_tag_get_frame(sample_id, fb, audio_buffer[chain_entry]);
@@ -1640,7 +1640,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 		   		vj_tag_set_active(sample_id, 0); 
 			frame_buffer[chain_entry]->ssm = 0;
 
-			if( settings->composite == 2 && dovp)
+			if( dovp == 2)
 			{
 				VJFrame *tmp = yuv_yuv_template( backing_fb[0],backing_fb[1],backing_fb[2],	
 								 width,height, get_ffmpeg_pixfmt(info->pixel_format) );
@@ -1665,7 +1665,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
             if(centry == -1 || info->no_caching)
 	    {
 		int dovp = sample_get_composite( sample_id );
-		if(settings->composite == 2 && dovp) {
+		if(dovp==2) {
 			len = vj_perform_get_frame_fx(info,sample_id,nframe,backing_fb );
 		} else {
 			len = vj_perform_get_frame_fx( info, sample_id, nframe, fb );	
@@ -1675,7 +1675,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 			error = 0;
 		frame_buffer[chain_entry]->ssm = 0;
 
-		if(settings->composite == 2 && dovp) {
+		if(dovp==2) {
 			VJFrame *tmp = yuv_yuv_template( backing_fb[0],backing_fb[1],backing_fb[2],	
 								 width,height, get_ffmpeg_pixfmt(info->pixel_format) );
 			frame_buffer[chain_entry]->ssm = composite_processX(info->composite,fb,tmp);
@@ -1812,7 +1812,7 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 		if (vj_tag_get_active(sample_id) == 1)
 		{ 
 			int dovp = vj_tag_get_composite( sample_id);
-			if( settings->composite == 2 && dovp) {
+			if(dovp==2) {
 				res = vj_tag_get_frame(sample_id,backing_fb,audio_buffer[chain_entry] );
 			} else {
 				res = vj_tag_get_frame(sample_id, fb,  audio_buffer[chain_entry]);
@@ -1824,7 +1824,7 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 
 			frame_buffer[chain_entry]->ssm = 0;
 			video_playback_setup *settings = info->settings;
-			if( settings->composite == 2 && dovp)
+			if( dovp==2)
 			{
 				VJFrame *tmp = yuv_yuv_template( backing_fb[0],backing_fb[1],backing_fb[2],	
 								 width,height, get_ffmpeg_pixfmt(info->pixel_format) );
@@ -1850,7 +1850,7 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 	    	if(centry == -1 || info->no_caching)
 	    	{
 			int dovp = sample_get_composite(sample_id);
-			if(settings->composite==2 && dovp) {
+			if(dovp==2) {
 				len = vj_perform_get_frame_fx(info,sample_id,nframe,backing_fb );
 			} else {
 				len = vj_perform_get_frame_fx( info, sample_id, nframe, fb );	
@@ -1859,7 +1859,7 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 			if(len > 0 )
 				error = 0;
 			frame_buffer[chain_entry]->ssm = 0;
-			if(settings->composite==2 && dovp)
+			if(dovp)
 			{
 				VJFrame *tmp = yuv_yuv_template( backing_fb[0],backing_fb[1],backing_fb[2],	
 								 width,height, get_ffmpeg_pixfmt(info->pixel_format));
@@ -2653,7 +2653,7 @@ static	char	*vj_perform_print_credits( veejay_t *info )
 {
 	char text[1024];
 	veejay_memset(text,0,sizeof(text));
-	snprintf(text, 1024,"This is Veejay version %s\n%s\n%s\n%s",VERSION,intro,copyr,license);
+	snprintf(text, 1024,"This is Veejay version %s\n%s\n%s\n%s\n",VERSION,intro,copyr,license);
 	
 	return strdup(text);
 }
