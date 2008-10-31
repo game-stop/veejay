@@ -314,7 +314,7 @@ void	vj_picture_init( void *templ )
 {
 	if(!__initialized)
 	{
-	//@ we call this so gdk works EVIL
+		// cool stuff
 		g_type_init();
 		veejay_msg(VEEJAY_MSG_DEBUG, "Using gdk pixbuf %s", gdk_pixbuf_version );
 		__initialized = 1;
@@ -378,10 +378,8 @@ void		vj_picture_free()
 #define	pic_has_changed(a,b,c) ( (a == pic_data_[0] && b == pic_data_[1] && c == pic_data_[2] ) ? 0: 1)
 #define update_pic_data(a,b,c) { pic_data_[0] = a; pic_data_[1] = b; pic_data_[2] = c;}
 
-void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt )
+void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixfmt )
 {
-	int pixfmt = get_ffmpeg_pixfmt( fmt );
-
 	VJFrame *src1 = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
 				frame->width,frame->height, pixfmt );
 
@@ -411,10 +409,8 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt 
 	free(dst1);
 }
 
-void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int fmt )
+void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixfmt )
 {
-	int pixfmt = get_ffmpeg_pixfmt( fmt );
-
 	VJFrame *src1 = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
 						frame->width,frame->height, pixfmt );
 

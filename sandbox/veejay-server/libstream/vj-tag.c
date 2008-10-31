@@ -2839,8 +2839,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 #ifdef STRICT_CHECKING
 				assert(tag->dict != NULL);
 #endif
-				vj_font_set_constraints_and_dict(
-					font, 0, tag->n_frames, 25.0f, tag->dict );
+				vj_font_set_dict( font, tag->dict );
 
 				vj_font_load_srt( font, tmp );
 

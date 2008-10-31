@@ -3019,8 +3019,6 @@ void	LoadSubtitles( sample_info *skel, char *file, void *font )
 #ifdef STRICT_CHECKING
 	assert( skel->dict != NULL );
 #endif
-	vj_font_set_constraints_and_dict( font, (long)skel->first_frame, (long) skel->last_frame,fps, skel->dict );
-
 	vj_font_load_srt( font, tmp );
 }
 

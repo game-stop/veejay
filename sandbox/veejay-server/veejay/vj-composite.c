@@ -225,6 +225,33 @@ static inline void	composite_scale( composite_t *c, VJFrame *input, VJFrame *out
 	yuv_convert_and_scale(c->scaler,input,output);
 }
 
+int	composite_get_top(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int which_vp )
+{
+	composite_t *c = (composite_t*) compiz;
+	int vp1_active = viewport_active(c->vp1);
+	if( vp1_active )
+	{
+		out[0] = c->proj_plane[0];
+		out[1] = c->proj_plane[1];
+		out[2] = c->proj_plane[2];
+		return c->frame2->format;
+	}
+
+	if( which_vp == 2 && c->pipe || which_vp == 1) {
+		out[0] = c->proj_plane[0];
+		out[1] = c->proj_plane[1];
+		out[2] = c->proj_plane[2];
+		return c->frame2->format;
+	} else if ( which_vp == 2  ) {
+		out[0] = current_in[0];
+		out[1] = current_in[1];
+		out[2] = current_in[2];
+		return c->frame1->format;
+	} 
+
+	return c->frame1->format;
+}
+
 /* Top frame, blit */
 void	composite_blit( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which_vp )
 {
@@ -339,10 +366,6 @@ int	composite_processX(  void *compiz, uint8_t *out_data[3], VJFrame *input )
 	assert( input->data[2] != out_data[2] );
 #endif
 	viewport_produce_bw_img(c->back1,input->data,out_data,c->Y_only);
-	if(c->Y_only) {
-		veejay_memset( out_data[1], 128, c->frame1->len );
-		veejay_memset( out_data[2], 128, c->frame1->len );
-	}
 
 	c->has_back = 1;
 

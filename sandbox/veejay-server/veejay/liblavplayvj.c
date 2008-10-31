@@ -480,10 +480,9 @@ int veejay_free(veejay_t * info)
         free(info->status_what);
 	free(info->homedir);  
         free(info->uc);
-	if(info->cpumask)
-	  free(info->cpumask);
-	if(info->mask)
-          free(info->mask);
+	if(info->cpumask) free(info->cpumask);
+	if(info->mask) free(info->mask);
+	if(info->rlinks) free(info->rlinks);
         free(settings);
         free(info);
     return 1;
@@ -650,16 +649,11 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 	if(info->font && info->uc->sample_id != sample_id)
 	{
 		void *dict = sample_get_dict( sample_id );
-		vj_font_set_constraints_and_dict(
-				info->font,
-				settings->min_frame_num,
-				settings->max_frame_num,
-				info->edit_list->video_fps,
-				dict
-			);
+		vj_font_set_dict( info->font, dict );
+		vj_font_prepare( info->font,start,end );
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "Subtitling sample %d: %ld - %ld", sample_id,
-			  settings->min_frame_num, settings->max_frame_num );
+			  start, end );
 
 	}
 #endif
@@ -707,11 +701,12 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 #ifdef HAVE_FREETYPE
 	  if(info->font )
 	  {
-		  void *dict = vj_tag_get_dict( stream_id );
-		  vj_font_set_constraints_and_dict( info->font, settings->min_frame_num,
-				  settings->max_frame_num, info->edit_list->video_fps, dict );
-		  veejay_msg(VEEJAY_MSG_DEBUG, "Subtitling stream %d: %ld - %ld", stream_id,
-				  settings->min_frame_num, settings->max_frame_num );
+		  void *dict = vj_tag_get_dict( stream_id );	
+		  vj_font_set_dict( info->font, dict );
+
+		  vj_font_prepare( info->font, settings->min_frame_num,
+				   settings->max_frame_num );
+
 	  }
 #endif
 	  info->last_tag_id = stream_id;
@@ -2124,7 +2119,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 			return -1;
 		}
 		info->settings->zoom = 0;
-		info->which_vp = 1;
+		/* start with calibration on secundary inputs */
+		info->settings->composite = 2;
 	}
 	else if(!info->settings->zoom)
 	{
@@ -3021,6 +3017,7 @@ veejay_t *veejay_malloc()
     info->settings->currently_processed_entry = -1;
     info->settings->first_frame = 1;
     info->settings->state = LAVPLAY_STATE_STOP;
+    info->settings->composite = 1;
     info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
     info->uc->use_timer = 2;
     info->uc->sample_key = 1;

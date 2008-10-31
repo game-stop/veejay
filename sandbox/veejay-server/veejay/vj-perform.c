@@ -2695,11 +2695,11 @@ static	char	*vj_perform_osd_status( veejay_t *info )
 			status = vj_tag_get_composite( info->uc->sample_id );
 		}
 		if( status == 0 ) {
-			snprintf(tmp,sizeof(tmp), "VP Front");
+			snprintf(tmp,sizeof(tmp), "Proj");
 			extra = strdup(tmp);
 		}
 		else if(status == 1 ) {
-			snprintf(tmp,sizeof(tmp), "VP Back");
+			snprintf(tmp,sizeof(tmp), "Cam");
 			extra = strdup(tmp);
 		} 
 	}
@@ -2735,6 +2735,11 @@ static	char	*vj_perform_osd_status( veejay_t *info )
 		snprintf(status_str, total_len, "%s %s", more,buf );
 	else
 		strncpy( status_str, buf, total_len );
+
+	if(extra)
+		free(extra);
+	if(more)
+		free(more);
 
 	return status_str;
 }
@@ -2806,6 +2811,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	uint8_t *pri[3];
 	uint8_t *buf[3];
 	char *osd_text = NULL;
+	char *more_text = NULL;
 	int   placement= 0;
 
 	pri[0] = primary_buffer[destination]->Y;
@@ -2816,11 +2822,9 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		if( settings->ca ) {
 			settings->ca = 0;
 		}
-		if(info->which_vp == 1 )
-		{	//@ focus on projection screen
-			composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
-				vj_perform_get_width(info), vj_perform_get_height(info));
-		}
+		//@ focus on projection screen
+		composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
+			vj_perform_get_width(info), vj_perform_get_height(info));
 
 		if( info->use_osd == 2 ) {
 			osd_text = vj_perform_print_credits(info);	
@@ -2831,6 +2835,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		} else if (info->use_osd == 3 && info->composite ) {
 			placement = 1;
 			osd_text = viewport_get_my_help( composite_get_vp(info->composite ) );
+			more_text = vj_perform_osd_status(info);
 		}
 	}
 
@@ -2856,9 +2861,13 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 				VJFrame *tst = composite_get_draw_buffer( info->composite );
 				if(tst) { 
 					vj_font_render_osd_status(info->osd,tst,osd_text,placement);
+					if(more_text)
+						vj_font_render_osd_status(info->osd,tst,more_text,0);
 					free(tst);	
 				}
 			} else { 	
+				if(more_text)
+					vj_font_render_osd_status(info->osd,out,more_text,0);
 				vj_font_render_osd_status(info->osd, out, osd_text,placement );
 			}
 		}
@@ -2867,7 +2876,8 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	} 
 	if( osd_text)
 		free(osd_text);
-
+	if( more_text)	
+		free(more_text);
 	if( frame->ssm == 1 )
 	{
 		chroma_subsample(
@@ -2905,7 +2915,7 @@ static	void	vj_perform_render_font( veejay_t *info, video_playback_setup *settin
     	frame->data[2] = primary_buffer[0]->Cr;
 
 #ifdef HAVE_FREETYPE
-/*	int n = vj_font_norender( info->font, settings->current_frame_num );
+	int n = vj_font_norender( info->font, settings->current_frame_num );
 	if( n > 0 )
 	{
 		veejay_msg(0, "Font job = %d",n);
@@ -2921,8 +2931,8 @@ static	void	vj_perform_render_font( veejay_t *info, video_playback_setup *settin
 			frame->ssm = 1;
 		}
 	
-		vj_font_render( info->font, frame , settings->current_frame_num,NULL );
-	}*/
+		vj_font_render( info->font, frame , settings->current_frame_num );
+	}
 #endif
 }
 

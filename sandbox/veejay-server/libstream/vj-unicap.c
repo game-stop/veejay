@@ -650,7 +650,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 			fourcc = get_fourcc("422P");break;
 	}
 
-	if( vut->composite ) {
+/*	if( vut->composite ) {
 		switch(vut->composite) {
 			case 1:
 				vut->dst_fmt = PIX_FMT_YUV444P;	
@@ -659,7 +659,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 				vut->dst_fmt = PIX_FMT_GRAY8;
 				break;
 		}
-	}
+	}*/
 	
 	for( i = 0;  SUCCESS( unicap_enumerate_formats( vut->handle, NULL, &(vut->format), i ) ); i ++ )
 	{
@@ -797,10 +797,11 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 			vut->format.buffer_size, vut->format.buffer_type );
 	}
 
-	if(vut->composite) {
+/*	if(vut->composite) {
 		vut->dst_sizes[1] = vut->dst_sizes[0];
 		vut->dst_sizes[2] = vut->dst_sizes[0];
-	} else if(pixel_format == FMT_420F || pixel_format == FMT_420 ) {
+	} else */
+	if(pixel_format == FMT_420F || pixel_format == FMT_420 ) {
 		vut->dst_sizes[1] = vut->dst_sizes[0]/4;
 		vut->dst_sizes[2] = vut->dst_sizes[1];
 	} else {

@@ -660,17 +660,16 @@ int vj_event_bundle_update( vj_msg_bundle *bundle, int bundle_id )
 	return 0;
 }
 
-static	void	constrain_sample( veejay_t *v,int n, long lo, long hi )
+static	void	constrain_sample( veejay_t *v,int n )
 {
 #ifdef STRICT_CHECKING
 	assert( v->font != NULL );
 #endif
-	vj_font_set_constraints_and_dict(
-		v->font,
-		lo,
-		hi,
-		v->current_edit_list->video_fps,
-		sample_get_dict( n ) );
+	vj_font_set_dict(v->font, sample_get_dict(n) );
+	//	v->current_edit_list->video_fps,
+	vj_font_prepare( v->font, sample_get_startFrame(n),
+			sample_get_endFrame(n) );
+
 }
 
 static	void	constrain_stream( veejay_t *v, int n, long hi )
@@ -678,12 +677,9 @@ static	void	constrain_stream( veejay_t *v, int n, long hi )
 #ifdef STRICT_CHECKING
 	assert(v->font != NULL );
 #endif
-	vj_font_set_constraints_and_dict(
-		v->font,
-		0,
-		hi,
-		v->current_edit_list->video_fps,
-		vj_tag_get_dict( n ) );
+	vj_font_set_dict(v->font, vj_tag_get_dict(n) );
+	//	v->current_edit_list->video_fps,
+	vj_font_prepare( v->font, 0, vj_tag_get_n_frames(n) );
 }
 
 vj_msg_bundle *vj_event_bundle_get(int event_id)
@@ -4407,7 +4403,7 @@ void vj_event_sample_rel_start(void *ptr, const char format[], va_list ap)
 		if	(sample_set_startframe(args[0],s_start) &&
 			sample_set_endframe(args[0],s_end))
 		{
-			constrain_sample( v, args[0], s_start, s_end );
+			constrain_sample( v, args[0] );
 			veejay_msg(VEEJAY_MSG_INFO, "Sample update start %d end %d",
 				s_start,s_end);
 		}
@@ -4486,10 +4482,7 @@ void vj_event_sample_set_end(void *ptr, const char format[] , va_list ap)
 	{
 		if(sample_set_endframe(args[0],args[1]))
 		{
-			constrain_sample( v, args[0],
-					sample_get_startFrame(v->uc->sample_id),
-					sample_get_endFrame(v->uc->sample_id )
-				);
+			constrain_sample( v, args[0] );
 	   		veejay_msg(VEEJAY_MSG_INFO,"Sample ending frame updated to frame %d",
 		        	sample_get_endFrame(args[0]));
 		}
@@ -6135,7 +6128,7 @@ void vj_event_el_cut(void *ptr, const char format[], va_list ap)
 		sample_set_startframe( v->uc->sample_id, 0 );
 		sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id) );
 
-		constrain_sample( v, v->uc->sample_id, 0, el->total_frames );
+		constrain_sample( v, v->uc->sample_id );
 	}
 
 	if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
@@ -6181,7 +6174,7 @@ void vj_event_el_copy(void *ptr, const char format[], va_list ap)
 		sample_set_startframe( v->uc->sample_id, 0 );
 		sample_set_endframe(   v->uc->sample_id,sample_video_length(v->uc->sample_id));
 
-		constrain_sample( v, v->uc->sample_id, 0, el->total_frames );
+		constrain_sample( v, v->uc->sample_id );
 	}
 	if ( STREAM_PLAYING(v) || PLAIN_PLAYING(v)) 
 	{
@@ -6226,7 +6219,7 @@ void vj_event_el_del(void *ptr, const char format[], va_list ap)
 		sample_set_startframe( v->uc->sample_id, 0 );
 		sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id));
 
-		constrain_sample( v, v->uc->sample_id, 0, el->total_frames  );
+		constrain_sample( v, v->uc->sample_id );
 
 	}
 
@@ -6291,7 +6284,7 @@ void vj_event_el_crop(void *ptr, const char format[], va_list ap)
 				res = 1;
 				sample_set_startframe( v->uc->sample_id, 0 );
 				sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id) );
-				constrain_sample( v, v->uc->sample_id,0, el->total_frames );
+				constrain_sample( v, v->uc->sample_id );
 			}
 
 		}
@@ -6336,7 +6329,7 @@ void vj_event_el_paste_at(void *ptr, const char format[], va_list ap)
 			}
 			sample_set_startframe( v->uc->sample_id, 0 );
 			sample_set_endframe(   v->uc->sample_id, sample_video_length(v->uc->sample_id));
-			constrain_sample( v, v->uc->sample_id, 0, el->total_frames);
+			constrain_sample( v, v->uc->sample_id );
 		}
 
 	}
@@ -6630,14 +6623,14 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 
 	if( args[0] == 1 )
 	{
-		int cs = composite_get_colormode(v->composite);
+	/*	int cs = composite_get_colormode(v->composite);
 		if(cs == 0 )
 			cs = 1;
 		else 
 			cs = 0;	
 		composite_set_colormode( v->composite, cs );
 		veejay_msg(VEEJAY_MSG_INFO ,"Secundary Input renders in %s", (cs == 1 ?"Grayscale" : "Color" ) );
-		return;
+		return;*/
 	}
 
 	if ( args[1] == 1 ) {
@@ -6855,12 +6848,16 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 	if(v->frontback == 0 )
 	{
 		v->frontback = 1;
+		composite_set_ui( v->composite, v->frontback );
+		v->settings->composite = 1;
+		v->use_osd=3;
 		veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera");
 	}
 	else
 	{
 		v->frontback = 0;
 		veejay_msg(VEEJAY_MSG_INFO, "Press CTRL-s or Middle mouse button again to activate setup.");
+		v->settings->composite = 0;	
 	}
 
 	composite_set_ui( v->composite, v->frontback );
@@ -7973,29 +7970,28 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	}
 
 	veejay_image_t *img = NULL;
-
+	int pixel_format = get_ffmpeg_pixfmt(v->pixel_format);
 	VJFrame frame;
 	veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
 	vj_perform_get_primary_frame( v, frame.data );
-
-	//@ 420,422,444
-	//int full444 =  (v->settings->composite);
-	//if( v->video_out == 4 )
-	//	full444 = 1; 
-	
+	if( v->settings->composite ) {
+		pixel_format = composite_get_top( v->composite, frame.data,
+						  frame.data,
+						  v->settings->composite );
+	}
 	//@ fast*_picture delivers always 4:2:0 data to reduce bandwidth
 	if( use_bw_preview_ )
 		vj_fastbw_picture_save_to_mem(
 				&frame,
 				w,
 				h,
-				v->pixel_format );
+				pixel_format );
 	else
 		vj_fast_picture_save_to_mem(
 				&frame,
 				w,
 				h,
-				v->pixel_format );
+				pixel_format );
 
 	int input_len = (use_bw_preview_ ? ( w * h ) : (( w * h ) + ((w * h)/2)) );
 
@@ -9270,10 +9266,6 @@ void	vj_event_upd_subtitle(	void *ptr,	const char format[],	va_list	ap	)
         }
 
 	vj_font_set_dict( v->font, dict );
-//	vj_font_set_constraints_and_dict( v->font, 
-//			(long) args[1], (long) args[2], 
-//			v->current_edit_list->video_fps,
-//			dict );
 	vj_font_update_text( v->font, (long) args[1], (long) args[2], args[0], text );
 }
 

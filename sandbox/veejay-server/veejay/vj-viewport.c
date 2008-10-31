@@ -692,7 +692,6 @@ static	float		vsx(viewport_t *v, float x)
 	int	    dy = cy - ( u->sh / 2 );
 
 	float		a = (float) dx / ( v->w / 100.0f );
-
 	float		s  = (float) v->w / (float) v->ui->sw;
 #ifdef STRICT_CHECKING
 	assert( (v->w > 0) );
@@ -740,7 +739,6 @@ static int		viewport_configure(
 					uint8_t  color,
 					int size)
 {
-	//FIXME
 	int w = wid, h = hei;
 
 	v->grid_size = 0;
@@ -788,6 +786,15 @@ static int		viewport_configure(
 	v->points[Y2] = tmp;
 
 	matrix_t *m = viewport_transform( x0, y0, x0 + w0, y0 + h0, v->points );
+
+	if(v->m) {
+	 free(v->m);
+	 v->m = NULL;
+	}
+	if(v->M) {
+	 free(v->M);
+	 v->M = NULL;
+	}
 	
 	if ( reverse )
 	{
@@ -797,11 +804,14 @@ static int		viewport_configure(
 		v->M = viewport_invert_matrix( v->m, im );
 		if(!v->M)
 		{
+			free(m);
 			free(im);
 			free(v->m);
+			v->m = NULL;
 			return 0;
 		}
 		free(im);
+		free(m);
 		viewport_prepare_process( v );
 		return 1;
 
@@ -873,7 +883,7 @@ static void		viewport_process( viewport_t *p )
 			if( tw == 0.0 )	{
 				ttx = 0.0;
 				tty = 0.0;
-			} else if ( tw != 1.0 ) {	
+			} else if ( tw != 1.0 ) {
 				ttx = tx / tw;
 				tty = ty / tw;
 			} else	{
@@ -884,12 +894,10 @@ static void		viewport_process( viewport_t *p )
 			itx = (int32_t) ttx;
 			ity = (int32_t) tty;
 
-			pos = ity * w + itx;
-
-			if( pos >= 0 && pos < len )
-				map[ (y * w + x) ] = pos;
+			if( itx >= X && itx <= w && ity >= Y && ity < h )
+				map[ (y * w + x) ] = (ity * w + itx);
 			else
-				map[ (y * w + x) ] = (len+1); 
+				map[ (y * w + x) ] = (len+1);
 				
 			tx += xinc;
 			ty += yinc;
@@ -935,7 +943,7 @@ static	void	viewport_prepare_process( viewport_t *v )
 	clamp1( v->tty2,0, v->h );
 	clamp1( v->ttx1,0, v->w );	
 	clamp1( v->tty1,0, v->h );
-	
+
 }
 
 
@@ -1220,6 +1228,13 @@ void			viewport_destroy( void *data )
 		if( v->help ) free( v->help );
 		if( v->homedir) free(v->homedir);
 		if( v->buf ) free(v->buf);
+		if( v->ui ) {
+			if( v->ui->scaler ) 
+				yuv_free_swscaler(v->ui->scaler);
+			if( v->ui->buf )
+				free(v->ui->buf[0]);
+			free(v->ui);
+		}
 		free(v);
 	}
 	v = NULL;
@@ -1405,6 +1420,8 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 	v->usermouse[1] = 0.0;
 	v->usermouse[2] = 0.0;
 	v->usermouse[3] = 0.0;
+	v->M = NULL;
+	v->m = NULL;
 	v->ui  = vj_calloc( sizeof(ui_t));
 	v->ui->buf[0] = vj_calloc(sizeof(uint8_t) * RUP8(w * h) );
 	v->ui->scale  = 0.5f;
@@ -1498,7 +1515,8 @@ void *viewport_clone(void *vv, int new_w, int new_h )
 
 	float sx = (float) new_w / (float) v->w;
 	float sy = (float) new_h / (float) v->h;
-
+	q->M  = NULL;
+	q->m  = NULL;
 	q->x0 = v->x0 * sx;
 	q->y0 = v->y0 * sy;
 	q->w0 = v->w0 * sx;
@@ -2807,20 +2825,12 @@ void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3
 	int x,y;
 
 	y  = ty1 * w;
-	veejay_memset( outY,0,y);
-	veejay_memset( outU,128,y);
-	veejay_memset( outV, 128,y);
+	veejay_memset( outY,0,len);
+	veejay_memset( outU,128,len);
+	veejay_memset( outV,128,len);
 
 	for( y = ty1; y < ty2; y ++ )
 	{
-		veejay_memset( outY + (y * w ), 0, tx1 );
-		veejay_memset( outY + (y * w ) + tx2, 0, (w-tx2));
-
-		veejay_memset( outU + (y * w ), 128, tx1 );
-		veejay_memset( outU + (y * w ) + tx2, 128, (w-tx2));
-
-		veejay_memset( outV + (y * w ), 128, tx1 );
-		veejay_memset( outV + (y * w ) + tx2, 128, (w-tx2));
 		for( x = tx1; x < tx2 ; x ++ )
 		{
 			i = y * w + x;
@@ -2832,9 +2842,6 @@ void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3
 	}
 	y = (v->h - ty2 ) * w;
 	x = ty2 * w;
-	veejay_memset( outY+x,0,y);
-	veejay_memset( outU + x, 128,y);
-	veejay_memset( outV + x , 128, y );
 }
 
 void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3], int Yonly)
@@ -2868,14 +2875,11 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3],
 #endif
 
 	int x,y;
-//@ FIXME: veejay_memset may actualy be slow here due to emms call
 	y  = ty1 * w;
-	veejay_memset( outY,0,y);
+	veejay_memset( outY,0,len);
 
 	for( y = ty1; y < ty2; y ++ )
 	{
-		veejay_memset( outY + (y * w ), 0, tx1 );
-		veejay_memset( outY + (y * w ) + tx2, 0, (w-tx2));
 		for( x = tx1; x < tx2 ; x ++ )
 		{
 			i = y * w + x;
@@ -2885,7 +2889,6 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3],
 	}
 	y = (v->h - ty2 ) * w;
 	x = ty2 * w;
-	veejay_memset( outY+x,0,y);
 }
 
 #define pack_yuyv_pixel( y0,u0,u1,y1,v0,v1 ) (\
@@ -2905,7 +2908,7 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 	register uint32_t	*plane_yuyv = (uint32_t*)out_img;
 	register uint8_t 	*outYUYV    = out_img;
 	register const	int32_t	tx1 = v->ttx1;
-	register const	int32_t tx2 = v->ttx2 - 8;
+	register const	int32_t tx2 = v->ttx2;
 	register const	int32_t	ty1 = v->tty1;
 	register const	int32_t ty2 = v->tty2;
 	register const int w = v->w;
@@ -2920,78 +2923,24 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 
 	// clear the yuyv plane (black)
 	y  = ty1 * w;
-	if( y > 0) 
-		yuyv_plane_clear( y*2, out_img);
+	yuyv_plane_clear( len*2, out_img);
 
-/*	for( y = ty1; y < ty2; y ++ )
-	{
-		i = (y * w);
-		yuyv_plane_clear( tx1+tx1, outYUYV + i + i );
-		yuyv_plane_clear( (w-tx2)+(w-tx2),outYUYV + (i+tx2) + (i+tx2));
-	}*/
-	y = (v->h - ty2 ) * w;
-	x = ty2 * w;
-	if( y > 0 )
-		yuyv_plane_clear( y*2, out_img + (x*2) );
 #if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
 	fast_memset_finish(); // finish yuyv_plane_clear
 #endif
 
 	for( y = ty1 ; y < ty2; y ++ )
 	{
-		for( x = 0; x < tx1; x += 2 ) 
-		{	
-			i = y * w;
-			plane_yuyv[ y * uw + ((x+1)>>1) ] = pack_yuyv_pixel(16,128,128,16,128,128);	
-		}
-		for( x = tx1; x < tx2; x += 8 )
+		for( x = tx1; x < tx2; x += 2 )
 		{ // 4 YUYV pixels out, 8 Y in,  16 UV in
 			i = y * w ;
 			n = map[ i + x ];
 			m = map[ i + x + 1];
 
-
 			plane_yuyv[y * uw + ( (x+1)>>1)] = pack_yuyv_pixel( inY[n], inU[n], inU[m],
 								 inY[m], inV[n], inV[m] );
 
-			n = map[ i + x + 2 ];
-			m = map[ i + x + 3 ];
-
-			plane_yuyv[y * uw + ( (x+1+2)>>1)] = pack_yuyv_pixel( inY[n], inU[n], inU[m],
-								 inY[m], inV[n], inV[m] );
-
-
-			n = map[ i + x + 4 ];
-			m = map[ i + x + 5 ];
-
-
-			plane_yuyv[y * uw + ( (x+1+4)>>1)] = pack_yuyv_pixel( inY[n], inU[n], inU[m],
-								 inY[m], inV[n], inV[m] );
-
-
-			n = map[ i + x + 6 ];
-			m = map[ i + x + 7 ];
-
-
-			plane_yuyv[y * uw + ( (x+1+6)>>1)] = pack_yuyv_pixel( inY[n], inU[n], inU[m],
-								 inY[m], inV[n], inV[m] );
-
-		}	
-		for( ; x < tx2; x += 2 )
-		{
-			i = y * w ;
-			n = map[ i + x ];
-			m = map[ i + x + 1];
-
-			plane_yuyv[y * uw + ( (x+1)>>1)] = pack_yuyv_pixel( inY[n], inU[n], inU[m],
-								 inY[m], inV[n], inV[m] );
 		}
-		for( x = tx2; x < w; x += 2 ) 
-		{	
-			i = y * w;
-			plane_yuyv[ y * uw + ((x+1)>>1) ] = pack_yuyv_pixel(16,128,128,16,128,128);	
-		}
-
 	}
 }
 

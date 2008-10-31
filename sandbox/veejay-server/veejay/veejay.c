@@ -123,6 +123,10 @@ static void Usage(char *progname)
     fprintf(stderr, "Usage: %s [options] <file name> [<file name> ...]\n",
 	    progname);
     fprintf(stderr, "where options are:\n\n");
+    fprintf(stderr,
+		"\t\t\t\t-w/--Projection Width \n");
+    fprintf(stderr,
+		"\t\t\t\t-h/--Projection Height \n");
 
     fprintf(stderr,
 	    "  -p/--portoffset\t\tTCP port to accept/send messages (default: 3490)\n");
@@ -232,7 +236,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -z/--zoom [1-11]\t\tScale output video\n");
 	fprintf(stderr,
-		"\t\t\t\tsoftware scaler type (also use -w/--zoomwidth, -h/--zoomheight ). \n");
+		"\t\t\t\tsoftware scaler type (also use -w/--projection-width, -h/--projection-height ). \n");
 	fprintf(stderr,
 		"\t\t\t\available types are:\n");         
 	fprintf(stderr,
@@ -272,13 +276,9 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"\t\t\t\t--cvs=<v>\tChroma vertical shifting\n");
 	fprintf(stderr,
-		"\t\t\t\t-w/--zoomwidth \n");
-	fprintf(stderr,
-		"\t\t\t\t-h/--zoomheight \n");
-	fprintf(stderr,
 		"\t\t\t\t-C/--zoomcrop [top:bottom:left:right] (crop source before scaling)\n");
 	fprintf(stderr,
-		"  -D/--composite \t\tProjection screen setup\n");
+		"  -D/--composite \t\tDo not start with camera/projection calibration viewport \n");
 #ifdef HAVE_UNICAP
 	fprintf(stderr,
 		"  -A/--all [num] \t\tStart with all capture devices, start with device <num> \n");
@@ -419,12 +419,12 @@ static int set_option(const char *name, char *value)
 	}
 	else if(strcmp(name, "D") == 0 || strcmp(name, "composite") == 0)
 	{
-		info->settings->composite = 1;
+		info->settings->composite = 0;
 	}
-	else if(strcmp(name, "zoomwidth") == 0 || strcmp(name, "w") == 0) {
+	else if(strcmp(name, "projection-width") == 0 || strcmp(name, "w") == 0) {
 		info->video_output_width = atoi(optarg);
 	}
-	else if(strcmp(name, "zoomheight") == 0 || strcmp(name, "h") == 0) {
+	else if(strcmp(name, "projection-height") == 0 || strcmp(name, "h") == 0) {
 		info->video_output_height = atoi(optarg);
 	}
 	else if(strcmp(name, "audiorate") == 0 || strcmp(name, "r") == 0 )
@@ -453,6 +453,10 @@ static int set_option(const char *name, char *value)
 	}
 	else if (strcmp(name, "zoom") == 0 || strcmp(name, "z" ) == 0)
 	{
+		if(info->settings->composite) {
+			fprintf(stderr, "Use --zoom or -z with -D or --composite");
+			nerr++;
+		}
 		info->settings->zoom = atoi(optarg);
 		if(info->settings->zoom < 1 || info->settings->zoom > 11)
 		{
@@ -570,8 +574,8 @@ static int check_command_line_options(int argc, char *argv[])
 	{"version",0,0,0},
 	{"width",1,0,0},
 	{"height",1,0,0},
-	{"zoomwidth", 1,0,0 },
-	{"zoomheight", 1,0,0 },
+	{"projection-width", 1,0,0 },
+	{"projection-height", 1,0,0 },
 	{"norm",1,0,0},
 	{"framerate",1,0,0},
 	{"audiorate",1,0,0},

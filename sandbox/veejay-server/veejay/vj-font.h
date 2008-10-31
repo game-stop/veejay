@@ -25,13 +25,13 @@ void	*vj_font_single_init(int s_w, int s_h, float fps, char *home);
 
 void	*vj_font_init(int s_w, int s_h, float fps, int osd);
 int	vj_font_srt_sequence_exists( void *font, int id );
-void vj_font_render(void *ctx, void *_picture, long nframe, char *in_string);
+void vj_font_render(void *ctx, void *_picture, long nframe);
 void	vj_font_destroy(void *ctx);
 int	vj_font_load_srt( void *font, const char *filename );
 int	vj_font_save_srt( void *font , const char *filename );
 char	*vj_font_get_sequence( void *font, int seq );
 void	*vj_font_get_plain_dict( void *font );
-void	vj_font_set_constraints_and_dict( void *font, long lo, long hi, float fps, void *dict );
+int	vj_font_prepare( void *font, long s1, long s2 );
 void	vj_font_dictionary_destroy(void *font,void *dict);
 int	vj_font_clear_text( void *font );
 int	vj_font_new_text( void *font, char *text,  long s1,long s2, int seq);

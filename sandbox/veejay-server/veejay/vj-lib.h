@@ -325,7 +325,6 @@ typedef struct {
 	void	*composite2;
 	int	 use_vp;
 	int	 use_proj;
-	int 	which_vp;
 	int	frontback;
 	int	out_buf;
 	unsigned long *mask;
