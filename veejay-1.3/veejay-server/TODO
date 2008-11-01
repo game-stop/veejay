@@ -1,0 +1,16 @@
+
+1. Extend viewport menu for mouse wheel scaling of points and quad
+2. Find functionality to mirror points in one click (pixmap rendering as sdl osd button?)
+3. Find functionality to use only 2 points to find the other 2
+
+4. Re-write vj-composite
+	1. Backing, push a frame to the viewport 
+        2. Render input source to backing viewport and take output as input
+	3. Render input source to viewport
+
+5. Mind different resolutions and keep track of sampling
+
+6. Reduce calls to vj_yuv_get444_template, vj_yuv_get_template, VJFrame *malloc()
+
+7. remove viewport in reloaded
+-
