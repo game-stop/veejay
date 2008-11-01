@@ -64,7 +64,6 @@ typedef struct
 	int run;
 	int back_run;
 	int has_back;
-	int pipe;
 	int proj_width;			/* projection (output) */
 	int proj_height;
 	int img_width;			/* image (input) */
@@ -237,18 +236,25 @@ int	composite_get_top(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int
 		return c->frame2->format;
 	}
 
-	if( which_vp == 2 && c->pipe || which_vp == 1) {
+	if (c->proj_width != c->img_width &&
+		c->proj_height != c->img_height && which_vp == 2  )
+	{
+		out[0] = c->proj_plane[0];
+		out[1] = c->proj_plane[1];
+		out[2] = c->proj_plane[2];
+	//FIXME
+		return c->frame3->format;
+	} else 	if( which_vp == 1) {
 		out[0] = c->proj_plane[0];
 		out[1] = c->proj_plane[1];
 		out[2] = c->proj_plane[2];
 		return c->frame2->format;
-	} else if ( which_vp == 2  ) {
+	} else if ( which_vp == 2 ) {
 		out[0] = current_in[0];
 		out[1] = current_in[1];
 		out[2] = current_in[2];
 		return c->frame1->format;
 	} 
-
 	return c->frame1->format;
 }
 
@@ -269,13 +275,21 @@ void	composite_blit( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which_vp )
 			yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
 		return;
 	} else if (which_vp == 2 ) {
-		if( c->pipe ) {
+	/*	if( c->pipe ) {
 			yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height);
 			c->pipe = 0;
 		}
 		else {
-			yuv422_to_yuyv(in,yuyv,c->proj_width,c->proj_height );	
-		}
+		*/
+			if (c->proj_width != c->img_width &&
+			c->proj_height != c->img_height && which_vp == 2  )
+			{
+					yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height);
+			} 
+			else {
+				yuv422_to_yuyv(in,yuyv,c->proj_width,c->proj_height );	
+			}
+//		}
 		return;
 	} 
 
@@ -309,7 +323,6 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 			else
 				c->frame4->format = c->frame3;
 			yuv_convert_and_scale(c->back_scaler,c->frame4,c->frame3);
-			c->pipe = 1;
 		}
 
 		return output->ssm;

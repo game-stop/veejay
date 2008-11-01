@@ -472,7 +472,7 @@ char *viewport_get_my_help(void *vv)
 	char tmp[1024];
 	int g = v->grid_size;
 
-	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Focus projection/secundary input\nCTRL + v: Transform secundary input in grayscale/color \nCTRL + o: Toggle OSD status\nMouse Scroll: Calibration Point (%dx%d)\nCTRL + Mouse Scroll: Calibration Grid (%dx%d)\n\n",
+	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Focus projection/secundary input\nCTRL + i : Transform secundary input\nCTRL + v: Transform secundary input in grayscale/color \nCTRL + o: Toggle OSD status\nMouse Scroll: Calibration Point (%dx%d)\nCTRL + Mouse Scroll: Calibration Grid (%dx%d)\n\n",
 			reverse_mode,
 			g,g,g,g);
 	
