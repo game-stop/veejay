@@ -6638,7 +6638,7 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 			v->settings->composite = 2;
 		else if (v->settings->composite == 2 )
 			v->settings->composite = 1;
-		veejay_msg(VEEJAY_MSG_INFO, "Calibrate %s, press CTRL-h for more help.", (v->settings->composite == 1 ? "Projection" : "Secundary Input"));
+		veejay_msg(VEEJAY_MSG_INFO, "Focus on %s, press CTRL-h for more help.", (v->settings->composite == 1 ? "Projection" : "Secundary Input"));
 		if( SAMPLE_PLAYING(v) ) {
 			sample_set_composite( v->uc->sample_id, v->settings->composite  );
 			veejay_msg(VEEJAY_MSG_INFO,

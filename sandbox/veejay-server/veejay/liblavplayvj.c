@@ -1551,11 +1551,11 @@ static	void	veejay_event_handle(veejay_t *info)
 				{
 					but = 14;
 				}
-				else if (mev->button == SDL_BUTTON_WHEELUP && ctrl_pressed )  
+				else if (mev->button == SDL_BUTTON_WHEELUP  )  
 				{	
 					but = 15;
 				}	
-				else if (mev->button == SDL_BUTTON_WHEELDOWN && ctrl_pressed )
+				else if (mev->button == SDL_BUTTON_WHEELDOWN  )
 				{
 					but = 16;
 				}
