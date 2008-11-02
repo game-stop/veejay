@@ -52,5 +52,10 @@ int	viewport_event_set_projection(void *data, float x, float y, int num, int fb)
 void		viewport_push_frame(void *data, int w, int h, uint8_t *Y, uint8_t *U, uint8_t *V );
 void	viewport_reconfigure(void *vv);
 int	viewport_get_mode(void *vv);
+int     viewport_reconfigure_from_config(void *vv, void *vc);
+void	viewport_set_composite(void *vc, int mode, int colormode);
+int	viewport_get_color_mode_from_config(void *vc);
+int	viewport_get_composite_mode_from_config(void *vc);
+void	*viewport_get_configuration(void *vv );
 #endif
 

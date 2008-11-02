@@ -78,6 +78,7 @@ static struct {
 {	PIX_FMT_BGR32,		"PIX_FMT_BGR32"},
 {	PIX_FMT_GRAY8,		"PIX_FMT_GRAY8"},
 {	PIX_FMT_RGB32_1,	"PIX_FMT_RGB32_1"},
+{	PIX_FMT_YUYV422,	"PIX_FMT_YUVYV22"},
 {	0	,		NULL}
 
 };
@@ -101,9 +102,9 @@ void	yuv_init_lib()
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "CPU Flags available:", ac_flagstotext( my_ac_flags ));
 
-	ac_init( AC_ALL );
+	//ac_init( AC_ALL );
 
-	ac_imgconvert_init(AC_ALL);
+	//ac_imgconvert_init(AC_ALL);
 
 	veejay_memset( ffmpeg_aclib, 0, sizeof(ffmpeg_aclib ));
 
@@ -121,6 +122,7 @@ void	yuv_init_lib()
 	put( PIX_FMT_RGB32,   IMG_RGBA32 );
 	put( PIX_FMT_RGBA,    IMG_RGBA32 );
 	put( PIX_FMT_RGB32_1, IMG_RGBA32 );
+	put( PIX_FMT_YUYV422, IMG_YUY2);
 	put( PIX_FMT_GRAY8,   IMG_Y8 );
 }
 
@@ -227,6 +229,32 @@ static struct
 	{ PIX_FMT_GRAY8,	IMG_GRAY8 },
 	{ -1,			-1},
 };
+
+void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst, int src_fmt, int dst_fmt )
+{
+#ifdef STRICT_CHECKING
+	assert( dst_fmt >= 0 && dst_fmt < 32 );
+	assert( src_fmt == PIX_FMT_YUV420P || src_fmt == PIX_FMT_YUVJ420P ||
+		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
+		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
+		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA ||
+		src_fmt == PIX_FMT_BGR24   || src_fmt == PIX_FMT_RGB32 ||
+		src_fmt == PIX_FMT_RGB32_1 || src_fmt == PIX_FMT_GRAY8 );
+	assert( src->width > 0 );
+	assert( dst->width > 0 );
+#endif
+	if(!ac_imgconvert( src->data, ffmpeg_aclib[ src_fmt ], 
+			dst, ffmpeg_aclib[ dst_fmt] , src->width,src->height ))
+	{
+		veejay_msg(VEEJAY_MSG_WARNING,
+			"Unable to convert image %dx%d in %x to %dx%d in %x!",
+				src->width,src->height,src_fmt,
+				src->width,src->height,dst_fmt );
+		yuv_pixstr( __FUNCTION__, "src_fmt", src_fmt );
+		yuv_pixstr( __FUNCTION__, "dst_fmt", dst_fmt );
+
+	}
+}
 
 void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 {
@@ -500,9 +528,12 @@ void	yuv422_to_yuyv(uint8_t *src[3], uint8_t *dstI, int w, int h)
 	{
 		for( j = jmax ; j -- ; )
 		{
-			__asm__( ".align 8" MMX_YUV422_YUYV
+	/*		__asm__( ".align 8" MMX_YUV422_YUYV
 				: : "r" (dst), "r" (src_y), "r" (src_u),
 				    "r" (src_v) );
+	*/
+    __asm__( ".p2align 3" MMX_YUV422_YUYV
+                     : : "r" (dst), "r" (src_y), "r" (src_u), "r" (src_v) );
 
 			dst += 16;
 			src_y += 8;

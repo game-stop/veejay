@@ -115,6 +115,9 @@ void	yuv_convert_ac( VJFrame *src, VJFrame *dst, int a, int b );
 
 //void	yuv_convert_any( VJFrame *src, VJFrame *dst, int a, int b );
 
+
+void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst, int src_fmt, int dst_fmt );
+
 void	yuv_convert_any3( VJFrame *src,int strides[], VJFrame *dst, int a, int b );
 
 

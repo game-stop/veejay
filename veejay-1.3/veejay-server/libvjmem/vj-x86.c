@@ -24,7 +24,8 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
-
+#include <aclib/ac.h>
+#include <aclib/imgconvert.h>
 extern void find_best_memcpy(void);
 extern void find_best_memset(void);
 extern void yuyv_plane_init();
@@ -137,6 +138,11 @@ int	cpu_cache_size()
 
 void vj_mem_init(void)
 {
+	ac_init( AC_ALL );
+
+	ac_imgconvert_init(AC_ALL);
+
+
 #ifdef ARCH_X86 
 	CACHE_LINE_SIZE = get_cache_line_size();
 #endif

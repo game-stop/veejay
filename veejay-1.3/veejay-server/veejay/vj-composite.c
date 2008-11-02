@@ -80,6 +80,12 @@ void	*composite_get_vp( void *data )
 	return c->vp1;
 }
 
+int	composite_get_ui(void *data )
+{
+	composite_t *c = (composite_t*) data;
+	return viewport_get_mode(c->vp1);
+}
+
 int	composite_has_back(void *data)
 {
 	composite_t *c = (composite_t*) data;
@@ -172,12 +178,40 @@ void	composite_set_ui(void *compiz, int status )
 	viewport_set_ui( c->vp1, status );
 }
 
-void	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y )
+void	composite_add_to_config( void *compiz, void *vc, int which_vp )
+{
+	composite_t *c = (composite_t*) compiz; 
+	viewport_set_composite( vc, which_vp, c->Y_only );
+}
+
+int	composite_load_config( void *compiz, void *vc )
+{
+	if( vc == NULL )
+		return 0; //@ projection
+
+	composite_t *c = (composite_t*) compiz; 
+	int cm = viewport_get_color_mode_from_config(vc);
+	int  m = viewport_get_composite_mode_from_config(vc);
+	
+	void *view = NULL;
+	int res = viewport_reconfigure_from_config( c->vp1, vc );
+	//@ push to back1 too!
+	if(res) {
+		viewport_update_from(c->vp1, c->back1 );
+		c->Y_only = cm;
+		return m;
+	}
+	return 0;
+}
+
+int	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y )
 {
 	composite_t *c = (composite_t*) compiz; 
 	if(viewport_external_mouse( c->vp1, c->proj_plane, mouse_x, mouse_y, mouse_button, 1,w_x,w_y )) {
 			viewport_update_from(c->vp1, c->back1 );
+			return 1;
 	}
+	return 0;
 }
 
 static struct {
@@ -301,10 +335,19 @@ void	composite_blit( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which_vp )
 	if(c->pf == FMT_420 || c->pf == FMT_420F ) {
 		yuv420p_to_yuv422(c->proj_plane, yuyv, c->proj_width,c->proj_height );
 	}
-	else
+	else {
 		yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
+	}
 }
 
+
+void	*composite_get_config(void *compiz, int which_vp )
+{
+	composite_t *c = (composite_t*) compiz;
+	void *config = viewport_get_configuration( c->vp1 );
+	viewport_set_composite( config, which_vp, c->Y_only );
+	return config;
+}
 
 /* Top frame */
 int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_vp )

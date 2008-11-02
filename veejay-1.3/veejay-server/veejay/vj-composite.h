@@ -34,7 +34,7 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 
 void	composite_blit( void *compiz,uint8_t *in[3], uint8_t *yuyv, int which_vp );
 
-void	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y );
+int	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y );
 
 void	composite_destroy( void *compiz );
 
@@ -42,6 +42,10 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 
 void	*composite_get_vp( void *data );
 void	composite_set_ui(void *compiz, int status );
-
+int	composite_get_ui(void *compiz );
+//@ load config after loading to activate viewport setup
+int	composite_load_config( void *compiz, void *vc );
+//@ add to config before saving
+void	composite_add_to_config( void *compiz, void *vc, int which_vp );
 
 #endif

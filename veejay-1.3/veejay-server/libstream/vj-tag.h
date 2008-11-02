@@ -111,10 +111,11 @@ typedef struct {
     void *dict;
     char padding[4];
     int composite;
+    void *viewport_config;
 } vj_tag;
 
 void	*vj_tag_get_dict( int id );
-int	vj_tag_set_composite(int id, int n);
+int	vj_tag_set_composite(void *compiz,int id, int n);
 int	vj_tag_get_composite(int t1);
 int 	vj_tag_chain_malloc(int e);
 int 	vj_tag_chain_free(int e);
@@ -307,8 +308,14 @@ int    vj_tag_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int
 
 int    vj_tag_num_devices();
 
+void	vj_tag_reload_config( void *compiz, int t1, int mode );
+
 #ifdef HAVE_XML2
+void	tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp);
+void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp);
 void tagCreateStreamFX(xmlNodePtr node, vj_tag *tag);
-void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font);
+void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font,
+	void *vp);
+
 #endif
 #endif

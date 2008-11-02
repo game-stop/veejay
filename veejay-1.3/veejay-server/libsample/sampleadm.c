@@ -48,7 +48,7 @@
 #include <assert.h>
 #include <libel/elcache.h>
 #include <veejay/vj-misc.h>
-//todo: change this into enum
+#include <veejay/vj-viewport-xml.h>
 //#define KAZLIB_OPAQUE_DEBUG 1
 
 #ifdef HAVE_XML2
@@ -75,8 +75,8 @@ static int avail_num[SAMPLE_MAX_SAMPLES];	/* an array of freed sample id's */
 static void *sample_font_ = NULL;
 static int sampleadm_state = SAMPLE_PEEK;	/* default state */
 
-extern void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font);
-extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font );
+extern void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp);
+extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp );
 extern int vj_tag_size();
 
 typedef struct
@@ -1454,12 +1454,25 @@ int sample_set_chain_source(int s1, int position, int input)
        	sample->effect_chain[position]->source_type = input;
     return (sample_update(sample,s1));
 }
+int	sample_load_composite_config( void *compiz, int s1 )
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample) return -1;
+	sample->composite = composite_load_config( compiz, sample->viewport_config );
+	return sample->composite;
+}
 
-int	sample_set_composite(int s1, int composite)
+int	sample_set_composite(void *compiz, int s1, int composite)
 {
 	sample_info *sample = sample_get(s1);
 	if(!sample) return -1;
 	sample->composite = composite;
+#ifdef STRICT_CHECKING
+	assert( sample->viewport_config != NULL );
+	assert( composite != 0 );
+#endif
+	composite_add_to_config( compiz, sample->viewport_config, composite );
+
 	return ( sample_update(sample,s1));
 }
 
@@ -2607,6 +2620,12 @@ void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, int start_a
 	cur = cur->next;
     }
 }
+void	ParseCalibration( xmlDocPtr doc, xmlNodePtr cur, sample_info *skel , void *vp)
+{
+	void *tmp = viewport_load_xml( doc, cur, vp );
+	if( tmp ) 
+		skel->viewport_config = tmp;
+}
 
 void	LoadCurrentPlaying( xmlDocPtr doc, xmlNodePtr cur , int *id, int *mode )
 {
@@ -2676,7 +2695,7 @@ void	LoadSequences( xmlDocPtr doc, xmlNodePtr cur, void *seq )
  * Parse a sample
  *
  ****************************************************************************************************/
-xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *el, void  *font, int start_at )
+xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *el, void  *font, int start_at, void *vp )
 {
 
     xmlChar *xmlTemp = NULL;
@@ -2933,6 +2952,12 @@ xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel,void *e
 
 	ParseEffects(doc, cur->xmlChildrenNode, skel, start_at);
 
+	if( !xmlStrcmp( cur->name, (const xmlChar*) "calibration" ) ) {
+		ParseCalibration( doc, cur->xmlChildrenNode, skel ,vp);
+	}
+
+
+
 	// xmlTemp and chTemp should be freed after use
 	xmlTemp = NULL;
 	chTemp = NULL;
@@ -3022,7 +3047,7 @@ void	LoadSubtitles( sample_info *skel, char *file, void *font )
 	vj_font_load_srt( font, tmp );
 }
 
-int sample_readFromFile(char *sampleFile, void *seq, void *font, void *el,int *id, int *mode)
+int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void *el,int *id, int *mode)
 {
     xmlDocPtr doc;
     xmlNodePtr cur;
@@ -3068,17 +3093,17 @@ int sample_readFromFile(char *sampleFile, void *seq, void *font, void *el,int *i
 	    if (skel != NULL) {
 		void *d = vj_font_get_dict(font);
 
-		xmlNodePtr subs = ParseSample( doc, cur->xmlChildrenNode, skel, el, font, start_at );	
+		xmlNodePtr subs = ParseSample( doc, cur->xmlChildrenNode, skel, el, font, start_at ,vp );	
 		if(subs)
 	    	{
 			LoadSubtitles( skel, sampleFile, font );
 			vj_font_xml_unpack( doc, subs, font );
 		}
+	
 		vj_font_set_dict(font,d);
 
 	    }
 	}
-
 	if( !xmlStrcmp( cur->name, (const xmlChar*) "CURRENT" )) {
 		LoadCurrentPlaying( doc, cur->xmlChildrenNode, id, mode );
 	}
@@ -3088,7 +3113,7 @@ int sample_readFromFile(char *sampleFile, void *seq, void *font, void *el,int *i
 	}
 
 	if( !xmlStrcmp( cur->name, (const xmlChar*) "stream" )) {
-		tagParseStreamFX( sampleFile, doc, cur->xmlChildrenNode, font );
+		tagParseStreamFX( sampleFile, doc, cur->xmlChildrenNode, font,vp );
 	}
 
 	cur = cur->next;
@@ -3176,8 +3201,6 @@ void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int position)
     CreateKeys( childnode, vj_effect_get_num_params(effect->effect_id), effect->kf );
     
 }
-
-
 
 
 void CreateEffects(xmlNodePtr node, sample_eff_chain ** effects)
@@ -3353,7 +3376,23 @@ void	WriteSubtitles( sample_info *next_sample, void *font, char *file )
 	vj_font_set_dict( font, d );
 }
 
-int sample_writeToFile(char *sampleFile, void *seq, void *font, int id, int mode)
+void	sample_reload_config(void *compiz, int s1, int mode )
+{
+	sample_info *sample = sample_get(s1);
+	if(sample) {
+		if(sample->viewport_config) {
+			free(sample->viewport_config);
+			sample->viewport_config = NULL;
+		}
+		if(!sample->viewport_config) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "Calibrated sample %d",s1);
+			sample->viewport_config = composite_get_config(compiz,mode);
+		}
+		sample_update(sample,s1);
+	}
+}
+
+int sample_writeToFile(char *sampleFile, void *vp,void *seq, void *font, int id, int mode)
 {
     int i;
 	char *encoding = "UTF-8";	
@@ -3389,6 +3428,8 @@ int sample_writeToFile(char *sampleFile, void *seq, void *font, int id, int mode
             WriteSubtitles( next_sample,font, sampleFile );
 
 	    CreateSample(childnode, next_sample, font);
+	
+	    viewport_save_xml( childnode, next_sample->viewport_config );
 	}
     }
 
@@ -3397,7 +3438,7 @@ int sample_writeToFile(char *sampleFile, void *seq, void *font, int id, int mode
     for( i = 1; i <= max; i ++ )
     {
         childnode = xmlNewChild(rootnode,NULL,(const xmlChar*) "stream", NULL );
-	tag_writeStream( sampleFile, i, childnode, font );
+	tag_writeStream( sampleFile, i, childnode, font ,vp);
     }
 
     xmlSaveFormatFileEnc( sampleFile, doc, encoding, 1 );

@@ -130,6 +130,7 @@
 #include <libvjmsg/vj-msg.h>
 #include <sys/time.h>
 #include <time.h>
+#include <aclib/ac.h>
 #include <libyuv/mmx.h>
 #include <stdlib.h>
 #include <string.h>
@@ -139,21 +140,34 @@
 #endif
 #define BUFSIZE 1024
 
-#if defined ( HAVE_ASM_MMX2 ) || defined ( HAVE_ASM_3DNOW ) || defined( HAVE_ASM_MMX )
-#undef HAVE_MMX1
-#if defined ( HAVE_ASM_MMX  ) && !defined(HAVE_ASM_MMX2) && !defined( HAVE_ASM_3DNOW ) && !defined( HAVE_ASM_SSE)
-/* means:  mmx v.1. Note: Since we added alignment of destinition it speedups
+#ifndef HAVE_ASM_SSE
+/*
+   P3 processor has only one SSE decoder so can execute only 1 sse insn per
+   cpu clock, but it has 3 mmx decoders (include load/store unit)
+   and executes 3 mmx insns per cpu clock.
+   P4 processor has some chances, but after reading:
+   http://www.emulators.com/pentium4.htm
+   I have doubts. Anyway SSE2 version of this code can be written better.
+*/
+#undef HAVE_SSE
+#endif
+
+#undef HAVE_ONLY_MMX1
+#if defined(HAVE_ASM_MMX) && !defined(HAVE_ASM_MMX2) && !defined(HAVE_ASM_3DNOW) && !defined(HAVE_ASM_SSE)
+/*  means: mmx v.1. Note: Since we added alignment of destinition it speedups
     of memory copying on PentMMX, Celeron-1 and P2 upto 12% versus
     standard (non MMX-optimized) version.
     Note: on K6-2+ it speedups memory copying upto 25% and
           on K7 and P3 about 500% (5 times). */
-#define HAVE_MMX1
+#define HAVE_ONLY_MMX1
 #endif
+
+
 #undef HAVE_K6_2PLUS
-#if !defined( HAVE_ASM_MMX2) && defined( HAVE_ASM_3DNOW )
+#if !defined( HAVE_ASM_MMX2) && defined( HAVE_ASM_3DNOW)
 #define HAVE_K6_2PLUS
 #endif
-#endif
+
 
 
 /* definitions */
@@ -250,11 +264,14 @@ static inline void * __memcpy(void * to, const void * from, size_t n)
 }
 
 #undef _MMREG_SIZE
-#ifdef HAVE_ASM_SSE
+#ifdef HAVE_SSE
 #define _MMREG_SIZE 16
 #else
 #define _MMREG_SIZE 64 
 #endif
+
+#undef PREFETCH
+#undef EMMS
 
 #undef _MIN_LEN
 #ifdef HAVE_ASM_MMX2 //@ was ifndef HAVE_MMX1
@@ -264,23 +281,29 @@ static inline void * __memcpy(void * to, const void * from, size_t n)
 #endif
 
 
-#undef _EMMS
-#undef _PREFETCH
-
-#ifdef HAVE_K6_2PLUS
-#define _PREFETCH "prefetch"
-/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
-#define _EMMS     "femms"
+#ifdef HAVE_ASM_MMX2
+#define PREFETCH "prefetchnta"
+#elif defined ( HAVE_ASM_3DNOW )
+#define PREFETCH  "prefetch"
 #else
-#define _PREFETCH "prefetchnta"
-#define _EMMS     "emms"
+#define PREFETCH "/nop"
 #endif
 
+/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
+#ifdef HAVE_ASM_3DNOW
+#define EMMS     "femms"
+#else
+#define EMMS     "emms"
+#endif
+
+#undef MOVNTQ
 #ifdef HAVE_ASM_MMX2
 #define MOVNTQ "movntq"
 #else
 #define MOVNTQ "movq"
 #endif
+
+
 
 char	*veejay_strncpy( char *dest, const char *src, size_t n )
 {
@@ -327,16 +350,16 @@ void	prefetch_memory( void *from )
 {
 #ifndef HAVE_MMX1
 	__asm__ __volatile__ (
-			_PREFETCH" (%0)\n"
-			_PREFETCH" 64(%0)\n"
-			_PREFETCH" 128(%0)\n"
-			_PREFETCH" 192(%0)\n"
-			_PREFETCH" 256(%0)\n"
+			PREFETCH" (%0)\n"
+			PREFETCH" 64(%0)\n"
+			PREFETCH" 128(%0)\n"
+			PREFETCH" 192(%0)\n"
+			PREFETCH" 256(%0)\n"
 		:: "r" (from));
 #else
 #ifdef HAVE_ASM_SSE
 	__asm__ __volatile__ (
-		_PREFETCH" 320(%0)\n"
+		PREFETCH" 320(%0)\n"
 		:: "r" (from));
 	
 #endif
@@ -371,7 +394,7 @@ void	yuyv_plane_clear( size_t len, void *to )
 	for(; i > 0 ; i -- )
 	{
 		__asm __volatile(
-			_PREFETCH" 320(%0)\n"
+			PREFETCH" 320(%0)\n"
 			MOVNTQ"	%%mm0,	(%0)\n"
 			MOVNTQ"	%%mm0,	8(%0)\n"
 			MOVNTQ"	%%mm0,	16(%0)\n"
@@ -484,14 +507,14 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 	retval = to;
 	unsigned char *t = to;
 	unsigned char *f = (unsigned char *)from;
-#ifndef HAVE_MMX1
+#ifndef HAVE_ONLY_MMX1
 	/* PREFETCH has effect even for MOVSB instruction ;) */
 	__asm__ __volatile__ (
-		_PREFETCH" (%0)\n"
-		_PREFETCH" 64(%0)\n"
-		_PREFETCH" 128(%0)\n"
-		_PREFETCH" 192(%0)\n"
-		_PREFETCH" 256(%0)\n"
+		PREFETCH" (%0)\n"
+		PREFETCH" 64(%0)\n"
+		PREFETCH" 128(%0)\n"
+		PREFETCH" 192(%0)\n"
+		PREFETCH" 256(%0)\n"
 		: : "r" (f) );
 #endif
 	if(len >= _MIN_LEN)
@@ -516,13 +539,13 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 	   perform reading and writing to be multiple to a number of
 	   processor's decoders, but it's not always possible.
 	*/
-#ifdef HAVE_ASM_SSE /* Only P3 (may be Cyrix3) */
+#ifdef HAVE_SSE /* Only P3 (may be Cyrix3) */
 	if(((unsigned long)f) & 15)
 	/* if SRC is misaligned */
 	for(; i>0; i--)
 	{
 		__asm__ __volatile__ (
-		_PREFETCH" 320(%0)\n"
+		PREFETCH" 320(%0)\n"
 		"movups (%0), %%xmm0\n"
 		"movups 16(%0), %%xmm1\n"
 		"movups 32(%0), %%xmm2\n"
@@ -544,7 +567,7 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 	for(; i>0; i--)
 	{
 		__asm__ __volatile__ (
-		_PREFETCH" 320(%0)\n"
+		PREFETCH" 320(%0)\n"
 		"movaps (%0), %%xmm0\n"
 		"movaps 16(%0), %%xmm1\n"
 		"movaps 32(%0), %%xmm2\n"
@@ -554,16 +577,19 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 		"movntps %%xmm2, 32(%1)\n"
 		"movntps %%xmm3, 48(%1)\n"
 		:: "r" (f), "r" (t) : "memory");
-		f+=64;
-		t+=64;
+	//	f+=64;
+	//	t+=64;
+		f=((const unsigned char *)f)+64;
+		t=((unsigned char *)t)+64;
+
 	}
 #else
 	// Align destination at BLOCK_SIZE boundary
 	for(; ((int)to & (BLOCK_SIZE-1)) && i>0; i--)
 	{
 		__asm__ __volatile__ (
-#ifndef HAVE_MMX1
-		_PREFETCH" 320(%0)\n"
+#ifndef HAVE_ONLY_MMX1
+		PREFETCH" 320(%0)\n"
 #endif
 		"movq (%0), %%mm0\n"
 		"movq 8(%0), %%mm1\n"
@@ -582,76 +608,78 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 		MOVNTQ" %%mm6, 48(%1)\n"
 		MOVNTQ" %%mm7, 56(%1)\n"
 		:: "r" (f), "r" (t) : "memory");
-		f+=64;
-		t+=64;
+	//	f+=64;
+	//	t+=64;
+		f=((const unsigned char *)f)+64;
+		t=((unsigned char *)t)+64;
+
 	}
 
 	// Pure Assembly cuz gcc is a bit unpredictable ;)
 	if(i>=BLOCK_SIZE/64)
 		asm volatile(
-			"xorl %%eax, %%eax	\n\t"
+			"xor %%"REG_a", %%"REG_a"	\n\t"
 			".balign 16		\n\t"
 			"1:			\n\t"
-				"movl (%0, %%eax), %%ebx 	\n\t"
-				"movl 32(%0, %%eax), %%ebx 	\n\t"
-				"movl 64(%0, %%eax), %%ebx 	\n\t"
-				"movl 96(%0, %%eax), %%ebx 	\n\t"
-				"addl $128, %%eax		\n\t"
-				"cmpl %3, %%eax			\n\t"
+				"movl (%0, %%"REG_a"), %%ebx 	\n\t"
+				"movl 32(%0, %%"REG_a"), %%ebx 	\n\t"
+				"movl 64(%0, %%"REG_a"), %%ebx 	\n\t"
+				"movl 96(%0, %%"REG_a"), %%ebx 	\n\t"
+				"add $128, %%"REG_a"		\n\t"
+				"cmp %3, %%"REG_a"		\n\t"
 				" jb 1b				\n\t"
 
-			"xorl %%eax, %%eax	\n\t"
+			"xor %%"REG_a", %%"REG_a"	\n\t"
 
 				".balign 16		\n\t"
 				"2:			\n\t"
-				"movq (%0, %%eax), %%mm0\n"
-				"movq 8(%0, %%eax), %%mm1\n"
-				"movq 16(%0, %%eax), %%mm2\n"
-				"movq 24(%0, %%eax), %%mm3\n"
-				"movq 32(%0, %%eax), %%mm4\n"
-				"movq 40(%0, %%eax), %%mm5\n"
-				"movq 48(%0, %%eax), %%mm6\n"
-				"movq 56(%0, %%eax), %%mm7\n"
-				MOVNTQ" %%mm0, (%1, %%eax)\n"
-				MOVNTQ" %%mm1, 8(%1, %%eax)\n"
-				MOVNTQ" %%mm2, 16(%1, %%eax)\n"
-				MOVNTQ" %%mm3, 24(%1, %%eax)\n"
-				MOVNTQ" %%mm4, 32(%1, %%eax)\n"
-				MOVNTQ" %%mm5, 40(%1, %%eax)\n"
-				MOVNTQ" %%mm6, 48(%1, %%eax)\n"
-				MOVNTQ" %%mm7, 56(%1, %%eax)\n"
-				"addl $64, %%eax		\n\t"
-				"cmpl %3, %%eax		\n\t"
+				"movq (%0, %%"REG_a"), %%mm0\n"
+				"movq 8(%0, %%"REG_a"), %%mm1\n"
+				"movq 16(%0, %%"REG_a"), %%mm2\n"
+				"movq 24(%0, %%"REG_a"), %%mm3\n"
+				"movq 32(%0, %%"REG_a"), %%mm4\n"
+				"movq 40(%0, %%"REG_a"), %%mm5\n"
+				"movq 48(%0, %%"REG_a"), %%mm6\n"
+				"movq 56(%0, %%"REG_a"), %%mm7\n"
+				MOVNTQ" %%mm0, (%1, %%"REG_a")\n"
+				MOVNTQ" %%mm1, 8(%1, %%"REG_a")\n"
+				MOVNTQ" %%mm2, 16(%1, %%"REG_a")\n"
+				MOVNTQ" %%mm3, 24(%1, %%"REG_a")\n"
+				MOVNTQ" %%mm4, 32(%1, %%"REG_a")\n"
+				MOVNTQ" %%mm5, 40(%1, %%"REG_a")\n"
+				MOVNTQ" %%mm6, 48(%1, %%"REG_a")\n"
+				MOVNTQ" %%mm7, 56(%1, %%"REG_a")\n"
+				"add $64, %%"REG_a"		\n\t"
+				"cmp %3, %%"REG_a"		\n\t"
 				"jb 2b				\n\t"
 
 #if CONFUSION_FACTOR > 0
 	// a few percent speedup on out of order executing CPUs
-			"movl %5, %%eax		\n\t"
+			"mov %5, %%"REG_a"		\n\t"
 				"2:			\n\t"
 				"movl (%0), %%ebx	\n\t"
 				"movl (%0), %%ebx	\n\t"
 				"movl (%0), %%ebx	\n\t"
 				"movl (%0), %%ebx	\n\t"
-				"decl %%eax		\n\t"
+				"dec %%"REG_a"		\n\t"
 				" jnz 2b		\n\t"
 #endif
 
-			"xorl %%eax, %%eax	\n\t"
-			"addl %3, %0		\n\t"
-			"addl %3, %1		\n\t"
-			"subl %4, %2		\n\t"
-			"cmpl %4, %2		\n\t"
+			"xor %%"REG_a", %%"REG_a"	\n\t"
+			"add %3, %0		\n\t"
+			"add %3, %1		\n\t"
+			"sub %4, %2		\n\t"
+			"cmp %4, %2		\n\t"
 			" jae 1b		\n\t"
-				: "+r" (f), "+r" (t), "+r" (i)
-				: "r" (BLOCK_SIZE), "i" (BLOCK_SIZE/64), "i" (CONFUSION_FACTOR)
-				: "%eax", "%ebx"
+				: "+r" (from), "+r" (to), "+r" (i)
+				: "r" ((long)BLOCK_SIZE), "i" (BLOCK_SIZE/64), "i" ((long)CONFUSION_FACTOR)
+				: "%"REG_a, "%ebx"
 		);
-
 	for(; i>0; i--)
 	{
 		__asm__ __volatile__ (
-#ifndef HAVE_MMX1
-		_PREFETCH" 320(%0)\n"
+#ifndef HAVE_ONLY_MMX1
+        	PREFETCH" 320(%0)\n"
 #endif
 		"movq (%0), %%mm0\n"
 		"movq 8(%0), %%mm1\n"
@@ -669,9 +697,9 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 		MOVNTQ" %%mm5, 40(%1)\n"
 		MOVNTQ" %%mm6, 48(%1)\n"
 		MOVNTQ" %%mm7, 56(%1)\n"
-		:: "r" (f), "r" (t) : "memory");
-		f+=64;
-		t+=64;
+		:: "r" (from), "r" (to) : "memory");
+		from=((const unsigned char *)from)+64;
+		to=((unsigned char *)to)+64;
 	}
 
 #endif /* Have SSE */
@@ -680,10 +708,10 @@ static void *fast_memcpy(void * to, const void * from, size_t len)
 		 * is needed to become ordered again. */
 		__asm__ __volatile__ ("sfence":::"memory");
 #endif
-#ifdef HAVE_ASM_MMX
+#ifndef HAVE_SSE
 		/* enables to use FPU */
 
-		__asm__ __volatile__ (_EMMS:::"memory");
+		__asm__ __volatile__ (EMMS:::"memory");
 #endif
 	}
 	/*
@@ -703,7 +731,7 @@ void fast_memset_finish()
 #endif
 #ifdef HAVE_ASM_MMX
                 /* enables to use FPU */
-                __asm__ __volatile__ (_EMMS:::"memory");
+                __asm__ __volatile__ (EMMS:::"memory");
 #endif
 
 }
@@ -895,7 +923,8 @@ static struct {
 #endif
 #if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE )
      { "MMX/MMX2/SSE optimized memcpy()",    fast_memcpy, 0},
-#endif
+#endif  
+     { "aclib optimized ac_memcpy()", (void*) ac_memcpy, 0 },
      { NULL, NULL, 0},
 };
 
@@ -909,8 +938,8 @@ static struct {
      { "glibc memset()",            (void*)memset, 0},
 #if defined(HAVE_ASM_MMX) || defined(HAVE_ASM_SSE)
      { "MMX/MMX2/SSE optimized memset()", (void*)   fast_memset, 0},
-#endif
-     { NULL, NULL, 0},
+#endif 
+       { NULL, NULL, 0},
 };
 
 
@@ -939,38 +968,45 @@ void find_best_memcpy()
      unsigned long long t;
      char *buf1, *buf2;
      int i, best = 0;
+     int bufsize = 720 * 576 * 3;
+     if( bufsize == 0 )
+	bufsize = BUFSIZE * 2000;
 
-     if (!(buf1 = (char*) malloc( BUFSIZE * 2000 * sizeof(char) )))
+     if (!(buf1 = (char*) malloc( bufsize * sizeof(char) )))
           return;
 
-     if (!(buf2 = (char*) malloc( BUFSIZE * 2000 * sizeof(char) ))) {
+     if (!(buf2 = (char*) malloc( bufsize * sizeof(char) ))) {
           free( buf1 );
           return;
      }
 	
-     memset(buf1,0, BUFSIZE*2000);
-     memset(buf2,0, BUFSIZE*2000);
+     memset(buf1,0, bufsize);
+     memset(buf2,0, bufsize);
 
      /* make sure buffers are present on physical memory */
-     memcpy( buf1, buf2, BUFSIZE * 2000 );
-     memcpy( buf2, buf1, BUFSIZE * 2000 );
-     for (i=1; memcpy_method[i].name; i++) {
+     memcpy( buf1, buf2, bufsize);
+     memcpy( buf2, buf1, bufsize );
+
+     int c = 16;
+     int k;
+     unsigned long long statistics[c];
+     for( k = 0; k < c; k ++ ) {
+      for (i=1; memcpy_method[i].name; i++) {
           t = rdtsc();
 
-          memcpy_method[i].function( buf1 , buf2 , 2000 * BUFSIZE );
+          memcpy_method[i].function( buf1 , buf2 , bufsize );
 
           t = rdtsc() - t;
           memcpy_method[i].time = t;
-
           if (best == 0 || t < memcpy_method[best].time)
                best = i;
-     }
-     if (best) {
+      }
+      if (best) {
           veejay_memcpy = memcpy_method[best].function;
-     }
-
-     free( buf1 );
-     free( buf2 );
+      }
+    }
+    free( buf1 );
+    free( buf2 );
 }
 
 

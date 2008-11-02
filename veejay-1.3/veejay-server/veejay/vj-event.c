@@ -1304,7 +1304,7 @@ static		char 	*inline_str_to_str(int flags, char *msg)
 
 	if( (flags & VIMS_LONG_PARAMS) ) /* copy rest of message */
 	{
-		res = (char*) malloc(sizeof(char) * len );
+		res = (char*) vj_calloc(sizeof(char) * (len+1) );
 		veejay_strncpy( res, msg, len );
 	}
 	else			
@@ -3367,23 +3367,26 @@ void	vj_event_viewport_composition( void *ptr, const char format[], va_list ap )
 	if(STREAM_PLAYING(v))
 	{
 		int status = vj_tag_get_composite( v->uc->sample_id );
-		if( status == 0 ) {
-			status = 1;
-		} else {
+		if( status == 1 || status == 2 ) {
 			status = 0;
+		} else {
+			status = 2;
 		}
-		vj_tag_set_composite( v->uc->sample_id, status );
+		vj_tag_set_composite( v->composite, v->uc->sample_id, status );
+
 		veejay_msg(VEEJAY_MSG_INFO, "Stream #%d will %s be transformed when used as secundary input",
-			v->uc->sample_id, (status==1? "now" : "not"));
+			v->uc->sample_id, (status==2? "now" : "not"));
+
 	} else if (SAMPLE_PLAYING(v)) {
 		int status = sample_get_composite( v->uc->sample_id );
-		if( status == 0 ) 
-			status = 1;
-		else 
+		if( status == 1 || status == 2 ) 
 			status = 0;
-		sample_set_composite( v->uc->sample_id, status );
+		else 
+			status = 2;
+
+		sample_set_composite( v->composite, v->uc->sample_id, status );
 		veejay_msg(VEEJAY_MSG_INFO, "Sample #%d will %s be transformed when used as secundary input",
-			v->uc->sample_id, (status==1? "now" : "not"));
+			v->uc->sample_id, (status==2? "now" : "not"));
 
 	}
 
@@ -4126,10 +4129,10 @@ void vj_event_sample_set_descr(void *ptr, const char format[], va_list ap)
 void vj_event_sample_save_list(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	char str[255];
+	char str[1024];
 	int *args = NULL;
 	P_A(args,str,format,ap);
-	if(sample_writeToFile( str, v->seq,v->font, v->uc->sample_id, v->uc->playback_mode) )
+	if(sample_writeToFile( str, v->composite,v->seq,v->font, v->uc->sample_id, v->uc->playback_mode) )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Saved %d samples to file '%s'", sample_size()-1, str);
 	}
@@ -4141,7 +4144,7 @@ void vj_event_sample_save_list(void *ptr, const char format[], va_list ap)
 
 void vj_event_sample_load_list(void *ptr, const char format[], va_list ap)
 {
-	char str[255];
+	char str[1024];
 	int *args = NULL;
 	veejay_t *v = (veejay_t*) ptr;
 	P_A( args, str, format, ap);
@@ -4149,7 +4152,7 @@ void vj_event_sample_load_list(void *ptr, const char format[], va_list ap)
 	int id = 0;
 	int mode = 0;
 	
-	if( sample_readFromFile( str, v->seq, v->font, v->edit_list, &id, &mode ) ) 
+	if( sample_readFromFile( str, v->composite,v->seq, v->font, v->edit_list, &id, &mode ) ) 
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list from file '%s'", str);
 	}
@@ -6640,12 +6643,23 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 			v->settings->composite = 1;
 		veejay_msg(VEEJAY_MSG_INFO, "Focus on %s, press CTRL-h for more help.", (v->settings->composite == 1 ? "Projection" : "Secundary Input"));
 		if( SAMPLE_PLAYING(v) ) {
-			sample_set_composite( v->uc->sample_id, v->settings->composite  );
+
+			sample_reload_config( v->composite, v->uc->sample_id,v->settings->composite );
+
+			if(v->settings->composite == 2 && sample_get_composite(v->uc->sample_id ) == 0 )
+			{
+				sample_set_composite( v->composite, v->uc->sample_id, 2  );
+				veejay_msg(0, "Saved calibration to current sample");
+			}
 			veejay_msg(VEEJAY_MSG_INFO,
 				"Secundary input sample %d will %s.", v->uc->sample_id,
 				(v->settings->composite == 2 ? "be transformed" : "not be transformed" ) );
 		} else if (STREAM_PLAYING(v)) {
-			vj_tag_set_composite( v->uc->sample_id, v->settings->composite  );
+			
+			vj_tag_reload_config( v->composite, v->uc->sample_id,v->settings->composite );
+
+			if(v->settings->composite == 2 && vj_tag_get_composite(v->uc->sample_id) == 0 )
+				vj_tag_set_composite( v->composite, v->uc->sample_id,2 );
 				veejay_msg(VEEJAY_MSG_INFO,
 				"Secundary input stream %d will %s.", v->uc->sample_id,
 				(v->settings->composite == 2 ? "be transformed" : "not be transformed" ) );
@@ -6845,23 +6859,25 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
-	if(v->frontback == 0 )
-	{
-		v->frontback = 1;
-		composite_set_ui( v->composite, v->frontback );
+	if( v->settings->composite && composite_get_ui( v->composite ) ) {
+		if(v->use_osd==3)
+			v->use_osd = 0;
+		v->settings->composite = 2;
+		if(STREAM_PLAYING(v)) {
+			vj_tag_reload_config(v->composite,v->uc->sample_id,v->settings->composite );
+			veejay_msg(VEEJAY_MSG_INFO, "Saved calibration to stream %d",v->uc->sample_id);
+		} else if (SAMPLE_PLAYING(v)) {
+                        sample_reload_config( v->composite,v->uc->sample_id, v->settings->composite);
+			veejay_msg(VEEJAY_MSG_INFO, "Saved calibration to sample %d",v->uc->sample_id );
+               }
+		composite_set_ui(v->composite, 0 );
+	}
+	else {
+		composite_set_ui( v->composite, 1 );
 		v->settings->composite = 1;
 		v->use_osd=3;
-		veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera");
+		veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, press CTRL-s again to exit.");
 	}
-	else
-	{
-		v->frontback = 0;
-		veejay_msg(VEEJAY_MSG_INFO, "Press CTRL-s or Middle mouse button again to activate setup.");
-		v->settings->composite = 0;	
-	}
-
-	composite_set_ui( v->composite, v->frontback );
-
 }
 
 void	vj_event_toggle_osd( void *ptr, const char format[], va_list ap )

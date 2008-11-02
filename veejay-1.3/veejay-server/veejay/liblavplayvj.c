@@ -279,7 +279,7 @@ void veejay_change_state_save(veejay_t * info, int new_state)
 		snprintf(recover_samples,1024, "%s/recovery/recovery_samplelist_p%d.sl", info->homedir, (int) my_pid);
 		snprintf(recover_edl, 1024, "%s/recovery/recovery_editlist_p%d.edl", info->homedir, (int) my_pid);
 
-		int rs = sample_writeToFile( recover_samples,info->seq,info->font,
+		int rs = sample_writeToFile( recover_samples,info->composite,info->seq,info->font,
 				info->uc->sample_id, info->uc->playback_mode );
 		int re = veejay_save_all( info, recover_edl, 0, 0 );
 		if(rs)
@@ -615,6 +615,10 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 		veejay_msg(0, "There is no sample %d", new_sample_id );
 		return 0;
 	}
+	if( info->composite ) {
+		if( sample_get_composite( info->uc->sample_id ) )
+			info->settings->composite = 2;
+	}
 	sample_chain_free( info->uc->sample_id );	
 	veejay_reset_el_buffer(info);
 	return 1;
@@ -622,6 +626,11 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 static  void	veejay_stop_playing_stream( veejay_t *info, int new_stream_id )
 {
 	vj_tag_disable( info->uc->sample_id );
+	if( info->composite ) {
+		if( vj_tag_get_composite( info->uc->sample_id ) )
+			info->settings->composite = 2;
+	}
+
 	vj_tag_chain_free( info->uc->sample_id );
 }
 static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
@@ -656,7 +665,11 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 			  start, end );
 
 	}
-#endif
+#endif	if(info->composite )
+	{
+		info->settings->composite = sample_load_composite_config( info->composite , sample_id );
+	}
+
 
 	 info->uc->sample_id = sample_id;
 	 info->last_sample_id = sample_id;
@@ -711,6 +724,10 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 #endif
 	  info->last_tag_id = stream_id;
 	  info->uc->sample_id = stream_id;
+	if(info->composite )
+	{
+		info->settings->composite = vj_tag_load_composite_config( info->composite , stream_id );
+	}
 	
 	 veejay_msg(VEEJAY_MSG_INFO,"Playing stream %d (FX=%x) (Ff=%d)", stream_id, tmp,
 			settings->max_frame_num );
@@ -764,7 +781,6 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		info->edit_list = info->current_edit_list;
 		video_playback_setup *settings = info->settings;
 		settings->min_frame_num = 0;
-//		settings->max_frame_num = info->edit_list->video_frames-1;
 		settings->max_frame_num = info->edit_list->total_frames;
 		veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %d - %d",
 			(int)settings->min_frame_num,  (int)settings->max_frame_num );
@@ -2172,6 +2188,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	{
 	
 		if(sample_readFromFile( info->settings->action_scheduler.sl,
+				info->composite,
 				info->seq, info->font, info->edit_list, &(info->uc->sample_id), &(info->uc->playback_mode) ) )
 			veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list %s from actionfile",
 					info->settings->action_scheduler.sl );
@@ -2284,6 +2301,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		if(veejay_load_action_file(info, info->action_file )==0)
 		{
 			if(sample_readFromFile( info->action_file,
+				info->composite,
 				info->seq, 
 				info->font, 
 				info->edit_list,

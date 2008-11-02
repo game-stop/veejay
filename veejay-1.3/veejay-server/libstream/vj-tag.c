@@ -53,6 +53,7 @@
 #ifdef HAVE_FREETYPE
 #include <veejay/vj-font.h>
 #endif
+#include <veejay/vj-viewport-xml.h>
 
 static veejay_t *_tag_info = NULL;
 static hash_t *TagHash = NULL;
@@ -904,11 +905,43 @@ int	vj_tag_set_n_frames( int t1, int n )
   return ( vj_tag_update(tag, t1)); 
 }
 
-int	vj_tag_set_composite( int t1, int n )
+int	vj_tag_load_composite_config( void *compiz, int t1 )
+{
+ vj_tag *tag = vj_tag_get(t1);
+ if(tag) {
+	tag->composite = composite_load_config( compiz, tag->viewport_config );
+	return tag->composite; 
+
+ }
+ return 0;
+}
+
+void	vj_tag_reload_config( void *compiz, int t1, int mode )
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(tag) {
+		if(tag->viewport_config) {
+			free(tag->viewport_config);
+			tag->viewport_config = NULL;
+		}
+		if(!tag->viewport_config) {
+			tag->viewport_config = composite_get_config( compiz, mode );
+		}
+		vj_tag_update(tag, t1);
+	}
+}
+
+int	vj_tag_set_composite( void *compiz,int t1, int n )
 {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return -1;
 	tag->composite = n;
+#ifdef STRICT_CHECKING
+	assert( tag->viewport_config != NULL );
+	assert( n > 0 );
+#endif
+	composite_add_to_config( compiz, tag->viewport_config, n );
+	
 	return (vj_tag_update(tag,t1));
 }
 
@@ -2336,10 +2369,10 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 				vj_tag_disable(t1);
 				return -1;
 			}
-			uint8_t *address = vj_picture_get( p->pic );
-			veejay_memcpy(buffer[0],address, len);
-			veejay_memcpy(buffer[1],address + len, uv_len);
-			veejay_memcpy(buffer[2],address + len + uv_len, uv_len);
+			VJFrame *pframe = vj_picture_get( p->pic );
+			veejay_memcpy(buffer[0],pframe->data[0], len);
+			veejay_memcpy(buffer[1],pframe->data[1], uv_len);
+			veejay_memcpy(buffer[2],pframe->data[2], uv_len);
 		}
 		break;
 #endif
@@ -2702,6 +2735,15 @@ static void tagParseEffects(xmlDocPtr doc, xmlNodePtr cur, int dst_stream)
 	cur = cur->next;
     }
 }
+
+void	tagParseCalibration( xmlDocPtr doc, xmlNodePtr cur, int dst_sample , void *vp)
+{
+	vj_tag *t = vj_tag_get( dst_sample );
+	void *tmp = viewport_load_xml( doc, cur, vp );
+	if( tmp ) 
+		t->viewport_config = tmp;
+}
+
 /*************************************************************************************************
  *
  * ParseSample()
@@ -2733,7 +2775,7 @@ static	char *tag_get_char_xml( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *key
 	return chTemp;
 }
 
-void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *font)
+void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp)
 {
 
     xmlChar *xmlTemp = NULL;
@@ -2753,8 +2795,9 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 	int k = 0;
 
 	xmlNodePtr subs = NULL;
-
+	xmlNodePtr cali = NULL;
 	void *d = vj_font_get_dict( font );
+	void *viewport_config = NULL;
 
 	while (cur != NULL)
 	{
@@ -2791,10 +2834,14 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 		if (!xmlStrcmp(cur->name, (const xmlChar*) "SUBTITLES" ))
 			subs = cur->xmlChildrenNode;
 
+		if (!xmlStrcmp(cur->name, (const xmlChar*) "calibration" ))
+			cali = cur->xmlChildrenNode;
+
 		if (!xmlStrcmp(cur->name, (const xmlChar *) XMLTAG_EFFECTS)) {
 			fx[k] = cur->xmlChildrenNode;
 			k++;
 		}
+
 		cur = cur->next;
     	}
 
@@ -2823,6 +2870,7 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 			tag->fader_direction = fader_dir;
 			tag->opacity = opacity;
 			tag->nframes = nframes;
+			tag->viewport_config = viewport_config;
 			vj_tag_update( tag, id );
 		
 			switch( source_type )
@@ -2846,16 +2894,17 @@ void tagParseStreamFX(char *sampleFile, xmlDocPtr doc, xmlNodePtr cur, void *fon
 				vj_font_xml_unpack( doc,subs, font );
 			}
 
+			if( cali ) 
+			{
+				tagParseCalibration( doc, cali, id, vp );
+			}
+
 			int q;
 			for( q = 0; q < k ; q ++ )
 			{
 				if(fx[q] )
 					tagParseEffects(doc, fx[q], id );
 			}
-
-
-			
-
 		}
 	}
 
@@ -2956,7 +3005,7 @@ static void tagCreateEffects(xmlNodePtr node, sample_eff_chain ** effects)
     
 }
     
-void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font)
+void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
 {   
     char buffer[100];
 
@@ -2996,14 +3045,16 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font)
 
 	vj_font_xml_pack( node, font );
 
+	viewport_save_xml( node, tag->viewport_config );
 
  	xmlNodePtr childnode =
 		xmlNewChild(node, NULL, (const xmlChar *) XMLTAG_EFFECTS, NULL);
 
 	tagCreateEffects(childnode, tag->effect_chain);
+
 }
 
-void	tag_writeStream( char *file, int n, xmlNodePtr node, void *font )
+void	tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp )
 {
 	vj_tag *tag = vj_tag_get(n);
 	if(!tag) {
@@ -3022,7 +3073,7 @@ void	tag_writeStream( char *file, int n, xmlNodePtr node, void *font )
 		vj_font_set_dict( font, d );
 	}
 
-	tagCreateStream(node,  tag , font);
+	tagCreateStream(node,  tag , font,vp);
 }
 
 

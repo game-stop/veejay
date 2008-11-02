@@ -175,13 +175,13 @@ typedef struct sample_info_t {
     void	*dict;
     void	*kf;
     int          composite;
+    void	*viewport_config;
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
 #define SAMPLE_MAX_DEPTH 4
 #define SAMPLE_DEC_BIBBER 1
 #define SAMPLE_DEC_FREEZE 2
-
 extern int sample_chain_malloc(int sample_id);
 extern int sample_chain_free(int sample_id);
 extern int sample_size();
@@ -189,8 +189,8 @@ extern int sample_verify();
 extern void sample_init(int len, void *font);
 extern int sample_update(sample_info *sample, int s1);
 #ifdef HAVE_XML2
-extern int sample_readFromFile(char *, void *ptr, void *font, void *el, int *id, int *mode);
-extern int sample_writeToFile(char *, void *ptr, void *font, int id, int mode);
+extern int sample_readFromFile(char *, void *vp, void *ptr, void *font, void *el, int *id, int *mode);
+extern int sample_writeToFile(char *, void *vp, void *ptr, void *font, int id, int mode);
 #endif
 extern int sample_update_offset(int s1, int nframe);
 extern int sample_set_state(int new_state);
@@ -219,7 +219,7 @@ extern int sample_get_next(int s1);
 extern int sample_get_depth(int s1);
 extern int sample_set_depth(int s1, int n);
 extern int sample_set_speed(int s1, int speed);
-extern int sample_set_composite(int s1, int composite);
+extern int sample_set_composite(void *compiz,int s1, int composite);
 extern int sample_get_composite(int s1);
 extern int sample_set_framedup(int s1, int n);
 extern int sample_get_framedup(int s1);
@@ -353,12 +353,13 @@ extern void CreateEffects(xmlNodePtr node, sample_eff_chain ** effects);
 extern void CreateEffect(xmlNodePtr node, sample_eff_chain * effect, int pos);
 extern void CreateArguments(xmlNodePtr node, int *arg, int argcount);
 extern void CreateKeys(xmlNodePtr node, int argcount, void *port );
-extern xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, void *el, void *font, int start_at);
+extern xmlNodePtr ParseSample(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, void *el, void *font, int start_at, void *vp);
 extern void ParseEffects(xmlDocPtr doc, xmlNodePtr cur, sample_info * skel, int start_at);
 extern void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at);
 extern void ParseArguments(xmlDocPtr doc, xmlNodePtr cur, int *arg );
 extern void ParseKEys(xmlDocPtr doc, xmlNodePtr cur, void *port);
 extern unsigned char *UTF8toLAT1(unsigned char *in);
 #endif
+void	sample_reload_config(void *compiz, int s1, int mode );
 
 #endif
