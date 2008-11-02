@@ -1,5 +1,5 @@
 /*
-Copyright (c) 2004-2007 N.Elburg <nelburg@looze.net>
+Copyright (c) 2004-2007 N.Elburg <nwelburg@gmail.com>
 
  This is vevo, veejay video objects. 
 

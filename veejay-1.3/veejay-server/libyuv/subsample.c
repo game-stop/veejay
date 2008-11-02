@@ -3,7 +3,7 @@
  *
  *
  *  Copyright (C) 2001 Matthew J. Marjanovic <maddog@mir.com>
- *                2004 Niels Elburg <nelburg@looze.net>
+ *                2004 Niels Elburg <nwelburg@gmail.com>
  *
  *  This program is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU General Public License

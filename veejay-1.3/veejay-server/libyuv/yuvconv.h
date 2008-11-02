@@ -1,7 +1,7 @@
 #ifndef YUVCONF_H
 #define YUVCONF_H
 /*  Veejay -  A visual instrument and realtime video sampler
- *            Copyright (C)    2004 Niels Elburg <nelburg@looze.net>
+ *            Copyright (C)    2004 Niels Elburg <nwelburg@gmail.com>
  *
  *  YUV library for veejay.
  *

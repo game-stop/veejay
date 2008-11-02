@@ -1,4 +1,4 @@
-/*Copyright (c) 2004-2005 N.Elburg <nelburg@looze.net>
+/*Copyright (c) 2004-2005 N.Elburg <nwelburg@gmail.com>
 
 All rights reserved.
 
