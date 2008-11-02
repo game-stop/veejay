@@ -1,6 +1,6 @@
 /* veejay - Linux VeeJay OpenGL display driver
  *           (C) MPlayer www.mplayerhq.hu/ 
- *           (C) 2002-2004 Niels Elburg <nelburg@looze.net> 
+ *           (C) 2002-2004 Niels Elburg <nwelburg@gmail.com> 
  *
  * Copy-pasted Mplayer source code.
  *

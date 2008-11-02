@@ -2,7 +2,7 @@
 #ifndef VJGL
 #define VJGL
 /* veejay - Linux VeeJay
- *           (C) 2002-2004 Niels Elburg <nelburg@looze.net> 
+ *           (C) 2002-2004 Niels Elburg <nwelburg@gmail.com> 
  *
  *
  * This program is free software; you can redistribute it and/or modify

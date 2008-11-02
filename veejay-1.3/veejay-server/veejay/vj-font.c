@@ -3,7 +3,7 @@
  * heavily modified to serve as font renderer in veejay
  ******************************************************************************
  * Author: Gustavo Sverzut Barbieri <gsbarbieri@yahoo.com.br>
- *         Niels Elburg <nelburg@looze.net> (Nov. 2006-2008)
+ *         Niels Elburg <nwelburg@gmail.com> (Nov. 2006-2008)
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
