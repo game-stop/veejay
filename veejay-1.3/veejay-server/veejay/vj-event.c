@@ -3364,6 +3364,7 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
 void	vj_event_viewport_composition( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
+	if(v->composite) {
 	if(STREAM_PLAYING(v))
 	{
 		int status = vj_tag_get_composite( v->uc->sample_id );
@@ -3389,7 +3390,7 @@ void	vj_event_viewport_composition( void *ptr, const char format[], va_list ap )
 			v->uc->sample_id, (status==2? "now" : "not"));
 
 	}
-
+	}
 }
 
 void vj_event_play_reverse(void *ptr,const char format[],va_list ap) 

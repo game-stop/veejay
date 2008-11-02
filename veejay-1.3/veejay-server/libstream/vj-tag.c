@@ -492,7 +492,7 @@ int	vj_tag_set_stream_color(int t1, int r, int g, int b)
 int	vj_tag_get_composite(int t1)
 {	
 	vj_tag *tag = vj_tag_get(t1);
-	if(!tag) return -1;
+	if(!tag) return 0;
 	return tag->composite;
 }
 
@@ -936,6 +936,10 @@ int	vj_tag_set_composite( void *compiz,int t1, int n )
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return -1;
 	tag->composite = n;
+	if( tag->viewport_config == NULL ) {
+		tag->composite = 1;
+		return (vj_tag_update(tag,t1));
+	}
 #ifdef STRICT_CHECKING
 	assert( tag->viewport_config != NULL );
 	assert( n > 0 );

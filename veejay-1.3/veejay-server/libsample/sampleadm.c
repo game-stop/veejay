@@ -1467,6 +1467,10 @@ int	sample_set_composite(void *compiz, int s1, int composite)
 	sample_info *sample = sample_get(s1);
 	if(!sample) return -1;
 	sample->composite = composite;
+	if(sample->viewport_config == NULL) { 
+		sample->composite = 1; 
+		return sample_update(sample,s1);
+	}
 #ifdef STRICT_CHECKING
 	assert( sample->viewport_config != NULL );
 	assert( composite != 0 );
@@ -1479,7 +1483,7 @@ int	sample_set_composite(void *compiz, int s1, int composite)
 int	sample_get_composite(int s1)
 {
 	sample_info *sample = sample_get(s1);
-	if(!sample) return -1;
+	if(!sample) return 0;
 	return sample->composite;	
 }
 /****************************************************************************************************
