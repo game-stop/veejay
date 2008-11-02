@@ -1934,6 +1934,8 @@ static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *ds
 #define XML_CONFIG_SETTING_PID		"play_id"
 #define XML_CONFIG_SETTING_SAMPLELIST "sample_list"
 #define XML_CONFIG_SETTING_EDITLIST   "edit_list"
+#define XML_CONFIG_BACKFX	      "backfx"
+#define XML_CONFIG_COMPOSITEMODE	"composite_mode"
 
 #define __xml_cint( buf, var , node, name )\
 {\
@@ -1984,6 +1986,8 @@ void	vj_event_format_xml_settings( veejay_t *v, xmlNodePtr node  )
 	__xml_cfloat( buf, v->settings->output_fps, node, XML_CONFIG_SETTING_FPS );
 	__xml_cint( buf, v->uc->playback_mode, node, XML_CONFIG_SETTING_PMODE );
 	__xml_cint( buf, v->uc->sample_id, node, XML_CONFIG_SETTING_PID );
+	__xml_cint( buf, v->settings->fxdepth, node, XML_CONFIG_BACKFX);
+	__xml_cint( buf, v->settings->composite, node, XML_CONFIG_COMPOSITEMODE );
 }
 
 void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
@@ -2022,7 +2026,9 @@ void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SCALE, &(v->settings->zoom) );
 		get_fstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_FPS, &(v->settings->output_fps ) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PMODE, &(v->uc->playback_mode) );
-		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PID, &(v->uc->sample_id ) );
+		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PID, &(v->uc->sample_id ) );	
+		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_BACKFX, &(v->settings->fxdepth) );
+		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_COMPOSITEMODE, &(v->settings->composite) );
 		cur = cur->next;
 	}
 

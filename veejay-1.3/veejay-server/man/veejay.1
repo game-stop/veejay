@@ -41,7 +41,7 @@ You can select effects to put on your samples by pressing the cursor keys up and
 .TP
 .SH Interactive camera/projection system
 .TP
-You can use veejay to calibrate a camera (or another input source) against a projector screen to map a physical position to veejay's projection. To use this feature, you can press CTRL\-s to activate the projection/camera calibration setup. This will render a graphical OSD on top of the video.Next, you need to play the live input source in order to find veejay's projection in the camera image. Set the points to the edges of the screen and right-click. Now press the middle mouse button to leave setup. You will see the image mapped forward, filling the video screen. Press CTRL-i to enable transforming the camera input and press CTRL-p to bring the projection screen in front.
+You can use veejay to calibrate a camera (or another input source) against a projector screen to map a physical position to veejay's projection. To use this feature, you can press CTRL\-s to activate the projection/camera calibration setup. This will render a graphical OSD on top of the video.Next, you need to play the live input source in order to find veejay's projection in the camera image. Set the points to the edges of the screen and right-click. Now press CTRL\-s or the middle mouse button to leave setup. Press CTRL-i to enable transforming the camera input and press CTRL-p to bring the projection screen in front.
 .TP
 .SH Interoperability
 .TP
@@ -270,7 +270,7 @@ Delete current marker
 Set playback speed to 1,2,3,4,5,6,7,8, or 9
 .TP
 .B [ALT] + [a|s|d|f|g|h|j|k|l]
-Set frame duplicator to 1,2,3,4,5,6,7,8 or 9
+Set frame duplicator to 1,2,3,4,5,6,7,8 or 9. Interpolates missing frames.
 .TP
 .B [1..9]
 Set sample range 0-12, 12-24, 24-36 etc.
@@ -452,6 +452,15 @@ Toggle OSD help for camera/projector setup
 .B CTRL + o
 Toggle OSD help for general status messages and mouse coordinates
 .TP
+.B CTRL + d
+Toggle rendering of single source FX on underlying samples
+.TP
+.B CTRL + r
+Start recording
+.TP
+.B CTRL + t
+Stop recording
+.TP
 .SH REFERENCES
 .TP
 http://veejay.sourceforge.net
@@ -463,10 +472,9 @@ This man page was written by Niels Elburg.
 If you have questions, remarks or you just want to
 contact the developers, the main mailing list for this
 project is: 
-.I veejay-users@lists.sourceforge.net
+.I http://groups.google.com/group/veejay-discussion/post?hl=en
 For more info see the website at
 .I http://veejayhq.net
 .I http://veejay.dyne.org
-.I http://veejay.sourceforge.net
 .SH "SEE ALSO"
 .B veejay sayVIMS  
