@@ -25,7 +25,7 @@ typedef struct
 	int	saved_w;
 	int	saved_h;
 	int	reverse;
-	int	grid_size;
+	int	grid_resolution;
 	int	grid_color;
 	int	frontback;
 	int	x0,y0,w0,h0;

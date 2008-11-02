@@ -257,6 +257,7 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_PROJ_STACK,			SDLK_v,		VIMS_MOD_CTRL,	"1 0"	},
 	{ VIMS_PROJ_STACK,			SDLK_p,		VIMS_MOD_CTRL,	"0 1"	},
 	{ VIMS_FRONTBACK,			SDLK_s,		VIMS_MOD_CTRL,  NULL	},
+	{ VIMS_RENDER_DEPTH,			SDLK_d,		VIMS_MOD_CTRL,  "2"	},
 	{ VIMS_SELECT_BANK,			SDLK_1,		VIMS_MOD_NONE,	"1"	},
 	{ VIMS_SELECT_BANK,			SDLK_2,		VIMS_MOD_NONE,	"2"	},
 	{ VIMS_SELECT_BANK,			SDLK_3,		VIMS_MOD_NONE,	"3"	},
@@ -3358,6 +3359,36 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
 	else
 	{
 		p_invalid_mode();
+	}
+}
+
+void	vj_event_render_depth( void *ptr, const char format[] , va_list ap )
+{
+	int args[1];
+	veejay_t *v = (veejay_t*)ptr;
+	char *s = NULL;
+	P_A(args,s,format,ap);
+	int status = 0;
+	int toggle = 0;
+	if( args[0] == 2 ) 
+		toggle = 1;
+
+	if( args[0] ) {	
+		status = 1;
+	}
+
+	if( toggle ) {
+		if( v->settings->fxdepth == 1 ) 	
+			v->settings->fxdepth = 0;
+		else	
+			v->settings->fxdepth = 1;	
+	} else {
+		v->settings->fxdepth = status;
+	}
+	if( v->settings->fxdepth == 1 ) {
+		veejay_msg(VEEJAY_MSG_INFO, "Rendering chain entries 1 - 3 of all underlying samples and streams.");
+	} else {
+		veejay_msg(VEEJAY_MSG_INFO, "Skipping all FX on all underlying samples and streams.");
 	}
 }
 

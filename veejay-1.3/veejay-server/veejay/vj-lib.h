@@ -196,6 +196,8 @@ typedef struct {
 	int	cx;
 	int	cn;
 	int	ca;
+	int	fxrow[3];
+	int	fxdepth;
 } video_playback_setup;
 
 typedef struct {

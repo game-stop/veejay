@@ -130,7 +130,8 @@ if((var) < (low)) { var = (low); } \
 if((var) > (high)) { var = (high); }
 
 //forward
-
+static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int current_ssm,int chain_entry, VJFrame **frames, VJFrameInfo *frameinfo );
+static	int	vj_perform_preprocess_has_ssm( veejay_t *info, int id, int mode);
 static int	vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t *img[3]);
 static void vj_perform_pre_chain(veejay_t *info, VJFrame *frame);
 static void vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame);
@@ -1938,6 +1939,16 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 				frames[1]->format  = info->pixel_format;
 				frames[1]->ssm     = frame_buffer[chain_entry]->ssm;
 
+				int done   = 0;
+				int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
+				if(do_ssm >= 0 ) {
+					if( (frames[1]->ssm == 0 && do_ssm == 0) || (frames[1]->ssm == 1 && do_ssm == 1 )
+							|| (frames[1]->ssm == 0 && do_ssm == 1 )) {
+						//@ call render now
+						frames[1]->ssm = vj_perform_preprocess_secundary( info, sub_id,source,sub_mode,chain_entry, frames, frameinfo );
+						done = 1;
+					}
+				}
 
 				// sample B
 	   			if(sub_mode && frames[1]->ssm == 0)
@@ -1963,8 +1974,17 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 					  frames[1]->ssm = 0;
 					  frame_buffer[chain_entry]->ssm = 0;
 				}
-			}
 
+				if(!done && do_ssm >= 0) {
+					if( (do_ssm == 1 && frames[1]->ssm == 1) || (do_ssm == 0 && frames[1]->ssm == 0) ) {
+						vj_perform_preprocess_secundary( info, sub_id,source,sub_mode,chain_entry, frames, frameinfo );
+
+					}
+				}
+
+
+			}
+		
 			if( sub_mode && frames[0]->ssm == 0 )
 			{
 				chroma_supersample(
@@ -1985,12 +2005,139 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
                                 );
                                 frames[0]->ssm = 0;
                         }
-			
 			vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
 				(int) settings->current_frame_num );
 	    } // if
 	} // for
 	return 0;
+}
+
+static	int	vj_perform_preprocess_has_ssm( veejay_t *info, int id, int mode)
+{
+	int n;
+
+	if(info->settings->fxdepth==0)
+		return -1;
+
+	switch( mode ) {
+		case VJ_PLAYBACK_MODE_SAMPLE:	
+			for( n=0; n < 3; n ++ ) {
+				if( sample_get_chain_status(id, n ) ) {
+					int fx_id = sample_get_effect_any(id,n );
+					if( fx_id > 0 ) 
+						return vj_effect_get_subformat(fx_id);
+				}
+			}
+			break;			
+		case VJ_PLAYBACK_MODE_TAG:	
+			for( n=0; n < 3; n ++ ) {
+				if( vj_tag_get_chain_status(id, n ) ) {
+					int fx_id = vj_tag_get_effect_any(id,n );
+					if( fx_id > 0 ) 
+						return vj_effect_get_subformat(fx_id);
+				}
+			}
+			break;	
+	}
+	return -1;		
+}
+
+static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int current_ssm,int chain_entry, VJFrame **frames, VJFrameInfo *frameinfo )
+{
+	int n;
+	int cur_id = info->effect_info->ref;
+	int ssm = current_ssm;
+	video_playback_setup *settings = info->settings;
+	vjp_kf *setup = NULL;
+	VJFrame   **f = frames;
+	VJFrameInfo *i = frameinfo;
+		
+	VJFrame a,b;
+	veejay_memcpy(&a, frames[1], sizeof(VJFrame));
+	veejay_memcpy(&b, frames[0], sizeof(VJFrame));
+	
+	VJFrame *F[2];
+	F[0] = &a;	
+	F[1] = &b;
+
+	switch( mode ) {
+		case VJ_PLAYBACK_MODE_SAMPLE:	
+			setup = info->effect_info;
+			setup->ref    = id;	
+			for( n=0; n < 3; n ++ ) {
+				if( sample_get_chain_status(id, n ) ) {
+					int fx_id = sample_get_effect_any(id,n );
+					if( fx_id > 0 ) {
+						int sm = vj_effect_get_subformat(fx_id);
+						int ef = vj_effect_get_extra_frame(fx_id);
+						if( ef ) continue;
+						if( sm ) {
+						   if( !ssm ) {
+							chroma_supersample( settings->sample_mode,effect_sampler,F[0]->data,i->width,i->height );
+							F[0]->ssm = 1;
+							frame_buffer[chain_entry]->ssm = 1;
+							ssm = 1;
+							}
+						} else if ( ssm ) {
+							chroma_subsample( settings->sample_mode, effect_sampler,F[0]->data,i->width,i->height);
+							F[0]->ssm = 0;
+							frame_buffer[chain_entry]->ssm = 1;
+							ssm = 0;
+							}	
+						
+						if(vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num )==-2) {
+							if( vj_effect_activate(fx_id) )  {
+								settings->fxrow[n] = fx_id;
+								vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num );
+							}
+
+						}
+							// FX needs init!
+					
+					}
+				}	
+			}
+			break;
+		case VJ_PLAYBACK_MODE_TAG:
+			setup = info->effect_info;
+			setup->ref    = id;	
+			for( n=0; n < 3; n ++ ) {
+				if( vj_tag_get_chain_status(id, n ) ) {
+					int fx_id = vj_tag_get_effect_any(id,n );
+					if( fx_id > 0 ) {
+						int sm = vj_effect_get_subformat(fx_id);
+						int ef = vj_effect_get_extra_frame(fx_id);
+						if( ef ) continue;
+						if( sm ) {
+  						 if( !ssm ) {
+							chroma_supersample( settings->sample_mode,effect_sampler,F[0]->data,i->width,i->height );
+							F[0]->ssm = 1;
+							frame_buffer[chain_entry]->ssm = 1;
+							ssm = 1;
+							}
+						} else if ( ssm ) {
+							chroma_subsample( settings->sample_mode, effect_sampler,F[0]->data,i->width,i->height);
+							F[0]->ssm = 0;
+							frame_buffer[chain_entry]->ssm = 1;
+							ssm = 0;
+							}	
+
+							// logic to super/sub sample
+						}
+						if(vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num ) == -2 ) {
+							if( vj_effect_activate(fx_id) ) {
+								settings->fxrow[n] = fx_id; 
+								vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num );
+							}
+						}
+
+					}
+				}	
+			break;
+	}
+	info->effect_info->ref = cur_id;
+	
+	return ssm;
 }
 
 static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
@@ -2034,6 +2181,17 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 	   	 		frames[1]->data[1] = frame_buffer[chain_entry]->Cb;
 		    		frames[1]->data[2] = frame_buffer[chain_entry]->Cr;
 				frames[1]->ssm     = frame_buffer[chain_entry]->ssm;	
+				int done   = 0;
+				int do_ssm =  vj_perform_preprocess_has_ssm( info, sub_id, source);
+				if(do_ssm >= 0 ) {
+					if( (frames[1]->ssm == 0 && do_ssm == 0) || (frames[1]->ssm == 1 && do_ssm == 1 )
+							|| (frames[1]->ssm == 0 && do_ssm == 1 )) {
+						//@ call render now
+						frames[1]->ssm = vj_perform_preprocess_secundary( info, sub_id,source,sub_mode,chain_entry, frames, frameinfo );
+						done = 1;
+					}
+				}
+
 
 				if(frames[1]->ssm == 0 && sub_mode)
 				{
@@ -2043,7 +2201,7 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 						frames[1]->data,
 						frameinfo->width,
 						frameinfo->height );
-					frames[1]->ssm = 0;
+					frames[1]->ssm = 1; // HUH FIXME was 0
 					frame_buffer[chain_entry]->ssm = 1;
 				}
 				else if(frames[1]->ssm == 1 && !sub_mode )
@@ -2057,6 +2215,13 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 						frameinfo->width,
 						frameinfo->height
 						);
+				}
+				
+				if(!done && do_ssm >= 0) {
+					if( (do_ssm == 1 && frames[1]->ssm == 1) || (do_ssm == 0 && frames[1]->ssm == 0) ) {
+						vj_perform_preprocess_secundary( info, sub_id,source,sub_mode,chain_entry, frames, frameinfo );
+
+					}
 				}
 			}
 

@@ -2337,6 +2337,17 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 
+	index_map_[ VIMS_RENDER_DEPTH ]				=	_new_event(
+				"%d",
+				VIMS_RENDER_DEPTH,
+				"Set render depth, use 1 to render chain entries 0,1 and 2 of underlying sample, use 2 to toggle on/off",
+				vj_event_render_depth,
+				1,
+				VIMS_ALLOW_ANY,
+				"Depth switch",
+				"2",
+				NULL );
+
 	index_map_[ VIMS_COMPOSITE ] 				=	_new_event(
 				NULL,
 				VIMS_COMPOSITE,
