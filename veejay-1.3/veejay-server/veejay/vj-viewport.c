@@ -2928,7 +2928,6 @@ static	void	viewport_compute_grid( viewport_t *v )
 
 	int gw = v->w/ v->grid_resolution;
 	int gh = v->h/v->grid_resolution;
-veejay_msg(0,"%dx%d , %d",gw,gh,v->grid_resolution);
 	v->grid_width = gw;
 	v->grid_height = gh;
 
