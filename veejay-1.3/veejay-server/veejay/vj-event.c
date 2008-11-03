@@ -197,6 +197,12 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 } vj_event_default_sdl_keys[] = {
 
 	{ 0,0,0,NULL },
+	{ VIMS_PROJ_INC,			SDLK_LEFT,		VIMS_MOD_CTRL, "-1 0" 	},
+	{ VIMS_PROJ_INC,			SDLK_RIGHT,		VIMS_MOD_CTRL, "1 0"	},
+	{ VIMS_PROJ_INC,			SDLK_UP,		VIMS_MOD_CTRL, "0 -1" 	},
+	{ VIMS_PROJ_INC,			SDLK_DOWN,		VIMS_MOD_CTRL, "0 1"	},
+
+
 	{ VIMS_EFFECT_SET_BG,			SDLK_b,		VIMS_MOD_ALT,	NULL	},
 	{ VIMS_VIDEO_PLAY_FORWARD,		SDLK_KP6,	VIMS_MOD_NONE,	NULL	},
 	{ VIMS_VIDEO_PLAY_BACKWARD,		SDLK_KP4, 	VIMS_MOD_NONE,	NULL	},
@@ -312,8 +318,6 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_MACRO_SELECT,			SDLK_F10,		VIMS_MOD_CTRL, "9"	},
 	{ VIMS_MACRO_SELECT,			SDLK_F11,		VIMS_MOD_CTRL, "10"	},
 	{ VIMS_MACRO_SELECT,			SDLK_F12,		VIMS_MOD_CTRL, "11"	},
-	{ VIMS_PROJ_INC,			SDLK_LEFT,		VIMS_MOD_NONE, NULL 	},
-	{ VIMS_PROJ_DEC,			SDLK_RIGHT,		VIMS_MOD_NONE, NULL	},
 	{ 0,0,0,NULL },
 };
 #endif
@@ -1827,6 +1831,11 @@ static	int	get_cstr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, char *d
 		t   = UTF8toLAT1(tmp);
 		if(!t)
 			return 0;
+#ifdef STRICT_CHECKING
+		veejay_msg(VEEJAY_MSG_DEBUG, "Load string property '%s' with value '%s'",
+			cur->name, t);
+#endif
+
 		veejay_strncpy( dst, t, strlen(t) );	
 		free(t);
 		xmlFree(tmp);
@@ -1846,7 +1855,11 @@ static	int	get_fstr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, float *
 		t   = UTF8toLAT1(tmp);
 		if(!t)
 			return 0;
-		
+#ifdef STRICT_CHECKING
+		veejay_msg(VEEJAY_MSG_DEBUG, "Load float property '%s' with value '%s'",
+			cur->name, t);
+#endif
+
 		n = sscanf( t, "%f", &tmp_f );
 		free(t);
 		xmlFree(tmp);
@@ -1876,6 +1889,10 @@ static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *ds
 			veejay_msg(VEEJAY_MSG_ERROR, "Input not in UTF8 format!");
 			return 0;
 		}
+#ifdef STRICT_CHECKING
+		veejay_msg(VEEJAY_MSG_DEBUG, "Load int property '%s' with value '%s'",
+			cur->name, t);
+#endif
 
 		n = sscanf( t, "%d", &tmp_i );
 		free(t);
@@ -1933,18 +1950,23 @@ static	int	get_istr( xmlDocPtr doc, xmlNodePtr cur, const xmlChar *what, int *ds
 #define XML_CONFIG_SETTING_PMODE	"play_mode"
 #define XML_CONFIG_SETTING_PID		"play_id"
 #define XML_CONFIG_SETTING_SAMPLELIST "sample_list"
+#define XML_CONFIG_SETTING_FILEASSAMPLE "file_as_sample"
 #define XML_CONFIG_SETTING_EDITLIST   "edit_list"
 #define XML_CONFIG_BACKFX	      "backfx"
 #define XML_CONFIG_COMPOSITEMODE	"composite_mode"
+#define XML_CONFIG_SCALERFLAGS		"scaler_flags"
+#define XML_CONFIG_SETTING_OSD		"use_osd"
 
 #define __xml_cint( buf, var , node, name )\
 {\
+veejay_msg(0,"Try i '%s', '%s'",name,buf);\
 sprintf(buf,"%d", var);\
 xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );\
 }
 
 #define __xml_cfloat( buf, var , node, name )\
 {\
+veejay_msg(0,"Try f '%s', '%s'",name,buf);\
 sprintf(buf,"%f", var);\
 xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );\
 }
@@ -1952,6 +1974,7 @@ xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );\
 #define __xml_cstr( buf, var , node, name )\
 {\
 if(var != NULL){\
+veejay_msg(0,"Try s '%s', '%s'",name,buf);\
 veejay_strncpy(buf,var,strlen(var));\
 xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );}\
 }
@@ -1959,24 +1982,24 @@ xmlNewChild(node, NULL, (const xmlChar*) name, (const xmlChar*) buf );}\
 
 void	vj_event_format_xml_settings( veejay_t *v, xmlNodePtr node  )
 {
-	char buf[4069];
-	veejay_memset(buf,0,4096);
+	char *buf = (char*) vj_calloc(sizeof(char) * 4000 );
 	int c = veejay_is_colored();
-	__xml_cint( buf, v->uc->port, node, 	XML_CONFIG_SETTING_PORTNUM );
-	__xml_cint( buf, v->video_out, node, 	XML_CONFIG_SETTING_PRIOUTPUT);
-	__xml_cstr( buf, v->stream_outname,node,XML_CONFIG_SETTING_PRINAME );
+
+	__xml_cint( buf, v->video_out,node,		XML_CONFIG_SETTING_PRIOUTPUT );
 	__xml_cint( buf, v->bes_width,node,	XML_CONFIG_SETTING_SDLSIZEX );
 	__xml_cint( buf, v->bes_height,node,	XML_CONFIG_SETTING_SDLSIZEY );
-	__xml_cint( buf, v->audio,node,		XML_CONFIG_SETTING_AUDIO );
-	__xml_cint( buf, v->sync_correction,node,	XML_CONFIG_SETTING_SYNC );
-	__xml_cint( buf, v->uc->use_timer,node,		XML_CONFIG_SETTING_TIMER );
 	__xml_cint( buf, v->uc->geox,node,		XML_CONFIG_SETTING_GEOX );
 	__xml_cint( buf, v->uc->geoy,node,		XML_CONFIG_SETTING_GEOY );
+	__xml_cint( buf, v->video_output_width,node, XML_CONFIG_SETTING_WIDTH );
+	__xml_cint( buf, v->video_output_height,node, XML_CONFIG_SETTING_HEIGHT );
+
+	__xml_cint( buf, v->audio,node,		XML_CONFIG_SETTING_AUDIO );
+	__xml_cint( buf, v->sync_correction,node,	XML_CONFIG_SETTING_SYNC );
+
+	__xml_cint( buf, v->uc->use_timer,node,		XML_CONFIG_SETTING_TIMER );
 	__xml_cint( buf, v->no_bezerk,node,		XML_CONFIG_SETTING_BEZERK );
 	__xml_cint( buf, c,node, XML_CONFIG_SETTING_COLOR );
 	__xml_cint( buf, v->pixel_format,node,	XML_CONFIG_SETTING_YCBCR );
-	__xml_cint( buf, v->video_output_width,node, XML_CONFIG_SETTING_WIDTH );
-	__xml_cint( buf, v->video_output_height,node, XML_CONFIG_SETTING_HEIGHT );
 	__xml_cfloat( buf,v->dummy->fps,node,	XML_CONFIG_SETTING_DFPS ); 
 	__xml_cint( buf, v->dummy->norm,node,	XML_CONFIG_SETTING_NORM );
 	__xml_cint( buf, v->dummy->active,node,	XML_CONFIG_SETTING_DUMMY );
@@ -1988,6 +2011,11 @@ void	vj_event_format_xml_settings( veejay_t *v, xmlNodePtr node  )
 	__xml_cint( buf, v->uc->sample_id, node, XML_CONFIG_SETTING_PID );
 	__xml_cint( buf, v->settings->fxdepth, node, XML_CONFIG_BACKFX);
 	__xml_cint( buf, v->settings->composite, node, XML_CONFIG_COMPOSITEMODE );
+	__xml_cint( buf, v->settings->sws_templ.flags ,node, XML_CONFIG_SCALERFLAGS );
+	__xml_cint( buf, v->uc->file_as_sample, node, XML_CONFIG_SETTING_FILEASSAMPLE );
+	__xml_cint( buf, v->use_osd, node, XML_CONFIG_SETTING_OSD );
+
+	free(buf);
 }
 
 void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
@@ -2029,6 +2057,10 @@ void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PID, &(v->uc->sample_id ) );	
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_BACKFX, &(v->settings->fxdepth) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_COMPOSITEMODE, &(v->settings->composite) );
+		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SCALERFLAGS, &(v->settings->sws_templ.flags));
+		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_FILEASSAMPLE, &(v->uc->file_as_sample));
+		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_OSD, &(v->use_osd));
+
 		cur = cur->next;
 	}
 
@@ -2130,18 +2162,22 @@ int  veejay_load_action_file( void *ptr, char *file_name )
 
 	doc = xmlParseFile( file_name );
 
-	if(doc==NULL)	
+	if(doc==NULL) {
+		veejay_msg(0, "Cannot read file '%s'",file_name);	
 		return 0;
+	}
 	
 	cur = xmlDocGetRootElement( doc );
 	if( cur == NULL)
 	{
+		veejay_msg(0, "Cannot get document root from '%s'",file_name);
 		xmlFreeDoc(doc);
 		return 0;
 	}
 
 	if( xmlStrcmp( cur->name, (const xmlChar *) XML_CONFIG_FILE))
 	{
+		veejay_msg(0, "This is not a veejay configuration file.");
 		xmlFreeDoc(doc);
 		return 0;
 	}
@@ -2231,6 +2267,9 @@ void vj_event_write_actionfile(void *ptr, const char format[], va_list ap)
 	doc = xmlNewDoc( "1.0" );
 	rootnode = xmlNewDocNode( doc, NULL, (const xmlChar*) XML_CONFIG_FILE,NULL);
 	xmlDocSetRootElement( doc, rootnode );
+
+	childnode = xmlNewChild( rootnode, NULL, (const xmlChar*) XML_CONFIG_SETTINGS, NULL );
+	vj_event_format_xml_settings( v, childnode  );
 
 	for( i = 0; i < VIMS_MAX; i ++ )
 	{
@@ -3565,14 +3604,38 @@ void vj_event_set_frame(void *ptr, const char format[], va_list ap)
 void	vj_event_projection_dec( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	if( v->settings->composite )
-		viewport_projection_inc( composite_get_vp( v->composite ), -1, vj_perform_get_width(v), vj_perform_get_height(v) );
+	int args[2];
+	char *s = NULL;
+	P_A(args,s,format,ap);
+	
+	float inc_x = (float) args[0];
+	float inc_y = (float) args[1];
+
+	if(!v->composite)
+	{
+		veejay_msg(0,"No viewport active");
+		return;
+	}
+	viewport_finetune_coord( composite_get_vp(v->composite),vj_perform_get_width(v), vj_perform_get_height(v),
+		inc_x,
+		inc_y);
+		
 }
 void	vj_event_projection_inc( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
-	if( v->settings->composite )
-		viewport_projection_inc( composite_get_vp( v->composite) , 1, vj_perform_get_width(v), vj_perform_get_height(v) );
+	int args[2];
+	char *s = NULL;
+	P_A(args,s,format,ap);
+	
+	if(!v->composite)
+	{
+		veejay_msg(0,"No viewport active");
+		return;
+	}
+	viewport_finetune_coord( composite_get_vp(v->composite),vj_perform_get_width(v), vj_perform_get_height(v),
+		args[0],
+		args[1]);
 }
 
 void vj_event_inc_frame(void *ptr, const char format[], va_list ap)

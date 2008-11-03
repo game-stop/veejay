@@ -241,7 +241,6 @@ void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst, int src_fmt, int dst
 		src_fmt == PIX_FMT_BGR24   || src_fmt == PIX_FMT_RGB32 ||
 		src_fmt == PIX_FMT_RGB32_1 || src_fmt == PIX_FMT_GRAY8 );
 	assert( src->width > 0 );
-	assert( dst->width > 0 );
 #endif
 	if(!ac_imgconvert( src->data, ffmpeg_aclib[ src_fmt ], 
 			dst, ffmpeg_aclib[ dst_fmt] , src->width,src->height ))

@@ -81,8 +81,8 @@
 #define _PREFETCHW "/nop"
 #endif
 
-#define GRID_STEP 4
-#define GRID_START 36
+#define GRID_STEP 1
+#define GRID_START 44
 typedef struct
 {
 	float m[4][4];
@@ -484,7 +484,7 @@ char *viewport_get_my_status(void  *vv)
 	float ty = vsy(v,v->usermouse[5]);
 
 	char status[1024];
-	snprintf(status,1024, "Projection Quad: %dx%d + %dx%d\nPoints: 1=%2.2fx%2.2f 2=%2.2fx%2.2f 3=%2.2fx%2.2f 4=%2.2fx%2.2f\nCurrent Position: %2.1fx%2.1f",
+	snprintf(status,1024, "Projection Quad: %dx%d + %dx%d\nPoints: 1=%2.2fx%2.2f 2=%2.2fx%2.2f 3=%2.2fx%2.2f 4=%2.2fx%2.2f\nCurrent Position: %2.1fx%2.1f\n",
 		v->x0,v->y0,
 		v->w0,v->h0,
 		v->x1,v->y1,
@@ -647,8 +647,8 @@ static	inline void		point_map_int( matrix_t *M, float x, float y, int *nx, int *
 	else
 		w = 1.0 / w;
 
-	*nx = lrintf( (M->m[0][0] * x + M->m[0][1] * y + M->m[0][2] ) * w);
-	*ny = lrintf( (M->m[1][0] * x + M->m[1][1] * y + M->m[1][2] ) * w);
+	*nx = ceilf( (M->m[0][0] * x + M->m[0][1] * y + M->m[0][2] ) * w);
+	*ny = ceilf( (M->m[1][0] * x + M->m[1][1] * y + M->m[1][2] ) * w);
 
 }
 
@@ -831,7 +831,7 @@ static int		viewport_configure(
 {
 	int w = wid, h = hei;
 	if( grid_resolution <= 8 )
-		grid_resolution = 100;
+		grid_resolution = GRID_START;
 	float rat = (h/(float)w);
 
 	v->grid_width = grid_resolution;
@@ -2480,7 +2480,98 @@ int	viewport_event_set_projection(void *data, float x, float y, int num, int fro
 	return 1;
 }*/
 
-//FIXME: need to scale coordinates from viewport to sw/sh image size
+
+int	viewport_finetune_coord(void *data, int screen_width, int screen_height,int inc_x, int inc_y)
+{
+	viewport_t *v = (viewport_t*) data;
+	if(!v->user_ui)
+		return 0;
+
+	int width = v->w;
+	int height = v->h;
+	int point = -1;
+	int i;
+
+	//@ use screen width/height
+	double dist = 100.0;
+	int	    cx = v->w / 2;
+	int	    cy = v->h / 2;
+	int	    dx = cx - ( v->ui->sw / 2 );
+	int	    dy = cy - ( v->ui->sh / 2 );
+	float		scx  = (float) v->w / (float) v->ui->sw;
+	float		scy = (float) v->h / (float) v->ui->sh;
+	int	x = v->usermouse[4];
+	int	y = v->usermouse[5];
+	float p_cpy[9];
+	float p[9];
+	
+	p[0] = v->x1;
+	p[2] = v->x2;
+	p[4] = v->x3;
+	p[6] = v->x4;
+	p[1] = v->y1;
+	p[3] = v->y2;
+	p[5] = v->y3;	
+	p[7] = v->y4;
+
+	int j;
+
+	float ix = (float) inc_x * 0.1f;
+	float iy = (float) inc_y * 0.1f;
+
+	for  ( j = 0 ; j < 8 ; j += 2 ) {
+		p_cpy[j] = p[j];
+		p_cpy[j+1]=p[j+1];
+		p[j]  =  msx(v, p[j] );
+		p[j+1]=  msy(v, p[j+1] );
+	}	
+
+	if( v->user_ui )
+	{
+		double dt[4];
+		dt[0] = sqrt( (p[0] - x) * (p[0] - x) + ( p[1] - y ) * (p[1] -y ) );
+		dt[1] = sqrt( (p[2] - x) * (p[2] - x) + ( p[3] - y ) * (p[3] -y ) );
+		dt[2] = sqrt( (p[4] - x) * (p[4] - x) + ( p[5] - y ) * (p[5] -y ) );
+		dt[3] = sqrt( (p[6] - x) * (p[6] - x) + ( p[7] - y ) * (p[7] -y ) );
+	
+		for ( i = 0; i < 4;  i ++ )
+		{
+			if( dt[i] < dist )
+			{
+				dist = dt[i];
+				point = i;
+			}	
+		}
+	}
+	
+	if( point < 0 )
+		return 0;
+
+	switch( point ) 
+	{
+		case 0:
+		v->x1 = vsx(v, p[0] + ix);
+		v->y1 = vsy(v, p[1] + iy);
+		break;
+		case 1:
+		v->x2 = vsx(v, p[2] + ix);
+		v->y2 = vsy(v, p[3] + iy);
+		break;
+		case 2:
+		v->x3 = vsx(v,p[4] + ix);
+		v->y3 = vsy(v,p[5] + iy);
+		break;
+		case 3:
+		v->x4 = vsx(v,p[6] + ix);
+		v->y4 = vsy(v,p[7] + iy);
+		break;
+	}
+	viewport_update_perspective( v, p_cpy );
+	if(v->grid)
+		viewport_compute_grid(v);
+	return 1;
+}
+
 int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int button, int frontback, int screen_width, int screen_height )
 {
 	viewport_t *v = (viewport_t*) data;
@@ -2646,8 +2737,8 @@ int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int bu
 	if( button == 5 ) // wheel up
 	{
 		v->grid_resolution -= GRID_STEP;	
-		if(v->grid_resolution < GRID_START )	
-			v->grid_resolution = GRID_START;
+		if(v->grid_resolution < 2 )	
+			v->grid_resolution = 2;
 		viewport_compute_grid(v);
 	}
 	
@@ -2661,8 +2752,8 @@ int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int bu
 	if (button == 4 ) // wheel down
 	{	
 		v->grid_resolution += GRID_STEP;	
-		if(v->grid_resolution > (v->w/4) )	
-			v->grid_resolution = (v->w/4);
+		if(v->grid_resolution > v->w )	
+			v->grid_resolution = v->w;
 		viewport_compute_grid(v);
 	}
 
@@ -2709,9 +2800,9 @@ int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int bu
 
 	if( ch )
 	{
+		viewport_update_perspective( v, p_cpy );
 		if(v->grid)
 			viewport_compute_grid(v);
-		viewport_update_perspective( v, p_cpy );
 
 		return 1;
 	}
@@ -2788,11 +2879,11 @@ static	void	viewport_draw_grid(viewport_t *v, int width, int height, uint8_t *pl
 			viewport_line( plane, grid[k].x, grid[k].y,
 			                     grid[j].x, grid[j].y,
 						width,height,
-						v->grid_val);
+						170);
 	}
 
 	viewport_line( plane, grid[v->grid_width-1].x, grid[v->grid_height].y ,
-			      grid[n-1].x, grid[n-1].y, width,height,v->grid_val );
+			      grid[n-1].x, grid[n-1].y, width,height,170);
 	
 	k = 0;
 	n = (v->grid_height-1) * v->grid_width;
@@ -2803,13 +2894,13 @@ static	void	viewport_draw_grid(viewport_t *v, int width, int height, uint8_t *pl
 		viewport_line( plane, grid[k].x, grid[k].y,
 				      grid[j].x, grid[j].y,
 					width,height,
-					v->grid_val);
+					170);
 	} 
 
 	n = (v->grid_width * v->grid_height) - v->grid_width;
 	viewport_line( plane, grid[n].x, grid[n].y,
 			      grid[n+v->grid_width-1].x, grid[n+v->grid_width-1].y,
-				width,height,v->grid_val);	
+				width,height,170);	
 		
 }
 
@@ -2825,8 +2916,6 @@ static	void	viewport_draw_points(viewport_t *v, int width, int height, uint8_t *
 			plane[y * width + x] = v->grid_val;
 	}
 }
-
-
 static	void	viewport_compute_grid( viewport_t *v )
 {
 	int i;
@@ -2837,13 +2926,9 @@ static	void	viewport_compute_grid( viewport_t *v )
 		return;
 	}
 
-	float rat = (v->h/(float)v->w);
-	float sx = ceilf( v->w / (float)(v->grid_resolution+0.5f));
-	float sy = ceilf( v->w / (float)(v->grid_resolution+0.5f));
-
-	int gw = v->grid_resolution;
-	int gh = v->grid_resolution * rat;
-
+	int gw = v->w/ v->grid_resolution;
+	int gh = v->h/v->grid_resolution;
+veejay_msg(0,"%dx%d , %d",gw,gh,v->grid_resolution);
 	v->grid_width = gw;
 	v->grid_height = gh;
 
@@ -2859,9 +2944,8 @@ static	void	viewport_compute_grid( viewport_t *v )
 
 	for(y = 0; y < gh; y ++ )
 		for( x = 0; x < gw; x ++ ) {
-			point_map_int( v->M, sx * x, sy* y, &(grid[k].x), &(grid[k].y));
-			clamp1( grid[k].x, 0, v->w );
-			clamp1( grid[k].y, 0, v->h );
+			point_map_int( v->M, x * v->grid_resolution,
+				             y * v->grid_resolution,&(grid[k].x), &(grid[k].y));
 			k++;
 		}
 }
@@ -2906,6 +2990,7 @@ static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *
 	const uint8_t p = v->grid_val;
 	const uint8_t uv = 128;
 
+	if(v->grid)
 	switch(v->grid_mode)
 	{
 	case 2:
@@ -2921,8 +3006,7 @@ static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *
 	viewport_line( plane, fx1, fy1, fx4,fy4,width,height, p );
 	viewport_line( plane, fx4, fy4, fx3,fy3,width,height, p );
 	viewport_line( plane, fx2, fy2, fx3,fy3,width,height, p );
-
-
+	
 	//@ Project rectangle in v->w * v->h , but scaled to size of >sw >sh
 	ui_t *ui = v->ui;
 	int	    cx = v->w / 2;

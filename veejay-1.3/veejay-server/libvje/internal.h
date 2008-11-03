@@ -211,11 +211,12 @@ enum {
 	VJ_IMAGE_EFFECT_BALTANTV	=	187,
 	VJ_IMAGE_EFFECT_CONTOUR		=	188,
 	VJ_IMAGE_EFFECT_LENSCORRECTION  = 	189,
+	VJ_IMAGE_EFFECT_BGSUBTRACT	=	190,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 190
+#define VJ_IMAGE_EFFECT_MAX 191
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 246
@@ -512,7 +513,11 @@ extern void dissolve_apply(VJFrame *frame,VJFrame *frame2, int w, int h, int opa
 
 extern void overclock_apply(VJFrame *frame, int w, int h, int val, int r);
 
-extern void diff_prepare(void *data, uint8_t *map[3], int w, int h);
+extern int bgsubstract_prepare(void *user, uint8_t *map[3], int width, int height);
+
+extern void bgsubstract_apply(VJFrame *frame,int width, int height, int mode, int threshold );
+
+extern int diff_prepare(void *data, uint8_t *map[3], int w, int h);
 
 extern void	cartonize_apply( VJFrame *frame, int w, int h, int b1, int b2, int b3 );
 

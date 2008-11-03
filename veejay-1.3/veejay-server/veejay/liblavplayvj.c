@@ -681,7 +681,8 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 			  start, end );
 
 	}
-#endif	if(info->composite )
+#endif
+	if(info->composite )
 	{
 		info->settings->composite = sample_load_composite_config( info->composite , sample_id );
 	}
@@ -1924,6 +1925,38 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 
 	available_diskspace();
 
+	int id=0;
+	int mode=0;
+	int has_config = 0;
+#ifdef HAVE_XML2
+	if(info->load_action_file)
+	{
+		if(veejay_load_action_file(info, info->action_file )==0)
+		{
+			if(sample_readFromFile( info->action_file,
+				info->composite,
+				info->seq, 
+				info->font, 
+				info->edit_list,
+				 &id,
+				 &mode ))
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file);
+				if( id > 0 )
+				{
+					veejay_change_playback_mode(info, mode, id );
+				}
+			}
+		}
+		else
+		{
+			veejay_msg(VEEJAY_MSG_INFO, "Loaded configuration file %s", info->action_file );
+			has_config = 1;
+		}
+	}
+#endif
+
+
 	if(info->video_out<0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "No video output driver selected (see man veejay)");
@@ -1937,8 +1970,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	}
 
 	vj_event_init();
-
-	int id = 0, mode = 0;
 
 	switch (info->uc->use_timer)
 	{
@@ -2139,8 +2170,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 			return -1;
 		}
 
-		if(info->settings->zoom <= 0 || info->settings->zoom > 11 )
-			info->settings->zoom = 1;
 		info->composite = composite_init( info->video_output_width, info->video_output_height,
 						  el->video_width, el->video_height,
 						  info->homedir,
@@ -2152,13 +2181,16 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		}
 		info->settings->zoom = 0;
 		/* start with calibration on secundary inputs */
-		info->settings->composite = 2;
+		if(!has_config)
+			info->settings->composite = 2;
 	}
 	else if(!info->settings->zoom)
 	{
-	    info->video_output_width = el->video_width;
-	    info->video_output_height = el->video_height;
-	    info->settings->sws_templ.flags  = 1; // fast bicubic
+	    if(!has_config) {
+	   	 info->video_output_width = el->video_width;
+	   	 info->video_output_height = el->video_height;
+	   	 info->settings->sws_templ.flags  = 1; // fast bicubic
+	    }
 	}
 
 	if(!info->bes_width)
@@ -2168,6 +2200,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	
 	if(info->current_edit_list->has_audio)
 	{
+		if( has_config && info->audio==0 )
+			goto skip_audio;
 		if (vj_perform_init_audio(info))
 			veejay_msg(VEEJAY_MSG_INFO, "Initialized Audio Task");
 		else
@@ -2177,6 +2211,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 			info->audio = NO_AUDIO;
 		}
 	}
+skip_audio:
 
   	veejay_msg(VEEJAY_MSG_INFO, 
 		"Initialized %d Image- and Video Effects", vj_effect_max_effects());
@@ -2191,9 +2226,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 		info->video_output_width,
 		info->video_output_height);
    
-    if(info->dump) vj_effect_dump(); 	
-    info->output_stream = vj_yuv4mpeg_alloc(info->current_edit_list, info->video_output_width,
-		info->video_output_height );
+    	if(info->dump) vj_effect_dump(); 	
+    	
+	info->output_stream = vj_yuv4mpeg_alloc(info->current_edit_list, info->video_output_width,info->video_output_height );
 	if(!info->output_stream)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot setup output stream?");
@@ -2311,35 +2346,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
     }
 
 
-#ifdef HAVE_XML2
-	if(info->load_action_file)
-	{
-		if(veejay_load_action_file(info, info->action_file )==0)
-		{
-			if(sample_readFromFile( info->action_file,
-				info->composite,
-				info->seq, 
-				info->font, 
-				info->edit_list,
-				 &id,
-				 &mode ))
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file);
-				if( id > 0 )
-				{
-					veejay_change_playback_mode(info, mode, id );
-				}
-			}
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Loaded configuration file %s", info->action_file );
-		}
-	}
-#endif
-
-
-
 	if(def_tags && id <= 0)
 	{
 		int n = vj_tag_num_devices();
@@ -2378,7 +2384,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 			return -1;
 		}
 	}
-	else if( info->uc->file_as_sample && id <= 0)
+	else if( info->uc->file_as_sample && id <= 0 && !has_config)
 	{
 		long i,n=info->current_edit_list->num_video_files;
 		for(i = 0; i < n; i ++ )

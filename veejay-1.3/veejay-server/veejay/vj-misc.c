@@ -32,7 +32,7 @@
 #include <veejay/vj-misc.h>
 #include <veejay/vj-lib.h>
 #include <libvjmem/vjmem.h>
-
+#include <libvje/internal.h>
 #ifdef HAVE_JPEG
 #include <liblavjpeg/jpegutils.h>
 #endif
@@ -75,17 +75,15 @@ unsigned int vj_get_relative_time()
 int vj_perform_take_bg(veejay_t *info, uint8_t **src)
 {
 	VJFrame frame;
-	char *descr = "Map B to A (substract background mask)";
-	veejay_memset(&frame, 0, sizeof(VJFrame));
+	veejay_memcpy( &frame, info->effect_frame1, sizeof(VJFrame));
 	frame.data[0] = src[0];
 	frame.data[1] = src[1];
 	frame.data[2] = src[2];
-	frame.width = info->edit_list->video_width;
-	frame.height = info->edit_list->video_height;	
 
-	vj_effect_prepare( &frame, vj_effect_get_by_name( descr ) );
+	int n = vj_effect_prepare( &frame, VJ_IMAGE_EFFECT_BGSUBTRACT );
+	n += vj_effect_prepare( &frame, VJ_VIDEO_EFFECT_DIFF );
 
-	return 1;
+	return n;
 }
 
 #ifdef HAVE_JPEG

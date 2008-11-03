@@ -57,5 +57,7 @@ void	viewport_set_composite(void *vc, int mode, int colormode);
 int	viewport_get_color_mode_from_config(void *vc);
 int	viewport_get_composite_mode_from_config(void *vc);
 void	*viewport_get_configuration(void *vv );
+int	viewport_finetune_coord(void *data, int screen_width, int screen_height,int inc_x,int inc_y);
+
 #endif
 

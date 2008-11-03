@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2008 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -18,18 +18,15 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#ifndef DIFFEFFECT_H
-#define DIFFEFFECT_H
+#ifndef BGSUBTRACT_H
+#define BGSUBTRACT_H
 #include <libvje/vje.h>
 #include <sys/types.h>
 #include <stdint.h>
 
-vj_effect *diff_init(int width, int height);
-void diff_free(void *d);
-int diff_malloc(void **c, int w, int h);
-int diff_prepare(void *d, uint8_t *map[3], int w, int h); 
-void diff_apply(void *d , VJFrame *frame,
-		VJFrame *frame2, int width, int height, 
-		int th, int reverse, int show, int take, int feather);
-void	diff_destroy();
+vj_effect *bgsubtract_init(int width, int height);
+void bgsubtract_free(void *d);
+int bgsubtract_malloc(int w, int h);
+int bgsubtract_prepare(uint8_t *map[3], int w, int h); 
+void bgsubtract_apply(VJFrame *frame,int width,int height,int mode, int threshold);
 #endif

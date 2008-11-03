@@ -110,12 +110,11 @@ void diff_free(void *d)
 	d = NULL;
 }
 
-void diff_prepare(void *user, uint8_t *map[3], int width, int height)
+int diff_prepare(void *user, uint8_t *map[3], int width, int height)
 {
 	if(!static_bg )
 	{
-		veejay_msg(0,"FX \"Map B to A (substract background mask)\" not initialized");
-		return;
+		return 0;
 	}
 	
 	veejay_memcpy( static_bg, map[0], (width*height));
@@ -128,6 +127,7 @@ void diff_prepare(void *user, uint8_t *map[3], int width, int height)
 	softblur_apply( &tmp, width,height,0);
 
 	veejay_msg(0, "Snapped and softblurred current frame to use as background mask");
+	return 1;
 }
 
 static	void	binarify( uint8_t *dst, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len )

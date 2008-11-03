@@ -339,6 +339,9 @@ void vj_effman_apply_image_effect(
      case VJ_IMAGE_EFFECT_RIPPLE:
 	ripple_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
 	break;
+     case VJ_IMAGE_EFFECT_BGSUBTRACT:
+	bgsubtract_apply( frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
+	break;
      case VJ_IMAGE_EFFECT_BATHROOM:
 	bathroom_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
 	break;
@@ -597,25 +600,25 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
 
 int vj_effect_prepare( VJFrame *frame, int selector)
 {
-	veejay_msg(VEEJAY_MSG_DEBUG, "Found FX %d", selector);
-	if(selector == VJ_VIDEO_EFFECT_DIFF && vj_effect_has_cb(selector))
-	{
-		int i = vj_effect_real_to_sequence( selector );
-		veejay_msg(VEEJAY_MSG_DEBUG,"internal id = %d", i );
-		if( vj_effects[i]->user_data != NULL)
-		{
-			diff_prepare(
-				(void*) vj_effects[i]->user_data,
-				frame->data,
-				frame->width,
-				frame->height );
-	
-			return 1;
-		}
-	}
-	else
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"There is currently no FX that needs a background image");
+	int fx_id = 0;
+	switch( selector ) {
+		case VJ_IMAGE_EFFECT_BGSUBTRACT:
+			fx_id = vj_effect_real_to_sequence( selector );
+			if( fx_id >= 0 && vj_effects[fx_id] ) {
+				return bgsubtract_prepare( frame->data, frame->width,frame->height );
+			}
+			break;	
+		case	VJ_VIDEO_EFFECT_DIFF:
+			if( !vj_effect_has_cb(selector))
+				return 0;
+			fx_id = vj_effect_real_to_sequence( selector );
+			if( fx_id >= 0 && vj_effects[fx_id]->user_data != NULL)
+			{
+				return diff_prepare(	(void*) vj_effects[fx_id]->user_data,	frame->data,	frame->width,	frame->height );
+			}	
+			break;
+		default:
+			break;
 	}
 	return 0;
 }

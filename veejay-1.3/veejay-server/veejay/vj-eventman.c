@@ -2300,21 +2300,29 @@ void		vj_init_vevo_events(void)
 
 
 	index_map_[ VIMS_PROJ_INC ] 			=	_new_event(
-				NULL,
+				"%d %d",
 				VIMS_PROJ_INC,
-				"Increase projection/camera area",
+				"Increase projection/camera point",
 				vj_event_projection_inc,
-				0,
+				2,
 				VIMS_ALLOW_ANY,
+				"X increment",
+				0,
+				"Y increment",
+				0,
 				NULL );
 
 	index_map_[ VIMS_PROJ_DEC ] 			=	_new_event(
-				NULL,
+				"%d %d",
 				VIMS_PROJ_DEC,
-				"Decrease projection/camera area",
+				"Decrease projection/camera point",
 				vj_event_projection_dec,
-				0,
+				2,
 				VIMS_ALLOW_ANY,
+				"X increment",
+				0,
+				"Y increment",
+				0,
 				NULL );
 
 	index_map_[ VIMS_PROJ_GET_POINT ]			=	_new_event(

@@ -3085,9 +3085,9 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 
 	if (info->uc->take_bg==1)
     	{
-        	vj_perform_take_bg(info,pri);
+        	if( vj_perform_take_bg(info,pri) )
+			veejay_msg(VEEJAY_MSG_INFO, "Snapped background image");
         	info->uc->take_bg = 0;
-		veejay_msg(VEEJAY_MSG_INFO, "Snapped background image");
     	} 
 
 

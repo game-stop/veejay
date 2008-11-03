@@ -63,6 +63,7 @@
 #include "transitions/wipe.h"
 #include "transitions/vbar.h"
 #include "effects/diff.h"
+#include "effects/bgsubtract.h"
 #include "effects/texmap.h"
 #include "effects/contourextract.h"
 #include "effects/autoeq.h"
@@ -160,7 +161,7 @@
 #include "effects/colflash.h"
 #include "effects/rgbchannel.h"
 #include "effects/diffmap.h"
-#include	"plugload.h"
+#include "plugload.h"
 #include "effects/picinpic.h"
 
 int  pixel_Y_hi_ = 235;
@@ -240,6 +241,7 @@ static struct
 {	radcor_malloc,			radcor_free,		VJ_IMAGE_EFFECT_LENSCORRECTION	},
 {	radioactivetv_malloc,		radioactivetv_free,	VJ_VIDEO_EFFECT_RADIOACTIVE	},
 {	waterrippletv_malloc,		waterrippletv_free,	VJ_IMAGE_EFFECT_RIPPLETV	},
+{	bgsubtract_malloc,		bgsubtract_free,	VJ_IMAGE_EFFECT_BGSUBTRACT	},
 {	NULL			,	NULL			,0				},
 };
 
@@ -594,6 +596,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 88] = contourextract_init(width,height);
 	vj_effects[i + 49] = waterrippletv_init(width,height);
 	vj_effects[i + 89 ]= radcor_init(width,height);
+	vj_effects[i + 90 ]= bgsubtract_init(width,height);
 	max_width = width;
 	max_height = height;
 

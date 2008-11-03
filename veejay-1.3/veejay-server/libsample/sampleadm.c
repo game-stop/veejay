@@ -1473,7 +1473,7 @@ int	sample_set_composite(void *compiz, int s1, int composite)
 	}
 #ifdef STRICT_CHECKING
 	assert( sample->viewport_config != NULL );
-	assert( composite != 0 );
+	assert( compiz != NULL );
 #endif
 	composite_add_to_config( compiz, sample->viewport_config, composite );
 
