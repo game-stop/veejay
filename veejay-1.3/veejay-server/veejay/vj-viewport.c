@@ -2898,9 +2898,9 @@ static	void	viewport_draw_grid(viewport_t *v, int width, int height, uint8_t *pl
 	} 
 
 	n = (v->grid_width * v->grid_height) - v->grid_width;
-	viewport_line( plane, grid[n].x, grid[n].y,
-			      grid[n+v->grid_width-1].x, grid[n+v->grid_width-1].y,
-				width,height,170);	
+//	viewport_line( plane, grid[n].x, grid[n].y,
+//			      grid[n+v->grid_width-1].x, grid[n+v->grid_width-1].y,
+//				width,height,170);	
 		
 }
 
