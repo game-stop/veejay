@@ -461,12 +461,31 @@ char *viewport_get_my_help(void *vv)
 	char reverse_mode[32];
 	veejay_memset(reverse_mode,0,sizeof(reverse_mode));
 	sprintf(reverse_mode, "%s", ( v->user_reverse ? "Forward"  : "Reverse" ) );
+	
+	char scroll_mode[64];
+
+	switch(v->grid_mode) {
+		case 0:
+			snprintf(scroll_mode,sizeof(scroll_mode),
+					"CTRL + Mousewheel: Marker %2dx%2d up=Grid down=Dots",v->marker_size,v->marker_size);
+			break;
+		case 1:
+			snprintf(scroll_mode,sizeof(scroll_mode),
+					"CTRL + Mousewheel: Dots %2dx%2d up=Marker down=Grid",v->grid_resolution,v->grid_resolution);
+			break;
+		case 2:
+			snprintf(scroll_mode,sizeof(scroll_mode),
+					"CTRL + Mousewheel: Grid %2dx%2d up=Grid down=Marker",v->grid_resolution,v->grid_resolution);
+			break;
+	}
+
+
 	char tmp[1024];
 	int gw = v->grid_width;
 	int gh = v->grid_height;
-	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nCTRL + Cursor Keys: Finetune point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Focus projection/secundary input\nCTRL + i : Transform secundary input\nCTRL + v: Transform secundary input in grayscale/color \nCTRL + o: Toggle OSD status\nMouse Scroll: Calibration Point (%dx%d)\nCTRL + Mouse Scroll: Calibration Grid (%dx%d)\n\n",
+	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nCTRL + Cursor Keys: Finetune point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Focus projection/secundary input\nCTRL + i : Transform secundary input\nCTRL + v: Transform secundary input in grayscale/color \nCTRL + o: Toggle OSD status\n%s\n\n",
 			reverse_mode,
-			gw,gh,gw,gh);
+			scroll_mode);
 	
 
 	return strdup( tmp );
@@ -1665,7 +1684,7 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 	v->h = h;
 	v->homedir = strdup(homedir);
 	v->mode	   = mode;
-	v->marker_size = 1;
+	v->marker_size = 4;
 	int res;
 
 	if( vc == NULL )
@@ -2736,12 +2755,18 @@ int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int bu
 
 	if( button == 5 ) // wheel up
 	{
-		v->grid_resolution -= GRID_STEP;	
-		if(v->grid_resolution < 2 )	
-			v->grid_resolution = 2;
-		viewport_compute_grid(v);
+		if(v->grid_mode == 0 ) {
+			v->marker_size --;
+			if(v->marker_size < 2 )
+				v->marker_size = 4;
+		} else {
+			v->grid_resolution -= GRID_STEP;	
+			if(v->grid_resolution < 2 )	
+				v->grid_resolution = 2;
+			viewport_compute_grid(v);
+		}
 	}
-	
+
 	if( button == 16 )
 	{
 		v->grid_mode ++;
@@ -2751,12 +2776,17 @@ int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int bu
 
 	if (button == 4 ) // wheel down
 	{	
-		v->grid_resolution += GRID_STEP;	
-		if(v->grid_resolution > v->w )	
-			v->grid_resolution = v->w;
-		viewport_compute_grid(v);
+		if(v->grid_mode == 0 ) {
+			v->marker_size ++;
+			if(v->marker_size > v->w/16)	
+				v->marker_size = 4;
+		} else {
+			v->grid_resolution += GRID_STEP;	
+			if(v->grid_resolution > v->w )	
+				v->grid_resolution = v->w;
+			viewport_compute_grid(v);
+		}
 	}
-
 	if( button == 7 )
 	{
 		if( v->grid_val == 0xff )
@@ -2810,13 +2840,6 @@ int	viewport_external_mouse( void *data, uint8_t *img[3], int sx, int sy, int bu
 }
 
 
-static	inline	int	grab_pixel( uint8_t *plane, int x, int y, int w )
-{
-	if( plane[ (y*w) + x ] > 128 )
-		return 0;
-	return 255;
-}
-
 void		viewport_push_frame(void *data, int w, int h, uint8_t *Y, uint8_t *U, uint8_t *V )
 {
 	viewport_t *v = (viewport_t*) data;
@@ -2866,6 +2889,33 @@ static void		viewport_translate_frame(void *data, uint8_t *plane )
 }
 
 
+static	void	viewport_draw_marker(viewport_t *v, int x, int y, int w, int h, uint8_t *plane )
+{
+	int x1 = x - v->marker_size;
+	int y1 = y - v->marker_size;
+	int x2 = x + v->marker_size;
+	int y2 = y + v->marker_size;
+
+	if( x1 < 0 ) x1 = 0; else if ( x1 > w ) x1 = w;
+	if( y1 < 0 ) y1 = 0; else if ( y1 > h ) y1 = h;
+	if( x2 < 0 ) x2 = 0; else if ( x2 > w ) x2 = w;
+	if( y2 < 0 ) y2 = 0; else if ( y2 > h ) y2 = h;
+
+	unsigned int i,j;
+	for( j = x1; j < x2 ; j ++ )
+		plane[ y1 * w + j ] = v->grid_val;
+
+	for( i = y1; i < y2; i ++ ) 
+	{
+		plane[ i * w + x1 ] = v->grid_val;
+		plane[ i * w + x2 ] = v->grid_val;
+	}
+
+	for( j = x1; j < x2 ; j ++ )
+		plane[ y2 * w + j ] = v->grid_val;
+
+}
+
 static	void	viewport_draw_grid(viewport_t *v, int width, int height, uint8_t *plane )
 {	
 	int x,y;
@@ -2873,7 +2923,7 @@ static	void	viewport_draw_grid(viewport_t *v, int width, int height, uint8_t *pl
 	int k = 0;
 	int n = v->grid_width * v->grid_height; 
 	int j = 0;
-	for( y = 0; y < v->grid_height-1; y ++) {	
+	for( y = 0; y < v->grid_height; y ++) {	
 			k = y * v->grid_width;
 			j = k + v->grid_width-1;
 			viewport_line( plane, grid[k].x, grid[k].y,
@@ -2882,12 +2932,9 @@ static	void	viewport_draw_grid(viewport_t *v, int width, int height, uint8_t *pl
 						170);
 	}
 
-	viewport_line( plane, grid[v->grid_width-1].x, grid[v->grid_height].y ,
-			      grid[n-1].x, grid[n-1].y, width,height,170);
-	
 	k = 0;
 	n = (v->grid_height-1) * v->grid_width;
-	for( x = 0; x < v->grid_width-1; x ++ )
+	for( x = 0; x < v->grid_width; x ++ )
 	{
 		k = x;
 		j = n + x;
@@ -2896,12 +2943,6 @@ static	void	viewport_draw_grid(viewport_t *v, int width, int height, uint8_t *pl
 					width,height,
 					170);
 	} 
-
-	n = (v->grid_width * v->grid_height) - v->grid_width;
-//	viewport_line( plane, grid[n].x, grid[n].y,
-//			      grid[n+v->grid_width-1].x, grid[n+v->grid_width-1].y,
-//				width,height,170);	
-		
 }
 
 static	void	viewport_draw_points(viewport_t *v, int width, int height, uint8_t *plane )
@@ -2954,7 +2995,7 @@ void		viewport_set_marker( void *data, int status )
 {
 	viewport_t *v = (viewport_t*) data;
 	v->snap_marker = status;
-	v->marker_size = 1;
+	//v->marker_size = 1;
 }
 
 static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *V )
@@ -3040,10 +3081,21 @@ static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *
 	 int mx = v->usermouse[0] * wx;
 	 int my = v->usermouse[1] * wy;
 	 
+	if(v->grid_mode == 0  ) {
+		viewport_draw_marker(v, mx,my,width,height,plane );
+	}
+
 	 if( mx >= 0 && my >= 0 && mx <= width && my < height )
 	 {
-		 int col = grab_pixel( plane, v->usermouse[0]*wx, v->usermouse[1]*wy,width );
-		 draw_point( plane, v->usermouse[0]*wx,v->usermouse[1]*wy, width,height,1, v->grid_val );
+		// draw_point( plane, v->usermouse[0]*wx,v->usermouse[1]*wy, width,height,1, v->grid_val );
+			
+		if( mx >= 0 && my >= 0 && mx < width && my < height )
+		{
+			if( abs(v->grid_val - plane[my*width+mx]) < 32 )
+				plane[my*width+mx] = 0xff - plane[my*width+mx];
+			else
+				plane[my * width + mx] = v->grid_val;
+		}
 	 }
 }
 
