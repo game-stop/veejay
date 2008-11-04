@@ -2994,9 +2994,8 @@ static void	viewport_draw_col( void *data, uint8_t *plane, uint8_t *u, uint8_t *
 	 int mx = v->usermouse[0] * wx;
 	 int my = v->usermouse[1] * wy;
 	 
-	if(v->grid_mode == 0  ) {
-		viewport_draw_marker(v, mx,my,width,height,plane );
-	}
+	viewport_draw_marker(v, mx,my,width,height,plane );
+	
 
 	 if( mx >= 0 && my >= 0 && mx <= width && my < height )
 	 {
