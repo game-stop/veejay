@@ -6,7 +6,7 @@ Build-Depends: debhelper (>= 5), autotools-dev,libx11-dev,xutils-dev,libxml2-dev
 Standards-Version: 3.7.2
 
 Package: veejay
-Architecture: any
+Architecture: i686
 Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Veejay - a 'visual' instrument and realtime video sampler
  Veejay is a visual instrument and real-time video sampler.
@@ -14,7 +14,3 @@ Description: Veejay - a 'visual' instrument and realtime video sampler
  While playing, you can record the resulting video directly to disk (video sampling).
 
 
-Package: veejay-doc
-Architecture: all
-Description: Documentation for veejay
- Standard minimal documentation for veejay
