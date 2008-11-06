@@ -50,7 +50,6 @@ typedef struct
 	uint8_t *proj_plane[3];
 	void *vp1;
 	void *back1;
-	void *vp2;
 	void *sampler;
 	void *scaler;
 	void *back_scaler;
@@ -70,7 +69,6 @@ typedef struct
 	int proj_height;
 	int img_width;			/* image (input) */
 	int img_height;
-	int vp_focus;			/* focus for split projection */
 } composite_t;
 
 //@ round to multiple of 8
@@ -120,11 +118,6 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 		free(c);
 		return NULL;
 	}
-	c->vp2 = viewport_init( 0,0,pw,ph,pw, ph,iw,ih, homedir, &vp1_enabled, &vp1_frontback, 1);
-	if(!c->vp1) {
-		free(c);
-		return NULL;
-	}
 
 	c->proj_plane[0] = (uint8_t*) vj_calloc( RUP8( pw * ph * 3) + RUP8(pw * 3) * sizeof(uint8_t));
 	c->proj_plane[1] = c->proj_plane[0] + RUP8(pw * ph) + RUP8(pw);
@@ -166,7 +159,6 @@ void	composite_destroy( void *compiz )
 	{
 		if(c->proj_plane[0]) free(c->proj_plane[0]);
 		if(c->vp1) viewport_destroy( c->vp1 );
-		if(c->vp2) viewport_destroy( c->vp2 );
 		if(c->back1) viewport_destroy(c->back1);
 		if(c->scaler)	yuv_free_swscaler( c->scaler );	
 		if(c->back_scaler) yuv_free_swscaler(c->back_scaler);
@@ -216,18 +208,9 @@ int	composite_load_config( void *compiz, void *vc )
 int	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y )
 {
 	composite_t *c = (composite_t*) compiz; 	
-	if(c->vp_focus == 0 ) { 
-		if(viewport_external_mouse( c->vp1, c->proj_plane, mouse_x, mouse_y, mouse_button, 1,w_x,w_y )) {
-			viewport_update_from(c->vp1, c->back1 );
-			return 1;
-	}
-	else {
-		if(viewport_external_mouse( c->vp2, c->proj_plane, mouse_x, mouse_y, mouse_button, 1,w_x,w_y )) {
-		//	viewport_update_from(c->vp1, c->back1 );
-				return 1;
-		}
-
-
+	if(viewport_external_mouse( c->vp1, c->proj_plane, mouse_x, mouse_y, mouse_button, 1,w_x,w_y )) {
+		viewport_update_from(c->vp1, c->back1 );
+		return 1;
 	}
 	return 0;
 }
@@ -382,7 +365,7 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 			if(output->ssm)
 				c->frame4->format = PIX_FMT_YUV444P;
 			else
-				c->frame4->format = c->frame3;
+				c->frame4->format = c->frame3->format;
 			yuv_convert_and_scale(c->back_scaler,c->frame4,c->frame3);
 		}
 
@@ -412,28 +395,6 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 	else if ( which_vp == 1 ) 
 	{
 		composite_scale( c, input, c->frame2 );	
-	}
-	return 1;
-}
-
-int	composite_process_2nd(void *compiz, VJFrame *output, VJFrame *input, int which_vp )
-{
-	composite_t *c = (composite_t*) compiz;
-	int vp1_active = viewport_active(c->vp2);
-
-	if(c->run2 == 0 ) {
-		viewport_reconfigure(c->vp2);
-		c->run2=1;
-	}
-
-	if( which_vp && vp1_active ) /* for both modes, render ui from vp1 */
-	{
-		viewport_draw_interface_color( c->vp2, c->proj_plane );
-	} 
-	else if ( which_vp == 1 ) 
-	{
-		// 
-		//	composite_scale( c, input, c->frame2 );	
 	}
 	return 1;
 }
