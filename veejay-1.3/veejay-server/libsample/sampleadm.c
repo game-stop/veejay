@@ -916,6 +916,10 @@ int sample_del(int sample_id)
 	    if( si->dict )
 		vj_font_dictionary_destroy( sample_font_,si->dict );
 #endif
+		if(si->viewport) {	
+			viewport_destroy(si->viewport);
+			si->viewport = NULL;
+		}
 	    free(si);
 
 		  /* store freed sample_id */
@@ -1460,6 +1464,19 @@ int	sample_load_composite_config( void *compiz, int s1 )
 	if(!sample) return -1;
 	sample->composite = composite_load_config( compiz, sample->viewport_config );
 	return sample->composite;
+}
+void		*sample_get_composite_view(int s1)
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample) return NULL;
+	return sample->viewport;
+}
+int	sample_set_composite_view(int s1, void *vp)
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample) return -1;
+	sample->viewport = vp;
+	return (sample_update(sample,s1));
 }
 
 int	sample_set_composite(void *compiz, int s1, int composite)

@@ -685,6 +685,16 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 	if(info->composite )
 	{
 		info->settings->composite = sample_load_composite_config( info->composite , sample_id );
+		void *cur = sample_get_composite_view(info->uc->sample_id);
+		if(info->settings->composite == 2 ) {
+			if( cur == NULL ) {
+				veejay_msg(VEEJAY_MSG_ERROR, "No perspective transform setup for this Sample, playing normal.");					info->settings->composite = 1;
+			} else {
+				composite_set_backing(info->composite, cur );
+			}
+		} 	
+	
+
 	}
 
 
@@ -744,6 +754,16 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	if(info->composite )
 	{
 		info->settings->composite = vj_tag_load_composite_config( info->composite , stream_id );
+		void *cur =vj_tag_get_composite_view(info->uc->sample_id);
+		if(info->settings->composite == 2 ) {
+			if( cur == NULL ) {
+				veejay_msg(VEEJAY_MSG_ERROR, "No perspective transform setup for this Stream, playing normal.");								info->settings->composite = 1;
+			} else {
+				composite_set_backing(info->composite, cur );
+			}
+		} 	
+
+
 	}
 	
 	 veejay_msg(VEEJAY_MSG_INFO,"Playing stream %d (FX=%x) (Ff=%d)", stream_id, tmp,

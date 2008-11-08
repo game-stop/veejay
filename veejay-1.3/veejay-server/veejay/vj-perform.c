@@ -147,7 +147,7 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id,int type, 
 static int vj_perform_tag_complete_buffers(veejay_t * info, int *h);
 static int vj_perform_increase_sample_frame(veejay_t * info, long num);
 static int vj_perform_sample_complete_buffers(veejay_t * info, int *h);
-static void vj_perform_use_cached_ycbcr_frame(veejay_t *info, int centry, int chain_entry, int width, int height, int vp);
+static void vj_perform_use_cached_ycbcr_frame(veejay_t *info, int centry, int chain_entry, int width, int height);
 static int vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info, VJFrame **frames, VJFrameInfo *frameinfo, int e, int c, int n_frames );
 static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[4], int sample);
 static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4]);
@@ -1243,11 +1243,10 @@ static void vj_perform_reverse_audio_frame(veejay_t * info, int len,
 }
 
 
-static void vj_perform_use_cached_ycbcr_frame(veejay_t *info, int centry, int chain_entry, int width, int height, int dovp)
+static void vj_perform_use_cached_ycbcr_frame(veejay_t *info, int centry, int chain_entry, int width, int height)
 {
 	int len1 = (width*height);
 	
-	if( dovp != 2 ) {
 	if( centry == 0 )
 	{
 		int len2 = ( info->effect_frame1->ssm == 1 ? len1 : 
@@ -1270,19 +1269,6 @@ static void vj_perform_use_cached_ycbcr_frame(veejay_t *info, int centry, int ch
 
 		frame_buffer[chain_entry]->ssm = frame_buffer[c]->ssm;
    	 }
-	} else {
-	if( dovp==2)
-	{
-		VJFrame *tmp = yuv_yuv_template( primary_buffer[0]->Y,primary_buffer[0]->Cb,primary_buffer[0]->Cr,	
-				 width,height, get_ffmpeg_pixfmt(info->pixel_format) );
-		if( info->effect_frame1->ssm == 1 )
-			tmp->format = PIX_FMT_YUV444P;
-		uint8_t *fb[3] = { frame_buffer[chain_entry]->Y, frame_buffer[chain_entry]->Cb,frame_buffer[chain_entry]->Cr };
-		frame_buffer[chain_entry]->ssm = composite_processX(info->composite,fb,tmp);
-		free(tmp);
-	}
-	}
-
 }
 
 
@@ -1631,6 +1617,8 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 	centry = vj_perform_tag_is_cached(chain_entry, sample_id);
 	int dovp = vj_tag_get_composite( sample_id );
 
+	void *vp = NULL;
+
 	if (centry == -1)
 	{
 		if(! vj_tag_get_active( sample_id ) )
@@ -1657,9 +1645,14 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 
 			if( dovp == 2)
 			{
+				vp = vj_tag_get_composite_view(sample_id);
+#ifdef STRICT_CHECKING
+				assert( vp != NULL );
+#endif
+
 				VJFrame *tmp = yuv_yuv_template( backing_fb[0],backing_fb[1],backing_fb[2],	
 								 width,height, get_ffmpeg_pixfmt(info->pixel_format) );
-				frame_buffer[chain_entry]->ssm = composite_processX(info->composite,fb,tmp);
+				frame_buffer[chain_entry]->ssm = composite_processX(info->composite,vp,fb,tmp);
 				free(tmp);
 			}
 
@@ -1667,7 +1660,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 	}
 	else
 	{	
-		vj_perform_use_cached_ycbcr_frame(info, centry, chain_entry, width,height, dovp);
+		vj_perform_use_cached_ycbcr_frame(info, centry, chain_entry, width,height);
 	    	error = 0;
 	}
 	if(!error)
@@ -1680,6 +1673,11 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
             if(centry == -1 || info->no_caching)
 	    {
 		dovp = sample_get_composite( sample_id );
+		vp   = sample_get_composite_view(sample_id);
+#ifdef STRICT_CHECKING
+		if(dovp==2)
+			assert( vp != NULL );
+#endif
 		if(dovp==2) {
 			len = vj_perform_get_frame_fx(info,sample_id,nframe,backing_fb );
 		} else {
@@ -1693,13 +1691,13 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 		if(dovp==2) {
 			VJFrame *tmp = yuv_yuv_template( backing_fb[0],backing_fb[1],backing_fb[2],	
 								 width,height, get_ffmpeg_pixfmt(info->pixel_format) );
-			frame_buffer[chain_entry]->ssm = composite_processX(info->composite,fb,tmp);
+			frame_buffer[chain_entry]->ssm = composite_processX(info->composite,vp,fb,tmp);
 			free(tmp);
 		}
 	    }
 	    else
 	    {
-		vj_perform_use_cached_ycbcr_frame( info, centry, chain_entry, width,height, dovp );
+		vj_perform_use_cached_ycbcr_frame( info, centry, chain_entry, width,height );
 		cached_sample_frames[ 1 + chain_entry ] = sample_id;
 		error = 0;
 	   }
@@ -1791,7 +1789,8 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
     int res = 1;
     int centry = -1;
     int dovp = 0;
-    
+    void *vp = NULL;
+
     uint8_t *fb[3] = {
 		frame_buffer[chain_entry]->Y,
 		frame_buffer[chain_entry]->Cb,
@@ -1843,9 +1842,13 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 			video_playback_setup *settings = info->settings;
 			if( dovp==2)
 			{
+				void *vp = vj_tag_get_composite_view( sample_id );
+#ifdef STRICT_CHECKING
+				assert( vp != NULL );
+#endif
 				VJFrame *tmp = yuv_yuv_template( backing_fb[0],backing_fb[1],backing_fb[2],	
 								 width,height, get_ffmpeg_pixfmt(info->pixel_format) );
-				frame_buffer[chain_entry]->ssm = composite_processX(info->composite,fb,tmp);
+				frame_buffer[chain_entry]->ssm = composite_processX(info->composite,vp,fb,tmp);
 				free(tmp);
 			}
 
@@ -1853,7 +1856,7 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 	}
 	else
 	{
-	    vj_perform_use_cached_ycbcr_frame(info,centry, chain_entry, width, height, dovp);
+	    vj_perform_use_cached_ycbcr_frame(info,centry, chain_entry, width, height);
 	    error = 0;
 	}
 	if(!error )
@@ -1867,6 +1870,11 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 	    	if(centry == -1 || info->no_caching)
 	    	{
 			dovp = sample_get_composite(sample_id);
+			vp   = sample_get_composite_view(sample_id);
+#ifdef STRICT_CHECKING			
+			if(dovp==2)
+				assert( vp != NULL );
+#endif
 			if(dovp==2) {
 				len = vj_perform_get_frame_fx(info,sample_id,nframe,backing_fb );
 			} else {
@@ -1881,13 +1889,13 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 				VJFrame *tmp = yuv_yuv_template( backing_fb[0],backing_fb[1],backing_fb[2],	
 								 width,height, get_ffmpeg_pixfmt(info->pixel_format));
 
-				frame_buffer[chain_entry]->ssm = composite_processX(info->composite,fb,tmp);
+				frame_buffer[chain_entry]->ssm = composite_processX(info->composite,vp,fb,tmp);
 				free(tmp);
 			}
 		}
 		else
 		{
-			vj_perform_use_cached_ycbcr_frame(info,centry, chain_entry,width,height, dovp);	
+			vj_perform_use_cached_ycbcr_frame(info,centry, chain_entry,width,height);	
 			cached_sample_frames[ 1 + chain_entry ] = sample_id;
 			error = 0;
 		}
@@ -3002,14 +3010,28 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		if( settings->ca ) {
 			settings->ca = 0;
 		}
+
 		//@ focus on projection screen
 		if(composite_event( info->composite, pri, info->uc->mouse[0],info->uc->mouse[1],info->uc->mouse[2],	
 			vj_perform_get_width(info), vj_perform_get_height(info)) ) {
 			//@ save config to playing sample/stream
 			if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
+				void *cur = vj_tag_get_composite_view(info->uc->sample_id);
+				if(cur == NULL )
+				{
+					cur = composite_clone(info->composite);
+					vj_tag_set_composite_view(info->uc->sample_id, cur );
+				}
+				composite_set_backing(info->composite,cur);
 				vj_tag_reload_config( info->composite,info->uc->sample_id,
 					settings->composite);
-			} else if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {	
+			} else if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
+				void *cur = sample_get_composite_view(info->uc->sample_id);
+				if(cur==NULL) {
+					cur = composite_clone(info->composite);
+					sample_set_composite_view(info->uc->sample_id,cur);
+				}
+				composite_set_backing(info->composite,cur);
 				sample_reload_config( info->composite,info->uc->sample_id,
 					settings->composite);
 			}

@@ -112,6 +112,7 @@ typedef struct {
     char padding[4];
     int composite;
     void *viewport_config;
+    void *viewport;
 } vj_tag;
 
 void	*vj_tag_get_dict( int id );
@@ -310,12 +311,14 @@ int    vj_tag_num_devices();
 
 void	vj_tag_reload_config( void *compiz, int t1, int mode );
 
+void	*vj_tag_get_composite_view(int t1);
+int	vj_tag_set_composite_view(int t1, void *v);
+
 #ifdef HAVE_XML2
 void	tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp);
 void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp);
 void tagCreateStreamFX(xmlNodePtr node, vj_tag *tag);
 void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font,
 	void *vp);
-
 #endif
 #endif

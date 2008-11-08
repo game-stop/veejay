@@ -25,6 +25,7 @@
 #include <X11/Xutil.h>
 #include <X11/Xatom.h>
 #include <libvjmsg/vj-msg.h>
+
 #ifdef HAVE_XINERAMA
 #include <X11/extensions/Xinerama.h>
 #endif
@@ -51,12 +52,12 @@ void	x11_disable_screensaver( void *display )
 {
 	Display *d = (Display*) display;
 
-	XGetScreenSaver( d, &screen_saver_[0], &screen_saver_[1],
-			&screen_saver_[2], &screen_saver_[3] );
+//	XGetScreenSaver( d, &screen_saver_[0], &screen_saver_[1],
+//			&screen_saver_[2], &screen_saver_[3] );
 
 	if( screen_saver_[0] )
 	{
-		XSetScreenSaver( d, 0, screen_saver_[1], screen_saver_[2],screen_saver_[3] );
+		//XSetScreenSaver( d, 0, screen_saver_[1], screen_saver_[2],screen_saver_[3] );
 	}
 
 #ifdef HAVE_XDPMS
@@ -75,8 +76,8 @@ void	x11_enable_screensaver( void *display )
 
 	if( screen_saver_[0] )
 	{
-		XSetScreenSaver( d, screen_saver_[0],screen_saver_[1],
-				screen_saver_[2],screen_saver_[3] );
+	//	XSetScreenSaver( d, screen_saver_[0],screen_saver_[1],
+	//			screen_saver_[2],screen_saver_[3] );
 	}
 #ifdef HAVE_XDPMS
 	int n = 0;
@@ -107,7 +108,7 @@ void	x11_move( void *display, void *window )
 #ifdef HAVE_XINERAMA
 	if( XineramaIsActive( d ) )
 	{
-		XMoveWindow( d, w, xinerama_x_, xinerama_y_ );
+		//XMoveWindow( d, w, xinerama_x_, xinerama_y_ );
 	}
 #endif
 }
@@ -149,7 +150,7 @@ void	x11_info(void *display)
 		veejay_msg(VEEJAY_MSG_INFO, "\tUsing screen %d : %dx%d+%dx%d", 
 				xinerama_user_selected_, screen_w_, screen_h_, xinerama_x_, xinerama_y_ );
 
-		XFree( screens );
+	//	XFree( screens );
 	}
 #endif
 }

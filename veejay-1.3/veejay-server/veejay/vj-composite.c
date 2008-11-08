@@ -139,10 +139,13 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	c->scaler = yuv_init_swscaler( c->frame1, c->frame2, &sws_templ, 0 );
 	c->back_scaler = yuv_init_swscaler( c->frame4, c->frame3, &sws_templ, 0 );
 
-	c->back1  = viewport_clone( c->vp1, iw, ih );
+	c->back1 = NULL;
+
+/*	c->back1  = viewport_clone( c->vp1, iw, ih );
 	if(!c->back1 ) {
 		return NULL;
 	}
+	viewport_reconfigure(c->back1);*/
 
 	veejay_msg(VEEJAY_MSG_INFO, "Configuring projection:");
 	veejay_msg(VEEJAY_MSG_INFO, "\tSoftware scaler  : %s", yuv_get_scaler_name(zoom_type) );
@@ -152,6 +155,22 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	return (void*) c;
 }
 
+void	*composite_clone( void *compiz )
+{
+	composite_t *c = (composite_t*) compiz;
+	if(!c) return NULL;
+	void *v = viewport_clone(c->vp1,c->img_width,c->img_height);
+	viewport_reconfigure(v);
+
+	return v;
+}
+
+void	composite_set_backing( void *compiz, void *vp )
+{
+	composite_t *c = (composite_t*) compiz;
+	c->back1 = vp;
+}
+
 void	composite_destroy( void *compiz )
 {
 	composite_t *c = (composite_t*) compiz;
@@ -159,7 +178,7 @@ void	composite_destroy( void *compiz )
 	{
 		if(c->proj_plane[0]) free(c->proj_plane[0]);
 		if(c->vp1) viewport_destroy( c->vp1 );
-		if(c->back1) viewport_destroy(c->back1);
+		//if(c->back1) viewport_destroy(c->back1);
 		if(c->scaler)	yuv_free_swscaler( c->scaler );	
 		if(c->back_scaler) yuv_free_swscaler(c->back_scaler);
 		if(c->frame1) free(c->frame1);
@@ -198,6 +217,9 @@ int	composite_load_config( void *compiz, void *vc )
 	int res = viewport_reconfigure_from_config( c->vp1, vc );
 	//@ push to back1 too!
 	if(res) {
+#ifdef STRICT_CHECKING
+		assert(c->back1 != NULL );
+#endif
 		viewport_update_from(c->vp1, c->back1 );
 		c->Y_only = cm;
 		return m;
@@ -207,9 +229,10 @@ int	composite_load_config( void *compiz, void *vc )
 
 int	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y )
 {
-	composite_t *c = (composite_t*) compiz; 	
+	composite_t *c = (composite_t*) compiz; 
 	if(viewport_external_mouse( c->vp1, c->proj_plane, mouse_x, mouse_y, mouse_button, 1,w_x,w_y )) {
-		viewport_update_from(c->vp1, c->back1 );
+		if(c->back1) 
+			viewport_update_from(c->vp1, c->back1 );
 		return 1;
 	}
 	return 0;
@@ -251,11 +274,6 @@ static inline void	composite_scale( composite_t *c, VJFrame *input, VJFrame *out
 #ifdef STRICT_CHECKING
 	assert( unicap_pf_str(input->format) != NULL );
 #endif
-/*	veejay_msg(0 ,"%s: scale %p (%dx%d) %s to %p (%dx%d) %s", __FUNCTION__,
-			input,input->width,input->height, 
-			unicap_pf_str( input->format ),
-			output, output->width,output->height,
-			unicap_pf_str( output->format ) ); */
 	yuv_convert_and_scale(c->scaler,input,output);
 }
 
@@ -277,7 +295,6 @@ int	composite_get_top(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int
 		out[0] = c->proj_plane[0];
 		out[1] = c->proj_plane[1];
 		out[2] = c->proj_plane[2];
-	//FIXME
 		return c->frame3->format;
 	} else 	if( which_vp == 1) {
 		out[0] = c->proj_plane[0];
@@ -310,13 +327,7 @@ void	composite_blit( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which_vp )
 			yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
 		return;
 	} else if (which_vp == 2 ) {
-	/*	if( c->pipe ) {
-			yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height);
-			c->pipe = 0;
-		}
-		else {
-		*/
-			if (c->proj_width != c->img_width &&
+		if (c->proj_width != c->img_width &&
 			c->proj_height != c->img_height && which_vp == 2  )
 			{
 					yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height);
@@ -324,7 +335,6 @@ void	composite_blit( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which_vp )
 			else {
 				yuv422_to_yuyv(in,yuyv,c->proj_width,c->proj_height );	
 			}
-//		}
 		return;
 	} 
 
@@ -401,17 +411,13 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 
 
 /* Chained Frame */
-int	composite_processX(  void *compiz, uint8_t *out_data[3], VJFrame *input )
+int	composite_processX(  void *compiz, void *back1, uint8_t *out_data[3], VJFrame *input )
 {
 	composite_t *c = (composite_t*) compiz;
 #ifdef STRICT_CHECKING
 	assert( input->width == c->frame1->width );
 	assert( input->height == c->frame1->height );
 #endif
-	if(c->back_run == 0 ) {
-		viewport_reconfigure(c->back1);
-		c->back_run = 1;
-	}
 
 	if(!input->ssm) /* supersample to YUV 4:4:4 */
 	{
@@ -422,8 +428,9 @@ int	composite_processX(  void *compiz, uint8_t *out_data[3], VJFrame *input )
 	assert( input->data[0] != out_data[0] );
 	assert( input->data[1] != out_data[1] );
 	assert( input->data[2] != out_data[2] );
+	assert( back1 != NULL );
 #endif
-	viewport_produce_bw_img(c->back1,input->data,out_data,c->Y_only);
+	viewport_produce_bw_img( back1,input->data,out_data,c->Y_only);
 
 	c->has_back = 1;
 

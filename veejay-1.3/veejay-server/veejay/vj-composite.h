@@ -28,7 +28,7 @@ int	composite_get_colormode(void *compiz);
 
 int	composite_get_top(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int mode );
 
-int	composite_processX(  void *compiz, uint8_t *tmp_data[3], VJFrame *input );
+int	composite_processX(  void *compiz, void *back1,uint8_t *tmp_data[3], VJFrame *input );
 
 int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_vp );
 
@@ -39,6 +39,10 @@ int	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int
 void	composite_destroy( void *compiz );
 
 void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int sample_mode, int zoom_type, int pf );
+
+void	composite_set_backing( void *compiz, void *vp );
+
+void	*composite_clone( void *compiz );
 
 void	*composite_get_vp( void *data );
 void	composite_set_ui(void *compiz, int status );

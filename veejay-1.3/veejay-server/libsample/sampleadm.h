@@ -176,6 +176,7 @@ typedef struct sample_info_t {
     void	*kf;
     int          composite;
     void	*viewport_config;
+    void	*viewport;
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
@@ -346,6 +347,8 @@ extern int sample_read_edl( sample_info *sample );
 
 extern int     sample_max_video_length(int s1);
 
+extern	int	sample_set_composite_view(int s1, void *vp );
+extern void	*sample_get_composite_view(int s1);
 
 #ifdef HAVE_XML2
 extern void CreateSample(xmlNodePtr node, sample_info * sample, void *font);

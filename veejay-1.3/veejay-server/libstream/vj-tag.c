@@ -22,6 +22,7 @@
 #include <libhash/hash.h>
 #include <libvje/vje.h>
 #include <linux/videodev.h>
+#include <veejay/vj-viewport.h>
 #include <veejay/vjkf.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -864,8 +865,11 @@ int vj_tag_del(int id)
 
 	if(tag->socket_frame)
 		free(tag->socket_frame);
+	if(tag->viewport)
+		viewport_destroy(tag->viewport);
 
       	free(tag);
+	tag = NULL;
       	avail_tag[ next_avail_tag] = id;
       	next_avail_tag++;
       	hash_delete(TagHash, tag_node);
@@ -929,6 +933,19 @@ void	vj_tag_reload_config( void *compiz, int t1, int mode )
 		}
 		vj_tag_update(tag, t1);
 	}
+}
+void	*vj_tag_get_composite_view( int t1 )
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return NULL;
+	return tag->viewport;
+}
+int	vj_tag_set_composite_view( int t1, void *vp )
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return -1;
+	tag->viewport = vp;
+	return (vj_tag_update(tag,t1));
 }
 
 int	vj_tag_set_composite( void *compiz,int t1, int n )
