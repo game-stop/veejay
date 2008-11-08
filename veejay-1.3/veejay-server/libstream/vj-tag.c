@@ -959,7 +959,6 @@ int	vj_tag_set_composite( void *compiz,int t1, int n )
 	}
 #ifdef STRICT_CHECKING
 	assert( tag->viewport_config != NULL );
-	assert( n > 0 );
 #endif
 	composite_add_to_config( compiz, tag->viewport_config, n );
 	

@@ -38,8 +38,6 @@
 #include <assert.h>
 #endif
 
-#define BUFFERS	2	
-
 //register_callback method for unicap. locking problem.
 //#define USE_UNICAP_CB 1
 
@@ -48,13 +46,15 @@
  *  In practice, it will block up to 40 ms when playing PAL at 25 fps. Meanwhile,
  *  we must continue rendering.
  */
+#define BUFFERS 4
 typedef struct
 {
 	unicap_handle_t handle;
 	unicap_device_t device;
 	unicap_format_t format_spec;
 	unicap_format_t format;
-	unicap_data_buffer_t buffer;
+	unicap_data_buffer_t buffer;	
+	unicap_data_buffer_t mbuf[BUFFERS];
 	pthread_mutex_t mutex;
 #ifndef USE_UNICAP_CB
 	pthread_t	thread;
@@ -149,16 +149,14 @@ static	void	vj_unicap_new_frame_cb( unicap_event_t event, unicap_handle_t handle
 			unicap_data_buffer_t *ready_buffer, vj_unicap_t *v );
 
 #ifdef STRICT_CHECKING
-static void lock__(vj_unicap_t *t, const char *f) {
-//	veejay_msg(0,"%s: from %s, %p", __FUNCTION__,f,t );
+static void lock__(vj_unicap_t *t, const char *f, int line) {
 	pthread_mutex_lock(&(t->mutex));
 }
-static void unlock__(vj_unicap_t *t, const char *f) {
-//	veejay_msg(0,"%s: from %s, %p", __FUNCTION__,f,t);
+static void unlock__(vj_unicap_t *t, const char *f, int line) {
 	pthread_mutex_unlock(&(t->mutex));
 }
-#define lock_(t) lock__(t,__FUNCTION__)
-#define unlock_(t) unlock__(t, __FUNCTION__ )
+#define lock_(t) lock__(t,__FUNCTION__,__LINE__)
+#define unlock_(t) unlock__(t, __FUNCTION__ ,__LINE__)
 
 #else
 static void lock_(vj_unicap_t *t)
@@ -1016,6 +1014,7 @@ static int	vj_unicap_start_capture_( void *vut )
 	assert( v->active == 0 );
 	assert( v->state == 0 );
 #endif
+	int i;
 
 	if( v->src_width == v->dst_width && v->src_height == v->dst_height ) {
 		v->priv_buf = (uint8_t*) vj_calloc( v->dst_width * v->dst_height * 4 * sizeof(uint8_t) );
@@ -1026,6 +1025,12 @@ static int	vj_unicap_start_capture_( void *vut )
 		} else  {
 			veejay_memset( v->buffer.data, 0, v->src_sizes[0]);
 		}
+		for( i = 0; i < BUFFERS; i ++ )
+		{
+			veejay_memset( &(v->mbuf[i]),0x0, sizeof(unicap_data_buffer_t));	
+			v->mbuf[i].data = vj_malloc(v->frame_size * sizeof(uint8_t));
+		}
+		
 	} else {
 #ifdef STRICT_CHECKING
 		assert( v->dst_width > 0 );
@@ -1034,6 +1039,12 @@ static int	vj_unicap_start_capture_( void *vut )
 #endif
 		v->priv_buf = (uint8_t*) vj_calloc( v->dst_width * v->dst_height * 4 * sizeof(uint8_t) );
 		v->buffer.data = vj_calloc( v->format.buffer_size * sizeof(uint8_t) * 2  );
+		for( i = 0; i < BUFFERS; i ++ )
+		{
+			veejay_memset( &(v->mbuf[i]),0x0, sizeof(unicap_data_buffer_t));	
+			v->mbuf[i].data = vj_calloc(v->format.buffer_size * sizeof(uint8_t));
+		}
+
 
 	}
 
@@ -1052,12 +1063,23 @@ static int	vj_unicap_start_capture_( void *vut )
 		return 0;
      	}
 #ifndef USE_UNICAP_CB
-	if( ! SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer) )) )
+/*	if( ! SUCCESS( unicap_queue_buffer( v->handle, &(v->buffer) )) )
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Failed to queue buffer ",__FUNCTION__,__LINE__);
 		free(v->priv_buf);
 		v->priv_buf = NULL;
 		return 0;
+	}
+*/
+	for( i = 0; i < BUFFERS; i ++ )  {
+
+		if( ! SUCCESS( unicap_queue_buffer( v->handle, &(v->mbuf[i]) )) )
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Failed to queue buffer ",__FUNCTION__,__LINE__);
+			free(v->priv_buf);
+			v->priv_buf = NULL;
+			return 0;
+		}
 	}
 #endif
 	v->active = 1;
@@ -1085,17 +1107,17 @@ void	vj_unicap_set_pause( void *vut , int status ) {
 int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const int height )
 {
 	vj_unicap_t *v = (vj_unicap_t*) vut;
-	lock_( vut );
+//	lock_( vut );
 
 	if(v->active == 0 || v->state == 0 )
 	{
-		unlock_(vut);
+//		unlock_(vut);
 		return 0;
 	}
 	
 	if( v->pause )
 	{
-		unlock_(vut);
+//		unlock_(vut);
 		return 1;
 	}	
 
@@ -1105,6 +1127,7 @@ int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const 
 //veejay_msg(0, "Copy captured frame:%dx%d, sizes=%d,%d,%d,dst=%d,%d,%d,rgb=%d",
 //	v->src_width,v->src_height,v->sizes[0],v->sizes[1],v->sizes[2],
 //		v->dst_sizes[0],v->dst_sizes[1],v->dst_sizes[2],v->rgb );
+	lock_(vut);
 	if( v->src_width == v->dst_width && v->src_height == v->dst_height )
 	{
 		uint8_t *src[3];
@@ -1141,11 +1164,36 @@ int	vj_unicap_grab_frame( void *vut, uint8_t *buffer[3], const int width, const 
 	return 1;
 }
 #ifndef USE_UNICAP_CB
+
+static void print_fps( )
+{
+   static struct timeval next,current;
+   static int count = 0;
+   suseconds_t usec;
+
+   if( count == 0 )
+   {
+      gettimeofday(&next, NULL);
+      next.tv_sec += 1;
+   }
+
+   count++;
+	
+   gettimeofday(&current, NULL);
+
+   if( timercmp( &next, &current, <= ) )
+   {
+      printf( "FPS: %d\n", count );
+      count = 0;
+   }
+}	
+
 int	vj_unicap_grab_a_frame( void *vut )
 {
 	vj_unicap_t *v = (vj_unicap_t*) vut;
 	unicap_data_buffer_t *ready_buffer = NULL;
 	uint8_t *buffer[3];
+	int i;
 	if( v->src_width == v->dst_width && v->src_height == v->dst_height ) 
 	{
 		buffer[0] = v->priv_buf;
@@ -1162,12 +1210,37 @@ int	vj_unicap_grab_a_frame( void *vut )
 		veejay_msg(VEEJAY_MSG_ERROR, "Capture not started on device %d", v->deviceID);
  		return 0;
 	}
-	if(! SUCCESS(unicap_wait_buffer(v->handle, &ready_buffer ) ))
+
+	int buffers_ready = 0;
+
+	if( v->state == 0 || v->active == 0 )
 	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Failed to wait for buffer from device %s",
-				v->device.identifier );
+		return 0;
+	}
+
+
+	if(!SUCCESS(unicap_poll_buffer( v->handle, &buffers_ready ) ) ) {
+		buffers_ready = 1;
+	}
+
+	if( buffers_ready == 0 )
+		return 0;
+
+	for( i = 0; i < buffers_ready-1; i ++ ) {
+		if(! SUCCESS(unicap_wait_buffer(v->handle, &ready_buffer ) ))
+		{
+			veejay_msg(VEEJAY_MSG_WARNING, "Failed to wait for buffer from device %s",
+					v->device.identifier );
+			return 1;
+		}
+		unicap_queue_buffer( v->handle, ready_buffer );
+	}
+
+	if( (!SUCCESS(unicap_wait_buffer(v->handle,&ready_buffer ) ) ) ) {
+		veejay_msg(0, "Failed to wait for buffer on device");
 		return 1;
 	}
+
 	if( ready_buffer->buffer_size <= 0 )
 	{
 		veejay_msg(0, "Unicap returned a buffer of size 0!");	
@@ -1179,14 +1252,8 @@ int	vj_unicap_grab_a_frame( void *vut )
 		veejay_msg(0, "Unicap returned a NULL buffer!");	
 		return 0;
 	}
-
+	//print_fps();
 	lock_(vut);
-
-	if( v->state == 0 || v->active == 0 )
-	{
-		unlock_(vut);
-		return 0;
-	}
 	if(!v->rgb)
 	{
 		if( v->src_width == v->dst_width && v->src_height == v->dst_height )
@@ -1246,7 +1313,8 @@ int	vj_unicap_grab_a_frame( void *vut )
 			free(dsti);
 		}
 	}
-	
+	unlock_(vut);
+
 	if( ! SUCCESS( unicap_queue_buffer( v->handle, ready_buffer) )) 
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Failed to queue buffer ",__FUNCTION__,__LINE__);
@@ -1257,8 +1325,6 @@ int	vj_unicap_grab_a_frame( void *vut )
 		veejay_memset( buffer[2], 128, v->dst_sizes[0]);
 	}
 
-	unlock_(vut);
-	
 	return 1;
 }
 #else
@@ -1333,6 +1399,15 @@ int		vj_unicap_status(void *vut)
 }
 
 #ifndef USE_UNICAP_CB
+static  void    unicap_delay(long nsec )
+{
+        struct timespec ts;
+        ts.tv_sec = 0;
+        ts.tv_nsec = nsec * 1000000;
+        nanosleep( &ts, NULL );
+}
+
+
 static void	*unicap_reader_thread(void *data)
 {
 	vj_unicap_t *v = (vj_unicap_t*) data;
@@ -1360,16 +1435,17 @@ static void	*unicap_reader_thread(void *data)
 	}
 	
 	v->state = 1; // thread run
-
+	//long s = 85000;
 	while( v->state )
 	{
 		if( v->active )
-		{
+		{	
 			if(vj_unicap_grab_a_frame( data )==0)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Unable to grab a frame from capture device %d", v->deviceID);
 				v->state = 0;
 			}
+		//	unicap_delay( s );
 		}
 	}
 
