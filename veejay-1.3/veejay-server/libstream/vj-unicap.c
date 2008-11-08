@@ -707,9 +707,9 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 		vut->format.buffer_size = vut->frame_size;
 		vut->format.size.width = vut->src_width;
 		vut->format.size.height = vut->src_height;
-#ifdef STRICT_CHECKING
-		assert( vut->frame_size > 0 );
-#endif
+
+		if(vut->frame_size<=0 )
+			search = 1;
 	}
 
 	if( search || !SUCCESS( unicap_set_format( vut->handle, &(vut->format) ) )  )
