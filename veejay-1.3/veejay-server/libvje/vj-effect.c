@@ -851,6 +851,11 @@ int vj_effect_get_summary_len(int entry)
 	len += 2;
 	len += 3;
 	len += ( p * 18 );
+	int i;
+	for( i = 0; i < p; i ++ )
+		len += (strlen(vj_effects[entry]->param_description[i])+3);
+	
+
 	return len;
 }
 
@@ -858,7 +863,7 @@ int vj_effect_get_summary(int entry, char *dst)
 {
 	int p = vj_effects[entry]->num_params;
 	int i;		
-	char tmp[20];
+	char tmp[512];
 
 	if(!vj_effects[entry])
 		return 0;
@@ -873,7 +878,7 @@ int vj_effect_get_summary(int entry, char *dst)
 		);
 	for(i=0; i < p; i++)
 	{
-		bzero(tmp,20);
+		bzero(tmp,512);
 		sprintf(tmp,
 			"%06d%06d%06d%03d%s",
 			vj_effects[entry]->limits[0][i],

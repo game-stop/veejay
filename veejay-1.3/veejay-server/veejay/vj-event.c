@@ -8601,14 +8601,13 @@ void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)
 	priv_msg = (char*) malloc(sizeof(char) * (5 + len + 1000));
 	memset(priv_msg, 0, (5+len+100));
 	sprintf(priv_msg, "%05d", len );
-
+	char line[1025];
+	char fline[1025];
 	for(i=1; i < vj_effect_max_effects(); i++)
 	{
-		char line[300];
-		char fline[300];
 		int effect_id = vj_effect_get_real_id(i);
-		veejay_memset(line,0, 300);
-		veejay_memset(fline,0,300);
+		veejay_memset(line,0, sizeof(line));
+		veejay_memset(fline,0,sizeof(fline));
 		if(vj_effect_get_summary(i,line))
 		{
 			sprintf(fline, "%03d%s", strlen(line), line );
