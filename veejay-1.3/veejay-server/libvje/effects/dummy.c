@@ -32,13 +32,6 @@ vj_effect *dummy_init(int w, int h)
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
-    /*
-       ve->param_description = (char**)vj_calloc(sizeof(char)* ve->num_params);
-       for(i=0; i < ve->num_params; i++) {
-       ve->param_description[i] = (char*)vj_calloc(sizeof(char) * 100);
-       }
-       sprintf(ve->param_description[0], "Static color");
-     */
     ve->defaults[0] = 3;
 
     ve->limits[0][0] = 0;
@@ -48,6 +41,7 @@ vj_effect *dummy_init(int w, int h)
     ve->sub_format = 0;
     ve->extra_frame = 0;
 	ve->has_user= 0;
+	ve->param_description = vje_build_param_list(ve->num_params, "Color");
 	return ve;
 }
 void dummy_apply( VJFrame *frame, int width, int height, int color)

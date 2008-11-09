@@ -246,7 +246,7 @@ void vj_effman_apply_image_effect(
 		baltantv_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
 		break;
 	case VJ_IMAGE_EFFECT_CHAMELEON:
-		chameleon_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
+		chameleon_apply(frames[0],frameinfo->width,frameinfo->height,arg[0]);
 		break;
 	case VJ_IMAGE_EFFECT_TIMEDISTORT:
 		timedistort_apply(frames[0],frameinfo->width,frameinfo->height,arg[0]);
@@ -365,7 +365,7 @@ void vj_effman_apply_image_effect(
 	break;
 	case VJ_IMAGE_EFFECT_CONTOUR:
 	contourextract_apply( vj_effects[entry]->user_data, frames[0],
-			frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5] );	
+			frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4] );	
 	break;
      case VJ_IMAGE_EFFECT_SLICE:
 	if(arg[2] > 0) { 
@@ -385,7 +385,7 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
 
     switch(e) {
 	case VJ_VIDEO_EFFECT_CHAMBLEND:
-		chameleonblend_apply(frames[0],frames[1], frameinfo->width,frameinfo->height,arg[0],arg[1]);
+		chameleonblend_apply(frames[0],frames[1], frameinfo->width,frameinfo->height,arg[0]);
 		break;
 	case VJ_VIDEO_EFFECT_EXTDIFF:
 		differencemap_apply( frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
@@ -465,11 +465,11 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
 	break;
       case VJ_VIDEO_EFFECT_DIFF:
 	diff_apply( vj_effects[entry]->user_data, frames[0], frames[1],
-		   frameinfo->width, frameinfo->height, arg[0], arg[1],arg[2],arg[3], arg[4]);
+		   frameinfo->width, frameinfo->height, arg[0], arg[1],arg[2],arg[3]);
 	break;
 	case VJ_VIDEO_EFFECT_TEXMAP:
 	texmap_apply( vj_effects[entry]->user_data, frames[0],frames[1],
-			frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5] );	
+			frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4] );	
 	break;
       case VJ_VIDEO_EFFECT_WHITEFRAME:
 	whiteframe_apply(frames[0], frames[1], frameinfo->width, frameinfo->height);
@@ -608,6 +608,12 @@ int vj_effect_prepare( VJFrame *frame, int selector)
 				return bgsubtract_prepare( frame->data, frame->width,frame->height );
 			}
 			break;	
+		case 	VJ_IMAGE_EFFECT_CONTOUR:
+			fx_id = vj_effect_real_to_sequence(selector);
+			if(fx_id>=0 && vj_effects[fx_id] ) {
+				return contourextract_prepare(frame->data,frame->width,frame->height );
+			}
+			break;
 		case	VJ_VIDEO_EFFECT_DIFF:
 			if( !vj_effect_has_cb(selector))
 				return 0;
@@ -617,6 +623,35 @@ int vj_effect_prepare( VJFrame *frame, int selector)
 				return diff_prepare(	(void*) vj_effects[fx_id]->user_data,	frame->data,	frame->width,	frame->height );
 			}	
 			break;
+		case 	VJ_IMAGE_EFFECT_CHAMELEON:
+			fx_id = vj_effect_real_to_sequence( selector );
+			if( fx_id >= 0 && vj_effects[fx_id])
+			{
+				return chameleon_prepare(	frame->data,	frame->width,	frame->height );
+			}	
+			break;
+		case 	VJ_IMAGE_EFFECT_MOTIONMAP:
+			fx_id = vj_effect_real_to_sequence( selector );
+			if( fx_id >= 0 && vj_effects[fx_id])
+			{
+				return	motionmap_prepare(	frame->data,	frame->width,	frame->height );
+			}	
+			break;
+		case	VJ_VIDEO_EFFECT_TEXMAP:
+			fx_id = vj_effect_real_to_sequence( selector );
+			if( fx_id >= 0 && vj_effects[fx_id] )
+			{	
+				return texmap_prepare( frame->data, frame->width, frame->height );	
+			}
+			break;
+		case 	VJ_VIDEO_EFFECT_CHAMBLEND:
+			fx_id = vj_effect_real_to_sequence( selector );
+			if( fx_id >= 0 && vj_effects[fx_id])
+			{
+				return chameleonblend_prepare(	frame->data,	frame->width,	frame->height );
+			}	
+			break;
+
 		default:
 			break;
 	}

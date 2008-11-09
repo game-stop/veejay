@@ -75,7 +75,7 @@ vj_effect *rgbkey_init(int w,int h)
     ve->limits[0][5] = 1;
     ve->limits[1][5] = 6300;
 
-
+	ve->param_description = vje_build_param_list(ve->num_params, "Angle", "Red", "Green", "Blue", "Mode", "Noise suppression");
 	ve->has_user = 0;
     ve->description = "Chroma Key (RGB)";
     ve->extra_frame = 1;

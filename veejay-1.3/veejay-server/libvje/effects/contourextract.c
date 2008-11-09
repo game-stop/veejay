@@ -62,7 +62,7 @@ vj_effect *contourextract_init(int width, int height)
 {
     //int i,j;
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 6;
+    ve->num_params = 5;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
@@ -72,25 +72,23 @@ vj_effect *contourextract_init(int width, int height)
     ve->limits[1][1] = 1;
     ve->limits[0][2] = 0;	/* show thresholded image / contour */
     ve->limits[1][2] = 2;
-    ve->limits[0][3] = 0;       /* switch to take bg mask */
-    ve->limits[1][3] = 1;
-    ve->limits[0][4] = 1;	/* thinning */
-    ve->limits[1][4] = 100;
-    ve->limits[0][5] = 1;	/* minimum blob weight */
-    ve->limits[1][5] = 5000;
+    ve->limits[0][3] = 1;	/* thinning */
+    ve->limits[1][3] = 100;
+    ve->limits[0][4] = 1;	/* minimum blob weight */
+    ve->limits[1][4] = 5000;
     
     ve->defaults[0] = 30;
     ve->defaults[1] = 0;
     ve->defaults[2] = 0;
-    ve->defaults[3] = 0;
-    ve->defaults[4] = 3;
-    ve->defaults[5] = 200;
+    ve->defaults[3] = 3;
+    ve->defaults[4] = 200;
     
     ve->description = "Contour extraction";
     ve->extra_frame = 0;
     ve->sub_format = 0;
     ve->has_user = 1;
     ve->user_data = NULL;
+	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Mode", "Show image/contour", "Thinning", "Min weight" );
     return ve;
 }
 
@@ -189,12 +187,12 @@ void contourextract_free(void *d)
 	d = NULL;
 }
 
-void contourextract_prepare(void *user, uint8_t *map[3], int width, int height)
+int contourextract_prepare(uint8_t *map[3], int width, int height)
 {
 	if(!static_bg )
 	{
 		veejay_msg(0,"FX \"Map B to A (substract background mask)\" not initialized");
-		return;
+		return 0;
 	}
 	
 	veejay_memcpy( static_bg, map[0], (width*height));
@@ -207,6 +205,7 @@ void contourextract_prepare(void *user, uint8_t *map[3], int width, int height)
 	softblur_apply( &tmp, width,height,0);
 
 	veejay_msg(0, "Snapped and softblurred current frame to use as background mask");
+	return 1;
 }
 
 static	void	binarify( uint8_t *bm, uint32_t *dst, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len )

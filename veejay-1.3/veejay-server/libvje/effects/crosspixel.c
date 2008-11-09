@@ -43,6 +43,7 @@ vj_effect *crosspixel_init(int w, int h)
     ve->sub_format = 0;
     ve->extra_frame = 0;
 	ve->has_user = 0;
+	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Size" );
     return ve;
 }
 // FIXME private

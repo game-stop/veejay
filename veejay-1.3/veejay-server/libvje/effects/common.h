@@ -23,6 +23,8 @@
 
 
 #include <config.h>
+#include <stdarg.h>
+#include <string.h>
 #include <stdlib.h>
 #include <stdint.h>
 #include <sys/types.h>
@@ -276,6 +278,7 @@ unsigned int fastrand(int val);
 int bl_pix_get_color_y(int color_num);
 int bl_pix_get_color_cb(int color_num);
 int bl_pix_get_color_cr(int color_num);
+
 
 void	memset_ycbcr(	uint8_t *in, 
 			uint8_t *out, 

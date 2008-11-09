@@ -46,6 +46,7 @@ vj_effect *transline_init(int width, int height)
     ve->description = "Transition Line";
     ve->extra_frame = 1;
 	ve->has_user = 0;
+	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Line width", "Distance" , "Mode");
     return ve;
 }
 

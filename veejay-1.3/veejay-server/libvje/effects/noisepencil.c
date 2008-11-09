@@ -44,7 +44,7 @@ vj_effect *noisepencil_init(int width , int height)
     ve->limits[1][2] = 255;
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 255;
-
+	ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Amplification", "Min Threshold", "Max Threshold");
     ve->description = "Noise Pencil";
 
     ve->extra_frame = 0;

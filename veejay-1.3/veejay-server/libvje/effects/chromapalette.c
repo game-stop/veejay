@@ -60,6 +60,7 @@ vj_effect *chromapalette_init(int w, int h)
     ve->has_help = 1;
 	ve->has_user = 0;
 	ve->rgb_conv = 1;
+	ve->param_description = vje_build_param_list( ve->num_params, "Angle", "Red","Green","Blue", "Chroma Blue","Chroma Red" );
     return ve;
 }
 

@@ -39,6 +39,7 @@ vj_effect *color_init(int w, int h)
     ve->limits[1][2] = 255;
     ve->sub_format = 0;
     ve->description = "Color Enhance";
+	ve->param_description = vje_build_param_list( ve->num_params, "Intensity Y", "Intensity U", "Intensity V" ); 
 	ve->has_user = 0;
     ve->extra_frame = 0;
     return ve;

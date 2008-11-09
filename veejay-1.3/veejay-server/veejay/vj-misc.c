@@ -72,7 +72,7 @@ unsigned int vj_get_relative_time()
     return relative;
 }
 
-int vj_perform_take_bg(veejay_t *info, uint8_t **src)
+int vj_perform_take_bg(veejay_t *info, uint8_t **src, int ssm)
 {
 	VJFrame frame;
 	veejay_memcpy( &frame, info->effect_frame1, sizeof(VJFrame));
@@ -80,9 +80,18 @@ int vj_perform_take_bg(veejay_t *info, uint8_t **src)
 	frame.data[1] = src[1];
 	frame.data[2] = src[2];
 
-	int n = vj_effect_prepare( &frame, VJ_IMAGE_EFFECT_BGSUBTRACT );
-	n += vj_effect_prepare( &frame, VJ_VIDEO_EFFECT_DIFF );
-
+	int n = 0;
+	
+	if(!ssm) {
+		n += vj_effect_prepare( &frame, VJ_IMAGE_EFFECT_BGSUBTRACT );
+		n += vj_effect_prepare( &frame, VJ_VIDEO_EFFECT_DIFF );
+		n += vj_effect_prepare( &frame, VJ_IMAGE_EFFECT_MOTIONMAP );	
+		n += vj_effect_prepare( &frame, VJ_IMAGE_EFFECT_CONTOUR );
+		n += vj_effect_prepare( &frame, VJ_VIDEO_EFFECT_TEXMAP);
+	} else {
+		n += vj_effect_prepare( &frame, VJ_VIDEO_EFFECT_CHAMBLEND );
+		n += vj_effect_prepare( &frame, VJ_IMAGE_EFFECT_CHAMELEON );
+	}
 	return n;
 }
 

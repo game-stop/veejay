@@ -31,7 +31,6 @@
 
 #include "softblur.h"
 static uint8_t *static_bg = NULL;
-static int take_bg_ = 0;
 static uint32_t *dt_map = NULL;
 static void *shrink_ = NULL;
 static sws_template template_;
@@ -63,7 +62,7 @@ vj_effect *texmap_init(int width, int height)
 {
     //int i,j;
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 6;
+    ve->num_params = 5;
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
@@ -73,20 +72,19 @@ vj_effect *texmap_init(int width, int height)
     ve->limits[1][1] = 1;
     ve->limits[0][2] = 0;	/* show mask */
     ve->limits[1][2] = 4;
-    ve->limits[0][3] = 0;       /* switch to take bg mask */
-    ve->limits[1][3] = 1;
-    ve->limits[0][4] = 1;	/* thinning */
-    ve->limits[1][4] = 100;
-    ve->limits[0][5] = 1;	/* minimum blob weight */
-    ve->limits[1][5] = 5000;
+    ve->limits[0][3] = 1;	/* thinning */
+    ve->limits[1][3] = 100;
+    ve->limits[0][4] = 1;	/* minimum blob weight */
+    ve->limits[1][4] = 5000;
     
     ve->defaults[0] = 30;
     ve->defaults[1] = 0;
     ve->defaults[2] = 2;
-    ve->defaults[3] = 0;
-    ve->defaults[4] = 5;
-    ve->defaults[5] = 200;
-    
+    ve->defaults[3] = 5;
+    ve->defaults[4] = 200;
+   
+	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Reverse", "Show mask", "Thinning", "Min blob weight");
+ 
     ve->description = "Map B to A (sub bg, texture map))";
     ve->extra_frame = 1;
     ve->sub_format = 1;
@@ -190,12 +188,12 @@ void texmap_free(void *d)
 	d = NULL;
 }
 
-void texmap_prepare(void *user, uint8_t *map[3], int width, int height)
+int texmap_prepare(uint8_t *map[3], int width, int height)
 {
 	if(!static_bg )
 	{
 		veejay_msg(0,"FX \"Map B to A (substract background mask)\" not initialized");
-		return;
+		return 0;
 	}
 	
 	veejay_memcpy( static_bg, map[0], (width*height));
@@ -208,6 +206,7 @@ void texmap_prepare(void *user, uint8_t *map[3], int width, int height)
 	softblur_apply( &tmp, width,height,0);
 
 	veejay_msg(0, "Snapped and softblurred current frame to use as background mask");
+	return 1;
 }
 
 static	void	binarify( uint8_t *bm, uint32_t *dst, uint8_t *bg, uint8_t *src,int threshold,int reverse, const int len )
@@ -248,7 +247,7 @@ static int bg_frame_ = 0;
 
 void texmap_apply(void *ed, VJFrame *frame,
 		VJFrame *frame2, int width, int height, 
-		int threshold, int reverse,int mode, int take_bg, int feather, int min_blob_weight)
+		int threshold, int reverse,int mode, int feather, int min_blob_weight)
 {
     
 	unsigned int i,j,k;
@@ -279,20 +278,6 @@ void texmap_apply(void *ed, VJFrame *frame,
 	
 	texmap_data *ud = (texmap_data*) ed;
 
-	if( take_bg != take_bg_ )
-	{
-		veejay_memcpy( static_bg, frame->data[0], frame->len );
-	/*	VJFrame tmp;
-		veejay_memset( &tmp, 0, sizeof(VJFrame));
-		tmp.data[0] = static_bg;
-		tmp.width = width;
-		tmp.height = height;
-		softblur_apply( &tmp, width,height,0);
-	*/
-		take_bg_ = take_bg;
-		bg_frame_ ++;
-		return;
-	}
 	if( bg_frame_ > 0 && bg_frame_ < 4 )
 	{
 		for( i = 0 ; i < len ; i ++ )

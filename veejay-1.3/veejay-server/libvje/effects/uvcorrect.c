@@ -78,6 +78,8 @@ vj_effect *uvcorrect_init(int w, int h)
     ve->defaults[5] = pixel_U_lo_; 
     ve->defaults[6] = pixel_U_hi_;
     ve->description = "U/V Correction";
+	ve->param_description = vje_build_param_list( ve->num_params, "Angle" ,"U Rotate Center", "V Rotate Center",
+			"Intensity U", "Intensity V", "Minimum UV", "Maximum UV");
 
     ve->sub_format = 0;
     ve->extra_frame = 0;

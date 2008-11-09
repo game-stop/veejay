@@ -42,7 +42,7 @@ vj_effect *diffimg_init(int width, int height)
 
     ve->limits[1][2] = 255;
     ve->limits[0][2] = 1;
-
+	ve->param_description = vje_build_param_list( ve->num_params,"Mode", "Min threshold", "Max threshold" );
     ve->description = "Enhanced Magic Blend";
     ve->extra_frame = 0;
     ve->sub_format = 0;

@@ -54,6 +54,7 @@ vj_effect *fadecolorrgb_init(int w,int h)
     ve->description = "Transition Fade to Color by RGB";
 	ve->has_user = 0;
     ve->extra_frame = 0;
+	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Red","Green", "Blue", "Mode", "Frame length");
     return ve;
 }
 

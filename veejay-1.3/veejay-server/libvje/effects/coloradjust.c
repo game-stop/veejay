@@ -41,7 +41,7 @@ vj_effect *coloradjust_init(int w, int h)
     ve->limits[1][1] = 256;
     ve->defaults[0] = 50;
     ve->defaults[1] = 50;
-
+	ve->param_description = vje_build_param_list( ve->num_params, "Degrees", "Intensity" );
     ve->description = "Hue and Saturation";
     ve->extra_frame = 0;
     ve->sub_format = 0;

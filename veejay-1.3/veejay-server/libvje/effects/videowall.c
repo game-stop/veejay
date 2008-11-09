@@ -52,6 +52,7 @@ vj_effect *videowall_init(int w, int h)
     ve->sub_format = 1; // todo: optimize to work in 4:2:0/4:2:2, see also photo/video play.c
     ve->extra_frame = 1;
     ve->has_user = 0;
+	ve->param_description = vje_build_param_list( ve->num_params, "Photos","X Displacement", "Y displacement", "Lock update");
     return ve;
 }
 

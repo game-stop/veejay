@@ -47,6 +47,7 @@ vj_effect *lumamagick_init(int width, int height)
    ve->sub_format = 0;
     ve->extra_frame = 1;
 	ve->has_user = 0;
+	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Opacity A", "Opacity B" );
     return ve;
 }
 

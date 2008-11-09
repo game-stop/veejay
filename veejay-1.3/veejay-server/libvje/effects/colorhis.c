@@ -47,7 +47,7 @@ vj_effect *colorhis_init(int w, int h)
     ve->defaults[1] = 0; // draw
     ve->defaults[2] = 200; // intensity
     ve->defaults[3] = 132; // strength
-
+	ve->param_description = vje_build_param_list ( ve->num_params, "Mode (R,G,B,All)", "Draw","Intensity", "Strength" );
     ve->description = "Color Histogram";
     ve->sub_format = 0;
     ve->extra_frame = 0;

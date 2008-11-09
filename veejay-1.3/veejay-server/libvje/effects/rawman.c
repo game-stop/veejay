@@ -39,6 +39,7 @@ vj_effect *rawman_init(int w,int h)
     ve->description = "Raw Data Manipulation";
 	ve->has_user = 0;
     ve->extra_frame = 0;
+	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Value");
     return ve;
 }
 

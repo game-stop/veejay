@@ -42,7 +42,7 @@ vj_effect *contrast_init(int w, int h)
 	ve->has_user = 0;
     ve->extra_frame = 0;
     ve->sub_format = 0;
-
+	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Intensity 1", "Intensity 2" );
     return ve;
 }
 

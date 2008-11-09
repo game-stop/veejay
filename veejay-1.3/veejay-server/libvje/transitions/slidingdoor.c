@@ -44,6 +44,7 @@ vj_effect *slidingdoor_init(int width, int height)
     ve->description = "AlphaLuma Overlay";
     ve->extra_frame = 1;
 	ve->has_user = 0;
+	ve->param_description = NULL;
     return ve;
 }
 

@@ -43,7 +43,8 @@ vj_effect *complexsync_init(int width, int height)
     ve->description = "Out of Sync -Replace selection-";
     ve->sub_format = 1;
     ve->extra_frame = 1;
-	ve->has_user = 0;
+	ve->has_user = 0;	
+	ve->param_description = vje_build_param_list( ve->num_params, "Vertical size", "Mode", "Framespeed" );
     return ve;
 }
 

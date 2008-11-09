@@ -55,6 +55,8 @@ vj_effect *maskstop_init(int width , int height)
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 255;
 
+	ve->param_description = vje_build_param_list( ve->num_params, "Negate Mask", "Swap Mask/Frame", "Hold Frame Frequency", "Hold Mask Frequency");
+
     ve->description = "vvMaskStop";
     ve->sub_format = 1;
     ve->extra_frame = 0;

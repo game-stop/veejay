@@ -37,6 +37,7 @@ vj_effect *overlaymagic_init(int w, int h)
     ve->extra_frame = 1;
     ve->sub_format = 0;
 	ve->has_user = 0;
+	ve->param_description = vje_build_param_list( ve->num_params, "Mode" );
 	   return ve;
 }
 

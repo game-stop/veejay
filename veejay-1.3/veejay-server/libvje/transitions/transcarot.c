@@ -50,6 +50,7 @@ vj_effect *transcarot_init(int width, int height)
     ve->limits[0][5] = 1;
     ve->limits[1][5] = width;
     ve->sub_format = 0;
+	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Mode", "Point size", "By start", "By end","Row");
     ve->description = "Transition Translate Carot";
 	ve->has_user = 0;
     ve->extra_frame = 1;

@@ -47,6 +47,7 @@ vj_effect *differencemap_init(int w, int h)
     ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
+	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Reverse", "Show");
     return ve;
 }
 

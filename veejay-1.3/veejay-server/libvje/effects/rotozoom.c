@@ -58,6 +58,7 @@ vj_effect *rotozoom_init(int width, int height)
     ve->description = "Rotozoom";
     ve->sub_format = 1;
     ve->extra_frame = 0;
+	ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Rotate", "Zoom" , "Automatic");
 	ve->has_user = 0;
     for (j = 0; j < 9; j++) {
 	 test_roto[j] = (int *) vj_malloc(sizeof(int) * 256);

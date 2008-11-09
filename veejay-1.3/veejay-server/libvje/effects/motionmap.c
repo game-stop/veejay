@@ -77,6 +77,7 @@ vj_effect *motionmap_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->n_out = 2;
+	ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Reverse","Draw","History" ,"Capture length");
     return ve;
 }
 
@@ -264,6 +265,19 @@ void	motionmap_interpolate_frame( VJFrame *fx, int N, int n )
         motionmap_lerp_frame( fx, &prev, N, n );
 }
 
+int	motionmap_prepare( uint8_t *map[3], int width, int height )
+{
+	if(!previous_img)
+		return 0;
+
+	veejay_memcpy( previous_img ,map[0], width *height );
+	have_bg = 1;
+	nframe_ = 0;
+	running = 0;
+
+	return 1;
+}
+
 static int stop_capture_ = 0;
 static int reaction_ready_ = 0;
 void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int reverse, int draw, int history, int capbuf )
@@ -277,19 +291,7 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
 	veejay_memcpy( original_img, frame->data[0], len );
 
 	softblur_apply( frame, width,height,0 );
-	if(!have_bg)	
-	{
-		veejay_memcpy( previous_img, frame->data[0], len );
-		have_bg = 1;
-		nframe_ = 0;
-		running = 0;
-		return;
-	}
-	else
-	{
-		update_bgmask( binary_img, previous_img, frame->data[0], len , threshold);
-	}
-
+	update_bgmask( binary_img, previous_img, frame->data[0], len , threshold);
 
 	uint32_t sum = 0,min=0xffff,max=0;
 	uint64_t activity_level1 = 0;

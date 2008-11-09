@@ -38,6 +38,7 @@ vj_effect *frameborder_init(int width, int height)
     ve->description = "Frame Border Translation";
     ve->sub_format = 1;
     ve->extra_frame = 1;
+	ve->param_description = vje_build_param_list( ve->num_params, "Size");
     return ve;
 }
 

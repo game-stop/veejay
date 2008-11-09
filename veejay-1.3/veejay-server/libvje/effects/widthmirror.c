@@ -38,6 +38,7 @@ vj_effect *widthmirror_init(int max_width,int h)
     ve->sub_format = 0;
     ve->extra_frame = 0;
     ve->has_user = 0;
+	ve->param_description = vje_build_param_list( ve->num_params, "Widths");
     return ve;
 }
 

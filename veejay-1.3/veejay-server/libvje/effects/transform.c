@@ -43,6 +43,7 @@ vj_effect *transform_init(int width,int height)
     ve->sub_format = 0;
     ve->extra_frame = 0;
    	ve->has_user = 0;
+	ve->param_description = vje_build_param_list(ve->num_params, "Cubics");
     return ve;
 }
 

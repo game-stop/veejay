@@ -27,6 +27,26 @@
 
 #include "common.h"
 
+char	**vje_build_param_list( int num, ... )
+{
+	va_list args;
+	char buf[1024];
+	char **list;
+	char *tmp = NULL;
+	list = (char**) vj_malloc(sizeof(char*) * num );
+
+	va_start( args, num );
+
+	int i;
+	for( i = 0; i <num; i ++ ) {
+		tmp = (char*) va_arg( args,char*);
+		if(tmp==NULL)
+			continue;
+		list[i] = strdup(tmp);
+	}
+	va_end(args);
+	return list;
+}
 static inline void linearBlend(unsigned char *src, int stride)
 {
   int x;

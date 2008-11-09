@@ -40,7 +40,7 @@ typedef struct {
 vj_effect *motionmap_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 5;
+    ve->num_params = 3;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
@@ -50,21 +50,22 @@ vj_effect *motionmap_init(int w, int h)
     ve->limits[0][1] = 50;  // reverse
     ve->limits[1][1] = 10000;
     ve->limits[0][2] = 0;
-    ve->limits[1][2] = 1;
-    ve->limits[0][4] = 0; // buffer 
+    ve->limits[1][2] = 60*25;
+   /* ve->limits[0][4] = 0; // buffer 
     ve->limits[1][4] = 255;
     ve->limits[0][3] = HIS_DEFAULT;
-    ve->limits[1][3] = HIS_LEN;
+    ve->limits[1][3] = HIS_LEN; */
     ve->defaults[0] = 40;
     ve->defaults[1] = ACT_TOP;
     ve->defaults[2] = 1;
-    ve->defaults[3] = HIS_DEFAULT;
-    ve->defaults[4] = 0;
+   /* ve->defaults[3] = HIS_DEFAULT;
+    ve->defaults[4] = 0; */
     ve->description = "Motion Mapping";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->n_out = 2;
+    ve->param_description = vje_build_param_list( ve->num_params, "Threshold", "Min weight", "Decay" ); 
     return ve;
 }
 
@@ -78,6 +79,17 @@ static int running = 0;
 static boxes_t *boxes = NULL;
 
 #define    RUP8(num)(((num)+8)&~8)
+int		motionmap_prepare( uint8_t *map[3], int w, int h )
+{
+	if(!previous_img)
+		return 0;
+
+	veejay_memcpy( previous_img, map[0], w * h );
+	have_bg = 1;
+	nframe_ = 0;
+	running = 0;
+	return 1;
+}
 
 int		motionmap_malloc(int w, int h )
 {
@@ -157,7 +169,7 @@ static void put_photo( uint8_t *dst_plane, uint8_t *src_plane, int dst_w, int ds
 	}
 }
 
-void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int param1, int param2, int history, int capbuf )
+void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int param1, int param2 )
 {
 	unsigned int i,x,y;
 	int len = (width * height);

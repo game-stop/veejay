@@ -52,6 +52,7 @@ vj_effect *colflash_init(int w, int h)
     ve->extra_frame = 0;
     ve->has_user = 0;
     ve->rgb_conv = 1;
+	ve->param_description = vje_build_param_list( ve->num_params, "Frametime" , "Red", "Green", "Blue", "Delay" );
     return ve;
 }
 

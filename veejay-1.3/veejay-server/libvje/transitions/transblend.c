@@ -51,6 +51,7 @@ vj_effect *transblend_init(int width, int height)
     ve->limits[0][6] = 1;
     ve->limits[1][6] = height;
     ve->description = "Transition Translate Blend";
+	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Width", "Height", "Ax offset", "Ay offset" , "Bx offset", "By offset");
     ve->sub_format = 0;
     ve->extra_frame = 1;
 	ve->has_user = 0;

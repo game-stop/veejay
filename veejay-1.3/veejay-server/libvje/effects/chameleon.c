@@ -31,25 +31,22 @@
 vj_effect *chameleon_init(int w, int h)
 {
     vj_effect *ve = (vj_effect *) vj_calloc(sizeof(vj_effect));
-    ve->num_params = 2;
+    ve->num_params = 1;
 
     ve->defaults = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* default values */
     ve->limits[0] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* min */
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 1;
-    ve->limits[0][1] = 0;
-    ve->limits[1][1] = 1;
     ve->defaults[0] = 0;
-    ve->defaults[1] = 0;
     ve->description = "ChameleonTV (EffectTV)";
     ve->sub_format = 1;
     ve->extra_frame = 0;
-	ve->has_user = 0;
-    return ve;
+    ve->has_user = 0;
+    ve->param_description = vje_build_param_list(ve->num_params, "Appearing/Dissapearing");
+     return ve;
 }
 
-static int refresh_bg_ = -1;
 static int last_mode_  = -1;
 static int N__ = 0;
 static int n__ = 0;
@@ -63,6 +60,29 @@ static uint8_t		*bgimage[3] = { NULL,NULL,NULL};
 
 #define PLANES_DEPTH 6
 #define	PLANES (1<< PLANES_DEPTH)
+
+int	chameleon_prepare( uint8_t *map[3], int width, int height )
+{
+	if(!bgimage[0])
+		return 0;
+
+		//@ copy the iamge
+	veejay_memcpy( bgimage[0], map[0], (width*height));
+	veejay_memcpy( bgimage[1], map[1], (width*height));
+	veejay_memcpy( bgimage[2], map[2], (width*height));
+	
+	VJFrame tmp;
+	veejay_memset( &tmp, 0, sizeof(VJFrame));
+	tmp.data[0] = bgimage[0];
+	tmp.width = width;
+	tmp.height = height;
+
+	//@ 3x3 blur
+	softblur_apply( &tmp, width,height,0);
+
+	veejay_msg(2, "Snapped and softblurred current frame to use as background mask");
+	return 1;
+}
 
 int	chameleon_malloc(int w, int h)
 {
@@ -93,7 +113,6 @@ int	chameleon_malloc(int w, int h)
 	N__ = 0;
 	n__ = 0;
 	last_mode_ = -1;
-	refresh_bg_ = -1;		
 
 	return 1;
 }
@@ -214,7 +233,7 @@ static	void	drawDisappearing(VJFrame *src, VJFrame *dest)
         plane = plane & (PLANES-1);
 }
 
-void chameleon_apply( VJFrame *frame, int width, int height, int mode, int refresh_bg)
+void chameleon_apply( VJFrame *frame, int width, int height, int mode)
 {
 	unsigned int i;
 	const int len = (width * height);
@@ -246,14 +265,6 @@ void chameleon_apply( VJFrame *frame, int width, int height, int mode, int refre
 	if( n__ == N__ || n__ == 0 )
 		auto_switch = 0;
 	
-
-	if( refresh_bg != refresh_bg_ )
-	{
-		veejay_memcpy( bgimage[0], frame->data[0], len );
-		veejay_memcpy( bgimage[1], frame->data[1], len );
-		veejay_memcpy( bgimage[2], frame->data[2], len );
-		refresh_bg_ = refresh_bg;
-	}
 
 	if(auto_switch)
 	{

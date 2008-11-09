@@ -36,7 +36,8 @@ vj_effect *split_init(int width,int height)
     ve->description = "Splitted Screens";
     ve->sub_format = 0;
     ve->extra_frame = 1;
-	ve->has_user = 0; 
+	ve->has_user = 0;
+	ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Switch");
     return ve;
 }
 int	split_malloc(int width, int height)

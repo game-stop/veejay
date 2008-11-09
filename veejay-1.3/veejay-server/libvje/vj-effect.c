@@ -665,8 +665,9 @@ void vj_effect_dump() {
 			if(vj_effects[i]->num_params > 0)
 			{
 				int j=0;
-				for(j=0; j < vj_effects[i]->num_params; j++)
-					printf("\n\t\t\t\t\t\t\t%d\t%d - %d\n", j, vj_effects[i]->limits[0][j],vj_effects[i]->limits[1][j]);
+				for(j=0; j < vj_effects[i]->num_params; j++) {
+					printf("\n\t\t\t%s\t\t\t%d\t%d - %d\n", vj_effects[i]->param_description[j] , j, vj_effects[i]->limits[0][j],vj_effects[i]->limits[1][j]);
+				}
 			}
 			else
 				printf("\n");
@@ -874,10 +875,13 @@ int vj_effect_get_summary(int entry, char *dst)
 	{
 		bzero(tmp,20);
 		sprintf(tmp,
-			"%06d%06d%06d",
+			"%06d%06d%06d%03d%s",
 			vj_effects[entry]->limits[0][i],
 			vj_effects[entry]->limits[1][i],
-			vj_effects[entry]->defaults[i]
+			vj_effects[entry]->defaults[i],
+			strlen(vj_effects[entry]->param_description[i]),
+			vj_effects[entry]->param_description[i]
+		
 		);
 		strncat( dst, tmp,strlen(tmp) );
 	}

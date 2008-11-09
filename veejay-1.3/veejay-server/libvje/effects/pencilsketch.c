@@ -38,7 +38,7 @@ vj_effect *pencilsketch_init(int w, int h)
     ve->limits[1][1] = 255;
     ve->limits[1][2] = 255;
     ve->limits[0][2] = 0;
-
+	ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Min Threshold", "Max Treshold" );
     ve->description = "Pencil Sketch (8)";   
     ve->extra_frame = 0;
     ve->sub_format = 0;

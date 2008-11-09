@@ -57,7 +57,7 @@ vj_effect *magicmirror_init(int w, int h)
     ve->description = "Magic Mirror Surface";
 	ve->has_user =0;
     ve->extra_frame = 0;
-
+	ve->param_description = vje_build_param_list(ve->num_params, "X", "Y", "X","Y" );
     return ve;
 }
 // FIXME private

@@ -51,6 +51,7 @@ vj_effect *zoom_init(int width , int height)
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_user = 0;
+	ve->param_description = vje_build_param_list( ve->num_params, "Width", "Height", "Factor", "Mode" );
     return ve;
 }
 static int zoom_[4] = { 0,0,0,0 };

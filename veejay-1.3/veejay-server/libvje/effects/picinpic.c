@@ -68,6 +68,8 @@ vj_effect *picinpic_init(int width, int height)
 
     ve->has_user = 1;
     ve->user_data = NULL;
+
+	ve->param_description = vje_build_param_list( ve->num_params, "Width", "Height", "X offset", "Y offset" );
     return ve;
 }
 

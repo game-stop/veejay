@@ -40,6 +40,7 @@ vj_effect *fibdownscale_init(int w, int h)
     ve->limits[1][1] = 8;
     ve->sub_format = 0;
     ve->extra_frame = 0;
+	ve->param_description = vje_build_param_list( ve->num_params, "Mode", "Fib" );
     ve->has_user =0;
     return ve;
 }

@@ -49,6 +49,7 @@ vj_effect *slice_init(int width,int height)
     ve->sub_format = 1;
     ve->extra_frame = 0;
 	ve->has_user =0;
+	ve->param_description = vje_build_param_list( ve->num_params, "Slices", "Mode");
     return ve;
 }
 //FIXME private

@@ -3088,6 +3088,15 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		free(osd_text);
 	if( more_text)	
 		free(more_text);
+
+
+	if (info->uc->take_bg==1 && frame->ssm == 1)
+    	{
+//@ TRAP: FIXME
+        	if( vj_perform_take_bg(info,pri,1) )
+			veejay_msg(VEEJAY_MSG_INFO, "Snapped 4:4:4 background image");
+    	} 
+
 	if( frame->ssm == 1 )
 	{
 		chroma_subsample(
@@ -3107,7 +3116,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 
 	if (info->uc->take_bg==1)
     	{
-        	if( vj_perform_take_bg(info,pri) )
+        	if( vj_perform_take_bg(info,pri,0) )
 			veejay_msg(VEEJAY_MSG_INFO, "Snapped background image");
         	info->uc->take_bg = 0;
     	} 

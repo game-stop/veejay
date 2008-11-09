@@ -55,6 +55,7 @@ vj_effect *transop_init(int width, int height)
     ve->sub_format = 1;
     ve->extra_frame = 1;
     ve->has_user = 0;
+	ve->param_description = vje_build_param_list(ve->num_params, "Opacity", "Width", "Height", "Ay", "Ax", "By", "Bx");
     return ve;
 }
 

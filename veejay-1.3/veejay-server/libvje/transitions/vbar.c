@@ -53,7 +53,8 @@ vj_effect *vbar_init(int width, int height)
 
     ve->extra_frame = 1;
 	ve->has_user = 0;
-    return ve;
+	ve->param_description = vje_build_param_list(ve->num_params, "Divider", "Top Y", "Bot Y", "Top X", "Bot X" ); 
+   return ve;
 }
 
 /* p0 351 , p1 92 : positioneert image 1 bovenaan

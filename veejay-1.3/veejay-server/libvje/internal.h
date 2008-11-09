@@ -374,14 +374,14 @@ extern void whiteframe_apply(VJFrame *frame, VJFrame *frame2,
 
 extern void texmap_apply(void *dd, VJFrame *frame,
 		       VJFrame *frame2, int width, int height, 
-		       int mode, int threshold, int c , int take, int feather, int blob);
+		       int mode, int threshold, int c , int feather, int blob);
 extern void contourextract_apply(void *dd, VJFrame *frame,
 		       int width, int height, 
-		       int mode, int threshold, int c , int take, int feather, int blob);
+		       int mode, int threshold, int c , int feather, int blob);
 
 extern void diff_apply(void *dd, VJFrame *frame,
 		       VJFrame *frame2, int width, int height, 
-		       int mode, int threshold, int c , int take, int feather);
+		       int mode, int threshold, int c ,int feather);
 
 extern void chromamagick_apply(VJFrame *frame, VJFrame *frame2,
 			       int width, int height, int type, int op0);
@@ -584,9 +584,9 @@ extern void rotozoom_destroy();
 
 extern void timedistort_apply( VJFrame *frame, int w, int h, int val );
 
-extern void chameleon_apply( VJFrame *frame, int w, int h, int mode, int refresh );
+extern void chameleon_apply( VJFrame *frame, int w, int h, int mode );
 
-extern void	chameleonblend_apply( VJFrame *frame, VJFrame *source, int w, int h, int mode, int refresh );
+extern void	chameleonblend_apply( VJFrame *frame, VJFrame *source, int w, int h, int mode );
 
 extern void	baltantv_apply (VJFrame *frame, int w, int h , int stride, int mode );
 
