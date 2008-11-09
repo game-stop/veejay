@@ -974,6 +974,7 @@ typedef struct {
 	int min[10];
 	int max[10];
 	char description[150];
+	char *param_description[10];
 	int  id;
 	int  is_video;
 	int num_arg;
@@ -1052,6 +1053,23 @@ int	_effect_get_minmax( int effect_id, int *min, int *max, int index )
 	return 0;
 
 }
+
+char *_effect_get_param_description(int effect_id, int param)
+{
+	int n = g_list_length( info->effect_info );
+	int i;
+	for(i = 0;i <= n ; i++)
+	{	
+		effect_constr *ec = g_list_nth_data(info->effect_info, i);
+		if(ec != NULL)
+		{
+			if(effect_id == ec->id )
+				return ec->param_description[param];
+		}
+	}
+	return "<none>";  
+}
+
 
 
 char *_effect_get_description(int effect_id)
@@ -1239,8 +1257,17 @@ effect_constr* _effect_new( char *effect_line )
 	offset = descr_len + 10;
 	for(p=0; p < ec->num_arg; p++)
 	{
-		sscanf(effect_line+offset,"%06d%06d%06d",
-			&(ec->min[p]), &(ec->max[p]),&(ec->defaults[p]) );
+		int len = 0;
+		sscanf(effect_line+offset,"%06d%06d%06d%03d",
+			&(ec->min[p]), &(ec->max[p]),&(ec->defaults[p]),&len );
+#ifdef STRICT_CHECKING
+		assert(len>0);
+#endif
+		ec->param_description[p] = (char*) vj_calloc(sizeof(char) * (len+1) );
+		strncpy( ec->param_description[p], effect_line + offset + 6 + 6 + 6 + 3, len );
+		
+		offset += 3;
+		offset += len;
 		offset+=18; 
 	}
 	return ec;
@@ -5705,6 +5732,10 @@ static void	process_reload_hints(int *history, int pm)
 				sprintf(button_name, "inc_p%d", i);
 				enable_widget( button_name );
 				sprintf(button_name, "dec_p%d", i );
+
+				gchar *tt1 = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],i));
+				gtk_widget_set_tooltip_text(	glade_xml_get_widget_(info->main_window, slider_name), tt1 );
+//FIXME
 				enable_widget( button_name );
 				gint min,max,value;
 				value = entry_tokens[3 + i];
@@ -5715,6 +5746,7 @@ static void	process_reload_hints(int *history, int pm)
 				sprintf(button_name, "kf_p%d", i );
 				enable_widget( button_name );
 			}
+			
 		}
 		update_spin_value( "button_fx_entry", info->uc.selected_chain_entry);	
 
@@ -5730,6 +5762,7 @@ static void	process_reload_hints(int *history, int pm)
 			disable_widget( button_name );
 			sprintf( button_name, "kf_p%d", i );
 			disable_widget( button_name );
+			gtk_widget_set_tooltip_text( glade_xml_get_widget_(info->main_window, slider_name), NULL );
 		}
 		GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(glade_xml_get_widget_(
 				info->main_window, "tree_chain") ));
