@@ -1533,9 +1533,9 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 	f->bg = 0;
 	f->outline = 0;
 	f->text_height = 0;
-	int tmp = (w / 100) * 3;
+	int tmp = ((w / 100) * 3) -1;
 	if(tmp>15) tmp = 14;
-	if(tmp<11) tmp = 11;
+	if(tmp<9) tmp = 9;
 	f->current_size = (is_osd ? (tmp): 40);
 
 	f->fps  = fps;
