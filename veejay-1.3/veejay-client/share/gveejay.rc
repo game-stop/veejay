@@ -105,14 +105,31 @@ style "buttons"
   base[INSENSITIVE] = "#27282f"
   
 }
+style "treeview"		= "default"
+{	
+  engine "pixmap"
+  {
+    # don't draw the focus around listitems
+    image
+    {
+      function			= FOCUS
+    }
+  }
+}
+style "header"
+{
+	
+ GtkTreeView::odd_row_color = "#2c2c2c"
+   GtkTreeView::even_row_color = "#555555"
 
-
+}
 
 class "GtkButton" style "buttons"
 class "GtkSpinButton" style "buttons"
 class "GtkToggleButton" style "buttons"
 class "GtkCheckBox" style "buttons"
-widget_class "*GtkTree*" style "text"
+widget_class "*Tree*" style "header"
+class  "GtkTreeView" style "treeview"
 class "GtkLabel" style "text"
 class "*List" style "text"
 class "GtkListItem" style "text"
