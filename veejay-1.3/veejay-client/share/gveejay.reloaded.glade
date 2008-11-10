@@ -15199,7 +15199,7 @@ MLZO</property>
 		<widget class="GtkExpander" id="expander8">
 		  <property name="visible">True</property>
 		  <property name="can_focus">True</property>
-		  <property name="expanded">True</property>
+		  <property name="expanded">False</property>
 		  <property name="spacing">0</property>
 
 		  <child>
@@ -15385,7 +15385,7 @@ MLZO</property>
 	      <child>
 		<widget class="GtkExpander" id="expander9">
 		  <property name="can_focus">True</property>
-		  <property name="expanded">True</property>
+		  <property name="expanded">False</property>
 		  <property name="spacing">0</property>
 
 		  <child>
