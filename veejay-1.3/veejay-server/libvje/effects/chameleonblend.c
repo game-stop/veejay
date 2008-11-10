@@ -80,7 +80,7 @@ int	chameleonblend_prepare( uint8_t *map[3], int width, int height )
 	//@ 3x3 blur
 	softblur_apply( &tmp, width,height,0);
 
-	veejay_msg(2, "Snapped and softblurred current frame to use as background mask");
+	veejay_msg(2, "Chameleon BlendTV: Snapped background mask");
 	return 1;
 }
 

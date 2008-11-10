@@ -72,27 +72,48 @@ unsigned int vj_get_relative_time()
     return relative;
 }
 
-int vj_perform_take_bg(veejay_t *info, uint8_t **src, int ssm)
+int vj_perform_take_bg(veejay_t *info, VJFrame *frame, int pass)
 {
-	VJFrame frame;
-	veejay_memcpy( &frame, info->effect_frame1, sizeof(VJFrame));
-	frame.data[0] = src[0];
-	frame.data[1] = src[1];
-	frame.data[2] = src[2];
-
 	int n = 0;
-	
-	if(!ssm) {
-		n += vj_effect_prepare( &frame, VJ_IMAGE_EFFECT_BGSUBTRACT );
-		n += vj_effect_prepare( &frame, VJ_VIDEO_EFFECT_DIFF );
-		n += vj_effect_prepare( &frame, VJ_IMAGE_EFFECT_MOTIONMAP );	
-		n += vj_effect_prepare( &frame, VJ_IMAGE_EFFECT_CONTOUR );
-		n += vj_effect_prepare( &frame, VJ_VIDEO_EFFECT_TEXMAP);
+	static void *bg_sampler = NULL;
+	if( pass == 0 ) {
+		if(frame->ssm = 1 ) {
+			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_CHAMBLEND );
+			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CHAMELEON );		
+			return 1;
+		}	
+		if(frame->ssm == 0) {
+			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_BGSUBTRACT );
+			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_DIFF );
+			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_MOTIONMAP );	
+			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CONTOUR );
+			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_TEXMAP);
+		}
+
+		if( frame->ssm == 0 ) 
+		{
+			//@ supersample
+			if(!bg_sampler)
+				bg_sampler = subsample_init( frame->width );
+			chroma_supersample( info->settings->sample_mode,bg_sampler,frame->data,frame->width,frame->height);
+			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_CHAMBLEND );
+			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CHAMELEON );
+			frame->ssm = 1;
+			return 1;
+		}	
+		return 0;
 	} else {
-		n += vj_effect_prepare( &frame, VJ_VIDEO_EFFECT_CHAMBLEND );
-		n += vj_effect_prepare( &frame, VJ_IMAGE_EFFECT_CHAMELEON );
+	
+		if(frame->ssm == 0) {
+			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_BGSUBTRACT );
+			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_DIFF );
+			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_MOTIONMAP );	
+			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CONTOUR );
+			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_TEXMAP);
+			return 0;
+		}
 	}
-	return n;
+	return 0;
 }
 
 #ifdef HAVE_JPEG

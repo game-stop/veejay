@@ -192,7 +192,6 @@ int texmap_prepare(uint8_t *map[3], int width, int height)
 {
 	if(!static_bg )
 	{
-		veejay_msg(0,"FX \"Map B to A (substract background mask)\" not initialized");
 		return 0;
 	}
 	
@@ -205,7 +204,7 @@ int texmap_prepare(uint8_t *map[3], int width, int height)
 	tmp.height = height;
 	softblur_apply( &tmp, width,height,0);
 
-	veejay_msg(0, "Snapped and softblurred current frame to use as background mask");
+	veejay_msg(2, "Map B to A: Snapped background frame");
 	return 1;
 }
 

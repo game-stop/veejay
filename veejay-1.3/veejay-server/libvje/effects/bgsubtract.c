@@ -87,7 +87,7 @@ int bgsubtract_prepare(uint8_t *map[3], int width, int height)
 	//@ 3x3 blur
 	softblur_apply( &tmp, width,height,0);
 
-	veejay_msg(2, "Snapped and softblurred current frame to use as background mask");
+	veejay_msg(2, "Substract background: Snapped background frame");
 	return 1;
 }
 
@@ -97,17 +97,17 @@ static	void	binarify( uint8_t *dst, uint8_t *bg, uint8_t *src,int threshold,int 
 
 	if(!reverse) 	
 		for( i = 0; i < len; i ++ ) {
-			if ( abs(bg[i] - src[i]) <= threshold )
-				dst[i] = 0;
-			else
+			if ( abs(bg[i] - src[i]) >= threshold )
 				dst[i] = 0xff;
+			else
+				dst[i] = 0;
 		}
 	else	
 		for( i = 0; i < len; i ++ ) {
-			if ( abs(bg[i] - src[i]) <= threshold )
-				dst[i] = 0xff;
-			else
+			if ( abs(bg[i] - src[i]) >= threshold )
 				dst[i] = 0;
+			else
+				dst[i] = 0xff;
 		}
 }
 

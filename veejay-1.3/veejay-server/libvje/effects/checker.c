@@ -88,6 +88,7 @@ int		motionmap_prepare( uint8_t *map[3], int w, int h )
 	have_bg = 1;
 	nframe_ = 0;
 	running = 0;
+	veejay_msg(2, "Motion Mapping: Snapped background frame");
 	return 1;
 }
 

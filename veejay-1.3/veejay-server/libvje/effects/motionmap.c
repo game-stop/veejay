@@ -157,7 +157,7 @@ static	void	update_bgmask( uint8_t *dst,uint8_t *in, uint8_t *src, int len, int 
 	  if( abs(in[i] - src[i]) > threshold )
 	  {
 		dst[i] = 0xff;
-		in[i] = (in[i] + src[i])>>1;
+		//in[i] = (in[i] + src[i])>>1;
 	 }
 	 else
 	 {
@@ -274,7 +274,7 @@ int	motionmap_prepare( uint8_t *map[3], int width, int height )
 	have_bg = 1;
 	nframe_ = 0;
 	running = 0;
-
+	veejay_msg(2, "Motion Mapping: Snapped background frame");
 	return 1;
 }
 
@@ -287,6 +287,8 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
     	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
+	if(!have_bg)
+		return;
 
 	veejay_memcpy( original_img, frame->data[0], len );
 

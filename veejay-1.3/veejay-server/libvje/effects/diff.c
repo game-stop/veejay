@@ -127,8 +127,8 @@ int diff_prepare(void *user, uint8_t *map[3], int width, int height)
 	tmp.width = width;
 	tmp.height = height;
 	softblur_apply( &tmp, width,height,0);
+	veejay_msg(2 , "Map B to A: Snapped background frame");
 
-	veejay_msg(0, "Snapped and softblurred current frame to use as background mask");
 	return 1;
 }
 
