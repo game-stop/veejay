@@ -1,0 +1,137 @@
+# Edit these colors and fonts however you like.
+style "default"
+{
+#  engine "hcengine" {}
+  xthickness = 1
+  ythickness = 1
+  GtkWidget::shadow_type = GTK_SHADOW_ETCHED_IN
+  #GtkWidget::interior_focus = 0
+  #GtkWidget::focus_padding = 0
+  #GtkWidget::default_border         = {0, 0, 0, 0}
+  #GtkWidget::default_outside_border = {0, 0, 0, 0} 
+  GtkWidget::default_spacing        = 0
+  GtkScale::stepper_size = 8
+  GtkRange::through-width = 4
+  GtkRange::trough_border = 0
+  GtkRange::slider-width = 16
+  GtkScale::slider-length = 12
+  
+  font_name = "Sans 8"
+
+  fg[NORMAL]        = "#646464" # borders etc.
+  fg[PRELIGHT]      = "#646464"
+  fg[ACTIVE]        = "#646464" # ook borders, van sliders en notebook
+  fg[SELECTED]      = "#646464"
+  fg[INSENSITIVE]   = "#404040"
+  
+  bg[NORMAL]        = "#27282F" # algemene achtergrond kleur
+  bg[PRELIGHT]      = "#aaacc1" # achtergrond geselecteerd widget
+  bg[ACTIVE]        = "#454f60" # niet actieve tabs, achtergrond sliders
+  bg[SELECTED]      = "#5058a0"
+  bg[INSENSITIVE]   = "#27282f" # achtergrond kleur van niet actieve knopjes
+
+  text[NORMAL]      = "#d8d8d8"
+  text[PRELIGHT]    = "#d8d8d8"
+  text[ACTIVE]      = "#FF0000"
+  text[SELECTED]    = "#FF0000"
+  text[INSENSITIVE] = "#404040"
+
+  base[NORMAL]      = "#37383f"
+  base[PRELIGHT]    = "#aaacc1"
+  base[ACTIVE]      = "#757f90"
+  base[SELECTED]    = "#757ab3"
+  base[INSENSITIVE] = "#27282f"
+  
+}
+
+style "text"
+{
+  font_name = "Sans 8"
+
+  fg[NORMAL]        = "#ffffff" # borders etc.
+  fg[PRELIGHT]      = "#ffffff"
+  fg[ACTIVE]        = "#ffffff" # ook borders, van sliders en notebook
+  fg[SELECTED]      = "#ffffff"
+  fg[INSENSITIVE]   = "#ffffff"
+  
+  bg[NORMAL]        = "#27282F" # algemene achtergrond kleur
+  bg[PRELIGHT]      = "#aaacc1" # achtergrond geselecteerd widget
+  bg[ACTIVE]        = "#454f60" # niet actieve tabs, achtergrond sliders
+  bg[SELECTED]      = "#5058a0"
+  bg[INSENSITIVE]   = "#27282f" # achtergrond kleur van niet actieve knopjes
+
+  text[NORMAL]      = "#d8d8d8"
+  text[PRELIGHT]    = "#d8d8d8"
+  text[ACTIVE]      = "#FF0000"
+  text[SELECTED]    = "#FF0000"
+  text[INSENSITIVE] = "#404040"
+
+  base[NORMAL]      = "#37383f"
+  base[PRELIGHT]    = "#aaacc1"
+  base[ACTIVE]      = "#757f90"
+  base[SELECTED]    = "#757ab3"
+  base[INSENSITIVE] = "#27282f"
+  
+}
+
+
+style "buttons"
+{
+  
+  font_name = "Sans 8"
+
+  fg[NORMAL]        = "#888888"
+  fg[PRELIGHT]      = "#888888"
+  fg[ACTIVE]        = "#888888"
+  fg[SELECTED]      = "#888888"
+  fg[INSENSITIVE]   = "#888888"
+  
+  bg[NORMAL]        = "#27282F"
+  bg[PRELIGHT]      = "#aaacc1"
+  bg[ACTIVE]        = "#454f60"
+  bg[SELECTED]      = "#5058a0"
+  bg[INSENSITIVE]   = "#27282f"
+
+  text[NORMAL]      = "#d8d8d8"
+  text[PRELIGHT]    = "#d8d8d8"
+  text[ACTIVE]      = "#FF0000"
+  text[SELECTED]    = "#FF0000"
+  text[INSENSITIVE] = "#404040"
+
+  base[NORMAL]      = "#37383f"
+  base[PRELIGHT]    = "#aaacc1"
+  base[ACTIVE]      = "#757f90"
+  base[SELECTED]    = "#757ab3"
+  base[INSENSITIVE] = "#27282f"
+  
+}
+style "treeview"		= "default"
+{	
+  engine "pixmap"
+  {
+    # don't draw the focus around listitems
+    image
+    {
+      function			= FOCUS
+    }
+  }
+}
+style "header"
+{
+	
+ GtkTreeView::odd_row_color = "#2c2c2c"
+   GtkTreeView::even_row_color = "#555555"
+
+}
+
+class "GtkButton" style "buttons"
+class "GtkSpinButton" style "buttons"
+class "GtkToggleButton" style "buttons"
+class "GtkCheckBox" style "buttons"
+widget_class "*Tree*" style "header"
+class  "GtkTreeView" style "treeview"
+class "GtkLabel" style "text"
+class "*List" style "text"
+class "GtkListItem" style "text"
+class "*GtkCList*" style "text"
+class "GtkWidget" style "default"

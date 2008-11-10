@@ -1,0 +1,10 @@
+bio2jack - NEWS
+--------
+9/12/2004  - Check out ChangeLog for news ;-)
+10/26/2003 - Updated to the new jack api, fixed a bunch of bugs
+             Removed all blocking functions, blocking is BAD as it could potentially
+             hold off the callback function.
+1/13/2003  - Continuing to refine the api by working on the xine plugin.  
+             Fixed a few bugs in the code.  Uploaded newer packages to 
+             sourceforge.
+12/31/2002 - Sourceforge project is setup.
