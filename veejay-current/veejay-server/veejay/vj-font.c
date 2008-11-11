@@ -1571,7 +1571,6 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 		if( f->font_index <= 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Please put some TrueType font files in %s",path);
-			vj_font_destroy( f );
 			return NULL;
 		} 
 	}
@@ -1658,10 +1657,6 @@ void	*vj_font_single_init( int w, int h, float fps,char *path )
 	if( f->font_index <= 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Please put some TrueType font files in %s",fontpath);
-			vj_font_destroy( f );
-		free(f->font_table);
-		free(f->font_list);
-		free(f);
 		return NULL;
 	}
 
