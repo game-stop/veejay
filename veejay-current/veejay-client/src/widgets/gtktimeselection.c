@@ -1,5 +1,5 @@
 /* veejay - Linux VeeJay
- * 	     (C) 2002-2004 Niels Elburg <nelburg@looze.net> 
+ * 	     (C) 2002-2008 Niels Elburg <nelburg@looze.net> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -25,10 +25,11 @@
 #include <assert.h>
 #include <math.h>
 #include <stdlib.h>
-#include <gtkcairo.h>
 #include <gtk/gtk.h>
 
 #include "gtktimeselection.h"
+
+//G_DEFINE_TYPE(TimelineSelectionClass, timeline, GTK_TYPE_DRAWING_AREA );
 
 enum
 {
@@ -85,7 +86,7 @@ typedef enum TimelineAction
 
 struct _TimelineSelection
 {
-	GtkCairo	cr;
+	GtkDrawingArea		cr;
 	GtkWidget	*widget;
 	gdouble		min;
 	gdouble		max;
@@ -130,14 +131,14 @@ static	void	timeline_class_init( TimelineSelectionClass *class );
 
 static	void	timeline_init(TimelineSelection *te );
 
-static	void	paint(GtkWidget *widget, cairo_t *cr, gpointer user_data);
+static	gboolean	timeline_expose(GtkWidget *widget, GdkEventExpose *event );
 
 static	GObjectClass	*parent_class = NULL;
 static	gint	timeline_signals[LAST_SIGNAL] = { 0 };
  
 struct _TimelineSelectionClass
 {
-	GtkCairoClass	parent_class;
+	GtkWidgetClass	parent_class;
 	void	(*pos_changed) (TimelineSelection *te);
 	void	(*in_point_changed) (TimelineSelection *te);
 	void	(*out_point_changed) (TimelineSelection *te);
@@ -237,9 +238,12 @@ static	void	finalize	(GObject *object)
 
 static	void	timeline_class_init( TimelineSelectionClass *class )
 {
+	GtkWidgetClass *widget_class = GTK_WIDGET_CLASS(class);
+	widget_class->expose_event = timeline_expose;
+
 	GObjectClass *gobject_class;
 	gobject_class = G_OBJECT_CLASS( class );
-	parent_class = g_type_class_peek( GTK_TYPE_CAIRO );
+	parent_class = g_type_class_peek( GTK_TYPE_DRAWING_AREA );
 	gobject_class->finalize = finalize;
 	gobject_class->get_property = get_property;
 	gobject_class->set_property = set_property;
@@ -392,7 +396,7 @@ GType	timeline_get_type(void)
 			(GInstanceInitFunc) timeline_init,
 			NULL
 		};
-		gtype = g_type_register_static( GTK_TYPE_CAIRO, "Timeline", &ginfo, 0 );
+		gtype = g_type_register_static( GTK_TYPE_DRAWING_AREA, "Timeline", &ginfo, 0 );
 	}
 	return gtype;
 }
@@ -692,8 +696,11 @@ cairo_rectangle_round (cairo_t * cr,
   cairo_close_path (cr);
 }
 
-static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
+static gboolean timeline_expose (GtkWidget *widget, GdkEventExpose *event )
 {
+	cairo_t *cr;
+	cr = gdk_cairo_create( widget->window );
+
  	TimelineSelection *te = TIMELINE_SELECTION( widget );
 	double width = widget->allocation.width;
 	double height = widget->allocation.height;
@@ -707,20 +714,6 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 	cairo_save(cr);
 	cairo_identity_matrix(cr);
 
-/* Draw frames*/ 
-	/* Drawing many boxes cause CPU hog .. */
-/*
-
-	cairo_set_source_rgba( cr, 0.0, 0.0, 0.0, 0.2 );
-	for(i =0; i < te->num_video_frames; i ++ )
-	{
-		double x1 = marker_width * i;
-		double x2 = x1 + frame_width; 
-		cairo_rectangle_round(cr, x1, height - te->stepper_size, frame_width,  marker_height, 4);
-	}
-	cairo_stroke(cr); */
-
-//	cairo_fill(cr);
 /* Draw stepper */
 	if( te->has_stepper )
 	{
@@ -731,7 +724,6 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 		te->stepper.width = te->stepper_size + 8;
 		te->stepper.height = te->stepper_size + 2;
 
-	//	cairo_set_line_width( cr, 0.16 );
 		cairo_move_to( cr, x1 - te->stepper_draw_size, 0.0 * height );
 		cairo_rel_line_to( cr, te->stepper_draw_size, te->stepper_draw_size  );
 		cairo_rel_line_to( cr, te->stepper_draw_size, -te->stepper_draw_size  );
@@ -740,7 +732,6 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 		cairo_move_to(cr, x1, te->stepper_draw_size   );
 		cairo_rel_line_to( cr, 0.0, te->stepper_length );
 		cairo_stroke(cr);
-		//cairo_fill_preserve(cr);
 		if( te->grab_button == 1 && te->current_location == MOUSE_STEPPER )
 		{
 			cairo_select_font_face(cr, "Sans", CAIRO_FONT_SLANT_NORMAL,
@@ -755,7 +746,6 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 			cairo_set_source_rgba( cr, v,v,v,0.7 );
 			cairo_fill(cr);	
 		}
-		//cairo_fill_preserve(cr);
 	}
 /* Draw selection */
 	if( te->has_selection )
@@ -819,6 +809,9 @@ static void paint (GtkWidget *widget, cairo_t * cr, gpointer user_data)
 		cairo_fill_preserve(cr);
 	}
 	cairo_restore(cr);
+
+	cairo_destroy(cr);
+	return FALSE;
 }
 
 GtkWidget *timeline_new(void)
@@ -834,7 +827,7 @@ GtkWidget *timeline_new(void)
 			GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
 			GDK_BUTTON3_MOTION_MASK | GDK_2BUTTON_PRESS );
 
-	g_signal_connect( G_OBJECT(widget), "paint", G_CALLBACK(paint), NULL );
+	g_signal_connect( G_OBJECT(widget), "expose", G_CALLBACK(timeline_expose), NULL );
 	g_signal_connect( G_OBJECT(widget), "motion_notify_event",
 			  G_CALLBACK(event_motion), NULL );
 	g_signal_connect( G_OBJECT(widget), "button_press_event",

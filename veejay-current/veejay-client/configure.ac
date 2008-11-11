@@ -652,20 +652,6 @@ if test x"$with_extra_cflags" != "x"; then
    CXXFLAGS="$CXXFLAGS $with_extra_cflags"
 fi
 
-
-PKG_CHECK_MODULES( GTKCAIRO, gtkcairo >= 0.3,
- [use_gtkcairo=yes],
- [use_gtkcairo="no"]
-)
-
-if test "x$use_gtkcairo" = "xyes"; then
-	AC_SUBST( GTKCAIRO_CFLAGS )
-	AC_SUBST( GTKCAIRO_LIBS )
-	AC_DEFINE( USE_GTKCAIRO,,[GtkCairo widget - Cairo])
-else
-	AC_MSG_ERROR([GtkCairo not found: get it at http://www.cairographics.org/GtkCairo])
-fi
-
 gveejay_datadir="${datadir}/gveejay"
 AC_SUBST(gveejay_datadir)
 sh gveejay-paths.sh > gveejay-paths.h
