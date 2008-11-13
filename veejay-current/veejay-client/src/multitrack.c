@@ -94,7 +94,7 @@ typedef struct
 	int  	  ph;
 } multitracker_t;
 
-static volatile int	MAX_TRACKS = 4;
+static volatile int	MAX_TRACKS = 2;
 static	void		*parent__ = NULL;
 
 static	int	mt_new_connection_dialog(multitracker_t *mt, char *hostname,int len, int *port_num);
@@ -106,6 +106,14 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 
 
 extern GdkPixbuf       *vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterpType inter_type );
+extern void		gtk_widget_set_size_request__( GtkWidget *w, gint iw, gint h, const char *f, int line );
+
+#ifndef STRICT_CHECKING
+#define gtk_widget_set_size_request_(a,b,c) gtk_widget_set_size_request(a,b,c)
+#else
+#define gtk_widget_set_size_request_(a,b,c) gtk_widget_set_size_request__(a,b,c,__FUNCTION__,__LINE__)
+#endif
+
 
 
 static	void	gtk_image_set_from_pixbuf__( GtkImage *w, GdkPixbuf *p, const char *f, int l )
@@ -342,10 +350,10 @@ static	void	add_buttons( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *
 		get_gd(path,NULL, button_template_t[i].file );
 		seqv->icons[i] = gtk_image_new_from_file( path );
 		seqv->buttons[i] = gtk_button_new_with_label(" ");
-		gtk_widget_set_size_request( seqv->icons[i],24,20 );
+		gtk_widget_set_size_request_( seqv->icons[i],24,20 );
 		
 		gtk_button_set_image( GTK_BUTTON(seqv->buttons[i]), seqv->icons[i] );
-		gtk_widget_set_size_request( seqv->buttons[i],24,20 );
+		gtk_widget_set_size_request_( seqv->buttons[i],24,20 );
 		gtk_box_pack_start( GTK_BOX(w), seqv->buttons[i], TRUE,TRUE, 0 );
 		g_signal_connect( G_OBJECT( seqv->buttons[i] ), "clicked", G_CALLBACK( button_template_t[i].f),
 				(gpointer)p );		
@@ -364,10 +372,10 @@ static	void	add_buttons2( sequence_view_t *p, sequence_view_t *seqv , GtkWidget 
 		get_gd(path,NULL, button_template_t[i].file );
 		seqv->icons[i] = gtk_image_new_from_file( path );
 		seqv->buttons2[i] = gtk_button_new_with_label(" ");
-		gtk_widget_set_size_request( seqv->icons[i],24,20 );
+		gtk_widget_set_size_request_( seqv->icons[i],24,20 );
 		
 		gtk_button_set_image( GTK_BUTTON(seqv->buttons2[i]), seqv->icons[i] );
-		gtk_widget_set_size_request( seqv->buttons2[i],24,20 );
+		gtk_widget_set_size_request_( seqv->buttons2[i],24,20 );
 		gtk_box_pack_start( GTK_BOX(w), seqv->buttons2[i], TRUE,TRUE, 0 );
 		g_signal_connect( G_OBJECT( seqv->buttons2[i] ), "clicked", G_CALLBACK( button_template_t[i].f),
 				(gpointer*)p );		
@@ -559,7 +567,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	
 	gtk_box_pack_start( GTK_BOX(seqv->main_vbox),GTK_WIDGET( seqv->area), FALSE,FALSE,0);
-	gtk_widget_set_size_request( seqv->area, 176,176  );
+	gtk_widget_set_size_request_( seqv->area, 176,176  );
 	seqv->panel = gtk_frame_new(NULL);
 
 	if( num > 0 )
@@ -595,7 +603,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	GtkWidget *box = gtk_vbox_new(FALSE,0);
 	seqv->timeline_ = gtk_hscale_new_with_range( 0.0,1.0,0.1 );
 	gtk_scale_set_draw_value( GTK_SCALE(seqv->timeline_), FALSE );
-	gtk_widget_set_size_request( seqv->panel,180 ,180);
+	gtk_widget_set_size_request_( seqv->panel,180 ,180);
 	gtk_adjustment_set_value(
                 GTK_ADJUSTMENT(GTK_RANGE(seqv->timeline_)->adjustment), 0.0 );
 	gtk_widget_show( seqv->panel );
@@ -607,13 +615,13 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	GtkWidget *scroll = gtk_scrolled_window_new(NULL,NULL);
 	gtk_scrolled_window_set_shadow_type( GTK_SCROLLED_WINDOW(scroll), GTK_SHADOW_ETCHED_IN );
-	gtk_widget_set_size_request(scroll,30,70);
+	gtk_widget_set_size_request_(scroll,30,70);
 	gtk_container_set_border_width(GTK_CONTAINER(scroll),0);
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(scroll),GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC );
 	GtkWidget *vvvbox = gtk_hbox_new(FALSE,0);
 	seqv->tracks = create_track_view(seqv->num, MAX_TRACKS, (void*) seqv );
 	gtk_tree_view_set_headers_visible( GTK_TREE_VIEW( get_track_tree(seqv->tracks)) , FALSE );
-	gtk_widget_set_size_request( get_track_tree(seqv->tracks),20,80 );
+	gtk_widget_set_size_request_( get_track_tree(seqv->tracks),20,80 );
 	gtk_widget_show(scroll);
 
 	gtk_scrolled_window_add_with_viewport(
@@ -786,7 +794,7 @@ void		*multitrack_new(
  	mt->logo = load_logo_image(vj_get_preview_box_w(), vj_get_preview_box_h());
 	mt->preview_toggle = preview_toggle;
 	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
-//	gtk_widget_set_size_request(mt->scroll,300, 300);
+	gtk_widget_set_size_request(mt->scroll,50+max_w*2, max_h);
 	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),1);
 	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(mt->scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_ALWAYS );
 	GtkWidget *table = gtk_table_new( 1, MAX_TRACKS, FALSE );

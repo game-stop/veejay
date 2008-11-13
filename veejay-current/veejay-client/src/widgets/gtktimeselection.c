@@ -178,13 +178,15 @@ static	void	set_property	(GObject *object,
 		case IN_POINT:
 		if(te->in != g_value_get_double(value))
 		{
-			te->in = g_value_get_double(value);
+			if( g_value_get_double(value) < te->out )
+				te->in = g_value_get_double(value);
 		}
 		break;
 		case OUT_POINT: 
 		if(te->out != g_value_get_double(value))
 		{
-			te->out = g_value_get_double(value);
+			if( g_value_get_double(value) > te->in )
+				te->out = g_value_get_double(value);
 		}
 		break;
 		case SEL:

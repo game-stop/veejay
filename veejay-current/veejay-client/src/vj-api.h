@@ -25,6 +25,7 @@ void	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, i
 int	vj_gui_reconnect( char *host, char *group, int port);
 void	vj_gui_free();
 void	vj_fork_or_connect_veejay();
+void	vj_gui_wipe();
 void	vj_gui_enable(void);
 void	vj_gui_disable(void);
 void	vj_gui_disconnect(void);

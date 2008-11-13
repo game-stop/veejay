@@ -2082,6 +2082,9 @@ void	on_button_videobook_clicked(GtkWidget *widget, gpointer user_data)
 
 void	on_samplepage_clicked(GtkWidget *widget, gpointer user_data)
 {
+	GtkWidget *m = glade_xml_get_widget_(info->main_window , "notebook18");
+	gtk_notebook_set_page( GTK_NOTEBOOK(m), 5 );
+
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
 
 	gint page = gtk_notebook_get_current_page( GTK_NOTEBOOK(n) );

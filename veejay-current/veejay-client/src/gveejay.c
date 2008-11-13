@@ -40,7 +40,7 @@ static	int verbosity = 0;
 static int timer = 6;
 static int col = 0;
 static int row = 0;
-static int n_tracks = 3;
+static int n_tracks = 1;
 static int launcher = 0;
 static int pw = 176;
 static int ph = 144;
@@ -223,18 +223,13 @@ int main(int argc, char *argv[]) {
 	
 	vj_gui_set_debug_level( verbosity , n_tracks,pw,ph);
 	vj_gui_set_timeout(timer);
-	set_skin( 0 );
+	set_skin( 1 );
 
 	default_bank_values( &col, &row );
 	gui_load_theme();	
 	vj_gui_init( skins[0].file, launcher, hostname, port_num, use_threads );
 	vj_gui_style_setup();
 
-//struct sched_param schp;
-//memset( &schp, 0, sizeof( schp ));
-//schp.sched_priority = sched_get_priority_min(SCHED_RR );
-//if( sched_setscheduler( 0, SCHED_FIFO, &schp ) == 0 )
-//  veejay_msg(VEEJAY_MSG_INFO, "Reloaded running with low priority");	
 
 	if( preview )
 	{
