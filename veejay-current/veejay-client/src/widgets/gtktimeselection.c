@@ -829,7 +829,7 @@ GtkWidget *timeline_new(void)
 			GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
 			GDK_BUTTON3_MOTION_MASK | GDK_2BUTTON_PRESS );
 
-	g_signal_connect( G_OBJECT(widget), "expose", G_CALLBACK(timeline_expose), NULL );
+	g_signal_connect( G_OBJECT(widget), "expose_event", G_CALLBACK(timeline_expose), NULL );
 	g_signal_connect( G_OBJECT(widget), "motion_notify_event",
 			  G_CALLBACK(event_motion), NULL );
 	g_signal_connect( G_OBJECT(widget), "button_press_event",
