@@ -3586,24 +3586,21 @@ void	on_bq_button_clicked( GtkWidget *w, gpointer data )
 {
 	info->quality = 2;
 	multitrack_set_quality( info->mt, 2 );
-	if(!is_button_toggled( "previewtoggle" ))
-		set_toggle_button( "previewtoggle", 1 );
+	set_toggle_button( "previewtoggle", 1 );
 }
 
 void	on_hqbutton_clicked( GtkWidget *w, gpointer data )
 {
 	info->quality = 1;
 	multitrack_set_quality( info->mt, 1 );
-	if(!is_button_toggled( "previewtoggle" ))
-		set_toggle_button( "previewtoggle", 1 );
+	set_toggle_button( "previewtoggle", 1 );
 
 }
 void	on_lqbutton_clicked( GtkWidget *w, gpointer data )
 {
 	info->quality = 0;
 	multitrack_set_quality( info->mt, 0 );
-	if(!is_button_toggled( "previewtoggle" ))
-		set_toggle_button( "previewtoggle", 1 );
+	set_toggle_button( "previewtoggle", 1 );
 
 }
 void	on_uq_button_clicked( GtkWidget *w, gpointer data )

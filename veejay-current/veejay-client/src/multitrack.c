@@ -351,7 +351,6 @@ static	void	add_buttons( sequence_view_t *p, sequence_view_t *seqv , GtkWidget *
 		seqv->icons[i] = gtk_image_new_from_file( path );
 		seqv->buttons[i] = gtk_button_new_with_label(" ");
 		gtk_widget_set_size_request_( seqv->icons[i],24,20 );
-		
 		gtk_button_set_image( GTK_BUTTON(seqv->buttons[i]), seqv->icons[i] );
 		gtk_widget_set_size_request_( seqv->buttons[i],24,20 );
 		gtk_box_pack_start( GTK_BOX(w), seqv->buttons[i], TRUE,TRUE, 0 );
@@ -394,7 +393,7 @@ static	void	playmode_sensitivity( sequence_view_t *p, gint pm )
 #endif
 	if( pm == MODE_STREAM || MODE_PLAIN || MODE_SAMPLE )
 	{
-		if(p->toggle)
+		if(p->num > 0)
 			gtk_widget_set_sensitive_( GTK_WIDGET( p->toggle ), TRUE );
 		gtk_widget_set_sensitive_( GTK_WIDGET( p->panel ), TRUE );
 
@@ -570,10 +569,9 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	gtk_widget_set_size_request_( seqv->area, 176,176  );
 	seqv->panel = gtk_frame_new(NULL);
 
-	if( num > 0 )
-	{
-		seqv->toggle = gtk_toggle_button_new_with_label( "preview" );
+	seqv->toggle = gtk_toggle_button_new_with_label( "preview" );
 	
+	if(num>0) {
 		gtk_toggle_button_set_active(
 			GTK_TOGGLE_BUTTON(seqv->toggle), FALSE );
 		g_signal_connect( G_OBJECT( seqv->toggle ), "toggled", G_CALLBACK(sequence_preview_cb),
@@ -583,6 +581,10 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 		gtk_widget_set_sensitive_( GTK_WIDGET( seqv->toggle ), FALSE );
 	
 		gtk_widget_show( seqv->toggle );
+	} else {
+		gtk_box_pack_start( GTK_BOX(seqv->main_vbox), seqv->toggle,FALSE,FALSE, 0 );
+		gtk_widget_show( seqv->toggle );
+		gtk_widget_set_sensitive_( GTK_WIDGET( seqv->toggle ), FALSE );
 	}
 
 	GtkWidget *vvbox = gtk_vbox_new(FALSE, 0);
@@ -603,7 +605,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 	GtkWidget *box = gtk_vbox_new(FALSE,0);
 	seqv->timeline_ = gtk_hscale_new_with_range( 0.0,1.0,0.1 );
 	gtk_scale_set_draw_value( GTK_SCALE(seqv->timeline_), FALSE );
-	gtk_widget_set_size_request_( seqv->panel,180 ,180);
+	//gtk_widget_set_size_request_( seqv->panel,180 ,180);
 	gtk_adjustment_set_value(
                 GTK_ADJUSTMENT(GTK_RANGE(seqv->timeline_)->adjustment), 0.0 );
 	gtk_widget_show( seqv->panel );
@@ -784,7 +786,10 @@ void		*multitrack_new(
 		int threads)
 {
 	multitracker_t *mt = NULL;
-
+#ifdef STRICT_CHECKING
+	assert( max_w > 0 );
+	assert( max_h > 0 );
+#endif
 	mt 		= (multitracker_t*) vj_calloc(sizeof(multitracker_t));
 	mt->view 	= (sequence_view_t**) vj_calloc(sizeof(sequence_view_t*) * MAX_TRACKS );
 	mt->preview	= NULL;
@@ -794,13 +799,12 @@ void		*multitrack_new(
  	mt->logo = load_logo_image(vj_get_preview_box_w(), vj_get_preview_box_h());
 	mt->preview_toggle = preview_toggle;
 	mt->scroll = gtk_scrolled_window_new(NULL,NULL);
-	gtk_widget_set_size_request(mt->scroll,50+max_w*2, max_h);
+//	gtk_widget_set_size_request(mt->scroll,50+max_w*2, max_h);
 	gtk_container_set_border_width(GTK_CONTAINER(mt->scroll),1);
-	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(mt->scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_ALWAYS );
+	gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(mt->scroll),GTK_POLICY_AUTOMATIC, GTK_POLICY_NEVER);
 	GtkWidget *table = gtk_table_new( 1, MAX_TRACKS, FALSE );
 	gtk_box_pack_start( GTK_BOX( mt->main_box ), mt->scroll , TRUE,TRUE, 0 );
 	gtk_widget_show(mt->scroll);
-
 	int c = 0;
 	for( c = 0; c < MAX_TRACKS; c ++ ) 
 	{

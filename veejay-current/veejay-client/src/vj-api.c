@@ -94,7 +94,7 @@ static struct
 	{"Mouse left: Set in point, Mouse right: Set out point, Double click: Clear selected, Mouse middle: Drag selection"},
 	{"Mouse left/right: Play slot, Shift + Mouse left: Put sample in slot"},
 	{"Mouse left click: Select slot (sample in slot), Mouse double click: Play sample in slot"},
-	NULL,
+	{NULL},
 };
 
 enum {
@@ -1865,12 +1865,12 @@ gboolean	gveejay_quit( GtkWidget *widget, gpointer user_data)
 
 	if( info->watch.state == STATE_PLAYING)
 	{
-		if( prompt_dialog("Quit gveejay", "Are you sure?" ) == GTK_RESPONSE_REJECT)
+		if( prompt_dialog("Quit Reloaded", "Are you sure?" ) == GTK_RESPONSE_REJECT)
 			return TRUE;
 	}
 	
 	running_g_ = 0;
-	info->watch.state == STATE_QUIT;
+	info->watch.state = STATE_QUIT;
 
 	return FALSE;
 }
@@ -2167,6 +2167,7 @@ static  void	update_curve_widget(const char *name)
 			char but[25];
 			sprintf(but, "kf_p%d", p);
 			set_toggle_button( but, 1 );
+
 			info->uc.selected_parameter_id = p;
 			switch( curve_type )
        			{
@@ -5361,7 +5362,7 @@ int		veejay_update_multitrack( void *data )
 
 	GtkWidget *maintrack = glade_xml_get_widget( info->main_window, "imageA");
 	int i;
-	GtkWidget *ww = glade_xml_get_widget_( info->main_window, "vjdeck" );
+	GtkWidget *ww = glade_xml_get_widget_( info->main_window, "notebook18" );
 	int deckpage = gtk_notebook_get_current_page(GTK_NOTEBOOK(ww));
 
 #ifdef STRICT_CHECKING
@@ -5445,7 +5446,7 @@ int		veejay_update_multitrack( void *data )
 				}*/
 			//	vj_img_cb( s->img_list[i] );
 			
-			if(deckpage == 2)
+			if(deckpage == 3)
 				multitrack_update_sequence_image( gui->mt, i, s->img_list[i] );
 
 			gdk_pixbuf_unref( s->img_list[i] );
@@ -5797,7 +5798,6 @@ static void	process_reload_hints(int *history, int pm)
 
 				gchar *tt1 = _utf8str(_effect_get_param_description(entry_tokens[ENTRY_FXID],i));
 				gtk_widget_set_tooltip_text(	glade_xml_get_widget_(info->main_window, slider_name), tt1 );
-				g_free(tt1);
 				enable_widget( button_name );
 				gint min,max,value;
 				value = entry_tokens[3 + i];
@@ -5807,6 +5807,8 @@ static void	process_reload_hints(int *history, int pm)
 				}
 				sprintf(button_name, "kf_p%d", i );
 				enable_widget( button_name );
+				set_tooltip( button_name, tt1 );
+				g_free(tt1);
 			}
 			
 		}
@@ -5823,6 +5825,7 @@ static void	process_reload_hints(int *history, int pm)
 			sprintf( button_name, "dec_p%d", i);
 			disable_widget( button_name );
 			sprintf( button_name, "kf_p%d", i );
+			set_tooltip( button_name, NULL );
 			disable_widget( button_name );
 			gtk_widget_set_tooltip_text( glade_xml_get_widget_(info->main_window, slider_name), NULL );
 		}
@@ -6754,7 +6757,6 @@ void	vj_gui_enable()
 		enable_widget( uiwidgets[i].name );
 		 i++;
 	}
-
 	info->sensitive = 1;
 }
 
