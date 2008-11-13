@@ -6072,8 +6072,8 @@ void	default_bank_values(int *col, int *row )
 {
 	if( *col == 0 && *row == 0 )
 	{
-		NUM_SAMPLES_PER_COL = 6;
-		NUM_SAMPLES_PER_ROW = 2;
+		NUM_SAMPLES_PER_COL = 2;
+		NUM_SAMPLES_PER_ROW = 6;
 	}
 	else
 	{
