@@ -5566,7 +5566,6 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 
 		select_slot( info->status_tokens[PLAY_MODE] );
 	
-		on_samplepage_clicked(NULL,NULL);
 #ifdef STRICT_CHECKING
 		if( pm != MODE_PLAIN )
 		assert( info->selected_slot != NULL );
