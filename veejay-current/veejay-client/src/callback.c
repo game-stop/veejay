@@ -1,5 +1,5 @@
 /* gveejay - Linux VeeJay - GVeejay GTK+-2/Glade User Interface
- *           (C) 2002-2005 Niels Elburg <nelburg@looze.net> 
+ *           (C) 2002-2005 Niels Elburg <nwelburg@gmail.com> 
  *           (C)      2006 Matthijs van Henten <cola@looze.net>
  *
  *

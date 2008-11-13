@@ -15,7 +15,7 @@ Release:       %{release}
 Prefix:        %{prefix}
 Copyright:     GNU GPL
 URL:           http://veejayq.net
-Packager:      nelburg <nelburg@looze.net>
+Packager:      nelburg <nwelburg@gmail.com>
 Group:         Productivity/Multimedia/Video/Editors and Convertors
 Source:        %{name}-%{version}.tar.bz2
 BuildRoot:     %{_tmppath}/%{name}-%{version}-build
@@ -26,13 +26,10 @@ Prereq:        /sbin/ldconfig
 #Requires:      libglade2
 #Requires:      libxml2 >= 2.5.4
 #Requires: 	cairo
-#Requires:	gtkcairo
 #BuildRequires: pkgconfig
 #BuildRequires: gtk2-devel
 #BuildRequires: glib2-devel
 #BuildRequires: libglade2-devel
-#BuildRequires: gtkcairo-devel
-#BuildRequires: cairo-devel
 
 %description
 Veejay is a visual instrument and realtime video sampler.

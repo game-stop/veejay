@@ -1,5 +1,5 @@
 /* Gveejay Reloaded - graphical interface for VeeJay
- * 	     (C) 2002-2004 Niels Elburg <nelburg@looze.net> 
+ * 	     (C) 2002-2004 Niels Elburg <nwelburg@gmail.com> 
  *  with contributions by  Thomas Rheinhold (2005)
  * 	                   (initial sampledeck representation in GTK) 
  *
@@ -1514,7 +1514,7 @@ void	about_dialog()
         "Developed by:",
 	"Matthijs v. Henten <cola@looze.net>",
 	"Dursun Koca",
-	"Niels Elburg <nelburg@looze.net>",
+	"Niels Elburg <nwelburg@gmail.com>",
 	"\n",
 	"Contributions by:",
 	"Thomas Reinhold <stan@jf-chemnitz.de>",
