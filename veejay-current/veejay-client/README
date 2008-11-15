@@ -23,9 +23,9 @@
                               :..,:::||||~~~====++                                 
                             ,:,,,:::~~~~~===++++            Reloaded                               
                              ,::::~~~====++++                                 
-                               ~~~~~===+++++               version 1.0                 
+                               ~~~~~===+++++               version 1.4.x                 
                                 ~~===+++++++:                               
-                                 N=++++++++++              April  2007.                             
+                                 N=++++++++++              Nov.  2008.                             
                                    +++++++++                                   
                                     ++++::::                                  
                                      :::::                                      
@@ -86,6 +86,15 @@ There is a utility 'aconnect' (comes with ALSA) that does this.
 
 
 4. Launch reloaded
+
+
+
+Know bugs
+=========
+- Multitracker crashes when using very high resolution video
+
+
+
 
 About
 =====
