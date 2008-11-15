@@ -820,6 +820,8 @@ void		*multitrack_new(
 	mt->master_track = 0;
 
 	mt->preview = gvr_preview_init( MAX_TRACKS, threads );
+//	gvr_set_master( mt->preview, mt->master_track );
+
 
 	parent__ = infog;
 
@@ -922,8 +924,8 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 		}
 	}
 
-	mt->master_track = track;
-	gvr_set_master( mt->preview, track );
+//	mt->master_track = track;
+//	gvr_set_master( mt->preview, track );
 
 	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
 
@@ -973,7 +975,6 @@ void		multitrack_set_quality( void *data , int quality )
 
 	int w = 0;
 	int h = 0;
-
 	switch( quality )
 	{
 		case 1:
@@ -1082,7 +1083,7 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 	sequence_view_t *v = (sequence_view_t*) user_data;
 	multitracker_t *mt = v->backlink;
 
-	if(event->type == GDK_2BUTTON_PRESS)
+	if(event->type == GDK_BUTTON_PRESS)
 	{
 		if( !gvr_track_test( mt->preview , v->num ) )
 			return FALSE;
@@ -1102,6 +1103,15 @@ static	gboolean seqv_mouse_press_event ( GtkWidget *w, GdkEventButton *event, gp
 		}
 
 		vj_gui_cb( 0, host, port );
+ 		
+		gvr_set_master( mt->preview, v->num );
+		if(!gvr_track_configure( mt->preview, v->num, mt->pw,mt->ph) )
+		{
+			veejay_msg(0, "Unable to configure preview %d x %d",mt->pw , mt->ph );
+		}
+		veejay_msg(VEEJAY_MSG_INFO, "Set master to track %d", mt->master_track );
+		mt->master_track = v->num;
+		
 		vj_gui_enable();
 	}
 	

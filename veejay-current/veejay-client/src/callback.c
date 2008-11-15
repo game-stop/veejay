@@ -2555,10 +2555,14 @@ void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 		multitrack_toggle_preview( info->mt, -1, is_button_toggled("previewtoggle"),
 			glade_xml_get_widget(info->main_window, "imageA") );
 	}
-	else {
-		multitrack_toggle_preview( info->mt, -1, 1, glade_xml_get_widget(info->main_window,"imageA")); //@ enable
-	}
-	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
+	multitrack_set_quality( info->mt, info->quality );
+	
+	multitrack_toggle_preview( info->mt,
+		-1,	
+		1,
+		glade_xml_get_widget(info->main_window,"imageA")); //@ enable
+	
+//	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 }
 
 void		on_previewspeed_value_changed( GtkWidget *widget, gpointer user_data)
@@ -3518,7 +3522,7 @@ gboolean	boxgreen_expose_event(GtkWidget *w,
 	GdkColor col;
 
 	memset( &col,0, sizeof( GdkColor ) );
-	col.green = 255 * get_slider_val( "textcolorgreen" );
+	col.green = 0xff * get_slider_val( "textcolorgreen" );
 
 	gdk_color_alloc( gtk_widget_get_colormap( w ), &col );
 	

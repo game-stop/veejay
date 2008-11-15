@@ -155,6 +155,7 @@ gboolean	gveejay_idle(gpointer data)
 					update_gveejay();
 			}
 		}
+
 	}
 
 	if( gveejay_restart() )

@@ -127,6 +127,8 @@ static gboolean event_release (GtkWidget *widget, GdkEventButton *bev, gpointer 
 
 static gboolean event_motion (GtkWidget *widget, GdkEventMotion *mev, gpointer user_data);
 
+static gboolean event_scroll (GtkWidget *widget, GdkEventScroll *mev, gpointer user_data);
+
 static	void	timeline_class_init( TimelineSelectionClass *class );
 
 static	void	timeline_init(TimelineSelection *te );
@@ -527,6 +529,30 @@ static	void	move_selection( GtkWidget *widget, gdouble x, gdouble width )
 
 }
 
+static gboolean
+event_scroll (GtkWidget *widget, GdkEventScroll *ev, gpointer user_data)
+{
+	TimelineSelection *te = TIMELINE_SELECTION (widget);
+	gdouble width = (gdouble) widget->allocation.width;
+	gint x,y;
+	GdkModifierType state;
+	gdk_window_get_pointer( ev->window, &x,&y,&state );
+
+	if( ev->direction == GDK_SCROLL_UP ) {
+		gdouble cur_pos = timeline_get_pos(widget);
+		timeline_set_pos( widget, cur_pos + 1 );
+	}
+	else if(ev->direction == GDK_SCROLL_DOWN ) {
+		gdouble cur_pos = timeline_get_pos(widget);
+		timeline_set_pos( widget, cur_pos - 1 );
+	}
+
+	gtk_widget_queue_draw( widget );
+
+	return FALSE;
+}
+
+
 static	gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer user_data)
 {
 	TimelineSelection *te = TIMELINE_SELECTION( widget );
@@ -534,6 +560,7 @@ static	gboolean event_press(GtkWidget *widget, GdkEventButton *ev, gpointer user
 
 	te->grab_button = ev->button;
 	te->current_location = MOUSE_WIDGET;
+
 
 	if( ev->type == GDK_2BUTTON_PRESS && te->grab_button == 1 )
 	{
@@ -827,7 +854,7 @@ GtkWidget *timeline_new(void)
 			GDK_EXPOSURE_MASK | GDK_POINTER_MOTION_HINT_MASK | GDK_POINTER_MOTION_MASK |
 			GDK_BUTTON1_MOTION_MASK | GDK_BUTTON2_MOTION_MASK | 
 			GDK_BUTTON_PRESS_MASK | GDK_BUTTON_RELEASE_MASK |
-			GDK_BUTTON3_MOTION_MASK | GDK_2BUTTON_PRESS );
+			GDK_BUTTON3_MOTION_MASK | GDK_2BUTTON_PRESS | GDK_SCROLL_MASK	);
 
 	g_signal_connect( G_OBJECT(widget), "expose_event", G_CALLBACK(timeline_expose), NULL );
 	g_signal_connect( G_OBJECT(widget), "motion_notify_event",
@@ -836,6 +863,8 @@ GtkWidget *timeline_new(void)
 			  G_CALLBACK(event_press), NULL );
 	g_signal_connect( G_OBJECT(widget), "button_release_event",
 			  G_CALLBACK(event_release), NULL );
+	g_signal_connect( G_OBJECT(widget), "scroll_event",
+			G_CALLBACK( event_scroll ), NULL );
 
 	te->widget = widget;
 
