@@ -1139,75 +1139,91 @@
 			      <property name="spacing">0</property>
 
 			      <child>
-				<widget class="GtkHBox" id="frame_fxtree4">
+				<widget class="GtkAlignment" id="alignment511">
 				  <property name="visible">True</property>
-				  <property name="homogeneous">False</property>
-				  <property name="spacing">0</property>
+				  <property name="xalign">0.5</property>
+				  <property name="yalign">0.5</property>
+				  <property name="xscale">1</property>
+				  <property name="yscale">1</property>
+				  <property name="top_padding">3</property>
+				  <property name="bottom_padding">20</property>
+				  <property name="left_padding">0</property>
+				  <property name="right_padding">0</property>
 
 				  <child>
-				    <widget class="GtkCheckButton" id="button_entry_toggle">
+				    <widget class="GtkHBox" id="frame_fxtree4">
 				      <property name="visible">True</property>
-				      <property name="tooltip" translatable="yes">Enable or disable selected FX </property>
-				      <property name="can_focus">True</property>
-				      <property name="label" translatable="yes"></property>
-				      <property name="use_underline">True</property>
-				      <property name="relief">GTK_RELIEF_HALF</property>
-				      <property name="focus_on_click">True</property>
-				      <property name="active">True</property>
-				      <property name="inconsistent">False</property>
-				      <property name="draw_indicator">True</property>
-				      <signal name="clicked" handler="on_button_entry_toggle_clicked" last_modification_time="Wed, 23 Mar 2005 20:17:44 GMT"/>
-				    </widget>
-				    <packing>
-				      <property name="padding">0</property>
-				      <property name="expand">False</property>
-				      <property name="fill">False</property>
-				    </packing>
-				  </child>
+				      <property name="homogeneous">False</property>
+				      <property name="spacing">0</property>
 
-				  <child>
-				    <placeholder/>
-				  </child>
+				      <child>
+					<widget class="GtkCheckButton" id="button_entry_toggle">
+					  <property name="visible">True</property>
+					  <property name="tooltip" translatable="yes">Enable or disable selected FX </property>
+					  <property name="can_focus">True</property>
+					  <property name="label" translatable="yes"></property>
+					  <property name="use_underline">True</property>
+					  <property name="relief">GTK_RELIEF_HALF</property>
+					  <property name="focus_on_click">True</property>
+					  <property name="active">True</property>
+					  <property name="inconsistent">False</property>
+					  <property name="draw_indicator">True</property>
+					  <signal name="clicked" handler="on_button_entry_toggle_clicked" last_modification_time="Wed, 23 Mar 2005 20:17:44 GMT"/>
+					</widget>
+					<packing>
+					  <property name="padding">0</property>
+					  <property name="expand">False</property>
+					  <property name="fill">False</property>
+					</packing>
+				      </child>
 
-				  <child>
-				    <widget class="GtkSpinButton" id="button_fx_entry">
-				      <property name="width_request">36</property>
-				      <property name="visible">True</property>
-				      <property name="can_focus">True</property>
-				      <property name="climb_rate">1</property>
-				      <property name="digits">0</property>
-				      <property name="numeric">False</property>
-				      <property name="update_policy">GTK_UPDATE_ALWAYS</property>
-				      <property name="snap_to_ticks">False</property>
-				      <property name="wrap">False</property>
-				      <property name="adjustment">0 0 19 1 10 10</property>
-				      <signal name="value_changed" handler="on_button_fx_entry_value_changed" last_modification_time="Wed, 23 Mar 2005 20:18:28 GMT"/>
-				    </widget>
-				    <packing>
-				      <property name="padding">0</property>
-				      <property name="expand">False</property>
-				      <property name="fill">True</property>
-				    </packing>
-				  </child>
+				      <child>
+					<placeholder/>
+				      </child>
 
-				  <child>
-				    <widget class="GtkEntry" id="entry_effectname">
-				      <property name="visible">True</property>
-				      <property name="can_focus">True</property>
-				      <property name="editable">True</property>
-				      <property name="visibility">True</property>
-				      <property name="max_length">0</property>
-				      <property name="text" translatable="yes"></property>
-				      <property name="has_frame">True</property>
-				      <property name="invisible_char">*</property>
-				      <property name="activates_default">False</property>
-				      <property name="width_chars">15</property>
+				      <child>
+					<widget class="GtkSpinButton" id="button_fx_entry">
+					  <property name="width_request">36</property>
+					  <property name="visible">True</property>
+					  <property name="tooltip" translatable="yes">Change currently selected FX chain entry</property>
+					  <property name="can_focus">True</property>
+					  <property name="climb_rate">1</property>
+					  <property name="digits">0</property>
+					  <property name="numeric">False</property>
+					  <property name="update_policy">GTK_UPDATE_ALWAYS</property>
+					  <property name="snap_to_ticks">False</property>
+					  <property name="wrap">False</property>
+					  <property name="adjustment">0 0 19 1 10 10</property>
+					  <signal name="value_changed" handler="on_button_fx_entry_value_changed" last_modification_time="Wed, 23 Mar 2005 20:18:28 GMT"/>
+					</widget>
+					<packing>
+					  <property name="padding">0</property>
+					  <property name="expand">False</property>
+					  <property name="fill">True</property>
+					</packing>
+				      </child>
+
+				      <child>
+					<widget class="GtkEntry" id="entry_effectname">
+					  <property name="visible">True</property>
+					  <property name="tooltip" translatable="yes">Displays FX on currently selected chain entry</property>
+					  <property name="can_focus">True</property>
+					  <property name="editable">True</property>
+					  <property name="visibility">True</property>
+					  <property name="max_length">0</property>
+					  <property name="text" translatable="yes"></property>
+					  <property name="has_frame">True</property>
+					  <property name="invisible_char">*</property>
+					  <property name="activates_default">False</property>
+					  <property name="width_chars">15</property>
+					</widget>
+					<packing>
+					  <property name="padding">0</property>
+					  <property name="expand">True</property>
+					  <property name="fill">True</property>
+					</packing>
+				      </child>
 				    </widget>
-				    <packing>
-				      <property name="padding">0</property>
-				      <property name="expand">True</property>
-				      <property name="fill">True</property>
-				    </packing>
 				  </child>
 				</widget>
 				<packing>
@@ -2413,6 +2429,7 @@
 					  <child>
 					    <widget class="GtkRadioButton" id="mixing_effects">
 					      <property name="visible">True</property>
+					      <property name="tooltip" translatable="yes">FX with at most one input sources</property>
 					      <property name="can_focus">True</property>
 					      <property name="label" translatable="yes">Mixing effects</property>
 					      <property name="use_underline">True</property>
@@ -2433,6 +2450,7 @@
 					  <child>
 					    <widget class="GtkRadioButton" id="image_effects">
 					      <property name="visible">True</property>
+					      <property name="tooltip" translatable="yes">FX without any input sources</property>
 					      <property name="can_focus">True</property>
 					      <property name="label" translatable="yes">Image effects</property>
 					      <property name="use_underline">True</property>
@@ -2949,7 +2967,7 @@
 					</widget>
 					<packing>
 					  <property name="padding">0</property>
-					  <property name="expand">True</property>
+					  <property name="expand">False</property>
 					  <property name="fill">True</property>
 					</packing>
 				      </child>
@@ -2977,7 +2995,7 @@
 					</widget>
 					<packing>
 					  <property name="padding">0</property>
-					  <property name="expand">True</property>
+					  <property name="expand">False</property>
 					  <property name="fill">True</property>
 					</packing>
 				      </child>
@@ -3004,7 +3022,7 @@
 					</widget>
 					<packing>
 					  <property name="padding">0</property>
-					  <property name="expand">True</property>
+					  <property name="expand">False</property>
 					  <property name="fill">True</property>
 					</packing>
 				      </child>
@@ -3380,7 +3398,7 @@
 			      <child>
 				<widget class="GtkLabel" id="label615">
 				  <property name="visible">True</property>
-				  <property name="label" translatable="yes">startframe</property>
+				  <property name="label" translatable="yes">Start at</property>
 				  <property name="use_underline">False</property>
 				  <property name="use_markup">False</property>
 				  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -3430,7 +3448,7 @@
 			      <child>
 				<widget class="GtkLabel" id="label682">
 				  <property name="visible">True</property>
-				  <property name="label" translatable="yes">endframe</property>
+				  <property name="label" translatable="yes">Stop at</property>
 				  <property name="use_underline">False</property>
 				  <property name="use_markup">False</property>
 				  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -3567,7 +3585,7 @@
 			  <child>
 			    <widget class="GtkLabel" id="label889">
 			      <property name="visible">True</property>
-			      <property name="label" translatable="yes">&lt;b&gt;timeline&lt;/b&gt;</property>
+			      <property name="label" translatable="yes">&lt;b&gt;Timeline&lt;/b&gt;</property>
 			      <property name="use_underline">False</property>
 			      <property name="use_markup">True</property>
 			      <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -11101,6 +11119,7 @@ MLZO</property>
 					  <child>
 					    <widget class="GtkButton" id="button_samplebank_prev">
 					      <property name="visible">True</property>
+					      <property name="tooltip" translatable="yes">Goto previous bank</property>
 					      <property name="can_focus">True</property>
 					      <property name="label" translatable="yes">&lt;&lt;</property>
 					      <property name="use_underline">True</property>
@@ -11143,6 +11162,7 @@ MLZO</property>
 					  <child>
 					    <widget class="GtkSpinButton" id="spin_samplebank_select">
 					      <property name="visible">True</property>
+					      <property name="tooltip" translatable="yes">Changes current sample bank page</property>
 					      <property name="can_focus">True</property>
 					      <property name="climb_rate">1</property>
 					      <property name="digits">0</property>
@@ -11163,6 +11183,7 @@ MLZO</property>
 					  <child>
 					    <widget class="GtkButton" id="button_samplebank_next">
 					      <property name="visible">True</property>
+					      <property name="tooltip" translatable="yes">Goto next bank</property>
 					      <property name="can_focus">True</property>
 					      <property name="label" translatable="yes">&gt;&gt;</property>
 					      <property name="use_underline">True</property>
@@ -12483,6 +12504,7 @@ MLZO</property>
 					  <property name="width_request">24</property>
 					  <property name="height_request">24</property>
 					  <property name="visible">True</property>
+					  <property name="tooltip" translatable="yes">Decrement framerate</property>
 					  <property name="can_focus">True</property>
 					  <property name="relief">GTK_RELIEF_HALF</property>
 					  <property name="focus_on_click">True</property>
@@ -12510,7 +12532,7 @@ MLZO</property>
 					<widget class="GtkButton" id="framerate_inc">
 					  <property name="width_request">24</property>
 					  <property name="height_request">24</property>
-					  <property name="visible">True</property>
+					  <property name="tooltip" translatable="yes">Increment framerate</property>
 					  <property name="can_focus">True</property>
 					  <property name="relief">GTK_RELIEF_HALF</property>
 					  <property name="focus_on_click">True</property>
@@ -12825,29 +12847,6 @@ MLZO</property>
 						  </child>
 						</widget>
 					      </child>
-
-					      <child>
-						<widget class="GtkLabel" id="label943">
-						  <property name="visible">True</property>
-						  <property name="label" translatable="yes">&lt;b&gt;Keystroke Recorder&lt;/b&gt;</property>
-						  <property name="use_underline">False</property>
-						  <property name="use_markup">True</property>
-						  <property name="justify">GTK_JUSTIFY_LEFT</property>
-						  <property name="wrap">False</property>
-						  <property name="selectable">False</property>
-						  <property name="xalign">0.5</property>
-						  <property name="yalign">0.5</property>
-						  <property name="xpad">0</property>
-						  <property name="ypad">0</property>
-						  <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
-						  <property name="width_chars">-1</property>
-						  <property name="single_line_mode">False</property>
-						  <property name="angle">0</property>
-						</widget>
-						<packing>
-						  <property name="type">label_item</property>
-						</packing>
-					      </child>
 					    </widget>
 					    <packing>
 					      <property name="padding">0</property>
@@ -12951,29 +12950,6 @@ MLZO</property>
 					      </child>
 					    </widget>
 					  </child>
-
-					  <child>
-					    <widget class="GtkLabel" id="label930">
-					      <property name="visible">True</property>
-					      <property name="label" translatable="yes">&lt;b&gt;Sample Randomizer&lt;/b&gt;</property>
-					      <property name="use_underline">False</property>
-					      <property name="use_markup">True</property>
-					      <property name="justify">GTK_JUSTIFY_LEFT</property>
-					      <property name="wrap">False</property>
-					      <property name="selectable">False</property>
-					      <property name="xalign">0.5</property>
-					      <property name="yalign">0.5</property>
-					      <property name="xpad">0</property>
-					      <property name="ypad">0</property>
-					      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
-					      <property name="width_chars">-1</property>
-					      <property name="single_line_mode">False</property>
-					      <property name="angle">0</property>
-					    </widget>
-					    <packing>
-					      <property name="type">label_item</property>
-					    </packing>
-					  </child>
 					</widget>
 					<packing>
 					  <property name="padding">0</property>
@@ -12995,7 +12971,7 @@ MLZO</property>
 			</widget>
 			<packing>
 			  <property name="padding">0</property>
-			  <property name="expand">True</property>
+			  <property name="expand">False</property>
 			  <property name="fill">True</property>
 			</packing>
 		      </child>
@@ -13048,7 +13024,7 @@ MLZO</property>
 
 		  <child>
 		    <widget class="GtkStatusbar" id="statusbar">
-		      <property name="width_request">600</property>
+		      <property name="width_request">800</property>
 		      <property name="height_request">18</property>
 		      <property name="visible">True</property>
 		      <property name="has_resize_grip">False</property>
