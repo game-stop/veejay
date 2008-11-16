@@ -790,7 +790,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		}
 		else
 		{
-			if(!veejay_stop_playing_sample(info, sample_id ))
+			if(!veejay_stop_playing_sample(info, cur_id ))
 				return;
 		}
 	}
@@ -804,16 +804,16 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		}
 		else
 		{
-			veejay_stop_playing_stream(info, sample_id );
+			veejay_stop_playing_stream(info, cur_id );
 		}
 	}
 
 	if(new_pm == VJ_PLAYBACK_MODE_PLAIN )
 	{
 		if(info->uc->playback_mode==VJ_PLAYBACK_MODE_TAG) 
-			veejay_stop_playing_stream( info , 0);
+			veejay_stop_playing_stream( info , info->uc->sample_id);
 		if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
-			veejay_stop_playing_sample( info, 0 );
+			veejay_stop_playing_sample( info,  info->uc->sample_id );
 		info->uc->playback_mode = new_pm;
 		info->edit_list = info->current_edit_list;
 		video_playback_setup *settings = info->settings;

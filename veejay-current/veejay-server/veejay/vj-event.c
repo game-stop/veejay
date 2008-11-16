@@ -2687,6 +2687,7 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
 			{	
 				p_no_sample(args[1]);
 			}
+			return;
 		}
 		if(args[0] == VJ_PLAYBACK_MODE_TAG)
 		{
@@ -2700,6 +2701,7 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
 			{
 				p_no_tag(args[1]);
 			}
+			return;
 		}
 	}
 	else
