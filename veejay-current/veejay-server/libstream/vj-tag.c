@@ -331,8 +331,8 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 	}
 	if( tag->socket_ready == 0 )
 	{
-		tag->socket_frame = (uint8_t*) vj_calloc(sizeof(uint8_t) * SOCKETFRAMELEN);
-		tag->socket_len = SOCKETFRAMELEN;
+		tag->socket_frame = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h * 3);
+		tag->socket_len = w * h * 3;
 		if(!tag->socket_frame) 
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Insufficient error to allocate memory for Network Stream");

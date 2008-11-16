@@ -69,7 +69,7 @@ vj_client *vj_client_alloc( int w, int h, int f )
 	v->blob = (unsigned char*) malloc(sizeof(unsigned char) * PACKET_LEN ); 
 	v->mcast = 0;
 	if( w > 0 && h > 0 )
-		v->space = (uint8_t*) malloc( sizeof(uint8_t) * SOCKETFRAMELEN );
+		v->space = (uint8_t*) malloc( sizeof(uint8_t) * w * h * 4 );
 	return v;
 }
 

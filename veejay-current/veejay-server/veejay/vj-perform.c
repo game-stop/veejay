@@ -160,7 +160,7 @@ static int vj_perform_tag_is_cached(int chain_entry, int tag_id)
 {
  	int c;
 	int res = -1;
-	for(c=CACHE_SIZE; c >= 0 ; c--)
+	for(c=0; c < CACHE_SIZE; c++)
   	{
 	    if(chain_entry != c && cached_tag_frames[c] == tag_id) 
 	    {
@@ -175,7 +175,7 @@ static int vj_perform_sample_is_cached(int nframe, int chain_entry)
 {
 	int c;
 	int res = -1;
-	for(c=CACHE_SIZE; c >= 0 ; c--)
+	for(c=0; c < CACHE_SIZE ; c++)
   	{
 	    	if(chain_entry != c && cached_sample_frames[c] == nframe) 
 		{
@@ -1631,6 +1631,10 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 		{	
 			int res = 0;	
 			//@ Capture frame into backing buffer
+			vp = vj_tag_get_composite_view(sample_id);			
+			if( dovp == 2 && vp == NULL ) 
+				dovp = 0;
+
 			if( dovp == 2) {
 				res = vj_tag_get_frame(sample_id,backing_fb, audio_buffer[chain_entry]);
 			} else {
@@ -1645,7 +1649,6 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 
 			if( dovp == 2)
 			{
-				vp = vj_tag_get_composite_view(sample_id);
 #ifdef STRICT_CHECKING
 				assert( vp != NULL );
 #endif
@@ -1674,6 +1677,9 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 	    {
 		dovp = sample_get_composite( sample_id );
 		vp   = sample_get_composite_view(sample_id);
+		if( dovp == 2 && vp == NULL ) 
+			dovp = 0;
+
 #ifdef STRICT_CHECKING
 		if(dovp==2)
 			assert( vp != NULL );
@@ -1828,6 +1834,10 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 		if (vj_tag_get_active(sample_id) == 1)
 		{ 
 			dovp = vj_tag_get_composite( sample_id);
+			vp = vj_tag_get_composite_view(sample_id );
+			if( dovp == 2 && vp == NULL )
+				dovp = 0;
+
 			if(dovp==2) {
 				res = vj_tag_get_frame(sample_id,backing_fb,audio_buffer[chain_entry] );
 			} else {
@@ -1871,6 +1881,9 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 	    	{
 			dovp = sample_get_composite(sample_id);
 			vp   = sample_get_composite_view(sample_id);
+			if( dovp == 2 && vp == NULL ) 
+				dovp = 0;
+	
 #ifdef STRICT_CHECKING			
 			if(dovp==2)
 				assert( vp != NULL );

@@ -177,7 +177,7 @@ static int	_vj_server_classic(vj_server *vjs, int port_offset)
    	}
 
 
-	int send_size = 512 * 1024;
+	int send_size = 1024 * 1024;
 	if( setsockopt( vjs->handle, SOL_SOCKET, SO_SNDBUF, (const char*) &send_size, sizeof(send_size) ) == - 1)
 	{
 		veejay_msg(0, "Cannot set send buffer size: %s", strerror(errno));
