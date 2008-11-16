@@ -19,10 +19,6 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 
-/*
- * If you are reading this code , you are insane.
- */ 
-
 #include <config.h>
 #include <math.h>
 #include <stdlib.h>
@@ -2744,7 +2740,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 	}
 
 	/* Actions for stream */
-	if( pm != last_pm && pm == MODE_STREAM )
+	if( ( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || pm != last_pm ) && pm == MODE_STREAM )
 	{
 		/* Is a solid color stream */	
 		if( info->status_tokens[STREAM_TYPE] == STREAM_WHITE )
@@ -2758,10 +2754,11 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 
 		}
 
-		update_label_str( "label_currentsource", "Stream" );
 		gchar *time = format_time( info->status_frame,info->el.fps );
 		update_label_str( "label_curtime", time );
 		g_free(time); 
+
+		update_label_str( "playhint", "Streaming");
 	}
 
 	/* Actions for sample */
@@ -2865,6 +2862,13 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 			if( speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
 			if( speed < 0 ) speed *= -1;
 			update_spin_value( "spin_samplespeed", speed);
+
+			if( pm == MODE_SAMPLE ) {
+				if( speed == 0 ) 	
+					update_label_str( "playhint", "Paused" );
+				else
+					update_label_str( "playhint", "Playing");
+			}
 		}
 
 		if( history[FRAME_DUP] != info->status_tokens[FRAME_DUP] )
@@ -2889,8 +2893,6 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 	
 			gchar *time = format_selection_time( 0, len );
 			g_free(time);	
-
-			update_label_str( "label_currentsource", "Sample");
 
 			update_spin_value( "spin_samplestart", info->status_tokens[SAMPLE_START]);
 			update_spin_value( "spin_sampleend", info->status_tokens[SAMPLE_END]);
@@ -3902,6 +3904,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 
 	if( with_reset_slotselection )
 		reset_samplebank();
+
 	multi_vims( VIMS_SAMPLE_LIST,"%d", 0 );
 	gint fxlen = 0;
 	gchar *fxtext = recv_vims(5,&fxlen);
@@ -5487,6 +5490,7 @@ static	void	update_status_accessibility(int old_pm, int new_pm)
 			enable_widget( streamwidgets[i].name);
 
 		update_label_str( "label_current_mode", "Stream");
+		update_label_str( "label_current_mode", "Stream");
 	}
 
 	if( new_pm == MODE_SAMPLE )
@@ -5499,6 +5503,8 @@ static	void	update_status_accessibility(int old_pm, int new_pm)
 			enable_widget( samplewidgets[i].name);
 
 		update_label_str( "label_current_mode", "Sample");
+		update_label_str( "label_currentsource", "Sample" );
+
 	}
 
 	if( new_pm == MODE_PLAIN)
@@ -5511,6 +5517,8 @@ static	void	update_status_accessibility(int old_pm, int new_pm)
 			enable_widget( plainwidgets[i].name);
 
 		update_label_str( "label_current_mode","Plain");
+		update_label_str( "label_currentsource", "Plain" );
+	
 	}
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
 	int page_needed = 0;
@@ -5572,6 +5580,7 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 			timeline_set_selection( info->tl, FALSE );
 
 		select_slot( info->status_tokens[PLAY_MODE] );
+
 	
 #ifdef STRICT_CHECKING
 		if( pm != MODE_PLAIN )
@@ -5692,6 +5701,12 @@ veejay_msg(0, "%s",time);
 			else
 				info->play_direction = 1;
 			if( plainspeed < 0 ) plainspeed *= -1;
+			if( plainspeed == 0 ) {
+				update_label_str( "playhint", "Paused");
+			} else {
+				update_label_str( "playhint", "Playing");
+			}
+
 		}
 	}
 
@@ -7471,8 +7486,10 @@ static gboolean on_slot_activated_by_mouse (GtkWidget *widget, GdkEventButton *e
 	if( event->type == GDK_2BUTTON_PRESS )
 	{
 		sample_slot_t *s = sample_banks[bank_nr]->slot[slot_nr];
-		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d", s->sample_type, s->sample_id);
+		multi_vims( VIMS_SET_MODE_AND_GO, "%d %d", (s->sample_type==0? 0:1), s->sample_id);
 		vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SET_MODE_AND_GO, s->sample_type, s->sample_id );
+		vj_msg(VEEJAY_MSG_INFO, "Start playing %s %d",
+				(s->sample_type==0 ? "Sample" : "Stream" ), s->sample_id );
 	}
 	else if(event->type == GDK_BUTTON_PRESS )
 	{

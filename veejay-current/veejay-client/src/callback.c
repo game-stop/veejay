@@ -2772,7 +2772,10 @@ on_spin_samplebank_select_value_changed
         if(page >= max_page){ /* @mvh I know this is not pretty but why make it difficult */
                  page = 0; 
                  gtk_spin_button_set_value(spinbutton, page);
-        }//if
+        } else if( page < 0 ) {
+		page = max_page;
+		gtk_spin_button_set_value(spinbutton,page);
+	}
         gtk_notebook_set_current_page(samplebank, page);        
 }
 void
