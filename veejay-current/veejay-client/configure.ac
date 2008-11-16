@@ -1,14 +1,14 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([gveejay],[1.4],[veejay-users@lists.sourceforge.net])
+AC_INIT([gveejay],[1.4.5],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/gveejay.c])
 
-VEEJAY_MAJOR_VERSION=1
-VEEJAY_MINOR_VERSION=4
-VEEJAY_MICRO_VERSION=5
-VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
-VEEJAY_CODENAME="Reloaded - build $VEEJAY_MAJOR_VERSION $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
+GVEEJAY_MAJOR_VERSION=1
+GVEEJAY_MINOR_VERSION=4
+GVEEJAY_MICRO_VERSION=5
+GVEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
+GVEEJAY_CODENAME="Reloaded - build $GVEEJAY_MAJOR_VERSION $GVEEJAY_MINOR_VERSION $GVEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
 
 AC_CANONICAL_HOST
@@ -19,10 +19,10 @@ AM_INIT_AUTOMAKE([dist-bzip2])
 
 AC_DEFINE(HAVE_CONFIG_H,1,[Include config.h])
 # libtool versioning
-LT_RELEASE=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
-LT_CURRENT=$VEEJAY_MICRO_VERSION
-LT_REVISION=$VEEJAY_MICRO_VERSION
-LT_AGE=$VEEJAY_MICRO_VERSION
+LT_RELEASE=$GVEEJAY_MAJOR_VERSION.$GVEEJAY_MINOR_VERSION.$GVEEJAY_MICRO_VERSION
+LT_CURRENT=$GVEEJAY_MICRO_VERSION
+LT_REVISION=$GVEEJAY_MICRO_VERSION
+LT_AGE=$GVEEJAY_MICRO_VERSION
 AC_SUBST(LT_RELEASE)
 AC_SUBST(LT_CURRENT)
 AC_SUBST(LT_REVISION)
@@ -79,8 +79,8 @@ AM_PROG_AS
 
 AC_CHECK_HEADERS([fenv.h stdint.h inttypes.h sys/types.h alloca.h])
 
-dnl AX_PREFIXED_DEFINE([VEEJAY], [HAVE_STDINT_H])
-dnl AX_PREFIXED_DEFINE([VEEJAY], [HAVE_INTTYPES_H])
+dnl AX_PREFIXED_DEFINE([GVEEJAY], [HAVE_STDINT_H])
+dnl AX_PREFIXED_DEFINE([GVEEJAY], [HAVE_INTTYPES_H])
 
 AC_CHECK_FUNCS([posix_memalign memalign fmax lround pow bzero gettimeofday memset mmap strndup strstr strncasecmp])
 AC_CHECK_FUNCS([sched_get_priority_max])
@@ -178,7 +178,7 @@ fi
 
 dnl Check for Veejay
 have_veejay=false
-PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.0 ],
+PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.4.1 ],
 	[	
 		AC_SUBST( VEEJAY_CFLAGS )
 		AC_SUBST( VEEJAY_LIBS )
@@ -723,7 +723,7 @@ AC_MSG_NOTICE([      Good luck! You can be the first! ])
 fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
-AC_MSG_NOTICE([  - Veejay 1.0                    : ${have_veejay}])
+AC_MSG_NOTICE([  - Veejay 1.4                    : ${have_veejay}])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - MJPEGTools                    : ${have_mjpegtools}])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
