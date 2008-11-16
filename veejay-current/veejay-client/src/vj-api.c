@@ -700,6 +700,7 @@ static struct
 	{"button_samplestart"},
 	{"button_sampleend"},
 	{"speed_slider"},
+	{"slow_slider"},
 	{"vjframerate"},
 	{"markerframe"},
 	{NULL}
@@ -715,6 +716,7 @@ static	struct
 	{"button_083"}, 
 	{"video_navigation_buttons"},
 	{"speed_slider"},
+	{"slow_slider"},
 	{"button_200"}, // mask button
 	{"frame_fxtree"},
 	{"frame_fxtree3"},
@@ -1565,7 +1567,7 @@ void	about_dialog()
 	GtkWidget *about = g_object_new(
 		GTK_TYPE_ABOUT_DIALOG,
 		"program_name", "reloaded",   
-		"name", "Reloaded",
+		"name", VEEJAY_CODENAME,
 		"version", VERSION,
 		"copyright", "(C) 2004 - 2008 N. Elburg et all.",
 		"comments", "The graphical interface for Veejay",
@@ -2868,6 +2870,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 		if( history[FRAME_DUP] != info->status_tokens[FRAME_DUP] )
 		{
 			update_spin_value( "spin_framedelay", info->status_tokens[FRAME_DUP]);
+			update_slider_value("slow_slider", info->status_tokens[FRAME_DUP],0);
 		}
 
 
@@ -6290,26 +6293,38 @@ gboolean	slider_scroll_event( GtkWidget *widget, GdkEventScroll *ev, gpointer us
 	} else if (ev->direction == GDK_SCROLL_DOWN ) {
 		param_changed( i, -1, slider_names_[i].text );
 	}
-	veejay_msg(0, "%s: %d,%d",__FUNCTION__,ev->direction,i);
 	return FALSE;
 }
 
 gboolean	speed_scroll_event(  GtkWidget *widget, GdkEventScroll *ev, gpointer user_data)
 {
-	gint i = GPOINTER_TO_INT(user_data);
 	int plainspeed =  info->status_tokens[SAMPLE_SPEED];
-
 	if(ev->direction == GDK_SCROLL_UP ) {
 		plainspeed = plainspeed + 1;
 	} else if (ev->direction == GDK_SCROLL_DOWN ) {
 		plainspeed = plainspeed - 1;
 	}
 	update_slider_value( "speed_slider", plainspeed, 0 );
-
-	veejay_msg(0, "%s: %d,%d",__FUNCTION__,ev->direction,i);
 	return FALSE;
 }
 
+gboolean	slow_scroll_event(  GtkWidget *widget, GdkEventScroll *ev, gpointer user_data)
+{
+	int plainspeed =  get_slider_val("slow_slider");
+	if(ev->direction == GDK_SCROLL_DOWN ) {
+		plainspeed = plainspeed - 1;
+	} else if (ev->direction == GDK_SCROLL_UP ) {
+		plainspeed = plainspeed + 1;
+	}
+	if(plainspeed < 0 )
+		plainspeed = 0;
+	update_slider_value("slow_slider",plainspeed,0);
+
+	plainspeed ++;
+	vj_msg(VEEJAY_MSG_INFO, "Slow video to %2.2f fps",
+		info->el.fps / (float) plainspeed );
+	return FALSE;
+}
 
 void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, int use_threads)
 {
@@ -6409,6 +6424,9 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 
 	g_signal_connect( GTK_OBJECT( glade_xml_get_widget(info->main_window, "speed_slider") ), "scroll-event",
 				G_CALLBACK(speed_scroll_event), NULL );
+	g_signal_connect( GTK_OBJECT( glade_xml_get_widget(info->main_window, "slow_slider") ), "scroll-event",
+				G_CALLBACK(slow_scroll_event), NULL );
+
 
 	veejay_memset( vj_event_list, 0, sizeof( vj_event_list ));
 	veejay_memset( vims_keys_list, 0, sizeof( vims_keys_list) );
@@ -6628,6 +6646,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	update_spin_range( "spin_framedelay", 1, 13, 0);
 	update_slider_range( "speed_slider", -13,13,speed,0);
+	update_slider_range( "slow_slider",0,13,0,0);
 	update_label_str( "label_hostnamex", (hostname == NULL ? group_name: hostname ) );
 	update_label_i( "label_portx",port_num,0);
 

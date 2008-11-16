@@ -785,6 +785,19 @@ void	on_spin_sampleend_value_changed( GtkWidget *widget, gpointer user_data)
 	}
 }
 
+void	on_slow_slider_value_changed( GtkWidget *widget, gpointer user_data )
+{
+	if(!info->status_lock) {
+		gint value = (gint) get_slider_val("slow_slider");
+		multi_vims(VIMS_VIDEO_SET_SLOW, "%d", value );	
+		value ++;
+		vj_msg(VEEJAY_MSG_INFO, "Slow video to %2.2f fps",	
+			info->el.fps / (float) value );
+		vj_midi_learning_vims_simple(info->midi, "slow_slider",VIMS_VIDEO_SET_SLOW);
+	}
+}
+
+
 void	on_speed_slider_value_changed(GtkWidget *widget, gpointer user_data)
 {
 	if(!info->status_lock)
