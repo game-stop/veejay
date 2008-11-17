@@ -908,8 +908,8 @@ AC_CHECK_HEADER( ffmpeg/avcodec.h, [FFMPEG_INCLUDE_AVCODEC="<ffmpeg/avcodec.h>"]
 AC_CHECK_HEADER( ffmpeg/avformat.h, [FFMPEG_INCLUDE_AVFORMAT="<ffmpeg/avformat.h>"],[])
 AC_CHECK_HEADER( ffmpeg/avutil.h, [FFMPEG_INCLUDE_AVUTIL="<ffmpeg/avutil.h>"],[])
 AC_CHECK_HEADER( ffmpeg/swscale.h, [FFMPEG_INCLUDE_SWSCALE="<ffmpeg/swscale.h>"],[])
-AC_CHECK_HEADER( libavutil/avutil.h , [FFMPEG_INCLUDE_AVUTIL="<libavutil/avutil.h>"],[])
-AC_CHECK_HEADER( libswscale/swscale.h, [FFMPEG_INCLUDE_SWSCALE="<libswcale/swscale.h>"],[])
+AC_CHECK_HEADER( libavutil/avutil.h, [FFMPEG_INCLUDE_AVUTIL="<libavutil/avutil.h>"],[])
+AC_CHECK_HEADER( libswscale/swscale.h, [FFMPEG_INCLUDE_SWSCALE="<libswscale/swscale.h>"],[])
 AC_CHECK_HEADER( libavcodec/avcodec.h, [FFMPEG_INCLUDE_AVCODEC="<libavcodec/avcodec.h>"],[])
 AC_CHECK_HEADER( libavformat/avformat.h, [FFMPEG_INCLUDE_AVFORMAT="<libavformat/avformat.h>"],[])
 
