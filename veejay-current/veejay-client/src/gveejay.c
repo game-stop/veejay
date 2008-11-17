@@ -151,8 +151,8 @@ gboolean	gveejay_idle(gpointer data)
 		if( sync ) {
 			if( gveejay_time_to_sync( get_ui_info() ) )
 			{
-				if(veejay_update_multitrack( get_ui_info() ))
-					update_gveejay();
+				veejay_update_multitrack( get_ui_info() );
+				update_gveejay();
 			}
 		}
 

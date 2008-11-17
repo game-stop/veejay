@@ -111,7 +111,10 @@ static	void	vj_midi_reset( void *vv )
 	free(items);
 	
 	vevo_port_free(v->vims);
+
 	v->vims = vpn(VEVO_ANONYMOUS_PORT);
+
+	vj_msg(VEEJAY_MSG_INFO, "Cleared all MIDI events.");
 }
 
 void	vj_midi_load(void *vv, const char *filename)
@@ -255,6 +258,13 @@ void	vj_midi_learning_vims( void *vv, char *widget, char *msg, int extra )
 
 	if( !v->learn )
 		return;
+
+	if( v->learn_event[0] == -1 || v->learn_event[1] == -1 || v->learn_event[2] == -1 ) {
+		veejay_msg(0, "Cannot learn '%s' (%s) - unknown midi event.",
+			widget, msg );
+		return;
+	}
+
 	dvims_t *d = (dvims_t*) vj_malloc(sizeof(dvims_t));
 	d->extra = extra;	
 	d->msg = (msg == NULL ? NULL : strdup(msg));
@@ -411,8 +421,11 @@ static	void	vj_midi_action( vmidi_t *v )
 	int data[4] = { 0,0,0,0};
 	snd_seq_event_input( v->sequencer, &ev );
 
-	data[0] = ev->type;
+	data[0] = -1;	
+	data[1] = -1;
+	data[2] = -1;
 
+	data[0] = ev->type;
 	switch( ev->type )
 	{
 		/* controller: channel <0-N>, <modwheel 0-127> */
@@ -436,7 +449,13 @@ static	void	vj_midi_action( vmidi_t *v )
 			data[1] = ev->data.control.channel;
 			data[2] = ev->data.note.velocity;
 		break;
+		case SND_SEQ_EVENT_PGMCHANGE:
+			data[1] = ev->data.control.param;
+			data[2] = ev->data.control.value;
+			break;
 		default:
+			data[1] = -1;
+			data[2] = -1;
 			break;
 	}
 
@@ -449,12 +468,9 @@ int	vj_midi_handle_events(void *vv)
 {
 	vmidi_t *v = (vmidi_t*) vv;
         if(!v->active) return 0;
-
 	if( poll( v->pfd, v->npfd, 0 ) > 0 )
 	{
-	//@ snd_event_input_pending doesnt work
-	//	while( snd_seq_event_input_pending( v->sequencer, 0 ) > 0 )
-			vj_midi_action( v );
+		vj_midi_action( v );
 		return 1;
 	}
 	return 0;
@@ -474,7 +490,7 @@ void	*vj_midi_new(void *mw)
 
 	snd_seq_set_client_name( v->sequencer, "Veejay" );
 
-	if( (portid = snd_seq_create_simple_port( v->sequencer, "Veejay",
+	if( (portid = snd_seq_create_simple_port( v->sequencer, "Reloaded",
 			SND_SEQ_PORT_CAP_WRITE | SND_SEQ_PORT_CAP_SUBS_WRITE ,
 			SND_SEQ_PORT_TYPE_APPLICATION )) < 0 )
 	{
@@ -496,7 +512,7 @@ void	*vj_midi_new(void *mw)
 	v->active = 1;
 	snd_seq_poll_descriptors( v->sequencer, v->pfd, v->npfd, POLLIN );
 
-	veejay_msg(VEEJAY_MSG_INFO, "MIDI listener active");
+	veejay_msg(VEEJAY_MSG_INFO, "MIDI listener active! Type 'aconnect -o' to see where to connect to.");
 
 	return (void*) v;
 }
