@@ -465,6 +465,9 @@ int _vj_server_del_client(vj_server * vje, int link_id)
 	}
 	_vj_server_empty_queue(vje, link_id);
 	Link[link_id]->handle = 0;
+	Link[link_id]->promote = 0;
+	Link[link_id]->n_queued = 0;
+	Link[link_id]->n_retrieved = 0;
 	return 1;
 }
 
