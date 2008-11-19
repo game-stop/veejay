@@ -365,7 +365,8 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 			info->uc->direction = -1;
 			if(!vj_perform_try_sequence( info ) )
 			{
-				sample_apply_loop_dec( info->uc->sample_id, info->edit_list->video_fps);
+				editlist *E = sample_get_editlist(info->uc->sample_id);
+				sample_apply_loop_dec( info->uc->sample_id,E->video_fps);
 				veejay_set_frame(info, end);
 				veejay_set_speed(info, (-1 * speed));
 			}
@@ -406,7 +407,8 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 		info->uc->direction = 1;
 		if(!vj_perform_try_sequence(info) )
 		{
-		  	sample_apply_loop_dec( info->uc->sample_id, info->edit_list->video_fps);
+			editlist *E = sample_get_editlist(info->uc->sample_id);
+		  	sample_apply_loop_dec( info->uc->sample_id, E->video_fps);
 			veejay_set_frame(info, start);
 			veejay_set_speed(info, (-1 * speed));
 		}
@@ -478,8 +480,8 @@ static int	vj_perform_verify_rows(veejay_t *info )
 		return 0;
 
 	int c,v,has_rows = 0;
-	const int w = info->edit_list->video_width;
-	const int h = info->edit_list->video_height;
+	const int w = info->current_edit_list->video_width;
+	const int h = info->current_edit_list->video_height;
 
 	for(c=0; c < SAMPLE_MAX_EFFECTS; c++)
 	{
@@ -822,14 +824,14 @@ void vj_perform_free(veejay_t * info)
 int vj_perform_audio_start(veejay_t * info)
 {
 	int res;
-	editlist *el = info->current_edit_list;	
+	editlist *el = info->edit_list;	
 
 	if (el->has_audio)
 	{
 #ifdef HAVE_JACK
 		vj_jack_initialize();
 
- 		res = vj_jack_init( info->current_edit_list );
+ 		res = vj_jack_init( info->edit_list );
 		if( res <= 0)
 		{
 			info->audio=NO_AUDIO;
@@ -913,8 +915,8 @@ void	vj_perform_get_output_frame( uint8_t **frame )
 }
 void	vj_perform_get_crop_dimensions(veejay_t *info, int *w, int *h)
 {
-	*w = info->edit_list->video_width - info->settings->viewport.left - info->settings->viewport.right;
-	*h = info->edit_list->video_height - info->settings->viewport.top - info->settings->viewport.bottom;
+	*w = info->current_edit_list->video_width - info->settings->viewport.left - info->settings->viewport.right;
+	*h = info->current_edit_list->video_height - info->settings->viewport.top - info->settings->viewport.bottom;
 
 }
 int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop )
@@ -925,8 +927,8 @@ int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop )
 		veejay_memset( &src, 0, sizeof(VJFrame));
 
 		vj_get_yuv_template( &src,
-				info->edit_list->video_width,
-				info->edit_list->video_height,
+				info->current_edit_list->video_width,
+				info->current_edit_list->video_height,
 				info->pixel_format );
 
 		src.data[0] = primary_buffer[0]->Y;
@@ -1172,7 +1174,7 @@ void	vj_perform_unlock_primary_frame( void )
 
 void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )   
 {
-	editlist *el = info->edit_list;
+	editlist *el = info->current_edit_list;
 	if(info->pixel_format==FMT_422 || info->pixel_format == FMT_422F)
 	{
 		uint8_t *pframe[3];
@@ -1232,7 +1234,7 @@ static void vj_perform_reverse_audio_frame(veejay_t * info, int len,
 				    uint8_t * buf)
 {
     int i;
-    int bps = info->edit_list->audio_bps;
+    int bps = info->current_edit_list->audio_bps;
     uint8_t sample[bps];
     int x=len*bps;
     for( i = 0; i < x/2 ; i += bps ) {
@@ -1469,8 +1471,8 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 	video_playback_setup *settings = info->settings;
 	int len = 0;
 	int speed = sample_get_speed(info->uc->sample_id);
-	int bps   =  info->edit_list->audio_bps;
-	int pred_len = (info->edit_list->audio_rate / info->edit_list->video_fps );
+	int bps   =  info->current_edit_list->audio_bps;
+	int pred_len = (info->current_edit_list->audio_rate / info->current_edit_list->video_fps );
         int rs = 0;
 	int n_samples = 0;
 
@@ -1504,7 +1506,7 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 
 			for ( i = start; i < end; i ++ )	
 			{
-				a_len = vj_el_get_audio_frame(info->edit_list,i, tmp);
+				a_len = vj_el_get_audio_frame(info->current_edit_list,i, tmp);
 				if( a_len <= 0 )
 				{
 					n_samples += pred_len;
@@ -1531,7 +1533,7 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 			n_samples = len = pred_len;
 			veejay_memset( audio_buf, 0, pred_len * bps );
 		} else	{
-			n_samples = vj_el_get_audio_frame( info->edit_list, settings->current_frame_num, audio_buf );
+			n_samples = vj_el_get_audio_frame( info->current_edit_list, settings->current_frame_num, audio_buf );
 			if(n_samples <= 0 )
 			{
 				veejay_memset( audio_buf,0, pred_len * bps );
@@ -1581,8 +1583,8 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 				   int type, int chain_entry )
 {				/* second sample */
-    int width = info->edit_list->video_width;
-    int height = info->edit_list->video_height;
+    int width = info->current_edit_list->video_width;
+    int height = info->current_edit_list->video_height;
     int error = 1;
     int nframe;
     int len = 0;
@@ -1717,7 +1719,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 
 static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *img[3] )
 {
-	editlist *el = ( s1 ? sample_get_editlist(s1) : info->current_edit_list);
+	editlist *el = ( s1 ? sample_get_editlist(s1) : info->edit_list);
 	int max_sfd = (s1 ? sample_get_framedup( s1 ) : info->sfd );
 	int cur_sfd = (s1 ? sample_get_framedups(s1 ) : simple_frame_duplicator );
 	if( cur_sfd <= max_sfd && max_sfd > 1 )
@@ -1774,7 +1776,6 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t *img[3])
 {
 	return vj_el_get_video_frame(
-				//info->edit_list,
 				sample_get_editlist( s1 ),
 				nframe,
 				img );
@@ -1786,8 +1787,8 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 {				/* second sample */
 
 
-    int width = info->edit_list->video_width;
-    int height = info->edit_list->video_height;
+    int width = info->current_edit_list->video_width;
+    int height = info->current_edit_list->video_height;
     int error = 1;
     int nframe;
     int len;
@@ -2342,7 +2343,7 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 	}
 	else
 	{
-		ret = vj_el_get_video_frame(info->current_edit_list,settings->current_frame_num,frame);
+		ret = vj_el_get_video_frame(info->edit_list,settings->current_frame_num,frame);
 	}
 	if(ret <= 0)
 	{
@@ -2503,7 +2504,7 @@ void vj_perform_record_sample_frame(veejay_t *info, int sample) {
 		{
 			veejay_msg(VEEJAY_MSG_DEBUG, "Continue, %d frames left to record", frames_left);
 			if( sample_init_encoder( sample, NULL,
-				df, info->edit_list, frames_left)==-1)
+				df, info->current_edit_list, frames_left)==-1)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,
 				"Error while auto splitting "); 
@@ -2631,17 +2632,17 @@ static int vj_perform_tag_fill_buffer(veejay_t * info)
  	{
 		VJFrame dumb;
 		if( info->pixel_format == FMT_422 || info->pixel_format == FMT_422F )
-			vj_el_init_422_frame( info->edit_list, &dumb );
+			vj_el_init_422_frame( info->current_edit_list, &dumb );
 		else
-			vj_el_init_420_frame( info->edit_list, &dumb );
+			vj_el_init_420_frame( info->current_edit_list, &dumb );
 
 		dumb.data[0] = frame[0];
 		dumb.data[1] = frame[1];
 		dumb.data[2] = frame[2];
 
 		dummy_apply(&dumb,
-		    info->edit_list->video_width,
-		    info->edit_list->video_height, VJ_EFFECT_COLOR_BLACK);
+		    info->current_edit_list->video_width,
+		    info->current_edit_list->video_height, VJ_EFFECT_COLOR_BLACK);
   	}
  	 return 1;      	
 }
@@ -2877,10 +2878,10 @@ static	char	*vj_perform_osd_status( veejay_t *info )
 	veejay_memset(&tc,0,sizeof(MPEG_timecode_t));
 	veejay_memset(&tmp,0,sizeof(tmp));
 	veejay_memset(&buf,0,sizeof(buf));
-        y4m_ratio_t ratio = mpeg_conform_framerate( info->edit_list->video_fps );
+        y4m_ratio_t ratio = mpeg_conform_framerate( info->current_edit_list->video_fps );
         int n = mpeg_framerate_code( ratio );
 
-        mpeg_timecode(&tc, settings->current_frame_num, n, info->edit_list->video_fps );
+        mpeg_timecode(&tc, settings->current_frame_num, n, info->current_edit_list->video_fps );
 
         snprintf(timecode, 20, "%2d:%2.2d:%2.2d:%2.2d",
                 tc.h, tc.m, tc.s, tc.f );
@@ -3397,8 +3398,8 @@ void	vj_perform_randomize(veejay_t *info)
 	
 	mpeg_timecode(&tc, max_delay,
                 mpeg_framerate_code(mpeg_conform_framerate(
-			info->edit_list->video_fps)),
-			info->edit_list->video_fps );
+			info->current_edit_list->video_fps)),
+			info->current_edit_list->video_fps );
 	sprintf(timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
 	veejay_msg(VEEJAY_MSG_DEBUG,
 		 "Sample randomizer trigger in %s",
