@@ -164,7 +164,7 @@ AC_CHECK_LIB( asound, snd_seq_open,
 	[
 		AC_DEFINE( HAVE_ALSA,1, [Whether or not we have alsa])
 		ALSA_LIBS="-lasound"
-		AC_SUBST( ALSA_LIBS )
+		AC_SUBST(ALSA_LIBS)
 		have_alsa=true ],,)
 
 AC_CHECK_HEADER(alsa/asoundlib.h,,[AC_MSG_ERROR([alsa/asoundlib.h not found - please install the alsa header])] )
@@ -180,8 +180,8 @@ dnl Check for Veejay
 have_veejay=false
 PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.4.1 ],
 	[	
-		AC_SUBST( VEEJAY_CFLAGS )
-		AC_SUBST( VEEJAY_LIBS )
+		AC_SUBST(VEEJAY_CFLAGS)
+		AC_SUBST(VEEJAY_LIBS)
 		have_veejay=true
 		AC_DEFINE(HAVE_VEEJAY,1, [Veejay installed])]
 		,
@@ -198,8 +198,8 @@ dnl *********************************************************************
 have_mjpegtools=false
 PKG_CHECK_MODULES(MJPEGTOOLS, [mjpegtools >= 1.6 ],
                     [
- 		     AC_SUBST( MJPEGTOOLS_CFLAGS )
-		     AC_SUBST( MJPEGTOOLS_LIBS )
+ 		     AC_SUBST(MJPEGTOOLS_CFLAGS)
+		     AC_SUBST(MJPEGTOOLS_LIBS)
 		     have_mjpegtools=true
                      AC_DEFINE(HAVE_MJPEGTOOLS, 1, [MJPEGTools installed])],
                     [have_mjpegtools=false])
@@ -212,8 +212,8 @@ have_pixbuf=false
 if test x$with_pixbuf != xno ; then
   PKG_CHECK_MODULES(PIXBUF, [gtk+-2.0 >= 2.8 gdk-pixbuf-2.0],
                     [
- 		     AC_SUBST( PIXBUF_CFLAGS )
-		     AC_SUBST( PIXBUF_LIBS )
+ 		     AC_SUBST(PIXBUF_CFLAGS)
+		     AC_SUBST(PIXBUF_LIBS)
 		     have_pixbuf=true
                      AC_DEFINE(USE_GDK_PIXBUF, 1, [use gdk image load / save])],
                     [have_pixbuf=false])
@@ -241,7 +241,7 @@ AC_MSG_CHECKING(whether to compile in profiling information)
 if test "x$enable_profiling" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -fprofile-arcs -ftest-coverage"
  DEBUGLIBS="-lgcov"
- AC_SUBST( DEBUGLIBS )
+ AC_SUBST(DEBUGLIBS)
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
@@ -284,8 +284,8 @@ case $host_cpu in
 		OP_CFLAGS="-O3"
  	fi
 
-	AC_SUBST( OP_CFLAGS )
-	AC_SUBST( YUVCFLAGS )
+	AC_SUBST(OP_CFLAGS)
+	AC_SUBST(YUVCFLAGS)
 
    	dnl If the host is pentium, align on double word boundary
     	case $host_cpu in
@@ -545,16 +545,16 @@ AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
 
 PKG_CHECK_MODULES(FFMPEG_AVCODEC, [libavcodec],
                     [
- 		     AC_SUBST( FFMPEG_AVCODEC_CFLAGS )
-		     AC_SUBST( FFMPEG_AVCODEC_LIBS )
+ 		     AC_SUBST(FFMPEG_AVCODEC_CFLAGS)
+		     AC_SUBST(FFMPEG_AVCODEC_LIBS)
 		     have_avcodec=true
                      AC_DEFINE(HAVE_AVCODEC, 1, [use avcodec])],
                     [have_avcodec=false])
 
 PKG_CHECK_MODULES(FFMPEG_SWSCALER, [libswscale],
 			[ 
-				AC_SUBST( FFMPEG_SWSCALER_CFLAGS )
-				AC_SUBST( FFMPEG_SWSCALER_LIBS )
+				AC_SUBST(FFMPEG_SWSCALER_CFLAGS)
+				AC_SUBST(FFMPEG_SWSCALER_LIBS)
 				have_swscaler=true
 				AC_DEFINE( HAVE_SWSCALER,1,[use swscaler])],
 				[ have_swscaler=false] )
