@@ -160,7 +160,7 @@ if test "x$enable_gl" = "xyes" ; then
   AC_CHECK_LIB([GL], [main], have_gl=true)
   if test x$have_gl = xtrue ; then
         GL_LIBS="$GL_LIB_PATH -lGL"
-	AC_SUBST( HAVE_GL )
+	AC_SUBST(HAVE_GL)
 	AC_DEFINE(HAVE_GL,1,[use gl])
   else
         AC_MSG_ERROR([Cannot find openGL library])
@@ -168,8 +168,8 @@ if test "x$enable_gl" = "xyes" ; then
   fi
 fi
 
-AC_SUBST( GL_LIBS )
-AC_SUBST( GL_CFLAGS )
+AC_SUBST(GL_LIBS)
+AC_SUBST(GL_CFLAGS)
 
 dnl Check for Xinerama
 use_xinerama=no
@@ -178,7 +178,7 @@ AC_CHECK_LIB( Xinerama, XineramaQueryExtension,
 	   [
 		AC_DEFINE( HAVE_XINERAMA,1,[Use Xinerama] )
 		XINERAMA_LIBS="-lXext -lXinerama"
-		AC_SUBST( XINERAMA_LIBS )
+		AC_SUBST(XINERAMA_LIBS)
         	use_xinerama=yes,
 	   ],
 	   use_xinerama=no,
@@ -281,8 +281,8 @@ dnl *********************************************************************
 have_mjpegtools=false
 PKG_CHECK_MODULES(MJPEGTOOLS, [mjpegtools >= 1.6 ],
                     [
- 		     AC_SUBST( MJPEGTOOLS_CFLAGS )
-		     AC_SUBST( MJPEGTOOLS_LIBS )
+ 		     AC_SUBST(MJPEGTOOLS_CFLAGS)
+		     AC_SUBST(MJPEGTOOLS_LIBS)
 		     have_mjpegtools=true
                      AC_DEFINE(HAVE_MJPEGTOOLS, 1, [MJPEGTools installed])],
                     [have_mjpegtools=false])
@@ -353,8 +353,8 @@ have_pixbuf=false
 if test x$with_pixbuf != xno ; then
   PKG_CHECK_MODULES(PIXBUF, [gtk+-2.0 >= 2.0 gdk-pixbuf-2.0],
                     [
- 		     AC_SUBST( PIXBUF_CFLAGS )
-		     AC_SUBST( PIXBUF_LIBS )
+ 		     AC_SUBST(PIXBUF_CFLAGS)
+		     AC_SUBST(PIXBUF_LIBS)
 		     have_pixbuf=true
                      AC_DEFINE(USE_GDK_PIXBUF, 1, [use gdk image load / save])],
                     [have_pixbuf=false])
@@ -547,7 +547,7 @@ AC_MSG_CHECKING(whether to compile in profiling information)
 if test "x$enable_profiling" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -fprofile-arcs -ftest-coverage"
  DEBUGLIBS="-lgcov"
- AC_SUBST( DEBUGLIBS )
+ AC_SUBST(DEBUGLIBS)
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
@@ -601,8 +601,8 @@ case $host_cpu in
 		OP_CFLAGS="-O3"
  	fi
 
-	AC_SUBST( OP_CFLAGS )
-	AC_SUBST( YUVCFLAGS )
+	AC_SUBST(OP_CFLAGS)
+	AC_SUBST(YUVCFLAGS)
 
    	dnl If the host is pentium, align on double word boundary
     	case $host_cpu in
@@ -862,8 +862,8 @@ AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
 
 PKG_CHECK_MODULES(FFMPEG_AVCODEC, [libavcodec],
                     [
- 		     AC_SUBST( FFMPEG_AVCODEC_CFLAGS )
-		     AC_SUBST( FFMPEG_AVCODEC_LIBS )
+ 		     AC_SUBST(FFMPEG_AVCODEC_CFLAGS)
+		     AC_SUBST(FFMPEG_AVCODEC_LIBS)
 		     have_avcodec=true
                      AC_DEFINE(HAVE_AVCODEC, 1, [use avcodec])],
                     [have_avcodec=false])
@@ -871,16 +871,16 @@ PKG_CHECK_MODULES(FFMPEG_AVCODEC, [libavcodec],
 
 PKG_CHECK_MODULES(FFMPEG_AVFORMAT, [libavformat],
                     [
- 		     AC_SUBST( FFMPEG_AVFORMAT_CFLAGS )
-		     AC_SUBST( FFMPEG_AVFORMAT_LIBS )
+ 		     AC_SUBST(FFMPEG_AVFORMAT_CFLAGS)
+		     AC_SUBST(FFMPEG_AVFORMAT_LIBS)
 		     have_avformat=true
                      AC_DEFINE(HAVE_AVFORMAT, 1, [use avformat])],
                     [have_avformat=false])
 
 PKG_CHECK_MODULES(FFMPEG_SWSCALER, [libswscale],
 			[ 
-				AC_SUBST( FFMPEG_SWSCALER_CFLAGS )
-				AC_SUBST( FFMPEG_SWSCALER_LIBS )
+				AC_SUBST(FFMPEG_SWSCALER_CFLAGS)
+				AC_SUBST(FFMPEG_SWSCALER_LIBS)
 				have_swscaler=true
 				AC_DEFINE( HAVE_SWSCALER,1,[use swscaler])],
 				[ have_swscaler=false] )
