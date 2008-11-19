@@ -32,6 +32,7 @@
 #include <src/vj-api.h>
 #include <sched.h>
 
+extern int	mt_get_max_tracks();
 
 static int port_num	= 3490;
 static char hostname[255];
@@ -91,6 +92,8 @@ static int      set_option( const char *name, char *value )
 	else if (strcmp(name, "X") == 0 )
 	{
 		n_tracks = atoi(optarg); 
+		if( n_tracks < 1 || n_tracks > mt_get_max_tracks() )
+			n_tracks = 1;
 	}
 	else if( strcmp(name, "t") == 0 || strcmp(name, "no-theme") == 0)
 	{

@@ -12,7 +12,8 @@ void            *multitrack_new(
                 gint max_h,
                 GtkWidget *main_preview_area,
 		void *gui,
-		int threads);
+		int threads,
+		int max_tracks);
 
 
 void		multitrack_set_logo(void *data , GtkWidget *img);

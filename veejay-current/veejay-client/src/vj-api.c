@@ -88,7 +88,7 @@ static struct
 } tooltips[] =
 {
 	{"Mouse left: Set in point, Mouse right: Set out point, Double click: Clear selected, Mouse middle: Drag selection"},
-	{"Mouse left/right: Play slot, Shift + Mouse left: Put sample in slot"},
+	{"Mouse left/right: Play slot, Shift + Mouse left: Put sample in slot. You can also put selected samples."},
 	{"Mouse left click: Select slot (sample in slot), Mouse double click: Play sample in slot, Mouse left + SHIFT: Set slot as mixing current mixing channel"},
 	{NULL},
 };
@@ -503,7 +503,7 @@ void	reloaded_schedule_restart();
 static	GtkWidget *effect_sources_tree = NULL;
 static 	GtkListStore *effect_sources_store = NULL;
 static 	GtkTreeModel *effect_sources_model = NULL;
-static int 		num_tracks_ = 0;
+static int 		num_tracks_ = 2;
 static int		default_preview_width_ = 176;
 static int		default_preview_height_ = 144;
 /* global pointer to the editlist-tree */
@@ -543,6 +543,7 @@ static  void    load_effectlist_info();
 static	void	load_sequence_list();
 static  void    load_samplelist_info(gboolean with_reset_slotselection);
 static  void    load_editlist_info();
+static	void	set_pm_page_label(int sample_id, int type);
 #ifndef STRICT_CHECKING
 static	void	disable_widget_( const char *name );
 static	void	enable_widget_(const char *name );
@@ -973,7 +974,7 @@ static void	setup_v4l_devices()
 
 	g_object_unref( G_OBJECT( store ));
 	setup_tree_text_column( "tree_v4ldevices", V4L_NUM, "#",0 );
-	setup_tree_text_column( "tree_v4ldevices", V4L_NAME, "Device Name",1);
+	setup_tree_text_column( "tree_v4ldevices", V4L_NAME, "Device Name",240);
 	setup_tree_spin_column( "tree_v4ldevices", V4L_SPINBOX, "Channel");
 	setup_tree_text_column( "tree_v4ldevices", V4L_LOCATION, "Location",0);
 
@@ -2729,6 +2730,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 		info->uc.reload_hint[HINT_HISTORY] = 1;
 
 		put_text( "entry_samplename", "" );
+		set_pm_page_label( info->status_tokens[CURRENT_ID], pm );
 	}
 	if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ||
 		info->uc.reload_hint[HINT_ENTRY] == 1 )
@@ -2766,11 +2768,6 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 	/* Actions for sample */
 	if(last_pm != pm || pm == MODE_SAMPLE )
 	{
-		/* Update label and video slider*/
-		update_label_i( "label_sampleposition",
-			info->status_tokens[FRAME_NUM] - info->status_tokens[SAMPLE_START] , 1);
-
-
 		int marker_go = 0;
 		/* Update marker bounds */
 		if( (history[SAMPLE_MARKER_START] != info->status_tokens[SAMPLE_MARKER_START]) )
@@ -3210,7 +3207,7 @@ static	void	setup_tree_text_column( const char *tree_name, int type, const char 
 
 	if(len)
 	{
-		gtk_tree_view_column_set_min_width( column, 220);
+		gtk_tree_view_column_set_min_width( column, len);
 	}
 }
 
@@ -3235,7 +3232,7 @@ static void	setup_effectchain_info( void )
 	g_object_unref( G_OBJECT( store ));
 
 	setup_tree_text_column( "tree_chain", FXC_ID, "#",0 );
-	setup_tree_text_column( "tree_chain", FXC_FXID, "Effect",1 );
+	setup_tree_text_column( "tree_chain", FXC_FXID, "Effect",350 );
 	setup_tree_pixmap_column( "tree_chain", FXC_FXSTATUS, "Run"); // todo: could be checkbox!!
 	setup_tree_pixmap_column( "tree_chain", FXC_KF , "Anim" ); // parameter interpolation on/off per entry
   	GtkTreeSelection *selection; 
@@ -3723,8 +3720,8 @@ void	setup_samplelist_info()
 	effect_sources_model = gtk_tree_view_get_model( GTK_TREE_VIEW(effect_sources_tree ));	
 	effect_sources_store = GTK_LIST_STORE(effect_sources_model);
 
-	setup_tree_text_column( "tree_sources", SL_ID, "Id",0 );
-	setup_tree_text_column( "tree_sources", SL_TIMECODE, "Length" ,0);
+	setup_tree_text_column( "tree_sources", SL_ID, "Id",175 );
+	setup_tree_text_column( "tree_sources", SL_TIMECODE, "Length" ,175);
 
 	GtkTreeSelection *selection;
   	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(effect_sources_tree));
@@ -3929,12 +3926,11 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				strncpy( line, fxtext + offset, len );
 				
 				int values[4];
-				sscanf( line, "%05d%09d%09d%03d%s",
-					&values[0], &values[1], &values[2], &values[3],	
-					descr );
+				sscanf( line, "%05d%09d%09d%03d",
+					&values[0], &values[1], &values[2], &values[3]);
+				strncpy( descr, line + 5 + 9 + 9 + 3 , values[3] );	
 				gchar *title = _utf8str( descr );
 				gchar *timecode = format_selection_time( 0,(values[2]-values[1]) );
-
 				int int_id = values[0];
 				int poke_slot= 0; int bank_page = 0;
 				verify_bank_capacity( &bank_page , &poke_slot, int_id, 0);
@@ -4352,10 +4348,10 @@ static	void	setup_editlist_info()
 	editlist_store = GTK_LIST_STORE(editlist_model);
 
 	setup_tree_text_column( "editlisttree", COLUMN_INT, "#",0);
-	setup_tree_text_column( "editlisttree", COLUMN_STRING0, "Timecode",0 );
-	setup_tree_text_column( "editlisttree", COLUMN_STRINGA, "Filename",0);
-	setup_tree_text_column( "editlisttree", COLUMN_STRINGB, "Duration",0);
-	setup_tree_text_column( "editlisttree", COLUMN_STRINGC, "FOURCC",0);
+	setup_tree_text_column( "editlisttree", COLUMN_STRING0, "Timecode",75 );
+	setup_tree_text_column( "editlisttree", COLUMN_STRINGA, "Filename",300);
+	setup_tree_text_column( "editlisttree", COLUMN_STRINGB, "Duration",75);
+	setup_tree_text_column( "editlisttree", COLUMN_STRINGC, "FOURCC",50);
 
 	g_signal_connect( editlist_tree, "row-activated",
 		(GCallback) on_editlist_row_activated, NULL );
@@ -5491,8 +5487,6 @@ static	void	update_status_accessibility(int old_pm, int new_pm)
 		for(i=0; streamwidgets[i].name != NULL; i++)
 			enable_widget( streamwidgets[i].name);
 
-		update_label_str( "label_current_mode", "Stream");
-		update_label_str( "label_current_mode", "Stream");
 	}
 
 	if( new_pm == MODE_SAMPLE )
@@ -5503,10 +5497,6 @@ static	void	update_status_accessibility(int old_pm, int new_pm)
 			disable_widget( plainwidgets[i].name);
 		for(i=0; samplewidgets[i].name != NULL; i++)
 			enable_widget( samplewidgets[i].name);
-
-		update_label_str( "label_current_mode", "Sample");
-		update_label_str( "label_currentsource", "Sample" );
-
 	}
 
 	if( new_pm == MODE_PLAIN)
@@ -5518,9 +5508,6 @@ static	void	update_status_accessibility(int old_pm, int new_pm)
 		for(i=0; plainwidgets[i].name != NULL; i++)
 			enable_widget( plainwidgets[i].name);
 
-		update_label_str( "label_current_mode","Plain");
-		update_label_str( "label_currentsource", "Plain" );
-	
 	}
 	GtkWidget *n = glade_xml_get_widget_( info->main_window, "panels" );
 	int page_needed = 0;
@@ -5539,6 +5526,21 @@ static	void	update_status_accessibility(int old_pm, int new_pm)
 	
 	gtk_notebook_set_page( GTK_NOTEBOOK(n),	page_needed );
 
+}
+
+static	void	set_pm_page_label(int sample_id, int type)
+{
+	gchar ostitle[100];
+	switch(type) {	
+		case 0: snprintf(ostitle, sizeof(ostitle), "Sample %d",sample_id);break;
+		case 1: snprintf(ostitle, sizeof(ostitle), "Stream %d",sample_id);break;
+		default:
+			snprintf(ostitle,sizeof(ostitle), "Plain");break;
+	}
+	gchar *title = _utf8str(ostitle);
+	update_label_str( "label_current_mode", title);
+	update_label_str( "label_currentsource", title );
+	g_free(title);
 }
 
 static void 	update_globalinfo(int *history, int pm, int last_pm)
@@ -5583,7 +5585,7 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 
 		select_slot( info->status_tokens[PLAY_MODE] );
 
-	
+		
 #ifdef STRICT_CHECKING
 		if( pm != MODE_PLAIN )
 		assert( info->selected_slot != NULL );
@@ -5630,6 +5632,7 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 		}
 		update_spin_range("button_fadedur", 0, total_frames_, 0 );
 		update_label_i( "label_totframes", total_frames_, 1 );
+		update_label_str( "label_samplelength",time);
 		if( pm == MODE_PLAIN )
 		{
 			for( i = 0; i < 3; i ++)
@@ -5641,7 +5644,6 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 			update_spin_range(
 				"button_el_selpaste", 0, total_frames_, info->selection[2]);
 		}	
-veejay_msg(0, "%s",time);
 		update_label_i( "label_totframes", total_frames_, 1 );
 		update_label_str( "label_totaltime", time );
 		if(pm == MODE_SAMPLE)
@@ -5664,6 +5666,7 @@ veejay_msg(0, "%s",time);
 	gchar *current_time_ = format_time( info->status_frame,info->el.fps );
 	update_label_i(   "label_curframe", info->status_frame ,1 );
 	update_label_str( "label_curtime", current_time_ );
+	update_label_str( "label_sampleposition", current_time_);
 	g_free(current_time_);
 
 	if( pm == MODE_SAMPLE )
@@ -5713,7 +5716,6 @@ veejay_msg(0, "%s",time);
 	}
 
 	update_current_slot(history, pm, last_pm);
-
 //	info->uc.playmode = pm;
 }	
 
@@ -6514,7 +6516,8 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 			ph,
 			img_wid,
 			(void*) gui,
-			use_threads);
+			use_threads,
+			num_tracks_);
 
 	if( theme_list )
 	{
@@ -7097,13 +7100,21 @@ void setup_samplebank(gint num_cols, gint num_rows, GtkWidget *pad, int *idx, in
 		result.height -= ( num_cols * 16);
 		gint image_width = result.width / num_rows;
 		gint image_height = result.height / num_cols;
+
+
 		float ratio = (float) info->el.height / (float) info->el.width;
 		image_height = image_width * ratio;
-		*idx = 64;
-		*idy = 64 * ratio;
-	//	info->image_dimensions[0] = 64;
-	//	info->image_dimensions[1] = 64 * ratio;
-veejay_msg(0, "Image: %dx%d", image_width,image_height );
+		*idx = image_width;
+		while( (image_width * ratio) > image_height )
+		*idy = image_width * ratio;
+
+
+		gfloat w = image_width;
+		gfloat h = image_width * ratio;
+
+		*idx = (int)w;
+		*idy = (int)h;
+
 	}
 	veejay_msg(VEEJAY_MSG_INFO, "Sample bank image dimensions: %dx%d", *idx,*idy);
 }
@@ -7457,7 +7468,9 @@ static void create_slot(gint bank_nr, gint slot_nr, gint w, gint h)
 	gui_slot->title = gtk_label_new("");
 	
 	gui_slot->timecode = gtk_label_new("");
-	gtk_misc_set_alignment(GTK_MISC(gui_slot->timecode), 0.0, 0.0);
+	gtk_misc_set_alignment(GTK_MISC(gui_slot->timecode), 0.5, 0.0);
+	gtk_misc_set_alignment(GTK_MISC(gui_slot->title), 0.5, 0.0);
+
 	gtk_misc_set_padding (GTK_MISC(gui_slot->timecode), 0,0 );	
 	gtk_box_pack_start (GTK_BOX (gui_slot->upper_vbox), GTK_WIDGET(gui_slot->timecode), FALSE, FALSE, 0);
 	gtk_widget_show(GTK_WIDGET(gui_slot->timecode));		
@@ -7720,8 +7733,8 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 
 	if(gui_slot)
 	{
-//		if(gui_slot->title)
-//			gtk_label_set_text( GTK_LABEL( gui_slot->title ), slot->title );
+		if(gui_slot->title)
+			gtk_label_set_text( GTK_LABEL( gui_slot->title ), slot->title );
 		if(gui_slot->timecode)
 			gtk_label_set_text( GTK_LABEL( gui_slot->timecode ), slot->timecode );
 
@@ -7745,7 +7758,6 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 			slot->pixbuf = NULL;
 		}
 	}
-
 }
 
 void	veejay_release_track(int id, int release_this)

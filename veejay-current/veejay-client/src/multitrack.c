@@ -114,6 +114,11 @@ extern void		gtk_widget_set_size_request__( GtkWidget *w, gint iw, gint h, const
 #define gtk_widget_set_size_request_(a,b,c) gtk_widget_set_size_request__(a,b,c,__FUNCTION__,__LINE__)
 #endif
 
+int	mt_get_max_tracks()
+{
+	return  __MAX_TRACKS;
+}
+
 
 
 static	void	gtk_image_set_from_pixbuf__( GtkImage *w, GdkPixbuf *p, const char *f, int l )
@@ -783,13 +788,18 @@ void		*multitrack_new(
 		gint max_h,
 		GtkWidget *main_preview_area,
 		void *infog,
-		int threads)
+		int threads,
+		int num_tracks)
 {
 	multitracker_t *mt = NULL;
 #ifdef STRICT_CHECKING
 	assert( max_w > 0 );
 	assert( max_h > 0 );
+	assert( num_tracks > 0 );
 #endif
+
+	MAX_TRACKS	= num_tracks;
+
 	mt 		= (multitracker_t*) vj_calloc(sizeof(multitracker_t));
 	mt->view 	= (sequence_view_t**) vj_calloc(sizeof(sequence_view_t*) * MAX_TRACKS );
 	mt->preview	= NULL;
