@@ -28,7 +28,8 @@
 #include <libvjmem/vjmem.h>
 #include <libel/vj-mmap.h>
 #include <libdv/dv.h>
-#include <ffmpeg/avcodec.h>
+#include AVCODEC_INC
+#include AVUTIL_INC
 
 #include <errno.h>
 #define	DV_PAL_SIZE 144000
