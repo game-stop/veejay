@@ -711,6 +711,8 @@ static	struct
 	{"button_084"}, 
 	{"button_083"}, 
 	{"video_navigation_buttons"},
+	{"button_samplestart"},
+	{"button_sampleend"},
 	{"speed_slider"},
 	{"slow_slider"},
 	{"button_200"}, // mask button
@@ -1939,7 +1941,7 @@ int		gveejay_new_slot(int mode)
 
 	if(result_len <= 0 )
 	{
-		gveejay_error_slot( mode );
+		veejay_msg(0, "No reply from veejay-server, but expected new sample/slot identifier");
 		return 0;
 	}
 
