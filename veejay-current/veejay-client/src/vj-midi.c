@@ -90,12 +90,25 @@ static	int	vj_midi_events(void *vv )
 	free(items);
 	return len;	
 }
-static	void	vj_midi_reset( void *vv )
+void	vj_midi_reset( void *vv )
 {
 	vmidi_t *v = (vmidi_t*)vv;
-	char **items = vevo_list_properties(v->vims);
-	if(!items) return;
 
+	int a = vj_midi_events(vv);
+	if( a > 0 )
+	{
+		char warn[200];
+		snprintf(warn,sizeof(warn), "This will clear %d MIDI events, Continue ?",a );
+		if( prompt_dialog( "MIDI", warn ) == GTK_RESPONSE_REJECT )
+			return;
+
+	}
+
+	char **items = vevo_list_properties(v->vims);
+	if(!items) {
+		vj_msg(VEEJAY_MSG_INFO,"No MIDI events to clear");
+		return;
+	}
 	int i;
 	for( i = 0; items[i] != NULL ; i ++ )
 	{
@@ -114,7 +127,7 @@ static	void	vj_midi_reset( void *vv )
 
 	v->vims = vpn(VEVO_ANONYMOUS_PORT);
 
-	vj_msg(VEEJAY_MSG_INFO, "Cleared all MIDI events.");
+	vj_msg(VEEJAY_MSG_INFO, "Cleared %d MIDI events.",a);
 }
 
 void	vj_midi_load(void *vv, const char *filename)
@@ -394,6 +407,7 @@ static	void	queue_vims_event( vmidi_t *v, int *data )
 				if( val > 0 )
 					val = val / tmp;
 			} else {
+				vj_msg(VEEJAY_MSG_INFO, "MIDI: what's this ? %x,%x,%x",data[0],data[1],data[2]);
 				return;
 			}
 

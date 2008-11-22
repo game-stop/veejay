@@ -30,6 +30,7 @@ void    vj_midi_load(void *vv, const char *filename);
 
 void    vj_midi_save(void *vv, const char *filename);
 
+void	vj_midi_reset( void *vv );
 
 void    vj_midi_learning_vims( void *vv, char *widget, char *msg, int extra );
 void    vj_midi_learning_vims_simple( void *vv, char *widget, int id );

@@ -3702,4 +3702,8 @@ void	on_save_midi_layout1_activate( GtkWidget *w, gpointer data )
 	if(filename)
 		vj_midi_save( info->midi, filename );
 }
-	
+
+void on_clear_midi_layout1_activate( GtkWidget *w, gpointer data )
+{
+	vj_midi_reset(info->midi);
+}	

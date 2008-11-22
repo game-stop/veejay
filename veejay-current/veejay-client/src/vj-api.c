@@ -7104,10 +7104,6 @@ void setup_samplebank(gint num_cols, gint num_rows, GtkWidget *pad, int *idx, in
 
 		float ratio = (float) info->el.height / (float) info->el.width;
 		image_height = image_width * ratio;
-		*idx = image_width;
-		while( (image_width * ratio) > image_height )
-		*idy = image_width * ratio;
-
 
 		gfloat w = image_width;
 		gfloat h = image_width * ratio;
