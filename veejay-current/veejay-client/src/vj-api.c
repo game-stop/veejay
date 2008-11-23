@@ -929,8 +929,8 @@ void	on_devicelist_row_activated(GtkTreeView *treeview,
 		gint	num = info->uc.strtmpl[0].dev;
 	
 		multi_vims( VIMS_STREAM_NEW_V4L,"%d %d",
-				channel,
-				num
+				num,
+				channel
 				);
 		gveejay_new_slot(MODE_STREAM);
 
@@ -3995,7 +3995,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				strncpy( descr, line + 22, values[6] );
 				switch( values[1] )
 				{
-					case STREAM_VIDEO4LINUX :sprintf(source,"unicap %d",values[0]);break;
+					case STREAM_VIDEO4LINUX :sprintf(source,"capture %d",values[0]);break;
 					case STREAM_WHITE	:sprintf(source,"solid %d",values[0]); 
 								 break;
 					case STREAM_MCAST	:sprintf(source,"multicast %d",values[0]);break;
