@@ -441,7 +441,7 @@ AC_DEFINE_UNQUOTED([HAVE_UNICAP], ${ac_cv_unicap},
 
 if test "${ac_cv_unicap}" = 0
 then
-  AC_MSG_WARN([Could not find libunicap, dropping capture device support])
+  AC_MSG_WARN([Could not find optional library libunicap])
 else
 have_unicap=true
 AC_SUBST(HAVE_UNICAP)

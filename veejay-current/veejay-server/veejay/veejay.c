@@ -65,6 +65,9 @@ static void CompiledWith()
 #ifdef HAVE_JACK
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Jack audio server");
 #endif
+#ifdef HAVE_UNICAP
+	veejay_msg(VEEJAY_MSG_INFO,"\tSupport for Unicap ( setenv VEEJAY_CAPTURE_DRIVER=unicap )");
+#endif
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Video4linux");
 #ifdef SUPPORT_READ_DV2
 	veejay_msg(VEEJAY_MSG_INFO,"\tSupport for Digital Video enabled");
@@ -279,10 +282,8 @@ static void Usage(char *progname)
 		"\t\t\t\t-C/--zoomcrop [top:bottom:left:right] (crop source before scaling)\n");
 	fprintf(stderr,
 		"  -D/--composite \t\tDo not start with camera/projection calibration viewport \n");
-#ifdef HAVE_UNICAP
 	fprintf(stderr,
-		"  -A/--all [num] \t\tStart with all capture devices, start with device <num> \n");
-#endif
+		"  -A/--all [num] \t\tStart with capture device <num> \n");
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
 }

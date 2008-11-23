@@ -38,15 +38,8 @@
 #include <assert.h>
 #endif
 
-//register_callback method for unicap. locking problem.
-//#define USE_UNICAP_CB 1
-
-/* Using pthreads
- *  the unicap_wait_buffer blocks until a frame is filled by the capture device.
- *  In practice, it will block up to 40 ms when playing PAL at 25 fps. Meanwhile,
- *  we must continue rendering.
- */
 #define BUFFERS 4
+
 typedef struct
 {
 	unicap_handle_t handle;
@@ -56,10 +49,8 @@ typedef struct
 	unicap_data_buffer_t buffer;	
 	unicap_data_buffer_t mbuf[BUFFERS];
 	pthread_mutex_t mutex;
-#ifndef USE_UNICAP_CB
 	pthread_t	thread;
 	pthread_attr_t	attr;
-#endif
 	uint8_t		*priv_buf;
 	int		state;
 	int	 deviceID;

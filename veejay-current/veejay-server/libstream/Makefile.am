@@ -9,4 +9,4 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem \
 		$(MJPEGTOOLS_CFLAGS) $(FFMPEG_CFLAGS) $(PTHREAD_CFLAGS) $(UNICAP_CFLAGS)
 STREAM_LIB_FILE = libstream.la
 noinst_LTLIBRARIES = $(STREAM_LIB_FILE)
-libstream_la_SOURCES =	vj-unicap.c vj-yuv4mpeg.c vj-net.c vj-dv1394.c vj-vloopback.c vj-tag.c 
+libstream_la_SOURCES =	frequencies.c v4lutils.c v4lvideo.c vj-unicap.c vj-yuv4mpeg.c vj-net.c vj-dv1394.c vj-vloopback.c vj-tag.c 

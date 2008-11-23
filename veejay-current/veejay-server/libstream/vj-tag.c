@@ -46,6 +46,8 @@
 #include <libvjmem/vjmem.h>
 #include <libvje/internal.h>
 #include <libstream/vj-net.h>
+#include <libstream/v4lvideo.h>
+
 #ifdef HAVE_UNICAP
 #include <libstream/vj-unicap.h>
 #endif
@@ -63,7 +65,10 @@ static vj_tag_data *vj_tag_input;
 static int next_avail_tag = 0;
 static int avail_tag[SAMPLE_MAX_SAMPLES];
 static int last_added_tag = 0;
+static int video_driver_  = -1; // V4lUtils
+#ifdef HAVE_UNICAP
 static void *unicap_data_= NULL;
+#endif
 //forward decl
 
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int ty );
@@ -182,7 +187,7 @@ int	vj_tag_num_devices()
 #ifdef HAVE_UNICAP
 	return vj_unicap_num_capture_devices( unicap_data_ );
 #else
-	return 0;
+	return v4lvideo_templ_num_devices();
 #endif
 }
 
@@ -194,6 +199,9 @@ char *vj_tag_scan_devices( void )
 	int len = 6;
 #ifdef HAVE_UNICAP
 	char **device_list = vj_unicap_get_devices(unicap_data_, &num);
+#else
+	char **device_list = v4lvideo_templ_get_devices(&num);
+#endif
 	if(!device_list)
 		return strdup(default_str);
 
@@ -213,12 +221,9 @@ char *vj_tag_scan_devices( void )
 	}
 	free(device_list);
 	return n;
-#else
-	return strdup(default_str);
-#endif
 }
 
-int vj_tag_init(int width, int height, int pix_fmt)
+int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
 {
     int i;
     TagHash = hash_create(HASHCOUNT_T_MAX, int_tag_compare, int_tag_hash);
@@ -235,7 +240,10 @@ int vj_tag_init(int width, int height, int pix_fmt)
     vj_tag_input->height = height;
     vj_tag_input->depth = 3;
     vj_tag_input->pix_fmt = pix_fmt;
-
+    video_driver_ = video_driver;
+#ifndef HAVE_UNICAP
+    video_driver_ = 1;
+#endif
 
     if( pix_fmt == FMT_420|| pix_fmt == FMT_420F)
 	    vj_tag_input->uv_len = (width*height) / 4;
@@ -268,6 +276,9 @@ int vj_tag_init(int width, int height, int pix_fmt)
     for(i=0; i < SAMPLE_MAX_SAMPLES; i++) {
 	avail_tag[i] = 0;
     }
+
+    v4lvideo_templ_init();
+
     return 0;
 }
 
@@ -343,51 +354,86 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 
 	return 1;
 }
-#ifdef HAVE_UNICAP
-int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
-		    int norm, int palette, int freq, int channel, int has_composite)
+
+static struct {
+	const char *name;
+} video_norm_[] = 
+{
+	"pal",
+	"ntsc",
+	"auto",
+	NULL
+};
+
+int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int device_num,
+		    char norm, int palette,int pixfmt, int freq, int channel, int has_composite, int driver)
 {
 	char refname[100];
-	veejay_msg(VEEJAY_MSG_DEBUG, "%s: %dx%d, channel=%d, stream id=%d",__FUNCTION__,width,height, channel,stream_nr );
-  	if (stream_nr < 0 || stream_nr > vj_tag_num_devices())
+	const char *selected_video_norm = video_norm_[2].name;
+  
+	if (stream_nr < 0 || stream_nr > vj_tag_num_devices())
 	{
 		return 0;
 	}
-    	vj_tag_input->unicap[stream_nr] = 
-	   vj_unicap_new_device( unicap_data_, freq );
-    	if(!vj_tag_input->unicap[stream_nr] )
-    	{
-	    veejay_msg(0,"Unable to open device %d", channel);
-	    return 0;
-    	}
 
-	if(!vj_unicap_configure_device(   vj_tag_input->unicap[stream_nr] ,
-			   palette, width,height, has_composite))
-	{
-		veejay_msg(0,"Unable to configure device %d",channel);
-	   	vj_unicap_free_device( unicap_data_,vj_tag_input->unicap[stream_nr] );
-	   	return 0;
-   	}
-	else
-		veejay_msg(VEEJAY_MSG_DEBUG, "Configured device %d", channel);
-	sprintf(refname, "%d",channel );
-	tag->extra = strdup(refname);
-
-
-	char **props = vj_unicap_get_list(
-			 vj_tag_input->unicap[stream_nr]  );
-	int i;
-	double v = 0.0;
-	for( i = 0; props[i] != NULL ; i ++ )
-	{
-		if(strncasecmp("video norm", props[i],10 ) == 0 )
+	snprintf(refname,sizeof(refname), "/dev/video%d",device_num ); // freq->device_num
+	
+	switch(norm) {
+		case 'P':
+		case 'p':
+			selected_video_norm = video_norm_[0].name; break;
+		case 'n': case 'N':	
+			selected_video_norm = video_norm_[1].name; break;
+		default:
+			break;//auto
+	}
+	
+	tag->capture_type = driver;
+	veejay_msg(VEEJAY_MSG_INFO, "Open capture device with %s",
+	  ( driver == 1 ? "Effectv V4lutils"  : "Unicap" ) );
+	if( tag->capture_type == 1 )  {
+   		vj_tag_input->unicap[stream_nr] = v4lvideo_init( refname, channel, 
+			v4lvideo_templ_get_norm( selected_video_norm ),
+			freq,
+			width, height, palette );
+		v4lvideo_set_composite_status(  vj_tag_input->unicap[stream_nr] ,has_composite );
+		if( vj_tag_input->unicap[stream_nr] == NULL ) {
+			veejay_msg(0, "Unable to open device %s", refname );
+			return 0;
+		}
+		sprintf(refname, "%d",channel );
+		tag->extra = strdup(refname);
+		veejay_msg(VEEJAY_MSG_DEBUG, "Using V4lutils from EffecTV");
+		return 1;
+	} else {
+#ifdef HAVE_UNICAP
+	   	vj_tag_input->unicap[stream_nr] = vj_unicap_new_device( unicap_data_, device_num );
+    		if(!vj_tag_input->unicap[stream_nr] )
+    		{
+		    veejay_msg(0,"Unable to open device %d", device_num);
+		    return 0;
+   	 	}
+		if(!vj_unicap_configure_device(   vj_tag_input->unicap[stream_nr] ,
+			   pixfmt, width,height, has_composite))
 		{
+			veejay_msg(0,"Unable to configure device %d",channel);
+		   	vj_unicap_free_device( unicap_data_,vj_tag_input->unicap[stream_nr] );
+		   	return 0;
+   		}
+		else
+			veejay_msg(VEEJAY_MSG_DEBUG, "Configured device %d with Unicap", channel);
+		sprintf(refname, "%d",channel );
+		tag->extra = strdup(refname);
+
+		char **props = vj_unicap_get_list( vj_tag_input->unicap[stream_nr]  );
+		int i;
+		double v = 0.0;
+		for( i = 0; props[i] != NULL ; i ++ ) {
+			if(strncasecmp("video norm", props[i],10 ) == 0 ) {
 			if( norm == 'p' || norm == 'P' )
-				vj_unicap_select_value(  vj_tag_input->unicap[tag->index],
-					UNICAP_PAL,0);
+				vj_unicap_select_value(vj_tag_input->unicap[tag->index],UNICAP_PAL,0);
 			else
-				vj_unicap_select_value(  vj_tag_input->unicap[tag->index],
-					UNICAP_NTSC,0 );	
+				vj_unicap_select_value(  vj_tag_input->unicap[tag->index],UNICAP_NTSC,0 );	
 		}
 		else if (strncasecmp( "video source", props[i], 12 ) == 0 )
 		{
@@ -397,14 +443,18 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height,
 					cha,0 );
 		}	
 		free(props[i]);
+		}
+		free(props);
+#else
+		veejay_msg(VEEJAY_MSG_ERROR, "Unicap support not compiled in.");
+		return 0;
+#endif
 	}
-	free(props);
-	
 	//set channel
 	
 	return 1;
 }
-#endif
+
 #ifdef USE_GDK_PIXBUF
 int _vj_tag_new_picture( vj_tag *tag, int stream_nr, editlist *el)
 {
@@ -518,11 +568,13 @@ int	vj_tag_composite(int t1)
 	if(!tag) return 0;
 	if(tag->source_type != VJ_TAG_TYPE_V4L )
 		return 0;
-#ifdef HAVE_UNICAP	
-	return vj_unicap_composite_status( vj_tag_input->unicap[ tag->index ] );
-#else
-	return 0;
+#ifdef HAVE_UNICAP
+	if(tag->capture_type==0)	
+		return vj_unicap_composite_status( vj_tag_input->unicap[ tag->index ] );
 #endif
+	if(tag->capture_type==1)
+		return v4lvideo_get_composite_status( vj_tag_input->unicap[tag->index]);
+	return 0;
 }
 
 // for network, filename /channel is passed as host/port num
@@ -630,29 +682,41 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->color_r = 0;
     tag->color_g = 0;
     tag->color_b = 0;
-    tag->opacity = 0; 
+    tag->opacity = 0;
 	tag->priv = NULL;
 
 	if(type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_NET)
 	    tag->priv = net_threader();
-	
-    palette = ( (pix_fmt == FMT_420||pix_fmt == FMT_420F) ? VIDEO_PALETTE_YUV420P : VIDEO_PALETTE_YUV422P);
-    
+
+    palette = v4lvideo_templ_get_palette( pix_fmt );
  
     switch (type) {
-#ifdef HAVE_UNICAP
 	    case VJ_TAG_TYPE_V4L:
 		sprintf(tag->source_name, "%s", filename );
-		
-		if (!_vj_tag_new_unicap
-		    (tag, stream_nr, w, h,el->video_norm, pix_fmt, extra,channel,has_composite ))
+//FIXME
+		veejay_msg(VEEJAY_MSG_DEBUG, "V4l: %s",filename);
+
+/*
+int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int device_num,
+		    char norm, int palette,int pixfmt, int freq, int channel, int has_composite)
+
+*/
+		if (!_vj_tag_new_unicap( tag,
+					 stream_nr,w,h,
+					 extra, // device num
+					 el->video_norm,
+					 palette,
+					 pix_fmt,
+					 0,
+					 channel,
+					 has_composite,
+					 video_driver_ ))
 		{
-			veejay_msg(0, "Unable to create unicap stream '%dx%d' %c, %d,  [%d,%d]",
+			veejay_msg(0, "Unable to create stream '%dx%d' %c, %d,  [%d,%d]",
 				w,h,el->video_norm, pix_fmt, extra,channel );
-			    return -1;
+			return -1;
 		}
 		break;
-#endif
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
 		sprintf(tag->source_name, "%s", filename );
@@ -662,7 +726,6 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     case VJ_TAG_TYPE_DV1394:
 #ifdef SUPPORT_READ_DV2
 	sprintf(tag->source_name, "/dev/dv1394/%d", channel);
-//	FIXME: dev fs
 	if( _vj_tag_new_dv1394( tag, stream_nr,channel,1,el ) == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "error opening dv1394");
@@ -810,8 +873,13 @@ int vj_tag_del(int id)
     switch(tag->source_type) {
 #ifdef HAVE_UNICAP
 	case VJ_TAG_TYPE_V4L: 
-		veejay_msg(VEEJAY_MSG_INFO, "Closing unicap device");
-	   	vj_unicap_free_device(unicap_data_,  vj_tag_input->unicap[tag->index] );
+//FIXME: close based on type, could be v4lvideo
+#ifdef HAVE_UNICAP
+		if(!tag->capture_type)
+	 	  	vj_unicap_free_device(unicap_data_,  vj_tag_input->unicap[tag->index] );
+#endif
+		if(tag->capture_type==1) 
+			v4lvideo_destroy( vj_tag_input->unicap[tag->index] );
 		break;
 #endif
      case VJ_TAG_TYPE_YUV4MPEG: 
@@ -1352,7 +1420,6 @@ int vj_tag_continue_record( int t1 )
 	return 0;
 
 }
-#ifdef HAVE_UNICAP
 int vj_tag_set_brightness(int t1, int value)
 {
 	vj_tag *tag = vj_tag_get(t1);
@@ -1364,30 +1431,18 @@ int vj_tag_set_brightness(int t1, int value)
 	}
 	else	
 	{
-		vj_unicap_select_value( vj_tag_input->unicap[tag->index],UNICAP_BRIGHTNESS,(double)value);
-	}
-	return 1;
-}
-int vj_tag_set_saturation(int t1, int value)
-{
-	vj_tag *tag = vj_tag_get(t1);
-
-	if(!tag) return -1;
-	if(value < 0 || value > 65535)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Saturation valid range is 0 - 65535");
-		return -1;
-	}
-	else
-	{
-		vj_unicap_select_value( vj_tag_input->unicap[tag->index],UNICAP_SATURATION,(double) value );
+		if(tag->capture_type==1)
+			v4lvideo_set_brightness( vj_tag_input->unicap[tag->index], value );
+#ifdef HAVE_UNICAP
+		else 
+			vj_unicap_select_value( vj_tag_input->unicap[tag->index],UNICAP_BRIGHTNESS,(double)value);
+#endif
 	}
 	return 1;
 }
 int vj_tag_set_white(int t1, int value)
 {
 	vj_tag *tag = vj_tag_get(t1);
-
 	if(!tag) return -1;
 	if(value < 0 || value > 65535)
 	{
@@ -1396,7 +1451,12 @@ int vj_tag_set_white(int t1, int value)
 	}
 	else
 	{
-		vj_unicap_select_value( vj_tag_input->unicap[tag->index],UNICAP_WHITE,(double) value );
+		if(tag->capture_type==1)
+			v4lvideo_set_white( vj_tag_input->unicap[tag->index],value );
+#ifdef HAVE_UNICAP
+		else
+			vj_unicap_select_value( vj_tag_input->unicap[tag->index],UNICAP_WHITE,(double) value );
+#endif
 	}
 	return 1;
 }
@@ -1404,7 +1464,6 @@ int vj_tag_set_white(int t1, int value)
 int vj_tag_set_hue(int t1, int value)
 {
 	vj_tag *tag = vj_tag_get(t1);
-
 	if(!tag) return -1;
 	if(value < 0 || value > 65535)
 	{
@@ -1413,14 +1472,18 @@ int vj_tag_set_hue(int t1, int value)
 	}
 	else
 	{
-		vj_unicap_select_value( vj_tag_input->unicap[tag->index],UNICAP_HUE, (double)value );
+		if(tag->capture_type==1)
+			v4lvideo_set_hue( vj_tag_input->unicap[tag->index], value );
+#ifdef HAVE_UNICAP
+		else
+			vj_unicap_select_value( vj_tag_input->unicap[tag->index],UNICAP_HUE, (double)value );
+#endif
 	}
 	return 1;
 }
 int vj_tag_set_contrast(int t1,int value)
 {
 	vj_tag *tag = vj_tag_get(t1);
-
 	if(!tag) return -1;
 	if(value < 0 || value > 65535)
 	{
@@ -1429,7 +1492,12 @@ int vj_tag_set_contrast(int t1,int value)
 	}
 	else
 	{
-		vj_unicap_select_value( vj_tag_input->unicap[tag->index],UNICAP_CONTRAST, (double) value);
+		if(tag->capture_type==1)
+			v4lvideo_set_contrast( vj_tag_input->unicap[tag->index], value );
+#ifdef HAVE_UNICAP
+		else
+			vj_unicap_select_value( vj_tag_input->unicap[tag->index],UNICAP_CONTRAST, (double) value);
+#endif
 	}
 	return 1;
 }
@@ -1445,14 +1513,19 @@ int vj_tag_set_color(int t1, int value)
 	}
 	else
 	{
-		vj_unicap_select_value( vj_tag_input->unicap[tag->index], UNICAP_COLOR, (double)value);
+		if(tag->capture_type==1)
+			v4lvideo_set_colour( vj_tag_input->unicap[tag->index], value );
+#ifdef HAVE_UNICAP
+		else
+			vj_unicap_select_value( vj_tag_input->unicap[tag->index], UNICAP_COLOR, (double)value);
+#endif
 	}
 	return 1;
 }
 
 
 int	vj_tag_get_v4l_properties(int t1,
-		int *brightness, int *contrast, int *hue,int *saturation, int *color, int *white )
+		int *brightness, int *contrast, int *hue, int *color, int *white )
 {
 	vj_tag *tag = vj_tag_get(t1);
 	if(!tag) return -1;
@@ -1460,32 +1533,42 @@ int	vj_tag_get_v4l_properties(int t1,
 	{
 		return -1;
 	}
-    	char **props = vj_unicap_get_list( vj_tag_input->unicap[tag->index] );
-        int i;
-        for( i = 0; props[i] != NULL ; i ++ )
-        {
-                double dvalue = 0.0;
-                vj_unicap_get_value( vj_tag_input->unicap[tag->index] ,
-				props[i], VEVO_ATOM_TYPE_DOUBLE, &dvalue );
-		if(strncasecmp( props[i], "brightness",8) == 0 ) {
-			*brightness = (int) dvalue;
-		} else if(strncasecmp( props[i], "hue",3 ) == 0 ) {
-			*hue = (int) dvalue;
-		} else if( strncasecmp( props[i], "contrast", 8) == 0 ){
-			*contrast = (int) dvalue;
-		} else if (strncasecmp( props[i], "white", 5 ) == 0 ){
-			*white = (int) dvalue;
-		} else if (strncasecmp( props[i], "saturation", 10)  == 0 ) {
-		  	*saturation = (int) dvalue;     
-		} else if (strncasecmp( props[i], "color",5 ) == 0 ){
-			*color = (int) dvalue;
-		}
-		free(props[i]);
+
+	if(tag->capture_type == 1 ) {
+		*brightness = v4lvideo_get_brightness(  vj_tag_input->unicap[tag->index] );
+		*contrast  = v4lvideo_get_contrast( vj_tag_input->unicap[tag->index] );
+		*hue	    = v4lvideo_get_hue( vj_tag_input->unicap[tag->index] );
+		*color	    = v4lvideo_get_colour( vj_tag_input->unicap[tag->index] );
+		*white     =  v4lvideo_get_white( vj_tag_input->unicap[tag->index] );
+		return 0;
 	}
-	free(props);
+#ifdef HAVE_UNICAP
+	if( tag->capture_type == 0 ) {
+    		char **props = vj_unicap_get_list( vj_tag_input->unicap[tag->index] );
+		int i;
+		for( i = 0; props[i] != NULL ; i ++ )
+		{
+			double dvalue = 0.0;
+				vj_unicap_get_value( vj_tag_input->unicap[tag->index] ,
+			props[i], VEVO_ATOM_TYPE_DOUBLE, &dvalue );
+			if(strncasecmp( props[i], "brightness",8) == 0 ) {
+				*brightness = (int) dvalue;
+			} else if(strncasecmp( props[i], "hue",3 ) == 0 ) {
+				*hue = (int) dvalue;
+			} else if( strncasecmp( props[i], "contrast", 8) == 0 ){
+				*contrast = (int) dvalue;
+			} else if (strncasecmp( props[i], "white", 5 ) == 0 ){
+				*white = (int) dvalue;
+			} else if (strncasecmp( props[i], "color",5 ) == 0 ){
+				*color = (int) dvalue;
+			}
+			free(props[i]);
+		}
+		free(props);
+	}
+#endif
 	return 0;
 }
-#endif
 
 int vj_tag_get_effect_any(int t1, int position) {
 	vj_tag *tag = vj_tag_get(t1);
@@ -1846,14 +1929,20 @@ int vj_tag_disable(int t1) {
 	{
 		net_thread_stop( tag );
 	}
-#ifdef HAVE_UNICAP
 	if(tag->source_type == VJ_TAG_TYPE_V4L )
 	{
-		vj_unicap_set_pause( vj_tag_input->unicap[tag->index], 1 );
-		//if( vj_unicap_status( vj_tag_input->unicap[tag->index]) )
-		//	vj_unicap_stop_capture( vj_tag_input->unicap[ tag->index] );
-	}
+		if( tag->capture_type == 1 ) {
+			if(v4lvideo_is_active(vj_tag_input->unicap[tag->index] ) )
+				v4lvideo_set_paused( vj_tag_input->unicap[tag->index] , 1 );
+		//	if(v4lvideo_is_active(vj_tag_input->unicap[tag->index] ))
+		//	v4lvideo_grabstop(vj_tag_input->unicap[tag->index]);
+		}
+#ifdef HAVE_UNICAP
+		if( tag->capture_type == 0 )
+			vj_unicap_set_pause( vj_tag_input->unicap[tag->index], 1 );
 #endif
+	}
+
 #ifdef USE_GDK_PIXBUF
 	if(tag->source_type == VJ_TAG_TYPE_PICTURE )
 	{
@@ -1875,20 +1964,35 @@ int vj_tag_enable(int t1) {
 #ifdef STRICT_CHECKING
 	assert( tag != NULL );
 #endif
-#ifdef HAVE_UNICAP
 	if( tag->source_type == VJ_TAG_TYPE_V4L )
 	{
-		if( vj_unicap_get_pause( vj_tag_input->unicap[tag->index] ) )
-			vj_unicap_set_pause( vj_tag_input->unicap[tag->index] , 0 );
-		else {
-			if(! vj_unicap_status( vj_tag_input->unicap[tag->index]) )
-				vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
+		if(tag->capture_type == 1 ) {
+			if(!v4lvideo_is_active(  vj_tag_input->unicap[tag->index] ) ) {
+				if(v4lvideo_grabstart(  vj_tag_input->unicap[tag->index] ) == 0 )
+				{
+					tag->active = 1;
+					veejay_msg(VEEJAY_MSG_INFO,"Started continues capturing");
+				} else {
+					veejay_msg(VEEJAY_MSG_ERROR, "Failed to start grabbing.");
+				}
+			} else {
+				if(v4lvideo_is_paused( vj_tag_input->unicap[tag->index] ) )
+					v4lvideo_set_paused( vj_tag_input->unicap[tag->index],0);
+				tag->active = 1;
+			}
 		}
-		tag->active = 1;
+#ifdef HAVE_UNICAP
+		if(tag->capture_type == 0 ) {
+			int sta = vj_unicap_status( vj_tag_input->unicap[tag->index]);
+			if( sta == 0 )
+				tag->active = vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
+			if( vj_unicap_get_pause( vj_tag_input->unicap[tag->index] ) )
+				vj_unicap_set_pause( vj_tag_input->unicap[tag->index] , 0 );
+		}
+#endif
 		vj_tag_update(tag,t1);
 		return 1;
 	}
-#endif
 	if(tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST )
 	{
 		if(!net_thread_start(vj_tag_input->net[tag->index], tag))
@@ -1911,16 +2015,6 @@ int vj_tag_enable(int t1) {
 
 		vj_tag_input->picture[tag->index] = p;
 		veejay_msg(VEEJAY_MSG_DEBUG, "Streaming from picture '%s'", tag->source_name );
-	}
-#endif
-#ifdef HAVE_UNICAP
-	if( tag->source_type == VJ_TAG_TYPE_V4L )
-	{
-		if( vj_unicap_get_pause( vj_tag_input->unicap[ tag->index ]  ) )
-			vj_unicap_set_pause( vj_tag_input->unicap[ tag->index ] , 0 );
-			
-	    if(!vj_unicap_status( vj_tag_input->unicap[tag->index]) )
-	    	vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
 	}
 #endif
 	tag->active = 1;
@@ -1951,24 +2045,46 @@ int vj_tag_set_active(int t1, int active)
 	    return 1;
  	
     switch (tag->source_type) {
-#ifdef HAVE_UNICAP
 	   case VJ_TAG_TYPE_V4L:
-		if(active) {
-		   if( vj_unicap_get_pause( vj_tag_input->unicap[ tag->index] ) ) {
-		   	vj_unicap_set_pause( vj_tag_input->unicap[tag->index] , 0 );\
-		    } else {
-		    	if( !vj_unicap_status( vj_tag_input->unicap[tag->index]) )
-		    		vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
+
+		if(tag->capture_type == 1 ) {
+			if(active) {	
+			     if( !v4lvideo_is_active( vj_tag_input->unicap[tag->index] ) ) {
+					if(v4lvideo_grabstart( vj_tag_input->unicap[tag->index] ) < 0 ) {
+						active = 1;
+						veejay_msg(VEEJAY_MSG_INFO, "Started grabbing ");
+					} else {
+						veejay_msg(VEEJAY_MSG_ERROR, "Unable to start grabbing.");
+						active = 0;
+					}
+			     } else {
+				if( v4lvideo_is_paused( vj_tag_input->unicap[tag->index] )  )
+					v4lvideo_set_paused( vj_tag_input->unicap[tag->index], 0 );
+				}
 			}
-		} else {
-		    if( !vj_unicap_get_pause( vj_tag_input->unicap[ tag->index ] ) )
-		       vj_unicap_set_pause( vj_tag_input->unicap[tag->index] , 1 );
-	//	     if( vj_unicap_status( vj_tag_input->unicap[tag->index]) )
-	//		vj_unicap_stop_capture( vj_tag_input->unicap[ tag->index] );
+			else {
+				if( !v4lvideo_is_paused( vj_tag_input->unicap[tag->index] )  )
+					v4lvideo_set_paused( vj_tag_input->unicap[tag->index], 1 );
+			}
+		} 
+#ifdef HAVE_UNICAP
+		else {
+			if(active) {
+				int sta =vj_unicap_status( vj_tag_input->unicap[tag->index]);
+				if(sta == 0 )
+		    			active = vj_unicap_start_capture( vj_tag_input->unicap[tag->index]);
+				 if(active ) {
+			  	 if( vj_unicap_get_pause( vj_tag_input->unicap[ tag->index] ) ) 
+			   		vj_unicap_set_pause( vj_tag_input->unicap[tag->index] , 0 );
+				}
+			} else {
+			    	if( !vj_unicap_get_pause( vj_tag_input->unicap[ tag->index ] ) )
+			       		vj_unicap_set_pause( vj_tag_input->unicap[tag->index] , 1 );
+			}
 		}
+#endif
 		tag->active = active;
 		break;
-#endif
 	case VJ_TAG_TYPE_YUV4MPEG:
 	     if(active==0)
 		{
@@ -2372,13 +2488,18 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
     
 	switch (tag->source_type)
 	{
-#ifdef HAVE_UNICAP
 	case VJ_TAG_TYPE_V4L:
-		if(vj_unicap_status(vj_tag_input->unicap[tag->index]) )
-			vj_unicap_grab_frame( vj_tag_input->unicap[tag->index], buffer, width,height );
+		if( tag->capture_type == 1 ) {
+			v4lvideo_copy_framebuffer_to(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]);
+		}
+#ifdef HAVE_UNICAP
+		else {
+			if(vj_unicap_status(vj_tag_input->unicap[tag->index]) )
+				vj_unicap_grab_frame( vj_tag_input->unicap[tag->index], buffer, width,height );
+		}
+#endif
 		return 1;
 		break;
-#endif
 #ifdef USE_GDK_PIXBUF
 	case VJ_TAG_TYPE_PICTURE:
 		{
@@ -3047,7 +3168,7 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
 
 	if(tag->extra && strlen(tag->extra) > 1)
 	{
-		sprintf(buffer, "%s", tag->extra );
+		sprintf(buffer, "%d", tag->extra );
 		xmlNewChild(node, NULL,(const xmlChar) "extra_data", (const xmlChar*) buffer );
 	}
 	sprintf(buffer, "%d", tag->color_r );

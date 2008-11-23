@@ -1,4 +1,4 @@
-/* libveejayvj - a extended librarified Linux Audio Video playback/Editing
+/*liblavplayvj - a extended librarified Linux Audio Video playback/Editing
  *supports: 
  *		sample based editing
  *		pattern based editing 
@@ -53,7 +53,6 @@
 #include <sys/stat.h>
 #include <sys/ioctl.h>
 #include <sys/mman.h>
-#define _POSIX_C_SOURCE 199309
 #include <sys/time.h>
 #include <sys/resource.h>
 #include <poll.h>
@@ -2013,7 +2012,15 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	}
 	vj_tag_set_veejay_t(info);
 
-	if (vj_tag_init(el->video_width, el->video_height, info->pixel_format) != 0) {
+
+	int driver = 1;
+	char *driver_str = getenv("VEEJAY_CAPTURE_DRIVER");
+	if( driver_str != NULL ) {
+		if( strncasecmp( "unicap",driver_str, 6) == 0 )
+			driver = 0;
+	}
+
+	if (vj_tag_init(el->video_width, el->video_height, info->pixel_format,driver) != 0) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing Stream Manager");
 		return -1;
     	}

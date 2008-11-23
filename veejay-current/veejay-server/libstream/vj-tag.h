@@ -74,6 +74,7 @@ typedef struct {
     int active;
     int source;
     int video_channel;
+    int capture_type;
     int encoder_active;
     unsigned long sequence_num;
     unsigned long rec_total_bytes;
@@ -120,8 +121,8 @@ int	vj_tag_set_composite(void *compiz,int id, int n);
 int	vj_tag_get_composite(int t1);
 int 	vj_tag_chain_malloc(int e);
 int 	vj_tag_chain_free(int e);
-int	vj_tag_get_v4l_properties(int t1,int *brightness, int *contrast, int *hue,int *saturation,int *color, int *white );
-int 	vj_tag_init(int w, int h, int pix_fmt);
+int	vj_tag_get_v4l_properties(int t1,int *brightness, int *contrast, int *hue,int *color, int *white );
+int 	vj_tag_init(int w, int h, int pix_fmt, int driver);
 int	vj_tag_get_n_frames(int t1);
 int	vj_tag_set_n_frames(int t1, int n_frames);
 int 	vj_tag_get_last_tag();

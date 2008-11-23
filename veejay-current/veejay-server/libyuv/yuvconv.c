@@ -144,7 +144,7 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->uv_width = w>>1;
 			f->uv_height= f->height;		
 			f->stride[0] = w;
-			f->stride[1] = f->stride[2] = f->stride[0]>>1;
+			f->stride[1] = f->stride[2] = f->stride[0]>>1;	
 			break;
 		case PIX_FMT_YUV420P:
 		case PIX_FMT_YUVJ420P:
@@ -172,6 +172,8 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 #endif
 		break;
 	}
+	f->len = w*h;	
+	f->uv_len = f->uv_width*f->uv_height;
 
 	return f;
 }

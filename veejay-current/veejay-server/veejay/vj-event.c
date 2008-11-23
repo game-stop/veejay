@@ -6624,13 +6624,19 @@ void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 
 	sprintf(filename, "video%d", args[0]);
 
-#ifdef HAVE_UNICAP
-	int id = veejay_create_tag(v, VJ_TAG_TYPE_V4L, filename, v->nstreams,args[0],args[1]);
+	int id = vj_tag_new(VJ_TAG_TYPE_V4L,
+			    filename,
+			    v->nstreams,
+			    v->edit_list,
+			    v->pixel_format,
+			    args[1],
+			    args[0],
+			    v->settings->composite );
+
+	if(id > 0 )
+		v->nstreams++;
+
 	vj_event_send_new_id( v, id );
-#else
-	int id = -1;
-	vj_event_send_new_id( v, id );
-#endif
 	if( id <= 0 )
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create new Video4Linux stream ");
 }
@@ -6717,7 +6723,6 @@ void vj_event_tag_new_y4m(void *ptr, const char format[], va_list ap)
 	if( id <= 0 )
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to create new Yuv4mpeg stream");
 }
-#ifdef HAVE_UNICAP
 void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -6735,7 +6740,6 @@ void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 	}
 	
 }
-#endif
 
 void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 {
@@ -6887,21 +6891,16 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 	{
 		int values[6];
 		memset(values,0,6*sizeof(int));
-#ifdef HAVE_UNICAP
-		if(vj_tag_get_v4l_properties( args[0], &values[0], &values[1], &values[2], &values[3],	&values[4], &values[5]))
+		if(vj_tag_get_v4l_properties( args[0], &values[0], &values[1], &values[2], &values[3],	&values[4]))
 		{
 			sprintf(message, "%05d%05d%05d%05d%05d%05d",
 				values[0],values[1],values[2],values[3],values[4],values[5] );
 		}
-#else
-		sprintf(message, "000000000000000000000000000000" );
-#endif
 	}
 	FORMAT_MSG(send_msg, message);
 	SEND_MSG( v,send_msg );
 }
 
-#ifdef HAVE_UNICAP
 void vj_event_v4l_set_contrast(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -6917,9 +6916,7 @@ void vj_event_v4l_set_contrast(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_INFO,"Set contrast to %d",args[1]);
 		}
 	}
-
 }
-
 
 void vj_event_v4l_set_white(void *ptr, const char format[], va_list ap)
 {
@@ -6948,10 +6945,7 @@ void vj_event_v4l_set_saturation(void *ptr, const char format[], va_list ap)
 	if(args[0]==-1)args[0] = vj_tag_size()-1;
 	if(vj_tag_exists(args[0]) && STREAM_PLAYING(v))
 	{
-		if(vj_tag_set_saturation(args[0],args[1]))
-		{
-			veejay_msg(VEEJAY_MSG_INFO,"Set saturation to %d",args[1]);
-		}
+veejay_msg(0, "broken");
 	}
 
 }
@@ -6989,7 +6983,6 @@ void vj_event_v4l_set_hue(void *ptr, const char format[], va_list ap)
 	}
 
 }
-#endif
 void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -9043,7 +9036,6 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 		     * once so only ONE VIMS-command is needed */
 		    else if (stream_type == VJ_TAG_TYPE_V4L)
 			{
-#ifdef HAVE_UNICAP
 			int brightness=0;
 			int hue = 0;
 			int contrast = 0;
@@ -9052,7 +9044,7 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 			int sat = 0;
 			int effects_on = 0;
 			
-			vj_tag_get_v4l_properties(id,&brightness,&hue,&sat, &contrast, &color, &white );			
+			vj_tag_get_v4l_properties(id,&brightness,&hue,&contrast, &color, &white );			
 			effects_on = si->effect_toggle;
 			
 			sprintf( options,
@@ -9065,7 +9057,6 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 			    white,
 			    effects_on);
 			failed = 0;
-#endif
 			}
 		    else	
 			{
