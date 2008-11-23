@@ -782,11 +782,14 @@ void	v4lvideo_copy_framebuffer_to( void *vv, uint8_t *dstY, uint8_t *dstU, uint8
 		return;
 	
 lock_(v);
+	if(!v->v4l ) {
+		unlock_(v);
+		return;
+	}
 #ifdef STRICT_CHECKING
 	assert( v->v4l != NULL );
 #endif
 	v4lvideo_t *v1 = (v4lvideo_t*) v->v4l;
-	int frame  =   v1->vd.frame;
 	if( v1->has_video ) {
 		uint8_t *src = v->frame_buffer;
 		veejay_memcpy( dstY, src, v->len );

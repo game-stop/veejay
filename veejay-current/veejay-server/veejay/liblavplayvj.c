@@ -609,7 +609,7 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 {
 	if(!sample_stop_playing( info->uc->sample_id, new_sample_id ) )
 	{
-		veejay_msg(0, "There is no sample %d", new_sample_id );
+		veejay_msg(0, "Error while stopping sample %d", new_sample_id );
 		return 0;
 	}
 	if( info->composite ) {
@@ -650,11 +650,6 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 {
 	int looptype,speed,start,end;
 	video_playback_setup *settings = info->settings;
-	if(!sample_exists(sample_id) )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist", sample_id);
-		return 0;
-	}
 
 	editlist *E = sample_get_editlist( sample_id );
 #ifdef STRICT_CHECKING
@@ -718,11 +713,6 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 {
 	video_playback_setup *settings = info->settings;
-	if(!vj_tag_exists(stream_id))
-        {
-		   veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist", stream_id);
-	     	   return 0;
-        }
 	
 	if(vj_tag_enable( stream_id ) <= 0 )
 	{
@@ -778,6 +768,19 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 
 void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 {
+	//@ check safity of samples
+	if( new_pm == VJ_PLAYBACK_MODE_SAMPLE ) {
+		if(!sample_exists(sample_id)) {
+			veejay_msg(0,"Sample %d does not exist!");
+			return;
+		}
+	} else if (new_pm == VJ_PLAYBACK_MODE_TAG ) {
+		if(!vj_tag_exists(sample_id)) {
+			veejay_msg(0,"Stream %d does not exist!");
+			return;
+		}
+	}
+
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
 	{
 		int cur_id = info->uc->sample_id;
@@ -1026,9 +1029,8 @@ static int veejay_screen_update(veejay_t * info )
 
 		vj_perform_get_output_frame(  frame );
 	}
- 	else
+ 	else if(!check_vp)
 		vj_perform_get_primary_frame(info,frame);
-
 
 #ifdef HAVE_JPEG
 #ifdef USE_GDK_PIXBUF 
@@ -2202,7 +2204,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 						  el->video_width, el->video_height,
 						  info->homedir,
 						  info->settings->sample_mode,
-						  info->settings->zoom,
+						  1,
 						  info->pixel_format );
 		if(!info->composite) {
 			return -1;
@@ -3735,7 +3737,10 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		veejay_msg(VEEJAY_MSG_WARNING, "Fallback to dummy - no video files given at commandline");
 		info->dummy->active = 1;
 	}
-
+	
+	//@ set dummy to output dimensions, fallback to internal defaults if fail
+	info->dummy->width = info->video_output_width;
+	info->dummy->height= info->video_output_height;
 
 	//TODO: pass yuv sampling to dummy
 	if( info->dummy->active )
@@ -3770,6 +3775,9 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 			veejay_msg(VEEJAY_MSG_DEBUG, "Dummy Audio: %f KHz, %d channels, %d bps, %d bit audio",
 				(float)el->audio_rate/1000.0,el->audio_chans,el->audio_bps,el->audio_bits);
 		}
+		veejay_msg(VEEJAY_MSG_DEBUG,"Dummy Video: %dx%d, chroma %x, fps %2.2f",
+					info->dummy->width,info->dummy->height, info->dummy->chroma,info->dummy->fps);
+
 	}
 	else
 	{
@@ -3787,6 +3795,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	//@ set current
 	info->current_edit_list = info->edit_list;
 
+	
 	if(info->edit_list==NULL)
 	{
 		return 0;
@@ -3805,7 +3814,6 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	{
 		info->settings->output_fps = info->current_edit_list->video_fps;
 	}
-// init tags , samples ?
 
 	return 1;
 }

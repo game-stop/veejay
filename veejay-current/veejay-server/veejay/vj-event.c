@@ -3040,6 +3040,14 @@ void vj_event_switch_sample_tag(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
 
+	int last_tag = vj_tag_size()-1;
+	int last_sample=sample_size()-1;
+
+	if(last_tag < 1 ) 
+		last_tag = 1;
+	if(last_sample < 1 )
+		last_sample = 1;
+
 	if(!STREAM_PLAYING(v) && !SAMPLE_PLAYING(v))
 	{
 		if(sample_exists(v->last_sample_id)) 
@@ -3054,9 +3062,9 @@ void vj_event_switch_sample_tag(void *ptr, const char format[], va_list ap)
 		}
 		if(sample_size()-1 <= 0)
 		{
-			if(vj_tag_exists( vj_tag_size()-1 ))
+			if(vj_tag_exists( last_tag ))
 			{
-				veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_TAG, vj_tag_size()-1);
+				veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_TAG, last_tag);
 				return;
 			}
 		}	
@@ -3068,37 +3076,18 @@ void vj_event_switch_sample_tag(void *ptr, const char format[], va_list ap)
 		{
 			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, v->last_tag_id);
 		}
-		else
-		{
-			int id = vj_tag_size() - 1;
-			if(id)
-			{
-				veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG,id);
-			}
-			else
-			{
-				p_no_tag(id);
-			}
-		}
+		else if ( vj_tag_exists(last_tag)) 
+			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_TAG, last_tag);
 	}
-	else
-	if(STREAM_PLAYING(v))
+	else if(STREAM_PLAYING(v))
 	{
 		if(sample_exists(v->last_sample_id) )
 		{
 			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE, v->last_sample_id);
 		}
-		else
+		else if( sample_exists( last_sample ))
 		{
-			int id = sample_size() - 1;
-			if(id)
-			{
-				veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE,id);
-			}
-			else
-			{
-				p_no_sample(id);
-			}
+			veejay_change_playback_mode(v, VJ_PLAYBACK_MODE_SAMPLE,last_sample);
 		}
 	}
 }

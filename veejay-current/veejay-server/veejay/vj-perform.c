@@ -3079,7 +3079,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 			int   on_proj = viewport_get_mode(vp);
 			if( settings->composite == 1 )
 				on_proj = 1;
-
 			if( on_proj == 1 )
 			{
 				VJFrame *tst = composite_get_draw_buffer( info->composite );
@@ -3087,7 +3086,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 					vj_font_render_osd_status(info->osd,tst,osd_text,placement);
 					if(more_text)
 						vj_font_render_osd_status(info->osd,tst,more_text,0);
-					free(tst);	
+					free(tst);
 				}
 			} else { 	
 				if(more_text)
@@ -3232,7 +3231,8 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 		vj_perform_record_frame(info);
 	}
 	//@ Render OSD menu
-	vj_perform_render_osd( info, settings, deep );
+	if(!settings->composite)
+		vj_perform_render_osd( info, settings, deep );
 
 	//@ Do the subsampling 
 	vj_perform_finish_render( info, settings,deep );
