@@ -5144,7 +5144,7 @@ void	find_user_themes(int theme)
 	veejay_memset( theme_file, 0, sizeof(theme_file));
 
 	theme_settings = gtk_settings_get_default();
-	snprintf( glade_path, sizeof(glade_path), "%s/gveejay.reloaded.glade",GVEEJAY_DATADIR);
+//	snprintf( glade_path, sizeof(glade_path), "%s/gveejay.reloaded.glade",GVEEJAY_DATADIR);
 
 
 	if(!home)
@@ -6114,7 +6114,7 @@ void	default_bank_values(int *col, int *row )
 
 void	set_skin(int skin)
 {
-	timeline_theme_colors( skin ? 1: 0 );
+	timeline_theme_colors( 1 );
 }
 
 int	vj_gui_sleep_time( void )
@@ -6354,6 +6354,8 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	{
 		return;
 	}
+	snprintf( glade_path, sizeof(glade_path), "%s/%s",GVEEJAY_DATADIR,glade_file);
+
 
 	veejay_memset( gui->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
 	veejay_memset( gui->sample, 0, 2 );

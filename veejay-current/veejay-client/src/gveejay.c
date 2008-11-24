@@ -32,6 +32,7 @@
 #include <src/vj-api.h>
 #include <sched.h>
 
+static int selected_skin = 0;
 extern int	mt_get_max_tracks();
 
 static int port_num	= 3490;
@@ -52,6 +53,7 @@ static struct
 	char *file;
 } skins[] = {
  {	"gveejay.reloaded.glade" },
+ {	"reloaded_classic.glade" },
  {	NULL 	}
 };
 
@@ -84,7 +86,10 @@ static int      set_option( const char *name, char *value )
         {
                 if(sscanf( optarg, "%d", &port_num ))
 			launcher++;
-        }
+        } 
+	else if (strcmp(name, "S" ) == 0 ) {
+		selected_skin = atoi( optarg);
+	}
 	else if (strcmp(name, "n") == 0 )
 	{
 		veejay_set_colors(0);
@@ -196,7 +201,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	sprintf(hostname, "127.0.0.1");
 
-        while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:q")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:qS:")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
@@ -227,11 +232,11 @@ int main(int argc, char *argv[]) {
 	
 	vj_gui_set_debug_level( verbosity , n_tracks,pw,ph);
 	vj_gui_set_timeout(timer);
-	set_skin( 1 );
+	set_skin( selected_skin );
 
 	default_bank_values( &col, &row );
 	gui_load_theme();	
-	vj_gui_init( skins[0].file, launcher, hostname, port_num, use_threads );
+	vj_gui_init( skins[selected_skin].file, launcher, hostname, port_num, use_threads );
 	vj_gui_style_setup();
 
 
