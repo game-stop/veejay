@@ -54,7 +54,7 @@
 			  <property name="use_underline">True</property>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image3277">
+			    <widget class="GtkImage" id="image3317">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">button_loop.png</property>
 			      <property name="xalign">0.5</property>
@@ -75,7 +75,7 @@
 				  <signal name="activate" handler="on_sampleadd_clicked" last_modification_time="Tue, 21 Feb 2006 22:53:15 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image3278">
+				    <widget class="GtkImage" id="image3318">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_openlist.png</property>
 				      <property name="xalign">0.5</property>
@@ -95,7 +95,7 @@
 				  <signal name="activate" handler="on_button_clipcopy_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:58 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image3279">
+				    <widget class="GtkImage" id="image3319">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_copy.png</property>
 				      <property name="xalign">0.5</property>
@@ -115,7 +115,7 @@
 				  <signal name="activate" handler="on_button_sample_del_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:35 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image3280">
+				    <widget class="GtkImage" id="image3320">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_clear.png</property>
 				      <property name="xalign">0.5</property>
@@ -138,7 +138,7 @@
 			  <property name="use_underline">True</property>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image3281">
+			    <widget class="GtkImage" id="image3321">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_stream.png</property>
 			      <property name="xalign">0.5</property>
@@ -159,7 +159,7 @@
 				  <signal name="activate" handler="on_streamnew_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:05 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image3282">
+				    <widget class="GtkImage" id="image3322">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_openlist.png</property>
 				      <property name="xalign">0.5</property>
@@ -179,7 +179,7 @@
 				  <signal name="activate" handler="on_new_colorstream_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:05 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image3283">
+				    <widget class="GtkImage" id="image3323">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_color.png</property>
 				      <property name="xalign">0.5</property>
@@ -199,7 +199,7 @@
 				  <signal name="activate" handler="on_button_sample_del_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:28 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image3284">
+				    <widget class="GtkImage" id="image3324">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_clear.png</property>
 				      <property name="xalign">0.5</property>
@@ -222,7 +222,7 @@
 			  <property name="use_underline">True</property>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image3285">
+			    <widget class="GtkImage" id="image3325">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_connect.png</property>
 			      <property name="xalign">0.5</property>
@@ -240,7 +240,7 @@
 				  <property name="visible">True</property>
 				  <property name="label" translatable="yes">_learn MIDI</property>
 				  <property name="use_underline">True</property>
-				  <property name="active">True</property>
+				  <property name="active">False</property>
 				  <signal name="activate" handler="on_midilearn_toggled" last_modification_time="Sat, 07 Apr 2007 17:55:42 GMT"/>
 				</widget>
 			      </child>
@@ -250,7 +250,7 @@
 				  <property name="visible">True</property>
 				  <property name="label" translatable="yes">_MIDI enable</property>
 				  <property name="use_underline">True</property>
-				  <property name="active">True</property>
+				  <property name="active">False</property>
 				  <property name="group">midilearn</property>
 				  <signal name="activate" handler="on_midievent_toggled" last_modification_time="Sat, 07 Apr 2007 17:55:29 GMT"/>
 				</widget>
@@ -282,7 +282,7 @@
 			  <property name="use_underline">True</property>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image3286">
+			    <widget class="GtkImage" id="image3326">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_save.png</property>
 			      <property name="xalign">0.5</property>
@@ -303,7 +303,7 @@
 				  <signal name="activate" handler="on_button_samplelist_save_clicked" last_modification_time="Wed, 19 Oct 2005 12:22:22 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image3287">
+				    <widget class="GtkImage" id="image3327">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_saveas.png</property>
 				      <property name="xalign">0.5</property>
@@ -323,7 +323,7 @@
 				  <signal name="activate" handler="on_button_saveconfigfile_clicked" last_modification_time="Wed, 19 Oct 2005 12:23:07 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image3288">
+				    <widget class="GtkImage" id="image3328">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_openlist.png</property>
 				      <property name="xalign">0.5</property>
@@ -343,7 +343,7 @@
 				  <signal name="activate" handler="on_save_midi_layout1_activate" last_modification_time="Fri, 06 Apr 2007 23:48:49 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image3289">
+				    <widget class="GtkImage" id="image3329">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_saveas.png</property>
 				      <property name="xalign">0.5</property>
@@ -366,7 +366,7 @@
 			  <property name="use_underline">True</property>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image3290">
+			    <widget class="GtkImage" id="image3330">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_open.png</property>
 			      <property name="xalign">0.5</property>
@@ -387,7 +387,7 @@
 				  <signal name="activate" handler="on_button_samplelist_open_clicked" last_modification_time="Wed, 19 Oct 2005 12:21:30 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image3291">
+				    <widget class="GtkImage" id="image3331">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_open.png</property>
 				      <property name="xalign">0.5</property>
@@ -407,7 +407,7 @@
 				  <signal name="activate" handler="on_button_loadconfigfile_clicked" last_modification_time="Wed, 19 Oct 2005 12:20:50 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image3292">
+				    <widget class="GtkImage" id="image3332">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_openlist.png</property>
 				      <property name="xalign">0.5</property>
@@ -427,7 +427,7 @@
 				  <signal name="activate" handler="on_load_midi_layout1_activate" last_modification_time="Fri, 06 Apr 2007 23:48:49 GMT"/>
 
 				  <child internal-child="image">
-				    <widget class="GtkImage" id="image3293">
+				    <widget class="GtkImage" id="image3333">
 				      <property name="visible">True</property>
 				      <property name="pixbuf">icon_open.png</property>
 				      <property name="xalign">0.5</property>
@@ -485,7 +485,7 @@
 			  <signal name="activate" handler="on_VideoSettings_activate" last_modification_time="Tue, 19 Jul 2005 19:33:02 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image3294">
+			    <widget class="GtkImage" id="image3334">
 			      <property name="visible">True</property>
 			      <property name="stock">gtk-preferences</property>
 			      <property name="icon_size">1</property>
@@ -512,7 +512,7 @@
 			  <signal name="activate" handler="on_vims_bundles_activate" last_modification_time="Sat, 23 Jul 2005 18:59:53 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image3295">
+			    <widget class="GtkImage" id="image3335">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_bundle.png</property>
 			      <property name="xalign">0.5</property>
@@ -545,7 +545,7 @@
 			  <signal name="activate" handler="on_about1_activate" last_modification_time="Thu, 15 Sep 2005 22:07:40 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image3296">
+			    <widget class="GtkImage" id="image3336">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_question.png</property>
 			      <property name="xalign">0.5</property>
@@ -565,7 +565,7 @@
 			  <signal name="activate" handler="on_report_a_bug1_activate" last_modification_time="Sun, 21 Sep 2008 13:31:19 GMT"/>
 
 			  <child internal-child="image">
-			    <widget class="GtkImage" id="image3297">
+			    <widget class="GtkImage" id="image3337">
 			      <property name="visible">True</property>
 			      <property name="pixbuf">icon_bug.png</property>
 			      <property name="xalign">0.5</property>
@@ -614,23 +614,75 @@
 	  </child>
 
 	  <child>
-	    <widget class="GtkLabel" id="cachemeter">
-	      <property name="width_request">100</property>
+	    <widget class="GtkHBox" id="hbox909">
 	      <property name="visible">True</property>
-	      <property name="label" translatable="yes">cache filled</property>
-	      <property name="use_underline">False</property>
-	      <property name="use_markup">False</property>
-	      <property name="justify">GTK_JUSTIFY_LEFT</property>
-	      <property name="wrap">False</property>
-	      <property name="selectable">False</property>
-	      <property name="xalign">0.5</property>
-	      <property name="yalign">0.5</property>
-	      <property name="xpad">0</property>
-	      <property name="ypad">0</property>
-	      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
-	      <property name="width_chars">-1</property>
-	      <property name="single_line_mode">False</property>
-	      <property name="angle">0</property>
+	      <property name="homogeneous">False</property>
+	      <property name="spacing">0</property>
+
+	      <child>
+		<widget class="GtkLabel" id="cachemeter">
+		  <property name="width_request">100</property>
+		  <property name="visible">True</property>
+		  <property name="label" translatable="yes">cache filled</property>
+		  <property name="use_underline">False</property>
+		  <property name="use_markup">False</property>
+		  <property name="justify">GTK_JUSTIFY_LEFT</property>
+		  <property name="wrap">False</property>
+		  <property name="selectable">False</property>
+		  <property name="xalign">0.5</property>
+		  <property name="yalign">0.5</property>
+		  <property name="xpad">0</property>
+		  <property name="ypad">0</property>
+		  <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
+		  <property name="width_chars">-1</property>
+		  <property name="single_line_mode">False</property>
+		  <property name="angle">0</property>
+		</widget>
+		<packing>
+		  <property name="padding">0</property>
+		  <property name="expand">False</property>
+		  <property name="fill">False</property>
+		</packing>
+	      </child>
+
+	      <child>
+		<widget class="GtkAlignment" id="alignment524">
+		  <property name="visible">True</property>
+		  <property name="xalign">0.5</property>
+		  <property name="yalign">0.5</property>
+		  <property name="xscale">1</property>
+		  <property name="yscale">1</property>
+		  <property name="top_padding">0</property>
+		  <property name="bottom_padding">0</property>
+		  <property name="left_padding">12</property>
+		  <property name="right_padding">0</property>
+
+		  <child>
+		    <widget class="GtkLabel" id="playhint">
+		      <property name="visible">True</property>
+		      <property name="label" translatable="yes"></property>
+		      <property name="use_underline">False</property>
+		      <property name="use_markup">False</property>
+		      <property name="justify">GTK_JUSTIFY_LEFT</property>
+		      <property name="wrap">False</property>
+		      <property name="selectable">False</property>
+		      <property name="xalign">0.5</property>
+		      <property name="yalign">0.5</property>
+		      <property name="xpad">0</property>
+		      <property name="ypad">0</property>
+		      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
+		      <property name="width_chars">-1</property>
+		      <property name="single_line_mode">False</property>
+		      <property name="angle">0</property>
+		    </widget>
+		  </child>
+		</widget>
+		<packing>
+		  <property name="padding">0</property>
+		  <property name="expand">True</property>
+		  <property name="fill">True</property>
+		</packing>
+	      </child>
 	    </widget>
 	    <packing>
 	      <property name="padding">0</property>
@@ -9838,105 +9890,6 @@ MLZO</property>
 					      <property name="spacing">0</property>
 
 					      <child>
-						<widget class="GtkFrame" id="frame321">
-						  <property name="visible">True</property>
-						  <property name="label_xalign">0</property>
-						  <property name="label_yalign">0.5</property>
-						  <property name="shadow_type">GTK_SHADOW_NONE</property>
-
-						  <child>
-						    <widget class="GtkAlignment" id="alignment533">
-						      <property name="visible">True</property>
-						      <property name="xalign">0.5</property>
-						      <property name="yalign">0.5</property>
-						      <property name="xscale">1</property>
-						      <property name="yscale">1</property>
-						      <property name="top_padding">250</property>
-						      <property name="bottom_padding">0</property>
-						      <property name="left_padding">0</property>
-						      <property name="right_padding">0</property>
-
-						      <child>
-							<widget class="GtkHBox" id="hbox898">
-							  <property name="visible">True</property>
-							  <property name="homogeneous">False</property>
-							  <property name="spacing">0</property>
-
-							  <child>
-							    <widget class="GtkButton" id="button_001">
-							      <property name="visible">True</property>
-							      <property name="tooltip" translatable="yes">Change Playback Mode</property>
-							      <property name="can_focus">True</property>
-							      <property name="relief">GTK_RELIEF_HALF</property>
-							      <property name="focus_on_click">True</property>
-							      <signal name="clicked" handler="on_button_001_clicked" last_modification_time="Sun, 20 Mar 2005 23:45:31 GMT"/>
-
-							      <child>
-								<widget class="GtkImage" id="image2143">
-								  <property name="visible">True</property>
-								  <property name="pixbuf">icon_playmode.png</property>
-								  <property name="xalign">0.5</property>
-								  <property name="yalign">0.5</property>
-								  <property name="xpad">0</property>
-								  <property name="ypad">0</property>
-								</widget>
-							      </child>
-							    </widget>
-							    <packing>
-							      <property name="padding">0</property>
-							      <property name="expand">False</property>
-							      <property name="fill">False</property>
-							    </packing>
-							  </child>
-
-							  <child>
-							    <widget class="GtkButton" id="button_samplestart">
-							      <property name="visible">True</property>
-							      <property name="tooltip" translatable="yes">Mark current position as start of a new sample</property>
-							      <property name="can_focus">True</property>
-							      <property name="label" translatable="yes">[...</property>
-							      <property name="use_underline">True</property>
-							      <property name="relief">GTK_RELIEF_HALF</property>
-							      <property name="focus_on_click">True</property>
-							      <signal name="clicked" handler="on_button_samplestart_clicked" last_modification_time="Mon, 21 Mar 2005 00:58:23 GMT"/>
-							    </widget>
-							    <packing>
-							      <property name="padding">0</property>
-							      <property name="expand">False</property>
-							      <property name="fill">False</property>
-							    </packing>
-							  </child>
-
-							  <child>
-							    <widget class="GtkButton" id="button_sampleend">
-							      <property name="visible">True</property>
-							      <property name="tooltip" translatable="yes">Mark current position as sample end and create new sample</property>
-							      <property name="can_focus">True</property>
-							      <property name="label" translatable="yes">...]</property>
-							      <property name="use_underline">True</property>
-							      <property name="relief">GTK_RELIEF_HALF</property>
-							      <property name="focus_on_click">True</property>
-							      <signal name="clicked" handler="on_button_sampleend_clicked" last_modification_time="Mon, 21 Mar 2005 00:58:45 GMT"/>
-							    </widget>
-							    <packing>
-							      <property name="padding">0</property>
-							      <property name="expand">False</property>
-							      <property name="fill">False</property>
-							    </packing>
-							  </child>
-							</widget>
-						      </child>
-						    </widget>
-						  </child>
-						</widget>
-						<packing>
-						  <property name="padding">0</property>
-						  <property name="expand">False</property>
-						  <property name="fill">False</property>
-						</packing>
-					      </child>
-
-					      <child>
 						<widget class="GtkImage" id="imageA">
 						  <property name="width_request">352</property>
 						  <property name="height_request">288</property>
@@ -9951,455 +9904,6 @@ MLZO</property>
 						  <property name="padding">0</property>
 						  <property name="expand">True</property>
 						  <property name="fill">True</property>
-						</packing>
-					      </child>
-
-					      <child>
-						<widget class="GtkFrame" id="frame322">
-						  <property name="visible">True</property>
-						  <property name="label_xalign">0</property>
-						  <property name="label_yalign">0.5</property>
-						  <property name="shadow_type">GTK_SHADOW_NONE</property>
-
-						  <child>
-						    <widget class="GtkAlignment" id="alignment534">
-						      <property name="visible">True</property>
-						      <property name="xalign">0.5</property>
-						      <property name="yalign">0.5</property>
-						      <property name="xscale">1</property>
-						      <property name="yscale">1</property>
-						      <property name="top_padding">185</property>
-						      <property name="bottom_padding">0</property>
-						      <property name="left_padding">0</property>
-						      <property name="right_padding">0</property>
-
-						      <child>
-							<widget class="GtkVBox" id="vbox626">
-							  <property name="visible">True</property>
-							  <property name="homogeneous">False</property>
-							  <property name="spacing">0</property>
-
-							  <child>
-							    <widget class="GtkAlignment" id="alignment531">
-							      <property name="visible">True</property>
-							      <property name="xalign">0.5</property>
-							      <property name="yalign">0.5</property>
-							      <property name="xscale">1</property>
-							      <property name="yscale">1</property>
-							      <property name="top_padding">0</property>
-							      <property name="bottom_padding">0</property>
-							      <property name="left_padding">12</property>
-							      <property name="right_padding">0</property>
-
-							      <child>
-								<widget class="GtkHBox" id="hbox904">
-								  <property name="visible">True</property>
-								  <property name="homogeneous">False</property>
-								  <property name="spacing">0</property>
-
-								  <child>
-								    <widget class="GtkToggleButton" id="button_251">
-								      <property name="visible">True</property>
-								      <property name="tooltip" translatable="yes">Toggle Bezerk Mode</property>
-								      <property name="can_focus">True</property>
-								      <property name="relief">GTK_RELIEF_HALF</property>
-								      <property name="focus_on_click">True</property>
-								      <property name="active">False</property>
-								      <property name="inconsistent">False</property>
-								      <signal name="clicked" handler="on_button_251_clicked" last_modification_time="Sun, 20 Mar 2005 23:46:57 GMT"/>
-
-								      <child>
-									<widget class="GtkImage" id="image262">
-									  <property name="visible">True</property>
-									  <property name="pixbuf">icon_berserk.png</property>
-									  <property name="xalign">0.5</property>
-									  <property name="yalign">0.5</property>
-									  <property name="xpad">0</property>
-									  <property name="ypad">0</property>
-									</widget>
-								      </child>
-								    </widget>
-								    <packing>
-								      <property name="padding">0</property>
-								      <property name="expand">False</property>
-								      <property name="fill">False</property>
-								    </packing>
-								  </child>
-
-								  <child>
-								    <widget class="GtkButton" id="button_200">
-								      <property name="visible">True</property>
-								      <property name="tooltip" translatable="yes">Take Background Mask(diff overlay)</property>
-								      <property name="can_focus">True</property>
-								      <property name="relief">GTK_RELIEF_HALF</property>
-								      <property name="focus_on_click">True</property>
-								      <signal name="clicked" handler="on_button_200_clicked" last_modification_time="Sun, 20 Mar 2005 23:47:10 GMT"/>
-
-								      <child>
-									<widget class="GtkImage" id="image265">
-									  <property name="visible">True</property>
-									  <property name="pixbuf">icon_mask.png</property>
-									  <property name="xalign">0.5</property>
-									  <property name="yalign">0.5</property>
-									  <property name="xpad">0</property>
-									  <property name="ypad">0</property>
-									</widget>
-								      </child>
-								    </widget>
-								    <packing>
-								      <property name="padding">0</property>
-								      <property name="expand">False</property>
-								      <property name="fill">False</property>
-								    </packing>
-								  </child>
-								</widget>
-							      </child>
-							    </widget>
-							    <packing>
-							      <property name="padding">0</property>
-							      <property name="expand">True</property>
-							      <property name="fill">True</property>
-							    </packing>
-							  </child>
-
-							  <child>
-							    <widget class="GtkVBox" id="sample_loop_box">
-							      <property name="visible">True</property>
-							      <property name="homogeneous">False</property>
-							      <property name="spacing">0</property>
-
-							      <child>
-								<widget class="GtkFrame" id="frame323">
-								  <property name="visible">True</property>
-								  <property name="label_xalign">0</property>
-								  <property name="label_yalign">0.5</property>
-								  <property name="shadow_type">GTK_SHADOW_NONE</property>
-
-								  <child>
-								    <widget class="GtkAlignment" id="alignment537">
-								      <property name="visible">True</property>
-								      <property name="xalign">0.5</property>
-								      <property name="yalign">0.5</property>
-								      <property name="xscale">1</property>
-								      <property name="yscale">1</property>
-								      <property name="top_padding">0</property>
-								      <property name="bottom_padding">2</property>
-								      <property name="left_padding">0</property>
-								      <property name="right_padding">2</property>
-
-								      <child>
-									<widget class="GtkHBox" id="hbox908">
-									  <property name="visible">True</property>
-									  <property name="homogeneous">False</property>
-									  <property name="spacing">0</property>
-
-									  <child>
-									    <widget class="GtkAlignment" id="alignment537">
-									      <property name="visible">True</property>
-									      <property name="xalign">0.5</property>
-									      <property name="yalign">0.5</property>
-									      <property name="xscale">1</property>
-									      <property name="yscale">1</property>
-									      <property name="top_padding">0</property>
-									      <property name="bottom_padding">0</property>
-									      <property name="left_padding">0</property>
-									      <property name="right_padding">0</property>
-
-									      <child>
-										<widget class="GtkRadioButton" id="loop_none">
-										  <property name="visible">True</property>
-										  <property name="tooltip" translatable="yes">Play once</property>
-										  <property name="can_focus">True</property>
-										  <property name="relief">GTK_RELIEF_NORMAL</property>
-										  <property name="focus_on_click">True</property>
-										  <property name="active">False</property>
-										  <property name="inconsistent">False</property>
-										  <property name="draw_indicator">True</property>
-										  <signal name="clicked" handler="on_loop_none_clicked" last_modification_time="Sun, 27 Mar 2005 06:13:22 GMT"/>
-
-										  <child>
-										    <widget class="GtkAlignment" id="alignment70">
-										      <property name="visible">True</property>
-										      <property name="xalign">0.5</property>
-										      <property name="yalign">0.5</property>
-										      <property name="xscale">0</property>
-										      <property name="yscale">0</property>
-										      <property name="top_padding">0</property>
-										      <property name="bottom_padding">0</property>
-										      <property name="left_padding">0</property>
-										      <property name="right_padding">0</property>
-
-										      <child>
-											<widget class="GtkHBox" id="hbox203">
-											  <property name="visible">True</property>
-											  <property name="homogeneous">False</property>
-											  <property name="spacing">2</property>
-
-											  <child>
-											    <widget class="GtkImage" id="image129">
-											      <property name="visible">True</property>
-											      <property name="pixbuf">button_looponce.png</property>
-											      <property name="xalign">0.5</property>
-											      <property name="yalign">0.5</property>
-											      <property name="xpad">0</property>
-											      <property name="ypad">0</property>
-											    </widget>
-											    <packing>
-											      <property name="padding">0</property>
-											      <property name="expand">False</property>
-											      <property name="fill">False</property>
-											    </packing>
-											  </child>
-											</widget>
-										      </child>
-										    </widget>
-										  </child>
-										</widget>
-									      </child>
-									    </widget>
-									    <packing>
-									      <property name="padding">0</property>
-									      <property name="expand">False</property>
-									      <property name="fill">False</property>
-									    </packing>
-									  </child>
-
-									  <child>
-									    <widget class="GtkRadioButton" id="loop_random">
-									      <property name="visible">True</property>
-									      <property name="tooltip" translatable="yes">Random Frame</property>
-									      <property name="can_focus">True</property>
-									      <property name="relief">GTK_RELIEF_HALF</property>
-									      <property name="focus_on_click">True</property>
-									      <property name="active">False</property>
-									      <property name="inconsistent">False</property>
-									      <property name="draw_indicator">True</property>
-									      <property name="group">loop_none</property>
-									      <signal name="clicked" handler="on_loop_random_clicked" last_modification_time="Thu, 04 Jan 2007 00:30:21 GMT"/>
-
-									      <child>
-										<widget class="GtkAlignment" id="alignment535">
-										  <property name="visible">True</property>
-										  <property name="xalign">0.5</property>
-										  <property name="yalign">0.5</property>
-										  <property name="xscale">0</property>
-										  <property name="yscale">0</property>
-										  <property name="top_padding">0</property>
-										  <property name="bottom_padding">0</property>
-										  <property name="left_padding">0</property>
-										  <property name="right_padding">0</property>
-
-										  <child>
-										    <widget class="GtkHBox" id="hbox906">
-										      <property name="visible">True</property>
-										      <property name="homogeneous">False</property>
-										      <property name="spacing">2</property>
-
-										      <child>
-											<widget class="GtkImage" id="image3175">
-											  <property name="visible">True</property>
-											  <property name="pixbuf">button_rand.png</property>
-											  <property name="xalign">0.5</property>
-											  <property name="yalign">0.5</property>
-											  <property name="xpad">0</property>
-											  <property name="ypad">0</property>
-											</widget>
-											<packing>
-											  <property name="padding">0</property>
-											  <property name="expand">False</property>
-											  <property name="fill">False</property>
-											</packing>
-										      </child>
-										    </widget>
-										  </child>
-										</widget>
-									      </child>
-									    </widget>
-									    <packing>
-									      <property name="padding">0</property>
-									      <property name="expand">False</property>
-									      <property name="fill">False</property>
-									    </packing>
-									  </child>
-									</widget>
-								      </child>
-								    </widget>
-								  </child>
-								</widget>
-								<packing>
-								  <property name="padding">0</property>
-								  <property name="expand">False</property>
-								  <property name="fill">True</property>
-								</packing>
-							      </child>
-
-							      <child>
-								<widget class="GtkFrame" id="frame324">
-								  <property name="visible">True</property>
-								  <property name="label_xalign">0</property>
-								  <property name="label_yalign">0.5</property>
-								  <property name="shadow_type">GTK_SHADOW_NONE</property>
-
-								  <child>
-								    <widget class="GtkAlignment" id="alignment538">
-								      <property name="visible">True</property>
-								      <property name="xalign">0.5</property>
-								      <property name="yalign">0.5</property>
-								      <property name="xscale">1</property>
-								      <property name="yscale">1</property>
-								      <property name="top_padding">2</property>
-								      <property name="bottom_padding">0</property>
-								      <property name="left_padding">0</property>
-								      <property name="right_padding">2</property>
-
-								      <child>
-									<widget class="GtkHBox" id="hbox905">
-									  <property name="visible">True</property>
-									  <property name="homogeneous">False</property>
-									  <property name="spacing">0</property>
-
-									  <child>
-									    <widget class="GtkRadioButton" id="loop_normal">
-									      <property name="visible">True</property>
-									      <property name="tooltip" translatable="yes">Normal Loop</property>
-									      <property name="can_focus">True</property>
-									      <property name="relief">GTK_RELIEF_HALF</property>
-									      <property name="focus_on_click">True</property>
-									      <property name="active">True</property>
-									      <property name="inconsistent">False</property>
-									      <property name="draw_indicator">True</property>
-									      <property name="group">loop_none</property>
-									      <signal name="clicked" handler="on_loop_normal_clicked" last_modification_time="Sun, 27 Mar 2005 06:13:08 GMT"/>
-
-									      <child>
-										<widget class="GtkAlignment" id="alignment71">
-										  <property name="visible">True</property>
-										  <property name="xalign">0.5</property>
-										  <property name="yalign">0.5</property>
-										  <property name="xscale">0</property>
-										  <property name="yscale">0</property>
-										  <property name="top_padding">0</property>
-										  <property name="bottom_padding">0</property>
-										  <property name="left_padding">0</property>
-										  <property name="right_padding">0</property>
-
-										  <child>
-										    <widget class="GtkHBox" id="hbox204">
-										      <property name="visible">True</property>
-										      <property name="homogeneous">False</property>
-										      <property name="spacing">2</property>
-
-										      <child>
-											<widget class="GtkImage" id="image130">
-											  <property name="visible">True</property>
-											  <property name="pixbuf">button_loop.png</property>
-											  <property name="xalign">0.5</property>
-											  <property name="yalign">0.5</property>
-											  <property name="xpad">0</property>
-											  <property name="ypad">0</property>
-											</widget>
-											<packing>
-											  <property name="padding">0</property>
-											  <property name="expand">False</property>
-											  <property name="fill">False</property>
-											</packing>
-										      </child>
-										    </widget>
-										  </child>
-										</widget>
-									      </child>
-									    </widget>
-									    <packing>
-									      <property name="padding">0</property>
-									      <property name="expand">False</property>
-									      <property name="fill">False</property>
-									    </packing>
-									  </child>
-
-									  <child>
-									    <widget class="GtkRadioButton" id="loop_pingpong">
-									      <property name="visible">True</property>
-									      <property name="tooltip" translatable="yes">Random Frame</property>
-									      <property name="can_focus">True</property>
-									      <property name="relief">GTK_RELIEF_HALF</property>
-									      <property name="focus_on_click">True</property>
-									      <property name="active">False</property>
-									      <property name="inconsistent">False</property>
-									      <property name="draw_indicator">True</property>
-									      <property name="group">loop_none</property>
-									      <signal name="clicked" handler="on_loop_pingpong_clicked" last_modification_time="Sun, 16 Nov 2008 19:58:10 GMT"/>
-
-									      <child>
-										<widget class="GtkAlignment" id="alignment536">
-										  <property name="visible">True</property>
-										  <property name="xalign">0.5</property>
-										  <property name="yalign">0.5</property>
-										  <property name="xscale">0</property>
-										  <property name="yscale">0</property>
-										  <property name="top_padding">0</property>
-										  <property name="bottom_padding">0</property>
-										  <property name="left_padding">0</property>
-										  <property name="right_padding">0</property>
-
-										  <child>
-										    <widget class="GtkHBox" id="hbox907">
-										      <property name="visible">True</property>
-										      <property name="homogeneous">False</property>
-										      <property name="spacing">2</property>
-
-										      <child>
-											<widget class="GtkImage" id="image3176">
-											  <property name="visible">True</property>
-											  <property name="pixbuf">icon_bounce.png</property>
-											  <property name="xalign">0.5</property>
-											  <property name="yalign">0.5</property>
-											  <property name="xpad">0</property>
-											  <property name="ypad">0</property>
-											</widget>
-											<packing>
-											  <property name="padding">0</property>
-											  <property name="expand">False</property>
-											  <property name="fill">False</property>
-											</packing>
-										      </child>
-										    </widget>
-										  </child>
-										</widget>
-									      </child>
-									    </widget>
-									    <packing>
-									      <property name="padding">0</property>
-									      <property name="expand">False</property>
-									      <property name="fill">False</property>
-									    </packing>
-									  </child>
-									</widget>
-								      </child>
-								    </widget>
-								  </child>
-								</widget>
-								<packing>
-								  <property name="padding">0</property>
-								  <property name="expand">True</property>
-								  <property name="fill">True</property>
-								</packing>
-							      </child>
-							    </widget>
-							    <packing>
-							      <property name="padding">0</property>
-							      <property name="expand">True</property>
-							      <property name="fill">True</property>
-							    </packing>
-							  </child>
-							</widget>
-						      </child>
-						    </widget>
-						  </child>
-						</widget>
-						<packing>
-						  <property name="padding">0</property>
-						  <property name="expand">False</property>
-						  <property name="fill">False</property>
 						</packing>
 					      </child>
 					    </widget>
@@ -11167,7 +10671,7 @@ MLZO</property>
 								      <property name="shadow_type">GTK_SHADOW_NONE</property>
 
 								      <child>
-									<widget class="GtkAlignment" id="alignment524">
+									<widget class="GtkAlignment" id="alignment540">
 									  <property name="visible">True</property>
 									  <property name="xalign">0.5</property>
 									  <property name="yalign">0.5</property>
@@ -11179,22 +10683,73 @@ MLZO</property>
 									  <property name="right_padding">0</property>
 
 									  <child>
-									    <widget class="GtkLabel" id="playhint">
+									    <widget class="GtkHBox" id="hbox898">
 									      <property name="visible">True</property>
-									      <property name="label" translatable="yes"></property>
-									      <property name="use_underline">False</property>
-									      <property name="use_markup">False</property>
-									      <property name="justify">GTK_JUSTIFY_LEFT</property>
-									      <property name="wrap">False</property>
-									      <property name="selectable">False</property>
-									      <property name="xalign">0.5</property>
-									      <property name="yalign">0.5</property>
-									      <property name="xpad">0</property>
-									      <property name="ypad">0</property>
-									      <property name="ellipsize">PANGO_ELLIPSIZE_NONE</property>
-									      <property name="width_chars">-1</property>
-									      <property name="single_line_mode">False</property>
-									      <property name="angle">0</property>
+									      <property name="homogeneous">False</property>
+									      <property name="spacing">0</property>
+
+									      <child>
+										<widget class="GtkButton" id="button_001">
+										  <property name="visible">True</property>
+										  <property name="tooltip" translatable="yes">Change Playback Mode</property>
+										  <property name="can_focus">True</property>
+										  <property name="relief">GTK_RELIEF_HALF</property>
+										  <property name="focus_on_click">True</property>
+										  <signal name="clicked" handler="on_button_001_clicked" last_modification_time="Sun, 20 Mar 2005 23:45:31 GMT"/>
+
+										  <child>
+										    <widget class="GtkImage" id="image2143">
+										      <property name="visible">True</property>
+										      <property name="pixbuf">icon_playmode.png</property>
+										      <property name="xalign">0.5</property>
+										      <property name="yalign">0.5</property>
+										      <property name="xpad">0</property>
+										      <property name="ypad">0</property>
+										    </widget>
+										  </child>
+										</widget>
+										<packing>
+										  <property name="padding">0</property>
+										  <property name="expand">False</property>
+										  <property name="fill">False</property>
+										</packing>
+									      </child>
+
+									      <child>
+										<widget class="GtkButton" id="button_samplestart">
+										  <property name="visible">True</property>
+										  <property name="tooltip" translatable="yes">Mark current position as start of a new sample</property>
+										  <property name="can_focus">True</property>
+										  <property name="label" translatable="yes">[...</property>
+										  <property name="use_underline">True</property>
+										  <property name="relief">GTK_RELIEF_HALF</property>
+										  <property name="focus_on_click">True</property>
+										  <signal name="clicked" handler="on_button_samplestart_clicked" last_modification_time="Mon, 21 Mar 2005 00:58:23 GMT"/>
+										</widget>
+										<packing>
+										  <property name="padding">0</property>
+										  <property name="expand">False</property>
+										  <property name="fill">False</property>
+										</packing>
+									      </child>
+
+									      <child>
+										<widget class="GtkButton" id="button_sampleend">
+										  <property name="visible">True</property>
+										  <property name="tooltip" translatable="yes">Mark current position as sample end and create new sample</property>
+										  <property name="can_focus">True</property>
+										  <property name="label" translatable="yes">...]</property>
+										  <property name="use_underline">True</property>
+										  <property name="relief">GTK_RELIEF_HALF</property>
+										  <property name="focus_on_click">True</property>
+										  <signal name="clicked" handler="on_button_sampleend_clicked" last_modification_time="Mon, 21 Mar 2005 00:58:45 GMT"/>
+										</widget>
+										<packing>
+										  <property name="padding">0</property>
+										  <property name="expand">False</property>
+										  <property name="fill">False</property>
+										</packing>
+									      </child>
 									    </widget>
 									  </child>
 									</widget>
@@ -11235,6 +10790,432 @@ MLZO</property>
 						    </packing>
 						  </child>
 						</widget>
+					      </child>
+					    </widget>
+					    <packing>
+					      <property name="padding">0</property>
+					      <property name="expand">True</property>
+					      <property name="fill">True</property>
+					    </packing>
+					  </child>
+
+					  <child>
+					    <widget class="GtkHBox" id="hbox910">
+					      <property name="visible">True</property>
+					      <property name="homogeneous">False</property>
+					      <property name="spacing">0</property>
+
+					      <child>
+						<widget class="GtkAlignment" id="alignment531">
+						  <property name="visible">True</property>
+						  <property name="xalign">0.5</property>
+						  <property name="yalign">0.5</property>
+						  <property name="xscale">1</property>
+						  <property name="yscale">1</property>
+						  <property name="top_padding">0</property>
+						  <property name="bottom_padding">0</property>
+						  <property name="left_padding">12</property>
+						  <property name="right_padding">0</property>
+
+						  <child>
+						    <widget class="GtkHBox" id="hbox904">
+						      <property name="visible">True</property>
+						      <property name="homogeneous">False</property>
+						      <property name="spacing">0</property>
+
+						      <child>
+							<widget class="GtkToggleButton" id="button_251">
+							  <property name="visible">True</property>
+							  <property name="tooltip" translatable="yes">Toggle Bezerk Mode</property>
+							  <property name="can_focus">True</property>
+							  <property name="relief">GTK_RELIEF_HALF</property>
+							  <property name="focus_on_click">True</property>
+							  <property name="active">False</property>
+							  <property name="inconsistent">False</property>
+							  <signal name="clicked" handler="on_button_251_clicked" last_modification_time="Sun, 20 Mar 2005 23:46:57 GMT"/>
+
+							  <child>
+							    <widget class="GtkImage" id="image262">
+							      <property name="visible">True</property>
+							      <property name="pixbuf">icon_berserk.png</property>
+							      <property name="xalign">0.5</property>
+							      <property name="yalign">0.5</property>
+							      <property name="xpad">0</property>
+							      <property name="ypad">0</property>
+							    </widget>
+							  </child>
+							</widget>
+							<packing>
+							  <property name="padding">0</property>
+							  <property name="expand">False</property>
+							  <property name="fill">False</property>
+							</packing>
+						      </child>
+
+						      <child>
+							<widget class="GtkButton" id="button_200">
+							  <property name="visible">True</property>
+							  <property name="tooltip" translatable="yes">Take Background Mask(diff overlay)</property>
+							  <property name="can_focus">True</property>
+							  <property name="relief">GTK_RELIEF_HALF</property>
+							  <property name="focus_on_click">True</property>
+							  <signal name="clicked" handler="on_button_200_clicked" last_modification_time="Sun, 20 Mar 2005 23:47:10 GMT"/>
+
+							  <child>
+							    <widget class="GtkImage" id="image265">
+							      <property name="visible">True</property>
+							      <property name="pixbuf">icon_mask.png</property>
+							      <property name="xalign">0.5</property>
+							      <property name="yalign">0.5</property>
+							      <property name="xpad">0</property>
+							      <property name="ypad">0</property>
+							    </widget>
+							  </child>
+							</widget>
+							<packing>
+							  <property name="padding">0</property>
+							  <property name="expand">False</property>
+							  <property name="fill">False</property>
+							</packing>
+						      </child>
+						    </widget>
+						  </child>
+						</widget>
+						<packing>
+						  <property name="padding">0</property>
+						  <property name="expand">True</property>
+						  <property name="fill">True</property>
+						</packing>
+					      </child>
+
+					      <child>
+						<widget class="GtkAlignment" id="alignment538">
+						  <property name="visible">True</property>
+						  <property name="xalign">0.5</property>
+						  <property name="yalign">0.5</property>
+						  <property name="xscale">1</property>
+						  <property name="yscale">1</property>
+						  <property name="top_padding">2</property>
+						  <property name="bottom_padding">0</property>
+						  <property name="left_padding">0</property>
+						  <property name="right_padding">2</property>
+
+						  <child>
+						    <widget class="GtkFrame" id="frame326">
+						      <property name="visible">True</property>
+						      <property name="label_xalign">0</property>
+						      <property name="label_yalign">0.5</property>
+						      <property name="shadow_type">GTK_SHADOW_NONE</property>
+
+						      <child>
+							<widget class="GtkAlignment" id="alignment541">
+							  <property name="visible">True</property>
+							  <property name="xalign">0.5</property>
+							  <property name="yalign">0.5</property>
+							  <property name="xscale">1</property>
+							  <property name="yscale">1</property>
+							  <property name="top_padding">0</property>
+							  <property name="bottom_padding">0</property>
+							  <property name="left_padding">12</property>
+							  <property name="right_padding">0</property>
+
+							  <child>
+							    <widget class="GtkHBox" id="hbox905">
+							      <property name="visible">True</property>
+							      <property name="homogeneous">False</property>
+							      <property name="spacing">0</property>
+
+							      <child>
+								<widget class="GtkRadioButton" id="loop_normal">
+								  <property name="visible">True</property>
+								  <property name="tooltip" translatable="yes">Normal Loop</property>
+								  <property name="can_focus">True</property>
+								  <property name="relief">GTK_RELIEF_HALF</property>
+								  <property name="focus_on_click">True</property>
+								  <property name="active">True</property>
+								  <property name="inconsistent">False</property>
+								  <property name="draw_indicator">True</property>
+								  <signal name="clicked" handler="on_loop_normal_clicked" last_modification_time="Sun, 27 Mar 2005 06:13:08 GMT"/>
+
+								  <child>
+								    <widget class="GtkAlignment" id="alignment71">
+								      <property name="visible">True</property>
+								      <property name="xalign">0.5</property>
+								      <property name="yalign">0.5</property>
+								      <property name="xscale">0</property>
+								      <property name="yscale">0</property>
+								      <property name="top_padding">0</property>
+								      <property name="bottom_padding">0</property>
+								      <property name="left_padding">0</property>
+								      <property name="right_padding">0</property>
+
+								      <child>
+									<widget class="GtkHBox" id="hbox204">
+									  <property name="visible">True</property>
+									  <property name="homogeneous">False</property>
+									  <property name="spacing">2</property>
+
+									  <child>
+									    <widget class="GtkImage" id="image130">
+									      <property name="visible">True</property>
+									      <property name="pixbuf">button_loop.png</property>
+									      <property name="xalign">0.5</property>
+									      <property name="yalign">0.5</property>
+									      <property name="xpad">0</property>
+									      <property name="ypad">0</property>
+									    </widget>
+									    <packing>
+									      <property name="padding">0</property>
+									      <property name="expand">False</property>
+									      <property name="fill">False</property>
+									    </packing>
+									  </child>
+									</widget>
+								      </child>
+								    </widget>
+								  </child>
+								</widget>
+								<packing>
+								  <property name="padding">0</property>
+								  <property name="expand">False</property>
+								  <property name="fill">False</property>
+								</packing>
+							      </child>
+
+							      <child>
+								<widget class="GtkRadioButton" id="loop_pingpong">
+								  <property name="visible">True</property>
+								  <property name="tooltip" translatable="yes">Random Frame</property>
+								  <property name="can_focus">True</property>
+								  <property name="relief">GTK_RELIEF_HALF</property>
+								  <property name="focus_on_click">True</property>
+								  <property name="active">False</property>
+								  <property name="inconsistent">False</property>
+								  <property name="draw_indicator">True</property>
+								  <property name="group">loop_normal</property>
+								  <signal name="clicked" handler="on_loop_pingpong_clicked" last_modification_time="Sun, 16 Nov 2008 19:58:10 GMT"/>
+
+								  <child>
+								    <widget class="GtkAlignment" id="alignment536">
+								      <property name="visible">True</property>
+								      <property name="xalign">0.5</property>
+								      <property name="yalign">0.5</property>
+								      <property name="xscale">0</property>
+								      <property name="yscale">0</property>
+								      <property name="top_padding">0</property>
+								      <property name="bottom_padding">0</property>
+								      <property name="left_padding">0</property>
+								      <property name="right_padding">0</property>
+
+								      <child>
+									<widget class="GtkHBox" id="hbox907">
+									  <property name="visible">True</property>
+									  <property name="homogeneous">False</property>
+									  <property name="spacing">2</property>
+
+									  <child>
+									    <widget class="GtkImage" id="image3176">
+									      <property name="visible">True</property>
+									      <property name="pixbuf">icon_bounce.png</property>
+									      <property name="xalign">0.5</property>
+									      <property name="yalign">0.5</property>
+									      <property name="xpad">0</property>
+									      <property name="ypad">0</property>
+									    </widget>
+									    <packing>
+									      <property name="padding">0</property>
+									      <property name="expand">False</property>
+									      <property name="fill">False</property>
+									    </packing>
+									  </child>
+									</widget>
+								      </child>
+								    </widget>
+								  </child>
+								</widget>
+								<packing>
+								  <property name="padding">0</property>
+								  <property name="expand">False</property>
+								  <property name="fill">False</property>
+								</packing>
+							      </child>
+							    </widget>
+							  </child>
+							</widget>
+						      </child>
+						    </widget>
+						  </child>
+						</widget>
+						<packing>
+						  <property name="padding">0</property>
+						  <property name="expand">False</property>
+						  <property name="fill">True</property>
+						</packing>
+					      </child>
+
+					      <child>
+						<widget class="GtkFrame" id="frame323">
+						  <property name="visible">True</property>
+						  <property name="label_xalign">0</property>
+						  <property name="label_yalign">0.5</property>
+						  <property name="shadow_type">GTK_SHADOW_NONE</property>
+
+						  <child>
+						    <widget class="GtkAlignment" id="alignment537">
+						      <property name="visible">True</property>
+						      <property name="xalign">0.5</property>
+						      <property name="yalign">0.5</property>
+						      <property name="xscale">0</property>
+						      <property name="yscale">1</property>
+						      <property name="top_padding">0</property>
+						      <property name="bottom_padding">2</property>
+						      <property name="left_padding">0</property>
+						      <property name="right_padding">32</property>
+
+						      <child>
+							<widget class="GtkHBox" id="hbox908">
+							  <property name="visible">True</property>
+							  <property name="homogeneous">False</property>
+							  <property name="spacing">0</property>
+
+							  <child>
+							    <widget class="GtkAlignment" id="alignment537">
+							      <property name="visible">True</property>
+							      <property name="xalign">0.5</property>
+							      <property name="yalign">0.5</property>
+							      <property name="xscale">1</property>
+							      <property name="yscale">1</property>
+							      <property name="top_padding">0</property>
+							      <property name="bottom_padding">0</property>
+							      <property name="left_padding">0</property>
+							      <property name="right_padding">0</property>
+
+							      <child>
+								<widget class="GtkRadioButton" id="loop_none">
+								  <property name="visible">True</property>
+								  <property name="tooltip" translatable="yes">Play once</property>
+								  <property name="can_focus">True</property>
+								  <property name="relief">GTK_RELIEF_NORMAL</property>
+								  <property name="focus_on_click">True</property>
+								  <property name="active">False</property>
+								  <property name="inconsistent">False</property>
+								  <property name="draw_indicator">True</property>
+								  <signal name="clicked" handler="on_loop_none_clicked" last_modification_time="Sun, 27 Mar 2005 06:13:22 GMT"/>
+
+								  <child>
+								    <widget class="GtkAlignment" id="alignment70">
+								      <property name="visible">True</property>
+								      <property name="xalign">0.5</property>
+								      <property name="yalign">0.5</property>
+								      <property name="xscale">0</property>
+								      <property name="yscale">0</property>
+								      <property name="top_padding">0</property>
+								      <property name="bottom_padding">0</property>
+								      <property name="left_padding">0</property>
+								      <property name="right_padding">0</property>
+
+								      <child>
+									<widget class="GtkHBox" id="hbox203">
+									  <property name="visible">True</property>
+									  <property name="homogeneous">False</property>
+									  <property name="spacing">2</property>
+
+									  <child>
+									    <widget class="GtkImage" id="image129">
+									      <property name="visible">True</property>
+									      <property name="pixbuf">button_looponce.png</property>
+									      <property name="xalign">0.5</property>
+									      <property name="yalign">0.5</property>
+									      <property name="xpad">0</property>
+									      <property name="ypad">0</property>
+									    </widget>
+									    <packing>
+									      <property name="padding">0</property>
+									      <property name="expand">False</property>
+									      <property name="fill">False</property>
+									    </packing>
+									  </child>
+									</widget>
+								      </child>
+								    </widget>
+								  </child>
+								</widget>
+							      </child>
+							    </widget>
+							    <packing>
+							      <property name="padding">0</property>
+							      <property name="expand">False</property>
+							      <property name="fill">False</property>
+							    </packing>
+							  </child>
+
+							  <child>
+							    <widget class="GtkRadioButton" id="loop_random">
+							      <property name="visible">True</property>
+							      <property name="tooltip" translatable="yes">Random Frame</property>
+							      <property name="can_focus">True</property>
+							      <property name="relief">GTK_RELIEF_HALF</property>
+							      <property name="focus_on_click">True</property>
+							      <property name="active">False</property>
+							      <property name="inconsistent">False</property>
+							      <property name="draw_indicator">True</property>
+							      <property name="group">loop_none</property>
+							      <signal name="clicked" handler="on_loop_random_clicked" last_modification_time="Thu, 04 Jan 2007 00:30:21 GMT"/>
+
+							      <child>
+								<widget class="GtkAlignment" id="alignment535">
+								  <property name="visible">True</property>
+								  <property name="xalign">0.5</property>
+								  <property name="yalign">0.5</property>
+								  <property name="xscale">0</property>
+								  <property name="yscale">0</property>
+								  <property name="top_padding">0</property>
+								  <property name="bottom_padding">0</property>
+								  <property name="left_padding">0</property>
+								  <property name="right_padding">0</property>
+
+								  <child>
+								    <widget class="GtkHBox" id="hbox906">
+								      <property name="visible">True</property>
+								      <property name="homogeneous">False</property>
+								      <property name="spacing">2</property>
+
+								      <child>
+									<widget class="GtkImage" id="image3175">
+									  <property name="visible">True</property>
+									  <property name="pixbuf">button_rand.png</property>
+									  <property name="xalign">0.5</property>
+									  <property name="yalign">0.5</property>
+									  <property name="xpad">0</property>
+									  <property name="ypad">0</property>
+									</widget>
+									<packing>
+									  <property name="padding">0</property>
+									  <property name="expand">False</property>
+									  <property name="fill">False</property>
+									</packing>
+								      </child>
+								    </widget>
+								  </child>
+								</widget>
+							      </child>
+							    </widget>
+							    <packing>
+							      <property name="padding">0</property>
+							      <property name="expand">False</property>
+							      <property name="fill">False</property>
+							    </packing>
+							  </child>
+							</widget>
+						      </child>
+						    </widget>
+						  </child>
+						</widget>
+						<packing>
+						  <property name="padding">0</property>
+						  <property name="expand">False</property>
+						  <property name="fill">True</property>
+						</packing>
 					      </child>
 					    </widget>
 					    <packing>

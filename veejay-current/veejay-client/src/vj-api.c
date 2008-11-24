@@ -6547,6 +6547,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	veejay_memset(&(info->watch.p_time),0,sizeof(struct timeval));
 	info->midi =  vj_midi_new( info->main_window );
 	gettimeofday( &(info->time_last) , 0 );
+
 }
 
 void	vj_gui_preview(void)
