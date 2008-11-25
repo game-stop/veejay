@@ -630,7 +630,7 @@ int vj_event_bundle_del( int event_id );
 vj_msg_bundle *vj_event_bundle_new(char *bundle_msg, int event_id);
 void vj_event_trigger_function(void *ptr, vj_event f, int max_args, const char format[], ...); 
 void  vj_event_parse_bundle(veejay_t *v, char *msg );
-int	vj_has_video(veejay_t *v);
+int	vj_has_video(veejay_t *v, editlist *el);
 void vj_event_fire_net_event(veejay_t *v, int net_id, char *str_arg, int *args, int arglen, int type);
 void    vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod);
 #ifdef HAVE_SDL
@@ -646,9 +646,13 @@ void    vj_event_format_xml_event( xmlNodePtr node, int event_id );
 #endif
 void	vj_event_init(void);
 
-int	vj_has_video(veejay_t *v)
+int	vj_has_video(veejay_t *v,editlist *el)
 {
-	if(v->current_edit_list->video_frames >= 1 && !v->current_edit_list->is_empty && v->current_edit_list->total_frames > 0)
+	if( el->is_empty )
+		return 0;
+	if( !el->has_video)
+		return 0;
+	if( el->video_frames > 0 )
 		return 1;
 	return 0;
 }
@@ -2674,7 +2678,7 @@ void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap)
 	{
 		if(args[0] == VJ_PLAYBACK_MODE_PLAIN) 
 		{
-			if( vj_has_video(v) )
+			if( vj_has_video(v,v->edit_list) )
 				veejay_change_playback_mode(v, args[0], 0);
 			else
 				veejay_msg(VEEJAY_MSG_ERROR,
@@ -3161,7 +3165,7 @@ void vj_event_set_play_mode(void *ptr, const char format[], va_list ap)
 		}
 		if(mode == VJ_PLAYBACK_MODE_PLAIN)
 		{
-			if(vj_has_video(v) )
+			if(vj_has_video(v,v->edit_list) )
 				veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_PLAIN, 0);
 			else
 				veejay_msg(VEEJAY_MSG_ERROR,
