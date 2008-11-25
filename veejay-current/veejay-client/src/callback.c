@@ -2776,7 +2776,7 @@ on_spin_samplebank_select_value_changed
 		page = max_page;
 		gtk_spin_button_set_value(spinbutton,page);
 	}
-        gtk_notebook_set_current_page(samplebank, page);        
+        gtk_notebook_set_current_page_(samplebank, page);        
 }
 void
 on_button_samplebank_prev_clicked      (GtkButton       *button,

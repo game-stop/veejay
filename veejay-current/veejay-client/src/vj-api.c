@@ -81,6 +81,18 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
+static int ui_skin_ = 0;
+static struct
+{
+	const int id;
+	const char *name;
+	const int page;
+} crappy_design[] =
+{
+	{ 1,"notebook18", 3 },    // On which notebook page is the multitrack view
+	{ 0,"vjdeck", 2 },
+	{ NULL, 0 }
+};
 
 static struct
 {
@@ -605,6 +617,44 @@ static	void set_textview_buffer(const char *name, gchar *utf8text);
 void	interrupt_cb();
 //static	gboolean	update_log(gpointer data);
 
+GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
+{
+	GtkWidget *widget = glade_xml_get_widget( m , name );
+	if(!widget)
+	{
+		veejay_msg(0,"Missing widget: %s %s ",__FUNCTION__,name);
+		return NULL;
+	}
+#ifdef STRICT_CHECKING
+	assert( widget != NULL );
+#endif
+	return widget;		
+}
+void		gtk_notebook_set_current_page__( GtkWidget *w, gint num, const char *f, int line )
+{
+#ifdef STRICT_CHECKING
+	veejay_msg(0, "%s: %d from %s:%d", __FUNCTION__, num,f,line);
+#endif
+	gtk_notebook_set_current_page( GTK_NOTEBOOK(w), num );
+}
+
+
+void		gtk_widget_set_size_request__( GtkWidget *w, gint iw, gint h, const char *f, int line )
+{
+#ifdef STRICT_CHECKING
+//	veejay_msg(0, "%s: %dx%d from %s:%d", __FUNCTION__, iw,h,f,line);
+#endif
+	gtk_widget_set_size_request(w, iw, h );
+}
+
+#ifndef STRICT_CHECKING
+#define gtk_widget_set_size_request_(a,b,c) gtk_widget_set_size_request(a,b,c)
+#define gtk_notebook_set_current_page_(a,b) gtk_notebook_set_current_page(a,b)
+#else
+#define gtk_widget_set_size_request_(a,b,c) gtk_widget_set_size_request__(a,b,c,__FUNCTION__,__LINE__)
+#define gtk_notebook_set_current_page_(a,b) gtk_notebook_set_current_page__(a,b,__FUNCTION__,__LINE__)
+#endif
+
 static struct
 {
 	const char *text;
@@ -788,34 +838,6 @@ GdkColor	*widget_get_fg(GtkWidget *w )
 	c->blue	 = s->fg[0].blue;
 	return c;
 }
-
-GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
-{
-	GtkWidget *widget = glade_xml_get_widget( m , name );
-	if(!widget)
-	{
-		veejay_msg(0,"Missing widget: %s ",__FUNCTION__,name);
-		return NULL;
-	}
-#ifdef STRICT_CHECKING
-	assert( widget != NULL );
-#endif
-	return widget;		
-}
-
-void		gtk_widget_set_size_request__( GtkWidget *w, gint iw, gint h, const char *f, int line )
-{
-#ifdef STRICT_CHECKING
-//	veejay_msg(0, "%s: %dx%d from %s:%d", __FUNCTION__, iw,h,f,line);
-#endif
-	gtk_widget_set_size_request(w, iw, h );
-}
-
-#ifndef STRICT_CHECKING
-#define gtk_widget_set_size_request_(a,b,c) gtk_widget_set_size_request(a,b,c)
-#else
-#define gtk_widget_set_size_request_(a,b,c) gtk_widget_set_size_request__(a,b,c,__FUNCTION__,__LINE__)
-#endif
 
 static void scan_devices( const char *name)
 {
@@ -2232,7 +2254,10 @@ static	void	update_curve_accessibility(const char *name)
 static	int	get_nums(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name);
-	if(!w) return 0;
+	if(!w) {
+		veejay_msg(0, "No such widget (spin): '%s'",name);
+		return 0;
+	}
 	return (int) gtk_spin_button_get_value( GTK_SPIN_BUTTON( w ) );
 }
 
@@ -2251,6 +2276,10 @@ static	int	count_textview_buffer(const char *name)
 static	void	clear_textview_buffer(const char *name)
 {
 	GtkWidget *view = glade_xml_get_widget_( info->main_window, name );
+	if(!view) {
+		veejay_msg(0, "No such widget (textview): '%s'",name);
+		return;
+	}
 	if(view)
 	{
 		GtkTextBuffer *tb = NULL;
@@ -2265,6 +2294,10 @@ static	void	clear_textview_buffer(const char *name)
 static	gchar	*get_textview_buffer(const char *name)
 {
 	GtkWidget *view = glade_xml_get_widget_( info->main_window,name );
+	if(!view) {
+		veejay_msg(0, "No such widget (textview): '%s'",name);
+		return;
+	}
 	if(view)
 	{
 		GtkTextBuffer *tb = NULL;
@@ -2282,6 +2315,10 @@ static	gchar	*get_textview_buffer(const char *name)
 static	void set_textview_buffer(const char *name, gchar *utf8text)
 {
 	GtkWidget *view = glade_xml_get_widget_( info->main_window, name );	
+	if(!view) {
+		veejay_msg(0, "No such widget (textview): '%s'",name);
+		return;
+	}
 	if(view)
 	{
 		GtkTextBuffer *tb = gtk_text_view_get_buffer(
@@ -2293,13 +2330,20 @@ static	void set_textview_buffer(const char *name, gchar *utf8text)
 static	gchar	*get_text(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
-	if(!w) return NULL;
+	if(!w) {
+		veejay_msg(0, "No such widget (text): '%s'",name);
+		return NULL;
+	}
 	return (gchar*) gtk_entry_get_text( GTK_ENTRY(w));
 }
 
 static	void	put_text(const char *name, char *text)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
+	if(!w) {
+		veejay_msg(0, "No such widget (text): '%s'",name);
+		return;
+	}
 	if(w)
 	{
 		gchar *utf8_text = _utf8str( text );
@@ -2311,7 +2355,11 @@ static	void	put_text(const char *name, char *text)
 int	is_button_toggled(const char *name)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name);
-	if(!w) return 0;
+	if(!w) {
+		veejay_msg(0, "No such widget (togglebutton): '%s'",name);
+		return 0;
+	}
+
 	if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(w) ) == TRUE )
 		return 1;
 	return 0;
@@ -2319,18 +2367,22 @@ int	is_button_toggled(const char *name)
 static	void	set_toggle_button(const char *name, int status)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
-	if(w)
-	{
-		gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), (status==1 ? TRUE: FALSE));
+	if(!w) {
+		veejay_msg(0, "No such widget (togglebutton): '%s'",name);
+		return;
 	}
+	gtk_toggle_button_set_active(GTK_TOGGLE_BUTTON(w), (status==1 ? TRUE: FALSE));
+	
 }
 
 
 static	void	update_slider_gvalue(const char *name, gdouble value)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
-	if(!w)
+	if(!w) {
+		veejay_msg(0, "No such widget (slider): '%s'",name);
 		return;
+	}
 	gtk_adjustment_set_value(
 		GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment), value );	
 }
@@ -2338,8 +2390,10 @@ static	void	update_slider_gvalue(const char *name, gdouble value)
 static	void	update_slider_value(const char *name, gint value, gint scale)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
-	if(!w)
+	if(!w) {
+		veejay_msg(0, "No such widget (slider): '%s'",name);
 		return;
+	}
 	gdouble gvalue;
 	if(scale)
 		gvalue = (gdouble) value / (gdouble) scale;
@@ -2385,14 +2439,20 @@ static  void	update_knob_range(GtkWidget *w, gdouble min, gdouble max, gdouble v
 static	void	update_spin_incr( const char *name, gdouble step, gdouble page )
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
-	if(!w) return;
+	if(!w) {
+		veejay_msg(0, "No such widget (spin): '%s'",name);
+		return;
+	}
 	gtk_spin_button_set_increments(GTK_SPIN_BUTTON(w),step,page );
 }
 
 static	void	update_spin_range(const char *name, gint min, gint max, gint val)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
-	if(!w) return;
+	if(!w) {
+		veejay_msg(0, "No such widget (spin): '%s'",name);
+		return;
+	}
 	
 	gtk_spin_button_set_range( GTK_SPIN_BUTTON(w), (gdouble)min, (gdouble) max );
 	gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble)val);
@@ -2417,14 +2477,20 @@ static	int	get_maxs(const char *name)
 static	void	update_spin_value(const char *name, gint value )
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, name );
-	if(!w) return;
+	if(!w) {
+		veejay_msg(0, "No such widget (spin): '%s'",name);
+		return;
+	}
 	gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble) value );
 }
 
 static  void	update_slider_range(const char *name, gint min, gint max, gint value, gint scaled)
 {
 	GtkWidget *w = glade_xml_get_widget_( info->main_window, name );
-	if(!w) return;
+	if(!w) {
+		veejay_msg(0, "No such widget (slider): '%s'",name);
+		return;
+	}
 	GtkRange *range = GTK_RANGE(w);
 	if(!scaled)
 	{
@@ -2447,7 +2513,10 @@ static	void	update_label_i(const char *name, int num, int prefix)
 {
 	GtkWidget *label = glade_xml_get_widget_(
 				info->main_window, name);
-	if(!label) return;
+	if(!label) {
+		veejay_msg(0, "No such widget (label): '%s'",name);
+		return;
+	}
 	char	str[20];
 	if(prefix)
 		g_snprintf( str,20, "%09d", num );
@@ -2461,7 +2530,10 @@ static	void	update_label_f(const char *name, float val )
 {
 	GtkWidget *label = glade_xml_get_widget_(
 				info->main_window, name);
-	if(!label) return;
+	if(!label) {
+		veejay_msg(0, "No such widget (label): '%s'",name);
+		return;
+	}
 	char value[10];
 	snprintf( value, sizeof(value)-1, "%2.2f", val );
 
@@ -2474,6 +2546,7 @@ static	void	update_label_str(const char *name, gchar *text)
 	GtkWidget *label = glade_xml_get_widget_(
 				info->main_window, name);
 #ifdef STRICT_CHECKING
+	if(!label) veejay_msg(0, "No such widget (label): '%s'",name);
 	assert( label != NULL );
 #else
 	if(!label ||!text) return;
@@ -3232,7 +3305,7 @@ static void	setup_effectchain_info( void )
 	g_object_unref( G_OBJECT( store ));
 
 	setup_tree_text_column( "tree_chain", FXC_ID, "#",0 );
-	setup_tree_text_column( "tree_chain", FXC_FXID, "Effect",350 );
+	setup_tree_text_column( "tree_chain", FXC_FXID, "Effect",( ui_skin_ == 0?350 : 250) );
 	setup_tree_pixmap_column( "tree_chain", FXC_FXSTATUS, "Run"); // todo: could be checkbox!!
 	setup_tree_pixmap_column( "tree_chain", FXC_KF , "Anim" ); // parameter interpolation on/off per entry
   	GtkTreeSelection *selection; 
@@ -5373,6 +5446,9 @@ int		gveejay_time_to_sync( vj_gui_t *ui )
 	return 0;
 }
 
+
+// skin 0: notebook18, page 3
+// skin 1: vjdeck , page 2
 int		veejay_update_multitrack( void *data )
 {
 	vj_gui_t *gui = (vj_gui_t*) data;
@@ -5385,7 +5461,7 @@ int		veejay_update_multitrack( void *data )
 
 	GtkWidget *maintrack = glade_xml_get_widget( info->main_window, "imageA");
 	int i;
-	GtkWidget *ww = glade_xml_get_widget_( info->main_window, "notebook18" );
+	GtkWidget *ww = glade_xml_get_widget_( info->main_window, crappy_design[ui_skin_].name );
 	int deckpage = gtk_notebook_get_current_page(GTK_NOTEBOOK(ww));
 
 #ifdef STRICT_CHECKING
@@ -5453,7 +5529,7 @@ int		veejay_update_multitrack( void *data )
 				vj_img_cb( s->img_list[i] );
 			} 
 			
-			if(deckpage == 3)
+			if(deckpage == crappy_design[ui_skin_].page)
 				multitrack_update_sequence_image( gui->mt, i, s->img_list[i] );
 
 			gdk_pixbuf_unref( s->img_list[i] );
@@ -6098,10 +6174,16 @@ int	vj_gui_get_preview_priority(void)
 
 void	default_bank_values(int *col, int *row )
 {
+	int nsc = 2;
+	int nsy = 6;
+	if( ui_skin_ == 1 ) {
+		nsc = 5;
+		nsy = 4;
+	}
 	if( *col == 0 && *row == 0 )
 	{
-		NUM_SAMPLES_PER_COL = 2;
-		NUM_SAMPLES_PER_ROW = 6;
+		NUM_SAMPLES_PER_COL = nsc;
+		NUM_SAMPLES_PER_ROW = nsy;
 	}
 	else
 	{
@@ -6114,6 +6196,7 @@ void	default_bank_values(int *col, int *row )
 
 void	set_skin(int skin)
 {
+	ui_skin_ = skin;
 	timeline_theme_colors( 1 );
 }
 
