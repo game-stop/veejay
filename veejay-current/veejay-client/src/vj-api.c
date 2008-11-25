@@ -111,17 +111,6 @@ enum {
 	TOOLTIP_SAMPLESLOT = 2
 };
 
-
-
-static int	TIMEOUT_SECONDS = 0;
-
-/* Stream type identifiers */
-
-void	vj_gui_set_timeout(int timer)
-{
-	TIMEOUT_SECONDS = timer;
-}
-
 enum
 {
 	STREAM_NO_STREAM = 0,

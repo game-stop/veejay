@@ -39,7 +39,6 @@ static int port_num	= 3490;
 static char hostname[255];
 static int gveejay_theme = 1;
 static	int verbosity = 0;
-static int timer = 6;
 static int col = 0;
 static int row = 0;
 static int n_tracks = 2;
@@ -71,6 +70,8 @@ static void usage(char *progname)
 	printf( "-s\t\tSet bank resolution (row X columns)\n");
 	printf( "-P\t\tStart with preview enabled (1=1/1,2=1/2,3=1/4,4=1/8)\n");
         printf( "-X\t\tSet number of tracks\n");
+	printf( "-l\t\tChoose layout (0=large screen, 1=small screens)\n");
+	printf( "-V\t\tShow version, data directory and exit.\n");
 	printf( "\n\n");
         exit(-1);
 }
@@ -87,7 +88,7 @@ static int      set_option( const char *name, char *value )
                 if(sscanf( optarg, "%d", &port_num ))
 			launcher++;
         } 
-	else if (strcmp(name, "S" ) == 0 ) {
+	else if (strcmp(name, "l" ) == 0 ) {
 		selected_skin = atoi( optarg);
 	}
 	else if (strcmp(name, "n") == 0 )
@@ -108,10 +109,6 @@ static int      set_option( const char *name, char *value )
 	{
 		verbosity = 1;
 	}
-	else if( strcmp(name, "t") == 0 || strcmp(name, "timeout") == 0)
-	{
-		timer = atoi(optarg);
-	}
 	else if (strcmp(name, "s") == 0 || strcmp(name, "size") == 0)
 	{
 		if(sscanf( (char*) optarg, "%dx%d",
@@ -121,9 +118,10 @@ static int      set_option( const char *name, char *value )
 			err++;
 		}
 	}
-	else if (strcmp(name, "q") == 0 )
+	else if (strcmp(name, "V") == 0 )
 	{
-		fprintf(stdout, "%s", get_gveejay_dir());
+		fprintf(stdout, "version: %s\n", PACKAGE_VERSION);
+		fprintf(stdout, "data directory: %s\n", get_gveejay_dir());
 		exit(0);
 	}
 	else if (strcmp(name, "P" ) == 0 || strcmp(name, "preview" ) == 0 )
@@ -201,7 +199,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	sprintf(hostname, "127.0.0.1");
 
-        while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:qS:")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:Vl:T:")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
@@ -231,7 +229,6 @@ int main(int argc, char *argv[]) {
 	find_user_themes(gveejay_theme);
 	
 	vj_gui_set_debug_level( verbosity , n_tracks,pw,ph);
-	vj_gui_set_timeout(timer);
 	set_skin( selected_skin );
 
 	default_bank_values( &col, &row );
