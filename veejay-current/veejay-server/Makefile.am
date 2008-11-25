@@ -1,6 +1,6 @@
 # Process with automake to produce Makefile.in
 
-SUBDIRS = aclib bio2jack libOSC libhash libvjmsg libvjmem 
+SUBDIRS = mjpegtools aclib bio2jack libOSC libhash libvjmsg libvjmem 
 SUBDIRS += libvevo liblzo libgoom libvje libsample libvjnet libyuv libel libstream liblavjpeg libsamplerec
 SUBDIRS += veejay 
 SUBDIRS += man

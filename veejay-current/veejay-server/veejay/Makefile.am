@@ -4,6 +4,7 @@ MAINTAINERCLEANFILES = Makefile.in
 AM_CFLAGS=$(OP_CFLAGS)
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-DG_LOG_DOMAIN=\"veejay\" -DVEEJAY_VERSION=\"$(VERSION)\" \
+		-I$(top_srcdir)/mjpegtools \
      		-I /usr/X11R6/include -I$(top_srcdir)/libOSC \
 		-I$(top_srcdir)/libhash \
 		-I$(top_srcdir)/libvje \
@@ -20,7 +21,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/bio2jack \
 		$(FFMPEG_AVCODEC_CFLAGS) $(FFMPEG_AVFORMAT_CFLAGS) $(LIBQUICKTIME_CFLAGS) $(FT_CFLAGS) \
 		$(AVIPLAY_CFLAGS) $(XML2_CFLAGS) $(GTK_CFLAGS) $(DV_FLAGS) $(X_CFLAGS) $(GL_CFLAGS) \
-		$(DIRECTFB_CFLAGS) $(SDL_CFLAGS) $(JPEG_CFLAGS) $(PTHREAD_CFLAGS) $(SAMPLERATE_CFLAGS) $(MJPEGTOOLS_CFLAGS)
+		$(DIRECTFB_CFLAGS) $(SDL_CFLAGS) $(JPEG_CFLAGS) $(PTHREAD_CFLAGS) $(SAMPLERATE_CFLAGS) 
  
 pkginclude_HEADERS = vims.h 
 VEEJAY_LIB_FILE = libveejay.la
@@ -40,7 +41,8 @@ libveejay_la_SOURCES =  vj-misc.c \
 libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS ) $(DEBUGLIBS)
 
 
-libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
+libveejay_la_LIBADD = -L$(top_builddir)/mjpegtools/ -lmjpegutils \
+			-L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libhash / -lhash \
 			-L$(top_builddir)/liblzo / -lminilzo \
 			-L$(top_builddir)/bio2jack/ -lbio2jack4vj \
@@ -61,7 +63,7 @@ libveejay_la_LIBADD = -L$(top_builddir)/libOSC / -lOSC \
 libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $(FT_LDFLAGS) $(FT_LIBS) \
 			$(XML2_LIBS) $(JPEG_LIBS) $(JACK_LIBS) $(UNICAP_LIBS) \
 		 	$(FFMPEG_AVFORMAT_LIBS) $(FFMPEG_AVCODEC_LIBS) $(FFMPEG_SWSCALER_LIBS) $(XINERAMA_LIBS) \
-			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(GL_LIBS) $(MJPEGTOOLS_LIBS) $(LIBQUICKTIME_LIBS) \
+			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(GL_LIBS) $(LIBQUICKTIME_LIBS) \
 			-DDYNAMIC -O3 -Wall -rdynamic 
 
 # *********************************************************************

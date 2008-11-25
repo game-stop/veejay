@@ -151,41 +151,6 @@ AC_TYPE_SIGNAL
 
 AC_MSG_NOTICE([The host is $host  $host_cpu  $host_vendor  $host_os .])
 
-have_gl=false
-if test "x$enable_gl" = "xyes" ; then
-  AC_CHECK_HEADERS(GL/gl.h ,,
-                [AC_MSG_WARN([Cannot find OpenGL headers]) ])
-  GL_LIBS=""
-  GL_CFLAGS="$GL_INC_PATH"
-  AC_CHECK_LIB([GL], [main], have_gl=true)
-  if test x$have_gl = xtrue ; then
-        GL_LIBS="$GL_LIB_PATH -lGL"
-	AC_SUBST(HAVE_GL)
-	AC_DEFINE(HAVE_GL,1,[use gl])
-  else
-        AC_MSG_ERROR([Cannot find openGL library])
-	have_gl=false
-  fi
-fi
-
-AC_SUBST(GL_LIBS)
-AC_SUBST(GL_CFLAGS)
-
-dnl Check for Xinerama
-use_xinerama=no
-AC_CHECK_LIB( Xinerama, XineramaQueryExtension,
-	[ AC_CHECK_HEADER(X11/extensions/Xinerama.h,
-	   [
-		AC_DEFINE( HAVE_XINERAMA,1,[Use Xinerama] )
-		XINERAMA_LIBS="-lXext -lXinerama"
-		AC_SUBST(XINERAMA_LIBS)
-        	use_xinerama=yes,
-	   ],
-	   use_xinerama=no,
-	   [#include <X11/Xlib.h>])],
-	   use_xinerama=no, -lXext)
-AC_MSG_CHECKING( for Xinerama support on XFree86 )
-AC_MSG_RESULT($use_xinerama)	
 
 
 dnl e_xdpms=no
@@ -231,309 +196,6 @@ if test x"$PKG_CONFIG_PATH" = x ; then
 fi
 
 
-AC_SUBST(LIBM_LIBS)
-
-if test x$with_v4l != xno ; then
-  if test x$have_linux != xfalse ; then
-
-	  AC_CHECK_HEADER(linux/videodev.h,
-                  [have_v4l=true
-	  if test x$with_v4l != xno; then
-                   AC_DEFINE(HAVE_V4L, 1,
-		             [Building for Linux - using the video4linux API])
-			fi
-			],
-                  [AC_MSG_ERROR([videodev.h not found - please install the linux kernel headers])])
-          fi
-fi
-
-dnl *********************************************************************
-dnl Check for the pthread lib
-dnl
-AC_SUBST(PTHREAD_LIBS)
-have_pthread=false
-AC_CHECK_LIB(pthread, pthread_create,
-  [ PTHREAD_LIBS="-lpthread" 
-    AC_DEFINE(HAVE_LIBPTHREAD,,[Compiling with pthread library])
-    have_pthread=true ],,)
-
-AC_CHECK_FUNC(pthread_attr_getstacksize,
-	          [
-				AC_DEFINE(HAVE_PTHREADSTACKSIZE,,[Using pthread stack size])
-			  ] )
-
-if test x$have_pthread != xtrue ; then
-	AC_MSG_ERROR([Cannot find pthread library])
-fi
-
-have_dl_dlopen=false
-AC_CHECK_LIB(dl,dlopen)
-if test "$ac_cv_lib_dl_dlopen" = "yes"; then
- AC_DEFINE(HAVE_DL_DLOPEN,,[Compile with dlopen support])
- have_dl_dlopen=true
-fi
-
-
-dnl *********************************************************************
-dnl Check for mjpegtools
-dnl   (creates MJPEGYTOOLS_CFLAGS, 
-dnl *********************************************************************
-have_mjpegtools=false
-PKG_CHECK_MODULES(MJPEGTOOLS, [mjpegtools >= 1.6 ],
-                    [
- 		     AC_SUBST(MJPEGTOOLS_CFLAGS)
-		     AC_SUBST(MJPEGTOOLS_LIBS)
-		     have_mjpegtools=true
-                     AC_DEFINE(HAVE_MJPEGTOOLS, 1, [MJPEGTools installed])],
-                    [have_mjpegtools=false])
-
-if test x$have_mjpegtools != xtrue ; then
-	AC_MSG_ERROR([Cannot find mjpegtools.] )
-fi
-
-dnl
-dnl Check if we want to link with libjpeg (used for making a screenshot)
-
-have_jpeg=false
-if test x$with_jpeg != xno ; then
-
-	dnl *********************************************************************
-	dnl Check for the special mmx accelerated jpeg library
-	dnl At the end of this mess, JPEG_LIBS will contain the libraries and 
-	dnl flags needed to link with the jpeg library and JPEG_CFLAGS will 
-	dnl have the needed flags to compile against said library
-	AC_SUBST(JPEG_LIBS)
-	AC_SUBST(JPEG_CFLAGS)
-	have_jpeg=false
-	if test x$with_jpegmmx = xyes ; then
-	  AC_MSG_ERROR([
-	*** A directory must be specified for --with-jpeg-mmx option.])
-	fi
-	if test x$with_jpegmmx = x ; then
-	  dnl Special case for building .deb's
-	  if test -d ../jpeg-mmx ; then
-	    with_jpegmmx=`pwd`/../jpeg-mmx
-	  else
-	    with_jpegmmx=/usr/local/src/jpeg-mmx
-	  fi
-	fi
-
-	dnl
-	dnl Look for the installed/specified copy
-	dnl
-
-	OLD_CFLAGS="$CFLAGS"
-	OLD_LIBS="$LIBS"
-	LIBS="$LIBS -L$with_jpegmmx"
-	CFLAGS="$CFLAGS -I$with_jpegmmx"
-	AC_CHECK_LIB(jpeg-mmx, jpeg_start_compress,
-	   [ JPEG_LIBS="$LIBS -ljpeg-mmx"
-	     JPEG_CFLAGS="-I$with_jpegmmx"
-	       have_jpeg=true ],,)
-	  LIBS="$OLD_LIBS"
-	  CFLAGS="$OLD_CFLAGS"
-
-	dnl 
-	dnl Look for _a_ jpeg lib that will work.
-	dnl
-	if test x$have_jpeg = xfalse ; then
-	  AC_CHECK_HEADER(jpeglib.h,,
-	    AC_MSG_ERROR([jpeglib.h not found - please install the libjpeg headers]))
-	  AC_CHECK_LIB(jpeg, jpeg_start_compress,
-	    [ JPEG_LIBS="-ljpeg"
-	      JPEG_CFLAGS=""
-	      have_jpeg=true ],,)
-	fi
-
-	if test x$have_jpeg = xtrue ; then
-		AC_DEFINE(HAVE_JPEG,,[Define is JPEG libraries are available])
-	fi
-fi
-have_pixbuf=false
-if test x$with_pixbuf != xno ; then
-  PKG_CHECK_MODULES(PIXBUF, [gtk+-2.0 >= 2.0 gdk-pixbuf-2.0],
-                    [
- 		     AC_SUBST(PIXBUF_CFLAGS)
-		     AC_SUBST(PIXBUF_LIBS)
-		     have_pixbuf=true
-                     AC_DEFINE(USE_GDK_PIXBUF, 1, [use gdk image load / save])],
-                    [have_pixbuf=false])
-fi
-
-
-if test x$have_pixbuf != xtrue ; then
-	AC_MSG_ERROR([Cannot find the gdk pixbuf library])
-fi
-
-
-
-dnl *********************************************************************
-dnl Check for libdv
-dnl   (creates LIBDV_CFLAGS, LIBDV_LIBS; defines HAVE_LIBDV)
-dnl *********************************************************************
-have_libdv=false
-if test x$with_libdv != xno ; then
-  PKG_CHECK_MODULES(LIBDV, [libdv >= 0.102],
-                    [have_libdv=true
-                     AC_DEFINE(SUPPORT_READ_DV2, 1, [libdv is present])],
-                    [have_libdv=false])
-fi
-
-have_libquicktime=false
-if test x$with_libquicktime != xno ; then
-  PKG_CHECK_MODULES(LIBQUICKTIME, [libquicktime >= 1.0.0],
-                    [have_libquicktime=true
-                     AC_DEFINE(HAVE_LIBQUICKTIME, 1, [libquicktime >= 1.0.0 prese
-nt])],
-                    [have_libquicktime=false])
-fi
-AM_CONDITIONAL(HAVE_LIBQUICKTIME, test x$have_libquicktime = xtrue)
-
-
-
-dnl ********************************************************************
-dnl Check to see if __progname is provided by the system
-dnl ********************************************************************
-AC_CACHE_CHECK([for __progname],
-               [mjt_cv_extern___progname],
-               [AC_LINK_IFELSE([AC_LANG_PROGRAM([[]],
-                                                [[extern char *__progname;
-                                                  puts(__progname);]])],
-                               [mjt_cv_extern___progname=yes],
-			       [mjt_cv_extern___progname=no])])
-if test x$mjt_cv_extern___progname = xyes ; then
-  AC_DEFINE(HAVE___PROGNAME, 1, [Is __progname defined by system?])
-fi
-
-dnl ********************************************************************
-dnl Check for DGA (for v4l-conf)
-dnl ********************************************************************
-AC_SUBST(V4LCONF_LIBS)
-AC_CHECK_LIB(Xxf86dga, XF86DGAQueryExtension,
-	V4LCONF_LIBS="$X_LIBS -lXxf86dga" 
-	AC_DEFINE(HAVE_LIBXXF86DGA,1, [libxf86dga is present]),,
-	$X_LIBS $X_PRE_LIBS -lXext -lX11 $X_EXTRA_LIBS)
-
-
-dnl Look for X
-AC_PATH_XTRA
-AM_CONDITIONAL(HAVE_X, test x$have_x = xyes)
-
-dnl ********************************************************************
-dnl Check for the SDL library (for software playback)
-dnl   (defines SDL_CFLAGS and SDL_LIBS)
-dnl ********************************************************************
-have_sdl=false
-if test x$with_sdl != xno ; then
-AM_PATH_SDL(1.2.3,[
-            have_sdl=true
-            AC_DEFINE(HAVE_SDL,, [SDL library present])],,)
-fi
-
-
-have_unicap=false
-if test x$with_unicap != xno; then
-PKG_CHECK_MODULES( UNICAP, libunicap >= 0.1.0,
-                ac_cv_unicap=1, ac_cv_unicap=0)
-
-AC_DEFINE_UNQUOTED([HAVE_UNICAP], ${ac_cv_unicap},
-        [ Set to 1 if you have unicap.])
-
-if test "${ac_cv_unicap}" = 0
-then
-  AC_MSG_WARN([Could not find optional library libunicap])
-else
-have_unicap=true
-AC_SUBST(HAVE_UNICAP)
-AC_DEFINE(HAVE_UNICAP,,[define if unicap])
-fi
-
-fi
-
-AC_SUBST(UNICAP_CFLAGS)
-AC_SUBST(UNICAP_LIBS)
-
-
-dnl *********************************************************************
-dnl Check for the DirectFB library (for Matrox G550 Tvout)
-dnl
-have_directfb=false
-if test x$with_directfb != xno ; then
-PKG_CHECK_MODULES(DIRECTFB, directfb >= 0.9.17, have_directfb=true,
-	have_directfb=false)
-
-if test x$have_directfb = xtrue ; then
-AC_SUBST(DIRECTFB_LIBS)
-AC_SUBST(DIRECTFB_CFLAGS)
-AC_DEFINE(HAVE_DIRECTFB,,[Compiling with DirectFB])
-fi
-fi
-
-dnl *********************************************************************
-dnl Check for the Jack Audio connection kit
-dnl
-
-have_jack=false
-if test x$with_jack != xno ; then
-  PKG_CHECK_MODULES(JACK, jack >= 0.1 , have_jack=true, have_jack=false)
-  if test x$have_jack = xtrue ; then
-    AC_SUBST(JACK_LIBS)
-    AC_SUBST(JACK_CFLAGS)
-    AC_DEFINE(HAVE_JACK,,[Compiling with support for Jack])
-  else
-    AC_MSG_WARN([Jack >= 0.100 is required, get it at http://jackit.sourceforge.net]);
-  fi
-fi
-
-dnl ********************************************************************
-dnl Check for the libxml2 library (for saving/loading project files)
-dnl
-have_xml2=false
-if test x$with_xml2 != xno; then
-	PKG_CHECK_MODULES( XML2, [libxml-2.0 >= 2.5.4],
-	[
-		have_xml2=true
-		AC_DEFINE(HAVE_XML2,1,[with XML])
-	],
-	[ have_xml2=false ])
-	
-dnl AM_PATH_XML2(2.5.4, [ 
-dnl	have_xml2=true
-dnl	AC_DEFINE(HAVE_XML2,,[Compiling with XML2])],,)
-dnl
-dnl	if test x$have_xml2 = xfalse ; then
-dnl		AC_MSG_WARN([cannot find The XML C library for gnome])
-dnl	fi
-fi
-
-if test x$have_xml2 != xtrue ; then
-	AC_MSG_ERROR([Cannot find the The XML C library for gnome])
-fi
-
-
-have_freetype=false
-AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
-if test $FREETYPE_CONFIG = yes; then
-  FT_CFLAGS="`freetype-config --cflags`"
-  FT_WORD="`freetype-config --libs`"
-  FT_LDFLAGS=""
-  FT_LIBS=""
-  for word in $FT_WORD ; do
-	beginning=`echo $word | cut -c -2`
-	if test ".$beginning" = ".-L"; then
-		FT_LDFLAGS="$FT_LDFLAGS $word"  
-	else
-		FT_LIBS="$FT_LIBS $word"
-	fi
-  done
-  AC_DEFINE(HAVE_FREETYPE,,[Compiling with FreeType])
-  AC_SUBST(FT_LIBS)
-  AC_SUBST(FT_LDFLAGS)
-  AC_SUBST(FT_CFLAGS)
-  have_freetype=true
-else
- AC_MSG_ERROR([Cannot find the freetype-config program])
-fi  
 
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""
@@ -919,6 +581,330 @@ AC_DEFINE_UNQUOTED( AVFORMAT_INC, $FFMPEG_INCLUDE_AVFORMAT,[] )
 AC_DEFINE_UNQUOTED( SWSCALE_INC, $FFMPEG_INCLUDE_SWSCALE,[] )
 
 
+AC_SUBST(LIBM_LIBS)
+
+have_gl=false
+if test "x$enable_gl" = "xyes" ; then
+  AC_CHECK_HEADERS(GL/gl.h ,,
+                [AC_MSG_WARN([Cannot find OpenGL headers]) ])
+  GL_LIBS=""
+  GL_CFLAGS="$GL_INC_PATH"
+  AC_CHECK_LIB([GL], [main], have_gl=true)
+  if test x$have_gl = xtrue ; then
+        GL_LIBS="$GL_LIB_PATH -lGL"
+	AC_SUBST(HAVE_GL)
+	AC_DEFINE(HAVE_GL,1,[use gl])
+  else
+        AC_MSG_ERROR([Cannot find openGL library])
+	have_gl=false
+  fi
+fi
+
+AC_SUBST(GL_LIBS)
+AC_SUBST(GL_CFLAGS)
+
+dnl Check for Xinerama
+use_xinerama=no
+AC_CHECK_LIB( Xinerama, XineramaQueryExtension,
+	[ AC_CHECK_HEADER(X11/extensions/Xinerama.h,
+	   [
+		AC_DEFINE( HAVE_XINERAMA,1,[Use Xinerama] )
+		XINERAMA_LIBS="-lXext -lXinerama"
+		AC_SUBST(XINERAMA_LIBS)
+        	use_xinerama=yes,
+	   ],
+	   use_xinerama=no,
+	   [#include <X11/Xlib.h>])],
+	   use_xinerama=no, -lXext)
+AC_MSG_CHECKING( for Xinerama support on XFree86 )
+AC_MSG_RESULT($use_xinerama)	
+
+
+if test x$with_v4l != xno ; then
+  if test x$have_linux != xfalse ; then
+
+	  AC_CHECK_HEADER(linux/videodev.h,
+                  [have_v4l=true
+	  if test x$with_v4l != xno; then
+                   AC_DEFINE(HAVE_V4L, 1,
+		             [Building for Linux - using the video4linux API])
+			fi
+			],
+                  [AC_MSG_ERROR([videodev.h not found - please install the linux kernel headers])])
+          fi
+fi
+
+dnl *********************************************************************
+dnl Check for the pthread lib
+dnl
+AC_SUBST(PTHREAD_LIBS)
+have_pthread=false
+AC_CHECK_LIB(pthread, pthread_create,
+  [ PTHREAD_LIBS="-lpthread" 
+    AC_DEFINE(HAVE_LIBPTHREAD,,[Compiling with pthread library])
+    have_pthread=true ],,)
+
+AC_CHECK_FUNC(pthread_attr_getstacksize,
+	          [
+				AC_DEFINE(HAVE_PTHREADSTACKSIZE,,[Using pthread stack size])
+			  ] )
+
+if test x$have_pthread != xtrue ; then
+	AC_MSG_ERROR([Cannot find pthread library])
+fi
+
+have_dl_dlopen=false
+AC_CHECK_LIB(dl,dlopen)
+if test "$ac_cv_lib_dl_dlopen" = "yes"; then
+ AC_DEFINE(HAVE_DL_DLOPEN,,[Compile with dlopen support])
+ have_dl_dlopen=true
+fi
+
+
+dnl
+dnl Check if we want to link with libjpeg (used for making a screenshot)
+
+have_jpeg=false
+if test x$with_jpeg != xno ; then
+
+	dnl *********************************************************************
+	dnl Check for the special mmx accelerated jpeg library
+	dnl At the end of this mess, JPEG_LIBS will contain the libraries and 
+	dnl flags needed to link with the jpeg library and JPEG_CFLAGS will 
+	dnl have the needed flags to compile against said library
+	AC_SUBST(JPEG_LIBS)
+	AC_SUBST(JPEG_CFLAGS)
+	have_jpeg=false
+	if test x$with_jpegmmx = xyes ; then
+	  AC_MSG_ERROR([
+	*** A directory must be specified for --with-jpeg-mmx option.])
+	fi
+	if test x$with_jpegmmx = x ; then
+	  dnl Special case for building .deb's
+	  if test -d ../jpeg-mmx ; then
+	    with_jpegmmx=`pwd`/../jpeg-mmx
+	  else
+	    with_jpegmmx=/usr/local/src/jpeg-mmx
+	  fi
+	fi
+
+	dnl
+	dnl Look for the installed/specified copy
+	dnl
+
+	OLD_CFLAGS="$CFLAGS"
+	OLD_LIBS="$LIBS"
+	LIBS="$LIBS -L$with_jpegmmx"
+	CFLAGS="$CFLAGS -I$with_jpegmmx"
+	AC_CHECK_LIB(jpeg-mmx, jpeg_start_compress,
+	   [ JPEG_LIBS="$LIBS -ljpeg-mmx"
+	     JPEG_CFLAGS="-I$with_jpegmmx"
+	       have_jpeg=true ],,)
+	  LIBS="$OLD_LIBS"
+	  CFLAGS="$OLD_CFLAGS"
+
+	dnl 
+	dnl Look for _a_ jpeg lib that will work.
+	dnl
+	if test x$have_jpeg = xfalse ; then
+	  AC_CHECK_HEADER(jpeglib.h,,
+	    AC_MSG_ERROR([jpeglib.h not found - please install the libjpeg headers]))
+	  AC_CHECK_LIB(jpeg, jpeg_start_compress,
+	    [ JPEG_LIBS="-ljpeg"
+	      JPEG_CFLAGS=""
+	      have_jpeg=true ],,)
+	fi
+
+	if test x$have_jpeg = xtrue ; then
+		AC_DEFINE(HAVE_JPEG,,[Define is JPEG libraries are available])
+	fi
+fi
+have_pixbuf=false
+if test x$with_pixbuf != xno ; then
+  PKG_CHECK_MODULES(PIXBUF, [gtk+-2.0 >= 2.0 gdk-pixbuf-2.0],
+                    [
+ 		     AC_SUBST(PIXBUF_CFLAGS)
+		     AC_SUBST(PIXBUF_LIBS)
+		     have_pixbuf=true
+                     AC_DEFINE(USE_GDK_PIXBUF, 1, [use gdk image load / save])],
+                    [have_pixbuf=false])
+fi
+
+
+if test x$have_pixbuf != xtrue ; then
+	AC_MSG_ERROR([Cannot find the gdk pixbuf library])
+fi
+
+
+
+dnl *********************************************************************
+dnl Check for libdv
+dnl   (creates LIBDV_CFLAGS, LIBDV_LIBS; defines HAVE_LIBDV)
+dnl *********************************************************************
+have_libdv=false
+if test x$with_libdv != xno ; then
+  PKG_CHECK_MODULES(LIBDV, [libdv >= 0.102],
+                    [have_libdv=true
+                     AC_DEFINE(SUPPORT_READ_DV2, 1, [libdv is present])],
+                    [have_libdv=false])
+fi
+
+have_libquicktime=false
+if test x$with_libquicktime != xno ; then
+  PKG_CHECK_MODULES(LIBQUICKTIME, [libquicktime >= 1.0.0],
+                    [have_libquicktime=true
+                     AC_DEFINE(HAVE_LIBQUICKTIME, 1, [libquicktime >= 1.0.0 prese
+nt])],
+                    [have_libquicktime=false])
+fi
+AM_CONDITIONAL(HAVE_LIBQUICKTIME, test x$have_libquicktime = xtrue)
+
+
+
+dnl ********************************************************************
+dnl Check to see if __progname is provided by the system
+dnl ********************************************************************
+AC_CACHE_CHECK([for __progname],
+               [mjt_cv_extern___progname],
+               [AC_LINK_IFELSE([AC_LANG_PROGRAM([[]],
+                                                [[extern char *__progname;
+                                                  puts(__progname);]])],
+                               [mjt_cv_extern___progname=yes],
+			       [mjt_cv_extern___progname=no])])
+if test x$mjt_cv_extern___progname = xyes ; then
+  AC_DEFINE(HAVE___PROGNAME, 1, [Is __progname defined by system?])
+fi
+
+dnl ********************************************************************
+dnl Check for DGA (for v4l-conf)
+dnl ********************************************************************
+AC_SUBST(V4LCONF_LIBS)
+AC_CHECK_LIB(Xxf86dga, XF86DGAQueryExtension,
+	V4LCONF_LIBS="$X_LIBS -lXxf86dga" 
+	AC_DEFINE(HAVE_LIBXXF86DGA,1, [libxf86dga is present]),,
+	$X_LIBS $X_PRE_LIBS -lXext -lX11 $X_EXTRA_LIBS)
+
+
+dnl Look for X
+AC_PATH_XTRA
+AM_CONDITIONAL(HAVE_X, test x$have_x = xyes)
+
+dnl ********************************************************************
+dnl Check for the SDL library (for software playback)
+dnl   (defines SDL_CFLAGS and SDL_LIBS)
+dnl ********************************************************************
+have_sdl=false
+if test x$with_sdl != xno ; then
+AM_PATH_SDL(1.2.3,[
+            have_sdl=true
+            AC_DEFINE(HAVE_SDL,, [SDL library present])],,)
+fi
+
+
+have_unicap=false
+if test x$with_unicap != xno; then
+PKG_CHECK_MODULES( UNICAP, libunicap >= 0.1.0,
+                ac_cv_unicap=1, ac_cv_unicap=0)
+
+AC_DEFINE_UNQUOTED([HAVE_UNICAP], ${ac_cv_unicap},
+        [ Set to 1 if you have unicap.])
+
+if test "${ac_cv_unicap}" = 0
+then
+  AC_MSG_WARN([Could not find optional library libunicap])
+else
+have_unicap=true
+AC_SUBST(HAVE_UNICAP)
+AC_DEFINE(HAVE_UNICAP,,[define if unicap])
+fi
+
+fi
+
+AC_SUBST(UNICAP_CFLAGS)
+AC_SUBST(UNICAP_LIBS)
+
+
+dnl *********************************************************************
+dnl Check for the DirectFB library (for Matrox G550 Tvout)
+dnl
+have_directfb=false
+if test x$with_directfb != xno ; then
+PKG_CHECK_MODULES(DIRECTFB, directfb >= 0.9.17, have_directfb=true,
+	have_directfb=false)
+
+if test x$have_directfb = xtrue ; then
+AC_SUBST(DIRECTFB_LIBS)
+AC_SUBST(DIRECTFB_CFLAGS)
+AC_DEFINE(HAVE_DIRECTFB,,[Compiling with DirectFB])
+fi
+fi
+
+dnl *********************************************************************
+dnl Check for the Jack Audio connection kit
+dnl
+
+have_jack=false
+if test x$with_jack != xno ; then
+  PKG_CHECK_MODULES(JACK, jack >= 0.1 , have_jack=true, have_jack=false)
+  if test x$have_jack = xtrue ; then
+    AC_SUBST(JACK_LIBS)
+    AC_SUBST(JACK_CFLAGS)
+    AC_DEFINE(HAVE_JACK,,[Compiling with support for Jack])
+  else
+    AC_MSG_WARN([Jack >= 0.100 is required, get it at http://jackit.sourceforge.net]);
+  fi
+fi
+
+dnl ********************************************************************
+dnl Check for the libxml2 library (for saving/loading project files)
+dnl
+have_xml2=false
+if test x$with_xml2 != xno; then
+	PKG_CHECK_MODULES( XML2, [libxml-2.0 >= 2.5.4],
+	[
+		have_xml2=true
+		AC_DEFINE(HAVE_XML2,1,[with XML])
+	],
+	[ have_xml2=false ])
+	
+dnl AM_PATH_XML2(2.5.4, [ 
+dnl	have_xml2=true
+dnl	AC_DEFINE(HAVE_XML2,,[Compiling with XML2])],,)
+dnl
+dnl	if test x$have_xml2 = xfalse ; then
+dnl		AC_MSG_WARN([cannot find The XML C library for gnome])
+dnl	fi
+fi
+
+if test x$have_xml2 != xtrue ; then
+	AC_MSG_ERROR([Cannot find the The XML C library for gnome])
+fi
+
+
+have_freetype=false
+AC_CHECK_PROG(FREETYPE_CONFIG, freetype-config,yes,no)
+if test $FREETYPE_CONFIG = yes; then
+  FT_CFLAGS="`freetype-config --cflags`"
+  FT_WORD="`freetype-config --libs`"
+  FT_LDFLAGS=""
+  FT_LIBS=""
+  for word in $FT_WORD ; do
+	beginning=`echo $word | cut -c -2`
+	if test ".$beginning" = ".-L"; then
+		FT_LDFLAGS="$FT_LDFLAGS $word"  
+	else
+		FT_LIBS="$FT_LIBS $word"
+	fi
+  done
+  AC_DEFINE(HAVE_FREETYPE,,[Compiling with FreeType])
+  AC_SUBST(FT_LIBS)
+  AC_SUBST(FT_LDFLAGS)
+  AC_SUBST(FT_CFLAGS)
+  have_freetype=true
+else
+ AC_MSG_ERROR([Cannot find the freetype-config program])
+fi  
+
 dnl **********************************************************************
 dnl All the conditional stuff for the Makefiles
 AM_CONDITIONAL(HAVE_ASM_MMX, test x$have_asm_mmx = xtrue)
@@ -1001,6 +987,7 @@ dnl Output a Makefile or two and the lib/header descriptor script
 dnl
 AC_CONFIG_FILES([
 Makefile
+mjpegtools/Makefile
 aclib/Makefile
 libOSC/Makefile
 libhash/Makefile
@@ -1066,19 +1053,16 @@ fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
-AC_MSG_NOTICE([  - MJPEGTools			 : ${have_mjpegtools}])
-AC_MSG_NOTICE([  - AVI MJPEG playback/recording  : true (always)])
 AC_MSG_NOTICE([  - FFmpeg AVFormat               : ${have_avformat} ])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - FFmpeg Swscaler		 : ${have_swscaler} ])
-AC_MSG_NOTICE([ Optional dependencies])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
+AC_MSG_NOTICE([ Optional dependencies])
 AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
 AC_MSG_NOTICE([  - OpenGL support                : ${have_gl}])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - Unicap Imaging                : ${have_unicap} ])
-AC_MSG_NOTICE([  - video4linux                   : ${have_v4l}])
 AC_MSG_NOTICE([  - JPEG support                  : ${have_jpeg} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
