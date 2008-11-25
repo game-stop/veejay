@@ -11096,7 +11096,7 @@ MLZO</property>
 								      <property name="focus_on_click">True</property>
 								      <property name="active">False</property>
 								      <property name="inconsistent">False</property>
-								      <property name="draw_indicator">False</property>
+								      <property name="draw_indicator">True</property>
 								      <property name="group">loop_normal</property>
 								      <signal name="clicked" handler="on_loop_none_clicked" last_modification_time="Sun, 27 Mar 2005 06:13:22 GMT"/>
 
