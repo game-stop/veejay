@@ -626,6 +626,7 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 	}
 	
 	veejay_reset_el_buffer(info);
+	sample_set_framedups(info->uc->sample_id,0);
 	return 1;
 }
 static  void	veejay_stop_playing_stream( veejay_t *info, int new_stream_id )
@@ -665,6 +666,8 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 
 	settings->min_frame_num = 0;
 	settings->max_frame_num = sample_video_length( sample_id );
+
+	sample_reset_loopcount( sample_id );
 
 #ifdef HAVE_FREETYPE
 	if(info->font && info->uc->sample_id != sample_id)

@@ -3578,8 +3578,13 @@ void vj_event_play_slow(void *ptr, const char format[],va_list ap)
 	
 	if(PLAIN_PLAYING(v) || SAMPLE_PLAYING(v))
 	{
+		if(args[0] <= 0 )
+			args[0] = 1;
+
 		if(veejay_set_framedup(v, args[0]))
 		{
+			if( SAMPLE_PLAYING(v))
+				sample_reset_loopcount( v->uc->sample_id );
 			veejay_msg(VEEJAY_MSG_INFO,"A/V frames will be repeated %d times ",args[0]);
 		}
 		else
@@ -4171,6 +4176,8 @@ void vj_event_sample_set_dup(void *ptr, const char format[], va_list ap)
 
 	if( sample_exists(args[0])) 
 	{
+		if( args[1] <= 0 )
+			args[1] = 1;
 		if( sample_set_framedup( args[0], args[1] ) != -1) 
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Sample %d frame repeat set to %d", args[0],args[1]);
@@ -4187,6 +4194,7 @@ void vj_event_sample_set_dup(void *ptr, const char format[], va_list ap)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR,"Cannot set frame repeat to %d for sample %d",args[0],args[1]);
 		}
+		sample_reset_loopcount( args[0] );
 	}
 	else
 	{

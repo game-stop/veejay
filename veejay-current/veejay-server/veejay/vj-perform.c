@@ -335,7 +335,7 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 
     int cur_sfd = sample_get_framedups( info->uc->sample_id );
     int max_sfd = sample_get_framedup( info->uc->sample_id );
-
+veejay_msg(VEEJAY_MSG_DEBUG, "%s: frame %ld, cur_sfd=%d, max_sfd=%d", __FUNCTION__, num,cur_sfd,max_sfd);
 	cur_sfd ++;
 
 	if( max_sfd > 0 ) {
@@ -362,6 +362,7 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 	if (settings->current_frame_num > end || settings->current_frame_num < start) {
 	    switch (looptype) {
 		    case 2:
+			sample_loopcount( info->uc->sample_id);
 			info->uc->direction = -1;
 			if(!vj_perform_try_sequence( info ) )
 			{
@@ -370,8 +371,10 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 				veejay_set_frame(info, end);
 				veejay_set_speed(info, (-1 * speed));
 			}
+			sample_loopcount( info->uc->sample_id);
 			break;
 		    case 1:
+			sample_loopcount( info->uc->sample_id);
 			if(! info->seq->active )
 				veejay_set_frame(info, start);
 			else
@@ -386,6 +389,7 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 			}
 			break;
 		    case 3:
+			sample_loopcount( info->uc->sample_id);
 			veejay_set_frame(info, start);
 			break;
 		    default:
@@ -404,6 +408,8 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 	if (settings->current_frame_num < start || settings->current_frame_num >= end ) {
 	    switch (looptype) {
 	    case 2:
+		sample_loopcount( info->uc->sample_id);
+
 		info->uc->direction = 1;
 		if(!vj_perform_try_sequence(info) )
 		{
@@ -414,6 +420,8 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 		}
 		break;
 	    case 1:
+		sample_loopcount( info->uc->sample_id);
+
 		if(!info->seq->active)
 			veejay_set_frame(info, end);
 		else
@@ -428,6 +436,8 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 		}
 		break;
 	    case 3:
+		sample_loopcount( info->uc->sample_id);
+
 		veejay_set_frame(info,end);
 		break;
 	    default:
@@ -1722,54 +1732,74 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 	editlist *el = ( s1 ? sample_get_editlist(s1) : info->edit_list);
 	int max_sfd = (s1 ? sample_get_framedup( s1 ) : info->sfd );
 	int cur_sfd = (s1 ? sample_get_framedups(s1 ) : simple_frame_duplicator );
-	if( cur_sfd <= max_sfd && max_sfd > 1 )
-	{
-		uint8_t *p0_buffer[3] = {
-			primary_buffer[7]->Y,
-			primary_buffer[7]->Cb,
-			primary_buffer[7]->Cr };
 
-		uint8_t *p1_buffer[3]= {
-			primary_buffer[4]->Y,
-			primary_buffer[4]->Cb,
-			primary_buffer[4]->Cr };
+	if( max_sfd <= 1 )
+		return vj_el_get_video_frame( el, nframe, img );
 
-		int speed = info->settings->current_playback_speed;
-		int start = ( s1 ? sample_get_startFrame(s1) : info->settings->min_frame_num );
-		int end   = ( s1 ? sample_get_endFrame(s1)  : info->settings->max_frame_num );	
+	int speed = info->settings->current_playback_speed;
+	int loops = (s1 ? sample_get_loopcount(s1) : 0 );
+	int uv_len = (info->effect_frame1->ssm ? info->effect_frame1->len : info->effect_frame1->uv_len );
 
-		if( cur_sfd == 0 )
-		{
-			int p0,p1, n2frame;
-			p0 = vj_el_get_video_frame( el, nframe, p0_buffer );
-			n2frame = nframe + speed;
-			if( n2frame < start ) n2frame = start; else if (n2frame > end ) n2frame = end;
-			p1 = vj_el_get_video_frame( el, n2frame, p1_buffer );
-			int uv_len = (info->effect_frame1->ssm ? info->effect_frame1->len : info->effect_frame1->uv_len );
-			veejay_memcpy( img[0], p0_buffer[0], info->effect_frame1->len );
-			veejay_memcpy( img[1], p0_buffer[1], uv_len);
-			veejay_memcpy( img[2], p0_buffer[2], uv_len );
-			return 1;
+	long p0_frame = 0;
+	long p1_frame = 0;
+	int  p0       = 0;
+	int  p1       = 0;
+
+	long	start = ( s1 ? sample_get_startFrame(s1) : info->settings->min_frame_num);
+	long	end   = ( s1 ? sample_get_endFrame(s1) : info->settings->max_frame_num );
+
+	uint8_t *p0_buffer[3] = {
+		primary_buffer[7]->Y,
+		primary_buffer[7]->Cb,
+		primary_buffer[7]->Cr };
+
+	uint8_t *p1_buffer[3]= {
+		primary_buffer[4]->Y,
+		primary_buffer[4]->Cb,
+		primary_buffer[4]->Cr };
+
+	if( cur_sfd == 0 ) {
+		if( speed > 0 && nframe == end ){ //@ p0 = last frame
+			p0_frame = end;
+			p0       = vj_el_get_video_frame( el, p0_frame, p0_buffer );
+			p1_frame = start;
+			p1	 = vj_el_get_video_frame( el, p1_frame, p1_buffer );
+		} else if( speed < 0 && nframe == start)  { //@ p0 = first frame
+			p0_frame = start;
+			p0	 = vj_el_get_video_frame( el, p0_frame, p0_buffer );
+			p1_frame = end;
+			p1	 = vj_el_get_video_frame( el, p1_frame, p1_buffer );
+		} else {
+			p0_frame = nframe;
+			p0       = vj_el_get_video_frame( el, p0_frame, p0_buffer );
+			p1_frame = nframe + speed;
+			p1	 = vj_el_get_video_frame( el, p1_frame, p1_buffer );
 		}
-		else
+		veejay_memcpy( img[0], p0_buffer[0], info->effect_frame1->len );
+		veejay_memcpy( img[1], p0_buffer[1], uv_len);
+		veejay_memcpy( img[2], p0_buffer[2], uv_len );
+
+	} else {
+		uint32_t i;
+		const uint32_t N = max_sfd;
+		const uint32_t n1 = cur_sfd;
+		const float frac = 1.0f / (float) N * n1;
+		const uint32_t len = el->video_width * el->video_height;
+		for( i  = 0; i < len ; i ++ )
 		{
-			uint32_t i;
-			const uint32_t N = max_sfd;
-			const uint32_t n1 = cur_sfd;
-			const float frac = 1.0f / (float) N * n1;
-			const uint32_t len = el->video_width * el->video_height;
-			for( i  = 0; i < len ; i ++ )
-			{
-				img[0][i] = p0_buffer[0][i] + ( frac * (p1_buffer[0][i] - p0_buffer[0][i]));
-				img[1][i] = p0_buffer[1][i] + ( frac * (p1_buffer[1][i] - p0_buffer[1][i]));
-				img[2][i] = p0_buffer[2][i] + ( frac * (p1_buffer[2][i] - p0_buffer[2][i]));
-			}
-			return 1;
+			img[0][i] = p0_buffer[0][i] + ( frac * (p1_buffer[0][i] - p0_buffer[0][i]));
+			img[1][i] = p0_buffer[1][i] + ( frac * (p1_buffer[1][i] - p0_buffer[1][i]));
+			img[2][i] = p0_buffer[2][i] + ( frac * (p1_buffer[2][i] - p0_buffer[2][i]));
 		}
+		//@ copy p0 buffer
+		if( (n1 + 1 ) == N ) {
+			veejay_memcpy( p0_buffer[0], img[0], info->effect_frame1->len );
+			veejay_memcpy( p0_buffer[1], img[1], uv_len );
+			veejay_memcpy( p0_buffer[2], img[2], uv_len );
+		}
+
 	}
-
-	return vj_el_get_video_frame( el, nframe, img );
-
+	return 1;
 }
 
 

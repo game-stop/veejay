@@ -169,6 +169,7 @@ typedef struct sample_info_t {
     int effect_toggle;
     int offset;
     int play_length;
+    int loopcount;
     editlist *edit_list;
     char     *edit_list_file;
     int		soft_edl;
@@ -220,6 +221,9 @@ extern int sample_get_next(int s1);
 extern int sample_get_depth(int s1);
 extern int sample_set_depth(int s1, int n);
 extern int sample_set_speed(int s1, int speed);
+extern void sample_loopcount(int s1);
+extern void sample_reset_loopcount(int s1);
+extern int sample_get_loopcount(int s1);
 extern int sample_set_composite(void *compiz,int s1, int composite);
 extern int sample_get_composite(int s1);
 extern int sample_set_framedup(int s1, int n);

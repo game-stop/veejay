@@ -6407,11 +6407,9 @@ gboolean	slow_scroll_event(  GtkWidget *widget, GdkEventScroll *ev, gpointer use
 	} else if (ev->direction == GDK_SCROLL_UP ) {
 		plainspeed = plainspeed + 1;
 	}
-	if(plainspeed < 0 )
-		plainspeed = 0;
+	if(plainspeed < 1 )
+		plainspeed = 1;
 	update_slider_value("slow_slider",plainspeed,0);
-
-	plainspeed ++;
 	vj_msg(VEEJAY_MSG_INFO, "Slow video to %2.2f fps",
 		info->el.fps / (float) plainspeed );
 	return FALSE;
@@ -6741,7 +6739,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	update_spin_range( "spin_framedelay", 1, 13, 0);
 	update_slider_range( "speed_slider", -13,13,speed,0);
-	update_slider_range( "slow_slider",0,13,0,0);
+	update_slider_range( "slow_slider",1,13,1,0);
 	update_label_str( "label_hostnamex", (hostname == NULL ? group_name: hostname ) );
 	update_label_i( "label_portx",port_num,0);
 

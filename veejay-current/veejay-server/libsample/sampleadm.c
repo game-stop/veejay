@@ -313,6 +313,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 //  si->fader_direction = 0;
 //  si->rec_total_bytes = 0;
 //  si->encoder_format = 0;
+    si->loopcount = 0;
     si->encoder_base = (char*) vj_malloc(sizeof(char) * 255);
 //  si->sequence_num = 0;
 //  si->encoder_duration = 0;
@@ -1511,6 +1512,27 @@ int	sample_get_composite(int s1)
  * returns -1  on error.
  *
  ****************************************************************************************************/
+void sample_loopcount(int s1)
+{
+    sample_info *sample = sample_get(s1);
+    if (!sample) return;
+    sample->loopcount ++;
+    if(sample->loopcount > 1000000 )
+	sample->loopcount = 0;
+}
+int	sample_get_loopcount(int s1)
+{
+  sample_info *sample = sample_get(s1);
+  if (!sample) return 0;
+
+  return sample->loopcount;
+}
+void	sample_reset_loopcount(int s1)
+{
+    sample_info *sample = sample_get(s1);
+    if (!sample) return;
+    sample->loopcount = 0;
+}
 
 int sample_set_speed(int s1, int speed)
 {
