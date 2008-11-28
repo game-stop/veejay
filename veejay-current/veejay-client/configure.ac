@@ -191,23 +191,6 @@ if test x$have_veejay != xtrue ; then
 	AC_MSG_ERROR([Cannot find Veejay.])
 fi
 
-dnl *********************************************************************
-dnl Check for mjpegtools
-dnl   (creates MJPEGYTOOLS_CFLAGS, 
-dnl *********************************************************************
-have_mjpegtools=false
-PKG_CHECK_MODULES(MJPEGTOOLS, [mjpegtools >= 1.6 ],
-                    [
- 		     AC_SUBST(MJPEGTOOLS_CFLAGS)
-		     AC_SUBST(MJPEGTOOLS_LIBS)
-		     have_mjpegtools=true
-                     AC_DEFINE(HAVE_MJPEGTOOLS, 1, [MJPEGTools installed])],
-                    [have_mjpegtools=false])
-
-if test x$have_mjpegtools != xtrue ; then
-	AC_MSG_ERROR([Cannot find mjpegtools. Did you set PKG_CONFIG_PATH variable?])
-fi
-
 have_pixbuf=false
 if test x$with_pixbuf != xno ; then
   PKG_CHECK_MODULES(PIXBUF, [gtk+-2.0 >= 2.8 gdk-pixbuf-2.0],
@@ -677,6 +660,7 @@ dnl Output a Makefile or two and the lib/header descriptor script
 dnl
 AC_CONFIG_FILES([
 Makefile
+mjpeg/Makefile
 src/Makefile
 gveejay-paths.sh
 ])
@@ -725,7 +709,6 @@ AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
 AC_MSG_NOTICE([  - Veejay 1.4                    : ${have_veejay}])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
-AC_MSG_NOTICE([  - MJPEGTools                    : ${have_mjpegtools}])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscaler} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])

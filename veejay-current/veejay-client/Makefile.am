@@ -1,5 +1,5 @@
 # Process with automake to produce Makefile.in
-SUBDIRS =
+SUBDIRS = mjpeg
 if USE_GVEEJAYRELOADED
 SUBDIRS += src
 endif

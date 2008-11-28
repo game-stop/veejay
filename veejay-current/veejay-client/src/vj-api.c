@@ -43,8 +43,8 @@
 #include <veejay/vims.h>
 #include <src/vj-api.h>
 #include <fcntl.h>
-#include <mjpegtools/mpegconsts.h>
-#include <mjpegtools/mpegtimecode.h>
+#include <mjpeg/mpegconsts.h>
+#include <mjpeg/mpegtimecode.h>
 #include <gtk/gtk.h>
 #include <gdk/gdkx.h>
 #include <sys/types.h>

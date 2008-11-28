@@ -18,8 +18,8 @@
  */
 #include <config.h>
 #include <stdio.h>
-#include <mjpegtools/mpegconsts.h>
-#include <mjpegtools/mpegtimecode.h>
+#include <mjpeg/mpegconsts.h>
+#include <mjpeg/mpegtimecode.h>
 #include <veejay/vjmem.h>
 #include <string.h>
 
