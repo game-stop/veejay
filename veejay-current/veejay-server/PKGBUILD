@@ -1,7 +1,7 @@
 # Contributor: Luciano A. Ferrer <laferrer@gmail.com>
-# 
-pkgname=veejay-server
-pkgdesc="Veejay is a visual instrument and realtime video sampler for GNU/Linux"
+pkgname=veejay-server-svn
+pkgrel=1
+pkgdesc="Veejay is a visual instrument and realtime video sampler for GNU/Linux, server"
 arch=(i686)
 url="http://www.veejayhq.net"
 license="GPL"
