@@ -6739,7 +6739,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 
 	update_spin_range( "spin_framedelay", 1, 13, 0);
 	update_slider_range( "speed_slider", -13,13,speed,0);
-	update_slider_range( "slow_slider",1,info->el.fps * 4,1,0);
+	update_slider_range( "slow_slider",1,100,1,0);
 	update_label_str( "label_hostnamex", (hostname == NULL ? group_name: hostname ) );
 	update_label_i( "label_portx",port_num,0);
 
