@@ -1954,34 +1954,15 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 	int id=0;
 	int mode=0;
 	int has_config = 0;
-#ifdef HAVE_XML2
+
 	if(info->load_action_file)
 	{
-		if(veejay_load_action_file(info, info->action_file )==0)
-		{
-			if(sample_readFromFile( info->action_file,
-				info->composite,
-				info->seq, 
-				info->font, 
-				el,
-				 &id,
-				 &mode ))
-			{
-				veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file);
-				if( id > 0 )
-				{
-					veejay_change_playback_mode(info, mode, id );
-				}
-			}
-		}
-		else
+		if(veejay_load_action_file(info, info->action_file ))
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Loaded configuration file %s", info->action_file );
 			has_config = 1;
 		}
 	}
-#endif
-
 
 	if(info->video_out<0)
 	{
@@ -2451,7 +2432,13 @@ skip_audio:
 		veejay_msg(VEEJAY_MSG_ERROR, "Can't set effective user-id: %s", sys_errlist[errno]);
 		return -1;
     	}
-
+	if(info->load_action_file ) {
+	  if(sample_readFromFile( info->action_file,info->composite,info->seq,info->font,info->edit_list,
+			&(info->settings->late[0]),&(info->settings->late[1]) ))
+	   {
+			veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file);
+	    }
+	}
 
     	veejay_change_state( info, LAVPLAY_STATE_PLAYING );  
 
@@ -2464,6 +2451,8 @@ skip_audio:
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize the threading system");
 		return -1;   
       	}
+	
+
     	return 0;
 }
 
@@ -2826,10 +2815,9 @@ static void *veejay_playback_thread(void *data)
 
 
     pthread_sigmask( SIG_BLOCK, &mask, NULL );
- 
+	int mode, id; 
 
     Welcome(info);
-   
     veejay_playback_cycle(info);
 
       veejay_close(info); 

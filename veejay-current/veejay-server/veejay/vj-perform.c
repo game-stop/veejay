@@ -335,7 +335,6 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 
     int cur_sfd = sample_get_framedups( info->uc->sample_id );
     int max_sfd = sample_get_framedup( info->uc->sample_id );
-veejay_msg(VEEJAY_MSG_DEBUG, "%s: frame %ld, cur_sfd=%d, max_sfd=%d", __FUNCTION__, num,cur_sfd,max_sfd);
 	cur_sfd ++;
 
 	if( max_sfd > 0 ) {
