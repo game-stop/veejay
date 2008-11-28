@@ -518,6 +518,8 @@ int veejay_set_frame(veejay_t * info, long framenum)
 		  framenum = start;
 		if(framenum > end) 
 		  framenum = end;
+		if(framenum == start || framenum == end ) 
+			sample_set_framedups(info->uc->sample_id,0);
     	}
 	else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
 	{
