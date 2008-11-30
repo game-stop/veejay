@@ -20,6 +20,6 @@
 #ifndef GVRUTILS
 #define GVRUTILS
 int 	status_to_arr( char *status, int *array );
-char   *format_time( int pos , float fps);
+char   *format_time( int pos , double fps);
 #endif
 

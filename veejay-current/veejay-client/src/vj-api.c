@@ -611,7 +611,9 @@ GtkWidget	*glade_xml_get_widget_( GladeXML *m, const char *name )
 	GtkWidget *widget = glade_xml_get_widget( m , name );
 	if(!widget)
 	{
+#ifdef STRICT_CHECKING
 		veejay_msg(0,"Missing widget: %s %s ",__FUNCTION__,name);
+#endif
 		return NULL;
 	}
 #ifdef STRICT_CHECKING
@@ -918,10 +920,10 @@ static	void	set_tooltip(const char *name, const char *text)
 {
 	GtkWidget *w = glade_xml_get_widget_(info->main_window,name);
 	if(!w) {
+#ifdef STRICT_CHECKING
 		veejay_msg(0, "Widget '%s' not found",name);
+#endif
 		return;
-	
-
 	}
 	gtk_widget_set_tooltip_text(	w,text );
 }
@@ -2737,7 +2739,7 @@ static	void	update_record_tab(int pm)
 	{
 		update_spin_value( "spin_streamduration" , 1 );
 		gint n_frames = get_nums( "spin_streamduration" );
-		gchar *time = format_time(n_frames, info->el.fps);
+		gchar *time = format_time(n_frames, (double) info->el.fps);
 		update_label_str( "label_streamrecord_duration", time );
 		g_free(time);
 	}
@@ -2746,7 +2748,7 @@ static	void	update_record_tab(int pm)
 		update_spin_value( "spin_sampleduration", 1 );
 		// combo_samplecodec
 		gint n_frames = sample_calctime();
-		gchar *time = format_time( n_frames,info->el.fps );
+		gchar *time = format_time( n_frames,(double) info->el.fps );
 		update_label_str( "label_samplerecord_duration", time );
 		g_free(time);
 	}
@@ -2820,7 +2822,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 
 		}
 
-		gchar *time = format_time( info->status_frame,info->el.fps );
+		gchar *time = format_time( info->status_frame,(double)info->el.fps );
 		update_label_str( "label_curtime", time );
 		g_free(time); 
 
@@ -2851,7 +2853,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 				}
 			}
 			gchar *dur = format_time( info->status_tokens[SAMPLE_MARKER_END] - info->status_tokens[SAMPLE_MARKER_START],
-				info->el.fps );
+				(double)info->el.fps );
 			update_label_str( "label_markerduration", dur );
 			g_free(dur);
 		}
@@ -4879,7 +4881,6 @@ static	void	reload_editlist_contents()
 
 		if(nl < 0 || nl >= num_files)
 		{
-			printf("exceed max files\n");
 			return;
 		}
 		int file_len = _el_get_nframes( nl );
@@ -4969,6 +4970,9 @@ static	void	load_editlist_info()
 	update_spin_value( "screenshot_height", info->el.height );	
 
 	info->el.fps = fps;
+#ifdef STRICT_CHECKING
+	assert( info->el.fps > 0 );
+#endif
 	info->el.num_files = dum[0];
 	snprintf( tmp, sizeof(tmp)-1, "%s",
 		( values[2] == 0 ? "progressive" : (values[2] == 1 ? "top first" : "bottom first" ) ) );
@@ -5050,18 +5054,10 @@ static	void	enable_widget_(const char *name, const char *s, int line)
 
 static	gchar	*format_selection_time(int start, int end)
 {
-	MPEG_timecode_t tc;
-	veejay_memset( &tc, 0,sizeof(tc));
-	if( (end-start) <= 0)
-		veejay_memset( &tc, 0, sizeof(tc));
-	else
-		mpeg_timecode( &tc, (end-start), mpeg_framerate_code(	
-			mpeg_conform_framerate( info->el.fps ) ), info->el.fps );
-
-	gchar *tmp = g_new( gchar, 20);
-	snprintf( tmp, 20, "%2d:%2.2d:%2.2d:%2.2d",	
-		tc.h, tc.m, tc.s, tc.f );
-	return tmp;
+	double fps = (double) info->el.fps;
+	int   pos = (end-start);
+	
+	return format_time( pos, fps );
 }
 
 
@@ -5689,7 +5685,7 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 
 	if( total_frames_ != history_frames_ || total_frames_ != (int) timeline_get_length(TIMELINE_SELECTION(info->tl)))
 	{
-		gchar *time = format_time( total_frames_, info->el.fps );
+		gchar *time = format_time( total_frames_,(double) info->el.fps );
 		if( pm == MODE_STREAM )
 		{
 			update_spin_value( "stream_length", info->status_tokens[SAMPLE_MARKER_END] );
@@ -5728,7 +5724,7 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 
 	info->status_frame = info->status_tokens[FRAME_NUM];
 	timeline_set_pos( info->tl, (gdouble) info->status_frame );
-	gchar *current_time_ = format_time( info->status_frame,info->el.fps );
+	gchar *current_time_ = format_time( info->status_frame, (double) info->el.fps );
 	update_label_i(   "label_curframe", info->status_frame ,1 );
 	update_label_str( "label_curtime", current_time_ );
 	update_label_str( "label_sampleposition", current_time_);

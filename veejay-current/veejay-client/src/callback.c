@@ -1007,38 +1007,18 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		int base = sample_calctime();
 		n_frames = base * dur_val;
-		n_frames = 0;
 	}
 	else
 	{
 		n_frames = dur_val;
 	}
 
-	gsize br=0; gsize bw=0;
-	gchar *utftext = (gchar*) get_text( "entry_samplename"); 
-	gchar *text = (utftext != NULL ? g_locale_from_utf8( utftext, -1, &br, &bw,NULL) : NULL);	
-	if(text != NULL)
-	{
-		int i = 0;
-		while( text[i] != '\0' )
-		{
-			if( !isalnum( text[i] ))
-			{
-				error_dialog("Error", "Only alpha numeric characters are allowed");
-				if( text) free(text);
-				return;
-			}
-			i++;
-		} 
-		multi_vims( VIMS_SAMPLE_SET_DESCRIPTION, "%d %s", 0, text );
-		g_free(text);
-	}
-	
 	if(format != NULL)
 	{
 		multi_vims( VIMS_RECORD_DATAFORMAT,"%s",
 			format );
 	}		
+
 	multi_vims( VIMS_SAMPLE_REC_START,
 		"%d %d",
 		n_frames,
@@ -1047,10 +1027,12 @@ void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 	vj_midi_learning_vims_msg2( info->midi, NULL, VIMS_SAMPLE_REC_START, n_frames, autoplay );
 
 	gchar *time1 = format_time(n_frames,info->el.fps);
-	vj_msg(VEEJAY_MSG_INFO,"Record duration: %s",
-		time1);
+	if( autoplay ) {
+		vj_msg(VEEJAY_MSG_INFO, "Recording %s from current sample, autoplaying	 new sample when finished.",time1);
+	} else {
+		vj_msg(VEEJAY_MSG_INFO,"Recording %s from current sample",time1);
+	}
 	g_free(time1);
-
 	g_free(format);	
 }
 

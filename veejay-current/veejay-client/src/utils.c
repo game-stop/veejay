@@ -18,8 +18,11 @@
  */
 #include <config.h>
 #include <stdio.h>
+#include <mjpeg/yuv4mpeg_intern.h>
+#include <mjpeg/yuv4mpeg.h>
 #include <mjpeg/mpegconsts.h>
 #include <mjpeg/mpegtimecode.h>
+
 #include <veejay/vjmem.h>
 #include <string.h>
 
@@ -52,18 +55,16 @@ int	status_to_arr( char *status, int *array )
 	return n;
 }
 
-char   *format_time(int pos, float fps)
+
+char   *format_time(int pos, double fps)
 {
+	static char temp[256];
         MPEG_timecode_t tc;
-	veejay_memset(&tc, 0,sizeof(MPEG_timecode_t));
-	char *tmp = (char*) vj_malloc( 20 );
-	y4m_ratio_t ratio = mpeg_conform_framerate( fps );
-	int n = mpeg_framerate_code( ratio );
-
-	mpeg_timecode(&tc, pos, n, fps );
-
-     	snprintf(tmp, 20, "%2d:%2.2d:%2.2d:%2.2d",
-       	        tc.h, tc.m, tc.s, tc.f );
-        return tmp;
+	mpeg_timecode(&tc,
+		      pos,
+                      mpeg_framerate_code(mpeg_conform_framerate(fps)),
+		      fps );
+     	sprintf(temp, "%d:%2.2d:%2.2d:%2.2d",tc.h, tc.m, tc.s, tc.f );
+        return strdup(temp);
 }
 
