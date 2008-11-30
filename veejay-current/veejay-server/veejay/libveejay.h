@@ -35,8 +35,7 @@ int veejay_init(veejay_t *info,int w, int h, char *arg, int td, int fr);
 
 int veejay_open(veejay_t *info);
 
-int veejay_open_files(veejay_t * info, char **files, int num_files, float fps, int force, int pixfmt,
-	char norm);
+int veejay_open_files(veejay_t * info, char **files, int num_files, float fps, int force, int pixfmt,	char norm, int switch_jpeg);
 
 int veejay_main(veejay_t * info);
 

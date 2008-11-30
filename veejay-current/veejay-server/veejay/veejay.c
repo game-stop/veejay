@@ -48,7 +48,8 @@ static float override_fps = 0.0;
 static int default_geometry_x = -1;
 static int default_geometry_y = -1;
 static int force_video_file = 0; // unused
-static int override_pix_fmt = 1;
+static int override_pix_fmt = -1;
+static int switch_jpeg = 0;
 static int full_range = 0;
 static char override_norm = 'p';
 static int auto_loop = 0;
@@ -211,6 +212,8 @@ static void Usage(char *progname)
 		"  -j/--max_cache \t\tDivide cache memory over N samples (default=4)\n");
 	fprintf(stderr,
 		"  -Y/--yuv [0123]\t\tForce pixel format if you get a corrupted image. Load one videofile only.\n");
+	fprintf(stderr,
+                "  -e/--swap-range\t\tSwap YUV range [0..255] <-> [16..235] on videofiles\n");
 	fprintf(stderr,
 		"\t\t\t\t 0 = YUV 4:2:0 Planar\n");
 	fprintf(stderr,
@@ -448,6 +451,10 @@ static int set_option(const char *name, char *value)
 		if( override_pix_fmt < 0 || override_pix_fmt > 3 )
 			override_pix_fmt = 1;
 	}
+	else if(strcmp(name, "swap-range") == 0 || strcmp(name, "e") == 0 )
+	{
+		switch_jpeg = 1;
+	}
 	else if( strcmp(name,"auto-loop")==0 || strcmp(name,"L") == 0)
 	{
 		auto_loop = 1;
@@ -596,6 +603,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"memory",1,0,0},
 	{"max_cache",1,0,0},
 	{"capture-device",1,0,0},
+	{"swap-range",0,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -609,12 +617,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:z:f:Y:A:N:H:W:R:M:C:T:nILFPVDugvdibjq",
+			"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:z:f:Y:A:N:H:W:R:M:C:T:nILFPVDugvdibjqe",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:z:f:Y:A:N:H:W:R:M:C:T:nILFPVDugvdibjq"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:z:f:Y:A:N:H:W:R:M:C:T:nILFPVDugvdibjqe"
 						   )) != EOF)
 #endif
     {
@@ -669,7 +677,8 @@ static int check_command_line_options(int argc, char *argv[])
 			override_fps,
 			force_video_file,
 			override_pix_fmt,
-			override_norm )<=0)
+			override_norm,
+			switch_jpeg )<=0)
        {
 			vj_el_show_formats();
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open video file(s), codec/format not supported)");

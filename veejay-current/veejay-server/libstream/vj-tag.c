@@ -712,7 +712,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 					 has_composite,
 					 video_driver_ ))
 		{
-			veejay_msg(0, "Unable to create stream '%dx%d' %c, %d,  [%d,%d]",
+			veejay_msg(0, "Unable to open capture stream '%dx%d' (norm=%c,format=%x,device=%d,channel=%d)",
 				w,h,el->video_norm, pix_fmt, extra,channel );
 			return -1;
 		}
@@ -2490,7 +2490,13 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	{
 	case VJ_TAG_TYPE_V4L:
 		if( tag->capture_type == 1 ) {
-			v4lvideo_copy_framebuffer_to(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]);
+			int res = v4lvideo_copy_framebuffer_to(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]);
+			if( res <= 0 ) {
+				veejay_memset( buffer[0], 0, len );
+				veejay_memset( buffer[1], 128, uv_len );
+				veejay_memset( buffer[2], 128, uv_len );
+			}
+
 		}
 #ifdef HAVE_UNICAP
 		else {

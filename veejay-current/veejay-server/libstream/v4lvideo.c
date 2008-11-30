@@ -434,6 +434,8 @@ static int	__v4lvideo_init( v4lvideo_t *v, char* file, int channel, int norm, in
 		return -1;
 	
 	if ( v4lopen(file, &(v->vd)) ) {
+		veejay_msg(0, "Unable to open capture device '%s' (no such device?)",
+					file );
 		return -1;
 	}
 
@@ -643,7 +645,7 @@ static	void	*v4lvideo_grabber_thread( void * vv )
 	uint8_t *dstV = i->frame_buffer + v->info->dst->len + v->info->dst->uv_len;
 
 	v->active = 1;
-	int retry = 0;
+	int retry = 4;
 	int flag  = 0;
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Capture device thread enters inner loop");
@@ -661,6 +663,7 @@ PAUSED:
 		} else {
 			if(!v->grabbing) {
 				lock_(i);
+				veejay_msg(VEEJAY_MSG_DEBUG, "Trying to start capturing.");
 				__v4lvideo_grabstart(v);
 				unlock_(i);
 				goto RESTART;
@@ -675,23 +678,35 @@ PAUSED:
 				__v4lvideo_copy_framebuffer_to( v,i, dstY, dstU, dstV );
 			}
 
+			if(flag == -1) {
+				if( retry == 0 ) {
+					veejay_msg(0,"Giving up on this device.");
+					v->active = 0;
+					goto CAPTURE_STOP;
+				} else {
+					veejay_msg(0,"Error syncing frame from capture device!");
+					retry --;
+				}
+			}
+
 			v4lvideo_grabframe(v);
 			goto RESTART;
 		}
 	
 	
-
+/*
 		if(!v->grabbing || flag < 0 ) {
 			__v4lvideo_draw_error_pattern( i, dstY, dstU,dstV );
-		}
+		}*/
 	}
-
 	if(v->grabbing)
 		__v4lvideo_grabstop(v);
+CAPTURE_STOP:
 	v4lvideo_destroy(v);
-	pthread_exit(NULL);
 
 	veejay_msg(0, "Stopped grabbing from device '%s'", i->filename);
+	i->status = 0;
+	pthread_exit(NULL);
 	return NULL;
 }
 int	v4lvideo_grabstop( void *vv )
@@ -775,16 +790,17 @@ int	v4lvideo_grabframe( void *vv )
 	return v4lgrabf( &(v->vd));
 }
 
-void	v4lvideo_copy_framebuffer_to( void *vv, uint8_t *dstY, uint8_t *dstU, uint8_t *dstV )
+int	v4lvideo_copy_framebuffer_to( void *vv, uint8_t *dstY, uint8_t *dstU, uint8_t *dstV )
 {
 	v4lvideo_template_t *v = (v4lvideo_template_t*) vv;
-	if(!v->status)	
-		return;
+	if(!v->status) {	
+		return -1;
+	}
 	
 lock_(v);
 	if(!v->v4l ) {
 		unlock_(v);
-		return;
+		return 0;
 	}
 #ifdef STRICT_CHECKING
 	assert( v->v4l != NULL );
@@ -799,8 +815,11 @@ lock_(v);
 		if( (v1->dps%25)== 1 && v->error == 0)
 			veejay_msg(VEEJAY_MSG_INFO, "Capture device is initializing, just a moment ...");
 		v1->dps++;
+		unlock_(v);
+		return 0;
 	}
-unlock_(v);
+	unlock_(v);
+	return 1;
 }
 
 static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *v2, uint8_t *dstY, uint8_t *dstU, uint8_t *dstV )

@@ -512,6 +512,12 @@ int sample_get_longest(int sample_id)
 		int t=0;
 		int _id=0;
 		int speed = abs(si->speed);
+		if( speed == 0 ) {
+			veejay_msg(VEEJAY_MSG_WARNING,
+				 "Starting paused sample %d at normal speed",
+					sample_id);
+			speed = 1;
+		}
 		int duration = len / speed; //how many frames are played of this sample
 
 		if( si->looptype == 2) duration *= 2; // pingpong loop duration     

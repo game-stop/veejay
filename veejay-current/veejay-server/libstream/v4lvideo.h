@@ -41,7 +41,7 @@ int	v4lvideo_grabstop( void *vv );
 int	v4lvideo_syncframe(void *vv);
 int	v4lvideo_grabframe( void *vv );
 //uint8_t *v4lvideo_getaddress( void *vv );
-void	v4lvideo_copy_framebuffer_to( void *vv, uint8_t *dstY, uint8_t *dstU, uint8_t *dstV );
+int	v4lvideo_copy_framebuffer_to( void *vv, uint8_t *dstY, uint8_t *dstU, uint8_t *dstV );
 
 int	v4lvideo_setfreq( void *vv, int f );
 

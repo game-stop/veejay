@@ -81,6 +81,7 @@ typedef struct
 void	yuv_init_lib();
 
 void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *templ, int cpu_flags);
+void	yuv_convert_and_scale_packed( void *sws, VJFrame *src, VJFrame *dst );
 
 void	yuv_convert_and_scale( void *sws, VJFrame *src, VJFrame *dst );
 

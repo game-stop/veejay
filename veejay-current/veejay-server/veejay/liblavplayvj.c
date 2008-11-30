@@ -2371,8 +2371,6 @@ skip_audio:
 		}
 		else
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Unable to open capture device, Use -A[%d-%d]",
-				1, n );
 			return -1;
 		}
 		info->settings->late[0] = VJ_PLAYBACK_MODE_TAG;
@@ -3110,7 +3108,7 @@ veejay_t *veejay_malloc()
 	info->sdl = (vj_sdl**) vj_calloc(sizeof(vj_sdl*) * MAX_SDL_OUT ); 
 #endif
 
-	info->pixel_format = FMT_422; //@default 
+	info->pixel_format = FMT_422F; //@default 
 	info->settings->ncpu = smp_check();
 
 	yuv_init_lib();
@@ -3811,14 +3809,15 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	return 1;
 }
 
-int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, int force,int force_pix_fmt, char override_norm)
+int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, int force,int force_pix_fmt, char override_norm, int switch_jpeg)
 {
 	int ret = 0;
    	video_playback_setup *settings =
 		(video_playback_setup *) info->settings;
 
-	if(force_pix_fmt >= 0)
+	if(force_pix_fmt >= 0) {
 		info->pixel_format = force_pix_fmt;
+	}
 	
 	char text[24];
 
@@ -3836,9 +3835,13 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 			return 0;
 	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Processing set to YUV %s", text );
+	if(force_pix_fmt >= 0 ) {
+	  veejay_msg(VEEJAY_MSG_WARNING , "Output pixel format set to %s by user", text );
+	}
+	else
+		veejay_msg(VEEJAY_MSG_DEBUG, "Processing set to YUV %s", text );
 
-	vj_el_init( info->pixel_format );
+	vj_el_init( info->pixel_format, switch_jpeg );
 	
 	/* override options */
 	if(ofps<=0.0)

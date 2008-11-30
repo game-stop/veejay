@@ -30,6 +30,7 @@
 #include <veejay/vims.h>
 #include <libvjmem/vjmem.h>
 #include <libel/vj-avcodec.h>
+#include <libyuv/yuvconv.h>
 #include <veejay/libveejay.h>
 #include <string.h>
 #include <stdlib.h>
@@ -58,6 +59,19 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
     vjsdl->custom_geo[1] = -1;
     vjsdl->show_cursor = 0;
     vjsdl->display = NULL;
+	switch(fmt) {	
+	case FMT_420: vjsdl->ffmpeg_pixfmt = PIX_FMT_YUV420P;break;
+	case FMT_420F:vjsdl->ffmpeg_pixfmt = PIX_FMT_YUVJ420P;break;
+	case FMT_422F:vjsdl->ffmpeg_pixfmt = PIX_FMT_YUVJ422P;break;
+	case FMT_422:vjsdl->ffmpeg_pixfmt = PIX_FMT_YUV422P;break;
+	}
+    sws_template templ;	
+    memset(&templ,0,sizeof(sws_template));
+    templ.flags = 1;
+    VJFrame *src = yuv_yuv_template( NULL,NULL,NULL,vjsdl->width,vjsdl->height, vjsdl->ffmpeg_pixfmt );
+    VJFrame *dst = yuv_yuv_template(  NULL,NULL,NULL,vjsdl->width,vjsdl->height,PIX_FMT_YUYV422);
+    vjsdl->scaler = yuv_init_swscaler( src,dst, &templ, yuv_sws_get_cpu_flags() );
+
     return vjsdl;
 }
 
@@ -358,15 +372,25 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
 	assert( yuv420[2] != NULL );
 #endif
 
+	VJFrame *src = yuv_yuv_template( yuv420[0],yuv420[1],yuv420[2],vjsdl->width,vjsdl->height, vjsdl->ffmpeg_pixfmt );
+	VJFrame *dst = yuv_yuv_template(  vjsdl->yuv_overlay->pixels[0],NULL,NULL,vjsdl->width,vjsdl->height,PIX_FMT_YUYV422);
+
+	yuv_convert_and_scale_packed( vjsdl->scaler, src,dst );
+
+	
+	/*
 	if(vjsdl->pix_fmt == FMT_420 || vjsdl->pix_fmt == FMT_420F)
 		yuv420p_to_yuv422( yuv420, vjsdl->yuv_overlay->pixels[0],vjsdl->width,vjsdl->height);
 	else
 		yuv422_to_yuyv( yuv420, vjsdl->yuv_overlay->pixels[0], vjsdl->width,vjsdl->height);
-
+	*/
 	if (!vj_sdl_unlock(vjsdl))
 		return 0;
 
 	SDL_DisplayYUVOverlay(vjsdl->yuv_overlay, &(vjsdl->rectangle));
+
+	free(src);
+	free(dst);
 
 	return 1;
 }

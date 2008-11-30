@@ -194,6 +194,35 @@ static struct
 };
 
 static	int mmap_size = 0;
+static struct {
+        int i;
+        char *s;
+} pixfmtstr[] = {
+{       -1    ,         "Unknown/Invalid"},
+{	PIX_FMT_YUV420P, "YUVPIX_FMT_YUV420P"},
+{       PIX_FMT_YUV422P, "4:2:2 planar, Y-Cb-Cr ( 422P )"},
+{       PIX_FMT_YUVJ420P, "4:2:0 planar, Y-U-V (420P JPEG)"},
+{       PIX_FMT_YUVJ422P, "4:2:2 planar, Y-U-V (422P JPEG)"},
+{       PIX_FMT_RGB24,    "RGB 24 bit"},
+{       PIX_FMT_BGR24,    "BGR 24 bit"},
+{       PIX_FMT_YUV444P,  "YUV 4:4:4 planar, Y-Cb-Cr (444P)"},
+{       PIX_FMT_YUVJ444P, "YUV 4:4:4 planar, Y-U-V (444P JPEG)"},
+{       PIX_FMT_RGB32,    "RGB 32 bit"},
+{       PIX_FMT_BGR32,    "BGR 32 bit"},
+{       PIX_FMT_GRAY8,    "Greyscale"},
+{       PIX_FMT_RGB32_1,  "RGB 32 bit LE"},
+{       0       ,         NULL}
+};
+
+static const    char    *el_pixfmt_str(int i)
+{
+        int j;
+        for( j = 0; pixfmtstr[j].s != NULL ; j ++ ) {
+                if( i == pixfmtstr[j].i )
+                        return pixfmtstr[j].s;
+        }
+        return pixfmtstr[0].s;
+}
 
 typedef struct
 {
@@ -311,12 +340,13 @@ static int el_len_ = 0;
 static int el_uv_len_ = 0;
 static int el_uv_wid_ = 0;
 static int mem_chunk_ = 0;
+static int el_switch_jpeg_ = 0;
 void	vj_el_init_chunk(int size)
 {
 //@@ chunk size per editlist
 	mem_chunk_ = 1024 * size;
 }
-void	vj_el_init(int pf)
+void	vj_el_init(int pf, int switch_jpeg)
 {
 	int i;
 	for( i = 0; i < MAX_CODECS ;i ++ )
@@ -325,6 +355,7 @@ void	vj_el_init(int pf)
 #ifdef STRICT_CHECKING
 	assert( pf == FMT_420 || pf == FMT_420F || pf == FMT_422 || pf == FMT_422F );
 #endif
+	el_switch_jpeg_ = switch_jpeg;
 }
 
 int	vj_el_is_dv(editlist *el)
@@ -642,6 +673,15 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "(!) Using pixelformat detected by FFmpeg (fallback)");
 		pix_fmt = in_pixel_format;
+	}
+
+	if(el_switch_jpeg_ ) {
+		switch(pix_fmt) {
+		 	case FMT_420:  pix_fmt=FMT_420F;break;
+			case FMT_420F: pix_fmt=FMT_420; break;
+			case FMT_422F: pix_fmt=FMT_422; break;
+			case FMT_422:  pix_fmt=FMT_422F;break;	
+		}
 	}
 
 	el->yuv_taste[n] = pix_fmt;
@@ -1229,6 +1269,16 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 
 			int dst_fmt = get_ffmpeg_pixfmt( el_pixel_format_ );
 			int src_fmt = d->context->pix_fmt;
+	
+			if( el_switch_jpeg_ ) {
+				switch(src_fmt) {
+					case PIX_FMT_YUV420P:src_fmt=PIX_FMT_YUVJ420P; break;
+					case PIX_FMT_YUVJ420P:src_fmt=PIX_FMT_YUV420P; break;
+					case PIX_FMT_YUV422P:src_fmt=PIX_FMT_YUVJ422P; break;
+					case PIX_FMT_YUVJ422P:src_fmt=PIX_FMT_YUV422P; break;
+				}
+			}
+
 			if(!d->frame->opaque)
 			{
 				if( el->auto_deinter && inter != LAV_NOT_INTERLACED)
@@ -1394,8 +1444,8 @@ further:
 		return -1;
 	}
 		
-	veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg reports Video [%s] %dx%d. Pixel format: %x Has B frames: %s (%s)",
-		codec_ctx->codec_name, codec_ctx->width,codec_ctx->height, codec_ctx->pix_fmt, 
+	veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg reports Video [%s] %dx%d. Pixel format: %s Has B frames: %s (%s)",
+		codec_ctx->codec_name, codec_ctx->width,codec_ctx->height, el_pixfmt_str(codec_ctx->pix_fmt), 
 		(codec_ctx->has_b_frames ? "Yes" : "No"), filename );
 
 	av_free_packet(&pkt); 

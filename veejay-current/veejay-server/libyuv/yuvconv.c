@@ -166,6 +166,11 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->stride[0] = w;
 			f->stride[1] = f->stride[2] = 0;
 			break;
+		case PIX_FMT_YUYV422:
+			f->uv_width = w>>1;
+			f->uv_height = f->height;
+			f->stride[0] = w * 2;
+			f->stride[1] = f->stride[2] = 0;
 		default:
 #ifdef STRICT_CHECKING
 			assert(0);
@@ -965,7 +970,15 @@ void	yuv_convert_and_scale_grey(void *sws , VJFrame *src, VJFrame *dst)
 	sws_scale( s->sws, src->data, src_stride, 0, src->height,
 		dst->data, dst_stride );
 }
+void	yuv_convert_and_scale_packed(void *sws , VJFrame *src, VJFrame *dst)
+{
+	vj_sws *s = (vj_sws*) sws;
+	int src_stride[3] = { src->width,src->uv_width,src->uv_width };
+	int dst_stride[3] = { dst->width * 2,0,0 };
 
+	sws_scale( s->sws, src->data, src_stride, 0, src->height,
+		dst->data, dst_stride );
+}
 int	yuv_sws_get_cpu_flags(void)
 {
 	int cpu_flags = 0;
