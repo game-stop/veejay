@@ -178,7 +178,7 @@ fi
 
 dnl Check for Veejay
 have_veejay=false
-PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.4.1 ],
+PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.4.3 ],
 	[	
 		AC_SUBST(VEEJAY_CFLAGS)
 		AC_SUBST(VEEJAY_LIBS)
