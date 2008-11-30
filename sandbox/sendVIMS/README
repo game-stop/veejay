@@ -6,7 +6,7 @@ This is free software covered under the terms of the
 GNU GPL. See the file COPYING for details.
 
 requirements:
-	veejay-0.7.2
+	veejay-1.4.3
 	or latest veejay from SVN (http://veejay.dyne.org)
 
 pre build (optional):
