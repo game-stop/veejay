@@ -381,7 +381,8 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 	if( av->encoder_id == 999 &&  (av->out_fmt == FMT_422 || av->out_fmt==FMT_422F)) 
 	{
 		VJFrame *srci= yuv_yuv_template( src[0],src[1],src[2], av->width,av->height, get_ffmpeg_pixfmt( av->out_fmt));
-		VJFrame *dsti= yuv_yuv_template( dst,dst+av->len,dst+av->len+(av->len/4), av->width,av->height, PIX_FMT_YUV420P );
+		VJFrame *dsti= yuv_yuv_template( dst,dst+av->len,dst+av->len+(av->len/4), av->width,av->height, 
+					(av->out_fmt == FMT_422F ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P ));
 
 		yuv_convert_any_ac( srci,dsti, srci->format, dsti->format );
 
@@ -395,7 +396,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 	{
 		VJFrame *srci = yuv_yuv_template( src[0],src[1],src[2], av->width,av->height,get_ffmpeg_pixfmt(av->out_fmt));
 		VJFrame *dsti = yuv_yuv_template( dst, dst + av->len, dst + (av->len + (av->len/2)), 
-					av->width,av->height, PIX_FMT_YUV422P);
+					av->width,av->height, 	(av->out_fmt == FMT_420F ? PIX_FMT_YUVJ422P : PIX_FMT_YUV422P ));
 
 		free(srci);
 		free(dsti);
@@ -442,7 +443,7 @@ int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[
 		pict.linesize[1] = av->context->width >> 1;
 		pict.linesize[2] = av->context->width >> 1;
 		
-		VJFrame *srci = yuv_yuv_template( src[0],src[1],src[2], av->context->width,av->context->height, src_fmt );
+		VJFrame *srci = yuv_yuv_template( src[0],src[1],src[2], av->width,av->height, src_fmt );
 		VJFrame *dsti = yuv_yuv_template( av->data[0],av->data[1],av->data[2],av->context->width,av->context->height,
 				   av->context->pix_fmt );
 
@@ -456,7 +457,7 @@ int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[
 		pict.data[0] = src[0];
 		pict.data[1] = src[1];
 		pict.data[2] = src[2];
-		pict.linesize[0] = av->context->width;
+		pict.linesize[0] = av->width;
 		pict.linesize[1] = pict.linesize[0]>>1;
 		pict.linesize[2] = pict.linesize[0]>>1;
 	}

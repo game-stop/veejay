@@ -1521,8 +1521,7 @@
 DVVIDEO
 MPEG4
 MSMPEG4V3
-YV12
-YV16
+YUV
 Quicktime-DV
 Quicktime-MJPEG
 MLZO</property>
@@ -3564,8 +3563,7 @@ MLZO</property>
 DVVIDEO
 MPEG4
 MSMPEG4V3
-YV12
-YV16
+YUV
 Quicktime-DV
 Quicktime-MJPEG
 MLZO</property>

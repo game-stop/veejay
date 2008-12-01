@@ -7080,12 +7080,21 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		return;
 	}
 
+	if( strncasecmp(str, "yv",2 ) == 0 || strncasecmp(str, "yuv", 3 ) == 0 ) {
+		if( v->pixel_format == FMT_422F || v->pixel_format == FMT_422 ) {
+			_recorder_format = ENCODER_YUV422;
+		} else {
+			_recorder_format = ENCODER_YUV420;
+		}
+	}
 
-	if(strncasecmp(str, "yv16",4) == 0 || strncasecmp(str,"y422",4)==0)
-	{
-		_recorder_format = ENCODER_YUV422;
-		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in YUV 4:2:2 Planar");
-		return;
+	if( v->pixel_format == FMT_422F || v->pixel_format == FMT_422 ) {
+		if(strncasecmp(str, "yv16",4) == 0 || strncasecmp(str,"y422",4)==0)
+		{
+			_recorder_format = ENCODER_YUV422;
+			veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in YUV 4:2:2 Planar");
+			return;
+		}
 	}
 
 	if(strncasecmp(str,"mpeg4",5)==0 || strncasecmp(str,"divx",4)==0)
@@ -7139,6 +7148,8 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		return;
 	}	
 #endif
+	if( v->pixel_format == FMT_420F || v->pixel_format == FMT_420 ) {
+
 	if(strncasecmp(str,"i420",4)==0 || strncasecmp(str,"yv12",4)==0 )
 	{
 		_recorder_format = ENCODER_YUV420;
@@ -7149,9 +7160,14 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		}
 		return;
 	}
-	veejay_msg(VEEJAY_MSG_INFO, "Use one of these:");
-	veejay_msg(VEEJAY_MSG_INFO, "mpeg4, div3, dvvideo , mjpeg , i420 or yv16");	
 
+	}
+	veejay_msg(VEEJAY_MSG_INFO, "Use one of these:");
+	if( v->pixel_format == FMT_420F || v->pixel_format == FMT_420 ) {
+		veejay_msg(VEEJAY_MSG_INFO, "yuv,mpeg4, div3, dvvideo, mjpeg or i420");	
+	} else {
+		veejay_msg(VEEJAY_MSG_INFO, "yuv,mpeg4, div3, dvvideo, mjpeg or yv16");	
+	}
 }
 
 static void _vj_event_tag_record( veejay_t *v , int *args, char *str )

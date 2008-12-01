@@ -5933,7 +5933,8 @@
 		  <child>
 		    <widget class="GtkNotebook" id="panels">
 		      <property name="visible">True</property>
-		      <property name="show_tabs">False</property>
+		      <property name="can_focus">True</property>
+		      <property name="show_tabs">True</property>
 		      <property name="show_border">False</property>
 		      <property name="tab_pos">GTK_POS_TOP</property>
 		      <property name="scrollable">False</property>
@@ -6320,8 +6321,7 @@
 DVVIDEO
 MPEG4
 MSMPEG4V3
-YV12
-YV16
+YUV
 Quicktime-DV
 Quicktime-MJPEG
 MLZO</property>
@@ -8413,8 +8413,7 @@ MLZO</property>
 DVVIDEO
 MPEG4
 MSMPEG4V3
-YV12
-YV16
+YUV
 Quicktime-DV
 Quicktime-MJPEG
 MLZO</property>
