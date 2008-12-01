@@ -31,7 +31,7 @@ void veejay_signal_loop(void *);
 
 int veejay_init_editlist(veejay_t * info);
 
-int veejay_init(veejay_t *info,int w, int h, char *arg, int td, int fr);
+int veejay_init(veejay_t *info,int w, int h, char *arg, int td);
 
 int veejay_open(veejay_t *info);
 
@@ -125,5 +125,7 @@ void     veejay_check_homedir(void *arg);
 void     veejay_auto_loop(veejay_t *info);
 
 int      prepare_cache_line(int perc, int n_slots);
+
+int	veejay_set_yuv_range( veejay_t *info );
 
 #endif

@@ -169,12 +169,12 @@ int  pixel_U_hi_ = 240;
 int  pixel_Y_lo_ = 16;
 int  pixel_U_lo_ = 16;
 
-void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t lo)
+void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo)
 {
 	pixel_Y_hi_ = Yhi;
 	pixel_U_hi_ = Uhi;
-	pixel_U_lo_ = lo;
-	pixel_Y_lo_ = lo;
+	pixel_U_lo_ = Ylo;
+	pixel_Y_lo_ = Ulo;
 }
 
 static struct
@@ -449,7 +449,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 
     if( full_range )
     {
-	    set_pixel_range( 255, 255,0 );
+	    set_pixel_range( 255, 255,0,0 );
     }
     
     n_ext_plugs_ = plug_detect_plugins();

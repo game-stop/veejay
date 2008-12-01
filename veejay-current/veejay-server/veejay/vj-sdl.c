@@ -59,10 +59,12 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
     vjsdl->custom_geo[1] = -1;
     vjsdl->show_cursor = 0;
     vjsdl->display = NULL;
-	switch(fmt) {	
+	switch(fmt) {
+	 //@ dont use YUVJ here - on blitting it to SDL it will be converted to YUV clamped for YUYJ422
+	
 	case FMT_420: vjsdl->ffmpeg_pixfmt = PIX_FMT_YUV420P;break;
-	case FMT_420F:vjsdl->ffmpeg_pixfmt = PIX_FMT_YUVJ420P;break;
-	case FMT_422F:vjsdl->ffmpeg_pixfmt = PIX_FMT_YUVJ422P;break;
+	case FMT_420F:vjsdl->ffmpeg_pixfmt = PIX_FMT_YUV420P;break;
+	case FMT_422F:vjsdl->ffmpeg_pixfmt = PIX_FMT_YUV422P;break;
 	case FMT_422:vjsdl->ffmpeg_pixfmt = PIX_FMT_YUV422P;break;
 	}
     sws_template templ;	

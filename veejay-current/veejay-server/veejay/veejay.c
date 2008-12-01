@@ -50,7 +50,6 @@ static int default_geometry_y = -1;
 static int force_video_file = 0; // unused
 static int override_pix_fmt = -1;
 static int switch_jpeg = 0;
-static int full_range = 0;
 static char override_norm = 'p';
 static int auto_loop = 0;
 static int n_slots_ = 4;
@@ -444,10 +443,6 @@ static int set_option(const char *name, char *value)
 	else if(strcmp(name,"yuv")==0 || strcmp(name,"Y")==0)
 	{
 		override_pix_fmt = atoi(optarg);
-		if(override_pix_fmt > 1 )
-		{
-			full_range = 1;
-		}
 		if( override_pix_fmt < 0 || override_pix_fmt > 3 )
 			override_pix_fmt = 1;
 	}
@@ -786,8 +781,7 @@ int main(int argc, char **argv)
 		default_geometry_x,
 		default_geometry_y,
 		NULL,
-		live,
-		full_range ) < 0 )
+		live )< 0)
 	{	
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot start Vveejay");
 		return 0;

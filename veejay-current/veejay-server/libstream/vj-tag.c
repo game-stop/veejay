@@ -679,9 +679,9 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->socket_ready = 0;
     tag->socket_frame = NULL;
     tag->socket_len = 0;
-    tag->color_r = 0;
-    tag->color_g = 0;
-    tag->color_b = 0;
+    tag->color_r = 255;
+    tag->color_g = 255;
+    tag->color_b = 255;
     tag->opacity = 0;
 	tag->priv = NULL;
 

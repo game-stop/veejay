@@ -256,6 +256,24 @@ int veejay_get_state(veejay_t *info) {
 	video_playback_setup *settings = (video_playback_setup*)info->settings;
 	return settings->state;
 }
+int	veejay_set_yuv_range(veejay_t *info) {
+	switch(info->pixel_format) {
+		case FMT_420:	
+		case FMT_422:
+		//	rgb_parameter_conversion_type_ = 1; //CCIR601_RGB;
+			set_pixel_range( 235,240,16,16 );
+			veejay_msg(VEEJAY_MSG_DEBUG, "Using CCIR601 RGB <-> YUV ");
+			return 0;
+			break;
+		default:
+		//	rgb_parameter_conversion_type_ = 0; //GIMP_RGB;
+			set_pixel_range( 255, 255,0,0 );
+			veejay_msg(VEEJAY_MSG_DEBUG, "Using GIMP RGB <-> YUV ");
+			break;
+	}
+	return 1;
+}
+
 /******************************************************
  * veejay_change_state()
  *   change the state
@@ -1946,7 +1964,7 @@ static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
  ******************************************************/
 
 
-int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_range)
+int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 {
 	editlist *el = info->edit_list;
 	video_playback_setup *settings = info->settings;
@@ -2056,6 +2074,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int full_
 			    info->preserve_pathnames,
 				0,
 			    el->video_norm );
+
+	int full_range = veejay_set_yuv_range( info );
 
 	if(info->pixel_format == FMT_422  || info->pixel_format == FMT_422F)
 	{

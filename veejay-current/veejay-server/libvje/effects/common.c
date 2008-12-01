@@ -24,7 +24,6 @@
 #include <math.h>
 #include <libvjmem/vjmem.h>
 #include <libvje/internal.h>
-
 #include "common.h"
 
 char	**vje_build_param_list( int num, ... )
