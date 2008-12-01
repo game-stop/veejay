@@ -388,7 +388,9 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 	dest[1] = dest[0] + (out_w * out_h);
 	dest[2] = dest[1] + ( (out_w * out_h)/4 );
 
-	VJFrame *dst1 = yuv_yuv_template( dest[0], dest[1], dest[2], out_w, out_h, PIX_FMT_YUV420P );
+
+	int dst_fmt = (pixfmt == PIX_FMT_YUVJ420P || pixfmt == PIX_FMT_YUVJ422P ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P );
+	VJFrame *dst1 = yuv_yuv_template( dest[0], dest[1], dest[2], out_w, out_h, dst_fmt );
 
 	pic_changed_ = pic_has_changed( out_w,out_h, pixfmt );
 
