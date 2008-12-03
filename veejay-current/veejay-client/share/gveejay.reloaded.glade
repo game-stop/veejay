@@ -5933,7 +5933,8 @@
 		  <child>
 		    <widget class="GtkNotebook" id="panels">
 		      <property name="visible">True</property>
-		      <property name="show_tabs">False</property>
+		      <property name="can_focus">True</property>
+		      <property name="show_tabs">True</property>
 		      <property name="show_border">False</property>
 		      <property name="tab_pos">GTK_POS_TOP</property>
 		      <property name="scrollable">False</property>
@@ -6316,14 +6317,18 @@
 							<widget class="GtkComboBoxEntry" id="combo_samplecodec">
 							  <property name="width_request">120</property>
 							  <property name="visible">True</property>
-							  <property name="items" translatable="yes">MJPEG
+							  <property name="items" translatable="yes">VJ20 (YUV 4:2:0 Planar)
+VJ22 (YUV 4:2:2 Planar)
+MJPEG
 DVVIDEO
 MPEG4
 MSMPEG4V3
-YUV
+YV16 (YCbCr 4:2:2 Planar)
+I420 (YCbCr 4:2:0 Planar)
 Quicktime-DV
 Quicktime-MJPEG
-MLZO</property>
+MLZO
+YUV (current)</property>
 							  <property name="add_tearoffs">False</property>
 							  <property name="has_frame">True</property>
 							  <property name="focus_on_click">True</property>
@@ -8408,14 +8413,18 @@ MLZO</property>
 							<widget class="GtkComboBoxEntry" id="combo_streamcodec">
 							  <property name="width_request">120</property>
 							  <property name="visible">True</property>
-							  <property name="items" translatable="yes">MJPEG
+							  <property name="items" translatable="yes">VJ20 (YUV 4:2:0 Planar 0-255/0-255)
+VJ22 (YUV 4:2:2 Planar 0-255/0-255)
+MJPEG
 DVVIDEO
 MPEG4
 MSMPEG4V3
-YUV
+YV16 (YCbCr 4:2:2 Planar, 16-235/16-240)
+I420 (YCbCr 4:2:0 Planar, 16-235/16-240)
 Quicktime-DV
 Quicktime-MJPEG
-MLZO</property>
+MLZO
+YUV (current)</property>
 							  <property name="add_tearoffs">False</property>
 							  <property name="has_frame">True</property>
 							  <property name="focus_on_click">True</property>
