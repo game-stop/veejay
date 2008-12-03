@@ -133,8 +133,10 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 	{
 		case ENCODER_DVVIDEO: sprintf(descr,"DV2"); cformat='d'; break;
 		case ENCODER_MJPEG: sprintf(descr, "MJPEG"); cformat='a'; break;
-		case ENCODER_YUV420: sprintf(descr, "YUV 4:2:0 YV12"); cformat='Y'; break;
-		case ENCODER_YUV422: sprintf(descr, "YUV 4:2:2 Planar"); cformat='P'; break;
+		case ENCODER_YUV420F:  sprintf(descr, "YUV 4:2:0 YV12"); cformat='v'; break;
+		case ENCODER_YUV420: sprintf(descr, "YCbCr 4:2:0 YV12"); cformat='Y'; break;
+		case ENCODER_YUV422F: sprintf(descr,"YUV 4:2:2 Planar");cformat='V';break;
+		case ENCODER_YUV422: sprintf(descr, "YCbCr 4:2:2 Planar"); cformat='P'; break;
 		case ENCODER_MPEG4: sprintf(descr, "MPEG4"); cformat='M'; break;
 		case ENCODER_DIVX: sprintf(descr, "DIVX"); cformat='D'; break;
 		case ENCODER_QUICKTIME_DV:
@@ -181,8 +183,10 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 		switch(format)
 		{
 			case ENCODER_YUV420:
+			case ENCODER_YUV420F:
 			 si->encoder_max_size= 2048 + tmp + (tmp/4) + (tmp/4);break;
 			case ENCODER_YUV422:
+			case ENCODER_YUV422F:
 			si->encoder_max_size = 2048 + tmp + (tmp/2) + (tmp/2);break;
 			case ENCODER_LZO:
 			si->encoder_max_size = (tmp * 3 ); break;
@@ -250,7 +254,7 @@ int sample_init_encoder(int sample_id, char *filename, int format, editlist *el,
 	{
 		 return -1; 
 	}
-	if(format < 0 || format > 8)
+	if(format < 0 || format > 11)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid format!");
 		return -1;
@@ -310,7 +314,7 @@ int sample_continue_record( int s1 )
 	return 0;
 }
 
-int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_size) {
+int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_size, int pix_fmt) {
    sample_info *si = sample_get(s1);
    int buf_len = 0;
    if(!si) return -1;
@@ -321,7 +325,8 @@ int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
   	}
 
    buf_len =  vj_avcodec_encode_frame(si->encoder, si->encoder_total_frames ++,
-		si->encoder_format, buffer, vj_avcodec_get_buf(si->encoder), si->encoder_max_size);
+		si->encoder_format, buffer, vj_avcodec_get_buf(si->encoder), si->encoder_max_size, pix_fmt);
+
    if(buf_len <= 0) 
    {
 

@@ -40,6 +40,8 @@
 #define CHROMA422 2
 #define CHROMA444 3
 #define CHROMA411 4
+#define CHROMA420F 5
+#define CHROMA422F 6
 
 /* raw data format of a single frame */
 #define DATAFORMAT_MJPG     0

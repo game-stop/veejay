@@ -2385,7 +2385,7 @@ static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[3], int
 		buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * PERFORM_AUDIO_SIZE );
 		audio_len = vj_perform_fill_audio_buffers(info, buf, audio_render_buffer, &rec_audio_sample_ );
 	}
-	int res = sample_record_frame( sample,frame,buf,audio_len );
+	int res = sample_record_frame( sample,frame,buf,audio_len,info->pixel_format );
 
 	if( buf )
 		free(buf);
@@ -2410,7 +2410,7 @@ static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[3])
 		}
 	}
 
-	return vj_tag_record_frame( sample_id, frame, NULL, 0);
+	return vj_tag_record_frame( sample_id, frame, NULL, 0, info->pixel_format);
 }	
 
 static int vj_perform_record_commit_single(veejay_t *info)

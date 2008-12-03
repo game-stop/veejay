@@ -270,7 +270,7 @@ void 	vj_tag_close_all();
 int	vj_tag_composite(int t1);
 
 int		vj_tag_init_encoder(int t1, char *filename, int format, long nframes);
-int		vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_size); 
+int		vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_size, int pixel_format); 
 int 	vj_tag_get_encoded_frames(int t1);
 long		vj_tag_get_total_frames(int t1);
 long		vj_tag_get_duration(int t1);

@@ -1217,6 +1217,11 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	char descr[100];
 	char cformat = 'Y';
 	int sample_id = tag->id;
+	if(format < 0 || format > 11)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid format!");
+		return -1;
+	}
 
 	switch(format)
 	{
@@ -1224,8 +1229,10 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		case ENCODER_QUICKTIME_MJPEG:	sprintf(descr, "MJPEG"); cformat='q'; break;
 		case ENCODER_DVVIDEO: sprintf(descr, "DV2"); cformat='b';break;
 		case ENCODER_MJPEG: sprintf(descr,"MJPEG"); cformat='a'; break;
-		case ENCODER_YUV420: sprintf(descr, "YUV 4:2:0 YV12"); cformat='Y'; break;
-		case ENCODER_YUV422: sprintf(descr, "YUV 4:2:2 Planar"); cformat='P'; break;
+		case ENCODER_YUV420F:  sprintf(descr, "YUV 4:2:0 YV12"); cformat='v'; break;
+		case ENCODER_YUV420: sprintf(descr, "YCbCr 4:2:0 YV12"); cformat='Y'; break;
+		case ENCODER_YUV422F: sprintf(descr,"YUV 4:2:2 Planar");cformat='V';break;
+		case ENCODER_YUV422: sprintf(descr, "YCbCr 4:2:2 Planar"); cformat='P'; break;
 		case ENCODER_MPEG4: sprintf(descr, "MPEG4"); cformat='M'; break;
 		case ENCODER_DIVX: sprintf(descr, "DIVX"); cformat='D'; break;
 		case ENCODER_LZO:  sprintf(descr, "LZO YUV"); cformat = 'L'; break;
@@ -1254,8 +1261,10 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		switch(format)
 		{
 			case ENCODER_YUV420:
+			case ENCODER_YUV420F:
 			tag->encoder_max_size = 2048 + tmp + (tmp/4) + (tmp/4);break;
 			case ENCODER_YUV422:
+			case ENCODER_YUV422F:
 			tag->encoder_max_size = 2048 + tmp + (tmp/2) + (tmp/2);break;
 			case ENCODER_LZO:
 			tag->encoder_max_size = tmp * 3; break;
@@ -2387,7 +2396,7 @@ int	vj_tag_var(int t1, int *type, int *fader, int *fx_sta , int *rec_sta, int *a
 	return 1;
 }
 
-int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_size) {
+int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_size,int pixel_format) {
    vj_tag *tag = vj_tag_get(t1);
    int buf_len = 0;
    if(!tag) return -1;
@@ -2399,7 +2408,7 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 		tag->encoder_height, buffer[0], buffer[1], buffer[2]);
 		*/
 
-   buf_len =	vj_avcodec_encode_frame( tag->encoder, tag->encoder_total_frames ++, tag->encoder_format, buffer, vj_avcodec_get_buf(tag->encoder), tag->encoder_max_size);
+   buf_len =	vj_avcodec_encode_frame( tag->encoder, tag->encoder_total_frames ++, tag->encoder_format, buffer, vj_avcodec_get_buf(tag->encoder), tag->encoder_max_size, pixel_format);
    if(buf_len <= 0 )
 	{
 		return -1;

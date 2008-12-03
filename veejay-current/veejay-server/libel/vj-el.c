@@ -55,6 +55,8 @@
 #define MAX_CODECS 50
 #define CODEC_ID_YUV420 999
 #define CODEC_ID_YUV422 998
+#define CODEC_ID_YUV422F 997
+#define CODEC_ID_YUV420F 996
 #define CODEC_ID_YUVLZO 900
 #define DUMMY_FRAMES 2
 
@@ -82,6 +84,8 @@ static struct
 	int	pf;
 } _supported_codecs[] = 
 {
+	{ "vj20", CODEC_ID_YUV420F,		-1 },
+	{ "vj22", CODEC_ID_YUV422F,		-1 },
         { "mjpg" , CODEC_ID_MJPEG ,		0 },
 	{ "mjpg" , CODEC_ID_MJPEG , 		1 },
 	{ "mjpb", CODEC_ID_MJPEGB,		0 },
@@ -146,6 +150,8 @@ static struct
 	int id;
 } _supported_fourcc[] =
 {
+	{ "vj20", CODEC_ID_YUV420F },
+	{ "vj22", CODEC_ID_YUV422F },
 	{ "mjpg",	CODEC_ID_MJPEG	},
 	{ "mjpb",	CODEC_ID_MJPEGB },
 	{ "dmb1",	CODEC_ID_MJPEG	},
@@ -446,7 +452,7 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 	{
 		lzo_decoder_ = lzo_new();
 		d->sampler = subsample_init( width );
-	} else  if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 )
+	} else  if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 && id != CODEC_ID_YUV420F && id != CODEC_ID_YUV422F)
         {
 		d->codec = avcodec_find_decoder( id );
 		d->context = avcodec_alloc_context();
@@ -616,7 +622,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 	}
 #endif
 
-	if( !(_fc == CHROMA422 || _fc == CHROMA420 || _fc == CHROMA444 || _fc == CHROMAUNKNOWN || _fc == CHROMA411 ))
+	if( !(_fc == CHROMA422 || _fc == CHROMA420 || _fc == CHROMA444 || _fc == CHROMAUNKNOWN || _fc == CHROMA411 || _fc == CHROMA422F || _fc == CHROMA420F))
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Input file %s is not in a valid format (%d)",filename,_fc);
 	    	if(realname) free(realname);
@@ -1148,12 +1154,27 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 	int inter = 0;
 	int got_picture = 0;
 	int in_uv_len = 0;
+	uint8_t *in[3] = { NULL,NULL,NULL };
 
 	switch( decoder_id )
 	{
 		case CODEC_ID_YUV420:
 			veejay_memcpy( dst[0], data, el_len_);
-			uint8_t *in[3] = { data, data+el_len_, data+el_len_+(el_len_/4) };
+			in[0] = data; in[1] = data+el_len_ ; in[2] = data + el_len_ + (el_len_/4);
+			if( el_pixel_format_ == FMT_422F ) {
+				yuv_scale_pixels_from_ycbcr( in[0],16.0f,235.0f, el_len_ );
+				yuv_scale_pixels_from_ycbcr( in[1],16.0f,240.0f, el_len_/2);
+			}
+			yuv420to422planar( in , dst, el->video_width,el->video_height );
+			return 1;
+			break;	
+		case CODEC_ID_YUV420F:
+			veejay_memcpy( dst[0], data, el_len_);
+			in[0] = data; in[1] = data + el_len_; in[2] = data + el_len_+(el_len_/4);
+			if( el_pixel_format_ == FMT_422 ) {
+				yuv_scale_pixels_from_yuv( dst[0],16.0f,235.0f, el_len_ );
+				yuv_scale_pixels_from_yuv( dst[1],16.0f,240.0f, el_len_/2);
+			}
 			yuv420to422planar( in , dst, el->video_width,el->video_height );
 			return 1;
 			break;
@@ -1161,6 +1182,21 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			veejay_memcpy( dst[0], data, el_len_);
             		veejay_memcpy( dst[1], data+el_len_,el_uv_len_);
             		veejay_memcpy( dst[2], data+el_len_+el_uv_len_, el_uv_len_);
+			if( el_pixel_format_ == FMT_422F ) {
+				yuv_scale_pixels_from_ycbcr( dst[0],16.0f,235.0f, el_len_ );
+				yuv_scale_pixels_from_ycbcr( dst[1],16.0f,240.0f, el_len_/2);
+			}	
+			return 1;
+			break;
+		case CODEC_ID_YUV422F:
+			veejay_memcpy( dst[0], data, el_len_);
+            		veejay_memcpy( dst[1], data+el_len_,el_uv_len_);
+            		veejay_memcpy( dst[2], data+el_len_+el_uv_len_, el_uv_len_);
+			if( el_pixel_format_ == FMT_422 ) {
+				yuv_scale_pixels_from_yuv( dst[0],16.0f,235.0f, el_len_ );
+				yuv_scale_pixels_from_yuv( dst[1],16.0f,240.0f, el_len_ );
+			}
+
 			return 1;
 			break;
 		case CODEC_ID_DVVIDEO:
@@ -1296,7 +1332,6 @@ int	detect_pixel_format_with_ffmpeg( const char *filename )
 	AVFrame *av_frame = NULL;
 	AVPacket pkt;
 
-//	int err = av_open_input_file( &avformat_ctx,filename, av_input_format,0,&avf);	
 	int err = av_open_input_file( &avformat_ctx,filename,NULL,0,NULL );
 	if(err < 0 ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unable to open %s: %d",filename,err );
@@ -1433,6 +1468,10 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 
 	switch( lav->MJPG_chroma )
 	{
+		case CHROMA420F:
+			in_pix_fmt = FMT_420F;break;
+		case CHROMA422F:
+			in_pix_fmt = FMT_422F;break;
 		case CHROMA420:
 			in_pix_fmt = FMT_420; break;
 		case CHROMA422:
@@ -1443,12 +1482,12 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 			break;			
 	}
 	vj_decoder *d = _el_new_decoder(
-					decoder_id,
-					lav_video_width( lav),
-					lav_video_height( lav),
-				   	(float) lav_frame_rate( lav ),
-					in_pix_fmt,
-					out_pix_fmt );
+				decoder_id,
+				lav_video_width( lav),
+				lav_video_height( lav),
+			   	(float) lav_frame_rate( lav ),
+				in_pix_fmt,
+				out_pix_fmt );
 
 	if(!d)
 	{
@@ -1470,15 +1509,21 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 	int len = 0;
 	switch( decoder_id )
 	{
-		case CODEC_ID_YUV420:
+		case CODEC_ID_YUV420F:
 			ret = FMT_420F;
 			break;
-		case CODEC_ID_YUV422:
+		case CODEC_ID_YUV422F:
 			ret = FMT_422F;
+			break;
+		case CODEC_ID_YUV420:
+			ret = FMT_420;
+			break;
+		case CODEC_ID_YUV422:
+			ret = FMT_422;
 			break;
 		case CODEC_ID_DVVIDEO:
 #ifdef SUPPORT_READ_DV2
-			ret = vj_dv_scan_frame( dv_decoder_, d->tmp_buffer );
+			ret = vj_dv_scan_frame( dv_decoder_, d->tmp_buffer );//FIXME
 			if( ret == FMT_420 || ret == FMT_420F )
 				lav->MJPG_chroma = CHROMA420;
 			else

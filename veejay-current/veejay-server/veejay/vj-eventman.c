@@ -820,7 +820,7 @@ void		vj_init_vevo_events(void)
 				"Set codec to use for recording (global setting)",
 				vj_event_tag_set_format,	
 				1,
-				VIMS_REQUIRE_ALL_PARAMS,
+				VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
 				"Codec name (use 'x' to see list)",
 				NULL,
 				NULL );	

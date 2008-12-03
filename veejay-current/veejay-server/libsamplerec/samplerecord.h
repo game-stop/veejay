@@ -22,7 +22,7 @@
 #include <libel/vj-el.h>
 int sample_record_init(int len);
 int sample_init_encoder(int sample_id, char *filename, int format, editlist *el,long nframes);
-int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_size);
+int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_size, int pixel_format);
 int sample_get_encoder_format(int s1);
 int sample_stop_encoder(int s1) ;
 int sample_get_encoded_frames(int s1);

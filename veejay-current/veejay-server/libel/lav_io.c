@@ -289,6 +289,9 @@ int lav_query_polarity(char format)
       case 'D': return LAV_NOT_INTERLACED; //divx
       case 'Y': return LAV_NOT_INTERLACED; // planar yuv 4:2:0 (yv12)
       case 'P': return LAV_NOT_INTERLACED; // planar yuv 4:2:2 (yv16)
+      case 'V': return LAV_NOT_INTERLACED; // planar yuv 4:2:0 (yv12)
+      case 'v': return LAV_NOT_INTERLACED; // planar yuv 4:2:2 (yv16)
+
       case 'M': return LAV_NOT_INTERLACED; // mpeg4 , 
       case 'd': return LAV_INTER_BOTTOM_FIRST;  // DV, interlaced 
       case 'j': return LAV_INTER_TOP_FIRST;
@@ -342,6 +345,14 @@ lav_file_t *lav_open_output_file(char *filename, char format,
 	case 'L':
 		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI LZO");
 		sprintf(fourcc, "MLZO" );
+		break;
+	case 'v':
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI VJ20");
+		sprintf(fourcc,"VJ20");
+		break;	
+	case 'V':
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI VJ22");
+		sprintf(fourcc,"VJ22");
 		break;
 	case 'Y':
 		veejay_msg(VEEJAY_MSG_DEBUG, "\tWriting output file in AVI IYUV");
@@ -591,6 +602,8 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
 		case 'M':
 		case 'P':
 		case 'D':
+		case 'v':
+		case 'V':
 		case 'Y':
 		case 'L':	
       if(n==0)
@@ -679,7 +692,9 @@ long lav_video_frames(lav_file_t *lav_file)
    switch(lav_file->format)
    {
 	  	case 'P':
-		case 'Y':
+		case 'Y':			
+		case 'v':
+		case 'V':
 		case 'D':
 		case 'M':
 		case 'L':
@@ -713,7 +728,9 @@ int lav_video_width(lav_file_t *lav_file)
 		case 'M':
 		case 'L':
 		case 'D':
-		case 'Y':
+		case 'Y':	
+		case 'v':
+		case 'V':
 			return AVI_video_width(lav_file->avi_fd);
 #ifdef SUPPORT_READ_DV2
 		case 'b':
@@ -743,6 +760,9 @@ int lav_video_height(lav_file_t *lav_file)
 		case 'L':
 		case 'D':
 		case 'Y':
+		case 'v':
+		case 'V':
+
 		    return AVI_video_height(lav_file->avi_fd);
 #ifdef SUPPORT_READ_DV2
 		case 'b':
@@ -837,6 +857,10 @@ int lav_video_cmodel( lav_file_t *lav_file)
 			return PIX_FMT_YUV420P;
 		case CHROMA422:
 			return PIX_FMT_YUV422P;
+		case CHROMA420F:
+			return PIX_FMT_YUVJ420P;
+		case CHROMA422F:
+			return PIX_FMT_YUVJ422P;
 		case CHROMA444:
 			return PIX_FMT_YUV444P;
 		default:
@@ -1400,7 +1424,6 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 
    if(lav_fd->bps==0) lav_fd->bps=1; /* make it save since we will divide by that value */
    
-   
 #ifdef USE_GDK_PIXBUF
 	if(strncasecmp(video_comp, "PICT",4) == 0 )
 	{
@@ -1456,9 +1479,24 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		lav_fd->MJPG_chroma = CHROMA420;
 		lav_fd->format = 'Y';
 		lav_fd->interlacing = LAV_NOT_INTERLACED;
+		return lav_fd;
+	}
+
+	if(strncasecmp(video_comp,"vj22",4)==0)
+	{
+		lav_fd->MJPG_chroma = CHROMA422F;
+		lav_fd->format = 'V';
+		lav_fd->interlacing = LAV_NOT_INTERLACED;
 		return lav_fd; 
 	}
-	
+	if(strncasecmp(video_comp,"vj20",4)==0)
+	{
+		lav_fd->MJPG_chroma = CHROMA420F;
+		lav_fd->format = 'v';
+		lav_fd->interlacing = LAV_NOT_INTERLACED;
+		return lav_fd; 
+	}
+
     	if (	strncasecmp(video_comp,"yv16",4)==0 ||
 		strncasecmp(video_comp,"i422",4)==0 ||
 		strncasecmp(video_comp,"hfyu",4)==0)
@@ -1714,6 +1752,8 @@ const char *lav_strerror(void)
       case 'a':
       case 'A':
       case 'Y':
+      case 'v':
+      case 'V':
       case 'M':
       case 'P':
       case 'L':
@@ -1801,6 +1841,8 @@ int lav_fileno(lav_file_t *lav_file)
       case 'P':
 	  case 'D':
 	  case 'Y':
+	  case 'V':
+	  case 'v':
 	  case 'M':
           res = AVI_fileno( lav_file->avi_fd );
          break;

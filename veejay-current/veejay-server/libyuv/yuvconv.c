@@ -1119,3 +1119,20 @@ void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 	}
 //FIXME
 }
+
+void	yuv_scale_pixels_from_yuv( uint8_t *plane, float min, float max, int len )
+{
+	unsigned int i;
+	float    s = (max - min) / 255.0f;
+	for( i = 0; i < len ; i ++ ) {
+		plane[i] = (uint8_t)( (float) plane[i] * s + min );
+	}
+}
+void	yuv_scale_pixels_from_ycbcr( uint8_t *plane, float min, float max, int len )
+{
+	unsigned int i;
+	float    s = 255.0f / ( max-min );
+	for( i = 0; i < len ; i ++ ) {
+		plane[i] = (uint8_t)( (float) plane[i]  * s - 16.0f );
+	}
+}

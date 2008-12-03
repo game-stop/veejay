@@ -1056,7 +1056,11 @@ static	void	dump_arguments_(int net_id,int arglen, int np, int prefixed, char *f
 	int i;
 	char *name = vj_event_vevo_get_event_name( net_id );
 	veejay_msg(VEEJAY_MSG_ERROR, "VIMS '%03d' : '%s'", net_id, name );
-	veejay_msg(VEEJAY_MSG_ERROR, "\tOnly %d arguments of %d seen",arglen,np);	
+	if(np < arglen) {
+		veejay_msg(VEEJAY_MSG_ERROR, "\tOnly %d arguments of %d seen",arglen,np);	
+	} else {
+		veejay_msg(VEEJAY_MSG_ERROR, "\tToo many parameters! %d of %d",np,arglen);
+	}
 	veejay_msg(VEEJAY_MSG_ERROR, "\tFormat is '%s'", fmt );
 
 	for( i = prefixed; i < np; i ++ )
@@ -7081,17 +7085,20 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 	}
 
 	if( strncasecmp(str, "yv",2 ) == 0 || strncasecmp(str, "yuv", 3 ) == 0 ) {
-		if( v->pixel_format == FMT_422F || v->pixel_format == FMT_422 ) {
-			_recorder_format = ENCODER_YUV422;
-		} else {
-			_recorder_format = ENCODER_YUV420;
+		switch(v->pixel_format) {
+			case FMT_422F: _recorder_format = ENCODER_YUV422F; break;
+			case FMT_420F: _recorder_format = ENCODER_YUV420F; break;
+			case FMT_422 : _recorder_format = ENCODER_YUV422; break;
+			case FMT_420 : _recorder_format = ENCODER_YUV420; break;
 		}
+		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in native format.");
+		return;
 	}
 
 	if(strncasecmp(str, "yv16",4) == 0 || strncasecmp(str,"y422",4)==0)
 	{
 		_recorder_format = ENCODER_YUV422;
-		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in YUV 4:2:2 Planar");
+		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in YCbCr/YCrCb 4:2:2 Planar");
 		return;
 	}
 
@@ -7149,13 +7156,23 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 	if(strncasecmp(str,"i420",4)==0 || strncasecmp(str,"yv12",4)==0 )
 	{
 		_recorder_format = ENCODER_YUV420;
-		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in uncompressed YV12/I420 (see swapping)");
-		if(v->pixel_format == FMT_422 || v->pixel_format == FMT_422F )
-		{
-			veejay_msg(VEEJAY_MSG_WARNING, "Using 2x2 -> 1x1 and 1x1 -> 2x2 conversion");
-		}
+		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in uncompressed YCbCr/YCrCb 4:2:0 Planar");
 		return;
 	}
+	if(strncasecmp(str,"vj20",4)==0 )
+	{
+		_recorder_format = ENCODER_YUV420F;
+		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in uncompressed YUV 4:2:0 Planar");
+		return;
+	}
+	if(strncasecmp(str,"vj22",4)==0 )
+	{
+		_recorder_format = ENCODER_YUV422F;
+		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in uncompressed YUV 4:2:2 Planar");
+		return;
+	}
+
+
 //FIXME
 	veejay_msg(VEEJAY_MSG_INFO, "yuv,mpeg4, div3, dvvideo, mjpeg , yv16 or i420");	
 	
