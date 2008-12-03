@@ -74,6 +74,8 @@ static struct
 	{	"4:2:2"		},
 	{	"4:4:4"		},
 	{	"4:1:1"		},
+	{	"4:2:0 full range" },
+	{	"4:2:2 full range" }
 };
 
 
