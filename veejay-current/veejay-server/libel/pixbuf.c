@@ -180,7 +180,7 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 	int len = v_outw * v_outh;
 	int ulen = len;
 	switch( v_outf )
-	{
+	{		
 		case PIX_FMT_YUV420P:
 		case PIX_FMT_YUVJ420P:
 			ulen = len / 4;

@@ -1128,6 +1128,7 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 
 void	vj_perform_get_output_frame_420p( veejay_t *info, uint8_t **frame, int w, int h )
 {
+//FIXME
 	if(info->pixel_format == FMT_422 || info->pixel_format == FMT_422F)
 	{
 		frame[0] = video_output_buffer[1]->Y;
@@ -1190,17 +1191,8 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
 		pframe[0] = primary_buffer[info->out_buf]->Y;
 		pframe[1] = primary_buffer[info->out_buf]->Cb;
 		pframe[2] = primary_buffer[info->out_buf]->Cr;
-	
-		VJFrame *srci = yuv_yuv_template( pframe[0],pframe[1],pframe[2],el->video_width,el->video_height,
-					get_ffmpeg_pixfmt( info->pixel_format));
-		VJFrame *dsti = yuv_yuv_template( temp_buffer[0],temp_buffer[1], temp_buffer[2],el->video_width,
-					el->video_height, (info->pixel_format == FMT_420 ? PIX_FMT_YUV420P:
-						PIX_FMT_YUVJ420P) );
-	
-		yuv_convert_any_ac(srci,dsti, srci->format,dsti->format );
-
-		free(srci);
-		free(dsti);
+		yuv422to420planar( pframe, temp_buffer, el->video_width,el->video_height );
+		veejay_memcpy( pframe[0],frame[0], el->video_width * el->video_height );
 
 		frame[0] = temp_buffer[0];
 		frame[1] = temp_buffer[1];

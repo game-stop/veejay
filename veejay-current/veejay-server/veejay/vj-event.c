@@ -7088,13 +7088,11 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		}
 	}
 
-	if( v->pixel_format == FMT_422F || v->pixel_format == FMT_422 ) {
-		if(strncasecmp(str, "yv16",4) == 0 || strncasecmp(str,"y422",4)==0)
-		{
-			_recorder_format = ENCODER_YUV422;
-			veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in YUV 4:2:2 Planar");
-			return;
-		}
+	if(strncasecmp(str, "yv16",4) == 0 || strncasecmp(str,"y422",4)==0)
+	{
+		_recorder_format = ENCODER_YUV422;
+		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in YUV 4:2:2 Planar");
+		return;
 	}
 
 	if(strncasecmp(str,"mpeg4",5)==0 || strncasecmp(str,"divx",4)==0)
@@ -7112,13 +7110,13 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 	}
 	if(strncasecmp(str,"dvvideo",7)==0||strncasecmp(str,"dvsd",4)==0)
 	{
-		int o = _recorder_format;
-		_recorder_format = ENCODER_DVVIDEO;
-		if(vj_el_is_dv(v->current_edit_list))
+		if(vj_el_is_dv(v->current_edit_list)) {
 			veejay_msg(VEEJAY_MSG_INFO,"Recorder writes in DVVIDEO format");
+			_recorder_format = ENCODER_DVVIDEO;
+		}
 		else
-		{	veejay_msg(VEEJAY_MSG_ERROR, "Not working in a valid DV resolution");
-			_recorder_format = o;
+		{
+			veejay_msg(VEEJAY_MSG_ERROR, "Not working in a valid DV resolution");
 		}
 		return;
 	}
@@ -7148,8 +7146,6 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		return;
 	}	
 #endif
-	if( v->pixel_format == FMT_420F || v->pixel_format == FMT_420 ) {
-
 	if(strncasecmp(str,"i420",4)==0 || strncasecmp(str,"yv12",4)==0 )
 	{
 		_recorder_format = ENCODER_YUV420;
@@ -7160,14 +7156,9 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		}
 		return;
 	}
-
-	}
-	veejay_msg(VEEJAY_MSG_INFO, "Use one of these:");
-	if( v->pixel_format == FMT_420F || v->pixel_format == FMT_420 ) {
-		veejay_msg(VEEJAY_MSG_INFO, "yuv,mpeg4, div3, dvvideo, mjpeg or i420");	
-	} else {
-		veejay_msg(VEEJAY_MSG_INFO, "yuv,mpeg4, div3, dvvideo, mjpeg or yv16");	
-	}
+//FIXME
+	veejay_msg(VEEJAY_MSG_INFO, "yuv,mpeg4, div3, dvvideo, mjpeg , yv16 or i420");	
+	
 }
 
 static void _vj_event_tag_record( veejay_t *v , int *args, char *str )

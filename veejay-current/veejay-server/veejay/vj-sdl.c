@@ -61,9 +61,7 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
     vjsdl->display = NULL;
 	switch(fmt) {
 	 //@ dont use YUVJ here - on blitting it to SDL it will be converted to YUV clamped for YUYJ422
-	
-	case FMT_420: vjsdl->ffmpeg_pixfmt = PIX_FMT_YUV420P;break;
-	case FMT_420F:vjsdl->ffmpeg_pixfmt = PIX_FMT_YUV420P;break;
+	//FIXME	
 	case FMT_422F:vjsdl->ffmpeg_pixfmt = PIX_FMT_YUV422P;break;
 	case FMT_422:vjsdl->ffmpeg_pixfmt = PIX_FMT_YUV422P;break;
 	}
@@ -373,15 +371,12 @@ int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
 	assert( yuv420[1] != NULL );
 	assert( yuv420[2] != NULL );
 #endif
-
 	VJFrame *src = yuv_yuv_template( yuv420[0],yuv420[1],yuv420[2],vjsdl->width,vjsdl->height, vjsdl->ffmpeg_pixfmt );
 	VJFrame *dst = yuv_yuv_template(  vjsdl->yuv_overlay->pixels[0],NULL,NULL,vjsdl->width,vjsdl->height,PIX_FMT_YUYV422);
 
 	yuv_convert_and_scale_packed( vjsdl->scaler, src,dst );
 
-	
-	/*
-	if(vjsdl->pix_fmt == FMT_420 || vjsdl->pix_fmt == FMT_420F)
+	/*if(vjsdl->pix_fmt == FMT_420 || vjsdl->pix_fmt == FMT_420F)
 		yuv420p_to_yuv422( yuv420, vjsdl->yuv_overlay->pixels[0],vjsdl->width,vjsdl->height);
 	else
 		yuv422_to_yuyv( yuv420, vjsdl->yuv_overlay->pixels[0], vjsdl->width,vjsdl->height);

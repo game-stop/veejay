@@ -321,10 +321,7 @@ void	composite_blit( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which_vp )
 	c->has_back   = 0;
 
 	if( which_vp == 2 && vp1_active ) {
-		if(c->pf == FMT_420 || c->pf == FMT_420F ) 
-			yuv420p_to_yuv422(c->proj_plane, yuyv, c->proj_width,c->proj_height );
-		else 
-			yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
+		yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
 		return;
 	} else if (which_vp == 2 ) {
 		if (c->proj_width != c->img_width &&
@@ -343,12 +340,8 @@ void	composite_blit( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which_vp )
 		return;
 	}
 
-	if(c->pf == FMT_420 || c->pf == FMT_420F ) {
-		yuv420p_to_yuv422(c->proj_plane, yuyv, c->proj_width,c->proj_height );
-	}
-	else {
-		yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
-	}
+	yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
+	
 }
 
 

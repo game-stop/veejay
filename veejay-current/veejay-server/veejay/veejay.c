@@ -210,7 +210,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -j/--max_cache \t\tDivide cache memory over N samples (default=4)\n");
 	fprintf(stderr,
-		"  -Y/--yuv [0123]\t\tForce pixel format if you get a corrupted image. Load one videofile only.\n");
+		"  -Y/--yuv [01]\t\tForce YCbCr (defaults to YUV)\n");
 	fprintf(stderr,
                 "  -e/--swap-range\t\tSwap YUV range [0..255] <-> [16..235] on videofiles\n");
 	fprintf(stderr,
@@ -443,8 +443,8 @@ static int set_option(const char *name, char *value)
 	else if(strcmp(name,"yuv")==0 || strcmp(name,"Y")==0)
 	{
 		override_pix_fmt = atoi(optarg);
-		if( override_pix_fmt < 0 || override_pix_fmt > 3 )
-			override_pix_fmt = 1;
+		if( override_pix_fmt < 0 || override_pix_fmt > 1 )
+			override_pix_fmt = -1;
 	}
 	else if(strcmp(name, "swap-range") == 0 || strcmp(name, "e") == 0 )
 	{

@@ -376,12 +376,10 @@ void yuv422p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
 		       int height)
 {
     unsigned int x, y;
-
-
+    uint8_t *Cb = yuv420[1];
+    uint8_t *Cr = yuv420[2];
+    uint8_t *Y  = yuv420[0];
     for (y = 0; y < height; ++y) {
-	uint8_t *Y = yuv420[0] + y * width;
-	uint8_t *Cb = yuv420[1] + (y / 2) * (width);
-	uint8_t *Cr = yuv420[2] + (y / 2) * (width);
 	for (x = 0; x < width; x +=2) {
 	    *(dest + 0) = Y[0];
 	    *(dest + 1) = Cb[0];
@@ -392,6 +390,9 @@ void yuv422p_to_yuv422(uint8_t * yuv420[3], uint8_t * dest, int width,
 	    ++Cb;
 	    ++Cr;
 	}
+	Y += width;
+	Cb += (width>>1);
+	Cr += (height>>1);
     }
 }
 
@@ -1077,4 +1078,44 @@ char	*yuv_get_scaler_name(int id)
 		if( id == sws_scaler_types[i].i )
 			return sws_scaler_types[i].name;
 	return NULL;
+}
+
+void	yuv422to420planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
+{
+	unsigned int x,y,k=0;
+	const int hei = h >> 1;
+	const int wid = w >> 1;
+	uint8_t *u = dst[1];
+	uint8_t *v = dst[2];
+	uint8_t *a = src[1];
+	uint8_t *b = src[2];
+	for( y = 0 ; y < hei; y ++ ) {
+		for( x= 0; x < wid ; x ++ ) {
+			u[k] = a[ (y<<1) * wid + x ];
+			v[k] = b[ (y<<1) * wid + x ];	
+			k++;
+		}
+	}	
+}
+void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
+{
+	unsigned int x,y;
+	unsigned int k=0;
+	const int hei = h >> 1;
+	const int wid = w >> 1;
+	uint8_t *u = dst[1];
+	uint8_t *v = dst[2];
+	uint8_t *a = src[1];
+	uint8_t *b = src[2];
+	for( y = 0 ; y < hei; y ++ ) {
+		u = dst[1] + ( (y << 1 ) * wid );
+		v = dst[2] + ( (y << 1 ) * wid );
+		for( x= 0; x < wid ; x ++ ) {
+			u[k] = a[ y * wid + x];
+			u[k + wid ] = a[y*wid+x];
+			v[k] = b[ y * wid + x];
+			v[k + wid ] = b[y * wid + x ];
+		}
+	}
+//FIXME
 }

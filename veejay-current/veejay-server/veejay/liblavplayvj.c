@@ -258,7 +258,6 @@ int veejay_get_state(veejay_t *info) {
 }
 int	veejay_set_yuv_range(veejay_t *info) {
 	switch(info->pixel_format) {
-		case FMT_420:	
 		case FMT_422:
 		//	rgb_parameter_conversion_type_ = 1; //CCIR601_RGB;
 			set_pixel_range( 235,240,16,16 );
@@ -2077,24 +2076,13 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 	int full_range = veejay_set_yuv_range( info );
 
-	if(info->pixel_format == FMT_422  || info->pixel_format == FMT_422F)
-	{
-		if(!vj_el_init_422_frame( el, info->effect_frame1)) return 0;
-		if(!vj_el_init_422_frame( el, info->effect_frame2)) return 0;
-		info->settings->sample_mode = SSM_422_444;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Internal YUV format is 4:2:2 Planar, %d x %d",
+	if(!vj_el_init_422_frame( el, info->effect_frame1)) return 0;
+	if(!vj_el_init_422_frame( el, info->effect_frame2)) return 0;
+	info->settings->sample_mode = SSM_422_444;
+	
+	veejay_msg(VEEJAY_MSG_DEBUG, "Internal YUV format is 4:2:2 Planar, %d x %d",
 				el->video_width,
 				el->video_height);
-	}
-	else 
-	{
-		if(!vj_el_init_420_frame( el, info->effect_frame1)) return 0;
-		if(!vj_el_init_420_frame( el, info->effect_frame2)) return 0;
-		info->settings->sample_mode = SSM_420_JPEG_TR;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Internal YUV format is 4:2:0 Planar, %d x %d",
-				el->video_width,
-				el->video_height);
-	}
 	
 	if(!vj_perform_init(info))
 	{
@@ -3764,10 +3752,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 			info->dummy->width = 352;
 		if( !info->dummy->height)
 			info->dummy->height = 288;
-		if( info->pixel_format == FMT_420 || info->pixel_format == FMT_420F)
-			info->dummy->chroma = CHROMA420;
-		else
-			info->dummy->chroma = CHROMA422;	
+		info->dummy->chroma = CHROMA422;	
 		if( !info->dummy->arate)
 			info->dummy->arate = 48000;
 	
@@ -3846,10 +3831,6 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 			sprintf(text, "4:2:2 [16-235][16-240]");break;
 		case FMT_422F:	
 			sprintf(text, "4:2:2 [0-255]");break;
-		case FMT_420:
-			sprintf(text, "4:2:0 [16-235][16-240]");break;
-		case FMT_420F:
-			sprintf(text, "4:2:0 [0-255]");break;
 		default:
 			veejay_msg(VEEJAY_MSG_ERROR, "Unknown pixel format set"); 
 			return 0;

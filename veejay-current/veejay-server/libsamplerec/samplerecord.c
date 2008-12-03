@@ -25,28 +25,19 @@
 #include AVUTIL_INC
 #include AVCODEC_INC
 #include <libel/vj-avcodec.h>
-
+#include <libvjmem/vjmem.h>
 void	sample_reset_encoder(int sample_id);
 extern int   sufficient_space(int max_size, int nframes); 
 
 
-static uint8_t *sample_encoder_buf;
-
 int sample_record_init(int len)
 {
 	if(len <= 0) return 0;
-	if(sample_encoder_buf) free(sample_encoder_buf);
-	sample_encoder_buf = (uint8_t*) malloc(sizeof(uint8_t) * len * 3);
-	if(!sample_encoder_buf) return 0;
-	memset(sample_encoder_buf, 0, len * 3 );
 	return 1;
 }
 
 void	sample_record_free()
 {
-	if( sample_encoder_buf)
-		free(sample_encoder_buf);
-	sample_encoder_buf = NULL;
 }
 
 int sample_get_encoded_file(int sample_id, char *description)
@@ -182,17 +173,19 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 	si->rec_total_bytes= 0;
 	si->encoder_succes_frames = 0;
 
+	int tmp = el->video_width * el->video_height;
+
 	if(format==ENCODER_DVVIDEO)
 		si->encoder_max_size = ( el->video_height == 480 ? 120000: 144000);
 	else
 		switch(format)
 		{
 			case ENCODER_YUV420:
-			 si->encoder_max_size=(el->video_height * el->video_width * 2);break;
+			 si->encoder_max_size= 2048 + tmp + (tmp/4) + (tmp/4);break;
 			case ENCODER_YUV422:
-			si->encoder_max_size = (el->video_width * el->video_height * 2);break;
+			si->encoder_max_size = 2048 + tmp + (tmp/2) + (tmp/2);break;
 			case ENCODER_LZO:
-			si->encoder_max_size = (el->video_width * el->video_height * 3 ); break;
+			si->encoder_max_size = (tmp * 3 ); break;
 			default:
 			si->encoder_max_size = ( 4 * 65535 );
 			break;
@@ -327,18 +320,15 @@ int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 	 return -1;
   	}
 
-   // si->encoder_format has one of ENCODER_*
-
-
    buf_len =  vj_avcodec_encode_frame(si->encoder, si->encoder_total_frames ++,
-		si->encoder_format, buffer, sample_encoder_buf, si->encoder_max_size);
+		si->encoder_format, buffer, vj_avcodec_get_buf(si->encoder), si->encoder_max_size);
    if(buf_len <= 0) 
    {
 
   	veejay_msg(VEEJAY_MSG_ERROR, "Cannot encode frame");
 	return -1;
    }
-    if(lav_write_frame( (lav_file_t*) si->encoder_file,sample_encoder_buf,buf_len,1))
+    if(lav_write_frame( (lav_file_t*) si->encoder_file,vj_avcodec_get_buf(si->encoder),buf_len,1))
 	{
 			veejay_msg(VEEJAY_MSG_ERROR, "writing frame, giving up %s", lav_strerror());
 			return 1;

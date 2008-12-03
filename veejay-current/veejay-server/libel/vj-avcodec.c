@@ -55,20 +55,20 @@ char*	vj_avcodec_get_codec_name(int codec_id )
 	return res;
 }
 
-static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_format)
+uint8_t 		*vj_avcodec_get_buf( vj_encoder *av )
+{
+	return av->data[0];
+}
+
+static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el)
 {
 	vj_encoder *e = (vj_encoder*) vj_calloc(sizeof(vj_encoder));
 	if(!e) return NULL;
 	
-	if( YUV420_ONLY_CODEC(id ))
-	{
-		e->data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) *
-				el->video_width * el->video_height );
-		e->data[1] = (uint8_t*) vj_calloc(sizeof(uint8_t) *
-				el->video_width * el->video_height /2 );
-		e->data[2] = (uint8_t*) vj_calloc(sizeof(uint8_t) *
-				el->video_width * el->video_height /2);
-	}
+	e->data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * el->video_width * el->video_height * 3 );
+	e->data[1] = e->data[0] + el->video_width * el->video_height;
+	e->data[2] = e->data[1] + el->video_width * el->video_height /2;
+	
 
 	if( id == 900 )
 	{
@@ -122,21 +122,10 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 		e->context->prediction_method = 0;
 		e->context->dct_algo = FF_DCT_AUTO; //global_quality?
 
-		switch(pixel_format)
-		{
-			case FMT_420:
-				e->context->pix_fmt = PIX_FMT_YUV420P;
-				break;
-			case FMT_420F:
-				e->context->pix_fmt = PIX_FMT_YUVJ420P;
-				break;
-			case FMT_422F:
-				e->context->pix_fmt = PIX_FMT_YUVJ422P;
-				break;
-			default:
-				e->context->pix_fmt = PIX_FMT_YUV422P;
-				break;
-		}
+		e->context->pix_fmt = get_ffmpeg_pixfmt( out_pixel_format );
+		if(YUV420_ONLY_CODEC(id))
+			e->context->pix_fmt = ( out_pixel_format == FMT_422F ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P );
+
 		char *descr = vj_avcodec_get_codec_name( id );
 
 		if ( avcodec_open( e->context, e->codec ) < 0 )
@@ -159,10 +148,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, int pixel_forma
 
 	e->len = el->video_width * el->video_height;
 
-	if(el->pixel_format == FMT_422 || el->pixel_format == FMT_422F)
-		e->uv_len = e->len / 2;
-	else
-		e->uv_len = e->len / 4;
+	e->uv_len = e->len / 2;
 	e->width = el->video_width;
 	e->height = el->video_height;
 
@@ -203,10 +189,6 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 		}
 		if(av->data[0])
 			free(av->data[0]);
-		if(av->data[1])
-			free(av->data[1]);
-		if(av->data[2])
-			free(av->data[2]);
 		if(av->lzo)
 			lzo_free(av->lzo);
 		free(av);
@@ -283,10 +265,12 @@ void 		*vj_avcodec_start( editlist *el, int encoder )
 		}
 	}
 #else
-	if( codec_id == CODEC_ID_DVVIDEO )
+	if( codec_id == CODEC_ID_DVVIDEO ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "No support for DV encoding built in.");
 		return NULL;
+	}
 #endif	
-	ee = vj_avcodec_new_encoder( codec_id, el , encoder );
+	ee = vj_avcodec_new_encoder( codec_id, el );
 	if(!ee)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "\tFailed to start encoder %x",encoder);
@@ -369,41 +353,23 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 		return 0;
 	}
 
-	if( (av->encoder_id == 999 && (av->out_fmt == FMT_420 ||av->out_fmt == FMT_420F)) || (av->encoder_id == 998 && (av->out_fmt == FMT_422||av->out_fmt == FMT_422F)))
+	if( av->encoder_id == 999 )
 	{
-		/* copy */
-		veejay_memcpy( dst, src[0], av->len );
-		veejay_memcpy( dst+(av->len), src[1], av->uv_len );
-		veejay_memcpy( dst+(av->len+av->uv_len) , src[2], av->uv_len);
-		return ( av->len + av->uv_len + av->uv_len );
-	}
-	/* copy by converting */
-	if( av->encoder_id == 999 &&  (av->out_fmt == FMT_422 || av->out_fmt==FMT_422F)) 
-	{
-		VJFrame *srci= yuv_yuv_template( src[0],src[1],src[2], av->width,av->height, get_ffmpeg_pixfmt( av->out_fmt));
-		VJFrame *dsti= yuv_yuv_template( dst,dst+av->len,dst+av->len+(av->len/4), av->width,av->height, 
-					(av->out_fmt == FMT_422F ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P ));
-
-		yuv_convert_any_ac( srci,dsti, srci->format, dsti->format );
-
-		free(srci);
-		free(dsti);
-
-		return ( av->len + (av->len/4) + (av->len/4));
+		uint8_t *dest[3] = { dst, dst + (av->len), dst + (av->len + av->len/4) };
+		veejay_memcpy( dest[0], src[0], av->len );
+		yuv422to420planar( src,dest, av->width,av->height );
+		return ( av->len + (av->len/2) );
 	}
 
-	if( av->encoder_id == 998 && (av->out_fmt == FMT_420||av->out_fmt==FMT_420F))
+	if( av->encoder_id == 998 )
 	{
-		VJFrame *srci = yuv_yuv_template( src[0],src[1],src[2], av->width,av->height,get_ffmpeg_pixfmt(av->out_fmt));
-		VJFrame *dsti = yuv_yuv_template( dst, dst + av->len, dst + (av->len + (av->len/2)), 
-					av->width,av->height, 	(av->out_fmt == FMT_420F ? PIX_FMT_YUVJ422P : PIX_FMT_YUV422P ));
+		uint8_t *dest[3] = { dst, dst + (av->len), dst + (av->len + av->uv_len) };
 
-		free(srci);
-		free(dsti);
-
+		veejay_memcpy( dest[0], src[0],av->len );	
+		veejay_memcpy( dest[1], src[1],av->uv_len);
+		veejay_memcpy( dest[2], src[2],av->uv_len );
 		return ( av->len + av->len );
 	}
-
 	
 	return 0;
 }
@@ -412,10 +378,6 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 
 int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[3], uint8_t *buf, int buf_len)
 {
-	AVFrame pict;
-	int res=0;
-	memset( &pict, 0, sizeof(pict));
-
 	if(format == ENCODER_LZO )
 		return vj_avcodec_lzo( encoder, src, buf, buf_len );
 	
@@ -426,40 +388,26 @@ int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[
 	if(format == ENCODER_DVVIDEO || format == ENCODER_QUICKTIME_DV )
 		return vj_dv_encode_frame( encoder,src, buf );
 #endif
-	
+	AVFrame pict;
+	int res=0;
+	memset( &pict, 0, sizeof(pict));
+
+
 	vj_encoder *av = (vj_encoder*) encoder;
 	
 	pict.quality = 1;
 	pict.pts = (int64_t)( (int64_t)nframe );
 
-	int src_fmt = get_ffmpeg_pixfmt( out_pixel_format );
+	pict.data[0] = av->data[0];
+	pict.data[1] = av->data[1];
+	pict.data[2] = av->data[2];
+	pict.linesize[0] = av->context->width;
+	pict.linesize[1] = pict.linesize[0]>>1;
+	pict.linesize[2] = pict.linesize[0]>>1;
 
-	if(av->context->pix_fmt != src_fmt )
-	{
-		pict.data[0] = av->data[0];
-		pict.data[1] = av->data[1];
-		pict.data[2] = av->data[2];
-		pict.linesize[0] = av->context->width;
-		pict.linesize[1] = av->context->width >> 1;
-		pict.linesize[2] = av->context->width >> 1;
-		
-		VJFrame *srci = yuv_yuv_template( src[0],src[1],src[2], av->width,av->height, src_fmt );
-		VJFrame *dsti = yuv_yuv_template( av->data[0],av->data[1],av->data[2],av->context->width,av->context->height,
-				   av->context->pix_fmt );
-
-		yuv_convert_any_ac( srci,dsti, srci->format, dsti->format );
-
-		free(srci);
-		free(dsti);
-	}
-	else
-	{
-		pict.data[0] = src[0];
-		pict.data[1] = src[1];
-		pict.data[2] = src[2];
-		pict.linesize[0] = av->width;
-		pict.linesize[1] = pict.linesize[0]>>1;
-		pict.linesize[2] = pict.linesize[0]>>1;
+	if( YUV420_ONLY_CODEC(av->encoder_id)) {
+		veejay_memcpy( av->data[0], src[0], av->width * av->height);
+		yuv422to420planar(src , av->data, av->width,av->height );
 	}
 
 	res = avcodec_encode_video( av->context, buf, buf_len, &pict );

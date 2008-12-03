@@ -116,20 +116,11 @@ int vj_dv_encode_frame(vj_dv_encoder *encoder, uint8_t *input_buf[3], uint8_t *o
 		h = NTSC_H;
 		w = NTSC_W;
     }
-
-	if( encoder->fmt == FMT_420 || encoder->fmt == FMT_420F)
-	{	
-		pixels[1] = (uint8_t *) encoder->dv_video + (w * h);
-		pixels[2] = (uint8_t *) encoder->dv_video + (w * h * 5) / 4;
-    	yuv420p_to_yuv422(input_buf, encoder->dv_video, w, h );	
-	}
-    else
-    {  // convert 422 planar to packed
-		int off = w * h / 2;
-		pixels[1] = (uint8_t *) encoder->dv_video + (w * h );
-		pixels[2] = (uint8_t *) encoder->dv_video + (w * h) + off;
-		yuv422p_to_yuv422(input_buf,encoder->dv_video,w,h);
-    }	
+//FIXME
+    int off = w * h / 2;
+    pixels[1] = (uint8_t *) encoder->dv_video + (w * h );
+    pixels[2] = (uint8_t *) encoder->dv_video + (w * h) + off;
+    yuv422p_to_yuv422(input_buf,encoder->dv_video,w,h);
   
     dv_encode_full_frame( encoder->encoder, pixels, e_dv_color_yuv,
 			 output_buf);

@@ -137,4 +137,7 @@ void    yuv_fx_context_process( void *ctx, VJFrame *src, VJFrame *dst );
 void    yuv_fx_context_destroy( void *ctx );
 
 
+void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h );
+void	yuv422to420planar( uint8_t *src[3], uint8_t *dst[3], int w, int h );
+
 #endif

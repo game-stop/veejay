@@ -80,7 +80,6 @@ extern unsigned char *UTF8toLAT1(unsigned char *in);
 
 
 static uint8_t *_temp_buffer[3]={NULL,NULL,NULL};
-static uint8_t *tag_encoder_buf = NULL; 
 static VJFrame _tmp;
 void	vj_tag_free(void)
 {
@@ -97,8 +96,6 @@ void	vj_tag_free(void)
 	if( vj_tag_input)
 		free(vj_tag_input);
 
-	if( tag_encoder_buf )
-		free( tag_encoder_buf );
 #ifdef HAVE_UNICAP
 	vj_unicap_deinit(unicap_data_);
 #endif
@@ -245,10 +242,7 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
     video_driver_ = 1;
 #endif
 
-    if( pix_fmt == FMT_420|| pix_fmt == FMT_420F)
-	    vj_tag_input->uv_len = (width*height) / 4;
-    else
-	    vj_tag_input->uv_len = (width*height) / 2;
+    vj_tag_input->uv_len = (width*height) / 2;
 
     memset( &_tmp, 0, sizeof(VJFrame));
     _tmp.len = width * height;
@@ -260,18 +254,9 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
    _temp_buffer[2] = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height);
 		
 
-    if( pix_fmt == FMT_422 || pix_fmt == FMT_422F )
-	{
-		_tmp.uv_width = width; 
-		_tmp.uv_height = height/2;
-		_tmp.uv_len = width * (height/2);
-	}
-	else
-	{
-		_tmp.uv_width = width / 2;
-		_tmp.uv_height= height / 2;
-		_tmp.uv_len = (width * height)/4;
-	}	
+	_tmp.uv_width = width; 
+	_tmp.uv_height = height/2;
+	_tmp.uv_len = width * (height/2);
 
     for(i=0; i < SAMPLE_MAX_SAMPLES; i++) {
 	avail_tag[i] = 0;
@@ -284,16 +269,6 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
 
 void vj_tag_record_init(int w, int h)
 {
-  if(tag_encoder_buf) free(tag_encoder_buf);
-  tag_encoder_buf = NULL;
-  tag_encoder_buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 3);
-  if(!tag_encoder_buf)
-  {
-	veejay_msg(VEEJAY_MSG_ERROR,
-		   "Error allocating memory for stream recorder\n");
-	return;
-  }
-  memset( tag_encoder_buf, 0 , (w*h) );
 }
 
 
@@ -330,16 +305,9 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 
 	v->planes[0] = w * h;
 	int fmt=  vj_tag_input->pix_fmt;
-	if( fmt == FMT_420 || fmt == FMT_420F )
-	{
-		v->planes[1] = v->planes[0] / 4;
-		v->planes[2] = v->planes[0] / 4;
-	}	
-	else
-	{	
-		v->planes[1] = v->planes[0] / 2;	
-		v->planes[2] = v->planes[0] / 2;
-	}
+	v->planes[1] = v->planes[0] / 2;	
+	v->planes[2] = v->planes[0] / 2;
+	
 	if( tag->socket_ready == 0 )
 	{
 		tag->socket_frame = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h * 3);
@@ -1277,17 +1245,20 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 	}
 	tag->encoder_active = 1;
 	tag->encoder_format = format;
+
+	int tmp = _tag_info->edit_list->video_width * _tag_info->edit_list->video_height;
+
 	if(format==ENCODER_DVVIDEO)
 		tag->encoder_max_size = ( _tag_info->edit_list->video_height == 480 ? 120000: 144000);
 	else
 		switch(format)
 		{
 			case ENCODER_YUV420:
-			tag->encoder_max_size = (_tag_info->edit_list->video_width * _tag_info->edit_list->video_height  * 2 );break;
+			tag->encoder_max_size = 2048 + tmp + (tmp/4) + (tmp/4);break;
 			case ENCODER_YUV422:
-			tag->encoder_max_size = (_tag_info->edit_list->video_width * _tag_info->edit_list->video_height * 2); break;
+			tag->encoder_max_size = 2048 + tmp + (tmp/2) + (tmp/2);break;
 			case ENCODER_LZO:
-			tag->encoder_max_size = (_tag_info->edit_list->video_width * _tag_info->edit_list->video_height * 3); break;
+			tag->encoder_max_size = tmp * 3; break;
 			default:
 			tag->encoder_max_size = ( 4 * 65535 );
 			break;
@@ -2428,13 +2399,13 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 		tag->encoder_height, buffer[0], buffer[1], buffer[2]);
 		*/
 
-   buf_len =	vj_avcodec_encode_frame( tag->encoder, tag->encoder_total_frames ++, tag->encoder_format, buffer, tag_encoder_buf, tag->encoder_max_size);
+   buf_len =	vj_avcodec_encode_frame( tag->encoder, tag->encoder_total_frames ++, tag->encoder_format, buffer, vj_avcodec_get_buf(tag->encoder), tag->encoder_max_size);
    if(buf_len <= 0 )
 	{
 		return -1;
 	}
 
-	if(lav_write_frame(tag->encoder_file, tag_encoder_buf, buf_len,1))
+	if(lav_write_frame(tag->encoder_file, vj_avcodec_get_buf(tag->encoder), buf_len,1))
 	{
 			veejay_msg(VEEJAY_MSG_ERROR, "writing frame, giving up :[%s]", lav_strerror());
 			return -1;
@@ -2530,34 +2501,14 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		return 1;
 		break;
 	case VJ_TAG_TYPE_YUV4MPEG:
-		if( vj_tag_input->pix_fmt == FMT_420 || vj_tag_input->pix_fmt == FMT_420F)
+		if(vj_yuv_get_frame(vj_tag_input->stream[tag->index], _temp_buffer) != 0)
 		{
-			if (vj_yuv_get_frame(vj_tag_input->stream[tag->index], buffer) != 0)
-		    	{
-		  		veejay_msg(VEEJAY_MSG_ERROR, "Error reading frame trom YUV4MPEG stream. (Stopping)");
-		    	 	vj_tag_set_active(t1,0);
-		    		return -1;
-			}
+			vj_tag_set_active(t1,0);
+			return -1;
 		}
-		else
-		{
-			if(vj_yuv_get_frame(vj_tag_input->stream[tag->index], _temp_buffer) != 0)
-			{
-				vj_tag_set_active(t1,0);
-				return -1;
-			}
-			
-			VJFrame *srci = yuv_yuv_template( _temp_buffer[0],_temp_buffer[1],_temp_buffer[2],
-						width,height, PIX_FMT_YUV420P);
-			VJFrame *dsti = yuv_yuv_template( buffer[0],buffer[1],buffer[2], width,height,
-						get_ffmpeg_pixfmt( vj_tag_input->pix_fmt ));
-
-			yuv_convert_any_ac( srci,dsti, srci->format, dsti->format );
-			
-			free(srci);
-			free(dsti);
-
-		}
+		
+		yuv420to422planar( _temp_buffer, buffer, width,height );
+		veejay_memcpy( buffer[0],_temp_buffer[0],width * height );
 		return 1;
 		
 		break;
