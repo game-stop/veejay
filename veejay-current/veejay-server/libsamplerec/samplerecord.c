@@ -364,13 +364,15 @@ int sample_stop_encoder(int s1) {
    sample_info *si = sample_get(s1);
    if(!si) return -1;
    if(si->encoder_active) {
-     lav_close((lav_file_t*)si->encoder_file);
-
-	vj_avcodec_stop( si->encoder, si->encoder_format );
+	if(si->encoder_file)
+   	  lav_close((lav_file_t*)si->encoder_file);
+	if( si->encoder)
+		vj_avcodec_stop( si->encoder, si->encoder_format );
      
      veejay_msg(VEEJAY_MSG_INFO, "Stopped sample encoder [%s]",si->encoder_destination);
      si->encoder_active = 0;
      si->encoder_file = NULL;
+     si->encoder = NULL;
      sample_update(si,s1);	
     
      //sample_reset_encoder(s1);
@@ -394,6 +396,8 @@ void sample_reset_encoder(int s1) {
 	si->encoder_active = 0;
 	si->rec_total_bytes = 0;
 	si->encoder_duration = 0;
+	si->encoder_file = NULL;
+	si->encoder = NULL;
 
 	sample_update(si, s1);
 }

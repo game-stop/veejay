@@ -57,6 +57,8 @@ char*	vj_avcodec_get_codec_name(int codec_id )
 
 uint8_t 		*vj_avcodec_get_buf( vj_encoder *av )
 {
+	if( av == NULL )
+		return NULL;
 	return av->data[0];
 }
 

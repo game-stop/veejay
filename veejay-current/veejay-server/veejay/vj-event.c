@@ -4390,6 +4390,10 @@ void vj_event_sample_rec_start( void *ptr, const char format[], va_list ap)
 	else
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"Unable to start sample recorder");
+		sample_stop_encoder( v->uc->sample_id );
+		result = 0;
+		v->settings->sample_record = 0;
+		return;
 	}   
 
 	if(result == 1)
