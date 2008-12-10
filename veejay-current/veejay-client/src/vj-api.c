@@ -94,6 +94,8 @@ static struct
 	{ NULL, 0 }
 };
 
+#define MAX_SLOW 100
+
 static struct
 {
 	const char *text;
@@ -2795,6 +2797,9 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 
 		put_text( "entry_samplename", "" );
 		set_pm_page_label( info->status_tokens[CURRENT_ID], pm );
+
+		//HERE
+
 	}
 	if( info->status_tokens[CURRENT_ENTRY] != history[CURRENT_ENTRY] ||
 		info->uc.reload_hint[HINT_ENTRY] == 1 )
@@ -2952,8 +2957,8 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 			if(speed < 0 ) info->play_direction = -1; else info->play_direction = 1;
 			if(speed < 0 ) speed *= -1;
 		
-			update_spin_range( "spin_samplespeed", 0, len, speed );
-	
+			update_spin_range( "spin_samplespeed", -1 * len, len, speed );
+			
 			gchar *time = format_selection_time( 0, len );
 			g_free(time);	
 
@@ -6733,9 +6738,10 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		info->play_direction = -1; else info->play_direction=1;
 	if( speed < 0 ) speed *= -1;
 
-	update_spin_range( "spin_framedelay", 1, 13, 0);
-	update_slider_range( "speed_slider", -13,13,speed,0);
-	update_slider_range( "slow_slider",1,100,1,0);
+	update_spin_range( "spin_framedelay", 1, MAX_SLOW, 0);
+	update_spin_range( "spin_samplespeed", -25,25,1);
+	update_slider_range( "speed_slider", -25,25,speed,0);
+	update_slider_range( "slow_slider",1,MAX_SLOW,1,0);
 	update_label_str( "label_hostnamex", (hostname == NULL ? group_name: hostname ) );
 	update_label_i( "label_portx",port_num,0);
 

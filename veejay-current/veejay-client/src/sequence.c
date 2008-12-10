@@ -115,7 +115,7 @@ void	*gvr_preview_init(int max_tracks, int use_threads)
 
 	vp->n_tracks = max_tracks;
 
-	yuv_init_lib();
+	yuv_init_lib(0,0,0);
 
 	return (void*) vp;
 }		
