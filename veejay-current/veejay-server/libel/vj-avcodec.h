@@ -33,7 +33,11 @@
 #define ENCODER_LZO 8
 #define ENCODER_YUV420F 9
 #define ENCODER_YUV422F 10
-#define NUM_ENCODERS 11
+#define ENCODER_MJPEGB 11
+#define ENCODER_LJPEG 12
+#define ENCODER_YUV4MPEG 13
+#define ENCODER_YUV4MPEG420 14
+#define NUM_ENCODERS 15
 
 typedef struct
 {
@@ -51,13 +55,17 @@ typedef struct
 	int height;
 	uint8_t *data[3];
 	void *lzo;
+	int	shift_y;
+	int	shift_x;
+	void	*dv;
+	void	*y4m;
 } vj_encoder;
 
 int		vj_avcodec_init(int pix, int verbose);
-
+char		vj_avcodec_find_lav(int format);
 int		vj_avcodec_encode_frame(void *encoder,int nframe, int format, uint8_t *src[3], uint8_t *dst, int dst_len, int pixel_format);
 uint8_t 		*vj_avcodec_get_buf( vj_encoder *av );
-
+char		*vj_avcodec_get_encoder_name(int encoder);
 int		vj_avcodec_free();
 
 /* color space conversion routines, should go somewhere else someday
@@ -75,11 +83,13 @@ int		yuv420p_to_yuv422p2( uint8_t *sY,uint8_t *sCb, uint8_t *sCr, uint8_t *dst[3
 
 void	yuv422p_to_yuv420p3( uint8_t *src, uint8_t *dst[3], int w, int h);
 
-void 		*vj_avcodec_start( editlist *el, int encoder );
+void 		*vj_avcodec_start( editlist *el, int encoder, char *filename );
 
 int		vj_avcodec_stop( void *encoder , int fmt);
 
 void               vj_avcodec_close_encoder( vj_encoder *av );
 
+
+void	yuv_scale_pixels_from_yuv_copy( uint8_t *plane, uint8_t *dst, float min, float max, int len );
 
 #endif

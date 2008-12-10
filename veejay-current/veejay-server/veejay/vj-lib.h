@@ -198,6 +198,9 @@ typedef struct {
 	int	ca;
 	int	fxrow[3];
 	int	fxdepth;
+	int	repeat_delay;
+	int	repeat_interval;
+	int	simple_frame_dup;
 } video_playback_setup;
 
 typedef struct {

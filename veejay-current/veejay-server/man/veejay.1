@@ -18,9 +18,13 @@ theathers and other interested users that want to use Free Software for their
 performances and/or video installations.
 
 .TP
-.SH Supported video codecs
+.SH Supported video codecs/formats
 .TP
-MJPEG (either jpeg 4:2:0 or jpeg 4:2:2), YUV 4:2:0 i420/yv12 AVI, Quasar DV codec (only I-frames), MPEG4 (only I-frames)
+MJPEG AVI / Quicktime
+LJPEG AVI
+MJPEG-b AVI / Quicktime
+Quasar DV codec (NTSC/PAL) AVI / Quicktime
+YUV4MPEG (chroma 4:2:0 jpeg/mpeg2, chroma 4:2:2) AVI / Y4M
 .TP
 .SH Supported video containers
 AVI , QuickTime 
@@ -60,12 +64,8 @@ TCP port offset for communication with clients like 'reloaded' , 'sayVIMS' or se
 .B \-h/--host
 Start as client of another veejay session (default is server)
 .TP
-.B \-o/--outstream <filename>
-write video in YCbCr (YUV 4:2:0) format to specified file. Use this with -O3.
-If you use 'stdout' here, veejay will be silent and write yuv4mpeg streams to STDOUT
-.TP
-.B \-O/--output [012345]
-specify video output 0 = SDL (default) 1 = DirectFB 2 = SDL and DirectFB 3 = YUV4MPEG stream , 4 = Open GL (required ARB fragment shader), 5 = Silent (no visual output)
+.B \-O/--output [01234]
+specify video output 0 = SDL (default) 1 = DirectFB 2 = SDL and DirectFB 3 = Open GL (requires ARB fragment shader), 4 = Silent (no visual output)
 .TP
 .B \-s/--size NxN
 Scaled video dimensions for SDL video output
@@ -173,9 +173,36 @@ Tell veejay which CPU to use (and lock) for rendering. By default
 veejay will lock CPU #1 if running on a SMP machine. 
 Use "0" to disable this behaviour. Use 1 for CPU#1, etc. 
 .TP
+.B VEEJAY_AUTO_SCALE_PIXELS
+Tell veejay to automatically convert between CCIR 601 and JPEG
+pixels - hence, it scales YUV values from 0 - 255 to YCbCr 16-235/16-240
+and vice versa. Use "0" to disable this behaviour, "1" to enable.
+.TP
+.B SDL_VIDEO_HWACCEL
+Set to 1 to use SDL video hardware accel (default=on)
+.TP
+.B VEEJAY_PERFORMANCE
+Set to "quality" or "fastest" (default is fastest)
+.TP
+.B VEEJAY_AUTO_SCALE_PIXELS
+Set to 1 to convert between CCIR 601 and JPEG automatically (default=dont care,white != white)
+.TP
+.B VEEJAY_INTERPOLATE_CHROMA
+Set to 1 if you wish to interpolate every chroma sample when scaling (default=0)
+.TP
+.B VEEJAY_SDL_KEY_REPEAT_INTERVAL
+Interval of key pressed to repeat while pressed down.
+.TP
+.B VEEJAY_PLAYBACK_CACHE   
+Sample cache size in MB - by default, veejay takes 30% of your total RAM
+.TP
+.B VEEJAY_SDL_KEY_REPEAT_DELAY     
+Delay key repeat in ms
+.TP
 .SH Home directory
 .TP
-Veejay creates a new directory in your HOME , ".veejay".
+Veejay creates a new directory in your $HOME , ".veejay".
+You must put a TrueType font file in $HOME/.veejay/fonts for veejay's OSD functionality.
 .TP
 .B .veejay/recovery
 If veejay stops unexpectedly, it will try to save your samplelist and editlist before aborting. 

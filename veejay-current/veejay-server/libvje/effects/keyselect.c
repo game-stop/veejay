@@ -72,8 +72,8 @@ uint8_t blend_func1(uint8_t a, uint8_t b) {
 
 uint8_t blend_func2(uint8_t a, uint8_t b) {
 	uint8_t val;
-	if(a < pixel_Y_lo_) a =  pixel_Y_lo_;
-	if(b <  pixel_Y_lo_) b =  pixel_Y_lo_;
+	if( a == 0 )
+	  a = 0xff;
 	val = 255 -  ((255-b) * (255-b))/a;
 	return CLAMP_Y(val);
 }
@@ -85,16 +85,13 @@ uint8_t blend_func3(uint8_t a , uint8_t b) {
 
 uint8_t blend_func4(uint8_t a, uint8_t b) {
 	uint8_t val;
-	if(b > pixel_Y_hi_) b = pixel_Y_hi_;
-	val = (a * a) / ( 255 - b );
+	val = (a * a) / ( 256 - b );
 	return CLAMP_Y(val);
 }
 
 uint8_t blend_func5(uint8_t a, uint8_t b) {
 	uint8_t val;
-	int c = 255 - b;
-	if( c  < pixel_Y_lo_ )
-		c = pixel_Y_lo_;
+	int c = 256 - b;
 	val = b / c;
 	return CLAMP_Y(val);
 }

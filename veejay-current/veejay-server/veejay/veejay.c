@@ -42,13 +42,16 @@
 #include <sys/sysinfo.h>
 #include <unistd.h>
 #include <veejay/vj-OSC.h>
+
+extern long vj_el_get_mem_size();
+
 static int run_server = 1;
 static veejay_t *info = NULL;
 static float override_fps = 0.0;
 static int default_geometry_x = -1;
 static int default_geometry_y = -1;
 static int force_video_file = 0; // unused
-static int override_pix_fmt = -1;
+static int override_pix_fmt = 0;
 static int switch_jpeg = 0;
 static char override_norm = 'p';
 static int auto_loop = 0;
@@ -132,12 +135,12 @@ static void Usage(char *progname)
 		"\t\t\t\t-h/--Projection Height \n");
 
     fprintf(stderr,
-	    "  -p/--portoffset\t\tTCP port to accept/send messages (default: 3490)\n");
+	    "  -p/--port\t\tTCP port to accept/send messages (default: 3490)\n");
     fprintf(stderr,
 	    "  -t/--timer num\t\tspecify timer to use (none:0,normal:2,rtc:1) default is 1\n");
 
 	fprintf(stderr,
-		"  -O/--output [012345]\t\tOutput video\n");
+		"  -O/--output [01234]\t\tOutput video\n");
 #ifdef HAVE_SDL
 	fprintf(stderr,
 		"\t\t\t\t0 = SDL (default)\t\n");
@@ -150,17 +153,13 @@ static void Usage(char *progname)
 		"\t\t\t\t2 = SDL and DirectDB secondary head (TV-Out) clone mode\n");
 #endif
 #endif
-	fprintf(stderr,
-		"\t\t\t\t3 = YUV4MPEG stream (use with -o/--outstream <file name>)\n");
 #ifdef HAVE_GL
 	fprintf(stderr,
-		"\t\t\t\t4 = OpenGL (requires openGL extension ARB fragment program)\n");
+		"\t\t\t\t3 = OpenGL (requires openGL extension ARB fragment program)\n");
 #endif
 	fprintf(stderr,
-		"\t\t\t\t5 = Head less (no video output)\n");	
+		"\t\t\t\t4 = Head less (no video output)\n");	
 		
-    fprintf(stderr,
-	    "  -o/--outstream <file name>\twhere to write the yuv4mpeg stream (use with -O3)\n");
     fprintf(stderr,
 	    "  -c/--synchronization [01]\tSync correction off/on (default on)\n");
     fprintf(stderr,
@@ -239,50 +238,6 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"     --map-from-file <num>\tmap N frames to memory\n");
 	fprintf(stderr,
-		"  -z/--zoom [1-11]\t\tScale output video\n");
-	fprintf(stderr,
-		"\t\t\t\tsoftware scaler type (also use -w/--projection-width, -h/--projection-height ). \n");
-	fprintf(stderr,
-		"\t\t\t\available types are:\n");         
-	fprintf(stderr,
-		"\t\t\t\t1\tFast bilinear (default)\n");
-	fprintf(stderr,
-		"\t\t\t\t2\tBilinear\n");
-	fprintf(stderr,
-		"\t\t\t\t3\tBicubic (good quality)\n");
-	fprintf(stderr,
-		"\t\t\t\t4\tExperimental\n");
-	fprintf(stderr,
-		"\t\t\t\t5\tNearest Neighbor (bad quality)\n");
-	fprintf(stderr,
-		"\t\t\t\t6\tArea\n");
-	fprintf(stderr,
-		"\t\t\t\t7\tLuma bi cubic / chroma bilinear\n");
-	fprintf(stderr,
-		"\t\t\t\t9\tGauss\n");
-	fprintf(stderr,
-		"\t\t\t\t9\tsincR\n");
-	fprintf(stderr,
-		"\t\t\t\t10\tLanczos\n");
-	fprintf(stderr,
-		"\t\t\t\t11\tNatural bi cubic spline\n");
-	fprintf(stderr,
-		"\n\t\t\t\tsoftware scaler options:\n");
-	fprintf(stderr,
-		"\t\t\t\t--lgb=<0-100>\tGaussian blur filter (luma)\n");
-	fprintf(stderr,
-		"\t\t\t\t--cgb=<0-100>\tGuassian blur filter (chroma)\n");
-	fprintf(stderr,
-		"\t\t\t\t--ls=<0-100>\tSharpen filter (luma)\n");
-	fprintf(stderr,
-		"\t\t\t\t--cs=<0-100>\tSharpen filter (chroma)\n");
-	fprintf(stderr,
-		"\t\t\t\t--chs=<h>\tChroma horizontal shifting\n");
-	fprintf(stderr,
-		"\t\t\t\t--cvs=<v>\tChroma vertical shifting\n");
-	fprintf(stderr,
-		"\t\t\t\t-C/--zoomcrop [top:bottom:left:right] (crop source before scaling)\n");
-	fprintf(stderr,
 		"  -D/--composite \t\tDo not start with camera/projection calibration viewport \n");
 	fprintf(stderr,
 		"  -A/--all [num] \t\tStart with capture device <num> \n");
@@ -308,7 +263,7 @@ static int set_option(const char *name, char *value)
 {
     /* return 1 means error, return 0 means okay */
     int nerr = 0;
-    if (strcmp(name, "portoffset") == 0 || strcmp(name, "p") == 0) {
+    if (strcmp(name, "port") == 0 || strcmp(name, "p") == 0) {
 	info->uc->port = atoi(optarg);
     } else if (strcmp(name, "verbose") == 0 || strcmp(name, "v") == 0) {
 	info->verbose = 1;
@@ -359,12 +314,16 @@ static int set_option(const char *name, char *value)
 	       || strcmp(name, "O") == 0) {
 	    info->video_out = atoi(optarg);	/* use SDL */
 #ifndef HAVE_GL
-            if(info->video_out==4)
+            if(info->video_out==3)
 	    {
 		fprintf(stderr, "OpenGL support not enabled at compile time\n");
 		exit(-1);
 	    }
 #endif
+	    if( info->video_out < 0 || info->video_out > 4 ) {
+		    fprintf(stderr, "Select a valid output display driver\n");
+		    exit(-1);
+		   }
     } else if (strcmp(name, "F") == 0 || strcmp(name, "features")==0) {
 	CompiledWith();
         nerr++;
@@ -387,15 +346,10 @@ static int set_option(const char *name, char *value)
     }
 #endif
 #endif
-    else if (strcmp(name, "outstream") == 0 || strcmp(name, "o") == 0) {
-	check_val(optarg,name);
-	snprintf(info->stream_outname,256,"%s", (char*) optarg);
-#ifdef HAVE_XML2
-    } else if (strcmp(name, "action-file")==0 || strcmp(name,"l")==0) {
+    else if (strcmp(name, "action-file")==0 || strcmp(name,"l")==0) {
 	check_val(optarg,name);
 	veejay_strncpy(info->action_file,(char*) optarg, strlen( (char*) optarg));
 	info->load_action_file = 1;
-#endif
 	}
 	else if(strcmp(name,"map-from-file") == 0 ) {
 		info->seek_cache = atoi(optarg);
@@ -443,8 +397,8 @@ static int set_option(const char *name, char *value)
 	else if(strcmp(name,"yuv")==0 || strcmp(name,"Y")==0)
 	{
 		override_pix_fmt = atoi(optarg);
-		if( override_pix_fmt < 0 || override_pix_fmt > 1 )
-			override_pix_fmt = -1;
+		if( override_pix_fmt < 0 || override_pix_fmt > 2 )
+			override_pix_fmt = 0;
 	}
 	else if(strcmp(name, "swap-range") == 0 || strcmp(name, "e") == 0 )
 	{
@@ -453,72 +407,6 @@ static int set_option(const char *name, char *value)
 	else if( strcmp(name,"auto-loop")==0 || strcmp(name,"L") == 0)
 	{
 		auto_loop = 1;
-	}
-	else if (strcmp(name, "zoom") == 0 || strcmp(name, "z" ) == 0)
-	{
-		if(info->settings->composite) {
-			fprintf(stderr, "Use --zoom or -z with -D or --composite");
-			nerr++;
-		}
-		info->settings->zoom = atoi(optarg);
-		if(info->settings->zoom < 1 || info->settings->zoom > 11)
-		{
-			fprintf(stderr, "Use --zoom [1-11] or -z [1-11]\n");
-			nerr++;
-		}
-	}
-	else if (strcmp(name, "lgb") == 0) 	
-	{
-		info->settings->sws_templ.lumaGBlur = (float)atof(optarg);
-		OUT_OF_RANGE_ERR( info->settings->sws_templ.lumaGBlur);
-		info->settings->sws_templ.use_filter = 1;
-	}
-	else if (strcmp(name, "cgb") == 0)
-	{
-		info->settings->sws_templ.chromaGBlur = (float)atof(optarg);
-		OUT_OF_RANGE_ERR( info->settings->sws_templ.chromaGBlur );
-		info->settings->sws_templ.use_filter = 1;
-
-	}
-	else if (strcmp(name, "ls") == 0)
-	{
-		info->settings->sws_templ.lumaSarpen = (float) atof(optarg);
-		OUT_OF_RANGE_ERR( info->settings->sws_templ.lumaSarpen);
-		info->settings->sws_templ.use_filter = 1;
-
-	}
-	else if (strcmp(name, "cs") == 0)
-	{
-		info->settings->sws_templ.chromaSharpen = (float) atof(optarg);
-		OUT_OF_RANGE_ERR(info->settings->sws_templ.chromaSharpen);
-		info->settings->sws_templ.use_filter = 1;
-
-	}	
-	else if (strcmp(name, "chs") == 0)
-	{
-		info->settings->sws_templ.chromaHShift = (float) atof(optarg);
-		OUT_OF_RANGE_ERR(info->settings->sws_templ.chromaHShift );
-		info->settings->sws_templ.use_filter = 1;
-
-	}
-	else if (strcmp(name, "cvs") == 0)
-	{
-		info->settings->sws_templ.chromaVShift = (float) atof(optarg);
-		OUT_OF_RANGE_ERR(info->settings->sws_templ.chromaVShift );
-		info->settings->sws_templ.use_filter = 1;
-
-	}	
-	else if (strcmp(name, "C") == 0 || strcmp(name, "zoomcrop") == 0 )
-	{
-		if (sscanf(value, "%d:%d:%d:%d", &(info->settings->viewport.top),
-						 &(info->settings->viewport.bottom),
-						 &(info->settings->viewport.left),
-						 &(info->settings->viewport.right)) < 4)
-		{
-			fprintf(stderr, "Crop requires top:bottom:left:right\n");
-			nerr++;
-		}
-		info->settings->crop = 1;
 	}
 	else if (strcmp(name, "quit") == 0 || strcmp(name, "q") == 0 )
 	{
@@ -560,13 +448,11 @@ static int check_command_line_options(int argc, char *argv[])
 	{"timer", 1, 0, 0},	/* timer */
 	{"dump-events",0,0,0},
 	{"bezerk",0,0,0},
-	{"outstream", 1, 0, 0},
 	{"action-file",1,0,0},
 	{"features",0,0,0},
 	{"deinterlace",0,0,0},
-	{"zoom",1,0,0},
 	{"clip-as-sample",0,0,0},
-	{"portoffset", 1, 0, 0},
+	{"port", 1, 0, 0},
 	{"sample-mode",1,0,0},
 	{"dummy",0,0,0},
 	{"geometry-x",1,0,0},
@@ -586,13 +472,6 @@ static int check_command_line_options(int argc, char *argv[])
 	{"multicast-osc",1,0,0},
 	{"multicast-vims",1,0,0},
 	{"map-from-file",1,0,0},
-	{"zoomcrop",1,0,0},
-	{"lgb",1,0,0},
-	{"cgb",1,0,0},
-	{"ls",1,0,0},
-	{"cs",1,0,0},
-	{"chs",1,0,0},
-	{"cvs",1,0,0},
 	{"composite",0,0,0},
 	{"quit",0,0,0},
 	{"memory",1,0,0},
@@ -612,12 +491,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:z:f:Y:A:N:H:W:R:M:C:T:nILFPVDugvdibjqe",
+			"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:f:Y:A:N:H:W:R:M:T:nILFPVDugvdibjqe",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:z:f:Y:A:N:H:W:R:M:C:T:nILFPVDugvdibjqe"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:f:Y:A:N:H:W:R:M:T:nILFPVDugvdibjqe"
 						   )) != EOF)
 #endif
     {
@@ -653,16 +532,8 @@ static int check_command_line_options(int argc, char *argv[])
 	Usage(argv[0]);
 
     veejay_set_debug_level(info->verbose);
-
-    if(info->video_out == 3)
-    {
-	veejay_silent();
-	mjpeg_default_handler_verbosity( 0 );	
-    }
-    else
-    {
-    	mjpeg_default_handler_verbosity( (info->verbose ? 1:0) );
-    }
+    mjpeg_default_handler_verbosity( (info->verbose ? 1:0) );
+    
     if(!info->dump)
 	{
        if(veejay_open_files(
@@ -731,7 +602,9 @@ int main(int argc, char **argv)
 		return 0;
     }
 
-    if(info->dump)
+	print_license();
+	
+    	if(info->dump)
  	{
 		veejay_set_colors(0);
 		vj_event_init();
@@ -739,12 +612,16 @@ int main(int argc, char **argv)
 		vj_osc_allocate(VJ_PORT+2);	
 		vj_event_dump();
 		vj_effect_dump();
+			fprintf(stdout, "Environment variables:\n\tSDL_VIDEO_HWACCEL\t\tSet to 1 to use SDL video hardware accel (default=on)\n\tVEEJAY_PERFORMANCE\t\tSet to \"quality\" or \"fastest\" (default is fastest)\n\tVEEJAY_AUTO_SCALE_PIXELS\tSet to 1 to convert between CCIR 601 and JPEG automatically (default=dont care)\n\tVEEJAY_INTERPOLATE_CHROMA\tSet to 1 if you wish to interpolate every chroma sample when scaling (default=0)\n\tVEEJAY_SET_CPU\t\t\tLock the veejay render/playback thread to a specific core, use 0-[num cpu's] (default=dont lock)\n\tVEEJAY_CAPTURE_DRIVER\t\tSet to \"unicap\" or \"v4lutils\" (default=v4lutils)\n\tVEEJAY_SDL_KEY_REPEAT_INTERVAL\tinterval of key pressed to repeat while pressed down.\n\tVEEJAY_PLAYBACK_CACHE\tSample cache size in MB - by default, veejay takes 30\% of total RAM\n\tVEEJAY_SDL_KEY_REPEAT_DELAY\tDelay key repeat in ms\n");
+			fprintf(stdout, "\n\n\tExample for bash:\n\t\t\t$ export VEEJAY_AUTO_SCALE_PIXEL=1\n");
+
+
 		veejay_free(info);
 		return 0;
 	}
 
-	print_license();
-	prepare_cache_line( max_mem_, n_slots_ );
+	if( vj_el_get_mem_size() == 0 )
+		prepare_cache_line( max_mem_, n_slots_ );
 	veejay_check_homedir( info );
 
     	sigemptyset(&(settings->signal_set));

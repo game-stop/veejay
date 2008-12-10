@@ -27,7 +27,7 @@
 vj_effect *overlaymagic_init(int w, int h);
 
 void overlaymagic_apply( VJFrame *frame, VJFrame *frame2, int width,
-			int height, int n);
+			int height, int n, int mode);
 
 void magicoverlays_free();
 #endif

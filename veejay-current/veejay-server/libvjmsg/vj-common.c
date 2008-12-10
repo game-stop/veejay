@@ -40,6 +40,7 @@ static int _debug_level = 0;
 static int _color_level = 1;
 static int _no_msg = 0;
 
+
 #define MAX_LINES 100 
 typedef struct
 {
@@ -51,6 +52,8 @@ typedef struct
 static	vj_msg_hist	_message_history;
 static	int		_message_his_status = 0;
 */
+
+
 void veejay_set_debug_level(int level)
 {
 	if(level)
@@ -86,7 +89,7 @@ int veejay_is_silent()
 
 void veejay_msg(int type, const char format[], ...)
 {
-    char prefix[10];
+    char prefix[64];
     char buf[256];
     va_list args;
     int line = 0;
@@ -128,6 +131,7 @@ void veejay_msg(int type, const char format[], ...)
 		sprintf(prefix, "%sD: ", TXT_BLU);
 		break;
 	 }
+
  	 if(!line)
 	     fprintf(out,"%s %s %s\n", prefix, buf, TXT_END);
 	     else
@@ -161,6 +165,7 @@ void veejay_msg(int type, const char format[], ...)
 		sprintf(prefix, "D: ");
 		break;
 	   }
+
 	   if(!line)
 	     fprintf(out,"%s %s\n", prefix, buf);
 	     else

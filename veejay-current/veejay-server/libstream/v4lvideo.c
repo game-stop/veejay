@@ -524,7 +524,7 @@ static int	__v4lvideo_init( v4lvideo_t *v, char* file, int channel, int norm, in
 	v->white      = v->vd.picture.whiteness;
 
 	veejay_memset( &(v->sws_templ), 0,sizeof(sws_template));
-	v->sws_templ.flags = 1;
+	v->sws_templ.flags = yuv_which_scaler();
 
 
 #ifdef STRICT_CHECKING
@@ -840,9 +840,15 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 	if( v1->native ) {
 		src = v4lgetaddress(&(v1->vd));
 		lock_(v2);
-		veejay_memcpy( dstY, src, v2->len );
-		veejay_memcpy( dstU, src + v2->len, v2->uvlen);
-		veejay_memcpy( dstV, src + v2->len + v2->uvlen, v2->uvlen );
+		uint8_t *srcin[3] = { src, src + v2->len, src + v2->len + v2->uvlen };
+		uint8_t *dstout[3]= { dstY,dstU,dstV };
+		if( yuv_use_auto_ccir_jpeg() ) {
+			yuv_scale_pixels_from_ycbcr2( srcin, dstout,v2->len );
+		} else {
+			veejay_memcpy( dstY, src, v2->len );
+			veejay_memcpy( dstU, src + v2->len, v2->uvlen);
+			veejay_memcpy( dstV, src + v2->len + v2->uvlen, v2->uvlen );
+		}
 		unlock_(v2);
 	} else {
 		VJFrame *srcf = v1->info->src;
@@ -856,7 +862,11 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 			src = v4lgetaddress(&(v1->vd));
 			srcf->data[0] = src;
 			srcf->data[1] = src + srcf->len;
-			srcf->data[2] = src + srcf->len + srcf->uv_len;	
+			srcf->data[2] = src + srcf->len + srcf->uv_len;
+#ifdef STRICT_CHECKING
+			assert(0);
+#endif
+				
 		} else {
 			srcf->data[0] = v4lgetaddress(&(v1->vd));
 			if(!v1->scaler) 

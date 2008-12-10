@@ -17,14 +17,15 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <config.h>
-#ifdef USE_GDK_PIXBUF
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
+#ifdef USE_GDK_PIXBUF
 #include <gdk-pixbuf/gdk-pixbuf.h>
+#endif
 #include <libvje/vje.h>
 #include <libvje/effects/common.h>
 #include <libyuv/yuvconv.h>
@@ -70,6 +71,7 @@ extern uint8_t *vj_perform_get_preview_buffer();
 static	VJFrame *open_pixbuf( const char *filename, int dst_w, int dst_h, int dst_fmt,
 			uint8_t *dY, uint8_t *dU, uint8_t *dV )
 {
+#ifdef USE_GDK_PIX_BUF
 	GdkPixbuf *image =
 		gdk_pixbuf_new_from_file( filename, NULL );
 	if(!image)
@@ -107,6 +109,10 @@ static	VJFrame *open_pixbuf( const char *filename, int dst_w, int dst_h, int dst
 
 
 	return dst;
+#else
+
+	return NULL;
+#endif
 }
 
 void	vj_picture_cleanup( void *pic )
@@ -153,6 +159,7 @@ int	vj_picture_get_width( void *pic )
 
 void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf )
 {
+#ifdef USE_GDK_PIXBUF
 	vj_pixbuf_t *pic = NULL;
 	if(filename == NULL )
 	{
@@ -208,13 +215,21 @@ void	*vj_picture_open( const char *filename, int v_outw, int v_outh, int v_outf 
 			pic->space,
 			pic->space + len,
 			pic->space + len + ulen );
+	if(!pic->img) {
+		free(pic->space);
+		return NULL;
+	}
 
 	return (void*) pic;
+#else
+	return NULL;
+#endif
 }
 
 int	vj_picture_probe( const char *filename )
 {
 	int ret = 0;
+#ifdef USE_GDK_PIXBUF
 	GdkPixbuf *image =
 		gdk_pixbuf_new_from_file( filename, NULL );
 	if(image)
@@ -222,11 +237,12 @@ int	vj_picture_probe( const char *filename )
 		ret = 1;
 		gdk_pixbuf_unref( image );
 	}
+#endif
 	return ret;
 }
 
 /* image saving */
-
+#ifdef USE_GDK_PIXBUF
 static	void	add_if_writeable( GdkPixbufFormat *data, GSList **list)
 {
 	if( gdk_pixbuf_format_is_writable( data ))
@@ -234,7 +250,7 @@ static	void	add_if_writeable( GdkPixbufFormat *data, GSList **list)
 	gchar *name = gdk_pixbuf_format_get_name( data );
 	if(name) g_free(name);
 } 
-
+#endif
 char	*vj_picture_get_filename( void *pic )
 {
 	vj_pixbuf_out_t *p = (vj_pixbuf_out_t*) pic;
@@ -245,6 +261,7 @@ char	*vj_picture_get_filename( void *pic )
 void *	vj_picture_prepare_save(
 	const char *filename, char *type, int out_w, int out_h)
 {
+#ifdef USE_GDK_PIXBUF
 	if(!type || !filename )
 	{
 		veejay_msg(0, "Missing filename or file extension");
@@ -270,10 +287,13 @@ void *	vj_picture_prepare_save(
 	pic->out_h = out_h;
 
 	return (void*) pic;
+#else
+	return NULL;
+#endif
 }
 
 
-
+#ifdef USE_GDK_PIXBUF
 static	void	display_if_writeable( GdkPixbufFormat *data, GSList **list)
 {
 	if( gdk_pixbuf_format_is_writable( data ))
@@ -291,7 +311,7 @@ void	vj_picture_display_formats()
 	g_slist_free( f );
 	g_slist_free( res );
 }
-
+#endif
 static	void	vj_picture_out_cleanup( vj_pixbuf_out_t *pic )
 {
 	if(pic)
@@ -315,20 +335,22 @@ void	vj_picture_init( void *templ )
 	if(!__initialized)
 	{
 		// cool stuff
+#ifdef USE_GDK_PIXBUF
 		g_type_init();
 		veejay_msg(VEEJAY_MSG_DEBUG, "Using gdk pixbuf %s", gdk_pixbuf_version );
+#endif
 		__initialized = 1;
 	}
 
 	pic_template_ = (sws_template*) templ;
-
+	pic_template_->flags = yuv_which_scaler();
 }
 
 int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 {
 	int ret = 0;
+#ifdef USE_GDK_PIXBUF
 	vj_pixbuf_out_t *pic = (vj_pixbuf_out_t*) picture;
-
 	GdkPixbuf *img_ = gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, w, h );
 	if(!img_)
 	{
@@ -366,7 +388,7 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 	free(dst);
 
 	vj_picture_out_cleanup( pic );
-	
+#endif
 	return ret;
 }
 
@@ -394,11 +416,14 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 
 	pic_changed_ = pic_has_changed( out_w,out_h, pixfmt );
 
-	if(pic_changed_ )
+	if(pic_changed_ || pic_scaler_ == NULL )
 	{
 		if(pic_scaler_)
 			yuv_free_swscaler( pic_scaler_ );
 		pic_scaler_ = yuv_init_swscaler( src1,dst1, pic_template_, yuv_sws_get_cpu_flags());
+#ifdef STRICT_CHECKING
+		assert( pic_scaler_ != NULL );
+#endif
 		update_pic_data( out_w, out_h, pixfmt );
 	}
 
@@ -444,4 +469,3 @@ void 	vj_fastbw_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int p
 	free(dst1);
 }
 
-#endif

@@ -122,7 +122,7 @@ typedef struct {
 	int	auto_number;
 	int	font_index;
 	long		index_len;
-	srt_cycle_t	**index;
+	srt_seq_t	**index;
 	float		fps;
 	void	*dictionary;
 	void	*plain;
@@ -1473,9 +1473,10 @@ void	*vj_font_get_dict(void *font)
 	return f->dictionary;
 }
 
-static	int	compare_strings( char **p1, char **p2 )
+static	int	compare_strings( const void *p1, const void *p2 )
 {
-	return strcoll( *p1, *p2 );
+
+	return strcoll( (const char *) p1, (const char *) p2 );
 }
 
 static	int	get_default_font( vj_font_t *f )
@@ -2049,7 +2050,7 @@ static void vj_font_text_render(vj_font_t *f, srt_seq_t *seq, void *_picture )
  	for (i=0; i < size; i++)
     	{
 		c = text[i];
-		if (  ((c == '_') && (text == f->text) ) || /* skip '_' (consider as space) 
+		if (  ((c == '_') && ((char*)text == (char*)f->text) ) || /* skip '_' (consider as space) 
 					     IF text was specified in cmd line 
 					     (which doesn't like neasted quotes)  */
 	 		 ( c == '\n' )) /* Skip new line char, just go to new line */

@@ -700,7 +700,7 @@ uint8_t bl_pix_divide_Y(uint8_t y1, uint8_t y2)
 {
 	int c = y1 * y2;
 	int b = 0xff - y2;
-	if( b < pixel_Y_lo_ || c < pixel_Y_lo_ )
+	if( b <= pixel_Y_lo_ || c <= pixel_Y_lo_ )
 		return pixel_Y_lo_;
 	return ( c / b );
 }
@@ -721,13 +721,11 @@ uint8_t bl_pix_softburn_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    if( a < pixel_Y_lo_) a = pixel_Y_lo_;
-    if( b < pixel_Y_lo_) b = pixel_Y_lo_;
     if (a + b < 0xff) {
 	if (a > pixel_Y_hi_) {
 	    new_Y = pixel_Y_hi_;
 	} else {
-	    new_Y = (b >> 7) / (0xff - a);
+	    new_Y = (b >> 7) / (256 - a);
 	    if (new_Y > pixel_Y_hi_)
 		new_Y = pixel_Y_hi_;
 	}
@@ -742,7 +740,7 @@ uint8_t bl_pix_inverseburn_Y(uint8_t y1, uint8_t y2)
     uint8_t a, b, new_Y;
     a = y1;
     b = y2;
-    if (a < pixel_Y_lo_) {
+    if (a <= pixel_Y_lo_) {
 	new_Y = pixel_Y_lo_;
     } else {
 	new_Y = 0xff - (((0xff - b) >> 8) / a);

@@ -37,6 +37,16 @@
 #include <config.h>
 #include <libvjmem/vjmem.h>
 #include "opacity.h"
+#undef _EMMS
+
+#ifdef HAVE_K6_2PLUS
+/* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
+#define _EMMS     "femms"
+#else
+#define _EMMS     "emms"
+#endif
+
+#define do_emms 	 __asm__ __volatile__ ( _EMMS:::"memory")
 
 vj_effect *opacity_init(int w, int h)
 {
@@ -114,7 +124,7 @@ void opacity_apply( VJFrame *frame, VJFrame *frame2, int width,
 	int u = blend_plane( frame->data[1], frame->data[1], frame2->data[1], frame->uv_len, opacity );
 	int v = blend_plane( frame->data[2], frame->data[2], frame2->data[2], frame->uv_len, opacity );
 #ifdef HAVE_ASM_MMX
-	__asm __volatile( "\n\t emms" );
+	do_emms;
 #endif
 	if( y>0) while (y--)
 		frame->data[0][y] = ((opacity * (frame->data[0][y] - frame2->data[0][y])) >> 8 ) + frame->data[0][y];
@@ -133,7 +143,7 @@ void	opacity_blend_apply( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_le
 	int u = blend_plane( src1[1], src1[1], src2[1], uv_len,opacity);
 	int v = blend_plane( src1[2], src1[2], src2[2], uv_len, opacity);
 #ifdef HAVE_ASM_MMX
-	__asm __volatile( "\n\t emms" );
+	do_emms;
 #endif
 
 	while (y--)
@@ -151,7 +161,7 @@ void	opacity_blend_luma_apply( uint8_t *A, uint8_t *B, int len,int opacity )
 {
 	int y = blend_plane( A,A,B, len, opacity );
 #ifdef HAVE_ASM_MMX
-	__asm __volatile( "\n\t emms" );
+	do_emms;
 #endif
 	while (y--)
 		A[y] = ((opacity * (A[y] - B[y])) >> 8 ) + A[y];

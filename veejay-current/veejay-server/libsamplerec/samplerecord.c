@@ -46,8 +46,7 @@ int sample_get_encoded_file(int sample_id, char *description)
     si = sample_get(sample_id);
     if (!si)
 	return -1;
-    sprintf(description, "%s", si->encoder_destination
-				 );
+    sprintf(description, "%s", si->encoder_destination	 );
     return 1;
 }
 
@@ -109,6 +108,9 @@ int sample_try_filename(int sample_id, char *filename, int format)
 		case ENCODER_DVVIDEO:
 			sprintf(ext,"dv");
 			break;
+		case ENCODER_YUV4MPEG:
+			sprintf(ext,"yuv");
+			break;
 		case ENCODER_QUICKTIME_MJPEG:
 		case ENCODER_QUICKTIME_DV:
 			sprintf(ext,"mov");
@@ -127,33 +129,14 @@ int sample_try_filename(int sample_id, char *filename, int format)
 static int sample_start_encoder(sample_info *si, editlist *el, int format, long nframes)
 {
 	char descr[100];
-	char cformat = 'Y';
+	char cformat = vj_avcodec_find_lav( format );
+	
+	if( cformat == '\0' ) 
+		return -1;
+
 	int sample_id = si->sample_id;
-	switch(format)
-	{
-		case ENCODER_DVVIDEO: sprintf(descr,"DV2"); cformat='d'; break;
-		case ENCODER_MJPEG: sprintf(descr, "MJPEG"); cformat='a'; break;
-		case ENCODER_YUV420F:  sprintf(descr, "YUV 4:2:0 YV12"); cformat='v'; break;
-		case ENCODER_YUV420: sprintf(descr, "YCbCr 4:2:0 YV12"); cformat='Y'; break;
-		case ENCODER_YUV422F: sprintf(descr,"YUV 4:2:2 Planar");cformat='V';break;
-		case ENCODER_YUV422: sprintf(descr, "YCbCr 4:2:2 Planar"); cformat='P'; break;
-		case ENCODER_MPEG4: sprintf(descr, "MPEG4"); cformat='M'; break;
-		case ENCODER_DIVX: sprintf(descr, "DIVX"); cformat='D'; break;
-		case ENCODER_QUICKTIME_DV:
-			   sprintf(descr, "Quicktime"); cformat = 'Q'; break;
 
-		case ENCODER_QUICKTIME_MJPEG:
-			   sprintf(descr, "Quicktime"); cformat = 'q'; break;
-		case ENCODER_LZO:
-			   sprintf(descr, "LZO YUV"); cformat = 'L'; break;
-		
-		default:
-		   veejay_msg(VEEJAY_MSG_ERROR, "Unsupported video codec");
-		   return -1;
-                break;
-	}
-
-	si->encoder = vj_avcodec_start( el, format );
+	si->encoder = vj_avcodec_start( el, format, si->encoder_destination );
 	if(!si->encoder)
 		return -1;
 
@@ -187,11 +170,12 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 			 si->encoder_max_size= 2048 + tmp + (tmp/4) + (tmp/4);break;
 			case ENCODER_YUV422:
 			case ENCODER_YUV422F:
+			case ENCODER_YUV4MPEG:
 			si->encoder_max_size = 2048 + tmp + (tmp/2) + (tmp/2);break;
 			case ENCODER_LZO:
 			si->encoder_max_size = (tmp * 3 ); break;
 			default:
-			si->encoder_max_size = ( 4 * 65535 );
+			si->encoder_max_size = ( 8 * 65535 );
 			break;
 		}
 	
@@ -207,30 +191,33 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 		return -1;
 	}
 
-	si->encoder_file = (void*)lav_open_output_file(si->encoder_destination,cformat,
+	if( cformat != 'S' ) {
+
+		si->encoder_file = (void*)lav_open_output_file(si->encoder_destination,cformat,
 			el->video_width,el->video_height,el->video_inter,
 			el->video_fps,el->audio_bits, el->audio_chans, el->audio_rate );
 		
-	if(!si->encoder_file)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Cannot write to %s (%s)",si->encoder_destination,
-		lav_strerror());
-		vj_avcodec_close_encoder( si->encoder );
-		si->encoder = NULL;
-		return -1;
-	}
+		if(!si->encoder_file)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR,"Cannot write to %s (%s)",si->encoder_destination,
+			lav_strerror());
+			vj_avcodec_close_encoder( si->encoder );
+			si->encoder = NULL;
+			return -1;
+		}
 
-	
-	veejay_msg(VEEJAY_MSG_INFO, "Encoding to %s file [%s] %dx%d@%2.2f %d/%d/%d %s >%09d< f=%c",
-	    descr,
-	    si->encoder_destination, 
+	}
+	veejay_msg(VEEJAY_MSG_INFO, "Encoding to %s file [%s]",  vj_avcodec_get_encoder_name(format),
+	    si->encoder_destination );
+
+	veejay_msg(VEEJAY_MSG_DEBUG,"\t%dx%d@%2.2f %d/%d/%d %s >%09d< f=%c",
 	    el->video_width,
 	    el->video_height,
 	    (float) el->video_fps,
 	    el->audio_bits,
 	    el->audio_chans,
 	    el->audio_rate,
-		(el->video_inter == 1 ? "Deinterlaced" : "Interlaced"),
+		(el->video_inter == 1 ? "Full frames" : "Interlaced"),
 		( si->encoder_duration - si->encoder_total_frames),
 		cformat );
 	
@@ -254,7 +241,7 @@ int sample_init_encoder(int sample_id, char *filename, int format, editlist *el,
 	{
 		 return -1; 
 	}
-	if(format < 0 || format > 11)
+	if(format < 0 || format > NUM_ENCODERS)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid format!");
 		return -1;
@@ -333,13 +320,18 @@ int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
   	veejay_msg(VEEJAY_MSG_ERROR, "Cannot encode frame");
 	return -1;
    }
+	si->rec_total_bytes += buf_len;
+
+
+   //@ if writing to AVI/QT
+   if( si->encoder_file != NULL ) {
+
     if(lav_write_frame( (lav_file_t*) si->encoder_file,vj_avcodec_get_buf(si->encoder),buf_len,1))
 	{
-			veejay_msg(VEEJAY_MSG_ERROR, "writing frame, giving up %s", lav_strerror());
+			veejay_msg(VEEJAY_MSG_ERROR, "writing frame, giving up: '%s' (%d bytes buffer)", lav_strerror(),
+					buf_len);
 			return 1;
 	}
-
-	si->rec_total_bytes += buf_len;
 
 	if(audio_size > 0)
 	{
@@ -349,6 +341,9 @@ int sample_record_frame(int s1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 		}
 		si->rec_total_bytes += audio_size;
 	}
+   }
+
+   //@ otherwise, encoder must be YUV4MPEG
 	/* write OK */
 	si->encoder_succes_frames ++;
 	si->encoder_num_frames ++;

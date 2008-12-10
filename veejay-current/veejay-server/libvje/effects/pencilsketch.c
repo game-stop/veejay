@@ -84,6 +84,7 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 	{
 		int p =  ( (b > a) ? b : a);
 		p = CLAMP_Y(p);
+		if( p == 0 ) p = 1;
 		p = ( 255 - ((256 - b) * (256 - b)) / p);
 		return (uint8_t)p;
 	}
@@ -92,6 +93,7 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 	{
 		a = CLAMP_Y(a);
 		b = CLAMP_Y(b);
+		if( a == 0 ) a = 1; else if ( b == 0 ) b = 1;
 		int p = 255 - ((256-a) * (256-a)) / a;
 		int q = 255 - ((256-b) * (256-b)) / b;
 		p = ( 255 - ((256-p) * (256 - a)) / q);
@@ -115,7 +117,7 @@ typedef uint8_t (*_pcbcr) (uint8_t a, uint8_t b);
 
 	static uint8_t _pcf_none(uint8_t a, uint8_t b, int t_max)
 	{
-		if( a > pixel_Y_lo_ || a <= t_max) a = pixel_Y_lo_ ; else a = pixel_Y_hi_;
+		if( a >= pixel_Y_lo_ || a <= t_max) a = pixel_Y_lo_ ; else a = pixel_Y_hi_;
 		return a;
 	}
 
@@ -159,7 +161,7 @@ void pencilsketch_apply(
 
 
  	/* get a pointer to a pixel blend function */
-	_pcf _pff = _get_pf(type);
+	_pcf _pff =  (_pcf) _get_pf(type);
 	_pcbcr _pcbcrff = &_pcbcr_color;
 
 	len = len - width - 1 ;

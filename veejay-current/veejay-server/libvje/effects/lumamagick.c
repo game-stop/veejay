@@ -241,10 +241,8 @@ void _lumamagick_divide(VJFrame *frame, VJFrame *frame2, int width,
     for (i = 0; i < len; i++) {
 	b = (Y[i] * opacity_a) * (Y[i] * opacity_a);
 	c = 255 - (Y2[i] * opacity_b);
-	if (c < pixel_Y_lo_)
-	    c = pixel_Y_lo_;
-	a = b / c;
-	Y[i] = a;
+	if (c > pixel_Y_lo_)
+	    Y[i] = b/c;
     }
 }
 
@@ -303,11 +301,9 @@ void _lumamagick_softburn(VJFrame *frame, VJFrame *frame2, int width,
 	    else
 		c = (b >> 7) / (256 - a);
 	} else {
-	    if (b < pixel_Y_lo_)
-		b = pixel_Y_lo_;
+	    if (b <= pixel_Y_lo_)
+		b = 0xff;
 	    c = 255 - (((255 - a) >> 7) / b);
-	    if (c < pixel_Y_lo_)
-		c = pixel_Y_lo_;
 	}
 	Y[i] = c;
     }
@@ -327,7 +323,7 @@ void _lumamagick_inverseburn(VJFrame *frame, VJFrame *frame2,
     for (i = 0; i < len; i++) {
 	a = Y[i] * opacity_a;
 	b = Y2[i] * opacity_b;
-	if (a < pixel_Y_lo_)
+	if (a <= pixel_Y_lo_)
 	    c = pixel_Y_lo_;
 	else
 	    c = 255 - (((255 - b) >> 8) / a);
@@ -340,7 +336,7 @@ void _lumamagick_colordodge(VJFrame *frame, VJFrame *frame2,
 			    int width, int height, int op_a, int op_b)
 {
     unsigned int i;
-    int a, b, c;
+    int a, b, c,d;
     const double opacity_a = op_a * 0.01;
     const double opacity_b = op_b * 0.01;
     const unsigned int len = frame->len;
@@ -352,9 +348,12 @@ void _lumamagick_colordodge(VJFrame *frame, VJFrame *frame2,
 	b = Y2[i] * opacity_b;
 	if (a >= pixel_Y_hi_)
 	    c = pixel_Y_hi_;
-	else
-	    c = (b >> 8) / (pixel_Y_hi_ - a);
-
+	else {
+		d = pixel_Y_hi_ - a;
+		if( d <= pixel_Y_lo_ )
+			d = 1;
+	    	c = (b >> 8) / d;
+	}
 	Y[i] = c;
     }
 }
@@ -373,8 +372,8 @@ void _lumamagick_mulsub(VJFrame *frame, VJFrame *frame2, int width,
     for (i = 0; i < len; i++) {
 	a = Y[i] * opacity_a;
 	b = (pixel_Y_hi_ - Y2[i]) * opacity_b;
-	if (b < pixel_Y_lo_)
-	    b = pixel_Y_lo_;
+	if (b <= pixel_Y_lo_)
+	    b = 1;
 	c = a / b;
 	Y[i] = c;
     }
@@ -473,10 +472,6 @@ void _lumamagick_basecolor(VJFrame *frame, VJFrame *frame2, int width,
     for (i = 0; i < len; i++) {
 	a = Y[i] * opacity_a;
 	b = Y2[i] * opacity_b;
-	if (a < pixel_Y_lo_)
-	    a = pixel_Y_lo_;
-	if (b < pixel_Y_lo_)
-	    b = pixel_Y_lo_;
 	c = a * b >> 7;
 	d = c + a * ((255 - (((255 - a) * (255 - b)) >> 7) - c) >> 7);	//8
 	Y[i] = d;
@@ -498,7 +493,7 @@ void _lumamagick_freeze(VJFrame *frame, VJFrame *frame2, int width,
 	a = Y[i] * opacity_a;
 	b = Y2[i] * opacity_b;
 
-	if (b < pixel_Y_lo_)
+	if (b <= pixel_Y_lo_)
 	    c = pixel_Y_lo_;
 	else
 	    c = 255 - ((255 - a) * (255 - a)) / b;
@@ -522,12 +517,10 @@ void _lumamagick_unfreeze(VJFrame *frame, VJFrame *frame2, int width,
 	a = Y[i] * opacity_a;
 	b = Y2[i] * opacity_b;
 
-	if (a < pixel_Y_lo_)
+	if (a <= pixel_Y_lo_)
 	    c = pixel_Y_lo_;
 	else
 	    c = 255 - ((256 - b) * (256 - b)) / a;
-	if (c < pixel_Y_lo_)
-	    c = pixel_Y_lo_;
 
 	Y[i] = c;
     }
@@ -552,8 +545,6 @@ void _lumamagick_hardlight(VJFrame *frame, VJFrame *frame2, int width,
 	    c = (a * b) >> 7;
 	else
 	    c = 255 - ((256 - b) * (256 - a) >> 7);
-	if (c < pixel_Y_lo_)
-	    c = pixel_Y_lo_;
 
 	Y[i] = c;
     }
@@ -838,12 +829,8 @@ void _lumamagick_addtest4(VJFrame *frame, VJFrame *frame2, int width,
 	a = Y[i] * opacity_a;
 	b = Y2[i] * opacity_b;
 	b = b - 255;
-	if (a < pixel_Y_lo_)
-	    a = pixel_Y_lo_;
-	if (b < pixel_Y_lo_)
-	    b = Y2[i] * opacity_b;
-	if (b < pixel_Y_lo_)
-	    b = pixel_Y_lo_;
+	if (b <= pixel_Y_lo_)
+	    b = 0xff;
 	c = (a * a) / b;
 
 	Y[i] = c;
@@ -905,8 +892,8 @@ void _lumamagick_addtest3(VJFrame *frame, VJFrame *frame2, int width,
     for (i = 0; i < len; i++) {
 	a = Y[i] * opacity_a;
 	b = (255 - Y2[i]) * opacity_b;
-	if (b < pixel_Y_lo_)
-	    b = pixel_Y_lo_;
+	if (b <= pixel_Y_lo_)
+	    b = 1;
 	c = (a * a) / b;
 
 	Y[i] = c;

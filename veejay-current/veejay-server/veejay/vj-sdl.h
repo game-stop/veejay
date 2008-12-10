@@ -67,5 +67,6 @@ int    vj_sdl_screen_w( vj_sdl *vjsdl );
 int    vj_sdl_screen_h( vj_sdl *vjsdl );
 void   vj_sdl_flip( vj_sdl *vjsdl );
 
+
 #endif
 #endif

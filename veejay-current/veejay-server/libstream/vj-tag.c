@@ -452,7 +452,7 @@ int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el)
 {
     if (stream_nr < 0 || stream_nr > VJ_TAG_MAX_STREAM_IN)
 	return 0;
-    vj_tag_input->stream[stream_nr] = vj_yuv4mpeg_alloc(el,el->video_width,el->video_height);
+    vj_tag_input->stream[stream_nr] = vj_yuv4mpeg_alloc(el,el->video_width,el->video_height, _tag_info->pixel_format);
 
     if(vj_tag_input->stream[stream_nr] == NULL) 
 	return 0;
@@ -647,9 +647,9 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
     tag->socket_ready = 0;
     tag->socket_frame = NULL;
     tag->socket_len = 0;
-    tag->color_r = 255;
-    tag->color_g = 255;
-    tag->color_b = 255;
+    tag->color_r = 0;
+    tag->color_g = 0;
+    tag->color_b = 0;
     tag->opacity = 0;
 	tag->priv = NULL;
 
@@ -1198,6 +1198,9 @@ int	vj_tag_try_filename(int t1, char *filename, int format)
 		case ENCODER_QUICKTIME_MJPEG:
 			sprintf(ext, "mov");
 			break;
+		case ENCODER_YUV4MPEG:
+			sprintf(ext, "yuv");
+			break;
 		case ENCODER_DVVIDEO:
 			sprintf(ext,"dv");
 			break;
@@ -1215,35 +1218,10 @@ int	vj_tag_try_filename(int t1, char *filename, int format)
 static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 {
 	char descr[100];
-	char cformat = 'Y';
+	char cformat = vj_avcodec_find_lav( format );
 	int sample_id = tag->id;
-	if(format < 0 || format > 11)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid format!");
-		return -1;
-	}
-
-	switch(format)
-	{
-		case ENCODER_QUICKTIME_DV:sprintf(descr,"DV2"); cformat='Q'; break;
-		case ENCODER_QUICKTIME_MJPEG:	sprintf(descr, "MJPEG"); cformat='q'; break;
-		case ENCODER_DVVIDEO: sprintf(descr, "DV2"); cformat='b';break;
-		case ENCODER_MJPEG: sprintf(descr,"MJPEG"); cformat='a'; break;
-		case ENCODER_YUV420F:  sprintf(descr, "YUV 4:2:0 YV12"); cformat='v'; break;
-		case ENCODER_YUV420: sprintf(descr, "YCbCr 4:2:0 YV12"); cformat='Y'; break;
-		case ENCODER_YUV422F: sprintf(descr,"YUV 4:2:2 Planar");cformat='V';break;
-		case ENCODER_YUV422: sprintf(descr, "YCbCr 4:2:2 Planar"); cformat='P'; break;
-		case ENCODER_MPEG4: sprintf(descr, "MPEG4"); cformat='M'; break;
-		case ENCODER_DIVX: sprintf(descr, "DIVX"); cformat='D'; break;
-		case ENCODER_LZO:  sprintf(descr, "LZO YUV"); cformat = 'L'; break;
 	
-		default:
-		   veejay_msg(VEEJAY_MSG_ERROR, "Unsupported video codec");
-		   return 0;
-                break;
-	}
-	
-	tag->encoder =  vj_avcodec_start( _tag_info->edit_list , format );
+	tag->encoder =  vj_avcodec_start( _tag_info->edit_list , format, tag->encoder_destination );
 	if(!tag->encoder)
 	{
 		veejay_msg(0, "Unable to use %s encoder, please select another",
@@ -1265,6 +1243,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 			tag->encoder_max_size = 2048 + tmp + (tmp/4) + (tmp/4);break;
 			case ENCODER_YUV422:
 			case ENCODER_YUV422F:
+			case ENCODER_YUV4MPEG:
 			tag->encoder_max_size = 2048 + tmp + (tmp/2) + (tmp/2);break;
 			case ENCODER_LZO:
 			tag->encoder_max_size = tmp * 3; break;
@@ -1291,8 +1270,8 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		return 0;
 	}
 
-	
-	tag->encoder_file = lav_open_output_file(
+	if( cformat != 'S' ) {
+		tag->encoder_file = lav_open_output_file(
 			tag->encoder_destination,
 			cformat,
 			_tag_info->edit_list->video_width,
@@ -1305,17 +1284,18 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		);
 
 
-	if(!tag->encoder_file)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Cannot write to %s (No permissions?)",tag->encoder_destination);
-		if(tag->encoder)
-			vj_avcodec_close_encoder( tag->encoder );
-		tag->encoder = NULL;
-		tag->encoder_active = 0;
-		return 0;
+		if(!tag->encoder_file)
+		{
+			veejay_msg(VEEJAY_MSG_ERROR,"Cannot write to %s (No permissions?)",tag->encoder_destination);
+			if(tag->encoder)
+				vj_avcodec_close_encoder( tag->encoder );
+			tag->encoder = NULL;
+			tag->encoder_active = 0;
+			return 0;
+		}
 	}
-	else
-		veejay_msg(VEEJAY_MSG_INFO, "Recording to %s file [%s] %ldx%ld@%2.2f %d/%d/%d >%09ld<",
+
+	veejay_msg(VEEJAY_MSG_INFO, "Recording to %s file [%s] %ldx%ld@%2.2f %d/%d/%d >%09ld<",
 		    descr,
 		    tag->encoder_destination, 
 		    _tag_info->edit_list->video_width,
@@ -2413,21 +2393,24 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 	{
 		return -1;
 	}
-
-	if(lav_write_frame(tag->encoder_file, vj_avcodec_get_buf(tag->encoder), buf_len,1))
-	{
-			veejay_msg(VEEJAY_MSG_ERROR, "writing frame, giving up :[%s]", lav_strerror());
-			return -1;
-	}
 	tag->rec_total_bytes += buf_len;
 	
-	if(audio_size > 0)
-	{
-		if(lav_write_audio(tag->encoder_file, abuff, audio_size))
+
+   	if(tag->encoder_file ) {
+		if(lav_write_frame(tag->encoder_file, vj_avcodec_get_buf(tag->encoder), buf_len,1))
 		{
-	 	    veejay_msg(VEEJAY_MSG_ERROR, "Error writing output audio [%s]",lav_strerror());
+			veejay_msg(VEEJAY_MSG_ERROR, "writing frame, giving up :[%s]", lav_strerror());
+				return -1;
 		}
-		tag->rec_total_bytes += ( audio_size * _tag_info->edit_list->audio_bps);
+	
+		if(audio_size > 0)
+		{
+			if(lav_write_audio(tag->encoder_file, abuff, audio_size))
+			{
+		 	    veejay_msg(VEEJAY_MSG_ERROR, "Error writing output audio [%s]",lav_strerror());
+			}
+			tag->rec_total_bytes += ( audio_size * _tag_info->edit_list->audio_bps);
+		}
 	}
 	/* write OK */
 	tag->encoder_succes_frames ++;
@@ -2440,15 +2423,6 @@ int vj_tag_record_frame(int t1, uint8_t *buffer[3], uint8_t *abuff, int audio_si
 
 int vj_tag_get_audio_frame(int t1, uint8_t *dst_buffer)
 {
-	vj_tag *tag = vj_tag_get(t1);
-	if(!tag) return 0;
-
-#ifdef SUPPORT_READ_DV2
-	if(tag->source_type == VJ_TAG_TYPE_DV1394)
-	{ // this is never tested ...
-		//vj_dv_decoder_get_audio( vj_tag_input->dv1394[tag->index], dst_buffer );	
-	}
-#endif
 	return 0;    
 }
 
@@ -3132,7 +3106,7 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
 	sprintf(buffer, "%s", tag->source_name );
 	xmlNewChild(node,NULL,(const xmlChar*) "source_file", (const xmlChar*) buffer );
 
-	if(tag->extra && strlen(tag->extra) > 1)
+	if(tag->extra )
 	{
 		sprintf(buffer, "%d", tag->extra );
 		xmlNewChild(node, NULL,(const xmlChar) "extra_data", (const xmlChar*) buffer );

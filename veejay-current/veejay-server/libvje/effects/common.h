@@ -43,7 +43,6 @@ extern int  pixel_Y_hi_;
 extern int  pixel_U_hi_;
 extern int  pixel_Y_lo_;
 extern int  pixel_U_lo_;
-
 #define CLAMP_Y( a ) ( a < pixel_Y_lo_ ? pixel_Y_lo_ : (a > pixel_Y_hi_ ? pixel_Y_hi_ : a ) )
 #define CLAMP_UV( a )( a < pixel_U_lo_ ? pixel_U_lo_ : (a > pixel_U_hi_ ? pixel_U_hi_ : a ) )
 
@@ -94,6 +93,13 @@ extern void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
 #define V_Blueco	(0.439f )
 
 
+#define JPEGJFIF_RGB( r,g,b,y,u,v) \
+ {\
+	r = y + 1.40200 * ( u - 128 );\
+	g = y - 0.34414 * ( v - 128 ) - 0.71414 * ( u - 128 );\
+	b = y + 1.77200 * ( v - 128 );\
+ }
+
 #define COLOR_rgb2yuv(r,g,b, y,u,v ) \
  {\
  y = (int) (  (Y_Redco  * (float) r) + (Y_Greenco * (float)g) + (Y_Blueco * (float)b) + 16.0);\
@@ -132,6 +138,8 @@ extern void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo);
 	v = ( v - 128 ) / 224.0 * 256.0 + 128;\
  }
 
+
+
 static inline int myround(float n) 
 {
   if (n >= 0) 
@@ -147,12 +155,9 @@ static inline int myround(float n)
 	float Ey = (0.299 * (float)r) + (0.587 * (float)g) + (0.114 * (float) b);\
 	float Eu = (-0.168736 * (float)r) - (0.331264 * (float)g) + (0.500 * (float)b) + 128.0;\
 	float Ev = (0.500 * (float)r) - (0.418688 * (float)g) - (0.081312 * (float)b)+ 128.0;\
-    	y = myround(Ey);\
-	u = myround(Eu);\
-	v = myround(Ev);\
-	if( y > 0xff ) y = 0xff ; else if ( y < 0 ) y = 0;\
-	if( u > 0xff ) u = 0xff ; else if ( u < 0 ) u = 0;\
-	if( v > 0xff ) v = 0xff ; else if ( v < 0 ) v = 0;\
+    	y = CLAMP_Y(myround(Ey));\
+	u = CLAMP_UV(myround(Eu));\
+	v = CLAMP_UV(myround(Ev));\
  }
 
 #define CCYUV_red( r,y,u,v )\
@@ -169,6 +174,7 @@ enum
 	GIMP_RGB=0,
 	CCIR601_RGB=1,
 	OLD_RGB=2,
+	JFIF_RGB=3,
 };
 
 #define	_rgb2yuv(r,g,b,y,u,v)\

@@ -29,7 +29,8 @@
 #define INTERNAL_Y4M_LIBCODE_STUFF_QPX
 #include "yuv4mpeg.h"
 #include "yuv4mpeg_intern.h"
-#include "mjpeg_logging.h"
+#include <libvjmem/vjmem.h>
+#include <libvjmsg/vj-msg.h>
 
 
 static int _y4mparam_allow_unknown_tags = 1;  /* default is forgiveness */
@@ -1085,8 +1086,8 @@ int y4m_read_fields_data_cb(y4m_cb_reader_t * fd, const y4m_stream_info_t *si,
           rbufpos=0;
         }
             
-        memcpy(dsttop,rbuf+rbufpos,width); rbufpos+=width;
-        memcpy(dstbot,rbuf+rbufpos,width); rbufpos+=width;
+        veejay_memcpy(dsttop,rbuf+rbufpos,width); rbufpos+=width;
+        veejay_memcpy(dstbot,rbuf+rbufpos,width); rbufpos+=width;
       }
       dsttop+=width;
       dstbot+=width;
@@ -1163,8 +1164,8 @@ int y4m_write_fields_cb(y4m_cb_writer_t * fd, const y4m_stream_info_t *si,
           numwbuf=0;
         }
 
-        memcpy(wbuf+numwbuf,srctop,width); numwbuf += width;
-        memcpy(wbuf+numwbuf,srcbot,width); numwbuf += width;
+        veejay_memcpy(wbuf+numwbuf,srctop,width); numwbuf += width;
+        veejay_memcpy(wbuf+numwbuf,srcbot,width); numwbuf += width;
       }
       srctop  += width;
       srcbot  += width;

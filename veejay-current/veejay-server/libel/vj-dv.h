@@ -36,6 +36,8 @@ typedef struct
 	dv_encoder_t	*encoder;
 	uint8_t		*dv_video;
 	int		fmt;
+	uint8_t		*buffer;
+	void		*scaler;
 } vj_dv_encoder;
 
 
@@ -53,7 +55,7 @@ void		vj_dv_decoder_set_audio(vj_dv_decoder *d, int audio);
 int vj_dv_decode_frame(vj_dv_decoder *d,uint8_t * in, uint8_t * Y,
 		       uint8_t * Cb, uint8_t * Cr, int w, int h, int fmt);
 
-int vj_dv_encode_frame(vj_dv_encoder *e,uint8_t * in[3], uint8_t * out);
+int vj_dv_encode_frame(vj_dv_encoder *e,uint8_t * in[3]);
 void vj_dv_free_encoder(vj_dv_encoder *e);
 void vj_dv_free_decoder(vj_dv_decoder *d); 
 int	is_dv_resolution( int w, int h );

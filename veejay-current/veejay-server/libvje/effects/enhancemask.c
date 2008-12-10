@@ -86,8 +86,6 @@ void enhancemask_apply(VJFrame *frame, int width, int height, int *s ) {
 	d /= 100;
 	m = m + d;
 //	a = Y[r];
-	if( m > pixel_Y_hi_) m = pixel_Y_hi_;
-	if( m < pixel_Y_lo_) m = pixel_Y_lo_;
 //	Y[r] = (m * op0 + a * op1) / 255;
 	Y[r] = m;
 	}
@@ -97,8 +95,6 @@ void enhancemask_apply(VJFrame *frame, int width, int height, int *s ) {
 	d *= s[0];
 	d /= 100;
 	m = m + d;
-	if( m > pixel_Y_hi_) m = pixel_Y_hi_;
-	if( m < pixel_Y_lo_) m = pixel_Y_lo_;
 	Y[r] = m;
    }
 

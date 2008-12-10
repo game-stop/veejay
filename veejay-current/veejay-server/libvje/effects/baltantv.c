@@ -53,16 +53,17 @@ static	unsigned int	plane_ = 0;
 
 #define	PLANES 64
 
-static	uint8_t	**planetable_ = NULL;
+static	uint8_t	*planetable_ = NULL;
 
 int	baltantv_malloc(int w, int h)
 {
 	if( planetable_ )
 		free(planetable_ );
-	planetable_ = (uint8_t**) vj_malloc( sizeof(uint8_t*) * PLANES *
-		(w * h ));
-	if(!planetable_)
+	planetable_ = (uint8_t*) vj_malloc( sizeof(uint8_t*) * PLANES * (w * h ));
+	if(!planetable_) {
+		veejay_msg(0,"Not enough memory to allocate %d planes of size %dx%d", PLANES,w,h);
 		return 0;
+	}
 
 	return 1;
 }

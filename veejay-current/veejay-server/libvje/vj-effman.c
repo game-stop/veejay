@@ -420,8 +420,7 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
       case VJ_VIDEO_EFFECT_BINARYOVERLAY:
 	binaryoverlay_apply(frames[0], frames[1],frameinfo->width,frameinfo->height,arg[0] );   break;
       case VJ_VIDEO_EFFECT_OVERLAYMAGIC:
-	overlaymagic_apply(frames[0], frames[1], frameinfo->width,
-			   frameinfo->height, arg[0]);
+	overlaymagic_apply(frames[0], frames[1], frameinfo->width,frameinfo->height, arg[0],arg[1]);
 	break;
       case VJ_VIDEO_EFFECT_MASK:
 	simplemask_apply(frames[0],frames[1], frameinfo->width,frameinfo->height,arg[0], arg[1]);

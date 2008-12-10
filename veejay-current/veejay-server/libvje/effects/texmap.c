@@ -176,7 +176,7 @@ void texmap_free(void *d)
 	int i;
 	for( i = 0; i < 255; i++ )
 		if( proj_[i] )
-			viewport_destroy( proj_[i] );
+			viewport_destroy( (void*)proj_[i] );
 	
 	if( points )
 	{
@@ -444,9 +444,9 @@ void texmap_apply(void *ed, VJFrame *frame,
 				if( y1 < 0 ) y1 = 0; else if ( y1 >= height ) y1 = height -1;
 				if( y2 < 0 ) y2 = 0; else if ( y2 >= height ) y2 = height -1;
 
-				if(proj_[i])
-				  	 viewport_destroy( proj_[i] );
-				proj_[i] = viewport_fx_init_map( width,height,
+				if((void*) proj_[i])
+				  	 viewport_destroy( (void*)proj_[i] );
+				proj_[i] = (void*)viewport_fx_init_map( width,height,
 						x1,
 						y1,
 						x2,
@@ -479,7 +479,7 @@ void texmap_apply(void *ed, VJFrame *frame,
 			}
 			else
 			{
-				viewport_process_dynamic_map( proj_[i], frame2->data, frame->data, dt_map, feather );
+				viewport_process_dynamic_map( (void*)proj_[i], frame2->data, frame->data, dt_map, feather );
 				packets++;
 			} 
 		}

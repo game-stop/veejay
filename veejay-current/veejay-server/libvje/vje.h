@@ -50,6 +50,7 @@ typedef struct VJFrame_t
 	int	ssm;
 	int	alpha;
 	int	stride[4];
+	int	stand; //ccir/jpeg
 } VJFrame;
 
 typedef struct VJRectangle_t

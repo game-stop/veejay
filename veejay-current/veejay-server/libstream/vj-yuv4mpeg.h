@@ -26,6 +26,10 @@ typedef struct {
     y4m_frame_info_t frameinfo;
     y4m_ratio_t sar;
     y4m_ratio_t dar;
+    int plane_w[4];
+    int plane_h[4];
+    int plane_size[4];
+    int chroma;
     int width;
     int height;
     int fd;
@@ -33,18 +37,21 @@ typedef struct {
     int audio_bits;
     float video_fps;
     long audio_rate;
+    void *scaler;
+    uint8_t *buf[4];
+    int  is_jpeg;
 } vj_yuv;
 
-vj_yuv *vj_yuv4mpeg_alloc(editlist * el, int dst_w, int dst_h);
+vj_yuv *vj_yuv4mpeg_alloc(editlist * el, int dst_w, int dst_h, int out_pix_fmt);
 
 
 void vj_yuv4mpeg_free(vj_yuv *v) ;
 
 int vj_yuv_stream_start_read(vj_yuv *, char *, int width, int height);
 
-int vj_yuv_stream_write_header(vj_yuv * yuv4mpeg, editlist * el);
+int vj_yuv_stream_write_header(vj_yuv * yuv4mpeg, editlist * el, int outchroma);
 
-int vj_yuv_stream_start_write(vj_yuv *, char *, editlist *);
+int vj_yuv_stream_start_write(vj_yuv *,editlist *, char *, int);
 
 void vj_yuv_stream_stop_read(vj_yuv * yuv4mpeg);
 

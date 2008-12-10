@@ -1432,7 +1432,7 @@ static	void	*viewport_init_swscaler(ui_t *u, int w, int h)
 	VJFrame *dsti = yuv_yuv_template( dummy[0],dummy[1],dummy[2],u->sw,u->sh,PIX_FMT_GRAY8);
 	sws_template t;
 	memset(&t,0,sizeof(sws_template));
-	t.flags = 1;
+	t.flags = yuv_which_scaler();
 	u->sx   = (float)w / (float) u->sw;
 	u->sy   = (float)h / (float) u->sh;
 	void *scaler = yuv_init_swscaler( srci,dsti,&t,yuv_sws_get_cpu_flags());
@@ -3117,6 +3117,12 @@ void	viewport_produce_bw_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3],
 	x = ty2 * w;
 }
 
+#define pack_yuyv_4pixel( y0,u0,y1,v0 ) (\
+		( (int) y0 ) & 0xff ) +\
+                ( (((int) (u0>>1) ) & 0xff) << 8) +\
+                ( ((((int) y1) & 0xff) << 16 )) +\
+                ( ((((int) (v0>>1)) & 0xff) << 24 ))
+
 #define pack_yuyv_pixel( y0,u0,u1,y1,v0,v1 ) (\
 		( (int) y0 ) & 0xff ) +\
                 ( (((int) ((u0+u1)>>1) ) & 0xff) << 8) +\
@@ -3132,7 +3138,6 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 	register uint8_t *inU  = img[1];
 	register uint8_t *inV  = img[2];
 	register uint32_t	*plane_yuyv = (uint32_t*)out_img;
-	register uint8_t 	*outYUYV    = out_img;
 	register const	int32_t	tx1 = v->ttx1;
 	register const	int32_t tx2 = v->ttx2;
 	register const	int32_t	ty1 = v->tty1;
@@ -3147,13 +3152,15 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 	inU[len+1] = 128;
 	inV[len+1] = 128;
 
-	// clear the yuyv plane (black)
-	y  = ty1 * w;
-	yuyv_plane_clear( len*2, out_img);
+	yuyv_plane_clear( len*2, plane_yuyv); 
 
-#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
+#if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE ) 
 	fast_memset_finish(); // finish yuyv_plane_clear
 #endif
+	__builtin_prefetch( inY, 0 ,3);
+	__builtin_prefetch( inU, 0 ,3);
+	__builtin_prefetch( inV, 0 ,3);
+	__builtin_prefetch( plane_yuyv, 1,3);
 
 	for( y = ty1 ; y < ty2; y ++ )
 	{
@@ -3168,6 +3175,7 @@ void	viewport_produce_full_img_yuyv( void *vdata, uint8_t *img[3], uint8_t *out_
 
 		}
 	}
+
 }
 
 void	viewport_produce_full_img_packed( void *vdata, uint8_t *img[3], uint8_t *out_img )
@@ -3191,13 +3199,16 @@ void	viewport_produce_full_img_packed( void *vdata, uint8_t *img[3], uint8_t *ou
 	register const int w = v->w;
 	register uint32_t n,i,x,y,m;
 
+	// clear the yuyv plane (black)
 	y  = ty1 * w;
-	yuyv_plane_clear( y*3, out_img);
+	yuyv_plane_clear( len*3, out_img); //@optimize FIXME
+
+#if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_SSE ) 
+	fast_memset_finish(); // finish yuyv_plane_clear
+#endif
 
 	for( y = ty1 ; y < ty2; y ++ )
 	{
-		yuyv_plane_clear( tx1*3, outYUYV + 3 * (y*w) );
-		yuyv_plane_clear( (w-tx2)*3, outYUYV + 3 * (y*w+tx2));
 		for( x = tx1; x < tx2; x ++ )
 		{
 			i = y * w + x;
@@ -3207,13 +3218,6 @@ void	viewport_produce_full_img_packed( void *vdata, uint8_t *img[3], uint8_t *ou
 			outYUYV[3  * i + 3 ] = inU[n];
 		}
 	}
-	y = (v->h - ty2 ) * w;
-	x = ty2 * w;
-
-	yuyv_plane_clear( y*3, out_img + (x*3) );
-#if defined (HAVE_ASM_MMX) || defined (HAVE_AMS_SSE ) 
-	fast_memset_finish();
-#endif
 }
 
 

@@ -67,11 +67,12 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
 	}
     sws_template templ;	
     memset(&templ,0,sizeof(sws_template));
-    templ.flags = 1;
+    templ.flags = yuv_which_scaler();
     VJFrame *src = yuv_yuv_template( NULL,NULL,NULL,vjsdl->width,vjsdl->height, vjsdl->ffmpeg_pixfmt );
     VJFrame *dst = yuv_yuv_template(  NULL,NULL,NULL,vjsdl->width,vjsdl->height,PIX_FMT_YUYV422);
     vjsdl->scaler = yuv_init_swscaler( src,dst, &templ, yuv_sws_get_cpu_flags() );
-
+    free(src);
+    free(dst);
     return vjsdl;
 }
 
@@ -148,7 +149,7 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	setenv( "SDL_VIDEO_HWACCEL", "1", 0 );
 
 	char *hw_env = getenv("SDL_VIDEO_HWACCEL");
-	int hw_on = 0;
+	int hw_on = 1;
 	if(hw_env)
 	{
 		hw_on = atoi(hw_env);	
@@ -360,7 +361,6 @@ void	vj_sdl_flip( vj_sdl *vjsdl )
 {
 	SDL_DisplayYUVOverlay( vjsdl->yuv_overlay, &(vjsdl->rectangle));
 }
-
 
 int vj_sdl_update_yuv_overlay(vj_sdl * vjsdl, uint8_t ** yuv420)
 {

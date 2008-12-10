@@ -70,6 +70,8 @@ vj_dv_decoder *vj_dv_decoder_init(int quality, int width, int height, int pixel_
 	return d;
 }
 
+static	sws_template dv_templ;
+
 /* init the dv encoder and encode buffer */
 vj_dv_encoder *vj_dv_init_encoder(void * edl, int pixel_format)
 {
@@ -83,19 +85,24 @@ vj_dv_encoder *vj_dv_init_encoder(void * edl, int pixel_format)
     	e->encoder->static_qno = 0;
     	e->encoder->force_dct = DV_DCT_AUTO;
     	e->fmt = pixel_format;
-
+	e->buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) *
+				el->video_width * el->video_height * 3 );
     	e->dv_video =
-	(uint8_t *) vj_malloc(sizeof(uint8_t) * 
+	(uint8_t *) vj_calloc(sizeof(uint8_t) * 
 			   (e->encoder->isPAL ?
 			    	DV_PAL_SIZE : DV_NTSC_SIZE));
-	memset( e->dv_video, 0 ,
-		(e->encoder->isPAL ? DV_PAL_SIZE: DV_NTSC_SIZE ) );
+
+	veejay_memset(&dv_templ,0,sizeof(sws_template));
+	dv_templ.flags = yuv_which_scaler();
+
+	e->scaler = NULL;
+
 	return e;
 }
 
 
 /* encode frame to dv format, dv frame will be in output_buf */
-int vj_dv_encode_frame(vj_dv_encoder *encoder, uint8_t *input_buf[3], uint8_t *output_buf)
+int vj_dv_encode_frame(vj_dv_encoder *encoder, uint8_t *input_buf[3])
 {
 
     time_t now = time(NULL);
@@ -104,33 +111,55 @@ int vj_dv_encode_frame(vj_dv_encoder *encoder, uint8_t *input_buf[3], uint8_t *o
     if (!input_buf)
 		return 0;
 
-    pixels[0] = (uint8_t *) encoder->dv_video;
+ //   pixels[0] = (uint8_t *) encoder->dv_video;
 
-    if (encoder->encoder->isPAL)
-    {
+
+     pixels[0] = (uint8_t*) encoder->buffer;
+
+    if (encoder->encoder->isPAL) {
 		h = PAL_H;
 		w = PAL_W;
-    }
-    else
-    {
+    } else {
 		h = NTSC_H;
 		w = NTSC_W;
     }
-//FIXME
-    int off = w * h / 2;
-    pixels[1] = (uint8_t *) encoder->dv_video + (w * h );
-    pixels[2] = (uint8_t *) encoder->dv_video + (w * h) + off;
-    yuv422p_to_yuv422(input_buf,encoder->dv_video,w,h);
-  
-    dv_encode_full_frame( encoder->encoder, pixels, e_dv_color_yuv,
-			 output_buf);
-    dv_encode_metadata(output_buf, encoder->encoder->isPAL,
-		       encoder->encoder->is16x9, &now, 0);
-    dv_encode_timecode(output_buf, encoder->encoder->isPAL, 0);
 
-    if(encoder->encoder->isPAL) return DV_PAL_SIZE;
+	
+
+	pixels[1] = NULL;
+	pixels[2] = NULL;
+
+    int src_fmt = PIX_FMT_YUVJ422P;
+    if( encoder->fmt == FMT_422 )
+	    src_fmt = PIX_FMT_YUV422P;
+
+    VJFrame *src = yuv_yuv_template( input_buf[0],input_buf[1],input_buf[2],
+		    w,h, src_fmt );
+    VJFrame *dst = yuv_yuv_template( encoder->buffer,NULL,NULL,
+		    w,h, PIX_FMT_YUV422);
+
+
+    if( encoder->scaler == NULL ) {
+	    encoder->scaler = yuv_init_swscaler( src,dst,&dv_templ, yuv_sws_get_cpu_flags() );
+	   }
+
+    yuv_convert_and_scale_packed( encoder->scaler, src,dst );
+
+//    if( encoder->fmt == FMT_422F ) {
+//	yuy2_scale_pixels_from_yuv( encoder->buffer, w * h );
+  //  }
+
+    dv_encode_full_frame( encoder->encoder, pixels, e_dv_color_yuv,encoder->dv_video);
+    dv_encode_metadata(encoder->dv_video, encoder->encoder->isPAL,encoder->encoder->is16x9, &now, 0);
+    dv_encode_timecode(encoder->dv_video, encoder->encoder->isPAL, 0);
+  
+    free(src);
+    free(dst);
+    if(encoder->encoder->isPAL) 
+	    return DV_PAL_SIZE;
     return DV_NTSC_SIZE;
 }
+
 
 void vj_dv_free_encoder(vj_dv_encoder *e)
 {
@@ -140,6 +169,10 @@ void vj_dv_free_encoder(vj_dv_encoder *e)
 			dv_encoder_free( e->encoder);
 		if(e->dv_video)
 			free(e->dv_video);
+		if(e->buffer)
+			free(e->buffer);
+		if(e->scaler)
+			yuv_free_swscaler(e->scaler);
 		free(e);
 	}
 }
@@ -180,10 +213,54 @@ void	   vj_dv_decoder_get_audio(vj_dv_decoder *d, uint8_t *audio_buf)
 
 }
 /*
- * Unpack libdv's 4:2:2-packed into our 4:2:0-planar or 4:2:2-planar,
- *  treating each interlaced field independently
  *
+  lav_common - some general utility functionality used by multiple
+	lavtool utilities. 
  */
+static void frame_YUV422_to_planar_411(uint8_t **output, uint8_t *input,
+				       int width, int height)
+{
+    int i, j, w4;
+    uint8_t *y, *cb, *cr;
+
+    w4 = width/4;
+    y = output[0];
+    cb = output[1];
+    cr = output[2];
+
+    for (i=0; i<height;) {
+	/* process two scanlines (one from each field, interleaved) */
+        /* ...top-field scanline */
+        for (j=0; j<w4; j++) {
+            /* packed YUV 422 is: Y[i] U[i] Y[i+1] V[i] */
+            *(y++) =  *(input++);
+            *(cb++) = *(input++);       // NTSC-specific: assert( j%2==0 || cb[-1]==cb[-2]);
+	    *(y++) =  *(input++);
+            *(cr++) = *(input++);       // NTSC-specific: assert( j%2==0 || cr[-1]==cr[-2]);
+
+            *(y++) =  *(input++);
+            (input++);                  // NTSC-specific: assert( j%2==0 || cb[-1]==cb[-2]);
+            *(y++) =  *(input++);
+            (input++);                  // NTSC-specific: assert( j%2==0 || cr[-1]==cr[-2]);
+        }
+	i++;
+        /* ...bottom-field scanline */
+        for (j=0; j<w4; j++) {
+            /* packed YUV 422 is: Y[i] U[i] Y[i+1] V[i] */
+            *(y++) =  *(input++);
+            *(cb++) = *(input++);       // NTSC-specific: assert( j%2==0 || cb[-1]==cb[-2]);
+	    *(y++) =  *(input++);
+            *(cr++) = *(input++);       // NTSC-specific: assert( j%2==0 || cr[-1]==cr[-2]);
+  
+  	    *(y++) =  *(input++);
+            (input++);                  // NTSC-specific: assert( j%2==0 || cb[-1]==cb[-2]);
+            *(y++) =  *(input++);
+            (input++);                  // NTSC-specific: assert( j%2==0 || cr[-1]==cr[-2]);
+        }
+	i++;
+    }
+}
+
 static inline void frame_YUV422_to_planar(uint8_t **output, uint8_t *input,
 			    int width, int height, int chroma422)
 {
@@ -199,6 +276,7 @@ static inline void frame_YUV422_to_planar(uint8_t **output, uint8_t *input,
 	/* process two scanlines (one from each field, interleaved) */
         /* ...top-field scanline */
         for (j=0; j<w2; j++) {
+
             /* packed YUV 422 is: Y[i] U[i] Y[i+1] V[i] */
             *(y++) =  *(input++);
             *(cb++) = *(input++);
@@ -215,7 +293,7 @@ static inline void frame_YUV422_to_planar(uint8_t **output, uint8_t *input,
             *(cr++) = *(input++);
         }
 	i++;
-	if (chroma422)
+	if (chroma422 == 0)
 	  continue;
 	/* process next two scanlines (one from each field, interleaved) */
         /* ...top-field scanline */
@@ -256,8 +334,7 @@ int	vj_dv_scan_frame( vj_dv_decoder *d, uint8_t * input_buf )
 	switch( d->decoder->sampling )
 	{
 		case e_dv_sample_411:
-				veejay_msg(0, "YUV 4:1:1 not supported.");
-				return -1;
+				sprintf(sampling , "4:1:1"); break;
 		case e_dv_sample_420:
 				sprintf(sampling, "4:2:0"); break;
 		case e_dv_sample_422:
@@ -272,7 +349,7 @@ int	vj_dv_scan_frame( vj_dv_decoder *d, uint8_t * input_buf )
 
 	veejay_msg( VEEJAY_MSG_DEBUG, "\tDetected DV sampling format %s", sampling );
 
-	if ( d->decoder->sampling == e_dv_sample_422)
+	if ( d->decoder->sampling == e_dv_sample_422 || d->decoder->sampling == e_dv_sample_411)
 		return FMT_422;
 	if( d->decoder->sampling == e_dv_sample_420 )
 		return FMT_420;
@@ -308,6 +385,7 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 		d->yuy2 = 1;
 	}
 
+
       	if (!((d->decoder->num_dif_seqs == 10)
 	  || (d->decoder->num_dif_seqs == 12)))
 	{
@@ -322,21 +400,37 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 //		assert( d->fmt == FMT_422 || d->fmt == FMT_422F );
 #endif
        
-    	if ( d->decoder->sampling == e_dv_sample_422)
+    	if ( d->decoder->sampling == e_dv_sample_422 || d->decoder->sampling ==
+				e_dv_sample_411 )
 	{
 		pitches[0] = width * 2;
 		pitches[1] = 0;
 		pitches[2] = 0;
-		uint8_t *pixels[3] = { Y , Cb, Cr };
+		int offset = ( d->decoder->sampling == e_dv_sample_411 ? width /4 : width /2) * height;
+		uint8_t *frame[3] = { Y , Cb, Cr };
+		uint8_t *pixels[3] = { d->dv_video, d->dv_video + (width * height),
+	       		d->dv_video + (width * height ) + offset	};
 
 		dv_decode_full_frame(d->decoder, input_buf,
 				     e_dv_color_yuv, pixels, pitches);
 
-		frame_YUV422_to_planar( pixels, pixels[0], width, height, fmt );
+		//@ this works
+		VJFrame *src = yuv_yuv_template( d->dv_video, NULL,NULL,width,height,PIX_FMT_YUV422 );
+		VJFrame *dst = yuv_yuv_template( Y,Cb,Cr,width,height,
+				( d->fmt == FMT_422 ? PIX_FMT_YUV422P : PIX_FMT_YUVJ422P ) );
+
+		yuv_convert_any_ac( src,dst, src->format,dst->format );
+		free(src);
+		free(dst);
+	/*	if(d->decoder->sampling == e_dv_sample_422 ) {
+			frame_YUV422_to_planar( frame, d->dv_video, width, height, 1);
+		else
+			frame_YUV422_to_planar_411( frame, d->dv_video, width, height  );*/
 
 		return 1;
     	} else if( d->decoder->sampling == e_dv_sample_420 )
-	{	
+	{
+	//remove this	
 		uint8_t *pixels[3];
                 pixels[0] = d->dv_video;
                 pixels[1] = d->dv_video + (width * height);
@@ -347,10 +441,16 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 
 		dv_decode_full_frame( d->decoder, input_buf, e_dv_color_yuv, pixels,pitches);
 
-	  	if(fmt==FMT_422 || fmt == FMT_422F)
-                       yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
-               else //@ FIXME broken!
-                       vj_yuy2toyv12( Y,Cb,Cr, d->dv_video, width, height );
+                yuy2toyv16( Y,Cb,Cr, d->dv_video, width ,height );
+
+		if( yuv_use_auto_ccir_jpeg() && fmt == FMT_422F) {
+			yuv_scale_pixels_from_ycbcr(
+					Y, 16.0f, 235.0f, width * height);
+			yuv_scale_pixels_from_ycbcr(
+					Cb,16.0f, 240.0f, width * height/2);
+			yuv_scale_pixels_from_ycbcr(
+					Cr,16.0f, 240.0f, width * height/2);
+		}
 
 		return 1;
 	}

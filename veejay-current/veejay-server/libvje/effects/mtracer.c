@@ -74,12 +74,12 @@ void mtracer_apply( VJFrame *frame, VJFrame *frame2,
 	uint8_t *Cr= frame->data[2];
 
     if (mtrace_counter == 0) {
-	overlaymagic_apply(frame, frame2, width, height, mode);
+	overlaymagic_apply(frame, frame2, width, height, mode,0);
 	veejay_memcpy(mtrace_buffer[0], Y, len);
 	veejay_memcpy(mtrace_buffer[1], Cb, uv_len);
 	veejay_memcpy(mtrace_buffer[2], Cr, uv_len);
     } else {
-	overlaymagic_apply(frame, frame2, width, height, mode);
+	overlaymagic_apply(frame, frame2, width, height, mode,0);
 	veejay_memcpy(mtrace_buffer[0], Y, len);
 	veejay_memcpy(mtrace_buffer[1], Cb, uv_len);
 	veejay_memcpy(mtrace_buffer[2], Cr, uv_len);

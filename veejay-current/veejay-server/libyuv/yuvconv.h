@@ -78,7 +78,7 @@ typedef struct
 	int	use_filter;
 } sws_template;
 
-void	yuv_init_lib();
+void	yuv_init_lib(int sws_extra_flags, int auto_jpeg_ccir, int scaler_type);
 
 void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *templ, int cpu_flags);
 void	yuv_convert_and_scale_packed( void *sws, VJFrame *src, VJFrame *dst );
@@ -140,7 +140,20 @@ void    yuv_fx_context_destroy( void *ctx );
 void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h );
 void	yuv422to420planar( uint8_t *src[3], uint8_t *dst[3], int w, int h );
 
-void	yuv_scale_pixels_from_yuv( uint8_t *plane, float min, float max, int len );
+void	yuv_scale_pixels_from_yuv( uint8_t *src[3], uint8_t *dst[3], int len );
+
+void	yuv_scale_pixels_from_y( uint8_t *plane, int len );
+void	yuv_scale_pixels_from_uv( uint8_t *plane, int len );
 void	yuv_scale_pixels_from_ycbcr( uint8_t *plane, float min, float max, int len );
+int 	yuv_use_auto_ccir_jpeg();
+
+void	yuy2_scale_pixels_from_yuv( uint8_t *plane, int len );
+void	yuy2_scale_pixels_from_ycbcr( uint8_t *plane, int len );
+void	yuv_scale_pixels_from_ycbcr2( uint8_t *plane[3], uint8_t *dst[3], int len );
+void yuv444_yvu444_1plane(
+		uint8_t *data[3],
+		const int width,
+		const int height,
+		uint8_t *dst_buffer);
 
 #endif

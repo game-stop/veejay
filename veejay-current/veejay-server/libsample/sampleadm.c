@@ -155,7 +155,6 @@ typedef struct
 } sample_setting;
 
 static sample_setting __sample_project_settings;
-static void *chain_cache_ = NULL;
 void	sample_set_project(int fmt, int deinterlace, int flags, int force, char norm )
 {
 	__sample_project_settings.fmt = fmt;
@@ -193,9 +192,7 @@ void sample_init(int len, void *font)
 	     hash_create(HASHCOUNT_T_MAX, int_compare, int_hash))) {
 	}
 	initialized = 1;
-	memset( &__sample_project_settings,0,sizeof(sample_setting));
-
-        chain_cache_ = vpn( 2000 ); //@ fx cache lines
+	veejay_memset( &__sample_project_settings,0,sizeof(sample_setting));
 
     }
 
@@ -204,8 +201,6 @@ void sample_init(int len, void *font)
 
 void	sample_free()
 {
-	if( chain_cache_ )
-		vevo_port_free( chain_cache_ );
 	if(!SampleHash)
 		return;
 	hscan_t scan;
@@ -296,42 +291,13 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     si->soft_edl = 1;
     si->speed = 1;
     si->looptype = 1; // normal looping
-//  si->max_loops = 0;
-//  si->next_sample_id = 0;
-//  si->playmode = 0;
-//  si->depth = 0;
-//  si->sub_audio = 0;
     si->audio_volume = 50;
     si->marker_start = 0;
     si->marker_end = 0;
-//  si->dup = 0;
-//  si->loop_dec = 0;
-//  si->max_loops2 = 0;
-//  si->fader_active = 0;
-//  si->fader_val = 0;
-//  si->fader_inc = 0;
-//  si->fader_direction = 0;
-//  si->rec_total_bytes = 0;
-//  si->encoder_format = 0;
     si->loopcount = 0;
-    si->encoder_base = (char*) vj_malloc(sizeof(char) * 255);
-//  si->sequence_num = 0;
-//  si->encoder_duration = 0;
-//  si->encoder_num_frames = 0;
-    si->encoder_destination = (char*) vj_malloc(sizeof(char) * 255);
-//  sii->encoder_succes_frames = 0;
-//    si->encoder_active = 0;
-//    si->encoder_total_frames = 0;
-//    si->rec_total_bytes = 0;
-//    si->encoder_max_size = 0;
-//    si->encoder_width = 0;
-//    si->encoder_height = 0;
-//    si->encoder_duration = 0;
-   // si->encoder_buf = (char*) malloc(sizeof(char) * 10 * 65535 + 16);
-//    si->auto_switch = 0;
-//    si->selected_entry = 0;
+    si->encoder_base = (char*) vj_calloc(sizeof(char) * 255);
+    si->encoder_destination = (char*) vj_calloc(sizeof(char) * 255);
     si->effect_toggle = 1;
-//    si->offset = 0;
     snprintf(tmp_file,sizeof(tmp_file), "sample_%05d.edl", si->sample_id );
     si->edit_list_file = strdup( tmp_file );
 
@@ -339,33 +305,15 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
 
     /* the effect chain is initially empty ! */
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
-
 	si->effect_chain[i] = &sec[i];
-	
-//	si->effect_chain[i] =
-//	    (sample_eff_chain *) vj_calloc(sizeof(sample_eff_chain));
-
 	if (si->effect_chain[i] == NULL) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error allocating entry %d in Effect Chain for new sample",i);
 		return NULL;
 		}
-//	si->effect_chain[i]->is_rendering = 0;
 	si->effect_chain[i]->effect_id = -1;
-//	si->effect_chain[i]->e_flag = 0;
-//	si->effect_chain[i]->frame_offset = 0;
-//	si->effect_chain[i]->frame_trimmer = 0;
 	si->effect_chain[i]->volume = 50;
-//	si->effect_chain[i]->a_flag = 0;
-//	si->effect_chain[i]->source_type = 0;
 	si->effect_chain[i]->channel = ( sample_size() <= 0 ? si->sample_id : sample_size()-1);
-//	si->effect_chain[i]->kf_status = 0;
-	/* effect parameters initially 0 */
-//	for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++) {
-//	    si->effect_chain[i]->arg[j] = 0;
-//	}
-
 	si->effect_chain[i]->kf = vpn( VEVO_ANONYMOUS_PORT );
-
     }
 #ifdef HAVE_FREETYPE
     si->dict = vpn( VEVO_ANONYMOUS_PORT );
@@ -402,20 +350,33 @@ int sample_store(sample_info * skel)
  * returns sample information struct or NULL on error.
  *
  ****************************************************************************************************/
+
+typedef struct {
+	int id;
+	sample_info *si;
+} row_t;
+
+static row_t recent_samples_[4];
+static int recent_ = 3;
+
 sample_info *sample_get(int sample_id)
 {
     sample_info *si;
-    //hnode_t *sample_node;
-  //  if (!initialized)
-//	return NULL;
-  //  if (sample_id <= 0)
-//	return NULL;
-  //  for (i = 0; i <= next_avail_num; i++)
-//	if (avail_num[i] == sample_id)
-//	    return NULL;
+
+    int i;
+    for( i = 0; i < 3; i ++ ) {
+	if( recent_samples_[i].id == sample_id )
+		return recent_samples_[i].si;
+    }
+
     hnode_t *sample_node = hash_lookup(SampleHash, (void *) sample_id);
     if (sample_node) {
    	 si = (sample_info *) hnode_get(sample_node);
+	 recent_samples_[recent_].si = si;
+	 recent_samples_[recent_].id = sample_id;
+	 recent_ --;
+	 if( recent_ == -1 )
+	   recent_ = 3;
    	 if(si) return si;
 	}
     return NULL;

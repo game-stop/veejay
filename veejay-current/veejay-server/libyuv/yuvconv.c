@@ -78,7 +78,7 @@ static struct {
 {	PIX_FMT_BGR32,		"PIX_FMT_BGR32"},
 {	PIX_FMT_GRAY8,		"PIX_FMT_GRAY8"},
 {	PIX_FMT_RGB32_1,	"PIX_FMT_RGB32_1"},
-{	PIX_FMT_YUYV422,	"PIX_FMT_YUVYV22"},
+{	PIX_FMT_YUYV422,	"PIX_FMT_YUYV422"},
 {	0	,		NULL}
 
 };
@@ -94,13 +94,165 @@ void	yuv_pixstr( const char *s, char *s2, int fmt ) {
 		veejay_msg(0, "%s: format %d invalid", s, fmt );
 }
 
-void	yuv_init_lib()
+static	float	jpeg_to_CCIR_tableY[256];
+static  float	CCIR_to_jpeg_tableY[256];
+static	float	jpeg_to_CCIR_tableUV[256];
+static  float	CCIR_to_jpeg_tableUV[256];
+#define round1(x) ( (int32_t)( (x>0) ? (x) + 0.5 : (x)  - 0.5 ))
+#define _CLAMP(a,min,max) ( round1(a) < min ? min : ( round1(a) > max ? max : round1(a) ))
+
+static struct {
+	int id;
+} ccir_pixfmts[] =
+{
+	{ PIX_FMT_YUV420P },
+	{ PIX_FMT_YUV422  },
+	{ PIX_FMT_YUYV422 },
+	{ PIX_FMT_YUV422P },
+	{ PIX_FMT_YUV444P },
+	{ -1 }
+};
+static struct {
+	int id;
+} jpeg_pixfmts[] = 
+{
+	{ PIX_FMT_YUVJ420P },
+	{ PIX_FMT_YUVJ422P },
+	{ PIX_FMT_YUVJ444P },
+	{ -1		   },
+};
+
+static	int	auto_conversion_ccir_jpeg_ = 0;
+
+static int	is_CCIR(int a) {
+	int i;
+	for( i = 0; ccir_pixfmts[i].id != -1; i ++ )
+		if( a == ccir_pixfmts[i].id )
+			return 1;
+	return 0;
+}
+static int	is_JPEG(int a) {
+	int i;
+	for( i = 0; jpeg_pixfmts[i].id != -1 ; i ++ )
+		if( a == jpeg_pixfmts[i].id )
+			return 1;
+	return 0;
+}
+
+static	void	verify_CCIR_auto(int a, int b, VJFrame *dst )
+{
+	int a_is_CCIR = is_CCIR(a);
+	int a_is_JPEG = is_JPEG(a);
+
+	int b_is_CCIR = is_CCIR(b);
+	int b_is_JPEG = is_JPEG(b);
+
+
+	if( a_is_JPEG && b_is_CCIR ) {
+		yuv_scale_pixels_from_y( dst->data[0], dst->len );
+		yuv_scale_pixels_from_uv( dst->data[1], dst->uv_len );
+		yuv_scale_pixels_from_uv( dst->data[2], dst->uv_len );
+	}
+	else if( a_is_CCIR && b_is_JPEG ) {
+		yuv_scale_pixels_from_ycbcr( dst->data[0], 16.0f, 235.0f, dst->len );
+		yuv_scale_pixels_from_ycbcr( dst->data[1], 16.0f, 240.0f, dst->uv_len );
+		yuv_scale_pixels_from_ycbcr( dst->data[2], 16.0f, 240.0f, dst->uv_len );
+	}
+
+
+}
+
+static	void	verify_CCIR_( int a, int b, char *caller, int line ) {
+
+	int a_is_CCIR = is_CCIR(a);
+	int a_is_JPEG = is_JPEG(a);
+
+	int b_is_CCIR = is_CCIR(b);
+	int b_is_JPEG = is_JPEG(b);
+
+
+	if( a_is_JPEG && b_is_CCIR ) {
+		if(caller) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Output is expecting CCIR, but source still in JPEG %s:%d",
+					caller,line );
+		} else {
+			veejay_msg(VEEJAY_MSG_DEBUG, "Output is expecting CCIR, but source still in JPEG!");
+		}
+	}
+	if( a_is_CCIR && b_is_JPEG ) {
+		if(caller) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Input is CCIR, but output is expecting JPEG %s:%d",
+					caller,line );
+		} else {
+			veejay_msg(VEEJAY_MSG_DEBUG, "Input is CCIR, but output is in JPEG");
+		}
+	}
+}
+
+#ifdef STRICT_CHECKING
+#define verify_CCIR( a,b ) verify_CCIR_( a,b,__FUNCTION__,__LINE__ )
+#else
+#define verify_CCIR( a,b ) return
+#endif
+
+int	yuv_use_auto_ccir_jpeg()
+{
+	return auto_conversion_ccir_jpeg_;
+}
+
+static int	global_scaler_ = SWS_FAST_BILINEAR;
+static int	full_chroma_interpolation_ = 0;
+int	yuv_which_scaler()
+{
+	return global_scaler_;
+}
+void	yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
 {
 	sws_context_flags_ = yuv_sws_get_cpu_flags();
-	
+	if(extra_flags) {
+		full_chroma_interpolation_ = 1;
+		veejay_msg(VEEJAY_MSG_WARNING,
+				"Interpolating full chroma in converter/scaler");
+	}
+	if( default_zoomer ) {
+		if( default_zoomer == 1 ) {
+			veejay_msg(VEEJAY_MSG_WARNING,"Using fast bilinear scaler (libswcale)");
+			global_scaler_ = SWS_FAST_BILINEAR;
+		} else if (default_zoomer == 2 ) {
+			veejay_msg(VEEJAY_MSG_WARNING, "Using bicubic scaler (libswscale)");
+			global_scaler_ = SWS_BICUBIC;
+		}
+	}
+
+	auto_conversion_ccir_jpeg_ = auto_ccir_jpeg;
+	if( auto_conversion_ccir_jpeg_ ) {
+		veejay_msg(VEEJAY_MSG_WARNING,
+				"On-the-fly conversion between CCIR 601 and JPEG color range!");
+		auto_conversion_ccir_jpeg_ = 1;
+	}
+
 	int my_ac_flags = ac_cpuinfo();
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "CPU Flags available:", ac_flagstotext( my_ac_flags ));
+
+	// initialize tables for jpeg <-> ccir conversion
+	veejay_memset( jpeg_to_CCIR_tableY, 0, sizeof( jpeg_to_CCIR_tableY ) );
+	veejay_memset( CCIR_to_jpeg_tableY, 0, sizeof( CCIR_to_jpeg_tableY ) );
+	veejay_memset( jpeg_to_CCIR_tableUV, 0, sizeof( jpeg_to_CCIR_tableUV ) );
+	veejay_memset( CCIR_to_jpeg_tableUV, 0, sizeof( CCIR_to_jpeg_tableUV ) );
+
+	unsigned int i;
+	float    s = (235.0f - 16.0f) / 255.0f;
+	float    u = (240.0f - 16.0f) / 255.0f;
+	float    c = 255.0f / ( 235.0f-16.0f );
+	float    d = 255.0f / ( 240.0f-16.0f );
+
+	for( i = 0; i < 256 ; i ++ ) {
+		jpeg_to_CCIR_tableY[i] = _CLAMP( (float)i * s + 16.0f , 16.0f, 235.0f );
+		jpeg_to_CCIR_tableUV[i]= _CLAMP( (float)i * u + 16.0f , 16.0f, 240.0f );
+		CCIR_to_jpeg_tableY[i] = _CLAMP( (float)i * c - 16.0f ,  0.0f, 255.0f );
+		CCIR_to_jpeg_tableUV[i]= _CLAMP( (float)i * d - 16.0f ,  0.0f, 255.0f );
+	}
 
 	//ac_init( AC_ALL );
 
@@ -111,7 +263,7 @@ void	yuv_init_lib()
 	put( PIX_FMT_YUV420P, IMG_YUV420P );
 	put( PIX_FMT_YUV422P, IMG_YUV422P );
 	put( PIX_FMT_YUV444P, IMG_YUV444P );
-	put( PIX_FMT_YUVJ420P, IMG_YUV420P ); //@ pfff dont care
+	put( PIX_FMT_YUVJ420P, IMG_YUV420P ); //@wrong, but size fits
 	put( PIX_FMT_YUVJ422P, IMG_YUV422P );
 	put( PIX_FMT_YUVJ422P, IMG_YUV444P );
 //	put( PIX_FMT_RGB24,   IMG_RGB24 );
@@ -167,12 +319,16 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->stride[1] = f->stride[2] = 0;
 			break;
 		case PIX_FMT_YUYV422:
+		case PIX_FMT_UYVY422:
 			f->uv_width = w>>1;
 			f->uv_height = f->height;
 			f->stride[0] = w * 2;
 			f->stride[1] = f->stride[2] = 0;
+			break;
 		default:
 #ifdef STRICT_CHECKING
+			yuv_pixstr( __FUNCTION__, "fmt", fmt );
+
 			assert(0);
 #endif
 		break;
@@ -286,6 +442,9 @@ void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 		yuv_pixstr( __FUNCTION__, "dst_fmt", dst_fmt );
 
 	}
+	if( auto_conversion_ccir_jpeg_ )
+        	verify_CCIR_auto( src_fmt,dst_fmt, dst );
+
 }
 /*
 void	yuv_convert_any( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
@@ -368,6 +527,7 @@ void	yuv_convert_any3( VJFrame *src, int src_stride[3], VJFrame *dst, int src_fm
 	sws_scale( ctx, src->data, src_stride, 0, src->height, dst->data, dst_stride);
 
 	sws_freeContext( ctx );
+
 }
 
 
@@ -805,10 +965,10 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 		case 2:
 			cpu_flags = cpu_flags|SWS_BILINEAR;
 			break;
-		case 3:
+		case 4:
 			cpu_flags = cpu_flags|SWS_BICUBIC;
 			break;
-		case 4:
+		case 3:
 			cpu_flags = cpu_flags |SWS_POINT;
 			break;
 		case 5:
@@ -833,6 +993,9 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 			cpu_flags = cpu_flags | SWS_SPLINE;
 			break;
 	}	
+
+	if( full_chroma_interpolation_ ) 
+		cpu_flags = cpu_flags |  SWS_FULL_CHR_H_INT;
 
 	s->sws = sws_getContext(
 			src->width,
@@ -980,6 +1143,7 @@ void	yuv_convert_and_scale_packed(void *sws , VJFrame *src, VJFrame *dst)
 	sws_scale( s->sws, src->data, src_stride, 0, src->height,
 		dst->data, dst_stride );
 }
+
 int	yuv_sws_get_cpu_flags(void)
 {
 	int cpu_flags = 0;
@@ -1091,7 +1255,7 @@ void	yuv422to420planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 	uint8_t *b = src[2];
 	for( y = 0 ; y < hei; y ++ ) {
 		for( x= 0; x < wid ; x ++ ) {
-			u[k] = a[ (y<<1) * wid + x ];
+			u[k] = a[ (y<<1) * wid + x ]; //@ drop left chroma
 			v[k] = b[ (y<<1) * wid + x ];	
 			k++;
 		}
@@ -1108,7 +1272,7 @@ void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 	uint8_t *a = src[1];
 	uint8_t *b = src[2];
 	for( y = 0 ; y < hei; y ++ ) {
-		u = dst[1] + ( (y << 1 ) * wid );
+		u = dst[1] + ( (y << 1 ) * wid ); //@ dup
 		v = dst[2] + ( (y << 1 ) * wid );
 		for( x= 0; x < wid ; x ++ ) {
 			u[k] = a[ y * wid + x];
@@ -1117,22 +1281,159 @@ void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 			v[k + wid ] = b[y * wid + x ];
 		}
 	}
-//FIXME
 }
 
-void	yuv_scale_pixels_from_yuv( uint8_t *plane, float min, float max, int len )
+void	yuy2_scale_pixels_from_yuv( uint8_t *plane, int len )
 {
+	unsigned int rlen = 2 * len ;
 	unsigned int i;
-	float    s = (max - min) / 255.0f;
-	for( i = 0; i < len ; i ++ ) {
-		plane[i] = (uint8_t)( (float) plane[i] * s + min );
+	for( i = 0; i < rlen; i += 4 ) {
+		plane[i+0] = jpeg_to_CCIR_tableY[ plane[i+0] ];
+		plane[i+1] = jpeg_to_CCIR_tableUV[plane[i+1] ];
+		plane[i+2] = jpeg_to_CCIR_tableY[ plane[i+2] ];
+		plane[i+3] = jpeg_to_CCIR_tableUV[ plane[i+3] ];
 	}
 }
+
+void	yuy2_scale_pixels_from_ycbcr( uint8_t *plane, int len )
+{
+	unsigned int rlen = 2 * len ;
+	unsigned int i;
+	for( i = 0; i < rlen; i += 4 ) {
+		plane[i+0] = CCIR_to_jpeg_tableY[ plane[i+0] ];
+		plane[i+1] = CCIR_to_jpeg_tableUV[plane[i+1] ];
+		plane[i+2] = CCIR_to_jpeg_tableY[ plane[i+2] ];
+		plane[i+3] = CCIR_to_jpeg_tableUV[ plane[i+3] ];
+	}
+}
+
+void	yuv_scale_pixels_from_yuv( uint8_t *src[3], uint8_t *dst[3], int len ) 
+{
+	unsigned int i;
+	uint8_t *y = src[0];
+	uint8_t *u = src[1];
+	uint8_t *v = src[2];
+	uint8_t *dY = dst[0];
+	uint8_t *dU = dst[1];
+	uint8_t *dV = dst[2];
+	for( i = 0; i < len ; i ++ ) {
+		dY[i] = jpeg_to_CCIR_tableY[ y[i] ];
+	}
+	len = len / 2;
+	for( i = 0; i < len ; i ++ ) {
+		dU[i] = jpeg_to_CCIR_tableUV[ u[i] ];
+		dV[i] = jpeg_to_CCIR_tableUV[ v[i] ];
+	}
+}
+
+void	yuv_scale_pixels_from_y( uint8_t *plane, int len )
+{
+	unsigned int i;
+//	float    s = (max - min) / 255.0f;
+
+	for( i = 0; i < len ; i ++ ) {
+		plane[i] = jpeg_to_CCIR_tableY[ plane[i] ];
+	}
+}
+void	yuv_scale_pixels_from_uv( uint8_t *plane, int len )
+{
+	unsigned int i;
+//	float    s = (max - min) / 255.0f;
+
+	for( i = 0; i < len ; i ++ ) {
+		plane[i] = jpeg_to_CCIR_tableUV[ plane[i] ];
+	}
+}
+
+
 void	yuv_scale_pixels_from_ycbcr( uint8_t *plane, float min, float max, int len )
 {
 	unsigned int i;
-	float    s = 255.0f / ( max-min );
-	for( i = 0; i < len ; i ++ ) {
-		plane[i] = (uint8_t)( (float) plane[i]  * s - 16.0f );
+//	float    s = 255.0f / ( max-min );
+
+	if( max == 235.0f ) {
+		for( i = 0; i < len ; i ++ ) {
+/*		float res = ( (float) plane[i]  * s - 16.0f );
+		if( res > 255.0f )
+			res = 255.0f;
+		else if ( res < 0.0f )
+			res = 0.0f;
+		plane[i] = (uint8_t) res;*/
+			plane[i] = CCIR_to_jpeg_tableY[ plane[i] ];
+		}
+	} else if ( max == 240.0f ) {
+		for( i = 0; i < len ; i ++ ) {
+			plane[i] = CCIR_to_jpeg_tableUV[ plane[i] ];
+		}
 	}
 }
+void	yuv_scale_pixels_from_ycbcr2( uint8_t *plane[3], uint8_t *dst[3], int len )
+{
+	unsigned int i;
+	uint8_t *y = plane[0];
+	uint8_t *u = plane[1];
+	uint8_t *v = plane[2];
+	uint8_t *dy = dst[0];
+	uint8_t *du = dst[1];
+	uint8_t *dv = dst[2];
+	for( i = 0; i < len ; i ++ ) {
+		dy[i] = CCIR_to_jpeg_tableY[ y[i] ];
+	}
+
+	len = len / 2;
+	for( i = 0; i < len ; i ++ ) {
+		du[i] = CCIR_to_jpeg_tableUV[ u[i] ];
+		dv[i] = CCIR_to_jpeg_tableUV[ v[i] ];
+	}
+}
+
+
+#define packv0__( y0,u0,v0,y1 ) (( (int) y0 ) & 0xff ) +\
+		( (((int) u0 ) & 0xff) << 8) +\
+		( ((((int) v0) & 0xff) << 16 )) +\
+		( ((((int) y1) & 0xff) << 24 ) )
+
+#define packv1__( u1,v1,y2,u2 )(( (int) u1 ) & 0xff ) +\
+		( (((int) v1 ) & 0xff) << 8) +\
+		( ((((int) y2) & 0xff) << 16 )) +\
+		( ((((int) u2) & 0xff) << 24 ) )
+
+
+#define packv2__( v2,y3,u3,v3 )(( (int) v2 ) & 0xff ) +\
+		( (((int) y3 ) & 0xff) << 8) +\
+		( ((((int) u3) & 0xff) << 16 )) +\
+		( ((((int) v3) & 0xff) << 24 ) )
+
+//! YUV 4:2:4 Planar to 4:4:4 Packed: Y, V, U, Y,V, U , .... */
+void yuv444_yvu444_1plane(
+		uint8_t *data[3],
+		const int width,
+		const int height,
+		uint8_t *dst_buffer)
+{
+	unsigned int x;
+	uint8_t *yp = data[0];
+	uint8_t *up = data[2];
+	uint8_t *vp = data[1];
+	int len = (width * height) / 4;
+	int *dst = dst_buffer;
+
+	__builtin_prefetch( yp, 0 ,3);
+	__builtin_prefetch( up, 0 ,3);
+	__builtin_prefetch( vp, 0 ,3);
+	__builtin_prefetch( dst, 1,3);
+	
+	for( x=0; x < len; x ++ )
+	{
+		dst[0] = packv0__( yp[0],up[0],vp[0],yp[1]);
+		dst[1] = packv1__( up[1],vp[1],yp[2],up[2]);
+		dst[2] = packv2__( vp[2],yp[3],up[3],vp[3]);
+
+		yp += 4;
+		up += 4;
+		vp += 4;
+		dst += 3;
+	}	
+	
+}
+

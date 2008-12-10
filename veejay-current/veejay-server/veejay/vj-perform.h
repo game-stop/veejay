@@ -70,7 +70,4 @@ int        vj_perform_get_sampling();
 int	vj_perform_get_width( veejay_t *info );
 int	vj_perform_get_height( veejay_t *info );
 
-
-int	vj_perform_get_dups();
-
 #endif

@@ -25,16 +25,46 @@
 #include <string.h>
 #include <libyuv/yuvconv.h>
 #include <liblzo/lzo.h>
+#include <libstream/vj-yuv4mpeg.h>
 #ifdef SUPPORT_READ_DV2
 #define __FALLBACK_LIBDV
 #include <libel/vj-dv.h>
 #endif
 #include AVCODEC_INC
 #include AVUTIL_INC
-#define YUV420_ONLY_CODEC(id) ( ( id == CODEC_ID_MJPEG || id == CODEC_ID_MJPEGB || id == CODEC_ID_MSMPEG4V3 || id == CODEC_ID_MPEG4) ? 1: 0)
 
 
-static int out_pixel_format = FMT_420; 
+
+//#define YUV420_ONLY_CODEC(id) ( ( id == CODEC_ID_MJPEG || id == CODEC_ID_MJPEGB || id == CODEC_ID_MSMPEG4V3 || id == CODEC_ID_MPEG4) ? 1: 0)
+
+//#define YUV420_ONLY_CODEC(id) ( (id == CODEC_ID_MSMPEG4V3 || id == CODEC_ID_MPEG4 ) ? 1 : 0 )
+
+static	int	YUV420_ONLY_CODEC(int id ) 
+{
+	switch(id) {
+	//	case CODEC_ID_MJPEG: 
+	//	case CODEC_ID_MJPEGB:
+		case CODEC_ID_MPEG4:
+	//	case CODEC_ID_LJPEG:
+		case CODEC_ID_MSMPEG4V3:
+//		case CODEC_ID_SP5X: 
+//		case CODEC_ID_THEORA:
+//		case CODEC_ID_H264:;
+
+			return 1;
+	}
+	return 0;
+}
+
+//from gst-ffmpeg, round up a number
+#define GEN_MASK(x) ((1<<(x))-1)
+#define ROUND_UP_X(v,x) (((v) + GEN_MASK(x)) & ~GEN_MASK(x))
+#define ROUND_UP_2(x) ROUND_UP_X (x, 1)
+#define ROUND_UP_4(x) ROUND_UP_X (x, 2)
+#define ROUND_UP_8(x) ROUND_UP_X (x, 3)
+#define DIV_ROUND_UP_X(v,x) (((v) + GEN_MASK(x)) >> (x))
+
+static int out_pixel_format = FMT_422F; 
 
 char*	vj_avcodec_get_codec_name(int codec_id )
 {
@@ -43,8 +73,17 @@ char*	vj_avcodec_get_codec_name(int codec_id )
 	{
 		case CODEC_ID_MJPEG: sprintf(name, "MJPEG"); break;
 		case CODEC_ID_MPEG4: sprintf(name, "MPEG4"); break;
+		case CODEC_ID_MJPEGB: sprintf(name,"MJPEGB");break;
 		case CODEC_ID_MSMPEG4V3: sprintf(name, "DIVX"); break;
 		case CODEC_ID_DVVIDEO: sprintf(name, "DVVideo"); break;
+		case CODEC_ID_LJPEG: sprintf(name, "LJPEG" );break;
+		case CODEC_ID_SP5X: sprintf(name, "SP5x"); break;
+		case CODEC_ID_THEORA: sprintf(name,"Theora");break;
+		case CODEC_ID_H264: sprintf(name, "H264");break;
+		case 997 : sprintf(name, "RAW YUV 4:2:2 Planar JPEG"); break;
+		case 996 : sprintf(name, "RAW YUV 4:2:0 Planar JPEG"); break;
+		case 995 : sprintf(name, "YUV4MPEG Stream 4:2:2"); break;
+		case 994 : sprintf(name, "YUV4MPEG Stream 4:2:0"); break;
 		case 999 : sprintf(name, "RAW YUV 4:2:0 Planar"); break;
 		case 998 : sprintf(name, "RAW YUV 4:2:2 Planar"); break;
 		case 900 : sprintf(name, "LZO YUV 4:2:2 Planar"); break;
@@ -57,27 +96,73 @@ char*	vj_avcodec_get_codec_name(int codec_id )
 
 uint8_t 		*vj_avcodec_get_buf( vj_encoder *av )
 {
-	if( av == NULL )
-		return NULL;
+#ifdef SUPPORT_READ_DV2
+	vj_dv_encoder *dv = av->dv;
+	switch(av->encoder_id) {
+		case CODEC_ID_DVVIDEO:
+			return dv->dv_video;
+	}
+#endif
 	return av->data[0];
 }
 
-static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el)
+static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 {
 	vj_encoder *e = (vj_encoder*) vj_calloc(sizeof(vj_encoder));
 	if(!e) return NULL;
-	
-	e->data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * el->video_width * el->video_height * 3 );
-	e->data[1] = e->data[0] + el->video_width * el->video_height;
-	e->data[2] = e->data[1] + el->video_width * el->video_height /2;
-	
 
+	int pf = get_ffmpeg_pixfmt( out_pixel_format );
+
+#ifdef SUPPORT_READ_DV2
+	if( id == CODEC_ID_DVVIDEO )
+	{
+		if(!is_dv_resolution(el->video_width, el->video_height ))
+		{	
+			veejay_msg(VEEJAY_MSG_ERROR,"\tVideo dimensions do not match required resolution");
+			return NULL;
+		}
+		else
+		{
+			e->dv = (void*)vj_dv_init_encoder( (void*)el , out_pixel_format);
+		}
+	}
+	else {
+#endif
+		e->data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * el->video_width * el->video_height * 3 );
+		e->data[1] = e->data[0] + el->video_width * el->video_height;
+		e->data[2] = e->data[1] + el->video_width * el->video_height /2;
+#ifdef SUPPORT_READ_DV2
+	}
+#endif
+	
 	if( id == 900 )
 	{
 		e->lzo = lzo_new();
 	}
+
+	if( id == 995 || id == 994) {
+		e->y4m = vj_yuv4mpeg_alloc(el, el->video_width,
+					       el->video_height,
+			       		       out_pixel_format	);
+		if( !e->y4m) {
+			veejay_msg(0, "Error while trying to setup Y4M stream, abort.");
+			return NULL;
+		}
+
+		int chroma_val = Y4M_CHROMA_422;
+		if( id == 994 ) {
+			chroma_val = Y4M_CHROMA_420MPEG2;
+		}
+
+		if( vj_yuv_stream_start_write( e->y4m, el,filename,chroma_val )== -1 )
+		{
+			veejay_msg(0, "Unable to write header to  YUV4MPEG stream");
+			vj_yuv4mpeg_free( e->y4m );
+			return NULL;
+		}
+	}
 	
-	if(id != 998 && id != 999 && id != 900 && id != 997 && id != 996)
+	if(id != 998 && id != 999 && id != 900 && id != 997 && id != 996 && id != 995 && id != 994)
 	{
 #ifdef __FALLBACK_LIBDV
 		if(id != CODEC_ID_DVVIDEO)
@@ -96,7 +181,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el)
 
 	}
 
-	if( id != 998 && id != 999 && id!= 900 && id != 997 && id != 996)
+	if( id != 998 && id != 999 && id!= 900 && id != 997 && id != 996 && id != CODEC_ID_DVVIDEO && id != 995 && id != 994 )
 	{
 #ifdef __FALLBACK_LIBDV
 	  if(id != CODEC_ID_DVVIDEO )
@@ -119,17 +204,19 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el)
 		e->context->flags = CODEC_FLAG_QSCALE;
 		e->context->gop_size = 0;
 		e->context->sub_id = 0;
-		e->context->me_method = 0; // motion estimation algorithm
 		e->context->workaround_bugs = FF_BUG_AUTODETECT;
 		e->context->prediction_method = 0;
-		e->context->dct_algo = FF_DCT_AUTO; //global_quality?
+		e->context->dct_algo = FF_DCT_AUTO; 
 
 		e->context->pix_fmt = get_ffmpeg_pixfmt( out_pixel_format );
+	
 		if(YUV420_ONLY_CODEC(id))
 			e->context->pix_fmt = ( out_pixel_format == FMT_422F ? PIX_FMT_YUVJ420P : PIX_FMT_YUV420P );
 
-		char *descr = vj_avcodec_get_codec_name( id );
+		pf = e->context->pix_fmt;
 
+	
+		char *descr = vj_avcodec_get_codec_name( id );
 		if ( avcodec_open( e->context, e->codec ) < 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Cannot open codec '%s'" , descr );
@@ -148,14 +235,30 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el)
 #endif
 	}
 
-	e->len = el->video_width * el->video_height;
-
-	e->uv_len = e->len / 2;
 	e->width = el->video_width;
 	e->height = el->video_height;
-
-	e->out_fmt = el->pixel_format;
 	e->encoder_id = id;
+
+
+	switch(pf) {
+		case PIX_FMT_YUVJ422P:
+		case PIX_FMT_YUV422P:
+			e->shift_y = 0;
+			e->shift_x = 1;
+			e->len = el->video_width * el->video_height;
+			e->uv_len = e->len / 2;
+			e->out_fmt = (pf == PIX_FMT_YUVJ422P ? FMT_422F : FMT_422 );
+			break;
+		case PIX_FMT_YUVJ420P:
+		case PIX_FMT_YUV420P:
+			e->shift_y = 1;
+			e->shift_x = 1;
+			e->len = el->video_width * el->video_height;
+			e->uv_len = e->len / 4;
+			e->out_fmt = (pf == PIX_FMT_YUVJ420P ? FMT_420F : FMT_420 );
+			break;
+		}
+
 
 /*
 	if( el->has_audio )
@@ -193,6 +296,12 @@ void		vj_avcodec_close_encoder( vj_encoder *av )
 			free(av->data[0]);
 		if(av->lzo)
 			lzo_free(av->lzo);
+#ifdef SUPPORT_READ_DV2
+		if(av->dv)
+			vj_dv_free_encoder( (vj_dv_encoder*) av->dv );
+#endif
+		if(av->y4m)
+			vj_yuv4mpeg_free( (vj_yuv*) av->y4m );
 		free(av);
 	}
 	av = NULL;
@@ -208,6 +317,10 @@ int		vj_avcodec_find_codec( int encoder )
 		case ENCODER_DVVIDEO:
 		case ENCODER_QUICKTIME_DV:
 			return CODEC_ID_DVVIDEO;
+		case ENCODER_MJPEGB:
+			return CODEC_ID_MJPEGB;
+		case ENCODER_LJPEG:
+			return CODEC_ID_LJPEG;
 		case ENCODER_YUV420:
 			return 999;
 		case ENCODER_YUV422:
@@ -222,6 +335,50 @@ int		vj_avcodec_find_codec( int encoder )
 			return CODEC_ID_MSMPEG4V3;
 		case ENCODER_LZO:
 			return 900;
+		case ENCODER_YUV4MPEG:
+			return 995;
+		case ENCODER_YUV4MPEG420:
+			return 994;
+		default:
+			veejay_msg(VEEJAY_MSG_DEBUG, "Unknown format %d selected", encoder );
+			return 0;
+	}
+	return 0;
+}
+
+char		vj_avcodec_find_lav( int encoder )
+{
+	switch( encoder)
+	{
+		case ENCODER_MJPEG:
+			return 'a';
+		case ENCODER_QUICKTIME_MJPEG:
+		       	return 'q';
+		case ENCODER_DVVIDEO:
+			return 'd';
+		case ENCODER_QUICKTIME_DV:
+			return 'Q';
+		case ENCODER_MJPEGB:
+			return 'c';
+		case ENCODER_LJPEG:
+			return 'l';
+		case ENCODER_YUV420:
+			return 'Y';
+		case ENCODER_YUV422:
+			return 'P';
+		case ENCODER_YUV422F:
+			return 'V';
+		case ENCODER_YUV420F:
+			return 'v';
+		case ENCODER_MPEG4:
+			return 'M';
+		case ENCODER_DIVX:
+			return 'D';
+		case ENCODER_LZO:
+			return 'L';
+		case ENCODER_YUV4MPEG:
+		case ENCODER_YUV4MPEG420:
+			return 'S';
 		default:
 			veejay_msg(VEEJAY_MSG_DEBUG, "Unknown format %d selected", encoder );
 			return 0;
@@ -230,53 +387,67 @@ int		vj_avcodec_find_codec( int encoder )
 }
 
 
+static struct {
+	const char *descr;
+	int   encoder_id;
+} encoder_names[] = {
+	{ "Invalid codec", -1 },
+	{ "DV2", ENCODER_DVVIDEO },
+	{ "MJPEG", ENCODER_MJPEG },
+	{ "LJPEG", ENCODER_LJPEG },
+	{ "MJPEGB", ENCODER_MJPEGB },
+	{ "YUV 4:2:2 Planar, 0-255 full range", ENCODER_YUV422F },
+	{ "YUV 4:2:0 Planar, 0-255 full range", ENCODER_YUV420F },
+	{ "YUV 4:2:2 Planar, CCIR 601. 16-235/16-240", ENCODER_YUV422 },
+	{ "YUV 4:2:0 Planar, CCIR 601, 16-235/16-240", ENCODER_YUV420 },
+	{ "YUV 4:2:2 Planar, LZO compressed (experimental)", ENCODER_LZO },
+	{ "MPEG4", ENCODER_MPEG4 },
+	{ "DIVX",  ENCODER_DIVX },
+	{ "Quicktime DV", ENCODER_QUICKTIME_DV },
+	{ "Quicktime MJPEG", ENCODER_QUICKTIME_MJPEG },	
+	{ "YUV4MPEG Stream 4:2:2", ENCODER_YUV4MPEG },
+	{ "YUV4MPEG Stream 4:2:0 for MPEG2", ENCODER_YUV4MPEG420 },
+	{ NULL, 0 }
+};
+
+char		*vj_avcodec_get_encoder_name( int encoder_id )
+{
+	int i;
+	for( i =1 ; encoder_names[i].descr != NULL ; i ++ ) {
+		if( encoder_names[i].encoder_id == encoder_id ) {
+			return encoder_names[i].descr;
+		}
+	}
+	return encoder_names[0].descr;
+}
+
 int		vj_avcodec_stop( void *encoder , int fmt)
 {
 	if(!encoder)
 		return 0;
-#ifdef SUPPORT_READ_DV2
-	if( fmt == CODEC_ID_DVVIDEO )
-	{
-		vj_dv_free_encoder(encoder);
-		encoder = NULL;
-		return 1;
-	}
-#endif
+	vj_encoder *env = (vj_encoder*) encoder;
+
 	if( fmt == 900 )
 	{
 		return 1;
 	}
-	vj_encoder *env = (vj_encoder*) encoder;
+
 	vj_avcodec_close_encoder( env );
 	encoder = NULL;
 	return 1;
 }
 
-void 		*vj_avcodec_start( editlist *el, int encoder )
+void 		*vj_avcodec_start( editlist *el, int encoder, char *filename )
 {
 	int codec_id = vj_avcodec_find_codec( encoder );
 	void *ee = NULL;
-#ifdef SUPPORT_READ_DV2
-	if(codec_id == CODEC_ID_DVVIDEO )
-	{
-		if(!is_dv_resolution(el->video_width, el->video_height ))
-		{	
-			veejay_msg(VEEJAY_MSG_ERROR,"\tVideo dimensions do not match required resolution");
-			return NULL;
-		}
-		else
-		{
-			ee = (void*)vj_dv_init_encoder( (void*)el , out_pixel_format);
-			return ee;
-		}
-	}
-#else
+#ifndef SUPPORT_READ_DV2
 	if( codec_id == CODEC_ID_DVVIDEO ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "No support for DV encoding built in.");
 		return NULL;
 	}
 #endif	
-	ee = vj_avcodec_new_encoder( codec_id, el );
+	ee = vj_avcodec_new_encoder( codec_id, el ,filename);
 	if(!ee)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "\tFailed to start encoder %x",encoder);
@@ -367,8 +538,8 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 
 		if(in_fmt == FMT_422F ) 
 		{
-			yuv_scale_pixels_from_yuv( dest[0], 16.0f,235.0f, av->len );
-			yuv_scale_pixels_from_yuv( dest[1], 16.0f,240.0f, av->len/2 );
+			yuv_scale_pixels_from_y( dest[0],  av->len );
+			yuv_scale_pixels_from_uv( dest[1], av->len/2 );
 		}
 
 		return ( av->len + (av->len/2) );
@@ -399,8 +570,8 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 
 		if(in_fmt == FMT_422F ) 
 		{
-			yuv_scale_pixels_from_yuv( dest[0], 16.0f,235.0f, av->len );
-			yuv_scale_pixels_from_yuv( dest[1], 16.0f,240.0f, av->uv_len * 2 );
+			yuv_scale_pixels_from_y( dest[0], av->len );
+			yuv_scale_pixels_from_uv( dest[1], av->uv_len * 2 );
 		}
 
 		return ( av->len + av->len );
@@ -423,6 +594,8 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 		return ( av->len + av->len );
 	}
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "Unknown encoder select: %d", av->encoder_id);	
+
 	return 0;
 }
 
@@ -431,40 +604,63 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[3], uint8_t *buf, int buf_len,
 	int in_fmt)
 {
+	vj_encoder *av = (vj_encoder*) encoder;
+
 	if(format == ENCODER_LZO )
 		return vj_avcodec_lzo( encoder, src, buf, buf_len );
 	
 	if(format == ENCODER_YUV420 || format == ENCODER_YUV422 || format == ENCODER_YUV422F || format == ENCODER_YUV420F) // no compression, just copy
 		return vj_avcodec_copy_frame( encoder,src, buf, in_fmt );
 
+	if(format == ENCODER_YUV4MPEG || format == ENCODER_YUV4MPEG420 ) {
+		if( in_fmt == FMT_422 ) {
+			vj_yuv_put_frame( av->y4m, src );
+			return ( av->width * av->height ) * 2;
+		} else {
+			yuv_scale_pixels_from_yuv( src,av->data,av->width*av->height);
+			vj_yuv_put_frame(av->y4m, av->data );
+			return ( av->width * av->height ) * 2;
+		}
+	}
+
 #ifdef __FALLBACK_LIBDV
 	if(format == ENCODER_DVVIDEO || format == ENCODER_QUICKTIME_DV )
-		return vj_dv_encode_frame( encoder,src, buf );
+	{
+		vj_dv_encoder *dv = av->dv;
+		return vj_dv_encode_frame( dv,src );
+	}
 #endif
 	AVFrame pict;
 	int res=0;
-	memset( &pict, 0, sizeof(pict));
+	int stride,h2,w2,size,size2,stride2;
+	veejay_memset( &pict, 0, sizeof(pict));
 
-
-	vj_encoder *av = (vj_encoder*) encoder;
-	
 	pict.quality = 1;
 	pict.pts = (int64_t)( (int64_t)nframe );
+	pict.data[0] = src[0];
+	pict.data[1] = src[1];
+	pict.data[2] = src[2];
 
-	pict.data[0] = av->data[0];
-	pict.data[1] = av->data[1];
-	pict.data[2] = av->data[2];
-	pict.linesize[0] = av->context->width;
-	pict.linesize[1] = pict.linesize[0]>>1;
-	pict.linesize[2] = pict.linesize[0]>>1;
+	stride = ROUND_UP_4( av->width );
+	h2 = ROUND_UP_X( av->height, av->shift_y );
+	size = stride * h2;
+	w2 = DIV_ROUND_UP_X(av->width, av->shift_x);
+	stride2 = ROUND_UP_4( w2 );
+	h2 = DIV_ROUND_UP_X(av->height, av->shift_y );
+	size2 = stride2 * h2;
+	pict.linesize[0] = stride;
+	pict.linesize[1] = stride2;
+	pict.linesize[2] = stride2;
 
 	if( YUV420_ONLY_CODEC(av->encoder_id)) {
 		veejay_memcpy( av->data[0], src[0], av->width * av->height);
 		yuv422to420planar(src , av->data, av->width,av->height );
+		pict.data[0] = av->data[0];
+		pict.data[1] = av->data[1];
+		pict.data[2] = av->data[2];
 	}
 
-	res = avcodec_encode_video( av->context, buf, buf_len, &pict );
-	return res;
+	return avcodec_encode_video( av->context, buf, buf_len, &pict );
 }
 
 int		vj_avcodec_encode_audio( void *encoder, int format, uint8_t *src, uint8_t *dst, int len, int nsamples )

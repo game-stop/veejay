@@ -168,55 +168,6 @@ static void yuv422_444_1plane(
 
 }
 
-#define packv0__( y0,u0,v0,y1 ) (( (int) y0 ) & 0xff ) +\
-		( (((int) u0 ) & 0xff) << 8) +\
-		( ((((int) v0) & 0xff) << 16 )) +\
-		( ((((int) y1) & 0xff) << 24 ) )
-
-#define packv1__( u1,v1,y2,u2 )(( (int) u1 ) & 0xff ) +\
-		( (((int) v1 ) & 0xff) << 8) +\
-		( ((((int) y2) & 0xff) << 16 )) +\
-		( ((((int) u2) & 0xff) << 24 ) )
-
-
-#define packv2__( v2,y3,u3,v3 )(( (int) v2 ) & 0xff ) +\
-		( (((int) y3 ) & 0xff) << 8) +\
-		( ((((int) u3) & 0xff) << 16 )) +\
-		( ((((int) v3) & 0xff) << 24 ) )
-
-//! YUV 4:2:4 Planar to 4:4:4 Packed: Y, V, U, Y,V, U , .... */
-static void yuv444_444_1plane(
-		uint8_t *data[3],
-		const int width,
-		const int height,
-		uint8_t *dst_buffer)
-{
-	unsigned int x;
-	uint8_t *yp = data[0];
-	uint8_t *up = data[2];
-	uint8_t *vp = data[1];
-	int len = (width * height) / 4;
-	int *dst = dst_buffer;
-
-	__builtin_prefetch( yp, 0 ,3);
-	__builtin_prefetch( up, 0 ,3);
-	__builtin_prefetch( vp, 0 ,3);
-	__builtin_prefetch( dst, 1,3);
-	
-	for( x=0; x < len; x ++ )
-	{
-		dst[0] = packv0__( yp[0],up[0],vp[0],yp[1]);
-		dst[1] = packv1__( up[1],vp[1],yp[2],up[2]);
-		dst[2] = packv2__( vp[2],yp[3],up[3],vp[3]);
-
-		yp += 4;
-		up += 4;
-		vp += 4;
-		dst += 3;
-	}	
-	
-}
-
 
 static void    yuv_planar_to_packed_444yvu( uint8_t *data[3], const int w, const int h,  uint8_t *dst_buffer, int format )
 {
@@ -233,7 +184,7 @@ static void    yuv_planar_to_packed_444yvu( uint8_t *data[3], const int w, const
 		default:
 			break;
 	}
-        yuv444_444_1plane(data,w,h,dst_buffer);
+        yuv444_yvu444_1plane(data,w,h,dst_buffer);
 }
 
 
@@ -1233,4 +1184,51 @@ int	x_display_push(void *dctx, uint8_t **data, int width, int height, int out )
 
 	return 1;
 }
+
+uint8_t	*x_display_get_buffer( void *dctx )
+{
+	display_ctx *ctx = (display_ctx*) dctx;
+	return ctx->data;
+}
+
+int	x_display_push_yvu(void *dctx, int width, int height, int out )
+{
+	display_ctx *ctx = (display_ctx*) dctx;
+	
+	if(!ctx->prog)
+	{
+		veejay_msg(0,
+				"No YUV -> RGB conversion in hardware. Use another output driver");
+		return 0;
+	}
+	else
+	{
+		//yuv_planar_to_packed_444yvu( data,width,height, data ,out);	
+		glEnable(GL_FRAGMENT_PROGRAM_ARB );
+	}
+	
+	resetTexturePointers( ctx );
+	setupTextureDirtyArea(ctx,
+			0,0,
+			width,
+			height,
+			width,
+			height
+			);
+	
+	int tw = ctx->texture[0];
+	int th = ctx->texture[1];
+
+	glBegin( GL_QUADS );
+	    glTexCoord2f(0,0);glVertex2i(0,0);
+ 	    glTexCoord2f(0,1);glVertex2i(0,th);
+	    glTexCoord2f(1,1);glVertex2i(tw ,th );
+	    glTexCoord2f(1,0);glVertex2i( tw,0);
+	glEnd();
+
+	flip_page(ctx);
+
+	return 1;
+}
+
 #endif

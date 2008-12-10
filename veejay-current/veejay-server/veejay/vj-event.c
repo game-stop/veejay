@@ -71,8 +71,6 @@
 static int use_bw_preview_ = 0;
 static int _last_known_num_args = 0;
 static hash_t *BundleHash = NULL;
-static struct timeval time_last_;
-static void *lzo_ = NULL;
 
 static int vj_event_valid_mode(int mode) {
 	switch(mode) {
@@ -125,14 +123,6 @@ typedef struct
 #endif
 
 static int _recorder_format = ENCODER_MJPEG;
-#ifdef USE_SWSCALER
-static	int	preview_active_ = 0;
-static	VJFrame	cached_cycle_[2];
-static sws_template preview_template;
-static void	*preview_scaler = NULL;
-static int 	cached_width_ =0;
-static int 	cached_height_ = 0;
-#endif
 
 #define SEND_BUF 125000
 static char _print_buf[SEND_BUF];
@@ -207,8 +197,8 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_VIDEO_PLAY_FORWARD,		SDLK_KP6,	VIMS_MOD_NONE,	NULL	},
 	{ VIMS_VIDEO_PLAY_BACKWARD,		SDLK_KP4, 	VIMS_MOD_NONE,	NULL	},
 	{ VIMS_VIDEO_PLAY_STOP,			SDLK_KP5, 	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_VIDEO_SKIP_FRAME,		SDLK_KP9, 	VIMS_MOD_NONE,	NULL	},
-	{ VIMS_VIDEO_PREV_FRAME,		SDLK_KP7, 	VIMS_MOD_NONE,	NULL	},
+	{ VIMS_VIDEO_SKIP_FRAME,		SDLK_KP9, 	VIMS_MOD_NONE,	"1"	},
+	{ VIMS_VIDEO_PREV_FRAME,		SDLK_KP7, 	VIMS_MOD_NONE,	"1"	},
 	{ VIMS_VIDEO_SKIP_SECOND,		SDLK_KP8, 	VIMS_MOD_NONE,	NULL	},
 	{ VIMS_VIDEO_PREV_SECOND,		SDLK_KP2, 	VIMS_MOD_NONE,	NULL	},
 	{ VIMS_VIDEO_GOTO_START,		SDLK_KP1, 	VIMS_MOD_NONE,	NULL	},
@@ -521,7 +511,7 @@ static	char	*retrieve_macro_(veejay_t *v, long frame, int idx )
 	if( SAMPLE_PLAYING(v))
 		s = sample_get_framedups( v->uc->sample_id );
 	else if ( PLAIN_PLAYING(v))
-		s = vj_perform_get_dups();	
+		s = v->settings->simple_frame_dup;
 
 	snprintf(key,16,"%08ld%02d", frame,s );
 
@@ -551,7 +541,7 @@ static	void	store_macro_(veejay_t *v, char *str, long frame )
 	if( SAMPLE_PLAYING(v))
 		s = sample_get_framedups( v->uc->sample_id );
 	else if ( PLAIN_PLAYING(v))
-		s = vj_perform_get_dups();	
+		s = v->settings->simple_frame_dup;
 
 
 	snprintf(key,16,"%08ld%02d", frame,s );
@@ -1045,6 +1035,7 @@ void vj_event_dump()
 	vj_event_vevo_dump();
 	
 	vj_osc_dump();
+
 }
 
 typedef struct {
@@ -1758,6 +1749,7 @@ void vj_event_single_gl_fire(void *ptr , int mod, int key)
 		case 0xff8d: key = SDLK_KP_ENTER; break;
 		case 0xffaf: key = SDLK_KP_DIVIDE; break;
 		case 0xff9e: case 0xff9f: key = SDLK_KP_PERIOD; break;
+		case 65507: key = SDLK_s; mod = 2; break;
 		default:
 			if( key > (256+128))
 				veejay_msg(VEEJAY_MSG_DEBUG, "\tUnknown key pressed %x, mod = %d", key, mod );
@@ -2546,10 +2538,6 @@ void vj_event_init()
 #ifdef HAVE_SDL
 	vj_event_init_keyboard_defaults();
 #endif
-	lzo_ = lzo_new();
-
-	veejay_memset( &time_last_, 0, sizeof( struct timeval ));	
-
 	init_vims_for_macro();
 
 }
@@ -3774,8 +3762,6 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 			editlist *E = v->edit_list;
 			if( SAMPLE_PLAYING(v))
 				E = v->current_edit_list;
-			veejay_msg(0, "%p == %p == %p ? ", v->edit_list, v->current_edit_list,	
-				sample_get_editlist(v->uc->sample_id ));
 			editlist *el = veejay_edit_copy_to_new( v, E, vstart, vend );
 			if(!el)
 			{
@@ -7068,6 +7054,38 @@ void	vj_event_toggle_osd_extra( void *ptr, const char format[], va_list ap )
 	}
 }
 
+static struct {
+	char *name;
+	int   id;
+} recorder_formats[] = {
+	{ "mlzo", ENCODER_LZO },
+	{ "y4m422", ENCODER_YUV4MPEG },
+	{ "y4m420", ENCODER_YUV4MPEG420 },
+	{ "yv16", ENCODER_YUV422 },
+	{ "y422", ENCODER_YUV422 },
+	{ "i420", ENCODER_YUV420 },
+	{ "y420", ENCODER_YUV420 },
+	{ "div3", ENCODER_DIVX   },
+	{ "mpeg4", ENCODER_MPEG4 },
+#ifdef SUPPORT_READ_DV2
+	{ "dvvideo", ENCODER_DVVIDEO },
+#endif
+	{ "dvsd", ENCODER_DVVIDEO },
+	{ "mjpeg", ENCODER_MJPEG },
+	{ "mjpeg-b", ENCODER_MJPEGB },
+	{ "mjpegb", ENCODER_MJPEGB },
+	{ "ljpeg", ENCODER_LJPEG },
+#ifdef HAVE_LIBQUICKTIME
+	{ "quicktime-mjpeg", ENCODER_QUICKTIME_MJPEG },
+#ifdef SUPPORT_READ_DV2
+	{ "quicktime-dv", ENCODER_QUICKTIME_DV },
+#endif
+#endif
+	{ "vj20", ENCODER_YUV420F },
+	{ "vj22", ENCODER_YUV422F },
+	{ NULL , -1 }
+};
+
 void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -7081,48 +7099,33 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot change data format while recording to disk");
 		return;
 	}
-	if(strncasecmp(str, "mlzo",4) == 0 )
-	{
-		_recorder_format = ENCODER_LZO;
-		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in LZO YUV 4:2:2 Planar");
+
+	int i;
+	if( strncasecmp(str, "list", 4 ) == 0 || strncasecmp( str, "help",4) == 0 ) {
+		for(i = 0; recorder_formats[i].name != NULL ; i ++ ) {
+			veejay_msg(VEEJAY_MSG_INFO,"%s", recorder_formats[i].name );
+		}
 		return;
 	}
 
-	if( strncasecmp(str, "yv",2 ) == 0 || strncasecmp(str, "yuv", 3 ) == 0 ) {
+
+	for( i = 0; recorder_formats[i].name != NULL ; i ++ ) {
+		if(strncasecmp( str, recorder_formats[i].name, strlen(recorder_formats[i].name) ) == 0 ) {
+			_recorder_format = recorder_formats[i].id;
+		}
+	}
+
+
+	if( strncasecmp(str, "yuv", 3 ) == 0 || strncasecmp(str, "intern", 6 ) == 0) {
 		switch(v->pixel_format) {
 			case FMT_422F: _recorder_format = ENCODER_YUV422F; break;
-			case FMT_420F: _recorder_format = ENCODER_YUV420F; break;
 			case FMT_422 : _recorder_format = ENCODER_YUV422; break;
-			case FMT_420 : _recorder_format = ENCODER_YUV420; break;
 		}
-		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in native format.");
-		return;
 	}
 
-	if(strncasecmp(str, "yv16",4) == 0 || strncasecmp(str,"y422",4)==0)
-	{
-		_recorder_format = ENCODER_YUV422;
-		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in YCbCr/YCrCb 4:2:2 Planar");
-		return;
-	}
-
-	if(strncasecmp(str,"mpeg4",5)==0 || strncasecmp(str,"divx",4)==0)
-	{
-		_recorder_format = ENCODER_MPEG4;
-		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in MPEG4 format");
-		return;
-	}
-
-	if(strncasecmp(str,"msmpeg4v3",9)==0 || strncasecmp(str,"div3",4)==0)
-	{
-		_recorder_format = ENCODER_DIVX;
-		veejay_msg(VEEJAY_MSG_INFO,"Recorder writes in MSMPEG4v3 format");
-		return;
-	}
 	if(strncasecmp(str,"dvvideo",7)==0||strncasecmp(str,"dvsd",4)==0)
 	{
 		if(vj_el_is_dv(v->current_edit_list)) {
-			veejay_msg(VEEJAY_MSG_INFO,"Recorder writes in DVVIDEO format");
 			_recorder_format = ENCODER_DVVIDEO;
 		}
 		else
@@ -7131,13 +7134,7 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		}
 		return;
 	}
-	if(strncasecmp(str,"mjpeg",5)== 0 || strncasecmp(str,"mjpg",4)==0 ||
-		strncasecmp(str, "jpeg",4)==0)
-	{
-		_recorder_format = ENCODER_MJPEG;
-		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in MJPEG AVI format");
-		return;
-	}
+
 #ifdef HAVE_LIBQUICKTIME
 	if(strncasecmp(str,"quicktime-dv", 12 ) == 0 )
 	{
@@ -7148,38 +7145,11 @@ void vj_event_tag_set_format(void *ptr, const char format[], va_list ap)
 		}
 		else
 			veejay_msg(VEEJAY_MSG_ERROR, "Not working in valid DV resolution");
-		return;
 	}
-	if(strncasecmp(str, "quicktime-mjpeg", 15 ) == 0 )
-	{
-		_recorder_format = ENCODER_QUICKTIME_MJPEG;
-		veejay_msg( VEEJAY_MSG_INFO, "Recorder writes in QT mjpeg format");
-		return;
-	}	
 #endif
-	if(strncasecmp(str,"i420",4)==0 || strncasecmp(str,"yv12",4)==0 )
-	{
-		_recorder_format = ENCODER_YUV420;
-		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in uncompressed YCbCr/YCrCb 4:2:0 Planar");
-		return;
-	}
-	if(strncasecmp(str,"vj20",4)==0 )
-	{
-		_recorder_format = ENCODER_YUV420F;
-		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in uncompressed YUV 4:2:0 Planar");
-		return;
-	}
-	if(strncasecmp(str,"vj22",4)==0 )
-	{
-		_recorder_format = ENCODER_YUV422F;
-		veejay_msg(VEEJAY_MSG_INFO, "Recorder writes in uncompressed YUV 4:2:2 Planar");
-		return;
-	}
 
-
-//FIXME
-	veejay_msg(VEEJAY_MSG_INFO, "yuv,mpeg4, div3, dvvideo, mjpeg , yv16 or i420");	
-	
+	veejay_msg(VEEJAY_MSG_INFO,
+			"Recording in %s" , vj_avcodec_get_encoder_name( _recorder_format ) );
 }
 
 static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
@@ -7424,52 +7394,12 @@ void vj_event_tag_rec_offline_stop(void *ptr, const char format[], va_list ap)
 
 void vj_event_output_y4m_start(void *ptr, const char format[], va_list ap)
 {
-	veejay_t *v = (veejay_t*)ptr;
-	char str[1024];
-	int *args = NULL;
-	P_A( args,str,format,ap);
-	if(v->stream_enabled==0)
-	{
-		int n=0;
-		veejay_strncpy(v->stream_outname, str,strlen(str));
-		n= vj_yuv_stream_start_write(v->output_stream,str,v->current_edit_list);
-		if(n==1) 
-		{
-			int s = v->settings->current_playback_speed;
-			veejay_msg(VEEJAY_MSG_DEBUG, "Pausing veejay");
-			
-			veejay_set_speed(v,0);
-			if(vj_yuv_stream_open_pipe(v->output_stream,str,v->current_edit_list))
-			{
-				vj_yuv_stream_header_pipe(v->output_stream,v->current_edit_list);
-				v->stream_enabled = 1;
-			}
-			veejay_msg(VEEJAY_MSG_DEBUG, "Resuming veejay");
-			veejay_set_speed(v,s);
-			
-		}
-		if(n==0)
-		if( vj_yuv_stream_start_write(v->output_stream,str,v->current_edit_list)==0)
-		{
-			v->stream_enabled = 1;
-			veejay_msg(VEEJAY_MSG_INFO, "Started YUV4MPEG streaming to [%s]", str);
-		}
-		if(n==-1)
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "YUV4MPEG stream not started");
-		}
-	}	
+	veejay_msg(0, "Y4M out stream: obsolete - use recorder.");
 }
 
 void vj_event_output_y4m_stop(void *ptr, const char format[], va_list ap)
 {
-	veejay_t *v = (veejay_t*)ptr;
-	if(v->stream_enabled==1)
-	{
-		vj_yuv_stream_stop_write(v->output_stream);
-		v->stream_enabled = 0;
-		veejay_msg(VEEJAY_MSG_INFO , "Stopped YUV4MPEG streaming to %s", v->stream_outname);
-	}
+	veejay_msg(0, "Y4M out stream: obsolete - use recorder.");
 }
 
 void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
@@ -9764,8 +9694,6 @@ void	vj_event_stop()
 	vj_picture_free();	
 
 	vj_event_vevo_free();
-
-	lzo_free( lzo_ );
 
 	int i;
 	for( i = 0; i < 12; i ++ )

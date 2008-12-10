@@ -44,7 +44,9 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
-
+#ifdef HAVE_GL
+#include <veejay/gl.h>
+#endif
 typedef struct
 {
 	uint8_t *proj_plane[3];
@@ -311,7 +313,7 @@ int	composite_get_top(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int
 }
 
 /* Top frame, blit */
-void	composite_blit( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which_vp )
+void	composite_blit_yuyv( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which_vp )
 {
 	composite_t *c = (composite_t*) compiz;
 	int vp1_active = viewport_active(c->vp1);
@@ -337,11 +339,74 @@ void	composite_blit( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which_vp )
 
 	if( which_vp == 1 && !vp1_active ) {
 		viewport_produce_full_img_yuyv( c->vp1,c->proj_plane,yuyv);
+		if( yuv_use_auto_ccir_jpeg() && c->pf == FMT_422 ) {
+			yuy2_scale_pixels_from_ycbcr( yuyv,c->proj_width * c->proj_height );
+		}
 		return;
 	}
 
-	yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
+	if( yuv_use_auto_ccir_jpeg() && c->pf == FMT_422 ) {
+		//@scale to full range yuv
+		yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height);
+		yuy2_scale_pixels_from_ycbcr( yuyv,c->proj_width * c->proj_height );
+	} else {
+		yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
+	}
 	
+}
+
+void	composite_blit_ycbcr( void *compiz, 
+			      uint8_t *in[3], 
+                              int which_vp,
+			      void *gl )
+{
+	composite_t *c = (composite_t*) compiz;
+	int vp1_active = viewport_active(c->vp1);
+
+	int blit_back = c->has_back;
+#ifdef HAVE_GL
+	uint8_t *gl_buffer = x_display_get_buffer(gl);
+	
+	c->has_back   = 0;
+
+//@ frame in 444
+
+	if( which_vp == 2 && vp1_active ) {
+		yuv444_yvu444_1plane(c->proj_plane,c->proj_width,c->proj_height, gl_buffer);
+		return;
+	} else if (which_vp == 2 ) {
+		if (c->proj_width != c->img_width &&
+			c->proj_height != c->img_height && which_vp == 2  )
+			{
+				yuv444_yvu444_1plane(c->proj_plane,c->proj_width,c->proj_height, gl_buffer);
+			} 
+			else {
+				yuv444_yvu444_1plane(in,c->proj_width,c->proj_height, gl_buffer);
+			}
+		return;
+	} 
+
+	if( which_vp == 1 && !vp1_active ) {
+		viewport_produce_full_img_packed( c->vp1,c->proj_plane,gl_buffer);
+		//if( yuv_use_auto_ccir_jpeg() && c->pf == FMT_422 ) {
+		//	yuy2_scale_pixels_from_ycbcr( yuyv,c->proj_width * c->proj_height );
+		//}
+		return;
+	}
+
+	yuv444_yvu444_1plane(c->proj_plane,c->proj_width,c->proj_height, gl_buffer);
+
+/*	if( yuv_use_auto_ccir_jpeg() && c->pf == FMT_422 ) {
+		//@scale to full range yuv
+		yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height);
+		yuy2_scale_pixels_from_ycbcr( yuyv,c->proj_width * c->proj_height );
+	} else {
+		yuv422_to_yuyv(c->proj_plane,yuyv,c->proj_width,c->proj_height );
+	}
+
+	*/
+
+#endif
 }
 
 
@@ -357,6 +422,12 @@ void	*composite_get_config(void *compiz, int which_vp )
 int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_vp )
 {
 	composite_t *c = (composite_t*) compiz;
+	
+	if(c->run == 0 ) {
+		viewport_reconfigure(c->vp1);
+		c->run=1;
+	}
+
 	int vp1_active = viewport_active(c->vp1);
 	if( which_vp == 2 && !vp1_active ) 
 	{
@@ -374,11 +445,6 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 
 		return output->ssm;
 	} 
-
-	if(c->run == 0 ) {
-		viewport_reconfigure(c->vp1);
-		c->run=1;
-	}
 
 	if( which_vp && vp1_active ) /* for both modes, render ui from vp1 */
 	{

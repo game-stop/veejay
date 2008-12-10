@@ -22,9 +22,9 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <stdio.h>
-#include <string.h> // for memset
-#include <unicap.h>
-#include <unicap_status.h>
+#include <string.h>
+#include <unicap/unicap.h>
+#include <unicap/unicap_status.h>
 #include <veejay/vims.h>
 #include <libvje/vje.h>
 #include <libvjmsg/vj-msg.h>
@@ -455,9 +455,8 @@ char	**vj_unicap_get_list( void *ud )
 
 	int n = i;
 
-	char **res = (char**) vj_malloc(sizeof(char*) * (n+1) );
-	memset(res, 0,sizeof(char*) * (n+1));
-	
+	char **res = (char**) vj_calloc(sizeof(char*) * (n+1) );
+
 	for( i = 0;i < n; i ++ )
 	{
 		if( SUCCESS( unicap_enumerate_properties(vut->handle,
@@ -627,7 +626,7 @@ int	vj_unicap_configure_device( void *ud, int pixel_format, int w, int h, int co
 	vut->dst_fmt = get_ffmpeg_pixfmt( pixel_format );
 	vut->src_fmt = get_ffmpeg_pixfmt( pixel_format );
 	vut->format.buffer_type = UNICAP_BUFFER_TYPE_USER;
-	vut->template.flags = 1;
+	vut->template.flags = yuv_which_scaler();
 	vut->scaler = NULL;
 
 	switch( pixel_format ) {	
