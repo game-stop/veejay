@@ -6317,18 +6317,21 @@
 							<widget class="GtkComboBoxEntry" id="combo_samplecodec">
 							  <property name="width_request">120</property>
 							  <property name="visible">True</property>
-							  <property name="items" translatable="yes">VJ20 (YUV 4:2:0 Planar)
-VJ22 (YUV 4:2:2 Planar)
-MJPEG
+							  <property name="items" translatable="yes">MJPEG
+LJPEG Lossless JPEG
 DVVIDEO
 MPEG4
 MSMPEG4V3
-YV16 (YCbCr 4:2:2 Planar)
-I420 (YCbCr 4:2:0 Planar)
+YV16 (YCbCr 4:2:2 Planar CCIR 601)
+I420 (YCbCr 4:2:0 Planar CCIR 601)
+VJ20 (YCbCr 4:2:0 Planar JPEG/JFIF)
+VJ22 (YCbCr 4:2:2 Planar JPEG/JFIF)
 Quicktime-DV
 Quicktime-MJPEG
-MLZO
-YUV (current)</property>
+MLZO (Oberhumer LZO)
+YUV (current internal processing format)
+Y4M422 YUV4MPEG 4:2:2
+Y4M420 YUV4MPEG 4:2:0 (mjpegtools)</property>
 							  <property name="add_tearoffs">False</property>
 							  <property name="has_frame">True</property>
 							  <property name="focus_on_click">True</property>
