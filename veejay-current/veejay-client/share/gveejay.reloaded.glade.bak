@@ -4311,7 +4311,7 @@
 						      <signal name="clicked" handler="on_button_text_new_clicked" last_modification_time="Thu, 16 Nov 2006 18:07:07 GMT"/>
 
 						      <child>
-							<widget class="GtkAlignment" id="alignment451">
+							<widget class="GtkAlignment" id="alignment542">
 							  <property name="visible">True</property>
 							  <property name="xalign">0.5</property>
 							  <property name="yalign">0.5</property>
@@ -4323,13 +4323,13 @@
 							  <property name="right_padding">0</property>
 
 							  <child>
-							    <widget class="GtkHBox" id="hbox808">
+							    <widget class="GtkHBox" id="hbox911">
 							      <property name="visible">True</property>
 							      <property name="homogeneous">False</property>
 							      <property name="spacing">2</property>
 
 							      <child>
-								<widget class="GtkImage" id="image2361">
+								<widget class="GtkImage" id="image3338">
 								  <property name="visible">True</property>
 								  <property name="pixbuf">button_text.png</property>
 								  <property name="xalign">0.5</property>
@@ -4345,9 +4345,9 @@
 							      </child>
 
 							      <child>
-								<widget class="GtkLabel" id="label833">
+								<widget class="GtkLabel" id="label947">
 								  <property name="visible">True</property>
-								  <property name="label" translatable="yes"></property>
+								  <property name="label" translatable="yes">Add</property>
 								  <property name="use_underline">True</property>
 								  <property name="use_markup">False</property>
 								  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -4686,9 +4686,9 @@
 					  </child>
 
 					  <child>
-					    <widget class="GtkLabel" id="label939">
+					    <widget class="GtkLabel" id="srtid_label">
 					      <property name="visible">True</property>
-					      <property name="label" translatable="yes">Edit subtitle</property>
+					      <property name="label" translatable="yes">Edit SRT [NUM]</property>
 					      <property name="use_underline">False</property>
 					      <property name="use_markup">False</property>
 					      <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -6317,18 +6317,21 @@
 							<widget class="GtkComboBoxEntry" id="combo_samplecodec">
 							  <property name="width_request">120</property>
 							  <property name="visible">True</property>
-							  <property name="items" translatable="yes">VJ20 (YUV 4:2:0 Planar)
-VJ22 (YUV 4:2:2 Planar)
-MJPEG
+							  <property name="items" translatable="yes">MJPEG
+LJPEG Lossless JPEG
 DVVIDEO
 MPEG4
 MSMPEG4V3
-YV16 (YCbCr 4:2:2 Planar)
-I420 (YCbCr 4:2:0 Planar)
+YV16 (YCbCr 4:2:2 Planar CCIR 601)
+I420 (YCbCr 4:2:0 Planar CCIR 601)
+VJ20 (YCbCr 4:2:0 Planar JPEG/JFIF)
+VJ22 (YCbCr 4:2:2 Planar JPEG/JFIF)
 Quicktime-DV
 Quicktime-MJPEG
-MLZO
-YUV (current)</property>
+MLZO (Oberhumer LZO)
+YUV (current internal processing format)
+Y4M422 YUV4MPEG 4:2:2
+Y4M420 YUV4MPEG 4:2:0 (mjpegtools)</property>
 							  <property name="add_tearoffs">False</property>
 							  <property name="has_frame">True</property>
 							  <property name="focus_on_click">True</property>

@@ -104,13 +104,15 @@ static struct
 	{"Mouse left: Set in point, Mouse right: Set out point, Double click: Clear selected, Mouse middle: Drag selection"},
 	{"Mouse left/right: Play slot, Shift + Mouse left: Put sample in slot. You can also put selected samples."},
 	{"Mouse left click: Select slot (sample in slot), Mouse double click: Play sample in slot, Mouse left + SHIFT: Set slot as mixing current mixing channel"},
+	{"Select a SRT sequence to edit"},
 	{NULL},
 };
 
 enum {
 	TOOLTIP_TIMELINE = 0,
 	TOOLTIP_QUICKSELECT = 1,
-	TOOLTIP_SAMPLESLOT = 2
+	TOOLTIP_SAMPLESLOT = 2,
+	TOOLTIP_SRTSELECT = 3
 };
 
 enum
@@ -4772,9 +4774,6 @@ static	void	reload_srt()
 	gchar *p = srts;
 	gchar *token = NULL;
 
-	if(len > 0 )
-		enable_widget( "SRTframe");
-
 	while(  i < len )
 	{
 		token = tokenize_on_space( p );
@@ -6621,6 +6620,9 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	info->midi =  vj_midi_new( info->main_window );
 	gettimeofday( &(info->time_last) , 0 );
 
+	GtkWidget *srtbox = glade_xml_get_widget( info->main_window, "combobox_textsrt");
+	set_tooltip_by_widget( srtbox, tooltips[TOOLTIP_SRTSELECT].text);  
+
 }
 
 void	vj_gui_preview(void)
@@ -7628,6 +7630,22 @@ static	void	indicate_sequence( gboolean active, sequence_gui_slot_t *slot )
 /* --------------------------------------------------------------------------------------------------------------------------
  *  Function that handles to select/activate a special slot in the samplebank
    -------------------------------------------------------------------------------------------------------------------------- */
+
+void 	set_widget_color( GtkWidget *widget , int red, int green, int blue, int def )
+{
+	GdkColor color;
+	if( def ) {
+		color.red = info->fg_->red;
+		color.green = info->fg_->green;
+		color.blue = info->fg_->blue;
+	} else {
+		color.red = red;
+		color.green = green;
+		color.blue = blue;
+	}
+	gtk_widget_modify_fg ( GTK_WIDGET(widget),GTK_STATE_NORMAL, &color );
+}
+
 static void set_activation_of_slot_in_samplebank( gboolean activate)
 {
 	if(!info->selected_gui_slot || !info->selected_slot )
@@ -7838,5 +7856,8 @@ void	veejay_release_track(int id, int release_this)
 
 void	veejay_bind_track( int id, int bind_this )
 {
-	multitrack_bind_track(info->mt, id, bind_this ); 
+	multitrack_bind_track(info->mt, id, bind_this );
+	info->uc.reload_hint[HINT_SLIST]  =1;
+
+ 
 }

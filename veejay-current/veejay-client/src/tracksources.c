@@ -24,7 +24,7 @@ extern void	veejay_release_track(int id, int release_this);
 extern void	veejay_bind_track( int id, int bind_this );
 extern int 	                multitrack_get_sequence_view_id( void *data );
 extern gchar  *_utf8str( const char *c_str );
-
+extern void 	set_widget_color( GtkWidget *widget , int red, int green, int blue, int def );
 typedef struct
 {
 	int track_id;
@@ -60,15 +60,17 @@ static	void	cell_toggled_callback( GtkCellRenderer *cell, gchar *path_string, gp
 
 	int id_data = -1; // invalid
 	char junk[32];
-	if(sscanf( data, "%s %d", junk,&id_data ) == 2 )
+	if(sscanf( data, "%d", &id_data ) == 1 )
 	{
 		if( gtk_cell_renderer_toggle_get_active( GTK_CELL_RENDERER_TOGGLE( cell) ) )
 		{
 		     veejay_release_track( v->track_id, id_data);
+//		     set_widget_color( v->view, 0,255,0,0);
 		}
 		else
 		{
 		     veejay_bind_track( v->track_id, id_data );
+//	             set_widget_color( v->view, 0,0,0,1 );
 		}
 		g_free(data);
 	}
@@ -93,7 +95,7 @@ void		update_track_view( int n_tracks, GtkWidget *widget, void *user_data )
 		if(id != i)
 		{
 			char name[12];
-			sprintf(name,"Track %d", i);
+			sprintf(name,"%d", i);
 			gchar *uname = _utf8str( name );
 			gtk_list_store_append( store, &iter );
 			gtk_list_store_set(
@@ -148,11 +150,11 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data)
 		
 //	GtkWidget *col = gtk_tree_view_get_column( GTK_TREE_VIEW(view) , 0 );
 	GtkTreeViewColumn *col = gtk_tree_view_get_column( GTK_TREE_VIEW(view),0);
-	gtk_tree_view_column_set_fixed_width(  col , 20 );
+	gtk_tree_view_column_set_fixed_width(  col , 5 );
 
 	col = gtk_tree_view_get_column( GTK_TREE_VIEW( view ), 1 );
 	gtk_tree_view_column_set_clickable(  col , TRUE );
-	gtk_tree_view_column_set_fixed_width(  col , 10 );
+	gtk_tree_view_column_set_fixed_width(  col , 20 );
 
 	gtk_tree_view_column_set_cell_data_func( col,
 		wrenderer, cell_data_func, NULL,NULL);
@@ -168,7 +170,7 @@ void *create_track_view(int track_id, int ref_tracks, void *user_data)
 		if( i != track_id )
 		{
 			char str[16];
-			sprintf(str,"Track %d",i);
+			sprintf(str,"%d",i);
 			gchar *ustr = _utf8str( str );
 			gtk_list_store_append( store, &iter );
 			gtk_list_store_set( store, &iter,

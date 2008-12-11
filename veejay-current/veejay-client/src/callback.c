@@ -2825,7 +2825,7 @@ on_vims_messenger_single_clicked( void )
 	}
 }
 
-static	void	srt_load_subtitle(int sid)
+static	gint	srt_load_subtitle(int sid)
 {
 	gint len = 0;
 	gint seq_id = 0;
@@ -2931,10 +2931,15 @@ static	void	srt_load_subtitle(int sid)
 //	glade_xml_get_widget( info->main_window, "combobox_textsrt" );
 //      gtk_combo_box_set_active( GTK_COMBO_BOX( combo ), seq_id-1 );
 
+	if(len > 0 )
+		enable_widget( "SRTframe");
+
 
 	srt_locked_ = 0;
 
 	if(text) free(text);
+
+	return seq_id;
 }
 
 void	on_button_text_new_clicked( GtkWidget *w, gpointer data )
@@ -2974,6 +2979,7 @@ void	on_button_text_new_clicked( GtkWidget *w, gpointer data )
 	free(text);
 	if( id > 0 )
 		info->uc.reload_hint[HINT_HISTORY] = 1;
+
 }
 
 void	on_button_text_del_clicked( GtkWidget *w, gpointer data )
@@ -3109,7 +3115,10 @@ void	on_combobox_textsrt_changed( GtkWidget *w, gpointer data)
 	{
 		multi_vims( VIMS_SRT_SELECT, "%d", sid );
 		srt_seq_ = sid;
-		srt_load_subtitle(sid);
+		gint res = srt_load_subtitle(sid);
+		char text[32];	
+		sprintf(text, "Edit SRT %d", res );
+		update_label_str( "srtid_label", text );	
 	}
 }
 
