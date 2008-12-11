@@ -989,7 +989,6 @@ static int veejay_screen_update(veejay_t * info )
 	uint8_t *c_frame[3];
 	int i = 0;
 	int skip_update = 0;
-	vj_perform_unlock_primary_frame();
 
 	video_playback_setup *settings = info->settings;
 
