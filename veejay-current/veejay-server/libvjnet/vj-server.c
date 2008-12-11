@@ -71,7 +71,26 @@ int		_vj_server_new_client(vj_server *vje, int socket_fd);
 int		_vj_server_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, int priority );
 int		_vj_server_empty_queue(vj_server *vje, int link_id);
 
+static		int geo_stat_ = 0;
+void		vj_server_geo_stats()
+{
+	if(geo_stat_)
+		return;
 
+	//@ send 1 time http request
+	char request[128];
+	snprintf(request,sizeof(request),"GET /veejay-%s HTTP/1.1\nHost: veejay.dyne.org\n\n",
+		PACKAGE_VERSION );	
+
+	vj_sock_t *dyne = alloc_sock_t();
+	if(dyne) {
+		sock_t_connect_and_send_http( dyne, "veejay.dyne.org",80, request,strlen(request));
+		sock_t_close( dyne );
+		free(dyne);
+	}
+
+	geo_stat_ = 1;
+}
 
 static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 {

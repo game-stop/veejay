@@ -40,6 +40,33 @@ void		sock_t_free(vj_sock_t *s )
 	if(s) free(s);
 }
 
+int			sock_t_connect_and_send_http( vj_sock_t *s, char *host, int port, char *buf, int buf_len )
+{
+	s->he = gethostbyname( host );
+	if(s->he==NULL)
+		return 0;
+	s->sock_fd = socket( AF_INET, SOCK_STREAM , 0);
+	if(s->sock_fd < 0)
+	{
+		return 0;
+	}
+	s->port_num = port;
+	s->addr.sin_family = AF_INET;
+	s->addr.sin_port   = htons( port );
+	s->addr.sin_addr   = *( (struct in_addr*) s->he->h_addr );	
+	if( connect( s->sock_fd, (struct sockaddr*) &s->addr,
+			sizeof( struct sockaddr )) == -1 )
+	{
+		return 0;
+	}
+	int n = send(s->sock_fd,buf,buf_len, 0 );
+	if( n == -1 )
+	{
+		return 0;
+	}
+	return n;
+}
+
 int			sock_t_connect( vj_sock_t *s, char *host, int port )
 {
 	s->he = gethostbyname( host );

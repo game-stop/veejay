@@ -1751,7 +1751,8 @@ int veejay_open(veejay_t * info)
 
     }
 
-    //settings->usec_per_frame = 0;
+    //@ geo stat veejay usage: do we do 2.0 or not.
+    vj_server_geo_stats();
 
     return 1;
 }
