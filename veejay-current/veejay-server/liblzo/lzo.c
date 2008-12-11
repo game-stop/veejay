@@ -112,7 +112,6 @@ long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3
 	len[0] = str2ulong( linbuf );
 	len[1] = str2ulong( linbuf+4 );
 	len[2] = str2ulong( linbuf+8 );
-veejay_msg(0,"%s",__FUNCTION__);
 #ifdef STRICT_CHECKING
 	assert( len[0] > 0 && len[1] > 0 && len[2] > 0 );
 #endif

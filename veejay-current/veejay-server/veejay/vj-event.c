@@ -2554,8 +2554,20 @@ void vj_event_linkclose(void *ptr, const char format[], va_list ap)
 
 void vj_event_quit(void *ptr, const char format[], va_list ap)
 {
+	int i;
 	veejay_t *v = (veejay_t*)ptr;
 	veejay_msg(VEEJAY_MSG_INFO, "Remote requested session-end, quitting Veejay");
+//@ hang up clients
+	for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ )
+	{	
+		if( vj_server_link_used( v->vjs[VEEJAY_PORT_CMD], i ) ) 
+		{
+			_vj_server_del_client(v->vjs[VEEJAY_PORT_CMD],i);
+			_vj_server_del_client(v->vjs[VEEJAY_PORT_STA],i);
+		}
+	}
+
+
 	veejay_change_state(v, LAVPLAY_STATE_STOP);         
 }
 

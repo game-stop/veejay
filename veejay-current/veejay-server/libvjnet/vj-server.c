@@ -72,6 +72,7 @@ int		_vj_server_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 int		_vj_server_empty_queue(vj_server *vje, int link_id);
 
 static		int geo_stat_ = 0;
+
 void		vj_server_geo_stats()
 {
 	if(geo_stat_)

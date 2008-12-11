@@ -1027,8 +1027,8 @@ static void long2str(unsigned char *dst, int32_t n)
 static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 {
 	const int len = info->effect_frame1->width * info->effect_frame1->height;
-	const int uv_len = info->effect_frame1->uv_width * info->effect_frame1->uv_height;
-	uint8_t *dstI = dst + (3*4);
+	const int uv_len = len / 2;
+	uint8_t *dstI = dst + (12 * sizeof(uint8_t));
 	unsigned int size1=0,size2=0,size3=0;
 	int i = lzo_compress( lzo_ , primary_buffer[info->out_buf]->Y, dstI, &size1, len );
 	if( i == 0 )
