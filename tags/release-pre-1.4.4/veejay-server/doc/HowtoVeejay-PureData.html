@@ -1,0 +1,503 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 3.2 Final//EN">
+<html>
+<head>
+  <meta name="GENERATOR" content="SGML-Tools 1.0.9">
+  <title>Using sendVIMS to write simple control paches for veejay in
+PureData</title>
+</head>
+<body>
+<h1>Using sendVIMS to write simple control paches for veejay in PureData</h1>
+<h2>M. van Henten cola at looze.net</h2>
+V0.01 104-10-09
+<hr><em>
+<!--
+sendVIMS
+-->SendVIMS is a Puredata external written by Niels
+Elburg and Tom Schouten. It is a control interface to veejay, a
+realtime video processing package.
+I will explain some of my work using both tools together.</em>
+<hr>
+<h2><a name="s1">1. Introduction</a></h2>
+<p>
+<!--
+sendVIMS!introduction
+--> SendVIMS is a Puredata external written
+by Niels Elburg and Tom Schouten. It is a control interface to veejay,
+a realtime video processing package. VIMS stands for 'Veejay's Internal
+Messaging System.<br>
+I have been working with veejay
+for a long time now so I took my knowledge of what it could do and
+built a few paches that will demonstrate the power of building
+interactive controls for veejay. This might be interesting for the
+newcomers to linux video, but also for the experienced who want to know
+more about veejay, and puredata although it is not intended as step by
+step guide on how to use PureData or veejay( Especially since I'm
+rather new to PureData), but I will try to explain some basics on how
+to get this working.
+</p>
+<h2>1.1 Copyright</h2>
+<p>This document is Copyright &copy; 104-10-09 M. van Henten.
+Permission is granted to copy, distribute and/or modify this document
+under the terms of the GNU Free Documentation License, Version 1.1 or
+any later version published by the Free Software Foundation with no
+Invariant Sections, no Front-Cover Texts, and no Back-Cover Texts.
+</p>
+<h2>1.2 Disclaimer</h2>
+<p>Use the information in this document at your own risk. I disavow any
+potential liability for the contents of this document. Use of the
+concepts, examples, and/or other content of this document is entirely
+at your own risk.
+</p>
+<p>All copyrights are owned by their owners, unless specifically noted
+otherwise. Use of a term in this document should not be regarded as
+affecting the validity of any trademark or service mark.
+</p>
+<p>Naming of particular products or brands should not be seen as
+endorsements.
+</p>
+<p>You are strongly recommended to take a backup of your system before
+major installation and backups at regular intervals.
+</p>
+<h2>1.3 News</h2>
+<p>9-10-2004
+Started Writing first draft to this howto, after finishing up on some
+basic patches.
+</p>
+<h2>1.4 Credits</h2>
+<p>Many thanks to of course to Tom Schouten en Niels Elburg for
+creating this tool, thanks to Niels for creating veejay after numerous
+sessions of feature dreaming, and continue working on it to create more
+then we ever fantasized about. </p>
+<p>Also, much obliged to the people in te PureData community, who
+helped me getting started in the first place.Thanks to Derek Holzer,
+who introduced me to PD and showed me how easy and fun PD was.
+</p>
+<p>A thankyou should be in place for the people at BEK (
+http://www.bek.no) Who brought a lot of video guys in the OS world
+together, and made this collaboration possible in the first place.
+</p>
+<h2><a name="s2">2. Technologies</a></h2>
+<p style="font-weight: bold;">2.1 Expected Skills<br>
+</p>
+<p>I assume that you know how to work with the linux commandline.
+Veejay is ( up to this date) mainly a console application ( besides the
+video bit of course) and you <span
+ style="font-weight: bold; font-style: italic;">need to type stuff</span><span
+ style="font-style: italic;"> </span>to get it working. If this is all
+too strange for you, I would advice you to get know a bit more of linux
+first, by reading some magazines, and some howto's ( <a
+ href="http://www.tldp.org">the linux documentation project</a> has a
+lot of howto's) like the <a
+ href="http://tldp.org/HOWTO/DOS-Win-to-Linux-HOWTO.html">windows/dos
+to linux howto</a>. <br>
+</p>
+<p><span style="font-weight: bold;">2.2 Veejay</span><br>
+</p>
+<p>First of all, you need to download and install a later version of
+veejay.&nbsp; In this document, I used veejay-0.6.2. Any version before
+0.5.9 will not work as expected, or not at all together with SendVims. <br>
+</p>
+<p>Veejay sources are located <a href="http://veejay.sourceforge.net">http://veejay.sourceforge.net</a>,
+or go directly to the <a href="http://www.sf.net/projects/veejay">sourceforge
+download area</a>.<br>
+Installation is standard: open a shell, or terminal, unpack the package
+somehwere, go into the newly created directory, and type:<br>
+</p>
+<p>./configure<br>
+</p>
+<p>when configure has finished, something like:<br>
+</p>
+<p>&nbsp;<small><span
+ style="font-family: courier new,courier,monospace;">veejay 0.6.2 build
+configuration :</span><br
+ style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;Build
+configuration:</span><br
+ style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+MMX
+enabled&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+: true</span><br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+MMX2
+enabled&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+: false</span><br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+SSE
+enabled&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+: true</span><br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+3DNow
+enabled&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+: false</span><br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+CMOV
+enabled&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+: true</span><br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+glibc support for &gt;2GB files&nbsp;&nbsp;&nbsp; : true</span><br
+ style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;Required
+dependencies:</span><br
+ style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+POSIX Threads (pthread)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+: true</span><br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+video4linux recording/playback&nbsp; : true</span><br
+ style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Simple Direct Media Layer&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : true</span><br
+ style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+XML C library for Gnome libxml2 : true</span><br
+ style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+libJPEG&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+: true</span><br style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;Optional
+dependencies:</span><br
+ style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+libDV (digital
+video)&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+: true</span><br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+Jack Audio Connection Kit&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; : true</span><br
+ style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+DirectFB
+support&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+: false</span></small><br>
+<br>
+</p>
+Should appear.<br>
+<br>
+Note that veejay depends on the <a href="http://www.xmlsoft.org/">XML
+C library</a> ( it comes as part of the GNOME libraries and desktop)
+and <a href="http://www.libsdl.org">SDL</a>, if you don't have these
+packages you should install them. <a
+ href="http://libdv.sourceforge.net">Libdv</a> is optional, for being
+able to play dv type 2 format avi's, <a
+ href="http://jackit.sourceforge.net">jack</a> is optional but needed
+if you want to hear sound with your movies. <br>
+<br>
+Describing how to get jack working optimal is not within the scope of
+this document, I can only say that if you have jack setup properly
+veejay should be able to output sound. <br>
+<br>
+When this is done, do a "make" followed by a "make install".<br>
+Veejay should now be installed. Get some movie to edit( you can borrow
+one from me <a href="http://cola.looze.net/sendvims/video/">here</a>) <br>
+<p style="font-weight: bold;">2.2 PureData</p>
+<p>PureData is a whole story upon itself. Please read the installation
+notes and documentation on <a href="http://www.puredata.org">http://www.puredata.org</a>.
+You can verify if everything works by just running pd, goto help en
+check out some of the example paches. Using the documentation&nbsp;
+from within pd you should at least get some basic understanding.<br>
+</p>
+<p><span style="font-weight: bold;">2.3 SendVims</span><br>
+</p>
+<p>In this document I used sendVIMS-0.1. <br>
+This is compied from the README in sendVIMS-0.1.tar.gz :<br>
+<br>
+</p>
+<p><small><span style="font-family: courier new,courier,monospace;">sendVIMS
+- very simple VeeJay client for pure data</span><br
+ style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+(C) 2002-2004 Niels Elburg &lt;elburg@hio.hen.nl&gt;</span><br
+ style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
+(C) 2004 Tom Schouten &lt;doelie@zzz.kotnet.org&gt;</span><br
+ style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">This is free
+software covered under the terms of the</span><br
+ style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">GNU GPL. See
+the file COPYING for details.</span><br
+ style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">building:</span><br
+ style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">./configure
+&amp;&amp; make &amp;&amp; make install</span><br
+ style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">'make
+install' copies these files to your pd directory:</span><br
+ style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&lt;prefix&gt;/lib/pd/extra/sendVIMS.pd_linux</span><br
+ style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">&lt;prefix&gt;/lib/pd/doc/5.reference/help-sendVIMS.pd</span><br
+ style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">the default
+&lt;prefix&gt; is /usr/local</span><br
+ style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">running:</span><br
+ style="font-family: courier new,courier,monospace;">
+<br style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">if the module
+is in your pd path it will be loaded automaticly.</span></small><br>
+</p>
+<h2><a name="s3">3. Implementation</a></h2>
+<p><span style="font-weight: bold;">3.1 Get veejay running</span><br>
+</p>
+<p>To start veejay, you need to start it with a video file. Veejay only
+plays avi files, so no quicktime, or mpeg movies.<br>
+Veejay only knows of two types of video codecs: mjpeg and DV type 2.0. <br>
+So to get veejay running, you need at least one mjpeg or DV type 2.0
+.avi file. These formats were chosen with some reasons, explained in
+the veejay-howto. Converting into codecs and other formats is a whole
+science upon itself, and I do intend to write a crash course into video
+and linux in the future. For creating mjpeg avi's I use the <a
+ href="mjpeg.sourceforge.net">lavtools</a> and <a
+ href="www.mplayerhq.hu">mplayer</a>, and veejay itself.<br>
+</p>
+<p><a href="http://cola.looze.net/sendvims/video">You can grab a one
+second mjpeg avi from here.</a><br>
+</p>
+<p>This is copyright free material I transcoded out of a movie from <a
+ href="http://www.archive.org">archive.org</a><br>
+Start veejay by opening up a terminal window such as xterm and type: <br>
+</p>
+<p style="font-family: courier new,courier,monospace;"><small>veejay
+mymovie.avi</small></p>
+<p>If you used the example one second avi, it will briefly play the
+whole movie and stop at the last frame. Move your mouse into the video
+window. As long as the mouse pointer is inside the video window, you
+can use the built in keyboard controls. press keypad-5, this pauzes
+playback. now press keypad-1, to skip to the start of your movie. press
+the [ key, this marks 'clip start', press keypad-3, to skip to the end
+of the movie, and press the ] key, this marks the 'clip end'. You can
+now sellect your clip by pressing the F1 key. the movie will
+automatically keep looping. you can alterate loopmode by pressing
+keypad-*. try some other keypad keys to see what they do. See 'man
+veejay' for the other controls.<br>
+</p>
+<p><span style="font-weight: bold;">3.2 Running PD/SendVIMS</span><br>
+</p>
+<p>Open up a terminal window such as xterm and type:<br>
+</p>
+<p><small style="font-family: courier new,courier,monospace;">pd</small><br>
+</p>
+<p>You'll need the terminal to get some feedback from pd. From the file
+menu of pd, choose 'new'. In the new window, choose 'put &gt; object'. <br>
+A rectangular object appears under your mousepointer. Click somewhere
+in the white area of the window, and type "sendVIMS" inside the object.
+If you installed the sendVIMS external properly, you should read&nbsp;
+in the terminal:<br>
+</p>
+<p><small><span style="font-family: courier new,courier,monospace;">sendVIMS:
+version 0.1</span><br
+ style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">sendVIMS: (c)
+2004 Niels Elburg &amp; Tom Schouten</span><br
+ style="font-family: courier new,courier,monospace;">
+<span style="font-family: courier new,courier,monospace;">sendVIMS:
+connected to localhost:3490</span></small><br>
+</p>
+<p>That's it! you should now be able to right-click on the sendVIMS
+object, and choose 'help' from the popup window. <br>
+You are now properly set up to use sendVIMS and veejay. Please refer to
+some of the examples I provide under 'examples' for more information.
+You should note that my examples will work right away, even without
+understanding PD in the first place, but they are not intended as a
+tutorial on how to use PD. you should see the 'help' menu and various
+resources around the web for that!.<br>
+</p>
+<p><br>
+</p>
+<h2><a name="s4">4. Troubleshooting</a></h2>
+<p><span style="font-weight: bold;">
+4.1 Veejay doesn't start!</span><br>
+</p>
+<p>You need to start veejay from a terminal, using a proper encoded avi
+file. you can use the <a href="http://cola.looze.net/sendvims/video">demo</a>
+file if you don't have one.<br>
+Please refer to veejay documentation and maillinglist.<br>
+</p>
+<p><span style="font-weight: bold;">4.2 SendVIMS doesn't work, PD tells
+me it can't create sendvims.</span><br>
+</p>
+<p>The sendVIMS-0.1 external is not installed. please install the
+external and restart PD.<br>
+</p>
+<p><span style="font-weight: bold;">4.3 I have a different problem,
+please help me.</span><br>
+</p>
+<p>If the problem is relevant to this document please <a
+ href="mailto:cola@looze.net">mail</a> me and I'll add it here. Try the
+PD and veejay maillinglist otherwise.<br>
+</p>
+<h2><a name="s5">5. Further Information</a></h2>
+<p><span style="font-weight: bold;">5.1 HOWTO's and documentation</span><br>
+</p>
+<p>The veejay howto can be found here: <a
+ href="http://veejay.sourceforge.net/veejay-HOWTO.html">http://veejay.sourceforge.net/veejay-HOWTO.html</a><br>
+PureData documentation is here:&nbsp;&nbsp; <a
+ href="http://www.puredata.org">http://www.puredata.org</a><br>
+</p>
+<p>I have have been working on some more patches besides the ones in
+the examples, they're on my personal homepage:<br>
+<a href="http://cola.looze.net/sendvims/">http://cola.looze.net/sendvims/</a></p>
+<p><br>
+<span style="font-weight: bold;">5.2 Email, Mailinglists</span></p>
+<p>Please post your questions to the veejay mailinglist, you can
+subscribe <a href="http://sourceforge.net/mail/?group_id=47564">here</a>.<br>
+<br>
+</p>
+<h2><a name="s6">6. Examples</a></h2>
+<p><span style="font-weight: bold;">6.1 Basic Example: play, play
+backwards.</span><br>
+</p>
+<p>In PD, you send a message by creating a message object, type the
+message into that object, and connect the output of the message to the
+sendVIMS object.<br>
+</p>
+<p><img src="VIMS-example-play.jpg" title=""
+ alt="Screenhost of example patch" style="width: 326px; height: 288px;"><br>
+</p>
+<p>In this example, I used PD aliasses: video.play.forward, and
+video.play.backward. Normally, most VIMS messages are represented as
+numbers, preceded by a 'p', for example, p100 stands for 'select and
+play sample' followed by an argument. In the following example, you can
+select different clips to play in veejay by changing the number inside
+the number box. ( you can make diferent clips in veejay when in 'plain
+video' mode, by pressing keypad '/'. Use keypad play controls to select
+different frame positions, use the [ and ] keys to mark in and
+outpoints of clips, use the function keys to select samples with the
+keyboard controls).<br>
+</p>
+<p>6.2 Set the playing clip with an argument.<br>
+</p>
+<p><img src="VIMS-example-setframe.jpg" title=""
+ alt="Set the playing clip with an argument"
+ style="width: 326px; height: 288px;"><br>
+</p>
+<p>The $1 takes the number from the number box, and together with the
+p100 message it gives the command "select and play sample $1" to
+veejay. Note, that since PD doesn't know how many clips we have here,
+we can select non-existing clips. We can give negative numbers. veejay
+will give an error message.<br>
+</p>
+<p><span style="font-weight: bold;">6.3 Getting status output from
+veejay.</span><br>
+</p>
+<p>This example shows how to get information you need from veejay: for
+example the current frame. <br>
+</p>
+<p><img src="VIMS-example-getstatus.jpg" title=""
+ alt="Example of getting status information"
+ style="width: 326px; height: 288px;"><br>
+</p>
+<p>Now, there are two number boxes. When playing clips, the first
+number box will display the current frame, but when playing in plain
+video, the second box outputs the current frame. Veejay sends it's
+status in one big string of numbers, seperated by spaces. all
+information comes in at the same time. You can use the 'unpack' object
+to split the information in smaller chunks. notice how many outputs it
+has - there are lots of status messages to be read. I have made a patch
+that helps me remember what goes where, and I include it as a subpatch
+when working with sendVIMS. You can find it on my personal weppage: <a
+ href="http://cola.looze.net/sendvims">http://cola.looze.net/sendvims</a>.<br>
+</p>
+<p><span style="font-weight: bold;">6.4 Controlling video effects.</span><br>
+</p>
+<p>Veejay has many video effects. you can find out what kind of effects
+on veejay's homepage, in the gallery section. For this next example,
+you need two different clips. Assuming that you are working with the
+example movie, press Keypad-5 for pauze, and Keypad-1 to go to the
+start of the movie. Mark the beginning of your first clip here. Now, we
+gently scrub to frame 12 in the movie using Keypad-9 - it skips one
+frame ahead at a time - and mark the end of the first clip, and, on the
+same frame, the beginning of the second clip, and at the last frame of
+the movie, the end of the second clip( HINT: you could use the
+"video.set.frame &lt;frame&gt;" message here instead).<br>
+You should have two samples now, which you can select with the F1 and
+F2 keys. Lets start with selecting the first clip and have a look at
+the example:<br>
+</p>
+<p><img src="VIMS-example4-videomixer.jpg" title=""
+ alt="example of effect controls" style="width: 561px; height: 414px;"><br>
+</p>
+<p>The first message sets up the effect chain. Veejay can chain
+multiple effects on top of eachother, like layers in an image editing
+program. In this example, it sets effect 4 on current playing sample (
+the number zero in the VIMS messages that control effects always stands
+for the current playing clip, as a convenience. you could also replace
+the number with a variable, and read it from veejay's output to know
+the current clip).<br>
+Effect 4 is the "Normal Overlay" effect, it simply mixes two video like
+a videomixer.<br>
+</p>
+<p>The second message controls the clip the overlay effect mixes with.
+Put it to 2 to mix with our second clip. <br>
+The third message is a PD message, that controls the boundaries of the
+slider. Normally, sliders have value 0 to 127 by default. the overlay
+effect has only one controll, opacity, and it is mesured in value 0 to
+255, so I want the slider to have boundaries ranging 0 to 255.<br>
+The slider is connected to the third message: control parameter 0 of
+the effect on chain-entry 3 of the current playing clip.<br>
+The order of these values is typical: first, tell which sample to
+select. second, what effect chain entry, third, which control
+parameter, and last, the value of that parameter. <br>
+You can make a dump of the effects numbers and the VIMS messages by
+running:<br>
+</p>
+<p><small><span style="font-family: courier new,courier,monospace;">veejay
+--dump-events -d &gt; veejay-events.txt<br>
+</span></small></p>
+<p>The last message, "connect localhost 3490" actually (re)connects the
+sendVIMS object to veejay if not already connected. You can use the
+message "disconnect" and "quit", too, have a look at the sendVIMS
+helpfile.<br>
+</p>
+<p><span style="font-weight: bold;">6.5 More advanced playback control:
+scrubbing.</span><br>
+</p>
+<p>This example shows two things: One slider can be used to set a new
+play position in a clip, the other shows the play position in the
+current clip.<br>
+Both sliders get their boundaries updated with the starting position of
+the clip and the ending position. This only works in the 'clip' mode,
+not when playing in plain video.<br>
+</p>
+<p><img src="VIMS-example5-scrubbing.jpg" title=""
+ alt="Example of controlling play position with a slider"
+ style="width: 372px; height: 396px;"><br>
+</p>
+<p>From the status, the starting frame and the end frame of the current
+playing clip are read, which sets the boundaries of both sliders. The
+slider in the top of the patch controls message p089: set frame $1, the
+slider in the bottom gets updated with the 'current frame of clip'
+information.<br>
+However, when switching from clip to plain video mode, this will no
+longer work as the outputs get different status updates. Switching
+between clips wil work perfectly however.<br>
+</p>
+<p>More advanced combinations are possible. PD offers a lot of
+functionality, such as MIDI, joystick controls and controlling things
+through sound. Some more examples of my work are on my personal
+website. <br>
+</p>
+<p><br>
+</p>
+<p><br>
+</p>
+<p><br>
+</p>
+</body>
+</html>

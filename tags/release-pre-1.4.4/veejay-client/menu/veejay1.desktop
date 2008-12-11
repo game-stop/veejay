@@ -1,0 +1,10 @@
+[Desktop Entry]
+Encoding=UTF-8
+Version=1.0
+Name=Veejay (720x576 with audio)
+Comment=Start new veejay project, 720x576 with default audio settings 
+Exec=veejay -v -W720 -H576 -a1 -d
+Terminal=true
+Type=Application
+Icon=veejay-icon.png
+Categories=AudioVideoEditing;AudioVideo;

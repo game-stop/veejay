@@ -1,0 +1,13 @@
+ ¶
+
+First, you need to create a file to tell veejay where to find plugins.
+
+ $ mkdir ~/.veejay
+ $ vi ~/.veejay/plugins
+
+The contents of the file can look like:
+
+/usr/local/lib/freeframe
+/usr/local/lib/frei0r-1
+
+Veejay will pick up the plugins the next time you start it. 

@@ -1,0 +1,89 @@
+#N canvas 44 39 828 878 10;
+#X obj 407 24 sendVIMS;
+#X msg 469 -84 connect localhost 3490;
+#X msg 469 -62 disconnect;
+#X text 573 -126 open a video stream <deviceID> <channelID>;
+#X text 491 25 optional creation arguments: <host> <port>;
+#X text 79 -173 (c) 2004-2006 Niels Elburg & Tom Schouten;
+#X text 37 -80 some command modifiers are supported. these can be prepended
+to a standard veejay command.;
+#X text 63 -41 '+ <n>' delay for n frames before sending command;
+#X text 614 -81 connect to veejay. (no port specified : default);
+#X text 493 41 default = localhost 3490;
+#X msg 467 -142 + 10 p240 0 1;
+#X msg 468 -117 p240 0 1;
+#X msg 466 -172 quit;
+#X obj 407 101 print status;
+#X obj 407 73 spigot;
+#X obj 448 49 tgl 15 0 empty empty empty 0 -6 0 8 -262144 -1 -1 0 1
+;
+#X obj 105 71 unpack 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0;
+#X floatatom 80 201 5 0 0 0 - - -;
+#N canvas 488 217 481 424 aliases 0;
+#X text 23 12 All veejay ports are addressable by their symbolic selector
+\, which is 'p' plus the number of the port. Some messages have more
+readable aliases.;
+#X msg 15 141 video.play.forward;
+#X msg 15 165 video.play.backward;
+#X msg 15 117 video.play.stop;
+#X msg 15 65 video.goto.start;
+#X msg 270 258 quit;
+#X floatatom 263 136 5 0 0 0 - - -;
+#X floatatom 263 84 5 0 0 0 - - -;
+#X msg 254 98 video.set.frame \$1;
+#X msg 254 151 video.set.speed \$1;
+#X obj 15 279 s \$0-0;
+#X obj 16 361 r \$0-0;
+#X obj 16 382 outlet;
+#X obj 254 287 s \$0-0;
+#X msg 15 89 video.goto.end;
+#X msg 270 236 aliases;
+#X text 331 235 print all aliases;
+#X connect 1 0 10 0;
+#X connect 2 0 10 0;
+#X connect 3 0 10 0;
+#X connect 4 0 10 0;
+#X connect 5 0 13 0;
+#X connect 6 0 9 0;
+#X connect 7 0 8 0;
+#X connect 8 0 13 0;
+#X connect 9 0 13 0;
+#X connect 11 0 12 0;
+#X connect 14 0 10 0;
+#X connect 15 0 13 0;
+#X restore 470 -24 pd aliases;
+#X text 38 -143 the object maps pd messages to veejay commands. the
+veejay ports are accessed by a symbol composed of the letter 'p' followed
+by the port number. see the veejay documentation for more info. (or
+run 'veejay -u | less');
+#X text 556 -23 <- a list of aliases for the p<n> port names;
+#X floatatom 112 218 5 0 0 0 - - -;
+#X floatatom 131 238 5 0 0 0 - - -;
+#X text 182 123 Status outlets. The outlet values depend on the playback
+mode. Properties like first and last frame \, looptype and trickplay
+speed are n/a when playing in plain (2) or stream mode (1). Outlet
+0 = elapsed render time (in ms) 1 = frame number 2 = playback mode
+(0=sample \, 1=stream \, 2=plain) 3 = identifier (sample or stream)
+4 = process effect chain (0=off \, 1=on) 5 = first frame of sample
+6 = last frame of sample 7 = trickplay speed 8 = looptype (0=none \,
+1=normal \, 2=bounce) 9 = recording (0=no \, 1=yes) 10 = frames to
+record 11 = frames left to record (counts to 0) 12 = number of samples
+or streams 13 = in position of sample 14 = out position of sample 15
+= select fx entry (0=first \, 19=last) 16 = total number of samples
+and streams 17 = cache consumed (0-100);
+#X text 9 -189 sendVIMS: an interface to veejay-0.9.8 internal message
+system;
+#X msg 91 -194;
+#X connect 0 0 14 0;
+#X connect 0 0 16 0;
+#X connect 1 0 0 0;
+#X connect 2 0 0 0;
+#X connect 10 0 0 0;
+#X connect 11 0 0 0;
+#X connect 12 0 0 0;
+#X connect 14 0 13 0;
+#X connect 15 0 14 1;
+#X connect 16 0 17 0;
+#X connect 16 1 21 0;
+#X connect 16 2 22 0;
+#X connect 18 0 0 0;

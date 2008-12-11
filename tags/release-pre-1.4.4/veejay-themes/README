@@ -1,0 +1,10 @@
+
+These are flat themes for reloaded.
+
+To install them, run INSTALL.sh as root (sudo)
+to remove them, run UNINSTALL.sh
+
+
+$ sudo sh INSTALL.sh
+# sh INSTALL.sh
+
