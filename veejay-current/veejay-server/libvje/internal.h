@@ -212,11 +212,12 @@ enum {
 	VJ_IMAGE_EFFECT_CONTOUR		=	188,
 	VJ_IMAGE_EFFECT_LENSCORRECTION  = 	189,
 	VJ_IMAGE_EFFECT_BGSUBTRACT	=	190,
+	VJ_IMAGE_EFFECT_NEGATECHANNEL	= 	191,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 191
+#define VJ_IMAGE_EFFECT_MAX 192
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 246
@@ -288,6 +289,9 @@ extern void mirrors2_apply( VJFrame *frame, int width, int height,
 			   int type);
 extern void negation_apply( VJFrame *frame, int width, int height,
 			   int val);
+extern void negatechannel_apply( VJFrame *frame, int width, int height,
+			  int chan, int val);
+
 extern void colormap_apply( VJFrame *frame, int width, int height,
 			   int r, int g, int b);
 extern void opacity_apply(VJFrame *frame, VJFrame *frame2, int width,

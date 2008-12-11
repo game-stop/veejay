@@ -28,6 +28,7 @@
 #include "effects/fibdownscale.h"
 #include "effects/magicoverlays.h"
 #include "effects/negation.h"
+#include "effects/negatechannel.h"
 #include "effects/radcor.h"
 #include "effects/opacity.h"
 #include "effects/posterize.h"
@@ -597,6 +598,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 49] = waterrippletv_init(width,height);
 	vj_effects[i + 89 ]= radcor_init(width,height);
 	vj_effects[i + 90 ]= bgsubtract_init(width,height);
+	vj_effects[i + 91 ]= negatechannel_init(width,height);
+
 	max_width = width;
 	max_height = height;
 

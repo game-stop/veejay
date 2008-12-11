@@ -257,6 +257,10 @@ void vj_effman_apply_image_effect(
      case VJ_IMAGE_EFFECT_NEGATION:
 	negation_apply(frames[0], frameinfo->width, frameinfo->height, arg[0]);
 	break;
+   case VJ_IMAGE_EFFECT_NEGATECHANNEL:
+	negatechannel_apply(frames[0], frameinfo->width, frameinfo->height, arg[0],arg[1]);
+	break;
+
 	case VJ_IMAGE_EFFECT_COLFLASH:
 	colflash_apply(frames[0], frameinfo->width,frameinfo->height,arg[0],
 			arg[1],arg[2],arg[3],arg[4] );

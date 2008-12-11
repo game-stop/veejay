@@ -11,7 +11,7 @@ noinst_LTLIBRARIES = $(VJE_LIB_FILE)
 libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			effects/diff.c effects/fibdownscale.c effects/killchroma.c \
 			effects/lumamagick.c effects/autoeq.c effects/colorhis.c \
-		        effects/mirrors.c effects/goom.c effects/colormap.c effects/negation.c \
+		        effects/mirrors.c effects/goom.c effects/colormap.c effects/negatechannel.c effects/negation.c \
 			effects/overclock.c effects/dissolve.c effects/opacity.c effects/posterize.c \
 			effects/dither.c effects/dices.c effects/emboss.c effects/flip.c \
 			effects/revtv.c effects/softblur.c effects/zoom.c effects/split.c effects/widthmirror.c \
