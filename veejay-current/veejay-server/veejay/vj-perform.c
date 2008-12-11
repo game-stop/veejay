@@ -1181,12 +1181,6 @@ int	vj_perform_is_ready(veejay_t *info)
 	return 1;
 }
 
-void	vj_perform_unlock_primary_frame( void )
-{
-	video_output_buffer_convert = 0;
-	// call this every cycle
-}
-
 void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )   
 {
 	editlist *el = info->current_edit_list;

@@ -11,8 +11,6 @@ void vj_perform_init_output_frame( veejay_t *info, uint8_t **frame,
 
 void	vj_perform_update_plugin_frame(VJFrame *frame);         
 
-void	vj_perform_unlock_primary_frame( void );
-
 VJFrame	*vj_perform_init_plugin_frame(veejay_t *info);
 VJFrameInfo *vj_perform_init_plugin_frame_info(veejay_t *info);
 
