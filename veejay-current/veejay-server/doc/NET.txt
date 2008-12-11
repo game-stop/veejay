@@ -1,3 +1,10 @@
+Veejay stats
+============
+
+As of veejay 1.4.4, veejay server will make a hit on veejay.dyne.org
+for collecting geographical data on veejay usage. 
+This is the HTTP request send: "GET /veejay-<PACKAGE_VERSION> HTTP/1.1\nHost: veejay.dyne.org\n\n"
+It is defined in vj-server.c and cannot be disabled.
 
 Veejay can stream over the Network 
 =================================================
