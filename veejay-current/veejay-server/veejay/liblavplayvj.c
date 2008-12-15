@@ -2983,6 +2983,16 @@ veejay_t *veejay_malloc()
 			info->no_caching = 0;
 	}
 
+	char *sdlfs = getenv("VEEJAY_FULLSCREEN");
+	if( sdlfs ) {
+		int val = 0;
+		if( sscanf( sdlfs, "%d", &val ) ) {
+			veejay_msg(VEEJAY_MSG_WARNING, "Playing in %s mode",
+				(val== 1 ? "fullscreen" : "windowed" ) );
+			info->settings->full_screen = val;
+		}
+	}
+
 	if( best_performance) {
 		if (strncasecmp( best_performance, "quality", 7 ) == 0 ) {
 			best_performance_ = 1;
