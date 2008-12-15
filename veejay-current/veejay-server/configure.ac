@@ -803,21 +803,15 @@ fi
 
 have_unicap=false
 if test x$with_unicap != xno; then
-PKG_CHECK_MODULES( UNICAP, libunicap >= 0.1.0,
-                ac_cv_unicap=1, ac_cv_unicap=0)
+PKG_CHECK_MODULES( UNICAP, libunicap >= 0.1.0,have_unicap=true,have_unicap=false)
+fi
 
-AC_DEFINE_UNQUOTED([HAVE_UNICAP], ${ac_cv_unicap},
-        [ Set to 1 if you have unicap.])
-
-if test "${ac_cv_unicap}" = 0
-then
+if test x$have_unicap = xfalse ; then
   AC_MSG_WARN([Could not find optional library libunicap])
 else
 have_unicap=true
 AC_SUBST(HAVE_UNICAP)
 AC_DEFINE(HAVE_UNICAP,,[define if unicap])
-fi
-
 fi
 
 AC_SUBST(UNICAP_CFLAGS)

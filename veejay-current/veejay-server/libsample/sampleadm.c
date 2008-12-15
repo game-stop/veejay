@@ -1430,9 +1430,18 @@ int	sample_load_composite_config( void *compiz, int s1 )
 {
 	sample_info *sample = sample_get(s1);
 	if(!sample) return -1;
-	sample->composite = composite_load_config( compiz, sample->viewport_config );
+
+	int val = 0;
+	void *temp = composite_load_config( compiz, sample->viewport_config , &val );
+	if( temp == NULL || val == -1 )
+		return 0;
+	
+	sample->composite = val;
+	sample->viewport  = temp;
+	sample_update(sample,s1);
 	return sample->composite;
 }
+
 void		*sample_get_composite_view(int s1)
 {
 	sample_info *sample = sample_get(s1);
@@ -3397,7 +3406,8 @@ void	sample_reload_config(void *compiz, int s1, int mode )
 		if(!sample->viewport_config) {
 			veejay_msg(VEEJAY_MSG_DEBUG, "Calibrated sample %d",s1);
 			sample->viewport_config = composite_get_config(compiz,mode);
-		}
+		}	
+		sample->composite = mode;
 		sample_update(sample,s1);
 	}
 }

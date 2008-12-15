@@ -705,18 +705,22 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 #endif
 	if(info->composite )
 	{
+		int cur_composite = info->settings->composite;
+		info->settings->composite = sample_load_composite_config( info->composite , sample_id );
 		void *cur = sample_get_composite_view(sample_id);
-		if( cur == NULL ) {
-			veejay_msg(VEEJAY_MSG_INFO, "No perspective transform setup for this Sample, playing normal.");			
-		} else {
-			int cur_composite = info->settings->composite;
-			info->settings->composite = sample_load_composite_config( info->composite , sample_id );
-			switch(info->settings->composite) {	
-				case 2: composite_set_backing(info->composite,cur);veejay_msg(VEEJAY_MSG_INFO, "Using perspective transform for this Sample");break;
-				case 1: veejay_msg(0, "No perspective transform configuration for this Sample!"); 
-				case 0: info->settings->composite = cur_composite; break;
-			}
-
+	
+		switch(info->settings->composite) {
+			case 1:	
+			case 2: 
+#ifdef STRICT_CHECKING
+				assert( cur != NULL );
+#endif
+				composite_set_backing(info->composite,cur);
+				veejay_msg(VEEJAY_MSG_INFO, "Using perspective transform for this Sample");
+				break;
+			case 0: 
+				info->settings->composite = cur_composite; 
+				break;
 		}
 	}
 
@@ -770,18 +774,19 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	  info->uc->sample_id = stream_id;
 	if(info->composite )
 	{
+		int cur_composite = info->settings->composite;
+		info->settings->composite = vj_tag_load_composite_config( info->composite , stream_id );
 		void *cur =vj_tag_get_composite_view(stream_id);
-		if( cur == NULL ) {
-			veejay_msg(VEEJAY_MSG_INFO, "No perspective transform setup for this Stream, playing normal.");			
-		} else {
-			int cur_composite = info->settings->composite;
-			info->settings->composite = vj_tag_load_composite_config( info->composite , stream_id );
-			switch(info->settings->composite) {	
-				case 2: composite_set_backing(info->composite,cur);veejay_msg(VEEJAY_MSG_INFO, "Using perspective transform for this Stream");break;
-				case 1: veejay_msg(0, "No perspective transform configuration found for this Stream!"); 
-				case 0: info->settings->composite = cur_composite; break;
-			}
-
+		switch(info->settings->composite) {	
+			case 1:
+			case 2:
+#ifdef STRICT_CHECKING
+				assert( cur != NULL );
+#endif
+				composite_set_backing(info->composite,cur);
+				veejay_msg(VEEJAY_MSG_INFO, "Using perspective transform for this Stream");
+				break;
+			case 0: info->settings->composite = cur_composite; break;
 		}
 	}
 	

@@ -407,7 +407,8 @@ static int vj_server_send_frame_now( vj_server *vje, int link_id, uint8_t *buf, 
 #endif
 	total  = sock_t_send_fd( Link[link_id]->handle, vje->send_size, buf, len);
 #ifdef STRICT_CHECKING
-	assert( total == len );
+	if( total != len )
+		veejay_msg(VEEJAY_MSG_ERROR, "Only sent %d out of %d bytes", total,len);
 #endif
 	if( total <= 0 )
 	{

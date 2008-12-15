@@ -6780,7 +6780,7 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 		veejay_msg(VEEJAY_MSG_INFO, "Focus on %s, press CTRL-h for more help.", (v->settings->composite == 1 ? "Projection" : "Secundary Input"));
 		if( SAMPLE_PLAYING(v) ) {
 
-			sample_reload_config( v->composite, v->uc->sample_id,v->settings->composite );
+		/*	sample_reload_config( v->composite, v->uc->sample_id,v->settings->composite );
 
 			if(v->settings->composite == 2 && sample_get_composite(v->uc->sample_id ) == 0 )
 			{
@@ -6791,13 +6791,15 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 				}
 				composite_set_backing(v->composite,cur );
 				veejay_msg(0, "Saved calibration to current sample");
-			}
+			}*/
+			sample_set_composite( v->composite, v->uc->sample_id, v->settings->composite  );
+
 			veejay_msg(VEEJAY_MSG_INFO,
 				"Secundary input sample %d will %s.", v->uc->sample_id,
 				(v->settings->composite == 2 ? "be transformed" : "not be transformed" ) );
 		} else if (STREAM_PLAYING(v)) {
 			
-			vj_tag_reload_config( v->composite, v->uc->sample_id,v->settings->composite );
+		/*	vj_tag_reload_config( v->composite, v->uc->sample_id,v->settings->composite );
 
 			if(v->settings->composite == 2 && vj_tag_get_composite(v->uc->sample_id) == 0 )
 			{
@@ -6809,7 +6811,10 @@ void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )
 				composite_set_backing(v->composite,cur );
 				
 				veejay_msg(0, "Saved calibration to current sample");
-			}
+			}*/
+
+			vj_tag_set_composite( v->composite, v->uc->sample_id, v->settings->composite  );
+
 			veejay_msg(VEEJAY_MSG_INFO,
 				"Secundary input stream %d will %s.", v->uc->sample_id,
 				(v->settings->composite == 2 ? "be transformed" : "not be transformed" ) );

@@ -206,10 +206,12 @@ void	composite_add_to_config( void *compiz, void *vc, int which_vp )
 	viewport_set_composite( vc, which_vp, c->Y_only );
 }
 
-int	composite_load_config( void *compiz, void *vc )
+void	*composite_load_config( void *compiz, void *vc, int *result )
 {
-	if( vc == NULL )
-		return 0; //@ projection
+	if( vc == NULL ) {
+		*result = -1;
+		return NULL;
+	}
 
 	composite_t *c = (composite_t*) compiz; 
 	int cm = viewport_get_color_mode_from_config(vc);
@@ -219,14 +221,18 @@ int	composite_load_config( void *compiz, void *vc )
 	int res = viewport_reconfigure_from_config( c->vp1, vc );
 	//@ push to back1 too!
 	if(res) {
+		if( c->back1 == NULL ) {
+			c->back1 = composite_clone(c );
+		}
 #ifdef STRICT_CHECKING
 		assert(c->back1 != NULL );
 #endif
 		viewport_update_from(c->vp1, c->back1 );
 		c->Y_only = cm;
-		return m;
+		*result = m;
+		return (void*)c->back1;
 	}
-	return 0;
+	return NULL;
 }
 
 int	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int mouse_button, int w_x, int w_y )

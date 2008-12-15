@@ -3141,8 +3141,9 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 					vj_tag_set_composite_view(info->uc->sample_id, cur );
 				}
 				composite_set_backing(info->composite,cur);
-				vj_tag_reload_config( info->composite,info->uc->sample_id,
-					settings->composite);
+				vj_tag_reload_config( info->composite,info->uc->sample_id, 1);
+
+//					settings->composite);
 			} else if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) {
 				void *cur = sample_get_composite_view(info->uc->sample_id);
 				if(cur==NULL) {
@@ -3150,8 +3151,8 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 					sample_set_composite_view(info->uc->sample_id,cur);
 				}
 				composite_set_backing(info->composite,cur);
-				sample_reload_config( info->composite,info->uc->sample_id,
-					settings->composite);
+				sample_reload_config( info->composite,info->uc->sample_id, 1 );
+			//		settings->composite);
 			}
 		}
 

@@ -947,13 +947,19 @@ int	vj_tag_set_n_frames( int t1, int n )
 
 int	vj_tag_load_composite_config( void *compiz, int t1 )
 {
- vj_tag *tag = vj_tag_get(t1);
- if(tag) {
-	tag->composite = composite_load_config( compiz, tag->viewport_config );
-	return tag->composite; 
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag)
+		return -1;
 
- }
- return 0;
+	int val = 0;
+	void *temp = composite_load_config( compiz, tag->viewport_config, &val );
+	if(temp == NULL || val == -1 )
+		return 0;
+
+	tag->composite = val;
+	tag->viewport  = temp;
+	vj_tag_update(tag,t1);
+	return tag->composite; 
 }
 
 void	vj_tag_reload_config( void *compiz, int t1, int mode )
@@ -967,6 +973,7 @@ void	vj_tag_reload_config( void *compiz, int t1, int mode )
 		if(!tag->viewport_config) {
 			tag->viewport_config = composite_get_config( compiz, mode );
 		}
+		tag->composite = mode;
 		vj_tag_update(tag, t1);
 	}
 }

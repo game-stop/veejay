@@ -51,8 +51,8 @@ void	*composite_get_vp( void *data );
 void	composite_set_ui(void *compiz, int status );
 int	composite_get_ui(void *compiz );
 //@ load config after loading to activate viewport setup
-int	composite_load_config( void *compiz, void *vc );
 //@ add to config before saving
+void	*composite_load_config( void *compiz, void *vc, int *result );
 void	composite_add_to_config( void *compiz, void *vc, int which_vp );
 
 #endif

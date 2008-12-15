@@ -46,8 +46,8 @@ typedef struct
 
 void 	viewport_save_xml(xmlNodePtr parent,void *vv);
 void	*viewport_load_xml(xmlDocPtr doc, xmlNodePtr cur, void *vv );
-extern int	composite_load_config( void *compiz, void *vc );
 extern void	composite_add_to_config( void *compiz, void *vc, int which_vp );
+extern void	*composite_load_config( void *compiz, void *vc, int *result );
 
 void	*composite_get_config(void *compiz, int which_vp );
 #endif
