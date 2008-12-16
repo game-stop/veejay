@@ -231,9 +231,9 @@ static int vj_perform_increase_plain_frame(veejay_t * info, long num)
 	settings->simple_frame_dup = 0;
     }
 
-
+// auto loop plain mode
     if (settings->current_frame_num < settings->min_frame_num) {
-	settings->current_frame_num = settings->min_frame_num;
+	settings->current_frame_num = settings->max_frame_num;
 	        	
 	return 0;
     }
@@ -243,7 +243,7 @@ static int vj_perform_increase_plain_frame(veejay_t * info, long num)
 		veejay_msg(VEEJAY_MSG_DEBUG, "Reached end of video - Ending veejay session ... ");
 		veejay_change_state(info, LAVPLAY_STATE_STOP);
 	}
-	settings->current_frame_num = settings->max_frame_num;
+	settings->current_frame_num = settings->min_frame_num;
 	return 0;
     }
     return 0;

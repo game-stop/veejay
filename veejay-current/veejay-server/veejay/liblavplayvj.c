@@ -2446,6 +2446,7 @@ static void veejay_playback_cycle(veejay_t * info)
 			settings->max_frame_num = info->edit_list->total_frames;
 			veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %d - %d",
 				(int)settings->min_frame_num,  (int)settings->max_frame_num );
+			settings->current_playback_speed = 1;
 			break;
 		case VJ_PLAYBACK_MODE_TAG:
 			veejay_start_playing_stream(info,info->settings->late[1]);	

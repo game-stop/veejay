@@ -3763,6 +3763,13 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 		if( v->uc->sample_end > v->uc->sample_start) {
 			long vstart = v->uc->sample_start;
 			long vend   = v->uc->sample_end;
+
+			if(v->settings->current_playback_speed < 0) {
+				long tmp = vend;
+				vend = vstart;
+				vstart = tmp;
+			}
+
 			if(vstart < 0 ) {
 				vstart=0; 
 			}
