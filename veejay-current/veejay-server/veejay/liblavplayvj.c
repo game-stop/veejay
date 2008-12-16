@@ -1061,8 +1061,11 @@ static int veejay_screen_update(veejay_t * info )
 
 
 	if(skip_update) {
-		if(info->video_out == 0 ) 
-			vj_sdl_flip(info->sdl[0]);
+		if(info->video_out == 0 ) { 
+		   for(i = 0 ; i < MAX_SDL_OUT; i ++ )
+			if( info->sdl[i] )
+				vj_sdl_flip(info->sdl[i]);
+		}
 #ifdef HAVE_GL
 		else if (info->video_out == 3 ) {
 			composite_blit_ycbcr( info->composite, frame, settings->composite, info->gl );
@@ -1662,12 +1665,14 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Error playing frame %d", settings->current_frame_num);
 	}
-	
+	settings->currently_processed_entry = 
+		settings->buffer_entry[settings->currently_processed_frame];
+
 	//@ here callbacks fixme was
 	pthread_mutex_lock(&(settings->valid_mutex));
 
-	settings->currently_processed_entry = 
-		settings->buffer_entry[settings->currently_processed_frame];
+//	settings->currently_processed_entry = 
+//		settings->buffer_entry[settings->currently_processed_frame];
 	/* sync timestamp */
 
 	veejay_mjpeg_software_frame_sync(info,
