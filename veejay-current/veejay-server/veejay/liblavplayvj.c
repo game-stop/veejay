@@ -1664,6 +1664,7 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 	}
 	
 	//@ here callbacks fixme was
+	pthread_mutex_lock(&(settings->valid_mutex));
 
 	settings->currently_processed_entry = 
 		settings->buffer_entry[settings->currently_processed_frame];
@@ -1678,7 +1679,7 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 
 
 
-	pthread_mutex_lock(&(settings->valid_mutex));
+//	pthread_mutex_lock(&(settings->valid_mutex));
 	settings->valid[settings->currently_processed_frame] = 0;
 	pthread_mutex_unlock(&(settings->valid_mutex));
 

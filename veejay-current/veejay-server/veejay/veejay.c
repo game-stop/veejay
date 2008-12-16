@@ -581,7 +581,6 @@ static void print_license()
 
 static void donothing(int sig)
 {
-	veejay_msg(VEEJAY_MSG_INFO,"Received signal %x ",sig);
 	veejay_handle_signal( info, sig );	
 }
 
@@ -609,7 +608,6 @@ int main(int argc, char **argv)
 		return 0;
     }
 
-	print_license();
 	
     	if(info->dump)
  	{
@@ -680,11 +678,12 @@ int main(int argc, char **argv)
 		return 1;
 	}
 
+	print_license();
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Starting playback");
 
-	veejay_set_frame(info, 0);
-	veejay_set_speed(info, 1);
+//	veejay_set_frame(info, 0);
+//	veejay_set_speed(info, 1);
 	
 	int sig;
 	
