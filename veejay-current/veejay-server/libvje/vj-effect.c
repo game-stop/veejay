@@ -122,7 +122,6 @@
 #include "effects/color.h"
 #include "effects/noisepencil.h"
 #include "effects/pencilsketch.h"
-#include "effects/pixelate.h"
 #include "effects/magicmirror.h"
 #include "effects/lumamask.h" 
 #include "effects/smear.h"
@@ -554,7 +553,7 @@ void vj_effect_initialize(int width, int height, int full_range)
     vj_effects[i + 47] = diffimg_init(width,height);
     vj_effects[i + 48] = noisepencil_init(width,height);  	
     vj_effects[i + 43] = pencilsketch_init(width,height);
-    vj_effects[i + 50] = pixelate_init(width,height); 
+    vj_effects[i + 50] = bgsubtract_init(width,height);
     vj_effects[i + 51] = magicmirror_init(width,height);
     vj_effects[i + 52] = smear_init(width,height);
     vj_effects[i + 53] = raster_init(width,height);
@@ -595,7 +594,6 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 88] = contourextract_init(width,height);
 	vj_effects[i + 49] = waterrippletv_init(width,height);
 	vj_effects[i + 89 ]= radcor_init(width,height);
-	vj_effects[i + 90 ]= bgsubtract_init(width,height);
 
 	max_width = width;
 	max_height = height;
