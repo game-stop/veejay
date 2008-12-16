@@ -593,7 +593,7 @@ int veejay_init_editlist(veejay_t * info)
     editlist *el = info->edit_list;
 
     /* Set min/max options so that it runs like it should */
-    settings->min_frame_num = 0;
+    settings->min_frame_num = 1;
 //    settings->max_frame_num = el->video_frames - 1;
     settings->max_frame_num = el->total_frames;
     settings->current_frame_num = settings->min_frame_num;
@@ -756,7 +756,7 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 	int	tmp = vj_tag_chain_malloc( stream_id);
 
 	info->uc->render_changed = 1;
-	settings->min_frame_num = 0;
+	settings->min_frame_num = 1;
 	settings->max_frame_num = vj_tag_get_n_frames( stream_id );
 
 #ifdef HAVE_FREETYPE
@@ -827,8 +827,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		}
 		else
 		{
-			if(!veejay_stop_playing_sample(info, cur_id ))
-				return;
+			veejay_stop_playing_sample(info, cur_id );
 		}
 	}
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
@@ -854,7 +853,7 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 		info->uc->playback_mode = new_pm;
 		info->current_edit_list = info->edit_list;
 		video_playback_setup *settings = info->settings;
-		settings->min_frame_num = 0;
+		settings->min_frame_num = 1;
 		settings->max_frame_num = info->edit_list->total_frames;
 		veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %d - %d",
 			(int)settings->min_frame_num,  (int)settings->max_frame_num );
@@ -1931,9 +1930,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 	if(info->load_action_file)
 	{
-		if(veejay_load_action_file(info, info->action_file ))
+		if(veejay_load_action_file(info, info->action_file[0] ))
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Loaded configuration file %s", info->action_file );
+			veejay_msg(VEEJAY_MSG_INFO, "Loaded configuration file %s", info->action_file[0] );
 			has_config = 1;
 		}
 	}
@@ -2110,7 +2109,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		if(sample_readFromFile( info->settings->action_scheduler.sl,
 				info->composite,
 				info->seq, info->font, el, &(info->uc->sample_id), &(info->uc->playback_mode) ) )
-			veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list %s from actionfile",
+			veejay_msg(VEEJAY_MSG_INFO, "Loaded sample list %s from actionfile - ",
 					info->settings->action_scheduler.sl );
 	}
 	
@@ -2236,8 +2235,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 			dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, "Solid", -1, el,info->pixel_format,-1,0,0);
 		else
 			dummy_id = vj_tag_size()-1;
+		info->settings->late[0] = VJ_PLAYBACK_MODE_TAG;
+		info->settings->late[1] = dummy_id;
 
-		if(dummy_id > 0)
+	/*	if(dummy_id > 0)
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Activating dummy mode (Stream %d)", dummy_id);
 			veejay_change_playback_mode(info,VJ_PLAYBACK_MODE_TAG,dummy_id);
@@ -2246,7 +2247,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Failed to create dummy stream");
 			return -1;
-		}
+		}*/
 	}
 	else if( info->uc->file_as_sample && id <= 0 && !has_config)
 	{
@@ -2270,6 +2271,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 				}
 			}	
 		}
+		info->settings->late[0] = VJ_PLAYBACK_MODE_SAMPLE;
+		info->settings->late[1] = 1;
 	}
 
 	/* After we have fired up the audio and video threads system (which
@@ -2284,10 +2287,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		return -1;
     	}
 	if(info->load_action_file ) {
-	  if(sample_readFromFile( info->action_file,info->composite,info->seq,info->font,info->edit_list,
+	  if(sample_readFromFile( info->action_file[1],info->composite,info->seq,info->font,info->edit_list,
 			&(info->settings->late[0]),&(info->settings->late[1]) ))
 	   {
-			veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file);
+			veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file[1]);
 	    }
 	}
 
@@ -2427,9 +2430,26 @@ static void veejay_playback_cycle(veejay_t * info)
 	veejay_msg(VEEJAY_MSG_INFO, "Found %d cores, locking core %d for rendering purposes", settings->ncpu,which_cpu);
 	veejay_pin_cpu( info, which_cpu );
     }
-
-    if( info->settings->late[1] )
-   	 veejay_change_playback_mode(info,info->settings->late[0],info->settings->late[1]);
+	info->uc->playback_mode = info->settings->late[0];
+	info->uc->sample_id     = info->settings->late[1];
+	switch(info->uc->playback_mode) {
+		case VJ_PLAYBACK_MODE_PLAIN:
+			info->current_edit_list = info->edit_list;
+			video_playback_setup *settings = info->settings;
+			settings->min_frame_num = 1;
+			settings->max_frame_num = info->edit_list->total_frames;
+			veejay_msg(VEEJAY_MSG_INFO, "Playing plain video, frames %d - %d",
+				(int)settings->min_frame_num,  (int)settings->max_frame_num );
+			break;
+		case VJ_PLAYBACK_MODE_TAG:
+			veejay_start_playing_stream(info,info->settings->late[1]);	
+			veejay_msg(VEEJAY_MSG_INFO, "Playing stream %d", info->settings->late[1]);
+			break;
+		case VJ_PLAYBACK_MODE_SAMPLE:
+			veejay_start_playing_sample(info, info->settings->late[1]);
+			veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d", info->settings->late[1]);
+			break;
+	}
 
  //   vj_perform_queue_audio_frame(info);
  //   vj_perform_queue_video_frame(info,0);
@@ -2921,8 +2941,8 @@ veejay_t *veejay_malloc()
 	for( i =0; i < 8 ; i ++ )
 		info->rlinks[i] = -1;
 
-    veejay_memset(info->action_file,0,256); 
-    veejay_memset(info->stream_outname,0,256);
+    veejay_memset(info->action_file[0],0,256); 
+    veejay_memset(info->action_file[1],0,256); 
 
     for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++)
 		info->effect_info->tmp[i] = 0;
@@ -2945,6 +2965,9 @@ veejay_t *veejay_malloc()
 
 	info->pixel_format = FMT_422F; //@default 
 	info->settings->ncpu = smp_check();
+
+	info->settings->late[0] = VJ_PLAYBACK_MODE_PLAIN;
+	info->settings->late[1] = 0; 
 
 	int status = 0;
 	int acj    = 0;
@@ -3532,7 +3555,7 @@ int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start,
 	el->video_frames = c;
 	el->total_frames = el->video_frames - 1;
 	settings->max_frame_num = el->total_frames;
-	settings->min_frame_num = 0;
+	settings->min_frame_num = 1;
 
 	return 1;
 }

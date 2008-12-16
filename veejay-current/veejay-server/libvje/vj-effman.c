@@ -352,9 +352,6 @@ void vj_effman_apply_image_effect(
      case VJ_IMAGE_EFFECT_RGBCHANNEL:
 	rgbchannel_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
 	break;
-    case VJ_IMAGE_EFFECT_GOOM:
-	goomfx_apply( frames[0], frameinfo->width,frameinfo->height,arg[0],arg[1]);
-	break;
      case VJ_IMAGE_EFFECT_ZOOM:
 	zoom_apply(frames[0], frameinfo->width, frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
 	break;

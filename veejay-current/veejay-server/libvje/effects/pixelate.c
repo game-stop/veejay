@@ -22,7 +22,7 @@
 #include <libvjmem/vjmem.h>
 #include "pixelate.h"
 
-static uint8_t values[512];
+static uint8_t values[2048];
 
 vj_effect *pixelate_init(int width, int height)
 {
@@ -61,7 +61,7 @@ void pixelate_apply( VJFrame *frame, int w, int h , int vv )
   	const unsigned int v = values[vv];
 	const unsigned int uv_len = frame->uv_len;
         const unsigned int u_v = v >> frame->shift_h;
-    uint8_t *Y = frame->data[0];
+    	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 

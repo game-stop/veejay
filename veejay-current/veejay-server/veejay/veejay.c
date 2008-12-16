@@ -181,7 +181,9 @@ static void Usage(char *progname)
 #endif
 #endif
     fprintf(stderr,
-	    "  -l/--action-file <file name>\tLoad a sample list/action list file (none at default)\n");
+	    "  -l/--sample-file <file name>\tLoad a sample list file (none at default)\n");
+	fprintf(stderr,
+		"  -F/--action-file <file name>\tLoad an action file (none at default)\n");
 	fprintf(stderr,
 	    "  -u/--dump-events  \t\tDump event information to screen\n");
 	fprintf(stderr,
@@ -191,7 +193,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -y/--geometryy <num> \t\tTop left y offset for SDL video window\n");
  	fprintf(stderr,
-		"  -F/--features  \t\tList of compiled features\n");
+		"  -B/--features  \t\tList of compiled features\n");
 	fprintf(stderr,
 		"  -v/--verbose  \t\tEnable debugging output (default off)\n");
 	fprintf(stderr,
@@ -324,7 +326,7 @@ static int set_option(const char *name, char *value)
 		    fprintf(stderr, "Select a valid output display driver\n");
 		    exit(-1);
 		   }
-    } else if (strcmp(name, "F") == 0 || strcmp(name, "features")==0) {
+    } else if (strcmp(name, "B") == 0 || strcmp(name, "features")==0) {
 	CompiledWith();
         nerr++;
     } else if (strcmp(name, "preserve-pathnames") == 0
@@ -346,9 +348,13 @@ static int set_option(const char *name, char *value)
     }
 #endif
 #endif
-    else if (strcmp(name, "action-file")==0 || strcmp(name,"l")==0) {
+    else if (strcmp(name, "action-file")==0 || strcmp(name,"F")==0) {
 	check_val(optarg,name);
-	veejay_strncpy(info->action_file,(char*) optarg, strlen( (char*) optarg));
+	veejay_strncpy(info->action_file[0],(char*) optarg, strlen( (char*) optarg));
+	info->load_action_file = 1;
+	}else if (strcmp(name, "sample-file")==0 || strcmp(name,"l")==0) {
+	check_val(optarg,name);
+	veejay_strncpy(info->action_file[1],(char*) optarg, strlen( (char*) optarg));
 	info->load_action_file = 1;
 	}
 	else if(strcmp(name,"map-from-file") == 0 ) {
@@ -448,6 +454,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"timer", 1, 0, 0},	/* timer */
 	{"dump-events",0,0,0},
 	{"bezerk",0,0,0},
+	{"sample-file",1,0,0},
 	{"action-file",1,0,0},
 	{"features",0,0,0},
 	{"deinterlace",0,0,0},
@@ -491,12 +498,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:f:Y:A:N:H:W:R:M:T:nILFPVDugvdibjqe",
+			"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:f:Y:A:N:H:W:R:M:T:F:nILPVDugvdibjqe",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:f:Y:A:N:H:W:R:M:T:nILFPVDugvdibjqe"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:f:Y:A:N:H:W:R:M:T:F:nILPVDugvdibjqe"
 						   )) != EOF)
 #endif
     {

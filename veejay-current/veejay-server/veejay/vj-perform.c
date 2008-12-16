@@ -2982,7 +2982,7 @@ static	char	*vj_perform_osd_status( veejay_t *info )
 	veejay_memset(&tc,0,sizeof(MPEG_timecode_t));
 	veejay_memset(&tmp,0,sizeof(tmp));
 	veejay_memset(&buf,0,sizeof(buf));
-        y4m_ratio_t ratio = mpeg_conform_framerate( info->current_edit_list->video_fps );
+        y4m_ratio_t ratio = mpeg_conform_framerate( (double)info->current_edit_list->video_fps );
         int n = mpeg_framerate_code( ratio );
 
         mpeg_timecode(&tc, settings->current_frame_num, n, info->current_edit_list->video_fps );
@@ -3520,15 +3520,10 @@ void	vj_perform_randomize(veejay_t *info)
 
 
 	MPEG_timecode_t tc;
-	
-	mpeg_timecode(&tc, max_delay,
-                mpeg_framerate_code(mpeg_conform_framerate(
-			info->current_edit_list->video_fps)),
-			info->current_edit_list->video_fps );
+	y4m_ratio_t ratio = mpeg_conform_framerate( (double)info->current_edit_list->video_fps );
+	mpeg_timecode(&tc,max_delay,mpeg_framerate_code(ratio),info->current_edit_list->video_fps );
 	sprintf(timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
-	veejay_msg(VEEJAY_MSG_DEBUG,
-		 "Sample randomizer trigger in %s",
-			timecode );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Sample randomizer trigger in %s",	timecode );
 
 	veejay_set_sample( info, take_n );
 }

@@ -2033,7 +2033,6 @@ void	vj_event_xml_parse_config( veejay_t *v, xmlDocPtr doc, xmlNodePtr cur )
 		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SAMPLELIST, sample_list );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PORTNUM, &(v->uc->port) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PRIOUTPUT, &(v->video_out) );
-		get_cstr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_PRINAME, v->stream_outname);
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SDLSIZEX, &(v->bes_width) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_SDLSIZEY, &(v->bes_height) );
 		get_istr( doc, cur, (const xmlChar*) XML_CONFIG_SETTING_AUDIO, &(v->audio) );
@@ -7774,28 +7773,24 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 	char curtime[15];
 	char sampletitle[200];
 	MPEG_timecode_t tc;
-	int start = sample_get_startFrame( id );
-	int end = sample_get_endFrame( id );
-	int speed = sample_get_speed(id);
-	int len = end - start;
+	y4m_ratio_t ratio = mpeg_conform_framerate( (double)v->current_edit_list->video_fps );
+	long start = sample_get_startFrame( id );
+	long end = sample_get_endFrame( id );
+	long speed = sample_get_speed(id);
+	long len = end - start;
 
-	if(start == 0) len ++;
-	veejay_memset( sampletitle,0,200);
-	mpeg_timecode(&tc, len,
- 		mpeg_framerate_code(mpeg_conform_framerate(v->current_edit_list->video_fps)),v->current_edit_list->video_fps);
+//	if(start == 0) len ++;
+	veejay_memset( &tc,0,sizeof(MPEG_timecode_t));
+	mpeg_timecode(&tc, len,	mpeg_framerate_code( ratio ),v->current_edit_list->video_fps);
 	sprintf(timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
 
-	mpeg_timecode(&tc,  s->current_frame_num,
-		mpeg_framerate_code(mpeg_conform_framerate
-		   (v->current_edit_list->video_fps)),
-	  	v->current_edit_list->video_fps);
-
+	mpeg_timecode(&tc,  s->current_frame_num, mpeg_framerate_code(ratio),v->current_edit_list->video_fps);
 	sprintf(curtime, "%2d:%2.2d:%2.2d:%2.2d", tc.h, tc.m, tc.s, tc.f);
 	sample_get_description( id, sampletitle );
 
 	veejay_msg(VEEJAY_MSG_PRINT, "\n");
 	veejay_msg(VEEJAY_MSG_INFO, 
-		"Sample '%s'[%4d]/[%4d]\t[duration: %s | %8d]",
+		"Sample '%s'[%4d]/[%4d]\t[duration: %s | %8ld]",
 		sampletitle,id,sample_size()-1,timecode,len);
 	
 	if( sample_get_composite( id ) )
@@ -7814,7 +7809,7 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 			curtime,(long)v->settings->current_frame_num);
 	}
 	veejay_msg(VEEJAY_MSG_INFO, 
-		"[%09d] - [%09d] @ %4.2f (speed %d)",
+		"[%09ld] - [%09ld] @ %4.2f (speed %d)",
 		start,end, (float)speed * v->current_edit_list->video_fps,speed);
 	veejay_msg(VEEJAY_MSG_INFO,
 		"[%s looping]",
@@ -7995,10 +7990,8 @@ static	void	_vj_event_gatter_sample_info( veejay_t *v, int id )
 	int start_frame = sample_get_startFrame( id );
 	char timecode[15];
 	MPEG_timecode_t tc;
-
-	mpeg_timecode( &tc, (end_frame - start_frame),
-		mpeg_framerate_code( mpeg_conform_framerate(v->current_edit_list->video_fps) ),
-		v->current_edit_list->video_fps );
+	y4m_ratio_t ratio = mpeg_conform_framerate( (double) v->current_edit_list->video_fps );
+	mpeg_timecode( &tc, (end_frame - start_frame),mpeg_framerate_code(ratio),v->current_edit_list->video_fps );
 
 	sprintf( timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h,tc.m,tc.s,tc.f );
 	sample_get_description( id, description );

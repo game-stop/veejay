@@ -114,7 +114,6 @@
 #include "effects/baltantv.h"
 #include "effects/radioactive.h"
 #include "effects/chameleonblend.h"
-#include "effects/goom.h"
 #include "effects/slice.h"
 #include "effects/zoom.h"
 #include "effects/deinterlace.h"
@@ -233,7 +232,6 @@ static struct
 {	videoplay_malloc,		videoplay_free,		VJ_VIDEO_EFFECT_VIDEOPLAY	},
 {	videowall_malloc,		videowall_free,		VJ_VIDEO_EFFECT_VIDEOWALL	},
 {	flare_malloc,			flare_free,		VJ_IMAGE_EFFECT_FLARE		},
-{	goomfx_malloc,			goomfx_free,		VJ_IMAGE_EFFECT_GOOM		},
 {	rgbchannel_malloc,		rgbchannel_free,	VJ_IMAGE_EFFECT_RGBCHANNEL	},
 {	timedistort_malloc,		timedistort_free,	VJ_IMAGE_EFFECT_TIMEDISTORT	},
 {	chameleon_malloc,		chameleon_free,		VJ_IMAGE_EFFECT_CHAMELEON	},
@@ -584,7 +582,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 75] = flare_init(width,height );
 	vj_effects[i + 76] = constantblend_init(width,height);
 	vj_effects[i + 77] = colormap_init(width,height);
-	vj_effects[i + 78] = goomfx_init(width,height);
+	vj_effects[i + 78] = negatechannel_init(width,height);
 	vj_effects[i + 79] = colmorphology_init(width,height);
 	vj_effects[i + 80] = colflash_init(width,height);
 	vj_effects[i + 81] = rgbchannel_init(width,height);
@@ -598,7 +596,6 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 49] = waterrippletv_init(width,height);
 	vj_effects[i + 89 ]= radcor_init(width,height);
 	vj_effects[i + 90 ]= bgsubtract_init(width,height);
-	vj_effects[i + 91 ]= negatechannel_init(width,height);
 
 	max_width = width;
 	max_height = height;

@@ -295,8 +295,7 @@ typedef struct {
     void *video_out_scaler;
     int render_now;	        /* write RGB */
     int render_continous;
-    char action_file[256];
-    char stream_outname[256];
+    char action_file[2][256];
     int stream_outformat;
     int stream_enabled;
     int last_sample_id;

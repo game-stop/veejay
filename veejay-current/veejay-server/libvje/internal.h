@@ -199,7 +199,7 @@ enum {
 	VJ_IMAGE_EFFECT_FLARE = 175,
 	VJ_IMAGE_EFFECT_CONSTANTBLEND = 176,
 	VJ_IMAGE_EFFECT_COLORMAP = 177,
-	VJ_IMAGE_EFFECT_GOOM = 178,
+	VJ_IMAGE_EFFECT_NEGATECHANNEL = 178,
 	VJ_IMAGE_EFFECT_COLMORPH = 179,
 	VJ_IMAGE_EFFECT_COLFLASH = 180,
 	VJ_IMAGE_EFFECT_RGBCHANNEL = 181,
@@ -212,12 +212,11 @@ enum {
 	VJ_IMAGE_EFFECT_CONTOUR		=	188,
 	VJ_IMAGE_EFFECT_LENSCORRECTION  = 	189,
 	VJ_IMAGE_EFFECT_BGSUBTRACT	=	190,
-	VJ_IMAGE_EFFECT_NEGATECHANNEL	= 	191,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 192
+#define VJ_IMAGE_EFFECT_MAX 191
 
 #define VJ_VIDEO_EFFECT_MIN 200
 #define VJ_VIDEO_EFFECT_MAX 246
@@ -553,9 +552,6 @@ extern void videoplay_apply(VJFrame *frame,VJFrame *B, int w, int h, int a, int 
 
 extern void videowall_apply(VJFrame *frame,VJFrame *B, int w, int h, int a, int b, int c, int d);
 
-extern void goom_apply(VJFrame *frame, int w, int h, int val );
-
-
 extern void flare_apply(VJFrame *frame, int w, int h, int type, int threshold, int radius );
 
 extern void constantblend_apply(VJFrame *frame , int w, int h, int type, int scale, int y );
@@ -599,7 +595,5 @@ extern	void	radioactivetv_apply( VJFrame *a, VJFrame *b,int w, int h, int mode, 
 extern void nervous_apply(VJFrame *Frame, int width, int height,int delay);
 
 extern void colflash_apply( VJFrame *frame, int width, int height, int f,int r, int g, int b, int d);
-
-extern void goomfx_apply( VJFrame *frame, int width, int height, int val, int val2);
 
 #endif

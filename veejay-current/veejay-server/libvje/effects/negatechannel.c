@@ -33,7 +33,7 @@ vj_effect *negatechannel_init(int w, int h)
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 2;
     ve->limits[0][1] = 0;
-    ve->limits[1][2] = 0xff;
+    ve->limits[1][1] = 0xff;
     ve->defaults[0] = 0;
     ve->defaults[1] = 0xff;
     ve->description = "Negate a channel";
