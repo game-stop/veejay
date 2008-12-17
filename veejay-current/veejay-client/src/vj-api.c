@@ -5975,7 +5975,7 @@ void	update_gui()
 	update_cachemeter_timeout(NULL);
 
 }
-
+/*
 void	vj_fork_or_connect_veejay(char *configfile)
 {
 	char	*files  = get_text( "entry_filename" );
@@ -6010,7 +6010,6 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	}
 	else
 	{
-		printf("FIXME: Cant guess port num / hostname yet !\n");
 		args[2] = g_strdup( config );
 	}
 
@@ -6072,7 +6071,7 @@ void	vj_fork_or_connect_veejay(char *configfile)
 	for( i = 0; i < n_args; i ++)
 		g_free(args[i]);
 }
-
+*/
 void	vj_gui_free()
 {
 	if(info)
@@ -6260,6 +6259,13 @@ void	vj_gui_cb(int state, char *hostname, int port_num)
 	info->watch.state = STATE_RECONNECT;
 	put_text( "entry_hostname", hostname );
 	update_spin_value( "button_portnum", port_num );
+
+	//@ clear status
+	int i;
+	for( i = 0; i < 4; i ++ ) {
+		int *h = info->history_tokens[i];
+		veejay_memset( h, 0, sizeof(int) * STATUS_TOKENS );
+	}
 }
 
 void	vj_gui_setup_defaults( vj_gui_t *gui )
@@ -6623,11 +6629,16 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	GtkWidget *srtbox = glade_xml_get_widget( info->main_window, "combobox_textsrt");
 	set_tooltip_by_widget( srtbox, tooltips[TOOLTIP_SRTSELECT].text);  
 
+
+	update_spin_range( "spin_framedelay", 1, MAX_SLOW, 0);
+	update_spin_range( "spin_samplespeed", -25,25,1);
+	update_slider_range( "speed_slider", -25,25,1,0);
+	update_slider_range( "slow_slider",1,MAX_SLOW,1,0);
+
 }
 
 void	vj_gui_preview(void)
 {
-	//FIXME: cleanup
 	gint w = info->el.width;
 	gint h = info->el.height;
 
@@ -6679,6 +6690,13 @@ int	gveejay_user_preview()
 
 int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 {
+	int k = 0;
+	for( k = 0; k < 4; k ++ )
+		veejay_memset( info->history_tokens[k] , 0, (sizeof(int) * STATUS_TOKENS) );
+
+	veejay_memset( info->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
+
+
 	if(!hostname && !group_name )
 	{
 		veejay_msg(0,"Invalid host/group name given");
@@ -6713,12 +6731,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	
 	veejay_msg(VEEJAY_MSG_INFO, "Connection established with %s:%d (Track 0)",hostname,port_num);
 
-	int k = 0;
-	for( k = 0; k < 4; k ++ )
-		veejay_memset( info->history_tokens[k] , 0, (sizeof(int) * STATUS_TOKENS) );
-
-	veejay_memset( info->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
-
 	load_editlist_info();
 
 	update_slider_value( "framerate", info->el.fps,  0 );
@@ -6735,15 +6747,10 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	gtk_widget_show( w );
 
 	
-	int speed = info->status_tokens[SAMPLE_SPEED];
+/*	int speed = info->status_tokens[SAMPLE_SPEED];
 	if( speed < 0 ) 
 		info->play_direction = -1; else info->play_direction=1;
-	if( speed < 0 ) speed *= -1;
-
-	update_spin_range( "spin_framedelay", 1, MAX_SLOW, 0);
-	update_spin_range( "spin_samplespeed", -25,25,1);
-	update_slider_range( "speed_slider", -25,25,speed,0);
-	update_slider_range( "slow_slider",1,MAX_SLOW,1,0);
+	if( speed < 0 ) speed *= -1;*/
 	update_label_str( "label_hostnamex", (hostname == NULL ? group_name: hostname ) );
 	update_label_i( "label_portx",port_num,0);
 

@@ -2220,12 +2220,11 @@ void 	on_button_sdlclose_clicked(GtkWidget *w, gpointer user_data)
 
 void	on_quicklaunch_clicked(GtkWidget *widget, gpointer user_data)
 {
-	if( info->watch.state == STATE_STOPPED )
+/*	if( info->watch.state == STATE_STOPPED )
 	{ 
 		vj_fork_or_connect_veejay( config_file );
-	//	GtkWidget *w = glade_xml_get_widget(info->main_window, "veejay_connection");
-	//	gtk_widget_show(w);
-	}	
+	}
+*/	
 }
 
 static void _update_vs()
