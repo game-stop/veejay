@@ -1027,7 +1027,7 @@ static void long2str(unsigned char *dst, int32_t n)
 static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 {
 	const int len = info->effect_frame1->width * info->effect_frame1->height;
-	const int uv_len = len / 2;
+	const int uv_len = info->effect_frame1->uv_len;
 	uint8_t *dstI = dst + (12 * sizeof(uint8_t));
 	unsigned int size1=0,size2=0,size3=0;
 	int i = lzo_compress( lzo_ , primary_buffer[info->out_buf]->Y, dstI, &size1, len );
@@ -1765,6 +1765,9 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 
 
 	editlist *el = ( s1 ? sample_get_editlist(s1) : info->edit_list);
+#ifdef STRICT_CHECKING
+	assert( el != NULL );
+#endif
 	int cur_sfd = (s1 ? sample_get_framedups(s1 ) : info->settings->simple_frame_dup );
 
 	if( max_sfd <= 1 )
@@ -3175,10 +3178,10 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 
 		int pff = get_ffmpeg_pixfmt(info->pixel_format);
 		if( frame->ssm == 1 )
-			pff = PIX_FMT_YUV444P;
+			pff = (info->pixel_format == FMT_422F ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P );
 		VJFrame *in  = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
 						 frame->width,frame->height, pff);
-		frame->ssm = composite_process(info->composite,out,in,settings->composite); //frame
+		frame->ssm = composite_process(info->composite,out,in,settings->composite,pff); 
 		if(osd_text) {
 			void *vp = composite_get_vp( info->composite );
 			int   on_proj = viewport_get_mode(vp);

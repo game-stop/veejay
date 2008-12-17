@@ -813,6 +813,11 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 			veejay_msg(0,"Stream %d does not exist!");
 			return;
 		}
+	} else if ( new_pm == VJ_PLAYBACK_MODE_PLAIN ) {
+		if( info->edit_list->video_frames < 1 ) {
+			veejay_msg( 0, "No video frames in EDL!");
+			return;	
+		}
 	}
 
 	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
@@ -852,6 +857,9 @@ void veejay_change_playback_mode( veejay_t *info, int new_pm, int sample_id )
 			veejay_stop_playing_sample( info,  info->uc->sample_id );
 		info->uc->playback_mode = new_pm;
 		info->current_edit_list = info->edit_list;
+#ifdef STRICT_CHECKING
+		assert(info->current_edit_list != NULL );
+#endif
 		video_playback_setup *settings = info->settings;
 		settings->min_frame_num = 1;
 		settings->max_frame_num = info->edit_list->total_frames;
@@ -978,6 +986,10 @@ void veejay_stop_sampling(veejay_t * info)
     info->uc->sample_id = 0;
     info->uc->sample_start = 0;
     info->uc->sample_end = 0;
+    info->current_edit_list = info->edit_list;
+#ifdef STRICT_CHECKING
+	assert(info->edit_list != NULL );
+#endif
 }
 
 /******************************************************
@@ -2441,6 +2453,9 @@ static void veejay_playback_cycle(veejay_t * info)
 	switch(info->uc->playback_mode) {
 		case VJ_PLAYBACK_MODE_PLAIN:
 			info->current_edit_list = info->edit_list;
+#ifdef STRICT_CHECKING
+			assert( info->edit_list != NULL );
+#endif
 			video_playback_setup *settings = info->settings;
 			settings->min_frame_num = 1;
 			settings->max_frame_num = info->edit_list->total_frames;
@@ -3712,17 +3727,12 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 				       	force,
 					override_norm,
 					info->pixel_format);
+		if(!info->edit_list ) 
+			return 0;
 	}
 
 	//@ set current
 	info->current_edit_list = info->edit_list;
-
-	
-	if(info->edit_list==NULL)
-	{
-		return 0;
-	}
-
 	info->effect_frame_info->width = info->current_edit_list->video_width;
 	info->effect_frame_info->height= info->current_edit_list->video_height;
 

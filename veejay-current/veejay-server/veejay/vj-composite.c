@@ -132,9 +132,8 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	veejay_memset(&sws_templ,0,sizeof(sws_template));
 	sws_templ.flags = zoom_type;
 
-	c->frame1 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],iw,ih, 
-						get_ffmpeg_pixfmt( pf ));
-	c->frame2 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw, ph, PIX_FMT_YUV444P );
+	c->frame1 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],iw,ih,get_ffmpeg_pixfmt( pf ));
+	c->frame2 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw, ph, (pf == FMT_422 ? PIX_FMT_YUV444P: PIX_FMT_YUVJ444P ));
 	c->frame3 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],pw,ph,c->frame1->format );
 	c->frame4 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],iw,ih,c->frame1->format );
 
@@ -425,7 +424,7 @@ void	*composite_get_config(void *compiz, int which_vp )
 }
 
 /* Top frame */
-int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_vp )
+int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_vp, int pff )
 {
 	composite_t *c = (composite_t*) compiz;
 	
@@ -442,12 +441,14 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 			c->frame4->data[0] = output->data[0];
 			c->frame4->data[1] = output->data[1];
 			c->frame4->data[2] = output->data[2];
-			if(output->ssm)
+	/*		if(output->ssm || pff == PIX_FMT_YUV444P || pff == PIX_FMT_YUVJ444P) 
 				c->frame4->format = PIX_FMT_YUV444P;
-			else
-				c->frame4->format = c->frame3->format;
+			else*/
+			c->frame4->format = pff;
 			yuv_convert_and_scale(c->back_scaler,c->frame4,c->frame3);
 		}
+		if( pff == PIX_FMT_YUV444P || pff == PIX_FMT_YUVJ444P )	
+			return 1;
 
 		return output->ssm;
 	} 

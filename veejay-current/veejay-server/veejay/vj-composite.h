@@ -30,7 +30,7 @@ int	composite_get_top(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int
 
 int	composite_processX(  void *compiz, void *back1,uint8_t *tmp_data[3], VJFrame *input );
 
-int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_vp );
+int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_vp, int pixfmt );
 
 void	composite_blit_ycbcr( void *compiz,uint8_t *in[3], int which_vp, void *gl );
 

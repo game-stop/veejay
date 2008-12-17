@@ -1042,16 +1042,11 @@ int	vj_el_set_bogus_length( editlist *el, long nframe, int len )
 
 	if( !el->has_video || el->is_empty )
 		return 0;
-#ifdef STRICT_CHECKING
-	assert( nframe >= 0 && nframe <= el->total_frames );
-#else
 	if (nframe < 0)
 		nframe = 0;
 
 	if (nframe >= el->video_frames)
 		nframe = el->video_frames-1;
-
-#endif
 
 	n = el->frame_list[nframe];
 
@@ -1079,19 +1074,12 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 	int out_pix_fmt = el->pixel_format;
 	int in_pix_fmt  = out_pix_fmt;
 
-#ifdef STRICT_CHECKING
-	if( nframe > el->total_frames  )
-		veejay_msg(0, "Frame %ld requested, have only %ld",
-			nframe, el->total_frames);
-	assert( nframe >= 0 && nframe < el->video_frames );
-#else
 	if (nframe < 0)
 		nframe = 0;
 
 	if (nframe >= el->video_frames)
 		nframe = el->video_frames-1;
 
-#endif
 	n = el->frame_list[nframe];
 
 	in_pix_fmt = el->yuv_taste[N_EL_FILE(n)];
@@ -1612,16 +1600,12 @@ int	vj_el_get_audio_frame(editlist *el, uint32_t nframe, uint8_t *dst)
 
     	if (!el->has_audio)
 		return 0;
-#ifdef STRICT_CHECKING
-	assert( nframe >= 0 && nframe < el->video_frames );
-#else
     	if (nframe < 0)
 		nframe = 0;
 
 	if (nframe >= el->video_frames)
 		nframe = el->video_frames-1;
 
-#endif
 
     n = el->frame_list[nframe];
 
@@ -1712,16 +1696,11 @@ int	vj_el_get_audio_frame_at(editlist *el, uint32_t nframe, uint8_t *dst, int nu
 		veejay_memset(dst,0,size);
 		return size;
 	}
-#ifdef STRICT_CHECKING
-	assert( nframe >= 0 && nframe < el->video_frames );
-#else
 	if (nframe < 0)
 		nframe = 0;
 
 	if (nframe >= el->video_frames)
 		nframe = el->video_frames-1;
-
-#endif
 
     n = el->frame_list[nframe];
 
