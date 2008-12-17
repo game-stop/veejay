@@ -498,12 +498,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:f:Y:A:N:H:W:R:M:T:F:nILPVDugvdibjqe",
+			"o:G:O:a:H:s:c:t:j:l:p:m:w:x:y:r:f:Y:A:N:H:W:R:M:T:F:nILPVDugvdibjqe",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:w:h:x:y:r:f:Y:A:N:H:W:R:M:T:F:nILPVDugvdibjqe"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:w:x:y:r:f:Y:A:N:H:W:R:M:T:F:nILPVDugvdibjqe"
 						   )) != EOF)
 #endif
     {

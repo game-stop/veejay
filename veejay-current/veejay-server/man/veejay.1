@@ -6,8 +6,8 @@ veejay - a visual (video) instrument and video sampler for GNU/Linux
 .SH DESCRIPTION
 .B veejay
 Veejay is a visual instrument and realtime video sampler. It allos you
-to "play" the video like you would play a Piano and it allows you to
-record the resulting video directly to disk for immediate playback (video sampling).
+to "play" the video like you would play a Piano.
+While playing, you can record the resulting video directly to disk (video sampling). Veejay keeps audio in sync and pitches when needed through trickplay (slow , faster, reverse, loop ) and delivered to JACK for possible further processing.
 
 Veejay can be operated live by using the keyboard (which is 100% user definable)
 and remotely over network (both unicast and multicast) using an inhouse message
@@ -20,14 +20,26 @@ performances and/or video installations.
 .TP
 .SH Supported video codecs/formats
 .TP
-MJPEG AVI / Quicktime
-LJPEG AVI
+
+.TP
+MJPEG AVI / Quicktime 
+.TP
+Lossless JPEG AVI
+.TP
 MJPEG-b AVI / Quicktime
+.TP
 Quasar DV codec (NTSC/PAL) AVI / Quicktime
+.TP
 YUV4MPEG (chroma 4:2:0 jpeg/mpeg2, chroma 4:2:2) AVI / Y4M
 .TP
+RAW YUV 4:2:2 planar JPEG/JFIF (sample range 0-255,8 bit, 3 planes)
+.TP
+RAW YUV 4:2:2 planar  Rec. 601 (Y’CbCr) (sample range 16-235 Y, 16-240 UV, 8 bit, 3 planes)
+.TP
+MLZO (YUV 4:2:2 planar compressed with OberHumer's LZO real-time data compression library)
+.TP
 .SH Supported video containers
-AVI , QuickTime 
+AVI , QuickTime, DVVideo
 .TP
 .SH Audio
 .TP
@@ -49,7 +61,7 @@ You can use veejay to calibrate a camera (or another input source) against a pro
 .TP
 .SH Interoperability
 .TP
-Veejay can be used with PD (PureData) by using sendVIMS, a small commandline utility that translates PD's symbols to veejay and vice versa.Look at the REFERENCES to find out where to download this utility. Also, by using the OpenSoundControl veejay can be used with a great number of sound and video processing applications.Also veejay can stream video data to STDOUT (-o stdout -O3) in yuv4mpeg format, or stream uncompressed video over the network (uni - and multicast)
+Veejay can be used with PD (PureData) by using sendVIMS, a small commandline utility that translates PD's symbols to veejay and vice versa.Look at the REFERENCES to find out where to download this utility. Also, by using the OpenSoundControl veejay can be used with a great number of sound and video processing applications.Also veejay can record video data to the yuv4mpeg format (mjpegtools), or stream uncompressed video over the network (uni - and multicast)
 .SH OPTIONS
 .TP
 .B \-w/--projection-width
@@ -60,9 +72,6 @@ Specify video output height for projection / on screen purposes
 .TP
 .B \-p/--portoffset <num>
 TCP port offset for communication with clients like 'reloaded' , 'sayVIMS' or sendVIMS for PD (default 3490)
-.TP
-.B \-h/--host
-Start as client of another veejay session (default is server)
 .TP
 .B \-O/--output [01234]
 specify video output 0 = SDL (default) 1 = DirectFB 2 = SDL and DirectFB 3 = Open GL (requires ARB fragment shader), 4 = Silent (no visual output)
@@ -94,7 +103,7 @@ Geometry x offset for SDL video window
 .B \-y/--geometryy <num>
 Geometry y offset for SDL video window
 .TP
-.B \-l/--action-file <filename>
+.B \-F/--action-file <filename>
 Configuration File to load at initialization.
 The configuration file stores custom keybindings, custom bundles, available VIMS events, editlist,samplelist,streamlist
 and commandline options.
@@ -117,12 +126,14 @@ Frame cache size in percentage of total system RAM
 .B \-j/--max_cache [0-100]
 Maximum number of samples to cache 
 .TP
-.B \-F/--features
+.B \-B/--features
 Show compiled in options
 .TP
-.B \-Y/--yuv [0123]
-Force pixel format if you get a corrupted image. Its recommanded to load
-only one videofile and re-record it.
+.B \-Y/--yuv [01]
+Use 0 for YUV 4:2:2 Rec 601 or 1 for YUV 4:2:2 JPEG/JFIF
+.TP
+.B \-e/--swap-range
+Overwrite pixel sample range from input source ( Rec. 601 or JPEG/JFIF )
 .TP
 .B \-d/--dummy
 Start veejay with no video files (dummy mode). By default it will play black video (Stream 1 [F1])
@@ -194,10 +205,13 @@ Set to 1 if you wish to interpolate every chroma sample when scaling (default=0)
 Interval of key pressed to repeat while pressed down.
 .TP
 .B VEEJAY_PLAYBACK_CACHE   
-Sample cache size in MB - by default, veejay takes 30% of your total RAM
+Sample cache size in MB - by default, veejay will consume up to 30% of your total RAM to cache video samples.
 .TP
 .B VEEJAY_SDL_KEY_REPEAT_DELAY     
 Delay key repeat in ms
+.TP
+.B VEEJAY_FULLSCREEN 
+Fullscreen (1) or windowed (0) mode
 .TP
 .SH Home directory
 .TP
@@ -205,7 +219,7 @@ Veejay creates a new directory in your $HOME , ".veejay".
 You must put a TrueType font file in $HOME/.veejay/fonts for veejay's OSD functionality.
 .TP
 .B .veejay/recovery
-If veejay stops unexpectedly, it will try to save your samplelist and editlist before aborting. 
+If veejay stops unexpectedly, it will try to save your samplelist and editlist before aborting. Most of the time, veejay will be able to fully recover.
 .TP
 .B .veejay/theme 
 Theme directory for GVeejayReloaded. 
@@ -227,7 +241,7 @@ Startup veejay listening on port 4000 (use this to use multiple veejays)
 Startup veejay using dummy video at 25 frames per second, dimensions 352x288
 and using PAL.
 .TP
-.B veejay movie1.avi -V 224.0.0.50 -p 5000 -n -v -L
+.B veejay movie1.avi -V 224.0.0.50 -p 5000 -n -v
 Startup veejay, using multicast protocol on port 5000 , with autolooping
 and no colored verbose output
 .TP
@@ -509,4 +523,4 @@ For more info see the website at
 .I http://veejayhq.net
 .I http://veejay.dyne.org
 .SH "SEE ALSO"
-.B veejay sayVIMS  
+.B veejay sayVIMS reloaded
