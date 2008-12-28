@@ -2422,9 +2422,12 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 		primary_buffer[4]->Cb,
 		primary_buffer[4]->Cr };
 
-	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE || info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN)
+	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE)
 	{
 		ret = vj_perform_get_frame_(info, info->uc->sample_id, settings->current_frame_num,frame, p0_buffer, p1_buffer,0 );
+	} else if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN ) {
+		ret = vj_perform_get_frame_(info, 0, settings->current_frame_num,frame, p0_buffer, p1_buffer,0 );
+
 	}
 /*	else
 	{
