@@ -258,8 +258,8 @@ void _lumamagick_additive(VJFrame *frame, VJFrame *frame2, int width,
     uint8_t *Y2 = frame2->data[0];
 
     for (i = 0; i < len; i++) {
-	a = (Y[i] * opacity_a) + (2 * (Y2[i] * opacity_b)) - 255;
-	Y[i] = a;
+	a = (Y[i] * opacity_a) + ((2 * (Y2[i] * opacity_b)) - 255);
+	Y[i] = CLAMP_Y(a);
     }
 }
 
@@ -276,7 +276,7 @@ void _lumamagick_substractive(VJFrame *frame, VJFrame *frame2,
 
     for (i = 0; i < len; i++) {
 	a = (Y[i] * opacity_a) + ((Y2[i] - 255) * opacity_b);
-	Y[i] = a;
+	Y[i] = CLAMP_Y(a);
     }
 }
 
@@ -473,7 +473,7 @@ void _lumamagick_basecolor(VJFrame *frame, VJFrame *frame2, int width,
 	a = Y[i] * opacity_a;
 	b = Y2[i] * opacity_b;
 	c = a * b >> 7;
-	d = c + a * ((255 - (((255 - a) * (255 - b)) >> 7) - c) >> 7);	//8
+	d = c + a * ((255 - (((255 - a) * (255 - b)) >> 8) - c) >> 8);	//8
 	Y[i] = d;
     }
 }
@@ -774,8 +774,8 @@ void _lumamagick_addtest(VJFrame *frame, VJFrame *frame2, int width,
     for (i = 0; i < len; i++) {
 	a = Y[i] * opacity_a;
 	b = Y2[i] * opacity_b;
-	c = a + (2 * b) - 255;
-	Y[i] = c;
+	c = a + ((2 * b) - 255);
+	Y[i] = CLAMP_Y(c);
     }
 }
 void _lumamagick_addtest2(VJFrame *frame, VJFrame *frame2, int width,
@@ -797,19 +797,19 @@ void _lumamagick_addtest2(VJFrame *frame, VJFrame *frame2, int width,
     for (i = 0; i < len; i++) {
 	a = Y[i] * opacity_a;
 	b = Y2[i] * opacity_b;
-	c = a + (2 * b) - 255;
-	Y[i] = c;
+	c = a + ((2 * b) - 255);
+	Y[i] = CLAMP_Y(c);
     }
     for (i = 0; i < uv_len; i++) {
 	a = Cb[i];
 	b = Cb2[i];
 	c = a + (2 * b) - 255;
-	Cb[i] = c;
+	Cb[i] = CLAMP_UV(c);
 
 	a = Cr[i];
 	b = Cr2[i];
 	c = a + (2 * b) - 255;
-	Cr[i] = c;
+	Cr[i] = CLAMP_UV(c);
 
     }
 
@@ -833,7 +833,7 @@ void _lumamagick_addtest4(VJFrame *frame, VJFrame *frame2, int width,
 	    b = 0xff;
 	c = (a * a) / b;
 
-	Y[i] = c;
+	Y[i] = CLAMP_Y(c);
     }
 
 }

@@ -1629,6 +1629,18 @@ static	void	veejay_event_handle(veejay_t *info)
 
 }
 
+static void *veejay_geo_stat_thread(void *arg)
+{
+    veejay_t *info = (veejay_t *) arg;
+   /* Allow easy shutting down by other processes... */
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
+
+    vj_server_geo_stats();
+
+    return NULL;
+}
+
 
 static void *veejay_mjpeg_playback_thread(void *arg)
 {
@@ -1772,8 +1784,12 @@ int veejay_open(veejay_t * info)
 
     }
 
+    if( pthread_create( &(settings->geo_stat), NULL, veejay_geo_stat_thread, (void*) info ) ) {
+	    veejay_msg(VEEJAY_MSG_ERROR, "Could not start geo stat thread.");
+	    return 0;
+	   }
     //@ geo stat veejay usage: do we do 2.0 or not.
-    vj_server_geo_stats();
+    //vj_server_geo_stats();
 
     return 1;
 }
@@ -2473,8 +2489,8 @@ static void veejay_playback_cycle(veejay_t * info)
 			break;
 	}
 
- //   vj_perform_queue_audio_frame(info);
- //   vj_perform_queue_video_frame(info,0);
+   vj_perform_queue_audio_frame(info);
+   vj_perform_queue_video_frame(info,0);
  
     if (vj_perform_queue_frame(info, 0) != 0)
     {

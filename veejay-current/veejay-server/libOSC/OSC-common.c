@@ -65,7 +65,7 @@ void fatal_error(char *s, ...) {
     vfprintf(stderr, s, ap);
     fprintf(stderr, "\n");
     va_end(ap);
-    exit(-321);
+    exit(-1);
 }
 
 void OSCProblem(char *s, ...) {

@@ -27,6 +27,9 @@
 #include <libstream/v4lvideo.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
+#include <jpeglib.h>
+#include <liblavjpeg/jpegutils.h>
+#include <libel/lav_io.h>
 #include <libstream/v4lutils.h>
 #include <linux/videodev.h>
 #include <libvevo/vevo.h>
@@ -103,6 +106,7 @@ typedef struct {
 	void		*scaler;
 	v4lprocessing	*info;
 	int		native;
+	int		jpeglen;
 	int		active;
 	int		has_video;
 	int		dps;
@@ -125,6 +129,7 @@ typedef struct {
 	pthread_attr_t	attr;
 	int	status;
 	uint8_t *frame_buffer;
+	uint8_t *temp_buffer;
 	int	len;
 	int	uvlen;
 	int	pause;
@@ -167,7 +172,7 @@ void *v4lvideo_init( char* file, int channel, int norm, int freq, int dst_w, int
 		return NULL;
 	}
 	v->frame_buffer = (uint8_t*) vj_calloc(sizeof(uint8_t) * 8 * v->width * v->height);
-	
+	v->temp_buffer  = v->frame_buffer + (4 * v->width * v->height );
 	pthread_mutex_init( &(v->mutex), NULL );
 
 	return v;
@@ -242,11 +247,13 @@ static struct {
 	const char *name;
 	const int ff;
 } palette_descr_[] =
-{
+{	
+	{ VIDEO_PALETTE_RAW,	   "RAW / JPEG Compressed", PIX_FMT_YUV420P },
+	{ VIDEO_PALETTE_RGB24 ,    "RGB 24 bit",	PIX_FMT_BGR24 	},
 	{ VIDEO_PALETTE_YUV422P ,  "YUV 4:2:2 Planar",	PIX_FMT_YUV422P  },
-	{ VIDEO_PALETTE_RGB24 , "RGB 24 bit",		PIX_FMT_RGB24 	},
 	{ VIDEO_PALETTE_YUV420P ,  "YUV 4:2:0 Planar",  PIX_FMT_YUV420P  },
-	{ VIDEO_PALETTE_RGB32 , "RGB 32 bit",		PIX_FMT_RGB32 },	
+	{ VIDEO_PALETTE_RGB32 , "RGB 32 bit",		PIX_FMT_RGB32 },
+
 	{ -1,			"Unsupported colour space", -1},
 };
 
@@ -291,6 +298,8 @@ static	v4lprocessing	*v4lvideo_get_processing( v4lvideo_t *v, int w, int h, int 
 	int i = 0;
 	int supported_palette = -1;
 	int native            = 0;
+	
+	
 	while( palette_descr_[i].id != -1 ) {
 		if(v4lvideo_grab_check( v, palette_descr_[i].id ) == 0 ) {
 			supported_palette = palette_descr_[i].id;
@@ -302,6 +311,10 @@ static	v4lprocessing	*v4lvideo_get_processing( v4lvideo_t *v, int w, int h, int 
 		}
 		i++;
 	}
+/*
+	if( supported_palette == -1 ) {
+		supported_palette = VIDEO_PALETTE_RGB24;
+	}*/
 
 	if( supported_palette == -1 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Did not find any supported video palette");
@@ -338,16 +351,22 @@ static	v4lprocessing	*v4lvideo_get_processing( v4lvideo_t *v, int w, int h, int 
 		p->src = yuv_yuv_template( NULL,NULL,NULL,p->w,p->h,p->src_fmt );	
 	}
 	else {
-		p->src = yuv_rgb_template( NULL, p->w,p->h, p->src_fmt );
+		if( supported_palette != VIDEO_PALETTE_RAW )
+			p->src = yuv_rgb_template( NULL, p->w,p->h, p->src_fmt );
+		else {
+			native = 2;
+			p->src = yuv_yuv_template( NULL, NULL,NULL, p->w, p->h, p->src_fmt );
+		}
 	}
+	p->native = native;
 
 	p->dst = yuv_yuv_template( NULL,NULL,NULL, w, h, p->dst_fmt );
 
 	*cap_palette = supported_palette; 
 
-veejay_msg(VEEJAY_MSG_DEBUG,
-		"Capture device info: %dx%d - %dx%d  src=%d,dst=%d, is_YUV=%d ",
-		min_w,min_h,max_w,max_h, supported_palette, palette, is_YUV(supported_palette) );
+	veejay_msg(VEEJAY_MSG_DEBUG,
+		"Capture device info: %dx%d - %dx%d  src=%d,dst=%d, is_YUV=%d, native =%d ",
+		min_w,min_h,max_w,max_h, supported_palette, palette, is_YUV(supported_palette), native );
 
 	return p;	
 }
@@ -525,7 +544,8 @@ static int	__v4lvideo_init( v4lvideo_t *v, char* file, int channel, int norm, in
 
 	veejay_memset( &(v->sws_templ), 0,sizeof(sws_template));
 	v->sws_templ.flags = yuv_which_scaler();
-
+	
+	v->native     = v->info->native;
 
 #ifdef STRICT_CHECKING
 	assert(v->info != NULL);
@@ -578,6 +598,7 @@ static void	__v4lvideo_destroy( void *vv )
 			free(v->info);
 		}
 		free(v->video_file);
+
 		free(v);
 		v = NULL;
 	}
@@ -807,11 +828,23 @@ lock_(v);
 #endif
 	v4lvideo_t *v1 = (v4lvideo_t*) v->v4l;
 	if( v1->has_video ) {
-		uint8_t *src = v->frame_buffer;
-		veejay_memcpy( dstY, src, v->len );
-		veejay_memcpy( dstU, src+v->len, v->uvlen );
-		veejay_memcpy( dstV, src+v->len + v->uvlen, v->uvlen );
+	/*	if( v1->native == 2 ) { //@ 4:2:2 data
+			uint8_t *frame[3] = { dstY,dstU,dstV };
+			uint8_t *in[3] = { v->frame_buffer,
+					   v->frame_buffer + v->len,
+					   v->frame_buffer + v->len + v->uvlen };
+			//yuv420to422planar( in,frame,v->width,v->height );
+			veejay_memcpy( frame[0], in[0], v->width * v->height );
+			veejay_memcpy( frame[1], in[1], v->uvlen );
+			veejay_memcpy( frame[2], in[2], v->uvlen );
+		} else {*/
+			uint8_t *src = v->frame_buffer;
+			veejay_memcpy( dstY, src, v->len );
+			veejay_memcpy( dstU, src+v->len, v->uvlen );
+			veejay_memcpy( dstV, src+v->len + v->uvlen, v->uvlen );
+	//	}
 	} else {
+		// damage per second: some devices need a *long* time to settle
 		if( (v1->dps%25)== 1 && v->error == 0)
 			veejay_msg(VEEJAY_MSG_INFO, "Capture device is initializing, just a moment ...");
 		v1->dps++;
@@ -828,16 +861,7 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 #ifdef STRICT_CHECKING
 	assert(v1->info != NULL );
 #endif
-/*
-	veejay_msg(VEEJAY_MSG_DEBUG,
-	"%s: native=%d,video=%dx%d %d, dst=%dx%d %d",
-		__FUNCTION__,
-		v->native,
-		v->info->src->width,v->info->src->height,v->info->src->format,
-		v->info->dst->width,v->info->dst->height,v->info->dst->format );*/
-
-
-	if( v1->native ) {
+	if( v1->native == 1 ) {
 		src = v4lgetaddress(&(v1->vd));
 		lock_(v2);
 		uint8_t *srcin[3] = { src, src + v2->len, src + v2->len + v2->uvlen };
@@ -849,6 +873,33 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 			veejay_memcpy( dstU, src + v2->len, v2->uvlen);
 			veejay_memcpy( dstV, src + v2->len + v2->uvlen, v2->uvlen );
 		}
+		unlock_(v2); //@ FIXME: put scaler here too
+	} else if ( v1->native == 2 ) {
+		src = v4lgetaddress(&(v1->vd));
+	//	lock_(v2);
+		uint8_t *tmp[3] = {
+				v2->temp_buffer,
+				v2->temp_buffer + v2->len ,
+				v2->temp_buffer + v2->len + v2->len };
+		uint8_t *dst[3] = { dstY, dstU, dstV };
+		VJFrame *srcf = v1->info->src;
+		VJFrame *dstf = v1->info->dst;
+		unsigned short *ptr = (unsigned short *)( src );
+		int count = (ssize_t)((unsigned int)(ptr[0])<<3);
+		int len = decode_jpeg_raw( src+2, count,0,420,srcf->width,srcf->height,tmp[0],tmp[1],tmp[2] ); 
+		//420 dat
+		if(!v1->scaler) 
+			v1->scaler = 
+				yuv_init_swscaler( srcf,dstf,&(v1->sws_templ), yuv_sws_get_cpu_flags());
+
+		dstf->data[0] = dstY;
+		dstf->data[1] = dstU;
+		dstf->data[2] = dstV;
+		srcf->data[0] = tmp[0];
+		srcf->data[1] = tmp[1];
+		srcf->data[2] = tmp[2];
+		lock_(v2);
+			yuv_convert_and_scale( v1->scaler, srcf, dstf );
 		unlock_(v2);
 	} else {
 		VJFrame *srcf = v1->info->src;

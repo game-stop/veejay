@@ -188,8 +188,6 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 		v->c[0]->s    = mcast_new_sender( group_name );
 		v->ports[0] = port_id + VJ_CMD_MCAST;
 		v->ports[1] = port_id + VJ_CMD_MCAST_IN;
-fprintf(stderr, "%s: receiver at port %d (v->ports[0] = %d, v->ports[1] = %d)",
-		__FUNCTION__, port_id + VJ_CMD_MCAST, v->ports[0], v->ports[1] );
 
 		mcast_sender_set_peer( v->c[0]->s , group_name );
 		v->mcast = 1;

@@ -65,7 +65,7 @@ int		vj_avcodec_init(int pix, int verbose);
 char		vj_avcodec_find_lav(int format);
 int		vj_avcodec_encode_frame(void *encoder,int nframe, int format, uint8_t *src[3], uint8_t *dst, int dst_len, int pixel_format);
 uint8_t 		*vj_avcodec_get_buf( vj_encoder *av );
-char		*vj_avcodec_get_encoder_name(int encoder);
+const char		*vj_avcodec_get_encoder_name(int encoder);
 int		vj_avcodec_free();
 
 /* color space conversion routines, should go somewhere else someday

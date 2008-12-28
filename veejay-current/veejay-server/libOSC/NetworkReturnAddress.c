@@ -54,5 +54,5 @@ Boolean NetworkSendReturnMessage(NetworkReturnAddressPtr addr,
 				 void *buf) {
     if (addr == 0) return FALSE;
 
-    return n == sendto(addr->sockfd, buf, n, 0, &(addr->cl_addr), addr->clilen);
+    return n == sendto(addr->sockfd, buf, n, 0,(const struct sockaddr*) &(addr->cl_addr), addr->clilen);
 }

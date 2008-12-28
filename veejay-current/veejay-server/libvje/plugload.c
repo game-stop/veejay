@@ -442,8 +442,8 @@ static	int	instantiate_plugin( void *plugin, int w , int h )
 		void *base = NULL;
 		vevo_property_get( plugin, "base", 0, &base);
 		plugMainType *q = (plugMainType*) base; 
-		void *instance = q( FF_INSTANTIATE, &v, 0).ivalue;
-		if( instance == FF_FAIL )
+		void *instance = (void*) q( FF_INSTANTIATE, &v, 0).ivalue;
+		if( instance == (void*) FF_FAIL )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize plugin");
 			return 0;

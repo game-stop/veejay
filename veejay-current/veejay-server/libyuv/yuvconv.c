@@ -405,8 +405,9 @@ void	yuv_convert_any_ac_packed( VJFrame *src, uint8_t *dst, int src_fmt, int dst
 		src_fmt == PIX_FMT_RGB32_1 || src_fmt == PIX_FMT_GRAY8 );
 	assert( src->width > 0 );
 #endif
+	uint8_t *dst_planes[3] = { dst, NULL, NULL };
 	if(!ac_imgconvert( src->data, ffmpeg_aclib[ src_fmt ], 
-			dst, ffmpeg_aclib[ dst_fmt] , src->width,src->height ))
+			dst_planes, ffmpeg_aclib[ dst_fmt] , src->width,src->height ))
 	{
 		veejay_msg(VEEJAY_MSG_WARNING,
 			"Unable to convert image %dx%d in %x to %dx%d in %x!",
@@ -1235,7 +1236,7 @@ static struct
 	{	0,	NULL }
 };
 
-char	*yuv_get_scaler_name(int id)
+const char	*yuv_get_scaler_name(int id)
 {
 	int i;
 	for( i = 0; sws_scaler_types[i].i != 0 ; i ++ )
@@ -1261,6 +1262,7 @@ void	yuv422to420planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 		}
 	}	
 }
+#ifndef HAVE_ASM_MMX
 void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 {
 	unsigned int x,y;
@@ -1282,6 +1284,53 @@ void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 		}
 	}
 }
+#else
+static	inline	copy8( uint8_t *to, uint8_t *to2, uint8_t *from ) {
+	__asm__ __volatile__ (
+			"movq	(%0),	%%mm0\n" 
+			"movq	%%mm0,	(%1)\n"
+			"movq   %%mm0,  (%2)\n"
+			:: "r" (from), "r" (to) , "r" (to2) : "memory"
+		);
+}
+
+void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
+{
+	unsigned int x,y;
+	const int hei = (h >> 1);
+	const int work = (w >> 1) / 8;
+	const int wid = w >> 1;
+	uint8_t *u = dst[1];
+	uint8_t *v = dst[2];
+	uint8_t *a = src[1];
+	uint8_t *b = src[2];
+	uint8_t *u2 = dst[1];
+	uint8_t *v2 = dst[2];
+	for( y = 0; y < hei;  y ++ ) {
+		u = dst[1] + ( (y << 1 ) * wid );
+		u2 = dst[1] + (( (y+1)<<1) * wid);
+		a = src[1] + ( y * wid );
+		for( x = 0; x < work; x ++ ) {
+			copy8( u,u2, a );
+			u += 8;
+			u2 += 8;
+			a  += 8;
+		}
+	}	
+	for( y = 0; y < hei;  y ++ ) {
+		v = dst[2] + ( (y << 1 ) * wid );
+		v2 = dst[2] + (( (y+1)<<1) * wid );
+		b = src[2] + ( y * wid );
+		for( x = 0; x < work; x ++ ) {
+			copy8( v,v2, b );
+			v += 8;
+			v2 += 8;
+			b  += 8;			
+		}
+	}
+       __asm__ __volatile__ ( _EMMS:::"memory");
+}
+#endif
 
 void	yuy2_scale_pixels_from_yuv( uint8_t *plane, int len )
 {
@@ -1416,7 +1465,7 @@ void yuv444_yvu444_1plane(
 	uint8_t *up = data[2];
 	uint8_t *vp = data[1];
 	int len = (width * height) / 4;
-	int *dst = dst_buffer;
+	uint8_t *dst = dst_buffer;
 
 	__builtin_prefetch( yp, 0 ,3);
 	__builtin_prefetch( up, 0 ,3);

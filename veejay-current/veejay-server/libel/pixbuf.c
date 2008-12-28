@@ -294,8 +294,11 @@ void *	vj_picture_prepare_save(
 
 
 #ifdef USE_GDK_PIXBUF
-static	void	display_if_writeable( GdkPixbufFormat *data, GSList **list)
+//static	void	display_if_writeable( GdkPixbufFormat *data, GSList **list)
+static	void display_if_writeable( gpointer a, gpointer b )
 {
+	GdkPixbufFormat *data = (GdkPixbufFormat*) a;
+	GSList **list = (GSList**) b;
 	if( gdk_pixbuf_format_is_writable( data ))
 		*list = g_slist_prepend( *list, data );
 	gchar *name = gdk_pixbuf_format_get_name( data );
@@ -427,9 +430,9 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 		update_pic_data( out_w, out_h, pixfmt );
 	}
 
-	if( frame->width == out_w && frame->height == out_h )
-		yuv_convert_any_ac( src1, dst1, src1->format, dst1->format );
-	else
+//	if( frame->width == out_w && frame->height == out_h )
+//		yuv_convert_any_ac( src1, dst1, src1->format, dst1->format );
+//	else
 		yuv_convert_and_scale( pic_scaler_, src1,dst1);
 
 	free(src1);

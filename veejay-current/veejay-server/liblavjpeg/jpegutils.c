@@ -441,7 +441,7 @@ static void guarantee_huff_tables(j_decompress_ptr dinfo)
  */
 
 int decode_jpeg_raw(unsigned char *jpeg_data, int len,
-		    int itype, int ctype,int _dct_method, int width, int height,
+		    int itype, int ctype, int width, int height,
 		    unsigned char *raw0, unsigned char *raw1,
 		    unsigned char *raw2)           
 {
@@ -485,7 +485,8 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
     jpeg_read_header(&dinfo, TRUE);
     dinfo.raw_data_out = TRUE;
     dinfo.out_color_space = JCS_YCbCr;
-    dinfo.dct_method = JDCT_FLOAT;//JDCT_DEFAULT;       
+//   dinfo.dct_method = (_dct_method == 0 ? JDCT_DEFAULT : JDCT_FLOAT);
+    dinfo.dct_method = JDCT_DEFAULT;
     guarantee_huff_tables(&dinfo);
     jpeg_start_decompress(&dinfo);
 
@@ -500,7 +501,7 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
 	vsf[i] = dinfo.comp_info[i].v_samp_factor;
     }
 
-    //mjpeg_info( "Sampling factors, hsf=(%d, %d, %d) vsf=(%d, %d, %d) !", hsf[0], hsf[1], hsf[2], vsf[0], vsf[1], vsf[2]);
+    mjpeg_error( "Sampling factors, hsf=(%d, %d, %d) vsf=(%d, %d, %d) !", hsf[0], hsf[1], hsf[2], vsf[0], vsf[1], vsf[2]);
     if ((hsf[0] != 2 && hsf[0] != 1) || hsf[1] != 1 || hsf[2] != 1 ||
 	(vsf[0] != 1 && vsf[0] != 2) || vsf[1] != 1 || vsf[2] != 1) {
 	mjpeg_error
@@ -669,7 +670,6 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
 	    /* Vertical downsampling of chroma */
 
 	    if (vsf[0] == 1) {
-		/* Really downclip */
 		for (y = 0; y < 8 /*&& yc < height/2 */ ;
 		     y += 2, yc += numfields) {
 		    xd = yc * width / 2;
@@ -727,7 +727,7 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
 
 
 int decode_jpeg_gray_raw(unsigned char *jpeg_data, int len,
-			 int itype, int ctype,int _dct_method, int width, int height,
+			 int itype, int ctype, int width, int height,
 			 unsigned char *raw0, unsigned char *raw1,
 			 unsigned char *raw2)
 {
@@ -766,7 +766,8 @@ int decode_jpeg_gray_raw(unsigned char *jpeg_data, int len,
     jpeg_read_header(&dinfo, TRUE);
     dinfo.raw_data_out = TRUE;
     dinfo.out_color_space = JCS_GRAYSCALE;
-    dinfo.dct_method = JDCT_FLOAT; //JDCT_DEFAULT;
+//  dinfo.dct_method = ( _dct_method == 0 ? JDCT_DEFAULT: JDCT_FLOAT);
+    dinfo.dct_method = JDCT_DEFAULT;	
 
     if (dinfo.jpeg_color_space != JCS_GRAYSCALE) {
 	mjpeg_error

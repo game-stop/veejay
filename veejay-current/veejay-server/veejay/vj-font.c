@@ -652,7 +652,7 @@ void	vj_font_xml_pack( xmlNodePtr node, void *font )
                 {
                         srt_seq_t *s = (srt_seq_t*) srt;
 		
-			xmlNodePtr *childnode = xmlNewChild( node, NULL, (const xmlChar*) "SUBTITLES" , NULL );
+			xmlNodePtr childnode = xmlNewChild( node, NULL, (const xmlChar*) "SUBTITLES" , NULL );
 	
 				sprintf(buf, "%d", s->id );
 				xmlNewChild(childnode, NULL, (const xmlChar*) "srt_id", (const xmlChar*) buf );	

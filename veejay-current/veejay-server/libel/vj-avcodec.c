@@ -410,7 +410,7 @@ static struct {
 	{ NULL, 0 }
 };
 
-char		*vj_avcodec_get_encoder_name( int encoder_id )
+const char		*vj_avcodec_get_encoder_name( int encoder_id )
 {
 	int i;
 	for( i =1 ; encoder_names[i].descr != NULL ; i ++ ) {
