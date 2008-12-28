@@ -241,23 +241,33 @@ int	v4lvideo_templ_num_devices()
 {
 	return device_count_;
 }
-
+#define VIDEO_PALETTE_JPEG	64 //fun
 static struct {
 	const int id;
 	const char *name;
 	const int ff;
 } palette_descr_[] =
 {	
-	{ VIDEO_PALETTE_RAW,	   "RAW / JPEG Compressed", PIX_FMT_YUV420P },
+	{ VIDEO_PALETTE_JPEG,      "JPEG Compressed", PIX_FMT_YUVJ420P },
 	{ VIDEO_PALETTE_RGB24 ,    "RGB 24 bit",	PIX_FMT_BGR24 	},
 	{ VIDEO_PALETTE_YUV422P ,  "YUV 4:2:2 Planar",	PIX_FMT_YUV422P  },
 	{ VIDEO_PALETTE_YUV420P ,  "YUV 4:2:0 Planar",  PIX_FMT_YUV420P  },
-	{ VIDEO_PALETTE_RGB32 , "RGB 32 bit",		PIX_FMT_RGB32 },
+	{ VIDEO_PALETTE_YUYV,      "YUYV 4:2:2 Packed",	PIX_FMT_YUYV422 },
+	{ VIDEO_PALETTE_UYVY,	   "UYVY 4:2:2 Packed", PIX_FMT_UYVY422 },
+	{ VIDEO_PALETTE_RGB32 ,	   "RGB 32 bit",		PIX_FMT_RGB32 },
 
 	{ -1,			"Unsupported colour space", -1},
 };
 
-#define is_YUV(a) ( a == VIDEO_PALETTE_YUV422P ? 1 : (a == VIDEO_PALETTE_YUV420P ? 1 : 0) )  
+static int is_YUV(int a) {
+	if( a == VIDEO_PALETTE_YUV422P || 
+            a == VIDEO_PALETTE_YUV420P ||
+	    a == VIDEO_PALETTE_YUV422  ||
+            a == VIDEO_PALETTE_YUYV    ||
+            a == VIDEO_PALETTE_UYVY )
+		return 1;
+	return 0;
+}
 
 static	v4lvideo_t*	v4lvideo_templ_try( int num )
 {
@@ -293,28 +303,94 @@ static	const char		*get_palette_name( int v4l )
 	}
 	return NULL;
 }
-static	v4lprocessing	*v4lvideo_get_processing( v4lvideo_t *v, int w, int h, int palette, int *cap_palette ) 
+
+static	int		v4lvideo_fun(v4lvideo_t *v, int w, int h, int palette, int *cap_palette, int *is_jpeg_frame )
 {
 	int i = 0;
 	int supported_palette = -1;
 	int native            = 0;
 	
+	int is_jpeg[2]	      = {0,0};
 	
 	while( palette_descr_[i].id != -1 ) {
+		if(palette_descr_[i].id == VIDEO_PALETTE_JPEG ) {
+			i ++;
+			continue;
+		}
+
 		if(v4lvideo_grab_check( v, palette_descr_[i].id ) == 0 ) {
-			supported_palette = palette_descr_[i].id;
-			veejay_msg(VEEJAY_MSG_DEBUG, "Device supports %s",
-				palette_descr_[i].name );
+			uint8_t *tmp = (uint8_t*) vj_malloc(sizeof(uint8_t) * v->video_width * v->video_height * 4 );
+			veejay_msg(VEEJAY_MSG_DEBUG, "Checking if device outputs in JPEG ...");
+			__v4lvideo_grabstart(v);
+			if(v4lvideo_syncframe(v) == 0 ) {
+				uint8_t *src = v4lgetaddress(&(v->vd));
+				uint8_t *dst[3] = { tmp , tmp + (v->video_width*v->video_height), 
+						    tmp + (2 * v->video_width * v->video_height) };
+				unsigned short *ptr = (unsigned short *)( src );
+				int count = (ssize_t)((unsigned int)(ptr[0])<<3);
+				int len = decode_jpeg_raw( src+2, count,0,420,v->video_width,v->video_height,dst[0],dst[1],dst[2] );
+				if(len >= 0 ) {
+					is_jpeg[0] = 1;
+					is_jpeg[1] = palette_descr_[i].id;	
+					veejay_msg(VEEJAY_MSG_DEBUG, "Device outputs in JPEG, but says %s",
+										palette_descr_[i].name );
+					supported_palette = VIDEO_PALETTE_JPEG;
+				} else {
+					veejay_msg(VEEJAY_MSG_DEBUG, "%s seems to be okay, using it ...", palette_descr_[i].name );
+					supported_palette = palette_descr_[i].id;
+				}
+			}
+			__v4lvideo_grabstop(v);
+			free(tmp);
 			break;
 		} else {
 			veejay_msg(VEEJAY_MSG_DEBUG, "No support for %s", palette_descr_[i].name );
 		}
 		i++;
 	}
-/*
-	if( supported_palette == -1 ) {
-		supported_palette = VIDEO_PALETTE_RGB24;
-	}*/
+	
+	*cap_palette 	   = is_jpeg[1];
+	*is_jpeg_frame     = is_jpeg[0];
+
+	return supported_palette;
+}
+
+static	v4lprocessing	*v4lvideo_get_processing( v4lvideo_t *v, int w, int h, int palette, int *cap_palette ) 
+{
+	int i = 0;
+	int supported_palette = -1;
+	int native            = 0;
+	int arr[2] = {0,0};
+	int skip = 0;
+	int fun = 	v4lvideo_fun(v, w,h,palette, &(arr[0]), &(arr[1]) );
+	if( fun < 0 ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Frame grabcheck failed ..." );
+	} else {
+		if( fun == VIDEO_PALETTE_JPEG ) {
+			veejay_msg(VEEJAY_MSG_WARNING, "Grabbing JPEG from video device");
+#ifdef STRICT_CHECKING
+			assert( arr[0] == 1 );
+#endif
+			skip = 1;
+			supported_palette = fun;
+			*cap_palette = arr[1];
+		}
+	}
+
+	
+	if(!skip) {
+		while( palette_descr_[i].id != -1 ) {
+			if(v4lvideo_grab_check( v, palette_descr_[i].id ) == 0 ) {
+				supported_palette = palette_descr_[i].id;
+				veejay_msg(VEEJAY_MSG_DEBUG, "Device supports %s",
+					palette_descr_[i].name );
+				break;
+			} else {
+				veejay_msg(VEEJAY_MSG_DEBUG, "No support for %s", palette_descr_[i].name );
+			}
+			i++;
+		}
+	}
 
 	if( supported_palette == -1 ) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Did not find any supported video palette");
@@ -351,7 +427,7 @@ static	v4lprocessing	*v4lvideo_get_processing( v4lvideo_t *v, int w, int h, int 
 		p->src = yuv_yuv_template( NULL,NULL,NULL,p->w,p->h,p->src_fmt );	
 	}
 	else {
-		if( supported_palette != VIDEO_PALETTE_RAW )
+		if( supported_palette != VIDEO_PALETTE_JPEG )
 			p->src = yuv_rgb_template( NULL, p->w,p->h, p->src_fmt );
 		else {
 			native = 2;
@@ -362,7 +438,8 @@ static	v4lprocessing	*v4lvideo_get_processing( v4lvideo_t *v, int w, int h, int 
 
 	p->dst = yuv_yuv_template( NULL,NULL,NULL, w, h, p->dst_fmt );
 
-	*cap_palette = supported_palette; 
+	if(!skip)
+		*cap_palette = supported_palette; 
 
 	veejay_msg(VEEJAY_MSG_DEBUG,
 		"Capture device info: %dx%d - %dx%d  src=%d,dst=%d, is_YUV=%d, native =%d ",
@@ -461,7 +538,6 @@ static int	__v4lvideo_init( v4lvideo_t *v, char* file, int channel, int norm, in
 	v->video_file = strdup(file);
 	v->video_channel = channel;
 	v->video_norm	= norm;
-//	v->video_palette = VIDEO_PALETTE_RGB24;
 	v->video_palette = 0;
 
 	v4lsetdefaultnorm( &(v->vd), norm );
@@ -616,6 +692,7 @@ int	v4lvideo_grab_check(v4lvideo_t *v, int palette ) {
 		ret = -1;
 		goto VIDEOEXIT;
 	}
+
 	if( v4lgrabstart( &(v->vd),0) < 0 ) {
 		ret = -1;	
 		goto VIDEOEXIT;
@@ -863,7 +940,7 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 #endif
 	if( v1->native == 1 ) {
 		src = v4lgetaddress(&(v1->vd));
-		lock_(v2);
+	/*	lock_(v2);
 		uint8_t *srcin[3] = { src, src + v2->len, src + v2->len + v2->uvlen };
 		uint8_t *dstout[3]= { dstY,dstU,dstV };
 		if( yuv_use_auto_ccir_jpeg() ) {
@@ -872,8 +949,19 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 			veejay_memcpy( dstY, src, v2->len );
 			veejay_memcpy( dstU, src + v2->len, v2->uvlen);
 			veejay_memcpy( dstV, src + v2->len + v2->uvlen, v2->uvlen );
-		}
-		unlock_(v2); //@ FIXME: put scaler here too
+		}*/
+		VJFrame *srcf = v1->info->src;
+		VJFrame *dstf = v1->info->dst;
+		dstf->data[0] = dstY;
+		dstf->data[1] = dstU;
+		dstf->data[2] = dstV;
+		if(!v1->scaler) 
+			v1->scaler = 
+				yuv_init_swscaler( srcf,dstf,&(v1->sws_templ), yuv_sws_get_cpu_flags());
+		lock_(v2);
+			yuv_convert_and_scale( v1->scaler, srcf, dstf );
+		unlock_(v2);
+
 	} else if ( v1->native == 2 ) {
 		src = v4lgetaddress(&(v1->vd));
 	//	lock_(v2);
@@ -909,7 +997,7 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 		dstf->data[1] = dstU;
 		dstf->data[2] = dstV;
 
-		if( is_YUV( v1->video_palette ) ) {
+/*		if( is_YUV( v1->video_palette ) ) {
 			src = v4lgetaddress(&(v1->vd));
 			srcf->data[0] = src;
 			srcf->data[1] = src + srcf->len;
@@ -918,7 +1006,7 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 			assert(0);
 #endif
 				
-		} else {
+		} else {*/
 			srcf->data[0] = v4lgetaddress(&(v1->vd));
 			if(!v1->scaler) 
 				v1->scaler = 
@@ -927,7 +1015,7 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 			lock_(v2);
 			yuv_convert_and_scale_from_rgb( v1->scaler, srcf, dstf );
 			unlock_(v2);
-		}	
+	//	}	
 	}
 	v1->has_video = 1;
 }
