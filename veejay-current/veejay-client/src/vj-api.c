@@ -91,7 +91,7 @@ static struct
 {
 	{ 1,"notebook18", 3 },    // On which notebook page is the multitrack view
 	{ 0,"vjdeck", 2 },
-	{ NULL, 0 }
+	{ 0,NULL, 0 }
 };
 
 #define MAX_SLOW 100
@@ -594,7 +594,7 @@ static int	add_bank( gint bank_num  );
 static void    set_selection_of_slot_in_samplebank(gboolean active);
 static void    remove_sample_from_slot();
 static void create_ref_slots(int envelope_size);
-static void create_sequencer_slots(int n );
+static void create_sequencer_slots(int x, int y);
 //void setup_knobs();
 void   free_samplebank(void);
 void   reset_samplebank(void);
@@ -652,7 +652,7 @@ void		gtk_widget_set_size_request__( GtkWidget *w, gint iw, gint h, const char *
 
 static struct
 {
-	const char *text;
+	gchar *text;
 } text_msg_[] =
 {
 	{	"Running realtime" 	},
@@ -678,8 +678,8 @@ static struct
 	{ NULL },
 };
 
-static	uint32_t	preview_box_w_ = 352;
-static  uint32_t	preview_box_h_ = 288;
+static	int	preview_box_w_ = 352;
+static  int	preview_box_h_ = 288;
 
 static	void		*bankport_ = NULL;
 
@@ -727,7 +727,7 @@ static	struct
 	const char *name;
 } uiwidgets[] =
 {
-	{"vbox594"},
+	{"veejay_box"},
 	{NULL}
 };
 
@@ -965,13 +965,17 @@ gboolean	device_selection_func( GtkTreeSelection *sel,
 	if( gtk_tree_model_get_iter( model, &iter, path ) )
 	{
 		gint num = 0;
-		gtk_tree_model_get(model, &iter, V4L_NUM,&num, -1 );
+		//gtk_tree_model_get(model, &iter, V4L_NUM,&num, -1 );
+		gchar *file = NULL;
+		gtk_tree_model_get( model, &iter, V4L_LOCATION, &file, -1 );
+		sscanf( file, "/dev/video%d", &num );
 		if(! path_currently_selected )
 		{
 			gtk_tree_model_get_value(model, &iter, V4L_SPINBOX, &val);
 			info->uc.strtmpl[0].dev = num;
 			info->uc.strtmpl[0].channel = (int) g_value_get_float(&val);
 		}
+		g_free(file);
 	}
 	return TRUE;
 }
@@ -991,7 +995,7 @@ static void	setup_v4l_devices()
 
 	g_object_unref( G_OBJECT( store ));
 	setup_tree_text_column( "tree_v4ldevices", V4L_NUM, "#",0 );
-	setup_tree_text_column( "tree_v4ldevices", V4L_NAME, "Device Name",240);
+	setup_tree_text_column( "tree_v4ldevices", V4L_NAME, "Device Name",0);
 	setup_tree_spin_column( "tree_v4ldevices", V4L_SPINBOX, "Channel");
 	setup_tree_text_column( "tree_v4ldevices", V4L_LOCATION, "Location",0);
 
@@ -2005,6 +2009,8 @@ void	gveejay_popup_err( const char *type, char *msg )
 	message_dialog( type, msg );
 }
 
+void	reportbug();
+void	update_gui();
 
 #include "callback.c"
 enum
@@ -2110,22 +2116,22 @@ static	void single_vims(int id)
 static gchar	*recv_vims(int slen, int *bytes_written)
 {
 	int tmp_len = slen+1;
-	char tmp[tmp_len];
+	unsigned char tmp[tmp_len];
 	veejay_memset(tmp,0,sizeof(tmp));
 	int ret = vj_client_read( info->client, V_CMD, tmp, slen );
 	if( ret == -1 )
 		reloaded_schedule_restart();
 	int len = 0;
-	sscanf( tmp, "%d", &len );
-	gchar *result = NULL;
+	sscanf( (char*)tmp, "%d", &len );
+	unsigned char *result = NULL;
 	if( ret <= 0 || len <= 0 || slen <= 0)
-		return result;
-	result = (gchar*) vj_calloc(sizeof(gchar) * (len + 1) );
+		return (gchar*)result;
+	result = (unsigned char*) vj_calloc(sizeof(unsigned char) * (len + 1) );
 
 	*bytes_written = vj_client_read( info->client, V_CMD, result, len );
 	if( *bytes_written == -1 )
 		reloaded_schedule_restart();
-	return result;
+	return (gchar*)result;
 }
 
 static	gdouble	get_numd(const char *name)
@@ -2291,7 +2297,7 @@ static	gchar	*get_textview_buffer(const char *name)
 	GtkWidget *view = glade_xml_get_widget_( info->main_window,name );
 	if(!view) {
 		veejay_msg(0, "No such widget (textview): '%s'",name);
-		return;
+		return NULL;
 	}
 	if(view)
 	{
@@ -2438,6 +2444,9 @@ static	void	update_spin_incr( const char *name, gdouble step, gdouble page )
 		veejay_msg(0, "No such widget (spin): '%s'",name);
 		return;
 	}
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_DEBUG, "SpinButton: %s, step=%g,page=%g",name,step,page);
+#endif
 	gtk_spin_button_set_increments(GTK_SPIN_BUTTON(w),step,page );
 }
 
@@ -2448,7 +2457,7 @@ static	void	update_spin_range(const char *name, gint min, gint max, gint val)
 		veejay_msg(0, "No such widget (spin): '%s'",name);
 		return;
 	}
-	
+
 	gtk_spin_button_set_range( GTK_SPIN_BUTTON(w), (gdouble)min, (gdouble) max );
 	gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble)val);
 }
@@ -2476,6 +2485,10 @@ static	void	update_spin_value(const char *name, gint value )
 		veejay_msg(0, "No such widget (spin): '%s'",name);
 		return;
 	}
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_DEBUG, "SpinButton: %s, value=%d",name,value);
+#endif
+
 	gtk_spin_button_set_value( GTK_SPIN_BUTTON(w), (gdouble) value );
 }
 
@@ -2837,7 +2850,7 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 	}
 
 	/* Actions for sample */
-	if(last_pm != pm || pm == MODE_SAMPLE )
+	if( ( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || last_pm != pm) && pm == MODE_SAMPLE )
 	{
 		int marker_go = 0;
 		/* Update marker bounds */
@@ -3075,7 +3088,6 @@ gboolean	capture_data	(GIOChannel *source, GIOCondition condition, gpointer data
 void	reportbug()
 {
 	char l[3] = { 'e','n', '\0'};
-	char *home = getenv("HOME");
 	char *lang = getenv("LANG");
 	char URL[1024];
 
@@ -3278,6 +3290,7 @@ static	void	setup_tree_text_column( const char *tree_name, int type, const char 
 
 	if(len)
 	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Tree %s ,Title %s, width=%d", tree_name,title, len );
 		gtk_tree_view_column_set_min_width( column, len);
 	}
 }
@@ -3303,7 +3316,7 @@ static void	setup_effectchain_info( void )
 	g_object_unref( G_OBJECT( store ));
 
 	setup_tree_text_column( "tree_chain", FXC_ID, "#",0 );
-	setup_tree_text_column( "tree_chain", FXC_FXID, "Effect",( ui_skin_ == 0?350 : 250) );
+	setup_tree_text_column( "tree_chain", FXC_FXID, "Effect",0 ); //FIXME
 	setup_tree_pixmap_column( "tree_chain", FXC_FXSTATUS, "Run"); // todo: could be checkbox!!
 	setup_tree_pixmap_column( "tree_chain", FXC_KF , "Anim" ); // parameter interpolation on/off per entry
   	GtkTreeSelection *selection; 
@@ -3791,8 +3804,8 @@ void	setup_samplelist_info()
 	effect_sources_model = gtk_tree_view_get_model( GTK_TREE_VIEW(effect_sources_tree ));	
 	effect_sources_store = GTK_LIST_STORE(effect_sources_model);
 
-	setup_tree_text_column( "tree_sources", SL_ID, "Id",175 );
-	setup_tree_text_column( "tree_sources", SL_TIMECODE, "Length" ,175);
+	setup_tree_text_column( "tree_sources", SL_ID, "Id",0 );
+	setup_tree_text_column( "tree_sources", SL_TIMECODE, "Length" ,0);
 
 	GtkTreeSelection *selection;
   	selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(effect_sources_tree));
@@ -3880,8 +3893,6 @@ static	void	select_slot__( int pm )
 #ifdef STRICT_CHECKING
 	assert( history != NULL );
 #endif
-	int poke_slot = 0;
-	int bank_page = 0;
 
 	if( pm == MODE_SAMPLE || pm == MODE_STREAM  )
 	{
@@ -4081,7 +4092,6 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				gchar *gtype = _utf8str( source );
 
 				int bank_page = 0; int poke_slot = 0;
-				int full = verify_bank_capacity( &bank_page , &poke_slot, values[0], 1);
 				if(bank_page >= 0)
 				{			
 					if( info->sample_banks[bank_page]->slot[poke_slot] <= 0 )
@@ -4419,10 +4429,10 @@ static	void	setup_editlist_info()
 	editlist_store = GTK_LIST_STORE(editlist_model);
 
 	setup_tree_text_column( "editlisttree", COLUMN_INT, "#",0);
-	setup_tree_text_column( "editlisttree", COLUMN_STRING0, "Timecode",75 );
-	setup_tree_text_column( "editlisttree", COLUMN_STRINGA, "Filename",300);
-	setup_tree_text_column( "editlisttree", COLUMN_STRINGB, "Duration",75);
-	setup_tree_text_column( "editlisttree", COLUMN_STRINGC, "FOURCC",50);
+	setup_tree_text_column( "editlisttree", COLUMN_STRING0, "Timecode",0 );
+	setup_tree_text_column( "editlisttree", COLUMN_STRINGA, "Filename",0);
+	setup_tree_text_column( "editlisttree", COLUMN_STRINGB, "Duration",0);
+	setup_tree_text_column( "editlisttree", COLUMN_STRINGC, "FOURCC",0);
 
 	g_signal_connect( editlist_tree, "row-activated",
 		(GCallback) on_editlist_row_activated, NULL );
@@ -4701,7 +4711,7 @@ static	char *tokenize_on_space( char *q )
 	char *p = q;
 	while( *p != '\0' && !isblank( *p ) && *p != ' ' && *p != 20)
 	{
-		*p++;
+		(*p)++;
 		n++;
 	}
 	if( n <= 0 )
@@ -5252,7 +5262,7 @@ void	find_user_themes(int theme)
 		{
 			if( data[i] == '\0' || data[i] == '\n' ) break;
 			*dst = data[i];
-			*dst++;
+			(*dst)++;
 		}
 	}
 	close( sloppy );
@@ -5390,6 +5400,14 @@ GdkPixbuf	*vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterp
 	free(dst1);
 
 	return res;*/
+}
+
+void		gveejay_sleep( void *u )
+{
+	struct timespec nsecsleep;
+	nsecsleep.tv_nsec = 1000000 * 4;
+	nsecsleep.tv_sec = 0;	
+	nanosleep( &nsecsleep, NULL ); 	
 }
 
 
@@ -6421,6 +6439,61 @@ gboolean	slow_scroll_event(  GtkWidget *widget, GdkEventScroll *ev, gpointer use
 	return FALSE;
 }
 
+static struct
+{
+	char *name;
+} spinboxes[] = {
+{ "button_portnum" },
+{ "screenshot_width" },
+{ "screenshot_height" },
+{ "preview_width" },
+{ "preview_height" },
+{ "preview_delay" },
+{ "priout_width" },
+{ "priout_height" },
+{ "priout_x" },
+{ "priout_y" },
+{ "inputstream_portnum" },
+{ "button_fx_entry" },
+{ "curve_spinstart" },
+{ "curve_spinend" },
+{ "spin_text_start" },
+{ "spin_text_end" },
+{ "spin_text_size" },
+{ "spin_text_x" },
+{ "spin_text_y" },
+{ "spin_sampleduration" },
+{ "spin_samplestart" },
+{ "spin_sampleend" },
+{ "spin_samplespeed" },
+{ "spin_framedelay" },
+{ "button_el_selend" },
+{ "button_el_selstart" },
+{ "button_el_selpaste" },
+{ "stream_length" },
+{ "spin_streamduration" },
+{ "spin_samplebank_select" },
+{ "button_fadedur" },
+{ NULL }
+};
+
+static	void	debug_spinboxes()
+{
+	int i;
+	for( i = 0; spinboxes[i].name != NULL ; i ++ ) {
+		GtkWidget *spin = glade_xml_get_widget_( info->main_window, spinboxes[i].name );
+		GtkAdjustment *adj  = gtk_spin_button_get_adjustment( GTK_SPIN_BUTTON(spin) );
+		veejay_msg(VEEJAY_MSG_DEBUG, "%s: Lower=%g,Upper=%g,Value=%g,Step=%g,Page Incr=%g,Page Size=%g",
+				spinboxes[i].name,
+				adj->lower,
+				adj->upper,
+				adj->value,
+				adj->step_increment,
+				adj->page_increment,
+				adj->page_size );
+	}
+}
+
 void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, int use_threads)
 {
 	int i;
@@ -6488,6 +6561,9 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 
 	GtkWidget *mainw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
 
+#ifdef STRICT_CHECKING
+	debug_spinboxes();
+#endif
 
 	sprintf(text, "Reloaded - version %s",VERSION);
 	gtk_label_set_text( GTK_LABEL(glade_xml_get_widget_(info->main_window, "build_revision")), text);
@@ -6510,7 +6586,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 
 
 	//SEQ
-	create_sequencer_slots( 10 );
+	create_sequencer_slots( 10,10 );
 
 	char slider_name[16];
 	for( i = 0 ; i < 8 ; i ++ ) {
@@ -7367,7 +7443,7 @@ static gboolean on_cacheslot_activated_by_mouse (GtkWidget *widget, GdkEventButt
 
 
 
-static void create_sequencer_slots(int envelope_size)
+static void create_sequencer_slots(int nx, int ny)
 {
 	GtkWidget *vbox = glade_xml_get_widget_ (info->main_window, "SampleSequencerBox");
 	info->sample_sequencer = gtk_frame_new(NULL);
@@ -7375,20 +7451,21 @@ static void create_sequencer_slots(int envelope_size)
 	gtk_widget_show(info->sample_sequencer);
 
 	info->sequencer_view = (sequence_envelope*) vj_calloc(sizeof(sequence_envelope) );
-	info->sequencer_view->gui_slot = (sequence_gui_slot_t**) vj_calloc(sizeof(sequence_gui_slot_t*) * ( envelope_size * envelope_size + 1 ) );
+	info->sequencer_view->gui_slot = (sequence_gui_slot_t**) vj_calloc(sizeof(sequence_gui_slot_t*) * ( nx * ny + 1 ) );
 
-	GtkWidget *table = gtk_table_new( envelope_size, envelope_size, TRUE );	
+	GtkWidget *table = gtk_table_new( nx, ny, TRUE );	
 	
 	gtk_container_add( GTK_CONTAINER(info->sample_sequencer), table );
 	gtk_widget_show(table);
 
 	gint col=0;
 	gint row=0;
-	for( col = 0; col < envelope_size; col ++ )
-	for( row = 0; row < envelope_size; row ++ )
+	gint k = 0;
+	for( col = 0; col < ny; col ++ )
+	for( row = 0; row < nx; row ++ )
 	{
 		sequence_gui_slot_t *gui_slot = (sequence_gui_slot_t*)vj_calloc(sizeof(sequence_gui_slot_t));
-		info->sequencer_view->gui_slot[row+(col * envelope_size)] = gui_slot;
+		info->sequencer_view->gui_slot[k] = gui_slot;
 
 		gui_slot->event_box = gtk_event_box_new();
 		gtk_event_box_set_visible_window(GTK_EVENT_BOX(gui_slot->event_box), TRUE);
@@ -7397,12 +7474,12 @@ static void create_sequencer_slots(int envelope_size)
 		g_signal_connect( G_OBJECT(gui_slot->event_box),
 			"button_press_event",
 			G_CALLBACK(on_sequencerslot_activated_by_mouse), //@@@@
-			(gpointer)row+(col * envelope_size )
+			(gpointer) k
 			);	    
 		gtk_widget_show(GTK_WIDGET(gui_slot->event_box));	
 
 		gui_slot->frame = gtk_frame_new(NULL);
-		gtk_container_set_border_width (GTK_CONTAINER(gui_slot->frame),2);
+		gtk_container_set_border_width (GTK_CONTAINER(gui_slot->frame),0);
 		gtk_frame_set_shadow_type(GTK_FRAME( gui_slot->frame), GTK_SHADOW_IN );
 		gtk_widget_show(GTK_WIDGET(gui_slot->frame));
 		gtk_container_add (GTK_CONTAINER (gui_slot->event_box), gui_slot->frame);
@@ -7419,8 +7496,8 @@ static void create_sequencer_slots(int envelope_size)
 
 
 	}
-	gtk_widget_set_size_request_( table, 300,300);
-	info->sequencer_view->envelope_size = envelope_size;
+//	gtk_widget_set_size_request_( table, 300,300);
+//	info->sequencer_view->envelope_size = envelope_size;
 }
 
 
@@ -7469,7 +7546,7 @@ static void create_ref_slots(int envelope_size)
 		/* The sample's image */
 		gui_slot->image = gtk_image_new();
 		gtk_box_pack_start (GTK_BOX (gui_slot->main_vbox), GTK_WIDGET(gui_slot->image), TRUE, TRUE, 0);
-		gtk_widget_set_size_request_( gui_slot->image, info->sequence_view->w,info->sequence_view->h );
+//		gtk_widget_set_size_request_( gui_slot->image, info->sequence_view->w,info->sequence_view->h );
 		gtk_widget_show( GTK_WIDGET(gui_slot->image));
 
 		gtk_table_attach_defaults ( GTK_TABLE(table), gui_slot->event_box, row, row+1, col, col+1);   

@@ -571,7 +571,7 @@ static sequence_view_t *new_sequence_view( void *vp, int num )
 
 	
 	gtk_box_pack_start( GTK_BOX(seqv->main_vbox),GTK_WIDGET( seqv->area), FALSE,FALSE,0);
-	gtk_widget_set_size_request_( seqv->area, 176,176  );
+	gtk_widget_set_size_request_( seqv->area, 176,144  ); //FIXME
 	seqv->panel = gtk_frame_new(NULL);
 
 	seqv->toggle = gtk_toggle_button_new_with_label( "preview" );

@@ -56,4 +56,5 @@ int	gveejay_restart();
 int	gveejay_update();
 int            update_gveejay();
 int           veejay_update_multitrack( void *data );
+void		gveejay_sleep( void *ui );
 #endif 

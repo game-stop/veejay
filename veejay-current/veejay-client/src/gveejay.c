@@ -160,6 +160,8 @@ gboolean	gveejay_idle(gpointer data)
 				veejay_update_multitrack( get_ui_info() );
 				update_gveejay();
 			}
+		} else {
+			gveejay_sleep( get_ui_info() );
 		}
 
 	}
