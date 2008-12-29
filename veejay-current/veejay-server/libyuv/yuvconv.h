@@ -126,7 +126,7 @@ VJFrame *yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt );
 
 VJFrame *yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int fmt );
 
-char	*yuv_get_scaler_name(int id);
+const char	*yuv_get_scaler_name(int id);
 
 void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt );
 

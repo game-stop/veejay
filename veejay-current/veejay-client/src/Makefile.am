@@ -12,7 +12,7 @@ reloaded_SOURCES = widgets/gtkcolorsel.c widgets/gtkknob.c widgets/cellrenderers
 LAUNCHER_BIN=gveejay
 gveejay_SOURCES = launcher.c ${gveejay_headers}
  
-bin_PROGRAMS = $(GVEEJAY_BIN) $(LAUNCHER_BIN)
+bin_PROGRAMS = $(GVEEJAY_BIN) 
 
 gveejay_LDFLAGS= $(VEEJAY_LIBS) $(GTK_LIBS) $(GLIB_LIBS) $(GLADE_LIBS) -lgthread-2.0 -export-dynamic
 
