@@ -366,7 +366,7 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 			vjsdl->display = wminfo.info.x11.display;
 		
 		}
-		XWindowAttributes attr;
+	/*	XWindowAttributes attr;
 		Display *disp;
 		Window win,dum;
 		int x=0,y=0,w=0,h=0,gravity=0;
@@ -375,7 +375,7 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 		XSync(disp,0);
 		XGetWindowAttributes(disp,win, &attr);
 		XTranslateCoordinates(disp,win,attr.root,&w,&h,&x,&y, &dum);
-		gravity = attr.win_gravity;
+		gravity = attr.win_gravity;*/
 
 		int screen = DefaultScreen( vjsdl->display );
 
