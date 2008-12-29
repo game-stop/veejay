@@ -868,6 +868,8 @@ static	int	x_display_init_gl( display_ctx *ctx, int w, int h )
 		return 0;
 	
 	resize(w,h,w,h);
+	glEnable(GL_FRAGMENT_PROGRAM_ARB );
+
 	glClearColor( 0.0f, 0.0f, 0.0f, 1.0f );
 	glClear( GL_COLOR_BUFFER_BIT ); 
 
@@ -1157,8 +1159,8 @@ int	x_display_push(void *dctx, uint8_t **data, int width, int height, int out )
 	}
 	else
 	{
-		yuv_planar_to_packed_444yvu( data,width,height, ctx->data ,out);	
-		glEnable(GL_FRAGMENT_PROGRAM_ARB );
+	//	yuv_planar_to_packed_444yvu( data,width,height, ctx->data ,out);	
+	//	glEnable(GL_FRAGMENT_PROGRAM_ARB );
 	}
 	
 	resetTexturePointers( ctx );
@@ -1203,7 +1205,7 @@ int	x_display_push_yvu(void *dctx, int width, int height, int out )
 	}
 	else
 	{
-		//yuv_planar_to_packed_444yvu( data,width,height, data ,out);	
+	//	yuv_planar_to_packed_444yvu( data,width,height, data ,out);	
 		glEnable(GL_FRAGMENT_PROGRAM_ARB );
 	}
 	

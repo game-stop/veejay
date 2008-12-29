@@ -3160,6 +3160,10 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 				sample_reload_config( info->composite,info->uc->sample_id, 1 );
 			//		settings->composite);
 			}
+			if( info->video_out == 0 ) {
+				//@ release focus
+				vj_sdl_grab( info->sdl[0], 0 );
+			}
 		}
 
 		if( info->use_osd == 2 ) {

@@ -38,7 +38,65 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
+/*
+static	int	wm_fullscreen(int action, Display *disp, Window *win) {
+#ifdef STRICT_CHECKING
+	assert(action == _NET_WM_STATE_REMOVE || action == _NET_WM_STATE_ADD ||
+			action == _NET_WM_STATE_TOGGLE );
+#endif
+	XEvent xev;
+	xev.xclient.type = ClientMessage;
+	xev.xclient.serial = 0;
+	xev.xclient.send_event = True;
+	xev.xclient.message_type = XInternAtom( disp, 
+					"_NET_WM_STATE", False );
+	xev.xclient.window = win;
+	xev.xclient.format = 32;
+	xev.xclient.data.1[0] = action;
+	xev.xclient.data.1[1] = XInternAtom( disp,
+					"_NET_WM_STATE_FULLSCREEN",False );
+	xev.xclient.data.1[2] = 0;
+	xev.xclient.data.1[3] = 0;
+	xev.xclient.data.1[4] = 0;
+		
+	if( !XSendEvent( disp, DefaultRootWindow( disp ), False,
+				SubstructureRedirectMask |
+				SubstructureNotifyMask, &xev ) )
+	{
+		veejay_msg(0, "WM Fullscreen state failed");
+		return 0;
+	}
+	return 1;
+}
+*/
+static void vj_sdl_move( vj_sdl *vjsdl , int scaled_width, int scaled_height, int x, int y )
+{
+	//@ sw_scale_width is misleading ; it lets SDL use the BES 
+	if (scaled_width)
+		vjsdl->sw_scale_width = scaled_width;
+	if (scaled_height)
+		vjsdl->sw_scale_height = scaled_height;
 
+	int my_bpp = SDL_VideoModeOK( vjsdl->sw_scale_width, vjsdl->sw_scale_height,24,	
+				vjsdl->flags[1] );
+	if(!my_bpp)
+	{
+		veejay_msg(VEEJAY_MSG_DEBUG, "Requested depth not supported");
+		return;
+	}
+
+	vjsdl->screen = SDL_SetVideoMode( vjsdl->sw_scale_width, vjsdl->sw_scale_height,my_bpp,
+				vjsdl->flags[1]);
+
+	vjsdl->rectangle.x = 0;
+	vjsdl->rectangle.y = 0;
+	vjsdl->rectangle.w = scaled_width;
+	vjsdl->rectangle.h = scaled_height;
+
+
+	veejay_msg(VEEJAY_MSG_INFO, "Changed video window to size %d x %d",
+			vjsdl->sw_scale_width,vjsdl->sw_scale_height);
+}
 vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
 {
     vj_sdl *vjsdl = (vj_sdl *) malloc(sizeof(vj_sdl));
@@ -136,12 +194,6 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 
 	veejay_memset( &wminfo, 0, sizeof(SDL_SysWMinfo));
 
-	if (SDL_Init(SDL_INIT_VIDEO) < 0)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "%s", SDL_GetError());
-		veejay_msg(VEEJAY_MSG_INFO, "\tHint: 'export SDL_VIDEODRIVER=x11'");
-		return 0;
-	}
 
 	/* dont overwrite environment settings, but export if they are not set already */
 
@@ -154,20 +206,44 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	{
 		hw_on = atoi(hw_env);	
 	}
-
 	int extra_flags = (ncpu > 1  ? SDL_ASYNCBLIT : 0 );
+	int extra_fs_flags = 0;
+	int manual_positioning = 0;
+	/* setup with no window, scale to some wxh+0x0 on fs
+	 */
+	char *veejay_screen_geom = getenv( "VEEJAY_SCREEN_GEOMETRY" );
+	char *veejay_screen_size  = getenv( "VEEJAY_SCREEN_SIZE" );
+	if( veejay_screen_geom && veejay_screen_size ) {
+		extra_flags = extra_flags | SDL_NOFRAME;
+		manual_positioning = 1;
+	} else {
+		extra_fs_flags = SDL_FULLSCREEN;
+	}
 
+	if (SDL_Init(SDL_INIT_VIDEO) < 0)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "%s", SDL_GetError());
+		veejay_msg(VEEJAY_MSG_INFO, "\tHint: 'export SDL_VIDEODRIVER=x11'");
+		return 0;
+	}
+
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_DEBUG, "%s" , (fs == 1 ? "Fullscreen": "Windowed"));
+#endif
+//FIXME
 	if( hw_on == 0 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Setting up for software emulation");
 		vjsdl->flags[0] = SDL_SWSURFACE | SDL_ANYFORMAT | extra_flags;
-		vjsdl->flags[1] = SDL_SWSURFACE | SDL_FULLSCREEN | SDL_ANYFORMAT | extra_flags;
+		vjsdl->flags[1] = SDL_SWSURFACE | SDL_ANYFORMAT | extra_flags | extra_fs_flags;
+	//	vjsdl->flags[1] = SDL_SWSURFACE | SDL_FULLSCREEN | SDL_ANYFORMAT | extra_flags;
 	}
 	else
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Setting up SDL with Hardware Acceleration");
 		vjsdl->flags[0] = SDL_HWSURFACE | SDL_DOUBLEBUF | extra_flags;
-		vjsdl->flags[1] = SDL_HWSURFACE | SDL_FULLSCREEN | SDL_DOUBLEBUF | extra_flags;
+		vjsdl->flags[1] = SDL_HWSURFACE | SDL_DOUBLEBUF | extra_flags | extra_fs_flags;
+	//	vjsdl->flags[1] = SDL_HWSURFACE | SDL_FULLSCREEN | SDL_DOUBLEBUF | extra_flags;
 	}
 
 	if (vjsdl->custom_geo[0] != -1 && vjsdl->custom_geo[1]!=-1)
@@ -180,7 +256,6 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 				vjsdl->custom_geo[0],vjsdl->custom_geo[1]);
 	}
 
-  
 	if (scaled_width)
 		vjsdl->sw_scale_width = scaled_width;
 	if (scaled_height)
@@ -190,6 +265,7 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	SDL_EnableKeyRepeat( SDL_DEFAULT_REPEAT_DELAY, 100 );
 
 	info = SDL_GetVideoInfo();
+
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Video output driver: SDL");
 	veejay_msg( (info->hw_available ? VEEJAY_MSG_DEBUG : VEEJAY_MSG_WARNING), " hw_surface = %s",
@@ -253,12 +329,6 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 
 	SDL_VideoDriverName( name, 100 );
 
-	vjsdl->display = NULL;
-	if(SDL_GetWMInfo(&wminfo))
-	{
-		if( wminfo.subsystem == SDL_SYSWM_X11 )
-			vjsdl->display = wminfo.info.x11.display;
-	}
 #ifndef X_DISPLAY_MISSING
 	if( vjsdl->display )
 		x11_disable_screensaver( vjsdl->display );
@@ -288,6 +358,110 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 	        vjsdl->screen->w * vjsdl->screen->format->BytesPerPixel);
 		sbuffer += vjsdl->screen->pitch;
     	}
+	vjsdl->display = NULL;
+	if(SDL_GetWMInfo(&wminfo))
+	{
+		if( wminfo.subsystem == SDL_SYSWM_X11 )
+		{
+			vjsdl->display = wminfo.info.x11.display;
+		
+		}
+		XWindowAttributes attr;
+		Display *disp;
+		Window win,dum;
+		int x=0,y=0,w=0,h=0,gravity=0;
+		disp = wminfo.info.x11.display;
+		win  = wminfo.info.x11.window;
+		XSync(disp,0);
+		XGetWindowAttributes(disp,win, &attr);
+		XTranslateCoordinates(disp,win,attr.root,&w,&h,&x,&y, &dum);
+		gravity = attr.win_gravity;
+
+		int screen = DefaultScreen( vjsdl->display );
+
+		if( manual_positioning ) {
+			int new_w,new_h,new_x=0,new_y=0;
+			int vid_w=0,vid_h=0;
+			int use_geom = 0;
+			int use_size = 0;
+			int offset_x=0,offset_y=0;
+			if( veejay_screen_geom )
+			if( sscanf( veejay_screen_geom, "%dx%d+%dx%d",&new_w,&new_h,&new_x,&new_y) == 4 ) 
+				use_geom = 1;
+
+			if( veejay_screen_size )
+			if( sscanf( veejay_screen_size,"%dx%d",&vid_w,&vid_h) == 2 ) 
+				use_size = 1;
+
+			if( veejay_screen_size && !use_size ) {
+				veejay_msg(VEEJAY_MSG_ERROR,
+						"Invalid syntax for VEEJAY_SCREEN_SIZE, use \"<N>x<N>\"");
+				veejay_msg(VEEJAY_MSG_ERROR,
+						" for example: VEEJAY_SCREEN_SIZE=1024x768");
+			}
+
+			if(!use_size) {
+				veejay_msg(VEEJAY_MSG_WARNING, 
+						"Warning, will use %dx%d for Fullscreen mode", DisplayWidth( vjsdl->display,screen),
+							DisplayHeight( vjsdl->display,screen) );
+
+			}
+			if( veejay_screen_geom && !use_geom) {
+				veejay_msg(VEEJAY_MSG_ERROR,
+						"Invalid syntax for VEEJAY_SCREEN_GEOMETRY, use\"<Width>x<Height>+<Offset X>x<Offset Y>\"");
+				veejay_msg(VEEJAY_MSG_ERROR,
+						" for example: VEEJAY_SCREEN_GEOMETRY=2624x1024+1600+0 for TwinView/One Big Desktop");
+				veejay_msg(VEEJAY_MSG_ERROR,
+						"              VEEJAY_SCREEN_GEOMETRY=0x0+0+0 for Single Screen Desktops");
+			}
+
+
+			if( fs == 1 ) {
+				scaled_width = DisplayWidth( vjsdl->display,screen);
+				scaled_height= DisplayHeight( vjsdl->display,screen);
+			/*	if( use_geom ) {
+					scaled_width = new_w;
+					scaled_height = new_h;
+				}*/
+			}
+			if( use_geom ) {
+				offset_x = new_x;
+				offset_y = new_y;
+				veejay_msg(VEEJAY_MSG_DEBUG, "VEEJAY_SCREEN_GEOMETRY: %dx%d+%dx%d", new_w,new_h,new_x,new_y);
+			}
+
+			if( use_size ) {
+				scaled_width = vid_w;
+				scaled_height = vid_h;
+				veejay_msg(VEEJAY_MSG_DEBUG, "VEEJAY_SCREEN_SIZE: %dx%d", vid_w,vid_h);
+			}
+
+			veejay_msg(VEEJAY_MSG_INFO, "Size of video window: %dx%d", scaled_width,scaled_height);
+			veejay_msg(VEEJAY_MSG_INFO, "Position            : %dx%d", new_x, new_y );
+			veejay_msg(VEEJAY_MSG_INFO, "Display size        : %dx%d", DisplayWidth(vjsdl->display,screen),
+										   DisplayHeight(vjsdl->display,screen));
+			
+			if( wminfo.subsystem == SDL_SYSWM_X11 )
+			{
+				Window rootwin;
+				Window parentwin;
+				Window *children;
+				unsigned int children_count;
+				XQueryTree( wminfo.info.x11.display,
+					    wminfo.info.x11.window,
+					    &rootwin,
+					    &parentwin,
+					    &children,
+					    &children_count );
+				wminfo.info.x11.lock_func();
+				XMoveWindow( wminfo.info.x11.display, parentwin, offset_x,offset_y );
+				XResizeWindow( wminfo.info.x11.display, parentwin, scaled_width,scaled_height);
+				wminfo.info.x11.unlock_func();
+				if(children) free(children);
+			}
+			vj_sdl_move( vjsdl, scaled_width,scaled_height,new_x,new_y );
+		}
+	}
 
 	char *title = veejay_title();
     	SDL_WM_SetCaption(title, NULL);
@@ -323,6 +497,14 @@ int	vj_sdl_screen_h( vj_sdl *vjsdl )
 {
 	return vjsdl->screen->h;
 }
+
+void	vj_sdl_grab(vj_sdl *vjsdl, int status)
+{
+	SDL_WM_GrabInput( (status==1? SDL_GRAB_ON : SDL_GRAB_OFF) );
+	veejay_msg(VEEJAY_MSG_DEBUG, "%s", status == 1 ? "Released mouse focus":
+						"Grabbed mouse focus");
+}
+
 
 void vj_sdl_show(vj_sdl *vjsdl) {
 	SDL_UpdateRect(vjsdl->screen,0,0,vjsdl->rectangle.w, vjsdl->rectangle.h);

@@ -213,6 +213,20 @@ Delay key repeat in ms
 .B VEEJAY_FULLSCREEN 
 Fullscreen (1) or windowed (0) mode
 .TP
+.B VEEJAY_SCREEN_GEOMETRY
+Specifiy a geometry for veejay to position the video window. Use this feature to specificy where a video window appears in TwinView or One Big Desktop
+.TP
+.B VEEJAY_SCREEN_SIZE
+Specifiy the size of the video window.
+.TP
+.B Examples
+.TP
+.B VEEJAY_SCREEN_GEOMETRY=2624x1024+1600x0
+The video window will be displayed on the second screen, first screen is 1600 pixels wide. Specify this and VEEJAY_SCREEN_SIZE to create a borderless video window for use on one of your monitors in TwinView or One Big Desktop mode.
+.TP
+.B VEEJAY_SCREEN_SIZE=1024x768
+The second screen is 1024x768, the video window will appear fullscreen 
+.TP
 .SH Home directory
 .TP
 Veejay creates a new directory in your $HOME , ".veejay".

@@ -3290,6 +3290,8 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 				1,
 				go_fs
 			);
+			if( go_fs)
+				vj_sdl_grab( v->sdl[id], 0 );
 			free(caption);
 		}
 #endif
@@ -7010,7 +7012,7 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 	}
 
 	if( v->settings->composite && composite_get_ui( v->composite ) ) {
-		if(v->use_osd==3)
+		if(v->use_osd==3) 
 			v->use_osd = 0;
 		v->settings->composite = 2;
 		if(STREAM_PLAYING(v)) {
@@ -7031,11 +7033,16 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_INFO, "Saved calibration to sample %d",v->uc->sample_id );
                }
 	       composite_set_ui(v->composite, 0 );
+	       if(v->video_out==0)
+	 	      vj_sdl_grab( v->sdl[0], 0 );
 	}
 	else {
 		composite_set_ui( v->composite, 1 );
 		v->settings->composite = 1;
 		v->use_osd=3;
+		if(v->video_out==0)
+			vj_sdl_grab( v->sdl[0], 1 );
+
 		veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, press CTRL-s again to exit.");
 	}
 }
