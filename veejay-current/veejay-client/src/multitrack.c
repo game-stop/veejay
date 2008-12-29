@@ -42,7 +42,7 @@
 #include <src/utils.h>
 #include <src/widgets/gtktimeselection.h>
 #include <src/vj-api.h>
-
+#include <src/multitrack.h>
 #define __MAX_TRACKS 64
 typedef struct
 {
@@ -962,11 +962,11 @@ void		multitrack_configure( void *data, float fps, int video_width, int video_he
 	mt->aspect_ratio = r;
 
 	if( mt->height > 300 ) {
-		mt->height = 288;
+		mt->height = DEFAULT_PREVIEW_HEIGHT;
 		mt->width  = (int) ( (float) mt->height * r );
 	}
 	if( mt->width > 360 ) {
-		mt->width = 352;
+		mt->width = DEFAULT_PREVIEW_WIDTH;
 		mt->height = mt->width / r;
 	}
 

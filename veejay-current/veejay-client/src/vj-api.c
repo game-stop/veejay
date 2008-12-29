@@ -678,8 +678,9 @@ static struct
 	{ NULL },
 };
 
-static	int	preview_box_w_ = 352;
-static  int	preview_box_h_ = 288;
+static	int	preview_box_w_ = DEFAULT_PREVIEW_WIDTH;
+static  int	preview_box_h_ = DEFAULT_PREVIEW_HEIGHT;
+
 
 static	void		*bankport_ = NULL;
 
@@ -5526,7 +5527,7 @@ int		veejay_update_multitrack( void *data )
 				    gdk_pixbuf_get_width(s->img_list[i]) >= 320 ) 
 				gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), s->img_list[i] );
 				else {
-				GdkPixbuf *result = vj_gdk_pixbuf_scale_simple( s->img_list[i],352,288, GDK_INTERP_NEAREST );
+				GdkPixbuf *result = vj_gdk_pixbuf_scale_simple( s->img_list[i],DEFAULT_PREVIEW_WIDTH,DEFAULT_PREVIEW_HEIGHT, GDK_INTERP_NEAREST );
 				gtk_image_set_from_pixbuf_( GTK_IMAGE( maintrack ), result );
 				gdk_pixbuf_unref(result);
 
@@ -6288,8 +6289,8 @@ void	vj_gui_cb(int state, char *hostname, int port_num)
 
 void	vj_gui_setup_defaults( vj_gui_t *gui )
 {
-	gui->config.w = 352;
-	gui->config.h = 288;
+	gui->config.w = DEFAULT_PREVIEW_WIDTH;
+	gui->config.h = DEFAULT_PREVIEW_HEIGHT;
 	gui->config.fps = 25.0;
 	gui->config.sampling = 1;
 	gui->config.pixel_format = 1;
@@ -6721,10 +6722,10 @@ void	vj_gui_preview(void)
 	update_spin_value( "priout_width", w );
 	update_spin_value( "priout_height", h );
 
-	if( w > 352 )
-		w = 352;
-	if( h > 288 )
-		h = 288;
+	if( w > DEFAULT_PREVIEW_WIDTH )
+		w = DEFAULT_PREVIEW_WIDTH;
+	if( h > DEFAULT_PREVIEW_HEIGHT )
+		h = DEFAULT_PREVIEW_HEIGHT;
 
 	update_spin_range( "preview_width", 16, w,
 		(info->run_state == RUN_STATE_REMOTE ? (default_preview_width_==0 ? w/4: default_preview_width_) : w ) ); 

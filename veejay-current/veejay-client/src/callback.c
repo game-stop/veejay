@@ -2551,10 +2551,11 @@ void		on_previewtoggle_toggled(GtkWidget *w, gpointer user_data)
 	}
 	multitrack_set_quality( info->mt, info->quality );
 	
-	multitrack_toggle_preview( info->mt,
+/*	multitrack_toggle_preview( info->mt,
 		-1,	
 		1,
-		glade_xml_get_widget(info->main_window,"imageA")); //@ enable
+		glade_xml_get_widget(info->main_window,"imageA"));
+       */	//@ enable
 	
 //	setup_samplebank( NUM_SAMPLES_PER_COL, NUM_SAMPLES_PER_ROW );
 }

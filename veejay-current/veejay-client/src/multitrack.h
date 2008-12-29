@@ -1,6 +1,9 @@
 #ifndef MTRACK_H
 #define MTRACK_H
-        
+
+#define DEFAULT_PREVIEW_WIDTH  (int)(352.0f*0.85f)
+#define DEFAULT_PREVIEW_HEIGHT  (int)(288.0f*0.85f)
+
 void            *multitrack_new(
                 void (*f)(int,char*,int),
                 int (*g)(GdkPixbuf *, GdkPixbuf *, GtkImage *),
