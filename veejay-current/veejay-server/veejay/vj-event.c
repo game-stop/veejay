@@ -3264,6 +3264,7 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 
 	switch(v->video_out)
 	{
+		/*
 		case 4:
 #ifdef HAVE_GL
 		{
@@ -3273,8 +3274,9 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 		}
 #endif
 			break;
-		case 1:	
+		*/
 		case 0:
+		case 2:
 #ifdef HAVE_SDL
 		{
 			int go_fs = v->sdl[id]->fs == 1 ? 0:1 ;
@@ -3330,6 +3332,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 		switch( v->video_out )
 		{
 			case 0:
+			case 2:
 #ifdef HAVE_SDL
 				if( v->sdl[id] )
 				{
@@ -3343,11 +3346,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 				}
 #endif
 				break;
-			case 4:
-				veejay_msg(VEEJAY_MSG_INFO, "Not yet implemented!");
-				return;
-				break;
-			case 5:
+			default:
 				break;
 		}
 	}
@@ -3389,12 +3388,15 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 					vj_sdl_resize( v->sdl[id], w, h, v->settings->full_screen );
 #endif				
 				break;
-		
+		/*
 			case 4:
 #ifdef HAVE_GL
 				if( w > 0 && h > 0 )
 					x_display_resize(w,h,w,h);	
 #endif
+				break;
+				*/
+			default:
 				break;
 		}
 		free(title);
@@ -7033,14 +7035,14 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 			veejay_msg(VEEJAY_MSG_INFO, "Saved calibration to sample %d",v->uc->sample_id );
                }
 	       composite_set_ui(v->composite, 0 );
-	       if(v->video_out==0)
+	       if(v->video_out==0 || v->video_out == 2)
 	 	      vj_sdl_grab( v->sdl[0], 0 );
 	}
 	else {
 		composite_set_ui( v->composite, 1 );
 		v->settings->composite = 1;
 		v->use_osd=3;
-		if(v->video_out==0)
+		if(v->video_out==0 || v->video_out == 2)
 			vj_sdl_grab( v->sdl[0], 1 );
 
 		veejay_msg(VEEJAY_MSG_INFO, "You can now calibrate your projection/camera, press CTRL-s again to exit.");

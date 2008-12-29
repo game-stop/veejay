@@ -54,9 +54,6 @@ AC_ARG_ENABLE(warnings_as_errors,
 AC_ARG_ENABLE(simd-accel,
               AC_HELP_STRING([--enable-simd-accel],
                              [use SIMD multimedia instructions such as MMX, AltiVec, etc.if possible]))
-AC_ARG_ENABLE(gl,
-		AC_HELP_STRING([--enable-gl],
-				[Compile with openGL display support]))
 
 AC_ARG_WITH(extra-cflags,
             AC_HELP_STRING([--with-extra-cflags=flags],
@@ -583,26 +580,6 @@ AC_DEFINE_UNQUOTED( SWSCALE_INC, $FFMPEG_INCLUDE_SWSCALE,[] )
 
 AC_SUBST(LIBM_LIBS)
 
-have_gl=false
-if test "x$enable_gl" = "xyes" ; then
-  AC_CHECK_HEADERS(GL/gl.h ,,
-                [AC_MSG_WARN([Cannot find OpenGL headers]) ])
-  GL_LIBS=""
-  GL_CFLAGS="$GL_INC_PATH"
-  AC_CHECK_LIB([GL], [main], have_gl=true)
-  if test x$have_gl = xtrue ; then
-        GL_LIBS="$GL_LIB_PATH -lGL"
-	AC_SUBST(HAVE_GL)
-	AC_DEFINE(HAVE_GL,1,[use gl])
-  else
-        AC_MSG_ERROR([Cannot find openGL library])
-	have_gl=false
-  fi
-fi
-
-AC_SUBST(GL_LIBS)
-AC_SUBST(GL_CFLAGS)
-
 dnl Check for Xinerama
 use_xinerama=no
 AC_CHECK_LIB( Xinerama, XineramaQueryExtension,
@@ -924,7 +901,6 @@ AM_CONDITIONAL(HAVE_V4L, test x$have_v4l = xtrue)
 AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
-AM_CONDITIONAL(HAVE_GL, test x$have_gl = xtrue)
 AM_CONDITIONAL(HAVE_UNICAP,test x$have_unicap = xtrue)
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
@@ -1058,7 +1034,6 @@ AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 
 AC_MSG_NOTICE([ Optional dependencies])
 AC_MSG_NOTICE([  - DirectFB support              : ${have_directfb}])
-AC_MSG_NOTICE([  - OpenGL support                : ${have_gl}])
 AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])

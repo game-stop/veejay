@@ -100,10 +100,11 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
+/*
 #ifdef HAVE_GL
 #include <veejay/gl.h>
 #endif
-
+*/
 #include <sched.h>
 
 static	veejay_t	*veejay_instance_ = NULL;
@@ -1078,6 +1079,7 @@ static int veejay_screen_update(veejay_t * info )
 			if( info->sdl[i] )
 				vj_sdl_flip(info->sdl[i]);
 		}
+		/*
 #ifdef HAVE_GL
 		else if (info->video_out == 3 ) {
 			composite_blit_ycbcr( info->composite, frame, settings->composite, info->gl );
@@ -1085,6 +1087,7 @@ static int veejay_screen_update(veejay_t * info )
 						info->pixel_format );
 		}
 #endif
+*/
 		return 1;
 	}
 
@@ -1097,15 +1100,17 @@ static int veejay_screen_update(veejay_t * info )
 				if(!vj_sdl_update_yuv_overlay( info->sdl[i], frame ) )  return 0;  
 	   	break;
 #endif
-#ifdef HAVE_DIRECTFB
 		case 1:
+#ifdef HAVE_DIRECTFB
 	   		vj_perform_get_primary_frame_420p(info,c_frame);
 	    		if (vj_dfb_update_yuv_overlay(info->dfb, c_frame) != 0)
 			{
 				return 0;
 	    		}
+#endif
 	    	break;
 		case 2:
+#ifdef HAVE_DIRECTFB
 #ifdef HAVE_SDL
 			for( i = 0; i < MAX_SDL_OUT; i ++ )
 				if( info->sdl[i] ) 	
@@ -1117,16 +1122,17 @@ static int veejay_screen_update(veejay_t * info )
 			{
 				return 0;
 	    		}
-	   		 break;
 #endif
+			 break;
+			 /*
 		case 3:
 #ifdef HAVE_GL
 			x_display_push( info->gl, frame , info->current_edit_list->video_width,
 					 info->current_edit_list->video_height, 
 					info->current_edit_list->pixel_format 	);
 #endif
-			break;
-		case 4:
+			break;*/
+		case 3:
 			break;	
 	default:
 		veejay_change_state(info,LAVPLAY_STATE_STOP);
@@ -1483,7 +1489,7 @@ static	void	veejay_event_handle(veejay_t *info)
 {
 	veejay_handle_callbacks(info);
 #ifdef HAVE_SDL
-	if( info->video_out == 0 )
+	if( info->video_out == 0 || info->video_out == 2)
 	{
 		SDL_Event event;
 		int ctrl_pressed = 0;
@@ -1614,6 +1620,7 @@ static	void	veejay_event_handle(veejay_t *info)
 		info->uc->mouse[2] = but;
 	}
 #endif
+	/*
 #ifdef HAVE_GL
 	if(info->video_out == 3 )
 	{
@@ -1626,6 +1633,7 @@ static	void	veejay_event_handle(veejay_t *info)
 						&(info->uc->mouse[3]));
 	}
 #endif
+	*/
 
 }
 
@@ -2174,6 +2182,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
     	/* now setup the output driver */
     	switch (info->video_out)
 	 {
+		 /*
  		case 3:
 #ifdef HAVE_GL
 			veejay_msg(VEEJAY_MSG_INFO, "Using output driver OpenGL");
@@ -2181,6 +2190,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 			x_display_open(info->gl, el->video_width, el->video_height );
 #endif
 			break;
+			*/
 		case 0:
 			veejay_msg(VEEJAY_MSG_INFO, "Using output driver SDL");
 #ifdef HAVE_SDL
@@ -2234,7 +2244,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 #endif
 		break;
 	
-		case 4:
+		case 3:
 			veejay_msg(VEEJAY_MSG_INFO, "Entering headless mode (no visual output)");
 		break;
 
@@ -2752,7 +2762,7 @@ static void *veejay_playback_thread(void *data)
 		free(info->dfb);
 	}
 #endif
-
+/*
 #ifdef HAVE_GL
 #ifndef X_DISPLAY_MISSING
 	if( info->video_out == 3 )
@@ -2762,6 +2772,7 @@ static void *veejay_playback_thread(void *data)
     	}
 #endif
 #endif
+*/
 #ifdef HAVE_FREETYPE
 	vj_font_destroy( info->font );
 	vj_font_destroy( info->osd );
@@ -2992,7 +3003,6 @@ veejay_t *veejay_malloc()
     info->video_out = 1;
 #else
     info->video_out = 3;
-    sprintf(info->stream_outname, "%s", "stdout");
 #endif
 #endif
 

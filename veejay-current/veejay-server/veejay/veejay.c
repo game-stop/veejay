@@ -84,9 +84,11 @@ static void CompiledWith()
 #ifdef HAVE_SDL
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Simple Direct Media Layer");
 #endif
+	/*
 #ifdef HAVE_GL
 	veejay_msg( VEEJAY_MSG_INFO,  "\tUsing  openGL ");
 #endif
+	*/
 #ifdef HAVE_DIRECTFB
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing DirectFB");
 #endif
@@ -140,7 +142,7 @@ static void Usage(char *progname)
 	    "  -t/--timer num\t\tspecify timer to use (none:0,normal:2,rtc:1) default is 1\n");
 
 	fprintf(stderr,
-		"  -O/--output [01234]\t\tOutput video\n");
+		"  -O/--output [0123]\t\tOutput video\n");
 #ifdef HAVE_SDL
 	fprintf(stderr,
 		"\t\t\t\t0 = SDL (default)\t\n");
@@ -153,12 +155,14 @@ static void Usage(char *progname)
 		"\t\t\t\t2 = SDL and DirectDB secondary head (TV-Out) clone mode\n");
 #endif
 #endif
+	/*
 #ifdef HAVE_GL
 	fprintf(stderr,
 		"\t\t\t\t3 = OpenGL (requires openGL extension ARB fragment program)\n");
 #endif
+	*/
 	fprintf(stderr,
-		"\t\t\t\t4 = Head less (no video output)\n");	
+		"\t\t\t\t3 = Head less (no video output)\n");	
 		
     fprintf(stderr,
 	    "  -c/--synchronization [01]\tSync correction off/on (default on)\n");
@@ -172,7 +176,7 @@ static void Usage(char *progname)
     fprintf(stderr,
 	    "  -s/--size NxN\t\t\twidth X height for SDL video window\n");
 #endif
-#ifdef HAVE_XINERAMA
+/*#ifdef HAVE_XINERAMA
 #ifndef X_DISPLAY_MISSING
 #ifdef HAVE_GL
     fprintf(stderr,
@@ -180,6 +184,7 @@ static void Usage(char *progname)
 #endif
 #endif
 #endif
+*/
     fprintf(stderr,
 	    "  -l/--sample-file <file name>\tLoad a sample list file (none at default)\n");
 	fprintf(stderr,
@@ -315,14 +320,15 @@ static int set_option(const char *name, char *value)
 	       || strcmp(name, "output-driver") == 0
 	       || strcmp(name, "O") == 0) {
 	    info->video_out = atoi(optarg);	/* use SDL */
-#ifndef HAVE_GL
+/*#ifndef HAVE_GL
             if(info->video_out==3)
 	    {
 		fprintf(stderr, "OpenGL support not enabled at compile time\n");
 		exit(-1);
 	    }
 #endif
-	    if( info->video_out < 0 || info->video_out > 4 ) {
+*/
+	    if( info->video_out < 0 || info->video_out > 3 ) {
 		    fprintf(stderr, "Select a valid output display driver\n");
 		    exit(-1);
 		   }
@@ -445,11 +451,12 @@ static int check_command_line_options(int argc, char *argv[])
 	{"preserve-pathnames", 0, 0, 0},	/* -P/--preserve-pathnames    */
 	{"audio", 1, 0, 0},	/* -a/--audio num       */
 	{"size", 1, 0, 0},	/* -S/--size            */
-#ifdef HAVE_XINERAMA
+/*#ifdef HAVE_XINERAMA
 #ifndef X_DISPLAY_MISSING
-	{"xinerama",1,0,0},	/* -X/--Xinerama	*/
+	{"xinerama",1,0,0},
 #endif
 #endif
+*/
 	{"graphics-driver", 1, 0, 0},
 	{"timer", 1, 0, 0},	/* timer */
 	{"dump-events",0,0,0},
@@ -617,7 +624,7 @@ int main(int argc, char **argv)
 		vj_osc_allocate(VJ_PORT+2);	
 		vj_event_dump();
 		vj_effect_dump();
-			fprintf(stdout, "Environment variables:\n\tSDL_VIDEO_HWACCEL\t\tSet to 1 to use SDL video hardware accel (default=on)\n\tVEEJAY_PERFORMANCE\t\tSet to \"quality\" or \"fastest\" (default is fastest)\n\tVEEJAY_AUTO_SCALE_PIXELS\tSet to 1 to convert between CCIR 601 and JPEG automatically (default=dont care)\n\tVEEJAY_INTERPOLATE_CHROMA\tSet to 1 if you wish to interpolate every chroma sample when scaling (default=0)\n\tVEEJAY_SET_CPU\t\t\tLock the veejay render/playback thread to a specific core, use 0-[num cpu's] (default=dont lock)\n\tVEEJAY_CAPTURE_DRIVER\t\tSet to \"unicap\" or \"v4lutils\" (default=v4lutils)\n\tVEEJAY_SDL_KEY_REPEAT_INTERVAL\tinterval of key pressed to repeat while pressed down.\n\tVEEJAY_PLAYBACK_CACHE\t\tSample cache size in MB - by default, veejay takes 30 percent of total RAM\n\tVEEJAY_SDL_KEY_REPEAT_DELAY\tDelay key repeat in ms\n\tVEEJAY_FULLSCREEN\t\tStart in fullscreen (1) or windowed (0) mode\nVEEJAY_SCREEN_GEOMETRY\t\tX11 Geometry to inform veejay about your desktop size (use this for Twinview/One big desktop)\nVEEJAY_SCREEN_SIZE\t\tSize of video window, defaults to full screen size.\n");
+			fprintf(stdout, "Environment variables:\n\tSDL_VIDEO_HWACCEL\t\tSet to 1 to use SDL video hardware accel (default=on)\n\tVEEJAY_PERFORMANCE\t\tSet to \"quality\" or \"fastest\" (default is fastest)\n\tVEEJAY_AUTO_SCALE_PIXELS\tSet to 1 to convert between CCIR 601 and JPEG automatically (default=dont care)\n\tVEEJAY_INTERPOLATE_CHROMA\tSet to 1 if you wish to interpolate every chroma sample when scaling (default=0)\n\tVEEJAY_SET_CPU\t\t\tLock the veejay render/playback thread to a specific core, use 0-[num cpu's] (default=dont lock)\n\tVEEJAY_CAPTURE_DRIVER\t\tSet to \"unicap\" or \"v4lutils\" (default=v4lutils)\n\tVEEJAY_SDL_KEY_REPEAT_INTERVAL\tinterval of key pressed to repeat while pressed down.\n\tVEEJAY_PLAYBACK_CACHE\t\tSample cache size in MB - by default, veejay takes 30 percent of total RAM\n\tVEEJAY_SDL_KEY_REPEAT_DELAY\tDelay key repeat in ms\n\tVEEJAY_FULLSCREEN\t\tStart in fullscreen (1) or windowed (0) mode\nVEEJAY_SCREEN_GEOMETRY\t\tSpecifiy a geometry for veejay to position the video window.\nVEEJAY_SCREEN_SIZE\t\tSize of video window, defaults to full screen size.\n");
 			fprintf(stdout, "\n\n\tExample for bash:\n\t\t\t$ export VEEJAY_AUTO_SCALE_PIXEL=1\n");
 
 
