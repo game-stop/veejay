@@ -7494,8 +7494,7 @@ static void create_sequencer_slots(int nx, int ny)
 		gtk_box_pack_start (GTK_BOX (gui_slot->main_vbox), GTK_WIDGET(gui_slot->image), TRUE, TRUE, 0);
 		gtk_widget_show( gui_slot->image);
 		gtk_table_attach_defaults ( GTK_TABLE(table), gui_slot->event_box, row, row+1, col, col+1);  
-
-
+		k++;
 	}
 //	gtk_widget_set_size_request_( table, 300,300);
 //	info->sequencer_view->envelope_size = envelope_size;
