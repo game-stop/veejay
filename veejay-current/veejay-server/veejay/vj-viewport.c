@@ -1659,8 +1659,8 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 		vc->h0 = vc->h0 * sy;
 		veejay_msg(VEEJAY_MSG_INFO,"\tQuad    : %dx%d+%dx%d",vc->x0,vc->y0,vc->w0,vc->h0 );
 	} else {
-		veejay_msg(VEEJAY_MSG_ERROR, "No or invalid viewport configuration file in %s", homedir );
-		veejay_msg(VEEJAY_MSG_ERROR, "Using default values");
+		veejay_msg(VEEJAY_MSG_WARNING, "No or invalid viewport configuration file in %s", homedir );
+		veejay_msg(VEEJAY_MSG_WARNING, "Using default values");
 		veejay_msg(VEEJAY_MSG_INFO,"\tBacking  : %dx%d",w,h);
 		veejay_msg(VEEJAY_MSG_INFO,"\tRectangle: %dx%d+%dx%d",x0,y0,w0,h0);
 	}
@@ -1700,7 +1700,7 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 
 		*enable = 0;
 		*frontback = 1;
-		v->user_ui = 1;
+		v->user_ui = 0;
 
 	}
 	else
