@@ -124,7 +124,7 @@ typedef struct
 
 static int _recorder_format = ENCODER_MJPEG;
 
-#define SEND_BUF 125000
+#define SEND_BUF 256000
 static char _print_buf[SEND_BUF];
 static char _s_print_buf[SEND_BUF];
 
@@ -8004,7 +8004,7 @@ static	void	_vj_event_gatter_sample_info( veejay_t *v, int id )
 	char description[SAMPLE_MAX_DESCR_LEN];
 	int end_frame 	= sample_get_endFrame( id );
 	int start_frame = sample_get_startFrame( id );
-	char timecode[15];
+	char timecode[20];
 	MPEG_timecode_t tc;
 	y4m_ratio_t ratio = mpeg_conform_framerate( (double) v->current_edit_list->video_fps );
 	mpeg_timecode( &tc, (end_frame - start_frame),mpeg_framerate_code(ratio),v->current_edit_list->video_fps );
@@ -8016,7 +8016,7 @@ static	void	_vj_event_gatter_sample_info( veejay_t *v, int id )
 	int tlen = strlen(timecode);	
 
 	sprintf( _s_print_buf, 
-		"%05d%03d%s%03d%s%02d%02d",
+		"%08d%03d%s%03d%s%02d%02d",
 		( 3 + dlen + 3+ tlen + 2 +2),
 		dlen,
 		description,
@@ -8039,8 +8039,8 @@ static	void	_vj_event_gatter_stream_info( veejay_t *v, int id )
 	int dlen = strlen( description );
 	int tlen = strlen( source );
 	sprintf( _s_print_buf,
-		"%05d%03d%s%03d%s%02d%02d",
-		(     3 + dlen + 3 + tlen + 2 + 2),
+		"%08d%03d%s%03d%s%02d%02d",
+		(  3 + dlen + 3 + tlen + 2 + 2),
 		dlen,
 		description,
 		tlen,
@@ -8089,7 +8089,7 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 	}
 	
 	if(failed)
-		sprintf( _s_print_buf, "%05d", 0 );
+		sprintf( _s_print_buf, "%08d", 0 );
 	SEND_MSG(v , _s_print_buf );
 }
 
@@ -8156,20 +8156,21 @@ void	vj_event_toggle_bw( void *ptr, const char format[], va_list ap )
 void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	int args[1];
+	int args[2];
 	int start_from_sample = 1;
-	char cmd[300];
+	char cmd[2048];
 	char *str = NULL;
 	int i,n;
 	P_A(args,str,format,ap);
-
+	if(args[0] > 0 )
+		start_from_sample = args[0];
 	veejay_memset( _s_print_buf,0,SEND_BUF);
-	sprintf(_s_print_buf, "%05d", 0);
+	sprintf(_s_print_buf, "00000000");
 
 	n = sample_size();
 	if( n >= 1 )
 	{
-		char line[308];
+		char line[400];
 		veejay_memset(_print_buf, 0,SEND_BUF);
 		for(i=start_from_sample; i <= n; i++)
 		{
@@ -8178,7 +8179,7 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 				char description[SAMPLE_MAX_DESCR_LEN];
 				int end_frame = sample_get_endFrame(i);
 				int start_frame = sample_get_startFrame(i);
-				veejay_memset(cmd,0, 300);
+				veejay_memset(cmd,0, sizeof(cmd));
 
 				/* format of sample:
 				 	00000 : id
@@ -8200,7 +8201,7 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 			}
 
 		}
-		sprintf(_s_print_buf, "%05d%s", strlen(_print_buf),_print_buf);
+		sprintf(_s_print_buf, "%08d%s", strlen(_print_buf),_print_buf);
 	}
 	SEND_MSG(v, _s_print_buf);
 }

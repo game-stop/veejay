@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.4.4],[veejay-users@lists.sourceforge.net])
+AC_INIT([veejay],[1.4.5],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=4
-VEEJAY_MICRO_VERSION=4
+VEEJAY_MICRO_VERSION=5
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
