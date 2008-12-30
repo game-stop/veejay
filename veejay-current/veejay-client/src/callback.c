@@ -1469,15 +1469,70 @@ void	on_button_openactionfile_clicked(GtkWidget *widget, gpointer user_data)
 	}
 }
 
+static	void	load_server_files(char *buf, int len)
+{
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "server_files");
+	GtkTreeIter iter;
+	GtkTreeModel *model = gtk_tree_view_get_model( GTK_TREE_VIEW(tree ));	
+	GtkListStore *store = GTK_LIST_STORE(model);
+#ifdef STRICT_CHECKING
+	assert(tree != NULL );
+#endif
+	int i = 0;
+	int idx = 0;
+	char *ptr = buf;
+	while( i < len ) {
+		int filelen = 0;
+		char name[1024];
+		char header[5];
+		memset(header,0,sizeof(header));
+		memset(name, 0,sizeof(name));
+		strncpy(header,ptr, 4 );
+		if(sscanf(header,"%04d", &filelen)==1) {
+			strncpy( name, ptr+4, filelen);
+			gchar *filename = _utf8str( name );
+			gtk_list_store_append(store, &iter);
+			gtk_list_store_set(store, &iter, 0,filename,-1);
+			gtk_tree_view_set_model(GTK_TREE_VIEW(tree),
+					GTK_TREE_MODEL(store));
+	veejay_msg(0, "'%s'", name);
+			idx ++;
+			ptr += filelen;
+		}
+		ptr += 4;
+		i+=4;
+		i+=filelen;
+	}
+veejay_msg(0, "done");
+}
+
 void	on_button_browse_clicked(GtkWidget *widget, gpointer user_data)
 {
 	// open file browser for launcher
-	gchar *filename = dialog_open_file( "Open Videofile or EditList",0 );
+/*	gchar *filename = dialog_open_file( "Open Videofile or EditList",0 );
 	if(filename)
 	{
 		put_text( "entry_filename", filename );
 		g_free(filename);
+	}*/
+	single_vims(VIMS_WORKINGDIR);
+
+	gint len = 0;
+fprintf(stderr, "wainting for 8 bytes\n");
+	gchar *test = recv_vims( 8, &len );
+
+	if(!test || len <= 0 ) {
+		fprintf(stderr, "no results.\n");
+		return ;
 	}
+fprintf(stderr, "'%s'\n", test);
+fprintf(stderr, "Size of buffer: %d\n", len);
+
+
+	reset_tree( "server_files");
+
+	load_server_files( test,len);
+free(test);
 }
 
 void	on_button_clipcopy_clicked(GtkWidget *widget, gpointer user_data)

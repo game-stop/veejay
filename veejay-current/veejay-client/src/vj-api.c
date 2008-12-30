@@ -1974,7 +1974,7 @@ int		gveejay_new_slot(int mode)
 
 	if( id <= 0 )
 	{
-		gveejay_error_slot( mode );
+	//	gveejay_error_slot( mode );
 		return 0;
 	}
 	else
@@ -2111,9 +2111,11 @@ static	void single_vims(int id)
 	if(!info->client)
 		return;
 	sprintf(block, "%03d:;",id);
-	if(vj_client_send( info->client, V_CMD, block )<=0)
+	if(vj_client_send( info->client, V_CMD, block)<=0 )
 		reloaded_schedule_restart();
+
 }
+
 
 static gchar	*recv_vims(int slen, int *bytes_written)
 {
@@ -3306,8 +3308,44 @@ static	void	setup_tree_pixmap_column( const char *tree_name, int type, const cha
     	column = gtk_tree_view_column_new_with_attributes( title, renderer, "pixbuf", type, NULL );
 	gtk_tree_view_append_column( GTK_TREE_VIEW( tree ), column );
 }
+void
+ server_files_selection_func (GtkTreeView *treeview,
+                GtkTreePath *path,
+                GtkTreeViewColumn *col,
+                gpointer user_data)
+{
+        GtkTreeModel *model;
+        GtkTreeIter iter;
+        model = gtk_tree_view_get_model(treeview);
 
+        if(gtk_tree_model_get_iter(model,&iter,path))
+    {
+      gchar *name = NULL;
+      gtk_tree_model_get(model, &iter, 0, &name, -1);
 
+	multi_vims(VIMS_EDITLIST_ADD_SAMPLE, "0 %s" , name );
+	vj_msg(VEEJAY_MSG_INFO, "Tried to open %s",name);
+	gveejay_new_slot(MODE_SAMPLE);       
+      g_free(name);
+
+    }
+
+  }
+static void 	setup_server_files(void)
+{
+	GtkWidget *tree = glade_xml_get_widget_( info->main_window, "server_files");
+	GtkListStore *store = gtk_list_store_new( 1,  G_TYPE_STRING );
+	gtk_tree_view_set_model( GTK_TREE_VIEW(tree), GTK_TREE_MODEL(store));
+	g_object_unref( G_OBJECT( store ));
+	GtkTreeSelection *selection = gtk_tree_view_get_selection(GTK_TREE_VIEW(tree));
+
+	setup_tree_text_column( "server_files", 0, "Filename",0 );
+ //  	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE); 
+   //	gtk_tree_selection_set_select_function(selection, server_files_selection_func, NULL, NULL);
+
+	g_signal_connect( tree, "row-activated", (GCallback) server_files_selection_func, NULL);
+
+}
 
 static void	setup_effectchain_info( void )
 {
@@ -6634,6 +6672,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	setup_colorselection();
 	setup_rgbkey();
 	setup_bundles();
+	setup_server_files();
 
 	text_defaults();
 
