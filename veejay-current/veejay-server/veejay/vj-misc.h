@@ -22,6 +22,14 @@
 #include <stdarg.h>
 #include "vj-lib.h"
 
+typedef struct 
+{
+	char **files;
+	char *working_dir;
+	int    num_files;
+	int    max_files;
+} filelist_t;
+
 #define VEEJAY_FILE_LIMIT (1048576 * 16000)
 int   available_diskspace(void);
 

@@ -72,6 +72,153 @@ unsigned int vj_get_relative_time()
     return relative;
 }
 
+static struct
+{
+	const char *ext;
+} filefilters[] =  {
+ { ".avi" },
+ { ".mov" },
+ { ".dv"  },
+ { ".edl" },
+ { ".y4m" },
+ { NULL}
+};
+
+static 	int	is_it_usable(const char *file)
+{
+	int i = 0;
+	while ( filefilters[i].ext != NULL ) {
+		if(strcasestr( file, filefilters[i].ext ) )
+			return 1;
+		i++;
+	}
+	return 0;
+}
+
+static	char	*relative_path(filelist_t *filelist, const char *node)
+{
+	int len = strlen(filelist->working_dir);
+	if( node + len + 1 ) {
+		char *tmp = strdup( node + len + 1);
+		return tmp;
+	}
+	return strdup(node);
+}
+
+static int	is_usable_file( filelist_t *filelist, const char *node, const char *filename )
+{
+	if(!node) 
+		return 0;
+
+	struct stat l;
+	veejay_memset(&l,0,sizeof(struct stat));
+#ifdef STRICT_CHECKING
+	assert( filelist != NULL );
+	assert( filelist->num_files >= 0 || filelist->num_files < 1024 );
+#endif
+	if( lstat( node, &l) < 0 )
+		return 0;
+	if( S_ISLNK( l.st_mode )) {
+		veejay_memset(&l,0,sizeof(struct stat));
+		stat(node, &l);
+		return 1;
+	}
+	if( S_ISDIR( l.st_mode ) ) {
+		return 1;
+	}
+
+	if( S_ISREG( l.st_mode ) ) {
+		if( is_it_usable(node)) {
+			if( filelist->num_files < filelist->max_files-1 ) {
+				filelist->files[ filelist->num_files ] =
+					relative_path(filelist,node);
+				filelist->num_files ++;
+			}
+		}
+	}
+	return 0;
+}
+
+static int	dir_selector( const struct dirent *dir )
+{	
+	return 1;
+}
+
+static int	find_files( filelist_t *filelist, const char *path )
+{
+	struct dirent **files;
+	int N = scandir ( path, &files, dir_selector,alphasort );
+	int n;
+	if( N < 0 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid path %s",path);
+		return 0;
+	}
+
+	for( n = 0; n < N; n ++ )
+	{
+		char tmp[2048];
+		if( strcmp( files[n]->d_name, "." ) == 0 ||
+		    strcmp( files[n]->d_name, ".." ) == 0 ) {
+			continue;
+		}
+
+		snprintf(tmp,sizeof(tmp), "%s/%s", path,files[n]->d_name );
+		if(is_usable_file( filelist, tmp, files[n]->d_name ) ) { //@recurse
+			find_files( filelist, tmp );
+		}
+	}
+
+	for( n = 0; n < N; n ++ )  {
+		if( files[n])
+	 	 free(files[n]);
+	}
+	free(files);
+	return 1;
+}
+void	free_media_files( veejay_t *info, filelist_t *fl )
+{
+	int n;
+	for( n = 0; n < fl->num_files ; n ++ ) {
+		if(fl->files[n] != NULL ) {
+			free(fl->files[n]);
+		}
+	}
+	free(fl->files);
+	free(fl->working_dir);
+	free(fl);
+	fl = NULL;
+}
+
+filelist_t *find_media_files( veejay_t *info )
+{
+	char working_dir[2048];
+
+	char *wd = getcwd( working_dir, sizeof(working_dir));
+
+	if( wd == NULL ) {
+		veejay_msg(0, "Strange, current working directory seems to be invalid?");
+		return NULL;
+	}
+
+	filelist_t *fl = (filelist_t*) vj_malloc(sizeof(filelist_t));
+	fl->files      = (char**) vj_malloc(sizeof(char*) * 1024 ); //@ 1024 files
+	fl->max_files  = 1024;
+	fl->num_files  = 0;	
+	fl->working_dir = strdup(working_dir);
+
+	int res = find_files( fl, wd );
+
+	if( res == 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "No files found in %s", wd );
+		free( fl->files );
+		free( fl );
+		return NULL;
+	}
+
+	return fl;
+}
+
+
 int vj_perform_take_bg(veejay_t *info, VJFrame *frame, int pass)
 {
 	int n = 0;
@@ -501,3 +648,7 @@ int	veejay_sprintf( char *s, size_t size, const char *format, ... )
 	return done;
 }
 #endif
+
+
+
+

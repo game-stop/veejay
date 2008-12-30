@@ -714,6 +714,7 @@ int main(int argc, char **argv)
 	
 	int sig;
 	
+
    	while (veejay_get_state(info) != LAVPLAY_STATE_STOP) 
     	{
 		usleep( 25000 );

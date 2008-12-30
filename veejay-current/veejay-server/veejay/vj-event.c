@@ -8153,6 +8153,47 @@ void	vj_event_toggle_bw( void *ptr, const char format[], va_list ap )
 		use_bw_preview_ = 1;
 }
 
+void	vj_event_send_working_dir(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[2];
+	char str[2048];
+	P_A(args,str,format,ap);
+
+	
+	filelist_t *list = find_media_files(v);
+	if(!list) {
+		veejay_msg(VEEJAY_MSG_ERROR, "No usable files found.");
+		sprintf(_s_print_buf, "00000000");
+	}else {
+
+		int len = 1;
+		int i;
+		for( i = 0; i < list->num_files; i ++ ) {
+			len += ( list->files[i] == NULL ? 0 : strlen( list->files[i] ) );
+		}
+
+		int msg_len = (list->num_files*4) + len - 1;
+		sprintf(_s_print_buf, "%08d", msg_len );
+
+		int tlen=0;
+		for( i = 0; i <list->num_files; i ++ ) {
+			char tmp[1024];
+			if(list->files[i]==NULL)
+				continue;
+			tlen = strlen(list->files[i]);
+#ifdef STRICT_CHECKING
+			assert( tlen <= sizeof(tmp));
+#endif
+			snprintf(tmp,sizeof(tmp), "%04d%s",tlen,list->files[i]);
+
+			strcat( _s_print_buf,tmp);
+		}
+		SEND_MSG(v,_s_print_buf);
+		free_media_files(v,list);
+	}
+}
+
 void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 {
 	veejay_t *v = (veejay_t*)ptr;

@@ -1770,11 +1770,22 @@ void		vj_init_vevo_events(void)
 				0,
 				VIMS_ALLOW_ANY,
 				NULL );
+	index_map_[VIMS_WORKINGDIR]				=	_new_event(
+				"%d",
+				VIMS_WORKINGDIR,
+				"GUI: Get all video files starting in cwd",
+				vj_event_send_working_dir,
+				1,
+				VIMS_ALLOW_ANY,
+				"(unused)",
+				0,
+				NULL );
+
 
 	index_map_[VIMS_SAMPLE_LIST]				=	_new_event(
 				"%d",
 				VIMS_SAMPLE_LIST,
-				"GUI: Get a list of all samples (unadvised!)",
+				"GUI: Get a list of all samples",
 				vj_event_send_sample_list,
 				1,
 				VIMS_ALLOW_ANY,
