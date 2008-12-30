@@ -1495,7 +1495,6 @@ static	void	load_server_files(char *buf, int len)
 			gtk_list_store_set(store, &iter, 0,filename,-1);
 			gtk_tree_view_set_model(GTK_TREE_VIEW(tree),
 					GTK_TREE_MODEL(store));
-	veejay_msg(0, "'%s'", name);
 			idx ++;
 			ptr += filelen;
 		}
@@ -1503,7 +1502,6 @@ static	void	load_server_files(char *buf, int len)
 		i+=4;
 		i+=filelen;
 	}
-veejay_msg(0, "done");
 }
 
 void	on_button_browse_clicked(GtkWidget *widget, gpointer user_data)
@@ -1518,16 +1516,11 @@ void	on_button_browse_clicked(GtkWidget *widget, gpointer user_data)
 	single_vims(VIMS_WORKINGDIR);
 
 	gint len = 0;
-fprintf(stderr, "wainting for 8 bytes\n");
 	gchar *test = recv_vims( 8, &len );
 
 	if(!test || len <= 0 ) {
-		fprintf(stderr, "no results.\n");
 		return ;
 	}
-fprintf(stderr, "'%s'\n", test);
-fprintf(stderr, "Size of buffer: %d\n", len);
-
 
 	reset_tree( "server_files");
 
