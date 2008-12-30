@@ -1640,15 +1640,11 @@ gboolean	dialogkey_snooper( GtkWidget *w, GdkEventKey *event, gpointer user_data
 
 gboolean	key_handler( GtkWidget *w, GdkEventKey *event, gpointer user_data)
 {
-	if(!info->key_now)
-		return FALSE;	
-
 	if(event->type != GDK_KEY_PRESS)
 		return FALSE;
 
 	int gdk_keyval = gdk2sdl_key( event->keyval );
 	int gdk_state  = gdk2sdl_mod( event->state );
-
 	if( gdk_keyval >= 0 && gdk_state >= 0 )
 	{
 		char *message = vims_keys_list[(gdk_state * MOD_OFFSET)+gdk_keyval].vims;
