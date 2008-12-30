@@ -120,6 +120,7 @@ typedef struct
 
 typedef struct {
     pthread_t software_playback_thread;	/* the thread for software playback */
+    pthread_attr_t playback_attr;
     pthread_t geo_stat;
     pthread_mutex_t valid_mutex;
     pthread_cond_t buffer_filled[MJPEG_MAX_BUF];

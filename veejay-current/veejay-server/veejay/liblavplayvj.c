@@ -116,7 +116,6 @@ void	veejay_set_instance( veejay_t *info )
 }
 
 
-static int	veejay_pin_cpu( veejay_t *info, int cpu_num );
 static void	veejay_schedule_fifo( veejay_t *info, int pid );
 
 // following struct copied from ../utils/videodev.h
@@ -709,9 +708,8 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 		int cur_composite = info->settings->composite;
 		info->settings->composite = sample_load_composite_config( info->composite , sample_id );
 		void *cur = sample_get_composite_view(sample_id);
-	
 		switch(info->settings->composite) {
-			case 1:	
+			case 1:
 			case 2: 
 #ifdef STRICT_CHECKING
 				assert( cur != NULL );
@@ -720,7 +718,7 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 				veejay_msg(VEEJAY_MSG_INFO, "Using perspective transform for this Sample");
 				break;
 			case 0: 
-				info->settings->composite = cur_composite; 
+				info->settings->composite = 2; //cur_composite; 
 				break;
 		}
 	}
@@ -787,7 +785,7 @@ static	int	veejay_start_playing_stream(veejay_t *info, int stream_id )
 				composite_set_backing(info->composite,cur);
 				veejay_msg(VEEJAY_MSG_INFO, "Using perspective transform for this Stream");
 				break;
-			case 0: info->settings->composite = cur_composite; break;
+			case 0: info->settings->composite = 2; break;
 		}
 	}
 	
@@ -2107,9 +2105,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 			return -1;
 		}
 		info->settings->zoom = 0;
-		/* start with calibration on secundary inputs */
-		if(!has_config)
-			info->settings->composite = 2;
 	}
 	if(!has_config) {
 		 if(info->video_output_width <= 0 ) {
@@ -2375,64 +2370,6 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
 	}
 }
 
-/*
- * pin_cpu: snapped from lm-sensors project
- *
- *
- */
-
-static int	veejay_pin_cpu( veejay_t *info, int cpu_num )
-{
-	uint32_t st = sizeof(cpu_set_t);
-	
-	int i,j,retval;
-	if( info->cpumask == NULL )
-	{
-		info->sz = 1 + (2 * sched_ncpus()) / (8 * sizeof(unsigned long));
-		info->mask = (unsigned long*) vj_calloc( st );
-		info->cpumask = (unsigned long*) vj_calloc( st);
-		retval = sched_getaffinity(0, st, info->cpumask );
-		if( retval < 0 )
-		{
-			veejay_msg(0,"sched_getaffinity()");
-			return retval;
-		}
-
-		for( i = 0; i < st; ++ i )
-		{
-			int word = i / (8 * sizeof(unsigned long));
-			int bit  = i % (8 * sizeof(unsigned long));
-			if( info->cpumask[word] & (1 << bit))
-				info->ncpus++;
-		}
-	}
-	
-
-	cpu_num %= info->ncpus;
-
-	veejay_memset( info->mask, 0, st );
-
-	for ( i = 0, j = 0; i < st; ++ i )
-	{
-		int word = i / (8 * sizeof(unsigned long));
-		int bit  = i % (8 * sizeof(unsigned long));
-		if( info->cpumask[word] & (1 << bit ))
-		{
-			if( j >= cpu_num ) {
-				info->mask[word] |= ( 1 << bit );
-				break;
-			}
-			j++;
-		}
-	}
-
-	int pi = (int) getpid();
-
-	retval = sched_setaffinity( pi, st, info->mask );
-
-	return retval;
-}
-
 /******************************************************
  * veejay_playback_cycle()
  *   the playback cycle
@@ -2453,26 +2390,9 @@ static void veejay_playback_cycle(veejay_t * info)
 
     veejay_set_instance( info );
 
-    int   which_cpu = -1;
-    char *env_value = getenv( "VEEJAY_SET_CPU" );
-    if( env_value )
+    if( settings->ncpu > 1 )
     {
-	if( sscanf( env_value, "%d", &which_cpu ))
-	{
-		if( which_cpu < 0 || which_cpu > settings->ncpu )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "VEEJAY_SET_CPU valid values are [%d ... %d]", 0, settings->ncpu );
-			which_cpu = -1;
-		}
-		else
-			veejay_msg(VEEJAY_MSG_INFO, "VEEJAY_SET_CPU set to CPU %d", which_cpu );
-	}
-    }
-
-    if( settings->ncpu > 1 && which_cpu >= 0 && which_cpu < settings->ncpu)
-    {
-	veejay_msg(VEEJAY_MSG_INFO, "Found %d cores, locking core %d for rendering purposes", settings->ncpu,which_cpu);
-	veejay_pin_cpu( info, which_cpu );
+	veejay_msg(VEEJAY_MSG_INFO, "Found %d cores.", settings->ncpu);
     }
 	info->uc->playback_mode = info->settings->late[0];
 	info->uc->sample_id     = info->settings->late[1];
@@ -3131,7 +3051,7 @@ int veejay_main(veejay_t * info)
     veejay_msg(VEEJAY_MSG_INFO, "Starting playback thread. Giving control to main app");
 
     /* fork ourselves to return control to the main app */
-    if (pthread_create(&(settings->playback_thread), NULL,
+    if (pthread_create(&(settings->playback_thread),NULL,
 		       veejay_playback_thread, (void *) info)) {
 	veejay_msg(VEEJAY_MSG_ERROR, "Failed to create thread");
 	return -1;

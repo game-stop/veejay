@@ -1433,12 +1433,20 @@ int	sample_load_composite_config( void *compiz, int s1 )
 
 	int val = 0;
 	void *temp = composite_load_config( compiz, sample->viewport_config , &val );
-	if( temp == NULL || val == -1 )
+	if( temp == NULL || val == -1 ) {
+#ifdef STRICT_CHECKING
+		veejay_msg(VEEJAY_MSG_DEBUG,"No composite config for sample %d",s1);
+#endif
 		return 0;
+	}
 	
 	sample->composite = val;
 	sample->viewport  = temp;
 	sample_update(sample,s1);
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_DEBUG, "Loaded config for sample %d, mode %d",
+			s1, val );
+#endif
 	return sample->composite;
 }
 
