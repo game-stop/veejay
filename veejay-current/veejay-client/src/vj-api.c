@@ -1985,7 +1985,9 @@ int		gveejay_new_slot(int mode)
 		int bank_page = 0;
 		if(verify_bank_capacity( &bank_page, &poke_slot, id, mode ))
 		{
-			sample_slot_t *tmp_slot = vj_gui_get_sample_info(id, mode );
+			info->uc.reload_hint[HINT_SLIST] = 1;
+
+		/*	sample_slot_t *tmp_slot = vj_gui_get_sample_info(id, mode );
 			if(tmp_slot)
 			{
 				tmp_slot->slot_number = poke_slot;
@@ -1993,7 +1995,7 @@ int		gveejay_new_slot(int mode)
 				free_slot( tmp_slot );
 				info->uc.expected_slots ++;
 				return id;
-			}
+			}*/
 		}
 		else
 		{
@@ -2101,7 +2103,6 @@ static	void	multi_vims(int id, const char format[],...)
 
 	if(vj_client_send( info->client, V_CMD, block)<=0 )
 		reloaded_schedule_restart();
- 
 }
 
 static	void single_vims(int id)
@@ -2128,7 +2129,6 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 	if( ret <= 0 || len <= 0 || slen <= 0)
 		return (gchar*)result;
 	result = (unsigned char*) vj_calloc(sizeof(unsigned char) * (len + 1) );
-
 	*bytes_written = vj_client_read( info->client, V_CMD, result, len );
 	if( *bytes_written == -1 )
 		reloaded_schedule_restart();
@@ -3989,13 +3989,14 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 
 	multi_vims( VIMS_SAMPLE_LIST,"%d", 0 );
 	gint fxlen = 0;
-	gchar *fxtext = recv_vims(5,&fxlen);
+	gchar *fxtext = recv_vims(8,&fxlen);
+
 	if(fxlen > 0 && fxtext != NULL)
 	{
 		has_samples = 1;
 		while( offset < fxlen )
 		{
-			char tmp_len[4];
+			char tmp_len[8];
 			veejay_memset(tmp_len,0,sizeof(tmp_len));
 			strncpy(tmp_len, fxtext + offset, 3 );
 			int  len = atoi(tmp_len);
@@ -4009,8 +4010,18 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				strncpy( line, fxtext + offset, len );
 				
 				int values[4];
+#ifdef STRICT_CHECKING
+				veejay_msg( VEEJAY_MSG_DEBUG, "[%s]", line);
+				int res = 	sscanf( line, "%05d%09d%09d%03d",
+					&values[0], &values[1], &values[2], &values[3]);
+				veejay_msg(VEEJAY_MSG_DEBUG,
+						"%d , %d, %d, %d res=%d",values[0],values[1],
+								values[2],values[3],res );
+				assert( res == 4 );
+#else
 				sscanf( line, "%05d%09d%09d%03d",
 					&values[0], &values[1], &values[2], &values[3]);
+#endif
 				strncpy( descr, line + 5 + 9 + 9 + 3 , values[3] );	
 				gchar *title = _utf8str( descr );
 				gchar *timecode = format_selection_time( 0,(values[2]-values[1]) );
@@ -7035,7 +7046,7 @@ sample_slot_t *vj_gui_get_sample_info(gint which_one, gint mode )
 	multi_vims( VIMS_SAMPLE_INFO, "%d %d", which_one, mode ); 
 
 	gint sample_info_len = 0;
-	gchar *sample_info = recv_vims( 5, &sample_info_len);
+	gchar *sample_info = recv_vims( 8, &sample_info_len);
 	gint descr_len = 0;
 	gchar *p = sample_info;
 
