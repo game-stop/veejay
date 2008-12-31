@@ -1,11 +1,11 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay-utils],[1.1],[veejay-users@lists.sourceforge.net])
+AC_INIT([veejay-utils],[1.4],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/sayVIMS.c])
 
 VEEJAY_MAJOR_VERSION=1
-VEEJAY_MINOR_VERSION=1
+VEEJAY_MINOR_VERSION=4
 VEEJAY_MICRO_VERSION=0
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Utilities - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
@@ -177,34 +177,6 @@ PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.0],
 
 if test x$have_veejay != xtrue; then
 	AC_MSG_ERROR( [Cannot find veejay])
-fi
-
-dnl *********************************************************************
-dnl Check for mjpegtools
-dnl   (creates MJPEGYTOOLS_CFLAGS, 
-dnl *********************************************************************
-have_mjpegtools=false
-PKG_CHECK_MODULES(MJPEGTOOLS, [mjpegtools >= 1.6 ],
-                    [
- 		     AC_SUBST( MJPEGTOOLS_CFLAGS )
-		     AC_SUBST( MJPEGTOOLS_LIBS )
-		     have_mjpegtools=true
-                     AC_DEFINE(HAVE_MJPEGTOOLS, 1, [MJPEGTools installed])],
-                    [have_mjpegtools=false])
-
-if test x$have_mjpegtools != xtrue ; then
-	AC_MSG_ERROR([Cannot find mjpegtools. Did you set PKG_CONFIG_PATH variable?])
-fi
-
-dnl Check for libdv
-dnl   (creates LIBDV_CFLAGS, LIBDV_LIBS; defines HAVE_LIBDV)
-dnl *********************************************************************
-have_libdv=false
-if test x$with_libdv != xno ; then
-  PKG_CHECK_MODULES(LIBDV, [libdv >= 0.102],
-                    [have_libdv=true
-                     AC_DEFINE(SUPPORT_READ_DV2, 1, [libdv is present])],
-                    [have_libdv=false])
 fi
 
 AC_MSG_CHECKING(whether to compile in debugging information)
@@ -646,6 +618,4 @@ fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
 AC_MSG_NOTICE([  - Veejay			 : ${have_veejay}])
-AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
-AC_MSG_NOTICE([  - MJPEGTools			 : ${have_mjpegtools}])
 
