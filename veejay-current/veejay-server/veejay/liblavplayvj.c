@@ -1959,7 +1959,7 @@ static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
 
 int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 {
-	editlist *el = info->edit_list;
+	editlist *el = NULL;
 	video_playback_setup *settings = info->settings;
 
 	available_diskspace();
@@ -2001,15 +2001,19 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		break;
     	}    
 #ifdef STRICT_CHECKING
-	assert(el != NULL );
+	assert(info->edit_list != NULL );
 #endif
+
  	if (veejay_init_editlist(info) != 0) 
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, 
 			    "Cannot initialize the EditList");
 		return -1;
 	}
+
 	vj_tag_set_veejay_t(info);
+
+	el = info->edit_list;
 
 
 	int driver = 1;
@@ -2029,9 +2033,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		info->video_output_height = el->video_height;
 	}
 	
-	info->font = vj_font_init( el->video_width,
-				   el->video_height,
-				   el->video_fps,0 );
+	info->font = vj_font_init( el->video_width,   el->video_height,	   el->video_fps,0 );
 
 	if(!info->font) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing font system.");
@@ -2264,7 +2266,31 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		}
 		info->settings->late[0] = VJ_PLAYBACK_MODE_TAG;
 		info->settings->late[1] = nid;
-	//	veejay_change_playback_mode(info,VJ_PLAYBACK_MODE_TAG,nid);
+	}
+	else if( info->uc->file_as_sample && id <= 0 && !has_config)
+	{
+		long i,n=el->num_video_files;
+		for(i = 0; i < n; i ++ )
+		{
+			long start=0,end=2;
+			if(vj_el_get_file_entry( info->edit_list, &start,&end, i ))
+			{
+				editlist *sample_el = veejay_edit_copy_to_new(	info,info->edit_list,start,end );
+				if(!el)
+				{
+					veejay_msg(0, "Unable to start from file, Abort");
+					return -1;
+				}
+				sample_info *skel = sample_skeleton_new( 0, info->edit_list->total_frames );
+				if(skel)
+				{
+					skel->edit_list = sample_el;
+					sample_store(skel);
+				}
+			}	
+		}
+		info->settings->late[0] = VJ_PLAYBACK_MODE_SAMPLE;
+		info->settings->late[1] = 1;
 	}
 	else if(info->dummy->active && id <= 0)
 	{
@@ -2276,42 +2302,6 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 			dummy_id = vj_tag_size()-1;
 		info->settings->late[0] = VJ_PLAYBACK_MODE_TAG;
 		info->settings->late[1] = dummy_id;
-
-	/*	if(dummy_id > 0)
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Activating dummy mode (Stream %d)", dummy_id);
-			veejay_change_playback_mode(info,VJ_PLAYBACK_MODE_TAG,dummy_id);
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Failed to create dummy stream");
-			return -1;
-		}*/
-	}
-	else if( info->uc->file_as_sample && id <= 0 && !has_config)
-	{
-		long i,n=el->num_video_files;
-		for(i = 0; i < n; i ++ )
-		{
-			long start=0,end=2;
-			if(vj_el_get_file_entry( el, &start,&end, i ))
-			{
-				editlist *el = veejay_edit_copy_to_new(	info,el,start,end );
-				if(!el)
-				{
-					veejay_msg(0, "Unable to start from file, Abort");
-					return -1;
-				}
-				sample_info *skel = sample_skeleton_new( 0, el->total_frames );
-				if(skel)
-				{
-					skel->edit_list = el;
-					sample_store(skel);
-				}
-			}	
-		}
-		info->settings->late[0] = VJ_PLAYBACK_MODE_SAMPLE;
-		info->settings->late[1] = 1;
 	}
 
 	/* After we have fired up the audio and video threads system (which
@@ -3125,17 +3115,17 @@ int veejay_edit_copy(veejay_t * info, editlist *el, long start, long end)
 }
 editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, long end)
 {
-	if( el->is_empty)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "EDL is empty");
-		return NULL;
-	}
-
 	uint64_t k, i;
 	uint64_t n1 = (uint64_t) start;
 	uint64_t n2 = (uint64_t) end;
 
 	long len = end - start + 1;
+  
+	if(el->is_empty)
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "No frames in EDL to copy");
+		return 0;
+	}
 
 	if( n2 >= el->video_frames)
 	{
@@ -3145,7 +3135,7 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 
 	if(len <= 0 )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Sample too short");
+		veejay_msg(VEEJAY_MSG_ERROR, "Sample too short!");
 		return NULL;
 	}
 

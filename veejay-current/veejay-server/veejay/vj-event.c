@@ -8160,10 +8160,9 @@ void	vj_event_send_working_dir(void *ptr, const char format[], va_list ap)
 	char str[2048];
 	P_A(args,str,format,ap);
 
-	
 	filelist_t *list = find_media_files(v);
 	if(!list) {
-		veejay_msg(VEEJAY_MSG_ERROR, "No usable files found.");
+		veejay_msg(VEEJAY_MSG_ERROR, "No usable files found in CWD");
 		sprintf(_s_print_buf, "00000000");
 	}else {
 

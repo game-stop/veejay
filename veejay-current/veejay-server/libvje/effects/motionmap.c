@@ -287,8 +287,10 @@ void motionmap_apply( VJFrame *frame, int width, int height, int threshold, int 
     	uint8_t *Y = frame->data[0];
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
-	if(!have_bg)
+	if(!have_bg) {
+		veejay_msg(VEEJAY_MSG_ERROR,"Take a background snapshot first!");
 		return;
+	}
 
 	veejay_memcpy( original_img, frame->data[0], len );
 

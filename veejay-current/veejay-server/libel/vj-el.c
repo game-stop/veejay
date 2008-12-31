@@ -1791,6 +1791,7 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 
 	el->has_video = 1; //assume we get it   
 	el->MJPG_chroma = CHROMA420;
+	el->is_empty  = 0;
     /* Check if a norm parameter is present */
 	if(!filename[0] || filename == NULL)
 	{

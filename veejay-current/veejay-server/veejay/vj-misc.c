@@ -150,7 +150,6 @@ static int	find_files( filelist_t *filelist, const char *path )
 	int N = scandir ( path, &files, dir_selector,alphasort );
 	int n;
 	if( N < 0 ) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Invalid path %s",path);
 		return 0;
 	}
 
@@ -196,7 +195,9 @@ filelist_t *find_media_files( veejay_t *info )
 	char *wd = getcwd( working_dir, sizeof(working_dir));
 
 	if( wd == NULL ) {
+#ifdef STRICT_CHECKING
 		veejay_msg(0, "Strange, current working directory seems to be invalid?");
+#endif
 		return NULL;
 	}
 
