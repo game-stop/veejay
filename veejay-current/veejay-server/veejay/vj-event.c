@@ -8121,6 +8121,31 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 		pixel_format = composite_get_top( v->composite, frame.data,
 						  frame.data,
 						  v->settings->composite );
+		frame.width = v->video_output_width;
+		frame.height = v->video_output_height;
+		switch(pixel_format) {
+			case PIX_FMT_YUV444P:
+			case PIX_FMT_YUVJ444P:
+				frame.uv_width = frame.width;
+				frame.uv_height= frame.height;
+				frame.ssm = 1;
+				frame.shift_v = 0;
+				frame.shift_h = 0;
+				frame.len = frame.width * frame.height;
+				frame.uv_len = frame.len;
+				break;
+			case PIX_FMT_YUVJ422P:
+			case PIX_FMT_YUV422P:
+				frame.uv_width = frame.width;
+				frame.uv_height= frame.height / 2;
+				frame.ssm = 0;
+				frame.shift_v = 1;
+				frame.shift_h = 0;
+				frame.len = frame.width * frame.height;
+				frame.uv_len = frame.uv_width * frame.uv_height;
+				break;
+			}
+
 	}
 	//@ fast*_picture delivers always 4:2:0 data to reduce bandwidth
 	if( use_bw_preview_ )
@@ -8160,9 +8185,10 @@ void	vj_event_send_working_dir(void *ptr, const char format[], va_list ap)
 	char str[2048];
 	P_A(args,str,format,ap);
 
+	
 	filelist_t *list = find_media_files(v);
 	if(!list) {
-		veejay_msg(VEEJAY_MSG_ERROR, "No usable files found in CWD");
+		veejay_msg(VEEJAY_MSG_ERROR, "No usable files found.");
 		sprintf(_s_print_buf, "00000000");
 	}else {
 
