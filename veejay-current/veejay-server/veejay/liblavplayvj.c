@@ -1701,7 +1701,7 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 		settings->buffer_entry[settings->currently_processed_frame];
 
 	//@ here callbacks fixme was
-	pthread_mutex_lock(&(settings->valid_mutex));
+//	pthread_mutex_lock(&(settings->valid_mutex));
 
 //	settings->currently_processed_entry = 
 //		settings->buffer_entry[settings->currently_processed_frame];
@@ -1886,6 +1886,8 @@ static int veejay_mjpeg_queue_buf(veejay_t * info,   int frame_periods)
     int current_state = LAVPLAY_STATE_PLAYING;
     pthread_mutex_lock(&(settings->valid_mutex));
     settings->valid[0] = frame_periods;
+    settings->buffer_entry[0] ++;
+
     current_state = settings->state;
     pthread_cond_broadcast(&(settings->buffer_filled[0]));
     pthread_mutex_unlock(&(settings->valid_mutex));
@@ -1915,8 +1917,8 @@ static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
     }
     pthread_mutex_unlock(&(settings->valid_mutex));
 	
-    memcpy(bs, &(settings->syncinfo[settings->currently_synced_frame]),
-	   sizeof(struct mjpeg_sync));
+    veejay_memcpy(bs, &(settings->syncinfo[settings->currently_synced_frame]),
+
     settings->currently_synced_frame =
 	(settings->currently_synced_frame + 1) % 1;
 	
@@ -2535,7 +2537,7 @@ static void veejay_playback_cycle(veejay_t * info)
 #ifdef HAVE_SDL
 	    ts= SDL_GetTicks();
 #endif
-	    settings->buffer_entry[0] ++;
+//	    settings->buffer_entry[0] ++;
 
 	    if (!skipa) 
 			vj_perform_queue_audio_frame(info);
@@ -3017,15 +3019,6 @@ veejay_t *veejay_malloc()
 /******************************************************
  * veejay_main()
  *   the whole video-playback cycle
- *
- * Basic setup:
- *   * this function initializes the devices,
- *       sets up the whole thing and then forks
- *       the main task and returns control to the
- *       main app. It can then start playing by
- *       setting playback speed and such. Stop
- *       by calling veejay_stop()
- *
  * return value: 1 on succes, 0 on error
  ******************************************************/
 
@@ -3036,10 +3029,12 @@ int veejay_main(veejay_t * info)
 
     /* Flush the Linux File buffers to disk */
     sync();
+
     if(info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
     {
         info->audio_running = vj_perform_audio_start(info);
     }
+
     veejay_msg(VEEJAY_MSG_INFO, "Starting playback thread. Giving control to main app");
 
     /* fork ourselves to return control to the main app */
