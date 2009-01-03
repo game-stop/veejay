@@ -281,11 +281,9 @@ void veejay_change_state(veejay_t * info, int new_state)
 {
     	video_playback_setup *settings =
 		(video_playback_setup *) info->settings;
-
-//	pthread_mutex_lock(&(settings->valid_mutex));
         settings->state = new_state;
-//	pthread_mutex_unlock(&(settings->valid_mutex));
 }
+
 void veejay_change_state_save(veejay_t * info, int new_state)
 {
 	if(new_state == LAVPLAY_STATE_STOP )
@@ -1705,7 +1703,7 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 //	settings->currently_processed_entry = 
 //		settings->buffer_entry[settings->currently_processed_frame];
 	/* sync timestamp */
-
+//	pthread_mutex_lock(&(settings->valid_mutex));
 	veejay_mjpeg_software_frame_sync(info,
 					  settings->valid[settings->
 							  currently_processed_frame]);
@@ -2532,14 +2530,13 @@ static void veejay_playback_cycle(veejay_t * info)
 #ifdef HAVE_SDL
 	    ts= SDL_GetTicks();
 #endif
-	    settings->buffer_entry[0] ++;
 
 	    if (!skipa) 
 			vj_perform_queue_audio_frame(info);
 
 	    if (!skipv)
 			vj_perform_queue_video_frame(info,skipi);
-  
+
 	    vj_perform_queue_frame( info, skipi );
 
 #ifdef HAVE_SDL	
@@ -2551,6 +2548,8 @@ static void veejay_playback_cycle(veejay_t * info)
 	    if(skipv ) continue;
 
 	    veejay_mjpeg_queue_buf(info, 1 );
+
+  	    settings->buffer_entry[0] ++;
 
 	    n++;
 	}
