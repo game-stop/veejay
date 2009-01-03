@@ -608,7 +608,9 @@ static void print_license()
 
 static void donothing(int sig)
 {
+	vj_lock(info);
 	veejay_handle_signal( info, sig );	
+	vj_unlock(info);
 }
 
 int main(int argc, char **argv)
@@ -713,12 +715,17 @@ int main(int argc, char **argv)
 //	veejay_set_speed(info, 1);
 	
 	int sig;
-	
+	int current_state = LAVPLAY_STATE_PLAYING;
 
-   	while (veejay_get_state(info) != LAVPLAY_STATE_STOP) 
-    	{
-		usleep( 25000 );
-    	}
+	while( 1 ) { //@ until your PC stops working
+		
+		usleep(50000);
+		vj_lock(info);
+		current_state = veejay_get_state(info);
+		vj_unlock(info);
+		if( current_state == LAVPLAY_STATE_STOP )
+			break;
+	}
 
 	veejay_quit(info);
 	veejay_busy(info);		/* wait for all the nice goodies to shut down */
