@@ -1917,7 +1917,7 @@ static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
     }
     pthread_mutex_unlock(&(settings->valid_mutex));
 	
-    veejay_memcpy(bs, &(settings->syncinfo[settings->currently_synced_frame]),
+    veejay_memcpy(bs, &(settings->syncinfo[settings->currently_synced_frame]),sizeof(struct mjpeg_sync));
 
     settings->currently_synced_frame =
 	(settings->currently_synced_frame + 1) % 1;
