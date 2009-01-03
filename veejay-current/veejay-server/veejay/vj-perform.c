@@ -2849,6 +2849,8 @@ static void vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 static uint32_t play_audio_sample_ = 0;
 int vj_perform_queue_audio_frame(veejay_t *info)
 {
+	veejay_msg(0, "%s: frame=%ld", __FUNCTION__, info->settings->current_frame_num );
+
 	if( info->audio == NO_AUDIO || !info->current_edit_list->has_audio)
 		return 1;
 
@@ -3339,6 +3341,7 @@ static	void	vj_perform_record_frame( veejay_t *info )
 static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settings )
 {
 	int deep = 0;
+veejay_msg(0, "%s: frame=%ld", __FUNCTION__, settings->current_frame_num );
 
 	VJFrame *frame = info->effect_frame1;
 	VJFrame *frame2= info->effect_frame2;
@@ -3379,6 +3382,7 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 {
 	video_playback_setup *settings = info->settings;
+veejay_msg(0, "%s: skip=%d, frame=%ld", __FUNCTION__,skip_incr, settings->current_frame_num );
 
 	if(skip_incr)
 		return 1;
@@ -3391,7 +3395,9 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 
 	if(settings->offline_record)	
 		vj_perform_record_tag_frame(info);
-	
+
+	int cur_out = info->out_buf;
+
 	switch (info->uc->playback_mode)
 	{
 		case VJ_PLAYBACK_MODE_SAMPLE:
@@ -3414,7 +3420,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 		   	 	vj_perform_sample_complete_buffers(info, &is444);
 
 			
-			info->out_buf = vj_perform_render_magic( info, info->settings );
+			cur_out = vj_perform_render_magic( info, info->settings );
 		   	res = 1;
 
      			 break;
@@ -3423,7 +3429,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 
 			   vj_perform_plain_fill_buffer(info);
 
-			   info->out_buf = vj_perform_render_magic( info, info->settings );
+			   cur_out = vj_perform_render_magic( info, info->settings );
 			   res = 1;
  		    break;
 		case VJ_PLAYBACK_MODE_TAG:
@@ -3441,13 +3447,15 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 			 {
 				if(vj_perform_verify_rows(info))
 					vj_perform_tag_complete_buffers(info, &is444);
-				info->out_buf = vj_perform_render_magic( info, info->settings );
+				cur_out = vj_perform_render_magic( info, info->settings );
 			 }
 			 res = 1;	 
 		   	 break;
 		default:
 			return 0;
 	}
+
+	info->out_buf = cur_out;
 
 	return res;
 }
@@ -3456,6 +3464,7 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 int vj_perform_queue_frame(veejay_t * info, int skip )
 {
 	video_playback_setup *settings = (video_playback_setup*) info->settings;
+veejay_msg(0, "%s: skip=%d, frame=%ld", __FUNCTION__,skip, settings->current_frame_num );
 	if(!skip)
 	{
 		switch(info->uc->playback_mode) 

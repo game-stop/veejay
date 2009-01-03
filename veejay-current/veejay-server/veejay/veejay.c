@@ -709,7 +709,7 @@ int main(int argc, char **argv)
 
 	print_license();
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Starting playback");
+	veejay_msg(VEEJAY_MSG_DEBUG, "Started playback");
 
 //	veejay_set_frame(info, 0);
 //	veejay_set_speed(info, 1);

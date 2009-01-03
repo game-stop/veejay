@@ -1451,7 +1451,6 @@ void veejay_handle_signal(void *arg, int sig)
 				veejay_change_state_save(info,LAVPLAY_STATE_STOP);
 			else
 				veejay_change_state( info, LAVPLAY_STATE_STOP );
-			
 			signal( sig, SIG_DFL );
 		}
 	}
@@ -1713,10 +1712,7 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 	settings->syncinfo[settings->currently_processed_frame].frame =
 	    settings->currently_processed_frame;
 
-
-
-
-//	pthread_mutex_lock(&(settings->valid_mutex));
+	pthread_mutex_lock(&(settings->valid_mutex));
 	settings->valid[settings->currently_processed_frame] = 0;
 	pthread_mutex_unlock(&(settings->valid_mutex));
 
@@ -1764,7 +1760,6 @@ int veejay_open(veejay_t * info)
     memset( &(settings->lastframe_completion), 0, sizeof(struct timeval));
 
     pthread_mutex_init(&(settings->valid_mutex), NULL);
-    pthread_mutex_init(&(settings->syncinfo_mutex), NULL);
     /* Invalidate all buffers, and initialize the conditions */
 
 	settings->valid[0] = 0;
@@ -1878,20 +1873,15 @@ static int veejay_mjpeg_set_playback_rate(veejay_t * info,
  * return value: 1 on success, 0 on error
  ******************************************************/
 
-static int veejay_mjpeg_queue_buf(veejay_t * info,   int frame_periods)
+static void veejay_mjpeg_queue_buf(veejay_t * info,   int frame_periods)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
     /* mark this buffer as playable and tell the software playback thread to wake up if it sleeps */
-    int current_state = LAVPLAY_STATE_PLAYING;
     pthread_mutex_lock(&(settings->valid_mutex));
     settings->valid[0] = frame_periods;
-    settings->buffer_entry[0] ++;
-
-    current_state = settings->state;
     pthread_cond_broadcast(&(settings->buffer_filled[0]));
     pthread_mutex_unlock(&(settings->valid_mutex));
-    return current_state;
 }
 
 
@@ -2413,14 +2403,14 @@ static void veejay_playback_cycle(veejay_t * info)
 			break;
 	}
 
- //  vj_perform_queue_audio_frame(info);
-   //vj_perform_queue_video_frame(info,0);
+ //   vj_perform_queue_audio_frame(info);
+   // vj_perform_queue_video_frame(info,0);
  
-    if (vj_perform_queue_frame(info, 1) != 0)
+   /* if (vj_perform_queue_frame(info, 0) != 0)
     {
 	   veejay_msg(VEEJAY_MSG_ERROR,"Unable to queue frame");
            return;
-    }
+    }*/
 
 
     bp.input = 0;
@@ -2453,13 +2443,18 @@ static void veejay_playback_cycle(veejay_t * info)
     tdiff2 = 0.;
     nvcorr = 0;
 
+    veejay_mjpeg_queue_buf(info, 1 );
+
+
+#ifdef HAVE_JACK
     if(el->has_audio && info->audio == AUDIO_PLAY)
     {
 	stats.audio = 1;
     }
-    int current_state = veejay_mjpeg_queue_buf(info, 0);
-   
-    while (current_state != LAVPLAY_STATE_STOP) {
+#else
+    stats.audio = 0;
+#endif   
+    while (settings->state != LAVPLAY_STATE_STOP) {
 	first_free = stats.nsync;
 
 	int current_speed = settings->current_playback_speed;
@@ -2537,7 +2532,7 @@ static void veejay_playback_cycle(veejay_t * info)
 #ifdef HAVE_SDL
 	    ts= SDL_GetTicks();
 #endif
-//	    settings->buffer_entry[0] ++;
+	    settings->buffer_entry[0] ++;
 
 	    if (!skipa) 
 			vj_perform_queue_audio_frame(info);
@@ -2555,17 +2550,10 @@ static void veejay_playback_cycle(veejay_t * info)
 #endif
 	    if(skipv ) continue;
 
-	    current_state = veejay_mjpeg_queue_buf(info, 1 );
-
-	    if (current_state == LAVPLAY_STATE_STOP) {
-		goto FINISH;
-	    }
+	    veejay_mjpeg_queue_buf(info, 1 );
 
 	    n++;
 	}
-//            veejay_event_handle(info);
-
-
 		/* output statistics */
 	if (el->has_audio && (info->audio==AUDIO_PLAY))
 	    stats.audio = settings->audio_mute ? 0 : 1;
