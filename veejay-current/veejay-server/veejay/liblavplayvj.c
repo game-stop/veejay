@@ -1,10 +1,5 @@
 /*liblavplayvj - a extended librarified Linux Audio Video playback/Editing
- *supports: 
- *		sample based editing
- *		pattern based editing 
- *		throughput of v4l / fifo
- *		
- *		Niels Elburg <nielselburg@yahoo.de>
+ * VJ'fied by	Niels Elburg <nwelburg@gmail.com>
  *
  *
  * libveejay - a librarified Linux Audio Video PLAYback

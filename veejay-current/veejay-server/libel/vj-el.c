@@ -1282,8 +1282,18 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 								el->video_width, el->video_height,
 								dst_fmt );
 
+					if(! el->scaler ) {
+						sws_template tmpl;
+						tmpl.flags = 1;
+						el->scaler = yuv_init_swscaler( src1,dst1,&tmpl,yuv_sws_get_cpu_flags() );
+					}
+#ifdef STRICT_CHECKING
+					assert( el->scaler != NULL );
+#endif
 
-					yuv_convert_any3( src1,d->frame->linesize,dst1,src1->format,dst1->format);
+					yuv_convert_and_scale( el->scaler, src1,dst1 );
+
+					//yuv_convert_any3( src1,d->frame->linesize,dst1,src1->format,dst1->format);
 
 					free(src1);
 					free(dst1);
@@ -1298,8 +1308,18 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 					VJFrame *dst1 = yuv_yuv_template( dst[0],dst[1],dst[2],
 								el->video_width,el->video_height,
 								dst_fmt );
-		
-					yuv_convert_any3( src1,d->frame->linesize,dst1,src1->format,dst1->format);
+					if(! el->scaler ) {
+						sws_template tmpl;
+						tmpl.flags = 1;
+						el->scaler = yuv_init_swscaler( src1,dst1,&tmpl,yuv_sws_get_cpu_flags() );
+					}
+#ifdef STRICT_CHECKING
+					assert( el->scaler != NULL );
+#endif
+
+					yuv_convert_and_scale( el->scaler, src1,dst1 );
+
+				//	yuv_convert_any3( src1,d->frame->linesize,dst1,src1->format,dst1->format);
 					free(src1);
 					free(dst1);
 				}
@@ -2089,6 +2109,8 @@ void	vj_el_free(editlist *el)
 		free_cache( el->cache );
 	if( el->frame_list )
 		free(el->frame_list );
+	if( el->scaler )
+		yuv_free_swscaler( el->scaler );
 	free(el);
 
 	el = NULL;

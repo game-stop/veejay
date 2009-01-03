@@ -72,6 +72,7 @@ typedef struct
 	void		*cache;
 
 	int		is_clone;
+	void		*scaler;
 } editlist;  
 
 int     test_video_frame( lav_file_t *lav,int out_pix_fmt);
