@@ -27,6 +27,10 @@ void veejay_change_playback_mode(veejay_t *info, int pm, int sample);
 
 int veejay_free(veejay_t *info);
 
+void	vj_lock(veejay_t *info);
+
+void	vj_unlock(veejay_t *info);
+
 void veejay_signal_loop(void *);
 
 int veejay_init_editlist(veejay_t * info);
