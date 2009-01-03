@@ -2849,8 +2849,6 @@ static void vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 static uint32_t play_audio_sample_ = 0;
 int vj_perform_queue_audio_frame(veejay_t *info)
 {
-	veejay_msg(0, "%s: frame=%ld", __FUNCTION__, info->settings->current_frame_num );
-
 	if( info->audio == NO_AUDIO || !info->current_edit_list->has_audio)
 		return 1;
 
@@ -3341,7 +3339,6 @@ static	void	vj_perform_record_frame( veejay_t *info )
 static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settings )
 {
 	int deep = 0;
-veejay_msg(0, "%s: frame=%ld", __FUNCTION__, settings->current_frame_num );
 
 	VJFrame *frame = info->effect_frame1;
 	VJFrame *frame2= info->effect_frame2;
@@ -3382,7 +3379,6 @@ veejay_msg(0, "%s: frame=%ld", __FUNCTION__, settings->current_frame_num );
 int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 {
 	video_playback_setup *settings = info->settings;
-veejay_msg(0, "%s: skip=%d, frame=%ld", __FUNCTION__,skip_incr, settings->current_frame_num );
 
 	if(skip_incr)
 		return 1;
@@ -3464,7 +3460,6 @@ veejay_msg(0, "%s: skip=%d, frame=%ld", __FUNCTION__,skip_incr, settings->curren
 int vj_perform_queue_frame(veejay_t * info, int skip )
 {
 	video_playback_setup *settings = (video_playback_setup*) info->settings;
-veejay_msg(0, "%s: skip=%d, frame=%ld", __FUNCTION__,skip, settings->current_frame_num );
 	if(!skip)
 	{
 		switch(info->uc->playback_mode) 
