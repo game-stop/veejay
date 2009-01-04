@@ -622,7 +622,7 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 	}
 	if( info->composite ) {
 		if( info->settings->composite == 2 ) {
-			info->settings->composite = 1; // back to top
+			info->settings->composite = info->settings->composite2; // back to top
 		} 
 	}
 
@@ -644,7 +644,7 @@ static  void	veejay_stop_playing_stream( veejay_t *info, int new_stream_id )
 	vj_tag_disable( info->uc->sample_id );
 	if( info->composite ) {
 		if( info->settings->composite == 2 ) {
-			info->settings->composite = 1;
+			info->settings->composite = info->settings->composite2;
 		}
 	}
 
@@ -2804,7 +2804,8 @@ veejay_t *veejay_malloc()
     info->settings->currently_processed_entry = -1;
     info->settings->first_frame = 1;
     info->settings->state = LAVPLAY_STATE_STOP;
-    info->settings->composite = 1;
+    info->settings->composite2 = 2;
+    info->settings->composite = info->settings->composite2;
     info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
     info->uc->use_timer = 2;
     info->uc->sample_key = 1;
