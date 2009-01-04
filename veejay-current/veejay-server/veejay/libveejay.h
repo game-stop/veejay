@@ -27,10 +27,6 @@ void veejay_change_playback_mode(veejay_t *info, int pm, int sample);
 
 int veejay_free(veejay_t *info);
 
-void	vj_lock(veejay_t *info);
-
-void	vj_unlock(veejay_t *info);
-
 void veejay_signal_loop(void *);
 
 int veejay_init_editlist(veejay_t * info);
@@ -42,8 +38,6 @@ int veejay_open(veejay_t *info);
 int veejay_open_files(veejay_t * info, char **files, int num_files, float fps, int force, int pixfmt,	char norm, int switch_jpeg);
 
 int veejay_main(veejay_t * info);
-
-int veejay_stop(veejay_t *info);
 
 void veejay_quit(veejay_t *info);
 
@@ -64,8 +58,6 @@ int veejay_set_frame(veejay_t *info, long frame_num);
 void veejay_change_state(veejay_t *info, int new_state);
 
 int veejay_set_speed(veejay_t *info , int speed);
-
-void veejay_busy(veejay_t *info);
 
 int veejay_increase_frame(veejay_t * info, long numframes);
 

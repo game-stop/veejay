@@ -237,7 +237,7 @@ static int vj_perform_increase_plain_frame(veejay_t * info, long num)
 	        	
 	return 0;
     }
-    if (settings->current_frame_num >= settings->max_frame_num) {
+    if (settings->current_frame_num > settings->max_frame_num) {
 	if(!info->continuous)
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Reached end of video - Ending veejay session ... ");
@@ -3379,7 +3379,6 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 {
 	video_playback_setup *settings = info->settings;
-
 	if(skip_incr)
 		return 1;
 

@@ -119,7 +119,11 @@ typedef struct
 
 
 typedef struct {
-    pthread_t software_playback_thread;	/* the thread for software playback */
+    pthread_t geo_stat;
+    sigset_t signal_set;
+
+	/*
+    pthread_t software_playback_thread;
     pthread_attr_t playback_attr;
     pthread_t geo_stat;
     pthread_mutex_t valid_mutex;
@@ -128,6 +132,7 @@ typedef struct {
     pthread_mutex_t syncinfo_mutex;
     pthread_t signal_thread;
     sigset_t signal_set;
+    */
     struct timeval lastframe_completion;	/* software sync variable */
 
     long old_field_len;
@@ -159,7 +164,7 @@ typedef struct {
     int state;			/* playing, paused or stoppped */
     int effect;			/* realtime effect during play */
     int video_fd;
-    pthread_t playback_thread;	/* the thread for the whole playback-library */
+  //  pthread_t playback_thread;	/* the thread for the whole playback-library */
     int offline_ready;
     int offline_record;
     int offline_tag_id;
