@@ -113,6 +113,7 @@ void bathroom_hori_apply(VJFrame *frame, int width, int height, int val)
     unsigned int i;
     unsigned int len = (width * height);
     unsigned int y_val = val;
+    unsigned int tmp = 0;
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
@@ -125,7 +126,10 @@ void bathroom_hori_apply(VJFrame *frame, int width, int height, int val)
     for(y=0; y < height;y++) {
      for(x=0; x <width; x++) {
 	i = ((y*width) + (y % y_val) - (y_val>>1)) + x;
-	if(i < 0) i += width;
+	//while(i < 0) i += width;
+
+	if( i < 0 ) i = 0; else if ( i >= len ) i = (len-1);
+
 	Y[(y*width)+x] = bathroom_frame[0][i];
 	Cb[(y*width)+x] = bathroom_frame[1][i];
 	Cr[(y*width)+x] = bathroom_frame[2][i];
