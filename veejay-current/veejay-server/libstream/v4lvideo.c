@@ -271,14 +271,21 @@ static int is_YUV(int a) {
 
 static	v4lvideo_t*	v4lvideo_templ_try( int num )
 {
+	char *refname = (char*) vj_calloc(sizeof(char) * 100);
 	v4lvideo_t *v = (v4lvideo_t*) vj_calloc(sizeof(v4lvideo_t));
-	char refname[100];
-	snprintf(refname,sizeof(refname),"/dev/video%d",num);
+	if(!v || !refname) {
+		if(v) free(v);
+		if(refname) free(refname);
+		return NULL;
+	}
+	snprintf(refname,100,"/dev/video%d",num);
 	if( v4lopen(refname,&(v->vd)) ) {
 		free(v);
+		free(refname);
 		return NULL;
 	}
 	v4lgetcapability( &(v->vd));
+	free(refname);
 	return v;
 }
 
@@ -502,36 +509,35 @@ void	v4lvideo_templ_init()
 	char key[64];
 	for( i = 0; i < max ;i ++ ) {
 		v4lvideo_t *v = v4lvideo_templ_try(i);
-		if( v ) {
-			char *name = v4lgetdevicename( &(v->vd));
-			snprintf(key,sizeof(key), "%d",i);
-			int error = vevo_property_set( device_list_, key, VEVO_ATOM_TYPE_STRING, 1,&name );
+		if(!v)
+			continue;
+		char *name = v4lgetdevicename( &(v->vd));
+		snprintf(key,sizeof(key), "%d",i);
+		int error = vevo_property_set( device_list_, key, VEVO_ATOM_TYPE_STRING, 1,&name );
 #ifdef STRICT_CHECKING
-			assert( error == VEVO_NO_ERROR );
+		assert( error == VEVO_NO_ERROR );
 #endif
-			veejay_msg(VEEJAY_MSG_DEBUG, "Detected %s as device /dev/video/%d",name,i);
-			device_count_ ++;
+		veejay_msg(VEEJAY_MSG_DEBUG, "Detected %s as device /dev/video/%d",name,i);
+		device_count_ ++;
 
-
-			if( i > max_device_ )
-				max_device_ = i;
-			v4lclose( &(v->vd));
-			free(v);
-		}
+		if( i > max_device_ )
+			max_device_ = i;
+		v4lclose( &(v->vd));
+		free(v);
 	}
 
 }
 
 
 
-static int	__v4lvideo_init( v4lvideo_t *v, char* file, int channel, int norm, int freq, int dst_w, int dst_h, int dst_palette )
+static int	__v4lvideo_init( v4lvideo_t *v, char *file, int channel, int norm, int freq, int dst_w, int dst_h, int dst_palette )
 {
 	if(file==NULL)
 		return -1;
 	
 	if ( v4lopen(file, &(v->vd)) ) {
-		veejay_msg(0, "Unable to open capture device '%s' (no such device?)",
-					file );
+		//veejay_msg(0, "Unable to open capture device '%s' (no such device?)",
+		//			file );
 		return -1;
 	}
 
