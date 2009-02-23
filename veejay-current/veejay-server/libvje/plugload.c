@@ -848,6 +848,10 @@ vj_effect	*plug_get_plugin( int n )
 
 		int k = 0;
 		int valid_p = 0;
+		char **param_descr = NULL;
+		if( vje->num_params > 0 ) 
+			param_descr = (char**) vj_malloc(sizeof(char*) * vje->num_params );
+
 		for( k = 0; k < vje->num_params;k++ )
 		{
 			char key[20];
@@ -859,11 +863,13 @@ vj_effect	*plug_get_plugin( int n )
 				vevo_property_get( parameter, "min", 0, &(vje->limits[0][k]));
 				vevo_property_get( parameter, "max", 0, &(vje->limits[1][k]));	
 				vevo_property_get( parameter, "default", 0,&(vje->defaults[k]));
+				param_descr[valid_p] = strdup( "Number" );
 				valid_p ++;
 			}
 		}		
 		vevo_property_set( port, "n_params",VEVO_ATOM_TYPE_INT, 1,&valid_p);
 		vje->num_params = valid_p;
+		vje->param_description = param_descr;
 	}
 
 	return vje;
