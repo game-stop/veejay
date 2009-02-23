@@ -1313,40 +1313,7 @@ void	memset_ycbcr(	uint8_t *in,
 			unsigned int width, 
 			unsigned int height)
 {
-
-#ifdef HAVE_ASM_MMX
-	double mmtemp_d;
-	uint8_t *mmtemp = (uint8_t*) &mmtemp_d;
-	int i;
-	unsigned int len = width * height;
-
-	for(i = 0; i < 8; i++) mmtemp[i] = val;
-	MMX_load8byte_mm7( mmtemp_d );
-
-	for(i = 0; i < len; i+=width)
-	{
-		double *ipt = (double*) &in[i];
-		double *opt = (double*) &out[i];
-		int index = 0;
-		int k = width / 8;
-		while( index < k )
-		{
-			__asm__(
-			"\n\t movq %0,%%mm0	\t"
-			"\n\t movq %1,%%mm1	\t"
-			"\n\t movq %%mm0,%%mm2	\t"
-			"\n\t movq %%mm7,%%mm2	\t"
-			"\n\t movq %%mm2,%0	\t"
-			: "=m" (opt[index])
-			:  "m" (ipt[index])
-			);
-			index ++;
-		}
-	}
-	__asm__("emms" : :  );
-#else
-	memset( in, val, (width*height) );
-#endif
+	veejay_memset( in, val, (width*height) );
 }
 
 double	m_get_radius( int x, int y )
