@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.4.5],[veejay-users@lists.sourceforge.net])
+AC_INIT([veejay],[1.4.6],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=4
-VEEJAY_MICRO_VERSION=5
+VEEJAY_MICRO_VERSION=6
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -66,6 +66,9 @@ AC_ARG_WITH(pixbuf,
             AC_HELP_STRING([--without-pixbuf], [Do not use GDK pixbuf]),
             [], [with_pixbuf=yes])
 
+AC_ARG_WITH(playthread,
+            AC_HELP_STRING([--without-playthread], [Do not use playback thread]),
+            [], [with_playthread=yes])
 	    
 AC_ARG_WITH(directfb,
 	     AC_HELP_STRING([--without-directfb], [Do not use DirectFB.]),
@@ -76,6 +79,10 @@ AC_ARG_WITH(sdl,
 AC_ARG_WITH(jack,
 		AC_HELP_STRING([--without-jack], [Do not use jack.]),
 		[], [with_jack=yes])
+AC_ARG_WITH(samplerate,
+		AC_HELP_STRING([--without-samplerate], [Do not use libsamplerate.]),
+		[], [with_samplerate=yes])
+
 AC_ARG_WITH(v4l,
 		AC_HELP_STRING([--without-v4l], [Do not use video4linux]),	
 		[], [with_v4l=yes])
@@ -192,12 +199,23 @@ if test x"$PKG_CONFIG_PATH" = x ; then
 	AC_MSG_ERROR([Abort])
 fi
 
+AC_MSG_CHECKING(whether to compile with threaded playback)
+have_playthread=true
+if test "x$with_playthread" = "xyes" ; then
+ AC_DEFINE(USE_THREADS, 1, [playback threads])
+ AC_MSG_RESULT([yes])
+else
+ AC_MSG_RESULT([no])
+ have_playthread=false
+fi
+
 
 
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
  debugCFLAGS="-g"
+ CFLAGS="$CFLAGS $debugCFLAGS"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
@@ -218,6 +236,7 @@ if test "x$enable_strict" = "xyes" ; then
 else
  AC_MSG_RESULT([no])
 fi
+
 
 dnl ********************************************************************
 dnl Test for MMX support if an IA32 platform.  If on a PPC then look for
@@ -812,18 +831,31 @@ fi
 
 dnl *********************************************************************
 dnl Check for the Jack Audio connection kit
+dnl   AC_DEFINE(HAVE_JACK,,[Compiling with support for Jack])
 dnl
 
-have_jack=false
-if test x$with_jack != xno ; then
-  PKG_CHECK_MODULES(JACK, jack >= 0.1 , have_jack=true, have_jack=false)
-  if test x$have_jack = xtrue ; then
-    AC_SUBST(JACK_LIBS)
-    AC_SUBST(JACK_CFLAGS)
-    AC_DEFINE(HAVE_JACK,,[Compiling with support for Jack])
-  else
-    AC_MSG_WARN([Jack >= 0.100 is required, get it at http://jackit.sourceforge.net]);
-  fi
+dnl have_jack=false
+dnl if test x$with_jack != xno ; then
+dnl  PKG_CHECK_MODULES(JACK, jack >= 0.1 , have_jack=true, have_jack=false)
+dnl  if test x$have_jack = xtrue ; then
+dnl    AC_SUBST(JACK_LIBS)
+dnl    AC_SUBST(JACK_CFLAGS)
+dnl  else
+dnl    AC_MSG_WARN([Jack >= 0.100 is optional, get it at http://jackit.sourceforge.net]);
+dnl  fi
+dnl fi
+
+have_samplerate=false
+if test x$with_samplerate != xno ; then
+	PKG_CHECK_MODULES( SAMPLERATE, samplerate >= 0.0.15,
+			  have_samplerate=true,have_samplerate=false)
+	if test x$have_jack = xtrue ; then
+		AC_DEFINE( HAVE_SAMPLERATE,1,[Compiling in libsamplerate])
+		AC_SUBST( SAMPLERATE_CFLAGS )
+		AC_SUBST( SAMPLERATE_LIBS )
+	else
+	 AC_MSG_WARN([libsamplerate >= 0.0.15 is required, get it at http://www.mega-nerd.com/SRC])
+	fi
 fi
 
 dnl ********************************************************************
@@ -895,6 +927,7 @@ AM_CONDITIONAL(HAVE_MMX2, test x$have_asm_mmx2 = xtrue)
 AM_CONDITIONAL(HAVE_SDL, test x$have_sdl = xtrue)
 AM_CONDITIONAL(HAVE_XML2, test x$have_xml2 = xtrue)
 AM_CONDITIONAL(HAVE_JACK, test x$have_jack = xtrue)
+AM_CONDITIONAL(HAVE_SAMPLERATE,test x$have_samplerate = xtrue)
 AM_CONDITIONAL(HAVE_DIRECTFB, test x$have_directfb = xtrue)
 AM_CONDITIONAL(HAVE_FREETYPE, test x$have_freetype = xtrue)
 AM_CONDITIONAL(HAVE_V4L, test x$have_v4l = xtrue)
@@ -974,7 +1007,6 @@ libel/Makefile
 libstream/Makefile
 liblavjpeg/Makefile
 libsamplerec/Makefile
-bio2jack/Makefile
 veejay/Makefile
 man/Makefile
 veejay.pc
@@ -1038,4 +1070,7 @@ AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Unicap Imaging                : ${have_unicap} ])
+AC_MSG_NOTICE([  - libsamplerate                 : ${have_samplerate}])
 
+AC_MSG_NOTICE([ Compile time switches:])
+AC_MSG_NOTICE([  - Threaded playback             : ${have_playthread}])
