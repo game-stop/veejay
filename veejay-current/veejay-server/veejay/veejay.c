@@ -608,7 +608,13 @@ static void print_license()
 
 static void donothing(int sig)
 {
+#ifdef USE_THREADS
+	vj_lock(info);
+#endif
 	veejay_handle_signal( info, sig );	
+#ifdef USE_THREADS
+	vj_unlock(info);
+#endif
 }
 
 int main(int argc, char **argv)
@@ -706,7 +712,30 @@ int main(int argc, char **argv)
 	    veejay_msg(VEEJAY_MSG_ERROR, "Cannot start main playback cycle");
 		return 1;
 	}
+#ifdef USE_THREADS
 
+	
+	veejay_msg(VEEJAY_MSG_DEBUG, "Started playback");
+
+//	veejay_set_frame(info, 0);
+//	veejay_set_speed(info, 1);
+	
+	int sig;
+	int current_state = LAVPLAY_STATE_PLAYING;
+
+	while( 1 ) { //@ until your PC stops working
+		
+		usleep(50000);
+		vj_lock(info);
+		current_state = veejay_get_state(info);
+		vj_unlock(info);
+		if( current_state == LAVPLAY_STATE_STOP )
+			break;
+	}
+
+	veejay_quit(info);
+	veejay_busy(info);			
+#endif
 	veejay_free(info);
 
 	veejay_msg(VEEJAY_MSG_INFO, "Thank you for using Veejay");

@@ -56,7 +56,6 @@
 #include <veejay/vj-OSC.h>
 #include <libvjnet/vj-server.h>
 #include <veejay/vevo.h>
-#include <veejay/vj-jack.h>
 #include <veejay/vj-misc.h>
 /* Highest possible SDL Key identifier */
 #define MAX_SDL_KEY	(3 * SDLK_LAST) + 1  
@@ -3470,6 +3469,7 @@ void	vj_event_viewport_composition( void *ptr, const char format[], va_list ap )
 
 		veejay_msg(VEEJAY_MSG_INFO, "Stream #%d will %s be transformed when used as secundary input",
 			v->uc->sample_id, (status==2? "now" : "not"));
+		veejay_msg(VEEJAY_MSG_INFO, "Press CTRL+i again to toggle.");
 
 	} else if (SAMPLE_PLAYING(v)) {
 		if( sample_get_composite_view(v->uc->sample_id ) == NULL ) {
@@ -3486,6 +3486,8 @@ void	vj_event_viewport_composition( void *ptr, const char format[], va_list ap )
 		sample_set_composite( v->composite, v->uc->sample_id, status );
 		veejay_msg(VEEJAY_MSG_INFO, "Sample #%d will %s be transformed when used as secundary input",
 			v->uc->sample_id, (status==2? "now" : "not"));
+		veejay_msg(VEEJAY_MSG_INFO, "Press CTRL+i again to toggle.");
+
 		}
 	}
 }

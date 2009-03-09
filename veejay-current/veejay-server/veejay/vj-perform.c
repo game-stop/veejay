@@ -856,7 +856,7 @@ int vj_perform_audio_start(veejay_t * info)
 
 		jack_rate_ = vj_jack_rate();
 
-		if ( res == 2 )
+	/*	if ( res == 2 )
 		{
 			veejay_msg(VEEJAY_MSG_WARNING, "Jack plays at %d Hz, resampling audio from %d -> %d",jack_rate_,el->audio_rate,jack_rate_);
 			resample_jack = audio_resample_init( el->audio_chans,el->audio_chans, jack_rate_, el->audio_rate);
@@ -874,7 +874,9 @@ int vj_perform_audio_start(veejay_t * info)
 		else
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Jack is running the same samplerate as Veejay");
-		}
+		}*/
+
+
 		return 1;
 #else
 		veejay_msg(VEEJAY_MSG_WARNING, "Jack support not compiled in (no audio)");
@@ -1653,7 +1655,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 			int res = 0;	
 			//@ Capture frame into backing buffer
 			vp = vj_tag_get_composite_view(sample_id);			
-			if( dovp == 2 && vp == NULL ) 
+			if( vp == NULL ) //dovp == 2 
 				dovp = 0;
 
 			if( dovp == 2) {
@@ -1698,7 +1700,7 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
 	    {
 		dovp = sample_get_composite( sample_id );
 		vp   = sample_get_composite_view(sample_id);
-		if( dovp == 2 && vp == NULL ) 
+		if( vp == NULL ) // dovp == 2 
 			dovp = 0;
 
 #ifdef STRICT_CHECKING
@@ -1912,7 +1914,7 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
 		{ 
 			dovp = vj_tag_get_composite( sample_id);
 			vp = vj_tag_get_composite_view(sample_id );
-			if( dovp == 2 && vp == NULL )
+			if( vp == NULL ) //dovp == 2
 				dovp = 0;
 
 			if(dovp==2) {
@@ -1952,12 +1954,11 @@ static void vj_perform_apply_secundary(veejay_t * info, int sample_id, int type,
     case VJ_TAG_TYPE_NONE:
 	    	nframe = vj_perform_get_subframe(info, sample_id, chain_entry); // get exact frame number to decode
  	  	centry = vj_perform_sample_is_cached(sample_id, chain_entry);
-
 	    	if(centry == -1 || info->no_caching)
 	    	{
 			dovp = sample_get_composite(sample_id);
 			vp   = sample_get_composite_view(sample_id);
-			if( dovp == 2 && vp == NULL ) 
+			if( vp == NULL )  //dovp == 2
 				dovp = 0;
 	
 #ifdef STRICT_CHECKING			
@@ -2916,6 +2917,7 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 				}
 				break;
 		}
+/*
 		if( jack_rate_ != el->audio_rate && rs)
 		{
 #ifdef STRICT_CHECKING
@@ -2929,10 +2931,13 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 		else
 		{
 			vj_jack_play( a_buf, (num_samples * bps ));
-		}
+		}*/
+			vj_jack_play( a_buf, (num_samples * bps ));
+
      }	
+	veejay_msg(0 ,"\tread %d samples, %d", num_samples,num_samples, (int) ( (float)el->audio_rate/el->video_fps));
 #endif
-     return 1;
+   	return 1;
 }
 
 int	vj_perform_get_width( veejay_t *info )

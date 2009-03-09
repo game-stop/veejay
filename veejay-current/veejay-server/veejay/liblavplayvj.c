@@ -68,7 +68,6 @@
 #include <veejay/x11misc.h>
 #endif
 #include <libvjnet/vj-client.h>
-#include <veejay/vj-jack.h>
 #include <veejay/vj-misc.h>
 #ifdef HAVE_SYS_SOUNDCARD_H
 #include <sys/soundcard.h>
@@ -389,11 +388,7 @@ int veejay_set_speed(veejay_t * info, int speed)
 		veejay_msg(VEEJAY_MSG_ERROR, "Unknown playback mode");
 		break;
     }
-#ifdef HAVE_JACK
 
-    if(info->audio == AUDIO_PLAY )
-		vj_jack_continue( settings->current_playback_speed );
-#endif
 
     return 1;
 }
@@ -492,9 +487,27 @@ int veejay_free(veejay_t * info)
     return 1;
 }
 
+#ifdef USE_THREADS
+/******************************************************
+ * veejay_busy()
+ *   Wait until playback is finished
+ ******************************************************/
+
+void veejay_busy(veejay_t * info)
+{
+    pthread_join( ((video_playback_setup*)(info->settings))->playback_thread, NULL );
+}
+
+#endif
 void veejay_quit(veejay_t * info)
 {
+#ifdef USE_THREADS
+	vj_lock(info);
+#endif
     veejay_change_state(info, LAVPLAY_STATE_STOP);
+#ifdef USE_THREADS
+    vj_unlock(info);
+#endif
 }
 
 
@@ -589,23 +602,22 @@ int veejay_init_editlist(veejay_t * info)
     settings->previous_frame_num = 1;
     settings->spvf = 1.0 / el->video_fps;
     settings->msec_per_frame = 1000 / settings->spvf;
-    veejay_msg(VEEJAY_MSG_DEBUG, 
-		"1.0/Seconds per video Frame = %4.4f",
-		1.0 / settings->spvf);
 
     /* Seconds per audio sample: */
  
    if( !el->has_audio )
 	veejay_msg(VEEJAY_MSG_DEBUG, "EditList has no audio");
 
-   if (el->has_audio && (info->audio==AUDIO_PLAY || info->audio==AUDIO_RENDER))
+   if (el->has_audio && info->audio==AUDIO_PLAY)
    {
 	settings->spas = 1.0 / (double) el->audio_rate;
    }
    else
    {
-	settings->spas = 0;
+	settings->spas = 0.;
    }
+   veejay_msg(VEEJAY_MSG_DEBUG, "1.0/Seconds per video Frame = %4.4f",	1.0 / settings->spvf);
+   veejay_msg(VEEJAY_MSG_DEBUG, "1.0/%ld = %g Seconds per audio Frame", el->audio_rate, settings->spas );
 
    vj_el_set_image_output_size( el, info->dummy->width, info->dummy->height,		
 				    info->dummy->fps, info->pixel_format );
@@ -622,7 +634,7 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 	}
 	if( info->composite ) {
 		if( info->settings->composite == 2 ) {
-			info->settings->composite = info->settings->composite2; // back to top
+			info->settings->composite = 1; // back to top
 		} 
 	}
 
@@ -644,7 +656,7 @@ static  void	veejay_stop_playing_stream( veejay_t *info, int new_stream_id )
 	vj_tag_disable( info->uc->sample_id );
 	if( info->composite ) {
 		if( info->settings->composite == 2 ) {
-			info->settings->composite = info->settings->composite2;
+			info->settings->composite = 1;
 		}
 	}
 
@@ -962,8 +974,9 @@ int veejay_stop(veejay_t * info)
     veejay_change_state(info, LAVPLAY_STATE_STOP);
 
     /*pthread_cancel( settings->playback_thread ); */
-    //pthread_join(settings->playback_thread, NULL);
-
+#ifdef USE_THREADS
+    pthread_join(settings->playback_thread, NULL);
+#endif
     return 1;
 }
 
@@ -1174,29 +1187,8 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 
 	    if (settings->first_frame ||
 		(frame_periods * settings->usec_per_frame -
-		usec_since_lastframe) < (1000000 / HZ)) {
-		    if(settings->first_frame) {
-			    break;
-		    }
-		    else
-#ifdef STRICT_CHECKING
-		    if(    (frame_periods * settings->usec_per_frame - usec_since_lastframe) < 0 ) {
-			    veejay_msg(0, "usec_per_frame=%ld, usec_since_lastframe=%ld",
-					    settings->usec_per_frame,
-					    usec_since_lastframe );
-			    veejay_msg(0, "\t(%d * %ld) - %ld = %ld",
-					    frame_periods,
-					    settings->usec_per_frame,
-					    usec_since_lastframe,
-					    frame_periods * settings->usec_per_frame - usec_since_lastframe );
-			    	   veejay_msg(0,
-				   "Estimated sleep time: %ld",
-					(  (frame_periods * settings->usec_per_frame) - usec_since_lastframe));
-
-		    }
-#endif
-		    break;
-	    }
+		usec_since_lastframe) < (1000000 / HZ))
+		break;
 	    	
 	    /* Assume some other process will get a time-slice before
 	     * we do... and hence the worst-case delay of 1/HZ after
@@ -1210,15 +1202,15 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
     }
 
     settings->first_frame = 0;
-/*  gettimeofday(&(settings->lastframe_completion), 0);
-   settings->syncinfo[settings->currently_processed_frame].timestamp = settings->lastframe_completion;
-
-   veejay_msg(0, "LastFrame completion=%ld:%ld, use timer=%d", settings->lastframe_completion.tv_usec,
-		    settings->lastframe_completion.tv_sec, info->uc->use_timer);
-*/
+#ifdef USE_THREADS
+      /* We are done with writing the picture - Now update all surrounding info */
+	gettimeofday(&(settings->lastframe_completion), 0);
+        settings->syncinfo[settings->currently_processed_frame].timestamp =
+  	  settings->lastframe_completion;
+#endif
 
 }
-
+#ifndef USE_THREADS
 void	veejay_sync_frame(veejay_t *info)
 {
    video_playback_setup *settings =
@@ -1229,7 +1221,7 @@ void	veejay_sync_frame(veejay_t *info)
    settings->syncinfo[settings->currently_processed_frame].timestamp = settings->lastframe_completion;
 
 }
-
+#endif
 void veejay_pipe_write_status(veejay_t * info, int link_id)
 {
     video_playback_setup *settings =
@@ -1485,7 +1477,18 @@ static void veejay_handle_callbacks(veejay_t *info) {
 	/*  update network */
 	vj_event_update_remote( (void*)info );
 }
-
+#ifdef USE_THREADS
+void vj_lock(veejay_t *info)
+{
+	video_playback_setup *settings = info->settings;
+	pthread_mutex_lock(&(settings->valid_mutex));
+}
+void vj_unlock(veejay_t *info)
+{
+	video_playback_setup *settings = info->settings;
+	pthread_mutex_unlock(&(settings->valid_mutex));
+}	 
+#endif
 static void donothing2(int sig)
 {
 	veejay_msg(VEEJAY_MSG_WARNING,"Catched signal %x (ignored)",sig );
@@ -1662,12 +1665,12 @@ static void *veejay_mjpeg_playback_thread(void *arg)
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
    /* Allow easy shutting down by other processes... */
-    //pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
-    //pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-
+#ifdef USE_THREADS
+    pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
+    pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 
   /* schedule FIFO */
-/*
+
     veejay_schedule_fifo( info, getpid());
 
     vj_get_relative_time();
@@ -1679,10 +1682,8 @@ static void *veejay_mjpeg_playback_thread(void *arg)
     if( info->settings->repeat_delay > 0 && info->settings->repeat_interval ) {
 	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 	}
-#endif*/
-  //  while (settings->state != LAVPLAY_STATE_STOP) {
-
-	    /*
+#endif
+    while (settings->state != LAVPLAY_STATE_STOP) {
 	pthread_mutex_lock(&(settings->valid_mutex));
 	while (settings->valid[settings->currently_processed_frame] == 0) {
 	    pthread_cond_wait(&
@@ -1735,7 +1736,7 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 	settings->currently_processed_frame =
 	    (settings->currently_processed_frame + 1) % 1;
     }
-*/
+#endif
     return NULL;
 }
 
@@ -1752,7 +1753,38 @@ int veejay_open(veejay_t * info)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
+#ifdef USE_THREADS
+  veejay_msg(VEEJAY_MSG_DEBUG, 
+		"Initializing the threading system");
 
+    memset( &(settings->lastframe_completion), 0, sizeof(struct timeval));
+
+    pthread_mutex_init(&(settings->valid_mutex), NULL);
+    /* Invalidate all buffers, and initialize the conditions */
+
+	settings->valid[0] = 0;
+	settings->buffer_entry[0] = 0;
+	pthread_cond_init(&(settings->buffer_filled[0]), NULL);
+	pthread_cond_init(&(settings->buffer_done[0]), NULL);
+
+	veejay_memset( &(settings->syncinfo[0]), 0, sizeof(struct mjpeg_sync));
+
+    /* Now do the thread magic */
+    settings->currently_processed_frame = 0;
+    settings->currently_processed_entry = -1;
+
+      veejay_msg(VEEJAY_MSG_DEBUG,"Starting software playback thread"); 
+
+
+     if( pthread_create(&(settings->software_playback_thread), NULL,
+		       veejay_mjpeg_playback_thread, (void *) info)) {
+	veejay_msg(VEEJAY_MSG_ERROR, 
+		    "Could not create software playback thread");
+	return 0;
+
+
+    }
+#endif
     //@ collect geo statistics; how many times was veejay started from which geographical location
     //@ - do we do internationalization
     //@ - do we do veejay 2.0
@@ -1801,6 +1833,11 @@ static int veejay_mjpeg_set_playback_rate(veejay_t * info,
     case VIDEO_MODE_NTSC:
 	norm_usec_per_frame = 1001000 / 30;	/* 30ish Hz */
 	break;
+    default:
+	    veejay_msg(VEEJAY_MSG_ERROR, 
+			"Unknown video norm! Use PAL , SECAM or NTSC");
+	    return 0;
+
 	}
 
     if (video_fps != 0.0)
@@ -1813,11 +1850,50 @@ static int veejay_mjpeg_set_playback_rate(veejay_t * info,
     return 1;
 }
 
+#ifdef USE_THREADS
+/******************************************************
+ * veejay_mjpeg_queue_buf()
+ *   queue a buffer
+ *
+ * return value: 1 on success, 0 on error
+ ******************************************************/
+
+static void veejay_mjpeg_queue_buf(veejay_t * info,   int frame_periods)
+{
+    video_playback_setup *settings =
+	(video_playback_setup *) info->settings;
+    /* mark this buffer as playable and tell the software playback thread to wake up if it sleeps */
+    pthread_mutex_lock(&(settings->valid_mutex));
+    settings->valid[0] = frame_periods;
+    pthread_cond_broadcast(&(settings->buffer_filled[0]));
+    pthread_mutex_unlock(&(settings->valid_mutex));
+}
+
+
+/******************************************************
+ * veejay_mjpeg_sync_buf()
+ *   sync on a buffer
+ *
+ * return value: 1 on success, 0 on error
+ ******************************************************/
+#endif
 
 static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
+#ifdef USE_THREADS
+     /* Wait until this buffer has been played */
+	
+    pthread_mutex_lock(&(settings->valid_mutex));
+    while (settings->valid[settings->currently_synced_frame] != 0) {
+	pthread_cond_wait(&
+			  (settings->
+			   buffer_done[settings->currently_synced_frame]),
+			  &(settings->valid_mutex));
+    }
+    pthread_mutex_unlock(&(settings->valid_mutex));
+#endif
     veejay_memcpy(bs, &(settings->syncinfo[settings->currently_synced_frame]),sizeof(struct mjpeg_sync));
 
     settings->currently_synced_frame =
@@ -1825,8 +1901,33 @@ static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
 	
     return 1;
 }
+#ifdef USE_THREADS
+/******************************************************
+ * veejay_mjpeg_close()
+ *   close down
+ *
+ * return value: 1 on success, 0 on error
+ ******************************************************/
 
+ int veejay_close(veejay_t * info)
+{
+    video_playback_setup *settings =
+	(video_playback_setup *) info->settings;
 
+    veejay_msg(VEEJAY_MSG_DEBUG, 
+		"Closing down the threading system ");
+
+    //pthread_cancel(settings->software_playback_thread);
+    if (pthread_join(settings->software_playback_thread, NULL)) {
+	veejay_msg(VEEJAY_MSG_ERROR, 
+		    "Failure deleting software playback thread");
+	return 0;
+    }
+
+    return 1;
+}
+
+#endif
 /******************************************************
  * veejay_init()
  *   check the given settings and initialize everything
@@ -2242,6 +2343,7 @@ static	void	veejay_schedule_fifo(veejay_t *info, int pid )
  * veejay_playback_cycle()
  *   the playback cycle
  ******************************************************/
+#ifndef USE_THREADS
 static void veejay_display_frame(veejay_t *info )
 {
 	  video_playback_setup *settings =
@@ -2263,6 +2365,7 @@ static void veejay_display_frame(veejay_t *info )
 	settings->currently_processed_frame =
 	    (settings->currently_processed_frame + 1) % 1;
 }
+#endif
 static void veejay_playback_cycle(veejay_t * info)
 {
     video_playback_stats stats;
@@ -2272,13 +2375,13 @@ static void veejay_playback_cycle(veejay_t * info)
     struct mjpeg_sync bs;
     
     struct timeval time_now;
-    double tdiff1, tdiff2;
-    int first_free, skipv, skipa, skipi, nvcorr;
+    double tdiff1=0.0, tdiff2=0.0;
+    int first_free, skipv, skipa, skipi, nvcorr,frame;
     struct mjpeg_params bp;
     long ts, te;
 
     veejay_set_instance( info );
-
+#ifndef USE_THREADS
     //@ from mjpeg_
     veejay_schedule_fifo( info, getpid());
 
@@ -2292,12 +2395,22 @@ static void veejay_playback_cycle(veejay_t * info)
 	SDL_EnableKeyRepeat(SDL_DEFAULT_REPEAT_DELAY, SDL_DEFAULT_REPEAT_INTERVAL);
 	}
 #endif
-
-
+#endif
     if( settings->ncpu > 1 )
     {
 	veejay_msg(VEEJAY_MSG_INFO, "Found %d cores.", settings->ncpu);
     }
+
+       if(info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
+    {
+#ifdef HAVE_JACK
+        info->audio_running = vj_perform_audio_start(info);
+	stats.audio = 1;
+#endif
+    } else {
+	stats.audio = 0;
+    }
+
 	info->uc->playback_mode = info->settings->late[0];
 	info->uc->sample_id     = info->settings->late[1];
 	switch(info->uc->playback_mode) {
@@ -2322,7 +2435,6 @@ static void veejay_playback_cycle(veejay_t * info)
 			veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d", info->settings->late[1]);
 			break;
 	}
-
     vj_perform_queue_audio_frame(info);
     vj_perform_queue_video_frame(info,0);
  
@@ -2331,7 +2443,6 @@ static void veejay_playback_cycle(veejay_t * info)
 	   veejay_msg(VEEJAY_MSG_ERROR,"Unable to queue frame");
            return;
     }
-
 
     bp.input = 0;
     bp.norm =
@@ -2353,6 +2464,7 @@ static void veejay_playback_cycle(veejay_t * info)
 	return ;
     }
 
+     stats.tdiff = 0.0;
     stats.stats_changed = 0;
     stats.num_corrs_a = 0;
     stats.num_corrs_b = 0;
@@ -2363,19 +2475,18 @@ static void veejay_playback_cycle(veejay_t * info)
     tdiff2 = 0.;
     nvcorr = 0;
 
-#ifdef HAVE_JACK
-    if(el->has_audio && info->audio == AUDIO_PLAY)
-    {
-	stats.audio = 1;
-    }
-#else
-    stats.audio = 0;
-#endif   
+#ifdef USE_THREADS
+        veejay_mjpeg_queue_buf(info, 1 );
+#endif
     while (settings->state != LAVPLAY_STATE_STOP) {
 	first_free = stats.nsync;
 
 	int current_speed = settings->current_playback_speed;
-	long timing[10];
+#ifdef HAVE_JACK
+    	if(info->audio == AUDIO_PLAY )
+		vj_jack_continue( current_speed );
+#endif
+
 	do {
 	    if (settings->state == LAVPLAY_STATE_STOP) {
 		goto FINISH;
@@ -2385,6 +2496,7 @@ static void veejay_playback_cycle(veejay_t * info)
 		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 		goto FINISH;
 	    }
+	   frame = bs.frame;
 	/* Broadcast & wake up the waiting processes */
 	/* Now update the internal variables */
 	
@@ -2394,17 +2506,19 @@ static void veejay_playback_cycle(veejay_t * info)
 		(time_now.tv_usec - bs.timestamp.tv_usec)*1.e-6;
 	} 
 	while (stats.tdiff > settings->spvf && (stats.nsync - first_free) < 0);
-
+#ifdef USE_THREADS
+	veejay_event_handle(info);
+#endif
 #ifdef HAVE_JACK
-	if ( info->audio==AUDIO_PLAY ) 
+	if ( info->audio==AUDIO_PLAY && el->has_audio ) 
 	{
 	   struct timeval audio_tmstmp;	
 	   long int sec=0;
 	   long int usec=0;
 	   long num_audio_bytes_written = vj_jack_get_status( &sec,&usec);
+
 	   audio_tmstmp.tv_sec = sec;
 	   audio_tmstmp.tv_usec = usec;
-
 	   if (audio_tmstmp.tv_sec)
  	   {
          	    tdiff1 = settings->spvf * (stats.nsync - nvcorr) -  
@@ -2413,8 +2527,7 @@ static void veejay_playback_cycle(veejay_t * info)
            }
 	}
 #endif
-	stats.tdiff = tdiff1 - tdiff2;
-
+	stats.tdiff = (tdiff1 - tdiff2);
 	/* Fill and queue free buffers again */
 	int n;
 	for (n = first_free; n < stats.nsync;) {
@@ -2446,14 +2559,15 @@ static void veejay_playback_cycle(veejay_t * info)
 		    stats.stats_changed = 1;
 		}
 	    }
+
+	    frame  = 0;
 #ifdef HAVE_SDL
 	    ts= SDL_GetTicks();
 #endif
-	    settings->buffer_entry[0] ++;
+	    settings->buffer_entry[frame] = settings->current_frame_num;
 
 	    if (!skipa) 
 			vj_perform_queue_audio_frame(info);
-
 	    if (!skipv)
 			vj_perform_queue_video_frame(info,skipi);
 
@@ -2467,8 +2581,14 @@ static void veejay_playback_cycle(veejay_t * info)
 #endif
 	    if(skipv ) continue;
 
+#ifdef USE_THREADS
+	    veejay_mjpeg_queue_buf(info, 1 );
+	
+	    stats.nqueue ++;
+#endif
 	    n++;
 	}
+#ifndef USE_THREADS
 	veejay_event_handle(info);
 
 
@@ -2476,12 +2596,14 @@ static void veejay_playback_cycle(veejay_t * info)
 	
 		
 	veejay_sync_frame(info);
-
+#endif
     
 		/* output statistics */
 	if (el->has_audio && (info->audio==AUDIO_PLAY))
 	    stats.audio = settings->audio_mute ? 0 : 1;
 	stats.stats_changed = 0;
+	stats.frame = settings->current_frame_num;
+	//stats.nsync = 0;
     }
 
   FINISH:
@@ -2537,15 +2659,16 @@ static void Welcome(veejay_t *info)
 			"If you want to start a new project, start veejay in an empty directory");
 	}
 }
-
+#ifdef USE_THREADS
+static	void *veejay_playback_thread(void *data)
+#else
 static void veejay_playback_thread(void *data)
-
-//static void *veejay_playback_thread(void *data)
+#endif
 {
     veejay_t *info = (veejay_t *) data;
     int i;
-   
-/*	sigset_t mask;
+#ifdef USE_THREADS
+	sigset_t mask;
 	struct sigaction act;
 	sigemptyset(&mask);
 	sigaddset( &mask, SIGPIPE );
@@ -2555,11 +2678,13 @@ static void veejay_playback_thread(void *data)
 
 
     pthread_sigmask( SIG_BLOCK, &mask, NULL );
-	int mode, id; */
-
+	int mode, id;
+#endif
     Welcome(info);
     veejay_playback_cycle(info);
-
+#ifdef USE_THREADS
+    veejay_close(info);
+#endif
     if(info->uc->is_server) {
 	for(i = 0; i < 4; i ++ )
 	  if(info->vjs[i]) vj_server_shutdown(info->vjs[i]); 
@@ -2603,11 +2728,15 @@ static void veejay_playback_thread(void *data)
 	vj_font_destroy( info->font );
 	vj_font_destroy( info->osd );
 #endif
-  //  veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
+#ifdef USE_THREADS
+    veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
+#endif
     vj_perform_free(info);
 
-//    pthread_exit(NULL);
- //   return NULL;
+#ifdef USE_THREADS
+    pthread_exit(NULL);
+    return NULL;
+#endif
 }
 
 /*
@@ -2804,8 +2933,7 @@ veejay_t *veejay_malloc()
     info->settings->currently_processed_entry = -1;
     info->settings->first_frame = 1;
     info->settings->state = LAVPLAY_STATE_STOP;
-    info->settings->composite2 = 2;
-    info->settings->composite = info->settings->composite2;
+    info->settings->composite = 1;
     info->uc->playback_mode = VJ_PLAYBACK_MODE_PLAIN;
     info->uc->use_timer = 2;
     info->uc->sample_key = 1;
@@ -2842,12 +2970,14 @@ veejay_t *veejay_malloc()
 
 	info->settings->late[0] = VJ_PLAYBACK_MODE_PLAIN;
 	info->settings->late[1] = 0; 
+#ifndef USE_THREADS
 	veejay_memset( &(info->settings->lastframe_completion), 0, sizeof(struct timeval));
 	info->settings->valid[0] = 0;
 	info->settings->buffer_entry[0] = 0;
 	veejay_memset( &(info->settings->syncinfo[0]), 0, sizeof(struct mjpeg_sync));
    	 info->settings->currently_processed_frame = 0; //@obsolete?
    	 info->settings->currently_processed_entry = -1;
+#endif
 
 	int status = 0;
 	int acj    = 0;
@@ -2947,19 +3077,15 @@ int veejay_main(veejay_t * info)
 
     /* Flush the Linux File buffers to disk */
     sync();
-
-    if(info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
-    {
-        info->audio_running = vj_perform_audio_start(info);
-    }
-
+#ifndef USE_THREADS
     veejay_playback_thread( (void*) info );
-   
-   /* if (pthread_create(&(settings->playback_thread),NULL,
+#else
+   if (pthread_create(&(settings->playback_thread),NULL,
 		       veejay_playback_thread, (void *) info)) {
 	veejay_msg(VEEJAY_MSG_ERROR, "Failed to create thread");
 	return -1;
-    }*/
+    }
+#endif
 
     return 1;
 }

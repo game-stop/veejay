@@ -18,7 +18,6 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/libsamplerec \
 		-I$(top_srcdir)/libvevo \
 		-I$(top_srcdir)/liblzo \
-		-I$(top_srcdir)/bio2jack \
 		$(FFMPEG_AVCODEC_CFLAGS) $(FFMPEG_AVFORMAT_CFLAGS) $(LIBQUICKTIME_CFLAGS) $(FT_CFLAGS) \
 		$(AVIPLAY_CFLAGS) $(XML2_CFLAGS) $(GTK_CFLAGS) $(DV_FLAGS) $(X_CFLAGS) \
 		$(DIRECTFB_CFLAGS) $(SDL_CFLAGS) $(JPEG_CFLAGS) $(PTHREAD_CFLAGS) $(SAMPLERATE_CFLAGS) 
@@ -34,7 +33,7 @@ VEEJAY_ALL_LIB_OPTS = \
 	-export-dynamic 
 
 libveejay_la_SOURCES =  vj-misc.c \
-			vj-osc.c vjkf.c vj-event.c vj-eventman.c vj-pjack.c vj-perform.c \
+			vj-osc.c vjkf.c vj-event.c vj-eventman.c vj-perform.c \
 			x11misc.c vj-sdl.c vj-dfb.c vj-viewport.c vj-composite.c \
 			vj-font.c liblavplayvj.c 
 
@@ -45,7 +44,6 @@ libveejay_la_LIBADD = -L$(top_builddir)/mjpegtools/ -lmjpegutils \
 			-L$(top_builddir)/libOSC / -lOSC \
 			-L$(top_builddir)/libhash / -lhash \
 			-L$(top_builddir)/liblzo / -lminilzo \
-			-L$(top_builddir)/bio2jack/ -lbio2jack4vj \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
 			-L$(top_builddir)/libvjmem/ -lvjmem \
 			-L$(top_builddir)/libvje -lvje \
@@ -60,9 +58,9 @@ libveejay_la_LIBADD = -L$(top_builddir)/mjpegtools/ -lmjpegutils \
 			-L$(top_builddir)/libvevo -lvevo 
 
 libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $(FT_LDFLAGS) $(FT_LIBS) \
-			$(XML2_LIBS) $(JPEG_LIBS) $(JACK_LIBS) $(UNICAP_LIBS) \
+			$(XML2_LIBS) $(JPEG_LIBS) $(UNICAP_LIBS) \
 		 	$(FFMPEG_AVFORMAT_LIBS) $(FFMPEG_AVCODEC_LIBS) $(FFMPEG_SWSCALER_LIBS) $(XINERAMA_LIBS) \
-			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(LIBQUICKTIME_LIBS) \
+			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(LIBQUICKTIME_LIBS) $(SAMPLERATE_LIBS) \
 			-DDYNAMIC -O3 -Wall -rdynamic 
 
 # *********************************************************************
