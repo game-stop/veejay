@@ -2217,6 +2217,8 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	int64_t n1 = 0;
 	int64_t j = 0;
 	int64_t n2 = el->video_frames-1;
+	char	filename[1024];
+	char	fourcc[6];
 	/* get which files are actually referenced in the edit list entries */
 	int est_len = 0;
    	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
@@ -2229,23 +2231,23 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	}
    
 	num_files = 0;
+	int nnf   = 0;
+	long len  = 0;
    	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
 	{
-		if (index[j] > 0 )
-			index[j] = (int64_t)num_files++;
-	}
-	int nnf = 0;
-	for ( j = 0; j < MAX_EDIT_LIST_FILES ; j ++ )
-		if(index[j] >= 0 && el->video_file_list[j] != NULL)
+		if (index[j] >= 0 && el->video_file_list[j] != NULL )
 		{
+			index[j] = (int64_t)num_files++;
 			nnf ++;
+			len     += (strlen(el->video_file_list[j])) + 25 + 20 + (16 * 3 );
 		}
+	}
+
 	n = el->frame_list[n1];
 	oldfile = index[ N_EL_FILE(n) ];
    	oldframe = N_EL_FRAME(n);
  
-	
-	est_len = nnf * 1024;
+	est_len = 52 + len;
 	result = (char*) vj_calloc(sizeof(char) * est_len );
 	sprintf(result, "%04d",nnf );
 
@@ -2253,11 +2255,9 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	{
 		if (index[j] >= 0 && el->video_file_list[j] != NULL)
 		{
-			char filename[400];
-			char fourcc[6];
-			sprintf(fourcc, "%s", "????");
+			snprintf(fourcc,sizeof(fourcc),"%s", "????");
 			vj_el_get_file_fourcc( el, j, fourcc );
-			sprintf(filename ,"%03d%s%04d%010ld%02d%s",
+			snprintf(filename,sizeof(filename),"%03d%s%04d%010ld%02d%s",
 				strlen( el->video_file_list[j]  ),
 				el->video_file_list[j],
 				(unsigned long) j,
@@ -2265,14 +2265,12 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 				strlen(fourcc),
 				fourcc 
 			);
-			sprintf(fourcc, "%04d", strlen( filename ));
-			veejay_strncat( result, fourcc, strlen(fourcc ));
 			veejay_strncat ( result, filename, strlen(filename));
 		}
 	}
 
-	char first[33];
-	sprintf(first, "%016lld%016lld",oldfile, oldframe);
+	char first[64];
+	snprintf(first,sizeof(first), "%016lld%016lld",oldfile, oldframe);
 	veejay_strncat( result, first, strlen(first) );
 
   	for (j = n1+1; j <= n2; j++)
@@ -2281,9 +2279,8 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 		if ( index[ N_EL_FILE(n) ] != oldfile ||
 			N_EL_FRAME(n) != oldframe + 1 )	
 		{
-			int len = 20 + (16 * 3 ) + strlen( el->video_file_list[ index[N_EL_FILE(n)] ] );
-			char *tmp = (char*) vj_calloc(sizeof(char) * len );
-			sprintf( tmp, "%016lld%016lld%016lld",
+			char *tmp = (char*) vj_calloc(sizeof(char) * 50 );
+			snprintf( tmp,sizeof(tmp), "%016lld%016lld%016lld",
 				 oldframe,
 				 index[N_EL_FILE(n)],
 				 N_EL_FRAME(n) );
