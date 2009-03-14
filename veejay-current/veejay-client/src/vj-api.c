@@ -4941,11 +4941,14 @@ static	void	reload_editlist_contents()
 
 		if(nl < 0 || nl >= num_files)
 		{
+			free(tmp);
+			g_free(eltext);
 			return;
 		}
 		int file_len = _el_get_nframes( nl );
 	  	if(file_len <= 0)
 		{
+			free(tmp);
 			row_num++;
 			continue;
 		}
@@ -4956,6 +4959,7 @@ static	void	reload_editlist_contents()
 
 		if(n2 <= n1 )
 		{
+			free(tmp);
 			row_num++;
 			continue;
 		}

@@ -1,8 +1,5 @@
 # Process with automake to produce Makefile.in
-SUBDIRS = mjpeg
-if USE_GVEEJAYRELOADED
-SUBDIRS += src
-endif
+SUBDIRS = src
 
 EXTRA_DIST = \
  autogen.sh\
