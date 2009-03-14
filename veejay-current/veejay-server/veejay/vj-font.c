@@ -2123,7 +2123,7 @@ static void vj_font_text_osd_render(vj_font_t *f, void *_picture, int x, int y )
 	y1 = y;	
 
 	unsigned int str_wi = 0;
-	char *text = f->add;
+	unsigned char *text = f->add;
 
 	for (i=0; i < size; i++)
 	{
@@ -2195,7 +2195,7 @@ static void vj_font_text_osd_render(vj_font_t *f, void *_picture, int x, int y )
  	for (i=0; i < size; i++)
     	{
 		c = text[i];
-		if (  ((c == '_') && (text == f->text) ) || /* skip '_' (consider as space) 
+		if (  ((c == (unsigned char) '_') && (text == f->text) ) || /* skip '_' (consider as space) 
 					     IF text was specified in cmd line 
 					     (which doesn't like neasted quotes)  */
 	 		 ( c == '\n' )) /* Skip new line char, just go to new line */
