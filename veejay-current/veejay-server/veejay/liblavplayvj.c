@@ -1953,6 +1953,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Loaded configuration file %s", info->action_file[0] );
 			has_config = 1;
+		} else {
+			veejay_msg(VEEJAY_MSG_WARNING, "File %s is not an action file", info->action_file[0]);
 		}
 	}
 
@@ -2243,8 +2245,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		{
 			return -1;
 		}
-		info->settings->late[0] = VJ_PLAYBACK_MODE_TAG;
-		info->settings->late[1] = nid;
+		info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
+		info->uc->sample_id = nid;
 	}
 	else if( info->uc->file_as_sample && id <= 0 && !has_config)
 	{
@@ -2268,8 +2270,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 				}
 			}	
 		}
-		info->settings->late[0] = VJ_PLAYBACK_MODE_SAMPLE;
-		info->settings->late[1] = 1;
+		info->uc->playback_mode = VJ_PLAYBACK_MODE_SAMPLE;
+		info->uc->sample_id = 1;
 	}
 	else if(info->dummy->active && id <= 0)
 	{
@@ -2279,8 +2281,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 			dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, "Solid", -1, el,info->pixel_format,-1,0,0);
 		else
 			dummy_id = vj_tag_size()-1;
-		info->settings->late[0] = VJ_PLAYBACK_MODE_TAG;
-		info->settings->late[1] = dummy_id;
+		info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
+		info->uc->sample_id = dummy_id;
 	}
 
 	/* After we have fired up the audio and video threads system (which
@@ -2296,7 +2298,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
     	}
 	if(info->load_action_file ) {
 	  if(sample_readFromFile( info->action_file[1],info->composite,info->seq,info->font,info->edit_list,
-			&(info->settings->late[0]),&(info->settings->late[1]) ))
+			 &(info->uc->sample_id), &(info->uc->playback_mode)  ))
 	   {
 			veejay_msg(VEEJAY_MSG_INFO, "Loaded samplelist %s", info->action_file[1]);
 	    }
@@ -2411,8 +2413,6 @@ static void veejay_playback_cycle(veejay_t * info)
 	stats.audio = 0;
     }
 
-	info->uc->playback_mode = info->settings->late[0];
-	info->uc->sample_id     = info->settings->late[1];
 	switch(info->uc->playback_mode) {
 		case VJ_PLAYBACK_MODE_PLAIN:
 			info->current_edit_list = info->edit_list;
@@ -2427,12 +2427,14 @@ static void veejay_playback_cycle(veejay_t * info)
 			settings->current_playback_speed = 1;
 			break;
 		case VJ_PLAYBACK_MODE_TAG:
-			veejay_start_playing_stream(info,info->settings->late[1]);	
-			veejay_msg(VEEJAY_MSG_INFO, "Playing stream %d", info->settings->late[1]);
+			veejay_start_playing_stream(info,info->uc->sample_id);	
+			veejay_msg(VEEJAY_MSG_INFO, "Playing stream %d", info->uc->sample_id);
 			break;
+		case VJ_PLAYBACK_MODE_PATTERN: //@ randomizer
+			info->uc->playback_mode = VJ_PLAYBACK_MODE_SAMPLE;
 		case VJ_PLAYBACK_MODE_SAMPLE:
-			veejay_start_playing_sample(info, info->settings->late[1]);
-			veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d", info->settings->late[1]);
+			veejay_start_playing_sample(info, info->uc->sample_id);
+			veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d", info->uc->sample_id);
 			break;
 	}
     vj_perform_queue_audio_frame(info);
@@ -2968,8 +2970,6 @@ veejay_t *veejay_malloc()
 	info->pixel_format = FMT_422F; //@default 
 	info->settings->ncpu = smp_check();
 
-	info->settings->late[0] = VJ_PLAYBACK_MODE_PLAIN;
-	info->settings->late[1] = 0; 
 #ifndef USE_THREADS
 	veejay_memset( &(info->settings->lastframe_completion), 0, sizeof(struct timeval));
 	info->settings->valid[0] = 0;
