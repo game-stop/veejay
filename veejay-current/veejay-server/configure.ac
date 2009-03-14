@@ -845,18 +845,18 @@ dnl    AC_MSG_WARN([Jack >= 0.100 is optional, get it at http://jackit.sourcefor
 dnl  fi
 dnl fi
 
-have_samplerate=false
-if test x$with_samplerate != xno ; then
-	PKG_CHECK_MODULES( SAMPLERATE, samplerate >= 0.0.15,
-			  have_samplerate=true,have_samplerate=false)
-	if test x$have_jack = xtrue ; then
-		AC_DEFINE( HAVE_SAMPLERATE,1,[Compiling in libsamplerate])
-		AC_SUBST( SAMPLERATE_CFLAGS )
-		AC_SUBST( SAMPLERATE_LIBS )
-	else
-	 AC_MSG_WARN([libsamplerate >= 0.0.15 is required, get it at http://www.mega-nerd.com/SRC])
-	fi
-fi
+dnl have_samplerate=false
+dnl if test x$with_samplerate != xno ; then
+dnl	PKG_CHECK_MODULES( SAMPLERATE, samplerate >= 0.0.15,
+dnl			  have_samplerate=true,have_samplerate=false)
+dnl	if test x$have_jack = xtrue ; then
+dnl		AC_DEFINE(HAVE_SAMPLERATE,1,[Compiling in libsamplerate])
+dnl		AC_SUBST(SAMPLERATE_CFLAGS)
+dnl		AC_SUBST(SAMPLERATE_LIBS)
+dnl	else
+dnl	 AC_MSG_WARN([libsamplerate >= 0.0.15 is required, get it at http://www.mega-nerd.com/SRC])
+dnl	fi
+dnl fi
 
 dnl ********************************************************************
 dnl Check for the libxml2 library (for saving/loading project files)
