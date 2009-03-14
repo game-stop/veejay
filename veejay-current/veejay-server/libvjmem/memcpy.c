@@ -818,7 +818,7 @@ void fast_memset_dirty(void * to, int val, size_t len)
 
 
 
-#if defined (HAVE_ASM_MMX) || defined( HAVE_ASM_SSE )
+#if defined (HAVE_ASM_MMX) 
 /* Fast memory set. See comments for fast_memcpy */
 void * fast_memset(void * to, int val, size_t len)
 {
@@ -827,6 +827,7 @@ void * fast_memset(void * to, int val, size_t len)
 	unsigned char mm_reg[_MMREG_SIZE], *pmm_reg;
 	unsigned char *t = to;
   	retval = to;
+//	veejay_msg(0, "clear %d bytes in %p",len,val);
         if(len >= _MIN_LEN)
 	{
 	  register unsigned long int delta;
@@ -841,7 +842,8 @@ void * fast_memset(void * to, int val, size_t len)
 	  len&=127;
 	  pmm_reg = mm_reg;
 	  small_memset(pmm_reg,val,sizeof(mm_reg));
-#ifdef HAVE_ASM_SSE /* Only P3 (may be Cyrix3) */
+/*#ifdef HAVE_ASM_SSE 
+ //Only P3 (may be Cyrix3) 
 	__asm__ __volatile__(
 		"movups (%0), %%xmm0\n"
 		:: "r"(mm_reg):"memory");
@@ -860,6 +862,7 @@ void * fast_memset(void * to, int val, size_t len)
 		t+=128;
 	}
 #else
+*/
 	__asm__ __volatile__(
 		"movq (%0), %%mm0\n"
 		:: "r"(mm_reg):"memory");
@@ -885,15 +888,12 @@ void * fast_memset(void * to, int val, size_t len)
 		:: "r" (t) : "memory");
 		t+=128;
 	}
-#endif /* Have SSE */
 #ifdef HAVE_ASM_MMX2
-                /* since movntq is weakly-ordered, a "sfence"
-		 * is needed to become ordered again. */
-		__asm__ __volatile__ ("sfence":::"memory");
-#endif
-#ifndef HAVE_ASM_SSE
-		/* enables to use FPU */
-		__asm__ __volatile__ (EMMS:::"memory");
+        /* since movntq is weakly-ordered, a "sfence"
+	 * is needed to become ordered again. */
+	__asm__ __volatile__ ("sfence":::"memory");
+	/* enables to use FPU */
+	__asm__ __volatile__ (EMMS:::"memory");
 #endif
 	}
 	/*
@@ -936,8 +936,8 @@ static struct {
 {
      { NULL, NULL, 0},
      { "glibc memset()",            (void*)memset, 0},
-#if defined(HAVE_ASM_MMX) || defined(HAVE_ASM_SSE)
-     { "MMX/MMX2/SSE optimized memset()", (void*)   fast_memset, 0},
+#if defined(HAVE_ASM_MMX) || defined(HAVE_ASM_MMX2)
+     { "MMX/MMX2 optimized memset()", (void*)   fast_memset, 0},
 #endif 
        { NULL, NULL, 0},
 };

@@ -258,7 +258,7 @@ void radioactivetv_apply( VJFrame *frame, VJFrame *blue, int width, int height,
 	if( last_mode != mode )
 	{
 //@ mode changed, reset
-		veejay_memset( blurzoombuf, 0, 2*len);
+		veejay_memset( blurzoombuf, 0, 2*buf_area);
 		veejay_memset( diff, 0, len );
 		last_mode = mode;
 	}
