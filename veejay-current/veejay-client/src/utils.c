@@ -18,10 +18,10 @@
  */
 #include <config.h>
 #include <stdio.h>
-#include <mjpeg/yuv4mpeg_intern.h>
-#include <mjpeg/yuv4mpeg.h>
-#include <mjpeg/mpegconsts.h>
-#include <mjpeg/mpegtimecode.h>
+#include "yuv4mpeg_intern.h"
+#include "yuv4mpeg.h"
+#include "mpegconsts.h"
+#include "mpegtimecode.h"
 
 #include <veejay/vjmem.h>
 #include <string.h>
