@@ -119,10 +119,6 @@ typedef struct
 
 
 typedef struct {
-#ifndef USE_THREADS
-    pthread_t geo_stat;
-    sigset_t signal_set;
-#else
     pthread_t software_playback_thread;
     pthread_t playback_thread;	
     pthread_attr_t playback_attr;
@@ -133,7 +129,6 @@ typedef struct {
     pthread_mutex_t syncinfo_mutex;
     pthread_t signal_thread;
     sigset_t signal_set;
-#endif
     struct timeval lastframe_completion;	/* software sync variable */
 
     long old_field_len;

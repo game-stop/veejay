@@ -153,8 +153,8 @@ static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 		link[i]->n_retrieved = 0;
 	}
 	v->link = (void**) link;
-	veejay_msg(VEEJAY_MSG_INFO, "UDP multicast frame sender ready at port %d (group '%s')",
-	  	 v->ports[0], group_name );
+	veejay_msg(VEEJAY_MSG_INFO, "UDP multicast frame sender ready at (group '%s')",
+	  	 group_name );
 
 	return 1;
 }

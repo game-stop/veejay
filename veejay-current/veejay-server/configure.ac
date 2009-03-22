@@ -199,18 +199,6 @@ if test x"$PKG_CONFIG_PATH" = x ; then
 	AC_MSG_ERROR([Abort])
 fi
 
-AC_MSG_CHECKING(whether to compile with threaded playback)
-have_playthread=true
-if test "x$with_playthread" = "xyes" ; then
- AC_DEFINE(USE_THREADS, 1, [playback threads])
- AC_MSG_RESULT([yes])
-else
- AC_MSG_RESULT([no])
- have_playthread=false
-fi
-
-
-
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""
 if test "x$enable_debug" = "xyes" ; then
@@ -1071,5 +1059,3 @@ AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Unicap Imaging                : ${have_unicap} ])
 AC_MSG_NOTICE([  - libsamplerate                 : ${have_samplerate}])
 
-AC_MSG_NOTICE([ Compile time switches:])
-AC_MSG_NOTICE([  - Threaded playback             : ${have_playthread}])

@@ -54,7 +54,7 @@ typedef struct
 
 #define			PACKET_HEADER_LENGTH	( sizeof(packet_header_t) )
 #define			PACKET_APP_HEADER_LENGTH ( sizeof(frame_info_t) )
-#define			CHUNK_SIZE		2048
+#define			CHUNK_SIZE		( 1500 - 28 )
 #define			PACKET_PAYLOAD_SIZE	(CHUNK_SIZE + PACKET_HEADER_LENGTH + PACKET_APP_HEADER_LENGTH )
 
 void			packet_dump_header( packet_header_t *h);

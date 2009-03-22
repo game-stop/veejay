@@ -153,13 +153,15 @@ int vj_client_connect_dat(vj_client *v, char *host, int port_id  )
 int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 {
 	int error = 0;
-	
+	if(port_id <= 0 || port_id > 65535)
+	{
+		veejay_msg(0, "Invalid port number '%d'", port_id );
+		return 0;
+	}
+
 	if( group_name == NULL )
 	{
-
 		if(host == NULL)
-			return 0;
-		if(port_id <= 0 || port_id > 65535)
 			return 0;
 
 		v->c[0]->type = VSOCK_C;
@@ -167,25 +169,37 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 		v->c[1]->type = VSOCK_S;
 		v->c[1]->fd   = alloc_sock_t();
 		if(!v->c[0]->fd || !v->c[1]->fd )
-		{
+		{	
+			veejay_msg(0, "Error opening socket");
 			return 0;
 		}
+
 		if( sock_t_connect( v->c[0]->fd, host, port_id + VJ_CMD_PORT ) )
 		{
 			if( sock_t_connect( v->c[1]->fd, host, port_id + VJ_STA_PORT ) )
 			{		
 				return 1;
+			} else {
+				veejay_msg(0, "Failed to connect to status port.");
 			}
+		} else {
+			veejay_msg(0, "Failed to connect to command port.");
 		}
 	}
 	else
 	{
-		if(port_id <= 0 || port_id > 65535 )
-			return 0;
-
 		v->c[0]->type = VMCAST_C;
 		v->c[0]->r    = mcast_new_receiver( group_name, port_id + VJ_CMD_MCAST ); 
+		if(!v->c[0]->r ) {
+			veejay_msg(0 ,"Unable to setup multicast receiver on group %s", group_name );
+			return 0;
+		}
+
 		v->c[0]->s    = mcast_new_sender( group_name );
+		if(!v->c[0]->s ) {
+			veejay_msg(0, "Unable to setup multicast sender on group %s", group_name );
+			return 0;
+		}
 		v->ports[0] = port_id + VJ_CMD_MCAST;
 		v->ports[1] = port_id + VJ_CMD_MCAST_IN;
 

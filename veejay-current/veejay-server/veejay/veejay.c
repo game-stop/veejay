@@ -608,13 +608,9 @@ static void print_license()
 
 static void donothing(int sig)
 {
-#ifdef USE_THREADS
 	vj_lock(info);
-#endif
 	veejay_handle_signal( info, sig );	
-#ifdef USE_THREADS
 	vj_unlock(info);
-#endif
 }
 
 int main(int argc, char **argv)
@@ -712,7 +708,6 @@ int main(int argc, char **argv)
 	    veejay_msg(VEEJAY_MSG_ERROR, "Cannot start main playback cycle");
 		return 1;
 	}
-#ifdef USE_THREADS
 
 	
 	veejay_msg(VEEJAY_MSG_DEBUG, "Started playback");
@@ -735,7 +730,6 @@ int main(int argc, char **argv)
 
 	veejay_quit(info);
 	veejay_busy(info);			
-#endif
 	veejay_free(info);
 
 	veejay_msg(VEEJAY_MSG_INFO, "Thank you for using Veejay");

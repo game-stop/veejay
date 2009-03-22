@@ -90,6 +90,10 @@ mcast_sender	*mcast_new_sender( const char *group_name )
 //		sizeof(int)) < 0 )
 //		print_error();
 
+	char *eth = getenv("VEEJAY_MCAST_INTERFACE");
+	if( eth != NULL ) {
+		mcast_set_interface(v, eth );
+	}
 	return v;
 }	
 
@@ -132,7 +136,8 @@ int		mcast_send( mcast_sender *v, const void *buf, int len, int port_num )
 {
 	int n ;
 	v->addr.sin_port = htons( port_num );
-	
+	v->addr.sin_family = AF_INET;
+
 	n =  sendto( v->sock_fd, buf, len, 0, (struct sockaddr*) &(v->addr), v->addr_len );
 
 	if( n == -1 )

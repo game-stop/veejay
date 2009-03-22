@@ -315,6 +315,12 @@ int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len, int
 		packet_header_t hdr = packet_get_header( chunk );
 		frame_info_t    inf;
 		packet_get_info(&inf,chunk );
+		*dw = info.width;
+		*dh = info.height;
+		*dfmt = info.fmt;
+
+//		packet_dump_header( &hdr );
+//		packet_dump_info( &inf );
 
 		if( n_packet == 0 )	// is this the first packet we get?
 		{
@@ -327,15 +333,15 @@ int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len, int
 					total_recv = n_packet * CHUNK_SIZE;
 					veejay_memcpy(&header, &(queued_packets->hdr), sizeof(packet_header_t));
 					veejay_memcpy(&info,   &(queued_packets->inf), sizeof(frame_info_t));
-			//	veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d dequeuing packet with timestamp %x in next buffer (ts=%x,length=%d,len=%d, packets=%d)",
-			//		__FUNCTION__,__LINE__, hdr.usec, queued_packets->hdr.usec, queued_packets->hdr.length, queued_packets->inf.len, n_packet );
+				veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d dequeuing packet with timestamp %x in next buffer (ts=%x,length=%d,len=%d, packets=%d)",
+					__FUNCTION__,__LINE__, hdr.usec, queued_packets->hdr.usec, queued_packets->hdr.length, queued_packets->inf.len, n_packet );
 				}
 				else
 				{
 					//@ there are queued packets, but not the expected ones.
 					//@ destroy packet buffer
-		//		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d packet with timestamp %x arrived (queued=%x, reset. grab new)",
-		//			__FUNCTION__,__LINE__, hdr.usec, queued_packets->hdr.usec );
+				veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d packet with timestamp %x arrived (queued=%x, reset. grab new)",
+					__FUNCTION__,__LINE__, hdr.usec, queued_packets->hdr.usec );
 					mcast_packet_buffer_release(v->next);
 					queued_packets = NULL;
 					v->next = NULL;
@@ -347,8 +353,8 @@ int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len, int
 			}
 			else
 			{
-		//	veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Queuing first packet %d/%d, data_len=%d",
-		//		__FUNCTION__,__LINE__, n_packet, hdr.length, info.len );
+		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Queuing first packet %d/%d, data_len=%d",
+				__FUNCTION__,__LINE__, n_packet, hdr.length, info.len );
 				packet_len = inf.len;
 				veejay_memcpy(&header,&hdr,sizeof(packet_header_t));
 				veejay_memcpy(&info, &inf, sizeof(frame_info_t));
@@ -362,7 +368,7 @@ int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len, int
 			if( hdr.usec < header.usec )
 			{
 				put_data = 0;
-		//		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d dropped packet (too old timestamp %x)", __FUNCTION__,__LINE__,header.usec);
+				veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d dropped packet (too old timestamp %x)", __FUNCTION__,__LINE__,header.usec);
 			}
 			else
 			{
@@ -372,8 +378,8 @@ int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len, int
 				{
 					v->next = mcast_packet_buffer_new( &hdr, &inf, chunk );
 	
-				//	veejay_msg(VEEJAY_MSG_DEBUG,"%s:%d Stored packet with timestamp %x (processing %x)",
-				//		__FUNCTION__,__LINE__, hdr.usec, header.usec );
+					veejay_msg(VEEJAY_MSG_DEBUG,"%s:%d Stored packet with timestamp %x (processing %x)",
+						__FUNCTION__,__LINE__, hdr.usec, header.usec );
 	
 				}
 				else
@@ -381,14 +387,14 @@ int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len, int
 					// store packet if next buffer has identical timestamp
 					if( mcast_packet_buffer_next( v->next, &hdr ) )
 					{
-			//		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d packet buffer STORE future frame (ts=%x)", __FUNCTION__,__LINE__, hdr.usec );
+					veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d packet buffer STORE future frame (ts=%x)", __FUNCTION__,__LINE__, hdr.usec );
 						mcast_packet_buffer_store( v->next, &hdr,chunk );
 						put_data = 0;
 					}
 					else
 					{
 						// release packet buffer and start queueing new frames only
-				//		veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d packet buffer release, storing newest packets",__FUNCTION__,__LINE__ );
+						veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d packet buffer release, storing newest packets",__FUNCTION__,__LINE__ );
 
 						if( mcast_packet_buffer_full( v->next ))
 						{
@@ -422,7 +428,7 @@ int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len, int
 
 		if( n_packet >= header.length )
 		{
-//			veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Have full frame",__FUNCTION__,__LINE__);
+			veejay_msg(VEEJAY_MSG_DEBUG, "%s:%d Have full frame",__FUNCTION__,__LINE__);
 			break;
 		}
 
@@ -431,9 +437,6 @@ int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len, int
 #ifdef STRICT_CHECKING
 	assert( total_recv >=  packet_len );
 #endif
-	*dw = info.width;
-	*dh = info.height;
-	*dfmt = info.fmt;
 		
 	return packet_len;
 }
