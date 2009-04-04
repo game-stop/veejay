@@ -109,6 +109,7 @@
 #include "effects/rippletv.h"
 #include "effects/waterrippletv.h"
 #include "effects/bathroom.h"
+#include "effects/slicer.h"
 #include "effects/timedistort.h"
 #include "effects/chameleon.h"
 #include "effects/baltantv.h"
@@ -240,6 +241,7 @@ static struct
 {	radioactivetv_malloc,		radioactivetv_free,	VJ_VIDEO_EFFECT_RADIOACTIVE	},
 {	waterrippletv_malloc,		waterrippletv_free,	VJ_IMAGE_EFFECT_RIPPLETV	},
 {	bgsubtract_malloc,		bgsubtract_free,	VJ_IMAGE_EFFECT_BGSUBTRACT	},
+{	slicer_malloc,			slicer_free,		VJ_VIDEO_EFFECT_SLICER		},
 {	NULL			,	NULL			,0				},
 };
 
@@ -504,7 +506,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[43] = radioactivetv_init(width,height);
 	vj_effects[44] = texmap_init( width,height);
 	vj_effects[45] = water_init(width,height);
-    vj_effects[46] = dummy_init(width,height);
+	vj_effects[46] = slicer_init(width,height);
+    vj_effects[47] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);

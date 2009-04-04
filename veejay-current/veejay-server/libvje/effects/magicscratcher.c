@@ -26,6 +26,7 @@
 static uint8_t *mframe;
 static int m_frame = 0;
 static int m_reverse = 0;
+static int m_rerun = 0;
 
 vj_effect *magicscratcher_init(int w, int h)
 {
@@ -62,6 +63,7 @@ int magicscratcher_malloc(int w, int h)
 }
 void magicscratcher_free() {
   if(mframe) free(mframe);
+  m_rerun = 0;
 }
 
 void store_mframe(uint8_t * yuv1[3], int w, int h, int n, int no_reverse)
@@ -88,7 +90,7 @@ void store_mframe(uint8_t * yuv1[3], int w, int h, int n, int no_reverse)
     if (m_frame == 0)
 	m_reverse = 0;
 
-
+     m_rerun = m_frame;
 }
 
 
@@ -155,16 +157,15 @@ void magicscratcher_apply(VJFrame *frame,
 	veejay_memset( Cb, 128, frame->uv_len);
 	veejay_memset( Cr, 128, frame->uv_len);
 
-
-    /* fixme : m_frame 0 + yuv1[0] = black screen,
-       it must be m_frame - 1 + yuv1[0] = result 
-       need perhaps to introduce dup_frame,
-       which retrieves the previous frame as well,
-     */
-
     if (m_frame == 0) {
-		veejay_memcpy(mframe + (len * m_frame), Y, len);
-		m_frame++;
+	if( m_rerun > 0 ) {
+	  veejay_memcpy( mframe + (len * m_rerun) , Y , len );  
+	  m_rerun = m_frame;
+         }
+	else {
+  	  veejay_memcpy(mframe + (len * m_frame), Y, len);
+ 	}
+	m_frame ++;
     }
 
     for (x = 0; x < len; x++) {

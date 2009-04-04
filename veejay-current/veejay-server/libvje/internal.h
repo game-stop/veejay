@@ -118,6 +118,7 @@ enum {
 	VJ_VIDEO_EFFECT_RADIOACTIVE = 243,
 	VJ_VIDEO_EFFECT_TEXMAP = 244,
 	VJ_VIDEO_EFFECT_RIPPLETV = 245,
+	VJ_VIDEO_EFFECT_SLICER = 246,
 };
 
 enum {
@@ -218,7 +219,7 @@ enum {
 #define VJ_IMAGE_EFFECT_MAX 190
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 246
+#define VJ_VIDEO_EFFECT_MAX 247
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
@@ -341,6 +342,7 @@ extern void lumakey_apply(VJFrame *frame, VJFrame *frame2, int width,
 extern void pointfade_apply(VJFrame *frame, VJFrame *frame2,
 			    int width, int height, int pointsize,
 			    int opacity);
+extern	void	slicer_apply( VJFrame *frame, VJFrame *frame2, int width, int height, int a, int b );
 
 extern void transcarot_apply(VJFrame *frame, VJFrame *frame2,
 			     int width, int height, int point_size, int dy,

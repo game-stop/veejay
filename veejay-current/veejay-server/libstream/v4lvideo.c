@@ -695,16 +695,25 @@ int	v4lvideo_grab_check(v4lvideo_t *v, int palette ) {
 	int ret=0;
 	v4lseterrorlevel( V4L_PERROR_NONE );
 	if( v4lvideo_set_grabformat(v, palette ) ) {	
+#ifdef STRICT_CHECKING
+		veejay_msg(0,"%s: wrong palette %x", __FUNCTION-_, palette );
+#endif
 		ret = -1;
 		goto VIDEOEXIT;
 	}
 
 	if( v4lgrabstart( &(v->vd),0) < 0 ) {
+#ifdef STRICT_CHECKING
+		veejay_msg(0, "%s: Unable to start grabbing.", __FUNCTION__ );
+#endif
 		ret = -1;	
 		goto VIDEOEXIT;
 	}
 	ret = v4lsync( &(v->vd),0);
 VIDEOEXIT:
+#ifdef STRICT_CHECKING
+	veejay_msg(0, "%s: Bail", __FUNCTION__);
+#endif
 	v4lseterrorlevel( V4L_PERROR_ALL );
 	return ret;
 }
@@ -731,6 +740,10 @@ static	void	*v4lvideo_grabber_thread( void * vv )
 		veejay_msg(0, "Unable to open capture device '%s' in %dx%d - %s",
 			i->filename, v->video_width,v->video_height,get_palette_name(v->video_palette) );
 		i->error = 1;
+#ifdef STRICT_CHECKING
+		veejay_msg(0,"%s: Giving up, unable to open %s, channel %d, norm %x, %dx%d palette %x",
+			__FUNCTION__, i->filename  , i->channel, i->norm, i->width, i->height, i->palette );
+#endif
 		pthread_exit(NULL);
 		return NULL;
 	}
@@ -762,7 +775,7 @@ PAUSED:
 				__v4lvideo_grabstop( v );
 			}
 			unlock_(i);
-			usleep( 40000 );
+			usleep( 20000 );
 			goto PAUSED;
 		} else {
 			if(!v->grabbing) {
@@ -911,21 +924,10 @@ lock_(v);
 #endif
 	v4lvideo_t *v1 = (v4lvideo_t*) v->v4l;
 	if( v1->has_video ) {
-	/*	if( v1->native == 2 ) { //@ 4:2:2 data
-			uint8_t *frame[3] = { dstY,dstU,dstV };
-			uint8_t *in[3] = { v->frame_buffer,
-					   v->frame_buffer + v->len,
-					   v->frame_buffer + v->len + v->uvlen };
-			//yuv420to422planar( in,frame,v->width,v->height );
-			veejay_memcpy( frame[0], in[0], v->width * v->height );
-			veejay_memcpy( frame[1], in[1], v->uvlen );
-			veejay_memcpy( frame[2], in[2], v->uvlen );
-		} else {*/
 			uint8_t *src = v->frame_buffer;
 			veejay_memcpy( dstY, src, v->len );
 			veejay_memcpy( dstU, src+v->len, v->uvlen );
-			veejay_memcpy( dstV, src+v->len + v->uvlen, v->uvlen );
-	//	}
+  			veejay_memcpy( dstV, src+v->len + v->uvlen, v->uvlen );
 	} else {
 		// damage per second: some devices need a *long* time to settle
 		if( (v1->dps%25)== 1 && v->error == 0)

@@ -1164,7 +1164,6 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
 	int usec_since_lastframe=0;
 
 	for (;;) {
-	//fixme?	
 	    gettimeofday(&now, 0);
 		
 	    usec_since_lastframe =
