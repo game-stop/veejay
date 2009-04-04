@@ -2552,10 +2552,10 @@ do_compress ( const lzo_bytep in , lzo_uint  in_len,
     ip += 4;
     for (;;)
     {
-        register const lzo_bytep m_pos;
-        lzo_uint m_off;
-        lzo_uint m_len;
-        lzo_uint dindex;
+        register const lzo_bytep m_pos=0;
+        lzo_uint m_off=0;
+        lzo_uint m_len=0;
+        lzo_uint dindex=0;
 
         DINDEX1(dindex,ip);
         GINDEX(m_pos,m_off,dict,dindex,in);

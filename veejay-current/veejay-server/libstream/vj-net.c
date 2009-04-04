@@ -291,7 +291,7 @@ int	net_thread_start(vj_client *v, vj_tag *tag)
 	if( tag->source_type == VJ_TAG_TYPE_MCAST )
 	{
 		char start_mcast[6];
-		sprintf(start_mcast, "%03d:;", VIMS_VIDEO_MCAST_START);
+		snprintf(start_mcast,sizeof(start_mcast), "%03d:;", VIMS_VIDEO_MCAST_START);
 		
 		veejay_msg(VEEJAY_MSG_DEBUG, "Request mcast stream from %s port %d",
 				tag->source_name, tag->video_channel);

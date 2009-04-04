@@ -293,7 +293,10 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 				&p[0],&p[1],&p[2] );
 		if(plen <= 0)
 			return 0;
-
+#ifdef STRICT_CHECKING
+		assert( p[0] > 0 );
+		assert( p[1] > 0 );
+#endif
 		v->in_width = p[0];
 		v->in_height = p[1];
 		v->in_fmt = p[2];

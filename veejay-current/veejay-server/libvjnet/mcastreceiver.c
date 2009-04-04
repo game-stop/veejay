@@ -59,11 +59,11 @@ static	void	*mcast_packet_buffer_new( packet_header_t *header, frame_info_t *inf
 #ifdef STRICT_CHECKING
 	assert( header->length > 0 );
 #endif
-	packet_buffer_t *pb = (packet_buffer_t*) vj_malloc(sizeof(packet_buffer_t));
+	packet_buffer_t *pb = (packet_buffer_t*) vj_calloc(sizeof(packet_buffer_t));
 	veejay_memcpy( &(pb->hdr), header, sizeof(packet_header_t));
 	veejay_memcpy( &(pb->inf), info,   sizeof(frame_info_t));
-	pb->buf = vj_malloc( sizeof(uint8_t) * CHUNK_SIZE * header->length );
-	pb->packets = vj_malloc( sizeof(uint16_t) * header->length );
+	pb->buf = vj_calloc( sizeof(uint8_t) * CHUNK_SIZE * header->length );
+	pb->packets = vj_calloc( sizeof(uint16_t) * header->length );
 	veejay_memcpy( pb->buf + ( header->seq_num * CHUNK_SIZE), data + (
 				sizeof(packet_header_t) + sizeof(frame_info_t)), CHUNK_SIZE );
 #ifdef STRICT_CHECKING
@@ -314,6 +314,7 @@ int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len, int
 #endif	
 		packet_header_t hdr = packet_get_header( chunk );
 		frame_info_t    inf;
+
 		packet_get_info(&inf,chunk );
 		*dw = info.width;
 		*dh = info.height;

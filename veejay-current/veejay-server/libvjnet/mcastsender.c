@@ -183,6 +183,8 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 	uint8_t	chunk[PACKET_PAYLOAD_SIZE];
 	int res = 0;
 
+	veejay_memset( chunk, 0,sizeof(chunk));
+
 	//@ If we can send in a single packet:
 	if( total_len <= CHUNK_SIZE )
 	{
