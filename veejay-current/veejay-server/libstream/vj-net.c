@@ -162,7 +162,7 @@ void	*reader_thread(void *data)
 		if( wait_time )
 		{	
 			if ( wait_time > 40 )
-				wait_time = 25;
+				wait_time = 15;
 			net_delay( wait_time );
 	//		usleep(wait_time);
 		}
@@ -241,9 +241,11 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 				buvlen = b_len/2;
 				break;
 		}
-	
+
+		int tmp_fmt = get_ffmpeg_pixfmt( v->in_fmt );
+ 
 		VJFrame *a = yuv_yuv_template( tag->socket_frame, tag->socket_frame + b_len, tag->socket_frame+b_len+buvlen,
-						v->in_width,v->in_height, get_ffmpeg_pixfmt( v->in_fmt ));
+						v->in_width,v->in_height, tmp_fmt);
 		VJFrame *b = yuv_yuv_template( buffer[0],buffer[1], buffer[2], 
 						v->cur_width,v->cur_height,get_ffmpeg_pixfmt(v->cur_fmt));
 		yuv_convert_any_ac(a,b, a->format,b->format );

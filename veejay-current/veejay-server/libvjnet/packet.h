@@ -49,12 +49,13 @@ typedef struct
 	uint16_t	height;
 	uint8_t		fmt;
 	uint32_t	len;
+	uint8_t		mode;
 } frame_info_t;
 
 
 #define			PACKET_HEADER_LENGTH	( sizeof(packet_header_t) )
 #define			PACKET_APP_HEADER_LENGTH ( sizeof(frame_info_t) )
-#define			CHUNK_SIZE		( 1500 - 28 )
+#define			CHUNK_SIZE		( 1500 - 32 )
 #define			PACKET_PAYLOAD_SIZE	(CHUNK_SIZE + PACKET_HEADER_LENGTH + PACKET_APP_HEADER_LENGTH )
 
 void			packet_dump_header( packet_header_t *h);

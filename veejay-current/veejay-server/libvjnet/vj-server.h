@@ -40,6 +40,7 @@ typedef struct vj_server_t {
     char	*recv_buf;
     int	send_size;
     int	recv_size;
+    int mcast_gray;
 } vj_server;
 
 vj_server *vj_server_alloc(int port, char *mcast_group_name, int type);
@@ -61,6 +62,7 @@ int	vj_server_init(void);
 
 int _vj_server_del_client(vj_server * vje, int link_id);
 
+void	vj_server_set_mcast_mode( vj_server *vje, int mode );
 
 void	vj_server_close_connection( vj_server *vje, int link_id );
 

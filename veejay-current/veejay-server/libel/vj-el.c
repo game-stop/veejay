@@ -1210,7 +1210,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 				inter = lzo_decompress420into422(d->lzo_decoder, data,res,dst, el->video_width,el->video_height );
 			} 
 			else { 
-				inter = lzo_decompress( d->lzo_decoder, data,res, dst);
+				inter = lzo_decompress( d->lzo_decoder, data,res, dst,el->video_width*el->video_height);
 			}
 
 			return inter;

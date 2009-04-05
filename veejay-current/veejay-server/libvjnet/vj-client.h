@@ -78,6 +78,5 @@ int	vj_client_window_sizes( int socket_fd, int *r, int *s );
 
 int vj_client_connect_dat(vj_client *v, char *host, int port_id  );
 
-
 #endif
 

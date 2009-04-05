@@ -2285,12 +2285,14 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 	index_map_[VIMS_VIDEO_MCAST_START]		=	_new_event(
-				NULL,	
+				"%d",	
 				VIMS_VIDEO_MCAST_START,
 				"Start built-in UDP mcast server (YUV planar)",
 				vj_event_mcast_start,
-				0,
+				1,
 				VIMS_ALLOW_ANY,
+				"0=Color,1=Grayscale (default)",
+				1,
 				NULL );
 	index_map_[VIMS_VIDEO_MCAST_STOP]		=	_new_event(
 				NULL,

@@ -32,6 +32,6 @@ long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 long	lzo_decompress2( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst );
 
 
-long     lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len,uint8_t *dst[3] );
+long     lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len,uint8_t *dst[3], int uv_len );
 
 #endif

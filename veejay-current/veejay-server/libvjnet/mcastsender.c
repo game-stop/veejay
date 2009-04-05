@@ -163,7 +163,7 @@ static	uint32_t	stamp_make( mcast_sender *v )
 }
 
 int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,  
-				uint8_t *buf, int total_len, long ms,int port_num)
+				uint8_t *buf, int total_len, long ms,int port_num, int mode)
 {
 	int n_chunks = total_len / CHUNK_SIZE;
 	int i;
@@ -174,7 +174,7 @@ int		mcast_send_frame( mcast_sender *v, const VJFrame *frame,
 	info.width = frame->width;
 	info.height = frame->height;
 	info.len = total_len;
-
+	info.mode = mode;
 	uint32_t frame_num = stamp_make(v);
 
 	header.timeout = ms * 1000;

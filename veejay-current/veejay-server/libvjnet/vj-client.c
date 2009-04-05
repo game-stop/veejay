@@ -252,12 +252,7 @@ static	void	vj_client_decompress( vj_client *t, uint8_t *out, int data_len, int 
 			out,
 			out + Y,
 			out + Y + UV };
-#ifdef STRICT_CHECKING
-	assert( data_len > 0 );
-	assert( Y > 0 );
-	assert( UV > 0 );
-#endif
-	lzo_decompress( t->lzo, t->space, data_len, d );
+	lzo_decompress( t->lzo, t->space, data_len, d, UV );
 }
 
 static	void	hexstr(uint8_t *bytes, int len){
@@ -277,6 +272,7 @@ static	int	getint(uint8_t *in, int len ) {
 	free(word);
 	return (int) v;
 }
+
 int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 {
 	uint8_t line[32];
@@ -286,7 +282,6 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 	int conv = 1;
 	int y_len = 0;
 	int uv_len = 0;
-
 	if( v->c[0]->type == VMCAST_C )
 	{
 		plen = mcast_recv_frame( v->c[0]->r, v->space, 0, v->cur_width,v->cur_height,v->cur_fmt,
@@ -311,9 +306,9 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 			default:
 				uv_len = y_len/2;break;
 		}
-			
-		vj_client_decompress( v, dst,p[3],y_len,uv_len ,0);
 
+		vj_client_decompress( v, dst,plen,y_len,uv_len ,16);
+		
 		if( p[0] != v->cur_width || p[1] != v->cur_height || p[2] != v->cur_fmt )
 			return 2;
 		return 1;

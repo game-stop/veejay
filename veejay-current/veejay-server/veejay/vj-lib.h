@@ -176,6 +176,7 @@ typedef struct {
 	int unicast_link_id;
 	int unicast_frame_sender;
 	int is_dat;
+	int mcast_mode;
 	int mcast_frame_sender;
 	int use_mcast;
 	char *group_name;

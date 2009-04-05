@@ -93,6 +93,12 @@ void		vj_server_geo_stats()
 	geo_stat_ = 1;
 }
 
+void		vj_server_set_mcast_mode( vj_server *v , int mode )
+{
+	v->mcast_gray = mode;
+	veejay_msg(VEEJAY_MSG_DEBUG, "Sending in %s", (mode==0 ? "Color" : "Grayscale" ) );
+}
+
 static	int	_vj_server_multicast( vj_server *v, char *group_name, int port )
 {
 	vj_link **link;
@@ -435,7 +441,7 @@ int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len,
 	{
 		vj_proto **proto = (vj_proto**) vje->protocol;
 		if( vje->server_type == V_CMD  )
-			return mcast_send_frame( proto[0]->s, frame, buf,len,ms, vje->ports[0] );
+			return mcast_send_frame( proto[0]->s, frame, buf,len,ms, vje->ports[0],vje->mcast_gray );
 	}
 	return 0;
 }

@@ -6690,13 +6690,12 @@ void vj_event_tag_new_mcast(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*)ptr;
 
 	char str[255];
-	int args[2];
+	int args[3];
 
 	P_A(args,str,format,ap);
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "%s, %d", str, args[0]);
-
 	int id = veejay_create_tag(v, VJ_TAG_TYPE_MCAST, str, v->nstreams, args[0],0);
+
 	vj_event_send_new_id( v, id  );
 
 	if( id <= 0)
@@ -8631,11 +8630,17 @@ void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 void	vj_event_mcast_start				(	void *ptr,	const char format[],	va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	char s[255];	
+	P_A( args, s , format, ap);
+
 	if(!v->settings->use_vims_mcast)
-		veejay_msg(VEEJAY_MSG_ERROR, "start veejay in multicast mode (see -V commandline option)");	
+		veejay_msg(VEEJAY_MSG_ERROR, "start veejay in multicast mode (see -T commandline option)");	
 	else
 	{
 		v->settings->mcast_frame_sender = 1;
+		v->settings->mcast_mode = args[0];
+		vj_server_set_mcast_mode( v->vjs[2],args[0] );
 		veejay_msg(VEEJAY_MSG_INFO, "Veejay started mcast frame sender");
 	}	
 }

@@ -63,7 +63,7 @@ void	*lzo_new( )
 	}
 
 	l->wrkmem = (lzo_bytep)
-		vj_malloc( LZO1X_1_MEM_COMPRESS );
+		vj_malloc( 2 * LZO1X_1_MEM_COMPRESS );
 
 	if(l->wrkmem == NULL )
 	{
@@ -100,10 +100,11 @@ int		lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, 
 	return (*size);	
 }
 
-long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3] )
+long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int uv_len )
 {
 	int i;
 	lzo_uint len[3] = { 0,0,0};
+	int mode = 0;
 	int sum = 0;
 	lzot *l = (lzot*) lzo;
 	lzo_uint result_len = 0;
@@ -112,19 +113,29 @@ long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3
 	len[0] = str2ulong( linbuf );
 	len[1] = str2ulong( linbuf+4 );
 	len[2] = str2ulong( linbuf+8 );
-#ifdef STRICT_CHECKING
-	assert( len[0] > 0 && len[1] > 0 && len[2] > 0 );
-#endif
+	mode   = str2ulong( linbuf+12 );
+
+	if(len[1] ==0 && len[2] == 0 )
+		mode = 1;
 
 	for( i = 0; i <= 2; i ++ )
 	{
-		const lzo_bytep src = (lzo_bytep) (linbuf+12+offset);
+		if( len[i] <= 0 ) 
+			continue;
+
+		const lzo_bytep src = (lzo_bytep) (linbuf+16+offset);
 		int r = lzo1x_decompress( src, len[i], dst[i], &result_len, l->wrkmem );
 		if( r != LZO_E_OK )
 			return 0;
 		sum += result_len;
 		offset += len[i];
 	}
+
+	if(mode == 1) {
+		veejay_memset( dst[1],128, uv_len );
+		veejay_memset( dst[2],128, uv_len );
+	}
+
 	return (long)sum;
 }
 
@@ -133,6 +144,7 @@ long		lzo_decompress422into420( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 	int i;
 	lzo_uint len[3] = { 0,0,0};
 	int sum = 0;
+	int mode = 0;
 	lzot *l = (lzot*) lzo;
 	lzo_uint result_len = 0;
 	lzo_uint offset = 0;
@@ -140,7 +152,7 @@ long		lzo_decompress422into420( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 	len[0] = str2ulong( linbuf );
 	len[1] = str2ulong( linbuf+4 );
 	len[2] = str2ulong( linbuf+8 );
-veejay_msg(0,"%s",__FUNCTION__);
+	mode   = str2ulong( linbuf+12 );
 
 	if( l->tmp[0] == NULL ) {
 		l->tmp[0] = vj_malloc(sizeof(uint8_t) * w * h * 3); // will do
@@ -148,13 +160,12 @@ veejay_msg(0,"%s",__FUNCTION__);
 		l->tmp[2] = l->tmp[1] + ( (w>>1)*h);
 	}
 
-#ifdef STRICT_CHECKING
-	assert( len[0] > 0 && len[1] > 0 && len[2] > 0 );
-#endif
-
 	for( i = 0; i <= 2; i ++ )
 	{
-		const lzo_bytep src = (lzo_bytep) (linbuf+12+offset);
+		if(len[i] <= 0)
+			continue;
+
+		const lzo_bytep src = (lzo_bytep) (linbuf+16+offset);
 		int r = lzo1x_decompress( src, len[i], l->tmp[i], &result_len, l->wrkmem );
 		if( r != LZO_E_OK )
 			return 0;
@@ -163,8 +174,12 @@ veejay_msg(0,"%s",__FUNCTION__);
 	}
 
 	veejay_memcpy( dst[0], l->tmp[0], w*h);
-	yuv422to420planar( l->tmp, dst, w, h );
-
+	if( mode == 1 ) {
+		veejay_memset(dst[1],128,( (w>>1)*h));
+		veejay_memset(dst[2],128,( (w>>1)*h));
+	} else {
+		yuv422to420planar( l->tmp, dst, w, h );
+	}
 	return (long)sum;
 }
 long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int w, int h )
@@ -172,14 +187,15 @@ long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 	int i;
 	lzo_uint len[3] = { 0,0,0};
 	int sum = 0;
+	int mode= 0;
 	lzot *l = (lzot*) lzo;
 	lzo_uint result_len = 0;
 	lzo_uint offset = 0;
-	veejay_msg(0,"%s",__FUNCTION__);
 
 	len[0] = str2ulong( linbuf );
 	len[1] = str2ulong( linbuf+4 );
 	len[2] = str2ulong( linbuf+8 );
+	mode   = str2ulong( linbuf+12 );
 
 	if( l->tmp[0] == NULL ) {
 		l->tmp[0] = vj_malloc(sizeof(uint8_t) * w * h * 3); // will do
@@ -187,13 +203,11 @@ long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 		l->tmp[2] = l->tmp[1] + ( (w>>1) * (h>>1));
 	}
 
-#ifdef STRICT_CHECKING
-	assert( len[0] > 0 && len[1] > 0 && len[2] > 0 );
-#endif
-
 	for( i = 0; i <= 2; i ++ )
 	{
-		const lzo_bytep src = (lzo_bytep) (linbuf+12+offset);
+		if( len[i] <= 0 )
+			continue;
+		const lzo_bytep src = (lzo_bytep) (linbuf+16+offset);
 		int r = lzo1x_decompress( src, len[i], l->tmp[i], &result_len, l->wrkmem );
 		if( r != LZO_E_OK )
 			return 0;
@@ -201,8 +215,13 @@ long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 		offset += len[i];
 	}
 	veejay_memcpy( dst[0], l->tmp[0], w*h);
-
-	yuv420to422planar( l->tmp, dst, w, h );
+	if(mode == 1) {
+		veejay_memset(dst[1],128,( (w>>1)*h));
+		veejay_memset(dst[2],128,( (w>>1)*h));
+	} 
+	else {
+		yuv420to422planar( l->tmp, dst, w, h );
+	}
 
 	return (long)sum;
 }

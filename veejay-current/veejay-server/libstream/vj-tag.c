@@ -271,8 +271,6 @@ void vj_tag_record_init(int w, int h)
 {
 }
 
-
-
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int type )
 {
 	vj_client *v;

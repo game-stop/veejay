@@ -1030,7 +1030,7 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 {
 	const int len = info->effect_frame1->width * info->effect_frame1->height;
 	const int uv_len = info->effect_frame1->uv_len;
-	uint8_t *dstI = dst + (12 * sizeof(uint8_t));
+	uint8_t *dstI = dst + (16 * sizeof(uint8_t));
 	unsigned int size1=0,size2=0,size3=0;
 	int i = lzo_compress( lzo_ , primary_buffer[info->out_buf]->Y, dstI, &size1, len );
 	if( i == 0 )
@@ -1042,6 +1042,16 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 		return 0;
 	}
 	dstI += size1;
+
+
+	if( info->settings->mcast_mode == 1 ) {
+		//@ only compress Y plane, set mode in header
+		long2str( dst,size1);
+		long2str( dst+4,0);
+		long2str( dst+8,0);
+		long2str( dst+12, info->settings->mcast_mode );
+		return 16 + size1;
+	}
 
 	i = lzo_compress( lzo_, primary_buffer[info->out_buf]->Cb, dstI, &size2, uv_len );
 	if( i == 0 )
@@ -1067,8 +1077,8 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 	long2str( dst,size1);
 	long2str( dst+4, size2 );
 	long2str( dst+8, size3 );
-
-	return (size1+size2+size3+12);
+	long2str( dst+12,info->settings->mcast_mode );
+	return (size1+size2+size3+16);
 }
 
 int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
