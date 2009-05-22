@@ -136,7 +136,7 @@ int vj_dv_encode_frame(vj_dv_encoder *encoder, uint8_t *input_buf[3])
     VJFrame *src = yuv_yuv_template( input_buf[0],input_buf[1],input_buf[2],
 		    w,h, src_fmt );
     VJFrame *dst = yuv_yuv_template( encoder->buffer,NULL,NULL,
-		    w,h, PIX_FMT_YUV422);
+		    w,h, PIX_FMT_YUVY422);
 
 
     if( encoder->scaler == NULL ) {
@@ -415,7 +415,7 @@ int vj_dv_decode_frame(vj_dv_decoder *d, uint8_t * input_buf, uint8_t * Y,
 				     e_dv_color_yuv, pixels, pitches);
 
 		//@ this works
-		VJFrame *src = yuv_yuv_template( d->dv_video, NULL,NULL,width,height,PIX_FMT_YUV422 );
+		VJFrame *src = yuv_yuv_template( d->dv_video, NULL,NULL,width,height,PIX_FMT_YUVY422 );
 		VJFrame *dst = yuv_yuv_template( Y,Cb,Cr,width,height,
 				( d->fmt == FMT_422 ? PIX_FMT_YUV422P : PIX_FMT_YUVJ422P ) );
 
