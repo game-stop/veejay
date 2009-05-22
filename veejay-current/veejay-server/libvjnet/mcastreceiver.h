@@ -49,8 +49,7 @@ int		mcast_poll( mcast_receiver *v );
 
 int		mcast_recv( mcast_receiver *v, void *dst, int len );
 
-int		mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf , int total_len, int cw, int ch, int fmt,
-				int *dw, int *dh, int *df);
+uint8_t 	*mcast_recv_frame( mcast_receiver *v, int *dw, int *dh, int *dfmt, int *len );
 
 void		mcast_close_receiver( mcast_receiver *v );
 

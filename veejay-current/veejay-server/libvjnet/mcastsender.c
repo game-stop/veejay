@@ -50,7 +50,7 @@ mcast_sender	*mcast_new_sender( const char *group_name )
 	v->addr_len = sizeof( struct sockaddr_in );	
 	v->sock_fd = socket( AF_INET, SOCK_DGRAM, 0 );
 	v->send_buf_size = 240 * 1024;
-	v->stamp = 0;
+	v->stamp = 1;
 	if( v->sock_fd == -1 )
 	{
 		print_error( "socket");
@@ -153,7 +153,7 @@ int		mcast_send( mcast_sender *v, const void *buf, int len, int port_num )
 
 static	void	stamp_reset( mcast_sender *v )
 {
-	v->stamp = 0;
+	v->stamp = 1;
 }
 
 static	uint32_t	stamp_make( mcast_sender *v )

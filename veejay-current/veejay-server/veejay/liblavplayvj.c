@@ -85,6 +85,9 @@
 #include <veejay/vj-lib.h>
 #include <libel/vj-avcodec.h>
 #include <libel/pixbuf.h>
+#ifdef HAVE_JACK
+#include <veejay/vj-audio.h>
+#endif
 #include <libyuv/yuvconv.h>
 #include <veejay/vj-composite.h>
 #include <veejay/vj-viewport.h>
@@ -1659,8 +1662,8 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 	pthread_mutex_lock(&(settings->valid_mutex));
 	while (settings->valid[settings->currently_processed_frame] == 0) {
 #ifdef STRICT_CHECKING
-   	veejay_msg(VEEJAY_MSG_DEBUG, "Playback thread: sleeping for new frames (waiting for frame %d)", 
-            settings->currently_processed_frame);
+   //	veejay_msg(VEEJAY_MSG_DEBUG, "Playback thread: sleeping for new frames (waiting for frame %d)", 
+   //       settings->currently_processed_frame);
 #endif		
 	    pthread_cond_wait(&
 			      (settings->
@@ -2413,13 +2416,15 @@ static void veejay_playback_cycle(veejay_t * info)
         veejay_mjpeg_queue_buf(info, n,1 );
     }
     stats.nqueue = QUEUE_LEN;
+    	settings->spas = 1.0 / (double) el->audio_rate;
+
     while (settings->state != LAVPLAY_STATE_STOP) {
 	first_free = stats.nsync;
 
 	int current_speed = settings->current_playback_speed;
 #ifdef HAVE_JACK
     	if(info->audio == AUDIO_PLAY )
-		vj_jack_continue( current_speed );
+		audio_continue( current_speed );
 #endif
 
 	do {
@@ -2454,12 +2459,13 @@ static void veejay_playback_cycle(veejay_t * info)
 
 	veejay_event_handle(info);
 #ifdef HAVE_JACK
-	if ( info->audio==AUDIO_PLAY && el->has_audio ) 
+	stats.tdiff = audio_get_delay(bs.timestamp);
+/*	if ( info->audio==AUDIO_PLAY && el->has_audio ) 
 	{
 	   struct timeval audio_tmstmp;	
 	   long int sec=0;
 	   long int usec=0;
-	   long num_audio_bytes_written = vj_jack_get_status( &sec,&usec);
+	   long num_audio_bytes_written = audio_get_buffered_bytes( &sec,&usec);
 
 	   audio_tmstmp.tv_sec = sec;
 	   audio_tmstmp.tv_usec = usec;
@@ -2469,9 +2475,16 @@ static void veejay_playback_cycle(veejay_t * info)
 				settings->spas * num_audio_bytes_written;
              	    tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) + (bs.timestamp.tv_usec - audio_tmstmp.tv_usec) * 1.e-6;
            }
-	}
+	}*/
 #endif
-	stats.tdiff = (tdiff1 - tdiff2);
+//	stats.tdiff = (tdiff1 - tdiff2);
+//
+
+/*	unsigned int tmp = bs.timestamp.tv_sec * 1000000 + bs.timestamp.tv_usec;
+	float          v = (float) tmp / 1000000.0;
+
+	veejay_msg(0, "TDIFF = %g, spas = %2.2g, V = %2.2f", stats.tdiff,settings->spas, v );
+*/
 	/* Fill and queue free buffers again */
 	for (n = first_free; n < stats.nsync;) {
 	    /* Audio/Video sync correction */
@@ -2509,6 +2522,8 @@ static void veejay_playback_cycle(veejay_t * info)
 	    ts= SDL_GetTicks();
 #endif
 	    settings->buffer_entry[frame] = settings->current_frame_num;
+
+//veejay_msg(0, "%s", (skipa==1 ? "Skip audio": "Get audio" ));
 
 	    if (!skipa) 
 			vj_perform_queue_audio_frame(info);

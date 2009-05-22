@@ -51,83 +51,18 @@ typedef struct
 	packet_header_t	hdr;
 	frame_info_t	inf;
 	uint8_t		*buf;
-	uint16_t	*packets;
+	int		len;
+	int		count;
+	int		rdy;
 } packet_buffer_t;
 
-static	void	*mcast_packet_buffer_new( packet_header_t *header, frame_info_t *info, uint8_t *data )
+#define PACKET_SLOTS 3
+typedef struct
 {
-#ifdef STRICT_CHECKING
-	assert( header->length > 0 );
-#endif
-	packet_buffer_t *pb = (packet_buffer_t*) vj_calloc(sizeof(packet_buffer_t));
-	veejay_memcpy( &(pb->hdr), header, sizeof(packet_header_t));
-	veejay_memcpy( &(pb->inf), info,   sizeof(frame_info_t));
-	pb->buf = vj_calloc( sizeof(uint8_t) * CHUNK_SIZE * header->length );
-	pb->packets = vj_calloc( sizeof(uint16_t) * header->length );
-	veejay_memcpy( pb->buf + ( header->seq_num * CHUNK_SIZE), data + (
-				sizeof(packet_header_t) + sizeof(frame_info_t)), CHUNK_SIZE );
-#ifdef STRICT_CHECKING
-	assert( (sizeof(packet_header_t) + sizeof(frame_info_t) + CHUNK_SIZE ) == PACKET_PAYLOAD_SIZE);
-#endif
-	pb->packets[ header->seq_num ] = 1;
-	return (void*) pb;
-}
-
-static	void	mcast_packet_buffer_release( void *dat )
-{
-	packet_buffer_t *pb = (packet_buffer_t*) dat;
-	if(pb)
-	{
-		if(pb->buf) free(pb->buf);
-		if(pb->packets) free(pb->packets);
-		free(pb);
-	}
-	dat = NULL;
-}
-
-static	int		mcast_packet_buffer_next( void *dat, packet_header_t *hdr )
-{
-	packet_buffer_t *pb = (packet_buffer_t*) dat;
-	if( pb->hdr.usec == hdr->usec )
-		return 1;
-	return 0;
-}
-
-static	int		mcast_packet_buffer_full(void *dst)
-{
-	packet_buffer_t *pb = (packet_buffer_t*) dst;
-	unsigned int i;	
-	int res = 0;
-	for(i = 0; i < pb->hdr.length; i ++ )
-		if( pb->packets[i]) res ++;
-	return ( res >= pb->hdr.length ? 1 : 0 );
-}
-
-static	void		mcast_packet_buffer_store( void *dat,packet_header_t *hdr, uint8_t *chunk )
-{
-	packet_buffer_t *pb = (packet_buffer_t*) dat;
-	veejay_memcpy( pb->buf + (CHUNK_SIZE * hdr->seq_num ), chunk +
-			( sizeof(packet_header_t) + sizeof(frame_info_t) ),
-			CHUNK_SIZE );
-	pb->packets[ hdr->seq_num ] = 1;
-}
-static	int		mcast_packet_buffer_fill( void *dat, int *packet_len, uint8_t *buf )
-{	
-	packet_buffer_t *pb = (packet_buffer_t*) dat;
-	unsigned int i;
-	unsigned int packet = 0;
-	for( i = 0; i < pb->hdr.length ; i ++ )
-	{
-		if( pb->packets[i] )
-		{
-			veejay_memcpy( buf + (CHUNK_SIZE * i ), pb->buf + (CHUNK_SIZE *i), CHUNK_SIZE );
-			packet++;
-		}
-	}
-	*packet_len = pb->inf.len;
-
-	return packet;
-}
+	packet_buffer_t	**slot;
+	int		 in_slot;
+	long		 last;
+} packet_slot_t;
 
 mcast_receiver	*mcast_new_receiver( const char *group_name, int port )
 {
@@ -135,7 +70,7 @@ mcast_receiver	*mcast_new_receiver( const char *group_name, int port )
 	if(!v) return NULL;
 	int	on = 1;
 	struct ip_mreq mcast_req;
-	
+	int i;
 	veejay_memset( &mcast_req, 0, sizeof(mcast_req ));
 	veejay_memset( &(v->addr), 0, sizeof(struct sockaddr_in) );
 	v->group = (char*) strdup( group_name );
@@ -189,6 +124,12 @@ mcast_receiver	*mcast_new_receiver( const char *group_name, int port )
 		if(v) free(v);
 		return NULL;
 	}
+
+	packet_slot_t *q = (packet_slot_t*) vj_calloc(sizeof(packet_slot_t));
+	q->slot          = (packet_buffer_t**) vj_calloc(sizeof(packet_buffer_t*) * PACKET_SLOTS );
+	for( i = 0; i < PACKET_SLOTS ; i ++ )
+		q->slot[i] = (packet_buffer_t*) vj_calloc(sizeof(packet_buffer_t));
+	v->next = (void*)q;
 
 	return v;
 }
@@ -265,120 +206,170 @@ int	mcast_recv( mcast_receiver *v, void *buf, int len )
 	return n;
 }
 
-#define dequeue_packet()\
-{\
-res = recv(v->sock_fd, chunk, PACKET_PAYLOAD_SIZE, 0 );\
-if( res == -1)\
-{\
-	veejay_msg(0, "mcast receiver: %s", strerror(errno));\
-	return 0;\
-}\
-}
-
-int	mcast_recv_frame( mcast_receiver *v, uint8_t *linear_buf, int total_len, int cw, int ch, int cfmt,
-		int *dw, int *dh, int *dfmt )
+int	mcast_recv_packet_frame( mcast_receiver *v )
 {
 	uint8_t  chunk[PACKET_PAYLOAD_SIZE];
-	packet_header_t header;
-	frame_info_t 	info;
-	int res = 0;
-	int queue = 0;
-	int work_done = 0;
+	packet_slot_t *q = (packet_slot_t*) v->next;
 
-	if( mcast_poll_timeout( v, 1000 ) == 0 )
+	packet_header_t	hdr;
+	frame_info_t	inf;
+
+	int res = recv(v->sock_fd, chunk, PACKET_PAYLOAD_SIZE, 0 );
+        if( res <= 0 )
+        {
+                veejay_msg(VEEJAY_MSG_ERROR, "Error receiving multicast packet:%s", strerror(errno));
+                return 0;
+        }
+        hdr = packet_get_header(chunk);
+        packet_get_info( &inf, chunk );
+
+	//@ choose slot to fill
+	int i;
+	int d_slot = -1;
+
+	for(i = 0; i < PACKET_SLOTS; i ++ ) 
 	{
+		if( q->slot[i]->hdr.usec == hdr.usec ) {
+			d_slot = i;
+#ifdef STRICT_CHECKING
+			assert( q->slot[i]->len == inf.len );
+#endif
+			break;
+		}
+	}
+
+	if( d_slot == -1) {
+		//@ find slot with count == 0 (unused)
+		for(i = 0; i < PACKET_SLOTS; i ++ ) {
+			if(q->slot[i]->count == 0 ) {
+				d_slot = i;
+				break;
+			}
+		}
+	}
+
+	//@ no slots available
+	if( d_slot == -1) {
+		veejay_msg(VEEJAY_MSG_WARNING, "All packet slots in use, cannot keep pace! Dropping oldest in queue.");
+		//@ drop oldest packet in slot
+		long oldest = LONG_MAX;
+		int  o      = 0;
+		for(i = 0; i < PACKET_SLOTS; i ++ ) {
+			if(q->slot[i]->hdr.usec < oldest ) {
+				o = i;
+				oldest = q->slot[i]->hdr.usec;
+			}
+		}
+
+		d_slot = o;
+
+	//	veejay_msg(VEEJAY_MSG_DEBUG, "Dropping frame in slot %d (%d/%d packets)",
+	//			d_slot, q->slot[d_slot]->count,q->slot[d_slot]->hdr.length );
+			
+		free(q->slot[d_slot]->buf);
+		q->slot[d_slot]->buf = NULL;
+		q->slot[d_slot]->count = 0;
+		veejay_memset( &(q->slot[d_slot]->hdr), 0,sizeof(packet_header_t));
+		veejay_memset( &(q->slot[d_slot]->inf), 0,sizeof(frame_info_t));
+		q->slot[d_slot]->rdy = 0;
+	}
+
+	//@ destination slot
+	packet_buffer_t	*pb = q->slot[d_slot];
+	if(pb->buf == NULL) { //@ allocate buffer if needed
+		pb->buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * inf.width * inf.height * 3);
+	}
+
+	pb->len = inf.len;
+	uint8_t *dst = pb->buf + (CHUNK_SIZE * hdr.seq_num );
+        packet_get_data( &hdr, chunk, dst );
+	pb->count ++;
+
+	//@ save info/hdr
+	veejay_memcpy( &(pb->hdr), &hdr, sizeof(packet_header_t));
+	veejay_memcpy( &(pb->inf), &inf, sizeof(frame_info_t));
+
+	if( pb->count >= hdr.length )
+	{
+		pb->rdy = 1;
+		q->last = hdr.usec;
 		return 0;
 	}
 
-	packet_buffer_t *queued_packets = (packet_buffer_t*) v->next;
+	return 1;
+}
 
-	if( queued_packets != NULL ) {
-		memcpy(&header, &(queued_packets->hdr), sizeof(packet_header_t));
-		memcpy(&info,   &(queued_packets->inf), sizeof(frame_info_t));
-		queue = 1;
-	}
-	else {
-		res = recv(v->sock_fd, chunk, PACKET_PAYLOAD_SIZE, 0 );
-		if( res <= 0 )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error receiving multicast packet:%s", strerror(errno));
-			return 0;
-		}
-		header = packet_get_header(chunk);
-		packet_get_info( &info, chunk );
-	}
-	
-
-	int expected_len = PACKET_PAYLOAD_SIZE * header.length;
-	int compressed_data_len = 0;
+uint8_t *mcast_recv_frame( mcast_receiver *v, int *dw, int *dh, int *dfmt, int *len )
+{
+	packet_slot_t *q = (packet_slot_t*) v->next;
 	int i;
-
-	if(queue) {
-		if( mcast_packet_buffer_full( v->next ) ) {
-			mcast_packet_buffer_fill( v->next, &compressed_data_len, linear_buf );
-			mcast_packet_buffer_release(v->next);
-			return compressed_data_len;
-		}
-		mcast_packet_buffer_fill(v->next,&compressed_data_len, linear_buf );
-		for( i = 0; i < queued_packets->hdr.length; i ++ )
-		{
-			if( queued_packets->packets[i] )
-				work_done += PACKET_PAYLOAD_SIZE;
-		}
-	}
-
-	*dw = info.width;
-	*dh = info.height;
-	*dfmt = info.fmt;
-
-	while( work_done < expected_len )
+	for(i = 0; i < PACKET_SLOTS; i ++ ) 
 	{
-	
-		uint8_t *dst = NULL;
-	        if(queue == 0 && work_done == 0) {
-			dst = linear_buf + (CHUNK_SIZE * header.seq_num );
-			packet_get_data( &header, chunk, dst );
-			work_done += PACKET_PAYLOAD_SIZE;
+		//@ find rdy frames or too-old-frames and free them
+		if( q->slot[i]->rdy == 1 || q->slot[i]->hdr.usec < q->last ) {
+			free(q->slot[i]->buf);
+			q->slot[i]->buf = NULL;
+			q->slot[i]->count = 0;
+			veejay_memset( &(q->slot[i]->hdr), 0,sizeof(packet_header_t));
+			veejay_memset( &(q->slot[i]->inf), 0,sizeof(frame_info_t));
+			q->slot[i]->rdy = 0;
 		}
-
-		res = recv(v->sock_fd, chunk, PACKET_PAYLOAD_SIZE, 0 );
-		packet_header_t hdr = packet_get_header( chunk );
-		frame_info_t    inf;
-		packet_get_info(&inf,chunk );
-		if( hdr.usec == header.usec ) {
-			dst = linear_buf + (CHUNK_SIZE * hdr.seq_num );
-			packet_get_data( &hdr, chunk,dst );
-			work_done += PACKET_PAYLOAD_SIZE;
-			compressed_data_len = info.len;
-		} 
-		else {
-			if( hdr.usec > header.usec ) { //@ store newer packets for next cycle
-				if(queue==1) {
-					veejay_msg(VEEJAY_MSG_WARNING,"Out of pace, can't keep up with network ?! Processing delta is %2.2f sec",
-							(float)	(hdr.usec - header.usec)/40000.0f);
-					if(v->next)
-						mcast_packet_buffer_release( v->next ); 
-					return 0;
-				} else {
-					if(!v->next) {
-						v->next = mcast_packet_buffer_new( &hdr, &inf, chunk );
-					}
-					if( mcast_packet_buffer_next( v->next,&hdr ) ) {
-						mcast_packet_buffer_store(v->next,&hdr,chunk );
-					}
-					if( mcast_packet_buffer_full(v->next)) {
-						int num_packets_done = mcast_packet_buffer_fill(v->next,&compressed_data_len,linear_buf );
-						mcast_packet_buffer_release(v->next);
-						v->next = NULL;
-						return compressed_data_len;
-					}
-				}
-			}
-
-		}	
 	}
 
-	return compressed_data_len;
+	//@ is there something todo
+	if( mcast_poll_timeout( v, 1000 ) == 0 )
+		return NULL;
+
+	while( mcast_recv_packet_frame(v) )
+	{
+		//@ do nothing	
+	}
+		
+	int d_slot = -1;
+	//@ find packet buffer with complete frame
+	int full_frame = 0;
+	long t1 = 0;
+	for(i = 0; i < PACKET_SLOTS; i ++ ) 
+	{
+		if( q->slot[i]->rdy == 1 ) {
+			full_frame = 1;
+			t1 = q->slot[i]->hdr.usec;
+			d_slot = i;
+			break;
+		}
+	}
+
+	//@ find newer packet buffer with complete frame
+	for(i = 0; i < PACKET_SLOTS; i ++ ) 
+	{
+		if( q->slot[i]->rdy == 1 && q->slot[i]->hdr.usec < t1) {
+			full_frame = 1;
+			d_slot = i;
+			break;
+		}
+	}
+	
+
+	//@debug queue
+/*	for( i = 0; i < PACKET_SLOTS; i ++ ) {
+		packet_buffer_t *p = q->slot[i];
+		veejay_msg(VEEJAY_MSG_INFO, "Slot %d: %d bytes, %d/%d queued, rdy=%d, t1=%ld",
+				i, p->len, p->count,p->hdr.length, p->rdy,(long) p->hdr.usec );
+	
+	}
+	*/
+
+	//@ return newest full frame
+	if( full_frame ) {
+		packet_buffer_t *pb = q->slot[d_slot];
+		*dw = pb->inf.width;
+		*dh = pb->inf.height;
+		*dfmt=pb->inf.fmt;
+		*len =pb->len;
+		return pb->buf;
+	}
+
+	return NULL;
 }
 
 
@@ -389,5 +380,18 @@ void	mcast_close_receiver( mcast_receiver *v )
 		close(v->sock_fd);
 		if(v->group) free(v->group);
 		v->group = NULL;
+		int i;
+		packet_slot_t *q = (packet_slot_t*) v->next;
+		if( q ) {
+		  for( i = 0; i < PACKET_SLOTS; i ++ ){
+			packet_buffer_t *r = q->slot[i];
+			if( r->buf ) {
+				free(r->buf);
+			}
+			free(r);
+		  }
+		  free(q->slot);
+		  free(q);
+		}
 	}
 }

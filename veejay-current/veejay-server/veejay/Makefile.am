@@ -20,7 +20,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/liblzo \
 		$(FFMPEG_AVCODEC_CFLAGS) $(FFMPEG_AVFORMAT_CFLAGS) $(LIBQUICKTIME_CFLAGS) $(FT_CFLAGS) \
 		$(AVIPLAY_CFLAGS) $(XML2_CFLAGS) $(GTK_CFLAGS) $(DV_FLAGS) $(X_CFLAGS) \
-		$(DIRECTFB_CFLAGS) $(SDL_CFLAGS) $(JPEG_CFLAGS) $(PTHREAD_CFLAGS) $(SAMPLERATE_CFLAGS) 
+		$(DIRECTFB_CFLAGS) $(SDL_CFLAGS) $(JPEG_CFLAGS) $(JACK_CFLAGS) $(PTHREAD_CFLAGS) $(SAMPLERATE_CFLAGS) 
  
 pkginclude_HEADERS = vims.h 
 VEEJAY_LIB_FILE = libveejay.la
@@ -35,7 +35,7 @@ VEEJAY_ALL_LIB_OPTS = \
 libveejay_la_SOURCES =  vj-misc.c \
 			vj-osc.c vjkf.c vj-event.c vj-eventman.c vj-perform.c \
 			x11misc.c vj-sdl.c vj-dfb.c vj-viewport.c vj-composite.c \
-			vj-font.c liblavplayvj.c 
+			vj-font.c vj-audio.c liblavplayvj.c 
 
 libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS ) $(DEBUGLIBS)
 
@@ -60,7 +60,7 @@ libveejay_la_LIBADD = -L$(top_builddir)/mjpegtools/ -lmjpegutils \
 libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $(FT_LDFLAGS) $(FT_LIBS) \
 			$(XML2_LIBS) $(JPEG_LIBS) $(UNICAP_LIBS) \
 		 	$(FFMPEG_AVFORMAT_LIBS) $(FFMPEG_AVCODEC_LIBS) $(FFMPEG_SWSCALER_LIBS) $(XINERAMA_LIBS) \
-			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(LIBQUICKTIME_LIBS) $(SAMPLERATE_LIBS) \
+			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(JACK_LIBS) $(LIBQUICKTIME_LIBS) $(SAMPLERATE_LIBS) \
 			-DDYNAMIC -O3 -Wall -rdynamic 
 
 # *********************************************************************

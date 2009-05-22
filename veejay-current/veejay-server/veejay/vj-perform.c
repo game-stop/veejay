@@ -51,7 +51,7 @@
 #endif
 #define RECORDERS 1
 #ifdef HAVE_JACK
-#include <veejay/vj-jack.h>
+#include <veejay/vj-audio.h>
 #endif
 #include <libvje/internal.h>
 #include <libvjmem/vjmem.h>
@@ -687,8 +687,8 @@ static void vj_perform_close_audio() {
 			audio_resample_close( downsample_context[i]);
 	}
 
-	if(resample_jack)
-		audio_resample_close(resample_jack);
+/*	if(resample_jack)
+		audio_resample_close(resample_jack); */
 #endif
 	veejay_msg(VEEJAY_MSG_INFO, "Stopped Audio playback task");
 }
@@ -843,19 +843,12 @@ int vj_perform_audio_start(veejay_t * info)
 	if (el->has_audio)
 	{
 #ifdef HAVE_JACK
-		vj_jack_initialize();
-
- 		res = vj_jack_init( info->edit_list );
-		if( res <= 0)
-		{
-			info->audio=NO_AUDIO;
-			veejay_msg(VEEJAY_MSG_WARNING,
-				"Audio playback disabled (unable to connect to jack)");
+		int success = audio_init( el->audio_rate, el->audio_chans,NULL, "veejay" );
+		if( success == 0 ) {
+			veejay_msg(0, "Audio playback disabled");
+			info->audio = NO_AUDIO;
 			return 0;
 		}
-
-		jack_rate_ = vj_jack_rate();
-
 	/*	if ( res == 2 )
 		{
 			veejay_msg(VEEJAY_MSG_WARNING, "Jack plays at %d Hz, resampling audio from %d -> %d",jack_rate_,el->audio_rate,jack_rate_);
@@ -890,12 +883,12 @@ void vj_perform_audio_stop(veejay_t * info)
 {
     if (info->edit_list->has_audio) {
 #ifdef HAVE_JACK
-	vj_jack_stop();
-	if(resample_jack)
+	   audio_uninit(1);
+	/*if(resample_jack)
 	{
 		audio_resample_close(resample_jack);
 		resample_jack = NULL;
-	}
+	}*/
 #endif
 	info->audio = NO_AUDIO;
     }
@@ -2877,7 +2870,7 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 		if(settings->audio_mute || settings->current_playback_speed == 0 )
 		{
 			veejay_memset( a_buf, 0, num_samples * bps);
-                        vj_jack_play( a_buf, num_samples * bps  );
+                        audio_play( a_buf, num_samples * bps,0  );
 			return 1;
 		}
 
@@ -2942,7 +2935,7 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 		{
 			vj_jack_play( a_buf, (num_samples * bps ));
 		}*/
-			vj_jack_play( a_buf, (num_samples * bps ));
+			audio_play( a_buf, (num_samples * bps ),0);
 
      }	
 	veejay_msg(0 ,"\tread %d samples, %d", num_samples,num_samples, (int) ( (float)el->audio_rate/el->video_fps));

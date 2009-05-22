@@ -246,13 +246,13 @@ int	vj_client_poll( vj_client *v, int sock_type )
 	return 0;
 }
 
-static	void	vj_client_decompress( vj_client *t, uint8_t *out, int data_len, int Y, int UV , int header_len)
+static	void	vj_client_decompress( vj_client *t,uint8_t *in, uint8_t *out, int data_len, int Y, int UV , int header_len)
 {
 	uint8_t *d[3] = {
 			out,
 			out + Y,
 			out + Y + UV };
-	lzo_decompress( t->lzo, t->space, data_len, d, UV );
+	lzo_decompress( t->lzo, ( in == NULL ? t->space: in ), data_len, d, UV );
 }
 
 static	void	hexstr(uint8_t *bytes, int len){
@@ -284,9 +284,9 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 	int uv_len = 0;
 	if( v->c[0]->type == VMCAST_C )
 	{
-		plen = mcast_recv_frame( v->c[0]->r, v->space, 0, v->cur_width,v->cur_height,v->cur_fmt,
-				&p[0],&p[1],&p[2] );
-		if(plen <= 0)
+
+		uint8_t *in = mcast_recv_frame( v->c[0]->r, &p[0],&p[1], &p[2], &plen );
+		if( in == NULL )
 			return 0;
 #ifdef STRICT_CHECKING
 		assert( p[0] > 0 );
@@ -307,7 +307,7 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 				uv_len = y_len/2;break;
 		}
 
-		vj_client_decompress( v, dst,plen,y_len,uv_len ,16);
+		vj_client_decompress( v,in, dst,plen,y_len,uv_len ,16);
 		
 		if( p[0] != v->cur_width || p[1] != v->cur_height || p[2] != v->cur_fmt )
 			return 2;
@@ -361,7 +361,7 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 			return -1;
 		}
 
-		vj_client_decompress( v, dst, p[3], y_len, uv_len , plen);
+		vj_client_decompress( v,NULL, dst, p[3], y_len, uv_len , plen);
 
 		return 2;
 	}

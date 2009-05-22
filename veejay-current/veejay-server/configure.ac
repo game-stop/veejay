@@ -822,16 +822,15 @@ dnl Check for the Jack Audio connection kit
 dnl   AC_DEFINE(HAVE_JACK,,[Compiling with support for Jack])
 dnl
 
-dnl have_jack=false
-dnl if test x$with_jack != xno ; then
-dnl  PKG_CHECK_MODULES(JACK, jack >= 0.1 , have_jack=true, have_jack=false)
-dnl  if test x$have_jack = xtrue ; then
-dnl    AC_SUBST(JACK_LIBS)
-dnl    AC_SUBST(JACK_CFLAGS)
-dnl  else
-dnl    AC_MSG_WARN([Jack >= 0.100 is optional, get it at http://jackit.sourceforge.net]);
-dnl  fi
-dnl fi
+have_jack=false
+if test x$with_jack != xno ; then
+  PKG_CHECK_MODULES(JACK, jack >= 0.1, have_jack=true, have_jack=false)
+  if test x$have_jack = xtrue ; then
+    AC_SUBST(JACK_LIBS)
+    AC_SUBST(JACK_CFLAGS)
+    AC_DEFINE(HAVE_JACK,,[Compiling in Jack])
+  fi
+fi
 
 dnl have_samplerate=false
 dnl if test x$with_samplerate != xno ; then

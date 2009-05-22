@@ -696,7 +696,7 @@ int	v4lvideo_grab_check(v4lvideo_t *v, int palette ) {
 	v4lseterrorlevel( V4L_PERROR_NONE );
 	if( v4lvideo_set_grabformat(v, palette ) ) {	
 #ifdef STRICT_CHECKING
-		veejay_msg(0,"%s: wrong palette %x", __FUNCTION-_, palette );
+		veejay_msg(0,"%s: wrong palette %x", __FUNCTION__, palette );
 #endif
 		ret = -1;
 		goto VIDEOEXIT;
