@@ -106,7 +106,6 @@ static struct {
 } ccir_pixfmts[] =
 {
 	{ PIX_FMT_YUV420P },
-	{ PIX_FMT_YUV422  },
 	{ PIX_FMT_YUYV422 },
 	{ PIX_FMT_YUV422P },
 	{ PIX_FMT_YUV444P },
