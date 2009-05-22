@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([gveejay],[1.4.7],[veejay-users@lists.sourceforge.net])
+AC_INIT([gveejay],[1.4.8],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/gveejay.c])
 
 GVEEJAY_MAJOR_VERSION=1
 GVEEJAY_MINOR_VERSION=4
-GVEEJAY_MICRO_VERSION=7
+GVEEJAY_MICRO_VERSION=8
 GVEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 GVEEJAY_CODENAME="Reloaded - build $GVEEJAY_MAJOR_VERSION $GVEEJAY_MINOR_VERSION $GVEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -178,7 +178,7 @@ fi
 
 dnl Check for Veejay
 have_veejay=false
-PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.4.5 ],
+PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.4.8 ],
 	[	
 		AC_SUBST(VEEJAY_CFLAGS)
 		AC_SUBST(VEEJAY_LIBS)
@@ -188,7 +188,7 @@ PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.4.5 ],
 		[have_veejay=false])
 
 if test x$have_veejay != xtrue ; then
-	PKG_CHECK_MODULES(VEEJAY, [veejay <= 1.4.5 ],
+	PKG_CHECK_MODULES(VEEJAY, [veejay <= 1.4.8 ],
 			  [
 			   AC_MSG_ERROR([veejay-server too old!])
 			   ],
@@ -712,7 +712,7 @@ AC_MSG_NOTICE([      Good luck! You can be the first! ])
 fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
-AC_MSG_NOTICE([  - Veejay 1.4                    : ${have_veejay}])
+AC_MSG_NOTICE([  - Veejay 1.4.8                  : ${have_veejay}])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscaler} ])
