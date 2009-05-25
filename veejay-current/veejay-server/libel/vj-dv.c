@@ -136,7 +136,7 @@ int vj_dv_encode_frame(vj_dv_encoder *encoder, uint8_t *input_buf[3])
     VJFrame *src = yuv_yuv_template( input_buf[0],input_buf[1],input_buf[2],
 		    w,h, src_fmt );
     VJFrame *dst = yuv_yuv_template( encoder->buffer,NULL,NULL,
-		    w,h, PIX_FMT_YUVY422);
+		    w,h, PIX_FMT_YUYV422);
 
 
     if( encoder->scaler == NULL ) {
