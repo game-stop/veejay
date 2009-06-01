@@ -1056,5 +1056,5 @@ AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Unicap Imaging                : ${have_unicap} ])
-AC_MSG_NOTICE([  - libsamplerate                 : ${have_samplerate}])
+#AC_MSG_NOTICE([  - libsamplerate                 : ${have_samplerate}])
 
