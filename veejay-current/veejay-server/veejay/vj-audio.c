@@ -60,7 +60,7 @@ static jack_port_t *ports[MAX_CHANS];
 static int	     num_ports = 0;
 static jack_client_t *client = NULL;
 static	float	     latency =0;
-static	int	     estimate = 0;
+static	int	     estimate = 1;
 static  int	     bps =  0;
 static  int	     audio_rate  = 0;
 static	int	     paused = 0;
@@ -112,7 +112,6 @@ static void av_fifo_reset(AVFifoBuffer *f)
 }
 static int av_fifo_size(AVFifoBuffer *f)
 {
-	veejay_msg(0,"\tw = %d, r = %d", f->wndx, f->rndx );
     return (uint32_t)(f->wndx - f->rndx);
 }
 
@@ -190,7 +189,6 @@ static int write_buffer(unsigned char* data, int len) {
   int free = av_fifo_space(buffer);
   if (len > free) len = free;
   int res = av_fifo_generic_write(buffer,data,len,NULL );
-  veejay_msg(0, "%s: write %d bytes, result = %d", __FUNCTION__,len,res);
   return res;
 }
 
@@ -249,8 +247,10 @@ static int outputaudio(jack_nframes_t nframes, void *arg) {
   float *bufs[MAX_CHANS];
   int i;
 
- // gettimeofday(&callbackTime,NULL);
+  gettimeofday(&callbackTime,NULL);
 
+  veejay_msg(0, "write to jack at time: %ld,%ld",
+		  	callbackTime.tv_sec,callbackTime.tv_usec);
 
   for (i = 0; i < num_ports; i++)
     bufs[i] = jack_port_get_buffer(ports[i], nframes);
@@ -278,7 +278,7 @@ static int outputaudio(jack_nframes_t nframes, void *arg) {
 int audio_init(int rate, int channels, char *port_name, char *client_name) {
   const char **matching_ports = NULL;
   int autostart = 0;
-  estimate  = 1;
+  estimate  = 0;
 //  jack_options_t open_options = JackUseExactName;
   jack_options_t open_options = JackNullOption;
   jack_status_t status;
@@ -455,13 +455,10 @@ static int usec_sleep(int usec_delay)
 
 static unsigned int GetTimer(void){
   struct timeval tv;
-//  float s;
   gettimeofday(&tv,NULL);
-//  s=tv.tv_usec;s*=0.000001;s+=tv.tv_sec;
   return tv.tv_sec * 1000000 + tv.tv_usec;
 }  
 
-//@ Function returns total time run for audio
 float audio_get_delay(struct timeval bs) {
   if( buffer == NULL )
 	  return 0.0f;
@@ -476,19 +473,19 @@ float audio_get_delay(struct timeval bs) {
     in_jack += callback_interval - elapsed;
     if (in_jack < 0) in_jack = 0;
   }
-  veejay_msg(0,"Buffered: %d, bps = %d, in_jack =%f, A = %2.2f , B = %2.2f",
-		  buffered, bps, in_jack, elapsed, b );
-  veejay_msg(0,"Total played: %2.2f ", ( (float) buffered / (float) bps + in_jack));
   return (float)buffered / (float)bps + in_jack;
 }
 
 int	audio_get_buffered_bytes(long *sec, long *usec)
 {
-	if( buffer == NULL )
+	if( buffer == NULL ) {
+		veejay_msg(0, "Audio buffer not ready.");
 		return 0;
+	}
 	int buffered = av_fifo_size(buffer);
 	*sec = callbackTime.tv_sec;
 	*usec = callbackTime.tv_usec;
+	veejay_msg(0, "%s: %d %ld, %ld",__FUNCTION__,buffered, callbackTime.tv_sec,callbackTime.tv_usec );
 	return buffered;
 }
 #endif

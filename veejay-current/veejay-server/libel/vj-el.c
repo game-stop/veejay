@@ -232,6 +232,17 @@ static const    char    *el_pixfmt_str(int i)
         return pixfmtstr[0].s;
 }
 
+void	free_av_packet( AVPacket *pkt )
+{
+	if( pkt ) {
+		if( pkt->destruct )
+			pkt->destruct(pkt);
+		pkt->data = NULL;
+		pkt->size = 0;
+	}
+	pkt = NULL;
+}
+
 typedef struct
 {
         AVCodec *codec; // veejay supports only 2 yuv formats internally
@@ -1435,7 +1446,7 @@ further:
 	if(!got_picture) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Error while reading %s", filename );
 		av_free(f);
-		av_free_packet(&pkt); 
+		free_av_packet(&pkt); 
 		avcodec_close( codec_ctx );
 		av_close_input_file( avformat_ctx );
 		return -1;
@@ -1447,7 +1458,7 @@ further:
 		codec_ctx->codec_name, codec_ctx->width,codec_ctx->height, el_pixfmt_str(codec_ctx->pix_fmt), 
 		(codec_ctx->has_b_frames ? "Yes" : "No"), filename );
 
-	av_free_packet(&pkt); 
+	free_av_packet(&pkt); 
 	avcodec_close( codec_ctx );
 	av_close_input_file( avformat_ctx );
 	av_free(f);

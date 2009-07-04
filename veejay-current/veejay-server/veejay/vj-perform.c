@@ -679,13 +679,13 @@ static void vj_perform_close_audio() {
 	if(audio_render_buffer) free( audio_render_buffer );
 	if(down_sample_buffer) free( down_sample_buffer );
 #ifdef HAVE_JACK
-	for(i=0; i <= MAX_SPEED; i ++)
+/*	for(i=0; i <= MAX_SPEED; i ++)
 	{
 		if(resample_context[i])
 			audio_resample_close( resample_context[i] );
 		if(downsample_context[i])
 			audio_resample_close( downsample_context[i]);
-	}
+	}*/
 
 /*	if(resample_jack)
 		audio_resample_close(resample_jack); */
@@ -701,12 +701,11 @@ int vj_perform_init_audio(veejay_t * info)
 #else
 	int i;
 
-	if(!info->audio )
+/*	if(!info->audio )
 	{
 		veejay_msg(0,"No audio found");
 		return 0;
 	}
-	/* top audio frame */
 	top_audio_buffer =
 	    (uint8_t *) vj_calloc(sizeof(uint8_t) * 8 * PERFORM_AUDIO_SIZE);
 	if(!top_audio_buffer)
@@ -723,7 +722,6 @@ int vj_perform_init_audio(veejay_t * info)
 	if(!resample_audio_buffer) 
 		return 0;
 
-	/* chained audio */
 	lin_audio_buffer_ = (uint8_t*) vj_calloc( sizeof(uint8_t) * PERFORM_AUDIO_SIZE * SAMPLE_MAX_EFFECTS );
 	if(!lin_audio_buffer_)
 		return 0;
@@ -761,6 +759,7 @@ int vj_perform_init_audio(veejay_t * info)
 		veejay_msg(VEEJAY_MSG_DEBUG, "Resampler %d: Speed %d resamples audio to %d Hz, Slow %d to %d Hz ", i,i+2,out_rate,
 			i+2, down_rate );
 	}
+	*/
 	return 1;
 #endif
 }
@@ -843,12 +842,18 @@ int vj_perform_audio_start(veejay_t * info)
 	if (el->has_audio)
 	{
 #ifdef HAVE_JACK
-		int success = audio_init( el->audio_rate, el->audio_chans,NULL, "veejay" );
+	/*	int success = audio_init( el->audio_rate, el->audio_chans,NULL, "veejay" );
 		if( success == 0 ) {
 			veejay_msg(0, "Audio playback disabled");
 			info->audio = NO_AUDIO;
 			return 0;
 		}
+			return 1;
+		*/
+		veejay_msg(0, "Audio playback disabled");
+		info->audio = NO_AUDIO;
+		return 0;
+
 	/*	if ( res == 2 )
 		{
 			veejay_msg(VEEJAY_MSG_WARNING, "Jack plays at %d Hz, resampling audio from %d -> %d",jack_rate_,el->audio_rate,jack_rate_);
@@ -870,7 +875,7 @@ int vj_perform_audio_start(veejay_t * info)
 		}*/
 
 
-		return 1;
+	//	return 1;
 #else
 		veejay_msg(VEEJAY_MSG_WARNING, "Jack support not compiled in (no audio)");
 		return 0;
@@ -883,7 +888,7 @@ void vj_perform_audio_stop(veejay_t * info)
 {
     if (info->edit_list->has_audio) {
 #ifdef HAVE_JACK
-	   audio_uninit(1);
+//	   audio_uninit(1);
 	/*if(resample_jack)
 	{
 		audio_resample_close(resample_jack);
@@ -2938,7 +2943,6 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 			audio_play( a_buf, (num_samples * bps ),0);
 
      }	
-	veejay_msg(0 ,"\tread %d samples, %d", num_samples,num_samples, (int) ( (float)el->audio_rate/el->video_fps));
 #endif
    	return 1;
 }

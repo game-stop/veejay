@@ -449,8 +449,8 @@ void chromamagic_freeze(VJFrame *frame, VJFrame *frame2, int w, int h, int op_a)
 		else
 			c = 255 - a;
 
-		Y[i] = CLAMP_Y(255 - ((op_a -a ) * (op_a - a)) / b);
-
+		Y[i] = CLAMP_Y(c);
+			
 		a = Cb[i];
 		b = Cb2[i];
 

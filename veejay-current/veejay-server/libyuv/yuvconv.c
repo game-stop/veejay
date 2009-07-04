@@ -426,6 +426,7 @@ void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
 		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
 		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA ||
+		src_fmt == PIX_FMT_YUYV422 ||
 		src_fmt == PIX_FMT_BGR24   || src_fmt == PIX_FMT_RGB32 ||
 		src_fmt == PIX_FMT_RGB32_1 || src_fmt == PIX_FMT_GRAY8 );
 	assert( src->width > 0 );
