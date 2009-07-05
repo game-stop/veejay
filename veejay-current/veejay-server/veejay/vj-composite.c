@@ -138,7 +138,13 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	c->frame4 = yuv_yuv_template( c->proj_plane[0],c->proj_plane[1],c->proj_plane[2],iw,ih,c->frame1->format );
 
 	c->scaler = yuv_init_swscaler( c->frame1, c->frame2, &sws_templ, 0 );
+#ifdef STRICT_CHECKING
+	assert(c->scaler != NULL );
+#endif
 	c->back_scaler = yuv_init_swscaler( c->frame4, c->frame3, &sws_templ, 0 );
+#ifdef STRICT_CHECKING
+	assert(c->back_scaler!=NULL);
+#endif
 
 	c->back1 = NULL;
 
@@ -276,10 +282,11 @@ static const    char    *unicap_pf_str(int i)
         return NULL;
 }
 
-static inline void	composite_scale( composite_t *c, VJFrame *input, VJFrame *output )
+static void	composite_scale( composite_t *c, VJFrame *input, VJFrame *output )
 {
 #ifdef STRICT_CHECKING
 	assert( unicap_pf_str(input->format) != NULL );
+	assert( c->scaler != NULL );
 #endif
 	yuv_convert_and_scale(c->scaler,input,output);
 }
