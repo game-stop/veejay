@@ -971,6 +971,25 @@ if test x"$with_extra_cflags" != "x"; then
    CXXFLAGS="$CXXFLAGS $with_extra_cflags"
 fi
 
+dnl	output some info on what veejay was build
+BUILD_PLATFORM=${build}
+BUILD_CPU=${build_cpu}
+BUILD_VENDOR=${build_vendor}
+BUILD_OS=${build_os}
+AC_SUBST(BUILD_PLATFORM)
+AC_SUBST(BUILD_CPU)
+AC_SUBST(BUILD_VENDOR)
+AC_SUBST(BUILD_OS)
+
+if test ! -r $srcdir/buildinfo.sh; then
+	AC_MSG_ERROR([buildinfo.sh script not found.])
+fi
+
+chmod +x $srcdir/buildinfo.sh
+
+$srcdir/buildinfo.sh
+
+
 
 dnl **********************************************************************
 dnl Output a Makefile or two and the lib/header descriptor script

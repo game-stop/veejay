@@ -42,7 +42,7 @@
 #include <sys/sysinfo.h>
 #include <unistd.h>
 #include <veejay/vj-OSC.h>
-
+#include <build.h>
 extern long vj_el_get_mem_size();
 
 static int run_server = 1;
@@ -595,6 +595,12 @@ static void print_license()
 {
 	veejay_msg(VEEJAY_MSG_INFO,
 	    "Veejay -<|Classic +|>- %s Copyright (C) Niels Elburg and others",VERSION);
+	veejay_msg(VEEJAY_MSG_INFO,
+	    "Build for %s/%s arch %s on %s",
+	    BUILD_OS,
+	    BUILD_KERNEL,
+	    BUILD_MACHINE,
+	    BUILD_DATE );
 	veejay_msg(VEEJAY_MSG_INFO,
 	    "This software is subject to the GNU GENERAL PUBLIC LICENSE");
 

@@ -279,6 +279,27 @@ int	veejay_set_yuv_range(veejay_t *info) {
  ******************************************************/
 static void	veejay_reset_el_buffer( veejay_t *info );
 
+#ifdef STRICT_CHECKING
+void veejay_change_state1(veejay_t * info, int new_state)
+{
+    	video_playback_setup *settings =
+		(video_playback_setup *) info->settings;
+
+//	pthread_mutex_lock(&(settings->valid_mutex));
+        settings->state = new_state;
+//	pthread_mutex_unlock(&(settings->valid_mutex));
+}
+
+#define veejay_change_state(a,b) vcs(a,b,__FUNCTION__,__LINE__)
+void vcs(veejay_t *info, int new_state,const char *caller_func,const int caller_line)
+{
+	veejay_msg(VEEJAY_MSG_DEBUG,
+			"Change state to %d by %s:%d",new_state,
+				caller_func,caller_line);
+	veejay_change_state1(info,new_state);
+}
+#else
+
 void veejay_change_state(veejay_t * info, int new_state)
 {
     	video_playback_setup *settings =
@@ -288,6 +309,7 @@ void veejay_change_state(veejay_t * info, int new_state)
         settings->state = new_state;
 //	pthread_mutex_unlock(&(settings->valid_mutex));
 }
+#endif
 void veejay_change_state_save(veejay_t * info, int new_state)
 {
 	if(new_state == LAVPLAY_STATE_STOP )
@@ -2479,9 +2501,6 @@ static void veejay_playback_cycle(veejay_t * info)
 //	stats.tdiff = (tdiff1 - tdiff2);
 //	veejay_msg(0, "stats.tdiff=%g, spvf=%g delay=%g",
 //				stats.tdiff, settings->spvf,ad );
-
-	if( settings->current_frame_num > 50 )
-		veejay_change_state(info, LAVPLAY_STATE_STOP );
 
 	/* Fill and queue free buffers again */
 	for (n = first_free; n < stats.nsync;) {
