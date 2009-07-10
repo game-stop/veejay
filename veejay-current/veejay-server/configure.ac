@@ -1012,6 +1012,7 @@ libel/Makefile
 libstream/Makefile
 liblavjpeg/Makefile
 libsamplerec/Makefile
+bio2jack/Makefile
 veejay/Makefile
 man/Makefile
 veejay.pc

@@ -86,7 +86,7 @@
 #include <libel/vj-avcodec.h>
 #include <libel/pixbuf.h>
 #ifdef HAVE_JACK
-#include <veejay/vj-audio.h>
+#include <veejay/vj-jack.h>
 #endif
 #include <libyuv/yuvconv.h>
 #include <veejay/vj-composite.h>
@@ -2367,11 +2367,12 @@ static void veejay_playback_cycle(veejay_t * info)
     tdiff2 = 0.;
     nvcorr = 0;
     stats.audio = 0;
+
     if(info->current_edit_list->has_audio && info->audio == AUDIO_PLAY)
     {
 #ifdef HAVE_JACK
-  //      info->audio_running = vj_perform_audio_start(info);
-  //	stats.audio = 1;
+        info->audio_running = vj_perform_audio_start(info);
+  	stats.audio = 1;
 #endif
    }
     veejay_set_speed(info,1);
@@ -2400,14 +2401,14 @@ static void veejay_playback_cycle(veejay_t * info)
 			veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d", info->uc->sample_id);
 			break;
 	}
-    /*vj_perform_queue_audio_frame(info);
+    vj_perform_queue_audio_frame(info);
     vj_perform_queue_video_frame(info,0);
  
     if (vj_perform_queue_frame(info, 0) != 0)
     {
 	   veejay_msg(VEEJAY_MSG_ERROR,"Unable to queue frame");
            return;
-    }*/
+    }
 
     bp.input = 0;
     bp.norm =
@@ -2442,8 +2443,8 @@ static void veejay_playback_cycle(veejay_t * info)
 
 	int current_speed = settings->current_playback_speed;
 #ifdef HAVE_JACK
-//    	if(info->audio == AUDIO_PLAY )
-//		audio_continue( current_speed );
+   	if(info->audio == AUDIO_PLAY )
+		vj_jack_continue( current_speed );
 #endif
 
 	do {
@@ -2478,29 +2479,25 @@ static void veejay_playback_cycle(veejay_t * info)
 
 	veejay_event_handle(info);
 #ifdef HAVE_JACK
-//	double ad = audio_get_delay( bs.timestamp );
-
-//	stats.tdiff = audio_get_delay(bs.timestamp);
-/*	if ( info->audio==AUDIO_PLAY && el->has_audio ) 
+	if ( info->audio==AUDIO_PLAY && el->has_audio ) 
 	{
 	   struct timeval audio_tmstmp;	
 	   long int sec=0;
 	   long int usec=0;
-	   long num_audio_bytes_written = audio_get_buffered_bytes( &sec,&usec);
+	   long num_audio_bytes_written = vj_jack_get_status( &sec,&usec);
 
 	   audio_tmstmp.tv_sec = sec;
 	   audio_tmstmp.tv_usec = usec;
-	  // if (audio_tmstmp.tv_sec)
- 	  // {
+
+	   if (audio_tmstmp.tv_sec)
+ 	   {
          	    tdiff1 = settings->spvf * (stats.nsync - nvcorr) -  
 				settings->spas * num_audio_bytes_written;
              	    tdiff2 = (bs.timestamp.tv_sec - audio_tmstmp.tv_sec) + (bs.timestamp.tv_usec - audio_tmstmp.tv_usec) * 1.e-6;
-        //   } */
-//	}
+           } 
+	}
 #endif
-//	stats.tdiff = (tdiff1 - tdiff2);
-//	veejay_msg(0, "stats.tdiff=%g, spvf=%g delay=%g",
-//				stats.tdiff, settings->spvf,ad );
+	stats.tdiff = (tdiff1 - tdiff2);
 
 	/* Fill and queue free buffers again */
 	for (n = first_free; n < stats.nsync;) {
@@ -2540,8 +2537,8 @@ static void veejay_playback_cycle(veejay_t * info)
 #endif
 	    settings->buffer_entry[frame] = settings->current_frame_num;
 
-//	    if (!skipa) 
-//			vj_perform_queue_audio_frame(info);
+	    if (!skipa) 
+			vj_perform_queue_audio_frame(info);
 	    if (!skipv)
 			vj_perform_queue_video_frame(info,skipi);
 
@@ -2561,11 +2558,11 @@ static void veejay_playback_cycle(veejay_t * info)
 	    n++;
 	}
 		/* output statistics */
-//	if (el->has_audio && (info->audio==AUDIO_PLAY))
-//	    stats.audio = settings->audio_mute ? 0 : 1;
+	if (el->has_audio && (info->audio==AUDIO_PLAY))
+	    stats.audio = settings->audio_mute ? 0 : 1;
 	stats.stats_changed = 0;
-	stats.frame = settings->current_frame_num;
-	//stats.nsync = 0;
+//	stats.frame = settings->current_frame_num;
+//	stats.nsync = 0;
     }
 
   FINISH:

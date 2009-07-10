@@ -51,7 +51,7 @@
 #endif
 #define RECORDERS 1
 #ifdef HAVE_JACK
-#include <veejay/vj-audio.h>
+#include <veejay/vj-jack.h>
 #endif
 #include <libvje/internal.h>
 #include <libvjmem/vjmem.h>
@@ -112,7 +112,6 @@ static VJFrame *helper_frame = NULL;
 static int vj_perform_record_buffer_init();
 static void vj_perform_record_buffer_free();
 #ifdef HAVE_JACK
-static int jack_rate_ = 0;
 static ReSampleContext *resample_context[(MAX_SPEED+1)];
 static ReSampleContext *downsample_context[(MAX_SPEED+1)];
 static ReSampleContext *resample_jack = NULL;
@@ -679,16 +678,16 @@ static void vj_perform_close_audio() {
 	if(audio_render_buffer) free( audio_render_buffer );
 	if(down_sample_buffer) free( down_sample_buffer );
 #ifdef HAVE_JACK
-/*	for(i=0; i <= MAX_SPEED; i ++)
+	for(i=0; i <= MAX_SPEED; i ++)
 	{
 		if(resample_context[i])
 			audio_resample_close( resample_context[i] );
 		if(downsample_context[i])
 			audio_resample_close( downsample_context[i]);
-	}*/
+	}
 
-/*	if(resample_jack)
-		audio_resample_close(resample_jack); */
+	if(resample_jack)
+		audio_resample_close(resample_jack); 
 #endif
 	veejay_msg(VEEJAY_MSG_INFO, "Stopped Audio playback task");
 }
@@ -701,7 +700,7 @@ int vj_perform_init_audio(veejay_t * info)
 #else
 	int i;
 
-/*	if(!info->audio )
+	if(!info->audio )
 	{
 		veejay_msg(0,"No audio found");
 		return 0;
@@ -735,31 +734,45 @@ int vj_perform_init_audio(veejay_t * info)
 		int out_rate = (info->edit_list->audio_rate * (i+2));
 		int down_rate = (info->edit_list->audio_rate / (i+2));
 
-		resample_context[i] = audio_resample_init(
+		resample_context[i] = av_audio_resample_init(
 					info->edit_list->audio_chans,
 					info->edit_list->audio_chans, 
 					info->edit_list->audio_rate,
-					out_rate);
+					out_rate,
+					SAMPLE_FMT_S16,
+					SAMPLE_FMT_S16,
+					16,
+					10,
+					0,
+					1.0
+					);
 		if(!resample_context[i])
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Cannot initialize audio upsampler for speed %d", i);
 			return 0;
 		}
-		downsample_context[i] = audio_resample_init(
+		downsample_context[i] = av_audio_resample_init(
 					info->edit_list->audio_chans,
 					info->edit_list->audio_chans,
 					info->edit_list->audio_rate,
-					down_rate );
+					down_rate,
+					SAMPLE_FMT_S16,
+					SAMPLE_FMT_S16,
+					16,
+					10,
+					0,
+					1.0 );
+       
 		if(!downsample_context[i])
 		{
 			veejay_msg(VEEJAY_MSG_WARNING, "Cannot initialize audio downsampler for dup %d",i);
 			return 0;
 		}
 
-		veejay_msg(VEEJAY_MSG_DEBUG, "Resampler %d: Speed %d resamples audio to %d Hz, Slow %d to %d Hz ", i,i+2,out_rate,
-			i+2, down_rate );
+		/*veejay_msg(VEEJAY_MSG_DEBUG, "Resampler %d: Speed %d resamples audio to %d Hz, Slow %d to %d Hz ", i,i+2,out_rate,
+			i+2, down_rate );*/
 	}
-	*/
+	
 	return 1;
 #endif
 }
@@ -842,40 +855,24 @@ int vj_perform_audio_start(veejay_t * info)
 	if (el->has_audio)
 	{
 #ifdef HAVE_JACK
-	/*	int success = audio_init( el->audio_rate, el->audio_chans,NULL, "veejay" );
-		if( success == 0 ) {
+		vj_jack_initialize();
+		res = vj_jack_init(el);
+		if( res <= 0 ) {	
 			veejay_msg(0, "Audio playback disabled");
 			info->audio = NO_AUDIO;
 			return 0;
 		}
-			return 1;
-		*/
-		veejay_msg(0, "Audio playback disabled");
-		info->audio = NO_AUDIO;
-		return 0;
 
-	/*	if ( res == 2 )
+		if ( res == 2 )
 		{
-			veejay_msg(VEEJAY_MSG_WARNING, "Jack plays at %d Hz, resampling audio from %d -> %d",jack_rate_,el->audio_rate,jack_rate_);
-			resample_jack = audio_resample_init( el->audio_chans,el->audio_chans, jack_rate_, el->audio_rate);
-
-			if(!resample_jack)
-			{
-				resample_jack = NULL;
-				veejay_msg(VEEJAY_MSG_WARNING, "Cannot initialize resampler for %d -> %d audio rate conversion ",
-					el->audio_rate,jack_rate_);
-				return 0;
-			}
-	
-			return 1;
+			vj_jack_stop();
+			info->audio = NO_AUDIO;
+			veejay_msg(VEEJAY_MSG_WARNING,"Please run jackd with a sample rate of %ld",
+					el->audio_rate );
+			return 0;
 		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Jack is running the same samplerate as Veejay");
-		}*/
 
-
-	//	return 1;
+		return 1;
 #else
 		veejay_msg(VEEJAY_MSG_WARNING, "Jack support not compiled in (no audio)");
 		return 0;
@@ -888,12 +885,12 @@ void vj_perform_audio_stop(veejay_t * info)
 {
     if (info->edit_list->has_audio) {
 #ifdef HAVE_JACK
-//	   audio_uninit(1);
-	/*if(resample_jack)
+	vj_jack_stop();
+    	   if(resample_jack)
 	{
 		audio_resample_close(resample_jack);
 		resample_jack = NULL;
-	}*/
+	}
 #endif
 	info->audio = NO_AUDIO;
     }
@@ -1556,7 +1553,7 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 			{
 				if( speed < 0 )
 					vj_perform_reverse_audio_frame(info, n_samples, sambuf );
-				n_samples = audio_resample( resample_context[n_frames-2], audio_buf, sambuf, n_samples );
+				n_samples = audio_resample( resample_context[n_frames-2],audio_buf, sambuf, n_samples );
 			}
 		} else if( speed == 0 ) {
 			n_samples = len = pred_len;
@@ -1591,7 +1588,7 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 		{
 			// @ resample buffer
 			n_samples = audio_resample( downsample_context[ max_sfd-2 ], 
-					down_sample_buffer, audio_buf, n_samples  );
+					down_sample_buffer,audio_buf, n_samples  );
 			*sampled_down = n_samples / max_sfd;
 			val = n_samples / max_sfd;
 			n_samples = pred_len;
@@ -2875,7 +2872,7 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 		if(settings->audio_mute || settings->current_playback_speed == 0 )
 		{
 			veejay_memset( a_buf, 0, num_samples * bps);
-                        audio_play( a_buf, num_samples * bps,0  );
+			vj_jack_play( a_buf, (num_samples * bps ));
 			return 1;
 		}
 
@@ -2925,23 +2922,8 @@ int vj_perform_queue_audio_frame(veejay_t *info)
 				}
 				break;
 		}
-/*
-		if( jack_rate_ != el->audio_rate && rs)
-		{
-#ifdef STRICT_CHECKING
-			assert( resample_jack != NULL );
-			assert( num_samples > 0 );
-#endif
-			veejay_memcpy( resample_audio_buffer, a_buf, num_samples * bps);
-			num_samples = audio_resample( resample_jack, (short*)top_audio_buffer,(short*)resample_audio_buffer, num_samples );
-			vj_jack_play( top_audio_buffer, num_samples * bps );
-		}
-		else
-		{
-			vj_jack_play( a_buf, (num_samples * bps ));
-		}*/
-			audio_play( a_buf, (num_samples * bps ),0);
 
+		vj_jack_play( a_buf, (num_samples * bps ));
      }	
 #endif
    	return 1;

@@ -3106,11 +3106,11 @@ void	vj_event_set_volume(void *ptr, const char format[], va_list ap)
 	if(args[0] >= 0 && args[0] <= 100)
 	{
 #ifdef HAVE_JACK
-	/*	if(vj_jack_set_volume(args[0]))
+		if(vj_jack_set_volume(args[0]))
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "Volume set to %d", args[0]);
-		}*/
-#else
+		}
+#else		
 		veejay_msg(VEEJAY_MSG_ERROR, "Audio support not compiled in");
 #endif
 	}
@@ -7447,7 +7447,7 @@ void vj_event_enable_audio(void *ptr, const char format[], va_list ap)
 
 	if( v->audio == NO_AUDIO  )
 	{
-	//	vj_jack_enable();
+		vj_jack_enable();
 		v->audio = AUDIO_PLAY;
 	}
 #endif	
@@ -7465,9 +7465,9 @@ void vj_event_disable_audio(void *ptr, const char format[], va_list ap)
 
 	if( v->audio != NO_AUDIO )
 	{
-	//	vj_jack_disable();
+		vj_jack_disable();
 		v->audio = NO_AUDIO;
-	//	vj_jack_reset();
+		vj_jack_reset();
 	}
 #endif
 }

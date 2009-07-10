@@ -79,8 +79,6 @@ int vj_jack_init(editlist *el)
 	int i = 0;
 	int ret = 0;
 
-	audio_rate = el->audio_rate;
-
 	JACK_Init();
 
 	bits_per_sample = 16;
@@ -89,16 +87,16 @@ int vj_jack_init(editlist *el)
 	if( !_vj_jack_start(&driver) )
 		return ret;
 
-	long jack_rate = vj_jack_rate();
+	long jack_rate = JACK_GetSampleRate(driver );
 
-	audio_bps = audio_rate * audio_channels;
-
-	veejay_msg(2,"Jack: %ld, %d Hz/ %d Channels %d Bit ", jack_rate,audio_rate,audio_channels,bits_per_sample);
+	audio_bps = v_rate;// audio_rate * audio_channels;
 
 	ret = 1;
 
-	if( jack_rate != el->audio_rate )
+	if( jack_rate != el->audio_rate ) {
+		veejay_msg(1,"Jack is running with a different sample rate (%ld)! Really should use a rate of %d", jack_rate,el->audio_rate );
 		ret = 2;
+	}
 
 	JACK_SetState(driver, PAUSED );
 
@@ -197,20 +195,6 @@ int	vj_jack_get_space()
 
 long	vj_jack_get_status(long int *sec, long int *usec)
 {
-
-//	long a = JACK_GetPosition( driver, MILLISECONDS, PLAYED );
-//	long b = JACK_GetPosition( driver, BYTES, PLAYED );
-
-	long c = JACK_OutputStatus( driver, sec,usec );
-
-//	long i = JACK_GetJackInputLatency( driver );
-//	long o = JACK_GetJackOutputLatency(driver);
-
-//	long r = JACK_GetJackBufferedBytes( driver );
-
-//	veejay_msg(0,"A=%ld,B=%ld, C=%ld, I=%ld,O=%ld, Request bytes:%ld",a,b,c,i,o,r);
-//@ return played samples
-//	return JACK_OutputStatus( driver, sec, usec);
-	return c;
+	return JACK_OutputStatus( driver, sec, usec);
 }
 #endif

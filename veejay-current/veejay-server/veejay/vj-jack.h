@@ -1,5 +1,5 @@
 /* veejay - Linux VeeJay
- * 	     (C) 2002-2004 Niels Elburg <nwelburg@gmail.com> 
+ * 	     (C) 2002-2004 Niels Elburg <nelburg@looze.net> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
