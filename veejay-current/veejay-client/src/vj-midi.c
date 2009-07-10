@@ -227,7 +227,7 @@ void	vj_midi_save(void *vv, const char *filename)
 	vmidi_t *v = (vmidi_t*) vv;
         if(!v->active) return;
 
-	int fd = open( filename, O_TRUNC|O_CREAT|O_WRONLY );
+	int fd = open( filename, O_TRUNC|O_CREAT|O_WRONLY,S_IRWXU );
 	if(!fd)
 	{
 		vj_msg(VEEJAY_MSG_ERROR, "Unable to save MIDI settings to %s",filename);
@@ -253,8 +253,8 @@ void	vj_midi_save(void *vv, const char *filename)
 				d->extra,
 				(d->widget == NULL ? "none" : d->widget ),
 				d->msg );
-			write( fd, tmp, strlen( tmp ));
-			count ++;
+			if( write( fd, tmp, strlen( tmp )) >= 0 )
+				count ++;
 		}
 		free(items[i]);
 	}

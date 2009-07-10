@@ -6359,7 +6359,7 @@ static	void	theme_response( gchar *string )
 	char theme_config[1024];
 	snprintf(theme_config,sizeof(theme_config), "%stheme.config", theme_dir );
 	snprintf(theme_file,sizeof(theme_file), "%s/%s/gveejay.rc", theme_dir, string );
-	int fd = open( theme_config , O_WRONLY | O_CREAT | O_TRUNC);
+	int fd = open( theme_config , O_WRONLY | O_CREAT | O_TRUNC, S_IRWXU);
 	if(fd > 0)
 	{
 		write( fd, string, strlen(string));
