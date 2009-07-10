@@ -460,11 +460,11 @@ void 		*vj_avcodec_start( editlist *el, int encoder, char *filename )
 int		vj_avcodec_init( int pixel_format, int verbose)
 {
 	out_pixel_format = pixel_format;
-	if( !verbose )
-		av_log_set_level( AV_LOG_QUIET);
-	else
-		av_log_set_level( AV_LOG_VERBOSE );
-
+#ifndef STRICT_CHECKING
+	av_log_set_level( AV_LOG_QUIET);
+#else
+	av_log_set_level( AV_LOG_VERBOSE );
+#endif
 	av_register_all();
 
 	veejay_msg(VEEJAY_MSG_INFO, "FFmpeg AVCodec initialized (http://ffmpeg.sourceforge.net)");

@@ -945,19 +945,22 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 	veejay_memset( s, 0, sizeof(vj_sws) );
 
 	int cpu_flags = 0;
+#ifdef  STRICT_CHECKING
+	cpu_flags = cpu_flags | SWS_PRINT_INFO;
+#endif
 
 #ifdef HAVE_ASM_MMX
 	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX;
 #endif
-#ifdef HAVE_ASM_3DNOW
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_3DNOW;
-#endif
-#ifdef HAVE_ASM_MMX2
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX2;
-#endif
-#ifdef HAVE_ALTIVEC
-	cpu_flags = cpu_flags | SWS_CPU_CAPS_ALTIVEC;
-#endif
+//#ifdef HAVE_ASM_3DNOW
+//	cpu_flags = cpu_flags | SWS_CPU_CAPS_3DNOW;
+//#endif
+//#ifdef HAVE_ASM_MMX2
+//	cpu_flags = cpu_flags | SWS_CPU_CAPS_MMX2;
+//#endif
+//#ifdef HAVE_ALTIVEC
+//	cpu_flags = cpu_flags | SWS_CPU_CAPS_ALTIVEC;
+//#endif
 	switch(tmpl->flags)
 	{
 		case 1:
@@ -1013,6 +1016,7 @@ void*	yuv_init_swscaler(VJFrame *src, VJFrame *dst, sws_template *tmpl, int cpu_
 
 	if(!s->sws)
 	{
+		veejay_msg(0,"sws_getContext failed.");
 		if(s)free(s);
 		return NULL;
 	}	
