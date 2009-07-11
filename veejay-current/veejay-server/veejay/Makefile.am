@@ -28,17 +28,13 @@ VEEJAY_LIB_FILE = libveejay.la
 
 lib_LTLIBRARIES = $(VEEJAY_LIB_FILE) 
 
-VEEJAY_ALL_LIB_OPTS = \
-	-version-info $(LT_AGE):$(LT_REVISION):$(LT_AGE) \
-	-release $(LT_RELEASE) \
-	-export-dynamic 
-
 libveejay_la_SOURCES =  vj-misc.c \
 			vj-osc.c vjkf.c vj-event.c vj-eventman.c vj-perform.c \
 			x11misc.c vj-sdl.c vj-dfb.c vj-viewport.c vj-composite.c \
 			vj-font.c vj-pjack.c liblavplayvj.c 
 
-libveejay_la_LDFLAGS = $(VEEJAY_ALL_LIB_OPTS ) $(DEBUGLIBS)
+libveejay_la_LDFLAGS = -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \
+		       -release $(LT_RELEASE) -no-undefined -export-dynamic $(DEBUGLIBS)
 
 
 libveejay_la_LIBADD = -L$(top_builddir)/mjpegtools/ -lmjpegutils \
