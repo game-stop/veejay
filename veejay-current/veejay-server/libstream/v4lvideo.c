@@ -318,7 +318,9 @@ static	int		v4lvideo_fun(v4lvideo_t *v, int w, int h, int palette, int *cap_pale
 	int native            = 0;
 	
 	int is_jpeg[2]	      = {0,0};
-	
+#ifdef STRICT_CHECKING
+	assert( v != NULL );
+#endif	
 	while( palette_descr_[i].id != -1 ) {
 		if(palette_descr_[i].id == VIDEO_PALETTE_JPEG ) {
 			i ++;
@@ -696,7 +698,7 @@ int	v4lvideo_grab_check(v4lvideo_t *v, int palette ) {
 	v4lseterrorlevel( V4L_PERROR_NONE );
 	if( v4lvideo_set_grabformat(v, palette ) ) {	
 #ifdef STRICT_CHECKING
-		veejay_msg(0,"%s: wrong palette %x", __FUNCTION__, palette );
+		veejay_msg(0,"%s: wrong palette %s", __FUNCTION__,get_palette_name( palette) );
 #endif
 		ret = -1;
 		goto VIDEOEXIT;
@@ -710,9 +712,10 @@ int	v4lvideo_grab_check(v4lvideo_t *v, int palette ) {
 		goto VIDEOEXIT;
 	}
 	ret = v4lsync( &(v->vd),0);
+	return ret;
 VIDEOEXIT:
 #ifdef STRICT_CHECKING
-	veejay_msg(0, "%s: Bail", __FUNCTION__);
+	veejay_msg(0, "%s: Bail", __FUNCTION__ );
 #endif
 	v4lseterrorlevel( V4L_PERROR_ALL );
 	return ret;
@@ -864,7 +867,7 @@ static int	__v4lvideo_grabstart( void *vv )
 	assert( ptr != NULL );
 	assert( v->video_width > 0 );
 	assert( v->video_height > 0 );
-	assert( v->info != NULL );
+//	assert( v->info != NULL );
 #endif
 	
 	v->vd.frame = 0;

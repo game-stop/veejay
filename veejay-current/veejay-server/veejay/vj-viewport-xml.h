@@ -42,6 +42,7 @@ typedef struct
 	int	colormode;
 	int	grid_mode;
 	int	marker_size;
+	int	initial_active;
 } viewport_config_t;
 
 void 	viewport_save_xml(xmlNodePtr parent,void *vv);

@@ -95,12 +95,11 @@ int	composite_has_back(void *data)
 	return c->has_back;
 }
 
-void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int sample_mode, int zoom_type, int pf )
+void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int sample_mode, int zoom_type, int pf, int *vp1_e )
 {
 	composite_t *c = (composite_t*) vj_calloc(sizeof(composite_t));
-	int 	vp1_enabled = 0;
-	int	vp1_frontback = 0;
-
+	int	vp1_frontback = 0;	
+	int	vp1_enabled = 0;
 	if( pw <= 0 || ph <= 0 ) {
 		veejay_msg(VEEJAY_MSG_WARNING ,"Missing projection dimensions,using image dimensions %dx%d",iw,ih);
 		pw = iw;
@@ -158,7 +157,10 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	veejay_msg(VEEJAY_MSG_INFO, "\tSoftware scaler  : %s", yuv_get_scaler_name(zoom_type) );
 	veejay_msg(VEEJAY_MSG_INFO, "\tVideo resolution : %dx%d", iw,ih );
 	veejay_msg(VEEJAY_MSG_INFO, "\tScreen resolution: %dx%d", pw,ph );
+	veejay_msg(VEEJAY_MSG_INFO, "\tStatus           : %s",
+		(vp1_enabled ? "Active":"Inactive"));
 	veejay_msg(VEEJAY_MSG_INFO, "Press Middle-Mouse button to activate setup.");
+	*vp1_e = (vp1_enabled ? 1 : 2);
 	return (void*) c;
 }
 
@@ -196,6 +198,18 @@ void	composite_destroy( void *compiz )
 		free(c);
 	}
 	c = NULL;
+}
+
+int	composite_get_status(void *compiz )
+{
+	composite_t *c = (composite_t*) compiz; 
+	return viewport_get_initial_active( c->vp1 );
+}
+
+void	composite_set_status(void *compiz, int mode)
+{
+	composite_t *c = (composite_t*) compiz; 
+	viewport_set_initial_active( c->vp1, mode );
 }
 
 void	composite_set_ui(void *compiz, int status )

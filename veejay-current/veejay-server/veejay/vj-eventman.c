@@ -2378,6 +2378,15 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,	
 				NULL );
 
+	index_map_[ VIMS_PROJ_TOGGLE ] 				=	_new_event(
+				NULL,
+				VIMS_PROJ_TOGGLE,
+				"Enable/disable viewport rendering",
+				vj_event_vp_proj_toggle,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
 	index_map_[ VIMS_PROJ_STACK ] 				=	_new_event(
 				"%d %d",
 				VIMS_PROJ_STACK,

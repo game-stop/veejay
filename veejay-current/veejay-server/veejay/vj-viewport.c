@@ -155,6 +155,7 @@ typedef struct
 	int	saved_h;
 	grid_t	*grid;	
 	int	grid_mode;
+	int	initial_active;
 } viewport_t;
 
 
@@ -480,12 +481,16 @@ char *viewport_get_my_help(void *vv)
 	}
 
 
-	char tmp[1024];
+	char tmp[1500];
+	char startup_mode[16];
+	sprintf(startup_mode, "%s", (v->initial_active==1 ? "Active" :"Inactive"  ));
 	int gw = v->grid_width;
 	int gh = v->grid_height;
-	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nCTRL + Cursor Keys: Finetune point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Focus projection/secundary input\nCTRL + i: Transform secundary input\nCTRL + v: Transform sec. input in grayscale/color \nCTRL + o: Toggle OSD status\n%s\n\n",
+	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nCTRL + Cursor Keys: Finetune point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Focus projection/secundary input\nCTRL + i: Transform secundary input\nCTRL + v: Transform sec. input in grayscale/color \nCTRL + a: %s on startup.\nCTRL + o: Toggle OSD status\n%s\n\n",
 			reverse_mode,
-			scroll_mode);
+			startup_mode,
+			scroll_mode
+			);
 	
 
 	return strdup( tmp );
@@ -1484,6 +1489,18 @@ int	viewport_get_composite_mode_from_config(void *vc)
 	return c->composite_mode;
 }
 
+int	viewport_get_initial_active( void *vv )
+{
+	viewport_t *v = (viewport_t*) vv;
+	return v->initial_active;
+}
+
+void	viewport_set_initial_active( void *vv, int status )
+{
+	viewport_t *v = (viewport_t*) vv;
+	v->initial_active = status;
+}
+
 void	*viewport_get_configuration(void *vv )
 {
 
@@ -1510,6 +1527,7 @@ void	*viewport_get_configuration(void *vv )
 	o->y3   = v->y3;
   	o->y4   = v->y4;
 	o->scale = v->ui->scale;
+	o->initial_active = v->initial_active;
 
 	return o;
 }
@@ -1708,6 +1726,7 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 		v->marker_size = vc->marker_size;
 		v->grid_resolution = vc->grid_resolution;
 		v->grid_mode = vc->grid_mode;	
+		v->initial_active = vc->initial_active;
 
 		res = viewport_configure( v, 	vc->x1, vc->y1,
 					     	vc->x2, vc->y2,
@@ -1720,7 +1739,7 @@ void *viewport_init(int x0, int y0, int w0, int h0, int w, int h, int iw, int ih
 						vc->grid_color,
 						vc->grid_resolution );
 
-		*enable = 1;
+		*enable = vc->initial_active;
 		*frontback = vc->frontback;
 		v->user_ui = 0;
 
@@ -1775,6 +1794,7 @@ void *viewport_clone(void *vv, int new_w, int new_h )
 	q->M  = NULL;
 	q->m  = NULL;
 	q->grid = NULL;
+	q->initial_active = v->initial_active;
 	q->x0 = v->x0 * sx;
 	q->y0 = v->y0 * sy;
 	q->w0 = v->w0 * sx;
@@ -1879,7 +1899,7 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 
 	fclose(fd );
 
-	int n = sscanf(buf, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %d %d %d %d",
+	int n = sscanf(buf, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %d %d %d %d %d",
 			&vc->x1, &vc->y1,
 			&vc->x2, &vc->y2,
 			&vc->x3, &vc->y3,
@@ -1895,9 +1915,16 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 			&vc->saved_w,
 			&vc->saved_h,
 			&vc->marker_size,
-			&vc->grid_mode);
+			&vc->grid_mode,
+			&vc->initial_active);
 
-	if( n != 20 )
+	//@ pre 1.4.10
+	if( n == 20 ) {
+		vc->initial_active = 1;
+		n++;
+	}
+
+	if( n != 21 )
 	{
 		veejay_msg(0, "Unable to read %s (file is %d bytes)",path, len );
 		free(vc);
@@ -1911,6 +1938,8 @@ static	viewport_config_t 	*viewport_load_settings( const char *dir, int mode )
 	veejay_msg(VEEJAY_MSG_INFO, "\tPoints     :\t(1) %fx%f (2) %fx%f", vc->x1,vc->y1,vc->x2,vc->y2);
 	veejay_msg(VEEJAY_MSG_INFO, "\t         :\t(3) %fx%f (4) %fx%f", vc->x2,vc->y2,vc->x3,vc->y3);
 	veejay_msg(VEEJAY_MSG_INFO, "\tPencil   :\t%s", (vc->grid_color == 0xff ? "white" : "black" ) );
+	veejay_msg(VEEJAY_MSG_INFO, "\tEnabled  :\t%s",
+	(vc->initial_active == 0 ? "No" : "Yes"));
 
 	return vc;
 }
@@ -1931,7 +1960,7 @@ static	void	viewport_save_settings( viewport_t *v, int frontback )
 
 	char content[512];
 
-	sprintf( content, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %d %d %d %d\n",
+	sprintf( content, "%f %f %f %f %f %f %f %f %d %d %d %d %d %d %d %d %d %d %d %d %d\n",
 			v->x1,v->y1,v->x2,v->y2,
 			v->x3,v->y3,v->x4,v->y4,
 			v->user_reverse,
@@ -1945,7 +1974,8 @@ static	void	viewport_save_settings( viewport_t *v, int frontback )
 			v->saved_w,
 			v->saved_h,
 			v->marker_size,
-			v->grid_mode );
+			v->grid_mode,
+	      		v->initial_active );
 
 	int res = fwrite( content, strlen(content), 1, fd );
 

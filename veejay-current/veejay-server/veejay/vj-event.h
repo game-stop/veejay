@@ -280,4 +280,5 @@ void	vj_event_viewport_composition( void *ptr, const char format[], va_list ap )
 void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap );
 void	vj_event_vp_stack(void *ptr, const char format[], va_list ap );
 void	vj_event_vp_get_points( void *ptr, const char format[], va_list ap );
+void	vj_event_vp_proj_toggle(void *ptr, const char format[],va_list ap );
 #endif

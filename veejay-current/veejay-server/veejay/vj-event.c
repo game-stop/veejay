@@ -251,6 +251,7 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_OSD_EXTRA,			SDLK_h,		VIMS_MOD_CTRL,	NULL	},
 	{ VIMS_PROJ_STACK,			SDLK_v,		VIMS_MOD_CTRL,	"1 0"	},
 	{ VIMS_PROJ_STACK,			SDLK_p,		VIMS_MOD_CTRL,	"0 1"	},
+	{ VIMS_PROJ_TOGGLE,			SDLK_a,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_FRONTBACK,			SDLK_s,		VIMS_MOD_CTRL,  NULL	},
 	{ VIMS_RENDER_DEPTH,			SDLK_d,		VIMS_MOD_CTRL,  "2"	},
 	{ VIMS_SELECT_BANK,			SDLK_1,		VIMS_MOD_NONE,	"1"	},
@@ -6757,6 +6758,22 @@ void vj_event_v4l_set_brightness(void *ptr, const char format[], va_list ap)
 		}
 	}
 	
+}
+
+void	vj_event_vp_proj_toggle(void *ptr, const char format[],va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+
+	if(!v->composite ) {
+		veejay_msg(0, "No viewport active.");
+		return;
+	}
+
+	int mode = !composite_get_status(v->composite);
+	composite_set_status( v->composite, mode );
+
+	veejay_msg(VEEJAY_MSG_INFO, "Projection transform is now %s",
+			(mode==0? "inactive" : "active"));
 }
 
 void	vj_event_vp_stack( void *ptr, const char format[], va_list ap )

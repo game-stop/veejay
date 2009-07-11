@@ -2063,7 +2063,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	{
 		int o1 = info->video_output_width * info->video_output_height;
 		int o2 = el->video_width * el->video_height;
-
+		int comp_mode = 2;
 		if( o2 > o1 ) {
 			veejay_msg(VEEJAY_MSG_ERROR, "Unable to perform viewport rendering when input resolution is larger then output resolution.");
 			return -1;
@@ -2074,11 +2074,13 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 						  info->homedir,
 						  info->settings->sample_mode,
 						  yuv_which_scaler(),
-						  info->pixel_format );
+						  info->pixel_format,
+			       			  &comp_mode	);
 		if(!info->composite) {
 			return -1;
 		}
 		info->settings->zoom = 0;
+		info->settings->composite = comp_mode;
 	}
 	if(!has_config) {
 		 if(info->video_output_width <= 0 ) {

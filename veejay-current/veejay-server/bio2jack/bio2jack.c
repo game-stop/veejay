@@ -31,6 +31,7 @@
 #include <jack/ringbuffer.h>
 #include <pthread.h>
 #include <sys/time.h>
+#include <libvjmsg/vj-msg.h>
 #ifdef HAVE_SAMPLERATE
 #include <samplerate.h>
 #endif
@@ -69,40 +70,40 @@
    along with the associated values). */
 static struct timeval timer_now;
 #define TIMER(format,args...) gettimeofday(&timer_now,0); \
-  fprintf(OUTFILE, "%ld.%06ld: %s::%s(%d) "format, timer_now.tv_sec, timer_now.tv_usec, __FILE__, __FUNCTION__, __LINE__, ##args)
+  veejay_msg(4, "%ld.%06ld: %s::%s(%d) "format, timer_now.tv_sec, timer_now.tv_usec, __FILE__, __FUNCTION__, __LINE__, ##args)
 #else
 #define TIMER(...)
 #endif
 
 #if TRACE_ENABLE
-#define TRACE(format,args...) fprintf(OUTFILE, "%s::%s(%d) "format, __FILE__, __FUNCTION__, __LINE__,##args);	\
+#define TRACE(format,args...) veejay_msg(4, "%s::%s(%d) "format, __FILE__, __FUNCTION__, __LINE__,##args);	\
          fflush(OUTFILE);
 #else
 #define TRACE(...)
 #endif
 
 #if DEBUG_OUTPUT
-#define DEBUG(format,args...) fprintf(OUTFILE, "%s::%s(%d) "format, __FILE__, __FUNCTION__, __LINE__,##args);	\
+#define DEBUG(format,args...) veejay_msg(4, "%s::%s(%d) "format, __FILE__, __FUNCTION__, __LINE__,##args);	\
          fflush(OUTFILE);
 #else
 #define DEBUG(...)
 #endif
 
 #if TRACE_CALLBACK
-#define CALLBACK_TRACE(format,args...) fprintf(OUTFILE, "%s::%s(%d) "format, __FILE__, __FUNCTION__, __LINE__,##args);	\
+#define CALLBACK_TRACE(format,args...) veejay_msg(4, "%s::%s(%d) "format, __FILE__, __FUNCTION__, __LINE__,##args);	\
          fflush(OUTFILE);
 #else
 #define CALLBACK_TRACE(...)
 #endif
 
 #if ENABLE_WARNINGS
-#define WARN(format,args...) fprintf(OUTFILE, "WARN: %s::%s(%d) "format, __FILE__,__FUNCTION__,__LINE__,##args);	\
+#define WARN(format,args...) veejay_msg(1, "WARN: %s::%s(%d) "format, __FILE__,__FUNCTION__,__LINE__,##args);	\
          fflush(OUTFILE);
 #else
 #define WARN(...)
 #endif
 
-#define ERR(format,args...) fprintf(OUTFILE, "ERR: %s::%s(%d) "format, __FILE__,__FUNCTION__,__LINE__,##args);	\
+#define ERR(format,args...) veejay_msg(0, "ERR: %s::%s(%d) "format, __FILE__,__FUNCTION__,__LINE__,##args);	\
          fflush(OUTFILE);
 
 #define min(a,b)   (((a) < (b)) ? (a) : (b))
@@ -272,7 +273,7 @@ TimeValDifference(struct timeval *start, struct timeval *end)
    easier detection of blocked calls.
  */
 #if TRACE_getReleaseDevice
-#define getDriver(x) _getDriver(x,fprintf(OUTFILE, "%s::%s(%d) getting driver %d\n", __FILE__, __FUNCTION__, __LINE__,x)); TRACE("got driver %d\n",x);
+#define getDriver(x) _getDriver(x,veejay_msg(4, "%s::%s(%d) getting driver %d\n", __FILE__, __FUNCTION__, __LINE__,x)); TRACE("got driver %d\n",x);
 jack_driver_t *
 _getDriver(int deviceID, int ignored)
 {
@@ -305,7 +306,7 @@ getDriver(int deviceID)
 }
 
 #if TRACE_getReleaseDevice
-#define tryGetDriver(x) _tryGetDriver(x,fprintf(OUTFILE, "%s::%s(%d) trying to get driver %d\n", __FILE__, __FUNCTION__, __LINE__,x)); TRACE("got driver %d\n",x);
+#define tryGetDriver(x) _tryGetDriver(x,veejay_msg(4, "%s::%s(%d) trying to get driver %d\n", __FILE__, __FUNCTION__, __LINE__,x)); TRACE("got driver %d\n",x);
 jack_driver_t *
 _tryGetDriver(int deviceID, int ignored)
 {

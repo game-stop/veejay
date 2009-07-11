@@ -41,7 +41,7 @@ int	composite_event( void *compiz, uint8_t *in[3], int mouse_x, int mouse_y, int
 
 void	composite_destroy( void *compiz );
 
-void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int sample_mode, int zoom_type, int pf );
+void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int sample_mode, int zoom_type, int pf, int *vp1_enabled );
 
 void	composite_set_backing( void *compiz, void *vp );
 
@@ -54,5 +54,6 @@ int	composite_get_ui(void *compiz );
 //@ add to config before saving
 void	*composite_load_config( void *compiz, void *vc, int *result );
 void	composite_add_to_config( void *compiz, void *vc, int which_vp );
-
+int	composite_get_status(void *compiz );
+void	composite_set_status(void *compiz, int mode);
 #endif
