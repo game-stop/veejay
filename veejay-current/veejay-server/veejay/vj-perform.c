@@ -3183,9 +3183,25 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		VJFrame *in  = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
 						 frame->width,frame->height, pff);
 		frame->ssm = composite_process(info->composite,out,in,settings->composite,pff); 
+
+		if(osd_text == NULL && info->settings->composite == 2 && info->use_osd == 3 ) {
+			int fx_mode=0;
+			int cur_e = 0;
+			int fx_id = 0;
+			if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG ) {
+				cur_e   = vj_tag_get_selected_entry(info->uc->sample_id);
+				fx_mode = vj_tag_get_chain_status( info->uc->sample_id,cur_e );
+			} else if ( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE ) {
+				cur_e   = sample_get_selected_entry(info->uc->sample_id);
+				fx_mode = sample_get_chain_status(info->uc->sample_id,cur_e);
+			}
+			osd_text = get_embedded_help(fx_mode,info->uc->playback_mode,cur_e,info->uc->sample_id );
+		}
+
 		if(osd_text) {
 			void *vp = composite_get_vp( info->composite );
 			int   on_proj = viewport_get_mode(vp);
+
 			if( settings->composite == 1 )
 				on_proj = 1;
 			if(!frame->ssm) {

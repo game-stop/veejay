@@ -406,7 +406,120 @@ else { veejay_msg(VEEJAY_MSG_DEBUG,"arg has size of 0x0");}
 
 
 #define CLAMPVAL(a) { if(a<0)a=0; else if(a >255) a =255; }
+//@ FIXME: implement embedded help
+//@ F1 -> sample playing FX=off -> standard help
+//@ F1 -> sample playing FX=on entry >= 0 <= MAX_E : show help for FX on entry N
+//
+//
+static	struct {
+	const char *msg;
+} embedded_help[] = {
+	{ "'[' Set starting position of sample\n" },
+	{ "']' Set ending position and create new sample\n"},
+	{ "'F1-F12' Play sample (Bank * 12) + Fx\n"},
+	{ "'0-9' Select Bank 0-12\n"},
+	{ "'KP/' Toggle between plain and sample mode\n"},
+	{ "'A...L' Speed\n"},
+	{ "'A...L' + ALT Slow motion\n"},
+	{ "'KP8' Forward 1 second\n"},
+	{ "'KP2' Back 1 second\n"},
+	{ "'KP5' Pause playback\n"},
+	{ "'KP4' Play backward\n"}, 
+	{ "'KP6' Play forward\n"},
+	{ "'KP7' Back one frame\n"},
+	{ "'KP9' Forward one frame\n"},
+	{ "'KP1' Goto starting position\n"},
+	{ "'KP3' Goto ending position\n"},
+	{ "'KP*' Change sample looping\n"},
+	{ "Cursor Up/Down Select FX from FX list\n"},
+	{ "ENTER Add selected FX to current FX slot\n"},
+	
+	NULL
+};
 
+static struct {
+	const char *msg;
+} fx_embedded_help[] = {
+	{ "'PgUp/PgDn' Inc/Dec FX parameter 0 "},
+	{ "'KP Ins/Del' Inc/Dec FX parameter 1 "},
+	{ "',/.' Inc/Dec FX parameter 2 "},
+	{ "'q/w' Inc/Dec FX parameter 3 "},
+	{ "'e/r' Inc/Dec FX parameter 4 "},
+	{ "'t/y' Inc/Dec FX parameter 5 "},
+	{ "'u/i' Inc/Dec FX parameter 6 "},
+	{ "'o/p' Inc/Dec FX parameter 7 "},
+	{"'\nEND' Toggle FX Chain\n"},
+	{"'Delete' Clear current FX slot\n"},
+	{ "'KP-' Down 1 position in FX chain\n"},
+	{ "'KP+' Up 1 position in FX chain\n"},
+	{ "-/+ Select mix-in source" },
+	{ "/ Toggle between stream and sample source"},
+	NULL
+};
+
+
+static char	*get_arr_embedded_help(char *ehelp[])
+{
+	int i;
+	int len = 0;
+	for( i = 0; ehelp[i] != NULL ; i ++ ) {
+		len += strlen(ehelp[i]);
+	}
+	if( len <= 0 )
+		return NULL;
+	char *msg = (char*) vj_malloc(sizeof(char) * len );
+	if( msg == NULL )
+		return NULL;
+	char *p = msg;
+	int   x = 0;
+	for( i = 0; ehelp[i] != NULL; i ++ ) {
+		x = strlen(ehelp[i]);
+		strncpy(p,ehelp[i],x);
+		p += x;
+	}
+	return msg;
+}
+
+char	*get_embedded_help( int fx_mode, int play_mode, int fx_entry, int id )
+{
+	char msg[16384];
+	if( play_mode == VJ_PLAYBACK_MODE_PLAIN || ( play_mode == VJ_PLAYBACK_MODE_SAMPLE && fx_mode == 0 ) )
+	{
+		return get_arr_embedded_help( embedded_help );
+	} else {
+		veejay_memset(msg,0,sizeof(msg));
+		int fx_id = 0;
+		if( play_mode == VJ_PLAYBACK_MODE_TAG  ) {
+			fx_id = vj_tag_get_effect_any(id,fx_entry);
+		} else if( play_mode == VJ_PLAYBACK_MODE_SAMPLE ) {
+			fx_id = sample_get_effect_any(id,fx_entry);
+		}
+		if( fx_id <= 0 ) 
+			return NULL;
+
+		int n = vj_effect_get_num_params( fx_id );
+		char *fx_descr = vj_effect_get_description(fx_id);
+		sprintf(msg,"FX slot %d:%s\n", fx_entry, fx_descr );
+		char *p   = msg + strlen(msg);
+		int i;
+		for( i = 0; i < n ; i ++ ) { //@ specific FX help
+			char name[128];
+			char *descr = vj_effect_get_param_description(fx_id,i );
+			snprintf(name,sizeof(name)-1,"%s'%s'\n",fx_embedded_help[i].msg,descr );
+			int len = strlen(name);
+			strncpy(p, name, len );
+			p += len;
+			//free(descr);
+		}
+		for( i = 0; fx_embedded_help[8+i].msg != NULL; i ++ ) {
+			int len = strlen(fx_embedded_help[8+i].msg);
+			strncpy(p, fx_embedded_help[8+i].msg, len );
+			p += len;
+		}
+		return strdup(msg);
+	}
+	return NULL;
+}
 
 static  void    init_vims_for_macro();
 
