@@ -34,7 +34,6 @@
 #include <veejay/vj-event.h>
 #include <mjpegtools/mpegconsts.h>
 #include <mjpegtools/mpegtimecode.h>
-#include <liblavjpeg/jpegutils.h>
 #include <libyuv/yuvconv.h>
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vj-perform.h>
@@ -42,7 +41,6 @@
 #include <libsamplerec/samplerecord.h>
 #include <libel/pixbuf.h>
 #include <veejay/vj-misc.h>
-#include <jpeglib.h>
 #include <liblzo/lzo.h>
 #include <veejay/vj-viewport.h>
 #include <veejay/vj-composite.h>

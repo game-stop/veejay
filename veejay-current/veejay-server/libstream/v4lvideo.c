@@ -27,8 +27,6 @@
 #include <libstream/v4lvideo.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
-#include <jpeglib.h>
-#include <liblavjpeg/jpegutils.h>
 #include <libel/lav_io.h>
 #include <libstream/v4lutils.h>
 #include <linux/videodev.h>

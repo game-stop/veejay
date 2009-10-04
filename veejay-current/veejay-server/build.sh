@@ -26,7 +26,7 @@ if [ -f configure ]; then
 	RET=$?
 	if [ $RET = 0 ]; then
 		tail -n38 $FILE
-
+		echo "Building veejay, please wait."
 		$SCRIPT $RUNSCRIPT make $FILE > /dev/null
 		RET=$?
 		if [ $RET = 0 ]; then
