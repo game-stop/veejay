@@ -1,5 +1,7 @@
 # # Process this file with automake to produce Makefile.in.
 
+pkginclude_HEADERS = ac.h ac_internal.h imgconvert.h img_internal.h img_x86_common.h
+
 AM_CPPFLAGS = \
         $(PTHREAD_CFLAGS) \
         -I$(top_srcdir)

@@ -14,7 +14,6 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/libel \
 		-I$(top_srcdir)/libstream \
 		-I$(top_scrdir)/libyuv \
-		-I$(top_srcdir)/liblavjpeg \
 		-I$(top_srcdir)/libsamplerec \
 		-I$(top_srcdir)/libvevo \
 		-I$(top_srcdir)/liblzo \
@@ -51,7 +50,6 @@ libveejay_la_LIBADD = -L$(top_builddir)/mjpegtools/ -lmjpegutils \
 			-L$(top_builddir)/libstream -lstream \
 			-L$(top_builddir)/aclib -lac \
 			-L$(top_builddir)/libyuv -lyuv \
-			-L$(top_builddir)/liblavjpeg -llavjpeg \
 			-L$(top_builddir)/libsamplerec -lsamplerec \
 			-L$(top_builddir)/libvevo -lvevo 
 
@@ -67,7 +65,12 @@ VEEJAY_BIN = veejay
 
 bin_PROGRAMS = $(VEEJAY_BIN)  
 
-veejay_headers = vims.h
+veejay_headers = vims.h jpegutils.h vevo.h vj-composite.h vj-jack.h \
+                 vj-OSC.h vj-viewport.h lav_common.h vims.h vj-dfb.h \
+                 vjkf.h vj-perform.h vj-viewport-xml.h libveejay.h \
+                 vj-audio.h vj-event.h vj-lib.h vj-plug.h x11misc.h \
+                 veejay.h vj-bjack.h vj-font.h vj-misc.h vj-sdl.h
+
 
 veejay_SOURCES	= veejay.c ${veejay_headers} 
 veejay_LDADD 	= libveejay.la @LIBGETOPT_LIB@

@@ -8,3 +8,4 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem \
 VJLZO_LIB_FILE = libminilzo.la
 noinst_LTLIBRARIES = $(VJLZO_LIB_FILE)
 libminilzo_la_SOURCES = minilzo.c lzo.c 
+pkginclude_HEADERS = lzoconf.h lzodefs.h lzo.h minilzo.h

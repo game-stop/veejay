@@ -368,7 +368,7 @@ void	vj_el_init_chunk(int size)
 //@@ chunk size per editlist
 	mem_chunk_ = 1024 * size;
 }
-void	vj_el_init(int pf, int switch_jpeg)
+void	vj_el_init(int pf, int switch_jpeg, int dw, int dh, float fps)
 {
 	int i;
 	for( i = 0; i < MAX_CODECS ;i ++ )
@@ -378,6 +378,8 @@ void	vj_el_init(int pf, int switch_jpeg)
 	assert( pf == FMT_422 || pf == FMT_422F );
 #endif
 	el_switch_jpeg_ = switch_jpeg;
+
+	lav_set_project( dw,dh, fps, pf );
 }
 
 int	vj_el_is_dv(editlist *el)
@@ -508,12 +510,12 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 
 void	vj_el_set_image_output_size(editlist *el, int dw, int dh, float fps, int pf)
 {
-	if( el->video_width <= 0 || el->video_height <= 0 )
+/*	if( el->video_width <= 0 || el->video_height <= 0 )
 		lav_set_project( dw,dh, fps, pf );
 	else
 		lav_set_project(
 			el->video_width, el->video_height, el->video_fps , el_pixel_format_ );
-
+*/
 }
 
 static int _el_probe_for_pixel_fmt( lav_file_t *fd )
@@ -2221,14 +2223,13 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 		return NULL;
 
 	int num_files;
-	int64_t oldfile, oldframe;
+	int64_t oldfile, oldframe, of1,ofr;
 	int64_t index[MAX_EDIT_LIST_FILES];
-	int64_t n;
+	int64_t n,n1=0;
 	char *result = NULL;
-	int64_t n1 = 0;
 	int64_t j = 0;
 	int64_t n2 = el->video_frames-1;
-	char	filename[1024];
+	char	filename[2048];
 	char	fourcc[6];
 	/* get which files are actually referenced in the edit list entries */
 	int est_len = 0;
@@ -2250,15 +2251,35 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 		{
 			index[j] = (int64_t)num_files++;
 			nnf ++;
-			len     += (strlen(el->video_file_list[j])) + 25 + 20 + (16 * 3 );
+			len     += (strlen(el->video_file_list[j])) + 25 + 20;
 		}
 	}
+
 
 	n = el->frame_list[n1];
 	oldfile = index[ N_EL_FILE(n) ];
    	oldframe = N_EL_FRAME(n);
+
+	n1 = n;
+	of1 = oldfile;
+	ofr = oldframe;
+
+	for (j = n1+1; j <= n2; j++)
+	{
+		n = el->frame_list[j];
+		if ( index[ N_EL_FILE(n) ] != oldfile ||
+			N_EL_FRAME(n) != oldframe + 1 )	{
+				len += (3*16);
+			}
+	}
+
+	n = n1;
+	oldfile = of1;
+	oldframe = ofr;
+	
+	n1 = 0;
  
-	est_len = 52 + len;
+	est_len = 64 + len;
 	result = (char*) vj_calloc(sizeof(char) * est_len );
 	sprintf(result, "%04d",nnf );
 
@@ -2279,6 +2300,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 			veejay_strncat ( result, filename, strlen(filename));
 		}
 	}
+
 
 	char first[64];
 	snprintf(first,sizeof(first), "%016lld%016lld",oldfile, oldframe);

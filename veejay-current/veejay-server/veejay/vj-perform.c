@@ -649,10 +649,6 @@ int vj_perform_init(veejay_t * info)
     
 	effect_sampler = subsample_init( w );
 
-#ifdef USE_GDK_PIXBUF
-	vj_picture_init( &(info->settings->sws_templ));
-#endif
-
 	lzo_ = lzo_new();
 
 	int vp = 0;  int frontback = 0;

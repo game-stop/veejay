@@ -499,7 +499,7 @@ void	packed_plane_clear( size_t len, void *to )
 }
 
 
-#if defined (HAVE_ASM_SSE) || defined (HAVE_ASM_MMX)
+#if defined (HAVE_ASM_SSE) || defined (HAVE_ASM_MMX) || defined( HAVE_ASM_MMX2 )
 static void *fast_memcpy(void * to, const void * from, size_t len)
 {
 	void *retval;

@@ -157,7 +157,7 @@ static void Usage(char *progname)
 		"\t\t\t\t-h/--Projection Height \n");
 
     fprintf(stderr,
-	    "  -p/--port\t\tTCP port to accept/send messages (default: 3490)\n");
+	    "  -p/--port\t\t\tTCP port to accept/send messages (default: 3490)\n");
     fprintf(stderr,
 	    "  -t/--timer num\t\tspecify timer to use (none:0,normal:2,rtc:1) default is 1\n");
 
@@ -236,7 +236,7 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -j/--max_cache \t\tDivide cache memory over N samples (default=4)\n");
 	fprintf(stderr,
-		"  -Y/--yuv [01]\t\tForce YCbCr (defaults to YUV)\n");
+		"  -Y/--yuv [01]\t\t\tForce YCbCr (defaults to YUV)\n");
 	fprintf(stderr,
                 "  -e/--swap-range\t\tSwap YUV range [0..255] <-> [16..235] on videofiles\n");
 	fprintf(stderr,
@@ -255,7 +255,7 @@ static void Usage(char *progname)
 		"  -H/--height <num>\t\tdummy height\n");
 
 	fprintf(stderr,
-		"  -N/--norm [0=PAL, 1=NTSC (defaults to PAL)]\n");
+		"  -N/--norm\t\t\tVideo Norm [0=PAL, 1=NTSC (defaults to PAL)]\n");
 	fprintf(stderr,
 		"  -R/--framerate <num>\t\tdummy frame rate\n");
 	fprintf(stderr,

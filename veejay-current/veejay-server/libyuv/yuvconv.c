@@ -215,10 +215,8 @@ void	yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
 	}
 	if( default_zoomer ) {
 		if( default_zoomer == 1 ) {
-			veejay_msg(VEEJAY_MSG_WARNING,"Using fast bilinear scaler (libswcale)");
 			global_scaler_ = SWS_FAST_BILINEAR;
 		} else if (default_zoomer == 2 ) {
-			veejay_msg(VEEJAY_MSG_WARNING, "Using bicubic scaler (libswscale)");
 			global_scaler_ = SWS_BICUBIC;
 		}
 	}

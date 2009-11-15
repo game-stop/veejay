@@ -84,7 +84,7 @@ int	vj_el_cache_size();
 
 void	vj_el_prepare(void); // reset cache
 
-void	vj_el_init(int out, int sj); 
+void	vj_el_init(int out, int sj, int dw, int dh, float fps); 
 
 void	vj_el_init_chunk(int n);
 

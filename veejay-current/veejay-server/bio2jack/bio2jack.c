@@ -19,6 +19,8 @@
 /* NOTE: All functions that take a jack_driver_t* do NOT lock the device, in order to get a */
 /*       jack_driver_t* you must call getDriver() which will pthread_mutex_lock() */
 
+#include <config.h>
+#ifdef HAVE_JACK
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -2687,3 +2689,4 @@ JACK_SetPortConnectionMode(enum JACK_PORT_CONNECTION_MODE mode)
 {
     port_connection_mode = mode;
 }
+#endif

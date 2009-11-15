@@ -2888,6 +2888,11 @@ veejay_t *veejay_malloc()
     info->uc->sample_start = 0;
     info->uc->sample_end = 0;
     info->net = 1;
+
+    info->dummy->width = 352;
+    info->dummy->height = 288;
+    info->dummy->fps    = 25.0;
+
 	for( i =0; i < 8 ; i ++ )
 		info->rlinks[i] = -1;
 
@@ -3688,8 +3693,12 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	else
 		veejay_msg(VEEJAY_MSG_DEBUG, "Processing set to YUV %s", text );
 
-	vj_el_init( info->pixel_format, switch_jpeg );
-	
+	vj_el_init( info->pixel_format, switch_jpeg, info->dummy->width,info->dummy->height, info->dummy->fps );
+#ifdef USE_GDK_PIXBUF
+	vj_picture_init( &(info->settings->sws_templ));
+#endif
+
+
 	/* override options */
 	if(ofps<=0.0)
 		ofps = settings->output_fps;

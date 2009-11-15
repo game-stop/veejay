@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.0],[veejay-users@lists.sourceforge.net])
+AC_INIT([veejay],[1.5.1],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
 VEEJAY_MAJOR_VERSION=1
 VEEJAY_MINOR_VERSION=5
-VEEJAY_MICRO_VERSION=0
+VEEJAY_MICRO_VERSION=1
 VEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 VEEJAY_CODENAME="Veejay Classic - build $VEEJAY_MINOR_VERSION $VEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
@@ -692,7 +692,7 @@ if test x$with_jpeg != xno ; then
 	dnl
 	if test x$have_jpeg = xfalse ; then
 	  AC_CHECK_HEADER(jpeglib.h,,
-	    AC_MSG_ERROR([jpeglib.h not found - please install the libjpeg headers]))
+	    AC_MSG_WARN([jpeglib.h not found - please install the libjpeg headers]))
 	  AC_CHECK_LIB(jpeg, jpeg_start_compress,
 	    [ JPEG_LIBS="-ljpeg"
 	      JPEG_CFLAGS=""
@@ -716,7 +716,7 @@ fi
 
 
 if test x$have_pixbuf != xtrue ; then
-	AC_MSG_ERROR([Cannot find the gdk pixbuf library])
+	AC_MSG_ERROR([Cannot find the gtk-2.0-dev / gdk pixbuf library.])
 fi
 
 

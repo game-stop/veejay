@@ -4,7 +4,47 @@ MAINTAINERCLEANFILES=Makefile.in
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir)/vjmsg $(FFMPEG_CFLAGS) $(GLIB_CFLAGS)   
 
 AM_CFLAGS = $(OP_CFLAGS) -freg-struct-return 
-pkginclude_HEADERS = vje.h
+
+pkginclude_HEADERS = internal.h plugload.h vje.h
+pkginclude_HEADERS += effects/autoeq.h effects/crosspixel.h effects/mask.h effects/rawval.h \
+		      effects/average.h effects/cutstop.h effects/maskstop.h effects/reflection.h \
+		      effects/baltantv.h effects/deinterlace.h effects/mirrors2.h effects/revtv.h \
+		      effects/bathroom.h effects/dices.h effects/mirrors.h effects/rgbchannel.h \
+		      effects/bgsubtract.h effects/diff.h effects/morphology.h effects/rgbkey.h \
+		      effects/binaryoverlays.h effects/diffimg.h effects/motionblur.h effects/rgbkeysmooth.h \
+		      effects/blob.h effects/diffmap.h effects/motionmap.h effects/ripple.h \
+		      effects/boids.h effects/dissolve.h effects/mtracer.h effects/rippletv.h \
+		      effects/borders.h effects/distort.h effects/negatechannel.h effects/rotozoom.h \
+		      effects/bwselect.h effects/dither.h effects/negation.h effects/scratcher.h \
+		      effects/cartonize.h effects/dummy.h effects/neighbours2.h effects/sinoids.h \
+		      effects/chameleonblend.h effects/dupmagic.h effects/neighbours3.h effects/slice.h \
+		      effects/chameleon.h effects/emboss.h effects/neighbours4.h effects/slicer.h \
+		      effects/chromamagick.h effects/enhancemask.h effects/neighbours5.h effects/smear.h \
+		      effects/chromapalette.h effects/fibdownscale.h effects/neighbours.h effects/smuck.h \
+		      effects/chromascratcher.h effects/fisheye.h effects/nervous.h effects/softblur.h \
+		      effects/chromium.h effects/flare.h effects/noiseadd.h effects/solarize.h \
+		      effects/colflash.h effects/flip.h effects/noisepencil.h effects/split.h \
+		      effects/colmorphology.h effects/frameborder.h effects/opacityadv.h effects/swirl.h \
+		      effects/coloradjust.h effects/gamma.h effects/opacity.h effects/texmap.h \
+		      effects/color.h effects/ghost.h effects/opacitythreshold.h effects/threshold.h \
+		      effects/colorhis.h effects/greyselect.h effects/overclock.h effects/timedistort.h \
+		      effects/colormap.h effects/isolate.h effects/pencilsketch.h effects/tracer.h \
+		      effects/colorshift.h effects/keyselect.h effects/photoplay.h effects/transform.h \
+		      effects/common.h effects/killchroma.h effects/picinpic.h effects/tripplicity.h \
+		      effects/complexinvert.h effects/lumablend.h effects/pixelate.h effects/uvcorrect.h \
+		      effects/complexsaturate.h effects/lumakey.h effects/posterize.h effects/videoplay.h \
+		      effects/complexsync.h effects/lumamagick.h effects/radcor.h effects/videowall.h \
+		      effects/complexthreshold.h effects/lumamask.h effects/radialblur.h effects/waterrippletv.h \
+		      effects/constantblend.h effects/magicmirror.h effects/radioactive.h effects/whiteframe.h \
+		      effects/contourextract.h effects/magicoverlays.h effects/raster.h effects/widthmirror.h \
+		      effects/contrast.h effects/magicscratcher.h effects/rawman.h effects/zoom.h
+
+pkginclude_HEADERS += specs/FreeFrame.h specs/frei0r.h
+
+pkginclude_HEADERS += transitions/3bar.h transitions/fadecolorrgb.h transitions/transblend.h transitions/transline.h \
+		      transitions/vbar.h transitions/fadecolor.h transitions/slidingdoor.h transitions/transcarot.h \
+		      transitions/transop.h transitions/wipe.h
+
 VJE_LIB_FILE = libvje.la
 noinst_LTLIBRARIES = $(VJE_LIB_FILE)
 

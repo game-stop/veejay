@@ -1116,6 +1116,11 @@ static int	test_font( vj_font_t *f , const char *font, int id)
 	int error;
 
 	FT_SfntName sn,qn,zn;	
+	FT_SfntName	sname;
+	FT_UInt		snamei,snamec;
+	char	*name1 = NULL;
+	char 	*name2 = NULL;
+
 	if ( (error = FT_New_Face( f->library, font, 0, &face )) != 0)
 	{
 		return 0;
@@ -1125,7 +1130,29 @@ static int	test_font( vj_font_t *f , const char *font, int id)
 	memset( &zn, 0, sizeof( FT_SfntName ));
 	memset( &sn, 0, sizeof( FT_SfntName ));
 
-	FT_Get_Sfnt_Name( face, TT_NAME_ID_FONT_FAMILY, &qn );
+//	FT_Get_Sfnt_Name( face, TT_NAME_ID_FONT_FAMILY, &qn );
+
+	snamec = FT_Get_Sfnt_Name_Count(face);
+	for(snamei=0;snamei<snamec;snamei++) {
+		if(FT_Get_Sfnt_Name(face,snamei,&qn) != 0 )
+			break;
+		if(strlen(qn.string) == 0 ) 
+			continue;
+		switch(qn.name_id) {
+			case TT_NAME_ID_FONT_FAMILY:
+				name1=strndup(qn.string,qn.string_len);
+				break;
+			case TT_NAME_ID_PS_NAME:
+				if(name1==NULL)
+					name1=strndup(qn.string,qn.string_len);
+				break;
+			case TT_NAME_ID_FONT_SUBFAMILY:
+				name2=strndup(qn.string,qn.string_len);
+				break;
+			default:
+				continue;
+		}
+	}
 	FT_Get_Sfnt_Name( face, TT_NAME_ID_FONT_SUBFAMILY, &zn );
 
 
@@ -1134,8 +1161,15 @@ static int	test_font( vj_font_t *f , const char *font, int id)
 		FT_Done_Face(face);
 		return 0;
 	}
+	/*
 	char *name1 = strndup( qn.string, qn.string_len );
 	char *name2 = strndup( zn.string, zn.string_len );
+	*/
+
+	if(name1 == NULL  || name2 == NULL ) {
+		FT_Done_Face(face);
+		return 0;
+	}
 
 	int n1 = strlen(name1);
 	int n2 = n1 + strlen(name2);

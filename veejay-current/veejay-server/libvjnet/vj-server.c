@@ -517,6 +517,10 @@ void	vj_server_client_promote( vj_server *vje, int link_id)
 	assert( Link[link_id]->in_use == 1 );
 #endif 
 	Link[link_id]->promote = 1;	
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_DEBUG, "Knock knock %x",
+			Link[link_id]->handle );
+#endif
 }
 
 

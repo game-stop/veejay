@@ -467,8 +467,6 @@ int		vj_avcodec_init( int pixel_format, int verbose)
 #endif
 	av_register_all();
 
-	veejay_msg(VEEJAY_MSG_INFO, "FFmpeg AVCodec initialized (http://ffmpeg.sourceforge.net)");
-	
 	return 1;
 }
 

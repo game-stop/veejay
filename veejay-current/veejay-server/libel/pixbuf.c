@@ -71,7 +71,7 @@ extern uint8_t *vj_perform_get_preview_buffer();
 static	VJFrame *open_pixbuf( const char *filename, int dst_w, int dst_h, int dst_fmt,
 			uint8_t *dY, uint8_t *dU, uint8_t *dV )
 {
-#ifdef USE_GDK_PIX_BUF
+#ifdef USE_GDK_PIXBUF
 	GdkPixbuf *image =
 		gdk_pixbuf_new_from_file( filename, NULL );
 	if(!image)

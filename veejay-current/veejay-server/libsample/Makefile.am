@@ -7,3 +7,4 @@ SAMPLE_LIB_FILE = libsample.la
 noinst_LTLIBRARIES = $(SAMPLE_LIB_FILE)
 libsample_la_SOURCES = sampleadm.c 
 
+pkginclude_HEADERS = sampleadm.h

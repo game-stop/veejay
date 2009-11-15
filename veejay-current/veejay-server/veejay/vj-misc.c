@@ -34,7 +34,7 @@
 #include <libvjmem/vjmem.h>
 #include <libvje/internal.h>
 #ifdef HAVE_JPEG
-#include <liblavjpeg/jpegutils.h>
+#include <veejay/jpegutils.h>
 #endif
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
@@ -317,7 +317,7 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
     {	
     	jpeg_size = encode_jpeg_raw(jpeg_buff, (65535*4), 100,
 				settings->dct_method,  
-				info->current_edit_list->video_inter, 0,
+				info->current_edit_list->video_inter,0,
 				info->video_output_width,
 				info->video_output_height,
 				tmp.data[0],
