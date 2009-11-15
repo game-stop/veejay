@@ -771,7 +771,7 @@ static	struct
 	{"scrolledwindow49"}, // srt stuff
 	{"samplegrid_frame"},	
 	{"markerframe"},
-	{"NULL"}
+	{NULL}
 };
 
 static	struct
@@ -785,7 +785,7 @@ static	struct
 	{"fxpanel"},
 	{"panels"},
 	{"scrolledwindow49"}, // srt stuff
-	{"NULL"},
+	{NULL},
 };
 
 enum
@@ -1957,7 +1957,11 @@ int		gveejay_new_slot(int mode)
 	int id = 0;
 	int result_len = 0;
 	gchar *result = recv_vims( 3, &result_len );
-
+#ifdef STRICT_CHECKING
+	//@ err
+	assert( result_len >= 0 );
+	assert( result != NULL );
+#endif
 	if(result_len <= 0 )
 	{
 		veejay_msg(0, "No reply from veejay-server, but expected new sample/slot identifier");
@@ -1970,34 +1974,9 @@ int		gveejay_new_slot(int mode)
 
 	if( id <= 0 )
 	{
+		veejay_msg(0, "Error creating new sample slot");
 	//	gveejay_error_slot( mode );
 		return 0;
-	}
-	else
-	{
-		vj_msg(VEEJAY_MSG_INFO, "Created new %s %d", (mode == MODE_SAMPLE ? "Sample" : "Stream"), id);
-
-		int poke_slot = 0;
-		int bank_page = 0;
-		if(verify_bank_capacity( &bank_page, &poke_slot, id, mode ))
-		{
-			info->uc.reload_hint[HINT_SLIST] = 1;
-
-		/*	sample_slot_t *tmp_slot = vj_gui_get_sample_info(id, mode );
-			if(tmp_slot)
-			{
-				tmp_slot->slot_number = poke_slot;
-					add_sample_to_sample_banks( bank_page, tmp_slot );
-				free_slot( tmp_slot );
-				info->uc.expected_slots ++;
-				return id;
-			}*/
-		}
-		else
-		{
-			message_dialog( "Error", "Samplebank is full");
-			return 0;
-		}
 	}
 
 	return id;
@@ -3813,15 +3792,27 @@ int	verify_bank_capacity(int *bank_page_, int *slot_, int sample_id, int sample_
 {
 	int poke_slot = 0;
 	int bank_page = find_bank_by_sample( sample_id, sample_type, &poke_slot );
-			
-	if(bank_page == -1)
+
+	if(bank_page == -1) {
+		veejay_msg(0, "No slot found for (%d,%d)",sample_id,sample_type);
 		return 0;
+	}
 
 	if( !bank_exists(bank_page, poke_slot))
 		add_bank( bank_page );
 
 	*bank_page_ = bank_page;
 	*slot_      = poke_slot;
+
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_DEBUG, "(type=%d,id=%d) needs new slot, suggesting page %d, slot %d",
+			sample_type, sample_id, bank_page, poke_slot );
+
+//	if( info->sample_banks[bank_page] )
+//		assert( info->sample_banks[bank_page]->slot[poke_slot]->sample_id <= 0 );
+	
+
+#endif	
 
 	return 1;
 }
@@ -3935,14 +3926,13 @@ static	void	select_slot__( int pm )
 		/* falsify activation */
 		if(info->status_tokens[CURRENT_ID] > 0)
 		{
-			if(verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID],
-				info->status_tokens[PLAY_MODE] ))
+			if(verify_bank_capacity( &b, &p, info->status_tokens[CURRENT_ID],pm ))
 			{	
 				if( info->selected_slot ) {			
-				if ( info->selected_slot->sample_type != pm || info->selected_slot->sample_id !=
-						info->status_tokens[CURRENT_ID] ) {
+					if ( info->selected_slot->sample_type != pm || info->selected_slot->sample_id !=
+						info->selected_slot->sample_id ) {
 					set_activation_of_slot_in_samplebank(FALSE);
-				}
+					}
 				}
 				info->selected_slot = info->sample_banks[b]->slot[p];
 				info->selected_gui_slot = info->sample_banks[b]->gui_slot[p];
@@ -4018,8 +4008,9 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	int n_slots = 0;
 	reset_tree( "tree_sources" );
 
-	if( with_reset_slotselection )
+	if( with_reset_slotselection ) {
 		reset_samplebank();
+		}
 
 	multi_vims( VIMS_SAMPLE_LIST,"%d", 0 );
 	gint fxlen = 0;
@@ -4061,6 +4052,7 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				gchar *timecode = format_selection_time( 0,(values[2]-values[1]) );
 				int int_id = values[0];
 				int poke_slot= 0; int bank_page = 0;
+
 				verify_bank_capacity( &bank_page , &poke_slot, int_id, 0);
 				if(bank_page >= 0 )
 				{			
@@ -4137,13 +4129,17 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				gchar *gsource = _utf8str( descr );
 				gchar *gtype = _utf8str( source );
 
-				int bank_page = 0; int poke_slot = 0;
+				int bank_page = 0;
+				int poke_slot = 0;
+
+				verify_bank_capacity( &bank_page , &poke_slot, values[0], 1);
+       
 				if(bank_page >= 0)
 				{			
 					if( info->sample_banks[bank_page]->slot[poke_slot] <= 0 )
 					{				
 						sample_slot_t *tmp_slot = create_temporary_slot(poke_slot,values[0],1, gtype,gsource );
-						add_sample_to_sample_banks(bank_page, tmp_slot );								n_slots ++;
+						add_sample_to_sample_banks(bank_page, tmp_slot );											     n_slots ++;
 						free_slot(tmp_slot);	
 					}
 					else
@@ -5315,7 +5311,9 @@ void	find_user_themes(int theme)
 			(*dst)++;
 		}
 	}
-	close( sloppy );
+
+	if( sloppy )	
+		close( sloppy );
 
 	if( strcmp( location, "Default" ) == 0 )	
 	{
@@ -6381,32 +6379,31 @@ static	void	theme_response( gchar *string )
 static void reloaded_sighandler(int x) 
 {
 	veejay_msg(VEEJAY_MSG_WARNING, "Caught signal %x", x);
-	switch( x ) {
-		case SIGINT:
-			//@ quit dialog;
-			break;
-		case SIGQUIT:
-		case SIGTERM:
-		case SIGKILL:
-		case SIGSEGV:
-			break;
-		case SIGPIPE:
-			reloaded_schedule_restart();
-			break;
+
+	if( x == SIGPIPE ) {
+		reloaded_schedule_restart();
 	}
-	veejay_msg(VEEJAY_MSG_WARNING, "Stopping reloaded");
-	exit(0);
+	else if  ( x == SIGINT || x == SIGABRT  ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Stopping reloaded");
+		exit(0);
+	} else if ( x == SIGSEGV ) {
+	       veejay_msg(VEEJAY_MSG_ERROR, "Bugs compromised the system.");	
+		exit(0);
+	}
 }
 
 void	register_signals()
 {
-	signal( SIGTERM, reloaded_sighandler );
 	signal( SIGINT,  reloaded_sighandler );
-	signal( SIGHUP , reloaded_sighandler );
 	signal( SIGPIPE, reloaded_sighandler );
 	signal( SIGQUIT, reloaded_sighandler );
 	signal( SIGSEGV, reloaded_sighandler );
+	signal( SIGABRT, reloaded_sighandler );
+	signal( SIGSEGV, reloaded_sighandler );
 }
+
+
+
 
 void	vj_gui_wipe()
 {
@@ -7231,10 +7228,11 @@ void	reset_samplebank(void)
 	{
 		if(info->sample_banks[i])
 		{
-			/* free memory in use */
+			/* clear memory in use */
 			for(j = 0; j < NUM_SAMPLES_PER_PAGE ; j ++ )
 			{
 				sample_slot_t *slot = info->sample_banks[i]->slot[j];
+			
 				if(slot->sample_id)
 				{		
 					if(slot->title) free(slot->title);
@@ -7366,45 +7364,50 @@ static	sample_gui_slot_t *find_gui_slot_by_sample( int sample_id , int sample_ty
 
 static	int	find_bank_by_sample(int sample_id, int sample_type, int *slot )
 {
-	int i;
+	int i,j;
 
-	/* See if ID is somewhere in the samplebank */
 	for( i = 0; i < NUM_BANKS; i ++ )
 	{
-		int j;
-		if(info->sample_banks[i])
+		if(!info->sample_banks[i]) {
+			continue;
+		}
+
 		for( j = 0; j < NUM_SAMPLES_PER_PAGE; j ++ )
 		{
 			if(info->sample_banks[i]->slot[j]->sample_id == sample_id &&
-			   info->sample_banks[i]->slot[j]->sample_type == sample_type )
+			   info->sample_banks[i]->slot[j]->sample_type == sample_type) 
 			{
 				*slot = j;
+#ifdef STRICT_CHECKING
+				veejay_msg(VEEJAY_MSG_DEBUG, "using existing slot (%d,%d)",
+						sample_id,sample_type );
+#endif
 				return i;
 			}
 		}
 	}
 
-	/* Fall back to suggest a bank number to add the new id */
 	for( i = 0; i < NUM_BANKS; i ++ )
 	{
-		if(!info->sample_banks[i]) /* First slot in bank */
-		{
+		if(!info->sample_banks[i]) {
 			*slot = 0;
 			return i;
 		}
-		else
+
+		for( j = 0; j < NUM_SAMPLES_PER_PAGE; j ++ )
 		{
-			int j; /* Scan for available slots in this bank page */
-			for( j = 0; j < NUM_SAMPLES_PER_PAGE; j ++ )
+			 if ( info->sample_banks[i]->slot[j]->sample_id <= 0) 
 			{
-				if( info->sample_banks[i]->slot[j]->sample_id <= 0 )
-				{
-					*slot = j;
-					return i;
-				}
+				*slot = j;
+#ifdef STRICT_CHECKING
+				veejay_msg(VEEJAY_MSG_DEBUG, "using new slot (%d,%d)",
+							sample_id,sample_type);
+#endif
+				return i;
 			}
 		}
 	}
+
 	*slot = -1;
 	return -1;
 }
@@ -7848,10 +7851,20 @@ static	void	set_selection_of_slot_in_samplebank(gboolean active)
 static int add_sample_to_sample_banks(int bank_page,sample_slot_t *slot)
 {
 	int bp = 0; int s = 0;
+#ifdef STRICT_CHECKING
+	
+	int result = verify_bank_capacity( &bp, &s, slot->sample_id, slot->sample_type );
 
+	
+	veejay_msg(VEEJAY_MSG_DEBUG, "add slot on page %d: type=%d id=%d. result=%d", bank_page,slot->sample_type,slot->sample_id,result );
+
+	if( result ) 
+		update_sample_slot_data( bp, s, slot->sample_id,slot->sample_type,slot->title,slot->timecode);
+
+#else
        if(verify_bank_capacity( &bp, &s, slot->sample_id, slot->sample_type ))
 	       update_sample_slot_data( bp, s, slot->sample_id,slot->sample_type,slot->title,slot->timecode);
-
+#endif	
  
        return 1;
 }
@@ -7935,6 +7948,16 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 {
 	sample_slot_t *slot = info->sample_banks[page_num]->slot[slot_num];
 	sample_gui_slot_t *gui_slot = info->sample_banks[page_num]->gui_slot[slot_num];
+
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_DEBUG, "update slot %d on page %d with (type=%d,id=%d)",
+				slot_num, page_num, sample_type, sample_id );
+	veejay_msg(VEEJAY_MSG_DEBUG, "(#%d,type=%d,%s,%s) change to (#%d,type=%d,%s,%s)",
+			slot->sample_id,slot->sample_type,slot->timecode,slot->title,
+			sample_id,sample_type,timecode,title );
+#endif
+
+
 
 	if(slot->timecode) free(slot->timecode);
 	if(slot->title) free(slot->title);

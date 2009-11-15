@@ -1,12 +1,12 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([gveejay],[1.4.8],[veejay-users@lists.sourceforge.net])
+AC_INIT([gveejay],[1.5.1],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/gveejay.c])
 
 GVEEJAY_MAJOR_VERSION=1
-GVEEJAY_MINOR_VERSION=4
-GVEEJAY_MICRO_VERSION=8
+GVEEJAY_MINOR_VERSION=5
+GVEEJAY_MICRO_VERSION=1
 GVEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
 GVEEJAY_CODENAME="Reloaded - build $GVEEJAY_MAJOR_VERSION $GVEEJAY_MINOR_VERSION $GVEEJAY_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])

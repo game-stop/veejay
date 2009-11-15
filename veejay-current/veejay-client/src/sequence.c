@@ -40,7 +40,7 @@ extern void reloaded_schedule_restart();
 typedef struct
 {
 	uint8_t *image_data[16];
-	uint8_t *status_tokens[16];
+	int *status_tokens[16];
 	int	widths[16];	
 	int	heights[16];
 	int	active_list[16];
@@ -339,16 +339,23 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 	}
 	else
 	{
+		int err = 0;
+
 		while( ( n = vj_client_poll( v->fd, V_STATUS ))) 
 		{
 			char trashcan[100];
 			int k = vj_client_read( v->fd, V_STATUS, trashcan,sizeof(trashcan));
-			if( k == -1 && v->is_master )
-				reloaded_schedule_restart();
-			if( k <= 0 )
-				break;
+#ifdef STRICT_CHECKING
+			veejay_msg(VEEJAY_MSG_DEBUG, "Flushing %d bytes '%s'",k,trashcan);
+#endif
+			if( k <= 0 && v->is_master)
+				err = -1;
 		}
-		if( n == -1 && v->is_master )
+
+		if( n <= 0 && v->is_master )
+			err = -1;
+		
+		if( err == -1)
 			reloaded_schedule_restart();
 	}
 	return 1;
@@ -979,10 +986,10 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
        				if(v->status_buffer) free(v->status_buffer);
 				if(v->data_buffer) free(v->data_buffer);
 				if(v->tmp_buffer) free(v->tmp_buffer);
-         			free(v);
 				vp->tracks[track_num] = NULL;			
 				if(  v->is_master )
 					reloaded_schedule_restart();
+				free(v);
 			}
 			else
 			{

@@ -1757,11 +1757,8 @@ void on_video_options_apply_clicked         (GtkButton       *button,
 void on_vims_bundles_activate               (GtkMenuItem     *menuitem,
 					     gpointer         user_data)
 {
-	if(!info->status_lock)
-	{
-		GtkWidget *vims_bundles_window = glade_xml_get_widget(info->main_window, "vims_bundles");
-		gtk_widget_show(vims_bundles_window);	
-	} 
+	GtkWidget *vims_bundles_window = glade_xml_get_widget(info->main_window, "vims_bundles");
+	gtk_widget_show(vims_bundles_window);	
 }
 
 
@@ -1771,11 +1768,8 @@ void on_vims_bundles_activate               (GtkMenuItem     *menuitem,
 void on_vims_bundles_close                  (GtkDialog       *dialog,
 					     gpointer         user_data)
 {
-	if(!info->status_lock)
-	{
-		GtkWidget *vims_bundles_window = glade_xml_get_widget(info->main_window, "vims_bundles");
-		gtk_widget_hide(vims_bundles_window);	
-	} 
+	GtkWidget *vims_bundles_window = glade_xml_get_widget(info->main_window, "vims_bundles");
+	gtk_widget_hide(vims_bundles_window);	
 }
 
 /* Menu entries */

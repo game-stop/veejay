@@ -482,7 +482,7 @@ int	vj_midi_handle_events(void *vv)
 {
 	vmidi_t *v = (vmidi_t*) vv;
         if(!v->active) return 0;
-	if( poll( v->pfd, v->npfd, 0 ) > 0 )
+	if( poll( v->pfd, v->npfd, 5 ) > 0 )
 	{
 		vj_midi_action( v );
 		return 1;

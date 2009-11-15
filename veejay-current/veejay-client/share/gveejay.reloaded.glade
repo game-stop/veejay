@@ -373,7 +373,7 @@
   <property name="window_position">GTK_WIN_POS_CENTER_ON_PARENT</property>
   <property name="modal">False</property>
   <property name="default_width">600</property>
-  <property name="default_height">550</property>
+  <property name="default_height">548</property>
   <property name="resizable">True</property>
   <property name="destroy_with_parent">False</property>
   <property name="decorated">True</property>
@@ -3443,7 +3443,7 @@
 		      <property name="use_underline">True</property>
 
 		      <child internal-child="image">
-			<widget class="GtkImage" id="image3317">
+			<widget class="GtkImage" id="image3357">
 			  <property name="visible">True</property>
 			  <property name="pixbuf">button_loop.png</property>
 			  <property name="xalign">0.5</property>
@@ -3464,7 +3464,7 @@
 			      <signal name="activate" handler="on_sampleadd_clicked" last_modification_time="Tue, 21 Feb 2006 22:53:15 GMT"/>
 
 			      <child internal-child="image">
-				<widget class="GtkImage" id="image3318">
+				<widget class="GtkImage" id="image3358">
 				  <property name="visible">True</property>
 				  <property name="pixbuf">icon_openlist.png</property>
 				  <property name="xalign">0.5</property>
@@ -3484,7 +3484,7 @@
 			      <signal name="activate" handler="on_button_clipcopy_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:58 GMT"/>
 
 			      <child internal-child="image">
-				<widget class="GtkImage" id="image3319">
+				<widget class="GtkImage" id="image3359">
 				  <property name="visible">True</property>
 				  <property name="pixbuf">icon_copy.png</property>
 				  <property name="xalign">0.5</property>
@@ -3504,7 +3504,7 @@
 			      <signal name="activate" handler="on_button_sample_del_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:35 GMT"/>
 
 			      <child internal-child="image">
-				<widget class="GtkImage" id="image3320">
+				<widget class="GtkImage" id="image3360">
 				  <property name="visible">True</property>
 				  <property name="pixbuf">icon_clear.png</property>
 				  <property name="xalign">0.5</property>
@@ -3527,7 +3527,7 @@
 		      <property name="use_underline">True</property>
 
 		      <child internal-child="image">
-			<widget class="GtkImage" id="image3321">
+			<widget class="GtkImage" id="image3361">
 			  <property name="visible">True</property>
 			  <property name="pixbuf">icon_stream.png</property>
 			  <property name="xalign">0.5</property>
@@ -3548,7 +3548,7 @@
 			      <signal name="activate" handler="on_streamnew_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:05 GMT"/>
 
 			      <child internal-child="image">
-				<widget class="GtkImage" id="image3322">
+				<widget class="GtkImage" id="image3362">
 				  <property name="visible">True</property>
 				  <property name="pixbuf">icon_openlist.png</property>
 				  <property name="xalign">0.5</property>
@@ -3568,7 +3568,7 @@
 			      <signal name="activate" handler="on_new_colorstream_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:05 GMT"/>
 
 			      <child internal-child="image">
-				<widget class="GtkImage" id="image3323">
+				<widget class="GtkImage" id="image3363">
 				  <property name="visible">True</property>
 				  <property name="pixbuf">icon_color.png</property>
 				  <property name="xalign">0.5</property>
@@ -3588,7 +3588,7 @@
 			      <signal name="activate" handler="on_button_sample_del_clicked" last_modification_time="Tue, 21 Feb 2006 22:54:28 GMT"/>
 
 			      <child internal-child="image">
-				<widget class="GtkImage" id="image3324">
+				<widget class="GtkImage" id="image3364">
 				  <property name="visible">True</property>
 				  <property name="pixbuf">icon_clear.png</property>
 				  <property name="xalign">0.5</property>
@@ -3611,7 +3611,7 @@
 		      <property name="use_underline">True</property>
 
 		      <child internal-child="image">
-			<widget class="GtkImage" id="image3325">
+			<widget class="GtkImage" id="image3365">
 			  <property name="visible">True</property>
 			  <property name="pixbuf">icon_connect.png</property>
 			  <property name="xalign">0.5</property>
@@ -3629,7 +3629,7 @@
 			      <property name="visible">True</property>
 			      <property name="label" translatable="yes">_learn MIDI</property>
 			      <property name="use_underline">True</property>
-			      <property name="active">False</property>
+			      <property name="active">True</property>
 			      <signal name="activate" handler="on_midilearn_toggled" last_modification_time="Sat, 07 Apr 2007 17:55:42 GMT"/>
 			    </widget>
 			  </child>
@@ -3639,7 +3639,7 @@
 			      <property name="visible">True</property>
 			      <property name="label" translatable="yes">_MIDI enable</property>
 			      <property name="use_underline">True</property>
-			      <property name="active">False</property>
+			      <property name="active">True</property>
 			      <property name="group">midilearn</property>
 			      <signal name="activate" handler="on_midievent_toggled" last_modification_time="Sat, 07 Apr 2007 17:55:29 GMT"/>
 			    </widget>
@@ -3671,7 +3671,7 @@
 		      <property name="use_underline">True</property>
 
 		      <child internal-child="image">
-			<widget class="GtkImage" id="image3326">
+			<widget class="GtkImage" id="image3366">
 			  <property name="visible">True</property>
 			  <property name="pixbuf">icon_save.png</property>
 			  <property name="xalign">0.5</property>
@@ -3692,7 +3692,7 @@
 			      <signal name="activate" handler="on_button_samplelist_save_clicked" last_modification_time="Wed, 19 Oct 2005 12:22:22 GMT"/>
 
 			      <child internal-child="image">
-				<widget class="GtkImage" id="image3327">
+				<widget class="GtkImage" id="image3367">
 				  <property name="visible">True</property>
 				  <property name="pixbuf">icon_saveas.png</property>
 				  <property name="xalign">0.5</property>
@@ -3712,7 +3712,7 @@
 			      <signal name="activate" handler="on_button_saveconfigfile_clicked" last_modification_time="Wed, 19 Oct 2005 12:23:07 GMT"/>
 
 			      <child internal-child="image">
-				<widget class="GtkImage" id="image3328">
+				<widget class="GtkImage" id="image3368">
 				  <property name="visible">True</property>
 				  <property name="pixbuf">icon_openlist.png</property>
 				  <property name="xalign">0.5</property>
@@ -3732,7 +3732,7 @@
 			      <signal name="activate" handler="on_save_midi_layout1_activate" last_modification_time="Fri, 06 Apr 2007 23:48:49 GMT"/>
 
 			      <child internal-child="image">
-				<widget class="GtkImage" id="image3329">
+				<widget class="GtkImage" id="image3369">
 				  <property name="visible">True</property>
 				  <property name="pixbuf">icon_saveas.png</property>
 				  <property name="xalign">0.5</property>
@@ -3755,7 +3755,7 @@
 		      <property name="use_underline">True</property>
 
 		      <child internal-child="image">
-			<widget class="GtkImage" id="image3330">
+			<widget class="GtkImage" id="image3370">
 			  <property name="visible">True</property>
 			  <property name="pixbuf">icon_open.png</property>
 			  <property name="xalign">0.5</property>
@@ -3776,7 +3776,7 @@
 			      <signal name="activate" handler="on_button_samplelist_open_clicked" last_modification_time="Wed, 19 Oct 2005 12:21:30 GMT"/>
 
 			      <child internal-child="image">
-				<widget class="GtkImage" id="image3331">
+				<widget class="GtkImage" id="image3371">
 				  <property name="visible">True</property>
 				  <property name="pixbuf">icon_open.png</property>
 				  <property name="xalign">0.5</property>
@@ -3796,7 +3796,7 @@
 			      <signal name="activate" handler="on_button_loadconfigfile_clicked" last_modification_time="Wed, 19 Oct 2005 12:20:50 GMT"/>
 
 			      <child internal-child="image">
-				<widget class="GtkImage" id="image3332">
+				<widget class="GtkImage" id="image3372">
 				  <property name="visible">True</property>
 				  <property name="pixbuf">icon_openlist.png</property>
 				  <property name="xalign">0.5</property>
@@ -3816,7 +3816,7 @@
 			      <signal name="activate" handler="on_load_midi_layout1_activate" last_modification_time="Fri, 06 Apr 2007 23:48:49 GMT"/>
 
 			      <child internal-child="image">
-				<widget class="GtkImage" id="image3333">
+				<widget class="GtkImage" id="image3373">
 				  <property name="visible">True</property>
 				  <property name="pixbuf">icon_open.png</property>
 				  <property name="xalign">0.5</property>
@@ -3874,7 +3874,7 @@
 		      <signal name="activate" handler="on_VideoSettings_activate" last_modification_time="Tue, 19 Jul 2005 19:33:02 GMT"/>
 
 		      <child internal-child="image">
-			<widget class="GtkImage" id="image3334">
+			<widget class="GtkImage" id="image3374">
 			  <property name="visible">True</property>
 			  <property name="stock">gtk-preferences</property>
 			  <property name="icon_size">1</property>
@@ -3894,14 +3894,14 @@
 		  </child>
 
 		  <child>
-		    <widget class="GtkImageMenuItem" id="vims_bundles">
+		    <widget class="GtkImageMenuItem" id="vims_bundles1">
 		      <property name="visible">True</property>
 		      <property name="label" translatable="yes">VIMS _Bundles</property>
 		      <property name="use_underline">True</property>
 		      <signal name="activate" handler="on_vims_bundles_activate" last_modification_time="Sat, 23 Jul 2005 18:59:53 GMT"/>
 
 		      <child internal-child="image">
-			<widget class="GtkImage" id="image3335">
+			<widget class="GtkImage" id="image3375">
 			  <property name="visible">True</property>
 			  <property name="pixbuf">icon_bundle.png</property>
 			  <property name="xalign">0.5</property>
@@ -3934,7 +3934,7 @@
 		      <signal name="activate" handler="on_about1_activate" last_modification_time="Thu, 15 Sep 2005 22:07:40 GMT"/>
 
 		      <child internal-child="image">
-			<widget class="GtkImage" id="image3336">
+			<widget class="GtkImage" id="image3376">
 			  <property name="visible">True</property>
 			  <property name="pixbuf">icon_question.png</property>
 			  <property name="xalign">0.5</property>
@@ -3954,7 +3954,7 @@
 		      <signal name="activate" handler="on_report_a_bug1_activate" last_modification_time="Sun, 21 Sep 2008 13:31:19 GMT"/>
 
 		      <child internal-child="image">
-			<widget class="GtkImage" id="image3337">
+			<widget class="GtkImage" id="image3377">
 			  <property name="visible">True</property>
 			  <property name="pixbuf">icon_bug.png</property>
 			  <property name="xalign">0.5</property>

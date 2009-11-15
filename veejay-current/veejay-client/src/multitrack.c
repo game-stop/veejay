@@ -935,7 +935,7 @@ int		multrack_audoadd( void *data, char *hostname, int port_num )
 	}
 
 //	mt->master_track = track;
-//	gvr_set_master( mt->preview, track );
+	gvr_set_master( mt->preview, track );
 
 	gtk_widget_set_sensitive_(GTK_WIDGET(mt->view[track]->panel), TRUE );
 

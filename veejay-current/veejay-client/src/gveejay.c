@@ -234,7 +234,10 @@ int main(int argc, char *argv[]) {
 	set_skin( selected_skin );
 
 	default_bank_values( &col, &row );
-	gui_load_theme();	
+	gui_load_theme();
+
+	register_signals();
+		
 	vj_gui_init( skins[selected_skin].file, launcher, hostname, port_num, use_threads );
 	vj_gui_style_setup();
 
@@ -244,6 +247,8 @@ int main(int argc, char *argv[]) {
 		veejay_msg(VEEJAY_MSG_INFO, "Starting with preview enabled");
 		gveejay_preview(preview);
 	}
+
+
 	if( launcher )
 	{
 		reloaded_launcher( hostname, port_num );
