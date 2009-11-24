@@ -1501,7 +1501,7 @@ int	test_video_frame( lav_file_t *lav,int out_pix_fmt)
 
 	if(lav_filetype( lav ) == 'x')
 	{
-		veejay_msg(VEEJAY_MSG_INFO,"\tFile is an image");
+		veejay_msg(VEEJAY_MSG_INFO,"\tIf the image is garbled, please set width and height dimensions (-W and -H) on the commandline.");
 		return out_pix_fmt;
 	}
 
