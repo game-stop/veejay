@@ -1415,7 +1415,14 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
    lav_fd->bps = (lav_audio_channels(lav_fd)*lav_audio_bits(lav_fd)+7)/8;
 
    if(lav_fd->bps==0) lav_fd->bps=1; /* make it save since we will divide by that value */
-   
+ /*  	if(strlen(video_comp) == 1 ) {
+	   lav_fd->MJPG_chroma = CHROMA422;
+		lav_fd->format = 'V';
+		lav_fd->interlacing = LAV_NOT_INTERLACED;
+		return lav_fd;
+	}
+*/
+
 #ifdef USE_GDK_PIXBUF
 	if(strncasecmp(video_comp, "PICT",4) == 0 )
 	{
@@ -1464,8 +1471,9 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		veejay_msg(VEEJAY_MSG_WARNING, "Playing MPEG4 Video (Every frame should be an intra frame)");
 		return lav_fd;
 	}
-	
+		
     	if (	strncasecmp(video_comp,"iyuv",4)==0 ||
+		strncasecmp(video_comp,"yv12",4)==0 ||
 		strncasecmp(video_comp,"i420",4)==0)
 	{
 		lav_fd->MJPG_chroma = CHROMA420;
@@ -1568,12 +1576,50 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 
 		ierr  = 0;
 		frame = NULL;
-		if ( lav_set_video_position(lav_fd,0) ) goto ERREXIT;
+
+
+		int rolls = 5; // try to survive loading broken AVI
+		int pos   = 0;
+		int success = 0;
+		while( pos < rolls ) {
+			if( lav_set_video_position(lav_fd, pos ) ) {
+				pos++;
+				continue;
+			}
+			if( (len = lav_frame_size(lav_fd, pos )) <= 0 ) {
+				pos++;
+				continue;
+			}
+			if( (frame = (unsigned char*) malloc(len)) == 0 ) {
+			       ierr = ERROR_MALLOC;
+			       break;
+			}
+	 		if( (lav_read_frame( lav_fd, frame ) <= 0 ) ) {
+				pos ++;
+				if( frame ) free(frame);
+				continue;
+			}
+			if( scan_jpeg(frame,len,1) ) {
+				ierr = ERROR_JPEG;
+				break;
+			}
+
+			success = 1;
+			break;
+		}
+
+		if(!success) {
+			goto ERREXIT;
+		} else {
+			lav_set_video_position( lav_fd, pos );
+		}
+
+	/*	if ( lav_set_video_position(lav_fd,0) ) goto ERREXIT;
 		if ( (len = lav_frame_size(lav_fd,0)) <=0 ) goto ERREXIT;
 		if ( (frame = (unsigned char*) malloc(len)) == 0 ) { ierr=ERROR_MALLOC; goto ERREXIT; }
 
 		if ( lav_read_frame(lav_fd,frame) <= 0 ) goto ERREXIT;
-	   /* reset video position to 0 */
+	
 		if ( lav_set_video_position(lav_fd,0) ) goto ERREXIT;
 		if( scan_jpeg(frame, len, 1) ) { ierr=ERROR_JPEG; goto ERREXIT; }
 

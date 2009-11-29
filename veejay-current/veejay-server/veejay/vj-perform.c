@@ -2429,15 +2429,12 @@ static void vj_perform_plain_fill_buffer(veejay_t * info)
 		ret = vj_perform_get_frame_(info, 0, settings->current_frame_num,frame, p0_buffer, p1_buffer,0 );
 
 	}
-/*	else
-	{
-		ret = vj_el_get_video_frame(info->edit_list,settings->current_frame_num,frame);
-	}*/
+	
 	if(ret <= 0)
 	{
-		veejay_msg(0, "Unable to queue video frame %d, stopping Veejay", 
+		veejay_msg(0, "Unable to queue video frame %d", 
 			settings->current_frame_num );
-		veejay_change_state_save(info, LAVPLAY_STATE_STOP);
+	//	veejay_change_state_save(info, LAVPLAY_STATE_STOP);
 	}
 }
 static uint32_t rec_audio_sample_ = 0;

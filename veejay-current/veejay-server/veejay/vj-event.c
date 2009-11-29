@@ -1766,7 +1766,7 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 	
 	SDL_KeyboardEvent *key = &event.key;
 	SDLMod mod = key->keysym.mod;
-	
+	veejay_t *v =  (veejay_t*) ptr;
 	int vims_mod = 0;
 
 	if( (mod & KMOD_LSHIFT) || (mod & KMOD_RSHIFT ))
@@ -1782,7 +1782,18 @@ int vj_event_single_fire(void *ptr , SDL_Event event, int pressed)
 	vj_keyboard_event *ev = get_keyboard_event( index );
 	if(!ev )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR,"Keyboard event %d unknown", index );
+	//	veejay_msg(VEEJAY_MSG_ERROR,"Keyboard event %d unknown", index );
+		if( event.button.button == SDL_BUTTON_WHEELUP && v->use_osd != 3 ) {
+			char msg[100];
+			sprintf(msg,"%03d:;", VIMS_VIDEO_SKIP_SECOND );
+			vj_event_parse_msg( (veejay_t*) ptr, msg, strlen(msg) );
+			return 1;
+		} else if (event.button.button == SDL_BUTTON_WHEELDOWN && v->use_osd != 3) {
+			char msg[100];
+			sprintf(msg,"%03d:;", VIMS_VIDEO_PREV_SECOND );
+			vj_event_parse_msg( (veejay_t*) ptr, msg, strlen(msg) );
+			return 1;
+		}	
 		return 0;
 	}
 
@@ -3393,20 +3404,30 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 #ifdef HAVE_SDL
 		{
 			int go_fs = v->sdl[id]->fs == 1 ? 0:1 ;
-			char *caption = veejay_title();
-			v->settings->full_screen = go_fs;
-			vj_sdl_free(v->sdl[id]);
-			vj_sdl_init(
+			char *caption = veejay_title(v);
+
+			vj_sdl *tmpsdl = vj_sdl_allocate( v->video_output_width,v->video_output_height,v->pixel_format);
+			
+			if(vj_sdl_init(
 				v->settings->ncpu,
-				v->sdl[id],
+				tmpsdl,
 				v->bes_width,
 				v->bes_height,
 				caption,
 				1,
 				go_fs
-			);
-			if( go_fs)
-				vj_sdl_grab( v->sdl[id], 0 );
+			) ) {
+				if( v->sdl[id] ) {
+					vj_sdl_free(v->sdl[id]);
+				}
+				v->sdl[id] = tmpsdl;		
+				if( go_fs)
+					vj_sdl_grab( v->sdl[id], 0 );
+				v->settings->full_screen = go_fs;
+			}
+			else {
+				vj_sdl_free(tmpsdl);
+			}
 			free(caption);
 		}
 #endif
@@ -3465,7 +3486,7 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 	}
 	else
 	{
-		char *title = veejay_title();
+		char *title = veejay_title(v);
 		
 		switch( v->video_out )
 		{

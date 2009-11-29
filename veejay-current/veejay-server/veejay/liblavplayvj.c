@@ -1509,7 +1509,7 @@ static	void	veejay_event_handle(veejay_t *info)
 		{
 			SDL_KeyboardEvent *k = &event.key;
 			int mod = SDL_GetModState();
-			if( event.type == SDL_KEYDOWN)
+			if( event.type == SDL_KEYDOWN || event.type == SDL_MOUSEBUTTONDOWN)
 			{
 				res = vj_event_single_fire( (void*) info, event, 0);
 			}
@@ -1737,10 +1737,11 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 }
 
 
-char	*veejay_title( )
+char	*veejay_title(veejay_t *info)
 {
 	char tmp[64];
-	sprintf(tmp, "Veejay %s", VERSION );
+	sprintf(tmp, "Veejay %s on port %d in %dx%d@%2.2f", VERSION,
+	      info->uc->port, info->video_output_width,info->video_output_height,info->edit_list->video_fps );
 	return strdup(tmp);
 }
 
@@ -2134,6 +2135,8 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 	int instances = 0;
 
+	char *title = NULL;
+
 	while( (instances < 4 ) && !vj_server_setup(info))
 	{
 		int port = info->uc->port;
@@ -2173,11 +2176,15 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 			if( x != -1 && y != -1 )
 				vj_sdl_set_geometry(info->sdl[0],x,y);
 
-			if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height, "Veejay",1,info->settings->full_screen))
+			title = veejay_title( info );
+
+			if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height, title,1,info->settings->full_screen))
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Error initializing SDL");
+				free(title);
 		    		return -1;
 			}
+			free(title);
 #endif
 			break;
 		case 1:
@@ -2201,9 +2208,13 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 			info->sdl[0] = 	(vj_sdl *) vj_sdl_allocate(info->video_output_width,info->video_output_height, info->pixel_format);
 			if(!info->sdl[0])		
 				return -1;
-	
-			if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height,"Veejay",1,info->settings->full_screen))
+			
+			title = veejay_title(info);	
+			if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height,title,1,info->settings->full_screen)) {
+				free(title);
 	   	 		return -1;
+			}
+			free(title);
 #endif
 #ifdef HAVE_DIRECTFB
 			info->dfb =  (vj_dfb *) vj_dfb_allocate( info->video_output_width, info->video_output_height, el->video_norm);
@@ -2647,15 +2658,14 @@ static	void *veejay_playback_thread(void *data)
       
 #ifdef HAVE_SDL
     for ( i = 0; i < MAX_SDL_OUT ; i ++ )
-		if( info->sdl[i] )
-		{
+	if( info->sdl[i] )
+	{
 #ifndef X_DISPLAY_MISSING
-			 if(info->sdl[i]->display)
-				 x11_enable_screensaver( info->sdl[i]->display);
+		 if(info->sdl[i]->display)
+			 x11_enable_screensaver( info->sdl[i]->display);
 #endif
-			 vj_sdl_free(info->sdl[i]);
-			 free(info->sdl[i]);
-		}
+		 vj_sdl_free(info->sdl[i]);
+	}
 
 	vj_sdl_quit();
 #endif

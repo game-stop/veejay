@@ -88,6 +88,7 @@ static struct
 {
 	{ "vj20", CODEC_ID_YUV420F,		-1 },
 	{ "vj22", CODEC_ID_YUV422F,		-1 },
+//	{ "", 		CODEC_ID_YUV422F,		-1 },
         { "mjpg" , CODEC_ID_MJPEG ,		0 },
 	{ "mjpg" , CODEC_ID_MJPEG , 		1 },
 	{ "mjpb", CODEC_ID_MJPEGB,		0 },
@@ -136,6 +137,7 @@ static struct
 	{ "iyuv",	CODEC_ID_YUV420,	-1},
 	{ "i420",	CODEC_ID_YUV420,	-1},
 	{ "yv16",	CODEC_ID_YUV422,	-1},
+	{ "yv12",	CODEC_ID_YUV420,	-1},
 	{ "mlzo",	CODEC_ID_YUVLZO,	-1},
 	{ "pict",	0xffff,			-1}, 
 	{ "hfyu",	CODEC_ID_HUFFYUV,	-1},
@@ -154,6 +156,7 @@ static struct
 {
 	{ "vj20", CODEC_ID_YUV420F },
 	{ "vj22", CODEC_ID_YUV422F },
+	{ "yv12", CODEC_ID_YUV420 },
 	{ "mjpg",	CODEC_ID_MJPEG	},
 	{ "mjpb",	CODEC_ID_MJPEGB },
 	{ "dmb1",	CODEC_ID_MJPEG	},

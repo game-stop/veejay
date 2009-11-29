@@ -486,7 +486,7 @@ char *viewport_get_my_help(void *vv)
 	sprintf(startup_mode, "%s", (v->initial_active==1 ? "Active" :"Inactive"  ));
 	int gw = v->grid_width;
 	int gh = v->grid_height;
-	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nCTRL + Cursor Keys: Finetune point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Focus projection/secundary input\nCTRL + i: Transform secundary input\nCTRL + v: Transform sec. input in grayscale/color \nCTRL + a: %s on startup.\nCTRL + o: Toggle OSD status\n%s\n\n",
+	sprintf(tmp, "Interactive Input/Projection calibration\nMouse Left: Set point\nCTRL + Cursor Keys: Finetune point\nMouse Left + RSHIFT: Set projection quad \nMouse Right: %s\nMouse Middle: Setup/Run\nMouse Middle + LSHIFT: Line Color\nCTRL + h:Hide/Show this Help\nCTRL + p:Focus projection/secundary input\nCTRL + i: Transform secundary input\nCTRL + v: Transform sec. input in grayscale/color \nCTRL + a: %s on startup.\nCTRL + s: Exit this screen.\n%s\n\n",
 			reverse_mode,
 			startup_mode,
 			scroll_mode

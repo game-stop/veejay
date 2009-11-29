@@ -99,9 +99,12 @@ static void vj_sdl_move( vj_sdl *vjsdl , int scaled_width, int scaled_height, in
 }
 vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
 {
-    vj_sdl *vjsdl = (vj_sdl *) malloc(sizeof(vj_sdl));
+    vj_sdl *vjsdl = (vj_sdl *) vj_malloc(sizeof(vj_sdl));
     if (!vjsdl)
 	return NULL;
+
+    veejay_memset( vjsdl,0,sizeof(vj_sdl));
+
     vjsdl->flags[0] = 0;
     vjsdl->flags[1] = 0;
     vjsdl->mouse_motion = 1;
@@ -463,9 +466,7 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 		}
 	}
 
-	char *title = veejay_title();
-    	SDL_WM_SetCaption(title, NULL);
-   	free(title);
+    	SDL_WM_SetCaption(caption, NULL);
 
 	if (!vj_sdl_unlock(vjsdl))
 		return 0;
@@ -581,7 +582,11 @@ void	vj_sdl_quit()
 
 void vj_sdl_free(vj_sdl * vjsdl)
 {
-    SDL_FreeYUVOverlay(vjsdl->yuv_overlay);
+	if( vjsdl->yuv_overlay)
+ 	   SDL_FreeYUVOverlay(vjsdl->yuv_overlay);
+	if( vjsdl->scaler )
+	   yuv_free_swscaler(vjsdl->scaler);
+	free(vjsdl);
 //    SDL_Quit();
 }
 #endif

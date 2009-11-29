@@ -36,7 +36,7 @@ vj_effect *noiseadd_init(int width , int height)
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 2;
     ve->limits[0][1] = 1;
-    ve->limits[1][1] = 10000;
+    ve->limits[1][1] = 5000;
     ve->description = "Amplify low noise";
 
     ve->extra_frame = 0;

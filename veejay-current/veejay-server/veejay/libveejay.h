@@ -50,7 +50,7 @@ int veejay_close(veejay_t *info);
 
 int      get_total_mem(void);
 
-char     *veejay_title( );
+char     *veejay_title(veejay_t *info);
 
 void veejay_stop_sampling(veejay_t *info);
 void	veejay_set_sample_f(veejay_t *info, int sample, int offset );
