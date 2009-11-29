@@ -2219,19 +2219,24 @@ int	vj_el_get_file_entry(editlist *el, long *start_pos, long *end_pos, long entr
 
 char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 {
-	if(el->is_empty)
+	if(el == NULL || el->is_empty)
 		return NULL;
 
-	int num_files;
+	int num_files	= 0;
 	int64_t oldfile, oldframe, of1,ofr;
 	int64_t index[MAX_EDIT_LIST_FILES];
 	int64_t n,n1=0;
-	char *result = NULL;
+	char 	*result = NULL;
 	int64_t j = 0;
 	int64_t n2 = el->video_frames-1;
 	char	filename[2048];
 	char	fourcc[6];
+
+#ifdef STRICT_CHECKING
+	int	dbg_buflen = 0;
+#endif
 	/* get which files are actually referenced in the edit list entries */
+
 	int est_len = 0;
    	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
 		index[j] = -1;
@@ -2245,6 +2250,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	num_files = 0;
 	int nnf   = 0;
 	long len  = 0;
+
    	for (j = 0; j < MAX_EDIT_LIST_FILES; j++)
 	{
 		if (index[j] >= 0 && el->video_file_list[j] != NULL )
@@ -2271,6 +2277,8 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 			N_EL_FRAME(n) != oldframe + 1 )	{
 				len += (3*16);
 			}
+		oldfile = index[N_EL_FILE(n)];
+		oldframe = N_EL_FRAME(n);
 	}
 
 	n = n1;
@@ -2280,6 +2288,10 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	n1 = 0;
  
 	est_len = 64 + len;
+
+#ifdef STRICT_CHECKING
+	dbg_buflen = est_len;
+#endif
 	result = (char*) vj_calloc(sizeof(char) * est_len );
 	sprintf(result, "%04d",nnf );
 
@@ -2297,13 +2309,22 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 				strlen(fourcc),
 				fourcc 
 			);
+#ifdef STRICT_CHECKING
+			dbg_buflen -= strlen(filename);
+			assert( dbg_buflen > 0);
+#endif
 			veejay_strncat ( result, filename, strlen(filename));
 		}
 	}
 
 
 	char first[64];
+	char tmpbuf[64];
 	snprintf(first,sizeof(first), "%016lld%016lld",oldfile, oldframe);
+#ifdef STRICT_CHECKING
+	dbg_buflen -= strlen(first);
+	assert( dbg_buflen > 0 );
+#endif
 	veejay_strncat( result, first, strlen(first) );
 
   	for (j = n1+1; j <= n2; j++)
@@ -2312,13 +2333,15 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 		if ( index[ N_EL_FILE(n) ] != oldfile ||
 			N_EL_FRAME(n) != oldframe + 1 )	
 		{
-			char *tmp = (char*) vj_calloc(sizeof(char) * 50 );
-			snprintf( tmp,sizeof(tmp), "%016lld%016lld%016lld",
+			snprintf( tmpbuf,sizeof(tmpbuf), "%016lld%016lld%016lld",
 				 oldframe,
 				 index[N_EL_FILE(n)],
 				 N_EL_FRAME(n) );
-			veejay_strncat( result, tmp, strlen(tmp) );
-			free(tmp);
+#ifdef STRICT_CHECKING
+			dbg_buflen -= strlen(tmpbuf);
+			assert( dbg_buflen > 0 );
+#endif
+			veejay_strncat( result, tmpbuf, strlen(tmpbuf) );
 		}
 		oldfile = index[N_EL_FILE(n)];
 		oldframe = N_EL_FRAME(n);
@@ -2326,9 +2349,17 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 
 	char last_word[16];
 	sprintf(last_word,"%016lld", oldframe);
+#ifdef STRICT_CHECKING
+	dbg_buflen -= 16;
+	assert( dbg_buflen > 0 );
+#endif
 	veejay_strncat( result, last_word, 16 );
-	*bytes_written = strlen( result );
-	el->total_frames = el->video_frames - 1;
+
+	int datalen = strlen(result);
+	*bytes_written =  datalen;
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_DEBUG, "EL estimated %d bytes, %d remaining bytes, %d used bytes",est_len,dbg_buflen,datalen);
+#endif	
 	return result;
 }
 
