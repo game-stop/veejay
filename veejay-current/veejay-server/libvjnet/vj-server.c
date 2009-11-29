@@ -80,12 +80,11 @@ void		vj_server_geo_stats()
 
 	//@ send 1 time http request
 	char request[128];
-	snprintf(request,sizeof(request),"GET /veejay-%s HTTP/1.1\nHost: veejay.dyne.org\n\n",
-		PACKAGE_VERSION );	
+	snprintf(request,sizeof(request),"GET /veejay-15 HTTP/1.1\nHost: www.veejayhq.net\nReferrer: http://");
 
 	vj_sock_t *dyne = alloc_sock_t();
 	if(dyne) {
-		sock_t_connect_and_send_http( dyne, "veejay.dyne.org",80, request,strlen(request));
+		sock_t_connect_and_send_http( dyne, "www.veejayhq.net",80, request,strlen(request));
 		sock_t_close( dyne );
 		free(dyne);
 	}

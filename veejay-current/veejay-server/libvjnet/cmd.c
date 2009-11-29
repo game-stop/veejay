@@ -25,6 +25,8 @@
 #include <unistd.h>
 #include "cmd.h"
 #include <libvjmsg/vj-msg.h>
+#include <sys/types.h>
+#include <sys/utsname.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -59,11 +61,34 @@ int			sock_t_connect_and_send_http( vj_sock_t *s, char *host, int port, char *bu
 	{
 		return 0;
 	}
-	int n = send(s->sock_fd,buf,buf_len, 0 );
+
+	struct sockaddr_in sinfo;
+	socklen_t sinfolen;
+	char *server_name[1024];
+	if( getsockname(s->sock_fd,(struct sockaddr*) &sinfo,&sinfolen)==0) {
+		char *tmp = inet_ntoa( sinfo.sin_addr );
+		strncpy( server_name, tmp, 1024);
+	} else {
+		return 0;
+	}
+
+	int len = strlen(server_name) + 128 + buf_len;
+	char *msg = (char*) malloc(sizeof(char) * len );
+	struct utsname name;
+	if( uname(&name) == -1 ) {
+		snprintf(msg,len,"%s%s/veejay-%s\n\n",buf,server_name,PACKAGE_VERSION);
+	} else {
+		snprintf(msg,len,"%s%s/veejay-%s/%s-%s\n\n",buf,server_name,PACKAGE_VERSION,name.sysname,name.release );
+	}
+	int msg_len = strlen(msg);
+	int n = send(s->sock_fd,msg,msg_len, 0 );
+	free(msg);
+	
 	if( n == -1 )
 	{
 		return 0;
 	}
+
 	return n;
 }
 
