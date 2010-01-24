@@ -40,8 +40,9 @@
 #include <mjpegtools/mpegtimecode.h>
 #include <libvjmem/vjmem.h>
 #include <libyuv/yuvconv.h>
-#include AVCODEC_INC
-#include AVFORMAT_INC
+#include <libavutil/avutil.h>
+#include <libavcodec/avcodec.h>
+#include <libavformat/avformat.h>
 #include <liblzo/lzo.h>
 #include <math.h>
 #include <stdlib.h>
@@ -660,8 +661,8 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 
 	pix_fmt = _el_probe_for_pixel_fmt( elfd );
 #ifdef STRICT_CHECKING
-	if( in_pixel_format >= 0 )
-		assert( pix_fmt == in_pixel_format );
+	//if( in_pixel_format >= 0 )
+	//	assert( pix_fmt == in_pixel_format );
 #endif
 	
 	if(pix_fmt < 0 && in_pixel_format < 0)
@@ -2227,13 +2228,13 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 
 	int num_files	= 0;
 	int64_t oldfile, oldframe, of1,ofr;
-	int64_t index[MAX_EDIT_LIST_FILES];
+	int64_t index[MAX_EDIT_LIST_FILES]; //@ TRACE
 	int64_t n,n1=0;
 	char 	*result = NULL;
 	int64_t j = 0;
 	int64_t n2 = el->video_frames-1;
-	char	filename[2048];
-	char	fourcc[6];
+	char	filename[2048];		    //@ TRACE
+	char	fourcc[6];                  //@ TRACE
 
 #ifdef STRICT_CHECKING
 	int	dbg_buflen = 0;
@@ -2258,9 +2259,10 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	{
 		if (index[j] >= 0 && el->video_file_list[j] != NULL )
 		{
-			index[j] = (int64_t)num_files++;
+			index[j] = (int64_t)num_files;
 			nnf ++;
 			len     += (strlen(el->video_file_list[j])) + 25 + 20;
+			num_files ++;
 		}
 	}
 
@@ -2321,8 +2323,8 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 	}
 
 
-	char first[64];
-	char tmpbuf[64];
+	char first[256];
+	char tmpbuf[256];
 	snprintf(first,sizeof(first), "%016lld%016lld",oldfile, oldframe);
 #ifdef STRICT_CHECKING
 	dbg_buflen -= strlen(first);
@@ -2350,7 +2352,7 @@ char *vj_el_write_line_ascii( editlist *el, int *bytes_written )
 		oldframe = N_EL_FRAME(n);
     	}
 
-	char last_word[16];
+	char last_word[64];
 	sprintf(last_word,"%016lld", oldframe);
 #ifdef STRICT_CHECKING
 	dbg_buflen -= 16;

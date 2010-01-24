@@ -10,5 +10,4 @@ AM_CFLAGS=$(OP_CFLAGS)
 SAMPLEREC_LIB_FILE = libsamplerec.la
 noinst_LTLIBRARIES = $(SAMPLEREC_LIB_FILE)
 libsamplerec_la_SOURCES =	samplerecord.c 
-
-pkginclude_HEADERS = samplerecord.h
+EXTRA_DIST = samplerecord.h

@@ -22,13 +22,13 @@
 #include <libvjmem/vjmem.h>
 #include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
-#include SWSCALE_INC
 #include <aclib/ac.h>
 #include <aclib/imgconvert.h>
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>
-#include AVUTIL_INC
-#include AVCODEC_INC
+#include <libavutil/avutil.h>
+#include <libswscale/swscale.h>
+#include <libavcodec/avcodec.h>
 /* this routine is the same as frame_YUV422_to_YUV420P , unpack
  * libdv's 4:2:2-packed into 4:2:0 planar 
  * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)
@@ -262,7 +262,7 @@ void	yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
 	put( PIX_FMT_YUV444P, IMG_YUV444P );
 	put( PIX_FMT_YUVJ420P, IMG_YUV420P ); //@wrong, but size fits
 	put( PIX_FMT_YUVJ422P, IMG_YUV422P );
-	put( PIX_FMT_YUVJ422P, IMG_YUV444P );
+	put( PIX_FMT_YUVJ422P, IMG_YUV422P ); 
 //	put( PIX_FMT_RGB24,   IMG_RGB24 );
 //	put( PIX_FMT_BGR24,   IMG_BGR24 );
 	put( PIX_FMT_RGB24,   IMG_BGR24 );
@@ -293,7 +293,8 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->uv_width = w>>1;
 			f->uv_height= f->height;		
 			f->stride[0] = w;
-			f->stride[1] = f->stride[2] = f->stride[0]>>1;	
+			f->stride[1] = w>>1;
+			f->stride[2] = w>>1;	
 			break;
 		case PIX_FMT_YUV420P:
 		case PIX_FMT_YUVJ420P:

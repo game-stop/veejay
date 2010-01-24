@@ -247,8 +247,8 @@ extern unsigned char * sample_chain_get_kfs( int s1, int entry, int parameter_id
 extern int     sample_chain_set_kf_status( int s1, int entry, int status );
 extern int     sample_chain_set_kfs( int s1, int len, unsigned char *data );
 extern int	sample_chain_reset_kf( int s1, int entry );
-
-
+extern int	sample_has_cali_fx(int sample_id);
+extern void	sample_cali_prepare( int sample_id, int slot, int chan );
 extern int sample_set_sub_audio(int s1, int audio);
 extern int sample_get_audio_volume(int s1);
 extern int sample_set_audio_volume(int s1, int volume);
@@ -295,7 +295,7 @@ extern int sample_set_chain_channel(int s1, int position, int channel);
 
 //int sample_chain_replace(int s1, int position, int effect_id);
 
-extern int sample_chain_sprint_status(int s1,int cache,int sa,int ca, int r, int f, int m, int t,int sr, int macro,char *s ); 
+extern int sample_chain_sprint_status(int s1,int cache,int sa,int ca, int r, int f, int m, int t,int sr,int curfps,uint32_t lo, uint32_t hi, int macro,char *s ); 
 
 extern int sample_set_render_entry(int s1, int entry);
 extern int sample_get_render_entry(int s1);

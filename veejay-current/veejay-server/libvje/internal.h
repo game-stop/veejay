@@ -119,6 +119,7 @@ enum {
 	VJ_VIDEO_EFFECT_TEXMAP = 244,
 	VJ_VIDEO_EFFECT_RIPPLETV = 245,
 	VJ_VIDEO_EFFECT_SLICER = 246,
+	VJ_VIDEO_EFFECT_IRIS   = 247,
 };
 
 enum {
@@ -212,14 +213,15 @@ enum {
 	VJ_IMAGE_EFFECT_BALTANTV	=	187,
 	VJ_IMAGE_EFFECT_CONTOUR		=	188,
 	VJ_IMAGE_EFFECT_LENSCORRECTION  = 	189,
+	VJ_IMAGE_EFFECT_CALI		=	190,
 	VJ_IMAGE_EFFECT_DUMMY=100,
 };
 
 #define VJ_IMAGE_EFFECT_MIN 100
-#define VJ_IMAGE_EFFECT_MAX 190
+#define VJ_IMAGE_EFFECT_MAX 191
 
 #define VJ_VIDEO_EFFECT_MIN 200
-#define VJ_VIDEO_EFFECT_MAX 247
+#define VJ_VIDEO_EFFECT_MAX 248
 
 #define VJ_VIDEO_COUNT (VJ_VIDEO_EFFECT_MAX - VJ_VIDEO_EFFECT_MIN)
 
@@ -596,5 +598,11 @@ extern	void	radioactivetv_apply( VJFrame *a, VJFrame *b,int w, int h, int mode, 
 extern void nervous_apply(VJFrame *Frame, int width, int height,int delay);
 
 extern void colflash_apply( VJFrame *frame, int width, int height, int f,int r, int g, int b, int d);
+
+extern	void	iris_apply( VJFrame *frame,VJFrame *frame2, int width, int height, int value, int shape );
+
+extern void cali_apply(void *d , VJFrame *frame,
+                int width, int height, 
+                int mode, int full);
 
 #endif

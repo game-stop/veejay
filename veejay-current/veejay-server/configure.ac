@@ -1,6 +1,6 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([veejay],[1.5.2],[veejay-users@lists.sourceforge.net])
+AC_INIT([veejay],[1.5.3],[veejay-users@lists.sourceforge.net])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([veejay/veejay.c])
 
@@ -520,72 +520,59 @@ then
 	fi	
 fi
 
+
+
 AC_MSG_RESULT($CFLAGS)
 
 
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
 
-PKG_CHECK_MODULES(FFMPEG_AVCODEC, [libavcodec],
-                    [
- 		     AC_SUBST(FFMPEG_AVCODEC_CFLAGS)
-		     AC_SUBST(FFMPEG_AVCODEC_LIBS)
-		     have_avcodec=true
-                     AC_DEFINE(HAVE_AVCODEC, 1, [use avcodec])],
-                    [have_avcodec=false])
-
-
-PKG_CHECK_MODULES(FFMPEG_AVFORMAT, [libavformat],
-                    [
- 		     AC_SUBST(FFMPEG_AVFORMAT_CFLAGS)
-		     AC_SUBST(FFMPEG_AVFORMAT_LIBS)
-		     have_avformat=true
-                     AC_DEFINE(HAVE_AVFORMAT, 1, [use avformat])],
-                    [have_avformat=false])
-
-PKG_CHECK_MODULES(FFMPEG_SWSCALER, [libswscale],
-			[ 
-				AC_SUBST(FFMPEG_SWSCALER_CFLAGS)
-				AC_SUBST(FFMPEG_SWSCALER_LIBS)
-				have_swscaler=true
-				AC_DEFINE( HAVE_SWSCALER,1,[use swscaler])],
-				[ have_swscaler=false] )
-				
-
-
-if test x$have_avcodec != xtrue ; then
- AC_MSG_ERROR([ FFmpeg AVCodec not found. Get it from http://ffmpeg.sourceforge.net ] )
+PKG_CHECK_MODULES(LIBAVUTIL, [libavutil >= 49.7.0],have_avutil=true,have_avutil=false)
+PKG_CHECK_MODULES(LIBAVCODEC,[libavcodec >= 51.57.2],have_avcodec=true,have_avcodec=false)
+PKG_CHECK_MODULES(LIBAVFORMAT,[libavformat >= 52.14.0],have_avformat=true,have_avformat=false)
+PKG_CHECK_MODULES(LIBSWSCALE,[libswscale >= 0.7.1],have_swscale=true,have_swscale=false)
+if test x$have_swscale = xfalse;
+then
+	AC_MSG_ERROR([libswscale not found.])
+fi
+if test x$have_avutil = xfalse;
+then
+	AC_MSG_ERROR([libavutil not found.])
+fi
+if test x$have_avformat = xfalse;
+then
+	AC_MSG_ERROR([libavformat not found.])
+fi
+if test x$have_avcodec = xfalse;
+then
+	AC_MSG_ERROR([libavcodec not found.])
 fi
 
-if test x$have_avformat != xtrue ; then
- AC_MSG_ERROR([ FFmpeg AVFormat not found. Get it from http://ffmpeg.sourceforge.net ] )
-fi
-
-if test x$have_swscaler != xtrue ; then
- AC_MSG_ERROR([ FFmpeg Swscaler not found. Did you enable it when you compiled ffmpeg ? ])
-fi
-
-FFMPEG_INCLUDE_AVCODEC=""
-FFMPEG_INCLUDE_AVUTIL=""
-FFMPEG_INCLUDE_SWSCALE=""
-FFMPEG_INCLUDE_AVFORMAT=""
-
-AC_CHECK_HEADER( ffmpeg/avcodec.h, [FFMPEG_INCLUDE_AVCODEC="<ffmpeg/avcodec.h>"],[])
-AC_CHECK_HEADER( ffmpeg/avformat.h, [FFMPEG_INCLUDE_AVFORMAT="<ffmpeg/avformat.h>"],[])
-AC_CHECK_HEADER( ffmpeg/avutil.h, [FFMPEG_INCLUDE_AVUTIL="<ffmpeg/avutil.h>"],[])
-AC_CHECK_HEADER( ffmpeg/swscale.h, [FFMPEG_INCLUDE_SWSCALE="<ffmpeg/swscale.h>"],[])
-AC_CHECK_HEADER( libavutil/avutil.h, [FFMPEG_INCLUDE_AVUTIL="<libavutil/avutil.h>"],[])
-AC_CHECK_HEADER( libswscale/swscale.h, [FFMPEG_INCLUDE_SWSCALE="<libswscale/swscale.h>"],[])
-AC_CHECK_HEADER( libavcodec/avcodec.h, [FFMPEG_INCLUDE_AVCODEC="<libavcodec/avcodec.h>"],[])
-AC_CHECK_HEADER( libavformat/avformat.h, [FFMPEG_INCLUDE_AVFORMAT="<libavformat/avformat.h>"],[])
-
-AC_DEFINE_UNQUOTED( AVCODEC_INC, $FFMPEG_INCLUDE_AVCODEC,[] )
-AC_DEFINE_UNQUOTED( AVUTIL_INC, $FFMPEG_INCLUDE_AVUTIL,[] )
-AC_DEFINE_UNQUOTED( AVFORMAT_INC, $FFMPEG_INCLUDE_AVFORMAT,[] )
-AC_DEFINE_UNQUOTED( SWSCALE_INC, $FFMPEG_INCLUDE_SWSCALE,[] )
+FFMPEG_CFLAGS="${LIBAVFORMAT_CFLAGS} ${LIBAVCODEC_CFLAGS} ${LIBAVUTIL_CFLAGS} ${LIBSWSCALE_CFLAGS}"
+FFMPEG_LIBS="${LIBAVFORMAT_LIBS} ${LIBAVCODEC_LIBS} ${LIBAVUTIL_LIBS} ${LIBSWSCALE_LIBS}"
+AC_SUBST(FFMPEG_CFLAGS)
+AC_SUBST(FFMPEG_LIBS)
 
 
 AC_SUBST(LIBM_LIBS)
+
+dnl ********************************************************************
+dnl Look for X
+AC_PATH_XTRA
+AC_CHECK_HEADER(X11/Xlib.h, HAVE_X="yes", HAVE_X="no")
+
+if test "x$HAVE_X" = "xno"
+then
+	AC_MSG_ERROR([Cannot find X11 development files.])
+else
+	X_LIBS="$X_LIBS $X_PRE_LIBS $X_EXTRA_LIBS"
+	X_LIBS="$X_LIBS -lX11"
+	AC_SUBST(X_CFLAGS)
+	AC_SUBST(X_LIBS)
+fi
+AC_SUBST(HAVE_X)
+AM_CONDITIONAL(HAVE_X, test "x$HAVE_X" = "xyes")
 
 dnl Check for Xinerama
 use_xinerama=no
@@ -593,7 +580,7 @@ AC_CHECK_LIB( Xinerama, XineramaQueryExtension,
 	[ AC_CHECK_HEADER(X11/extensions/Xinerama.h,
 	   [
 		AC_DEFINE( HAVE_XINERAMA,1,[Use Xinerama] )
-		XINERAMA_LIBS="-lXext -lXinerama"
+		XINERAMA_LIBS="-lXext -lX11 -lXinerama"
 		AC_SUBST(XINERAMA_LIBS)
         	use_xinerama=yes,
 	   ],
@@ -758,20 +745,6 @@ AC_CACHE_CHECK([for __progname],
 if test x$mjt_cv_extern___progname = xyes ; then
   AC_DEFINE(HAVE___PROGNAME, 1, [Is __progname defined by system?])
 fi
-
-dnl ********************************************************************
-dnl Check for DGA (for v4l-conf)
-dnl ********************************************************************
-AC_SUBST(V4LCONF_LIBS)
-AC_CHECK_LIB(Xxf86dga, XF86DGAQueryExtension,
-	V4LCONF_LIBS="$X_LIBS -lXxf86dga" 
-	AC_DEFINE(HAVE_LIBXXF86DGA,1, [libxf86dga is present]),,
-	$X_LIBS $X_PRE_LIBS -lXext -lX11 $X_EXTRA_LIBS)
-
-
-dnl Look for X
-AC_PATH_XTRA
-AM_CONDITIONAL(HAVE_X, test x$have_x = xyes)
 
 dnl ********************************************************************
 dnl Check for the SDL library (for software playback)
@@ -965,6 +938,15 @@ if test "x$cflags_set" != "xyes" ; then
   cflags_set=yes
 fi
 
+AC_CACHE_CHECK([whether gcc has -fno-stack-protector],no_stack_protector_flag,[
+	saved_CFLAGS=$CFLAGS
+	CFLAGS="-fno-stack-protector"
+      	AC_TRY_COMPILE(,,no_stack_protector_flag=yes,no_stack_protector_flag=no)
+      	CFLAGS=$saved_CFLAGS])
+
+if test "x$no_stack_protector_flag" = xyes; then
+	CFLAGS="$CFLAGS -fno-stack-protector"
+fi
 
 if test x"$with_extra_cflags" != "x"; then
    CFLAGS="$CFLAGS $with_extra_cflags"
@@ -1062,7 +1044,8 @@ AC_MSG_NOTICE([ Required dependencies:])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - FFmpeg AVFormat               : ${have_avformat} ])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
-AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscaler} ])
+AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscale} ])
+AC_MSG_NOTICE([  - FFmpeg avutil		 : ${have_avutil} ])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
 AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])
 AC_MSG_NOTICE([  - XML c library for Gnome       : ${have_xml2}])

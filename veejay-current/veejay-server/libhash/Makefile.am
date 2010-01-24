@@ -1,7 +1,5 @@
 # Makefile for veejay
-pkginclude_HEADERS  = hash.h
-
-
+EXTRA_DIST= hash.h
 MAINTAINERCLEANFILES=Makefile.in
 AM_CFLAGS=$(OP_CFLAGS)
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) 

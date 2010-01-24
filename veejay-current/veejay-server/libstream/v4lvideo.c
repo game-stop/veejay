@@ -37,8 +37,8 @@
 #include <veejay/vims.h>
 #include <libstream/frequencies.h>
 #include <string.h>
-#include AVUTIL_INC
-#include SWSCALE_INC
+#include <libavutil/avutil.h>
+#include <libswscale/swscale.h>
 #include <pthread.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -248,15 +248,16 @@ static struct {
 {	
 	{ VIDEO_PALETTE_JPEG,      "JPEG Compressed", PIX_FMT_YUVJ420P },
 	{ VIDEO_PALETTE_RGB24 ,    "RGB 24 bit",	PIX_FMT_BGR24 	},
-	{ VIDEO_PALETTE_YUV422P ,  "YUV 4:2:2 Planar",	PIX_FMT_YUV422P  },
-	{ VIDEO_PALETTE_YUV420P ,  "YUV 4:2:0 Planar",  PIX_FMT_YUV420P  },
+	{ VIDEO_PALETTE_YUV422P ,  "YUV 4:2:2 Planar",	PIX_FMT_YUVJ422P  },
+	{ VIDEO_PALETTE_YUV420P ,  "YUV 4:2:0 Planar",  PIX_FMT_YUVJ420P  },
 	{ VIDEO_PALETTE_YUYV,      "YUYV 4:2:2 Packed",	PIX_FMT_YUYV422 },
 	{ VIDEO_PALETTE_UYVY,	   "UYVY 4:2:2 Packed", PIX_FMT_UYVY422 },
 	{ VIDEO_PALETTE_RGB32 ,	   "RGB 32 bit",		PIX_FMT_RGB32 },
 
 	{ -1,			"Unsupported colour space", -1},
 };
-
+//@fixme: 16-235 yuv
+//
 static int is_YUV(int a) {
 	if( a == VIDEO_PALETTE_YUV422P || 
             a == VIDEO_PALETTE_YUV420P ||
@@ -434,8 +435,22 @@ static	v4lprocessing	*v4lvideo_get_processing( v4lvideo_t *v, int w, int h, int 
 		p->src = yuv_yuv_template( NULL,NULL,NULL,p->w,p->h,p->src_fmt );	
 	}
 	else {
-		if( supported_palette != VIDEO_PALETTE_JPEG )
+		if( supported_palette != VIDEO_PALETTE_JPEG ) {
+			//p->src = yuv_rgb_template( NULL, p->w,p->h, p->src_fmt );
+			char *swaprgb = getenv("VEEJAY_SWAP_RGB");
+			if(swaprgb!=NULL) {
+				int val = atoi(swaprgb);
+				if( val == 1 ) {
+				if( p->src_fmt == PIX_FMT_BGR24 ) 
+					p->src_fmt = PIX_FMT_RGB24;
+				else if ( p->src_fmt == PIX_FMT_RGB24 )
+					p->src_fmt = PIX_FMT_BGR24;
+				veejay_msg(VEEJAY_MSG_DEBUG, "Swapped RGB format to %s",
+						(p->src_fmt==PIX_FMT_RGB24? "RGB" : "BGR" ));
+				}
+			}	
 			p->src = yuv_rgb_template( NULL, p->w,p->h, p->src_fmt );
+		}
 		else {
 			native = 2;
 			p->src = yuv_yuv_template( NULL, NULL,NULL, p->w, p->h, p->src_fmt );
@@ -449,8 +464,8 @@ static	v4lprocessing	*v4lvideo_get_processing( v4lvideo_t *v, int w, int h, int 
 		*cap_palette = supported_palette; 
 
 	veejay_msg(VEEJAY_MSG_DEBUG,
-		"Capture device info: %dx%d - %dx%d  src=%d,dst=%d, is_YUV=%d, native =%d ",
-		min_w,min_h,max_w,max_h, supported_palette, palette, is_YUV(supported_palette), native );
+		"Capture device info: %dx%d - %dx%d  src=%s,dst=%s, is_YUV=%d, native =%d ",
+		min_w,min_h,max_w,max_h, get_palette_name(supported_palette), get_palette_name(palette), is_YUV(supported_palette), native );
 
 	return p;	
 }
@@ -736,7 +751,7 @@ static	void	*v4lvideo_grabber_thread( void * vv )
 	v4lvideo_template_t *i = (v4lvideo_template_t*) vv;
 	v4lvideo_t *v = (v4lvideo_t*) vj_calloc(sizeof(v4lvideo_t));
 	i->v4l = (void*) v;
-
+	
 	if( __v4lvideo_init( v, i->filename, i->channel, i->norm,i->frequency, i->width, i->height, i->palette ) < 0 ) {
 		veejay_msg(0, "Unable to open capture device '%s' in %dx%d - %s",
 			i->filename, v->video_width,v->video_height,get_palette_name(v->video_palette) );

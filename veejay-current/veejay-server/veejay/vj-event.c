@@ -2794,6 +2794,25 @@ void vj_event_suspend(void *ptr, const char format[], va_list ap)
 	veejay_msg(VEEJAY_MSG_WARNING, "Suspending veejay");
 }
 
+void	vj_event_play_norestart( void *ptr, const char format[], va_list ap )
+{
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args,s,format,ap);
+
+	//@ change mode so veejay does not restart samples at all
+
+	if( args[0] == 0 ) { 	
+		//@ off
+		v->settings->sample_restart = 0;
+	} else if ( args[0] == 1 ) {
+		//@ on
+		v->settings->sample_restart = 1;
+	}
+
+}
+
 void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap) 
 {
 	int args[2];
@@ -6211,7 +6230,13 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d) to mix in",
 					(source == VJ_TAG_TYPE_NONE ? "sample" : "stream") , channel_id);
-		//		if(v->no_bezerk) veejay_set_sample(v,v->uc->sample_id);
+				if( source != VJ_TAG_TYPE_NONE ) {
+					int slot = sample_has_cali_fx( args[0]);//@sample
+				        if( slot >= 0 )	{
+						sample_cali_prepare( args[0],slot,channel_id);
+						veejay_msg(VEEJAY_MSG_DEBUG, "Using calibration data of stream %d",channel_id);
+					}
+				}
 				if(v->no_bezerk) veejay_set_frame(v,sample_get_startFrame(v->uc->sample_id));
 			}
 			else
@@ -6242,14 +6267,24 @@ void vj_event_chain_entry_srccha(void *ptr, const char format[], va_list ap)
 			if( source != VJ_TAG_TYPE_NONE && vj_tag_exists(channel_id))
 				err = 0;
 
-	
+			//@ if there is CALI in FX chain,
+			//@ call cali_prepare and pass channel id
+
+				
 			if(	err == 0 &&
 				vj_tag_set_chain_source(args[0],args[1],source)!=-1 &&
 				vj_tag_set_chain_channel(args[0],args[1],channel_id) != -1)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d) to mix in",
 					(source == VJ_TAG_TYPE_NONE ? "sample" : "stream") , channel_id);
-		//		if(v->no_bezerk) veejay_set_sample(v,v->uc->sample_id);
+				
+				if( source != VJ_TAG_TYPE_NONE ) {
+					int slot = vj_tag_has_cali_fx( args[0]);
+				        if( slot >= 0 )	{
+						vj_tag_cali_prepare( args[0],slot, channel_id);
+					}
+					
+				}
 			}
 			else
 			{
@@ -6768,6 +6803,82 @@ void	vj_event_tag_new_dv1394(void *ptr, const char format[], va_list ap)
 }
 #endif
 
+void	vj_event_v4l_blackframe( void *ptr, const char format[] , va_list ap)
+{
+	veejay_t *v = (veejay_t*) ptr;
+
+	char *str = NULL;
+	int args[3];
+	
+	P_A(args,str,format,ap);
+	
+	int id = args[0];
+	if( id == 0 ) {
+		if( STREAM_PLAYING(v) )
+			id = v->uc->sample_id;
+	}
+
+	if( id == 0 ) {
+		return;
+	}
+
+	if( args[1] == 0 ) {
+		vj_tag_drop_blackframe(id);
+	} else {
+		vj_tag_grab_blackframe(id, args[1], args[2],args[3]);
+	}
+}
+
+void	vj_event_cali_write_file( void *ptr, const char format[], va_list ap)
+{
+	char str[1024];
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+
+	P_A(args,str,format,ap);
+
+	int id = args[0];
+	if( id == 0 ) {
+		if(STREAM_PLAYING(v))
+			id = v->uc->sample_id;
+	}
+	if( vj_tag_exists( id ) ){
+		if(vj_tag_cali_write_file( id, str, v->current_edit_list )) {
+			veejay_msg(VEEJAY_MSG_INFO, "Saved calibration file to %s", str );
+		} 
+	}
+	else {
+	  p_no_tag(id);
+	}
+}
+
+void	vj_event_stream_new_cali( void *ptr, const char format[], va_list ap)
+{
+	char str[1024];
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+
+	P_A(args,str,format,ap);
+
+
+	int id = veejay_create_tag(
+			v, VJ_TAG_TYPE_CALI, 
+			str, 
+			v->nstreams, 
+			0,0);
+	if(id > 0 )
+		v->nstreams++;
+
+	vj_event_send_new_id( v, id );
+
+	if( id <= 0 )
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to create load calibration file '%s'",str);
+	else	
+		veejay_msg(VEEJAY_MSG_INFO, "Loaded calibration file to Stream %d",id );
+
+
+}
+
 void vj_event_tag_new_v4l(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -7011,9 +7122,8 @@ void	vj_event_vp_get_points( void *ptr, const char format[], va_list ap )
 
 	FORMAT_MSG(msg,message);
 	SEND_MSG(v,msg);
-
-	free(r);
 }
+
 void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
 {
 	int args[4];
@@ -7061,6 +7171,8 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 	veejay_memset(send_msg, 0,sizeof(send_msg));
 	veejay_memset(message, 0,sizeof(message));
 
+	sprintf( send_msg, "000" );
+
 	if(vj_tag_exists(args[0]))
 	{
 		int values[6];
@@ -7069,9 +7181,10 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 		{
 			sprintf(message, "%05d%05d%05d%05d%05d%05d",
 				values[0],values[1],values[2],values[3],values[4],values[5] );
+			FORMAT_MSG(send_msg, message);
 		}
 	}
-	FORMAT_MSG(send_msg, message);
+
 	SEND_MSG( v,send_msg );
 }
 
@@ -7172,7 +7285,7 @@ void	vj_event_viewport_frontback(void *ptr, const char format[], va_list ap)
 		if(STREAM_PLAYING(v)) {
 			void *cur = vj_tag_get_composite_view(v->uc->sample_id);
 			if(cur == NULL ) {
-				cur = composite_clone(v->composite);
+				cur = (void*)composite_clone(v->composite);
 				vj_tag_set_composite_view(v->uc->sample_id,cur);
 			}
 			vj_tag_reload_config(v->composite,v->uc->sample_id,v->settings->composite );
@@ -8245,7 +8358,6 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 	SEND_MSG(v , _s_print_buf );
 }
 
-#ifdef USE_GDK_PIXBUF
 void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -8320,7 +8432,45 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 	SEND_DATA(v, header, 7 );
 	SEND_DATA(v, vj_perform_get_preview_buffer(), input_len );
 }
-#endif
+
+void	vj_event_get_cali_image		(	void *ptr,	const char format[],	va_list	ap	)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[2];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+
+	int id   = args[0];
+	int type = args[1];
+	
+	if( !vj_tag_exists(id) || vj_tag_get_type(id) != VJ_TAG_TYPE_V4L || type < 0 || type > 2)
+	{
+		SEND_MSG(v, "000000000" );
+		return;
+	}
+
+	vj_tag *tag = vj_tag_get(id);
+
+	int total_len = 0;
+	int uv_len    = 0;
+	int len       = 0;
+
+	uint8_t *buf = vj_tag_get_cali_buffer( id , type,  &total_len, &len, &uv_len );
+
+	if( buf == NULL ) {
+		SEND_MSG(v, "00000000"  );
+	}
+	else {
+		char header[128];//FIXME
+		memset(header,0,sizeof(header));
+		sprintf( header, "%03d%08d%06d%06d%06d%06d",8+6+6+6+6,len, len, 0, v->current_edit_list->video_width, v->current_edit_list->video_height );
+		SEND_MSG( v, header );
+
+		int res = vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, buf,len);
+	}
+}
+
+
 
 void	vj_event_toggle_bw( void *ptr, const char format[], va_list ap )
 {
@@ -8338,7 +8488,7 @@ void	vj_event_send_working_dir(void *ptr, const char format[], va_list ap)
 	P_A(args,str,format,ap);
 
 	
-	filelist_t *list = find_media_files(v);
+	filelist_t *list = (filelist_t*)find_media_files(v);
 	if(!list) {
 		veejay_msg(VEEJAY_MSG_ERROR, "No usable files found.");
 		sprintf(_s_print_buf, "00000000");
@@ -8386,7 +8536,7 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 	sprintf(_s_print_buf, "00000000");
 
 	n = sample_size();
-	if( n >= 1 )
+	if( n > 1 )
 	{
 		char line[400];
 		veejay_memset(_print_buf, 0,SEND_BUF);
@@ -8420,6 +8570,7 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 
 		}
 		sprintf(_s_print_buf, "%08d%s", strlen(_print_buf),_print_buf);
+
 	}
 	SEND_MSG(v, _s_print_buf);
 }
@@ -9079,9 +9230,6 @@ void vj_event_screenshot(void *ptr, const char format[], va_list ap)
 }
 #endif
 #endif
-
-
-
 
 void		vj_event_quick_bundle( void *ptr, const char format[], va_list ap)
 {

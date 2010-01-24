@@ -31,8 +31,9 @@
 #include <libyuv/yuvconv.h>
 #include <libel/pixbuf.h>
 #include <veejay/vims.h>
-#include AVCODEC_INC
-#include SWSCALE_INC
+#include <libavutil/avutil.h>
+#include <libavcodec/avcodec.h>
+#include <libswscale/swscale.h>
 #include <libyuv/yuvconv.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -355,6 +356,7 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 #ifdef USE_GDK_PIXBUF
 	vj_pixbuf_out_t *pic = (vj_pixbuf_out_t*) picture;
 	GdkPixbuf *img_ = gdk_pixbuf_new( GDK_COLORSPACE_RGB, FALSE, 8, w, h );
+
 	if(!img_)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cant allocate buffer for RGB");
@@ -362,17 +364,17 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 	}
 	
 	// convert frame to yuv
-	VJFrame *src = yuv_yuv_template( frame[0],frame[1],frame[2],w,h, fmt );
+	VJFrame *src = yuv_yuv_template( frame[0],frame[1],frame[2],w,h,fmt );
 	VJFrame *dst = yuv_rgb_template(
 		(uint8_t*) gdk_pixbuf_get_pixels( img_ ),
 				   gdk_pixbuf_get_width(  img_ ),
 				   gdk_pixbuf_get_height( img_ ),
-				   PIX_FMT_RGB24
+				   PIX_FMT_BGR24
 			);
 
-	yuv_convert_any_ac( src, dst, fmt, PIX_FMT_RGB24 );
-	
-	if( gdk_pixbuf_savev( img_, pic->filename, pic->type, NULL, NULL, NULL ))
+	yuv_convert_any_ac( src, dst, src->format, dst->format );
+
+	if( gdk_pixbuf_savev( img_, pic->filename, pic->type, NULL,NULL,NULL))
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Save frame as %s of type %s",
 			pic->filename, pic->type );
@@ -383,7 +385,7 @@ int	vj_picture_save( void *picture, uint8_t **frame, int w, int h , int fmt )
 		veejay_msg(VEEJAY_MSG_ERROR,
 			"Cant save file as %s (%s) size %d x %d", pic->filename,pic->type, pic->out_w, pic->out_h);
 	}
-	
+
 	if( img_ ) 
 		gdk_pixbuf_unref( img_ );
 

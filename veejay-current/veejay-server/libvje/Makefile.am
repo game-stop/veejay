@@ -5,8 +5,10 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem -I$(top_srcdir
 
 AM_CFLAGS = $(OP_CFLAGS) -freg-struct-return 
 
-pkginclude_HEADERS = internal.h plugload.h vje.h
-pkginclude_HEADERS += effects/autoeq.h effects/crosspixel.h effects/mask.h effects/rawval.h \
+pkginclude_HEADERS=vje.h
+
+EXTRA_DIST = internal.h plugload.h vje.h
+EXTRA_DIST += effects/autoeq.h effects/crosspixel.h effects/mask.h effects/rawval.h \
 		      effects/average.h effects/cutstop.h effects/maskstop.h effects/reflection.h \
 		      effects/baltantv.h effects/deinterlace.h effects/mirrors2.h effects/revtv.h \
 		      effects/bathroom.h effects/dices.h effects/mirrors.h effects/rgbchannel.h \
@@ -25,7 +27,7 @@ pkginclude_HEADERS += effects/autoeq.h effects/crosspixel.h effects/mask.h effec
 		      effects/chromium.h effects/flare.h effects/noiseadd.h effects/solarize.h \
 		      effects/colflash.h effects/flip.h effects/noisepencil.h effects/split.h \
 		      effects/colmorphology.h effects/frameborder.h effects/opacityadv.h effects/swirl.h \
-		      effects/coloradjust.h effects/gamma.h effects/opacity.h effects/texmap.h \
+		      effects/coloradjust.h effects/gamma.h effects/opacity.h effects/iris.h effects/texmap.h \
 		      effects/color.h effects/ghost.h effects/opacitythreshold.h effects/threshold.h \
 		      effects/colorhis.h effects/greyselect.h effects/overclock.h effects/timedistort.h \
 		      effects/colormap.h effects/isolate.h effects/pencilsketch.h effects/tracer.h \
@@ -37,22 +39,25 @@ pkginclude_HEADERS += effects/autoeq.h effects/crosspixel.h effects/mask.h effec
 		      effects/complexthreshold.h effects/lumamask.h effects/radialblur.h effects/waterrippletv.h \
 		      effects/constantblend.h effects/magicmirror.h effects/radioactive.h effects/whiteframe.h \
 		      effects/contourextract.h effects/magicoverlays.h effects/raster.h effects/widthmirror.h \
-		      effects/contrast.h effects/magicscratcher.h effects/rawman.h effects/zoom.h
+		      effects/contrast.h effects/magicscratcher.h effects/rawman.h effects/zoom.h effects/iris.h
 
-pkginclude_HEADERS += specs/FreeFrame.h specs/frei0r.h
+EXTRA_DIST += specs/FreeFrame.h specs/frei0r.h
 
-pkginclude_HEADERS += transitions/3bar.h transitions/fadecolorrgb.h transitions/transblend.h transitions/transline.h \
+EXTRA_DIST += transitions/3bar.h transitions/fadecolorrgb.h transitions/transblend.h transitions/transline.h \
 		      transitions/vbar.h transitions/fadecolor.h transitions/slidingdoor.h transitions/transcarot.h \
 		      transitions/transop.h transitions/wipe.h
+
+EXTRA_DIST += ctmf/ctmf.h
 
 VJE_LIB_FILE = libvje.la
 noinst_LTLIBRARIES = $(VJE_LIB_FILE)
 
 libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
+			ctmf/ctmf.c \
 			effects/diff.c effects/fibdownscale.c effects/killchroma.c \
 			effects/lumamagick.c effects/autoeq.c effects/colorhis.c \
 		        effects/mirrors.c effects/colormap.c effects/negatechannel.c effects/negation.c \
-			effects/overclock.c effects/dissolve.c effects/opacity.c effects/posterize.c \
+			effects/overclock.c effects/dissolve.c effects/opacity.c effects/iris.c effects/posterize.c \
 			effects/dither.c effects/dices.c effects/emboss.c effects/flip.c \
 			effects/revtv.c effects/softblur.c effects/zoom.c effects/split.c effects/widthmirror.c \
 			effects/frameborder.c effects/dummy.c effects/rawman.c effects/rawval.c \
@@ -81,6 +86,6 @@ libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			effects/cartonize.c effects/tripplicity.c effects/neighbours.c effects/neighbours2.c\
 			effects/neighbours3.c effects/neighbours4.c effects/neighbours5.c effects/cutstop.c\
 			effects/contourextract.c effects/texmap.c effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/rgbchannel.c \
-			effects/videowall.c effects/flare.c effects/radioactive.c effects/baltantv.c effects/constantblend.c effects/picinpic.c effects/bgsubtract.c 
+			effects/videowall.c effects/flare.c effects/radioactive.c effects/baltantv.c effects/constantblend.c effects/picinpic.c effects/bgsubtract.c effects/cali.c 
 
 

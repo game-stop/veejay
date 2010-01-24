@@ -19,6 +19,7 @@
 #ifndef VJ_TAG_H
 #define VJ_TAG_H
 
+#define VJ_TAG_TYPE_CALI 6
 #define VJ_TAG_TYPE_PICTURE 5
 #define VJ_TAG_TYPE_COLOR 4
 #define VJ_TAG_TYPE_VLOOPBACK 3
@@ -52,7 +53,8 @@ typedef struct {
     vj_dv1394 *dv1394[VJ_TAG_MAX_STREAM_IN];
 #ifdef USE_GDK_PIXBUF
 	vj_picture *picture[VJ_TAG_MAX_STREAM_IN];
-#endif  
+#endif 
+       void	*cali[VJ_TAG_MAX_STREAM_IN];	
     int width;
     int height;
     int depth;
@@ -114,7 +116,25 @@ typedef struct {
     int composite;
     void *viewport_config;
     void *viewport;
+    int noise_suppression;
+    uint8_t *blackframe;
+    int bf_count;
+    int median_radius;
+    int has_white;
+    double *tabmean[3];
+    double mean[3];
+    double *bf;
+    double *bfu;
+    double *bfv;
+    double *lf;
+    double *lfu;
+    double *lfv;
+    int cali_duration;
 } vj_tag;
+
+#define V4L_BLACKFRAME 1
+#define V4L_BLACKFRAME_NEXT 2
+#define V4L_BLACKFRAME_PROCESS 3
 
 void	*vj_tag_get_dict( int id );
 int	vj_tag_set_composite(void *compiz,int id, int n);
@@ -233,11 +253,12 @@ int 	vj_tag_enable(int t1);
 
 int 	vj_tag_disable(int t1);
 
-int		vj_tag_sprint_status(int tag_id, int cache,int sa, int ca, int r, int f, int m, int t, int macro,char *str );
+int		vj_tag_sprint_status(int tag_id, int cache,int sa, int ca, int r, int f, int m, int t,int curfps, uint32_t lo, uint32_t hi, int macro,char *str );
 
 //int vj_tag_init_encoder(int t1, char *filename, int format,
 //	int w, int h, double fps, long seconds, int autoplay);
 
+uint8_t		*vj_tag_get_cali_buffer(int t1, int type, int *total, int *len, int *uvlen);
 int 	vj_tag_stop_encoder(int t1);
 int 	vj_tag_set_brightness(int t1, int value);
 int 	vj_tag_set_contrast(int t1, int value);
@@ -294,8 +315,10 @@ int 	vj_tag_set_logical_index(int t1, int stream_nr);
 int	vj_tag_set_description(int t1, char *descr);
 int	vj_tag_get_description(int t1, char *descr);
 void	vj_tag_get_by_type( int type, char *descr );
-
-
+int	vj_tag_get_width();
+int	vj_tag_get_height();
+int	vj_tag_get_uvlen();
+void	vj_tag_cali_prepare_now(int a, int b);
 int	vj_tag_chain_set_kfs( int s1, int len, unsigned char *data );
 unsigned char *	vj_tag_chain_get_kfs( int s1, int entry, int parameter_id, int *len );
 int	vj_tag_get_kf_status(int t1, int entry);
@@ -307,13 +330,15 @@ void    *vj_tag_get_kf_port( int s1, int entry );
 
 char *vj_tag_scan_devices( void );
 int    vj_tag_get_kf_tokens( int s1, int entry, int id, int *start,int *end, int *type);
-
+int vj_tag_grab_blackframe(int t1, int duration, int median_radius,int mode );
+int vj_tag_drop_blackframe(int t1);
 int    vj_tag_num_devices();
 
 void	vj_tag_reload_config( void *compiz, int t1, int mode );
 
 void	*vj_tag_get_composite_view(int t1);
 int	vj_tag_set_composite_view(int t1, void *v);
+int		vj_tag_cali_write_file( int id, char *name, editlist *el );
 
 #ifdef HAVE_XML2
 void	tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp);

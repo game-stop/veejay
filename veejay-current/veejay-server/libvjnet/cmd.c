@@ -63,8 +63,8 @@ int			sock_t_connect_and_send_http( vj_sock_t *s, char *host, int port, char *bu
 	}
 
 	struct sockaddr_in sinfo;
-	socklen_t sinfolen;
-	char *server_name[1024];
+	socklen_t sinfolen=0;
+	char server_name[1024];
 	if( getsockname(s->sock_fd,(struct sockaddr*) &sinfo,&sinfolen)==0) {
 		char *tmp = inet_ntoa( sinfo.sin_addr );
 		strncpy( server_name, tmp, 1024);
@@ -247,6 +247,9 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 			veejay_msg(0, "\t[%s], %d bytes", buf,len );
 			return 0;
 		}
+#ifdef NET_DEBUG
+		printf("%d %06d [%s]\n",s->sock_fd,len,buf );
+#endif
 		return n;
 	}
 	else
@@ -261,6 +264,10 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 				veejay_msg(VEEJAY_MSG_ERROR, "TCP send error: %s", strerror(errno));
 				return 0;
 			}
+#ifdef NET_DEBUG
+				printf("%d %06d [%s]\n",s->sock_fd,n,buf + done );
+#endif
+
 			done += n;
 		}
 		return done;
@@ -284,6 +291,10 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 			veejay_msg(0, "Send error: %s",strerror(errno));
 			return 0;
 		}
+#ifdef NET_DEBUG
+		printf("%d %06d [%s]\n",fd,n,buf );
+#endif
+
 		return n;
 	}
 	else
@@ -298,6 +309,10 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 				veejay_msg(VEEJAY_MSG_ERROR, "TCP send error: %s", strerror(errno));
 				return 0;
 			}
+#ifdef NET_DEBUG
+			printf("%d %06d [%s]\n",fd,n,buf + done );
+#endif
+
 			bytes_left -= n;
 			done += n;
 		}

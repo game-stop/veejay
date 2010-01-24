@@ -39,7 +39,7 @@
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
-#include AVUTIL_INC
+#include <libavutil/avutil.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -275,7 +275,7 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
 
     video_playback_setup *settings = info->settings;
 
-    jpeg_buff = (uint8_t *) malloc( 65535 * 4);
+    jpeg_buff = (uint8_t *) malloc( 65535 * 10);
     if (!jpeg_buff)
 		return -1;
 
@@ -290,10 +290,10 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
 	tmp.data[1] = tmp.data[0] + tmp.len;
 	tmp.data[2] = tmp.data[1] + tmp.len + tmp.uv_len;
 
-	tmp.format = PIX_FMT_YUV420P;
+	tmp.format = PIX_FMT_YUVJ420P;
 	
 	VJFrame *srci = yuv_yuv_template( src[0],src[1],src[2], info->video_output_width,
-					info->video_output_height , PIX_FMT_YUV422P);
+					info->video_output_height , PIX_FMT_YUVJ422P);
 
 	yuv_convert_any_ac( srci,&tmp, srci->format, tmp.format );
 
@@ -315,7 +315,7 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
 
     if (frame)
     {	
-    	jpeg_size = encode_jpeg_raw(jpeg_buff, (65535*4), 100,
+    	jpeg_size = encode_jpeg_raw(jpeg_buff, (65535*10), 100,
 				settings->dct_method,  
 				info->current_edit_list->video_inter,0,
 				info->video_output_width,
@@ -331,6 +331,7 @@ int vj_perform_screenshot2(veejay_t * info, uint8_t ** src)
 
     if (jpeg_buff)
 	free(jpeg_buff);
+
     if( tmp.shift_v == 0 )
     {
 	free(tmp.data[0]);
@@ -401,23 +402,26 @@ void	vj_get_yuvgrey_template(VJFrame *src, int w, int h)
 void	vj_get_yuv_template(VJFrame *src, int w, int h, int fmt)
 {
 	src->width = w;
-	src->uv_width = w >> 1;
 	src->height = h;
 	
 	src->format = get_ffmpeg_pixfmt( fmt );
 
-	if(fmt == 0||fmt == 2)
+	if(fmt == FMT_420||fmt == FMT_420F)
 	{
 		src->uv_height = h >> 1;
+		src->uv_width = w >> 1;
 		src->shift_v = 1;
+		src->uv_len = (w*h)/4;
 	}
-	if(fmt == 1||fmt==3)
+	if(fmt == FMT_422||fmt==FMT_422F)
 	{
-		src->uv_height = h;
+		src->uv_height = h >> 1;
+		src->uv_width = w;
 		src->shift_v = 0;
+		src->uv_len = src->uv_width * src->uv_height;
+
 	}
 	src->len = w * h;
-	src->uv_len = src->uv_width * src->uv_height;
 	src->shift_h = 1;
 	src->data[0] = NULL;
 	src->data[1] = NULL;
@@ -485,6 +489,7 @@ int	verify_working_dir()
 		snprintf( tmp, sizeof(tmp), "%s/%s", path, files[n]->d_name );
 		if( try_file( tmp ) )
 			c++;
+		free( files[n] );
 	}
 
 	free(files);
@@ -649,7 +654,3 @@ int	veejay_sprintf( char *s, size_t size, const char *format, ... )
 	return done;
 }
 #endif
-
-
-
-

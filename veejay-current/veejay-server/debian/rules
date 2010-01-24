@@ -49,7 +49,7 @@ build-arch: build-arch-stamp
 build-arch-stamp:  config.status
 
 	# Add here commands to compile the arch part of the package.
-	#$(MAKE) 
+	$(MAKE) CC="$(CC)" CFLAGS="$(CFLAGS)" 
 	touch $@
 
 build-indep: build-indep-stamp
@@ -91,7 +91,7 @@ install-arch:
 
 	# Add here commands to install the arch part of the package into 
 	# debian/tmp.
-	$(MAKE) DESTDIR=$(CURDIR)/debian/veejay install
+	$(MAKE) DESTDIR=$(CURDIR)/debian/tmp install
 
 	dh_install -s
 # Must not depend on anything. This is to be called by

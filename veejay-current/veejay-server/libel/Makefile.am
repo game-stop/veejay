@@ -4,12 +4,12 @@ MAINTAINERCLEANFILES = Makefile.in
 AM_CFLAGS=$(OP_CFLAGS)
 INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem \
 		-I$(top_srcdir)/vjmsg \
-		-I$(top_srcdir)/mjpegtools $(FFMPEG_CFLAGS) $(PIXBUF_CFLAGS) \
+		-I$(top_srcdir)/mjpegtools $(FFMPEG_AVUTIL_CFLAGS) $(FFMPEG_AVFORMAT_CFLAGS) $(FFMPEG_AVCODEC_CFLAGS) $(FFMPEG_SWSCALER_CFLAGS) $(PIXBUF_CFLAGS) \
 		$(LIBQUICKTIME_CFLAGS)
  
 VJEL_LIB_FILE = libel.la
 noinst_LTLIBRARIES = $(VJEL_LIB_FILE)
 libel_la_SOURCES = vj-mmap.c elcache.c avilib.c lav_io.c vj-dv.c rawdv.c pixbuf.c vj-avcodec.c vj-el.c
 
-pkginclude_HEADERS = avilib.h elcache.h lav_io.h pixbuf.h \
+EXTRA_DIST = avilib.h elcache.h lav_io.h pixbuf.h \
                      rawdv.h vj-avcodec.h vj-dv.h vj-el.h vj-mmap.h

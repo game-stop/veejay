@@ -556,6 +556,8 @@ static void vj_perform_record_buffer_free()
 }
 static	char ppm_path[1024];
 
+static	long	CYCLE_CAP = 0; //@ saturate cycle counter at this boundary value
+
 int vj_perform_init(veejay_t * info)
 {
     const int w = info->edit_list->video_width;
@@ -655,6 +657,14 @@ int vj_perform_init(veejay_t * info)
 	int pvp = 0;
 
 	veejay_memset( &pvar_, 0, sizeof( varcache_t));
+
+	//@ undocumented 
+	char *cc = getenv( "VEEJAY_CYCLE_SATURATE" );
+	if( cc ) {
+		CYCLE_CAP = atol(cc);
+		veejay_msg(VEEJAY_MSG_INFO,
+				"Saturating Cycle Count at %ld", CYCLE_CAP);
+	}
 
 	return 1;
 }
@@ -3477,8 +3487,15 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
 				break;
 		}
 	}
+
+	//@ increase tick
+
   	vj_perform_clear_cache();
 	//__global_frame = 0;
+
+	settings->cycle_count[0] ++;
+	if( settings->cycle_count[0] == 0 )
+		settings->cycle_count[1] ++;
 
 	return 0;
 }

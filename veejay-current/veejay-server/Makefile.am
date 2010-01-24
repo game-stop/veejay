@@ -10,7 +10,20 @@ EXTRA_DIST = \
  depcomp \
  cpuinfo.sh \
  autogen.sh \
- gveejay-paths.sh.in  
+ PKGBUILD \
+ doc/veejay-HOWTO.html \
+ doc/README.quickstart \
+ doc/README.whatis \
+ doc/README.performance \
+ doc/HowtoPlugins.txt \
+ doc/HowtoCache.txt \
+ doc/VIMS.txt \
+ doc/NET.txt \
+ debian/changelog \
+ debian/control \
+ debian/copyright \
+ debian/rules \
+ buildinfo.sh 
 
 pkgconfigdir = $(libdir)/pkgconfig
 pkgconfig_DATA = veejay.pc
@@ -21,8 +34,7 @@ DISTCLEANFILES = \
 	confdefs.h \
 	config.cache \
 	config.status \
-	config.log \
-	gveejay-paths.h
+	config.log 
 
 MAINTAINERCLEANFILES = \
 	compile \
@@ -43,6 +55,17 @@ MAINTAINERCLEANFILES = \
 rpm: Makefile
 	$(MAKE) dist
 	rpmbuild -ta --clean $(PACKAGE)-$(VERSION).tar.gz
+
+ubuntu:
+	chmod a+x debian/rules
+	debuild -i -us -uc -b
+
+release:
+	rm -rf .deps */.deps
+	$(MAKE) distcheck
+
+snapshot:
+	$(MAKE) dist distdir=$(PACKAGE)-`date +%Y-%m-%d`
 
 ## make debs
 deb: Makefile dist

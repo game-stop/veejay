@@ -231,7 +231,7 @@ static vevo_port_t	*_new_event(
 		sprintf(param_name, "argument_%d", n );
 		const char *arg = va_arg( ap, const char*);
 #ifdef STRICT_CHECKING
-		if(!arg) veejay_msg(VEEJAY_MSG_DEBUG, "\t%s - %d = '%s' of format %c (%s)",param_name, n, arg, format[it],format );
+		if(!arg) veejay_msg(VEEJAY_MSG_DEBUG, "\t'%s' %s - %d = '%s' of format %c (%s)",name,param_name, n, arg, format[it],format );
 		assert( arg != NULL );
 #endif
 		char *descr = (char*) strdup( arg );
@@ -1147,6 +1147,43 @@ void		vj_init_vevo_events(void)
 				"Stream ID >= 1",
 				0,
 				NULL );
+	index_map_[VIMS_V4L_CALI]				=	_new_event(
+				"%s",
+				VIMS_V4L_CALI,
+				"Write calibration data to file",
+				vj_event_cali_write_file,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
+				"Filename",
+				NULL,
+				NULL );
+	index_map_[VIMS_STREAM_NEW_CALI]			=	_new_event(
+				"%s",
+				VIMS_STREAM_NEW_CALI,
+				"Load calibration data",
+				vj_event_stream_new_cali,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS | VIMS_LONG_PARAMS,
+				"Filename",
+				NULL,
+				NULL );
+	index_map_[VIMS_V4L_BLACKFRAME]				=	_new_event(
+				"%d %d %d %d",
+				VIMS_V4L_BLACKFRAME,
+				"Capture a black/light frame and subtract it from the video stream",
+				vj_event_v4l_blackframe,
+				4,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Tag ID",
+				0,
+				"Frame Duration (Use 0 to drop blackframe)",
+				5,
+				"Median Radius (0=Average, N=NxN square)",
+				0,
+				"Blackframe=0,Lightframe=1",
+				0,
+				NULL);
+
 	index_map_[VIMS_STREAM_NEW_V4L]				=	_new_event(
 				"%d %d",
 				VIMS_STREAM_NEW_V4L,
@@ -1915,6 +1952,20 @@ void		vj_init_vevo_events(void)
 				"VIMS text",
 				0,
 				NULL );
+
+	index_map_[VIMS_CALI_IMAGE]				=	_new_event(
+				"%d %d",	
+				VIMS_REQUIRE_ALL_PARAMS,
+				"GUI: Get Calibrated image (raw)",
+				vj_event_get_cali_image,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"ID",
+				0,
+				"Type",
+				0,
+				NULL );
+
 	index_map_[VIMS_BUNDLE_CAPTURE]				=	_new_event(
 				NULL,
 				VIMS_BUNDLE_CAPTURE,
@@ -2311,6 +2362,17 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 
+
+	index_map_[ VIMS_CONTINUOUS_PLAY ] 		=	_new_event(
+				"%d",
+				VIMS_PROJ_INC,
+				"Continuous sample play, do not restart samples",
+				vj_event_play_norestart,
+				1,
+				VIMS_ALLOW_ANY,
+				"0=off (default),1=on",
+				0,
+				NULL );
 
 	index_map_[ VIMS_PROJ_INC ] 			=	_new_event(
 				"%d %d",

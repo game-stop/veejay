@@ -38,7 +38,7 @@
 #ifdef USE_GDK_PIXBUF
 #include <libel/pixbuf.h>
 #endif
-#include AVCODEC_INC
+#include <libavcodec/avcodec.h>
 #ifdef HAVE_LIBQUICKTIME
 #include <quicktime.h>
 #include <lqt.h>
@@ -1582,6 +1582,11 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 		int pos   = 0;
 		int success = 0;
 		while( pos < rolls ) {
+			if( frame != NULL ) {
+				free(frame);
+				frame = NULL;
+			}	
+
 			if( lav_set_video_position(lav_fd, pos ) ) {
 				pos++;
 				continue;
@@ -1590,17 +1595,19 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 				pos++;
 				continue;
 			}
+			
 			if( (frame = (unsigned char*) malloc(len)) == 0 ) {
 			       ierr = ERROR_MALLOC;
 			       break;
 			}
 	 		if( (lav_read_frame( lav_fd, frame ) <= 0 ) ) {
 				pos ++;
-				if( frame ) free(frame);
+				if( frame ) { free(frame);frame=NULL;}
 				continue;
 			}
 			if( scan_jpeg(frame,len,1) ) {
 				ierr = ERROR_JPEG;
+				if( frame ) { free(frame);frame=NULL;}
 				break;
 			}
 
@@ -1700,6 +1707,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 	           }
 		   if( pf >= 0 ) {
 	          	 lav_fd->interlacing = LAV_NOT_INTERLACED;
+			 if(frame) free(frame);
 		  	 return lav_fd;
 		   }
 	   } 
@@ -1896,7 +1904,12 @@ int lav_fileno(lav_file_t *lav_file)
       case 'q':
       case 'Q':
 	 {
+#if ( LQT_CODEC_API_VERSION & 0xff ) > 6
 		res = lqt_fileno( (quicktime_t*) lav_file->qt_fd );
+#else
+		quicktime_t *q = lav_file->qt_fd;
+		res = (int) fileno( (quicktime_t*) q->stream );
+#endif
 	 }
 		break;
 #endif		 

@@ -105,6 +105,9 @@ void vj_effman_apply_image_effect(
 	noisepencil_apply(frames[0],frameinfo->width,frameinfo->height,
 		arg[0],arg[1],arg[2],arg[3]);
 	break;
+	case VJ_IMAGE_EFFECT_CALI:
+		cali_apply( vj_effects[entry]->user_data,frames[0], frameinfo->width,frameinfo->height,arg[0], arg[1] );
+		break;
       case VJ_IMAGE_EFFECT_DIFF:
 	diffimg_apply(frames[0], 
 		      frameinfo->width, frameinfo->height, arg[0], arg[1],
@@ -434,6 +437,9 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
       case VJ_VIDEO_EFFECT_OPACITY:
 	opacity_apply(frames[0], frames[1], frameinfo->width,
 		      frameinfo->height, arg[0]);
+	break;
+      case VJ_VIDEO_EFFECT_IRIS:
+	iris_apply( frames[0],frames[1], frameinfo->width,frameinfo->height,arg[0],arg[1]);
 	break;
       case VJ_VIDEO_EFFECT_THRESHOLDSMOOTH:
 	opacitythreshold_apply(frames[0], frames[1], frameinfo->width,

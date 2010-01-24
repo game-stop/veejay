@@ -79,7 +79,7 @@ void *vj_vloopback_open(const char *device_name, int norm, int mode,
 
 	memset(v , 0, sizeof(vj_vloopback_t ));
 
-	v->fd = open( device_name, O_RDWR );
+	v->fd = open( device_name, O_RDWR, S_IRUSR|S_IWUSR );
 	v->norm = norm;
 	v->mode = mode;
 	v->width = w;

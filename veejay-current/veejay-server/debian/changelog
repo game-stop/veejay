@@ -1,10 +1,10 @@
-
-
-veejay (1.4-3) unstable; urgency=low
+veejay (1.5.2) unstable; urgency=low
+  
+  * 1.5.2 release
 
   * 1.4-3 release
 
   * Initial official release 
 
- -- Niels Elburg <nwelburg@gmail.com>  Tue, 04 Nov 2008 19:38:26 +0100
+ -- Niels Elburg <nwelburg@gmail.com>  Sat, 19 Dec 2009 19:38:26 +0100
 

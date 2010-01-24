@@ -24,7 +24,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <math.h>
-#include AVUTIL_INC
+#include <libavutil/avutil.h>
 #include <libyuv/yuvconv.h>
 #include <libvjmsg/vj-msg.h>
 #include "softblur.h"

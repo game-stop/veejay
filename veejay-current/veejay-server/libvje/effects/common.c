@@ -25,24 +25,30 @@
 #include <libvjmem/vjmem.h>
 #include <libvje/internal.h>
 #include "common.h"
-
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 char	**vje_build_param_list( int num, ... )
 {
 	va_list args;
 	char buf[1024];
 	char **list;
 	char *tmp = NULL;
-	list = (char**) vj_malloc(sizeof(char*) * num );
+	list = (char**) vj_malloc(sizeof(char*) * (num+1) );
 
 	va_start( args, num );
 
 	int i;
 	for( i = 0; i <num; i ++ ) {
 		tmp = (char*) va_arg( args,char*);
-		if(tmp==NULL)
-			continue;
+#ifdef STRICT_CHECKING
+		assert( tmp != NULL );
+#endif
+//		if(tmp==NULL)
+//			continue;
 		list[i] = strdup(tmp);
 	}
+	list[num] = NULL;
 	va_end(args);
 	return list;
 }

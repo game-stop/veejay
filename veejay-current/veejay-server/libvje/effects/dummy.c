@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002 Niels Elburg <elburg@hio.hen.nl>
+ * Copyright(C)2002-2010 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -57,7 +57,7 @@ void dummy_apply( VJFrame *frame, int width, int height, int color)
     colorY = bl_pix_get_color_y(color);
     colorCb = bl_pix_get_color_cb(color);
     colorCr = bl_pix_get_color_cr(color);
-  
+
     veejay_memset( Y, colorY, len);
     veejay_memset( Cb,colorCb,uv_len);
     veejay_memset( Cr,colorCr,uv_len);
@@ -73,11 +73,10 @@ void dummy_rgb_apply( VJFrame *frame, int width, int height, int r,int g, int b)
 	uint8_t *Cb = frame->data[1];
 	uint8_t *Cr = frame->data[2];
 
- 
 	_rgb2yuv(r,g,b,colorY,colorCb,colorCr);
   
  	veejay_memset( Y, colorY, len);
-    	veejay_memset( Cb,colorCb,uv_len);
+   	veejay_memset( Cb,colorCb,uv_len);
    	veejay_memset( Cr,colorCr,uv_len);
 }
 void dummy_free(){}

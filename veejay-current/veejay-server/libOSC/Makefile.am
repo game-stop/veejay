@@ -14,7 +14,7 @@ libOSC_la_SOURCES = OSC-address-space.c \
 		 OSC-timetag.c \
 		 NetworkReturnAddress.c 
 
-pkginclude_HEADERS = libosc.h OSC-address-space.h OSC-dispatch.h \
+EXTRA_DIST= libosc.h OSC-address-space.h OSC-dispatch.h \
 		     OSC-pattern-match.h OSC-string-help.h NetworkReturnAddress.h \
 		     OSC-callbacklist.h OSC-drop.h OSC-priority-queue.h \
 		     OSC-struct.h NetworkUDP.h OSC-common.h \

@@ -47,6 +47,8 @@ vj_yuv *vj_yuv4mpeg_alloc(editlist * el, int dst_w, int dst_h, int out_pix_fmt);
 
 void vj_yuv4mpeg_free(vj_yuv *v) ;
 
+int vj_yuv_stream_start_read_fd( vj_yuv *, int fd, int width,int height );
+
 int vj_yuv_stream_start_read(vj_yuv *, char *, int width, int height);
 
 int vj_yuv_stream_write_header(vj_yuv * yuv4mpeg, editlist * el, int outchroma);

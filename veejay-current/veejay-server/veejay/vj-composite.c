@@ -32,7 +32,7 @@
 #include <veejay/vj-viewport.h>
 #include <veejay/vj-composite.h>
 #include <veejay/vj-misc.h>
-#include AVUTIL_INC
+#include <libavutil/avutil.h>
 
 #ifdef HAVE_XML2
 #include <libxml/xmlmemory.h>

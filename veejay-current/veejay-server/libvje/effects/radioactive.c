@@ -32,8 +32,8 @@
 #include <libvjmem/vjmem.h>
 #include "radioactive.h"
 #include "softblur.h"
+#include <libavutil/avutil.h>
 #include <libyuv/yuvconv.h>
-#include AVUTIL_INC
 #include "common.h"
 #include <stdlib.h>
 

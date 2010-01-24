@@ -30,8 +30,8 @@
 #define __FALLBACK_LIBDV
 #include <libel/vj-dv.h>
 #endif
-#include AVCODEC_INC
-#include AVUTIL_INC
+#include <libavutil/avutil.h>
+#include <libavcodec/avcodec.h>
 
 
 

@@ -752,11 +752,17 @@ static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )
 	 info->uc->render_changed = 1; /* different render list */
     	
 	 sample_reset_offset( sample_id );	/* reset mixing offsets */
-    	 veejay_set_frame(info, start);
-    	 veejay_set_speed(info, speed);
- 	 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (FX=%x, Sl=%d, Speed=%d, Start=%d, Loop=%d)",
+    	 
+	 
+	 if( info->settings->sample_restart ) {
+		 veejay_set_frame(info, start);
+    		 veejay_set_speed(info, speed);
+ 		 veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (FX=%x, Sl=%d, Speed=%d, Start=%d, Loop=%d)",
 			sample_id, tmp,info->sfd, speed, start, looptype );
-
+	 } else {
+		veejay_msg(VEEJAY_MSG_INFO, "Playing sample %d (FX=%x, Sl=%d, Speed=%d, Start=%d, Loop=%d, Continue=%ld)",
+				sample_id,tmp,info->sfd,speed,start,looptype,info->settings->current_frame_num );
+	 }
 	 return 1;
 }
 
@@ -947,6 +953,7 @@ void veejay_set_sample(veejay_t * info, int sampleid)
 int veejay_create_tag(veejay_t * info, int type, char *filename,
 			int index, int palette, int channel)
 {
+
 	if( type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST ) {
 		if( (filename != NULL) && ((strcasecmp( filename, "localhost" ) == 0)  || (strcmp( filename, "127.0.0.1" ) == 0)) ) {
 			if( channel == info->uc->port )	{
@@ -1042,32 +1049,6 @@ static int veejay_screen_update(veejay_t * info )
 	} 
 
 
-
-#ifdef HAVE_JPEG
-#ifdef USE_GDK_PIXBUF 
-    	/* dirty hack to save a frame to image */
-	if (info->uc->hackme == 1)
-	{
-		info->uc->hackme = 0;
-
-#ifdef USE_GDK_PIXBUF
-		if(!vj_picture_save( info->settings->export_image, frame, 
-				info->video_output_width, info->video_output_height,
-				get_ffmpeg_pixfmt( info->current_edit_list->pixel_format )) )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR,
-				"Unable to write frame %ld to image as '%s'",
-					info->settings->current_frame_num, info->settings->export_image );
-		}
-#else
-#ifdef HAVE_JPEG
-		vj_perform_screenshot2(info, frame);
-		if(info->uc->filename) free(info->uc->filename);
-#endif
-#endif
-	}
-#endif
-#endif
       
 #ifdef HAVE_V4L
 	if( info->vloopback )
@@ -1088,7 +1069,30 @@ static int veejay_screen_update(veejay_t * info )
 		vj_perform_send_primary_frame_s2(info, 1, info->uc->current_link);
 	}
 
-
+	//@ FIXME: Both pixbuf and jpeg method is broken for screenshot
+#ifdef HAVE_JPEG
+#ifdef USE_GDK_PIXBUF 
+        if (info->uc->hackme == 1)
+        {
+                info->uc->hackme = 0;
+#ifdef USE_GDK_PIXBUF
+                if(!vj_picture_save( info->settings->export_image, frame, 
+                                info->video_output_width, info->video_output_height,
+                                get_ffmpeg_pixfmt( info->pixel_format )) )
+                {
+                        veejay_msg(VEEJAY_MSG_ERROR,
+                                "Unable to write frame %ld to image as '%s'",
+                                        info->settings->current_frame_num, info->settings->export_image );
+                }
+#else
+#ifdef HAVE_JPEG
+                vj_perform_screenshot2(info, frame);
+                if(info->uc->filename) free(info->uc->filename);
+#endif
+#endif
+        }
+#endif
+#endif
 	if(skip_update) {
 		if(info->video_out == 0 ) { 
 		   for(i = 0 ; i < MAX_SDL_OUT; i ++ )
@@ -1155,6 +1159,7 @@ static int veejay_screen_update(veejay_t * info )
 		return 0;
 		break;
     }
+
   	
     return 1;
 }
@@ -1240,6 +1245,10 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 
    int mstatus = vj_event_macro_status();
 
+
+   int curfps  = (int) ( 100.0f / settings->spvf );
+   
+
     switch (info->uc->playback_mode) {
     	case VJ_PLAYBACK_MODE_SAMPLE:
 		cache_used = sample_cache_used(0);
@@ -1248,7 +1257,7 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 			RANDMODE_SAMPLE)
 			pm = VJ_PLAYBACK_MODE_PATTERN;
 		if( sample_chain_sprint_status
-			(info->uc->sample_id,cache_used,info->seq->active,info->seq->current,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,mstatus,info->status_what ) != 0)
+			(info->uc->sample_id,cache_used,info->seq->active,info->seq->current,info->real_fps,settings->current_frame_num, pm, total_slots,info->seq->rec_id,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus,info->status_what ) != 0)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Fatal error, tried to collect properties of invalid sample");
 #ifdef STRICT_CHECKING
@@ -1259,7 +1268,7 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 		}
 		break;
        	case VJ_PLAYBACK_MODE_PLAIN:
-		veejay_sprintf(info->status_what,1024, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d",
+		veejay_sprintf(info->status_what,1024, "%d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %d %ld %d %d %d %d %d",
 			info->real_fps,
 			settings->current_frame_num,
 			info->uc->playback_mode,
@@ -1278,7 +1287,10 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 			0,
 			total_slots,
 			cache_used,
-		      	0,
+		      	curfps,
+			settings->cycle_count[0],
+			settings->cycle_count[1],
+			0,
 		        0,
 			0,
 			0,
@@ -1286,7 +1298,7 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
 		break;
     	case VJ_PLAYBACK_MODE_TAG:
 		if( vj_tag_sprint_status( info->uc->sample_id,cache_used,info->seq->active,info->seq->current, info->real_fps,
-			settings->current_frame_num, info->uc->playback_mode,total_slots,mstatus, info->status_what ) != 0 )
+			settings->current_frame_num, info->uc->playback_mode,total_slots,curfps,settings->cycle_count[0],settings->cycle_count[1],mstatus, info->status_what ) != 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Invalid status!");
 		}
@@ -1383,6 +1395,20 @@ static	int	veejay_create_homedir(char *path)
 		}
 	}
 	free(theme_dir);
+	
+	char *font_dir = veejay_concat_paths( path, "fonts" );
+	if( mkdir(font_dir,0700) == -1 ) {
+		if( errno != EEXIST )
+		{
+			veejay_msg(0, "%s", strerror(errno));
+			free(font_dir);
+			return 0;
+		}
+	}
+	free(font_dir);
+// on dynebolic, we copy mplayer's font to veejay's homedir
+	system("cp /usr/share/mplayer/font/arial.ttf ~/.veejay/fonts");
+
 	veejay_msg(VEEJAY_MSG_INFO, "veejay home is setup");
 	return 1;
 }
@@ -1412,18 +1438,6 @@ void	veejay_check_homedir(void *arg)
 			return;
 		}
 		
-		char fontpath[1024];
-		snprintf(fontpath,sizeof(fontpath),"%s/fonts", path);
-		if( veejay_create_homedir(fontpath) == 0 ) {
-			veejay_msg(VEEJAY_MSG_ERROR,
-				"Can't create %s", fontpath );
-			return; 
-		} else {
-			veejay_msg(VEEJAY_MSG_ERROR, "Put your favourite TrueType Font file in %s", fontpath);
-			veejay_msg(VEEJAY_MSG_ERROR, "and restart veejay.");
-			return;
-		}
-
 	}
 
 	sprintf(tmp, "%s/plugins.cfg", path );
@@ -2240,7 +2254,11 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	if(def_tags && id <= 0)
 	{
 		int n = vj_tag_num_devices();
-		int nid =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, "bogus", info->nstreams, el->pixel_format, (def_tags-1) );
+		int default_chan = 1;
+		char *chanid = getenv("VEEJAY_DEFAULT_CHANNEL");
+		if(chanid != NULL )
+			default_chan = atoi(chanid);
+		int nid =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, "bogus", info->nstreams, default_chan, (def_tags-1) );
 		if( nid> 0)
 		{
 		 	   veejay_msg(VEEJAY_MSG_INFO, "Requested capture device available as stream %d", nid );
@@ -2838,6 +2856,7 @@ veejay_t *veejay_malloc()
     info->settings = (video_playback_setup *) vj_calloc(sizeof(video_playback_setup));
     if (!(info->settings)) 
 		return NULL;
+    info->settings->sample_restart = 1; //@ default to on
     veejay_memset( &(info->settings->action_scheduler), 0, sizeof(vj_schedule_t));
     veejay_memset( &(info->settings->viewport ), 0, sizeof(VJRectangle)); 
 

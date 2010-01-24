@@ -40,7 +40,7 @@
 #include <veejay/vj-viewport-xml.h>
 #include <libvje/effects/opacity.h>
 #include <libyuv/yuvconv.h>
-#include AVUTIL_INC
+#include <libavutil/avutil.h>
 #include <libvjmem/vjmem.h>
 #include <math.h>
 #include <assert.h>

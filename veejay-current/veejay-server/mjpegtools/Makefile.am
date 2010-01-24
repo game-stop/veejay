@@ -1,4 +1,4 @@
-pkginclude_HEADERS = fastintfns.h mjpeg_logging.h mpegconsts.h videodev_mjpeg.h yuv4mpeg_intern.h format_codes.h \
+EXTRA_DIST= fastintfns.h mjpeg_logging.h mpegconsts.h videodev_mjpeg.h yuv4mpeg_intern.h format_codes.h \
 mjpeg_types.h mpegtimecode.h yuv4mpeg.h
 MAINTAINERCLEANFILES = Makefile.in
 AM_CFLAGS=$(OP_CFLAGS)

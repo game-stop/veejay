@@ -229,6 +229,8 @@ void	vj_event_mcast_start(	void *ptr,	const char format[], va_list ap);
 void	vj_event_mcast_stop( void *ptr,		const char format[], va_list ap);
 void	vj_event_vloopback_start		(	void *ptr,	const char format[], 	va_list ap	);
 void	vj_event_vloopback_stop			(	void *ptr,	const char format[],	va_list ap	);
+
+void 	vj_event_play_norestart( void *ptr, const char format[], va_list ap );
 void	vj_event_quick_bundle  (void *ptr, const char format[], va_list ap);
 
 void	vj_event_sample_rand_start(	void *ptr, const char format[], va_list ap);
@@ -281,4 +283,10 @@ void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap );
 void	vj_event_vp_stack(void *ptr, const char format[], va_list ap );
 void	vj_event_vp_get_points( void *ptr, const char format[], va_list ap );
 void	vj_event_vp_proj_toggle(void *ptr, const char format[],va_list ap );
+
+void	vj_event_v4l_blackframe( void *ptr, const char format[], va_list ap );
+
+void	vj_event_cali_write_file( void *ptr, const char format[], va_list ap );
+void	vj_event_stream_new_cali( void *ptr, const char format[], va_list ap );
+void	vj_event_get_cali_image		(	void *ptr,	const char format[],	va_list	ap	);
 #endif

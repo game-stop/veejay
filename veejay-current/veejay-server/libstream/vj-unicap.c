@@ -32,7 +32,7 @@
 #include <libyuv/yuvconv.h>
 #include <libvevo/libvevo.h>
 #include <libstream/vj-unicap.h>
-#include AVUTIL_INC
+#include <libavutil/avutil.h>
 #include <pthread.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -285,7 +285,7 @@ void	vj_unicap_deinit(void *dud )
 	unicap_driver_t *ud = (unicap_driver_t*) dud;
 	if( ud )
 	{
-		//vevo_port_recursive_free( ud->device_list );
+		vevo_port_recursive_free( ud->device_list );
 		free(ud);
 	}
 	dud = NULL;

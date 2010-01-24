@@ -32,7 +32,6 @@ typedef struct
 
 #define VEEJAY_FILE_LIMIT (1048576 * 16000)
 int   available_diskspace(void);
-
 int vj_perform_screenshot2(veejay_t * info, uint8_t ** src);
 
 #ifdef ARCH_X86

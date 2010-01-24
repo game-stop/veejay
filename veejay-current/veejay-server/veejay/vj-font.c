@@ -148,6 +148,7 @@ static  void    vj_font_substract_timecodes( vj_font_t *font, const char *tc_srt
 static char     *vj_font_split_strd( const char *str );
 static char     *vj_font_split_str( const char *str );
 
+static	char	*get_font_name( vj_font_t *f,const char *font, int id );
 static	int	get_default_font( vj_font_t *f );
 
 static int	test_font( vj_font_t *f , const char *font, int id);
@@ -636,7 +637,10 @@ void	vj_font_xml_unpack( xmlDocPtr doc, xmlNodePtr node, void *font )
 void	vj_font_xml_pack( xmlNodePtr node, void *font )
 {
 	vj_font_t *ff = (vj_font_t*) font;
-        char **items = vevo_list_properties ( ff->dictionary );
+        if(ff == NULL )
+		return;
+
+	char **items = vevo_list_properties ( ff->dictionary );
         if(!items)
                 return;
 #ifdef STRICT_CHECKING
@@ -698,6 +702,9 @@ void	vj_font_xml_pack( xmlNodePtr node, void *font )
 int     vj_font_save_srt( void *font , const char *filename )
 {
 	vj_font_t *ff = (vj_font_t*) font;
+	if( ff == NULL )
+		return 0;
+
 	char **items = vevo_list_properties ( ff->dictionary );
 	if(!items)
 	{
@@ -1062,6 +1069,21 @@ static	int	try_deepen( vj_font_t *f , char *path )
 			if( f->font_index < MAX_FONTS )
 			{
 				char *try_font = strdup(path);
+				if( get_font_name( f,try_font, f->font_index ) ) {
+					f->font_table[f->font_index] = try_font;
+					f->font_index ++;
+				} else {
+				   free(try_font);
+				  }
+				/*
+				if( fnname ) {
+					veejay_msg(VEEJAY_MSG_INFO, "FontName ='%s'",fnname );
+
+				}else {
+					veejay_msg(0, "Error '%s'",try_font);
+				}
+				
+				
 				if( test_font (f, try_font, f->font_index) )
 				{
 					f->font_table[ f->font_index ] = try_font;
@@ -1070,7 +1092,7 @@ static	int	try_deepen( vj_font_t *f , char *path )
 				else
 				{
 					free(try_font);
-				}
+				}*/
 			}
 		}
 	}
@@ -1109,12 +1131,106 @@ static char 	*select_font( vj_font_t *ec, int id )
 	return ec->font_table[id]; 	 
 }
 
+
+static	char	*get_font_name( vj_font_t *f,const char *font, int id )
+{
+	int len = 0;
+	char *string;
+	int platform,encoding,lang;
+	int error;
+
+	static char *fontName = NULL;
+	static int   fontLen  = 256;
+
+	if( fontName == NULL ) {
+		fontName = (char*) vj_malloc(sizeof(char) * fontLen );
+	}
+	if( fontName == NULL ) {
+		return NULL;
+	}
+	
+	FT_SfntName sn,qn,zn;	
+	FT_SfntName	sname;
+	FT_UInt		snamei,snamec;
+
+	FT_Face face;
+	if ( (error = FT_New_Face( f->library, font, 0, &face )) != 0)
+	{
+		return 0;
+	}
+
+	memset( &qn, 0,sizeof( FT_SfntName ) );
+	memset( &zn, 0, sizeof( FT_SfntName ));
+	memset( &sn, 0, sizeof( FT_SfntName ));
+	
+	snamec = FT_Get_Sfnt_Name_Count(face);
+
+	int found = 0;
+	int tlen = 0;
+	for(snamei=0;snamei<snamec;snamei++) {
+
+		error = FT_Get_Sfnt_Name(face,snamei,&qn);
+		if(error) 
+			continue;
+
+		platform = qn.platform_id;
+		lang     = qn.language_id;
+		encoding = qn.encoding_id;
+
+		if( qn.string_len == 0 )
+			continue;
+		switch(qn.name_id) {
+			case TT_NAME_ID_FULL_NAME:
+				string = qn.string;
+				tlen = qn.string_len;
+				break;
+			default:
+				continue;
+		}
+
+		if(( platform == TT_PLATFORM_MICROSOFT) &&
+		   ( encoding == TT_MS_ID_SYMBOL_CS ||
+		     encoding == TT_MS_ID_UNICODE_CS ) &&
+		   ( (lang&0xff) == 0x9 )) {
+			found = 1;
+			break;
+		}
+		if( platform == TT_PLATFORM_APPLE_UNICODE &&
+		    lang == TT_MAC_LANGID_ENGLISH ) {
+			found = 1;
+			break;
+		}
+	}
+	
+	if(!found ) {
+		return NULL;
+	}
+
+	while( (tlen/2+1) > fontLen ) {
+		fontLen *= 2;
+		fontName = (char*) realloc( fontName, fontLen );
+		if( fontName == NULL ) {
+			return NULL;
+		}
+	}
+
+	int i,k;
+
+	for( i=0; i < tlen; i +=2 ) {
+	       fontName[i/2] = string[i+1];
+	}
+	fontName[tlen/2] = '\0';
+
+	f->font_list[id] = strdup( fontName );
+
+	return fontName;
+}
+
 static int	test_font( vj_font_t *f , const char *font, int id)
 {
 	char name[1024];
 	FT_Face face;
 	int error;
-
 	FT_SfntName sn,qn,zn;	
 	FT_SfntName	sname;
 	FT_UInt		snamei,snamec;
@@ -1133,13 +1249,22 @@ static int	test_font( vj_font_t *f , const char *font, int id)
 //	FT_Get_Sfnt_Name( face, TT_NAME_ID_FONT_FAMILY, &qn );
 
 	snamec = FT_Get_Sfnt_Name_Count(face);
+
 	for(snamei=0;snamei<snamec;snamei++) {
+		
 		if(FT_Get_Sfnt_Name(face,snamei,&qn) != 0 )
-			break;
+			continue;
+		
 		if(strlen(qn.string) == 0 ) 
 			continue;
+
+	/*	if( qn.platform_id == TT_PLATFORM_MICROSOFT &&
+			( qn.encoding_id==TT_MS_ID_SYMBOL_CS || qn.encoding_id==TT_MS_ID_UNICODE_CS) &&
+			( qn.language_id &0xff ) == 0x9) {
+	*/
 		switch(qn.name_id) {
 			case TT_NAME_ID_FONT_FAMILY:
+				if( name1 ) free(name1);
 				name1=strndup(qn.string,qn.string_len);
 				break;
 			case TT_NAME_ID_PS_NAME:
@@ -1147,11 +1272,13 @@ static int	test_font( vj_font_t *f , const char *font, int id)
 					name1=strndup(qn.string,qn.string_len);
 				break;
 			case TT_NAME_ID_FONT_SUBFAMILY:
+				if(name2) free(name2);
 				name2=strndup(qn.string,qn.string_len);
 				break;
 			default:
 				continue;
 		}
+//		}
 	}
 	FT_Get_Sfnt_Name( face, TT_NAME_ID_FONT_SUBFAMILY, &zn );
 
@@ -1159,12 +1286,18 @@ static int	test_font( vj_font_t *f , const char *font, int id)
 	if( !zn.string || !qn.string ||  qn.string_len <= 0 || zn.string_len <= 0 )
 	{
 		FT_Done_Face(face);
+		if(name1 != NULL )
+			free(name1);
+		if(name2 != NULL )
+			free(name2);
 		return 0;
 	}
 	/*
 	char *name1 = strndup( qn.string, qn.string_len );
 	char *name2 = strndup( zn.string, zn.string_len );
 	*/
+
+veejay_msg(0, "name1=%s,name2=%s",name1,name2);
 
 	if(name1 == NULL  || name2 == NULL ) {
 		FT_Done_Face(face);
@@ -1322,8 +1455,10 @@ void vj_font_set_fgcolor( void *font, int r, int g, int b, int a)
 void	vj_font_dictionary_destroy( void *font, void *dict )
 {
 	char **items = vevo_list_properties(dict );
-	if(!items)
+	if(!items) {
+		vevo_port_free(dict);
 		return;
+	}
 
 	vj_font_t *f = (vj_font_t*) font;
 
@@ -1498,12 +1633,16 @@ void	vj_font_set_osd_text(void *font, char *text )
 void	vj_font_set_dict( void *font, void *dict )
 {
 	vj_font_t *f = (vj_font_t*) font;
+	if( f == NULL ) 
+		return;
 	f->dictionary = dict;
 }
 
 void	*vj_font_get_dict(void *font)
 {
 	vj_font_t *f = (vj_font_t*) font;
+	if(f == NULL )
+		return;
 	return f->dictionary;
 }
 

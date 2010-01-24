@@ -27,8 +27,8 @@
 #include <libstream/vj-yuv4mpeg.h>
 #include <string.h>
 #include <libvjmem/vjmem.h>
-#include AVUTIL_INC
-#include SWSCALE_INC
+#include <libavutil/avutil.h>
+#include <libswscale/swscale.h>
 #include <libyuv/yuvconv.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
@@ -93,19 +93,31 @@ vj_yuv *vj_yuv4mpeg_alloc(editlist * el, int w, int h, int out_pixel_format)
 void vj_yuv4mpeg_free(vj_yuv *v) {
 }
 
+static int vj_yuv_stream_start_read1(vj_yuv * yuv4mpeg, int fd, int width, int height);
 
 int vj_yuv_stream_start_read(vj_yuv * yuv4mpeg, char *filename, int width,
+			     int height) {
+	int fd = open(filename,O_RDONLY);
+	if(!fd) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open video stream %s\n", filename);
+		return -1;
+	}
+	return vj_yuv_stream_start_read1( yuv4mpeg, fd, width,height );
+}
+
+int vj_yuv_stream_start_read_fd( vj_yuv *yuv4mpeg, int fd, int width,int height )
+{
+	return vj_yuv_stream_start_read1( yuv4mpeg,fd,width,height );
+}
+
+static int vj_yuv_stream_start_read1(vj_yuv * yuv4mpeg, int fd, int width,
 			     int height)
 {
     int i, w, h;
  
-    yuv4mpeg->fd = open(filename,O_RDONLY);
-    if (!yuv4mpeg->fd) {
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to open video stream %s\n", filename);
-		return -1;
-    }
+    yuv4mpeg->fd = fd;
 
-	i = y4m_read_stream_header(yuv4mpeg->fd, &(yuv4mpeg->streaminfo));
+    i = y4m_read_stream_header(yuv4mpeg->fd, &(yuv4mpeg->streaminfo));
     if (i != Y4M_OK) {
 		veejay_msg(VEEJAY_MSG_ERROR, "yuv4mpeg: %s", y4m_strerr(i));
 		return -1;

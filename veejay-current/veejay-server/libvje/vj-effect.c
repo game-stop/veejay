@@ -83,6 +83,7 @@
 #include "effects/colorshift.h"
 #include "effects/opacitythreshold.h"
 #include "effects/opacityadv.h"
+#include "effects/iris.h"
 #include "effects/rgbkeysmooth.h"
 #include "effects/magicscratcher.h"
 #include "effects/chromascratcher.h"
@@ -163,11 +164,19 @@
 #include "effects/diffmap.h"
 #include "plugload.h"
 #include "effects/picinpic.h"
+#include "effects/cali.h"
 
 int  pixel_Y_hi_ = 235;
 int  pixel_U_hi_ = 240;
 int  pixel_Y_lo_ = 16;
 int  pixel_U_lo_ = 16;
+
+int	get_pixel_range_min_Y() {
+	return pixel_Y_lo_;
+}
+int	get_pixel_range_min_UV() {
+	return pixel_U_lo_;
+}
 
 void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo)
 {
@@ -189,7 +198,6 @@ static struct
 {	dices_malloc	 	,	dices_free		,VJ_IMAGE_EFFECT_DICES		},
 {	colorhis_malloc,		colorhis_free,		VJ_IMAGE_EFFECT_COLORHIS	},
 {	autoeq_malloc,			autoeq_free		,VJ_IMAGE_EFFECT_AUTOEQ		},
-//{ 	diff_malloc		,	diff_free		,VJ_VIDEO_EFFECT_DIFF		},	
 {	magicscratcher_malloc	,	magicscratcher_free	,VJ_IMAGE_EFFECT_MAGICSCRATCHER	},
 {	lumamask_malloc		,	lumamask_free		,VJ_VIDEO_EFFECT_LUMAMASK	},
 {	motionblur_malloc	, 	motionblur_free		,VJ_IMAGE_EFFECT_MOTIONBLUR	},
@@ -256,6 +264,7 @@ static struct
 	{	diff_malloc,		diff_free,			VJ_VIDEO_EFFECT_DIFF },
 	{	texmap_malloc,		texmap_free,			VJ_VIDEO_EFFECT_TEXMAP },
 	{	contourextract_malloc,  contourextract_free,		VJ_IMAGE_EFFECT_CONTOUR },
+	{	cali_malloc,		cali_free,			VJ_IMAGE_EFFECT_CALI },
 	{	picinpic_malloc,	picinpic_free,			VJ_VIDEO_EFFECT_PICINPIC },
 	{	water_malloc,		water_free,			VJ_VIDEO_EFFECT_RIPPLETV },
 	{	NULL,			NULL,				0		     },
@@ -384,6 +393,11 @@ int vj_effect_activate(int effect_id)
 	return 1;
 }
 
+void	*vj_effect_get_data( int seq_id ) {
+
+	return vj_effects[seq_id]->user_data;
+}
+
 int vj_effect_deactivate(int effect_id)
 {
 	int seq = vj_effect_real_to_sequence(effect_id);
@@ -507,7 +521,8 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[44] = texmap_init( width,height);
 	vj_effects[45] = water_init(width,height);
 	vj_effects[46] = slicer_init(width,height);
-    vj_effects[47] = dummy_init(width,height);
+	vj_effects[47] = iris_init(width,height);
+    vj_effects[48] = dummy_init(width,height);
     vj_effects[i + 1] = mirrors2_init(width,height);
     vj_effects[i + 2] = mirrors_init(width,height);
     vj_effects[i + 3] = widthmirror_init(width,height);
@@ -597,6 +612,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 88] = contourextract_init(width,height);
 	vj_effects[i + 49] = waterrippletv_init(width,height);
 	vj_effects[i + 89 ]= radcor_init(width,height);
+	vj_effects[i + 90 ]= cali_init(width,height);
 
 	max_width = width;
 	max_height = height;
@@ -625,7 +641,14 @@ void vj_effect_free(vj_effect *ve) {
   if(ve->limits[0]) free(ve->limits[0]);
   if(ve->limits[1]) free(ve->limits[1]);
   if(ve->defaults) free(ve->defaults);
- // if(ve->vjed) free(ve->vjed);
+  int i = 0;
+  if( ve->param_description != NULL ) {
+  	for( i = 0; ve->param_description[i] != NULL; i ++ )
+		  free(ve->param_description[i]);
+  
+   	free(ve->param_description);
+  }
+   // if(ve->vjed) free(ve->vjed);
     free(ve);
 }
 
@@ -647,7 +670,7 @@ void vj_effect_shutdown() {
     contourextract_destroy();
     rotozoom_destroy();
     distortion_destroy();
-
+    cali_destroy();
 }
 
 void vj_effect_dump() {
