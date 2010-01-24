@@ -40,7 +40,7 @@
 #endif
 #include <src/common.h>
 #include <src/utils.h>
-#include <src/widgets/gtktimeselection.h>
+#include <src/gtktimeselection.h>
 #include <src/vj-api.h>
 #include <src/multitrack.h>
 #define __MAX_TRACKS 64

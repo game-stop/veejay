@@ -50,9 +50,9 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <widgets/cellrendererspin.h>
-#include <widgets/gtkknob.h>
-#include <widgets/gtktimeselection.h>
+#include <cellrendererspin.h>
+#include <gtkknob.h>
+#include <gtktimeselection.h>
 #include <libgen.h>
 #include <src/keyboard.h>
 #include <gtk/gtkversion.h>
@@ -64,7 +64,7 @@
 #include <src/utils.h>
 #include <src/sequence.h>
 #include <veejay/yuvconv.h>
-#include AVUTIL_INC
+#include <libavutil/avutil.h>
 #include <veejay/vevo.h>
 #include <veejay/libvevo.h>
 #include <veejay/vevo.h>
@@ -121,7 +121,7 @@ enum
 	STREAM_RED = 9,
 	STREAM_GREEN = 8,
 	STREAM_YELLOW = 7,
-	STREAM_BLUE = 6,
+	STREAM_CALI = 6,
 	STREAM_WHITE = 4,
 	STREAM_VIDEO4LINUX = 2,
 	STREAM_DV1394 = 17,
@@ -238,6 +238,8 @@ typedef struct
 	int	selected_parameter_id; // current kf
 	int	selected_vims_type;
 	char    *selected_vims_args;
+	int	cali_duration;
+	int	cali_stage;
 } veejay_user_ctrl_t;
 
 typedef struct
@@ -289,6 +291,8 @@ static	vims_t	vj_event_list[VIMS_MAX];
 static  vims_keys_t vims_keys_list[VIMS_MAX];
 static  int vims_verbosity = 0;
 #define   livido_port_t vevo_port_t
+static	int	cali_stream_id = 0;
+static	int	cali_onoff     = 0;
 
 static	vevo_port_t *fx_list_ = NULL;
 
@@ -452,6 +456,7 @@ typedef struct
 	int		preview_locked;
 	void		*midi;
 	struct timeval	time_last;
+	uint8_t 	*cali_buffer;
 } vj_gui_t;
 
 enum
@@ -508,6 +513,12 @@ void	reloaded_schedule_restart();
 static	GtkWidget *effect_sources_tree = NULL;
 static 	GtkListStore *effect_sources_store = NULL;
 static 	GtkTreeModel *effect_sources_model = NULL;
+
+
+static	GtkWidget	*cali_sourcetree = NULL;
+static	GtkListStore	*cali_sourcestore = NULL;
+static  GtkTreeModel    *cali_sourcemodel = NULL;
+
 static int 		num_tracks_ = 2;
 static int		default_preview_width_ = 176;
 static int		default_preview_height_ = 144;
@@ -2101,7 +2112,8 @@ static gchar	*recv_vims(int slen, int *bytes_written)
 	if( ret == -1 )
 		reloaded_schedule_restart();
 	int len = 0;
-	sscanf( (char*)tmp, "%d", &len );
+	if( sscanf( (char*)tmp, "%d", &len ) != 1 )
+		return NULL;
 	unsigned char *result = NULL;
 	if( ret <= 0 || len <= 0 || slen <= 0)
 		return (gchar*)result;
@@ -3165,6 +3177,42 @@ gboolean
   }
 
 gboolean
+  cali_sources_selection_func (GtkTreeSelection *selection,
+                       GtkTreeModel     *model,
+                       GtkTreePath      *path,
+                       gboolean          path_currently_selected,
+                       gpointer          userdata)
+  {
+    GtkTreeIter iter;
+    if (gtk_tree_model_get_iter(model, &iter, path))
+    {
+      gchar *name = NULL;
+
+	if( info->uc.cali_stage != 0 ) {
+		veejay_msg(0, "%d", info->uc.cali_stage);
+		return TRUE;
+	}
+
+      gtk_tree_model_get(model, &iter, FXC_ID, &name, -1);
+
+      if (!path_currently_selected)
+      {
+	gint id = 0;
+	sscanf(name+1, "[ %d]", &id);
+	if(name[0] != 'S')
+	{
+		cali_stream_id = id;
+		update_label_str("current_step_label","Please take an image with the cap on the lens.");
+		GtkWidget *nb = glade_xml_get_widget_(info->main_window, "cali_notebook");
+		gtk_notebook_next_page( GTK_NOTEBOOK(nb));
+	}
+	if(name) g_free(name);
+      }
+    }
+    return TRUE; /* allow selection state to change */
+}
+
+gboolean
   view_sources_selection_func (GtkTreeSelection *selection,
                        GtkTreeModel     *model,
                        GtkTreePath      *path,
@@ -3347,7 +3395,7 @@ static	void	load_v4l_info()
 {
 	int values[6];
 	int len = 0;
-	multi_vims( VIMS_STREAM_GET_V4L, "%d", (info->selected_slot == NULL ? 0 : info->selected_slot->sample_id ));
+/*	multi_vims( VIMS_STREAM_GET_V4L, "%d", (info->selected_slot == NULL ? 0 : info->selected_slot->sample_id ));
 	gchar *answer = recv_vims(3, &len);
 	if(len > 0 )
 	{
@@ -3362,7 +3410,7 @@ static	void	load_v4l_info()
 			}	
 		}	
 		g_free(answer);
-	}
+	}*/
 }
 
 static	gint load_parameter_info()
@@ -3839,8 +3887,135 @@ void	setup_samplelist_info()
     	gtk_tree_selection_set_mode(selection, GTK_SELECTION_SINGLE);
 
 	g_signal_connect( effect_sources_tree, "row-activated", (GCallback) on_effectlist_sources_row_activated, (gpointer*)"tree_sources");
+
+
+
+	cali_sourcetree = glade_xml_get_widget_(info->main_window, "cali_sourcetree");
+	cali_sourcestore= gtk_list_store_new( 3, G_TYPE_STRING, G_TYPE_STRING, G_TYPE_STRING );
+
+	gtk_tree_view_set_headers_visible( GTK_TREE_VIEW( cali_sourcetree), FALSE );
+	gtk_tree_view_set_model( GTK_TREE_VIEW(cali_sourcetree), GTK_TREE_MODEL(cali_sourcestore));
+	g_object_unref( G_OBJECT(cali_sourcestore));
+
+	cali_sourcemodel = gtk_tree_view_get_model( GTK_TREE_VIEW(cali_sourcetree ));	
+	cali_sourcestore = GTK_LIST_STORE(cali_sourcemodel);
+
+	setup_tree_text_column( "cali_sourcetree", SL_ID, "Id",0 );
+	setup_tree_text_column( "cali_sourcetree", SL_TIMECODE, "Length" ,0);
+
+  	GtkTreeSelection *sel = gtk_tree_view_get_selection(GTK_TREE_VIEW(cali_sourcetree));
+    	gtk_tree_selection_set_select_function(sel, cali_sources_selection_func, NULL, NULL);
+    	gtk_tree_selection_set_mode(sel, GTK_SELECTION_SINGLE);
+
+//	g_signal_connect( cali_sourcetree, "row-activated", (GCallback) on_effectlist_sources_row_activated, (gpointer*)"tree_sources");
+
+
 }
 
+static	uint8_t *ref_trashcan[3] = { NULL,NULL,NULL };
+static  GdkPixbuf *pix_trashcan[3] = { NULL,NULL,NULL };
+
+void	reset_cali_images( int type, char *wid_name )
+{
+	GtkWidget *dstImage = glade_xml_get_widget( 
+				info->main_window, wid_name );
+
+	if( pix_trashcan[type] != NULL ) {
+		gdk_pixbuf_unref( pix_trashcan[type] );
+		pix_trashcan[type] = NULL;
+	}
+	if( ref_trashcan[type] != NULL  ) {
+		free( ref_trashcan[type] );
+		ref_trashcan[type] = NULL;
+	}
+	gtk_image_clear( dstImage );
+
+}
+
+int	get_and_draw_frame(int type, char *wid_name)
+{
+	GtkWidget *dstImage = glade_xml_get_widget( 
+				info->main_window, wid_name );
+	if(dstImage == 0 ) {
+		veejay_msg(0, "No widget '%s'",wid_name);
+		return 0;
+	}
+
+	multi_vims( VIMS_CALI_IMAGE, "%d %d", cali_stream_id,type);
+	
+	int bw = 0;
+	gchar *buf = recv_vims( 3, &bw );
+	
+	if( bw <= 0 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to get calibration image.");
+		return 0;
+	}
+	
+	int len = 0;
+	int uvlen = 0;
+	int w = 0;
+	int h = 0;
+	int tlen = 0;
+	int n = sscanf(buf,"%08d%06d%06d%06d%06d",&tlen, &len, &uvlen,&w,&h);
+
+	uint8_t *out = (uint8_t*) vj_malloc(sizeof(uint8_t) * (w*h*3));
+	uint8_t *srcbuf = (uint8_t*) vj_malloc(sizeof(uint8_t) * len );
+
+	int res = vj_client_read(info->client, V_CMD, srcbuf, tlen );
+	if( res <= 0 ) {
+		free(out);
+		free(srcbuf);
+		free(buf);
+		veejay_msg(0, "Error while receiving calibration image.");
+		return 0;
+	}	
+
+	VJFrame *src = yuv_yuv_template( srcbuf,
+					 srcbuf,
+					 srcbuf,
+					 w,
+					 h,
+					 PIX_FMT_GRAY8 );
+
+	VJFrame *dst = yuv_rgb_template( out, w,h,PIX_FMT_BGR24 );
+
+	yuv_convert_any_ac( src,dst, src->format, dst->format );
+
+	GdkPixbuf *pix = gdk_pixbuf_new_from_data(
+				out,
+				GDK_COLORSPACE_RGB,
+				FALSE,
+				8,
+				w,
+				h,
+				w*3,
+				NULL,
+				NULL );
+
+	if( ref_trashcan[type] != NULL ) {
+		free(ref_trashcan[type]);
+		ref_trashcan[type]=NULL;
+	}
+	if( pix_trashcan[type] != NULL ) {
+		gdk_pixbuf_unref( pix_trashcan[type] );
+		pix_trashcan[type] = NULL;
+	}
+
+	gtk_image_set_from_pixbuf_( GTK_IMAGE( dstImage ), pix );
+	
+//	gdk_pixbuf_unref( pix );
+
+	free(src);
+	free(dst);
+	free(buf);
+//	free(out);
+	free(srcbuf);
+
+	ref_trashcan[type] = out;
+	pix_trashcan[type] = pix;
+
+	return 1;
+}
 
 void	load_effectlist_info()
 {
@@ -4007,13 +4182,24 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 	int has_streams = 0;
 	int n_slots = 0;
 	reset_tree( "tree_sources" );
+	if( cali_onoff == 1 )
+		reset_tree( "cali_sourcetree");
 
 	if( with_reset_slotselection ) {
 		reset_samplebank();
 		}
 
+	char tmp[5];
+	int slen = 1;
+	memset(tmp,0,sizeof(tmp));
+
 	multi_vims( VIMS_SAMPLE_LIST,"%d", 0 );
 	gint fxlen = 0;
+/*	while(vj_client_read( info->client, V_CMD, tmp, slen )) {
+	
+		veejay_msg(0, "'%c'", tmp[0] );
+	}*/
+
 	gchar *fxtext = recv_vims(8,&fxlen);
 
 	if(fxlen > 0 && fxtext != NULL)
@@ -4115,6 +4301,8 @@ static	void	load_samplelist_info(gboolean with_reset_slotselection)
 				strncpy( descr, line + 22, values[6] );
 				switch( values[1] )
 				{
+					case STREAM_CALI	:sprintf(source,"calibrate %d",values[0]);
+								 break;
 					case STREAM_VIDEO4LINUX :sprintf(source,"capture %d",values[0]);break;
 					case STREAM_WHITE	:sprintf(source,"solid %d",values[0]); 
 								 break;
@@ -4819,7 +5007,7 @@ static	void	reload_srt()
 	gchar *srts = recv_vims(6,&len );
 	if( srts == NULL || len <= 0 )
 	{
-		disable_widget( "SRTframe" );
+	//	disable_widget( "SRTframe" );
 		return;
 	}
 
@@ -5247,8 +5435,8 @@ static int	select_f(const struct dirent *d )
 
 static void set_default_theme()
 {
-	sprintf( theme_path, "%s", GVEEJAY_DATADIR);
-	sprintf( theme_file, "%s/gveejay.rc", GVEEJAY_DATADIR );
+	sprintf( theme_path, "%s", RELOADED_DATADIR);
+	sprintf( theme_file, "%s/gveejay.rc", RELOADED_DATADIR );
 	use_default_theme_ = 1;
 }
 
@@ -5262,7 +5450,7 @@ void	find_user_themes(int theme)
 	veejay_memset( theme_file, 0, sizeof(theme_file));
 
 	theme_settings = gtk_settings_get_default();
-//	snprintf( glade_path, sizeof(glade_path), "%s/gveejay.reloaded.glade",GVEEJAY_DATADIR);
+//	snprintf( glade_path, sizeof(glade_path), "%s/gveejay.reloaded.glade",RELOADED_DATADIR);
 
 
 	if(!home)
@@ -5282,7 +5470,7 @@ void	find_user_themes(int theme)
 	if( sloppy < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Theme config '%s' not found, creating default.", path );
-		veejay_msg(VEEJAY_MSG_WARNING, "Please setup symbolic links from %s/theme/", GVEEJAY_DATADIR );
+		veejay_msg(VEEJAY_MSG_WARNING, "Please setup symbolic links from %s/theme/", RELOADED_DATADIR );
 		veejay_msg(VEEJAY_MSG_WARNING, "                            to %s/.veejay/theme/",home);
 		veejay_msg(VEEJAY_MSG_WARNING, "and set the name of the theme in theme.config" );
 		set_default_theme();
@@ -5405,12 +5593,12 @@ char	*get_glade_path()
 
 char	*get_gveejay_dir()
 {
-	return GVEEJAY_DATADIR;
+	return RELOADED_DATADIR;
 }
 
 void	get_gd(char *buf, char *suf, const char *filename)
 {
-	const char *dir = GVEEJAY_DATADIR;
+	const char *dir = RELOADED_DATADIR;
 	
 	if(filename !=NULL && suf != NULL)
 		sprintf(buf, "%s/%s/%s",dir,suf, filename );
@@ -5473,6 +5661,9 @@ int		gveejay_time_to_sync( vj_gui_t *ui )
 	{
 		fps = ui->el.fps;	
 		float spvf = 1.0 / fps;
+		float ela  = ( info->status_tokens[ELAPSED_TIME] / 1000.0 );	
+		spvf += ela; //@ add elapsed time 
+		
 		if( diff > spvf ) {
 			ui->time_last.tv_sec = time_now.tv_sec;
 			ui->time_last.tv_usec = time_now.tv_usec;
@@ -5480,22 +5671,28 @@ int		gveejay_time_to_sync( vj_gui_t *ui )
 		}
 		int usec = 0;
 		int uspf = (int)(1000000.0 / fps);
+		if( ela )
+			uspf += (int)(1000000.0 / ela );
 		usec = time_now.tv_usec - ui->time_last.tv_usec;
 		if( usec < 0 )
 			usec += 1000000;
 		if( time_now.tv_sec > ui->time_last.tv_sec + 1 )
 			usec = 1000000;
-		if( (uspf - usec) < (1000000 / 100))
+		if( (uspf - usec) < (1000000 / 100)) {
 			return 0;
-			nsecsleep.tv_nsec = (uspf - usec - 1000000 / 100 ) * 1000;
+		}
+
+//veejay_msg(0 , "%d", (uspf - usec - 1000000 / 100 ) * 1000);
+		nsecsleep.tv_nsec = 3200000;
+//		nsecsleep.tv_nsec =(uspf - usec - 1000000 / 100 ) * 1000;
 		nsecsleep.tv_sec = 0;	
 		nanosleep( &nsecsleep, NULL ); 	
 		return 0;
 	} else if ( ui->watch.state == STATE_STOPPED ) 
 	{
 		reloaded_restart();
-	} 
-	nsecsleep.tv_nsec = 1000000;
+	}
+	nsecsleep.tv_nsec = 1600000;
 	nsecsleep.tv_sec = 0;
 	nanosleep( &nsecsleep, NULL );
 	return 0;
@@ -5844,6 +6041,47 @@ static void 	update_globalinfo(int *history, int pm, int last_pm)
 			}
 
 		}
+	}
+
+	if( pm == MODE_STREAM ) {
+		if( info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX ) {
+			if(info->uc.cali_duration > 0 ) {
+				GtkWidget *tb = glade_xml_get_widget_( info->main_window, "cali_take_button");
+				info->uc.cali_duration--;
+				vj_msg(VEEJAY_MSG_INFO, "Calibrate step %d of %d",
+						info->uc.cali_duration,
+						info->uc.cali_stage);
+				if(info->uc.cali_duration == 0) {
+					info->uc.cali_stage ++; //@ cali_stage = 1, done capturing black frames
+
+					switch(info->uc.cali_stage) {
+						case 1: //@ capturing black frames
+							update_label_str( "current_step_label",
+							"Please take an image of a uniformly lit area in placed in front of your lens.");
+							gtk_button_set_label( tb, "Take White Frames");
+							break;
+						case 2:
+						case 3:
+							update_label_str( "current_step_label",
+							"Image calibrated. You may need to adjust brightness.");
+							enable_widget( "cali_save_button");
+							break;
+						default:
+							update_label_str( "current_step_label","Image calibrated. You may need to adjust brightness.");
+							gtk_button_set_label( tb, "Take Black Frames");
+							veejay_msg(0, "Warning, mem leak if not reset first.");
+							break;
+						
+					}
+					veejay_msg(0, "Label update for case %d", info->uc.cali_stage);
+					
+					if(info->uc.cali_stage >= 2 ) {
+						info->uc.cali_stage = 0;
+					}
+				}
+			}
+		}
+
 	}
 
 	update_current_slot(history, pm, last_pm);
@@ -6550,7 +6788,7 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	{
 		return;
 	}
-	snprintf( glade_path, sizeof(glade_path), "%s/%s",GVEEJAY_DATADIR,glade_file);
+	snprintf( glade_path, sizeof(glade_path), "%s/%s",RELOADED_DATADIR,glade_file);
 
 
 	veejay_memset( gui->status_tokens, 0, sizeof(int) * STATUS_TOKENS );
@@ -7939,6 +8177,11 @@ static void add_sample_to_effect_sources_list(gint id, gint type, gchar *title, 
 	gtk_list_store_append( effect_sources_store, &iter );
 	gtk_list_store_set( effect_sources_store, &iter, SL_ID, id_string, SL_DESCR, title, SL_TIMECODE , timecode,-1 );
 
+	GtkTreeIter iter2;
+	if(type == 1 && strncmp("bogus",title, 7)==0) {
+		gtk_list_store_append( cali_sourcestore,&iter2);
+		gtk_list_store_set( cali_sourcestore,&iter2,SL_ID, id_string,SL_DESCR,title,SL_TIMECODE,timecode,-1);
+	}
 }
 
 /*

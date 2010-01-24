@@ -19,7 +19,7 @@
  */
 #include <ctype.h>
 #include <veejay/vj-msg.h>
-#include <widgets/gtktimeselection.h>
+#include <gtktimeselection.h>
 #include <veejay/vims.h>
 static int config_file_status = 0;
 static gchar *config_file = NULL;
@@ -1717,6 +1717,12 @@ void on_VideoSettings_activate              (GtkMenuItem     *menuitem,
 }
 
 
+void	on_image_calibration1_activate	(GtkMenuItem	*menuitem, gpointer data)
+{
+	GtkWidget *win = glade_xml_get_widget(info->main_window,"calibration_window" );
+	gtk_widget_show(win);
+	cali_onoff = 1;
+}
 
 /* 
  * Handler to close the video_settings-dialog 
@@ -1749,6 +1755,123 @@ void on_video_options_apply_clicked         (GtkButton       *button,
 			width,height,x , y );
 		vj_msg(VEEJAY_MSG_INFO, "Resize Video Window to %dx%d", width,height);
 	}
+}
+
+void	on_cali_save_button_clicked( GtkButton *button, gpointer user_data)
+{
+	gchar *filename = dialog_save_file( "Save calibration to file");
+	if( filename ) {
+		multi_vims( VIMS_V4L_CALI, "%s", filename );
+	}
+}
+
+void	on_load_calibration1_activate( GtkMenuItem     *menuitem,
+					     gpointer         user_data)
+{
+	gchar	*filename = dialog_open_file("Select calibration file to load",0);
+	if(filename)
+	{
+		multi_vims( VIMS_STREAM_NEW_CALI, "%s", filename );
+		vj_msg(VEEJAY_MSG_INFO ,"Loaded calibration file %s",filename);
+	}
+	gveejay_new_slot(MODE_STREAM);
+}
+
+void	on_cali_take_button_clicked(	GtkButton *button, gpointer data )
+{
+	gint method = 0;
+	gint kernel = 0;
+
+	if( info->uc.cali_stage == 1 )
+		method = 1;
+
+	if( info->uc.cali_duration > 0 ) {
+		error_dialog( "Error", "Already taking calibration images");
+		return;
+	}
+
+	if( is_button_toggled( "cali_method_median" ))
+	{
+		kernel = get_nums( "cali_kernelsize_spin");
+	}
+	gint duration=get_nums( "cali_duration_spin" );
+
+	if( cali_stream_id <= 0 )  {
+		if(info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX )
+			cali_stream_id =
+				info->status_tokens[CURRENT_ID];
+	}
+
+	if( cali_stream_id <= 0 ) {
+		error_dialog( "Error", "No source selected to calibrate. Play a Live stream or double click one in the List");
+		
+		return;
+	}
+
+	multi_vims( VIMS_V4L_BLACKFRAME, "%d %d %d %d",
+			cali_stream_id,
+			duration,
+			kernel,
+			method );
+
+	info->uc.cali_duration = duration;
+
+	//@ substract duration in status pipe
+	
+}
+
+void	on_cali_darkframe_clicked( GtkButton *button, gpointer data ) 
+{
+	get_and_draw_frame( 0, "image_darkframe" );
+}
+
+void	on_cali_lightframe_clicked( GtkButton *button, gpointer data ) 
+{
+	get_and_draw_frame( 1, "image_lightframe" );
+}
+
+void	on_cali_flatframe_clicked( GtkButton *button, gpointer data )
+{
+	get_and_draw_frame( 2, "image_flatframe" );
+}
+
+void	on_cali_image_clicked( GtkButton *button, gpointer data )
+{
+
+//	get_and_draw_frame( 0, "image_darkframe" );
+//	get_and_draw_frame( 1, "image_lightframe");
+//	get_and_draw_frame( 2, "image_flatframe");
+
+}
+
+void	on_cali_reset_button_clicked( 	GtkButton *button, gpointer data )
+{
+	if( cali_stream_id <= 0 ) {
+		if(info->status_tokens[STREAM_TYPE] == STREAM_VIDEO4LINUX )
+			cali_stream_id =
+				info->status_tokens[CURRENT_ID];
+	}
+
+	if( cali_stream_id <= 0 ) {
+		error_dialog( "Error", "No source selected to calibrate. Play a Live stream or double click one in the List");
+		
+		return;
+	}
+
+	info->uc.cali_stage = 0;
+	update_label_str("current_step_label","Please take an image with the cap on the lens.");
+
+	multi_vims( VIMS_V4L_BLACKFRAME, "%d 0 0 0", cali_stream_id );
+
+	reset_cali_images(0, "image_darkframe");
+	reset_cali_images(1, "image_lightframe");
+	reset_cali_images(2, "image_flatframe");
+
+	GtkWidget *tb = glade_xml_get_widget_( info->main_window, "cali_take_button");
+	gtk_button_set_label( tb, "Take Black Frames");
+
+	disable_widget( "cali_save_button" );
+
 }
 
 /*
@@ -2423,6 +2546,14 @@ void	on_inputstream_window_delete_event(GtkWidget *w, gpointer user_data)
 	gtk_widget_hide(vs);
 }
 
+void	on_calibration_window_delete_event(GtkWidget *w,gpointer data)
+{
+	GtkWidget *win = glade_xml_get_widget(info->main_window, "calibration_window");
+	cali_onoff = 0;
+	gtk_widget_hide(win);
+}
+
+
 void	on_vs_delete_event( GtkWidget *w, gpointer user_data)
 {
 	GtkWidget *vs = glade_xml_get_widget(info->main_window, "vs");
@@ -2973,8 +3104,8 @@ static	gint	srt_load_subtitle(int sid)
 //	glade_xml_get_widget( info->main_window, "combobox_textsrt" );
 //      gtk_combo_box_set_active( GTK_COMBO_BOX( combo ), seq_id-1 );
 
-	if(len > 0 )
-		enable_widget( "SRTframe");
+//	if(len > 0 )
+//		enable_widget( "SRTframe");
 
 
 	srt_locked_ = 0;

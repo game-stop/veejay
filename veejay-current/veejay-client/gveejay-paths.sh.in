@@ -5,7 +5,7 @@ datadir="@datadir@"
 
 DATADIRNAME="@DATADIRNAME@"
 
-gveejay_datadir="@gveejay_datadir@"
+reloaded_datadir="@reloaded_datadir@"
 
 cat << EOF
 /*
@@ -15,7 +15,7 @@ cat << EOF
 #ifndef GVEEJAY_PATHS_H
 #define GVEEJAY_PATHS_H
 
-#define GVEEJAY_DATADIR "$gveejay_datadir"
+#define RELOADED_DATADIR "$reloaded_datadir"
 
 #endif /* GVEEJAY_PATHS_H */
 EOF

@@ -1,14 +1,14 @@
 dnl Process this file with autoconf to produce a configure script.
 dnl AC_INIT
-AC_INIT([gveejay],[1.5.1],[veejay-users@lists.sourceforge.net])
+AC_INIT([reloaded],[1.5.3],[nwelburg@gmail.com])
 AC_PREREQ(2.57)
 AC_CONFIG_SRCDIR([src/gveejay.c])
 
-GVEEJAY_MAJOR_VERSION=1
-GVEEJAY_MINOR_VERSION=5
-GVEEJAY_MICRO_VERSION=1
-GVEEJAY_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
-GVEEJAY_CODENAME="Reloaded - build $GVEEJAY_MAJOR_VERSION $GVEEJAY_MINOR_VERSION $GVEEJAY_MICRO_VERSION"
+RELOADED_MAJOR_VERSION=1
+RELOADED_MINOR_VERSION=5
+RELOADED_MICRO_VERSION=2
+RELOADED_VERSION=$VEEJAY_MAJOR_VERSION.$VEEJAY_MINOR_VERSION.$VEEJAY_MICRO_VERSION
+RELOADED_CODENAME="Reloaded - build $RELOADED_MAJOR_VERSION $RELOADED_MINOR_VERSION $RELOADED_MICRO_VERSION"
 AC_CONFIG_HEADERS([config.h])
 
 AC_CANONICAL_HOST
@@ -19,10 +19,10 @@ AM_INIT_AUTOMAKE([dist-bzip2])
 
 AC_DEFINE(HAVE_CONFIG_H,1,[Include config.h])
 # libtool versioning
-LT_RELEASE=$GVEEJAY_MAJOR_VERSION.$GVEEJAY_MINOR_VERSION.$GVEEJAY_MICRO_VERSION
-LT_CURRENT=$GVEEJAY_MICRO_VERSION
-LT_REVISION=$GVEEJAY_MICRO_VERSION
-LT_AGE=$GVEEJAY_MICRO_VERSION
+LT_RELEASE=$RELOADED_MAJOR_VERSION.$RELOADED_MINOR_VERSION.$RELOADED_MICRO_VERSION
+LT_CURRENT=$RELOADED_MICRO_VERSION
+LT_REVISION=$RELOADED_MICRO_VERSION
+LT_AGE=$RELOADED_MICRO_VERSION
 AC_SUBST(LT_RELEASE)
 AC_SUBST(LT_CURRENT)
 AC_SUBST(LT_REVISION)
@@ -79,8 +79,8 @@ AM_PROG_AS
 
 AC_CHECK_HEADERS([fenv.h stdint.h inttypes.h sys/types.h alloca.h])
 
-dnl AX_PREFIXED_DEFINE([GVEEJAY], [HAVE_STDINT_H])
-dnl AX_PREFIXED_DEFINE([GVEEJAY], [HAVE_INTTYPES_H])
+dnl AX_PREFIXED_DEFINE([RELOADED], [HAVE_STDINT_H])
+dnl AX_PREFIXED_DEFINE([RELOADED], [HAVE_INTTYPES_H])
 
 AC_CHECK_FUNCS([posix_memalign memalign fmax lround pow bzero gettimeofday memset mmap strndup strstr strncasecmp])
 AC_CHECK_FUNCS([sched_get_priority_max])
@@ -108,7 +108,6 @@ AC_TYPE_SIGNAL
 
 AC_MSG_NOTICE([The host is $host  $host_cpu  $host_vendor  $host_os .])
 
-use_gveejayreloaded=true
 case $host in
   *-*-linux*)
 	AC_CHECK_HEADER(linux/version.h,
@@ -178,7 +177,7 @@ fi
 
 dnl Check for Veejay
 have_veejay=false
-PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.4.8 ],
+PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.2 ],
 	[	
 		AC_SUBST(VEEJAY_CFLAGS)
 		AC_SUBST(VEEJAY_LIBS)
@@ -188,9 +187,9 @@ PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.4.8 ],
 		[have_veejay=false])
 
 if test x$have_veejay != xtrue ; then
-	PKG_CHECK_MODULES(VEEJAY, [veejay <= 1.4.8 ],
+	PKG_CHECK_MODULES(VEEJAY, [veejay >= 1.4.8 ],
 			  [
-			   AC_MSG_ERROR([veejay-server too old!])
+			   AC_MSG_WARN([veejay-server old but should be compatible!])
 			   ],
 			   [
 			    AC_MSG_ERROR([Cannot find veejay])
@@ -532,46 +531,31 @@ AC_MSG_RESULT($CFLAGS)
 AC_DEFINE_UNQUOTED(HAVE_FFMPEG_UNINSTALLED,,
                     [Defined if building against uninstalled FFmpeg source])
 
-PKG_CHECK_MODULES(FFMPEG_AVCODEC, [libavcodec],
-                    [
- 		     AC_SUBST(FFMPEG_AVCODEC_CFLAGS)
-		     AC_SUBST(FFMPEG_AVCODEC_LIBS)
-		     have_avcodec=true
-                     AC_DEFINE(HAVE_AVCODEC, 1, [use avcodec])],
-                    [have_avcodec=false])
-
-PKG_CHECK_MODULES(FFMPEG_SWSCALER, [libswscale],
-			[ 
-				AC_SUBST(FFMPEG_SWSCALER_CFLAGS)
-				AC_SUBST(FFMPEG_SWSCALER_LIBS)
-				have_swscaler=true
-				AC_DEFINE( HAVE_SWSCALER,1,[use swscaler])],
-				[ have_swscaler=false] )
-				
-
-
-if test x$have_avcodec != xtrue ; then
- AC_MSG_ERROR([ FFmpeg AVCodec not found. Get it from http://ffmpeg.sourceforge.net ] )
+PKG_CHECK_MODULES(LIBAVUTIL, [libavutil >= 49.7.0],have_avutil=true,have_avutil=false)
+PKG_CHECK_MODULES(LIBAVCODEC,[libavcodec >= 51.57.2],have_avcodec=true,have_avcodec=false)
+PKG_CHECK_MODULES(LIBAVFORMAT,[libavformat >= 52.14.0],have_avformat=true,have_avformat=false)
+PKG_CHECK_MODULES(LIBSWSCALE,[libswscale >= 0.7.1],have_swscale=true,have_swscale=false)
+if test x$have_swscale = xfalse;
+then
+	AC_MSG_ERROR([libswscale not found.])
+fi
+if test x$have_avutil = xfalse;
+then
+	AC_MSG_ERROR([libavutil not found.])
+fi
+if test x$have_avformat = xfalse;
+then
+	AC_MSG_ERROR([libavformat not found.])
+fi
+if test x$have_avcodec = xfalse;
+then
+	AC_MSG_ERROR([libavcodec not found.])
 fi
 
-if test x$have_swscaler != xtrue ; then
- AC_MSG_ERROR([ FFmpeg Swscaler not found. Did you enable it when you compiled ffmpeg ? ])
-fi
-
-FFMPEG_INCLUDE_AVCODEC=""
-FFMPEG_INCLUDE_SWSCALE=""
-FFMPEG_INCLUDE_AVUTIL=""
-
-AC_CHECK_HEADER( ffmpeg/avutil.h, [FFMPEG_INCLUDE_AVUTIL="<ffmpeg/avutil.h>"],[])
-AC_CHECK_HEADER( ffmpeg/avcodec.h, [FFMPEG_INCLUDE_AVCODEC="<ffmpeg/avcodec.h>"],[])
-AC_CHECK_HEADER( ffmpeg/swscale.h, [FFMPEG_INCLUDE_SWSCALE="<ffmpeg/swscale.h>"],[])
-AC_CHECK_HEADER( libswscale/swscale.h, [FFMPEG_INCLUDE_SWSCALE="<libswscale/swscale.h>"],[])
-AC_CHECK_HEADER( libavcodec/avcodec.h, [FFMPEG_INCLUDE_AVCODEC="<libavcodec/avcodec.h>"],[])
-AC_CHECK_HEADER( libavutil/avutil.h, [FFMPEG_INCLUDE_AVUTIL="<libavutil/avutil.h>"],[])
-
-AC_DEFINE_UNQUOTED( AVCODEC_INC, $FFMPEG_INCLUDE_AVCODEC,[] )
-AC_DEFINE_UNQUOTED( SWSCALE_INC, $FFMPEG_INCLUDE_SWSCALE,[] )
-AC_DEFINE_UNQUOTED( AVUTIL_INC, $FFMPEG_INCLUDE_AVUTIL,[] )
+FFMPEG_CFLAGS="${LIBAVFORMAT_CFLAGS} ${LIBAVCODEC_CFLAGS} ${LIBAVUTIL_CFLAGS} ${LIBSWSCALE_CFLAGS}"
+FFMPEG_LIBS="${LIBAVFORMAT_LIBS} ${LIBAVCODEC_LIBS} ${LIBAVUTIL_LIBS} ${LIBSWSCALE_LIBS}"
+AC_SUBST(FFMPEG_CFLAGS)
+AC_SUBST(FFMPEG_LIBS)
 
 
 dnl **********************************************************************
@@ -591,7 +575,6 @@ AM_CONDITIONAL(HAVE_SSE, test x$have_asm_sse = xtrue)
 AM_CONDITIONAL(HAVE_SSE2, test x$have_asm_sse2 = xtrue)
 AM_CONDITIONAL(HAVE_MMX2, test x$have_asm_mmx2 = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
-AM_CONDITIONAL(USE_GVEEJAYRELOADED,test x$use_gveejayreloaded = xtrue )
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
@@ -641,8 +624,8 @@ if test x"$with_extra_cflags" != "x"; then
    CXXFLAGS="$CXXFLAGS $with_extra_cflags"
 fi
 
-gveejay_datadir="${datadir}/gveejay"
-AC_SUBST(gveejay_datadir)
+reloaded_datadir="${datadir}/reloaded"
+AC_SUBST(reloaded_datadir)
 sh gveejay-paths.sh > gveejay-paths.h
 
 glib_modules="glib-2.0 >= 2.4"
@@ -712,9 +695,9 @@ AC_MSG_NOTICE([      Good luck! You can be the first! ])
 fi
 AC_MSG_NOTICE([])
 AC_MSG_NOTICE([ Required dependencies:])
-AC_MSG_NOTICE([  - Veejay 1.4.8                  : ${have_veejay}])
+AC_MSG_NOTICE([  - Veejay 1.5.2                  : ${have_veejay}])
 AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
-AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscaler} ])
+AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscale} ])
 AC_MSG_NOTICE([  - GDK Pixbuf support            : ${have_pixbuf}])
 AC_MSG_NOTICE([  - Alsa support (midi sequencer) : ${have_alsa}])

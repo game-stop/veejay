@@ -29,7 +29,7 @@
 #include <veejay/libvevo.h>
 #include <src/sequence.h>
 #include <src/utils.h>
-#include AVUTIL_INC
+#include <libavutil/avutil.h>
 #include <veejay/vje.h>
 #include <veejay/yuvconv.h>
 #include <string.h>
@@ -94,6 +94,8 @@ static	int	track_exists( veejay_preview_t *vp, const char *hostname, int port_nu
 static	int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v );
 
 static	GStaticRecMutex	mutex_ = G_STATIC_REC_MUTEX_INIT;
+
+void		gvr_veejay_grabber_step( void *data );
 
 static  float   get_ratio(int w, int h)
 {
@@ -290,11 +292,61 @@ static unsigned char		*vims_track_list( veejay_track_t *v, int slen, int *bytes_
 
 static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 {
+
 	unsigned char status_len[6];
 	veejay_memset( status_len, 0, sizeof(status_len) );
+	int k = -1;
+	int n = 0;
+	while( (k = vj_client_poll( v->fd, V_STATUS )) ) // is there a more recent message?
+	{
+		veejay_memset( status_len, 0, sizeof( status_len ) );
+		n = vj_client_read(v->fd, V_STATUS, status_len, 5 );
+		int bytes= 0;
+#ifdef STRICT_CHECKING
+	assert( status_len[0] == 'V' );
+#endif
+
+		if( status_len[0] != 'V' ) {
+			veejay_msg(0, "Error parsing status message.");
+			n = -1;
+		}
+
+		if( n == -1  && v->is_master )
+			reloaded_schedule_restart();
+		
+		if( sscanf( status_len+1, "%03d", &bytes ) != 1 ) {
+			veejay_msg(0, "Invalid status message.");
+			bytes = 0;
+			reloaded_schedule_restart();
+		}
+
+		if(bytes > 0 )
+		{
+			n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
+			if( n <= 0 ) {	
+				if( n == -1 && v->is_master )
+					reloaded_schedule_restart();		
+									
+				break;
+			}
+		}
+	}
+	if( k == -1 && v->is_master )
+		reloaded_schedule_restart();
+	
+	veejay_memset( v->status_tokens,0, sizeof(sizeof(int) * 32));
+	status_to_arr( v->status_buffer, v->status_tokens );	
+/*
+
+
 	gint n = vj_client_read( v->fd, V_STATUS, status_len, 5 );
+
 	if( n <= 0 && v->is_master )
 		reloaded_schedule_restart();
+
+#ifdef STRICT_CHECKING
+	assert( status_len[0] == 'V' );
+#endif
 
 	if( status_len[0] == 'V' )
 	{
@@ -304,6 +356,7 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 		{
 			veejay_memset( v->status_buffer,0, sizeof(v->status_buffer));
 			n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
+			veejay_msg(0, " --> [%s]", v->status_buffer );
 			if( n <= 0 )
 			{
 				if( n == -1 && v->is_master )
@@ -314,14 +367,17 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 			int k = -1;
 			while( (k = vj_client_poll( v->fd, V_STATUS )) ) // is there a more recent message?
 			{
+				veejay_msg(0,"More in buffer!");
 				veejay_memset( status_len, 0, sizeof( status_len ) );
 				n = vj_client_read(v->fd, V_STATUS, status_len, 5 );
+				veejay_msg(0, "FLUSH %d [%s]",n,status_len );
 				if( n == -1  && v->is_master )
 					reloaded_schedule_restart();
 				sscanf( status_len+1, "%03d", &bytes );
 				if(bytes > 0 )
 				{
 					n = vj_client_read( v->fd, V_STATUS, v->status_buffer, bytes );
+					veejay_msg(0, "FLUSH --> [%s]", v->status_buffer );
 					if( n <= 0 ) {	
 						if( n == -1 && v->is_master )
 							reloaded_schedule_restart();		
@@ -331,14 +387,22 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 				}
 			}
 			if( k == -1 && v->is_master )
-				reloaded_schedule_restart();
+		
+			reloaded_schedule_restart();
 			veejay_memset( v->status_tokens,0, sizeof(sizeof(int) * 32));
 			status_to_arr( v->status_buffer, v->status_tokens );	
 			return 1;
 		}
+#ifdef STRICT_CHECKING
+		else {
+			assert(0);
+		}
+#endif
 	}
 	else
 	{
+		veejay_msg(0, "FATAL! cannot parse status message.");
+		assert(0);
 		int err = 0;
 
 		while( ( n = vj_client_poll( v->fd, V_STATUS ))) 
@@ -357,7 +421,7 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 		
 		if( err == -1)
 			reloaded_schedule_restart();
-	}
+	}*/
 	return 1;
 }
 extern int     is_button_toggled(const char *name);

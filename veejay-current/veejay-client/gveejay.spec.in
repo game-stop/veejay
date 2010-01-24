@@ -1,8 +1,8 @@
 # norootforbuild
 # neededforbuild update-desktop-files gtk2-devel-packages glib2 gtk2 libglade3 gtk2-devel glib2-devel libglade-devel libxml2-devel pkgconfig 
 
-%define name    gveejay
-%define	version 1.0
+%define name    reloaded
+%define	version 1.5.2
 %define release reloaded
 %define prefix  /usr
 
@@ -55,9 +55,7 @@ CFLAGS="$RPM_OPT_FLAGS" \
 CXXFLAGS="$RPM_OPT_FLAGS" \
 ./configure \
 	--prefix=%{prefix} \
-	--mandir=%{_mandir} \
-	--with-gveejayreloaded \
-	--with-swscaler
+	--mandir=%{_mandir} 
 
 %build
 # Setup for parallel builds
@@ -79,17 +77,17 @@ install -m 644 share/%{name}-logo.png %{buildroot}%{_datadir}/pixmaps/gveejay.pn
 cat > gveejay.desktop << EOF
 [Desktop Entry]
 Comment=Video Mixing/Editing Instrument
-Exec=gveejayreloaded
+Exec=reloaded
 GenericName=
 Icon=%{name}
 MimeType=
-Name=Gveejay Reloaded
+Name=Reloaded
 Path=
 StartupNotify=true
 Terminal=false
 Type=Application
 EOF
-%suse_update_desktop_file -i gveejay AudioVideo Player
+%suse_update_desktop_file -i reloaded AudioVideo Player
 
 %post -p /sbin/ldconfig
 
@@ -104,7 +102,7 @@ EOF
 %doc doc
 %{_bindir}/%{name}
 %{_datadir}/%{name}/*.png
-# gveejay
+# reloaded
 %{_bindir}/src
 %{_datadir}/%{name}/gveejay-reloaded-2.glade
 %{_datadir}/%{name}/gveejay.rc
@@ -112,4 +110,5 @@ EOF
 %{_datadir}/applications/gveejay.desktop
 
 %changelog -n veejay
+Dec 20, 2009. Updated rpm spec for reloaded 1.5.2
 Mar 21, 2007. Initial rpm spec for gveejayreloaded
