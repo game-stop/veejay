@@ -3629,7 +3629,7 @@
 			      <property name="visible">True</property>
 			      <property name="label" translatable="yes">_learn MIDI</property>
 			      <property name="use_underline">True</property>
-			      <property name="active">True</property>
+			      <property name="active">False</property>
 			      <signal name="activate" handler="on_midilearn_toggled" last_modification_time="Sat, 07 Apr 2007 17:55:42 GMT"/>
 			    </widget>
 			  </child>
@@ -3639,7 +3639,7 @@
 			      <property name="visible">True</property>
 			      <property name="label" translatable="yes">_MIDI enable</property>
 			      <property name="use_underline">True</property>
-			      <property name="active">True</property>
+			      <property name="active">False</property>
 			      <property name="group">midilearn</property>
 			      <signal name="activate" handler="on_midievent_toggled" last_modification_time="Sat, 07 Apr 2007 17:55:29 GMT"/>
 			    </widget>

@@ -17287,7 +17287,7 @@ YUV (current)</property>
       <child>
 	<widget class="GtkLabel" id="current_step_label">
 	  <property name="visible">True</property>
-	  <property name="label" translatable="yes">CurrentStep</property>
+	  <property name="label" translatable="yes">Please select a source to calibrate</property>
 	  <property name="use_underline">False</property>
 	  <property name="use_markup">False</property>
 	  <property name="justify">GTK_JUSTIFY_LEFT</property>
@@ -17498,7 +17498,7 @@ YUV (current)</property>
 		</widget>
 		<packing>
 		  <property name="padding">0</property>
-		  <property name="expand">True</property>
+		  <property name="expand">False</property>
 		  <property name="fill">True</property>
 		</packing>
 	      </child>
