@@ -5229,14 +5229,14 @@ static	void	load_editlist_info()
 	update_label_i( "label_el_achans", values[7], 0);
 	update_label_i( "label_el_abits", values[5], 0);
 
-	if( rate == 0 )
+/*	if( rate == 0 )
 	{
 		enable_widget( "vjframerate" );
 	}
 	else
 	{
 		disable_widget( "vjframerate");
-	}
+	}*/
 
 	
 	info->el.ratio = (float)info->el.width / (float) info->el.height;

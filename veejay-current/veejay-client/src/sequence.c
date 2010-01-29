@@ -64,6 +64,9 @@ typedef struct
 	int	preview;
 	int	width;
 	int	height;
+	int	prevwidth;
+	int	prevheight;
+	int	prevmode;
 	int	need_track_list;
 	unsigned char 	*queue[16];
 	int	n_queued;
@@ -478,6 +481,19 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 						      v->width,v->height, PIX_FMT_YUV420P );
 	else
 		src1 = yuv_yuv_template( in, in, in, v->width,v->height, PIX_FMT_GRAY8 );
+
+	
+	if( (v->prevwidth != v->width) || (v->prevheight != v->height) || (v->prevmode != v->grey_scale ) ) {
+		v->prevwidth = v->width;
+		v->prevheight = v->height;
+		v->prevmode = v->grey_scale;
+		veejay_memset( in, 0, v->width*v->height);
+		if(!v->grey_scale) {
+			veejay_memset( in + (v->width*v->height), 128, ((v->width*v->height)/4));
+			veejay_memset( in + (v->width*v->height) + ((v->width*v->height)/4),128,((v->width*v->height)/4));
+		}
+	}
+	
 	VJFrame *dst1 = NULL;
 
 	dst1 = yuv_rgb_template( out, v->width,v->height, PIX_FMT_BGR24 );
