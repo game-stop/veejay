@@ -430,6 +430,10 @@ void vj_fast_picture_save_to_mem( VJFrame *frame, int out_w, int out_h, int pixf
 		assert( pic_scaler_ != NULL );
 #endif
 		update_pic_data( out_w, out_h, pixfmt );
+
+		veejay_memset( dest[0], 0, out_w*out_h);
+		veejay_memset( dest[1], 128, (out_w*out_h)/4);
+		veejay_memset( dest[2], 128, (out_w*out_h)/4);
 	}
 
 //	if( frame->width == out_w && frame->height == out_h )

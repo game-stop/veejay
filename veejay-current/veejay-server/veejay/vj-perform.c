@@ -596,6 +596,10 @@ int vj_perform_init(veejay_t * info)
 
 	primary_buffer[6] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
 	primary_buffer[6]->Y = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8(512 * 512 * 3));
+	//@ layout of primary_buffer[6] is flat, only Y
+	
+
+
 	primary_buffer[7] = (ycbcr_frame*) vj_calloc(sizeof(ycbcr_frame));
 	primary_buffer[7]->Y = (uint8_t*) vj_calloc( sizeof(uint8_t) * RUP8(w * h * 3));
 	primary_buffer[7]->Cb = primary_buffer[7]->Y + ( RUP8(w*h));

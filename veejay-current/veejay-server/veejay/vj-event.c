@@ -8425,12 +8425,12 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 				h,
 				pixel_format );
 
-	int input_len = (use_bw_preview_ ? ( w * h ) : (( w * h ) + ((w * h)/2)) );
+	int dstlen = (use_bw_preview_ ? ( w * h ) : (( w * h ) + ((w * h)/2)) );
 
 	char header[8];
-	sprintf( header, "%06d%1d", input_len, use_bw_preview_ );
+	sprintf( header, "%06d%1d", dstlen, use_bw_preview_ );
 	SEND_DATA(v, header, 7 );
-	SEND_DATA(v, vj_perform_get_preview_buffer(), input_len );
+	SEND_DATA(v, vj_perform_get_preview_buffer(), dstlen );
 }
 
 void	vj_event_get_cali_image		(	void *ptr,	const char format[],	va_list	ap	)
