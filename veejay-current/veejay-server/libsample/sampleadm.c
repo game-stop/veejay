@@ -357,15 +357,15 @@ typedef struct {
 	sample_info *si;
 } row_t;
 
-static row_t recent_samples_[4];
-static int recent_ = 3;
+static row_t recent_samples_[12];
+static int recent_ = 0;
 
 sample_info *sample_get(int sample_id)
 {
     sample_info *si;
 
     int i;
-    for( i = 0; i < 3; i ++ ) {
+    for( i = 0; i < 12; i ++ ) {
 	if( recent_samples_[i].id == sample_id )
 		return recent_samples_[i].si;
     }
@@ -375,9 +375,7 @@ sample_info *sample_get(int sample_id)
    	 si = (sample_info *) hnode_get(sample_node);
 	 recent_samples_[recent_].si = si;
 	 recent_samples_[recent_].id = sample_id;
-	 recent_ --;
-	 if( recent_ == -1 )
-	   recent_ = 3;
+	 recent_ = (recent_+1) % 12;
    	 if(si) return si;
 	}
     return NULL;

@@ -8597,6 +8597,70 @@ void	vj_event_send_log			(	void *ptr,	const char format[],	va_list ap 	)
 	SEND_MSG( v, _s_print_buf );
 }
 
+void	vj_event_send_sample_stack		(	void *ptr,	const char format[],	va_list ap )
+{
+	char line[32];
+	int args[4];
+	char *str = NULL;
+	int error = 1;
+
+	char	buffer[1024];
+	char    message[1024];  
+	veejay_t *v = (veejay_t*)ptr;
+	P_A(args,str,format,ap);
+
+	buffer[0] = '\0';
+	message[0] = '\0';
+
+	int channel, source,fx_id,i, offset,sample_len;
+
+	if( SAMPLE_PLAYING(v)  ) {
+		if(args[0] == 0) 
+			args[0] = v->uc->sample_id;
+
+		for( i = 0; i < SAMPLE_MAX_EFFECTS ;i ++ ) {
+			fx_id = sample_get_effect_any( args[0], i );
+			if( fx_id <= 0 )
+				continue;
+			channel = sample_get_chain_channel( args[0], i );
+			source  = sample_get_chain_source( args[0], i );
+			offset  = sample_get_offset( args[0], i );
+			if( source == 0 )
+				sample_len= sample_video_length( channel );
+			else 
+				sample_len = 50; //@TODO, implement stream handling
+			snprintf( line, sizeof(line), "%02d%04d%02d%08d%08d", i, channel, source, offset, sample_len );
+			strncat( buffer, line, strlen(line));
+		}
+	} else if(STREAM_PLAYING(v))
+	{
+		if(args[0] == 0) 
+			args[0] = v->uc->sample_id;
+
+		for(i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ ) {
+			fx_id = vj_tag_get_effect_any( args[0], i );
+			if( fx_id <= 0 )
+				continue;
+			channel = vj_tag_get_chain_channel( args[0], i );
+			source  = vj_tag_get_chain_source( args[0], i );
+			offset	= vj_tag_get_offset( args[0], i );
+			if( source == 0 )
+				sample_len= sample_video_length( channel );
+			else 
+				sample_len = 50; //@TODO, implement stream handling
+
+			snprintf( line, sizeof(line), "%02d%04d%02d%08d%08d",i,channel,source, offset, sample_len );
+			strncat( buffer, line, strlen(line));
+		}
+	}	
+
+
+
+	FORMAT_MSG( message, buffer );
+	SEND_MSG(   v, message );
+
+}
+
 void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 {
 	char fline[255];

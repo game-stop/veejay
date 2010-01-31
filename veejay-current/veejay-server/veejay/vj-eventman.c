@@ -1992,6 +1992,17 @@ void		vj_init_vevo_events(void)
 				SAMPLE_STREAM_ID_HELP,
 				0,
 				NULL );
+
+	index_map_[VIMS_SAMPLE_STACK]				=	_new_event(
+				"%d",
+				VIMS_SAMPLE_STACK,
+				"Get sample stack details",
+				vj_event_send_sample_stack,
+				1,
+				VIMS_ALLOW_ANY,
+				SAMPLE_STREAM_ID_HELP,
+				NULL );
+
 	index_map_[VIMS_CHAIN_GET_ENTRY]			=	_new_event(
 				"%d %d",
 				VIMS_CHAIN_GET_ENTRY,
