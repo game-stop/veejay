@@ -89,21 +89,6 @@ void negation_apply( VJFrame *frame, int width, int height, int val)
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
 
-    
-
-     uint8_t *buffer = (uint8_t*) vj_malloc(sizeof(uint8_t)*width*height*3);
-     veejay_memset( buffer,0, width*height*3);
-     ctmf( Y, buffer, width,height,width,width,val,1,1024*1024*8);
-  //   ctmf( Cb,buffer + (width*height), width,height,1,1,val,1,512*1024);
-  //   ctmf( Cr,buffer + (width*height*2),width,height,1,1,val,1,512*1024);
-
-     veejay_memcpy( Y, buffer, width*height);
-   //  veejay_memcpy( Cb,buffer + (width*height), width*height);
-    // veejay_memcpy( Cr,buffer + (width*height*2), width*height);
-veejay_memset( Cb, 128, uv_len );
-veejay_memset( Cr, 128, uv_len );
-     free(buffer);
-/*
 #ifndef HAVE_ASM_MMX
     for (i = 0; i < len; i++) {
 	*(Y) = val - *(Y);
@@ -162,5 +147,4 @@ veejay_memset( Cr, 128, uv_len );
 	__asm__ __volatile__ ( _EMMS:::"memory");
 
 #endif
-*/
 }

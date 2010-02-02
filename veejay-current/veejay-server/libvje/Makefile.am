@@ -39,7 +39,7 @@ EXTRA_DIST += effects/autoeq.h effects/crosspixel.h effects/mask.h effects/rawva
 		      effects/complexthreshold.h effects/lumamask.h effects/radialblur.h effects/waterrippletv.h \
 		      effects/constantblend.h effects/magicmirror.h effects/radioactive.h effects/whiteframe.h \
 		      effects/contourextract.h effects/magicoverlays.h effects/raster.h effects/widthmirror.h \
-		      effects/contrast.h effects/magicscratcher.h effects/rawman.h effects/zoom.h effects/iris.h
+		      effects/contrast.h effects/magicscratcher.h effects/rawman.h effects/zoom.h effects/iris.h effects/cali.h effects/median.h
 
 EXTRA_DIST += specs/FreeFrame.h specs/frei0r.h
 
@@ -86,6 +86,6 @@ libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
 			effects/cartonize.c effects/tripplicity.c effects/neighbours.c effects/neighbours2.c\
 			effects/neighbours3.c effects/neighbours4.c effects/neighbours5.c effects/cutstop.c\
 			effects/contourextract.c effects/texmap.c effects/maskstop.c effects/photoplay.c effects/videoplay.c effects/rgbchannel.c \
-			effects/videowall.c effects/flare.c effects/radioactive.c effects/baltantv.c effects/constantblend.c effects/picinpic.c effects/bgsubtract.c effects/cali.c 
+			effects/videowall.c effects/flare.c effects/radioactive.c effects/baltantv.c effects/constantblend.c effects/picinpic.c effects/bgsubtract.c effects/cali.c effects/median.c
 
 

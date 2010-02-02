@@ -55,6 +55,7 @@
 #include "effects/coloradjust.h"
 #include "effects/gamma.h"
 #include "effects/rgbkey.h"
+#include "effects/median.h"
 #include "transitions/transblend.h"
 #include "transitions/slidingdoor.h"
 #include "transitions/fadecolor.h"
@@ -613,6 +614,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 	vj_effects[i + 49] = waterrippletv_init(width,height);
 	vj_effects[i + 89 ]= radcor_init(width,height);
 	vj_effects[i + 90 ]= cali_init(width,height);
+	vj_effects[i + 91 ] = medianfilter_init(width,height);
 
 	max_width = width;
 	max_height = height;
