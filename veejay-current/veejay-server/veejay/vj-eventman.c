@@ -1577,6 +1577,19 @@ void		vj_init_vevo_events(void)
 				"Duration in frames",
 				100,
 				NULL );
+
+	index_map_[VIMS_CHAIN_FOLLOW_FADE]			=	_new_event(
+				"%d",
+				VIMS_CHAIN_FOLLOW_FADE,
+				"Follow to sample #B after finishing fade from sample #A",
+				vj_event_chain_fade_follow,
+				1,
+				VIMS_ALLOW_ANY,
+				"0=On, 1=Off",
+				0,
+				NULL );
+
+
 	index_map_[VIMS_CHAIN_MANUAL_FADE]			=	_new_event(
 				"%d %d",
 				VIMS_CHAIN_MANUAL_FADE,

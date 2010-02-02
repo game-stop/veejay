@@ -70,6 +70,7 @@ void 	vj_event_chain_entry_video_toggle	(	void *ptr, 	const char format[], 	va_l
 void 	vj_event_chain_entry_disable_video	(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_chain_entry_enable_video	(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_chain_entry_set_defaults	(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_chain_fade_follow		(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_chain_fade_in			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_chain_fade_out			(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_chain_toggle			(	void *ptr,	const char format[],	va_list ap	); 

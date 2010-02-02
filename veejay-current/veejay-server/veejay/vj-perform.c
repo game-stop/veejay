@@ -73,6 +73,9 @@ typedef struct {
 
 typedef struct {
 	int	fader_active;
+	int	follow_fade;
+	int	follow_now[2];
+	int	follow_run;
 	int	fx_status;
 	int	enc_active;
 	int	type;
@@ -130,8 +133,8 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 static	int	vj_perform_preprocess_has_ssm( veejay_t *info, int id, int mode);
 static int vj_perform_get_frame_fx(veejay_t *info, int s1, long nframe, uint8_t *frame[3], uint8_t *p0plane, uint8_t *p1plane);
 static void vj_perform_pre_chain(veejay_t *info, VJFrame *frame);
-static void vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame);
-static void vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame);
+static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame);
+static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame);
 static void seq_play_sample( veejay_t *info, int n);
 static void vj_perform_plain_fill_buffer(veejay_t * info);
 static int vj_perform_tag_fill_buffer(veejay_t * info);
@@ -2787,11 +2790,17 @@ static	inline	void	vj_perform_supersample_chain( veejay_t *info, VJFrame *frame 
 	frame->ssm = 1;
 }
 
-static void vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
+
+void	vj_perform_follow_fade(int status) {
+	pvar_.follow_fade = status;
+}
+
+static int vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 {
 	unsigned int opacity; 
-	int mode = pvar_.fader_active;
-	
+	int mode   = pvar_.fader_active;
+	int follow = 0;
+
 	if( frame->ssm )
 		vj_perform_supersample_chain( info, frame );
 	
@@ -2808,6 +2817,10 @@ static void vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 		{
 			sample_set_effect_status(info->uc->sample_id, 1);
      			sample_reset_fader(info->uc->sample_id);
+			if( pvar_.follow_fade ) {
+		 	  follow = 1;
+			}
+
 	      		veejay_msg(VEEJAY_MSG_DEBUG, "Sample Chain Auto Fade Out done");
 		}
 		if((dir>0) && (opacity==255))
@@ -2815,19 +2828,43 @@ static void vj_perform_post_chain_sample(veejay_t *info, VJFrame *frame)
 			sample_set_effect_status(info->uc->sample_id,0);
 			sample_reset_fader(info->uc->sample_id);
 			veejay_msg(VEEJAY_MSG_DEBUG, "Sample Chain Auto fade In done");
+			if( pvar_.follow_fade ) {
+		 	  follow = 1;
+			}
 		}
-    	}
+    	} else if(mode) {
+		if( pvar_.follow_fade ) {
+		 	  follow = 1;
+		}
+	}
 
 	int len2 = ( frame->ssm == 1 ? helper_frame->len : helper_frame->uv_len );
+
+
 	opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
+
+	if( follow ) {
+		//@ find something to jump to, start with last on chain
+		int i;
+		
+		for( i = SAMPLE_MAX_EFFECTS - 1; i > 0; i -- ) {
+			if( sample_get_chain_channel( info->uc->sample_id, i ) > 0 ) {
+				pvar_.follow_now[0] = sample_get_chain_channel(info->uc->sample_id, i );
+				pvar_.follow_now[1] = sample_get_chain_source( info->uc->sample_id, i );
+			}
+		}
+	}
+
+	return follow;
 }
 
 
-static void vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
+static int vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 {
 	unsigned int opacity; 
 	int mode = pvar_.fader_active;
-	
+	int follow = 0;
+
 	if( !frame->ssm )
 		vj_perform_supersample_chain( info, frame );
 
@@ -2835,7 +2872,13 @@ static void vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 		opacity = (int) vj_tag_get_fader_val(info->uc->sample_id);
 	else
      		opacity = (int) vj_tag_apply_fader_inc(info->uc->sample_id);
-   
+
+	if( opacity == 0 ) {
+		if( pvar_.follow_fade ) {
+		   follow = 1;
+		}
+	}
+
 	if(mode != 2)
 	{
  		int dir = vj_tag_get_fader_direction(info->uc->sample_id);
@@ -2843,19 +2886,44 @@ static void vj_perform_post_chain_tag(veejay_t *info, VJFrame *frame)
 		{
 			vj_tag_set_effect_status(info->uc->sample_id,1);
 			vj_tag_reset_fader(info->uc->sample_id);
+			if( pvar_.follow_fade ) {
+			   follow = 1;
+			}
+
 			veejay_msg(VEEJAY_MSG_DEBUG, "Stream Chain Auto Fade done");
 		}
 		if((dir > 0) && (opacity == 255))
 		{
 			vj_tag_set_effect_status(info->uc->sample_id,0);
 			vj_tag_reset_fader(info->uc->sample_id);
+			if( pvar_.follow_fade ) {
+			   follow = 1;
+			}
 			veejay_msg(VEEJAY_MSG_DEBUG, "Stream Chain Auto Fade done");
 		}
-		
-    	}
+    	} else if(mode){
+		if( pvar_.follow_fade ) {
+		   follow = 1;
+		}
+	}
 
 	int len2 = ( frame->ssm == 1 ? helper_frame->len : helper_frame->uv_len );
 	opacity_blend_apply( frame->data ,temp_buffer,frame->len, len2, opacity );
+
+	if( follow ) {
+		//@ find something to jump to, start with last on chain
+		int i;
+		
+		for( i = SAMPLE_MAX_EFFECTS - 1; i > 0; i -- ) {
+			if( sample_get_chain_channel( info->uc->sample_id, i ) > 0 ) {
+				pvar_.follow_now[0] = vj_tag_get_chain_channel(info->uc->sample_id, i );
+				pvar_.follow_now[1] = vj_tag_get_chain_source( info->uc->sample_id, i );
+			}
+		}
+	}
+
+
+	return follow;
 }
 static uint32_t play_audio_sample_ = 0;
 int vj_perform_queue_audio_frame(veejay_t *info)
@@ -3103,15 +3171,21 @@ static	void 	vj_perform_finish_chain( veejay_t *info )
    	frame->data[1] = primary_buffer[0]->Cb;
     	frame->data[2] = primary_buffer[0]->Cr;
 
+	int result = 0;
+
 	if(info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
 	{
 		if( pvar_.fader_active )
-			vj_perform_post_chain_tag(info,frame);
+			result = vj_perform_post_chain_tag(info,frame);
 	}
 	else if( info->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
 	{
 		if( pvar_.fader_active)
-			vj_perform_post_chain_sample(info,frame);
+			result = vj_perform_post_chain_sample(info,frame);
+	}
+
+	if( result ) {
+		pvar_.follow_run = result;
 	}
 }
 
@@ -3400,8 +3474,9 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 	int is444 = 0;
 	int res = 0;
 
-
+	int safe_ff = pvar_.follow_fade;
 	veejay_memset( &pvar_, 0, sizeof(varcache_t));
+	pvar_.follow_fade = safe_ff;
 
 	if(settings->offline_record)	
 		vj_perform_record_tag_frame(info);
@@ -3474,6 +3549,24 @@ int vj_perform_queue_video_frame(veejay_t *info, const int skip_incr)
 int vj_perform_queue_frame(veejay_t * info, int skip )
 {
 	video_playback_setup *settings = (video_playback_setup*) info->settings;
+
+	if( pvar_.follow_run ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Following to [%d,%d]", pvar_.follow_now[0], pvar_.follow_now[1] );
+
+		if( pvar_.follow_now[1] == 0 ) {
+			info->uc->playback_mode = VJ_PLAYBACK_MODE_SAMPLE;
+			veejay_set_sample( info, pvar_.follow_now[1] );
+		} else {
+			info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
+			veejay_set_sample( info, pvar_.follow_now[1] );
+		}
+
+		pvar_.follow_run    = 0;
+		pvar_.follow_now[0] = 0;
+		pvar_.follow_now[1] = 0;
+	}
+
+
 	if(!skip)
 	{
 		switch(info->uc->playback_mode) 

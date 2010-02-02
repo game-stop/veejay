@@ -5216,6 +5216,18 @@ void vj_event_chain_entry_disable_video(void *ptr, const char format[], va_list 
 
 }
 
+void	vj_event_chain_fade_follow(void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+
+	if( args[0] == 0 || args[0] == 1 ) {
+		vj_perform_follow_fade( args[0] );
+	}
+}
+
 void	vj_event_manual_chain_fade(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
@@ -5269,11 +5281,14 @@ void vj_event_chain_fade_in(void *ptr, const char format[], va_list ap)
 		args[0] = v->uc->sample_id;
 	}
 
+	if( args[1] == 0 ) 
+		args[1] = 1; //@forward
+
 	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
 	{
 		if( sample_set_fader_active( args[0], args[1],-1 ) )
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "Chain Fade In from sample to full effect chain in %d frames. Per frame %2.2f",
+			veejay_msg(VEEJAY_MSG_INFO, "Chain Fade In from sample to full effect chain in %d frames. Per frame %2.4f",
 				args[1], sample_get_fader_inc(args[0]));
 			if(sample_get_effect_status(args[0]==0))
 			{
@@ -5285,7 +5300,7 @@ void vj_event_chain_fade_in(void *ptr, const char format[], va_list ap)
 	{
 		if( vj_tag_set_fader_active( args[0], args[1],-1 ) )
 		{
-			veejay_msg(VEEJAY_MSG_INFO,"Chain Fade In from stream to full effect chain in %d frames. Per frame %2.2f",
+			veejay_msg(VEEJAY_MSG_INFO,"Chain Fade In from stream to full effect chain in %d frames. Per frame %2.4f",
 				args[1], sample_get_fader_inc(args[0]));
 			if(vj_tag_get_effect_status(args[0]==0))
 			{
@@ -5306,6 +5321,9 @@ void vj_event_chain_fade_out(void *ptr, const char format[], va_list ap)
 	{
 		args[0] = v->uc->sample_id;
 	}
+
+	if( args[1] == 0 )
+		args[1] = -1;
 
 	if( SAMPLE_PLAYING(v) && sample_exists(args[0])) 
 	{
