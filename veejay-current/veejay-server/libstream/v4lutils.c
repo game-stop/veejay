@@ -563,7 +563,7 @@ void v4lprint(v4ldevice *vd)
 	veejay_msg(VEEJAY_MSG_DEBUG,"\tPalette:%x",vd->picture.palette);
 	veejay_msg(VEEJAY_MSG_DEBUG,"\tWidth:%d",vd->mmap.width);
 	veejay_msg(VEEJAY_MSG_DEBUG,"\tHeight:%d",vd->mmap.height);
-
+	veejay_msg(VEEJAY_MSG_DEBUG,"\tNorm: %s", v4lvideo_templ_get_norm_str( 	vd->channel[0].norm ));
 	veejay_msg(VEEJAY_MSG_DEBUG,"\tBuffer size: %08x",vd->mbuf.size);
 	veejay_msg(VEEJAY_MSG_DEBUG,"\tNum buffers: %d",vd->mbuf.frames);
 	veejay_msg(VEEJAY_MSG_DEBUG,"\t  offsets[0]: %08x",vd->mbuf.offsets[0]);

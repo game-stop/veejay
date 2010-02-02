@@ -402,8 +402,8 @@ static int set_option(const char *name, char *value)
 		info->dummy->height = atoi(optarg);
 	}
 	else if(strcmp(name, "norm") == 0 || strcmp(name, "N") == 0 ) {
-		info->dummy->norm = optarg[0];
-		if(info->dummy->norm == 1 )	
+		int val = atoi(optarg);
+		if(val == 1 )	
 			override_norm = 'n';
 	}
 	else if(strcmp(name, "D") == 0 || strcmp(name, "composite") == 0)

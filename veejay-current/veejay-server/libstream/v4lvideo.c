@@ -209,6 +209,15 @@ int	v4lvideo_templ_get_palette( int p )
 	return -1;
 }
 
+char	*v4lvideo_templ_get_norm_str( int id ) {
+	int i;
+	for( i = 0; normlists[i].type != -1; i ++ ) {
+		if( normlists[i].type == id ) 
+			return normlists[i].name;
+	}
+	return "?";
+}
+
 int	v4lvideo_templ_get_norm( const char *name )
 {
 	int i;

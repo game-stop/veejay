@@ -2918,11 +2918,7 @@ veejay_t *veejay_malloc()
     info->uc->sample_end = 0;
     info->net = 1;
 
-    info->dummy->width = 352;
-    info->dummy->height = 288;
-    info->dummy->fps    = 25.0;
-
-	for( i =0; i < 8 ; i ++ )
+    for( i =0; i < 8 ; i ++ )
 		info->rlinks[i] = -1;
 
     veejay_memset(info->action_file[0],0,256); 
@@ -3627,21 +3623,45 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	//TODO: pass yuv sampling to dummy
 	if( info->dummy->active )
 	{
-		if( !info->dummy->norm )
-			info->dummy->norm = 'p'; 
-		if( !info->dummy->fps )
+		info->dummy->norm = override_norm;
+		if( override_norm == 'n' ) {
+			if(!info->dummy->fps) //@ if not set
+				info->dummy->fps = 30000.0/1001;
+		} 
+		if(!info->dummy->fps)
 			info->dummy->fps = 25.0;
-		if( !info->dummy->width )
-			info->dummy->width = 352;
-		if( !info->dummy->height)
-			info->dummy->height = 288;
-		info->dummy->chroma = CHROMA422;	
-		if( !info->dummy->arate)
-			info->dummy->arate = 48000;
 	
-		info->edit_list = vj_el_dummy( 0, info->auto_deinterlace, info->dummy->chroma,
-				info->dummy->norm, info->dummy->width, info->dummy->height, info->dummy->fps,
-				info->pixel_format );
+		int dw = 720;
+		int dh = (override_norm == 'p' ? 576 : 480);
+
+		char *runClassic = getenv( "VEEJAY_RUN_MODE" );
+		if( runClassic ) {
+			if( strncasecmp("CLASSIC",runClassic,7 ) == 0 ) {
+			       dw = (override_norm == 'p' ? 352 : 360 );
+		       	       dh = dh / 2;
+			}	       
+		}
+
+		if( !info->dummy->width )
+			info->dummy->width  = dw;
+		if( !info->dummy->height)
+			info->dummy->height = dh;
+		
+		info->dummy->chroma = CHROMA422;
+		if( info->audio ) {
+			if( !info->dummy->arate)
+				info->dummy->arate = 48000;
+		}
+
+		info->edit_list = vj_el_dummy( 0, 
+				info->auto_deinterlace,
+				info->dummy->chroma,
+				info->dummy->norm,
+				info->dummy->width,
+				info->dummy->height,
+				info->dummy->fps,
+				info->pixel_format 
+				);
 
 		if( info->dummy->arate )
 		{
@@ -3654,8 +3674,9 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 			veejay_msg(VEEJAY_MSG_DEBUG, "Dummy Audio: %f KHz, %d channels, %d bps, %d bit audio",
 				(float)el->audio_rate/1000.0,el->audio_chans,el->audio_bps,el->audio_bits);
 		}
-		veejay_msg(VEEJAY_MSG_DEBUG,"Dummy Video: %dx%d, chroma %x, fps %2.2f",
-					info->dummy->width,info->dummy->height, info->dummy->chroma,info->dummy->fps);
+		veejay_msg(VEEJAY_MSG_DEBUG,"Dummy Video: %dx%d, chroma %x, framerate %2.2f, norm %s",
+					info->dummy->width,info->dummy->height, info->dummy->chroma,info->dummy->fps,
+					(info->dummy->norm == 'n' ? "NTSC" :"PAL"));
 
 	}
 	else

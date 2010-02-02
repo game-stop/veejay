@@ -29,6 +29,7 @@ int	v4lvideo_templ_get_norm( const char *name );
 int	v4lvideo_templ_getfreq( const char *name );
 int	v4lvideo_templ_num_devices();
 int	v4lvideo_templ_get_palette( int p );
+char *v4lvideo_templ_get_norm_str(int id );
 
 char	**v4lvideo_templ_get_devices(int *num);
 
