@@ -475,7 +475,6 @@ int 	vj_osc_build_cont( vj_osc *o )
 		}
 		o->leaves[next_id] = OSCNewContainer( arr[0], o->container, &(o->cqinfo) );
 		err = vevo_property_set(o->index, arr[0], VEVO_ATOM_TYPE_INT , 1, &next_id);
-		veejay_msg(0, "Added container '%s' to slot %d", arr[0],next_id);
 		next_id ++;
 	}
 
@@ -501,7 +500,6 @@ int 	vj_osc_build_cont( vj_osc *o )
 		
 			err = vevo_property_get( o->index, arr[t], 0, &exists );
 			if( err == VEVO_NO_ERROR ) {
-				veejay_msg(VEEJAY_MSG_INFO, "'%s' is in container '%s'%d", arr[t], arr[t-1],attach_id);
 				continue;
 			}
 
@@ -514,7 +512,7 @@ int 	vj_osc_build_cont( vj_osc *o )
 			
 			next_id ++;
 
-			veejay_msg(0, "Added leave '%s'%d to container '%s'%d", arr[t],next_id-1,arr[t-1],attach_id);
+			//veejay_msg(0, "Added leave '%s'%d to container '%s'%d", arr[t],next_id-1,arr[t-1],attach_id);
 		}
 	}	
 
