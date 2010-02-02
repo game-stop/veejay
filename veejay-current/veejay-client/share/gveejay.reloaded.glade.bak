@@ -3629,7 +3629,7 @@
 			      <property name="visible">True</property>
 			      <property name="label" translatable="yes">_learn MIDI</property>
 			      <property name="use_underline">True</property>
-			      <property name="active">True</property>
+			      <property name="active">False</property>
 			      <signal name="activate" handler="on_midilearn_toggled" last_modification_time="Sat, 07 Apr 2007 17:55:42 GMT"/>
 			    </widget>
 			  </child>
@@ -3639,7 +3639,7 @@
 			      <property name="visible">True</property>
 			      <property name="label" translatable="yes">_MIDI enable</property>
 			      <property name="use_underline">True</property>
-			      <property name="active">True</property>
+			      <property name="active">False</property>
 			      <property name="group">midilearn</property>
 			      <signal name="activate" handler="on_midievent_toggled" last_modification_time="Sat, 07 Apr 2007 17:55:29 GMT"/>
 			    </widget>
@@ -15137,6 +15137,36 @@ YUV (current)</property>
 						  <property name="padding">0</property>
 						  <property name="expand">True</property>
 						  <property name="fill">True</property>
+						</packing>
+					      </child>
+
+					      <child>
+						<widget class="GtkCheckButton" id="fx_followfade">
+						  <property name="visible">True</property>
+						  <property name="tooltip" translatable="yes">Switch to sample #B after completing fade.</property>
+						  <property name="can_focus">True</property>
+						  <property name="relief">GTK_RELIEF_HALF</property>
+						  <property name="focus_on_click">True</property>
+						  <property name="active">False</property>
+						  <property name="inconsistent">False</property>
+						  <property name="draw_indicator">True</property>
+						  <signal name="toggled" handler="on_fx_followfade_toggled" last_modification_time="Tue, 02 Feb 2010 20:48:43 GMT"/>
+
+						  <child>
+						    <widget class="GtkImage" id="image3508">
+						      <property name="visible">True</property>
+						      <property name="pixbuf">icon_follow.png</property>
+						      <property name="xalign">0.5</property>
+						      <property name="yalign">0.5</property>
+						      <property name="xpad">0</property>
+						      <property name="ypad">0</property>
+						    </widget>
+						  </child>
+						</widget>
+						<packing>
+						  <property name="padding">0</property>
+						  <property name="expand">False</property>
+						  <property name="fill">False</property>
 						</packing>
 					      </child>
 					    </widget>
