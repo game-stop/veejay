@@ -1831,8 +1831,9 @@ int	vj_tag_get_v4l_properties(int t1,
 
 int vj_tag_get_effect_any(int t1, int position) {
 	vj_tag *tag = vj_tag_get(t1);
+	if(!tag )
+	   return 0;
 #ifdef STRICT_CHECKING
-	assert( tag != NULL );
 	assert( position >= 0 && position < SAMPLE_MAX_EFFECTS );
 #endif
 	return tag->effect_chain[position]->effect_id;
