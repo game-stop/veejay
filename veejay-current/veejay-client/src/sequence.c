@@ -179,7 +179,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 	gint tmp_len = header_len + 1;
 	unsigned char *tmp = vj_calloc( tmp_len );
 	gint len = 0;
-	gint n = vj_client_read( v->fd, V_CMD, tmp, header_len );
+	gint n = vj_client_read_no_wait( v->fd, V_CMD, tmp, header_len );
 
 	if( n<= 0 )
 	{
@@ -212,7 +212,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 
 	while( bw < len )
 	{
-		n = vj_client_read( v->fd, V_CMD, buf_ptr, bytes_read );
+		n = vj_client_read_no_wait( v->fd, V_CMD, buf_ptr, bytes_read );
 		if ( n <= 0 )
 		{
 			if( n == -1 && v->is_master )
