@@ -62,14 +62,21 @@ vj_client *vj_client_alloc( int w, int h, int f )
 	v->cur_height = h;
 	v->cur_fmt = f;
 	v->space = NULL;
-//	v->lzo = lzo_new();
 	v->c = (conn_type_t**) malloc(sizeof(conn_type_t*) * 3);
 	v->c[0] = (conn_type_t*) malloc(sizeof(conn_type_t));
 	v->c[1] = (conn_type_t*) malloc(sizeof(conn_type_t));
 	v->blob = (unsigned char*) malloc(sizeof(unsigned char) * PACKET_LEN ); 
+	if(!v->blob ) {
+		veejay_msg(0, "Memory allocation error.");
+		free(v);
+		return NULL;
+	}
+	memset( v->blob,0,sizeof(unsigned char) * PACKET_LEN );
 	v->mcast = 0;
-	if( w > 0 && h > 0 )
+	if( w > 0 && h > 0 ) {
 		v->space = (uint8_t*) malloc( sizeof(uint8_t) * w * h * 4 );
+		memset(v->space,0,sizeof(uint8_t)*w*h*4);
+	}
 	return v;
 }
 
@@ -90,22 +97,22 @@ void		vj_client_free(vj_client *v)
 		if(v->space)
 			free(v->space);
 		free(v);
+		v = NULL;
 	}
 }
 
 #ifdef STRICT_CHECKING
-static	void	vj_client_stdout_dump( int fd, int got_len,int len, char *buf, int bufsize )
-{
+static	int	verify_integrity( int len, char *buf ) {
+	if( len > 0 && buf == NULL )
+		return 0;
 	int i;
-	veejay_msg(0, "FD %x, %d out of %d bytes received (timeout)", fd, got_len, len );
-	for(i = 0;i < bufsize; i ++ ) {
-		if( isalnum( buf[i] ) ) {
-			printf("'%c',",buf[i]);
-		} else {
-			printf("%x,",buf[i]);
-		}
-	}
-	printf("\n");
+	for ( i = 0; i < len ; i ++ ) {
+		if( buf[i] == '\0' )
+			return 0;
+		if( !isalnum(buf[i]) )
+			return 0;
+	}	
+	return 1;
 }
 #endif
 
@@ -125,20 +132,6 @@ int	vj_client_window_sizes( int socket_fd, int *r, int *s )
 	return 1;
 }
 
-void	vj_client_flush(vj_client *v, int num_frames)
-{
-	if(vj_client_poll(v, V_STATUS ))
-	{
-		char status[100];
-		int bytes = 100;
-		int n = vj_client_read( v, V_STATUS,status,bytes);
-		if( n > 0 )
-		{	num_frames --;	
-		}
-	
-	}
-}
-
 int vj_client_connect_dat(vj_client *v, char *host, int port_id  )
 {
 	int error = 0;
@@ -156,8 +149,12 @@ int vj_client_connect_dat(vj_client *v, char *host, int port_id  )
 
 	v->c[0]->type = VSOCK_C;
 	v->c[0]->fd   = alloc_sock_t();
-	  free(v->c[1]);
+        
+	if(v->c[1])	
+      		free(v->c[1]);
+	
 	v->c[1] = NULL;
+	
 	if( sock_t_connect( v->c[0]->fd, host, port_id + 5  ) )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Connect to DAT port %d", port_id + 5);	
@@ -172,13 +169,13 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 	if(port_id <= 0 || port_id > 65535)
 	{
 		veejay_msg(0, "Invalid port number '%d'", port_id );
-		return 0;
+		return error;
 	}
 
 	if( group_name == NULL )
 	{
 		if(host == NULL)
-			return 0;
+			return error;
 
 		v->c[0]->type = VSOCK_C;
 		v->c[0]->fd   = alloc_sock_t();
@@ -187,7 +184,7 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 		if(!v->c[0]->fd || !v->c[1]->fd )
 		{	
 			veejay_msg(0, "Error opening socket");
-			return 0;
+			return error;
 		}
 
 		if( sock_t_connect( v->c[0]->fd, host, port_id + VJ_CMD_PORT ) )
@@ -208,13 +205,13 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 		v->c[0]->r    = mcast_new_receiver( group_name, port_id + VJ_CMD_MCAST ); 
 		if(!v->c[0]->r ) {
 			veejay_msg(0 ,"Unable to setup multicast receiver on group %s", group_name );
-			return 0;
+			return error;
 		}
 
 		v->c[0]->s    = mcast_new_sender( group_name );
 		if(!v->c[0]->s ) {
 			veejay_msg(0, "Unable to setup multicast sender on group %s", group_name );
-			return 0;
+			return error;
 		}
 		v->ports[0] = port_id + VJ_CMD_MCAST;
 		v->ports[1] = port_id + VJ_CMD_MCAST_IN;
@@ -271,17 +268,7 @@ static	void	vj_client_decompress( vj_client *t,uint8_t *in, uint8_t *out, int da
 	lzo_decompress( t->lzo, ( in == NULL ? t->space: in ), data_len, d, UV );
 }
 
-static	void	hexstr(uint8_t *bytes, int len){
-	unsigned int i;
-	printf("\tHex:");
-	for( i = 0  ; i < len ; i ++ )  {
-		printf("%x.", bytes[i]);
-	}
-	printf("\n");
-
-}
 static	int	getint(uint8_t *in, int len ) {
-	
 	char *ptr, *word = strndup( in, len+1 );
 	word[len] = '\0';
 	long v = strtol( word, &ptr, 10 );
@@ -331,23 +318,15 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 	} else if ( v->c[0]->type == VSOCK_C )
 	{
 		veejay_memset( line,0, sizeof(line));
-		plen = sock_t_recv_w( v->c[0]->fd, line, 21 );	
-#ifndef STRICT_CHECKING
+//		plen = sock_t_recv_w( v->c[0]->fd, line, 21 );	
+		plen = sock_t_recv( v->c[0]->fd, line, 21 );
 		if( plen <= 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Network I/O Error while reading header: %s", strerror(errno));
 			return -1;
 		}
-#else
-		if( plen == -5 ) {
-			vj_client_stdout_dump( v->c[0]->fd, plen, 21, line, sizeof(line)-1 );
-			return -1;
-		} else if ( plen <= 0 ) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Network I/O Error while reading header: %s", strerror(errno));
-			return -1;
-		}
-#endif
-
+		
+		//vj_client_stdout_dump_recv( v->c[0]->fd, plen, line );
 #ifdef STRICT_CHECKING
 		assert( plen == 21 );
 #endif
@@ -376,17 +355,11 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 				uv_len = y_len/2;break;
 		}
 
-		int n = sock_t_recv_w( v->c[0]->fd, v->space, p[3]  );
-#ifdef STRICT_CHECKING
-		if( n == -5 ) {
-			vj_client_stdout_dump( v->c[0]->fd, n, p[3], NULL, 0 );
-			return -1;
-		} else if ( n != p[3] ) 
-		{
-#else
+	//	int n = sock_t_recv_w( v->c[0]->fd, v->space, p[3]  );
+
+		int n = sock_t_recv( v->c[0]->fd,v->space,p[3] );
 		if( n != p[3] )
 		{
-#endif
 			if( n < 0 ) {
 				veejay_msg(VEEJAY_MSG_ERROR, "Network I/O Error: %s", strerror(errno));
 			} else {
@@ -445,29 +418,13 @@ int	vj_client_read(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 	if( sock_type == V_STATUS )
 	{
 		if(v->c[1]->type == VSOCK_S) {
-#ifdef STRICT_CHECKING
-			int res = sock_t_recv_w( v->c[1]->fd, dst, bytes );
-			if( res == -5 ) {
-				vj_client_stdout_dump( v->c[1]->fd, res,bytes,dst, bytes );
-			}
-			return res;
-#else
 			return( sock_t_recv_w( v->c[1]->fd, dst, bytes ) );
-#endif
 		}
 	}
 	if( sock_type == V_CMD )
 	{
 		if(v->c[0]->type == VSOCK_C) {
-#ifdef STRICT_CHECKING
-			int res = sock_t_recv_w( v->c[0]->fd, dst,bytes );
-			if( res == -5 ) {
-				vj_client_stdout_dump( v->c[0]->fd, res, bytes, dst, bytes );
-			}
-			return res;
-#else
 			return ( sock_t_recv_w( v->c[0]->fd, dst, bytes ) );
-#endif
 		}
 	}
 	return 0;
@@ -477,10 +434,14 @@ int vj_client_send(vj_client *v, int sock_type,char *buf )
 {
 	if( sock_type == V_CMD )
 	{
-
 		// format msg
 		int len = strlen( buf );
 		sprintf(v->blob, "V%03dD%s", len, buf);
+#ifdef STRICT_CHECKING
+		if(!verify_integrity(v->blob,len) ) {
+			veejay_msg(0,"VIMS validation error in buf of %d bytes: '%s'", len,buf);
+		}
+#endif
 		if(v->c[0]->type == VSOCK_C)
 			return ( sock_t_send( v->c[0]->fd, v->blob, len + 5 ));
 		if(v->c[0]->type == VMCAST_C)
@@ -497,8 +458,15 @@ int vj_client_send_buf(vj_client *v, int sock_type,unsigned char *buf, int len )
 		// format msg
 		sprintf(v->blob, "V%03dD", len);
 		veejay_memcpy( v->blob+5, buf, len );
+#ifdef STRICT_CHECKING
+		if(!verify_integrity(v->blob,len+5) ) {
+			veejay_msg(0,"VIMS validation error in buf of %d bytes: '%s'", len+5,buf);
+		}
+#endif
+						
 		if(v->c[0]->type == VSOCK_C)
 			return ( sock_t_send( v->c[0]->fd, v->blob, len + 5 ));
+		
 		if(v->c[0]->type == VMCAST_C)
 			return ( mcast_send( v->c[0]->s, (void*) v->blob, len + 5,
 					v->ports[1] ));
@@ -510,10 +478,10 @@ int vj_client_send_bufX(vj_client *v, int sock_type,unsigned char *buf, int len 
 {
 	if( sock_type == V_CMD )
 	{
-
 		// format msg
 		sprintf(v->blob, "K%08d", len);
 		veejay_memcpy( v->blob+9, buf, len );
+		
 		if(v->c[0]->type == VSOCK_C)
 			return ( sock_t_send( v->c[0]->fd, v->blob, len + 9 ));
 		if(v->c[0]->type == VMCAST_C)

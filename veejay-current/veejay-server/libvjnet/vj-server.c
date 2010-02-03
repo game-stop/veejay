@@ -311,6 +311,7 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
     	return NULL;
 }
 
+int	vj_server_link_can_write( vj_server *vje, int link_id, int timeout );
 
 int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 {
@@ -326,6 +327,10 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 	vj_link **Link = (vj_link**) vje->link;
 	
 	if( !Link[link_id]->in_use ) 
+		return -1;
+
+
+	if( !vj_server_link_can_write( vje,link_id, 1 ) )
 		return -1;
 
 	if( !vje->use_mcast)
@@ -349,7 +354,7 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 	return total;
 }
 
-int	vj_server_link_can_write( vj_server *vje, int link_id )
+int	vj_server_link_can_write( vj_server *vje, int link_id, int timeout )
 {
 	fd_set wds;
 	fd_set eds;
@@ -369,6 +374,7 @@ int	vj_server_link_can_write( vj_server *vje, int link_id )
 
 	struct timeval tv;
 	memset( &tv, 0,sizeof(struct timeval));
+	tv.tv_sec = timeout;
 
 	int err = select( link[link_id]->handle+1, NULL, &wds, &eds,&tv );
 
@@ -430,7 +436,7 @@ int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len,
 {
 	if(!vje->use_mcast )
 	{
-		if( vj_server_link_can_write( vje, link_id ))
+		if( vj_server_link_can_write( vje, link_id,0 ))
 		{
 			return vj_server_send_frame_now( vje, link_id, buf, len );
 		}

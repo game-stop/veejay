@@ -42,6 +42,8 @@ void		sock_t_free(vj_sock_t *s )
 	if(s) free(s);
 }
 
+#define TIMEOUT 3
+
 int			sock_t_connect_and_send_http( vj_sock_t *s, char *host, int port, char *buf, int buf_len )
 {
 	s->he = gethostbyname( host );
@@ -135,6 +137,8 @@ int			sock_t_poll_w(vj_sock_t *s )
 	int	status;
 	fd_set	fds;
 	struct timeval no_wait;
+	no_wait.tv_sec = TIMEOUT;
+	no_wait.tv_usec = 0;
 	memset( &no_wait, 0, sizeof(no_wait) );
 
 	FD_ZERO( &fds );
@@ -184,6 +188,7 @@ int			sock_t_poll( vj_sock_t *s )
 	return 0;
 }
 
+
 static		int	timed_recv( int fd, void *buf, const int len, int timeout )
 {
 	fd_set fds;
@@ -194,8 +199,8 @@ static		int	timed_recv( int fd, void *buf, const int len, int timeout )
 	FD_ZERO(&fds);
 	FD_SET( fd,&fds );
 
-	tv.tv_sec = timeout;
-	tv.tv_usec   = 0;
+	tv.tv_sec  = TIMEOUT;
+	tv.tv_usec = 0;
 
 	n	  = select( fd + 1, &fds, NULL, NULL, &tv );
 	if( n == 0 ) {
@@ -211,27 +216,17 @@ static		int	timed_recv( int fd, void *buf, const int len, int timeout )
 	return recv( fd, buf, len, 0 );
 }
 
-#define TIMEOUT 10
 int			sock_t_recv_w( vj_sock_t *s, void *dst, int len )
 {
 	int n = 0;
 	if( len < s->recv_size )
 	{
-#ifdef STRICT_CHECKING
-		n = timed_recv( s->sock_fd,dst,len, TIMEOUT );
-#else
 		n = recv( s->sock_fd, dst, len, MSG_WAITALL );
-#endif
 		if(n==-1)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
 			return -1;
 		}
-#ifdef STRICT_CHECKING
-		else if ( n == -5 ) {
-			return -5; //@ timeout
-		}		
-#endif
 		return n;
 	}
 	else
@@ -241,21 +236,15 @@ int			sock_t_recv_w( vj_sock_t *s, void *dst, int len )
 
 		while( done < len )
 		{
-#ifdef STRICT_CHECKING
-			n = timed_recv( s->sock_fd,dst + done, bytes_left, TIMEOUT );
-#else
 			n = recv( s->sock_fd, dst + done,bytes_left,MSG_WAITALL );
-#endif
 			if( n == -1)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "%s",strerror(errno));
 				return -1;
 			}
-#ifdef STRICT_CHECKING
-			else if ( n == -5 ) {
-				return -5;
-			}
-#endif
+			if( n == 0 ) 
+				break;
+
 			done += n;
 			
 			if( (len-done) < s->recv_size)
@@ -268,13 +257,31 @@ int			sock_t_recv_w( vj_sock_t *s, void *dst, int len )
 
 int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 {
-	int n = recv( s->sock_fd, dst, len , 0  );
-	if(n==-1)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
-		return -1;
+	int done = 0;
+	int bytes_left = s->recv_size;
+	int n;
+	if( len < bytes_left )
+		bytes_left = len;
+
+	while( done < len )
+	{	
+		n = timed_recv( s->sock_fd, dst+done,bytes_left, TIMEOUT );
+		if( n == -5 ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "Timeout while receiving data");	
+			return -1;
+		} else if ( n == -1 ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
+			return -1;
+		}
+
+		if( n == 0 )
+			break;
+		done += n;
+
+		if( (len-done) < s->recv_size )
+			bytes_left = len - done;
 	}
-	return n;
+	return done;
 }
 
 int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
@@ -283,42 +290,26 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 #ifdef STRICT_CHECKING
 	assert( buf != NULL );
 #endif
-	//@ send in reasonable chunks
-	if( len < s->send_size )
+	int bs   = s->send_size;
+	if( len < bs )
+		bs = len;
+	int done  = 0;
+	while( done < len )
 	{
-		n = send(s->sock_fd,buf,len, 0 );
-		if( n == -1 )
+		n = send( s->sock_fd, buf + done, bs , MSG_DONTWAIT );
+		if(n == -1)
 		{
-			veejay_msg(0, "Send error: %s",strerror(errno));
-			veejay_msg(0, "\t[%s], %d bytes", buf,len );
+			veejay_msg(VEEJAY_MSG_ERROR, "TCP send error: %s", strerror(errno));
 			return 0;
 		}
-#ifdef NET_DEBUG
-		printf("%d %06d [%s]\n",s->sock_fd,len,buf );
-#endif
-		return n;
+		if( n == 0 )
+			break;
+		
+		done += n;
+		if( (len-done) < s->send_size)
+			bs = len - done;
 	}
-	else
-	{	
-		int done = 0;
-		int bs   = s->send_size;
-		while( done < len )
-		{
-			n = send( s->sock_fd, buf + done, bs , 0 );
-			if(n == -1)
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "TCP send error: %s", strerror(errno));
-				return 0;
-			}
-#ifdef NET_DEBUG
-				printf("%d %06d [%s]\n",s->sock_fd,n,buf + done );
-#endif
-
-			done += n;
-		}
-		return done;
-	}
-	return 0;
+	return done;
 }
 
 int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
@@ -327,47 +318,27 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 #ifdef STRICT_CHECKING
 	assert( buf != NULL );
 #endif
-	
-	//@ send in reasonable chunks
-	if( len < send_size )
+	int done = 0;
+	int bs   = send_size;
+	if( len < bs )
+		bs = len;
+
+	while( done < len )
 	{
-		n = send(fd,buf,len, 0 );
-		if( n == -1 )
+		n = send( fd, buf + done, bs , MSG_DONTWAIT  );
+		if(n == -1)
 		{
-			veejay_msg(0, "Send error: %s",strerror(errno));
+			veejay_msg(VEEJAY_MSG_ERROR, "TCP send error: %s", strerror(errno));
 			return 0;
 		}
-#ifdef NET_DEBUG
-		printf("%d %06d [%s]\n",fd,n,buf );
-#endif
-
-		return n;
+		if( n == 0 )
+			break;
+		
+		done += n;
+		if( (len-done) < send_size)
+			bs = len - done;
 	}
-	else
-	{	
-		int done = 0;
-		int bytes_left = len;
-		while( done < len )
-		{
-			n = send( fd, buf + done, bytes_left , 0 );
-			if(n == -1)
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "TCP send error: %s", strerror(errno));
-				return 0;
-			}
-#ifdef NET_DEBUG
-			printf("%d %06d [%s]\n",fd,n,buf + done );
-#endif
-
-			bytes_left -= n;
-			done += n;
-		}
-#ifdef STRICT_CHECKING
-		assert( done == len );
-#endif
-		return done;
-	}
-	return 0;
+	return done;
 }
 
 void			sock_t_close( vj_sock_t *s )
@@ -375,5 +346,6 @@ void			sock_t_close( vj_sock_t *s )
 	if(s)
 	{
 		close(s->sock_fd);
+		s->sock_fd = 0;
 	}
 }
