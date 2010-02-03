@@ -184,17 +184,54 @@ int			sock_t_poll( vj_sock_t *s )
 	return 0;
 }
 
+static		int	timed_recv( int fd, void *buf, const int len, int timeout )
+{
+	fd_set fds;
+	int	n;
+
+	struct timeval tv;
+
+	FD_ZERO(&fds);
+	FD_SET( fd,&fds );
+
+	tv.tv_sec = timeout;
+	tv.tv_usec   = 0;
+
+	n	  = select( fd + 1, &fds, NULL, NULL, &tv );
+	if( n == 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tsocket %x :: requested %d bytes", fd, len );
+	}
+
+	if( n == -1 )
+		return -1;
+
+	if( n == 0 )
+		return -5;
+
+	return recv( fd, buf, len, 0 );
+}
+
+#define TIMEOUT 10
 int			sock_t_recv_w( vj_sock_t *s, void *dst, int len )
 {
 	int n = 0;
 	if( len < s->recv_size )
 	{
+#ifdef STRICT_CHECKING
+		n = timed_recv( s->sock_fd,dst,len, TIMEOUT );
+#else
 		n = recv( s->sock_fd, dst, len, MSG_WAITALL );
+#endif
 		if(n==-1)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
 			return -1;
 		}
+#ifdef STRICT_CHECKING
+		else if ( n == -5 ) {
+			return -5; //@ timeout
+		}		
+#endif
 		return n;
 	}
 	else
@@ -204,12 +241,21 @@ int			sock_t_recv_w( vj_sock_t *s, void *dst, int len )
 
 		while( done < len )
 		{
+#ifdef STRICT_CHECKING
+			n = timed_recv( s->sock_fd,dst + done, bytes_left, TIMEOUT );
+#else
 			n = recv( s->sock_fd, dst + done,bytes_left,MSG_WAITALL );
+#endif
 			if( n == -1)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "%s",strerror(errno));
 				return -1;
 			}
+#ifdef STRICT_CHECKING
+			else if ( n == -5 ) {
+				return -5;
+			}
+#endif
 			done += n;
 			
 			if( (len-done) < s->recv_size)

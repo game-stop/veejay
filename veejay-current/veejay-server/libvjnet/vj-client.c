@@ -93,6 +93,22 @@ void		vj_client_free(vj_client *v)
 	}
 }
 
+#ifdef STRICT_CHECKING
+static	void	vj_client_stdout_dump( int fd, int got_len,int len, char *buf, int bufsize )
+{
+	int i;
+	veejay_msg(0, "FD %x, %d out of %d bytes received (timeout)", fd, got_len, len );
+	for(i = 0;i < bufsize; i ++ ) {
+		if( isalnum( buf[i] ) ) {
+			printf("'%c',",buf[i]);
+		} else {
+			printf("%x,",buf[i]);
+		}
+	}
+	printf("\n");
+}
+#endif
+
 int	vj_client_window_sizes( int socket_fd, int *r, int *s )
 {
 	int tmp = sizeof(int);
@@ -316,11 +332,22 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 	{
 		veejay_memset( line,0, sizeof(line));
 		plen = sock_t_recv_w( v->c[0]->fd, line, 21 );	
+#ifndef STRICT_CHECKING
 		if( plen <= 0 )
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Network I/O Error while reading header: %s", strerror(errno));
 			return -1;
 		}
+#else
+		if( plen == -5 ) {
+			vj_client_stdout_dump( v->c[0]->fd, plen, 21, line, sizeof(line)-1 );
+			return -1;
+		} else if ( plen <= 0 ) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Network I/O Error while reading header: %s", strerror(errno));
+			return -1;
+		}
+#endif
+
 #ifdef STRICT_CHECKING
 		assert( plen == 21 );
 #endif
@@ -350,8 +377,16 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 		}
 
 		int n = sock_t_recv_w( v->c[0]->fd, v->space, p[3]  );
+#ifdef STRICT_CHECKING
+		if( n == -5 ) {
+			vj_client_stdout_dump( v->c[0]->fd, n, p[3], NULL, 0 );
+			return -1;
+		} else if ( n != p[3] ) 
+		{
+#else
 		if( n != p[3] )
 		{
+#endif
 			if( n < 0 ) {
 				veejay_msg(VEEJAY_MSG_ERROR, "Network I/O Error: %s", strerror(errno));
 			} else {
@@ -410,13 +445,29 @@ int	vj_client_read(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 	if( sock_type == V_STATUS )
 	{
 		if(v->c[1]->type == VSOCK_S) {
+#ifdef STRICT_CHECKING
+			int res = sock_t_recv_w( v->c[1]->fd, dst, bytes );
+			if( res == -5 ) {
+				vj_client_stdout_dump( v->c[1]->fd, res,bytes,dst, bytes );
+			}
+			return res;
+#else
 			return( sock_t_recv_w( v->c[1]->fd, dst, bytes ) );
+#endif
 		}
 	}
 	if( sock_type == V_CMD )
 	{
 		if(v->c[0]->type == VSOCK_C) {
+#ifdef STRICT_CHECKING
+			int res = sock_t_recv_w( v->c[0]->fd, dst,bytes );
+			if( res == -5 ) {
+				vj_client_stdout_dump( v->c[0]->fd, res, bytes, dst, bytes );
+			}
+			return res;
+#else
 			return ( sock_t_recv_w( v->c[0]->fd, dst, bytes ) );
+#endif
 		}
 	}
 	return 0;

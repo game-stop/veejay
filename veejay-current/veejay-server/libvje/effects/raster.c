@@ -50,6 +50,9 @@ void raster_apply(VJFrame *frame, int w, int h, int v )
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
+	if(v == 0 )
+	  return; 
+
 	for(y=0; y < h; y++)
 	{
 		for(x=0; x < w; x++)
