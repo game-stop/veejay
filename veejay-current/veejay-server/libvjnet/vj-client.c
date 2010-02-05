@@ -114,6 +114,10 @@ static	int	verify_integrity( char *buf, int len ) {
 					i, len );
 			return 0;
 		}
+
+		if( buf[i] == '\n' || buf[i] == '\r' ) 
+			continue;
+
 		if( !isprint(buf[i]) ) {
 			veejay_msg(VEEJAY_MSG_DEBUG, "character '%x' is not alphanumeric at pos %d/%d",
 					buf[i], i, len );

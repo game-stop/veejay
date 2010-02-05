@@ -1877,6 +1877,8 @@ static void draw_glyph(
 	int spixel, dpixel[3], in_glyph=0;
 	dpixel[2] = 128; dpixel[1] = 128;
 
+	if( x < 0 ) x = 0; else if ( x > width ) x = width;
+	if( y < 0 ) y = 0; else if ( y > height ) y = height;
 
 	uint8_t *Y = picture->data[0];
 	uint8_t *U = picture->data[1];

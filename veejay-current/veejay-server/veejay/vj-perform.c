@@ -3281,8 +3281,8 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 			void *vp = composite_get_vp( info->composite );
 			int   on_proj = viewport_get_mode(vp);
 
-			if( settings->composite == 1 )
-				on_proj = 1;
+	//		if( settings->composite == 1 )
+	//			on_proj = 1;
 			if(!frame->ssm) {
                         	chroma_supersample(
                        	         settings->sample_mode,
@@ -3293,8 +3293,8 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
                                 );
                      		   frame->ssm = 1;
                 	}
-			if( on_proj == 1 )
-			{
+		//	if( on_proj == 1 )
+		//	{
 				VJFrame *tst = composite_get_draw_buffer( info->composite );
 				if(tst) { 
 					vj_font_render_osd_status(info->osd,tst,osd_text,placement);
@@ -3302,11 +3302,11 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 						vj_font_render_osd_status(info->osd,tst,more_text,0);
 					free(tst);
 				}
-			} else { 	
+		/*	} else { 	
 				if(more_text)
 					vj_font_render_osd_status(info->osd,out,more_text,0);
 				vj_font_render_osd_status(info->osd, out, osd_text,placement );
-			}
+			}*/
 		}
 		free(out);	
 		free(in);
