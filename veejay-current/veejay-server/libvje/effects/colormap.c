@@ -19,6 +19,7 @@
  */
 #include <config.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include <libvje/effects/common.h>
 #include "colormap.h"

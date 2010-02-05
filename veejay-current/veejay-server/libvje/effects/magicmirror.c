@@ -18,9 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include <config.h>
-#include "magicmirror.h"
-#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <math.h>
+#include "magicmirror.h"
 #include "common.h"
 // if d or n changes, tables need to be calculated
 static uint8_t *magicmirrorbuf[3];

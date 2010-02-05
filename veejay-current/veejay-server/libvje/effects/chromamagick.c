@@ -24,6 +24,7 @@
    of this effect */
 
 #include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "chromamagick.h"
 #include <math.h>

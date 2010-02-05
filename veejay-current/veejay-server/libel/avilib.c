@@ -27,6 +27,8 @@
 
 #include <config.h>
 #include <unistd.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include "avilib.h"

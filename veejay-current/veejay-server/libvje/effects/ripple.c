@@ -28,10 +28,12 @@
 
 */
 
-#include "ripple.h"
 #include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <math.h>
 #include <stdio.h>
+#include "ripple.h"
 
 #define RIPPLE_DEGREES 360.0
 #define RIPPLE_VAL 180.0

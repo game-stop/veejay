@@ -19,6 +19,7 @@
  */
 #include <config.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include "scratcher.h"
 #include "common.h"
 #include "magicoverlays.h"

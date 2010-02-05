@@ -19,9 +19,9 @@
  */
 #include <config.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "colorhis.h"
-#include <stdlib.h>
 #include <libavutil/avutil.h>
 #include <libyuv/yuvconv.h>
 #include <veejay/vims.h>

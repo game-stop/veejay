@@ -24,6 +24,8 @@
 
 
 #include <config.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "rippletv.h"
 #include "softblur.h"

@@ -42,6 +42,7 @@
  * Copyright (C) 2002 Michael Niedermayer <michaelni@gmx.at>
  */
 #include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "radialblur.h"
 #include "common.h"

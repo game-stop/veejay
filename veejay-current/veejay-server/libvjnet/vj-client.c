@@ -102,15 +102,23 @@ void		vj_client_free(vj_client *v)
 }
 
 #ifdef STRICT_CHECKING
-static	int	verify_integrity( int len, char *buf ) {
-	if( len > 0 && buf == NULL )
+static	int	verify_integrity( char *buf, int len ) {
+	if( len < 0 || buf == NULL ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "nothing to send");
 		return 0;
+	}
 	int i;
-	for ( i = 0; i < len ; i ++ ) {
-		if( buf[i] == '\0' )
+	for ( i = 0; i < len; i ++ ) {
+		if( buf[i] == '\0' ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "end of string at pos %d, should have been pos %d",
+					i, len );
 			return 0;
-		if( !isalnum(buf[i]) )
+		}
+		if( !isprint(buf[i]) ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "character '%x' is not alphanumeric at pos %d/%d",
+					buf[i], i, len );
 			return 0;
+		}
 	}	
 	return 1;
 }
@@ -438,7 +446,7 @@ int vj_client_send(vj_client *v, int sock_type,char *buf )
 		int len = strlen( buf );
 		sprintf(v->blob, "V%03dD%s", len, buf);
 #ifdef STRICT_CHECKING
-		if(!verify_integrity(v->blob,len) ) {
+		if(!verify_integrity(v->blob,strlen(v->blob)) ) {
 			veejay_msg(0,"VIMS validation error in buf of %d bytes: '%s'", len,buf);
 		}
 #endif
@@ -459,7 +467,7 @@ int vj_client_send_buf(vj_client *v, int sock_type,unsigned char *buf, int len )
 		sprintf(v->blob, "V%03dD", len);
 		veejay_memcpy( v->blob+5, buf, len );
 #ifdef STRICT_CHECKING
-		if(!verify_integrity(v->blob,len+5) ) {
+		if(!verify_integrity( v->blob, strlen(v->blob) ) ) {
 			veejay_msg(0,"VIMS validation error in buf of %d bytes: '%s'", len+5,buf);
 		}
 #endif

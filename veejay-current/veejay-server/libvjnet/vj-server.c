@@ -330,8 +330,8 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 		return -1;
 
 
-	if( !vj_server_link_can_write( vje,link_id, 1 ) )
-		return -1;
+//	if( !vj_server_link_can_write( vje,link_id, 1 ) )
+//		return -1;
 
 	if( !vje->use_mcast)
 	{

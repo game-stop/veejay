@@ -38,6 +38,7 @@
   */
 #include <config.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "uvcorrect.h"
 #include "common.h"

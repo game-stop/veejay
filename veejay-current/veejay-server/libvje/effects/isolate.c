@@ -18,8 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include <stdint.h>
-#include <libvjmem/vjmem.h>
 #include <stdlib.h>
+#include <libvjmem/vjmem.h>
 #include <math.h>
 #include "common.h"
 #include "isolate.h"

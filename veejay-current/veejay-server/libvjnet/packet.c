@@ -18,6 +18,8 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <config.h>
+#include <stdio.h>
+#include <stdint.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvjmem/vjmem.h>
 #include "packet.h"

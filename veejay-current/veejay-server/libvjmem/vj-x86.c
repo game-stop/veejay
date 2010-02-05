@@ -18,6 +18,7 @@
  */
 #include <config.h>
 #include <stdlib.h>
+#include <stdint.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <sys/time.h>

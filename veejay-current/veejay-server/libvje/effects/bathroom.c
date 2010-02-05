@@ -26,6 +26,8 @@
  */
 #include <config.h>
 #include <stdlib.h>
+#include <stdio.h>
+#include <stdint.h>
 #include <libvjmem/vjmem.h>
 #include "bathroom.h"
 #include "common.h"

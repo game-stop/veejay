@@ -19,6 +19,7 @@
  */
 
 #include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "lumablend.h"
 

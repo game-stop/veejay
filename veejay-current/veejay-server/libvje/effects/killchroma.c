@@ -19,12 +19,13 @@
  */
 #include <config.h>
 #include <stdint.h>
-#include <libvjmem/vjmem.h>
 #include "killchroma.h"
 #include "common.h"
 #include <stdlib.h>
 #include <sys/types.h>
 #include <stdint.h>
+#include <libvjmem/vjmem.h>
+
 vj_effect *killchroma_init(int w, int h)
 {
 

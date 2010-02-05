@@ -19,11 +19,11 @@
  */
 #include <stdint.h>
 #include <config.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "diff.h"
 #include "common.h"
 #include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
 #include <libavutil/avutil.h>
 #include <libyuv/yuvconv.h>

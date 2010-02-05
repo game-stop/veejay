@@ -17,11 +17,11 @@
  * along with this program; if not, write to the Free Software
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
-
-#include "fibdownscale.h"
 #include <stdint.h>
 #include <sys/types.h>
 #include <stdlib.h>
+#include <libvjmem/vjmem.h>
+#include "fibdownscale.h"
 
 vj_effect *fibdownscale_init(int w, int h)
 {

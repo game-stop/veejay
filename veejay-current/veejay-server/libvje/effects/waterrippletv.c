@@ -24,12 +24,12 @@
 
 
 #include <config.h>
+#include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "rippletv.h"
 #include <stdlib.h>
 #include <math.h>
-#include <stdio.h>
-#include <stdint.h>
 #include "common.h"
 #define    RUP8(num)(((num)+8)&~8)
 

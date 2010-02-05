@@ -42,6 +42,7 @@
    this effect works in YCbCr space now. */
 
 #include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "reflection.h"
 #include <math.h>

@@ -19,10 +19,10 @@
  */
 
 /* distortion effects */
-
+#include <stdio.h>
+#include <stdint.h>
 #include "rotozoom.h"
 #include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
 
 

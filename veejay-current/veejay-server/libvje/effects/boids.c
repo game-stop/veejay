@@ -59,6 +59,7 @@
 #include <config.h>
 #include <stdint.h>
 #include <math.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "common.h"
 #include "blob.h"

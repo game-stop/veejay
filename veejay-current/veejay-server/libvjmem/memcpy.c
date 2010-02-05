@@ -126,15 +126,16 @@
     "Using prefetches efficiently is more of an art than a science"
 */
 #include <config.h>
-#include <libvjmem/vjmem.h>
-#include <libvjmsg/vj-msg.h>
-#include <sys/time.h>
-#include <time.h>
-#include <aclib/ac.h>
-#include <libyuv/mmx.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdint.h>
 #include <stdio.h>
+#include <sys/time.h>
+#include <time.h>
+#include <libvjmem/vjmem.h>
+#include <libvjmsg/vj-msg.h>
+#include <aclib/ac.h>
+#include <libyuv/mmx.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif

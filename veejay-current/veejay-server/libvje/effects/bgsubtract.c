@@ -18,11 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "bgsubtract.h"
 #include "common.h"
-#include <stdlib.h>
-#include <stdio.h>
 #include <math.h>
 #include <libyuv/yuvconv.h>
 #include <libvjmsg/vj-msg.h>

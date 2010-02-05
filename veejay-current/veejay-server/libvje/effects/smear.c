@@ -19,6 +19,7 @@
  */
 #include <config.h>
 #include <stdint.h>
+#include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include "smear.h"
 #include "common.h"

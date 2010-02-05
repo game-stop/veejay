@@ -18,13 +18,13 @@
  * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
  */
 #include <config.h>
+#include <stdio.h> 
+#include <stdlib.h>
+#include <string.h>
 #include <stdint.h>
 #include <libvjmem/vjmem.h>
 #include "mcastsender.h"
 #include <errno.h>
-#include <stdio.h> 
-#include <stdlib.h>
-#include <string.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
 #include <veejay/vims.h>

@@ -331,8 +331,10 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 			veejay_msg(VEEJAY_MSG_ERROR, "TCP send error: %s", strerror(errno));
 			return 0;
 		}
-		if( n == 0 )
-			break;
+		if( n == 0 ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "Remote hang up");
+			return 0;
+		}
 		
 		done += n;
 		if( (len-done) < send_size)

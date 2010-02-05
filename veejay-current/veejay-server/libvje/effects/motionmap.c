@@ -37,6 +37,7 @@
  */
 #include <config.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include "motionmap.h"

@@ -18,9 +18,10 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 
-#include "scratcher.h"
 #include <config.h>
-#include <stdlib.h>
+#include <stdint.h>
+#include <stdio.h>
+#include "scratcher.h"
 #include "common.h"
 #include <libvjmem/vjmem.h>
 

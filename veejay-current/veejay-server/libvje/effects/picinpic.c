@@ -23,6 +23,8 @@
 	(--with-swscaler) if you want to use this Effect.
  */
 #include <stdint.h>
+#include <stdlib.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "picinpic.h"
 #include <libyuv/yuvconv.h>

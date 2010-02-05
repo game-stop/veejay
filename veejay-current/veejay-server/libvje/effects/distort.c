@@ -20,6 +20,7 @@
 
 /* distortion effects */
 #include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include <math.h>
 #include "distort.h"

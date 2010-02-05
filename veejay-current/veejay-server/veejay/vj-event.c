@@ -342,6 +342,7 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
   if(res_ <= 0) { \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link); \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link); \
+	_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], v->uc->current_link); \
 	return;\
 	}\
 }
@@ -350,7 +351,8 @@ veejay_msg(VEEJAY_MSG_INFO, "---------------------------------------------------
 {\
 if(vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8_t*) str, strlen(str)) < 0) { \
 	_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link); \
-	_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link);} \
+	_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], v->uc->current_link); \
+	_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], v->uc->current_link);} \
 }
 
 /* some macros for commonly used checks */
@@ -1479,9 +1481,13 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		return 0;
 	}
 
+#ifndef STRICT_CHECKING
 	if( net_id != 412 && net_id != 333)
+#else
+	
 		veejay_msg(VEEJAY_MSG_DEBUG, "VIMS: Parse message '%s'", msg );
 	
+#endif
 	if( net_id <= 0 || net_id >= VIMS_MAX )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "VIMS Selector %d invalid", net_id );
@@ -1694,6 +1700,7 @@ void vj_event_update_remote(void *ptr)
 				{
 					_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
 					_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
+					_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
 				}
 			}
 		}
@@ -1723,6 +1730,8 @@ void vj_event_update_remote(void *ptr)
 				if( res == -1 )
 				{
 					_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
+					_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
+					_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
 				}
 			}
 		}
@@ -2687,6 +2696,7 @@ void vj_event_quit(void *ptr, const char format[], va_list ap)
 		{
 			_vj_server_del_client(v->vjs[VEEJAY_PORT_CMD],i);
 			_vj_server_del_client(v->vjs[VEEJAY_PORT_STA],i);
+			_vj_server_del_client(v->vjs[VEEJAY_PORT_DAT],i);
 		}
 	}
 
@@ -8848,8 +8858,7 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 		}
 		sprintf(_s_print_buf, "%03d%s",strlen(_print_buf), _print_buf);
 
-	}
-	if(STREAM_PLAYING(v))
+	} else if(STREAM_PLAYING(v))
 	{
 		if(args[0] == -1) args[0] = vj_tag_size()-1;
 

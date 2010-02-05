@@ -20,6 +20,7 @@
 #include <stdio.h>
 #include <stdarg.h>
 #include <string.h>
+#include <stdint.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 

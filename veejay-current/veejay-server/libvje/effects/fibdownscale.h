@@ -20,7 +20,6 @@
 
 #ifndef FIBDOWNSCALE_H
 #define FIBDOWNSCALE_H
-#include <libvjmem/vjmem.h>
 #include <sys/types.h>
 #include <stdint.h>
 #include <libvje/vje.h>

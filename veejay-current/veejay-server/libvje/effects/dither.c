@@ -18,6 +18,8 @@
  * Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307 , USA.
  */
 #include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include "dither.h"
 vj_effect *dither_init(int w, int h)

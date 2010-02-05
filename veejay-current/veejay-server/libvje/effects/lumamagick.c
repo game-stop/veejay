@@ -19,7 +19,9 @@
  */
 
 /* 7 ,14, 24, 25, 26 */
+#include <config.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <libvje/internal.h>
 #include <libvjmem/vjmem.h>
 #include "magicoverlays.h"

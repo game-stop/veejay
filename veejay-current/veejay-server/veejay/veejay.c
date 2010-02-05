@@ -19,8 +19,9 @@
 #include <config.h>
 #include <string.h>
 #define VJ_PROMPT "$> "
-#include <libvjmem/vjmem.h>
 #include <stdio.h>
+#include <stdint.h>
+#include <libvjmem/vjmem.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <signal.h>

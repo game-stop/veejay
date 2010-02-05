@@ -22,11 +22,11 @@
 */
 #include <config.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <libvjmem/vjmem.h>
 #ifdef SUPPORT_READ_DV2
 #include <stdint.h>
 #include <unistd.h>
-#include <stdio.h>
 #include <stdlib.h>
 #include <fcntl.h>
 #include <libel/vj-el.h>

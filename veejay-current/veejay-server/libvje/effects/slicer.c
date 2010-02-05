@@ -19,7 +19,9 @@
  */
     	
 #include <stdint.h>	
+#include <stdio.h>
 #include <config.h>
+#include <stdlib.h>
 #include <libvjmem/vjmem.h>
 #include "slicer.h"
 static int *slice_xshift;
