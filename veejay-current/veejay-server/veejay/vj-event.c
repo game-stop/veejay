@@ -472,6 +472,7 @@ static char	*get_arr_embedded_help(char *ehelp[])
 	char *msg = (char*) vj_malloc(sizeof(char) * len );
 	if( msg == NULL )
 		return NULL;
+	memset( msg, 0, len );
 	char *p = msg;
 	int   x = 0;
 	for( i = 0; ehelp[i] != NULL; i ++ ) {

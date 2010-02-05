@@ -3263,7 +3263,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 						 frame->width,frame->height, pff);
 		frame->ssm = composite_process(info->composite,out,in,settings->composite,pff); 
 
-		if(osd_text == NULL && info->settings->composite == 2 && info->use_osd == 3 ) {
+		if(osd_text == NULL && info->use_osd == 3 ) {
 			int fx_mode=0;
 			int cur_e = 0;
 			int fx_id = 0;
