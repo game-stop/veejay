@@ -290,26 +290,17 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 #ifdef STRICT_CHECKING
 	assert( buf != NULL );
 #endif
-	int bs   = s->send_size;
-	if( len < bs )
-		bs = len;
-	int done  = 0;
-	while( done < len )
-	{
-		n = send( s->sock_fd, buf + done, bs , MSG_DONTWAIT );
-		if(n == -1)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "TCP send error: %s", strerror(errno));
-			return 0;
-		}
-		if( n == 0 )
-			break;
-		
-		done += n;
-		if( (len-done) < s->send_size)
-			bs = len - done;
+
+	int length = len;
+	int bw = 0;
+	while( length > 0 ) {
+		bw = length;
+		n = send( s->sock_fd, buf, length , 0 );
+		if( n <= 0 )
+			return -1;
+		buf += n;
+		length -= n;
 	}
-	return done;
 }
 
 int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
@@ -318,29 +309,17 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 #ifdef STRICT_CHECKING
 	assert( buf != NULL );
 #endif
-	int done = 0;
-	int bs   = send_size;
-	if( len < bs )
-		bs = len;
-
-	while( done < len )
-	{
-		n = send( fd, buf + done, bs , MSG_DONTWAIT  );
-		if(n == -1)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "TCP send error: %s", strerror(errno));
-			return 0;
-		}
-		if( n == 0 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Remote hang up");
-			return 0;
-		}
-		
-		done += n;
-		if( (len-done) < send_size)
-			bs = len - done;
+	int length = len;
+	int bw = 0;
+	while( length > 0 ) {
+		bw = length;
+		n = send( fd, buf, length , 0 );
+		if( n <= 0 )
+			return -1;
+		buf += n;
+		length -= n;
 	}
-	return done;
+
 }
 
 void			sock_t_close( vj_sock_t *s )
