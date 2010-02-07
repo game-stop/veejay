@@ -3608,6 +3608,9 @@ int veejay_save_all(veejay_t * info, char *filename, long n1, long n2)
 // open_video_files is called BEFORE init
 static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, int force , char override_norm)
 {
+	
+    video_playback_setup *settings =
+	(video_playback_setup *) info->settings;
 	vj_el_frame_cache(info->seek_cache );
 
 	if(num_files<=0 || files == NULL)
@@ -3629,7 +3632,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 				info->dummy->fps = 30000.0/1001;
 		} 
 		if(!info->dummy->fps)
-			info->dummy->fps = 25.0;
+			info->dummy->fps = settings->output_fps;
 	
 		int dw = 720;
 		int dh = (override_norm == 'p' ? 576 : 480);
@@ -3716,8 +3719,8 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, int force,int force_pix_fmt, char override_norm, int switch_jpeg)
 {
 	int ret = 0;
-   	video_playback_setup *settings =
-		(video_playback_setup *) info->settings;
+   	 video_playback_setup *settings =
+	(video_playback_setup *) info->settings;
 
 	switch( force_pix_fmt ) {
 			case 1: info->pixel_format = FMT_422;break;

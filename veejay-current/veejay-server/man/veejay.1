@@ -64,13 +64,13 @@ You can use veejay to calibrate a camera (or another input source) against a pro
 Veejay can be used with PD (PureData) by using sendVIMS, a small commandline utility that translates PD's symbols to veejay and vice versa.Look at the REFERENCES to find out where to download this utility. Also, by using the OpenSoundControl veejay can be used with a great number of sound and video processing applications.Also veejay can record video data to the yuv4mpeg format (mjpegtools), or stream uncompressed video over the network (uni - and multicast)
 .SH OPTIONS
 .TP
-.B \-w/--projection-width
+.B \-w/--output-width
 Specify video output width for projection / on screen purposes
 .TP
-.B \-h/--projection-height
+.B \-h/--output-height
 Specify video output height for projection / on screen purposes
 .TP
-.B \-p/--portoffset <num>
+.B \-p/--port <num>
 TCP port offset for communication with clients like 'reloaded' , 'sayVIMS' or sendVIMS for PD (default 3490)
 .TP
 .B \-O/--output [01234]
@@ -160,8 +160,7 @@ The frame sender transmits on port offset + 3, send commands to port offset + 4,
 .B \  /--map-from-file <num frames>
 To reduce transfers between memory and disk, you can set a number
 of frames to be cached in memory from file (only valid for rawDV and AVI)
-Use smaller values for better performance (mapping several hundreds of
-megabytes can become a problem)
+Use smaller values for better performance 
 .TP
 .B \-V/--viewport
 Start with source viewport enabled. Use this if you have previously setup
@@ -234,6 +233,9 @@ The video window will be displayed on the second screen, first screen is 1600 pi
 .TP
 .B VEEJAY_SCREEN_SIZE=1024x768
 The second screen is 1024x768, the video window will appear fullscreen 
+.TP
+.B VEEJAY_DEFAULT_CHANNEL
+Set the Video4Linux Channel ID for veejay to use by default.
 .TP
 .SH Home directory
 .TP

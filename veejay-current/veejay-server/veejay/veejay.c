@@ -149,97 +149,43 @@ static void CompiledWith()
 static void Usage(char *progname)
 {
     fprintf(stderr, "This is Veejay %s\n\n", VERSION);
-    fprintf(stderr, "Usage: %s [options] <file name> [<file name> ...]\n",
-	    progname);
-    fprintf(stderr, "where options are:\n\n");
+    fprintf(stderr, "Usage: %s [options] <file name> [<file name> ...]\n", progname);
+    fprintf(stderr,"where options are:\n\n");
+	fprintf(stderr,
+			"  -v/--verbose  \t\tEnable debugging output (default off)\n");
+	fprintf(stderr,
+			"  -n/--no-color     \t\tDo not use colored text\n");
     fprintf(stderr,
-		"\t\t\t\t-w/--Projection Width \n");
-    fprintf(stderr,
-		"\t\t\t\t-h/--Projection Height \n");
+	    	"  -u/--dump-events  \t\tDump veejay's documentation to stdout\n");
+	fprintf(stderr,
+			"  -B/--features  \t\tList of compiled features\n");
+   	fprintf(stderr,
+			"  -D/--composite \t\tDo not start with camera/projection calibration viewport \n");
+
+	fprintf(stderr,
+	   		"  -p/--port <num>\t\tTCP port to accept/send messages (default: 3490)\n");
+	fprintf(stderr,
+			"  -M/--multicast-osc \t\tmulticast OSC\n");
+	fprintf(stderr,
+			"  -T/--multicast-vims \t\tmulticast VIMS\n");
+	
+	fprintf(stderr,
+			"     --map-from-file <num>\tmap N frames to memory\n");
+ 	fprintf(stderr,
+			"  -m/--memory <num>\t\tMaximum memory to use for cache (0=disable, default=30 max=100)\n");  
+	fprintf(stderr,
+			"  -j/--max_cache <num>\t\tDivide cache memory over N samples (default=4)\n");
+	
+	fprintf(stderr,
+			"  -Y/--yuv [01]\t\t\tForce YCbCr (defaults to YUV)\n");
+
+	fprintf(stderr,
+	    	"  -t/--timer <num>\t\tspecify timer to use (none:0,normal:2,rtc:1) default is 1\n");
 
     fprintf(stderr,
-	    "  -p/--port\t\t\tTCP port to accept/send messages (default: 3490)\n");
-    fprintf(stderr,
-	    "  -t/--timer num\t\tspecify timer to use (none:0,normal:2,rtc:1) default is 1\n");
-
+	    	"  -P/--preserve-pathnames\tDo not 'canonicalise' pathnames in edit lists\n");
 	fprintf(stderr,
-		"  -O/--output [0123]\t\tOutput video\n");
-#ifdef HAVE_SDL
-	fprintf(stderr,
-		"\t\t\t\t0 = SDL (default)\t\n");
-#endif
-#ifdef HAVE_DIRECTFB
-	fprintf(stderr,
-		"\t\t\t\t1 = DirectDB\t\n");
-#ifdef HAVE_SDL
-	fprintf(stderr,
-		"\t\t\t\t2 = SDL and DirectDB secondary head (TV-Out) clone mode\n");
-#endif
-#endif
-	/*
-#ifdef HAVE_GL
-	fprintf(stderr,
-		"\t\t\t\t3 = OpenGL (requires openGL extension ARB fragment program)\n");
-#endif
-	*/
-	fprintf(stderr,
-		"\t\t\t\t3 = Head less (no video output)\n");	
-		
-    fprintf(stderr,
-	    "  -c/--synchronization [01]\tSync correction off/on (default on)\n");
-    fprintf(stderr,
-		"  -f/--fps num\t\t\tOverride default frame rate (default: read from first loaded file)\n");
-    fprintf(stderr,
-	    "  -P/--preserve-pathnames\tDo not 'canonicalise' pathnames in edit lists\n");
-    fprintf(stderr,
-	    "  -a/--audio [01]\t\tEnable (1) or disable (0) audio (default 1)\n");
-#ifdef HAVE_SDL
-    fprintf(stderr,
-	    "  -s/--size NxN\t\t\twidth X height for SDL video window\n");
-#endif
-/*#ifdef HAVE_XINERAMA
-#ifndef X_DISPLAY_MISSING
-#ifdef HAVE_GL
-    fprintf(stderr,
-            "  -X/--xinerama N\t\tSelect Xinerama screen [0-n] (Use with -O4)\n");
-#endif
-#endif
-#endif
-*/
-    fprintf(stderr,
-	    "  -l/--sample-file <file name>\tLoad a sample list file (none at default)\n");
-	fprintf(stderr,
-		"  -F/--action-file <file name>\tLoad an action file (none at default)\n");
-	fprintf(stderr,
-	    "  -u/--dump-events  \t\tDump event information to screen\n");
-	fprintf(stderr,
-	    "  -I/--deinterlace\t\tDeinterlace video if it is interlaced\n");    
-	fprintf(stderr,
-		"  -x/--geometryx <num> \t\tTop left x offset for SDL video window\n");
-	fprintf(stderr,
-		"  -y/--geometryy <num> \t\tTop left y offset for SDL video window\n");
- 	fprintf(stderr,
-		"  -B/--features  \t\tList of compiled features\n");
-	fprintf(stderr,
-		"  -v/--verbose  \t\tEnable debugging output (default off)\n");
-	fprintf(stderr,
-		"  -b/--bezerk    \t\tBezerk (default off)   \n");
- 	fprintf(stderr,
-		"  -L/--auto-loop   \t\tStart with default sample\n");
-	fprintf(stderr,
-		"  -g/--clip-as-sample\t\tLoad every video clip as a new sample\n");	
-	fprintf(stderr,
-		"  -n/--no-color     \t\tDont use colored text\n");
-	fprintf(stderr,
-		"  -r/--audiorate\t\tDummy audio rate\n");
-	fprintf(stderr,
-		"  -m/--memory	\t\tMaximum memory to use for cache (0=disable, default=30 max=100)\n");  
-	fprintf(stderr,
-		"  -j/--max_cache \t\tDivide cache memory over N samples (default=4)\n");
-	fprintf(stderr,
-		"  -Y/--yuv [01]\t\t\tForce YCbCr (defaults to YUV)\n");
-	fprintf(stderr,
-                "  -e/--swap-range\t\tSwap YUV range [0..255] <-> [16..235] on videofiles\n");
+            "  -e/--swap-range <num>\t\tSwap YUV range [0..255] <-> [16..235] on videofiles\n");
 	fprintf(stderr,
 		"\t\t\t\t 0 = YUV 4:2:0 Planar\n");
 	fprintf(stderr,
@@ -248,27 +194,74 @@ static void Usage(char *progname)
 		"\t\t\t\t 2 = YUV 4:2:0 Planar full range\n");
 	fprintf(stderr,
 		"\t\t\t\t 3 = YUV 4:2:2 Planar full range\n");
+   	fprintf(stderr,
+			"  -L/--auto-loop   \t\tStart with default sample\n");
 	fprintf(stderr,
-		"  -d/--dummy	\t\tDummy playback\n");
+			"  -b/--bezerk    \t\tBezerk (default off)   \n");
 	fprintf(stderr,
-		"  -W/--width <num>\t\tdummy width\n");
+	   		"  -l/--sample-file <file name>\tLoad a sample list file (none at default)\n");
 	fprintf(stderr,
-		"  -H/--height <num>\t\tdummy height\n");
+			"  -F/--action-file <file name>\tLoad an action file (none at default)\n");
+
+	
+	fprintf(stderr,
+			"  -g/--clip-as-sample\t\tLoad every video clip as a new sample\n");	
+	
+	fprintf(stderr,
+	    	"  -a/--audio [01]\t\tEnable (1) or disable (0) audio (default 1)\n");
+	
+	fprintf(stderr,
+	    	"  -c/--synchronization [01]\tSync correction off/on (default on)\n");
+
+    fprintf(stderr,
+	    	"  -O/--output [0..3]\t\tOutput video\n");
+#ifdef HAVE_SDL
+	fprintf(stderr,
+			"\t\t\t\t0 = SDL (default)\t\n");
+#endif
+#ifdef HAVE_DIRECTFB
+	fprintf(stderr,
+			"\t\t\t\t1 = DirectDB\t\n");
+#ifdef HAVE_SDL
+	fprintf(stderr,
+			"\t\t\t\t2 = SDL and DirectDB secondary head (TV-Out) clone mode\n");
+#endif
+#endif
+	fprintf(stderr,
+			"\t\t\t\t3 = Head less (no video output)\n");	
+#ifdef HAVE_SDL
+    fprintf(stderr,
+	    "  -s/--size NxN\t\t\tDisplay dimension for video window, use Width x Height\n");
 
 	fprintf(stderr,
-		"  -N/--norm\t\t\tVideo Norm [0=PAL, 1=NTSC (defaults to PAL)]\n");
+		"  -x/--geometry-x <num> \tTop left x offset for SDL video window\n");
 	fprintf(stderr,
-		"  -R/--framerate <num>\t\tdummy frame rate\n");
-	fprintf(stderr,
-		"  -M/--multicast-osc \t\tmulticast OSC\n");
-	fprintf(stderr,
-		"  -T/--multicast-vims \t\tmulticast VIMS\n");
-	fprintf(stderr,
-		"     --map-from-file <num>\tmap N frames to memory\n");
-	fprintf(stderr,
-		"  -D/--composite \t\tDo not start with camera/projection calibration viewport \n");
+		"  -y/--geometry-y <num> \tTop left y offset for SDL video window\n");
+
+#endif
 	fprintf(stderr,
 		"  -A/--all [num] \t\tStart with capture device <num> \n");
+
+	fprintf(stderr,
+		"  -d/--dummy	\t\tStart with no video (black frames)\n");
+	fprintf(stderr,
+		"  -W/--input-width <num>\tSet input video width\n");
+	fprintf(stderr,
+		"  -H/--input-height <num>\tSet input video height\n");
+    fprintf(stderr,
+		"  -f/--fps <num>\t\tOverride default frame rate (default: read from first loaded file)\n");
+   	fprintf(stderr,
+		"  -r/--audiorate <num>\t\tSet audio rate (defaults to 48Khz)\n");
+	fprintf(stderr,
+	    "  -I/--deinterlace\t\tDeinterlace video if it is interlaced\n");    
+	fprintf(stderr,
+		"  -N/--norm <num>\t\tSet video norm [0=PAL, 1=NTSC (defaults to PAL)]\n");
+
+	fprintf(stderr,
+		"  -w/--output-width <num>\tSet output video width (Projection)\n");
+	fprintf(stderr,
+		"  -h/--output-height <num>\tSet output video height (Projection)\n");
+
 	fprintf(stderr,"  -q/--quit \t\t\tQuit at end of file\n");
 	fprintf(stderr,"\n\n");
 }
@@ -396,10 +389,10 @@ static int set_option(const char *name, char *value)
 	else if(strcmp(name,"dump-events")==0 || strcmp(name,"u")==0) {
 	info->dump = 1;
 	}
-	else if(strcmp(name, "width") == 0 || strcmp(name, "W") == 0 ) {
+	else if(strcmp(name, "input-width") == 0 || strcmp(name, "W") == 0 ) {
 		info->dummy->width = atoi(optarg);
 	}
-	else if(strcmp(name, "height") == 0 || strcmp(name, "H") == 0 ) {
+	else if(strcmp(name, "input-height") == 0 || strcmp(name, "H") == 0 ) {
 		info->dummy->height = atoi(optarg);
 	}
 	else if(strcmp(name, "norm") == 0 || strcmp(name, "N") == 0 ) {
@@ -411,18 +404,15 @@ static int set_option(const char *name, char *value)
 	{
 		info->settings->composite = 0;
 	}
-	else if(strcmp(name, "projection-width") == 0 || strcmp(name, "w") == 0) {
+	else if(strcmp(name, "output-width") == 0 || strcmp(name, "w") == 0) {
 		info->video_output_width = atoi(optarg);
 	}
-	else if(strcmp(name, "projection-height") == 0 || strcmp(name, "h") == 0) {
+	else if(strcmp(name, "output-height") == 0 || strcmp(name, "h") == 0) {
 		info->video_output_height = atoi(optarg);
 	}
 	else if(strcmp(name, "audiorate") == 0 || strcmp(name, "r") == 0 )
 	{
 		info->dummy->arate = atoi(optarg);
-	}
-	else if(strcmp(name, "framerate") == 0 || strcmp(name, "R" ) == 0 ) {
-		info->dummy->fps = atof(optarg);
 	}
     	else if (strcmp(name,"fps")==0 || strcmp(name, "f")==0) {
 		override_fps = atof(optarg);
@@ -496,12 +486,11 @@ static int check_command_line_options(int argc, char *argv[])
 	{"fps",1,0,0},
 	{"no-color",0,0,0},
 	{"version",0,0,0},
-	{"width",1,0,0},
-	{"height",1,0,0},
-	{"projection-width", 1,0,0 },
-	{"projection-height", 1,0,0 },
+	{"input-width",1,0,0},
+	{"input-height",1,0,0},
+	{"output-width", 1,0,0 },
+	{"output-height", 1,0,0 },
 	{"norm",1,0,0},
-	{"framerate",1,0,0},
 	{"audiorate",1,0,0},
 	{"yuv",1,0,0},
 	{"multicast-osc",1,0,0},
@@ -526,12 +515,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:R:M:T:F:nILPVDugvBdibjqe",
+			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqe",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:R:M:T:F:nILPVDugvBdibjqe"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqe"
 						   )) != EOF)
 #endif
     {
