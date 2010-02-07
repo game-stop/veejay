@@ -472,7 +472,7 @@ static char	*get_arr_embedded_help(char *ehelp[])
 	char *msg = (char*) vj_malloc(sizeof(char) * len );
 	if( msg == NULL )
 		return NULL;
-	memset( msg, 0, len );
+	veejay_memset( msg, 0, len );
 	char *p = msg;
 	int   x = 0;
 	for( i = 0; ehelp[i] != NULL; i ++ ) {
@@ -7142,15 +7142,16 @@ void	vj_event_vp_get_points( void *ptr, const char format[], va_list ap )
 		SEND_MSG(v,msg);
 		return;
 	}	
-
+//FIXME
 //	int *r = viewport_event_get_projection(  composite_get_vp( v->composite ),args[0] );
 	int r[8];
 	memset(r,0,sizeof(r));	
 	snprintf(message,256, "%d %d %d %d %d %d %d %d",
 		r[0],r[1],r[2],r[3],r[4],r[5],r[6],r[7] );
 
-	FORMAT_MSG(msg,message);
-	SEND_MSG(v,msg);
+	char *err = "0 0 0 0 0 0 0 0";
+	FORMAT_MSG(msg,err);
+	SEND_MSG(v,err);
 }
 
 void	vj_event_vp_set_points( void *ptr, const char format[], va_list ap )
@@ -7198,7 +7199,6 @@ void	vj_event_v4l_get_info(void *ptr, const char format[] , va_list ap)
 	char send_msg[33];
 	char message[30];
 	veejay_memset(send_msg, 0,sizeof(send_msg));
-	veejay_memset(message, 0,sizeof(message));
 
 	sprintf( send_msg, "000" );
 
@@ -7501,7 +7501,6 @@ static void _vj_event_tag_record( veejay_t *v , int *args, char *str )
 	}	
 
 	char sourcename[255];	
-	veejay_memset(sourcename,0,255);
 	vj_tag_get_description( v->uc->sample_id, sourcename );
 	sprintf(prefix,"%s-%02d-", sourcename, v->uc->sample_id);
 	if(! veejay_create_temp_file(prefix, tmp )) 
@@ -8033,7 +8032,6 @@ void vj_event_create_effect_bundle(veejay_t * v, char *buf, int key_id, int key_
 			{
 				char bundle[200];
 				int np = vj_effect_get_num_params(y);
-				veejay_memset(bundle,0,200);
 				sprintf(bundle, "%03d:0 %d %d", VIMS_CHAIN_ENTRY_SET_PRESET,i, effect_id );
 		    		for (j = 0; j < np; j++)
 				{
@@ -8214,7 +8212,6 @@ void vj_event_print_info(void *ptr, const char format[], va_list ap)
 void	vj_event_send_track_list		(	void *ptr,	const char format[], 	va_list ap 	)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	veejay_memset( _s_print_buf,0,SEND_BUF);
 	sprintf(_s_print_buf, "%05d",0);
 	int n = vj_tag_size()-1;
 	if (n >= 1 )
@@ -8251,7 +8248,6 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 	char *str = NULL; 
 	P_A(args,str,format,ap);
 	int i,n;
-	veejay_memset( _s_print_buf,0,SEND_BUF);
 	sprintf(_s_print_buf, "%05d",0);
 
 	//if(args[0]>0) start_from_tag = args[0];
@@ -8326,7 +8322,6 @@ static	void	_vj_event_gatter_stream_info( veejay_t *v, int id )
 	char description[SAMPLE_MAX_DESCR_LEN];
 	char source[255];
 	int  stream_type = vj_tag_get_type( id );
-	veejay_memset( source,0, 255 );
 	vj_tag_get_source_name( id, source );
 	vj_tag_get_description( id, description );
 	
@@ -8353,8 +8348,6 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 	P_A(args,str,format,ap);
 	if(args[0] == 0 )
 		args[0] = v->uc->sample_id;
-
-	veejay_memset( _s_print_buf,0,SEND_BUF);
 
 	switch( args[1] )
 	{
@@ -8491,7 +8484,6 @@ void	vj_event_get_cali_image		(	void *ptr,	const char format[],	va_list	ap	)
 	}
 	else {
 		char header[128];//FIXME
-		memset(header,0,sizeof(header));
 		sprintf( header, "%03d%08d%06d%06d%06d%06d",8+6+6+6+6,len, len, 0, v->current_edit_list->video_width, v->current_edit_list->video_height );
 		SEND_MSG( v, header );
 
@@ -8561,7 +8553,6 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 	P_A(args,str,format,ap);
 	if(args[0] > 0 )
 		start_from_sample = args[0];
-	veejay_memset( _s_print_buf,0,SEND_BUF);
 	sprintf(_s_print_buf, "00000000");
 
 	n = sample_size();
@@ -8610,7 +8601,6 @@ void	vj_event_send_log			(	void *ptr,	const char format[],	va_list ap 	)
 	int num_lines = 0;
 	int str_len = 0;
 	char *messages = NULL;
-	veejay_memset( _s_print_buf,0,SEND_BUF);
 
 	messages = veejay_pop_messages( &num_lines, &str_len );
 
@@ -8699,7 +8689,6 @@ void	vj_event_send_chain_entry		( 	void *ptr,	const char format[],	va_list ap	)
 	int error = 1;
 	veejay_t *v = (veejay_t*)ptr;
 	P_A(args,str,format,ap);
-	veejay_memset(line,0,255);
 	veejay_memset(fline,0,255);
 	sprintf(line, "%03d", 0);
 
@@ -8829,7 +8818,6 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 		args[0] = v->uc->sample_id;
 
 	veejay_memset( _s_print_buf,0,SEND_BUF);
-	veejay_memset(  _print_buf,0, SEND_BUF);
 
 	sprintf( _s_print_buf, "%03d",0 );
 
@@ -8882,6 +8870,8 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 		}
 		sprintf(_s_print_buf, "%03d%s",strlen( _print_buf ), _print_buf);
 
+	} else {
+		sprintf(_s_print_buf, "000");
 	}
 	SEND_MSG(v, _s_print_buf);
 }
@@ -8891,9 +8881,6 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 	/* send video properties */
 	char info_msg[255];
 	veejay_t *v = (veejay_t*)ptr;
-	veejay_memset(info_msg,0,sizeof(info_msg));
-	veejay_memset( _s_print_buf,0,SEND_BUF);
-	veejay_memset( info_msg,0, 255 );
 
 	editlist *el = v->current_edit_list;
 /*
@@ -8927,7 +8914,6 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 {
 	veejay_t *v = (veejay_t*) ptr;
-	veejay_memset( _s_print_buf,0, SEND_BUF );
 	int b = 0;
 	editlist *el = v->current_edit_list;
 /* ( SAMPLE_PLAYING(v) ? sample_get_editlist( v->uc->sample_id ) : 
@@ -9070,8 +9056,6 @@ void	vj_event_send_effect_list		(	void *ptr,	const char format[],	va_list ap	)
 	for(i=1; i < vj_effect_max_effects(); i++)
 	{
 		int effect_id = vj_effect_get_real_id(i);
-		veejay_memset(line,0, sizeof(line));
-		veejay_memset(fline,0,sizeof(fline));
 		if(vj_effect_get_summary(i,line))
 		{
 			sprintf(fline, "%03d%s", strlen(line), line );
@@ -9143,7 +9127,6 @@ void vj_event_attach_detach_key(void *ptr, const char format[], va_list ap)
 {
 	int args[4] = { 0,0,0,0 };
 	char value[100];
-	veejay_memset(value,0,sizeof(value));
 	int mode = 0;
 	
 
@@ -9413,8 +9396,6 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 		args[0] = v->uc->sample_id;
 	if(args[0] == -1)
 		args[0] = sample_size() - 1;
-
-	veejay_memset( _s_print_buf,0,SEND_BUF);
 
 	id = args[0];
 	char options[100];
@@ -10065,8 +10046,6 @@ void	vj_event_get_sample_sequences( 		void *ptr, 	const char format[],	va_list a
 		return;
 	}
 	
-	veejay_memset( _s_print_buf, 0, SEND_BUF );
-
 	sprintf(_s_print_buf, "%06d%04d%04d%04d",
 			( 12 + (4*MAX_SEQUENCES)),
 			v->seq->current,MAX_SEQUENCES, v->seq->active );

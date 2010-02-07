@@ -3633,6 +3633,9 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 		} 
 		if(!info->dummy->fps)
 			info->dummy->fps = settings->output_fps;
+
+		if(!info->dummy->fps)
+			info->dummy->fps = 25.0f;
 	
 		int dw = 720;
 		int dh = (override_norm == 'p' ? 576 : 480);
