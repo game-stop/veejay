@@ -42,6 +42,7 @@
 #ifdef HAVE_LIBQUICKTIME
 #include <quicktime.h>
 #include <lqt.h>
+#include <lqt_version.h>
 #endif
 #include <veejay/vims.h>
 #include <liblzo/lzo.h>
