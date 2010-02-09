@@ -167,10 +167,10 @@ if test "$ac_cv_lib_dl_dlopen" = "yes"; then
 fi
 
 
-PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.0],
+PKG_CHECK_MODULES( VEEJAY, [veejay >= 1.5.3],
 		[	
-		AC_SUBST( VEEJAY_CFLAGS )
-		AC_SUBST( VEEJAY_LIBS )
+		AC_SUBST(VEEJAY_CFLAGS)
+		AC_SUBST(VEEJAY_LIBS)
 		have_veejay=true
 		AC_DEFINE( HAVE_VEEJAY,1, [Veejay Installed])],
 			[have_veejay=false])
@@ -186,8 +186,8 @@ dnl *********************************************************************
 have_mjpegtools=false
 PKG_CHECK_MODULES(MJPEGTOOLS, [mjpegtools >= 1.6 ],
                     [
- 		     AC_SUBST( MJPEGTOOLS_CFLAGS )
-		     AC_SUBST( MJPEGTOOLS_LIBS )
+ 		     AC_SUBST(MJPEGTOOLS_CFLAGS)
+		     AC_SUBST(MJPEGTOOLS_LIBS)
 		     have_mjpegtools=true
                      AC_DEFINE(HAVE_MJPEGTOOLS, 1, [MJPEGTools installed])],
                     [have_mjpegtools=false])
@@ -219,7 +219,7 @@ AC_MSG_CHECKING(whether to compile in profiling information)
 if test "x$enable_profiling" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -fprofile-arcs -ftest-coverage"
  DEBUGLIBS="-lgcov"
- AC_SUBST( DEBUGLIBS )
+ AC_SUBST(DEBUGLIBS)
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
@@ -273,8 +273,8 @@ case $host_cpu in
 		OP_CFLAGS="-O3"
  	fi
 
-	AC_SUBST( OP_CFLAGS )
-	AC_SUBST( YUVCFLAGS )
+	AC_SUBST(OP_CFLAGS)
+	AC_SUBST(YUVCFLAGS)
 
    	dnl If the host is pentium, align on double word boundary
     	case $host_cpu in

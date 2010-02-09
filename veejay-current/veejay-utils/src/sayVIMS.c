@@ -167,7 +167,7 @@ int main(int argc, char *argv[])
 	int err = 0;
 	FILE *infile;
 
-	veejay_set_debug_level(0);
+	veejay_set_debug_level(1);
 
 	// parse commandline parameters
 	while( ( n = getopt(argc,argv, "h:g:p:micd")) != EOF)
