@@ -249,10 +249,18 @@ static struct
 	{ "macro/select"					, VIMS_MACRO_SELECT },
 	
 	{ "composite/select"					, VIMS_COMPOSITE },
+#ifdef USE_GDK_PIXBUF
 	{ "console/screenshot"					, VIMS_SCREENSHOT },
+#else 
+#ifdef HAVE_JPEG
+	{ "console/screenshot",					VIMS_SCREENSHOT },
+#endif
+#endif
 	{ "console/framerate"					, VIMS_FRAMERATE },
 	{ "console/bezerk"					, VIMS_BEZERK },
+#ifdef HAVE_SDL
 	{ "console/resize"					, VIMS_RESIZE_SDL_SCREEN },
+#endif
 	{ "console/renderdepth"					, VIMS_RENDER_DEPTH },
 	{ "console/continuous"					, VIMS_CONTINUOUS_PLAY },
 //@ NO VIMS callback!	{ "console/recviewport"			, VIMS_RECVIEWPORT },
@@ -308,7 +316,9 @@ static struct
 	{ "stream/play"						, VIMS_SET_MODE_AND_GO },
 	{ "stream/delete",					VIMS_STREAM_DELETE },
 	{ "stream/new/v4l",					VIMS_STREAM_NEW_V4L },
+#ifdef SUPPORT_READ_DV2
 	{ "stream/new/dv1394",					VIMS_STREAM_NEW_DV1394 },
+#endif
 	{ "stream/new/solid",					VIMS_STREAM_NEW_COLOR },
 	{ "stream/new/y4m",					VIMS_STREAM_NEW_Y4M },
 	{ "stream/new/cali",					VIMS_STREAM_NEW_CALI },
@@ -391,7 +401,9 @@ static struct
 	{ "chain/channel/dec",					VIMS_CHAIN_ENTRY_CHANNEL_DEC },
 //	{ "chain/entry/channel/up",				VIMS_CHAIN_ENTRY_CHANNEL_UP },
 //	{ "chain/entry/channel/down",				VIMS_CHAIN_ENTRY_CHANNEL_DOWN },
+#ifdef HAVE_FREETYPE
 	{ "display/copyright",					VIMS_COPYRIGHT },
+#endif
 	{ "vloopback/start",					VIMS_VLOOPBACK_START },
 	{ "vloopback/stop",					VIMS_VLOOPBACK_STOP },
 	{ "y4m/start",						VIMS_OUTPUT_Y4M_START },
