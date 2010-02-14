@@ -311,8 +311,9 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 #endif
 
 		if( status_len[0] != 'V' ) {
-			veejay_msg(0, "Error parsing status message.");
 			n = -1;
+			k = -1;
+			break;
 		}
 
 		if( n == -1  && v->is_master )

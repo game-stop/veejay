@@ -6625,7 +6625,10 @@ static void reloaded_sighandler(int x)
 		veejay_msg(VEEJAY_MSG_WARNING, "Stopping reloaded");
 		exit(0);
 	} else if ( x == SIGSEGV ) {
-	       veejay_msg(VEEJAY_MSG_ERROR, "Bugs compromised the system.");	
+		veejay_msg(VEEJAY_MSG_ERROR, "Found Gremlins in your system.");
+		veejay_msg(VEEJAY_MSG_WARNING, "No fresh ale found in the fridge.");
+		veejay_msg(VEEJAY_MSG_INFO, "Running with sub-atomic precision...");
+	        veejay_msg(VEEJAY_MSG_ERROR, "Bugs compromised the system.");	
 		exit(0);
 	}
 }
