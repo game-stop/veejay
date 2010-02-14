@@ -59,6 +59,7 @@ static int auto_loop = 0;
 static int n_slots_ = 4;
 static int max_mem_ = 30;
 static int live =0;
+
 static void CompiledWith()
 {
 	veejay_msg(VEEJAY_MSG_INFO,"Compilation flags:");
@@ -609,6 +610,16 @@ static void donothing(int sig)
 	vj_unlock(info);
 }
 
+static void	sigsegfault_handler(void) {
+	struct sigaction sigst;
+	sigst.sa_sigaction = veejay_backtrace_handler;
+	sigemptyset(&sigst.sa_mask);
+	sigaddset(&sigst.sa_mask, SIGSEGV );
+	sigst.sa_flags = SA_SIGINFO | SA_ONESHOT;
+	if( sigaction(SIGSEGV, &sigst, NULL == - 1) )
+		veejay_msg(0,"sigaction");
+}
+
 int main(int argc, char **argv)
 {
 	video_playback_setup *settings;
@@ -618,6 +629,7 @@ int main(int argc, char **argv)
 	struct sched_param schp;
 	int i;
 	fflush(stdout);
+
 	vj_mem_init();
 	vevo_strict_init();
 
@@ -654,11 +666,13 @@ int main(int argc, char **argv)
 		prepare_cache_line( max_mem_, n_slots_ );
 	veejay_check_homedir( info );
 
+	sigsegfault_handler();
+
     	sigemptyset(&(settings->signal_set));
 	sigaddset(&(settings->signal_set), SIGINT);
 	sigaddset(&(settings->signal_set), SIGPIPE);
 	sigaddset(&(settings->signal_set), SIGILL);
-	sigaddset(&(settings->signal_set), SIGSEGV);
+//	sigaddset(&(settings->signal_set), SIGSEGV);
 	sigaddset(&(settings->signal_set), SIGFPE );
 	sigaddset(&(settings->signal_set), SIGTERM );
 	sigaddset(&(settings->signal_set), SIGABRT);
@@ -668,7 +682,7 @@ int main(int argc, char **argv)
 	sigfillset( &allsignals );
 	action.sa_handler = donothing;
 	action.sa_mask = allsignals;
-	action.sa_flags = SA_RESTART | SA_RESETHAND;
+	action.sa_flags = SA_SIGINFO | SA_ONESHOT ; //SA_RESTART | SA_RESETHAND;
 
 	signal( SIGPIPE, SIG_IGN );
 

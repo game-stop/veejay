@@ -16,6 +16,15 @@
  * You should have received a copy of the GNU General Public License
  * along with this program; if not, write to the Free Software
  */
+
+
+/**
+ * Printing the stack trace, explanation by Jaco Kroon:
+ * http://tlug.up.ac.za/wiki/index.php/Obtaining_a_stack_trace_in_C_upon_SIGSEGV
+ * Jaco Kroon <jaco@kroon.co.za>
+ *
+ */
+
 #include <config.h>
 #include <stdio.h>
 #include <stdarg.h>
@@ -23,6 +32,28 @@
 #include <stdint.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
+#include <dlfcn.h>
+#include <sys/wait.h>
+#include <sys/signal.h>
+#include <sys/ucontext.h>
+
+#include <libgen.h>
+
+/* Bug in gcc prevents from using CPP_DEMANGLE in pure "C" */
+#if !defined(__cplusplus) && !defined(NO_CPP_DEMANGLE)
+#define NO_CPP_DEMANGLE
+#endif
+#ifndef NO_CPP_DEMANGLE
+#include <cxxabi.h>
+#endif
+
+#if defined(REG_RIP)
+#define SIGSEGV_STACK_IA64
+#elif defined(REG_EIP)
+#define SIGSEGV_STACK_X86
+#else
+#define SIGSEGV_STACK_GENERIC
+#endif
 
 #define TXT_RED		"\033[0;31m"
 #define TXT_RED_B 	"\033[1;31m"
@@ -54,6 +85,172 @@ static	vj_msg_hist	_message_history;
 static	int		_message_his_status = 0;
 */
 
+
+static	void	veejay_addr2line_bt( int n, void *addr, char *sym )
+{
+	int res;
+	Dl_info info;
+	const void *address;
+	FILE *out;
+	char cmd[1024];
+	char line[1024], *line_ptr, *line_pos;
+	char func_name[1024];
+	int  line_no;
+
+	res = dladdr( addr, &info );
+	if( (res == 0) || !info.dli_fname || !info.dli_fname[0] ) {
+		veejay_msg(VEEJAY_MSG_INFO, "\t%d ?:ACCESS VIOLATION", n);
+		return;
+	}
+
+	address = addr;
+	if( info.dli_fbase >= (const void*)0x40000000)
+		addr = (const char*) address - (unsigned int ) info.dli_fbase;
+
+	snprintf( cmd,sizeof(cmd), "addr2line --functions --demangle -e $(which %s) %p", info.dli_fname, address);
+	out = popen( cmd, "r");
+	if(!out) {
+		veejay_msg(VEEJAY_MSG_INFO, "\t%d %s (addr2line error)", n, sym );
+		return;
+	}
+
+	func_name[0] = '\0';
+	line_no = 0;
+
+	while( !feof(out)) {
+		line_ptr = fgets(line,sizeof(line)-1,out);
+		if(line_ptr && line_ptr[0]) {
+			line_pos = strchr( line_ptr, '\n');
+			if( line_pos )
+				line_pos[0] = '\0';
+			if( strchr( line_ptr, ':' )) {
+				line_no = 1;
+				veejay_msg(VEEJAY_MSG_INFO, "\t%d %s %s (@%x)",
+						n,
+						line_ptr,
+						func_name,
+						addr);
+				func_name[0] = '\0';
+			} else {
+				if( func_name[0] )
+					veejay_msg(VEEJAY_MSG_INFO, "%d\t%s", n, func_name );
+				snprintf(func_name, sizeof(func_name), "%s", line_ptr );
+			}
+		}
+	}
+	if( func_name[0] )
+		veejay_msg(VEEJAY_MSG_INFO, "%03d %s",n,func_name );
+	fclose(out);
+}
+
+void	veejay_print_backtrace()
+{
+	void *space[100];
+	size_t i,s;
+	char **strings;
+
+	int i_size = sizeof(void*);
+	int n_size = i_size * 2 + 1;	
+
+	s = backtrace( space, 100 );
+	strings = backtrace_symbols(space,s);
+
+	for( i = 0; i < s ; i ++ ) 
+		veejay_addr2line_bt( i + 1, space[i],strings[i] );
+
+
+}
+
+void	veejay_backtrace_handler(int n , void *dist, void *x)
+{
+	siginfo_t *ist = (siginfo_t*) dist;
+	static char *strerr = "???";
+	static struct ucontext *puc;
+	int i,f=0;
+	void *ip = NULL;
+	void **bp = NULL;
+	Dl_info info;
+	
+	puc = (struct ucontext*) x;
+#define SICCASE(c) case c: strerr = #c
+	switch(n) {
+		case SIGSEGV:
+			switch(ist->si_code) {
+				SICCASE(SEGV_MAPERR);
+				SICCASE(SEGV_ACCERR);
+			}
+			
+		//@ print stack
+#ifndef SIGSEGV_NOSTACK
+#if defined(SIGSEGV_STACK_IA64) || defined(SIGSEGV_STACK_X86)
+#if defined(SIGSEGV_STACK_IA64)
+			ip = (void*) puc->uc_mcontext.gregs[REG_RIP];
+			bp= (void**) puc->uc_mcontext.gregs[REG_RBP];
+#elif defined(SIGSEGV_STACK_X86)
+			ip = (void*) puc->uc_mcontext.gregs[REG_EIP];
+			bp = (void**) puc->uc_mcontext.gregs[REG_EBP];
+#endif
+#endif
+#endif
+
+			veejay_msg(VEEJAY_MSG_ERROR,"Found Gremlins in your system."); //@ Suggested by Matthijs
+			veejay_msg(VEEJAY_MSG_WARNING, "No fresh ale found in the fridge."); //@
+			veejay_msg(VEEJAY_MSG_INFO, "Running with sub-atomic precision..."); //@
+
+			veejay_msg(VEEJAY_MSG_INFO,"(%s) invalid access to %p at %x",
+					strerr,ist->si_addr, puc->uc_mcontext.gregs[REG_EIP]);
+			veejay_addr2line_bt( 0, puc->uc_mcontext.gregs[REG_EIP] ,  puc->uc_mcontext.gregs[REG_EIP] );
+
+			
+
+			for( i = 0; i < NGREG; i ++ ) {
+				veejay_msg(VEEJAY_MSG_INFO, "\tregister [%2d]\t=%x",i,puc->uc_mcontext.gregs[i]);
+			}
+
+			while( bp && ip ) {
+
+				if( !dladdr( ip, &info ))
+					break;
+				char *symname = info.dli_sname;
+#ifndef NO_CPP_DEMANGLE
+				int status;
+				char *tmp = __cxa_demangle( symname, NULL, 0,
+						&status );
+				if( status == 0 && tmp )
+					symname = tmp;
+#endif
+
+				veejay_msg(VEEJAY_MSG_INFO,"\t\t%d\t: %p <%s+%lu> (%s)",
+						++f,
+						ip,
+						symname,
+						(unsigned long) ip - (unsigned long) info.dli_saddr,
+						info.dli_fname );
+#ifndef NO_CPP_DEMANGLE
+				if(tmp)
+					free(tmp);
+#endif
+
+				if(info.dli_sname && !strcmp(info.dli_sname, "main"))
+					break;
+
+				ip = bp[1];
+				bp = (void**) bp[0];
+
+			}
+
+			break;
+	}
+	
+	veejay_print_backtrace(puc->uc_mcontext.gregs[REG_EIP]);	
+
+	//@ Bye
+	veejay_msg(VEEJAY_MSG_ERROR, "Bugs compromised the system.");
+
+	report_bug();
+
+	exit(0);
+}
 
 void veejay_set_debug_level(int level)
 {

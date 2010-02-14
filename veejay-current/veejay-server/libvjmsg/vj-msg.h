@@ -29,6 +29,7 @@ enum {
     VEEJAY_MSG_DEBUG = 4,
 };
 
+extern void	veejay_backtrace_handler(int n , void *ist, void *x);
 extern void veejay_strrep(char *s, char delim, char tok);
 extern void report_bug();
 extern void veejay_msg(int type, const char format[], ...);

@@ -1461,7 +1461,6 @@ void	veejay_check_homedir(void *arg)
  *
  * return value: 1 on success, 0 on error
  ******************************************************/
-
 void veejay_handle_signal(void *arg, int sig)
 {
 	veejay_t *info = (veejay_t *) arg;
@@ -2658,7 +2657,7 @@ static	void *veejay_playback_thread(void *data)
 	sigemptyset(&mask);
 	sigaddset( &mask, SIGPIPE );
 	act.sa_handler = donothing2;
-	act.sa_flags = 0;
+	act.sa_flags = SA_SIGINFO | SA_ONESHOT;
 	sigemptyset(&act.sa_mask);
 
 
