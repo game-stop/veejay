@@ -7204,9 +7204,6 @@ gboolean		is_alive( int *do_sync )
 	void *data = info;
 	vj_gui_t *gui = (vj_gui_t*) data;
 
-	int *ptr = NULL;
-	*ptr = 1;
-
 	if( gui->watch.state == STATE_PLAYING )
 	{
 		*do_sync = 1;
