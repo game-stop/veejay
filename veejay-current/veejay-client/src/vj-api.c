@@ -6628,9 +6628,18 @@ static void reloaded_sighandler(int x)
 		veejay_msg(VEEJAY_MSG_ERROR, "Found Gremlins in your system.");
 		veejay_msg(VEEJAY_MSG_WARNING, "No fresh ale found in the fridge.");
 		veejay_msg(VEEJAY_MSG_INFO, "Running with sub-atomic precision...");
-	        veejay_msg(VEEJAY_MSG_ERROR, "Bugs compromised the system.");	
+	        veejay_msg(VEEJAY_MSG_ERROR, "Bugs compromised the system.");
 		exit(0);
 	}
+}
+static void	sigsegfault_handler(void) {
+	struct sigaction sigst;
+	sigst.sa_sigaction = veejay_backtrace_handler;
+	sigemptyset(&sigst.sa_mask);
+	sigaddset(&sigst.sa_mask, SIGSEGV );
+	sigst.sa_flags = SA_SIGINFO | SA_ONESHOT;
+	if( sigaction(SIGSEGV, &sigst, NULL == - 1) )
+		veejay_msg(0,"sigaction");
 }
 
 void	register_signals()
@@ -6638,9 +6647,10 @@ void	register_signals()
 	signal( SIGINT,  reloaded_sighandler );
 	signal( SIGPIPE, reloaded_sighandler );
 	signal( SIGQUIT, reloaded_sighandler );
-	signal( SIGSEGV, reloaded_sighandler );
+//	signal( SIGSEGV, reloaded_sighandler );
 	signal( SIGABRT, reloaded_sighandler );
-	signal( SIGSEGV, reloaded_sighandler );
+
+	sigsegfault_handler();
 }
 
 
@@ -7193,6 +7203,9 @@ gboolean		is_alive( int *do_sync )
 {
 	void *data = info;
 	vj_gui_t *gui = (vj_gui_t*) data;
+
+	int *ptr = NULL;
+	*ptr = 1;
 
 	if( gui->watch.state == STATE_PLAYING )
 	{
