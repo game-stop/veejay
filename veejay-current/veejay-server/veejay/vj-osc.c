@@ -50,8 +50,17 @@
 #include <libvevo/vevo.h>
 static veejay_t *osc_info;
 
+#ifdef HAVE_LIBLO
+#include <lo/lo.h>
+static vevo_port_t **osc_clients = NULL;
+#endif
+
 #include <libOSC/libosc.h>
 #include <sys/types.h>
+#include <libstream/vj-tag.h>
+#include <libsample/sampleadm.h>
+#include <libvevo/vevo.h>
+#include <libvevo/libvevo.h>
 
 typedef struct osc_arg_t {
     int a;
@@ -73,6 +82,7 @@ typedef struct vj_osc_t {
   OSCPacketBuffer packet;
   osc_arg *osc_args;
   void	*index;
+  void	*clients;
 } vj_osc;
 
 
@@ -214,6 +224,217 @@ void vj_osc_free(void *d)
 	c = NULL;
 }
 
+#ifdef HAVE_LIBLO
+static int	osc_has_connection( char *name ) {
+
+	int i;
+	for( i = 0; i < 32; i ++ ){
+
+		vevo_port_t *port = osc_clients[i];
+		if( port == NULL )
+			continue;
+
+		size_t len = vevo_property_element_size( port, "connection", 0 );
+#ifdef STRICT_CHECKING
+		assert( len > 0 );
+#endif
+		
+		char       *con = malloc( sizeof(char) * len );
+		int err   	= vevo_property_get(port, "connection", 0,&con );
+		if( err == VEVO_NO_ERROR ) {
+			if( strncasecmp(con,name, strlen(con)) == 0  )
+				return 1;
+		}
+	}
+	return 0;
+}
+
+static	void	osc_add_client(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
+{
+	int	client_id = *( (int*) context );
+	char str[OSC_STRING_SIZE];
+	int  args[16];
+	int __a = vj_osc_count_int_arguments(arglen,vargs);
+	int __n = vj_osc_parse_char_arguments(arglen,vargs,str);
+	memset( args,0,16 );
+	str[__n] = '\0';
+
+	vj_osc_parse_int_arguments( arglen , vargs , args );
+
+	if( __n > 0 ) __a ++;
+
+
+	int free_id = -1;
+	int i;
+	for( i = 0; i < 31; i ++ ) {
+	  if(osc_clients[i] == NULL ) {
+	    free_id = i;
+	    break;
+	  }
+	}
+
+	if( free_id == -1 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to add more OSC senders.");
+		return;
+	}
+
+	if( __a != 2 || __n <= 0) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid arguments, use HOSTNAME PORT");
+		return;
+	}
+	char port[6];
+	snprintf( port, sizeof(port-1), "%d", args[0] );
+	char name[1024];
+	snprintf(name, sizeof(name)-1, "%s:%s", str,port );
+	char *cmd = "/status";
+	char *nptr = name;
+	if( osc_has_connection( name ) ) {
+		veejay_msg(0, "There already exists a status sender for %s",name);
+		return;
+	}
+
+	osc_clients[ free_id ] = vpn(VEVO_ANONYMOUS_PORT );
+	lo_address t 	       = lo_address_new( str, port );
+
+	if(vevo_property_set( osc_clients[free_id], "lo", VEVO_ATOM_TYPE_VOIDPTR,1, &t ) != VEVO_NO_ERROR ) {
+		veejay_msg(0, "Unable to add lo_address to vevo port.");
+		vevo_port_free( osc_clients[free_id] );
+		osc_clients[free_id] = NULL;
+		return;
+	}
+
+	if(vevo_property_set( osc_clients[free_id], "cmd", VEVO_ATOM_TYPE_STRING, 1, &cmd ) != VEVO_NO_ERROR ) {
+		veejay_msg(0, "Unable to store command '%s'", cmd );
+		vevo_port_free(osc_clients[free_id]);
+		osc_clients[free_id]=NULL;
+		return;
+	}
+
+	if( vevo_property_set( osc_clients[free_id], "connection", VEVO_ATOM_TYPE_STRING,1,&nptr ) != VEVO_NO_ERROR ) {
+		veejay_msg(0, "Unable to store connection string.");
+		vevo_port_free(osc_clients[free_id]);
+		osc_clients[free_id] = NULL;
+		return;
+	}
+
+	veejay_msg(VEEJAY_MSG_INFO, "Configured OSC sender to %s:%s, send /status [ArgList] every cycle.",
+		       str,port );	
+}
+
+static	int	osc_client_status_send( lo_address t, char *cmd )
+{
+	sample_info *s;
+	vj_tag *tag;
+	int err = 0;
+
+	switch( osc_info->uc->playback_mode ) {
+		case VJ_PLAYBACK_MODE_SAMPLE:
+			s = sample_get( osc_info->uc->sample_id );
+			
+			err = lo_send( t,
+				 cmd,
+				 "iiiiiiiiiiiiiiii",
+				 osc_info->uc->playback_mode,
+				 osc_info->real_fps,
+				 osc_info->settings->current_frame_num,
+				 osc_info->uc->sample_id,
+				 s->effect_toggle,
+				 s->first_frame,
+				 s->last_frame,
+				 s->speed,
+				 s->dup,
+				 s->looptype,
+				 s->marker_start,
+				 s->marker_end,
+				 (sample_size()-1),
+				 (int)( 100.0f/osc_info->settings->spvf ),
+				 osc_info->settings->cycle_count[0],
+				 osc_info->settings->cycle_count[1],
+				 vj_event_macro_status() );
+				 
+
+
+		break;
+		case VJ_PLAYBACK_MODE_TAG:
+			tag = vj_tag_get( osc_info->uc->sample_id );
+			
+			err = lo_send( t,
+				 cmd,
+				 "iiiiiiiiiiiiiiiii",
+				 osc_info->uc->playback_mode,
+				 osc_info->real_fps,
+				 osc_info->settings->current_frame_num,
+				 osc_info->uc->sample_id,
+				 tag->effect_toggle,
+				 0,
+				 tag->n_frames,
+				 1,1,1,0,0,
+				 (vj_tag_size()-1),
+				 (int) ( 100.0f/osc_info->settings->spvf ),
+				 osc_info->settings->cycle_count[0],
+				 osc_info->settings->cycle_count[1],
+				 vj_event_macro_status() );	 
+		break;
+		case VJ_PLAYBACK_MODE_PLAIN:
+			err = lo_send( t,
+				 cmd,
+				 "iiiiiiiiiiiiiiiiii",
+				 osc_info->uc->playback_mode,
+				 osc_info->real_fps,
+				 osc_info->settings->current_frame_num,
+				 0,
+				 0,
+				 osc_info->settings->min_frame_num,
+				 osc_info->settings->max_frame_num,
+				 osc_info->settings->current_playback_speed,
+				 0,0,0,0,0,
+				 (sample_size()-1 + vj_tag_true_size() - 1),
+				 (int) ( 100.0f / osc_info->settings->spvf ),
+				 osc_info->settings->cycle_count[0],
+				 osc_info->settings->cycle_count[1],
+				 vj_event_macro_status());
+				 
+		break;
+	}
+
+	if( err == -1 ) {
+		lo_address_free( t );
+		return 0;
+	}	
+	return 1;
+}
+
+static	void	osc_iterate_clients()
+{
+	int i;
+	for( i = 0; i < 32; i ++ ){
+
+		vevo_port_t *port = osc_clients[i];
+		if( port == NULL )
+			continue;
+		lo_address clnt;
+	       	int err = vevo_property_get( port, "lo", 0, &clnt );
+		if( err == VEVO_NO_ERROR ) {
+			size_t len = vevo_property_element_size( port, "cmd", 0 );
+#ifdef STRICT_CHECKING
+			assert( len > 0 );
+#endif
+			
+			
+			char       *cmd = malloc( sizeof(char) * len );
+			err = vevo_property_get( port, "cmd", 0, &cmd );
+
+			int res = osc_client_status_send( clnt, cmd );
+			if( res == 0 ) {
+				vevo_port_free( port );
+				osc_clients[i] = NULL;
+				veejay_msg(VEEJAY_MSG_WARNING,"Failed to send %s",cmd);
+			} 
+			free(cmd);
+		}
+	}
+}
+#endif
 
 static 	void osc_vims_method(void *context, int arglen, const void *vargs, OSCTimeTag when, NetworkReturnAddressPtr ra)
 {
@@ -408,6 +629,9 @@ static struct
 	{ "vloopback/stop",					VIMS_VLOOPBACK_STOP },
 	{ "y4m/start",						VIMS_OUTPUT_Y4M_START },
 	{ "y4m/stop",						VIMS_OUTPUT_Y4M_STOP },
+#ifdef HAVE_LIBLO
+	{ "osc/sender",					-2 },
+#endif
 	{ NULL,							-1 }
 };
 
@@ -546,8 +770,25 @@ int 	vj_osc_build_cont( vj_osc *o )
 #ifdef STRICT_CHECKING
 		assert( err == VEVO_NO_ERROR );
 #endif	
+
+#ifdef HAVE_LIBLO
+		if( osc_method_layout[i].vims_id == -2 ) {
+			o->ris.description = strdup( "Setup a OSC sender (Arg 0=host, 1=port)");
+			OSCNewMethod( arr[method],
+				      o->leaves[leave_id],
+				      osc_add_client,
+				      &(osc_method_layout[i].vims_id),
+				      &(o->ris));
+		} else {
+			o->ris.description = vj_event_vevo_get_event_name( osc_method_layout[i].vims_id );
+			OSCNewMethod( arr[ method ], o->leaves[  leave_id ], osc_vims_method, &(osc_method_layout[i].vims_id),&(o->ris));
+	
+		}	
+#else
 		o->ris.description = vj_event_vevo_get_event_name( osc_method_layout[i].vims_id );
 		OSCNewMethod( arr[ method ], o->leaves[  leave_id ], osc_vims_method, &(osc_method_layout[i].vims_id),&(o->ris));
+
+#endif
 	}
 
 	return 1;
@@ -558,7 +799,13 @@ int 	vj_osc_build_cont( vj_osc *o )
 void* vj_osc_allocate(int port_id) {
 	void *res;
 	char tmp[200];
+	int i;
 	vj_osc *o = (vj_osc*)vj_malloc(sizeof(vj_osc));
+#ifdef HAVE_LIBLO
+	osc_clients = (vevo_port_t*) vj_malloc(sizeof(vevo_port_t*) * 32);
+	for( i = 0; i < 32 ;i ++ )
+		osc_clients[i] = NULL;
+#endif
 	//o->osc_args = (osc_arg*)vj_malloc(50 * sizeof(*o->osc_args));
 	o->rt.InitTimeMemoryAllocator = _vj_osc_time_malloc;
 	o->rt.RealTimeMemoryAllocator = _vj_osc_rt_malloc;
@@ -611,6 +858,19 @@ void vj_osc_dump()
 {
 
 	OSCPrintWholeAddressSpace();
+#ifdef HAVE_LIBLO
+	veejay_msg(VEEJAY_MSG_INFO, "The OSC command /osc/sender <hostname> <port> will setup an OSC client");
+	veejay_msg(VEEJAY_MSG_INFO, "which periodically sends veejay's status information. Format below:");
+
+	veejay_msg(VEEJAY_MSG_INFO,
+			"/status ( [playback mode], [real fps], [frame num], [sample_id], [fx on/off], [first frame],");
+	veejay_msg(VEEJAY_MSG_INFO,
+			"          [last_frame],[speed],[slow],[looptype],[in point],[out point],[num samples],");
+	veejay_msg(VEEJAY_MSG_INFO,
+			"	      [second per video frame],[cycle count low],[cycle count high],[macro status]) ");
+	veejay_msg(VEEJAY_MSG_INFO,"\n");
+#endif
+
 }
  
 /* dump the OSC address space to screen */
@@ -635,6 +895,9 @@ int vj_osc_get_packet(void *d) {
    tv.tv_sec=0;
    tv.tv_usec = 0;
 	vj_osc *o = (vj_osc*) d;
+#ifdef HAVE_LIBLO
+	osc_iterate_clients();
+#endif
    /* see if there is something to read , this is effectivly NetworkPacketWaiting */
   // if(ioctl( o->sockfd, FIONREAD, &bytes,0 ) == -1) return 0;
   // if(bytes==0) return 0;
@@ -651,4 +914,5 @@ int vj_osc_get_packet(void *d) {
     }
     return 0;
 }
+
 

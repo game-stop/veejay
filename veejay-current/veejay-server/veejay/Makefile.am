@@ -19,7 +19,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
 		-I$(top_srcdir)/liblzo \
 		-I$(top_srcdir)/bio2jack \
 		$(FFMPEG_CFLAGS) $(LIBQUICKTIME_CFLAGS) $(FT_CFLAGS) \
-		$(AVIPLAY_CFLAGS) $(XML2_CFLAGS) $(GTK_CFLAGS) $(DV_FLAGS) $(X_CFLAGS) \
+		$(AVIPLAY_CFLAGS) $(XML2_CFLAGS) $(GTK_CFLAGS) $(DV_FLAGS) $(X_CFLAGS) $(LIBLO_CFLAGS) \
 		$(DIRECTFB_CFLAGS) $(SDL_CFLAGS) $(JPEG_CFLAGS) $(JACK_CFLAGS) $(PTHREAD_CFLAGS) $(SAMPLERATE_CFLAGS) 
  
 pkginclude_HEADERS = vims.h
@@ -55,7 +55,7 @@ libveejay_la_LIBADD = -L$(top_builddir)/mjpegtools/ -lmjpegutils \
 			-L$(top_builddir)/libvevo -lvevo 
 
 libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $(FT_LDFLAGS) $(FT_LIBS) \
-			$(XML2_LIBS) $(JPEG_LIBS) $(UNICAP_LIBS) \
+			$(XML2_LIBS) $(JPEG_LIBS) $(UNICAP_LIBS) $(LIBLO_LIBS) \
 		 	$(FFMPEG_LIBS) $(XINERAMA_LIBS) \
 			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(JACK_LIBS) $(LIBQUICKTIME_LIBS) $(SAMPLERATE_LIBS) \
 			-DDYNAMIC -O3 -Wall -rdynamic 

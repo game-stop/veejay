@@ -757,6 +757,15 @@ AM_PATH_SDL(1.2.3,[
             AC_DEFINE(HAVE_SDL,, [SDL library present])],,)
 fi
 
+have_liblo=false
+PKG_CHECK_MODULES( LIBLO, liblo >= 0.26,have_liblo=true,have_liblo=false)
+if test x$have_liblo = xfalse ; then
+ AC_MSG_WARN([Could not find optional library liblo])
+else
+ have_liblo=true
+ AC_SUBST(HAVE_LIBLO)
+ AC_DEFINE(HAVE_LIBLO,,[define if liblo])
+fi
 
 have_unicap=false
 if test x$with_unicap != xno; then
@@ -895,6 +904,7 @@ AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
 AM_CONDITIONAL(HAVE_UNICAP,test x$have_unicap = xtrue)
+AM_CONDITIONAL(HAVE_LIBLO,test x$have_liblo = xtrue)
 dnl *********************************************************************
 dnl Check for what warnings we want gcc to use and adjust the CFLAGS
 dnl as needed. This only works for GCC.
@@ -1058,5 +1068,6 @@ AC_MSG_NOTICE([  - libDV (digital video) support : ${have_libdv} ])
 AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Unicap Imaging                : ${have_unicap} ])
+AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
 #AC_MSG_NOTICE([  - libsamplerate                 : ${have_samplerate}])
 
