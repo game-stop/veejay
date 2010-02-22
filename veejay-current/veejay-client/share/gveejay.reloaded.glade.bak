@@ -17205,9 +17205,7 @@ YUV (current)</property>
 	  </child>
 
 	  <child>
-	    <widget class="GtkHBox" id="quickselect">
-	      <property name="width_request">200</property>
-	      <property name="height_request">32</property>
+	    <widget class="GtkHBox" id="hbox933">
 	      <property name="visible">True</property>
 	      <property name="homogeneous">False</property>
 	      <property name="spacing">0</property>
@@ -17220,6 +17218,7 @@ YUV (current)</property>
 
 		  <child>
 		    <widget class="GtkLabel" id="cpumeter">
+		      <property name="width_request">110</property>
 		      <property name="visible">True</property>
 		      <property name="label" translatable="yes">cpumeter</property>
 		      <property name="use_underline">False</property>
@@ -17245,7 +17244,7 @@ YUV (current)</property>
 
 		  <child>
 		    <widget class="GtkLabel" id="cachemeter">
-		      <property name="width_request">100</property>
+		      <property name="width_request">70</property>
 		      <property name="visible">True</property>
 		      <property name="label" translatable="yes">cache filled</property>
 		      <property name="use_underline">False</property>
@@ -17271,7 +17270,34 @@ YUV (current)</property>
 		</widget>
 		<packing>
 		  <property name="padding">0</property>
-		  <property name="expand">False</property>
+		  <property name="expand">True</property>
+		  <property name="fill">True</property>
+		</packing>
+	      </child>
+
+	      <child>
+		<widget class="GtkFrame" id="frame345">
+		  <property name="width_request">109</property>
+		  <property name="visible">True</property>
+		  <property name="label_xalign">0</property>
+		  <property name="label_yalign">0.5</property>
+		  <property name="shadow_type">GTK_SHADOW_NONE</property>
+
+		  <child>
+		    <widget class="GtkHBox" id="quickselect">
+		      <property name="visible">True</property>
+		      <property name="homogeneous">False</property>
+		      <property name="spacing">0</property>
+
+		      <child>
+			<placeholder/>
+		      </child>
+		    </widget>
+		  </child>
+		</widget>
+		<packing>
+		  <property name="padding">0</property>
+		  <property name="expand">True</property>
 		  <property name="fill">True</property>
 		</packing>
 	      </child>

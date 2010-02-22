@@ -220,6 +220,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 				reloaded_schedule_restart();
 			veejay_msg(0, "Received %d out of %d bytes", bw,len);
 			free(tmp);
+			*payload = 0;
 			return 0;
 		}
 		bw += n;
@@ -282,6 +283,7 @@ static unsigned char		*vims_track_list( veejay_track_t *v, int slen, int *bytes_
 			if( n == -1 && v->is_master )
 				reloaded_schedule_restart();	
                         bytes_left = 0;
+			break;
                 }
                 if( n > 0 )
                 {
@@ -290,6 +292,12 @@ static unsigned char		*vims_track_list( veejay_track_t *v, int slen, int *bytes_
                 }
         }
 	free(tmp);
+
+	if( bytes_left ) {
+		free(result);
+		return NULL;
+	}	
+
         return result;
 }
 
@@ -445,7 +453,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	gint bw = 0;
 
 	res = recvvims( v, 7, &bw, v->data_buffer );
-	if( res <= 0 )
+	if( res <= 0 || bw <= 0 )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Can't get a preview image");
 		v->have_frame = 0;
@@ -532,10 +540,19 @@ static int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v )
 	return 0;
 }
 
+static int fail_connection = 0;
 static int 	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
 {
-	if( veejay_get_image_data( vp, v ) == 0 )
-		return 0;
+	if( veejay_get_image_data( vp, v ) == 0 ) {
+		//@ settle
+		usleep(200000);
+		fail_connection ++;
+		if( fail_connection > 2 ) {
+			fail_connection = 0;
+			return 0;
+		}
+		return 1;
+	}
 	return 1;
 }
 
@@ -1075,6 +1092,8 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 			}
 			else
 			{
+				vj_client_setup_timeout( v->fd,V_CMD,1);
+
 				v->preview = is_button_toggled( "previewtoggle");
 				v->active = 1;
   				vj_msg(VEEJAY_MSG_WARNING, "VeejayGrabber: connected with %s:%d on Track %d  %d x %d", 
