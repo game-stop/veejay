@@ -939,7 +939,7 @@ int	v4lvideo_copy_framebuffer_to( void *vv, uint8_t *dstY, uint8_t *dstU, uint8_
 		return -1;
 	}
 	
-lock_(v);
+	lock_(v);
 	if(!v->v4l ) {
 		unlock_(v);
 		return 0;
@@ -993,6 +993,8 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 				yuv_init_swscaler( srcf,dstf,&(v1->sws_templ), yuv_sws_get_cpu_flags());
 		lock_(v2);
 			yuv_convert_and_scale( v1->scaler, srcf, dstf );
+				v1->has_video = 1;
+
 		unlock_(v2);
 
 	} else if ( v1->native == 2 ) {
@@ -1021,6 +1023,8 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 		srcf->data[2] = tmp[2];
 		lock_(v2);
 			yuv_convert_and_scale( v1->scaler, srcf, dstf );
+				v1->has_video = 1;
+
 		unlock_(v2);
 	} else {
 		VJFrame *srcf = v1->info->src;
@@ -1047,10 +1051,12 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 			
 			lock_(v2);
 			yuv_convert_and_scale_from_rgb( v1->scaler, srcf, dstf );
+			v1->has_video = 1;
+
 			unlock_(v2);
 	//	}	
 	}
-	v1->has_video = 1;
+//	v1->has_video = 1;
 }
 
 

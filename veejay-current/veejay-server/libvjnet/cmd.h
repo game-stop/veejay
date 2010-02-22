@@ -48,4 +48,5 @@ int		sock_t_send( vj_sock_t *s, unsigned char *buf, int len );
 int		sock_t_send_fd( int fd, int sndsize, unsigned char *buf, int len );
 void		sock_t_close( vj_sock_t *s );
 int		sock_t_connect_and_send_http( vj_sock_t *s, char *host, int port, char *buf, int buf_len );
+void		sock_t_set_timeout( vj_sock_t *s, int t );
 #endif

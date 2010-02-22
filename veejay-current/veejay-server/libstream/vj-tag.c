@@ -1516,15 +1516,13 @@ int	vj_tag_try_filename(int t1, char *filename, int format)
 
 static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 {
-	char descr[100];
 	char cformat = vj_avcodec_find_lav( format );
 	int sample_id = tag->id;
 	
 	tag->encoder =  vj_avcodec_start( _tag_info->edit_list , format, tag->encoder_destination );
 	if(!tag->encoder)
 	{
-		veejay_msg(0, "Unable to use %s encoder, please select another",
-			descr );
+		veejay_msg(0, "Unable to use selected encoder, please choose another.");
 		return 0;
 	}
 	tag->encoder_active = 1;
@@ -1594,8 +1592,7 @@ static int vj_tag_start_encoder(vj_tag *tag, int format, long nframes)
 		}
 	}
 
-	veejay_msg(VEEJAY_MSG_INFO, "Recording to %s file [%s] %ldx%ld@%2.2f %d/%d/%d >%09ld<",
-		    descr,
+	veejay_msg(VEEJAY_MSG_INFO, "Recording to file [%s] %ldx%ld@%2.2f %d/%d/%d >%09ld<",
 		    tag->encoder_destination, 
 		    _tag_info->edit_list->video_width,
 		    _tag_info->edit_list->video_height,

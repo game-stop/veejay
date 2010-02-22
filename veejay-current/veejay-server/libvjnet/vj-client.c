@@ -410,6 +410,19 @@ int	vj_client_get_status_fd(vj_client *v, int sock_type )
 	}
 	return 0;	
 }
+
+int	vj_client_setup_timeout( vj_client *v, int sock_type, int timeout )
+{
+	if( sock_type == V_STATUS )
+	{
+		sock_t_set_timeout( v->c[1], timeout );
+	}
+	if( sock_type == V_CMD )
+	{
+		sock_t_set_timeout( v->c[0], timeout );
+	}
+}
+
 int	vj_client_read_no_wait(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 {
 	if( sock_type == V_STATUS )

@@ -374,21 +374,24 @@ int	vj_server_link_can_write( vj_server *vje, int link_id, int timeout )
 
 	struct timeval tv;
 	memset( &tv, 0,sizeof(struct timeval));
-	tv.tv_sec = timeout;
+	
+//	if( timeout ) {
+//		tv.tv_sec  = 1;
+//	}
 
 	int err = select( link[link_id]->handle+1, NULL, &wds, &eds,&tv );
 
-	if( err < 0 )
+	if( err <= 0 )
 	{
 		veejay_msg(0, "Unable to poll for immediate write: %s", link_id,strerror(errno));
 		return 0;
 	}
-	if( err == 0 )
+/*	if( err == 0 )
 	{
 		veejay_msg(0, "Timeout expired");
 		return 1;
 	}
-
+*/
 	if( FD_ISSET( link[link_id]->handle, &eds ))
 	{
 		veejay_msg(0, "An exception occured to link %d", link_id );

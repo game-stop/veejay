@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2002-2004 Niels Elburg <nwelburg@gmail.com>
+ * Copyright(C)2002-2010 Niels Elburg <nwelburg@gmail.com>
  *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
@@ -21,8 +21,8 @@
 /**
  * Printing the stack trace, explanation by Jaco Kroon:
  * http://tlug.up.ac.za/wiki/index.php/Obtaining_a_stack_trace_in_C_upon_SIGSEGV
- * Jaco Kroon <jaco@kroon.co.za>
- *
+ * Author: Jaco Kroon <jaco@kroon.co.za>
+ * Copyright (C) 2005 - 2008 Jaco Kroon
  */
 
 #include <config.h>
@@ -197,12 +197,17 @@ void	veejay_backtrace_handler(int n , void *dist, void *x)
 			veejay_msg(VEEJAY_MSG_WARNING, "No fresh ale found in the fridge."); //@
 			veejay_msg(VEEJAY_MSG_INFO, "Running with sub-atomic precision..."); //@
 
+#if defined(SIGSEGV_STACK_IA64) || defined(SIGSEGV_STACK_X86)
+#if defined(SIGSEGV_STACK_X86)
 			veejay_msg(VEEJAY_MSG_INFO,"(%s) invalid access to %p at %x",
 					strerr,ist->si_addr, puc->uc_mcontext.gregs[REG_EIP]);
 			veejay_addr2line_bt( 0, puc->uc_mcontext.gregs[REG_EIP] ,  puc->uc_mcontext.gregs[REG_EIP] );
-
-			
-
+#elif defined(SIGSEGV_STACK_IA64)
+			veejay_msg(VEEJAY_MSG_INFO,"(%s) invalid access to %p at %x",
+					strerr,ist->si_addr, puc->uc_mcontext.gregs[REG_RIP]);
+			veejay_addr2line_bt( 0, puc->uc_mcontext.gregs[REG_RIP] );
+#endif
+#endif
 			for( i = 0; i < NGREG; i ++ ) {
 				veejay_msg(VEEJAY_MSG_INFO, "\tregister [%2d]\t=%x",i,puc->uc_mcontext.gregs[i]);
 			}
@@ -241,9 +246,14 @@ void	veejay_backtrace_handler(int n , void *dist, void *x)
 
 			break;
 	}
-	
-	veejay_print_backtrace(puc->uc_mcontext.gregs[REG_EIP]);	
 
+#if defined(SIGSEGV_STACK_IA64) || defined(SIGSEGV_STACK_X86)
+#if defined(SIGSEGV_STACK_IA64)
+	veejay_print_backtrace(puc->uc_mcontext.gregs[REG_RIP]);	
+#elif defined(SIGSEGV_STACK_X86)
+	veejay_print_backtrace(puc->uc_mcontext.gregs[REG_EIP]);
+#endif
+#endif
 	//@ Bye
 	veejay_msg(VEEJAY_MSG_ERROR, "Bugs compromised the system.");
 

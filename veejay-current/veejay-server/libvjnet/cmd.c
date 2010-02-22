@@ -137,9 +137,9 @@ int			sock_t_poll_w(vj_sock_t *s )
 	int	status;
 	fd_set	fds;
 	struct timeval no_wait;
+	memset( &no_wait, 0, sizeof(no_wait) );
 	no_wait.tv_sec = TIMEOUT;
 	no_wait.tv_usec = 0;
-	memset( &no_wait, 0, sizeof(no_wait) );
 
 	FD_ZERO( &fds );
 	FD_SET( s->sock_fd, &fds );
@@ -176,6 +176,7 @@ int			sock_t_poll( vj_sock_t *s )
 	FD_SET( s->sock_fd, &fds );
 
 	status = select( s->sock_fd + 1, &fds, 0, 0, &no_wait );
+	
 	if( status < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to poll socket for immediate read: %s", strerror(errno));
@@ -188,19 +189,18 @@ int			sock_t_poll( vj_sock_t *s )
 	return 0;
 }
 
-
+/*
 static		int	timed_recv( int fd, void *buf, const int len, int timeout )
 {
 	fd_set fds;
 	int	n;
 
 	struct timeval tv;
-
+	memset( &tv, 0,sizeof(timeval));
 	FD_ZERO(&fds);
 	FD_SET( fd,&fds );
 
 	tv.tv_sec  = TIMEOUT;
-	tv.tv_usec = 0;
 
 	n	  = select( fd + 1, &fds, NULL, NULL, &tv );
 	if( n == 0 ) {
@@ -214,7 +214,7 @@ static		int	timed_recv( int fd, void *buf, const int len, int timeout )
 		return -5;
 
 	return recv( fd, buf, len, 0 );
-}
+}*/
 
 int			sock_t_recv_w( vj_sock_t *s, void *dst, int len )
 {
@@ -255,6 +255,13 @@ int			sock_t_recv_w( vj_sock_t *s, void *dst, int len )
 	return 0;
 }
 
+void			sock_t_set_timeout( vj_sock_t *s, int t )
+{
+	int opt = t;
+	setsockopt( s->sock_fd, SOL_SOCKET, SO_SNDTIMEO, (char*) &opt, sizeof(int));
+	setsockopt( s->sock_fd, SOL_SOCKET, SO_RCVTIMEO, (char*) &opt, sizeof(int));
+}
+
 int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 {
 	int done = 0;
@@ -265,11 +272,9 @@ int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 
 	while( done < len )
 	{	
-		n = timed_recv( s->sock_fd, dst+done,bytes_left, TIMEOUT );
-		if( n == -5 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Timeout while receiving data");	
-			return -1;
-		} else if ( n == -1 ) {
+		//@ setup socket with SO_RCVTIMEO
+		n = recv( s->sock_fd, dst+done,bytes_left, 0 );
+		if ( n == -1 ) {
 			veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
 			return -1;
 		}
