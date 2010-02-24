@@ -1446,13 +1446,13 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 	int np = 0;
 	if( msg == NULL )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Empty VIMS, dropped!");
+		veejay_msg(VEEJAY_MSG_ERROR, "Dropped empty VIMS message.");
 		return 0;
 	}
 
 	if( msg_len < MSG_MIN_LEN )
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "VIMS Message too small, dropped!");
+		veejay_msg(VEEJAY_MSG_ERROR, "VIMS Message too small (%s), dropped!",msg);
 		return 0;
 
 	}
@@ -1481,7 +1481,15 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		veejay_msg(VEEJAY_MSG_ERROR, "Error parsing VIMS selector");
 		return 0;
 	}
-
+#ifdef STRICT_CHECKING
+	char *dbg_msg = vj_event_vevo_get_event_name( net_id );
+	if( dbg_msg == NULL ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "No event knownn by '%d' (%s)", net_id,msg );
+	} else {
+	veejay_msg(VEEJAY_MSG_DEBUG, "VIMS '%s' %s",
+		msg,dbg_msg );
+	}
+#endif
 #ifndef STRICT_CHECKING
 	if( net_id != 412 && net_id != 333)
 #else
@@ -2721,6 +2729,10 @@ void	vj_event_set_framerate( void *ptr, const char format[] , va_list ap )
 
 	if(new_fps == 0.0 )
 		new_fps = v->current_edit_list->video_fps;
+	else if (new_fps <= 0.25 ) {
+		new_fps = 0.25f;
+		veejay_msg(VEEJAY_MSG_WARNING, "Limited new framerate to %2.2f ", new_fps );
+	}
 
 	veejay_set_framerate( v, new_fps );
 

@@ -904,7 +904,7 @@ int	vj_server_update( vj_server *vje, int id )
 		n = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
 		if( n < 0)
 		{
-	//		veejay_msg(VEEJAY_MSG_ERROR, "Receive error: %s", strerror(errno));
+			veejay_msg(VEEJAY_MSG_ERROR, "Network error: %s", strerror(errno));
 			return -1;
 		}
 		if( n == 0 )
@@ -1033,6 +1033,7 @@ char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 		return NULL;
 
 	int index = Link[id]->n_retrieved;
+
 	if( index >= Link[id]->n_queued )
 		return NULL; // done
 
@@ -1041,6 +1042,12 @@ char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 	assert( msg != NULL );
 #endif
 	int len = Link[id]->m_queue[index]->len;
+
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_DEBUG, "L%2d queue [%4d]/[%d] [%4d] '%s'",
+			id, index, Link[id]->n_queued, len, msg );
+			
+#endif
 
 	index ++;
 	Link[id]->n_retrieved = index;

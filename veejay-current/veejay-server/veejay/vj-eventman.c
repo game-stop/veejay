@@ -277,6 +277,9 @@ void *		vj_event_vevo_get_event_function( int id )
 char	*vj_event_vevo_get_event_name( int id )
 {
 	char *descr = NULL;
+	if( index_map_[id] == NULL )
+		return NULL;
+
 	size_t len = vevo_property_element_size( index_map_[id], "description", 0  );
 	if(len > 0 )
 	{
