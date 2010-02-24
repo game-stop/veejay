@@ -7101,12 +7101,14 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 		return 0;
 	}
 	
+
 	vj_msg(VEEJAY_MSG_INFO, "New connection with Veejay running on %s port %d",
 		(group_name == NULL ? hostname : group_name), port_num );
 	
 	veejay_msg(VEEJAY_MSG_INFO, "Connection established with %s:%d (Track 0)",hostname,port_num);
 
 	load_editlist_info();
+	info->status_lock = 1;
 
 	update_slider_value( "framerate", info->el.fps,  0 );
 
@@ -7129,6 +7131,7 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	update_label_str( "label_hostnamex", (hostname == NULL ? group_name: hostname ) );
 	update_label_i( "label_portx",port_num,0);
 
+	info->status_lock = 0;
 
 	multitrack_configure( info->mt,
 			      info->el.fps, info->el.width, info->el.height, &preview_box_w_, &preview_box_h_ );

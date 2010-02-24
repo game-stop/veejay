@@ -455,7 +455,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	res = recvvims( v, 7, &bw, v->data_buffer );
 	if( res <= 0 || bw <= 0 )
 	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Can't get a preview image");
+		veejay_msg(VEEJAY_MSG_WARNING, "Can't get a preview image! Only got %d bytes", bw);
 		v->have_frame = 0;
 		return 0;
 	}
@@ -540,19 +540,24 @@ static int	gvr_preview_process_status( veejay_preview_t *vp, veejay_track_t *v )
 	return 0;
 }
 
-static int fail_connection = 0;
+static int fail_connection	 = 0;
+static int continue_anyway       = 0;
 static int 	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
 {
 	if( veejay_get_image_data( vp, v ) == 0 ) {
 		//@ settle
-		usleep(200000);
 		fail_connection ++;
 		if( fail_connection > 2 ) {
-			fail_connection = 0;
+			fail_connection = 0; //@ fail 2 out of 10 images and we break connection
 			return 0;
 		}
 		return 1;
+	} else {
+		continue_anyway = (continue_anyway + 1) % 10;
+		if(continue_anyway == 0)
+		  fail_connection = 0;
 	}
+
 	return 1;
 }
 

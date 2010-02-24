@@ -2002,9 +2002,12 @@ void	on_frameratenormal_clicked( GtkWidget *w, gpointer data )
 
 void	on_framerate_value_changed( GtkWidget *w, gpointer data )
 {
-    gdouble slider_val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
-    int value = (int)(100.0 * slider_val);
-    multi_vims( VIMS_FRAMERATE, "%d", value );
+	if(info->status_lock)
+		return;
+
+	gdouble slider_val = GTK_ADJUSTMENT(GTK_RANGE(w)->adjustment)->value;
+	int value = (int)(100.0 * slider_val);
+	multi_vims( VIMS_FRAMERATE, "%d", value );
 	vj_midi_learning_vims_simple( info->midi, "framerate", VIMS_FRAMERATE );
 }
 
