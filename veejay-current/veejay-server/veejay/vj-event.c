@@ -124,8 +124,14 @@ typedef struct
 static int _recorder_format = ENCODER_MJPEG;
 
 #define SEND_BUF 256000
-static char _print_buf[SEND_BUF];
-static char _s_print_buf[SEND_BUF];
+
+static	char	*get_print_buf(int size) {
+	int s = size;
+	if( s<= 0)
+		s = SEND_BUF;
+	char *res = (char*) vj_calloc(sizeof(char) * s );
+	return res;
+}
 
 static	void	*macro_bank_[12];
 static	void	*macro_port_ = NULL;
@@ -1494,7 +1500,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 	if( net_id != 412 && net_id != 333)
 #else
 	
-		veejay_msg(VEEJAY_MSG_DEBUG, "VIMS: Parse message '%s'", msg );
+		veejay_msg(VEEJAY_MSG_DEBUG, "VIMS: @%ld Parse message '%s'",v->settings->current_frame_num, msg );
 	
 #endif
 	if( net_id <= 0 || net_id >= VIMS_MAX )
@@ -2384,13 +2390,13 @@ void	vj_event_format_xml_event( xmlNodePtr node, int event_id )
 
 static	void	vj_event_send_new_id(veejay_t * v, int new_id)
 {
-
+	char s_print_buf[16];
 	if( vj_server_client_promoted( v->vjs[0], v->uc->current_link ))
 	{
 		char result[6];
 		sprintf( result, "%05d",new_id );
-		sprintf(_s_print_buf, "%03d%s",5, result);	
-		SEND_MSG( v,_s_print_buf );
+		sprintf(s_print_buf, "%03d%s",5, result);	
+		SEND_MSG( v,s_print_buf);
 	}
 }
 
@@ -8224,12 +8230,13 @@ void vj_event_print_info(void *ptr, const char format[], va_list ap)
 void	vj_event_send_track_list		(	void *ptr,	const char format[], 	va_list ap 	)
 {
 	veejay_t *v = (veejay_t*)ptr;
-	sprintf(_s_print_buf, "%05d",0);
+	char *s_print_buf = get_print_buf(0);
+	sprintf(s_print_buf, "%05d",0);
 	int n = vj_tag_size()-1;
 	if (n >= 1 )
 	{
 		char line[300];
-		veejay_memset( _print_buf, 0,SEND_BUF);
+		char *print_buf = get_print_buf(SEND_BUF);
 		int i;
 		for(i=0; i <= n; i++)
 		{
@@ -8242,14 +8249,16 @@ void	vj_event_send_track_list		(	void *ptr,	const char format[], 	va_list ap 	)
 					char space[275];
 					sprintf(space, "%s %d", tag->descr, tag->id );
 					sprintf(cmd, "%03d%s",strlen(space),space);
-					APPEND_MSG(_print_buf,cmd); 
+					APPEND_MSG(print_buf,cmd); 
 				}
 			}
 		}
-		sprintf(_s_print_buf, "%05d%s",strlen(_print_buf),_print_buf);
+		sprintf(s_print_buf, "%05d%s",strlen(print_buf),print_buf);
+		free(print_buf);
 	}
 
-	SEND_MSG(v,_s_print_buf);
+	SEND_MSG(v,s_print_buf);
+	free(s_print_buf);
 }
 
 void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
@@ -8260,7 +8269,8 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 	char *str = NULL; 
 	P_A(args,str,format,ap);
 	int i,n;
-	sprintf(_s_print_buf, "%05d",0);
+	char *s_print_buf = get_print_buf(0);
+	sprintf(s_print_buf, "%05d",0);
 
 	//if(args[0]>0) start_from_tag = args[0];
 
@@ -8268,7 +8278,7 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 	if (n >= 1 )
 	{
 		char line[300];
-		veejay_memset( _print_buf,0, SEND_BUF);
+		char *print_buf = get_print_buf(SEND_BUF);
 
 		for(i=0; i <= n; i++)
 		{
@@ -8292,16 +8302,18 @@ void	vj_event_send_tag_list			(	void *ptr,	const char format[],	va_list ap	)
 					source_name
 				);
 				sprintf(cmd, "%03d%s",strlen(line),line);
-				APPEND_MSG(_print_buf,cmd); 
+				APPEND_MSG(print_buf,cmd); 
 			}
 		}
-		sprintf(_s_print_buf, "%05d%s",strlen(_print_buf),_print_buf);
+		sprintf(s_print_buf, "%05d%s",strlen(print_buf),print_buf);
+		free(print_buf);
 	}
 
-	SEND_MSG(v,_s_print_buf);
+	SEND_MSG(v,s_print_buf);
+	free(s_print_buf);
 }
 
-static	void	_vj_event_gatter_sample_info( veejay_t *v, int id )
+static	char *_vj_event_gatter_sample_info( veejay_t *v, int id )
 {
 	char description[SAMPLE_MAX_DESCR_LEN];
 	int end_frame 	= sample_get_endFrame( id );
@@ -8316,8 +8328,8 @@ static	void	_vj_event_gatter_sample_info( veejay_t *v, int id )
 
 	int dlen = strlen(description);
 	int tlen = strlen(timecode);	
-
-	sprintf( _s_print_buf, 
+	char *s_print_buf = get_print_buf(512);
+	snprintf( s_print_buf, 512,
 		"%08d%03d%s%03d%s%02d%02d",
 		( 3 + dlen + 3+ tlen + 2 +2),
 		dlen,
@@ -8327,9 +8339,9 @@ static	void	_vj_event_gatter_sample_info( veejay_t *v, int id )
 		0,
 		id
 	);	
-
+	return s_print_buf;
 }
-static	void	_vj_event_gatter_stream_info( veejay_t *v, int id )
+static	char *	_vj_event_gatter_stream_info( veejay_t *v, int id )
 {
 	char description[SAMPLE_MAX_DESCR_LEN];
 	char source[255];
@@ -8339,7 +8351,8 @@ static	void	_vj_event_gatter_stream_info( veejay_t *v, int id )
 	
 	int dlen = strlen( description );
 	int tlen = strlen( source );
-	sprintf( _s_print_buf,
+	char *s_print_buf = get_print_buf( 512 );
+	snprintf( s_print_buf,512,
 		"%08d%03d%s%03d%s%02d%02d",
 		(  3 + dlen + 3 + tlen + 2 + 2),
 		dlen,
@@ -8349,6 +8362,7 @@ static	void	_vj_event_gatter_stream_info( veejay_t *v, int id )
 		stream_type,
 		id 
 	);
+	return s_print_buf;
 }
 
 void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
@@ -8361,6 +8375,9 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 	if(args[0] == 0 )
 		args[0] = v->uc->sample_id;
 
+
+	char *s_print_buf = NULL;
+
 	switch( args[1] )
 	{
 		case 0:
@@ -8369,7 +8386,7 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 
 			if(sample_exists(args[0]))
 			{
-				_vj_event_gatter_sample_info(v,args[0]);
+				s_print_buf = _vj_event_gatter_sample_info(v,args[0]);
 				failed = 0;
 			}
 			break;
@@ -8379,7 +8396,7 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 
 			if(vj_tag_exists(args[0]))
 			{
-				_vj_event_gatter_stream_info(v,args[0]);	
+				s_print_buf = _vj_event_gatter_stream_info(v,args[0]);	
 				failed = 0;
 			}
 			break;
@@ -8387,9 +8404,12 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 			break;
 	}
 	
-	if(failed)
-		sprintf( _s_print_buf, "%08d", 0 );
-	SEND_MSG(v , _s_print_buf );
+	if(failed) {
+		s_print_buf = get_print_buf( 8 );
+		snprintf( s_print_buf,8, "%08d", 0 );
+	}
+	SEND_MSG(v , s_print_buf );
+	free(s_print_buf);
 }
 
 void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
@@ -8522,9 +8542,11 @@ void	vj_event_send_working_dir(void *ptr, const char format[], va_list ap)
 
 	
 	filelist_t *list = (filelist_t*)find_media_files(v);
+	char *s_print_buf = NULL;
 	if(!list) {
 		veejay_msg(VEEJAY_MSG_ERROR, "No usable files found.");
-		sprintf(_s_print_buf, "00000000");
+		s_print_buf = get_print_buf( 8 );
+		snprintf(s_print_buf,8,"%08d",0);
 	}else {
 
 		int len = 1;
@@ -8534,7 +8556,8 @@ void	vj_event_send_working_dir(void *ptr, const char format[], va_list ap)
 		}
 
 		int msg_len = (list->num_files*4) + len - 1;
-		sprintf(_s_print_buf, "%08d", msg_len );
+		s_print_buf = get_print_buf ( msg_len + 32 );
+		sprintf(s_print_buf, "%08d", msg_len );
 
 		int tlen=0;
 		for( i = 0; i <list->num_files; i ++ ) {
@@ -8547,11 +8570,12 @@ void	vj_event_send_working_dir(void *ptr, const char format[], va_list ap)
 #endif
 			snprintf(tmp,sizeof(tmp), "%04d%s",tlen,list->files[i]);
 
-			strcat( _s_print_buf,tmp);
+			strcat( s_print_buf,tmp);
 		}
-		SEND_MSG(v,_s_print_buf);
+		SEND_MSG(v,s_print_buf);
 		free_media_files(v,list);
 	}
+	free( s_print_buf );
 }
 
 void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
@@ -8559,19 +8583,21 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 	veejay_t *v = (veejay_t*)ptr;
 	int args[2];
 	int start_from_sample = 1;
-	char cmd[2048];
+	char cmd[512];
 	char *str = NULL;
 	int i,n;
 	P_A(args,str,format,ap);
 	if(args[0] > 0 )
 		start_from_sample = args[0];
-	sprintf(_s_print_buf, "00000000");
+	char *s_print_buf = get_print_buf(0);
+
+	sprintf(s_print_buf, "00000000");
 
 	n = sample_size();
 	if( n > 1 )
 	{
 		char line[400];
-		veejay_memset(_print_buf, 0,SEND_BUF);
+		char *print_buf = get_print_buf(SEND_BUF);
 		for(i=start_from_sample; i <= n; i++)
 		{
 			if(sample_exists(i))
@@ -8597,14 +8623,15 @@ void	vj_event_send_sample_list		(	void *ptr,	const char format[],	va_list ap	)
 					description
 				);
 				FORMAT_MSG(line,cmd);
-				APPEND_MSG(_print_buf,line); 
+				APPEND_MSG(print_buf,line); 
 			}
 
 		}
-		sprintf(_s_print_buf, "%08d%s", strlen(_print_buf),_print_buf);
-
+		sprintf(s_print_buf, "%08d%s", strlen(print_buf),print_buf);
+		free(print_buf);
 	}
-	SEND_MSG(v, _s_print_buf);
+	SEND_MSG(v, s_print_buf);
+	free(s_print_buf);
 }
 
 void	vj_event_send_log			(	void *ptr,	const char format[],	va_list ap 	)
@@ -8614,18 +8641,21 @@ void	vj_event_send_log			(	void *ptr,	const char format[],	va_list ap 	)
 	int str_len = 0;
 	char *messages = NULL;
 
+	char *s_print_buf = get_print_buf(0);
+
 	messages = veejay_pop_messages( &num_lines, &str_len );
 
 	if(str_len == 0 || num_lines == 0 )
-		sprintf(_s_print_buf, "%06d", 0);
+		sprintf(s_print_buf, "%06d", 0);
 	else
-		sprintf(_s_print_buf, "%06d%s", str_len, messages );
+		sprintf(s_print_buf, "%06d%s", str_len, messages );
 	if(messages)
 		free(messages);	
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "\tDebug: send log %s", _s_print_buf);
+	veejay_msg(VEEJAY_MSG_DEBUG, "\tDebug: send log %s", s_print_buf);
 
-	SEND_MSG( v, _s_print_buf );
+	SEND_MSG( v, s_print_buf );
+	free(s_print_buf);
 }
 
 void	vj_event_send_sample_stack		(	void *ptr,	const char format[],	va_list ap )
@@ -8829,14 +8859,14 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 	if(args[0] == 0) 
 		args[0] = v->uc->sample_id;
 
-	veejay_memset( _s_print_buf,0,SEND_BUF);
+	char *s_print_buf = get_print_buf(0);
 
-	sprintf( _s_print_buf, "%03d",0 );
+	sprintf( s_print_buf, "%03d",0 );
 
 	if(SAMPLE_PLAYING(v))
 	{
 		if(args[0] == -1) args[0] = sample_size()-1;
-
+		char *print_buf = get_print_buf(16*SAMPLE_MAX_EFFECTS);
 		for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
 		{
 			int effect_id = sample_get_effect_any(args[0], i);
@@ -8854,14 +8884,16 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 					(using_audio  <= 0  ? 0 : 1 )
 				);
 						
-				APPEND_MSG(_print_buf,line);
+				APPEND_MSG(print_buf,line);
 			}
 		}
-		sprintf(_s_print_buf, "%03d%s",strlen(_print_buf), _print_buf);
+		sprintf(s_print_buf, "%03d%s",strlen(print_buf), print_buf);
+		free(print_buf);
 
 	} else if(STREAM_PLAYING(v))
 	{
 		if(args[0] == -1) args[0] = vj_tag_size()-1;
+		char *print_buf = get_print_buf(16*SAMPLE_MAX_EFFECTS);
 
 		for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
 		{
@@ -8877,21 +8909,22 @@ void	vj_event_send_chain_list		( 	void *ptr,	const char format[],	va_list ap	)
 					(using_effect <= 0  ? 0 : 1 ),
 					0
 				);
-				APPEND_MSG(_print_buf, line);
+				APPEND_MSG(print_buf, line);
 			}
 		}
-		sprintf(_s_print_buf, "%03d%s",strlen( _print_buf ), _print_buf);
-
+		sprintf(s_print_buf, "%03d%s",strlen( print_buf ), print_buf);
+		free(print_buf);
 	} else {
-		sprintf(_s_print_buf, "000");
+		sprintf(s_print_buf, "000");
 	}
-	SEND_MSG(v, _s_print_buf);
+	SEND_MSG(v, s_print_buf);
+	free(s_print_buf);
 }
 
 void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_list ap	)
 {
 	/* send video properties */
-	char info_msg[255];
+	char info_msg[150];
 	veejay_t *v = (veejay_t*)ptr;
 
 	editlist *el = v->current_edit_list;
@@ -8902,7 +8935,7 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 	long n_frames = el->total_frames;
 	if( SAMPLE_PLAYING(v))
 		n_frames = sample_max_video_length( v->uc->sample_id );
-
+	char *s_print_buf = get_print_buf(200);
 	snprintf(info_msg,sizeof(info_msg)-1, "%04d %04d %01d %c %02.3f %1d %04d %06ld %02d %03ld %08ld %1d",
 		el->video_width,
 		el->video_height,
@@ -8917,10 +8950,9 @@ void 	vj_event_send_video_information		( 	void *ptr,	const char format[],	va_lis
 		n_frames,
 		v->audio
 		);	
-	sprintf( _s_print_buf, "%03d%s",strlen(info_msg), info_msg);
-
-
-	SEND_MSG(v,_s_print_buf);
+	sprintf(s_print_buf, "%03d%s",strlen(info_msg), info_msg);
+	SEND_MSG(v,s_print_buf);
+	free(s_print_buf);
 }
 
 void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
@@ -8939,10 +8971,13 @@ void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 
 
 	char *msg = (char*) vj_el_write_line_ascii( el, &b );
-	sprintf( _s_print_buf, "%06d%s", b, msg );
-	if(msg)free(msg);
 
-	SEND_MSG( v, _s_print_buf );
+
+	char *s_print_buf = get_print_buf( b + 8 );
+	snprintf( s_print_buf, (b+8),"%06d%s", b, msg );
+	if(msg)free(msg);
+	SEND_MSG( v, s_print_buf );
+	free(s_print_buf);
 }
 
 void	vj_event_send_devices			(	void *ptr,	const char format[],	va_list ap	)
@@ -9415,6 +9450,9 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 	veejay_memset(prefix,0, 4 );
 	veejay_memset(options, 0,100);
 
+
+	char *s_print_buf = get_print_buf(128);
+
 	switch(args[1])
 	    {
 	    case VJ_PLAYBACK_MODE_SAMPLE: 
@@ -9516,11 +9554,12 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 	    }	
 
 	if(failed)
-		sprintf( _s_print_buf, "%05d", 0 );
+		sprintf( s_print_buf, "%05d", 0 );
 	else
-		sprintf( _s_print_buf, "%05d%s%s",strlen(prefix) + strlen(options), prefix,options );
+		sprintf( s_print_buf, "%05d%s%s",strlen(prefix) + strlen(options), prefix,options );
 
-	SEND_MSG(v , _s_print_buf );
+	SEND_MSG(v , s_print_buf );
+	free(s_print_buf);
 }
 #ifdef HAVE_FREETYPE
 void	vj_event_get_srt_list(	void *ptr,	const char format[],	va_list	ap	)
@@ -10058,7 +10097,9 @@ void	vj_event_get_sample_sequences( 		void *ptr, 	const char format[],	va_list a
 		return;
 	}
 	
-	sprintf(_s_print_buf, "%06d%04d%04d%04d",
+	char *s_print_buf = get_print_buf( 32  + (MAX_SEQUENCES*4));
+
+	sprintf(s_print_buf, "%06d%04d%04d%04d",
 			( 12 + (4*MAX_SEQUENCES)),
 			v->seq->current,MAX_SEQUENCES, v->seq->active );
 	
@@ -10066,11 +10107,11 @@ void	vj_event_get_sample_sequences( 		void *ptr, 	const char format[],	va_list a
 	{
 		char tmp[32];
 		sprintf(tmp, "%04d", v->seq->samples[i]);
-		veejay_strncat(_s_print_buf, tmp, 4 );
+		veejay_strncat(s_print_buf, tmp, 4 );
 	}
 
-	SEND_MSG(v, _s_print_buf );
-	
+	SEND_MSG(v, s_print_buf );
+	free(s_print_buf);	
 }
 
 void	vj_event_sample_sequencer_active(	void *ptr, 	const char format[],	va_list ap )
