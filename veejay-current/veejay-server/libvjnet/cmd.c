@@ -132,60 +132,39 @@ int			sock_t_connect( vj_sock_t *s, char *host, int port )
 	return 1;
 }
 
-int			sock_t_poll_w(vj_sock_t *s )
-{
-	int	status;
-	fd_set	fds;
-	struct timeval no_wait;
-	memset( &no_wait, 0, sizeof(no_wait) );
-	no_wait.tv_sec = TIMEOUT;
-	no_wait.tv_usec = 0;
-
-	FD_ZERO( &fds );
-	FD_SET( s->sock_fd, &fds );
-
-	status = select( s->sock_fd + 1,NULL, &fds, NULL, &no_wait );
-	if( status < 0 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Unable to poll socket for immediate write: %s", strerror(errno));
-		return 0;
-	}
-	if( status == 0 )
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Timeout occured");
-		return 0;
-	}
-
-	if( FD_ISSET( s->sock_fd, &fds ))
-	{
-		return 1;
-	}
-
-	return 0;
+int			sock_t_wds_isset( vj_sock_t *s ) {
+	return FD_ISSET( s->sock_fd, &(s->wds));
 }
 
+int			sock_t_rds_isset( vj_sock_t *s ) {
+	return FD_ISSET( s->sock_fd, &(s->rds) );
+}
 
 int			sock_t_poll( vj_sock_t *s )
 {
 	int	status;
-	fd_set	fds;
 	struct timeval no_wait;
 	memset( &no_wait, 0, sizeof(no_wait) );
 
-	FD_ZERO( &fds );
-	FD_SET( s->sock_fd, &fds );
+	FD_ZERO( &(s->rds) );
+	FD_ZERO( &(s->wds) );
 
-	status = select( s->sock_fd + 1, &fds, 0, 0, &no_wait );
+	FD_SET( s->sock_fd, &(s->rds) );
+	FD_SET( s->sock_fd, &(s->wds) );
+
+	status = select( s->sock_fd + 1, &(s->rds),&(s->wds), 0, &no_wait );
 	
-	if( status < 0 )
+	if( status == -1 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to poll socket for immediate read: %s", strerror(errno));
-		return 0;
+		return -1;
 	}
-	if( FD_ISSET( s->sock_fd, &fds ) )
-	{
+	if( status == 0 )
+		return -1;
+
+	if( sock_t_rds_isset( s ) )
 		return 1;
-	}
+
 	return 0;
 }
 
@@ -216,45 +195,6 @@ static		int	timed_recv( int fd, void *buf, const int len, int timeout )
 	return recv( fd, buf, len, 0 );
 }*/
 
-int			sock_t_recv_w( vj_sock_t *s, void *dst, int len )
-{
-	int n = 0;
-	if( len < s->recv_size )
-	{
-		n = recv( s->sock_fd, dst, len, MSG_WAITALL );
-		if(n==-1)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
-			return -1;
-		}
-		return n;
-	}
-	else
-	{
-		int done = 0;
-		int bytes_left = s->recv_size;
-
-		while( done < len )
-		{
-			n = recv( s->sock_fd, dst + done,bytes_left,MSG_WAITALL );
-			if( n == -1)
-			{
-				veejay_msg(VEEJAY_MSG_ERROR, "%s",strerror(errno));
-				return -1;
-			}
-			if( n == 0 ) 
-				break;
-
-			done += n;
-			
-			if( (len-done) < s->recv_size)
-				bytes_left = len - done;
-		}
-		return done;
-	}
-	return 0;
-}
-
 void			sock_t_set_timeout( vj_sock_t *s, int t )
 {
 	int opt = t;
@@ -267,6 +207,7 @@ int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 	int done = 0;
 	int bytes_left = s->recv_size;
 	int n;
+
 	if( len < bytes_left )
 		bytes_left = len;
 
@@ -295,17 +236,28 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 #ifdef STRICT_CHECKING
 	assert( buf != NULL );
 #endif
+/*	if( sock_t_wds_isset( s ) == 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "%s", __FUNCTION__);
+		return 0;
+	}*/
 
 	int length = len;
 	int bw = 0;
+	int done = 0;
 	while( length > 0 ) {
 		bw = length;
 		n = send( s->sock_fd, buf, length , 0 );
-		if( n <= 0 )
+		if( n == -1 ) {
+			veejay_msg(0, "Error sending buffer:%s",strerror(errno));
 			return -1;
+		}
+		if( n == 0 )
+			break;
 		buf += n;
 		length -= n;
+		done += n;
 	}
+	return done;
 }
 
 int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
@@ -314,16 +266,24 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 #ifdef STRICT_CHECKING
 	assert( buf != NULL );
 #endif
+
 	int length = len;
 	int bw = 0;
+	int done = 0;
 	while( length > 0 ) {
 		bw = length;
 		n = send( fd, buf, length , 0 );
-		if( n <= 0 )
+		if( n == -1 ) {
+			veejay_msg(0, "Error sending buffer:%s", strerror(errno));
 			return -1;
+		}
+		if( n == 0 )
+			break;
 		buf += n;
 		length -= n;
+		done += n;
 	}
+	return done;
 
 }
 
@@ -333,5 +293,7 @@ void			sock_t_close( vj_sock_t *s )
 	{
 		close(s->sock_fd);
 		s->sock_fd = 0;
+		FD_ZERO(&(s->rds));
+		FD_ZERO(&(s->wds));
 	}
 }

@@ -44,6 +44,9 @@ typedef struct
 	unsigned char *blob;
 } vj_client;
 
+int	vj_client_link_can_write(vj_client *v, int s);
+
+int 	vj_client_link_can_read(vj_client *v,int s );
 
 int vj_client_connect( vj_client *v, char *host, char *group_name, int port_id );
   
@@ -52,8 +55,6 @@ int	vj_client_get_status_fd(vj_client *v, int sock_type );
 void	vj_client_flush( vj_client *v, int delay );
 
 int	vj_client_poll( vj_client *v, int sock_type );
-
-int	vj_client_poll_w( vj_client *v, int sock_type );
 
 int	vj_client_read_i(vj_client *v, uint8_t *dst, int len );
 

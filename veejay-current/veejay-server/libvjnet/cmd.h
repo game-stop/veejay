@@ -33,17 +33,17 @@ typedef struct
 	unsigned char *sbuf;
 	int send_size;
 	int recv_size;
+	fd_set rds;
+	fd_set wds;
 } vj_sock_t;
 
 vj_sock_t	*alloc_sock_t(void);
 void		sock_t_free(vj_sock_t *s);
+int		sock_t_wds_isset(vj_sock_t *s);
+int		sock_t_rds_isset(vj_sock_t *s);
 int		sock_t_connect( vj_sock_t *s, char *host, int port );
-int		sock_t_poll_w(vj_sock_t *s);
 int		sock_t_poll( vj_sock_t *s );
-int		sock_t_recvw(vj_sock_t *s, void *dst, int len );
 int		sock_t_recv( vj_sock_t *s, void *dst, int len );
-int             sock_t_recv_w( vj_sock_t *s, void *dst, int len );
-int             sock_t_recv_w1( vj_sock_t *s, void *dst, int len );
 int		sock_t_send( vj_sock_t *s, unsigned char *buf, int len );
 int		sock_t_send_fd( int fd, int sndsize, unsigned char *buf, int len );
 void		sock_t_close( vj_sock_t *s );

@@ -311,7 +311,8 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
     	return NULL;
 }
 
-int	vj_server_link_can_write( vj_server *vje, int link_id, int timeout );
+
+int	vj_server_link_can_write( vj_server *vje, int link_id );
 
 int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 {
@@ -330,8 +331,10 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 		return -1;
 
 
-	if( !vj_server_link_can_write( vje,link_id, 1 ) )
+	if( !vj_server_link_can_write( vje,link_id ) ) {
+		veejay_msg(0,"Not ready for sending.");
 		return -1;
+	}
 
 	if( !vje->use_mcast)
 	{
@@ -354,51 +357,25 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 	return total;
 }
 
-int	vj_server_link_can_write( vj_server *vje, int link_id, int timeout )
+int	vj_server_link_can_write( vj_server *vje, int link_id)
 {
-	fd_set wds;
-	fd_set eds;
-
-	vj_link **link = (vj_link**) vje->link;
-	if( !link[link_id]->in_use )
+	vj_link **Link = (vj_link**) vje->link;
+	if( !Link[link_id]->in_use )
 		return 0;
 
-#ifdef STRICT_CHECKING
-	assert( link[link_id]->in_use == 1 );
-#endif
-
-	FD_ZERO(&wds );
-	FD_ZERO(&eds );
-	FD_SET( link[link_id]->handle, &wds );
-	FD_SET( link[link_id]->handle, &eds );
-
-	struct timeval tv;
-	memset( &tv, 0,sizeof(struct timeval));
-	
-//	if( timeout ) {
-//		tv.tv_sec  = 1;
-//	}
-
-	int err = select( link[link_id]->handle+1, NULL, &wds, &eds,&tv );
-
-	if( err <= 0 )
-	{
-		veejay_msg(0, "Unable to poll for immediate write: %s", link_id,strerror(errno));
-		return 0;
-	}
-/*	if( err == 0 )
-	{
-		veejay_msg(0, "Timeout expired");
+	if( FD_ISSET( Link[link_id]->handle, &(vje->wds) ) )
 		return 1;
-	}
-*/
-	if( FD_ISSET( link[link_id]->handle, &eds ))
-	{
-		veejay_msg(0, "An exception occured to link %d", link_id );
+	return 0;
+}
+
+int	vj_server_link_can_read( vj_server *vje, int link_id)
+{
+	vj_link **Link = (vj_link**) vje->link;
+
+	if( !Link[link_id]->in_use )
 		return 0;
-	}
-	
-	if( FD_ISSET( link[link_id]->handle, &wds ))
+
+	if( FD_ISSET( Link[link_id]->handle, &(vje->fds) ) )
 		return 1;
 	return 0;
 }
@@ -439,9 +416,11 @@ int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len,
 {
 	if(!vje->use_mcast )
 	{
-		if( vj_server_link_can_write( vje, link_id,0 ))
+		if( vj_server_link_can_write( vje, link_id ))
 		{
 			return vj_server_send_frame_now( vje, link_id, buf, len );
+		} else {
+			veejay_msg(VEEJAY_MSG_DEBUG, "%s: not ready to write.");
 		}
 		return 0;
 	}
@@ -558,24 +537,26 @@ int vj_server_poll(vj_server * vje)
 		vj_link **Link= (vj_link**) vje->link; 
 		if( Link[i]->in_use )
 		{
-			if(vje->server_type == V_CMD )
-			{
+		//	if(vje->server_type == V_CMD )
+		//	{
 				FD_SET( Link[i]->handle, &(vje->fds) );
 				FD_SET( Link[i]->handle, &(vje->wds) );	
-			}
-			if(vje->server_type == V_STATUS )
-				FD_SET( Link[i]->handle, &(vje->wds));
+		//	}
+		//	if(vje->server_type == V_STATUS )
+		//		FD_SET( Link[i]->handle, &(vje->wds));
 		}
 	}		
  
 	status = select(vje->nr_of_connections + 1, &(vje->fds), &(vje->wds), 0, &t);
 
-	if( status > 0 )
-	{
-		return 1;
-	}
+	if( status == -1 ) {
+		veejay_msg(0, "Error while polling socket: %s", strerror(errno));
+		return 0;
+	} else if ( status == 0 ) {
+		return 0;
+	} 
 
-	return 0;
+	return 1;
 }
 
 int	_vj_server_empty_queue(vj_server *vje, int link_id)
@@ -898,9 +879,15 @@ int	vj_server_update( vj_server *vje, int id )
 	}
 
 	veejay_memset( vje->recv_buf, 0, RECV_SIZE );
-	
+
 	if(!vje->use_mcast)
 	{
+		/*if(vj_server_link_can_read( vje,sock_fd ) == 0 )
+		{
+			veejay_msg(VEEJAY_MSG_DEBUG, "Not ready to receive yet");
+			return 0;
+		}*/
+
 		n = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
 		if( n < 0)
 		{
