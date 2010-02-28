@@ -205,7 +205,7 @@ void	veejay_backtrace_handler(int n , void *dist, void *x)
 #elif defined(SIGSEGV_STACK_IA64)
 			veejay_msg(VEEJAY_MSG_INFO,"(%s) invalid access to %p at %x",
 					strerr,ist->si_addr, puc->uc_mcontext.gregs[REG_RIP]);
-			veejay_addr2line_bt( 0, puc->uc_mcontext.gregs[REG_RIP] );
+			veejay_addr2line_bt( 0, puc->uc_mcontext.gregs[REG_RIP], puc->uc_mcontext.gregs[REG_RIP] );
 #endif
 #endif
 			for( i = 0; i < NGREG; i ++ ) {
