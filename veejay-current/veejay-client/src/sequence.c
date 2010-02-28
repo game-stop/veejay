@@ -159,7 +159,7 @@ static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... )
 				reloaded_schedule_restart();
 			return 0;
 		}
-		return n;
+		return 0;
 	}
 
 	va_start( args, format );
@@ -172,7 +172,7 @@ static	int	sendvims( veejay_track_t *v, int vims_id, const char format[], ... )
 		if( n == -1 && v->is_master )
 			reloaded_schedule_restart();
 	}
-	return n;
+	return 1;
 }
 
 static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *buffer )
@@ -188,7 +188,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 			reloaded_schedule_restart();
 		veejay_msg(0,"Reading header of %d bytes: %d", header_len,n );
 		free(tmp);
-		return 0;
+		return n;
 	}
 
 	if( sscanf( (char*)tmp, "%6d%1d", &len,&(v->grey_scale) )<=0)
@@ -221,7 +221,7 @@ static	int	recvvims( veejay_track_t *v, gint header_len, gint *payload, guchar *
 			veejay_msg(0, "Received %d out of %d bytes", bw,len);
 			free(tmp);
 			*payload = 0;
-			return 0;
+			return n;
 		}
 		bw += n;
 
@@ -314,9 +314,9 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 		veejay_memset( status_len, 0, sizeof( status_len ) );
 		n = vj_client_read(v->fd, V_STATUS, status_len, 5 );
 		int bytes= 0;
-
-		if( n == 0 )
-			break;
+#ifdef STRICT_CHECKING
+	assert( status_len[0] == 'V' );
+#endif
 
 		if( status_len[0] != 'V' ) {
 			n = -1;
@@ -448,7 +448,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	if( res <= 0 )
 	{
 		v->have_frame = 0;
-		return 0;
+		return res;
 	}
 	gint bw = 0;
 
@@ -457,7 +457,7 @@ static	int	veejay_get_image_data(veejay_preview_t *vp, veejay_track_t *v )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Can't get a preview image! Only got %d bytes", bw);
 		v->have_frame = 0;
-		return 0;
+		return res;
 	}
 
 	int expected_len = (v->width * v->height) + (v->width*v->height/2);
@@ -544,7 +544,9 @@ static int fail_connection	 = 0;
 static int continue_anyway       = 0;
 static int 	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
 {
-	if( veejay_get_image_data( vp, v ) == 0 ) {
+	int n = veejay_get_image_data( vp, v );
+       
+	if(n == 0 ) {
 		//@ settle
 		fail_connection ++;
 		if( fail_connection > 2 ) {
@@ -552,6 +554,8 @@ static int 	gvr_preview_process_image( veejay_preview_t *vp, veejay_track_t *v )
 			return 0;
 		}
 		return 1;
+	} if( n == -1 ) {
+		return 0;	
 	} else {
 		continue_anyway = (continue_anyway + 1) % 10;
 		if(continue_anyway == 0)
