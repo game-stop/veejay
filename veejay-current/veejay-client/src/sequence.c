@@ -314,9 +314,9 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 		veejay_memset( status_len, 0, sizeof( status_len ) );
 		n = vj_client_read(v->fd, V_STATUS, status_len, 5 );
 		int bytes= 0;
-#ifdef STRICT_CHECKING
-	assert( status_len[0] == 'V' );
-#endif
+
+		if( n == 0 )
+			break;
 
 		if( status_len[0] != 'V' ) {
 			n = -1;
