@@ -6962,11 +6962,12 @@ void vj_event_tag_new_net(void *ptr, const char format[], va_list ap)
 
 	P_A(args,str,format,ap);
 
-	if( strncasecmp( str, "localhost",9 ) == 0 )
+	if( strncasecmp( str, "localhost",9 ) == 0 || strncasecmp( str, "127.0.0.1",9 ) == 0 )
 	{
 		if( args[0] == v->uc->port )
 		{	
 			veejay_msg(0, "Try another port number, I am listening on this one.");
+			vj_event_send_new_id(v, 0 );
 			return;
 		}
 	}

@@ -215,13 +215,14 @@ int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 	{	
 		//@ setup socket with SO_RCVTIMEO
 		n = recv( s->sock_fd, dst+done,bytes_left, 0 );
-		if ( n == -1 ) {
+		if ( n < 0 ) {
 			veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
+			return -1;
+		} else if ( n == 0 ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
 			return -1;
 		}
 
-		if( n == 0 )
-			break;
 		done += n;
 
 		if( (len-done) < s->recv_size )
@@ -251,8 +252,10 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 			veejay_msg(0, "Error sending buffer:%s",strerror(errno));
 			return -1;
 		}
-		if( n == 0 )
-			break;
+		if( n == 0 ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
+			return -1;
+		}
 		buf += n;
 		length -= n;
 		done += n;
@@ -277,8 +280,10 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 			veejay_msg(0, "Error sending buffer:%s", strerror(errno));
 			return -1;
 		}
-		if( n == 0 )
-			break;
+		if( n == 0 ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
+			return -1;
+		}
 		buf += n;
 		length -= n;
 		done += n;

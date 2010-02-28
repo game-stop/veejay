@@ -337,7 +337,8 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 		plen = sock_t_recv( v->c[0]->fd, line, 21 );
 
 		if( plen == 0 ) {
-			return 0;
+			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
+			return -1;
 		}
 
 		if( plen < 0 )
@@ -378,6 +379,10 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 	//	int n = sock_t_recv_w( v->c[0]->fd, v->space, p[3]  );
 
 		int n = sock_t_recv( v->c[0]->fd,v->space,p[3] );
+		if( n == 0 ) {
+			veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection.");
+			return -1;
+		}
 		if( n != p[3] )
 		{
 			if( n < 0 ) {
