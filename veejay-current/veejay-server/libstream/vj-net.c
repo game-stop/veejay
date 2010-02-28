@@ -67,10 +67,10 @@ static void unlock_(threaded_t *t, const char *f, int line)
 #define unlock( t ) unlock_( t, __FUNCTION__ , __LINE__ )
 
 #define MS_TO_NANO(a) (a *= 1000000)
-static	void	net_delay(long nsec )
+static	void	net_delay(long nsec, long sec )
 {
 	struct timespec ts;
-	ts.tv_sec = 0;
+	ts.tv_sec = sec;
 	ts.tv_nsec = MS_TO_NANO( nsec);
 	nanosleep( &ts, NULL );
 }
@@ -89,53 +89,75 @@ void	*reader_thread(void *data)
 
 	sprintf(buf, "%03d:;", VIMS_GET_FRAME);
 
-	int retrieve = 0;	
+	int retrieve = 0;
+
 	for( ;; )
 	{
 		int error    = 0;
-
+		int pollres  = 0;
+		int res      = 0;
 		if( t->state == 0 )
 		{
-			error = 1;
+			vj_client_close(v);
+			pthread_exit( &(t->thread));
+			return NULL;
 		}
 		
 		lock(t);
+	
+		if( t->grab && tag->source_type == VJ_TAG_TYPE_NET && retrieve == 0 ) {
+			ret =  vj_client_send( v, V_CMD, buf );
+			if( ret < 0 )
+			{
+				veejay_msg(VEEJAY_MSG_DEBUG,
+								"%s:%d failed to query frame",
+								tag->source_name,
+								tag->video_channel );
+
+				error = 1;
+			}
+			else
+			{
+				t->grab = 0;
+			}
+		}
 		
-		if( t->grab && tag->source_type == VJ_TAG_TYPE_NET && retrieve== 0)
+		if( tag->source_type == VJ_TAG_TYPE_NET )
 		{
-			ret = vj_client_poll_w(v , V_CMD );
+			res = vj_client_poll(v, V_CMD );
 			if( ret )
 			{
-				ret =  vj_client_send( v, V_CMD, buf );
-				if( ret <= 0 )
-				{
-					error = 1;
-				}
-				else
-				{
-					t->grab = 0;
-					retrieve = 1;
-				}
+				retrieve = 1;
+			} else if ( ret < 0 ) {
+				veejay_msg(VEEJAY_MSG_DEBUG,
+								"%s:%d failed to poll frame",
+								tag->source_name,
+								tag->video_channel );
+				error = 1;
 			}
-		} 
 
-		if (tag->source_type == VJ_TAG_TYPE_MCAST )
+		} else if (tag->source_type == VJ_TAG_TYPE_MCAST )
 		{
 			error = 0;
 			retrieve = 1;
+			res = 1;
 		}
 	
 		long wait_time = 20;
 	
 		if(!error && retrieve)
 		{
-			if( vj_client_poll(v, V_CMD ) )
+			if( res )
 			{
 				ret = vj_client_read_i ( v, tag->socket_frame,tag->socket_len );
 				if( ret <= 0 )
 				{
 					if( tag->source_type == VJ_TAG_TYPE_NET )
 					{
+						veejay_msg(VEEJAY_MSG_DEBUG,
+								"%s:%d failed to read frame",
+								tag->source_name,
+								tag->video_channel );
 						error = 1;
 					}
 					else
@@ -163,18 +185,34 @@ void	*reader_thread(void *data)
 		{	
 			if ( wait_time > 40 )
 				wait_time = 15;
-			net_delay( wait_time );
-	//		usleep(wait_time);
+			net_delay( wait_time,0 );
+			wait_time = 0;
 		}
 
 		if( error )
 		{
-			veejay_msg(VEEJAY_MSG_ERROR,
-					"Closing connection with remote veejay,");
-			t->state = 0;
+			int success = 0;
+			vj_client_close( v );
+
+			net_delay( 0,3 );
+
+			if(tag->source_type == VJ_TAG_TYPE_MCAST )
+				success = vj_client_connect( v,NULL,tag->source_name,tag->video_channel  );
+			else
+				success = vj_client_connect_dat( v, tag->source_name,tag->video_channel );
+	
+			if( success <= 0 )
+			{
+				wait_time = 4000;
+			}
+			else
+			{
+				veejay_msg(VEEJAY_MSG_INFO, "Connecton re-established with %s:%d",tag->source_name,
+				tag->video_channel + 5);
+			}
+
 			t->grab = 0;
-			pthread_exit( &(t->thread));
-			return NULL;
+			retrieve = 0;
 		}
 	}
 	return NULL;
