@@ -9029,11 +9029,19 @@ void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 	veejay_t *v = (veejay_t*) ptr;
 	
 	int i = 0;
-	for( i = 0; i < 8 ; v->rlinks ++ )
-		if( v->rlinks[i] < 0 || v->rlinks[i] == v->uc->current_link )
+	int ok = 0;
+	for( i = 0; i < 8; i ++ ) {
+		if( v->uc->current_link == v->rlinks[i] ) {
+			veejay_msg(VEEJAY_MSG_DEBUG, "Some one grabbed two beers at once!");
+		}
+		if( v->rlinks[i] == -1 ) {
+			v->rlinks[i] = v->uc->current_link;
+			ok = 1;
 			break;
+		}
+	}
 
-	if( i == 8 ) {
+	if( !ok ) {
 		veejay_msg(0, "No more video stream connections allowed, limited to 8");	
 		SEND_MSG(v,"00000000000000000000"); 
 		return;
@@ -9041,17 +9049,12 @@ void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 
 	if (!v->settings->is_dat )
 	{
-		veejay_msg(1, "Wrong control port for retrieving frames!");
+		veejay_msg(0, "Wrong control port for retrieving frames!");
 		SEND_MSG(v, "00000000000000000000"); //@ send empty header only (20 bytes)
 		return;
 	}
 
-
-	v->rlinks[i] = v->uc->current_link;
 	v->settings->unicast_frame_sender = 1;
-
-//	v->settings->unicast_frame_sender = 1;
-//	v->settings->unicast_link_id      = v->uc->current_link;
 }
 
 

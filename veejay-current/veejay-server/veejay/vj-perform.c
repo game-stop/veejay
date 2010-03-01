@@ -1125,13 +1125,12 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 	{
 		int i;
 		for( i = 0; i < 8 ; i++ ) {
-			if( info->rlinks[i] >= 0 ) {
-				to_link_id = info->rlinks[i];
-				if(vj_server_send_frame( info->vjs[id], to_link_id, socket_buffer, __socket_len,
+			if( info->rlinks[i] != -1 ) {
+				if(vj_server_send_frame( info->vjs[id], info->rlinks[i], socket_buffer, __socket_len,
 						info->effect_frame1, info->real_fps )<=0)
 				{
 					veejay_msg(VEEJAY_MSG_ERROR,  "Error sending frame to remote");
-					_vj_server_del_client( info->vjs[id], to_link_id );
+					_vj_server_del_client( info->vjs[id], info->rlinks[i] );
 				}
 				info->rlinks[i] = -1;
 			}	
