@@ -292,6 +292,7 @@ typedef struct {
 #ifdef HAVE_GL
     void	*gl;
 #endif
+    void	*y4m;
 #ifdef HAVE_SDL
     vj_sdl **sdl;		/* array of SDL windows */
 #endif
@@ -301,7 +302,8 @@ typedef struct {
     void *video_out_scaler;
     int render_now;	        /* write RGB */
     int render_continous;
-    char action_file[2][256];
+    char action_file[2][1024];
+    char y4m_file[1024];
     int stream_outformat;
     int stream_enabled;
     int last_sample_id;

@@ -215,7 +215,7 @@ static void Usage(char *progname)
 	    	"  -c/--synchronization [01]\tSync correction off/on (default on)\n");
 
     fprintf(stderr,
-	    	"  -O/--output [0..3]\t\tOutput video\n");
+	    	"  -O/--output [0..4]\t\tOutput video\n");
 #ifdef HAVE_SDL
 	fprintf(stderr,
 			"\t\t\t\t0 = SDL (default)\t\n");
@@ -230,6 +230,10 @@ static void Usage(char *progname)
 #endif
 	fprintf(stderr,
 			"\t\t\t\t3 = Head less (no video output)\n");	
+	fprintf(stderr,
+			"\t\t\t\t4 = Y4M Stream\n");
+	fprintf(stderr,
+			"  -o/--output-file [file]\tWrite to file (for use with Y4M Stream)\n");
 #ifdef HAVE_SDL
     fprintf(stderr,
 	    "  -s/--size NxN\t\t\tDisplay dimension for video window, use Width x Height\n");
@@ -332,7 +336,7 @@ static int set_option(const char *name, char *value)
 	{ printf("Veejay %s\n", VERSION); exit(0); 
     } else if (strcmp(name, "graphics-driver") == 0
 	       || strcmp(name, "G") == 0
-	       || strcmp(name, "output-driver") == 0
+	       || strcmp(name, "output") == 0
 	       || strcmp(name, "O") == 0) {
 	    info->video_out = atoi(optarg);	/* use SDL */
 /*#ifndef HAVE_GL
@@ -343,18 +347,21 @@ static int set_option(const char *name, char *value)
 	    }
 #endif
 */
-	    if( info->video_out < 0 || info->video_out > 3 ) {
+	    if( info->video_out < 0 || info->video_out > 4 ) {
 		    fprintf(stderr, "Select a valid output display driver\n");
 		    exit(-1);
 		   }
     } else if (strcmp(name, "B") == 0 || strcmp(name, "features")==0) {
 	CompiledWith();
         nerr++;
+	} else if ( strcmp(name, "output-file" ) == 0 || strcmp(name, "o") == 0 ) {
+		check_val(optarg,name);
+		veejay_strncpy(info->y4m_file,(char*) optarg, strlen( (char*) optarg));
     } else if (strcmp(name, "preserve-pathnames") == 0
 	       || strcmp(name, "P") == 0) {
-	info->preserve_pathnames = 1;
+		info->preserve_pathnames = 1;
     } else if (strcmp(name, "deinterlace") == 0 || strcmp(name, "I" )==0) {
-	info->auto_deinterlace = 1;
+		info->auto_deinterlace = 1;
     } else if (strcmp(name, "size") == 0 || strcmp(name, "s") == 0) {
 	if (sscanf(value, "%dx%d", &info->bes_width, &info->bes_height) !=
 	    2) {
@@ -490,6 +497,8 @@ static int check_command_line_options(int argc, char *argv[])
 	{"input-width",1,0,0},
 	{"input-height",1,0,0},
 	{"output-width", 1,0,0 },
+	{"output",1,0,0},
+	{"output-file",1,0,0},
 	{"output-height", 1,0,0 },
 	{"norm",1,0,0},
 	{"audiorate",1,0,0},

@@ -381,6 +381,7 @@ void	composite_blit_yuyv( void *compiz, uint8_t *in[3], uint8_t *yuyv, int which
 	
 }
 
+//@OBSOLETE
 void	composite_blit_ycbcr( void *compiz, 
 			      uint8_t *in[3], 
                               int which_vp,

@@ -80,17 +80,26 @@ vj_yuv *vj_yuv4mpeg_alloc(editlist * el, int w, int h, int out_pixel_format)
     yuv4mpeg->video_fps = el->video_fps;
     yuv4mpeg->has_audio = el->has_audio;
     yuv4mpeg->audio_bits = el->audio_bps;
-	if( out_pixel_format == FMT_422F ) {
-			yuv4mpeg->is_jpeg = 1;
-	} else {
-			yuv4mpeg->is_jpeg = 0;
-		}
-    yuv4mpeg->chroma = -1;
+    if( out_pixel_format == FMT_422F || out_pixel_format == FMT_420F ) {
+ 	yuv4mpeg->is_jpeg = 1;
+    } else {
+	yuv4mpeg->is_jpeg = 0;
+    }
+    yuv4mpeg->chroma = Y4M_CHROMA_422; //@ default
     yuv4mpeg->scaler = NULL;	
     return yuv4mpeg;
 }
 
 void vj_yuv4mpeg_free(vj_yuv *v) {
+	if(v) {
+		if( v->scaler ) {
+			yuv_free_swscaler( v->scaler );
+			v->scaler = NULL;
+		}
+		if(v->buf[0] != NULL )
+			free(v->buf[0]);
+		free(v);
+	}
 }
 
 static int vj_yuv_stream_start_read1(vj_yuv * yuv4mpeg, int fd, int width, int height);
@@ -165,6 +174,11 @@ static int vj_yuv_stream_start_read1(vj_yuv * yuv4mpeg, int fd, int width,
     return 0;
 }
 
+uint8_t *vj_yuv_get_buf( void *v ) {
+	vj_yuv *y = (vj_yuv*)v;
+	return y->buf;
+}
+
 int vj_yuv_stream_write_header(vj_yuv * yuv4mpeg, editlist * el, int out_chroma)
 {
     int i = 0;
@@ -176,15 +190,11 @@ int vj_yuv_stream_write_header(vj_yuv * yuv4mpeg, editlist * el, int out_chroma)
 			 mpeg_conform_framerate(el->video_fps));
 
 	yuv4mpeg->chroma = out_chroma;
-	if( out_chroma != Y4M_CHROMA_422 ) {
-			yuv4mpeg->buf[0] = vj_calloc(sizeof(uint8_t) * yuv4mpeg->width * yuv4mpeg->height * 4 );
-			yuv4mpeg->buf[1] = yuv4mpeg->buf[0] + yuv4mpeg->width * yuv4mpeg->height;
-			yuv4mpeg->buf[2] = yuv4mpeg->buf[1] + yuv4mpeg->width * yuv4mpeg->height;
-			yuv4mpeg->buf[3] = yuv4mpeg->buf[2] + yuv4mpeg->width * yuv4mpeg->height;
-	}
-	 
+yuv4mpeg->buf[0] = vj_calloc(sizeof(uint8_t) * yuv4mpeg->width * yuv4mpeg->height * 4 );
+	yuv4mpeg->buf[1] = yuv4mpeg->buf[0] + yuv4mpeg->width * yuv4mpeg->height;
+	yuv4mpeg->buf[2] = yuv4mpeg->buf[1] + yuv4mpeg->width * yuv4mpeg->height;
+	yuv4mpeg->buf[3] = yuv4mpeg->buf[2] + yuv4mpeg->width * yuv4mpeg->height;
     if (!Y4M_RATIO_EQL(yuv4mpeg->sar, y4m_sar_UNKNOWN)) {
-		y4m_si_set_sampleaspect(&(yuv4mpeg->streaminfo), yuv4mpeg->sar);
 		yuv4mpeg->sar.n = el->video_sar_width;
 		yuv4mpeg->sar.d = el->video_sar_height;
 		y4m_si_set_sampleaspect(&(yuv4mpeg->streaminfo), yuv4mpeg->sar);
@@ -259,8 +269,10 @@ int vj_yuv_stream_start_write(vj_yuv * yuv4mpeg,editlist *el, char *filename, in
 	    	else
 	    	{
 			if (S_ISFIFO(sstat.st_mode))
-			  veejay_msg(VEEJAY_MSG_INFO, "Destination file is a FIFO"); 
-			return 1; // pipe needs handling
+			  veejay_msg(VEEJAY_MSG_INFO, "Waiting for a program to open %s", filename);
+		       	yuv4mpeg->fd = open(filename,O_WRONLY,0600);
+   			     if(!yuv4mpeg->fd) return 0;
+
 		}
 	    }
 	    else

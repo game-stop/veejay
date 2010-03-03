@@ -1044,8 +1044,10 @@ static int veejay_screen_update(veejay_t * info )
 			composite_blit_yuyv( info->composite,frame, vj_sdl_get_yuv_overlay(info->sdl[0]),settings->composite);
 			if(!vj_sdl_unlock( info->sdl[0]) )
 				return 0;
+		} 
+		if( info->video_out != 4 ) {
+			skip_update = 1;
 		}
-		skip_update = 1;
 	} 
 
 
@@ -1154,6 +1156,15 @@ static int veejay_screen_update(veejay_t * info )
 			break;*/
 		case 3:
 			break;	
+		case 4:
+			if( vj_yuv_put_frame( info->y4m, frame ) == -1 ) {
+				veejay_msg(0, "Failed to write a frame!");
+				veejay_change_state(info,LAVPLAY_STATE_STOP);
+
+				return 0;
+		
+			}
+			break;
 	default:
 		veejay_change_state(info,LAVPLAY_STATE_STOP);
 		return 0;
@@ -2243,6 +2254,14 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 			veejay_msg(VEEJAY_MSG_INFO, "Entering headless mode (no visual output)");
 		break;
 
+		case 4:
+			veejay_msg(VEEJAY_MSG_INFO, "Entering Y4M streaming mode.");
+			info->y4m = vj_yuv4mpeg_alloc( el, info->video_output_width,info->video_output_height, info->pixel_format );
+			if( vj_yuv_stream_start_write( info->y4m, el, info->y4m_file, Y4M_CHROMA_420JPEG ) == -1 ) {
+				return -1;
+			}	
+			break;
+
 	default:
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid playback mode. Use -O [012345]");
 		return -1;
@@ -2693,6 +2712,11 @@ static	void *veejay_playback_thread(void *data)
 		free(info->dfb);
 	}
 #endif
+    if( info->y4m ) {
+	    vj_yuv_stream_stop_write( info->y4m );
+	    vj_yuv4mpeg_free(info->y4m );
+	    info->y4m = NULL;
+	   }
 /*
 #ifdef HAVE_GL
 #ifndef X_DISPLAY_MISSING

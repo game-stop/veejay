@@ -324,11 +324,11 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 			default:
 				uv_len = y_len/2;break;
 		}
+		if( p[0] != v->cur_width || p[1] != v->cur_height || p[2] != v->cur_fmt )
+			return 2;
 
 		vj_client_decompress( v,in, dst,plen,y_len,uv_len ,16);
 		
-		if( p[0] != v->cur_width || p[1] != v->cur_height || p[2] != v->cur_fmt )
-			return 2;
 		return 1;
 	} else if ( v->c[0]->type == VSOCK_C )
 	{
@@ -379,7 +379,7 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 	//	int n = sock_t_recv_w( v->c[0]->fd, v->space, p[3]  );
 
 		int n = sock_t_recv( v->c[0]->fd,v->space,p[3] );
-		if( n == 0 ) {
+		if( n <= 0 ) {
 			veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection.");
 			return -1;
 		}
