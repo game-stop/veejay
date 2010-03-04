@@ -152,18 +152,18 @@ void	*reader_thread(void *data)
 				ret = vj_client_read_i ( v, tag->socket_frame,tag->socket_len );
 				if( ret <= 0 )
 				{
-					if( tag->source_type == VJ_TAG_TYPE_NET )
-					{
+				//	if( tag->source_type == VJ_TAG_TYPE_NET )
+				//	{
 						veejay_msg(VEEJAY_MSG_DEBUG,
 								"%s:%d failed to read frame",
 								tag->source_name,
 								tag->video_channel );
 						error = 1;
-					}
-					else
-					{
-						wait_time += 10;
-					}
+				//	}
+				//	else
+				//	{
+				//		wait_time += 10;
+				//	}
 					ret = 0;
 				}
 				else
@@ -204,6 +204,9 @@ void	*reader_thread(void *data)
 			if( success <= 0 )
 			{
 				wait_time = 4000;
+#ifdef STRICT_CHECKING
+				veejay_msg(VEEJAY_MSG_DEBUG, "Tried to connect to %s:%d code=%d", tag->source_name,tag->video_channel,success);
+#endif
 			}
 			else
 			{
@@ -328,10 +331,21 @@ int	net_thread_start(vj_client *v, vj_tag *tag)
 	t->state = 1;
 	t->remote = v;
 	t->grab = 1;
+	
+	
 	if( tag->source_type == VJ_TAG_TYPE_MCAST )
 	{
-		char start_mcast[6];
-		snprintf(start_mcast,sizeof(start_mcast), "%03d:;", VIMS_VIDEO_MCAST_START);
+		char start_mcast[8];
+		
+		int  gs = 0;
+		char *gs_str = getenv( "VEEJAY_MCAST_GREYSCALE" );
+		if( gs_str ) {
+			gs = atoi(gs_str);
+			if(gs < 0 || gs > 1 )
+				gs = 0;
+		}
+		
+		snprintf(start_mcast,sizeof(start_mcast), "%03d:%d;", VIMS_VIDEO_MCAST_START,gs);
 		
 		veejay_msg(VEEJAY_MSG_DEBUG, "Request mcast stream from %s port %d",
 				tag->source_name, tag->video_channel);

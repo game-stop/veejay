@@ -217,7 +217,9 @@ int	mcast_recv_packet_frame( mcast_receiver *v )
 	int res = recv(v->sock_fd, chunk, PACKET_PAYLOAD_SIZE, 0 );
         if( res <= 0 )
         {
-                veejay_msg(VEEJAY_MSG_ERROR, "Error receiving multicast packet:%s", strerror(errno));
+		if(res == - 1)
+               	 veejay_msg(VEEJAY_MSG_ERROR, "Error receiving multicast packet:%s", strerror(errno));
+		
                 return 0;
         }
         hdr = packet_get_header(chunk);
@@ -262,10 +264,10 @@ int	mcast_recv_packet_frame( mcast_receiver *v )
 		}
 
 		d_slot = o;
-
-	//	veejay_msg(VEEJAY_MSG_DEBUG, "Dropping frame in slot %d (%d/%d packets)",
-	//			d_slot, q->slot[d_slot]->count,q->slot[d_slot]->hdr.length );
-			
+#ifdef STRICT_CHECKING
+		veejay_msg(VEEJAY_MSG_DEBUG, "Dropping frame in slot %d (%d/%d packets)",
+				d_slot, q->slot[d_slot]->count,q->slot[d_slot]->hdr.length );
+#endif		
 		free(q->slot[d_slot]->buf);
 		q->slot[d_slot]->buf = NULL;
 		q->slot[d_slot]->count = 0;
@@ -293,7 +295,7 @@ int	mcast_recv_packet_frame( mcast_receiver *v )
 	{
 		pb->rdy = 1;
 		q->last = hdr.usec;
-		return 0;
+		return 2;
 	}
 
 	return 1;
@@ -302,7 +304,7 @@ int	mcast_recv_packet_frame( mcast_receiver *v )
 uint8_t *mcast_recv_frame( mcast_receiver *v, int *dw, int *dh, int *dfmt, int *len )
 {
 	packet_slot_t *q = (packet_slot_t*) v->next;
-	int i;
+	int i,n;
 	for(i = 0; i < PACKET_SLOTS; i ++ ) 
 	{
 		//@ find rdy frames or too-old-frames and free them
@@ -317,12 +319,17 @@ uint8_t *mcast_recv_frame( mcast_receiver *v, int *dw, int *dh, int *dfmt, int *
 	}
 
 	//@ is there something todo
-	if( mcast_poll_timeout( v, 1000 ) == 0 )
-		return NULL;
+//	if( mcast_poll_timeout( v, 1000 ) == 0 )
+//		return NULL;
 
-	while( mcast_recv_packet_frame(v) )
+	while( (n = mcast_recv_packet_frame(v) ) )
 	{
-		//@ do nothing	
+		if( n == 2 ) {
+#ifdef STRICT_CHECKING
+
+#endif
+			break; //@ full frame
+		}
 	}
 		
 	int d_slot = -1;
@@ -342,23 +349,22 @@ uint8_t *mcast_recv_frame( mcast_receiver *v, int *dw, int *dh, int *dfmt, int *
 	//@ find newer packet buffer with complete frame
 	for(i = 0; i < PACKET_SLOTS; i ++ ) 
 	{
-		if( q->slot[i]->rdy == 1 && q->slot[i]->hdr.usec < t1) {
+		if( q->slot[i]->rdy == 1 && q->slot[i]->hdr.usec > t1) {
 			full_frame = 1;
 			d_slot = i;
-			break;
 		}
 	}
-	
-
+	/*
+#ifdef STRICT_CHECKING
 	//@debug queue
-/*	for( i = 0; i < PACKET_SLOTS; i ++ ) {
+	for( i = 0; i < PACKET_SLOTS; i ++ ) {
 		packet_buffer_t *p = q->slot[i];
-		veejay_msg(VEEJAY_MSG_INFO, "Slot %d: %d bytes, %d/%d queued, rdy=%d, t1=%ld",
+		veejay_msg(VEEJAY_MSG_DEBUG, "Slot %d: %d bytes, %d/%d queued, rdy=%d, t1=%ld",
 				i, p->len, p->count,p->hdr.length, p->rdy,(long) p->hdr.usec );
 	
 	}
+#endif
 	*/
-
 	//@ return newest full frame
 	if( full_frame ) {
 		packet_buffer_t *pb = q->slot[d_slot];
