@@ -1095,20 +1095,20 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 	int compr_len = 0;
 	if( !mcast )
 	{
-		uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * 21 );
+		uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * 18 );
 		compr_len = vj_perform_compress_frame(info,sbuf);
 #ifdef STRICT_CHECKING
 		assert( compr_len > 0 );
 #endif
 		/* peer to peer connection */
-		sprintf(info_line, "%04d %04d %1d %08d ", info->effect_frame1->width,
+		sprintf(info_line, "%04d%04d%1d%08d ", info->effect_frame1->width,
 				info->effect_frame1->height, info->effect_frame1->format,
 		      		compr_len );
 		hlen = strlen(info_line );
 #ifdef STRICT_CHECKING
-		assert( hlen == 21 );
+		assert( hlen == 18 );
 #endif
-		veejay_memcpy( socket_buffer, info_line, sizeof(uint8_t) * 21 );
+		veejay_memcpy( socket_buffer, info_line, sizeof(uint8_t) * hlen );
 	}
 	else	
 	{

@@ -335,7 +335,7 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 	{
 		veejay_memset( line,0, sizeof(line));
 //		plen = sock_t_recv_w( v->c[0]->fd, line, 21 );	
-		plen = sock_t_recv( v->c[0]->fd, line, 21 );
+		plen = sock_t_recv( v->c[0]->fd, line, 18 );
 
 		if( plen == 0 ) {
 			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
@@ -350,12 +350,12 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 		
 		//vj_client_stdout_dump_recv( v->c[0]->fd, plen, line );
 #ifdef STRICT_CHECKING
-		assert( plen == 21 );
+		assert( plen == 18 );
 #endif
 		p[0] = getint( line , 4 );
-		p[1] = getint( line + 5, 4 );
-		p[2] = getint( line + 4 + 5, 4 );
-		p[3] = getint( line + 4 + 5 + 5, 8 );
+		p[1] = getint( line + 4, 4 );
+		p[2] = getint( line + 8, 1 );
+		p[3] = getint( line + 9, 8 );
 
 		if( v->cur_width != p[0] || v->cur_height != p[1] || v->cur_fmt != p[2]) {
 			veejay_msg(VEEJAY_MSG_ERROR, "Unexpected video frame format, %dx%d (%d) , received %dx%d(%d)",
