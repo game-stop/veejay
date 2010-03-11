@@ -107,7 +107,6 @@ static uint8_t *resample_audio_buffer = NULL;
 static uint8_t *audio_render_buffer = NULL;
 static uint8_t *down_sample_buffer = NULL;
 static uint8_t *temp_buffer[4];
-static uint8_t *socket_buffer = NULL;
 static ycbcr_frame *record_buffer = NULL;	// needed for recording invisible streams
 static VJFrame *helper_frame = NULL;
 static int vj_perform_record_buffer_init();
@@ -638,9 +637,6 @@ int vj_perform_init(veejay_t * info)
     if(!temp_buffer[2]) return 0;
 	veejay_memset( temp_buffer[2], 128,sizeof(uint8_t) * RUP8(frame_len+16) * 2 );
     // to render fading of effect chain:
-    socket_buffer = (uint8_t*)vj_malloc(sizeof(uint8_t) * frame_len * 4 ); // large enough !!
-    veejay_memset( socket_buffer, 16, frame_len * 4 );
-    // to render fading of effect chain:
 
     /* allocate space for frame_buffer, the place we render effects  in */
     for (c = 0; c < SAMPLE_MAX_EFFECTS; c++) {
@@ -819,7 +815,6 @@ void vj_perform_free(veejay_t * info)
 	}
   	if(primary_buffer) free(primary_buffer);
 
-	if(socket_buffer) free(socket_buffer);
 	if(crop_frame)
 	{
 		if(crop_frame->data[0]) free(crop_frame->data[0]);
@@ -1092,6 +1087,9 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 	int hlen =0;
 	unsigned char info_line[32];
 
+	uint8_t *socket_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * info->effect_frame1->width *
+						info->effect_frame1->height * 3 );
+
 	int compr_len = 0;
 	if( !mcast )
 	{
@@ -1145,6 +1143,10 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 			veejay_msg(VEEJAY_MSG_DEBUG,  "Error sending multicast frame.");
 		}
 	}
+
+
+	free(socket_buffer);
+
 	return 1;
 }
 

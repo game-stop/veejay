@@ -63,7 +63,7 @@ void	*lzo_new( )
 	}
 
 	l->wrkmem = (lzo_bytep)
-		vj_malloc( 2 * LZO1X_1_MEM_COMPRESS );
+		vj_calloc( LZO1X_1_MEM_COMPRESS );
 
 	if(l->wrkmem == NULL )
 	{
@@ -94,7 +94,7 @@ int		lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, 
 	lzo_bytep dst = plane;
 	lzo_uintp dst_len = (lzo_uintp) size;
 	lzo_voidp wrkmem = l->wrkmem;
-	int r = lzo1x_1_compress( src, len, dst, dst_len, l->wrkmem );
+	int r = lzo1x_1_compress( src, len, dst, dst_len, wrkmem );
 	if( r != LZO_E_OK )
 		return 0;
 	return (*size);	
@@ -102,13 +102,13 @@ int		lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, 
 
 long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int uv_len )
 {
-	int i;
+	unsigned int i;
 	lzo_uint len[3] = { 0,0,0};
-	int mode = 0;
-	int sum = 0;
+	unsigned int mode = 0;
+	unsigned int sum = 0;
 	lzot *l = (lzot*) lzo;
 	lzo_uint result_len = 0;
-	lzo_uint offset = 0;
+	lzo_uint offset = 16;
 	
 	len[0] = str2ulong( linbuf );
 	len[1] = str2ulong( linbuf+4 );
@@ -118,17 +118,19 @@ long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3
 	if(len[1] ==0 && len[2] == 0 )
 		mode = 1;
 
-	for( i = 0; i <= 2; i ++ )
+	for( i = 0; i < 3; i ++ )
 	{
 		if( len[i] <= 0 ) 
 			continue;
 
-		const lzo_bytep src = (lzo_bytep) (linbuf+16+offset);
+		const lzo_bytep src = (lzo_bytep) (linbuf+offset);
 		int r = lzo1x_decompress( src, len[i], dst[i], &result_len, l->wrkmem );
 		if( r != LZO_E_OK )
 			return 0;
 		sum += result_len;
 		offset += len[i];
+
+		result_len = 0;
 	}
 
 	if(mode == 1) {
