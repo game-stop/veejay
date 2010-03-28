@@ -99,8 +99,7 @@ int		lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, 
 		return 0;
 	return (*size);	
 }
-
-long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int uv_len )
+long		lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int uv_len)
 {
 	unsigned int i;
 	lzo_uint len[3] = { 0,0,0};
@@ -109,7 +108,6 @@ long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3
 	lzot *l = (lzot*) lzo;
 	lzo_uint result_len = 0;
 	lzo_uint offset = 16;
-	
 	len[0] = str2ulong( linbuf );
 	len[1] = str2ulong( linbuf+4 );
 	len[2] = str2ulong( linbuf+8 );
@@ -141,7 +139,59 @@ long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3
 	return (long)sum;
 }
 
-long		lzo_decompress422into420( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int w, int h )
+long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int uv_len, 
+	       		uint32_t stride1, uint32_t stride2, uint32_t stride3	)
+{
+	unsigned int i;
+	lzo_uint len[3] = { 0,0,0};
+	unsigned int mode = 0;
+	unsigned int sum = 0;
+	lzot *l = (lzot*) lzo;
+	lzo_uint result_len = 0;
+	lzo_uint offset = 16;
+	
+	len[0] = str2ulong( linbuf );
+	len[1] = str2ulong( linbuf+4 );
+	len[2] = str2ulong( linbuf+8 );
+	mode   = str2ulong( linbuf+12 );
+
+	if( len[0] != stride1 || len[1] != stride2 || len[2] != stride3 ) {
+		veejay_msg(0, "Data corruption.");
+		return 0;
+	}
+
+	len[0] = stride1;
+	len[1] = stride2;
+	len[2] = stride3;
+
+	if(len[1] ==0 && len[2] == 0 )
+		mode = 1;
+
+	for( i = 0; i < 3; i ++ )
+	{
+		if( len[i] <= 0 ) 
+			continue;
+
+		const lzo_bytep src = (lzo_bytep) (linbuf+offset);
+		int r = lzo1x_decompress( src, len[i], dst[i], &result_len, l->wrkmem );
+		if( r != LZO_E_OK )
+			return 0;
+		sum += result_len;
+		offset += len[i];
+
+		result_len = 0;
+	}
+
+	if(mode == 1) {
+		veejay_memset( dst[1],128, uv_len );
+		veejay_memset( dst[2],128, uv_len );
+	}
+
+	return (long)sum;
+}
+
+long		lzo_decompress422into420( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int w, int h,
+	       	uint32_t stride1, uint32_t stride2, uint32_t stride3	)
 {
 	int i;
 	lzo_uint len[3] = { 0,0,0};
@@ -149,12 +199,33 @@ long		lzo_decompress422into420( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 	int mode = 0;
 	lzot *l = (lzot*) lzo;
 	lzo_uint result_len = 0;
-	lzo_uint offset = 0;
+	lzo_uint offset = 16;
 	
 	len[0] = str2ulong( linbuf );
 	len[1] = str2ulong( linbuf+4 );
 	len[2] = str2ulong( linbuf+8 );
 	mode   = str2ulong( linbuf+12 );
+
+	if( len[0] != stride1 || len[1] != stride2 || len[2] != stride3 ) {
+		veejay_msg(0, "Data corruption.");
+		return 0;
+	}
+
+	len[0] = stride1;
+	len[1] = stride2;
+	len[2] = stride3;
+
+/*
+	len[0] = str2ulong( linbuf );
+	len[1] = str2ulong( linbuf+4 );
+	len[2] = str2ulong( linbuf+8 );
+	mode   = str2ulong( linbuf+12 );
+*/
+
+	if(len[1] ==0 && len[2] == 0 )
+		mode = 1;
+
+
 
 	if( l->tmp[0] == NULL ) {
 		l->tmp[0] = vj_malloc(sizeof(uint8_t) * w * h * 3); // will do
@@ -167,7 +238,7 @@ long		lzo_decompress422into420( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 		if(len[i] <= 0)
 			continue;
 
-		const lzo_bytep src = (lzo_bytep) (linbuf+16+offset);
+		const lzo_bytep src = (lzo_bytep) (linbuf+offset);
 		int r = lzo1x_decompress( src, len[i], l->tmp[i], &result_len, l->wrkmem );
 		if( r != LZO_E_OK )
 			return 0;
@@ -192,7 +263,7 @@ long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 	int mode= 0;
 	lzot *l = (lzot*) lzo;
 	lzo_uint result_len = 0;
-	lzo_uint offset = 0;
+	lzo_uint offset = 16;
 
 	len[0] = str2ulong( linbuf );
 	len[1] = str2ulong( linbuf+4 );
@@ -209,7 +280,7 @@ long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 	{
 		if( len[i] <= 0 )
 			continue;
-		const lzo_bytep src = (lzo_bytep) (linbuf+16+offset);
+		const lzo_bytep src = (lzo_bytep) (linbuf+offset);
 		int r = lzo1x_decompress( src, len[i], l->tmp[i], &result_len, l->wrkmem );
 		if( r != LZO_E_OK )
 			return 0;

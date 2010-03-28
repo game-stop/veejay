@@ -25,13 +25,16 @@ void    *lzo_new(  );
 void	lzo_free( void *lzo );
 
 int  	lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, int ilen );
-long		lzo_decompress422into420( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int w, int h );
+long		lzo_decompress422into420( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int w, int h,
+	       uint32_t s1, uint32_t s2, uint32_t s3	);
 long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int w, int h );
 
 
 long	lzo_decompress2( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst );
 
+long     lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len,uint8_t *dst[3], int uv_len);
 
-long     lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len,uint8_t *dst[3], int uv_len );
+long     lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len,uint8_t *dst[3], int uv_len,
+	       	uint32_t s1, uint32_t s2, uint32_t s3	);
 
 #endif

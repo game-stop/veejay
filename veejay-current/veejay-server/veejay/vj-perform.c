@@ -1027,11 +1027,11 @@ static void long2str(unsigned char *dst, int32_t n)
    dst[3] = (n>>24)&0xff;
 }
 
-static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
+static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_t *p1_len, uint32_t *p2_len, uint32_t *p3_len)
 {
 	const int len = info->effect_frame1->width * info->effect_frame1->height;
 	const int uv_len = info->effect_frame1->uv_len;
-	uint8_t *dstI = dst + (16 * sizeof(uint8_t));
+	uint8_t *dstI = dst + (sizeof(uint8_t) * 16);
 	unsigned int size1=0,size2=0,size3=0;
 	int i = lzo_compress( lzo_ , primary_buffer[info->out_buf]->Y, dstI, &size1, len );
 	if( i == 0 )
@@ -1043,15 +1043,15 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 		return 0;
 	}
 	dstI += size1;
-
+	*p1_len  = size1;
 
 	if( info->settings->mcast_mode == 1 ) {
 		//@ only compress Y plane, set mode in header
-		long2str( dst,size1);
+	/*	long2str( dst,size1);
 		long2str( dst+4,0);
 		long2str( dst+8,0);
-		long2str( dst+12, info->settings->mcast_mode );
-		return 16 + size1;
+		long2str( dst+12, info->settings->mcast_mode );*/
+		return size1;
 	}
 
 	i = lzo_compress( lzo_, primary_buffer[info->out_buf]->Cb, dstI, &size2, uv_len );
@@ -1064,6 +1064,7 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 		return 0;
 	}
 	dstI += size2;
+	*p2_len = size2;
 
 	i = lzo_compress( lzo_, primary_buffer[info->out_buf]->Cr, dstI, &size3, uv_len );
 	if( i == 0 )
@@ -1075,45 +1076,67 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst)
 		return 0;
 	}	
 
+	*p3_len = size3;
+
 	long2str( dst,size1);
 	long2str( dst+4, size2 );
 	long2str( dst+8, size3 );
 	long2str( dst+12,info->settings->mcast_mode );
+
 	return (size1+size2+size3+16);
 }
 
 int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 {
 	int hlen =0;
-	unsigned char info_line[32];
+	unsigned char info_line[48];
 
 	uint8_t *socket_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * info->effect_frame1->width *
 						info->effect_frame1->height * 3 );
 
 	int compr_len = 0;
+	uint32_t planes[3];
+
 	if( !mcast )
 	{
-		uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * 18 );
-		compr_len = vj_perform_compress_frame(info,sbuf);
+		uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * 41 );
+		compr_len = vj_perform_compress_frame(info,sbuf, &planes[0], &planes[1], &planes[2]);
 #ifdef STRICT_CHECKING
 		assert( compr_len > 0 );
 #endif
 		/* peer to peer connection */
-		sprintf(info_line, "%04d%04d%1d%08d ", info->effect_frame1->width,
+		sprintf(info_line, "%04d%04d%1d%08d%08d%08d%08d", info->effect_frame1->width,
 				info->effect_frame1->height, info->effect_frame1->format,
-		      		compr_len );
+		      		compr_len,
+		      		planes[0],
+		      		planes[1],
+		      		planes[2] );
 		hlen = strlen(info_line );
 #ifdef STRICT_CHECKING
-		assert( hlen == 18 );
+		assert( hlen == 41 );
 #endif
 		veejay_memcpy( socket_buffer, info_line, sizeof(uint8_t) * hlen );
 	}
 	else	
 	{
-		compr_len = vj_perform_compress_frame(info,socket_buffer );
+		uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * 41 );
+
+		compr_len = vj_perform_compress_frame(info,sbuf, &planes[0], &planes[1], &planes[2] );
 #ifdef STRICT_CHECKING
 		assert(compr_len > 0 );
 #endif
+		sprintf(info_line, "%04d%04d%1d%08d%08d%08d%08d", info->effect_frame1->width,
+				info->effect_frame1->height, info->effect_frame1->format,
+		      		compr_len,
+		      		planes[0],
+		      		planes[1],
+		      		planes[2] );
+		hlen = strlen(info_line );
+#ifdef STRICT_CHECKING
+		assert( hlen == 41 );
+#endif
+		veejay_memcpy( socket_buffer, info_line, sizeof(uint8_t) * hlen );
+
 	}
 
 	int id = (mcast ? 2: 3);
