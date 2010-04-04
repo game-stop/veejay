@@ -116,6 +116,7 @@ typedef struct sample_eff_t {
     int is_rendering;		/* is rendering */
     void *kf;			/* keyframe values for this entry */
     int kf_status;	        /* use keyframed values */
+    void *fx_instance;		/* lib plugger instance */
 } sample_eff_chain;
 
 
@@ -253,6 +254,7 @@ extern int sample_set_sub_audio(int s1, int audio);
 extern int sample_get_audio_volume(int s1);
 extern int sample_set_audio_volume(int s1, int volume);
 extern int sample_copy(int s1);
+void	*sample_get_plugin( int s1, int position, void *ptr );
 extern int sample_get_effect(int s1, int position);
 /* get effect any, even if effect is disabled (required for informational purposes)*/
 extern int sample_get_effect_any(int s1, int position);

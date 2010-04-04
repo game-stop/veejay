@@ -285,7 +285,7 @@ enum {
 #define FMT_420F 2
 #define FMT_422 1
 #define FMT_422F 3
-
+#define FMT_444 4
 #define VEEJAY_PORT_CMD 0
 #define VEEJAY_PORT_STA 1
 #define VEEJAY_PORT_DAT 3

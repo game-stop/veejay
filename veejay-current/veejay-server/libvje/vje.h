@@ -51,6 +51,8 @@ typedef struct VJFrame_t
 	int	alpha;
 	int	stride[4];
 	int	stand; //ccir/jpeg
+	float	fps;
+	double	timecode;
 } VJFrame;
 
 typedef struct VJRectangle_t
@@ -111,15 +113,15 @@ extern int vj_effect_has_rgbkey(int effect_id);
 extern int vj_effect_is_valid(int effect_id);
 extern int vj_effect_get_summary(int entry, char *dst);
 extern int vj_effect_get_summary_len(int entry);
-extern int vj_effect_activate(int e);
-extern int vj_effect_deactivate(int e);
+extern void *vj_effect_activate(int e, int *retcode);
+extern int vj_effect_deactivate(int e, void *ptr);
 extern int vj_effect_initialized(int e);
 extern int vj_effect_get_min_i();
 extern int vj_effect_get_max_i();
 extern int vj_effect_get_min_v();
 extern int vj_effect_get_max_v();
 extern int vj_effect_get_by_name(char *name);
-extern int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int selector, int *arguments );
+extern int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int selector, int *arguments, void *ptr);
 extern int	vj_effect_prepare( VJFrame *frame, int selector);
 extern	void	vj_effect_dump(void);
 extern int	rgb_parameter_conversion_type_;

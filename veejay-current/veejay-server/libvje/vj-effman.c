@@ -17,6 +17,9 @@
  *
  */
 #include <config.h>
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
 #include <stdint.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -25,21 +28,54 @@
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
 #include <libvje/internal.h>
-#include <libvje/plugload.h>
+#include <libplugger/plugload.h>
 extern vj_effect *vj_effects[]; 
 
-void vj_effman_apply_ff_effect(
+#define VEVO_PLUG_LIVIDO        0xffaa
+#define VEVO_PLUG_FF            0x00ff
+#define VEVO_PLUG_FR            0xffbb
+
+void vj_effman_apply_plug_effect(
 	VJFrame **frames,
 	VJFrameInfo *frameinfo,
 	vjp_kf *todo_info,
 	int *arg,
+	int n_arg,
 	int entry,
-	int fx_id)
+	int fx_id,
+	void *instance)
 
 {
-	plug_control( entry - MAX_EFFECTS, arg );
+	int plug_id = entry - MAX_EFFECTS;
+#ifdef STRICT_CHECKING
+	assert( instance != NULL );
+#endif
+	int type	= -1;
+	int error	= vevo_property_get( instance, "HOST_plugin_type", 0, &type );
+
+	if( type == VEVO_PLUG_FR || type == VEVO_PLUG_FF ) {
+		return;
+	}	
+
+	int n 	    = plug_get_num_input_channels( plug_id );
+
+	n_arg	    = plug_get_num_parameters( plug_id );
+
+	int i;
+
+	for( i = 0; i < n_arg; i ++ ) {
+		plug_set_parameter(instance,i, 1, &(arg[i]) );
+	}
+
+	for( i = 0; i < n; i ++ ) {
+		plug_push_frame(instance, 0, i, frames[i]);
+	}
+
+	if( plug_get_num_output_channels(plug_id ) > 0 )
+		plug_push_frame(instance, 1, 0, frames[0] );
+
 	
-	plug_process( frames[0],frames[1],entry - MAX_EFFECTS, get_ffmpeg_pixfmt(frames[0]->format) );
+	plug_process( instance );
 }
 
 void vj_effman_apply_image_effect(
@@ -668,7 +704,7 @@ int vj_effect_prepare( VJFrame *frame, int selector)
 }
 
 
-int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int selector, int *arguments )
+int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int selector, int *arguments, void *ptr )
 {
 	int entry = vj_effect_real_to_sequence( selector );
 	int n_a   = vj_effect_get_num_params( selector );
@@ -681,7 +717,7 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 	}
 
 	if( selector >= 500 )
-		vj_effman_apply_ff_effect( frames, frameinfo, kf, arguments, entry, selector );
+		vj_effman_apply_plug_effect( frames, frameinfo, kf, arguments,n_a, entry, selector, ptr );
 	else
 	{		
 		if( selector > 200 )	

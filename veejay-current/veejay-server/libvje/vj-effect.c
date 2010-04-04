@@ -163,9 +163,10 @@
 #include "effects/colflash.h"
 #include "effects/rgbchannel.h"
 #include "effects/diffmap.h"
-#include "plugload.h"
 #include "effects/picinpic.h"
 #include "effects/cali.h"
+#include <libplugger/plugload.h>
+#include <veejay/vims.h>
 
 int  pixel_Y_hi_ = 235;
 int  pixel_U_hi_ = 240;
@@ -322,38 +323,46 @@ int vj_effect_initialized(int effect_id)
 	return 0;
 }
 
-int	vj_effect_activate_ext( int fx_id )
+static void 	*vj_effect_activate_ext( int fx_id, int *result )
 {
 	if( fx_id > (MAX_EFFECTS + n_ext_plugs_) )
 		return 0;
-	int res = plug_activate( fx_id - MAX_EFFECTS );
-	if(res)
+	void *plug = plug_activate( fx_id - MAX_EFFECTS );
+	if(plug)
 	{
 		vj_effect_ready[fx_id] = 1;
-		return 1;
+		*result = 1;
+		return plug;
 	}
-	return 0;
+	return NULL;
 }
 
-
-int vj_effect_activate(int effect_id)
+void *vj_effect_activate(int effect_id, int *result)
 {
 	int seq = vj_effect_real_to_sequence(effect_id);
 
-	if( seq < 0 || seq > (MAX_EFFECTS + n_ext_plugs_ ))
-		return 0;
+	if( seq < 0 || seq > (MAX_EFFECTS + n_ext_plugs_ )) {
+		*result = 0;
+		return NULL;
+	}
 
-	if(seq >= MAX_EFFECTS && seq < (MAX_EFFECTS + n_ext_plugs_))
-		return vj_effect_activate_ext(seq);
+	if(seq >= MAX_EFFECTS && seq < (MAX_EFFECTS + n_ext_plugs_)) {
+		return vj_effect_activate_ext(seq, result);
+		//FIXME
+	}
 
-	if( _no_mem_required(effect_id) )
-		return 1;
+
+	if( _no_mem_required(effect_id) ) {
+		*result = 1;
+		return NULL;
+	}
 
 	if( vj_effect_ready[seq] == 1 )
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Effect %s already initialized",
 			vj_effects[seq]->description);
-		return 1;
+		*result = 1;
+		return NULL;
 	}
 
 	if( vj_effect_ready[seq] == 0 )
@@ -364,34 +373,40 @@ int vj_effect_activate(int effect_id)
 			index = _get_complex_effect(effect_id);
 			if(index == -1)
 			{
-				return 0;
+				*result = 0;
+				return NULL;
 			}
 			if(!complex_effect_index[index].mem_init( &(vj_effects[seq]->user_data), max_width, max_height ))
 			{
-				return 0;	
+				*result = 0;
+				return NULL;	
 			}
 			else
 			{
 				veejay_msg(VEEJAY_MSG_DEBUG, "Initialized complex effects %s",
 						vj_effects[seq]->description);
 				vj_effect_ready[seq] = 1;
-				return 1;
+				*result = 1;
+				return NULL;
 			}
 			//perhaps it is a complex effect
 		}
 		if(!simple_effect_index[index].mem_init( max_width, max_height ))
 		{
-				return 0;
+				*result = 0;
+				return NULL;
 		}
 		else
 		{
 				veejay_msg(VEEJAY_MSG_DEBUG, "Initialized simple effect %s",
 						vj_effects[seq]->description);
 				vj_effect_ready[seq]= 1;
-				return 1;
+				*result = 1;
+				return NULL;
 		}
 	}
-	return 1;
+	*result = 1;
+	return NULL;
 }
 
 void	*vj_effect_get_data( int seq_id ) {
@@ -399,7 +414,7 @@ void	*vj_effect_get_data( int seq_id ) {
 	return vj_effects[seq_id]->user_data;
 }
 
-int vj_effect_deactivate(int effect_id)
+int vj_effect_deactivate(int effect_id, void *ptr)
 {
 	int seq = vj_effect_real_to_sequence(effect_id);
 
@@ -414,7 +429,8 @@ int vj_effect_deactivate(int effect_id)
 	{
 		if( seq >= MAX_EFFECTS && seq < (n_ext_plugs_ + MAX_EFFECTS))
 		{
-			plug_deactivate( seq - MAX_EFFECTS );
+			plug_deactivate( ptr );
+			//seq - MAX_EFFECTS );
 			vj_effect_ready[seq] = 0;
 			return 1;
 		}
@@ -452,7 +468,7 @@ void vj_effect_deactivate_all()
 		int effect_id = vj_effect_get_real_id( i );
 		if( effect_id > 100)
 		{
-			vj_effect_deactivate( effect_id );
+			vj_effect_deactivate( effect_id, NULL );
 		}
 	}	
 }
@@ -466,12 +482,12 @@ void vj_effect_initialize(int width, int height, int full_range)
     {
 	    set_pixel_range( 255, 255,0,0 );
     }
-    
+   /* 
     n_ext_plugs_ = plug_detect_plugins();
 
     if( n_ext_plugs_  > 0 )
 	plug_init( width,height );
-
+*/
     for(k=0; k  < MAX_EFFECTS; k++)
 	vj_effects[k] = NULL;
 
@@ -631,8 +647,15 @@ void vj_effect_initialize(int width, int height, int full_range)
 	}
 
 //@ initialize external plugins
+//
+	
+	plug_sys_init( FMT_422,width,height );
+
+	n_ext_plugs_ = plug_sys_detect_plugins();
+
 	int p = 0;
 	int p_stop = MAX_EFFECTS + n_ext_plugs_;
+
 
 	for( p = MAX_EFFECTS; p < p_stop; p ++ )
 		vj_effects[p] = plug_get_plugin( (p-MAX_EFFECTS) );
@@ -657,7 +680,6 @@ void vj_effect_free(vj_effect *ve) {
 void vj_effect_shutdown() {
     int i;
     vj_effect_deactivate_all(); 
-    plug_free();
     for(i=0; i < vj_effect_max_effects(); i++) { 
 	if(vj_effects[i]) {
 	 if( i >= MAX_EFFECTS )
@@ -673,6 +695,8 @@ void vj_effect_shutdown() {
     rotozoom_destroy();
     distortion_destroy();
     cali_destroy();
+
+    plug_sys_free();
 }
 
 void vj_effect_dump() {

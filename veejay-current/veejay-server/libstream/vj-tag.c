@@ -1311,6 +1311,20 @@ int vj_tag_get_effect(int t1, int position)
 	return -1;
     return tag->effect_chain[position]->effect_id;
 }
+void *vj_tag_get_plugin(int t1, int position, void *instance)
+{
+    vj_tag *tag = vj_tag_get(t1);
+    if (!tag)
+	return NULL;
+    if (position >= SAMPLE_MAX_EFFECTS)
+	return NULL;
+
+    if( instance != NULL )
+	    tag->effect_chain[position]->fx_instance = instance;
+
+    return tag->effect_chain[position]->fx_instance;
+}
+
 
 float vj_tag_get_fader_val(int t1) {
    vj_tag *tag = vj_tag_get(t1);
@@ -1854,7 +1868,8 @@ int vj_tag_chain_malloc(int t1)
 		if(!vj_effect_initialized(e_id))
 		{
 			sum ++;
-			vj_effect_activate(e_id);
+			int res = 0;
+			tag->effect_chain[i]->fx_instance = vj_effect_activate(e_id, &res);
 		}
 	}
     } 
@@ -1878,7 +1893,7 @@ int vj_tag_chain_free(int t1)
 	{
 		if(vj_effect_initialized(e_id))
 		{
-			vj_effect_deactivate(e_id);
+			vj_effect_deactivate(e_id, tag->effect_chain[i]->fx_instance);
 			sum++;
 		}
 	  }
@@ -1995,13 +2010,16 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 				if( tag->effect_chain[i]->effect_id == tag->effect_chain[position]->effect_id) ok = 0;
 			}
 			// ok, lets get rid of it.
-			if( ok ) vj_effect_deactivate( tag->effect_chain[position]->effect_id );
+			if( ok ) vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
 		}
     }
 
     if (!vj_effect_initialized(effect_id))
 	{
-		if(vj_effect_activate( effect_id ) == -1) return -1;
+	 	int res = 0;
+		tag->effect_chain[position]->fx_instance = vj_effect_activate( effect_id, &res );
+		if( res == -1 )
+			return -1;
 	}
 
     tag->effect_chain[position]->effect_id = effect_id;
@@ -2539,7 +2557,7 @@ int vj_tag_chain_remove(int t1, int index)
     {
 	if( vj_effect_initialized( tag->effect_chain[index]->effect_id ) && 
 	    vj_tag_chain_can_delete(tag, index, tag->effect_chain[index]->effect_id))
-		vj_effect_deactivate( tag->effect_chain[index]->effect_id );
+		vj_effect_deactivate( tag->effect_chain[index]->effect_id, tag->effect_chain[index]->fx_instance );
 
 	if( tag->effect_chain[index]->kf )
 		vevo_port_free(tag->effect_chain[index]->kf );

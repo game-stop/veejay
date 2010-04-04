@@ -658,13 +658,13 @@ static	int	veejay_stop_playing_sample( veejay_t *info, int new_sample_id )
 	}
 
 	sample_chain_free( info->uc->sample_id );
-	int n;
+/*&	int n;
 	for( n = 0; n < 3 ; n ++ ) {
 		if(info->settings->fxrow[n] ) {
-			vj_effect_deactivate( info->settings->fxrow[n] );
+			vj_effect_deactivate( info->settings->fxrow[n] , sample_get_plugin( info->uc->sample_id,);
 			info->settings->fxrow[n] = 0;
 		}
-	}
+	}*/
 	
 	veejay_reset_el_buffer(info);
 	sample_set_framedups(info->uc->sample_id,0);
@@ -680,13 +680,13 @@ static  void	veejay_stop_playing_stream( veejay_t *info, int new_stream_id )
 	}
 
 	vj_tag_chain_free( info->uc->sample_id );
-	int n;
+/*	int n;
 	for( n = 0; n < 3 ; n ++ ) {
 		if(info->settings->fxrow[n] ) {
 			vj_effect_deactivate( info->settings->fxrow[n] );
 			info->settings->fxrow[n] = 0;	
 		}
-	}
+	}*/
 
 }
 static	int	veejay_start_playing_sample( veejay_t *info, int sample_id )

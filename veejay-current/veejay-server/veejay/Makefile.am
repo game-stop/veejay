@@ -8,6 +8,7 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) \
      		-I /usr/X11R6/include -I$(top_srcdir)/libOSC \
 		-I$(top_srcdir)/libhash \
 		-I$(top_srcdir)/libvje \
+		-I$(top_srcdir)/libplugger \
 		-I$(top_srcdir)/libvjmem \
 		-I$(top_srcdir)/libvjmsg \
 		-I$(top_srcdir)/libvjnet \
@@ -45,6 +46,7 @@ libveejay_la_LIBADD = -L$(top_builddir)/mjpegtools/ -lmjpegutils \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
 			-L$(top_builddir)/libvjmem -lvjmem \
 			-L$(top_builddir)/libvje -lvje \
+			-L$(top_builddir)/libplugger -lvjplug \
 			-L$(top_builddir)/libsample -lsample \
 			-L$(top_builddir)/libvjnet -lvjnet \
 			-L$(top_builddir)/libel -lel \

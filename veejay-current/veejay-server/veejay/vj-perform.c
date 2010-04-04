@@ -146,7 +146,7 @@ static int vj_perform_tag_complete_buffers(veejay_t * info, int *h);
 static int vj_perform_increase_sample_frame(veejay_t * info, long num);
 static int vj_perform_sample_complete_buffers(veejay_t * info, int *h);
 static void vj_perform_use_cached_ycbcr_frame(veejay_t *info, int centry, int chain_entry, int width, int height);
-static int vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info, VJFrame **frames, VJFrameInfo *frameinfo, int e, int c, int n_frames );
+static int vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info, VJFrame **frames, VJFrameInfo *frameinfo, int e, int c, int n_frames, void *ptr );
 static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[4], int sample);
 static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4]);
 static int vj_perform_record_commit_single(veejay_t *info);
@@ -1238,7 +1238,7 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
 }
 
 static int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
-	VJFrame **frames, VJFrameInfo *frameinfo, int e , int c, int n_frame)
+	VJFrame **frames, VJFrameInfo *frameinfo, int e , int c, int n_frame, void *ptr)
 {
 	int n_a = vj_effect_get_num_params(e);
 	int entry = e;
@@ -1258,7 +1258,7 @@ static int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
 			return 1;
 	}
 
-	err = vj_effect_apply( frames, frameinfo, todo_info,entry, args );
+	err = vj_effect_apply( frames, frameinfo, todo_info,entry, args, ptr );
 	return err;
 }
 
@@ -2144,7 +2144,7 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
                                 frames[0]->ssm = 0;
                         }
 			vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
-				(int) settings->current_frame_num );
+				(int) settings->current_frame_num, vj_tag_get_plugin(info->uc->sample_id,chain_entry,NULL  ));
 	    } // if
 	} // for
 	return 0;
@@ -2223,10 +2223,17 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 							ssm = 0;
 							}	
 						
-						if(vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num )==-2) {
-							if( vj_effect_activate(fx_id) )  {
+						if(vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num,
+								       sample_get_plugin(id,n,NULL)	)==-2) {
+							int res = 0;
+							void *pfx = vj_effect_activate( fx_id, &res );
+							if( res )  {
 								settings->fxrow[n] = fx_id;
-								vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num );
+								if( pfx ) {
+									sample_get_plugin(id,n,pfx);
+								}
+									
+								vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num,pfx );
 							}
 
 						}
@@ -2262,10 +2269,16 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 
 							// logic to super/sub sample
 						}
-						if(vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num ) == -2 ) {
-							if( vj_effect_activate(fx_id) ) {
+						if(vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num,
+								       vj_tag_get_plugin(id,n,NULL)	) == -2 ) {
+							int res = 0;
+							void *pfx = vj_effect_activate( fx_id, &res);
+							if( res ) {
 								settings->fxrow[n] = fx_id; 
-								vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num );
+								if(pfx) {
+									vj_tag_get_plugin( id,n, pfx );
+								}
+								vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num, pfx );
 							}
 						}
 
@@ -2387,7 +2400,7 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 			}
 		
 			vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
-				(int) settings->current_frame_num );
+				(int) settings->current_frame_num, sample_get_plugin(info->uc->sample_id,chain_entry,NULL) );
 
 	    	} // if
 	} // status

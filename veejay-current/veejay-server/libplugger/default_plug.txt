@@ -1,0 +1,10 @@
+
+instance		PORTPTR
+handle			VOIDPTR		dlopen
+name			STRING
+num_params		INT
+num_inputs		INT
+info			PORTPTR		filter_templ
+signature		INT		plug_type
+
+

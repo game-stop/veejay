@@ -997,6 +997,7 @@ libvevo/Makefile
 liblzo/Makefile
 libvjmem/Makefile
 libvje/Makefile
+libplugger/Makefile
 libsample/Makefile
 libvjnet/Makefile
 libyuv/Makefile

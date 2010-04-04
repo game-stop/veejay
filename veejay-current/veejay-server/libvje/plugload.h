@@ -21,15 +21,15 @@
 
 #include "vje.h"
 
-void	plug_free(void);
-void	plug_init( int w, int h );
-int	plug_activate( int fx_id );
-void	plug_deactivate( int fx_id );
+void	plug_x_free(void);
+void	plug_x_init( int w, int h );
+int	plug_x_activate( int fx_id );
+void	plug_x_deactivate( int fx_id );
 
-int	plug_detect_plugins(void);
-vj_effect	*plug_get_plugin(int n);
+int	plug_x_detect_plugins(void);
+vj_effect	*plug_x_get_plugin(int n);
 
-void    plug_process( VJFrame *frame,VJFrame *b, int fx_id, int src_fmt );
-void    plug_control( int fx_id, int *args );
+void    plug_x_process( VJFrame *frame,VJFrame *b, int fx_id, int src_fmt );
+void    plug_x_control( int fx_id, int *args );
 
 #endif

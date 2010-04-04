@@ -7,7 +7,7 @@ AM_CFLAGS = $(OP_CFLAGS) -freg-struct-return
 
 pkginclude_HEADERS=vje.h
 
-EXTRA_DIST = internal.h plugload.h vje.h
+EXTRA_DIST = internal.h vje.h
 EXTRA_DIST += effects/autoeq.h effects/crosspixel.h effects/mask.h effects/rawval.h \
 		      effects/average.h effects/cutstop.h effects/maskstop.h effects/reflection.h \
 		      effects/baltantv.h effects/deinterlace.h effects/mirrors2.h effects/revtv.h \
@@ -52,7 +52,7 @@ EXTRA_DIST += ctmf/ctmf.h
 VJE_LIB_FILE = libvje.la
 noinst_LTLIBRARIES = $(VJE_LIB_FILE)
 
-libvje_la_SOURCES =	plugload.c vj-effect.c vj-effman.c effects/common.c \
+libvje_la_SOURCES =	vj-effect.c vj-effman.c effects/common.c \
 			ctmf/ctmf.c \
 			effects/diff.c effects/fibdownscale.c effects/killchroma.c \
 			effects/lumamagick.c effects/autoeq.c effects/colorhis.c \

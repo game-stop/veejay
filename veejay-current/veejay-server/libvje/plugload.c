@@ -318,12 +318,12 @@ static	void* 	deal_with_fr( void *handle, char *name)
 
 	char new_name[512];
 	sprintf(new_name, "Frei0r %s", finfo.name );
-	char *plug_name = strdup( new_name );
+	char *plug_x_name = strdup( new_name );
 	vevo_property_set( port, "n_params", VEVO_ATOM_TYPE_INT, 1, &r_params );
 	vevo_property_set( port, "f0r_p", VEVO_ATOM_TYPE_INT,1, &n_params );
-	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &plug_name );
+	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &plug_x_name );
 	vevo_property_set( port, "mixer", VEVO_ATOM_TYPE_INT,1, &extra );
-	free(plug_name);
+	free(plug_x_name);
 	return port;
 }
 
@@ -733,7 +733,7 @@ static	void	scan_plugins()
 	}
 }
 
-static	void	process_plug_plugin( void *plugin, void *buffer , void *out_buffer)
+static	void	process_plug_x_plugin( void *plugin, void *buffer , void *out_buffer)
 {
 	int type = 0;
 	vevo_property_get( plugin, "type", 0, &type);
@@ -762,7 +762,7 @@ static	void	process_plug_plugin( void *plugin, void *buffer , void *out_buffer)
 
 /* public IF */
 
-void	plug_free(void)
+void	plug_x_free(void)
 {
 	free_plugins();
 
@@ -779,7 +779,7 @@ void	plug_free(void)
 		free( buffer_b_ );
 }
 
-void	plug_init( int w, int h )
+void	plug_x_init( int w, int h )
 {
 	buffer_ = (void*) vj_calloc( w * h * (V_BITS >> 3));
 	buffer2_ = (void*) vj_calloc( w * h * (V_BITS >> 3));
@@ -789,7 +789,7 @@ void	plug_init( int w, int h )
 	base_height_ = h;
 }
 
-int	plug_detect_plugins(void)
+int	plug_x_detect_plugins(void)
 {
 	index_map_ = (vevo_port_t**) vj_calloc(sizeof(vevo_port_t*) * 256 );
 	
@@ -824,7 +824,7 @@ int	plug_detect_plugins(void)
 	return index_;
 }
 
-vj_effect	*plug_get_plugin( int n )
+vj_effect	*plug_x_get_plugin( int n )
 {
 	vj_effect *vje = (vj_effect*) vj_calloc(sizeof(vj_effect));
 	vevo_port_t *port = index_map_[n];
@@ -876,16 +876,16 @@ vj_effect	*plug_get_plugin( int n )
 }
 
 
-int	plug_activate( int fx_id )
+int	plug_x_activate( int fx_id )
 {
 	return	instantiate_plugin( index_map_[fx_id], base_width_, base_height_ );
 }
-void	plug_deactivate( int fx_id )
+void	plug_x_deactivate( int fx_id )
 {
 	deinstantiate_plugin( index_map_[fx_id] );	
 }
 
-void	plug_control( int fx_id, int *args )
+void	plug_x_control( int fx_id, int *args )
 {
 	vevo_port_t *port = index_map_[ fx_id ];
 		
@@ -975,7 +975,7 @@ void	plug_control( int fx_id, int *args )
 	}
 }
 
-void	plug_process( VJFrame *frame,VJFrame *b, int fx_id, int src_fmt )
+void	plug_x_process( VJFrame *frame,VJFrame *b, int fx_id, int src_fmt )
 {
 	AVPicture p1,p2;
 	AVPicture o1,o2;
@@ -1001,7 +1001,7 @@ void	plug_process( VJFrame *frame,VJFrame *b, int fx_id, int src_fmt )
 	
 	yuv_fx_context_process( convert_yuv, frame,dst1 );
 
-	process_plug_plugin( plugin, buffer_, buffer2_ );
+	process_plug_x_plugin( plugin, buffer_, buffer2_ );
 
 	yuv_fx_context_process( convert_rgb, dst1, frame );
 
