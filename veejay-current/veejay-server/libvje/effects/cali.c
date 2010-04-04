@@ -134,7 +134,7 @@ void cali_apply(void *ed, VJFrame *frame, int w, int h,int mode, int full)
 		c->mean[2] <= 0.0 ) {
 		if( flood == 0 ) {
 		veejay_msg(VEEJAY_MSG_ERROR,
-			"Please select a calibration source.");
+			"Please select a calibration source (use source/channel list)");
 		}
 		flood = (flood + 1) % 25;
 		return;
