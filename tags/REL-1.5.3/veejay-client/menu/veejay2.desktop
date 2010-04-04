@@ -1,0 +1,10 @@
+[Desktop Entry]
+Encoding=UTF-8
+Version=1.0
+Name=Veejay (720x576 without audio)
+Comment=Start new Veejay project, 720x576 without audio
+Exec=veejay -v -W720 -H576 -a0 -d
+Terminal=true
+Type=Application
+Icon=veejay-icon.png
+Categories=AudioVideoEditing;AudioVideo;
