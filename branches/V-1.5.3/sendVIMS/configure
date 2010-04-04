@@ -1,0 +1,49 @@
+#!/usr/bin/env perl
+
+# set sefaults for all options
+$var{prefix} = "/usr/local/";
+$var{debug}  = "no";
+
+if ($ENV{CC}) {$var{CC} = $ENV{CC};} else {$var{CC} = "cc";}
+
+# print valid options
+sub print_options {
+    foreach $key (keys %var){
+	print "\t--$key=$var{$key}\n";
+    }
+}
+sub do_help { 
+    print "\navailable options with defaults: \n";
+    print_options; 
+    print "\n--enable|disable-<thing> is equivalent to --<thing>=yes|no\n";
+    exit(0); 
+}
+
+# override with command line args
+while ($a = shift) {
+    if ($a eq "--help") { do_help; }
+    elsif ($a =~ m/^--enable-(.+)/) { $var{$1} = "yes"; }
+    elsif ($a =~ m/^--disable-(.+)/) { $var{$1} = "no"; }
+    elsif ($a =~ m/^--(.+?)=(.+)/)  { $var{$1} = $2; }
+    else  {print "invalid argument ".$a."\n"; do_help;}
+}
+
+
+print "generating Makefile.defs\n";
+open CONFIG, ">Makefile.defs";
+sub config {print CONFIG shift; print CONFIG "\n";}
+
+
+config "CC = $var{CC}" ;
+config "PREFIX = $var{prefix}" ;
+
+if ($var{debug} eq "yes"){
+    config "DEBUG_CFLAGS = -g -Wall -Werror -W -Wstrict-prototypes -Wno-unused -Wno-parentheses -Wno-switch -g";
+}
+else {
+    config "OPTI_CFLAGS = -O3 -fomit-frame-pointer -ffast-math -funroll-loops";
+}
+
+
+
+close CONFIG;

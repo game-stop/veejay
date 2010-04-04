@@ -1,0 +1,23 @@
+
+
+To build the package from source yourself:
+
+
+# 1 # get the required software
+	sudo devscripts apt-get install libgtk2.0-dev autotools-dev libx11-dev libxml2-dev libxinerama-dev libswscale-dev libsdl1.2-dev libavformat-dev libjack-dev libavcodec-dev libglib2.0-dev libquicktime-dev libmjpegtools-dev libjpeg62-dev libfreetype6-dev libdv4-dev libavutil-dev
+
+
+# 2 # build a .deb package 
+	dpkg-buildpackage -rfakeroot -us -uc -b
+
+# 3 # install
+	dpkg -i veejay-1.5.x.deb
+
+
+To install the binary version:
+
+# 1   dpkg -i veejay-1.5.x.deb
+
+(meet package dependency requirements)
+# apt-cache search <package name>
+# apt-get install <package name>

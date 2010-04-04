@@ -1,0 +1,47 @@
+
+#2010: untested against 1.6.0
+
+
+sendVIMS - very simple VeeJay client for pure data
+ 	     (C) 2002-2004 Niels Elburg <elburg@hio.hen.nl>
+	     (C) 2004 Tom Schouten <doelie@zzz.kotnet.org>
+
+This is free software covered under the terms of the
+GNU GPL. See the file COPYING for details.
+
+requirements:
+	veejay-1.4.3
+	or latest veejay from SVN (http://veejay.dyne.org)
+
+pre build (optional):
+	copy the vims.h file from veejay-current/veejay/vims.h
+	from veejay's SVN repository
+	The vims.h is taken from veejay 0.8.1
+
+	perl parse-vims.pl vims.h
+
+building:
+
+
+./configure && make && make install
+
+
+'make install' copies these files to your pd directory:
+
+<prefix>/lib/pd/extra/sendVIMS.pd_linux
+<prefix>/lib/pd/doc/5.reference/help-sendVIMS.pd
+
+the default <prefix> is /usr/local/pd
+
+
+
+running:
+
+if the module is in your pd path it will be loaded automaticly.
+
+
+the status line always has 13 status bytes, depending on the 
+the playback mode some may or may not be used (-). 
+0 = off, 1 = on
+
+

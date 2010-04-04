@@ -1,0 +1,4 @@
+0.1	 initial release by Tom
+0.1.1	 fixed status outlets 
+0.1.2	 fixed selector range (0-600) to match veejay > 0.8
+0.1.4	 update veejay >= 0.9.8
