@@ -299,6 +299,67 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 	return 1;
 }
 
+int	net_thread_get_frame_rgb( vj_tag *tag, uint8_t *buffer, int w, int h )
+{
+	threaded_t *t = (threaded_t*) tag->priv;
+	vj_client *v = t->remote;
+	const uint8_t *buf = tag->socket_frame;
+	
+	lock(t);
+	if( t->state == 0 || t->error  )
+	{
+		if(t->repeat < 0)
+			veejay_msg(VEEJAY_MSG_INFO, "Connection closed with remote host");
+		t->repeat++;
+		unlock(t);
+		return 0;
+	}
+
+	//@ color space convert frame	
+	int len = v->cur_width * v->cur_height;
+	int uv_len = len;
+	switch(v->cur_fmt)
+	{
+		case FMT_420:
+		case FMT_420F:
+			uv_len=len/4;
+		break;
+		default:
+			uv_len=len/2;
+		break;
+	}
+
+	if(t->have_frame )
+	{
+		int b_len = v->in_width * v->in_height;
+		int buvlen = b_len;
+		switch(v->in_fmt)
+		{
+			case FMT_420:
+			case FMT_420F:
+				buvlen = b_len/4;
+				break;
+			default:
+				buvlen = b_len/2;
+				break;
+		}
+
+		int tmp_fmt = get_ffmpeg_pixfmt( v->in_fmt );
+ 
+		VJFrame *a = yuv_yuv_template( tag->socket_frame, tag->socket_frame + b_len, tag->socket_frame+b_len+buvlen,
+						v->in_width,v->in_height, tmp_fmt);
+		VJFrame *b = yuv_rgb_template( buffer,w,h,PIX_FMT_RGB24);
+		yuv_convert_any_ac(a,b, a->format,b->format );
+		free(a);
+		free(b);
+	}	
+	t->grab = 1;
+	
+	unlock(t);
+	return 1;
+}
+
+
 int	net_thread_start(vj_client *v, vj_tag *tag)
 {
 	int success = 0;
