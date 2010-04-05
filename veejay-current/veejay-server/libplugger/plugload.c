@@ -43,7 +43,8 @@
 #include <libplugger/ldefs.h>
 #include <libplugger/specs/livido.h>
 #include <libyuv/yuvconv.h>
-#include <ffmpeg/avcodec.h>
+
+#include <libavutil/avutil.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -53,8 +54,6 @@
 #include <libplugger/freeframe-loader.h>
 #include <libplugger/frei0r-loader.h>
 #include <libplugger/livido-loader.h>
-#include <ffmpeg/avcodec.h>
-#include <ffmpeg/avutil.h>
 
 static	vevo_port_t **index_map_ = NULL;
 static  vevo_port_t *illegal_plugins_ =NULL;

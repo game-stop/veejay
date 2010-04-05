@@ -28,6 +28,8 @@
 #include <libvjnet/vj-client.h>
 #include <veejay/vims.h>
 #include <libyuv/yuvconv.h>
+
+#include <libavutil/avutil.h>
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>
 #include <libstream/vj-net.h>

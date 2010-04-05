@@ -988,6 +988,7 @@ dnl Output a Makefile or two and the lib/header descriptor script
 dnl
 AC_CONFIG_FILES([
 Makefile
+default.apspec
 mjpegtools/Makefile
 aclib/Makefile
 libOSC/Makefile

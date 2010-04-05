@@ -42,7 +42,7 @@
 #include <libplugger/specs/livido.h>
 #include <libplugger/portdef.h>
 #include <libyuv/yuvconv.h>
-#include <ffmpeg/avcodec.h>
+#include <libavutil/avutil.h>
 #include <stdlib.h>
 //#include <veejay/oscservit.h>
 #include <libplugger/utility.h>

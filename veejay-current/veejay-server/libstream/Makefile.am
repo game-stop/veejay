@@ -11,6 +11,6 @@ INCLUDES = 	-I$(top_srcdir) -I$(includedir) -I$(top_srcdir)/vjmem \
 STREAM_LIB_FILE = libstream.la
 noinst_LTLIBRARIES = $(STREAM_LIB_FILE)
 libstream_la_SOURCES =	frequencies.c v4lutils.c v4lvideo.c vj-unicap.c vj-yuv4mpeg.c vj-net.c vj-dv1394.c vj-vloopback.c vj-tag.c 
-pkginclude_HEADERS = vj-net.h vj-client.h
+pkginclude_HEADERS = vj-net.h 
 EXTRA_DIST = dv1394.h v4lutils.h vj-dv1394.h vj-tag.h vj-vloopback.h \
                      frequencies.h v4lvideo.h vj-net.h vj-unicap.h vj-yuv4mpeg.h

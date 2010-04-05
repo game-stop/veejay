@@ -32,7 +32,7 @@
 #include <libplugger/ldefs.h>
 #include <libplugger/specs/livido.h>
 #include <libyuv/yuvconv.h>
-#include <ffmpeg/avcodec.h>
+#include <libavcodec/avcodec.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>

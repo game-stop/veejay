@@ -31,8 +31,8 @@
 #include <libplugger/defs.h>
 #include <libplugger/ldefs.h>
 #include <libyuv/yuvconv.h>
+#include <libavutil/avutil.h>
 #include <libplugger/portdef.h>
-#include <ffmpeg/avcodec.h>
 #define LINUX 1 
 #include <libplugger/specs/FreeFrame.h>
 #define V_BITS 24
