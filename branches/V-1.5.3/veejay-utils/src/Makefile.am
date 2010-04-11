@@ -1,7 +1,7 @@
 MAINTAINERCLEANFILES = Makefile.in
 	
 INCLUDES = 	-I$(top_srcdir) \
-		-I$(includedir) $(MJPEGTOOLS_CFLAGS)  $(VEEJAY_CFLAGS) $(GLIB_CFLAGS)
+		-I$(includedir)  $(VEEJAY_CFLAGS) $(GLIB_CFLAGS)
 
 sayVIMS_SOURCES = sayVIMS.c
 sayVIMS_LDFLAGS = $(LAV_ALL_LIB_OPTS)
