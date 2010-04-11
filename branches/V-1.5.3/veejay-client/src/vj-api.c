@@ -2001,6 +2001,8 @@ void	gveejay_popup_err( const char *type, char *msg )
 void	reportbug();
 void	update_gui();
 
+void	reset_cali_images( int type, char *wid_name );
+
 #include "callback.c"
 enum
 {
