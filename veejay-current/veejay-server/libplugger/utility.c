@@ -32,7 +32,7 @@
 #include <libplugger/ldefs.h>
 #include <libplugger/specs/livido.h>
 #include <libyuv/yuvconv.h>
-#include <libavcodec/avcodec.h>
+#include <libavutil/avutil.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -250,3 +250,70 @@ void		clone_prop_vevo2( void *port, void *to_port, const char *key, const char *
 }
 
 
+static	char	make_valid_char_( const char c )
+{
+	const char *invalid = " #*,?[]{}";
+	int k = 0;
+	char o = '_';
+	char r = c;
+	for( k = 0; k < 8 ; k ++ )
+	{
+		if ( c == invalid[k] || isspace((unsigned char)c))
+			return o;
+		char l = tolower(c);
+		if(l)
+			r = l;
+	}
+	return r;
+}
+
+char	*veejay_valid_osc_name( const char *in )
+{
+	int n = strlen( in );
+	int k;
+	char *res = strdup( in );
+	for( k = 0; k < n ; k ++ )
+	{
+		res[k] = make_valid_char_( in[k] );
+	}
+	return res;
+}
+
+VJFrame	*vjf_clone_frame( VJFrame *v ) {
+//@ FIXME: embed color/sampling conversion
+	VJFrame *f = (VJFrame*) vj_calloc(sizeof(VJFrame));
+	veejay_memcpy( f, v,sizeof(VJFrame));
+	f->data[0] = (uint8_t*) vj_malloc(sizeof(uint8_t)*v->width*v->height*4);
+	f->data[1] = (uint8_t*) f->data[0] + (v->width*v->height);
+	f->data[2] = (uint8_t*) f->data[1] + (v->width*v->height);
+	f->data[3] = (uint8_t*) f->data[2] + (v->width*v->height);
+	veejay_memcpy( f->data[0], v->data[0], v->len );
+	veejay_memcpy( f->data[1], v->data[1], v->uv_len );
+	veejay_memcpy( f->data[2], v->data[2], v->uv_len );
+
+	return f;
+}
+
+void	vjf_dump_frame( VJFrame *v ) {
+
+	if( v == NULL ) {
+		veejay_msg(0, "VJFrame <invalid>");
+	} else {
+		veejay_msg(VEEJAY_MSG_DEBUG,"Frame %p: ",v);
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tWidth=%d Height=%d FPS=%2.2f TC=%2.2g",
+				v->width,v->height,v->fps,v->timecode );
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tUV   =%dx%d V=%d,H=%d",
+				v->uv_width,v->uv_height,v->shift_v,v->shift_h );
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tSSM  =%d Alpha=%d Format=%d Len=%d, UV len=%d, stand=%d",
+				v->ssm, v->alpha, v->format, v->len,v->uv_len, v->stand );
+		veejay_msg(VEEJAY_MSG_DEBUG,"\tData planes = %p,%p,%p", v->data[0],v->data[1],v->data[2]);
+	}
+
+}
+
+char 	*vevo_create_key(char *prefix, int val )
+{
+	char tmp[128];
+	snprintf(tmp,sizeof(tmp),"%s_%d",prefix,val);
+	return strdup(tmp);
+}

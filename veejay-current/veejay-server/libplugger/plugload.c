@@ -43,7 +43,6 @@
 #include <libplugger/ldefs.h>
 #include <libplugger/specs/livido.h>
 #include <libyuv/yuvconv.h>
-
 #include <libavutil/avutil.h>
 #include <stdlib.h>
 #include <sys/types.h>
@@ -67,6 +66,10 @@ static  int	n_ff_ = 0;
 static	int	n_fr_ = 0;
 static  int	n_lvd_ = 0;
 static	int	base_fmt_ = -1;
+static	char	make_valid_char_( const char c );
+static char	*veejay_valid_osc_name( const char *in );
+
+static void	plug_print_all();
 
 static	int	select_f( const struct dirent *d )
 {
@@ -191,10 +194,11 @@ static	void	add_to_plugin_list( const char *path )
 			continue;
 		}
 
-	//	veejay_msg(0, "\tOpened plugin '%s' in '%s'", name,path );
 		
 		if(dlsym( handle, "plugMain" ))
 		{
+			veejay_msg(VEEJAY_MSG_INFO, "%d\tOpened FreeFrame plugin '%s' in '%s'",index_,name,path );
+
 			void *plugin = deal_with_ff( handle, name );
 			if( plugin )
 			{
@@ -205,7 +209,10 @@ static	void	add_to_plugin_list( const char *path )
 			else
 				dlclose( handle );	
 		} else if(dlsym( handle, "f0r_construct" )) {
-			void *plugin = deal_with_fr( handle, name );
+
+			veejay_msg(VEEJAY_MSG_INFO, "%d\tSkip Frei0r plugin '%s' in '%s'",index_,name,path );
+//@FIXME: Fix frei0r loading
+			void *plugin = NULL; // deal_with_fr( handle, name );
 			if( plugin )
 			{
 				index_map_[ index_ ] = plugin;	
@@ -215,6 +222,9 @@ static	void	add_to_plugin_list( const char *path )
 			else
 				dlclose( handle );
 		} else if(dlsym( handle, "livido_setup" )) {
+
+			veejay_msg(VEEJAY_MSG_INFO, "%d\tOpened LiViDO plugin '%s' in '%s'",index_,name,path );
+
 			void *plugin = deal_with_livido( handle , name );
 			if( plugin )
 			{
@@ -587,7 +597,9 @@ char	*plug_describe( int fx_id )
 	error = vevo_property_get( plug, "num_out_params",0,&po );
 	error = vevo_property_get( plug, "num_outputs",0,&co );
 	error = vevo_property_get( plug, "instance", 0,&instance );
-	
+#ifdef STRICT_CHECKING
+	assert( error == VEVO_NO_ERROR);
+#endif	
 	error = vevo_property_get( instance, "filters",0,&filter );
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
@@ -620,6 +632,8 @@ char	*plug_describe( int fx_id )
 		{
 			sprintf(key, "q%02d",i);
 			out_params[i] = flatten_port( plug , key );
+			if(out_params[i] == NULL )
+				continue;
 			len += strlen(out_params[i])+1;
 		}
 	}
@@ -638,21 +652,6 @@ char	*plug_describe( int fx_id )
 	sprintf( res,
 			"name=%s:description=%s:author=%s:maintainer=%s:license=%s:version=%s:outs=%d:ins=%d",
 				name,description,author,maintainer,license,version,co,ci );
-
-	char *p = res + strlen(res);
-	
-	for( i = 0; i < pi ; i ++ )
-	{
-		sprintf(p, "p%02d=[%s]:", i, in_params[i] );
-		p += strlen(in_params[i]) + 7;
-		free(in_params[i]);
-	}
-	for( i = 0; i < po ; i ++ )
-	{
-		sprintf(p, "q%02d=[%s]:", i, out_params[i] );
-		p += strlen( out_params[i] ) + 7;
-		free(out_params[i]);
-	}
 
 	free(in_params);
 	free(out_params);
@@ -714,7 +713,7 @@ void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_
 }
 
 
-void	plug_print_all()
+static void	plug_print_all()
 {
 	int n;
 	for(n = 0; n < index_ ; n ++ )
@@ -723,6 +722,8 @@ void	plug_print_all()
 		if(fx_name)
 		{
 			veejay_msg(VEEJAY_MSG_INFO, "\t'FX %s loaded", fx_name ); 
+			char *txt = plug_describe(n);
+			printf("%s\n",txt);
 			free(fx_name);
 		}
 	}
@@ -845,6 +846,8 @@ void	plug_push_frame( void *instance, int out, int seq_num, void *frame_info )
 #ifdef STRICT_CHECKING
 	assert( error == 0 );
 #endif
+	veejay_msg(0,"%s: %s Channel %d",
+			__FUNCTION__, (out ? "Output" : "Input" ), seq_num);
 	(*gpu)( instance, (out ? "out_channels" : "in_channels" ), seq_num, frame );
 }
 
@@ -947,4 +950,125 @@ vj_effect *plug_get_plugin( int fx_id ) {
 		vje->param_description = param_descr;
 	}
 	return vje;
+}
+
+
+static	char	make_valid_char_( const char c )
+{
+	const char *invalid = " #*,?[]{}";
+	int k = 0;
+	char o = '_';
+	char r = c;
+	for( k = 0; k < 8 ; k ++ )
+	{
+		if ( c == invalid[k] || isspace((unsigned char)c))
+			return o;
+		char l = tolower(c);
+		if(l)
+			r = l;
+	}
+	return r;
+}
+
+static char	*veejay_valid_osc_name( const char *in )
+{
+	int n = strlen( in );
+	int k;
+	char *res = strdup( in );
+	for( k = 0; k < n ; k ++ )
+	{
+		res[k] = make_valid_char_( in[k] );
+	}
+	return res;
+}
+
+//@FIXME
+int		plug_fx_activate( void *info, int fx_entry, int fx_id )
+{
+/*	fx_slot_t *slot = (fx_slot_t*) sample_get_fx_port_ptr( info,fx_entry );
+#ifdef STRICT_CHECKING
+        assert(slot!=NULL);
+#endif
+    slot->fx_instance = plug_activate( new_fx );
+        if(!slot->fx_instance)
+        {
+                veejay_msg(0, "Unable to initialize plugin %d", new_fx );
+                return 0;
+        }
+
+        slot->fx_id = new_fx;
+        slot->id    = fx_entry;
+        char tmp[128];
+        sprintf( tmp, "Sample%dFX%d", srd->primary_key, fx_entry );
+        slot->frame = strdup( tmp );
+
+        plug_get_defaults( slot->fx_instance, slot->in_values );
+        plug_set_defaults( slot->fx_instance, slot->in_values );
+
+        int i;
+        int n_channels = vevo_property_num_elements( slot->fx_instance, "in_channels" );
+
+        if( n_channels <= 0)
+        {
+                veejay_msg(0, "Veejay cannot handle generator plugins yet");
+                return 0;
+        }
+        
+        for(i=0; i < n_channels; i ++ )
+                sample_fx_set_in_channel(info,fx_entry,i, sample_get_key_ptr(info));
+
+        int pk = 0;
+        vevo_property_get( srd->info_port, "primary_key", 0, &pk );
+        plug_build_name_space( new_fx, slot->fx_instance, srd->user_data, fx_entry ,pk,
+                        sample_notify_parameter, info );
+*/
+	return 0;
+
+}
+
+static void     sample_osc_print( void *osc_port )
+{
+        char **osc_events = vevo_list_properties ( osc_port );
+        int i;
+        for( i = 0; osc_events[i] != NULL ; i ++ )
+        {
+                void *osc_info = NULL;
+                int error = vevo_property_get( osc_port, osc_events[i], 0, &osc_info );
+#ifdef STRICT_CHECKING
+                assert( error == VEVO_NO_ERROR );
+#endif
+                char *format = get_str_vevo( osc_info, "format" );
+                veejay_msg(VEEJAY_MSG_INFO, "OSC PATH %s",osc_events[i] );
+                char *descr = get_str_vevo( osc_info, "description" );
+                if(descr)
+                {
+                        veejay_msg(VEEJAY_MSG_INFO,"\t%s", descr);              
+                        free(descr);
+                }
+                
+                veejay_msg(VEEJAY_MSG_INFO, "\tFormat=%s", format );
+
+
+                if(format)
+                {
+                        int   n_args = strlen(format);
+                        char  key[10];
+                        int j;
+                        for( j = 0; j < n_args ; j ++ )
+                        {
+                                sprintf(key, "help_%d", j );
+                                char *help_str = get_str_vevo( osc_info, key );
+                                if(help_str)
+                                {
+                                  veejay_msg(VEEJAY_MSG_INFO,"\t\tArgument %d : %s", j, help_str );
+                                  free(help_str);
+                                }
+                        }
+                        free(format);
+                }
+                veejay_msg(VEEJAY_MSG_INFO,"\t");
+                free( osc_events[i]);
+        }
+        free(osc_events);
+
 }
