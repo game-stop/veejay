@@ -52,34 +52,6 @@
 
 #define IS_RGB_PALETTE( p ) ( p < 512 ? 1 : 0 )
 
-static	char	make_valid_char_( const char c )
-{
-	const char *invalid = " #*,?[]{}";
-	int k = 0;
-	char o = '_';
-	char r = c;
-	for( k = 0; k < 8 ; k ++ )
-	{
-		if ( c == invalid[k] || isspace((unsigned char)c))
-			return o;
-		char l = tolower(c);
-		if(l)
-			r = l;
-	}
-	return r;
-}
-
-char	*veejay_valid_osc_name( const char *in )
-{
-	int n = strlen( in );
-	int k;
-	char *res = strdup( in );
-	for( k = 0; k < n ; k ++ )
-	{
-		res[k] = make_valid_char_( in[k] );
-	}
-	return res;
-}
 
 static	int	pref_palette_ = 0;
 static	int	pref_palette_ffmpeg_ = 0;
@@ -149,6 +121,9 @@ static	int	configure_channel( void *instance, const char *name, int channel_id, 
 	void *channel = NULL;
 	int error = 0;
 	void *pd[4];
+#ifdef STRICT_CHECKING
+	vjf_dump_frame( frame );
+#endif
 
 	error = vevo_property_get( instance, name, channel_id, &channel );
 #ifdef STRICT_CHECKING
@@ -165,15 +140,40 @@ static	int	configure_channel( void *instance, const char *name, int channel_id, 
 #ifdef STRICT_CHECKING
 	assert( error == LIVIDO_NO_ERROR );
 #endif
+	int flags	=	0;
+	error	=	vevo_property_get( channel, "flags",0,&flags );
+
+	pd[0] = (void*) frame->data[0];
+	pd[1] = (void*) frame->data[1];
+	pd[2] = (void*) frame->data[2];
+	pd[3] = (void*) frame->data[3];
+
+	if( flags & LIVIDO_FILTER_CAN_DO_INPLACE ) {
+		if( name[0] =='o' ){ //@ set output_channels to inplace
+			pd[0] = NULL; pd[1] = NULL; pd[2] = NULL; pd[3] = NULL;
+		}
+	} else {
+		if(name[0] == 'i') {
+			VJFrame *tmp = vjf_clone_frame(frame);
+			pd[0] = (void*) tmp->data[0];
+			pd[1] = (void*) tmp->data[1];
+			pd[2] = (void*) tmp->data[2];
+			pd[3] = (void*) tmp->data[3];
+			vjf_dump_frame(tmp);
+			char *stkey = vevo_create_key( "HOST_inplace", channel_id);
+			error = vevo_property_set( channel, stkey, LIVIDO_ATOM_TYPE_VOIDPTR,1,&tmp );
+#ifdef STRICT_CHECKING
+			assert( error == LIVIDO_NO_ERROR );
+#endif
+			free(stkey);
+			//@ FIXME: clean data
+		}
+	}
 
 	error = vevo_property_set( channel  , "timecode", LIVIDO_ATOM_TYPE_DOUBLE,1, &(frame->timecode));
 #ifdef STRICT_CHECKING
 	assert( error == LIVIDO_NO_ERROR );
 #endif
-	pd[0] = (void*) frame->data[0];
-	pd[1] = (void*) frame->data[1];
-	pd[2] = (void*) frame->data[2];
-	pd[3] = (void*) frame->data[3];
 
 	error = vevo_property_set( channel, "pixel_data",LIVIDO_ATOM_TYPE_VOIDPTR, 4, &pd);	
 #ifdef STRICT_CHECKING
@@ -191,6 +191,8 @@ static	int	configure_channel( void *instance, const char *name, int channel_id, 
 		chroma_supersample( hsampling, sampler, pd, frame->width,
 				frame->height );
 	}
+
+//@ FIXME: must allocate buffer to copy frame 0 to temporary and use temporary frame as input.
 	
 	return 1;
 }
@@ -716,13 +718,10 @@ static	int	init_channel_port(livido_port_t *ptr, livido_port_t *in_channel, int 
 	}	
 
 	error = vevo_property_get( ptr, "flags", 0, &flags );
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
+	
 	livido_property_set( in_channel, "width",  LIVIDO_ATOM_TYPE_INT,1,&w );
 	livido_property_set( in_channel, "height", LIVIDO_ATOM_TYPE_INT,1,&h );
 	livido_property_set( in_channel, "flags",  LIVIDO_ATOM_TYPE_INT,1,&flags );
-
 
 	error = vevo_property_get( in_channel, "current_palette",0,NULL );
 	if( error != LIVIDO_NO_ERROR )
@@ -1020,34 +1019,18 @@ void	*livido_plug_init(void *plugin,int w, int h )
 			"out_channel_templates", "out_channels",
 			w,h, 0 );
 	
-	if( num_out_channels < 0 )
-	{
-		veejay_msg(0, "Require at least 1 output channel");
-		return  NULL;
-	}
 	int num_in_params = init_ports_from_template( 
 			filter_instance, filter_templ,
 			LIVIDO_PORT_TYPE_PARAMETER,
 			"in_parameter_templates", "in_parameters",
 			w,h, 0 );
 
-	if( num_in_params < 0 )
-	{
-		veejay_msg(0, "Require at least 0 input parameter");
-		return NULL;
-	}
 	int num_out_params = init_ports_from_template(
 				filter_instance, filter_templ,
 				LIVIDO_PORT_TYPE_PARAMETER,
 				"out_parameter_templates", "out_parameters",
 				w,h,0 );
 
-	if( num_out_params < 0 )
-	{
-		veejay_msg(0, "Require at least 0 output parameters (%d)",
-				num_out_params);
-		return NULL;
-	}
 #ifdef STRICT_CHECKING
 	assert( num_in_params >= 0 );
 	assert( num_out_params >= 0 );
@@ -1110,6 +1093,33 @@ void	livido_push_channel( void *instance,const char *key, int n, VJFrame *frame 
 	configure_channel( instance, key, n, frame );
 }
 
+static	void	livido_cleanup_channels( void *instance, char *name ) {
+	int np = vevo_property_num_elements( instance, "in_channels" );
+	if( np <= 0 )
+		return;
+	int n = 0;
+	int error = 0;
+	for( n = 0; n < np ; n ++ )
+	{
+		void *port = NULL;
+		error = vevo_property_get( instance, name,n, &port );
+		if( error != LIVIDO_NO_ERROR ) {
+			veejay_msg(0, "__FATAL__ %s",__FUNCTION__ );
+		}
+		
+		VJFrame *tmp = NULL;
+		char *stkey = vevo_create_key( "HOST_inplace", n );
+		error = vevo_property_get( port, stkey, 0, &tmp );
+		free(stkey);
+		if( error == LIVIDO_NO_ERROR ) {
+			veejay_msg(0, "Clean %s:%d",name,n);
+			free(tmp->data[0]);
+			free(tmp);
+		}
+	}
+}
+
+//@FIXME: color space / sampling
 void	livido_plug_process( void *instance, double time_code )
 {
 	void *filter_templ = NULL;
@@ -1154,6 +1164,10 @@ void	livido_plug_process( void *instance, double time_code )
 		
 		chroma_subsample( hsampling,sampler,pd,w,h );
 	}
+
+	livido_cleanup_channels( instance, "in_channels" );
+	livido_cleanup_channels( instance, "out_channels" );
+
 }
 
 void	livido_plug_deinit( void *instance )
@@ -1519,6 +1533,9 @@ void*	deal_with_livido( void *handle, const char *name )
 	int is_mix = 0;
 	int n_inputs = livido_property_num_elements( filter_templ, "in_channel_templates" );
 
+
+	int n_outputs = livido_property_num_elements( filter_templ, "out_channel_templates");
+
 	//@ Now, prefix the name with LVD
 	plugin_name =  get_str_vevo( filter_templ, "name" );
 
@@ -1534,6 +1551,7 @@ void*	deal_with_livido( void *handle, const char *name )
 	vevo_property_set( port, "num_out_params", VEVO_ATOM_TYPE_INT,1,&n_oparams );
 	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &clone_name );
 	vevo_property_set( port, "num_inputs", VEVO_ATOM_TYPE_INT,1, &n_inputs);
+	vevo_property_set( port, "num_outputs",VEVO_ATOM_TYPE_INT,1, &n_outputs);
 	vevo_property_set( port, "info", LIVIDO_ATOM_TYPE_PORTPTR,1,&filter_templ );
 	vevo_property_set( port, "HOST_plugin_type", VEVO_ATOM_TYPE_INT,1,&livido_signature_);
 
@@ -1556,3 +1574,6 @@ void	livido_set_pref_palette( int pref_palette )
 void	livido_exit( void )
 {
 }
+
+
+
