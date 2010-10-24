@@ -1,9 +1,0 @@
-#ifndef PLUGLOCALDEF
-#define PLUGLOCALDEF
-#define	HOST_PARAM_NUMBER	1
-#define HOST_PARAM_INDEX	2
-#define	HOST_PARAM_SWITCH	6
-#define HOST_PARAM_COORD	3
-#define HOST_PARAM_COLOR	4	
-#define	HOST_PARAM_TEXT		5
-#endif

@@ -1,5 +1,0 @@
-LIBVEVO_2_2_0
-{
-	global:	vevo_*;
-	local: *;
-};
