@@ -7,4 +7,3 @@ pkginclude_HEADERS = libvevo.h lowlevel.h pool.h vevo.h
 noinst_LTLIBRARIES = $(VEVO_LIB_FILE)
 
 libvevo_la_SOURCES = pool.c vevo.c
-

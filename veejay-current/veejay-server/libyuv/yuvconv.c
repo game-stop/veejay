@@ -275,6 +275,58 @@ void	yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
 	put( PIX_FMT_GRAY8,   IMG_Y8 );
 }
 
+void	yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 )
+{
+
+	switch(src->format) {
+		case PIX_FMT_YUV420P:
+		case PIX_FMT_YUVJ420P:
+			*p1 = src->len;
+			*p2 = src->len / 4;
+			*p3 = src->len / 4;
+			*p4 = 0;
+			break;
+		case PIX_FMT_YUV422P:
+		case PIX_FMT_YUVJ422P:
+		case PIX_FMT_YUVJ444P:
+		case PIX_FMT_YUV444P:
+			
+			if(p1 != NULL) {
+				*p1 = src->len;
+			}
+			if(p2 != NULL) {
+				*p2 = src->uv_len;
+			}
+			if(p3 != NULL) {
+				*p3 = src->uv_len;
+			}
+
+			if(p4 != NULL) {
+				*p4 = 0;
+			}
+			
+			break;
+		default:	
+			if(p1 != NULL) {
+				*p1 = src->len;
+			}
+			if(p2 != NULL) {
+				*p2 = 0;
+			}
+			if(p3 != NULL) {
+				*p3 = 0;
+			}
+
+			if(p4 != NULL) {
+				*p4 = 0;
+			}
+
+			break;
+	}
+	return 0;
+}
+
+
 VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int fmt )
 {
 	VJFrame *f = (VJFrame*) vj_calloc(sizeof(VJFrame));

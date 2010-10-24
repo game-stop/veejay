@@ -824,7 +824,7 @@ void	on_spin_samplespeed_value_changed(GtkWidget *widget, gpointer user_data)
 		gint value = (gint) gtk_spin_button_get_value( GTK_SPIN_BUTTON(widget) );
 		value *= info->play_direction;
 		multi_vims( VIMS_SAMPLE_SET_SPEED, "%d %d",0, value );
-		vj_midi_learning_vims_spin( info->midi, "samplespeed", VIMS_SAMPLE_SET_SPEED );
+		vj_midi_learning_vims_complex( info->midi, "spin_samplespeed", VIMS_SAMPLE_SET_SPEED,0,2 );
 		vj_msg(VEEJAY_MSG_INFO, "Change video playback speed to %d",
 			value );
 	}

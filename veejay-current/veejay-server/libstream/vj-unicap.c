@@ -53,6 +53,7 @@ typedef struct
 	pthread_attr_t	attr;
 	uint8_t		*priv_buf;
 	int		state;
+	int		errors;
 	int	 deviceID;
 	int	 sizes[3];
 	int	active;
@@ -1433,9 +1434,16 @@ static void	*unicap_reader_thread(void *data)
 			if(vj_unicap_grab_a_frame( data )==0)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Unable to grab a frame from capture device %d", v->deviceID);
-				v->state = 0;
+				v->errors = (v->errors + 1) % 5;
+				if( v->errors == 4 ) {
+					veejay_msg(VEEJAY_MSG_ERROR, "Stopping capture device.");
+					v->state = 0;
+				} else {
+					unicap_delay(5000);
+				}
+			} else {
+				v->errors = 0;
 			}
-		//	unicap_delay( s );
 		}
 	}
 

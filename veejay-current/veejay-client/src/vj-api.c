@@ -6393,8 +6393,8 @@ void	vj_gui_free()
 	}
 	info = NULL;
 
-	vevo_port_free( fx_list_ );
-	vevo_port_free( bankport_ );
+	vpf( fx_list_ );
+	vpf( bankport_ );
 }
 
 void	vj_gui_style_setup()

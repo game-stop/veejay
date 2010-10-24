@@ -320,15 +320,15 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
     int start,end,looptype,speed;
     int ret_val = 1;
 
-    if(num == 0 ) return 1;
-
     if(sample_get_short_info(info->uc->sample_id,&start,&end,&looptype,&speed)!=0) return -1;
 
     settings->current_playback_speed = speed;
 
     int cur_sfd = sample_get_framedups( info->uc->sample_id );
     int max_sfd = sample_get_framedup( info->uc->sample_id );
-	cur_sfd ++;
+	
+	if( num )
+		cur_sfd ++;
 
 	if( max_sfd > 0 ) {
 		if( cur_sfd >= max_sfd )
@@ -342,13 +342,16 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 	}
 	settings->current_frame_num += num;
 
+	if( num == 0 )
+		return 1;
+
     if (speed >= 0) {		/* forward play */
 
 	if(looptype==3)
 	{
 		int range = end - start;
-		int num   = start + ((int) ( (double)range * rand()/(RAND_MAX)));
-		settings->current_frame_num = num;
+		int n2   = start + ((int) ( (double)range * rand()/(RAND_MAX)));
+		settings->current_frame_num = n2;
 	}
 
 	if (settings->current_frame_num > end || settings->current_frame_num < start) {
@@ -390,11 +393,11 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 	    }
 	}
     } else {			/* reverse play */
-	if( looptype == 3 )
+	if( looptype == 3)
 	{
 		int range = end - start;
-		int num   = end - ((int) ( (double)range*rand()/(RAND_MAX)));
-		settings->current_frame_num = num;
+		int n2   = end - ((int) ( (double)range*rand()/(RAND_MAX)));
+		settings->current_frame_num = n2;
 	}
 
 	if (settings->current_frame_num < start || settings->current_frame_num >= end ) {
@@ -1346,14 +1349,13 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,
 	/* offset + start >= end */
 	if(sample_b[3] >= 0) /* sub sample plays forward */
 	{
-		if( settings->current_playback_speed != 0)
-	   		offset += sample_b[3]; /* speed */
+	   	offset += sample_b[3]; /* speed */
 
 		if( sample_b[2] == 3 )
 			offset = sample_b[0] + ( (int) ( (double) len_b * rand()/RAND_MAX) );
 	
 		/* offset reached sample end */
-    		if(  offset > len_b )
+    	if(  offset > len_b )
 		{
 			if(sample_b[2] == 2) /* sample is in pingpong loop */
 			{
@@ -1381,8 +1383,7 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,
 	}
 	else
 	{	/* sub sample plays reverse */
-		if(settings->current_playback_speed != 0)
-	    		offset += sample_b[3]; /* speed */
+	    offset += sample_b[3]; /* speed */
 
 		if( sample_b[2] == 3 )
 			offset = sample_b[0] + ( (int) ( (double) len_b * rand()/RAND_MAX));

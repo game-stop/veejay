@@ -1178,7 +1178,7 @@ int vj_tag_del(int id)
   
 	  for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
 	  {
-		vevo_port_free( tag->effect_chain[i]->kf );
+		vpf( tag->effect_chain[i]->kf );
 	  }
     tag_node = hash_lookup(TagHash, (void *) tag->id);
     if(tag_node)
@@ -1907,7 +1907,7 @@ int	vj_tag_chain_reset_kf( int s1, int entry )
    if (!tag) return -1;
    tag->effect_chain[entry]->kf_status = 0;
    if(tag->effect_chain[entry]->kf)
-     vevo_port_free( tag->effect_chain[entry]->kf);
+     vpf( tag->effect_chain[entry]->kf);
    tag->effect_chain[entry]->kf = vpn( VEVO_ANONYMOUS_PORT );
    return 1;	
 }
@@ -2560,7 +2560,7 @@ int vj_tag_chain_remove(int t1, int index)
 		vj_effect_deactivate( tag->effect_chain[index]->effect_id, tag->effect_chain[index]->fx_instance );
 
 	if( tag->effect_chain[index]->kf )
-		vevo_port_free(tag->effect_chain[index]->kf );
+		vpf(tag->effect_chain[index]->kf );
 	tag->effect_chain[index]->kf = vpn(VEVO_ANONYMOUS_PORT);
     }
 
@@ -4061,7 +4061,7 @@ void tagCreateStream(xmlNodePtr node, vj_tag *tag, void *font, void *vp)
 	if(tag->extra )
 	{
 		sprintf(buffer, "%s", (char*)tag->extra );
-		xmlNewChild(node, NULL,(const xmlChar) "extra_data", (const xmlChar*) buffer );
+		xmlNewChild(node, NULL,(const xmlChar*) "extra_data", (const xmlChar*) buffer );
 	}
 	sprintf(buffer, "%d", tag->color_r );
 	xmlNewChild(node,NULL,(const xmlChar*) "red", (const xmlChar*) buffer );

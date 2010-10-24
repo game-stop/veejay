@@ -32,7 +32,6 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <config.h>
 #include <stdint.h>
-
 typedef void vevo_port_t;
 
 #ifndef FALSE
@@ -42,11 +41,6 @@ typedef void vevo_port_t;
 #define TRUE 1
 #endif
 
-#ifdef STRICT_CHECKING
-#define vpn(type) vevo_port_new( type, __FUNCTION__ , __LINE__ )
-#else
-#define vpn(type) vevo_port_new( type )
-#endif
 
 int	vevo_property_num_elements( vevo_port_t *p, const char *key);
 
@@ -55,17 +49,26 @@ int 	vevo_property_atom_type( vevo_port_t *p, const char *key);
 size_t vevo_property_element_size( vevo_port_t * p, const char *key, const int idx);
 
 #ifdef STRICT_CHECKING
-vevo_port_t *vevo_port_new( int port_type, const char *func, int line_no );
+vevo_port_t *vevo_port_new( int port_type, const char *func,const int line_no );
+void		 vevo_port_free( vevo_port_t *port, const char *func, const int line_no );
 #else
 vevo_port_t *vevo_port_new(int port_type);
+void		 vevo_port_free( vevo_port_t *port );
 #endif
+
+#ifdef STRICT_CHECKING
+#define vpn(type) vevo_port_new( type, __FUNCTION__ , __LINE__ )
+#define vpf( port ) vevo_port_free( port, __FUNCTION__, __LINE__ )
+#else
+#define vpn(type) vevo_port_new( type )
+#define vpf( port ) vevo_port_free( port )
+#endif
+
 int 	vevo_property_soft_reference(vevo_port_t * p, const char *key);
 
 void	vevo_strict_init();
 
 int	vevo_port_verify( vevo_port_t *port );
-
-void	vevo_port_free( vevo_port_t *port );
 
 int	vevo_property_set(vevo_port_t * p, const char *key, int atom_type, int num_elements, void *src);
 
@@ -77,8 +80,6 @@ char 	**vevo_list_properties(vevo_port_t * p);
 
 void	vevo_port_recursive_free(vevo_port_t *p );
 
-void	vevo_port_dump( vevo_port_t *p );
-
 char	*vevo_format_kind( vevo_port_t *port, const char *key );
 
 char	*vevo_format_property( vevo_port_t *port, const char *key );
@@ -87,9 +88,9 @@ void	vevo_report_stats();
 
 int	vevo_property_del(vevo_port_t * p,   const char *key );
 
-char	**vevo_port_deepen_namespace( void *port, char *path);
+//char	**vevo_port_deepen_namespace( void *port, char *path);
 
-char	**vevo_port_recurse_namespace( vevo_port_t *port, const char *base );
+void *vevo_port_recurse_namespace( vevo_port_t *port, const char *base );
 
 void	*vevo_port_register( vevo_port_t *in, vevo_port_t *ref );
 
@@ -109,12 +110,35 @@ char	*vevo_sprintf_property_value( vevo_port_t *port, const char *key);
 
 char            *vevo_property_get_string( void *port, const char *key );
 
+char            *vevo_property_get_utf8string( void *port, const char *key );
+
 void		vevo_strict_init();
 
+int     vevo_property_call(vevo_port_t * p, const char *key, void *ctx, int32_t type, int32_t value );
+
+int		vevo_property_call_get( vevo_port_t *p, const char *key, void *ctx );
+
+int		vevo_property_clone( void *port, void *to_port, const char *key, const char *as_key );
+
+int	vevo_property_protect( vevo_port_t *p, const char *key  );
+
+void	vevo_port_dump( void *p, int lvl );
+
+int
+vevo_property_set_f(vevo_port_t * p,
+		    const char *key,
+		    int atom_type, int num_elements, void (*set_func)() , int (*get_func)() );
+
+
+
+int		vevo_port_get_total_size( vevo_port_t *port );
+
+#define VEVO_ATOM_TYPE_FUNCPTR	11
 #define	VEVO_ATOM_TYPE_VOIDPTR	65
 #define VEVO_ATOM_TYPE_INT	1
 #define VEVO_ATOM_TYPE_DOUBLE	2
 #define VEVO_ATOM_TYPE_STRING	4
+#define VEVO_ATOM_TYPE_UTF8STRING 8
 #define VEVO_ATOM_TYPE_BOOL	3
 #define VEVO_ATOM_TYPE_PORTPTR	66
 #define VEVO_ATOM_TYPE_HIDDEN   50

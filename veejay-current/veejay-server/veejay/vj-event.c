@@ -619,7 +619,7 @@ static	void	reset_macro_(void)
 				strokes, current_macro_ );
 		free(items);
 	}
-	vevo_port_free(macro_port_);
+	vpf(macro_port_);
 	macro_bank_[ current_macro_ ] = NULL;
 	macro_port_ = NULL;
 }

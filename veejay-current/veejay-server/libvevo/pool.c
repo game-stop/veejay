@@ -1,34 +1,4 @@
 /*
-Copyright (c) 2004-2005 N.Elburg <nwelburg@gmail.com>
-
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the distribution.
-3. The name of the author may not be used to endorse or promote products
-   derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
-IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
-INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
-THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
-
- /** \defgroup mem_pool Efficient Object Caching
- *
- * 	To reduce the overhead of malloc/free when allocating and freeing many small objects
  *	I keep a linked list of Spaces. Each Space holds a continuous
  *	memory area that is of size ROUNDS_PER_MAG * sizeof(type). This area is divided
  *	into ROUND_PER_MAG chunks. The malloc() replacement pops a round from the stack,
@@ -72,6 +42,9 @@ typedef struct
 {
 	space_t **spaces;	/*!<  array of spaces */
 	space_t *space;		/*!<  single space */
+#ifdef STRICT_CHECKING
+	int	msize;
+#endif
 } pool_t;
 
 //!Allocate a new space of a fixed size
@@ -88,8 +61,8 @@ static space_t	*alloc_space( size_t bs )
 #ifdef STRICT_CHECKING
 	assert( s != NULL );
 #endif
-	s->area = vj_malloc(bs * ROUNDS_PER_MAG);
-	s->mag  = vj_malloc( sizeof(void*) * (ROUNDS_PER_MAG + 1) );
+	s->area = vj_calloc(bs * ROUNDS_PER_MAG);
+	s->mag  = vj_calloc( sizeof(void*) * (ROUNDS_PER_MAG + 1) );
 	p = s->area;
 	for( k = 0; k <= ROUNDS_PER_MAG  ;k ++ )
 	{
@@ -99,6 +72,16 @@ static space_t	*alloc_space( size_t bs )
 	s->rounds = ROUNDS_PER_MAG;
 	s->next = NULL;
 	return s;
+}
+
+int	vevo_pool_size( void *p )
+{
+#ifdef STRICT_CHECKING
+	pool_t *pool = (pool_t*) p;
+	return pool->msize;
+#else
+	return 0;
+#endif
 }
 
 //! Allocate a new pool with spaces of various fixed sizes
@@ -127,6 +110,19 @@ void	*vevo_pool_init(size_t prop_size,size_t stor_size, size_t atom_size, size_t
 	p->spaces[Matom] = alloc_space( atom_size );
 	p->spaces[Midx]  = alloc_space( index_size );
 	p->spaces[Mend] = NULL;
+#ifdef STRICT_CHECKING
+
+	p->msize = sizeof(space_t*) * Msize;
+	p->msize += sizeof(int32_t);
+	p->msize += sizeof(double);
+	p->msize += sizeof(void*);
+	p->msize += sizeof(uint64_t);
+	p->msize += prop_size;
+	p->msize += stor_size;
+	p->msize += atom_size;
+	p->msize += index_size;
+	p->msize += sizeof(pool_t);
+#endif
 	return (void*)p;
 }
 
@@ -140,6 +136,10 @@ void	*vevo_pool_slice_init( size_t node_size )
 	pool_t *p = (pool_t*) malloc(sizeof(pool_t));
 	p->spaces = NULL;
 	p->space = alloc_space( node_size );
+#ifdef STRICT_CHECKING
+	p->msize += node_size;
+	p->msize += sizeof(pool_t);
+#endif
 	return p;	
 }
 
@@ -218,6 +218,7 @@ void	vevo_pool_destroy( void *p )
 	}
 	free( nS );
 	free( pool );
+	p = NULL;
 }
 
 //! Destroy a pool and the space it holds. Frees all used memory
@@ -239,6 +240,7 @@ void	vevo_pool_slice_destroy( void *p )
 	}	
 	free( pool->space );
 	free( pool );
+	p = NULL;
 }
 
 //! Get a pointer to the starting address of an unused block. Pops a round from the magazine and creates a new space if magazine is empty. 

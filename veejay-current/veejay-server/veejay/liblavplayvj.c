@@ -2020,6 +2020,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 			driver = 0;
 	}
 
+
 	if (vj_tag_init(el->video_width, el->video_height, info->pixel_format,driver) != 0) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing Stream Manager");
 		return -1;

@@ -63,6 +63,8 @@ void yuv422_to_yuyv( uint8_t *yuv422[3], uint8_t *dst, int w, int h );
 // scene detection
 int luminance_mean(uint8_t * frame[], int w, int h);
 
+void yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 );
+
 /* software scaler from ffmpeg project: */
 
 typedef struct

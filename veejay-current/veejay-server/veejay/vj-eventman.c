@@ -374,7 +374,7 @@ void		vj_event_vevo_free(void)
 		return;
 
 	for( i = 0 ; i < MAX_INDEX  ; i ++ )
-	  if( index_map_[i] ) vevo_port_free( index_map_[i] );
+	  if( index_map_[i] ) vpf( index_map_[i] );
 	
 	free(index_map_);
 }

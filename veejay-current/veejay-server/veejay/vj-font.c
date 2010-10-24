@@ -1456,7 +1456,7 @@ void	vj_font_dictionary_destroy( void *font, void *dict )
 {
 	char **items = vevo_list_properties(dict );
 	if(!items) {
-		vevo_port_free(dict);
+		vpf(dict);
 		return;
 	}
 
@@ -1474,7 +1474,7 @@ void	vj_font_dictionary_destroy( void *font, void *dict )
 		free(items[i]);
 	}
 	free(items);
-	vevo_port_free( dict );
+	vpf( dict );
 }
 
 

@@ -218,7 +218,7 @@ void vj_osc_free(void *d)
 		free(addr);
 	//if(c->osc_args) free(c->osc_args);
 	if(c->leaves) free(c->leaves);
-	if(c->index) vevo_port_free(c->index);
+	if(c->index) (c->index);
 	if(c) free(c);
 	
 	c = NULL;
@@ -298,21 +298,21 @@ static	void	osc_add_client(void *context, int arglen, const void *vargs, OSCTime
 
 	if(vevo_property_set( osc_clients[free_id], "lo", VEVO_ATOM_TYPE_VOIDPTR,1, &t ) != VEVO_NO_ERROR ) {
 		veejay_msg(0, "Unable to add lo_address to vevo port.");
-		vevo_port_free( osc_clients[free_id] );
+		( osc_clients[free_id] );
 		osc_clients[free_id] = NULL;
 		return;
 	}
 
 	if(vevo_property_set( osc_clients[free_id], "cmd", VEVO_ATOM_TYPE_STRING, 1, &cmd ) != VEVO_NO_ERROR ) {
 		veejay_msg(0, "Unable to store command '%s'", cmd );
-		vevo_port_free(osc_clients[free_id]);
+		(osc_clients[free_id]);
 		osc_clients[free_id]=NULL;
 		return;
 	}
 
 	if( vevo_property_set( osc_clients[free_id], "connection", VEVO_ATOM_TYPE_STRING,1,&nptr ) != VEVO_NO_ERROR ) {
 		veejay_msg(0, "Unable to store connection string.");
-		vevo_port_free(osc_clients[free_id]);
+		(osc_clients[free_id]);
 		osc_clients[free_id] = NULL;
 		return;
 	}
@@ -426,7 +426,7 @@ static	void	osc_iterate_clients()
 
 			int res = osc_client_status_send( clnt, cmd );
 			if( res == 0 ) {
-				vevo_port_free( port );
+				( port );
 				osc_clients[i] = NULL;
 				veejay_msg(VEEJAY_MSG_WARNING,"Failed to send %s",cmd);
 			} 

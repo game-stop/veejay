@@ -24,8 +24,8 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
-
 #ifndef POOLM
+#include <config.h>
 #define POOLM
 #define	ROUNDS_PER_MAG	16	
 
@@ -38,6 +38,10 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define Mprop	6
 #define M64b	7
 #define Mend    8
+
+#ifdef STRICT_CHECKING
+int	vevo_pool_size(void *pool);
+#endif
 
 void	*vevo_pool_alloc( void *pool, size_t bs, unsigned int k );
 void	vevo_pool_free( void *pool, void *ptr, unsigned int k );

@@ -663,7 +663,9 @@ static int	__v4lvideo_init( v4lvideo_t *v, char *file, int channel, int norm, in
 void	v4lvideo_set_paused(void *vv, int pause) 
 {
 	v4lvideo_template_t *v = (v4lvideo_template_t*) vv;
+	lock_(v);
 	v->pause = pause;
+	unlock_(v);
 }
 
 int	v4lvideo_is_paused(void *vv )
@@ -759,6 +761,7 @@ static	void	*v4lvideo_grabber_thread( void * vv )
 	pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
 	v4lvideo_template_t *i = (v4lvideo_template_t*) vv;
 	v4lvideo_t *v = (v4lvideo_t*) vj_calloc(sizeof(v4lvideo_t));
+	lock_(i);
 	i->v4l = (void*) v;
 	
 	if( __v4lvideo_init( v, i->filename, i->channel, i->norm,i->frequency, i->width, i->height, i->palette ) < 0 ) {
@@ -769,13 +772,16 @@ static	void	*v4lvideo_grabber_thread( void * vv )
 		veejay_msg(0,"%s: Giving up, unable to open %s, channel %d, norm %x, %dx%d palette %x",
 			__FUNCTION__, i->filename  , i->channel, i->norm, i->width, i->height, i->palette );
 #endif
+		unlock_(i);
 		pthread_exit(NULL);
 		return NULL;
 	}
 
+	unlock_(i);
+
 	veejay_msg(VEEJAY_MSG_INFO, "Capture device looks ready to go!");
 	v4lprint( &(v->vd));
-
+	
 /*	if( __v4lvideo_grabstart( v ) != 0 ) {
 		veejay_msg(0, "Unable to start grabbing from device '%s'", i->filename);
 		pthread_exit(NULL);
@@ -808,6 +814,7 @@ PAUSED:
 				veejay_msg(VEEJAY_MSG_DEBUG, "Trying to start capturing.");
 				__v4lvideo_grabstart(v);
 				unlock_(i);
+				usleep( 20000 );
 				goto RESTART;
 			}
 		}
@@ -816,9 +823,11 @@ PAUSED:
 		if(v->grabbing) {
 			flag = v4lvideo_syncframe(v);
 
+			lock_(i);
 			if(flag==0) {
 				__v4lvideo_copy_framebuffer_to( v,i, dstY, dstU, dstV );
 			}
+			unlock_(i);
 
 			if(flag == -1) {
 				if( retry == 0 ) {
@@ -935,11 +944,12 @@ int	v4lvideo_grabframe( void *vv )
 int	v4lvideo_copy_framebuffer_to( void *vv, uint8_t *dstY, uint8_t *dstU, uint8_t *dstV )
 {
 	v4lvideo_template_t *v = (v4lvideo_template_t*) vv;
+	lock_(v);
 	if(!v->status) {	
+		unlock_(v);
 		return -1;
 	}
 	
-	lock_(v);
 	if(!v->v4l ) {
 		unlock_(v);
 		return 0;
@@ -991,11 +1001,11 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 		if(!v1->scaler) 
 			v1->scaler = 
 				yuv_init_swscaler( srcf,dstf,&(v1->sws_templ), yuv_sws_get_cpu_flags());
-		lock_(v2);
+		//lock_(v2);
 			yuv_convert_and_scale( v1->scaler, srcf, dstf );
 				v1->has_video = 1;
 
-		unlock_(v2);
+		//unlock_(v2);
 
 	} else if ( v1->native == 2 ) {
 		src = v4lgetaddress(&(v1->vd));
@@ -1021,11 +1031,11 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 		srcf->data[0] = tmp[0];
 		srcf->data[1] = tmp[1];
 		srcf->data[2] = tmp[2];
-		lock_(v2);
+	//	lock_(v2);
 			yuv_convert_and_scale( v1->scaler, srcf, dstf );
 				v1->has_video = 1;
 
-		unlock_(v2);
+	//	unlock_(v2);
 	} else {
 		VJFrame *srcf = v1->info->src;
 		VJFrame *dstf = v1->info->dst;
@@ -1049,11 +1059,11 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 				v1->scaler = 
 					yuv_init_swscaler( srcf,dstf,&(v1->sws_templ), yuv_sws_get_cpu_flags());
 			
-			lock_(v2);
+			//lock_(v2);
 			yuv_convert_and_scale_from_rgb( v1->scaler, srcf, dstf );
 			v1->has_video = 1;
 
-			unlock_(v2);
+			//unlock_(v2);
 	//	}	
 	}
 //	v1->has_video = 1;

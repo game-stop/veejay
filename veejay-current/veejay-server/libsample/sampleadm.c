@@ -576,18 +576,15 @@ int sample_get_short_info(int sample_id, int *start, int *end, int *loop, int *s
 	   *start = si->marker_start;
 	   *end = si->marker_end;
 	} 
-        else {
+    else {
 	   *start = si->first_frame;
 	   *end = si->last_frame;
 	}
-        *speed = si->speed;
-        *loop = si->looptype;
+    *speed = si->speed;
+    *loop = si->looptype;
 	return 0;
     }
-    *start = 0;
-    *end = 0;
-    *loop = 0;
-    *speed = 0;
+    
     return -1;
 }
 
@@ -893,7 +890,7 @@ int sample_del(int sample_id)
 	    for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
 	    {
 		if( si->effect_chain[i]->kf )
-			vevo_port_free( si->effect_chain[i]->kf );
+			vpf( si->effect_chain[i]->kf );
 	    }
 	//@  *sample_eff_chain -> &addr[0]
 	    if( si->effect_chain[0] )
@@ -1896,7 +1893,7 @@ int	sample_chain_reset_kf( int s1, int entry )
         if(!sample) return 0;
 	sample->effect_chain[entry]->kf_status = 0;
 	if(sample->effect_chain[entry]->kf)
-	  vevo_port_free(sample->effect_chain[entry]->kf );
+	  vpf(sample->effect_chain[entry]->kf );
 	sample->effect_chain[entry]->kf = vpn(VEVO_ANONYMOUS_PORT );
 	return 1;
 }
@@ -2136,7 +2133,7 @@ int sample_chain_clear(int s1)
 	sample->effect_chain[i]->volume = 0;
 	sample->effect_chain[i]->a_flag = 0;
 	if( sample->effect_chain[i]->kf )	
-		vevo_port_free( sample->effect_chain[i]->kf );
+		vpf( sample->effect_chain[i]->kf );
 	sample->effect_chain[i]->kf = vpn(VEVO_ANONYMOUS_PORT);
 	int src_type = sample->effect_chain[i]->source_type;
 	int id       = sample->effect_chain[i]->channel;
@@ -2239,7 +2236,7 @@ int sample_chain_remove(int s1, int position)
     sample->effect_chain[position]->a_flag = 0;
 
 	if( sample->effect_chain[position]->kf )
-		vevo_port_free( sample->effect_chain[position]->kf );
+		vpf( sample->effect_chain[position]->kf );
 	sample->effect_chain[position]->kf = vpn( VEVO_ANONYMOUS_PORT );
 
  	int src_type = sample->effect_chain[position]->source_type;
