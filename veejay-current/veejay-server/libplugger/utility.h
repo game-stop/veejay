@@ -25,7 +25,4 @@ double  *get_dbl_arr_vevo( void *port, const char *key );
 void    clone_prop_vevo( void *port, void *to_port, const char *key, const char *as_key );
 void    util_convertrgba32( uint8_t **data, int w, int h,int in_pix_fmt,int shiftv, void *out_buffer );
 void    util_convertsrc( void *indata, int w, int h, int out_pix_fmt, uint8_t **data);
-char	*veejay_valid_osc_name( const char *in );
-void	vjf_dump_frame( VJFrame *v );
-VJFrame	*vjf_clone_frame( VJFrame *v );
 #endif

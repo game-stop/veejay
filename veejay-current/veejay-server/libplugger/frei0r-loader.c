@@ -122,7 +122,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	if( f0r_init == NULL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"\tBorked frei0r plugin '%s': %s", name, dlerror());
-		vevo_port_free( port );
+		vpf( port );
 		return NULL;
 	}
 
@@ -130,7 +130,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	if( f0r_deinit == NULL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"\tBorked frei0r plugin '%s': %s", name, dlerror());
-		vevo_port_free( port );
+		vpf( port );
 		return NULL;
 	}
 
@@ -138,7 +138,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	if( f0r_info == NULL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"\tBorked frei0r plugin '%s': %s", name, dlerror());
-		vevo_port_free( port );
+		vpf( port );
 		return NULL;
 	}
 
@@ -146,7 +146,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	if( f0r_param == NULL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"\tBorked frei0r plugin '%s': %s", name, dlerror());
-		vevo_port_free( port );
+		vpf( port );
 		return NULL;
 	}
 //@ gamble
@@ -178,7 +178,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	if( (*f0r_init)() == 0)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"\tBorked frei0r plugin '%s': ", name);
-		vevo_port_free( port );
+		vpf( port );
 		return NULL;
 	}
 
@@ -187,7 +187,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	if( finfo.frei0r_version != FREI0R_MAJOR_VERSION )
 	{
 		(*f0r_deinit)();	
-		vevo_port_free(port);
+		vpf(port);
 		return NULL;	
 	}
 	int extra = 0;

@@ -75,7 +75,7 @@ void*	deal_with_ff( void *handle, char *name )
 	if( q == NULL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"\tBad FreeFrame plugin '%s': %s", name, dlerror());
-		vevo_port_free( port );
+		vpf( port );
 		return NULL;
 	}
 
@@ -84,7 +84,7 @@ void*	deal_with_ff( void *handle, char *name )
 	if ((q(FF_GETPLUGINCAPS, (LPVOID)FF_CAP_V_BITS_VIDEO, 0)).ivalue != FF_TRUE)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "FreeFrame plugin '%s' cannot handle 32 bit",name);
-		vevo_port_free(port);
+		vpf(port);
 		return NULL;
 	}
 
@@ -92,7 +92,7 @@ void*	deal_with_ff( void *handle, char *name )
 	if (pis->APIMajorVersion < 1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cowardly refusing FreeFrame API version < 1.0 (%s)",name );
-		vevo_port_free(port);
+		vpf(port);
 		return NULL;
 	}
 
@@ -100,7 +100,7 @@ void*	deal_with_ff( void *handle, char *name )
 	if ( (q(FF_INITIALISE, NULL, 0 )).ivalue == FF_FAIL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Plugin '%s' unable to initialize", name);
-		vevo_port_free(port);	
+		vpf(port);	
 		if(plugin_name) free(plugin_name);
 		return NULL;
 	}
@@ -109,7 +109,7 @@ void*	deal_with_ff( void *handle, char *name )
 	if( n_params == FF_FAIL )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot get number of parameters for plugin %s",name);
-		vevo_port_free(port);
+		vpf(port);
 		if(plugin_name) free(plugin_name);
 		return NULL;
 	}
