@@ -5641,7 +5641,8 @@ GdkPixbuf	*vj_gdk_pixbuf_scale_simple( GdkPixbuf *src, int dw, int dh, GdkInterp
 void		gveejay_sleep( void *u )
 {
 	struct timespec nsecsleep;
-	nsecsleep.tv_nsec = 1000000 * 4;
+//	nsecsleep.tv_nsec = 1000000 * 4; //@ too long
+	nsecsleep.tv_nsec = 500000; 
 	nsecsleep.tv_sec = 0;	
 	nanosleep( &nsecsleep, NULL ); 	
 }

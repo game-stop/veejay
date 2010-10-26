@@ -5900,9 +5900,12 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 			{
 			   sample_set_chain_channel(args[0],args[1], c);
 			   sample_set_chain_source (args[0],args[1],src);
-
-				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source (%s %d)", 
-					src == VJ_TAG_TYPE_NONE ? "sample" : "stream",c);
+			   int sample_offset = sample_get_offset(args[0],args[1]);
+			   int sample_speed = 0;
+			   if( src == VJ_TAG_TYPE_NONE )
+				   sample_speed = sample_get_speed(c);
+				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source (%s %d) at speed %d position %d", 
+					src == VJ_TAG_TYPE_NONE ? "sample" : "stream",c,sample_speed,sample_offset);
 	//			if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 				if(v->no_bezerk)
 				{
@@ -5958,8 +5961,13 @@ void vj_event_chain_entry_source(void *ptr, const char format[], va_list ap)
 			{
 			   vj_tag_set_chain_channel(args[0],args[1], c);
 			   vj_tag_set_chain_source (args[0],args[1],src);
-				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source (%s %d)", 
-					src==VJ_TAG_TYPE_NONE ? "sample" : "stream",c);
+			   int sample_offset = vj_tag_get_offset(args[0],args[1]);
+			   int sample_speed = 0;
+			   if( src == VJ_TAG_TYPE_NONE )
+				   sample_speed = sample_get_speed(c);
+
+				veejay_msg(VEEJAY_MSG_INFO, "Mixing with source (%s %d) at speed %d position %d", 
+					src==VJ_TAG_TYPE_NONE ? "sample" : "stream",c,sample_speed, sample_offset);
 	//		if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
 
 			}	
@@ -8179,10 +8187,16 @@ void vj_event_print_sample_info(veejay_t *v, int id)
 	    		if (vj_effect_get_extra_frame(y) == 1)
 			{
 				int source = sample_get_chain_source(id, i);
-						 
-				veejay_msg(VEEJAY_MSG_PRINT, "I:\t\t\t Mixing with %s %d\n",(source == VJ_TAG_TYPE_NONE ? "sample" : "stream"),
-			    		sample_get_chain_channel(id,i)
-					);
+				int sample_offset = sample_get_offset(id,i);
+				int c = sample_get_chain_channel(id,i);
+			   int sample_speed = 0;
+			   if( source == VJ_TAG_TYPE_NONE )
+				   sample_speed = sample_get_speed(c);
+	 
+				veejay_msg(VEEJAY_MSG_PRINT, "I:\t\t\t Mixing with %s %d at speed %d, position %d\n",(source == VJ_TAG_TYPE_NONE ? "sample" : "stream"),
+			    		c,
+						sample_speed,
+						sample_offset );
 	    		}
 		}
     	}

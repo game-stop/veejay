@@ -125,7 +125,7 @@ void	vj_midi_reset( void *vv )
 	}
 	free(items);
 	
-	vevo_port_free(v->vims);
+	vpf(v->vims);
 
 	v->vims = vpn(VEVO_ANONYMOUS_PORT);
 

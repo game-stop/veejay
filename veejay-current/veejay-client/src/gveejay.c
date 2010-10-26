@@ -158,11 +158,12 @@ gboolean	gveejay_idle(gpointer data)
 			if( gveejay_time_to_sync( get_ui_info() ) )
 			{
 				veejay_update_multitrack( get_ui_info() );
-				update_gveejay();
 			}
 		} else {
-			gveejay_sleep( get_ui_info() );
+		//	gveejay_sleep( get_ui_info() );
 		}
+
+		update_gveejay();
 
 	}
 
