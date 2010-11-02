@@ -1,6 +1,22 @@
-expect: 
-	bounce sample 1
-	overlay with sample 2
-	bounce sample 2
-    stop sample 1
-    see bouncing sample 2 through 1
+explain: 
+	create sample 1
+	create sample 2
+	play sample 1
+	play sample 1 in reverse
+	wait 25 frames
+	pause sample 1
+	wait 25 frames
+	start change direction and speed a few times
+	end with speed 1
+	wait 25 frames
+	normal overlay with sample 2
+	play sample 2 in reverse
+	wait 25 frames
+	play sample 2 in normal speed
+	wait 25 frames
+	start change direction and speed
+	end with speed 0
+
+expect after run:
+	sample 1 is paused and sample 2 shines through and plays in speed 2 forward
+

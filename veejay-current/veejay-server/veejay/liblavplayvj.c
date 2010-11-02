@@ -2585,7 +2585,9 @@ static void veejay_playback_cycle(veejay_t * info)
 #ifdef HAVE_SDL
 	    ts= SDL_GetTicks();
 #endif
-	    settings->buffer_entry[frame] = settings->current_frame_num;
+//	    settings->buffer_entry[frame] = settings->current_frame_num;
+
+		settings->buffer_entry[frame] = (settings->buffer_entry[frame] + 1 ) % 2;
 
 	    if (!skipa) 
 			vj_perform_queue_audio_frame(info);
