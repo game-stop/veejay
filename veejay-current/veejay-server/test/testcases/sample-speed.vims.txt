@@ -1,0 +1,6 @@
+expect: 
+	bounce sample 1
+	overlay with sample 2
+	bounce sample 2
+    stop sample 1
+    see bouncing sample 2 through 1
