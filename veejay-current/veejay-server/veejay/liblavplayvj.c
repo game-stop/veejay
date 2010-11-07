@@ -1239,7 +1239,7 @@ static void veejay_mjpeg_software_frame_sync(veejay_t * info,
   	  settings->lastframe_completion;
 
 }
-void veejay_pipe_write_status(veejay_t * info, int link_id)
+void veejay_pipe_write_status(veejay_t * info)
 {
     video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
@@ -1317,22 +1317,7 @@ void veejay_pipe_write_status(veejay_t * info, int link_id)
     }
     
 	d_len = strlen(info->status_what);
-	snprintf(info->status_msg,MESSAGE_SIZE, "V%03dS", d_len );
-
-    	res = vj_server_send(info->vjs[VEEJAY_PORT_STA],link_id, info->status_msg, 5);
-    	if( res <= 0)
-	{ /* close command socket */
-		veejay_msg(VEEJAY_MSG_DEBUG ,"Error sending status message , closing connection(s)");
-		_vj_server_del_client(info->vjs[VEEJAY_PORT_CMD], link_id );
-		_vj_server_del_client(info->vjs[VEEJAY_PORT_STA], link_id );
-	}
-    	res = vj_server_send(info->vjs[VEEJAY_PORT_STA], link_id, info->status_what, d_len );
-    	if( res <= 0)
-	{ /* close command socket */
-		veejay_msg(VEEJAY_MSG_DEBUG ,"Error sending status message , closing connection(s)");
-		_vj_server_del_client(info->vjs[VEEJAY_PORT_CMD], link_id );
-		_vj_server_del_client(info->vjs[VEEJAY_PORT_STA], link_id );
-	}
+	snprintf( info->status_line, 1500, "V%03dS%s", d_len, info->status_what );
 
     if (info->uc->chain_changed == 1)
 		info->uc->chain_changed = 0;
@@ -1501,7 +1486,21 @@ static void veejay_handle_callbacks(veejay_t *info) {
 
 	/*  update network */
 	vj_event_update_remote( (void*)info );
+
+	veejay_pipe_write_status( info );
+
+	/* create status message and write to clients */
+	int status_line_len = strlen( info->status_line );
+	int i;
+	for( i = 0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
+		int res = vj_server_send( info->vjs[VEEJAY_PORT_STA], i, info->status_line, status_line_len);
+		if( res < 0 ) {
+			_vj_server_del_client( info->vjs[VEEJAY_PORT_CMD], i );
+			_vj_server_del_client( info->vjs[VEEJAY_PORT_STA], i );
+		}
+	}
 }
+
 void vj_lock(veejay_t *info)
 {
 	video_playback_setup *settings = info->settings;
@@ -2943,7 +2942,7 @@ veejay_t *veejay_malloc()
     info->uc->sample_start = 0;
     info->uc->sample_end = 0;
     info->net = 1;
-
+	info->status_line = (char*) vj_calloc(sizeof(char) * 1500 );
     for( i =0; i < 8 ; i ++ )
 		info->rlinks[i] = -1;
 

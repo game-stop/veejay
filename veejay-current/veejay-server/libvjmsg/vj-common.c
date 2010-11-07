@@ -33,6 +33,7 @@
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <dlfcn.h>
+#include <time.h>
 #include <sys/wait.h>
 #include <sys/signal.h>
 #include <sys/ucontext.h>
@@ -72,6 +73,8 @@ static int _debug_level = 0;
 static int _color_level = 1;
 static int _no_msg = 0;
 
+static struct timeval _start_time;
+static int _start_time_offset = -1;
 
 #define MAX_LINES 100 
 typedef struct
@@ -85,6 +88,37 @@ static	vj_msg_hist	_message_history;
 static	int		_message_his_status = 0;
 */
 
+ 	
+
+/* Subtract the `struct timeval' values X and Y,
+   storing the result in RESULT.
+   Return 1 if the difference is negative, otherwise 0.  
+   gnu/docs/glibc/libc_428.html
+   */
+
+static int
+timeval_subtract (struct timeval *result, struct timeval *x, struct timeval *y)
+{
+  /* Perform the carry for the later subtraction by updating y. */
+  if (x->tv_usec < y->tv_usec) {
+    int nsec = (y->tv_usec - x->tv_usec) / 1000000 + 1;
+    y->tv_usec -= 1000000 * nsec;
+    y->tv_sec += nsec;
+  }
+  if (x->tv_usec - y->tv_usec > 1000000) {
+    int nsec = (x->tv_usec - y->tv_usec) / 1000000;
+    y->tv_usec += 1000000 * nsec;
+    y->tv_sec -= nsec;
+  }
+
+  /* Compute the time remaining to wait.
+     tv_usec is certainly positive. */
+  result->tv_sec = x->tv_sec - y->tv_sec;
+  result->tv_usec = x->tv_usec - y->tv_usec;
+
+  /* Return 1 if result is negative. */
+  return x->tv_sec < y->tv_sec;
+}
 
 static	void	veejay_addr2line_bt( int n, void *addr, char *sym )
 {
@@ -272,6 +306,8 @@ void veejay_set_debug_level(int level)
 	{
 		_debug_level = 0;
 	}
+
+	gettimeofday( &_start_time, NULL );
 }
 void veejay_set_colors(int l)
 {
@@ -297,13 +333,14 @@ int veejay_is_silent()
 
 void veejay_msg(int type, const char format[], ...)
 {
-    char prefix[64];
-    char buf[256];
+    char prefix[128];
+    char buf[1024];
     va_list args;
     int line = 0;
-
+	struct timeval timenow;
     FILE *out = (_no_msg ? stderr: stdout );
-
+	char tmbuf[64];
+	char timebuf[64];
     if( type != VEEJAY_MSG_ERROR && _no_msg )
 		return;
 
@@ -313,6 +350,22 @@ void veejay_msg(int type, const char format[], ...)
     // parse arguments
     va_start(args, format);
     vsnprintf(buf, sizeof(buf) - 1, format, args);
+
+	gettimeofday( &timenow, NULL );
+
+	timeval_subtract( &timenow, &timenow, &_start_time );
+
+	struct tm *nowtm = localtime(&timenow);
+	if( _start_time_offset == -1 && nowtm->tm_hour > 0 ) {
+		_start_time_offset = nowtm->tm_hour;
+	} else if(_start_time_offset==-1) {
+		_start_time_offset= 0;
+	}
+	nowtm->tm_hour -= _start_time_offset;
+
+	strftime( tmbuf,sizeof(tmbuf), "%H:%M:%S",nowtm );
+	snprintf( timebuf, sizeof(timebuf), "%s.%06d", tmbuf, timenow.tv_usec );
+
  /*
     if(!_message_his_status)
     {
@@ -324,24 +377,24 @@ void veejay_msg(int type, const char format[], ...)
     {
 	  switch (type) {
 	    case 2: //info
-		sprintf(prefix, "%sI: ", TXT_GRE);
+		sprintf(prefix, "%s %s I: ", TXT_GRE,timebuf);
 		break;
 	    case 1: //warning
-		sprintf(prefix, "%sW: ", TXT_YEL);
+		sprintf(prefix, "%s %s W: ", TXT_YEL,timebuf);
 		break;
 	    case 0: // error
-		sprintf(prefix, "%sE: ", TXT_RED);
+		sprintf(prefix, "%s %s E: ", TXT_RED,timebuf);
 		break;
 	    case 3:
 	        line = 1;
 		break;
 	    case 4: // debug
-		sprintf(prefix, "%sD: ", TXT_BLU);
+		sprintf(prefix, "%s %s D: ", TXT_BLU,timebuf);
 		break;
 	 }
 
  	 if(!line)
-	     fprintf(out,"%s %s %s\n", prefix, buf, TXT_END);
+	     fprintf(out,"%s %s %s\n",prefix, buf, TXT_END);
 	     else
 	     fprintf(out,"%s%s%s", TXT_GRE, buf, TXT_END );
 /* 
@@ -358,19 +411,19 @@ void veejay_msg(int type, const char format[], ...)
      {
 	   switch (type) {
 	    case 2: //info
-		sprintf(prefix, "I: ");
+		sprintf(prefix, "%s I: ",timebuf);
 		break;
 	    case 1: //warning
-		sprintf(prefix, "W: ");
+		sprintf(prefix, "%s W: ",timebuf);
 		break;
 	    case 0: // error
-		sprintf(prefix, "E: ");
+		sprintf(prefix, "%s E: ",timebuf);
 		break;
 	    case 3:
 	        line = 1;
 		break;
 	    case 4: // debug
-		sprintf(prefix, "D: ");
+		sprintf(prefix, "%s D: ",timebuf);
 		break;
 	   }
 

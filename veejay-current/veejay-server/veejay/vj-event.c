@@ -158,7 +158,7 @@ static	void	store_macro_( veejay_t *v,char *str, long frame );
 static	void	reset_macro_(void);
 static	void	replay_macro_(void);
 
-extern void	veejay_pipe_write_status(veejay_t *info, int link_id );
+extern void	veejay_pipe_write_status(veejay_t *info);
 extern int	_vj_server_del_client(vj_server * vje, int link_id);
 extern int       vj_event_exists( int id );
 
@@ -1663,15 +1663,18 @@ void vj_event_update_remote(void *ptr)
 	veejay_t *v = (veejay_t*)ptr;
 	int i;
 
-	if( vj_server_poll( v->vjs[VEEJAY_PORT_CMD] ) )
-		vj_server_new_connection( v->vjs[VEEJAY_PORT_CMD] );
-	if( vj_server_poll( v->vjs[VEEJAY_PORT_STA] ) )
-		vj_server_new_connection( v->vjs[VEEJAY_PORT_STA] );
+	int p1 = vj_server_poll( v->vjs[VEEJAY_PORT_CMD] );
+	int p2 = vj_server_poll( v->vjs[VEEJAY_PORT_STA] );
+	int p3 = vj_server_poll( v->vjs[VEEJAY_PORT_DAT] );
 
-	if( vj_server_poll( v->vjs[VEEJAY_PORT_DAT] ) )
-	{
-		vj_server_new_connection( v->vjs[VEEJAY_PORT_DAT] );
-	}
+	int has_n=0;
+
+	has_n += vj_server_new_connection(v->vjs[VEEJAY_PORT_CMD]);
+	has_n += vj_server_new_connection( v->vjs[VEEJAY_PORT_STA] );
+	has_n += vj_server_new_connection( v->vjs[VEEJAY_PORT_DAT] );
+
+	if( has_n )
+		return;
 
 	if( v->settings->use_vims_mcast )
 	{
@@ -1693,30 +1696,27 @@ void vj_event_update_remote(void *ptr)
 	v->settings->is_dat = 0;
 	for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ )
 	{	
-		if( vj_server_link_used( v->vjs[VEEJAY_PORT_CMD], i ) )
+		if( vj_server_link_can_read( v->vjs[VEEJAY_PORT_CMD], i ) )
 		{
-			int res = 1;
-			while( res != 0 )
+			int res = vj_server_update( v->vjs[VEEJAY_PORT_CMD], i );
+			if(res>0)
 			{
-				res = vj_server_update( v->vjs[VEEJAY_PORT_CMD], i );
-				if(res>0)
+				v->uc->current_link = i;
+				int n = 0;
+				int len = 0;
+				char *buf  = NULL;
+				while( (buf= vj_server_retrieve_msg(v->vjs[VEEJAY_PORT_CMD],i,buf, &len))!= NULL )
 				{
-					v->uc->current_link = i;
-					int n = 0;
-					int len = 0;
-					char *buf  = NULL;
-					while( (buf= vj_server_retrieve_msg(v->vjs[VEEJAY_PORT_CMD],i,buf, &len))!= NULL )
-					{
-						vj_event_parse_msg( v, buf,len );
-						n++;
-					}
-				}	
-				if( res == -1 )
-				{
-					_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
-					_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
-					_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
+					vj_event_parse_msg( v, buf,len );
+					n++;
 				}
+			}	
+			if( res == -1 )
+			{
+				_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
+				_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
+				_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
+				
 			}
 		}
 	}
@@ -1724,7 +1724,7 @@ void vj_event_update_remote(void *ptr)
 	v->settings->is_dat = 1;
 	for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ )
 	{	
-		if( vj_server_link_used( v->vjs[VEEJAY_PORT_DAT], i ) )
+		if( vj_server_link_can_read( v->vjs[VEEJAY_PORT_DAT], i ) )
 		{
 			int res = 1;
 			while( res != 0 )
@@ -1768,10 +1768,6 @@ void vj_event_update_remote(void *ptr)
 
 	v->settings->is_dat = 0;
 
-
-	for( i = 0; i <  VJ_MAX_CONNECTIONS; i ++ )
-		if( vj_server_link_used( v->vjs[VEEJAY_PORT_STA], i ))
-			veejay_pipe_write_status( v, i );
 	
 	if(!veejay_keep_messages())
 		veejay_reap_messages();
@@ -4158,6 +4154,41 @@ void vj_event_sample_set_loop_type(void *ptr, const char format[], va_list ap)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist or invalid looptype %d",args[1],args[0]);
 	}
+}
+
+void	vj_event_sample_set_position( void *ptr, const char format[], va_list ap )
+{
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args, s, format, ap);
+
+	if(SAMPLE_PLAYING(v))
+	{
+		if(args[0] == -1)
+			args[0] = sample_size() - 1;
+
+		if( args[0] == 0) 
+			args[0] = v->uc->sample_id;
+
+		int entry = args[1];
+		if( entry == -1 )
+			entry = sample_get_selected_entry(v->uc->sample_id);
+
+		int src = sample_get_chain_source(v->uc->sample_id, entry);
+		int cha = sample_get_chain_channel( v->uc->sample_id, entry );
+
+		if( src == VJ_TAG_TYPE_NONE ) {
+			int pos = sample_get_offset( cha,entry );
+			
+			pos += args[2];
+
+			sample_set_offset( cha,entry, pos );
+
+			veejay_msg(VEEJAY_MSG_INFO, "Changed frame position to %d for sample %d", pos,cha );
+		}
+	}
+
 }
 
 void vj_event_sample_set_speed(void *ptr, const char format[], va_list ap)

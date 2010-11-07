@@ -63,8 +63,8 @@ typedef struct
 	int type;
 } vj_proto;
 
-#define VJ_MAX_PENDING_MSG 64
-#define RECV_SIZE (16384)
+#define VJ_MAX_PENDING_MSG 128
+#define RECV_SIZE (32000) 
 
 int		_vj_server_free_slot(vj_server *vje);
 int		_vj_server_new_client(vj_server *vje, int socket_fd);
@@ -329,7 +329,7 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 	vj_link **Link = (vj_link**) vje->link;
 	
 	if( !Link[link_id]->in_use ) 
-		return -1;
+		return 0;
 
 
 	if( !vj_server_link_can_write( vje,link_id ) ) {
@@ -530,34 +530,28 @@ int vj_server_poll(vj_server * vje)
     	FD_ZERO( &(vje->wds) );
 
 	FD_SET( vje->handle, &(vje->fds) );
-	if(vje->server_type == V_STATUS)
-		FD_SET( vje->handle, &(vje->wds) );
+	FD_SET( vje->handle, &(vje->wds) );
 
 	for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ )
 	{
-		vj_link **Link= (vj_link**) vje->link; 
-		if( Link[i]->in_use )
-		{
-		//	if(vje->server_type == V_CMD )
-		//	{
-				FD_SET( Link[i]->handle, &(vje->fds) );
-				FD_SET( Link[i]->handle, &(vje->wds) );	
-		//	}
-		//	if(vje->server_type == V_STATUS )
-		//		FD_SET( Link[i]->handle, &(vje->wds));
-		}
+		vj_link **Link= (vj_link**) vje->link;
+	        if( Link[i]->handle <= 0 )
+			continue;	
+	//	if( Link[i]->in_use )
+	//	{
+			FD_SET( Link[i]->handle, &(vje->fds) );
+			FD_SET( Link[i]->handle, &(vje->wds) );	
+//			FD_SET( Link[i]->handle, &(vje->eds) );
+	//	} 
 	}		
- 
-	status = select(vje->nr_of_connections + 1, &(vje->fds), &(vje->wds), 0, &t);
+
+	status = select(vje->nr_of_connections + 1, &(vje->fds), &(vje->wds), NULL, &t);
 
 	if( status == -1 ) {
 		veejay_msg(0, "Error while polling socket: %s", strerror(errno));
-		return 0;
-	} else if ( status == 0 ) {
-		return 0;
 	} 
 
-	return 1;
+	return status;
 }
 
 int	_vj_server_empty_queue(vj_server *vje, int link_id)
@@ -574,6 +568,9 @@ int	_vj_server_empty_queue(vj_server *vje, int link_id)
 	}
 	Link[link_id]->n_queued = 0;
 	Link[link_id]->n_retrieved = 0;
+	
+	veejay_memset( vje->recv_buf, 0, RECV_SIZE );
+	
 	return 1;
 }
 
@@ -788,11 +785,11 @@ static  int	_vj_parse_msg(vj_server *vje,int link_id, char *buf, int buf_len, in
 				}
 			}
 	
-			if(num_msg == VJ_MAX_PENDING_MSG )
-				{
-				veejay_msg(VEEJAY_MSG_DEBUG, "VIMS server queue full - max messages per interval is %d",
-					VJ_MAX_PENDING_MSG );	
-				   return num_msg; // cant take more
+			if(num_msg >= (VJ_MAX_PENDING_MSG-1) )
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "VIMS server queue full - got %d/%d messages.",
+					num_msg,VJ_MAX_PENDING_MSG );	
+				return VJ_MAX_PENDING_MSG-1; // cant take more
 			}
 	//		i += slen;
 			i += (slen+1); // try next message
@@ -838,8 +835,9 @@ int	vj_server_new_connection(vj_server *vje)
 		int fd = accept( vje->handle, (struct sockaddr*) &(vje->remote), &addr_len );
 		if(fd == -1)
 		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Error accepting connection");
-			return -1;
+			veejay_msg(VEEJAY_MSG_ERROR, "Error accepting connection: %s",
+						strerror(errno));
+			return 0;
 		}	
 
 		char *host = inet_ntoa( vje->remote.sin_addr ); 
@@ -854,21 +852,19 @@ int	vj_server_new_connection(vj_server *vje)
 			veejay_msg(VEEJAY_MSG_ERROR,
 					"No more connections allowed");
 			close(fd);
-			return -1;
+			return 0;
 		}
-		return n;
+		return 1;
 	}
-	return -1;
+	return 0;
 }
 
+//@ return 0 when work is done
 int	vj_server_update( vj_server *vje, int id )
 {
 	int sock_fd = vje->handle;
 	int n = 0;
 	_vj_server_empty_queue(vje, id);
-
- 	if(!vj_server_poll(vje))
-		return 0;
 
 	if(!vje->use_mcast)
 	{
@@ -876,52 +872,37 @@ int	vj_server_update( vj_server *vje, int id )
 		sock_fd = Link[id]->handle;
 
 		if(!FD_ISSET( sock_fd, &(vje->fds)) )
-			return 0;
+			return 0; //@ nothing to receive, fall through
 	}
 
-	veejay_memset( vje->recv_buf, 0, RECV_SIZE );
-
-	if(!vje->use_mcast)
-	{
-		/*if(vj_server_link_can_read( vje,sock_fd ) == 0 )
-		{
-			veejay_msg(VEEJAY_MSG_DEBUG, "Not ready to receive yet");
-			return 0;
-		}*/
-
-		n = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
-		if( n < 0)
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Network error: %s", strerror(errno));
-			return -1;
-		}
-		if( n == 0 )
-		{
-			veejay_msg(VEEJAY_MSG_INFO ,"Connection closed by remote");
-			return -1;
-		}
+	int bytes_received = 0;
+	if(!vje->use_mcast) {
+		bytes_received = recv( sock_fd, vje->recv_buf, RECV_SIZE, 0 );
 	}
 	else
 	{
 		vj_proto **proto = (vj_proto**) vje->protocol;
-		n = mcast_recv( proto[0]->r, (void*) vje->recv_buf, RECV_SIZE );
-		if( n <= 0 )
-		{
-			return -1;
+		bytes_received = mcast_recv( proto[0]->r, (void*) vje->recv_buf, RECV_SIZE );
+	}
+
+	if( bytes_received <= 0 ) {
+		veejay_msg(0, "Link %d reports ready but no data to read!", sock_fd );
+		if( bytes_received == -1 ) {
+			veejay_msg(0, "%s",strerror(errno));
 		}
+		return -1; // close client now
 	}
 
 
 	char *msg_buf = vje->recv_buf;
-	int bytes_left = n;
+	int bytes_left = bytes_received;
 
 	int n_msg = _vj_verify_msg( vje, id, msg_buf, bytes_left ); 
 
-	if(n_msg == 0 )
+	if(n_msg == 0 && bytes_received > 0)
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Invalid instruction '%s'",
-				msg_buf );
-		return 0;
+		veejay_msg(VEEJAY_MSG_ERROR, "Invalid instruction '%s'", msg_buf );
+		return -1; //@ close client now
 	}
 
 
@@ -934,6 +915,9 @@ int	vj_server_update( vj_server *vje, int id )
 			return 0; 
 		}
 		return nn;
+	} else {
+		veejay_msg(VEEJAY_MSG_ERROR, "Too many messages in queue. Abort client");
+		return -1;
 	}
 	return 0;
 }

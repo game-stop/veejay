@@ -33,6 +33,7 @@ typedef struct vj_server_t {
     void **link;
     fd_set	fds;
     fd_set	wds;
+    fd_set	eds;
     int	 use_mcast;
     int	 server_type;
     int  ports[2];

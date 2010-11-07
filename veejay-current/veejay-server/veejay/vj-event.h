@@ -125,6 +125,7 @@ void 	vj_event_sample_set_descr			(	void *ptr, 	const char format[], 	va_list ap
 void 	vj_event_sample_set_end			(	void *ptr, 	const char format[], 	va_list ap	);
 void	vj_event_sample_set_freeze_play		(	void *ptr, 	const char format[],	va_list ap	);
 void 	vj_event_sample_set_loop_type		(	void *ptr, 	const char format[], 	va_list ap	);
+void 	vj_event_sample_set_position			(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_sample_set_speed			(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_sample_set_nl			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_sample_set_no			(	void *ptr, 	const char format[], 	va_list ap	);

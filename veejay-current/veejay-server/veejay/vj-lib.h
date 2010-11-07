@@ -326,6 +326,7 @@ typedef struct {
 	int bes_height;
 	char *status_what;
 	char *status_msg;
+	char *status_line;
 	char *homedir;
 	void *font;
 	void *osd;

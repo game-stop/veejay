@@ -915,6 +915,22 @@ void		vj_init_vevo_events(void)
 				"Speed (0=pause, > 0  and < (end-start)",
 				1,
 				NULL );
+	
+	index_map_[VIMS_SAMPLE_SET_POSITION]	=	_new_event(
+				"%d %d %d",
+				VIMS_SAMPLE_SET_SPEED,
+				"Change mixing position of sample",
+				vj_event_sample_set_position,
+				3,
+				VIMS_REQUIRE_ALL_PARAMS,
+				SAMPLE_ID_HELP,
+				0,
+				"Chain entry",
+				-1,
+				"Relative position",
+				-1,
+				NULL );
+
 
 	index_map_[VIMS_SAMPLE_SET_DESCRIPTION]	=	_new_event(
 				"%d %s",
