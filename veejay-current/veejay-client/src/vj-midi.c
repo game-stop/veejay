@@ -170,7 +170,6 @@ void	vj_midi_load(void *vv, const char *filename)
 	}
 
 	char *buf = (char*) vj_calloc( 128000 );
-	int done = 0;
 	uint32_t count = 0;
 	if (read( fd, buf, 128000 ) > 0 )
 	{
@@ -212,7 +211,14 @@ void	vj_midi_load(void *vv, const char *filename)
 						free(cur);
 					}
 					int error = vevo_property_set( v->vims, key, 1, VEVO_ATOM_TYPE_VOIDPTR, &d);
-					count ++;
+					if( error == VEVO_NO_ERROR )
+						count ++;
+#ifdef STRICT_CHECKING
+					else {
+						veejay_msg(VEEJAY_MSG_ERROR, "Error loading MIDI event '%s': %d",key, error );
+
+					}
+#endif
 				}
 
 			}
@@ -356,8 +362,19 @@ void	vj_midi_learning_vims_fx( void *vv, int widget, int id, int a, int b, int c
 	vj_midi_learning_vims( vv, wid, message, extra );
 }
 
-static	void	queue_vims_event( vmidi_t *v, int *data )
+static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 {
+	// format vims message and send it now
+	// it would be nice to filter out unique events per frame step
+	
+	// this can be done by keeping a temporary vevo port
+	// and store (instead of send) the VIMS message
+	// including the sample_id and chain_entry_id but
+	// cutting off all other arguments.
+	// then, last SET_SPEED will overwrite any previous ones for this frame step.
+	//
+	// last, send all messages in temporary port out and cleanup
+
 	char key[32];
 
 	if( v->learn )
@@ -378,7 +395,6 @@ static	void	queue_vims_event( vmidi_t *v, int *data )
 		{	//@ argument is dynamic
 			double min = 0.0;
 			double max = 0.0;
-			double tmp = 0.0;
 			double val = 0.0;
 			switch(d->extra)
 			{
@@ -397,23 +413,17 @@ static	void	queue_vims_event( vmidi_t *v, int *data )
 				
 				break;
 			}
-
-#ifdef STRICT_CHECKING
-			veejay_msg(VEEJAY_MSG_DEBUG, "bounds are %g - %g (type=%d)",min,max,d->extra );
-#endif
-
+			
 			if( data[0] == SND_SEQ_EVENT_PITCHBEND )
 			{
-//				val = ((max-min)/16384.0)*data[2] + min; //@ scale min-max to -8192-8192
 				val =  ( (data[2]/16384.0f) * (max-min) );
-
 			}
 			else if( data[0] == SND_SEQ_EVENT_CONTROLLER || data[0] == SND_SEQ_EVENT_KEYPRESS )
 			{
 				val = ((max-min)/127.0) * data[2] + min;
-				veejay_msg(VEEJAY_MSG_INFO, "Keypress/Ctrl: %d val = %g, min=%g,max=%g",data[2],val,min,max);
-			} else {
-				vj_msg(VEEJAY_MSG_INFO, "MIDI: what's this ? %x,%x,%x",data[0],data[1],data[2]);
+			}
+		   	else {
+				vj_msg(VEEJAY_MSG_INFO, "MIDI: what's this %x,%x,%x ?",data[0],data[1],data[2]);
 				return;
 			}
 
@@ -442,77 +452,88 @@ static	void	queue_vims_event( vmidi_t *v, int *data )
 	}
 	else
 	{
-		vj_msg(VEEJAY_MSG_ERROR, "No vims event for MIDI %x:%x,%x found",
-				data[0],data[1],data[2]);
+		vj_msg(VEEJAY_MSG_ERROR, "No vims event for MIDI %x:%x,%x found",data[0],data[1],data[2]);
 	}
 }
 
-static	int		vj_midi_action( vmidi_t *v )
+static	int		vj_dequeue_midi_event( vmidi_t *v )
 {
-	snd_seq_event_t *ev;
+	snd_seq_event_t *ev; //@ dequeue midi events
 	int ret = 0;
-	int data[4] = { 0,0,0,0};
-	snd_seq_event_input( v->sequencer, &ev );
+	int err = 0;
+	while( snd_seq_event_input_pending( v->sequencer, 1 ) > 0 ) {
+		int data[4] = { 0,0,0,0};
 
-	data[0] = -1;	
-	data[1] = -1;
-	data[2] = -1;
+		err = snd_seq_event_input( v->sequencer, &ev );
+		if( err == -ENOSPC || err == -EAGAIN )
+			return ret;
 
-	data[0] = ev->type;
-	switch( ev->type )
-	{
-		/* controller: channel <0-N>, <modwheel 0-127> */
-		case SND_SEQ_EVENT_CONTROLLER:
-			//data[1] = ev->data.control.channel;
-			data[1] = ev->data.control.channel*256+ev->data.control.param; // OB: added chan+param as identifier
-			data[2] = ev->data.control.value;
-			ret=1;
-			veejay_msg(VEEJAY_MSG_DEBUG, "SND_SEQ_EVENT_CONTROLLER: %d %d",data[1],data[2]);
-		break;
-		case SND_SEQ_EVENT_PITCHBEND:
-			data[1] = ev->data.control.channel;
-			data[2] = ev->data.control.value;
-			veejay_msg(VEEJAY_MSG_DEBUG, "SND_SEQ_EVENT_PITCHBEND: %d %d",data[1],data[2]);
-		break;
-		case SND_SEQ_EVENT_NOTEON:
-			data[2] = ev->data.control.channel;
-			data[1] = ev->data.note.note;
-			veejay_msg(VEEJAY_MSG_DEBUG, "SND_SEQ_EVENT_NOTEON: %d %d",data[1],data[2]);
-		break;
-		case SND_SEQ_EVENT_NOTEOFF:
-			data[2] = ev->data.control.channel;
-			data[1] = ev->data.note.note;
-			veejay_msg(VEEJAY_MSG_DEBUG, "SND_SEQ_EVENT_NOTEOFF: %d %d",data[1],data[2]);
-		break;
-		case SND_SEQ_EVENT_KEYPRESS:
-			data[1] = ev->data.control.channel;
-			data[2] = ev->data.note.velocity;
-			veejay_msg(VEEJAY_MSG_DEBUG, "SND_SEQ_EVENT_KEYPRESS: %d %d",data[1],data[2]);
-		break;
-		case SND_SEQ_EVENT_PGMCHANGE:
-			data[1] = ev->data.control.param;
-			data[2] = ev->data.control.value;
-			veejay_msg(VEEJAY_MSG_DEBUG, "SND_SEQ_EVENT_PGMCHANGE: %d %d", data[1],data[2]);
-			break;
-		default:
-			veejay_msg(VEEJAY_MSG_DEBUG, "UNKNOWN MIDI EVENT");
-			data[1] = -1;
-			data[2] = -1;
-			break;
+		data[0] = -1;	
+		data[1] = -1;
+		data[2] = -1;
+
+		data[0] = ev->type;
+		switch( ev->type )
+		{
+			/* controller: channel <0-N>, <modwheel 0-127> */
+			case SND_SEQ_EVENT_CONTROLLER:
+				data[1] = ev->data.control.channel*256+ev->data.control.param; // OB: added chan+param as identifier
+				data[2] = ev->data.control.value;
+				break;
+			case SND_SEQ_EVENT_PITCHBEND:
+				data[1] = ev->data.control.channel;
+				data[2] = ev->data.control.value;
+				break;
+			case SND_SEQ_EVENT_NOTEON:
+				data[2] = ev->data.control.channel;
+				data[1] = ev->data.note.note;
+				break;
+			case SND_SEQ_EVENT_NOTEOFF:
+				data[2] = ev->data.control.channel;
+				data[1] = ev->data.note.note;
+				break;
+			case SND_SEQ_EVENT_KEYPRESS:
+				data[1] = ev->data.control.channel;
+				data[2] = ev->data.note.velocity;
+				break;
+			case SND_SEQ_EVENT_PGMCHANGE:
+				data[1] = ev->data.control.param;
+				data[2] = ev->data.control.value;
+				break;
+			default:
+				data[1] = -1;
+				data[2] = -1;
+				veejay_msg(VEEJAY_MSG_WARNING, "unknown midi event received: %x %x %x",ev->type,data[1],data[2],data[2]);
+				break;
+		}
+
+		vj_midi_send_vims_now( v, data );
+
+		snd_seq_free_event( ev );
+
+		ret ++;
 	}
 
-	queue_vims_event( v, data );
-
-	snd_seq_free_event( ev );
-	return ret; // OB: added return for multi pop of ctrl
-
+	return ret; 
 }
 
 int	vj_midi_handle_events(void *vv)
 {
-	int n_msg = 0;
 	vmidi_t *v = (vmidi_t*) vv;
-        if(!v->active) return 0;
+    if(!v->active) return 0;
+
+	int status = poll( v->pfd, v->npfd, 0 );
+
+	if( status == -1 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "MIDI: unable to poll file descriptor: %s", strerror(errno));
+		return 0;
+	}
+	else if( status > 0 ) {
+		return vj_dequeue_midi_event(v);
+	}
+
+	/*
+
 	while( poll( v->pfd, v->npfd, 0 ) > 0 )
 	{
 		n_msg ++;
@@ -522,6 +543,8 @@ int	vj_midi_handle_events(void *vv)
 	}
 	if(n_msg>0)
 		veejay_msg(VEEJAY_MSG_INFO, "MIDI: %d events received", n_msg);
+	*/
+
 	return 0;
 }
 
@@ -531,7 +554,7 @@ void	*vj_midi_new(void *mw)
 	vmidi_t *v = (vmidi_t*) vj_calloc(sizeof(vmidi_t));
 	int portid = 0;
 
-	if( snd_seq_open( &(v->sequencer), "hw", SND_SEQ_OPEN_DUPLEX, 0 ) < 0 )
+	if( snd_seq_open( &(v->sequencer), "hw", SND_SEQ_OPEN_DUPLEX | SND_SEQ_NONBLOCK, 0 ) < 0 )
 	{
 		veejay_msg(0, "Error opening ALSA sequencer");
 		return v;
@@ -544,7 +567,6 @@ void	*vj_midi_new(void *mw)
 			SND_SEQ_PORT_TYPE_APPLICATION )) < 0 )
 	{
 		veejay_msg(0, "Error creating sequencer port");
-	
 		return v;
 	}
 
@@ -562,6 +584,7 @@ void	*vj_midi_new(void *mw)
 	snd_seq_poll_descriptors( v->sequencer, v->pfd, v->npfd, POLLIN );
 
 	veejay_msg(VEEJAY_MSG_INFO, "MIDI listener active! Type 'aconnect -o' to see where to connect to.");
+	veejay_msg(VEEJAY_MSG_INFO, "For example: $ aconnect 128 129");
 
 	return (void*) v;
 }

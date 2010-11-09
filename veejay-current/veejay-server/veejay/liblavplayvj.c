@@ -2584,9 +2584,12 @@ static void veejay_playback_cycle(veejay_t * info)
 #ifdef HAVE_SDL
 	    ts= SDL_GetTicks();
 #endif
-//	    settings->buffer_entry[frame] = settings->current_frame_num;
-
-		settings->buffer_entry[frame] = (settings->buffer_entry[frame] + 1 ) % 2;
+	
+		if( info->pause_render ) {
+		    settings->buffer_entry[frame] = settings->current_frame_num;
+		} else {
+			settings->buffer_entry[frame] = (settings->buffer_entry[frame] + 1 ) % 2;
+		}
 
 	    if (!skipa) 
 			vj_perform_queue_audio_frame(info);
@@ -3014,6 +3017,19 @@ veejay_t *veejay_malloc()
 			veejay_msg(VEEJAY_MSG_WARNING, "Playing in %s mode",
 				(val== 1 ? "fullscreen" : "windowed" ) );
 			info->settings->full_screen = val;
+		}
+	}
+
+	info->pause_render = 1;// old behaviour was always to pause everything on speed=0
+	char *pausefl = getenv( "VEEJAY_PAUSE_EVERYTHING" );
+	if( pausefl ) {
+		int val = 0;
+		if( sscanf( pausefl, "%d", &val) ) {
+			veejay_msg(VEEJAY_MSG_WARNING,
+					"Playback engine will %s",
+					(val == 0 ? "only stop top sample on pause" :
+					 		    "stop rendering on pause" ) );
+			info->pause_render = val;
 		}
 	}
 
