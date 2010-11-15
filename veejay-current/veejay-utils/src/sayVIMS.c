@@ -183,6 +183,9 @@ int main(int argc, char *argv[])
 	}
 
 	sayvims = sayvims_connect();
+
+	vj_flush(1);
+
 	if(!sayvims)
 		return -1;
 
@@ -209,8 +212,7 @@ int main(int argc, char *argv[])
 			}
 			else
 			{
-				int n = vj_client_send( sayvims,V_CMD, msg[i] );
-				vj_flush(1);
+				vj_client_send( sayvims,V_CMD, msg[i] );
 			}
 			i++;
 		}
@@ -244,7 +246,6 @@ int main(int argc, char *argv[])
 			else
 			{
 				vj_client_send( sayvims, V_CMD, buf );
-				vj_flush(1);
 			}
 		}
 	}

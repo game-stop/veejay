@@ -1342,8 +1342,9 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,
 			cur_sfd = 0;
 		}
 		sample_set_framedups( b , cur_sfd);
-		if( cur_sfd != 0 )
+		if( cur_sfd != 0 ) {
 			return 1;
+		}
 	}
 
 	/* offset + start >= end */
@@ -1361,7 +1362,7 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,
 			{
 				/* then set speed in reverse and set offset to sample end */
 				//offset = sample_b[1] - sample_b[0];
-				offset = 0;
+				offset = len_b;
 				sample_set_speed( b, (-1 * sample_b[3]) );
 				sample_set_offset(a,chain_entry,offset);
 				return sample_b[1];
@@ -1388,7 +1389,9 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,
 		if( sample_b[2] == 3 )
 			offset = sample_b[0] + ( (int) ( (double) len_b * rand()/RAND_MAX));
 
-		if ( offset < -(len_b)  )
+
+
+		if (  (sample_b[0] + offset ) <=0  ) // < -(len_b)  )
 		{
 			/* reached start position */
 			if(sample_b[2] == 2)
@@ -1402,20 +1405,24 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,
 			if(sample_b[2] == 1)
 			{
 				//offset = sample_b[1] - sample_b[0];
-				offset = 0;
+				offset = sample_b[1]; // play from end to start
 			}	
 			if(sample_b[2]== 0)
 			{
 				sample_set_speed(b , 0);
-				offset = 0;
+				offset = 0; // stop playing
 			}
 			if(sample_b[2] == 3 )
 				offset = 0;
 		}
+#ifdef STRICT_CHECKING
+		assert( offset >= 0 );
+#endif
 		sample_set_offset(a, chain_entry, offset);
-	
-		return (sample_b[1] + offset);
+
+		return (sample_b[0] + offset); //1
 	}
+
 	return 0;
 }
 
