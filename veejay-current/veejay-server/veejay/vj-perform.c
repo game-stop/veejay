@@ -1404,8 +1404,8 @@ static int vj_perform_get_subframe(veejay_t * info, int sub_sample,
 			}
 			if(sample_b[2] == 1)
 			{
-				//offset = sample_b[1] - sample_b[0];
-				offset = sample_b[1]; // play from end to start
+				offset = len_b;
+				//offset = sample_b[1]; // play from end to start
 			}	
 			if(sample_b[2]== 0)
 			{
@@ -1437,7 +1437,6 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample,
     int sample[4];
 
     int offset = sample_get_offset(sub_sample, chain_entry);	
-    int nset = offset;
     int len;
      
 	if(sample_get_short_info(sub_sample,&sample[0],&sample[1],&sample[2],&sample[3])!=0) return -1;
@@ -1461,8 +1460,7 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample,
 	/* offset + start >= end */
 	if(sample[3] >= 0) /* sub sample plays forward */
 	{
-		if( settings->current_playback_speed != 0)
-	   		offset += sample[3]; /* speed */
+	   	offset += sample[3]; /* speed */
 
 		if( sample[2] == 3  )
 			offset = sample[0] + ( (int) ( (double) len * rand()/RAND_MAX));
@@ -1474,7 +1472,7 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample,
 			{
 				/* then set speed in reverse and set offset to sample end */
 				//offset = sample_b[1] - sample_b[0];
-				offset = 0;
+				offset = len;
 				sample_set_speed( sub_sample, (-1 * sample[3]) );
 				sample_set_offset( sub_sample,chain_entry,offset);
 				return sample[1];
@@ -1493,16 +1491,16 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample,
 		}
 
 		sample_set_offset(sub_sample,chain_entry,offset);
-		return (sample[0] + nset);
+		return (sample[0] + offset);
 	}
 	else
 	{	/* sub sample plays reverse */
-		if(settings->current_playback_speed != 0)
-	    		offset += sample[3]; /* speed */
+	    	offset += sample[3]; /* speed */
+		
 		if( sample[2] == 3  )
 			offset = sample[0] + ( (int) ( (double) len * rand()/RAND_MAX));
 	
-		if ( offset < -(len)  )
+		if ( (sample[0] + offset) <= 0  )
 		{
 			/* reached start position */
 			if(sample[2] == 2)
@@ -1515,8 +1513,8 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample,
 			}
 			if(sample[2] == 1)
 			{
-				//offset = sample_b[1] - sample_b[0];
-				offset = 0;
+				offset = len;
+			//	offset = sample_b[1];
 			}	
 			if(sample[2]== 0)
 			{
@@ -1528,7 +1526,7 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample,
 		}
 		sample_set_offset(sub_sample, chain_entry, offset);
 	
-		return (sample[1] + nset);
+		return (sample[0] + offset);
 	}
 	return 0;
 }
