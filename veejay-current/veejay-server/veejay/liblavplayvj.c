@@ -2587,6 +2587,9 @@ static void veejay_playback_cycle(veejay_t * info)
 	
 		if( info->pause_render ) {
 		    settings->buffer_entry[frame] = settings->current_frame_num;
+		    if(info->sfd > 1 ) //@ kick the renderer or it wont see slowed frames
+			    settings->buffer_entry[frame]++;
+		    
 		} else {
 			settings->buffer_entry[frame] = (settings->buffer_entry[frame] + 1 ) % 2;
 		}
