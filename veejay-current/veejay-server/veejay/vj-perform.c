@@ -3169,7 +3169,7 @@ static	char	*vj_perform_osd_status( veejay_t *info )
 
 static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *settings, int destination )
 {
-	if(info->use_osd <= 0 || info->settings->composite )
+	if(info->use_osd <= 0 ) // || info->settings->composite )
 		return;
 
 	VJFrame *frame = info->effect_frame1;
@@ -3336,8 +3336,8 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
                                 );
                      		   frame->ssm = 1;
                 	}
-		//	if( on_proj == 1 )
-		//	{
+			if( viewport_active(vp) )
+			{
 				VJFrame *tst = composite_get_draw_buffer( info->composite );
 				if(tst) { 
 					vj_font_render_osd_status(info->osd,tst,osd_text,placement);
@@ -3345,11 +3345,11 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 						vj_font_render_osd_status(info->osd,tst,more_text,0);
 					free(tst);
 				}
-		/*	} else { 	
+			} else { 	
 				if(more_text)
 					vj_font_render_osd_status(info->osd,out,more_text,0);
-				vj_font_render_osd_status(info->osd, out, osd_text,placement );
-			}*/
+				vj_font_render_osd_status(info->osd, info->effect_frame1, osd_text,placement );
+			}
 		}
 		free(out);	
 		free(in);
@@ -3497,8 +3497,8 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 	//@ record frame 
 	if( pvar_.enc_active )
 		vj_perform_record_frame(info);
-	//@ Render OSD menu
-	if(!settings->composite)
+
+	if(!info->settings->composite)
 		vj_perform_render_osd( info, settings, deep );
 
 	//@ Do the subsampling 
