@@ -3322,10 +3322,6 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 
 		if(osd_text) {
 			void *vp = composite_get_vp( info->composite );
-			int   on_proj = viewport_get_mode(vp);
-
-	//		if( settings->composite == 1 )
-	//			on_proj = 1;
 			if(!frame->ssm) {
                         	chroma_supersample(
                        	         settings->sample_mode,

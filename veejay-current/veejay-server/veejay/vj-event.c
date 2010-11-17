@@ -471,14 +471,13 @@ static char	*get_arr_embedded_help(char *ehelp[])
 	int i;
 	int len = 0;
 	for( i = 0; ehelp[i] != NULL ; i ++ ) {
-		len += strlen(ehelp[i]);
+		len += strlen(ehelp[i]) + 1;
 	}
 	if( len <= 0 )
 		return NULL;
-	char *msg = (char*) vj_malloc(sizeof(char) * len );
+	char *msg = (char*) vj_calloc(sizeof(char) * len );
 	if( msg == NULL )
 		return NULL;
-	veejay_memset( msg, 0, len );
 	char *p = msg;
 	int   x = 0;
 	for( i = 0; ehelp[i] != NULL; i ++ ) {
