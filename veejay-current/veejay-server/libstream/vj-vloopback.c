@@ -44,7 +44,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
-
+#include <errno.h>
 #include <linux/videodev.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
@@ -124,6 +124,9 @@ int	vj_vloopback_start_pipe( void *vloop )
 
 	vj_vloopback_t *v = (vj_vloopback_t*) vloop;
 
+	memset( &win , 0 , sizeof(struct video_window));
+	memset( &caps, 0 , sizeof(struct video_capability));
+	memset( &pic, 0, sizeof(struct video_picture));
 	if(!v) return 0;
 
 	if(v->mode != VLOOPBACK_PIPE)
@@ -134,13 +137,13 @@ int	vj_vloopback_start_pipe( void *vloop )
 	/* get capabilities */
 	if( ioctl( v->fd, VIDIOCGCAP, &caps ) < 0 )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Cant get video capabilities");
+		veejay_msg(VEEJAY_MSG_DEBUG, "Cant get video capabilities: %s", strerror(errno));
 		return 0;
 	}
 	/* get picture */
 	if( ioctl( v->fd, VIDIOCGPICT, &pic ) < 0 )
 	{
-		veejay_msg(VEEJAY_MSG_DEBUG, "Cant get video picture");
+		veejay_msg(VEEJAY_MSG_DEBUG, "Cant get video picture: %s", strerror(errno));
 		return 0;
 	}
 	/* set palette */
