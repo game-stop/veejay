@@ -1403,9 +1403,7 @@ static	int	veejay_create_homedir(char *path)
 	}
 	free(font_dir);
 // on dynebolic, we copy mplayer's font to veejay's homedir
-	system("cp /usr/share/mplayer/font/arial.ttf ~/.veejay/fonts");
-
-	veejay_msg(VEEJAY_MSG_INFO, "veejay home is setup");
+//	system("cp /usr/share/mplayer/font/arial.ttf ~/.veejay/fonts");
 	return 1;
 }
 void	veejay_check_homedir(void *arg)
