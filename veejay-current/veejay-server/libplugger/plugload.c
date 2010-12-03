@@ -289,7 +289,7 @@ static	void	free_plugins()
 	for( i = 0; i < index_ ; i ++ )
 		free_plugin( index_map_[i]);
 
-	vevo_port_recursive_free( illegal_plugins_ );
+	//vevo_port_recursive_free( illegal_plugins_ );
 	
 	free( index_map_ );
 	index_ = 0;

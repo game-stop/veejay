@@ -332,7 +332,7 @@ static void port_node_free(__vevo_port_t *port,port_index_t * node)
 {
     if (node) {
 	if (node->key) {
-    		free(node->key);
+    		free((void*)node->key);
 			node->key=NULL;
 		}
 //	free(node);
@@ -1997,11 +1997,7 @@ static	int	vevo_scan_for_atom( vevo_port_t *p, int atype )
  \param atype Atom type
  \return List of vevo_storage_t
  */
-#ifdef STRICT_CHECKING
-static vevo_storage_t **vevo_list_nodes_( vevo_port_t *p, int atype, int *msize )
-#else
 static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
-#endif
 {
     __vevo_port_t *port = (__vevo_port_t *) p;
     if(!p) return NULL;
@@ -2021,9 +2017,6 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 	while((node=hash_scan_next(&scan)) != NULL)
 	{
 		s = hnode_get(node);
-#ifdef STRICT_CHECKING
-		if( msize ) ( *msize += vevo_storage_size( s ) );
-#endif
 		if( (s && s->atom_type == atype) || atype == 0)
 		{
 			int type = 0;
@@ -2043,9 +2036,6 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 	{
 		n = l->next;
 		s = l->st;
-#ifdef STRICT_CHECKING
-		if( msize ) { *msize += vevo_storage_size(s); }
-#endif
 		if( s->atom_type == atype || atype == 0 )
 		{
 			int type = 0;
@@ -2057,9 +2047,6 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 		l = n;
 	}
     }
-#ifdef STRICT_CHECKING
-    assert( i < 256 );
-#endif
     return list;
 }
 
@@ -2292,12 +2279,7 @@ void	vevo_port_recursive_free( vevo_port_t *port )
 	assert( sor != NULL );
 #endif
 	int i;
-#ifdef STRICT_CHECKING
-	int msize = 0;
-	vevo_storage_t **item = vevo_list_nodes_( sor, VEVO_ATOM_TYPE_PORTPTR, &msize );
-#else
 	vevo_storage_t **item = vevo_list_nodes_( sor, VEVO_ATOM_TYPE_PORTPTR );
-#endif
 	if(!item)
 	{
 		vevo_port_free_(sor);
@@ -2460,13 +2442,7 @@ void *vevo_port_recurse_namespace( vevo_port_t *port, const char *base )
  */
 static void	vevo_port_recurse_free( vevo_port_t *sorted_port, vevo_port_t *p )
 {
-#ifdef STRICT_CHECKING
-	assert( p != NULL );
-	int msize = 0;
-	vevo_storage_t **item = vevo_list_nodes_( p, VEVO_ATOM_TYPE_PORTPTR,&msize );
-#else
 	vevo_storage_t **item = vevo_list_nodes_( p, VEVO_ATOM_TYPE_PORTPTR );
-#endif
 	if(!item)
 	{
 		free(item);
@@ -3375,7 +3351,6 @@ vevo_property_del(vevo_port_t * p,
     uint32_t hash_key = hash_key_code(key);
     void *node = NULL;
     if (!port->table) {
-	    veejay_msg(0, "Is LIst");
 	vevo_property_t *pnode = NULL;
 	if ((pnode = prop_node_get(port, hash_key)) != NULL) {
 	    vevo_free_storage(port,pnode->st);
@@ -3383,7 +3358,6 @@ vevo_property_del(vevo_port_t * p,
 	    //node = (void *) pnode;
 	}
     } else {
-	    veejay_msg(0, "Is Hash");
 	hnode_t *old_node = NULL;
 	if ((old_node = property_exists(port, hash_key)) != NULL) {
 	    vevo_storage_t *oldstor =
