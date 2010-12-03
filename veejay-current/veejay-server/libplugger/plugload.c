@@ -831,7 +831,7 @@ void	plug_push_frame( void *instance, int out, int seq_num, void *frame_info )
 	int error = vevo_property_get( instance, "HOST_plugin_push_f", 0, &gpu );
 	
 	if( error == VEVO_NO_ERROR )
-		(*gpu)( instance, (out ? "out_channels" : "in_channels" ), seq_num, frame );
+		(*gpu)( instance, out, seq_num, frame );
 }
 
 
