@@ -948,15 +948,8 @@ if test "x$cflags_set" != "xyes" ; then
   cflags_set=yes
 fi
 
-AC_CACHE_CHECK([whether gcc has -fno-stack-protector],no_stack_protector_flag,[
-	saved_CFLAGS=$CFLAGS
-	CFLAGS="-fno-stack-protector"
-      	AC_TRY_COMPILE(,,no_stack_protector_flag=yes,no_stack_protector_flag=no)
-      	CFLAGS=$saved_CFLAGS])
 
-if test "x$no_stack_protector_flag" = xyes; then
-	CFLAGS="$CFLAGS -fno-stack-protector"
-fi
+CFLAGS="$CFLAGS -fno-stack-protector"
 
 if test x"$with_extra_cflags" != "x"; then
    CFLAGS="$CFLAGS $with_extra_cflags"
