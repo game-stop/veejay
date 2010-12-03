@@ -243,7 +243,7 @@ static	void	free_plugin(void *plugin)
 	assert( error == 0 );
 #endif
 
-	vevo_port_recursive_free( plugin );
+	//vevo_port_recursive_free( plugin );
 
 	if( handle ) dlclose( handle );
 
