@@ -1324,6 +1324,8 @@ effect_constr* _effect_new( char *effect_line )
 	if(descr_len <= 0) return NULL;
 
 	ec = g_new( effect_constr, 1);
+	veejay_memset(ec,0,sizeof(ec));
+	veejay_memset(ec->param_description,0,sizeof(ec->param_description));
 	veejay_memset(ec->description,0,sizeof(ec->description));
 	strncpy( ec->description, effect_line+3, descr_len );
 	tokens = sscanf(effect_line+(descr_len+3), "%03d%1d%1d%02d", &(ec->id),&(ec->is_video),
@@ -4047,8 +4049,8 @@ void	load_effectlist_info()
 		if(len > 0)
 		{
 			effect_constr *ec;
-			char line[255];
-			veejay_memset( line,0,sizeof(line));
+			char line[512];
+			veejay_memset( line,512,sizeof(line));
 			strncpy( line, fxtext + offset, len );
 			ec = _effect_new(line);
 			if(ec) info->effect_info = g_list_append( info->effect_info, ec );

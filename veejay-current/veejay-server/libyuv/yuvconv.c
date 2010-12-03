@@ -1156,7 +1156,10 @@ void	yuv_convert_and_scale_gray_rgb(void *sws,VJFrame *src, VJFrame *dst)
 void	yuv_convert_and_scale_from_rgb(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
-	int src_stride[3] = { src->width*3,0,0};
+	int n = 3;
+	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA )
+		n = 4;
+	int src_stride[3] = { src->width*n,0,0};
 	int dst_stride[3] = { dst->width,dst->uv_width,dst->uv_width };
 
 	sws_scale( s->sws, src->data, src_stride, 0, src->height,
@@ -1166,8 +1169,12 @@ void	yuv_convert_and_scale_from_rgb(void *sws , VJFrame *src, VJFrame *dst)
 void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
+	int n = 3;
+	if( dst->format == PIX_FMT_RGBA || dst->format == PIX_FMT_BGRA )
+		n = 4;
+
 	int src_stride[3] = { src->width,src->uv_width,src->uv_width };
-	int dst_stride[3] = { dst->width*3,0,0 };
+	int dst_stride[3] = { dst->width*n,0,0 };
 
 	sws_scale( s->sws, src->data, src_stride, 0, src->height,
 		dst->data, dst_stride );

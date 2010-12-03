@@ -58,9 +58,6 @@
 static	vevo_port_t **index_map_ = NULL;
 static  vevo_port_t *illegal_plugins_ =NULL;
 static  int	index_     = 0;
-static	void	*buffer_	 = NULL;
-static	void	*buffer2_  = NULL;
-static	void	*buffer_b_ = NULL;
 static	int	base_width_	=0;
 static	int	base_height_	=0;
 static  int	n_ff_ = 0;
@@ -108,7 +105,7 @@ static	void *instantiate_plugin( void *plugin, int w , int h )
 			return freeframe_plug_init( plugin,w,h);
 			break;
 		case VEVO_PLUG_FR:
-			return frei0r_plug_init( plugin,w,h );
+			return frei0r_plug_init( plugin,w,h,base_fmt_ );
 			break;
 		default:
 #ifdef STRICT_CHECKING
@@ -341,23 +338,10 @@ static	int	scan_plugins()
 void	plug_sys_free(void)
 {
 	free_plugins();
-	if( buffer_ )
-		free( buffer_ );
-	if( buffer2_ )
-		free( buffer2_ );
-	if( buffer_b_)
-		free( buffer_b_ );
 }
 
 void	plug_sys_init( int fmt, int w, int h )
 {
-	buffer_ = (void*) vj_malloc( w * h * 4);
-	memset( buffer_, 0, w * h * 4);
-	buffer2_ = (void*) vj_malloc( w * h * 4);
-	memset( buffer2_, 0, w * h  * 4);
-	buffer_b_ = (void*) vj_malloc( w * h * 4);
-	memset( buffer_b_, 0, w * h  * 4);
-	
 	base_width_ = w;
 	base_height_ = h;
 
@@ -411,6 +395,9 @@ int	plug_sys_detect_plugins(void)
 	veejay_msg(VEEJAY_MSG_INFO, "\thttp://www.piksel.org/frei0r");
 	veejay_msg(VEEJAY_MSG_INFO, "\tFound %d frei0r %s",
 		n_fr_ , n_fr_ == 1 ? "plugin" : "plugins" );
+
+	veejay_msg(VEEJAY_MSG_WARNING, "\tPerformance penalty for frei0r: native -> RGB -> native.");
+
 	veejay_msg(VEEJAY_MSG_INFO, "\tLivido - (Linux) Video Dynamic Objects" );
 	veejay_msg(VEEJAY_MSG_INFO, "\t(C) Copyright 2005 Gabriel 'Salsaman' Finch, Niels Elburg, Dennis 'Jaromil' Rojo");
 	veejay_msg(VEEJAY_MSG_INFO, "\t                   Daniel Fischer, Martin Bayer, Kentaro Fukuchi and Andraz Tori");
@@ -477,7 +464,7 @@ void	plug_set_parameter( void *instance, int seq_num,int n_elements,void *value 
 #ifdef STRICT_CHECKING
 	else
 	{
-		assert(0);
+		veejay_msg(0, "HOST_plugin_param_f missing!");
 	}
 #endif	
 }
@@ -842,10 +829,9 @@ void	plug_push_frame( void *instance, int out, int seq_num, void *frame_info )
 #endif
 	generic_push_channel_f	gpu;
 	int error = vevo_property_get( instance, "HOST_plugin_push_f", 0, &gpu );
-#ifdef STRICT_CHECKING
-	assert( error == 0 );
-#endif
-	(*gpu)( instance, (out ? "out_channels" : "in_channels" ), seq_num, frame );
+	
+	if( error == VEVO_NO_ERROR )
+		(*gpu)( instance, (out ? "out_channels" : "in_channels" ), seq_num, frame );
 }
 
 
@@ -908,7 +894,7 @@ vj_effect *plug_get_plugin( int fx_id ) {
 	size_t name_len = vevo_property_element_size( port, "name", 0);
 	vje->description = (char*) vj_calloc(name_len);
 	vevo_property_get( port, "name", 0 , &(vje->description));
-	vevo_property_get( port, "n_params", 0, &(vje->num_params));
+	vevo_property_get( port, "num_params", 0, &(vje->num_params));
 	vevo_property_get( port, "mixer", 0, &(vje->extra_frame));
 
 	if( vje->num_params > 0 ) {
@@ -925,12 +911,12 @@ vj_effect *plug_get_plugin( int fx_id ) {
 		int valid_p = 0;
 		char **param_descr = NULL;
 		if( vje->num_params > 0 ) 
-			param_descr = (char**) vj_malloc(sizeof(char*) * vje->num_params );
+			param_descr = (char**) vj_calloc(sizeof(char*) * (vje->num_params+1) );
 
 		for( k = 0; k < vje->num_params;k++ )
 		{
 			char key[20];
-			sprintf(key, "p%d", k );
+			sprintf(key, "p%02d", k );
 			void *parameter = NULL;
 			vevo_property_get( port, key, 0, &parameter );
 			if(parameter)
@@ -938,11 +924,12 @@ vj_effect *plug_get_plugin( int fx_id ) {
 				vevo_property_get( parameter, "min", 0, &(vje->limits[0][k]));
 				vevo_property_get( parameter, "max", 0, &(vje->limits[1][k]));	
 				vevo_property_get( parameter, "default", 0,&(vje->defaults[k]));
-				param_descr[valid_p] = strdup( "Number" );
+				param_descr[valid_p] = vevo_property_get_string(parameter,"name");
+				if(param_descr[valid_p]==NULL)
+					param_descr[valid_p] = strdup( "Number" );
 				valid_p ++;
 			}
 		}		
-		vevo_property_set( port, "n_params",VEVO_ATOM_TYPE_INT, 1,&valid_p);
 		vje->num_params = valid_p;
 		vje->param_description = param_descr;
 	}

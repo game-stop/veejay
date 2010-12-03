@@ -56,8 +56,8 @@ static int override_pix_fmt = 0;
 static int switch_jpeg = 0;
 static char override_norm = 'p';
 static int auto_loop = 0;
-static int n_slots_ = 4;
-static int max_mem_ = 30;
+static int n_slots_ = 0;
+static int max_mem_ = 0;
 static int live =0;
 
 static void CompiledWith()
@@ -173,9 +173,9 @@ static void Usage(char *progname)
 	fprintf(stderr,
 			"     --map-from-file <num>\tmap N frames to memory\n");
  	fprintf(stderr,
-			"  -m/--memory <num>\t\tMaximum memory to use for cache (0=disable, default=30 max=100)\n");  
+			"  -m/--memory <num>\t\tMaximum memory to use for cache (0=disable, default=0 max=100)\n");  
 	fprintf(stderr,
-			"  -j/--max_cache <num>\t\tDivide cache memory over N samples (default=4)\n");
+			"  -j/--max_cache <num>\t\tDivide cache memory over N samples (default=0)\n");
 	
 	fprintf(stderr,
 			"  -Y/--yuv [01]\t\t\tForce YCbCr (defaults to YUV)\n");
@@ -673,6 +673,7 @@ int main(int argc, char **argv)
 
 	if( vj_el_get_mem_size() == 0 )
 		prepare_cache_line( max_mem_, n_slots_ );
+
 	veejay_check_homedir( info );
 
 	sigsegfault_handler();

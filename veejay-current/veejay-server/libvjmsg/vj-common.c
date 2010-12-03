@@ -350,7 +350,7 @@ void veejay_msg(int type, const char format[], ...)
     // parse arguments
     va_start(args, format);
     vsnprintf(buf, sizeof(buf) - 1, format, args);
-
+#ifdef STRICT_CHECKING
 	gettimeofday( &timenow, NULL );
 
 	timeval_subtract( &timenow, &timenow, &_start_time );
@@ -441,6 +441,77 @@ void veejay_msg(int type, const char format[], ...)
 		_message_history.msg[_message_history.w_index ++ ] = strdup(sline);
 	  }*/
      }
+#else
+    if(_color_level)
+    {
+	  switch (type) {
+	    case 2: //info
+		sprintf(prefix, "%sI: ", TXT_GRE);
+		break;
+	    case 1: //warning
+		sprintf(prefix, "%sW: ", TXT_YEL);
+		break;
+	    case 0: // error
+		sprintf(prefix, "%sE: ", TXT_RED);
+		break;
+	    case 3:
+	        line = 1;
+		break;
+	    case 4: // debug
+		sprintf(prefix, "%sD: ", TXT_BLU);
+		break;
+	 }
+
+ 	 if(!line)
+	     fprintf(out,"%s %s %s\n",prefix, buf, TXT_END);
+	     else
+	     fprintf(out,"%s%s%s", TXT_GRE, buf, TXT_END );
+/* 
+	if( _message_history.w_index < MAX_LINES )
+	{
+		if(type == 3)
+			sprintf(sline, "%s", buf );
+		else
+			sprintf( sline, "%s\n", buf );	
+		_message_history.msg[_message_history.w_index ++ ] = strndup(sline,200);
+	}*/
+     }
+     else
+     {
+	   switch (type) {
+	    case 2: //info
+		sprintf(prefix, "I: ");
+		break;
+	    case 1: //warning
+		sprintf(prefix, "W: ");
+		break;
+	    case 0: // error
+		sprintf(prefix, "E: ");
+		break;
+	    case 3:
+	        line = 1;
+		break;
+	    case 4: // debug
+		sprintf(prefix, "D: ");
+		break;
+	   }
+
+	   if(!line)
+	     fprintf(out,"%s %s\n", prefix, buf);
+	     else
+	     fprintf(out,"%s", buf );
+
+	/*  if( _message_history.w_index < MAX_LINES )
+	  {
+		if(type == 3 )
+			sprintf(sline, "%s", buf );
+		else
+			sprintf(sline, "%s\n", buf );
+		_message_history.msg[_message_history.w_index ++ ] = strdup(sline);
+	  }*/
+     }
+
+#endif
      va_end(args);
 }
 
