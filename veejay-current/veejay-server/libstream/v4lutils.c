@@ -253,7 +253,6 @@ int v4loverlaystop(v4ldevice *vd)
 int v4lsetchannel(v4ldevice *vd, int ch)
 {
 	if(ioctl(vd->fd, VIDIOCSCHAN, &(vd->channel[ch])) < 0) {
-		veejay_msg(0,"v4lsetchannel:VIDIOCSCHAN %s", strerror(errno));
 		return -1;
 	}
 	return 0;
