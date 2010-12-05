@@ -360,7 +360,6 @@ int v4lsetpalette(v4ldevice *vd, int palette)
 int v4lgetmbuf(v4ldevice *vd)
 {
 	if(ioctl(vd->fd, VIDIOCGMBUF, &(vd->mbuf))<0) {
-		veejay_msg(0, "v4lgetmbuf:VIDIOCGMBUF %s", strerror(errno));
 		return -1;
 	}
 	return 0;
