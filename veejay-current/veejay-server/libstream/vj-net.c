@@ -20,21 +20,18 @@
 #define THREAD_START 0
 #define THREAD_STOP 1
 #include <config.h>
-#include <string.h>
 #include <stdint.h>
-#include <libvjmem/vjmem.h>
 #include <pthread.h>
 #include <libstream/vj-tag.h>
 #include <libvjnet/vj-client.h>
 #include <veejay/vims.h>
 #include <libyuv/yuvconv.h>
-
+#include <libvjmem/vjmem.h>
 #include <libavutil/avutil.h>
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>
 #include <libstream/vj-net.h>
 #include <liblzo/lzo.h>
-#define _POSIX_C_SOURCE 199309 
 #include <time.h>
 
 

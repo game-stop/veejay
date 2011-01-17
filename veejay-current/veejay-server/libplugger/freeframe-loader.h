@@ -14,11 +14,12 @@ void	freeframe_plug_free( void *plugin );
 void	freeframe_plug_deinit( void *plugin );
 
 
-int	freeframe_plug_init( void *plugin, int w, int h );
+void *freeframe_plug_init( void *plugin, int w, int h );
 
 void	freeframe_plug_retrieve_current_values( void *instance, void *fx_values );
 
 void	freeframe_plug_retrieve_default_values( void *instance, void *fx_values );
 
+void	freeframe_destroy( );
 
 #endif

@@ -139,7 +139,7 @@ static	void	veejay_addr2line_bt( int n, void *addr, char *sym )
 
 	address = addr;
 	if( info.dli_fbase >= (const void*)0x40000000)
-		addr = (const char*) address - (unsigned int ) info.dli_fbase;
+		addr = (void*)((const char*) address - (unsigned int ) info.dli_fbase);
 
 	snprintf( cmd,sizeof(cmd), "addr2line --functions --demangle -e $(which %s) %p", info.dli_fname, address);
 	out = popen( cmd, "r");

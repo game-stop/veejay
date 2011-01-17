@@ -270,6 +270,7 @@ void	yuv_init_lib(int extra_flags, int auto_ccir_jpeg, int default_zoomer)
 //	put( PIX_FMT_RGB32,   IMG_ARGB32 );
 	put( PIX_FMT_RGB32,   IMG_RGBA32 );
 	put( PIX_FMT_RGBA,    IMG_RGBA32 );
+	put( PIX_FMT_ARGB,	  IMG_ARGB32 );
 	put( PIX_FMT_RGB32_1, IMG_RGBA32 );
 	put( PIX_FMT_YUYV422, IMG_YUY2);
 	put( PIX_FMT_GRAY8,   IMG_Y8 );
@@ -393,7 +394,7 @@ VJFrame	*yuv_rgb_template( uint8_t *rgb_buffer, int w, int h, int fmt )
 {
 #ifdef STRICT_CHECKING
 	assert( fmt == PIX_FMT_RGB24 || fmt == PIX_FMT_BGR24 ||
-		fmt == PIX_FMT_RGBA || fmt == PIX_FMT_RGB32_1 || fmt == PIX_FMT_RGB32);
+		fmt == PIX_FMT_RGBA || fmt == PIX_FMT_RGB32_1 || fmt == PIX_FMT_RGB32 || fmt == PIX_FMT_ARGB);
 	assert( w > 0 );
 	assert( h > 0 );
 #endif
@@ -479,7 +480,7 @@ void	yuv_convert_any_ac( VJFrame *src, VJFrame *dst, int src_fmt, int dst_fmt )
 		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA ||
 		src_fmt == PIX_FMT_YUYV422 ||
 		src_fmt == PIX_FMT_BGR24   || src_fmt == PIX_FMT_RGB32 ||
-		src_fmt == PIX_FMT_RGB32_1 || src_fmt == PIX_FMT_GRAY8 );
+		src_fmt == PIX_FMT_RGB32_1 || src_fmt == PIX_FMT_GRAY8 || src_fmt == PIX_FMT_ARGB );
 	assert( src->width > 0 );
 	assert( dst->width > 0 );
 #endif
@@ -553,17 +554,15 @@ void	yuv_fx_context_destroy( void *ctx )
 void	yuv_convert_any3( VJFrame *src, int src_stride[3], VJFrame *dst, int src_fmt, int dst_fmt )
 {
 #ifdef STRICT_CHECKING
-	assert( dst_fmt >= 0 && dst_fmt < 32 );
+/*	assert( dst_fmt >= 0 && dst_fmt < 32 );
 	assert( src_fmt == PIX_FMT_YUV420P || src_fmt == PIX_FMT_YUVJ420P ||
 		src_fmt == PIX_FMT_YUV422P || src_fmt == PIX_FMT_YUVJ422P ||	
 		src_fmt == PIX_FMT_YUV444P || src_fmt == PIX_FMT_YUVJ444P ||
-		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA  );
+		src_fmt == PIX_FMT_RGB24   || src_fmt == PIX_FMT_RGBA || src_fmt == PIX_FMT_ARGB );*/
 	assert( src_stride[0] > 0 );
 	assert( dst->width > 0 );
 	assert( dst->height > 0 );
 	assert( dst->data[0] != NULL );
-	assert( dst->data[1] != NULL );
-	assert( dst->data[2] != NULL );
 #endif
 	struct SwsContext *ctx = sws_getContext(
 			src->width,
@@ -1157,7 +1156,7 @@ void	yuv_convert_and_scale_from_rgb(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
 	int n = 3;
-	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA )
+	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB )
 		n = 4;
 	int src_stride[3] = { src->width*n,0,0};
 	int dst_stride[3] = { dst->width,dst->uv_width,dst->uv_width };
@@ -1170,7 +1169,8 @@ void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
 	int n = 3;
-	if( dst->format == PIX_FMT_RGBA || dst->format == PIX_FMT_BGRA )
+	if( dst->format == PIX_FMT_RGBA || dst->format == PIX_FMT_BGRA || dst->format == PIX_FMT_ARGB ||
+	 dst->format == PIX_FMT_RGB32 )
 		n = 4;
 
 	int src_stride[3] = { src->width,src->uv_width,src->uv_width };

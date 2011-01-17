@@ -332,9 +332,9 @@ static void port_node_free(__vevo_port_t *port,port_index_t * node)
 {
     if (node) {
 	if (node->key) {
-    		free(node->key);
-			node->key=NULL;
-		}
+    	free(node->key);
+		node->key = NULL;	
+	}
 //	free(node);
 	vevo_pool_free_node( port->pool,(void*)node );
     }
@@ -3396,12 +3396,15 @@ vevo_property_del(vevo_port_t * p,
 
     port_index_t *l = port->index;
     port_index_t *n = NULL;
-     while (l != NULL) {
-	n = l->next;
-	if( (uint32_t) l->key == hash_key )
-		port_node_free(port,l);
-	l = n;
-     }
+	
+	while (l != NULL) 
+	{
+		n = l->next;
+ 		uint32_t pkey = hash_key_code( l->key );
+		if( pkey == hash_key )
+			port_node_free(port,l);
+			l = n;
+    }
 
     return VEVO_NO_ERROR;
 }

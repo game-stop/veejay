@@ -173,11 +173,11 @@ static int vj_yuv_stream_start_read1(vj_yuv * yuv4mpeg, int fd, int width,
 
     return 0;
 }
-
+/*
 uint8_t *vj_yuv_get_buf( void *v ) {
 	vj_yuv *y = (vj_yuv*)v;
 	return y->buf;
-}
+}*/
 
 int vj_yuv_stream_write_header(vj_yuv * yuv4mpeg, editlist * el, int out_chroma)
 {

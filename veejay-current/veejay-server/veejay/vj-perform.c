@@ -2304,12 +2304,12 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 	video_playback_setup *settings = info->settings;
 	frames[0] = info->effect_frame1;
 	frames[1] = info->effect_frame2;
-	frames[1]->format = info->pixel_format;
+//	frames[1]->format = info->pixel_format;
     	frameinfo = info->effect_frame_info;
     	frames[0]->data[0] = primary_buffer[0]->Y;
    	frames[0]->data[1] = primary_buffer[0]->Cb;
     	frames[0]->data[2] = primary_buffer[0]->Cr;
-	frames[0]->format  = info->pixel_format;
+//	frames[0]->format  = info->pixel_format;
 
 	vjp_kf *setup;
     	setup = info->effect_info;

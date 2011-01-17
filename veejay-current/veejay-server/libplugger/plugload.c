@@ -294,6 +294,9 @@ static	void	free_plugins()
 	free( index_map_ );
 	index_ = 0;
 	index_map_ = NULL;
+
+
+	freeframe_destroy();
 }
 
 void	*plug_get( int fx_id ) {
@@ -461,12 +464,6 @@ void	plug_set_parameter( void *instance, int seq_num,int n_elements,void *value 
 	int error = vevo_property_get( instance, "HOST_plugin_param_f", 0, &gpp );
 	if( error == VEVO_NO_ERROR)
 		(*gpp)( instance, seq_num, value );
-#ifdef STRICT_CHECKING
-	else
-	{
-		veejay_msg(0, "HOST_plugin_param_f missing!");
-	}
-#endif	
 }
 
 void	plug_get_defaults( void *instance, void *fx_values )
@@ -590,7 +587,7 @@ char	*plug_describe( int fx_id )
 	char **out_params = NULL;
 	if( pi > 0 )
 	{
-		in_params = (char*) vj_malloc(sizeof(char*) * pi );
+		in_params = (char**) vj_malloc(sizeof(char*) * pi );
 	
 		for( i = 0; i < pi; i ++ )
 		{
@@ -601,7 +598,7 @@ char	*plug_describe( int fx_id )
 	}
 	if( po > 0 )
 	{
-		out_params = (char*) vj_malloc(sizeof(char*) * pi );
+		out_params = (char**) vj_malloc(sizeof(char*) * pi );
 	
 		for( i = 0; i < pi; i ++ )
 		{

@@ -1692,7 +1692,7 @@ int	vj_el_init_420_frame(editlist *el, VJFrame *frame)
 	frame->ssm = 0;
 	frame->stride[0] = el->video_width;
 	frame->stride[1] = frame->stride[2] = frame->stride[0]/2;
-	frame->format = el_pixel_format_;
+	frame->format = get_ffmpeg_pixfmt(el_pixel_format_);
 	return 1;
 }
 
@@ -1714,7 +1714,7 @@ int	vj_el_init_422_frame(editlist *el, VJFrame *frame)
 	frame->ssm = 0;
 	frame->stride[0] = el->video_width;
 	frame->stride[1] = frame->stride[2] = frame->stride[0]/2;
-	frame->format = el_pixel_format_;
+	frame->format = get_ffmpeg_pixfmt( el_pixel_format_ );
 	return 1;
 }
 

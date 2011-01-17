@@ -50,13 +50,6 @@ void vj_effman_apply_plug_effect(
 #ifdef STRICT_CHECKING
 	assert( instance != NULL );
 #endif
-	int type	= -1;
-	int error	= vevo_property_get( instance, "HOST_plugin_type", 0, &type );
-
-	if( type == VEVO_PLUG_FR || type == VEVO_PLUG_FF ) {
-		return;
-	}	
-
 	int n 	    = plug_get_num_input_channels( plug_id );
 
 	n_arg	    = plug_get_num_parameters( plug_id );
