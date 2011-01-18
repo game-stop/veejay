@@ -2074,6 +2074,10 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	veejay_msg(VEEJAY_MSG_DEBUG, "Internal YUV format is 4:2:2 Planar, %d x %d",
 				el->video_width,
 				el->video_height);
+	veejay_msg(VEEJAY_MSG_DEBUG, "FX Frame Info: %d x %d, ssm=%d, format=%d",
+			info->effect_frame1->width,info->effect_frame1->height,
+			info->effect_frame1->ssm,
+			info->effect_frame1->format );
 	
 	if(!vj_perform_init(info))
 	{
@@ -3782,9 +3786,11 @@ int veejay_open_files(veejay_t * info, char **files, int num_files, float ofps, 
 	char text[24];
 	switch(info->pixel_format) {
 		case FMT_422:
-			sprintf(text, "4:2:2 [16-235][16-240]");break;
+			sprintf(text, "4:2:2 [16-235][16-240]");
+			break;
 		case FMT_422F:	
-			sprintf(text, "4:2:2 [0-255]");break;
+			sprintf(text, "4:2:2 [0-255]");
+			break;
 		default:
 			veejay_msg(VEEJAY_MSG_ERROR, "Unknown pixel format set"); 
 			return 0;
