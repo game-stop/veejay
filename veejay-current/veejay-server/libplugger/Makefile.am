@@ -1,7 +1,8 @@
 MAINTAINERCLEANFILES = Makefile.in
 INCLUDES = 	-I$(top_srcdir)/libplugger -I$(includedir) -I$(top_srcdir)/libhash -I$(top_srcdir)/libvevo ${FFMPEG_CFLAGS} 
 
-AM_CFLAGS = $(CFLAGS) -freg-struct-return
+
+AM_CFLAGS = $(CFLAGS) $(FREEFRAME_CFLAGS)
 
 LIBVJPLUG_LIB_FILE = libvjplug.la
 noinst_LTLIBRARIES = $(LIBVJPLUG_LIB_FILE)

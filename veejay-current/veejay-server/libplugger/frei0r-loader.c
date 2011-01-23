@@ -273,7 +273,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	} else {
 		//@ frei0r "supports" source plugins,
 		//@ but our sources are samples, so skip them.
-		veejay_msg(0, "Frei0r plugin type %d not supported.", finfo.plugin_type );
+		veejay_msg(0, "Frei0r generator plugins are not supported, skip '%s'.", name );
 		(*f0r_deinit)();
 		vpf(port);
 		return NULL;
@@ -310,8 +310,8 @@ void* 	deal_with_fr( void *handle, char *name)
 	}
 
 	if( r_params > 8 ) {
-		veejay_msg(0, "Maximum parameter count reached, allowing %d/%d parameters.",
-				r_params,n_params);
+		veejay_msg(VEEJAY_MSG_WARNING, "Maximum parameter count reached, allowing %d/%d parameters.",
+				8,r_params);
 		r_params = 8;
 	}
 

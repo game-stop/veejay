@@ -192,7 +192,7 @@ static	void	add_to_plugin_list( const char *path )
 		
 		if(dlsym( handle, "plugMain" ))
 		{
-			void *plugin = deal_with_ff( handle, name );
+			void *plugin = deal_with_ff( handle, name, base_width_, base_height_ );
 			if( plugin )
 			{
 				index_map_[ index_ ] = plugin;
@@ -315,8 +315,10 @@ static	int	scan_plugins()
 	sprintf( path , "%s/.veejay/plugins.cfg" , home );
 
 	int fd = open( path, O_RDONLY );
-	if( fd < 0 )
+	if( fd < 0 ) {
+		veejay_msg(0, "unable to open veejay plugin configuration file : $HOME/.veejay/plugins.cfg");
 		return 0;
+	}
 
 	bzero( data, CONFIG_FILE_LEN );
 
@@ -388,25 +390,24 @@ int	plug_sys_detect_plugins(void)
 	veejay_msg(VEEJAY_MSG_INFO, "-------------------------------------------------------------------------------------------");
 	//@ display copyright notice in binary form
 	veejay_msg(VEEJAY_MSG_INFO, "\tFreeFrame - cross-platform real-time video effects");
-	veejay_msg(VEEJAY_MSG_INFO, "\t(C) Copyright 2002 Marcus Clements www.freeframe.org. All Rights reserved.");
+	veejay_msg(VEEJAY_MSG_INFO, "\t\t(C) Copyright 2002 Marcus Clements www.freeframe.org. All Rights reserved.");
 	veejay_msg(VEEJAY_MSG_INFO, "\thttp://freeframe.sourceforge.net");
-	veejay_msg(VEEJAY_MSG_INFO, "\tFound %d FreeFrame %s",
-		n_ff_ , n_ff_ == 1 ? "plugin" : "plugins" );
+	veejay_msg(VEEJAY_MSG_INFO, "\tFound %d FreeFrame %s",	n_ff_ , n_ff_ == 1 ? "plugin" : "plugins" );
 	veejay_msg(VEEJAY_MSG_INFO, "\tfrei0r - a minimalistic plugin API for video effects");
-	veejay_msg(VEEJAY_MSG_INFO, "\t(C) Copyright 2004 Georg Seidel, Phillip Promesberger and Martin Bayer.");
-	veejay_msg(VEEJAY_MSG_INFO, "\t                   Licensed as GPL");
+	veejay_msg(VEEJAY_MSG_INFO, "\t\t(C) Copyright 2004 Georg Seidel, Phillip Promesberger and Martin Bayer (GPL)");
 	veejay_msg(VEEJAY_MSG_INFO, "\thttp://www.piksel.org/frei0r");
 	veejay_msg(VEEJAY_MSG_INFO, "\tFound %d frei0r %s",
 		n_fr_ , n_fr_ == 1 ? "plugin" : "plugins" );
 
-	veejay_msg(VEEJAY_MSG_WARNING, "\tPerformance penalty for frei0r: native -> RGB -> native.");
+	veejay_msg(VEEJAY_MSG_WARNING, "\tPerformance penalty for frei0r and FreeFrame: native -> RGB -> native.");
 
-	veejay_msg(VEEJAY_MSG_INFO, "\tLivido - (Linux) Video Dynamic Objects" );
+	/*veejay_msg(VEEJAY_MSG_INFO, "\tLivido - (Linux) Video Dynamic Objects" );
 	veejay_msg(VEEJAY_MSG_INFO, "\t(C) Copyright 2005 Gabriel 'Salsaman' Finch, Niels Elburg, Dennis 'Jaromil' Rojo");
 	veejay_msg(VEEJAY_MSG_INFO, "\t                   Daniel Fischer, Martin Bayer, Kentaro Fukuchi and Andraz Tori");
-	veejay_msg(VEEJAY_MSG_INFO, "\t                   Licensed as LGPL");
 	veejay_msg(VEEJAY_MSG_INFO, "\tFound %d Livido %s",
 		n_lvd_, n_lvd_ == 1 ? "plugin" :"plugins" );
+	veejay_msg(VEEJAY_MSG_INFO, "-------------------------------------------------------------------------------------------");
+	*/
 	veejay_msg(VEEJAY_MSG_INFO, "-------------------------------------------------------------------------------------------");
 	
 	plug_print_all();
@@ -701,15 +702,22 @@ void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_
 void	plug_print_all()
 {
 	int n;
+	int x=0;
 	for(n = 0; n < index_ ; n ++ )
 	{
 		char *fx_name = plug_get_name(n);
 		if(fx_name)
 		{
-			veejay_msg(VEEJAY_MSG_INFO, "\t'FX %s loaded", fx_name ); 
+			veejay_msg(VEEJAY_MSG_DEBUG, "\t'FX %s loaded", fx_name ); 
 			free(fx_name);
+			x++;
 		}
 	}
+
+	if( x < n ) {
+		veejay_msg(VEEJAY_MSG_INFO, "Loaded %d/%d plugins", x,n );
+	}
+	veejay_msg(VEEJAY_MSG_INFO, "Loaded %d plugins",n);
 		
 }
 
@@ -896,7 +904,7 @@ vj_effect *plug_get_plugin( int fx_id ) {
 
 	if( vje->num_params > 0 ) {
 		if( vje->num_params > 8 ) {
-			veejay_msg(VEEJAY_MSG_WARNING, "%s has %d parameters, supporting only %d",
+			veejay_msg(VEEJAY_MSG_WARNING, "%s has %d parameters, supporting only 8.",
 				vje->description,vje->num_params );
 			vje->num_params = 8;
 		}
