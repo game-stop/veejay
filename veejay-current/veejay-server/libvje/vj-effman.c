@@ -17,9 +17,6 @@
  *
  */
 #include <config.h>
-#ifdef STRICT_CHECKING
-#include <assert.h>
-#endif
 #include <stdint.h>
 #include <sys/types.h>
 #include <stdlib.h>
@@ -29,6 +26,10 @@
 #include <libvje/vje.h>
 #include <libvje/internal.h>
 #include <libplugger/plugload.h>
+#ifdef STRICT_CHECKING
+#include <assert.h>
+#endif
+
 extern vj_effect *vj_effects[]; 
 
 #define VEVO_PLUG_LIVIDO        0xffaa

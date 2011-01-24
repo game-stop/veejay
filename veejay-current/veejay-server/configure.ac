@@ -932,7 +932,7 @@ if test "x$enable_compile_warnings" != "xno" ; then
      *) warnCFLAGS="" ;;
     esac
   if test "x$enable_compile_warnings" = "xyes" ; then
-    warnCFLAGS="$warnCFLAGS -Wmissing-prototypes -Wundef -Wshadow -Wbad-function-cast -Wconversion -Wpadded -Wunreachable-code -Wmissing-declarations -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual"
+    warnCFLAGS="$warnCFLAGS -Wmissing-prototypes -Wundef -Wshadow -Wbad-function-cast -Wconversion -Wpadded -Wunreachable-code -Wmissing-declarations -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual -Wall"
     warnCXXFLAGS="$warnCXXFLAGS -Wmissing-prototypes  -Wpointer-arith -Wcast-align -Wwrite-strings -Wcast-qual"
   fi
   if test "x$enable_warnings_as_errors" = "xyes" ; then

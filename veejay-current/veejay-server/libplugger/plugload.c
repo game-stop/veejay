@@ -48,8 +48,9 @@
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>
-
+#ifdef STRICT_CHECKING
 #include <assert.h>
+#endif
 #include <libplugger/plugload.h>
 #include <libplugger/freeframe-loader.h>
 #include <libplugger/frei0r-loader.h>
