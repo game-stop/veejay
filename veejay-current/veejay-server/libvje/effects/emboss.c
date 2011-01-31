@@ -48,8 +48,8 @@ void simpleedge_framedata(VJFrame *frame, int width, int height)
     unsigned int x, y;
     uint8_t a1, a2, a3, b1, b2, b3, c1, c2, c3;
     uint8_t *Y = frame->data[0];
-    for (y = 0; y < height; y++) {
-	for (x = 0; x < width; x++) {
+    for (y = 1; y < (height-1); y++) {
+	for (x = 1; x < (width-1); x++) {
 	    a1 = Y[(y - 1) * width + (x - 1)];
 	    a2 = Y[(y - 1) * width + x];
 	    a3 = Y[(y - 1) * width + (x + 1)];
