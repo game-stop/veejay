@@ -253,7 +253,7 @@ void	freeframe_plug_retrieve_default_values( void *instance, void *fx_values )
 	void *base = NULL;
 	int error = vevo_property_get( instance, "base", 0, &base);
 #ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
+	assert( error == VEVO_NO_ERROR );
 #endif
 
 	plugMainType *q = (plugMainType*) base; 
@@ -277,7 +277,7 @@ void	freeframe_plug_retrieve_current_values( void *instance, void *fx_values )
 	void *base = NULL;
 	int error = vevo_property_get( instance, "base", 0, &base);
 #ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
+	assert( error == VEVO_NO_ERROR );
 #endif
 
 	plugMainType *q = (plugMainType*) base; 
@@ -308,7 +308,7 @@ void	freeframe_reverse_clone_parameter( void *instance, int seq, void *fx_values
 	void *base = NULL;
 	int error = vevo_property_get( instance, "base", 0, &base);
 #ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
+	assert( error == VEVO_NO_ERROR );
 #endif
 
 	plugMainType *q = (plugMainType*) base; 
@@ -341,7 +341,7 @@ void	freeframe_clone_parameter( void *instance, int seq, void *fx_values )
 	void *base = NULL;
 	int error = vevo_property_get( instance, "base", 0, &base);
 #ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
+	assert( error == VEVO_NO_ERROR );
 	assert(0); //@ this function must be dropped
 #endif
 
@@ -385,7 +385,7 @@ void *freeframe_plug_init( void *plugin, int w, int h )
 	void *base = NULL;
 	int error = vevo_property_get( plugin, "base", 0, &base);
 #ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
+	assert( error == VEVO_NO_ERROR );
 #endif
 
 	plugMainType *q = (plugMainType*) base; 
@@ -528,7 +528,7 @@ void	freeframe_plug_free( void *plugin )
 	void *base = NULL;
 	int error = vevo_property_get( plugin, "base", 0, &base);
 #ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
+	assert( error == VEVO_NO_ERROR );
 #endif
 	plugMainType *q = (plugMainType*) base; 
 	q( FF_DEINITIALISE, NULL, 0 );
@@ -574,19 +574,19 @@ int	freeframe_plug_process( void *plugin, double timecode )
 	void *base = NULL;
 	int error = vevo_property_get( plugin, "base", 0, &base);
 #ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
+	assert( error == VEVO_NO_ERROR );
 #endif
 
 	plugMainType *q = (plugMainType*) base; 
 	int instance = 0;
 	error = vevo_property_get( plugin, "instance",0, &instance );	
 #ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
+	assert( error == VEVO_NO_ERROR );
 #endif
 	uint8_t *space = NULL;
 	error = vevo_property_get( plugin, "HOST_buffer",0,&space );
 #ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
+	assert( error == VEVO_NO_ERROR );
 #endif
 	
 	q( FF_PROCESSFRAME, space, instance );
@@ -595,7 +595,7 @@ int	freeframe_plug_process( void *plugin, double timecode )
 	
 	error = vevo_property_get( plugin, "HOST_output", 0,&output_frame );
 #ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
+	assert( error == VEVO_NO_ERROR );
 #endif
 	
 	VJFrame *src1 = yuv_rgb_template( space, output_frame->width, output_frame->height, PIX_FMT_RGB32 );
@@ -638,7 +638,7 @@ void	freeframe_plug_param_f( void *plugin, int seq_no, void *dargs )
 	void *base = NULL;
 	error = vevo_property_get( plugin, "base", 0, &base);
 #ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
+	assert( error == VEVO_NO_ERROR );
 #endif
 	int instance = 0;
 	error = vevo_property_get( plugin, "instance", 0, &instance );
