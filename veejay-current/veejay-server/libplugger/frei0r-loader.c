@@ -65,7 +65,7 @@ typedef void (*f0r_update2_f)(f0r_instance_t instance, double time, const uint32
 
 typedef void (*f0r_set_param_value_f)(f0r_instance_t *instance, f0r_param_t *param, int param_index);
 void	frei0r_plug_param_f( void *port, int seq_no, void *value );
-int	frei0r_push_frame_f( void *plugin, char *dir, int seqno, VJFrame *in );
+int	frei0r_push_frame_f( void *plugin, int dir, int seqno, VJFrame *in );
 int	frei0r_process_frame_f( void *plugin );
 int	frei0r_process_frame_ext_f( void *plugin );
 int	frei0r_get_param_f( void *port, void *dst );
@@ -106,7 +106,7 @@ int	frei0r_get_param_f( void *port, void *dst )
 	return 1;
 }
 
-int	frei0r_push_frame_f( void *plugin, char *dir, int seqno, VJFrame *in )
+int	frei0r_push_frame_f( void *plugin, int dir, int seqno, VJFrame *in )
 {
 	void *instance = NULL;
 	int  err = vevo_property_get(plugin, "frei0r",0,&instance );
@@ -114,10 +114,8 @@ int	frei0r_push_frame_f( void *plugin, char *dir, int seqno, VJFrame *in )
 		return 0;
 
 	int i = 0;
-	if( strcasecmp( dir, "in_channels" ) == 0 )
+	if( dir == 0 )
 		i = 1;
-	else 
-		i = 0;
 
 	fr0_conv_t *fr = NULL;
 	err = vevo_property_get(plugin, "HOST_conv",0,&fr);
@@ -275,7 +273,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	} else {
 		//@ frei0r "supports" source plugins,
 		//@ but our sources are samples, so skip them.
-		veejay_msg(0, "Frei0r plugin type %d not supported.", finfo.plugin_type );
+		veejay_msg(0, "Frei0r generator plugins are not supported, skip '%s'.", name );
 		(*f0r_deinit)();
 		vpf(port);
 		return NULL;
@@ -312,8 +310,8 @@ void* 	deal_with_fr( void *handle, char *name)
 	}
 
 	if( r_params > 8 ) {
-		veejay_msg(0, "Maximum parameter count reached, allowing %d/%d parameters.",
-				r_params,n_params);
+		veejay_msg(VEEJAY_MSG_WARNING, "Maximum parameter count reached, allowing %d/%d parameters.",
+				8,r_params);
 		r_params = 8;
 	}
 

@@ -183,29 +183,6 @@ dnl *********************************************************************
 dnl Check for mjpegtools
 dnl   (creates MJPEGYTOOLS_CFLAGS, 
 dnl *********************************************************************
-have_mjpegtools=false
-PKG_CHECK_MODULES(MJPEGTOOLS, [mjpegtools >= 1.6 ],
-                    [
- 		     AC_SUBST(MJPEGTOOLS_CFLAGS)
-		     AC_SUBST(MJPEGTOOLS_LIBS)
-		     have_mjpegtools=true
-                     AC_DEFINE(HAVE_MJPEGTOOLS, 1, [MJPEGTools installed])],
-                    [have_mjpegtools=false])
-
-if test x$have_mjpegtools != xtrue ; then
-	AC_MSG_ERROR([Cannot find mjpegtools. Did you set PKG_CONFIG_PATH variable?])
-fi
-
-dnl Check for libdv
-dnl   (creates LIBDV_CFLAGS, LIBDV_LIBS; defines HAVE_LIBDV)
-dnl *********************************************************************
-have_libdv=false
-if test x$with_libdv != xno ; then
-  PKG_CHECK_MODULES(LIBDV, [libdv >= 0.102],
-                    [have_libdv=true
-                     AC_DEFINE(SUPPORT_READ_DV2, 1, [libdv is present])],
-                    [have_libdv=false])
-fi
 
 AC_MSG_CHECKING(whether to compile in debugging information)
 debugCFLAGS=""

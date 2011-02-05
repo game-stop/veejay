@@ -253,7 +253,6 @@ int v4loverlaystop(v4ldevice *vd)
 int v4lsetchannel(v4ldevice *vd, int ch)
 {
 	if(ioctl(vd->fd, VIDIOCSCHAN, &(vd->channel[ch])) < 0) {
-		veejay_msg(0,"v4lsetchannel:VIDIOCSCHAN %s", strerror(errno));
 		return -1;
 	}
 	return 0;
@@ -361,7 +360,6 @@ int v4lsetpalette(v4ldevice *vd, int palette)
 int v4lgetmbuf(v4ldevice *vd)
 {
 	if(ioctl(vd->fd, VIDIOCGMBUF, &(vd->mbuf))<0) {
-		veejay_msg(0, "v4lgetmbuf:VIDIOCGMBUF %s", strerror(errno));
 		return -1;
 	}
 	return 0;

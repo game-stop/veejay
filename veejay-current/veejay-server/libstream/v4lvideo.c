@@ -603,8 +603,9 @@ static int	__v4lvideo_init( v4lvideo_t *v, char *file, int channel, int norm, in
 
 	if ( v4lmaxchannel( &(v->vd) ) ) {	
 		if( v4lsetchannel( &(v->vd) , channel ) ) {
-			v4lclose(&(v->vd));
-			return -1;
+			veejay_msg(VEEJAY_MSG_WARNING, "Unable to select channel %d", channel );
+		//	v4lclose(&(v->vd));
+		//	return -1;
 		}
 	}
 

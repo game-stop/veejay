@@ -286,7 +286,7 @@ void	vj_unicap_deinit(void *dud )
 	unicap_driver_t *ud = (unicap_driver_t*) dud;
 	if( ud )
 	{
-		vevo_port_recursive_free( ud->device_list );
+		//vevo_port_recursive_free( ud->device_list );
 		free(ud);
 	}
 	dud = NULL;
