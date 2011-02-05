@@ -429,7 +429,7 @@ int vj_effect_deactivate(int effect_id, void *ptr)
 	{
 		if( seq >= MAX_EFFECTS && seq < (n_ext_plugs_ + MAX_EFFECTS))
 		{
-			plug_deactivate( ptr );
+			if(ptr) plug_deactivate( ptr );
 			//seq - MAX_EFFECTS );
 			vj_effect_ready[seq] = 0;
 			return 1;
