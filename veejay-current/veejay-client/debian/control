@@ -5,7 +5,6 @@ Maintainer: Jof Thibaut <tangostudio@tuxfamily.org> Niels Elburg <nwelburg@gmail
 Build-Depends: autotools-dev (>= 20100122),
                bison,
                debhelper (>= 7),
-               dh-autoreconf,
                flex,
                libasound2-dev,
                libavcodec-dev,
