@@ -2,8 +2,7 @@ Source: veejay-server
 Section: video
 Priority: optional
 Maintainer: Jof Thibaut <tangostudio@tuxfamily.org> Niels Elburg <nwelburg@gmail.com>
-Build-Depends: autotools-dev (>= 20100122),               
-               bison,
+Build-Depends: bison,         
                debhelper (>= 7),
                d-shlibs,
                flex,
@@ -16,7 +15,6 @@ Build-Depends: autotools-dev (>= 20100122),
                libjack-dev,
                libjpeg62-dev,
                liblo-dev,
-               libmjpegtools-dev,
                libsdl1.2-dev,
                libswscale-dev,
                libunicap-dev,
