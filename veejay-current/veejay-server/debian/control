@@ -1,16 +1,89 @@
-Source: veejay
+Source: veejay-server
 Section: video
-Priority: extra
-Maintainer: Niels Elburg <nwelburg@gmail.com>
-Build-Depends: debhelper (>= 5), libgtk2.0-dev,autotools-dev,libx11-dev,libxml2-dev,libxinerama-dev,libswscale-dev,libsdl1.2-dev,libavformat-dev,libjack-dev,libavcodec-dev,libglib2.0-dev,libquicktime-dev,libmjpegtools-dev,libjpeg62-dev,libfreetype6-dev,libdv4-dev,libavutil-dev,libmjpegtools-dev     
-Standards-Version: 3.7.2
+Priority: optional
+Maintainer: Jof Thibaut <tangostudio@tuxfamily.org> Niels Elburg <nwelburg@gmail.com>
+Build-Depends: autotools-dev (>= 20100122),               
+               bison,
+               debhelper (>= 7),
+               d-shlibs,
+               flex,
+               libavcodec-dev,
+               libavformat-dev,
+               libavutil-dev,
+               libdirectfb-dev,
+               libdv4-dev,
+               libgtk2.0-dev,
+               libjack-dev,
+               libjpeg62-dev,
+               liblo-dev,
+               libmjpegtools-dev,
+               libsdl1.2-dev,
+               libswscale-dev,
+               libunicap-dev,
+               libxml2-dev,
+               libx11-dev
+Standards-Version: 3.8.4
+Homepage: http://www.veejayhq.net/
 
 Package: veejay
 Architecture: any 
+Depends: ${shlibs:Depends}, ${misc:Depends}, libveejay0 (>= ${source:Version}),
+		ffmpeg,jackd
+Recommends: reloaded (>= 1.5.6)
+Suggests: veejay-utils, frei0r-plugins
+Description:Veejay a visual instrument and realtime video sampler.
+ With veejay, you can play the video like you would play a piano. The
+ engine is based upon ffmpeg and the mjpegtools featuring a client-server
+ model with multiple clients.
+ .
+ Veejay boasts the following powerfull features.
+ .
+ While playing, you can record the resulting video directly to disk 
+ (video sampling).
+ .
+ All effects are realtime and optimized for use on modern processors.
+ .
+ Veejay likes the sound of your videos as much as their images: sound is
+ kept in sync (pitched when needed - trickplay) and delivered to JACK for
+ possible further processing.
+ .
+ Can cluster to allow a number of machines to work together over the
+ network (uncompressed streaming, veejay chaining).
+ .
+ And much more...
+ .
+ Tango Studio Package: http://tangostudio.tuxfamily.org/
+
+Package: veejay-dbg
+Section: debug
+Priority: extra
+Architecture: any
+Depends: veejay (= ${binary:Version}),
+ ${misc:Depends}
+Description: Veejay a visual instrument and realtime video sampler.
+ With veejay, you can play the video like you would play a piano. The
+ engine is based upon ffmpeg and the mjpegtools featuring a client-server
+ model with multiple clients.
+ .
+ This package contains the debugging symbols.
+ .
+ Tango Studio Package: http://tangostudio.tuxfamily.org/
+
+Package: libveejay0
+Architecture: any
+Section: libs
 Depends: ${shlibs:Depends}, ${misc:Depends}
-Description: Veejay - a 'visual' instrument and realtime video sampler
- Veejay is a visual instrument and real-time video sampler.
- It allows you to "play" the video like you would play a piano.
- While playing, you can record the resulting video directly to disk (video sampling).
+Description: Veejay a visual instrument and realtime video sampler.
+ This package contains the shared library file.
+ .
+ Tango Studio Package: http://tangostudio.tuxfamily.org/
 
-
+Package: libveejay-dev
+Architecture: any
+Section: libdevel
+Depends: libveejay0 (>= ${source:Version})
+Description: Veejay a visual instrument and realtime video sampler.
+ This package contains development files needed for compiling veejay-client
+ or veejay-utils.
+ .
+ Tango Studio Package: http://tangostudio.tuxfamily.org/

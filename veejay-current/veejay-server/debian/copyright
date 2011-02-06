@@ -1,19 +1,56 @@
-This package was debianized by root <nwelburg@gmail.com> on
-Sat, 19 Dec 2009 17:12:26 +0100.
+This work was packaged for Debian by:
 
-It was downloaded from <http://www.veejayhq.net>
+    Jof Thibaut <tangostudio@tuxfamily.org> on Tue, 01 Feb 2011 22:48:10 +0100
+
+It was downloaded from http://www.veejayhq.net/
 
 Upstream Author(s): 
 
-	Niels Elburg <nwelburg@gmail.com>
+    Niels Elburg <nelburg@looze.net>
+
+    Veejay contributors:
+    Jeff Carpenter
+    David Denny
+    Daniel Jircik
+    Pilo Chambert
+    Matthijs van Henten
+    Dursun Koca
+    Peter de Man
+    Stefan Thieme
+    Andrew Wood  
+    Kyle Davenport
+    Daniel Rohr
+    Rupert Reddington
+    Toni from Germany
+    Thomas Reinhold 
+    Maciek Szczesniak
 
 Copyright: 
 
-    <Copyright (C) 2002-2009 Niels Elburg>
+    Copyright (C) 2008-2011, Niels Elburg VeejayHQ.
 
 License:
 
- You are free to distribute this software under the terms of
- the GNU General Public License.
- On Debian systems, the complete text of the GNU General Public
- License can be found in the file `/usr/share/common-licenses/GPL'
+    This program is free software; you can redistribute it and/or
+    modify it under the terms of the GNU General Public License
+    as published by the Free Software Foundation; either version 2
+    of the License, or (at your option) any later version.
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License along
+    with this program; if not, write to the Free Software Foundation, Inc.,
+    51 Franklin Street, Fifth Floor, Boston, MA 02110-1301 USA.
+
+    On Debian systems, the complete text of the GNU General
+    Public License version 2 can be found in `/usr/share/common-licenses/GPL-2'.
+
+The Debian packaging is:
+
+    Copyright (C) 2011 Jof Thibaut <tangostudio@tuxfamily.org>
+    and is licensed under the GPL version 3, 
+    see `/usr/share/common-licenses/GPL-3'.
+
+
