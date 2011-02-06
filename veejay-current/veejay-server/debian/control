@@ -2,8 +2,8 @@ Source: veejay-server
 Section: video
 Priority: optional
 Maintainer: Jof Thibaut <tangostudio@tuxfamily.org> Niels Elburg <nwelburg@gmail.com>
-Build-Depends: autotools-dev,bison,         
-               debhelper (>= 7),
+Build-Depends: autotools-dev [>= 20100122.1~],bison,         
+               debhelper (>= 7.2),
                d-shlibs,
                flex,
                libavcodec-dev,
