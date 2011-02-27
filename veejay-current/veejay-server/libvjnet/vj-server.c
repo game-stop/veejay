@@ -468,17 +468,17 @@ int _vj_server_new_client(vj_server *vje, int socket_fd)
 int _vj_server_del_client(vj_server * vje, int link_id)
 {
 	vj_link **Link = (vj_link**) vje->link;
-	if(!Link[link_id]->in_use)
-		return 0;
-
 	Link[link_id]->in_use = 0;
 	if(Link[link_id]->handle)
 	{
+		int res = close(Link[link_id]->handle);
+		if( res == -1 ) {
+			veejay_msg(0,"Error closing connection with socket %d:%s", Link[link_id]->handle, strerror(errno));
+		}
+
 		FD_CLR( Link[link_id]->handle, &(vje->fds) );
 		FD_CLR( Link[link_id]->handle, &(vje->wds) );
-		close(Link[link_id]->handle);
 	}
-	_vj_server_empty_queue(vje, link_id);
 	Link[link_id]->handle = 0;
 	Link[link_id]->promote = 0;
 	Link[link_id]->n_queued = 0;
@@ -561,7 +561,7 @@ int	_vj_server_empty_queue(vj_server *vje, int link_id)
 	int i;
 	for( i = 0; i < VJ_MAX_PENDING_MSG; i ++ )
 	{
-		if( v[i]->msg )
+		if( v[i]->msg ) 
 			free(v[i]->msg);
 		v[i]->msg = NULL;
 		v[i]->len = 0;
@@ -886,9 +886,11 @@ int	vj_server_update( vj_server *vje, int id )
 	}
 
 	if( bytes_received <= 0 ) {
-		veejay_msg(0, "Link %d reports ready but no data to read!", sock_fd );
 		if( bytes_received == -1 ) {
-			veejay_msg(0, "%s",strerror(errno));
+			veejay_msg(0, "Networking error with socket %d: %s",sock_fd,strerror(errno));
+		}
+		if( bytes_received == 0 ) {
+			veejay_msg(0, "Socket %d closed connection, terminating client connection.");
 		}
 		return -1; // close client now
 	}
@@ -1028,28 +1030,3 @@ char *vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
 	return msg;
 }
 
-/*
-int vj_server_retrieve_msg(vj_server *vje, int id, char *dst, int *str_len )
-{
-	vj_link **Link = (vj_link**) vje->link;
-   	if (!Link[id]->in_use)
-		return 0;
-
-	int index = Link[id]->n_retrieved;
-	char *msg;
-	int   len;
-	if( index >= Link[id]->n_queued )
-		return 0; // done
-
-	msg = Link[id]->m_queue[index]->msg;
-	len = Link[id]->m_queue[index]->len;
-//	strncpy( dst, msg, len );
-
-	veejay_memcpy(dst,msg, len );
-	*str_len = len;
-
-	index ++;
-	Link[id]->n_retrieved = index;
-	return 1;			
-}
-*/

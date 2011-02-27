@@ -314,23 +314,20 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 		veejay_memset( status_len, 0, sizeof( status_len ) );
 		n = vj_client_read(v->fd, V_STATUS, status_len, 5 );
 		int bytes= 0;
-#ifdef STRICT_CHECKING
-	assert( status_len[0] == 'V' );
-#endif
 
 		if( status_len[0] != 'V' ) {
 			n = -1;
 			k = -1;
-			break;
 		}
 
-		if( n == -1  && v->is_master )
+		if( n == -1  && v->is_master ) {
 			reloaded_schedule_restart();
+			break;
+		}
 		
 		if( sscanf( status_len+1, "%03d", &bytes ) != 1 ) {
 			veejay_msg(0, "Invalid status message.");
 			bytes = 0;
-			reloaded_schedule_restart();
 		}
 
 		if(bytes > 0 )

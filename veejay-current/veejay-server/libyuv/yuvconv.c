@@ -307,6 +307,21 @@ void	yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 )
 			}
 			
 			break;
+		case PIX_FMT_RGB24:
+		case PIX_FMT_BGR24:
+			if( p1 != NULL ) 
+				*p1 = src->len * 3;
+			*p2 = 0;
+			*p3 = 0;
+			*p4 = 0;
+			break;
+		case PIX_FMT_RGBA:
+			if( p1 != NULL )
+				*p1 = src->len * 4;
+			*p2 = NULL;
+			*p3 = NULL;
+			*p4 = NULL;
+			break;
 		default:	
 			if(p1 != NULL) {
 				*p1 = src->len;
@@ -324,7 +339,6 @@ void	yuv_plane_sizes( VJFrame *src, int *p1, int *p2, int *p3, int *p4 )
 
 			break;
 	}
-	return 0;
 }
 
 
@@ -375,6 +389,12 @@ VJFrame	*yuv_yuv_template( uint8_t *Y, uint8_t *U, uint8_t *V, int w, int h, int
 			f->uv_height = f->height;
 			f->stride[0] = w * 2;
 			f->stride[1] = f->stride[2] = 0;
+			break;
+		case PIX_FMT_RGB24:
+		case PIX_FMT_BGR24:
+			f->stride[0] = w * 3;
+			f->uv_width = 0; f->uv_height=0;
+			f->data[1] = NULL;f->data[2] = NULL;
 			break;
 		default:
 #ifdef STRICT_CHECKING
@@ -1182,8 +1202,33 @@ void	yuv_convert_and_scale_rgb(void *sws , VJFrame *src, VJFrame *dst)
 void	yuv_convert_and_scale(void *sws , VJFrame *src, VJFrame *dst)
 {
 	vj_sws *s = (vj_sws*) sws;
-	int src_stride[3] = { src->width,src->uv_width,src->uv_width };
-	int dst_stride[3] = { dst->width,dst->uv_width,dst->uv_width };
+
+	int src_stride[3];
+	int dst_stride[3];
+
+	int n = 0;
+	if( src->format == PIX_FMT_RGBA || src->format == PIX_FMT_BGRA || src->format == PIX_FMT_ARGB ||
+	 src->format == PIX_FMT_RGB32 ) {
+		n = 4;
+	} 
+	if( src->format == PIX_FMT_RGB24 || src->format == PIX_FMT_BGR24 ) {
+		n = 3;
+	}
+	if( n > 0 ) {
+		src_stride[0] = src->width * n;
+		src_stride[1] = 0;
+		src_stride[2] = 0;
+	} else {
+		src_stride[0] = src->width;
+		src_stride[1] = src->uv_width;
+		src_stride[2] = src->uv_width;
+	}
+
+	//@ dst is never rgb
+
+	dst_stride[0] = dst->width;
+	dst_stride[1] = dst->uv_width;
+	dst_stride[2] = dst->uv_width;
 
 	sws_scale( s->sws, src->data, src_stride, 0, src->height,
 		dst->data, dst_stride );

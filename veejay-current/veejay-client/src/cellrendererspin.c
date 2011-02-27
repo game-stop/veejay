@@ -325,7 +325,7 @@ gui_cell_renderer_spin_start_editing (GtkCellRenderer      *cell,
                                                 spincell->upper,
                                                 spincell->step_inc,
                                                 spincell->page_inc,
-                                                spincell->page_size));
+                                                0));
 
         gtk_spin_button_configure(GTK_SPIN_BUTTON(spinbutton), adj, spincell->climb_rate, spincell->digits);
 

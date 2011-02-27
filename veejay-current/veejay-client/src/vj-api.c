@@ -1999,7 +1999,7 @@ void	gveejay_popup_err( const char *type, char *msg )
 {
 	message_dialog( type, msg );
 }
-
+void	donatenow();
 void	reportbug();
 void	update_gui();
 
@@ -3135,13 +3135,23 @@ void	reportbug()
 //	if( prompt_dialog("Report a problem", "" )
 //		 == GTK_RESPONSE_ACCEPT )
 	snprintf(URL , sizeof(URL),	
-		"firefox http://groups.google.com/group/veejay-discussion/post?hl=%s",l );
+		"firefox \"http://groups.google.com/group/veejay-discussion/post?hl=%s\"",l );
 
 	printf(URL);
 
 	system(URL);
 }
 
+void	donatenow()
+{
+	char URL[512];
+	snprintf(URL , sizeof(URL),	
+	 "firefox \"http://www.veejayhq.net/donate\"" );
+
+	printf(URL);
+
+	system(URL);
+}
 
 static	void	reset_tree(const char *name)
 {
@@ -7195,14 +7205,15 @@ void			reloaded_restart()
 	gtk_widget_hide( mw );
 
 	vj_gui_wipe();
-	
+/*	
 	//@ bring up the launcher window
 	gtk_widget_show( cd );
 //	info->watch.state = STATE_CONNECT;
 	info->watch.state = STATE_WAIT_FOR_USER;
 	info->launch_sensitive = TRUE;
 
-	veejay_msg(VEEJAY_MSG_INFO, "Ready to make a connection to a veejay server");
+	veejay_msg(VEEJAY_MSG_INFO, "Ready to make a connection to a veejay server");*/
+
 }
 
 gboolean		is_alive( int *do_sync )
@@ -7236,6 +7247,10 @@ gboolean		is_alive( int *do_sync )
 	//	reloaded_schedule_restart();
 		reloaded_restart();
 		*do_sync = 0;
+		if( 	info->launch_sensitive == 0 ) {
+			return FALSE;
+		}
+
 		return TRUE;
 	//	return FALSE; 
 	}
@@ -7301,6 +7316,8 @@ void	vj_gui_disconnect()
 	reset_tree("tree_chain");
 	reset_tree("tree_sources");
 	reset_tree("editlisttree");
+
+	multitrack_close_track(info->mt);
 
 	reloaded_schedule_restart();
 }

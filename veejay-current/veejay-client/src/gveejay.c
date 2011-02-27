@@ -149,10 +149,7 @@ gboolean	gveejay_idle(gpointer data)
 	{
 		int sync = 0;
 		if( is_alive(&sync) == FALSE ) {
-			//@ restart reloaded
-			veejay_msg(VEEJAY_MSG_WARNING,
-				"No connection with veejay, attempting restart.");
-			reloaded_restart();
+			return FALSE;
 		} 
 		if( sync ) {
 			if( gveejay_time_to_sync( get_ui_info() ) )
@@ -166,7 +163,6 @@ gboolean	gveejay_idle(gpointer data)
 		update_gveejay();
 
 	}
-
 	if( gveejay_restart() )
 	{
 		//@ reinvoke 
@@ -258,11 +254,14 @@ int main(int argc, char *argv[]) {
 	memset( &time_last_, 0, sizeof(struct timeval));
 
 	while(gveejay_running()) {
-		gveejay_idle(NULL);
+		if(gveejay_idle(NULL)==FALSE)
+			break;
 		while( gtk_events_pending()  ) 
 			gtk_main_iteration();
 
 	}
+
+	veejay_msg(VEEJAY_MSG_INFO, "See you!");
 
 
 	return 0;  

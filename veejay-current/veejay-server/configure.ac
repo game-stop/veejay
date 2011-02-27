@@ -82,9 +82,11 @@ AC_ARG_WITH(jack,
 AC_ARG_WITH(samplerate,
 		AC_HELP_STRING([--without-samplerate], [Do not use libsamplerate.]),
 		[], [with_samplerate=yes])
-
+AC_ARG_WITH(v4l2,
+		AC_HELP_STRING([--without-v4l2], [Do not use video4linux2]),	
+		[with_v4l2=yes], [with_v4l2=no])
 AC_ARG_WITH(v4l,
-		AC_HELP_STRING([--without-v4l], [Do not use video4linux]),	
+		AC_HELP_STRING([--without-v4l], [Do not use video4linux1]),	
 		[], [with_v4l=yes])
 AC_ARG_WITH(xml2,
 		AC_HELP_STRING([--without-xml2], [Do not use the XML library for Gnome]),
@@ -166,6 +168,7 @@ dnl *********************************************************************
 dnl Test whether we're linux or not. If so, define HAVE_V4L and build the
 dnl video4linux/hardware dependent tools. Else, undefine HAVE_V4L
 have_v4l=false
+have_v4l2=false
 have_linux=false
 have_darwin=false
 case $host in
@@ -609,6 +612,22 @@ if test x$with_v4l != xno ; then
           fi
 fi
 
+
+if test x$with_v4l2 != xno ; then
+  if test x$have_linux != xfalse ; then
+
+	  AC_CHECK_HEADER(linux/videodev2.h,
+                  [have_v4l2=true
+	  if test x$with_v4l2 != xno; then
+                   AC_DEFINE(USE_V4L2, 1,
+		             [Building for Linux - using the video4linux2 API])
+			fi
+			],
+                  [AC_MSG_ERROR([videodev2.h not found - please install the linux kernel headers])])
+          fi
+fi
+
+
 dnl *********************************************************************
 dnl Check for the pthread lib
 dnl
@@ -904,6 +923,7 @@ AM_CONDITIONAL(HAVE_SAMPLERATE,test x$have_samplerate = xtrue)
 AM_CONDITIONAL(HAVE_DIRECTFB, test x$have_directfb = xtrue)
 AM_CONDITIONAL(HAVE_FREETYPE, test x$have_freetype = xtrue)
 AM_CONDITIONAL(HAVE_V4L, test x$have_v4l = xtrue)
+AM_CONDITIONAL(USE_V4L2, test x$have_V4l2 = xtrue)
 AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)
@@ -1053,7 +1073,7 @@ AC_MSG_NOTICE([  - POSIX Threads (pthread)       : ${have_pthread}])
 AC_MSG_NOTICE([  - FFmpeg AVFormat               : ${have_avformat} ])
 AC_MSG_NOTICE([  - FFmpeg AVCodec                : ${have_avcodec} ])
 AC_MSG_NOTICE([  - FFmpeg Swscaler               : ${have_swscale} ])
-AC_MSG_NOTICE([  - FFmpeg avutil		 : ${have_avutil} ])
+AC_MSG_NOTICE([  - FFmpeg avutil		         : ${have_avutil} ])
 AC_MSG_NOTICE([  - SDL support                   : ${have_sdl}])
 AC_MSG_NOTICE([  - Freetype support              : ${have_freetype}])
 AC_MSG_NOTICE([  - XML c library for Gnome       : ${have_xml2}])
@@ -1067,5 +1087,8 @@ AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Unicap Imaging                : ${have_unicap} ])
 AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
+AC_MSG_NOTICE([  - V4L2                          : ${have_v4l2}])
+AC_MSG_NOTICE([  - V4L1 (default)                : ${have_v4l}])
 #AC_MSG_NOTICE([  - libsamplerate                 : ${have_samplerate}])
 
+cat NEWS

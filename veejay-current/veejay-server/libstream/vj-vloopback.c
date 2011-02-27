@@ -31,7 +31,7 @@
  */
 
 #include <config.h>
-#ifdef HAVE_V4L
+#if defined (HAVE_V4L) || defined (USE_V4L2)
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
