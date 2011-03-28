@@ -21,7 +21,6 @@
 #include <libstream/vj-tag.h>
 #include <libhash/hash.h>
 #include <libvje/vje.h>
-#include <linux/videodev.h>
 #include <veejay/vj-viewport.h>
 #include <veejay/vjkf.h>
 #ifdef STRICT_CHECKING
@@ -47,9 +46,11 @@
 #include <libvje/internal.h>
 #include <libvje/ctmf/ctmf.h>
 #include <libstream/vj-net.h>
-#ifndef USE_V4L2
+#ifdef HAVE_V4L
+#include <linux/videodev.h>
 #include <libstream/v4lvideo.h>
-#else
+#endif
+#ifdef HAVE_V4L2
 #include <libstream/v4l2utils.h>
 #endif
 #ifdef HAVE_UNICAP
@@ -220,11 +221,12 @@ int	vj_tag_num_devices()
 {
 #ifdef HAVE_UNICAP
 	return vj_unicap_num_capture_devices( unicap_data_ );
-#ifndef USE_V4L2
-	return v4lvideo_templ_num_devices();
-#else
-	return v4l2_num_devices();
 #endif
+#ifdef HAVE_V4L
+	return v4lvideo_templ_num_devices();
+#endif
+#ifdef HAVE_V4L2
+	return v4l2_num_devices();
 #endif
 }
 
@@ -237,12 +239,12 @@ char *vj_tag_scan_devices( void )
 #ifdef HAVE_UNICAP
 	char **device_list = vj_unicap_get_devices(unicap_data_, &num);
 #else
-#ifndef USE_V4L2
+#ifdef HAVE_V4L
 	char **device_list = v4lvideo_templ_get_devices(&num);
-#else
+#endif
+#ifdef HAVE_V4L2
 	char **device_list = v4l2_get_device_list();
 #endif
-
 #endif
 	if(!device_list)
 		return strdup(default_str);
@@ -316,7 +318,7 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
     for(i=0; i < SAMPLE_MAX_SAMPLES; i++) {
 	avail_tag[i] = 0;
     }
-#ifndef USE_V4L2 
+#ifdef HAVE_V4L 
 	v4lvideo_templ_init();
 #endif
     return 0;
@@ -396,7 +398,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 	{
 		return 0;
 	}
-#ifdef USE_V4L2
+#ifdef HAVE_V4L2
 	snprintf(refname,sizeof(refname), "/dev/v4l/video%d",device_num );
 #else
 	snprintf(refname,sizeof(refname), "/dev/video%d",device_num ); // freq->device_num
@@ -415,7 +417,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 	veejay_msg(VEEJAY_MSG_INFO, "Open capture device with %s",
 	  ( driver == 1 ? "v4l[x]"  : "Unicap" ) );
 	if( tag->capture_type == 1 )  {
-#ifndef USE_V4L2
+#ifdef HAVE_V4L
    		vj_tag_input->unicap[stream_nr] = v4lvideo_init( refname, channel, 
 			v4lvideo_templ_get_norm( selected_video_norm ),
 			freq,
@@ -428,7 +430,8 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 		sprintf(refname, "%d",channel );
 		tag->extra = strdup(refname);
 		veejay_msg(VEEJAY_MSG_DEBUG, "Using V4lutils from EffecTV");
-#else
+#endif
+#ifdef HAVE_V4L2
 		vj_tag_input->unicap[stream_nr] = v4l2open( refname, channel, palette,width,height,
 				_tag_info->edit_list->video_fps,_tag_info->edit_list->video_norm );
 		if( !vj_tag_input->unicap[stream_nr] ) {
@@ -838,9 +841,10 @@ int	vj_tag_composite(int t1)
 		return vj_unicap_composite_status( vj_tag_input->unicap[ tag->index ] );
 #endif
 	if(tag->capture_type==1)
-#ifndef USE_V4L2
+#ifdef HAVE_V4L
 		return v4lvideo_get_composite_status( vj_tag_input->unicap[tag->index]);
-#else
+#endif
+#ifdef HAVE_V4L2
 		return v4l2_get_composite_status( vj_tag_input->unicap[tag->index] );
 #endif
 		return 0;
@@ -954,9 +958,10 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 	if(type == VJ_TAG_TYPE_MCAST || type == VJ_TAG_TYPE_NET)
 	    tag->priv = net_threader();
 
-#ifndef USE_V4L2
+#ifdef HAVE_V4L
 	palette = v4lvideo_templ_get_palette( pix_fmt );
-#else
+#endif
+#ifdef HAVE_V4L2
 	palette = get_ffmpeg_pixfmt( pix_fmt );
 #endif
     switch (type) {
@@ -1153,7 +1158,7 @@ int vj_tag_del(int id)
 #endif
 
 		if(tag->capture_type==1) 
-#ifdef USE_V4L2
+#ifdef HAVE_V4L2
 			v4l2_close( vj_tag_input->unicap[tag->index]);
 #else
 			v4lvideo_destroy( vj_tag_input->unicap[tag->index] );
@@ -1739,7 +1744,7 @@ int vj_tag_set_brightness(int t1, int value)
 	else	
 	{
 		if(tag->capture_type==1)
-#ifdef USE_V4L2
+#ifdef HAVE_V4L2
 			v4l2_set_brightness( vj_tag_input->unicap[tag->index],value);
 #else
 			v4lvideo_set_brightness( vj_tag_input->unicap[tag->index], value );
@@ -1763,9 +1768,10 @@ int vj_tag_set_white(int t1, int value)
 	else
 	{
 		if(tag->capture_type==1)
-#ifndef USE_V4L2
+#ifdef HAVE_V4L
 			v4lvideo_set_white( vj_tag_input->unicap[tag->index],value );
-#else
+#endif
+#ifdef HAVE_V4L2
 			v4l2_set_temperature( vj_tag_input->unicap[tag->index],value);
 #endif
 #ifdef HAVE_UNICAP
@@ -1785,19 +1791,18 @@ int vj_tag_set_hue(int t1, int value)
 		veejay_msg(VEEJAY_MSG_ERROR,"Hue valid range is 0 - 65535");
 		return -1;
 	}
-	else
-	{
-		if(tag->capture_type==1)
-#ifndef USE_V4L2
-			v4lvideo_set_hue( vj_tag_input->unicap[tag->index], value );
-#else
-			v4l2_set_hue( vj_tag_input->unicap[tag->index],value );
-#endif
 #ifdef HAVE_UNICAP
-		else
-			vj_unicap_select_value( vj_tag_input->unicap[tag->index],UNICAP_HUE, (double)value );
+		if(tag->capture_type==0) {
+			vj_unicap_select_value( vj_tag_input->unicap[tag->index],UNICAP_HUE,(double)value);
+		} 
 #endif
-	}
+		if( tag->capture_type==1) 
+#ifdef HAVE_V4L
+		{	v4lvideo_set_hue( vj_tag_input->unicap[tag->index], value ); }
+#endif
+#ifdef HAVE_V4l2
+		{	v4l2_set_hue( vj_tag_input->unicap[tag->index],value ); 	}
+#endif
 	return 1;
 }
 int vj_tag_set_contrast(int t1,int value)
@@ -1812,9 +1817,10 @@ int vj_tag_set_contrast(int t1,int value)
 	else
 	{
 		if(tag->capture_type==1)
-#ifndef USE_V4L2
+#ifdef HAVE_V4L
 			v4lvideo_set_contrast( vj_tag_input->unicap[tag->index], value );
-#else
+#endif
+#ifdef HAVE_V4L2
 			v4l2_set_contrast( vj_tag_input->unicap[tag->index], value );
 #endif
 #ifdef HAVE_UNICAP
@@ -1837,9 +1843,10 @@ int vj_tag_set_color(int t1, int value)
 	else
 	{
 		if(tag->capture_type==1)
-#ifndef USE_V4L2
+#ifdef HAVE_V4L
 			v4lvideo_set_colour( vj_tag_input->unicap[tag->index], value );
-#else
+#endif
+#ifdef HAVE_V4L2
 			v4l2_set_contrast( vj_tag_input->unicap[tag->index],value);
 #endif
 #ifdef HAVE_UNICAP
@@ -1862,11 +1869,22 @@ int	vj_tag_get_v4l_properties(int t1,
 	}
 
 	if(tag->capture_type == 1 ) {
+#ifdef HAVE_V4L
 		*brightness = v4lvideo_get_brightness(  vj_tag_input->unicap[tag->index] );
 		*contrast  = v4lvideo_get_contrast( vj_tag_input->unicap[tag->index] );
 		*hue	    = v4lvideo_get_hue( vj_tag_input->unicap[tag->index] );
 		*color	    = v4lvideo_get_colour( vj_tag_input->unicap[tag->index] );
 		*white     =  v4lvideo_get_white( vj_tag_input->unicap[tag->index] );
+#endif
+#ifdef HAVE_V4L2
+		*brightness = v4l2_get_brightness(  vj_tag_input->unicap[tag->index] );
+		*contrast  = v4l2_get_contrast( vj_tag_input->unicap[tag->index] );
+		*hue	    = v4l2_get_hue( vj_tag_input->unicap[tag->index] );
+		*color	    = v4l2_get_saturation( vj_tag_input->unicap[tag->index] );
+		*white     =  v4l2_get_temperature( vj_tag_input->unicap[tag->index] );
+
+#endif
+
 		return 0;
 	}
 #ifdef HAVE_UNICAP
@@ -2312,7 +2330,7 @@ int vj_tag_disable(int t1) {
 	}
 	if(tag->source_type == VJ_TAG_TYPE_V4L )
 	{
-#ifndef USE_V4L2
+#ifdef HAVE_V4L
 		if( tag->capture_type == 1 ) {
 			if(v4lvideo_is_active(vj_tag_input->unicap[tag->index] ) )
 				v4lvideo_set_paused( vj_tag_input->unicap[tag->index] , 1 );
@@ -2350,7 +2368,7 @@ int vj_tag_enable(int t1) {
 	if( tag->source_type == VJ_TAG_TYPE_V4L )
 	{
 		if(tag->capture_type == 1 ) {
-#ifndef USE_V4L2
+#ifdef HAVE_V4L
 			if(!v4lvideo_is_active(  vj_tag_input->unicap[tag->index] ) ) {
 				if(v4lvideo_grabstart(  vj_tag_input->unicap[tag->index] ) == 0 )
 				{
@@ -2433,7 +2451,7 @@ int vj_tag_set_active(int t1, int active)
 	   case VJ_TAG_TYPE_V4L:
 
 		if(tag->capture_type == 1 ) {
-#ifndef USE_V4L2
+#ifdef HAVE_V4L
 			if(active) {
 			     if( !v4lvideo_is_active( vj_tag_input->unicap[tag->index] ) ) {
 					if(v4lvideo_grabstart( vj_tag_input->unicap[tag->index] ) < 0 ) {
@@ -3365,9 +3383,10 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	{
 	case VJ_TAG_TYPE_V4L:
 		if( tag->capture_type == 1 ) {
-#ifndef USE_V4L2
+#ifdef HAVE_V4L
 			int res = v4lvideo_copy_framebuffer_to(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]);
-#else
+#endif
+#ifdef HAVE_V4L2
 			int res = v4l2_pull_frame( vj_tag_input->unicap[tag->index],v4l2_get_dst(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]) );
 #endif
 			if( res <= 0 ) {

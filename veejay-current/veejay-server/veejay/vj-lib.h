@@ -25,7 +25,6 @@
 #include <libvjnet/vj-server.h>
 #include <libvjnet/vj-client.h>
 #include <libyuv/yuvconv.h>
-#include <libstream/vj-vloopback.h>
 #include <libstream/vj-yuv4mpeg.h>
 #include <veejay/vj-sdl.h>
 #include <libel/lav_io.h>

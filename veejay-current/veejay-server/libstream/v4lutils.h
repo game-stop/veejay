@@ -23,11 +23,7 @@
 
 #ifndef __V4LUTILS_H__
 #define __V4LUTILS_H__
-
-#include <sys/types.h>
 #include <linux/videodev.h>
-#include <pthread.h>
-
 /*
  * Error message displaying level
  */

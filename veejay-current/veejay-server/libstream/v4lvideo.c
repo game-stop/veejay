@@ -21,6 +21,7 @@
 
 
 #include <config.h>
+#ifdef HAVE_V4L
 #include <stdio.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -1194,4 +1195,4 @@ int	v4lvideo_get_composite_status( void *vv)
 	v4lvideo_template_t *v = (v4lvideo_template_t*) vv;
 	return v->composite;
 }
-
+#endif

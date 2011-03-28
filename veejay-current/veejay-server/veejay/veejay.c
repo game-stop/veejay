@@ -135,7 +135,7 @@ static void CompiledWith()
 #ifdef HAVE_V4L
 	veejay_msg(VEEJAY_MSG_INFO,"\tUsing Video4Linux");
 #endif
-#ifdef USE_V4L2
+#ifdef HAVE_V4L2
 	veejay_msg(VEEJAY_MSG_INFO, "\tUsing Video4Linux II");
 #endif
 	/*

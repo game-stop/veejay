@@ -619,7 +619,7 @@ if test x$with_v4l2 != xno ; then
 	  AC_CHECK_HEADER(linux/videodev2.h,
                   [have_v4l2=true
 	  if test x$with_v4l2 != xno; then
-                   AC_DEFINE(USE_V4L2, 1,
+                   AC_DEFINE(HAVE_V4L2, 1,
 		             [Building for Linux - using the video4linux2 API])
 			fi
 			],
@@ -923,7 +923,7 @@ AM_CONDITIONAL(HAVE_SAMPLERATE,test x$have_samplerate = xtrue)
 AM_CONDITIONAL(HAVE_DIRECTFB, test x$have_directfb = xtrue)
 AM_CONDITIONAL(HAVE_FREETYPE, test x$have_freetype = xtrue)
 AM_CONDITIONAL(HAVE_V4L, test x$have_v4l = xtrue)
-AM_CONDITIONAL(USE_V4L2, test x$have_V4l2 = xtrue)
+AM_CONDITIONAL(HAVE_V4L2, test x$have_V4l2 = xtrue)
 AM_CONDITIONAL(SUPPORT_READ_DV2, test x$have_libdv = xtrue)
 AM_CONDITIONAL(HAVE_DL_DLOPEN, test x$have_dl_dlopen = xtrue)
 AM_CONDITIONAL(HAVE_JPEG,test x$have_jpeg = xtrue)

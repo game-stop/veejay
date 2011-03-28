@@ -22,18 +22,20 @@
  */
 
 #include <config.h>
+#ifdef HAVE_V4L
 #include <stdio.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
-#include <sys/ioctl.h>
-#include <sys/types.h>
-#include <sys/mman.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <linux/videodev.h>
 #include <pthread.h>
 #include <errno.h>
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <sys/mman.h>
+#
 #include <libvjmsg/vj-msg.h>
 #include <libstream/v4lutils.h>
 #define DEFAULT_DEVICE "/dev/video"
@@ -588,3 +590,4 @@ void v4ldebug(int flag)
 	veejay_msg(0, "debug: %d",flag);
 	v4l_debug = flag;
 }
+#endif

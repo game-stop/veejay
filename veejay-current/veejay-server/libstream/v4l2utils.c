@@ -39,7 +39,7 @@
 */
 
 #include <config.h>
-#ifdef USE_V4L2
+#ifdef HAVE_V4L2
 #include <stdio.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>

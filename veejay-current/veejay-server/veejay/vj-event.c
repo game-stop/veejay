@@ -9406,9 +9406,9 @@ void		vj_event_quick_bundle( void *ptr, const char format[], va_list ap)
 	vj_event_commit_bundle( (veejay_t*) ptr,0,0);
 }
 
-
 void	vj_event_vloopback_start(void *ptr, const char format[], va_list ap)
 {
+#ifdef HAVE_V4L
 	int args[2];
 	char *s = NULL;
 	char device_name[100];
@@ -9462,14 +9462,20 @@ void	vj_event_vloopback_start(void *ptr, const char format[], va_list ap)
 	if( v->vloopback == NULL )
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to setup vloopback pusher"); 
 
+#else
+		veejay_msg(VEEJAY_MSG_ERROR, "not implemented yet!");
+#endif
 }
 
 void	vj_event_vloopback_stop( void *ptr, const char format[], va_list ap )
 {
+#ifdef HAVE_V4L
 	veejay_t *v = (veejay_t*) ptr;
 	vj_vloopback_close( v->vloopback );
+#else
+	veejay_msg(VEEJAY_MSG_ERROR, "not implemented yet!");
+#endif
 }
-
 /* 
  * Function that returns the options for a special sample (markers, looptype, speed ...) or
  * for a special stream ... 
