@@ -7160,7 +7160,6 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	info->uc.reload_hint[HINT_SEQ_ACT] = 1;
 	info->uc.reload_hint[HINT_HISTORY] = 1;       
 
-
 	return 1;
 }
 
@@ -7283,10 +7282,9 @@ gboolean		is_alive( int *do_sync )
 			multrack_audoadd( info->mt, remote, port );
 			*do_sync = 1;
 			if( user_preview ) {
-				info->preview_locked = 1;
-				multitrack_set_quality( info->mt, user_preview );
+			//	info->preview_locked = 1;
 				set_toggle_button( "previewtoggle", 1 );
-				info->preview_locked = 0;
+			//	info->preview_locked = 0;
 			}
 			veejay_stop_connecting(gui);
 		}
