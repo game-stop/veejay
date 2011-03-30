@@ -1,5 +1,5 @@
 /* gveejay - Linux VeeJay - GVeejay GTK+-2/Glade User Interface
- *           (C) 2002-2005 Niels Elburg <nwelburg@gmail.com> 
+ *           (C) 2002-2011 Niels Elburg <nwelburg@gmail.com> 
  *
  *
  * This program is free software; you can redistribute it and/or modify
@@ -34,7 +34,7 @@
 
 static int selected_skin = 0;
 extern int	mt_get_max_tracks();
-
+static int load_midi = 0;
 static int port_num	= 3490;
 static char hostname[255];
 static int gveejay_theme = 1;
@@ -47,6 +47,7 @@ static int pw = 176;
 static int ph = 144;
 static int preview = 0; // off
 static int use_threads = 0;
+static char midi_file[1024];
 static struct
 {
 	char *file;
@@ -72,6 +73,7 @@ static void usage(char *progname)
         printf( "-X\t\tSet number of tracks\n");
 	printf( "-l\t\tChoose layout (0=large screen, 1=small screens)\n");
 	printf( "-V\t\tShow version, data directory and exit.\n");
+	printf( "-m <file>\tMIDI configuration file.\n");
 	printf( "\n\n");
         exit(-1);
 }
@@ -123,6 +125,10 @@ static int      set_option( const char *name, char *value )
 		fprintf(stdout, "version: %s\n", PACKAGE_VERSION);
 		fprintf(stdout, "data directory: %s\n", get_gveejay_dir());
 		exit(0);
+	}
+	else if (strcmp( name, "m" ) == 0 ) {
+		strcpy(midi_file, optarg);
+		load_midi = 1;
 	}
 	else if (strcmp(name, "P" ) == 0 || strcmp(name, "preview" ) == 0 )
 	{
@@ -198,7 +204,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	sprintf(hostname, "127.0.0.1");
 
-        while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:Vl:T:")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:Vl:T:m:")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);
@@ -235,7 +241,7 @@ int main(int argc, char *argv[]) {
 
 	register_signals();
 		
-	vj_gui_init( skins[selected_skin].file, launcher, hostname, port_num, use_threads );
+	vj_gui_init( skins[selected_skin].file, launcher, hostname, port_num, use_threads, load_midi, midi_file );
 	vj_gui_style_setup();
 
 
@@ -244,7 +250,6 @@ int main(int argc, char *argv[]) {
 		veejay_msg(VEEJAY_MSG_INFO, "Starting with preview enabled");
 		gveejay_preview(preview);
 	}
-
 
 	if( launcher )
 	{

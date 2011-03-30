@@ -156,6 +156,7 @@ void	vj_midi_load(void *vv, const char *filename)
 	struct stat t;
 	if( fstat( fd, &t) != 0 )
 	{
+		veejay_msg(0, "Error loading MIDI config '%s':%s",filename,strerror(errno));
 		vj_msg(VEEJAY_MSG_ERROR,"Unable to load %s: %s", filename, strerror(errno));
 		return;
 	}
@@ -229,6 +230,7 @@ void	vj_midi_load(void *vv, const char *filename)
 	
 	}
 	free(buf);
+	veejay_msg(VEEJAY_MSG_INFO, "loaded %d midi events from %s",count,filename);
 	vj_msg(VEEJAY_MSG_INFO, "Loaded %d MIDI events from %s", count ,filename);
 }
 

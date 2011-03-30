@@ -6805,7 +6805,7 @@ static	void	debug_spinboxes()
 	}
 }
 
-void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, int use_threads)
+void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, int use_threads, int load_midi , char *midi_file)
 {
 	int i;
 	char text[100];
@@ -7023,6 +7023,9 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 	update_slider_range( "speed_slider", -25,25,1,0);
 	update_slider_range( "slow_slider",1,MAX_SLOW,1,0);
 
+
+	if( load_midi )
+			vj_midi_load(info->midi,midi_file);
 }
 
 void	vj_gui_preview(void)
