@@ -1,5 +1,7 @@
-veejay (1.5.8) unstable; urgency=low
+veejay (1.5.9) unstable; urgency=low
 
+  * 1.5.9 release
+ 
   * 1.5.8 release  
 
   * 1.5.3 release
@@ -10,6 +12,5 @@ veejay (1.5.8) unstable; urgency=low
 
   * Initial official release 
 
- -- Jof Thibaut <tangostudio@tuxfamily.org> Tue, 01 Feb 2011 22:48:10 +0100
- -- Niels Elburg <nwelburg@gmail.com>  Sat, 19 Dec 2009 19:38:26 +0100
+ -- Niels Elburg <nwelburg@gmail.com>  Sun, 03 Apr 2011 15:15:15 +0100
 

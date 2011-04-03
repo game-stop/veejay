@@ -1,11 +1,11 @@
 Source: veejay
 Section: video
 Priority: optional
-Maintainer: Jof Thibaut <tangostudio@tuxfamily.org> Niels Elburg <nwelburg@gmail.com>
-Build-Depends: autotools-dev [>= 20100122.1~],bison,         
-               debhelper (>= 7.2),
+Maintainer: Niels Elburg <nwelburg@gmail.com>
+Build-Depends: debhelper,
+               autotools-dev,
                d-shlibs,
-               flex,
+               flex,bison,
                libavcodec-dev,
                libavformat-dev,
                libavutil-dev,
@@ -14,10 +14,8 @@ Build-Depends: autotools-dev [>= 20100122.1~],bison,
                libgtk2.0-dev,
                libjack-dev,
                libjpeg62-dev,
-               liblo-dev,
                libsdl1.2-dev,
                libswscale-dev,
-               libunicap-dev,
                libxml2-dev,
                libx11-dev
 Standards-Version: 3.8.4
@@ -50,7 +48,6 @@ Description:Veejay a visual instrument and realtime video sampler.
  .
  And much more...
  .
- Tango Studio Package: http://tangostudio.tuxfamily.org/
 
 Package: veejay-dbg
 Section: debug
@@ -65,7 +62,6 @@ Description: Veejay a visual instrument and realtime video sampler.
  .
  This package contains the debugging symbols.
  .
- Tango Studio Package: http://tangostudio.tuxfamily.org/
 
 Package: libveejay0
 Architecture: any
@@ -74,7 +70,6 @@ Depends: ${shlibs:Depends}, ${misc:Depends}
 Description: Veejay a visual instrument and realtime video sampler.
  This package contains the shared library file.
  .
- Tango Studio Package: http://tangostudio.tuxfamily.org/
 
 Package: libveejay-dev
 Architecture: any
@@ -84,4 +79,3 @@ Description: Veejay a visual instrument and realtime video sampler.
  This package contains development files needed for compiling veejay-client
  or veejay-utils.
  .
- Tango Studio Package: http://tangostudio.tuxfamily.org/
