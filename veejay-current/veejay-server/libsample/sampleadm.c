@@ -3131,6 +3131,9 @@ int sample_readFromFile(char *sampleFile, void *vp, void *seq, void *font, void 
     if( vj_tag_size()-1 > 0 )
 	veejay_msg(VEEJAY_MSG_INFO, "Existing streams will be deleted (samplelist overrides active streams)");
 
+	if( start_at <= 0 )
+		start_at = 0;
+
     cur = xmlDocGetRootElement(doc);
     if (cur == NULL) {
 	veejay_msg(VEEJAY_MSG_ERROR,"Empty samplelist. Nothing to do.\n");
