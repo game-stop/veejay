@@ -747,7 +747,6 @@ void	on_button_samplelist_load_clicked(GtkWidget *widget, gpointer user_data)
 	{
 		if(erase_all)
 		{
-			single_vims( VIMS_SET_PLAIN_MODE );
 			single_vims( VIMS_SAMPLE_DEL_ALL ); 
 		}
 		multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename );
@@ -1181,14 +1180,21 @@ void	on_check_audio_mute_clicked(GtkWidget *widget, gpointer user_data)
 }
 void	on_button_samplelist_open_clicked(GtkWidget *widget, gpointer user_data)
 {
-	gchar *filename = dialog_open_file("Load samplelist",1);
-	if( filename )
+	gint erase_all = 0;
+	if(info->status_tokens[TOTAL_SLOTS] > 0 )
 	{
+		vj_msg(VEEJAY_MSG_WARNING, "Any existing samples will be deleted.");
+	}
+
+	gchar *filename = dialog_open_file( "Open samplelist",1);
+	if(filename)
+	{
+		single_vims( VIMS_SAMPLE_DEL_ALL ); 
 		multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename );
-		vj_msg(VEEJAY_MSG_INFO, "Try to load sample list %s", filename);
-		g_free(filename);
+		g_free(filename );
 	}
 }
+
 void	on_veejay_expander_activate(GtkWidget *exp, gpointer user_data)
 {
 }
@@ -1929,7 +1935,6 @@ void	on_open2_activate( GtkWidget *w, gpointer user_data)
 			filename = dialog_open_file( "Open Samplelist ",1);
 			if(filename)
 			{
-				single_vims( VIMS_SET_PLAIN_MODE );
 				single_vims( VIMS_SAMPLE_DEL_ALL );
 				multi_vims( VIMS_SAMPLE_LOAD_SAMPLELIST, "%s", filename);
 				g_free(filename);
