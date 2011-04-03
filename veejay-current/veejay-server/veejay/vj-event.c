@@ -3944,7 +3944,16 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 	if(PLAIN_PLAYING(v) || SAMPLE_PLAYING(v))
 	{
 		v->uc->sample_end = s->current_frame_num;
+		
+		if( v->uc->sample_end < v->uc->sample_start) {
+			int se = v->uc->sample_end;
+			v->uc->sample_end = v->uc->sample_start;
+			v->uc->sample_start = se;	
+			veejay_msg(VEEJAY_MSG_WARNING, "Swapped starting and ending positions: %ld - %ld, please set a new starting position.", v->uc->sample_start,v->uc->sample_end );
+		}
+		
 		if( v->uc->sample_end > v->uc->sample_start) {
+
 			long vstart = v->uc->sample_start;
 			long vend   = v->uc->sample_end;
 
@@ -3997,10 +4006,6 @@ void vj_event_sample_end(void *ptr, const char format[] , va_list ap)
 			{
 				veejay_msg(VEEJAY_MSG_ERROR,"Unable to create new sample");
 			}
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Sample ending position before starting position. Cannot create new sample");
 		}
 	}
 	else
@@ -4909,15 +4914,22 @@ void vj_event_sample_copy(void *ptr, const char format[] , va_list ap)
 void vj_event_sample_clear_all(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
-	if( !SAMPLE_PLAYING(v)) 
-	{
-		sample_del_all();
-		veejay_msg(VEEJAY_MSG_INFO,"Deleted all samples");
+	if( SAMPLE_PLAYING(v)) {
+		if( !vj_has_video(v,v->edit_list) ) {
+			veejay_msg(VEEJAY_MSG_WARNING,"There are no video frames in plain mode.");
+			if( vj_tag_size() > 0 ) {
+				veejay_msg(VEEJAY_MSG_WARNING,"Switching to stream 1 to clear all samples");
+				veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_TAG, 1 );
+			} else {
+				veejay_msg(VEEJAY_MSG_ERROR, "Nothing to fallback to, cannot delete all samples.");
+				return;
+			}
+		} else {
+			veejay_change_playback_mode( v, VJ_PLAYBACK_MODE_PLAIN, 0 );
+		}
 	}
-	else
-	{
-		p_invalid_mode();
-	}
+	sample_del_all();
+	veejay_msg(VEEJAY_MSG_INFO, "Deleted all samples (%d remaining)",sample_size());
 } 
 
 

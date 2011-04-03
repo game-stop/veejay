@@ -79,7 +79,6 @@ static int sampleadm_state = SAMPLE_PEEK;	/* default state */
 extern void tagParseStreamFX(char *file, xmlDocPtr doc, xmlNodePtr cur, void *font, void *vp);
 extern void   tag_writeStream( char *file, int n, xmlNodePtr node, void *font, void *vp );
 extern int vj_tag_size();
-
 typedef struct
 {
         int   active;
@@ -194,7 +193,6 @@ void sample_init(int len, void *font)
 	}
 	initialized = 1;
 	veejay_memset( &__sample_project_settings,0,sizeof(sample_setting));
-
     }
 
     sample_font_ = font;
@@ -352,33 +350,12 @@ int sample_store(sample_info * skel)
  *
  ****************************************************************************************************/
 
-typedef struct {
-	int id;
-	sample_info *si;
-} row_t;
-
-static row_t recent_samples_[12];
-static int recent_ = 0;
-
 sample_info *sample_get(int sample_id)
 {
-    sample_info *si;
-
-    int i;
-    for( i = 0; i < 12; i ++ ) {
-	if( recent_samples_[i].id == sample_id )
-		return recent_samples_[i].si;
-    }
-
     hnode_t *sample_node = hash_lookup(SampleHash, (void *) sample_id);
-    if (sample_node) {
-   	 si = (sample_info *) hnode_get(sample_node);
-	 recent_samples_[recent_].si = si;
-	 recent_samples_[recent_].id = sample_id;
-	 recent_ = (recent_+1) % 12;
-   	 if(si) return si;
-	}
-    return NULL;
+	if(!sample_node)
+		return NULL;
+	return (sample_info*) hnode_get(sample_node);
 }
 
 /****************************************************************************************************
@@ -894,36 +871,37 @@ int sample_del(int sample_id)
 	    }
 	//@  *sample_eff_chain -> &addr[0]
 	    if( si->effect_chain[0] )
-		free(si->effect_chain[0]);
+			free(si->effect_chain[0]);
   
 	    if(si->edit_list)
-		vj_el_free(si->edit_list);
-
+		{
+			vj_el_free(si->edit_list);
+			si->edit_list = NULL;
+		}
 	    if(si->encoder_base )
-		free(si->encoder_base );
+			free(si->encoder_base );
 	    if(si->encoder_destination )
-		free(si->encoder_destination );
-	    if(si->edit_list_file)
-		free( si->edit_list_file );
+			free(si->encoder_destination );
+	   	if(si->edit_list_file)
+			free( si->edit_list_file );
 #ifdef HAVE_FREETYPE
-//font ?
 	    if( si->dict )
-		vj_font_dictionary_destroy( sample_font_,si->dict );
+			vj_font_dictionary_destroy( sample_font_,si->dict );
 #endif
 		if(si->viewport) {	
 			viewport_destroy(si->viewport);
 			si->viewport = NULL;
 		}
-	    free(si);
+	    
+		free(si);
 
 		  /* store freed sample_id */
-  	 	  avail_num[next_avail_num] = sample_id;
-  		  next_avail_num++;
-   		   hash_delete(SampleHash, sample_node);
+  	 	avail_num[next_avail_num] = sample_id;
+  		next_avail_num++;
+   		hash_delete_free(SampleHash, sample_node);
+	    veejay_msg(VEEJAY_MSG_DEBUG, "Deleted sample %d",sample_id );
 
-	     veejay_msg(VEEJAY_MSG_DEBUG, "Deleted sample %d",sample_id );
-
-    		return 1;
+    	return 1;
     }
 
     return 0;
@@ -934,13 +912,20 @@ void sample_del_all()
 {
     int end = sample_size();
     int i;
+
     for (i = 1; i < end; i++) {
-	if (sample_exists(i)) {
-		sample_chain_clear(i);
-		sample_del(i);
-	}
+		if (sample_exists(i)) {
+			sample_chain_clear(i);
+			sample_del(i);
+		}
     }
+
+	memset( avail_num, 0, sizeof(int) * SAMPLE_MAX_SAMPLES );
+	next_avail_num = 0;
     this_sample_id = 0;
+
+	hash_free_nodes( SampleHash );
+
 }
 
 /****************************************************************************************************
@@ -2140,11 +2125,13 @@ int sample_chain_clear(int s1)
 	if( src_type == 0 && id > 0 )
 	{
 		sample_info *old = sample_get( id );
-		if(old)
+		if(old && old->edit_list)
+		{
 			vj_el_clear_cache(old->edit_list);
+		}
 	}
 	sample->effect_chain[i]->source_type = 0;
-	sample->effect_chain[i]->channel = s1; // myself
+	sample->effect_chain[i]->channel = 0;
 	for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
 	    sample->effect_chain[i]->arg[j] = 0;
     }
