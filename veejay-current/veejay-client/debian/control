@@ -1,10 +1,9 @@
 Source: veejay-client
 Section: video
 Priority: optional
-Maintainer: Jof Thibaut <tangostudio@tuxfamily.org> Niels Elburg <nwelburg@gmail.com>
-Build-Depends: autotools-dev (>= 20100122),
-               bison,
-               debhelper (>= 7),
+Maintainer: Niels Elburg <nwelburg@gmail.com>
+Build-Depends: bison,
+               autotools-dev,debhelper (>= 7),
                flex,
                libasound2-dev,
                libavcodec-dev,
@@ -34,7 +33,6 @@ Description: Gveejay Reloaded is a client for veejay-server.
  * Slick interface designed for live performing
  * Tracks multiple veejay servers
  .
- Tango Studio Package: http://tangostudio.tuxfamily.org/
 
 Package: reloaded-dbg
 Section: debug
@@ -46,4 +44,3 @@ Description: Gveejay Reloaded is a client for veejay-server.
  .
  This package contains the debugging symbols.
  .
- Tango Studio Package: http://tangostudio.tuxfamily.org/

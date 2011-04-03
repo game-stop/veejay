@@ -1,6 +1,6 @@
-veejay-client (1.5.6-0tstudio1) lucid; urgency=low
+veejay-client (1.5.9) lucid; urgency=low
 
   * Initial release.
 
- -- Jof Thibaut <tangostudio@tuxfamily.org>  Tue, 01 Feb 2011 23:11:57 +0100
+ -- Niels Elburg <nwelburg@gmail.com> Sun , 3 Apr 2011 15:11:57 +0100
 

@@ -4,7 +4,7 @@
 export PKG_CONFIG_PATH=/usr/lib/pkgconfig
 
 %:
-	dh --with autotools_dev $@
+	dh $@
 
 override_dh_auto_configure:
 ifeq ($(DEB_HOST_ARCH),i386)
