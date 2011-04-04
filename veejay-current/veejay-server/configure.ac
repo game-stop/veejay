@@ -507,19 +507,16 @@ if test x$have_x86cpu = xtrue -o x$have_ppccpu = xtrue; then
 fi
 
 
-if test x$have_x86cpu = xtrue;
+if test x$have_x86cpu = xtrue ;
 then
-	AC_MSG_NOTICE([enable_debug = $enable_debug])
 	if test "x$enable_debug" != "xyes" ;
 	then
-		AC_MSG_NOTICE([debug koekje])
 		if test $ac_cv_flag_sse = yes; then
 			CFLAGS="$CFLAGS -msse -mfpmath=sse"
-			AC_MSG_NOTICE([cflags aangepast])
 		fi
+
 		if test $av_cv_flag_sse2 = yes; then
 			CFLAGS="$CFLAGS -msse2 -mfpmath=sse"
-			AC_MSG_NOTICE([cflags aangepast])
 		fi
 	fi	
 fi

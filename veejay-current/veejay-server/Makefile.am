@@ -5,6 +5,8 @@ SUBDIRS += bio2jack libvevo liblzo libvje libplugger libsample libvjnet libyuv l
 SUBDIRS += veejay 
 SUBDIRS += man
 
+ACLOCAL_AMFLAGS = -I m4 
+
 EXTRA_DIST = \
  autogen.sh\
  depcomp \
