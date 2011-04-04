@@ -5,4 +5,4 @@
 # you may have to create the m4 directory yourself
 # 
 
-autoreconf -v -fi -I "${ORIGDIR}/m4"
+autoreconf -v -fi -I m4
