@@ -14,19 +14,17 @@ Build-Depends: bison,
                libpthread-stubs0-dev,
                libsdl1.2-dev,
                libswscale-dev,
-               libveejay-dev (>= 1.5.6),
+               libveejay-dev (>= 1.5.9),
                libx11-dev
 Standards-Version: 3.8.4
 Homepage: http://www.veejayhq.net/
 
-Package: reloaded
+Package: veejay-client
 Architecture: any
-Depends: ${shlibs:Depends}, ${misc:Depends}, veejay (>= 1.5.6)
-Description: Gveejay Reloaded is a client for veejay-server.
- A GUI developed in GTK/GLADE for Veejay.
- As long as veejay (the server) is running, you can connect
- and disconnect from it with reloaded.
- .
+Depends: ${shlibs:Depends}, ${misc:Depends}, veejay (>= 1.5.9)
+Description: Reloaded, a graphical interface for veejay.
+ This program requires veejay (running). 
+.
  Features:
  * Thin client (TCP/IP) 
  * MIDI support (auto learning)
@@ -34,13 +32,11 @@ Description: Gveejay Reloaded is a client for veejay-server.
  * Tracks multiple veejay servers
  .
 
-Package: reloaded-dbg
+Package: veejay-client-dbg
 Section: debug
 Priority: extra
 Architecture: any
-Depends: reloaded (= ${binary:Version})
-Description: Gveejay Reloaded is a client for veejay-server.
- A GUI developed in GTK/GLADE for Veejay.
- .
+Depends: veejay-client (= ${binary:Version})
+Description: Reloaded, a graphical interface for veejay.
  This package contains the debugging symbols.
  .

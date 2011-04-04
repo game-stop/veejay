@@ -26,6 +26,11 @@ Upstream Author(s):
     CellRendererSpin 15 minute hack - good enough
     Tim Philipp Müller
 
+    Debian package files by
+    Jof Thibaut <tangostudio@tuxfamily.org> 
+   
+
+
 Copyright: 
 
     Copyright (C) 2008-2011, Niels Elburg VeejayHQ.

@@ -20,4 +20,4 @@ ifeq ($(DEB_HOST_ARCH),amd64)
 endif
 
 override_dh_strip:
-	dh_strip --dbg-package=reloaded-dbg
+	dh_strip --dbg-package=veejay-client-dbg
