@@ -238,8 +238,8 @@ static int	v4l2_enum_video_standards( v4l2info *v, char norm )
 	int std_id = (norm == 'p' ? V4L2_STD_PAL: V4L2_STD_NTSC);
 
 	if (-1 == ioctl (v->fd, VIDIOC_S_STD, &std_id)) {
-		veejay_msg(VEEJAY_MSG_ERROR, "v4l2: unable to set video standard.");
-		return 0;
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: unable to set video standard.");
+		return 1;//@ show must go on 
 	} else {
 		veejay_msg(VEEJAY_MSG_INFO,"v4l2: set video standard PAL");
 	}	
@@ -401,6 +401,38 @@ VJFrame	*v4l2_get_dst( void *vv, uint8_t *Y, uint8_t *U, uint8_t *V ) {
 	return v->dst;
 }
 
+static	int	v4l2_channel_choose( v4l2info *v, const int pref_channel )
+{
+	int chan = pref_channel;
+	int n    = 0;
+	int i;
+	int	pref_ok = 0;
+	int other   = -1;
+	for ( i = 0; i < (pref_channel+1); i ++ ) {
+		if( -1 == vioctl( v->fd, VIDIOC_S_INPUT, &i )) {
+#ifdef STRICT_CHECKING
+			veejay_msg(VEEJAY_MSG_DEBUG, "Input channel %d does not exist", i);
+#endif
+			if( errno == EINVAL )
+				continue;
+			return 0;
+		} else {
+#ifdef STRICT_CHECKING
+			veejay_msg(VEEJAY_MSG_DEBUG, "Input channel %d is valid.",i);
+#endif
+			if(pref_channel==i)
+				pref_ok = 1;
+			else
+				other = i;
+		}
+	}
+
+	if( pref_ok )
+		return pref_channel;
+
+	return other;
+}
+
 void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wid, int hei, float fps, char norm  )
 {
 
@@ -447,12 +479,24 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 			v->capability.card );
 
 	//@ which video input ?
-	int chan = input_channel;
-	if( -1 == vioctl( fd, VIDIOC_S_INPUT, &chan )) {
-		veejay_msg(0, "v4l2: VIDIOC_S_INPUT failed with %s", strerror(errno));
+	int chan = v4l2_channel_choose( v, input_channel );
+	if(chan == -1) {
+		veejay_msg(0, "v4l2: Video device has no input channels ? What video device is that?");
 		free(v);
 		close(fd);
 		return NULL;
+	}
+	if( -1 == vioctl( fd, VIDIOC_S_INPUT, &chan )) {
+		int lvl = 0;
+		if( errno == EINVAL )
+			lvl = VEEJAY_MSG_WARNING;
+		veejay_msg(0, "v4l2: VIDIOC_S_INPUT failed with %s, arg was %x", strerror(errno),chan);
+		if( errno != EINVAL ) {
+			free(v);
+			close(fd);
+			return NULL;
+		}
+		
 	}
 
 	v->input.index = chan;
