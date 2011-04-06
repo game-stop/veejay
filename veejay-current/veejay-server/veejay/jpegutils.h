@@ -53,6 +53,17 @@ int encode_jpeg_raw(unsigned char *jpeg_data, int len, int quality,int dct,
 		    int itype, int ctype, int width, int height,
 		    unsigned char *raw0, unsigned char *raw1,
 		    unsigned char *raw2);
+
+typedef struct {
+	int	jpeg_color_space;
+	int	width;
+	int	height;
+	int	num_components;
+	int	ccir601;
+	int	version[2];
+} jpeghdr_t;
+
+jpeghdr_t *decode_jpeg_raw_hdr(unsigned char *jpeg_data, int len);
 /*
 void jpeg_skip_ff   (j_decompress_ptr cinfo);
 */

@@ -398,11 +398,9 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 	{
 		return 0;
 	}
-#ifdef HAVE_V4L2
-	snprintf(refname,sizeof(refname), "/dev/v4l/video%d",device_num );
-#else
+	
 	snprintf(refname,sizeof(refname), "/dev/video%d",device_num ); // freq->device_num
-#endif
+	
 	switch(norm) {
 		case 'P':
 		case 'p':

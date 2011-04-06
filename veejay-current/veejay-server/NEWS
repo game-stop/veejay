@@ -1,4 +1,2 @@
-Feb. 28,2011
- Added support for Video4Linux 2 (beta)
- Re-run configure with --without-v4l --with-v4l2 to enable v4l2 support.
- This will become the default once the v4l2 driver is threaded.
+
+

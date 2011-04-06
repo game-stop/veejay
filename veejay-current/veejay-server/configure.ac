@@ -85,10 +85,10 @@ AC_ARG_WITH(samplerate,
 		[], [with_samplerate=yes])
 AC_ARG_WITH(v4l2,
 		AC_HELP_STRING([--without-v4l2], [Do not use video4linux2]),	
-		[with_v4l2=yes], [with_v4l2=no])
+		[with_v4l2=no], [with_v4l2=yes])
 AC_ARG_WITH(v4l,
 		AC_HELP_STRING([--without-v4l], [Do not use video4linux1]),	
-		[], [with_v4l=yes])
+		[with_v4l=yes], [with_v4l=no])
 AC_ARG_WITH(xml2,
 		AC_HELP_STRING([--without-xml2], [Do not use the XML library for Gnome]),
 		[], [with_xml2=yes])
@@ -1085,7 +1085,7 @@ AC_MSG_NOTICE([  - QuickTime support             : ${have_libquicktime} ])
 AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Unicap Imaging                : ${have_unicap} ])
 AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
-AC_MSG_NOTICE([  - V4L2                          : ${have_v4l2}])
+AC_MSG_NOTICE([  - V4L2 (default)                : ${have_v4l2}])
 AC_MSG_NOTICE([  - V4L1 (default)                : ${have_v4l}])
 #AC_MSG_NOTICE([  - libsamplerate                 : ${have_samplerate}])
 

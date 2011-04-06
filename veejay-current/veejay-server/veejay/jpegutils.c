@@ -429,7 +429,45 @@ static void guarantee_huff_tables(j_decompress_ptr dinfo)
 #endif				/* ...'std' Huffman table generation */
 
 
+jpeghdr_t *decode_jpeg_raw_hdr(unsigned char *jpeg_data, int len)
+{
+    int numfields, hsf[3], vsf[3], field, yl, yc, x, y =
+	0, i, xsl, xsc, xs, xd, hdown;
 
+    JSAMPROW row0[16] = { buf0[0], buf0[1], buf0[2], buf0[3],
+	buf0[4], buf0[5], buf0[6], buf0[7],
+	buf0[8], buf0[9], buf0[10], buf0[11],
+	buf0[12], buf0[13], buf0[14], buf0[15]
+    };
+    JSAMPROW row1[8] = { buf1[0], buf1[1], buf1[2], buf1[3],
+	buf1[4], buf1[5], buf1[6], buf1[7]
+    };
+    JSAMPROW row2[16] = { buf2[0], buf2[1], buf2[2], buf2[3],
+	buf2[4], buf2[5], buf2[6], buf2[7]
+    };
+    JSAMPROW row1_444[16], row2_444[16];
+    JSAMPARRAY scanarray[3] = { row0, row1, row2 };
+
+    struct jpeg_decompress_struct dinfo;
+    jpeg_create_decompress(&dinfo);
+
+    jpeg_buffer_src(&dinfo, jpeg_data, len);
+
+    jpeg_read_header(&dinfo, TRUE);
+   
+	jpeghdr_t *j = (jpeghdr_t*) malloc(sizeof(jpeghdr_t));
+	j->jpeg_color_space= dinfo.jpeg_color_space;
+	j->width = dinfo.image_width;
+	j->height= dinfo.image_height;
+	j->num_components = dinfo.num_components;
+	j->ccir601 = dinfo.CCIR601_sampling;
+	j->version[0] = dinfo.JFIF_major_version;
+	j->version[1] = dinfo.JFIF_minor_version;
+
+    jpeg_destroy_decompress(&dinfo);
+
+    return j;
+}
 /*
  * jpeg_data:       Buffer with jpeg data to decode
  * len:             Length of buffer
@@ -501,7 +539,6 @@ int decode_jpeg_raw(unsigned char *jpeg_data, int len,
 	vsf[i] = dinfo.comp_info[i].v_samp_factor;
     }
 
-    mjpeg_error( "Sampling factors, hsf=(%d, %d, %d) vsf=(%d, %d, %d) !", hsf[0], hsf[1], hsf[2], vsf[0], vsf[1], vsf[2]);
     if ((hsf[0] != 2 && hsf[0] != 1) || hsf[1] != 1 || hsf[2] != 1 ||
 	(vsf[0] != 1 && vsf[0] != 2) || vsf[1] != 1 || vsf[2] != 1) {
 	mjpeg_error
