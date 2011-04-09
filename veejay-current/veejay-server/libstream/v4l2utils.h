@@ -20,6 +20,25 @@
  */
 #ifndef V4L2UTILS
 #define V4L2UTILS
+typedef struct {
+	char 	*file;
+	int	channel;
+	int	host_fmt;
+	int	wid;
+	int	hei;
+	float 	fps;
+	char	norm;
+	void	*v4l2;
+	VJFrame	*dst;
+	int	paused;
+	int	stop;
+	int	grabbing;
+	int	retries;
+	pthread_mutex_t mutex;
+	pthread_t	thread;
+	pthread_attr_t	attr;
+} v4l2_thread_info;
+
 void 	*v4l2open ( const char *file, const int input_channel, int host_fmt, int wid, int hei, float fps, char norm );
 int		v4l2_pull_frame(void *vv,VJFrame *dst);
 void	v4l2_close( void *d );
@@ -46,5 +65,11 @@ int32_t v4l2_get_contrast( void *d );
 void	v4l2_set_hue( void *d, int32_t value );
 int32_t	v4l2_get_hue( void *d );
 VJFrame	*v4l2_get_dst( void *v,uint8_t *Y, uint8_t *U, uint8_t *V );
+int	v4l2_poll( void *d , int nfds, int timeout );
+int	v4l2_thread_start( v4l2_thread_info *info );
+void	v4l2_thread_stop( v4l2_thread_info *i );
+int	v4l2_thread_pull( v4l2_thread_info *i , VJFrame *dst );
+void	*v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, float fps, char norm );
+v4l2_thread_info *v4l2_thread_info_get( void *vv);
 #endif
 

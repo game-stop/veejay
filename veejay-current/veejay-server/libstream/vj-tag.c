@@ -50,6 +50,7 @@
 #include <linux/videodev.h>
 #include <libstream/v4lvideo.h>
 #endif
+#include <pthread.h>
 #ifdef HAVE_V4L2
 #include <libstream/v4l2utils.h>
 #endif
@@ -432,6 +433,8 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 #ifdef HAVE_V4L2
 		vj_tag_input->unicap[stream_nr] = v4l2open( refname, channel, palette,width,height,
 				_tag_info->edit_list->video_fps,_tag_info->edit_list->video_norm );
+	//	vj_tag_input->unicap[stream_nr] = v4l2_thread_new( refname, channel,palette,width,height,
+	//			_tag_info->edit_list->video_fps,_tag_info->edit_list->video_norm );
 		if( !vj_tag_input->unicap[stream_nr] ) {
 			veejay_msg(0, "Unable to open device %d (%s)",device_num, refname );
 			return 0;
@@ -3386,6 +3389,9 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 #endif
 #ifdef HAVE_V4L2
 			int res = v4l2_pull_frame( vj_tag_input->unicap[tag->index],v4l2_get_dst(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]) );
+			/*
+			int res = v4l2_thread_pull( v4l2_thread_info_get( vj_tag_input->unicap[tag->index]),
+						v4l2_get_dst( vj_tag_input->unicap[tag->index], buffer[0],buffer[1],buffer[2]));*/	
 #endif
 			if( res <= 0 ) {
 				veejay_memset( buffer[0], 0, len );

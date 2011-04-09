@@ -951,7 +951,7 @@ void veejay_set_sample(veejay_t * info, int sampleid)
  * return value: 1 on success, -1 on error
  ******************************************************/
 int veejay_create_tag(veejay_t * info, int type, char *filename,
-			int index, int palette, int channel)
+			int index, int channel, int device)
 {
 
 	if( type == VJ_TAG_TYPE_NET || type == VJ_TAG_TYPE_MCAST ) {
@@ -964,7 +964,7 @@ int veejay_create_tag(veejay_t * info, int type, char *filename,
 		}
 	}
 
-	int id = vj_tag_new(type, filename, index, info->edit_list, info->pixel_format, palette, channel,info->settings->composite );
+	int id = vj_tag_new(type, filename, index, info->edit_list, info->pixel_format, channel, device,info->settings->composite );
 	char descr[200];
 	veejay_memset(descr,0,200);
 	vj_tag_get_by_type(type,descr);
@@ -2273,12 +2273,14 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 	if(def_tags && id <= 0)
 	{
+		char vidfile[1024];
 		int n = vj_tag_num_devices();
 		int default_chan = 1;
 		char *chanid = getenv("VEEJAY_DEFAULT_CHANNEL");
 		if(chanid != NULL )
 			default_chan = atoi(chanid);
-		int nid =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, "bogus", info->nstreams, default_chan, (def_tags-1) );
+		snprintf(vidfile,sizeof(vidfile),"/dev/video%d", (def_tags-1));
+		int nid =	veejay_create_tag( info, VJ_TAG_TYPE_V4L, vidfile, info->nstreams, default_chan, (def_tags-1) );
 		if( nid> 0)
 		{
 		 	   veejay_msg(VEEJAY_MSG_INFO, "Requested capture device available as stream %d", nid );
