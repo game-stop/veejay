@@ -76,6 +76,7 @@ static int video_driver_  = -1; // V4lUtils
 static void *unicap_data_= NULL;
 #endif
 //forward decl
+static int no_v4l2_threads_ = 0;
 
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int ty );
 int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el);
@@ -322,6 +323,13 @@ int vj_tag_init(int width, int height, int pix_fmt, int video_driver)
 #ifdef HAVE_V4L 
 	v4lvideo_templ_init();
 #endif
+
+	char *v4l2threading = getenv( "VEEJAY_V4L2_NO_THREADING" );
+	if( v4l2threading ) {
+		no_v4l2_threads_ = atoi(v4l2threading);
+	}
+
+
     return 0;
 }
 
@@ -431,10 +439,13 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 		veejay_msg(VEEJAY_MSG_DEBUG, "Using V4lutils from EffecTV");
 #endif
 #ifdef HAVE_V4L2
+		if(  no_v4l2_threads_ ) {
 		vj_tag_input->unicap[stream_nr] = v4l2open( refname, channel, palette,width,height,
 				_tag_info->edit_list->video_fps,_tag_info->edit_list->video_norm );
-	//	vj_tag_input->unicap[stream_nr] = v4l2_thread_new( refname, channel,palette,width,height,
-	//			_tag_info->edit_list->video_fps,_tag_info->edit_list->video_norm );
+		} else {
+			vj_tag_input->unicap[stream_nr] = v4l2_thread_new( refname, channel,palette,width,height,
+			_tag_info->edit_list->video_fps,_tag_info->edit_list->video_norm );
+		}
 		if( !vj_tag_input->unicap[stream_nr] ) {
 			veejay_msg(0, "Unable to open device %d (%s)",device_num, refname );
 			return 0;
@@ -3388,10 +3399,13 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 			int res = v4lvideo_copy_framebuffer_to(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]);
 #endif
 #ifdef HAVE_V4L2
-			int res = v4l2_pull_frame( vj_tag_input->unicap[tag->index],v4l2_get_dst(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]) );
-			/*
-			int res = v4l2_thread_pull( v4l2_thread_info_get( vj_tag_input->unicap[tag->index]),
-						v4l2_get_dst( vj_tag_input->unicap[tag->index], buffer[0],buffer[1],buffer[2]));*/	
+			int res  = 0;
+			if( no_v4l2_threads_ ) {
+			 res = v4l2_pull_frame( vj_tag_input->unicap[tag->index],v4l2_get_dst(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]) );
+			} else {
+			 res = v4l2_thread_pull( v4l2_thread_info_get( vj_tag_input->unicap[tag->index]),
+						v4l2_get_dst( vj_tag_input->unicap[tag->index], buffer[0],buffer[1],buffer[2]));
+			}
 #endif
 			if( res <= 0 ) {
 				veejay_memset( buffer[0], 0, len );

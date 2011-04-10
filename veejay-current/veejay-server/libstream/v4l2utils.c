@@ -123,14 +123,21 @@ typedef struct
 	int		processed_buffer;
 	int		allinthread;
 	int		grey;
+	int		threaded;
 } v4l2info;
 
 static	void	lock_( v4l2_thread_info *i ) {
-	pthread_mutex_lock(&(i->mutex));
+	int res = pthread_mutex_lock(&(i->mutex));
+	if( res < 0 ) {
+		veejay_msg(0, "v4l2: lock error %s", strerror(errno));
+	}
 }
 
 static	void	unlock_(v4l2_thread_info *i) {
-	pthread_mutex_unlock(&(i->mutex));
+	int res = pthread_mutex_unlock(&(i->mutex));
+	if( res < 0 ) { 
+		veejay_msg(0, "v4l2: unlock error %s",strerror(errno));
+	}
 }
 
 static	int	vioctl( int fd, int request, void *arg )
@@ -420,7 +427,7 @@ static	int	v4l2_try_pix_format( v4l2info *v, int pixelformat, int wid, int hei, 
 	
 	if( vioctl( v->fd, VIDIOC_TRY_FMT, &format ) != -1 ) {
 
-		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: format %s not supported ... ",
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: format %s not supported by capture card... ",
 				(char*) &v4l2_pixel_format);
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: testing palette %4.4s (%dx%d)",
@@ -540,7 +547,7 @@ static	int	v4l2_try_pix_format( v4l2info *v, int pixelformat, int wid, int hei, 
 static void	v4l2_set_output_pointers( v4l2info *v, void *src )
 {
 	uint8_t *map = (uint8_t*) src;
-
+//@A
 	if( v->planes[0] > 0 ) {
 		v->info->data[0] = map;
 	}
@@ -557,9 +564,13 @@ static void	v4l2_set_output_pointers( v4l2info *v, void *src )
 
 VJFrame	*v4l2_get_dst( void *vv, uint8_t *Y, uint8_t *U, uint8_t *V ) {
 	v4l2info *v = (v4l2info*) vv;
+	if(v->threaded)
+		lock_(v->video_info);
 	v->buffer_filled->data[0] = Y;
 	v->buffer_filled->data[1] = U;
 	v->buffer_filled->data[2] = V;
+	if(v->threaded)
+		unlock_(v->video_info);
 	return v->buffer_filled;
 }
 
@@ -573,15 +584,12 @@ static	int	v4l2_channel_choose( v4l2info *v, const int pref_channel )
 	for ( i = 0; i < (pref_channel+1); i ++ ) {
 		if( -1 == vioctl( v->fd, VIDIOC_S_INPUT, &i )) {
 #ifdef STRICT_CHECKING
-			veejay_msg(VEEJAY_MSG_DEBUG, "Input channel %d does not exist", i);
+			veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: input channel %d does not exist", i);
 #endif
 			if( errno == EINVAL )
 				continue;
 			return 0;
 		} else {
-#ifdef STRICT_CHECKING
-			veejay_msg(VEEJAY_MSG_DEBUG, "Input channel %d is valid.",i);
-#endif
 			if(pref_channel==i)
 				pref_ok = 1;
 			else
@@ -650,7 +658,7 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 	}
 
 	char *flt = getenv( "VEEJAY_V4L2_ALL_IN_THREAD" );
-	int   flti = 0;
+	int   flti = 1; //@ on by default
 	if( flt ) {
 		flti = atoi(flt);
 	}
@@ -669,6 +677,8 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 	} else {	
 		v->buffer_filled = yuv_yuv_template( NULL,NULL,NULL,wid,hei,host_fmt );
 	}
+
+	veejay_msg(VEEJAY_MSG_INFO, "v4l2: output in %s", av_pix_fmt_descriptors[ v->buffer_filled->format ] );
 
 	if( -1 == vioctl( fd, VIDIOC_QUERYCAP, &(v->capability) ) ) {
 		veejay_msg(0, "v4l2: VIDIOC_QUERYCAP failed with %s",			strerror(errno));
@@ -1013,10 +1023,18 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 
 	v4l2info *v = (v4l2info*) vv;
 	if( v->scaler == NULL ) {
+		int tmp = dst->format;
 		sws_template templ;     
    		memset(&templ,0,sizeof(sws_template));
    		templ.flags = yuv_which_scaler();
+	
+		if( v->grey ) {
+			dst->format = PIX_FMT_GRAY8;
+		}
 		v->scaler = yuv_init_swscaler( v->info,dst, &templ, yuv_sws_get_cpu_flags() );
+		if( v->grey ) {
+			dst->format = tmp;
+		}
 	}
 
 	if( v->rw == 0 ) {
@@ -1072,13 +1090,7 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 	}
 
 	if( length > 0 ) {
-		int cf = dst->format;
-		if( v->grey ) {
-			dst->format = PIX_FMT_GRAY8;
-		}
 		yuv_convert_and_scale( v->scaler, v->info, dst );
-		if( v->grey) 
-			dst->format = cf;
 	}
 	if(!v->rw) {
 		if( -1 == vioctl( v->fd, VIDIOC_QBUF, &(v->buffer))) {
@@ -1660,7 +1672,7 @@ static	void	*v4l2_grabber_thread( void *v )
 
 	i->v4l2 = v4l2;
 	v4l2->video_info = i;
-	
+	v4l2->threaded = 1;
 	if(v4l2==NULL) {
 		unlock_(v);
 		pthread_exit(NULL);
@@ -1675,17 +1687,14 @@ static	void	*v4l2_grabber_thread( void *v )
 		veejay_msg(VEEJAY_MSG_INFO, "v4l2: output buffer is %d x %d", v4l2->buffer_filled->width,v4l2->buffer_filled->height);
 	}
 
+	veejay_msg(VEEJAY_MSG_INFO, "v4l2: image processing (scale/convert) in (%s)",
+			(v4l2->allinthread ? "thread" : "host" ));
+
 	veejay_msg(VEEJAY_MSG_INFO, "v4l2: capture format: %d x %d (%s)",
 			v4l2->info->width,v4l2->info->height, av_pix_fmt_descriptors[ v4l2->info->format ].name );
 	veejay_msg(VEEJAY_MSG_INFO, "v4l2:  output format: %d x %d (%s)",
 			v4l2->buffer_filled->width,v4l2->buffer_filled->height, av_pix_fmt_descriptors[v4l2->buffer_filled->format]);
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: rw=%d, jpeg=%d, retries=%d", v4l2->rw, v4l2->is_jpeg, max_retries );
-	veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: plane sizes input: %d, %d, %d, %d",
-			v4l2->planes[0],v4l2->planes[1],v4l2->planes[2],v4l2->planes[3]);
-	veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: input frame c[0] = %d, c[1] = %d, c[2] = %d, [%dx%d][%dx%d]",
-			v4l2->info->len, v4l2->info->uv_len, v4l2->info->uv_len,
-		 	v4l2->info->width,v4l2->info->height, v4l2->info->uv_width, v4l2->info->uv_height );
 	
 	i->grabbing = 1;
 	i->retries  = max_retries;
@@ -1760,7 +1769,7 @@ int	v4l2_thread_pull( v4l2_thread_info *i , VJFrame *dst )
    		templ.flags = yuv_which_scaler();
 		v->scaler = yuv_init_swscaler( v->info,dst, &templ, yuv_sws_get_cpu_flags() );
 	}
-
+//@A
 	if( v->info->data[0] == NULL )
 	{
 		unlock_(i); 
@@ -1774,8 +1783,13 @@ int	v4l2_thread_pull( v4l2_thread_info *i , VJFrame *dst )
 		yuv_convert_and_scale( v->scaler, v->info, dst );
 	} else {
 		veejay_memcpy( dst->data[0], v->buffer_filled->data[0], v->planes[0]);	
-		veejay_memcpy( dst->data[1], v->buffer_filled->data[1], v->planes[1]);
-		veejay_memcpy( dst->data[2], v->buffer_filled->data[2], v->planes[2]);
+		if(!v->grey) {
+			veejay_memcpy( dst->data[1], v->buffer_filled->data[1], v->planes[1]);
+			veejay_memcpy( dst->data[2], v->buffer_filled->data[2], v->planes[2]);
+		} else {
+			veejay_memset( dst->data[1], 127, dst->uv_len );
+			veejay_memset( dst->data[2], 127, dst->uv_len );
+		}
 	}
 		
 	status = i->grabbing;
@@ -1798,6 +1812,12 @@ void *v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, 
 	i->hei = hei;
 	i->fps = fps;
 	i->norm = norm;
+
+	pthread_mutexattr_t type;
+	pthread_mutexattr_init(&type);
+	pthread_mutexattr_settype(&type, PTHREAD_MUTEX_NORMAL);
+	pthread_mutex_init(&(i->mutex), &type);
+
 
 	if( v4l2_thread_start( i ) == 0 ) {
 		free(i->file);
