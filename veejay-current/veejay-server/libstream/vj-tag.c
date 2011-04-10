@@ -1171,8 +1171,13 @@ int vj_tag_del(int id)
 
 		if(tag->capture_type==1) 
 #ifdef HAVE_V4L2
-			v4l2_close( vj_tag_input->unicap[tag->index]);
-#else
+			if( no_v4l2_threads_ ) {
+				v4l2_close( vj_tag_input->unicap[tag->index]);
+			} else {
+				v4l2_thread_stop( v4l2_thread_info_get(vj_tag_input->unicap[tag->index]));
+			}
+#endif
+#ifdef HAVE_V4L1
 			v4lvideo_destroy( vj_tag_input->unicap[tag->index] );
 #endif
 			if(tag->blackframe)
@@ -2350,6 +2355,11 @@ int vj_tag_disable(int t1) {
 		//	v4lvideo_grabstop(vj_tag_input->unicap[tag->index]);
 		}
 #endif
+#ifdef HAVE_V4L2
+		if(tag->capture_type==1) {
+			v4l2_thread_set_status( v4l2_thread_info_get(vj_tag_input->unicap[tag->index]),0 );
+		}
+#endif
 #ifdef HAVE_UNICAP
 		if( tag->capture_type == 0 )
 			vj_unicap_set_pause( vj_tag_input->unicap[tag->index], 1 );
@@ -2394,6 +2404,9 @@ int vj_tag_enable(int t1) {
 					v4lvideo_set_paused( vj_tag_input->unicap[tag->index],0);
 				tag->active = 1;
 			}
+#endif
+#ifdef HAVE_V4L2
+			v4l2_thread_set_status( v4l2_thread_info_get( vj_tag_input->unicap[tag->index] ), 1 );
 #endif
 		}
 #ifdef HAVE_UNICAP
@@ -2482,6 +2495,9 @@ int vj_tag_set_active(int t1, int active)
 				if( !v4lvideo_is_paused( vj_tag_input->unicap[tag->index] )  )
 					v4lvideo_set_paused( vj_tag_input->unicap[tag->index], 1 );
 			}
+#endif
+#ifdef HAVE_V4L2
+			v4l2_thread_set_status( v4l2_thread_info_get( vj_tag_input->unicap[tag->index]), active );
 #endif
 		} 
 #ifdef HAVE_UNICAP

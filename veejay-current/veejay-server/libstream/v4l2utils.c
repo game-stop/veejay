@@ -43,7 +43,6 @@
 */
 
 
-//@ FIXME: fix greyscale
 //@ FIXME: not all drivers implement TRY_FMT
 //@ FIXME: find maximum width/height: start with large and TRY_FMT
 //@ TODO:  add support for tuner (set frequency)
@@ -114,6 +113,7 @@ typedef struct
 	VJFrame		*buffer_filled;
 	uint8_t 	*tmpbuf;
 	int		is_streaming;
+	int		pause_read;
 
 	AVCodec *codec;
 	AVCodecContext *c;
@@ -413,7 +413,7 @@ static	int	v4l2_try_pix_format( v4l2info *v, int pixelformat, int wid, int hei, 
 		if( greycap ) {
 			int gc = atoi(greycap);
 			if( gc == 1 ) {
-				v4l2_pixel_format = V4L2_PIX_FMT_GREY; //@ FIXME
+				v4l2_pixel_format = V4L2_PIX_FMT_GREY; 
 				veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: setting grey scale (env)");
 				v->grey=1;
 			}
@@ -913,6 +913,7 @@ v4l2_rw_fallback:
 
 		v->buffers[0].length = v->sizeimage;
 		v->buffers[0].start = malloc( v->sizeimage * 2 );
+
 	}	
 
 
@@ -1022,6 +1023,10 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 	int	n = 0;
 
 	v4l2info *v = (v4l2info*) vv;
+
+	if( (v->rw == 1 && v->pause_read ) || (v->rw == 0 && !v->is_streaming) )
+		return 0;
+
 	if( v->scaler == NULL ) {
 		int tmp = dst->format;
 		sws_template templ;     
@@ -1703,6 +1708,11 @@ static	void	*v4l2_grabber_thread( void *v )
 	while( 1 ) {
 		int err = (v4l2->rw);
 
+		if( ( !v4l2->is_streaming && v4l2->rw == 0 ) || ( v4l2->rw == 1 && v4l2->pause_read ) ) {
+			usleep(1000);
+			continue;
+		} 
+
 		while( ( err = v4l2_poll( v4l2, 1, 200 ) ) < 0 ) {
 			if( !(err == -1) ) {
 				break;
@@ -1748,6 +1758,27 @@ int	v4l2_thread_start( v4l2_thread_info *i )
 
 	veejay_msg(0, "v4l2: failed to start thread: %d, %s", errno, strerror(errno));
 	return 0;
+}
+
+void	v4l2_thread_set_status( v4l2_thread_info *i, int status )
+{
+	v4l2info *v = (v4l2info* )i->v4l2;
+	lock_(i);	
+	if( v->rw == 0 ) {
+		if( status == 0 ) {
+			v4l2_stop_video_capture(i->v4l2);
+			v4l2_vidioc_qbuf( i->v4l2 );
+		} else {
+			v4l2_start_video_capture(i->v4l2);
+		}
+	} else {
+		if( status == 0 ) { 
+			v->pause_read = 1;
+		} else {
+			v->pause_read = 0;
+		}
+	}
+	unlock_(i);
 }
 
 void	v4l2_thread_stop( v4l2_thread_info *i )
