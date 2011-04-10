@@ -114,7 +114,8 @@ typedef struct
 	uint8_t 	*tmpbuf;
 	int		is_streaming;
 	int		pause_read;
-
+	int		pause_capture;
+	int		pause_capture_status;
 	AVCodec *codec;
 	AVCodecContext *c;
 	AVFrame *picture;
@@ -653,6 +654,7 @@ int	v4l2_poll( void *d , int nfds, int timeout )
 
 void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wid, int hei, float fps, char norm  )
 {
+	//@ in case of thread, check below is done twice
 	if(!v4l2_verify_file( file ) ) {
 		return NULL;
 	}
@@ -1668,6 +1670,12 @@ static	void	*v4l2_grabber_thread( void *v )
 	lock_( v );
 	v4l2_thread_info *i = (v4l2_thread_info*) v;
 
+	if(!v4l2_verify_file( i->file ) ) {
+		i->stop = 1;
+		pthread_exit(NULL);
+		return NULL;
+	}
+
 	v4l2info *v4l2 = v4l2open( i->file, i->channel, i->host_fmt, i->wid, i->hei, i->fps, i->norm );
 	if( v4l2 == NULL ) {
 		veejay_msg(0, "v4l2: error opening v4l2 device '%s'",i->file );
@@ -1707,7 +1715,23 @@ static	void	*v4l2_grabber_thread( void *v )
 
 	while( 1 ) {
 		int err = (v4l2->rw);
-
+	
+		lock_(i);
+		if( v4l2->pause_capture ) {
+			if( v4l2->rw == 0 ) {
+				if( !v4l2->pause_capture_status) {
+			  		v4l2_stop_video_capture(v4l2);
+					v4l2_vidioc_qbuf( v4l2 );
+				} else {
+					v4l2_start_video_capture(v4l2);
+				}
+			} else {
+				v4l2->pause_read = !v4l2->pause_capture_status;
+			}
+			v4l2->pause_capture = 0; 
+		}
+		unlock_(i);
+		
 		if( ( !v4l2->is_streaming && v4l2->rw == 0 ) || ( v4l2->rw == 1 && v4l2->pause_read ) ) {
 			usleep(1000);
 			continue;
@@ -1724,6 +1748,7 @@ static	void	*v4l2_grabber_thread( void *v )
 		if( err == -1 ) {
 			if( i->retries < 0 ) {
 				veejay_msg(0,"v4l2: giving up on this device, too many errors.");
+				i->stop = 1;
 				v4l2_close( v4l2 );
 				pthread_exit(NULL);
 				return NULL;
@@ -1764,20 +1789,8 @@ void	v4l2_thread_set_status( v4l2_thread_info *i, int status )
 {
 	v4l2info *v = (v4l2info* )i->v4l2;
 	lock_(i);	
-	if( v->rw == 0 ) {
-		if( status == 0 ) {
-			v4l2_stop_video_capture(i->v4l2);
-			v4l2_vidioc_qbuf( i->v4l2 );
-		} else {
-			v4l2_start_video_capture(i->v4l2);
-		}
-	} else {
-		if( status == 0 ) { 
-			v->pause_read = 1;
-		} else {
-			v->pause_read = 0;
-		}
-	}
+	v->pause_capture = 1;
+	v->pause_capture_status = status;
 	unlock_(i);
 }
 
@@ -1863,16 +1876,18 @@ void *v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, 
 		usleep(100);
 		lock_(i);
 		ready = i->grabbing;
+		if( i->stop ) {
+			ready = i->stop;
+		}
 		unlock_(i);
 		if(ready) 
 		 break;
 		retries--;
 	}
 
-#ifdef STRICT_CHECKING
-	v4l2info *v = (v4l2info*)i->v4l2;
-	assert( v != NULL );
-#endif
+	if( i->stop )
+		pthread_mutex_destroy(&(i->mutex));
+	
 	return i->v4l2;
 }
 #endif
