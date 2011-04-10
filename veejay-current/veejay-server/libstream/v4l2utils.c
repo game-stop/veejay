@@ -43,11 +43,10 @@
 */
 
 
-//@ FIXME: capture dimensions != screen dimensions, use scaler and setup capture to maximum size
-//@ FIXME: and also, capture to smaller size and position on screen
-//@ FIXME: also support gray scale capture
-//@ FIXME: 
-//
+//@ FIXME: fix greyscale
+//@ FIXME: not all drivers implement TRY_FMT
+//@ FIXME: find maximum width/height: start with large and TRY_FMT
+//@ TODO:  add support for tuner (set frequency)
 //
 #include <config.h>
 #ifdef HAVE_V4L2
@@ -114,6 +113,7 @@ typedef struct
 	int		sizeimage;
 	VJFrame		*buffer_filled;
 	uint8_t 	*tmpbuf;
+	int		is_streaming;
 
 	AVCodec *codec;
 	AVCodecContext *c;
@@ -122,6 +122,7 @@ typedef struct
 	void		*video_info;
 	int		processed_buffer;
 	int		allinthread;
+	int		grey;
 } v4l2info;
 
 static	void	lock_( v4l2_thread_info *i ) {
@@ -149,6 +150,47 @@ static	void	v4l2_free_buffers( v4l2info *v )
 		munmap( v->buffers[i].start, v->buffers[i].length );
 	}
 	free(v->buffers);
+}
+
+static	int		v4l2_start_video_capture( v4l2info *v )
+{
+	if(!v->is_streaming) {
+		if( -1 == vioctl( v->fd, VIDIOC_STREAMON, &(v->buftype)) ) {
+			veejay_msg(0, "v4l2: unable to start streaming: %d,%s",errno,strerror(errno));
+			return 0;
+		}
+		v->is_streaming = 1;
+	}
+	return 1;
+}
+
+static	int	v4l2_vidioc_qbuf( v4l2info *v )
+{
+	int i;
+	for( i = 0; i < v->reqbuf.count ; i ++ ) {
+		veejay_memset( &(v->buffer),0,sizeof(v->buffer));
+		v->buffer.type = v->reqbuf.type;
+		v->buffer.memory=V4L2_MEMORY_MMAP;
+		v->buffer.index = i;
+
+		if( -1 == vioctl( v->fd, VIDIOC_QBUF, &(v->buffer)) ) {
+			veejay_msg(0, "v4l2: first VIDIOC_QBUF failed with %s", strerror(errno));
+			return -1;
+		}
+	}
+	return 1;
+}
+
+static	int		v4l2_stop_video_capture( v4l2info *v )
+{
+	if(v->is_streaming) {
+		if( -1 == vioctl( v->fd, VIDIOC_STREAMOFF, &(v->buftype)) ) {
+			veejay_msg(0,"v4l2: unable to stop streaming:%d, %s",errno,strerror(errno));
+			return 0;
+		}
+		v->is_streaming = 0;
+	}
+	return 1;
 }
 
 static int	v4l2_pixelformat2ffmpeg( int pf )
@@ -344,8 +386,6 @@ static	int	v4l2_try_pix_format( v4l2info *v, int pixelformat, int wid, int hei, 
 		return -1;
 	}
 
-	*pp = format.fmt.pix.pixelformat;
-
 	veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: current configuration is in %s (%dx%d)",
 			(char*) &v->format.fmt.pix.pixelformat,
 			v->format.fmt.pix.width,
@@ -359,9 +399,29 @@ static	int	v4l2_try_pix_format( v4l2info *v, int pixelformat, int wid, int hei, 
 
 	int ffmpeg_pixelformat = get_ffmpeg_pixfmt(pixelformat);
 	int v4l2_pixel_format = v4l2_ffmpeg2v4l2( ffmpeg_pixelformat );
+
+	//@ or take from environment
+	if( *pp == 0 ) {
+		char *greycap = getenv( "VEEJAY_V4L2_GREYSCALE_ONLY" );
+		if( greycap ) {
+			int gc = atoi(greycap);
+			if( gc == 1 ) {
+				v4l2_pixel_format = V4L2_PIX_FMT_GREY; //@ FIXME
+				veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: setting grey scale (env)");
+				v->grey=1;
+			}
+		}
+	}
+
+
+	*pp = format.fmt.pix.pixelformat;
+
 	format.fmt.pix.pixelformat = v4l2_pixel_format;
 	
 	if( vioctl( v->fd, VIDIOC_TRY_FMT, &format ) != -1 ) {
+
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: format %s not supported ... ",
+				(char*) &v4l2_pixel_format);
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: testing palette %4.4s (%dx%d)",
 				(char*)&format.fmt.pix.pixelformat,
@@ -603,8 +663,13 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 
 	v->fd = fd;
 	v->allinthread = flti;
-	//@ FIXME: input dimensions != output dimensions
-	v->buffer_filled = yuv_yuv_template( NULL,NULL,NULL,wid,hei,host_fmt );
+
+	if( v->grey == 1 ) {
+		v->buffer_filled = yuv_yuv_template( NULL,NULL,NULL, wid,hei, PIX_FMT_GRAY8 );
+	} else {	
+		v->buffer_filled = yuv_yuv_template( NULL,NULL,NULL,wid,hei,host_fmt );
+	}
+
 	if( -1 == vioctl( fd, VIDIOC_QUERYCAP, &(v->capability) ) ) {
 		veejay_msg(0, "v4l2: VIDIOC_QUERYCAP failed with %s",			strerror(errno));
 		free(v);
@@ -775,32 +840,31 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 
 		}
 
-		for( i = 0; i < v->reqbuf.count ; i ++ ) {
-			veejay_memset( &(v->buffer),0,sizeof(v->buffer));
-			v->buffer.type = v->reqbuf.type;
-			v->buffer.memory=V4L2_MEMORY_MMAP;
-			v->buffer.index = i;
 
-			if( -1 == vioctl( fd, VIDIOC_QBUF, &(v->buffer)) ) {
-				veejay_msg(0, "v4l2: first VIDIOC_QBUF failed with %s", strerror(errno));
-		//	int k;
-		//	for( k = 0; k < v->reqbuf.count; k ++ ) 
-		//		munmap( v->buffer[k].start, v->buffer[k].length );
-	
+		if( v4l2_vidioc_qbuf( v ) == -1 ) {
+				veejay_msg(0, "v4l2: VIDIOC_QBUF failed with:%d, %s", errno,strerror(errno));
 				free(v->buffers);
 				free(v);
 				close(fd);
 				return NULL;
-			}
-
 		}
 
-		if( -1 == vioctl( fd, VIDIOC_STREAMON, &(v->buftype)) ) {
-			veejay_msg(0, "v4l2: VIDIOC_STREAMON failed with %s", strerror(errno));
+		if( !v4l2_start_video_capture( v ) ) {
 			if(cap_read) {
 				veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: fallback read/write");
 				v->rw = 1;
 				v4l2_free_buffers(v);
+
+				//@ close and re-open
+				close(v->fd);
+ 				v->fd = open( file , O_RDWR );
+				if(v->fd <= 0 ) {
+					veejay_msg(0,"v4l2: cannot re-open device:%d,%s",errno,strerror(errno));
+					free(v->buffers);
+					free(v);
+					return NULL;
+				}
+
 				goto v4l2_rw_fallback;
 			} else{
 			  	free(v->buffers);
@@ -861,6 +925,12 @@ static	int	v4l2_pull_frame_intern( v4l2info *v )
 	
 		if( -1 == vioctl( v->fd, VIDIOC_DQBUF, &(v->buffer))) {
 			veejay_msg(0, "v4l2: VIDIOC_DQBUF: %s", strerror(errno));
+			if( errno != EIO ) {
+				veejay_msg(0,"v4l2: unable to grab a frame: %d, %s",errno,strerror(errno));
+			}
+			v4l2_stop_video_capture(v);
+			v4l2_vidioc_qbuf( v );
+			v4l2_start_video_capture(v);
 			return 0;
 		}
 
@@ -1001,9 +1071,15 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 			break;
 	}
 
-	if( length > 0 )
+	if( length > 0 ) {
+		int cf = dst->format;
+		if( v->grey ) {
+			dst->format = PIX_FMT_GRAY8;
+		}
 		yuv_convert_and_scale( v->scaler, v->info, dst );
-	
+		if( v->grey) 
+			dst->format = cf;
+	}
 	if(!v->rw) {
 		if( -1 == vioctl( v->fd, VIDIOC_QBUF, &(v->buffer))) {
 			veejay_msg(0, "v4l2: VIDIOC_QBUF failed with %s", strerror(errno));
@@ -1595,7 +1671,6 @@ static	void	*v4l2_grabber_thread( void *v )
 		v4l2->buffer_filled->data[0] = (uint8_t*) vj_malloc(sizeof(uint8_t) * (v4l2->buffer_filled->len * 3));
 		v4l2->buffer_filled->data[1] = v4l2->buffer_filled->data[0] + v4l2->buffer_filled->len;
 		v4l2->buffer_filled->data[2] = v4l2->buffer_filled->data[1] + v4l2->buffer_filled->len;
-		//@ FIXME
 		veejay_msg(VEEJAY_MSG_INFO, "v4l2: allocated %d bytes for output buffer", (v4l2->buffer_filled->len*3));
 		veejay_msg(VEEJAY_MSG_INFO, "v4l2: output buffer is %d x %d", v4l2->buffer_filled->width,v4l2->buffer_filled->height);
 	}
@@ -1632,7 +1707,7 @@ static	void	*v4l2_grabber_thread( void *v )
 				veejay_msg(0,"v4l2: giving up on this device, too many errors.");
 				v4l2_close( v4l2 );
 				pthread_exit(NULL);
-				return NULL; //@FIXME : crash in closing v4l2; scaler object (yuv_free_swscaler)
+				return NULL;
 			} else {
 #ifdef STRICT_CHECKING
 				veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: error queuing frame, %d retries left", i->retries );
@@ -1701,7 +1776,6 @@ int	v4l2_thread_pull( v4l2_thread_info *i , VJFrame *dst )
 		veejay_memcpy( dst->data[0], v->buffer_filled->data[0], v->planes[0]);	
 		veejay_memcpy( dst->data[1], v->buffer_filled->data[1], v->planes[1]);
 		veejay_memcpy( dst->data[2], v->buffer_filled->data[2], v->planes[2]);
-		//@FIXME: move copy function to libyuv and make generic
 	}
 		
 	status = i->grabbing;
