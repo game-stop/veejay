@@ -2357,7 +2357,11 @@ int vj_tag_disable(int t1) {
 #endif
 #ifdef HAVE_V4L2
 		if(tag->capture_type==1) {
-			v4l2_thread_set_status( v4l2_thread_info_get(vj_tag_input->unicap[tag->index]),0 );
+			if( no_v4l2_threads_ ) {
+				v4l2_set_status( vj_tag_input->unicap[tag->index],1);
+			} else {
+				v4l2_thread_set_status( v4l2_thread_info_get(vj_tag_input->unicap[tag->index]),0 );
+			}
 		}
 #endif
 #ifdef HAVE_UNICAP
@@ -2406,7 +2410,11 @@ int vj_tag_enable(int t1) {
 			}
 #endif
 #ifdef HAVE_V4L2
-			v4l2_thread_set_status( v4l2_thread_info_get( vj_tag_input->unicap[tag->index] ), 1 );
+			if( no_v4l2_threads_ ) {
+				v4l2_set_status( vj_tag_input->unicap[tag->index],1);
+			} else {
+				v4l2_thread_set_status( v4l2_thread_info_get( vj_tag_input->unicap[tag->index] ), 1 );
+			}
 #endif
 		}
 #ifdef HAVE_UNICAP
@@ -2497,7 +2505,12 @@ int vj_tag_set_active(int t1, int active)
 			}
 #endif
 #ifdef HAVE_V4L2
-			v4l2_thread_set_status( v4l2_thread_info_get( vj_tag_input->unicap[tag->index]), active );
+			if( no_v4l2_threads_ ) {
+				v4l2_set_status( vj_tag_input->unicap[tag->index],1);
+
+			} else {
+				v4l2_thread_set_status( v4l2_thread_info_get( vj_tag_input->unicap[tag->index]), active );
+			}
 #endif
 		} 
 #ifdef HAVE_UNICAP

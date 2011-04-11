@@ -71,5 +71,6 @@ void	v4l2_thread_stop( v4l2_thread_info *i );
 int	v4l2_thread_pull( v4l2_thread_info *i , VJFrame *dst );
 void	*v4l2_thread_new( char *file, int channel, int host_fmt, int wid, int hei, float fps, char norm );
 v4l2_thread_info *v4l2_thread_info_get( void *vv);
+void	v4l2_set_status( void *d , int status);
 #endif
 

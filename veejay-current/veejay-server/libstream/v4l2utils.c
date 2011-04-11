@@ -1784,14 +1784,21 @@ int	v4l2_thread_start( v4l2_thread_info *i )
 	veejay_msg(0, "v4l2: failed to start thread: %d, %s", errno, strerror(errno));
 	return 0;
 }
+void	v4l2_set_status( void *d , int status) {
+	v4l2info *v = (v4l2info*)d;
+	v->pause_capture = 1;
+	v->pause_capture_status = status;
+}
 
 void	v4l2_thread_set_status( v4l2_thread_info *i, int status )
 {
 	v4l2info *v = (v4l2info* )i->v4l2;
-	lock_(i);	
+	if(v->threaded)
+		lock_(i);	
 	v->pause_capture = 1;
 	v->pause_capture_status = status;
-	unlock_(i);
+	if(v->threaded)
+		unlock_(i);
 }
 
 void	v4l2_thread_stop( v4l2_thread_info *i )
