@@ -76,7 +76,7 @@ static int video_driver_  = -1; // V4lUtils
 static void *unicap_data_= NULL;
 #endif
 //forward decl
-static int no_v4l2_threads_ = 0;
+static int no_v4l2_threads_ = 1;
 
 int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, int port, int p, int ty );
 int _vj_tag_new_yuv4mpeg(vj_tag * tag, int stream_nr, editlist * el);
