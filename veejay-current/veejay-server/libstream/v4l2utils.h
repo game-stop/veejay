@@ -37,6 +37,7 @@ typedef struct {
 	pthread_mutex_t mutex;
 	pthread_t	thread;
 	pthread_attr_t	attr;
+	pthread_cond_t	cond;
 } v4l2_thread_info;
 
 void 	*v4l2open ( const char *file, const int input_channel, int host_fmt, int wid, int hei, float fps, char norm );
