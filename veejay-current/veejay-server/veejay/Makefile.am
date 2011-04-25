@@ -41,7 +41,7 @@ libveejay_la_LDFLAGS = -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \
 libveejay_la_LIBADD = -L$(top_builddir)/mjpegtools/ -lmjpegutils \
 			-L$(top_builddir)/libOSC  -lOSC \
 			-L$(top_builddir)/libhash  -lhash \
-			-L$(top_builddir)/liblzo  -lminilzo \
+			-L$(top_builddir)/liblzo  -lvjlzo \
 			-L$(top_builddir)/bio2jack -lbio2jack4vj \
 			-L$(top_builddir)/libvjmsg -lvjmsg \
 			-L$(top_builddir)/libvjmem -lvjmem \
