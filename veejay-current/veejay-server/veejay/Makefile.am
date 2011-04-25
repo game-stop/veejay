@@ -60,7 +60,7 @@ libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $
 			$(XML2_LIBS) $(JPEG_LIBS) $(UNICAP_LIBS) $(LIBLO_LIBS) \
 		 	$(FFMPEG_LIBS) $(XINERAMA_LIBS) \
 			$(LIBDV_LIBS) $(LIBM_LIBS) $(PIXBUF_LIBS) $(JACK_LIBS) $(LIBQUICKTIME_LIBS) $(SAMPLERATE_LIBS) \
-			-DDYNAMIC -O3 -Wall -rdynamic 
+			-DDYNAMIC -O3 -Wall -rdynamic -Wl,-no-undefined 
 
 # *********************************************************************
 # The tools themselves
