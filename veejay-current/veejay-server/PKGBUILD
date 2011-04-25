@@ -1,30 +1,31 @@
 # Contributor: Luciano A. Ferrer <laferrer@gmail.com>
-pkgname=veejay-server-svn
+# Modified for ArchLinux by Niels <nwelburg@gmail.com>
+pkgname=veejay
 pkgrel=1
+pkgver=1.5.9
 pkgdesc="Veejay is a visual instrument and realtime video sampler for GNU/Linux, server"
-arch=(i686,x86_64)
+arch=('i686','x86_64')
 url="http://www.veejayhq.net"
-license="GPL"
-conflicts=('veejay-server')
-provides=('veejay-server')
-depends=('libxml2' 'jack-audio-connection-kit' 'ffmpeg' )
+license=('GPL')
+groups=()
+conflicts=('veejay')
+depends=('libxml2' 'ffmpeg' 'sdl' 'gtk2' 'gdk-pixbuf2' 'libsm' )
+optdepends=('unicap' 'liblo' 'libdv' 'libquicktime' 'jack')
 source=()
 md5sums=()
-
-_svntrunk="svn://dyne.org/veejay/trunk/veejay-current/veejay-server"
-_svnmod="veejay-server"
+changelog=('ChangeLog')
+backup=()
+replaces=()
 
 build() {
-cd $startdir/src/
-
-svn co $_svntrunk --config-dir ./ $_svnmod
-
-  cp -r $startdir/src/$_svnmod $startdir/src/$_svnmod-build
-  cd $startdir/src/$_svnmod-build
-
+	export PKG_CONFIG_PATH=/usr/lib/pkgconfig
+	cd $startdir
   ./autogen.sh
   ./configure --prefix=/usr
   make || return 1
-  make DESTDIR=$startdir/pkg install
+}
 
+package() {
+	cd $startdir
+	make DESTDIR="$pkgdir/" install
 }

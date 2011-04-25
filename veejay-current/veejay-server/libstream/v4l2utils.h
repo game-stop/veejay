@@ -1,7 +1,7 @@
 /* 
  * Linux VeeJay
  *
- * Copyright(C)2010 Niels Elburg <nwelburg@gmail.com / niels@dyne.org >
+ * Copyright(C)2010-2011 Niels Elburg <nwelburg@gmail.com / niels@dyne.org >
  *             - re-use Freej's v4l2 cam driver
  *             - implemented controls method and image format negotiation  
  *
