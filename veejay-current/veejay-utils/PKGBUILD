@@ -1,15 +1,15 @@
 # Contributor: Luciano A. Ferrer <laferrer@gmail.com>
 # Modified for ArchLinux by Niels <nwelburg@gmail.com>
-pkgname=reloaded
+pkgname=sayVIMS
 pkgrel=1
 pkgver=1.5.9
-pkgdesc="Reloaded is the graphical user interface for Veejay"
+pkgdesc="sayVIMS is the commandline utility for veejay remote-access"
 arch=('i686' 'x86_64')
 url="http://www.veejayhq.net"
 license=('GPL')
 groups=()
-conflicts=('reloaded')
-depends=('libxml2' 'veejay' 'gtk2' 'glib2' 'glade' 'alsa-lib' )
+conflicts=('sayVIMS')
+depends=( 'veejay'  )
 optdepends=()
 source=()
 md5sums=()
