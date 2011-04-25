@@ -376,7 +376,11 @@ static void port_node_append(vevo_port_t * p, const char *key,
 #define PROPERTY_KEY_SIZE	128
 
 //! \define property_exists Check if a property exists
-#define property_exists( port, key ) hash_lookup( (hash_t*) port->table, (const void*) key )
+//#define property_exists( port, key ) hash_lookup( (hash_t*) port->table, (const void*) key )
+static inline hnode_t *property_exists( __vevo_port_t *port, uint32_t key )
+{
+	return (hnode_t*) hash_lookup( (hash_t*) port->table,(const void*) key );
+}
 
 //! \define atom_store__ store atom
 #define atom_store__(value) {\
