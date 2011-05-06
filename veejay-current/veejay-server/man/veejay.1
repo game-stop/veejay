@@ -256,6 +256,20 @@ If you want to load frei0r or freeframe plugins , set the paths
 to the .so files in the plugins.cfg file. Only support for single
 channel plugins.  
 .TP
+.SH ENVIRONMENT VARIABLES FOR V4L2 CAPTURE
+.TP
+.B VEEJAY_V4L2_GREYSCALE_ONLY
+Use '1' to capture in greyscale only
+.TP
+.B VEEJAY_V4L2_CAPTURE_METHOD
+Capturing method. Use 0 for read/write, 1 for memory mapping
+.TP
+.B VEEJAY_V4L2_MAX_RETRIES
+Maximum number of attempts before giving up on capture device
+.TP
+.B VEEJAY_V4L2_NO_THREADING
+Do not start a seperate thread for capturing. Use '1' to disable threads.
+.TP
 .SH EXAMPLES
 .TP
 .B veejay -u |less
