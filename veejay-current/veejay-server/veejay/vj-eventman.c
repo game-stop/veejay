@@ -2411,7 +2411,7 @@ void		vj_init_vevo_events(void)
 				vj_event_play_norestart,
 				1,
 				VIMS_ALLOW_ANY,
-				"0=off (default),1=on",
+				"0=continious play ,1=sample restart (default)",
 				0,
 				NULL );
 
