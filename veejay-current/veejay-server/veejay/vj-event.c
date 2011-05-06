@@ -2835,6 +2835,9 @@ void	vj_event_play_norestart( void *ptr, const char format[], va_list ap )
 		v->settings->sample_restart = 1;
 	}
 
+	veejay_msg(VEEJAY_MSG_INFO, "Sample continuous mode is %s.",
+			(v->settings->sample_restart == 0 ? "enabled" : "disabled"));
+
 }
 
 void vj_event_set_play_mode_go(void *ptr, const char format[], va_list ap) 

@@ -441,8 +441,9 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 	    }
 	}
     }
-    sample_update_offset( info->uc->sample_id, settings->current_frame_num );	
-    vj_perform_rand_update( info );
+ //   sample_update_offset( info->uc->sample_id, settings->current_frame_num );	
+   	sample_set_resume( info->uc->sample_id, settings->current_frame_num );
+   	vj_perform_rand_update( info );
 
     return ret_val;
 }

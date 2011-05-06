@@ -286,6 +286,7 @@ sample_info *sample_skeleton_new(long startFrame, long endFrame)
     snprintf(si->descr,SAMPLE_MAX_DESCR_LEN, "Sample %4d", si->sample_id);
     si->first_frame = startFrame;
     si->last_frame = endFrame;
+	si->resume_pos = startFrame;
     si->edit_list = NULL;	// clone later
     si->soft_edl = 1;
     si->speed = 1;
@@ -999,6 +1000,35 @@ int	sample_get_first_mix_offset(int s1, int *parent, int look_for)
 }
 
 
+int	sample_set_resume(int s1,long position)
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample)
+		return -1;
+	sample->resume_pos = position;
+	sample_update(s1,sample);
+	return 1;
+}
+long	sample_get_resume(int s1)
+{
+	sample_info *sample = sample_get(s1);
+	if(!sample)
+		return -1;
+	if( sample->resume_pos < sample->first_frame )
+		sample->resume_pos = sample->first_frame;
+	else if ( sample->resume_pos > sample->last_frame )
+		sample->resume_pos = sample->last_frame;	
+	
+	if( sample->marker_start >= 0 && sample->marker_end > 0  ) {
+		if( sample->resume_pos < sample->marker_start )
+			sample->resume_pos = sample->marker_start;
+		else if ( sample->resume_pos > sample->marker_end ) 
+			sample->resume_pos = sample->marker_end;
+	}
+	
+	return sample->resume_pos;
+}
+
 int sample_get_offset(int s1, int position)
 {
     sample_info *sample;
@@ -1666,6 +1696,11 @@ int sample_set_startframe(int s1, long frame_num)
     sample->first_frame = frame_num;
     if(sample->first_frame >= sample->last_frame )
 	sample->first_frame = sample->last_frame-1;
+
+	if( sample->resume_pos < frame_num )
+		sample->resume_pos = frame_num;
+	
+
     return (sample_update(sample,s1));
 }
 
@@ -1724,7 +1759,10 @@ int sample_set_endframe(int s1, long frame_num)
 	if( new_len <= 1 )
 		new_len = 1;
 	sample->last_frame = sample->first_frame + new_len;
-	
+
+	if( sample->resume_pos > frame_num )
+		sample->resume_pos = frame_num;
+
 	if( vj_el_set_bogus_length( sample->edit_list, 0, new_len ) )
 	{
 		sample->play_length = new_len;
@@ -1738,6 +1776,8 @@ int sample_set_endframe(int s1, long frame_num)
 		frame_num = sample->edit_list->total_frames;
 
     sample->last_frame = frame_num;
+	if( sample->resume_pos > frame_num )
+		sample->resume_pos = frame_num;
 
     return (sample_update(sample,s1));
 }

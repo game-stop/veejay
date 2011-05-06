@@ -179,6 +179,7 @@ typedef struct sample_info_t {
     int          composite;
     void	*viewport_config;
     void	*viewport;
+	long	resume_pos;
 } sample_info;
 
 #define SAMPLE_YUV420_BUFSIZE 16
@@ -356,6 +357,9 @@ extern int     sample_max_video_length(int s1);
 extern	int	sample_set_composite_view(int s1, void *vp );
 extern void	*sample_get_composite_view(int s1);
 
+extern	long	sample_get_resume(int s1);
+extern	int		sample_set_resume(int s1, long pos );
+
 #ifdef HAVE_XML2
 extern void CreateSample(xmlNodePtr node, sample_info * sample, void *font);
 extern void CreateEffects(xmlNodePtr node, sample_eff_chain ** effects);
@@ -370,5 +374,6 @@ extern void ParseKEys(xmlDocPtr doc, xmlNodePtr cur, void *port);
 extern unsigned char *UTF8toLAT1(unsigned char *in);
 #endif
 void	sample_reload_config(void *compiz, int s1, int mode );
+
 
 #endif
