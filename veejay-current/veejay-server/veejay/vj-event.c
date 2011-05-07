@@ -6251,8 +6251,8 @@ void vj_event_chain_entry_channel(void *ptr, const char format[], va_list ap)
 			{
 				veejay_msg(VEEJAY_MSG_INFO, "Selected input channel (%s %d)",
 				  (src == VJ_TAG_TYPE_NONE ? "sample" : "stream"),args[2]);
-	//			if(v->no_bezerk) veejay_set_sample(v, v->uc->sample_id);
-				if(v->no_bezerk) veejay_set_frame(v,sample_get_startFrame(v->uc->sample_id));
+				if(v->settings->sample_restart) 
+					veejay_set_frame(v,sample_get_startFrame(v->uc->sample_id));
 			}
 			else
 			{
