@@ -990,12 +990,13 @@ int	sample_get_first_mix_offset(int s1, int *parent, int look_for)
 	if(!sample)
 		return 0;
 	int p = 0;
-	for( p = 0; p < SAMPLE_MAX_EFFECTS; p ++ )
-	  if( sample->effect_chain[p]->frame_offset && sample->effect_chain[p]->source_type == 0 && look_for ==
-			sample->effect_chain[p]->channel)
+	for( p = 0; p < SAMPLE_MAX_EFFECTS; p ++ ) {
+	  if( sample->effect_chain[p]->source_type == 0 && look_for == sample->effect_chain[p]->channel)
 	  {	 
 		return sample->effect_chain[p]->frame_offset;
  	  }
+
+	}
 	return 0;
 }
 
@@ -1034,9 +1035,10 @@ int sample_get_offset(int s1, int position)
     sample_info *sample;
     sample = sample_get(s1);
     if (!sample)
-	return -1;
+		return -1;
     if (position >= SAMPLE_MAX_EFFECTS)
-	return -1;
+		return -1;
+
     return sample->effect_chain[position]->frame_offset;
 }
 
@@ -1329,23 +1331,23 @@ int sample_set_chain_channel(int s1, int position, int input)
     //sample->effect_chain[position]->channel = input;
     int src_type =  sample->effect_chain[position]->source_type;
     // now, reset cache and setup
-   	 if( src_type == 0)
-   	 {
-		sample_info *new = sample_get( input );
-
+   	if( src_type == 0)
+   	{
 		if( sample->effect_chain[position]->channel != input && sample->effect_chain[position]->effect_id > 0)
 		{
+			sample_info *new = sample_get(input);
 		    sample_info *old = sample_get( sample->effect_chain[position]->channel );
 		    if(old)
 			    vj_el_break_cache( old->edit_list ); // no longer needed
 	    	
 		    if(new)
-			vj_el_setup_cache( new->edit_list ); // setup new cache
+				vj_el_setup_cache( new->edit_list ); // setup new cache
 		}
 	 }
-	sample->effect_chain[position]->channel = input;
 
-    	return ( sample_update(sample,s1));
+	 sample->effect_chain[position]->channel = input;
+
+    return ( sample_update(sample,s1));
 }
 
 static	int sample_sample_used(sample_info *a, int b )
@@ -1468,19 +1470,29 @@ int sample_set_chain_source(int s1, int position, int input)
 
 	if( sample->effect_chain[position]->source_type == 0 &&
 		    sample->effect_chain[position]->channel > 0 &&
-			sample->effect_chain[position]->effect_id > 0)
+			sample->effect_chain[position]->effect_id > 0 &&
+			input != sample->effect_chain[position]->source_type )
 	{
-	    sample_info *second = sample_get( sample->effect_chain[position]->channel );
-	    if(second && second->edit_list)
-		vj_el_clear_cache( second->edit_list );
+		sample_info *second = sample_get( sample->effect_chain[position]->channel );
+		if(second && second->edit_list)
+			vj_el_clear_cache( second->edit_list );
+	}
+	if( sample->effect_chain[position]->source_type == 0 &&
+		sample->effect_chain[position]->effect_id > 0 &&
+		sample->effect_chain[position]->channel > 0 &&
+		input != sample->effect_chain[position]->source_type)
+	{
 	    sample_info *new = sample_get( input );
 	    if(new)
-	  	vj_el_setup_cache( new->edit_list );
+	  		vj_el_setup_cache( new->edit_list );
 	}
 
-       	sample->effect_chain[position]->source_type = input;
-    return (sample_update(sample,s1));
+    sample->effect_chain[position]->source_type = input;
+    
+	return (sample_update(sample,s1));
 }
+
+
 int	sample_load_composite_config( void *compiz, int s1 )
 {
 	sample_info *sample = sample_get(s1);

@@ -2406,7 +2406,7 @@ void		vj_init_vevo_events(void)
 
 	index_map_[ VIMS_CONTINUOUS_PLAY ] 		=	_new_event(
 				"%d",
-				VIMS_PROJ_INC,
+				VIMS_CONTINUOUS_PLAY,
 				"Continuous sample play, do not restart samples",
 				vj_event_play_norestart,
 				1,

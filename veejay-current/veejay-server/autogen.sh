@@ -7,7 +7,7 @@
 
 echo "Edit me"
  
-# newer distributions, ubuntu 11. etc
+## newer distributions, ubuntu 11. etc
 
 #if [ ! -d m4 ]; then
 #        mkdir m4
@@ -15,6 +15,6 @@ echo "Edit me"
 #autoreconf -v -fi -I m4
 
 
-# slackware 13.1 and older
+## slackware 13.1 and older
 
 # autoreconf -v -fi
