@@ -9473,7 +9473,7 @@ void	vj_event_vloopback_start(void *ptr, const char format[], va_list ap)
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to setup vloopback pusher"); 
 
 #else
-		veejay_msg(VEEJAY_MSG_ERROR, "not implemented yet!");
+		veejay_msg(VEEJAY_MSG_ERROR, "not implemented yet for v4l2!");
 #endif
 }
 

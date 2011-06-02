@@ -48,7 +48,7 @@
 #include <linux/videodev.h>
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
-
+#include <veejay/vims.h>
 #define VLOOPBACK_MMAP 0 	// commented out
 #define VLOOPBACK_PIPE 1
 #define VLOOPBACK_N_BUFS 2
@@ -79,20 +79,26 @@ void *vj_vloopback_open(const char *device_name, int norm, int mode,
 
 	memset(v , 0, sizeof(vj_vloopback_t ));
 
-	v->fd = open( device_name, O_RDWR, S_IRUSR|S_IWUSR );
+	v->fd = open( device_name, O_RDWR ); //, S_IRUSR|S_IWUSR );
+	if( v->fd <= 0 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot open vloopback device %s: %s", device_name, strerror(errno) );
+		return ret;
+	}
+
 	v->norm = norm;
 	v->mode = mode;
 	v->width = w;
 	v->height = h;
-	v->palette = (pixel_format == 1 ? VIDEO_PALETTE_YUV422P :
-				VIDEO_PALETTE_YUV420P );
 
-	if(!v->fd)
-	{
-		if(v) free(v);
-		veejay_msg(VEEJAY_MSG_ERROR, "Cannot open vloopback %s",
-			device_name );
-		return ret;
+	switch(pixel_format) {
+		case FMT_420:
+		case FMT_420F:
+			v->palette = VIDEO_PALETTE_YUV420P; break;
+		case FMT_422:
+		case FMT_422F:
+			v->palette = VIDEO_PALETTE_YUV422P; break;
+		default:
+			v->palette = VIDEO_PALETTE_PLANAR; break;
 	}
 
 	v->dev_name = strdup( device_name );
@@ -100,11 +106,11 @@ void *vj_vloopback_open(const char *device_name, int norm, int mode,
 	ret = (void*) v;
 
 	veejay_msg(VEEJAY_MSG_DEBUG,
-		"Vloopback %s size %d x %d, palette YUV42%sP",
+		"Vloopback %s size %d x %d, palette %d",
 		v->dev_name,
 		v->width,
 		v->height,
-		(pixel_format == 1  ? "2" : "0" ) );
+		v->palette );
 
 	return (void*) ret;
 }

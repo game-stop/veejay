@@ -263,7 +263,7 @@ static struct {
 	{ VIDEO_PALETTE_YUYV,      "YUYV 4:2:2 Packed",	PIX_FMT_YUYV422 },
 	{ VIDEO_PALETTE_UYVY,	   "UYVY 4:2:2 Packed", PIX_FMT_UYVY422 },
 	{ VIDEO_PALETTE_RGB32 ,	   "RGB 32 bit",		PIX_FMT_RGB32 },
-
+	{  VIDEO_PALETTE_PLANAR,   "Planar data",		PIX_FMT_YUVJ422P },
 	{ -1,			"Unsupported colour space", -1},
 };
 //@fixme: 16-235 yuv
@@ -271,9 +271,11 @@ static struct {
 static int is_YUV(int a) {
 	if( a == VIDEO_PALETTE_YUV422P || 
             a == VIDEO_PALETTE_YUV420P ||
-	    a == VIDEO_PALETTE_YUV422  ||
+	    	a == VIDEO_PALETTE_YUV422  ||
             a == VIDEO_PALETTE_YUYV    ||
-            a == VIDEO_PALETTE_UYVY )
+            a == VIDEO_PALETTE_UYVY ||
+			a == VIDEO_PALETTE_PLANAR
+			)
 		return 1;
 	return 0;
 }
@@ -324,7 +326,6 @@ static	int		v4lvideo_fun(v4lvideo_t *v, int w, int h, int palette, int *cap_pale
 {
 	int i = 0;
 	int supported_palette = -1;
-	int native            = 0;
 	
 	int is_jpeg[2]	      = {0,0};
 #ifdef STRICT_CHECKING
@@ -1000,6 +1001,11 @@ static void	__v4lvideo_copy_framebuffer_to(v4lvideo_t *v1, v4lvideo_template_t *
 		dstf->data[0] = dstY;
 		dstf->data[1] = dstU;
 		dstf->data[2] = dstV;
+		srcf->data[0] = src;
+		srcf->data[1] = src + srcf->len;
+		srcf->data[2] = src + srcf->len + srcf->uv_len;
+
+
 		if(!v1->scaler) 
 			v1->scaler = 
 				yuv_init_swscaler( srcf,dstf,&(v1->sws_templ), yuv_sws_get_cpu_flags());
