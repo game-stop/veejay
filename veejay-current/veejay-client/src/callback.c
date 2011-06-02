@@ -132,6 +132,12 @@ void	on_button_001_clicked(GtkWidget *widget, gpointer user_data)
 	vj_midi_learning_vims_simple( info->midi, NULL, VIMS_SET_PLAIN_MODE );
 }
 
+void	on_feedbackbutton_toggled( GtkWidget *widget, gpointer data )
+{
+	int val = is_button_toggled( "feedbackbutton" ) ? 1:0;
+	multi_vims( VIMS_FEEDBACK, "%d", val );
+}
+
 void	on_fx_followfade_toggled( GtkWidget *widget, gpointer data )
 {
 	int val = is_button_toggled( "fx_followfade" ) ? 1:0;

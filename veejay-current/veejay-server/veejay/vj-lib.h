@@ -206,6 +206,8 @@ typedef struct {
 	int	simple_frame_dup;
 	uint32_t cycle_count[2]; //@ required for veejay-radar 
 	int	sample_restart;
+	int	feedback;
+	int feedback_stage;
 } video_playback_setup;
 
 typedef struct {

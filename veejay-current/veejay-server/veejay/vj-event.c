@@ -3598,6 +3598,22 @@ void vj_event_play_stop(void *ptr, const char format[], va_list ap)
 	}
 }
 
+void	vj_event_feedback( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	int args[1];
+	char *s = NULL;
+	P_A(args,s,format,ap);
+	if( args[0] == 0 ) {
+		v->settings->feedback = 0;
+	} else if ( args[0] == 1 ) {
+		v->settings->feedback = 1;
+		v->settings->feedback_stage = 1;
+	}
+	veejay_msg(VEEJAY_MSG_INFO ,"Feedback on main source is %s",
+			( v->settings->feedback ? "enabled." : "disabled.") );
+}
+
 void	vj_event_render_depth( void *ptr, const char format[] , va_list ap )
 {
 	int args[1];

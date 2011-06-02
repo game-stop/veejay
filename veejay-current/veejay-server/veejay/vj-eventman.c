@@ -2461,6 +2461,18 @@ void		vj_init_vevo_events(void)
 				VIMS_ALLOW_ANY,
 				NULL );
 
+	index_map_[ VIMS_FEEDBACK ]				=	_new_event(
+				"%d",
+				VIMS_FEEDBACK,
+				"Toggle feedback loop",
+				vj_event_feedback,
+				1,
+				VIMS_ALLOW_ANY,
+				"Enable/disable",
+				"0",
+				NULL 
+				);
+
 	index_map_[ VIMS_RENDER_DEPTH ]				=	_new_event(
 				"%d",
 				VIMS_RENDER_DEPTH,
