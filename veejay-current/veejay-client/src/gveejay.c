@@ -48,6 +48,7 @@ static int ph = 144;
 static int preview = 0; // off
 static int use_threads = 0;
 static char midi_file[1024];
+static int geom_[2] = { -1 , -1};
 static struct
 {
 	char *file;
@@ -74,6 +75,7 @@ static void usage(char *progname)
 	printf( "-l\t\tChoose layout (0=large screen, 1=small screens)\n");
 	printf( "-V\t\tShow version, data directory and exit.\n");
 	printf( "-m <file>\tMIDI configuration file.\n");
+    printf( "-g\t\t<X,Y>\tWindow position on screen.\n");
 	printf( "\n\n");
         exit(-1);
 }
@@ -129,6 +131,15 @@ static int      set_option( const char *name, char *value )
 	else if (strcmp( name, "m" ) == 0 ) {
 		strcpy(midi_file, optarg);
 		load_midi = 1;
+	}
+	else if (strcmp(name,"g") == 0 ) {
+		if(sscanf( optarg, "%d,%d",&geom_[0],&geom_[1]) != 2 ) {
+			fprintf(stderr, "invalid screen coordinates:%s\n",optarg);
+		} else {
+			fprintf(stdout, "Place window at %d,%d", geom_[0],geom_[1]);
+			vj_gui_set_geom(geom_[0],geom_[1]);
+		}
+
 	}
 	else if (strcmp(name, "P" ) == 0 || strcmp(name, "preview" ) == 0 )
 	{
@@ -204,7 +215,7 @@ int main(int argc, char *argv[]) {
 	// default host to connect to
 	sprintf(hostname, "127.0.0.1");
 
-        while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:Vl:T:m:")) != EOF )
+        while( ( n = getopt( argc, argv, "s:h:p:tnvHf:X:P:Vl:T:m:g:")) != EOF )
         {
                 sprintf(option, "%c", n );
                 err += set_option( option, optarg);

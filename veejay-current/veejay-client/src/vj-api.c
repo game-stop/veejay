@@ -293,7 +293,7 @@ static  int vims_verbosity = 0;
 #define   livido_port_t vevo_port_t
 static	int	cali_stream_id = 0;
 static	int	cali_onoff     = 0;
-
+static int geo_pos_[2] = { -1,-1 };
 static	vevo_port_t *fx_list_ = NULL;
 
 typedef struct
@@ -6805,6 +6805,12 @@ static	void	debug_spinboxes()
 	}
 }
 
+void	vj_gui_set_geom( int x, int y )
+{
+	geo_pos_[0] = x;
+	geo_pos_[1] = y;
+}
+
 void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, int use_threads, int load_midi , char *midi_file)
 {
 	int i;
@@ -7026,6 +7032,15 @@ void 	vj_gui_init(char *glade_file, int launcher, char *hostname, int port_num, 
 
 	if( load_midi )
 			vj_midi_load(info->midi,midi_file);
+
+
+	GtkWidget *lw = glade_xml_get_widget_( info->main_window, "veejay_connection");
+
+	if( geo_pos_[0] >= 0 && geo_pos_[1] >= 0 )
+		gtk_window_move( lw, geo_pos_[0], geo_pos_[1] );
+
+
+
 }
 
 void	vj_gui_preview(void)
@@ -7139,6 +7154,9 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	GtkWidget *w = glade_xml_get_widget_(info->main_window, "gveejay_window" );
 	gtk_widget_show( w );
 
+	if( geo_pos_[0] >= 0 && geo_pos_[1] >= 0 )
+		gtk_window_move( w, geo_pos_[0], geo_pos_[1] );
+
 	
 /*	int speed = info->status_tokens[SAMPLE_SPEED];
 	if( speed < 0 ) 
@@ -7177,6 +7195,10 @@ static	void	veejay_stop_connecting(vj_gui_t *gui)
 	GtkWidget *mw = glade_xml_get_widget_(info->main_window,"gveejay_window" );
 
 	gtk_widget_show( mw );
+	if( geo_pos_[0] >= 0 && geo_pos_[1] >= 0 )
+		gtk_window_move( mw, geo_pos_[0], geo_pos_[1] );
+
+
 }
 
 void	reloaded_launcher(char *hostname, int port_num)
