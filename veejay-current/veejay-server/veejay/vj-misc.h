@@ -40,8 +40,9 @@ int	veejay_sprintf( char *s, size_t size, const char *format, ... );
 #else
 #define	veejay_snprintf snprintf
 #endif
+long	vj_get_timer(void);
 
-unsigned int	vj_get_relative_time(void);
+long	vj_get_relative_time(void);
 
 void	vj_stamp_clear();
 unsigned int vj_stamp();

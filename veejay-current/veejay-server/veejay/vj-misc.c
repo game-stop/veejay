@@ -45,7 +45,7 @@
 #endif
 static unsigned int vj_relative_time = 0;
 static unsigned int vj_stamp_ = 0;
-static unsigned int vj_get_timer()
+long vj_get_timer()
 {
     struct timeval tv;
     gettimeofday(&tv, 0);
@@ -63,9 +63,9 @@ void	vj_stamp_clear()
 	vj_stamp_ = 0;
 }
 
-unsigned int vj_get_relative_time()
+long vj_get_relative_time()
 {
-    unsigned int time, relative;
+    long time, relative;
     time = vj_get_timer();
     relative = time - vj_relative_time;
     vj_relative_time = time;

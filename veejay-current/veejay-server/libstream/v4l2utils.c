@@ -657,9 +657,16 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 		return NULL;
 	}
 
+	veejay_msg(VEEJAY_MSG_INFO, "v4l2: Opening Video4Linux2 device: %s ...", file );
+
 	int fd = open( file , O_RDWR );
 	int i;
-	veejay_msg(VEEJAY_MSG_INFO, "v4l2: Video4Linux2 device opened: %s", file );
+
+	if( fd <= 0 ) {
+		return NULL;
+	} else {
+		veejay_msg(VEEJAY_MSG_INFO, "v4l2: Video4Linux2 device opened: %s", file );
+	}
 
 	v4l2info *v = (v4l2info*) vj_calloc(sizeof(v4l2info));
 

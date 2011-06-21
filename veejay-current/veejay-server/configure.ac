@@ -35,6 +35,7 @@ dnl Options
 
 AC_CONFIG_MACRO_DIR([m4])
 
+
 dnl kill CFLAGS
 CFLAGS=""
 AC_ARG_ENABLE(strict,
@@ -83,12 +84,12 @@ AC_ARG_WITH(jack,
 AC_ARG_WITH(samplerate,
 		AC_HELP_STRING([--without-samplerate], [Do not use libsamplerate.]),
 		[], [with_samplerate=yes])
-AC_ARG_WITH(v4l2,
-		AC_HELP_STRING([--without-v4l2], [Do not use video4linux2]),	
-		[with_v4l2=no], [with_v4l2=yes])
-AC_ARG_WITH(v4l,
-		AC_HELP_STRING([--without-v4l], [Do not use video4linux1]),	
-		[with_v4l=yes], [with_v4l=no])
+
+
+AC_ARG_ENABLE(v4l1,
+		AC_HELP_STRING([--enable-v4l1],
+			     [Compile with video4linux instead of video4linux 2]))
+
 AC_ARG_WITH(xml2,
 		AC_HELP_STRING([--without-xml2], [Do not use the XML library for Gnome]),
 		[], [with_xml2=yes])
@@ -229,6 +230,14 @@ else
  AC_MSG_RESULT([no])
 fi
 
+
+if test "x$enable_v4l1" = "xyes" ; then
+	 with_v4l2=no
+	 with_v4l=yes
+else
+	with_v4l2=yes
+	with_v4l=no
+fi
 
 dnl ********************************************************************
 dnl Test for MMX support if an IA32 platform.  If on a PPC then look for
@@ -596,6 +605,26 @@ AC_MSG_CHECKING( for Xinerama support on XFree86 )
 AC_MSG_RESULT($use_xinerama)	
 
 
+AC_MSG_RESULT( $with_v4l )
+
+AC_MSG_RESULT( $with_v4l2 )
+
+if test x$with_v4l2 != xno ; then
+  if test x$have_linux != xfalse ; then
+
+	  AC_CHECK_HEADER(linux/videodev2.h,
+                  [have_v4l2=true
+	  if test x$with_v4l2 != xno; then
+                   AC_DEFINE(HAVE_V4L2, 1,
+		             [Building for Linux - using the video4linux2 API])
+				   have_v4l=false
+				   with_v4l=no
+			fi
+			],
+                  [AC_MSG_ERROR([videodev2.h not found - please install the linux kernel headers or try configure with --enable-v4l1])])
+          fi
+fi
+
 if test x$with_v4l != xno ; then
   if test x$have_linux != xfalse ; then
 
@@ -610,20 +639,6 @@ if test x$with_v4l != xno ; then
           fi
 fi
 
-
-if test x$with_v4l2 != xno ; then
-  if test x$have_linux != xfalse ; then
-
-	  AC_CHECK_HEADER(linux/videodev2.h,
-                  [have_v4l2=true
-	  if test x$with_v4l2 != xno; then
-                   AC_DEFINE(HAVE_V4L2, 1,
-		             [Building for Linux - using the video4linux2 API])
-			fi
-			],
-                  [AC_MSG_ERROR([videodev2.h not found - please install the linux kernel headers])])
-          fi
-fi
 
 
 dnl *********************************************************************
@@ -1086,7 +1101,7 @@ AC_MSG_NOTICE([  - Jack Audio Connection Kit     : ${have_jack}])
 AC_MSG_NOTICE([  - Unicap Imaging                : ${have_unicap} ])
 AC_MSG_NOTICE([  - Liblo OSC client              : ${have_liblo}])
 AC_MSG_NOTICE([  - V4L2 (default)                : ${have_v4l2}])
-AC_MSG_NOTICE([  - V4L1 (default)                : ${have_v4l}])
+AC_MSG_NOTICE([  - V4L1 (obsolete)               : ${have_v4l}])
 #AC_MSG_NOTICE([  - libsamplerate                 : ${have_samplerate}])
 
 cat NEWS

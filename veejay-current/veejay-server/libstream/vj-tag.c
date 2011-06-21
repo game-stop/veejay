@@ -3426,9 +3426,10 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		if( tag->capture_type == 1 ) {
 #ifdef HAVE_V4L
 			int res = v4lvideo_copy_framebuffer_to(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]);
+#else
+			int res = 0;
 #endif
 #ifdef HAVE_V4L2
-			int res  = 0;
 			if( no_v4l2_threads_ ) {
 			 res = v4l2_pull_frame( vj_tag_input->unicap[tag->index],v4l2_get_dst(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]) );
 			} else {

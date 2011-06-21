@@ -125,13 +125,6 @@ void mymemset_generic(void *s, char c, size_t cc )
 } 
 #endif
 
-unsigned int vj_get_timer()
-{
-    struct timeval tv;
-    gettimeofday(&tv, 0);
-    return ((tv.tv_sec & 1000000) + tv.tv_usec);
-}
-
 int	cpu_cache_size()
 {
 	return CACHE_LINE_SIZE;
