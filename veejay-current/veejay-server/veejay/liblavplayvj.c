@@ -2024,14 +2024,16 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 	el = info->edit_list;
 
-
+#ifdef HAVE_V4L
 	int driver = 1;
 	char *driver_str = getenv("VEEJAY_CAPTURE_DRIVER");
 	if( driver_str != NULL ) {
 		if( strncasecmp( "unicap",driver_str, 6) == 0 )
 			driver = 0;
 	}
-
+#else
+	int driver = 1;
+#endif
 
 	if (vj_tag_init(el->video_width, el->video_height, info->pixel_format,driver) != 0) {
 		veejay_msg(VEEJAY_MSG_ERROR, "Error while initializing Stream Manager");

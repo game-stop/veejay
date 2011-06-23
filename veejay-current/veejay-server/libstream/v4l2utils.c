@@ -669,6 +669,8 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 	}
 
 	v4l2info *v = (v4l2info*) vj_calloc(sizeof(v4l2info));
+	if( v == NULL )
+		return NULL;
 
 	v->fd = fd;
 
@@ -677,8 +679,6 @@ void *v4l2open ( const char *file, const int input_channel, int host_fmt, int wi
 	if( v->grey == 1 ) {
 		dst_fmt = PIX_FMT_GRAY8;
 	}
-
-	veejay_msg(VEEJAY_MSG_INFO, "v4l2: Host running in %s", av_pix_fmt_descriptors[ dst_fmt ] );
 
 	if( -1 == vioctl( fd, VIDIOC_QUERYCAP, &(v->capability) ) ) {
 		veejay_msg(0, "v4l2: VIDIOC_QUERYCAP failed with %s",			strerror(errno));

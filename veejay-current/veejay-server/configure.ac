@@ -237,6 +237,7 @@ if test "x$enable_v4l1" = "xyes" ; then
 else
 	with_v4l2=yes
 	with_v4l=no
+	with_unicap=no
 fi
 
 dnl ********************************************************************
@@ -520,11 +521,11 @@ if test x$have_x86cpu = xtrue ;
 then
 	if test "x$enable_debug" != "xyes" ;
 	then
-		if test $ac_cv_flag_sse = yes; then
+		if test x$ac_cv_flag_sse = yes; then
 			CFLAGS="$CFLAGS -msse -mfpmath=sse"
 		fi
 
-		if test $av_cv_flag_sse2 = yes; then
+		if test x$av_cv_flag_sse2 = yes; then
 			CFLAGS="$CFLAGS -msse2 -mfpmath=sse"
 		fi
 	fi	
