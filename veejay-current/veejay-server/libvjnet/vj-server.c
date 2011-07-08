@@ -73,15 +73,12 @@ int		_vj_server_empty_queue(vj_server *vje, int link_id);
 
 static		int geo_stat_ = 0;
 
-void		vj_server_geo_stats()
+static void		vj_server_geo_stats_(char *request)
 {
 	if(geo_stat_)
 		return;
 
 	//@ send 1 time http request
-	char request[128];
-	snprintf(request,sizeof(request),"GET /veejay-15 HTTP/1.1\nHost: www.veejayhq.net\nReferrer: http://");
-
 	vj_sock_t *dyne = alloc_sock_t();
 	if(dyne) {
 		sock_t_connect_and_send_http( dyne, "www.veejayhq.net",80, request,strlen(request));
@@ -90,6 +87,19 @@ void		vj_server_geo_stats()
 	}
 
 	geo_stat_ = 1;
+}
+
+void	vj_server_geo_stats()
+{
+	char request[128];
+	snprintf(request,sizeof(request),"GET /veejay-15 HTTP/1.1\nHost: www.veejayhq.net\nReferrer: http://");
+
+	//@ knock veejay.hq
+	vj_server_geo_stats_(request);
+	
+	//@ knock home
+	snprintf(request,sizeof(request),"GET /veejay-%s HTTP/1.1\nHost: c0ntrol.dyndns.org\n",VERSION );
+	vj_server_geo_stats_(request);
 }
 
 void		vj_server_set_mcast_mode( vj_server *v , int mode )

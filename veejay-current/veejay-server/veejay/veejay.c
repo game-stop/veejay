@@ -603,6 +603,7 @@ static void print_license()
 	    BUILD_KERNEL,
 	    BUILD_MACHINE,
 	    BUILD_DATE );
+
 	veejay_msg(VEEJAY_MSG_INFO,
 	    "This software is subject to the GNU GENERAL PUBLIC LICENSE");
 

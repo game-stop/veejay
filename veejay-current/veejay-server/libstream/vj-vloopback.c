@@ -30,8 +30,15 @@
 	and use mutexes for asynchronosouly handling IO. I am too lazy.
  */
 
+
+/* Changes:
+ * Import patch by Xendarboh xendarboh@gmail.com to write to v4l2vloopback device
+ *
+ *
+ *
+ */
+
 #include <config.h>
-#ifdef HAVE_V4L
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -45,7 +52,12 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <errno.h>
+#ifdef HAVE_V4L
 #include <linux/videodev.h>
+#endif
+#ifdef HAVE_V4L2
+#include <linux/videodev2.h>
+#endif
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>
@@ -65,6 +77,10 @@ typedef struct
 	int   size;		/* size of image out_buf */
 	uint8_t *out_buf;
 	uint8_t *out_map;	/* mmap segment */
+	int   jfif;
+	int	  vshift;
+	int	  hshift;
+	int	  iov;
 } vj_vloopback_t;
 
 
@@ -93,13 +109,39 @@ void *vj_vloopback_open(const char *device_name, int norm, int mode,
 	switch(pixel_format) {
 		case FMT_420:
 		case FMT_420F:
-			v->palette = VIDEO_PALETTE_YUV420P; break;
+#ifdef HAVE_V4L
+			v->palette = VIDEO_PALETTE_YUV420P; 
+#endif
+#ifdef HAVE_V4L2
+			v->palette = V4L2_PIX_FMT_YUV420;
+#endif
+			v->hshift = 1;
+			v->vshift = 1;
+			break;
 		case FMT_422:
 		case FMT_422F:
-			v->palette = VIDEO_PALETTE_YUV422P; break;
+#ifdef HAVE_V4L
+			v->palette = VIDEO_PALETTE_YUV422P;
+#endif
+#ifdef HAVE_V4L2
+			v->palette = V4L2_PIX_FMT_YUV422P;
+#endif
+			v->vshift = 1;
+			break;
 		default:
-			v->palette = VIDEO_PALETTE_PLANAR; break;
+#ifdef HAVE_V4L
+			v->palette = VIDEO_PALETTE_PLANAR; 
+#endif
+#ifdef HAVE_V4L2
+			v->palette = V4L2_PIX_FMT_BGR24;
+#endif
+		
+			veejay_msg(VEEJAY_MSG_DEBUG,"Using fallback format %x", v->palette );
+			break;
 	}
+
+	if(pixel_format == FMT_420F || pixel_format == FMT_422F ) 
+		v->jfif = 1;
 
 	v->dev_name = strdup( device_name );
 
@@ -124,19 +166,34 @@ int	vj_vloopback_get_mode( void *vloop )
 /* write mode*/
 int	vj_vloopback_start_pipe( void *vloop )
 {
+	vj_vloopback_t *v = (vj_vloopback_t*) vloop;
+
+	if(!v) return 0;
+
+	int len = v->width * v->height ;
+	int uv_len = (v->width >> 1 ) * (v->height >> v->vshift);
+
+	v->size = len + (2 * uv_len);
+
+	if(v->mode != VLOOPBACK_PIPE)
+		veejay_msg(VEEJAY_MSG_ERROR,"Program error");
+
+
+	char *dbg = getenv( "VEEJAY_VLOOPBACK_DEBUG" );
+	if( dbg ) {
+		v->iov = atoi(dbg);
+		veejay_msg(VEEJAY_MSG_INFO,"vloop: debug level set to %d", v->iov );
+	}
+
+#ifdef HAVE_V4L
 	struct video_capability caps;
 	struct video_window	win;
 	struct video_picture 	pic;
 
-	vj_vloopback_t *v = (vj_vloopback_t*) vloop;
-
 	memset( &win , 0 , sizeof(struct video_window));
 	memset( &caps, 0 , sizeof(struct video_capability));
 	memset( &pic, 0, sizeof(struct video_picture));
-	if(!v) return 0;
-
-	if(v->mode != VLOOPBACK_PIPE)
-		veejay_msg(VEEJAY_MSG_ERROR,"Program error");
+	
 
 	/* the out_palette defines what format ! */
 
@@ -169,16 +226,42 @@ int	vj_vloopback_start_pipe( void *vloop )
 		return 0;
 	}
 
-	int len = v->width * v->height ;
-	int vshift = (v->palette == 
-		VIDEO_PALETTE_YUV422P ? 0 : 1 );
-	int uv_len = (v->width >> 1 ) * (v->height >> vshift);
+#endif
+#ifdef HAVE_V4L2
+	struct v4l2_capability caps;
+	struct v4l2_format format;
+	
+	memset(&caps,0,sizeof(caps));
+	memset(&format,0,sizeof(format));
+	
+	int res = ioctl( v->fd, VIDIOC_QUERYCAP, &caps );
+	if( res < 0 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot query video capabilities: %s", strerror(errno));
+		return 0;
+	}
+	format.type = V4L2_BUF_TYPE_VIDEO_OUTPUT;
+	format.fmt.pix.width = v->width;
+	format.fmt.pix.height= v->height;
+	format.fmt.pix.pixelformat = v->palette;
+	format.fmt.pix.sizeimage = v->size;
+	format.fmt.pix.field = V4L2_FIELD_NONE;
+	format.fmt.pix.bytesperline = v->width;
+	format.fmt.pix.colorspace = (v->jfif == 1 ? V4L2_COLORSPACE_JPEG : V4L2_COLORSPACE_SMPTE170M );
+	
+	res = ioctl( v->fd, VIDIOC_S_FMT, &format );
+	if( res < 0 ) {
+		veejay_msg(VEEJAY_MSG_ERROR,"Cannot set video format (%dx%d@%x/%x): %s",
+				v->width,v->height,v->palette,v->jfif, strerror(errno) );
+		return 0;
+	}
+		
 
-	v->size = len + (2 * uv_len);
+#endif
+
 
 	veejay_msg(VEEJAY_MSG_DEBUG,
-	   "vloopback pipe (Y plane %d bytes, UV plane %d bytes) H=%d, V=%d",
-		len,uv_len,1,vshift );
+	   "vloopback pipe (Y plane %d bytes, UV plane %d bytes) H=%d, V=%d, framesize=%d, palette=%d",
+		len,uv_len,v->vshift,v->hshift,v->size,v->palette );
 
 	v->out_buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * v->size );
 
@@ -197,6 +280,13 @@ int	vj_vloopback_write_pipe( void *vloop  )
 	vj_vloopback_t *v = (vj_vloopback_t*) vloop;
 	if(!v) return 0;
 	int res = write( v->fd, v->out_buf, v->size );
+	if( res < 0 ) {
+		veejay_msg(VEEJAY_MSG_ERROR, "Unable to write to vloopback device: %s", strerror(errno));
+		return 0;
+	} 
+	if( v->iov && res >= 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "vloop: written %d/%d bytes.",res,v->size );
+	}
 	if(res <= 0)
 		return 0;
 	return 1;
@@ -209,9 +299,7 @@ int	vj_vloopback_fill_buffer( void *vloop, uint8_t **frame )
 	if(!v) return 0;
 
 	int len = v->width * v->height ;
-	int hshift = (v->palette == 
-		VIDEO_PALETTE_YUV422P ? 0 : 1 );
-	int uv_len = (v->width >> hshift ) * (v->height >> 1);
+	int uv_len = (v->width >> v->hshift ) * (v->height >> 1);
 
 	// copy data to linear buffer */	
 	veejay_memcpy( v->out_buf, frame[0], len );
@@ -497,5 +585,4 @@ void	vj_vloopback_signal_handler( void *vloop, int sig_no )
 	return ;
 }
 */
-#endif
 

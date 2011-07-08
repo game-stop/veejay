@@ -1831,7 +1831,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	el->has_video = 1; //assume we get it   
 	el->MJPG_chroma = CHROMA420;
 	el->is_empty  = 0;
-    /* Check if a norm parameter is present */
 	if(!filename[0] || filename == NULL)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,"\tInvalid filename given");
@@ -1839,9 +1838,9 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		return NULL;	
 	}
 
-    if (strcmp(filename[0], "+p") == 0 || strcmp(filename[0], "+n") == 0)
+	if( norm == 'p' || norm == 'n' )
 	{
-		el->video_norm = filename[0][1];
+		el->video_norm = n;
 		nf = 1;
 		veejay_msg(VEEJAY_MSG_DEBUG,"Norm set to %s",  el->video_norm == 'n' ? "NTSC" : "PAL");
     }

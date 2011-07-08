@@ -351,10 +351,13 @@ static	void	v4l2_enum_frame_sizes( v4l2info *v )
 	const char *flags[] = { "uncompressed", "compressed" };
 	veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: discovering supported video formats");
 
+	//@clear mem
+	memset( &fmtdesc, 0, sizeof( fmtdesc ));
+
 	for( fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		 fmtdesc.type < V4L2_BUF_TYPE_VIDEO_OVERLAY;
 		 fmtdesc.type ++ ) {
-		fmtdesc.index = 0;
+	//	fmtdesc.index = 0;
 		while( vioctl( v->fd, VIDIOC_ENUM_FMT, &fmtdesc ) >= 0 ) {
 			veejay_msg(VEEJAY_MSG_DEBUG,"v4l2: Enumerate (%d,%s)", fmtdesc.index, buf_types[ fmtdesc.type ] );
 			veejay_msg(VEEJAY_MSG_DEBUG,"\tindex:%d", fmtdesc.index );
@@ -365,16 +368,14 @@ static	void	v4l2_enum_frame_sizes( v4l2info *v )
 						(fmtdesc.pixelformat >> 8 ) & 0xff,
 						(fmtdesc.pixelformat >> 16) & 0xff,
 						(fmtdesc.pixelformat >> 24) & 0xff );
-
-			fmtsize.index = 0;
+	
+			//@ some other day
+		/*	memset( &fmtsize, 0, sizeof(fmtsize));
 			fmtsize.pixel_format = fmtdesc.pixelformat;
+			
 			while( vioctl( v->fd, VIDIOC_ENUM_FRAMESIZES, &fmtsize ) >= 0 ) {
 				if( fmtsize.type == V4L2_FRMSIZE_TYPE_DISCRETE ) {
 					veejay_msg(VEEJAY_MSG_DEBUG, "\t\t%d x %d", fmtsize.discrete.width, fmtsize.discrete.height );
-					//while( vioctl( v->fd, VIDIOC_ENUM_FRAMEINTERVAL, &frmival ) >= 0 ) {
-					//	frmival.index ++;
-					//	veejay_msg(0, "\t\t\t<discrete>");
-					//}
 				} else if( fmtsize.type == V4L2_FRMSIZE_TYPE_STEPWISE ) {
 					veejay_msg(VEEJAY_MSG_DEBUG,"\t\t%d x %d - %d x %d with step %d / %d",
 							fmtsize.stepwise.min_width,
@@ -383,15 +384,10 @@ static	void	v4l2_enum_frame_sizes( v4l2info *v )
 							fmtsize.stepwise.min_height,
 							fmtsize.stepwise.step_width,
 							fmtsize.stepwise.step_height );
-					//while( vioctl( v->fd, VIDIOC_ENUM_FRAMEINTERVAL, &frmival ) >= 0 ) {
-					//	veejay_msg(0, "\t\t\t<stepwise interval>");
-				//		frmival.index ++;
-//
-//					}
 				}
 				fmtsize.index++;
 			}
-				
+			*/
 			fmtdesc.index ++;
 		}
 	}
@@ -443,9 +439,9 @@ static	int	v4l2_try_pix_format( v4l2info *v, int pixelformat, int wid, int hei, 
 	format.fmt.pix.pixelformat = v4l2_pixel_format;
 	
 	if( vioctl( v->fd, VIDIOC_TRY_FMT, &format ) == 0 ) {
-
-		veejay_msg(VEEJAY_MSG_INFO, "v4l2: Format %s supported by capture card (?)", //@ some drivers dont and still get here
-				(char*) &v4l2_pixel_format);
+//@ v4l2_pixel_format may be garbage
+//		veejay_msg(VEEJAY_MSG_INFO, "v4l2: Format %s supported by capture card (?)", //@ some drivers dont and still get here
+//				(char*) &v4l2_pixel_format);
 
  		if( format.fmt.pix.pixelformat == V4L2_PIX_FMT_JPEG )
 		{

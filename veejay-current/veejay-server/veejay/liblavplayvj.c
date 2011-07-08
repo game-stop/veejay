@@ -3696,10 +3696,11 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	//TODO: pass yuv sampling to dummy
 	if( info->dummy->active )
 	{
-		info->dummy->norm = override_norm;
+		info->dummy->norm =  'p';
 		if( override_norm == 'n' ) {
 			if(!info->dummy->fps) //@ if not set
 				info->dummy->fps = 30000.0/1001;
+			info->dummy->norm = 'n';
 		} 
 		if(!info->dummy->fps)
 			info->dummy->fps = settings->output_fps;
