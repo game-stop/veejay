@@ -133,6 +133,53 @@ typedef struct
 	int		threaded;
 } v4l2info;
 
+static struct {
+	const uint64_t std;
+	const char *descr;
+} v4l2_video_standards[] = 
+{
+	{ V4L2_STD_NTSC, 	"NTSC"      },
+	{ V4L2_STD_NTSC_M, 	"NTSC-M"    },
+	{ V4L2_STD_NTSC_M_JP, 	"NTSC-M-JP" },
+	{ V4L2_STD_NTSC_M_KR,	"NTSC-M-KR" },
+	{ V4L2_STD_NTSC_443, 	"NTSC-443"  },
+	{ V4L2_STD_PAL, 	"PAL"       },
+	{ V4L2_STD_PAL_BG, 	"PAL-BG"    },
+	{ V4L2_STD_PAL_B, 	"PAL-B"     },
+	{ V4L2_STD_PAL_B1, 	"PAL-B1"    },
+	{ V4L2_STD_PAL_G, 	"PAL-G"     },
+	{ V4L2_STD_PAL_H, 	"PAL-H"     },
+	{ V4L2_STD_PAL_I, 	"PAL-I"     },
+	{ V4L2_STD_PAL_DK, 	"PAL-DK"    },
+	{ V4L2_STD_PAL_D, 	"PAL-D"     },
+	{ V4L2_STD_PAL_D1, 	"PAL-D1"    },
+	{ V4L2_STD_PAL_K, 	"PAL-K"     },
+	{ V4L2_STD_PAL_M, 	"PAL-M"     },
+	{ V4L2_STD_PAL_N, 	"PAL-N"     },
+	{ V4L2_STD_PAL_Nc, 	"PAL-Nc"    },
+	{ V4L2_STD_PAL_60, 	"PAL-60"    },
+	{ V4L2_STD_SECAM, 	"SECAM"     },
+	{ V4L2_STD_SECAM_B, 	"SECAM-B"   },
+	{ V4L2_STD_SECAM_G, 	"SECAM-G"   },
+	{ V4L2_STD_SECAM_H, 	"SECAM-H"   },
+	{ V4L2_STD_SECAM_DK, 	"SECAM-DK"  },
+	{ V4L2_STD_SECAM_D, 	"SECAM-D"   },
+	{ V4L2_STD_SECAM_K, 	"SECAM-K"   },
+	{ V4L2_STD_SECAM_K1, 	"SECAM-K1"  },
+	{ V4L2_STD_SECAM_L, 	"SECAM-L"   },
+	{ V4L2_STD_SECAM_LC, 	"SECAM-Lc"  },
+	{ 0, 			"Unknown"   }
+};
+
+static	const	char	*v4l2_get_std(int std) {
+	unsigned int i;
+	for(i=0; v4l2_video_standards[i].std != 0 ; i ++ ) {
+		if( v4l2_video_standards[i].std == std )
+			return v4l2_video_standards[i].descr;
+	}	
+	return v4l2_video_standards[i].descr;
+}
+
 static	void	lock_( v4l2_thread_info *i ) {
 	int res = pthread_mutex_lock(&(i->mutex));
 	if( res < 0 ) {
@@ -297,17 +344,21 @@ static int	v4l2_enum_video_standards( v4l2info *v, char norm )
 {
 	struct v4l2_input input;
 	struct v4l2_standard standard;
+	v4l2_std_id current;
 
 	memset( &input, 0,sizeof(input));
 	if( -1 == vioctl( v->fd, VIDIOC_G_INPUT, &input.index )) {
-		return 0;
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: VIDIOC_G_INPUT failed with %s",
+				strerror(errno));
+		
 	}
 
 	if( -1 == vioctl( v->fd, VIDIOC_ENUMINPUT, &input )) {
-		return 0;
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: VIDIOC_ENUMINPUT failed with %s",
+				strerror(errno));
 	}
 
-/*	memset( &standard, 0,sizeof(standard));
+	memset( &standard, 0,sizeof(standard));
 	standard.index = 0;
 
 	while( 0 == vioctl( v->fd, VIDIOC_ENUMSTD, &standard )) {
@@ -327,15 +378,33 @@ static int	v4l2_enum_video_standards( v4l2info *v, char norm )
 		standard.index ++;
 	}
 
-	if( standard.index == 0 )
-		return 0;*/
 	int std_id = (norm == 'p' ? V4L2_STD_PAL: V4L2_STD_NTSC);
 
+	if( -1 == ioctl( v->fd, VIDIOC_G_STD, &current ) ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: unable to get video standard from video device:%s",
+				strerror(errno));
+	}
+
+	if( norm == 'n' ) {
+		if( current & V4L2_STD_PAL  ) {
+			veejay_msg(VEEJAY_MSG_WARNING,"v4l2: running in NTSC but device in norm %x",
+					current );
+			std_id = V4L2_STD_NTSC;
+		}
+	} else if (norm == 'p' ) {
+		if( current & V4L2_STD_NTSC ) {
+			veejay_msg(VEEJAY_MSG_WARNING,"v4l2: running in PAL but device in norm %x",
+					current );
+			std_id = V4L2_STD_PAL;
+		}
+	}
+
+
 	if (-1 == ioctl (v->fd, VIDIOC_S_STD, &std_id)) {
-		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: unable to set video standard.");
+		veejay_msg(VEEJAY_MSG_WARNING, "v4l2: unable to set video standard: %s", strerror(errno));
 		return 1;//@ show must go on 
 	} else {
-		veejay_msg(VEEJAY_MSG_INFO,"v4l2: set video standard PAL");
+		veejay_msg(VEEJAY_MSG_INFO,"v4l2: set video standard %s", v4l2_get_std(std_id));
 	}	
 
 	return 1;
@@ -353,6 +422,8 @@ static	void	v4l2_enum_frame_sizes( v4l2info *v )
 
 	//@clear mem
 	memset( &fmtdesc, 0, sizeof( fmtdesc ));
+
+	int loop_limit = 64;
 
 	for( fmtdesc.type = V4L2_BUF_TYPE_VIDEO_CAPTURE;
 		 fmtdesc.type < V4L2_BUF_TYPE_VIDEO_OVERLAY;
@@ -389,6 +460,10 @@ static	void	v4l2_enum_frame_sizes( v4l2info *v )
 			}
 			*/
 			fmtdesc.index ++;
+
+			loop_limit --; //@ endless loop in enumerating video formats 
+			if( loop_limit == 0 )
+				return; //@ give up
 		}
 	}
 }
@@ -405,7 +480,7 @@ static	int	v4l2_try_pix_format( v4l2info *v, int pixelformat, int wid, int hei, 
 		return -1;
 	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Current configuration is in %s (%dx%d)",
+	veejay_msg(VEEJAY_MSG_DEBUG, "v4l2: Current configuration is in %s (%dx%d), trying more formats ...",
 			(char*) &v->format.fmt.pix.pixelformat,
 			v->format.fmt.pix.width,
 			v->format.fmt.pix.height );

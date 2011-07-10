@@ -452,8 +452,8 @@ int _vj_server_free_slot(vj_server *vje)
 	{
 	    if (!Link[i]->in_use)
 			return i;
-    	}
-    	return VJ_MAX_CONNECTIONS;
+   	}
+   	return VJ_MAX_CONNECTIONS;
 }
 
 int _vj_server_new_client(vj_server *vje, int socket_fd)

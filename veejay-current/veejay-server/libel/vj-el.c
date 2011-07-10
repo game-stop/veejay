@@ -1826,7 +1826,6 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 	uint64_t n =0;
 	bzero(line,1024);
 	if(!el) return NULL;
-	veejay_memset( el, 0, sizeof(editlist) );  
 
 	el->has_video = 1; //assume we get it   
 	el->MJPG_chroma = CHROMA420;
@@ -1838,12 +1837,11 @@ editlist *vj_el_init_with_args(char **filename, int num_files, int flags, int de
 		return NULL;	
 	}
 
-	if( norm == 'p' || norm == 'n' )
-	{
-		el->video_norm = n;
+	if(strcmp(filename[0], "+p" ) == 0 || strcmp(filename[0], "+n") == 0 ) {
+		el->video_norm = filename[0][1];
 		nf = 1;
-		veejay_msg(VEEJAY_MSG_DEBUG,"Norm set to %s",  el->video_norm == 'n' ? "NTSC" : "PAL");
-    }
+	}
+
 
 	if(force)
 	{
