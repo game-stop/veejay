@@ -237,7 +237,7 @@ char *vj_tag_scan_devices( void )
 	const char *default_str = "000000";
 	int num = 0;
 	int i;
-	int len = 6;
+	int len = 0;
 #ifdef HAVE_UNICAP
 	char **device_list = vj_unicap_get_devices(unicap_data_, &num);
 #else
@@ -254,14 +254,16 @@ char *vj_tag_scan_devices( void )
 	for( i = 0; device_list[i] != NULL ;i++ )
 		len += strlen( device_list[i] );
 
-	char *n = (char*) vj_calloc(sizeof(char) * (len+1) );
+	char *n = (char*) vj_calloc(sizeof(char) * (6 + len) );
 	char *p = n + 6;
 
-	sprintf(n, "%06d",  (len-6) );	
+	sprintf(n, "%06d", len );	
 	for( i = 0; device_list[i] != NULL ;i++ )
 	{
-		int str_len = strlen(device_list[i]);
-		veejay_memcpy( p, device_list[i], str_len);
+		char tmp[1024];
+		snprintf( tmp, sizeof(tmp)-1, "%s", device_list[i] );
+		int str_len = strlen(tmp);
+		strncpy( p, tmp, str_len );
 		p += str_len;
 		free(device_list[i]);
 	}

@@ -9051,49 +9051,6 @@ void 	vj_event_send_editlist			(	void *ptr,	const char format[],	va_list ap	)
 	free(s_print_buf);
 }
 
-void	vj_event_send_devices			(	void *ptr,	const char format[],	va_list ap	)
-{
-	char str[255];
-	struct dirent **namelist;
-	int n_dev = 0;
-	int n;
-	char device_list[512];
-	char useable_devices[2];
-	int *args = NULL;
-	veejay_t *v = (veejay_t*)ptr;
-	P_A(args,str,format,ap);
-	veejay_memset(device_list,0,512);
-
-	n = scandir(str,&namelist,0,alphasort);
-	if( n<= 0)
-	{
-		veejay_msg(VEEJAY_MSG_ERROR, "No device information in [%s]",str);
-		SEND_MSG(v,"0000");
-		return;
-	}
-
-		
-	while(n--)
-	{
-		if( strncmp(namelist[n]->d_name, "video", 4)==0)
-		{
-			FILE *fd;
-			char filename[300];
-			sprintf(filename,"%s%s",str,namelist[n]->d_name);
-			fd = fopen( filename, "r");
-			if(fd)
-			{
-				fclose(fd);
-			}
-		}
-	}
-	sprintf(useable_devices,"%02d", n_dev);
-
-	APPEND_MSG( device_list, useable_devices );
-	SEND_MSG(v,device_list);
-
-}
-
 void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;

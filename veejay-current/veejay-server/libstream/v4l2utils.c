@@ -1722,10 +1722,19 @@ char **v4l2_get_device_list()
 	memset( files, 0, sizeof(char*) * (n_devices+1));
 	
 	for( i = 0;i < n_devices; i ++ ) {
-		files[i] = (char*) malloc(sizeof(char) * (strlen(list[i]) + 5));
-		sprintf(files[i],"%s%s",v4lprefix, list[i]);
-		veejay_msg(VEEJAY_MSG_DEBUG, "Found %s", files[i]);
-    	}
+		char tmp[1024];
+		
+		snprintf(tmp, sizeof(tmp) - 1, "%03dDevice %02d%03d%s%s",
+				9, // 'Device xx'
+				i, // 'device num'
+				(5 + strlen(list[i])), //@ '/dev/' + device
+				v4lprefix, // '/dev/'
+				list[i]    // 'video0'
+				);
+		files[i] = strdup(tmp);
+		veejay_msg(VEEJAY_MSG_DEBUG, "Found '%s'", list[i]);
+    }
+	files[n_devices] = NULL;
 	return files;
 
 }
