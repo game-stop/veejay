@@ -7138,8 +7138,10 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	
 	veejay_msg(VEEJAY_MSG_INFO, "Connection established with %s:%d (Track 0)",hostname,port_num);
 
-	load_editlist_info();
+	sleep(1); //@ give it some time to settle ( at least 1 frame period )
+
 	info->status_lock = 1;
+	load_editlist_info();
 
 	update_slider_value( "framerate", info->el.fps,  0 );
 
