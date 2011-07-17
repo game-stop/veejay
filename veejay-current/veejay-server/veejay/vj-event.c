@@ -8483,6 +8483,83 @@ void	vj_event_send_sample_info		(	void *ptr,	const char format[],	va_list ap	)
 	free(s_print_buf);
 }
 
+void	vj_event_get_image_part			(	void *ptr,	const char format[],	va_list ap	)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int args[4];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+
+	int w=0,h=0,x=0,y=0;
+	x = args[0]; 
+	y = args[1];
+	w = args[2];
+	h = args[3];
+
+	if( x < 0 || x > v->video_output_width || y < 0 || y > v->video_output_height ||
+			w < 0 || w > (v->video_output_width - x) ||
+			h < 0 || h > (v->video_output_height -y) )
+	{
+		veejay_msg(0, "Invalid image region, use [start x, start y, box width, box height]");
+		SEND_MSG(v, "00000000" );
+		return;
+	}
+
+	VJFrame frame;
+	veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
+	vj_perform_get_primary_frame( v, frame.data );
+	
+	int pixel_format = composite_get_top( v->composite, frame.data,
+						  frame.data,
+						  v->settings->composite );
+	
+	int ux = x;
+	int uy = y;
+
+	int uw = w;
+	int uh = h;
+
+	if( pixel_format == PIX_FMT_YUV422P || pixel_format == PIX_FMT_YUVJ422P) {
+		ux = x / 2;
+		uw = w / 2;
+	}
+	
+	uint8_t *tmp = (uint8_t*) vj_malloc (sizeof(uint8_t) * (w * h) + (2 * uw * uh));
+	if(!tmp) {
+		veejay_msg(0, "Memory allocation error");
+		SEND_MSG(v, "00000000" );
+		return;
+	}
+
+	unsigned int i,j;
+
+	for( i = y; i < h; i ++ ) {
+		for( j = x; j < w; j ++ ) {
+			*(tmp++) = frame.data[0][i * frame.width + j];
+		}
+	}
+
+	for( i = uy; i < uh; i ++ ) {
+		for( j = ux; j < uw; j ++ ) {
+			*(tmp++) = frame.data[1][i * frame.uv_width + j];
+		}
+	}
+
+	for( i = uy; i < uh; i ++ ) {
+		for( j = ux; j < uw; j ++ ) {
+			*(tmp++) = frame.data[2][i * frame.uv_height + j];
+		}
+	}
+
+	int len = (uw * uh * 2) + ( w * h );
+	
+	char header[8];
+	sprintf( header, "%08d",len );
+	SEND_DATA(v, header, 8 );
+	SEND_DATA(v, tmp, len );
+	free(tmp);
+}
+
 void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -9391,7 +9468,6 @@ void		vj_event_quick_bundle( void *ptr, const char format[], va_list ap)
 
 void	vj_event_vloopback_start(void *ptr, const char format[], va_list ap)
 {
-#ifdef HAVE_V4L
 	int args[2];
 	char *s = NULL;
 	char device_name[100];
@@ -9414,7 +9490,6 @@ void	vj_event_vloopback_start(void *ptr, const char format[], va_list ap)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,
 			"Cannot open vloopback %s", device_name );
-
 		return;
 	}
 
@@ -9422,10 +9497,6 @@ void	vj_event_vloopback_start(void *ptr, const char format[], va_list ap)
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Vloopback pipe");
 	ret = vj_vloopback_start_pipe( v->vloopback );
-	/*
-		veejay_msg(VEEJAY_MSG_DEBUG, "Vloopback mmap");
-		ret = vj_vloopback_start_mmap( v->vloopback );
-	*/
 
 	if(ret)
 	{
@@ -9445,19 +9516,12 @@ void	vj_event_vloopback_start(void *ptr, const char format[], va_list ap)
 	if( v->vloopback == NULL )
 		veejay_msg(VEEJAY_MSG_ERROR, "Failed to setup vloopback pusher"); 
 
-#else
-		veejay_msg(VEEJAY_MSG_ERROR, "not implemented yet for v4l2!");
-#endif
 }
 
 void	vj_event_vloopback_stop( void *ptr, const char format[], va_list ap )
 {
-#ifdef HAVE_V4L
 	veejay_t *v = (veejay_t*) ptr;
 	vj_vloopback_close( v->vloopback );
-#else
-	veejay_msg(VEEJAY_MSG_ERROR, "not implemented yet!");
-#endif
 }
 /* 
  * Function that returns the options for a special sample (markers, looptype, speed ...) or

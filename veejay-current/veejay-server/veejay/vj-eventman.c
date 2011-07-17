@@ -2778,7 +2778,22 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL );
 
-	
+	index_map_[ VIMS_GET_IMAGE ]			=	_new_event(
+				"%d %d %d %d",
+				VIMS_GET_IMAGE,
+				"Get image region (x,y,w,h)",
+				vj_event_get_image_part,
+				4,
+				VIMS_ALLOW_ANY,
+				"start X",
+				0,
+				"start Y",
+				0,
+				"width",
+				0,
+				"height",
+				0,
+				NULL );	
 #endif
 }
 
