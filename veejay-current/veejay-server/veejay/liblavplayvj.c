@@ -429,7 +429,7 @@ int veejay_hold_frame(veejay_t * info, int rel_resume_pos, int hold_pos) {
   	} else {
 	  //@first press aprox
 	  settings->hold_pos = hold_pos + rel_resume_pos;
-	  settings->hold_resume = settings->hold_pos;
+	  settings->hold_resume = hold_pos;
   }
 
   settings->hold_status = 1;
