@@ -314,6 +314,7 @@ static struct {					/* hardcoded keyboard layout (the default keys) */
 	{ VIMS_MACRO_SELECT,			SDLK_F10,		VIMS_MOD_CTRL, "9"	},
 	{ VIMS_MACRO_SELECT,			SDLK_F11,		VIMS_MOD_CTRL, "10"	},
 	{ VIMS_MACRO_SELECT,			SDLK_F12,		VIMS_MOD_CTRL, "11"	},
+	{ VIMS_SAMPLE_HOLD_FRAME,		SDLK_PAUSE,		VIMS_MOD_NONE, "0 0 5" },
 	{ 0,0,0,NULL },
 };
 #endif
@@ -3461,7 +3462,8 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 				v->bes_height,
 				caption,
 				1,
-				go_fs
+				go_fs,
+				v->current_edit_list->video_fps
 			) ) {
 				if( v->sdl[id] ) {
 					vj_sdl_free(v->sdl[id]);
@@ -3552,7 +3554,8 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 						v->bes_height,
 						title,
 						1,
-						v->settings->full_screen )
+						v->settings->full_screen,
+					    v->current_edit_list->video_fps	)
 					) {
 					veejay_msg(VEEJAY_MSG_INFO, "Opened SDL Video Window of size %d x %d", w, h );
 					v->video_out = 0;
@@ -3745,6 +3748,26 @@ void vj_event_play_speed(void *ptr, const char format[], va_list ap)
 	}
 	else
 	{
+		p_invalid_mode();
+	}
+}
+
+void	vj_event_hold_frame( void *ptr, const char format[], va_list ap )
+{
+	int args[3];
+	veejay_t *v = (veejay_t*) ptr;
+
+	if(SAMPLE_PLAYING(v)||PLAIN_PLAYING(v)) {
+		char *s = NULL;
+		P_A( args,s,format, ap);
+		if(args[1] <= 0 )
+			args[1] = 1;
+		if(args[2] <= 0 )
+			args[2] = 1;
+		if(args[2] >= 300)
+			args[2] = 1;
+		veejay_hold_frame(v,args[1],args[2]);
+	} else {
 		p_invalid_mode();
 	}
 }

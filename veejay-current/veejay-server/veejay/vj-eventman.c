@@ -915,7 +915,22 @@ void		vj_init_vevo_events(void)
 				"Speed (0=pause, > 0  and < (end-start)",
 				1,
 				NULL );
-	
+
+	index_map_[VIMS_SAMPLE_HOLD_FRAME]	=	_new_event(
+				"%d %d %d",
+				VIMS_SAMPLE_HOLD_FRAME,
+				"Hold frame (pause and resume from frame position + pause duration)",
+				vj_event_hold_frame,
+				3,
+				VIMS_ALLOW_ANY,
+				SAMPLE_ID_HELP,
+				0,
+				"Minimum delay offset (0=1 frame)",
+				0,
+				"Initial delay ( > 4 frames < 300 )",
+				5,
+				NULL );
+
 	index_map_[VIMS_SAMPLE_SET_POSITION]	=	_new_event(
 				"%d %d %d",
 				VIMS_SAMPLE_SET_POSITION,

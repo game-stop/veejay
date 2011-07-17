@@ -417,7 +417,24 @@ int veejay_set_speed(veejay_t * info, int speed)
 
     return 1;
 }
+int veejay_hold_frame(veejay_t * info, int rel_resume_pos, int hold_pos) {
+  video_playback_setup *settings = (video_playback_setup *) info->settings;
+  
 
+  if( settings->hold_status == 1 ) {
+	  settings->hold_pos += rel_resume_pos;
+	  settings->hold_resume ++;
+	  if(settings->hold_resume < hold_pos )
+		  settings->hold_resume = hold_pos;
+  	} else {
+	  //@first press aprox
+	  settings->hold_pos = hold_pos + rel_resume_pos;
+	  settings->hold_resume = settings->hold_pos;
+  }
+
+  settings->hold_status = 1;
+
+}
 static void	veejay_sample_resume_at( veejay_t *info, int cur_id )
 {
 	long pos = 0;
@@ -2221,7 +2238,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 
 			title = veejay_title( info );
 
-			if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height, title,1,info->settings->full_screen))
+			if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height, title,1,info->settings->full_screen,el->video_fps))
 			{
 				veejay_msg(VEEJAY_MSG_ERROR, "Error initializing SDL");
 				free(title);
@@ -2253,7 +2270,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 				return -1;
 			
 			title = veejay_title(info);	
-			if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height,title,1,info->settings->full_screen)) {
+			if (!vj_sdl_init(info->settings->ncpu, info->sdl[0], info->bes_width, info->bes_height,title,1,info->settings->full_screen, el->video_fps)) {
 				free(title);
 	   	 		return -1;
 			}

@@ -208,6 +208,9 @@ typedef struct {
 	int	sample_restart;
 	int	feedback;
 	int feedback_stage;
+	int hold_pos;
+	int	hold_resume;
+	int hold_status;
 } video_playback_setup;
 
 typedef struct {

@@ -3649,16 +3649,34 @@ int vj_perform_queue_frame(veejay_t * info, int skip )
 
 	if(!skip)
 	{
+
+		int speed = settings->current_playback_speed;
+		if( settings->hold_status == 1 ) {
+			speed = 0;
+			if(settings->hold_pos == 0 ) {
+				settings->hold_status = 0;
+				long was_at_pos = settings->current_frame_num;
+				veejay_increase_frame(info, settings->hold_resume );
+				veejay_msg(VEEJAY_MSG_DEBUG, "Reached hold position, skip from frame %ld to frame %ld",
+						was_at_pos,
+						settings->current_frame_num );
+
+				if( speed == 0 )
+					speed = settings->current_playback_speed;
+			}
+			settings->hold_pos --;
+		}
+
 		switch(info->uc->playback_mode) 
 		{
 			case VJ_PLAYBACK_MODE_TAG:
-				vj_perform_increase_tag_frame(info, settings->current_playback_speed);
+				vj_perform_increase_tag_frame(info, speed);
 				break;
 			case VJ_PLAYBACK_MODE_SAMPLE: 
-	 			vj_perform_increase_sample_frame(info,settings->current_playback_speed);
+	 			vj_perform_increase_sample_frame(info, speed);
 	  			break;
 			case VJ_PLAYBACK_MODE_PLAIN:
-				vj_perform_increase_plain_frame(info,settings->current_playback_speed);
+				vj_perform_increase_plain_frame(info, speed);
 				break;
 			default:
 				break;

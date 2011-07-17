@@ -183,7 +183,7 @@ void vj_sdl_resize( vj_sdl *vjsdl , int scaled_width, int scaled_height, int fs 
 }
 
 
-int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, const char *caption, int show, int fs)
+int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, const char *caption, int show, int fs, float fps)
 {
 	uint8_t *sbuffer;
 	char name[100];
@@ -265,7 +265,9 @@ int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height, c
 		vjsdl->sw_scale_height = scaled_height;
 
 
-	SDL_EnableKeyRepeat( SDL_DEFAULT_REPEAT_DELAY, 100 );
+	int ms = ( 1.0 / fps ) * 1000;
+
+	SDL_EnableKeyRepeat( SDL_DEFAULT_REPEAT_DELAY, ms  ); //@ default 100
 
 	info = SDL_GetVideoInfo();
 

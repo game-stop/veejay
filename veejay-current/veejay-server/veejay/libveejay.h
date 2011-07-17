@@ -66,6 +66,8 @@ void veejay_change_state(veejay_t *info, int new_state);
 #endif
 int veejay_set_speed(veejay_t *info , int speed);
 
+int veejay_hold_frame(veejay_t *info, int rrp, int pos);
+
 int veejay_increase_frame(veejay_t * info, long numframes);
 
 void	veejay_composite_transform_points( veejay_t *info, void *coords, int points, int blob_id, int cx, int cy,int w, int h, int num_objects,uint8_t *plane );
