@@ -6819,7 +6819,6 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*)ptr;
 	int start = -1;
-	int destination = v->current_edit_list->total_frames;
 	char str[1024];
 	int *args = NULL;
 	P_A(args,str,format,ap);
@@ -6833,7 +6832,7 @@ void vj_event_el_add_video(void *ptr, const char format[], va_list ap)
 		}
 	}
 
-	if ( veejay_edit_addmovie(v,v->current_edit_list,str,start,destination))
+	if ( veejay_edit_addmovie(v,v->current_edit_list,str,start ))
 		veejay_msg(VEEJAY_MSG_INFO, "Added video file %s to EditList",str); 
 	else
 		veejay_msg(VEEJAY_MSG_INFO, "Unable to add file %s to EditList",str); 

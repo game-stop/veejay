@@ -594,7 +594,7 @@ int open_video_file(char *filename, editlist * el, int preserve_pathname, int de
 		{
 		    veejay_msg(VEEJAY_MSG_ERROR, "File %s already in editlist", realname);
 		    if(realname) free(realname);
-		    return i;
+		    return -1;
 		}
 	}
 

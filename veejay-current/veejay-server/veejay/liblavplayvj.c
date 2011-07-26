@@ -3512,8 +3512,18 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 	if(sample_edl && sample)
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "Adding video file to existing sample %d", id );
-		if(veejay_edit_addmovie_sample( info, movie, id))
-			return 0;
+		long endpos = sample_get_endFrame( id );
+		
+		int res = veejay_edit_addmovie( info, sample_edl, movie, endpos );
+
+		if(files[0]) 
+			free(files[0]);
+
+		if( res > 0 ) {
+			sample_set_endframe( id, sample_edl->video_frames - 1);
+			veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d new ending position is %ld",id, sample_edl->video_frames - 1 );
+			return id;
+		}
 		return -1;
 	}
 
@@ -3525,6 +3535,8 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 	if(!sample_edl)
 	{
 		veejay_msg(0, "Error while creating EDL");
+		if(files[0]) free(files[0]);
+
 		return -1;
 	}
 	// the editlist dimensions must match (there's more)
@@ -3534,6 +3546,8 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 		if(sample_edl) 
 			vj_el_free(sample_edl);
 		veejay_msg(0, "Frame dimensions do not match. Abort");
+	 	if(files[0]) free(files[0]);
+
 		return -1;
 	}
 
@@ -3561,18 +3575,20 @@ int veejay_edit_addmovie_sample(veejay_t * info, char *movie, int id )
 	// free temporary values
    	if(files[0]) free(files[0]);
 
-	// return new id
-        return sample->sample_id;
+    return sample->sample_id;
 }
 
-int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start,long end )
+int veejay_edit_addmovie(veejay_t * info, editlist *el, char *movie, long start )
 {
 	video_playback_setup *settings =
 		(video_playback_setup *) info->settings;
 	uint64_t n, i;
 	uint64_t c = el->video_frames;
+	long end   = c;
 	if( el->is_empty )
 		c -= 2;
+
+	n = el->num_video_files;
 
 	int res = open_video_file(movie, el, info->preserve_pathnames, info->auto_deinterlace,1,
 		info->edit_list->video_norm );
