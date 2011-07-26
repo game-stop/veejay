@@ -2798,7 +2798,7 @@ void		vj_init_vevo_events(void)
 				VIMS_GET_IMAGE,
 				"Get image region (x,y,w,h)",
 				vj_event_get_image_part,
-				4,
+				5,
 				VIMS_ALLOW_ANY,
 				"start X",
 				0,
@@ -2807,6 +2807,8 @@ void		vj_init_vevo_events(void)
 				"width",
 				0,
 				"height",
+				0,
+				"greyscale",
 				0,
 				NULL );	
 #endif

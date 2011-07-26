@@ -8513,10 +8513,18 @@ void	vj_event_get_image_part			(	void *ptr,	const char format[],	va_list ap	)
 	P_A(args,str,format,ap);
 
 	int w=0,h=0,x=0,y=0;
+	int y_only = 0;
 	x = args[0]; 
 	y = args[1];
 	w = args[2];
 	h = args[3];
+	y_only = args[4];
+
+	if( y_only < 0 || y_only > 1 ) {
+		veejay_msg(0,"Please specify 0 for full chroma, 1 for luminance only (greyscale)");
+		SEND_MSG(v, "00000000" );
+		return;
+	}
 
 	if( x < 0 || x > v->video_output_width || y < 0 || y > v->video_output_height ||
 			w < 0 || w > (v->video_output_width - x) ||
@@ -8545,41 +8553,53 @@ void	vj_event_get_image_part			(	void *ptr,	const char format[],	va_list ap	)
 		ux = x / 2;
 		uw = w / 2;
 	}
+
+	int len = (w * h);
+    if( y_only == 0 )
+		len += (uw * uh);
 	
-	uint8_t *tmp = (uint8_t*) vj_malloc (sizeof(uint8_t) * (w * h) + (2 * uw * uh));
+	uint8_t *tmp = (uint8_t*) vj_malloc (sizeof(uint8_t) * len);
+
 	if(!tmp) {
 		veejay_msg(0, "Memory allocation error");
 		SEND_MSG(v, "00000000" );
 		return;
 	}
 
+	uint8_t *start_addr = tmp;
 	unsigned int i,j;
 
-	for( i = y; i < h; i ++ ) {
-		for( j = x; j < w; j ++ ) {
+	const int bh = h + y;
+	const int bw = w + x;
+
+	for( i = y; i < bh; i ++ ) {
+		for( j = x; j < bw; j ++ ) {
 			*(tmp++) = frame.data[0][i * frame.width + j];
 		}
 	}
 
-	for( i = uy; i < uh; i ++ ) {
-		for( j = ux; j < uw; j ++ ) {
-			*(tmp++) = frame.data[1][i * frame.uv_width + j];
+	if( y_only == 0 ) {
+		const int ubh = uh + uy;
+		const int ubw = uw + ux;
+
+		for( i = uy; i < ubh; i ++ ) {
+			for( j = ux; j < ubw; j ++ ) {
+				*(tmp++) = frame.data[1][i * frame.uv_width + j];
+			}
+		}
+
+		for( i = uy; i < ubh; i ++ ) {
+			for( j = ux; j < ubw; j ++ ) {
+				*(tmp++) = frame.data[2][i * frame.uv_height + j];
+			}
 		}
 	}
 
-	for( i = uy; i < uh; i ++ ) {
-		for( j = ux; j < uw; j ++ ) {
-			*(tmp++) = frame.data[2][i * frame.uv_height + j];
-		}
-	}
-
-	int len = (uw * uh * 2) + ( w * h );
-	
 	char header[8];
 	sprintf( header, "%08d",len );
 	SEND_DATA(v, header, 8 );
-	SEND_DATA(v, tmp, len );
-	free(tmp);
+	SEND_DATA(v, start_addr, len );
+	free(start_addr);
 }
 
 void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
