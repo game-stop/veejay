@@ -106,7 +106,7 @@ int	frei0r_get_param_f( void *port, void *dst )
 	return 1;
 }
 
-int	frei0r_push_frame_f( void *plugin, int dir, int seqno, VJFrame *in )
+int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
 {
 	void *instance = NULL;
 	int  err = vevo_property_get(plugin, "frei0r",0,&instance );

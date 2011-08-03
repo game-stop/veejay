@@ -130,6 +130,7 @@ typedef struct {
     double *lfu;
     double *lfv;
     int cali_duration;
+	void	*generator;
 } vj_tag;
 
 #define V4L_BLACKFRAME 1

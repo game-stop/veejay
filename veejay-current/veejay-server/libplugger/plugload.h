@@ -48,7 +48,7 @@ void	plug_build_name_space( int fx_id, void *fx_instance, void *data, int entry_
 char 	*plug_get_osc_path_parameter(void *instance, int k);
 
 void	plug_clear_namespace( void *fx_instance, void *data );
-
+int	plug_find_generator_plugins(int *total, int seq );
 void	*plug_get( int fd_id );
 
 vj_effect *plug_get_plugin( int fx_id );

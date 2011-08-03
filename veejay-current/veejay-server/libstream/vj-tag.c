@@ -811,13 +811,19 @@ int	vj_tag_set_stream_color(int t1, int r, int g, int b)
 	return 0;
     if(tag->source_type != VJ_TAG_TYPE_COLOR)
 	return 0;
-
+	
 	veejay_msg(VEEJAY_MSG_DEBUG,"Set stream %d color %d,%d,%d",t1,
 		r,g, b );
  
     tag->color_r = r;
     tag->color_g = g;
     tag->color_b = b;
+
+	if( tag->generator ) {
+		plug_set_parameter( tag->generator, 0,1,&r );
+		plug_set_parameter( tag->generator, 1,1,&g );
+		plug_set_parameter( tag->generator, 2,1,&b );
+	}
 
     return (vj_tag_update(tag,t1));
 }
@@ -1048,9 +1054,40 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 	tag->active = 1;
 	break;
 	case VJ_TAG_TYPE_COLOR:
+
 	sprintf(tag->source_name, "[%d,%d,%d]",
 		tag->color_r,tag->color_g,tag->color_b );
-	tag->active = 1;	
+	
+	if( channel == -1 ) {
+		int total = 0;
+		int agen = plug_find_generator_plugins( &total, 0 );
+		
+		if( agen >= 0 ) {
+			channel = agen;
+			veejay_msg(VEEJAY_MSG_DEBUG, "first available generator is at index %d", agen );
+		}
+		else {
+			veejay_msg(VEEJAY_MSG_WARNING, "No generator plugins found. Using built-in.");
+		}
+	}
+	
+	if( channel >= 0 ) {
+		tag->generator = plug_activate( channel );
+		if( tag->generator ) {
+			char *plugname = plug_get_name( channel );
+			if( plug_get_num_input_channels( channel ) > 0 ||
+				plug_get_num_output_channels( channel ) != 1 ) {
+				veejay_msg(0, "Plug '%s' is not a generator", plugname);
+				plug_deactivate(tag->generator);
+				return -1;
+			}
+			veejay_msg(VEEJAY_MSG_DEBUG, "Using plug '%s' to generate frames for this stream.",plugname);
+			strcpy( tag->source_name, plugname );
+			free(plugname);
+		}
+	}
+
+	tag->active = 1;
 	break;
 
     default:
@@ -1233,6 +1270,11 @@ int vj_tag_del(int id)
 		{
 			vj_client_close( vj_tag_input->net[tag->index] );
 			vj_tag_input->net[tag->index] = NULL;
+		}
+		break;
+	case VJ_TAG_TYPE_COLOR:
+		if( tag->generator ) {
+			plug_deactivate( tag->generator );
 		}
 		break;
     }
@@ -3592,8 +3634,17 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		_tmp.data[0] = buffer[0];
 		_tmp.data[1] = buffer[1];
 		_tmp.data[2] = buffer[2];
-		dummy_rgb_apply( &_tmp, width, height, 
+		_tmp.width   = width;
+		_tmp.height  = height;
+		_tmp.format  = PIX_FMT_YUVJ422P;
+		if(tag->generator == NULL ) {
+			dummy_rgb_apply( &_tmp, width, height, 
 			tag->color_r,tag->color_g,tag->color_b );
+		}
+	 	else {
+			plug_push_frame( tag->generator, 1, 0, &_tmp );
+			plug_process( tag->generator );
+		}
 		break;
 
     	case VJ_TAG_TYPE_NONE:

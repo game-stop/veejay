@@ -52,6 +52,10 @@
 
 #define IS_RGB_PALETTE( p ) ( p < 512 ? 1 : 0 )
 
+void    livido_dummy_function() {
+
+}
+   
 static	char	make_valid_char_( const char c )
 {
 	const char *invalid = " #*,?[]{}";
@@ -1096,8 +1100,7 @@ void	*livido_plug_init(void *plugin,int w, int h )
 }
 
 
-
-void	livido_push_channel( void *instance,const char *key, int n, VJFrame *frame ) // in_channels / out_channels
+static void	livido_push_channel_local( void *instance,const char *key, int n, VJFrame *frame ) // in_channels / out_channels
 {
 	int error;
 #ifdef STRICT_CHECKING
@@ -1108,6 +1111,14 @@ void	livido_push_channel( void *instance,const char *key, int n, VJFrame *frame 
 	assert( frame != NULL );
 #endif	
 	configure_channel( instance, key, n, frame );
+}
+
+void	livido_push_channel( void *instance,int n,int dir, VJFrame *frame ) // in_channels / out_channels
+{
+
+	char *key = (dir == 0 ? "in_channels" : "out_channels" );
+	livido_push_channel_local(instance, key, n, frame );
+
 }
 
 void	livido_plug_process( void *instance, double time_code )
@@ -1458,43 +1469,47 @@ void*	deal_with_livido( void *handle, const char *name )
 
 	livido_setup_f livido_setup = dlsym( handle, "livido_setup" );
 
-	return NULL; //@disable
-/*
 #ifndef STRICT_CHECKING
 	livido_setup_t setup[] = {
-		{	(void(*)()) malloc 			},	
+		{	(void(*)()) vj_malloc 			},	
 		{	(void(*)()) free			},
 		{	(void(*)())memset			},
-                {	(void(*)())memcpy			},
-                {	(void(*)())vevo_port_new		},
-                {	(void(*)())		},
-                {	(void(*)())vevo_property_set		},
-                {	(void(*)())vevo_property_get		},
-                {	(void(*)())vevo_property_num_elements	},
-                {	(void(*)())vevo_property_atom_type	},
-                {	(void(*)())vevo_property_element_size	},
-                {	(void(*)())vevo_list_properties		}
+        {	(void(*)())memcpy			},
+        {	(void(*)())vpn		},
+        {	(void(*)())vpf		},
+        {	(void(*)())vevo_property_set		},
+        {	(void(*)())vevo_property_get		},
+        {	(void(*)())vevo_property_num_elements	},
+        {	(void(*)())vevo_property_atom_type	},
+        {	(void(*)())vevo_property_element_size	},
+        {	(void(*)())vevo_list_properties		},
+		{	(void(*)())livido_dummy_function },
+		{ 	(void(*)())livido_dummy_function },
+
+
 	};
 #else
 	livido_setup_t setup[] = {
 		{	(void(*)()) vj_malloc_ 			},	
 		{	(void(*)()) free			},
 		{	(void(*)())memset			},
-                {	(void(*)())memcpy			},
-                {	(void(*)())livido_plugin_port_new	},
-                {	(void(*)())		},
-                {	(void(*)())vevo_property_set		},
-                {	(void(*)())vevo_property_get		},
-                {	(void(*)())vevo_property_num_elements	},
-                {	(void(*)())vevo_property_atom_type	},
-                {	(void(*)())vevo_property_element_size	},
-                {	(void(*)())vevo_list_properties		}
+        {	(void(*)())memcpy			},
+        {	(void(*)())vevo_port_new	},
+        {	(void(*)())vevo_port_free		},
+        {	(void(*)())vevo_property_set		},
+        {	(void(*)())vevo_property_get		},
+        {	(void(*)())vevo_property_num_elements	},
+        {	(void(*)())vevo_property_atom_type	},
+        {	(void(*)())vevo_property_element_size	},
+        {	(void(*)())vevo_list_properties		},
+		{	(void(*)())livido_dummy_function },
+		{ 	(void(*)())livido_dummy_function },
 	};
 
 
 #endif
 
-	void *livido_plugin = livido_setup( setup, 100 );
+	void *livido_plugin = livido_setup( setup, LIVIDO_API_VERSION );
 	
 #ifdef STRICT_CHECKING
 	assert( livido_plugin != NULL );
@@ -1521,6 +1536,8 @@ void*	deal_with_livido( void *handle, const char *name )
 //@ p%02d is a key with a portptr value. it contains min,max,defaults for each plugin setup()	
 	int is_mix = 0;
 	int n_inputs = livido_property_num_elements( filter_templ, "in_channel_templates" );
+	int n_outputs = livido_property_num_elements( filter_templ, "out_channel_templates" );
+
 
 	//@ Now, prefix the name with LVD
 	plugin_name =  get_str_vevo( filter_templ, "name" );
@@ -1537,13 +1554,14 @@ void*	deal_with_livido( void *handle, const char *name )
 	vevo_property_set( port, "num_out_params", VEVO_ATOM_TYPE_INT,1,&n_oparams );
 	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &clone_name );
 	vevo_property_set( port, "num_inputs", VEVO_ATOM_TYPE_INT,1, &n_inputs);
+	vevo_property_set( port, "num_outputs",VEVO_ATOM_TYPE_INT,1, &n_outputs);
 	vevo_property_set( port, "info", LIVIDO_ATOM_TYPE_PORTPTR,1,&filter_templ );
 	vevo_property_set( port, "HOST_plugin_type", VEVO_ATOM_TYPE_INT,1,&livido_signature_);
 
 	free(clone_name);
 	free(plugin_name);	
 
-	return port;*/
+	return port;
 }
 
 void	livido_set_pref_palette( int pref_palette )

@@ -35,7 +35,7 @@ void	livido_set_pref_palette( int pref_palette );
 
 int	livido_plug_inplace( void *instance );
 
-void	livido_push_channel( void *instance,const char *key, int n, VJFrame *frame );
+void	livido_push_channel( void *instance,int n, int dir, VJFrame *frame );
 #define livido_push_input_channel(instance,n,frame) livido_push_channel( instance, "in_channels", n , frame )
 #define livido_push_output_channel(instance,n,frame) livido_push_channel( instance, "out_channels",n, frame )
 

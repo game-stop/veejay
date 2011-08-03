@@ -373,6 +373,33 @@ void	plug_sys_init( int fmt, int w, int h )
 	plug_sys_set_palette( base_fmt_ );
 }
 
+int	plug_find_generator_plugins(int *total, int seq )
+{
+	int n;
+	int last_found = -1;
+	int total_found = 0;
+	int seqno = 0;
+	for( n = 0; n < index_ ; n ++ ) {
+		if( index_map_[n] == NULL )
+			continue;
+		int in_c = plug_get_num_input_channels( n );
+		int out_c= plug_get_num_output_channels( n );
+		if( in_c == 0 && out_c == 1 ) {
+			if( seq >= 0 && seq == seqno ) {
+				*total = -1; // N/A
+				return n;
+			}
+			seqno++;
+			total_found ++;
+			last_found = n;
+		}
+	
+	}
+	*total = total_found;
+	return last_found;
+}
+
+
 int	plug_sys_detect_plugins(void)
 {
 	index_map_ = (vevo_port_t**) vj_malloc(sizeof(vevo_port_t*) * 256 );
@@ -402,13 +429,13 @@ int	plug_sys_detect_plugins(void)
 
 	veejay_msg(VEEJAY_MSG_WARNING, "\tPerformance penalty for frei0r and FreeFrame: native -> RGB -> native.");
 
-	/*veejay_msg(VEEJAY_MSG_INFO, "\tLivido - (Linux) Video Dynamic Objects" );
-	veejay_msg(VEEJAY_MSG_INFO, "\t(C) Copyright 2005 Gabriel 'Salsaman' Finch, Niels Elburg, Dennis 'Jaromil' Rojo");
+	veejay_msg(VEEJAY_MSG_INFO, "\tLivido - (Linux) Video Dynamic Objects" );
+	veejay_msg(VEEJAY_MSG_INFO, "\t(C) Copyright 2005 Gabriel 'Salsaman' Finch, Dennis 'Jaromil' Rojo");
 	veejay_msg(VEEJAY_MSG_INFO, "\t                   Daniel Fischer, Martin Bayer, Kentaro Fukuchi and Andraz Tori");
 	veejay_msg(VEEJAY_MSG_INFO, "\tFound %d Livido %s",
 		n_lvd_, n_lvd_ == 1 ? "plugin" :"plugins" );
 	veejay_msg(VEEJAY_MSG_INFO, "-------------------------------------------------------------------------------------------");
-	*/
+	
 	veejay_msg(VEEJAY_MSG_INFO, "-------------------------------------------------------------------------------------------");
 	
 	plug_print_all();
@@ -785,7 +812,7 @@ int	plug_get_num_output_channels( int fx_id )
 		return NULL;
 
 	int res = 0;
-	int error = vevo_property_get( index_map_[fx_id], "num_inputs",0,&res);
+	int error = vevo_property_get( index_map_[fx_id], "num_outputs",0,&res);
 
 #ifdef STRICT_CHECKING
 	assert( error == VEVO_NO_ERROR );
@@ -837,7 +864,7 @@ void	plug_push_frame( void *instance, int out, int seq_num, void *frame_info )
 	int error = vevo_property_get( instance, "HOST_plugin_push_f", 0, &gpu );
 	
 	if( error == VEVO_NO_ERROR )
-		(*gpu)( instance, out, seq_num, frame );
+		(*gpu)( instance, seq_num,out, frame );
 }
 
 

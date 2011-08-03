@@ -534,7 +534,7 @@ void	freeframe_plug_free( void *plugin )
 	q( FF_DEINITIALISE, NULL, 0 );
 }
 
-void	freeframe_push_channel( void *instance, int dir,int n, VJFrame *frame )
+void	freeframe_push_channel( void *instance, int n,int dir, VJFrame *frame )
 {
 	char inkey[10];
 	int i;
