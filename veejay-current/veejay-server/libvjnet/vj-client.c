@@ -295,7 +295,7 @@ static	uint32_t	getint(uint8_t *in, int len ) {
 
 int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 {
-	uint8_t line[48];
+	uint8_t line[128];
 	uint32_t p[4] = {0, 0,0,0 };
 	uint32_t strides[4] = { 0,0,0,0 };
 	int n = 0;
@@ -309,10 +309,7 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 		uint8_t *in = mcast_recv_frame( v->c[0]->r, &p[0],&p[1], &p[2], &plen );
 		if( in == NULL )
 			return 0;
-#ifdef STRICT_CHECKING
-		assert( p[0] > 0 );
-		assert( p[1] > 0 );
-#endif
+		
 		v->in_width = p[0];
 		v->in_height = p[1];
 		v->in_fmt = p[2];
@@ -321,29 +318,33 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 		y_len = p[0]  * p[1];
 		switch(v->in_fmt )
 		{
-			case FMT_420F:
+			case FMT_422:
+			case FMT_422F:
+				uv_len = y_len / 2; 
+				break;
 			case FMT_420:
-				uv_len = y_len/4; break;
+			case FMT_420F:
+				uv_len = y_len / 4;break;
 			default:
-				uv_len = y_len/2;break;
+				veejay_msg(VEEJAY_MSG_ERROR, "Unknown data format: %02x", v->in_fmt);
+				break;
 		}
+
 		if( p[0] != v->cur_width || p[1] != v->cur_height || p[2] != v->cur_fmt )
 			return 2;
 
-		strides[0] = getint( in + 9 + 8, 8 );
-		strides[1] = getint( in + 9 + 16, 8 );
-		strides[2] = getint( in + 9 + 24, 8 );
+		strides[0] = getint( in + 12 + 8, 8 );
+		strides[1] = getint( in + 12 + 16, 8 );
+		strides[2] = getint( in + 12 + 24, 8 );
 
-		//vj_client_decompress( v,in, dst,plen,y_len,uv_len ,16);
-	
 		vj_client_decompress( v,in, dst, p[3], y_len, uv_len , plen, strides[0],strides[1],strides[2]);
 
-
 		return 1;
-	} else if ( v->c[0]->type == VSOCK_C )
+	}
+	else if ( v->c[0]->type == VSOCK_C )
 	{
 		veejay_memset( line,0, sizeof(line));
-		plen = sock_t_recv( v->c[0]->fd, line, 41 );
+		plen = sock_t_recv( v->c[0]->fd, line, 44 );
 
 		if( plen == 0 ) {
 			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
@@ -357,17 +358,15 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 		}
 		
 		//vj_client_stdout_dump_recv( v->c[0]->fd, plen, line );
-#ifdef STRICT_CHECKING
-		assert( plen == 41 );
-#endif
+		
 		p[0] = getint( line , 4 );
 		p[1] = getint( line + 4, 4 );
-		p[2] = getint( line + 8, 1 );
-		p[3] = getint( line + 9, 8 );
+		p[2] = getint( line + 8, 4 );
+		p[3] = getint( line + 12, 8 );
 
-		strides[0] = getint( line + 9 + 8, 8 );
-		strides[1] = getint( line + 9 + 16, 8 );
-		strides[2] = getint( line + 9 + 24, 8 );
+		strides[0] = getint( line + 12 + 8, 8 );
+		strides[1] = getint( line + 12 + 16, 8 );
+		strides[2] = getint( line + 12 + 24, 8 );
 
 		if( v->cur_width != p[0] || v->cur_height != p[1] || v->cur_fmt != p[2]) {
 			veejay_msg(VEEJAY_MSG_ERROR, "Unexpected video frame format, %dx%d (%d) , received %dx%d(%d)",
@@ -382,26 +381,31 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 		y_len = p[0]  * p[1];
 		switch(v->in_fmt )
 		{
-			case FMT_420F:
+			case FMT_422:
+			case FMT_422F:
+				uv_len = y_len / 2; 
+				break;
 			case FMT_420:
-				uv_len = y_len/4; break;
+			case FMT_420F:
+				uv_len = y_len / 4;break;
 			default:
-				uv_len = y_len/2;break;
+				veejay_msg(VEEJAY_MSG_ERROR, "Unknown data format: %02x", v->in_fmt);
+				break;
 		}
 
 		int n = sock_t_recv( v->c[0]->fd,v->space,p[3] );
 		if( n <= 0 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection.");
+			if( n == -1 ) {
+				veejay_msg(VEEJAY_MSG_ERROR, "Error '%s' while reading socket", strerror(errno));
+			} else {
+				veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection");
+			}
 			return -1;
 		}
-		if( n != p[3] )
+
+		if( n != p[3] && n > 0 )
 		{
-			if( n < 0 ) {
-				veejay_msg(VEEJAY_MSG_ERROR, "Network I/O Error: %s", strerror(errno));
-			} else {
-				veejay_msg(VEEJAY_MSG_ERROR, "Broken video packet , got %d out of %d bytes",
-					n, p[3] );	
-			}
+			veejay_msg(VEEJAY_MSG_ERROR, "Broken video packet , got %d out of %d bytes",n, p[3] );	
 			return -1;
 		}
 

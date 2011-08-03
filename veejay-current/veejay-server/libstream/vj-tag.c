@@ -248,7 +248,7 @@ char *vj_tag_scan_devices( void )
 	char **device_list = v4l2_get_device_list();
 #endif
 #endif
-	if(!device_list)
+	if(device_list==NULL)
 		return strdup(default_str);
 
 	for( i = 0; device_list[i] != NULL ;i++ )

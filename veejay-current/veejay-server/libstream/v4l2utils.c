@@ -1777,8 +1777,8 @@ char **v4l2_get_device_list()
 	const char prefix[] = "/sys/class/video4linux/";
 	const char v4lprefix[] = "/dev/";
 	if( (dir = opendir( prefix )) == NULL ) {
-		veejay_msg(VEEJAY_MSG_WARNING,"Failed to open '%s':%d, %s", prefix, errno,strerror(errno));
-		return v4l2_dummy_list();
+		veejay_msg(VEEJAY_MSG_WARNING,"Failed to open '%s':%s", prefix, strerror(errno));
+		return NULL;
 	}
 
 	char *list[255];

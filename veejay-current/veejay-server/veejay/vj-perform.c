@@ -108,6 +108,7 @@ static uint8_t *audio_render_buffer = NULL;
 static uint8_t *down_sample_buffer = NULL;
 static uint8_t *temp_buffer[4];
 static uint8_t *feedback_buffer[4];
+static uint8_t *socket_buffer = NULL;
 static ycbcr_frame *record_buffer = NULL;	// needed for recording invisible streams
 static VJFrame *helper_frame = NULL;
 static int vj_perform_record_buffer_init();
@@ -661,6 +662,11 @@ int vj_perform_init(veejay_t * info)
 	frame_buffer[c] = (ycbcr_frame *) vj_calloc(sizeof(ycbcr_frame));
         if(!frame_buffer[c]) return 0;
     }
+
+
+	/* pre allocate space for streaming */
+	socket_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(frame_len+16));
+
     // clear the cache information
 	vj_perform_clear_cache();
 	veejay_memset( frame_info[0],0,SAMPLE_MAX_EFFECTS);
@@ -808,6 +814,9 @@ void vj_perform_free(veejay_t * info)
     int c;
 
     sample_record_free();
+
+	if( socket_buffer ) 
+		free( socket_buffer );
 
     if(info->edit_list->has_audio)
 	    vj_perform_close_audio();
@@ -1106,59 +1115,47 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_t *p1
 
 int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 {
-	int hlen =0;
-	unsigned char info_line[48];
-
-	uint8_t *socket_buffer = (uint8_t*) vj_malloc(sizeof(uint8_t) * info->effect_frame1->width *
-						info->effect_frame1->height * 3 );
+	unsigned char info_line[128];
 
 	int compr_len = 0;
 	uint32_t planes[3];
+	const int data_len = 44;
+
+	memset(info_line, 0, sizeof(info_line) );
 
 	if( !mcast )
 	{
-		uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * 41 );
+		uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * data_len );
 		compr_len = vj_perform_compress_frame(info,sbuf, &planes[0], &planes[1], &planes[2]);
 #ifdef STRICT_CHECKING
 		assert( compr_len > 0 );
 #endif
 		/* peer to peer connection */
-		sprintf(info_line, "%04d%04d%1d%08d%08d%08d%08d", info->effect_frame1->width,
-				info->effect_frame1->height, info->effect_frame1->format,
-		      		compr_len,
-		      		planes[0],
-		      		planes[1],
-		      		planes[2] );
-		hlen = strlen(info_line );
-#ifdef STRICT_CHECKING
-		assert( hlen == 41 );
-#endif
-		veejay_memcpy( socket_buffer, info_line, sizeof(uint8_t) * hlen );
+		snprintf(info_line,
+				data_len + 1, //@ '\0' counts
+				"%04d%04d%04d%08d%08d%08d%08d", info->effect_frame1->width,
+				info->effect_frame1->height, info->pixel_format,
+		      	compr_len,planes[0],planes[1],planes[2] );
+		veejay_memcpy( socket_buffer, info_line, sizeof(uint8_t) * data_len );
 	}
 	else	
 	{
-		uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * 41 );
+		uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * 43 );
 
 		compr_len = vj_perform_compress_frame(info,sbuf, &planes[0], &planes[1], &planes[2] );
 #ifdef STRICT_CHECKING
 		assert(compr_len > 0 );
 #endif
-		sprintf(info_line, "%04d%04d%1d%08d%08d%08d%08d", info->effect_frame1->width,
-				info->effect_frame1->height, info->effect_frame1->format,
-		      		compr_len,
-		      		planes[0],
-		      		planes[1],
-		      		planes[2] );
-		hlen = strlen(info_line );
-#ifdef STRICT_CHECKING
-		assert( hlen == 41 );
-#endif
-		veejay_memcpy( socket_buffer, info_line, sizeof(uint8_t) * hlen );
-
-	}
+		snprintf(info_line,
+			    data_len + 1,
+				"%04d%04d%04d%08d%08d%08d%08d", info->effect_frame1->width,
+				info->effect_frame1->height, info->pixel_format,
+		      	compr_len,planes[0],planes[1],planes[2] );
+		veejay_memcpy( socket_buffer, info_line, sizeof(uint8_t) * data_len );
+	}	
 
 	int id = (mcast ? 2: 3);
-	int __socket_len = hlen + compr_len;
+	int __socket_len = data_len + compr_len;
 
 	if(!mcast) 
 	{
@@ -1185,8 +1182,6 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 		}
 	}
 
-
-	free(socket_buffer);
 
 	return 1;
 }

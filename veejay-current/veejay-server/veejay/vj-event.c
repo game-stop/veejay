@@ -1711,7 +1711,8 @@ void vj_event_update_remote(void *ptr)
 					n++;
 				}
 			}	
-			if( res == -1 )
+			if( res <= 0 ) 
+		//	if( res == -1 )
 			{
 				_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
 				_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
@@ -1726,28 +1727,25 @@ void vj_event_update_remote(void *ptr)
 	{	
 		if( vj_server_link_can_read( v->vjs[VEEJAY_PORT_DAT], i ) )
 		{
-			int res = 1;
-			while( res != 0 )
+			int res = vj_server_update( v->vjs[VEEJAY_PORT_DAT], i );
+			if(res>0)
 			{
-				res = vj_server_update( v->vjs[VEEJAY_PORT_DAT], i );
-				if(res>0)
+				v->uc->current_link = i;
+				int n = 0;
+				int len = 0;
+				char *buf  = NULL;
+				while( (buf= vj_server_retrieve_msg(v->vjs[VEEJAY_PORT_DAT],i,buf, &len))!= NULL )
 				{
-					v->uc->current_link = i;
-					int n = 0;
-					int len = 0;
-					char *buf  = NULL;
-					while( (buf= vj_server_retrieve_msg(v->vjs[VEEJAY_PORT_DAT],i,buf, &len))!= NULL )
-					{
-						vj_event_parse_msg( v, buf,len );
-						n++;
-					}
-				}	
-				if( res == -1 )
-				{
-					_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
-					_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
-					_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
+					vj_event_parse_msg( v, buf,len );
+					n++;
 				}
+			}
+			if( res <= 0 )	
+			//if( res == -1 )
+			{
+				_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
+				_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
+				_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
 			}
 		}
 	}

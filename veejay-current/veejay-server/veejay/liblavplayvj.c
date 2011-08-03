@@ -1092,7 +1092,7 @@ static int veejay_screen_update(veejay_t * info )
 			vj_vloopback_write_pipe( info->vloopback );
 	}
 #endif
-
+	
 	if( info->settings->unicast_frame_sender )
 	{
 		vj_perform_send_primary_frame_s2(info, 0, info->settings->unicast_link_id);
@@ -1524,10 +1524,10 @@ static void veejay_handle_callbacks(veejay_t *info) {
 	int i;
 	for( i = 0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
 		int res = vj_server_send( info->vjs[VEEJAY_PORT_STA], i, info->status_line, status_line_len);
-		if( res < 0 ) {
+	/*	if( res < 0 ) {
 			_vj_server_del_client( info->vjs[VEEJAY_PORT_CMD], i );
 			_vj_server_del_client( info->vjs[VEEJAY_PORT_STA], i );
-		}
+		}*/
 	}
 }
 

@@ -25,6 +25,8 @@
 #define VJ_PORT 3490
 #define VJ_MAX_CONNECTIONS 16
 
+#define VEEJAY_SERVER_LOG "/tmp/veejay.net.log"
+
 typedef struct vj_server_t {
     struct sockaddr_in myself;
     struct sockaddr_in remote;
@@ -42,6 +44,7 @@ typedef struct vj_server_t {
     int	send_size;
     int	recv_size;
     int mcast_gray;
+	FILE *logfd;
 } vj_server;
 
 vj_server *vj_server_alloc(int port, char *mcast_group_name, int type);
