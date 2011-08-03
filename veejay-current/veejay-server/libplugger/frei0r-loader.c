@@ -264,6 +264,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	}
 	int extra = 0;
 	int n_inputs = 0;
+	int n_outputs = 0;
 	if( finfo.plugin_type == F0R_PLUGIN_TYPE_MIXER2 ) {
 		extra = 1;
 		n_inputs = 2;
@@ -328,6 +329,7 @@ void* 	deal_with_fr( void *handle, char *name)
 	vevo_property_set( port, "HOST_plugin_push_f", VEVO_ATOM_TYPE_VOIDPTR,1,&frei0r_push_frame_f);
 	vevo_property_set( port, "HOST_plugin_process_f", VEVO_ATOM_TYPE_VOIDPTR,1,&frei0r_process_frame_f);*/
 	vevo_property_set( port, "num_inputs", VEVO_ATOM_TYPE_INT,1, &n_inputs );
+	vevo_property_set( port, "num_outputs", VEVO_ATOM_TYPE_INT,1, &n_outputs );
 	
 	int pixfmt = PIX_FMT_RGB24;
 	free(plug_name);

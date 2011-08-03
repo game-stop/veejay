@@ -135,6 +135,8 @@ void*	deal_with_ff( void *handle, char *name, int w, int h )
 		n_inputs = 2; 
 	}
 
+	int n_outputs = 0;
+
 	vevo_property_set( port, "handle", VEVO_ATOM_TYPE_VOIDPTR,1, &handle );
 	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &plugin_name );
 	vevo_property_set( port, "base", VEVO_ATOM_TYPE_VOIDPTR, 1, &base );
@@ -142,6 +144,7 @@ void*	deal_with_ff( void *handle, char *name, int w, int h )
 	vevo_property_set( port, "num_params", VEVO_ATOM_TYPE_INT, 1,&n_params );
 	vevo_property_set( port, "num_inputs", VEVO_ATOM_TYPE_INT,1, &n_inputs );
 	vevo_property_set( port, "max_inputs", VEVO_ATOM_TYPE_INT,1,&m_inputs );
+	vevo_property_set( port, "num_outputs", VEVO_ATOM_TYPE_INT,1,&n_outputs );
 	vevo_property_set( port, "HOST_plugin_type", VEVO_ATOM_TYPE_INT, 1, &freeframe_signature_ );
 	
 	int p;
