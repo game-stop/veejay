@@ -190,7 +190,9 @@ static	void	add_to_plugin_list( const char *path )
 		}
 
 	//	veejay_msg(0, "\tOpened plugin '%s' in '%s'", name,path );
-		
+	
+		veejay_msg(VEEJAY_MSG_DEBUG, "Loading %s",fullname );
+
 		if(dlsym( handle, "plugMain" ))
 		{
 			void *plugin = deal_with_ff( handle, name, base_width_, base_height_ );

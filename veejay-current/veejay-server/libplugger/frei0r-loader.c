@@ -258,6 +258,8 @@ void* 	deal_with_fr( void *handle, char *name)
 
 	if( finfo.frei0r_version != FREI0R_MAJOR_VERSION )
 	{
+		veejay_msg(VEEJAY_MSG_ERROR,"\tI am using frei0r version %d but plugin requires %d",
+				FREI0R_MAJOR_VERSION, finfo.frei0r_version );
 		(*f0r_deinit)();	
 		vpf(port);
 		return NULL;	
@@ -290,7 +292,8 @@ void* 	deal_with_fr( void *handle, char *name)
 	}
 
 	//@ bang, if plug behaves badly. veejay crashes. is it blacklisted?
-
+	veejay_msg(VEEJAY_MSG_DEBUG, "Frei0r plugin '%s' version %d.%d",
+			name, finfo.major_version, finfo.minor_version );
 	//@FIXME: blacklist
 	
 	int n_params = finfo.num_params;
@@ -316,8 +319,14 @@ void* 	deal_with_fr( void *handle, char *name)
 		r_params = 8;
 	}
 
-	char tmp_name[256];
-	snprintf(tmp_name, sizeof(tmp_name), "frei0r %s",finfo.name );
+
+	char tmp_name[1024];
+	memset( tmp_name,0,sizeof(tmp_name));
+	int len = (finfo.name == NULL ? 0 : strlen(finfo.name));
+	if( len > 1023 )
+		len = 1023;
+	strncpy( tmp_name, finfo.name, len );
+
 
 	char *plug_name = strdup(tmp_name);
 
