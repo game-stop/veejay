@@ -145,7 +145,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 
 		livido_set_string_value(port, "name", "Red" );
 		livido_set_string_value(port, "kind", "INDEX" );
-		livido_set_int_value( port, "min", 1 );
+		livido_set_int_value( port, "min", 0 );
 		livido_set_int_value( port, "max", 255 );
 		livido_set_int_value( port, "default", 0 );
 		livido_set_string_value( port, "description" ,"Color Red");
@@ -156,7 +156,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 
 		livido_set_string_value(port, "name", "Blue" );
 		livido_set_string_value(port, "kind", "INDEX" );
-		livido_set_int_value( port, "min", 1 );
+		livido_set_int_value( port, "min", 0 );
 		livido_set_int_value( port, "max", 255 );
 		livido_set_int_value( port, "default", 0 );
 		livido_set_string_value( port, "description" ,"Color Blue");
@@ -168,7 +168,7 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 
 		livido_set_string_value(port, "name", "Green" );
 		livido_set_string_value(port, "kind", "INDEX" );
-		livido_set_int_value( port, "min", 1 );
+		livido_set_int_value( port, "min", 0 );
 		livido_set_int_value( port, "max", 255 );
 		livido_set_int_value( port, "default", 0 );
 		livido_set_string_value( port, "description" ,"Color Green");

@@ -207,10 +207,7 @@ static	double	lvd_extract_param_number( livido_port_t *instance, const char *pna
 	error = livido_property_get( c, "value", 0, &pn );
 	if( error != LIVIDO_NO_ERROR ) {
 		printf(" --> %s idx %d invalid\n", pname, n );
-	} else {
-		printf(" --> %s idx %d has value %d",pname,n,pn);
-	} 
-
+	}
 #ifdef STRICT_CHECKING
 	assert( error == LIVIDO_NO_ERROR );
 #endif
@@ -230,9 +227,7 @@ static	int	lvd_extract_param_index( livido_port_t *instance, const char *pname, 
 	error = livido_property_get( c, "value", 0, &pn );
 #ifdef STRICT_CHECKING
 	if( error != LIVIDO_NO_ERROR ) {
-		printf(" --> %s idx %d invalid\n", pname, n );
-	} else {
-		printf(" --> %s idx %d has value %d",pname,n,pn);
+		printf(" --> %s idx %d invalid: %d\n", pname, n,error );
 	} 
 	assert( error == LIVIDO_NO_ERROR );
 #endif

@@ -99,7 +99,6 @@ static struct
 {
 	 { LIVIDO_PALETTE_RGB888, PIX_FMT_RGB24 },
 	 { LIVIDO_PALETTE_BGR888, PIX_FMT_BGR24 },
-	 { LIVIDO_PALETTE_RGB565, PIX_FMT_RGB565 },
 	 { LIVIDO_PALETTE_YUV422P,PIX_FMT_YUV422P },
 	 { LIVIDO_PALETTE_YUV420P,PIX_FMT_YUV420P },
 	 { LIVIDO_PALETTE_YUV444P,PIX_FMT_YUV444P },
@@ -1471,12 +1470,12 @@ void*	deal_with_livido( void *handle, const char *name )
 
 #ifndef STRICT_CHECKING
 	livido_setup_t setup[] = {
-		{	(void(*)()) vj_malloc 			},	
-		{	(void(*)()) free			},
-		{	(void(*)())memset			},
-        {	(void(*)())memcpy			},
-        {	(void(*)())vpn		},
-        {	(void(*)())vpf		},
+		{	(void(*)())vj_malloc 			},	
+		{	(void(*)())free			},
+		{	(void(*)())veejay_memset			},
+        {	(void(*)())veejay_memcpy			},
+        {	(void(*)())vevo_port_new		},
+        {	(void(*)())vevo_port_free		},
         {	(void(*)())vevo_property_set		},
         {	(void(*)())vevo_property_get		},
         {	(void(*)())vevo_property_num_elements	},
@@ -1516,7 +1515,8 @@ void*	deal_with_livido( void *handle, const char *name )
 #endif
 	if(!livido_plugin)
 	{
-		( port );
+	//	( port );		//FIXME leak
+
 		return NULL;
 	}
 
@@ -1528,6 +1528,28 @@ void*	deal_with_livido( void *handle, const char *name )
 #ifdef STRICT_CHECKING
 	assert( error == LIVIDO_NO_ERROR );
 #endif
+	plugin_name =  get_str_vevo( filter_templ, "name" );
+
+	int compiled_as = 0;
+	if( vevo_property_get( filter_templ, "api_version", 0,&compiled_as ) != LIVIDO_NO_ERROR )
+	{
+		veejay_msg(VEEJAY_MSG_WARNING,"Plugin '%s' does not have the property 'api_version'. ", plugin_name );
+		return NULL;	
+	}
+
+	if( compiled_as < LIVIDO_API_VERSION ) {
+		veejay_msg(VEEJAY_MSG_WARNING,  "I am using a newer LiViDO API. Overwrite your livido.h from libplugger/specs/livido.h and recompile your plugins.");
+		return NULL;
+	}
+
+	if( compiled_as > LIVIDO_API_VERSION ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Plugin '%s' uses newer LiViDO API (version %d).", plugin_name, compiled_as);
+		return NULL;
+	}
+
+	plugin_name =  get_str_vevo( filter_templ, "name" );
+
+
 	int n_params = livido_scan_parameters( filter_templ, port );
 
 
@@ -1539,10 +1561,8 @@ void*	deal_with_livido( void *handle, const char *name )
 	int n_outputs = livido_property_num_elements( filter_templ, "out_channel_templates" );
 
 
-	//@ Now, prefix the name with LVD
-	plugin_name =  get_str_vevo( filter_templ, "name" );
 
-	veejay_msg(0, "Loading '%s' , %d IP, %d OP" , plugin_name, n_params, n_oparams );
+	veejay_msg(0, "Loading LiVIDO-%d plugin '%s' , %d IP, %d OP" , compiled_as, plugin_name, n_params, n_oparams );
 	
 #ifdef STRICT_CHECKING
 	assert( plugin_name != NULL );

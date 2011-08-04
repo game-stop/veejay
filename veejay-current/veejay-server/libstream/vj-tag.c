@@ -3643,6 +3643,9 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		}
 	 	else {
 			plug_push_frame( tag->generator, 1, 0, &_tmp );
+			plug_set_parameter( tag->generator, 0,1,&(tag->color_r) );
+			plug_set_parameter( tag->generator, 1,1,&(tag->color_g) );
+			plug_set_parameter( tag->generator, 2,1,&(tag->color_b) );
 			plug_process( tag->generator );
 		}
 		break;
