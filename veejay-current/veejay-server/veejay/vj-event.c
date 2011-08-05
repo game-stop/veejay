@@ -9176,12 +9176,12 @@ void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 	int ok = 0;
 	for( i = 0; i < 8; i ++ ) {
 		if( v->uc->current_link == v->rlinks[i] ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Some one grabbed two beers at once!");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Someone grabbed two beers at once!");
 		}
 		if( v->rlinks[i] == -1 ) {
-			v->rlinks[i] = v->uc->current_link;
+			v->rlinks[i] = v->uc->current_link; //@ queue. used in vj_perform_send_primary_frame_s2
 			ok = 1;
-			break;
+			break; 
 		}
 	}
 
@@ -9198,6 +9198,7 @@ void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 		return;
 	}
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "Will send frame %ld to link %d soon", v->settings->current_frame_num, v->uc->current_link );
 	v->settings->unicast_frame_sender = 1;
 }
 

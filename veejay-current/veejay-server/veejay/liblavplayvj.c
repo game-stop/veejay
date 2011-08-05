@@ -1065,6 +1065,21 @@ static int veejay_screen_update(veejay_t * info )
 
 	video_playback_setup *settings = info->settings;
 	int check_vp = settings->composite;
+
+	if( info->settings->unicast_frame_sender )
+	{
+		vj_perform_send_primary_frame_s2(info, 0, info->uc->current_link );
+		vj_perform_done_s2(info);
+	}
+
+	if( info->settings->mcast_frame_sender && info->settings->use_vims_mcast )
+	{
+		vj_perform_send_primary_frame_s2(info, 1, info->uc->current_link);
+		vj_perform_done_s2(info);
+	}
+
+
+
 	vj_perform_get_primary_frame(info,frame);
 	if(check_vp)
 	{
@@ -1092,16 +1107,6 @@ static int veejay_screen_update(veejay_t * info )
 			vj_vloopback_write_pipe( info->vloopback );
 	}
 #endif
-	
-	if( info->settings->unicast_frame_sender )
-	{
-		vj_perform_send_primary_frame_s2(info, 0, info->settings->unicast_link_id);
-		info->settings->unicast_frame_sender = 0;
-	}
-	if( info->settings->mcast_frame_sender && info->settings->use_vims_mcast )
-	{
-		vj_perform_send_primary_frame_s2(info, 1, info->uc->current_link);
-	}
 
 	//@ FIXME: Both pixbuf and jpeg method is broken for screenshot
 #ifdef HAVE_JPEG
@@ -1127,6 +1132,7 @@ static int veejay_screen_update(veejay_t * info )
         }
 #endif
 #endif
+			
 	if(skip_update) {
 		if(info->video_out == 0 ) { 
 		   for(i = 0 ; i < MAX_SDL_OUT; i ++ )
@@ -1755,11 +1761,12 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 	}
 	pthread_mutex_unlock(&(settings->valid_mutex));
 
-        if( settings->currently_processed_entry != settings->buffer_entry[settings->currently_processed_frame] &&
+    if( settings->currently_processed_entry != settings->buffer_entry[settings->currently_processed_frame] &&
 		!veejay_screen_update(info)  )
 	{
-		veejay_msg(VEEJAY_MSG_WARNING, "Error playing frame %d", settings->current_frame_num);
+		veejay_msg(VEEJAY_MSG_WARNING, "Error playing frame %d. I won't give up yet!", settings->current_frame_num);
 	}
+
 	settings->currently_processed_entry = 
 		settings->buffer_entry[settings->currently_processed_frame];
 
@@ -1811,14 +1818,15 @@ int veejay_open(veejay_t * info)
 
     pthread_mutex_init(&(settings->valid_mutex), NULL);
     pthread_mutex_init(&(settings->syncinfo_mutex), NULL);
-    /* Invalidate all buffers, and initialize the conditions */
+    
+	/* Invalidate all buffers, and initialize the conditions */
     for(i = 0; i < QUEUE_LEN ;i ++ ) {
-	settings->valid[i] = 0;
-	settings->buffer_entry[i] = 0;
-	pthread_cond_init(&(settings->buffer_filled[i]), NULL);
-	pthread_cond_init(&(settings->buffer_done[i]), NULL);
+		settings->valid[i] = 0;
+		settings->buffer_entry[i] = 0;
+		pthread_cond_init(&(settings->buffer_filled[i]), NULL);
+		pthread_cond_init(&(settings->buffer_done[i]), NULL);
 
-	veejay_memset( &(settings->syncinfo[i]), 0, sizeof(struct mjpeg_sync));
+		veejay_memset( &(settings->syncinfo[i]), 0, sizeof(struct mjpeg_sync));
     }
 
     /* Now do the thread magic */

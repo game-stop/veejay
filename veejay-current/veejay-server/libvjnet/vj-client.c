@@ -168,7 +168,7 @@ int vj_client_connect_dat(vj_client *v, char *host, int port_id  )
 	
 	v->c[1] = NULL;
 	
-	if( sock_t_connect( v->c[0]->fd, host, port_id + 5  ) )
+	if( sock_t_connect( v->c[0]->fd, host, (port_id + 5)  ) )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Connect to DAT port %d", port_id + 5);	
 		return 1;

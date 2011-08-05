@@ -109,6 +109,7 @@ static uint8_t *down_sample_buffer = NULL;
 static uint8_t *temp_buffer[4];
 static uint8_t *feedback_buffer[4];
 static uint8_t *socket_buffer = NULL;
+static int		sbic = 0;
 static ycbcr_frame *record_buffer = NULL;	// needed for recording invisible streams
 static VJFrame *helper_frame = NULL;
 static int vj_perform_record_buffer_init();
@@ -1113,7 +1114,13 @@ static	int	vj_perform_compress_frame( veejay_t *info, uint8_t *dst, uint32_t *p1
 	return (size1+size2+size3+16);
 }
 
-int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
+void	vj_perform_done_s2( veejay_t *info ) {
+
+	sbic = 0;
+	info->settings->unicast_frame_sender = 0;
+}
+
+int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_link_id)
 {
 	unsigned char info_line[128];
 
@@ -1123,13 +1130,14 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 
 	memset(info_line, 0, sizeof(info_line) );
 
-	if( !mcast )
-	{
-		uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * data_len );
+	uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * data_len );
+
+	if( sbic == 0 ) {
 		compr_len = vj_perform_compress_frame(info,sbuf, &planes[0], &planes[1], &planes[2]);
 #ifdef STRICT_CHECKING
 		assert( compr_len > 0 );
 #endif
+		sbic = 1;
 		/* peer to peer connection */
 		snprintf(info_line,
 				data_len + 1, //@ '\0' counts
@@ -1138,28 +1146,22 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 		      	compr_len,planes[0],planes[1],planes[2] );
 		veejay_memcpy( socket_buffer, info_line, sizeof(uint8_t) * data_len );
 	}
-	else	
-	{
-		uint8_t *sbuf = socket_buffer + (sizeof(uint8_t) * 43 );
-
-		compr_len = vj_perform_compress_frame(info,sbuf, &planes[0], &planes[1], &planes[2] );
-#ifdef STRICT_CHECKING
-		assert(compr_len > 0 );
-#endif
-		snprintf(info_line,
-			    data_len + 1,
-				"%04d%04d%04d%08d%08d%08d%08d", info->effect_frame1->width,
-				info->effect_frame1->height, info->pixel_format,
-		      	compr_len,planes[0],planes[1],planes[2] );
-		veejay_memcpy( socket_buffer, info_line, sizeof(uint8_t) * data_len );
-	}	
 
 	int id = (mcast ? 2: 3);
 	int __socket_len = data_len + compr_len;
+	int i;
+
+#ifdef STRICT_CHECKING
+	for( i = 0; i < 8 ; i++ ) {
+			if( info->rlinks[i] != -1 ) {
+				veejay_msg(VEEJAY_MSG_DEBUG, "Send cached frame to link %d now",
+						info->rlinks[i]);
+			}
+		}
+#endif
 
 	if(!mcast) 
 	{
-		int i;
 		for( i = 0; i < 8 ; i++ ) {
 			if( info->rlinks[i] != -1 ) {
 				if(vj_server_send_frame( info->vjs[id], info->rlinks[i], socket_buffer, __socket_len,
@@ -1175,7 +1177,7 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_link_id)
 	}
 	else
 	{		
-		if(vj_server_send_frame( info->vjs[id], to_link_id, socket_buffer, __socket_len,
+		if(vj_server_send_frame( info->vjs[id], to_mcast_link_id, socket_buffer, __socket_len,
 					info->effect_frame1, info->real_fps )<=0)
 		{
 			veejay_msg(VEEJAY_MSG_DEBUG,  "Error sending multicast frame.");

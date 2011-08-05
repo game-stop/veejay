@@ -129,6 +129,8 @@ int			sock_t_connect( vj_sock_t *s, char *host, int port )
 		return 0;
 	}
 
+	veejay_msg(VEEJAY_MSG_DEBUG, "Connected to host '%s' port %d", host,port );
+
 	return 1;
 }
 
@@ -159,8 +161,8 @@ int			sock_t_poll( vj_sock_t *s )
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to poll socket for immediate read: %s", strerror(errno));
 		return -1;
 	}
-	if( status == 0 )
-		return -1;
+//	if( status == 0 )
+//		return -1;
 
 	if( sock_t_rds_isset( s ) )
 		return 1;
