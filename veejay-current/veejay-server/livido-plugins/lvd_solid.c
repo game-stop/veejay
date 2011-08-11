@@ -17,8 +17,10 @@
  *
  */
 
+#ifndef IS_LIVIDO_PLUGIN
+#define IS_LIVIDO_PLUGIN
+#endif
 
-#define IS_LIVIDO_PLUGIN 
 #include 	"../libplugger/specs/livido.h"
 LIVIDO_PLUGIN
 #include	"utils.h"

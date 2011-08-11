@@ -1279,34 +1279,48 @@ int vj_tag_del(int id)
 		break;
     }
   
-	  for(i=0; i < SAMPLE_MAX_EFFECTS; i++) 
-	  {
-		vpf( tag->effect_chain[i]->kf );
-	  }
-    tag_node = hash_lookup(TagHash, (void *) tag->id);
-    if(tag_node)
-	{
-        if(tag->encoder_active)
+	if(tag->encoder_active)
 		vj_tag_stop_encoder( tag->id );	
-        if(tag->source_name) free(tag->source_name);
-	if(tag->method_filename) free(tag->method_filename);
-      	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) 
-		if (tag->effect_chain[i])
-		    free(tag->effect_chain[i]);
+    if(tag->source_name) 
+		free(tag->source_name);
+	
+	if(tag->method_filename) 
+	{
+		free(tag->method_filename);
+    	tag->method_filename = NULL;
+	}
+
+	for (i = 0; i < SAMPLE_MAX_EFFECTS; i++)  {
+		if (tag->effect_chain[i]) {
+		 	if( tag->effect_chain[i]->kf )
+				vpf(tag->effect_chain[i]->kf);
+			free(tag->effect_chain[i]);
+		}
+		tag->effect_chain[i] = NULL;
+	}
 
 	if(tag->socket_frame)
+	{
 		free(tag->socket_frame);
+		tag->socket_frame = NULL;
+	}
+
 	if(tag->viewport)
 		viewport_destroy(tag->viewport);
 
-      	free(tag);
+   	tag_node = hash_lookup(TagHash, (void *) tag->id);
+
+	if(tag_node)
+	{
+	    hash_delete(TagHash, tag_node);
+	}
+    
+	free(tag);
 	tag = NULL;
-      	avail_tag[ next_avail_tag] = id;
-      	next_avail_tag++;
-      	hash_delete(TagHash, tag_node);
-      return 1;
-  }
-  return -1;
+    avail_tag[ next_avail_tag] = id;
+    next_avail_tag++;
+
+	return 1;
 }
 
 void vj_tag_close_all() {

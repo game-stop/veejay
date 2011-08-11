@@ -114,7 +114,17 @@ THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define PORT_TYPE_CHANNEL 6
 #define PORT_TYPE_PARAMETER 7
 #define PORT_TYPE_GUI 8
+/*
+ * uncomment to track port new/free calls
+ * requires -DSTRICT_CHECKING
+ */
 
+/*
+#ifdef STRICT_CHECKING
+#define VEVO_TRACKPORTS
+#endif
+*/
+//
 
 //! \typedef atom_t
 /*! \brief atom
@@ -195,7 +205,7 @@ static	vevo_port_t	*port_ref_ = NULL;
 #endif*/
 static  size_t		atom_sizes_[100];
 
-#ifdef STRICT_CHECKING
+#ifdef VEVO_TRACKPORTS
 static void *trackports = NULL;
 static int hastrackports = 0;
 #endif
@@ -1221,12 +1231,8 @@ vevo_port_t *vevo_port_new(int port_type, const char *func, int line_num)
 #ifdef VVERBOSE
     veejay_msg( VEEJAY_MSG_INFO, "New port %p (%d) from %s:%d", port,port_type,func,line_num);
 #endif
-/*    char har[1024];
-    sprintf(har,"%s::%d", func,line_num );
-	vevo_property_set( port, har, VEVO_ATOM_TYPE_HIDDEN,0,NULL);
-  */ 
    
-#ifdef STRICT_CHECKING
+#ifdef VEVO_TRACKPORTS
     if( hastrackports == 0 ) {
 	    hastrackports = 1;
 	    trackports = vpn(1331);
@@ -1234,14 +1240,14 @@ vevo_port_t *vevo_port_new(int port_type, const char *func, int line_num)
 
     if( trackports != NULL && port_type != 1331) {
     	char key[64];
-	char har[1024];
-	char *str = &har[0];
-	memset(har,0,sizeof(har));
-	snprintf(har,sizeof(har), "%s::%d",func,line_num);
+		char har[1024];
+		char *str = &har[0];
+		memset(har,0,sizeof(har));
+		snprintf(har,sizeof(har)-1, "%s::%d",func,line_num);
     	snprintf(key,64, "%p", port );
     	assert( vevo_property_set( trackports, key,VEVO_ATOM_TYPE_STRING,1,&str ) == VEVO_NO_ERROR );
     }
-#endif  
+#endif
     return (vevo_port_t *) port;
 }
 
@@ -1281,7 +1287,7 @@ static void vevo_port_free_(vevo_port_t * p)
 	int msize = 0;
 #endif
 
-#ifdef STRICT_CHECKING
+#ifdef VEVO_TRACKPORTS
     char key[64];
     snprintf(key,64, "%p", port );
     char *val = vevo_property_get_string( trackports, key );	
@@ -2057,7 +2063,8 @@ static vevo_storage_t **vevo_list_nodes_(vevo_port_t * p, int atype)
 //! Report statistics and free bookkeeping information
 void	vevo_report_stats()
 {
-#ifdef STRICT_CHECKING
+
+#ifdef VEVO_TRACKPORTS
 	char **items = vevo_list_properties( trackports );
 	int i;
 	for( i = 0; items[i] != NULL; i ++ ) {
@@ -2070,6 +2077,8 @@ void	vevo_report_stats()
 	free(items);
 	
 	vevo_port_free( trackports,__FUNCTION__,__LINE__ );
+#else
+	veejay_msg(0, "recompile with -DVEVO_TRACKPORTS");
 #endif
 	/*
 #ifdef VVERBOSE
