@@ -103,6 +103,7 @@
 #endif
 */
 #include <sched.h>
+#include <veejay/vj-shm.h>
 
 static	veejay_t	*veejay_instance_ = NULL;
 static	int		best_performance_ = 0;
@@ -1097,7 +1098,14 @@ static int veejay_screen_update(veejay_t * info )
 		}
 	} 
 
-
+	if( info->shm )
+	{
+		int plane_sizes[3] = { info->effect_frame1->len, info->effect_frame1->uv_len,
+		   		info->effect_frame1->uv_len };	
+		if( vj_shm_write(info->shm, frame,plane_sizes) == -1 ) {
+			veejay_msg(0, "failed to write to shared resource!");
+		}
+	}
       
 #ifdef HAVE_V4L
 	if( info->vloopback )
@@ -2399,6 +2407,21 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		return -1;
     	}
 
+	char *use_shm = getenv( "VEEJAY_SHM_MASTER" );
+	if( use_shm != NULL ) {
+		int tmp = atoi( use_shm );
+		if( tmp == info->uc->port || tmp == 0){
+			veejay_msg(VEEJAY_MSG_INFO, "********************************************************");
+			info->shm = vj_shm_new_master( info->homedir,info->effect_frame1 );
+			veejay_msg(VEEJAY_MSG_INFO, "********************************************************");
+		} else {
+			veejay_msg(VEEJAY_MSG_WARNING, "SHM Master is '%d', This is %d (VEEJAY_SHM_MASTER env)",
+					tmp, info->uc->port );
+		}
+	} else {
+		veejay_msg(VEEJAY_MSG_WARNING, "set env VEEJAY_SHM_MASTER=%d if this is the master resource", info->uc->port );
+	}
+
    	if(veejay_open(info) != 1)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to initialize the threading system");
@@ -2791,6 +2814,11 @@ static	void *veejay_playback_thread(void *data)
 	vj_font_destroy( info->font );
 	vj_font_destroy( info->osd );
 #endif
+
+	if( info->shm ) {
+		vj_shm_free(info->shm);
+	}
+
     veejay_msg(VEEJAY_MSG_DEBUG,"Exiting playback thread");
     vj_perform_free(info);
 
@@ -3827,6 +3855,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 	{
 		info->settings->output_fps = info->current_edit_list->video_fps;
 	}
+
 
 	return 1;
 }

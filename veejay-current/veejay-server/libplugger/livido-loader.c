@@ -1066,6 +1066,11 @@ void	*livido_plug_init(void *plugin,int w, int h )
 #endif
 
 	error = (*init_f)( (livido_port_t*) filter_instance );
+	if( error != LIVIDO_NO_ERROR ) {
+		return NULL;
+		//@ FIXME: leak
+	}
+
 #ifdef STRICT_CHECKING
 	assert( error == LIVIDO_NO_ERROR );
 #endif

@@ -31,7 +31,7 @@ lib_LTLIBRARIES = $(VEEJAY_LIB_FILE)
 
 libveejay_la_SOURCES =  jpegutils.c vj-misc.c \
 			vj-osc.c vjkf.c vj-event.c vj-eventman.c vj-perform.c \
-			x11misc.c vj-sdl.c vj-dfb.c vj-viewport.c vj-composite.c \
+			x11misc.c vj-shm.c vj-sdl.c vj-dfb.c vj-viewport.c vj-composite.c \
 			vj-font.c vj-pjack.c liblavplayvj.c 
 
 libveejay_la_LDFLAGS = -version-info $(LT_CURRENT):$(LT_REVISION):$(LT_AGE) \

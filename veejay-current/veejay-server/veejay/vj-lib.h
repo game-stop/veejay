@@ -351,6 +351,7 @@ typedef struct {
 	int	audio_running;
 	int	*rlinks;
 	int pause_render;
+	void	*shm;
 } veejay_t;
 
 typedef struct {
