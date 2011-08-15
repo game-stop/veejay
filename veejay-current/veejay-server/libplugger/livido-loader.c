@@ -1145,12 +1145,10 @@ void	livido_plug_process( void *instance, double time_code )
 	//see if output channel needs downsampling
 	void *channel = NULL;
 	int hsampling = 0;
-	error = vevo_property_get( instance, "out_channels", 0, &channel );
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
 
-	if( vevo_property_get( channel, "HOST_sampling",0,&hsampling ) ==
+	error = vevo_property_get( instance, "out_channels", 0, &channel );
+
+	if( error == LIVIDO_NO_ERROR &&  vevo_property_get( channel, "HOST_sampling",0,&hsampling ) ==
 			LIVIDO_NO_ERROR )
 	{
 		void *sampler = NULL;

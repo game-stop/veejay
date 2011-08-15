@@ -263,7 +263,6 @@ static	void	lvd_set_param_number( livido_port_t *instance, const char *pname,int
 #endif
 }
 
-
 static	void	lvd_extract_dimensions( livido_port_t *instance,const char *name, int *w, int *h )
 {
 	livido_port_t *channel = NULL;

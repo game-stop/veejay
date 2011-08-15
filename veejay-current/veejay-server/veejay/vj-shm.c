@@ -266,7 +266,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	data->header[2]      = frame->stride[0];
 	data->header[3]      = frame->stride[1];
 	data->header[4]      = frame->stride[2];
-	data->header[5]      = frame->format;
+	data->header[5]      = frame->format; 
 
 	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  Starting address: %p", data );
 	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  Frame data      : %p", data + 4096 );

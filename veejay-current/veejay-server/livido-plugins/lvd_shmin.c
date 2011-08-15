@@ -34,6 +34,7 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
+#include <errno.h>
 
 #include 	"../libplugger/specs/livido.h"
 LIVIDO_PLUGIN
@@ -75,6 +76,10 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	}
 	
 	int r = shmget( shm_id, 0, 0666 );
+	if( r == -1 ) {
+		printf("error: %s for shm_id %d\n", strerror(errno),shm_id);
+		return LIVIDO_ERROR_HARDWARE;
+	}
 
 	char *ptr = (char*) shmat( r, NULL , 0 );
 

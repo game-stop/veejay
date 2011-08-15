@@ -1063,8 +1063,10 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 		int agen = plug_find_generator_plugins( &total, 0 );
 		
 		if( agen >= 0 ) {
+			char *plugname = plug_get_name( agen );
 			channel = agen;
-			veejay_msg(VEEJAY_MSG_DEBUG, "first available generator is at index %d", agen );
+			veejay_msg(VEEJAY_MSG_DEBUG, "first available generator '%s' at index %d",plugname, agen );
+			free(plugname);
 		}
 		else {
 			veejay_msg(VEEJAY_MSG_WARNING, "No generator plugins found. Using built-in.");
@@ -1084,6 +1086,8 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 			veejay_msg(VEEJAY_MSG_DEBUG, "Using plug '%s' to generate frames for this stream.",plugname);
 			strcpy( tag->source_name, plugname );
 			free(plugname);
+		} else {
+			veejay_msg(VEEJAY_MSG_ERROR, "Failed to initialize generator.");
 		}
 	}
 
