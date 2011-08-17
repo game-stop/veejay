@@ -9447,7 +9447,7 @@ void	vj_event_set_stream_color(void *ptr, const char format[], va_list ap)
 	}
 	// allow changing of color while playing plain/sample
 	if(vj_tag_exists(args[0]) &&
-		vj_tag_get_type(args[0]) == VJ_TAG_TYPE_COLOR )
+		(vj_tag_get_type(args[0]) == VJ_TAG_TYPE_COLOR || vj_tag_get_type(args[0]) == VJ_TAG_TYPE_GENERATOR ))
 	{
 		CLAMPVAL( args[1] );
 		CLAMPVAL( args[2] );
@@ -9703,6 +9703,45 @@ void vj_event_send_sample_options	(	void *ptr,	const char format[],	va_list ap	)
 	SEND_MSG(v , s_print_buf );
 	free(s_print_buf);
 }
+
+
+void	vj_event_set_shm_status( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	char *str = NULL;
+	P_A(args,str,format,ap);
+	
+	if(!v->shm) {
+		//@ try it anyway
+		v->shm = vj_shm_new_master( v->homedir, v->effect_frame1 );
+		if(!v->shm) {
+			return;
+		}
+	}
+
+	if( args[0] == 0 ) {
+		vj_shm_set_status( v->shm, 0 );
+	} else {
+		vj_shm_set_status( v->shm, 1 );
+	}
+
+}
+
+void	vj_event_get_shm( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*)ptr;
+	if(!v->shm) {
+		SEND_MSG(v, "00000000" );
+		return;
+	}
+
+	char tmp[64];
+	snprintf(tmp, sizeof(tmp)-1, "%d", vj_shm_get_shm_id( v->shm ) );
+
+	SEND_MSG(v, tmp );
+}
+
 #ifdef HAVE_FREETYPE
 void	vj_event_get_srt_list(	void *ptr,	const char format[],	va_list	ap	)
 {

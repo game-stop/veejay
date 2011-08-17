@@ -1030,10 +1030,9 @@ int veejay_stop(veejay_t * info)
 	}
     }
 
-    veejay_change_state(info, LAVPLAY_STATE_STOP);
-
     /*pthread_cancel( settings->playback_thread ); */
-    pthread_join(settings->playback_thread, NULL);
+ 	veejay_msg(VEEJAY_MSG_DEBUG, "Waiting for playback_thread ...");
+ 	pthread_join(settings->playback_thread, NULL);
     return 1;
 }
 
@@ -1098,7 +1097,7 @@ static int veejay_screen_update(veejay_t * info )
 		}
 	} 
 
-	if( info->shm )
+	if( info->shm && vj_shm_get_status(info->shm) == 1 )
 	{
 		int plane_sizes[3] = { info->effect_frame1->len, info->effect_frame1->uv_len,
 		   		info->effect_frame1->uv_len };	
@@ -1997,7 +1996,7 @@ static int veejay_mjpeg_sync_buf(veejay_t * info, struct mjpeg_sync *bs)
  ******************************************************/
 
 
-int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
+int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_tags )
 {
 	editlist *el = NULL;
 	video_playback_setup *settings = info->settings;
@@ -2320,7 +2319,31 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 	break;
     }
 
-
+	if( gen_tags ) {
+		int total  = 0;
+		int *world = plug_find_all_generator_plugins( &total );
+		if( total == 0 ) {
+			veejay_msg(0,"No generator plugins found!");
+			return -1;
+		}
+		int i;
+		int plugrdy = 0;
+		for ( i = 0; i < total; i ++ ) {
+			int plugid = world[i];
+			veejay_msg(VEEJAY_MSG_DEBUG, "Plug index %d", plugid );
+			if( vj_tag_new( VJ_TAG_TYPE_GENERATOR, "generator",-1, el, info->pixel_format,
+					plugid, 0, 0 ) > 0 )
+				plugrdy++;
+		}
+		if( plugrdy > 0 ) {
+			veejay_msg(VEEJAY_MSG_INFO, "Initialized %d generators.");
+			info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
+			info->uc->sample_id = 1;
+		} else {
+			return -1;
+		}
+	} 
+	
 	if(def_tags && id <= 0)
 	{
 		char vidfile[1024];
@@ -2407,19 +2430,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags)
 		return -1;
     	}
 
-	char *use_shm = getenv( "VEEJAY_SHM_MASTER" );
-	if( use_shm != NULL ) {
-		int tmp = atoi( use_shm );
-		if( tmp == info->uc->port || tmp == 0){
-			veejay_msg(VEEJAY_MSG_INFO, "********************************************************");
-			info->shm = vj_shm_new_master( info->homedir,info->effect_frame1 );
-			veejay_msg(VEEJAY_MSG_INFO, "********************************************************");
-		} else {
-			veejay_msg(VEEJAY_MSG_WARNING, "SHM Master is '%d', This is %d (VEEJAY_SHM_MASTER env)",
-					tmp, info->uc->port );
-		}
-	} else {
-		veejay_msg(VEEJAY_MSG_WARNING, "set env VEEJAY_SHM_MASTER=%d if this is the master resource", info->uc->port );
+	info->shm = vj_shm_new_master( info->homedir,info->effect_frame1 );
+	if( !info->shm ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Unable to initialize shared resource!");
 	}
 
    	if(veejay_open(info) != 1)
@@ -2816,6 +2829,7 @@ static	void *veejay_playback_thread(void *data)
 #endif
 
 	if( info->shm ) {
+		vj_shm_stop(info->shm);
 		vj_shm_free(info->shm);
 	}
 

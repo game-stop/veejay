@@ -59,7 +59,7 @@ static int auto_loop = 0;
 static int n_slots_ = 0;
 static int max_mem_ = 0;
 static int live =0;
-
+static int ta = 0;
 static void CompiledWith()
 {
 	veejay_msg(VEEJAY_MSG_INFO,"Compilation flags:");
@@ -252,6 +252,8 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -d/--dummy	\t\tStart with no video (black frames)\n");
 	fprintf(stderr,
+		"  -Z/--load-generators\tLoad all generator plugins as streams\n");
+	fprintf(stderr,
 		"  -W/--input-width <num>\tSet input video width\n");
 	fprintf(stderr,
 		"  -H/--input-height <num>\tSet input video height\n");
@@ -302,7 +304,9 @@ static int set_option(const char *name, char *value)
 	info->audio = atoi(optarg);
     } else if ( strcmp(name, "A" ) == 0 || strcmp(name, "capture-device" ) == 0 ) {
 	live = atoi(optarg);
-    } else if (strcmp(name, "bezerk") == 0 || strcmp(name, "b") == 0) {
+    } else if ( strcmp(name, "Z" ) == 0 || strcmp(name, "load-generators" ) == 0 ) {
+		ta = 1;
+	} else if (strcmp(name, "bezerk") == 0 || strcmp(name, "b") == 0) {
 	info->no_bezerk = 0;
     } else if (strcmp(name, "timer") == 0 || strcmp(name, "t") == 0) {
 	info->uc->use_timer = atoi(optarg);
@@ -359,8 +363,7 @@ static int set_option(const char *name, char *value)
 	} else if ( strcmp(name, "output-file" ) == 0 || strcmp(name, "o") == 0 ) {
 		check_val(optarg,name);
 		veejay_strncpy(info->y4m_file,(char*) optarg, strlen( (char*) optarg));
-    } else if (strcmp(name, "preserve-pathnames") == 0
-	       || strcmp(name, "P") == 0) {
+    } else if (strcmp(name, "preserve-pathnames") == 0 ) {
 		info->preserve_pathnames = 1;
     } else if (strcmp(name, "deinterlace") == 0 || strcmp(name, "I" )==0) {
 		info->auto_deinterlace = 1;
@@ -514,6 +517,7 @@ static int check_command_line_options(int argc, char *argv[])
 	{"max_cache",1,0,0},
 	{"capture-device",1,0,0},
 	{"swap-range",0,0,0},
+	{"load-generators",0,0,0},
 	{0, 0, 0, 0}
     };
 #endif
@@ -527,12 +531,12 @@ static int check_command_line_options(int argc, char *argv[])
 #ifdef HAVE_GETOPT_LONG
     while ((n =
 	    getopt_long(argc, argv,
-			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqe",
+			"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqeZ",
 			long_options, &option_index)) != EOF)
 #else
     while ((n =
 	    getopt(argc, argv,
-		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqe"
+		   	"o:G:O:a:H:s:c:t:j:l:p:m:h:w:x:y:r:f:Y:A:N:H:W:M:T:F:nILPVDugvBdibjqeZ"
 						   )) != EOF)
 #endif
     {
@@ -715,7 +719,8 @@ int main(int argc, char **argv)
 		default_geometry_x,
 		default_geometry_y,
 		NULL,
-		live )< 0)
+		live,
+	    ta	)< 0)
 	{	
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot start Vveejay");
 		return 0;

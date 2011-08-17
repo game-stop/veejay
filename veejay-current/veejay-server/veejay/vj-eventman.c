@@ -2811,6 +2811,28 @@ void		vj_init_vevo_events(void)
 				"greyscale",
 				0,
 				NULL );	
+
+	index_map_[ VIMS_SHM_WRITER ]			=	_new_event(
+				"%d",
+				VIMS_SHM_WRITER,
+				"Start/Stop writing frames to a shared memory segment",
+				vj_event_set_shm_status,
+				1,
+				VIMS_ALLOW_ANY,
+				"Status (0=off,1=on)",
+				0,
+				NULL );
+
+	index_map_[ VIMS_GET_SHM ] 				= _new_event(
+				"%d",
+				VIMS_GET_SHM,
+				"Write back veejay's SHM ID",
+				vj_event_get_shm,
+				1,
+				VIMS_ALLOW_ANY,
+				"Not used yet",
+				0,
+				NULL );
 #endif
 }
 

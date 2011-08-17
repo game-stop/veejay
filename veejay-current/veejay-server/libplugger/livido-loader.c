@@ -1178,18 +1178,18 @@ void	livido_plug_deinit( void *instance )
 #endif
 
 	livido_deinit_f deinit;
-	error = vevo_property_get( filter_templ, "deinit_func", 0, &deinit );
+	error = vevo_property_get( filter_templ, "HOST_plugin_deinit_func", 0, &deinit );
 #ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
+	char *plugin_name =  get_str_vevo( filter_templ, "name" );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Destroy '%s'", plugin_name );
+	free(plugin_name);
 #endif
 
-	(*deinit)( instance );
+	if( error == VEVO_NO_ERROR )
+		(*deinit)( instance );
 	
 	int n;
 	int np = vevo_property_num_elements( instance, "in_channels" );
-#ifdef STRICT_CHECKING
-	assert( np >= 0 );
-#endif
 	
 	for( n = 0; n < np ; n ++ )
 	{
@@ -1214,21 +1214,17 @@ void	livido_plug_deinit( void *instance )
 	void *channel = NULL;
 	int hsampling = 0;
 	error = vevo_property_get( instance, "out_channels", 0, &channel );
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
+	
 	if( vevo_property_get( channel, "HOST_sampling",0,&hsampling ) ==
 			LIVIDO_NO_ERROR )
 	{
 		void *sampler = NULL;
 		error = vevo_property_get(channel, "HOST_sampler",0,&sampler );
-#ifdef STRICT_CHECKING
-		assert( sampler != NULL );
-#endif
-		subsample_free(sampler);
+		if(error == VEVO_NO_ERROR )
+			subsample_free(sampler);
 	}
 
-//	livido_port_recursive_free( instance );
+	livido_port_recursive_free( instance );
 
 //	instance = NULL;
 }

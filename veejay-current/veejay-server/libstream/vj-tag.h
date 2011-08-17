@@ -18,7 +18,7 @@
  */
 #ifndef VJ_TAG_H
 #define VJ_TAG_H
-
+#define VJ_TAG_TYPE_GENERATOR 7
 #define VJ_TAG_TYPE_CALI 6
 #define VJ_TAG_TYPE_PICTURE 5
 #define VJ_TAG_TYPE_COLOR 4

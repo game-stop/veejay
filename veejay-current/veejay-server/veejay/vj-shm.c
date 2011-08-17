@@ -36,6 +36,11 @@
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
 
+#define HEADER_LENGTH 4096
+#ifndef PATH_MAX
+#define PATH_MAX 1024
+#endif
+
 typedef struct {
 	int shm_id;
 	char *sms;
@@ -43,6 +48,7 @@ typedef struct {
 	int parent;
 	key_t key;
 	char *file;
+	int status;
 } vj_shm_t;
 
 
@@ -78,6 +84,25 @@ void	vj_shm_free(void *vv)
 	free(v);
 }
 
+
+void	vj_shm_set_status( void *vv, int status )
+{
+	vj_shm_t *v = (vj_shm_t*) vv;
+	v->status = status;
+	if( v->status == 0 ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Stopped writing frames to SHM %d", v->shm_id );
+	} else {
+		veejay_msg(VEEJAY_MSG_INFO,  "Started writing frames to SHM %d", v->shm_id );
+	}
+}
+
+int		vj_shm_get_status( void *vv )
+{
+	vj_shm_t *v = (vj_shm_t*) vv;
+	return v->status;
+}
+
+
 int		vj_shm_stop( void *vv )
 {
 	vj_shm_t *v = (vj_shm_t*) vv;
@@ -93,30 +118,39 @@ int		vj_shm_stop( void *vv )
 	return 0;
 }
 
-int		vj_shm_read( void *vv )
+int		vj_shm_get_shm_id( void *vv )
+{
+	vj_shm_t *v = (vj_shm_t*) vv;
+	return v->shm_id;
+}
+
+int		vj_shm_read( void *vv , uint8_t *dst[3] )
 {
 	vj_shm_t *v         = (vj_shm_t*) vv;
 	vj_shared_data *data = (vj_shared_data*) v->sms;
 #ifdef STRICT_CHECKING
 	assert( v->parent == 0 );
+	assert( v->sms != NULL );
 #endif
 	int res = pthread_rwlock_rdlock( &data->rwlock );
 	if( res == -1 ) {
-		veejay_msg(0, "%s",strerror(errno));
+	//	veejay_msg(0, "%s",strerror(errno));
 		return -1;
 	}
+	uint8_t *ptr = v->sms + HEADER_LENGTH;
+	
+	int len = data->header[0] * data->header[1]; //@ 
+	int uv_len = len / 2;
 
-	//@ resource protected
-	veejay_msg(0, "Reading resource!");
-	sleep(1);
-	veejay_msg(0, "Done reading!");
+	veejay_memcpy( dst[0], ptr, len );
+	veejay_memcpy( dst[1], ptr + len, uv_len );
+	veejay_memcpy( dst[2], ptr + len + uv_len, uv_len );
 
 	res = pthread_rwlock_unlock( &data->rwlock );
 	if( res == -1 ) {
-		veejay_msg(0, "%s",strerror(errno));
+	//	veejay_msg(0, "%s",strerror(errno));
 		return -1;
 	}
-
 
 	return 0;
 }
@@ -135,11 +169,11 @@ int		vj_shm_write( void *vv, uint8_t *frame[3], int plane_sizes[3] )
 
 	int res = pthread_rwlock_wrlock( &data->rwlock );
 	if( res == -1 ) {
-		veejay_msg(0, "%s",strerror(errno));
+	//	veejay_msg(0, "%s",strerror(errno));
 		return -1;
 	}
 
-	uint8_t *ptr = (uint8_t*) v->sms + 4096;
+	uint8_t *ptr = (uint8_t*) v->sms + HEADER_LENGTH;
 
 	veejay_memcpy( ptr , frame[0], plane_sizes[0] );
 
@@ -149,7 +183,7 @@ int		vj_shm_write( void *vv, uint8_t *frame[3], int plane_sizes[3] )
 
 	res = pthread_rwlock_unlock( &data->rwlock );
 	if( res == -1 ) {
-		veejay_msg(0, "%s",strerror(errno));
+		//veejay_msg(0, "%s",strerror(errno));
 		return -1;
 	}
 
@@ -171,7 +205,13 @@ void	*vj_shm_new_slave(int shm_id)
 
 	veejay_msg(VEEJAY_MSG_INFO, "Trying SHM_ID %d", shm_id );
 
-	void *ptr = shmat( shm_id, NULL, 0 );
+	int r = shmget( shm_id, 0, 0666 );
+	if( r == -1 ) {
+		veejay_msg(0, "SHM ID '%d' gives error: %s", shm_id, strerror(errno));
+		return NULL;
+	}
+
+	void *ptr = shmat( r, NULL, 0 );
 
 	if( ptr == (char*) (-1) ) {
 		veejay_msg(0, "failed to attach to shared memory %d", shm_id );
@@ -181,46 +221,71 @@ void	*vj_shm_new_slave(int shm_id)
 
 	vj_shm_t *v = (vj_shm_t*) vj_calloc(sizeof( vj_shm_t*));
 	v->sms = ptr;
-	vj_shared_data *data = (vj_shared_data*) ptr;
+	//vj_shared_data *data = (vj_shared_data*) &(ptr[0]);
+
 
 	v->shm_id = shm_id;
+
+	veejay_msg(VEEJAY_MSG_INFO, "Attached to shared memory segment %d", shm_id );
 
 	return v;
 }
 
-//@ create a file in HOME/.veejay to store SHM ID
-//@ is read by plugin 'lvd_shmin.so'
-//
-static	int		vj_shm_file_ref( vj_shm_t *v,const char *homedir )
-{
-	char path[1024];
-	snprintf(path, sizeof(path) - 1, "%s/veejay.shm", homedir );
-
+static	int		vj_shm_file_ref_use_this( char *path ) {
 	struct stat inf;
 	int res = stat( path, &inf );
 	if( res == 0 ) {
-		veejay_msg(0, "Only 1 shared resource for now, remove resource with ipcrm <master>.");
-		veejay_msg(0, "and delete '%s'", path );
-		return -1;
+		return 0; //@ no
+	}
+	return 1; //@ try anyway
+}
+
+static	int		vj_shm_file_ref( vj_shm_t *v, const char *homedir )
+{
+	char path[PATH_MAX];
+	int  tries = 0;
+	while( tries < 0xff ) {
+		snprintf(path, sizeof(path) - 1, "%s/veejay_shm_out-%d.shm_id", homedir, tries );
+		if( vj_shm_file_ref_use_this( path ) )	
+			break;
+		tries ++;
+	}
+
+	if(tries == 0xff) {
+		veejay_msg(0, "Run out of veejay_shm_out files, cat the files and ipcs/ipcrm any shared memory resources left over by previous processes");
+		veejay_msg(0, " --> %s", homedir );
+		return 0;
 	}
 
 	FILE *f = fopen( path,"w+" );
 	if(!f ) {
-		veejay_msg(0,"Unable to open %s: %s", path, strerror(errno) );
-		return -1;
+		veejay_msg(0, "I used to be able to write here but can't anymore: %s", homedir );
+		return 0;
 	}
 
-	key_t key = ftok( path, getpid());
+	key_t key = ftok( path, tries ); //@ whatever 
 
-	fprintf( f, "master: %d", key );
+	fprintf( f, "veejay_shm_out-%d: shm_id=%d\n", tries,key );
 	fclose(f );
 
 	v->key = key;
 	v->file = strdup( path );
 	
-	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  saved in '%s'", path );
+	veejay_msg(VEEJAY_MSG_DEBUG, " --> %s ", path );
 
-	return 0;
+	return 1;
+}
+
+static 	void	failed_init_cleanup( vj_shm_t *v )
+{
+	if(v->file) {
+		if( vj_shm_file_ref_use_this(v->file) == 0 )
+			remove(v->file);
+		free(v->file);
+	}
+	if( v->sms && v->shm_id > 0)
+		shmctl( v->shm_id, IPC_RMID, NULL );
+	free(v);
 }
 
 //@ new producer, puts frame in shm
@@ -234,15 +299,15 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 		return NULL;
 	}
 
-	long size = 2 * 1048576;
-	long size1 = 4096;
+	long size = (frame->width * frame->height * 4);
+	long offset = HEADER_LENGTH;
 
 	//@ create
 	v->shm_id = shmget( v->key,size, IPC_CREAT |0666 );
 
 	if( v->shm_id == -1 ) {
 		veejay_msg(0,"Error while allocating shared memory segment: %s", strerror(errno));
-		free(v);
+		failed_init_cleanup( v );
 		return NULL;
 	}
 
@@ -251,12 +316,19 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	if( v->sms == NULL ) {
 		shmctl( v->shm_id, IPC_RMID, NULL );
 		veejay_msg(0, "Failed to attach to shared memory:%s",strerror(errno));
-		free(v);
+		failed_init_cleanup(v);
 		return NULL;
 	}
 
 	pthread_rwlockattr_t	rw_lock_attr;
-	memset( v->sms, 0, size );
+	veejay_memset( v->sms, 0, size );
+
+	uint8_t *Y = v->sms + HEADER_LENGTH;
+	uint8_t *U = Y + (frame->width * frame->height);
+	uint8_t *V = U + ( (frame->width * frame->height)/2);
+	
+	veejay_memset( U, 128, (frame->width*frame->height)/2);
+	veejay_memset( V, 128, (frame->width*frame->height)/2);
 
 	//@ set up frame info (fixme, incomplete)
 	vj_shared_data *data = (vj_shared_data*) &(v->sms[0]);
@@ -269,7 +341,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	data->header[5]      = frame->format; 
 
 	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  Starting address: %p", data );
-	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  Frame data      : %p", data + 4096 );
+	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  Frame data      : %p", data + HEADER_LENGTH );
 	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  Static resolution of %d x %d, YUV 4:2:2 planar",
 			data->header[0],data->header[1] );
 
@@ -297,13 +369,10 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 		return NULL;
 	}
 
-	char tmp_name[1024];
-	snprintf( tmp_name,sizeof(tmp_name)-1, "VEEJAY_SHMID=%d", v->shm_id );
-
-	v->env_shm_id = strdup( tmp_name );
-
-	res		= putenv( v->env_shm_id );
-
+	veejay_msg( VEEJAY_MSG_INFO, "Shared Memory ID = %d", v->shm_id );
+	veejay_msg( VEEJAY_MSG_INFO, "Your Shared Memory Key = %d   <---- ", v->key );
+	veejay_msg( VEEJAY_MSG_INFO, "Starting Address: %p, Frame starts at: %p, Lock at %p",
+			v->sms, v->sms + HEADER_LENGTH, &(data->rwlock));
 	return v;
 }
 

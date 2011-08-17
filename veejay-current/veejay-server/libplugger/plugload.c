@@ -375,6 +375,44 @@ void	plug_sys_init( int fmt, int w, int h )
 	plug_sys_set_palette( base_fmt_ );
 }
 
+int *plug_find_all_generator_plugins( int *total )
+{
+	int n;
+	int len = 0;
+	for( n = 0; n < index_ ; n ++ ) {
+		if( index_map_[n] == NULL )
+			continue;
+		int in_c = plug_get_num_input_channels( n );
+		int out_c= plug_get_num_output_channels( n );
+		if( in_c == 0 && out_c == 1 ) {
+			len ++;
+		}
+	}
+
+	if( len == 0 )
+		return NULL;
+
+	int *arr = (int*) vj_calloc( sizeof(int) * (len+1) );
+	if( !arr )
+		return NULL;
+
+	len = 0;
+
+	for( n = 0; n < index_ ; n ++ ) {
+		if( index_map_[n] == NULL )
+			continue;
+		int in_c = plug_get_num_input_channels( n );
+		int out_c= plug_get_num_output_channels( n );
+		if( in_c == 0 && out_c == 1 ) {
+			arr[ len ] = n;
+			len ++;
+		}
+	}
+
+	*total = len;
+	return arr;
+}
+
 int	plug_find_generator_plugins(int *total, int seq )
 {
 	int n;

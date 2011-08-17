@@ -67,7 +67,6 @@ typedef void (*f0r_set_param_value_f)(f0r_instance_t *instance, f0r_param_t *par
 void	frei0r_plug_param_f( void *port, int seq_no, void *value );
 int	frei0r_push_frame_f( void *plugin, int dir, int seqno, VJFrame *in );
 int	frei0r_process_frame_f( void *plugin );
-int	frei0r_process_frame_ext_f( void *plugin );
 int	frei0r_get_param_f( void *port, void *dst );
 
 typedef struct
@@ -75,11 +74,11 @@ typedef struct
 	uint8_t *buf;
 	VJFrame *in[4];
 	VJFrame *out;
+	VJFrame *dst;
 	void    *in_scaler;
 	void	*out_scaler;
 	VJFrame	*last;
 } fr0_conv_t;
-
 
 int	frei0r_get_param_f( void *port, void *dst )
 {
@@ -114,20 +113,26 @@ int	frei0r_push_frame_f( void *plugin, int seqno, int dir, VJFrame *in )
 		return 0;
 
 	int i = 0;
-	if( dir == 0 )
-		i = 1;
 
 	fr0_conv_t *fr = NULL;
 	err = vevo_property_get(plugin, "HOST_conv",0,&fr);
 	if( err != VEVO_NO_ERROR )
 		return 0;
 
-	if ( i == 1 ) {
-		yuv_convert_and_scale_rgb( fr->in_scaler, in, fr->in[seqno]);
-	}
+	if( dir == 1 ) { //@ output channel push
+		if( seqno == 0 ) 	
+			fr->last = in; //@ 1 output channel 
+	
 
-	if( seqno == 0 && i == 1 ) {
-		fr->last = in;
+		return 1;	
+	}
+	else if ( dir == 0  ) {
+		if( seqno < 0 || seqno > 1 ) {
+			return 0;
+		}
+		yuv_convert_and_scale_rgb( fr->in_scaler, in, fr->in[seqno]); //@ yuv -> rgb
+		if(seqno == 0)
+			fr->last = in;
 	}
 
 	return 1;
@@ -180,6 +185,10 @@ static	int	init_param_fr( void *port, int p,f0r_param_info_t *info, int hint, in
 	snprintf(key,20, "p%02d", p );
 	vevo_property_set( port, key, VEVO_ATOM_TYPE_PORTPTR, 1, &parameter );
 
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_DEBUG, " -> Parameter %d '%s' %d - %d ", pcount,info->name,min,max );
+#endif
+
 	return n_values;
 }
 void* 	deal_with_fr( void *handle, char *name)
@@ -228,9 +237,13 @@ void* 	deal_with_fr( void *handle, char *name)
 	vevo_property_set( port, "init", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_init );
 	vevo_property_set( port, "deinit", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_deinit );
 	vevo_property_set( port, "info", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_info );
+	
 	vevo_property_set( port, "parameters", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_param );
+	
 	vevo_property_set( port, "construct", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_construct );
-	vevo_property_set( port, "destruct", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_destruct );
+	
+	if( f0r_destruct != NULL )
+		vevo_property_set( port, "destruct", VEVO_ATOM_TYPE_VOIDPTR, 1, &f0r_destruct );
 	
 	if( processf != NULL)
 		vevo_property_set( port, "process", VEVO_ATOM_TYPE_VOIDPTR, 1, &processf);
@@ -276,11 +289,14 @@ void* 	deal_with_fr( void *handle, char *name)
 	} else {
 		//@ frei0r "supports" source plugins,
 		//@ but our sources are samples, so skip them.
-		veejay_msg(0, "Frei0r generator plugins are not supported, skip '%s'.", name );
-		(*f0r_deinit)();
-		vpf(port);
-		return NULL;
+		veejay_msg(VEEJAY_MSG_WARNING, "Frei0r generator plugins are not supported, skip '%s'.", name );
+	//	(*f0r_deinit)();
+	//	vpf(port);
+	//	return NULL;
+		n_inputs = 0;
+		n_outputs = 1;
 	}
+
 
 	//@ cheap check for insane frei0r plugins
 	if( (finfo.plugin_type == F0R_PLUGIN_TYPE_FILTER && processf == NULL) ||
@@ -313,6 +329,8 @@ void* 	deal_with_fr( void *handle, char *name)
 		r_params += fr_params;
 	}
 
+
+
 	if( r_params > 8 ) {
 		veejay_msg(VEEJAY_MSG_WARNING, "Maximum parameter count reached, allowing %d/%d parameters.",
 				8,r_params);
@@ -334,9 +352,6 @@ void* 	deal_with_fr( void *handle, char *name)
 	vevo_property_set( port, "name", VEVO_ATOM_TYPE_STRING,1, &plug_name );
 	vevo_property_set( port, "mixer", VEVO_ATOM_TYPE_INT,1, &extra );
 	vevo_property_set( port, "HOST_plugin_type", VEVO_ATOM_TYPE_INT,1,&frei0r_signature_);
-/*	vevo_property_set( port, "HOST_plugin_param_f", VEVO_ATOM_TYPE_VOIDPTR, 1, &frei0r_plug_param_f);
-	vevo_property_set( port, "HOST_plugin_push_f", VEVO_ATOM_TYPE_VOIDPTR,1,&frei0r_push_frame_f);
-	vevo_property_set( port, "HOST_plugin_process_f", VEVO_ATOM_TYPE_VOIDPTR,1,&frei0r_process_frame_f);*/
 	vevo_property_set( port, "num_inputs", VEVO_ATOM_TYPE_INT,1, &n_inputs );
 	vevo_property_set( port, "num_outputs", VEVO_ATOM_TYPE_INT,1, &n_outputs );
 	
@@ -372,10 +387,13 @@ void	frei0r_plug_deinit( void *plugin )
 	}
 
 	f0r_destruct_f base;
-	vevo_property_get( parent, "destruct", 0, &base);
+	err = vevo_property_get( parent, "destruct", 0, &base);
 	f0r_instance_t instance;
-	vevo_property_get( plugin, "frei0r", 0, &instance );
-	(*base)(instance);
+	if( err == VEVO_NO_ERROR )
+		err = vevo_property_get( plugin, "frei0r", 0, &instance );
+
+	if( err == VEVO_NO_ERROR )
+		(*base)(instance);
 
 
 	fr0_conv_t *fr = NULL;
@@ -386,8 +404,11 @@ void	frei0r_plug_deinit( void *plugin )
 		if(fr->in[1]) free(fr->in[1]);
 		if(fr->in[2]) free(fr->in[2]);
 		if(fr->out) free(fr->out);
-		yuv_free_swscaler( fr->in_scaler );
-		yuv_free_swscaler( fr->out_scaler );
+		if( fr->in_scaler)
+			yuv_free_swscaler( fr->in_scaler );
+	
+		if( fr->out_scaler)
+			yuv_free_swscaler( fr->out_scaler );
 		free(fr);
 		fr = NULL;
 	}
@@ -419,11 +440,6 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf )
 	generic_push_parameter_f gpp = frei0r_plug_param_f;
 	generic_deinit_f	 gdd = frei0r_plug_deinit;
 
-	int n = 0;
-	vevo_property_get( plugin, "num_inputs", 0,&n);
-	if( n > 1 ) 
-		gpf = frei0r_process_frame_ext_f;
-
 	vevo_property_set( instance, "HOST_plugin_param_f", VEVO_ATOM_TYPE_VOIDPTR, 1, &gpp);
 	vevo_property_set( instance, "HOST_plugin_push_f", VEVO_ATOM_TYPE_VOIDPTR,1,&gpc);
 	vevo_property_set( instance, "HOST_plugin_process_f", VEVO_ATOM_TYPE_VOIDPTR,1,&gpf);
@@ -436,22 +452,46 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf )
 	memset(&templ,0,sizeof(sws_template));
 	templ.flags = yuv_which_scaler();
 
+	int n_in = 0;
+	int n_out = 0;
+	vevo_property_get( plugin, "num_inputs",0,&n_in );
+	vevo_property_get( plugin, "num_outputs",0,&n_out );
+	
+	int n_planes = 4 * (n_out + n_in);
+
 	fr0_conv_t *fr = (fr0_conv_t*) vj_calloc(sizeof(fr0_conv_t));
 	int i;
-	fr->buf        = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h * 4 * (2+n));
+	fr->buf        = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h * n_planes );
 	uint8_t *bufx  = fr->buf;
-	for( i = 0; i < (n+1); i ++ ){
+
+	for( i = 0; i < n_in; i ++ ){
 		fr->in[i] = yuv_rgb_template(bufx, w,h, frfmt );
 		bufx   += (w*h*4);
 	}
+
 	fr->out        = yuv_yuv_template(bufx, bufx+(w*h), bufx+(w*h*2), w,h,pf );
-	fr->out_scaler = yuv_init_swscaler( fr->in[0], fr->out, &templ, yuv_sws_get_cpu_flags()); // rgb -> yuv
-	fr->in_scaler  = yuv_init_swscaler( fr->out,fr->in[0], &templ, yuv_sws_get_cpu_flags());  // yuv -> rgb
+	
+	if( n_in == 0 ) {
+		fr->in[0] = yuv_rgb_template( fr->buf, w, h, frfmt );
+		//fr->in[0] = yuv_yuv_template( NULL,NULL,NULL,w,h,pf );
+	}
+
+	
+	fr->out_scaler = yuv_init_swscaler( fr->in[0], 	fr->out, 	&templ, yuv_sws_get_cpu_flags()); // rgb -> yuv
+
+	if( n_in > 0 ) 
+		fr->in_scaler  = yuv_init_swscaler( fr->out,	fr->in[0], 	&templ, yuv_sws_get_cpu_flags());  // yuv -> rgb
 	
 
 	void *frptr    = (void*) fr;
 	vevo_property_set( instance, "HOST_conv", VEVO_ATOM_TYPE_VOIDPTR,1,&frptr);
-	
+
+	int n_inputs = 0;
+	int err = vevo_property_get(plugin, "num_inputs", 0, &n_inputs );
+		err = vevo_property_set( instance, "num_inputs", VEVO_ATOM_TYPE_INT, 1, &n_inputs );
+		err = vevo_property_get( plugin, "num_outputs", 0, &n_inputs );
+		err = vevo_property_set( instance, "num_outputs", VEVO_ATOM_TYPE_INT,1,&n_inputs );
+
 	return instance;
 }
 
@@ -477,58 +517,52 @@ int	frei0r_process_frame_f( void *plugin )
 	f0r_update_f base;
 	vevo_property_get( parent, "process", 0, &base );
 	f0r_instance_t instance;
+	f0r_update2_f base2;
+	vevo_property_get( parent, "process_mix", 0, &base2 );
+
+
 
 	vevo_property_get( plugin, "frei0r",0, &instance );		
-
-
+	
 	fr0_conv_t *fr = NULL;
 	err = vevo_property_get(plugin, "HOST_conv",0,&fr);
 	if( err != VEVO_NO_ERROR )
 		return 0;
+	
+	VJFrame *dst = fr->last;
 
+	int n_inputs = 0;
+	err = vevo_property_get(plugin, "num_inputs", 0, &n_inputs );
 
-	(*base)( instance, rand(), fr->in[0]->data[0],fr->in[1]->data[0] );
+	int n_outputs = 0;
+	err = vevo_property_get(plugin, "num_outputs",0, &n_outputs );
 
-	VJFrame *dst = fr->in[0];
-	if( fr->last )
-		dst  = fr->last;
+	if( n_inputs == 0 && n_outputs == 1 ) {
+		
+		(*base)( instance, rand(), fr->buf, fr->buf );
+		
+		yuv_convert_and_scale_from_rgb( fr->out_scaler, fr->in[0], dst );
+		
+		return 1;
 
-	yuv_convert_and_scale_from_rgb( fr->out_scaler, fr->in[1], dst );
+	} else if( n_inputs == 1 ) {
 
-	return 1;
-}
+		(*base)( instance, rand(), fr->in[0]->data[0],fr->in[1]->data[0] );
+	
+		yuv_convert_and_scale_from_rgb( fr->out_scaler, fr->in[1], dst );
 
-int	frei0r_process_frame_ext_f(void *plugin)
-{
+	} else if ( n_inputs == 2 ) {
 
-	void *parent  = NULL;
-	int err       = vevo_property_get( plugin, "parent",0,&parent );
-	if( err != VEVO_NO_ERROR ) {
-		veejay_msg(0, "unable to process frei0r plugin.");
-		return 0;
+		
+		(*base2)( instance, rand(), fr->in[0]->data[0],fr->in[1]->data[0],NULL,fr->in[2]->data[0] );
+
+		yuv_convert_and_scale_from_rgb( fr->out_scaler, fr->in[2], dst );
+
 	}
 
-	f0r_update2_f base;
-	vevo_property_get( parent, "process_mix", 0, &base );
-	f0r_instance_t instance;
-
-	vevo_property_get( plugin, "frei0r",0, &instance );		
-	fr0_conv_t *fr = NULL;
-	err = vevo_property_get(plugin, "HOST_conv",0,&fr);
-	if( err != VEVO_NO_ERROR )
-		return 0;
-
-
-	(*base)( instance, rand(), fr->in[0]->data[0],fr->in[1]->data[0],NULL,fr->in[2]->data[0] );
-
-	VJFrame *dst = fr->in[0];
-	if( fr->last )
-		dst  = fr->last;
-
-	yuv_convert_and_scale_from_rgb( fr->out_scaler, fr->in[2], dst );
-
 	return 1;
 }
+
 
 void	frei0r_plug_param_f( void *port, int seq_no, void *dargs )
 {
@@ -563,6 +597,7 @@ void	frei0r_plug_param_f( void *port, int seq_no, void *dargs )
 		
 	if( vevo_property_get( parent, "parameters",0,&inf ) != VEVO_NO_ERROR )
 		return;
+
 
 	(*inf)( &finfo, seq_no );
 

@@ -809,8 +809,6 @@ int	vj_tag_set_stream_color(int t1, int r, int g, int b)
     vj_tag *tag = vj_tag_get(t1);
     if(!tag)
 	return 0;
-    if(tag->source_type != VJ_TAG_TYPE_COLOR)
-	return 0;
 	
 	veejay_msg(VEEJAY_MSG_DEBUG,"Set stream %d color %d,%d,%d",t1,
 		r,g, b );
@@ -1053,6 +1051,33 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 	}
 	tag->active = 1;
 	break;
+	case VJ_TAG_TYPE_GENERATOR:
+
+	sprintf(tag->source_name, "[GEN %d]", channel );
+	if(channel >= 0 ) {
+		char *plugname = plug_get_name( channel );
+		tag->generator = plug_activate(channel);
+		if(tag->generator ) {
+			if( plug_get_num_input_channels( channel ) > 0 ||
+				plug_get_num_output_channels( channel ) != 1 ) {
+					veejay_msg(0, "Plug '%s' is not a generator", plugname);
+					plug_deactivate(tag->generator);
+					free(plugname);
+					return -1;
+			}
+			strcpy( tag->source_name, plugname );
+
+			veejay_msg(VEEJAY_MSG_DEBUG, " -> %s", plugname );
+			free(plugname);
+		}
+		else {
+			veejay_msg(VEEJAY_MSG_ERROR, "Failed to initialize generator '%s'",plugname);
+			free(plugname);
+			return -1;
+		}
+	}
+	break;
+
 	case VJ_TAG_TYPE_COLOR:
 
 	sprintf(tag->source_name, "[%d,%d,%d]",
@@ -1277,6 +1302,7 @@ int vj_tag_del(int id)
 		}
 		break;
 	case VJ_TAG_TYPE_COLOR:
+	case VJ_TAG_TYPE_GENERATOR:
 		if( tag->generator ) {
 			plug_deactivate( tag->generator );
 		}
@@ -2783,6 +2809,9 @@ void vj_tag_get_method_filename(int t1, char *dst)
 void	vj_tag_get_by_type(int type, char *description )
 {
  	switch (type) {
+	case VJ_TAG_TYPE_GENERATOR:
+	sprintf(description, "Generator");
+	break;
     case VJ_TAG_TYPE_COLOR:
 	sprintf(description, "Solid" );
 	break;
@@ -3645,7 +3674,7 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 			vj_dv1394_read_frame( vj_tag_input->dv1394[tag->index], buffer , abuffer,vj_tag_input->pix_fmt);
 			break;
 #endif
-
+	case VJ_TAG_TYPE_GENERATOR:
 	case VJ_TAG_TYPE_COLOR:
 		_tmp.len     = len;
 		_tmp.uv_len  = uv_len;

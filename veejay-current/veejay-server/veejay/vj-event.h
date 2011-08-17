@@ -251,6 +251,8 @@ void	vj_event_feedback( void *ptr, const char format[], va_list ap );
 void	vj_event_render_depth( void *ptr, const char format[] , va_list ap );
 void	vj_event_send_sample_stack( void *ptr, const char format[], va_list ap );
 
+void	vj_event_set_shm_status( void *ptr, const char format[], va_list ap);
+void	vj_event_get_shm( void *ptr, const char format[], va_list ap );
 #ifdef HAVE_FREETYPE
 void	vj_event_get_srt_list(	void *ptr,	const char format[],	va_list	ap	);
 void	vj_event_get_font_list(	void *ptr,	const char format[],	va_list	ap	);

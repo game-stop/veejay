@@ -24,8 +24,10 @@
 int		vj_shm_write( void *vv, uint8_t *frame[3], int plane_sizes[3] );
 void	*vj_shm_new_slave(int shm_id);
 void	*vj_shm_new_master(const char *homedir, VJFrame *frame);
-int		vj_shm_read( void *vv );
+int		vj_shm_read( void *vv, uint8_t *dst[3] );
 int		vj_shm_stop( void *vv );
 void	vj_shm_free(void *vv);
-
+int		vj_shm_get_status( void *vv );
+void	vj_shm_set_status( void *vv, int status );
+int		vj_shm_get_shm_id( void *vv );
 #endif
