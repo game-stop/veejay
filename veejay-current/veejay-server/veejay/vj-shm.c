@@ -26,6 +26,7 @@
 #include <sys/ipc.h>
 #include <sys/shm.h>
 #include <stdio.h>
+#include <stdint.h>
 #include <string.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -35,6 +36,7 @@
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
+#include <libvevo/vevo.h>
 
 #define HEADER_LENGTH 4096
 #ifndef PATH_MAX
@@ -340,7 +342,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	data->header[2]      = frame->stride[0];
 	data->header[3]      = frame->stride[1];
 	data->header[4]      = frame->stride[2];
-	data->header[5]      = frame->format; 
+	data->header[5]      = 513; // format LIVIDO_PALETTE_YUV422P 
 
 	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  Starting address: %p", data );
 	veejay_msg(VEEJAY_MSG_INFO, "Shared Resource:  Frame data      : %p", data + HEADER_LENGTH );

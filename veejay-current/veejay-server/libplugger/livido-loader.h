@@ -20,6 +20,8 @@
 #ifndef LIVIDO_LOADER_H
 #define LIVIDO_LOADER_H
 
+int		lvd_livido_palette( int v );
+
 void	*deal_with_livido(void *handle, const char *name);
 
 void	*livido_plug_init( void *plugin, int w, int h );

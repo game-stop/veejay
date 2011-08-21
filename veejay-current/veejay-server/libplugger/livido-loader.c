@@ -47,7 +47,7 @@
 //#include <veejay/oscservit.h>
 #include <libplugger/utility.h>
 #include <libplugger/livido-loader.h>
-
+#include <veejay/vims.h>
 #define LIVIDO_COPY 1
 
 #define IS_RGB_PALETTE( p ) ( p < 512 ? 1 : 0 )
@@ -124,11 +124,23 @@ static	struct
 	int lp;
 } vj_palettes_[] = 
 {
-	{	0,	LIVIDO_PALETTE_YUV420P },
-	{	1,	LIVIDO_PALETTE_YUV422P },
-	{	2,	LIVIDO_PALETTE_YUV444P },
+	{	FMT_420,	LIVIDO_PALETTE_YUV420P },
+	{	FMT_422,	LIVIDO_PALETTE_YUV422P },
+	{	FMT_422F,	LIVIDO_PALETTE_YUV422P },
+	{	FMT_444,	LIVIDO_PALETTE_YUV444P },
+	//{	FMT_444F,	LIVIDO_PALETTE_YUV444P },
 	{	-1,	-1 },
 };
+
+int		lvd_livido_palette(int v)
+{
+	int i;
+	for( i = 0; vj_palettes_[i].it >= 0 ; i ++ ) {
+		if( vj_palettes_[i].it == v )
+			return vj_palettes_[i].lp;
+	}
+	return -1;
+}
 
 static	int	select_ffmpeg_palette(int lvd_palette )
 {

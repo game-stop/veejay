@@ -36,6 +36,9 @@
 #include <fcntl.h>
 #include <errno.h>
 
+#include <libavutil/pixfmt.h>
+#include <libswscale/swscale.h>
+
 #include 	"../libplugger/specs/livido.h"
 LIVIDO_PLUGIN
 #include	"utils.h"
@@ -47,6 +50,21 @@ typedef struct
 	pthread_rwlock_t	rwlock;
 	int					header[8];
 } vj_shared_data;
+
+
+static	inline int	lvd_to_ffmpeg( int lvd ) {
+	switch( lvd ) {
+		case LIVIDO_PALETTE_YUV422P:
+			return PIX_FMT_YUVJ422P;
+		case LIVIDO_PALETTE_RGB24:
+			return PIX_FMT_RGB24;
+		case LIVIDO_PALETTE_RGBA32:
+			return PIX_FMT_RGBA;
+		default:
+			return PIX_FMT_YUVJ422P;
+	}
+	return PIX_FMT_YUVJ422P;
+}
 
 livido_init_f	init_instance( livido_port_t *my_instance )
 {
@@ -89,8 +107,52 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 		return LIVIDO_ERROR_HARDWARE;
 	}
 
+	int dst_w = 0;
+	int dst_h = 0;
+  
+   	lvd_extract_dimensions( my_instance, "out_channels", &dst_w, &dst_h );
+    
+
+	//@ read format and dimensions from shared memory
+	int lvd_shm_palette = data->header[5]; //@ read livido palette format 
+	int	lvd_shm_width	= data->header[0]; //@ read width of frame in shm
+	int lvd_shm_height  = data->header[1]; //@ ... height ...
+
+	
+	int cpu_flags		= 0;
+	cpu_flags		    = cpu_flags | SWS_FAST_BILINEAR;
+
+//@ uncomment this to enable some runtime optimizations
+
+//  cpu_flags			= cpu_flags | SWS_CPU_CAPS_MMX;
+//  cpu_flags		    = cpu_flags | SWS_CPU_CAPS_SSE;
+
+
+//@ intialize ffmpeg's libswscale context
+
+	struct	SwsContext	*sws = NULL;
+
+	sws					= sws_getContext(
+							lvd_shm_width,
+							lvd_shm_height,
+							lvd_to_ffmpeg( lvd_shm_palette ),
+							dst_w,
+							dst_h,
+							PIX_FMT_YUVJ422P, // assume ldv_shmin is used in veejay, produce YUV 4:2:2 planar
+							cpu_flags,
+							NULL,
+							NULL,
+							NULL );
+
+	if( !sws ) {
+		return LIVIDO_ERROR_HARDWARE;
+	}
+
  	int error = livido_property_set( my_instance, "PLUGIN_private", 
                         LIVIDO_ATOM_TYPE_VOIDPTR, 1, &ptr );
+
+	error	  = livido_property_set( my_instance, "PLUGIN_scaler",
+						LIVIDO_ATOM_TYPE_VOIDPTR,1, &sws );
 
 	return LIVIDO_NO_ERROR;
 }
@@ -107,9 +169,19 @@ livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 			printf("error detaching from shm.");
 		}
 	}
+
+	struct SwsContext *sws = NULL;
+
+	error	= livido_property_get( my_instance, "PLUGIN_scaler",0, &sws );
+
+	if( error == LIVIDO_NO_ERROR ) {
+		sws_freeContext( sws ); //@ destroy it
+	}
 	
-  	livido_property_set( my_instance , "PLUGIN_private", 
-                        LIVIDO_ATOM_TYPE_VOIDPTR, 0, NULL );
+  	livido_property_set( my_instance, "PLUGIN_private", LIVIDO_ATOM_TYPE_VOIDPTR, 0, NULL );
+	livido_property_set( my_instance, "PLUGIN_scaler", LIVIDO_ATOM_TYPE_VOIDPTR,0,NULL );
+	
+
 	return LIVIDO_NO_ERROR;
 }
 
@@ -135,6 +207,9 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
     char  *addr = NULL; 
 	error = livido_property_get( my_instance, "PLUGIN_private", 0, &addr );
 
+	struct SwsContext *sws = NULL;
+	error = livido_property_get( my_instance, "PLUGIN_scaler", 0, &sws );
+
 	vj_shared_data *v =(vj_shared_data*) &(addr[0]);
 
 	if( error != LIVIDO_NO_ERROR ) 
@@ -145,8 +220,46 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 		return LIVIDO_ERROR_HARDWARE;
 	}
 
-	uint8_t *ptr = addr + 4096; //v->memptr
+	uint8_t *start_addr = addr + 4096; //v->memptr
 
+	int srcFormat = lvd_to_ffmpeg( v->header[5] );
+	int srcW      = v->header[0];
+	int srcH	  = v->header[1];
+
+	int	 n = 1; //@ stride width
+	if( srcFormat == PIX_FMT_RGB24 )
+		n = 3;
+	if( srcFormat == PIX_FMT_RGB32 )
+		n = 4;
+
+	int  strides[4] = 		{ srcW * n, 0, 0, 0 };
+	int  dst_strides[4] = 	{ w, w, w, 0 }; 
+
+	uint8_t *in[4] = { //@ pointers to planes in shm
+		start_addr, 
+		NULL,
+		NULL,
+		NULL };
+
+	if( srcFormat == PIX_FMT_YUVJ422P || srcFormat == PIX_FMT_YUV422P ) {
+		strides[0] = srcW;
+		strides[1] = strides[0];
+		strides[2] = strides[0];
+		in[1] = in[0] + len; //@ U and V planes 
+		in[2] = in[1] + (len/2);
+	}
+
+	if( srcFormat == PIX_FMT_YUVJ420P || srcFormat == PIX_FMT_YUV420P ) {
+		strides[0] = srcW;
+		strides[1] = strides[0] / 2;
+		strides[2] = strides[1] / 2;
+		in[1] = in[0] + len; //@ U and V planes
+		in[2] = in[1] + (len/4);
+	}
+
+	sws_scale( sws, in, strides,0, srcH, O, dst_strides );
+
+	/*
 	uint8_t *y = ptr;
 	uint8_t *u = ptr + len;
 	uint8_t *v1 = u+ uv_len;
@@ -158,14 +271,20 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 		printf("oops, height != height of shared resource\n");
 	}
 
+	if( v->header[5] != palette ) {
+		printf("oops, palette != palette of shared resource\n");
+	}
+
+	//@ scale and convert
 
 	livido_memcpy( O[0], y, len );
 	livido_memcpy( O[1], u, uv_len );
 	livido_memcpy( O[2], v1, uv_len );
+	*/
 
 	res = pthread_rwlock_unlock( &v->rwlock );
 	if( res == -1 ) {
-		return LIVIDO_ERROR_HARDWARE;
+		return LIVIDO_ERROR_HARDWARE; //@ fix this in livido asap 
 	}
 
 
@@ -212,6 +331,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 	//@ some palettes veejay-classic uses
 	int palettes0[] = {
            	LIVIDO_PALETTE_YUV422P,
+			LIVIDO_PALETTE_RGB24,
+			LIVIDO_PALETTE_RGBA32,
             0
 	};
 	
