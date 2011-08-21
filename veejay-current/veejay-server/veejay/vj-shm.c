@@ -74,6 +74,8 @@ void	vj_shm_free(void *vv)
 	res = shmctl( v->shm_id, IPC_RMID, NULL );
 	if( res ) {
 		veejay_msg(0, "failed to remove shared memory %d: %s", v->shm_id, strerror(errno));
+	} else {
+		veejay_msg(VEEJAY_MSG_INFO, "Removed shared segment %d", v->shm_id );
 	}
 
 	if( v->file ) {

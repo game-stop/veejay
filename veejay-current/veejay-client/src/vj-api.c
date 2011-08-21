@@ -120,7 +120,7 @@ enum
 	STREAM_NO_STREAM = 0,
 	STREAM_RED = 9,
 	STREAM_GREEN = 8,
-	STREAM_YELLOW = 7,
+	STREAM_GENERATOR = 7,
 	STREAM_CALI = 6,
 	STREAM_WHITE = 4,
 	STREAM_VIDEO4LINUX = 2,
@@ -2776,7 +2776,8 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 		update = 1;
 		update_record_tab( pm );
 
-		if( info->status_tokens[STREAM_TYPE] == STREAM_WHITE )
+		if( info->status_tokens[STREAM_TYPE] == STREAM_WHITE ||
+		 	info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR )
 		{
 			enable_widget( "colorselection" );
 		}
@@ -2823,7 +2824,8 @@ static void	update_current_slot(int *history, int pm, int last_pm)
 	if( ( info->status_tokens[CURRENT_ID] != history[CURRENT_ID] || pm != last_pm ) && pm == MODE_STREAM )
 	{
 		/* Is a solid color stream */	
-		if( info->status_tokens[STREAM_TYPE] == STREAM_WHITE )
+		if( info->status_tokens[STREAM_TYPE] == STREAM_WHITE  ||
+			info->status_tokens[STREAM_TYPE] == STREAM_GENERATOR)
 		{
 			if( ( history[STREAM_COL_R] != info->status_tokens[STREAM_COL_R] ) ||
 			    ( history[STREAM_COL_G] != info->status_tokens[STREAM_COL_G] ) ||
@@ -8290,8 +8292,8 @@ static void update_sample_slot_data(int page_num, int slot_num, int sample_id, g
 
 		if(sample_id > 0 )
 		{
-			gchar frame_title[20];
-			sprintf(frame_title, "%s", slot->title );
+			gchar frame_title[8];
+			snprintf(frame_title, sizeof(frame_title)-1, "%s", slot->title );
 			gtk_frame_set_label( GTK_FRAME(gui_slot->frame),frame_title );
 		}
 		else

@@ -2319,7 +2319,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 	break;
     }
 
-	if( gen_tags ) {
+	if( gen_tags > 0 ) {
 		int total  = 0;
 		int *world = plug_find_all_generator_plugins( &total );
 		if( total == 0 ) {
@@ -2336,9 +2336,9 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 				plugrdy++;
 		}
 		if( plugrdy > 0 ) {
-			veejay_msg(VEEJAY_MSG_INFO, "Initialized %d generators.");
+			veejay_msg(VEEJAY_MSG_INFO, "Initialized %d generators.", plugrdy);
 			info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
-			info->uc->sample_id = 1;
+			info->uc->sample_id = ( gen_tags < plugrdy ? gen_tags : 1 );
 		} else {
 			return -1;
 		}
@@ -2398,8 +2398,12 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 			dummy_id = vj_tag_new( VJ_TAG_TYPE_COLOR, "Solid", -1, el,info->pixel_format,-1,0,0);
 		else
 			dummy_id = vj_tag_size()-1;
-		info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
-		info->uc->sample_id = dummy_id;
+		
+		if( info->uc->sample_id <= 0 ) {
+			info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
+			info->uc->sample_id = dummy_id;
+	
+		}	
 	}
 
 	/* After we have fired up the audio and video threads system (which

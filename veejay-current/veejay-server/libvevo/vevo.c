@@ -639,8 +639,9 @@ static int atom_get_value(vevo_storage_t * t, int idx, void *dst)
     	return VEVO_ERROR_NOSUCH_ELEMENT;
     
     if (atom->size <= 0)
-	return VEVO_NO_ERROR;
-  
+		return VEVO_NO_ERROR;
+  	//	return VEVO_ERROR_PROPERTY_EMPTY;
+
     if( dst == NULL )
 	    return VEVO_NO_ERROR;
    

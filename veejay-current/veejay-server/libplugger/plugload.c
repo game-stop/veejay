@@ -123,13 +123,11 @@ static	void	deinstantiate_plugin( void *instance )
 #ifdef STRICT_CHECKING
 	assert( instance != NULL );
 #endif
-	generic_deinit_f	gin;
+	generic_deinit_f	gin = NULL;
 	int error = vevo_property_get( instance, "HOST_plugin_deinit_f", 0, &gin );
 
-#ifdef STRICT_CHECKING
-	assert( error == VEVO_NO_ERROR );
-#endif
-	(*gin)(instance);
+	if( error == VEVO_NO_ERROR && gin != NULL )
+		(*gin)(instance);
 }
 
 static	void	add_to_plugin_list( const char *path )

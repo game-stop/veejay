@@ -912,26 +912,25 @@ int vj_tag_new(int type, char *filename, int stream_nr, editlist * el,
 
      /* see if we can reclaim some id */
     for(i=0; i <= next_avail_tag; i++) {
-	if(avail_tag[i] != 0) {
- 	  hnode_t *tag_node;
-  	  tag_node = hnode_create(tag);
-   	  if (!tag_node)
-	  {
-		veejay_msg(0, "Unable to find available ID");
-		return -1;
-	  }
-	  id = avail_tag[i];
-	  avail_tag[i] = 0;
-	  hash_insert(TagHash, tag_node, (void *) id);
-	  break;
+		if(avail_tag[i] != 0) {
+ 		  hnode_t *tag_node;
+ 	 	  tag_node = hnode_create(tag);
+   		  if (!tag_node)
+		  {
+			veejay_msg(0, "Unable to find available ID");
+			return -1;
+		  }
+		  id = avail_tag[i];
+		  avail_tag[i] = 0;
+		  hash_insert(TagHash, tag_node, (void *) id);
+		  break;
         }
     }
 
          
     if(id==0) { 
 		tag->id = this_tag_id;
-		this_tag_id++;
-    }
+	}
     else {
 		tag->id = id;
 	}
@@ -1106,6 +1105,8 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 				plug_get_num_output_channels( channel ) != 1 ) {
 				veejay_msg(0, "Plug '%s' is not a generator", plugname);
 				plug_deactivate(tag->generator);
+				free(tag->source_name );
+				free(tag);
 				return -1;
 			}
 			veejay_msg(VEEJAY_MSG_DEBUG, "Using plug '%s' to generate frames for this stream.",plugname);
@@ -1113,6 +1114,9 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 			free(plugname);
 		} else {
 			veejay_msg(VEEJAY_MSG_ERROR, "Failed to initialize generator.");
+			free(tag->source_name);
+			free(tag);
+			return -1;
 		}
 	}
 
@@ -1152,6 +1156,10 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 		return -1;
 	}
     last_added_tag = tag->id; 
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_DEBUG, "Created new tag %d", tag->id );
+#endif
+	this_tag_id++;
 
 #ifdef HAVE_FREETYPE
     tag->dict = vpn(VEVO_ANONYMOUS_PORT );
@@ -1304,7 +1312,7 @@ int vj_tag_del(int id)
 	case VJ_TAG_TYPE_COLOR:
 	case VJ_TAG_TYPE_GENERATOR:
 		if( tag->generator ) {
-			plug_deactivate( tag->generator );
+		//	plug_deactivate( tag->generator );
 		}
 		break;
     }
@@ -2542,6 +2550,7 @@ int vj_tag_enable(int t1) {
 	}
 #endif
 	tag->active = 1;
+
 	if(!vj_tag_update(tag,t1)) return -1;
 	return 1;
 }
