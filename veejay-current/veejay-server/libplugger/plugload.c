@@ -100,7 +100,7 @@ static	void *instantiate_plugin( void *plugin, int w , int h )
 	switch( type )
 	{
 		case VEVO_PLUG_LIVIDO:
-			return livido_plug_init( plugin,w,h );
+			return livido_plug_init( plugin,w,h, base_fmt_ );
 			break;
 		case VEVO_PLUG_FF:
 			return freeframe_plug_init( plugin,w,h);
@@ -350,25 +350,7 @@ void	plug_sys_init( int fmt, int w, int h )
 {
 	base_width_ = w;
 	base_height_ = h;
-
-	switch(fmt)
-	{
-		case FMT_420:
-			base_fmt_ = PIX_FMT_YUV420P;
-			break;
-		case FMT_422:
-			base_fmt_ = PIX_FMT_YUV422P;
-			break;
-		case FMT_444:
-			base_fmt_ = PIX_FMT_YUV444P;
-			break;
-		default:
-		veejay_msg(0, "%s: Unknown pixel format",__FUNCTION__);
-#ifdef STRICT_CHECKING
-			assert(0);
-#endif	
-			break;	
-	}
+	base_fmt_ = fmt;
 	
 	plug_sys_set_palette( base_fmt_ );
 }

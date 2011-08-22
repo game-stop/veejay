@@ -25,6 +25,7 @@
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
 #include <libvje/internal.h>
+#include <libavutil/pixfmt.h>
 #include "effects/fibdownscale.h"
 #include "effects/magicoverlays.h"
 #include "effects/negation.h"
@@ -646,10 +647,7 @@ void vj_effect_initialize(int width, int height, int full_range)
 		}
 	}
 
-//@ initialize external plugins
-//
-	
-	plug_sys_init( FMT_422,width,height );
+	plug_sys_init( (full_range == 0 ? PIX_FMT_YUV422P : PIX_FMT_YUVJ422P ),width,height );
 
 	n_ext_plugs_ = plug_sys_detect_plugins();
 

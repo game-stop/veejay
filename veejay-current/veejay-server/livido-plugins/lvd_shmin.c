@@ -52,18 +52,22 @@ typedef struct
 } vj_shared_data;
 
 
-static	inline int	lvd_to_ffmpeg( int lvd ) {
+static	inline int	lvd_to_ffmpeg( int lvd, int fr ) {
 	switch( lvd ) {
 		case LIVIDO_PALETTE_YUV422P:
-			return PIX_FMT_YUVJ422P;
+			if( fr )
+				return PIX_FMT_YUVJ422P;
+			return PIX_FMT_YUV422P;
 		case LIVIDO_PALETTE_RGB24:
 			return PIX_FMT_RGB24;
 		case LIVIDO_PALETTE_RGBA32:
 			return PIX_FMT_RGBA;
 		default:
-			return PIX_FMT_YUVJ422P;
+			if( fr ) 
+				return PIX_FMT_YUVJ422P;
+			return PIX_FMT_YUV422P;
 	}
-	return PIX_FMT_YUVJ422P;
+	return PIX_FMT_YUV422P;
 }
 
 livido_init_f	init_instance( livido_port_t *my_instance )
@@ -130,15 +134,29 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 
 //@ intialize ffmpeg's libswscale context
 
+	int fullrange = 0;
+	
+	livido_property_get( my_instance, "HOST_fullrange",0,&fullrange);
+
+
 	struct	SwsContext	*sws = NULL;
 
 	sws					= sws_getContext(
 							lvd_shm_width,
 							lvd_shm_height,
-							lvd_to_ffmpeg( lvd_shm_palette ),
+							lvd_to_ffmpeg( lvd_shm_palette, fullrange ),
 							dst_w,
 							dst_h,
-							PIX_FMT_YUVJ422P, // assume ldv_shmin is used in veejay, produce YUV 4:2:2 planar
+							/*
+							  PIX_FMT_YUVJ422P or PIX_FMT_YUV422P
+
+							*/
+							
+							( fullrange == 1 ? PIX_FMT_YUVJ422P :  PIX_FMT_YUV422P ), 
+							
+							
+							
+							// assume ldv_shmin is used in veejay, produce YUV 4:2:2 planar
 							cpu_flags,
 							NULL,
 							NULL,
@@ -222,7 +240,10 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 
 	uint8_t *start_addr = addr + 4096; //v->memptr
 
-	int srcFormat = lvd_to_ffmpeg( v->header[5] );
+	int fullrange = 0;
+	error = livido_property_get( my_instance, "HOST_fullrange",0,&fullrange );
+
+	int srcFormat = lvd_to_ffmpeg( v->header[5], fullrange );
 	int srcW      = v->header[0];
 	int srcH	  = v->header[1];
 
@@ -233,7 +254,7 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 		n = 4;
 
 	int  strides[4] = 		{ srcW * n, 0, 0, 0 };
-	int  dst_strides[4] = 	{ w, w, w, 0 }; 
+	int  dst_strides[4] = 	{ w, w>>1, w>>1, 0 }; //@ width >> 1 
 
 	uint8_t *in[4] = { //@ pointers to planes in shm
 		start_addr, 
@@ -243,40 +264,15 @@ livido_process_f		process_instance( livido_port_t *my_instance, double timecode 
 
 	if( srcFormat == PIX_FMT_YUVJ422P || srcFormat == PIX_FMT_YUV422P ) {
 		strides[0] = srcW;
-		strides[1] = strides[0];
-		strides[2] = strides[0];
-		in[1] = in[0] + len; //@ U and V planes 
-		in[2] = in[1] + (len/2);
-	}
-
-	if( srcFormat == PIX_FMT_YUVJ420P || srcFormat == PIX_FMT_YUV420P ) {
-		strides[0] = srcW;
-		strides[1] = strides[0] / 2;
-		strides[2] = strides[1] / 2;
-		in[1] = in[0] + len; //@ U and V planes
-		in[2] = in[1] + (len/4);
+		strides[1] = strides[0] >> 1;
+		strides[2] = strides[1];
+		in[1] = in[0] + ( srcW * srcH );
+		in[2] = in[1] + ( (srcW>>1) * srcH);
 	}
 
 	sws_scale( sws, in, strides,0, srcH, O, dst_strides );
 
 	/*
-	uint8_t *y = ptr;
-	uint8_t *u = ptr + len;
-	uint8_t *v1 = u+ uv_len;
-
-	if( v->header[0] != w ) {
-		printf("oops, width != width of shared resource\n");
-	}
-	if( v->header[1] != h ) {
-		printf("oops, height != height of shared resource\n");
-	}
-
-	if( v->header[5] != palette ) {
-		printf("oops, palette != palette of shared resource\n");
-	}
-
-	//@ scale and convert
-
 	livido_memcpy( O[0], y, len );
 	livido_memcpy( O[1], u, uv_len );
 	livido_memcpy( O[2], v1, uv_len );

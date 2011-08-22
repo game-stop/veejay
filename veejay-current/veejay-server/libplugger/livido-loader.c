@@ -91,33 +91,6 @@ static	int	livido_signature_ = VEVO_PLUG_LIVIDO;
 
 typedef	int	(*livido_set_parameter_f)( void *parameter, void *value );
 
-static struct
-{
-	int	lp;
-	int	pf;
-} palette_list_[] = 
-{
-	 { LIVIDO_PALETTE_RGB888, PIX_FMT_RGB24 },
-	 { LIVIDO_PALETTE_BGR888, PIX_FMT_BGR24 },
-	 { LIVIDO_PALETTE_YUV422P,PIX_FMT_YUV422P },
-	 { LIVIDO_PALETTE_YUV420P,PIX_FMT_YUV420P },
-	 { LIVIDO_PALETTE_YUV444P,PIX_FMT_YUV444P },
-//	 { LIVIDO_PALETTE_RGBA32, PIX_FMT_RGBA32  },
-	 { -1, -1 }
-};
-
-static	struct
-{
-	int it;
-	int pf;
-} img_palettes_[] = 
-{
-	{	0,	PIX_FMT_YUV420P },
-	{	1,	PIX_FMT_YUV422P },
-	{	2,	PIX_FMT_YUV444P },
-	{	-1,	-1 },
-};
-
 static	struct
 {
 	int it;
@@ -140,23 +113,6 @@ int		lvd_livido_palette(int v)
 			return vj_palettes_[i].lp;
 	}
 	return -1;
-}
-
-static	int	select_ffmpeg_palette(int lvd_palette )
-{
-	int i = 0;
-	for( i = 0; palette_list_[i].pf != -1 ; i ++ )
-	  if( lvd_palette == palette_list_[i].lp )
-		return palette_list_[i].pf;
-	return -1;	
-}
-static	int	select_livido_palette(int palette )
-{
-	int i = 0;
-	for( i = 0; palette_list_[i].pf != -1 ; i ++ )
-	  if( palette == palette_list_[i].pf )
-		return palette_list_[i].lp;
-	return -1;	
 }
 
 static	int	configure_channel( void *instance, const char *name, int channel_id, VJFrame *frame )
@@ -1002,7 +958,7 @@ void	*livido_get_name_space( void *instance )
 }
 
 /* initialize a plugin */
-void	*livido_plug_init(void *plugin,int w, int h )
+void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ )
 {
 	void *plug_info = NULL;
 	void *filter_templ = NULL;
@@ -1076,6 +1032,12 @@ void	*livido_plug_init(void *plugin,int w, int h )
 #ifdef STRICT_CHECKING
 	assert( error == LIVIDO_NO_ERROR );
 #endif
+	int fullrange = ( base_fmt_ == PIX_FMT_YUVJ422P ? 1: 0 );
+	error = vevo_property_set( filter_instance, 
+					"HOST_fullrange",
+					VEVO_ATOM_TYPE_INT,
+					1,
+					&fullrange );
 
 	error = (*init_f)( (livido_port_t*) filter_instance );
 	if( error != LIVIDO_NO_ERROR ) {
@@ -1598,11 +1560,10 @@ void*	deal_with_livido( void *handle, const char *name )
 void	livido_set_pref_palette( int pref_palette )
 {
 #ifdef STRICT_CHECKING
-	assert( pref_palette == PIX_FMT_YUV420P || pref_palette == PIX_FMT_YUV422P ||
-			pref_palette == PIX_FMT_YUV444P);
+	assert( pref_palette == PIX_FMT_YUVJ422P || pref_palette == PIX_FMT_YUV422P );
 #endif
 	pref_palette_ffmpeg_ = pref_palette;
-	pref_palette_        = select_livido_palette( pref_palette );
+	pref_palette_        = LIVIDO_PALETTE_YUV422P;
 }
 
 void	livido_exit( void )
