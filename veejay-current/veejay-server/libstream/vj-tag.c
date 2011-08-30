@@ -1101,7 +1101,21 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 		break;
 	case VJ_TAG_TYPE_GENERATOR:
 
-	sprintf(tag->source_name, "[GEN %d]", channel );
+	sprintf(tag->source_name, "[GEN]" );
+
+	if( channel == -1 && filename == NULL ) {
+		int total = 0;
+		int agen = plug_find_generator_plugins( &total, 0 );
+		
+		if( agen >= 0 ) {
+			char *plugname = plug_get_name( agen );
+			channel = agen;
+			veejay_msg(VEEJAY_MSG_INFO, "First available generator is '%s'",plugname );
+			free(plugname);
+		}
+	}
+
+
 	if(channel >= 0 || filename != NULL)  {
 		char *plugname = NULL;
 		if( filename != NULL ) {
@@ -1141,7 +1155,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 
 	sprintf(tag->source_name, "[%d,%d,%d]",
 		tag->color_r,tag->color_g,tag->color_b );
-	
+/*	
 	if( channel == -1 ) {
 		int total = 0;
 		int agen = plug_find_generator_plugins( &total, 0 );
@@ -1178,7 +1192,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 			free(tag);
 			return -1;
 		}
-	}
+	}*/
 
 	tag->active = 1;
 	break;
@@ -3762,6 +3776,22 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	
 		break;
 	case VJ_TAG_TYPE_GENERATOR:
+		_tmp.len     = len;
+		_tmp.uv_len  = uv_len;
+		_tmp.data[0] = buffer[0];
+		_tmp.data[1] = buffer[1];
+		_tmp.data[2] = buffer[2];
+		_tmp.width   = width;
+		_tmp.height  = height;
+		_tmp.format  = PIX_FMT_YUVJ422P;
+		if( tag->generator ) {
+			plug_push_frame( tag->generator, 1, 0, &_tmp );
+			plug_set_parameter( tag->generator, 0,1,&(tag->color_r) );
+			plug_set_parameter( tag->generator, 1,1,&(tag->color_g) );
+			plug_set_parameter( tag->generator, 2,1,&(tag->color_b) );
+			plug_process( tag->generator );
+		}
+		break;
 	case VJ_TAG_TYPE_COLOR:
 		_tmp.len     = len;
 		_tmp.uv_len  = uv_len;
@@ -3771,20 +3801,10 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		_tmp.width   = width;
 		_tmp.height  = height;
 		_tmp.format  = PIX_FMT_YUVJ422P;
-		if(tag->generator == NULL ) {
-			dummy_rgb_apply( &_tmp, width, height, 
-			tag->color_r,tag->color_g,tag->color_b );
-		}
-	 	else {
-			plug_push_frame( tag->generator, 1, 0, &_tmp );
-			plug_set_parameter( tag->generator, 0,1,&(tag->color_r) );
-			plug_set_parameter( tag->generator, 1,1,&(tag->color_g) );
-			plug_set_parameter( tag->generator, 2,1,&(tag->color_b) );
-			plug_process( tag->generator );
-		}
+		dummy_rgb_apply( &_tmp, width, height, tag->color_r,tag->color_g,tag->color_b );
 		break;
 
-    	case VJ_TAG_TYPE_NONE:
+    case VJ_TAG_TYPE_NONE:
 		break;
 		default:
 		break;
