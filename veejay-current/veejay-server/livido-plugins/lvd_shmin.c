@@ -73,11 +73,15 @@ static	inline int	lvd_to_ffmpeg( int lvd, int fr ) {
 livido_init_f	init_instance( livido_port_t *my_instance )
 {
 	int shm_id = 0;
-	//@ did use set shared memory id ?
-	//@ use ipcs to find out, or read $HOME/.veejay/veejay.shm
 	char *env_id = getenv( "VEEJAY_SHMID" );
-	if( env_id == NULL ) {
-		//@ try veejay homedir
+	
+ 	if ( livido_property_get( my_instance, "HOST_shmid", 0, &shm_id ) ==
+			LIVIDO_NO_ERROR ) {
+		env_id = NULL; //@ use shm_id from HOST instead.
+	}
+
+	if( env_id == NULL && shm_id <= 0) {
+		//@ try veejay homedir last resort.
 		char path[1024];
 		char *home = getenv("HOME");
 		snprintf(path,sizeof(path)-1, "%s/.veejay/veejay.shm", home );
@@ -93,7 +97,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 			return LIVIDO_ERROR_HARDWARE;
 		printf(" '%s' -> shm id %d\n", path, shm_id );
 		close(fd);
-	} else {
+	} else if( env_id != NULL ) {
 		shm_id = atoi( env_id );
 	}
 	
@@ -323,6 +327,8 @@ livido_port_t	*livido_setup(livido_setup_t list[], int version)
 		livido_set_int_value( port, "flags", 0);
 		livido_set_string_value( port, "license", "GPL2");
 		livido_set_int_value( port, "version", 1);
+
+		livido_set_int_value( port, "HOST_shmid", 0 ); //@ hint host 
 	
 	//@ some palettes veejay-classic uses
 	int palettes0[] = {

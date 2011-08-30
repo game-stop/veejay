@@ -1218,6 +1218,43 @@ void		vj_init_vevo_events(void)
 				0,
 				NULL);
 
+	index_map_[VIMS_STREAM_NEW_SHARED]			=	_new_event(
+				"%d",
+			   VIMS_STREAM_NEW_SHARED,
+		   		"Request shared resource from another veejay",
+		 		vj_event_connect_shm,
+				1,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Port number",
+				0,
+				NULL,
+				NULL );	
+
+	index_map_[ VIMS_STREAM_NEW_SPLITTER ]		=   _new_event(
+				"%d %d",
+				VIMS_STREAM_NEW_SPLITTER,
+				"New splitted screen",
+				vj_event_new_splitter,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Number of (vertical) screens",
+				3,
+				"Screen layout (binary)",
+				1,
+				NULL );	
+
+	index_map_[VIMS_STREAM_NEW_GENERATOR]		=	_new_event(
+				"%d %s",
+				VIMS_STREAM_NEW_GENERATOR,
+				"Open a generator plugin that was loaded. use .so name",
+				vj_event_tag_new_generator,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+				"Optional argument (some value)",
+				0,
+				".so plugin filename (must have been loaded at startup)",
+				NULL );
+
 	index_map_[VIMS_STREAM_NEW_V4L]				=	_new_event(
 				"%d %d",
 				VIMS_STREAM_NEW_V4L,
@@ -2718,6 +2755,32 @@ void		vj_init_vevo_events(void)
 				"Filename",	
 				NULL,
 				NULL );	
+
+	index_map_[VIMS_OFFLINE_PLAYMODE]		=	_new_event(
+				NULL,
+				VIMS_OFFLINE_PLAYMODE,
+				"VIMS: actions depend on playback mode",
+				vj_event_playmode_rule,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+	index_map_[VIMS_OFFLINE_SAMPLES]		=	_new_event(
+				NULL,
+				VIMS_OFFLINE_SAMPLES,
+				"VIMS: pretend playmode is sample (offline sample editing)",
+				vj_event_offline_samples,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
+
+	index_map_[VIMS_OFFLINE_TAGS]			=	_new_event(
+				NULL,
+				VIMS_OFFLINE_TAGS,
+				"VIMS: pretend playmode is tag (offline stream editing)",
+				vj_event_offline_tags,
+				0,
+				VIMS_ALLOW_ANY,
+				NULL );
 
 	index_map_[VIMS_FONT_LIST]			=	_new_event(
 				NULL,

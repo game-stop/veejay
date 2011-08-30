@@ -535,7 +535,8 @@ int veejay_free(veejay_t * info)
 	if(info->cpumask) free(info->cpumask);
 	if(info->mask) free(info->mask);
 	if(info->rlinks) free(info->rlinks);
-        free(settings);
+        if(info->rmodes) free(info->rmodes );
+	free(settings);
         free(info);
     return 1;
 }
@@ -2331,7 +2332,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		for ( i = 0; i < total; i ++ ) {
 			int plugid = world[i];
 			veejay_msg(VEEJAY_MSG_DEBUG, "Plug index %d", plugid );
-			if( vj_tag_new( VJ_TAG_TYPE_GENERATOR, "generator",-1, el, info->pixel_format,
+			if( vj_tag_new( VJ_TAG_TYPE_GENERATOR, NULL,-1, el, info->pixel_format,
 					plugid, 0, 0 ) > 0 )
 				plugrdy++;
 		}
@@ -3033,7 +3034,8 @@ veejay_t *veejay_malloc()
     info->no_bezerk = 1;
     info->nstreams = 1;
     info->stream_outformat = -1;
-    info->rlinks = (int*) vj_calloc(sizeof(int) * 8 );
+    info->rlinks = (int*) vj_calloc(sizeof(int) * VJ_MAX_CONNECTIONS );
+    info->rmodes = (int*) vj_calloc(sizeof(int) * VJ_MAX_CONNECTIONS );
     info->settings->currently_processed_entry = -1;
     info->settings->first_frame = 1;
     info->settings->state = LAVPLAY_STATE_STOP;
@@ -3046,8 +3048,10 @@ veejay_t *veejay_malloc()
     info->uc->sample_end = 0;
     info->net = 1;
 	info->status_line = (char*) vj_calloc(sizeof(char) * 1500 );
-    for( i =0; i < 8 ; i ++ )
-		info->rlinks[i] = -1;
+    for( i =0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
+	info->rlinks[i] = -1;
+	info->rmodes[i] = -1;
+	}
 
     veejay_memset(info->action_file[0],0,256); 
     veejay_memset(info->action_file[1],0,256); 

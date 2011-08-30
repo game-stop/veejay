@@ -364,9 +364,20 @@ if(vj_server_send(v->vjs[VEEJAY_PORT_CMD], v->uc->current_link, (uint8_t*) str, 
 
 /* some macros for commonly used checks */
 
-#define SAMPLE_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) )
-#define STREAM_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_TAG) )
-#define PLAIN_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN) )
+#ifdef STRICT_CHECKING
+static int SAMPLE_PLAYING( veejay_t *v ) {
+	if( v->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE )
+		return 1;
+	if( v->rmodes[v->uc->current_link] == VJ_PLAYBACK_MODE_SAMPLE )
+		return 1;
+	return 0;
+}
+#else
+
+#define SAMPLE_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_SAMPLE) || (v->rmodes[v->uc->current_link] == VJ_PLAYBACK_MODE_SAMPLE) )
+#endif
+#define STREAM_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_TAG) || (v->rmodes[v->uc->current_link] == VJ_PLAYBACK_MODE_TAG))
+#define PLAIN_PLAYING(v) ( (v->uc->playback_mode == VJ_PLAYBACK_MODE_PLAIN) || (v->rmodes[v->uc->current_link] == VJ_PLAYBACK_MODE_PLAIN))
 
 #define p_no_sample(a) {  veejay_msg(VEEJAY_MSG_ERROR, "Sample %d does not exist",a); }
 #define p_no_tag(a)    {  veejay_msg(VEEJAY_MSG_ERROR, "Stream %d does not exist",a); }
@@ -1538,7 +1549,10 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 	}
 
 	if( net_id >= 400 && net_id < 499 )
+	{
 		vj_server_client_promote( v->vjs[VEEJAY_PORT_CMD] , v->uc->current_link );
+		v->rmodes[ v->uc->current_link ] = -1000;
+	}
 
 	np = vj_event_vevo_get_num_args( net_id );
 		
@@ -1658,6 +1672,8 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 	return 0;
 }
 
+void breaker()
+{}
 void vj_event_update_remote(void *ptr)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -1671,10 +1687,12 @@ void vj_event_update_remote(void *ptr)
 
 	has_n += vj_server_new_connection(v->vjs[VEEJAY_PORT_CMD]);
 	has_n += vj_server_new_connection( v->vjs[VEEJAY_PORT_STA] );
-	has_n += vj_server_new_connection( v->vjs[VEEJAY_PORT_DAT] );
 
-	if( has_n )
+	if( has_n ) {
 		return;
+	}
+
+	has_n += vj_server_new_connection( v->vjs[VEEJAY_PORT_DAT] );
 
 	if( v->settings->use_vims_mcast )
 	{
@@ -1716,8 +1734,8 @@ void vj_event_update_remote(void *ptr)
 			{
 				_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
 				_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
-				_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
-				
+				if( v->vjs[VEEJAY_PORT_DAT] )
+					_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
 			}
 		}
 	}
@@ -1743,7 +1761,8 @@ void vj_event_update_remote(void *ptr)
 			if( res <= 0 )	
 			//if( res == -1 )
 			{
-				_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
+				if( v->vjs[VEEJAY_PORT_DAT] )
+					_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
 				_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
 				_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
 			}
@@ -6901,6 +6920,28 @@ void vj_event_tag_toggle(void *ptr, const char format[], va_list ap)
 	}
 }
 
+void	vj_event_tag_new_generator( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	char str[255];
+	int args[2] = { 0,0 };
+	P_A(args,str,format,ap);
+
+	int shm_before = vj_shm_get_id(); //@ get temporary shmid
+	
+	vj_shm_set_id( args[0] ); //@ temporary store shm id somewhere
+
+	int id = veejay_create_tag(v, VJ_TAG_TYPE_GENERATOR, str, v->nstreams,vj_shm_get_id(),0);
+
+	vj_event_send_new_id ( v, id );
+
+	if( id <= 0 ) {
+		veejay_msg(0,"No plugin '%s' was found", str );
+	}
+	
+	vj_shm_set_id( shm_before );
+}
+
 #ifdef USE_GDK_PIXBUF
 void vj_event_tag_new_picture(void *ptr, const char format[], va_list ap)
 {
@@ -9731,16 +9772,90 @@ void	vj_event_set_shm_status( void *ptr, const char format[], va_list ap )
 void	vj_event_get_shm( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*)ptr;
+	char tmp[64];
 	if(!v->shm) {
-		SEND_MSG(v, "00000000" );
+		snprintf(tmp,sizeof(tmp)-1,"%016d",0);
+		SEND_MSG(v, tmp );
 		return;
 	}
 
-	char tmp[64];
-	snprintf(tmp, sizeof(tmp)-1, "%d", vj_shm_get_shm_id( v->shm ) );
+	snprintf(tmp, sizeof(tmp)-1, "%016d", vj_shm_get_my_id( v->shm ) );
 
 	SEND_MSG(v, tmp );
 }
+void	vj_event_offline_samples(void *ptr, const char format[], va_list ap)
+{
+	veejay_t *v = (veejay_t*)ptr;
+	int i;
+	for( i = 0; i < VJ_MAX_CONNECTIONS;  i ++ ) {
+		if( v->rmodes[i] == -1000 )
+			continue;
+		v->rmodes[i] = VJ_PLAYBACK_MODE_SAMPLE;
+	}
+	veejay_msg(VEEJAY_MSG_INFO, "Okay, I will force play-mode depending VIMS events to sample mode for link %d", v->uc->current_link);
+}
+void	vj_event_offline_tags( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t *)ptr;
+	int i;
+	for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ ) {
+		if( v->rmodes[i] == -1000 )
+			continue;
+		v->rmodes[ i ] = VJ_PLAYBACK_MODE_TAG;
+	}
+	veejay_msg(VEEJAY_MSG_INFO, "Okay, I will force play-mode depending VIMS events to stream mode for link %d", v->uc->current_link);
+}
+
+void	vj_event_playmode_rule( void *ptr, const char format[],  va_list ap )
+{
+	veejay_t *v = (veejay_t *)ptr;
+	int i;
+	for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ ) {
+		if( v->rmodes[i] == -1000 ) {
+			continue;
+		}
+		v->rmodes[ i ] = -1;
+	}
+	veejay_msg(VEEJAY_MSG_INFO, "Okay, play-mode depending VIMS for link %d no longer enforced.", v->uc->current_link);
+}
+
+void	vj_event_connect_shm( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	char str[255];
+	P_A(args,str,format,ap);
+	
+	//@ port, shm_id
+
+	int32_t key = vj_share_pull_master( v->shm,"127.0.0.1", args[0] );
+
+
+	int id = veejay_create_tag( v, VJ_TAG_TYPE_GENERATOR, "lvd_shmin.so", v->nstreams, key,0);
+	vj_event_send_new_id( v, id );
+	if( id <= 0 ) {
+		veejay_msg(0, "Unable to connect to shared resource id %d", key );
+	}
+
+}
+
+void	vj_event_new_splitter( void *ptr, const char format[], va_list ap )
+{
+		veejay_t *v = (veejay_t*) ptr;
+	int args[2];
+	char str[255];
+	P_A(args,str,format,ap);
+	
+	//@ port, shm_id
+	int id = veejay_create_tag( v, VJ_TAG_TYPE_SPLITTER, NULL, v->nstreams, args[0],args[1]);
+	vj_event_send_new_id( v, id );
+	if( id <= 0 ) {
+		veejay_msg(0, "Unable to create new splitter %d", id );
+	}
+
+
+}
+
 
 #ifdef HAVE_FREETYPE
 void	vj_event_get_srt_list(	void *ptr,	const char format[],	va_list	ap	)

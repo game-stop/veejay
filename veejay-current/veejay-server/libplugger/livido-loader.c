@@ -1039,6 +1039,17 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ )
 					1,
 					&fullrange );
 
+	int shmid = 0;
+
+
+	error = vevo_property_get( filter_templ, "HOST_shmid", 0,&shmid );
+	if( error == VEVO_NO_ERROR ) {
+		shmid = vj_shm_get_id(); //@ put in HOST value
+		error = vevo_property_set( filter_instance,"HOST_shmid", VEVO_ATOM_TYPE_INT,1,&shmid );
+	} 
+	veejay_msg(0, "HOST_shmid err=%d",error);
+	
+
 	error = (*init_f)( (livido_port_t*) filter_instance );
 	if( error != LIVIDO_NO_ERROR ) {
 		return NULL;
@@ -1550,6 +1561,7 @@ void*	deal_with_livido( void *handle, const char *name )
 	vevo_property_set( port, "num_outputs",VEVO_ATOM_TYPE_INT,1, &n_outputs);
 	vevo_property_set( port, "info", LIVIDO_ATOM_TYPE_PORTPTR,1,&filter_templ );
 	vevo_property_set( port, "HOST_plugin_type", VEVO_ATOM_TYPE_INT,1,&livido_signature_);
+
 
 	free(clone_name);
 	free(plugin_name);	

@@ -142,12 +142,17 @@ void 	vj_event_set_frame			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_set_play_mode			(	void *ptr, 	const char format[], 	va_list ap	);
 void 	vj_event_set_play_mode_go		(	void *ptr,	const char format[], 	va_list ap	); 
 void	vj_event_switch_sample_tag		(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_connect_shm			(	void *ptr,	const char format[],	va_list ap );
+void	vj_event_offline_samples		(	void *ptr,	const char format[], 	va_list ap );
+void	vj_event_offline_tags			(	void *ptr,	const char format[], 	va_list ap );
+void	vj_event_playmode_rule			(	void *ptr,	const char format[],	va_list ap );
 #ifdef HAVE_SDL
 void 	vj_event_set_screen_size		(	void *ptr, 	const char format[], 	va_list ap	);
 #endif
 void	vj_event_sample_set_dup			(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_tag_del			(	void *ptr, 	const char format[], 	va_list ap	); 
 void 	vj_event_tag_new_raw			(	void *ptr, 	const char format[], 	va_list ap	);
+void	vj_event_tag_new_generator		(  	void *ptr,	const char format[], 	va_list ap );
 void 	vj_event_tag_new_avformat		(	void *ptr,	const char format[],	va_list ap	);
 #ifdef USE_GDK_PIXBUF
 void	vj_event_tag_new_picture		(	void *ptr,	const char format[],	va_list ap	);
@@ -213,7 +218,7 @@ void	vj_event_quit				(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_suspend			(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_tag_set_format			( 	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_set_volume			(	void *ptr,	const char format[],	va_list ap	);
-void	vj_event_tag_new_shm			(	void *ptr,	const char format[],	va_list ap	);
+void	vj_event_new_splitter( void *ptr, const char format[], va_list ap );
 void	vj_event_debug_level			( 	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_bezerk				(	void *ptr,	const char format[],	va_list ap	);
 void	vj_event_plugin_command			(	void *ptr,	const char format[],	va_list ap	);

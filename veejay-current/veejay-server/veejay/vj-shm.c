@@ -61,6 +61,22 @@ typedef struct
 	int					header[8];
 } vj_shared_data;
 
+static	int	just_a_shmid = 0;
+
+static	key_t	simply_my_shmid = 0;
+
+int		vj_shm_get_my_id() {
+	return simply_my_shmid;
+}
+
+int		vj_shm_get_id(){ 
+	return just_a_shmid;
+}
+
+void	vj_shm_set_id(int v) {
+	just_a_shmid = v;
+}
+
 void	vj_shm_free(void *vv)
 {
 	vj_shm_t *v = (vj_shm_t*) vv;
@@ -94,9 +110,9 @@ void	vj_shm_set_status( void *vv, int status )
 	vj_shm_t *v = (vj_shm_t*) vv;
 	v->status = status;
 	if( v->status == 0 ) {
-		veejay_msg(VEEJAY_MSG_WARNING, "Stopped writing frames to SHM %d", v->shm_id );
+		veejay_msg(VEEJAY_MSG_WARNING, "Stopped writing frames to SHM %d", v->key );
 	} else {
-		veejay_msg(VEEJAY_MSG_INFO,  "Started writing frames to SHM %d", v->shm_id );
+		veejay_msg(VEEJAY_MSG_INFO,  "Started writing frames to SHM %d", v->key );
 	}
 }
 
@@ -377,6 +393,10 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 	veejay_msg( VEEJAY_MSG_INFO, "Your Shared Memory Key = %d   <---- ", v->key );
 	veejay_msg( VEEJAY_MSG_INFO, "Starting Address: %p, Frame starts at: %p, Lock at %p",
 			v->sms, v->sms + HEADER_LENGTH, &(data->rwlock));
+
+
+	simply_my_shmid = v->key;
+
 	return v;
 }
 

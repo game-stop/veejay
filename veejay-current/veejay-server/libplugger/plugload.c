@@ -188,12 +188,14 @@ static	void	add_to_plugin_list( const char *path )
 		}
 
 	//	veejay_msg(0, "\tOpened plugin '%s' in '%s'", name,path );
-	
+		char *bname = basename( fullname );
+		char *basename = strdup( bname );
+		void *plugin = NULL;
 		veejay_msg(VEEJAY_MSG_DEBUG, "Loading %s",fullname );
 
 		if(dlsym( handle, "plugMain" ))
 		{
-			void *plugin = deal_with_ff( handle, name, base_width_, base_height_ );
+			plugin = deal_with_ff( handle, name, base_width_, base_height_ );
 			if( plugin )
 			{
 				index_map_[ index_ ] = plugin;
@@ -203,7 +205,7 @@ static	void	add_to_plugin_list( const char *path )
 			else
 				dlclose( handle );	
 		} else if(dlsym( handle, "f0r_construct" )) {
-			void *plugin = deal_with_fr( handle, name );
+			plugin = deal_with_fr( handle, name );
 			if( plugin )
 			{
 				index_map_[ index_ ] = plugin;	
@@ -213,7 +215,7 @@ static	void	add_to_plugin_list( const char *path )
 			else
 				dlclose( handle );
 		} else if(dlsym( handle, "livido_setup" )) {
-			void *plugin = deal_with_livido( handle , name );
+			plugin = deal_with_livido( handle , name );
 			if( plugin )
 			{
 				index_map_[index_] = plugin;
@@ -225,6 +227,12 @@ static	void	add_to_plugin_list( const char *path )
 		} else
 			dlclose(handle);
 
+		if( plugin ) {
+			vevo_property_set( plugin, "so_name",VEVO_ATOM_TYPE_STRING,1,&basename );
+		}
+
+		free(basename);
+	
 	}
 
 	for( i = 0; i < n_files; i ++ )
@@ -299,6 +307,42 @@ static	void	free_plugins()
 
 	freeframe_destroy();
 }
+int plug_get_idx_by_so_name( char *soname )
+{
+	int i;
+	for( i = 0; i < index_ ; i ++ ) {
+
+		char *str = vevo_property_get_string( index_map_[i], "so_name" );
+		if( str == NULL )
+			continue;
+	veejay_msg(0, "'%s' vs '%s'", str,soname );
+
+
+		if( strcmp( soname,str ) == 0 )
+			return i;
+	}
+
+	return -1;
+}
+
+void	*plug_get_by_so_name( char *soname )
+{
+	int i;
+	for( i = 0; i < index_ ; i ++ ) {
+
+		char *str = vevo_property_get_string( index_map_[i], "so_name" );
+		if( str == NULL )
+			continue;
+
+		veejay_msg(0, "'%s' vs '%s'", str,soname );
+
+		if( strcmp( soname,str ) == 0 )
+			return index_map_[i];
+	}
+
+	return NULL;
+}
+
 
 void	*plug_get( int fx_id ) {
 	return index_map_[fx_id];

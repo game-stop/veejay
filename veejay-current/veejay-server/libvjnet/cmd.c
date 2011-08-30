@@ -251,7 +251,9 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 		bw = length;
 		n = send( s->sock_fd, buf, length , 0 );
 		if( n == -1 ) {
+#ifdef STRICT_CHECKING
 			veejay_msg(0, "Error sending buffer:%s",strerror(errno));
+#endif
 			return -1;
 		}
 		if( n == 0 ) {
@@ -279,8 +281,10 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 		bw = length;
 		n = send( fd, buf, length , 0 );
 		if( n == -1 ) {
+#ifdef STRICT_CHECKING
 			veejay_msg(0, "Error sending buffer:%s", strerror(errno));
 			return -1;
+#endif
 		}
 		if( n == 0 ) {
 			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");

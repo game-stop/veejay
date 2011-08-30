@@ -804,6 +804,48 @@ void	*vj_tag_get_dict( int t1 )
 	return NULL;
 }
 
+int	vj_tag_set_stream_layout( int t1, int stream_id_g, int screen_no_b, int value )
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return 0;
+
+	if( screen_no_b >= 0 ) {
+		tag->color_b = screen_no_b;
+	}
+
+	if( stream_id_g > 0 ) {
+		if( vj_tag_exists(stream_id_g) ) {
+			tag->color_g = stream_id_g;
+		}
+	}
+
+	if( value >= 0 ) {
+		if( value > 7 )
+			value = 7;
+		tag->color_r = value;
+	}
+	return (vj_tag_update(tag,t1));
+}
+
+int	vj_tag_get_stream_layout( int t1, char *dst )
+{
+	vj_tag *tag = vj_tag_get(t1);
+	if(!tag) return 0;
+
+	vj_split_get_layout( tag->generator, dst );
+
+	int *res = vj_split_get_samples( tag->generator );
+
+	int n = strlen(dst);
+	int k;
+	for( k = 0;k < n; k ++ ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "slot %d sample %d status %d",
+				k, res[k], dst[k]);
+	}
+
+	return 1;
+}
+
 int	vj_tag_set_stream_color(int t1, int r, int g, int b)
 {
     vj_tag *tag = vj_tag_get(t1);
@@ -1050,12 +1092,30 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 	}
 	tag->active = 1;
 	break;
+	case VJ_TAG_TYPE_SPLITTER:
+		sprintf(tag->source_name, "[SPLITTER]");
+		tag->generator = vj_split_display( el->video_width, el->video_height );
+		if(tag->generator==NULL ) {
+			return -1;
+		}
+		break;
 	case VJ_TAG_TYPE_GENERATOR:
 
 	sprintf(tag->source_name, "[GEN %d]", channel );
-	if(channel >= 0 ) {
-		char *plugname = plug_get_name( channel );
+	if(channel >= 0 || filename != NULL)  {
+		char *plugname = NULL;
+		if( filename != NULL ) {
+			channel = plug_get_idx_by_so_name( filename );
+			if( channel == -1 ) {
+				veejay_msg(0, "'%s' not found.",filename );
+				return -1;
+			}
+		}
+
+
+		plugname = plug_get_name( channel );
 		tag->generator = plug_activate(channel);
+		
 		if(tag->generator ) {
 			if( plug_get_num_input_channels( channel ) > 0 ||
 				plug_get_num_output_channels( channel ) != 1 ) {
@@ -1310,6 +1370,9 @@ int vj_tag_del(int id)
 		}
 		break;
 	case VJ_TAG_TYPE_COLOR:
+	case VJ_TAG_TYPE_SPLITTER:
+			// FIXME
+			break;
 	case VJ_TAG_TYPE_GENERATOR:
 		if( tag->generator ) {
 		//	plug_deactivate( tag->generator );
@@ -2818,6 +2881,9 @@ void vj_tag_get_method_filename(int t1, char *dst)
 void	vj_tag_get_by_type(int type, char *description )
 {
  	switch (type) {
+	case VJ_TAG_TYPE_SPLITTER:
+	sprintf(description, "Splitter");
+	break;
 	case VJ_TAG_TYPE_GENERATOR:
 	sprintf(description, "Generator");
 	break;
@@ -3683,6 +3749,18 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 			vj_dv1394_read_frame( vj_tag_input->dv1394[tag->index], buffer , abuffer,vj_tag_input->pix_fmt);
 			break;
 #endif
+	case VJ_TAG_TYPE_SPLITTER:
+	
+		tag->color_r = 7;
+		
+
+		vj_split_change_screen_setup( tag->generator, tag->color_r );
+		
+		//vj_split_set_stream_in_screen( tag->generator, tag->color_g, tag->color_b );
+
+		vj_split_process_frame( tag->generator, buffer );
+	
+		break;
 	case VJ_TAG_TYPE_GENERATOR:
 	case VJ_TAG_TYPE_COLOR:
 		_tmp.len     = len;
