@@ -75,9 +75,9 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	int shm_id = 0;
 	char *env_id = getenv( "VEEJAY_SHMID" );
 	
- 	if ( livido_property_get( my_instance, "HOST_shmid", 0, &shm_id ) ==
-			LIVIDO_NO_ERROR ) {
-		env_id = NULL; //@ use shm_id from HOST instead.
+ 	if ( livido_property_get( my_instance, "HOST_shmid", 0, &shm_id ) == LIVIDO_NO_ERROR ) {
+		if( shm_id > 0 )
+			env_id = NULL; //@ use shm_id from HOST instead.
 	}
 
 	if( env_id == NULL && shm_id <= 0) {
@@ -95,9 +95,9 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 		read( fd, buf, 256 );
 		if(sscanf(buf, "master: %d", &shm_id ) != 1 )
 			return LIVIDO_ERROR_HARDWARE;
-		printf(" '%s' -> shm id %d\n", path, shm_id );
 		close(fd);
-	} else if( env_id != NULL ) {
+	} 
+	else if( env_id != NULL ) {
 		shm_id = atoi( env_id );
 	}
 	
