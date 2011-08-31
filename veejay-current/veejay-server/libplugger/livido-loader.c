@@ -1454,7 +1454,7 @@ void*	deal_with_livido( void *handle, const char *name )
 
 #ifndef STRICT_CHECKING
 	livido_setup_t setup[] = {
-		{	(void(*)())vj_malloc 			},	
+		{	(void(*)())vj_malloc_ 			},	
 		{	(void(*)())free			},
 		{	(void(*)())veejay_memset			},
         {	(void(*)())veejay_memcpy			},
