@@ -1093,7 +1093,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 	tag->active = 1;
 	break;
 	case VJ_TAG_TYPE_SPLITTER:
-		sprintf(tag->source_name, "[SPLITTER]");
+		sprintf(tag->source_name, "[Three Split]");
 		tag->generator = vj_split_display( el->video_width, el->video_height );
 		if(tag->generator==NULL ) {
 			return -1;
@@ -1384,9 +1384,12 @@ int vj_tag_del(int id)
 		}
 		break;
 	case VJ_TAG_TYPE_COLOR:
+		break;
 	case VJ_TAG_TYPE_SPLITTER:
-			// FIXME
-			break;
+		if(tag->generator) {
+			vj_split_destroy(tag->generator);
+		}
+		break;
 	case VJ_TAG_TYPE_GENERATOR:
 		if( tag->generator ) {
 		//	plug_deactivate( tag->generator );
@@ -3759,21 +3762,12 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 		
 		break;
 #ifdef SUPPORT_READ_DV2
-		case VJ_TAG_TYPE_DV1394:
-			vj_dv1394_read_frame( vj_tag_input->dv1394[tag->index], buffer , abuffer,vj_tag_input->pix_fmt);
-			break;
+	case VJ_TAG_TYPE_DV1394:
+		vj_dv1394_read_frame( vj_tag_input->dv1394[tag->index], buffer , abuffer,vj_tag_input->pix_fmt);
+		break;
 #endif
 	case VJ_TAG_TYPE_SPLITTER:
-	
-		tag->color_r = 7;
-		
-
-		vj_split_change_screen_setup( tag->generator, tag->color_r );
-		
-		//vj_split_set_stream_in_screen( tag->generator, tag->color_g, tag->color_b );
-
 		vj_split_process_frame( tag->generator, buffer );
-	
 		break;
 	case VJ_TAG_TYPE_GENERATOR:
 		_tmp.len     = len;

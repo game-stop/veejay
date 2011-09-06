@@ -315,8 +315,6 @@ int plug_get_idx_by_so_name( char *soname )
 		char *str = vevo_property_get_string( index_map_[i], "so_name" );
 		if( str == NULL )
 			continue;
-	veejay_msg(0, "'%s' vs '%s'", str,soname );
-
 
 		if( strcmp( soname,str ) == 0 )
 			return i;

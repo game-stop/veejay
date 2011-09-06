@@ -184,10 +184,10 @@ int main(int argc, char *argv[])
 
 	sayvims = sayvims_connect();
 
-	vj_flush(1);
-
-	if(!sayvims)
+	if(!sayvims) {
+		fprintf(stderr, "error connecting.\n");
 		return -1;
+	}
 
 	if(single_msg || interactive )
 	{
@@ -250,6 +250,8 @@ int main(int argc, char *argv[])
 		}
 	}
 
+
+	vj_flush(1);
 	vj_client_close(sayvims);
 	vj_client_free(sayvims);
 

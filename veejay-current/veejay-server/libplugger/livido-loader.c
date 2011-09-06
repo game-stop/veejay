@@ -1047,8 +1047,6 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ )
 		shmid = vj_shm_get_id(); //@ put in HOST value
 		error = vevo_property_set( filter_instance,"HOST_shmid", VEVO_ATOM_TYPE_INT,1,&shmid );
 	} 
-	veejay_msg(0, "HOST_shmid err=%d",error);
-	
 
 	error = (*init_f)( (livido_port_t*) filter_instance );
 	if( error != LIVIDO_NO_ERROR ) {

@@ -74,6 +74,11 @@ static	void	vj_split_change_screens(split_display_t *sd, int n)
 	}
 }
 
+void	vj_split_destroy( void *s )
+{
+
+}
+
 void	*vj_split_display(int w, int h)
 {
 	split_display_t *sd = (split_display_t*) vj_calloc( sizeof( split_display_t));
@@ -307,7 +312,7 @@ void	vj_split_process_frame( void *sd , uint8_t *dst[3])
 			continue;
 		}
 					
-		//@ streams only for now
+		//@ streams only 
 		if(! vj_tag_get_frame( sdt->samples[k]->sample_id, sdt->darea, NULL ) )
 			continue;
 

@@ -1142,7 +1142,7 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_lin
 		snprintf(info_line,
 				data_len + 1, //@ '\0' counts
 				"%04d%04d%04d%08d%08d%08d%08d", info->effect_frame1->width,
-				info->effect_frame1->height, info->pixel_format,
+				info->effect_frame1->height, info->effect_frame1->format,
 		      	compr_len,planes[0],planes[1],planes[2] );
 		veejay_memcpy( socket_buffer, info_line, sizeof(uint8_t) * data_len );
 	}
@@ -1167,7 +1167,6 @@ int	vj_perform_send_primary_frame_s2(veejay_t *info, int mcast, int to_mcast_lin
 				if(vj_server_send_frame( info->vjs[id], info->rlinks[i], socket_buffer, __socket_len,
 						info->effect_frame1, info->real_fps )<=0)
 				{
-					veejay_msg(VEEJAY_MSG_ERROR,  "Error sending frame to remote");
 					_vj_server_del_client( info->vjs[id], info->rlinks[i] );
 				}
 				info->rlinks[i] = -1;

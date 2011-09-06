@@ -1004,7 +1004,46 @@ void	on_spin_streamduration_value_changed(GtkWidget *widget , gpointer user_data
 	update_label_str( "label_streamrecord_duration", time );
 	g_free(time);
 }
+void 	on_new_shm_stream_clicked(GtkWidget *wid, gpointer data)
+{
+	char	*port = get_text("shm_text_port");
+	multi_vims( VIMS_STREAM_NEW_SHARED, "%s", port );
+	gveejay_new_slot(MODE_STREAM);
+}
 
+void	on_new_generator_stream_clicked(GtkWidget *wid, gpointer data)
+{
+	// generator_text_args optionals args
+	// tree_generators get selected row
+	//        VIMS_STREAM_NEW_GENERATOR
+	veejay_msg(0, "implemented me");
+}
+
+void	on_shm_3490_clicked(GtkWidget *w, gpointer data)
+{
+	multi_vims( VIMS_STREAM_NEW_SHARED, "%d", 3490 );
+	gveejay_new_slot(MODE_STREAM);
+}
+void	on_shm_4490_clicked(GtkWidget *w, gpointer data)
+{
+	multi_vims( VIMS_STREAM_NEW_SHARED, "%d", 4490 );
+	gveejay_new_slot(MODE_STREAM);
+}
+void	on_shm_5490_clicked(GtkWidget *w, gpointer data)
+{
+	multi_vims( VIMS_STREAM_NEW_SHARED, "%d", 5490 );
+	gveejay_new_slot(MODE_STREAM);
+}
+void	on_shm_6490_clicked(GtkWidget *w, gpointer data)
+{
+	multi_vims( VIMS_STREAM_NEW_SHARED, "%d", 6490 );
+	gveejay_new_slot(MODE_STREAM);
+}
+void	on_shm_7490_clicked(GtkWidget *w, gpointer data)
+{
+	multi_vims( VIMS_STREAM_NEW_SHARED, "%d", 7490 );
+	gveejay_new_slot(MODE_STREAM);
+}
 
 void	on_button_sample_recordstart_clicked(GtkWidget *widget, gpointer user_data)
 {

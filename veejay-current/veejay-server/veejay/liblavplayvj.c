@@ -1537,11 +1537,14 @@ static void veejay_handle_callbacks(veejay_t *info) {
 	int status_line_len = strlen( info->status_line );
 	int i;
 	for( i = 0; i < VJ_MAX_CONNECTIONS ; i ++ ) {
+		if( !vj_server_link_can_write( info->vjs[VEEJAY_PORT_STA],  i ) ) 
+			continue;
 		int res = vj_server_send( info->vjs[VEEJAY_PORT_STA], i, info->status_line, status_line_len);
-	/*	if( res < 0 ) {
+		if( res < 0 ) {
 			_vj_server_del_client( info->vjs[VEEJAY_PORT_CMD], i );
 			_vj_server_del_client( info->vjs[VEEJAY_PORT_STA], i );
-		}*/
+			_vj_server_del_client( info->vjs[VEEJAY_PORT_DAT], i );
+		}
 	}
 }
 

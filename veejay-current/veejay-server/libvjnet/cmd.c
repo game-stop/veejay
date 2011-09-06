@@ -33,6 +33,7 @@
 vj_sock_t	*alloc_sock_t(void)
 {
 	vj_sock_t *s = (vj_sock_t*) malloc(sizeof(vj_sock_t));
+	memset( s, 0, sizeof(vj_sock_t));
 	if(!s) return NULL;
 	return s;
 }
@@ -274,26 +275,31 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 	assert( buf != NULL );
 #endif
 
-	int length = len;
-	int bw = 0;
-	int done = 0;
+	unsigned int length = len;
+	unsigned int done = 0;
+	unsigned char *ptr = buf;
 	while( length > 0 ) {
-		bw = length;
-		n = send( fd, buf, length , 0 );
+		n = send( fd, ptr, length , 0 );
 		if( n == -1 ) {
-#ifdef STRICT_CHECKING
 			veejay_msg(0, "Error sending buffer:%s", strerror(errno));
 			return -1;
-#endif
 		}
+
 		if( n == 0 ) {
 			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
 			return 0;
 		}
-		buf += n;
-		length -= n;
-		done += n;
+
+		ptr += n; //@ advance ptr by bytes send
+		length -= n; //@ decrement length by bytes send
+		done += n; //@ keep count of bytes done
 	}
+
+#ifdef STRICT_CHECKING
+	assert( length == 0 );
+	assert( done == len );
+#endif
+
 	return done;
 
 }
@@ -303,7 +309,7 @@ void			sock_t_close( vj_sock_t *s )
 	if(s)
 	{
 		close(s->sock_fd);
-		s->sock_fd = 0;
+		s->sock_fd = -1;
 		FD_ZERO(&(s->rds));
 		FD_ZERO(&(s->wds));
 	}

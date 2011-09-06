@@ -418,6 +418,7 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 
 	if( !vje->use_mcast)
 	{
+		//@ FIXME: vje->send_size is not used in sock_t_send_fd
 		total  = sock_t_send_fd( Link[link_id]->handle, vje->send_size, buf, len);
 #ifdef STRICT_CHECKING
 		if( vje->logfd ) {
@@ -431,6 +432,7 @@ int vj_server_send( vj_server *vje, int link_id, uint8_t *buf, int len )
 				(char*)(inet_ntoa(vje->remote.sin_addr)),strerror(errno));
 			return -1;
 		}
+		
 		if( total < len )
 			return -1;
 	}
@@ -514,7 +516,7 @@ int		vj_server_send_frame( vj_server *vje, int link_id, uint8_t *buf, int len,
 		{
 			return vj_server_send_frame_now( vje, link_id, buf, len );
 		} else {
-			veejay_msg(VEEJAY_MSG_DEBUG, "%s: not ready to write.");
+			veejay_msg(VEEJAY_MSG_DEBUG, "Link %d's socket not ready for immediate send: %s", link_id, strerror(errno));
 		}
 		return 0;
 	}
@@ -567,7 +569,7 @@ int _vj_server_del_client(vj_server * vje, int link_id)
 {
 	vj_link **Link = (vj_link**) vje->link;
 	Link[link_id]->in_use = 0;
-	if(Link[link_id]->handle)
+	if(Link[link_id]->handle > 0)
 	{
 		int res = close(Link[link_id]->handle);
 		if( res == -1 ) {
@@ -583,7 +585,7 @@ int _vj_server_del_client(vj_server * vje, int link_id)
 #endif
 
 	}
-	Link[link_id]->handle = 0;
+	Link[link_id]->handle = -1;
 	Link[link_id]->promote = 0;
 	Link[link_id]->n_queued = 0;
 	Link[link_id]->n_retrieved = 0;
@@ -641,7 +643,7 @@ int vj_server_poll(vj_server * vje)
 	for( i = 0; i < VJ_MAX_CONNECTIONS; i ++ )
 	{
 		vj_link **Link= (vj_link**) vje->link;
-	        if( Link[i]->handle <= 0 )
+	    if( Link[i]->handle <= 0 || !Link[i]->in_use )
 			continue;	
 	//	if( Link[i]->in_use )
 	//	{
@@ -939,16 +941,19 @@ int	vj_server_new_connection(vj_server *vje)
 		int addr_len = sizeof(vje->remote);
 		int n = 0;
 		int fd = accept( vje->handle, (struct sockaddr*) &(vje->remote), &addr_len );
+#ifdef STRICT_CHECKING
+		assert( fd != 0 ); //@ grab a beer if fd == FILENO_STDIN
+#endif
 		if(fd == -1)
 		{
 			veejay_msg(VEEJAY_MSG_ERROR, "Error accepting connection: %s",
 						strerror(errno));
+
 			return 0;
 		}	
 
 		char *host = inet_ntoa( vje->remote.sin_addr ); 
-		veejay_msg(VEEJAY_MSG_INFO, "Connection with %s on port %d", host,
-			vje->remote.sin_port);		
+
 		if( vje->nr_of_connections < fd )
 			vje->nr_of_connections = fd;
 
@@ -960,6 +965,9 @@ int	vj_server_new_connection(vj_server *vje)
 			close(fd);
 			return 0;
 		}
+
+		veejay_msg(VEEJAY_MSG_INFO, "Link: %d connected with %s on port %d", n,host,vje->remote.sin_port);		
+
 #ifdef STRICT_CHECKING
 		if( vje->logfd ) {
 			fprintf(vje->logfd, "new connection, socket=%d, max connections=%d\n",
@@ -967,6 +975,8 @@ int	vj_server_new_connection(vj_server *vje)
 		}
 #endif
 
+
+		FD_CLR( vje->handle, &(vje->fds) );
 		return 1;
 	}
 	return 0;

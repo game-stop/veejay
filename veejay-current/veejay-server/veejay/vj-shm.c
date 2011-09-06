@@ -62,8 +62,12 @@ typedef struct
 } vj_shared_data;
 
 static	int	just_a_shmid = 0;
-
+static  int simply_my_shmkey  = 0;
 static	key_t	simply_my_shmid = 0;
+
+int		vj_shm_get_my_shmid() {
+	return simply_my_shmkey;
+}
 
 int		vj_shm_get_my_id() {
 	return simply_my_shmid;
@@ -85,15 +89,15 @@ void	vj_shm_free(void *vv)
 
 	int res     = pthread_rwlock_destroy( &data->rwlock );
 
-	res = shmdt( data );
+	res = shmdt( v->sms );
 	if(res ) {
-		veejay_msg(0, "failed to detach shared memory: %s",strerror(errno));
+		veejay_msg(VEEJAY_MSG_DEBUG, "Failed to detach shared memory: %s",strerror(errno));
 	}
 	res = shmctl( v->shm_id, IPC_RMID, NULL );
 	if( res ) {
-		veejay_msg(0, "failed to remove shared memory %d: %s", v->shm_id, strerror(errno));
+		veejay_msg(0, "Failed to remove shared memory %d: %s", v->shm_id, strerror(errno));
 	} else {
-		veejay_msg(VEEJAY_MSG_INFO, "Removed shared segment %d", v->shm_id );
+		veejay_msg(VEEJAY_MSG_INFO, "Shared resource will %d be destroyed.", v->shm_id );
 	}
 
 	if( v->file ) {
@@ -189,7 +193,7 @@ int		vj_shm_write( void *vv, uint8_t *frame[3], int plane_sizes[3] )
 
 	int res = pthread_rwlock_wrlock( &data->rwlock );
 	if( res == -1 ) {
-	//	veejay_msg(0, "%s",strerror(errno));
+		veejay_msg(0, "SHM locking error: %s",strerror(errno));
 		return -1;
 	}
 
@@ -203,15 +207,15 @@ int		vj_shm_write( void *vv, uint8_t *frame[3], int plane_sizes[3] )
 
 	res = pthread_rwlock_unlock( &data->rwlock );
 	if( res == -1 ) {
-		//veejay_msg(0, "%s",strerror(errno));
+		veejay_msg(0, "SHM locking error: %s",strerror(errno));
 		return -1;
 	}
 
 	return 0;
 }
-
+/*
 void	*vj_shm_new_slave(int shm_id)
-{ //@ incomplete!
+{ 
 	int rc = 0;
 
 	if( shm_id <= 0 ) {
@@ -249,7 +253,7 @@ void	*vj_shm_new_slave(int shm_id)
 	veejay_msg(VEEJAY_MSG_INFO, "Attached to shared memory segment %d", shm_id );
 
 	return v;
-}
+}*/
 
 static	int		vj_shm_file_ref_use_this( char *path ) {
 	struct stat inf;
@@ -284,6 +288,10 @@ static	int		vj_shm_file_ref( vj_shm_t *v, const char *homedir )
 	}
 
 	key_t key = ftok( path, tries ); //@ whatever 
+	if( key == -1 ) {
+		veejay_msg(0,"ftok returns error: %s", strerror(errno));
+		return 0;
+	}
 
 	fprintf( f, "veejay_shm_out-%d: shm_id=%d\n", tries,key );
 	fclose(f );
@@ -333,7 +341,7 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 
 	//@ attach
 	v->sms 	    = shmat( v->shm_id, NULL , 0 );
-	if( v->sms == NULL ) {
+	if( v->sms == NULL || v->sms == (uint8_t*) (-1) ) {
 		shmctl( v->shm_id, IPC_RMID, NULL );
 		veejay_msg(0, "Failed to attach to shared memory:%s",strerror(errno));
 		failed_init_cleanup(v);
@@ -396,6 +404,8 @@ void	*vj_shm_new_master( const char *homedir, VJFrame *frame)
 
 
 	simply_my_shmid = v->key;
+	simply_my_shmkey = v->shm_id;
+
 
 	return v;
 }

@@ -36,6 +36,7 @@
 #include <libvjnet/cmd.h>
 #include <libvjnet/mcastreceiver.h>
 #include <libvjnet/mcastsender.h>
+#include <libavutil/pixfmt.h>
 #include <stdlib.h>
 #include <string.h>
 #include <pthread.h>
@@ -60,7 +61,7 @@ vj_client *vj_client_alloc( int w, int h, int f )
 	}
 	v->cur_width = w;
 	v->cur_height = h;
-	v->cur_fmt = f;
+	v->cur_fmt = get_ffmpeg_pixfmt(f);
 	v->space = NULL;
 	v->c = (conn_type_t**) malloc(sizeof(conn_type_t*) * 3);
 	v->c[0] = (conn_type_t*) malloc(sizeof(conn_type_t));
@@ -292,12 +293,113 @@ static	uint32_t	getint(uint8_t *in, int len ) {
 	free(word);
 	return (uint32_t) v;
 }
+/*
+#define LIVES_HEADER_LENGTH 1024
+#define SALSAMAN_DATASIZE 3
+#define SALSAMAN_HSIZE 5
+#define SALSAMAN_VSIZE 6
+#define SALSAMAN_SUBSPACE 11
+static int	vj_client_parse_salsaman( vj_client *v,uint8_t *partial_header, int partial_size, int *dst, uint8_t *header )
+{
+	uint8_t header[LIVES_HEADER_LENGTH];
+	memset( header,0,sizeof(LIVES_HEADER_LENGTH ));
+	memcpy( header, partial_header, partial_size );
+
+	uint8_t *header_ptr = header + partial_size;
+
+	//@ read rest of LiVES header
+	int rest = sock_t_recv( v->c[0]->fd, header_ptr, LIVES_HEADER_LENGTH - partial_header );
+
+	//@ values are space seperated
+	gchar **tokens = g_strsplit( header, " ", -1 );
+	if( tokens == NULL  || tokens[0] == NULL ) {
+		if( tokens != NULL ) free(tokens);
+		return 0;
+	}
+	
+	//@ fetch the values into vars
+	dst[0]	= atoi( header[0] );
+	dst[1]	= 0; // 
+
+	dst[2]  = atoi( header[2] ); // flags uint32
+	dst[SALSAMAN_DATASIZE]  = atoi( header[SALSAMAN_DATASIZE] ); // dsize size_t
+
+	dst[4]  = 0;
+
+	dst[5]  = atoi( header[5] ); //@ hsize int
+	dst[6]  = atoi( header[6] ); //@ vsize int
+	dst[7]  = g_strtod( header[7], NULL ); // fps double
+	dst[8]  = atoi( header[8] ); // palette int
+	dst[9]  = atoi( header[9] ); // yuv sampling int
+	dst[10] = atoi( header[10] ); // clamp int
+	dst[11] = atoi( header[11] ); // subspace int
+	dst[12] = atoi( header[12] ); // compression type int
+
+	g_strfreev( tokens );
+	return 1;
+}
+*/
+
+/* packet negotation.
+ * read a small portion (44 bytes for veejay, its veejay's full header size) 
+ * and try to identify which software is sending frames
+ *
+ */
+
+static	int	vj_client_packet_negotiate( vj_client *v, int *tokens )
+{
+	uint8_t line[45];
+
+	//@ 1. read 44 bytes and see if its us
+	veejay_memset( line,0, sizeof(line));
+	int plen = sock_t_recv( v->c[0]->fd, line, 44 );
+	if( plen == 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
+		return -1;
+	}
+
+	if( plen < 0 )
+	{
+		veejay_msg(VEEJAY_MSG_ERROR, "Network I/O Error while reading header: %s", strerror(errno));
+		return -1;
+	}
+
+	//@ there is 44 bytes read, identify producer software here,
+	//@             the function below parses the header in LiVES
+	/*
+		int res = vj_client_parse_salsaman( v, line, 44, tokens );
+		if( res == 0 ) {
+			veejay_msg(0, "Error parsing salsaman header!");
+			return -1;
+		}
+		return 0;
+	*/
+	
+
+
+	// default: packet is from veejay
+	tokens[0] = getint( line , 4 );
+	tokens[1] = getint( line + 4, 4 );
+	tokens[2] = getint( line + 8, 4 );
+	tokens[3] = getint( line + 12, 8 );
+
+	tokens[4] = getint( line + 12 + 8, 8 );
+	tokens[5] = getint( line + 12 + 16, 8 );
+	tokens[6] = getint( line + 12 + 24, 8 );
+
+
+	return 1;
+}
+
 
 int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 {
 	uint8_t line[128];
 	uint32_t p[4] = {0, 0,0,0 };
 	uint32_t strides[4] = { 0,0,0,0 };
+
+	int	tokens[16];
+
 	int n = 0;
 	int plen = 0;
 	int conv = 1;
@@ -305,7 +407,6 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 	int uv_len = 0;
 	if( v->c[0]->type == VMCAST_C )
 	{
-//@FIXME
 		uint8_t *in = mcast_recv_frame( v->c[0]->r, &p[0],&p[1], &p[2], &plen );
 		if( in == NULL )
 			return 0;
@@ -318,20 +419,17 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 		y_len = p[0]  * p[1];
 		switch(v->in_fmt )
 		{
-			case FMT_422:
-			case FMT_422F:
+			case PIX_FMT_YUV422P:
+			case PIX_FMT_YUVJ422P:
 				uv_len = y_len / 2; 
 				break;
-			case FMT_420:
-			case FMT_420F:
+			case PIX_FMT_YUV420P:
+			case PIX_FMT_YUVJ420P:
 				uv_len = y_len / 4;break;
 			default:
 				veejay_msg(VEEJAY_MSG_ERROR, "Unknown data format: %02x", v->in_fmt);
 				break;
 		}
-
-		if( p[0] != v->cur_width || p[1] != v->cur_height || p[2] != v->cur_fmt )
-			return 2;
 
 		strides[0] = getint( in + 12 + 8, 8 );
 		strides[1] = getint( in + 12 + 16, 8 );
@@ -339,79 +437,114 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 
 		vj_client_decompress( v,in, dst, p[3], y_len, uv_len , plen, strides[0],strides[1],strides[2]);
 
-		return 1;
+		if( p[0] != v->cur_width || p[1] != v->cur_height )
+			return 2;
+
+
+		return 1; //@ caller will memcpy it to destination buffer
 	}
 	else if ( v->c[0]->type == VSOCK_C )
 	{
-		veejay_memset( line,0, sizeof(line));
-		plen = sock_t_recv( v->c[0]->fd, line, 44 );
+		//@ result returns software package id
+		int result = vj_client_packet_negotiate( v, tokens );
+		if( result == 0 ) { //@ ids are out of thin air
+			
+			//@ header is from lives
+			/*
+			if( v->cur_width != tokens[ SALSAMAN_VSIZE ] || v->cur_height != tokens[SALSAMAN_HSIZE] ) {
+				//@ no changing of sizes on the fly	
+				veejay_msg(VEEJAY_MSG_ERROR, "Unexpected video frame format");
+				int n;
+				for( n = 0;n < 16; n ++ ) {
+					veejay_msg(VEEJAY_MSG_DEBUG, "%d: [%d] %02x ", n,tokens[n],tokens[n]);
+				}
+				return 0;
+			} 
 
-		if( plen == 0 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
-			return -1;
-		}
+			//@ read information from the header and figure out which pixelformat it is
+			v->in_fmt = weed_palette2_pixfmt( tokens[SALSAMAN_PALETTE] , tokens[SALSAMAN_SUBSPACE ] );
+			if( v->in_fmt == -1 ) {
+				veejay_msg(VEEJAY_MSG_ERROR, "No support for weed palette %d", tokens[SALSAMAN_PALETTE]);
+				return 0;
+			}
 
-		if( plen < 0 )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Network I/O Error while reading header: %s", strerror(errno));
-			return -1;
-		}
-		
-		//vj_client_stdout_dump_recv( v->c[0]->fd, plen, line );
-		
-		p[0] = getint( line , 4 );
-		p[1] = getint( line + 4, 4 );
-		p[2] = getint( line + 8, 4 );
-		p[3] = getint( line + 12, 8 );
+			//@ assign required values for veejay (format,width,height)
+			v->in_width = tokens[SALSAMAN_VSIZE];
+			v->in_height= tokens[SALSAMAN_HSIZE];
+			
+			//@ start reading rest of frame, assuming size is given by SALSAMAN_DATASIZE
+			int n = sock_t_recv( v->c[0]->fd,v->space, tokens[SALSAMAN_DATASIZE] );
+			if( n <= 0 ) {
+				if( n == -1 ) {
+					veejay_msg(VEEJAY_MSG_ERROR, "Error '%s' while reading socket", strerror(errno));
+				} else {
+					veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection");
+				}
+				return -1;
+			}
+			//@ ready
+			//@ vj-net.c 
+			
+			//@ returning 2 means caller will scale 	
+			return 2;
+			*/
+			return 0;
+		} else if ( result == 1 ) {
+			//@ header is veejay
+			p[0] = tokens[0];
+			p[1] = tokens[1];
+			p[2] = tokens[2];
+			p[3] = tokens[3];
+			strides[0] = tokens[4];
+			strides[1] = tokens[5];
+			strides[2] = tokens[6];
 
-		strides[0] = getint( line + 12 + 8, 8 );
-		strides[1] = getint( line + 12 + 16, 8 );
-		strides[2] = getint( line + 12 + 24, 8 );
+			v->in_width = p[0];
+			v->in_height = p[1];
+			v->in_fmt = p[2];
+	
+			uv_len = 0;
+			y_len = p[0]  * p[1];
 
-		if( v->cur_width != p[0] || v->cur_height != p[1] || v->cur_fmt != p[2]) {
-			veejay_msg(VEEJAY_MSG_ERROR, "Unexpected video frame format, %dx%d (%d) , received %dx%d(%d)",
-				v->cur_width,v->cur_height,v->cur_fmt,p[0],p[1],p[2]);
+			switch(v->in_fmt ) //@ veejay is sending compressed YUV data, calculate UV size
+			{
+				case PIX_FMT_YUV422P:
+				case PIX_FMT_YUVJ422P:
+					uv_len = y_len / 2; 
+					break;
+				case PIX_FMT_YUV420P:
+				case PIX_FMT_YUVJ420P:
+					uv_len = y_len / 4;break;
+				default:
+					veejay_msg(VEEJAY_MSG_ERROR, "Unknown data format: %02x", v->in_fmt);
+					break;
+			}
+
+			int n = sock_t_recv( v->c[0]->fd,v->space,p[3] );
+			if( n <= 0 ) {
+				if( n == -1 ) {
+					veejay_msg(VEEJAY_MSG_ERROR, "Error '%s' while reading socket", strerror(errno));
+				} else {
+					veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection");
+				}
+				return -1;
+			}
+
+			if( n != p[3] && n > 0 )
+			{
+				veejay_msg(VEEJAY_MSG_ERROR, "Broken video packet , got %d out of %d bytes",n, p[3] );	
+				return -1;
+			}
+			
+			//@ decompress YUV buffer
+			vj_client_decompress( v,NULL, dst, p[3], y_len, uv_len , plen, strides[0],strides[1],strides[2]);
+
+			return 2; //@ caller will scale frame in dst
+		} else {
 			return 0;
 		}
 
-		v->in_width = p[0];
-		v->in_height = p[1];
-		v->in_fmt = p[2];
-		uv_len = 0;
-		y_len = p[0]  * p[1];
-		switch(v->in_fmt )
-		{
-			case FMT_422:
-			case FMT_422F:
-				uv_len = y_len / 2; 
-				break;
-			case FMT_420:
-			case FMT_420F:
-				uv_len = y_len / 4;break;
-			default:
-				veejay_msg(VEEJAY_MSG_ERROR, "Unknown data format: %02x", v->in_fmt);
-				break;
-		}
-
-		int n = sock_t_recv( v->c[0]->fd,v->space,p[3] );
-		if( n <= 0 ) {
-			if( n == -1 ) {
-				veejay_msg(VEEJAY_MSG_ERROR, "Error '%s' while reading socket", strerror(errno));
-			} else {
-				veejay_msg(VEEJAY_MSG_DEBUG,"Remote closed connection");
-			}
-			return -1;
-		}
-
-		if( n != p[3] && n > 0 )
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Broken video packet , got %d out of %d bytes",n, p[3] );	
-			return -1;
-		}
-
-		vj_client_decompress( v,NULL, dst, p[3], y_len, uv_len , plen, strides[0],strides[1],strides[2]);
-
-		return 2;
+		return 0;
 	}
 	return 0;
 }

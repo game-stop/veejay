@@ -89,8 +89,10 @@ int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
 	memset(tmp,0,sizeof(tmp));
 
 	vj_client_send( c, V_CMD, "425:0;" ); 
-
+	
 	vj_client_read( c, V_CMD, tmp, 16 ); //@ get SHM id from
+
+	vj_flush(c,1);
 
 //	int32_t key = atoi(tmp);
 
@@ -98,12 +100,10 @@ int32_t			vj_share_pull_master( void *shm, char *master_host, int master_port )
 
 	veejay_msg(VEEJAY_MSG_DEBUG, "Veejay sister at port %d says shared resoure ID is %d",master_port,key);
 
+
 	vj_client_send( c, V_CMD, "025:1;" ); //@ master starts writing frames to shm
 
 	vj_shm_set_id( key ); //@ temporary store
-
-
-	vj_flush(c,1);
 
 	vj_client_close( c );
 

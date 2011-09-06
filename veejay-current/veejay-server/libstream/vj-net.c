@@ -104,12 +104,12 @@ void	*reader_thread(void *data)
 		
 		lock(t);
 	
-		if( t->grab && tag->source_type == VJ_TAG_TYPE_NET && retrieve == 0 ) {
+		if(!error && t->grab && tag->source_type == VJ_TAG_TYPE_NET && retrieve == 0 ) {
 			ret =  vj_client_send( v, V_CMD, buf );
-			if( ret < 0 )
+			if( ret <= 0 )
 			{
 				veejay_msg(VEEJAY_MSG_DEBUG,
-								"%s:%d failed to query frame",
+								"Error sending get frame command to %s:%d",
 								tag->source_name,
 								tag->video_channel );
 
@@ -121,7 +121,7 @@ void	*reader_thread(void *data)
 			}
 		}
 		
-		if( tag->source_type == VJ_TAG_TYPE_NET )
+		if(!error && tag->source_type == VJ_TAG_TYPE_NET )
 		{
 			res = vj_client_poll(v, V_CMD );
 			if( ret )
@@ -129,7 +129,7 @@ void	*reader_thread(void *data)
 				retrieve = 1;
 			} else if ( ret < 0 ) {
 				veejay_msg(VEEJAY_MSG_DEBUG,
-								"%s:%d failed to poll frame",
+								"Error polling connection %s:%d",
 								tag->source_name,
 								tag->video_channel );
 				error = 1;
@@ -142,7 +142,7 @@ void	*reader_thread(void *data)
 			res = 1;
 		}
 	
-		long wait_time = 20;
+		long wait_time = 0;
 	
 		if(!error && retrieve)
 		{
@@ -151,14 +151,14 @@ void	*reader_thread(void *data)
 				ret = vj_client_read_i ( v, tag->socket_frame,tag->socket_len );
 				if( ret <= 0 )
 				{
-				//	if( tag->source_type == VJ_TAG_TYPE_NET )
-				//	{
+					if( tag->source_type == VJ_TAG_TYPE_NET )
+					{
 						veejay_msg(VEEJAY_MSG_DEBUG,
-								"%s:%d failed to read frame",
+								"Error reading video frame from %s:%d",
 								tag->source_name,
 								tag->video_channel );
 						error = 1;
-				//	}
+					}
 				//	else
 				//	{
 				//		wait_time += 10;
@@ -182,9 +182,9 @@ void	*reader_thread(void *data)
 
 		if( wait_time )
 		{	
-			if ( wait_time > 40 )
-				wait_time = 15;
-			net_delay( wait_time,0 );
+			if ( wait_time > 15 )
+				wait_time = 10;
+			//net_delay( wait_time,0 );
 			wait_time = 0;
 		}
 
@@ -249,8 +249,8 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 	int uv_len = len;
 	switch(v->cur_fmt)
 	{
-		case FMT_420:
-		case FMT_420F:
+		case PIX_FMT_YUV420P:
+		case PIX_FMT_YUVJ420P:
 			uv_len=len/4;
 		break;
 		default:
@@ -269,25 +269,35 @@ int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3] )
 	}
 	else if(t->have_frame == 2 )
 	{
-		int b_len = v->in_width * v->in_height;
-		int buvlen = b_len;
-		switch(v->in_fmt)
-		{
-			case FMT_420:
-			case FMT_420F:
-				buvlen = b_len/4;
-				break;
-			default:
-				buvlen = b_len/2;
-				break;
+		VJFrame *a = NULL;
+		VJFrame *b = NULL;
+
+		if( v->in_fmt == PIX_FMT_RGB24 || v->in_fmt == PIX_FMT_BGR24 || v->in_fmt == PIX_FMT_RGBA ||
+				v->in_fmt == PIX_FMT_RGB32_1 ) {
+		
+			a = yuv_rgb_template( tag->socket_frame, v->in_width, v->in_width, v->in_fmt );
+		
+		} else {
+			int b_len = v->in_width * v->in_height;
+			int buvlen = b_len;
+		
+			switch(v->in_fmt)
+			{
+				case PIX_FMT_YUV420P:
+				case PIX_FMT_YUVJ420P:
+					buvlen = b_len/4;
+					break;
+				default:
+					buvlen = b_len/2;
+					break;
+			}
+
+
+			a =yuv_yuv_template( tag->socket_frame, tag->socket_frame + b_len, tag->socket_frame+b_len+buvlen,
+						v->in_width,v->in_height, v->in_fmt);
 		}
 
-		int tmp_fmt = get_ffmpeg_pixfmt( v->in_fmt );
- 
-		VJFrame *a = yuv_yuv_template( tag->socket_frame, tag->socket_frame + b_len, tag->socket_frame+b_len+buvlen,
-						v->in_width,v->in_height, tmp_fmt);
-		VJFrame *b = yuv_yuv_template( buffer[0],buffer[1], buffer[2], 
-						v->cur_width,v->cur_height,get_ffmpeg_pixfmt(v->cur_fmt));
+		b = yuv_yuv_template( buffer[0],buffer[1], buffer[2],v->cur_width,v->cur_height,v->cur_fmt);
 		yuv_convert_any_ac(a,b, a->format,b->format );
 		free(a);
 		free(b);

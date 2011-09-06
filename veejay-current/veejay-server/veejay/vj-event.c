@@ -1672,8 +1672,7 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 	return 0;
 }
 
-void breaker()
-{}
+
 void vj_event_update_remote(void *ptr)
 {
 	veejay_t *v = (veejay_t*)ptr;
@@ -1683,16 +1682,21 @@ void vj_event_update_remote(void *ptr)
 	int p2 = vj_server_poll( v->vjs[VEEJAY_PORT_STA] );
 	int p3 = vj_server_poll( v->vjs[VEEJAY_PORT_DAT] );
 
-	int has_n=0;
+	int has_n=0, has_b=0;
 
+	if( p1  )
 	has_n += vj_server_new_connection(v->vjs[VEEJAY_PORT_CMD]);
+	
+	if( p2 )
 	has_n += vj_server_new_connection( v->vjs[VEEJAY_PORT_STA] );
+	
+	if( p3 )
+	has_n += vj_server_new_connection( v->vjs[VEEJAY_PORT_DAT] );
 
-	if( has_n ) {
+	if( has_n )
+	{
 		return;
 	}
-
-	has_n += vj_server_new_connection( v->vjs[VEEJAY_PORT_DAT] );
 
 	if( v->settings->use_vims_mcast )
 	{
@@ -1788,6 +1792,8 @@ void vj_event_update_remote(void *ptr)
 	
 	if(!veejay_keep_messages())
 		veejay_reap_messages();
+
+	return;
 }
 
 void	vj_event_commit_bundle( veejay_t *v, int key_num, int key_mod)
@@ -6927,19 +6933,13 @@ void	vj_event_tag_new_generator( void *ptr, const char format[], va_list ap )
 	int args[2] = { 0,0 };
 	P_A(args,str,format,ap);
 
-	int shm_before = vj_shm_get_id(); //@ get temporary shmid
-	
-	vj_shm_set_id( args[0] ); //@ temporary store shm id somewhere
-
-	int id = veejay_create_tag(v, VJ_TAG_TYPE_GENERATOR, str, v->nstreams,vj_shm_get_id(),0);
+	int id = veejay_create_tag(v, VJ_TAG_TYPE_GENERATOR, str, v->nstreams,args[0],0);
 
 	vj_event_send_new_id ( v, id );
 
 	if( id <= 0 ) {
-		veejay_msg(0,"No plugin '%s' was found", str );
+		veejay_msg(0,"Error launching plugin '%s'.", str );
 	}
-	
-	vj_shm_set_id( shm_before );
 }
 
 #ifdef USE_GDK_PIXBUF
@@ -9773,6 +9773,7 @@ void	vj_event_get_shm( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*)ptr;
 	char tmp[64];
+	memset(tmp,0,sizeof(tmp));
 	if(!v->shm) {
 		snprintf(tmp,sizeof(tmp)-1,"%016d",0);
 		SEND_MSG(v, tmp );
@@ -9823,16 +9824,20 @@ void	vj_event_connect_shm( void *ptr, const char format[], va_list ap )
 {
 	veejay_t *v = (veejay_t*) ptr;
 	int args[2];
-	char str[255];
+	char *str = NULL;
 	P_A(args,str,format,ap);
 	
-	//@ port, shm_id
+	if( args[0] == v->uc->port ) {
+		veejay_msg(0, "Cannot pull info from myself inside VIMS event!");
+		vj_event_send_new_id( v, -1 );
+		return;
+	}
 
 	int32_t key = vj_share_pull_master( v->shm,"127.0.0.1", args[0] );
-
-
 	int id = veejay_create_tag( v, VJ_TAG_TYPE_GENERATOR, "lvd_shmin.so", v->nstreams, key,0);
+	
 	vj_event_send_new_id( v, id );
+	
 	if( id <= 0 ) {
 		veejay_msg(0, "Unable to connect to shared resource id %d", key );
 	}

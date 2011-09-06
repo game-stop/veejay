@@ -7,5 +7,5 @@ AM_CFLAGS = $(CFLAGS) $(FREEFRAME_CFLAGS)
 LIBVJPLUG_LIB_FILE = libvjplug.la
 noinst_LTLIBRARIES = $(LIBVJPLUG_LIB_FILE)
 
-libvjplug_la_SOURCES = utility.c freeframe-loader.c frei0r-loader.c livido-loader.c plugload.c
+libvjplug_la_SOURCES = utility.c weed-utils.c freeframe-loader.c frei0r-loader.c livido-loader.c plugload.c
 

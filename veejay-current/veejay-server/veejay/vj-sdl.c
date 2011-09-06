@@ -501,6 +501,11 @@ int	vj_sdl_screen_h( vj_sdl *vjsdl )
 	return vjsdl->screen->h;
 }
 
+void	vj_sdl_set_title( const char *caption )
+{
+	SDL_WM_SetCaption(caption, NULL);
+}
+
 void	vj_sdl_grab(vj_sdl *vjsdl, int status)
 {
 	SDL_WM_GrabInput( (status==1? SDL_GRAB_ON : SDL_GRAB_OFF) );

@@ -61,7 +61,7 @@ int vj_sdl_direct_yuv_overlay(vj_sdl * vjsdl, uint8_t * buffer, int buflen,
 void vj_sdl_free(vj_sdl * vjsdl);
 void vj_sdl_quit();
 uint8_t	*vj_sdl_get_yuv_overlay(vj_sdl *vjsdl );
-
+void	vj_sdl_set_title( const char *caption );
 void vj_sdl_resize( vj_sdl *vjsdl , int scaled_width, int scaled_height, int fs );
 int    vj_sdl_screen_w( vj_sdl *vjsdl );
 int    vj_sdl_screen_h( vj_sdl *vjsdl );

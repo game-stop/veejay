@@ -76,11 +76,11 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 	char *env_id = getenv( "VEEJAY_SHMID" );
 	
  	if ( livido_property_get( my_instance, "HOST_shmid", 0, &shm_id ) == LIVIDO_NO_ERROR ) {
-		if( shm_id > 0 )
+		if( shm_id != 0 )
 			env_id = NULL; //@ use shm_id from HOST instead.
 	}
 
-	if( env_id == NULL && shm_id <= 0) {
+	if( env_id == NULL && shm_id == 0) {
 		//@ try veejay homedir last resort.
 		char path[1024];
 		char *home = getenv("HOME");
@@ -101,7 +101,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 		shm_id = atoi( env_id );
 	}
 	
-	int r = shmget( shm_id, 0, 0666 );
+	int r = shmget( shm_id, 0, 0400 );
 	if( r == -1 ) {
 		printf("error: %s for shm_id %d\n", strerror(errno),shm_id);
 		return LIVIDO_ERROR_HARDWARE;

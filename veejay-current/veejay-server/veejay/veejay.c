@@ -749,14 +749,13 @@ int main(int argc, char **argv)
 	while( 1 ) { //@ until your PC stops working
 		
 		usleep(50000);
-		vj_lock(info);
+
 		current_state = veejay_get_state(info);
-		vj_unlock(info);
+		
 		if( current_state == LAVPLAY_STATE_STOP )
 			break;
 	}
 
-	veejay_quit(info);
 	veejay_busy(info);			
 	veejay_free(info);
 

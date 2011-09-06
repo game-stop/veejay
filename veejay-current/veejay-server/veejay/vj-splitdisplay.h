@@ -3,6 +3,8 @@
 void	*vj_split_display(int w, int h);
 void	vj_split_process_frame( void *sd, uint8_t *work_buffer[3] );
 
+void	vj_split_destroy(void *v);
+
 void	vj_split_change_num_screens( void *sd, int n_screens );
 void	vj_split_change_screen_setup(void *sd, int value);
 

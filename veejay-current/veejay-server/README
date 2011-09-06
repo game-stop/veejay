@@ -30,6 +30,27 @@ It allows you to "play" the video like you would play a piano.
 While playing, you can record the resulting video directly to disk (video sampling).
 
 
+====== quick install:
+
+   order of packages:
+    veejay-server, veejay-client, veejay-utils
+
+   for each package:
+     ./configure
+     make && make install
+
+
+   for plugins:
+
+   cd veejay-sever/livido-plugins
+   ./RUNME.sh /tmp/plugins
+
+   mkdir ~/.veejay    # or start veejay 
+   echo "/tmp/plugins" >> ~/.veejay/plugins.cfg
+
+
+
+
 
 	FEATURE OVERVIEW
 
