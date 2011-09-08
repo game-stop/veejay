@@ -64,7 +64,7 @@ typedef struct
 } vj_proto;
 
 #define VJ_MAX_PENDING_MSG 128
-#define RECV_SIZE (32000) 
+#define RECV_SIZE (4096) 
 #ifdef STRICT_CHECKING
 static	void	printbuf( FILE *f, uint8_t *buf , int len )
 {
@@ -989,6 +989,9 @@ int	vj_server_update( vj_server *vje, int id )
 	int n = 0;
 	vj_link **Link = (vj_link**) vje->link;
 
+	if(!Link[id]->in_use)
+		return 0;
+
 	_vj_server_empty_queue(vje, id);
 
 	if(!vje->use_mcast)
@@ -1022,7 +1025,7 @@ int	vj_server_update( vj_server *vje, int id )
 			veejay_msg(0, "Networking error with socket %d: %s",sock_fd,strerror(errno));
 		}
 		if( bytes_received == 0 ) {
-			veejay_msg(0, "Socket %d closed connection, terminating client connection.");
+			veejay_msg(0, "Link %d closed connection, terminating client connection.",id);
 		}
 		return -1; // close client now
 	}

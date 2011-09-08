@@ -2857,9 +2857,9 @@ void		vj_init_vevo_events(void)
 				NULL );
 
 	index_map_[ VIMS_GET_IMAGE ]			=	_new_event(
-				"%d %d %d %d",
+				"%d %d %d %d %d",
 				VIMS_GET_IMAGE,
-				"Get image region (x,y,w,h)",
+				"Get image region (x,y,w,h,g)",
 				vj_event_get_image_part,
 				5,
 				VIMS_ALLOW_ANY,

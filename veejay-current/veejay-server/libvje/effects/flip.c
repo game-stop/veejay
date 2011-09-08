@@ -35,7 +35,7 @@ vj_effect *flip_init(int w, int h)
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 1;
 
-    ve->description = "Flip Frane";
+    ve->description = "Flip Frame";
     ve->sub_format = 0;
     ve->extra_frame = 0;
 	ve->has_user = 0;
