@@ -130,7 +130,7 @@ int			sock_t_connect( vj_sock_t *s, char *host, int port )
 		return 0;
 	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Connected to host '%s' port %d", host,port );
+	veejay_msg(VEEJAY_MSG_DEBUG, "Connected to host '%s' port %d, fd %d", host,port,s->sock_fd );
 
 	return 1;
 }
@@ -157,13 +157,11 @@ int			sock_t_poll( vj_sock_t *s )
 
 	status = select( s->sock_fd + 1, &(s->rds),&(s->wds), 0, &no_wait );
 	
-	if( status == -1 )
+	if( status < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Unable to poll socket for immediate read: %s", strerror(errno));
 		return -1;
 	}
-//	if( status == 0 )
-//		return -1;
 
 	if( sock_t_rds_isset( s ) )
 		return 1;
@@ -239,11 +237,13 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 	int n; 
 #ifdef STRICT_CHECKING
 	assert( buf != NULL );
-#endif
-/*	if( sock_t_wds_isset( s ) == 0 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "%s", __FUNCTION__);
+
+	if( sock_t_wds_isset( s ) == 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "%s: socket %d", __FUNCTION__, s->sock_fd);
+		assert(sock_t_wds_isset(s) == 0);
 		return 0;
-	}*/
+	}
+#endif
 
 	int length = len;
 	int bw = 0;
@@ -287,7 +287,7 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 
 		if( n == 0 ) {
 			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
-			return 0;
+			return -1;
 		}
 
 		ptr += n; //@ advance ptr by bytes send
@@ -308,8 +308,13 @@ void			sock_t_close( vj_sock_t *s )
 {
 	if(s)
 	{
-		close(s->sock_fd);
+#ifdef STRICT_CHECKING
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tclosing socket %d", s->sock_fd );
+#endif
+		if( s->sock_fd > 0 )
+			close(s->sock_fd);
 		s->sock_fd = -1;
+	
 		FD_ZERO(&(s->rds));
 		FD_ZERO(&(s->wds));
 	}

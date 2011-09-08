@@ -22,7 +22,7 @@
 
 int	net_already_opened(const char *filname, int n, int chan);
 void	net_thread_stop(vj_tag *tag);
-int	net_thread_start(vj_client *v, vj_tag *tag);
+int	net_thread_start(vj_tag *tag, int w, int h, int f);
 void	net_thread_remote(void *priv, void *p );
 int	net_thread_get_frame( vj_tag *tag, uint8_t *buffer[3]);
 int	net_thread_get_frame_rgb( vj_tag *tag, uint8_t *buffer, int w, int h);

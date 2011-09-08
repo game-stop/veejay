@@ -49,7 +49,7 @@
 #define VJC_SOCKET 2
 #define VJC_BAD_HOST 3
 
-#define PACKET_LEN (65535*32)
+#define PACKET_LEN (65535*2)
 
 vj_client *vj_client_alloc( int w, int h, int f )
 {
@@ -164,16 +164,14 @@ int vj_client_connect_dat(vj_client *v, char *host, int port_id  )
 	v->c[0]->type = VSOCK_C;
 	v->c[0]->fd   = alloc_sock_t();
         
-	if(v->c[1])	
-      		free(v->c[1]);
-	
-	v->c[1] = NULL;
-	
 	if( sock_t_connect( v->c[0]->fd, host, (port_id + 5)  ) )
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Connect to DAT port %d", port_id + 5);	
 		return 1;
 	}
+
+	v->c[1]->fd = -1;
+
 	return error;
 }
 
@@ -683,18 +681,23 @@ int vj_client_close( vj_client *v )
 	{
 		if(v->c[0])
 		{
-			if(v->c[0]->type == VSOCK_C)
+			if(v->c[0]->type == VSOCK_C && v->c[0]->fd > 0) { 
 				sock_t_close(v->c[0]->fd );
-			else if ( v->c[0]->type == VMCAST_C )
+				v->c[0]->fd = -1;
+			}
+			else if ( v->c[0]->type == VMCAST_C && v->c[0]->fd > 0)
 			{
 				mcast_close_receiver( v->c[0]->r );
 				mcast_close_sender( v->c[0]->s );
+				v->c[0]->fd = -1;
 			}
 		}
 		if(v->c[1])
 		{
-			if(v->c[1]->type == VSOCK_S)
+			if(v->c[1]->type == VSOCK_S && v->c[1]->fd > 0) {
 				sock_t_close(v->c[1]->fd );
+				v->c[1]->fd = -1;
+			}
 		}
 
 		return 1;

@@ -357,22 +357,19 @@ int _vj_tag_new_net(vj_tag *tag, int stream_nr, int w, int h,int f, char *host, 
 		 return 0;
 	}
 
-	vj_tag_input->net[stream_nr] = vj_client_alloc(w,h,f);
+/*	vj_tag_input->net[stream_nr] = vj_client_alloc(w,h,f);
 	v = vj_tag_input->net[stream_nr];
 	if(!v) 
 	{
 		veejay_msg(0, "Memory allocation error while creating network stream");
 		return 0;
-	}
+	}*/
 	char tmp[255];
 	bzero(tmp,255);
 	snprintf(tmp,sizeof(tmp)-1, "%s %d", host, port );
 	tag->extra = (void*) strdup(tmp);
 
-	v->planes[0] = w * h;
 	int fmt=  vj_tag_input->pix_fmt;
-	v->planes[1] = v->planes[0] / 2;	
-	v->planes[2] = v->planes[0] / 2;
 	
 	if( tag->socket_ready == 0 )
 	{
@@ -1377,11 +1374,6 @@ int vj_tag_del(int id)
 	case VJ_TAG_TYPE_MCAST:
 	case VJ_TAG_TYPE_NET:
 		net_thread_stop(tag);	
-		if(vj_tag_input->net[tag->index])
-		{
-			vj_client_close( vj_tag_input->net[tag->index] );
-			vj_tag_input->net[tag->index] = NULL;
-		}
 		break;
 	case VJ_TAG_TYPE_COLOR:
 		break;
@@ -1392,8 +1384,10 @@ int vj_tag_del(int id)
 		break;
 	case VJ_TAG_TYPE_GENERATOR:
 		if( tag->generator ) {
-		//	plug_deactivate( tag->generator );
+			//@ crashes some frei0r plugin, FIXME
+			//plug_deactivate( tag->generator );
 		}
+		tag->generator = NULL;
 		break;
     }
   
@@ -2607,7 +2601,7 @@ int vj_tag_enable(int t1) {
 	}
 	if(tag->source_type == VJ_TAG_TYPE_NET || tag->source_type == VJ_TAG_TYPE_MCAST )
 	{
-		if(!net_thread_start(vj_tag_input->net[tag->index], tag))
+		if(!net_thread_start(tag, vj_tag_input->width , vj_tag_input->height,  vj_tag_input->pix_fmt))
 		{
 			veejay_msg(VEEJAY_MSG_ERROR,
 					"Unable to start thread");

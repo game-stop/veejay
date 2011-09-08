@@ -1693,10 +1693,10 @@ void vj_event_update_remote(void *ptr)
 	if( p3 )
 	has_n += vj_server_new_connection( v->vjs[VEEJAY_PORT_DAT] );
 
-	if( has_n )
-	{
-		return;
-	}
+//	if( has_n )
+//	{
+//		return;
+//	}
 
 	if( v->settings->use_vims_mcast )
 	{
@@ -1732,14 +1732,11 @@ void vj_event_update_remote(void *ptr)
 					vj_event_parse_msg( v, buf,len );
 					n++;
 				}
-			}	
-			if( res <= 0 ) 
-		//	if( res == -1 )
+			}else if( res <= 0 ) 
 			{
 				_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
 				_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
-				if( v->vjs[VEEJAY_PORT_DAT] )
-					_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
+		//		_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
 			}
 		}
 	}
@@ -1761,17 +1758,17 @@ void vj_event_update_remote(void *ptr)
 					vj_event_parse_msg( v, buf,len );
 					n++;
 				}
-			}
-			if( res <= 0 )	
-			//if( res == -1 )
+			} else if( res <= 0 )	
 			{
-				if( v->vjs[VEEJAY_PORT_DAT] )
-					_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
-				_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
-				_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
+				_vj_server_del_client( v->vjs[VEEJAY_PORT_DAT], i );
+			//	_vj_server_del_client( v->vjs[VEEJAY_PORT_CMD], i );
+			//	_vj_server_del_client( v->vjs[VEEJAY_PORT_STA], i );
 			}
 		}
 	}
+
+	v->settings->is_dat = 0;
+
 
 	//@ repeat macros
 	if(macro_status_ == 2 && macro_port_ != NULL)
@@ -1787,9 +1784,6 @@ void vj_event_update_remote(void *ptr)
 	}
 
 
-	v->settings->is_dat = 0;
-
-	
 	if(!veejay_keep_messages())
 		veejay_reap_messages();
 
@@ -2713,8 +2707,11 @@ void vj_event_linkclose(void *ptr, const char format[], va_list ap)
 	veejay_t *v = (veejay_t*)ptr;
 	veejay_msg(VEEJAY_MSG_INFO, "Remote requested session-end, quitting Client");
 	int i = v->uc->current_link;
+	if( v->vjs[0] )
         _vj_server_del_client( v->vjs[0], i );
+	if( v->vjs[1] )
         _vj_server_del_client( v->vjs[1], i );
+	if( v->vjs[2] )
         _vj_server_del_client( v->vjs[3], i );
 }
 
@@ -8292,7 +8289,6 @@ void	vj_event_send_track_list		(	void *ptr,	const char format[], 	va_list ap 	)
 	int n = vj_tag_size()-1;
 	if (n >= 1 )
 	{
-		char line[300];
 		char *print_buf = get_print_buf(SEND_BUF);
 		int i;
 		for(i=0; i <= n; i++)
@@ -8304,8 +8300,8 @@ void	vj_event_send_track_list		(	void *ptr,	const char format[], 	va_list ap 	)
 				{
 					char cmd[275];
 					char space[275];
-					sprintf(space, "%s %d", tag->descr, tag->id );
-					sprintf(cmd, "%03d%s",strlen(space),space);
+					snprintf(space,sizeof(space)-1,"%s %d", tag->descr, tag->id );
+					snprintf(cmd,sizeof(cmd)-1,"%03d%s",strlen(space),space);
 					APPEND_MSG(print_buf,cmd); 
 				}
 			}
@@ -9164,7 +9160,6 @@ void	vj_event_send_frame				( 	void *ptr, const char format[], va_list ap )
 		return;
 	}
 
-	veejay_msg(VEEJAY_MSG_DEBUG, "Will send frame %ld to link %d soon", v->settings->current_frame_num, v->uc->current_link );
 	v->settings->unicast_frame_sender = 1;
 }
 

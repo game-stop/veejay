@@ -328,6 +328,8 @@ static int	veejay_process_status( veejay_preview_t *vp, veejay_track_t *v )
 		if( sscanf( status_len+1, "%03d", &bytes ) != 1 ) {
 			veejay_msg(0, "Invalid status message.");
 			bytes = 0;
+			reloaded_schedule_restart();
+			break;
 		}
 
 		if(bytes > 0 )

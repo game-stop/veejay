@@ -567,7 +567,12 @@ int _vj_server_new_client(vj_server *vje, int socket_fd)
 int _vj_server_del_client(vj_server * vje, int link_id)
 {
 	vj_link **Link = (vj_link**) vje->link;
+	if(!Link[link_id]->in_use) {
+		return 0;
+	}
+
 	Link[link_id]->in_use = 0;
+
 	if(Link[link_id]->handle > 0)
 	{
 		int res = close(Link[link_id]->handle);
@@ -588,6 +593,9 @@ int _vj_server_del_client(vj_server * vje, int link_id)
 	Link[link_id]->promote = 0;
 	Link[link_id]->n_queued = 0;
 	Link[link_id]->n_retrieved = 0;
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_DEBUG,"Link %d: closed socket %d", link_id, Link[link_id]->handle );
+#endif
 	return 1;
 }
 
@@ -644,12 +652,9 @@ int vj_server_poll(vj_server * vje)
 		vj_link **Link= (vj_link**) vje->link;
 	    if( Link[i]->handle <= 0 || !Link[i]->in_use )
 			continue;	
-	//	if( Link[i]->in_use )
-	//	{
-			FD_SET( Link[i]->handle, &(vje->fds) );
-			FD_SET( Link[i]->handle, &(vje->wds) );	
-//			FD_SET( Link[i]->handle, &(vje->eds) );
-	//	} 
+		FD_SET( Link[i]->handle, &(vje->fds) );
+		FD_SET( Link[i]->handle, &(vje->wds) );	
+		FD_SET( Link[i]->handle, &(vje->eds) );
 	}		
 
 	status = select(vje->nr_of_connections + 1, &(vje->fds), &(vje->wds), NULL, &t);
@@ -975,7 +980,7 @@ int	vj_server_new_connection(vj_server *vje)
 #endif
 
 
-		FD_CLR( vje->handle, &(vje->fds) );
+		FD_CLR( fd, &(vje->fds) );
 		return 1;
 	}
 	return 0;
