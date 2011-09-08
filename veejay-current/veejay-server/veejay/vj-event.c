@@ -3008,81 +3008,14 @@ void	vj_event_send_keylist( void *ptr, const char format[], va_list ap )
 
 }
 
-static	int	min_bundles_len(veejay_t *v )
-{
-	vj_msg_bundle *m;
-	int i;
-	int len = 0;
-	const int token_len = 20;
-	char tmp[1024];
-	char *buf = NULL;
-
-	for( i = 0; i <= 600 ; i ++ )
-	{
-		if( i >= VIMS_BUNDLE_START && i < VIMS_BUNDLE_END )
-		{
-			if(!vj_event_bundle_exists(i))
-				continue;
-
-			len += token_len;
-			m = vj_event_bundle_get(i);
-			len += strlen( m->bundle );
-
-		}
-		else
-		{
-			if( !vj_event_exists(i) || (i >= 400 && i < VIMS_BUNDLE_START))
-				continue;
-		
-			char *name = vj_event_vevo_get_event_name(i);
-			char *form = vj_event_vevo_get_event_format(i);
-		
-			len += token_len;
-			len += strlen(name);
-	
-			int form_len = (form ? strlen( form ): 0);
-			int name_len = (name ? strlen(name) : 0);
-#ifdef HAVE_SDL
-			vims_key_list *tree = vj_event_get_keys( i );
-			while( tree != NULL )
-			{
-				vims_key_list *this = tree;
-				len += tree->arg_len;
-				len += form_len;
-				len += token_len;
-				len += name_len;
-				tree = tree->next;
-				free(this);
-			}
-
-#endif
-			free(name);	
-			if(form) free(form);
-		}
-	}
-	return len;
-}
-
 void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
 	vj_msg_bundle *m;
 	int i;
 	const int token_len = 20;
-	char tmp[1024];
-
-	int len = min_bundles_len(v);
-#ifdef STRICT_CHECKING
-	int consumed_len = len;
-#endif
-
-	if( len <= 0 )
-	{
-		SEND_MSG(v, "000000");
-		return;
-	}
-
-	char *buf = vj_calloc( len+6+64 );
+	char tmp[4096];
+	char *buf = vj_calloc( 65535 );
 
 	int rc  = 0;
 
@@ -3097,16 +3030,15 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 #ifdef STRICT_CHECKING
 			assert( m!= NULL);
 #endif
-			int bun_len = strlen(m->bundle);
 
-			sprintf(tmp, "%04d%03d%03d%04d%s%03d%03d",
+			int bun_len = strlen(m->bundle);
+			if( bun_len <= 0 )
+				continue;
+
+			snprintf(tmp,sizeof(tmp)-1,"%04d%03d%03d%04d%s%03d%03d",
 				i, m->accelerator, m->modifier, bun_len, m->bundle, 0,0 );
 
 			veejay_strncat( buf, tmp, strlen(tmp) );
-#ifdef STRICT_CHECKING
-			consumed_len -= strlen(tmp);
-			assert( consumed_len > 0 );
-#endif
 		}
 		else
 		{
@@ -3125,9 +3057,11 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 			while( tree != NULL )
 			{
 				vims_key_list *this = tree;
-				sprintf(tmp, "%04d%03d%03d%04d%s%03d%03d",
+				snprintf(tmp, sizeof(tmp)-1, "%04d%03d%03d%04d%s%03d%03d",
 					i, tree->key_symbol, tree->key_mod, name_len, name, form_len, tree->arg_len );
+
 				veejay_strncat( buf,tmp,strlen(tmp));
+
 #ifdef STRICT_CHECKING
 				if( tree->arg_len )
 					assert( tree->args != NULL );
@@ -3136,14 +3070,7 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 					veejay_strncat( buf, form, form_len);	
 				if(tree->arg_len)
 					veejay_strncat( buf, tree->args, tree->arg_len );
-#ifdef STRICT_CHECKING
-				consumed_len -= strlen(tmp);
-				consumed_len -= form_len;
-				consumed_len -= tree->arg_len;
-				assert( consumed_len > 0 );
-#endif
 				tree = tree->next;
-				free(this);
 			}
 
 #endif
@@ -3154,17 +3081,17 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 		}
 	}
 
-#ifdef STRICT_CHECKING
-	assert( consumed_len >= 0 );
-#endif
 	int  pack_len = strlen( buf );
 	char header[7];
+	
 	sprintf(header, "%06d", pack_len );
+	
 	SEND_MSG(v, header);
 	SEND_MSG(v,buf);
 
-	if(buf) free(buf);
+	printf("'%s' : %d\n", buf, pack_len);
 
+	free(buf);
 }
 
 void	vj_event_send_vimslist(void *ptr, const char format[], va_list ap)
