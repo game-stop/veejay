@@ -347,10 +347,9 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
 	}	
 
 	vjs->server_type = type;
-
+#ifdef STRICT_CHECKING
 	char *netlog = getenv("VEEJAY_LOG_NET_IO" );
 
-#ifdef STRICT_CHECKING
 	if( netlog != NULL && strncasecmp("ON",netlog, 2) == 0 ) {
 		char logpath[1024];
 		sprintf( logpath, "%s.%d", VEEJAY_SERVER_LOG, port_offset );
