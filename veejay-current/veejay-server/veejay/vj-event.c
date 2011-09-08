@@ -3089,8 +3089,6 @@ void	vj_event_send_bundles(void *ptr, const char format[], va_list ap)
 	SEND_MSG(v, header);
 	SEND_MSG(v,buf);
 
-	printf("'%s' : %d\n", buf, pack_len);
-
 	free(buf);
 }
 
