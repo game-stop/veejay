@@ -63,12 +63,15 @@ vj_client *vj_client_alloc( int w, int h, int f )
 	v->cur_height = h;
 	v->cur_fmt = get_ffmpeg_pixfmt(f);
 	v->space = NULL;
-	v->c = (conn_type_t**) malloc(sizeof(conn_type_t*) * 3);
+	v->c = (conn_type_t**) malloc(sizeof(conn_type_t*) * 2);
 	v->c[0] = (conn_type_t*) malloc(sizeof(conn_type_t));
 	v->c[1] = (conn_type_t*) malloc(sizeof(conn_type_t));
 	v->blob = (unsigned char*) malloc(sizeof(unsigned char) * PACKET_LEN ); 
 	if(!v->blob ) {
 		veejay_msg(0, "Memory allocation error.");
+		free(v->c[1]);
+		free(v->c[0]);
+		free(v->c);
 		free(v);
 		return NULL;
 	}
@@ -82,16 +85,43 @@ vj_client *vj_client_alloc( int w, int h, int f )
 	return v;
 }
 
+#ifdef STRICT_CHECKING
+static  void vj_client_check( vj_client *v, int sock_type )
+{
+#ifdef STRICT_CHECKING
+	if( sock_type == V_STATUS ) {
+		assert( v->c[1] != NULL );
+		assert( v->c[1]->fd != NULL );
+	}
+	if( sock_type == V_CMD ) {
+		assert( v->c[0] != NULL );
+		assert( v->c[0]->fd != NULL );
+	}
+#endif
+}
+#endif
+
+
 void		vj_client_free(vj_client *v)
 {
 	if(v)
 	{
-		if(v->c[0])
-			free(v->c[0]);
-		if(v->c[1])
-			free(v->c[1]);
-		if(v->c) 
+		int i;
+		if( v->c ) {
+			for( i = 0; i < 2; i ++ ) {
+				if(!v->c[i]) 
+					continue;
+
+				if(v->c[i]->fd) {
+				//	sock_t_free( v->c[i]->fd );
+					v->c[i]->fd = NULL;
+				}
+				free(v->c[i]);
+				v->c[i] = NULL;
+			}
 			free(v->c);
+		}
+
 		if(v->blob)
 			free(v->blob);
 		if(v->lzo)
@@ -159,7 +189,6 @@ int vj_client_connect_dat(vj_client *v, char *host, int port_id  )
 		veejay_msg(VEEJAY_MSG_ERROR, "Invalid port number. Use [1-65535]");
 		return 0;
 	}
-
 
 	v->c[0]->type = VSOCK_C;
 	v->c[0]->fd   = alloc_sock_t();
@@ -241,25 +270,36 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 }
 
 int	vj_client_link_can_write( vj_client *v, int sock_type ){
+#ifdef STRICT_CHECKING
+	vj_client_check( v,sock_type);
+#endif
 	if(sock_type==VSOCK_S) {
 		return sock_t_wds_isset( v->c[1]->fd );
-	} else if (sock_type == VSOCK_C) {
+	} else if (sock_type == VSOCK_C ) {
 		return sock_t_rds_isset( v->c[0]->fd );
 	}
 	return 0;
 }
 
 int	vj_client_link_can_read( vj_client *v, int sock_type ) {
-	if(sock_type==VSOCK_S) { 
-		return sock_t_rds_isset(v->c[1]->fd);
-	} else if (sock_type == VSOCK_C) {
-		return sock_t_rds_isset( v->c[0]->fd);
+#ifdef STRICT_CHECKING
+	vj_client_check( v,sock_type);
+#endif
+
+	if( sock_type == VSOCK_S) { 
+			return sock_t_rds_isset(v->c[1]->fd);
+	} else if (sock_type == VSOCK_C ) {
+			return sock_t_rds_isset( v->c[0]->fd);
 	}
 	return 0;
 }
 
 int	vj_client_poll( vj_client *v, int sock_type )
 {
+#ifdef STRICT_CHECKING
+	vj_client_check( v,sock_type);
+#endif
+
 	if(sock_type == V_STATUS )
 	{
 		if(v->c[1]->type == VSOCK_S)
@@ -550,6 +590,10 @@ int	vj_client_read_i( vj_client *v, uint8_t *dst, int len )
 
 int	vj_client_get_status_fd(vj_client *v, int sock_type )
 {	
+#ifdef STRICT_CHECKING
+	vj_client_check( v,sock_type);
+#endif
+
 	if(sock_type == V_STATUS)
 	{
 		vj_sock_t *c = v->c[1]->fd;
@@ -573,6 +617,10 @@ int	vj_client_get_status_fd(vj_client *v, int sock_type )
 
 int	vj_client_setup_timeout( vj_client *v, int sock_type, int timeout )
 {
+#ifdef STRICT_CHECKING
+	vj_client_check( v,sock_type);
+#endif
+
 	if( sock_type == V_STATUS )
 	{
 		sock_t_set_timeout( v->c[1], timeout );
@@ -585,14 +633,18 @@ int	vj_client_setup_timeout( vj_client *v, int sock_type, int timeout )
 
 int	vj_client_read_no_wait(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 {
+#ifdef STRICT_CHECKING
+	vj_client_check( v,sock_type);
+#endif
+
 	if( sock_type == V_STATUS )
 	{
-		if(v->c[1] && v->c[1]->type == VSOCK_S)
+		if(v->c[1] && v->c[1]->fd && v->c[1]->type == VSOCK_S)
 			return( sock_t_recv( v->c[1]->fd, dst, bytes ) );
 	}
 	if( sock_type == V_CMD )
 	{
-		if(v->c[0]->type == VSOCK_C)
+		if(v->c[0] && v->c[0]->fd && v->c[0]->type == VSOCK_C)
 			return ( sock_t_recv( v->c[0]->fd, dst, bytes ) );
 	}
 	return 0;
@@ -600,23 +652,30 @@ int	vj_client_read_no_wait(vj_client *v, int sock_type, uint8_t *dst, int bytes 
 
 int	vj_client_read(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 {
+#ifdef STRICT_CHECKING
+	vj_client_check( v,sock_type);
+#endif
+
 	if( sock_type == V_STATUS )
 	{
-		if(v->c[1] && v->c[1]->type == VSOCK_S) {
+		if(v->c[1] && v->c[1]->fd && v->c[1]->type == VSOCK_S) {
 			return( sock_t_recv( v->c[1]->fd, dst, bytes ) );
 		}
 	}
 	if( sock_type == V_CMD )
 	{
-		if(v->c[0]->type == VSOCK_C) {
+		if(v->c[0] && v->c[0]->fd && v->c[0]->type == VSOCK_C) {
 			return ( sock_t_recv( v->c[0]->fd, dst, bytes ) );
 		}
 	}
 	return 0;
 }
 
-int vj_client_send(vj_client *v, int sock_type,char *buf )
-{
+int vj_client_send(vj_client *v, int sock_type,char *buf ) {
+#ifdef STRICT_CHECKING
+	vj_client_check( v,sock_type);
+#endif
+
 	if( sock_type == V_CMD )
 	{
 		// format msg
@@ -638,6 +697,10 @@ int vj_client_send(vj_client *v, int sock_type,char *buf )
 
 int vj_client_send_buf(vj_client *v, int sock_type,unsigned char *buf, int len )
 {
+#ifdef STRICT_CHECKING
+	vj_client_check( v,sock_type);
+#endif
+
 	if( sock_type == V_CMD )
 	{
 		// format msg
@@ -661,6 +724,10 @@ int vj_client_send_buf(vj_client *v, int sock_type,unsigned char *buf, int len )
 
 int vj_client_send_bufX(vj_client *v, int sock_type,unsigned char *buf, int len )
 {
+#ifdef STRICT_CHECKING
+	vj_client_check( v,sock_type);
+#endif
+
 	if( sock_type == V_CMD )
 	{
 		// format msg
@@ -683,7 +750,12 @@ int vj_client_close( vj_client *v )
 		if(v->c[0])
 		{
 			if(v->c[0]->type == VSOCK_C ) { 
+#ifdef STRICT_CHECKING
+				assert( v->c[0]->fd != NULL );
+#endif
 				sock_t_close(v->c[0]->fd );
+				sock_t_free( v->c[0]->fd);
+				v->c[0]->fd = NULL;
 			}
 			else if ( v->c[0]->type == VMCAST_C )
 			{
@@ -694,7 +766,14 @@ int vj_client_close( vj_client *v )
 		if(v->c[1])
 		{
 			if(v->c[1]->type == VSOCK_S ) {
+#ifdef STRICT_CHECKING
+				assert( v->c[1]->fd != NULL );
+#endif
+#ifdef STRICT_CHECKING
 				sock_t_close(v->c[1]->fd );
+				sock_t_free(v->c[1]->fd);
+				v->c[1]->fd = NULL;
+#endif
 			}
 		}
 
