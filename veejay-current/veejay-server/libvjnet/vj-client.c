@@ -112,10 +112,6 @@ void		vj_client_free(vj_client *v)
 				if(!v->c[i]) 
 					continue;
 
-				if(v->c[i]->fd) {
-				//	sock_t_free( v->c[i]->fd );
-					v->c[i]->fd = NULL;
-				}
 				free(v->c[i]);
 				v->c[i] = NULL;
 			}

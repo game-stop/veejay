@@ -216,13 +216,9 @@ int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 	{	
 		//@ setup socket with SO_RCVTIMEO
 		n = recv( s->sock_fd, dst+done,bytes_left, 0 );
-		if ( n < 0 ) {
-			veejay_msg(VEEJAY_MSG_ERROR, "%s", strerror(errno));
+		if ( n <= 0 ) {
 			return -1;
-		} else if ( n == 0 ) {
-			veejay_msg(VEEJAY_MSG_DEBUG, "Remote closed connection.");
-			return -1;
-		}
+		} 
 
 		done += n;
 
