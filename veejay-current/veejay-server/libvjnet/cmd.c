@@ -250,7 +250,7 @@ int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 	int done = 0;
 	while( length > 0 ) {
 		bw = length;
-		n = send( s->sock_fd, buf, length , 0 );
+		n = send( s->sock_fd, buf, length , MSG_NOSIGNAL );
 		if( n == -1 ) {
 #ifdef STRICT_CHECKING
 			veejay_msg(0, "Error sending buffer:%s",strerror(errno));
@@ -279,7 +279,7 @@ int			sock_t_send_fd( int fd, int send_size, unsigned char *buf, int len )
 	unsigned int done = 0;
 	unsigned char *ptr = buf;
 	while( length > 0 ) {
-		n = send( fd, ptr, length , 0 );
+		n = send( fd, ptr, length , MSG_NOSIGNAL );
 		if( n == -1 ) {
 			veejay_msg(0, "Error sending buffer:%s", strerror(errno));
 			return -1;
@@ -311,10 +311,11 @@ void			sock_t_close( vj_sock_t *s )
 #ifdef STRICT_CHECKING
 		veejay_msg(VEEJAY_MSG_DEBUG, "\tclosing socket %d", s->sock_fd );
 #endif
-		if( s->sock_fd > 0 )
+		if( s->sock_fd ) {
 			close(s->sock_fd);
-		s->sock_fd = -1;
-	
+			s->sock_fd = -1;
+		}
+
 		FD_ZERO(&(s->rds));
 		FD_ZERO(&(s->wds));
 	}

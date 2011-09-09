@@ -87,9 +87,6 @@ void	*reader_thread(void *data)
 	threaded_t *t = tag->priv;
 	int ret = 0;
 	char buf[16];
-#ifdef STRICT_CHECKING
-	assert( v != NULL );
-#endif
 
 	snprintf(buf,sizeof(buf)-1, "%03d:;", VIMS_GET_FRAME);
 

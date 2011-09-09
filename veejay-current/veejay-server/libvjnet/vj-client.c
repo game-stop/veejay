@@ -170,7 +170,8 @@ int vj_client_connect_dat(vj_client *v, char *host, int port_id  )
 		return 1;
 	}
 
-	v->c[1]->fd = -1;
+	v->c[1]->fd = alloc_sock_t();
+	v->c[1]->type = 654321;
 
 	return error;
 }
@@ -586,7 +587,7 @@ int	vj_client_read_no_wait(vj_client *v, int sock_type, uint8_t *dst, int bytes 
 {
 	if( sock_type == V_STATUS )
 	{
-		if(v->c[1]->type == VSOCK_S)
+		if(v->c[1] && v->c[1]->type == VSOCK_S)
 			return( sock_t_recv( v->c[1]->fd, dst, bytes ) );
 	}
 	if( sock_type == V_CMD )
@@ -601,7 +602,7 @@ int	vj_client_read(vj_client *v, int sock_type, uint8_t *dst, int bytes )
 {
 	if( sock_type == V_STATUS )
 	{
-		if(v->c[1]->type == VSOCK_S) {
+		if(v->c[1] && v->c[1]->type == VSOCK_S) {
 			return( sock_t_recv( v->c[1]->fd, dst, bytes ) );
 		}
 	}
@@ -681,22 +682,19 @@ int vj_client_close( vj_client *v )
 	{
 		if(v->c[0])
 		{
-			if(v->c[0]->type == VSOCK_C && v->c[0]->fd > 0) { 
+			if(v->c[0]->type == VSOCK_C ) { 
 				sock_t_close(v->c[0]->fd );
-				v->c[0]->fd = -1;
 			}
-			else if ( v->c[0]->type == VMCAST_C && v->c[0]->fd > 0)
+			else if ( v->c[0]->type == VMCAST_C )
 			{
 				mcast_close_receiver( v->c[0]->r );
 				mcast_close_sender( v->c[0]->s );
-				v->c[0]->fd = -1;
 			}
 		}
 		if(v->c[1])
 		{
-			if(v->c[1]->type == VSOCK_S && v->c[1]->fd > 0) {
+			if(v->c[1]->type == VSOCK_S ) {
 				sock_t_close(v->c[1]->fd );
-				v->c[1]->fd = -1;
 			}
 		}
 
