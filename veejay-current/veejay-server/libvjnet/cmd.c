@@ -27,9 +27,52 @@
 #include <libvjmsg/vj-msg.h>
 #include <sys/types.h>
 #include <sys/utsname.h>
+#include <pthread.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
+
+
+struct host_list {
+  struct hostent hostent;
+  char h_addr_space[1024]; 
+};
+
+static int ref_count = 0;
+static pthread_key_t ghbn_key;
+static pthread_once_t ghbn_key_once = PTHREAD_ONCE_INIT;
+
+static void ghbn_cleanup(void *data) {
+  struct host_list *current = (struct host_list *) data;
+  ref_count--;
+  free(current);
+}
+
+static void create_ghbn_key() {
+  pthread_key_create(&ghbn_key, ghbn_cleanup);
+}
+
+struct hostent *sock_gethostbyname(const char *name) {
+	struct hostent *result;
+	int local_errno;
+
+  	pthread_once(&ghbn_key_once, create_ghbn_key);
+
+	struct host_list *current = (struct host_list *) pthread_getspecific(ghbn_key);
+	
+	if (!current) {
+    	current = (struct host_list *) calloc(1, sizeof(struct host_list));
+ 		current->hostent.h_name = "busy";
+    	ref_count++;
+   		pthread_setspecific(ghbn_key, current);
+	}
+  
+	if (gethostbyname_r(name, &(current->hostent), current->h_addr_space,sizeof(current->h_addr_space),&result, &local_errno)) {
+		h_errno = local_errno;
+	}
+	return result;
+}
+
 vj_sock_t	*alloc_sock_t(void)
 {
 	vj_sock_t *s = (vj_sock_t*) malloc(sizeof(vj_sock_t));
@@ -47,7 +90,7 @@ void		sock_t_free(vj_sock_t *s )
 
 int			sock_t_connect_and_send_http( vj_sock_t *s, char *host, int port, char *buf, int buf_len )
 {
-	s->he = gethostbyname( host );
+	s->he = sock_gethostbyname( host );
 	if(s->he==NULL)
 		return 0;
 	s->sock_fd = socket( AF_INET, SOCK_STREAM , 0);
@@ -97,9 +140,11 @@ int			sock_t_connect_and_send_http( vj_sock_t *s, char *host, int port, char *bu
 
 int			sock_t_connect( vj_sock_t *s, char *host, int port )
 {
-	s->he = gethostbyname( host );
+	s->he = sock_gethostbyname( host );
+	
 	if(s->he==NULL)
 		return 0;
+	
 	s->sock_fd = socket( AF_INET, SOCK_STREAM , 0);
 	if(s->sock_fd < 0)
 	{
@@ -109,6 +154,7 @@ int			sock_t_connect( vj_sock_t *s, char *host, int port )
 	s->port_num = port;
 	s->addr.sin_family = AF_INET;
 	s->addr.sin_port   = htons( port );
+	
 	s->addr.sin_addr   = *( (struct in_addr*) s->he->h_addr );	
 
 	if( connect( s->sock_fd, (struct sockaddr*) &s->addr,

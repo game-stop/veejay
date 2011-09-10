@@ -2731,8 +2731,7 @@ void vj_event_quit(void *ptr, const char format[], va_list ap)
 		}
 	}
 
-
-	veejay_change_state(v, LAVPLAY_STATE_STOP);         
+	veejay_quit(v);
 }
 
 void  vj_event_sample_mode(void *ptr,	const char format[],	va_list ap)

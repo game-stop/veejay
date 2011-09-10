@@ -2104,9 +2104,12 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	int len = end - start;
 	float *data = (float*) vj_calloc(sizeof(float) * len );
 	int *values = (int*) vj_calloc(sizeof(int) * len );
-	unsigned char *kf = (unsigned char*) vj_calloc( (len*4)+25);
+
+	unsigned char *kkf = (unsigned char*) vj_calloc( (len*4)+64);
 	int min=0,max=0;
-		
+	
+	unsigned char *kf = kkf + 9;	//@ reserve space for header
+	
 	_effect_get_minmax( id, &min,&max,j );
 
 	int k;
@@ -2115,9 +2118,13 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 	for( k = 0 ; k < len ; k++ )
 		values[k] = ( (int) ( data[k] * max ));
 
-	int total_len = 25 + (4 * len);
+	int total_len = 9;
+	int row_len   = 3 + 2 + 2 + 8 + 8 + 2;
 	sprintf( (char*)kf, "key%02d%02d%08d%08d%02d",i,j,start,end,type );
-	unsigned char *ptr = kf + 25;
+	unsigned char *ptr = kf + row_len;
+
+	total_len += row_len;
+
 	for( k = 0; k < len; k ++ )
 	{
 		unsigned char *p = ptr + (k*4);
@@ -2125,13 +2132,22 @@ void	on_curve_buttonstore_clicked(GtkWidget *widget, gpointer user_data )
 		p[1] = (values[k] >> 8) & 0xff;
 		p[2] = (values[k] >> 16) & 0xff;
 		p[3] = (values[k] >> 24) & 0xff;
+
+		total_len += 4;
 	}
 
 	free(values);
 	free(data);
+	
+	char header[10];
+	snprintf( header,10, "K%08d", total_len );
+	for( k = 0; k < 9; k ++ )
+		kkf[k] = header[k];
 
-	vj_client_send_bufX( info->client, V_CMD, kf,total_len );
-	free(kf);
+	printf("[%s]: %d\n", kkf,total_len );
+
+	vj_client_send_buf( info->client, V_CMD, kkf,total_len );
+	free(kkf);
 
 	vj_msg( VEEJAY_MSG_INFO, "Saved new animation for parameter %d on entry %d, start at frame %d and end at frame %d",j,i,start,end );
 				

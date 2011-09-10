@@ -24,4 +24,4 @@ fi
 ## slackware 13.1 and older
 #########################################
 
-#autoreconf -v -fi
+autoreconf -v -fi

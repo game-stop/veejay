@@ -21,14 +21,6 @@
 
 typedef struct
 {
-	void	*r;
-	void   	*s;
-	void	*fd;
-	int	type;
-} conn_type_t;
-	
-typedef struct
-{
 	int planes[3];
 	int cur_width;
 	int cur_height;
@@ -36,12 +28,20 @@ typedef struct
 	int in_width;
 	int in_height;
 	int in_fmt;
+
+	int orig_width;
+	int orig_height;
+
 	uint8_t *space;
-	conn_type_t **c;
-	int ports[3];
 	int mcast;
 	void *lzo;
 	unsigned char *blob;
+
+	void	*r;
+	void	*s;
+	
+	void	*fd[2];
+	int		ports[2];
 } vj_client;
 
 int	vj_client_link_can_write(vj_client *v, int s);
@@ -50,8 +50,6 @@ int 	vj_client_link_can_read(vj_client *v,int s );
 
 int vj_client_connect( vj_client *v, char *host, char *group_name, int port_id );
   
-int	vj_client_get_status_fd(vj_client *v, int sock_type );
-
 void	vj_client_flush( vj_client *v, int delay );
 
 int	vj_client_poll( vj_client *v, int sock_type );
@@ -62,9 +60,11 @@ int vj_client_read( vj_client *v, int sock_type, uint8_t *dst, int bytes );
 
 int vj_client_read_no_wait( vj_client *v, int sock_type, uint8_t *dst, int bytes );
 
-int	vj_client_close( vj_client *v );
+void	vj_client_close( vj_client *v );
 
-int vj_client_send( vj_client *v, int sock_type, char *buf);
+int vj_client_send( vj_client *v, int sock_type,unsigned char *buf);
+
+int vj_client_send_buf( vj_client *v, int sock_type,unsigned char *buf, int len);
 
 vj_client *vj_client_alloc(int w , int h, int f);
 
@@ -72,12 +72,9 @@ void	vj_client_free(vj_client *v);
 
 int	vj_client_test(char *addr, int port );
 
-int vj_client_send_bufX(vj_client *v, int sock_type,unsigned char *buf, int len );
-
 int	vj_client_window_sizes( int socket_fd, int *r, int *s );
 
 int vj_client_connect_dat(vj_client *v, char *host, int port_id  );
 
-int	vj_client_setup_timeout( vj_client *v, int sock_type, int timeout );
 #endif
 

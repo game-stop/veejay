@@ -1100,8 +1100,6 @@ static	int	 gvr_veejay( veejay_preview_t *vp , veejay_track_t *v, int track_num 
 			}
 			else
 			{
-				vj_client_setup_timeout( v->fd,V_CMD,1);
-
 				v->preview = is_button_toggled( "previewtoggle");
 				v->active = 1;
   				vj_msg(VEEJAY_MSG_WARNING, "VeejayGrabber: connected with %s:%d on Track %d  %d x %d", 

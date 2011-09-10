@@ -308,12 +308,8 @@ enum {
 
 #define MAX_EDIT_LIST_FILES 4096
 
-#define	VSOCK_S	0
-#define VSOCK_C 1
-#define V_STATUS 0
-#define V_CMD 1
-#define VMCAST_S 4
-#define VMCAST_C 5
+#define V_STATUS 1
+#define V_CMD 0
 
 enum
 {

@@ -209,7 +209,9 @@ static inline unsigned long long int rdtsc()
 #define small_memset(to,val,n) memset(to,val,n)
 char	*veejay_strncpy( char *dest, const char *src, size_t n )
 {
-	return strncpy( dest,src, n-1 );
+	memcpy ( dest, src, n );
+	dest[n] = '\0';
+	return dest;
 }
 
 char	*veejay_strncat( char *s1, char *s2, size_t n )

@@ -576,7 +576,7 @@ int	veejay_get_file_ext( char *file, char *dst, int dlen)
 	int len = strlen(file)-1;
 	int i = 0;
 	char tmp[dlen];
-	bzero(tmp,dlen);
+	memset( tmp, 0, dlen );
 	while(len)
 	{
 		if(file[len] == '.')
