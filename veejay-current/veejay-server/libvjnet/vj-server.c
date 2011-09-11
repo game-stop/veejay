@@ -593,9 +593,6 @@ int _vj_server_del_client(vj_server * vje, int link_id)
 	Link[link_id]->promote = 0;
 	Link[link_id]->n_queued = 0;
 	Link[link_id]->n_retrieved = 0;
-#ifdef STRICT_CHECKING
-	veejay_msg(VEEJAY_MSG_DEBUG,"Link %d: closed socket %d", link_id, Link[link_id]->handle );
-#endif
 	return 1;
 }
 

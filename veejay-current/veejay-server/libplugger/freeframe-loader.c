@@ -523,6 +523,8 @@ void	freeframe_plug_deinit( void *plugin )
 	if( error == VEVO_NO_ERROR ) {
 		free(space);
 	}
+
+	vpf( plugin );
 }
 
 void	freeframe_plug_free( void *plugin )

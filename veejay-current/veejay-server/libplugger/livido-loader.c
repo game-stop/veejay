@@ -979,46 +979,24 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ )
 			"in_channel_templates", "in_channels",
 			w,h, 0);
 
-	if( num_in_channels < 0 )
-	{
-		veejay_msg(0 ,"Not dealing with generator plugins yet");
-		return NULL;
-	}
-	
 	int num_out_channels = init_ports_from_template( 
 			filter_instance, filter_templ,
 			LIVIDO_PORT_TYPE_CHANNEL,
 			"out_channel_templates", "out_channels",
 			w,h, 0 );
 	
-	if( num_out_channels < 0 )
-	{
-		veejay_msg(0, "Require at least 1 output channel");
-		return  NULL;
-	}
 	int num_in_params = init_ports_from_template( 
 			filter_instance, filter_templ,
 			LIVIDO_PORT_TYPE_PARAMETER,
 			"in_parameter_templates", "in_parameters",
 			w,h, 0 );
 
-	if( num_in_params < 0 )
-	{
-		veejay_msg(0, "Require at least 0 input parameter");
-		return NULL;
-	}
 	int num_out_params = init_ports_from_template(
 				filter_instance, filter_templ,
 				LIVIDO_PORT_TYPE_PARAMETER,
 				"out_parameter_templates", "out_parameters",
 				w,h,0 );
 
-	if( num_out_params < 0 )
-	{
-		veejay_msg(0, "Require at least 0 output parameters (%d)",
-				num_out_params);
-		return NULL;
-	}
 #ifdef STRICT_CHECKING
 	assert( num_in_params >= 0 );
 	assert( num_out_params >= 0 );
@@ -1050,6 +1028,8 @@ void	*livido_plug_init(void *plugin,int w, int h, int base_fmt_ )
 
 	error = (*init_f)( (livido_port_t*) filter_instance );
 	if( error != LIVIDO_NO_ERROR ) {
+
+		livido_port_recursive_free( filter_instance );
 		return NULL;
 		//@ FIXME: leak
 	}
@@ -1198,7 +1178,7 @@ void	livido_plug_deinit( void *instance )
 	int hsampling = 0;
 	error = vevo_property_get( instance, "out_channels", 0, &channel );
 	
-	if( vevo_property_get( channel, "HOST_sampling",0,&hsampling ) ==
+	if( (error == VEVO_NO_ERROR) && vevo_property_get( channel, "HOST_sampling",0,&hsampling ) ==
 			LIVIDO_NO_ERROR )
 	{
 		void *sampler = NULL;
@@ -1208,8 +1188,7 @@ void	livido_plug_deinit( void *instance )
 	}
 
 	livido_port_recursive_free( instance );
-
-//	instance = NULL;
+	instance = NULL;
 }
 //get plugin defaults
 void	livido_plug_retrieve_values( void *instance, void *fx_values )

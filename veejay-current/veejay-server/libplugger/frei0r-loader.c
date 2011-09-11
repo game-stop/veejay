@@ -412,9 +412,9 @@ void	frei0r_plug_deinit( void *plugin )
 		veejay_msg(0,"Unable to free plugin.");
 		return;
 	}
-
-	vevo_port_dump(plugin,0);
-
+#ifdef STRICT_CHECKING
+	vevo_port_dump( parent, 0 );
+#endif
 	f0r_destruct_f base = NULL;
 	err = vevo_property_get( parent, "destruct", 0, &base);
 
@@ -439,7 +439,7 @@ void	frei0r_plug_deinit( void *plugin )
 		free(fr);
 		fr = NULL;
 	}
-
+	
 	vpf(plugin);
 	plugin = NULL;
 }
@@ -497,10 +497,10 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf )
 
 	fr0_conv_t *fr = (fr0_conv_t*) vj_calloc(sizeof(fr0_conv_t));
 	int i;
-	fr->buf        = (uint8_t*) vj_calloc(sizeof(uint8_t) * w * h * n_planes );
+	fr->buf        = (uint8_t*) vj_calloc((sizeof(uint8_t) * w * h * n_planes) * (n_in+1) );
 	uint8_t *bufx  = fr->buf;
 
-	for( i = 0; i < n_in; i ++ ){
+	for( i = 0; i < (n_in+1); i ++ ) { //@ extra buffer for rgb output
 		fr->in[i] = yuv_rgb_template(bufx, w,h, frfmt );
 		bufx   += (w*h*4);
 	}
@@ -519,7 +519,6 @@ void *frei0r_plug_init( void *plugin , int w, int h, int pf )
 
 	if( n_in > 0 && in_scaler__ == NULL) { 
 		in_scaler__  = yuv_init_swscaler( fr->out,	fr->in[0], 	&templ, yuv_sws_get_cpu_flags());  // yuv -> rgb
-		//@ same joke
 	}
 
 	void *frptr    = (void*) fr;
@@ -539,9 +538,9 @@ void	frei0r_plug_free( void *plugin )
 	int n = 0;
 	//FIXME: not used
 	f0r_deinit_f base;
-	vevo_property_get( plugin, "deinit", 0, &base);
-	(*base)();
-	vevo_property_get( plugin, "f0r_p", 0, &n );
+	if( vevo_property_get( plugin, "deinit", 0, &base) == VEVO_NO_ERROR )
+		(*base)();
+//	vevo_property_get( plugin, "f0r_p", 0, &n );
 }
 
 int	frei0r_process_frame_f( void *plugin )

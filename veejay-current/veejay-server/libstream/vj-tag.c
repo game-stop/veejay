@@ -1139,6 +1139,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 				plug_get_num_output_channels( channel ) != 1 ) {
 					veejay_msg(0, "Plug '%s' is not a generator", plugname);
 					plug_deactivate(tag->generator);
+					tag->generator = NULL;
 					free(plugname);
 					return -1;
 			}
@@ -1391,7 +1392,6 @@ int vj_tag_del(int id)
 		break;
 	case VJ_TAG_TYPE_GENERATOR:
 		if( tag->generator ) {
-			//@ crashes some frei0r plugin, FIXME
 			//plug_deactivate( tag->generator );
 		}
 		tag->generator = NULL;

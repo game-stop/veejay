@@ -128,6 +128,8 @@ static	void	deinstantiate_plugin( void *instance )
 
 	if( error == VEVO_NO_ERROR && gin != NULL )
 		(*gin)(instance);
+
+	instance = NULL;
 }
 
 static	void	add_to_plugin_list( const char *path )
@@ -252,7 +254,7 @@ static	void	free_plugin(void *plugin)
 	assert( error == 0 );
 #endif
 
-	//vevo_port_recursive_free( plugin );
+	vevo_port_recursive_free( plugin );
 
 	if( handle ) dlclose( handle );
 
@@ -586,7 +588,8 @@ void	plug_set_defaults( void *instance, void *fx_values )
 
 void	plug_deactivate( void *instance )
 {
-	deinstantiate_plugin( instance );	
+	if( instance )
+		deinstantiate_plugin( instance );	
 }
 
 static	int	linear_len( char **items )

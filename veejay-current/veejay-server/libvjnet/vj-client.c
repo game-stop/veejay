@@ -251,25 +251,11 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 }
 
 int	vj_client_link_can_write( vj_client *v, int sock_type ){
-#ifdef STRICT_CHECKING
-	int n = sock_t_wds_isset( v->fd[sock_type] );
-	veejay_msg(VEEJAY_MSG_DEBUG, "%s: type %d, socket %p : result=%d",
-			__FUNCTION__, sock_type, v->fd[sock_type], n );
-	return n;
-#else
 	return sock_t_wds_isset( v->fd[sock_type]);
-#endif
 }
 
 int	vj_client_link_can_read( vj_client *v, int sock_type ) {
-#ifdef STRICT_CHECKING
-	int n = sock_t_rds_isset( v->fd[sock_type] );
-	veejay_msg(VEEJAY_MSG_DEBUG, "%s: type %d, socket %p : result=%d",
-			__FUNCTION__, sock_type, v->fd[sock_type], n );
-	return n;
-#else
 	return sock_t_rds_isset( v->fd[sock_type] );
-#endif
 }
 
 int	vj_client_poll( vj_client *v, int sock_type )
@@ -620,17 +606,11 @@ void vj_client_close( vj_client *v )
 		v->r = NULL;
 	} else {
 		if( v->fd[0] ) {
-#ifdef STRICT_CHECKING
-			veejay_msg(VEEJAY_MSG_DEBUG, "close connection: socket %p", v->fd[0] );
-#endif
 			sock_t_close( v->fd[0] );
 			sock_t_free( v->fd[0] );
 			v->fd[0] = NULL;
 		}
 		if( v->fd[1] ) {
-#ifdef STRICT_CHECKING
-			veejay_msg(VEEJAY_MSG_DEBUG, "close connection: socket %p", v->fd[1] );
-#endif
 			sock_t_close( v->fd[1] );
 			sock_t_free( v->fd[1] );
 			v->fd[1] = NULL;
