@@ -277,16 +277,6 @@ int			sock_t_recv( vj_sock_t *s, void *dst, int len )
 int			sock_t_send( vj_sock_t *s, unsigned char *buf, int len )
 {
 	int n; 
-#ifdef STRICT_CHECKING
-	assert( buf != NULL );
-
-	if( sock_t_wds_isset( s ) == 0 ) {
-		veejay_msg(VEEJAY_MSG_DEBUG, "%s: socket %d", __FUNCTION__, s->sock_fd);
-		assert(sock_t_wds_isset(s) == 0);
-		return 0;
-	}
-#endif
-
 	int length = len;
 	int bw = 0;
 	int done = 0;

@@ -276,8 +276,6 @@ int	vj_client_poll( vj_client *v, int sock_type )
 {
 #ifdef STRICT_CHECKING
 	int n = sock_t_poll( v->fd[sock_type] );
-	veejay_msg(VEEJAY_MSG_DEBUG, "%s: type %d, socket %p : result=%d",
-			__FUNCTION__, sock_type, v->fd[sock_type], n );
 	return n;
 #else
 	return sock_t_poll( v->fd[sock_type ]);

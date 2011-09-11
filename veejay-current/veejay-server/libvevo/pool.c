@@ -204,9 +204,6 @@ void	vevo_pool_free( void *p, void *ptr, unsigned int k )
 void	vevo_pool_destroy( void *p )
 {
 	pool_t *pool = (pool_t*) p;
-#ifdef STRICT_CHECKING
-	veejay_msg(0, "%s: free %d bytes", __FUNCTION__, pool->msize );
-#endif
 	space_t **nS = pool->spaces;
 	int i ;
 	for( i = 0 ; nS[i] != NULL ; i ++ )
