@@ -1128,7 +1128,8 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 
 		int foo_arg  = vj_shm_get_id();
 
-		vj_shm_set_id( extra );
+		if( extra != 0 ) //@ vj_shm_set_id is a hack
+			vj_shm_set_id( extra );
 
 		tag->generator = plug_activate(channel);
 		
