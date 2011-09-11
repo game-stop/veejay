@@ -1,32 +1,21 @@
-/*
-Copyright (c) 2004-2007 N.Elburg <nwelburg@gmail.com>
-
- This is vevo, veejay video objects. 
-
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-1. Redistributions of source code must retain the above copyright
-   notice, this list of conditions and the following disclaimer.
-2. Redistributions in binary form must reproduce the above copyright
-   notice, this list of conditions and the following disclaimer in the
-   documentation and/or other materials provided with the distribution.
-3. The name of the author may not be used to endorse or promote products
-   derived from this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE AUTHOR ``AS IS'' AND ANY EXPRESS OR
-IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES
-OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
-IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY DIRECT, INDIRECT,
-INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
-NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
-THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-*/
+/* veejay - vevo objects
+ * 	     (C) 2002-2011 Niels Elburg <nwelburg@gmail.com> 
+ *
+ *
+ * This program is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation; either version 2 of the License, or
+ * (at your option) any later version.
+ *
+ * This program is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this program; if not, write to the Free Software
+ * Foundation, Inc., 675 Mass Ave, Cambridge, MA 02139, USA.
+ */
 #ifndef LIBVEVO
 #define LIBVEVO
 
@@ -42,11 +31,11 @@ typedef void vevo_port_t;
 #endif
 
 
-int	vevo_property_num_elements( vevo_port_t *p, const char *key);
+int		vevo_property_num_elements( vevo_port_t *p, const char *key);
 
 int 	vevo_property_atom_type( vevo_port_t *p, const char *key);
 
-size_t vevo_property_element_size( vevo_port_t * p, const char *key, const int idx);
+size_t 	vevo_property_element_size( vevo_port_t * p, const char *key, const int idx);
 
 #ifdef STRICT_CHECKING
 vevo_port_t *vevo_port_new( int port_type, const char *func,const int line_no );
@@ -68,11 +57,11 @@ int 	vevo_property_soft_reference(vevo_port_t * p, const char *key);
 
 void	vevo_strict_init();
 
-int	vevo_port_verify( vevo_port_t *port );
+int		vevo_port_verify( vevo_port_t *port );
 
-int	vevo_property_set(vevo_port_t * p, const char *key, int atom_type, int num_elements, void *src);
+int		vevo_property_set(vevo_port_t * p, const char *key, int atom_type, int num_elements, void *src);
 
-int	vevo_union_ports( void *port_a, void *port_b, int filter_type );
+int		vevo_union_ports( void *port_a, void *port_b, int filter_type );
 
 int 	vevo_property_get(vevo_port_t * p, const char *key, int idx, void *dst);
 
@@ -86,33 +75,33 @@ char	*vevo_format_property( vevo_port_t *port, const char *key );
 
 void	vevo_report_stats();
 
-int	vevo_property_del(vevo_port_t * p,   const char *key );
+int		vevo_property_del(vevo_port_t * p,   const char *key );
 
 //char	**vevo_port_deepen_namespace( void *port, char *path);
 
-void *vevo_port_recurse_namespace( vevo_port_t *port, const char *base );
+void 	*vevo_port_recurse_namespace( vevo_port_t *port, const char *base );
 
 void	*vevo_port_register( vevo_port_t *in, vevo_port_t *ref );
 
 char  	*vevo_sprintf_property( vevo_port_t *port, const char *key  );
 
-int	vevo_sscanf_property( vevo_port_t *port, const char *s);
+int		vevo_sscanf_property( vevo_port_t *port, const char *s);
 
 char	**vevo_sprintf_port( vevo_port_t *port );
 
-int	vevo_sscanf_port( vevo_port_t *port, const char *s );
+int		vevo_sscanf_port( vevo_port_t *port, const char *s );
 
-int	vevo_special_union_ports( void *port_a, void *port_b );
+int		vevo_special_union_ports( void *port_a, void *port_b );
 
-int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key, int n_elem, int type);
+int		vevo_property_from_string( vevo_port_t *port, const char *s, const char *key, int n_elem, int type);
 
 char	*vevo_sprintf_property_value( vevo_port_t *port, const char *key);
 
-char            *vevo_property_get_string( void *port, const char *key );
+char    *vevo_property_get_string( void *port, const char *key );
 
-char            *vevo_property_get_utf8string( void *port, const char *key );
+char    *vevo_property_get_utf8string( void *port, const char *key );
 
-void		vevo_strict_init();
+void	vevo_strict_init();
 
 int     vevo_property_call(vevo_port_t * p, const char *key, void *ctx, int32_t type, int32_t value );
 
@@ -124,8 +113,7 @@ int	vevo_property_protect( vevo_port_t *p, const char *key  );
 
 void	vevo_port_dump( void *p, int lvl );
 
-int
-vevo_property_set_f(vevo_port_t * p,
+int		vevo_property_set_f(vevo_port_t * p,
 		    const char *key,
 		    int atom_type, int num_elements, void (*set_func)() , int (*get_func)() );
 
@@ -153,7 +141,7 @@ int		vevo_port_get_total_size( vevo_port_t *port );
 #define VEVO_ERROR_TOO_MANY_INSTANCES 6
 #define VEVO_ERROR_HARDWARE 7
 #define VEVO_ERROR_PROPERTY_EMPTY 8
-
+#define VEVO_ERROR_INVALID_VALUE 9
 
 #define VEVO_PORT_POOL			1041
 #define VEVO_ANONYMOUS_PORT		-1

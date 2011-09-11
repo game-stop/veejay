@@ -6854,7 +6854,7 @@ void	vj_event_tag_new_generator( void *ptr, const char format[], va_list ap )
 	int args[2] = { 0,0 };
 	P_A(args,str,format,ap);
 
-	int id = veejay_create_tag(v, VJ_TAG_TYPE_GENERATOR, str, v->nstreams,args[0],0);
+	int id = veejay_create_tag(v, VJ_TAG_TYPE_GENERATOR, str, v->nstreams,0,args[0]);
 
 	vj_event_send_new_id ( v, id );
 

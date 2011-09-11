@@ -1113,6 +1113,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 	}
 
 
+
 	if(channel >= 0 || filename != NULL)  {
 		char *plugname = NULL;
 		if( filename != NULL ) {
@@ -1123,10 +1124,16 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 			}
 		}
 
-
 		plugname = plug_get_name( channel );
+
+		int foo_arg  = vj_shm_get_id();
+
+		vj_shm_set_id( extra );
+
 		tag->generator = plug_activate(channel);
 		
+		vj_shm_set_id( foo_arg );
+
 		if(tag->generator ) {
 			if( plug_get_num_input_channels( channel ) > 0 ||
 				plug_get_num_output_channels( channel ) != 1 ) {

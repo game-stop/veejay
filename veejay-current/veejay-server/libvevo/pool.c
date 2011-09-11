@@ -95,7 +95,7 @@ int	vevo_pool_size( void *p )
 void	*vevo_pool_init(size_t prop_size,size_t stor_size, size_t atom_size, size_t index_size)
 {
 	unsigned int Msize = Mend + 1;
-	pool_t *p = (pool_t*) vj_malloc(sizeof(pool_t));
+	pool_t *p = (pool_t*) vj_malloc(sizeof(pool_t)); //@ FIXME: reachable
 #ifdef STRICT_CHECKING
 	assert( p != NULL );
 #endif
@@ -111,16 +111,19 @@ void	*vevo_pool_init(size_t prop_size,size_t stor_size, size_t atom_size, size_t
 	p->spaces[Midx]  = alloc_space( index_size );
 	p->spaces[Mend] = NULL;
 #ifdef STRICT_CHECKING
+	int sp_size = sizeof(space_t);
+	int n       = sizeof(void*) * (ROUNDS_PER_MAG+1);
+	int na      = ROUNDS_PER_MAG;
 
 	p->msize = sizeof(space_t*) * Msize;
-	p->msize += sizeof(int32_t);
-	p->msize += sizeof(double);
-	p->msize += sizeof(void*);
-	p->msize += sizeof(uint64_t);
-	p->msize += prop_size;
-	p->msize += stor_size;
-	p->msize += atom_size;
-	p->msize += index_size;
+	p->msize += (na * sizeof(int32_t)) + sp_size + n;
+	p->msize += (na * sizeof(double)) + sp_size + n;
+	p->msize += (na * sizeof(void*)) + sp_size + n;
+	p->msize += (na * sizeof(uint64_t)) + sp_size + n;
+	p->msize += (na * sizeof(prop_size)) + sp_size +n;
+	p->msize += (na * stor_size) + sp_size + n;
+	p->msize += (na * atom_size) + sp_size + n;
+	p->msize += (na * index_size) + sp_size + n;
 	p->msize += sizeof(pool_t);
 #endif
 	return (void*)p;
@@ -201,6 +204,9 @@ void	vevo_pool_free( void *p, void *ptr, unsigned int k )
 void	vevo_pool_destroy( void *p )
 {
 	pool_t *pool = (pool_t*) p;
+#ifdef STRICT_CHECKING
+	veejay_msg(0, "%s: free %d bytes", __FUNCTION__, pool->msize );
+#endif
 	space_t **nS = pool->spaces;
 	int i ;
 	for( i = 0 ; nS[i] != NULL ; i ++ )

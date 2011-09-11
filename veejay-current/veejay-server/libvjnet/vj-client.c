@@ -220,7 +220,7 @@ int vj_client_connect(vj_client *v, char *host, char *group_name, int port_id  )
 		veejay_msg( VEEJAY_MSG_DEBUG, "connected CMD port %d (socket %p, type %d)",
 				v->ports[0], v->fd[0], 0 );
 		veejay_msg( VEEJAY_MSG_DEBUG, "connected STATUS port %d (socket %p, type %d)",
-			   V->ports[1], v->fd[1], 1 );	
+			   v->ports[1], v->fd[1], 1 );	
 #endif
 	}
 	else

@@ -131,8 +131,15 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 
 	char *plugin_dir  = getenv("LIVIDO_PLUGIN_SHMOUT_TMP");
 	if(!plugin_dir) {
-		printf("set env var LIVIDO_PLUGIN_SHMOUT_TMP to a path I can write to\n");
-		return LIVIDO_ERROR_HARDWARE;
+		char path[1024];
+		char *homedir = getenv("HOME");
+		if(!homedir) {
+			printf("HOME not set!\n");
+			return LIVIDO_ERROR_HARDWARE;
+		}
+		snprintf( path, sizeof(path)-1, "%s/.veejay", homedir );
+
+		plugin_dir = path;
 	}
 
 	if(!vj_shm_file_ref( v, plugin_dir ) ) {
