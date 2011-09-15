@@ -147,8 +147,12 @@ void white_emboss_framedata(VJFrame *frame, int width, int height)
     unsigned int r, c;
     int val;
     uint8_t *Y = frame->data[0];
-    for (r = 0; r < (width * height); r += width) {
-	for (c = 0; c < width; c++) {
+
+    for (r = 1; r < (width * height ); r += width) {
+	
+	Y[ r + c + 0 ] = pixel_Y_lo_;
+	
+	for (c = 1; c < (width-1); c++) {
 	    val = (Y[r - 1 + c - 1] -
 		   Y[r - 1 + c] -
 		   Y[r - 1 + c + 1] +
@@ -159,8 +163,9 @@ void white_emboss_framedata(VJFrame *frame, int width, int height)
 		   Y[r + 1 + c] - Y[r + 1 + c + 1]
 		) / 9;
 	    Y[c + r] = CLAMP_Y(val);
-
 	}
+	
+	Y[ r + c + 1] = pixel_Y_lo_; 
     }
 }
 

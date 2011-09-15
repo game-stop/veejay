@@ -1598,14 +1598,21 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 					rs = 1;
 				}
 			}
-#ifdef STRICT_CHECKING
-			assert( resample_context[ n_frames ] != NULL );
-#endif
+			
 			if( rs )
 			{
 				if( speed < 0 )
 					vj_perform_reverse_audio_frame(info, n_samples, sambuf );
-				n_samples = audio_resample( resample_context[n_frames-2],audio_buf, sambuf, n_samples );
+
+				int sc = n_frames - 2;
+#ifdef STRICT_CHECKING
+				assert( sc >= 0 );
+				assert( sc <= MAX_SPEED );
+#else
+				if( sc < 0 ) sc = 0; else if ( sc > MAX_SPEED ) sc = MAX_SPEED;
+#endif
+
+				n_samples = audio_resample( resample_context[sc],audio_buf, sambuf, n_samples );
 			}
 		} else if( speed == 0 ) {
 			n_samples = len = pred_len;
@@ -1638,8 +1645,14 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 		int val = *sampled_down;
 		if( cur_sfd == 0 )
 		{
+			int sc = max_sfd - 2;
+#ifdef STRICT_CHECKING
+			assert(sc>=0);
+			assert(sc <= MAX_SPEED );
+#endif
+			if( sc < 0 ) sc = 0; else if ( sc > MAX_SPEED ) sc = MAX_SPEED; 
 			// @ resample buffer
-			n_samples = audio_resample( downsample_context[ max_sfd-2 ], 
+			n_samples = audio_resample( downsample_context[ sc ], 
 					down_sample_buffer,audio_buf, n_samples  );
 			*sampled_down = n_samples / max_sfd;
 			val = n_samples / max_sfd;

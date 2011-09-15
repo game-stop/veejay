@@ -159,6 +159,7 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 	si->encoder_succes_frames = 0;
 
 	int tmp = el->video_width * el->video_height;
+	int tmp1 = (el->video_width/2 ) * el->video_height;
 
 	if(format==ENCODER_DVVIDEO)
 		si->encoder_max_size = ( el->video_height == 480 ? 120000: 144000);
@@ -171,11 +172,11 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 			case ENCODER_YUV422:
 			case ENCODER_YUV422F:
 			case ENCODER_YUV4MPEG:
-			si->encoder_max_size = 2048 + tmp + (tmp/2) + (tmp/2);break;
+			si->encoder_max_size = 2048 + tmp + tmp1 + tmp1;break;
 			case ENCODER_LZO:
 			si->encoder_max_size = (tmp * 3 ); break;
 			default:
-			si->encoder_max_size = ( 8 * 65535 );
+			si->encoder_max_size = ( 16 * 65535 );
 			break;
 		}
 	

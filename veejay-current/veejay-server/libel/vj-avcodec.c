@@ -130,7 +130,7 @@ static vj_encoder	*vj_avcodec_new_encoder( int id, editlist *el, char *filename)
 #endif
 		e->data[0] = (uint8_t*) vj_calloc(sizeof(uint8_t) * el->video_width * el->video_height * 3 );
 		e->data[1] = e->data[0] + el->video_width * el->video_height;
-		e->data[2] = e->data[1] + el->video_width * el->video_height /2;
+		e->data[2] = e->data[1] + el->video_width * el->video_height; //@ for all pixfmt
 #ifdef SUPPORT_READ_DV2
 	}
 #endif
