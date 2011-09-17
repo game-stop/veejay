@@ -1605,12 +1605,9 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 					vj_perform_reverse_audio_frame(info, n_samples, sambuf );
 
 				int sc = n_frames - 2;
-#ifdef STRICT_CHECKING
-				assert( sc >= 0 );
-				assert( sc <= MAX_SPEED );
-#else
+				
+				//@ clip sc into range, there isn't a resampler for every speed
 				if( sc < 0 ) sc = 0; else if ( sc > MAX_SPEED ) sc = MAX_SPEED;
-#endif
 
 				n_samples = audio_resample( resample_context[sc],audio_buf, sambuf, n_samples );
 			}
@@ -1646,10 +1643,7 @@ int vj_perform_fill_audio_buffers(veejay_t * info, uint8_t *audio_buf, uint8_t *
 		if( cur_sfd == 0 )
 		{
 			int sc = max_sfd - 2;
-#ifdef STRICT_CHECKING
-			assert(sc>=0);
-			assert(sc <= MAX_SPEED );
-#endif
+			
 			if( sc < 0 ) sc = 0; else if ( sc > MAX_SPEED ) sc = MAX_SPEED; 
 			// @ resample buffer
 			n_samples = audio_resample( downsample_context[ sc ], 
