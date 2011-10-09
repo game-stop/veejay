@@ -152,7 +152,7 @@ void vj_mem_init(void)
 
 void *vj_malloc_(unsigned int size)
 {
-	if( size == 0 )
+	if( size <= 0 )
 		return NULL;
 	void *ptr = NULL;
 #ifdef HAVE_POSIX_MEMALIGN
@@ -169,13 +169,11 @@ void *vj_malloc_(unsigned int size)
 
 	return ptr;
 }
-#ifdef STRICT_CHECKING
 void	*vj_strict_malloc( unsigned int size, const char *f, int line )
 {	
 	veejay_msg(0, "%d\t\tbytes\t\tin %s:%d",size,f,line);
 	return vj_malloc_( size );
 }
-#endif
 void	*vj_calloc_( unsigned int size )
 {
 	void *ptr = vj_malloc_( size );
@@ -183,13 +181,11 @@ void	*vj_calloc_( unsigned int size )
 		veejay_memset( ptr, 0, size );
 	return ptr;	
 }
-#ifdef STRICT_CHECKING
 void	*vj_strict_calloc( unsigned int size, const char *f, int line )
 {
 	veejay_msg(0, "%d\t\tbytes\t\tin %s:%d", size,f, line );
 	return vj_calloc_(size);
 }
-#endif
 #define    RUP8(num)(((num)+8)&~8)
 
 void *vj_yuvalloc( unsigned int w, unsigned int h )

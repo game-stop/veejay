@@ -1309,7 +1309,7 @@ static void vevo_port_free_(vevo_port_t * p)
 	   	 veejay_msg(0, "port %s is not a port (not allocated by vpn). (%s)", key,val);
     	}
 	} else if ( err == VEVO_NO_ERROR ) {
-    	vevo_property_del( trackports, key);//,VEVO_ATOM_TYPE_STRING, 0, NULL );
+    	vevo_property_set( trackports, key, VEVO_ATOM_TYPE_PORTPTR,0,NULL );//,VEVO_ATOM_TYPE_STRING, 0, NULL );
     } else {
 	    veejay_msg(0, "unknown error code %d on port %s. (%s)", err,key,val );
 	}
@@ -1319,8 +1319,9 @@ static void vevo_port_free_(vevo_port_t * p)
     if (port->table) {
 	 if (!hash_isempty((hash_t *) port->table)) {
 		hscan_t scan;
+		memset( &scan, 0, sizeof(hscan_t));
 		hash_scan_begin(&scan, (hash_t *) port->table);
-		hnode_t *node;
+		hnode_t *node = NULL;
 
 		while ((node = hash_scan_next(&scan)) != NULL) {
 		    vevo_storage_t *stor = NULL;

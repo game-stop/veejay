@@ -30,6 +30,10 @@
 #include <stdarg.h>
 #include <string.h>
 #include <stdint.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+
 #include <libvjmem/vjmem.h>
 #include <libvjmsg/vj-msg.h>
 #include <dlfcn.h>
@@ -73,8 +77,9 @@ static int _debug_level = 0;
 static int _color_level = 1;
 static int _no_msg = 0;
 
-static struct timeval _start_time;
-static int _start_time_offset = -1;
+__thread struct timeval _start_time;
+__thread int timerdy = 0;
+__thread int _start_time_offset = 0;
 
 #define MAX_LINES 100 
 typedef struct
@@ -306,9 +311,8 @@ void veejay_set_debug_level(int level)
 	{
 		_debug_level = 0;
 	}
-
-	gettimeofday( &_start_time, NULL );
 }
+
 void veejay_set_colors(int l)
 {
 	if(l) _color_level = 1;
@@ -350,17 +354,25 @@ void veejay_msg(int type, const char format[], ...)
     // parse arguments
     va_start(args, format);
     vsnprintf(buf, sizeof(buf) - 1, format, args);
+
 #ifdef STRICT_CHECKING
+	
+	struct tm *nowtm = NULL;
+	
 	gettimeofday( &timenow, NULL );
-
-	timeval_subtract( &timenow, &timenow, &_start_time );
-
-	struct tm *nowtm = localtime(&timenow);
-	if( _start_time_offset == -1 && nowtm->tm_hour > 0 ) {
-		_start_time_offset = nowtm->tm_hour;
-	} else if(_start_time_offset==-1) {
-		_start_time_offset= 0;
+	if( !timerdy  ) {
+		memcpy( &_start_time, &timenow, sizeof(struct timeval));
+		timerdy = 1;
+		timeval_subtract( &timenow,&timenow,&_start_time);
+		nowtm = localtime(&timenow);
+		if(nowtm->tm_hour > 0 )
+			_start_time_offset = nowtm->tm_hour; // wat
 	}
+	else {
+		timeval_subtract( &timenow, &timenow, &_start_time );
+		nowtm = localtime(&timenow);
+	}
+
 	nowtm->tm_hour -= _start_time_offset;
 
 	strftime( tmbuf,sizeof(tmbuf), "%H:%M:%S",nowtm );
@@ -626,9 +638,31 @@ void	veejay_chomp_str( char *msg, int *nlen )
 
 void    report_bug(void)
 {
-        veejay_msg(VEEJAY_MSG_WARNING, "Please report this error to http://groups.google.com/group/veejay-discussion?hl=en");
-        veejay_msg(VEEJAY_MSG_WARNING, "Send at least veejay's output and include the command(s) you have used to start it.");
+    veejay_msg(VEEJAY_MSG_WARNING, "Please report this error to http://groups.google.com/group/veejay-discussion?hl=en");
+    veejay_msg(VEEJAY_MSG_WARNING, "Send at least veejay's output and include the command(s) you have used to start it.");
 	veejay_msg(VEEJAY_MSG_WARNING, "Also, please consider sending in the recovery files if any have been created.");
 	veejay_msg(VEEJAY_MSG_WARNING, "If you compiled it yourself, please include information about your system.");
+
+#ifdef STRICT_CHECKING
+	veejay_msg(VEEJAY_MSG_WARNING, "Dumping core file to: core.%d",getpid() );
+	
+	char cmd[128];
+	memset(cmd,0,sizeof(cmd));
+	sprintf(cmd, "generate-core-file");
+	int fd = open( "veejay.cmd", O_RDWR|O_CREAT );
+	if(!fd) {
+		veejay_msg(VEEJAY_MSG_ERROR,"Unable to write gdb batch commands, no core dump written. ");
+	} else {
+		int res = write( fd , cmd, strlen(cmd));
+		close(fd);
+		sprintf(cmd, "gdb -p %d -batch -x veejay.cmd", getpid());
+		veejay_msg(VEEJAY_MSG_WARNING,"Please wait! Running command '%s'", cmd);
+		system(cmd);
+		veejay_msg(VEEJAY_MSG_WARNING, "Done!");
+		veejay_msg(VEEJAY_MSG_INFO, "Please bzip2 and upload the coredump somewhere and tell us where to find it!");
+	}
+#endif
+		
+
 }
 

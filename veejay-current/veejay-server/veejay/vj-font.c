@@ -129,8 +129,8 @@ typedef struct {
 	char	*add;
 	char 	*prev;
 	pthread_mutex_t	mutex;
-	srt_cycle_t	*text_buffer;
-	uint32_t	 text_max_size;
+//	srt_cycle_t	*text_buffer;
+//	uint32_t	 text_max_size;
 } vj_font_t;
 
 static int	configure(vj_font_t *f, int size, int font);
@@ -1510,7 +1510,7 @@ void	vj_font_destroy(void *ctx)
 		if( f->font_table[i] )
 			free(f->font_table[i]);
 	}
-	free( f->text_buffer );	
+//	free( f->text_buffer );	
 	free( f->font_table );
 	free( f->font_list );
 	free( f );
@@ -1767,9 +1767,9 @@ void	*vj_font_init( int w, int h, float fps, int is_osd )
 		}		
 	}
 
-	f->text_buffer = (srt_cycle_t*)
-		vj_calloc(sizeof(srt_cycle_t) *	(sizeof(srt_cycle_t)*22500));
-	f->text_max_size = 22500;
+//	f->text_buffer = (srt_cycle_t*)
+//		vj_calloc(sizeof(srt_cycle_t) *	(sizeof(srt_cycle_t)*22500));
+//	f->text_max_size = 22500;
 	//print_fonts(f);
 
 	pthread_mutex_init( &(f->mutex), NULL );
@@ -1851,9 +1851,9 @@ void	*vj_font_single_init( int w, int h, float fps,char *path )
 		}		
 	}
 
-	f->text_buffer = (srt_cycle_t*)
-		vj_calloc(sizeof(srt_cycle_t) *	(sizeof(srt_cycle_t)*22500));
-	f->text_max_size = 22500;
+//	f->text_buffer = (srt_cycle_t*)
+//		vj_calloc(sizeof(srt_cycle_t) *	(sizeof(srt_cycle_t)*22500));
+//	f->text_max_size = 22500;
 	//print_fonts(f);
 
 	pthread_mutex_init( &(f->mutex), NULL );

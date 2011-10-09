@@ -601,8 +601,8 @@ static void print_license()
 {
 	veejay_msg(VEEJAY_MSG_INFO,
 	    "Veejay -<|Classic +|>- %s Copyright (C) Niels Elburg and others",VERSION);
-	veejay_msg(VEEJAY_MSG_INFO,
-	    "Build for %s/%s arch %s on %s",
+	veejay_msg(VEEJAY_MSG_INFO,    
+		"Build for %s/%s arch %s on %s",
 	    BUILD_OS,
 	    BUILD_KERNEL,
 	    BUILD_MACHINE,
@@ -611,17 +611,19 @@ static void print_license()
 	veejay_msg(VEEJAY_MSG_INFO,
 	    "This software is subject to the GNU GENERAL PUBLIC LICENSE");
 
-	veejay_msg(VEEJAY_MSG_INFO,
-	    "Veejay comes with ABSOLUTELY NO WARRANTY; this is free software and");
+	veejay_msg(VEEJAY_MSG_INFO,    
+		"Veejay comes with ABSOLUTELY NO WARRANTY; this is free software and");
+	
 	veejay_msg(VEEJAY_MSG_INFO,
 		"you are welcome to redistribute it under certain conditions.");
+	
 	veejay_msg(VEEJAY_MSG_INFO,
 	    "The license must be included in the (source) package (COPYING)");
 }
 
 static void donothing(int sig)
 {
-	vj_lock(info);
+	vj_lock(info); //FIXME
 	veejay_handle_signal( info, sig );	
 	vj_unlock(info);
 }
@@ -731,7 +733,7 @@ int main(int argc, char **argv)
 
 	print_license();
 
-    	if(!veejay_main(info))
+    if(!veejay_main(info))
 	{
 	    veejay_msg(VEEJAY_MSG_ERROR, "Cannot start main playback cycle");
 		return 1;

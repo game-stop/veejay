@@ -496,7 +496,14 @@ hnode_t *hash_scan_next(hscan_t *scan)
 {
     hnode_t *next = scan->next;		/* 1 */
     hash_t *hash = scan->table;
-    hash_val_t chain = scan->chain + 1;
+#ifdef STRICT_CHECKING
+	//@ illegal state, must abort and fix cause
+	assert( hash != NULL ); 
+#else
+	if( hash == NULL )
+		return NULL;
+#endif
+	hash_val_t chain = scan->chain + 1;
     hash_val_t nchains = hash->nchains;
 #ifdef SRTICT_CHECING
     assert (hash_val_t_bit != 0);	/* 2 */
