@@ -74,6 +74,7 @@
 #include <poll.h>
 #include <libvje/vje.h>
 #include <libavutil/pixfmt.h>
+#include <libavformat/avformat.h>
 #include <libvevo/libvevo.h>
 #include <libstream/v4l2utils.h>
 #include <libvjmsg/vj-msg.h>
@@ -1091,6 +1092,7 @@ static	double	calc_tc( struct v4l2_timecode *tc, float fps )
 #endif
 	return (double) tc->frames / fps;
 }
+
 static	int	v4l2_pull_frame_intern( v4l2info *v )
 { //@ fixme more functions no pasta
 	void *src = NULL;
@@ -1139,7 +1141,8 @@ static	int	v4l2_pull_frame_intern( v4l2info *v )
 			}
 			break;
 		case 2:
-			length = avcodec_decode_video( v->c, v->picture, &got_picture, v->tmpbuf,src );
+		//	length = avcodec_decode_video( v->c, v->picture, &got_picture, v->tmpbuf,src );
+			length = -1; 
 			if( length == -1 ) {
 			 veejay_msg(0,"v4l2: error while decoding frame");
 			 return 0;
@@ -1244,7 +1247,8 @@ int		v4l2_pull_frame(void *vv,VJFrame *dst)
 			}
 			break;
 		case 2:
-			length = avcodec_decode_video( v->c, v->picture, &got_picture, v->tmpbuf,src );
+			//length = avcodec_decode_video( v->c, v->picture, &got_picture, v->tmpbuf,src );
+			length = -1;
 			if( length == -1 ) {
 			 veejay_msg(0,"v4l2: error while decoding frame");
 			 return 0;

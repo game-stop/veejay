@@ -476,7 +476,11 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 	} else  if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 && id != CODEC_ID_YUV420F && id != CODEC_ID_YUV422F)
         {
 		d->codec = avcodec_find_decoder( id );
+#if (LIBAVFORMAT_VERSION_MAJOR >= 53)
+		d->context = avcodec_alloc_context3(NULL); /* stripe was here! */
+#else
 		d->context = avcodec_alloc_context();
+#endif
 		d->context->width = width;
 		d->context->height = height;
 		d->context->opaque = d;
@@ -485,7 +489,7 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 		d->img = (VJFrame*) vj_calloc(sizeof(VJFrame));
 		d->img->width = width;	
 		if ( avcodec_open( d->context, d->codec ) < 0 )
-       		{
+		{
       		       veejay_msg(VEEJAY_MSG_ERROR, "Error initializing decoder %d",id); 
 		       _el_free_decoder( d );
        		       return NULL;
@@ -1074,6 +1078,15 @@ int	vj_el_set_bogus_length( editlist *el, long nframe, int len )
 	
 	return 1;
 }
+#if (LIBAVFORMAT_VERSION_MAJOR >= 53)
+static int avcodec_decode_video( AVCodecContext *avctx, AVFrame *picture, int *got_picture, uint8_t *data, int pktsize ) {
+	AVPacket pkt;
+	veejay_memset( &pkt, 0, sizeof(AVPacket));
+	pkt.data = data;
+	pkt.size = pktsize;
+	return avcodec_decode_video2( avctx, picture, got_picture, &pkt );
+}
+#endif
 
 int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 {
@@ -1367,13 +1380,21 @@ int	detect_pixel_format_with_ffmpeg( const char *filename )
 	AVFormatParameters avf;
 	AVFrame *av_frame = NULL;
 	AVPacket pkt;
-
+#if (LIBAVFORMAT_VERSION_MAJOR >= 53)
+	int err = avformat_open_input( &avformat_ctx, filename, NULL, NULL );
+#else
 	int err = av_open_input_file( &avformat_ctx,filename,NULL,0,NULL );
+#endif
+
 	if(err < 0 ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Unable to open %s: %d",filename,err );
 		return -1;
 	}
+#if (LIBAVFORMAT_VERSION_MAJOR >= 53 )
+	err = avformat_find_stream_info( avformat_ctx, NULL );
+#else
 	err = av_find_stream_info( avformat_ctx );
+#endif
 	if(err < 0 )
 	{
 		veejay_msg(VEEJAY_MSG_DEBUG, "FFmpeg: Stream information found in %s",filename);
@@ -1392,7 +1413,11 @@ int	detect_pixel_format_with_ffmpeg( const char *filename )
 	{
 		if( avformat_ctx->streams[i]->codec )
 		{
+#if (LIBAVFORMAT_VERSION_MAJOR >= 53)
+			if( avformat_ctx->streams[i]->codec->codec_type < CODEC_ID_FIRST_AUDIO )
+#else
 			if( avformat_ctx->streams[i]->codec->codec_type == CODEC_TYPE_VIDEO )
+#endif
 			{
 				int sup_codec = 0;
 				for( j = 0; _supported_codecs[j].name != NULL; j ++ ) {
