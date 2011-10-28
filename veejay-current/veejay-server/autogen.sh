@@ -14,9 +14,9 @@ echo "Edit me"
 ## newer distributions, ubuntu 11. etc
 ########################################
 
-if [ ! -d m4 ]; then
-        mkdir m4
-fi
+#if [ ! -d m4 ]; then
+#        mkdir m4
+#fi
 
 #autoreconf -v -fi -I m4
 
@@ -24,4 +24,4 @@ fi
 ## slackware 13.1 and older
 #########################################
 
-autoreconf -v -fi
+#autoreconf -v -fi
