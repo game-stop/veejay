@@ -2403,9 +2403,9 @@ void	vj_event_format_xml_event( xmlNodePtr node, int event_id )
 
 static	void	vj_event_send_new_id(veejay_t * v, int new_id)
 {
-	char s_print_buf[16];
 	if( vj_server_client_promoted( v->vjs[0], v->uc->current_link ))
 	{
+		char s_print_buf[16];
 		char result[6];
 		sprintf( result, "%05d",new_id );
 		sprintf(s_print_buf, "%03d%s",5, result);	
@@ -3528,6 +3528,14 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 		}
 		free(title);
 	}
+}
+
+void	vj_event_promote_me( void *ptr, const char format[], va_list ap )
+{
+	veejay_t *v = (veejay_t*) ptr;
+	vj_server_client_promote( v->vjs[VEEJAY_PORT_CMD], v->uc->current_link );
+	v->rmodes[ v->uc->current_link ] = -1000;
+	veejay_msg(VEEJAY_MSG_DEBUG, "Promoted link %d", v->uc->current_link );	
 }
 
 void vj_event_play_stop(void *ptr, const char format[], va_list ap) 
@@ -8373,7 +8381,7 @@ static	char *_vj_event_gatter_sample_info( veejay_t *v, int id )
 	char timecode[20];
 	MPEG_timecode_t tc;
 	y4m_ratio_t ratio = mpeg_conform_framerate( (double) v->current_edit_list->video_fps );
-	mpeg_timecode( &tc, (end_frame - start_frame),mpeg_framerate_code(ratio),v->current_edit_list->video_fps );
+	mpeg_timecode( &tc, (end_frame - start_frame + 1),mpeg_framerate_code(ratio),v->current_edit_list->video_fps );
 
 	sprintf( timecode, "%2d:%2.2d:%2.2d:%2.2d", tc.h,tc.m,tc.s,tc.f );
 	sample_get_description( id, description );

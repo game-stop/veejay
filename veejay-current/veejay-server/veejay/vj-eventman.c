@@ -2106,6 +2106,15 @@ void		vj_init_vevo_events(void)
 				vj_event_send_effect_list,
 				0,
 				VIMS_ALLOW_ANY );
+
+	index_map_[VIMS_PROMOTION]				=	_new_event(
+				NULL,
+				VIMS_PROMOTION,
+				"Tell client of new samples immediately after creation (reloaded)",
+				vj_event_promote_me,
+				0,
+				VIMS_ALLOW_ANY );
+
 	index_map_[VIMS_VIDEO_INFORMATION]			=	_new_event(
 				NULL,
 				VIMS_VIDEO_INFORMATION,

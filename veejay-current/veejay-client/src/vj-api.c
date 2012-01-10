@@ -7143,6 +7143,9 @@ int	vj_gui_reconnect(char *hostname,char *group_name, int port_num)
 	sleep(1); //@ give it some time to settle ( at least 1 frame period )
 
 	info->status_lock = 1;
+	
+	single_vims( VIMS_PROMOTION );
+	
 	load_editlist_info();
 
 	update_slider_value( "framerate", info->el.fps,  0 );

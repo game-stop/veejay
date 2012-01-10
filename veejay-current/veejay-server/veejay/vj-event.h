@@ -46,6 +46,7 @@ void    vj_event_xml_new_keyb_event		( 	void *v,	xmlDocPtr doc, 	xmlNodePtr cur 
 int vj_event_get_video_format(void);
 int vj_event_get_num_args(int net_id);
 void vj_event_update_remote(void *ptr);
+void	vj_event_promote_me			(	void *ptr,	const char format[], 	va_list ap	);
 void	vj_event_dump(void);
 void	vj_event_set_stream_color		(	void *ptr,	const char format[],	va_list ap	);
 void 	vj_event_chain_arg_inc			(	void *ptr, 	const char format[], 	va_list ap	); 

@@ -42,6 +42,7 @@ enum {
 	VIMS_CONTINUOUS_PLAY			=	35,
 	VIMS_RECVIEWPORT			=	90,
 	VIMS_VIDEO_INFORMATION			=	400,
+	VIMS_PROMOTION				=	444, /* client reads id of new sample after creation */
 	VIMS_EFFECT_LIST			=	401,
 	VIMS_EDITLIST_LIST			=	402,
 	VIMS_BUNDLE_LIST			=	403,
