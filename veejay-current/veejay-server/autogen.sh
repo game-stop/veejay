@@ -5,7 +5,6 @@
 # you may have to create the m4 directory yourself
 # 
 
-echo "Edit me"
 
 
 ## remove the '#' in front of the line for 'autoreconf'
@@ -14,11 +13,11 @@ echo "Edit me"
 ## newer distributions, ubuntu 11. etc
 ########################################
 
-#if [ ! -d m4 ]; then
-#        mkdir m4
-#fi
+if [ ! -d m4 ]; then
+        mkdir m4
+fi
 
-#autoreconf -v -fi -I m4
+autoreconf -v -fi -I m4
 
 #########################################
 ## slackware 13.1 and older
