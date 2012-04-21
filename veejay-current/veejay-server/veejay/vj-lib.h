@@ -353,6 +353,9 @@ typedef struct {
 	int	*rmodes;
 	int pause_render;
 	void	*shm;
+	int	use_keyb;
+	int	use_mouse;
+	int	show_cursor;
 } veejay_t;
 
 typedef struct {

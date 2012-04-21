@@ -2248,7 +2248,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 			veejay_msg(VEEJAY_MSG_INFO, "Using output driver SDL");
 #ifdef HAVE_SDL
 			info->sdl[0] =
-			    (vj_sdl *) vj_sdl_allocate( info->video_output_width,info->video_output_height,info->pixel_format);
+			    (vj_sdl *) vj_sdl_allocate( info->video_output_width,info->video_output_height,info->pixel_format, info->use_keyb, info->use_mouse,info->show_cursor);
 			if( !info->sdl[0] )
 				return -1;
 
@@ -2284,7 +2284,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 			veejay_msg(VEEJAY_MSG_INFO, 
 			    "Using output driver SDL & DirectFB");
 #ifdef HAVE_SDL
-			info->sdl[0] = 	(vj_sdl *) vj_sdl_allocate(info->video_output_width,info->video_output_height, info->pixel_format);
+			info->sdl[0] = 	(vj_sdl *) vj_sdl_allocate(info->video_output_width,info->video_output_height, info->pixel_format, info->use_keyb,info->use_mouse,info->show_cursor);
 			if(!info->sdl[0])		
 				return -1;
 			

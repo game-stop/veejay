@@ -97,7 +97,8 @@ static void vj_sdl_move( vj_sdl *vjsdl , int scaled_width, int scaled_height, in
 	veejay_msg(VEEJAY_MSG_INFO, "Changed video window to size %d x %d",
 			vjsdl->sw_scale_width,vjsdl->sw_scale_height);
 }
-vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
+
+vj_sdl *vj_sdl_allocate(int width, int height, int fmt, int use_key, int use_mouse, int show_cursor)
 {
     vj_sdl *vjsdl = (vj_sdl *) vj_malloc(sizeof(vj_sdl));
     if (!vjsdl)
@@ -107,8 +108,11 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
 
     vjsdl->flags[0] = 0;
     vjsdl->flags[1] = 0;
-    vjsdl->mouse_motion = 1;
-    vjsdl->use_keyboard = 1;
+//   vjsdl->mouse_motion = 1;
+  //  vjsdl->use_keyboard = 1;
+    vjsdl->use_keyboard = use_key;
+    vjsdl->mouse_motion = use_mouse;
+    vjsdl->show_cursor = show_cursor;
     vjsdl->pix_format = SDL_YUY2_OVERLAY; 
     vjsdl->pix_fmt = fmt;
     vjsdl->width = width;
@@ -118,7 +122,6 @@ vj_sdl *vj_sdl_allocate(int width, int height, int fmt)
     vjsdl->sw_scale_height = 0;
     vjsdl->custom_geo[0] = -1;
     vjsdl->custom_geo[1] = -1;
-    vjsdl->show_cursor = 0;
     vjsdl->display = NULL;
 	switch(fmt) {
 	 //@ dont use YUVJ here - on blitting it to SDL it will be converted to YUV clamped for YUYJ422

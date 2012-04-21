@@ -1547,13 +1547,13 @@ int	vj_event_parse_msg( void *ptr, char *msg, int msg_len )
 		vj_event_parse_bundle( v, bun->bundle );
 		return 1;
 	}
-
+/*
 	if( net_id >= 400 && net_id < 499 )
 	{
 		vj_server_client_promote( v->vjs[VEEJAY_PORT_CMD] , v->uc->current_link );
 		v->rmodes[ v->uc->current_link ] = -1000;
 	}
-
+*/
 	np = vj_event_vevo_get_num_args( net_id );
 		
 	if ( msg_len <= MSG_MIN_LEN )
@@ -3397,7 +3397,7 @@ void	vj_event_fullscreen(void *ptr, const char format[], va_list ap )
 			int go_fs = v->sdl[id]->fs == 1 ? 0:1 ;
 			char *caption = veejay_title(v);
 
-			vj_sdl *tmpsdl = vj_sdl_allocate( v->video_output_width,v->video_output_height,v->pixel_format);
+			vj_sdl *tmpsdl = vj_sdl_allocate( v->video_output_width,v->video_output_height,v->pixel_format,v->use_keyb,v->use_mouse,v->show_cursor);
 			
 			if(vj_sdl_init(
 				v->settings->ncpu,
@@ -3489,7 +3489,10 @@ void vj_event_set_screen_size(void *ptr, const char format[], va_list ap)
 					v->sdl[id] = vj_sdl_allocate( 
 						v->video_output_width,
 					 	v->video_output_height,
-					 	v->pixel_format );
+					 	v->pixel_format,
+						v->use_keyb,
+						v->use_mouse,
+						v->show_cursor );
 					veejay_msg(VEEJAY_MSG_INFO, "Allocated SDL window");
 				
 					if(vj_sdl_init( v->settings->ncpu,

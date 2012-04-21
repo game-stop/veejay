@@ -49,7 +49,7 @@ typedef struct vj_sdl_t {
     int ffmpeg_pixfmt;
 } vj_sdl;
 
-vj_sdl *vj_sdl_allocate(int width, int height, int pixel_format);
+vj_sdl *vj_sdl_allocate(int width, int height, int pixel_format, int k, int m, int s);
 void vj_sdl_set_geometry(vj_sdl *sdl, int w, int h);
 void vj_sdl_show(vj_sdl *vjsdl);
 int vj_sdl_init(int ncpu, vj_sdl * vjsdl, int scaled_width, int scaled_height,const char *caption, int show, int fs, float fps);

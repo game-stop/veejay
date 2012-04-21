@@ -51,6 +51,9 @@ static veejay_t *info = NULL;
 static float override_fps = 0.0;
 static int default_geometry_x = -1;
 static int default_geometry_y = -1;
+static	int	use_keyb = 1;
+static	int	use_mouse = 1;
+static	int	show_cursor = 0;
 static int force_video_file = 0; // unused
 static int override_pix_fmt = 0;
 static int switch_jpeg = 0;
@@ -245,6 +248,12 @@ static void Usage(char *progname)
 	fprintf(stderr,
 		"  -y/--geometry-y <num> \tTop left y offset for SDL video window\n");
 
+	fprintf(stderr,
+		"  --no-keyboard\t\tdisable keyboard for SDL video window\n");
+	fprintf(stderr,
+		"  --no-mouse\t\tdisable mouse for SDL video window\n");
+	fprintf(stderr, 
+		"  --show-cursor\t\tshow mouse cursor in SDL video window\n");	
 #endif
 	fprintf(stderr,
 		"  -A/--all [num] \t\tStart with capture device <num> \n");
@@ -399,6 +408,15 @@ static int set_option(const char *name, char *value)
 	else if (strcmp(name, "geometry-y") == 0 || strcmp(name,"y")==0) {
 		default_geometry_y = atoi(optarg);
 	}
+	else if (strcmp(name, "no-keyboard") == 0 ) {
+		use_keyb = 0;
+	}
+	else if (strcmp(name, "no-mouse") == 0 ) {
+		use_mouse = 0;
+	}
+	else if (strcmp(name, "show-cursor") == 0 ) {
+		show_cursor = 1;
+	}
 	else if(strcmp(name,"dump-events")==0 || strcmp(name,"u")==0) {
 	info->dump = 1;
 	}
@@ -495,6 +513,9 @@ static int check_command_line_options(int argc, char *argv[])
 	{"dummy",0,0,0},
 	{"geometry-x",1,0,0},
 	{"geometry-y",1,0,0},
+	{"no-keyboard",0,0,0},
+	{"no-mouse",0,0,0},
+	{"show-cursor",0,0,0},
 	{"auto-loop",0,0,0},
 	{"fps",1,0,0},
 	{"no-color",0,0,0},
@@ -654,7 +675,7 @@ int main(int argc, char **argv)
 	info = veejay_malloc();
 	if (!info)
 		return 1;
-
+	
    	settings = (video_playback_setup *) info->settings;
 
 	if(!check_command_line_options(argc, argv))
@@ -715,6 +736,10 @@ int main(int argc, char **argv)
 		veejay_msg(VEEJAY_MSG_INFO, "Using SIMD %s", mem_func);
 		free(mem_func);
 	}
+	info->use_keyb = use_keyb;
+	info->use_mouse = use_mouse;
+	info->show_cursor = show_cursor;
+
 
 	if(veejay_init(
 		info,

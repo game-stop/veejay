@@ -484,7 +484,6 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 		d->context->width = width;
 		d->context->height = height;
 		d->context->opaque = d;
-		d->context->palctrl = NULL;
 		d->frame = avcodec_alloc_frame();
 		d->img = (VJFrame*) vj_calloc(sizeof(VJFrame));
 		d->img->width = width;	
@@ -1377,7 +1376,6 @@ int	detect_pixel_format_with_ffmpeg( const char *filename )
 	AVFormatContext *avformat_ctx = NULL;
 	AVStream *avformat_stream = NULL;	
 	AVInputFormat *av_input_format = NULL;
-	AVFormatParameters avf;
 	AVFrame *av_frame = NULL;
 	AVPacket pkt;
 #if (LIBAVFORMAT_VERSION_MAJOR >= 53)
