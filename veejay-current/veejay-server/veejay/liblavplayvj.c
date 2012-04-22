@@ -1589,7 +1589,7 @@ static	void	veejay_event_handle(veejay_t *info)
 				mouse_y = event.button.y;
 			}
 
-			if( event.type == SDL_MOUSEBUTTONDOWN )
+			if( info->use_mouse && event.type == SDL_MOUSEBUTTONDOWN )
 			{
 				mouse_x = event.button.x;
 				mouse_y = event.button.y;
@@ -1623,7 +1623,7 @@ static	void	veejay_event_handle(veejay_t *info)
 				}
 			}
 
-			if( event.type == SDL_MOUSEBUTTONUP )
+			if( info->use_mouse && event.type == SDL_MOUSEBUTTONUP )
 			{
 				SDL_MouseButtonEvent *mev = &(event.button);
 				alt_pressed = (mod & KMOD_RSHIFT );
