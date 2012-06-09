@@ -21,6 +21,7 @@
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "lumakey.h"
+#include "common.h"
 
 vj_effect *lumakey_init(int width, int height)
 {
@@ -266,7 +267,7 @@ void lumakey_smooth_white(uint8_t * yuv1[3], uint8_t * yuv2[3], int width,
 	    if ((a1 >= t2 && a1 < threshold)
 		|| (a1 > threshold2 && a1 <= t3)) {
 		/* special case */
-		yuv1[0][x + y] = 235;
+		yuv1[0][x + y] = pixel_Y_hi_;
 		yuv1[1][x + y] = 128;
 		yuv1[2][x + y] = 128;
 	    } else {
