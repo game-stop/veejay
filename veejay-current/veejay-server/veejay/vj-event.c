@@ -5540,8 +5540,6 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 			//int real_id = vj_effect_real_to_sequence(args[2]);
 			if(sample_chain_add(args[0],args[1],args[2])) 
 			{
-				veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d chain entry %d has effect %s",
-					args[0],args[1],vj_effect_get_description(args[2]));
 				v->uc->chain_changed = 1;
 			}
 			else
@@ -5566,7 +5564,6 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 		{
 			if(vj_tag_set_effect(args[0],args[1], args[2]))
 			{
-				veejay_msg(VEEJAY_MSG_INFO, "Stream %d chain entry %d has effect %s",args[0],args[1],args[2]);
 				v->uc->chain_changed = 1;
 			}
 			else

@@ -149,7 +149,7 @@ static int vj_perform_tag_complete_buffers(veejay_t * info, int *h);
 static int vj_perform_increase_sample_frame(veejay_t * info, long num);
 static int vj_perform_sample_complete_buffers(veejay_t * info, int *h);
 static void vj_perform_use_cached_ycbcr_frame(veejay_t *info, int centry, int chain_entry, int width, int height);
-static int vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info, VJFrame **frames, VJFrameInfo *frameinfo, int e, int c, int n_frames, void *ptr );
+static int vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info, VJFrame **frames, VJFrameInfo *frameinfo, int e, int c, int n_frames, void *ptr, int playmode );
 static int vj_perform_render_sample_frame(veejay_t *info, uint8_t *frame[4], int sample);
 static int vj_perform_render_tag_frame(veejay_t *info, uint8_t *frame[4]);
 static int vj_perform_record_commit_single(veejay_t *info);
@@ -1253,7 +1253,7 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
 
 
 static int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
-	VJFrame **frames, VJFrameInfo *frameinfo, int e , int c, int n_frame, void *ptr)
+	VJFrame **frames, VJFrameInfo *frameinfo, int e , int c, int n_frame, void *ptr, int playmode)
 {
 	int n_a = vj_effect_get_num_params(e);
 	int entry = e;
@@ -1262,7 +1262,7 @@ static int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
 
 	veejay_memset( args, 0 , sizeof(args) );
 
-	if( info->uc->playback_mode == VJ_PLAYBACK_MODE_TAG )
+	if( playmode == VJ_PLAYBACK_MODE_TAG )
 	{
 		if(!vj_tag_get_all_effect_args(todo_info->ref, c, args, n_a, n_frame ))
 			return 1;
@@ -2171,14 +2171,14 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 
 			if(vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
 						(int) settings->current_frame_num, 
-						vj_tag_get_plugin(info->uc->sample_id,chain_entry,NULL)  ) ==-2) {
+						vj_tag_get_plugin(info->uc->sample_id,chain_entry,NULL),info->uc->playback_mode) ==-2) {
 				int res = 0;
 				void *pfx = vj_effect_activate( effect_id, &res );
 				if( res )  {
 					settings->fxrow[chain_entry] = effect_id;
 					if( pfx ) {
 						vj_tag_get_plugin(info->uc->sample_id,chain_entry,pfx);
-						vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,(int) settings->current_frame_num,pfx );
+						vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,(int) settings->current_frame_num,pfx,info->uc->playback_mode );
 					}
 				}
 			}
@@ -2261,7 +2261,7 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 							}	
 						
 						if(vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num,
-								       sample_get_plugin(id,n,NULL)	)==-2) {
+								       sample_get_plugin(id,n,NULL),mode	)==-2) {
 							int res = 0;
 							void *pfx = vj_effect_activate( fx_id, &res );
 							if( res )  {
@@ -2270,7 +2270,7 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 									sample_get_plugin(id,n,pfx);
 								
 									
-									vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num,pfx );
+									vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num,pfx,mode );
 								}
 							}
 
@@ -2308,14 +2308,14 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 							// logic to super/sub sample
 						}
 						if(vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num,
-								       vj_tag_get_plugin(id,n,NULL)	) == -2 ) {
+								       vj_tag_get_plugin(id,n,NULL),mode	) == -2 ) {
 							int res = 0;
 							void *pfx = vj_effect_activate( fx_id, &res);
 							if( res ) {
 								settings->fxrow[n] = fx_id; 
 								if(pfx) {
 									vj_tag_get_plugin( id,n, pfx );
-									vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num, pfx );
+									vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num, pfx,mode );
 								}
 							}
 						}
@@ -2438,14 +2438,14 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 			}
 		
 			if( vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
-				(int) settings->current_frame_num, sample_get_plugin(info->uc->sample_id,chain_entry,NULL) ) == -2 ) {
+				(int) settings->current_frame_num, sample_get_plugin(info->uc->sample_id,chain_entry,NULL),info->uc->playback_mode   ) == -2 ) {
 					int res = 0;
 					void *pfx = vj_effect_activate( effect_id, &res );
 					if( res )  {
 						settings->fxrow[chain_entry] = effect_id;
 						if( pfx ) {
 							sample_get_plugin(info->uc->sample_id,chain_entry,pfx);
-							vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,(int) settings->current_frame_num,pfx );
+							vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,(int) settings->current_frame_num,pfx,info->uc->playback_mode  );
 						}
 					}
 				}
