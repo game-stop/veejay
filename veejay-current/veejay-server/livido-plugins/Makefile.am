@@ -7,7 +7,8 @@ lvd_shmin_la_SOURCES = lvd_shmin.c
 lvd_shmout_la_SOURCES= lvd_shmout.c
 lvd_solid_la_SOURCES = lvd_solid.c
 
-AM_CFLAGS=-I@top_srcdir@/include
+INCLUDES=$(FFMPEG_CFLAGS)
+AM_CFLAGS=-I@top_srcdir@/include 
 AM_LDFLAGS=-module -avoid-version -lm -export-dynamic
 AM_LIBTOOLFLAGS = --tag=disable-static
 
