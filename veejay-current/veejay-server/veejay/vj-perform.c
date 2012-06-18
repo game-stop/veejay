@@ -2167,6 +2167,7 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
                                 );
                                 frames[0]->ssm = 0;
                         }
+
 			vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
 				(int) settings->current_frame_num, vj_tag_get_plugin(info->uc->sample_id,chain_entry,NULL  ));
 	    } // if
@@ -3330,7 +3331,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 		VJFrame *out = yuv_yuv_template( pri[0],pri[1],pri[2],info->video_output_width,info->video_output_height,
 					get_ffmpeg_pixfmt( info->pixel_format));
 
-		int pff = get_ffmpeg_pixfmt(info->pixel_format);
+		int pff = frame->format; //get_ffmpeg_pixfmt(info->pixel_format);
 		if( frame->ssm == 1 )
 			pff = (info->pixel_format == FMT_422F ? PIX_FMT_YUVJ444P : PIX_FMT_YUV444P );
 		VJFrame *in  = yuv_yuv_template( frame->data[0],frame->data[1],frame->data[2],
@@ -3357,7 +3358,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
                         	chroma_supersample(
                        	         settings->sample_mode,
                        	         effect_sampler,
-                       	         frame->data,
+                       	         pri,
                        	         frame->width,
                        	         frame->height
                                 );
@@ -3519,6 +3520,8 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 
 	
 	vj_perform_finish_chain( info );
+
+	
 
 	vj_perform_render_font( info, settings);
 	//@ record frame 

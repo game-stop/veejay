@@ -1079,9 +1079,8 @@ static int veejay_screen_update(veejay_t * info )
 		vj_perform_done_s2(info);
 	}
 
-
-
 	vj_perform_get_primary_frame(info,frame);
+
 	if(check_vp)
 	{
 		if( info->video_out == 0 ) {

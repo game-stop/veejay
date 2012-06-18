@@ -1454,7 +1454,7 @@ void*	deal_with_livido( void *handle, const char *name )
 		{	(void(*)()) free			},
 		{	(void(*)())memset			},
         {	(void(*)())memcpy			},
-        {	(void(*)())vevo_port_new	},
+        {	(void(*)())livido_plugin_port_new	},
         {	(void(*)())vevo_port_free		},
         {	(void(*)())vevo_property_set		},
         {	(void(*)())vevo_property_get		},
