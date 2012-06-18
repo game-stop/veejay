@@ -2251,6 +2251,48 @@ int		vevo_port_get_total_size( vevo_port_t *port )
 }
 #endif
 
+
+void	vevo_port_recursive_free( vevo_port_t *port )
+{
+	if(!port == NULL)
+		return;
+	int i;
+	vevo_storage_t **item = vevo_list_nodes_( port, VEVO_ATOM_TYPE_PORTPTR );
+	if(!item)
+	{
+		vevo_port_free_( port );
+		return;
+	}
+
+	for( i = 0; item[i] != NULL ; i ++ )
+	{
+		void *q = NULL;
+		int n = vevo_port_get_port( port, item[i], &q );	
+
+		if( n == 1 && q != NULL )
+		{	
+			vevo_port_recursive_free( q );	
+		}
+		else
+		{
+			if( n > 1 )
+			{
+				int k = 0;
+				for( k = 0; k < item[i]->num_elements; k ++ )
+				{
+					void *qq = NULL;
+					int err = atom_get_value( item[i], k, &qq );
+					if( err != VEVO_NO_ERROR )
+						continue;
+					vevo_port_recursive_free( qq );
+				}
+			}
+		}
+	}
+
+	vevo_port_free_( port );
+}	
+/*	
 void	vevo_port_recursive_free( vevo_port_t *port )
 {
 	if(!port)
@@ -2296,6 +2338,7 @@ void	vevo_port_recursive_free( vevo_port_t *port )
 
 	vevo_port_free_(port);
 }
+*/
 
 /*
 char	**vevo_port_deepen_namespace( void *port, char *path)

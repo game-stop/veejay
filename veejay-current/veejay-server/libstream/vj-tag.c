@@ -2290,7 +2290,7 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 	{
 	 	int res = 0;
 		tag->effect_chain[position]->fx_instance = vj_effect_activate( effect_id, &res );
-		if( res == -1 )
+		if( res == 0 )
 			return -1;
 	}
 

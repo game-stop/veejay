@@ -710,8 +710,9 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 		return VJE_NEED_INIT;
 	}
 
-	if( selector >= 500 )
+	if( selector >= 500 ) {
 		vj_effman_apply_plug_effect( frames, frameinfo, kf, arguments,n_a, entry, selector, ptr );
+	}
 	else
 	{		
 		if( selector > 200 )	

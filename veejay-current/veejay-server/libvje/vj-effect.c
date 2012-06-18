@@ -327,11 +327,11 @@ int vj_effect_initialized(int effect_id)
 static void 	*vj_effect_activate_ext( int fx_id, int *result )
 {
 	if( fx_id > (MAX_EFFECTS + n_ext_plugs_) )
-		return 0;
+		return NULL;
 	void *plug = plug_activate( fx_id - MAX_EFFECTS );
 	if(plug)
 	{
-		vj_effect_ready[fx_id] = 1;
+	//	vj_effect_ready[fx_id] = 1;
 		*result = 1;
 		return plug;
 	}
