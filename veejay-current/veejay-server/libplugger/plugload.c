@@ -334,13 +334,24 @@ void	*plug_get_by_so_name( char *soname )
 		if( str == NULL )
 			continue;
 
-		veejay_msg(0, "'%s' vs '%s'", str,soname );
-
 		if( strcmp( soname,str ) == 0 )
 			return index_map_[i];
 	}
 
 	return NULL;
+}
+
+int	plug_get_idx_by_name( char *name )
+{
+	int i;
+	int len = strlen(name);
+	for( i = 0; i < index_; i ++ ) {
+		char *plugname = plug_get_name( i );
+		if( strncasecmp( name, plugname, len ) == 0 ) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 

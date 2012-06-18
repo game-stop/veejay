@@ -1113,8 +1113,15 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 		if( filename != NULL ) {
 			channel = plug_get_idx_by_so_name( filename );
 			if( channel == -1 ) {
-				veejay_msg(0, "'%s' not found.",filename );
-				return -1;
+				channel = plug_get_idx_by_name( filename );
+				if( channel == - 1) {
+					veejay_msg(0, "'%s' not found.",filename );
+					if( vj_tag_del( tag->id ) == 0 ) {
+						free(tag->source_name );
+						free(tag);
+					}
+					return -1;
+				}
 			}
 		}
 
@@ -1122,7 +1129,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 
 		int foo_arg  = vj_shm_get_id();
 
-		if( extra != 0 ) //@ vj_shm_set_id is a hack
+		if( extra != 0 ) //@ vj_shm_set_id is a hack FIXME
 			vj_shm_set_id( extra );
 
 		tag->generator = plug_activate(channel);
@@ -1384,7 +1391,7 @@ int vj_tag_del(int id)
 		break;
 	case VJ_TAG_TYPE_GENERATOR:
 		if( tag->generator ) {
-			//plug_deactivate( tag->generator );
+			plug_deactivate( tag->generator );
 		}
 		tag->generator = NULL;
 		break;

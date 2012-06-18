@@ -52,5 +52,6 @@ int	plug_find_generator_plugins(int *total, int seq );
 void	*plug_get( int fd_id );
 vj_effect *plug_get_plugin( int fx_id );
 void	*plug_get_by_so_name( char *soname );
+int	plug_get_idx_by_name( char *name);
 int 	plug_get_idx_by_so_name( char *soname );
 #endif
