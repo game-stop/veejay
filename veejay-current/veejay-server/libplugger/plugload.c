@@ -350,6 +350,40 @@ void	*plug_get( int fx_id ) {
 
 #define CONFIG_FILE_LEN 65535
 
+static	char	*get_livido_plug_path()
+{ //@ quick & dirty
+	char location[1024];
+	snprintf( location, sizeof(location)-1, "/proc/%d/exe", getpid() );
+	
+	char target[1024];
+	char lvdpath[1024];
+	
+	memset(lvdpath,0,sizeof(lvdpath));
+
+	int  err = readlink( location, target, sizeof(target) );
+	if( err >= 0 )
+	{
+	 target[err] = '\0';
+
+	 int n = err;
+	 while( target[n] != '/' && n > 0 ) {
+	   n--; //@ strip name of executable
+	 }
+	 if( n > 0 ) n --;
+	 
+	 while( target[n] != '/' && n > 0 ) {
+	   n--; //@ strip bin dir of executable
+	 }
+	 
+	 strncpy(lvdpath, target, n );
+ 	 strcat( lvdpath, "/lib/livido-plugins" );	 
+
+	 return strdup( lvdpath );
+	}
+	return NULL;
+}
+
+
 static	int	scan_plugins()
 {
 	char *home = getenv( "HOME" );
@@ -382,6 +416,9 @@ static	int	scan_plugins()
 			pch = strtok( NULL, "\n");
 		}
 	}
+
+	close(fd);
+
 	return 1;
 }
 
@@ -471,6 +508,14 @@ int	plug_sys_detect_plugins(void)
 #ifdef STRICT_CHECKING
 	assert( illegal_plugins_ != NULL );
 #endif	
+
+	char *lvd_path = get_livido_plug_path();
+	if( lvd_path != NULL ) {
+		add_to_plugin_list( lvd_path );
+		free(lvd_path);
+	}
+
+
 	if(!scan_plugins())
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,

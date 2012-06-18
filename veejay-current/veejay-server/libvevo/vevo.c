@@ -1335,8 +1335,10 @@ static void vevo_port_free_(vevo_port_t * p)
 		    vevo_free_storage(port,stor);
 		}
 		hash_free_nodes((hash_t *) port->table);
-		hash_destroy((hash_t *) port->table);
-	  }
+	 }
+ 	 hash_destroy((hash_t *) port->table);
+	 port->table = NULL;
+
     }
     else
     {
@@ -1351,22 +1353,25 @@ static void vevo_port_free_(vevo_port_t * p)
 		prop_node_free(port,l);
 		l = n;
 	    }
+	    port->list = NULL;
      }
 
      port_index_t *l = port->index;
      port_index_t *n = NULL;
      while (l != NULL) {
-		n = l->next;
-		port_node_free(port,l);
-		l = n;
+	n = l->next;
+	port_node_free(port,l);
+	l = n;
      }
+     port->index = NULL;
  
      vevo_pool_destroy( port->pool );	
      
      free(port);
+
      p = port = NULL;
 #ifdef STRICT_CHECKING
-	 return msize;
+	return msize;
 #endif
 }
 

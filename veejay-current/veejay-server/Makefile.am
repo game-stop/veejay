@@ -3,6 +3,7 @@
 SUBDIRS = mjpegtools aclib libOSC libhash libvjmsg libvjmem 
 SUBDIRS += bio2jack libvevo liblzo libvje libplugger libsample libvjnet libyuv libel libstream libsamplerec
 SUBDIRS += veejay 
+SUBDIRS += livido-plugins
 SUBDIRS += man
 
 ACLOCAL_AMFLAGS = -I m4 
