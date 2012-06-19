@@ -493,8 +493,6 @@ int veejay_free(veejay_t * info)
 
 	vj_event_stop();
 
-	vj_effect_shutdown();
-
      	vj_tag_free();
    	vj_el_free(info->edit_list);
    	vj_avcodec_free();
@@ -504,6 +502,9 @@ int veejay_free(veejay_t * info)
 	sample_free();
 
 //	vj_tag_free();
+
+	vj_effect_shutdown();
+
 
 	if( info->settings->composite )
 		composite_destroy( info->composite );

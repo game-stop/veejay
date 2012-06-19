@@ -706,7 +706,9 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 	if( !frames || !frames[0] ) return VJE_NO_FRAMES;
 
 	if( !vj_effect_initialized( selector, ptr ) ) {
-		veejay_msg(0, "FX REQUIRES INTIALIZATION DURING PROCESS RUN");
+#ifdef STRICT_CHECKING
+		veejay_msg(VEEJAY_MSG_DEBUG, "FX %d was dropped but is needed to render chain, instantiating...", selector);
+#endif
 		return VJE_NEED_INIT;
 	}
 

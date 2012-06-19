@@ -1251,6 +1251,7 @@ void vj_perform_get_primary_frame_420p(veejay_t *info, uint8_t **frame )
 	frame[2] = temp_buffer[2];
 }
 
+
 static int	vj_perform_apply_first(veejay_t *info, vjp_kf *todo_info,
 	VJFrame **frames, VJFrameInfo *frameinfo, int e , int c, int n_frame, void *ptr)
 {
@@ -2168,8 +2169,19 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
                                 frames[0]->ssm = 0;
                         }
 
-			vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
-				(int) settings->current_frame_num, vj_tag_get_plugin(info->uc->sample_id,chain_entry,NULL  ));
+			if(vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
+						(int) settings->current_frame_num, 
+						vj_tag_get_plugin(info->uc->sample_id,chain_entry,NULL)  ) ==-2) {
+				int res = 0;
+				void *pfx = vj_effect_activate( effect_id, &res );
+				if( res )  {
+					settings->fxrow[chain_entry] = effect_id;
+					if( pfx ) {
+						vj_tag_get_plugin(info->uc->sample_id,chain_entry,pfx);
+						vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,(int) settings->current_frame_num,pfx );
+					}
+				}
+			}
 	    } // if
 	} // for
 	return 0;
@@ -2425,8 +2437,18 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 				frames[0]->ssm = 0;
 			}
 		
-			vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
-				(int) settings->current_frame_num, sample_get_plugin(info->uc->sample_id,chain_entry,NULL) );
+			if( vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,
+				(int) settings->current_frame_num, sample_get_plugin(info->uc->sample_id,chain_entry,NULL) ) == -2 ) {
+					int res = 0;
+					void *pfx = vj_effect_activate( effect_id, &res );
+					if( res )  {
+						settings->fxrow[chain_entry] = effect_id;
+						if( pfx ) {
+							sample_get_plugin(info->uc->sample_id,chain_entry,pfx);
+							vj_perform_apply_first(info,setup,frames,frameinfo,effect_id,chain_entry,(int) settings->current_frame_num,pfx );
+						}
+					}
+				}
 
 	    	} // if
 	} // status

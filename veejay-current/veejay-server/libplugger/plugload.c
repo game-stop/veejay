@@ -254,7 +254,8 @@ static	void	free_plugin(void *plugin)
 #ifdef STRICT_CHECKING
 	assert( error == 0 );
 #endif
-	vevo_port_recursive_free( plugin );
+	if( error == VEVO_NO_ERROR )
+		vevo_port_recursive_free( plugin );
 
 	if( handle ) dlclose( handle );
 

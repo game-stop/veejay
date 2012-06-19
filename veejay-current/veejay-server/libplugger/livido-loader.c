@@ -1144,8 +1144,15 @@ void	livido_plug_deinit( void *instance )
 
 	livido_deinit_f deinit;
 	error = vevo_property_get( filter_templ, "HOST_plugin_deinit_func", 0, &deinit );
+	if( error != VEVO_NO_ERROR ) {
+		livido_port_recursive_free( instance );
+		instance = NULL;
+		return;
+	}
+
 #ifdef STRICT_CHECKING
 	char *plugin_name =  get_str_vevo( filter_templ, "name" );
+	assert( plugin_name != NULL );
 	veejay_msg(VEEJAY_MSG_DEBUG, "Destroy '%s'", plugin_name );
 	free(plugin_name);
 #endif
