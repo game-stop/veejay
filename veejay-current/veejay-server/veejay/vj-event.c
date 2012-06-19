@@ -5538,7 +5538,7 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 		if(sample_exists(args[0]))
 		{
 			//int real_id = vj_effect_real_to_sequence(args[2]);
-			if(sample_chain_add(args[0],args[1],args[2]) != -1) 
+			if(sample_chain_add(args[0],args[1],args[2])) 
 			{
 				veejay_msg(VEEJAY_MSG_DEBUG, "Sample %d chain entry %d has effect %s",
 					args[0],args[1],vj_effect_get_description(args[2]));
@@ -5564,10 +5564,9 @@ void vj_event_chain_entry_set(void *ptr, const char format[], va_list ap)
 
 		if(vj_tag_exists(args[0]))
 		{
-			if(vj_tag_set_effect(args[0],args[1], args[2]) != -1)
+			if(vj_tag_set_effect(args[0],args[1], args[2]))
 			{
-			//	veejay_msg(VEEJAY_MSG_INFO, "Stream %d chain entry %d has effect %s",
-			//		args[0],args[1],vj_effect_get_description(real_id));
+				veejay_msg(VEEJAY_MSG_INFO, "Stream %d chain entry %d has effect %s",args[0],args[1],args[2]);
 				v->uc->chain_changed = 1;
 			}
 			else
@@ -5697,7 +5696,7 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 			int i;
 			num_p   = vj_effect_get_num_params(real_id);
 			
-			if(sample_chain_add( args[0],args[1],args[2])!=-1)
+			if(sample_chain_add( args[0],args[1],args[2]))
 			{
 				int args_offset = 3;
 				
@@ -5752,13 +5751,13 @@ void vj_event_chain_entry_preset(void *ptr,const char format[], va_list ap)
 			int num_p   = vj_effect_get_num_params(real_id);
 			int i;
 		
-			if(vj_tag_set_effect(args[0],args[1], args[2]) != -1)
+			if(vj_tag_set_effect(args[0],args[1], args[2]) )
 			{
 				for(i=0; i < num_p; i++) 
 				{
 					if(vj_effect_valid_value(real_id, i, args[i+3]) )
 					{
-						if(vj_tag_set_effect_arg(args[0],args[1],i,args[i+3]) == -1)
+						if(vj_tag_set_effect_arg(args[0],args[1],i,args[i+3]))
 						{
 							veejay_msg(VEEJAY_MSG_ERROR, "setting argument %d value %d for  %s",
 								i,
@@ -7893,7 +7892,7 @@ void vj_event_effect_add(void *ptr, const char format[], va_list ap)
 	{	
 		int c = sample_get_selected_entry(v->uc->sample_id);
 		if ( sample_chain_add( v->uc->sample_id, c, 
-				       vj_effect_get_real_id(v->uc->key_effect)) != 1)
+				       vj_effect_get_real_id(v->uc->key_effect)))
 		{
 			int real_id = vj_effect_get_real_id(v->uc->key_effect);
 			veejay_msg(VEEJAY_MSG_INFO,"Added Effect %s on chain entry %d",
@@ -7913,8 +7912,7 @@ void vj_event_effect_add(void *ptr, const char format[], va_list ap)
 	if(STREAM_PLAYING(v))
 	{
 		int c = vj_tag_get_selected_entry(v->uc->sample_id);
-		if ( vj_tag_set_effect( v->uc->sample_id, c,
-				vj_effect_get_real_id( v->uc->key_effect) ) != -1) 
+		if ( vj_tag_set_effect( v->uc->sample_id, c,	vj_effect_get_real_id( v->uc->key_effect) )) 
 		{
 			int real_id = vj_effect_get_real_id(v->uc->key_effect);
 			veejay_msg(VEEJAY_MSG_INFO,"Added Effect %s on chain entry %d",

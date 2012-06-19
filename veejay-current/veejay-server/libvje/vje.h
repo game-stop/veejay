@@ -115,7 +115,7 @@ extern int vj_effect_get_summary(int entry, char *dst);
 extern int vj_effect_get_summary_len(int entry);
 extern void *vj_effect_activate(int e, int *retcode);
 extern int vj_effect_deactivate(int e, void *ptr);
-extern int vj_effect_initialized(int e);
+extern int vj_effect_initialized(int e, void *ptr);
 extern int vj_effect_get_min_i();
 extern int vj_effect_get_max_i();
 extern int vj_effect_get_min_v();

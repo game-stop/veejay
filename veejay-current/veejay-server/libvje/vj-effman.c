@@ -705,14 +705,10 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 
 	if( !frames || !frames[0] ) return VJE_NO_FRAMES;
 
-	if( !vj_effect_initialized( selector ) && !vj_effect_is_plugin(selector) ) {
+	if( !vj_effect_initialized( selector, ptr ) ) {
+		veejay_msg(0, "FX REQUIRES INTIALIZATION DURING PROCESS RUN");
 		return VJE_NEED_INIT;
 	}
-
-//	if(!vj_effect_initialized(selector) && !vj_effect_is_plugin( selector ))
-//	{
-//		return VJE_NEED_INIT;
-//	}
 
 	if( selector >= 500 ) {
 		vj_effman_apply_plug_effect( frames, frameinfo, kf, arguments,n_a, entry, selector, ptr );

@@ -3026,7 +3026,7 @@ veejay_t *veejay_malloc()
 	if(!info->seq)
 		return NULL;
 	
-	info->seq->samples = (int*) vj_calloc(sizeof(int) * MAX_SEQUENCES );
+	info->seq->samples = (int*) vj_calloc(sizeof(int) * (MAX_SEQUENCES+1) ); //@ SL contains 100 sequence items
 	
     info->audio = AUDIO_PLAY;
     info->continuous = 1;

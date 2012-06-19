@@ -1190,6 +1190,7 @@ void	livido_plug_deinit( void *instance )
 	}
 
 	livido_port_recursive_free( instance );
+	
 	instance = NULL;
 }
 //get plugin defaults

@@ -646,6 +646,7 @@ void	plug_deactivate( void *instance )
 {
 	if( instance )
 		deinstantiate_plugin( instance );	
+
 }
 
 static	int	linear_len( char **items )

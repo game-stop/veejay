@@ -192,6 +192,8 @@ void	set_pixel_range(uint8_t Yhi,uint8_t Uhi, uint8_t Ylo, uint8_t Ulo)
 	pixel_Y_lo_ = Ulo;
 }
 
+static	void	*__plugin_ref = NULL;
+
 static struct
 {
 	int	(*mem_init)(int width, int height);
@@ -324,16 +326,33 @@ int	vj_effect_is_plugin( int effect_id )
 	return 0;
 }
 
-int vj_effect_initialized(int effect_id)
+int vj_effect_initialized(int effect_id, void *instance_ptr )
 {
  
 	int seq = vj_effect_real_to_sequence(effect_id);
+#ifdef STRICT_CHECKNIG
+	if( seq < 0 ) {
+		veejay_msg(0, "FX %d, ptr %p has seq %d", effect_id, instance_ptr , seq);
+		assert( seq >= 0 );
+	}
+#endif
 	if( seq < 0 )
 		return 0;
-	if( _no_mem_required(effect_id) || vj_effect_ready[seq] == 1 )
+	
+	if( seq >= MAX_EFFECTS && seq < (MAX_EFFECTS + n_ext_plugs_)) {
+		//@ is plugin
+		if( instance_ptr == NULL ) {
+			return 0;
+		}
 		return 1;
-
-
+	} else if( seq < MAX_EFFECTS ) { //@ veejay internal FX
+		if( _no_mem_required(effect_id) || vj_effect_ready[seq] == 1 ) {
+			return 1;
+		}
+	}
+#ifdef STRICT_CHECKING
+	assert( vj_effect_ready[seq] == 0 );
+#endif
 	return 0;
 }
 
@@ -349,7 +368,6 @@ static void 	*vj_effect_activate_ext( int fx_id, int *result )
 	void *plug = plug_activate( fx_id - MAX_EFFECTS );
 	if(plug)
 	{
-	//	vj_effect_ready[fx_id] = 1;
 		*result = 1;
 		return plug;
 	} 
@@ -449,44 +467,32 @@ int vj_effect_deactivate(int effect_id, void *ptr)
 	
 
 	
-//	if( vj_effect_ready[seq] == 1 )
-//	{
-	
 	if( seq >= MAX_EFFECTS && seq < (n_ext_plugs_ + MAX_EFFECTS))
 	{
 		if(ptr) 
 		{
 			plug_deactivate( ptr );
-			ptr = NULL;
 			return 1;
 		}
-		return 0;
-	}
-	
-	if( vj_effect_ready[seq] == 1 ) {
-		int index = _get_simple_effect(effect_id);
-		if(index==-1)
-		{
-			index = _get_complex_effect(effect_id);
-			if(index == -1)
-			{
-				return 0;
+	} else if ( seq < MAX_EFFECTS ) {
+		if( vj_effect_ready[seq] == 1 ) {
+			int index = _get_simple_effect(effect_id);
+			if(index==-1) {
+				index = _get_complex_effect(effect_id);
+				if(index == -1)
+				{
+					return 0;
+				}
+				complex_effect_index[index].free( vj_effects[seq]->user_data );
+				vj_effect_ready[seq] = 0;
+				veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated complex effect %s",	vj_effects[seq]->description);
+				return 1;
 			}
-			complex_effect_index[index].free( vj_effects[seq]->user_data );
+			simple_effect_index[index].free();
 			vj_effect_ready[seq] = 0;
-			veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated complex effect %s",
-			vj_effects[seq]->description);
+			veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated simple effect %s", vj_effects[seq]->description);
 			return 1;
 		}
-		simple_effect_index[index].free(  );
-		vj_effect_ready[seq] = 0;
-		veejay_msg(VEEJAY_MSG_DEBUG, "Deactivated simple effect %s", vj_effects[seq]->description);
-		return 1;
-	}
-
-	if( vj_effect_ready[seq] == 0  )
-	{
-		return 1;
 	}
 
 	return 0;

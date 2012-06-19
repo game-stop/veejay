@@ -1918,7 +1918,7 @@ int sample_chain_free(int s1)
 	e_id = sample->effect_chain[i]->effect_id;
 	if(e_id!=-1)
 	{
-		if(vj_effect_initialized(e_id) || sample->effect_chain[i]->fx_instance != NULL)
+		if(vj_effect_initialized(e_id, sample->effect_chain[i]->fx_instance))
 		{
 			vj_effect_deactivate(e_id, sample->effect_chain[i]->fx_instance);
 			sample->effect_chain[i]->fx_instance = NULL;
@@ -2007,9 +2007,9 @@ int sample_chain_add(int s1, int c, int effect_nr)
     int effect_params = 0, i;
     sample_info *sample = sample_get(s1);
     if (!sample)
-		return -1;
+		return 0;
     if (c < 0 || c >= SAMPLE_MAX_EFFECTS)
-		return -1;
+		return 0;
 
 /*	if ( effect_nr < VJ_IMAGE_EFFECT_MIN ) return -1;
 
@@ -2020,30 +2020,32 @@ int sample_chain_add(int s1, int c, int effect_nr)
     if( sample->effect_chain[c]->effect_id != -1 && sample->effect_chain[c]->effect_id != effect_nr )
     {
 	//verify if the effect should be discarded
-	if(vj_effect_initialized( sample->effect_chain[c]->effect_id ))
+	if(vj_effect_initialized( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance )  ) 
 	{
-		// it is using some memory, see if we can free it ...
-		int i;
-		int ok = 1;
-		for(i=(c+1); i < SAMPLE_MAX_EFFECTS; i++)
-		{
-			if( sample->effect_chain[i]->effect_id == sample->effect_chain[c]->effect_id) ok = 0;
-		}
-		// ok, lets get rid of it.
-		if( ok ) {
+		if(!vj_effect_is_plugin( sample->effect_chain[c]->effect_id ) ) {
+			int i  = 0;
+			int frm = 1;
+			
+			for( i = 0; i < SAMPLE_MAX_EFFECTS ; i ++ ) {
+			        if( i == c )
+			       		continue;
+			 	if( sample->effect_chain[i]->effect_id == effect_nr )
+		 			frm = 0;
+			}
+			
+			if( frm == 1 ) {
+				vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance );
+				sample->effect_chain[c]->fx_instance = NULL;
+			}
+		} else {
 			vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance );
 			sample->effect_chain[c]->fx_instance = NULL;
-
 		}
-	}
-	else if( sample->effect_chain[c]->fx_instance != NULL && vj_effect_is_plugin( sample->effect_chain[c]->effect_id ) ) {
-		vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance );
-		sample->effect_chain[c]->fx_instance = NULL;
 	}
     }
 
 
-    if(!vj_effect_initialized(effect_nr) || vj_effect_is_plugin( effect_nr ) )
+    if(!vj_effect_initialized(effect_nr, sample->effect_chain[c]->fx_instance) )
     {
 	veejay_msg(VEEJAY_MSG_DEBUG, "Effect %s must be initialized now",
 		vj_effect_get_description(effect_nr));
@@ -2051,8 +2053,16 @@ int sample_chain_add(int s1, int c, int effect_nr)
 	sample->effect_chain[c]->fx_instance = vj_effect_activate( effect_nr, &res );
 	if(!res)
 	{
-		veejay_msg(VEEJAY_MSG_ERROR, "Cant activate %d", effect_nr);
-		return -1;
+		veejay_msg(VEEJAY_MSG_ERROR, "Cannot activate %d", effect_nr);
+		//@ clear
+		sample->effect_chain[c]->effect_id = -1;
+		sample->effect_chain[c]->e_flag = 1;
+		int i;
+		for( i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ )
+			sample->effect_chain[c]->arg[i] = 0;
+
+		sample->effect_chain[c]->frame_trimmer = 0;
+		return 0;
 	}
     }
 
@@ -2087,7 +2097,7 @@ int sample_chain_add(int s1, int c, int effect_nr)
     }
     sample_update(sample,s1);
 
-    return c;			/* return position on which it was added */
+    return 1;			/* return position on which it was added */
 }
 
 int sample_reset_offset(int s1)
@@ -2175,7 +2185,7 @@ int sample_chain_clear(int s1)
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
 	if(sample->effect_chain[i]->effect_id != -1)
 	{
-		if(vj_effect_initialized( sample->effect_chain[i]->effect_id ) || sample->effect_chain[i]->fx_instance != NULL ) {
+		if(vj_effect_initialized( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance )) {
 			vj_effect_deactivate( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance ); 
 			sample->effect_chain[i]->fx_instance = NULL;
 		}
@@ -2260,15 +2270,22 @@ int sample_chain_get_free_entry(int s1)
  *
  ****************************************************************************************************/
 
+
 static int _sample_can_free(sample_info *sample, int reserved, int effect_id)
 {
 	int i;
+
+	if( vj_effect_is_plugin(effect_id ) )
+		return 1;
+
 	for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
-		if(i != reserved && effect_id == sample->effect_chain[i]->effect_id) return 0;
+		if(i != reserved && effect_id == sample->effect_chain[i]->effect_id) 
+			return 0;
 	}
 	return 1;
 }
+
 
 int sample_chain_remove(int s1, int position)
 {
@@ -2281,8 +2298,7 @@ int sample_chain_remove(int s1, int position)
 	return -1;
     if(sample->effect_chain[position]->effect_id != -1)
     {
-	if(vj_effect_initialized( sample->effect_chain[position]->effect_id) && 
-	 _sample_can_free(sample,position, sample->effect_chain[position]->effect_id) || sample->effect_chain[position]->fx_instance != NULL) {
+	if(vj_effect_initialized( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance ) && _sample_can_free( sample, position, sample->effect_chain[position]->effect_id) ) { 
 		vj_effect_deactivate( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance);    
 		sample->effect_chain[position]->fx_instance = NULL;
 	}
@@ -2698,7 +2714,7 @@ void ParseEffect(xmlDocPtr doc, xmlNodePtr cur, int dst_sample, int start_at)
 
     if (effect_id != -1) {
 	int j;
-	if (sample_chain_add(dst_sample, chain_index, effect_id) == -1) {
+	if (!sample_chain_add(dst_sample, chain_index, effect_id)) {
 	    veejay_msg(VEEJAY_MSG_ERROR, "Error parsing effect %d (pos %d)\n",
 		    effect_id, chain_index);
 	}
