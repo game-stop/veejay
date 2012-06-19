@@ -2340,7 +2340,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		if( plugrdy > 0 ) {
 			veejay_msg(VEEJAY_MSG_INFO, "Initialized %d generators.", plugrdy);
 			info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
-			info->uc->sample_id = ( gen_tags < plugrdy ? gen_tags : 1 );
+			info->uc->sample_id = ( gen_tags <= plugrdy ? gen_tags : 1 );
 		} else {
 			return -1;
 		}
