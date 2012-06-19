@@ -218,7 +218,8 @@ void vj_osc_free(void *d)
 		free(addr);
 	//if(c->osc_args) free(c->osc_args);
 	if(c->leaves) free(c->leaves);
-	if(c->index) (c->index);
+	if(c->index) 
+		vevo_port_recursive_free( c->index );
 	if(c) free(c);
 	
 	c = NULL;

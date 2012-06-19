@@ -188,8 +188,9 @@ static	void	add_to_plugin_list( const char *path )
 				 dlerror() );
 			continue;
 		}
-
-	//	veejay_msg(0, "\tOpened plugin '%s' in '%s'", name,path );
+#ifdef STRICT_CHECKING
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tOpened plugin '%s' in '%s'", name,path );
+#endif
 		char *bname = basename( fullname );
 		char *basename = strdup( bname );
 		void *plugin = NULL;
@@ -253,7 +254,6 @@ static	void	free_plugin(void *plugin)
 #ifdef STRICT_CHECKING
 	assert( error == 0 );
 #endif
-
 	vevo_port_recursive_free( plugin );
 
 	if( handle ) dlclose( handle );
@@ -300,7 +300,7 @@ static	void	free_plugins()
 	for( i = 0; i < index_ ; i ++ )
 		free_plugin( index_map_[i]);
 
-	//vevo_port_recursive_free( illegal_plugins_ );
+	vevo_port_recursive_free( illegal_plugins_ );
 	
 	free( index_map_ );
 	index_ = 0;

@@ -1,7 +1,7 @@
 lividoplugin_LTLIBRARIES = \
 			   lvd_shmin.la \
 			   lvd_shmout.la \
-			   lvd_solid.la
+			   lvd_solid.la 
 
 lvd_shmin_la_SOURCES = lvd_shmin.c
 lvd_shmout_la_SOURCES= lvd_shmout.c

@@ -300,7 +300,6 @@ void vcs(veejay_t *info, int new_state,const char *caller_func,const int caller_
 	veejay_change_state1(info,new_state);
 }
 #else
-
 void veejay_change_state(veejay_t * info, int new_state)
 {
     	video_playback_setup *settings =
@@ -497,7 +496,7 @@ int veejay_free(veejay_t * info)
 	vj_effect_shutdown();
 
      	vj_tag_free();
-   	vj_el_free(info->current_edit_list);
+   	vj_el_free(info->edit_list);
    	vj_avcodec_free();
 
 	vj_el_deinit();	
@@ -2830,6 +2829,8 @@ static	void *veejay_playback_thread(void *data)
 #endif
 #endif
 */
+
+
 #ifdef HAVE_FREETYPE
 	vj_font_destroy( info->font );
 	vj_font_destroy( info->osd );
@@ -3290,7 +3291,6 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 
 	/* Copy edl */
 	editlist *new_el = vj_el_soft_clone( el );
- 
 	if(!new_el)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot soft clone EDL");

@@ -202,6 +202,9 @@ void	sample_free()
 {
 	if(!SampleHash)
 		return;
+	
+	sample_del_all();
+/*
 	hscan_t scan;
 	hash_scan_begin( &scan, (hash_t*) SampleHash );
 	hnode_t *node;
@@ -211,7 +214,7 @@ void	sample_free()
 		sample_del( info->sample_id);
 	}
 	hash_free_nodes( SampleHash );
-	hash_destroy( SampleHash );
+	hash_destroy( SampleHash );*/
 }
 
 int sample_set_state(int new_state)
@@ -949,15 +952,16 @@ int sample_get_effect(int s1, int position)
 
 void	*sample_get_plugin( int s1, int position, void *ptr)
 {
- 	sample_info *sample = sample_get(s1);
+	sample_info *sample = sample_get(s1);
     if(position >= SAMPLE_MAX_EFFECTS || position < 0 ) return NULL;
-    if(sample) {
+    
+	if(sample) {
 
-	if( ptr != NULL )
-		sample->effect_chain[position]->fx_instance = ptr;
-
-   	return sample->effect_chain[position]->fx_instance;
+		if( ptr != NULL )
+			sample->effect_chain[position]->fx_instance = ptr;
+   		return sample->effect_chain[position]->fx_instance;
     }
+
     return NULL;
 }
 
@@ -1914,9 +1918,10 @@ int sample_chain_free(int s1)
 	e_id = sample->effect_chain[i]->effect_id;
 	if(e_id!=-1)
 	{
-		if(vj_effect_initialized(e_id))
+		if(vj_effect_initialized(e_id) || sample->effect_chain[i]->fx_instance != NULL)
 		{
 			vj_effect_deactivate(e_id, sample->effect_chain[i]->fx_instance);
+			sample->effect_chain[i]->fx_instance = NULL;
 			sum++;
   		}
 	 }
@@ -2006,10 +2011,11 @@ int sample_chain_add(int s1, int c, int effect_nr)
     if (c < 0 || c >= SAMPLE_MAX_EFFECTS)
 		return -1;
 
-	if ( effect_nr < VJ_IMAGE_EFFECT_MIN ) return -1;
+/*	if ( effect_nr < VJ_IMAGE_EFFECT_MIN ) return -1;
 
 	if ( effect_nr > VJ_IMAGE_EFFECT_MAX && effect_nr < VJ_VIDEO_EFFECT_MIN )
 		return -1;
+*/
 
     if( sample->effect_chain[c]->effect_id != -1 && sample->effect_chain[c]->effect_id != effect_nr )
     {
@@ -2024,12 +2030,20 @@ int sample_chain_add(int s1, int c, int effect_nr)
 			if( sample->effect_chain[i]->effect_id == sample->effect_chain[c]->effect_id) ok = 0;
 		}
 		// ok, lets get rid of it.
-		if( ok ) vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance );
+		if( ok ) {
+			vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance );
+			sample->effect_chain[c]->fx_instance = NULL;
+
+		}
+	}
+	else if( sample->effect_chain[c]->fx_instance != NULL && vj_effect_is_plugin( sample->effect_chain[c]->effect_id ) ) {
+		vj_effect_deactivate( sample->effect_chain[c]->effect_id, sample->effect_chain[c]->fx_instance );
+		sample->effect_chain[c]->fx_instance = NULL;
 	}
     }
 
 
-    if(!vj_effect_initialized(effect_nr))
+    if(!vj_effect_initialized(effect_nr) || vj_effect_is_plugin( effect_nr ) )
     {
 	veejay_msg(VEEJAY_MSG_DEBUG, "Effect %s must be initialized now",
 		vj_effect_get_description(effect_nr));
@@ -2161,8 +2175,11 @@ int sample_chain_clear(int s1)
     for (i = 0; i < SAMPLE_MAX_EFFECTS; i++) {
 	if(sample->effect_chain[i]->effect_id != -1)
 	{
-		if(vj_effect_initialized( sample->effect_chain[i]->effect_id ))
+		if(vj_effect_initialized( sample->effect_chain[i]->effect_id ) || sample->effect_chain[i]->fx_instance != NULL ) {
 			vj_effect_deactivate( sample->effect_chain[i]->effect_id, sample->effect_chain[i]->fx_instance ); 
+			sample->effect_chain[i]->fx_instance = NULL;
+		}
+		
 	}
 	sample->effect_chain[i]->effect_id = -1;
 	sample->effect_chain[i]->frame_offset = 0;
@@ -2265,8 +2282,10 @@ int sample_chain_remove(int s1, int position)
     if(sample->effect_chain[position]->effect_id != -1)
     {
 	if(vj_effect_initialized( sample->effect_chain[position]->effect_id) && 
-	 _sample_can_free(sample,position, sample->effect_chain[position]->effect_id))
+	 _sample_can_free(sample,position, sample->effect_chain[position]->effect_id) || sample->effect_chain[position]->fx_instance != NULL) {
 		vj_effect_deactivate( sample->effect_chain[position]->effect_id, sample->effect_chain[position]->fx_instance);    
+		sample->effect_chain[position]->fx_instance = NULL;
+	}
     }
     sample->effect_chain[position]->effect_id = -1;
     sample->effect_chain[position]->frame_offset = 0;

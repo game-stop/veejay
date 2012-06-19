@@ -66,7 +66,7 @@ libveejay_la_LDFLAGS +=	$(SDL_LIBS) $(DIRECTFB_LIBS) $(X_LIBS) $(PTHREAD_LIBS) $
 # The tools themselves
 VEEJAY_BIN = veejay
 
-# VEVOTEST = vevotest
+VEVOTEST = vevotest
 
 bin_PROGRAMS = $(VEEJAY_BIN) $(VEVOTEST)
 
@@ -80,6 +80,6 @@ veejay_headers = vims.h jpegutils.h vevo.h vj-composite.h vj-jack.h \
 veejay_SOURCES	= veejay.c ${veejay_headers} 
 veejay_LDADD 	= libveejay.la @LIBGETOPT_LIB@
 
-# vevotest_SOURCES = vevotest.c ${veejay_headres}
-# vevotest_LDADD   = libveejay.la @LIBGETOPT_LIB@
+vevotest_SOURCES = vevotest.c ${veejay_headres}
+vevotest_LDADD   = libveejay.la @LIBGETOPT_LIB@
 

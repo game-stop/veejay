@@ -61,8 +61,9 @@ static space_t	*alloc_space( size_t bs )
 #ifdef STRICT_CHECKING
 	assert( s != NULL );
 #endif
-	s->area = vj_calloc(bs * ROUNDS_PER_MAG);
-	s->mag  = vj_calloc( sizeof(void*) * (ROUNDS_PER_MAG + 1) );
+	s->area = vj_calloc(bs * (ROUNDS_PER_MAG+1));
+	s->mag  = vj_calloc( sizeof(void*) * (ROUNDS_PER_MAG + 2) );
+	
 	p = s->area;
 	for( k = 0; k <= ROUNDS_PER_MAG  ;k ++ )
 	{
@@ -206,17 +207,21 @@ void	vevo_pool_destroy( void *p )
 	pool_t *pool = (pool_t*) p;
 	space_t **nS = pool->spaces;
 	int i ;
-	for( i = 0 ; nS[i] != NULL ; i ++ )
+	for( i = 0 ; i < Mend ; i ++ )
 	{
+		if( nS[i] == NULL )
+			continue;
 		space_t *n = pool->spaces[i];
 		space_t *k = NULL;
 		while( n != NULL )
 		{
 			k = n;
-			free( k->area );
-			free( k->mag );
+			free( k->area ); 
+			free( k->mag ); 
 			n = k->next;
+			
 			free( k );
+			k = NULL;
 		}
 	}
 	free( nS );

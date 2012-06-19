@@ -1391,7 +1391,8 @@ int vj_tag_del(int id)
 		break;
 	case VJ_TAG_TYPE_GENERATOR:
 		if( tag->generator ) {
-			plug_deactivate( tag->generator );
+			//@ leak it FIXME
+			//	plug_deactivate( tag->generator );
 		}
 		tag->generator = NULL;
 		break;
@@ -2137,7 +2138,7 @@ int vj_tag_chain_malloc(int t1)
 	e_id = tag->effect_chain[i]->effect_id;
 	if(e_id!=-1)
 	{
-		if(!vj_effect_initialized(e_id))
+		if(!vj_effect_initialized(e_id) || vj_effect_is_plugin( e_id ) )
 		{
 			sum ++;
 			int res = 0;
@@ -2163,9 +2164,10 @@ int vj_tag_chain_free(int t1)
 	e_id = tag->effect_chain[i]->effect_id;
 	if(e_id!=-1)
 	{
-		if(vj_effect_initialized(e_id))
+		if(vj_effect_initialized(e_id) || ( vj_effect_is_plugin(e_id) && tag->effect_chain[i]->fx_instance != NULL ) )
 		{
 			vj_effect_deactivate(e_id, tag->effect_chain[i]->fx_instance);
+			tag->effect_chain[i]->fx_instance = NULL;
 			sum++;
 		}
 	  }
@@ -2270,7 +2272,7 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
 		return -1;
 
-	if( tag->effect_chain[position]->effect_id != -1 && tag->effect_chain[position]->effect_id != effect_id )
+    if( tag->effect_chain[position]->effect_id != -1 && tag->effect_chain[position]->effect_id != effect_id )
     {
 		//verify if the effect should be discarded
 		if(vj_effect_initialized( tag->effect_chain[position]->effect_id ))
@@ -2282,17 +2284,24 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
 				if( tag->effect_chain[i]->effect_id == tag->effect_chain[position]->effect_id) ok = 0;
 			}
 			// ok, lets get rid of it.
-			if( ok ) vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
+			if( ok ) {
+				vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
+				tag->effect_chain[position]->fx_instance = NULL;
+			}
+		}
+		else if ( vj_effect_is_plugin( tag->effect_chain[position]->effect_id ) && tag->effect_chain[position]->fx_instance != NULL ) {
+			vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
+			tag->effect_chain[position]->fx_instance = NULL;
 		}
     }
 
-    if (!vj_effect_initialized(effect_id))
-	{
-	 	int res = 0;
-		tag->effect_chain[position]->fx_instance = vj_effect_activate( effect_id, &res );
-		if( res == 0 )
-			return -1;
-	}
+    if (!vj_effect_initialized(effect_id)||vj_effect_is_plugin( effect_id ))
+    {
+ 	int res = 0;
+	tag->effect_chain[position]->fx_instance = vj_effect_activate( effect_id, &res );
+	if( res == 0 )
+		return -1;
+    }
 
     tag->effect_chain[position]->effect_id = effect_id;
     tag->effect_chain[position]->e_flag = 1; 
@@ -2857,9 +2866,11 @@ int vj_tag_chain_remove(int t1, int index)
     if( tag->effect_chain[index]->effect_id != -1)
     {
 	if( vj_effect_initialized( tag->effect_chain[index]->effect_id ) && 
-	    vj_tag_chain_can_delete(tag, index, tag->effect_chain[index]->effect_id))
-		vj_effect_deactivate( tag->effect_chain[index]->effect_id, tag->effect_chain[index]->fx_instance );
-
+	    vj_tag_chain_can_delete(tag, index, tag->effect_chain[index]->effect_id) || vj_effect_is_plugin( tag->effect_chain[index]->effect_id) )
+		{
+			vj_effect_deactivate( tag->effect_chain[index]->effect_id, tag->effect_chain[index]->fx_instance );
+			tag->effect_chain[index]->fx_instance = NULL;
+		}
 	if( tag->effect_chain[index]->kf )
 		vpf(tag->effect_chain[index]->kf );
 	tag->effect_chain[index]->kf = vpn(VEVO_ANONYMOUS_PORT);

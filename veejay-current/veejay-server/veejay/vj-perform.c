@@ -2256,9 +2256,10 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 								settings->fxrow[n] = fx_id;
 								if( pfx ) {
 									sample_get_plugin(id,n,pfx);
-								}
+								
 									
-								vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num,pfx );
+									vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num,pfx );
+								}
 							}
 
 						}
@@ -2302,8 +2303,8 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 								settings->fxrow[n] = fx_id; 
 								if(pfx) {
 									vj_tag_get_plugin( id,n, pfx );
+									vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num, pfx );
 								}
-								vj_perform_apply_first(info,setup,F,frameinfo,fx_id,n,(int) settings->current_frame_num, pfx );
 							}
 						}
 

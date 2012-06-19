@@ -125,6 +125,7 @@ extern int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf
 extern int	vj_effect_prepare( VJFrame *frame, int selector);
 extern	void	vj_effect_dump(void);
 extern int	rgb_parameter_conversion_type_;
+extern	int	vj_effect_is_plugin( int fx_id );
 extern void	*vj_effect_get_data( int seq_id );
 
 #endif
