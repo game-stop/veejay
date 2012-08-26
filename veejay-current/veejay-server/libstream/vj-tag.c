@@ -1113,8 +1113,15 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 		if( filename != NULL ) {
 			channel = plug_get_idx_by_so_name( filename );
 			if( channel == -1 ) {
-				veejay_msg(0, "'%s' not found.",filename );
-				return -1;
+				channel = plug_get_idx_by_name( filename );
+				if( channel == - 1) {
+					veejay_msg(0, "'%s' not found.",filename );
+					if( vj_tag_del( tag->id ) == 0 ) {
+						free(tag->source_name );
+						free(tag);
+					}
+					return -1;
+				}
 			}
 		}
 
@@ -1122,7 +1129,7 @@ int _vj_tag_new_unicap( vj_tag * tag, int stream_nr, int width, int height, int 
 
 		int foo_arg  = vj_shm_get_id();
 
-		if( extra != 0 ) //@ vj_shm_set_id is a hack
+		if( extra != 0 ) //@ vj_shm_set_id is a hack FIXME
 			vj_shm_set_id( extra );
 
 		tag->generator = plug_activate(channel);
@@ -1384,7 +1391,7 @@ int vj_tag_del(int id)
 		break;
 	case VJ_TAG_TYPE_GENERATOR:
 		if( tag->generator ) {
-			//plug_deactivate( tag->generator );
+			plug_deactivate( tag->generator );
 		}
 		tag->generator = NULL;
 		break;
@@ -2127,18 +2134,17 @@ int vj_tag_chain_malloc(int t1)
 
     for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
     {
-	e_id = tag->effect_chain[i]->effect_id;
-	if(e_id!=-1)
-	{
-		if(!vj_effect_initialized(e_id))
+		e_id = tag->effect_chain[i]->effect_id;
+		if(e_id)
 		{
-			sum ++;
 			int res = 0;
 			tag->effect_chain[i]->fx_instance = vj_effect_activate(e_id, &res);
+			if( res )
+				   sum ++;
 		}
 	}
-    } 
-    return sum; 
+    veejay_msg(VEEJAY_MSG_DEBUG, "Allocated %d effects",sum);
+	return sum; 
 }
 
 int vj_tag_chain_free(int t1)
@@ -2153,15 +2159,16 @@ int vj_tag_chain_free(int t1)
    
     for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
     {
-	e_id = tag->effect_chain[i]->effect_id;
-	if(e_id!=-1)
-	{
-		if(vj_effect_initialized(e_id))
+		e_id = tag->effect_chain[i]->effect_id;
+		if(e_id!=-1)
 		{
-			vj_effect_deactivate(e_id, tag->effect_chain[i]->fx_instance);
-			sum++;
-		}
-	  }
+			if(vj_effect_initialized(e_id, tag->effect_chain[i]->fx_instance) )
+			{
+				vj_effect_deactivate(e_id, tag->effect_chain[i]->fx_instance);
+				tag->effect_chain[i]->fx_instance = NULL;
+				sum++;
+			}
+	  	}
 	}  
     return sum;
 }
@@ -2259,33 +2266,54 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
     vj_tag *tag = vj_tag_get(t1);
 
     if (!tag)
-		return -1;
+		return 0;
     if (position < 0 || position >= SAMPLE_MAX_EFFECTS)
-		return -1;
+		return 0;
 
-	if( tag->effect_chain[position]->effect_id != -1 && tag->effect_chain[position]->effect_id != effect_id )
+    if( tag->effect_chain[position]->effect_id != -1 && tag->effect_chain[position]->effect_id != effect_id )
     {
 		//verify if the effect should be discarded
-		if(vj_effect_initialized( tag->effect_chain[position]->effect_id ))
+		if(vj_effect_initialized( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance ))
 		{
-			// it is using some memory, see if we can free it ...
-			int ok = 1;
-			for(i=(position+1); i < SAMPLE_MAX_EFFECTS; i++)
-			{
-				if( tag->effect_chain[i]->effect_id == tag->effect_chain[position]->effect_id) ok = 0;
+			if(!vj_effect_is_plugin( tag->effect_chain[position]->effect_id )) {
+					int i = 0;
+					int frm = 1;
+					for( i =0; i < SAMPLE_MAX_EFFECTS; i ++ ) {
+							if( i == position )
+									continue;
+							if( tag->effect_chain[i]->effect_id == effect_id )
+									frm = 0;
+					}
+					if( frm == 1 ) {
+						vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
+						tag->effect_chain[position]->fx_instance = NULL;
+					}
+			} else {
+					vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
+					tag->effect_chain[position]->fx_instance = NULL;
 			}
-			// ok, lets get rid of it.
-			if( ok ) vj_effect_deactivate( tag->effect_chain[position]->effect_id, tag->effect_chain[position]->fx_instance );
+
 		}
     }
 
-    if (!vj_effect_initialized(effect_id))
-	{
-	 	int res = 0;
+    if (!vj_effect_initialized(effect_id, tag->effect_chain[position]->fx_instance ))
+    {
+		veejay_msg(VEEJAY_MSG_DEBUG, "Effect %s must be initialized now",
+			vj_effect_get_description(effect_id));
+ 		int res = 0;
 		tag->effect_chain[position]->fx_instance = vj_effect_activate( effect_id, &res );
-		if( res == -1 )
-			return -1;
-	}
+		if(!res) {
+			veejay_msg(VEEJAY_MSG_ERROR, "Cannot activate FX %d", effect_id );
+			tag->effect_chain[position]->effect_id = -1;
+			tag->effect_chain[position]->e_flag = 1;
+			int i;
+			for( i = 0; i < SAMPLE_MAX_PARAMETERS; i ++ ) 
+				tag->effect_chain[position]->arg[i] = 0;
+
+			tag->effect_chain[position]->frame_trimmer = 0;
+			return 0;
+		}
+    }
 
     tag->effect_chain[position]->effect_id = effect_id;
     tag->effect_chain[position]->e_flag = 1; 
@@ -2305,8 +2333,8 @@ int vj_tag_set_effect(int t1, int position, int effect_id)
     }
 
     if (!vj_tag_update(tag,t1))
-	return -1;
-    return position;
+		return 0;
+    return 1;
 }
 
 int	vj_tag_has_cali_fx( int t1 ) {
@@ -2828,45 +2856,54 @@ int vj_tag_set_selected_entry(int t1, int position)
 	return (vj_tag_update(tag,t1));
 }
 
-static int vj_tag_chain_can_delete(vj_tag *tag, int s_pos, int e_id)
+static int vj_tag_chain_can_delete(vj_tag *tag, int reserved, int effect_id)
 {
 	int i;
-	for(i=0; i < SAMPLE_MAX_EFFECTS;i++)
+
+	if( vj_effect_is_plugin(effect_id ) )
+		return 1;
+
+	for(i=0; i < SAMPLE_MAX_EFFECTS; i++)
 	{
-		// effect is on chain > 1
-		if(e_id == tag->effect_chain[i]->effect_id && i != s_pos)
-		{
+		if(i != reserved && effect_id == tag->effect_chain[i]->effect_id) 
 			return 0;
-		}	
 	}
+	
 	return 1;
 }
+
 int vj_tag_chain_remove(int t1, int index)
 {
     int i;
     vj_tag *tag = vj_tag_get(t1);
     if (!tag)
-	return -1;
+		return -1;
     if( tag->effect_chain[index]->effect_id != -1)
     {
-	if( vj_effect_initialized( tag->effect_chain[index]->effect_id ) && 
-	    vj_tag_chain_can_delete(tag, index, tag->effect_chain[index]->effect_id))
-		vj_effect_deactivate( tag->effect_chain[index]->effect_id, tag->effect_chain[index]->fx_instance );
+		if( vj_effect_initialized( tag->effect_chain[index]->effect_id, tag->effect_chain[index]->fx_instance ) && vj_tag_chain_can_delete( tag, index, tag->effect_chain[index]->effect_id ) )
+		{
+			vj_effect_deactivate( tag->effect_chain[index]->effect_id, tag->effect_chain[index]->fx_instance );
+			tag->effect_chain[index]->fx_instance = NULL;
+		}
+    }
 
-	if( tag->effect_chain[index]->kf )
+    tag->effect_chain[index]->effect_id = -1;
+    tag->effect_chain[index]->e_flag = 0;
+
+    if( tag->effect_chain[index]->kf )
 		vpf(tag->effect_chain[index]->kf );
+	
 	tag->effect_chain[index]->kf = vpn(VEVO_ANONYMOUS_PORT);
-    }
+    
+	tag->effect_chain[index]->source_type = 0;
+	tag->effect_chain[index]->channel     = 0;
 
-    if (tag->effect_chain[index]->effect_id != -1) {
-	tag->effect_chain[index]->effect_id = -1;
-	tag->effect_chain[index]->e_flag = 0;
-	for (i = 0; i < SAMPLE_MAX_PARAMETERS; i++) {
-	    vj_tag_set_effect_arg(t1, index, i, 0);
-	}
-    }
+	int j;
+    for (j = 0; j < SAMPLE_MAX_PARAMETERS; j++)
+		tag->effect_chain[index]->arg[j] = 0;
+
     if (!vj_tag_update(tag,t1))
-	return -1;
+		return -1;
     return 1;
 }
 

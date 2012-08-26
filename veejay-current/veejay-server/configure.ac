@@ -41,6 +41,10 @@ CFLAGS=""
 AC_ARG_ENABLE(strict,
 		AC_HELP_STRING([--enable-strict],
 			     [Compile in paranoia assertion checking]))
+AC_ARG_ENABLE(portleak,
+	      	AC_HELP_STRING([--enable-portleak],
+			      [Compile in vevo port validation (requires --enable-strict)]))
+
 AC_ARG_ENABLE(debug,
 		AC_HELP_STRING([--enable-debug],
 			     [Compile in debugging information]))
@@ -225,6 +229,13 @@ fi
 AC_MSG_CHECKING(whether to compile in assertion checking)
 if test "x$enable_strict" = "xyes" ; then
  debugCFLAGS="$debugCFLAGS -DSTRICT_CHECKING"
+ AC_MSG_RESULT([yes])
+else
+ AC_MSG_RESULT([no])
+fi
+AC_MSG_CHECKING(whether to compile in vevo port tracking)
+if test "x$enable_portleak" = "xyes"; then
+ debugCFLAGS="$debugCFLAGS -DVEVO_TRACKPORTS"
  AC_MSG_RESULT([yes])
 else
  AC_MSG_RESULT([no])
@@ -1037,6 +1048,7 @@ libsamplerec/Makefile
 bio2jack/Makefile
 veejay/Makefile
 man/Makefile
+livido-plugins/Makefile
 veejay.pc
 ])
 AC_OUTPUT

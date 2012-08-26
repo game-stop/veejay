@@ -57,11 +57,11 @@ int 	vevo_property_soft_reference(vevo_port_t * p, const char *key);
 
 void	vevo_strict_init();
 
-int		vevo_port_verify( vevo_port_t *port );
+int	vevo_port_verify( vevo_port_t *port );
 
-int		vevo_property_set(vevo_port_t * p, const char *key, int atom_type, int num_elements, void *src);
+int	vevo_property_set(vevo_port_t * p, const char *key, int atom_type, int num_elements, void *src);
 
-int		vevo_union_ports( void *port_a, void *port_b, int filter_type );
+int	vevo_union_ports( void *port_a, void *port_b, int filter_type );
 
 int 	vevo_property_get(vevo_port_t * p, const char *key, int idx, void *dst);
 
@@ -75,7 +75,7 @@ char	*vevo_format_property( vevo_port_t *port, const char *key );
 
 void	vevo_report_stats();
 
-int		vevo_property_del(vevo_port_t * p,   const char *key );
+int	vevo_property_del(vevo_port_t * p,   const char *key );
 
 //char	**vevo_port_deepen_namespace( void *port, char *path);
 
@@ -85,15 +85,15 @@ void	*vevo_port_register( vevo_port_t *in, vevo_port_t *ref );
 
 char  	*vevo_sprintf_property( vevo_port_t *port, const char *key  );
 
-int		vevo_sscanf_property( vevo_port_t *port, const char *s);
+int	vevo_sscanf_property( vevo_port_t *port, const char *s);
 
 char	**vevo_sprintf_port( vevo_port_t *port );
 
-int		vevo_sscanf_port( vevo_port_t *port, const char *s );
+int	vevo_sscanf_port( vevo_port_t *port, const char *s );
 
-int		vevo_special_union_ports( void *port_a, void *port_b );
+int	vevo_special_union_ports( void *port_a, void *port_b );
 
-int		vevo_property_from_string( vevo_port_t *port, const char *s, const char *key, int n_elem, int type);
+int	vevo_property_from_string( vevo_port_t *port, const char *s, const char *key, int n_elem, int type);
 
 char	*vevo_sprintf_property_value( vevo_port_t *port, const char *key);
 
@@ -105,21 +105,19 @@ void	vevo_strict_init();
 
 int     vevo_property_call(vevo_port_t * p, const char *key, void *ctx, int32_t type, int32_t value );
 
-int		vevo_property_call_get( vevo_port_t *p, const char *key, void *ctx );
+int	vevo_property_call_get( vevo_port_t *p, const char *key, void *ctx );
 
-int		vevo_property_clone( void *port, void *to_port, const char *key, const char *as_key );
+int	vevo_property_clone( void *port, void *to_port, const char *key, const char *as_key );
 
 int	vevo_property_protect( vevo_port_t *p, const char *key  );
 
 void	vevo_port_dump( void *p, int lvl );
 
-int		vevo_property_set_f(vevo_port_t * p,
-		    const char *key,
-		    int atom_type, int num_elements, void (*set_func)() , int (*get_func)() );
+int	vevo_property_set_f(vevo_port_t * p, const char *key,  int atom_type, int num_elements, void (*set_func)() , int (*get_func)() );
 
+int	vevo_property_softref( void *port, const char *key );
 
-
-int		vevo_port_get_total_size( vevo_port_t *port );
+int	vevo_port_get_total_size( vevo_port_t *port );
 
 #define VEVO_ATOM_TYPE_FUNCPTR	11
 #define	VEVO_ATOM_TYPE_VOIDPTR	65

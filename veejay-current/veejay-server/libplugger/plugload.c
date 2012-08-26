@@ -188,8 +188,9 @@ static	void	add_to_plugin_list( const char *path )
 				 dlerror() );
 			continue;
 		}
-
-	//	veejay_msg(0, "\tOpened plugin '%s' in '%s'", name,path );
+#ifdef STRICT_CHECKING
+		veejay_msg(VEEJAY_MSG_DEBUG, "\tOpened plugin '%s' in '%s'", name,path );
+#endif
 		char *bname = basename( fullname );
 		char *basename = strdup( bname );
 		void *plugin = NULL;
@@ -253,8 +254,8 @@ static	void	free_plugin(void *plugin)
 #ifdef STRICT_CHECKING
 	assert( error == 0 );
 #endif
-
-	vevo_port_recursive_free( plugin );
+	if( error == VEVO_NO_ERROR )
+		vevo_port_recursive_free( plugin );
 
 	if( handle ) dlclose( handle );
 
@@ -300,7 +301,7 @@ static	void	free_plugins()
 	for( i = 0; i < index_ ; i ++ )
 		free_plugin( index_map_[i]);
 
-	//vevo_port_recursive_free( illegal_plugins_ );
+	vevo_port_recursive_free( illegal_plugins_ );
 	
 	free( index_map_ );
 	index_ = 0;
@@ -334,13 +335,24 @@ void	*plug_get_by_so_name( char *soname )
 		if( str == NULL )
 			continue;
 
-		veejay_msg(0, "'%s' vs '%s'", str,soname );
-
 		if( strcmp( soname,str ) == 0 )
 			return index_map_[i];
 	}
 
 	return NULL;
+}
+
+int	plug_get_idx_by_name( char *name )
+{
+	int i;
+	int len = strlen(name);
+	for( i = 0; i < index_; i ++ ) {
+		char *plugname = plug_get_name( i );
+		if( strncasecmp( name, plugname, len ) == 0 ) {
+			return i;
+		}
+	}
+	return -1;
 }
 
 
@@ -349,6 +361,40 @@ void	*plug_get( int fx_id ) {
 }
 
 #define CONFIG_FILE_LEN 65535
+
+static	char	*get_livido_plug_path()
+{ //@ quick & dirty
+	char location[1024];
+	snprintf( location, sizeof(location)-1, "/proc/%d/exe", getpid() );
+	
+	char target[1024];
+	char lvdpath[1024];
+	
+	memset(lvdpath,0,sizeof(lvdpath));
+
+	int  err = readlink( location, target, sizeof(target) );
+	if( err >= 0 )
+	{
+	 target[err] = '\0';
+
+	 int n = err;
+	 while( target[n] != '/' && n > 0 ) {
+	   n--; //@ strip name of executable
+	 }
+	 if( n > 0 ) n --;
+	 
+	 while( target[n] != '/' && n > 0 ) {
+	   n--; //@ strip bin dir of executable
+	 }
+	 
+	 strncpy(lvdpath, target, n );
+ 	 strcat( lvdpath, "/lib/livido-plugins" );	 
+
+	 return strdup( lvdpath );
+	}
+	return NULL;
+}
+
 
 static	int	scan_plugins()
 {
@@ -382,6 +428,9 @@ static	int	scan_plugins()
 			pch = strtok( NULL, "\n");
 		}
 	}
+
+	close(fd);
+
 	return 1;
 }
 
@@ -471,6 +520,14 @@ int	plug_sys_detect_plugins(void)
 #ifdef STRICT_CHECKING
 	assert( illegal_plugins_ != NULL );
 #endif	
+
+	char *lvd_path = get_livido_plug_path();
+	if( lvd_path != NULL ) {
+		add_to_plugin_list( lvd_path );
+		free(lvd_path);
+	}
+
+
 	if(!scan_plugins())
 	{
 		veejay_msg(VEEJAY_MSG_ERROR,
@@ -590,6 +647,7 @@ void	plug_deactivate( void *instance )
 {
 	if( instance )
 		deinstantiate_plugin( instance );	
+
 }
 
 static	int	linear_len( char **items )

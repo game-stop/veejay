@@ -787,9 +787,9 @@ int main(int argc, char **argv)
 	veejay_free(info);
 
 	veejay_msg(VEEJAY_MSG_INFO, "Thank you for using Veejay");
-// print ports that were never freed
-//#ifdef STRICT_CHECKING
-//	vevo_report_stats();
-//#endif
+
+#ifdef STRICT_CHECKING
+	vevo_report_stats();
+#endif
 	return 0;
 }

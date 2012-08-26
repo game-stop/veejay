@@ -300,7 +300,6 @@ void vcs(veejay_t *info, int new_state,const char *caller_func,const int caller_
 	veejay_change_state1(info,new_state);
 }
 #else
-
 void veejay_change_state(veejay_t * info, int new_state)
 {
     	video_playback_setup *settings =
@@ -494,10 +493,8 @@ int veejay_free(veejay_t * info)
 
 	vj_event_stop();
 
-	vj_effect_shutdown();
-
      	vj_tag_free();
-   	vj_el_free(info->current_edit_list);
+   	vj_el_free(info->edit_list);
    	vj_avcodec_free();
 
 	vj_el_deinit();	
@@ -505,6 +502,9 @@ int veejay_free(veejay_t * info)
 	sample_free();
 
 //	vj_tag_free();
+
+	vj_effect_shutdown();
+
 
 	if( info->settings->composite )
 		composite_destroy( info->composite );
@@ -1079,9 +1079,8 @@ static int veejay_screen_update(veejay_t * info )
 		vj_perform_done_s2(info);
 	}
 
-
-
 	vj_perform_get_primary_frame(info,frame);
+
 	if(check_vp)
 	{
 		if( info->video_out == 0 ) {
@@ -2342,7 +2341,7 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 		if( plugrdy > 0 ) {
 			veejay_msg(VEEJAY_MSG_INFO, "Initialized %d generators.", plugrdy);
 			info->uc->playback_mode = VJ_PLAYBACK_MODE_TAG;
-			info->uc->sample_id = ( gen_tags < plugrdy ? gen_tags : 1 );
+			info->uc->sample_id = ( gen_tags <= plugrdy ? gen_tags : 1 );
 		} else {
 			return -1;
 		}
@@ -2833,6 +2832,8 @@ static	void *veejay_playback_thread(void *data)
 #endif
 #endif
 */
+
+
 #ifdef HAVE_FREETYPE
 	vj_font_destroy( info->font );
 	vj_font_destroy( info->osd );
@@ -3028,7 +3029,7 @@ veejay_t *veejay_malloc()
 	if(!info->seq)
 		return NULL;
 	
-	info->seq->samples = (int*) vj_calloc(sizeof(int) * MAX_SEQUENCES );
+	info->seq->samples = (int*) vj_calloc(sizeof(int) * (MAX_SEQUENCES+1) ); //@ SL contains 100 sequence items
 	
     info->audio = AUDIO_PLAY;
     info->continuous = 1;
@@ -3293,7 +3294,6 @@ editlist *veejay_edit_copy_to_new(veejay_t * info, editlist *el, long start, lon
 
 	/* Copy edl */
 	editlist *new_el = vj_el_soft_clone( el );
- 
 	if(!new_el)
 	{
 		veejay_msg(VEEJAY_MSG_ERROR, "Cannot soft clone EDL");

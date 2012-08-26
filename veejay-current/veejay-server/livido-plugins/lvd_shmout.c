@@ -215,7 +215,7 @@ livido_init_f	init_instance( livido_port_t *my_instance )
 livido_deinit_f	deinit_instance( livido_port_t *my_instance )
 {
 	shared_video_t *v = NULL;
-    int error = livido_property_get( my_instance, "PLUGIN_private",0, &v );
+    	int error = livido_property_get( my_instance, "PLUGIN_private",0, &v );
 
 	if( error == LIVIDO_NO_ERROR ) {
 		vj_shared_data *data = (vj_shared_data*) &(v->sms[0]);

@@ -17,6 +17,7 @@
 /* todo: cleanup. lots bad things. */
 #ifndef VJ_LIBLAVPLAY_H
 #define VJ_LIBLAVPLAY_H
+#include <config.h>
 #include "vj-lib.h"
 
 void	veejay_set_instance( veejay_t *info );

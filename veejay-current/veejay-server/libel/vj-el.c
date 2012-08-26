@@ -2128,8 +2128,10 @@ void	vj_el_free(editlist *el)
 	{
 		for( i = 0; i < el->num_video_files; i ++ )
 		{
-			if( el->video_file_list[i])
+			if( el->video_file_list[i]) {
 				free(el->video_file_list[i] );
+				el->video_file_list[i] = NULL;
+			}
 		}
 	}
 	else
@@ -2148,10 +2150,14 @@ void	vj_el_free(editlist *el)
 		}
 	}
 
-	if( el->cache )
+	if( el->cache ) {
 		free_cache( el->cache );
-	if( el->frame_list )
+		el->cache = NULL;
+	}
+	if( el->frame_list ) {
 		free(el->frame_list );
+		el->frame_list = NULL;
+	}
 	if( el->scaler )
 		yuv_free_swscaler( el->scaler );
 	free(el);

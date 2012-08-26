@@ -339,7 +339,7 @@ vj_server *vj_server_alloc(int port_offset, char *mcast_group_name, int type)
 	if (!vjs)
 		return NULL;
 
-	vjs->recv_buf = (char*) vj_calloc(sizeof(char) * RECV_SIZE );
+	vjs->recv_buf = (char*) vj_calloc(sizeof(char) * (RECV_SIZE+1024) );
 	if(!vjs->recv_buf)
 	{
 		if(vjs) free(vjs);

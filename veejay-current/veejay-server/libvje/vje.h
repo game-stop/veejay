@@ -115,7 +115,7 @@ extern int vj_effect_get_summary(int entry, char *dst);
 extern int vj_effect_get_summary_len(int entry);
 extern void *vj_effect_activate(int e, int *retcode);
 extern int vj_effect_deactivate(int e, void *ptr);
-extern int vj_effect_initialized(int e);
+extern int vj_effect_initialized(int e, void *ptr);
 extern int vj_effect_get_min_i();
 extern int vj_effect_get_max_i();
 extern int vj_effect_get_min_v();
@@ -125,6 +125,7 @@ extern int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf
 extern int	vj_effect_prepare( VJFrame *frame, int selector);
 extern	void	vj_effect_dump(void);
 extern int	rgb_parameter_conversion_type_;
+extern	int	vj_effect_is_plugin( int fx_id );
 extern void	*vj_effect_get_data( int seq_id );
 
 #endif

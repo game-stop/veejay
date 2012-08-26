@@ -1136,14 +1136,23 @@ void	livido_plug_deinit( void *instance )
 {
 	void *filter_templ = NULL;	
 	int error = vevo_property_get( instance, "filter_templ", 0, &filter_templ );
-#ifdef STRICT_CHECKING
-	assert( error == LIVIDO_NO_ERROR );
-#endif
+	if( error != VEVO_NO_ERROR ) {
+		livido_port_recursive_free( instance );
+		instance = NULL;
+		return;
+	}
 
 	livido_deinit_f deinit;
 	error = vevo_property_get( filter_templ, "HOST_plugin_deinit_func", 0, &deinit );
+	if( error != VEVO_NO_ERROR ) {
+		livido_port_recursive_free( instance );
+		instance = NULL;
+		return;
+	}
+
 #ifdef STRICT_CHECKING
 	char *plugin_name =  get_str_vevo( filter_templ, "name" );
+	assert( plugin_name != NULL );
 	veejay_msg(VEEJAY_MSG_DEBUG, "Destroy '%s'", plugin_name );
 	free(plugin_name);
 #endif
@@ -1188,6 +1197,7 @@ void	livido_plug_deinit( void *instance )
 	}
 
 	livido_port_recursive_free( instance );
+	
 	instance = NULL;
 }
 //get plugin defaults
@@ -1454,7 +1464,7 @@ void*	deal_with_livido( void *handle, const char *name )
 		{	(void(*)()) free			},
 		{	(void(*)())memset			},
         {	(void(*)())memcpy			},
-        {	(void(*)())vevo_port_new	},
+        {	(void(*)())livido_plugin_port_new	},
         {	(void(*)())vevo_port_free		},
         {	(void(*)())vevo_property_set		},
         {	(void(*)())vevo_property_get		},
@@ -1537,6 +1547,7 @@ void*	deal_with_livido( void *handle, const char *name )
 	vevo_property_set( port, "num_inputs", VEVO_ATOM_TYPE_INT,1, &n_inputs);
 	vevo_property_set( port, "num_outputs",VEVO_ATOM_TYPE_INT,1, &n_outputs);
 	vevo_property_set( port, "info", LIVIDO_ATOM_TYPE_PORTPTR,1,&filter_templ );
+	vevo_property_softref( port, "info" );
 	vevo_property_set( port, "HOST_plugin_type", VEVO_ATOM_TYPE_INT,1,&livido_signature_);
 
 
