@@ -2834,8 +2834,15 @@ void vj_event_debug_level(void *ptr, const char format[], va_list ap)
 void vj_event_suspend(void *ptr, const char format[], va_list ap)
 {
 	veejay_t *v = (veejay_t*) ptr;
-	veejay_change_state(v, LAVPLAY_STATE_PAUSED);
-	veejay_msg(VEEJAY_MSG_WARNING, "Suspending veejay");
+	if( veejay_get_state(v) == LAVPLAY_STATE_PAUSED )
+	{
+		veejay_change_state(v, LAVPLAY_STATE_PLAYING );
+		veejay_msg(VEEJAY_MSG_WARNING, "Resuming playback.");
+	}
+	else {
+		veejay_change_state(v, LAVPLAY_STATE_PAUSED);
+		veejay_msg(VEEJAY_MSG_WARNING, "Suspending playback.");
+	}
 }
 
 void	vj_event_play_norestart( void *ptr, const char format[], va_list ap )
