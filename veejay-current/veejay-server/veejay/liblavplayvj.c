@@ -1771,7 +1771,7 @@ static void *veejay_mjpeg_playback_thread(void *arg)
 	}
 	pthread_mutex_unlock(&(settings->valid_mutex));
 
-    if( settings->currently_processed_entry != settings->buffer_entry[settings->currently_processed_frame] &&
+        if( settings->state != LAVPLAY_STATE_PAUSED && settings->currently_processed_entry != settings->buffer_entry[settings->currently_processed_frame] &&
 		!veejay_screen_update(info)  )
 	{
 		veejay_msg(VEEJAY_MSG_WARNING, "Error playing frame %d. I won't give up yet!", settings->current_frame_num);
@@ -2688,13 +2688,15 @@ static void veejay_playback_cycle(veejay_t * info)
 			settings->buffer_entry[frame] = (settings->buffer_entry[frame] + 1 ) % 2;
 		}
 
-	    if (!skipa) 
+	    if( settings->state != LAVPLAY_STATE_PAUSED ) {
+	   	 if (!skipa) 
 			vj_perform_queue_audio_frame(info);
-	    if (!skipv)
+		    if (!skipv)
 			vj_perform_queue_video_frame(info,skipi);
-
-	    vj_perform_queue_frame( info, skipi );
-
+	    	vj_perform_queue_frame( info, skipi );
+	     } else {
+	     	pthread_yield();
+	     }
 #ifdef HAVE_SDL	
 	    te = SDL_GetTicks();
             info->real_fps = (int)( te - ts );
