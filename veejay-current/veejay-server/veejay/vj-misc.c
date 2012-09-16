@@ -118,18 +118,20 @@ static int	is_usable_file( filelist_t *filelist, const char *node, const char *f
 #endif
 	if( lstat( node, &l) < 0 )
 		return 0;
+	
 	if( S_ISLNK( l.st_mode )) {
 		veejay_memset(&l,0,sizeof(struct stat));
 		stat(node, &l);
 		return 1;
 	}
+	
 	if( S_ISDIR( l.st_mode ) ) {
 		return 1;
 	}
 
 	if( S_ISREG( l.st_mode ) ) {
 		if( is_it_usable(node)) {
-			if( filelist->num_files < filelist->max_files-1 ) {
+			if( filelist->num_files < filelist->max_files ) {
 				filelist->files[ filelist->num_files ] =
 					relative_path(filelist,node);
 				filelist->num_files ++;
@@ -146,7 +148,7 @@ static int	dir_selector( const struct dirent *dir )
 
 static int	find_files( filelist_t *filelist, const char *path )
 {
-	struct dirent **files;
+	struct dirent **files = NULL;
 	int N = scandir ( path, &files, dir_selector,alphasort );
 	int n;
 	if( N < 0 ) {
@@ -155,7 +157,7 @@ static int	find_files( filelist_t *filelist, const char *path )
 
 	for( n = 0; n < N; n ++ )
 	{
-		char tmp[2048];
+		char tmp[PATH_MAX];
 		if( strcmp( files[n]->d_name, "." ) == 0 ||
 		    strcmp( files[n]->d_name, ".." ) == 0 ) {
 			continue;
@@ -190,8 +192,7 @@ void	free_media_files( veejay_t *info, filelist_t *fl )
 
 filelist_t *find_media_files( veejay_t *info )
 {
-	char working_dir[2048];
-
+	char working_dir[PATH_MAX];
 	char *wd = getcwd( working_dir, sizeof(working_dir));
 
 	if( wd == NULL ) {
@@ -202,7 +203,7 @@ filelist_t *find_media_files( veejay_t *info )
 	}
 
 	filelist_t *fl = (filelist_t*) vj_malloc(sizeof(filelist_t));
-	fl->files      = (char**) vj_malloc(sizeof(char*) * 1024 ); //@ 1024 files
+	fl->files      = (char**) vj_calloc(sizeof(char*) * 1024 ); 
 	fl->max_files  = 1024;
 	fl->num_files  = 0;	
 	fl->working_dir = strdup(working_dir);
@@ -212,8 +213,9 @@ filelist_t *find_media_files( veejay_t *info )
 	if( res == 0 ) {
 		veejay_msg(VEEJAY_MSG_DEBUG, "No files found in %s", wd );
 		free( fl->files );
+		free( fl->working_dir );
 		free( fl );
-		return NULL;
+		fl = NULL;
 	}
 
 	return fl;

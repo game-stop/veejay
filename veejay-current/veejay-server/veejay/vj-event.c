@@ -8705,38 +8705,41 @@ void	vj_event_send_working_dir(void *ptr, const char format[], va_list ap)
 	
 	filelist_t *list = (filelist_t*)find_media_files(v);
 	char *s_print_buf = NULL;
+	
 	if(!list) {
-		veejay_msg(VEEJAY_MSG_ERROR, "No usable files found.");
-		s_print_buf = get_print_buf( 8 );
-		snprintf(s_print_buf,8,"%08d",0);
+		
+		s_print_buf = get_print_buf( 9 );
+		sprintf(s_print_buf,"%08d",0);
+
 	}else {
 
-		int len = 1;
+		int len = 0;
 		int i;
+		//@ length of file names
 		for( i = 0; i < list->num_files; i ++ ) {
-			len += ( list->files[i] == NULL ? 0 : strlen( list->files[i] ) );
+			len += ( list->files[i] == NULL ? 0 : strlen( list->files[i] ) + 4 );
 		}
 
-		int msg_len = (list->num_files*4) + len - 1;
-		s_print_buf = get_print_buf ( msg_len + 32 );
-		sprintf(s_print_buf, "%08d", msg_len );
+		s_print_buf = get_print_buf( len + 9 );
+		sprintf( s_print_buf, "%08d", len );
 
-		int tlen=0;
 		for( i = 0; i <list->num_files; i ++ ) {
-			char tmp[1024];
+			char tmp[PATH_MAX];
+
 			if(list->files[i]==NULL)
 				continue;
-			tlen = strlen(list->files[i]);
-#ifdef STRICT_CHECKING
-			assert( tlen <= sizeof(tmp));
-#endif
-			snprintf(tmp,sizeof(tmp), "%04d%s",tlen,list->files[i]);
+
+			snprintf(tmp,sizeof(tmp), "%04d%s",strlen( list->files[i] ), list->files[i] );
 
 			strcat( s_print_buf,tmp);
 		}
-		SEND_MSG(v,s_print_buf);
+
 		free_media_files(v,list);
 	}
+
+	printf( s_print_buf );
+
+	SEND_MSG(v, s_print_buf );
 	free( s_print_buf );
 }
 

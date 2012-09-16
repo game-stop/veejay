@@ -465,6 +465,7 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 	int err = 0;
 	while( snd_seq_event_input_pending( v->sequencer, 1 ) > 0 ) {
 		int data[4] = { 0,0,0,0};
+		int isvalid = 1;
 
 		err = snd_seq_event_input( v->sequencer, &ev );
 		if( err == -ENOSPC || err == -EAGAIN )
@@ -505,12 +506,14 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 			default:
 				data[1] = -1;
 				data[2] = -1;
+				isvalid = 0;
 				veejay_msg(VEEJAY_MSG_WARNING, "unknown midi event received: %x %x %x",ev->type,data[1],data[2],data[2]);
 				break;
 		}
 
-		vj_midi_send_vims_now( v, data );
-
+		if( isvalid == 1 ) {
+			vj_midi_send_vims_now( v, data );
+		}
 		snd_seq_free_event( ev );
 
 		ret ++;
@@ -522,7 +525,8 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 int	vj_midi_handle_events(void *vv)
 {
 	vmidi_t *v = (vmidi_t*) vv;
-    if(!v->active) return 0;
+    	
+	if(!v->active) return 0;
 
 	int status = poll( v->pfd, v->npfd, 0 );
 
