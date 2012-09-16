@@ -8395,8 +8395,8 @@ static	char *_vj_event_gatter_sample_info( veejay_t *v, int id )
 	int tlen = strlen(timecode);	
 	char *s_print_buf = get_print_buf(512);
 	snprintf( s_print_buf, 512,
-		"%08d%03d%s%03d%s%02d%02d",
-		( 3 + dlen + 3+ tlen + 2 +2),
+		"%08d%03d%s%03d%s%02d%04d", 
+		( 3 + dlen + 3+ tlen + 2 + 4),
 		dlen,
 		description,
 		tlen,
