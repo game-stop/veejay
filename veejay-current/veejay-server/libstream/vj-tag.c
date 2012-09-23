@@ -237,12 +237,13 @@ char *vj_tag_scan_devices( void )
 	int num = 0;
 	int i;
 	int len = 0;
+	char **device_list = NULL;
 #ifdef HAVE_UNICAP
-	char **device_list = vj_unicap_get_devices(unicap_data_, &num);
+	device_list = vj_unicap_get_devices(unicap_data_, &num);
 #elif HAVE_V4L
-	char **device_list = v4lvideo_templ_get_devices(&num);
+	device_list = v4lvideo_templ_get_devices(&num);
 #elif HAVE_V4L2
-	char **device_list = v4l2_get_device_list();
+	device_list = v4l2_get_device_list();
 #endif
 	if(device_list==NULL)
 		return strdup(default_str);
@@ -3639,10 +3640,9 @@ int vj_tag_get_frame(int t1, uint8_t *buffer[3], uint8_t * abuffer)
 	{
 	case VJ_TAG_TYPE_V4L:
 		if( tag->capture_type == 1 ) {
-#ifdef HAVE_V4L
-			int res = v4lvideo_copy_framebuffer_to(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]);
-#elif HAVE_V4L2
 			int res = 0;
+#ifdef HAVE_V4L
+			res = v4lvideo_copy_framebuffer_to(vj_tag_input->unicap[tag->index],buffer[0],buffer[1],buffer[2]);
 #endif
 
 #ifdef HAVE_V4L2

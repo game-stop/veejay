@@ -110,6 +110,10 @@ AC_ARG_WITH(unicap, AC_HELP_STRING([--without-unicap], [Do not use unicap]),
 		[],	[with_unicap=yes])
 
 
+AC_ARG_WITH(v4l2, AC_HELP_STRING([--without-v4l2],[Do not use Video4Linux]),
+		[],	[with_v4l2=yes])
+
+
 AC_GNU_SOURCE
 
 dnl Initialize libtool
@@ -241,15 +245,16 @@ else
  AC_MSG_RESULT([no])
 fi
 
+if test "x$with_v4l2" != "xno" ; then
+	with_v4l=no
+fi
+
 
 if test "x$enable_v4l1" = "xyes" ; then
 	 with_v4l2=no
 	 with_v4l=yes
-else
-	with_v4l2=yes
-	with_v4l=no
-	with_unicap=no
 fi
+
 
 dnl ********************************************************************
 dnl Test for MMX support if an IA32 platform.  If on a PPC then look for
