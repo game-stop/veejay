@@ -460,20 +460,16 @@ static	void	vj_midi_send_vims_now( vmidi_t *v, int *data )
 
 static	int		vj_dequeue_midi_event( vmidi_t *v )
 {
-	snd_seq_event_t *ev; //@ dequeue midi events
 	int ret = 0;
 	int err = 0;
 	while( snd_seq_event_input_pending( v->sequencer, 1 ) > 0 ) {
 		int data[4] = { 0,0,0,0};
 		int isvalid = 1;
+		snd_seq_event_t *ev = NULL;
 
 		err = snd_seq_event_input( v->sequencer, &ev );
 		if( err == -ENOSPC || err == -EAGAIN )
 			return ret;
-
-		data[0] = -1;	
-		data[1] = -1;
-		data[2] = -1;
 
 		data[0] = ev->type;
 		switch( ev->type )
@@ -486,6 +482,10 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 			case SND_SEQ_EVENT_PITCHBEND:
 				data[1] = ev->data.control.channel;
 				data[2] = ev->data.control.value;
+				break;
+			case SND_SEQ_EVENT_NOTE:
+				data[1] = ev->data.control.channel;
+				data[2] = ev->data.note.note;
 				break;
 			case SND_SEQ_EVENT_NOTEON:
 				data[2] = ev->data.control.channel;
@@ -507,16 +507,18 @@ static	int		vj_dequeue_midi_event( vmidi_t *v )
 				data[1] = -1;
 				data[2] = -1;
 				isvalid = 0;
-				veejay_msg(VEEJAY_MSG_WARNING, "unknown midi event received: %x %x %x",ev->type,data[1],data[2],data[2]);
+				veejay_msg(VEEJAY_MSG_WARNING, "unknown midi event received: %d %x %x",ev->type,data[1],data[2],data[2]);
 				break;
 		}
 
 		if( isvalid == 1 ) {
 			vj_midi_send_vims_now( v, data );
 		}
-		snd_seq_free_event( ev );
 
-		ret ++;
+		if( ev ) {
+			snd_seq_free_event( ev );
+			ret ++;
+		}
 	}
 
 	return ret; 
