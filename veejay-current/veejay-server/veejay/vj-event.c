@@ -8511,27 +8511,27 @@ void	vj_event_get_image_part			(	void *ptr,	const char format[],	va_list ap	)
 	veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
 	vj_perform_get_primary_frame( v, frame.data );
 	
-	int pixel_format = composite_get_top( v->composite, frame.data,
+	int pixel_format = composite_get_original_frame( v->composite, frame.data,
 						  frame.data,
 						  v->settings->composite );
 	
 	int ux = x;
 	int uy = y;
 
-	int uw = w;
-	int uh = h;
+	int uw = v->effect_frame1->uv_width;
+	int uh = v->effect_frame1->uv_height;
 
-	if( pixel_format == PIX_FMT_YUV422P || pixel_format == PIX_FMT_YUVJ422P) {
-		ux = x / 2;
-		uw = w / 2;
-	}
+	ux = ux >> v->effect_frame1->shift_h; // / 2;
+	uy = uy >> v->effect_frame1->shift_v;
 
 	int len = (w * h);
-    if( y_only == 0 )
+	if( y_only == 0 ) {
 		len += (uw * uh);
-	
-	uint8_t *tmp = (uint8_t*) vj_malloc (sizeof(uint8_t) * len);
+		len += (uw * uh);
+	}
 
+	uint8_t *tmp = (uint8_t*) vj_malloc (sizeof(uint8_t) * len);
+	
 	if(!tmp) {
 		veejay_msg(0, "Memory allocation error");
 		SEND_MSG(v, "00000000" );
@@ -8601,6 +8601,7 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 		pixel_format = composite_get_top( v->composite, frame.data,
 						  frame.data,
 						  v->settings->composite );
+		
 		frame.width = v->video_output_width;
 		frame.height = v->video_output_height;
 		switch(pixel_format) {
@@ -8625,7 +8626,6 @@ void	vj_event_get_scaled_image		(	void *ptr,	const char format[],	va_list	ap	)
 				frame.uv_len = frame.uv_width * frame.uv_height;
 				break;
 			}
-
 	}
 	//@ fast*_picture delivers always 4:2:0 data to reduce bandwidth
 	if( use_bw_preview_ )

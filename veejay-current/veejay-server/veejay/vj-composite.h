@@ -26,6 +26,8 @@ void	composite_set_colormode( void *compiz, int mode );
 
 int	composite_get_colormode(void *compiz);
 
+int	composite_get_original_frame(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int which_vp );
+
 int	composite_get_top(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int mode );
 
 int	composite_processX(  void *compiz, void *back1,uint8_t *tmp_data[3], VJFrame *input );

@@ -50,6 +50,7 @@
 typedef struct
 {
 	uint8_t *proj_plane[3];
+	uint8_t *mirror_plane[3];
 	void *vp1;
 	void *back1;
 	void *sampler;
@@ -71,6 +72,7 @@ typedef struct
 	int proj_height;
 	int img_width;			/* image (input) */
 	int img_height;
+	int has_mirror_plane;
 } composite_t;
 
 //@ round to multiple of 8
@@ -161,6 +163,19 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 		(vp1_enabled ? "Active":"Inactive"));
 	veejay_msg(VEEJAY_MSG_INFO, "Press Middle-Mouse button to activate setup.");
 	*vp1_e = (vp1_enabled ? 1 : 2);
+
+	char *gf_instr = getenv( "VEEJAY_ORIGINAL_FRAME" );
+	if( gf_instr == NULL ) {
+		return (void*) c;
+	}
+
+	if( strncasecmp( gf_instr, "1", 1 ) == 0 ) {
+		c->has_mirror_plane = 1;
+		c->mirror_plane[0] = (uint8_t*) vj_calloc( RUP8( iw * ih * 3) + RUP8(iw * 3) * sizeof(uint8_t));
+		c->mirror_plane[1] = c->mirror_plane[0] + RUP8(iw * ih) + RUP8(iw);
+		c->mirror_plane[2] = c->mirror_plane[1] + RUP8(iw * ih) + RUP8(iw);
+	}
+
 	return (void*) c;
 }
 
@@ -303,6 +318,18 @@ static void	composite_scale( composite_t *c, VJFrame *input, VJFrame *output )
 	assert( c->scaler != NULL );
 #endif
 	yuv_convert_and_scale(c->scaler,input,output);
+}
+
+int	composite_get_original_frame(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int which_vp )
+{
+	composite_t *c = (composite_t*) compiz;
+	if( c->has_mirror_plane ) {
+		out[0] = c->mirror_plane[0];
+		out[1] = c->mirror_plane[1];
+		out[2] = c->mirror_plane[2];
+		return c->frame1->format;
+	}
+	return composite_get_top( compiz, current_in, out, which_vp );
 }
 
 int	composite_get_top(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int which_vp )
@@ -456,6 +483,13 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 	}
 
 	int vp1_active = viewport_active(c->vp1);
+	
+	if( c->has_mirror_plane ) {
+		veejay_memcpy( c->mirror_plane[0], input->data[0], input->len );
+		veejay_memcpy( c->mirror_plane[1], input->data[0], input->uv_len );
+		veejay_memcpy( c->mirror_plane[2], input->data[0], input->uv_len );
+	}
+
 	if( which_vp == 2 && !vp1_active ) 
 	{
 		if( input->width != output->width ||
