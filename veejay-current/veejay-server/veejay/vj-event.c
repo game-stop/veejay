@@ -8510,19 +8510,25 @@ void	vj_event_get_image_part			(	void *ptr,	const char format[],	va_list ap	)
 	VJFrame frame;
 	veejay_memcpy(&frame, v->effect_frame1, sizeof(VJFrame));
 	vj_perform_get_primary_frame( v, frame.data );
-	
-	int pixel_format = composite_get_original_frame( v->composite, frame.data,
-						  frame.data,
-						  v->settings->composite );
-	
+
 	int ux = x;
 	int uy = y;
 
 	int uw = v->effect_frame1->uv_width;
 	int uh = v->effect_frame1->uv_height;
 
-	ux = ux >> v->effect_frame1->shift_h; // / 2;
+	ux = ux >> v->effect_frame1->shift_h; 
 	uy = uy >> v->effect_frame1->shift_v;
+
+	int result = composite_get_original_frame( v->composite, frame.data,
+						  frame.data,
+						  v->settings->composite,
+		       				  y,
+						  h );
+
+	if( result == -1 ) {
+		composite_get_top( v->composite,frame.data, frame.data, v->settings->composite );
+	}
 
 	int len = (w * h);
 	if( y_only == 0 ) {
@@ -8541,26 +8547,36 @@ void	vj_event_get_image_part			(	void *ptr,	const char format[],	va_list ap	)
 	uint8_t *start_addr = tmp;
 	unsigned int i,j;
 
-	const int bh = h + y;
-	const int bw = w + x;
+	int	nobackplane = 0;
+	if( result == -1 )
+		nobackplane = 1;
 
-	for( i = y; i < bh; i ++ ) {
+	int bh = ( h - y ); //@ composite copies from row start to row end in new buffer
+	if( nobackplane )
+		bh = h + y; //@ but if composite has no mirror plane, fetch the pixels directly from final frame
+
+	int bw = w + x; //@ width is unchanged (composite copies image rows)
+
+	for( i = (nobackplane ? y : 0); i < bh; i ++ ) {
 		for( j = x; j < bw; j ++ ) {
 			*(tmp++) = frame.data[0][i * frame.width + j];
 		}
 	}
 
 	if( y_only == 0 ) {
-		const int ubh = uh + uy;
-		const int ubw = uw + ux;
+		int ubh = (uh - uy);
+		if( nobackplane )
+			ubh = uh + uy;
 
-		for( i = uy; i < ubh; i ++ ) {
+		int ubw = uw + ux;
+
+		for( i = (nobackplane ? uy : 0); i < ubh; i ++ ) {
 			for( j = ux; j < ubw; j ++ ) {
 				*(tmp++) = frame.data[1][i * frame.uv_width + j];
 			}
 		}
 
-		for( i = uy; i < ubh; i ++ ) {
+		for( i = (nobackplane ? uy : 0); i < ubh; i ++ ) {
 			for( j = ux; j < ubw; j ++ ) {
 				*(tmp++) = frame.data[2][i * frame.uv_height + j];
 			}

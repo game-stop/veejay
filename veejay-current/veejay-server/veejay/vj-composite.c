@@ -73,6 +73,8 @@ typedef struct
 	int img_width;			/* image (input) */
 	int img_height;
 	int has_mirror_plane;
+	int mirror_row_start;
+	int mirror_row_end;
 } composite_t;
 
 //@ round to multiple of 8
@@ -174,6 +176,8 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 		c->mirror_plane[0] = (uint8_t*) vj_calloc( RUP8( iw * ih * 3) + RUP8(iw * 3) * sizeof(uint8_t));
 		c->mirror_plane[1] = c->mirror_plane[0] + RUP8(iw * ih) + RUP8(iw);
 		c->mirror_plane[2] = c->mirror_plane[1] + RUP8(iw * ih) + RUP8(iw);
+		c->mirror_row_start = 0;
+		c->mirror_row_end = 0;
 	}
 
 	return (void*) c;
@@ -320,16 +324,18 @@ static void	composite_scale( composite_t *c, VJFrame *input, VJFrame *output )
 	yuv_convert_and_scale(c->scaler,input,output);
 }
 
-int	composite_get_original_frame(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int which_vp )
+int	composite_get_original_frame(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int which_vp, int row_start, int row_end )
 {
 	composite_t *c = (composite_t*) compiz;
 	if( c->has_mirror_plane ) {
 		out[0] = c->mirror_plane[0];
 		out[1] = c->mirror_plane[1];
 		out[2] = c->mirror_plane[2];
+		c->mirror_row_start = row_start;
+		c->mirror_row_end   = row_end;
 		return c->frame1->format;
-	}
-	return composite_get_top( compiz, current_in, out, which_vp );
+	} 
+	return -1;
 }
 
 int	composite_get_top(void *compiz, uint8_t *current_in[3], uint8_t *out[3], int which_vp )
@@ -485,10 +491,20 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 	int vp1_active = viewport_active(c->vp1);
 	
 	if( c->has_mirror_plane ) {
-		veejay_memcpy( c->mirror_plane[0], input->data[0], input->len );
-		veejay_memcpy( c->mirror_plane[1], input->data[0], input->uv_len );
-		veejay_memcpy( c->mirror_plane[2], input->data[0], input->uv_len );
-	}
+		if(c->mirror_row_start == 0 && (c->mirror_row_end == input->height || c->mirror_row_end == 0) ) {
+			veejay_memcpy( c->mirror_plane[0], input->data[0], input->len );
+			veejay_memcpy( c->mirror_plane[1], input->data[1], input->uv_len );
+			veejay_memcpy( c->mirror_plane[2], input->data[2], input->uv_len );
+		}
+		else {
+			unsigned int i,j = 0;
+			for( i = c->mirror_row_start; i < c->mirror_row_end; i ++, j ++ ) {
+				veejay_memcpy( c->mirror_plane[0] + ( j * input->width ), input->data[0] + ( i * input->width ), input->width );
+				veejay_memcpy( c->mirror_plane[1] + ( j * input->uv_width ), input->data[1] + ( i * input->uv_width ), input->uv_width );
+				veejay_memcpy( c->mirror_plane[2] + ( j * input->uv_width), input->data[2] + ( i * input->uv_width ), input->uv_width );
+			}
+		}
+	}	
 
 	if( which_vp == 2 && !vp1_active ) 
 	{
