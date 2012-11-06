@@ -8514,8 +8514,8 @@ void	vj_event_get_image_part			(	void *ptr,	const char format[],	va_list ap	)
 	int ux = x;
 	int uy = y;
 
-	int uw = v->effect_frame1->uv_width;
-	int uh = v->effect_frame1->uv_height;
+	int uw = w >> v->effect_frame1->shift_h;
+	int uh = h >> v->effect_frame1->shift_v;
 
 	ux = ux >> v->effect_frame1->shift_h; 
 	uy = uy >> v->effect_frame1->shift_v;
