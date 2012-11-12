@@ -4199,6 +4199,53 @@ void	vj_event_sample_set_position( void *ptr, const char format[], va_list ap )
 
 }
 
+void	vj_event_sample_skip_frame(void	*ptr, const char format[], va_list ap)
+{
+	int args[2];
+	veejay_t *v = (veejay_t*) ptr;
+	char *s = NULL;
+	P_A(args, s, format, ap);
+
+	if(args[0] == -1)
+		args[0] = sample_size() - 1;
+
+	if( args[0] == 0) 
+		args[0] = v->uc->sample_id;
+	
+	int job = sample_size();
+	int i   = 1;
+	int k   = 0;
+	for( i = 1; i < job; i ++ ) {
+		sample_info *si = sample_get( i );
+		if(!si)
+		  continue;
+		
+		//@ find the mixing ID in all effect chains , frame offset is FX chain attribute
+		for( k = 0; k < SAMPLE_MAX_EFFECTS; k ++ ) {
+			if( si->effect_chain[k]->effect_id > 0 && 
+				si->effect_chain[k]->source_type == 0 &&
+			    si->effect_chain[k]->channel == args[0] ) {
+				int start = sample_get_startFrame(
+						si->effect_chain[k]->channel );
+				int end   = sample_get_endFrame(
+						si->effect_chain[k]->channel );
+				int len   = end - start;
+
+				si->effect_chain[k]->frame_offset += args[1];
+				
+				if( si->effect_chain[k]->frame_offset > len )
+					si->effect_chain[k]->frame_offset = len;
+				if( si->effect_chain[k]->frame_offset < 0 )
+					si->effect_chain[k]->frame_offset = 0;
+				
+				veejay_msg(VEEJAY_MSG_DEBUG,
+					"Set offset of mixing sample #%d on chain entry %d of sample %d to %d",
+						si->effect_chain[k]->channel, k,i, si->effect_chain[k]->frame_offset );	
+			}
+		}
+	}
+}
+
 void vj_event_sample_set_speed(void *ptr, const char format[], va_list ap)
 {
 	int args[2];

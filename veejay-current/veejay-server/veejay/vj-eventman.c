@@ -445,7 +445,20 @@ void		vj_init_vevo_events(void)
 				"Number of frames", // param label
 				1,		 // default
 				NULL );
-	
+
+	index_map_[VIMS_SAMPLE_SKIP_FRAME]	=	_new_event(
+				"%d %d",
+				VIMS_SAMPLE_SKIP_FRAME,
+				"Skip N frames forward or backward",
+				vj_event_sample_skip_frame,
+				2,
+				VIMS_REQUIRE_ALL_PARAMS,
+                                SAMPLE_ID_HELP,
+                                0,
+                                "Increment value",
+                                0,
+                                NULL );
+
 	index_map_[VIMS_VIDEO_PREV_FRAME]	=	_new_event(
 				"%d",
 				VIMS_VIDEO_PREV_FRAME,
