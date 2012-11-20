@@ -29,6 +29,7 @@
 #include <aclib/imgconvert.h>
 extern void find_best_memcpy(void);
 extern void find_best_memset(void);
+extern int find_best_threaded_memcpy(int w, int h);
 extern void yuyv_plane_init();
 
 static int MEM_ALIGNMENT_SIZE = 0;
@@ -147,7 +148,20 @@ void vj_mem_init(void)
 #endif
 	find_best_memcpy();	
 	find_best_memset();
+}
 
+void	vj_mem_threaded_init(int w, int h)
+{
+	int n = find_best_threaded_memcpy(w, h);
+	if( n > 1 )
+		task_start( n );
+}
+
+void	vj_mem_threaded_stop()
+{
+	int tasks = num_threaded_tasks();
+	if( tasks > 0 )
+		task_stop( tasks );
 }
 
 void *vj_malloc_(unsigned int size)
@@ -197,8 +211,4 @@ void *vj_yuvalloc( unsigned int w, unsigned int h )
 	veejay_memset( ptr + (w*h), 128, (w*h)*2);
 	return ptr;
 }
-
-
-
-
 

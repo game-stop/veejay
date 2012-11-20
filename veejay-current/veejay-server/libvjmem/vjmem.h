@@ -23,6 +23,8 @@
 extern void *(* veejay_memcpy)(void *to, const void *from, size_t len);
 extern void *(* veejay_memset)(void *to, uint8_t val, size_t len);
 extern void vj_mem_init(void);
+extern void vj_mem_threaded_init(int w, int h);
+extern void vj_mem_threaded_stop(void);
 extern char *get_memcpy_descr( void );
 extern void *vj_malloc_(unsigned int size);
 extern  void *vj_calloc_(unsigned int size );
@@ -44,4 +46,10 @@ extern char	*veejay_strncpy( char *s1, const char *s2, size_t n );
 extern void    yuyv_plane_init();
 extern void    yuyv_plane_clear( size_t len, void *to );
 extern char	**vje_build_param_list( int num, ... );
+extern void	*(*vj_frame_copy)( uint8_t **input, uint8_t **output, int *strides, int planes );
+extern void	vj_frame_copy1( uint8_t *input, uint8_t *output, int size );
+extern int	num_threaded_tasks();
+//@ FIXME: Design change
+extern void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac );
+
 #endif

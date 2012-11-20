@@ -198,11 +198,15 @@ __asm__ __volatile__(\
         :"0" (to), "1" (n), "a"((char)val)\
 	:"memory");\
 }
+
 static inline unsigned long long int rdtsc()
 {
-     unsigned long long int x;
-     __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
-     return x;
+     struct timeval tv;
+     gettimeofday (&tv, NULL);
+     return (tv.tv_sec * 1000000 + tv.tv_usec);
+//      unsigned long long int x;
+  //    __asm__ volatile (".byte 0x0f, 0x31" : "=A" (x));
+  //   return x;
 }
 #else
 #define	small_memcpy(to,from,n) memcpy( to,from,n )
@@ -968,7 +972,7 @@ char *get_memcpy_descr( void )
 void find_best_memcpy()
 {
      /* save library size on platforms without special memcpy impl. */
-     unsigned long long t;
+     unsigned long long int t;
      char *buf1, *buf2;
      int i, best = 0;
      int bufsize = 720 * 576 * 3;
@@ -992,7 +996,7 @@ void find_best_memcpy()
 
      int c = 16;
      int k;
-     unsigned long long statistics[c];
+     unsigned long long int statistics[c];
      for( k = 0; k < c; k ++ ) {
       for (i=1; memcpy_method[i].name; i++) {
           t = rdtsc();
@@ -1058,3 +1062,374 @@ void find_best_memset()
      free( buf2 );
 }
 
+typedef struct {
+	uint8_t *input[4];
+	uint8_t *output[4];
+	int	strides[4];
+	uint8_t *temp[4];
+	float fparam;
+} fcpy_info;
+
+static	void	vj_frame_copy_job( fcpy_info *info ) {
+	int i;
+#ifdef STRICT_CHECKING
+	assert( task_get_workers() > 0 );
+#endif
+	for( i = 0; i < 4; i ++ ) {
+		if( info->strides[i] > 0  )
+			veejay_memcpy( info->output[i], info->input[i], info->strides[i] );
+	}
+}
+
+//@ cleanup FIXME: all below -> move.
+
+static void	vj_frame_copy2( uint8_t **input, uint8_t **output, int *strides, int planes )
+{
+	fcpy_info f[2];
+	
+	memset(&(f[0]),0,sizeof(fcpy_info));
+	memset(&(f[1]),0,sizeof(fcpy_info));
+
+	int i;
+	int j;
+
+	/* calculate new stride lengths */
+	
+	for( j = 0; j < 2; j ++ ) {
+		for( i = 0; i < planes; i ++ ) {
+			f[j].strides[i] = strides[i] >> 1;
+		}
+	}
+
+	/* assign planes for job 0 */
+
+	for( i = 0; i < planes; i ++ ) {
+		f[0].input[i] = input[i];
+		f[0].output[i] = output[i];
+	}
+
+	/* assign pointers for job 1 */
+	for( i = 0; i < planes; i ++ ) {
+		f[1].input[i] = input[i] + (strides[i] >> 1);
+		f[1].output[i] = output[i] + (strides[i] >> 1);
+	}
+
+	/* launch the two jobs in parallel */
+
+	void *task = performer_new_job( 2 );
+	performer_set_job( task, 0, &vj_frame_copy_job, &(f[0]));
+	performer_set_job( task, 1, &vj_frame_copy_job, &(f[1]));
+	performer_job( task,2 );
+	performer_jobs_free( task );
+
+}
+
+static void	vj_frame_copyN( uint8_t **input, uint8_t **output, int *strides, int planes, int n )
+{
+	fcpy_info *f = (fcpy_info*) malloc(sizeof(fcpy_info) * n );
+	memset(f,0,sizeof(fcpy_info)*n);
+	int i,j;
+	/* calculate new stride lengths */
+	
+	for( j = 0; j < n; j ++ ) {
+		for( i = 0; i < planes; i ++ ) {
+			f[j].strides[i] = strides[i] / n;
+		}
+	}
+
+	/* assign planes for job 0 */
+
+	for( i = 0; i < planes; i ++ ) {
+		f[0].input[i] = input[i];
+		f[0].output[i] = output[i];
+	}
+
+
+	/* assign pointers for other jobs */
+	for( j = 1; j < n; j ++ ) {
+		for( i = 0; i < planes; i ++ ) {
+			f[j].input[i] = f[(j-1)].input[i] + f[(j-1)].strides[i];
+			f[j].output[i] = f[(j-1)].output[i] + f[(j-1)].strides[i];
+			//f[j].input[i] = input[i] + ((strides[i] >> 2) * j);
+			//f[j].output[i] = output[i] + ((strides[i] >> 2) * j);
+		}
+	}
+
+	/* launch the four jobs in parallel */
+	void *task = performer_new_job( n );
+	for( i = 0; i < n; i ++ ) {
+		performer_set_job( task, i, &vj_frame_copy_job, &(f[i]));
+	}
+	performer_job( task,n );
+	performer_jobs_free( task );
+	free(f);
+}
+
+void	vj_frame_slow_job( fcpy_info *job )
+{
+	int i,j;
+	uint8_t **img = job->output;
+	uint8_t **p0_buffer = job->input;
+	uint8_t **p1_buffer = job->temp;
+	float frac = job->fparam;
+
+	for( i = 0; i < 3; i ++ ) {
+		for( j = 0; j < job->strides[i]; j ++  ) {
+			img[i][j] = p0_buffer[i][j] + ( frac * (p1_buffer[i][j] - p0_buffer[i][j]));
+		}
+	}
+}
+
+void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
+{
+	int N = task_get_workers();
+	int strides[4] = { len, uv_len, uv_len,0 };
+	int i;
+	if( N == 0 ) {
+		if( uv_len != len ) { 
+			for( i  = 0; i < len ; i ++ ) {
+				img[0][i] = p0_buffer[0][i] + ( frac * (p1_buffer[0][i] - p0_buffer[0][i]));
+			}
+			for( i  = 0; i < uv_len ; i ++ ) {
+				img[1][i] = p0_buffer[1][i] + ( frac * (p1_buffer[1][i] - p0_buffer[1][i]));
+				img[2][i] = p0_buffer[2][i] + ( frac * (p1_buffer[2][i] - p0_buffer[2][i]));
+			}
+		} else {
+			for( i  = 0; i < len ; i ++ ) {
+				img[0][i] = p0_buffer[0][i] + ( frac * (p1_buffer[0][i] - p0_buffer[0][i]));
+				img[1][i] = p0_buffer[1][i] + ( frac * (p1_buffer[1][i] - p0_buffer[1][i]));
+				img[2][i] = p0_buffer[2][i] + ( frac * (p1_buffer[2][i] - p0_buffer[2][i]));
+			}
+		}
+	}
+	else {
+		fcpy_info *f = (fcpy_info*) malloc(sizeof(fcpy_info) * N );
+		memset(f,0,sizeof(fcpy_info) * N );
+		int i,j;
+
+		
+
+		for( j = 0; j < N; j ++ ) {
+			f[j].strides[0] = len / N;
+			f[j].strides[1] = uv_len / N;
+			f[j].strides[2] = uv_len / N;
+			f[j].strides[3] = 0;
+			f[j].temp[3] = NULL;
+			f[j].input[3] = NULL;
+			f[j].output[3] = NULL;
+		}
+
+		for( i = 0; i < 3; i ++ ) {
+			f[0].input[i] = p0_buffer[i];
+			f[0].output[i] = img[i];
+			f[0].temp[i] = p1_buffer[i];
+		}
+
+		for( j = 1; j < N; j ++ ) {
+			for( i = 0; i < 3; i ++ ) {
+				f[j].input[i]  = p0_buffer[i] + (f[0].strides[i] * j);// ( f[(j-1)].input[i]  + f[(j-1)].strides[i];
+				f[j].output[i] = img[i] + (f[0].strides[i] * j);// f[(j-1)].output[i] + f[(j-1)].strides[i];
+				f[j].temp[i]   = p1_buffer[i] + (f[0].strides[i]* j); //f[(j-1)].temp[i]   + f[(j-1)].strides[i];
+			}
+		}
+	
+		void *task = performer_new_job( N );
+		for( i = 0; i < N; i ++ ) {
+			performer_set_job( task, i, &vj_frame_slow_job, &(f[i]));
+		}
+		performer_job( task,N );
+		performer_jobs_free( task );
+		free(f);
+	}
+}
+
+
+
+static void	vj_frame_copy4( uint8_t **input, uint8_t **output, int *strides, int planes )
+{
+	vj_frame_copyN( input,output,strides,planes,4 );
+}
+static void	vj_frame_copy6( uint8_t **input, uint8_t **output, int *strides, int planes )
+{
+	vj_frame_copyN( input,output,strides,planes,6 );
+}
+static void	vj_frame_copy8( uint8_t **input, uint8_t **output, int *strides, int planes )
+{
+	vj_frame_copyN( input,output,strides,planes,8 );
+}
+
+
+void	vj_frame_simple_copy(  uint8_t **input, uint8_t **output, int *strides, int planes )
+{
+	int i;
+	for( i = 0; i < planes; i ++ ) 
+			veejay_memcpy( output[i],input[i], strides[i] );
+}
+
+
+static int	num_tasks_ = 0;
+
+int	num_threaded_tasks()
+{
+	return num_tasks_;
+}
+
+static void	vj_frame_user1( uint8_t **input, uint8_t **output, int *strides, int planes )
+{
+	vj_frame_copyN( input,output,strides,planes,num_tasks_ );
+}
+static void	vj_frame_copy12( uint8_t **input, uint8_t **output, int *strides, int planes )
+{
+	vj_frame_copyN( input,output,strides,planes,12 );
+}
+
+static void	vj_frame_copy16( uint8_t **input, uint8_t **output, int *strides, int planes )
+{
+	vj_frame_copyN( input,output,strides,planes,16 );
+}
+
+
+static struct {
+		char	*name;
+		void	(*function)(uint8_t **input, uint8_t **output, int *strides, int planes );
+		unsigned long long time;
+		int	 tasks;
+} multithreaded_copy_method[] = 
+{
+	{ NULL, NULL, 0,0 },
+	{ "Inside main (classic)", vj_frame_simple_copy, 0,0 },
+	{ "2 threads", vj_frame_copy2, 0,2 },
+	{ "4 threads", vj_frame_copy4, 0,4 },
+	{ "6 threads", vj_frame_copy6, 0,6 },
+	{ "8 threads", vj_frame_copy8, 0,8 },
+	{ "12 threads", vj_frame_copy12,0,12 },
+	{ "16 threads", vj_frame_copy16,0,16 },
+	{ "user defined", vj_frame_user1, 0, 0 },
+	{ NULL, NULL, 0,0 },
+};
+
+
+void	*(* vj_frame_copy)( uint8_t **input, uint8_t **output, int *strides, int n_planes ) = 0;
+
+void	    vj_frame_copy1( uint8_t *input, uint8_t *output, int size )
+{
+	uint8_t *in[4] = { input, NULL,NULL,NULL };
+	uint8_t *ou[4] = { output,NULL,NULL,NULL };
+	int     strides[4] = { size,0,0,0 };
+	vj_frame_copy( in, ou, strides, 1 );
+}
+
+
+int	find_best_threaded_memcpy(int w, int h) 
+{
+	uint8_t *src = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 4 );
+	uint8_t *dst = (uint8_t*) vj_malloc(sizeof(uint8_t) * w * h * 4 );
+
+	int planes[4] = { w * h, w * h, w * h , w * h };
+
+	uint8_t *source[4] = { src, src + (w*h), src + (w * h * 2), src + (w * h * 3), };
+	uint8_t *dest[4] = { dst,dst + (w*h), dst + (w*h*2), dst + (w * h * 3)};
+
+	memset( src, 0, sizeof(uint8_t) * w * h * 4 );
+	memset( dst, 0, sizeof(uint8_t) * w * h * 4 );
+
+	long c = 100;
+	
+	long k;
+	int j;
+	int i,best=0;
+	unsigned long long stats[c];
+	unsigned long long best_avg[c];
+
+	//@ fire up the threadpool
+
+	task_init();
+
+	int cpus = task_num_cpus();
+	int preferred_tasks = 1;
+        int warn_user = 0;
+
+	if( w <= 720 && h <= 480 )
+	{
+		preferred_tasks = 1; //@ classic, run in 1/4 PAL, low res, fast, keep it outside threadpooling.
+		best = 1;
+	}
+	else {
+	     preferred_tasks = (cpus * 2 );
+	     warn_user = 1;
+	}
+
+	for ( i = 1; multithreaded_copy_method[i].name; i ++ )
+		if( preferred_tasks == multithreaded_copy_method[i].tasks )
+			best = i;
+
+	unsigned long long best_time = 0;
+	char *str2 = getenv( "VEEJAY_MULTITHREAD_TASKS" );
+	int num_tasks = preferred_tasks;
+	
+	if( best == 0 ) {
+		best = 8; //@ user defined
+	}
+	else {
+		num_tasks = multithreaded_copy_method[best].tasks;
+	}
+	
+	if( str2 != NULL ) {
+		num_tasks  = atoi( str2 );
+		
+		if(num_tasks_ <= 1 )
+			best = 1;
+		else	
+			best = 8;
+
+		veejay_msg(VEEJAY_MSG_DEBUG, "Testing your settings ..."); 
+		if( num_tasks > 1 )
+			task_start( num_tasks );
+		
+		for( k = 0; k < c; k ++ )	
+		{
+			unsigned long long t = rdtsc();
+			multithreaded_copy_method[best].function( source,dest,planes,4 );
+			t = rdtsc() - t;
+			stats[k] = t;
+		}
+		
+		int sum = 0;
+		for( k = 0; k < c ;k ++ )
+			sum += stats[k];
+
+		unsigned long long best_time = (sum / c );
+		veejay_msg(VEEJAY_MSG_DEBUG, "Timing results for copying %2.2f MB data with %d thread(s): %lld",
+				(c * (w*h) *4) /1048576.0f, num_tasks, best_time);
+
+
+		if( num_tasks > 1 ) {
+			task_stop( num_tasks );
+
+			veejay_msg( VEEJAY_MSG_INFO, "Threadpool is %d threads.", num_tasks );	
+			veejay_msg( VEEJAY_MSG_INFO, "Settings will be used for Slow Motion, Feedback, Cache and FX Cache");
+		}
+		else {
+			veejay_msg( VEEJAY_MSG_WARNING, "Not multithreading pixel operations.");
+		}
+	}
+	
+	if( warn_user ){
+		veejay_msg(VEEJAY_MSG_WARNING, "(Experimental) Enabling multicore support!");
+	}
+
+	if( num_tasks > 1 ) {	
+		veejay_msg( VEEJAY_MSG_INFO, "Using %d threads scheduled over %d cpus in performer.", num_tasks, cpus );
+		veejay_msg( VEEJAY_MSG_DEBUG,"Use envvar VEEJAY_MULTITHREAD_TASKS=<num threads> to customize.");
+	}
+
+
+	vj_frame_copy = multithreaded_copy_method[best].function;
+
+	free(src);
+	free(dst);
+
+	num_tasks_ = num_tasks;
+
+	return num_tasks;
+}

@@ -43,6 +43,9 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
+#include <pthread.h>
+
+
 static unsigned int vj_relative_time = 0;
 static unsigned int vj_stamp_ = 0;
 long vj_get_timer()
@@ -656,3 +659,341 @@ int	veejay_sprintf( char *s, size_t size, const char *format, ... )
 	return done;
 }
 #endif
+
+
+/* performer: run a function in parallel on multi core cpu
+ *            move this to a new file.
+ *
+ */
+/*
+
+#define THREAD_STACK 1024*1024
+
+void	performer_init()
+{
+	mlockall( MCL_CURRENT | MCL_FUTURE );
+	stack = malloc(THREAD_STACK);
+	pthread_attr_setstack( &attr, stack, THREAD_STACK );
+}
+*/
+
+struct task
+{
+        int     task_id;
+ 	    void	*data;
+	    void	*(*handler)(void *arg);
+      //  performer_job_routine handler;
+		struct  task    *next;
+};
+
+typedef struct
+{
+	int	thread_id;
+} is_task_t;
+
+
+#define	MAX_WORKERS 16
+
+static volatile int	total_tasks_	=	0;
+static	volatile int tasks_done[MAX_WORKERS];
+static	volatile int tasks_todo = 0;
+static int exitFlag = 0;
+static int taskLock = 0;
+static pthread_mutex_t	queue_mutex;//	= PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP; //PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+//pthread_mutex_t sync_mutex = PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
+static pthread_cond_t 	tasks_completed;
+static pthread_cond_t	current_task;//	= PTHREAD_COND_INITIALIZER;
+static	int	numThreads	= 0;
+struct	task	*tasks_		= NULL;
+struct	task	*tail_task_	= NULL;
+ 
+static pthread_t p_threads[MAX_WORKERS];
+static pthread_attr_t p_attr[MAX_WORKERS];
+static is_task_t p_tasks[MAX_WORKERS];
+static int	 thr_id[MAX_WORKERS];
+
+int	task_get_workers()
+{
+	return numThreads;
+}
+
+void	*task_add(int task_no, void *(fp)(void *data), void *data)
+{
+	struct	task	*enqueue_task = (struct task*) malloc( sizeof(struct task));
+	if(!enqueue_task) {
+		return NULL;
+	}
+
+
+//	int err					=	pthread_mutex_lock( &queue_mutex );
+
+	enqueue_task->task_id	=	task_no;
+	enqueue_task->handler	=	fp;
+	enqueue_task->data		= 	data;
+	enqueue_task->next		= 	NULL;
+
+	if( total_tasks_ == 0 ) {
+		tasks_				=	enqueue_task;
+		tail_task_			=	tasks_;
+	}
+	else {
+		tail_task_->next	=	enqueue_task;
+		tail_task_			=	enqueue_task;
+	}
+
+	total_tasks_ ++;
+
+	int err						=	pthread_cond_signal( &current_task );
+//	err						=	pthread_mutex_unlock( &queue_mutex );
+
+
+}
+
+struct	task	*task_get( pthread_mutex_t *mutex )
+{
+	int err = pthread_mutex_lock(mutex);
+	struct task *t = NULL;
+	if( total_tasks_ > 0  ) {
+		t 		=	tasks_;
+		tasks_	=	tasks_->next;
+
+		if( tasks_ == NULL ) {
+			tail_task_ = NULL;
+		}
+
+		total_tasks_ --;
+	}
+
+	err = pthread_mutex_unlock(mutex);
+ 
+	return t;
+}
+
+void		task_run( struct task *task, void *data, int id)
+{
+	if( task )
+	{
+		(*task->handler)(data);
+		
+		pthread_mutex_lock(&queue_mutex);
+		tasks_done[id] ++; //@ inc, it is possible same thread tasks both tasks
+		pthread_cond_signal( &tasks_completed );
+		pthread_mutex_unlock( &queue_mutex );
+
+	}
+}
+
+void		*task_thread(void *data)
+{
+	const unsigned int id = (int) data;
+	for( ;; ) 
+	{
+		pthread_mutex_lock( &queue_mutex );
+		while( total_tasks_ == 0 ) {
+			if( exitFlag ) {
+				pthread_mutex_unlock(&queue_mutex);
+				pthread_exit(0);
+				return NULL;
+			}
+			pthread_cond_wait(&current_task, &queue_mutex );
+		}
+		pthread_mutex_unlock( &queue_mutex );
+		
+		struct task *t = task_get( &queue_mutex );
+
+		if( t ) {
+			task_run( t, t->data, id );
+			free(t);
+			t = NULL;
+		}
+	}
+}
+
+int			n_cpu = 1;
+
+void		task_init()
+{
+	memset( &thr_id, 0,sizeof(thr_id));
+	memset( &p_threads,0,sizeof(p_threads));
+	memset( &p_tasks, 0,sizeof(p_tasks));
+
+	n_cpu = sysconf( _SC_NPROCESSORS_ONLN );
+	if( n_cpu <= 0 )
+			n_cpu = 1;
+
+	numThreads = 0;
+}
+
+int		task_num_cpus()
+{
+	return n_cpu;
+}
+
+void		task_start(int max_workers)
+{
+	int i;
+
+	exitFlag = 0;
+
+    /*int max_p = sched_get_priority_max( SCHED_FIFO );
+    int min_p = sched_get_priority_min( SCHED_FIFO );
+
+    max_p = (int) ( ((float) max_p) * 0.8f );
+    if( max_p < min_p )
+	    max_p = min_p;
+	*/
+
+    struct sched_param param;
+	cpu_set_t cpuset;
+	pthread_cond_init( &tasks_completed, NULL );
+	pthread_cond_init( &current_task, NULL );
+	pthread_mutex_init( &queue_mutex , NULL);
+	pthread_mutex_lock( &queue_mutex );
+	for( i = 0 ; i < max_workers; i ++ ) {
+		thr_id[i]	= i;
+		pthread_attr_init( &p_attr[i] );
+		pthread_attr_setstacksize( &p_attr[i], 4096 );
+	
+//	  	pthread_attr_setschedpolicy( &p_attr[i], SCHED_FIFO );
+  //  		pthread_attr_setschedparam( &p_attr[i], &param );
+
+
+
+		if( n_cpu > 1 ) {
+			CPU_ZERO(&cpuset);
+			CPU_SET( ((i+1) % n_cpu ), &cpuset );
+			if(pthread_attr_setaffinity_np( &p_attr[i], sizeof(cpuset), &cpuset ) != 0 )
+				veejay_msg(0,"Unable to set CPU %d affinity to thread %d", ((i+1)%n_cpu),i);
+		}
+
+		if( pthread_create(  &p_threads[i], (void*) &p_attr[i], task_thread, (void*) i ) )
+		{
+			veejay_msg(0, "%s: error starting thread %d/%d", __FUNCTION__,i,max_workers );
+			//@ stop
+		}
+	}
+
+	numThreads = max_workers;
+
+	pthread_mutex_unlock( &queue_mutex );
+}
+
+void		task_stop(int max_workers)
+{
+	int i;
+	
+	pthread_mutex_lock(&queue_mutex);
+	exitFlag = 1;
+	pthread_cond_broadcast( &current_task );
+	pthread_mutex_unlock(&queue_mutex);
+
+	for( i = 0; i < max_workers;i++ ) {
+		pthread_join( p_threads[i], (void*)&p_tasks[i] );
+		pthread_attr_destroy( &p_attr[i] );
+	}
+	
+	pthread_mutex_destroy( &queue_mutex );
+	pthread_cond_destroy( &tasks_completed );
+	pthread_cond_destroy( &current_task );	
+
+	task_init();
+	
+}
+
+void	task_wait_all()
+{
+
+}
+
+
+typedef struct {
+	performer_job_routine	job;
+	pthread_t				thread;
+	void					*arg;
+} pjob_t;
+
+
+void	performer_job( void *info, int n )
+{
+	pjob_t		*arr  = (pjob_t*) info;
+
+	int i;
+
+	pthread_mutex_lock(&queue_mutex);
+//	taskLock = 1;
+//	pthread_mutex_unlock(&queue_mutex);
+	
+	tasks_todo = n;
+	veejay_memset( tasks_done, 0, sizeof(tasks_done));
+
+	for( i = 0; i < n; i ++ ) {
+		pjob_t *slot  = &(arr[i]);
+		task_add( i, slot->job, slot->arg );
+	}
+
+	//task_ready(n);
+
+	pthread_mutex_unlock( &queue_mutex );
+
+/*	for( i = 0; i < n; i ++ ) {
+		void *exit_code = NULL;
+		pjob_t *slot = &(arr[i]);
+		pthread_join( slot->thread, NULL );
+		if( exit_code != 0 ) {
+
+		}
+	} */
+
+	int stop = 0;
+	int c = 0;
+	while(!stop) {
+		pthread_mutex_lock( &queue_mutex );
+		int done = 0;
+		for( i = 0 ; i < tasks_todo; i ++ ) {
+			done += tasks_done[i];
+		}
+
+		
+		if( done < tasks_todo ) {
+			pthread_cond_wait( &tasks_completed, &queue_mutex );
+			done = 0;
+			for( i = 0 ; i < tasks_todo; i ++ ) {
+				done += tasks_done[i];
+			}
+		}
+		
+		if( done == tasks_todo )
+		{
+			stop = 1;
+		}
+
+		pthread_mutex_unlock(&queue_mutex);
+	}
+
+}
+
+void	performer_set_job( void *info, int num, performer_job_routine job , void *arg )
+{
+	pjob_t *jobs = (pjob_t*) info;
+	jobs[num].job = job;
+	jobs[num].arg = arg;
+}
+
+void	*performer_new_job( int n_jobs )
+{
+	int		   n = 1 + n_jobs;
+	pjob_t *jobs = (pjob_t*) malloc( sizeof( pjob_t ) * n );
+
+	if( jobs == NULL )
+			return NULL;
+
+	veejay_memset( jobs, 0, sizeof(pjob_t) * n );
+
+	return (void*) jobs;
+}
+
+void	performer_jobs_free( void *jobs ) {
+	free( jobs );
+	jobs = NULL;
+}
+

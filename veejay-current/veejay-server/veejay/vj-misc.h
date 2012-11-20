@@ -30,6 +30,8 @@ typedef struct
 	int    max_files;
 } filelist_t;
 
+typedef	void	*(*performer_job_routine)(void *);
+
 #define VEEJAY_FILE_LIMIT (1048576 * 2000)
 int   available_diskspace(void);
 int vj_perform_screenshot2(veejay_t * info, uint8_t ** src);
@@ -60,5 +62,15 @@ void	vj_get_yuvgrey_template(VJFrame *src, int w, int h);
 void	vj_get_yuv444_template(VJFrame *src, int w, int h);
 
 int	verify_working_dir();
+
+void	performer_job( void *info, int job_num );
+void	*performer_new_job( int n_jobs );
+void	performer_set_job( void *info, int num, performer_job_routine job , void *arg );
+void	performer_jobs_free( void *jobs );
+
+void		task_start(int max_workers);
+void		task_stop(int max_workers);
+void		task_init();
+int		task_num_cpus();
 
 #endif

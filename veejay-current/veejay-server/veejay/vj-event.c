@@ -4171,31 +4171,29 @@ void	vj_event_sample_set_position( void *ptr, const char format[], va_list ap )
 	char *s = NULL;
 	P_A(args, s, format, ap);
 
-	if(SAMPLE_PLAYING(v))
-	{
-		if(args[0] == -1)
-			args[0] = sample_size() - 1;
+	if(args[0] == -1)
+		args[0] = sample_size() - 1;
 
-		if( args[0] == 0) 
-			args[0] = v->uc->sample_id;
+	if( args[0] == 0) 
+		args[0] = v->uc->sample_id;
 
-		int entry = args[1];
-		if( entry == -1 )
-			entry = sample_get_selected_entry(v->uc->sample_id);
+	int entry = args[1];
+	if( entry == -1 )
+		entry = sample_get_selected_entry(v->uc->sample_id);
 
-		int src = sample_get_chain_source(v->uc->sample_id, entry);
-		int cha = sample_get_chain_channel( v->uc->sample_id, entry );
+	int src = sample_get_chain_source(v->uc->sample_id, entry);
+	int cha = sample_get_chain_channel( v->uc->sample_id, entry );
 
-		if( src == VJ_TAG_TYPE_NONE ) {
-			int pos = sample_get_offset( cha,entry );
+//	if( src == VJ_TAG_TYPE_NONE ) {
+		int pos = sample_get_offset( cha,entry );
 			
-			pos += args[2];
+		pos += args[2];
 
-			sample_set_offset( cha,entry, pos );
+		sample_set_offset( cha,entry, pos );
 
-			veejay_msg(VEEJAY_MSG_INFO, "Changed frame position to %d for sample %d", pos,cha );
-		}
-	}
+		veejay_msg(VEEJAY_MSG_INFO, "Changed frame position to %d for sample %d on FX entry %d (only)", pos,cha,entry );
+		
+//	}
 
 }
 
@@ -4222,25 +4220,28 @@ void	vj_event_sample_skip_frame(void	*ptr, const char format[], va_list ap)
 		
 		//@ find the mixing ID in all effect chains , frame offset is FX chain attribute
 		for( k = 0; k < SAMPLE_MAX_EFFECTS; k ++ ) {
-			if( si->effect_chain[k]->effect_id > 0 && 
-				si->effect_chain[k]->source_type == 0 &&
-			    si->effect_chain[k]->channel == args[0] ) {
+			if( si->effect_chain[k]->effect_id > 0 && // active
+		            si->effect_chain[k]->source_type == 0 &&	 // sample (=0)
+			    si->effect_chain[k]->channel == args[0] ) { // ID
+				//@ vars needed for range check
 				int start = sample_get_startFrame(
 						si->effect_chain[k]->channel );
 				int end   = sample_get_endFrame(
 						si->effect_chain[k]->channel );
 				int len   = end - start;
 
+				//@ skip frame = increment current with offset in args[1]
 				si->effect_chain[k]->frame_offset += args[1];
 				
+				//@ check range
 				if( si->effect_chain[k]->frame_offset > len )
 					si->effect_chain[k]->frame_offset = len;
 				if( si->effect_chain[k]->frame_offset < 0 )
 					si->effect_chain[k]->frame_offset = 0;
 				
 				veejay_msg(VEEJAY_MSG_DEBUG,
-					"Set offset of mixing sample #%d on chain entry %d of sample %d to %d",
-						si->effect_chain[k]->channel, k,i, si->effect_chain[k]->frame_offset );	
+					"Set offset of mixing sample #%d (%d-%d) on chain entry %d of sample %d to %d",
+						si->effect_chain[k]->channel,start,end, k,i, si->effect_chain[k]->frame_offset );	
 			}
 		}
 	}
@@ -4253,27 +4254,20 @@ void vj_event_sample_set_speed(void *ptr, const char format[], va_list ap)
 	char *s = NULL;
 	P_A(args, s, format, ap);
 
-	if(SAMPLE_PLAYING(v))
+	if(args[0] == -1)
+		args[0] = sample_size() - 1;
+
+	if( args[0] == 0) 
+		args[0] = v->uc->sample_id;
+
+	if( sample_set_speed(args[0], args[1]) != -1)
 	{
-		if(args[0] == -1)
-			args[0] = sample_size() - 1;
-
-		if( args[0] == 0) 
-			args[0] = v->uc->sample_id;
-
-		if( sample_set_speed(args[0], args[1]) != -1)
-		{
-			veejay_msg(VEEJAY_MSG_INFO, "Changed speed of sample %d to %d",args[0],args[1]);
-		}
-		else
-		{
-			veejay_msg(VEEJAY_MSG_ERROR, "Speed %d it too high to set on sample %d !",
-				args[1],args[0]); 
-		}
+		veejay_msg(VEEJAY_MSG_INFO, "Changed speed of sample %d to %d",args[0],args[1]);
 	}
 	else
 	{
-		p_invalid_mode();
+		veejay_msg(VEEJAY_MSG_ERROR, "Speed %d it too high to set on sample %d !",
+			args[1],args[0]); 
 	}
 }
 

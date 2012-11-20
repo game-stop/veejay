@@ -671,10 +671,13 @@ int main(int argc, char **argv)
 
 	vj_mem_init();
 	vevo_strict_init();
+	
 
 	info = veejay_malloc();
-	if (!info)
+	if (!info) {
+		vj_mem_threaded_stop();
 		return 1;
+	}
 	
    	settings = (video_playback_setup *) info->settings;
 
@@ -685,7 +688,7 @@ int main(int argc, char **argv)
     }
 
 	
-    	if(info->dump)
+   	if(info->dump)
  	{
 		veejay_set_colors(0);
 		vj_event_init();
@@ -756,11 +759,13 @@ int main(int argc, char **argv)
 	if(auto_loop)
 		veejay_auto_loop(info);
 
+
 	print_license();
 
-    if(!veejay_main(info))
+    	if(!veejay_main(info))
 	{
 	    veejay_msg(VEEJAY_MSG_ERROR, "Cannot start main playback cycle");
+		veejay_free(info);
 		return 1;
 	}
 

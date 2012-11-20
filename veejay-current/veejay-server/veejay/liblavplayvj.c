@@ -489,6 +489,8 @@ int veejay_free(veejay_t * info)
 	video_playback_setup *settings =
 	(video_playback_setup *) info->settings;
 
+	vj_mem_threaded_stop();
+
 	veejay_reap_messages();
 
 	vj_event_stop();
@@ -1735,7 +1737,6 @@ static void *veejay_mjpeg_playback_thread(void *arg)
    /* Allow easy shutting down by other processes... */
     pthread_setcancelstate(PTHREAD_CANCEL_ENABLE, NULL);
     pthread_setcanceltype(PTHREAD_CANCEL_ASYNCHRONOUS, NULL);
-  /* schedule FIFO */
 
     veejay_schedule_fifo( info, getpid());
 
@@ -3194,7 +3195,8 @@ int veejay_main(veejay_t * info)
 
     /* Flush the Linux File buffers to disk */
     sync();
-   if (pthread_create(&(settings->playback_thread),NULL,
+   
+    if (pthread_create(&(settings->playback_thread),NULL,
 		       veejay_playback_thread, (void *) info)) {
 	veejay_msg(VEEJAY_MSG_ERROR, "Failed to create thread");
 	return -1;
