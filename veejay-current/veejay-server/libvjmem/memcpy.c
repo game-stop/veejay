@@ -1116,11 +1116,10 @@ static void	vj_frame_copy2( uint8_t **input, uint8_t **output, int *strides, int
 
 	/* launch the two jobs in parallel */
 
-	void *task = performer_new_job( 2 );
-	performer_set_job( task, 0, &vj_frame_copy_job, &(f[0]));
-	performer_set_job( task, 1, &vj_frame_copy_job, &(f[1]));
-	performer_job( task,2 );
-	performer_jobs_free( task );
+	performer_new_job( 2 );
+	performer_set_job( 0, &vj_frame_copy_job, &(f[0]));
+	performer_set_job( 1, &vj_frame_copy_job, &(f[1]));
+	performer_job( 2 );
 
 }
 
@@ -1156,12 +1155,11 @@ static void	vj_frame_copyN( uint8_t **input, uint8_t **output, int *strides, int
 	}
 
 	/* launch the four jobs in parallel */
-	void *task = performer_new_job( n );
+	performer_new_job( n );
 	for( i = 0; i < n; i ++ ) {
-		performer_set_job( task, i, &vj_frame_copy_job, &(f[i]));
+		performer_set_job( i, &vj_frame_copy_job, &(f[i]));
 	}
-	performer_job( task,n );
-	performer_jobs_free( task );
+	performer_job( n );
 	free(f);
 }
 
@@ -1233,12 +1231,11 @@ void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t *
 			}
 		}
 	
-		void *task = performer_new_job( N );
+		performer_new_job( N );
 		for( i = 0; i < N; i ++ ) {
-			performer_set_job( task, i, &vj_frame_slow_job, &(f[i]));
+			performer_set_job( i, &vj_frame_slow_job, &(f[i]));
 		}
-		performer_job( task,N );
-		performer_jobs_free( task );
+		performer_job( N );
 		free(f);
 	}
 }
@@ -1384,8 +1381,12 @@ int	find_best_threaded_memcpy(int w, int h)
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "Testing your settings ..."); 
 		if( num_tasks > 1 )
-			task_start( num_tasks );
-		
+		{
+			if( task_start( num_tasks ) != num_tasks ) {
+				veejay_msg(0,"Failed to launch %d threads!", num_tasks);
+				return 0;
+			}	
+		}
 		for( k = 0; k < c; k ++ )	
 		{
 			unsigned long long t = rdtsc();

@@ -150,11 +150,17 @@ void vj_mem_init(void)
 	find_best_memset();
 }
 
-void	vj_mem_threaded_init(int w, int h)
+int	vj_mem_threaded_init(int w, int h)
 {
 	int n = find_best_threaded_memcpy(w, h);
-	if( n > 1 )
-		task_start( n );
+	if( n > 1 ) {
+		int res = task_start( n );
+		if( res != n ) {
+			veejay_msg(0, "Failed to initialize threadpool of %d threads.", n );
+			return 0;
+		}
+	}
+	return 1;
 }
 
 void	vj_mem_threaded_stop()
