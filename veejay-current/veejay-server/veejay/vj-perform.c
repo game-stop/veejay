@@ -1845,7 +1845,6 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
     }
 }
 
-
 static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *img[3], uint8_t *p0_buffer[3], uint8_t *p1_buffer[3], int check_sample )
 {
 	int max_sfd = (s1 ? sample_get_framedup( s1 ) : info->sfd );
@@ -1920,9 +1919,9 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 		}
 		
 		vj_perform_copy3( p0_buffer, img, info->effect_frame1->len, uv_len );
-		//veejay_memcpy( img[0], p0_buffer[0], info->effect_frame1->len );
-		//veejay_memcpy( img[1], p0_buffer[1], uv_len);
-		//veejay_memcpy( img[2], p0_buffer[2], uv_len );
+		veejay_memcpy( img[0], p0_buffer[0], info->effect_frame1->len );
+		veejay_memcpy( img[1], p0_buffer[1], uv_len);
+		veejay_memcpy( img[2], p0_buffer[2], uv_len );
 
 	} else {
 		uint32_t i;
@@ -1933,7 +1932,7 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 
 
 //@ SSE optimize this, takes about 10ms for 1024x768x3 
-		/*if(!info->effect_frame1->ssm ) {
+	/*	if(!info->effect_frame1->ssm ) {
 			for( i  = 0; i < len ; i ++ )
 				img[0][i] = p0_buffer[0][i] + ( frac * (p1_buffer[0][i] - p0_buffer[0][i]));
 			for( i  = 0; i < uv_len ; i ++ ) {
@@ -1947,12 +1946,12 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 				img[2][i] = p0_buffer[2][i] + ( frac * (p1_buffer[2][i] - p0_buffer[2][i]));
 			}
 
-		}*/
+		}
  		
-
+		*/
 
 		vj_frame_slow_threaded( p0_buffer, p1_buffer, img , len, uv_len, frac );
-
+		
 		//@ copy p0 buffer
 		if( (n1 + 1 ) == N ) {
 			vj_perform_copy3( img, p0_buffer, info->effect_frame1->len,uv_len );

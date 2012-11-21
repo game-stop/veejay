@@ -688,15 +688,14 @@ struct task
 
 typedef struct {
 	performer_job_routine	job;
-	pthread_t				thread;
-	void					*arg;
+	void			*arg;
 } pjob_t;
 
 #define	MAX_WORKERS 16
 
-static volatile int	total_tasks_	=	0;
-static	volatile int tasks_done[MAX_WORKERS];
-static	volatile int tasks_todo = 0;
+static int	total_tasks_	=	0;
+static int tasks_done[MAX_WORKERS];
+static int tasks_todo = 0;
 static int exitFlag = 0;
 static int taskLock = 0;
 static pthread_mutex_t	queue_mutex;//	= PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP; //PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
@@ -786,7 +785,7 @@ void		task_run( struct task *task, void *data, int id)
 
 void		*task_thread(void *data)
 {
-	const unsigned int id = (int) data;
+	const unsigned int id = (int) (int*) data;
 	for( ;; ) 
 	{
 		pthread_mutex_lock( &queue_mutex );
@@ -886,7 +885,7 @@ int		task_start(int max_workers)
 				veejay_msg(0,"Unable to set CPU %d affinity to thread %d", ((i+1)%n_cpu),i);
 		}
 
-		if( pthread_create(  &p_threads[i], (void*) &p_attr[i], task_thread, (void*) i ) )
+		if( pthread_create(  &p_threads[i], (void*) &p_attr[i], task_thread, i ) )
 		{
 			veejay_msg(0, "%s: error starting thread %d/%d", __FUNCTION__,i,max_workers );
 			
@@ -999,8 +998,8 @@ void	performer_set_job( int num, performer_job_routine job , void *arg )
 void	performer_new_job( int n_jobs )
 {	
 	int i;
-	for( i = 0; i < n_jobs; i ++ )
-		veejay_memset( job_list[i], 0, sizeof(pjob_t) );
+//	for( i = 0; i < n_jobs; i ++ )
+//		veejay_memset( job_list[i], 0, sizeof(pjob_t) );
 
 }
 
