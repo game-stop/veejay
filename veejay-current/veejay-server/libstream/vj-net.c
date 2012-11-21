@@ -27,7 +27,7 @@
 #include <veejay/vims.h>
 #include <libyuv/yuvconv.h>
 #include <libvjmem/vjmem.h>
-#include <libavutil/avutil.h>
+#include <libavutil/pixfmt.h>
 #include <libvjmsg/vj-msg.h>
 #include <veejay/vims.h>
 #include <libstream/vj-net.h>

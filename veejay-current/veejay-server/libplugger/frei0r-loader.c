@@ -31,7 +31,7 @@
 #include <libvevo/libvevo.h>
 #include <libplugger/defs.h>
 #include <libyuv/yuvconv.h>
-#include <libavutil/avutil.h>
+#include <libavutil/pixfmt.h>
 #include <stdlib.h>
 #include <sys/types.h>
 #include <sys/stat.h>

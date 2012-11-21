@@ -39,7 +39,7 @@
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
-#include <libavutil/avutil.h>
+#include <libavutil/pixfmt.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif

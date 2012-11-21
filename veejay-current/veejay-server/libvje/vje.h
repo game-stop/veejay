@@ -27,6 +27,7 @@
 #define PARAM_HEIGHT	(1<<0x3)
 #define PARAM_FADER  	(1<<0x1)
 
+
 typedef struct
 {
 	int type;
