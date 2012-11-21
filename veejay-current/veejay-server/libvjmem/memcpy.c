@@ -1384,7 +1384,7 @@ int	find_best_threaded_memcpy(int w, int h)
 		{
 			if( task_start( num_tasks ) != num_tasks ) {
 				veejay_msg(0,"Failed to launch %d threads!", num_tasks);
-				return 0;
+				return -1;
 			}	
 		}
 		for( k = 0; k < c; k ++ )	
