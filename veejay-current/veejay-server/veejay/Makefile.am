@@ -29,7 +29,7 @@ VEEJAY_LIB_FILE = libveejay.la
 
 lib_LTLIBRARIES = $(VEEJAY_LIB_FILE) 
 
-libveejay_la_SOURCES =  jpegutils.c vj-misc.c \
+libveejay_la_SOURCES =  jpegutils.c vj-misc.c vj-task.c \
 			vj-osc.c vjkf.c vj-event.c vj-eventman.c vj-perform.c \
 			x11misc.c vj-shm.c vj-sdl.c vj-dfb.c vj-viewport.c vj-composite.c \
 			vj-font.c vj-pjack.c vj-splitdisplay.c vj-share.c liblavplayvj.c 
@@ -75,12 +75,12 @@ veejay_headers = vims.h jpegutils.h vevo.h vj-composite.h vj-jack.h \
                  vj-OSC.h vj-viewport.h lav_common.h vims.h vj-dfb.h \
                  vjkf.h vj-perform.h vj-viewport-xml.h libveejay.h \
                  vj-audio.h vj-event.h vj-lib.h vj-plug.h x11misc.h \
-                 veejay.h vj-bjack.h vj-font.h vj-misc.h vj-sdl.h
+                 veejay.h vj-bjack.h vj-font.h vj-misc.h vj-sdl.h vj-task.h
 
 
 veejay_SOURCES	= veejay.c ${veejay_headers} 
 veejay_LDADD 	= libveejay.la @LIBGETOPT_LIB@
 
-vevotest_SOURCES = vevotest.c ${veejay_headres}
-vevotest_LDADD   = libveejay.la @LIBGETOPT_LIB@
+#vevotest_SOURCES = vevotest.c ${veejay_headres}
+#vevotest_LDADD   = libveejay.la @LIBGETOPT_LIB@
 
