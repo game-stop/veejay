@@ -1101,8 +1101,8 @@ static int veejay_screen_update(veejay_t * info )
 
 	if( info->shm && vj_shm_get_status(info->shm) == 1 )
 	{
-		int plane_sizes[3] = { info->effect_frame1->len, info->effect_frame1->uv_len,
-		   		info->effect_frame1->uv_len };	
+		int plane_sizes[4] = { info->effect_frame1->len, info->effect_frame1->uv_len,
+		   		info->effect_frame1->uv_len,0 };	
 		if( vj_shm_write(info->shm, frame,plane_sizes) == -1 ) {
 			veejay_msg(0, "failed to write to shared resource!");
 		}
@@ -3804,7 +3804,7 @@ static int	veejay_open_video_files(veejay_t *info, char **files, int num_files, 
 			info->dummy->fps = settings->output_fps;
 
 		if(!info->dummy->fps)
-			info->dummy->fps = 25.0f;
+			info->dummy->fps = ( override_norm == 'p' ? 25.0f : 29.97f );
 	
 		int dw = 720;
 		int dh = (override_norm == 'p' ? 576 : 480);

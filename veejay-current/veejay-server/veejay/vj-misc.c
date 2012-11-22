@@ -691,8 +691,6 @@ typedef struct {
 	void			*arg;
 } pjob_t;
 
-#define	MAX_WORKERS 16
-
 static int	total_tasks_	=	0;
 static int tasks_done[MAX_WORKERS];
 static int tasks_todo = 0;

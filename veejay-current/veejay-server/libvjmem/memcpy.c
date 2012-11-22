@@ -994,7 +994,7 @@ void find_best_memcpy()
      memcpy( buf1, buf2, bufsize);
      memcpy( buf2, buf1, bufsize );
 
-     int c = 16;
+     int c = MAX_WORKERS;
      int k;
      unsigned long long int statistics[c];
      for( k = 0; k < c; k ++ ) {
@@ -1356,7 +1356,7 @@ int	find_best_threaded_memcpy(int w, int h)
 
 	//@ fire up the threadpool
 
-	for ( i = 0; i < 16 ; i++ )  {
+	for ( i = 0; i < MAX_WORKERS ; i++ )  {
 		fcpy_info_arr[i] = (fcpy_info*) vj_malloc(sizeof(fcpy_info));
 		memset(fcpy_info_arr[i],0,sizeof(fcpy_info));	
 	}
@@ -1394,7 +1394,12 @@ int	find_best_threaded_memcpy(int w, int h)
 	
 	if( str2 != NULL ) {
 		num_tasks  = atoi( str2 );
-		
+	
+		if( num_tasks >= MAX_WORKERS ) {
+			veejay_msg(0, "Built-in limit is %d tasks. Change it in libvjmem/vjmem.h ", MAX_WORKERS);
+			return -1;
+		}
+	
 		if(num_tasks_ <= 1 )
 			best = 1;
 		else	
@@ -1404,7 +1409,7 @@ int	find_best_threaded_memcpy(int w, int h)
 		if( num_tasks > 1 )
 		{
 			if( task_start( num_tasks ) != num_tasks ) {
-				veejay_msg(0,"Failed to launch %d threads!", num_tasks);
+				veejay_msg(0,"Failed to launch %d threads ?!", num_tasks);
 				return -1;
 			}	
 		}
