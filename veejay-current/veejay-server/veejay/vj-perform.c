@@ -3435,7 +3435,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 				cur_e   = sample_get_selected_entry(info->uc->sample_id);
 				fx_mode = sample_get_chain_status(info->uc->sample_id,cur_e);
 			}
-			osd_text = get_embedded_help(fx_mode,info->uc->playback_mode,cur_e,info->uc->sample_id );
+			//osd_text = get_embedded_help(fx_mode,info->uc->playback_mode,cur_e,info->uc->sample_id );
 		}
 
 		if(osd_text) {
@@ -3462,6 +3462,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 			} else { 	
 				if(more_text)
 					vj_font_render_osd_status(info->osd,out,more_text,0);
+				
 				vj_font_render_osd_status(info->osd, info->effect_frame1, osd_text,placement );
 			}
 		}
