@@ -63,12 +63,11 @@ void	vj_get_yuv444_template(VJFrame *src, int w, int h);
 
 int	verify_working_dir();
 
-void	performer_job( void *info, int job_num );
-void	*performer_new_job( int n_jobs );
-void	performer_set_job( void *info, int num, performer_job_routine job , void *arg );
-void	performer_jobs_free( void *jobs );
+void	performer_job( int job_num );
+void	performer_new_job( int n_jobs );
+void	performer_set_job( int num, performer_job_routine job , void *arg );
 
-void		task_start(int max_workers);
+int		task_start(int max_workers);
 void		task_stop(int max_workers);
 void		task_init();
 int		task_num_cpus();

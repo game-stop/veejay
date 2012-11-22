@@ -20,10 +20,12 @@
 #ifndef VJ_X86_H
 #define VJ_X86_H
 
+#define MAX_WORKERS 32
+
 extern void *(* veejay_memcpy)(void *to, const void *from, size_t len);
 extern void *(* veejay_memset)(void *to, uint8_t val, size_t len);
 extern void vj_mem_init(void);
-extern void vj_mem_threaded_init(int w, int h);
+extern int vj_mem_threaded_init(int w, int h);
 extern void vj_mem_threaded_stop(void);
 extern char *get_memcpy_descr( void );
 extern void *vj_malloc_(unsigned int size);

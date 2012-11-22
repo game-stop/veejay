@@ -23,7 +23,7 @@
 #include <libvjmem/vjmem.h>
 #include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
-#include <libavutil/avutil.h>
+#include <libavutil/pixfmt.h>
 #include "rgbchannel.h"
 
 vj_effect *rgbchannel_init(int w, int h)

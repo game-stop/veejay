@@ -609,7 +609,8 @@ int vj_perform_init(veejay_t * info)
     const int frame_len = ((w * h)/7) * 8;
     int c;
 
-    vj_mem_threaded_init(  info->video_output_width, info->video_output_height );
+    if(!vj_mem_threaded_init(  info->video_output_width, info->video_output_height ) )
+	return 0;
 
     // buffer used to store encoded frames (for plain and sample mode)
     frame_buffer = (ycbcr_frame **) vj_malloc(sizeof(ycbcr_frame*) * SAMPLE_MAX_EFFECTS);
@@ -1844,7 +1845,6 @@ static void vj_perform_apply_secundary_tag(veejay_t * info, int sample_id,
     }
 }
 
-
 static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *img[3], uint8_t *p0_buffer[3], uint8_t *p1_buffer[3], int check_sample )
 {
 	int max_sfd = (s1 ? sample_get_framedup( s1 ) : info->sfd );
@@ -1919,9 +1919,9 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 		}
 		
 		vj_perform_copy3( p0_buffer, img, info->effect_frame1->len, uv_len );
-		//veejay_memcpy( img[0], p0_buffer[0], info->effect_frame1->len );
-		//veejay_memcpy( img[1], p0_buffer[1], uv_len);
-		//veejay_memcpy( img[2], p0_buffer[2], uv_len );
+		veejay_memcpy( img[0], p0_buffer[0], info->effect_frame1->len );
+		veejay_memcpy( img[1], p0_buffer[1], uv_len);
+		veejay_memcpy( img[2], p0_buffer[2], uv_len );
 
 	} else {
 		uint32_t i;
@@ -1932,7 +1932,7 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 
 
 //@ SSE optimize this, takes about 10ms for 1024x768x3 
-		/*if(!info->effect_frame1->ssm ) {
+	/*	if(!info->effect_frame1->ssm ) {
 			for( i  = 0; i < len ; i ++ )
 				img[0][i] = p0_buffer[0][i] + ( frac * (p1_buffer[0][i] - p0_buffer[0][i]));
 			for( i  = 0; i < uv_len ; i ++ ) {
@@ -1946,12 +1946,12 @@ static	int	vj_perform_get_frame_( veejay_t *info, int s1, long nframe, uint8_t *
 				img[2][i] = p0_buffer[2][i] + ( frac * (p1_buffer[2][i] - p0_buffer[2][i]));
 			}
 
-		}*/
+		}
  		
-
+		*/
 
 		vj_frame_slow_threaded( p0_buffer, p1_buffer, img , len, uv_len, frac );
-
+		
 		//@ copy p0 buffer
 		if( (n1 + 1 ) == N ) {
 			vj_perform_copy3( img, p0_buffer, info->effect_frame1->len,uv_len );
@@ -3435,7 +3435,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 				cur_e   = sample_get_selected_entry(info->uc->sample_id);
 				fx_mode = sample_get_chain_status(info->uc->sample_id,cur_e);
 			}
-			osd_text = get_embedded_help(fx_mode,info->uc->playback_mode,cur_e,info->uc->sample_id );
+			//osd_text = get_embedded_help(fx_mode,info->uc->playback_mode,cur_e,info->uc->sample_id );
 		}
 
 		if(osd_text) {
@@ -3462,6 +3462,7 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 			} else { 	
 				if(more_text)
 					vj_font_render_osd_status(info->osd,out,more_text,0);
+				
 				vj_font_render_osd_status(info->osd, info->effect_frame1, osd_text,placement );
 			}
 		}

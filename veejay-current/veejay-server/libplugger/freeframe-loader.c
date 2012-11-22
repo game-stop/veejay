@@ -20,6 +20,7 @@
 #include <config.h>
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <dlfcn.h>
@@ -31,7 +32,7 @@
 #include <libplugger/defs.h>
 #include <libplugger/ldefs.h>
 #include <libyuv/yuvconv.h>
-#include <libavutil/avutil.h>
+#include <libavutil/pixfmt.h>
 #include <libplugger/portdef.h>
 #define LINUX 1 
 #include <libplugger/specs/FreeFrame.h>

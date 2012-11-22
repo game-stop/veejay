@@ -39,7 +39,7 @@
 #include <libvjmsg/vj-msg.h>
 #include <libvje/vje.h>
 #include <libyuv/yuvconv.h>
-#include <libavutil/avutil.h>
+#include <libavutil/pixfmt.h>
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
@@ -686,17 +686,14 @@ struct task
 		struct  task    *next;
 };
 
-typedef struct
-{
-	int	thread_id;
-} is_task_t;
+typedef struct {
+	performer_job_routine	job;
+	void			*arg;
+} pjob_t;
 
-
-#define	MAX_WORKERS 16
-
-static volatile int	total_tasks_	=	0;
-static	volatile int tasks_done[MAX_WORKERS];
-static	volatile int tasks_todo = 0;
+static int	total_tasks_	=	0;
+static int tasks_done[MAX_WORKERS];
+static int tasks_todo = 0;
 static int exitFlag = 0;
 static int taskLock = 0;
 static pthread_mutex_t	queue_mutex;//	= PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP; //PTHREAD_RECURSIVE_MUTEX_INITIALIZER_NP;
@@ -709,8 +706,9 @@ struct	task	*tail_task_	= NULL;
  
 static pthread_t p_threads[MAX_WORKERS];
 static pthread_attr_t p_attr[MAX_WORKERS];
-static is_task_t p_tasks[MAX_WORKERS];
+static int	 p_tasks[MAX_WORKERS];
 static int	 thr_id[MAX_WORKERS];
+static	pjob_t *job_list[MAX_WORKERS];
 
 int	task_get_workers()
 {
@@ -785,7 +783,7 @@ void		task_run( struct task *task, void *data, int id)
 
 void		*task_thread(void *data)
 {
-	const unsigned int id = (int) data;
+	const unsigned int id = (int) (int*) data;
 	for( ;; ) 
 	{
 		pthread_mutex_lock( &queue_mutex );
@@ -811,11 +809,27 @@ void		*task_thread(void *data)
 
 int			n_cpu = 1;
 
+void	task_free()
+{
+	int i;
+	for ( i = 0; i < MAX_WORKERS; i ++ ) {
+		free(job_list[i]);
+	}
+}
+
 void		task_init()
 {
+	int i;
+
 	memset( &thr_id, 0,sizeof(thr_id));
 	memset( &p_threads,0,sizeof(p_threads));
 	memset( &p_tasks, 0,sizeof(p_tasks));
+
+	memset( job_list, 0,sizeof(pjob_t*) * MAX_WORKERS );
+	for( i = 0; i < MAX_WORKERS; i ++ ) {
+		job_list[i] = vj_malloc(sizeof(pjob_t));
+		memset( job_list[i], 0, sizeof(pjob_t));
+	}	
 
 	n_cpu = sysconf( _SC_NPROCESSORS_ONLN );
 	if( n_cpu <= 0 )
@@ -829,10 +843,13 @@ int		task_num_cpus()
 	return n_cpu;
 }
 
-void		task_start(int max_workers)
+int		task_start(int max_workers)
 {
 	int i;
-
+	if( max_workers >= MAX_WORKERS ) {
+		veejay_msg(0, "Maximum number of threads is %d", MAX_WORKERS );
+		return 0;
+	}
 	exitFlag = 0;
 
     /*int max_p = sched_get_priority_max( SCHED_FIFO );
@@ -852,7 +869,7 @@ void		task_start(int max_workers)
 	for( i = 0 ; i < max_workers; i ++ ) {
 		thr_id[i]	= i;
 		pthread_attr_init( &p_attr[i] );
-		pthread_attr_setstacksize( &p_attr[i], 4096 );
+//		pthread_attr_setstacksize( &p_attr[i], 4096 );
 	
 //	  	pthread_attr_setschedpolicy( &p_attr[i], SCHED_FIFO );
   //  		pthread_attr_setschedparam( &p_attr[i], &param );
@@ -866,16 +883,20 @@ void		task_start(int max_workers)
 				veejay_msg(0,"Unable to set CPU %d affinity to thread %d", ((i+1)%n_cpu),i);
 		}
 
-		if( pthread_create(  &p_threads[i], (void*) &p_attr[i], task_thread, (void*) i ) )
+		if( pthread_create(  &p_threads[i], (void*) &p_attr[i], task_thread, i ) )
 		{
 			veejay_msg(0, "%s: error starting thread %d/%d", __FUNCTION__,i,max_workers );
-			//@ stop
+			
+			memset( &p_threads[i], 0, sizeof(pthread_t) );
+			return -1;
 		}
 	}
 
 	numThreads = max_workers;
 
 	pthread_mutex_unlock( &queue_mutex );
+
+	return numThreads;
 }
 
 void		task_stop(int max_workers)
@@ -905,18 +926,8 @@ void	task_wait_all()
 
 }
 
-
-typedef struct {
-	performer_job_routine	job;
-	pthread_t				thread;
-	void					*arg;
-} pjob_t;
-
-
-void	performer_job( void *info, int n )
+void	performer_job( int n )
 {
-	pjob_t		*arr  = (pjob_t*) info;
-
 	int i;
 
 	pthread_mutex_lock(&queue_mutex);
@@ -927,7 +938,7 @@ void	performer_job( void *info, int n )
 	veejay_memset( tasks_done, 0, sizeof(tasks_done));
 
 	for( i = 0; i < n; i ++ ) {
-		pjob_t *slot  = &(arr[i]);
+		pjob_t *slot  = job_list[i];
 		task_add( i, slot->job, slot->arg );
 	}
 
@@ -972,28 +983,22 @@ void	performer_job( void *info, int n )
 
 }
 
-void	performer_set_job( void *info, int num, performer_job_routine job , void *arg )
+void	performer_set_job( int num, performer_job_routine job , void *arg )
 {
-	pjob_t *jobs = (pjob_t*) info;
-	jobs[num].job = job;
-	jobs[num].arg = arg;
+#ifdef STRICT_CHECKING
+	assert( num >= 0 && num < MAX_WORKERS );
+#endif
+	job_list[ num ]->job = job;
+	job_list[ num ]->arg = arg;
+
 }
 
-void	*performer_new_job( int n_jobs )
-{
-	int		   n = 1 + n_jobs;
-	pjob_t *jobs = (pjob_t*) malloc( sizeof( pjob_t ) * n );
+void	performer_new_job( int n_jobs )
+{	
+	int i;
+//	for( i = 0; i < n_jobs; i ++ )
+//		veejay_memset( job_list[i], 0, sizeof(pjob_t) );
 
-	if( jobs == NULL )
-			return NULL;
-
-	veejay_memset( jobs, 0, sizeof(pjob_t) * n );
-
-	return (void*) jobs;
 }
 
-void	performer_jobs_free( void *jobs ) {
-	free( jobs );
-	jobs = NULL;
-}
 

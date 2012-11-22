@@ -994,7 +994,7 @@ void find_best_memcpy()
      memcpy( buf1, buf2, bufsize);
      memcpy( buf2, buf1, bufsize );
 
-     int c = 16;
+     int c = MAX_WORKERS;
      int k;
      unsigned long long int statistics[c];
      for( k = 0; k < c; k ++ ) {
@@ -1070,6 +1070,8 @@ typedef struct {
 	float fparam;
 } fcpy_info;
 
+static 	fcpy_info *fcpy_info_arr[16]; 
+
 static	void	vj_frame_copy_job( fcpy_info *info ) {
 	int i;
 #ifdef STRICT_CHECKING
@@ -1085,10 +1087,9 @@ static	void	vj_frame_copy_job( fcpy_info *info ) {
 
 static void	vj_frame_copy2( uint8_t **input, uint8_t **output, int *strides, int planes )
 {
-	fcpy_info f[2];
-	
-	memset(&(f[0]),0,sizeof(fcpy_info));
-	memset(&(f[1]),0,sizeof(fcpy_info));
+	fcpy_info **f = fcpy_info_arr;
+	memset(f[0],0,sizeof(fcpy_info));
+	memset(f[1],0,sizeof(fcpy_info));
 
 	int i;
 	int j;
@@ -1097,73 +1098,86 @@ static void	vj_frame_copy2( uint8_t **input, uint8_t **output, int *strides, int
 	
 	for( j = 0; j < 2; j ++ ) {
 		for( i = 0; i < planes; i ++ ) {
-			f[j].strides[i] = strides[i] >> 1;
+			f[j]->strides[i] = strides[i] >> 1;
 		}
 	}
 
 	/* assign planes for job 0 */
 
 	for( i = 0; i < planes; i ++ ) {
-		f[0].input[i] = input[i];
-		f[0].output[i] = output[i];
+		f[0]->input[i] = input[i];
+		f[0]->output[i] = output[i];
 	}
 
 	/* assign pointers for job 1 */
 	for( i = 0; i < planes; i ++ ) {
-		f[1].input[i] = input[i] + (strides[i] >> 1);
-		f[1].output[i] = output[i] + (strides[i] >> 1);
+		f[1]->input[i] = input[i] + (strides[i] >> 1);
+		f[1]->output[i] = output[i] + (strides[i] >> 1);
 	}
 
 	/* launch the two jobs in parallel */
 
-	void *task = performer_new_job( 2 );
-	performer_set_job( task, 0, &vj_frame_copy_job, &(f[0]));
-	performer_set_job( task, 1, &vj_frame_copy_job, &(f[1]));
-	performer_job( task,2 );
-	performer_jobs_free( task );
+	performer_new_job( 2 );
+	performer_set_job( 0, &vj_frame_copy_job, f[0]);
+	performer_set_job( 1, &vj_frame_copy_job, f[1]);
+	performer_job( 2 );
 
 }
 
 static void	vj_frame_copyN( uint8_t **input, uint8_t **output, int *strides, int planes, int n )
 {
-	fcpy_info *f = (fcpy_info*) malloc(sizeof(fcpy_info) * n );
-	memset(f,0,sizeof(fcpy_info)*n);
 	int i,j;
+	for( i = 0; i < n ; i ++ )
+		memset( fcpy_info_arr[i],0,sizeof(fcpy_info));
+	
+	fcpy_info **f = fcpy_info_arr;
+
 	/* calculate new stride lengths */
 	
 	for( j = 0; j < n; j ++ ) {
 		for( i = 0; i < planes; i ++ ) {
-			f[j].strides[i] = strides[i] / n;
+			f[j]->strides[i] = strides[i] / n;
 		}
 	}
 
 	/* assign planes for job 0 */
 
 	for( i = 0; i < planes; i ++ ) {
-		f[0].input[i] = input[i];
-		f[0].output[i] = output[i];
+		f[0]->input[i] = input[i];
+		f[0]->output[i] = output[i];
 	}
 
 
 	/* assign pointers for other jobs */
 	for( j = 1; j < n; j ++ ) {
 		for( i = 0; i < planes; i ++ ) {
-			f[j].input[i] = f[(j-1)].input[i] + f[(j-1)].strides[i];
-			f[j].output[i] = f[(j-1)].output[i] + f[(j-1)].strides[i];
+			f[j]->input[i] = f[(j-1)]->input[i] + f[(j-1)]->strides[i];
+			f[j]->output[i] = f[(j-1)]->output[i] + f[(j-1)]->strides[i];
 			//f[j].input[i] = input[i] + ((strides[i] >> 2) * j);
 			//f[j].output[i] = output[i] + ((strides[i] >> 2) * j);
 		}
 	}
 
 	/* launch the four jobs in parallel */
-	void *task = performer_new_job( n );
+	performer_new_job( n );
 	for( i = 0; i < n; i ++ ) {
-		performer_set_job( task, i, &vj_frame_copy_job, &(f[i]));
+		performer_set_job( i, &vj_frame_copy_job, f[i]);
 	}
-	performer_job( task,n );
-	performer_jobs_free( task );
-	free(f);
+	performer_job( n );
 }
+
+/*
+test pattern:
+	int len = job->strides[0];
+	for( i = 0; i < len; i ++ )
+		img[0][i] = 255 - ( 15 * job->id );
+	
+	len = job->strides[1];
+	for( i = 0; i < len; i ++ )
+		{
+		img[1][i] = 128; img[2][i] = 128;
+		}
+*/
 
 void	vj_frame_slow_job( fcpy_info *job )
 {
@@ -1171,20 +1185,23 @@ void	vj_frame_slow_job( fcpy_info *job )
 	uint8_t **img = job->output;
 	uint8_t **p0_buffer = job->input;
 	uint8_t **p1_buffer = job->temp;
-	float frac = job->fparam;
-
+	const float frac = job->fparam;
+	
 	for( i = 0; i < 3; i ++ ) {
 		for( j = 0; j < job->strides[i]; j ++  ) {
 			img[i][j] = p0_buffer[i][j] + ( frac * (p1_buffer[i][j] - p0_buffer[i][j]));
 		}
 	}
+
 }
+
 
 void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac )
 {
 	int N = task_get_workers();
 	int strides[4] = { len, uv_len, uv_len,0 };
 	int i;
+
 	if( N == 0 ) {
 		if( uv_len != len ) { 
 			for( i  = 0; i < len ; i ++ ) {
@@ -1203,43 +1220,39 @@ void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t *
 		}
 	}
 	else {
-		fcpy_info *f = (fcpy_info*) malloc(sizeof(fcpy_info) * N );
-		memset(f,0,sizeof(fcpy_info) * N );
 		int i,j;
-
-		
-
+		fcpy_info **f = fcpy_info_arr;
 		for( j = 0; j < N; j ++ ) {
-			f[j].strides[0] = len / N;
-			f[j].strides[1] = uv_len / N;
-			f[j].strides[2] = uv_len / N;
-			f[j].strides[3] = 0;
-			f[j].temp[3] = NULL;
-			f[j].input[3] = NULL;
-			f[j].output[3] = NULL;
+			memset( f[j], 0, sizeof( fcpy_info ));
+			f[j]->strides[0] = len / N;
+			f[j]->strides[1] = uv_len / N;
+			f[j]->strides[2] = uv_len / N;
+			f[j]->strides[3] = 0;
+			f[j]->temp[3] = NULL;
+			f[j]->input[3] = NULL;
+			f[j]->output[3] = NULL;
+			f[j]->fparam = frac;
 		}
 
 		for( i = 0; i < 3; i ++ ) {
-			f[0].input[i] = p0_buffer[i];
-			f[0].output[i] = img[i];
-			f[0].temp[i] = p1_buffer[i];
+			f[0]->input[i] = p0_buffer[i];
+			f[0]->output[i] = img[i];
+			f[0]->temp[i] = p1_buffer[i];
 		}
 
 		for( j = 1; j < N; j ++ ) {
 			for( i = 0; i < 3; i ++ ) {
-				f[j].input[i]  = p0_buffer[i] + (f[0].strides[i] * j);// ( f[(j-1)].input[i]  + f[(j-1)].strides[i];
-				f[j].output[i] = img[i] + (f[0].strides[i] * j);// f[(j-1)].output[i] + f[(j-1)].strides[i];
-				f[j].temp[i]   = p1_buffer[i] + (f[0].strides[i]* j); //f[(j-1)].temp[i]   + f[(j-1)].strides[i];
+				f[j]->input[i]  = p0_buffer[i] + (f[0]->strides[i] * j);// ( f[(j-1)].input[i]  + f[(j-1)].strides[i];
+				f[j]->output[i] = img[i] + (f[0]->strides[i] * j);// f[(j-1)].output[i] + f[(j-1)].strides[i];
+				f[j]->temp[i]   = p1_buffer[i] + (f[0]->strides[i]* j); //f[(j-1)].temp[i]   + f[(j-1)].strides[i];
 			}
 		}
 	
-		void *task = performer_new_job( N );
+		performer_new_job( N );
 		for( i = 0; i < N; i ++ ) {
-			performer_set_job( task, i, &vj_frame_slow_job, &(f[i]));
+			performer_set_job( i, &vj_frame_slow_job, f[i]);
 		}
-		performer_job( task,N );
-		performer_jobs_free( task );
-		free(f);
+		performer_job( N );
 	}
 }
 
@@ -1343,6 +1356,11 @@ int	find_best_threaded_memcpy(int w, int h)
 
 	//@ fire up the threadpool
 
+	for ( i = 0; i < MAX_WORKERS ; i++ )  {
+		fcpy_info_arr[i] = (fcpy_info*) vj_malloc(sizeof(fcpy_info));
+		memset(fcpy_info_arr[i],0,sizeof(fcpy_info));	
+	}
+
 	task_init();
 
 	int cpus = task_num_cpus();
@@ -1376,7 +1394,12 @@ int	find_best_threaded_memcpy(int w, int h)
 	
 	if( str2 != NULL ) {
 		num_tasks  = atoi( str2 );
-		
+	
+		if( num_tasks >= MAX_WORKERS ) {
+			veejay_msg(0, "Built-in limit is %d tasks. Change it in libvjmem/vjmem.h ", MAX_WORKERS);
+			return -1;
+		}
+	
 		if(num_tasks_ <= 1 )
 			best = 1;
 		else	
@@ -1384,8 +1407,12 @@ int	find_best_threaded_memcpy(int w, int h)
 
 		veejay_msg(VEEJAY_MSG_DEBUG, "Testing your settings ..."); 
 		if( num_tasks > 1 )
-			task_start( num_tasks );
-		
+		{
+			if( task_start( num_tasks ) != num_tasks ) {
+				veejay_msg(0,"Failed to launch %d threads ?!", num_tasks);
+				return -1;
+			}	
+		}
 		for( k = 0; k < c; k ++ )	
 		{
 			unsigned long long t = rdtsc();
