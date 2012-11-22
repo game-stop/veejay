@@ -55,6 +55,8 @@ static int	 p_tasks[MAX_WORKERS];
 static int	 thr_id[MAX_WORKERS];
 static	pjob_t *job_list[MAX_WORKERS];
 
+#define    RUP8(num)(((num)+8)&~8)
+
 int	task_get_workers()
 {
 	return numThreads;
@@ -371,7 +373,7 @@ void	vj_task_alloc_internal_buf( int w )
 {
 	int i;
 	for( i = 0; i < MAX_WORKERS; i ++ ) {
-		vj_task_args[i]->priv = (void*) vj_malloc( w );
+		vj_task_args[i]->priv = (void*) vj_malloc( RUP8( w ) );
 	}
 }
 

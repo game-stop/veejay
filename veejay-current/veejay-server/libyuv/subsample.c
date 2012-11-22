@@ -67,34 +67,28 @@ const char *ssm_description[SSM_COUNT] = {
 // forward decl
 void ss_420_to_422(uint8_t *buffer, int width, int height);
 void ss_422_to_420(uint8_t *buffer, int width, int height);
-
+/*
 typedef struct
 {
 	uint8_t *buf; 
 } yuv_sampler_t;
-
+*/
 void *subsample_init(int len)
 {
-	yuv_sampler_t *s = (yuv_sampler_t*) vj_malloc(sizeof(yuv_sampler_t) );
+//	yuv_sampler_t *s = (yuv_sampler_t*) vj_malloc(sizeof(yuv_sampler_t) );
+//	if(!s)
+//		return NULL;
+	void *s = (void*) vj_malloc(sizeof(uint8_t) * RUP8(len*2) );
 	if(!s)
 		return NULL;
-	s->buf = (uint8_t*) vj_malloc(sizeof(uint8_t) * RUP8(len*2) );
-	if(!s->buf)
-		return NULL;
 
-	return (void*) s;
+	return s;
 }
 
 void	subsample_free(void *data)
 {
-	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
-	if(sampler)
-	{
-		if(sampler->buf) 
-			free(sampler->buf);
-		free(sampler);
-	}
-	sampler = NULL;
+	free(data);
+	data = NULL;
 }
 
 /*************************************************************************
@@ -251,9 +245,7 @@ static void tr_420jpeg_to_444(void *data, uint8_t *buffer, int width, int height
   uint8_t cmm, cm0, cmp, c0m, c00, c0p, cpm, cp0, cpp;
   int x, y;
 
-  yuv_sampler_t *sampler = (yuv_sampler_t*) data;
-
-  uint8_t *saveme = sampler->buf;
+  uint8_t *saveme = (uint8_t*) data;
 
   veejay_memcpy(saveme, buffer, width);
 
@@ -556,8 +548,7 @@ static void ss_444_to_422_cp(void *data, uint8_t *buffer, uint8_t *dest, int wid
 	int mmxdst_stride=dst_stride >> 3;
 	int left = dst_stride % 8;
 #endif
-	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
-	uint8_t *src = sampler->buf;
+	uint8_t *src = (uint8_t*) data;
 	uint8_t *dst;
 
 #ifdef HAVE_ASM_MMX
@@ -601,8 +592,7 @@ static void ss_444_to_422(void *data, uint8_t *buffer, int width, int height)
 	int mmxdst_stride=dst_stride >> 3;
 	int left = dst_stride % 8;
 #endif
-	yuv_sampler_t *sampler = (yuv_sampler_t*) data;
-	uint8_t *src = sampler->buf;
+	uint8_t *src = (uint8_t*) data;
 	uint8_t *dst;
 
 #ifdef HAVE_ASM_MMX
@@ -610,7 +600,7 @@ static void ss_444_to_422(void *data, uint8_t *buffer, int width, int height)
 #endif
 	for(y = 0; y < height; y ++)
 	{
-		src = sampler->buf;
+		src = (uint8_t*) data;
 		dst = buffer + (y*dst_stride);
 
 #if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_MMX2)
