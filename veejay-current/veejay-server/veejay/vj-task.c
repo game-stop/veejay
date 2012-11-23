@@ -430,7 +430,7 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 		int uwid = uv_width;
 
 		int hei = h / n;
-		int uhei = hei >> f[0]->shifth;
+		int uhei = uv_height / n;
 
 		for( j = 0; j < n; j ++ ) {
 			f[j]->input[0] = buf1[0] + ( j * wid * hei );

@@ -87,7 +87,7 @@ void *subsample_init(int len)
 
 void	subsample_free(void *data)
 {
-	free(data);
+	if( data ) free(data);
 	data = NULL;
 }
 
@@ -840,14 +840,14 @@ static void chroma_supersample_task( void *ptr )
 void chroma_subsample_cp(subsample_mode_t mode, void *data, uint8_t *ycbcr[], uint8_t *dcbcr[],
 		      int width, int height)
 {
-  if( vj_task_available() ) {
+  /*if( vj_task_available() ) { //@ FIXME: 
 	vj_task_set_wid( width );
 	vj_task_set_hei( height );
 	vj_task_set_int( mode );
 	vj_task_alloc_internal_buf( width * 2);	
 	vj_task_run( ycbcr, dcbcr, NULL, NULL,3, (performer_job_routine) &chroma_subsample_cp_task );
 	return;
-  }
+  }*/
 
   switch (mode) {
 	  case SSM_420_JPEG_BOX:
@@ -874,7 +874,7 @@ void chroma_subsample_cp(subsample_mode_t mode, void *data, uint8_t *ycbcr[], ui
 void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
 		      int width, int height)
 {
-	if( vj_task_available() ) {
+/*	if( vj_task_available() ) {
 
 		vj_task_set_shift(0,0);
 		vj_task_set_wid( width );
@@ -885,8 +885,8 @@ void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
 		vj_task_run( ycbcr, ycbcr, NULL, NULL, 3,  (performer_job_routine ) &chroma_subsample_task );
 	
 		return;
-  }
-
+  	}
+*/
   switch (mode) {
   case SSM_420_JPEG_BOX:
   case SSM_420_JPEG_TR: 
@@ -920,15 +920,17 @@ void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
 void chroma_supersample(subsample_mode_t mode,void *data, uint8_t *ycbcr[],
 			int width, int height)
 {	
-  if( vj_task_available() ) {
+  /*if( vj_task_available() ) {
 		switch( mode ) {
 				case SSM_420_JPEG_BOX:
 				case SSM_420_JPEG_TR:
-				case SSM_420_422:
-						vj_task_set_shift(1,1);
+					vj_task_set_shift(1,1);
 				break;
+				case SSM_422_444:
+					vj_task_set_shift(0,1);
+					break;
 				default:
-				   	    vj_task_set_shift(0,1 );
+				   	    vj_task_set_shift(0,0 );
 				break;
 		}
 		vj_task_set_wid( width );
@@ -939,7 +941,7 @@ void chroma_supersample(subsample_mode_t mode,void *data, uint8_t *ycbcr[],
 		vj_task_run( ycbcr, ycbcr, NULL, NULL,3, (performer_job_routine) &chroma_supersample_task );
 	
 		return;
-  }
+  }*/
 
   switch (mode) {
 	  case SSM_420_JPEG_BOX:
