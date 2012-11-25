@@ -621,7 +621,7 @@ void	vj_task_free_internal_buf()
 	int n = task_get_workers();
 	int i;
 	
-	for( int i = 0; i < n; i ++ )
+	for( i = 0; i < n; i ++ )
 		vj_task_args[0]->priv = NULL;
 }
 
