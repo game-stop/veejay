@@ -849,7 +849,6 @@ void chroma_subsample_cp(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[],
 		vj_task_run( ycbcr, planes, temp, NULL, 3,  (performer_job_routine ) &chroma_subsample_task );
 
 		vj_task_free_internal_buf();
-		vj_task_set_sampling(0);
 		free(data);
 		return;
   	}
@@ -896,7 +895,6 @@ void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[] )
 		vj_task_run( ycbcr, planes, temp, NULL, 3,  (performer_job_routine ) &chroma_subsample_task );
 
 		vj_task_free_internal_buf();
-		vj_task_set_sampling(0);
 		free(data);
 		return;
   	}
@@ -952,7 +950,6 @@ void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
 	vj_task_run( frame->data,planes, NULL, NULL,3, (performer_job_routine) &chroma_supersample_task );
 
 	vj_task_free_internal_buf();
-	vj_task_set_sampling(0);
 	free(data);
 	return;
   }

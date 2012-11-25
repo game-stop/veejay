@@ -526,7 +526,7 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 	int i,j;
 
 	for ( i = 0; i < n_planes; i ++ ) {
-		if( f[0]->sampling && i == 0 ){
+		if( f[0]->sampling == 1 && i == 0 ){
 			f[0]->input[i] = NULL;
 			f[0]->output[i] = NULL;
 			f[0]->temp[i] = NULL;
@@ -549,7 +549,7 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 	}
 
 	for( j = 1; j < n; j ++ ) {
-		if( f[j]->sampling ) {	
+		if( f[j]->sampling == 1 ) {	
 			//@ for sampling, must be present:
 			//@   UV planes, width, height, inplace
 			unsigned int start = j * f[j]->strides[1];
@@ -611,6 +611,7 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 			f[j]->overlaprow = NULL;
 		}
 		f[j]->overlap = 0;
+		f[j]->sampling = 0;
 	}
 
 	return 1;
