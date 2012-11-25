@@ -487,7 +487,7 @@ static int vj_perform_increase_sample_frame(veejay_t * info, long num)
 static long vj_perform_alloc_row(veejay_t *info, int c, int frame_len)
 {
 	uint8_t *buf = vj_malloc(sizeof(uint8_t) * RUP8(helper_frame->len * 3 * 3));
-	mlock( buf, RUP8(helper_frame->len * 3 * 3));
+	//mlock( buf, RUP8(helper_frame->len * 3 * 3));
 
 #ifdef STRICT_CHECKING
 	assert ( buf != NULL );
@@ -509,7 +509,6 @@ static void vj_perform_free_row(int c)
 {
 	if(frame_buffer[c]->Y)
 	{
-		munlock( frame_buffer[c]->Y,RUP8(helper_frame->len * 3 * 3));
 		free( frame_buffer[c]->Y );
 	}
 	frame_buffer[c]->Y = NULL;

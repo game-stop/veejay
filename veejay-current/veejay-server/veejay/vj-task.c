@@ -618,15 +618,10 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 
 void	vj_task_free_internal_buf()
 {
-	if(vj_task_args[0]->priv )
-		free(vj_task_args[0]->priv);
-
 	int n = task_get_workers();
 	int i;
 	
-	for( i = 0; i < n; i ++ ) {
-		vj_task_arg_t *v = vj_task_args[i];
-		v->priv = NULL;
-	}
+	for( int i = 0; i < n; i ++ )
+		vj_task_args[0]->priv = NULL;
 }
 
