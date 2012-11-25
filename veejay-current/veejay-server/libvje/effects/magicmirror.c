@@ -167,10 +167,8 @@ void magicmirror_apply( VJFrame *frame, int w, int h, int vx, int vy, int d, int
 		}
 	}
 
-	veejay_memcpy( magicmirrorbuf[0], Y, len );
-	veejay_memcpy( magicmirrorbuf[1], Cb, len );
-	veejay_memcpy( magicmirrorbuf[2], Cr, len );
-
+	int strides[4] = { len,len,len, 0 };
+	vj_frame_copy( frame->data, magicmirrorbuf, strides );
 
 	for(x=0; x < w; x++)
 	{

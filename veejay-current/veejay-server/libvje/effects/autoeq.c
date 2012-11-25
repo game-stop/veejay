@@ -76,12 +76,12 @@ void autoeq_apply( VJFrame *frame, int width, int height, int val, int intensity
 		VJFrame tmp;
 		veejay_memcpy( &tmp, frame, sizeof(VJFrame));
 		tmp.data[0] = (uint8_t*) vj_malloc( sizeof(uint8_t) * frame->len );
-		veejay_memcpy( tmp.data[0], frame->data[0], frame->len );
+		vj_frame_copy1( frame->data[0], tmp.data[0], frame->len );
 
 		veejay_histogram_draw( histogram_,&tmp, frame, intensity, strength );
 
-		veejay_memset( frame->data[1], 128, frame->uv_len );
-		veejay_memset( frame->data[2], 128, frame->uv_len );
+		vj_frame_clear1( frame->data[1], 128, frame->uv_len );
+		vj_frame_clear1( frame->data[2], 128, frame->uv_len );
 
 		free(tmp.data[0]);
 	}

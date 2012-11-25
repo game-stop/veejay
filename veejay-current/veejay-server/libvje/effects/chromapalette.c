@@ -56,7 +56,9 @@ vj_effect *chromapalette_init(int w, int h)
     ve->defaults[3] = 0; //b
     ve->defaults[4] = 200;  //cb default
     ve->defaults[5] = 20; //cr default
-    ve->description = "Chrominance Palette (rgb key) ";
+   	ve->parallel = 1;
+
+	ve->description = "Chrominance Palette (rgb key) ";
     ve->sub_format = 1;
     ve->extra_frame = 0;
     ve->has_help = 1;

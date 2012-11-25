@@ -49,6 +49,7 @@ vj_effect *constantblend_init(int w, int h)
     ve->defaults[1] = 110; // scale before blend
     ve->defaults[2] = 16;  // constant Y
     ve->description = "Constant Luminance Blend";
+    ve->parallel = 1;
     ve->sub_format = 0;
     ve->extra_frame = 0;
     ve->has_user = 0;

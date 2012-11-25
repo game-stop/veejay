@@ -77,19 +77,14 @@ void complexsync_apply(VJFrame *frame, VJFrame *frame2, int width, int height, i
 	uint8_t *Cr2 = frame2->data[2];
 
 	const unsigned int region = width * val;
+	int strides[4] = { region, region, region, 0 };
+	vj_frame_copy( frame->data, c_outofsync_buffer, strides );
 
-	veejay_memcpy( c_outofsync_buffer[0], Y, region );
-        veejay_memcpy( c_outofsync_buffer[1], Cb, region );
-        veejay_memcpy( c_outofsync_buffer[2], Cr, region );
-
-	veejay_memcpy( Y, Y2, region );
-	veejay_memcpy( Cb, Cb2, region );
-	veejay_memcpy( Cr, Cr2, region );
+	vj_frame_copy( frame2->data, frame->data, strides );
 
         if( (len - region) > 0)
 	{
-		veejay_memcpy( Y + region, c_outofsync_buffer[0], (len-region) );
-		veejay_memcpy( Cb + region, c_outofsync_buffer[1], (len - region) );
-		veejay_memcpy( Cr + region, c_outofsync_buffer[2], (len - region) );
+		uint8_t *dest[3] = { Y + region, Cb + region, Cr + region };
+		vj_frame_copy( c_outofsync_buffer, dest, strides );
 	}
 }

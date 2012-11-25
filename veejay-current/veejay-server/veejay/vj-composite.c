@@ -53,7 +53,6 @@ typedef struct
 	uint8_t *mirror_plane[3];
 	void *vp1;
 	void *back1;
-	void *sampler;
 	void *scaler;
 	void *back_scaler;
 	VJFrame	*frame1;
@@ -129,7 +128,6 @@ void	*composite_init( int pw, int ph, int iw, int ih, const char *homedir, int s
 	c->proj_plane[2] = c->proj_plane[1] + RUP8(pw * ph) + RUP8(pw);
 	viewport_set_marker( c->vp1, 1 );
 	
-	c->sampler = subsample_init( pw );
 
 	sws_template sws_templ;
 	veejay_memset(&sws_templ,0,sizeof(sws_template));
@@ -213,7 +211,6 @@ void	composite_destroy( void *compiz )
 		if(c->frame2) free(c->frame2);
 		if(c->frame3) free(c->frame3);
 		if(c->frame4) free(c->frame4);
-		if(c->sampler) subsample_free(c->sampler);
 		free(c);
 	}
 	c = NULL;
@@ -492,9 +489,8 @@ int	composite_process(void *compiz, VJFrame *output, VJFrame *input, int which_v
 	
 	if( c->has_mirror_plane ) {
 		if(c->mirror_row_start == 0 && (c->mirror_row_end == input->height || c->mirror_row_end == 0) ) {
-			veejay_memcpy( c->mirror_plane[0], input->data[0], input->len );
-			veejay_memcpy( c->mirror_plane[1], input->data[1], input->uv_len );
-			veejay_memcpy( c->mirror_plane[2], input->data[2], input->uv_len );
+			int strides[4] = { input->len, input->uv_len, input->uv_len, 0 };
+			vj_frame_copy( input->data, c->mirror_plane, strides );
 		}
 		else {
 			unsigned int i,j = 0;
@@ -559,7 +555,7 @@ int	composite_processX(  void *compiz, void *back1, uint8_t *out_data[3], VJFram
 
 	if(!input->ssm) /* supersample to YUV 4:4:4 */
 	{
-		chroma_supersample( c->sample_mode, c->sampler, input->data, input->width, input->height );
+		chroma_supersample( c->sample_mode, input, input->data);
 		input->ssm = 1;
 	}
 #ifdef STRICT_CHECKING

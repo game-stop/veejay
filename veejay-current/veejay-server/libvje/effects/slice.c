@@ -149,9 +149,8 @@ void slice_apply(VJFrame *frame, int width, int height, int val, int re_init) {
 
   if(tmp2==1) slice_recalc(width,height,tmp1);
 
-  veejay_memcpy( slice_frame[0], Y, len);
-  veejay_memcpy( slice_frame[1], Cb, len);
-  veejay_memcpy( slice_frame[2], Cr, len);
+  int strides[4] = { len, len, len, 0 };
+	vj_frame_copy1( Y, slice_frame, strides );  
 
   for(y=0; y < height; y++){ 
     for(x=0; x < width; x++) {

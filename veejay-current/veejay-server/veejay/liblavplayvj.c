@@ -2131,6 +2131,12 @@ int veejay_init(veejay_t * info, int x, int y,char *arg, int def_tags, int gen_t
 			info->effect_frame1->width,info->effect_frame1->height,
 			info->effect_frame1->ssm,
 			info->effect_frame1->format );
+	veejay_msg(VEEJAY_MSG_DEBUG, "               %d x %d (h=%d,v=%d)",
+			info->effect_frame1->uv_width,info->effect_frame1->uv_height,
+			info->effect_frame1->shift_v, info->effect_frame1->shift_h );
+	veejay_msg(VEEJAY_MSG_DEBUG, "		     Y=%d bytes, UV=%d bytes",
+			info->effect_frame1->len,
+			info->effect_frame1->uv_len );
 	
 	if(!vj_perform_init(info))
 	{

@@ -221,18 +221,15 @@ void rotozoom1_apply(VJFrame *frame, uint8_t *data[3], int w, int h,
 void rotozoom_apply( VJFrame *frame, int width, int height, int mode,
 		    int rotate, int zoom, int autom)
 {
+	int strides[4] = { width*height,width*height,width*height,0};
     switch (autom) {		/* alas must do memcpy */
     case 0:
-	veejay_memcpy(rotobuffer[0], frame->data[0], (width * height));
-	veejay_memcpy(rotobuffer[1], frame->data[1], (width * height));
-	veejay_memcpy(rotobuffer[2], frame->data[2], (width * height));
+	vj_frame_copy1( frame->data, rotobuffer, strides );
 	rotozoom2_apply(frame, rotobuffer, width, height, mode, rotate,
 			zoom);
 	break;
     case 1:
-	veejay_memcpy(rotobuffer[0], frame->data[0], (width * height));
-	veejay_memcpy(rotobuffer[1], frame->data[1], (width * height));
-	veejay_memcpy(rotobuffer[2], frame->data[2], (width * height));
+	vj_frame_copy1( frame->data,rotobuffer, strides );
 	rotozoom1_apply(frame, rotobuffer, width, height, mode, rotate,
 			zoom);
 	break;

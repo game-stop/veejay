@@ -82,7 +82,8 @@ vj_effect *rgbkey_init(int w,int h)
     ve->extra_frame = 1;
     ve->sub_format = 1;
 	ve->rgb_conv = 1;
-    return ve;
+    ve->parallel = 1;
+	return ve;
 }
 /*
 void rgbkey_scan_fg(uint8_t * src2[3], int *r, int *g, int *b)

@@ -66,11 +66,8 @@ int	chameleonblend_prepare( uint8_t *map[3], int width, int height )
 {
 	if(!bgimage[0])
 		return 0;
-
-		//@ copy the iamge
-	veejay_memcpy( bgimage[0], map[0], (width*height));
-	veejay_memcpy( bgimage[1], map[1], (width*height));
-	veejay_memcpy( bgimage[2], map[2], (width*height));
+	int strides[4] = { width*height,width*height,width*height, 0 };
+	vj_frame_copy( map, bgimage, strides );
 	
 	VJFrame tmp;
 	veejay_memset( &tmp, 0, sizeof(VJFrame));

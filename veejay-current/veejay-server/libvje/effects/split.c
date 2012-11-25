@@ -108,9 +108,14 @@ void split_fib_downscaleb(VJFrame *frame, int width, int height)
     uint8_t *Cr = frame->data[2];
 
     split_fib_downscale(frame, width, height);
-	veejay_memcpy( Y+len, Y , len );
-	veejay_memcpy( Cb+uv_len, Cb, uv_len);
-	veejay_memcpy( Cr+uv_len, Cr, uv_len);
+
+    int strides[4] = { len, uv_len, uv_len, 0 };
+    uint8_t *output[3] = {
+	Y + len,
+	Cb + uv_len,
+	Cr + uv_len };
+
+    vj_frame_copy( frame->data, output, strides );
 }
 
 void dosquarefib(VJFrame *frame, int width, int height)
@@ -201,9 +206,8 @@ void split_push_downscale_uh(VJFrame *frame, int width, int height)
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
 
-   veejay_memcpy( split_fixme[0], Y, len);
-   veejay_memcpy( split_fixme[1], Cb, len);
-   veejay_memcpy( split_fixme[2], Cr, len);
+	int	strides[4] = { len,len,len ,0};
+	vj_frame_copy( frame->data, split_fixme,strides );
 
 }
 void split_push_downscale_lh(VJFrame *frame, int width, int height)
@@ -240,9 +244,9 @@ void split_push_downscale_lh(VJFrame *frame, int width, int height)
 	}
     }
 
-    veejay_memcpy( Y+hlen, split_fixme[0] , hlen );
-    veejay_memcpy( Cb+uv_hlen, split_fixme[1], uv_hlen);
-    veejay_memcpy( Cr+uv_hlen, split_fixme[2], uv_hlen);
+	int strides[4] = { hlen, uv_hlen, uv_hlen,0 };
+	uint8_t *input[3] = { Y + hlen, Cb + uv_hlen, Cr + uv_hlen };
+	vj_frame_copy( split_fixme, input, strides );
 }
 
 void split_push_vscale_left(VJFrame *frame, int width, int height)
@@ -642,10 +646,9 @@ void split_h_first_half(VJFrame *frame, VJFrame *frame2, int width,
  	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
 
-    veejay_memcpy(Y, Y2, len);
-    veejay_memcpy(Cb, Cb2, uv_len);
-    veejay_memcpy(Cr, Cr2, uv_len);  
+	int strides[4] = { len,uv_len,uv_len, 0 };
 
+	vj_frame_copy( frame2->data, frame->data, strides );    
 }
 void split_h_second_half(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
@@ -655,13 +658,11 @@ void split_h_second_half(VJFrame *frame, VJFrame *frame2, int width,
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
+	uint8_t *Y2 = frame2->data[0];
  	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-
-	veejay_memcpy( Y, Y2+len, len );
-	veejay_memcpy( Cb, Cb2+uv_len, uv_len );
-	veejay_memcpy( Cr, Cr2+uv_len, uv_len );
+	int strides[4] = { len, uv_len, uv_len, 0 };
+	vj_frame_copy( frame2->data,frame->data, strides );
 }
 void split_h_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
 			 int height)
@@ -671,14 +672,13 @@ void split_h_first_halfs(VJFrame *frame, VJFrame *frame2, int width,
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
+	uint8_t *Y2 = frame2->data[0];
  	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-
-	veejay_memcpy( Y, Y2, len );
-	veejay_memcpy( Cb, Cb2, uv_len);
-	veejay_memcpy( Cr, Cr2, uv_len);
+	int strides[4] = { len,uv_len,uv_len, 0 };
+	vj_frame_copy( frame2->data, frame->data, strides );
 }
+
 void split_h_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
 			  int height)
 {
@@ -687,13 +687,11 @@ void split_h_second_halfs(VJFrame *frame, VJFrame *frame2, int width,
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
-    uint8_t *Y2 = frame2->data[0];
+	uint8_t *Y2 = frame2->data[0];
  	uint8_t *Cb2= frame2->data[1];
 	uint8_t *Cr2= frame2->data[2];
-
-	veejay_memcpy( Y+len, Y2, len );
-	veejay_memcpy( Cb+uv_len, Cb2, uv_len);
-	veejay_memcpy( Cr+uv_len, Cr2, uv_len);
+	int strides[4] = { len, uv_len, uv_len, 0 };
+	vj_frame_copy( frame2->data, frame->data, strides );
 }
 
 void split_apply(VJFrame *frame, VJFrame *frame2, int width,

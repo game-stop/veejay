@@ -73,6 +73,7 @@ void mtracer_apply( VJFrame *frame, VJFrame *frame2,
   	uint8_t *Y = frame->data[0];
 	uint8_t *Cb= frame->data[1];
 	uint8_t *Cr= frame->data[2];
+	int strides[4] = { len, uv_len, uv_len, 0 };
 
     if (mtrace_counter == 0) {
 	overlaymagic_apply(frame, frame2, width, height, mode,0);

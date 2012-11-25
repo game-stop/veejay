@@ -168,7 +168,7 @@ int		vj_shm_read( void *vv , uint8_t *dst[3] )
 
 	uint8_t *in[4] = { ptr, ptr + len, ptr + len + uv_len,NULL };
 	int strides[4]    = { len, uv_len, uv_len,0 };
-	vj_frame_copy( in, dst, strides,3 );
+	vj_frame_copy( in, dst, strides );
 
 //	veejay_memcpy( dst[0], ptr, len );
 //	veejay_memcpy( dst[1], ptr + len, uv_len );
@@ -205,7 +205,7 @@ int		vj_shm_write( void *vv, uint8_t *frame[3], int plane_sizes[4] )
 	
 	uint8_t *dst[4] = { ptr, ptr + plane_sizes[0], ptr + plane_sizes[0] + plane_sizes[1], NULL };
 	plane_sizes[3] = 0;
-	vj_frame_copy( frame, dst, plane_sizes,3 );
+	vj_frame_copy( frame, dst, plane_sizes );
 
 
 //	veejay_memcpy( ptr , frame[0], plane_sizes[0] );

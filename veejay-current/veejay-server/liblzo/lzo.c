@@ -97,8 +97,15 @@ int		lzo_compress( void *lzo, uint8_t *src, uint8_t *plane, unsigned int *size, 
 	int r = lzo1x_1_compress( src, len, dst, dst_len, wrkmem );
 	if( r != LZO_E_OK )
 		return 0;
+	
+	if( dst[0] == 2 && src[1] == dst[1] && src[2] == dst[2] && src[3] == dst[3] && r == 0 ) {
+		veejay_msg(0 , "compression failed. Reported at http://bugs.dyne.org #353 ");
+		return 0;
+	}
+
 	return (*size);	
 }
+
 long		lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3], int uv_len)
 {
 	unsigned int i;
@@ -113,6 +120,11 @@ long		lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *ds
 	len[2] = str2ulong( linbuf+8 );
 	mode   = str2ulong( linbuf+12 );
 
+	if(len[0] == 0 && len[1] == 0 ) {
+		veejay_msg(VEEJAY_MSG_DEBUG, "%s", linbuf );
+		return -1;
+	}
+
 	if(len[1] ==0 && len[2] == 0 )
 		mode = 1;
 
@@ -120,8 +132,8 @@ long		lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *ds
 	{
 		if( len[i] <= 0 ) 
 			continue;
-
 		const lzo_bytep src = (lzo_bytep) (linbuf+offset);
+		veejay_msg(0, "decompressing plane %d, size %d to %p... (%d,%d,%d) off=%d", i, len[i], linbuf+offset,len[0],len[1],len[2],offset );
 		int r = lzo1x_decompress( src, len[i], dst[i], &result_len, l->wrkmem );
 		if( r != LZO_E_OK )
 			return 0;
@@ -132,8 +144,8 @@ long		lzo_decompress_el( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *ds
 	}
 
 	if(mode == 1) {
-		veejay_memset( dst[1],128, uv_len );
-		veejay_memset( dst[2],128, uv_len );
+		vj_frame_clear1( dst[1],128, uv_len );
+		vj_frame_clear1( dst[2],128, uv_len );
 	}
 
 	return (long)sum;
@@ -183,8 +195,8 @@ long		lzo_decompress( void *lzo, uint8_t *linbuf, int linbuf_len, uint8_t *dst[3
 	}
 
 	if(mode == 1) {
-		veejay_memset( dst[1],128, uv_len );
-		veejay_memset( dst[2],128, uv_len );
+		vj_frame_clear1( dst[1],128, uv_len );
+		vj_frame_clear1( dst[2],128, uv_len );
 	}
 
 	return (long)sum;
@@ -246,10 +258,10 @@ long		lzo_decompress422into420( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 		offset += len[i];
 	}
 
-	veejay_memcpy( dst[0], l->tmp[0], w*h);
+	vj_frame_copy1( l->tmp[0], dst[0], w*h);
 	if( mode == 1 ) {
-		veejay_memset(dst[1],128,( (w>>1)*h));
-		veejay_memset(dst[2],128,( (w>>1)*h));
+		vj_frame_clear1(dst[1],128,( (w>>1)*h));
+		vj_frame_clear1(dst[2],128,( (w>>1)*h));
 	} else {
 		yuv422to420planar( l->tmp, dst, w, h );
 	}
@@ -287,10 +299,11 @@ long		lzo_decompress420into422( void *lzo, uint8_t *linbuf, int linbuf_len, uint
 		sum += result_len;
 		offset += len[i];
 	}
-	veejay_memcpy( dst[0], l->tmp[0], w*h);
+	
+	vj_frame_copy1( l->tmp[0], dst[0], w*h);
 	if(mode == 1) {
-		veejay_memset(dst[1],128,( (w>>1)*h));
-		veejay_memset(dst[2],128,( (w>>1)*h));
+		vj_frame_clear1(dst[1],128,( (w>>1)*h));
+		vj_frame_clear1(dst[2],128,( (w>>1)*h));
 	} 
 	else {
 		yuv420to422planar( l->tmp, dst, w, h );

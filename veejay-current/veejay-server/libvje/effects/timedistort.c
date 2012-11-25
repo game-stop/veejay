@@ -159,7 +159,7 @@ void timedistort_apply( VJFrame *frame, int width, int height, int val)
 
 		if(!have_bg)
 		{
-			veejay_memcpy( prev, Y, len );
+			vj_frame_copy1( Y, prev, len );
 			VJFrame smooth;
 			veejay_memcpy(&smooth,frame, sizeof(VJFrame));
 			smooth.data[0] = prev;
@@ -174,7 +174,7 @@ void timedistort_apply( VJFrame *frame, int width, int height, int val)
 			{
 				diff[i] = (abs(prev[i] - Y[i])> val ? 0xff: 0 );
 			}
-			veejay_memcpy( prev, Y, len );	
+			vj_frame_copy1( Y, prev, len );
 			VJFrame smooth;
 			veejay_memcpy(&smooth,frame, sizeof(VJFrame));
 			smooth.data[0] = prev;
@@ -190,9 +190,9 @@ void timedistort_apply( VJFrame *frame, int width, int height, int val)
 #endif
 
 	//@ process
-	veejay_memcpy( planetableY[plane], Y,  len );
-	veejay_memcpy( planetableU[plane], Cb, len );
-	veejay_memcpy( planetableV[plane], Cr, len );
+	uint8_t *planeTables[3] = { planetableY[plane], planetableU[plane], planetableV[plane] };
+	int strides[4] = { len, len, len, 0 };
+	vj_frame_copy( frame->data, planeTables, strides );
 
 	uint8_t *p = warptime[ warptimeFrame	] + width + 1;
 	uint8_t *q = warptime[ warptimeFrame ^ 1] + width + 1;

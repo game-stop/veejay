@@ -67,10 +67,10 @@ int	chameleon_prepare( uint8_t *map[3], int width, int height )
 	if(!bgimage[0])
 		return 0;
 
-		//@ copy the iamge
-	veejay_memcpy( bgimage[0], map[0], (width*height));
-	veejay_memcpy( bgimage[1], map[1], (width*height));
-	veejay_memcpy( bgimage[2], map[2], (width*height));
+	
+	//@ copy the iamge
+	int strides[4] = { width * height, width * height, width * height, 0 };
+	vj_frame_copy( map, bgimage, strides );	
 	
 	VJFrame tmp;
 	veejay_memset( &tmp, 0, sizeof(VJFrame));
@@ -239,9 +239,9 @@ void chameleon_apply( VJFrame *frame, int width, int height, int mode)
 	unsigned int i;
 	const int len = (width * height);
 	VJFrame source;
-	veejay_memcpy( tmpimage[0], frame->data[0], len );
-	veejay_memcpy( tmpimage[1], frame->data[1], len );
-	veejay_memcpy( tmpimage[2], frame->data[2], len );
+	int strides[4] = { len, len, len, 0 };
+	vj_frame_copy1( frame->data, tmpimage, strides );
+
 	veejay_memcpy( &source, frame, sizeof(VJFrame));
 	source.data[0] = tmpimage[0];
 	source.data[1] = tmpimage[1];

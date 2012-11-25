@@ -39,7 +39,8 @@ vj_effect *contrast_init(int w, int h)
     ve->limits[1][1] = 255;
     ve->limits[0][2] = 0;
     ve->limits[1][2] = 255;
-    ve->description = "Contrast";
+    ve->parallel = 1;
+	ve->description = "Contrast";
 	ve->has_user = 0;
     ve->extra_frame = 0;
     ve->sub_format = 0;

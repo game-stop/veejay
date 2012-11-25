@@ -40,7 +40,7 @@
 #include <libvjmem/vjmem.h>
 #include "opacity.h"
 #undef _EMMS
-
+#include <veejay/vj-task.h>
 #ifdef HAVE_K6_2PLUS
 /* On K6 femms is faster of emms. On K7 femms is directly mapped on emms. */
 #define _EMMS     "femms"
@@ -63,6 +63,7 @@ vj_effect *opacity_init(int w, int h)
     ve->description = "Normal Overlay";
     ve->sub_format = 0;
     ve->extra_frame = 1;
+	ve->parallel = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Opacity"); 
     return ve;
@@ -119,7 +120,7 @@ static	inline int blend_plane( uint8_t *dst, uint8_t *A, uint8_t *B, int size, i
 #endif
 
 
-void opacity_apply( VJFrame *frame, VJFrame *frame2, int width,
+static void opacity_apply1( VJFrame *frame, VJFrame *frame2, int width,
 		   int height, int opacity)
 {
 	int y = blend_plane( frame->data[0], frame->data[0], frame2->data[0], frame->len, opacity );
@@ -139,7 +140,54 @@ void opacity_apply( VJFrame *frame, VJFrame *frame2, int width,
 
 }
 
-void	opacity_blend_apply( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_len, int opacity )
+static void	opacity_apply_job( void *arg )
+{
+	vj_task_arg_t *t = (vj_task_arg_t*) arg;
+	//@ output holds secondunary source here, this in inplace.
+	int y = blend_plane( t->input[0], t->input[0], t->output[0], t->strides[0], t->iparam );
+	int u = blend_plane( t->input[1], t->input[1], t->output[1], t->strides[1], t->iparam );
+	int v = blend_plane( t->input[2], t->input[2], t->output[2], t->strides[2], t->iparam );
+#ifdef HAVE_ASM_MMX
+	do_emms;
+#endif
+	if( y>0) while (y--)
+		t->input[0][y] = ((t->iparam * (t->input[0][y] - t->output[0][y])) >> 8 ) + t->input[0][y];
+
+	if( u>0) while( u-- )
+		t->input[1][u] = ((t->iparam * (t->input[1][u] - t->output[1][u])) >> 8 ) + t->input[1][u];
+
+	if(v>0)	 while( v-- )
+		t->input[2][v] = ((t->iparam * (t->input[2][v] - t->output[2][v])) >> 8 ) + t->input[2][v];
+
+}
+
+void opacity_apply( VJFrame *frame, VJFrame *frame2, int width,
+		   int height, int opacity)
+{
+/*	if( vj_task_available() ) {
+		vj_task_set_from_frame( frame );
+		vj_task_set_int( opacity );
+		vj_task_run( frame->data, frame2->data, NULL, NULL, 3, &opacity_apply_job );
+	} else {
+*/
+	opacity_apply1( frame,frame2,width,height,opacity );
+//	}
+}
+
+void opacity_applyN( VJFrame *frame, VJFrame *frame2, int width,
+		   int height, int opacity)
+{
+	if( vj_task_available() ) {
+		vj_task_set_from_frame( frame );
+		vj_task_set_int( opacity );
+		vj_task_run( frame->data, frame2->data, NULL, NULL, 3, &opacity_apply_job );
+	} else {
+		opacity_apply1( frame,frame2,width,height,opacity );
+	}
+}
+	
+//@ used in performer
+static void	opacity_blend_apply1( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_len, int opacity )
 {
 	int y = blend_plane( src1[0], src1[0], src2[0], len, opacity );
 	int u = blend_plane( src1[1], src1[1], src2[1], uv_len,opacity);
@@ -154,11 +202,18 @@ void	opacity_blend_apply( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_le
 		src1[1][u] = ((opacity * (src1[1][u] - src2[1][u])) >> 8) + src1[1][u];
 	while( v-- )
 		src1[2][v] = ((opacity * (src1[2][v] - src2[2][v])) >> 8) + src1[2][v];
-
-
 }
 
-
+void	opacity_blend_apply( uint8_t *src1[3], uint8_t *src2[3], int len, int uv_len, int opacity )
+{
+	if( vj_task_available() ) {
+		vj_task_set_from_args( len,uv_len );
+		vj_task_set_int( opacity );
+		vj_task_run( src1, src2, NULL, NULL, 3, &opacity_apply_job );
+	} else {
+		opacity_blend_apply1( src1,src2,len,uv_len,opacity );
+	}
+}
 void	opacity_blend_luma_apply( uint8_t *A, uint8_t *B, int len,int opacity )
 {
 	int y = blend_plane( A,A,B, len, opacity );

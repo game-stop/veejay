@@ -376,6 +376,12 @@ static void 	*vj_effect_activate_ext( int fx_id, int *result )
 	return NULL;
 }
 
+
+int vj_effect_is_parallel(int effect_id)
+{
+	int seq = vj_effect_real_to_sequence(effect_id);
+	return vj_effects[seq]->parallel;
+}
 void *vj_effect_activate(int effect_id, int *result)
 {
 	int seq = vj_effect_real_to_sequence(effect_id);

@@ -231,12 +231,14 @@ void neighbours5_apply( VJFrame *frame, int width, int height, int brush_size, i
 	uint8_t *dstCb = frame->data[1];
 	uint8_t *dstCr = frame->data[2];
 	// keep luma
-	veejay_memcpy( Y2, frame->data[0], frame->len );
+
+	vj_frame_copy1( frame->data[0], Y2, frame->len );
 
 	if(mode)
 	{
-		veejay_memcpy( chromacity[0], frame->data[1], frame->len );
-		veejay_memcpy( chromacity[1], frame->data[2], frame->len );
+		int strides[4] = { 0,frame->len, frame->len };
+		uint8_t *dest[3] = { NULL, chromacity[0], chromacity[1] };
+		vj_frame_copy( frame->data, dest, strides );
 	}
 
 	// premultiply intensity map

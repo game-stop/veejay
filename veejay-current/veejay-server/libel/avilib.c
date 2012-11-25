@@ -123,10 +123,21 @@ static ssize_t avi_write (int fd, char *buf, size_t len)
 
 #define HEADERBYTES 2048
 
-/* AVI_MAX_LEN: The maximum length of an AVI file, we stay a bit below
-    the 2GB limit (Remember: 2*10^9 is smaller than 2 GB) */
+#ifdef _LARGEFILE_SOURCE
+uint64_t AVI_MAX_LEN = LONG_MAX - HEADERBYTES; //@ not much larger, but a little. 
+#else
+uint64_t AVI_MAX_LEN = (UINT_MAX-(1<<20)*16-HEADERBYTES);
+#endif
 
-#define AVI_MAX_LEN (UINT_MAX-(1<<20)*16-HEADERBYTES)
+uint64_t AVI_set_MAX_LEN( uint64_t n )
+{
+	AVI_MAX_LEN = n;
+}
+
+uint64_t AVI_get_MAX_LEN()
+{
+	return AVI_MAX_LEN;
+}
 
 #define PAD_EVEN(x) ( ((x)+1) & ~1 )
 
@@ -755,7 +766,7 @@ int AVI_set_audio(avi_t *AVI, int channels, long rate, int bits, int format)
 int avi_update_header(avi_t *AVI)
 {
    int njunk, sampsize, hasIndex, ms_per_frame, frate, flag;
-   int movi_len, hdrl_start, strl_start, j;
+   unsigned long movi_len, hdrl_start, strl_start, j;
    unsigned char AVI_header[HEADERBYTES];
    long nhb;
    unsigned long xd_size, xd_size_align2;

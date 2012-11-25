@@ -88,10 +88,20 @@ typedef struct vj_effect_t {
     int has_help;
     int rgb_conv;
     int n_out;
-    int instance;//crap
+    int instance;
     void *user_data;		
     char padding[4];
+    int parallel;
 } vj_effect;
+
+typedef struct vj_effect_instance_t {
+	uint8_t *buffer[4];
+	int	 len;
+	int	 iparams[16];
+	float	 fparams[8];
+	int	*iarr;
+	float	*farr;
+} vj_fx_instance;
 
 extern int	get_pixel_range_min_Y();
 extern int	get_pixel_range_min_UV();

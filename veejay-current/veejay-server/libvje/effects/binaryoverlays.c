@@ -35,6 +35,7 @@ vj_effect *binaryoverlay_init(int w, int h)
     ve->description = "Binary Overlays";
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 10;
+    ve->parallel = 1;
     ve->extra_frame = 1;
     ve->sub_format = 0;
 	ve->has_user = 0;

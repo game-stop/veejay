@@ -531,7 +531,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 	if( av->encoder_id == 999 )
 	{
 		uint8_t *dest[3] = { dst, dst + (av->len), dst + (av->len + av->len/4) };
-		veejay_memcpy( dest[0], src[0], av->len );
+		vj_frame_copy1(src[0], dest[0],  av->len );
 		yuv422to420planar( src,dest, av->width,av->height );
 
 		if(in_fmt == FMT_422F ) 
@@ -545,7 +545,7 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 	if( av->encoder_id == 996 )
 	{
 		uint8_t *dest[3] = { dst, dst + (av->len), dst + (av->len + av->len/4) };
-		veejay_memcpy( dest[0], src[0], av->len );
+		vj_frame_copy1( src[0], dest[0], av->len );
 		yuv422to420planar( src,dest, av->width,av->height );
 
 		if(in_fmt == FMT_422 ) 
@@ -561,10 +561,8 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 	if( av->encoder_id == 998 )
 	{
 		uint8_t *dest[3] = { dst, dst + (av->len), dst + (av->len + av->uv_len) };
-
-		veejay_memcpy( dest[0], src[0],av->len );	
-		veejay_memcpy( dest[1], src[1],av->uv_len);
-		veejay_memcpy( dest[2], src[2],av->uv_len );
+		int strides[4] = { av->len, av->uv_len, av->uv_len, 0 };
+		vj_frame_copy( src, dest, strides );
 
 		if(in_fmt == FMT_422F ) 
 		{
@@ -578,10 +576,8 @@ static	int	vj_avcodec_copy_frame( vj_encoder  *av, uint8_t *src[3], uint8_t *dst
 	if( av->encoder_id == 997 )
 	{
 		uint8_t *dest[3] = { dst, dst + (av->len), dst + (av->len + av->uv_len) };
-
-		veejay_memcpy( dest[0], src[0],av->len );	
-		veejay_memcpy( dest[1], src[1],av->uv_len);
-		veejay_memcpy( dest[2], src[2],av->uv_len );
+		int strides[4] = { av->len, av->uv_len,av->uv_len, 0 };
+		vj_frame_copy( src, dest, strides );
 
 		if(in_fmt == FMT_422 ) 
 		{
@@ -651,7 +647,7 @@ int		vj_avcodec_encode_frame(void *encoder, int nframe,int format, uint8_t *src[
 	pict.linesize[2] = stride2;
 
 	if( YUV420_ONLY_CODEC(av->encoder_id)) {
-		veejay_memcpy( av->data[0], src[0], av->width * av->height);
+		vj_frame_copy1(src[0],av->data[0], av->width * av->height);
 		yuv422to420planar(src , av->data, av->width,av->height );
 		pict.data[0] = av->data[0];
 		pict.data[1] = av->data[1];

@@ -3081,9 +3081,10 @@ void	viewport_produce_full_img( void *vdata, uint8_t *img[3], uint8_t *out_img[3
 	int x,y;
 
 	y  = ty1 * w;
-	veejay_memset( outY,0,len);
-	veejay_memset( outU,128,len);
-	veejay_memset( outV,128,len);
+		
+	vj_frame_clear1( outY,0,len);
+	vj_frame_clear1( outU,128,len);
+	vj_frame_clear1( outV,128,len);
 
 	for( y = ty1; y < ty2; y ++ )
 	{

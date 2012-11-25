@@ -315,7 +315,7 @@ case $host_cpu in
     	AC_DEFINE(ARCH_X86_64,1, [Compiling for x86-64 architecture CPU])
     	have_x86cpu=true
     	have_x86_64cpu=true
-	CFLAGS="$CFLAGS -fPIC -DPIC"
+	CFLAGS="$CFLAGS -m64 -fPIC -DPIC"
     ;;
   powerpc | powerpc64)
 	AC_DEFINE(HAVE_PPCCPU,, [Compiling for PowerPC CPU])
@@ -357,6 +357,9 @@ dnl     CFLAGS="$CFLAGS -no-cpp-precomp"
     AC_MSG_RESULT([unknown])
     ;;
 esac
+
+CFLAGS="$CFLAGS -D_FILE_OFFSET_BITS=64 -D_LARGE_FILES"
+
 
 dnl This flag is used for PROGRAMS not SHARED LIBRARIES.  PIC code is required
 dnl for shared libraries but is slower than non-pic code.  Compute bound 

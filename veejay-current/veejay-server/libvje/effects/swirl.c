@@ -160,9 +160,9 @@ void swirl_apply(VJFrame *frame, int w, int h, int v)
                 _v = v;
 
 	}
-	veejay_memcpy(buf[0], Y,len);
-	veejay_memcpy(buf[1], Cb,len);
-	veejay_memcpy(buf[2], Cr,len);
+
+	int strides[4] = { len, len, len , 0 };
+	vj_frame_copy( frame->data, buf, strides );
 
 	for(i=0; i < len; i++)
 	{

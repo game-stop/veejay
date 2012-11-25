@@ -36,16 +36,9 @@ typedef enum subsample_mode {
 extern const char *ssm_id[SSM_COUNT];
 extern const char *ssm_description[SSM_COUNT];
 
-void *subsample_init(int buf_len);
-void subsample_free(void *sampler);
-
-void chroma_subsample(subsample_mode_t mode, void *sampler, uint8_t * ycbcr[],
-		      int width, int height);
-void chroma_subsample_cp(subsample_mode_t mode, void *data, uint8_t *ycbcr[], uint8_t *dcbcr[],
-		      int width, int height);
-
-void chroma_supersample(subsample_mode_t mode, void *sampler, uint8_t * ycbcr[],
-			int width, int height);
+void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t * ycbcr[] );
+void chroma_subsample_cp(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[], uint8_t *dcbcr[] );
+void chroma_supersample(subsample_mode_t mode, VJFrame *frame, uint8_t * ycbcr[] );
 
 // yuv 4:2:2 packed to yuv 4:2:0 planar 
 void vj_yuy2toyv12( uint8_t *y, uint8_t *u, uint8_t *v,  uint8_t *in, int w, int h);

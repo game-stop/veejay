@@ -56,7 +56,8 @@ vj_effect *keyselect_init(int w, int h)
 	ve->limits[0][5] = 0;
 	ve->limits[1][5] = 3500;
 	ve->has_user = 0;
-    ve->description = "Blend by Color Key";
+    ve->parallel = 1;
+	ve->description = "Blend by Color Key";
     ve->extra_frame = 1;
     ve->sub_format = 1;
 	ve->rgb_conv = 1;

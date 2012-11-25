@@ -114,10 +114,8 @@ void radialblur_apply(VJFrame *frame, int width, int height, int radius, int pow
 
 	if(radius == 0) return;
 	// inplace
-
-	veejay_memcpy( radial_src[0] , Y, len);
-	veejay_memcpy( radial_src[1] , Cb, uv_len); 
-	veejay_memcpy( radial_src[2] , Cr, uv_len);	
+	int strides[4] = { len, uv_len, uv_len, 0 };
+	vj_frame_copy( frame->data, radial_src, strides );
 
 	switch(direction)
 	{

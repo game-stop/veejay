@@ -210,9 +210,11 @@ static inline void drop(water_t *w,int power)
 
 static	void	drawmotionframe( VJFrame *f , water_t *w )
 {
-	veejay_memset( f->data[1], 128, f->uv_len );
-	veejay_memset( f->data[2], 128, f->uv_len );
-	veejay_memcpy( f->data[0], w->diff_img, f->width * f->height );
+	int strides[4] = { 0, f->uv_len,f->uv_len, 0 };
+	vj_frame_clear( f->data, strides, 128 );
+	vj_frame_clear( f->data, strides, 128 );
+	vj_frame_copy1( w->diff_img, f->data[0], f->width * f->height );
+//	veejay_memcpy( f->data[0], w->diff_img, f->width * f->height );
 }
 
 static	int	globalactivity(VJFrame *f2, water_t *w, int in)
@@ -274,8 +276,9 @@ static  void    motiondetect(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
         if(!w->have_img)
         {
                 //softblur_apply( f2,f->width,f->height,0);
-                veejay_memcpy(bg, f2->data[0], f->width * f->height );  
-                w->have_img = 1;
+                //veejay_memcpy(bg, f2->data[0], f->width * f->height );  
+                vj_frame_copy1( f2->data[0],bg, f->width * f->height );
+		w->have_img = 1;
                 return;
         }
 
@@ -321,7 +324,8 @@ static	void	motiondetect2(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 	if(!w->have_img)
 	{
 		softblur_apply( f2,f->width,f->height,0);
-		veejay_memcpy(bg, f2->data[0], f->width * f->height );	
+		//	veejay_memcpy(bg, f2->data[0], f->width * f->height );	
+		vj_frame_copy1( f2->data[0], bg, f->width * f->height );
 		w->have_img = 1;
 		return;
 	}
@@ -368,7 +372,8 @@ static	void	motiondetect3(VJFrame *f, VJFrame *f2, int threshold, water_t *w)
 	if(!w->have_img)
 	{
 		softblur_apply( f2,f->width,f->height,0);
-		veejay_memcpy(bg, f2->data[0], f->width * f->height );	
+	//	veejay_memcpy(bg, f2->data[0], f->width * f->height );	
+		vj_frame_copy1( f2->data[0], bg, f->width * f->height );
 		w->have_img = 1;
 		return;
 	}
@@ -499,19 +504,19 @@ void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, in
 	if(w->last_fresh_rate != fresh_rate)
 	{
 		w->last_fresh_rate = fresh_rate;
-		veejay_memset( w->map, 0, (w->map_h*w->map_w*2*sizeof(int)));
+		vj_frame_clear1( w->map, 0,(w->map_h*w->map_w*2*sizeof(int)));
+		//veejay_memset( w->map, 0, (w->map_h*w->map_w*2*sizeof(int)));
 	}
 	if(w->lastmode != mode )
 	{
-		veejay_memset( w->map, 0, (w->map_h*w->map_w*2*sizeof(int)));
+		vj_frame_clear1( w->map, 0, (w->map_h*w->map_w*2*sizeof(int)));
 		w->have_img = 0;
 		w->lastmode = mode;
 	}
-	veejay_memcpy ( w->ripple_data[0],frame->data[0],len);
+	vj_frame_copy1( frame->data[0], w->ripple_data[0],len);
 
 	dest = frame->data[0];
 	src = w->ripple_data[0];
-
 
 	w->loopnum = loopnum;
 

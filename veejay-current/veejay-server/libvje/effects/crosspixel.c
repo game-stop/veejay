@@ -79,21 +79,19 @@ void crosspixel_apply(VJFrame *frame, int w, int h, int t,int v) {
 	const int uv_height = frame->uv_height;
 
     unsigned int p = 0;
-    
-    veejay_memcpy( cross_pixels[0], Y, len);
-    veejay_memcpy( cross_pixels[1], Cb, uv_len);
-    veejay_memcpy( cross_pixels[2], Cr, uv_len);
+   	int strides[4] = { len, uv_len, uv_len ,0};
+	vj_frame_copy( frame->data, cross_pixels, strides );
 
     if(t==0) {
-	    veejay_memset(Y, pixel_Y_lo_, len);
-	    veejay_memset(Cb, 128, uv_len);
-	    veejay_memset(Cr, 128, uv_len);
+	    vj_frame_clear1(Y, pixel_Y_lo_, len);
+	    vj_frame_clear1(Cb, 128, uv_len);
+	    vj_frame_clear1(Cr, 128, uv_len);
     }
     else
     {
-	    veejay_memset(Y, 235, len);
-	    veejay_memset(Cb, 128, uv_len);
-	    veejay_memset(Cr, 128, uv_len);
+	    vj_frame_clear1(Y, 235, len);
+	    vj_frame_clear1(Cb, 128, uv_len);
+	    vj_frame_clear1(Cr, 128, uv_len);
     }
 
     for(y=0; y < (h>>1); y++) {

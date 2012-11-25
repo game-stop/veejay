@@ -25,7 +25,7 @@
 #include <stdint.h>
 
 vj_effect *pencilsketch_init();
-void pencilsketch_apply(VJFrame *frame, int w, int h, int type, int threshold, int opacity);
+void pencilsketch_apply(VJFrame *frame, int w, int h, int type, int threshold, int opacity,int mode);
 
 void pencilsketch_free();
 #endif

@@ -228,7 +228,6 @@ filelist_t *find_media_files( veejay_t *info )
 int vj_perform_take_bg(veejay_t *info, VJFrame *frame, int pass)
 {
 	int n = 0;
-	static void *bg_sampler = NULL;
 	if( pass == 0 ) {
 		if(frame->ssm = 1 ) {
 			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_CHAMBLEND );
@@ -245,10 +244,7 @@ int vj_perform_take_bg(veejay_t *info, VJFrame *frame, int pass)
 
 		if( frame->ssm == 0 ) 
 		{
-			//@ supersample
-			if(!bg_sampler)
-				bg_sampler = subsample_init( frame->width );
-			chroma_supersample( info->settings->sample_mode,bg_sampler,frame->data,frame->width,frame->height);
+			chroma_supersample( info->settings->sample_mode,frame,frame->data );
 			n += vj_effect_prepare( frame, VJ_VIDEO_EFFECT_CHAMBLEND );
 			n += vj_effect_prepare( frame, VJ_IMAGE_EFFECT_CHAMELEON );
 			frame->ssm = 1;

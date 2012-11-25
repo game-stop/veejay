@@ -43,7 +43,7 @@ vj_effect *rawval_init(int w,int h)
     ve->limits[1][2] = 255;
     ve->limits[0][3] = 0;
     ve->limits[1][3] = 255;
-
+	ve->parallel = 1;
     ve->sub_format = 0;
     ve->description = "Raw Chroma Pixel Replacement";
 	ve->has_user = 0;

@@ -257,7 +257,6 @@ typedef struct
 	VJFrame *img;
 	int fmt;
         int ref;
-	void *sampler;
 #ifdef SUPPORT_READ_DV2
 	vj_dv_decoder *dv_decoder;
 #endif
@@ -317,9 +316,6 @@ static void	_el_free_decoder( vj_decoder *d )
 		if(d->frame) 
 			free(d->frame);
 
-		if(d->sampler)
-			subsample_free(d->sampler);
-	
 		if(d->img)
 			free(d->img);
 	
@@ -472,7 +468,6 @@ vj_decoder *_el_new_decoder( int id , int width, int height, float fps, int pixe
 	if( id == CODEC_ID_YUVLZO )
 	{
 		d->lzo_decoder = lzo_new();
-		d->sampler = subsample_init( width );
 	} else  if( id != CODEC_ID_YUV422 && id != CODEC_ID_YUV420 && id != CODEC_ID_YUV420F && id != CODEC_ID_YUV422F)
         {
 		d->codec = avcodec_find_decoder( id );
@@ -1142,9 +1137,8 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 #ifdef STRICT_CHECKING
 		assert( dst[0] != NULL  && dst[1] != NULL && dst[2] != NULL );
 #endif	
-		veejay_memcpy( dst[0], srci->data[0], el_len_ );
-                veejay_memcpy( dst[1], srci->data[1], el_uv_len_ );
-                veejay_memcpy( dst[2], srci->data[2], el_uv_len_ );
+		int strides[4] = { el_len_, el_uv_len_, el_uv_len_,0 };
+		vj_frame_copy( srci->data, dst, strides );
                 return 1;     
 	}
 
@@ -1177,11 +1171,12 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 	int got_picture = 0;
 	int in_uv_len = 0;
 	uint8_t *in[3] = { NULL,NULL,NULL };
-
+	int strides[4] = { el_len_, el_uv_len_, el_uv_len_ ,0};
+	uint8_t *dataplanes[3] = { data , data + el_len_, data + el_len_ + el_uv_len_ };
 	switch( decoder_id )
 	{
 		case CODEC_ID_YUV420:
-			veejay_memcpy( dst[0], data, el_len_);
+			vj_frame_copy1( data,dst[0], el_len_ );
 			in[0] = data; in[1] = data+el_len_ ; in[2] = data + el_len_ + (el_len_/4);
 			if( el_pixel_format_ == FMT_422F ) {
 				yuv_scale_pixels_from_ycbcr( in[0],16.0f,235.0f, el_len_ );
@@ -1191,7 +1186,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			return 1;
 			break;	
 		case CODEC_ID_YUV420F:
-			veejay_memcpy( dst[0], data, el_len_);
+			vj_frame_copy1( data, dst[0], el_len_);
 			in[0] = data; in[1] = data + el_len_; in[2] = data + el_len_+(el_len_/4);
 			if( el_pixel_format_ == FMT_422 ) {
 				yuv_scale_pixels_from_y( dst[0], el_len_ );
@@ -1203,9 +1198,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			return 1;
 			break;
 		case CODEC_ID_YUV422:
-			veejay_memcpy( dst[0], data, el_len_);
-            		veejay_memcpy( dst[1], data+el_len_,el_uv_len_);
-            		veejay_memcpy( dst[2], data+el_len_+el_uv_len_, el_uv_len_);
+			vj_frame_copy( dataplanes,dst,strides );
 			if( el_pixel_format_ == FMT_422F ) {
 				yuv_scale_pixels_from_ycbcr( dst[0],16.0f,235.0f, el_len_ );
 				yuv_scale_pixels_from_ycbcr( dst[1],16.0f,240.0f, el_len_/2);
@@ -1213,9 +1206,7 @@ int	vj_el_get_video_frame(editlist *el, long nframe, uint8_t *dst[3])
 			return 1;
 			break;
 		case CODEC_ID_YUV422F:
-			veejay_memcpy( dst[0], data, el_len_);
-            		veejay_memcpy( dst[1], data+el_len_,el_uv_len_);
-            		veejay_memcpy( dst[2], data+el_len_+el_uv_len_, el_uv_len_);
+			vj_frame_copy( dataplanes, dst, strides );
 			if( el_pixel_format_ == FMT_422 ) {
 				yuv_scale_pixels_from_y( dst[0], el_len_ );
 				yuv_scale_pixels_from_uv( dst[1], el_len_/2);
@@ -2549,7 +2540,7 @@ int		vj_el_framelist_clone( editlist *src, editlist *dst)
 	dst->frame_list = (uint64_t*) vj_malloc(sizeof(uint64_t) * src->video_frames );
 	if(!dst->frame_list)
 		return 0;
-
+	
 	veejay_memcpy(
 		dst->frame_list,
 		src->frame_list,

@@ -90,9 +90,8 @@ void zoom_apply( VJFrame *frame, int width, int height, int x, int y, int factor
 		zoom_[0] = x; zoom_[1] = y; zoom_[2] = factor; zoom_[3] = dir;
 	}
 
-	veejay_memcpy( zoom_private_[0], frame->data[0], (width*height));
-	veejay_memcpy( zoom_private_[1], frame->data[1], (width*height));
-	veejay_memcpy( zoom_private_[2], frame->data[2], (width*height));
+	int strides[4] = { (width*height),(width*height),(width*height), 0 };
+	vj_frame_copy( frame->data, zoom_private_, strides );
 
 	viewport_process_dynamic( zoom_vp_, zoom_private_, frame->data );
 	

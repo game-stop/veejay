@@ -52,6 +52,7 @@ vj_effect *isolate_init(int w, int h)
     ve->limits[0][4] = 0;
     ve->limits[1][4] = 255;
 	ve->has_user = 0;
+	ve->parallel = 1;
 	ve->description = "Isolate Color";
     ve->extra_frame = 0;
     ve->sub_format = 1;

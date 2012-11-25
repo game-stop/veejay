@@ -88,10 +88,8 @@ void bathroom_verti_apply(VJFrame *frame, int width, int height, int val)
     uint8_t *Y = frame->data[0];
     uint8_t *Cb = frame->data[1];
     uint8_t *Cr = frame->data[2];
-
-    veejay_memcpy( bathroom_frame[0], Y, len);
-    veejay_memcpy( bathroom_frame[1], Cb, len);
-    veejay_memcpy( bathroom_frame[2], Cr, len);
+	int strides[4] = { len, len, len, 0 };
+	vj_frame_copy( frame->data, bathroom_frame, strides );
 
     if( y_val <= 0 )
 	y_val = 1;
@@ -121,9 +119,8 @@ void bathroom_hori_apply(VJFrame *frame, int width, int height, int val)
     uint8_t *Cr = frame->data[2];
 
     unsigned int x,y;
-    veejay_memcpy( bathroom_frame[0], Y, len);
-    veejay_memcpy( bathroom_frame[1], Cb, len);
-    veejay_memcpy( bathroom_frame[2], Cr, len);
+	int strides[4] = { len, len, len, 0 };
+	vj_frame_copy( frame->data, bathroom_frame, strides );
 
     for(y=0; y < height;y++) {
      for(x=0; x <width; x++) {

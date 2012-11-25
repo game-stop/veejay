@@ -34,6 +34,7 @@ vj_effect *average_init(int w, int h)
     ve->limits[0][0] = 1;
     ve->limits[1][0] = 100;
     ve->defaults[0] = 1;
+	ve->parallel = 1;
     ve->description = "Average";
     ve->sub_format = 0;
     ve->extra_frame = 0;

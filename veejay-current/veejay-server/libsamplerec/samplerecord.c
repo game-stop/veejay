@@ -176,7 +176,7 @@ static int sample_start_encoder(sample_info *si, editlist *el, int format, long 
 			case ENCODER_LZO:
 			si->encoder_max_size = (tmp * 3 ); break;
 			default:
-			si->encoder_max_size = ( 16 * 65535 );
+			si->encoder_max_size = 8 * ( 16 * 65535 );
 			break;
 		}
 	

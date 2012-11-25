@@ -29,6 +29,7 @@
 #include <libavutil/avutil.h>
 #include <libswscale/swscale.h>
 #include <libavcodec/avcodec.h>
+#include <veejay/vj-task.h>
 /* this routine is the same as frame_YUV422_to_YUV420P , unpack
  * libdv's 4:2:2-packed into 4:2:0 planar 
  * See http://mjpeg.sourceforge.net/ (MJPEG Tools) (lav-common.c)
@@ -1439,11 +1440,15 @@ void	yuv420to422planar( uint8_t *src[3], uint8_t *dst[3], int w, int h )
 }
 #endif
 
-void	yuy2_scale_pixels_from_yuv( uint8_t *plane, int len )
+static void	yuy2_scale_pixels_from_yuv_job( void *arg )
 {
-	unsigned int rlen = 2 * len ;
+	vj_task_arg_t *v = (vj_task_arg_t*) arg;
+	uint8_t *plane = v->input[0];
+	int	 len   = v->strides[0];
+
+//	unsigned int rlen = 2 * len ;
 	unsigned int i;
-	for( i = 0; i < rlen; i += 4 ) {
+	for( i = 0; i < len; i += 4 ) {
 		plane[i+0] = jpeg_to_CCIR_tableY[ plane[i+0] ];
 		plane[i+1] = jpeg_to_CCIR_tableUV[plane[i+1] ];
 		plane[i+2] = jpeg_to_CCIR_tableY[ plane[i+2] ];
@@ -1451,11 +1456,32 @@ void	yuy2_scale_pixels_from_yuv( uint8_t *plane, int len )
 	}
 }
 
-void	yuy2_scale_pixels_from_ycbcr( uint8_t *plane, int len )
+void	yuy2_scale_pixels_from_yuv( uint8_t *plane, int len )
 {
-	unsigned int rlen = 2 * len ;
+	if(vj_task_available() ) {
+		uint8_t *in[4] = { plane,NULL,NULL,NULL };
+		int strides[4] = { len * 2, 0, 0, 0 };
+		vj_task_run( in,in,NULL, strides, 1, &yuy2_scale_pixels_from_yuv_job );
+	}
+	else {
+		unsigned int rlen = 2 * len ;
+		unsigned int i;
+		for( i = 0; i < rlen; i += 4 ) {
+			plane[i+0] = jpeg_to_CCIR_tableY[ plane[i+0] ];
+			plane[i+1] = jpeg_to_CCIR_tableUV[plane[i+1] ];
+			plane[i+2] = jpeg_to_CCIR_tableY[ plane[i+2] ];
+			plane[i+3] = jpeg_to_CCIR_tableUV[ plane[i+3] ];
+		}
+	}
+}
+
+static void	yuy2_scale_pixels_from_ycbcr_job( void *arg )
+{
+	vj_task_arg_t *v = (vj_task_arg_t*) arg;
+	uint8_t *plane = v->input[0];
+	int len = v->strides[0];
 	unsigned int i;
-	for( i = 0; i < rlen; i += 4 ) {
+	for( i = 0; i < len; i += 4 ) {
 		plane[i+0] = CCIR_to_jpeg_tableY[ plane[i+0] ];
 		plane[i+1] = CCIR_to_jpeg_tableUV[plane[i+1] ];
 		plane[i+2] = CCIR_to_jpeg_tableY[ plane[i+2] ];
@@ -1463,25 +1489,70 @@ void	yuy2_scale_pixels_from_ycbcr( uint8_t *plane, int len )
 	}
 }
 
-void	yuv_scale_pixels_from_yuv( uint8_t *src[3], uint8_t *dst[3], int len ) 
+void	yuy2_scale_pixels_from_ycbcr( uint8_t *plane, int len )
 {
+	if(vj_task_available() ) {
+		uint8_t *in[4] = { plane,NULL,NULL,NULL };
+		int strides[4] = { len * 2, 0, 0, 0 };
+		vj_task_run( in,in,NULL, strides, 1, &yuy2_scale_pixels_from_ycbcr_job );
+	}
+	else {
+		unsigned int rlen = 2 * len ;
+		unsigned int i;
+		for( i = 0; i < rlen; i += 4 ) {
+			plane[i+0] = CCIR_to_jpeg_tableY[ plane[i+0] ];
+			plane[i+1] = CCIR_to_jpeg_tableUV[plane[i+1] ];
+			plane[i+2] = CCIR_to_jpeg_tableY[ plane[i+2] ];
+			plane[i+3] = CCIR_to_jpeg_tableUV[ plane[i+3] ];
+		}
+	}
+}
+
+static void	yuy_scale_pixels_from_yuv_job( void *arg)
+{
+	vj_task_arg_t *t = (vj_task_arg_t*) arg;
+	
 	unsigned int i;
-	uint8_t *y = src[0];
-	uint8_t *u = src[1];
-	uint8_t *v = src[2];
-	uint8_t *dY = dst[0];
-	uint8_t *dU = dst[1];
-	uint8_t *dV = dst[2];
-	for( i = 0; i < len ; i ++ ) {
+	uint8_t *y = t->input[0];
+	uint8_t *u = t->input[1];
+	uint8_t *v = t->input[2];
+	uint8_t *dY = t->output[0];
+	uint8_t *dU = t->output[1];
+	uint8_t *dV = t->output[2];
+	
+	for( i = 0; i < t->strides[0] ; i ++ ) {
 		dY[i] = jpeg_to_CCIR_tableY[ y[i] ];
 	}
-	len = len / 2;
-	for( i = 0; i < len ; i ++ ) {
+	for( i = 0; i < t->strides[1] ; i ++ ) {
 		dU[i] = jpeg_to_CCIR_tableUV[ u[i] ];
 		dV[i] = jpeg_to_CCIR_tableUV[ v[i] ];
 	}
 }
 
+void	yuv_scale_pixels_from_yuv( uint8_t *src[3], uint8_t *dst[3], int len ) 
+{
+	if(vj_task_available() ) {
+		int strides[4] = { len, len/2,len/2, 0 };
+		vj_task_run( src,dst,NULL, strides, 3, (performer_job_routine) &yuy_scale_pixels_from_yuv_job );
+	}
+	else {
+		unsigned int i;
+		uint8_t *y = src[0];
+		uint8_t *u = src[1];
+		uint8_t *v = src[2];
+		uint8_t *dY = dst[0];
+		uint8_t *dU = dst[1];
+		uint8_t *dV = dst[2];
+		for( i = 0; i < len ; i ++ ) {
+			dY[i] = jpeg_to_CCIR_tableY[ y[i] ];
+		}
+		len = len / 2;
+		for( i = 0; i < len ; i ++ ) {
+			dU[i] = jpeg_to_CCIR_tableUV[ u[i] ];
+			dV[i] = jpeg_to_CCIR_tableUV[ v[i] ];
+		}
+	}
+}
 void	yuv_scale_pixels_from_y( uint8_t *plane, int len )
 {
 	unsigned int i;

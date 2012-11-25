@@ -40,11 +40,13 @@ vj_effect *chromamagick_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->defaults[0] = 7;
     ve->defaults[1] = 150;
+	ve->parallel = 1;
     ve->description = "Chroma Magic";
     ve->limits[0][0] = 0;
     ve->limits[1][0] = 25;
     ve->limits[0][1] = 0;
     ve->limits[1][1] = 255;
+    ve->parallel = 1;
     ve->extra_frame = 1;
     ve->sub_format = 1;
 	ve->has_user = 0;

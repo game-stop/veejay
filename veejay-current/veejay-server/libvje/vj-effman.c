@@ -29,7 +29,7 @@
 #ifdef STRICT_CHECKING
 #include <assert.h>
 #endif
-
+#include <veejay/vj-task.h>
 extern vj_effect *vj_effects[]; 
 
 #define VEVO_PLUG_LIVIDO        0xffaa
@@ -74,7 +74,6 @@ void vj_effman_apply_plug_effect(
 
 void vj_effman_apply_image_effect(
 	VJFrame **frames,
-	VJFrameInfo *frameinfo,
 	vjp_kf *todo_info,
 	int *arg,
 	int entry,
@@ -86,320 +85,320 @@ void vj_effman_apply_image_effect(
 
    switch (e) {
 	case VJ_IMAGE_EFFECT_CONSTANTBLEND:
-		constantblend_apply( frames[0], frameinfo->width,
-			frameinfo->height, arg[0], arg[1], arg[2]);
+		constantblend_apply( frames[0], frames[0]->width,
+			frames[0]->height, arg[0], arg[1], arg[2]);
 		break;
 	case VJ_IMAGE_EFFECT_FLARE:
-		flare_apply( frames[0], frameinfo->width,
-			frameinfo->height,arg[0],arg[1],arg[2] );
+		flare_apply( frames[0], frames[0]->width,
+			frames[0]->height,arg[0],arg[1],arg[2] );
 		break;
 	case VJ_IMAGE_EFFECT_PHOTOPLAY:
-		photoplay_apply(frames[0],frameinfo->width,
-			frameinfo->height,arg[0],arg[1],arg[2]);
+		photoplay_apply(frames[0],frames[0]->width,
+			frames[0]->height,arg[0],arg[1],arg[2]);
 			break;
 	case VJ_IMAGE_EFFECT_MASKSTOP:
-		maskstop_apply(frames[0],frameinfo->width,
-			frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
+		maskstop_apply(frames[0],frames[0]->width,
+			frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
 		break;
 	case VJ_IMAGE_EFFECT_CUTSTOP:
-		cutstop_apply(frames[0],frameinfo->width,
-			frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
+		cutstop_apply(frames[0],frames[0]->width,
+			frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
 		break;
 	case VJ_IMAGE_EFFECT_NEIGHBOUR4:
-		neighbours4_apply(frames[0],frameinfo->width,
-			frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
+		neighbours4_apply(frames[0],frames[0]->width,
+			frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
 		break;
 	case VJ_IMAGE_EFFECT_NEIGHBOUR5:
-		neighbours5_apply(frames[0],frameinfo->width,
-			frameinfo->height,arg[0],arg[1],arg[2]);
+		neighbours5_apply(frames[0],frames[0]->width,
+			frames[0]->height,arg[0],arg[1],arg[2]);
 		break;
 	case VJ_IMAGE_EFFECT_NEIGHBOUR2:
-		neighbours2_apply(frames[0],frameinfo->width,
-			frameinfo->height,arg[0],arg[1],arg[2]);
+		neighbours2_apply(frames[0],frames[0]->width,
+			frames[0]->height,arg[0],arg[1],arg[2]);
 		break;
 	case VJ_IMAGE_EFFECT_NEIGHBOUR:
-		neighbours_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
+		neighbours_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
 		break;
 	case VJ_IMAGE_EFFECT_NEIGHBOUR3:
-	neighbours3_apply(frames[0],frameinfo->width,
-			frameinfo->height,arg[0],arg[1],arg[2]);
+	neighbours3_apply(frames[0],frames[0]->width,
+			frames[0]->height,arg[0],arg[1],arg[2]);
 		break;
 
 	case VJ_IMAGE_EFFECT_RIPPLETV:
-	waterrippletv_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
+	waterrippletv_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
 	 case VJ_IMAGE_EFFECT_PENCILSKETCH:
-	  pencilsketch_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
+	  pencilsketch_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
 	 break;
       case VJ_IMAGE_EFFECT_NOISEPENCIL:
-	noisepencil_apply(frames[0],frameinfo->width,frameinfo->height,
+	noisepencil_apply(frames[0],frames[0]->width,frames[0]->height,
 		arg[0],arg[1],arg[2],arg[3]);
 	break;
 	case VJ_IMAGE_EFFECT_CALI:
-		cali_apply( vj_effects[entry]->user_data,frames[0], frameinfo->width,frameinfo->height,arg[0], arg[1] );
+		cali_apply( vj_effects[entry]->user_data,frames[0], frames[0]->width,frames[0]->height,arg[0], arg[1] );
 		break;
       case VJ_IMAGE_EFFECT_DIFF:
 	diffimg_apply(frames[0], 
-		      frameinfo->width, frameinfo->height, arg[0], arg[1],
+		      frames[0]->width, frames[0]->height, arg[0], arg[1],
 		      arg[2]);
 	break;
 
      case VJ_IMAGE_EFFECT_COMPLEXINVERT:
-	complexinvert_apply(frames[0], frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
+	complexinvert_apply(frames[0], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
 	break;
      case VJ_IMAGE_EFFECT_COMPLEXSATURATE:
-	complexsaturation_apply(frames[0], frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6]);
+	complexsaturation_apply(frames[0], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6]);
 	break;
      case VJ_IMAGE_EFFECT_REFLECTION:
-	reflection_apply(frames[0], frameinfo->width, frameinfo->height,
+	reflection_apply(frames[0], frames[0]->width, frames[0]->height,
 			 arg[0], arg[1], arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_FIBDOWNSCALE:
 	for (j = 0; j < arg[1]; j++) {
-	    fibdownscale_apply(frames[0], frames[0], frameinfo->width,
-			       frameinfo->height, arg[0]);
+	    fibdownscale_apply(frames[0], frames[0], frames[0]->width,
+			       frames[0]->height, arg[0]);
 	}
 	break;
      case VJ_IMAGE_EFFECT_NOISEADD:
-	noiseadd_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
+	noiseadd_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_CONTRAST:
-	contrast_apply(frames[0], frameinfo->width, frameinfo->height,arg);
+	contrast_apply(frames[0], frames[0]->width, frames[0]->height,arg);
 	break;
      case VJ_IMAGE_EFFECT_ENHANCEMASK:
-	enhancemask_apply(frames[0],frameinfo->width,frameinfo->height,arg);
+	enhancemask_apply(frames[0],frames[0]->width,frames[0]->height,arg);
 	break;
      case VJ_IMAGE_EFFECT_SOLARIZE:
-	solarize_apply(frames[0], frameinfo->width, frameinfo->height, arg[0]);
+	solarize_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_DISTORTION:
-	distortion_apply(frames[0], frameinfo->width, frameinfo->height, arg[0],
+	distortion_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
 			 arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_GAMMA:
 	gamma_apply(
-		    frames[0], frameinfo->width, frameinfo->height, arg[0]);
+		    frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_COLORADJUST:
-	coloradjust_apply(frames[0], frameinfo->width, frameinfo->height, arg[0],
+	coloradjust_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
 			  arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_MOTIONBLUR:
-        motionblur_apply(frames[0],frameinfo->width,frameinfo->height,arg[0]);
+        motionblur_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
 	break;
 
      case VJ_IMAGE_EFFECT_MAGICSCRATCHER:
-	magicscratcher_apply(frames[0], frameinfo->width, frameinfo->height, arg[0],
+	magicscratcher_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
 			     arg[1], arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_CHROMASCRATCHER:
-	chromascratcher_apply(frames[0], frameinfo->width, frameinfo->height,
+	chromascratcher_apply(frames[0], frames[0]->width, frames[0]->height,
 			      arg[0], arg[1], arg[2], arg[3]);
 	break;
      case VJ_IMAGE_EFFECT_SCRATCHER:
-	scratcher_apply(frames[0], frameinfo->width, frameinfo->height,
+	scratcher_apply(frames[0], frames[0]->width, frames[0]->height,
 			arg[0], arg[1], arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_KILLCHROMA:
-	killchroma_apply(frames[0], frameinfo->width, frameinfo->height, arg[0]
+	killchroma_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]
 			 );
 	break;
      case VJ_IMAGE_EFFECT_MIRROR:
-	mirrors2_apply(frames[0], frameinfo->width, frameinfo->height, arg[0]);
+	mirrors2_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_MIRRORS:
-	mirrors_apply(frames[0], frameinfo->width, frameinfo->height, arg[0],
+	mirrors_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
 		      arg[1]);
 	break;
 	case VJ_IMAGE_EFFECT_MAGICMIRROR:
-	magicmirror_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
+	magicmirror_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
 	break;
     case  VJ_IMAGE_EFFECT_RASTER:
-	raster_apply(frames[0],frameinfo->width,frameinfo->height,arg[0]);
+	raster_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
 	break;
 	case VJ_IMAGE_EFFECT_SWIRL:
-	swirl_apply(frames[0],frameinfo->width,frameinfo->height,arg[0]);
+	swirl_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
 	break;
     case VJ_IMAGE_EFFECT_RADIALBLUR:
-	radialblur_apply(frames[0], frameinfo->width, frameinfo->height,arg[0],arg[1],arg[2]);
+	radialblur_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
     case VJ_IMAGE_EFFECT_FISHEYE:
-	fisheye_apply(frames[0],frameinfo->width,frameinfo->height,arg[0]);
+	fisheye_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_PIXELSMEAR:
-	smear_apply(frames[0], frameinfo->width, frameinfo->height,arg[0],arg[1]);
+	smear_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1]);
 	break;  
      case VJ_IMAGE_EFFECT_UVCORRECT:
-	uvcorrect_apply(frames[0], frameinfo->width, frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6]);
+	uvcorrect_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6]);
 	break;
    case VJ_IMAGE_EFFECT_CHROMAPALETTE:
-	chromapalette_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
+	chromapalette_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
 	break;
    case VJ_IMAGE_EFFECT_CHROMIUM:
-	chromium_apply( frames[0], frameinfo->width, frameinfo->height, arg[0]);
+	chromium_apply( frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	break;
 	case VJ_IMAGE_EFFECT_CARTONIZE:
-		cartonize_apply( frames[0], frameinfo->width,frameinfo->height,
+		cartonize_apply( frames[0], frames[0]->width,frames[0]->height,
 			arg[0],arg[1],arg[2] );
 		break;
 	case VJ_IMAGE_EFFECT_VIDBLOB:
-		blob_apply( frames[0],frameinfo->width,frameinfo->height,
+		blob_apply( frames[0],frames[0]->width,frames[0]->height,
 			arg[0],arg[1],arg[2],arg[3] );
 			break;
 	case VJ_IMAGE_EFFECT_VIDBOIDS:
-		boids_apply( frames[0],frameinfo->width,frameinfo->height,
+		boids_apply( frames[0],frames[0]->width,frames[0]->height,
 			arg[0],arg[1],arg[2],arg[3],arg[4],arg[5],arg[6],arg[7] );
 		break;
 	case VJ_IMAGE_EFFECT_GHOST:
-		ghost_apply( frames[0], frameinfo->width,frameinfo->height,arg[0]);
+		ghost_apply( frames[0], frames[0]->width,frames[0]->height,arg[0]);
 		break;
 	case VJ_IMAGE_EFFECT_MORPHOLOGY:
-		morphology_apply( frames[0], frameinfo->width,frameinfo->height,
+		morphology_apply( frames[0], frames[0]->width,frames[0]->height,
 			arg[0],arg[1],arg[2] );
 		break;
 	case VJ_IMAGE_EFFECT_COLMORPH:
-		colmorphology_apply( frames[0], frameinfo->width, frameinfo->height,arg[0],arg[1],arg[2]);
+		colmorphology_apply( frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1],arg[2]);
 		break;
 	case VJ_IMAGE_EFFECT_NERVOUS:
-		nervous_apply( frames[0], frameinfo->width, frameinfo->height,
+		nervous_apply( frames[0], frames[0]->width, frames[0]->height,
 			arg[0]); break;
    case VJ_IMAGE_EFFECT_OVERCLOCK:
-	overclock_apply(frames[0], frameinfo->width, frameinfo->height,arg[0],arg[1]);
+	overclock_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1]);
 	break;
 	case VJ_IMAGE_EFFECT_COLORHIS:
-		colorhis_apply( frames[0], frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3] );
+		colorhis_apply( frames[0], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3] );
 		break;
 	case VJ_IMAGE_EFFECT_AUTOEQ:
-		autoeq_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
+		autoeq_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
 	case VJ_IMAGE_EFFECT_BALTANTV:
-		baltantv_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
+		baltantv_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 		break;
 	case VJ_IMAGE_EFFECT_CHAMELEON:
-		chameleon_apply(frames[0],frameinfo->width,frameinfo->height,arg[0]);
+		chameleon_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
 		break;
 	case VJ_IMAGE_EFFECT_TIMEDISTORT:
-		timedistort_apply(frames[0],frameinfo->width,frameinfo->height,arg[0]);
+		timedistort_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
 		break;
 	case VJ_IMAGE_EFFECT_LENSCORRECTION:
-		radcor_apply( frames[0], frameinfo->width,frameinfo->height, arg[0],arg[1] ,arg[2]);
+		radcor_apply( frames[0], frames[0]->width,frames[0]->height, arg[0],arg[1] ,arg[2]);
 		break;
      case VJ_IMAGE_EFFECT_NEGATION:
-	negation_apply(frames[0], frameinfo->width, frameinfo->height, arg[0]);
+	negation_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	break;
 	case VJ_IMAGE_EFFECT_MEDIANFILTER:
-	medianfilter_apply(frames[0],frameinfo->width,frameinfo->height,arg[0]);
+	medianfilter_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
 	break;
    case VJ_IMAGE_EFFECT_NEGATECHANNEL:
-	negatechannel_apply(frames[0], frameinfo->width, frameinfo->height, arg[0],arg[1]);
+	negatechannel_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],arg[1]);
 	break;
 
 	case VJ_IMAGE_EFFECT_COLFLASH:
-	colflash_apply(frames[0], frameinfo->width,frameinfo->height,arg[0],
+	colflash_apply(frames[0], frames[0]->width,frames[0]->height,arg[0],
 			arg[1],arg[2],arg[3],arg[4] );
 	break;
      case VJ_IMAGE_EFFECT_COLORMAP:
-	colormap_apply(frames[0], frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
+	colormap_apply(frames[0], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_POSTERIZE:
-	posterize_apply(frames[0], frameinfo->width, frameinfo->height, arg[0],
+	posterize_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
 			arg[1],arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_DITHER:
-	dither_apply(frames[0], frameinfo->width, frameinfo->height, arg[0],
+	dither_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
 		     arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_EMBOSS:
-	emboss_apply(frames[0], frameinfo->width, frameinfo->height, arg[0]);
+	emboss_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_FLIP:
-	flip_apply(frames[0], frameinfo->width, frameinfo->height, arg[0]);
+	flip_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_REVTV:
-	revtv_apply(frames[0], frameinfo->width, frameinfo->height, arg[0],
+	revtv_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
 		    arg[1], arg[2], arg[3]);
 	break;
      case VJ_IMAGE_EFFECT_COLORSHIFT:
-	colorshift_apply(frames[0], frameinfo->width, frameinfo->height, arg[0],
+	colorshift_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
 			 arg[1]); 
 	break;
      case VJ_IMAGE_EFFECT_SOFTBLUR:
-	softblur_apply(frames[0], frameinfo->width, frameinfo->height, arg[0]);
+	softblur_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_WIDTHMIRROR:
-	widthmirror_apply(frames[0], frameinfo->width, frameinfo->height, arg[0]);
+	widthmirror_apply(frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_DICES:
-	dices_apply(vj_effects[entry], frames[0], frameinfo->width,
-		    frameinfo->height, arg[0]);
+	dices_apply(vj_effects[entry], frames[0], frames[0]->width,
+		    frames[0]->height, arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_COLORTEST:
-	color_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
+	color_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_RAWMAN:
-	rawman_apply(frames[0], frameinfo->width, frameinfo->height, arg[0],
+	rawman_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
 		     arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_RAWVAL:
-	rawval_apply(frames[0], frameinfo->width, frameinfo->height, arg[0], arg[1],
+	rawval_apply(frames[0], frames[0]->width, frames[0]->height, arg[0], arg[1],
 		     arg[2], arg[3]);
 	break;
      case VJ_IMAGE_EFFECT_SMUCK:
-	smuck_apply(frames[0], frames[0], frameinfo->width, frameinfo->height,
+	smuck_apply(frames[0], frames[0], frames[0]->width, frames[0]->height,
 		    arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_TRANSFORM:
-	transform_apply(frames[0], frames[0], frameinfo->width, frameinfo->height,
+	transform_apply(frames[0], frames[0], frames[0]->width, frames[0]->height,
 			arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_BWSELECT:
-	bwselect_apply(frames[0], frameinfo->width, frameinfo->height, arg[0], arg[1]);
+	bwselect_apply(frames[0], frames[0]->width, frames[0]->height, arg[0], arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_GREYSELECT:
-	greyselect_apply(frames[0], frameinfo->width, frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
+	greyselect_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
 	break;
      case VJ_IMAGE_EFFECT_ISOLATE:
-	isolate_apply(frames[0],frameinfo->width,frameinfo->height,
+	isolate_apply(frames[0],frames[0]->width,frames[0]->height,
 		arg[0],arg[1],arg[2],arg[3],arg[4]);
 	break;
      case VJ_IMAGE_EFFECT_ROTOZOOM:
 	rotozoom_apply(frames[0],
-		       frameinfo->width,
-		       frameinfo->height, arg[0], arg[1], arg[2], arg[3]);
+		       frames[0]->width,
+		       frames[0]->height, arg[0], arg[1], arg[2], arg[3]);
 	break;
      case VJ_IMAGE_EFFECT_SINOIDS:
-	sinoids_apply(frames[0], frameinfo->width, frameinfo->height,arg[0],arg[1]);
+	sinoids_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_AVERAGE:
-	average_apply(frames[0],frameinfo->width,frameinfo->height,arg[0]);
+	average_apply(frames[0],frames[0]->width,frames[0]->height,arg[0]);
 	break;
      case VJ_IMAGE_EFFECT_RIPPLE:
-	ripple_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
+	ripple_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_BGSUBTRACT:
-	bgsubtract_apply( frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
+	bgsubtract_apply( frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_BATHROOM:
-	bathroom_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
+	bathroom_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_RGBCHANNEL:
-	rgbchannel_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
+	rgbchannel_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
      case VJ_IMAGE_EFFECT_ZOOM:
-	zoom_apply(frames[0], frameinfo->width, frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
+	zoom_apply(frames[0], frames[0]->width, frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
 	break;
      case VJ_IMAGE_EFFECT_CROSSPIXEL:
-	crosspixel_apply(frames[0],frameinfo->width,frameinfo->height,arg[0],arg[1]);
+	crosspixel_apply(frames[0],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 	break;
      case VJ_IMAGE_EFFECT_DEINTERLACE:
-	 deinterlace_apply( frames[0], frameinfo->width, frameinfo->height, arg[0]);
+	 deinterlace_apply( frames[0], frames[0]->width, frames[0]->height, arg[0]);
 	 break;
 	case VJ_IMAGE_EFFECT_MOTIONMAP:
-	motionmap_apply( frames[0], frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
+	motionmap_apply( frames[0], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
 	break;
 	case VJ_IMAGE_EFFECT_CONTOUR:
 	contourextract_apply( vj_effects[entry]->user_data, frames[0],
-			frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4] );	
+			frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4] );	
 	break;
      case VJ_IMAGE_EFFECT_SLICE:
 	if(arg[2] > 0) { 
@@ -409,140 +408,140 @@ void vj_effman_apply_image_effect(
 	     todo_info->tmp[1] = arg[1];
 	}
 
-	slice_apply(frames[0],frameinfo->width,frameinfo->height,arg[0], todo_info->tmp[1]);
+	slice_apply(frames[0],frames[0]->width,frames[0]->height,arg[0], todo_info->tmp[1]);
 	todo_info->tmp[1] = 0;
 	break;
     }
 }
 
-void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp_kf *todo_info,int *arg, int entry, int e) {
+void vj_effman_apply_video_effect( VJFrame **frames, vjp_kf *todo_info,int *arg, int entry, int e) {
 
     switch(e) {
 	case VJ_VIDEO_EFFECT_CHAMBLEND:
-		chameleonblend_apply(frames[0],frames[1], frameinfo->width,frameinfo->height,arg[0]);
+		chameleonblend_apply(frames[0],frames[1], frames[0]->width,frames[0]->height,arg[0]);
 		break;
 	case VJ_VIDEO_EFFECT_EXTDIFF:
-		differencemap_apply( frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
+		differencemap_apply( frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
 		break;
 	case VJ_VIDEO_EFFECT_EXTTHRESHOLD:
-		threshold_apply( frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0],arg[1]);
+		threshold_apply( frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1]);
 		break;
 	case VJ_VIDEO_EFFECT_VIDEOWALL:
-		videowall_apply(frames[0],frames[1],frameinfo->width,
-			frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
+		videowall_apply(frames[0],frames[1],frames[0]->width,
+			frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
 		break;
 	case VJ_VIDEO_EFFECT_VIDEOPLAY:
-		videoplay_apply(frames[0],frames[1],frameinfo->width,
-			frameinfo->height,arg[0],arg[1],arg[2]);
+		videoplay_apply(frames[0],frames[1],frames[0]->width,
+			frames[0]->height,arg[0],arg[1],arg[2]);
 		break;
 	case VJ_VIDEO_EFFECT_TRIPPLICITY:
 	tripplicity_apply(frames[0],frames[1], 
-		frameinfo->width,frameinfo->height, arg[0],arg[1],arg[2]);
+		frames[0]->width,frames[0]->height, arg[0],arg[1],arg[2]);
 		break;
       case VJ_VIDEO_EFFECT_COMPLEXTHRESHOLD:
-	complexthreshold_apply(frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],
+	complexthreshold_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],
 		arg[4], arg[5]);
 	break;
       case VJ_VIDEO_EFFECT_DUPMAGIC:
-	dupmagic_apply(frames[0], frames[1], frameinfo->width, frameinfo->height,
+	dupmagic_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
 		       arg[0]);
 	break;
       case VJ_VIDEO_EFFECT_LUMAMAGICK:
-	lumamagic_apply(frames[0], frames[1], frameinfo->width, frameinfo->height,
+	lumamagic_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
 			arg[0], arg[1],arg[2]);
    	break;
       case VJ_VIDEO_EFFECT_BINARYOVERLAY:
-	binaryoverlay_apply(frames[0], frames[1],frameinfo->width,frameinfo->height,arg[0] );   break;
+	binaryoverlay_apply(frames[0], frames[1],frames[0]->width,frames[0]->height,arg[0] );   break;
       case VJ_VIDEO_EFFECT_OVERLAYMAGIC:
-	overlaymagic_apply(frames[0], frames[1], frameinfo->width,frameinfo->height, arg[0],arg[1]);
+	overlaymagic_apply(frames[0], frames[1], frames[0]->width,frames[0]->height, arg[0],arg[1]);
 	break;
 	case VJ_VIDEO_EFFECT_SLICER:
-		slicer_apply(frames[0],frames[1], frameinfo->width, frameinfo->height, arg[0],arg[1] );
+		slicer_apply(frames[0],frames[1], frames[0]->width, frames[0]->height, arg[0],arg[1] );
 		break;
       case VJ_VIDEO_EFFECT_MASK:
-	simplemask_apply(frames[0],frames[1], frameinfo->width,frameinfo->height,arg[0], arg[1]);
+	simplemask_apply(frames[0],frames[1], frames[0]->width,frames[0]->height,arg[0], arg[1]);
 	break;
 	case VJ_VIDEO_EFFECT_LUMAMASK:
-	lumamask_apply(frames[0], frames[1], frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2]);
+	lumamask_apply(frames[0], frames[1], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2]);
 	break;
 	case VJ_VIDEO_EFFECT_DISSOLVE:
-	dissolve_apply(frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0]);break; 
+	dissolve_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0]);break; 
       case VJ_VIDEO_EFFECT_OPACITY:
-	opacity_apply(frames[0], frames[1], frameinfo->width,
-		      frameinfo->height, arg[0]);
+	opacity_apply(frames[0], frames[1], frames[0]->width,
+		      frames[0]->height, arg[0]);
 	break;
       case VJ_VIDEO_EFFECT_IRIS:
-	iris_apply( frames[0],frames[1], frameinfo->width,frameinfo->height,arg[0],arg[1]);
+	iris_apply( frames[0],frames[1], frames[0]->width,frames[0]->height,arg[0],arg[1]);
 	break;
       case VJ_VIDEO_EFFECT_THRESHOLDSMOOTH:
-	opacitythreshold_apply(frames[0], frames[1], frameinfo->width,
-			       frameinfo->height, arg[0], arg[1],arg[2]);
+	opacitythreshold_apply(frames[0], frames[1], frames[0]->width,
+			       frames[0]->height, arg[0], arg[1],arg[2]);
 	break;
       case VJ_VIDEO_EFFECT_THRESHOLD:
-	opacityadv_apply(frames[0], frames[1], frameinfo->width,
-			 frameinfo->height, arg[0], arg[1], arg[2]);
+	opacityadv_apply(frames[0], frames[1], frames[0]->width,
+			 frames[0]->height, arg[0], arg[1], arg[2]);
 	break;
       case VJ_VIDEO_EFFECT_RGBKEY:
-	rgbkey_apply(frames[0], frames[1], frameinfo->width, frameinfo->height,
+	rgbkey_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
 		     arg[0], arg[1], arg[2], arg[3], arg[4], arg[5]);
 	break;
       case VJ_VIDEO_EFFECT_KEYSELECT:
-	keyselect_apply(frames[0],frames[1],frameinfo->width,frameinfo->height,
+	keyselect_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,
 			arg[0],arg[1],arg[2],arg[3],arg[4],arg[5]);
 	break;
       case VJ_VIDEO_EFFECT_CHROMAMAGICK:
-	chromamagick_apply(frames[0], frames[1], frameinfo->width,
-			   frameinfo->height, arg[0], arg[1]);
+	chromamagick_apply(frames[0], frames[1], frames[0]->width,
+			   frames[0]->height, arg[0], arg[1]);
 	break;
       case VJ_VIDEO_EFFECT_LUMABLEND:
-	lumablend_apply(frames[0], frames[1], frameinfo->width, frameinfo->height,
+	lumablend_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
 			arg[0], arg[1], arg[2], arg[3]);
 	break;
       case VJ_VIDEO_EFFECT_LUMAKEY:
-	lumakey_apply(frames[0], frames[1], frameinfo->width, frameinfo->height,
+	lumakey_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
 		      arg[4], arg[1], arg[2], arg[0], arg[3]);
 	break;
       case VJ_VIDEO_EFFECT_DIFF:
 	diff_apply( vj_effects[entry]->user_data, frames[0], frames[1],
-		   frameinfo->width, frameinfo->height, arg[0], arg[1],arg[2],arg[3]);
+		   frames[0]->width, frames[0]->height, arg[0], arg[1],arg[2],arg[3]);
 	break;
 	case VJ_VIDEO_EFFECT_TEXMAP:
 	texmap_apply( vj_effects[entry]->user_data, frames[0],frames[1],
-			frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4] );	
+			frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4] );	
 	break;
       case VJ_VIDEO_EFFECT_WHITEFRAME:
-	whiteframe_apply(frames[0], frames[1], frameinfo->width, frameinfo->height);
+	whiteframe_apply(frames[0], frames[1], frames[0]->width, frames[0]->height);
 	break;
       case VJ_VIDEO_EFFECT_MTRACER:
-	mtracer_apply(frames[0], frames[1], frameinfo->width, frameinfo->height,
+	mtracer_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
 		      arg[0], arg[1]);
 	break;
       case VJ_VIDEO_EFFECT_TRACER:
-	tracer_apply(frames[0], frames[1], frameinfo->width,
-		     frameinfo->height, arg[0], arg[1]);
+	tracer_apply(frames[0], frames[1], frames[0]->width,
+		     frames[0]->height, arg[0], arg[1]);
 	break;
       case VJ_VIDEO_EFFECT_CAROT:
-	transcarot_apply(frames[0], frames[1], frameinfo->width, frameinfo->height,
+	transcarot_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
 			 arg[2], arg[3], arg[4], arg[5], arg[0], arg[1]);
 	break;
       case VJ_VIDEO_EFFECT_LINE:
-	transline_apply(frames[0], frames[1], frameinfo->width, frameinfo->height,
+	transline_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
 			arg[2], arg[1], arg[0], arg[3]);
 	break;
       case VJ_VIDEO_EFFECT_TRANSOP:
 	transop_apply(frames[0], frames[1], arg[1], arg[2], arg[3],
-		      arg[4], arg[5], arg[6], frameinfo->width, frameinfo->height,
+		      arg[4], arg[5], arg[6], frames[0]->width, frames[0]->height,
 		      arg[0]);
 	break;
       case VJ_VIDEO_EFFECT_COMPLEXSYNC:
 	if(arg[1] == 1) { /* auto increment as option in effect*/
 	   if(arg[2]==0) arg[2]=1;   
 	   todo_info->tmp[0] += (arg[0]/arg[2] )+1; /* val / max frames */
-	   if(todo_info->tmp[0] > frameinfo->height-2) todo_info->tmp[0] = 1;
+	   if(todo_info->tmp[0] > frames[0]->height-2) todo_info->tmp[0] = 1;
 	} else { /* arg1 = off , copy arg*/
 	     todo_info->tmp[0] = arg[0];
 	}
-	complexsync_apply(frames[0], frames[1],frameinfo->width, frameinfo->height, 
+	complexsync_apply(frames[0], frames[1],frames[0]->width, frames[0]->height, 
 			todo_info->tmp[0]);
 	break;
       case VJ_VIDEO_EFFECT_FADECOLORRGB:
@@ -557,7 +556,7 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
 	    todo_info->tmp[0] -= (arg[0] / arg[5]);
 	}
 
-	colorfadergb_apply(frames[0], frameinfo->width, frameinfo->height,
+	colorfadergb_apply(frames[0], frames[0]->width, frames[0]->height,
 			   todo_info->tmp[0], arg[1], arg[2], arg[3]);
 	break;
       case VJ_VIDEO_EFFECT_FADECOLOR:
@@ -572,63 +571,63 @@ void vj_effman_apply_video_effect( VJFrame **frames, VJFrameInfo *frameinfo ,vjp
 	}
 
 
-	colorfade_apply(frames[0], frameinfo->width, frameinfo->height,
+	colorfade_apply(frames[0], frames[0]->width, frames[0]->height,
 			todo_info->tmp[0], arg[1]);
 	break;
 	case VJ_VIDEO_EFFECT_VBAR:
-		vbar_apply(frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
+		vbar_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
 		break;
       case VJ_VIDEO_EFFECT_3BAR:
-	bar_apply(frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
+	bar_apply(frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4]);
 	break;
       case VJ_VIDEO_EFFECT_SLIDINGDOOR:
 	if(arg[1] == 1) { /* auto increment as option in effect*/
 	   todo_info->tmp[0] ++; /* val / max frames */
-	   if(todo_info->tmp[0] >= (frameinfo->height/16))
+	   if(todo_info->tmp[0] >= (frames[0]->height/16))
 		   todo_info->tmp[0] = 1;
 	} else { /* arg1 = off , copy arg*/
 	     todo_info->tmp[0] = arg[0];
 	}
 
-	slidingdoor_apply(frames[0], frames[1], frameinfo->width,
-			  frameinfo->height, todo_info->tmp[0]  );
+	slidingdoor_apply(frames[0], frames[1], frames[0]->width,
+			  frames[0]->height, todo_info->tmp[0]  );
 	break;
       case VJ_VIDEO_EFFECT_WIPE:
-	wipe_apply(frames[0], frames[1], frameinfo->width, frameinfo->height,
+	wipe_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
 		   arg[0], arg[1]);
 	break;
       case VJ_VIDEO_EFFECT_RGBKEYSMOOTH:
-	rgbkeysmooth_apply(frames[0], frames[1], frameinfo->width,
-			   frameinfo->height, arg[0], arg[1], arg[2], arg[3],
+	rgbkeysmooth_apply(frames[0], frames[1], frames[0]->width,
+			   frames[0]->height, arg[0], arg[1], arg[2], arg[3],
 			   arg[4],arg[5]);
 	break;
       case VJ_VIDEO_EFFECT_SPLIT:
-	split_apply(frames[0], frames[1], frameinfo->width, frameinfo->height,
+	split_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
 		    arg[0], arg[1]);
 	break;
        case VJ_VIDEO_EFFECT_BORDERS:
-	borders_apply(frames[0], frameinfo->width, frameinfo->height, arg[0],
+	borders_apply(frames[0], frames[0]->width, frames[0]->height, arg[0],
 		      arg[1]);
 	break;
       case VJ_VIDEO_EFFECT_FRAMEBORDER:
-	frameborder_apply(frames[0], frames[1], frameinfo->width,
-			  frameinfo->height, arg[0]);
+	frameborder_apply(frames[0], frames[1], frames[0]->width,
+			  frames[0]->height, arg[0]);
 	break;
       case VJ_VIDEO_EFFECT_TRANSBLEND:
-	transblend_apply(frames[0], frames[1], frameinfo->width, frameinfo->height,
+	transblend_apply(frames[0], frames[1], frames[0]->width, frames[0]->height,
 			 arg[0], arg[1], arg[2], arg[3], arg[4], arg[5],
 			 arg[6]);
 	break;
 	case VJ_VIDEO_EFFECT_PICINPIC:
-	picinpic_apply( vj_effects[entry]->user_data,frames[0], frames[1], frameinfo->width, frameinfo->height,
+	picinpic_apply( vj_effects[entry]->user_data,frames[0], frames[1], frames[0]->width, frames[0]->height,
 			arg[0], arg[1], arg[2], arg[3] );
 	break;
 	case VJ_VIDEO_EFFECT_RIPPLETV:
-	water_apply( vj_effects[entry]->user_data,frames[0],frames[1],frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3],arg[4] );
+	water_apply( vj_effects[entry]->user_data,frames[0],frames[1],frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3],arg[4] );
 
 	break;
 	case VJ_VIDEO_EFFECT_RADIOACTIVE:
-	radioactivetv_apply( frames[0],frames[1], frameinfo->width,frameinfo->height,arg[0],arg[1],arg[2],arg[3]);
+	radioactivetv_apply( frames[0],frames[1], frames[0]->width,frames[0]->height,arg[0],arg[1],arg[2],arg[3]);
 	break;
    
       default:
@@ -696,7 +695,38 @@ int vj_effect_prepare( VJFrame *frame, int selector)
 	}
 	return 0;
 }
+static void	vj_effman_apply_job( void *arg )
+{
+	vj_task_arg_t *v = (vj_task_arg_t*) arg;
 
+	int entry	 = v->iparams[11];
+	int selector	 = v->iparam;
+	vjp_kf *kf	 = v->ptr;
+	VJFrame frame;
+	VJFrame frame2;
+		
+	vj_task_set_to_frame( &frame, 0, v->jobnum );
+
+	VJFrame *frames[2];
+
+	frames[0] = &frame;
+	frames[1] = &frame2;
+
+	if( v->overlap ) {
+		frame.data[3] = v->overlaprow;
+	}
+
+	if( selector > 200 )	
+	{
+		vj_task_set_to_frame( &frame2, 1, v->jobnum);
+		vj_effman_apply_video_effect(frames,kf, v->iparams, entry,selector);
+	}
+	else
+	{
+		vj_effman_apply_image_effect( frames,kf,v->iparams,entry, selector);
+	}	
+
+}
 
 int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int selector, int *arguments, void *ptr )
 {
@@ -716,11 +746,29 @@ int	vj_effect_apply( VJFrame **frames, VJFrameInfo *frameinfo, vjp_kf *kf, int s
 		vj_effman_apply_plug_effect( frames, frameinfo, kf, arguments,n_a, entry, selector, ptr );
 	}
 	else
-	{		
-		if( selector > 200 )	
-			vj_effman_apply_video_effect(frames,frameinfo,kf,arguments, entry,selector);
-		else
-			vj_effman_apply_image_effect( frames, frameinfo, kf, arguments,entry, selector);
+	{
+		int isP = vj_effect_is_parallel(selector);
+		if( vj_task_available() && isP > 0 ) {
+			vj_task_set_from_frame( frames[0] );
+			vj_task_set_int( selector );
+			vj_task_set_param( entry, 11 );
+			vj_task_set_ptr( (void*) kf );
+			int i;
+			for ( i = 0; i < n_a; i ++ )
+				vj_task_set_param( arguments[i], i );
+			if( isP > 1 )
+				vj_task_set_overlap( frames[0]->width );
+
+			vj_task_run( frames[0]->data,frames[1]->data, NULL, NULL, 3, &vj_effman_apply_job );
+		} 
+		else {
+			
+			if( selector > 200 )	
+				vj_effman_apply_video_effect(frames,kf,arguments, entry,selector);
+			else
+				vj_effman_apply_image_effect( frames,kf, arguments,entry, selector);
+	
+		}
 	}
 	return VJE_SUCCESS;
 }

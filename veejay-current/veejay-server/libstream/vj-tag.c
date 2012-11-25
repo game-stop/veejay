@@ -1901,14 +1901,11 @@ int vj_tag_continue_record( int t1 )
 		return 1;
 	}
 
-	// 2 GB barrier
 	if (si->rec_total_bytes  >= VEEJAY_FILE_LIMIT)
 	{
 		veejay_msg(VEEJAY_MSG_INFO, "Auto splitting files (reached internal 2GB barrier)");
 		si->sequence_num ++;
 		si->rec_total_bytes = 0;
-	//	si->encoder_duration
-	//	reset some variables
 
 		printf(" %d %ld %d (%ld)%ld \n",
 			(int)si->sequence_num,

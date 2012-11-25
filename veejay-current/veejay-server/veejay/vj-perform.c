@@ -159,24 +159,24 @@ static int vj_perform_get_subframe_tag(veejay_t * info, int sub_sample, int chai
 static void vj_perform_reverse_audio_frame(veejay_t * info, int len, uint8_t *buf );
 
 
-//@ FIXME: DROP THESE METHODS
+
 static	void	vj_perform_copy( ycbcr_frame *src, ycbcr_frame *dst, int Y_len, int UV_len )
 {
 	uint8_t *input[4] = { src->Y, src->Cb, src->Cr,NULL };
 	uint8_t *output[4] = { dst->Y, dst->Cb, dst->Cr,NULL };
 	int 	strides[4] = { Y_len, UV_len, UV_len,0 };
-	vj_frame_copy(input,output,strides,3);
+	vj_frame_copy(input,output,strides);
 }
 static	void	vj_perform_copy2( ycbcr_frame *src, uint8_t **output, int Y_len, int UV_len )
 {
 	uint8_t *input[4] = { src->Y, src->Cb, src->Cr,NULL };
 	int 	strides[4] = { Y_len, UV_len, UV_len,0 };
-	vj_frame_copy(input,output,strides,3);
+	vj_frame_copy(input,output,strides);
 }
 static	void	vj_perform_copy3( uint8_t **input, uint8_t **output, int Y_len, int UV_len )
 {
 	int 	strides[4] = { Y_len, UV_len, UV_len,0 };
-	vj_frame_copy(input,output,strides,3);
+	vj_frame_copy(input,output,strides);
 }
 
 
@@ -717,8 +717,6 @@ int vj_perform_init(veejay_t * info)
  
    	// vj_perform_record_buffer_init();
     
-	effect_sampler = subsample_init( w );
-
 	lzo_ = lzo_new();
 
 	int vp = 0;  int frontback = 0;
@@ -883,11 +881,6 @@ void vj_perform_free(veejay_t * info)
 		if(crop_frame->data[1]) free(crop_frame->data[1]);
 		if(crop_frame->data[2]) free(crop_frame->data[2]);
 	}
-	if(crop_sampler)
-	subsample_free(crop_sampler);
-   if(effect_sampler)
-	subsample_free(effect_sampler);
-
 
 //   if( info->viewport )
 //	viewport_destroy( info->viewport );
@@ -1015,9 +1008,9 @@ int	vj_perform_get_cropped_frame( veejay_t *info, uint8_t **frame, int crop )
 		src.data[2] = primary_buffer[0]->Cr;
 
 		// yuv crop needs supersampled data
-		chroma_supersample( info->settings->sample_mode,effect_sampler, src.data, src.width,src.height );
+		chroma_supersample( info->settings->sample_mode,&src, src.data);
 		yuv_crop( &src, crop_frame, &(info->settings->viewport));
-		chroma_subsample( info->settings->sample_mode,crop_sampler, crop_frame->data, crop_frame->width, crop_frame->height );
+		chroma_subsample( info->settings->sample_mode,crop_frame, crop_frame->data);
 	}
 
 	frame[0] = crop_frame->data[0];
@@ -1038,8 +1031,6 @@ int	vj_perform_init_cropped_output_frame(veejay_t *info, VJFrame *src, int *dw, 
 
 	*dw = crop_frame->width;
 	*dh = crop_frame->height;
-
-	crop_sampler = subsample_init( *dw );
 
 	/* enough space to supersample*/
 	int i;
@@ -2176,10 +2167,8 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 				{
 					chroma_supersample(
 						settings->sample_mode,
-						effect_sampler,
-						frames[1]->data,
-						frameinfo->width,
-						frameinfo->height );
+						frames[1],
+						frames[1]->data );
 					frames[1]->ssm = 1;
 					frame_buffer[chain_entry]->ssm = 1;	
 				}
@@ -2187,10 +2176,8 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 				{
 					  chroma_subsample(
                                 	        settings->sample_mode,
-                                      		effect_sampler,
-                                       		frames[1]->data,
-						frameinfo->width,
-                                    		frameinfo->height
+                                       		frames[1],
+						frames[1]->data
                                 		);
 					  frames[1]->ssm = 0;
 					  frame_buffer[chain_entry]->ssm = 0;
@@ -2210,19 +2197,16 @@ static int	vj_perform_tag_render_chain_entry(veejay_t *info, int chain_entry)
 			{
 				chroma_supersample(
 					settings->sample_mode,
-					effect_sampler,
-					frames[0]->data,
-					frameinfo->width,
-					frameinfo->height );
+					frames[0],
+					frames[0]->data );
 				frames[0]->ssm = 1;	
 			}
 			else if(!sub_mode && frames[0]->ssm == 1)
                         {
                                 chroma_subsample(
                                         settings->sample_mode,
-                                        effect_sampler,
-                                        frames[0]->data,frameinfo->width,
-                                        frameinfo->height
+                                        frames[0],
+					frames[0]->data
                                 );
                                 frames[0]->ssm = 0;
                         }
@@ -2306,13 +2290,13 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 						if( ef ) continue;
 						if( sm ) {
 						   if( !ssm ) {
-							chroma_supersample( settings->sample_mode,effect_sampler,F[0]->data,i->width,i->height );
+							chroma_supersample( settings->sample_mode,F[0],F[0]->data );
 							F[0]->ssm = 1;
 							frame_buffer[chain_entry]->ssm = 1;
 							ssm = 1;
 							}
 						} else if ( ssm ) {
-							chroma_subsample( settings->sample_mode, effect_sampler,F[0]->data,i->width,i->height);
+							chroma_subsample( settings->sample_mode,F[0],F[0]->data);
 							F[0]->ssm = 0;
 							frame_buffer[chain_entry]->ssm = 1;
 							ssm = 0;
@@ -2351,13 +2335,13 @@ static	int	vj_perform_preprocess_secundary( veejay_t *info, int id, int mode,int
 						if( ef ) continue;
 						if( sm ) {
   						 if( !ssm ) {
-							chroma_supersample( settings->sample_mode,effect_sampler,F[0]->data,i->width,i->height );
+							chroma_supersample( settings->sample_mode,F[0],F[0]->data );
 							F[0]->ssm = 1;
 							frame_buffer[chain_entry]->ssm = 1;
 							ssm = 1;
 							}
 						} else if ( ssm ) {
-							chroma_subsample( settings->sample_mode, effect_sampler,F[0]->data,i->width,i->height);
+							chroma_subsample( settings->sample_mode,F[0],F[0]->data);
 							F[0]->ssm = 0;
 							frame_buffer[chain_entry]->ssm = 1;
 							ssm = 0;
@@ -2392,14 +2376,15 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 	VJFrame *frames[2];
 	VJFrameInfo *frameinfo;
 	video_playback_setup *settings = info->settings;
+	
 	frames[0] = info->effect_frame1;
 	frames[1] = info->effect_frame2;
-//	frames[1]->format = info->pixel_format;
-    	frameinfo = info->effect_frame_info;
-    	frames[0]->data[0] = primary_buffer[0]->Y;
+    	
+	frameinfo = info->effect_frame_info;
+    	
+	frames[0]->data[0] = primary_buffer[0]->Y;
    	frames[0]->data[1] = primary_buffer[0]->Cb;
     	frames[0]->data[2] = primary_buffer[0]->Cr;
-//	frames[0]->format  = info->pixel_format;
 
 	vjp_kf *setup;
     	setup = info->effect_info;
@@ -2444,11 +2429,9 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 				{
 					chroma_supersample(
 						settings->sample_mode,
-						effect_sampler,	
-						frames[1]->data,
-						frameinfo->width,
-						frameinfo->height );
-					frames[1]->ssm = 1; // HUH FIXME was 0
+						frames[1],
+						frames[1]->data );
+					frames[1]->ssm = 1;
 					frame_buffer[chain_entry]->ssm = 1;
 				}
 				else if(frames[1]->ssm == 1 && !sub_mode )
@@ -2457,11 +2440,8 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 					frame_buffer[chain_entry]->ssm = 0;
 					chroma_subsample(
 						settings->sample_mode,
-						effect_sampler,
-						frames[1]->data,
-						frameinfo->width,
-						frameinfo->height
-						);
+						frames[1],
+						frames[1]->data );
 				}
 				
 				if(!done && do_ssm >= 0) {
@@ -2476,10 +2456,8 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 			{
 				chroma_supersample(
 					settings->sample_mode,
-					effect_sampler,
-					frames[0]->data,
-					frameinfo->width,
-					frameinfo->height );
+					frames[0],
+					frames[0]->data );
 
 				frames[0]->ssm = 1;
 			}
@@ -2487,11 +2465,8 @@ static int	vj_perform_render_chain_entry(veejay_t *info, int chain_entry)
 			{
 				chroma_subsample(
 					settings->sample_mode,
-					effect_sampler,
-					frames[0]->data,
-					frameinfo->width,
-					frameinfo->height
-				);
+					frames[0],
+					frames[0]->data );
 				frames[0]->ssm = 0;
 			}
 		
@@ -2944,11 +2919,8 @@ static	inline	void	vj_perform_supersample_chain( veejay_t *info, VJFrame *frame 
 {
 	chroma_supersample(
 		info->settings->sample_mode,
-		effect_sampler,
-		temp_buffer,
-		frame->width,
-		frame->height
-	);
+		frame,
+		temp_buffer );
 	frame->ssm = 1;
 }
 
@@ -3300,11 +3272,8 @@ static	void	vj_perform_render_osd( veejay_t *info, video_playback_setup *setting
 	{
 		chroma_supersample(
 			settings->sample_mode,
-			effect_sampler,
-			frame->data,
-			frame->width,
-			frame->height
-		       	);
+			frame,
+			frame->data );
 		frame->ssm = 1;
 	}
 	
@@ -3444,11 +3413,8 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 			if(!frame->ssm) {
                         	chroma_supersample(
                        	         settings->sample_mode,
-                       	         effect_sampler,
-                       	         pri,
-                       	         frame->width,
-                       	         frame->height
-                                );
+                       	         frame,
+				 pri );
                      		   frame->ssm = 1;
                 	}
 			if( viewport_active(vp) )
@@ -3484,12 +3450,9 @@ static	void	vj_perform_finish_render( veejay_t *info, video_playback_setup *sett
 	if( frame->ssm == 1 )
 	{
 		chroma_subsample(
-		settings->sample_mode,
-			effect_sampler,
-			pri,
-			frame->width,
-			frame->height
-			);
+			settings->sample_mode,
+			frame,
+			pri);
 		frame->ssm = 0;
 	}
 
@@ -3536,11 +3499,8 @@ static	void	vj_perform_render_font( veejay_t *info, video_playback_setup *settin
 		{
 			chroma_supersample(
 				settings->sample_mode,
-				effect_sampler,
-				frame->data,
-				frame->width,
-				frame->height
-			       	);
+				frame,
+				frame->data );
 			frame->ssm = 1;
 		}
 	
@@ -3561,8 +3521,7 @@ static	void	vj_perform_record_frame( veejay_t *info )
 		video_playback_setup *settings = info->settings;
 		uint8_t *dst[3] = { NULL, primary_buffer[3]->Cb,
 					  primary_buffer[3]->Cr };
-		chroma_subsample_cp( settings->sample_mode, effect_sampler,
-				  frame->data,dst, frame->width,frame->height );
+		chroma_subsample_cp( settings->sample_mode, frame,  frame->data,dst );
 		uint8_t *chroma[2] = { primary_buffer[0]->Cb, primary_buffer[0]->Cr };
 		primary_buffer[0]->Cb = dst[1];
 		primary_buffer[0]->Cr = dst[2];
@@ -3598,11 +3557,8 @@ static	int	vj_perform_render_magic( veejay_t *info, video_playback_setup *settin
 	{
 		chroma_subsample(
 		settings->sample_mode,
-			effect_sampler,
-			pri,
-			frame->width,
-			frame->height
-			);
+			frame,
+			pri );
 		frame->ssm = 0;
 	}
 

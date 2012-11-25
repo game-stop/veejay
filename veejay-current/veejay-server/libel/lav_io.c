@@ -629,10 +629,18 @@ int lav_write_frame(lav_file_t *lav_file, uint8_t *buff, long size, long count)
 		case 'l':
 		case 'd':
       if(n==0)
-           res = AVI_write_frame( lav_file->avi_fd, buff, size );
+      {
+	     res = AVI_write_frame( lav_file->avi_fd, buff, size );
+      	     if( AVI_bytes_remain( lav_file->avi_fd ) < ( size * 50 ) ) {
+		veejay_msg(VEEJAY_MSG_WARNING, "Reaching AVI file limit soon! (%d - %d bytes)",
+			AVI_bytes_remain(lav_file->avi_fd), AVI_get_MAX_LEN() );
+	     } 
+      }	
       else
-           res = AVI_dup_frame( lav_file->avi_fd );
-		break;
+      {     
+	res = AVI_dup_frame( lav_file->avi_fd );
+	}
+	break;
 		
 #ifdef HAVE_LIBQUICKTIME
          case 'q':
@@ -1199,7 +1207,7 @@ lav_file_t *lav_open_input_file(char *filename, int mmap_size)
 {
    int n;
    char *video_comp = NULL;
-   unsigned char *frame = NULL; /* Make sure un-init segfaults! */
+   unsigned char *frame = NULL; 
    long len;
    int jpg_height, jpg_width, ncomps, hf[3], vf[3];
    int ierr;

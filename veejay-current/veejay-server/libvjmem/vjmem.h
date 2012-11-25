@@ -20,7 +20,7 @@
 #ifndef VJ_X86_H
 #define VJ_X86_H
 
-#define MAX_WORKERS 32
+#define MAX_WORKERS 256 
 
 extern void *(* veejay_memcpy)(void *to, const void *from, size_t len);
 extern void *(* veejay_memset)(void *to, uint8_t val, size_t len);
@@ -48,8 +48,10 @@ extern char	*veejay_strncpy( char *s1, const char *s2, size_t n );
 extern void    yuyv_plane_init();
 extern void    yuyv_plane_clear( size_t len, void *to );
 extern char	**vje_build_param_list( int num, ... );
-extern void	*(*vj_frame_copy)( uint8_t **input, uint8_t **output, int *strides, int planes );
+extern void	*(*vj_frame_copy)( uint8_t **input, uint8_t **output, int *strides );
+extern void	*(*vj_frame_clear)( uint8_t **input, int *strides, unsigned int val );
 extern void	vj_frame_copy1( uint8_t *input, uint8_t *output, int size );
+extern void	vj_frame_clear1( uint8_t *input, unsigned int value, int size );
 extern int	num_threaded_tasks();
 //@ FIXME: Design change
 extern void	vj_frame_slow_threaded( uint8_t **p0_buffer, uint8_t **p1_buffer, uint8_t **img, int len, int uv_len,const float frac );

@@ -67,29 +67,6 @@ const char *ssm_description[SSM_COUNT] = {
 // forward decl
 void ss_420_to_422(uint8_t *buffer, int width, int height);
 void ss_422_to_420(uint8_t *buffer, int width, int height);
-/*
-typedef struct
-{
-	uint8_t *buf; 
-} yuv_sampler_t;
-*/
-void *subsample_init(int len)
-{
-//	yuv_sampler_t *s = (yuv_sampler_t*) vj_malloc(sizeof(yuv_sampler_t) );
-//	if(!s)
-//		return NULL;
-	void *s = (void*) vj_malloc(sizeof(uint8_t) * RUP8(len*2) );
-	if(!s)
-		return NULL;
-
-	return s;
-}
-
-void	subsample_free(void *data)
-{
-	if( data ) free(data);
-	data = NULL;
-}
 
 /*************************************************************************
  * Chroma Subsampling
@@ -239,13 +216,13 @@ static void ss_444_to_420jpeg_cp(uint8_t *buffer,uint8_t *dest, int width, int h
 #define BLANK_CRB in0[1]
 #define BLANK_CRB_2 (in0[1] << 1)
 
-static void tr_420jpeg_to_444(void *data, uint8_t *buffer, int width, int height)
+static void tr_420jpeg_to_444(uint8_t *data, uint8_t *buffer, int width, int height)
 {
   uint8_t *inm, *in0, *inp, *out0, *out1;
   uint8_t cmm, cm0, cmp, c0m, c00, c0p, cpm, cp0, cpp;
   int x, y;
 
-  uint8_t *saveme = (uint8_t*) data;
+  uint8_t *saveme = data;
 
   veejay_memcpy(saveme, buffer, width);
 
@@ -540,7 +517,8 @@ static	inline	void	down_sample16to8( uint8_t *out, uint8_t *in )
 	);
 }
 #endif
-static void ss_444_to_422_cp(void *data, uint8_t *buffer, uint8_t *dest, int width, int height)
+
+static void ss_444_to_422_cp(uint8_t *data, uint8_t *buffer, uint8_t *dest, int width, int height)
 {
 	const int dst_stride = width >> 1;
 	int x,y;
@@ -560,6 +538,7 @@ static void ss_444_to_422_cp(void *data, uint8_t *buffer, uint8_t *dest, int wid
 		dst = dest + (y*dst_stride);
 
 #if defined (HAVE_ASM_MMX) || defined (HAVE_ASM_MMX2)
+		copy_width( src, buffer + (y*width), width );
 
 		for( x= 0; x < mmxdst_stride; x++ )
 		{
@@ -583,8 +562,8 @@ static void ss_444_to_422_cp(void *data, uint8_t *buffer, uint8_t *dest, int wid
 	}
 }
 
-
-static void ss_444_to_422(void *data, uint8_t *buffer, int width, int height)
+//@ data = input, buffer = output
+static void ss_444_to_422(uint8_t *data, uint8_t *buffer, int width, int height)
 {
 	const int dst_stride = width >> 1;
 	int x,y;
@@ -593,6 +572,7 @@ static void ss_444_to_422(void *data, uint8_t *buffer, int width, int height)
 	int left = dst_stride % 8;
 #endif
 	uint8_t *src = (uint8_t*) data;
+//	uint8_t *src = buffer;
 	uint8_t *dst;
 
 #ifdef HAVE_ASM_MMX
@@ -651,10 +631,12 @@ static	inline	void	super_sample8to16( uint8_t *in, uint8_t *out )
 }
 #endif
 
-static void tr_422_to_444(void *data, uint8_t *buffer, int width, int height)
+static void tr_422_to_444(uint8_t *data, uint8_t *buffer, int width, int height)
 {
 	int x,y;
 	const int stride = width >> 1;
+
+	veejay_msg(0,"%s: w=%d,h=%d, buffer=%p, temp=%p",__FUNCTION__, width,height, buffer,data );
 
 #ifndef HAVE_ASM_MMX
 	for( y = height-1; y > 0 ; y -- )
@@ -693,8 +675,46 @@ static void tr_422_to_444(void *data, uint8_t *buffer, int width, int height)
 #endif
 }
 
+static void tr_422_to_444t(uint8_t *dst, uint8_t *src, int width, int height)
+{
+	int x,y;
+	const int stride = width >> 1;
+#ifndef HAVE_ASM_MMX
+	for( y = height; y > 0 ; y -- )
+	{
+		uint8_t *d = dst + (y * width);
+		uint8_t *s = src + (y * stride);
+		for(x=0; x < stride; x++) // for 1 row
+		{
+			d[0] = s[x]; //put to dst
+			d[1] = s[x];
+			d+=2; // increment dst
+		}
+	}
+#else
+	const int mmx_stride = stride >> 3;
+	int left = (mmx_stride % 8)-1;
+	if( left < 0 ) left = 0;
+	for( y = height; y > 0 ; y -- )
+	{
+		uint8_t *s = src + (y * stride);
+		uint8_t *d = dst + (y * width);
+		for(x=0; x < mmx_stride; x++) // for 1 row
+		{
+			super_sample8to16(s,d);
+			s += 8;
+			d += 16;
+		}
+		for(x=0; x < left; x++) 
+		{
+			d[0] = src[x]; //put to dst
+			d[1] = src[x];
+			dst+=2; // increment dst
+		}
+	}
+#endif
 
-
+}
 
 /* vertical intersitial siting; horizontal cositing
  *
@@ -744,59 +764,37 @@ static void ss_444_to_420mpeg2(uint8_t *buffer, int width, int height)
   }
 }
       
-static void	chroma_subsample_cp_task( void *ptr )
-{
-	vj_task_arg_t *f = (vj_task_arg_t*) ptr;
-
-	switch (f->iparam) {
-	  case SSM_420_JPEG_BOX:
-	  case SSM_420_JPEG_TR:
-	    ss_444_to_420jpeg_cp(f->input[1],f->output[1], f->width, f->height);
-	    ss_444_to_420jpeg_cp(f->input[2],f->output[2], f->width, f->height);
-    	break;
- 	 case SSM_420_MPEG2:
-    	break;
- 	 case SSM_422_444:
-   	    ss_444_to_422_cp(f->priv,f->input[1],f->output[1],f->width,f->height);
-        ss_444_to_422_cp(f->priv,f->input[2],f->output[2],f->width,f->height);
-#ifdef HAVE_ASM_MMX
-		__asm__ __volatile__ ( _EMMS:::"memory");
-#endif
-   		 break;
-		
-	}
-}
-
 static void	chroma_subsample_task( void *ptr )
 {
 	vj_task_arg_t *f = (vj_task_arg_t*) ptr;
 
 	switch (f->iparam) {
-  case SSM_420_JPEG_BOX:
-  case SSM_420_JPEG_TR: 
-  	  ss_444_to_420jpeg(f->input[1], f->width, f->height);
-  	  ss_444_to_420jpeg(f->input[2], f->width, f->height);
+		case SSM_420_JPEG_BOX:
+		case SSM_420_JPEG_TR: 
+			ss_444_to_420jpeg(f->input[1], f->width, f->subhei);
+  			ss_444_to_420jpeg(f->input[2], f->width, f->subhei);
 #ifdef HAVE_ASM_MMX
-		__asm__ __volatile__ ( _EMMS:::"memory");
+			__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
-    break;
-  case SSM_420_MPEG2:
-    	ss_444_to_420mpeg2(f->input[1], f->width, f->height);
-  		ss_444_to_420mpeg2(f->input[2], f->width, f->height);
-    break;
-  case SSM_422_444:
-   	 	ss_444_to_422(f->priv,f->input[1],f->width,f->height);
-    	ss_444_to_422(f->priv,f->input[2],f->width,f->height);
+    		break;
+		case SSM_420_MPEG2:
+			ss_444_to_420mpeg2(f->input[1], f->width, f->subhei);
+			ss_444_to_420mpeg2(f->input[2], f->width, f->subhei);
+		break;
+		case SSM_422_444:
+			//@ src, dst
+	   	 	ss_444_to_422_cp(f->temp[1],f->output[1],f->input[1],f->width,f->subhei);
+		    ss_444_to_422_cp(f->temp[1],f->output[2],f->input[2],f->width,f->subhei);
 #ifdef HAVE_ASM_MMX
-		__asm__ __volatile__ ( _EMMS:::"memory");
+			__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
-    break;
-  case SSM_420_422:
-    		ss_422_to_420(f->input[1],f->width,f->height);
-   			ss_422_to_420(f->input[2],f->width,f->height);
+    		break;
+		case SSM_420_422:
+    		ss_422_to_420(f->input[1],f->width,f->subhei);
+   			ss_422_to_420(f->input[2],f->width,f->subhei);
    		break;
 		default:
-	    break;
+		break;
 
 	}
 }
@@ -806,30 +804,26 @@ static void chroma_supersample_task( void *ptr )
 
 	switch (f->iparam) {
 	  case SSM_420_JPEG_BOX:
-      	ss_420jpeg_to_444(f->input[1], f->width, f->height);
-    	ss_420jpeg_to_444(f->input[2], f->width, f->height);
+      	ss_420jpeg_to_444(f->input[1], f->width, f->subhei);
+    	ss_420jpeg_to_444(f->input[2], f->width, f->subhei);
 #ifdef HAVE_ASM_MMX
 	__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
     	break;
  	 case SSM_420_JPEG_TR:
-   		tr_420jpeg_to_444(f->priv,f->input[1], f->width, f->height);
-   		tr_420jpeg_to_444(f->priv,f->input[2], f->width, f->height);
+   		tr_420jpeg_to_444(f->priv,f->input[1], f->width, f->subhei);
+   		tr_420jpeg_to_444(f->priv,f->input[2], f->width, f->subhei);
    		break;
   	 case SSM_422_444:
-   		tr_422_to_444(f->priv,f->input[1],f->width,f->height);
-   		tr_422_to_444(f->priv,f->input[2],f->width,f->height);
+		tr_422_to_444t(f->input[1],f->output[1],f->width,f->subhei);
+   		tr_422_to_444t(f->input[2],f->output[2],f->width,f->subhei);
 #ifdef HAVE_ASM_MMX
 		__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
     	break;
   	case SSM_420_422:
-  		ss_420_to_422( f->input[1], f->width, f->height );
-    	ss_420_to_422( f->input[2], f->width, f->height );
-    	break;
-  	case SSM_420_MPEG2:
-    //    ss_420mpeg2_to_444(ycbcr[1], width, height);
-    //    ss_420mpeg2_to_444(ycbcr[2], width, height);
+  		ss_420_to_422( f->input[1], f->width, f->subhei );
+    	ss_420_to_422( f->input[2], f->width, f->subhei );
     	break;
   	default:
    	 	break;
@@ -837,142 +831,159 @@ static void chroma_supersample_task( void *ptr )
 
 }
 
-void chroma_subsample_cp(subsample_mode_t mode, void *data, uint8_t *ycbcr[], uint8_t *dcbcr[],
-		      int width, int height)
+void chroma_subsample_cp(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[], uint8_t *dcbcr[])
 {
-  /*if( vj_task_available() ) { //@ FIXME: 
-	vj_task_set_wid( width );
-	vj_task_set_hei( height );
-	vj_task_set_int( mode );
-	vj_task_alloc_internal_buf( width * 2);	
-	vj_task_run( ycbcr, dcbcr, NULL, NULL,3, (performer_job_routine) &chroma_subsample_cp_task );
-	return;
-  }*/
-
-  switch (mode) {
-	  case SSM_420_JPEG_BOX:
-	  case SSM_420_JPEG_TR:
-	    ss_444_to_420jpeg_cp(ycbcr[1],dcbcr[1], width, height);
-	    ss_444_to_420jpeg_cp(ycbcr[2],dcbcr[2], width, height);
-    	break;
- 	 case SSM_420_MPEG2:
-    	break;
- 	 case SSM_422_444:
-   	    ss_444_to_422_cp(data,ycbcr[1],dcbcr[1],width,height);
-        ss_444_to_422_cp(data,ycbcr[2],dcbcr[2],width,height);
-#ifdef HAVE_ASM_MMX
-	__asm__ __volatile__ ( _EMMS:::"memory");
-#endif
-    break;
-  case SSM_420_422:
-    break;
-  default:
-    break;
-  }
-}
-
-void chroma_subsample(subsample_mode_t mode, void *data, uint8_t *ycbcr[],
-		      int width, int height)
-{
-/*	if( vj_task_available() ) {
-
-		vj_task_set_shift(0,0);
-		vj_task_set_wid( width );
-		vj_task_set_hei( height );
+	if( vj_task_available() ) {
+		void *data = vj_task_alloc_internal_buf( frame->len * 2 + (frame->width*2) );
+		uint8_t *plane = (uint8_t*) data;
+		uint8_t *vplane = plane + frame->len;
+		uint8_t *buffer = vplane + frame->len;
+		uint8_t *planes[3] = { NULL, plane,vplane };
+		uint8_t *temp[3] = { NULL, buffer, NULL };
+		int strides[4] = { 0, frame->len, frame->len, 0 };
+		vj_frame_copy( ycbcr, planes,strides );
+		vj_task_set_from_frame( frame );
 		vj_task_set_int( mode );
-		vj_task_alloc_internal_buf( width * 2); //@ FIXME, redundant malloc of *data (unused in multithreaded context)	
-
-		vj_task_run( ycbcr, ycbcr, NULL, NULL, 3,  (performer_job_routine ) &chroma_subsample_task );
+		vj_task_set_sampling( 1 );
 	
+		vj_task_run( ycbcr, planes, temp, NULL, 3,  (performer_job_routine ) &chroma_subsample_task );
+
+		vj_task_free_internal_buf();
+		vj_task_set_sampling(0);
 		return;
   	}
-*/
-  switch (mode) {
-  case SSM_420_JPEG_BOX:
-  case SSM_420_JPEG_TR: 
-    ss_444_to_420jpeg(ycbcr[1], width, height);
-    ss_444_to_420jpeg(ycbcr[2], width, height);
+	
+	uint8_t *data = (uint8_t*) vj_malloc(sizeof(uint8_t) * frame->width * 2 );
+
+	switch (mode) {
+		case SSM_420_JPEG_BOX:
+		case SSM_420_JPEG_TR:
+			ss_444_to_420jpeg_cp(ycbcr[1],dcbcr[1], frame->width, frame->height);
+			ss_444_to_420jpeg_cp(ycbcr[2],dcbcr[2], frame->width, frame->height);
+			break;
+		case SSM_420_MPEG2:
+ 			break;
+		case SSM_422_444:
+//  			ss_444_to_422_cp(data,ycbcr[1],dcbcr[1],frame->width,frame->height);
+//			ss_444_to_422_cp(data,ycbcr[2],dcbcr[2],frame->width,frame->height);
 #ifdef HAVE_ASM_MMX
-	__asm__ __volatile__ ( _EMMS:::"memory");
+			__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
-    break;
-  case SSM_420_MPEG2:
-    ss_444_to_420mpeg2(ycbcr[1], width, height);
-    ss_444_to_420mpeg2(ycbcr[2], width, height);
-    break;
-  case SSM_422_444:
-    ss_444_to_422(data,ycbcr[1],width,height);
-    ss_444_to_422(data,ycbcr[2],width,height);
+		    break;
+  		default:
+   		break;
+  	}
+
+	free(data);
+}
+
+void chroma_subsample(subsample_mode_t mode, VJFrame *frame, uint8_t *ycbcr[] )
+{
+	if( vj_task_available() ) {
+		void *data = vj_task_alloc_internal_buf( frame->len * 2 + (frame->width*2) );
+		uint8_t *plane = (uint8_t*) data;
+		uint8_t *vplane = plane + frame->len;
+		uint8_t *buffer = vplane + frame->len;
+		uint8_t *planes[3] = { NULL, plane,vplane };
+		uint8_t *temp[3] = { NULL, buffer, NULL };
+		int strides[4] = { 0, frame->len, frame->len, 0 };
+		vj_frame_copy( ycbcr, planes,strides );
+		vj_task_set_from_frame( frame );
+		vj_task_set_int( mode );
+		vj_task_set_sampling( 1 );
+	
+		vj_task_run( ycbcr, planes, temp, NULL, 3,  (performer_job_routine ) &chroma_subsample_task );
+
+		vj_task_free_internal_buf();
+		vj_task_set_sampling(0);
+		return;
+  	}
+
+	uint8_t *data = (uint8_t*) vj_malloc( sizeof(uint8_t) * frame->width * 2 );
+
+	switch (mode) {
+		case SSM_420_JPEG_BOX:
+		case SSM_420_JPEG_TR: 
+			ss_444_to_420jpeg(ycbcr[1], frame->width, frame->height);
+ 			ss_444_to_420jpeg(ycbcr[2], frame->width, frame->height);
 #ifdef HAVE_ASM_MMX
-	__asm__ __volatile__ ( _EMMS:::"memory");
+			__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
-    break;
-  case SSM_420_422:
-    ss_422_to_420(ycbcr[1],width,height);
-    ss_422_to_420(ycbcr[2],width,height);
-    break;
-  default:
-    break;
-  }
+			break;
+		case SSM_420_MPEG2:
+			ss_444_to_420mpeg2(ycbcr[1], frame->width, frame->height);
+			ss_444_to_420mpeg2(ycbcr[2], frame->width, frame->height);
+			break;
+		case SSM_422_444:
+		    ss_444_to_422(data,ycbcr[1],frame->width,frame->height);
+		    ss_444_to_422(data,ycbcr[2],frame->width,frame->height);
+#ifdef HAVE_ASM_MMX
+			__asm__ __volatile__ ( _EMMS:::"memory");
+#endif
+    		break;
+		case SSM_420_422:
+			ss_422_to_420(ycbcr[1],frame->width,frame->height);
+			ss_422_to_420(ycbcr[2],frame->width,frame->height);
+			break;
+		default:
+		break;
+  	}
+	free(data);
 }
 
 
-void chroma_supersample(subsample_mode_t mode,void *data, uint8_t *ycbcr[],
-			int width, int height)
+void chroma_supersample(subsample_mode_t mode,VJFrame *frame, uint8_t *ycbcr[] )
 {	
-  /*if( vj_task_available() ) {
-		switch( mode ) {
-				case SSM_420_JPEG_BOX:
-				case SSM_420_JPEG_TR:
-					vj_task_set_shift(1,1);
-				break;
-				case SSM_422_444:
-					vj_task_set_shift(0,1);
-					break;
-				default:
-				   	    vj_task_set_shift(0,0 );
-				break;
-		}
-		vj_task_set_wid( width );
-		vj_task_set_hei( height );
-		vj_task_set_int( mode );
-		vj_task_alloc_internal_buf( width * 2 );	
+  if( vj_task_available() ) {
+	void *data = vj_task_alloc_internal_buf( frame->uv_len * 2 );
 
-		vj_task_run( ycbcr, ycbcr, NULL, NULL,3, (performer_job_routine) &chroma_supersample_task );
+	uint8_t *plane = (uint8_t*) data;
+	uint8_t *vplane = plane + frame->uv_len;
+	uint8_t *planes[3] = { NULL, plane,vplane };
+	int strides[4] = { 0, frame->uv_len, frame->uv_len, 0 };
+	vj_task_set_sampling( 0 );
+	vj_frame_copy( ycbcr, planes,strides);
+	vj_task_set_from_frame( frame );
+	vj_task_set_int( mode );
+	vj_task_set_sampling( 1 );
 	
-		return;
-  }*/
+	vj_task_run( frame->data,planes, NULL, NULL,3, (performer_job_routine) &chroma_supersample_task );
+
+	vj_task_free_internal_buf();
+	vj_task_set_sampling(0);
+	return;
+  }
+	
+  uint8_t *data = (uint8_t*) vj_malloc( sizeof(uint8_t) * frame->width * 2 );
 
   switch (mode) {
-	  case SSM_420_JPEG_BOX:
-      	ss_420jpeg_to_444(ycbcr[1], width, height);
-    	ss_420jpeg_to_444(ycbcr[2], width, height);
+		case SSM_420_JPEG_BOX:
+	      	ss_420jpeg_to_444(ycbcr[1], frame->width, frame->height);
+	    	ss_420jpeg_to_444(ycbcr[2], frame->width, frame->height);
 #ifdef HAVE_ASM_MMX
-	__asm__ __volatile__ ( _EMMS:::"memory");
+			__asm__ __volatile__ ( _EMMS:::"memory");
+#endif
+		break;
+		case SSM_420_JPEG_TR:
+			tr_420jpeg_to_444(data,ycbcr[1], frame->width, frame->height);
+			tr_420jpeg_to_444(data,ycbcr[2], frame->width, frame->height);
+		break;
+		case SSM_422_444:
+ 			tr_422_to_444(data,ycbcr[1],frame->width,frame->height);
+ 			tr_422_to_444(data,ycbcr[2],frame->width,frame->height);
+#ifdef HAVE_ASM_MMX
+			__asm__ __volatile__ ( _EMMS:::"memory");
 #endif
     break;
-	  case SSM_420_JPEG_TR:
-   		tr_420jpeg_to_444(data,ycbcr[1], width, height);
-    	tr_420jpeg_to_444(data,ycbcr[2], width, height);
-    	break;
- 	 case SSM_422_444:
-    	tr_422_to_444(data,ycbcr[1],width,height);
-   	 	tr_422_to_444(data,ycbcr[2],width,height);
-#ifdef HAVE_ASM_MMX
-		__asm__ __volatile__ ( _EMMS:::"memory");
-#endif
-    break;
-  	case SSM_420_422:
-    	ss_420_to_422( ycbcr[1], width, height );
-    	ss_420_to_422( ycbcr[2], width, height );
-    	break;
-  	case SSM_420_MPEG2:
-   	 	//    ss_420mpeg2_to_444(ycbcr[1], width, height);
-   		//    ss_420mpeg2_to_444(ycbcr[2], width, height);
+ 		case SSM_420_422:
+    		ss_420_to_422( ycbcr[1], frame->width, frame->height );
+    		ss_420_to_422( ycbcr[2], frame->width, frame->height );
     	break;
   	default:
    		break;
   }
+
+  free( data );
 
 }
 

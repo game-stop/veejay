@@ -37,7 +37,8 @@ vj_effect *chromium_init(int w, int h)
     ve->limits[1][0] = 3;
     ve->defaults[0] = 0;
     ve->description = "Chromium";
-    ve->sub_format = 0;
+   	ve->parallel = 1;
+	ve->sub_format = 0;
     ve->extra_frame = 0;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list( ve->num_params, "Mode" );

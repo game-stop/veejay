@@ -492,7 +492,7 @@ extern void color_apply(VJFrame *frame, int w, int h, int a,int b, int c);
 //extern void water_apply(VJFrame *frame, int w, int h, int val, int l, int d);
 extern void	water_apply(void *user_data, VJFrame *frame, VJFrame *frame2, int width, int height, int fresh,int loopnum, int decay, int mode, int threshold);
 
-extern void pencilsketch_apply(VJFrame *frame, int w, int h, int type, int threshold, int opacity);
+extern void pencilsketch_apply(VJFrame *frame, int w, int h, int type, int threshold, int opacity, int mode);
 
 extern void pixelate_apply(VJFrame *frame, int w, int h, int v );
 

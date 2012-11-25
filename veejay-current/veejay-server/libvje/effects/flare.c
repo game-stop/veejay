@@ -269,11 +269,8 @@ void flare_apply(VJFrame *A,
 	B.data[0] = flare_buf[0];
 	B.data[1] = flare_buf[1];
 	B.data[2] = flare_buf[2];
-
-	/* copy image data */
-	veejay_memcpy( B.data[0], A->data[0], A->len );
-	veejay_memcpy( B.data[1], A->data[1], A->len );
-	veejay_memcpy( B.data[2], A->data[2], A->len );
+	int strides[4] = { A->len, A->len, A->len, 0 };
+	vj_frame_copy( A->data, B.data,strides );
 
 	/* apply blur on Image, horizontal and vertical
 	   (blur2 is from xine, see radial blur */

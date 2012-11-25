@@ -22,6 +22,7 @@
 #include <stdio.h>
 #include <libvjmem/vjmem.h>
 #include "lumablend.h"
+#include <veejay/vj-task.h>
 
 vj_effect *lumablend_init(int w, int h)
 {
@@ -32,6 +33,8 @@ vj_effect *lumablend_init(int w, int h)
     ve->limits[1] = (int *) vj_calloc(sizeof(int) * ve->num_params);	/* max */
     ve->limits[0][0] = 0;	/* type */
     ve->limits[1][0] = 2;
+    if(vj_task_available() )
+      ve->limits[1][0] = 1; /* no blur */
     ve->limits[0][1] = 0;	/* threshold 1 */
     ve->limits[1][1] = 255;
     ve->limits[0][2] = 0;	/* threshold 2 */
@@ -44,7 +47,9 @@ vj_effect *lumablend_init(int w, int h)
     ve->defaults[3] = 150;
     ve->description = "Opacity by Threshold";
     ve->extra_frame = 1;
+    ve->parallel = 0;
     ve->sub_format = 1;
+    ve->parallel = 1;
 	ve->has_user = 0;
 	ve->param_description = vje_build_param_list(ve->num_params, "Mode", "Threshold A", "Threshold B", "Opacity" );
 
@@ -119,8 +124,23 @@ void opacity_by_threshold_blur(uint8_t * yuv1[3], uint8_t * yuv2[3],
     unsigned int op0, op1;
     op1 = (opacity > 255) ? 255 : opacity;
     op0 = 255 - op1;
-   /* incomplete */
+	for( y = 0; y < width; y+= width ) {
+	  for( x = 0; x < width; x ++ ) {
+		
+		    yuv1[0][x + y] = (op0 * a1 + op1 * a2) >> 8;
+		    yuv1[1][x + y] =
+			(op0 * yuv1[1][x + y] + op1 * yuv2[1][x + y]) >> 8;
+		    yuv1[2][x + y] =
+			(op0 * yuv1[2][x + y] + op1 * yuv2[2][x + y]) >> 8;
+		}
+	}
     for (y = width; y < len; y += width) {
+		    yuv1[0][y] = (op0 * a1 + op1 * a2) >> 8;
+		    yuv1[1][y] =
+			(op0 * yuv1[1][y] + op1 * yuv2[1][y]) >> 8;
+		    yuv1[2][y] =
+			(op0 * yuv1[2][y] + op1 * yuv2[2][y]) >> 8;
+
 	for (x = 1; x < width-1; x++) {
 	    a1 = yuv1[0][x + y];
 	    a2 = yuv2[0][x + y];
@@ -154,7 +174,23 @@ void opacity_by_threshold_blur(uint8_t * yuv1[3], uint8_t * yuv2[3],
 			(op0 * yuv1[2][x + y] + op1 * yuv2[2][x + y]) >> 8;
 		}
        }
+
+	  yuv1[0][width + y] = (op0 * a1 + op1 * a2) >> 8;
+	  yuv1[1][width + y] =
+			(op0 * yuv1[1][width + y] + op1 * yuv2[1][width + y]) >> 8;
+		    yuv1[2][width + y] =
+			(op0 * yuv1[2][width + y] + op1 * yuv2[2][width + y]) >> 8;
+	
    }
+ 	for( x = 0; x < width; x ++ ) {
+		
+	    yuv1[0][x + y] = (op0 * a1 + op1 * a2) >> 8;
+	    yuv1[1][x + y] =
+		(op0 * yuv1[1][x + y] + op1 * yuv2[1][x + y]) >> 8;
+	    yuv1[2][x + y] =
+		(op0 * yuv1[2][x + y] + op1 * yuv2[2][x + y]) >> 8;
+	}
+
 }
 
 void lumablend_apply(VJFrame *frame, VJFrame *frame2, int width,
