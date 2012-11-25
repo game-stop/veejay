@@ -636,8 +636,6 @@ static void tr_422_to_444(uint8_t *data, uint8_t *buffer, int width, int height)
 	int x,y;
 	const int stride = width >> 1;
 
-	veejay_msg(0,"%s: w=%d,h=%d, buffer=%p, temp=%p",__FUNCTION__, width,height, buffer,data );
-
 #ifndef HAVE_ASM_MMX
 	for( y = height-1; y > 0 ; y -- )
 	{
