@@ -610,6 +610,7 @@ int	vj_task_run(uint8_t **buf1, uint8_t **buf2, uint8_t **buf3, int *strides,int
 			free(f[j]->overlaprow);
 			f[j]->overlaprow = NULL;
 		}
+		f[j]->overlap = 0;
 	}
 
 	return 1;
